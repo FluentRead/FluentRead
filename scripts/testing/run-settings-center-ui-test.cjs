@@ -315,7 +315,8 @@ async function inspectPopupContentHeight(page, label) {
       maxHeight: Number.parseFloat(shellStyle.maxHeight),
       overflowY: shellStyle.overflowY,
       initialScrollTop,
-      longContent: element.scrollHeight > element.clientHeight + 1,
+      // scrollHeight/clientHeight 已取整；即使仅多 1px，也需要验证滚动到底。
+      longContent: element.scrollHeight > element.clientHeight,
       horizontalOverflow: [document.documentElement, document.body, app, element]
         .filter(Boolean).some(node => node.scrollWidth > node.clientWidth + 1),
       end: null,

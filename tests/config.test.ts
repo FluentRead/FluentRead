@@ -3270,7 +3270,7 @@ describe('统一配置存储', () => {
             cursor: current.entries.length,
             nextVersion: current.nextVersion + 1,
         };
-        const historyWatchCallback = storageMock.watch.mock.calls[1][1];
+        const historyWatchCallback = storageMock.watch.mock.calls.find(([key]) => key === 'local:configHistory')![1];
         historyWatchCallback(external);
 
         expect(listener).toHaveBeenCalledWith(expect.objectContaining({
@@ -3319,4 +3319,36 @@ describe('统一配置存储', () => {
         )).rejects.toThrow('没有返回结果');
         expect(storageMock.setItem).not.toHaveBeenCalled();
     });
+});
+
+describe('启动配置按需读取', () => {
+    it('popup 首屏只读取主配置和持久凭据，历史消费者并发订阅只初始化一次', async () => {
+        const store = await loadConfigModule(storedConfig, {writeOwner: false});
+        await store.configReady;
+        expect(storageOperations).toEqual(['get:local:config', 'get:local:credentials']);
+        expect(storageWatchers.has('local:configHistory')).toBe(false);
+        const listener = vi.fn();
+        const unsubscribe = store.subscribeConfigHistory(listener);
+        await Promise.all([store.configHistoryReady, store.configHistoryReady]);
+        expect(storageOperations.filter(value => value === 'get:local:configHistory')).toHaveLength(1);
+        expect(storageWatchers.has('local:configHistory')).toBe(true);
+        unsubscribe();
+    });
+
+    it('普通网页启动和显式等待历史都不请求无权限记录或订阅历史', async () => {
+        const store = await loadConfigModule(storedConfig, {trusted: false, writeOwner: false});
+        await store.configReady;
+        await store.configHistoryReady;
+        expect(storageOperations).toEqual(['get:local:config']);
+        expect(storageWatchers.has('local:configHistory')).toBe(false);
+    });
+});
+
+it('历史尚未打开时首次保存仍保留可撤销的原配置基线', async () => {
+    const store = await loadConfigModule(storedConfig);
+    await store.configReady;
+    await store.saveConfig({...store.config, to: 'ja'}, {recordHistory: true, immediateHistory: true});
+    expect(store.getConfigHistorySnapshot().entries.map(entry => entry.config.to)).toEqual(['zh-Hans', 'ja']);
+    await store.applyConfigHistoryAction('undo');
+    expect(store.config.to).toBe('zh-Hans');
 });

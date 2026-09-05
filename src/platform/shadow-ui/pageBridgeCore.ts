@@ -97,22 +97,25 @@ export function installShadowRouteBridgeCore(environment: ShadowRouteBridgeEnvir
     };
     const attachShadowWrapper: AttachShadowPort = function attachShadow(init) {
         const root = Reflect.apply(originalAttachShadow, this, [init]);
-        if (init.mode === 'open') {
-            this.dispatchEvent(environment.createEvent(SHADOW_ROOT_EVENT, {
-                bubbles: true,
-                composed: true,
-            }));
-        }
+        // 原生调用只读取一次 Web IDL 参数；通知失败不能把成功创建的 root 变成异常。
+        try {
+            if ((root as {mode?: string})?.mode === 'open') {
+                this.dispatchEvent(environment.createEvent(SHADOW_ROOT_EVENT, {
+                    bubbles: true,
+                    composed: true,
+                }));
+            }
+        } catch { /* 页面可改写事件 API；保持原生调用的返回值。 */ }
         return root;
     };
     const pushStateWrapper: HistoryMutationPort = function pushState(data, unused, url) {
         const result = Reflect.apply(originalPushState, this, [data, unused, url]);
-        dispatchRouteChange();
+        try { dispatchRouteChange(); } catch { /* 桥通知失败不能改变宿主导航结果。 */ }
         return result;
     };
     const replaceStateWrapper: HistoryMutationPort = function replaceState(data, unused, url) {
         const result = Reflect.apply(originalReplaceState, this, [data, unused, url]);
-        dispatchRouteChange();
+        try { dispatchRouteChange(); } catch { /* 桥通知失败不能改变宿主导航结果。 */ }
         return result;
     };
     const dispose = () => {

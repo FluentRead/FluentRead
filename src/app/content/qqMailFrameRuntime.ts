@@ -4,6 +4,7 @@
  * 主要内容：绑定受限后台桥、无凭据会话快照、公共样式与键盘生命周期，按配置和页面离开释放子页面翻译。
  * 模块边界：只在经过后台认证的旧版 QQ 邮件 frame 激活，不挂载悬浮球等顶层 UI；候选算法、请求和异步状态仲裁分别由共享 feature 承担。
  */
+import {installContentPageLifecycle} from './pageLifecycle';
 import type {ContentScriptContext} from 'wxt/utils/content-script-context';
 import {config, configReady, subscribeConfig} from '@/src/services/config/store';
 import {constants} from '@/src/core/config/constants';
@@ -60,6 +61,7 @@ export function installQqMailTopFrameBridge(isEnabled: () => boolean, signal: Ab
 export async function startQqMailFrameApp(ctx: ContentScriptContext): Promise<void> {
     if (window.top === window || !isQqMailReadmailUrl(window.location.href)) return;
     let disposed = false;
+    let pageSuspended = false;
     ctx.onInvalidated(() => { disposed = true; });
     await configReady;
     if (disposed) return;
@@ -67,7 +69,7 @@ export async function startQqMailFrameApp(ctx: ContentScriptContext): Promise<vo
     let activation: AbortController | null = null;
     let removeStyles: (() => void) | null = null;
     let authorized = false;
-    const enabled = () => !disposed && config.on !== false
+    const enabled = () => !disposed && !pageSuspended && config.on !== false
         && !isExtensionDisabledOnSite(window.location.href, config.disabledExtensionDomains);
     const toggle = (invocation?: PageTranslationInvocation) => {
         if (!enabled() || !authorized) return;
@@ -138,6 +140,10 @@ export async function startQqMailFrameApp(ctx: ContentScriptContext): Promise<vo
         browser.runtime.onMessage.removeListener(listener);
     };
     ctx.onInvalidated(cleanup);
-    window.addEventListener('beforeunload', cleanup, {once: true, signal: lifetime.signal});
+    installContentPageLifecycle(window, lifetime.signal, {
+        suspend: () => { pageSuspended = true; controller.suspend(); },
+        resume: () => { pageSuspended = false; void controller.refresh(); },
+        dispose: cleanup,
+    });
     await controller.refresh();
 }

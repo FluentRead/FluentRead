@@ -2,7 +2,7 @@
  * @file src/services/config/store.ts
  *
  * 文件职责：协调 FluentRead 配置、凭据与历史记录在后台加密配置仓库中的读取、订阅、保存和并发持久化。
- * 主要内容：维护 config 响应式状态和监听器，区分公开配置与加密持久凭据，串行发送整份替换或字段级 patch，在页面关闭前把尚未确认的补丁链交给后台，并处理乐观更新回滚、revision 冲突、旧会话凭据迁移、历史 debounce 及 undo/redo 请求。
+ * 主要内容：维护 config 响应式状态和监听器，区分公开配置与加密持久凭据，串行发送整份替换或字段级 patch，在页面关闭前把尚未确认的补丁链交给后台，并处理乐观更新回滚、revision 冲突、旧会话凭据迁移、历史按需初始化、debounce 及 undo/redo 请求。
  * 模块边界：本文件位于配置 application service 层，可协调 core 规则与浏览器存储端口；不包含设置页面组件，也不实现具体翻译供应商协议，调用方应通过公开服务 API 订阅或提交配置。
  */
 
@@ -234,6 +234,12 @@ async function queueHistoryWrite(nextHistory: ConfigHistoryState): Promise<void>
 async function initializeConfigHistory(): Promise<void> {
     try {
         await configReady;
+        if (!trustedCredentialStorageContext) {
+            historyInitialized = true;
+            setHistoryState(createBaselineConfigHistory(config, persistedConfigRevision), false);
+            return;
+        }
+        storage.watch(CONFIG_HISTORY_STORAGE_KEY, handleStoredHistoryChange);
         const storedHistory = await storage.getItem<unknown>(CONFIG_HISTORY_STORAGE_KEY);
         const parsed = parseConfigHistory(storedHistory);
         historyInitialized = true;
@@ -241,7 +247,7 @@ async function initializeConfigHistory(): Promise<void> {
             setHistoryState(parsed);
             // 旧历史可能仍含统计、安全开关或内部迁移字段；读取时立即迁移为
             // 可恢复投影，避免这些字段继续占用存储或在其他上下文中泄漏出来。
-            if (serializeConfig(storedHistory) !== serializeConfig(parsed)) {
+            if (configStorageWriteOwner && serializeConfig(storedHistory) !== serializeConfig(parsed)) {
                 try {
                     await storage.setItem<ConfigHistoryState>(CONFIG_HISTORY_STORAGE_KEY, parsed);
                 } catch (error) {
@@ -528,7 +534,6 @@ function handleStoredConfigChange(value: unknown, options: StoredConfigChangeOpt
 
 // 在首次读取前注册监听，避免设置页打开期间丢失其他上下文的更新。
 storage.watch(CONFIG_STORAGE_KEY, (value) => handleStoredConfigChange(value));
-storage.watch(CONFIG_HISTORY_STORAGE_KEY, handleStoredHistoryChange);
 
 function registerCredentialWatch(): void {
     if (!trustedCredentialStorageContext || credentialWatchRegistered) return;
@@ -599,7 +604,9 @@ async function initializeConfig(): Promise<void> {
             : null;
         const localCredentialsValue = await storage.getItem<unknown>(LOCAL_CREDENTIALS_STORAGE_KEY);
         const localCredentials = parseStoredCredentials(localCredentialsValue);
-        const rawHistory = await storage.getItem<unknown>(CONFIG_HISTORY_STORAGE_KEY);
+        // 历史清理是后台迁移职责，远程 UI 不为首屏读取整个历史。
+        const rawHistory = configStorageWriteOwner
+            ? await storage.getItem<unknown>(CONFIG_HISTORY_STORAGE_KEY) : null;
         const sanitizedRawHistory = sanitizeConfigHistoryCredentials(rawHistory);
         const historyNeedsSanitizing = rawHistory !== null
             && rawHistory !== undefined
@@ -608,9 +615,12 @@ async function initializeConfig(): Promise<void> {
         let sessionCredentials: ConfigCredentials | null = null;
         let sessionReadError: unknown;
         try {
-            sessionCredentials = parseStoredCredentials(
-                await storage.getItem<unknown>(SESSION_CREDENTIALS_STORAGE_KEY),
-            );
+            // 后台完成迁移后，远程页面只需唯一持久凭据；旧策略仍在时保留安全兜底。
+            if (configStorageWriteOwner || (parsed && Object.prototype.hasOwnProperty.call(parsed, 'persistCredentials'))) {
+                sessionCredentials = parseStoredCredentials(
+                    await storage.getItem<unknown>(SESSION_CREDENTIALS_STORAGE_KEY),
+                );
+            }
         } catch (error) {
             sessionReadError = error;
         }
@@ -712,7 +722,14 @@ async function initializeConfig(): Promise<void> {
 }
 
 export const configReady = initializeConfig();
-export const configHistoryReady = initializeConfigHistory();
+let historyReadyPromise: Promise<void> | undefined;
+function ensureConfigHistoryReady(): Promise<void> {
+    return historyReadyPromise ??= initializeConfigHistory();
+}
+// 保留 await/then 公共契约，但只有历史消费者才触发 I/O；popup/content 导入无副作用。
+export const configHistoryReady: PromiseLike<void> = {
+    then: (fulfilled, rejected) => ensureConfigHistoryReady().then(fulfilled, rejected),
+};
 
 /**
  * 返回可写入用户完整备份的权威配置快照。调用会等待公开配置和专用凭据完成同一轮
@@ -1035,6 +1052,7 @@ export function getConfigHistorySnapshot(): ConfigHistoryState {
 }
 
 export function subscribeConfigHistory(listener: ConfigHistoryListener): () => void {
+    void ensureConfigHistoryReady();
     historyListeners.add(listener);
     if (historyInitialized && historyState) listener(cloneConfigHistory(historyState));
     return () => historyListeners.delete(listener);
@@ -1051,6 +1069,8 @@ export interface SaveConfigOptions {
 
 export async function saveConfig(value: unknown = config, options: SaveConfigOptions = {}): Promise<void> {
     await configReady;
+    // 首次保存前捕获原配置基线，不能让按需历史把修改后的配置当成初始版本。
+    if (options.recordHistory) await configHistoryReady;
 
     // 普通设置、导入与恢复都无权回滚统计；计数只能经专用增量协议修改。
     const normalized = normalizeConfig({...normalizeConfig(value), count: config.count});

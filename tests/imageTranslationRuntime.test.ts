@@ -224,6 +224,19 @@ describe('图片翻译前台交互与生命周期', () => {
         env.scroll(); env.runFrames(); expect(background.style.opacity).not.toBe('0');
     });
 
+    it('空闲不观察整页，首个覆盖层启用观察，移除后断开且下次悬停可重新启用', () => {
+        const env = setup();
+        expect(env.observers).toHaveLength(0);
+        env.hover();
+        expect(env.observers).toHaveLength(1);
+        env.image.remove();
+        env.notify('', 'childList');
+        expect(env.observers[0].disconnect).toHaveBeenCalledOnce();
+        env.parent.appendChild(env.image);
+        env.hover();
+        expect(env.observers).toHaveLength(2);
+    });
+
     it('合成与触屏悬浮不创建入口，合成点击不能触发识别；小图不分配状态', async () => {
         const env = setup();
         env.dispatch(env.image, 'pointerover', false);

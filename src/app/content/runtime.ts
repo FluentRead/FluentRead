@@ -1,7 +1,7 @@
 /**
  * @file src/app/content/runtime.ts
  * 文件职责：作为内容脚本应用的顶层 composition root，协调配置就绪、站点规则、公共样式、主世界桥、功能注册表、快捷键和消息监听生命周期。
- * 主要内容：安装内联 page.css，构建输入框与页面 feature registry，按 capability 和配置挂载全文周边、悬浮、划词、区域、图片、视频与写作助手等能力；订阅配置变化并处理停用、恢复与销毁。
+ * 主要内容：安装内联 page.css，构建输入框与页面 feature registry，按 capability 和配置挂载全文周边、悬浮、划词、区域、图片、视频与写作助手等能力；订阅配置变化并处理停用、往返缓存暂停恢复与销毁。
  * 模块边界：本文件只负责依赖装配和页面激活所有权，不实现具体翻译算法、组件内部状态、provider 请求或配置存储；这些职责分别属于 features、services 与 platform。
  */
 import {isWritingPage} from '@/src/core/config/writing';
@@ -51,12 +51,14 @@ import {
     shouldAutomaticallyTranslatePage,
     type ContentPageAvailabilityRuntime,
 } from './pageAvailability';
+import {installContentPageLifecycle} from './pageLifecycle';
 import {syncBilingualSentenceHighlight} from './bilingualSentenceHighlight';
 import {createContentSiteAdaptationRuntime} from './siteAdaptationRuntime';
 
 export async function startContentApp(ctx: ContentScriptContext,
     capabilities: BrowserCapabilities = browserCapabilities): Promise<void> {
     await configReady;
+    if (ctx.isInvalid) return;
     const siteAdaptation = createContentSiteAdaptationRuntime(config.siteAdaptation, new URL(window.location.href));
     clearLegacyPageTranslationCache();
     let currentPageSiteDisabled = isExtensionDisabledOnSite(
@@ -65,7 +67,7 @@ export async function startContentApp(ctx: ContentScriptContext,
     );
     let unsubscribeContentConfig: (() => void) | null = null;
     let runtimeMessageListener: ContentRuntimeMessageHandler | null = null;
-    let cleanedUp = false;
+    let cleanedUp = false, pageSuspended = false;
     let featureController: AbortController | null = null;
     let activePageFeatureRegistry: ContentFeatureRegistry | null = null;
     let removePageStyles: (() => void) | null = null;
@@ -89,7 +91,7 @@ export async function startContentApp(ctx: ContentScriptContext,
             isDisabled: currentPageSiteDisabled,
         }).catch(() => undefined);
     };
-    const isPageRuntimeEnabled = (): boolean => !cleanedUp && !currentPageSiteDisabled && config.on !== false;
+    const isPageRuntimeEnabled = (): boolean => !cleanedUp && !pageSuspended && !currentPageSiteDisabled && config.on !== false;
     const qqMailFullPageToggle = capabilities.browser !== 'userscript'
         ? installQqMailTopFrameBridge(isPageRuntimeEnabled, pageEventController.signal) : undefined;
     let pageAvailability: ContentPageAvailabilityRuntime | null = null;
@@ -111,9 +113,7 @@ export async function startContentApp(ctx: ContentScriptContext,
         syncBilingualSentenceHighlight(document, config.bilingualSentenceHighlightEnabled === true);
         const activationController = new AbortController();
         featureController = activationController;
-        const isActivationCurrent = () => !cleanedUp
-            && !currentPageSiteDisabled
-            && featureController === activationController
+        const isActivationCurrent = () => isPageRuntimeEnabled() && featureController === activationController
             && !activationController.signal.aborted;
 
         inputTranslationFeature.mount(activationController.signal);
@@ -231,8 +231,11 @@ export async function startContentApp(ctx: ContentScriptContext,
         unsubscribeContentConfig = null;
     };
     ctx.onInvalidated(cleanup);
-    window.addEventListener('beforeunload', cleanup, {once: true, signal: pageEventController.signal});
-
+    installContentPageLifecycle(window, pageEventController.signal, {
+        suspend: () => { pageSuspended = true; void pageAvailability!.reconcile(); },
+        resume: () => { pageSuspended = false; void pageAvailability!.reconcile(); },
+        dispose: cleanup,
+    });
     runtimeMessageListener = createContentRuntimeMessageHandler(ctx, {
         isSiteDisabled: () => currentPageSiteDisabled, updateSiteDisabled: applySiteDisabledState,
     }, capabilities);

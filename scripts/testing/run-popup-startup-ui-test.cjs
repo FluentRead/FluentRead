@@ -55,7 +55,7 @@ const {
 const CONFIG_REVISION_FIELD = '__fluentConfigRevision';
 const TEST_CLIENT_ID = `popup-startup-${process.pid}-${Date.now()}`;
 const MODULE_ORDER = ['quickFeatures', 'translation', 'siteRule', 'footer'];
-const QUICK_FEATURE_ORDER = ['document', 'hover', 'selection', 'appearance', 'video', 'image'];
+const QUICK_FEATURE_ORDER = ['document', 'hover', 'selection', 'appearance', 'video', 'image', 'area'];
 
 function delay(milliseconds) {
   return new Promise(resolve => setTimeout(resolve, milliseconds));
@@ -107,6 +107,7 @@ function startupProbeScript() {
       configReadReleased: 0,
       configReadDelayMs: 0,
       configReadFailures: 0,
+      storageReadKeys: [],
       persistConfigRequests: 0,
       persistConfigModes: [],
       persistConfigResponses: 0,
@@ -165,6 +166,7 @@ function startupProbeScript() {
           state.persistConfigBatchSizes.push(message.patches?.length || 0);
           return original(...args);
         }
+        if (message?.type === 'configStorageRead') state.storageReadKeys.push(message.key);
         if (message?.type !== 'configStorageRead' || message.key !== 'local:config') return original(...args);
         state.configReadRequests += 1;
         const requestedAt = performance.now();
@@ -363,6 +365,11 @@ async function runPopupCase({
   }));
   const startup = await readStartupState(page);
   if (!startup) throw new Error(`${caseName} 没有取得 document_start 首帧状态`);
+  if (!failureMode && !expectFlash) {
+    if (startup.storageReadKeys.some(key => key === 'local:configHistory' || key === 'session:credentials')) {
+      throw new Error(`${caseName} 首屏读取了非必要历史或旧会话凭据：${startup.storageReadKeys}`);
+    }
+  }
   const readSettleDeadline = Date.now() + Math.max(1000, delayMs + 3000);
   while (Date.now() < readSettleDeadline) {
     if (startup.configReadRequests > 0 && startup.configReadReleased >= startup.configReadRequests) break;
@@ -464,6 +471,7 @@ async function runPopupCase({
       failureCount: startup.configReadFailures,
     },
     firstCorrectFrame,
+    storageReadKeys: startup.storageReadKeys,
     mountCount: startup.mountCount,
     renderMutations: startup.renderMutations,
     firstVisibleShell: firstFrame,
@@ -477,6 +485,7 @@ async function runPopupCase({
     firstFrame,
     finalFrame,
     firstCorrectFrame,
+    storageReadKeys: startup.storageReadKeys,
     mountCount: startup.mountCount,
     renderMutations: startup.renderMutations,
     flashObserved,
@@ -587,6 +596,44 @@ async function runPersistenceRegression({context, extensionOrigin, popupPath, pa
   report.persistence.quickClose = persistence;
 }
 
+/** 在真实 content 上验证取消导航、缓存暂停恢复和原生 Shadow API，而非只测试 helper。 */
+async function runContentLifecycleRegression(context) {
+  const server = require('node:http').createServer((_request, response) => {
+    response.writeHead(200, {'Content-Type': 'text/html; charset=utf-8'});
+    response.end('<!doctype html><html><body><h1>Page lifecycle fixture</h1><p>Keep this page and its extension active.</p></body></html>');
+  });
+  await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
+  let page;
+  try {
+    page = await newPageWithoutForeground(context);
+    await page.goto(`http://127.0.0.1:${server.address().port}/`, {waitUntil: 'domcontentloaded'});
+    const floating = page.locator('#fluent-read-floating-ball-container');
+    await floating.waitFor({state: 'attached', timeout});
+    await page.evaluate(() => window.dispatchEvent(new Event('beforeunload')));
+    if (await floating.count() !== 1) throw new Error('取消导航时扩展被卸载');
+    const shadow = await page.evaluate(() => {
+      const host = document.createElement('div');
+      document.body.append(host);
+      let reads = 0;
+      const root = host.attachShadow({get mode() {
+        if (++reads > 1) throw new Error('mode getter read twice');
+        return 'open';
+      }});
+      return {reads, attached: host.shadowRoot === root};
+    });
+    if (shadow.reads !== 1 || !shadow.attached) throw new Error('Shadow bridge 改变了宿主 API 语义');
+    await page.evaluate(() => window.dispatchEvent(new PageTransitionEvent('pagehide', {persisted: true})));
+    await floating.waitFor({state: 'detached', timeout});
+    await page.evaluate(() => window.dispatchEvent(new PageTransitionEvent('pageshow', {persisted: true})));
+    await floating.waitFor({state: 'attached', timeout});
+    if (await floating.count() !== 1) throw new Error('往返恢复重复挂载');
+    return {cancelledNavigation: true, simulatedPersistedTransition: true, shadow, screenshot: await screenshot(page, 'content-lifecycle-restored.png')};
+  } finally {
+    await page?.close().catch(() => undefined);
+    await new Promise(resolve => server.close(resolve));
+  }
+}
+
 async function main() {
   const manifest = JSON.parse(fs.readFileSync(path.join(extensionDir, 'manifest.json'), 'utf8'));
   const manifestEntrypoints = assertManifest(manifest);
@@ -636,14 +683,25 @@ async function main() {
     const extensionOrigin = `chrome-extension://${new URL(worker.url()).host}`;
     pageForConfig = await newPageWithoutForeground(context, timeout);
     attachDiagnostics(pageForConfig, report.consoleErrors);
-    await pageForConfig.goto(`${extensionOrigin}/options.html#settings-interface`, {
+    await installStartupProbe(pageForConfig, {delayMs: 0});
+    await pageForConfig.setViewportSize({width: 400, height: 600});
+    await pageForConfig.goto(`${extensionOrigin}/${manifestEntrypoints.popup}`, {
       waitUntil: 'domcontentloaded',
       timeout,
     });
+    await pageForConfig.locator('.popup-shell[data-config-ready="true"]').waitFor({state: 'visible', timeout});
+    await pageForConfig.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))));
+    const freshProfileStartup = await readStartupState(pageForConfig);
+    report.firstPopupOnFreshProfile = {
+      firstFrame: freshProfileStartup.firstVisibleShell,
+      storageReadKeys: freshProfileStartup.storageReadKeys,
+      screenshot: await screenshot(pageForConfig, 'popup-first-install.png'),
+    };
     originalConfig = await readConfig(pageForConfig, timeout);
     report.persistence.original = summarizeConfig(originalConfig);
     const targetConfig = {
       on: true,
+      disableFloatingBall: false,
       uiLanguageSetupCompleted: true,
       theme: 'dark',
       interfaceSkin: requestedSkin,
@@ -706,10 +764,12 @@ async function main() {
         report,
       });
     }
+    report.contentLifecycle = await runContentLifecycleRegression(context);
     report.screenshots = report.startupCases.map(item => item.screenshot);
     // 读回并恢复测试前的公开 UI 配置，避免留下测试状态；凭据始终不参与日志或 patch。
     const restorePatch = {
       on: originalConfig.on,
+      disableFloatingBall: originalConfig.disableFloatingBall,
       uiLanguageSetupCompleted: originalConfig.uiLanguageSetupCompleted,
       theme: originalConfig.theme,
       interfaceSkin: originalConfig.interfaceSkin,

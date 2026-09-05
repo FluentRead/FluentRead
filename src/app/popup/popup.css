@@ -1,7 +1,7 @@
 /**
  * @file src/app/popup/popup.css
  * 文件职责：定义宽度随皮肤、高度随内容自适应的浏览器 Popup 视觉系统与交互状态，包括亮暗主题、服务选择、功能卡、设置抽屉、通知和响应式细节。
- * 主要内容：声明服务菜单、AI 精翻偏好及状态说明、站点控制、两列三行默认快捷入口与抽屉等视觉样式；在 600px 内滚动较长内容并允许站点操作换行，兼容皮肤、多语言和 Element Plus 内部结构。
+ * 主要内容：声明服务菜单、AI 精翻偏好及状态说明、站点控制、两列三行默认快捷入口与抽屉等视觉样式；收紧默认纵向间距，在 560px 内滚动较长内容并允许站点操作换行，兼容皮肤、多语言和 Element Plus 内部结构。
  * 模块边界：样式只对应 PopupApp 的 DOM 和受控第三方组件，不决定配置值、能力可用性或消息行为；跨页面 token 在 src/ui/styles，Options/文档页各自维护页面样式。
  */
 /* Popup 页面样式跟随 app 页面边界，避免 WXT 入口目录继续承载实现。 */
@@ -43,7 +43,7 @@ button:focus-visible, select:focus-visible { outline: 3px solid rgba(239, 71, 11
 
 .popup-shell {
   position: relative;
-  padding: 12px 16px 3px;
+  padding: 10px 16px 4px;
   background:
     radial-gradient(circle at 92% 0, rgba(239, 71, 118, .12), transparent 30%),
     linear-gradient(180deg, #fff 0, #f7f8fb 165px, #f6f7fb 100%);
@@ -53,7 +53,7 @@ button:focus-visible, select:focus-visible { outline: 3px solid rgba(239, 71, 11
 .popup-startup { display: flex; align-items: center; gap: 8px; padding: 20px; color: #737c8f; font-size: 12px; }
 .popup-startup img { border-radius: 7px; }
 .popup-startup i { width: 12px; height: 12px; margin-left: auto; border: 1.5px solid #d4d8e1; border-top-color: #737c8f; border-radius: 50%; }
-.popup-shell:not(.language-onboarding-shell) { max-height: 600px; overflow-y: auto; scrollbar-width: thin; }
+.popup-shell:not(.language-onboarding-shell) { max-height: 560px; overflow-y: auto; scrollbar-width: thin; }
 .popup-content { position: relative; z-index: 1; }
 .popup-shell.language-onboarding-shell { overflow: hidden; }
 :root.dark .popup-shell {
@@ -67,7 +67,7 @@ button:focus-visible, select:focus-visible { outline: 3px solid rgba(239, 71, 11
 .popup-header { margin-bottom: 8px; }
 .brand { gap: 9px; }
 .header-actions { gap: 6px; }
-.brand img { width: 38px; height: 38px; border-radius: 12px; box-shadow: 0 8px 18px rgba(239, 71, 118, .2); }
+.brand img { width: 32px; height: 32px; border-radius: 12px; box-shadow: 0 8px 18px rgba(239, 71, 118, .2); }
 .brand div { display: flex; flex-direction: column; }
 .brand strong { font-size: 15px; line-height: 1.25; font-weight: 760; }
 .brand small { margin-top: 2px; color: var(--muted); font-size: 10px; }
@@ -96,7 +96,7 @@ button:focus-visible, select:focus-visible { outline: 3px solid rgba(239, 71, 11
 :root.dark .donation-button:hover { border-color: rgba(240, 201, 103, .54); color: #ffe29a; background: rgba(199, 150, 40, .22); }
 
 .hero-card {
-  padding: 13px;
+  padding: 11px 13px;
   border: 1px solid var(--line);
   border-radius: 22px;
   background: var(--surface);
@@ -123,18 +123,18 @@ h2 { margin-bottom: 0; font-size: 15px; line-height: 1.35; letter-spacing: -.01e
 .switch.compact { width: 40px; height: 24px; }
 .switch.compact i { width: 18px; height: 18px; }
 .switch.compact[aria-checked="true"] i { transform: translateX(16px); }
-.language-pair { display: grid; grid-template-columns: 1fr 34px 1fr; align-items: end; gap: 7px; margin-top: 14px; }
-.language-pair label > span, .choice-block > label { display: block; margin: 0 0 7px 3px; color: var(--muted); font-size: 10px; font-weight: 650; }
+.language-pair { display: grid; grid-template-columns: 1fr 34px 1fr; align-items: end; gap: 7px; margin-top: 8px; }
+.language-pair label > span, .choice-block > label { display: block; margin: 0 0 5px 3px; color: var(--muted); font-size: 10px; font-weight: 650; }
 .language-pair select, .select-row select {
-  width: 100%; height: 39px; padding: 0 28px 0 11px; border: 1px solid var(--line); border-radius: 11px;
+  width: 100%; height: 35px; padding: 0 28px 0 11px; border: 1px solid var(--line); border-radius: 11px;
   color: var(--ink); background: var(--surface-soft); font-size: 11px; font-weight: 650; cursor: pointer;
 }
-.arrow { display: grid; place-items: center; height: 39px; color: var(--muted); }
+.arrow { display: grid; place-items: center; height: 35px; color: var(--muted); }
 
-.service-picker { position: relative; margin-top: 10px; }
+.service-picker { position: relative; margin-top: 8px; }
 .service-field {
   position: relative; display: flex; align-items: center; gap: 10px; width: 100%; min-height: 50px;
-  padding: 9px 38px 9px 10px; border: 1px solid var(--line); border-radius: 14px; color: var(--ink);
+  padding: 5px 38px 5px 10px; border: 1px solid var(--line); border-radius: 14px; color: var(--ink);
   background: var(--surface-soft); text-align: left; cursor: pointer; transition: border-color 160ms ease, box-shadow 160ms ease;
 }
 .service-field:hover:not(:disabled), .service-field[aria-expanded="true"] {
@@ -195,9 +195,9 @@ h2 { margin-bottom: 0; font-size: 15px; line-height: 1.35; letter-spacing: -.01e
 .service-more-meta b { color: var(--muted); font-size: 15px; line-height: .7; font-weight: 500; transform: translateY(-1px); transition: transform 160ms ease; }
 .service-more-meta b.open { transform: translateY(1px) rotate(180deg); }
 
-.translate-action { display: flex; align-items: center; gap: 7px; margin-top: 11px; }
+.translate-action { display: flex; align-items: center; gap: 7px; margin-top: 8px; }
 .translate-button {
-  display: flex; flex: 1 1 auto; align-items: center; justify-content: center; gap: 9px; min-width: 0; height: 42px;
+  display: flex; flex: 1 1 auto; align-items: center; justify-content: center; gap: 9px; min-width: 0; min-height: 38px; height: auto; padding: 8px 10px;
   overflow: hidden; border: 0; border-radius: 14px; color: #fff; background: linear-gradient(135deg, #f35482, #e93267);
   box-shadow: 0 10px 22px rgba(233, 50, 103, .24); font-size: 13px; font-weight: 750; cursor: pointer;
   transition: transform 160ms ease, box-shadow 160ms ease, opacity 160ms ease;
@@ -248,7 +248,7 @@ h2 { margin-bottom: 0; font-size: 15px; line-height: 1.35; letter-spacing: -.01e
 .ai-context-explanation dt { margin-bottom: 4px; color: var(--ink); font-size: 12px; font-weight: 700; }
 .ai-context-explanation dd { margin: 0; color: var(--muted); font-size: 11px; line-height: 1.65; overflow-wrap: anywhere; }
 .site-rule-row {
-  display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px; min-height: 34px; margin-top: 9px; padding: 6px 8px 6px 10px;
+  display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 4px; min-height: 34px; margin-top: 8px; padding: 6px 8px 6px 10px;
   border: 1px solid var(--line); border-radius: 11px; background: var(--surface-soft);
 }
 .site-rule-copy { display: flex; min-width: 0; align-items: baseline; gap: 6px; }
@@ -298,9 +298,9 @@ h2 { margin-bottom: 0; font-size: 15px; line-height: 1.35; letter-spacing: -.01e
 footer button {
   padding: 0; border: 0; color: var(--brand-strong); background: none; font-size: 10px; font-weight: 700; cursor: pointer;
 }
-.feature-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 7px; }
+.feature-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; }
 .feature-card {
-  position: relative; display: grid; grid-template-columns: 30px minmax(0, 1fr) 6px; align-items: center; gap: 9px; min-width: 0; min-height: 55px; padding: 10px;
+  position: relative; display: grid; grid-template-columns: 30px minmax(0, 1fr) 6px; align-items: center; gap: 9px; min-width: 0; min-height: 44px; padding: 5px 10px;
   border: 1px solid var(--line); border-radius: 11px; background: var(--surface); text-align: left; cursor: pointer;
   transition: border-color 160ms ease, transform 160ms ease, box-shadow 160ms ease;
 }

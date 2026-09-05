@@ -296,7 +296,7 @@ async function capturePopupOverflowFailure(page, label) {
 
 // 扩展页在固定测试 viewport 中也必须按内容排版；documentElement.scrollHeight 至少等于
 // viewport 高度，不能据此推断 Popup 的自然高度。短内容检查整条高度链及底部留白；
-// 长内容按生产的 600px 内部滚动契约检查末尾可达性，不能把初始位置的底栏越界当作裁切。
+// 长内容按生产的 560px 内部滚动契约检查末尾可达性，不能把初始位置的底栏越界当作裁切。
 async function inspectPopupContentHeight(page, label) {
   const metrics = await page.locator('.popup-shell').evaluate(element => {
     const rect = element.getBoundingClientRect();
@@ -380,8 +380,8 @@ async function inspectPopupContentHeight(page, label) {
   }
   const {scrolling} = metrics;
   if (scrolling.longContent && (
-    metrics.shellHeight > 601
-    || scrolling.maxHeight !== 600
+    metrics.shellHeight > 561
+    || scrolling.maxHeight !== 560
     || !['auto', 'scroll'].includes(scrolling.overflowY)
     || !scrolling.end
     || scrolling.end.scrollTop <= 0
@@ -393,7 +393,7 @@ async function inspectPopupContentHeight(page, label) {
     || Math.abs(scrolling.end.lastModuleBottomGap - metrics.expectedBottomGap) > 1
     || Math.abs(scrolling.restoredScrollTop - scrolling.initialScrollTop) > 1
   )) {
-    throw new Error(`${label}没有满足600px内部滚动、末尾完整可见及位置恢复：${JSON.stringify(metrics)}`);
+    throw new Error(`${label}没有满足560px内部滚动、末尾完整可见及位置恢复：${JSON.stringify(metrics)}`);
   }
   return metrics;
 }
@@ -2028,7 +2028,7 @@ async function main() {
       Object.assign(metrics, await inspectPopupContentHeight(skinPopup, `${skin.label}完整栏目`));
       if (Math.abs(metrics.shellWidth - skin.popupWidth) > 1
         || metrics.popupWidthVariable !== `${skin.popupWidth}px`
-        || metrics.shellHeight > 600
+        || metrics.shellHeight > 560
         || metrics.horizontalOverflow
         || metrics.brand !== skin.brand
         || metrics.surface !== skin.surface

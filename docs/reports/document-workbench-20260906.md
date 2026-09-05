@@ -20,12 +20,14 @@
 ## 验证
 
 - `pnpm test:document`：100 项通过，包括增量提交、部分失败后续译、人工校订保留、无效服务结果以及取消后的迟到返回。
-- `pnpm test:architecture`：843 项通过；测试审计通过。
-- `pnpm test:coverage`：213 个文件、3994 项通过，已纳入业务模块的 statements、branches、functions、lines 均为 100%。
+- `pnpm test:architecture`：同步最新主分支后 844 项通过；测试审计通过。
+- `pnpm test:coverage`：同步最新主分支后 213 个文件、4008 项通过，已纳入业务模块的 statements、branches、functions、lines 均为 100%。
 - `pnpm compile`、Chrome/Firefox 生产构建、清单验证和文档构建通过。
 - 文档生产浏览器回归使用临时 Edge profile 与本机确定性 OpenAI 兼容服务：12 种文件导入、实际翻译请求、UI 校订与原格式导出；95 段长文档分页和搜索；暂停、失败恢复、重新翻译、更换文件、刷新提醒；独立阅读与导出模式；深色与 390/820/1440 宽度布局。
 - 所有浏览器窗口由 focus-safe helper 在第二块显示器可见区域后台启动，不使用日常 profile，不抢前台。真实外部翻译服务质量与 Firefox 实机交互没有在本轮验证。
 
-最终机器报告及截图位于 `/private/tmp/fluentread-document-workbench-final/`，报告为 `report.json`。套件：`scripts/run-document-translation-test.cjs`。报告包含实际 launch mode、focus policy、window placement、逐项结果和运行时错误。
+实现阶段的机器报告及截图位于 `/private/tmp/fluentread-document-workbench-final/`，同步主分支后的复验位于 `/private/tmp/fluentread-document-pr-final/`，报告均为 `report.json`。套件：`scripts/run-document-translation-test.cjs`。报告包含实际 launch mode、focus policy、window placement、逐项结果和运行时错误。
+
+集成最新主分支时，既有 i18n 契约发现学习中心更新后的说明与搜索词缺少多语言映射。本次补齐六种界面的这两条文案；保留原测试，完整覆盖率套件重新通过。
 
 通用扩展 `--suite full` 已运行但未完成：外部技能脚本 `run-ui-test.cjs:293` 仍查找“默认目标语言”，而本任务基线 `7d06f95` 的 `src/core/i18n/messages/zh-CN.ts:412` 已使用“语言”。该定位失配不属于本次文档改动；未将完整 UI 套件计为通过。日志在 `/private/tmp/document-ui-full.log`。

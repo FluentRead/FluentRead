@@ -42,14 +42,17 @@ describe('site adaptation settings persistence and editor behavior', () => {
         expect(parseSiteAdaptationDraft(draft, document)).toEqual({ok: true, pack: SITE_ADAPTATION_EXAMPLE});
     });
 
-    it('localizes adaptation controls in every interface language and falls back for detailed guidance', () => {
+    it('localizes adaptation controls and detailed guidance in every interface language', () => {
         for (const language of ['en-US', 'ja-JP', 'ko-KR', 'fr-FR', 'ru-RU', 'es-ES'] as const) {
             for (const label of ['网站适配', '保存规则', 'JSON 编辑草稿', '网址匹配预览', '撤销草稿替换']) {
                 expect(translateLegacyText(label, language)).not.toBe(label);
             }
         }
         const guide = '按已保存规则预览；仅检查网址匹配，实际内容以网页结构为准。';
-        expect(translateLegacyText(guide, 'ja-JP')).toBe(translateLegacyText(guide, 'en-US'));
+        for (const locale of ['ja-JP', 'ko-KR', 'fr-FR', 'ru-RU', 'es-ES'] as const) {
+            expect(translateLegacyText(guide, locale)).not.toBe(translateLegacyText(guide, 'en-US'));
+            expect(translateLegacyText(guide, locale)).not.toBe(guide);
+        }
         expect(translateLegacyText(guide, 'en-US')).toContain('URL matching only');
     });
 

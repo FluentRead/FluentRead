@@ -17,7 +17,8 @@ export const IMAGE_CONTROLS_CSS = `
 .fr-image-details {margin:0;padding:10px;max-height:160px;max-width:320px;overflow:auto;background:#fff;color:#182132;border:1px solid #dce2ea;border-radius:8px;white-space:pre-wrap;overflow-wrap:anywhere;user-select:text;font:13px/1.6 system-ui,sans-serif;}
 `;
 
-export function createImageControls(actions: {onAction(): void; onPrepare(): void; onInspect?(): void}) {
+export function createImageControls(actions: {onAction(): void; onPrepare(): void; onInspect?(): void; translate?(source: string): string}) {
+    const localize = (source: string) => actions.translate?.(source) ?? source;
     const element = document.createElement('div');
     element.className = 'fr-image-controls';
     const status = document.createElement('div');
@@ -43,6 +44,17 @@ export function createImageControls(actions: {onAction(): void; onPrepare(): voi
     details.tabIndex = 0;
     details.hidden = true;
     let phase: ImageControlPhase = 'idle';
+    let sourceMessage = '翻译图片';
+    const refreshLanguage = () => {
+        prepare.textContent = localize('下载语言包并重试');
+        inspect.textContent = localize('文字');
+        inspect.setAttribute('aria-label', localize('查看完整译文'));
+        details.setAttribute('aria-label', localize('图片完整译文'));
+        button.textContent = localize(phase === 'loading' ? '取消' : phase === 'translated' ? '原图' : phase === 'error' ? '重试' : '翻译');
+        button.title = localize(phase === 'loading' ? '取消图片翻译' : phase === 'translated' ? '恢复原图' : sourceMessage);
+        button.setAttribute('aria-label', button.title);
+        status.textContent = localize(sourceMessage);
+    };
     let disposed = false;
     const handleClick = (event: MouseEvent) => {
         if (!event.isTrusted || disposed) return;
@@ -66,10 +78,8 @@ export function createImageControls(actions: {onAction(): void; onPrepare(): voi
         phase = next;
         element.dataset.phase = next;
         button.dataset.phase = next;
-        button.textContent = next === 'loading' ? '取消' : next === 'translated' ? '原图' : next === 'error' ? '重试' : '翻译';
-        button.title = next === 'loading' ? '取消图片翻译' : next === 'translated' ? '恢复原图' : message;
-        button.setAttribute('aria-label', button.title);
-        status.textContent = message;
+        sourceMessage = message;
+        refreshLanguage();
         status.hidden = next === 'idle' || next === 'translated';
         element.setAttribute('aria-busy', String(next === 'loading'));
         prepare.hidden = next !== 'error' || !options.prepare;
@@ -81,7 +91,7 @@ export function createImageControls(actions: {onAction(): void; onPrepare(): voi
     };
     update('idle', '翻译图片');
     return {
-        element, button, status, update,
+        element, button, status, update, refreshLanguage,
         setLines(lines: Array<{text: string}>) {
             details.textContent = lines.map(line => line.text).join('\n');
             inspect.hidden = phase !== 'translated' || lines.length === 0;

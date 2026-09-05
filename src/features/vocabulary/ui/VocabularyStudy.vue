@@ -11,11 +11,11 @@
       <span>理解原句 → 学会用法 → 自己表达</span>
     </header>
     <div class="study-source">
-      <div class="study-title"><h3>{{ entry.term }}</h3><button type="button" @click="emit('speak')">朗读原文</button></div>
+      <div class="study-title"><h3 data-i18n-ignore>{{ entry.term }}</h3><button type="button" @click="emit('speak')">朗读原文</button></div>
       <template v-if="context">
         <h4>你收藏时的原句</h4>
-        <blockquote>{{ context.text }}</blockquote>
-        <a v-if="context.sourceUrl" :href="context.sourceUrl" target="_blank" rel="noopener noreferrer">{{ context.pageTitle || '查看原文来源' }} ↗</a>
+        <blockquote data-i18n-ignore>{{ context.text }}</blockquote>
+        <a v-if="context.sourceUrl" :href="context.sourceUrl" target="_blank" rel="noopener noreferrer"><span data-i18n-ignore>{{ context.pageTitle || translateLegacy('查看原文来源') }}</span> ↗</a>
       </template>
       <p v-else class="study-hint">这条收藏没有可用的原句。可以先了解常见用法；下次连同原句收藏，更容易判断具体含义。</p>
       <details v-if="reference" class="study-reference"><summary>收藏时的参考内容</summary><ReadingAnswer :text="reference" /></details>
@@ -29,12 +29,12 @@
       </section>
       <section class="study-step">
         <h4>2 · 用自己的话说一句</h4>
-        <p class="study-hint">写一句与你有关的话，试着用上“{{ entry.term }}”。反馈会保留你的原意，重点看含义和搭配。</p>
+        <p class="study-hint"><span data-i18n-ignore>{{ t("learning.writeSentenceHint", {term: entry.term}) }}</span></p>
         <form @submit.prevent="run('use')">
           <textarea v-model="draft" maxlength="300" rows="3" aria-label="我的造句" placeholder="写下你自己的句子…" :disabled="busy" @keydown.stop />
           <button type="submit" class="study-primary" :disabled="busy || !draft.trim()">看看用得是否自然</button>
         </form>
-        <div v-if="feedback" class="study-feedback"><p class="submitted-sentence">你的句子：{{ submittedDraft }}</p><ReadingAnswer :text="feedback" /></div>
+        <div v-if="feedback" class="study-feedback"><p class="submitted-sentence">你的句子：<span data-i18n-ignore>{{ submittedDraft }}</span></p><ReadingAnswer :text="feedback" /></div>
       </section>
     </div>
     <p v-if="busy" class="study-status" role="status">{{ mode === 'use' ? '正在检查你的表达…' : '正在结合语境讲解…' }} <button type="button" @click="stop">停止</button></p>
@@ -46,6 +46,8 @@
   </section>
 </template>
 <script setup lang="ts">
+import {useUiI18n} from "@/src/ui/i18n";
+const {t, translateLegacy} = useUiI18n();
 import {computed, onBeforeUnmount, ref, watch} from 'vue';
 import {ReadingAnswer, streamReading} from '@/src/features/reading-assistant/public';
 import {config, subscribeConfig} from '@/src/services/config/store';

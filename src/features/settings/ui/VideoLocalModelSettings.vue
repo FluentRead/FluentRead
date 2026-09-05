@@ -37,7 +37,7 @@
             <Check v-if="downloaded.includes(item.value)" aria-hidden="true" />
             {{ !modelStateLoaded ? '读取中…' : downloaded.includes(item.value) ? '可离线使用' : downloading.includes(item.value) ? '正在下载模型' : '尚未下载' }}
           </span>
-          <button type="button" class="video-model-download-button" :aria-label="`${downloaded.includes(item.value) ? '已下载' : '下载'} ${item.label}`" :disabled="!modelStateLoaded || downloaded.includes(item.value) || downloading.includes(item.value) || !config.videoTranslationEnabled || !browserCapabilities.offscreenDocument" @click="config.videoLocalModel = item.value; download(item.value)">
+          <button type="button" class="video-model-download-button" :aria-label="t(downloaded.includes(item.value) ? 'video.modelDownloadedAria' : 'video.modelDownloadAria', {model: translateLegacy(item.label)})" :disabled="!modelStateLoaded || downloaded.includes(item.value) || downloading.includes(item.value) || !config.videoTranslationEnabled || !browserCapabilities.offscreenDocument" @click="config.videoLocalModel = item.value; download(item.value)">
             <component :is="downloaded.includes(item.value) ? Check : downloading.includes(item.value) ? Loading : Download" :class="{ 'is-loading': downloading.includes(item.value) }" aria-hidden="true" />
             {{ downloaded.includes(item.value) ? '已下载' : downloading.includes(item.value) ? '下载中…' : '下载模型' }}
           </button>
@@ -52,7 +52,7 @@
       <div class="video-ai-cache-heading">
         <Files aria-hidden="true" />
         <h3 id="video-ai-cache-title">已识别视频缓存</h3>
-        <span class="video-ai-cache-status" role="status">{{ cacheStats ? `${cacheStats.entries} 个视频` : cacheError ? '读取失败' : '读取中…' }}</span>
+        <span class="video-ai-cache-status" role="status">{{ cacheStats ? t('video.cacheCount', {count: cacheStats.entries}) : cacheError ? '读取失败' : '读取中…' }}</span>
       </div>
       <p>最多保留 32 个视频、7 天；只保存字幕文字和时间，不保存音频。</p>
       <p v-if="cacheError" class="video-model-error" role="alert">{{ cacheError }}</p>
@@ -64,6 +64,7 @@
 </template>
 
 <script lang="ts" setup>
+import {useUiI18n} from '@/src/ui/i18n';
 import {onMounted, onUnmounted, ref} from 'vue';
 import browser from 'webextension-polyfill';
 import {Check, Cpu, Delete, Download, Files, Loading} from '@element-plus/icons-vue';
@@ -80,6 +81,7 @@ import {VIDEO_SOURCE_LANGUAGE_OPTIONS} from '@/src/core/config/model';
 import type {Config} from '@/src/core/config/model';
 import {browserCapabilities} from '@/src/platform/browser/capabilities';
 
+const {t, translateLegacy} = useUiI18n();
 const props = defineProps<{config: Config}>();
 const config = props.config;
 const modelOptions = VIDEO_LOCAL_TRANSCRIPTION_MODELS;
@@ -110,7 +112,7 @@ async function download(model: VideoLocalTranscriptionModel): Promise<void> {
     if (!response?.success) throw new Error(response?.error || '模型下载失败');
     downloaded.value = normalizeVideoLocalTranscriptionModels(response.models);
   } catch (error) {
-    downloadError.value = error instanceof Error ? `${error.message}。请检查网络后重试。` : '模型下载失败，请检查网络后重试。';
+    downloadError.value = error instanceof Error ? t('video.modelDownloadError', {error: translateLegacy(error.message)}) : '模型下载失败，请检查网络后重试。';
   } finally {
     downloading.value = downloading.value.filter(item => item !== model);
   }

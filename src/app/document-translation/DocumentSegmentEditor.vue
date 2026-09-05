@@ -15,10 +15,10 @@
     <p class="editor-note">{{ disabled ? '翻译进行中，可查看已完成的片段；暂停后即可校订。' : '修改即时用于本页预览和下载，下载文件后再离开。' }}</p>
     <div v-if="!filteredSegments.length" class="editor-empty">{{ query ? '没有找到匹配内容，试试其他关键词。' : '所有片段都已有译文。' }}</div>
     <article v-for="segment in visibleSegments" :key="segment.id" class="segment-edit-row" :data-segment-id="segment.id">
-      <div class="segment-position"><strong>#{{ segment.id + 1 }}</strong><span data-i18n-ignore>{{ segment.pathLabel || segment.contextLabel || (segment.timeStart ? `${segment.timeStart} → ${segment.timeEnd}` : '正文') }}</span><small :class="{ pending: !translations[segment.id]?.trim() }">{{ translations[segment.id]?.trim() ? '已有译文' : '未翻译' }}</small></div>
+      <div class="segment-position"><strong>#{{ segment.id + 1 }}</strong><span data-i18n-ignore>{{ segment.pathLabel || segment.contextLabel || (segment.timeStart ? `${segment.timeStart} → ${segment.timeEnd}` : translateLegacy('正文')) }}</span><small :class="{ pending: !translations[segment.id]?.trim() }">{{ translations[segment.id]?.trim() ? '已有译文' : '未翻译' }}</small></div>
       <div class="segment-edit-columns">
         <div><span class="segment-column-label">原文</span><p class="document-source" data-i18n-ignore>{{ formatDocumentReaderText(document.format, segment.source) }}</p></div>
-        <label><span class="segment-column-label">译文</span><textarea class="document-translation" :value="translations[segment.id] || ''" :aria-label="`第 ${segment.id + 1} 段译文`" :disabled="disabled" @focus="editingId = segment.id" @blur="editingId = null" :rows="Math.min(12, Math.max(3, Math.ceil((translations[segment.id]?.length || segment.source.length) / 55)))" placeholder="译文会出现在这里，也可以手动填写" @input="emit('update', segment.id, ($event.target as HTMLTextAreaElement).value)" /></label>
+        <label><span class="segment-column-label">译文</span><textarea class="document-translation" :value="translations[segment.id] || ''" :aria-label="t('document.segmentTranslation', {number: segment.id + 1})" :disabled="disabled" @focus="editingId = segment.id" @blur="editingId = null" :rows="Math.min(12, Math.max(3, Math.ceil((translations[segment.id]?.length || segment.source.length) / 55)))" placeholder="译文会出现在这里，也可以手动填写" @input="emit('update', segment.id, ($event.target as HTMLTextAreaElement).value)" /></label>
       </div>
     </article>
     <nav v-if="pageCount > 1" class="reader-pagination" aria-label="校订分页">
@@ -29,6 +29,8 @@
   </section>
 </template>
 <script setup lang="ts">
+import {useUiI18n} from "@/src/ui/i18n";
+const {t, translateLegacy} = useUiI18n();
 import {computed, ref, watch} from 'vue';
 import {formatDocumentReaderText, type ParsedDocument} from '@/src/features/document-translation/public';
 const props = defineProps<{document: ParsedDocument; translations: string[]; disabled: boolean}>();

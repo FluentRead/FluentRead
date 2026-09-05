@@ -1,5 +1,6 @@
 import {afterEach, describe, expect, it, vi} from 'vitest';
 import {parseHTML} from 'linkedom';
+import {translateLegacyText, type UiLanguage} from '@/src/core/i18n';
 import {createImageTranslationBackgroundHandlers, IMAGE_TRANSLATE_MESSAGE_TYPE, IMAGE_TRANSLATE_TEXTS_MESSAGE_TYPE, IMAGE_CANCEL_MESSAGE_TYPE} from '@/src/features/image-translation/background/handlers';
 import {IMAGE_PROGRESS_MESSAGE_TYPE, isImageTranslationStage} from '@/src/features/image-translation/progress';
 import {createImageControls} from '@/src/features/image-translation/content/controls';
@@ -299,5 +300,31 @@ describe('图片进度平台传输', () => {
         sendMessage.mockRejectedValueOnce(new Error('tab closed'));
         await imageTranslationProgressTransport.sendProgress({sender: {tab: {id: 2}, frameId: 3}}, message);
         expect(sendMessage).toHaveBeenLastCalledWith(2, message, {frameId: 3});
+    });
+});
+
+
+describe('图片控件界面语言', () => {
+    it('语言刷新只修改控件与状态，保留展开状态和原始译文', () => {
+        const {document} = parseHTML('<html><body></body></html>');
+        vi.stubGlobal('document', document);
+        let language: UiLanguage = 'en-US';
+        const controls = createImageControls({onAction() {}, onPrepare() {}, translate: source => translateLegacyText(source, language)});
+        controls.update('error', '没有识别到圈选区域文字', {prepare: true});
+        expect(controls.status.textContent).toBe('No text was recognized in the selected region.');
+        expect(controls.element.querySelectorAll('button')[1].textContent).toBe('Download language pack and retry');
+        controls.setLines([{text: '原文'}]);
+        controls.update('translated', '翻译完成');
+        const details = controls.element.querySelector('pre')!;
+        details.hidden = false;
+        language = 'ja-JP'; controls.refreshLanguage();
+        expect(controls.button.textContent).toBe('元画像');
+        expect(controls.button.title).toBe('元画像に戻す');
+        expect(details.textContent).toBe('原文');
+        expect(details.hidden).toBe(false);
+        language = 'zh-CN'; controls.refreshLanguage();
+        expect(controls.button.textContent).toBe('原图');
+        expect(details.textContent).toBe('原文');
+        controls.dispose();
     });
 });

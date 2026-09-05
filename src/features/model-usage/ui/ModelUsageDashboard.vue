@@ -532,7 +532,7 @@ const breakdownSortOptions: Array<{key: BreakdownSortKey; label: string}> = [
 ]
 
 const props = withDefaults(defineProps<{active?: boolean}>(), {active: true})
-const {t} = useUiI18n()
+const {t, translateLegacy} = useUiI18n()
 const customOpenAIProviders = ref<CustomOpenAIProvider[]>(config.customOpenAIProviders)
 const snapshot = ref<DashboardSnapshot | null>(null)
 const selectedService = ref('')
@@ -648,7 +648,7 @@ const timelineHasDifference = computed(() => timelineRows.value.some(point => po
 const inspectedPoint = computed(() => timelineRows.value.find(point => point.key === selectedPointKey.value)
   || [...timelineRows.value].reverse().find(point => point.totals.requestCount > 0)
   || timelineRows.value.at(-1))
-const trendAriaLabel = computed(() => `${appliedRangeLabel.value}${appliedScopeLabel.value}用量趋势，${trendMetric.value === 'tokens' ? 'Token' : '请求次数'}`)
+const trendAriaLabel = computed(() => `${translateLegacy(appliedRangeLabel.value)}${translateLegacy(appliedScopeLabel.value)}用量趋势，${trendMetric.value === 'tokens' ? 'Token' : translateLegacy('请求次数')}`)
 function tokenValue(totals: Totals, key: 'totalTokens' | 'inputTokens' | 'outputTokens'): string {
   return totals.requestCount > 0 && totals.reportedTokenRequests === 0 ? '—' : formatToken(totals[key])
 }

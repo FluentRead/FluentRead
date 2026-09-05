@@ -298,6 +298,7 @@ export default defineConfig({
                 'src/core/language/detect.ts',
                 'src/core/language/chinese.ts',
                 'src/core/i18n/messages/legacy-overrides.ts',
+                'src/core/i18n/messages/legacy-patterns.ts',
                 'src/core/config/catalog.ts',
                 'src/core/glossary/model.ts',
                 'src/core/glossary/builtins.ts',

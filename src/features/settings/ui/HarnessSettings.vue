@@ -106,12 +106,12 @@ const modelOptions = computed(() => {
 const effectiveServiceSupportsHarness = computed(() => isHarnessService(config.value.harness.service || config.value.service, config.value.customOpenAIProviders))
 const visibleActions = computed(() => HARNESS_ACTIONS.filter((action) => config.value.harness.actions.includes(action.id)))
 const previewAction = ref<HarnessActionId>(config.value.harness.defaultAction)
-const previewResults: Record<HarnessActionId, string> = {
-  meaning: '### 这句话在说什么\n虽然任务很难，她还是按时完成了。\n\n### 理解重点\n**Although** 表示“虽然”，把困难和结果放在一起对比。重点是她克服了困难，仍然 **on time（按时）** 完成。',
-  grammar: '### 先找主干\n**she → finished → it**\n她（主语）→ 完成（谓语）→ 任务（宾语）。\n\n### 再看修饰\n- **Although the task was difficult**：让步从句，交代“虽然任务很难”。\n- **on time**：修饰 finished，说明是“按时”完成。\n\n### 记住这个句型\n**Although + 困难，主句 + 结果。** Although 已经表达转折，主句不用再加 but。',
-  usage: '### on time · 按时\n表示没有迟到，符合约定的时间。\n\n> The train arrived on time.\n\n火车准点到达。\n\n### 别和 in time 混淆\n- **on time**：按计划准时。\n- **in time**：赶得及，还不算太晚。',
-  practice: '### 试着补完整\n虽然今天下雨了，我们还是准时到达。\n\n**Although it was raining, we arrived __ __.**\n\n### 核对答案\n**on time**。这里强调按约定时间到达。\n\n### 换成你的经历\n用 Although 开头，写一句“虽然有困难，但仍完成了”的经历。',
-}
+const previewResults = computed<Record<HarnessActionId, string>>(() => ({
+  meaning: t('reading.demo.meaning'),
+  grammar: t('reading.demo.grammar'),
+  usage: t('reading.demo.usage'),
+  practice: t('reading.demo.practice'),
+}))
 watch(() => config.value.harness.defaultAction, (action) => { previewAction.value = action })
 watch(visibleActions, (actions) => {
   if (!actions.some((action) => action.id === previewAction.value)) previewAction.value = config.value.harness.defaultAction

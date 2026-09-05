@@ -5,7 +5,7 @@
  * 模块边界：仅接收文本与紧凑模式，不请求模型、不读取存储，不插入 HTML、不创建可点击外链或远程图片。
  -->
 <template>
-  <div class="fr-reading-markdown" :class="{'is-compact': compact}" data-reading-answer>
+  <div class="fr-reading-markdown" :class="{'is-compact': compact}" data-reading-answer data-i18n-ignore>
     <template v-for="(block, index) in blocks" :key="index">
       <component :is="block.level <= 2 ? 'h3' : 'h4'" v-if="block.kind === 'heading'"><AnswerInline :text="block.text" /></component>
       <p v-else-if="block.kind === 'paragraph'"><AnswerInline :text="block.text" /></p>

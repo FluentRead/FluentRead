@@ -5,7 +5,8 @@
  * 模块边界：本运行时只读取页面允许访问的 Canvas 像素并调用既有图片客户端；识别、文本翻译、图像修复与语言包管理位于 background/services，控件交互由 controls 模块提供。
  */
 import { config } from '@/src/services/config/store';
-import {watchEffect} from 'vue';
+import {watch, watchEffect} from 'vue';
+import {normalizeUiLanguage, translateLegacyText} from '@/src/core/i18n';
 import {
     fetchImageInExtension,
     prepareImageOcrLanguages,
@@ -346,6 +347,7 @@ function createState(image: HTMLImageElement): ImageTranslationState {
     overlay.className = IMAGE_TRANSLATION_OVERLAY;
     overlay.dataset.fluentReadImageTranslation = 'true';
     const controls = createImageControls({
+        translate: (source) => translateLegacyText(source, normalizeUiLanguage(config.uiLanguage)),
         onAction: () => {
             const state = states.get(image);
             if (!state || !config.on || config.disableImageTranslator) return;
@@ -726,6 +728,9 @@ export function mountImageTranslator(): void {
     if (mounted) return;
     mounted = true;
     stopConfigurationWatch = watchTranslationConfiguration();
+    const stopLanguageWatch = watch(() => config.uiLanguage, () => {
+        activeStates.forEach(state => state.controls.refreshLanguage());
+    });
     document.addEventListener('pointerover', handlePointerOver, true);
     document.addEventListener('pointerout', handlePointerOut, true);
     window.addEventListener('scroll', scheduleViewportChange, true);
@@ -737,6 +742,7 @@ export function mountImageTranslator(): void {
         childList: true, subtree: true,
     });
     removeListeners = () => {
+        stopLanguageWatch();
         stopConfigurationWatch?.();
         stopConfigurationWatch = null;
         document.removeEventListener('pointerover', handlePointerOver, true);

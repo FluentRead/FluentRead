@@ -20,7 +20,7 @@
       <p class="fr-reading-hint">选择一条，继续上次的问答。记录仅保存在本机 30 天。</p>
       <div class="fr-reading-session-list">
         <button v-for="item in sessions" :key="item.id" type="button" class="fr-reading-session" @click="restoreSession(item.id)">
-          <span>{{ item.text }}</span>
+          <span data-i18n-ignore>{{ item.text }}</span>
           <small>{{ actionLabelFor(item.intent) }} · {{ formatDate(item.updatedAt) }} · {{ item.turnCount }} 轮<span>继续阅读 ›</span></small>
         </button>
         <p v-if="!sessions.length && !recordsLoading && !recordsError" class="fr-reading-empty">还没有阅读记录。选中一段文字，点击读懂或拆句，问答会自动保存在这里。</p>
@@ -31,7 +31,7 @@
     </section>
     <template v-else>
     <div class="fr-reading-source">
-      <p>{{ activeText }}</p>
+      <p data-i18n-ignore>{{ activeText }}</p>
       <div class="fr-reading-source-tools">
       <button v-if="!historicalText && selection.sentence !== selection.text && !wholeSentence" type="button" @click="expandSentence">理解整句</button>
       <span v-else-if="wholeSentence">已展开到整句</span>
@@ -47,14 +47,14 @@
     </div>
     <div ref="answerScroll" class="fr-reading-scroll fr-reading-result" aria-live="polite" aria-atomic="false">
       <details v-if="priorAnswers.length" class="fr-reading-session-detail">
-        <summary>前面的问答（{{ priorAnswers.length }} 轮）</summary>
+        <summary data-i18n-ignore>{{ t("reading.priorTurns", {count: priorAnswers.length}) }}</summary>
         <article v-for="turn in priorAnswers" :key="turn.id" class="fr-reading-turn">
-          <p class="fr-reading-question">{{ turn.question || actionLabelFor(turn.intent) }}<small>{{ statusLabel(turn.status) }}</small></p>
+          <p class="fr-reading-question"><span data-i18n-ignore>{{ turn.question || translateLegacy(actionLabelFor(turn.intent)) }}</span><small>{{ statusLabel(turn.status) }}</small></p>
           <ReadingAnswer :text="turn.answer" />
         </article>
       </details>
-      <p v-if="currentQuestion" class="fr-reading-question">{{ currentQuestion }}</p>
-      <p v-if="busy" class="fr-reading-status" role="status"><span class="fr-reading-pulse" :class="{'fr-reading-static': !animations}" aria-hidden="true" />正在{{ actionLabel }}…<button type="button" @click="stop">停止</button></p>
+      <p v-if="currentQuestion" class="fr-reading-question" data-i18n-ignore>{{ currentQuestion }}</p>
+      <p v-if="busy" class="fr-reading-status" role="status"><span class="fr-reading-pulse" :class="{'fr-reading-static': !animations}" aria-hidden="true" /><span data-i18n-ignore>{{ t("reading.generatingAction", {action: translateLegacy(actionLabel)}) }}</span><button type="button" @click="stop">停止</button></p>
       <div v-if="error" class="fr-reading-error" role="alert">
         <p>{{ error }}</p>
         <div><button type="button" @click="retry">重试</button><button type="button" @click="openSettings('settings-services')">设置模型</button></div>
@@ -65,7 +65,7 @@
       </div>
       <p v-if="!busy && !answer && !error && !stopped" class="fr-reading-hint">选一种方式，理解这段表达。</p>
     <footer v-if="answer && !busy" class="fr-reading-footer">
-      <span :title="model">{{ model }}<small v-if="memoryCount"> · 参考 {{ memoryCount }} 条记忆</small></span>
+      <span :title="model">{{ model }}<small v-if="memoryCount" data-i18n-ignore> · {{ t("reading.memoryReferences", {count: memoryCount}) }}</small></span>
       <button type="button" @click="copyAnswer">{{ copied ? '已复制' : '复制' }}</button>
       <button v-if="preferences.memoryEnabled && !privateContext && !stopped && !error" type="button" :disabled="remembering || remembered" title="将这段原文与回答保存为长期学习记忆" @click="rememberLearning">{{ remembered ? '已记住' : '记住要点' }}</button>
     </footer>
@@ -82,6 +82,8 @@
 </template>
 
 <script setup lang="ts">
+import {useUiI18n} from "@/src/ui/i18n";
+const {t, translateLegacy} = useUiI18n();
 import {computed, nextTick, onBeforeUnmount, onMounted, ref, watch} from 'vue';
 import browser from 'webextension-polyfill';
 import {HARNESS_ACTIONS, type HarnessActionId, type HarnessPreferences} from '@/src/core/config/harness';

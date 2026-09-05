@@ -61,15 +61,21 @@ export function installQqMailTopFrameBridge(isEnabled: () => boolean, signal: Ab
 export async function startQqMailFrameApp(ctx: ContentScriptContext): Promise<void> {
     if (window.top === window || !isQqMailReadmailUrl(window.location.href)) return;
     let disposed = false;
-    let pageSuspended = false;
-    ctx.onInvalidated(() => { disposed = true; });
-    await configReady;
-    if (disposed) return;
     const lifetime = new AbortController();
+    let lifecycleController: ReturnType<typeof createFrameSessionController> | undefined;
+    let cleanup = () => { disposed = true; lifetime.abort(); };
+    ctx.onInvalidated(() => cleanup());
+    const pageLifecycle = installContentPageLifecycle(window, lifetime.signal, {
+        suspend: () => lifecycleController?.suspend(),
+        resume: () => { void lifecycleController?.refresh(); },
+        dispose: () => cleanup(),
+    });
+    await configReady;
+    if (ctx.isInvalid || disposed) { cleanup(); return; }
     let activation: AbortController | null = null;
     let removeStyles: (() => void) | null = null;
     let authorized = false;
-    const enabled = () => !disposed && !pageSuspended && config.on !== false
+    const enabled = () => !disposed && !pageLifecycle.isSuspended() && config.on !== false
         && !isExtensionDisabledOnSite(window.location.href, config.disabledExtensionDomains);
     const toggle = (invocation?: PageTranslationInvocation) => {
         if (!enabled() || !authorized) return;
@@ -116,9 +122,10 @@ export async function startQqMailFrameApp(ctx: ContentScriptContext): Promise<vo
             profileId: state.translationConfig!.profileId, fullPageMode: state.fullPageMode, scope: state.scope,
         }, state.translationConfig),
     });
+    lifecycleController = controller;
     const listener = (message: any, sender: any): false => {
         if (sender?.id !== browser.runtime.id) return false;
-        if (message?.type === 'qqMailFrameRefresh') void controller.refresh();
+        if (message?.type === 'qqMailFrameRefresh' && enabled()) void controller.refresh();
         if (message?.type === 'translationCacheCleared') invalidateFullPageTranslationSessionCache();
         return false;
     };
@@ -130,20 +137,14 @@ export async function startQqMailFrameApp(ctx: ContentScriptContext): Promise<vo
     browser.runtime.onMessage.addListener(listener);
     const unsubscribe = subscribeConfig(() => {
         siteAdaptation.update(config.siteAdaptation, new URL(window.location.href));
-        syncBilingualSentenceHighlight(document, authorized && config.bilingualSentenceHighlightEnabled === true);
+        syncBilingualSentenceHighlight(document, enabled() && authorized && config.bilingualSentenceHighlightEnabled === true);
         if (!enabled()) controller.suspend();
         else void controller.refresh();
     });
-    const cleanup = () => {
+    cleanup = () => {
         if (lifetime.signal.aborted) return;
         disposed = true; lifetime.abort(); controller.dispose(); unsubscribe();
         browser.runtime.onMessage.removeListener(listener);
     };
-    ctx.onInvalidated(cleanup);
-    installContentPageLifecycle(window, lifetime.signal, {
-        suspend: () => { pageSuspended = true; controller.suspend(); },
-        resume: () => { pageSuspended = false; void controller.refresh(); },
-        dispose: cleanup,
-    });
-    await controller.refresh();
+    if (enabled()) await controller.refresh();
 }

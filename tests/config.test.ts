@@ -284,6 +284,50 @@ describe('统一配置存储', () => {
         expect(storageMock.setItem).not.toHaveBeenCalled();
     });
 
+    it.each(['旧值', '读取失败'])('popup 首次凭据回读的%s 晚于广播时采用新 Key，延迟主配置广播不会保留旧凭据', async readOutcome => {
+        let releaseConfigRead!: () => void;
+        let releaseCredentialRead!: () => void;
+        const configReadBarrier = new Promise<void>(resolve => { releaseConfigRead = resolve; });
+        const credentialReadBarrier = new Promise<void>(resolve => { releaseCredentialRead = resolve; });
+        const oldConfig = {
+            ...sanitizeConfigCredentials(normalizeConfig(storedConfig)),
+            __fluentConfigRevision: 4,
+        };
+        const nextCredentials = {token: {openai: 'updated-during-popup-hydration'}};
+        const store = await loadConfigModule(oldConfig, {
+            writeOwner: false,
+            configReadBarrier,
+            localCredentials: {token: {openai: 'old-popup-hydration-value'}},
+        });
+        const defaultRead = storageMock.getItem.getMockImplementation()!;
+        let credentialReads = 0;
+        storageMock.getItem.mockImplementation(async (key: string) => {
+            if (key !== 'local:credentials') return defaultRead(key);
+            storageOperations.push(`get:${key}`);
+            // 后台已经读取旧值，但发回 popup 的响应仍在途。
+            const snapshot = structuredClone(storageState.get(key));
+            const firstRead = credentialReads++ === 0;
+            await credentialReadBarrier;
+            if (firstRead && readOutcome === '读取失败') throw new Error('stale credential read failed');
+            return snapshot;
+        });
+        releaseConfigRead();
+        await vi.waitFor(() => expect(storageOperations).toContain('get:local:credentials'));
+
+        storageState.set('local:credentials', nextCredentials);
+        storageWatchers.get('local:credentials')?.(nextCredentials);
+        releaseCredentialRead();
+        await store.configReady;
+        const nextConfig = {...oldConfig, to: 'ja', __fluentConfigRevision: 5};
+        storageState.set('local:config', nextConfig);
+        storageWatchers.get('local:config')!(nextConfig);
+
+        expect(store.config.to).toBe('ja');
+        expect(store.config.token.openai).toBe(nextCredentials.token.openai);
+        await expect(store.prepareHydratedConfigForExport()).resolves.toMatchObject({token: nextCredentials.token});
+        expect(storageMock.setItem).not.toHaveBeenCalled();
+    });
+
     it('凭据水合失败前收到更高 revision 时 fallback 也采用最新公开配置', async () => {
         let releaseCredentialRead!: () => void;
         const credentialReadBarrier = new Promise<void>(resolve => {
@@ -3341,6 +3385,42 @@ describe('启动配置按需读取', () => {
         await store.configHistoryReady;
         expect(storageOperations).toEqual(['get:local:config']);
         expect(storageWatchers.has('local:configHistory')).toBe(false);
+    });
+
+    it.each(['旧快照', '读取失败'])('首次历史读取期间收到外部更新后，%s 不得回滚可撤销版本', async readOutcome => {
+        const store = await loadConfigModule(storedConfig);
+        await store.configReady;
+        const baseline = store.getConfigHistorySnapshot();
+        let releaseHistoryRead!: () => void;
+        const historyReadBarrier = new Promise<void>(resolve => { releaseHistoryRead = resolve; });
+        const defaultRead = storageMock.getItem.getMockImplementation()!;
+        storageMock.getItem.mockImplementation(async (key: string) => {
+            if (key !== 'local:configHistory') return defaultRead(key);
+            await historyReadBarrier;
+            if (readOutcome === '读取失败') throw new Error('stale history read failed');
+            return baseline;
+        });
+        const historyReady = Promise.resolve(store.configHistoryReady);
+        await vi.waitFor(() => expect(storageWatchers.has('local:configHistory')).toBe(true));
+        const external = {
+            ...baseline,
+            entries: [
+                ...baseline.entries,
+                {version: baseline.nextVersion, savedAt: new Date().toISOString(), config: {...storedConfig, to: 'ja'}},
+            ],
+            cursor: baseline.entries.length,
+            nextVersion: baseline.nextVersion + 1,
+        };
+        storageState.set('local:configHistory', external);
+        storageWatchers.get('local:configHistory')!(external);
+        releaseHistoryRead();
+        await historyReady;
+
+        expect(store.getConfigHistorySnapshot()).toMatchObject({
+            cursor: external.cursor,
+            nextVersion: external.nextVersion,
+            entries: expect.arrayContaining([expect.objectContaining({config: expect.objectContaining({to: 'ja'})})]),
+        });
     });
 });
 

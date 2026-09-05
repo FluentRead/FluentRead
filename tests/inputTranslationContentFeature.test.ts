@@ -129,6 +129,82 @@ afterEach(() => {
 });
 
 describe('input translation content feature', () => {
+    it.each([
+        {isComposing: true}, {keyCode: 229}, {repeat: true},
+        {altKey: true}, {metaKey: true}, {shiftKey: true},
+    ])('Ctrl+Enter 不接管组合输入、长按或额外快捷键 %j', async extra => {
+        const harness = mountHarness();
+        const input = fakeElement('textarea');
+        input.value = '正在输入';
+        harness.fakeDocument.activeElement = input;
+        const event = trustedKey({key: 'Enter', ctrlKey: true, ...extra});
+
+        await harness.fakeDocument.emit('keydown', event);
+
+        expect(event.preventDefault).not.toHaveBeenCalled();
+        expect(harness.sendMessage).not.toHaveBeenCalled();
+        expect(input.value).toBe('正在输入');
+    });
+
+    it.each([
+        {isComposing: true}, {keyCode: 229}, {ctrlKey: true},
+        {altKey: true}, {metaKey: true}, {shiftKey: true},
+    ])('三连空格不吞掉 IME 选词或修饰键，并中断旧计数 %j', async extra => {
+        const harness = mountHarness({config: {inputBoxTranslationTrigger: 'triple_space'}});
+        const input = fakeElement('textarea');
+        input.value = '正在输入';
+        harness.fakeDocument.activeElement = input;
+        const space = () => trustedKey({key: ' ', code: 'Space'});
+        await harness.fakeDocument.emit('keydown', space());
+        await harness.fakeDocument.emit('keydown', space());
+        const interrupted = trustedKey({key: ' ', code: 'Space', ...extra});
+        await harness.fakeDocument.emit('keydown', interrupted);
+        await harness.fakeDocument.emit('keydown', space());
+
+        expect(interrupted.preventDefault).not.toHaveBeenCalled();
+        expect(harness.sendMessage).not.toHaveBeenCalled();
+        expect(input.value).toBe('正在输入');
+    });
+
+    it.each(['success', 'error'])('切换输入目标后完整释放上个目标的 %s 动画类', async phase => {
+        vi.useFakeTimers();
+        const harness = mountHarness({
+            config: {animations: true},
+            sendMessage: async () => ({success: true, translatedText: phase === 'success' ? '翻译完成' : 'Hello'}),
+        });
+        const first = fakeElement('input');
+        first.value = 'Hello';
+        first.classList.add('host-owned');
+        harness.fakeDocument.activeElement = first;
+        await harness.fakeDocument.emit('keydown', trustedKey({key: 'Enter', ctrlKey: true}));
+        expect(first.classList.values.has(`fluent-input-${phase}`)).toBe(true);
+
+        const second = fakeElement('input');
+        second.value = 'Second';
+        harness.fakeDocument.activeElement = second;
+        await harness.fakeDocument.emit('keydown', trustedKey({key: 'Enter', ctrlKey: true}));
+        harness.feature.invalidate();
+        vi.runAllTimers();
+
+        expect(first.classList.values).toEqual(new Set(['host-owned']));
+        expect(second.classList.values).toEqual(new Set());
+    });
+
+    it('请求完成后卸载 feature 仍清理宿主上的完成动画和 tooltip', async () => {
+        vi.useFakeTimers();
+        const harness = mountHarness({config: {animations: true}});
+        const input = fakeElement('input');
+        input.value = 'Hello';
+        harness.fakeDocument.activeElement = input;
+        await harness.fakeDocument.emit('keydown', trustedKey({key: 'Enter', ctrlKey: true}));
+
+        harness.controller.abort();
+        vi.runAllTimers();
+
+        expect(input.classList.values).toEqual(new Set());
+        expect(harness.tooltipRecords.at(-1).ui.remove).toHaveBeenCalledOnce();
+    });
+
     it('生成配置 key 并判断 feature 是否可用', () => {
         expect(inputBoxTranslationConfigKey({
             on: true,

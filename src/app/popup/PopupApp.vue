@@ -237,7 +237,7 @@
           class="translate-button"
           :class="{ translated: pageTranslated }"
           type="button"
-          :disabled="!config.on || translating || Boolean(selectedServiceUnavailableMessage)"
+          :disabled="!config.on || translating || (!pageTranslated && Boolean(selectedServiceUnavailableMessage))"
           :aria-pressed="pageTranslated"
           @click="togglePageTranslation"
         >
@@ -581,8 +581,8 @@
       </div>
     </el-drawer>
 
-    <CustomHotkeyInput v-model="showCustomMouseHotkeyDialog" :current-value="config.customHotkey" :validate="validateCustomMouseHotkey" @confirm="confirmMouseHotkey" @cancel="cancelMouseHotkey" />
-    <CustomHotkeyInput v-model="showCustomSelectionHotkeyDialog" :current-value="config.customSelectionTranslatorHotkey" @confirm="confirmSelectionHotkey" @cancel="cancelSelectionHotkey" />
+    <CustomHotkeyInput v-if="showCustomMouseHotkeyDialog" v-model="showCustomMouseHotkeyDialog" :current-value="config.customHotkey" :validate="validateCustomMouseHotkey" @confirm="confirmMouseHotkey" @cancel="cancelMouseHotkey" />
+    <CustomHotkeyInput v-if="showCustomSelectionHotkeyDialog" v-model="showCustomSelectionHotkeyDialog" :current-value="config.customSelectionTranslatorHotkey" @confirm="confirmSelectionHotkey" @cancel="cancelSelectionHotkey" />
     </div>
   </main>
 </template>
@@ -1270,7 +1270,7 @@ async function setCurrentSiteAlwaysTranslated(enabled: boolean) {
   }
 }
 
-async function setCurrentSiteExtensionDisabled(enabled: boolean) {
+function setCurrentSiteExtensionDisabled(enabled: boolean) {
   const domain = currentSiteDomain.value;
   const tabId = currentTabId.value;
   if (!domain || tabId === null) return;
@@ -1282,38 +1282,12 @@ async function setCurrentSiteExtensionDisabled(enabled: boolean) {
   pageTranslated.value = false;
   translating.value = false;
 
-  // 先通知当前页立即收起扩展 UI；配置仍由 popup 的统一保存链路持久化。
-  await browser.tabs.sendMessage(tabId, {
-    type: 'updateSiteExtensionDisabled',
-    isDisabled: enabled,
-  }).catch(() => undefined);
   showNotice(enabled ? `已在 ${domain} 禁用扩展` : `已恢复 ${domain} 的扩展`);
 }
 
-async function broadcast(message: Record<string, unknown>) {
-  const tabs = await browser.tabs.query({});
-  const tabIds = tabs.map((tab) => tab.id).filter(isBrowserTabId);
-  await Promise.allSettled(tabIds.map((tabId) => browser.tabs.sendMessage(tabId, message)));
-}
-
+// 配置订阅是内容功能的唯一状态来源；避免无 revision 的广播晚到后覆盖新快照。
 function setPluginEnabled(enabled: boolean) {
   config.value.on = enabled;
-  if (!enabled) {
-    void broadcast({ type: 'toggleFloatingBall', isEnabled: false });
-    void broadcast({ type: 'updateSelectionTranslatorMode', mode: 'disabled' });
-    void broadcast({ type: 'toggleSelectionAreaTranslator', isEnabled: false });
-    void broadcast({ type: 'toggleImageTranslator', isEnabled: false });
-    return;
-  }
-
-  void broadcast({ type: 'toggleFloatingBall', isEnabled: !config.value.disableFloatingBall });
-  void broadcast({ type: 'updateSelectionTranslatorMode', mode: config.value.selectionTranslatorMode });
-  if (browserCapabilities.areaTranslation) {
-    void broadcast({ type: 'toggleSelectionAreaTranslator', isEnabled: config.value.selectionAreaEnabled });
-  }
-  if (browserCapabilities.imageTranslation) {
-    void broadcast({ type: 'toggleImageTranslator', isEnabled: !config.value.disableImageTranslator });
-  }
 }
 
 function openDrawer(name: DrawerName) { activeDrawer.value = name; drawerVisible.value = true; }
@@ -1332,7 +1306,7 @@ async function openDocumentTranslation() {
 }
 
 async function togglePageTranslation() {
-  if (credentialWarning.value) {
+  if (!pageTranslated.value && credentialWarning.value) {
     showNotice(credentialWarning.value, 'error');
     return;
   }
@@ -1391,7 +1365,6 @@ function setHoverHotkey(value: string) {
 function setSelectionMode(mode: string) {
   config.value.selectionTranslatorMode = mode;
   config.value.disableSelectionTranslator = mode === 'disabled';
-  void broadcast({ type: 'updateSelectionTranslatorMode', mode });
 }
 const selectionShortcutTriggers = new Set(['Control', 'Alt', 'Shift', 'custom']);
 function setSelectionTrigger(trigger: string) {
@@ -1401,11 +1374,9 @@ function setSelectionTrigger(trigger: string) {
   config.value.selectionTranslatorTrigger = trigger;
   config.value.selectionTranslatorHotkey = selectionShortcutTriggers.has(trigger) ? trigger : 'none';
   if (trigger === 'custom' && !config.value.customSelectionTranslatorHotkey) showCustomSelectionHotkeyDialog.value = true;
-  broadcastSelectionTranslatorSettings();
 }
 function handleSelectionTranslatorDelayChange(value: number | undefined) {
   config.value.selectionTranslatorDelay = normalizeSelectionTranslatorDelay(value);
-  broadcastSelectionTranslatorSettings();
 }
 function setAreaEnabled(enabled: boolean) {
   if (!browserCapabilities.areaTranslation) {
@@ -1418,7 +1389,6 @@ function setAreaEnabled(enabled: boolean) {
     return;
   }
   config.value.selectionAreaEnabled = enabled;
-  void broadcast({ type: 'toggleSelectionAreaTranslator', isEnabled: enabled });
 }
 function setImageTranslatorEnabled(enabled: boolean) {
   if (!browserCapabilities.imageTranslation) {
@@ -1426,7 +1396,6 @@ function setImageTranslatorEnabled(enabled: boolean) {
     return;
   }
   config.value.disableImageTranslator = !enabled;
-  void broadcast({ type: 'toggleImageTranslator', isEnabled: enabled });
 }
 function setVideoTranslationEnabled(enabled: boolean) {
   config.value.videoTranslationEnabled = enabled;
@@ -1459,24 +1428,13 @@ function confirmSelectionHotkey(hotkey: string) {
   }
   showCustomSelectionHotkeyDialog.value = false;
   previousSelectionTrigger.value = '';
-  broadcastSelectionTranslatorSettings();
 }
 function cancelSelectionHotkey() {
   if (!config.value.customSelectionTranslatorHotkey) {
     const trigger = previousSelectionTrigger.value || 'icon';
     config.value.selectionTranslatorTrigger = trigger;
     config.value.selectionTranslatorHotkey = selectionShortcutTriggers.has(trigger) ? trigger : 'none';
-    broadcastSelectionTranslatorSettings();
   }
   previousSelectionTrigger.value = '';
-}
-function broadcastSelectionTranslatorSettings() {
-  void broadcast({
-    type: 'updateSelectionTranslatorSettings',
-    trigger: config.value.selectionTranslatorTrigger,
-    hotkey: config.value.selectionTranslatorHotkey,
-    customHotkey: config.value.customSelectionTranslatorHotkey,
-    delay: config.value.selectionTranslatorDelay,
-  });
 }
 </script>

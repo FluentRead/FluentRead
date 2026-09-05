@@ -29,6 +29,7 @@ import {browserCapabilities, type BrowserCapabilities} from '@/src/platform/brow
 import {rejectUnsupportedContentFeature} from './featureRegistry';
 export interface ContentRuntimeMessageState {
     isSiteDisabled(): boolean;
+    isPageSuspended?(): boolean;
     updateSiteDisabled(disabled: boolean): Promise<void>;
 }
 export type ContentRuntimeMessageHandler = (
@@ -61,7 +62,7 @@ export function createContentRuntimeMessageHandler(ctx: ContentScriptContext, st
                 .catch(() => sendResponse({status: 'failed'}));
             return true;
         }
-        if (state.isSiteDisabled() && payload.type !== 'getFullPageTranslationState') {
+        if ((state.isSiteDisabled() || state.isPageSuspended?.()) && payload.type !== 'getFullPageTranslationState') {
             sendResponse({status: 'disabled'});
             return true;
         }

@@ -596,21 +596,88 @@ async function runPersistenceRegression({context, extensionOrigin, popupPath, pa
   report.persistence.quickClose = persistence;
 }
 
+/** 首屏不加载快捷键编辑器，首次懒挂载仍能管理焦点并正确关闭。 */
+async function runPopupDeferredUiRegression(context, extensionOrigin, popupPath) {
+  const page = await newPageWithoutForeground(context, timeout);
+  const requestedScripts = new Set();
+  const parsedScripts = new Set();
+  const isEditor = url => /CustomHotkeyInput[^/]*\.js$/u.test(url);
+  page.on('request', request => { if (isEditor(request.url())) requestedScripts.add(request.url()); });
+  const debuggerSession = await context.newCDPSession(page);
+  debuggerSession.on('Debugger.scriptParsed', event => { if (isEditor(event.url)) parsedScripts.add(event.url); });
+  await debuggerSession.send('Debugger.enable');
+  try {
+    await page.setViewportSize({width: 400, height: 600});
+    await page.goto(new URL(popupPath, `${extensionOrigin}/`).href, {waitUntil: 'domcontentloaded'});
+    await page.locator('.popup-shell[data-config-ready="true"]').waitFor({state: 'visible', timeout});
+    // chrome-extension 协议不保证写入 Resource Timing；用网络事件与 V8 实际模块解析共同验证。
+    if (requestedScripts.size || parsedScripts.size) throw new Error('首屏提前加载了快捷键编辑器');
+    await page.locator('[data-popup-quick-feature="hover"]').click();
+    await page.locator('.popup-drawer').getByRole('button', {name: '自定义', exact: true}).click();
+    const dialog = page.locator('.custom-hotkey-dialog');
+    await dialog.waitFor({state: 'visible', timeout});
+    await page.waitForFunction(() => document.activeElement?.closest('.custom-hotkey-dialog'));
+    if (parsedScripts.size !== 1) throw new Error(`快捷键编辑器未按需解析：${JSON.stringify([...parsedScripts])}`);
+    const dialogScreenshot = await screenshot(page, 'popup-deferred-hotkey-dialog.png');
+    await dialog.getByRole('button', {name: '取消', exact: true}).click();
+    await dialog.waitFor({state: 'detached', timeout});
+    await page.waitForFunction(() => document.activeElement?.closest('.popup-drawer'));
+    return {initialEditorResources: 0, editorLoadedOnDemand: true, requestedScripts: [...requestedScripts],
+      parsedScripts: [...parsedScripts], initialFocus: true, restoredFocus: true, dialogScreenshot};
+  } finally { await debuggerSession.detach().catch(() => undefined); await page.close(); }
+}
+
 /** 在真实 content 上验证取消导航、缓存暂停恢复和原生 Shadow API，而非只测试 helper。 */
-async function runContentLifecycleRegression(context) {
+async function runContentLifecycleRegression(context, extensionOrigin, popupPath) {
   const server = require('node:http').createServer((_request, response) => {
     response.writeHead(200, {'Content-Type': 'text/html; charset=utf-8'});
-    response.end('<!doctype html><html><body><h1>Page lifecycle fixture</h1><p>Keep this page and its extension active.</p></body></html>');
+    response.end('<!doctype html><html><body><h1>Page lifecycle fixture</h1><button id=activate>Activate page</button><p>Keep this page and its extension active.</p></body></html>');
   });
   await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
   let page;
   try {
     page = await newPageWithoutForeground(context);
-    await page.goto(`http://127.0.0.1:${server.address().port}/`, {waitUntil: 'domcontentloaded'});
+    const fixtureUrl = `http://127.0.0.1:${server.address().port}/`;
+    await page.goto(fixtureUrl, {waitUntil: 'domcontentloaded'});
     const floating = page.locator('#fluent-read-floating-ball-container');
     await floating.waitFor({state: 'attached', timeout});
-    await page.evaluate(() => window.dispatchEvent(new Event('beforeunload')));
-    if (await floating.count() !== 1) throw new Error('取消导航时扩展被卸载');
+    const popup = await newPageWithoutForeground(context, timeout);
+    try {
+      await popup.goto(new URL(popupPath, `${extensionOrigin}/`).href, {waitUntil: 'domcontentloaded'});
+      await popup.locator('.popup-shell[data-config-ready="true"]').waitFor({state: 'visible', timeout});
+      await popup.getByRole('switch', {name: '暂停插件', exact: true}).click();
+      await floating.waitFor({state: 'detached', timeout});
+      await popup.getByRole('switch', {name: '启用插件', exact: true}).click();
+      await floating.waitFor({state: 'attached', timeout});
+    } finally { await popup.close(); }
+    // 宿主脚本合成事件不能控制扩展的生命周期。
+    await page.evaluate(() => {
+      window.dispatchEvent(new PageTransitionEvent('pagehide', {persisted: false}));
+      window.dispatchEvent(new PageTransitionEvent('pagehide', {persisted: true}));
+      window.dispatchEvent(new PageTransitionEvent('pageshow', {persisted: true}));
+      document.dispatchEvent(new Event('fluentread-route-change'));
+    });
+    if (await floating.count() !== 1) throw new Error('伪造页面离开事件卸载了扩展');
+    await page.locator('#activate').click();
+    await page.evaluate(() => {
+      window.__leaveGuard = event => { event.preventDefault(); event.returnValue = ''; };
+      window.addEventListener('beforeunload', window.__leaveGuard);
+    });
+    let dismissed = false;
+    page.once('dialog', async dialog => { dismissed = dialog.type() === 'beforeunload'; await dialog.dismiss(); });
+    await page.goto(`${fixtureUrl}cancelled`).catch(error => {
+      if (!String(error).includes('ERR_ABORTED')) throw error;
+    });
+    if (!dismissed || page.url() !== fixtureUrl || await floating.count() !== 1) {
+      throw new Error('取消真实离开确认后页面或扩展状态异常');
+    }
+    await page.evaluate(() => {
+      window.removeEventListener('beforeunload', window.__leaveGuard);
+      window.__persistedTransitions = [];
+      for (const type of ['pagehide', 'pageshow']) window.addEventListener(type, event => {
+        window.__persistedTransitions.push({type, persisted: event.persisted, trusted: event.isTrusted});
+      });
+    });
     const shadow = await page.evaluate(() => {
       const host = document.createElement('div');
       document.body.append(host);
@@ -619,15 +686,22 @@ async function runContentLifecycleRegression(context) {
         if (++reads > 1) throw new Error('mode getter read twice');
         return 'open';
       }});
-      return {reads, attached: host.shadowRoot === root};
+      let missingArgumentsThrow = false;
+      try { history.pushState(); } catch (error) { missingArgumentsThrow = error instanceof TypeError; }
+      return {reads, attached: host.shadowRoot === root, missingArgumentsThrow};
     });
-    if (shadow.reads !== 1 || !shadow.attached) throw new Error('Shadow bridge 改变了宿主 API 语义');
-    await page.evaluate(() => window.dispatchEvent(new PageTransitionEvent('pagehide', {persisted: true})));
-    await floating.waitFor({state: 'detached', timeout});
-    await page.evaluate(() => window.dispatchEvent(new PageTransitionEvent('pageshow', {persisted: true})));
+    if (shadow.reads !== 1 || !shadow.attached || !shadow.missingArgumentsThrow) throw new Error('Shadow bridge 改变了宿主 API 语义');
+    await page.goto(`${fixtureUrl}next`, {waitUntil: 'domcontentloaded'});
+    // BFCache 恢复已有文档，不会重新触发 DOMContentLoaded；先等导航提交，再验证 pageshow。
+    await page.goBack({waitUntil: 'commit'});
     await floating.waitFor({state: 'attached', timeout});
     if (await floating.count() !== 1) throw new Error('往返恢复重复挂载');
-    return {cancelledNavigation: true, simulatedPersistedTransition: true, shadow, screenshot: await screenshot(page, 'content-lifecycle-restored.png')};
+    const transitions = await page.evaluate(() => window.__persistedTransitions || []);
+    if (!transitions.some(event => event.type === 'pageshow' && event.persisted && event.trusted)) {
+      throw new Error(`本轮未命中真实 BFCache 恢复：${JSON.stringify(transitions)}`);
+    }
+    return {configDrivenGlobalToggle: true, cancelledNavigation: true, forgedEventsIgnored: true, realBackForwardCache: true,
+      transitions, shadow, screenshot: await screenshot(page, 'content-lifecycle-restored.png')};
   } finally {
     await page?.close().catch(() => undefined);
     await new Promise(resolve => server.close(resolve));
@@ -764,7 +838,8 @@ async function main() {
         report,
       });
     }
-    report.contentLifecycle = await runContentLifecycleRegression(context);
+    report.deferredUi = await runPopupDeferredUiRegression(context, extensionOrigin, manifestEntrypoints.popup);
+    report.contentLifecycle = await runContentLifecycleRegression(context, extensionOrigin, manifestEntrypoints.popup);
     report.screenshots = report.startupCases.map(item => item.screenshot);
     // 读回并恢复测试前的公开 UI 配置，避免留下测试状态；凭据始终不参与日志或 patch。
     const restorePatch = {

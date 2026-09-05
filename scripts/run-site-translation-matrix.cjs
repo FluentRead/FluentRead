@@ -160,14 +160,14 @@ function validateMatrix(caseConfigs = CASES) {
     errors.push(`required 矩阵至少需要 ${MATRIX_REQUIREMENTS.dynamicCoverageRules} 个动态节点覆盖契约`);
   }
 
-  const pr4038 = caseConfigs['github-immersive-pr-4038'];
-  const pr4038Rules = normalizedByName.get('github-immersive-pr-4038')?.coverageRules || [];
+  const pr4038 = caseConfigs['github-project-pr'];
+  const pr4038Rules = normalizedByName.get('github-project-pr')?.coverageRules || [];
   if (!pr4038 || (pr4038.tier || 'required') !== 'required') {
-    errors.push('缺少 required 的 github-immersive-pr-4038 回归页');
+    errors.push('缺少 required 的 github-project-pr 回归页');
   } else if (!pr4038Rules.some((rule) => rule.kind === 'heading' && /\bh1\b/iu.test(rule.selector)) ||
       !pr4038Rules.some((rule) => rule.kind === 'content') ||
       !pr4038Rules.some((rule) => rule.kind === 'list')) {
-    errors.push('github-immersive-pr-4038 必须分别覆盖 H1、正文和列表，不能只验证单个 selector');
+    errors.push('github-project-pr 必须分别覆盖 H1、正文和列表，不能只验证单个 selector');
   }
   const pr4038HoverSelectors = (pr4038?.hoverTargets || []).map((target) => target.selector);
   if (JSON.stringify(pr4038HoverSelectors) !== JSON.stringify([
@@ -176,7 +176,7 @@ function validateMatrix(caseConfigs = CASES) {
     '.markdown-body p',
     '.markdown-body li',
   ])) {
-    errors.push('github-immersive-pr-4038 的 hover 必须分别验证 H1、首个 H2、首个 P 和首个 LI');
+    errors.push('github-project-pr 的 hover 必须分别验证 H1、首个 H2、首个 P 和首个 LI');
   }
   if (!pr4038?.forbiddenMustExistSelectors?.includes("button[aria-haspopup='dialog'][aria-label*='search' i]") ||
       !pr4038?.interactionScenarios?.some((scenario) =>
@@ -185,7 +185,7 @@ function validateMatrix(caseConfigs = CASES) {
         scenario.comboboxSelector === "[role='combobox']" &&
         scenario.listboxSelector === "[role='listbox']" && scenario.inputText === 'issues' &&
         scenario.closeAttempts === 2)) {
-    errors.push('github-immersive-pr-4038 必须验证真实 Search trigger、输入、dialog、combobox 和 listbox');
+    errors.push('github-project-pr 必须验证真实 Search trigger、输入、dialog、combobox 和 listbox');
   }
 
   if (errors.length > 0) throw new Error(`站点矩阵配置无效：\n- ${errors.join('\n- ')}`);

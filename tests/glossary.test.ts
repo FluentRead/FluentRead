@@ -268,7 +268,7 @@ describe('术语文件预览与导出', () => {
         ]);
     });
 
-    it('按沉浸式翻译tgt_lng及源语言拆库，不丢掉第三列语言范围', () => {
+    it('按tgt_lng及源语言拆库，不丢掉第三列语言范围', () => {
         const preview = parseGlossaryImport('source,target,tgt_lng,src_lng\nAPI,接口,zh-CN,en\nAPI,API,ja,en\nToken,令牌,zh-CN,en\nX,Y,auto,auto', 'csv');
         expect(preview.errors).toEqual([]);
         expect(preview.libraries.map((lib) => [lib.sourceLanguage, lib.targetLanguage, lib.entries.length])).toEqual([
@@ -301,7 +301,7 @@ describe('术语文件预览与导出', () => {
         expect(flags.libraries[0].entries.map((term) => term.caseSensitive)).toEqual([true, true, false, false, false, false]);
     });
 
-    it('沉浸式CSV简繁中文别名可直接用于FluentRead源目标语言，简繁互不串库', () => {
+    it('CSV简繁中文别名可直接用于FluentRead源目标语言，简繁互不串库', () => {
         const preview = parseGlossaryImport('source,target,tgt_lng,src_lng\nAPI,接口,zh-CN,en\nToken,令牌,zh_SG,en\nAPI,介面,zh-TW,en\nToken,權杖,zh-HK,en\nAgent,代理,zh-MO,en', 'csv');
         expect(preview.errors).toEqual([]);
         expect(preview.libraries.map(({targetLanguage, entries}) => [targetLanguage, entries.length])).toEqual([

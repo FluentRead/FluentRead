@@ -96,7 +96,7 @@ flowchart TD
 
 当前只实现 `read_context` 一个模型可调用工具；“当前选区”模式不提供它。单词本写入由用户点击触发，不是模型自主调用的工具。循环默认最多进行 4 次模型调用、2 次工具调用，40 秒超时；不会让模型无限运行。
 
-本次复用 AI SDK，新增固定版本的 Anthropic、Google 适配器，使 Claude、Gemini 及已支持的兼容服务保持各自协议。DeepSeek Harness MIT 与新增适配器 Apache 2.0 声明随扩展包分发。没有使用 `read-frog` 或 `kiss-translator` 的代码。
+本次复用 AI SDK，新增固定版本的 Anthropic、Google 适配器，使 Claude、Gemini 及已支持的兼容服务保持各自协议。DeepSeek Harness MIT 与新增适配器 Apache 2.0 声明随扩展包分发。
 
 更多来源与范围见[使用指南](../guide/deepseek-harness.md)。
 

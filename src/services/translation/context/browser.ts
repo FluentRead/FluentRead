@@ -157,7 +157,7 @@ function collectBoundedReadableText(doc: Document): string {
 function createDefuddleSnapshotDocument(): Document | null {
     if (typeof document === 'undefined') return null;
 
-    // 脱离页面的 document 可防止解析器读取或修改实时页面；这与 Read Frog 使用的隔离边界一致。
+    // 脱离页面的 document 可防止解析器读取或修改实时页面。
     if (document.implementation?.createHTMLDocument && document.documentElement?.outerHTML) {
         const snapshot = document.implementation.createHTMLDocument(document.title);
         snapshot.documentElement.innerHTML = document.documentElement.outerHTML;

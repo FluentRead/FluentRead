@@ -84,8 +84,8 @@
     "fullPageHotkey": "Alt+T",
     "service": "freeTranslation"
   },
-  "github-immersive-pulls": {
-    "url": "https://github.com/immersive-translate/immersive-translate/pulls",
+  "github-project-pulls": {
+    "url": "https://github.com/FluentRead/FluentRead/pulls",
     "hoverSelector": ".markdown-title",
     "requiredSelectors": [".markdown-title"],
     "coverageRules": [
@@ -100,8 +100,8 @@
     "fullPageHotkey": "Alt+T",
     "service": "freeTranslation"
   },
-  "github-immersive-pr-4038": {
-    "url": "https://github.com/immersive-translate/immersive-translate/pull/4038",
+  "github-project-pr": {
+    "url": "https://github.com/FluentRead/FluentRead/pull/428",
     "hoverSelector": "main h1",
     "hoverTargets": [
       {"name": "pr-title-h1", "selector": "main h1"},
@@ -117,15 +117,15 @@
         "kind": "heading",
         "minInitial": 1,
         "trackDynamic": true,
-        "sourceIncludes": ["fix(github): preserve quick search during translation"]
+        "sourceIncludes": ["fix: stabilize translation lifecycle and preserve remounted sources"]
       },
       {
         "name": "body-headings",
         "selector": ".markdown-body h2",
         "kind": "heading",
-        "minInitial": 3,
+        "minInitial": 1,
         "trackDynamic": true,
-        "sourceIncludes": ["What changed", "Why", "Validation"]
+        "sourceIncludes": ["验证"]
       },
       {
         "name": "body-paragraphs",
@@ -133,7 +133,7 @@
         "kind": "content",
         "minInitial": 2,
         "trackDynamic": true,
-        "sourceIncludes": ["GitHub mounts its global search UI dynamically"]
+        "sourceIncludes": ["本 PR 沿用现有共享翻译链路"]
       },
       {
         "name": "body-list-items",
@@ -141,7 +141,7 @@
         "kind": "list",
         "minInitial": 7,
         "trackDynamic": true,
-        "sourceIncludes": ["Exclude GitHub's global search trigger"]
+        "sourceIncludes": ["已取消的快捷键手势"]
       }
     ],
     "forbiddenSelectors": ["button[aria-haspopup='dialog'][aria-label*='search' i]"],
@@ -162,7 +162,7 @@
     ],
     "modes": ["hover", "full"],
     "tier": "required",
-    "notes": "用户截图中的主回归页：H1、正文分节、段落和列表必须分别达到 100% 覆盖；旧的 7-wrapper 单点基线必须失败。",
+    "notes": "FluentRead PR 回归页：H1、正文分节、段落和列表必须分别达到 100% 覆盖；旧的 7-wrapper 单点基线必须失败。",
     "hoverHotkey": "Control",
     "fullPageHotkey": "Alt+T",
     "service": "freeTranslation"
@@ -499,7 +499,7 @@
     "modes": ["hover", "full"],
     "tier": "quarantine",
     "quarantineReason": "当前隔离浏览器收到 HTTP 202 空白响应，未取得论坛正文；保留为联网环境观察样本。",
-    "notes": "Immersive Translate Issue #212 的论坛正文误判场景。",
+    "notes": "论坛正文误判回归场景。",
     "hoverHotkey": "Control",
     "fullPageHotkey": "Alt+T",
     "service": "freeTranslation"

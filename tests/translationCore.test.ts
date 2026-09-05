@@ -1262,7 +1262,7 @@ describe('translation candidate core', () => {
                     </a>
                 </div>
             </main>
-        `, 'https://github.com/immersive-translate/immersive-translate/pulls');
+        `, 'https://github.com/FluentRead/FluentRead/pulls');
         const title = document.querySelector('#pr-title')!;
         const candidate = core.discover(document).find((item) => item.element === title);
 
@@ -1459,7 +1459,7 @@ describe('translation candidate core', () => {
                 <a id="pr-title" class="markdown-title">Fix partial pull-request translation</a>
                 <p>Block child that makes the row produce an inline run.</p>
             </div></main>
-        `, 'https://github.com/immersive-translate/immersive-translate/pulls');
+        `, 'https://github.com/FluentRead/FluentRead/pulls');
         const candidates = [...core.discoverSteps(document)]
             .flatMap((step) => step.candidate ? [step.candidate] : []);
         const explicit = candidates.find((candidate) => candidate.adapterId === 'github')!;
@@ -1480,7 +1480,7 @@ describe('translation candidate core', () => {
             <main><div id="row">Readable prose before the title.
                 <a id="pr-title" class="markdown-title">Fix partial pull-request translation</a>
                 Readable prose after the title.</div></main>
-        `, 'https://github.com/immersive-translate/immersive-translate/pulls');
+        `, 'https://github.com/FluentRead/FluentRead/pulls');
         const row = document.querySelector('#row')!;
         const title = document.querySelector('#pr-title')!;
         const before = row.childNodes[0]!;
@@ -1543,7 +1543,7 @@ describe('translation candidate core', () => {
                     </div>
                 </div>
             </main>
-        `, 'https://github.com/immersive-translate/immersive-translate/pull/4038');
+        `, 'https://github.com/FluentRead/FluentRead/pull/428');
 
         const candidates = core.discover(document);
         const ids = candidates.map((item) => item.element.id);

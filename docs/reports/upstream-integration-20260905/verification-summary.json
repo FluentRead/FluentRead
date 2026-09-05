@@ -489,54 +489,6 @@
         }
       },
       {
-        "case": "github-immersive-pulls",
-        "mode": "hover",
-        "ok": true,
-        "focusPreserved": true,
-        "translated": null,
-        "retranslated": null,
-        "hostMathRendering": {
-          "detected": false,
-          "errors": []
-        }
-      },
-      {
-        "case": "github-immersive-pulls",
-        "mode": "full",
-        "ok": true,
-        "focusPreserved": true,
-        "translated": 12,
-        "retranslated": 12,
-        "hostMathRendering": {
-          "detected": false,
-          "errors": []
-        }
-      },
-      {
-        "case": "github-immersive-pr-4038",
-        "mode": "hover",
-        "ok": true,
-        "focusPreserved": true,
-        "translated": null,
-        "retranslated": null,
-        "hostMathRendering": {
-          "detected": false,
-          "errors": []
-        }
-      },
-      {
-        "case": "github-immersive-pr-4038",
-        "mode": "full",
-        "ok": true,
-        "focusPreserved": true,
-        "translated": 37,
-        "retranslated": 37,
-        "hostMathRendering": {
-          "detected": false,
-          "errors": []
-        }
-      },
-      {
         "case": "pubdev-provider",
         "mode": "hover",
         "ok": true,

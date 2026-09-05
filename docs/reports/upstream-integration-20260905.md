@@ -1,6 +1,6 @@
 # 上游修复整合与 PR #447 验证（2026-09-05）
 
-本报告记录整合当前主分支后的交付验证，替代旧报告中的“最新源码”计数。原始上游对照见[阅读蛙与简约翻译审查](../upstream-fix-audit-20260905.md)，原有失败及观察用例的归因见[浏览器跟进报告](../upstream-regression-followup-20260905.md)。
+本报告记录整合当前主分支后的交付验证，替代旧报告中的“最新源码”计数。原有失败及观察用例的归因见[浏览器跟进报告](../upstream-regression-followup-20260905.md)。
 
 目标仓库为 `FluentRead/FluentRead`，PR 为 [#447](https://github.com/FluentRead/FluentRead/pull/447)。验证生产源码为 `93cc473c4d46d73b731d8b40a43b4e2b5d56c942`，包含主分支 `e69bca319fb59dcbd0401d386dcb2d4311ebf94a` 的 JSON 站点规则、术语库、共享划词/阅读助手及最新设置界面。两个参考仓库保持只读。
 
@@ -53,7 +53,7 @@ Chrome 副本 `/private/tmp/fr-pr-integration-v3-chrome` 共 233 文件；逐文
 - 用户脚本 `/private/tmp/fr-pr-integration-v3.user.js`：`19c86578e17aa42145211510027c930be198863e60420100aa6d8c120c53f9ee`。
 - 完整摘要：`/private/tmp/fr-pr-integration-v3-artifact.json`。
 
-最终验收使用以上同一份冻结产物，所有有效执行均通过。逐项结果、范围和摘要已保存在仓库的[机器可读验证摘要](./upstream-integration-20260905/verification-summary.json)。
+最终验收使用以上同一份冻结产物，所有有效执行均通过。逐项结果见[机器可读验证摘要](./upstream-integration-20260905/verification-summary.json)；摘要已移除第三方产品页面的历史记录，其余数据保留原始验证结果。
 
 | 浏览器检查 | 最终结果及范围 |
 | --- | --- |

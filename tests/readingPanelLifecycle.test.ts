@@ -142,7 +142,7 @@ describe('reading action ownership and reuse', () => {
     await panel.openSettings('settings-services');
     expect(panel.feedback).toContain('翻译服务');
     sendMessage.mockRejectedValueOnce(new Error('background stopped'));
-    await panel.openSettings(); expect(panel.feedback).toContain('基础配置');
+    await panel.openSettings(); expect(panel.feedback).toContain('专项翻译');
     await panel.openSettings(); expect(sendMessage).toHaveBeenLastCalledWith({type: 'openOptionsPage', section: 'settings-harness'});
     await panel.saveWord();
     expect(sendMessage).toHaveBeenLastCalledWith(expect.objectContaining({action: 'upsert', input: expect.objectContaining({term: 'Practice helps.', sourceLanguage: 'en', translation: ''})}));

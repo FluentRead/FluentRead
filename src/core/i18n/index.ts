@@ -15,6 +15,7 @@ import {jaJPLegacyText, jaJPMessages} from './messages/ja-JP';
 import {koKRLegacyText, koKRMessages} from './messages/ko-KR';
 import {ruRULegacyText, ruRUMessages} from './messages/ru-RU';
 import {zhCNMessages} from './messages/zh-CN';
+import {translateLegacyPattern} from './messages/legacy-patterns';
 import {
     DEFAULT_UI_LANGUAGE,
 } from './language';
@@ -42,6 +43,13 @@ const legacyCatalogs: Record<UiLanguage, Readonly<Record<string, string>>> = {
     'ru-RU': ruRULegacyText,
     'es-ES': esESLegacyText,
 };
+
+/** 稳定资源中的中文文案也可供旧模板精确复用，避免同时维护两份相同译文。 */
+const messageLegacyCatalogs = Object.fromEntries(
+    Object.entries(catalogs).map(([language, catalog]) => [language, Object.fromEntries(
+        Object.entries(zhCNMessages).map(([key, source]) => [source, catalog[key] ?? source]),
+    )]),
+) as Record<UiLanguage, Readonly<Record<string, string>>>;
 
 function formatMessage(template: string, params?: TranslationParams): string {
     if (!params) return template;
@@ -315,8 +323,11 @@ const legacyPatternCatalog: Partial<Record<UiLanguage, ReadonlyArray<readonly [R
 export function translateLegacyText(value: string, language: UiLanguage): string {
     if (language === 'zh-CN' || !value.trim()) return value;
     const trimmed = value.trim();
-    const exact = legacyCatalogs[language]?.[trimmed];
+    const exact = legacyCatalogs[language]?.[trimmed] ?? messageLegacyCatalogs[language]?.[trimmed];
     if (exact) return preserveWhitespace(value, exact);
+
+    const dynamic = translateLegacyPattern(trimmed, language, (fragment) => fragment.split('；').map((part) => translateLegacyText(part, language)).join('；'));
+    if (dynamic !== undefined) return preserveWhitespace(value, dynamic);
 
     for (const separator of [' · ', ' → ']) {
         const compound = trimmed.split(separator);

@@ -58,8 +58,8 @@
         <div v-if="currentReview" class="review-card">
           <span class="status-pill" :class="`status-${currentReview.status}`">{{ statusLabel(currentReview.status) }}</span>
           <div class="review-prompt">
-            <p v-if="currentClozeContext" class="cloze-context">{{ currentClozeContext }}</p>
-            <h3 v-else>{{ currentReview.term }}</h3>
+            <p v-if="currentClozeContext" class="cloze-context" data-i18n-ignore>{{ currentClozeContext }}</p>
+            <h3 v-else data-i18n-ignore>{{ currentReview.term }}</h3>
             <small>{{ currentClozeContext ? '回忆空缺处的表达和含义' : '回忆它的含义，并想想可以怎样使用' }}</small>
           </div>
 
@@ -67,13 +67,13 @@
           <button v-if="!reviewAnswerVisible" class="reveal-button" type="button" @click="reviewAnswerVisible = true">显示答案 <kbd>Space</kbd></button>
 
           <div v-else class="review-answer">
-            <div class="answer-heading"><h3>{{ currentReview.term }}</h3><button class="vocabulary-speak" type="button" :aria-label="playingEntryId === currentReview.id ? '停止朗读' : '朗读原文'" :title="playingEntryId === currentReview.id ? '停止朗读' : '朗读原文'" @click="toggleEntrySpeech(currentReview)"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M3 7h4l4-3v12l-4-3H3z" /><path :d="playingEntryId === currentReview.id ? 'M14 7v6m3-6v6' : 'M14 7a4 4 0 0 1 0 6m2-9a8 8 0 0 1 0 12'" /></svg></button><span v-if="currentReview.phonetic">{{ currentReview.phonetic }}</span></div>
-            <p v-if="recallDraft" class="recall-attempt">你的回忆：{{ recallDraft }}</p>
+            <div class="answer-heading"><h3 data-i18n-ignore>{{ currentReview.term }}</h3><button class="vocabulary-speak" type="button" :aria-label="playingEntryId === currentReview.id ? '停止朗读' : '朗读原文'" :title="playingEntryId === currentReview.id ? '停止朗读' : '朗读原文'" @click="toggleEntrySpeech(currentReview)"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M3 7h4l4-3v12l-4-3H3z" /><path :d="playingEntryId === currentReview.id ? 'M14 7v6m3-6v6' : 'M14 7a4 4 0 0 1 0 6m2-9a8 8 0 0 1 0 12'" /></svg></button><span v-if="currentReview.phonetic">{{ currentReview.phonetic }}</span></div>
+            <p v-if="recallDraft" class="recall-attempt">你的回忆：<span data-i18n-ignore>{{ recallDraft }}</span></p>
             <span class="answer-reference-label">收藏时的参考内容</span>
             <ReadingAnswer v-if="entryTranslation(currentReview)" :text="entryTranslation(currentReview)" />
             <p v-else class="answer-translation">尚未保存参考内容。可以先进入学习页理解这个表达，再回来复习。</p>
             <button type="button" class="study-entry-button" @click="openStudy(currentReview)">结合原句学用法</button>
-            <p v-if="latestContext(currentReview)?.text" class="answer-context">{{ latestContext(currentReview)?.text }}</p>
+            <p v-if="latestContext(currentReview)?.text" class="answer-context" data-i18n-ignore>{{ latestContext(currentReview)?.text }}</p>
             <a v-if="latestContext(currentReview)?.sourceUrl" :href="latestContext(currentReview)?.sourceUrl" target="_blank" rel="noreferrer">查看收藏来源 ↗</a>
             <div class="review-actions">
               <button type="button" class="again" :disabled="actionBusy" @click="rateReview('again')"><span>1</span><strong>忘了</strong><small>约 10 分钟后</small></button>
@@ -138,9 +138,9 @@
         <section v-else class="word-list" aria-label="收藏的单词与句子">
           <article v-for="entry in pagedEntries" :key="entry.id" class="word-row">
             <div class="word-main">
-              <div class="word-heading"><h3>{{ entry.term }}</h3><button class="vocabulary-speak" type="button" :aria-label="playingEntryId === entry.id ? '停止朗读' : '朗读原文'" :title="playingEntryId === entry.id ? '停止朗读' : '朗读原文'" @click="toggleEntrySpeech(entry)"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M3 7h4l4-3v12l-4-3H3z" /><path :d="playingEntryId === entry.id ? 'M14 7v6m3-6v6' : 'M14 7a4 4 0 0 1 0 6m2-9a8 8 0 0 1 0 12'" /></svg></button><span v-if="entry.phonetic">{{ entry.phonetic }}</span></div>
+              <div class="word-heading"><h3 data-i18n-ignore>{{ entry.term }}</h3><button class="vocabulary-speak" type="button" :aria-label="playingEntryId === entry.id ? '停止朗读' : '朗读原文'" :title="playingEntryId === entry.id ? '停止朗读' : '朗读原文'" @click="toggleEntrySpeech(entry)"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M3 7h4l4-3v12l-4-3H3z" /><path :d="playingEntryId === entry.id ? 'M14 7v6m3-6v6' : 'M14 7a4 4 0 0 1 0 6m2-9a8 8 0 0 1 0 12'" /></svg></button><span v-if="entry.phonetic">{{ entry.phonetic }}</span></div>
               <p>{{ vocabularyReferencePreview(entryTranslation(entry)) || '从原句开始，理解这个表达的含义与用法' }}</p>
-              <small v-if="contextPreview(entry)" class="context-preview">{{ contextPreview(entry) }}</small>
+              <small v-if="contextPreview(entry)" class="context-preview" data-i18n-ignore>{{ contextPreview(entry) }}</small>
               <div class="word-meta">
                 <span v-if="entry.partOfSpeech">{{ entry.partOfSpeech }}</span>
                 <span>{{ entry.encounterCount }} 次收藏记录</span>
@@ -183,7 +183,7 @@ import VocabularyStudy from './VocabularyStudy.vue';
 import {ReadingAnswer} from '@/src/features/reading-assistant/public';
 import {ElMessageBox} from 'element-plus';
 import browser from 'webextension-polyfill';
-import {normalizeUiLanguage, translateLegacyText} from '@/src/core/i18n';
+import {normalizeUiLanguage, translate, translateLegacyText} from '@/src/core/i18n';
 import {createSelectionTtsClientRequestId, createSelectionTtsContentController, normalizeSpeechLanguage} from '@/src/features/selection-translation/speech/public';
 import {
   config as runtimeConfig,
@@ -729,7 +729,7 @@ function nextReviewLabel(entry: VocabularyEntry): string {
   if (delta <= 0) return '现在可以复习';
   if (delta < 60 * 60 * 1000) return `${Math.max(1, Math.ceil(delta / 60000))} 分钟后`;
   if (delta < 24 * 60 * 60 * 1000) return `${Math.ceil(delta / 3600000)} 小时后`;
-  return `${Math.ceil(delta / 86400000)} 天后`;
+  return translate("learning.dueDays", normalizeUiLanguage(runtimeConfig.uiLanguage), {count: Math.ceil(delta / 86400000)});
 }
 function normalizeLanguageKey(value: unknown): string {
   const normalized = String(value ?? '').trim().replaceAll('_', '-').toLowerCase();

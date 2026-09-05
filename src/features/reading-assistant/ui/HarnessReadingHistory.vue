@@ -26,10 +26,10 @@
             <p>{{ formatDate(selectedHistory.updatedAt) }} · {{ selectedHistory.turns.length }} 次问答</p>
           </header>
           <section v-for="(turn, index) in selectedHistory.turns" :key="turn.id" class="harness-history-turn">
-            <header><h3 data-i18n-ignore>{{ turn.question || actionLabelFor(turn.intent) }}</h3><small>{{ actionLabelFor(turn.intent) }} · {{ formatDate(turn.createdAt) }}<template v-if="turn.status !== 'completed'"> · {{ statusLabel(turn.status) }}</template></small></header>
+            <header><h3 data-i18n-ignore>{{ turn.question || translateLegacy(actionLabelFor(turn.intent)) }}</h3><small>{{ actionLabelFor(turn.intent) }} · {{ formatDate(turn.createdAt) }}<template v-if="turn.status !== 'completed'"> · {{ statusLabel(turn.status) }}</template></small></header>
             <ReadingAnswer v-if="turn.answer" data-i18n-ignore :text="turn.answer" :compact="false" />
             <p v-else class="harness-history-empty-answer">{{ turn.status === 'streaming' ? '回答仍在生成中，稍后重新打开这条记录查看。' : '这次提问没有保存回答。' }}</p>
-            <span class="harness-visually-hidden">第 {{ index + 1 }} 次问答结束</span>
+            <span class="harness-visually-hidden">{{ t("reading.turnEnd", {number: index + 1}) }}</span>
           </section>
         </article>
         <p class="harness-history-footnote">想继续提问？回到网页，在阅读卡的“阅读记录”中打开这条记录。</p>
@@ -59,6 +59,8 @@
   </section>
 </template>
 <script setup lang="ts">
+import {useUiI18n} from "@/src/ui/i18n"
+const {t, translateLegacy} = useUiI18n()
 import {onBeforeUnmount, onMounted, ref} from 'vue'
 import ReadingAnswer from './ReadingAnswer.vue'
 import {clearHarnessSessions, deleteHarnessSession, getHarnessSession, listHarnessSessions} from '../client'

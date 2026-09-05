@@ -190,14 +190,14 @@
                 <figure v-if="effectivePreviewMode !== 'translated'" class="pdf-page-column">
                   <figcaption><span>原文</span><strong>{{ t('document.pageNumber', {page: pdfPage.pageNumber}) }}</strong></figcaption>
                   <div class="pdf-page-frame" :style="{ aspectRatio: `${pdfPage.width} / ${pdfPage.height}` }">
-                    <img v-if="pdfPage.originalUrl" :src="pdfPage.originalUrl" :alt="`PDF 原文第 ${pdfPage.pageNumber} 页`" />
+                    <img v-if="pdfPage.originalUrl" :src="pdfPage.originalUrl" :alt="t('document.pdfOriginalPage', {page: pdfPage.pageNumber})" />
                     <span v-else class="pdf-page-loading">正在渲染原页…</span>
                   </div>
                 </figure>
                 <figure v-if="effectivePreviewMode !== 'source'" class="pdf-page-column translated">
                   <figcaption><span>译文</span><strong>保留原版式</strong></figcaption>
                   <div class="pdf-page-frame" :style="{ aspectRatio: `${pdfPage.width} / ${pdfPage.height}` }">
-                    <img v-if="pdfPage.translatedUrl" :src="pdfPage.translatedUrl" :alt="`PDF 译文第 ${pdfPage.pageNumber} 页`" />
+                    <img v-if="pdfPage.translatedUrl" :src="pdfPage.translatedUrl" :alt="t('document.pdfTranslatedPage', {page: pdfPage.pageNumber})" />
                     <div v-else class="pdf-page-pending">
                       <span v-if="pdfPage.loading || pdfPreviewLoading" class="spinner dark-spinner" />
                       <strong>{{ translating ? '正在翻译并重排本页' : '等待生成译页' }}</strong>
@@ -238,7 +238,7 @@
             class="rich-preview-frame"
             :srcdoc="richPreviewHtml"
             sandbox=""
-            :title="`${parsedDocument.label}排版阅读预览`"
+            :title="t('document.layoutPreview', {format: parsedDocument.label})"
           />
         </section>
 
@@ -270,7 +270,7 @@
                 :class="`docx-role-${row.role || 'paragraph'}`"
               >
                 <p v-if="effectivePreviewMode !== 'translated'" class="docx-source document-source" data-i18n-ignore>{{ row.source }}</p>
-                <p v-if="effectivePreviewMode !== 'source'" class="docx-translation document-translation" data-i18n-ignore>{{ row.translation || '等待翻译…' }}</p>
+                <p v-if="effectivePreviewMode !== 'source'" class="docx-translation document-translation" data-i18n-ignore>{{ row.translation || translateLegacy('等待翻译…') }}</p>
               </section>
             </article>
           </div>
@@ -293,7 +293,7 @@
                   <td><time>{{ row.timeEnd || '—' }}</time></td>
                   <td v-if="effectivePreviewMode !== 'translated'"><p class="subtitle-source document-source" data-i18n-ignore>{{ readerText(row.source) }}</p></td>
                   <td v-if="effectivePreviewMode !== 'source'">
-                    <p class="subtitle-translation document-translation" data-i18n-ignore>{{ row.translation || '等待翻译…' }}</p>
+                    <p class="subtitle-translation document-translation" data-i18n-ignore>{{ row.translation || translateLegacy('等待翻译…') }}</p>
                   </td>
                 </tr>
               </tbody>
@@ -312,7 +312,7 @@
           <article v-for="row in jsonRows" :key="row.index" class="json-table-row" :class="{ single: effectivePreviewMode !== 'bilingual' }">
             <code>{{ row.pathLabel || '$' }}</code>
             <p v-if="effectivePreviewMode !== 'translated'" class="json-source document-source" data-i18n-ignore>{{ row.source }}</p>
-            <p v-if="effectivePreviewMode !== 'source'" class="json-translation document-translation" data-i18n-ignore>{{ row.translation || '等待翻译…' }}</p>
+            <p v-if="effectivePreviewMode !== 'source'" class="json-translation document-translation" data-i18n-ignore>{{ row.translation || translateLegacy('等待翻译…') }}</p>
           </article>
         </section>
 
@@ -322,7 +322,7 @@
             <div v-if="effectivePreviewMode !== 'translated'" class="reader-source document-source" data-i18n-ignore :class="readerSourceClass(row.source)">
               {{ readerText(row.source) }}
             </div>
-            <p v-if="effectivePreviewMode !== 'source'" class="reader-translation document-translation" data-i18n-ignore>{{ row.translation || '等待翻译…' }}</p>
+            <p v-if="effectivePreviewMode !== 'source'" class="reader-translation document-translation" data-i18n-ignore>{{ row.translation || translateLegacy('等待翻译…') }}</p>
           </article>
         </div>
         <p v-if="!hasTranslation" class="reader-empty">
@@ -345,7 +345,7 @@
         <button type="button" :disabled="preparingDownload" :aria-pressed="outputMode === 'bilingual'" :class="{ selected: outputMode === 'bilingual' }" @click="outputMode = 'bilingual'"><strong>双语对照</strong><span>{{ isPdfDocument ? '原页与译页左右并排' : '同时保留原文和译文' }}</span></button>
         <button type="button" :disabled="preparingDownload" :aria-pressed="outputMode === 'translated'" :class="{ selected: outputMode === 'translated' }" @click="outputMode = 'translated'"><strong>仅译文</strong><span>适合直接阅读和分享</span></button>
       </div>
-      <p v-if="!translationComplete" class="notice warning">还有 {{ (parsedDocument?.segments.length || 0) - completedSegments }} 段未翻译，这些位置会保留原文。</p>
+      <p v-if="!translationComplete" class="notice warning">{{ t("document.untranslatedWarning", {count: (parsedDocument?.segments.length || 0) - completedSegments}) }}</p>
       <label v-if="!translationComplete" class="partial-export"><input v-model="partialExportAcknowledged" type="checkbox" :disabled="preparingDownload" />我已了解，下载当前结果</label>
       <p v-if="isPdfDocument" class="export-note">PDF 译页以图像呈现，适合保留版面阅读，暂不支持复制译文。</p>
       <p v-if="downloadError" class="notice error" role="alert">{{ downloadError }}</p>

@@ -1,4 +1,5 @@
 import {describe, expect, it} from 'vitest';
+import {localizedLegacyPatterns, translateLegacyPattern} from '@/src/core/i18n/messages/legacy-patterns';
 
 import {
   DEFAULT_UI_LANGUAGE,
@@ -769,5 +770,87 @@ describe('界面 i18n 契约', () => {
     expect(imported.uiLanguage).toBe('en-US');
     expect(imported.token).toEqual({});
     expect(toRestorableConfig({uiLanguageSetupCompleted: true})).not.toHaveProperty('uiLanguageSetupCompleted');
+  });
+});
+
+// 扫描实际界面源文件，避免只检查词典自身而放过未登记的新文案。
+describe('i18n 全量界面扫描', () => {
+  it('Vue 文案和展示注册表在非中文界面有本地化结果', async () => {
+    const {collectUiSourceCopy} = await import('../scripts/testing/i18n-source-audit.mjs');
+    const audit = collectUiSourceCopy(process.cwd());
+    // 固定的中英术语演示、语言自身名称和装饰图标不属于界面译文。
+    const examples = new Set(['中文', 'A中', 'large language model → 大语言模型', 'source,target,tgt_lng large language model,大语言模型,zh-Hans']);
+    const missing: string[] = [];
+    for (const {source, files} of audit.sources) {
+      if (examples.has(source)) continue;
+      for (const locale of ['en-US', 'ko-KR', 'fr-FR', 'ru-RU', 'es-ES'] as const) {
+        const result = translateLegacyText(source, locale);
+        if (/[\u3400-\u9fff]/u.test(result)) missing.push(`${locale} ${files.join(', ')}: ${source}`);
+      }
+    }
+    expect(audit.files.length).toBeGreaterThan(50);
+    expect(missing).toEqual([]);
+  });
+
+  it('新增稳定资源必须提供实际译文，不能继承 English 掩盖遗漏', () => {
+    const common = new Set(['common.brand', 'metadata.popupTitle', 'settings.advanced.translationLoadingStyleOptionAria', 'reading.generatingAction']);
+    const frenchCognates = new Set(['learning.memoryNote', 'document.progressSegments', 'document.pageCount', 'document.pageNumber', 'options.aboutDocs', 'settings.advanced.animations', 'settings.advanced.translationLoadingStyle.minimal.label']);
+    for (const [locale, catalog] of Object.entries({'ja-JP': jaJPMessages, 'ko-KR': koKRMessages, 'fr-FR': frFRMessages, 'ru-RU': ruRUMessages, 'es-ES': esESMessages})) {
+      const untranslated = Object.entries(enUSMessages).filter(([key, source]) => (
+        !key.startsWith('language.') && !common.has(key) && !(locale === 'fr-FR' && frenchCognates.has(key))
+        && catalog[key as keyof typeof catalog] === source
+      )).map(([key]) => key);
+      expect(untranslated, locale).toEqual([]);
+    }
+  });
+
+  it('动态模板本地化并保留用户词条、数字及空格', () => {
+    for (const locale of ['ja-JP', 'ko-KR', 'fr-FR', 'ru-RU', 'es-ES'] as const) {
+      const deleted = translateLegacyText('  已删除 阅读  ', locale);
+      expect(deleted.startsWith('  ')).toBe(true);
+      expect(deleted.endsWith('  ')).toBe(true);
+      expect(deleted).toContain('阅读');
+      expect(deleted).not.toContain('已删除');
+      const summary = translateLegacyText('复习 3 个 · 记得 2 个 · 忘了 1 个', locale);
+      expect(summary).not.toBe(translateLegacyText('复习 3 个 · 记得 2 个 · 忘了 1 个', 'en-US'));
+      for (const number of ['1', '2', '3']) expect(summary).toContain(number);
+      expect(translate('learning.writeSentenceHint', locale, {term: '保存'})).toContain('保存');
+    }
+  });
+});
+
+
+describe('动态旧文案资源契约', () => {
+  it('每个模板的全部语言都保留捕获参数，未登记正文不被改写', () => {
+    for (const {pattern, messages} of localizedLegacyPatterns) {
+      const source = pattern.source.slice(1, -1).replaceAll('(\\d+)', '12').replaceAll('(.+)', '原文').replaceAll('(.*)', '原文').replaceAll('(.*)', '原文').replaceAll('\\/', '/');
+      const captures = pattern.exec(source);
+      expect(captures, source).not.toBeNull();
+      for (const locale of ['ja-JP', 'ko-KR', 'fr-FR', 'ru-RU', 'es-ES'] as const) {
+        const result = translateLegacyPattern(source, locale, (value) => value);
+        expect(result, source).not.toBeUndefined();
+        expect(result).not.toMatch(/\{\d+\}/u);
+        for (const placeholder of messages[locale].matchAll(/\{(\d+)\}/gu)) {
+          expect(captures![Number(placeholder[1])]).toBeDefined();
+          expect(result).toContain(captures![Number(placeholder[1])]);
+        }
+      }
+    }
+    expect(translateLegacyPattern('已删除 原文', 'en-US', (value) => value)).toBeUndefined();
+    expect(translateLegacyPattern('已删除 原文', 'zh-CN', (value) => value)).toBeUndefined();
+    expect(translateLegacyPattern('不属于界面文案的原文', 'ja-JP', (value) => value)).toBeUndefined();
+  });
+});
+
+// 嵌套界面片段需要继续本地化，名称和正文参数仍保持原样。
+describe('动态界面片段', () => {
+  it('翻译嵌套进度和按钮标签，保留自定义模型名称', () => {
+    for (const locale of ['en-US', 'ko-KR', 'fr-FR', 'ru-RU', 'es-ES'] as const) {
+      for (const source of ['复制原文', '播放译文', '导入完成：模型用量新增 1、跳过 2；单词本新增 3、更新 4、跳过 5', '翻译进度：正在进行 2 个任务，剩余 3 个任务，其中 1 个任务将在滚动到附近时翻译']) {
+        expect(translateLegacyText(source, locale)).not.toMatch(/[\u3400-\u9fff]/u);
+      }
+      expect(translateLegacyText('删除模型 保存', locale)).toContain('保存');
+    }
+    expect(translateLegacyText('1 分 2 秒', 'en-US')).toBe('1 min 2 sec');
   });
 });

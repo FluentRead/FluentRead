@@ -2332,7 +2332,7 @@ async function main() {
       ? defaultFullMetrics.scrolling.end.lastModuleBottomGap
       : defaultFullMetrics.lastModuleBottomGap;
     if (defaultFullMetrics.lastModule !== 'footer'
-      || Math.abs(defaultFooterBottomGap - 3) > 1
+      || Math.abs(defaultFooterBottomGap - defaultFullMetrics.expectedBottomGap) > 1
       || defaultFullMetrics.shellHeight <= defaultHiddenMetrics.shellHeight + 40) {
       throw new Error(`默认完整布局的页脚边距或内容伸展异常：${JSON.stringify(defaultFullMetrics)}`);
     }

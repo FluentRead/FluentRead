@@ -1,451 +1,264 @@
 #!/usr/bin/env node
+'use strict';
 
+// 文档产品流程回归：临时 profile、生产扩展、真实 UI 输入和下载，网络仅连接本机确定性服务。
+// 覆盖所有支持格式、暂停续译、失败恢复、完整校订、设置变化、离开保护及响应式外观。
+const assert = require('node:assert/strict');
 const fs = require('node:fs');
+const http = require('node:http');
 const os = require('node:os');
 const path = require('node:path');
-const { createRequire } = require('node:module');
+const {createRequire} = require('node:module');
+const arg = (name, fallback) => { const i = process.argv.indexOf(`--${name}`); return i < 0 ? fallback : process.argv[i + 1]; };
 
-const DOCUMENT_EXAMPLES = [
-  {name: 'sample.pdf', badge: 'PDF', mimeType: 'application/pdf', source: 'Document Translation Example'},
-  {name: 'sample.epub', badge: 'EPUB', mimeType: 'application/epub+zip', source: 'Fluent reading'},
-  {name: 'sample.docx', badge: 'DOCX', mimeType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', source: 'REFERENCE GUIDE'},
-  {name: 'sample.html', badge: 'HTML', mimeType: 'text/html', source: 'Document translation example'},
-  {name: 'sample.txt', badge: 'TXT', mimeType: 'text/plain', source: 'Document translation example'},
-  {name: 'sample.md', badge: 'MARKDOWN', mimeType: 'text/markdown', source: 'Document translation example'},
-  {name: 'sample.srt', badge: 'SRT', mimeType: 'text/plain', source: 'Hello subtitle'},
-  {name: 'sample.vtt', badge: 'VTT', mimeType: 'text/vtt', source: 'Hello VTT subtitle'},
-  {name: 'sample.ass', badge: 'ASS', mimeType: 'text/plain', source: 'Hello ASS subtitle'},
-  {name: 'sample.ssa', badge: 'ASS', mimeType: 'text/plain', source: 'Hello SSA subtitle'},
-  {name: 'sample.lrc', badge: 'LRC', mimeType: 'text/plain', source: 'Hello LRC lyric'},
-  {name: 'sample.json', badge: 'JSON', mimeType: 'application/json', source: 'Document translation example'},
-];
-
-const BINARY_EXAMPLES = new Set(['sample.pdf', 'sample.epub', 'sample.docx']);
-
-function fail(message) {
-  throw new Error(message);
-}
-
-function parseArgs(argv) {
-  const args = {
-    browserPath: '/Applications/Microsoft Edge.app/Contents/MacOS/Microsoft Edge',
-    timeout: 60000,
-  };
-  for (let index = 0; index < argv.length; index += 1) {
-    const token = argv[index];
-    if (!token.startsWith('--')) fail(`无法识别的参数：${token}`);
-    const key = token.slice(2).replace(/-([a-z])/g, (_, letter) => letter.toUpperCase());
-    const value = argv[index + 1];
-    if (!value || value.startsWith('--')) fail(`参数缺少值：${token}`);
-    args[key] = value;
-    index += 1;
-  }
-  args.timeout = Number(args.timeout);
-  if (!Number.isFinite(args.timeout) || args.timeout <= 0) fail('--timeout 必须是正数');
-  return args;
-}
-
-function loadPlaywright(playwrightRoot) {
-  try {
-    return require('playwright');
-  } catch (error) {
-    if (!playwrightRoot) fail(`无法加载 Playwright：${error.message}`);
-    const root = path.resolve(playwrightRoot);
-    const requireFromRuntime = createRequire(path.join(root, '__fluentread_document_test__.cjs'));
-    return requireFromRuntime('playwright');
-  }
-}
-
-function loadFocusSafeBrowser(helperPath) {
-  if (!helperPath) fail('必须传入 --focus-safe-helper，确保真实浏览器在后台隔离运行');
-  const resolved = path.resolve(helperPath);
-  if (!fs.existsSync(resolved)) fail(`找不到后台浏览器辅助脚本：${resolved}`);
-  const helper = require(resolved);
-  if (typeof helper.launchFocusSafePersistentContext !== 'function' || typeof helper.newPageWithoutForeground !== 'function') {
-    fail('后台浏览器辅助脚本缺少所需接口');
-  }
-  return helper;
-}
-
-function captureErrors(target, label, errors) {
-  target.on('console', (message) => {
-    if (message.type() === 'error') errors.push({label, type: 'console', message: message.text()});
+async function fixtureServer() {
+  const state = {requests: [], delay: 5, fail: false};
+  const server = http.createServer(async (req, res) => {
+    res.setHeader('Access-Control-Allow-Origin', '*');
+    res.setHeader('Access-Control-Allow-Headers', '*');
+    if (req.method === 'OPTIONS') { res.writeHead(204); res.end(); return; }
+    try {
+      const chunks = []; for await (const chunk of req) chunks.push(chunk);
+      const body = JSON.parse(Buffer.concat(chunks).toString());
+      const prompt = body.messages.filter(message => message.role === 'user').map(message => message.content).join('\n');
+      const source = /SOURCE_BEGIN([\s\S]*?)SOURCE_END/u.exec(prompt)?.[1];
+      assert.equal(typeof source, 'string');
+      state.requests.push(source);
+      await new Promise(resolve => setTimeout(resolve, state.delay));
+      if (state.fail && source.includes('Failure target')) { res.writeHead(400); res.end(JSON.stringify({error: {message: 'Fixture intentional failure'}})); return; }
+      res.setHeader('Content-Type', 'application/json');
+      res.end(JSON.stringify({id: 'document-fixture', object: 'chat.completion', created: 1, model: 'document-fixture',
+        choices: [{index: 0, message: {role: 'assistant', content: `测试译文：${source}`}, finish_reason: 'stop'}],
+        usage: {prompt_tokens: 10, completion_tokens: 10, total_tokens: 20}}));
+    } catch (error) { res.writeHead(400); res.end(JSON.stringify({error: {message: error.message}})); }
   });
-  target.on('pageerror', (error) => errors.push({label, type: 'pageerror', message: error.message}));
-}
-
-async function verifyBinaryDownload(exampleName, downloadPath) {
-  const bytes = fs.readFileSync(downloadPath);
-  if (exampleName === 'sample.pdf') {
-    if (bytes.subarray(0, 5).toString('latin1') !== '%PDF-') fail('PDF 双语下载文件签名无效');
-    const {PDFDocument} = require('pdf-lib');
-    const pdf = await PDFDocument.load(bytes);
-    if (pdf.getPageCount() !== 2) fail(`PDF 双语下载应保持两页并排页面，实际为 ${pdf.getPageCount()} 页`);
-    const firstPage = pdf.getPage(0).getSize();
-    if (firstPage.width <= firstPage.height) fail('PDF 双语下载没有生成横向原页/译页对照版式');
-    return {bytes: bytes.length, signature: '%PDF-', pages: pdf.getPageCount(), layout: 'side-by-side'};
-  }
-
-  const JSZip = require('jszip');
-  const zip = await JSZip.loadAsync(bytes);
-  if (exampleName === 'sample.epub') {
-    const mimetype = await zip.file('mimetype')?.async('string');
-    if (mimetype !== 'application/epub+zip') fail('ePub 双语下载缺少有效 mimetype');
-    if (!zip.file('OEBPS/chapter-1.xhtml')) fail('ePub 双语下载缺少原章节');
-    return {bytes: bytes.length, signature: 'EPUB'};
-  }
-  if (!zip.file('[Content_Types].xml') || !zip.file('word/document.xml')) {
-    fail('DOCX 双语下载缺少 OOXML 必需文件');
-  }
-  return {bytes: bytes.length, signature: 'OOXML'};
-}
-
-function isExpectedShutdownNoise(error) {
-  return error.type === 'console' && /browser is shutting down/u.test(error.message);
-}
-
-async function waitForServiceWorker(context, timeout) {
-  if (context.serviceWorkers().length > 0) return context.serviceWorkers()[0];
-  return context.waitForEvent('serviceworker', {timeout});
+  await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
+  return {...state, state, url: `http://127.0.0.1:${server.address().port}/v1/chat/completions`, close: () => { server.closeAllConnections(); return new Promise(resolve => server.close(resolve)); }};
 }
 
 async function main() {
-  const args = parseArgs(process.argv.slice(2));
-  if (!args.extensionDir) fail('必须传入 --extension-dir');
-  const extensionDir = path.resolve(args.extensionDir);
-  const manifestPath = path.join(extensionDir, 'manifest.json');
-  if (!fs.existsSync(manifestPath)) fail(`找不到扩展清单：${manifestPath}`);
-  if (!fs.existsSync(path.join(extensionDir, 'document.html'))) fail('生产产物缺少 document.html');
-  if (!fs.existsSync(args.browserPath)) fail(`找不到浏览器：${args.browserPath}`);
-  const exampleDir = path.resolve(args.exampleDir || path.join(process.cwd(), 'examples/document-translation'));
-  if (!fs.existsSync(exampleDir)) fail(`找不到文档示例目录：${exampleDir}`);
-  for (const example of DOCUMENT_EXAMPLES) {
-    const examplePath = path.join(exampleDir, example.name);
-    if (!fs.existsSync(examplePath)) fail(`缺少文档示例：${examplePath}`);
-  }
-
-  const {chromium} = loadPlaywright(args.playwrightRoot);
-  const {launchFocusSafePersistentContext, newPageWithoutForeground} = loadFocusSafeBrowser(args.focusSafeHelper);
-  const artifactsDir = path.resolve(args.artifactsDir || path.join(os.tmpdir(), 'fluentread-document-evidence'));
+  const extensionDir = path.resolve(arg('extension-dir', '.output/chrome-mv3'));
+  const artifactsDir = path.resolve(arg('artifacts-dir', '/private/tmp/fluentread-document-experience'));
+  const exampleDir = path.resolve(arg('example-dir', 'examples/document-translation'));
+  const packages = arg('playwright-root');
+  const helperPath = arg('focus-safe-helper');
+  assert(packages && helperPath, '需要 Playwright 和 focus-safe helper');
+  const requireRuntime = createRequire(path.join(packages, 'document-runner.cjs'));
+  const {chromium} = requireRuntime('playwright');
+  const {launchFocusSafePersistentContext, newPageWithoutForeground} = require(helperPath);
   fs.mkdirSync(artifactsDir, {recursive: true});
-  const profileDir = fs.mkdtempSync(path.join(os.tmpdir(), 'fluentread-document-edge-profile-'));
-  const errors = [];
-  const result = {
-    ok: false,
-    extensionDir,
-    exampleDir,
-    profileDir,
-    artifactsDir,
-    windowMode: 'background-screen-off',
-    assertions: {},
-    screenshots: [],
-    downloads: [],
-    errors,
-  };
-
-  let context;
-  let browserHandle;
+  const profileDir = fs.mkdtempSync(path.join(os.tmpdir(), 'fluentread-document-flow-'));
+  const report = {ok: false, extensionDir, artifactsDir, service: 'loopback deterministic fixture', cases: [], screenshots: [], downloads: [], consoleErrors: [], exampleLoads: {}};
+  const fixture = await fixtureServer();
+  let launched, page;
   try {
-    browserHandle = await launchFocusSafePersistentContext({
-      chromium,
-      profileDir,
-      browserPath: args.browserPath,
-      headless: false,
-      background: true,
-      browserArgs: [
-        `--disable-extensions-except=${extensionDir}`,
-        `--load-extension=${extensionDir}`,
-        '--no-first-run',
-        '--no-default-browser-check',
-      ],
-      viewport: {width: 1440, height: 960},
-      timeout: args.timeout,
-    });
-    context = browserHandle.context;
-    result.launchMode = browserHandle.launchMode;
-    result.focusPolicy = browserHandle.focusPolicy;
-    result.windowPlacement = browserHandle.windowPlacement;
-
-    const worker = await waitForServiceWorker(context, Math.min(args.timeout, 30000));
-    captureErrors(worker, 'service-worker', errors);
-    const extensionId = worker.url().match(/^chrome-extension:\/\/([^/]+)/)?.[1];
-    if (!extensionId) fail(`无法从 Service Worker URL 获取扩展 ID：${worker.url()}`);
-    result.extensionId = extensionId;
-    const documentUrl = `chrome-extension://${extensionId}/document.html`;
-    const popupUrl = `chrome-extension://${extensionId}/popup.html`;
-    const optionsUrl = `chrome-extension://${extensionId}/options.html`;
-
-    const page = await newPageWithoutForeground(context, args.timeout);
-    captureErrors(page, 'document', errors);
-    await page.goto(documentUrl, {waitUntil: 'domcontentloaded', timeout: args.timeout});
-    await page.locator('.file-drop-zone').waitFor({state: 'visible', timeout: args.timeout});
-    const formatCards = await page.locator('.format-card').count();
-    if (formatCards !== 8) fail(`文档页格式卡片应为 8 个，实际为 ${formatCards}`);
-    result.assertions.formatCards = formatCards;
-    await page.screenshot({path: path.join(artifactsDir, 'document-empty.png'), fullPage: true});
-    result.screenshots.push(path.join(artifactsDir, 'document-empty.png'));
-
-    const exampleLoads = {};
-    for (const [index, example] of DOCUMENT_EXAMPLES.entries()) {
-      if (index > 0) {
-        await page.getByRole('button', {name: '打开新文件'}).click();
-        await page.locator('.file-drop-zone').waitFor({state: 'visible', timeout: args.timeout});
+    launched = await launchFocusSafePersistentContext({chromium, profileDir,
+      browserPath: arg('browser-path', '/Applications/Microsoft Edge.app/Contents/MacOS/Microsoft Edge'),
+      background: true, headless: false, viewport: {width: 1440, height: 960}, timeout: 30000,
+      browserArgs: [`--disable-extensions-except=${extensionDir}`, `--load-extension=${extensionDir}`, '--no-first-run', '--no-default-browser-check']});
+    Object.assign(report, {launchMode: launched.launchMode, focusPolicy: launched.focusPolicy, windowPlacement: launched.windowPlacement});
+    const context = launched.context;
+    const worker = context.serviceWorkers()[0] || await context.waitForEvent('serviceworker', {timeout: 30000});
+    const origin = /^chrome-extension:\/\/[^/]+/u.exec(worker.url())[0];
+    page = await newPageWithoutForeground(context, 30000);
+    page.setDefaultTimeout(30000);
+    page.on('pageerror', error => report.consoleErrors.push(error.message));
+    page.on('console', message => { if (message.type() === 'error') report.consoleErrors.push(message.text()); });
+    await page.goto(`${origin}/document.html`, {waitUntil: 'domcontentloaded'});
+    await page.locator('.file-drop-zone').waitFor();
+    const service = 'custom:document-fixture';
+    const seeded = await page.evaluate(async ({service, endpoint}) => {
+      const stored = await chrome.runtime.sendMessage({type: 'configStorageRead', key: 'local:config'});
+      if (!stored.success) throw new Error(stored.error);
+      const current = typeof stored.value === 'string' ? JSON.parse(stored.value) : stored.value;
+      return chrome.runtime.sendMessage({type: 'persistConfig', mode: 'replace', baseRevision: current.__fluentConfigRevision,
+        clientId: `document-fixture-${crypto.randomUUID()}`, sequence: 1, config: {...current,
+          uiLanguage: 'zh-CN', uiLanguageSetupCompleted: true, from: 'en', to: 'zh-Hans', documentService: service,
+          documentModel: {...current.documentModel, [service]: 'document-fixture'},
+          customOpenAIProviders: [{id: service, name: '本机测试翻译', endpoint, models: ['document-fixture']}],
+          requireApiKey: {[`v2:${JSON.stringify([service, 'document-fixture'])}`]: false},
+          user_role: {...current.user_role, [service]: 'SOURCE_BEGIN{{origin}}SOURCE_END'},
+          enableAIContext: false, enableAIMultiSegment: false,
+        }});
+    }, {service, endpoint: fixture.url});
+    assert.equal(seeded.success, true, seeded.error);
+    const shot = async name => { const file = path.join(artifactsDir, `${name}.png`); await page.screenshot({path: file, animations: 'disabled'}); report.screenshots.push(file); };
+    const noOverflow = async () => assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth), false, '页面不得横向溢出');
+    const status = label => page.locator('.document-status').filter({hasText: label}).waitFor();
+    const load = async (name, buffer) => {
+      await page.locator('input[type=file]').setInputFiles({name, mimeType: 'application/octet-stream', buffer});
+      await page.locator('.workspace-heading h1').filter({hasText: name}).waitFor();
+      if (await page.locator('.rich-preview-frame').count()) {
+        const frame = await (await page.locator('.rich-preview-frame').elementHandle()).contentFrame();
+        await frame.waitForFunction(() => Boolean(document.body?.innerText.trim()));
       }
-
-      await page.locator('input[type=file]').setInputFiles({
-        name: example.name,
-        mimeType: example.mimeType,
-        buffer: fs.readFileSync(path.join(exampleDir, example.name)),
-      });
-      await page.locator('.workspace-section').waitFor({state: 'visible', timeout: args.timeout});
-      if ((await page.locator('.workspace-heading h1').textContent())?.trim() !== example.name) {
-        fail(`${example.name} 加载后文件名不正确`);
-      }
-      if ((await page.locator('.file-type-badge').textContent())?.trim() !== example.badge) {
-        fail(`${example.name} 文件格式徽标不正确`);
-      }
-      const isPdf = example.name === 'sample.pdf';
-      let pdfScroll;
-      let pdfPageRows = 0;
-      if (isPdf) {
-        await page.locator('.pdf-layout-viewer').waitFor({state: 'visible', timeout: args.timeout});
-        await page.locator('.pdf-page-row').nth(0).locator('.pdf-page-column:not(.translated) img').waitFor({state: 'visible', timeout: args.timeout});
-        pdfPageRows = await page.locator('.pdf-page-row').count();
-        const pdfPageCount = Number((await page.locator('.pdf-page-summary strong').textContent())?.match(/\d+/u)?.[0] || 0);
-        if (await page.locator('.pdf-page-navigation').count() !== 0) {
-          fail('PDF 阅读器不应再提供左右翻页控件');
-        }
-        if (pdfPageRows !== pdfPageCount || pdfPageRows < 2) {
-          fail(`PDF 阅读器必须一次渲染全部页面并纵向排列：页面行 ${pdfPageRows}，页数 ${pdfPageCount}`);
-        }
-        pdfScroll = await page.locator('[data-pdf-scroll]').evaluate((element) => ({
-          rows: element.querySelectorAll('.pdf-page-row').length,
-          documentVerticalOverflow: document.documentElement.scrollHeight > document.documentElement.clientHeight,
-          horizontalOverflow: element.scrollWidth > element.clientWidth,
-        }));
-        if (pdfScroll.rows !== pdfPageRows || !pdfScroll.documentVerticalOverflow || pdfScroll.horizontalOverflow) {
-          fail(`PDF 连续阅读滚动容器异常：${JSON.stringify(pdfScroll)}`);
-        }
-      }
-      const nativeReader = page.locator('[data-document-reader]').first();
-      await nativeReader.waitFor({state: 'visible', timeout: args.timeout});
-      const previewCount = Number(await nativeReader.getAttribute('data-segment-count'));
-      if (previewCount < 1) fail(`${example.name} 加载后没有阅读片段`);
-      const firstSource = await page.locator('.document-source').first().textContent();
-      if (!firstSource?.includes(example.source)) {
-        fail(`${example.name} 首个可翻译片段不正确`);
-      }
-      if (await page.getByRole('button', {name: '开始翻译'}).count() !== 1) {
-        fail(`${example.name} 缺少开始翻译按钮`);
-      }
-      exampleLoads[example.name] = {badge: example.badge, previewCount, ...(pdfScroll ? {continuousScroll: pdfScroll} : {})};
-
-      const editableTranslations = page.locator('.document-translation');
-      const editableCount = await editableTranslations.count();
-      if (editableCount < 1) fail(`${example.name} 缺少可校对译文输入框`);
-      const fillCount = isPdf ? Math.min(editableCount, 12) : 1;
-      await editableTranslations.evaluateAll((elements, payload) => {
-        elements.slice(0, payload.fillCount).forEach((element, index) => {
-          element.removeAttribute('disabled');
-          element.value = `浏览器回归译文 ${index + 1}：${payload.name}。这是用于验证中文翻译后的自动换行、版面保留、多栏阅读和相邻文本区域不会互相覆盖的回归内容。`;
-          element.dispatchEvent(new Event('input', {bubbles: true}));
-        });
-      }, {name: example.name, fillCount});
-
-      if (['sample.html', 'sample.txt', 'sample.md', 'sample.epub'].includes(example.name)) {
-        const frame = page.locator('.rich-preview-frame');
-        await frame.waitFor({state: 'visible', timeout: args.timeout});
-        const frameBody = frame.contentFrame().locator('body');
-        await frameBody.waitFor({state: 'visible', timeout: args.timeout});
-        await frameBody.getByText(/浏览器回归译文/u).first().waitFor({state: 'visible', timeout: args.timeout});
-        exampleLoads[example.name].previewLayout = example.name === 'sample.epub' ? 'chapter-reader' : 'formatted-article';
-      }
-      if (example.name === 'sample.docx') {
-        if (await page.locator('.docx-page').count() !== 1) fail('DOCX 没有使用页面化文档预览');
-        exampleLoads[example.name].previewLayout = 'word-page';
-      }
-      if (['sample.srt', 'sample.vtt', 'sample.ass', 'sample.ssa', 'sample.lrc'].includes(example.name)) {
-        if (await page.locator('.subtitle-document-reader table').count() !== 1) fail(`${example.name} 没有使用字幕时间轴表格`);
-        exampleLoads[example.name].previewLayout = 'subtitle-timeline';
-      }
-      if (example.name === 'sample.json') {
-        const firstPath = await page.locator('.json-table-row code').first().textContent();
-        if (!firstPath?.startsWith('$.')) fail('JSON 没有显示字符串值路径');
-        exampleLoads[example.name].previewLayout = 'json-path-table';
-      }
-
-      if (BINARY_EXAMPLES.has(example.name)) {
-        const downloadButton = page.getByRole('button', {name: '下载双语文件'});
-        await downloadButton.waitFor({state: 'visible', timeout: args.timeout});
-        const [download] = await Promise.all([
-          page.waitForEvent('download', {timeout: args.timeout}),
-          downloadButton.click(),
-        ]);
-        const downloadPath = path.join(artifactsDir, download.suggestedFilename());
-        await download.saveAs(downloadPath);
-        exampleLoads[example.name].download = await verifyBinaryDownload(example.name, downloadPath);
-        result.downloads.push(downloadPath);
-        if (isPdf) {
-          await page.locator('.pdf-page-row').nth(pdfPageRows - 1).locator('.pdf-page-column.translated img').waitFor({state: 'visible', timeout: args.timeout});
-          const previewDimensions = await page.locator('.pdf-page-column img').evaluateAll(images => images.map(image => ({
-            width: image.naturalWidth,
-            height: image.naturalHeight,
-          })));
-          if (previewDimensions.length !== pdfPageRows * 2 || previewDimensions.some(size => size.width <= 0 || size.height <= 0)) {
-            fail(`PDF 原页/译页预览没有完整渲染：${previewDimensions.length}/${pdfPageRows * 2}`);
-          }
-          exampleLoads[example.name].previewLayout = 'continuous-vertical-side-by-side';
-        }
-      }
-
-      if (example.name === 'sample.pdf') {
-        result.assertions.pdfLoadAndExport = 'passed';
-        await page.screenshot({path: path.join(artifactsDir, 'document-pdf-reader.png'), fullPage: true});
-        result.screenshots.push(path.join(artifactsDir, 'document-pdf-reader.png'));
-      }
-      if (example.name === 'sample.epub') {
-        result.assertions.epubLoadAndExport = 'passed';
-        await page.screenshot({path: path.join(artifactsDir, 'document-epub-reader.png'), fullPage: true});
-        result.screenshots.push(path.join(artifactsDir, 'document-epub-reader.png'));
-      }
-      if (example.name === 'sample.docx') {
-        result.assertions.docxLoadAndExport = 'passed';
-        await page.screenshot({path: path.join(artifactsDir, 'document-docx-reader.png'), fullPage: true});
-        result.screenshots.push(path.join(artifactsDir, 'document-docx-reader.png'));
-      }
-
-      if (example.name === 'sample.html') {
-        result.assertions.htmlLoad = 'passed';
-        await page.screenshot({path: path.join(artifactsDir, 'document-html-loaded.png'), fullPage: true});
-        result.screenshots.push(path.join(artifactsDir, 'document-html-loaded.png'));
-      }
-      if (example.name === 'sample.srt') {
-        result.assertions.subtitleLoad = 'passed';
-        await page.screenshot({path: path.join(artifactsDir, 'document-srt-loaded.png'), fullPage: true});
-        result.screenshots.push(path.join(artifactsDir, 'document-srt-loaded.png'));
-      }
-      if (example.name === 'sample.md') {
-        if (await page.locator('.preview-table').count() !== 0) fail('Markdown 文档不应使用表格作为主阅读界面');
-        result.assertions.markdownReader = 'passed';
-        await page.screenshot({path: path.join(artifactsDir, 'document-markdown-reader.png'), fullPage: true});
-        result.screenshots.push(path.join(artifactsDir, 'document-markdown-reader.png'));
-      }
-    }
-    result.assertions.exampleLoads = exampleLoads;
-
-    await page.locator('[aria-label="文档翻译服务"]').selectOption('openai');
-    const documentModel = page.locator('[aria-label="文档翻译模型"]');
-    await documentModel.waitFor({state: 'visible', timeout: args.timeout});
-    const modelOptions = await documentModel.locator('option').count();
-    if (modelOptions < 2) fail(`文档翻译模型选项过少：${modelOptions}`);
-    await documentModel.selectOption('gpt-5.4-mini');
-    if (await documentModel.inputValue() !== 'gpt-5.4-mini') fail('文档翻译模型没有保存当前选择');
-    result.assertions.documentModelSelection = 'passed';
-    await page.screenshot({path: path.join(artifactsDir, 'document-model-selection.png'), fullPage: true});
-    result.screenshots.push(path.join(artifactsDir, 'document-model-selection.png'));
-
-    const popup = await newPageWithoutForeground(context, args.timeout);
-    captureErrors(popup, 'popup', errors);
-    await popup.setViewportSize({width: 400, height: 600});
-    await popup.goto(popupUrl, {waitUntil: 'domcontentloaded', timeout: args.timeout});
-    await popup.locator('.popup-shell[data-config-ready="true"]').waitFor({state: 'visible', timeout: args.timeout});
-    // 临时配置首次打开 Popup 必须先完成语言引导，才能点击被遮罩保护的文档入口。
-    await popup.getByTestId('onboarding-language-next').click();
-    await popup.locator('[data-testid="onboarding-language-step"] [data-language="zh-CN"]').click();
-    await popup.getByTestId('onboarding-language-step').locator('button.onboarding-confirm').click();
-    await popup.getByTestId('ui-language-onboarding').waitFor({state: 'hidden', timeout: args.timeout});
-    result.assertions.popupLanguageSetup = 'completed-via-ui';
-    const popupMetrics = await popup.evaluate(() => ({
-      width: document.documentElement.scrollWidth,
-      height: document.documentElement.scrollHeight,
-      horizontalOverflow: document.documentElement.scrollWidth > document.documentElement.clientWidth,
-    }));
-    if (popupMetrics.width > 400 || popupMetrics.height > 600 || popupMetrics.horizontalOverflow) {
-      fail(`Popup 布局超出边界：${JSON.stringify(popupMetrics)}`);
-    }
-    result.assertions.popupMetrics = popupMetrics;
-    await popup.screenshot({path: path.join(artifactsDir, 'popup-document-beta.png'), fullPage: true});
-    result.screenshots.push(path.join(artifactsDir, 'popup-document-beta.png'));
-    const featureOrder = await popup.locator('.feature-card').evaluateAll((cards) => cards.map((card) => ({
-      feature: card.getAttribute('data-feature') || card.textContent?.trim() || '',
-      text: card.textContent?.trim() || '',
-    })));
-    const videoIndex = featureOrder.findIndex((item) => item.text.includes('视频字幕'));
-    const documentIndex = featureOrder.findIndex((item) => item.feature === 'document-translation');
-    if (featureOrder.length !== 6) fail(`Popup 快捷功能卡应为 6 个，实际为 ${featureOrder.length}`);
-    if (featureOrder.some((item) => item.text.includes('全文悬浮球'))) fail('Popup 不应显示全文翻译悬浮球设置入口');
-    if (await popup.getByRole('switch', {name: '启用或关闭全文翻译悬浮球'}).count() !== 0) {
-      fail('Popup 不应保留全文翻译悬浮球设置抽屉');
-    }
-    if (videoIndex < 0 || documentIndex !== videoIndex + 1) fail('文档翻译卡片必须紧跟在视频字幕卡片下面');
-    if (featureOrder.some((item) => /beta|测试版/iu.test(item.text))) fail('Popup 快捷功能卡不应显示 Beta 标识');
-    result.assertions.popupFeatures = {
-      count: featureOrder.length,
-      floatingBallSettingsHidden: true,
-      documentAfterVideoWithoutBetaBadge: true,
     };
-
-    const optionsPage = await newPageWithoutForeground(context, args.timeout);
-    captureErrors(optionsPage, 'options', errors);
-    // “全文翻译悬浮球”属于通用设置的网页辅助分组，先验证开关仍可操作。
-    await optionsPage.goto(`${optionsUrl}#settings-general`, {waitUntil: 'domcontentloaded', timeout: args.timeout});
-    const floatingBallRow = optionsPage.locator('.settings-control-row').filter({hasText: '全文翻译悬浮球'});
-    await floatingBallRow.waitFor({state: 'visible', timeout: args.timeout});
-    const floatingBallControlCount = await floatingBallRow.getByRole('switch').count();
-    if (floatingBallControlCount < 1) {
-      fail('完整设置页缺少全文翻译悬浮球开关');
-    }
-    await optionsPage.screenshot({path: path.join(artifactsDir, 'options-floating-ball-switch.png'), fullPage: true});
-    result.screenshots.push(path.join(artifactsDir, 'options-floating-ball-switch.png'));
-    // 全文翻译快捷键位于翻译设置；按稳定的分区标识导航，避免依赖历史标题。
-    await optionsPage.locator('button[data-section="settings-translation"]').click();
-    // 显示标题已改为“常用全文快捷键”，使用控件稳定的可访问名称定位。
-    const fullPageHotkeyControl = optionsPage.getByRole('combobox', {name: '全文翻译快捷键', exact: true});
-    await fullPageHotkeyControl.waitFor({state: 'visible', timeout: args.timeout});
-    const fullPageHotkeyControlCount = await fullPageHotkeyControl.count();
-    if (fullPageHotkeyControlCount < 1) {
-      fail('完整设置页缺少全文翻译快捷键控件');
-    }
-    result.assertions.optionsFloatingBallSettings = {
-      switchControls: floatingBallControlCount,
-      hotkeyControls: fullPageHotkeyControlCount,
+    const newFile = async () => {
+      await page.getByRole('button', {name: '打开新文件', exact: true}).first().click();
+      const dialog = page.locator('dialog[open]').filter({hasText: '打开另一份文档'});
+      if (await dialog.count()) await dialog.getByRole('button', {name: '打开新文件', exact: true}).click();
+      await page.locator('.file-drop-zone').waitFor();
     };
-    await optionsPage.screenshot({path: path.join(artifactsDir, 'options-floating-ball-hotkey.png'), fullPage: true});
-    result.screenshots.push(path.join(artifactsDir, 'options-floating-ball-hotkey.png'));
-    await optionsPage.close();
-    const [openedPage] = await Promise.all([
-      context.waitForEvent('page', {timeout: args.timeout}),
-      popup.getByRole('button', {name: '打开文档翻译'}).click(),
-    ]);
-    captureErrors(openedPage, 'document-from-popup', errors);
-    await openedPage.waitForURL(documentUrl, {timeout: args.timeout});
-    await openedPage.locator('.file-drop-zone').waitFor({state: 'visible', timeout: args.timeout});
-    result.assertions.popupEntry = 'passed';
-    await openedPage.close();
-    await popup.close();
-    await page.close();
+    const download = async (mode = 'bilingual', partial = false) => {
+      await page.getByRole('button', {name: '下载文件 ↓', exact: true}).click();
+      const dialog = page.locator('dialog[open]').filter({hasText: '下载翻译结果'});
+      await dialog.locator('.export-options button').nth(mode === 'bilingual' ? 0 : 1).click();
+      if (partial) {
+        assert.equal(await dialog.getByRole('button', {name: '下载双语文件', exact: true}).isDisabled(), true);
+        await dialog.getByRole('checkbox').check();
+      }
+      const [file] = await Promise.all([page.waitForEvent('download'), dialog.getByRole('button', {name: mode === 'bilingual' ? '下载双语文件' : '下载译文文件', exact: true}).click()]);
+      const dest = path.join(artifactsDir, file.suggestedFilename()); await file.saveAs(dest); report.downloads.push(dest); return dest;
+    };
+    assert.equal(await page.locator('.format-card').count(), 8);
+    await shot('01-import-desktop'); await noOverflow();
+    await page.setViewportSize({width: 390, height: 844}); await noOverflow(); await shot('02-import-mobile');
+    await page.setViewportSize({width: 1440, height: 960});
+    await page.locator('input[type=file]').setInputFiles({name: 'unsupported.exe', mimeType: 'application/octet-stream', buffer: Buffer.from('not a document')});
+    await page.locator('.notice.error').waitFor();
+    assert.match(await page.locator('.notice.error').innerText(), /不支持/);
+    report.cases.push('unsupported import has persistent actionable error');
 
-    result.ok = true;
+    for (const name of ['sample.pdf', 'sample.epub', 'sample.docx', 'sample.html', 'sample.txt', 'sample.md', 'sample.srt', 'sample.vtt', 'sample.ass', 'sample.ssa', 'sample.lrc', 'sample.json']) {
+      await load(name, fs.readFileSync(path.join(exampleDir, name)));
+      await page.getByRole('button', {name: '开始翻译', exact: true}).click();
+      await status('翻译完成');
+      assert.equal(await page.getByRole('progressbar').getAttribute('aria-valuenow'), '100');
+      await page.getByRole('button', {name: '校订译文', exact: true}).click();
+      assert.match(await page.locator('textarea.document-translation').first().inputValue(), /测试译文/);
+      await page.locator('textarea.document-translation').first().fill(`人工校订：${name}`);
+      await page.getByRole('button', {name: '阅读', exact: true}).click();
+      await noOverflow();
+      if (name === 'sample.pdf') {
+        await page.locator('.pdf-page-column.translated img').last().waitFor();
+        assert.equal(await page.locator('.pdf-page-row').count(), 2);
+        const previewImage = page.locator('.pdf-page-column.translated img').first();
+        const beforeZoom = (await previewImage.boundingBox()).width;
+        await page.getByRole('combobox', {name: 'PDF 预览缩放'}).selectOption('1.5');
+        assert((await previewImage.boundingBox()).width > beforeZoom * 1.4, 'PDF 放大必须实际改变页面尺寸');
+        await page.getByRole('combobox', {name: 'PDF 预览缩放'}).selectOption('1');
+      }
+      const dest = await download();
+      const bytes = fs.readFileSync(dest);
+      assert(bytes.length > 0);
+      if (name === 'sample.pdf') {
+        const {PDFDocument} = require('pdf-lib'); const pdf = await PDFDocument.load(bytes);
+        assert.equal(pdf.getPageCount(), 2); assert(pdf.getPage(0).getSize().width > pdf.getPage(0).getSize().height);
+      } else if (name.endsWith('.epub') || name.endsWith('.docx')) {
+        const zip = await require('jszip').loadAsync(bytes);
+        assert(zip.file(name.endsWith('.epub') ? 'OEBPS/chapter-1.xhtml' : 'word/document.xml'));
+      } else assert(bytes.toString().includes('人工校订'));
+      report.exampleLoads[name] = {translated: true, edited: true, exported: true, bytes: bytes.length};
+      if (['sample.pdf', 'sample.epub', 'sample.docx', 'sample.md', 'sample.srt', 'sample.json'].includes(name)) await shot(`reader-${name.replace('.', '-')}`);
+      await newFile();
+    }
+    report.cases.push('12 formats parse, translate through provider, edit via UI and export original format');
+
+    fixture.state.delay = 650;
+    const longText = Array.from({length: 95}, (_, i) => `Long document paragraph ${i + 1}. This is a complete sentence for testing translation and proofreading.`).join('\n\n');
+    await load('long-document.txt', Buffer.from(longText));
+    await shot('03-ready-to-translate');
+    await page.getByRole('button', {name: '开始翻译', exact: true}).click();
+    await page.waitForFunction(() => Number(document.querySelector('[role=progressbar]').getAttribute('aria-valuenow')) > 0);
+    await page.getByRole('button', {name: '暂停翻译', exact: true}).click();
+    await status('已暂停');
+    const pausedProgress = await page.getByRole('progressbar').getAttribute('aria-valuenow');
+    await page.getByRole('button', {name: '校订译文', exact: true}).click();
+    await page.getByRole('combobox', {name: '校订页码'}).selectOption('3');
+    assert.equal(await page.locator('[data-segment-id="94"]').count(), 1);
+    await page.getByRole('searchbox', {name: '搜索原文、译文或位置'}).fill('paragraph 91.');
+    assert.equal(await page.locator('.segment-edit-row').count(), 1);
+    await page.getByRole('checkbox', {name: '只看未翻译'}).check();
+    await page.getByRole('textbox', {name: '第 91 段译文', exact: true}).fill('第 91 段人工校订结果');
+    assert.equal(await page.getByRole('textbox', {name: '第 91 段译文', exact: true}).count(), 1, '输入中不得因为未翻译筛选而卸载编辑框');
+    await page.getByRole('checkbox', {name: '只看未翻译'}).uncheck();
+    await page.getByRole('searchbox').fill('');
+    await shot('04-paused-proofreading');
+    const partial = await download('bilingual', true);
+    assert(fs.readFileSync(partial, 'utf8').includes('第 91 段人工校订结果'));
+    assert(fs.readFileSync(partial, 'utf8').includes('Long document paragraph 95.'));
+    assert(Number(pausedProgress) < 100);
+    report.cases.push('pause retains partial result, page 3 reaches segment 95, search edits segment 91, partial export requires acknowledgement');
+    fixture.state.delay = 15;
+    await page.getByRole('button', {name: '继续翻译', exact: true}).click();
+    await status('翻译完成');
+    await page.getByRole('searchbox').fill('第 91 段人工校订结果');
+    assert.equal(await page.getByRole('textbox', {name: '第 91 段译文', exact: true}).inputValue(), '第 91 段人工校订结果');
+    assert(!fixture.state.requests.some(source => source.startsWith('Long document paragraph 91.')));
+    report.cases.push('resume does not translate or overwrite manual completed segments');
+    const reloadAttempt = page.reload({timeout: 5000}).catch(() => undefined);
+    const unloadDialog = await page.waitForEvent('dialog');
+    assert.equal(unloadDialog.type(), 'beforeunload');
+    await unloadDialog.dismiss(); await reloadAttempt;
+    assert.match(await page.locator('.workspace-heading h1').innerText(), /long-document/);
+    report.cases.push('browser reload prompts beforeunload and cancellation retains unsaved document');
+    await page.getByRole('button', {name: '阅读', exact: true}).click();
+    await page.getByRole('button', {name: '原文', exact: true}).click();
+    await page.getByRole('button', {name: '下载文件 ↓', exact: true}).click();
+    assert.equal(await page.locator('dialog[open] .export-options button').first().getAttribute('aria-pressed'), 'true');
+    await page.locator('dialog[open]').getByRole('button', {name: '返回文档'}).click();
+    await page.getByRole('button', {name: '双语', exact: true}).click();
+    await page.getByRole('button', {name: '打开新文件', exact: true}).click();
+    await page.locator('dialog[open]').getByRole('button', {name: '返回文档'}).click();
+    assert.match(await page.locator('.workspace-heading h1').innerText(), /long-document/);
+    await page.getByRole('combobox', {name: '文档目标语言'}).selectOption('ja');
+    await page.locator('.notice.warning').filter({hasText: '设置已更改'}).waitFor();
+    await page.getByRole('button', {name: '按新设置翻译'}).click();
+    await page.locator('dialog[open]').getByRole('button', {name: '返回文档'}).click();
+    await page.getByRole('combobox', {name: '文档目标语言'}).selectOption('zh-Hans');
+    report.cases.push('reading and download modes independent; discard/restart dialogs cancel safely; setting change cannot mix translation sessions');
+    await page.emulateMedia({colorScheme: 'dark'});
+    const richRoot = page.locator('.rich-preview-frame').contentFrame().locator('html');
+    await richRoot.waitFor();
+    assert.equal(await richRoot.evaluate(element => getComputedStyle(element).backgroundColor), 'rgb(32, 38, 50)', '深色阅读区不应保留刺眼的白底');
+    await shot('05-reader-dark');
+    await page.getByRole('button', {name: '校订译文', exact: true}).click();
+    assert.equal(await page.getByRole('searchbox').inputValue(), '第 91 段人工校订结果', '阅读与校订切换应保留查询');
+    await page.setViewportSize({width: 390, height: 844}); await noOverflow(); await shot('06-proofreading-mobile-dark');
+    await page.emulateMedia({colorScheme: 'light'}); await shot('07-proofreading-mobile-light');
+    await page.setViewportSize({width: 820, height: 960}); await noOverflow();
+    await page.setViewportSize({width: 1440, height: 960});
+    await newFile();
+    fixture.state.fail = true;
+    await load('failure.txt', Buffer.from('A successful first paragraph.\n\nAnother successful paragraph.\n\nFailure target paragraph.'));
+    await page.getByRole('button', {name: '开始翻译', exact: true}).click();
+    await status('翻译中断');
+    assert(Number(await page.getByRole('progressbar').getAttribute('aria-valuenow')) < 100);
+    await shot('08-interrupted');
+    fixture.state.fail = false;
+    await page.locator('.translation-actions button').click();
+    await status('翻译完成');
+    await page.getByRole('combobox', {name: '文档目标语言'}).selectOption('ja');
+    await page.getByRole('button', {name: '按新设置翻译', exact: true}).click();
+    const restartDialog = page.locator('dialog[open]');
+    fixture.state.delay = 1000;
+    await restartDialog.getByRole('button', {name: '重新翻译', exact: true}).click();
+    await status('正在翻译');
+    await newFile();
+    await load('replacement.txt', Buffer.from('A replacement document with independent text.'));
+    await page.getByRole('button', {name: '校订译文', exact: true}).click();
+    assert.equal(await page.locator('textarea.document-translation').first().inputValue(), '');
+    fixture.state.delay = 5;
+    await page.getByRole('button', {name: '开始翻译', exact: true}).click();
+    await status('翻译完成');
+    assert.match(await page.locator('textarea.document-translation').first().inputValue(), /replacement document/);
+    report.cases.push('confirmed restart then replace aborts previous task; late results cannot contaminate new document');
+    const recovery = await download('translated');
+    assert(fs.readFileSync(recovery, 'utf8').includes('测试译文：A replacement document'));
+    report.cases.push('failure keeps completed work, error stays visible, retry succeeds, translated-only export works');
+    assert.equal(report.consoleErrors.filter(message => !/Fixture intentional failure|400 \(Bad Request\)/u.test(message)).length, 0);
+    report.expectedFixtureErrors = report.consoleErrors.filter(message => /Fixture intentional failure|400 \(Bad Request\)/u.test(message));
+    report.consoleErrors = report.consoleErrors.filter(message => !/Fixture intentional failure|400 \(Bad Request\)/u.test(message));
+    report.ok = true;
+  } catch (error) {
+    report.failure = error.stack || String(error);
+    if (page) await page.screenshot({path: path.join(artifactsDir, 'failure.png')}).catch(() => {});
+    throw error;
   } finally {
-    if (browserHandle) await browserHandle.close().catch(() => undefined);
-    else if (context) await context.close().catch(() => undefined);
-    fs.rmSync(profileDir, {recursive: true, force: true});
+    fs.writeFileSync(path.join(artifactsDir, 'report.json'), JSON.stringify(report, null, 2));
+    if (launched) await launched.close().catch(() => {});
+    await fixture.close(); fs.rmSync(profileDir, {recursive: true, force: true});
+    console.log(JSON.stringify({ok: report.ok, cases: report.cases, report: path.join(artifactsDir, 'report.json'), failure: report.failure}, null, 2));
   }
-
-  const runtimeErrors = errors.filter((error) => !isExpectedShutdownNoise(error));
-  result.errors = runtimeErrors;
-  result.assertions.consoleErrors = runtimeErrors.length;
-  if (runtimeErrors.length > 0) {
-    result.ok = false;
-    fail(`文档页隔离浏览器出现控制台错误：${JSON.stringify(runtimeErrors)}`);
-  }
-
-  result.reportPath = path.join(artifactsDir, 'report.json');
-  fs.writeFileSync(result.reportPath, `${JSON.stringify(result, null, 2)}\n`, 'utf8');
-  console.log(JSON.stringify(result, null, 2));
 }
-
-main().catch((error) => {
-  console.error(error.stack || error.message || String(error));
-  process.exitCode = 1;
-});
+main().catch(error => {console.error(error.stack || String(error)); process.exitCode = 1;});

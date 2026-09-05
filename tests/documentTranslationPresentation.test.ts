@@ -32,7 +32,7 @@ describe('document translation presentation', () => {
         expect(getDocumentPreviewMeta(pdf).title).toBe('PDF 原页与译页');
         expect(getDocumentPreviewMeta(epub).title).toBe('ePub 章节双语阅读');
         expect(getDocumentPreviewMeta(docx).title).toBe('Word 文档原文与译文');
-        expect(getDocumentPreviewMeta(parsed('srt')).title).toBe('字幕原文与可编辑译文');
+        expect(getDocumentPreviewMeta(parsed('srt')).title).toBe('字幕时间轴与译文');
         expect(getDocumentPreviewMeta(parsed('json')).title).toBe('JSON 路径与字符串译文');
         expect(getDocumentPreviewMeta(parsed('markdown')).title).toBe('Markdown 双语文章');
         expect(getDocumentPreviewMeta(parsed('html')).title).toBe('HTML 双语排版预览');

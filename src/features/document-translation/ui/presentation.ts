@@ -27,7 +27,7 @@ export function getDocumentPreviewMeta(document: ParsedDocument | null): Documen
     if (document?.binary?.kind === 'pdf') return {
         eyebrow: '版式阅读',
         title: 'PDF 原页与译页',
-        hint: '使用 PDF.js 版面坐标重排译文；所有页面纵向连续滚动，双语模式逐页并排对照',
+        hint: '逐页连续阅读，双语模式并排对照；可在校订区修改文字',
     };
     if (document?.binary?.kind === 'epub') return {
         eyebrow: '电子书阅读',
@@ -41,8 +41,8 @@ export function getDocumentPreviewMeta(document: ParsedDocument | null): Documen
     };
     if (isSubtitleDocumentFormat(document?.format)) return {
         eyebrow: '时间轴校对',
-        title: '字幕原文与可编辑译文',
-        hint: '开始时间、结束时间和字幕标签保持不变，逐条校对后按原格式下载',
+        title: '字幕时间轴与译文',
+        hint: '保留时间轴，切换到校订区修改文字后按原格式下载',
     };
     if (document?.format === 'json') return {
         eyebrow: '结构化翻译',

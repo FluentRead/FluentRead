@@ -700,6 +700,8 @@ const modelUsageTextOverrides: Record<Exclude<UiLanguage, 'zh-CN'>, Readonly<Rec
 const learningCenterTextOverrides: Record<Exclude<UiLanguage, 'zh-CN'>, Readonly<Record<string, string>>> = {
     'en-US': {
         "学习中心": "Learning center",
+        "从收藏原句理解表达，练习自己的用法，再通过复习巩固。": "Understand expressions in saved sentences, practice using them yourself, and reinforce them through review.",
+        "学习中心、单词本、收藏、词汇、句子、学习用法、造句、原句、复习、阅读记录、问答、30 天、Anki、导入导出": "Learning center, wordbook, saved items, vocabulary, sentences, usage, writing practice, source sentences, review, reading history, questions, 30 days, Anki, import, export",
         "收藏、复习与阅读记录": "Saved items, review and reading history",
         "统一管理主动收藏的内容，回看最近 30 天的阅读问答。": "Manage saved items and revisit reading questions from the past 30 days.",
         "收藏内容长期保留，阅读问答保留 30 天；所有学习数据只保存在当前浏览器。": "Saved items are kept long term and reading questions for 30 days. All learning data stays in this browser.",
@@ -710,6 +712,8 @@ const learningCenterTextOverrides: Record<Exclude<UiLanguage, 'zh-CN'>, Readonly
     },
     'ja-JP': {
         "学习中心": "学習センター",
+        "从收藏原句理解表达，练习自己的用法，再通过复习巩固。": "保存した原文から表現を理解し、自分で使う練習をして、復習で定着させます。",
+        "学习中心、单词本、收藏、词汇、句子、学习用法、造句、原句、复习、阅读记录、问答、30 天、Anki、导入导出": "学習センター、単語帳、保存、語彙、文、用法学習、作文、原文、復習、読書履歴、質問、30日、Anki、インポート、エクスポート",
         "收藏、复习与阅读记录": "保存、復習、読書履歴",
         "统一管理主动收藏的内容，回看最近 30 天的阅读问答。": "保存した内容をまとめて管理し、過去30日間の読書中の質問を振り返ります。",
         "收藏内容长期保留，阅读问答保留 30 天；所有学习数据只保存在当前浏览器。": "保存した内容は長期保存され、読書中の質問は30日間保存されます。学習データはこのブラウザー内だけに保存されます。",
@@ -720,6 +724,8 @@ const learningCenterTextOverrides: Record<Exclude<UiLanguage, 'zh-CN'>, Readonly
     },
     'ko-KR': {
         "学习中心": "학습 센터",
+        "从收藏原句理解表达，练习自己的用法，再通过复习巩固。": "저장한 원문에서 표현을 이해하고 직접 사용해 본 뒤 복습으로 익히세요.",
+        "学习中心、单词本、收藏、词汇、句子、学习用法、造句、原句、复习、阅读记录、问答、30 天、Anki、导入导出": "학습 센터, 단어장, 저장 항목, 어휘, 문장, 용법 학습, 작문, 원문, 복습, 읽기 기록, 질문, 30일, Anki, 가져오기, 내보내기",
         "收藏、复习与阅读记录": "저장 항목, 복습 및 읽기 기록",
         "统一管理主动收藏的内容，回看最近 30 天的阅读问答。": "저장한 항목을 모아 관리하고 지난 30일 동안의 읽기 질문을 다시 확인하세요.",
         "收藏内容长期保留，阅读问答保留 30 天；所有学习数据只保存在当前浏览器。": "저장한 항목은 계속 보관되며 읽기 질문은 30일 동안 보관됩니다. 모든 학습 데이터는 현재 브라우저에만 저장됩니다.",
@@ -730,6 +736,8 @@ const learningCenterTextOverrides: Record<Exclude<UiLanguage, 'zh-CN'>, Readonly
     },
     'fr-FR': {
         "学习中心": "Centre d’apprentissage",
+        "从收藏原句理解表达，练习自己的用法，再通过复习巩固。": "Comprenez les expressions dans les phrases enregistrées, entraînez-vous à les employer, puis consolidez vos acquis en révisant.",
+        "学习中心、单词本、收藏、词汇、句子、学习用法、造句、原句、复习、阅读记录、问答、30 天、Anki、导入导出": "Centre d’apprentissage, vocabulaire, favoris, mots, phrases, usage, rédaction, phrases originales, révision, historique de lecture, questions, 30 jours, Anki, importation, exportation",
         "收藏、复习与阅读记录": "Favoris, révision et historique de lecture",
         "统一管理主动收藏的内容，回看最近 30 天的阅读问答。": "Gérez vos favoris et retrouvez les questions de lecture des 30 derniers jours.",
         "收藏内容长期保留，阅读问答保留 30 天；所有学习数据只保存在当前浏览器。": "Les favoris sont conservés durablement et les questions de lecture pendant 30 jours. Les données restent dans ce navigateur.",
@@ -740,6 +748,8 @@ const learningCenterTextOverrides: Record<Exclude<UiLanguage, 'zh-CN'>, Readonly
     },
     'ru-RU': {
         "学习中心": "Учебный центр",
+        "从收藏原句理解表达，练习自己的用法，再通过复习巩固。": "Изучайте выражения в сохранённых предложениях, учитесь использовать их самостоятельно и закрепляйте знания повторением.",
+        "学习中心、单词本、收藏、词汇、句子、学习用法、造句、原句、复习、阅读记录、问答、30 天、Anki、导入导出": "Учебный центр, словарь, сохранённое, слова, предложения, употребление, составление предложений, исходные предложения, повторение, история чтения, вопросы, 30 дней, Anki, импорт, экспорт",
         "收藏、复习与阅读记录": "Сохранённое, повторение и история чтения",
         "统一管理主动收藏的内容，回看最近 30 天的阅读问答。": "Управляйте сохранёнными материалами и просматривайте вопросы за последние 30 дней.",
         "收藏内容长期保留，阅读问答保留 30 天；所有学习数据只保存在当前浏览器。": "Сохранённые материалы хранятся постоянно, вопросы по чтению — 30 дней. Все учебные данные остаются в этом браузере.",
@@ -750,6 +760,8 @@ const learningCenterTextOverrides: Record<Exclude<UiLanguage, 'zh-CN'>, Readonly
     },
     'es-ES': {
         "学习中心": "Centro de aprendizaje",
+        "从收藏原句理解表达，练习自己的用法，再通过复习巩固。": "Comprende las expresiones en las frases guardadas, practica su uso y refuérzalas con el repaso.",
+        "学习中心、单词本、收藏、词汇、句子、学习用法、造句、原句、复习、阅读记录、问答、30 天、Anki、导入导出": "Centro de aprendizaje, vocabulario, guardados, palabras, frases, uso, redacción, frases originales, repaso, historial de lectura, preguntas, 30 días, Anki, importar, exportar",
         "收藏、复习与阅读记录": "Guardados, repaso e historial de lectura",
         "统一管理主动收藏的内容，回看最近 30 天的阅读问答。": "Gestiona los elementos guardados y consulta las preguntas de lectura de los últimos 30 días.",
         "收藏内容长期保留，阅读问答保留 30 天；所有学习数据只保存在当前浏览器。": "Los elementos guardados se conservan y las preguntas de lectura se guardan durante 30 días. Los datos permanecen en este navegador.",

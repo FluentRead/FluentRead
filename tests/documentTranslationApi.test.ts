@@ -267,3 +267,69 @@ describe('document translation API', () => {
         await Promise.resolve();
     });
 });
+
+describe('document incremental translation and resume', () => {
+    const segments = Array.from({length: 18}, (_, id) => ({id, source: `Paragraph ${id}`}));
+
+    it('批次成功后立即提交片段，失败后仅补译缺失内容并保留人工校订', async () => {
+        const committed: string[] = [];
+        mocks.translateTextBatch.mockResolvedValueOnce(segments.slice(0, 16).map(({id}) => `译文 ${id}`)).mockRejectedValueOnce(new Error('offline'));
+        await expect(translateDocumentSegments(segments, {fileName: 'resume.txt', onSegment: ({id, translation}) => { committed[id] = translation; }})).rejects.toThrow('第 17 段');
+        expect(committed).toHaveLength(16);
+        committed[0] = '人工校订';
+        const saved = [...committed];
+        const progress: number[] = [];
+        mocks.translateTextBatch.mockResolvedValueOnce(['译文 16', '译文 17']);
+        const result = await translateDocumentSegments(segments, {fileName: 'resume.txt', initialTranslations: committed, onProgress: ({completed}) => progress.push(completed)});
+        expect(mocks.translateTextBatch.mock.calls.at(-1)?.[0]).toEqual(['Paragraph 16', 'Paragraph 17']);
+        expect(result).toEqual([...saved, '译文 16', '译文 17']);
+        expect(committed).toEqual(saved);
+        expect(progress).toEqual([16, 18]);
+    });
+
+    it('取消后网关即使正常返回，也不得提交迟到批次', async () => {
+        const controller = new AbortController();
+        const onSegment = vi.fn();
+        mocks.translateTextBatch.mockImplementation(async () => { controller.abort(); return ['迟到译文']; });
+        await expect(translateDocumentSegments(segments.slice(0, 1), {fileName: 'cancel.txt', signal: controller.signal, onSegment})).rejects.toMatchObject({name: 'AbortError'});
+        expect(onSegment).not.toHaveBeenCalled();
+    });
+
+    it.each([[['only one']], [['ok', '']], [['ok', 42]]])('不完整批次 %j 不能污染已完成结果', async (result) => {
+        const onSegment = vi.fn();
+        mocks.translateTextBatch.mockResolvedValue(result);
+        await expect(translateDocumentSegments(segments.slice(0, 2), {fileName: 'bad.txt', onSegment})).rejects.toThrow('片段不完整');
+        expect(onSegment).not.toHaveBeenCalled();
+    });
+
+    it('单段并发返回乱序时保留原始位置，空白位置可以继续翻译', async () => {
+        mocks.defaultService = 'openai';
+        const onSegment = vi.fn();
+        mocks.translateText.mockResolvedValue('补译');
+        const result = await translateDocumentSegments(segments.slice(0, 3), {fileName: 'single.txt', initialTranslations: ['校订', ' ', '已完成'], onSegment});
+        expect(result).toEqual(['校订', '补译', '已完成']);
+        expect(onSegment).toHaveBeenCalledOnce();
+        expect(onSegment).toHaveBeenCalledWith({id: 1, translation: '补译'});
+        expect(mocks.translateText.mock.calls[0][0]).toBe('Paragraph 1');
+        mocks.translateText.mockClear();
+        await expect(translateDocumentSegments(segments.slice(0, 3), {fileName: 'done.txt', initialTranslations: result})).resolves.toEqual(result);
+        expect(mocks.translateText).not.toHaveBeenCalled();
+    });
+
+    it.each(['', '   ', 42])('拒绝单段空白或无效返回 %j', async (result) => {
+        mocks.defaultService = 'openai';
+        mocks.translateText.mockResolvedValue(result);
+        const onSegment = vi.fn();
+        await expect(translateDocumentSegments(segments.slice(0, 1), {fileName: 'empty.txt', onSegment})).rejects.toThrow('空译文');
+        expect(onSegment).not.toHaveBeenCalled();
+    });
+
+    it('单段服务忽略取消信号时也不能产生迟到提交', async () => {
+        mocks.defaultService = 'openai';
+        const controller = new AbortController();
+        const onSegment = vi.fn();
+        mocks.translateText.mockImplementation(async () => { controller.abort(); return '迟到译文'; });
+        await expect(translateDocumentSegments(segments.slice(0, 1), {fileName: 'late.txt', signal: controller.signal, onSegment})).rejects.toMatchObject({name: 'AbortError'});
+        expect(onSegment).not.toHaveBeenCalled();
+    });
+});

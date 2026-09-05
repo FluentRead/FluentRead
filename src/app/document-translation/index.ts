@@ -5,6 +5,7 @@
  * 模块边界：该文件只整理稳定公开面，不执行页面挂载、不持有配置副本，也不暴露 document feature 内部实现；实际适配在 runtime，UI 状态在 DocumentApp。
  */
 export * from '@/src/features/document-translation/public';
+export {buildGlossaryRevision} from '@/src/core/glossary';
 export {Config} from '@/src/core/config/model';
 export {getMissingCredentialMessage} from '@/src/core/config/validation';
 export {

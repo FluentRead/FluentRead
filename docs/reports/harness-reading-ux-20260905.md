@@ -75,4 +75,4 @@ flowchart LR
 - [390px 设置](./harness-reading-ux-20260905/harness-settings-390.png)
 - [暗色设置](./harness-reading-ux-20260905/harness-settings-dark.png)
 
-部分设置截图处于内部滚动后的状态，重开截图展示完整顶部启用和示例。截图均为真实浏览器输出，没有修饰或编辑。本次未借用或修改 `read-frog`、`kiss-translator` 的实现。
+部分设置截图处于内部滚动后的状态，重开截图展示完整顶部启用和示例。截图均为真实浏览器输出，没有修饰或编辑。

@@ -1482,7 +1482,7 @@ describe('site translation coverage contract', () => {
   });
 
   it('fails the old seven-wrapper PR 4038 baseline', () => {
-    const pr = cases['github-immersive-pr-4038'];
+    const pr = cases['github-project-pr'];
     const rules = normalizeCoverageRules(pr.coverageRules);
     const oldSevenWrapperBaseline = [
       {
@@ -1721,7 +1721,7 @@ describe('real-site translation matrix gates', () => {
     expect(cases['curl-http-scripting'].tier).toBe('required');
     expect(cases['sqlite-select-language'].tier).toBe('required');
     expect(cases['git-book-version-control'].tier).toBe('required');
-    expect(cases['github-immersive-pulls'].forbiddenSelectors).toEqual([
+    expect(cases['github-project-pulls'].forbiddenSelectors).toEqual([
       "button[aria-haspopup='dialog'][aria-label*='search' i]",
     ]);
     expect(cases['brown-pl-introduction'].forbiddenSelectors).toEqual(['table.RktBlk']);
@@ -1849,7 +1849,7 @@ describe('real-site translation matrix gates', () => {
   });
 
   it('keeps PR 4038 title, body headings, paragraphs and lists as separate requirements', () => {
-    const rules = normalizeCoverageRules(cases['github-immersive-pr-4038'].coverageRules);
+    const rules = normalizeCoverageRules(cases['github-project-pr'].coverageRules);
     expect(rules.map(({selector}) => selector)).toEqual([
       'main h1',
       '.markdown-body h2',
@@ -1858,7 +1858,7 @@ describe('real-site translation matrix gates', () => {
     ]);
     expect(rules.every(({selector}) => !selector.includes(','))).toBe(true);
     expect(rules.every(({trackDynamic}) => trackDynamic)).toBe(true);
-    const prHoverTargets = normalizeHoverTargets(cases['github-immersive-pr-4038'].hoverTargets, {
+    const prHoverTargets = normalizeHoverTargets(cases['github-project-pr'].hoverTargets, {
       coverageRules: rules,
     });
     expect(prHoverTargets.map(({selector}) => selector)).toEqual([
@@ -1868,18 +1868,18 @@ describe('real-site translation matrix gates', () => {
       '.markdown-body li',
     ]);
     expect(prHoverTargets.find(({selector}) => selector === '.markdown-body h2')?.sourceIncludes).toEqual([
-      'What changed',
+      '验证',
     ]);
     expect(prHoverTargets.find(({selector}) => selector === '.markdown-body li')?.sourceIncludes).toEqual([
-      "Exclude GitHub's global search trigger",
+      '已取消的快捷键手势',
     ]);
     expect(rules.find(({name}) => name === 'body-list-items')?.sourceIncludes).toEqual([
-      "Exclude GitHub's global search trigger",
+      '已取消的快捷键手势',
     ]);
-    expect(cases['github-immersive-pr-4038'].forbiddenMustExistSelectors).toEqual([
+    expect(cases['github-project-pr'].forbiddenMustExistSelectors).toEqual([
       "button[aria-haspopup='dialog'][aria-label*='search' i]",
     ]);
-    expect(cases['github-immersive-pr-4038'].interactionScenarios).toEqual([
+    expect(cases['github-project-pr'].interactionScenarios).toEqual([
       expect.objectContaining({
         triggerSelector: "button[aria-haspopup='dialog'][aria-label*='search' i]",
         openKey: 'click',

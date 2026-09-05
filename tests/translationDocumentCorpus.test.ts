@@ -78,7 +78,7 @@ describe('offline whole-document translation corpus', () => {
     it('covers the GitHub PR 4038 title and every markdown H2/P/LI while pruning Quick Search', () => {
         const {document, core} = loadFixture(
             'github-pr-4038.html',
-            'https://github.com/immersive-translate/immersive-translate/pull/4038',
+            'https://github.com/FluentRead/FluentRead/pull/428',
         );
         const candidates = core.discover(document);
         const expected = [

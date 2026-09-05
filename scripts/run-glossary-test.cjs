@@ -219,7 +219,7 @@ async function main() {
     await dialog.getByRole('button', {name: '确认导入', exact: true}).click();
     await dialog.waitFor({state: 'hidden'});
     await waitConfig(config => config.glossaryLibraries.length === 2);
-    report.cases.push('Immersive-compatible source,target,tgt_lng import preview and confirmed append');
+    report.cases.push('CSV source,target,tgt_lng import preview and confirmed append');
     await ui.locator('.glossary-library-name').filter({hasText: '技术词库'}).click();
     const downloadPromise = options.waitForEvent('download');
     await editor.getByRole('button', {name: '导出', exact: true}).click();

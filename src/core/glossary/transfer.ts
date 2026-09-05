@@ -1,7 +1,7 @@
 /**
  * @file src/core/glossary/transfer.ts
  * 文件职责：把 CSV、TSV 和 JSON 术语文件转换为可确认的导入预览，并输出可在表格软件中安全打开且精确回导的文件。
- * 主要内容：解析引号、多行、BOM 和中英文列名，按沉浸式翻译 tgt_lng 分组，并在表格导出中保留源目标语言；对格式错误、范围错误和容量超限给出阻止性错误，防止静默丢词。
+ * 主要内容：解析引号、多行、BOM 和中英文列名，按目标语言 tgt_lng 分组，并在表格导出中保留源目标语言；对格式错误、范围错误和容量超限给出阻止性错误，防止静默丢词。
  * 模块边界：本文件只转换字符串和领域对象，不打开文件、不修改配置、不触发下载；导入确认与持久化由设置界面承担。
  */
 import {cleanGlossaryText, glossaryRecord, GLOSSARY_LIMITS, normalizeGlossaryDomain,

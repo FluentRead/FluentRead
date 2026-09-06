@@ -108,7 +108,7 @@
           :data-selected-model="serviceModelLabel || undefined"
           @click="toggleServicePicker"
         >
-          <ServiceIcon :service="config.service" :label="serviceLabel" />
+          <ServiceIcon :service="config.service" :label="serviceLabel" size="small" />
           <span class="service-copy">
             <small>翻译服务</small>
             <span class="service-value">

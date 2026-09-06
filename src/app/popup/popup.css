@@ -146,6 +146,7 @@ h2 { margin-bottom: 0; font-size: 15px; line-height: 1.35; letter-spacing: -.01e
 .service-value { display: flex; min-width: 0; align-items: baseline; gap: 6px; }
 .service-copy strong, .service-model { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .service-copy strong { max-width: 45%; flex: 0 0 auto; font-size: 12px; }
+.service-copy strong:only-child { max-width: 100%; }
 .service-model { flex: 1 1 0; color: var(--muted); font-size: 9px; font-style: normal; font-weight: 600; }
 .chevron { position: absolute; right: 14px; color: var(--muted); font-size: 18px; line-height: 1; transform: translateY(-2px); transition: transform 160ms ease; }
 .chevron.open { transform: translateY(1px) rotate(180deg); }

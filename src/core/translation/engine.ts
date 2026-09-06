@@ -669,7 +669,8 @@ export class TranslationCandidateCore {
                 continue;
             }
             // 继承硬守卫适用于每个可能的祖先候选；遇到极深树时立即停止，避免反复上溯。
-            if (this.hardGuard(current, evaluationContext).reason === 'ancestor-depth-limit') return null;
+            const guardReason = this.hardGuard(current, evaluationContext).reason;
+            if (guardReason === 'ancestor-depth-limit' || guardReason === 'foreign-translation') return null;
             // 外壳本身不是显式目标；避免在缺少更细粒度块边界的 SPA 中把整个应用根
             // 当作候选，同时允许继续向其上方寻找正常的页面结构。
             if (isTopLevelApplicationShell(current) &&

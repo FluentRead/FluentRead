@@ -1,6 +1,6 @@
 {
-  "title": "FluentRead",
-  "shortDescription": "Open-source bilingual translation, with AI reading assistance using a browser adaptation of the DeepSeek Harness session core.",
+  "title": "FluentRead-流畅阅读",
+  "shortDescription": "An open-source browser extension for bilingual reading and translation. 一款开源的双语阅读与翻译浏览器插件。",
   "descriptionFile": "description.txt",
   "language": "en",
   "sourceLanguageInScreenshots": "auto"

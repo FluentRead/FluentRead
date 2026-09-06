@@ -1,1 +1,1 @@
-开源双语阅读与翻译扩展。支持网页、划词、图片、文档和字幕翻译，AI 翻译卡接入 DeepSeek Harness 会话内核的浏览器适配。
+An open-source browser extension for bilingual reading and translation. 一款开源的双语阅读与翻译浏览器插件。

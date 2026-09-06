@@ -15,12 +15,12 @@ const grants = [
 export function createUserscriptMetadata({version, iconDataUrl}: UserscriptMetadataOptions): string {
     const lines = [
         '// ==UserScript==',
-        '// @name         流畅阅读',
+        '// @name         FluentRead-流畅阅读',
         '// @name:en      FluentRead',
         '// @namespace    https://fr.unmeta.cn/',
         `// @version      ${version}`,
-        '// @description  双语网页翻译、悬浮翻译与划词翻译的 FluentRead userscript 版本。',
-        '// @description:en FluentRead bilingual page, hover, and selection translation userscript.',
+        '// @description  An open-source userscript for bilingual reading and translation. 一款开源的双语阅读与翻译用户脚本。',
+        '// @description:en An open-source userscript for bilingual reading and translation.',
         '// @author       ThinkStu',
         '// @license      GPL-3.0-only',
         '// @homepageURL  https://github.com/FluentRead/FluentRead',

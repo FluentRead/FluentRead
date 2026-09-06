@@ -1,10 +1,10 @@
 <div align="center">
 
-<img src="../public/icon/512.png" alt="FluentRead 流畅阅读" width="96" />
+<img src="../public/icon/512.png" alt="FluentRead-流畅阅读" width="96" />
 
-# FluentRead · 流畅阅读
+# FluentRead-流畅阅读
 
-开源的双语阅读与翻译浏览器扩展。
+一款开源的双语阅读与翻译浏览器插件。
 
 [安装](#安装) · [官网](https://fluent.thinkstu.com/) · [使用指南](https://fluent.thinkstu.com/guide/) · [English](../README.md) · [GPL-3.0](../LICENSE)
 

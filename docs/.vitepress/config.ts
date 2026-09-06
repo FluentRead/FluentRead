@@ -111,9 +111,9 @@ const theme = (en = false) => ({
   },
 })
 export default defineConfig({
-  title: 'FluentRead · 流畅阅读',
+  title: 'FluentRead-流畅阅读',
   description:
-    'FluentRead 是一款开源双语阅读与翻译扩展，支持网页、图片、文档和字幕翻译，翻译卡接入经浏览器适配的 DeepSeek Harness 会话内核。',
+    '一款开源的双语阅读与翻译浏览器插件。',
   lang: 'zh-CN',
   base: '/',
   cleanUrls: true,
@@ -134,7 +134,7 @@ export default defineConfig({
     root: {
       label: '简体中文',
       lang: 'zh-CN',
-      title: 'FluentRead · 流畅阅读',
+      title: 'FluentRead-流畅阅读',
       themeConfig: theme(),
     },
     en: {
@@ -142,7 +142,7 @@ export default defineConfig({
       lang: 'en',
       title: 'FluentRead',
       description:
-        'Open-source bilingual reading, with a browser adaptation of the DeepSeek Harness session core for AI reading conversations.',
+        'An open-source browser extension for bilingual reading and translation.',
       themeConfig: theme(true),
     },
   },

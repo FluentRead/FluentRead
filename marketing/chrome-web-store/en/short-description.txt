@@ -1,1 +1,1 @@
-Open-source bilingual translation, with AI reading assistance using a browser adaptation of the DeepSeek Harness session core.
+An open-source browser extension for bilingual reading and translation. 一款开源的双语阅读与翻译浏览器插件。

@@ -16,7 +16,7 @@
 | `source/` | 2x 高清原图、自有示例文章、译文与采集记录 |
 | `asset-manifest.json` | 每张成品的尺寸、格式、体积与来源 |
 
-详细介绍是 UTF-8 纯文本，可整段复制。短介绍单独存放且不超过 132 字符；它对应扩展的摘要，不会在本次内容改写中自动修改扩展 manifest。提交商店时请检查待发布包中的名称和摘要是否一致。
+详细介绍是 UTF-8 纯文本，可整段复制。中英文素材中的 `title.txt`、`short-description.txt` 和 `listing.json` 使用相同的软件包名称与双语摘要，对应 `package.json` 的 `name` 和 `description`；WXT 将这两个字段写入 Chrome、Edge 和 Firefox 的扩展 manifest。短介绍不超过 132 字符。修改软件包元信息时同步更新这些素材，提交商店时核对实际发布包。
 
 ## 图片怎么选？
 

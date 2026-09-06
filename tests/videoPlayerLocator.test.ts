@@ -43,6 +43,23 @@ afterEach(() => {
 });
 
 describe('video player locator', () => {
+  it('does not rescan the document for duplicate pointer, mouse and focus events in the same video', () => {
+    const {document, window, videos} = setup('<article><div><video></video></div></article><article><div><video></video></div></article>');
+    const locator = createVideoPlayerLocator({document, window, isXPage: () => true});
+    const scan = vi.spyOn(document, 'querySelectorAll');
+    const emit = (video: HTMLVideoElement, type: string) => video.dispatchEvent(new (window as unknown as {Event: typeof Event}).Event(type, {bubbles: true}));
+    emit(videos[0], 'pointerover');
+    scan.mockClear();
+    for (let i = 0; i < 20; i += 1) {
+      emit(videos[0], 'pointerover'); emit(videos[0], 'mouseover'); emit(videos[0], 'focusin');
+    }
+    expect(scan).not.toHaveBeenCalledWith('video');
+    emit(videos[1], 'pointerover');
+    expect(scan).toHaveBeenCalledWith('video');
+    expect(locator.getTarget()?.video).toBe(videos[1]);
+    locator.destroy();
+    scan.mockRestore();
+  });
   it('does not guess the first video in an X feed and selects the hovered video', () => {
     const {document, window, videos} = setup('<article><div class="one"><video></video></div></article><article><div class="two"><video></video></div></article>');
     expect(selectVideoPlayerTarget(document, {window, isXPage: true})).toBeNull();

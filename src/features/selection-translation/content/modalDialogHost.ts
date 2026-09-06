@@ -1,7 +1,7 @@
 /**
  * @file src/features/selection-translation/content/modalDialogHost.ts
  * 文件职责：让划词翻译 Shadow host 在原生 showModal() 对话框的 top layer 中保持可见且可交互。
- * 主要内容：按选区 Range 查找共同的 dialog:modal，创建零尺寸坐标 slot，迁移现有 host，处理滚动/尺寸/DOM 变化并在关闭或卸载时恢复。
+ * 主要内容：按选区 Range 查找共同的 dialog:modal，创建坐标 slot，迁移现有 host；宿主持续移除时停止重插，关闭或卸载时恢复。
  * 模块边界：本文件只管理 selection host 的 DOM 所有权和定位，不创建 Vue 实例、不读取配置、不调用翻译服务。
  */
 
@@ -162,6 +162,8 @@ export function createModalDialogHostController(host: HTMLElement): ModalDialogH
     let frame: number | null = null;
     let disposed = false;
     let calibrationRetries = 0;
+    let ownershipRepairs = 0;
+    let rejectedDialog: HTMLDialogElement | null = null;
 
     const scheduleSync = () => {
         if (!view || disposed || !activeDialog || frame !== null) return;
@@ -212,6 +214,15 @@ export function createModalDialogHostController(host: HTMLElement): ModalDialogH
         if (!isActiveModalDialog(activeDialog)) {
             restore();
             return;
+        }
+        if (slot.parentNode !== activeDialog || host.parentNode !== slot) {
+            // 宿主框架反复拒绝外来子节点时让出 DOM，不能每一帧都与页面争夺所有权。
+            if (ownershipRepairs >= 2) {
+                rejectedDialog = activeDialog;
+                restore();
+                return;
+            }
+            ownershipRepairs += 1;
         }
         if (slot.parentNode !== activeDialog) activeDialog.appendChild(slot);
         if (host.parentNode !== slot) slot.appendChild(host);
@@ -265,17 +276,20 @@ export function createModalDialogHostController(host: HTMLElement): ModalDialogH
         if (disposed) return false;
         const dialog = findSelectionModalDialog(range);
         if (!dialog) {
+            rejectedDialog = null;
             restore();
             return false;
         }
+        if (dialog === rejectedDialog) return false;
         if (dialog === activeDialog && slot) {
             syncPlacement();
-            return true;
+            return dialog !== rejectedDialog;
         }
         restore();
         activeDialog = dialog;
         slot = createModalDialogHostSlot(ownerDocument);
         calibrationRetries = 0;
+        ownershipRepairs = 0;
         activeDialog.appendChild(slot);
         slot.appendChild(host);
         syncPlacement();

@@ -56,6 +56,32 @@ describe('content feature activation lifecycle', () => {
 });
 
 describe('content 页面总开关与 SPA 路由生命周期', () => {
+    it('caps non-progressing activations and permits recovery on the next explicit reconciliation', async () => {
+        let active = false;
+        let recover = false;
+        const activate = vi.fn(async () => {
+            // 原实现无限微任务重试时也要快速失败，不能让回归测试本身饿死超时器。
+            if (activate.mock.calls.length > 5) throw new Error('unbounded activation');
+            active = recover;
+        });
+        const dispose = vi.fn(() => { active = false; });
+        const autoTranslate = vi.fn();
+        const runtime = createContentPageAvailabilityRuntime({
+            isEnabled: () => true, isPageFeaturesActive: () => active,
+            isVideoPage: () => false, shouldAutomaticallyTranslate: () => true,
+            isFullPageTranslationActive: () => false, setMainWorldBridgesEnabled: vi.fn(),
+            activatePageFeatures: activate, disposePageFeatures: dispose,
+            mountVideoSubtitle: () => vi.fn(), autoTranslate,
+        });
+        await runtime.reconcile();
+        expect(activate).toHaveBeenCalledTimes(2);
+        expect(dispose).toHaveBeenCalledOnce();
+        expect(autoTranslate).not.toHaveBeenCalled();
+        recover = true;
+        await runtime.reconcile();
+        expect(active).toBe(true);
+        expect(autoTranslate).toHaveBeenCalledOnce();
+    });
     it('首次 activation 之前已经安装配置订阅，初始化异步窗口不会漏掉写入', () => {
         const source = readFileSync(new URL('../src/app/content/runtime.ts', import.meta.url), 'utf8');
         expect(source.indexOf('unsubscribeContentConfig = subscribeConfig'))

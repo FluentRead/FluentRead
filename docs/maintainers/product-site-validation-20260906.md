@@ -16,9 +16,9 @@
 | `pnpm docs:build` | 生产构建成功，47 个 HTML 页面 |
 | `pnpm compile` | TypeScript / Vue 类型检查通过 |
 | `pnpm build` / `pnpm build:firefox` | Chrome MV3 与 Firefox MV2 生产构建成功；真实 UI 验证使用 Chrome MV3 产物 |
-| 相关单元测试 | i18n、Popup 功能显隐、设置 UI 架构、界面外观，共 4 个文件 93 个用例通过 |
+| 相关单元测试 | i18n、Popup 功能显隐、设置 UI 架构、界面外观、Harness 配置/运行时、中文识别，共 7 个文件 261 个用例通过 |
 | `scripts/verify-support-ui.cjs` | 7 种语言的双入口、原图链接、默认尺寸不滚动、窄窗口可达、Tab 焦点循环、Escape 与关闭按钮、中文英文深色模式；无页面或控制台错误 |
-| `pnpm test:audit` | 266 个测试文件、3,449 个登记用例归类审计通过；此项不是运行全部用例 |
+| `pnpm test:audit` | 266 个测试文件、3,456 个登记用例归类审计通过；此项不是运行全部用例 |
 | `git diff --check` | 通过 |
 | `scripts/verify-product-site.cjs` | 1,490 处内部链接和锚点、68 处图片引用通过；中英文指南路径成对 |
 | 生产站点浏览器 | 中文与英文自动选择、手动语言切换与记忆、文档对应页、移动端菜单、深色模式、无横向溢出；无 pageerror 或 console error |
@@ -46,3 +46,7 @@
 微信原图在扩展、README 和官网三个位置的 SHA-256 均为 `a2e7f4452a0efa645ca5e1013c6229d49e276e7e489cd95c18e195f494e2c63e`。界面通过 CSS 放大完整赞赏码区域，未改写图片内容；原图链接仍可打开 1152×1152 的原文件。Ko-fi 链接采用用户提供的 `https://ko-fi.com/thinkstu`，使用新标签页并带 `noopener noreferrer`。未发起支付，也未验证服务商的付款流程。
 
 通用扩展 UI Skill 的 `run-ui-test.cjs --suite full` 已运行，但在初始化 Popup 时超时：脚本第 533 行查找旧标题 `/让阅读自然地流动|翻译功能已暂停/`，当前启用标题为“网页翻译”。改动前的 `27e315a` 也是“网页翻译”，且此脚本没有处理现有的首次语言选择。因此完整通用套件没有通过，后续用例未运行；不能把赞赏专项的通过当作通用套件通过。该外部 Skill 脚本未在本任务中修改。Firefox 完成构建，未执行浏览器交互回归。
+
+## 合并前复核
+
+任务分支已集成 `bc3c057` 的主分支更新，代码集成提交为 `dac0d25`。两处用户指南冲突按新的文档结构解决，并在中英文指南中保留中文书写体系识别与七语言默认提示词说明。类型检查、7 个文件 261 个测试、测试归类审计、Chrome / Firefox 构建及官网生产构建重新通过。官网报告位于 `/private/tmp/fluentread-product-site-merge/report.json`，赞赏窗口报告位于 `/private/tmp/fluentread-support-ui-merge/report.json`，两者均通过且没有页面或控制台错误。通用 UI 套件及 Firefox 交互的既有验证限制仍适用。

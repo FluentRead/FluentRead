@@ -14,11 +14,11 @@
     <div class="harness-provider-panel">
       <div class="harness-provider-row">
         <div class="harness-provider-field">
-          <label id="harness-service-label">服务</label>
+          <label id="harness-service-label">翻译服务</label>
           <el-select v-model="config.harness.service" class="harness-select" @change="config.harness.model = ''" clearable aria-labelledby="harness-service-label" aria-label="翻译卡服务" placeholder="跟随当前默认服务">
             <el-option v-for="item in serviceOptions" :key="item.value" :label="item.label" :value="item.value" />
           </el-select>
-          <small>使用你已配置的 AI 服务和密钥，也可单独选择。</small>
+          <small>仅支持大模型，使用已配置的服务和密钥。</small>
         </div>
         <div class="harness-provider-field">
           <label id="harness-model-label">模型</label>
@@ -83,9 +83,11 @@
     </SettingsItem>
   </SettingsGroup></section>
 
+  <HarnessPromptSettings :preferences="config.harness" />
 </template>
 
 <script setup lang="ts">
+import HarnessPromptSettings from './HarnessPromptSettings.vue';
 import FeatureEnableCard from '@/src/ui/components/FeatureEnableCard.vue';
 import {computed, ref, toRef, watch} from 'vue'
 import {models, options} from '@/src/core/config/catalog'

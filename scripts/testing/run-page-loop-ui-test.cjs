@@ -84,8 +84,10 @@ async function main() {
           const reopened = await page.evaluate(async () => {
             window.fixture.observer.disconnect();
             const dialog = document.querySelector('dialog');
-            dialog.close();
-            await new Promise(resolve => setTimeout(resolve, 0));
+            await new Promise(resolve => {
+              dialog.addEventListener('close', resolve, {once: true});
+              dialog.close();
+            });
             dialog.showModal();
             return window.fixture.controller.placeForRange(window.fixture.range);
           });

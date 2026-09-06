@@ -540,20 +540,23 @@ async function runPersistenceRegression({context, extensionOrigin, popupPath, pa
   // 冻结首请求给 Popup 的回执，让第二次修改确定停留在页面本地队列。
   // 后台真实处理照常执行；关闭后的成功必须来自补丁链交接，不能依赖机器快慢。
   const modifiedPage = await openReadyPopup('persistence-latest-write-wins', {holdFirstPersistResponse: true});
-  const targetSelect = modifiedPage.locator('.language-pair select').nth(1);
-  const languageValues = await targetSelect.locator('option').evaluateAll(options => options
-    .filter(option => !option.disabled)
-    .map(option => option.value)
-    .filter(Boolean));
-  const initialValue = await targetSelect.inputValue();
-  const candidates = languageValues.filter(value => value !== initialValue);
-  if (candidates.length < 2) throw new Error(`目标语言选项不足以验证连续写入：${JSON.stringify(languageValues)}`);
-  const firstTarget = candidates[0];
-  const finalTarget = candidates[1];
-  await targetSelect.selectOption(firstTarget);
+  const targetSelect = modifiedPage.locator('.language-pair .el-select').nth(1);
+  const initialValue = (await readConfig(pageForConfig, timeout)).to;
+  const candidates = [
+    {value: 'en', label: /English|英语/u},
+    {value: 'ja', label: /日本語|Japanese|日语/u},
+    {value: 'fr', label: /Français|French|法语/u},
+  ].filter(option => option.value !== initialValue);
+  const firstTarget = candidates[0].value;
+  const finalTarget = candidates[1].value;
+  const selectTarget = async candidate => {
+    await targetSelect.locator('.el-select__wrapper').click();
+    await modifiedPage.locator('.el-select-dropdown:visible').getByRole('option', {name: candidate.label}).click();
+  };
+  await selectTarget(candidates[0]);
   await modifiedPage.waitForFunction(() => globalThis.__fluentReadPopupStartup?.persistConfigResponseHolds === 1,
     undefined, {timeout});
-  await targetSelect.selectOption(finalTarget);
+  await selectTarget(candidates[1]);
   // 直接触发短生命周期关闭，不额外等待保存完成。
   await modifiedPage.evaluate(() => window.dispatchEvent(new Event('pagehide')));
   const modifiedState = await readStartupState(modifiedPage);
@@ -588,9 +591,9 @@ async function runPersistenceRegression({context, extensionOrigin, popupPath, pa
     throw new Error(`连续修改后最终目标语言没有胜出：${JSON.stringify(persistence.latestWriteWins)}`);
   }
   const reopenedPage = await openReadyPopup('persistence-reopened');
-  const reopenedValue = await reopenedPage.locator('.language-pair select').nth(1).inputValue();
-  persistence.latestWriteWins.reopenedValue = reopenedValue;
-  if (reopenedValue !== finalTarget) throw new Error(`重新打开后目标语言回滚为 ${reopenedValue}`);
+  const reopenedLabel = await reopenedPage.locator('.language-pair .el-select').nth(1).innerText();
+  persistence.latestWriteWins.reopenedLabel = reopenedLabel;
+  if (!candidates[1].label.test(reopenedLabel)) throw new Error(`重新打开后目标语言显示异常：${reopenedLabel}`);
   persistence.latestWriteWins.screenshot = await screenshot(reopenedPage, 'popup-persistence-reopened.png');
   await reopenedPage.close();
   report.persistence.quickClose = persistence;
@@ -629,9 +632,14 @@ async function runPopupDeferredUiRegression(context, extensionOrigin, popupPath)
 
 /** 在真实 content 上验证取消导航、缓存暂停恢复和原生 Shadow API，而非只测试 helper。 */
 async function runContentLifecycleRegression(context, extensionOrigin, popupPath) {
-  const server = require('node:http').createServer((_request, response) => {
+  const server = require('node:http').createServer((request, response) => {
+    if (request.url === '/image.svg') {
+      response.writeHead(200, {'Content-Type': 'image/svg+xml'});
+      response.end('<svg xmlns="http://www.w3.org/2000/svg" width="400" height="200"><rect width="400" height="200" fill="white"/><text x="20" y="100">Image ownership fixture</text></svg>');
+      return;
+    }
     response.writeHead(200, {'Content-Type': 'text/html; charset=utf-8'});
-    response.end('<!doctype html><html><body><h1>Page lifecycle fixture</h1><button id=activate>Activate page</button><p>Keep this page and its extension active.</p></body></html>');
+    response.end('<!doctype html><html><body><h1>Page lifecycle fixture</h1><button id=activate>Activate page</button><p>Keep this page and its extension active.</p><img src="/image.svg" width="400" height="200" alt="Image ownership fixture"></body></html>');
   });
   await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
   let page;
@@ -700,7 +708,30 @@ async function runContentLifecycleRegression(context, extensionOrigin, popupPath
     if (!transitions.some(event => event.type === 'pageshow' && event.persisted && event.trusted)) {
       throw new Error(`本轮未命中真实 BFCache 恢复：${JSON.stringify(transitions)}`);
     }
-    return {configDrivenGlobalToggle: true, cancelledNavigation: true, forgedEventsIgnored: true, realBackForwardCache: true,
+    await page.locator('img').hover();
+    await page.locator('#fluent-read-image-translation-root').waitFor({state: 'attached', timeout});
+    await page.evaluate(() => {
+      window.__imageRemoveCount = 0;
+      const reject = () => {
+        const root = document.getElementById('fluent-read-image-translation-root');
+        if (root) {window.__imageRemoveCount++; root.remove();}
+      };
+      window.__imageRejectObserver = new MutationObserver(reject);
+      window.__imageRejectObserver.observe(document.documentElement, {childList: true});
+      reject();
+    });
+    await page.waitForFunction(() => window.__imageRemoveCount >= 3);
+    await page.waitForTimeout(300);
+    const imageRemovals = await page.evaluate(() => window.__imageRemoveCount);
+    if (imageRemovals !== 3 || await page.locator('#fluent-read-image-translation-root').count()) {
+      throw new Error(`图片浮层持续重挂：${imageRemovals}`);
+    }
+    await page.evaluate(() => window.__imageRejectObserver.disconnect());
+    await page.locator('#activate').hover();
+    await page.locator('img').hover();
+    await page.locator('#fluent-read-image-translation-root').waitFor({state: 'attached', timeout});
+    return {imageOwnership: {removals: imageRemovals, recoveredOnNewHover: true},
+      configDrivenGlobalToggle: true, cancelledNavigation: true, forgedEventsIgnored: true, realBackForwardCache: true,
       transitions, shadow, screenshot: await screenshot(page, 'content-lifecycle-restored.png')};
   } finally {
     await page?.close().catch(() => undefined);
@@ -776,6 +807,8 @@ async function main() {
     const targetConfig = {
       on: true,
       disableFloatingBall: false,
+      disableImageTranslator: false,
+      imageTranslationHoverEnabled: true,
       uiLanguageSetupCompleted: true,
       theme: 'dark',
       interfaceSkin: requestedSkin,
@@ -845,6 +878,8 @@ async function main() {
     const restorePatch = {
       on: originalConfig.on,
       disableFloatingBall: originalConfig.disableFloatingBall,
+      disableImageTranslator: originalConfig.disableImageTranslator,
+      imageTranslationHoverEnabled: originalConfig.imageTranslationHoverEnabled,
       uiLanguageSetupCompleted: originalConfig.uiLanguageSetupCompleted,
       theme: originalConfig.theme,
       interfaceSkin: originalConfig.interfaceSkin,

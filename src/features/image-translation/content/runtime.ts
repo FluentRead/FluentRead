@@ -68,6 +68,7 @@ let mounted = false;
 let removeListeners: (() => void) | null = null;
 let imageOverlayHost: HTMLDivElement | null = null;
 let imageOverlayContainer: HTMLDivElement | null = null;
+let overlayRecoveryAttempts = 0;
 let layoutObserver: MutationObserver | null = null;
 let positionFrame: number | null = null;
 let configurationRevision = 0;
@@ -196,6 +197,7 @@ function removeImageOverlayRoot(): void {
     imageOverlayHost?.remove();
     imageOverlayHost = null;
     imageOverlayContainer = null;
+    overlayRecoveryAttempts = 0;
 }
 
 function createImageAbortError(): Error {
@@ -292,6 +294,12 @@ function invalidateSource(state: ImageTranslationState): void {
 function updateOverlayPosition(state: ImageTranslationState): void {
     if (!state.image.isConnected) {
         removeState(state);
+        return;
+    }
+    if (imageOverlayHost && !imageOverlayHost.isConnected && ++overlayRecoveryAttempts > 2) {
+        // 宿主持续拒绝覆盖层时停止自动重挂，恢复原图并释放观察器；下次主动悬停可重试。
+        Array.from(activeStates).forEach(removeState);
+        removeImageOverlayRoot();
         return;
     }
     ensureImageOverlayRoot();

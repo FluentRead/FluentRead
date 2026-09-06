@@ -6,6 +6,7 @@ const mocks = vi.hoisted(() => ({
         on: true, disabledExtensionDomains: [] as string[], bilingualSentenceHighlightEnabled: true,
         disableFloatingBall: true, disableSelectionTranslator: true, disableImageTranslator: true,
         selectionAreaEnabled: false, translationProgressPanelEnabled: false,
+        writing: {enabled: false},
     },
     configReady: Promise.resolve(), subscribeConfig: vi.fn(),
     installPageStyles: vi.fn(), removeStyles: vi.fn(), syncHighlight: vi.fn(),
@@ -13,6 +14,12 @@ const mocks = vi.hoisted(() => ({
     resetRouteState: vi.fn(),
     addRuntimeListener: vi.fn(), removeRuntimeListener: vi.fn(), createMessageHandler: vi.fn(),
     setBridges: vi.fn(),
+    mountWriting: vi.fn(), unmountWriting: vi.fn(), writingMounted: false,
+}));
+vi.mock('@/src/features/writing-assistant/public', () => ({
+    mountWritingAssistant: () => {mocks.writingMounted = true; mocks.mountWriting();},
+    unmountWritingAssistant: () => {mocks.writingMounted = false; mocks.unmountWriting();},
+    isWritingAssistantMounted: () => mocks.writingMounted,
 }));
 
 vi.mock('@/src/services/config/store', () => ({
@@ -126,6 +133,8 @@ describe('content composition root 冷启动与暂停恢复', () => {
         vi.resetModules();
         vi.clearAllMocks();
         mocks.config.on = true;
+        mocks.config.writing.enabled = false;
+        mocks.writingMounted = false;
         mocks.config.disabledExtensionDomains = [];
         mocks.config.bilingualSentenceHighlightEnabled = true;
         mocks.configReady = new Promise<void>(resolve => { ready = resolve; });
@@ -144,6 +153,20 @@ describe('content composition root 冷启动与暂停恢复', () => {
     });
 
     afterEach(() => { invalidated?.(); vi.unstubAllGlobals(); });
+
+    it('main 新写作功能遵循同一启停和 BFCache 恢复生命周期', async () => {
+        Object.assign(page, {location: {href: 'https://github.com/FluentRead/FluentRead/issues/1'}});
+        mocks.config.writing.enabled = true;
+        const {startContentApp} = await import('@/src/app/content/runtime');
+        const starting = startContentApp(context as never); ready(); await starting;
+        expect(mocks.mountWriting).toHaveBeenCalledOnce();
+        transition(page, 'pagehide', true);
+        expect(mocks.writingMounted).toBe(false);
+        transition(page, 'pageshow', true);
+        await vi.waitFor(() => expect(mocks.mountWriting).toHaveBeenCalledTimes(2));
+        invalidated();
+        expect(mocks.writingMounted).toBe(false);
+    });
 
     it.each(['pagehide', 'invalidate'] as const)('配置读取期间 %s 后不允许迟到初始化挂载', async reason => {
         const {startContentApp} = await import('@/src/app/content/runtime');

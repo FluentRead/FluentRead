@@ -33,9 +33,7 @@ import {
     mountVideoSubtitleTranslation,
     isSupportedVideoPage,
     restoreOriginalContent, resetFullPageTranslationRouteState,
-    unmountAreaTranslator,
-    unmountFloatingBall,
-    unmountImageTranslator,
+    unmountAreaTranslator, unmountFloatingBall, unmountImageTranslator,
     unmountSelectionTranslator,
     unmountTranslationProgressPanel,
 } from './features';

@@ -303,6 +303,7 @@ export default defineConfig({
                 'src/core/hotkey/index.ts',
                 'src/core/language/detect.ts',
                 'src/core/language/chinese.ts',
+                'src/core/language/chineseVariants.ts',
                 'src/core/i18n/messages/legacy-overrides.ts',
                 'src/core/i18n/messages/legacy-patterns.ts',
                 'src/core/config/catalog.ts',

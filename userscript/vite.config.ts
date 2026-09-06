@@ -12,6 +12,7 @@ const packageJson = JSON.parse(fs.readFileSync(resolve(root, 'package.json'), 'u
 };
 const iconDataUrl = `data:image/png;base64,${fs.readFileSync(resolve(root, 'public/icon/128.png')).toString('base64')}`;
 const metadata = createUserscriptMetadata({version: packageJson.userscriptVersion, iconDataUrl});
+const unicodeNotice = `/*\n${fs.readFileSync(resolve(root, 'public/third-party-notices/unicode-17.0.0.txt'), 'utf8')}\n*/`;
 const browserShimPath = resolve(root, 'userscript/browser.ts');
 const projectRoot = `${normalizePath(root)}/`;
 
@@ -23,6 +24,7 @@ export const executionGuardEnd = '/* FluentRead userscript execution guard:end *
 export function wrapUserscriptEntry(entryCode: string, bootstrapCode: string): string {
     return [
         metadata,
+        unicodeNotice,
         executionGuardStart,
         'if (!globalThis.__fluentReadUserscriptBootstrapped) {',
         bootstrapCode,

@@ -744,9 +744,9 @@ describe('Offscreen Chrome 翻译域', () => {
 
 describe('Chrome 中文字形与语言包保持独立', () => {
     it.each([
-        ['這是一段繁體中文翻譯測試，閱讀設定與網頁內容。', 'zh-Hans', 'zh', 'zh'],
+        ['這是一段繁體中文翻譯測試，閱讀設定與網頁內容。', 'zh-Hans', 'zh-Hant', 'zh'],
         ['这是一段简体中文翻译测试，阅读设置与网页内容。', 'zh-Hant', 'zh', 'zh-Hant'],
-    ])('泛中文检测的正文 %s 仍请求翻译，未确认字形时保留通用语言代码', async (text, to, sourceLanguage, targetLanguage) => {
+    ])('泛中文检测的正文 %s 按实际字形选择源语言并保留简繁互译', async (text, to, sourceLanguage, targetLanguage) => {
         const environment: ChromeTranslationEnvironment = {
             ...modernTranslator({translate: vi.fn(async () => 'converted'), destroy: vi.fn()}),
             LanguageDetector: {create: vi.fn(async () => ({detect: vi.fn(async () => [{detectedLanguage: 'zh', confidence: 0.9}])}))},

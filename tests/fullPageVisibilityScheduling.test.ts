@@ -1,5 +1,7 @@
 import {afterEach, beforeEach, describe, expect, it, vi} from "vitest";
 import {parseHTML} from "linkedom";
+import chinesePosts from './fixtures/chinese-language-posts.json';
+import {isClearlyTargetLanguage} from '@/src/core/translation/text';
 import type {TranslationSiteAdapter} from '@/src/core/translation/types';
 import {TranslationCandidateCore} from '@/src/core/translation/engine';
 import {compileSiteRulePack} from '@/src/core/site-adaptation/compiler';
@@ -1551,6 +1553,19 @@ describe("全文翻译可见性锚点", () => {
             sourceLanguage: 'auto',
         }));
         expect(runtime.requestOptions[0]).not.toHaveProperty('sourceLanguageDetectionText');
+    });
+
+    it('截图中文评论在真实语言判定下不进入批次，外语槽仍翻译且按原索引回填', async () => {
+        runtime.clearlyTargetLanguage.mockImplementation(isClearlyTargetLanguage);
+        const origins = [chinesePosts[0]!, 'English source', ...chinesePosts.slice(1), '這個軟體可以翻譯網頁。'];
+        const snapshot = translationSnapshot({service: 'freeTranslation', targetLanguage: 'zh-Hans'});
+        await expect(translateTextSlots(origins, snapshot)).resolves.toEqual(origins.map((text) =>
+            chinesePosts.includes(text) ? text : `译:${text}`));
+        expect(runtime.requests).toHaveBeenCalledOnce();
+        expect(runtime.requests).toHaveBeenCalledWith(['English source', '這個軟體可以翻譯網頁。']);
+        runtime.requests.mockClear();
+        await expect(translateTextSlots(chinesePosts, snapshot)).resolves.toEqual(chinesePosts);
+        expect(runtime.requests).not.toHaveBeenCalled();
     });
 
     it('文本槽在请求前保留目标语言与非文字内容，并按原索引回填译文', async () => {

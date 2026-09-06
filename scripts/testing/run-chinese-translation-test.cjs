@@ -2,12 +2,14 @@
 'use strict';
 
 // 中文简繁及 --spanish 西班牙语生产浏览器回归：临时 Edge、无前台焦点启动、真实配置选择和真实快捷键。
+// 默认同时验证截图中文零请求、相邻外语正常翻译和动态评论换语言后的重新识别。
 // loopback AI fixture 只验证请求与 UI 链路；--live-google 独立报告无需凭据的外部服务实译。
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const http = require('node:http');
 const os = require('node:os');
 const path = require('node:path');
+const chinesePosts = require('../../tests/fixtures/chinese-language-posts.json');
 
 const paragraphs = {
   en: [
@@ -111,6 +113,12 @@ async function startFixture() {
     }
     const url = new URL(request.url, 'http://fixture.local');
     const source = url.searchParams.get('source') || 'en';
+    if (source === 'same-language') {
+      response.setHeader('Content-Type', 'text/html; charset=utf-8');
+      // 故意沿用英文页面语言，证明每条评论按原文判断，而非信任宿主整页语言。
+      response.end(`<!doctype html><html lang="en"><head><meta charset="utf-8"><title>Same-language comments</title></head><body style="padding:24px;font:18px/1.6 sans-serif"><main>${chinesePosts.map((text, index) => `<article><p data-same-language="${index}">${text}</p></article>`).join('')}<p id="english-control">${paragraphs.en[0]}</p><p id="traditional-control">${paragraphs['zh-Hant'][0]}</p></main></body></html>`);
+      return;
+    }
     const texts = paragraphs[source];
     if (!texts) {response.writeHead(404); response.end(); return;}
     response.setHeader('Content-Type', 'text/html; charset=utf-8');
@@ -134,12 +142,13 @@ async function main() {
   const profileDir = fs.mkdtempSync(path.join(os.tmpdir(), 'fluentread-chinese-edge-'));
   const fixture = await startFixture();
   const report = {ok: false, extensionDir, artifactsDir, profileDir,
-    scope: 'production Popup native language selection, persistence, real Control hover and Alt+T full-page [1,0,1], Chinese script / Spanish output discrimination and target cache isolation',
+    scope: 'production Popup language selection, persistence, real Control hover and Alt+T full-page [1,0,1], Chinese same-language skipping, dynamic redetection, Chinese script / Spanish output discrimination and target cache isolation',
     evidenceBoundary: 'The local HTML and loopback OpenAI-compatible server are deterministic fixtures. Their success does not prove any external service translation quality or availability.',
     fixture: {ok: false, cases: []}, liveGoogle: {requested: process.argv.includes('--live-google'), cases: []},
     screenshots: [], consoleErrors: [], ui: {}};
   let launched;
   let currentPage;
+  let browserSafetyFailure = false;
   try {
     launched = await launchFocusSafePersistentContext({chromium, profileDir,
       browserPath: argument('browser-path', '/Applications/Microsoft Edge.app/Contents/MacOS/Microsoft Edge'),
@@ -157,7 +166,10 @@ async function main() {
     capture(worker, 'worker');
     const extensionOrigin = /^chrome-extension:\/\/[^/]+/u.exec(worker.url())[0];
     const createPage = async (url, name) => {
-      const page = await newPageWithoutForeground(context, 30000);
+      const page = await newPageWithoutForeground(context, 30000).catch(error => {
+        browserSafetyFailure = true;
+        throw error;
+      });
       page.setDefaultTimeout(20000); capture(page, name);
       await page.goto(url, {waitUntil: 'domcontentloaded'});
       currentPage = page;
@@ -207,11 +219,22 @@ async function main() {
       mouseHoverTranslationDelay: 0, selectionTranslatorMode: 'disabled', disableSelectionTranslator: true,
       animations: false});
     await popup.reload({waitUntil: 'domcontentloaded'});
-    const sourceSelect = popup.locator('.language-pair select').nth(0);
-    const targetSelect = popup.locator('.language-pair select').nth(1);
+    const sourceSelect = popup.locator('.language-pair .el-select').nth(0);
+    const targetSelect = popup.locator('.language-pair .el-select').nth(1);
     await sourceSelect.waitFor({state: 'visible'});
-    report.ui.sourceChoices = await sourceSelect.locator('option').evaluateAll(nodes => nodes.map(node => ({value: node.value, label: node.textContent})));
-    report.ui.targetChoices = await targetSelect.locator('option').evaluateAll(nodes => nodes.map(node => ({value: node.value, label: node.textContent})));
+    const labels = {'zh-Hans': '简体中文 /', 'zh-Hant': '繁體中文 /', en: 'English /', es: 'Español /'};
+    const choicesFor = async control => {
+      await control.click();
+      const options = popup.locator('.el-select-dropdown:visible .el-select-dropdown__item');
+      await options.first().waitFor({state: 'visible'});
+      const choices = (await options.allTextContents()).map(label => ({label,
+        value: Object.keys(labels).find(value => label.includes(labels[value]))}));
+      await popup.keyboard.press('Escape');
+      await popup.locator('.el-select-dropdown:visible').waitFor({state: 'hidden'});
+      return choices;
+    };
+    report.ui.sourceChoices = await choicesFor(sourceSelect);
+    report.ui.targetChoices = await choicesFor(targetSelect);
     for (const choices of [report.ui.sourceChoices, report.ui.targetChoices]) {
       assert(choices.some(item => item.value === 'es'));
       assert(choices.some(item => item.value === 'zh-Hans' && item.label.includes('简体中文')));
@@ -219,18 +242,22 @@ async function main() {
     }
     const selectLanguages = async (from, to) => {
       await activateExtensionTabWithoutForeground(context, popup, 30000);
-      await sourceSelect.selectOption(from); await targetSelect.selectOption(to);
+      for (const [control, value] of [[sourceSelect, from], [targetSelect, to]]) {
+        await control.click();
+        await popup.locator('.el-select-dropdown:visible .el-select-dropdown__item').filter({hasText: labels[value]}).click();
+        await popup.locator('.el-select-dropdown:visible').waitFor({state: 'hidden'});
+      }
       await waitConfig(config => config.from === from && config.to === to);
       await popup.reload({waitUntil: 'domcontentloaded'});
       await sourceSelect.waitFor({state: 'visible'});
-      assert.equal(await sourceSelect.inputValue(), from);
-      assert.equal(await targetSelect.inputValue(), to);
+      assert((await sourceSelect.innerText()).includes(labels[from]));
+      assert((await targetSelect.innerText()).includes(labels[to]));
     };
     await selectLanguages('zh-Hans', 'zh-Hant');
     await shot(popup, 'popup-simplified-to-traditional');
     await selectLanguages('zh-Hant', 'zh-Hans');
     await shot(popup, 'popup-traditional-to-simplified');
-    report.ui.nativeSelectionPersistence = true;
+    report.ui.languageSelectionPersistence = true;
 
     const runCase = async (pair, mode, live = false) => {
       await selectLanguages(pair.from, pair.to);
@@ -305,14 +332,68 @@ async function main() {
     const beforeRevisit = fixture.requests.length;
     report.fixture.cacheRevisit = await runCase(pairs[0], 'hover');
     assert.equal(fixture.requests.length, beforeRevisit, '切回简体必须命中简体缓存');
-    report.fixture.ok = true;
     report.fixture.targetCacheIsolation = true;
+    if (!spanishMode) {
+      await patchConfig({from: 'auto', to: 'zh-Hans', useCache: false});
+      const article = await createPage(`${fixture.url}/?source=same-language`, 'same-language-comments');
+      try {
+        await article.locator('#fluent-read-page-styles').waitFor({state: 'attached'});
+        await activateExtensionTabWithoutForeground(context, article, 20000);
+        const requestStart = fixture.requests.length;
+        const originalUrl = article.url();
+        const checkOriginals = async () => {
+          assert.equal(article.url(), originalUrl);
+          assert.equal(await article.locator('.fluent-read-bilingual-content .fluent-read-bilingual-content').count(), 0);
+          assert.equal(await article.locator('[data-same-language] .fluent-read-bilingual-content').count(), 0);
+          assert.deepEqual(await article.locator('[data-same-language]').allTextContents(), chinesePosts);
+          assert(!fixture.requests.slice(requestStart).some(request => chinesePosts.some(text => request.source.includes(text))), '同语言评论不得进入翻译请求');
+        };
+        for (let index = 0; index < chinesePosts.length; index++) {
+          await article.locator(`[data-same-language="${index}"]`).click();
+          await article.keyboard.press('Control');
+          await wait(150);
+          await checkOriginals();
+        }
+        assert.equal(fixture.requests.length, requestStart, '同语言悬浮必须零请求');
+        const controlCounts = [];
+        for (const expected of [1, 0, 1]) {
+          await article.keyboard.press('Alt+t');
+          await article.waitForFunction(expected => ['english-control', 'traditional-control'].every(id =>
+            document.querySelectorAll(`#${id} .fluent-read-bilingual-content`).length === expected), expected);
+          await checkOriginals();
+          controlCounts.push(await article.locator('#english-control .fluent-read-bilingual-content').count());
+        }
+        // 全文会话期间动态新增同语言评论，然后把它改为外语；必须重新检测，不能永久跳过节点。
+        await article.evaluate(text => {
+          const node = document.createElement('p'); node.id = 'dynamic-comment'; node.textContent = text;
+          document.querySelector('main').append(node);
+        }, chinesePosts[2]);
+        await wait(500);
+        assert.equal(await article.locator('#dynamic-comment .fluent-read-bilingual-content').count(), 0);
+        await checkOriginals();
+        await article.evaluate(text => {document.querySelector('#dynamic-comment').textContent = text;}, paragraphs.en[0]);
+        await article.locator('#dynamic-comment .fluent-read-bilingual-content').waitFor();
+        await checkOriginals();
+        await shot(article, 'same-language-comments');
+        await article.keyboard.press('Alt+t');
+        await article.waitForFunction(() => document.querySelectorAll('.fluent-read-bilingual-content').length === 0);
+        assert.equal(await article.locator('#dynamic-comment').innerText(), paragraphs.en[0]);
+        await checkOriginals();
+        report.fixture.sameLanguage = {comments: chinesePosts.length, hoverRequests: 0, sameLanguageWrappers: 0,
+          foreignControlCounts: controlCounts, dynamicRedetection: true, restored: true};
+      } finally {await article.close(); currentPage = popup;}
+    }
+    report.fixture.ok = true;
     if (report.liveGoogle.requested) {
       await patchConfig({service: 'google', useCache: false});
       for (const mode of ['hover', 'full']) {
         for (const pair of pairs) {
           try {report.liveGoogle.cases.push(await runCase(pair, mode, true));}
-          catch (error) {report.liveGoogle.cases.push({...pair, mode, status: 'failed', error: error.stack || String(error)});}
+          catch (error) {
+            report.liveGoogle.cases.push({...pair, mode, status: 'failed', error: error.stack || String(error)});
+            // 防抢焦点/窗口校验失败必须立即结束，不能当作单个供应商故障继续创建页面。
+            if (browserSafetyFailure) throw error;
+          }
         }
       }
       report.liveGoogle.ok = report.liveGoogle.cases.every(item => item.status === 'passed');

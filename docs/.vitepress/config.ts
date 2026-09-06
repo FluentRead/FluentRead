@@ -9,19 +9,19 @@ const guide = (en = false) => {
   })
   return [
     {
-      text: en ? 'Start reading' : '开始读',
+      text: en ? 'Getting started' : '开始使用',
       items: [
-        item('使用指南', 'Find your way', '/guide/'),
-        item('安装与第一次翻译', 'Install & try it', '/guide/getting-started'),
+        item('使用指南', 'User guide', '/guide/'),
+        item('安装与第一次翻译', 'Installation', '/guide/getting-started'),
         item(
-          '网页与随手翻译',
-          'Webpage & quick translation',
+          '网页与划词翻译',
+          'Webpage and selection translation',
           '/guide/features'
         ),
       ],
     },
     {
-      text: en ? 'A little more' : '再多看两眼',
+      text: en ? 'Translation and learning' : '翻译与学习',
       items: [
         item('翻译卡', 'Reading card', '/guide/deepseek-harness'),
         item('学习中心', 'Learning center', '/guide/vocabulary-book'),
@@ -32,7 +32,7 @@ const guide = (en = false) => {
       ],
     },
     {
-      text: en ? 'Make it yours' : '用得顺手',
+      text: en ? 'Settings' : '设置',
       items: [
         item('设置', 'Settings', '/config/'),
         item('翻译服务', 'Translation services', '/config/translation-engines'),
@@ -53,10 +53,11 @@ const guide = (en = false) => {
       ],
     },
     {
-      text: en ? 'Need a hand?' : '遇到问题',
+      text: en ? 'Help' : '帮助',
       items: [
         item('常见问题', 'Troubleshooting', '/guide/faq'),
         item('数据与隐私', 'Data & privacy', '/guide/privacy'),
+        item('支持项目', 'Support the project', '/guide/support'),
       ],
     },
   ]
@@ -64,12 +65,15 @@ const guide = (en = false) => {
 const theme = (en = false) => ({
   nav: [
     {
-      text: en ? 'What it does' : '能做什么',
+      text: en ? 'Features' : '功能',
       link: en ? '/en/guide/features' : '/guide/features',
     },
-    { text: en ? 'Guide' : '怎么用', link: en ? '/en/guide/' : '/guide/' },
     {
-      text: en ? 'Help' : '遇到问题',
+      text: en ? 'User guide' : '使用指南',
+      link: en ? '/en/guide/' : '/guide/',
+    },
+    {
+      text: en ? 'Help' : '帮助',
       link: en ? '/en/guide/faq' : '/guide/faq',
     },
     {
@@ -77,6 +81,10 @@ const theme = (en = false) => ({
       link: en
         ? '/en/guide/getting-started#install'
         : '/guide/getting-started#安装',
+    },
+    {
+      text: en ? 'Support' : '支持项目',
+      link: en ? '/en/guide/support' : '/guide/support',
     },
   ],
   sidebar: en
@@ -86,7 +94,7 @@ const theme = (en = false) => ({
     level: [2, 3] as [number, number],
     label: en ? 'On this page' : '这一页',
   },
-  docFooter: { prev: en ? 'Previous' : '上一篇', next: en ? 'Next' : '接着看' },
+  docFooter: { prev: en ? 'Previous' : '上一篇', next: en ? 'Next' : '下一篇' },
   sidebarMenuLabel: en ? 'Menu' : '目录',
   returnToTopLabel: en ? 'Back to top' : '回到顶部',
   darkModeSwitchLabel: en ? 'Appearance' : '外观',
@@ -94,14 +102,16 @@ const theme = (en = false) => ({
   darkModeSwitchTitle: en ? 'Switch to dark theme' : '切换深色',
   langMenuLabel: en ? 'Language' : '切换语言',
   footer: {
-    message: en ? 'Another language? Keep reading.' : '外语？照样读。',
+    message: en
+      ? 'FluentRead · Open-source bilingual reading'
+      : 'FluentRead · 开源双语阅读扩展',
     copyright: '© FluentRead · GPL-3.0',
   },
 })
 export default defineConfig({
   title: 'FluentRead · 流畅阅读',
   description:
-    '外语？照样读。FluentRead 开源双语阅读扩展，接入 DeepSeek Harness 会话内核的浏览器适配，让难句可以接着问。',
+    'FluentRead 是一款开源双语阅读与翻译扩展，支持网页、图片、文档和字幕翻译，翻译卡接入经浏览器适配的 DeepSeek Harness 会话内核。',
   lang: 'zh-CN',
   base: '/',
   cleanUrls: true,

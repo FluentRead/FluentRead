@@ -1,41 +1,41 @@
-# 这句话，再讲讲
+# AI 翻译卡
 
-译文看懂了，语气还没摸透？用翻译卡再多看一眼。它可以解释原意、拆解长句、介绍用法，也能陪你围绕这句话做个小练习。
+AI 翻译卡结合选中的原文提供含义解释、句子分析、表达用法和练习，支持围绕同一段内容继续追问。
 
-## 里面有 DeepSeek Harness
+## DeepSeek Harness
 
-FluentRead 开源，翻译卡接入了 **DeepSeek Harness 会话内核的浏览器适配**。对你来说，就是可以围绕原文连着问：先弄懂意思，再拆句、看用法，接着自己的阅读走。
+FluentRead 开源，翻译卡接入了 **DeepSeek Harness 会话内核的浏览器适配**。通过保存会话上下文，支持连续问答与阅读记录。
 
 这里采用的是上游的会话记录与消息组织部分，由 FluentRead 连接网页选区、AI 模型和学习记录。它不会把你绑定到 DeepSeek 模型；在设置里选择自己使用的 AI 服务即可。[查看 FluentRead 源码](https://github.com/FluentRead/FluentRead) · [DeepSeek Harness 来源与许可](https://github.com/FluentRead/FluentRead/blob/main/public/third-party-notices/deepseek-harness-MIT.txt)
 
 <a href="/screenshots/reading-card.webp" target="_blank" rel="noopener noreferrer"><img class="doc-screenshot" src="/screenshots/reading-card.webp" alt="翻译卡结合选中的原文讲解含义与表达用法，底部可以继续追问" width="2560" height="1600" loading="lazy" /></a>
 
-## 先准备好
+## 启用与配置
 
 进入 **设置 → 专项翻译 → 翻译卡**，开启功能，选择已配置的 AI 服务和模型。连接信息在[翻译服务](/config/translation-engines)中填写。
 
-## 在网页里用
+## 网页中的使用方式
 
 双击一个词，或拖动选中一句话，再点击附近的动作：
 
 | 动作 | 适合什么时候 |
 | --- | --- |
 | 读懂 | 想知道这句话在说什么、是什么语气 |
-| 拆句 | 长句绕不过来，想先找主干再看修饰 |
+| 拆句 | 分析句子主干、从句与修饰关系 |
 | 用法 | 想学一个表达的搭配和自然说法 |
-| 练习 | 想试试自己能不能用上 |
+| 练习 | 结合原文进行表达练习 |
 
 选中文字不会直接调用 AI，点击动作才开始。回答出来后可以继续追问；原文旁的喇叭可以朗读，再点一次停止。
 
 如果选中的是一个词，卡片提供“理解整句”时，点击它才会把分析范围扩展到所在句子。
 
-## 想记住，就收下来
+## 收藏与阅读记录
 
 点击收藏，把单词、短语或句子放进[学习中心](/guide/vocabulary-book)。不用等 AI 回答完成，也能先收藏原文。
 
 阅读卡里的 **记录** 和学习中心的 **阅读记录** 显示同一份问答。普通模式的问答在本机保留 30 天，可以查看、继续追问或删除。仅打开记录不会产生新请求。
 
-## 让回答更合胃口
+## 讲解设置
 
 在翻译卡设置中调整学习程度、解释长短和默认动作。不常用的动作可以隐藏。
 

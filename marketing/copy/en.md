@@ -1,23 +1,29 @@
-# Reusable product copy
+# Product descriptions
 
-## One line
+## One-line description
 
-FluentRead: Another language? Keep reading.
+FluentRead is an open-source browser extension for bilingual reading and translation.
 
 ## Short introduction
 
-Found something good to read? FluentRead keeps translations beside the original, helps with tricky sentences, and saves expressions you want to use again. Pictures, documents, and video subtitles are part of the reading too.
+FluentRead supports bilingual webpages, selection translation, AI reading assistance, and image, document, and video subtitle translation. Its AI reading card integrates a browser adaptation of the DeepSeek Harness session core for explanations, sentence analysis, usage examples, and follow-up questions. The learning center provides word and sentence collections, study, and review.
 
-FluentRead is an open-source browser extension under GPL-3.0. Its reading card integrates a browser adaptation of the DeepSeek Harness session core, so you can explore a sentence and keep asking follow-up questions with your chosen AI model. The code is open for you to explore and improve.
+The project is released under GPL-3.0, with source code on GitHub. It supports multiple translation providers, AI models, and local Ollama, with configurable glossaries, shortcuts, translation styles, and menu layout.
 
-## Community post
+## Community introduction
 
-We’re building FluentRead, an open-source browser extension under GPL-3.0. The reading card uses a browser adaptation of the DeepSeek Harness session core to turn a quick translation into a conversation about what you’re reading.
+FluentRead is an open-source browser extension under GPL-3.0, with the following features:
 
-Read a whole article in two languages, select a passage for a quick translation, or ask the reading card to unpack a sentence and explain an expression. Save the good bits to your learning center and revisit them in context.
+- Bilingual webpages, hover translation, and selection translation.
+- An AI reading card using a browser adaptation of the DeepSeek Harness session core for contextual explanations and follow-up questions.
+- Word and sentence collections that retain the original context for study and review.
+- Image and area text recognition, bilingual document reading and editing, and YouTube and X bilingual subtitles.
+- Multiple translation services, AI models, and local Ollama, with glossaries, styles, shortcuts, and menu layout settings.
 
-It also translates images and local documents, and supports bilingual subtitles on YouTube and X. Choose your translation service and arrange the menu around your habits.
+AI explanations require a configured AI service and model. See the user guide for feature availability, setup, and data handling.
 
-Got a page in mind? Give it a go: https://fluent.thinkstu.com/en/
+Website: https://fluent.thinkstu.com/en/
 
-AI explanations need a configured service. See the guide for image, document, and subtitle requirements.
+Source: https://github.com/FluentRead/FluentRead
+
+User guide: https://fluent.thinkstu.com/en/guide/

@@ -1,6 +1,6 @@
-# Read the page. Check a sentence.
+# Webpage and selection translation
 
-Read a long article all the way through, or pause over the one sentence you want to understand. Both stay on the webpage.
+FluentRead supports bilingual webpage translation, selection translation, and hover translation. Results appear on the current webpage.
 
 ## Page translation
 
@@ -26,7 +26,7 @@ You can change the trigger to a direct popup, a key, or another gesture, and adj
 
 Hover over a paragraph and press **Control** to translate it. You don’t need to select text or translate the whole page. See [Shortcuts & triggers](/en/guide/custom-hotkey) to change the behavior.
 
-## Tell me a little more
+## AI reading card and learning center
 
 The [reading card](/en/guide/deepseek-harness) can explain tone, unpack a long sentence, show usage, or suggest a practice question. It uses a configured AI service and starts when you choose an action.
 

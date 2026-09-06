@@ -1,4 +1,4 @@
-# Drop in a document
+# Document translation
 
 Read a file beside its translation. Edit a passage when needed, then download a copy to keep.
 

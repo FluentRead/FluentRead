@@ -1,6 +1,6 @@
 # Choose your translation service
 
-FluentRead puts translation back into reading. Your chosen service produces the words. Start with the default and change it when you need to.
+FluentRead displays translations produced by your selected service. Use the default service or configure another machine translation provider, AI service, or local model.
 
 ## Which one fits?
 

@@ -1,8 +1,8 @@
 ---
 layout: home
 markdownStyles: false
-title: 外语？照样读。
-description: FluentRead 流畅阅读，把双语译文放在原文旁边。随手翻译网页、图片和文档，在阅读中理解与积累。
+title: 开源双语阅读与翻译
+description: FluentRead 是一款开源浏览器扩展，支持网页双语对照、AI 阅读辅助，以及图片、文档和视频字幕翻译。
 ---
 
 <ProductHome />

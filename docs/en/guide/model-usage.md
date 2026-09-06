@@ -1,4 +1,4 @@
-# See how much AI you used
+# AI usage
 
 Open **Model usage** to see recent services and models, request counts, successes, and reported token use.
 

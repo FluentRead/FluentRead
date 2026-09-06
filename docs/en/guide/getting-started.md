@@ -1,6 +1,6 @@
-# Install it. Try a paragraph.
+# Installation
 
-Open an article you’ve been wanting to read. In a few steps, its translation can sit beside the original.
+This guide covers installation, language settings, your first webpage translation, and restoring the original text.
 
 ## Install
 

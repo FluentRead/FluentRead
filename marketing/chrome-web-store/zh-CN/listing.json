@@ -1,6 +1,6 @@
 {
   "title": "FluentRead 流畅阅读",
-  "shortDescription": "开源双语阅读扩展，翻译卡接入 DeepSeek Harness 会话内核的浏览器适配。全文对照、难句追问，喜欢的表达顺便收下。",
+  "shortDescription": "开源双语阅读与翻译扩展。支持网页、划词、图片、文档和字幕翻译，AI 翻译卡接入 DeepSeek Harness 会话内核的浏览器适配。",
   "descriptionFile": "description.txt",
   "language": "zh-CN",
   "sourceLanguageInScreenshots": "auto"

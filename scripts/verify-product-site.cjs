@@ -216,10 +216,7 @@ const report = {
         await page.locator('html').getAttribute('lang'),
         locale === 'zh-CN' ? 'zh-CN' : 'en'
       )
-      assert.match(
-        await page.locator('h1').innerText(),
-        locale === 'zh-CN' ? /外语/ : /Another language/
-      )
+      assert.match(await page.locator('h1').innerText(), /FluentRead/)
       for (const img of await page
         .locator(
           '.product-main-shot img,.product-popup-shot img,.product-detail-shot img'
@@ -256,6 +253,27 @@ const report = {
         false
       )
       await shot(page, locale + '-mobile')
+      await page.goto(
+        base + (locale === 'zh-CN' ? '/guide/support' : '/en/guide/support')
+      )
+      await page.waitForLoadState('networkidle')
+      assert.equal(
+        await page.locator('.support-visit').getAttribute('href'),
+        'https://ko-fi.com/thinkstu'
+      )
+      assert.equal(
+        await page.locator('.support-code img').evaluate((i) => i.naturalWidth),
+        1152
+      )
+      assert.equal(
+        await page.evaluate(
+          () => document.documentElement.scrollWidth > innerWidth
+        ),
+        false
+      )
+      await shot(page, locale + '-support-mobile')
+      await page.setViewportSize({ width: 1440, height: 960 })
+      await shot(page, locale + '-support-desktop')
       await ctx.close()
     }
     report.cases.push(
@@ -303,7 +321,7 @@ const report = {
       .filter({ hasText: 'English' })
       .click()
     await page.waitForURL('**/en/guide/document-translation')
-    assert.match(await page.locator('h1').innerText(), /document/)
+    assert.match(await page.locator('h1').innerText(), /Document translation/)
     await page.setViewportSize({ width: 390, height: 844 })
     await page.locator('.VPNavBarHamburger').click()
     await page.locator('.VPNavScreenTranslations button').click()
@@ -334,7 +352,7 @@ const report = {
     attach(p)
     await p.goto(base + '/')
     await p.waitForURL('**/en/')
-    assert.match(await p.locator('h1').innerText(), /Another language/)
+    assert.match(await p.locator('h1').innerText(), /FluentRead/)
     await noStorage.close()
     assert.deepEqual(report.pageErrors, [])
     assert.deepEqual(report.consoleErrors, [])

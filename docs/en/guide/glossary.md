@@ -1,6 +1,6 @@
-# Translate this term this way
+# Glossaries
 
-Want a name, product, or technical term translated consistently? Put it in a glossary. Your learning collection is for practice; glossaries guide actual AI translations.
+Glossaries specify consistent translations for names, products, and technical terms. Entries guide AI translations; the separate learning collection is used for study.
 
 ## Create a glossary
 

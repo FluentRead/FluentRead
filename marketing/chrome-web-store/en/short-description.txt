@@ -1,1 +1,1 @@
-Open-source bilingual reading. Ask about tricky sentences with a browser-adapted DeepSeek Harness session core.
+Open-source bilingual translation, with AI reading assistance using a browser adaptation of the DeepSeek Harness session core.

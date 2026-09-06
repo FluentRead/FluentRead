@@ -1,4 +1,4 @@
-# Keep a phrase. Try it yourself.
+# Learning center
 
 The learning center starts with words, phrases, and sentences you save while reading. Understand them in their original context, use them in your own words, and revisit them later.
 

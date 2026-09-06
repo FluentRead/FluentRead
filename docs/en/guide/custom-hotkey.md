@@ -1,6 +1,6 @@
-# Pick a shortcut that feels right
+# Shortcuts and triggers
 
-Use a shortcut when opening the menu every time feels like one step too many.
+Keyboard shortcuts and mouse actions can trigger webpage, selection, and hover translation directly.
 
 | Action | Default |
 | --- | --- |

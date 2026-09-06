@@ -158,13 +158,13 @@ const mkdir = (p) => fs.mkdirSync(p, { recursive: true })
         }px;line-height:1.13;letter-spacing:-.04em;margin:${
           kind === 'small' ? '22px 0 0' : '30px 0 20px'
         };font-weight:750}p{font-size:17px;color:#ffe5ef;letter-spacing:.01em;line-height:1.6}.screen{width:auto;max-width:560px;max-height:430px;height:auto;border:6px solid #ffffff35;border-radius:14px;box-shadow:0 20px 55px #520f2840}</style><div class="canvas"><div><div class="brand"><img src="${logoData}" alt="">FluentRead</div><h1>${
-          en ? 'Another language?<br>Keep reading.' : '外语？<br>照样读。'
+          en ? 'Bilingual reading<br>and translation' : '双语阅读<br>与翻译'
         }</h1>${
           kind === 'marquee'
             ? `<p>${
                 en
-                  ? 'Open source · DeepSeek Harness session core<br>Read, ask, and keep the good bits.'
-                  : '开源 · 接入 DeepSeek Harness 会话内核<br>读原文，聊难句，收下喜欢的表达。'
+                  ? 'Open source · GPL-3.0<br>AI reading card with a browser adaptation of DeepSeek Harness.'
+                  : 'GPL-3.0 开源项目<br>AI 翻译卡接入 DeepSeek Harness 会话内核的浏览器适配。'
               }</p>`
             : `<p>${
                 en ? 'Open-source bilingual reading' : '开源双语阅读扩展'

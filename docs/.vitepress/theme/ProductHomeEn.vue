@@ -15,14 +15,11 @@ const chrome =
         alt=""
         fetchpriority="high"
       />
-      <p class="product-eyebrow">FluentRead</p>
-      <h1 id="product-title">
-        Another language?<br /><span>Keep reading.</span>
-      </h1>
+      <p class="product-eyebrow">Open-source browser extension</p>
+      <h1 id="product-title">FluentRead</h1>
       <p class="product-intro">
-        Found something good to read? Don’t let the language put you off.<br />Read
-        it in two languages, check a tricky sentence, and keep a phrase you
-        like.
+        A browser extension for bilingual webpages, selection translation, AI
+        reading assistance, and image, document, and subtitle translation.
       </p>
       <div class="product-actions">
         <a
@@ -66,9 +63,9 @@ const chrome =
           />
         </a>
         <figcaption>
-          <span>Original above, translation below. Easy to compare.</span
+          <span>Original text and translation displayed together.</span
           ><a :href="withBase('/en/guide/getting-started')"
-            >Give it a try <span aria-hidden="true">→</span></a
+            >Installation guide <span aria-hidden="true">→</span></a
           >
         </figcaption>
       </figure>
@@ -76,34 +73,37 @@ const chrome =
 
     <section class="product-story" aria-labelledby="reading-title">
       <div class="product-story-copy">
-        <p class="product-eyebrow">Read the whole thing</p>
-        <h2 id="reading-title">Long article?<br />One paragraph at a time.</h2>
+        <p class="product-eyebrow">Webpage reading</p>
+        <h2 id="reading-title">Bilingual webpage translation</h2>
         <p>
-          News, posts, papers—pick up where you left off. The translation stays
-          beside the original, so names, terms, and details are easy to compare.
-          Done with the translation? Restore the original.
+          Display translations alongside the original text while retaining
+          paragraph correspondence. Translate a full page, hover over a
+          paragraph, or select text, and restore the original when needed.
         </p>
         <a
           class="product-text-link"
           :href="withBase('/en/guide/features#page-translation')"
-          >Explore bilingual reading <span aria-hidden="true">→</span></a
+          >Webpage translation guide <span aria-hidden="true">→</span></a
         >
       </div>
       <div class="product-rhythm">
         <div>
           <span>01</span>
-          <h3>Open something interesting</h3>
-          <p>A story, a post, a page you want to understand.</p>
+          <h3>Open a webpage</h3>
+          <p>Open a webpage in your browser.</p>
         </div>
         <div>
           <span>02</span>
-          <h3>Choose “Translate page”</h3>
-          <p>Pick a language and read beside the original.</p>
+          <h3>Select a language</h3>
+          <p>
+            Choose the target language. The source language is detected
+            automatically.
+          </p>
         </div>
         <div>
           <span>03</span>
-          <h3>Read at your own pace</h3>
-          <p>Keep going, check a paragraph, or restore the page.</p>
+          <h3>Translate and read</h3>
+          <p>Display both languages on the page or restore the original.</p>
         </div>
       </div>
     </section>
@@ -126,22 +126,20 @@ const chrome =
             decoding="async"
             alt="FluentRead’s AI reading card explains the selected sentence and expression, with a follow-up question field"
         /></a>
-        <figcaption>
-          Meaning, expressions, and a place to keep asking.
-        </figcaption>
+        <figcaption>Contextual explanation and follow-up questions.</figcaption>
       </figure>
       <div class="product-story-copy">
-        <p class="product-eyebrow">DeepSeek Harness inside the reading card</p>
-        <h2 id="selection-title">This sentence.<br />Tell me more.</h2>
+        <p class="product-eyebrow">DeepSeek Harness</p>
+        <h2 id="selection-title">AI reading card</h2>
         <p>
-          You get the gist, but why say it that way? Select it and let the
-          reading card unpack the sentence or explain the expression. Save the
-          good ones to your learning center and try using them yourself.
+          Explain selected text, analyze sentence structure, explore usage, and
+          generate practice. Follow-up questions and vocabulary collection are
+          available in the card.
         </p>
         <p>
-          The card uses a browser adaptation of the DeepSeek Harness session
-          core. Ask about the sentence, bring in its paragraph, and keep the
-          conversation going with your chosen AI model.
+          The card integrates a browser adaptation of the DeepSeek Harness
+          session core. It connects the selection, permitted paragraph context,
+          and reading history to your configured AI provider and model.
         </p>
         <p class="product-subnote">
           Explanations and practice use your configured AI service and start
@@ -150,41 +148,37 @@ const chrome =
         <a
           class="product-text-link"
           :href="withBase('/en/guide/deepseek-harness')"
-          >Meet the reading card <span aria-hidden="true">→</span></a
+          >Reading card guide <span aria-hidden="true">→</span></a
         >
       </div>
     </section>
 
     <section class="product-more" aria-labelledby="more-title">
-      <p class="product-eyebrow">There’s more to read</p>
-      <h2 id="more-title">Pictures, files, videos. Those too.</h2>
+      <p class="product-eyebrow">Translation formats</p>
+      <h2 id="more-title">Images, documents, and subtitles</h2>
       <div class="product-use-cases">
         <a :href="withBase('/en/guide/image-translation')"
           ><span class="product-case-type">Images & selected areas</span>
-          <h3>
-            Can’t select it? Draw around it. <span aria-hidden="true">↗</span>
-          </h3>
+          <h3>Image and area translation <span aria-hidden="true">↗</span></h3>
           <p>
-            Translate an image or draw around a small area to get text you can
-            copy.
+            Recognize text in webpage images or selected areas and display
+            translations that can be copied.
           </p></a
         >
         <a :href="withBase('/en/guide/document-translation')"
           ><span class="product-case-type">Documents</span>
-          <h3>
-            Drop in a file. Take your time. <span aria-hidden="true">↗</span>
-          </h3>
+          <h3>Document translation <span aria-hidden="true">↗</span></h3>
           <p>
-            Open a PDF, ePub, or Word file. Read both languages, edit the
-            translation, and download it.
+            Read PDF, ePub, Word, and other supported files in two languages,
+            edit translations, and export the result.
           </p></a
         >
         <a :href="withBase('/en/guide/video-subtitles')"
           ><span class="product-case-type">Video subtitles</span>
-          <h3>Watch with both languages. <span aria-hidden="true">↗</span></h3>
+          <h3>Bilingual subtitles <span aria-hidden="true">↗</span></h3>
           <p>
-            Read bilingual subtitles on YouTube and X, with the display set just
-            how you like it.
+            Display bilingual subtitles on YouTube and X, with configurable
+            subtitle appearance.
           </p></a
         >
       </div>
@@ -195,16 +189,15 @@ const chrome =
       aria-labelledby="control-title"
     >
       <div class="product-story-copy">
-        <p class="product-eyebrow">Your reading habits</p>
-        <h2 id="control-title">Make yourself<br />comfortable.</h2>
+        <p class="product-eyebrow">Configuration</p>
+        <h2 id="control-title">Services and reading settings</h2>
         <p>
-          Translate your usual sites automatically. Hide buttons you don’t use.
-          Change how translations look and move the menu around until it feels
-          right.
+          Configure automatic translation by website, translation styles,
+          keyboard shortcuts, and menu layout.
         </p>
         <p>
-          Start with the ready-to-use free service. If you have a favorite,
-          connect DeepL, an AI service, or a local Ollama model.
+          Choose the free translation service, connect DeepL or an AI provider,
+          or use a local Ollama model.
         </p>
         <a
           class="product-text-link"
@@ -236,35 +229,35 @@ const chrome =
 
     <section class="product-open" aria-labelledby="open-title">
       <div>
-        <p class="product-eyebrow">Open source · GPL-3.0</p>
-        <h2 id="open-title">The code is yours to explore.</h2>
+        <p class="product-eyebrow">Source and contributions</p>
+        <h2 id="open-title">An open-source project under GPL-3.0</h2>
         <p>
-          Have a look around, change something, or bring an idea. FluentRead is
-          built in the open, with room for more people to make reading feel
-          right.
+          The source code is hosted on GitHub. Contributions to code,
+          documentation, interface translations, and website support are welcome
+          through issues and pull requests.
         </p>
       </div>
       <a
         class="product-button secondary"
         href="https://github.com/FluentRead/FluentRead"
-        >Explore on GitHub <span aria-hidden="true">↗</span></a
+        >Source on GitHub <span aria-hidden="true">↗</span></a
       >
     </section>
 
     <section class="product-end" aria-labelledby="start-title">
-      <p class="product-eyebrow">Got a page in mind?</p>
-      <h2 id="start-title">Open it. Give it a go.</h2>
+      <p class="product-eyebrow">Chrome · Edge · Firefox</p>
+      <h2 id="start-title">Installation and user guide</h2>
       <div class="product-actions">
         <a
           class="product-button primary"
           :href="withBase('/en/guide/getting-started#install')"
-          >Get FluentRead <span aria-hidden="true">→</span></a
+          >Install FluentRead <span aria-hidden="true">→</span></a
         ><a class="product-button secondary" :href="withBase('/en/guide/')"
           >Read the guide</a
         >
       </div>
       <a class="product-help-link" :href="withBase('/en/guide/faq')"
-        >Already installed and stuck on something?</a
+        >Help and troubleshooting</a
       >
     </section>
   </div>

@@ -1,16 +1,16 @@
-# This sentence. Tell me more.
+# AI reading card
 
-You understand the translation, but not quite the tone. The reading card gives you another way in: explain the meaning, unpack the sentence, explore an expression, or try a small exercise.
+The AI reading card explains selected text, analyzes sentence structure, describes usage, and provides exercises. Follow-up questions retain the conversation context.
 
-## DeepSeek Harness inside
+## DeepSeek Harness
 
-FluentRead is open source, and the reading card integrates a **browser adaptation of the DeepSeek Harness session core**. Start with the meaning of a sentence, ask about its structure, then follow an expression into your next question.
+FluentRead is open source, and the reading card integrates a **browser adaptation of the DeepSeek Harness session core**. It supports contextual follow-up questions and reading history.
 
 The adaptation uses the upstream conversation-event and message organization components. FluentRead connects these to your selection, AI model, and learning records. You can choose your own AI service; it does not require a DeepSeek model. [FluentRead source](https://github.com/FluentRead/FluentRead) · [DeepSeek Harness attribution and license](https://github.com/FluentRead/FluentRead/blob/main/public/third-party-notices/deepseek-harness-MIT.txt)
 
 <a href="/screenshots/en/reading-card.webp" target="_blank" rel="noopener noreferrer"><img class="doc-screenshot" src="/screenshots/en/reading-card.webp" alt="The reading card explaining a selected sentence, with follow-up questions available" width="2560" height="1600" loading="lazy" /></a>
 
-## Set it up
+## Setup
 
 Open **Settings → Translation card**, enable it, and choose a configured AI service and model. Enter connection details under [Translation services](/en/config/translation-engines).
 
@@ -29,7 +29,7 @@ Selecting text alone does not call AI. Choosing an action does. Continue with a 
 
 If you selected one word and the card offers to understand the whole sentence, clicking that option expands the analysis to its sentence.
 
-## Keep the good bits
+## Collections and reading history
 
 Save a word, phrase, or sentence to the [learning center](/en/guide/vocabulary-book). You can save the original before the AI response finishes.
 

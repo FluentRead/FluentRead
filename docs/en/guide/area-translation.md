@@ -1,4 +1,4 @@
-# Draw around the bit you need
+# Area translation
 
 Use area translation for words inside screenshots, charts, paused video frames, or comic bubbles. The result is a card with text you can copy.
 

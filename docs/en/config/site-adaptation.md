@@ -1,4 +1,4 @@
-# Which parts of a website get translated?
+# Website reading area
 
 If content is missing or too much is translated, start with the simple checks.
 

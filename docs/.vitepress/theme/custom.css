@@ -102,8 +102,8 @@
 .product-hero h1 span {
   color: var(--vp-c-brand-1);
 }
-.mobile-break {
-  display: none;
+.product-name-local {
+  margin-left: 0.15em;
 }
 .product-intro {
   font-size: 19px;
@@ -370,8 +370,9 @@
   .product-end {
     padding: 48px 20px;
   }
-  .mobile-break {
+  .product-name-local {
     display: block;
+    margin-left: 0;
   }
   .product-hero h1 {
     line-height: 1.3;

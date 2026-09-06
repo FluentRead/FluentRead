@@ -1,4 +1,4 @@
-# Watch with both languages
+# Video subtitles
 
 Read original subtitles and translations together on YouTube and X, or show just one language.
 

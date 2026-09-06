@@ -1,4 +1,4 @@
-# Stuck on something?
+# Troubleshooting
 
 ## Page translation does nothing
 

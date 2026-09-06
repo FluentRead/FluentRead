@@ -1,6 +1,6 @@
-# Read the words inside an image
+# Image translation
 
-A screenshot, comic, or picture with text you can’t select? Hover over it and click FluentRead to read the translation over the image.
+Image translation recognizes text inside webpage images and overlays the translation on the image. Hover over an image and click the FluentRead icon to start.
 
 ## Translate one image
 

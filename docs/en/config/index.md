@@ -1,4 +1,4 @@
-# Make FluentRead comfortable
+# Settings
 
 Open full settings from the gear in the extension menu. Search for a setting when you can’t find it, such as language, shortcuts, or menu layout. Changes normally save automatically.
 

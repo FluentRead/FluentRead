@@ -1,7 +1,7 @@
 ---
 layout: home
 markdownStyles: false
-title: Open-source bilingual reading and translation
+title: Open-source browser extension for bilingual translation
 ---
 
 <ProductHomeEn />

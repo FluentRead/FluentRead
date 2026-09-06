@@ -105,15 +105,15 @@ const theme = (en = false) => ({
   langMenuLabel: en ? 'Language' : '切换语言',
   footer: {
     message: en
-      ? 'FluentRead · Open-source bilingual reading'
-      : 'FluentRead · 开源双语阅读扩展',
+      ? 'FluentRead · Open-source bilingual translation'
+      : 'FluentRead · 开源浏览器双语翻译插件',
     copyright: '© FluentRead · GPL-3.0',
   },
 })
 export default defineConfig({
   title: 'FluentRead-流畅阅读',
   description:
-    '一款开源的双语阅读与翻译浏览器插件。',
+    '一款开源的浏览器双语翻译插件。',
   lang: 'zh-CN',
   base: '/',
   cleanUrls: true,
@@ -142,7 +142,7 @@ export default defineConfig({
       lang: 'en',
       title: 'FluentRead',
       description:
-        'An open-source browser extension for bilingual reading and translation.',
+        'An open-source browser extension for bilingual translation.',
       themeConfig: theme(true),
     },
   },

@@ -1,4 +1,4 @@
-FluentRead is an open-source browser extension under GPL-3.0 for bilingual reading, translation, and AI reading assistance.
+FluentRead is an open-source browser extension for bilingual translation, released under GPL-3.0. It also supports AI reading assistance.
 
 Open source and DeepSeek Harness
 The source code is available on GitHub. The AI reading card integrates a browser adaptation of the DeepSeek Harness session core. Conversation-event and message organization components connect to webpage selections, AI models, and learning records, supporting contextual follow-up questions. You can choose different AI providers and models.

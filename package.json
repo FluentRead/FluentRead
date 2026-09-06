@@ -1,6 +1,6 @@
 {
   "name": "FluentRead-流畅阅读",
-  "description": "An open-source browser extension for bilingual reading and translation. 一款开源的双语阅读与翻译浏览器插件。",
+  "description": "An open-source browser extension for bilingual translation. 一款开源的浏览器双语翻译插件。",
   "private": true,
   "version": "0.0.32",
   "userscriptVersion": "2.0.0",

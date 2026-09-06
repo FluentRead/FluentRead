@@ -15,7 +15,7 @@ const chrome =
         alt=""
         fetchpriority="high"
       />
-      <p class="product-eyebrow">开源双语阅读与翻译扩展</p>
+      <p class="product-eyebrow">开源浏览器双语翻译插件</p>
       <h1 id="product-title">
         FluentRead <span class="product-name-local">流畅阅读</span>
       </h1>

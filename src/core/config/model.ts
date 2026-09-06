@@ -400,7 +400,7 @@ export class Config {
         this.selectionTtsVoices = []; // 默认按当前语言使用内置音色回退顺序
         this.vocabularyBookEnabled = false; // Beta 默认关闭，由用户在单词本页面主动开启
         this.newApiUrl = DEFAULT_NEW_API_URL; // NewAPI 默认地址
-        this.maxConcurrentTranslations = DEFAULT_MAX_CONCURRENT_TRANSLATIONS; // 默认最大并发数为3
+        this.maxConcurrentTranslations = DEFAULT_MAX_CONCURRENT_TRANSLATIONS; // 默认最大并发数为6
         this.translationRequestsPerSecond = DEFAULT_TRANSLATION_REQUESTS_PER_SECOND;
         this.translationRequestsPerMinute = DEFAULT_TRANSLATION_REQUESTS_PER_MINUTE;
         this.translationMaxRetries = DEFAULT_TRANSLATION_MAX_RETRIES;

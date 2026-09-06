@@ -2,12 +2,12 @@
  * @file src/core/translation/serialization.ts
  *
  * 文件职责：把候选 DOM 安全序列化为可翻译文本槽，并在异步请求后依据源快照恢复到仍然匹配的真实节点。
- * 主要内容：定义 TranslationTextSlot、TranslationSourceSnapshot 与样式覆盖规则，负责槽位编码解析、活节点收集、译文写入克隆、宿主 metadata 省略、译文产物过滤，以及查找 line-clamp 祖先并应用临时解除截断的样式。 可核对的公开符号包括 TranslationTextSlot、TranslationSourceSnapshot、SerializedTranslationSlots、TranslationStyleOverride、translationTruncationStyleOverrides、serializeTranslationSlots、parseTranslationSlots、createTranslationSourceSnapshot。
+ * 主要内容：定义 TranslationTextSlot、TranslationSourceSnapshot 与样式覆盖规则，负责槽位编码解析、活节点收集（排除候选内的独立 tooltip）、译文写入克隆、宿主 metadata 省略、译文产物过滤，以及查找 line-clamp 祖先并应用临时解除截断的样式。 可核对的公开符号包括 TranslationTextSlot、TranslationSourceSnapshot、SerializedTranslationSlots、TranslationStyleOverride、translationTruncationStyleOverrides、serializeTranslationSlots、parseTranslationSlots、createTranslationSourceSnapshot。
  * 模块边界：本文件属于可独立测试的 core 候选领域；可以读取传入 DOM 以计算结果，但不访问配置存储、不调用 provider、不注册页面监听器，也不负责译文渲染或 feature 生命周期。
  */
 
 import {isTranslationTextNodeProtected} from './text';
-import {isIconFontElement} from './dom';
+import {isForeignTranslationBoundary, isIconFontElement, isTextInNestedTranslationTooltip, isTranslationTooltip} from './dom';
 import type {TranslationTextProtectionOptions} from './dom';
 
 const translationArtifactSelector = [
@@ -162,7 +162,7 @@ function collectSlots(
             ignoredExtensionElement,
             protectionOptions,
         );
-        if (parts) slots.push({node, ...parts});
+        if (parts && !isTextInNestedTranslationTooltip(node, root)) slots.push({node, ...parts});
         current = walker.nextNode();
     }
     return slots;
@@ -192,7 +192,7 @@ function collectSnapshotSlots(
             ignoredExtensionElement,
             protectionOptions,
         );
-        if (parts) slots.push({node: cloneNode as Text, ...parts});
+        if (parts && !isTextInNestedTranslationTooltip(liveNode, liveRoot)) slots.push({node: cloneNode as Text, ...parts});
         liveNode = liveWalker.nextNode();
         cloneNode = cloneWalker.nextNode();
     }
@@ -211,6 +211,12 @@ export function createTranslationSourceSnapshot(
     shouldOmitFromTranslation?: (element: Element) => boolean,
 ): TranslationSourceSnapshot {
     const clone = node.cloneNode(true) as HTMLElement;
+    // 外部译文属于展示产物，不是需要保留的 code/notranslate 原文。连同其已接管
+    // 的最小来源单元一起省略，防止 sanitizer 去掉标记后再次展示一份旧译文。
+    if (isForeignTranslationBoundary(node)) {
+        clone.replaceChildren();
+        return {clone, slots: []};
+    }
     // 每个槽都依据实时 composed tree 判断。脱离文档的克隆已失去站点选择器、继承
     // contenteditable 和 CSS 可见性规则所需的外部祖先，只能作为映射后的输出骨架。
     const slots = collectSnapshotSlots(
@@ -225,7 +231,7 @@ export function createTranslationSourceSnapshot(
     const liveElements = node.querySelectorAll('*');
     const clonedElements = clone.querySelectorAll('*');
     liveElements.forEach((element, index) => {
-        if (isIconFontElement(element) || shouldOmitFromTranslation?.(element)) {
+        if (isTranslationTooltip(element) || isForeignTranslationBoundary(element) || isIconFontElement(element) || shouldOmitFromTranslation?.(element)) {
             clonedElements[index]!.remove();
         }
     });

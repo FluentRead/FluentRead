@@ -891,3 +891,59 @@ describe("synthetic 双语工件的真实 observer 生命周期", () => {
         restoreTranslation(segment);
     });
 });
+
+
+describe('tooltip 翻译生命周期命中保护', () => {
+    it.each(['inside', 'self', 'ancestor'])('覆盖 %s 的直接控件翻译并在取消后清理', (placement) => {
+        const {document} = parseHTML('<html><body><div role="button" id="control"><div class="tooltip"><div class="tooltip-inner">Support ThinkStu monthly</div></div></div></body></html>');
+        const node = document.querySelector(placement === 'inside' ? '.tooltip-inner' : placement === 'self' ? '.tooltip' : '#control') as HTMLElement;
+        const attempt = beginTranslation(node, 'bilingual', 'control')!;
+        expect(node.getAttribute('data-fr-tooltip-translation-active')).toBe('true');
+        expect(beginTranslation(node, 'bilingual', 'control')).toBeNull();
+        markTranslationComplete(node, attempt.state, attempt.generation, false);
+        expect(node.getAttribute('data-fr-tooltip-translation-active')).toBe('true');
+        restoreTranslation(node);
+        expect(node.hasAttribute('data-fr-tooltip-translation-active')).toBe(false);
+        const retry = beginTranslation(node, 'bilingual', 'control')!;
+        discardTranslation(node, retry.state);
+        expect(node.hasAttribute('data-fr-tooltip-translation-active')).toBe(false);
+    });
+
+    it('重试继承原属性快照，且不回滚宿主后续写入', () => {
+        const {document} = parseHTML('<html><body><div role="tooltip" data-fr-tooltip-translation-active="host">Support monthly</div></body></html>');
+        const node = document.querySelector('[role="tooltip"]') as HTMLElement;
+        const first = beginTranslation(node, 'single', 'control')!;
+        markTranslationError(node, first.state, first.generation, false);
+        const retry = beginTranslation(node, 'single', 'control')!;
+        discardTranslation(node, retry.state);
+        expect(node.getAttribute('data-fr-tooltip-translation-active')).toBe('host');
+        beginTranslation(node, 'single', 'control');
+        node.setAttribute('data-fr-tooltip-translation-active', 'new-host-value');
+        restoreTranslation(node);
+        expect(node.getAttribute('data-fr-tooltip-translation-active')).toBe('new-host-value');
+    });
+
+    it('普通正文不增加 tooltip 状态属性', () => {
+        const {document} = parseHTML('<html><body><p>Ordinary content</p></body></html>');
+        const node = document.querySelector('p') as HTMLElement;
+        beginTranslation(node, 'bilingual');
+        expect(node.hasAttribute('data-fr-tooltip-translation-active')).toBe(false);
+        restoreTranslation(node);
+    });
+});
+
+
+it('tooltip 的插入、内容变化和移除不使外层按钮来源失效', () => {
+    const {document} = parseHTML('<html><body><button>Monthly</button></body></html>');
+    const node = document.querySelector('button') as HTMLElement;
+    const before = getTranslationSourceStructureSignature(node);
+    const tooltip = document.createElement('div');
+    tooltip.setAttribute('role', 'tooltip');
+    tooltip.textContent = 'Support ThinkStu monthly';
+    node.appendChild(tooltip);
+    expect(getTranslationSourceStructureSignature(node)).toBe(before);
+    tooltip.textContent = '支持 ThinkStu';
+    expect(getTranslationSourceStructureSignature(node)).toBe(before);
+    tooltip.remove();
+    expect(getTranslationSourceStructureSignature(node)).toBe(before);
+});

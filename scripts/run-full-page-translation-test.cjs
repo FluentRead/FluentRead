@@ -1866,14 +1866,18 @@ async function runFailureActionScenario({
 }
 
 // 模拟页面按原文高度定位的 Bootstrap tooltip；双语增高后会覆盖触发图标。
-async function verifyTranslatedTooltipHover(page, timeout, artifactsDir) {
+async function verifyTranslatedTooltipHover(page, timeout, artifactsDir, control = false) {
   await page.mouse.move(0, 0);
-  await page.evaluate(() => {
+  await page.evaluate((control) => {
     const trigger = document.createElement('i');
     trigger.id = 'tooltip-hover-trigger';
     trigger.setAttribute('aria-label', 'Information');
     trigger.style.cssText = 'position:fixed;left:600px;top:350px;width:24px;height:24px;z-index:2147483000;background:#ddd';
-    document.body.appendChild(trigger);
+    const container = document.createElement('div');
+    container.id = 'tooltip-hover-control';
+    if (control) container.setAttribute('role', 'button');
+    document.body.appendChild(container);
+    container.appendChild(trigger);
     window.tooltipHoverCounts = {opens: 0, closes: 0};
     trigger.addEventListener('mouseenter', () => {
       window.tooltipHoverCounts.opens++;
@@ -1882,19 +1886,19 @@ async function verifyTranslatedTooltipHover(page, timeout, artifactsDir) {
       tooltip.className = 'tooltip fade top';
       tooltip.style.cssText = 'position:fixed;left:520px;width:220px;z-index:2147483001;background:white;color:black;padding:8px';
       tooltip.innerHTML = '<div class="tooltip-arrow"></div><div class="tooltip-inner">Set the lowest amount you are happy to receive. You can use suggested amounts to encourage supporters towards your preferred amounts.</div>';
-      document.body.appendChild(tooltip);
+      container.appendChild(tooltip);
       tooltip.style.top = `${350 - tooltip.getBoundingClientRect().height - 8}px`;
     });
     trigger.addEventListener('mouseleave', () => {
       window.tooltipHoverCounts.closes++;
       document.querySelector('#translated-hover-tooltip')?.remove();
     });
-  });
+  }, control);
   const cycles = [];
   try {
     for (let cycle = 0; cycle < 2; cycle++) {
       await page.mouse.move(612, 362);
-      await page.waitForFunction(() => document.querySelector('#translated-hover-tooltip .fluent-read-bilingual-content'), undefined, {timeout});
+      await page.waitForFunction(() => document.querySelector('#translated-hover-tooltip')?.textContent.includes('测试译文'), undefined, {timeout});
       await page.waitForTimeout(1200);
       const state = await page.evaluate(() => {
         const tooltip = document.querySelector('#translated-hover-tooltip');
@@ -1910,7 +1914,7 @@ async function verifyTranslatedTooltipHover(page, timeout, artifactsDir) {
         throw new Error(`翻译后 tooltip 抢占鼠标并闪烁：${JSON.stringify(state)}`);
       }
       cycles.push(state);
-      if (artifactsDir && cycle === 0) await page.screenshot({path: path.join(artifactsDir, 'tooltip-hover.png')});
+      if (artifactsDir && cycle === 0) await page.screenshot({path: path.join(artifactsDir, control ? 'tooltip-control-hover.png' : 'tooltip-hover.png')});
       await page.mouse.move(0, 0);
       await page.waitForFunction(() => !document.querySelector('#translated-hover-tooltip'));
     }
@@ -1951,7 +1955,7 @@ async function verifyTranslatedTooltipHover(page, timeout, artifactsDir) {
   } finally {
     await page.mouse.move(0, 0);
     await page.evaluate(() => {
-      document.querySelector('#tooltip-hover-trigger')?.remove();
+      document.querySelector('#tooltip-hover-control')?.remove();
       document.querySelector('#translated-hover-tooltip')?.remove();
     });
   }
@@ -2486,6 +2490,7 @@ async function main() {
       };
     }
     const tooltipHover = await verifyTranslatedTooltipHover(page, Math.min(args.timeout, 15000), artifactsDir);
+    const tooltipControlHover = await verifyTranslatedTooltipHover(page, Math.min(args.timeout, 15000), artifactsDir, true);
     if (artifactsDir) await page.screenshot({
       path: path.join(artifactsDir, 'full-page-translated.png'),
       fullPage: !args.verifyFloatingUi,
@@ -2668,6 +2673,7 @@ async function main() {
       cancelledHoverGesture,
       unchangedAttributeStability,
       tooltipHover,
+      tooltipControlHover,
       failureActions,
       floatingUi: floatingUiEvidence,
       loadingStyleIsolation: loadingStyleIsolationEvidence,
@@ -2703,6 +2709,9 @@ if (require.main === module) {
 }
 
 module.exports = {
+  readConfig,
+  installTranslationFixtureOnWorker,
+  toggleFullPage,
   assertCancelledHoverGesture,
   assertDeterministicFixtureTraffic,
   assertNoRuntimeErrors,

@@ -1,0 +1,1 @@
+Open-source bilingual translation, with AI reading assistance using a browser adaptation of the DeepSeek Harness session core.

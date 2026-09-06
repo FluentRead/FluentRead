@@ -25,6 +25,7 @@ import {
 } from '@/src/core/translation/public';
 import {
     evaluateHardGuard,
+    isTextInNestedTranslationTooltip,
     findElementsAtPoint,
     findNodeAtPoint,
     hasHiddenMarker,
@@ -1233,6 +1234,63 @@ describe('translation candidate core', () => {
         expect(core.resolve(document.querySelector('#community')?.firstChild)).toBeNull();
         expect(core.resolve(document.querySelector('#advertise')?.firstChild)).toBeNull();
         expect(core.resolve(document.querySelector('#unscoped-copy')?.firstChild)).toBeNull();
+    });
+
+    it.each(['content', 'all'] as const)('Reddit %s 范围不叠加沉浸式译文，也不吞掉未翻译的相邻正文', (scope) => {
+        const {document} = page(`<main><shreddit-post>
+            <h1 slot="title" id="translated-title">A model with strong potential
+                <font class="notranslate immersive-translate-target-wrapper"><br><font>已有标题译文</font></font>
+            </h1><div slot="text-body">
+                <p id="translated-prose">Original model analysis <strong id="emphasis">with useful detail</strong>
+                    <font class="notranslate immersive-translate-target-wrapper"><br><font>已有正文译文</font></font>
+                </p><p id="remaining">This paragraph still needs translation.</p>
+            </div></shreddit-post></main>`);
+        const core = createTranslationCore({scope, url: new URL('https://www.reddit.com/r/example/comments/example')});
+        const title = document.querySelector<HTMLElement>('#translated-title')!;
+        const prose = document.querySelector<HTMLElement>('#translated-prose')!;
+        const before = document.body.innerHTML;
+        expect(core.discover(document).map(candidate => candidate.element.id)).toEqual(['remaining']);
+        for (const node of [title, title.firstChild, prose, prose.firstChild, document.querySelector('#emphasis'), prose.querySelector('font')]) {
+            expect(core.resolve(node)).toBeNull();
+        }
+        expect(extractTranslationText(prose)).toBe('');
+        expect(collectLiveTranslationTextSlots(prose)).toEqual([]);
+        const snapshot = createTranslationSourceSnapshot(document.querySelector('main')!);
+        expect(snapshot.slots.map(slot => slot.source)).toEqual(['This paragraph still needs translation.']);
+        const output = applyTranslationsToSnapshot(snapshot, ['剩余正文译文']);
+        expect(output).toContain('剩余正文译文');
+        expect(output).not.toMatch(/已有|Original model|A model|immersive-translate/);
+        expect(createTranslationSourceSnapshot(prose).clone.innerHTML).toBe('');
+        expect(document.body.innerHTML).toBe(before);
+        prose.querySelector('.immersive-translate-target-wrapper')!.remove();
+        expect(core.discover(prose).map(candidate => candidate.element)).toContain(prose);
+    });
+
+    it('只识别明确的外部译文 wrapper，普通 notranslate 术语与代码仍保留在译文骨架中', () => {
+        const {document, core} = page('<p id="prose">Use <span class="notranslate">MiniMax</span> with <code>api_key</code>.</p>');
+        const prose = document.querySelector<HTMLElement>('p')!;
+        expect(core.discover(document).map(candidate => candidate.element)).toEqual([prose]);
+        const snapshot = createTranslationSourceSnapshot(prose);
+        expect(snapshot.clone.innerHTML).toContain('MiniMax');
+        expect(snapshot.clone.innerHTML).toContain('<code>api_key</code>');
+    });
+
+    it('快照不会把外部译文复制成丢失标记的第二份文字', () => {
+        const {document} = page('<p id="source">Original sentence.<font class="notranslate immersive-translate-target-wrapper"><br><font>已有译文</font></font></p>');
+        const paragraph = document.querySelector<HTMLElement>('p')!;
+        const original = paragraph.innerHTML;
+        const snapshot = createTranslationSourceSnapshot(paragraph);
+        expect(applyTranslationsToSnapshot(snapshot, ['新的译文'])).toBe('');
+        expect(paragraph.innerHTML).toBe(original);
+    });
+
+    it('外部译文只保护局部单元，body 直属产物不关闭页面，开放 Shadow DOM 继承相同边界', () => {
+        const {document, core} = page('<font class="immersive-translate-target-wrapper">页面译文</font><p id="remaining">Remaining source paragraph.</p><comment-body></comment-body>');
+        const shadow = document.querySelector('comment-body')!.attachShadow({mode: 'open'});
+        shadow.innerHTML = '<p id="translated">Source comment.<font class="immersive-translate-target-wrapper">已有评论译文</font></p><p id="new-comment">A new comment.</p>';
+        expect(core.discover(document).map(candidate => candidate.element.id)).toEqual(['remaining', 'new-comment']);
+        expect(core.resolve(shadow.querySelector('#translated')!.firstChild)).toBeNull();
+        expect(extractTranslationText(shadow.querySelector('#translated')!)).toBe('');
     });
 
     it('bounds cyclic Shadow DOM coordinate lookup without overflowing the call stack', () => {
@@ -2595,4 +2653,41 @@ describe('embedded semantic chrome classification', () => {
             expect(ids, `${chromeId} must remain structural chrome`).not.toContain(chromeId);
         }
     });
+});
+
+
+describe('动态 tooltip 与按钮来源隔离', () => {
+    it.each(['role="tooltip"', 'class="tooltip"'])('嵌套提示 %s 独立发现且不进入按钮来源', (attributes) => {
+        const {document, core} = page(`<button id="monthly"><span>Monthly</span><i></i><div ${attributes} id="tip"><div class="tooltip-inner" id="tip-content">Support ThinkStu monthly</div></div></button>`);
+        const button = document.querySelector('#monthly') as HTMLElement;
+        const tip = document.querySelector('#tip-content') as HTMLElement;
+        expect(extractTranslationText(button)).toBe('Monthly');
+        expect(collectLiveTranslationTextSlots(button).map(slot => slot.source)).toEqual(['Monthly']);
+        expect(createTranslationSourceSnapshot(button).slots.map(slot => slot.source)).toEqual(['Monthly']);
+        expect(createTranslationSourceSnapshot(button).clone.querySelector('#tip')).toBeNull();
+        expect(button.querySelector('#tip')).not.toBeNull();
+        expect(extractTranslationText(tip)).toBe('Support ThinkStu monthly');
+        const candidates = core.discover(document);
+        expect(candidates.map(candidate => candidate.element.id)).toEqual(['tip-content', 'monthly']);
+        expect(candidates.map(candidate => candidate.kind)).toEqual(['content', 'control']);
+        expect(core.resolve(tip)?.element).toBe(tip);
+        document.querySelector('#tip')!.remove();
+        expect(extractTranslationText(button)).toBe('Monthly');
+        expect(core.discover(document).map(candidate => candidate.element.id)).toEqual(['monthly']);
+    });
+});
+
+
+it('tooltip 文本边界探测在异常深度下保守退出', () => {
+    const {document} = page('<div id="root"></div>');
+    const root = document.querySelector('#root')!;
+    let parent = root;
+    for (let index = 0; index <= maxComposedAncestorDepth; index++) {
+        const next = document.createElement('span');
+        parent.appendChild(next);
+        parent = next;
+    }
+    const text = document.createTextNode('Deep source');
+    parent.appendChild(text);
+    expect(isTextInNestedTranslationTooltip(text, root)).toBe(true);
 });

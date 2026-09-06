@@ -1,6 +1,7 @@
 import {afterEach, describe, expect, it, vi} from 'vitest';
 const state = vi.hoisted(() => ({config: {on: true, disableImageTranslator: false, imageTranslationContextMenuEnabled: true}, capability: {imageTranslation: true}}));
-vi.mock('@/src/services/config/store', () => ({config: state.config}));
+const subscriptions: Array<(config: unknown) => void> = [];
+vi.mock('@/src/services/config/store', () => ({config: state.config, configReady: Promise.resolve(), subscribeConfig: (listener: (config: unknown) => void) => {subscriptions.push(listener); return () => {};}}));
 vi.mock('@/src/platform/browser/capabilities', () => ({browserCapabilities: state.capability}));
 import {createImageContextMenu, imageMenuEnabled, routeImageContextMenu} from '@/src/app/background/imageContextMenu';
 import {CONTEXT_MENU_IDS} from '@/src/core/config/constants';
@@ -26,4 +27,22 @@ describe('图片原生菜单配置与 frame 路由', () => {
         state.config.imageTranslationContextMenuEnabled = true; sendMessage.mockRejectedValue(new Error('missing frame')); vi.spyOn(console, 'error').mockImplementation(() => {});
         routeImageContextMenu(info, {id: 4}); await Promise.resolve(); expect(console.error).toHaveBeenCalled();
     });
+});
+
+it('后台从已保存的开启配置启动后，首次关闭图片菜单仍重新同步', async () => {
+    const {installBackgroundContextMenus} = await import('@/src/app/background/contextMenuRuntime');
+    const {TabTranslationStateStore} = await import('@/src/app/background/tabTranslationState');
+    const event = () => ({addListener: vi.fn()});
+    const create = vi.fn();
+    vi.stubGlobal('browser', {contextMenus: {create, removeAll: vi.fn(), update: vi.fn(), onClicked: event()},
+        tabs: {query: vi.fn().mockResolvedValue([]), onActivated: event(), onUpdated: event(), onRemoved: event()}});
+    state.config.disableImageTranslator = true;
+    installBackgroundContextMenus(new TabTranslationStateStore());
+    state.config.disableImageTranslator = false;
+    for (let i = 0; i < 12; i++) await Promise.resolve();
+    expect(create.mock.calls.some(([menu]) => menu.id === CONTEXT_MENU_IDS.TRANSLATE_IMAGE)).toBe(true);
+    create.mockClear(); state.config.imageTranslationContextMenuEnabled = false;
+    subscriptions.at(-1)!(state.config as never);
+    for (let i = 0; i < 12; i++) await Promise.resolve();
+    expect(create.mock.calls.map(([menu]) => menu.id)).toEqual([CONTEXT_MENU_IDS.TRANSLATE_FULL_PAGE]);
 });

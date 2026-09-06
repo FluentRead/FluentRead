@@ -106,6 +106,7 @@ export function installBackgroundContextMenus(
         console.log('不支持右键菜单');
     } else {
         void configReady.then(() => {
+            previousImageMenuEnabled = imageMenuEnabled();
             contextMenuEnabled = config.contextMenuEnabled !== false;
             contextMenuLanguage = resolveContextMenuLanguage(config.uiLanguage);
             void sync();

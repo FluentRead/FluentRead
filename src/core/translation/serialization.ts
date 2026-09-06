@@ -7,7 +7,7 @@
  */
 
 import {isTranslationTextNodeProtected} from './text';
-import {isIconFontElement} from './dom';
+import {isForeignTranslationBoundary, isIconFontElement} from './dom';
 import type {TranslationTextProtectionOptions} from './dom';
 
 const translationArtifactSelector = [
@@ -211,6 +211,12 @@ export function createTranslationSourceSnapshot(
     shouldOmitFromTranslation?: (element: Element) => boolean,
 ): TranslationSourceSnapshot {
     const clone = node.cloneNode(true) as HTMLElement;
+    // 外部译文属于展示产物，不是需要保留的 code/notranslate 原文。连同其已接管
+    // 的最小来源单元一起省略，防止 sanitizer 去掉标记后再次展示一份旧译文。
+    if (isForeignTranslationBoundary(node)) {
+        clone.replaceChildren();
+        return {clone, slots: []};
+    }
     // 每个槽都依据实时 composed tree 判断。脱离文档的克隆已失去站点选择器、继承
     // contenteditable 和 CSS 可见性规则所需的外部祖先，只能作为映射后的输出骨架。
     const slots = collectSnapshotSlots(
@@ -225,7 +231,7 @@ export function createTranslationSourceSnapshot(
     const liveElements = node.querySelectorAll('*');
     const clonedElements = clone.querySelectorAll('*');
     liveElements.forEach((element, index) => {
-        if (isIconFontElement(element) || shouldOmitFromTranslation?.(element)) {
+        if (isForeignTranslationBoundary(element) || isIconFontElement(element) || shouldOmitFromTranslation?.(element)) {
             clonedElements[index]!.remove();
         }
     });

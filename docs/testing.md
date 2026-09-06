@@ -141,7 +141,7 @@ node scripts/testing/run-model-usage-ui-test.cjs \
 
 ## 简体与繁体中文回归
 
-`tests/chineseLanguage.test.ts` 覆盖语言别名、显式脚本优先、共享字和简繁混排；未收录汉字不作为同语言跳过的证据。供应商协议矩阵、旧配置迁移、术语隔离和并发缓存分别由 `chineseTranslationProviders`、配置测试、`glossary`、`translationBroker` 与 `translationCache` 测试覆盖。缓存版本更新会隔离旧版以繁体身份存储的简体或粤语译文。
+`tests/chineseLanguage.test.ts` 覆盖语言别名、显式脚本优先、共享字和简繁混排；中文语境由明确字形或短语确认，常用中性汉字无需逐字白名单，简繁冲突由人工常用字表与 Unicode 17.0.0 Unihan 单向变体数据共同检查。截图评论语料位于 `tests/fixtures/chinese-language-posts.json`，覆盖普通中文、`OpenAI`/`CoT` 嵌入、同目标跳过和跨语言保留；完整外语、短混排与未确认的罕见字仍允许翻译。供应商协议矩阵、旧配置迁移、术语隔离和并发缓存分别由 `chineseTranslationProviders`、配置测试、`glossary`、`translationBroker` 与 `translationCache` 测试覆盖。
 
 生产扩展可重复运行以下浏览器专项：
 
@@ -153,7 +153,7 @@ node scripts/testing/run-chinese-translation-test.cjs \
   --artifacts-dir /private/tmp/fluentread-chinese-browser
 ```
 
-该脚本在临时 Edge profile 中以不抢焦点方式启动正常尺寸窗口，验证 Popup 原生源语言和目标语言选择、保存与重载、英文分别译成简繁、简繁互译，以及 Control 悬浮和 Alt+T 全文的 `[1,0,1]` 切换、恢复原文和缓存隔离。默认本机 OpenAI 兼容服务只证明请求与交互链路；追加 `--live-google` 后另行验证实际 Google 服务，报告分开记录服务失败与确定性结果。此专项不替代其他站点、真实 OCR 或付费服务验证。
+该脚本在临时 Edge profile 中以不抢焦点方式启动正常尺寸窗口，验证 Popup 源语言和目标语言选择、保存与重载、英文分别译成简繁、简繁互译，以及 Control 悬浮和 Alt+T 全文的 `[1,0,1]` 切换、恢复原文和缓存隔离。默认还用截图评论验证同目标中文零请求、零译文节点，相邻英文和繁体正常翻译，以及动态中文评论改为英文后的重新识别。默认本机 OpenAI 兼容服务只证明请求与交互链路；追加 `--live-google` 后另行验证实际 Google 服务，报告分开记录服务失败与确定性结果。此专项不替代其他站点、真实 OCR 或付费服务验证。
 
 追加 `--spanish` 可运行西班牙语与简体、繁体中文之间的双向翻译矩阵，同样覆盖语言选择持久化、两种快捷键、恢复和缓存。西班牙语识别与朗读映射由 `commonUtilities`、`selectionTranslatorCore` 验证，OCR 语言包选择和保存由 `imageTranslation` 验证。
 
@@ -230,3 +230,7 @@ node scripts/testing/run-area-translation-flow-test.cjs \
 使用临时 Edge profile、防抢焦点 helper、真实截图和 Tesseract，验证可信按键、可编辑输入保护、原/译文核对、整块请求、Esc取消、同截图重试、图像不上传、AI结构错误与重试、关闭后迟到响应、禁用卸载及页面CSS隔离。清晰/小字/暗底英文样本记录字符错误率和语言准备/首次/重试耗时；Google/OpenAI翻译传输是确定性夹具，不能代表外部服务质量或可用性。
 
 标签切换用例通过 `connectOverCDP({noDefaults: true})` 禁用 Playwright 默认焦点模拟，验证浏览器真实的 `visible → hidden` 及在途取消。窄屏用例先稳定布局和页面焦点，再圈选；深色卡片同时断言外围透明，配置变更断言主题和静态进度立即更新。
+
+### 悬浮说明框翻译稳定性
+
+`run-full-page-translation-test.cjs` 在全文翻译会话中动态创建与旧 Bootstrap 相同结构的 tooltip，按原文高度定位，使双语内容增高后覆盖触发图标。真实 CDP 鼠标连续执行两次移入、持续停留和移出，断言每次只打开一次、译文仅一份、图标仍获得鼠标命中，移出后正常关闭。报告的 `tooltipHover` 同时记录语义 tooltip、未翻译提示、交互弹层和恢复原文后的命中边界。该保护只作用于已翻译的纯说明提示框，保留链接、按钮和可聚焦控件的交互。此测试为本地结构夹具，不代表登录后的真实网站验证。

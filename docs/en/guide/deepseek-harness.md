@@ -43,6 +43,8 @@ The source scope controls what the model can reference. The default permits the 
 
 You can expand the prompt editor to adjust the general instruction and each action. Clear a template or restore its default to reset it. Changes apply to the next analysis.
 
+Default prompts follow the interface language and support Chinese, English, Japanese, Korean, French, Russian, and Spanish. Empty templates and restored defaults use the current interface language; custom text is preserved. The target language controls the response language independently.
+
 ## Optional learning memories
 
 If enabled, learning memories can retain preferences or notes you choose to keep and use them in later explanations. You can review, disable, delete, or clear them. Memories used for a cloud explanation are sent to the selected AI service.

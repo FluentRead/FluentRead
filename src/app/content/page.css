@@ -1,6 +1,6 @@
 /**
  * @file src/app/content/page.css
- * 文件职责：定义内容脚本直接注入宿主文档的 FluentRead 专属视觉状态，覆盖翻译占位、重试、图片覆盖层、输入框反馈和多种双语译文样式。
+ * 文件职责：定义内容脚本直接注入宿主文档的 FluentRead 专属视觉状态，覆盖翻译占位、重试、图片覆盖层、输入框反馈、已翻译提示框的鼠标命中保护和多种双语译文样式。
  * 主要内容：包含错误原因与重试控件、图片翻译按钮和 canvas、输入框 translating/success/error tooltip，以及 dimmed、下划线、卡片、标记、纸张、技术风等显示类；段落 loading 已由自带 Shadow Root 的组件隔离。
  * 模块边界：选择器均以 fluent 前缀或受控状态类约束，不承担 Shadow UI 组件主题，也不决定何时添加类名；DOM 状态由各 content feature 管理，共享 token 由 src/ui/styles 提供。
  */
@@ -310,6 +310,15 @@
     background: transparent; /* 确保背景透明，与周围背景融合 */
     box-sizing: border-box; /* 使用 border-box 模型，确保内外边距和边框计算正确 */
     overflow-wrap: break-word; /* 处理长单词或 URL 的断行，避免溢出 */
+}
+
+/* 纯说明 tooltip 按原文高度定位后，译文增高可能盖住触发图标，导致
+ * mouseleave -> 关闭 -> mouseenter -> 重建的循环。仅让已翻译且没有交互
+ * 控件的语义 tooltip（含旧 Bootstrap 结构）穿透鼠标；恢复原文后自动失效。
+ * 不改宿主属性或监听器，也不影响带链接、表单、可聚焦控件的弹层。 */
+:is([role="tooltip"], .tooltip:has(> .tooltip-inner)):has(:is(.fluent-read-bilingual-content, .fluent-read-single-slot)[data-fr-translation-owned="true"]):not([tabindex], [contenteditable]:not([contenteditable="false"])):not(:has(a[href], button, input, select, textarea, summary, [tabindex], [contenteditable]:not([contenteditable="false"]), [role="button"], [role="link"], [role="dialog"])),
+:is([role="tooltip"], .tooltip:has(> .tooltip-inner)):has(:is(.fluent-read-bilingual-content, .fluent-read-single-slot)[data-fr-translation-owned="true"]):not([tabindex], [contenteditable]:not([contenteditable="false"])):not(:has(a[href], button, input, select, textarea, summary, [tabindex], [contenteditable]:not([contenteditable="false"]), [role="button"], [role="link"], [role="dialog"])) * {
+    pointer-events: none !important;
 }
 
 /* 双语逐句高亮：只绘制不会改变几何尺寸的单层强调，避免动态页面在 hover 时发生布局抖动。 */

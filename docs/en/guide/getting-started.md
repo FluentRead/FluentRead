@@ -25,6 +25,8 @@ A news story, blog, forum post, or online document is a good starting point. Bro
 
 Open FluentRead from the toolbar. Leave the source language on automatic detection and choose your target language. The extension’s default target is Simplified Chinese; change it to the language you want to read.
 
+Simplified and Traditional Chinese are separate language options. Text clearly matching the target Chinese script is skipped; a few abbreviations such as AI, CoT, or OpenAI do not trigger translation of a Chinese paragraph. Mixed scripts, complete foreign-language passages, and uncertain script detection are still translated.
+
 Keep **Free translation service** to begin. It needs no API key. If the service is busy or unavailable on your network, retry later or [choose another service](/en/config/translation-engines).
 
 <figure class="doc-figure"><a href="/screenshots/en/popup.webp" target="_blank" rel="noopener"><img class="doc-screenshot popup" src="/screenshots/en/popup.webp" width="720" height="1120" alt="FluentRead menu with source and target language, translation service, and page translation" /></a><figcaption>The everyday controls live in the extension menu. Open the image for full resolution.</figcaption></figure>

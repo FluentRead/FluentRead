@@ -2,9 +2,11 @@
  * @file src/core/language/chinese.ts
  *
  * 文件职责：统一中文语言别名与书写体系，并以保守字形证据区分简体、繁体和未知文本。
- * 主要内容：normalizeChineseLanguageCode 规范化中文语言码，getChineseScript 读取明确书写体系，detectChineseScript 要求所有汉字均有已审核的字形或共享字依据，再排除混合字形、其他语言字母和粤语口语；未收录汉字与无证据文本保持未知。
+ * 主要内容：normalizeChineseLanguageCode 规范化中文语言码，getChineseScript 读取明确书写体系，detectChineseScript 结合 Unicode 简繁冲突表与中文特有字形判断，允许常用中性汉字和少量技术缩写，排除混排、完整外语及粤语口语。
  * 模块边界：本文件属于 core 纯算法，不转换原文、不猜测地区或方言，不访问配置、浏览器、网络或翻译服务；未知结果由调用方继续检测或翻译。
  */
+
+import {simplifiedOnlyCharacters, traditionalOnlyCharacters} from './chineseVariants';
 
 export type ChineseScript = 'Hans' | 'Hant';
 
@@ -64,31 +66,45 @@ const scriptPairs = `
 释釋 钱錢 铁鐵 银銀 链鏈 锁鎖 错錯 镜鏡 闪閃 闭閉 问問 闻聞 阅閱 队隊 阳陽
 阴陰 阵陣 际際 陆陸 险險 随隨 隐隱 难難 雾霧 静靜 页頁 顺順 顾顧 预預 领領
 频頻 额額 颜顏 风風 飞飛 饭飯 饮飲 馆館 骑騎 骗騙 鸡雞 鸣鳴 鸭鴨 麦麥 齐齊
-齿齒 龟龜 与與
+齿齒 龟龜 与與 两兩 猫貓 数數
 `.trim().split(/\s+/u);
-const simplifiedScriptPattern = new RegExp(`[${scriptPairs.map((pair) => pair[0]).join('')}]`, 'u');
+const simplifiedScriptPattern = new RegExp(`[${scriptPairs.map((pair) => pair[0]).join('')}${simplifiedOnlyCharacters}]`, 'u');
 // 「于」自身在繁体中也有合法用途，不能当作简体证据；「於」可单向证明繁体字形。
 const traditionalAlternativeCharacters = '於';
-const traditionalScriptPattern = new RegExp(`[${scriptPairs.map((pair) => pair[1]).join('')}${traditionalAlternativeCharacters}]`, 'u');
+const traditionalScriptPattern = new RegExp(`[${scriptPairs.map((pair) => pair[1]).join('')}${traditionalAlternativeCharacters}${traditionalOnlyCharacters}]`, 'u');
 
-// 只有逐字确认过的共享字可以放行。表外汉字保持未知，不能仅凭没有匹配到
-// 另一种脚本就认定整段同语言；否则「这里有兩隻貓」会漏掉未收录的繁体字。
-const sharedHanCharacters = '已需再迎使置了杯屋的一是不在人有我他她它你和及其之可以中上下大小天子文言字句完整成功用日月年水火土木金山人口手心目力女王后干台里云于只余佛像玩硅矽元素包括些第本末未正生先光今空看出入回到地方面所要好比多高低左右每自此同各另也都就才很太更最全真相原理意思安定平常清楚新老重直白黑早晚快慢事然因果而被把向但如或且次部份分段什怎取容翻繁共亨享普英做式德士君仁空力文字';
-const knownHanCharacters = new Set(`${scriptPairs.join('')}${traditionalAlternativeCharacters}${sharedHanCharacters}`);
+// 常用 CJK 统一汉字不再依赖几百字的白名单。罕见扩展、兼容字与迭代符号仍保持未知，
+// 避免把「々」或未经检测的罕见字当成共享字；补充平面中有明确变体依据的字可以检查冲突。
+const commonHanPattern = /[\u3400-\u4DBF\u4E00-\u9FFF]/u;
+const variantCharacters = new Set(`${simplifiedOnlyCharacters}${traditionalOnlyCharacters}`);
 const hanPattern = /\p{Script=Han}/u;
+// 首字母缩写和内部大写产品名（AI、CoT、OpenAI、iPhone）可嵌在长中文句中。
+// 普通英文单词、句子和其他书写体系不能仅凭中文占比被丢弃。
+const technicalTokenPattern = /^(?:[A-Z][a-z]*[A-Z][A-Za-z]*|[a-z]+[A-Z][A-Za-z]*)$/u;
+
+function hasForeignLanguageContent(value: string): boolean {
+    const nonHan = value.replace(/\p{Script=Han}/gu, ' ');
+    const foreignLetters = nonHan.match(/\p{L}/gu);
+    if (!foreignLetters) return false;
+    const hanCount = [...value].filter(character => hanPattern.test(character)).length;
+    if (hanCount < 10 || foreignLetters.length * 2 > hanCount) return true;
+    const tokens = nonHan.match(/\p{L}+/gu)!;
+    return tokens.some(token => token.length > 24 || !technicalTokenPattern.test(token));
+}
 
 // 明确中文证据另用短表审核，避免把只有日文共享汉字的「日本語」「時間」误作中文。
-const simplifiedChineseEvidencePattern = /[这们语译设为说从对还样书门车东发见长电现间题让气实图网边变进选级应标经简汉龙刘吴赵陈张听读广欢专严丽举买亲众伤伦]/u;
-const traditionalChineseEvidencePattern = /[這們譯與說從對樣發氣點實圖邊變條應經體廣歡專嚴舉眾寫]/u;
+const simplifiedChineseEvidencePattern = /[这们语译设为说从对还样书门车东发见长电现间题让气实图网边变进选级应标经简汉龙刘吴赵陈张听读广欢专严丽举买亲众伤伦]|[起出下]来/u;
+const traditionalChineseEvidencePattern = /[這們譯與說從對樣發氣點實圖邊變條應經體廣歡專嚴舉眾寫續]/u;
 // 方言不是书写体系。含常见粤语口语标记时不能据繁体字形推断普通话。
 const cantoneseMarkerPattern = /[嘅咗哋佢冇嚟喺啲嘢唔咁乜嗰咩噉]/u;
 
 /** 只报告有明确中文证据且字形一致的文本，所有不确定结果允许继续翻译。 */
 export function detectChineseScript(value: string): ChineseScript | undefined {
-    if (cantoneseMarkerPattern.test(value) || /\p{L}/u.test(value.replace(/\p{Script=Han}/gu, ''))) {
+    if (cantoneseMarkerPattern.test(value) || hasForeignLanguageContent(value)) {
         return undefined;
     }
-    if ([...value].some((character) => hanPattern.test(character) && !knownHanCharacters.has(character))) {
+    if ([...value].some((character) => hanPattern.test(character)
+        && !commonHanPattern.test(character) && !variantCharacters.has(character))) {
         return undefined;
     }
     const hasHans = simplifiedScriptPattern.test(value);

@@ -419,6 +419,27 @@ describe('统一配置存储', () => {
         expect(storageState.get('local:config')).toMatchObject({areaTranslationMode: 'ai', areaTranslationService: 'openai'});
     });
 
+    it('翻译卡提示词经过保存与重载保持，占位符和用户空白不被改写', async () => {
+        const store = await loadConfigModule(storedConfig);
+        await store.configReady;
+        const harness = {...store.config.harness, systemPrompt: 'Use {{to}}', actionPrompts: {...store.config.harness.actionPrompts, grammar: '  Custom {{learningLevel}}  '}};
+        await store.saveConfig({...store.config, harness});
+        const reopened = await loadConfigModule(storageState.get('local:config'));
+        await reopened.configReady;
+        expect(reopened.config.harness).toMatchObject({systemPrompt: 'Use {{to}}', actionPrompts: {grammar: '  Custom {{learningLevel}}  '}});
+    });
+
+    it('保留用户关闭视频、图片和圈选的选择，保存后重新加载仍关闭', async () => {
+        const disabled = {videoTranslationEnabled: false, selectionAreaEnabled: false, disableImageTranslator: true};
+        const store = await loadConfigModule({...storedConfig, ...disabled});
+        await store.configReady;
+        expect(store.config).toMatchObject(disabled);
+        await store.saveConfig({...store.config, to: 'en'});
+        const reopened = await loadConfigModule(storageState.get('local:config'));
+        await reopened.configReady;
+        expect(reopened.config).toMatchObject(disabled);
+    });
+
     it('独立圈选服务接受机器翻译和已配置AI，拒绝畸形模式或孤立服务', () => {
         for (const service of ['microsoft', 'openai', 'deeplx', '']) {
             expect(normalizeConfig({areaTranslationService: service}).areaTranslationService).toBe(service);
@@ -438,12 +459,14 @@ describe('统一配置存储', () => {
         expect(layout.popupQuickFeatureVisibility).toMatchObject({image: false, area: false});
     });
 
-    it('为旧配置补齐默认关闭的视频字幕 Beta、独立微软翻译服务和默认字号', async () => {
+    it('为旧配置默认开启视频、图片和圈选，并补齐视频服务和字号', async () => {
         const configStore = await loadConfigModule(storedConfig);
 
         await configStore.configReady;
 
-        expect(configStore.config.videoTranslationEnabled).toBe(false);
+        expect(configStore.config.videoTranslationEnabled).toBe(true);
+        expect(configStore.config.selectionAreaEnabled).toBe(true);
+        expect(configStore.config.disableImageTranslator).toBe(false);
         expect(configStore.config.videoService).toBe('microsoft');
         expect(configStore.config.videoLocalModel).toBe('tiny');
         expect(configStore.config.videoSubtitleVisible).toBe(true);
@@ -2640,7 +2663,7 @@ describe('统一配置存储', () => {
     });
 
     it('配置持久化 barrier 等待已排队及等待期间追加的请求', async () => {
-        const canonical = sanitizeConfigCredentials(normalizeConfig(storedConfig));
+        const canonical = sanitizeConfigCredentials(normalizeConfig({...storedConfig, videoTranslationEnabled: false}));
         const configStore = await loadConfigModule({...canonical, __fluentConfigRevision: 4});
         await configStore.configReady;
         const configWatch = storageMock.watch.mock.calls[0][1];
@@ -2821,7 +2844,7 @@ describe('统一配置存储', () => {
     });
 
     it('外部 revision 会取消混合队列中的旧 replace，但保留可做字段 CAS 的 patch', async () => {
-        const canonical = sanitizeConfigCredentials(normalizeConfig(storedConfig));
+        const canonical = sanitizeConfigCredentials(normalizeConfig({...storedConfig, videoTranslationEnabled: false}));
         const configStore = await loadConfigModule({...canonical, __fluentConfigRevision: 4});
         await configStore.configReady;
         const configWatch = storageMock.watch.mock.calls[0][1];
@@ -2871,7 +2894,7 @@ describe('统一配置存储', () => {
     });
 
     it('active replace 期间 deferred 的外部更新会取消所有旧 replace，但后续 patch 仍可 CAS', async () => {
-        const canonical = sanitizeConfigCredentials(normalizeConfig(storedConfig));
+        const canonical = sanitizeConfigCredentials(normalizeConfig({...storedConfig, videoTranslationEnabled: false}));
         const configStore = await loadConfigModule({...canonical, __fluentConfigRevision: 4});
         await configStore.configReady;
         const configWatch = storageMock.watch.mock.calls[0][1];

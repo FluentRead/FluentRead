@@ -8,7 +8,12 @@ describe('图片翻译 OCR 工具', () => {
     it('按源语言选择最小 OCR 语言集', () => {
         for (const source of ['es', 'es-ES', 'es-MX', ' ES_ar ']) expect(getOcrLanguages(source)).toEqual(['spa', 'eng']);
         expect(getOcrLanguages('esperanto')).toEqual(['chi_sim', 'chi_tra', 'eng', 'jpn']);
-        expect(getOcrLanguages('en')).toEqual(['eng']);
+        for (const source of ['en', 'en-US', ' EN_gb ']) expect(getOcrLanguages(source)).toEqual(['eng']);
+        for (const [language, code] of [['ko', 'kor'], ['fr', 'fra'], ['ru', 'rus'], ['ja', 'jpn']]) {
+            for (const source of [language, `${language}-XX`, ` ${language.toUpperCase()}_xx `]) expect(getOcrLanguages(source)).toEqual([code, 'eng']);
+        }
+        expect(getOcrLanguages('constructor')).toEqual(IMAGE_OCR_RECOMMENDED_LANGUAGES);
+        expect(normalizeImageOcrLanguageCodes(['kor', 'fra', 'rus', 'kor'])).toEqual(['kor', 'fra', 'rus']);
         expect(getOcrLanguages('zh-Hans')).toEqual(['chi_sim', 'eng']);
         expect(getOcrLanguages('zh-Hant')).toEqual(['chi_tra', 'eng']);
         expect(getOcrLanguages('zh-TW')).toEqual(['chi_tra', 'eng']);

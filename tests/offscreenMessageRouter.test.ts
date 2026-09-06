@@ -346,7 +346,7 @@ describe('Offscreen 消息静态路由', () => {
             .toEqual({success: false, error: 'Offscreen OCR languages 必须是非空数组'});
         expect((await dispatch({type: 'FLUENT_READ_IMAGE_OCR_DOWNLOAD_OFFSCREEN', languages: []})).response)
             .toEqual({success: false, error: 'Offscreen OCR languages 必须是非空数组'});
-        expect((await dispatch({type: 'FLUENT_READ_IMAGE_OCR_DOWNLOAD_OFFSCREEN', languages: ['fra']})).response)
+        expect((await dispatch({type: 'FLUENT_READ_IMAGE_OCR_DOWNLOAD_OFFSCREEN', languages: ['unsupported']})).response)
             .toEqual({success: false, error: 'Offscreen OCR languages 包含不支持的语言'});
         expect((await dispatch({type: 'FLUENT_READ_IMAGE_OCR_DOWNLOAD_OFFSCREEN', languages: [1]})).response)
             .toEqual({success: false, error: 'Offscreen OCR languages 包含不支持的语言'});

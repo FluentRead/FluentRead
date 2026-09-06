@@ -1,9 +1,11 @@
 /**
  * @file src/core/config/harness.ts
  * 文件职责：定义 Harness 学习辅助功能的动作注册表、配置类型、默认值与纯规范化规则。
- * 主要内容：提供 HarnessActionId/HarnessPreferences、动作注册表、支持服务判断和规范化函数，限制服务/模型覆盖、动作白名单、上下文长度和学习难度。
+ * 主要内容：提供 HarnessActionId/HarnessPreferences、动作注册表、支持服务判断和规范化函数，限制服务/模型覆盖、动作白名单、上下文长度和学习难度，并定义可编辑提示词、默认模板及占位符替换规则。
  * 模块边界：本文件只处理领域数据，不读取浏览器存储、不发起 AI 请求，也不决定选区或网页生命周期。
  */
+import {DEFAULT_HARNESS_ACTION_PROMPTS, DEFAULT_HARNESS_SYSTEM_PROMPT, HARNESS_PROMPT_MAX_LENGTH} from '../harness/prompts';
+export {DEFAULT_HARNESS_ACTION_PROMPTS, DEFAULT_HARNESS_SYSTEM_PROMPT, HARNESS_PROMPT_MAX_LENGTH, HARNESS_PROMPT_VARIABLES, renderHarnessPrompt} from '../harness/prompts';
 import {customModelString, services, servicesType} from './catalog';
 import {isConfiguredCustomOpenAIProvider, isCustomOpenAIProviderId, type CustomOpenAIProvider} from './customOpenAI';
 
@@ -29,6 +31,8 @@ export interface HarnessPreferences {
     explanationDepth: HarnessExplanationDepth;
     learningLevel: 'beginner' | 'intermediate' | 'advanced';
     memoryEnabled: boolean;
+    systemPrompt: string;
+    actionPrompts: Record<HarnessActionId, string>;
 }
 
 export const DEFAULT_HARNESS_PREFERENCES: HarnessPreferences = {
@@ -42,6 +46,8 @@ export const DEFAULT_HARNESS_PREFERENCES: HarnessPreferences = {
     explanationDepth: 'concise',
     learningLevel: 'intermediate',
     memoryEnabled: false,
+    systemPrompt: DEFAULT_HARNESS_SYSTEM_PROMPT,
+    actionPrompts: {...DEFAULT_HARNESS_ACTION_PROMPTS},
 };
 
 const HARNESS_UNSUPPORTED_SERVICES = new Set([services.huanYuanTranslation]);
@@ -66,7 +72,11 @@ export function normalizeHarnessPreferences(value: unknown, customProviders: rea
         : [...DEFAULT_HARNESS_PREFERENCES.actions];
     if (!actions.includes('meaning')) actions.unshift('meaning');
     const rawChars = typeof source.maxContextChars === 'number' ? source.maxContextChars : Number(source.maxContextChars);
+    const promptSource = source.actionPrompts && typeof source.actionPrompts === 'object' && !Array.isArray(source.actionPrompts) ? source.actionPrompts : {} as Partial<Record<HarnessActionId, unknown>>;
+    const normalizePrompt = (value: unknown, fallback: string): string => typeof value === 'string' ? value.slice(0, HARNESS_PROMPT_MAX_LENGTH) : fallback;
     return {
+        systemPrompt: normalizePrompt(source.systemPrompt, DEFAULT_HARNESS_SYSTEM_PROMPT),
+        actionPrompts: Object.fromEntries(HARNESS_ACTIONS.map(({id}) => [id, normalizePrompt(promptSource[id], DEFAULT_HARNESS_ACTION_PROMPTS[id])])) as Record<HarnessActionId, string>,
         enabled: source.enabled === true,
         service: isHarnessService(typeof source.service === 'string' ? source.service.trim() : '', customProviders) ? source.service!.trim().slice(0, 128) : '',
         model: typeof source.model === 'string' && source.model.trim() !== customModelString ? source.model.trim().slice(0, 128) : '',

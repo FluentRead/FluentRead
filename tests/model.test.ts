@@ -533,8 +533,8 @@ describe('AI 模型编号列表', () => {
 });
 
 describe('图片翻译配置', () => {
-    it('默认关闭，并保留用户主动启用或关闭的状态', () => {
-        expect(normalizeConfig({}).disableImageTranslator).toBe(true);
+    it('默认开启，并保留用户主动启用或关闭的状态', () => {
+        expect(normalizeConfig({}).disableImageTranslator).toBe(false);
         expect(normalizeConfig({disableImageTranslator: false}).disableImageTranslator).toBe(false);
         expect(normalizeConfig({disableImageTranslator: true}).disableImageTranslator).toBe(true);
     });
@@ -771,11 +771,11 @@ describe('快捷翻译方案配置', () => {
 });
 
 describe('圈选翻译配置', () => {
-    it('默认关闭，并保留用户主动启用的状态', () => {
-        expect(new Config().selectionAreaEnabled).toBe(false);
-        expect(normalizeConfig({}).selectionAreaEnabled).toBe(false);
+    it('默认开启，并保留用户主动启用或关闭的状态', () => {
+        expect(new Config().selectionAreaEnabled).toBe(true);
+        expect(normalizeConfig({}).selectionAreaEnabled).toBe(true);
         expect(normalizeConfig({selectionAreaEnabled: true}).selectionAreaEnabled).toBe(true);
-        expect(normalizeConfig({selectionAreaEnabled: 'true'}).selectionAreaEnabled).toBe(false);
+        expect(normalizeConfig({selectionAreaEnabled: 'true'}).selectionAreaEnabled).toBe(true);
     });
 });
 

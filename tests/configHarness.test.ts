@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { HARNESS_ACTIONS, isHarnessService, normalizeHarnessPreferences } from '@/src/core/config/harness'
+import { HARNESS_ACTIONS, DEFAULT_HARNESS_ACTION_PROMPTS, DEFAULT_HARNESS_SYSTEM_PROMPT, HARNESS_PROMPT_MAX_LENGTH, renderHarnessPrompt, isHarnessService, normalizeHarnessPreferences } from '@/src/core/config/harness'
 import { Config, normalizeConfig } from '@/src/core/config/model'
 
 describe('Harness config contract', () => {
@@ -91,3 +91,21 @@ describe('Harness config contract', () => {
   })
 
 })
+
+
+describe('翻译卡提示词配置', () => {
+  it('旧配置使用实际默认提示词，非法类型回退且动作白名单和长度限制生效', () => {
+    for (const actionPrompts of [undefined, null, [], false, 'bad']) {
+      expect(normalizeHarnessPreferences({systemPrompt: 123, actionPrompts})).toMatchObject({systemPrompt: DEFAULT_HARNESS_SYSTEM_PROMPT, actionPrompts: DEFAULT_HARNESS_ACTION_PROMPTS});
+    }
+    const prefs = normalizeHarnessPreferences({systemPrompt: '', actionPrompts: {meaning: ' x ', grammar: 1, usage: 'z'.repeat(5000), practice: '', unknown: 'bad'}});
+    expect(prefs.systemPrompt).toBe('');
+    expect(prefs.actionPrompts).toEqual({meaning: ' x ', grammar: DEFAULT_HARNESS_ACTION_PROMPTS.grammar, usage: 'z'.repeat(HARNESS_PROMPT_MAX_LENGTH), practice: ''});
+    prefs.actionPrompts.grammar = 'edited';
+    expect(normalizeHarnessPreferences({}).actionPrompts.grammar).toBe(DEFAULT_HARNESS_ACTION_PROMPTS.grammar);
+  });
+  it('占位符只替换登记变量，不递归解析替换值、不执行表达式', () => {
+    expect(renderHarnessPrompt('{{to}} {{to}} {{learningLevel}} {{explanationDepth}} {{unknown}} {{constructor}}', {to: '{{learningLevel}}', learningLevel: 'beginner', explanationDepth: 'concise'}))
+      .toBe('{{learningLevel}} {{learningLevel}} beginner concise {{unknown}} {{constructor}}');
+  });
+});

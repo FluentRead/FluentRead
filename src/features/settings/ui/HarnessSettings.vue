@@ -1,7 +1,7 @@
 <!--
  * @file src/features/settings/ui/HarnessSettings.vue
  * 文件职责：让用户通过翻译卡示例理解功能，并配置网页动作、模型和阅读偏好。
- * 主要内容：提供无需联网的交互示例、服务与模型选择，以及常驻独立分组的学习记忆、网页动作、回答和原文范围设置，开头注明内核来源和开源链接。
+ * 主要内容：提供无需联网的交互示例、开关下方并排强调的服务与模型选择，以及常驻独立分组的学习记忆、网页动作、回答和原文范围设置，开头注明内核来源和开源链接。
  * 模块边界：只编辑传入 Config 的 harness 字段；阅读记录由学习中心统一呈现，不发起模型请求，不拥有网页选区或提示词。
  -->
 <template>
@@ -11,6 +11,25 @@
   </div>
   <SettingsGroup description="选中网页文字，直接点“读懂”或“拆句”。回答留在原文旁边，读完就继续浏览。">
     <FeatureEnableCard v-model="config.harness.enabled" title="启用翻译卡" description="选中文字后显示学习动作，点击才会调用模型。" />
+    <div class="harness-provider-panel">
+      <div class="harness-provider-row">
+        <div class="harness-provider-field">
+          <label id="harness-service-label">翻译服务</label>
+          <el-select v-model="config.harness.service" class="harness-select" @change="config.harness.model = ''" clearable aria-labelledby="harness-service-label" aria-label="翻译卡服务" placeholder="跟随当前默认服务">
+            <el-option v-for="item in serviceOptions" :key="item.value" :label="item.label" :value="item.value" />
+          </el-select>
+          <small>仅支持大模型，使用已配置的服务和密钥。</small>
+        </div>
+        <div class="harness-provider-field">
+          <label id="harness-model-label">模型</label>
+          <el-select v-model="config.harness.model" class="harness-select" clearable filterable allow-create default-first-option aria-labelledby="harness-model-label" aria-label="翻译卡模型" placeholder="跟随服务模型">
+            <el-option v-for="model in modelOptions" :key="model" :label="model" :value="model" />
+          </el-select>
+          <small>默认沿用服务的模型，也可以选择或输入模型名称。</small>
+        </div>
+      </div>
+      <small v-if="!effectiveServiceSupportsHarness" class="service-hint" role="status">当前默认服务不能回答学习问题，请在这里选择一个 AI 服务。</small>
+    </div>
     <SettingsItem label="试试翻译卡" description="选中文字 → 点一个动作 → 读懂后继续浏览。" stacked>
       <div class="harness-preview-wrap"><div class="harness-preview">
         <div class="harness-preview-caption"><span>网页中的效果</span><small>演示内容，不调用模型</small></div>
@@ -25,19 +44,6 @@
         <div class="harness-preview-answer" aria-live="polite"><ReadingAnswer :text="previewResults[previewAction]" /></div>
         <p class="harness-preview-footer">还想问一句？在翻译卡下方输入问题，继续围绕这段原文学习。</p>
       </div></div>
-    </SettingsItem>
-    <SettingsItem label="服务" description="使用你已配置的 AI 服务和密钥，也可单独选择。">
-      <div class="service-control">
-        <el-select v-model="config.harness.service" class="harness-select" @change="config.harness.model = ''" clearable aria-label="翻译卡服务" placeholder="跟随当前默认服务">
-          <el-option v-for="item in serviceOptions" :key="item.value" :label="item.label" :value="item.value" />
-        </el-select>
-        <small v-if="!effectiveServiceSupportsHarness" class="service-hint" role="status">当前默认服务不能回答学习问题，请在这里选择一个 AI 服务。</small>
-      </div>
-    </SettingsItem>
-    <SettingsItem label="模型" description="默认沿用服务的模型，也可以选择或输入模型名称。">
-      <el-select v-model="config.harness.model" class="harness-select" clearable filterable allow-create default-first-option aria-label="翻译卡模型" placeholder="跟随服务模型">
-        <el-option v-for="model in modelOptions" :key="model" :label="model" :value="model" />
-      </el-select>
     </SettingsItem>
   </SettingsGroup>
 
@@ -77,9 +83,11 @@
     </SettingsItem>
   </SettingsGroup></section>
 
+  <HarnessPromptSettings :preferences="config.harness" />
 </template>
 
 <script setup lang="ts">
+import HarnessPromptSettings from './HarnessPromptSettings.vue';
 import FeatureEnableCard from '@/src/ui/components/FeatureEnableCard.vue';
 import {computed, ref, toRef, watch} from 'vue'
 import {models, options} from '@/src/core/config/catalog'
@@ -144,7 +152,17 @@ function toggleAction(id: HarnessActionId) {
 .harness-preview-answer { min-height:150px; padding:14px; border:1px solid var(--line); border-radius:10px; background:var(--surface); }
 .harness-preview-footer { margin:12px 0 0; color:var(--muted); font-size:10.5px; line-height:1.6; }
 .harness-more { width:min(100%,1080px); margin:0 auto 22px; }
-.service-control { display:flex; width:100%; max-width:360px; flex-direction:column; gap:5px; }
+.harness-provider-panel { margin:0 12px 12px; padding:16px; border:1px solid color-mix(in srgb,var(--brand) 24%,var(--line)); border-radius:12px; background:linear-gradient(120deg,color-mix(in srgb,var(--brand) 5%,var(--surface)),var(--surface-soft)); }
+.harness-provider-row { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:20px; }
+.harness-provider-field { display:flex; flex-direction:column; gap:8px; min-width:0; }
+.harness-provider-field label { color:var(--ink); font-size:14px; font-weight:750; }
+.harness-provider-field small { color:var(--muted); font-size:10.5px; line-height:1.6; }
+.harness-provider-field .harness-select { width:100%; min-width:0; max-width:none; }
+.harness-provider-field :deep(.el-select__wrapper) { min-height:44px; background:var(--surface); border-radius:10px; box-shadow:0 0 0 1px var(--line) inset; }
+.harness-provider-field :deep(.el-select__wrapper:hover) { box-shadow:0 0 0 1px color-mix(in srgb,var(--brand) 55%,var(--line)) inset; }
+.harness-provider-field :deep(.el-select__wrapper.is-focused) { box-shadow:0 0 0 1px var(--brand) inset,0 0 0 3px color-mix(in srgb,var(--brand) 12%,transparent); }
+.harness-provider-field :deep(.el-select__placeholder) { color:var(--ink); font-weight:550; }
+.harness-provider-panel > .service-hint { display:block; margin-top:12px; }
 .service-hint { color:var(--warning, #b26a00); font-size:10.5px; line-height:1.5; }
 :global(:root.dark .harness-select .el-select__wrapper) { border-color:var(--line); background:var(--surface-soft); transition-property:border-color,box-shadow; }
 :global(:root.dark .harness-select .el-select__wrapper:hover),
@@ -163,6 +181,9 @@ function toggleAction(id: HarnessActionId) {
 .harness-action small { color:var(--muted); font-size:10.5px; line-height:1.5; }
 @media (max-width:700px) { .harness-actions { grid-template-columns:1fr; } }
 @media (max-width:480px) {
+  .harness-provider-panel { margin-inline:8px; padding:12px; }
+  .harness-provider-row { gap:10px; }
+  .harness-provider-field small { font-size:10px; }
   .harness-preview { padding:12px; }
   .harness-preview-answer { padding:12px; }
   .harness-preview-caption { gap:4px; }

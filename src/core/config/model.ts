@@ -318,7 +318,7 @@ export class Config {
             [...defaultModels].filter(([service]) => service !== LEGACY_CUSTOM_OPENAI_PROVIDER_ID),
         );
         this.documentCustomModel = {};
-        this.videoTranslationEnabled = false; // Beta 功能默认关闭
+        this.videoTranslationEnabled = true; // 默认开启视频字幕翻译
         this.videoService = services.microsoft; // 视频字幕默认使用微软翻译
         this.videoLocalModel = 'tiny';
         this.videoSourceLanguage = 'auto';
@@ -378,12 +378,12 @@ export class Config {
         this.quickTranslationProfiles = []; // 默认仅保留旧快捷键，新方案由用户按需添加
         this.mouseHoverTranslationDelay = DEFAULT_MOUSE_HOVER_TRANSLATION_DELAY;
         this.disableSelectionTranslator = true; // 默认关闭划词翻译
-        this.selectionAreaEnabled = false; // 圈选翻译需要用户主动开启，避免意外截图
+        this.selectionAreaEnabled = true; // 默认开启，按快捷键圈选后才截图翻译
         this.areaTranslationMode = 'standard';
         this.areaTranslationService = '';
         this.imageTranslationHoverEnabled = true;
         this.imageTranslationContextMenuEnabled = true;
-        this.disableImageTranslator = true; // 默认关闭图片翻译，避免首次安装后扫描网页图片
+        this.disableImageTranslator = false; // 默认开启图片翻译入口，点击后才翻译
         this.freeTranslationOrder = [...DEFAULT_FREE_TRANSLATION_ORDER];
         this.freeTranslationTimeoutMs = DEFAULT_FREE_TRANSLATION_TIMEOUT_MS;
         this.freeTranslationCooldownMs = DEFAULT_FREE_TRANSLATION_COOLDOWN_MS;
@@ -805,7 +805,7 @@ export function normalizeConfig(value: unknown): Config {
         ? source.areaTranslationService : '';
 
     if (typeof normalized.videoTranslationEnabled !== 'boolean') {
-        normalized.videoTranslationEnabled = false;
+        normalized.videoTranslationEnabled = true;
     }
     if (normalized.videoLocalModel !== 'tiny' && normalized.videoLocalModel !== 'base') {
         normalized.videoLocalModel = 'tiny';
@@ -938,7 +938,10 @@ export function normalizeConfig(value: unknown): Config {
         normalized.vocabularyBookEnabled = false;
     }
     if (typeof normalized.selectionAreaEnabled !== 'boolean') {
-        normalized.selectionAreaEnabled = false;
+        normalized.selectionAreaEnabled = true;
+    }
+    if (typeof normalized.disableImageTranslator !== 'boolean') {
+        normalized.disableImageTranslator = false;
     }
     normalized.imageTranslationHoverEnabled = typeof normalized.imageTranslationHoverEnabled === 'boolean' ? normalized.imageTranslationHoverEnabled : true;
     normalized.imageTranslationContextMenuEnabled = typeof normalized.imageTranslationContextMenuEnabled === 'boolean' ? normalized.imageTranslationContextMenuEnabled : true;

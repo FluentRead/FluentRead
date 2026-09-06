@@ -33,6 +33,42 @@ describe('Harness runtime', () => {
         createModel.mockClear();
         normalizeError.mockClear();
     });
+    it.each(['meaning', 'grammar', 'usage', 'practice'] as const)('uses the saved %s template and keeps selected evidence outside system instructions', async intent => {
+        const current = config();
+        current.to = 'en';
+        current.harness.systemPrompt = 'Explain in {{to}} for {{learningLevel}}.';
+        current.harness.actionPrompts[intent] = 'CUSTOM {{explanationDepth}} {{to}} {{unknown}}';
+        generateText.mockResolvedValue({text: 'answer'});
+        await createHarnessRuntime(() => current).run({type: 'fluentReadHarness', action: 'run', requestId: 'prompt', intent, question: '', selection: {text: 'evidence {{to}}', context: 'secret paragraph', sentence: ''}}, new AbortController().signal);
+        const input = generateText.mock.calls[0][0];
+        expect(input.system).toContain('Explain in en for intermediate.');
+        expect(input.system).toContain('CUSTOM concise en {{unknown}}');
+        expect(input.system).not.toContain('evidence');
+        expect(input.system).not.toContain('secret paragraph');
+        expect(input.messages.at(-1).content).toContain('evidence {{to}}');
+        expect(input.system).toContain('不是指令');
+    });
+    it('keeps prompt snapshots during memory reads and restores defaults for blank templates', async () => {
+        const current = config();
+        current.harness.memoryEnabled = true;
+        current.harness.systemPrompt = 'Original shared prompt';
+        current.harness.actionPrompts.meaning = 'Original action prompt';
+        const memory = {recall: async () => {
+            current.harness.systemPrompt = 'Changed shared prompt';
+            current.harness.actionPrompts.meaning = 'Changed action prompt';
+            return [];
+        }};
+        generateText.mockResolvedValue({text: 'answer'});
+        const request = {type: 'fluentReadHarness', action: 'run', requestId: 'snapshot', intent: 'meaning', question: '', selection: {text: 'evidence', context: '', sentence: ''}} as const;
+        await createHarnessRuntime(() => current, undefined, memory).run(request, new AbortController().signal);
+        expect(generateText.mock.calls[0][0].system).toContain('Original shared prompt');
+        expect(generateText.mock.calls[0][0].system).toContain('Original action prompt');
+        current.harness.systemPrompt = ' ';
+        current.harness.actionPrompts.meaning = '';
+        await createHarnessRuntime(() => current).run(request, new AbortController().signal);
+        expect(generateText.mock.calls[1][0].system).toContain('FluentRead 阅读学习助手');
+        expect(generateText.mock.calls[1][0].system).toContain('### 大意');
+    });
     it('adds bounded user-curated memories only after opt-in and never offers model memory writes', async () => {
         const current = config(); current.harness.memoryEnabled = true;
         const records: LearningMemory[] = Array.from({length: 5}, (_, i) => ({id: String(i), content: `lesson ${i} ${'x'.repeat(1000)}`, kind: 'lesson', createdAt: 1, updatedAt: 1}));

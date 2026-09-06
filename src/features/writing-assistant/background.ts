@@ -5,7 +5,7 @@
  * 模块边界：不读密钥或浏览器全局；由应用层注入配置就绪、资格和生成函数。
  */
 import {z} from 'zod';
-import {WRITING_ACTIONS, WRITING_LANGUAGES, WRITING_TONES} from '@/src/core/config/writing';
+import {WRITING_ACTIONS, WRITING_LANGUAGES, WRITING_TONES, WRITING_LENGTHS} from '@/src/core/config/writing';
 import type {WritingRequest, WritingResponse, WritingProgress, WritingStreamMessage} from './types';
 
 export interface WritingSender {id?: string; url?: string; documentId?: string; tab?: {id?: number; url?: string}; frameId?: number}
@@ -21,6 +21,7 @@ const requestSchema = z.object({
     instruction: z.string().max(2000), draft: z.string().max(12000), context: z.string().max(12000),
     language: z.string().refine(value => WRITING_LANGUAGES.some(item => item.value === value)),
     tone: z.string().refine(value => WRITING_TONES.some(item => item.value === value)),
+    length: z.string().refine(value => WRITING_LENGTHS.some(item => item.value === value)).default('auto'),
     history: z.array(z.object({question: z.string().max(2000), answer: z.string().max(12000)}).strict()).max(4),
 }).strict();
 export const parseWritingRequest = (value: unknown): WritingRequest | null => {

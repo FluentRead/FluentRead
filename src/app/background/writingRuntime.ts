@@ -18,7 +18,7 @@ export function installWritingBackgroundRuntime(): void {
         eligibility: sender => {
             if (!isWritingPage(sender.url || '')) return '写作助手仅支持 Gmail 和 GitHub 的 Issue、Pull Request 回复页面';
             if (!config.on || !config.writing.enabled) return '写作助手已停用';
-            const domains = [...config.disabledExtensionDomains, ...config.writing.disabledDomains];
+            const domains = config.disabledExtensionDomains;
             if (isExtensionDisabledOnSite(sender.url!, domains) || isExtensionDisabledOnSite(sender.tab?.url || '', domains)) return '当前网站已禁用写作助手';
             return undefined;
         },

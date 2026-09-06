@@ -537,6 +537,3 @@ footer > button { justify-self: end; }
 .language-pair .fluentread-select .el-select__wrapper { min-height: 35px; padding: 0 9px; border-radius: 11px; }
 .language-pair .fluentread-select .el-select__selected-item { font-size: 11px; font-weight: 650; }
 .select-row > .fluentread-select { width: 180px; flex: 0 1 58%; }
-
-.writing-shortcut-heading { display:flex; align-items:center; justify-content:space-between; gap:8px; }
-.writing-shortcut-heading button { border:0; background:transparent; padding:0; color:var(--brand-strong); font:inherit; font-size:10px; cursor:pointer; }

@@ -779,7 +779,7 @@ import {getServiceWebsite} from '@/src/ui/view-model/serviceCatalog';
 import ServiceConfiguration from './services/ServiceConfiguration.vue';
 import CustomOpenAIProviderDialog from './services/CustomOpenAIProviderDialog.vue';
 import {TranslationCenter} from '@/src/features/translation-center/public';
-const openWritingServiceSettings = () => { window.location.hash = 'settings-services'; };
+const openWritingServiceSettings = () => { setConfigurationService(config.value.writing.service || config.value.service); window.location.hash = 'settings-services'; };
 import WritingSettings from './WritingSettings.vue';
 import HarnessSettings from './HarnessSettings.vue';
 import {GlossarySettings} from '@/src/features/glossary/public';

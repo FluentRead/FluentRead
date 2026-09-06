@@ -274,7 +274,7 @@
       class="features"
       data-popup-module="quickFeatures"
     >
-      <div class="writing-shortcut-heading"><span class="eyebrow features-eyebrow">快捷功能</span><button v-if="browserCapabilities.browser !== 'userscript'" type="button" @click="openOptions('settings-writing')">写作助手 ↗</button></div>
+      <span class="eyebrow features-eyebrow">快捷功能</span>
       <div class="feature-grid">
         <button
           v-for="feature in visiblePopupQuickFeatures"
@@ -657,7 +657,7 @@ import {
 } from '@/src/services/translation/capabilities';
 
 type DrawerName = 'hover' | 'selection' | 'appearance' | 'image' | 'area' | 'video' | 'aiContext';
-type SettingsSection = 'settings-writing' | 'settings-general' | 'settings-image-translation' | 'settings-area-translation' | 'settings-translation' | 'settings-services' | 'settings-sites' | 'settings-video' | 'settings-vocabulary';
+type SettingsSection = 'settings-general' | 'settings-image-translation' | 'settings-area-translation' | 'settings-translation' | 'settings-services' | 'settings-sites' | 'settings-video' | 'settings-vocabulary';
 interface PopupQuickFeatureViewModel {
   id: PopupQuickFeatureId;
   label: string;

@@ -93,9 +93,9 @@ export const navigationGroups = [
     items: [
       {
         id: 'settings-writing', icon: '✎', label: '写作助手', description: '起草、润色与智能回复', group: '工具与学习',
-        heading: '写作助手', summary: '用 AI 整理想法、润色表达，在 Gmail 和 GitHub 中轻松回复。',
-        kicker: '写作工具', title: '写作助手', detail: '配置写作服务、网页回复入口和写作偏好。',
-        searchDescription: '写作助手、起草、润色、续写、精简、总结、自由对话、智能回复、邮件、Gmail、GitHub、Alt+W',
+        heading: '写作助手', summary: '在 Gmail 和 GitHub 的回复框旁，起草回复或完善已有草稿。',
+        kicker: '写作工具', title: '写作助手', detail: '启用写作助手，选择写作服务和模型。',
+        searchDescription: '写作助手、起草、润色、回复、草稿、改进、语言、篇幅、语气、邮件、Gmail、GitHub、AI 服务、模型',
       },
       {
         id: 'settings-translation-center', icon: '译', label: '翻译中心', description: '多服务对比', group: '工具与学习',

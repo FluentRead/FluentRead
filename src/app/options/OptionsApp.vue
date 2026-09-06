@@ -24,7 +24,7 @@
             :aria-current="activeSection === item.id ? 'page' : undefined"
             @click="selectSection(item.id)"
           >
-            <span class="nav-icon"><img v-if="item.id === 'settings-writing'" src="/icon/128.png" alt="" width="18" height="18" /><template v-else>{{ item.icon }}</template></span>
+            <span class="nav-icon">{{ item.icon }}</span>
             <strong>{{ item.label }}</strong>
           </button>
         </section>

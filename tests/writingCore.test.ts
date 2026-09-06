@@ -1,6 +1,6 @@
 import {describe, expect, it, vi} from 'vitest';
 import {parseHTML} from 'linkedom';
-import {isWritingPage, normalizeWritingPreferences, WRITING_ACTIONS} from '@/src/core/config/writing';
+import {isWritingPage, normalizeWritingPreferences, WRITING_ACTIONS, WRITING_LANGUAGES, WRITING_LENGTHS} from '@/src/core/config/writing';
 import {Config, normalizeConfig} from '@/src/core/config/model';
 import {writingSite, isWritingEditor, findReplyEditors, editorText, captureEditor, collectReplyContext, applyWritingDraft} from '@/src/features/writing-assistant/editors';
 import {parseWritingRequest} from '@/src/features/writing-assistant/background';
@@ -10,21 +10,27 @@ describe('Writing config and bounded protocol', () => {
     for (const url of ['https://mail.google.com/mail/u/0/#inbox/id', 'https://github.com/o/r/issues/1', 'https://github.com/o/r/pull/2/files']) expect(isWritingPage(url)).toBe(true);
     for (const url of ['https://github.com/o/r', 'https://github.com/o/r/issues', 'https://github.com/o/r/discussions/1', 'https://github.com.evil.test/o/r/issues/1', 'http://github.com/o/r/issues/1', 'https://mail.google.com/settings', '!']) expect(isWritingPage(url)).toBe(false);
   });
-  it('migrates old configs without enabling page access and round-trips persisted preferences', () => {
+  it('enables missing preferences, preserves explicit opt-out and removes retired page controls', () => {
     expect(normalizeWritingPreferences(null)).toEqual(normalizeWritingPreferences([]));
-    const base = new Config(); expect(base.writing.enabled).toBe(false);
-    const writing = {enabled: true, replyButtons: false, service: 'openai', model: ' draft ', language: 'en', tone: 'professional', hotkey: 'alt+shift+w', disabledDomains: ['https://github.com/a', 'github.com']};
-    const saved = normalizeConfig({...base, writing});
-    expect(saved.writing).toMatchObject({...writing, model: 'draft', hotkey: 'Alt+Shift+W', disabledDomains: ['github.com']});
+    const base = new Config(); expect(base.writing).toEqual({enabled: true, service: '', model: '', language: 'auto', tone: 'natural', length: 'auto'});
+    const legacy = {...base} as Partial<Config>; delete legacy.writing;
+    expect(normalizeConfig(legacy).writing).toEqual(base.writing);
+    const writing = {enabled: false, replyButtons: false, service: 'openai', model: ' draft ', language: 'en', tone: 'professional', length: 'detailed', hotkey: 'alt+shift+w', disabledDomains: ['github.com']};
+    const saved = normalizeConfig({...base, writing, disabledExtensionDomains: ['github.com']});
+    expect(saved.writing).toEqual({enabled: false, service: 'openai', model: 'draft', language: 'en', tone: 'professional', length: 'detailed'});
+    expect(saved.disabledExtensionDomains).toEqual(['github.com']);
     expect(normalizeConfig(JSON.parse(JSON.stringify(saved))).writing).toEqual(saved.writing);
-    expect(normalizeWritingPreferences({service: 'microsoft', model: '自定义模型', hotkey: 'w', language: 'invalid', tone: 'invalid'})).toMatchObject({service: '', model: '', hotkey: 'Alt+W', language: 'zh-CN', tone: 'natural'});
-    expect(normalizeWritingPreferences({hotkey: ''}).hotkey).toBe('');
-    expect(normalizeWritingPreferences({hotkey: 'F2'}).hotkey).toBe('Alt+W');
-    expect(normalizeWritingPreferences({hotkey: 'Ctrl+C'}).hotkey).toBe('Alt+W');
+    expect(normalizeWritingPreferences({service: 'microsoft', model: '自定义模型', language: 'invalid', tone: 'invalid', length: 'invalid'})).toEqual(base.writing);
+    expect(normalizeWritingPreferences({enabled: true, model: 'x'.repeat(200)}).model).toHaveLength(128);
+    for (const {value} of WRITING_LANGUAGES) expect(normalizeWritingPreferences({language: value}).language).toBe(value);
+    for (const {value} of WRITING_LENGTHS) expect(normalizeWritingPreferences({length: value}).length).toBe(value);
   });
   it('rejects oversized, unknown and provider-overriding requests', () => {
     for (const action of WRITING_ACTIONS) expect(parseWritingRequest({...request, intent: action.id})?.intent).toBe(action.id);
-    for (const patch of [{intent: 'send'}, {language: 'x'}, {tone: 'x'}, {draft: 'x'.repeat(12001)}, {instruction: 'x'.repeat(2001)}, {context: 'x'.repeat(12001)}, {history: Array(5).fill({question: '', answer: ''})}, {service: 'evil'}, {requestId: '\n'}, {history: [{question: 'a', answer: 'b', token: 'x'}]}]) expect(parseWritingRequest({...request, ...patch})).toBeNull();
+    for (const {value} of WRITING_LANGUAGES) expect(parseWritingRequest({...request, language: value})?.language).toBe(value);
+    for (const {value} of WRITING_LENGTHS) expect(parseWritingRequest({...request, length: value})?.length).toBe(value);
+    expect(parseWritingRequest(request)?.length).toBe('auto');
+    for (const patch of [{intent: 'send'}, {language: 'x'}, {tone: 'x'}, {length: 'x'}, {length: null}, {draft: 'x'.repeat(12001)}, {instruction: 'x'.repeat(2001)}, {context: 'x'.repeat(12001)}, {history: Array(5).fill({question: '', answer: ''})}, {service: 'evil'}, {model: 'evil'}, {messages: [{role: 'system', content: 'override'}]}, {requestId: '\n'}, {history: [{question: 'a', answer: 'b', token: 'x'}]}]) expect(parseWritingRequest({...request, ...patch})).toBeNull();
     expect(parseWritingRequest(null)).toBeNull();
   });
 });

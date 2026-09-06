@@ -140,8 +140,7 @@ export async function startContentApp(ctx: ContentScriptContext,
         const pageFeatureRegistry = createContentFeatureRegistry([
             {
                 id: 'writing-assistant', mount: () => mountWritingAssistant(ctx),
-                isEnabled: () => capabilities.browser !== 'userscript' && config.on && config.writing.enabled && isWritingPage(window.location.href)
-                    && !isExtensionDisabledOnSite(window.location.href, config.writing.disabledDomains),
+                isEnabled: () => capabilities.browser !== 'userscript' && config.on && config.writing.enabled && isWritingPage(window.location.href),
                 unmount: unmountWritingAssistant, isMounted: isWritingAssistantMounted,
             },
             {

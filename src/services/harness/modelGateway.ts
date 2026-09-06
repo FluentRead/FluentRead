@@ -10,7 +10,8 @@ import {createOpenAICompatible} from '@ai-sdk/openai-compatible';
 import {createAnthropic} from '@ai-sdk/anthropic';
 import {createGoogleGenerativeAI} from '@ai-sdk/google';
 import type {LanguageModel} from 'ai';
-import CryptoJS from 'crypto-js';
+import hmacSha256 from 'crypto-js/hmac-sha256';
+import base64 from 'crypto-js/enc-base64';
 import type {Config} from '@/src/core/config/model';
 import {currentModelIds, services} from '@/src/core/config/catalog';
 import {tongyiTokenPlanUrl, urls} from '@/src/core/config/constants';
@@ -30,7 +31,7 @@ function zhipuBearer(apiKey: string): string {
   const encode = (value: string) => btoa(value).replace(/\+/gu, '-').replace(/\//gu, '_').replace(/=+$/gu, '');
   const header = encode(JSON.stringify({alg: 'HS256', sign_type: 'SIGN', typ: 'JWT'}));
   const payload = encode(JSON.stringify({api_key: key, exp: Math.floor(Date.now() / 1000) + 86_400, timestamp: Math.floor(Date.now() / 1000)}));
-  const signature = CryptoJS.HmacSHA256(`${header}.${payload}`, secret).toString(CryptoJS.enc.Base64)
+  const signature = hmacSha256(`${header}.${payload}`, secret).toString(base64)
     .replace(/\+/gu, '-').replace(/\//gu, '_').replace(/=+$/gu, '');
   return `${header}.${payload}.${signature}`;
 }

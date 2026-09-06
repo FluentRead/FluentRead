@@ -9,7 +9,8 @@
 import {method, urls} from "@/src/core/config/constants";
 import {resolveConfiguredModel, services} from "@/src/core/config/catalog";
 import {commonMsgTemplate} from '@/src/services/translation/templates';
-import CryptoJS from 'crypto-js';
+import hmacSha256 from 'crypto-js/hmac-sha256';
+import base64 from 'crypto-js/enc-base64';
 import {config} from "@/src/services/config/store";
 import {isApiKeyRequired} from "@/src/core/config/validation";
 import {createHttpStatusError, readJsonResponse} from '@/src/platform/http/errors';
@@ -113,7 +114,7 @@ function generateJWT(secret: string, header: any, payload: any) {
     const encodedHeader = base64UrlSafe(btoa(JSON.stringify(header)));
     const encodedPayload = base64UrlSafe(btoa(JSON.stringify(payload)));
     // 生成 jwt 签名
-    let hmacsha256 = base64UrlSafe(CryptoJS.HmacSHA256(encodedHeader + "." + encodedPayload, secret).toString(CryptoJS.enc.Base64))
+    let hmacsha256 = base64UrlSafe(hmacSha256(encodedHeader + "." + encodedPayload, secret).toString(base64))
     return `${encodedHeader}.${encodedPayload}.${hmacsha256}`;
 }
 

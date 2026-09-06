@@ -25,3 +25,5 @@ export function mountVideoSubtitleTranslation(): () => void {
 export function isSupportedVideoPage(): boolean {
     return false;
 }
+
+export function toggleContextMenuImage(): boolean { return false; }

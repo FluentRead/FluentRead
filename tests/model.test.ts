@@ -1329,3 +1329,13 @@ describe('OpenAI 兼容服务端点', () => {
         expect(servicesType.isUseAkSk(services.yiyan)).toBe(false);
     });
 });
+
+it('图片入口偏好默认开启并保留独立关闭状态', () => {
+    expect(new Config().imageTranslationHoverEnabled).toBe(true);
+    expect(new Config().imageTranslationContextMenuEnabled).toBe(true);
+    expect(normalizeConfig({}).imageTranslationHoverEnabled).toBe(true);
+    expect(normalizeConfig({imageTranslationHoverEnabled: 'false'}).imageTranslationHoverEnabled).toBe(true);
+    expect(normalizeConfig({imageTranslationHoverEnabled: false}).imageTranslationHoverEnabled).toBe(false);
+    expect(normalizeConfig({imageTranslationContextMenuEnabled: false}).imageTranslationContextMenuEnabled).toBe(false);
+    expect(normalizeConfig({imageTranslationContextMenuEnabled: 'false'}).imageTranslationContextMenuEnabled).toBe(true);
+});

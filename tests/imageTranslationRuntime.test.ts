@@ -8,9 +8,13 @@ vi.mock('@/src/features/image-translation/services/client', () => ({
     prepareImageOcrLanguages: client.prepare,
     fetchImageInExtension: client.fetch,
 }));
-vi.mock('@/src/services/config/store', async () => ({config: (await import('vue')).reactive(rawSettings)}));
+vi.mock('@/src/services/config/store', async () => {
+    const {reactive, watch} = await import('vue');
+    const config = reactive(rawSettings);
+    return {config, subscribeConfig: (listener: (value: typeof config) => void) => watch(config, listener)};
+});
 import {config as settings} from '@/src/services/config/store';
-import {mountImageTranslator, unmountImageTranslator} from '@/src/features/image-translation/content/runtime';
+import {mountImageTranslator, unmountImageTranslator, toggleContextMenuImage} from '@/src/features/image-translation/content/runtime';
 
 const result = {image: 'data:image/png;base64,translated', lines: [{text: '完整译文', bbox: {x0: 0, y0: 0, x1: 100, y1: 20}, backgroundColor: '#fff'}]};
 const deferred = <T>() => {
@@ -140,6 +144,7 @@ function setup() {
 
 beforeEach(() => {
     vi.useFakeTimers();
+    settings.imageTranslationHoverEnabled = true; settings.imageTranslationContextMenuEnabled = true;
     settings.on = true; settings.disableImageTranslator = false; settings.to = 'zh-Hans'; settings.useCache = true;
     settings.service = 'google'; settings.model = {}; settings.customModel = {}; settings.customBody = {}; settings.proxy = {}; settings.customOpenAIProviders = []; settings.token = {};
     client.translate.mockReset().mockResolvedValue(result);
@@ -424,4 +429,52 @@ describe('图片翻译前台交互与生命周期', () => {
         expect(env.observers[0].disconnect).toHaveBeenCalledOnce();
         expect(env.windowObject.removeEventListener).toHaveBeenCalledTimes(2);
     });
+});
+
+describe('图片入口独立开关与右键身份', () => {
+    it('覆盖层上的可信指针命中局部图片，移出后收起', () => {
+        const env = setup();
+        const cover = document.createElement('div'); env.parent.append(cover);
+        env.dispatch(cover, 'pointermove', true, {clientX: 100, clientY: 100});
+        expect(env.button()).toBeTruthy();
+        env.dispatch(cover, 'pointerout'); vi.advanceTimersByTime(500);
+        expect(env.roots.at(-1)?.querySelector('.fr-image-controls')).toBeNull();
+    });
+    it('只启用右键时悬浮不创建入口，右键支持翻译、恢复和缓存重显', async () => {
+        const env = setup(); settings.imageTranslationHoverEnabled = false;
+        env.hover(); expect(env.roots).toHaveLength(0);
+        env.dispatch(env.image, 'contextmenu');
+        expect(toggleContextMenuImage(env.image.src)).toBe(true); await flush();
+        expect(env.bitmap()).toBeTruthy();
+        env.dispatch(env.image, 'contextmenu'); toggleContextMenuImage(env.image.src);
+        expect(env.bitmap()).toBeNull();
+        env.dispatch(env.image, 'contextmenu'); toggleContextMenuImage(env.image.src); await flush();
+        expect(env.bitmap()).toBeTruthy(); expect(client.translate).toHaveBeenCalledTimes(1);
+    });
+    it('关闭右键不影响悬浮，拒绝合成右键、换图和不匹配 URL', async () => {
+        const env = setup(); settings.imageTranslationContextMenuEnabled = false;
+        env.hover(); expect(env.button()).toBeTruthy();
+        env.dispatch(env.image, 'contextmenu'); expect(toggleContextMenuImage()).toBe(false);
+        settings.imageTranslationContextMenuEnabled = true;
+        env.dispatch(env.image, 'contextmenu', false); expect(toggleContextMenuImage()).toBe(false);
+        env.dispatch(env.image, 'contextmenu'); expect(toggleContextMenuImage('https://wrong.test')).toBe(false);
+        env.dispatch(env.image, 'contextmenu'); env.image.src += '#new'; expect(toggleContextMenuImage()).toBe(false);
+        expect(client.translate).not.toHaveBeenCalled();
+    });
+    it('关闭悬浮开关立即撤下空闲入口', async () => {
+        const env = setup(); env.hover(); settings.imageTranslationHoverEnabled = false; await flush();
+        expect(env.roots.at(-1)?.querySelector('.fr-image-controls')).toBeNull();
+    });
+});
+
+it('悬浮不穿透按钮或弹窗，不在同一区域多图时猜测目标；移除右键目标后拒绝执行', () => {
+    const env = setup();
+    const button = document.createElement('button'); env.parent.append(button);
+    env.dispatch(button, 'pointerover', true, {clientX: 100, clientY: 100}); expect(env.roots).toHaveLength(0);
+    const dialog = document.createElement('div'); dialog.setAttribute('role', 'dialog'); env.parent.append(dialog);
+    env.dispatch(dialog, 'pointermove', true, {clientX: 100, clientY: 100}); expect(env.roots).toHaveLength(0);
+    const duplicate = document.createElement('img'); duplicate.getBoundingClientRect = env.image.getBoundingClientRect; env.parent.append(duplicate);
+    const cover = document.createElement('div'); env.parent.append(cover);
+    env.dispatch(cover, 'pointerover', true, {clientX: 100, clientY: 100}); expect(env.roots).toHaveLength(0);
+    env.dispatch(env.image, 'contextmenu'); env.image.remove(); expect(toggleContextMenuImage()).toBe(false);
 });

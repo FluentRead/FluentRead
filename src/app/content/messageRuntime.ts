@@ -13,6 +13,7 @@ import {
     isFullPageTranslationActive,
     mountAreaTranslator,
     mountFloatingBall,
+    toggleContextMenuImage,
     mountImageTranslator,
     mountSelectionTranslator,
     mountTranslationProgressPanel,
@@ -31,8 +32,7 @@ export interface ContentRuntimeMessageState {
     updateSiteDisabled(disabled: boolean): Promise<void>;
 }
 export type ContentRuntimeMessageHandler = (
-    message: unknown,
-    sender: unknown,
+    message: unknown, sender: unknown,
     sendResponse: (response?: unknown) => void,
 ) => boolean;
 /** 创建当前 document 私有的 runtime message handler，避免跨生命周期共享可变状态。 */
@@ -114,7 +114,10 @@ export function createContentRuntimeMessageHandler(ctx: ContentScriptContext, st
             sendResponse();
             return true;
         }
-
+        if (payload.type === 'contextMenuTranslateImage') {
+            sendResponse({status: capabilities.imageTranslation && toggleContextMenuImage(payload.srcUrl) ? 'success' : 'disabled'});
+            return true;
+        }
         if (payload.type === 'toggleImageTranslator') {
             if (rejectUnsupportedContentFeature(capabilities.imageTranslation, unmountImageTranslator,
                 sendResponse, '当前浏览器暂不支持图片翻译与 OCR')) return true;
@@ -125,7 +128,6 @@ export function createContentRuntimeMessageHandler(ctx: ContentScriptContext, st
             sendResponse();
             return true;
         }
-
         if (payload.type === 'toggleTranslationProgressPanel') {
             const requestedEnabled = payload.isEnabled === true;
             config.translationProgressPanelEnabled = requestedEnabled;
@@ -134,7 +136,6 @@ export function createContentRuntimeMessageHandler(ctx: ContentScriptContext, st
             sendResponse();
             return true;
         }
-
         if (payload.type === 'getFullPageTranslationState') {
             sendResponse({
                 status: 'success',
@@ -169,7 +170,6 @@ export function createContentRuntimeMessageHandler(ctx: ContentScriptContext, st
                 return true;
             }
         }
-
         return false;
     };
 }

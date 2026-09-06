@@ -445,7 +445,7 @@ async function main() {
         }
 
         const addons = await client.request('listAddons');
-        const addon = addons.addons.find(item => item.temporarilyInstalled && item.name === '流畅阅读');
+        const addon = addons.addons.find(item => item.temporarilyInstalled && item.id === '{3096bd53-3bda-4556-b076-ebf47442a5c1}');
         if (!addon) throw new Error('Firefox runner did not install the temporary FluentRead add-on');
         const extensionBase = addon.manifestURL.replace(/\/manifest\.json$/, '');
         const popupUrl = `${extensionBase}/popup.html`;

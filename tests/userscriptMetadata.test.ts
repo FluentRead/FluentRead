@@ -6,7 +6,7 @@ describe('userscript metadata', () => {
         const metadata = createUserscriptMetadata({version: '1.2.3'});
 
         expect(metadata.startsWith('// ==UserScript==\n')).toBe(true);
-        expect(metadata).toContain('// @name         流畅阅读');
+        expect(metadata).toContain('// @name         FluentRead-流畅阅读');
         expect(metadata).toContain('// @namespace    https://fr.unmeta.cn/');
         expect(metadata).toContain('// @version      1.2.3');
         expect(metadata).toContain('// @grant        GM_xmlhttpRequest');

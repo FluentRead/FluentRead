@@ -331,6 +331,7 @@
                 <ElOption value="translation" :label="translateLegacy('翻译')" />
                 <ElOption value="page-summary" :label="translateLegacy('页面摘要')" />
                 <ElOption value="connection-test" :label="translateLegacy('连接测试')" />
+                <ElOption value="writing" label="写作助手" />
                 <ElOption value="reading" :label="translateLegacy('阅读理解')" />
               </UiSelect>
             </label>
@@ -736,7 +737,7 @@ function formatDuration(durationMs: number): string {
 }
 
 function purposeLabel(purpose: ModelUsagePurpose): string {
-  return purpose === 'page-summary' ? '页面摘要' : purpose === 'connection-test' ? '连接测试' : purpose === 'reading' ? '阅读理解' : '翻译'
+  return purpose === 'writing' ? '写作助手' : purpose === 'page-summary' ? '页面摘要' : purpose === 'connection-test' ? '连接测试' : purpose === 'reading' ? '阅读理解' : '翻译'
 }
 
 function outcomeLabel(outcome: ModelUsageOutcome): string {

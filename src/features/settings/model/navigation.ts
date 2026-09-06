@@ -92,6 +92,12 @@ export const navigationGroups = [
     label: '工具与学习',
     items: [
       {
+        id: 'settings-writing', icon: '✎', label: '写作助手', description: '起草、润色与智能回复', group: '工具与学习',
+        heading: '写作助手', summary: '用 AI 整理想法、润色表达，在 Gmail 和 GitHub 中轻松回复。',
+        kicker: '写作工具', title: '写作助手', detail: '配置写作服务、网页回复入口和写作偏好。',
+        searchDescription: '写作助手、起草、润色、续写、精简、总结、自由对话、智能回复、邮件、Gmail、GitHub、Alt+W',
+      },
+      {
         id: 'settings-translation-center', icon: '译', label: '翻译中心', description: '多服务对比', group: '工具与学习',
         heading: '比较不同翻译服务', summary: '输入一句话，同时查看多个翻译服务的结果，并支持重复翻译。',
         kicker: '翻译工具', title: '翻译中心', detail: '用同一句话比较不同服务的译文表现。',

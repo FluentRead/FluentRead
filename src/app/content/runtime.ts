@@ -1,9 +1,11 @@
 /**
  * @file src/app/content/runtime.ts
  * 文件职责：作为内容脚本应用的顶层 composition root，协调配置就绪、站点规则、公共样式、主世界桥、功能注册表、快捷键和消息监听生命周期。
- * 主要内容：安装内联 page.css，构建输入框与页面 feature registry，按 capability 和配置挂载全文周边、悬浮、划词、区域、图片、视频等能力；订阅配置变化并处理停用、恢复与销毁。
+ * 主要内容：安装内联 page.css，构建输入框与页面 feature registry，按 capability 和配置挂载全文周边、悬浮、划词、区域、图片、视频与写作助手等能力；订阅配置变化并处理停用、恢复与销毁。
  * 模块边界：本文件只负责依赖装配和页面激活所有权，不实现具体翻译算法、组件内部状态、provider 请求或配置存储；这些职责分别属于 features、services 与 platform。
  */
+import {isWritingPage} from '@/src/core/config/writing';
+import {mountWritingAssistant, unmountWritingAssistant, isWritingAssistantMounted} from '@/src/features/writing-assistant/public';
 import type {ContentScriptContext} from 'wxt/utils/content-script-context';
 import {createShadowRootUi} from 'wxt/utils/content-script-ui/shadow-root';
 import {constants} from '@/src/core/config/constants';
@@ -52,10 +54,6 @@ import {
 import {syncBilingualSentenceHighlight} from './bilingualSentenceHighlight';
 import {createContentSiteAdaptationRuntime} from './siteAdaptationRuntime';
 
-/**
- * 启动当前 document 对应的内容应用。
- * WXT 只负责创建 context；所有功能组装和清理都在这一 composition root 内完成。
- */
 export async function startContentApp(ctx: ContentScriptContext,
     capabilities: BrowserCapabilities = browserCapabilities): Promise<void> {
     await configReady;
@@ -98,13 +96,11 @@ export async function startContentApp(ctx: ContentScriptContext,
     const disposePageFeatures = (): void => {
         featureController?.abort();
         featureController = null;
-        restoreOriginalContent();
-        cancelAllTranslations();
+        restoreOriginalContent(); cancelAllTranslations();
         activePageFeatureRegistry?.unmountAll();
         activePageFeatureRegistry = null;
         pageAvailability?.disposeVideoSubtitlePage();
-        inputTranslationFeature.invalidate();
-        removePageStyles?.();
+        inputTranslationFeature.invalidate(); removePageStyles?.();
         removePageStyles = null;
         syncBilingualSentenceHighlight(document, false);
     };
@@ -142,6 +138,12 @@ export async function startContentApp(ctx: ContentScriptContext,
             () => { resetHoverKeyboardGesture(); resetFullPageKeyboardGesture(); }, qqMailFullPageToggle);
 
         const pageFeatureRegistry = createContentFeatureRegistry([
+            {
+                id: 'writing-assistant', mount: () => mountWritingAssistant(ctx),
+                isEnabled: () => capabilities.browser !== 'userscript' && config.on && config.writing.enabled && isWritingPage(window.location.href)
+                    && !isExtensionDisabledOnSite(window.location.href, config.writing.disabledDomains),
+                unmount: unmountWritingAssistant, isMounted: isWritingAssistantMounted,
+            },
             {
                 id: 'floating-ball',
                 isEnabled: () => config.on && config.disableFloatingBall !== true,
@@ -216,6 +218,7 @@ export async function startContentApp(ctx: ContentScriptContext,
         siteAdaptation.routeChanged(new URL(window.location.href));
         resetPageTranslationContextCache(); resetFullPageTranslationRouteState();
         pageAvailability!.syncVideoSubtitlePage();
+        void activePageFeatureRegistry?.reconcileEnabled();
     }, {signal: pageEventController.signal});
 
     const cleanup = (): void => {

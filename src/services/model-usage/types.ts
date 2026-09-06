@@ -15,7 +15,7 @@ export const MODEL_USAGE_TRANSFER_MAX_EVENTS = 250_000 as const;
 export const MODEL_USAGE_TRANSFER_MAX_BYTES = 128 * 1024 * 1024;
 
 export type Range = 'today' | '7d' | '30d';
-export type ModelUsagePurpose = 'translation' | 'page-summary' | 'connection-test' | 'reading';
+export type ModelUsagePurpose = 'translation' | 'page-summary' | 'connection-test' | 'reading' | 'writing';
 export type ModelUsageOutcome = 'success' | 'error' | 'timeout' | 'cancelled';
 export type ModelUsageAvailability = 'reported' | 'unreported' | 'malformed';
 export type ModelUsageCacheStatus = 'hit' | 'miss' | 'unreported';

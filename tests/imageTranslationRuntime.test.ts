@@ -1,7 +1,9 @@
 import {afterEach, beforeEach, describe, expect, it, vi} from 'vitest';
 import {parseHTML} from 'linkedom';
+import {toRaw} from 'vue';
 
 const client = vi.hoisted(() => ({translate: vi.fn(), prepare: vi.fn(), fetch: vi.fn()}));
+const configNotifications = vi.hoisted(() => new Set<() => void>());
 const rawSettings = vi.hoisted(() => ({on: true, disableImageTranslator: false, from: 'auto', to: 'zh-Hans', service: 'google', useCache: true, animations: false}));
 vi.mock('@/src/features/image-translation/services/client', () => ({
     translateImageInExtension: client.translate,
@@ -11,7 +13,11 @@ vi.mock('@/src/features/image-translation/services/client', () => ({
 vi.mock('@/src/services/config/store', async () => {
     const {reactive, watch} = await import('vue');
     const config = reactive(rawSettings);
-    return {config, subscribeConfig: (listener: (value: typeof config) => void) => watch(config, listener)};
+    return {config, subscribeConfig: (listener: (value: typeof config) => void) => {
+        const notify = () => listener(config); configNotifications.add(notify);
+        const stop = watch(config, listener);
+        return () => {stop(); configNotifications.delete(notify);};
+    }};
 });
 import {config as settings} from '@/src/services/config/store';
 import {mountImageTranslator, unmountImageTranslator, toggleContextMenuImage} from '@/src/features/image-translation/content/runtime';
@@ -136,7 +142,7 @@ function setup() {
     const runFrames = () => { const callbacks = Array.from(frames.values()); frames.clear(); callbacks.forEach(callback => callback(0)); };
     mountImageTranslator();
     return {image, parent, roots, decoded, canvases, draw, imageStyle, parentStyle, observers, resizeObservers, windowObject,
-        hover, button, click, bitmap, dispatch, notify, runFrames,
+        hover, button, click, bitmap, dispatch, notify, runFrames, extraStyles,
         addBackground: () => {
             const background = document.createElement('div'); decorateStyle(background);
             background.getBoundingClientRect = () => rect as DOMRect;
@@ -154,6 +160,7 @@ function setup() {
 beforeEach(() => {
     vi.useFakeTimers();
     settings.imageTranslationHoverEnabled = true; settings.imageTranslationContextMenuEnabled = true;
+    settings.uiLanguage = 'zh-CN';
     settings.on = true; settings.disableImageTranslator = false; settings.to = 'zh-Hans'; settings.useCache = true;
     settings.service = 'google'; settings.model = {}; settings.customModel = {}; settings.customBody = {}; settings.proxy = {}; settings.customOpenAIProviders = []; settings.token = {};
     client.translate.mockReset().mockResolvedValue(result);
@@ -163,6 +170,60 @@ beforeEach(() => {
 afterEach(() => {unmountImageTranslator(); vi.restoreAllMocks(); vi.unstubAllGlobals(); vi.useRealTimers();});
 
 describe('图片翻译前台交互与生命周期', () => {
+    it('通过配置仓库通知即时更新品牌提示，不依赖配置对象的 Vue 响应式代理', () => {
+        const env = setup(); env.hover();
+        expect(env.button().title).toBe('FluentRead · 翻译图片');
+        toRaw(settings).uiLanguage = 'en-US';
+        configNotifications.forEach(notify => notify());
+        expect(env.button().title).toBe('FluentRead · Translate image');
+        expect(env.button().getAttribute('aria-label')).toBe(env.button().title);
+        configNotifications.forEach(notify => notify());
+        expect(env.button().title).toBe('FluentRead · Translate image');
+        unmountImageTranslator(); expect(configNotifications.size).toBe(0);
+    });
+
+    it.each(['html', 'body-quirks', 'body-propagated'])('整页滚动 %s 后入口、加载和译图仍在视口内', async (mode) => {
+        const env = setup();
+        const doc = env.image.ownerDocument;
+        const root = mode === 'html' ? doc.documentElement : doc.body;
+        Object.defineProperty(doc, 'scrollingElement', {value: mode === 'body-quirks' ? doc.body : doc.documentElement});
+        env.extraStyles.set(root, {overflowX: 'auto', overflowY: 'scroll', opacity: '1'});
+        root.getBoundingClientRect = () => ({left: 0, top: -2622, width: 1000, height: 800, right: 1000, bottom: -1822}) as DOMRect;
+        Object.defineProperties(root, {offsetWidth: {value: 1000}, offsetHeight: {value: 800}, clientWidth: {value: 1000}, clientHeight: {value: 800}, clientLeft: {value: 0}, clientTop: {value: 0}});
+        const background = env.addBackground();
+        const pending = deferred<typeof result>(); client.translate.mockReturnValue(pending.promise);
+        env.hover();
+        const overlay = env.roots[0].querySelector('.fluent-read-image-translation-overlay') as HTMLElement;
+        expect(overlay.style.display).toBe('block');
+        env.click(); await flush();
+        expect(env.button().dataset.phase).toBe('loading');
+        expect((env.roots[0].querySelector('.fr-image-feedback') as HTMLElement).hidden).toBe(false);
+        expect(background.style.opacity).not.toBe('0');
+        pending.resolve(result); await flush();
+        expect(overlay.style.display).toBe('block');
+        expect(overlay.style.clipPath).toBe('inset(0px 0px 0px 0px)');
+        expect(env.bitmap()?.isConnected).toBe(true);
+        expect(background.style.opacity).toBe('0');
+        env.click(); expect(background.style.opacity).not.toBe('0');
+    });
+
+    it('译图在视口外完成时保留原图，重入视口再交接；宿主移除 UI 根节点后恢复挂载', async () => {
+        const env = setup(); const background = env.addBackground();
+        const pending = deferred<typeof result>(); client.translate.mockReturnValue(pending.promise);
+        env.hover(); env.click(); await flush();
+        env.setRect({left: 20, top: -400, width: 400, height: 200, right: 420, bottom: -200});
+        pending.resolve(result); await flush();
+        expect(background.style.opacity).not.toBe('0');
+        env.setRect({left: 20, top: 40, width: 400, height: 200, right: 420, bottom: 240});
+        env.scroll(); env.runFrames();
+        expect(background.style.opacity).toBe('0');
+        const host = env.image.ownerDocument.getElementById('fluent-read-image-translation-root')!;
+        host.remove(); env.scroll(); env.runFrames();
+        expect(host.isConnected).toBe(true); expect(env.bitmap()?.isConnected).toBe(true);
+        env.setRect({left: 20, top: -400, width: 400, height: 200, right: 420, bottom: -200});
+        env.scroll(); env.runFrames(); expect(background.style.opacity).not.toBe('0');
+    });
+
     it('合成与触屏悬浮不创建入口，合成点击不能触发识别；小图不分配状态', async () => {
         const env = setup();
         env.dispatch(env.image, 'pointerover', false);
@@ -401,7 +462,10 @@ describe('图片翻译前台交互与生命周期', () => {
         env.dispatch(prepare, 'click'); await flush(); expect(client.prepare).toHaveBeenCalledWith('auto', expect.any(AbortSignal));
         expect(env.button().dataset.phase).toBe('translated');
         env.click(); settings.useCache = false; const pending = deferred<typeof result>(); client.translate.mockReturnValueOnce(pending.promise);
-        env.click(); await flush(); client.translate.mock.calls.at(-1)![3].onProgress('translating');
+        env.click(); await flush();
+        client.translate.mock.calls.at(-1)![3].onProgress('recognizing', 37);
+        expect(env.roots[0].querySelector('[role="status"]')!.textContent).toBe('正在识别图片文字… 37%');
+        client.translate.mock.calls.at(-1)![3].onProgress('translating');
         expect(env.roots[0].querySelector('[role="status"]')!.textContent).toBe('正在翻译文字…');
         pending.resolve(result); await flush();
     });

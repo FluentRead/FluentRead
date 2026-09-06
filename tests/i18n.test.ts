@@ -199,14 +199,24 @@ describe('界面 i18n 契约', () => {
     expect(englishChromeMessages.filter(([, value]) => /[\u3400-\u9fff]/u.test(value))).toEqual([]);
   });
 
+  it.each(['en-US','ja-JP','ko-KR','fr-FR','ru-RU','es-ES'] as const)('图片翻译的准备与各阶段说明在 %s 中完整本地化', language => {
+    for (const source of ["首次使用需准备识别语言包，下载后自动继续", "正在准备识别语言包…", "正在读取图片…", "正在识别图片文字…", "正在翻译文字…", "正在生成译图…", "已翻译 · 点击恢复原图", "查看译图", "翻译设置已更改，请重试", "译图加载超时", "图片读取超时", "图片加载超时"]) {
+      const translated = translateLegacyText(source, language);
+      expect(translated).not.toBe(source);
+      if (language !== 'ja-JP') expect(translated).not.toMatch(/[\u3400-\u9fff]/u);
+    }
+    expect(translateLegacyText('图片翻译失败：图片读取超时',language)).toContain(translateLegacyText('图片读取超时',language));
+    expect(translateLegacyText('图片翻译失败：NETWORK_ERROR_42',language)).toContain('NETWORK_ERROR_42');
+  });
+
   it.each([
-    ['en-US', 'Traditional Chinese', 'three language packs'],
-    ['ja-JP', '中国語（繁体字）', '3 つの言語パック'],
-    ['ko-KR', '중국어 번체', '세 언어 팩'],
-    ['fr-FR', 'Chinois traditionnel', 'trois packs de langue'],
-    ['ru-RU', 'Китайский (традиционный)', 'три языковых пакета'],
-    ['es-ES', 'Chino tradicional', 'tres paquetes de idiomas'],
-  ] as const)('OCR 简繁语言包在 %s 界面中具有独立名称、说明和三包下载提示', (language, traditionalLabel, packCount) => {
+    ['en-US', 'Traditional Chinese', 'four language packs'],
+    ['ja-JP', '中国語（繁体字）', '4 つの言語パック'],
+    ['ko-KR', '중국어 번체', '네 언어 팩'],
+    ['fr-FR', 'Chinois traditionnel', 'quatre packs de langue'],
+    ['ru-RU', 'Китайский (традиционный)', 'четыре языковых пакета'],
+    ['es-ES', 'Chino tradicional', 'cuatro paquetes de idiomas'],
+  ] as const)('OCR 简繁语言包在 %s 界面中具有独立名称、说明和四包下载提示', (language, traditionalLabel, packCount) => {
     const simplified = IMAGE_OCR_LANGUAGE_PACKS.find(pack => pack.code === 'chi_sim')!;
     const traditional = IMAGE_OCR_LANGUAGE_PACKS.find(pack => pack.code === 'chi_tra')!;
     expect(translateLegacyText(traditional.label, language)).toBe(traditionalLabel);
@@ -217,8 +227,8 @@ describe('界面 i18n 契约', () => {
       simplified.label,
       simplified.description,
       traditional.description,
-      '推荐先下载简体中文、繁體中文和 English',
-      '自动检测默认使用这三种语言包。识别其他语言图片前，请选择源语言并下载对应语言包。',
+      '推荐先下载简体中文、繁體中文、English 和日本語',
+      '自动检测默认使用这四种语言包。识别其他语言图片前，请选择源语言并下载对应语言包。',
     ];
     sourceCopy.push(IMAGE_OCR_LANGUAGE_PACKS.find(pack => pack.code === 'spa')!.description);
     for (const source of sourceCopy) {

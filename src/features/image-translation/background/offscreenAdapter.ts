@@ -138,7 +138,7 @@ export const imageTranslationProgressTransport = {
     isOffscreenSender(context: ImageProgressContext): boolean {
         return context.sender?.url === browser.runtime.getURL('/offscreen.html');
     },
-    async sendProgress(context: ImageProgressContext, message: {type: typeof IMAGE_PROGRESS_MESSAGE_TYPE; requestId: string; stage: ImageTranslationStage}): Promise<void> {
+    async sendProgress(context: ImageProgressContext, message: {type: typeof IMAGE_PROGRESS_MESSAGE_TYPE; requestId: string; stage: ImageTranslationStage; progress?: number}): Promise<void> {
         const tabId = context.sender?.tab?.id;
         if (typeof tabId !== 'number') return;
         await browser.tabs.sendMessage(tabId, message, {frameId: context.sender?.frameId ?? 0}).catch(() => undefined);

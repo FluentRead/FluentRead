@@ -20,8 +20,8 @@
       </div>
       <div class="image-ocr-recommendation">
         <div>
-          <strong>推荐先下载简体中文、繁體中文和 English</strong>
-          <p>自动检测默认使用这三种语言包。识别其他语言图片前，请选择源语言并下载对应语言包。</p>
+          <strong>推荐先下载简体中文、繁體中文、English 和日本語</strong>
+          <p>自动检测默认使用这四种语言包。识别其他语言图片前，请选择源语言并下载对应语言包。</p>
         </div>
         <button type="button" class="image-ocr-primary-action"
           :disabled="recommendedReady || recommendedDownloading"

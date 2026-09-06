@@ -1,10 +1,10 @@
 /**
  * @file src/features/image-translation/background/handlers.ts
  * 文件职责：定义跨域图片读取、图片 OCR、整图翻译、文本批译、阶段进度、取消和语言包下载后台消息，并对来自页面或扩展 UI 的未知输入执行严格校验。
- * 主要内容：包含消息解析、OCR 语言白名单、阶段通知与取消预算；图片文本去重批量和有界并发翻译同时保留后台恢复的可信页面范围、源语言与术语版本。
+ * 主要内容：包含消息解析、OCR 语言白名单、阶段与百分比通知和取消预算；图片文本去重批量和有界并发翻译同时保留后台恢复的可信页面范围、源语言与术语版本。
  * 模块边界：本文件只负责协议入口与用例编排，不直接运行 Tesseract、Canvas、网络 fetch 或 Offscreen；图像读取和运算能力均由 Offscreen adapter 与 services 实现并由 app 注入。
  */
-import {IMAGE_PROGRESS_MESSAGE_TYPE, isImageTranslationStage, type ImageTranslationStage} from '../progress';
+import {IMAGE_PROGRESS_MESSAGE_TYPE, isImageTranslationStage, normalizeImageProgress, type ImageTranslationStage} from '../progress';
 import {
     IMAGE_OCR_LANGUAGE_PACKS,
     normalizeImageOcrLanguageCodes,
@@ -71,7 +71,7 @@ export interface ImageFetchMessage {
 }
 
 export interface ImageProgressContext {readonly sender?: {readonly tab?: {readonly id?: number}; readonly frameId?: number; readonly url?: string}}
-export interface ImageProgressMessage {type: typeof IMAGE_PROGRESS_MESSAGE_TYPE; requestId?: unknown; stage?: unknown}
+export interface ImageProgressMessage {type: typeof IMAGE_PROGRESS_MESSAGE_TYPE; requestId?: unknown; stage?: unknown; progress?: unknown}
 
 export type ImageTranslationBackgroundMessage =
     | ImageProgressMessage
@@ -119,7 +119,7 @@ export interface ImageTranslationBackgroundDependencies {
     readonly downloadLanguages: (languages: ImageOcrLanguageCode[]) => Promise<void>;
     readonly markLanguagesDownloaded: (languages: ImageOcrLanguageCode[]) => Promise<ImageOcrLanguageCode[]>;
     readonly now?: () => number;
-    readonly sendProgress?: (context: ImageProgressContext, message: {type: typeof IMAGE_PROGRESS_MESSAGE_TYPE; requestId: string; stage: ImageTranslationStage}) => Promise<void>;
+    readonly sendProgress?: (context: ImageProgressContext, message: {type: typeof IMAGE_PROGRESS_MESSAGE_TYPE; requestId: string; stage: ImageTranslationStage; progress?: number}) => Promise<void>;
     readonly isOffscreenSender?: (context: ImageProgressContext) => boolean;
 }
 
@@ -394,7 +394,7 @@ export function createImageTranslationBackgroundHandlers(
                 if (!dependencies.isOffscreenSender?.(context) || !isImageTranslationStage(message.stage)) return {success: false};
                 const requestId = parseRequestId(message.requestId);
                 const owner = progressOwners.get(requestId);
-                if (owner) await dependencies.sendProgress?.(owner.context, {type: IMAGE_PROGRESS_MESSAGE_TYPE, requestId, stage: message.stage});
+                if (owner) await dependencies.sendProgress?.(owner.context, {type: IMAGE_PROGRESS_MESSAGE_TYPE, requestId, stage: message.stage, progress: normalizeImageProgress(message.progress)});
                 return {success: true};
             },
         },

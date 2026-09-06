@@ -1,7 +1,7 @@
 /**
  * @file src/features/image-translation/services/ocrRuntime.ts
  * 文件职责：将 Tesseract.js Worker 适配为图片翻译可调用的 OCR 服务，配置扩展内 worker/core 资源并按源语言串行执行识别或语言包预下载。
- * 主要内容：配置扩展语言资源与图片/圈选识别策略；对图片解码设置超时并释放像素，圈选小图有界放大加边且仅空结果重试单块分割；坐标映回原图并按策略隔离有界缓存。
+ * 主要内容：配置扩展语言资源、转发引擎任务进度与图片/圈选识别策略；对图片解码设置超时并释放像素，圈选小图有界放大加边且仅空结果重试单块分割；坐标映回原图并按策略隔离有界缓存。
  * 模块边界：该文件是 Tesseract 基础设施边界，不保存下载状态、不翻译识别文本也不绘制图片；并发所有权由 ocrWorkerRuntime 管理，持久化由后台 repository 负责。
  */
 import { createWorker, PSM, type Worker } from 'tesseract.js';
@@ -30,7 +30,7 @@ const OCR_INIT_CONFIG = {tessedit_load_sublangs: ''} as unknown as Parameters<ty
 
 const ocrWorkerRuntime = createOcrWorkerRuntime<TesseractRecognitionResult>({
     sparseTextMode: PSM.SPARSE_TEXT,
-    createWorker: async languages => createWorker(languages.split('+'), 1, {
+    createWorker: async (languages, onProgress) => createWorker(languages.split('+'), 1, {
         workerPath: extensionAsset('worker/worker.min.js'),
         corePath: extensionAsset('core'),
         cachePath: 'fluent-read-image-ocr',
@@ -38,13 +38,16 @@ const ocrWorkerRuntime = createOcrWorkerRuntime<TesseractRecognitionResult>({
         // 并将解压后的语言包缓存到 Offscreen Document 的 IndexedDB。
         // Offscreen 页面拥有扩展源，直接加载本地 worker 可避免 Blob Worker 的 CSP/源限制。
         workerBlobURL: false,
+        logger: message => {
+            if (message.status === 'recognizing text') onProgress(message.progress, message.userJobId);
+        },
     }, OCR_INIT_CONFIG) as unknown as Promise<OcrWorkerPort<TesseractRecognitionResult>>,
 });
 
 const MAX_CACHED_OCR_IMAGES = 3;
 const MAX_CACHED_OCR_BYTES = 12 * 1024 * 1024;
 const OCR_IMAGE_DECODE_TIMEOUT_MS = 15_000;
-export type OcrRecognitionOptions = {profile?: 'image' | 'area'};
+export type OcrRecognitionOptions = {profile?: 'image' | 'area'; onProgress?: (percent: number) => void};
 const completedRecognitionCache = new Map<string, {lines: OcrLine[]; bytes: number}>();
 let cachedRecognitionBytes = 0;
 
@@ -160,7 +163,7 @@ export async function recognizeImage(
 
     const {recognitionImage, sourceWidth, sourceHeight, size} = await prepareOcrImage(image, profile, signal);
     if (signal?.aborted) throw abortRecognition();
-    const result = await ocrWorkerRuntime.recognize(recognitionImage, languages, signal);
+    const result = await ocrWorkerRuntime.recognize(recognitionImage, languages, signal, undefined, options.onProgress);
     if (signal?.aborted) throw abortRecognition();
     const readLines = (recognition: TesseractRecognitionResult) => restoreOcrLineCoordinates(
         normalizeOcrLines(recognition.data.blocks), sourceWidth, sourceHeight, size.width, size.height, size.padding,

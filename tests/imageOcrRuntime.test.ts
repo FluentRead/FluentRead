@@ -21,6 +21,14 @@ describe('图片 OCR 处理与结果缓存', () => {
     let context: {drawImage: ReturnType<typeof vi.fn>; fillRect: ReturnType<typeof vi.fn>; fillStyle: string; imageSmoothingEnabled: boolean; imageSmoothingQuality: string};
     let onImageCreated: (() => void) | undefined;
 
+    it('把任务进度回调传入 OCR Worker，缓存命中不重放旧识别进度', async () => {
+        const onProgress = vi.fn();
+        recognize.mockImplementationOnce(async (_image, _languages, _signal, _mode, progress) => {progress(42);return blockResult();});
+        await recognizeImage('progress', 'en', undefined, {onProgress});
+        expect(onProgress).toHaveBeenCalledOnce(); expect(onProgress).toHaveBeenCalledWith(42);
+        await recognizeImage('progress', 'en', undefined, {onProgress});
+        expect(onProgress).toHaveBeenCalledOnce();
+    });
     it('清除语言包后丢弃 OCR 结果并重新识别', async () => {
         await recognizeImage('same', 'en');
         await recognizeImage('same', 'en');
@@ -84,12 +92,17 @@ describe('图片 OCR 处理与结果缓存', () => {
 
     it('扩展 Worker 使用本地资源目录并复用语言下载边界及取消信号', async () => {
         vi.stubGlobal('chrome', {runtime: {getURL: (path: string) => `chrome-extension://test${path}`}});
-        await createRuntime.mock.calls[0][0].createWorker('jpn+eng');
+        const onProgress = vi.fn();
+        await createRuntime.mock.calls[0][0].createWorker('jpn+eng', onProgress);
         expect(tesseractCreateWorker).toHaveBeenCalledWith(['jpn', 'eng'], 1, {
             workerPath: 'chrome-extension://test/fluent-read-ocr/worker/worker.min.js',
             corePath: 'chrome-extension://test/fluent-read-ocr/core',
-            cachePath: 'fluent-read-image-ocr', workerBlobURL: false,
+            cachePath: 'fluent-read-image-ocr', workerBlobURL: false, logger: expect.any(Function),
         }, {tessedit_load_sublangs: ''});
+        const logger = tesseractCreateWorker.mock.calls[0][2].logger;
+        logger({status:'loading language', progress:0.2, userJobId:'load'});
+        logger({status:'recognizing text', progress:0.4, userJobId:'recognize'});
+        expect(onProgress).toHaveBeenCalledOnce(); expect(onProgress).toHaveBeenCalledWith(0.4, 'recognize');
         const {downloadImageOcrLanguages} = await import('@/src/features/image-translation/services/ocrRuntime');
         const controller = new AbortController();
         await downloadImageOcrLanguages(['jpn', 'eng'], controller.signal);
@@ -116,7 +129,7 @@ describe('图片 OCR 处理与结果缓存', () => {
         expect(recognize).toHaveBeenCalledTimes(4);
         await recognizeImage('one', 'ja');
         expect(recognize).toHaveBeenCalledTimes(5);
-        expect(recognize).toHaveBeenLastCalledWith('one', 'jpn+eng', undefined);
+        expect(recognize).toHaveBeenLastCalledWith('one', 'jpn+eng', undefined, undefined, undefined);
     });
 
     it('单图和总输入字节预算限制缓存，不长期保留巨型 data URL', async () => {
@@ -139,7 +152,7 @@ describe('图片 OCR 处理与结果缓存', () => {
         expect(context.drawImage).toHaveBeenCalledWith(sources[0], 0, 0, 4096, 512);
         expect(context.imageSmoothingEnabled).toBe(true);
         expect(context.imageSmoothingQuality).toBe('high');
-        expect(recognize).toHaveBeenCalledWith('scaled-image', 'eng', undefined);
+        expect(recognize).toHaveBeenCalledWith('scaled-image', 'eng', undefined, undefined, undefined);
         expect(lines).toEqual([{text: 'hello', bbox: {x0: 19, y0: 19, x1: 98, y1: 59}}]);
         expect(canvas.width).toBe(0);
         expect(canvas.height).toBe(0);
@@ -166,7 +179,7 @@ describe('图片 OCR 处理与结果缓存', () => {
     it('圈选稀疏模式空结果才以单块模式重试一次，普通图片保留单次识别', async () => {
         recognize.mockResolvedValueOnce({data: {blocks: []}});
         await expect(recognizeImage('area', 'en', undefined, {profile: 'area'})).resolves.toHaveLength(1);
-        expect(recognize).toHaveBeenNthCalledWith(1, 'scaled-image', 'eng', undefined);
+        expect(recognize).toHaveBeenNthCalledWith(1, 'scaled-image', 'eng', undefined, undefined, undefined);
         expect(recognize).toHaveBeenNthCalledWith(2, 'scaled-image', 'eng', undefined, 6);
         recognize.mockResolvedValue({data: {blocks: []}});
         await expect(recognizeImage('blank', 'en', undefined, {profile: 'area'})).resolves.toEqual([]);

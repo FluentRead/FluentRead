@@ -9,6 +9,8 @@ Use area translation for words inside screenshots, charts, paused video frames, 
 3. Release the pointer and wait for recognition and translation.
 4. Copy the translation, expand the recognized original, or view the captured area.
 
+If recognition packs are missing, choose **Download language pack and retry**. The required packs download and translation continues using the same capture. You can retry a failed download or press Esc to cancel.
+
 Press **Esc** to exit. Choose a new selection to capture elsewhere, or retranslate to reuse the current capture with a changed service. Scrolling or resizing requires a new selection.
 
 ## Standard or AI text enhancement?

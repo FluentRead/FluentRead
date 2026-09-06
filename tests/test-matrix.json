@@ -261,7 +261,8 @@
       "tests/myMemoryProvider.test.ts",
       "tests/writingRuntime.test.ts",
       "tests/writingIntegration.test.ts",
-      "tests/popupActions.test.ts"
+      "tests/popupActions.test.ts",
+      "tests/areaTranslationRecovery.test.ts"
     ],
     "regression": [
       "tests/translationControlOwnership.test.ts",

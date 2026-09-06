@@ -15,8 +15,14 @@ export function getVideoTranscriptionCacheRequest(
   const post = video.closest('article');
   const links = Array.from(post?.querySelectorAll<HTMLAnchorElement>('a[href]') || []);
   const permalink = links.find(link => /\/status\/\d+(?:\/|$)/.test(link.pathname));
+  const statusUrl = permalink?.href || href;
+  const explicitIndex = statusUrl.match(/\/status\/\d+\/video\/(\d+)(?:[/?#]|$)/)?.[1];
+  const videos = Array.from(post?.querySelectorAll('video') || []);
+  const index = videos.indexOf(video);
+  const videoIndex = explicitIndex || (index >= 0 ? String(index + 1) : '');
   return {source: {
-    statusUrl: permalink?.href || href,
+    statusUrl,
+    ...(videoIndex ? {videoIndex} : {}),
     poster: video.poster,
     directSource: video.currentSrc || video.src,
   }, model, videoSourceLanguage: language};

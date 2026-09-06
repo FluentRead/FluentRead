@@ -783,6 +783,8 @@ export class VideoAiFullCaptureController {
         ...this.fullFallbackCues,
       ]).map((cue) => ({
         ...cue,
+        // 完整采集已结束：流式短句标记不再代表未完成的识别会话。
+        partial: false,
         availableAtMs: 0,
         translationAvailableAtMs: 0,
       })) as unknown as VideoAiStabilizedCue[])) as unknown as VideoAiStabilizedCue[];

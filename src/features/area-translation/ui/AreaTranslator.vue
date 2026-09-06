@@ -1,7 +1,7 @@
 <!--
  * @file src/features/area-translation/ui/AreaTranslator.vue
  * 文件职责：提供独立圈选阅读工具，按 Shift+Z 进入选区模式，松开鼠标后展示可核对、可复制的原文与译文卡片。
- * 主要内容：管理选择、截图、识别、翻译、结果和失败状态；重试复用同一截图，取消或新选区使旧请求失效，卡片显示本次服务与模型，支持原图核对、AI 校对文和清晰的质量说明。
+ * 主要内容：管理选择、截图、识别、翻译、结果和失败状态；缺少语言包时一键下载后续接原截图，重试复用同一截图，取消或新选区使旧请求失效，卡片显示本次服务与模型，支持原图核对、AI 校对文和清晰的质量说明。
  * 模块边界：组件只调用圈选客户端，不执行 OCR 或网络请求；截图权限归后台，像素只在封闭 Shadow UI 展示，所有页面监听、异步状态与临时截图在关闭或卸载时清理。
  -->
 <template>
@@ -26,14 +26,15 @@
       </header>
       <div v-if="phase === 'loading'" class="fr-area-loading" role="status" aria-live="polite">
         <span class="fr-area-spinner" :class="{'fr-area-static': !animationsEnabled}" aria-hidden="true" />
-        <span>{{ progressStage === 'translating' ? '正在翻译选区文字…' : '正在识别选区文字…' }}</span>
+        <span>{{ preparingLanguages ? '下载中…' : progressStage === 'translating' ? '正在翻译选区文字…' : '正在识别选区文字…' }}</span>
         <button type="button" @click="clearResult">取消</button>
       </div>
       <div v-else-if="phase === 'error'" class="fr-area-error-body" role="alert">
         <strong>圈选翻译失败</strong>
         <p>{{ errorMessage }}</p>
         <div class="fr-area-actions">
-          <button type="button" @click="retryTranslation">重试</button>
+          <button v-if="needsLanguages" type="button" @click="downloadLanguagesAndRetry">下载语言包并重试</button>
+          <button v-else type="button" @click="retryTranslation">重试</button>
           <button type="button" @click="beginSelection">重新圈选</button>
           <button type="button" @click="openSettings">圈选设置</button>
         </div>
@@ -76,6 +77,7 @@ import { isCustomOpenAIProviderId } from '@/src/core/config/customOpenAI';
 import { useUiI18n } from '@/src/ui/i18n';
 import { captureVisibleAreaInExtension, translateCapturedAreaInExtension, type AreaTranslationResult } from '@/src/features/area-translation/services/client';
 import { isAreaHotkey, isUsableAreaRect, normalizeAreaRect, type AreaPoint, type AreaRect, type AreaTranslationSelection } from '@/src/features/area-translation/core';
+import {prepareImageOcrLanguages} from '@/src/features/image-translation/public';
 import type { ImageTranslationStage } from '@/src/features/image-translation/protocol';
 
 const {translateLegacy} = useUiI18n();
@@ -85,6 +87,9 @@ const selectionRect = ref<AreaRect | null>(null);
 const activeRect = ref<AreaRect | null>(null);
 const result = ref<AreaTranslationResult | null>(null);
 const errorMessage = ref('');
+const needsLanguages = ref(false);
+const preparingLanguages = ref(false);
+let requestedSourceLanguage = config.from;
 const feedback = ref('');
 const isDarkTheme = ref(false);
 const animationsEnabled = ref(config.animations !== false);
@@ -144,6 +149,8 @@ function clearResult(): void {
   activeRect.value = null;
   result.value = null;
   errorMessage.value = '';
+  needsLanguages.value = false;
+  preparingLanguages.value = false;
   capturedImage = '';
   capturedSelection = null;
   clearTimeout(feedbackTimer);
@@ -202,7 +209,7 @@ function handlePointercancel(event: PointerEvent): void {
   if (isSelecting.value && event.pointerId === activePointerId) clearResult();
 }
 function handleWindowBlur(): void { if (isSelecting.value) clearResult(); }
-async function requestTranslation(rect: AreaRect): Promise<void> {
+async function requestTranslation(rect: AreaRect, prepareLanguages = false): Promise<void> {
   translationAbortController?.abort();
   const controller = new AbortController();
   translationAbortController = controller;
@@ -210,9 +217,18 @@ async function requestTranslation(rect: AreaRect): Promise<void> {
   errorMessage.value = '';
   progressStage.value = 'recognizing';
   result.value = null;
+  preparingLanguages.value = prepareLanguages;
+  if (!prepareLanguages) requestedSourceLanguage = config.from;
+  const sourceLanguage = requestedSourceLanguage;
   // ref 会代理选区对象，不能将原始对象与代理比较；代次和取消信号才是请求所有权。
   const stale = () => controller.signal.aborted || requestId !== translationRequestId || document.visibilityState === 'hidden';
   try {
+    if (prepareLanguages) {
+      await prepareImageOcrLanguages(sourceLanguage, controller.signal);
+      if (stale()) return;
+      preparingLanguages.value = false;
+      needsLanguages.value = false;
+    }
     if (!capturedImage || !capturedSelection) {
       const selection = {...rect, viewportWidth: window.innerWidth, viewportHeight: window.innerHeight};
       // 等待 Vue 和浏览器完成选区层的隐藏，避免边框和提示文字被截图识别。
@@ -235,7 +251,7 @@ async function requestTranslation(rect: AreaRect): Promise<void> {
       capturedSelection = selection;
     }
     capturePending.value = false;
-    const translated = await translateCapturedAreaInExtension(capturedImage, capturedSelection, config.from, document.title, {
+    const translated = await translateCapturedAreaInExtension(capturedImage, capturedSelection, sourceLanguage, document.title, {
       signal: controller.signal,
       timeoutMs: 180_000,
       onProgress: stage => { if (!stale()) progressStage.value = stage; },
@@ -250,10 +266,19 @@ async function requestTranslation(rect: AreaRect): Promise<void> {
     if (stale()) return;
     capturePending.value = false;
     errorMessage.value = error instanceof Error ? error.message : String(error);
+    needsLanguages.value = preparingLanguages.value || /^图片文字识别需要先下载.+语言包/u.test(errorMessage.value) || /^请先下载语言包$/u.test(errorMessage.value);
     phase.value = 'error';
   } finally {
-    if (translationAbortController === controller) translationAbortController = null;
+    if (translationAbortController === controller) {
+      translationAbortController = null;
+      preparingLanguages.value = false;
+    }
   }
+}
+function downloadLanguagesAndRetry(): void {
+  if (!activeRect.value || phase.value !== 'error') return;
+  phase.value = 'loading';
+  void requestTranslation(activeRect.value, true);
 }
 function retryTranslation(): void {
   if (!activeRect.value) return;

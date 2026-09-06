@@ -5,6 +5,7 @@ import {
   createVideoAiFullAudioWindows,
   VideoAiFullCaptureController,
 } from '@/src/features/video-subtitle/content/video-ai/fullCapture';
+import {normalizeCompletedVideoAiSubtitleCues} from '@/src/features/video-subtitle/transcriptionCache';
 import type { VideoAiAudioChunk } from '@/src/features/video-subtitle/content/video-ai/capture';
 
 afterEach(() => {
@@ -257,10 +258,10 @@ describe('本地 AI 完整生成控制器的安全边界', () => {
       play: vi.fn(async () => undefined),
     };
     const transcribe = vi.fn(async () => ({
-      text: 'A fast decoded sentence.',
-      segments: [{ startMs: 0, endMs: 1_000, text: 'A fast decoded sentence.' }],
+      text: 'A fast decoded sentence without punctuation',
+      segments: [{ startMs: 0, endMs: 1_000, text: 'A fast decoded sentence without punctuation' }],
     }));
-    const onTranscriptionComplete = vi.fn(async () => undefined);
+    const onTranscriptionComplete = vi.fn(async (_cues: import('@/src/features/video-subtitle/content/video-ai/streamingTranscript').VideoAiStabilizedCue[]) => undefined);
     const progress: Array<{ captureMode?: string; phase: string }> = [];
     vi.stubGlobal('window', {
       AudioContext: FastAudioContext,
@@ -295,6 +296,10 @@ describe('本地 AI 完整生成控制器的安全边界', () => {
     }));
     expect(transcribe).toHaveBeenCalledTimes(1);
     expect(onTranscriptionComplete).toHaveBeenCalledTimes(1);
+    const completedCues = onTranscriptionComplete.mock.calls[0][0];
+    expect(completedCues.length).toBeGreaterThan(0);
+    expect(completedCues.every(cue => cue.partial === false)).toBe(true);
+    expect(normalizeCompletedVideoAiSubtitleCues(completedCues)).toHaveLength(completedCues.length);
     expect(progress.some((item) => item.captureMode === 'fast-decode')).toBe(true);
     // 快速解码不应改写用户 video 的播放位置或主动播放。
     expect(videoState.currentTime).toBe(0);

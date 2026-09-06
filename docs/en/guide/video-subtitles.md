@@ -5,7 +5,7 @@ Read original subtitles and translations together on YouTube and X, or show just
 ## A video with subtitles
 
 1. Make sure video subtitle translation is enabled.
-2. Open a YouTube or X video and find the FluentRead icon near the player.
+2. Open a YouTube or X video and find the FluentRead icon at the right end of the player controls.
 3. Choose bilingual, translation-only, or original-only display.
 
 FluentRead uses subtitle tracks or subtitle text provided by the page. It cannot guarantee translations where no subtitles are available. The subtitle translation service is independent of the webpage service.
@@ -24,7 +24,7 @@ Audio recognition runs locally; recognized subtitle text still goes to your tran
 
 Adjust subtitle size, background, position, and width in video appearance settings. X subtitles follow the player and try to avoid visible playback controls.
 
-Use the menu to show or hide subtitles and download them. Completed X transcripts are cached locally for a limited time, so reopening the same video usually avoids another transcription. Use re-recognition or clear the video cache to start fresh.
+Use the menu to show or hide subtitles and download them. Completed X transcripts are cached locally for a limited time, so reopening the same video usually avoids another transcription. Cached subtitles appear immediately while translations become available, and the cache count refreshes when you return to video settings. Use re-recognition or clear the video cache to start fresh.
 
 ## Missing or inaccurate subtitles
 

@@ -654,7 +654,7 @@ export function mountVideoSubtitleTranslation(): () => void {
     if (nextVideo === observedVideo && nextSource === observedMediaSource && nextStableMediaKey === observedStableMediaKey) return;
     const previousVideo = observedVideo;
     const identityEnriched = previousVideo === nextVideo && nextSource === observedMediaSource
-      && (!observedStableMediaKey || observedStableMediaKey.startsWith('blob:'));
+      && (!observedStableMediaKey || observedStableMediaKey.startsWith('blob:') || observedStableMediaKey.startsWith('tweet:'));
     const sameMedia = previousVideo && nextVideo && (identityEnriched || observedStableMediaKey === nextStableMediaKey);
     xCaptionSource.restoreTracks();
     stopCaptionClock();
@@ -677,7 +677,7 @@ export function mountVideoSubtitleTranslation(): () => void {
     if (isXVideoPage()) document.dispatchEvent(new CustomEvent(YOUTUBE_BRIDGE_REPLAY_EVENT));
     startCaptionClock();
     schedulePretranslation();
-    if (isXVideoPage() && !sameMedia) void restoreCachedAiSubtitles();
+    if (isXVideoPage() && (!sameMedia || identityEnriched)) void restoreCachedAiSubtitles();
   };
 
   const appendAiSubtitleCue = (cue: VideoAiStabilizedCue) => {
@@ -800,16 +800,17 @@ export function mountVideoSubtitleTranslation(): () => void {
         translationAvailableAtMs: 0,
       }))
       .filter((cue) => cue.text);
-    if (activeAiCacheRequest) void transcriptCache.set(activeAiCacheRequest, normalizedCues);
-    await translateFullAiCues(normalizedCues, sessionId);
     if (destroyed || !aiFullCapture?.isRequested() || aiFullCapture.getSessionId() !== sessionId) {
       throw new Error('本地视频完整 AI 字幕已取消');
     }
+    if (activeAiCacheRequest) void transcriptCache.set(activeAiCacheRequest, normalizedCues);
+    // 已完成识别或缓存命中后立即恢复时间轴；当前句优先翻译，不等待整段预翻译。
     aiCues = normalizedCues;
     setPretranslationTrack('ai:capture', { url: 'ai:capture', cues: aiCues });
     aiCaptureError = '';
     syncXVideoCaptionSource();
     scheduleUpdate();
+    await translateFullAiCues(normalizedCues, sessionId);
   };
 
   aiFullCapture = new VideoAiFullCaptureController({
@@ -1802,6 +1803,8 @@ export function mountVideoSubtitleTranslation(): () => void {
       }
       clearPretranslationState(false);
       resetTranslationState();
+      // 切换仅原文后立即重建 X 原文层，不留到下一秒轮询才恢复。
+      if (nextConfig.on && nextConfig.videoTranslationEnabled && nextConfig.videoSubtitleVisible !== false) scheduleUpdate();
       return;
     }
     observeCaptionContainer();

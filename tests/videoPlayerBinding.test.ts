@@ -66,6 +66,7 @@ describe('video player binding', () => {
       createButton: () => button,
     });
     expect(button.parentElement?.className).toBe('ytp-right-controls');
+    expect(button.parentElement?.lastElementChild).toBe(button);
     expect(button.getAttribute('data-fluent-read-video-progress')).toBe('42%');
     expect(player.classList.contains('fluent-read-video-player-host')).toBe(true);
     expect(binding.getTarget()).toBe(target);
@@ -122,6 +123,7 @@ describe('video player binding', () => {
     const button = fixture.document.createElement('button');
     const binding = createVideoPlayerBinding({document: fixture.document, locator: fixture.locator, getState: () => ({enabled: true}), createButton: () => button});
     expect(button.parentElement?.className).toBe('x-controls');
+    expect(button.parentElement?.lastElementChild).toBe(button);
     const settings = fixture.player.querySelector('button')!;
     settings.dispatchEvent(new fixture.window.Event('focusin', {bubbles: true}));
     settings.dispatchEvent(new fixture.window.Event('focusout', {bubbles: true}));
@@ -133,6 +135,7 @@ describe('video player binding', () => {
     const button = fixture.document.createElement('button');
     const binding = createVideoPlayerBinding({document: fixture.document, locator: fixture.locator, getState: () => ({enabled: true}), createButton: () => button});
     expect(button.parentElement?.className).toBe('x-controls');
+    expect(button.parentElement?.lastElementChild).toBe(button);
     binding.destroy();
   });
 
@@ -412,12 +415,12 @@ describe('X controls delayed mounting', () => {
     fixture.player.appendChild(controls);
     binding.sync();
     expect(createButton).toHaveBeenCalledTimes(1);
-    expect(controls.firstElementChild).toBe(createButton.mock.results[0].value);
+    expect(controls.lastElementChild).toBe(createButton.mock.results[0].value);
     controls.remove(); binding.sync();
     expect(fixture.player.querySelector('.fluent-read-video-fallback-controls')).toBeNull();
     expect(createButton.mock.results[0].value.isConnected).toBe(false);
     fixture.player.appendChild(controls); binding.sync();
-    expect(controls.firstElementChild).toBe(createButton.mock.results[1].value);
+    expect(controls.lastElementChild).toBe(createButton.mock.results[1].value);
     binding.destroy();
     expect(controls.querySelectorAll('button')).toHaveLength(2);
   });

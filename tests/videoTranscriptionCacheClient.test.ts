@@ -1,3 +1,4 @@
+import {buildVideoAiSubtitleVideoKey} from '@/src/features/video-subtitle/transcriptionCache';
 import {describe, expect, it, vi} from 'vitest';
 import {getVideoTranscriptionCacheRequest, VideoTranscriptionCacheClient} from '@/src/features/video-subtitle/content/transcriptionCacheClient';
 
@@ -10,12 +11,19 @@ describe('内容页完整识别缓存', () => {
       {pathname: '/someone/status/12/video/1', href: 'https://x.com/someone/status/12/video/1'},
     ]}), poster: request.source.poster, currentSrc: 'blob:https://x.com/random', src: ''} as unknown as HTMLVideoElement;
     expect(getVideoTranscriptionCacheRequest(video, 'base', 'ko', 'https://x.com/someone')).toEqual({
-      source: {statusUrl: 'https://x.com/someone/status/12/video/1', poster: request.source.poster, directSource: 'blob:https://x.com/random'},
+      source: {statusUrl: 'https://x.com/someone/status/12/video/1', videoIndex: '1', poster: request.source.poster, directSource: 'blob:https://x.com/random'},
       model: 'base', videoSourceLanguage: 'ko',
     });
     expect(getVideoTranscriptionCacheRequest(null, 'tiny', 'auto', '')).toBeNull();
     expect(getVideoTranscriptionCacheRequest({closest: () => null, src: 'https://video.twimg.com/a.mp4'} as unknown as HTMLVideoElement, 'tiny', 'auto', 'https://x.com/u/status/1'))
       .toMatchObject({source: {statusUrl: 'https://x.com/u/status/1', directSource: 'https://video.twimg.com/a.mp4'}});
+  });
+  it('缩略图尚未挂载时使用明确的视频序号，区分同帖的多段视频', () => {
+    const first = {poster: '', currentSrc: 'blob:first'} as unknown as HTMLVideoElement;
+    const second = {poster: '', currentSrc: 'blob:second'} as unknown as HTMLVideoElement;
+    for (const video of [first, second]) video.closest = (() => ({querySelectorAll: (selector: string) => selector === 'video' ? [first, second] : []})) as any;
+    expect(buildVideoAiSubtitleVideoKey(getVideoTranscriptionCacheRequest(first, 'tiny', 'auto', 'https://x.com/u/status/12')!.source)).toBe('tweet:12:video:1');
+    expect(buildVideoAiSubtitleVideoKey(getVideoTranscriptionCacheRequest(second, 'tiny', 'auto', 'https://x.com/u/status/12')!.source)).toBe('tweet:12:video:2');
   });
   it('命中只返回有效时间轴，缺失、损坏和存储故障均安全回退', async () => {
     const send = vi.fn().mockResolvedValue({success: true, hit: true, cues});

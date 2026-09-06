@@ -1,7 +1,7 @@
 <!--
  @file src/features/model-usage/ui/ModelUsageDashboard.vue
  文件职责：在 Options 设置页展示当前浏览器保存的模型调用可观测数据，并提供筛选、请求明细和清除统计入口。
- 主要内容：呈现 Token、请求与耗时概览，支持双指标趋势及键盘选取、互斥 Token 构成、模型排行筛选和按需展开的稳定游标请求记录。
+ 主要内容：按界面语言格式化 Token、日期和耗时，呈现请求概览，支持双指标趋势及键盘选取、互斥 Token 构成、模型排行筛选和按需展开的稳定游标请求记录。
  模块边界：组件只消费后台白名单数据，不读取 API Key、不记录原文、译文、提示词或网址，也不直接访问 IndexedDB；事件采集、Token 解释、持久化及备份恢复由 services、providers、background 与统一“备份与恢复”页面拥有。
 -->
 <template>
@@ -487,7 +487,7 @@ import {
 } from '@/src/core/config/customOpenAI'
 import {config, subscribeConfig} from '@/src/services/config/store'
 import {buildUsageComposition, buildUsageHealth, buildUsageTimeline, type UsageTimelineMetric} from '@/src/features/model-usage/model/insights'
-import {formatTokenCount, formatUsageRate} from '@/src/features/model-usage/model/tokenFormat'
+import {formatTokenCount, formatUsageRate as formatRate} from '@/src/features/model-usage/model/tokenFormat'
 import ServiceIcon from '@/src/ui/components/ServiceIcon.vue'
 import {useUiI18n} from '@/src/ui/i18n'
 import {
@@ -518,10 +518,10 @@ type RequestCacheFilter = '' | ModelUsageCacheStatus
 
 const BREAKDOWN_PREVIEW_COUNT = 8
 const requestPageSizeOptions = [20, 50, MODEL_USAGE_REQUEST_MAX_PAGE_SIZE] as const
-const numberFormatter = new Intl.NumberFormat('zh-CN', {maximumFractionDigits: 0})
-const requestDateFormatter = new Intl.DateTimeFormat('zh-CN', {
+const numberFormatter = computed(() => new Intl.NumberFormat(language.value, {maximumFractionDigits: 0}))
+const requestDateFormatter = computed(() => new Intl.DateTimeFormat(language.value, {
   month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false,
-})
+}))
 const rangeOptions: Array<{value: Range; label: string}> = [
   {value: 'today', label: '今日'},
   {value: '7d', label: '7 天'},
@@ -536,7 +536,7 @@ const breakdownSortOptions: Array<{key: BreakdownSortKey; label: string}> = [
 ]
 
 const props = withDefaults(defineProps<{active?: boolean}>(), {active: true})
-const {t, translateLegacy} = useUiI18n()
+const {t, translateLegacy, language} = useUiI18n()
 const customOpenAIProviders = ref<CustomOpenAIProvider[]>(config.customOpenAIProviders)
 const snapshot = ref<DashboardSnapshot | null>(null)
 const selectedService = ref('')
@@ -595,7 +595,7 @@ const modelOptions = computed(() => {
     ? dimensions.filter(dimension => dimension.serviceId === selectedService.value)
     : dimensions
   return [...new Set(source.flatMap(dimension => dimension.models))]
-    .sort((left, right) => modelLabel(left).localeCompare(modelLabel(right), 'zh-CN'))
+    .sort((left, right) => modelLabel(left).localeCompare(modelLabel(right), language.value))
 })
 const appliedScopeLabel = computed(() => {
   const service = appliedFilter.value.serviceId ? serviceLabel(appliedFilter.value.serviceId) : '全部 AI 服务'
@@ -693,20 +693,24 @@ function modelLabel(model: string): string {
   return model === 'unknown' ? '未知模型' : model
 }
 
+function formatUsageRate(value: number | null): string {
+  return formatRate(value, language.value)
+}
+
 function formatNumber(value: number): string {
-  return numberFormatter.format(Number.isFinite(value) && value > 0 ? value : 0)
+  return numberFormatter.value.format(Number.isFinite(value) && value > 0 ? value : 0)
 }
 
 function formatToken(value: number): string {
-  return formatTokenCount(value).compact
+  return formatTokenCount(value, language.value).compact
 }
 
 function tokenExactTitle(value: number): string {
-  return `完整数值：${formatTokenCount(value).exact} Token`
+  return `完整数值：${formatTokenCount(value, language.value).exact} Token`
 }
 
 function tokenAriaLabel(value: number): string {
-  return `${formatTokenCount(value).exact} Token`
+  return `${formatTokenCount(value, language.value).exact} Token`
 }
 
 function formatAverageValue(value: number | null): string {
@@ -718,22 +722,24 @@ function averageTokenTitle(value: number | null): string {
 }
 
 function formatDate(timestamp: number): string {
-  return new Intl.DateTimeFormat('zh-CN', {
+  return new Intl.DateTimeFormat(language.value, {
     month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit', hour12: false,
   }).format(timestamp)
 }
 
 function formatRequestTime(timestamp: number): string {
-  return requestDateFormatter.format(timestamp)
+  return requestDateFormatter.value.format(timestamp)
 }
 
 function formatDuration(durationMs: number): string {
   if (!Number.isFinite(durationMs) || durationMs < 0) return '—'
   if (durationMs < 1_000) return `${Math.round(durationMs)} ms`
-  if (durationMs < 60_000) return `${new Intl.NumberFormat('zh-CN', {maximumFractionDigits: 2}).format(durationMs / 1_000)} 秒`
-  const minutes = Math.floor(durationMs / 60_000)
-  const seconds = Math.round((durationMs % 60_000) / 1_000)
-  return `${minutes} 分 ${seconds} 秒`
+  const unit = (value: number, name: 'second' | 'minute') => new Intl.NumberFormat(language.value, {
+    style: 'unit', unit: name, unitDisplay: 'short', maximumFractionDigits: 2,
+  }).format(value)
+  if (durationMs < 60_000) return unit(durationMs / 1_000, 'second')
+  const totalSeconds = Math.round(durationMs / 1_000)
+  return `${unit(Math.floor(totalSeconds / 60), 'minute')} ${unit(totalSeconds % 60, 'second')}`
 }
 
 function purposeLabel(purpose: ModelUsagePurpose): string {

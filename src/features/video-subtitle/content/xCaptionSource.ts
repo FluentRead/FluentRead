@@ -1,13 +1,13 @@
 /**
  * @file src/features/video-subtitle/content/xCaptionSource.ts
  * 文件职责：把 X 播放器中的原生轨道、sidecar 与本地识别时间轴映射到唯一合成字幕容器。
- * 主要内容：在当前播放时间选择文本，仅在内容变化时写入 DOM，保留原生 TextTrack 模式并在媒体离开时恢复。
+ * 主要内容：清理原生 cue 的时间标记后按播放时间选择正文，仅在内容变化时写入 DOM，保留原生 TextTrack 模式并在媒体离开时恢复。
  * 模块边界：不读取配置存储、不识别或翻译音频，也不发起网络请求；运行时注入当前媒体及字幕状态，负责挂载和卸载时序。
  */
 import {VIDEO_AI_CAPTION_CONTAINER_ID, VIDEO_CAPTION_SEGMENT_SELECTOR, VIDEO_PLAYER_SELECTOR, findVideoPlayer, isXVideoPage} from './ui';
 import {getVisibleVideoAiCue} from './video-ai/cueTimeline';
 import type {VideoSubtitleCue} from './youtubeSubtitleData';
-import {selectXSubtitleLanguageResources} from './xVideoSubtitleData';
+import {cleanSubtitleText, selectXSubtitleLanguageResources} from './xVideoSubtitleData';
 
 export class XCaptionSource {
   private readonly changedTracks = new Map<TextTrack, TextTrackMode>();
@@ -63,7 +63,7 @@ export class XCaptionSource {
     for (const track of this.selectedNativeTracks()) {
       const cues = Array.from(track.cues || []).map(cue => ({
         startMs: cue.startTime * 1000, durationMs: (cue.endTime - cue.startTime) * 1000,
-        text: String((cue as TextTrackCue & {text?: string}).text || '').trim(),
+        text: cleanSubtitleText(String((cue as TextTrackCue & {text?: string}).text || '')),
       })).filter(cue => cue.text && Number.isFinite(cue.startMs) && cue.durationMs > 0);
       if (cues.length) return {languageCode: track.language || 'original', cues};
     }
@@ -110,7 +110,7 @@ export class XCaptionSource {
       // auto 尊重宿主选中的轨道；显式语言使用标签匹配，不能把 French 中的 en 当成英语。
       for (const track of this.selectedNativeTracks()) {
         const activeText = Array.from(track.activeCues || [])
-          .map((cue) => String((cue as TextTrackCue & { text?: string }).text || '').trim())
+          .map((cue) => cleanSubtitleText(String((cue as TextTrackCue & { text?: string }).text || '')))
           .filter(Boolean)
           .join('\n');
         if (activeText) {

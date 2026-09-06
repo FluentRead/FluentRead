@@ -1,84 +1,82 @@
 <div align="center">
 
-<img src="./public/icon/128.png" alt="FluentRead logo" width="96" />
+<img src="./public/icon/512.png" alt="FluentRead" width="96" />
 
 # FluentRead
 
-### Read more. Switch less.
+An open-source browser extension for bilingual reading and translation.
 
-An open-source browser extension that helps you understand foreign-language webpages without leaving the page.
-
-[![Latest version](https://img.shields.io/badge/version-0.0.32-6d5dfc?style=flat-square)](https://github.com/FluentRead/FluentRead/releases)
-[![License: GPL v3](https://img.shields.io/badge/license-GPL--3.0-22a06b?style=flat-square)](./LICENSE)
-[![GitHub stars](https://img.shields.io/github/stars/FluentRead/FluentRead?style=flat-square)](https://github.com/FluentRead/FluentRead)
-
-<br />
-
-**[Install](#install)** · **[See what it does](#what-you-can-do)** · **[Read the docs](https://fluent.thinkstu.com/)** · **[简体中文](./misc/README_ZH.md)**
+[Install](#installation) · [Website](https://fluent.thinkstu.com/en/) · [User guide](https://fluent.thinkstu.com/en/guide/) · [简体中文](./misc/README_ZH.md) · [GPL-3.0](./LICENSE)
 
 </div>
 
-<p align="center">
-  <img src="./misc/screenshots/translation.webp" alt="A webpage showing original text and translation together" width="920" />
-</p>
+FluentRead displays translations alongside the original webpage and provides selection translation, AI reading assistance, image and document translation, and bilingual video subtitles. Its reading card integrates a **browser adaptation of the DeepSeek Harness session core** for contextual explanations and follow-up questions.
 
-FluentRead puts translation back into the reading flow. Keep the original beside the translation, check one sentence without translating the whole page, or read a long article in two languages without opening another tab.
+[![FluentRead bilingual webpage translation](./docs/public/screenshots/en/translation.webp)](./docs/public/screenshots/en/translation.webp)
 
-## What you can do
+## Features
 
-| Read naturally | Keep your control |
+| Feature | Description |
 | --- | --- |
-| **Bilingual pages** — Keep the original text and translation together for study, research, news, and technical reading. | **Choose your service** — Start with free translation, or use Microsoft, Google, DeepL, AI services, or a local Ollama model. |
-| **Whole-page translation** — Translate an article while preserving its page structure, then restore the original whenever you want. | **Clear settings** — Choose a target language, translation style, theme, website rules, and shortcuts in one place. |
-| **Selection translation** — Select a sentence, term, or word and get a focused translation card. | **Privacy you can understand** — FluentRead has no account system or first-party translation server; you choose where translation requests go. |
-| **More than plain text** — Translate image text, local documents, and YouTube subtitles where supported. | **Reversible reading** — Change the language or service, then translate again without losing the original page. |
+| Webpage translation | Bilingual page translation, hover and selection translation, original-text restoration, and automatic translation rules. |
+| AI reading card | Meaning, sentence analysis, usage explanations, and practice, with paragraph context and follow-up questions. |
+| Learning center | Save words, phrases, and sentences with their original context for study and review. |
+| Image and area translation | Recognize text in webpage images or selected screen areas and display translations that can be copied. |
+| Document translation | Read PDF, ePub, DOCX, and other supported formats in two languages, edit translations, and export files. |
+| Video subtitles | Bilingual subtitles on YouTube and X; supported X videos can also use local AI transcription. |
+| Services and settings | Free translation services, DeepL, AI providers, and local Ollama models, with glossaries, translation styles, shortcuts, and menu layout settings. |
 
-## See it in action
+See the [user guide](https://fluent.thinkstu.com/en/guide/) for instructions and supported formats. AI explanations require a configured AI service. Third-party pricing and availability depend on the provider.
 
-<figure>
-  <img src="./misc/screenshots/popup.webp" alt="FluentRead popup with language, service, and translation controls" width="400" />
-  <figcaption>The popup keeps the most-used reading actions close at hand.</figcaption>
-</figure>
+## DeepSeek Harness
 
-<figure>
-  <img src="./misc/screenshots/settings-general.webp" alt="FluentRead general settings page" width="920" />
-  <figcaption>Set the language, appearance, website rules, and reading helpers to match your habits.</figcaption>
-</figure>
+The reading card adapts the conversation-event and message organization components of the DeepSeek Harness session core for the browser. FluentRead connects these to the selected text, permitted paragraph context, model services, and local reading history. It supports different AI providers and models, with optional learning memories.
 
-<figure>
-  <img src="./misc/screenshots/settings-services.webp" alt="FluentRead translation service settings page" width="920" />
-  <figcaption>Choose a translation service and configure it only when you need to.</figcaption>
-</figure>
+The adaptation is used for selection-based reading assistance. Full-page, hover, and regular selection translation use their respective translation pipelines. See the [integration map](./docs/reports/harness-embedding-map-20260905.md) for scope and upstream references, and the [third-party notice](./public/third-party-notices/deepseek-harness-MIT.txt) for its MIT license.
 
-## Install
+[Reading card guide](https://fluent.thinkstu.com/en/guide/deepseek-harness)
 
-| Browser or manager | Link |
-| --- | --- |
-| Chrome | [Chrome Web Store](https://chromewebstore.google.com/detail/%E6%B5%81%E7%95%85%E9%98%85%E8%AF%BB/djnlaiohfaaifbibleebjggkghlmcpcj?hl=en) · [CrxSoso mirror](https://www.crxsoso.com/webstore/detail/djnlaiohfaaifbibleebjggkghlmcpcj) |
-| Edge | [Microsoft Edge Add-ons](https://microsoftedge.microsoft.com/addons/detail/%E6%B5%81%E7%95%85%E9%98%85%E8%AF%BB/kakgmllfpjldjhcnkghpplmlbnmcoflp) |
-| Firefox | [Firefox Add-ons](https://addons.mozilla.org/en-US/firefox/addon/%E6%B5%81%E7%95%85%E9%98%85%E8%AF%BB/) |
-| Tampermonkey / Violentmonkey / Via | [Greasy Fork userscript](https://greasyfork.org/zh-CN/scripts/482986-%E6%B5%81%E7%95%85%E9%98%85%E8%AF%BB) |
+## Installation
 
-## Start reading
+[Chrome](https://chromewebstore.google.com/detail/djnlaiohfaaifbibleebjggkghlmcpcj) · [Edge](https://microsoftedge.microsoft.com/addons/detail/kakgmllfpjldjhcnkghpplmlbnmcoflp) · [Firefox](https://addons.mozilla.org/en-US/firefox/addon/%E6%B5%81%E7%95%85%E9%98%85%E8%AF%BB/) · [Userscript](https://greasyfork.org/en/scripts/482986)
 
-1. Install FluentRead from the store or script manager above.
-2. Open a normal webpage and choose a target language.
-3. Click “Translate page”, or select a sentence for a quick translation.
+1. Install the extension and refresh the webpage.
+2. Open FluentRead and select a target language. The source language defaults to automatic detection and can also be selected manually.
+3. Choose “Translate page.” Enable selection translation and other tools in settings as needed.
 
-For menus, buttons, or node labels missed by normal translation, enable **“Detect all nodes”** under **Settings → Advanced options → Page recognition**. It is off by default and stays saved for future translations. Continue using the usual hover or page translation controls; for an already translated page, restore the original and translate again. Try it on the [Epoch AI data center page](https://epoch.ai/data/ai-data-centers), n8n node panels, or expanded navigation trees. During page translation, newly opened menus are also translated. This scans mounted, visible DOM text; text drawn on Canvas or contained in images needs image or area translation. See the [feature guide](https://fluent.thinkstu.com/guide/features#补充翻译菜单和动态界面) for details.
+Store updates may arrive at different times. The userscript provides core webpage translation features. See the [installation guide](https://fluent.thinkstu.com/en/guide/getting-started) for browser and feature availability.
 
-The [official documentation](https://fluent.thinkstu.com/) explains the main features, service choices, website rules, and privacy boundaries in plain language.
+## Local development
 
-## Privacy
+Requirements: Node.js 20 or later and pnpm 9.
 
-FluentRead does not run an account system or a first-party translation server. When you use a cloud service, the text you ask to translate is sent to that service. You can choose a local Ollama model to keep more content on your computer. See the [data and privacy guide](https://fluent.thinkstu.com/guide/privacy) for the details.
+```sh
+pnpm install --frozen-lockfile
+pnpm dev
+```
 
-## Help
+Use `pnpm build` to build the Chrome extension, `pnpm compile` for type checking, and `pnpm docs:build` to build the website. See [architecture](./docs/architecture.md) and [testing](./docs/testing.md) for project conventions.
 
-To adjust a website's reading area, follow the [custom website rules tutorial](https://fluent.thinkstu.com/guide/custom-site-rules). To add or improve built-in rules, see the [website adaptation contribution guide](./docs/contributing/site-adaptation.md), including examples, fixtures, and validation steps.
+## Contributing
 
-- [Common questions](https://fluent.thinkstu.com/guide/faq)
-- [GitHub Issues](https://github.com/FluentRead/FluentRead/issues)
-- [Bilibili introduction](https://www.bilibili.com/video/BV1ux4y1e73x/)
+Report bugs and propose changes through [Issues](https://github.com/FluentRead/FluentRead/issues). Pull requests for code, documentation, interface translations, and [website adaptation](./docs/contributing/site-adaptation.md) are welcome.
 
-FluentRead is released under the [GPL-3.0 license](./LICENSE).
+Product descriptions and Chinese and English store images are maintained in the separate [press and store kit](./marketing/README.md).
+
+## Support
+
+Thank you for supporting FluentRead’s development and maintenance. Voluntary contributions are welcome through either service.
+
+<table>
+<tr><th>WeChat Pay</th><th>Ko-fi · International</th></tr>
+<tr>
+<td align="center"><a href="./misc/approve.jpg"><img src="./misc/approve.jpg" width="220" alt="Thinkstu’s WeChat support code" /></a><br />Scan with WeChat. Click the image to enlarge.</td>
+<td align="center"><a href="https://ko-fi.com/thinkstu"><strong>Support thinkstu on Ko-fi ↗</strong></a><br /><br />ko-fi.com/thinkstu</td>
+</tr>
+</table>
+
+## License and privacy
+
+FluentRead is released under [GPL-3.0](./LICENSE). See [third-party notices](./public/third-party-notices/) for component attribution and licenses.
+
+Cloud translation sends relevant text to the selected provider. See [data and privacy](https://fluent.thinkstu.com/en/guide/privacy) for file parsing, image recognition, and local model behavior.

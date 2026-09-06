@@ -36,9 +36,9 @@
         </div>
       </div>
       <div class="header-actions">
-        <button class="donation-button" type="button" title="赞赏流畅阅读" aria-label="打开赞赏页" @click="openDonation()">
+        <button ref="donationTrigger" class="donation-button" type="button" :title="t('popup.donationTitle')" :aria-label="t('popup.donationTitle')" @click="openDonation()">
           <Coffee />
-          <span>赞赏</span>
+          <span>{{ t('popup.donationButton') }}</span>
         </button>
         <button class="settings-button" type="button" title="完整设置" aria-label="打开完整设置" @click="openOptions()">
           <Setting />
@@ -56,15 +56,21 @@
         aria-labelledby="donation-title"
         @click.self="closeDonation"
       >
-        <section class="donation-card">
-          <button class="donation-close" type="button" aria-label="关闭赞赏页" @click="closeDonation">×</button>
-          <div class="donation-icon" aria-hidden="true"><Coffee /></div>
-          <span class="eyebrow">软件开源免费</span>
-          <h2 id="donation-title">如果你喜欢这款软件，</h2>
-          <p class="donation-description">可以扫描微信赞赏码支持作者，感谢鼓励。</p>
-          <div class="donation-qr-frame">
-            <img :src="'/misc/approve.jpg'" alt="流畅阅读赞赏码" />
-          </div>
+        <section ref="donationCard" class="donation-card" tabindex="-1">
+          <button class="donation-close" type="button" :aria-label="t('popup.donationClose')" @click="closeDonation">×</button>
+          <h2 id="donation-title">{{ t('popup.donationTitle') }}</h2>
+          <p class="donation-description">{{ t('popup.donationDescription') }}</p>
+          <section class="donation-method donation-wechat">
+            <div class="donation-method-heading"><h3>{{ t('popup.donationWechat') }}</h3><span>WeChat Pay</span></div>
+            <a class="donation-qr-frame" href="/misc/approve.jpg" target="_blank" rel="noopener noreferrer" :aria-label="t('popup.donationOpenCode')">
+              <img src="/misc/approve.jpg" :alt="t('popup.donationCodeAlt')" width="1152" height="1152" />
+            </a>
+            <p class="donation-method-note">{{ t('popup.donationScan') }}</p>
+          </section>
+          <a class="donation-method donation-kofi" href="https://ko-fi.com/thinkstu" target="_blank" rel="noopener noreferrer">
+            <span class="donation-kofi-mark" aria-hidden="true"><Coffee /></span>
+            <span class="donation-kofi-copy"><strong>Ko-fi <span aria-hidden="true">↗</span></strong><span>{{ t('popup.donationKofi') }}</span><small>ko-fi.com/thinkstu</small></span>
+          </a>
         </section>
       </div>
     </Transition>
@@ -678,6 +684,8 @@ const currentTabId = ref<number | null>(null);
 const currentSiteDomain = ref('');
 const clearingCache = ref(false);
 const donationVisible = ref(false);
+const donationCard = ref<HTMLElement | null>(null);
+const donationTrigger = ref<HTMLButtonElement | null>(null);
 const notice = ref('');
 const noticeType = ref<'success' | 'error'>('success');
 const showCustomMouseHotkeyDialog = ref(false);
@@ -1079,10 +1087,31 @@ function closeServicePicker(event?: Event) {
   servicePickerOpen.value = false;
   serviceSearchQuery.value = '';
 }
-function openDonation() { donationVisible.value = true; }
-function closeDonation() { donationVisible.value = false; }
+async function openDonation() {
+  donationVisible.value = true;
+  await nextTick();
+  donationCard.value?.querySelector<HTMLButtonElement>('.donation-close')?.focus();
+}
+function closeDonation() {
+  donationVisible.value = false;
+  donationTrigger.value?.focus();
+}
 function handleDonationKeydown(event: KeyboardEvent) {
-  if (event.key === 'Escape' && donationVisible.value) closeDonation();
+  if (!donationVisible.value) return;
+  if (event.key === 'Escape') {
+    event.preventDefault();
+    closeDonation();
+  } else if (event.key === 'Tab') {
+    const controls = donationCard.value?.querySelectorAll<HTMLElement>('button, a[href]');
+    if (!controls?.length) return;
+    const first = controls[0];
+    const last = controls[controls.length - 1];
+    const outside = !donationCard.value?.contains(document.activeElement);
+    if (outside || (event.shiftKey && document.activeElement === first) || (!event.shiftKey && document.activeElement === last)) {
+      event.preventDefault();
+      (event.shiftKey ? last : first).focus();
+    }
+  }
 }
 function handleServicePickerKeydown(event: KeyboardEvent) {
   if (event.key === 'Escape') closeServicePicker();

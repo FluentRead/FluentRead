@@ -83,7 +83,7 @@
                 <a href="https://github.com/Bistutu/FluentRead" target="_blank" rel="noreferrer">{{ t('options.aboutProject') }} <span>↗</span></a>
                 <a href="https://fluent.thinkstu.com/" target="_blank" rel="noreferrer">{{ t('options.aboutDocs') }} <span>↗</span></a>
                 <a href="https://github.com/Bistutu/FluentRead/issues" target="_blank" rel="noreferrer">{{ t('options.aboutFeedback') }} <span>↗</span></a>
-                <a :href="language === 'zh-CN' ? 'https://fluent.thinkstu.com/guide/support' : 'https://fluent.thinkstu.com/en/guide/support'" target="_blank" rel="noopener noreferrer">{{ t('popup.donationTitle') }} <span>↗</span></a>
+                <a href="https://github.com/FluentRead/FluentRead#support" target="_blank" rel="noopener noreferrer">{{ t('popup.donationTitle') }} <span>↗</span></a>
               </div>
             </article>
           </div>
@@ -120,7 +120,7 @@ import {
 import {applyInterfaceSkin} from '@/src/ui/interfaceAppearance'
 
 const version = process.env.VUE_APP_VERSION
-const {language, t, translateLegacy} = useUiI18n()
+const {t, translateLegacy} = useUiI18n()
 const query = ref('')
 const interfaceSkin = ref(getInterfaceSkinOption(runtimeConfig.interfaceSkin))
 const activeSection = ref('settings-general')

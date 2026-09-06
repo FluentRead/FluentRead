@@ -12,26 +12,26 @@ const handler = (type: string): BackgroundMessageHandler<object> => ({
 });
 
 describe('background capability registry', () => {
-    it('registers supported Chrome MV3 feature handlers in factory order', () => {
+    it.each([{browser: 'chrome', manifestVersion: 3 as const}, {browser: 'firefox', manifestVersion: 2 as const}])('registers the same feature handlers for $browser', (target) => {
         const areaHandlers = [handler('area-a'), handler('area-b')];
         const imageHandlers = [handler('image')];
         const areaTranslation = vi.fn(() => areaHandlers);
         const imageTranslation = vi.fn(() => imageHandlers);
 
         expect(createCapabilityGatedBackgroundHandlers(
-            resolveBrowserCapabilities({browser: 'chrome', manifestVersion: 3}),
+            resolveBrowserCapabilities(target),
             {areaTranslation, imageTranslation},
         )).toEqual([...areaHandlers, ...imageHandlers]);
         expect(areaTranslation).toHaveBeenCalledOnce();
         expect(imageTranslation).toHaveBeenCalledOnce();
     });
 
-    it('does not instantiate unsupported Firefox feature factories', () => {
+    it('does not instantiate unsupported Firefox MV3 feature factories', () => {
         const areaTranslation = vi.fn(() => [handler('area')]);
         const imageTranslation = vi.fn(() => [handler('image')]);
 
         expect(createCapabilityGatedBackgroundHandlers(
-            resolveBrowserCapabilities({browser: 'firefox', manifestVersion: 2}),
+            resolveBrowserCapabilities({browser: 'firefox', manifestVersion: 3}),
             {areaTranslation, imageTranslation},
         )).toEqual([]);
         expect(areaTranslation).not.toHaveBeenCalled();
@@ -41,7 +41,7 @@ describe('background capability registry', () => {
     it('can gate the two feature families independently', () => {
         const area = handler('area');
         const image = handler('image');
-        const baseline = resolveBrowserCapabilities({browser: 'firefox', manifestVersion: 2});
+        const baseline = resolveBrowserCapabilities({browser: 'firefox', manifestVersion: 3});
 
         expect(createCapabilityGatedBackgroundHandlers(
             {...baseline, areaTranslation: true},
@@ -68,7 +68,7 @@ describe('background capability registry', () => {
         expect(stop).toHaveBeenCalledWith({id: 'chrome'});
 
         const pageOnlyTransport = createCapabilityGatedSelectionTtsTransport(
-            resolveBrowserCapabilities({browser: 'firefox', manifestVersion: 2}),
+            resolveBrowserCapabilities({browser: 'firefox', manifestVersion: 3}),
             transport,
         );
         expect(pageOnlyTransport.play).toBe(play);

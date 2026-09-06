@@ -127,7 +127,7 @@ async function main() {
     assert(chromeArtifacts.includes('offscreen.html'), 'Chrome MV3 缺少 offscreen.html');
     assert(firefoxManifest.manifest_version === 2, 'Firefox 默认产物必须是 Manifest V2');
     assert(countPermission(firefoxManifest, 'offscreen') === 0, 'Firefox 不得声明 Chrome-only offscreen 权限');
-    assert(firefoxArtifacts.length === 0, `Firefox 不得包含 Offscreen 页面或 chunk：${firefoxArtifacts.join(', ')}`);
+    assert(firefoxArtifacts.includes('offscreen.html'), 'Firefox 缺少后台 iframe 使用的共享 DOM 页面');
     assert(!chromeManifest.browser_specific_settings?.gecko, 'Chrome manifest 不得包含 Firefox Gecko metadata');
     const firefoxGecko = firefoxManifest.browser_specific_settings?.gecko;
     assert(firefoxGecko?.id === '{3096bd53-3bda-4556-b076-ebf47442a5c1}', 'Firefox manifest 缺少稳定 AMO GUID');
@@ -143,7 +143,9 @@ async function main() {
     assert(chromeOcrAssets.some((file) => file.includes('/core/'))
         && chromeOcrAssets.some((file) => file.includes('/worker/')),
     'Chrome 产物必须保留本地 OCR core 与 worker');
-    assert(firefoxOcrAssets.length === 0, `Firefox 不得打包不可用的 OCR 资产：${firefoxOcrAssets.join(', ')}`);
+    assert(firefoxOcrAssets.some((file) => file.includes('/core/'))
+        && firefoxOcrAssets.some((file) => file.includes('/worker/')),
+    'Firefox 必须打包与 Chrome 共用的 OCR core 与 worker');
     const chromeBuildMarker = '__FLUENTREAD_BROWSER_CAPABILITY_BUILD__:chrome:mv3__';
     const firefoxBuildMarker = '__FLUENTREAD_BROWSER_CAPABILITY_BUILD__:firefox:mv2__';
     assert(chromeJavaScript.includes(chromeBuildMarker), 'Chrome 产物缺少 chrome/MV3 runtime capability 构建标记');
@@ -180,8 +182,11 @@ async function main() {
             ...extensionArchive.filter((file) => file.startsWith('fluent-read-ocr/')),
             ...sourceArchive.filter((file) => file.startsWith('public/fluent-read-ocr/')),
         ];
-        assert(firefoxArchiveOcrAssets.length === 0,
-            `Firefox 发布压缩包不得包含不可用的 OCR 资产：${firefoxArchiveOcrAssets.join(', ')}`);
+        assert(extensionArchive.includes('offscreen.html')
+            && firefoxArchiveOcrAssets.some(file => file.startsWith('fluent-read-ocr/core/'))
+            && firefoxArchiveOcrAssets.some(file => file.startsWith('fluent-read-ocr/worker/'))
+            && sourceArchive.some(file => file.startsWith('public/fluent-read-ocr/core/')),
+        'Firefox 扩展包与源码包必须保留共享 DOM 页面和 OCR 资源');
     }
 
     console.log(JSON.stringify({

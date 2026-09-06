@@ -529,7 +529,7 @@
             <ElOption v-for="item in videoServiceOptions" :key="item.value" :value="item.value" :label="translateControlLabel(item.label)" />
           </UiSelect>
         </label>
-        <div v-if="browserCapabilities.offscreenDocument" class="x-video-ai-group">
+        <div v-if="browserCapabilities.extensionDom" class="x-video-ai-group">
           <div class="x-video-ai-group-heading">
             <strong>X 视频 · 本地 AI</strong>
             <small>无原生字幕时使用浏览器本地识别</small>

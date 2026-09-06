@@ -82,7 +82,7 @@ describe('selection TTS background handlers', () => {
         expect(dependencies.playWithOffscreen).not.toHaveBeenCalled();
     });
 
-    it('Firefox page-only 依赖路径直接返回 page audio，取消合成且不触碰 Offscreen 或 warn', async () => {
+    it('显式关闭扩展播放时直接返回 page audio，取消合成且不触碰文档或 warn', async () => {
         const synthesis = deferred<SelectionTtsAudio>();
         let signal: AbortSignal | undefined;
         const offscreen = {
@@ -90,7 +90,7 @@ describe('selection TTS background handlers', () => {
             stop: vi.fn(async () => undefined),
         };
         const transport = createCapabilityGatedSelectionTtsTransport(
-            resolveBrowserCapabilities({browser: 'firefox', manifestVersion: 2}),
+            {...resolveBrowserCapabilities({browser: 'firefox', manifestVersion: 2}), selectionTtsExtensionPlayback: false},
             offscreen,
         );
         const {dependencies, router} = createSubject({

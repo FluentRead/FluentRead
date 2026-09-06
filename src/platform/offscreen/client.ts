@@ -1,9 +1,9 @@
 /**
  * @file src/platform/offscreen/client.ts
  *
- * 文件职责：管理 Chrome Offscreen document 的创建、复用与消息发送，为 OCR、内置翻译和音频等后台能力提供基础设施客户端。
+ * 文件职责：统一管理扩展自有 DOM 的创建、复用与消息发送，为 OCR、内置翻译和音频等后台能力提供基础设施客户端。
  * 主要内容：定义 runtime/document 依赖端口和 OffscreenClient，createOffscreenClient 串行创建文档、等待接收端 ready 握手，并在接收端丢失时受控重建一次，默认 chromeOffscreenClient 连接浏览器 API。 可核对的公开符号包括 OffscreenMessage、OffscreenMessageEnvelope、OffscreenRuntimeApi、OffscreenDocumentApi、OffscreenClientDependencies、OffscreenClient、createOffscreenClient、chromeOffscreenClient。
- * 模块边界：本文件属于 platform 基础设施边界，只封装浏览器、网络、存储上下文或 Shadow DOM 机制；不决定翻译业务策略，不直接实现 feature，业务层通过类型化端口消费这里的能力。
+ * 模块边界：只封装文档生命周期与消息可靠性；默认连接 Chrome Offscreen，Firefox 注入文档容器与查询端口，不复制任务调度或业务逻辑。
  */
 
 export interface OffscreenMessage {
@@ -40,6 +40,8 @@ export interface OffscreenDocumentApi {
 export interface OffscreenClientDependencies {
     readonly getRuntime: () => OffscreenRuntimeApi;
     readonly getOffscreen: () => OffscreenDocumentApi | undefined;
+    /** 替代文档容器的查询端口；未提供时使用 Chrome runtime.getContexts。 */
+    readonly getDocumentContexts?: () => Promise<unknown[]>;
     readonly documentUrl?: string;
     readonly readyRetryAttempts?: number;
     readonly readyRetryDelay?: () => Promise<void>;
@@ -104,7 +106,7 @@ function throwIfAborted(signal: AbortSignal): void {
     if (signal.aborted) throw createAbortError();
 }
 
-/** Chrome MV3 Offscreen 生命周期与 callback runtime messaging 的唯一平台适配器。 */
+/** 原生 Offscreen 与 Firefox 后台容器共享的生命周期和 callback 消息客户端。 */
 export function createOffscreenClient(dependencies: OffscreenClientDependencies): OffscreenClient {
     type DocumentPreparationResult = {createdDocument: boolean};
     let preparingDocument: {
@@ -171,6 +173,7 @@ export function createOffscreenClient(dependencies: OffscreenClientDependencies)
     });
 
     const getExistingContexts = async (): Promise<unknown[]> => {
+        if (dependencies.getDocumentContexts) return dependencies.getDocumentContexts();
         const getContexts = dependencies.getRuntime().getContexts;
         if (typeof getContexts !== 'function') {
             throw new Error('当前浏览器不支持查询 Offscreen 文档');
@@ -180,8 +183,9 @@ export function createOffscreenClient(dependencies: OffscreenClientDependencies)
 
     const hasDocumentWithoutDeadline = async (): Promise<boolean> => {
         const runtime = dependencies.getRuntime();
-        if (!dependencies.getOffscreen() || typeof runtime.getContexts !== 'function') return false;
-        const contexts = await runtime.getContexts({contextTypes: ['OFFSCREEN_DOCUMENT']});
+        if (!dependencies.getOffscreen()
+            || (!dependencies.getDocumentContexts && typeof runtime.getContexts !== 'function')) return false;
+        const contexts = await getExistingContexts();
         return contexts.length > 0;
     };
 

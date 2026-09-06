@@ -1,0 +1,85 @@
+{
+  "baseCommit": "1492cc3a30c94c344fe6f0679fe72d7608402320",
+  "extension": "production chrome-mv3",
+  "captureScale": 2,
+  "content": "Self-authored sample; reviewed fixture translations through the real extension pipeline",
+  "screenshots": [
+    {
+      "name": "translation",
+      "width": 2560,
+      "height": 1600
+    },
+    {
+      "name": "selection",
+      "width": 2560,
+      "height": 1600
+    },
+    {
+      "name": "selection-detail",
+      "width": 1400,
+      "height": 960
+    },
+    {
+      "name": "popup",
+      "width": 720,
+      "height": 1120
+    },
+    {
+      "name": "settings-general",
+      "width": 2560,
+      "height": 1600
+    },
+    {
+      "name": "settings-services",
+      "width": 2560,
+      "height": 1600
+    },
+    {
+      "name": "document",
+      "width": 2560,
+      "height": 1600
+    },
+    {
+      "name": "reading-card",
+      "width": 2560,
+      "height": 1600
+    },
+    {
+      "name": "reading-card-detail",
+      "width": 840,
+      "height": 1140
+    }
+  ],
+  "pageErrors": [],
+  "launchMode": "macos-background-cdp",
+  "focusPolicy": "launchservices-no-foreground",
+  "windowPlacement": {
+    "mode": "background-visible-no-focus",
+    "visible": true,
+    "hidden": false,
+    "centered": true,
+    "windowState": "normal",
+    "bounds": {
+      "left": 212,
+      "top": -940,
+      "width": 1280,
+      "height": 800
+    },
+    "displayTarget": "secondary",
+    "source": "macos-nsscreen",
+    "screenIndex": 1,
+    "browserFrontmost": false,
+    "frontmostBefore": {
+      "pid": 17439,
+      "name": "ChatGPT"
+    },
+    "frontmostAfter": {
+      "pid": 17439,
+      "name": "ChatGPT"
+    }
+  },
+  "readingRequests": 2,
+  "requests": 10,
+  "sourceLanguage": "auto",
+  "ok": true
+}

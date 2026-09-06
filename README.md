@@ -1,84 +1,63 @@
 <div align="center">
 
-<img src="./public/icon/128.png" alt="FluentRead logo" width="96" />
+<img src="./public/icon/128.png" alt="FluentRead" width="72" />
 
 # FluentRead
 
-### Read more. Switch less.
+### Another language? Keep reading.
 
-An open-source browser extension that helps you understand foreign-language webpages without leaving the page.
+Found something good to read? Don’t let the language put you off.<br />Read it in two languages, check a tricky sentence, and keep a phrase you like.
 
-[![Latest version](https://img.shields.io/badge/version-0.0.32-6d5dfc?style=flat-square)](https://github.com/FluentRead/FluentRead/releases)
-[![License: GPL v3](https://img.shields.io/badge/license-GPL--3.0-22a06b?style=flat-square)](./LICENSE)
-[![GitHub stars](https://img.shields.io/github/stars/FluentRead/FluentRead?style=flat-square)](https://github.com/FluentRead/FluentRead)
+**Open source · GPL-3.0 · DeepSeek Harness session core**
 
-<br />
-
-**[Install](#install)** · **[See what it does](#what-you-can-do)** · **[Read the docs](https://fluent.thinkstu.com/)** · **[简体中文](./misc/README_ZH.md)**
+[Get the extension](#get-fluentread) · [Website](https://fluent.thinkstu.com/en/) · [Guide](https://fluent.thinkstu.com/en/guide/) · [简体中文](./misc/README_ZH.md)
 
 </div>
 
-<p align="center">
-  <img src="./misc/screenshots/translation.webp" alt="A webpage showing original text and translation together" width="920" />
-</p>
+[![FluentRead showing Chinese text and English translations together](./docs/public/screenshots/en/translation.webp)](./docs/public/screenshots/en/translation.webp)
 
-FluentRead puts translation back into the reading flow. Keep the original beside the translation, check one sentence without translating the whole page, or read a long article in two languages without opening another tab.
+## Open source. With DeepSeek Harness inside the reading card.
 
-## What you can do
+FluentRead is an **open-source browser extension under [GPL-3.0](./LICENSE)**. Read the code, build your own version, and bring your ideas to the project.
 
-| Read naturally | Keep your control |
-| --- | --- |
-| **Bilingual pages** — Keep the original text and translation together for study, research, news, and technical reading. | **Choose your service** — Start with free translation, or use Microsoft, Google, DeepL, AI services, or a local Ollama model. |
-| **Whole-page translation** — Translate an article while preserving its page structure, then restore the original whenever you want. | **Clear settings** — Choose a target language, translation style, theme, website rules, and shortcuts in one place. |
-| **Selection translation** — Select a sentence, term, or word and get a focused translation card. | **Privacy you can understand** — FluentRead has no account system or first-party translation server; you choose where translation requests go. |
-| **More than plain text** — Translate image text, local documents, and YouTube subtitles where supported. | **Reversible reading** — Change the language or service, then translate again without losing the original page. |
+The reading card integrates a **browser adaptation of the DeepSeek Harness session core**. Explain a sentence, reference its paragraph, and keep asking follow-up questions using your chosen AI model. FluentRead connects the conversation to reading history, optional learning memories, and a learning center for the expressions you want to keep.
 
-## See it in action
+[Try the reading card →](https://fluent.thinkstu.com/en/guide/deepseek-harness)
 
-<figure>
-  <img src="./misc/screenshots/popup.webp" alt="FluentRead popup with language, service, and translation controls" width="400" />
-  <figcaption>The popup keeps the most-used reading actions close at hand.</figcaption>
-</figure>
+## Read the whole thing. Or just this bit.
 
-<figure>
-  <img src="./misc/screenshots/settings-general.webp" alt="FluentRead general settings page" width="920" />
-  <figcaption>Set the language, appearance, website rules, and reading helpers to match your habits.</figcaption>
-</figure>
+**A long article?** Translate it on the page and keep the original nearby. Follow along paragraph by paragraph, check a name or detail, and restore the original when you’re done.
 
-<figure>
-  <img src="./misc/screenshots/settings-services.webp" alt="FluentRead translation service settings page" width="920" />
-  <figcaption>Choose a translation service and configure it only when you need to.</figcaption>
-</figure>
+**A sentence that won’t quite click?** Hover over a paragraph or select a passage for a quick translation. The AI reading card can explain the tone, unpack the sentence, and show how an expression is used.
 
-## Install
+**A phrase worth keeping?** Save words, phrases, and sentences to the learning center. Come back to the original context, try writing your own sentence, and revisit it later.
 
-| Browser or manager | Link |
-| --- | --- |
-| Chrome | [Chrome Web Store](https://chromewebstore.google.com/detail/%E6%B5%81%E7%95%85%E9%98%85%E8%AF%BB/djnlaiohfaaifbibleebjggkghlmcpcj?hl=en) · [CrxSoso mirror](https://www.crxsoso.com/webstore/detail/djnlaiohfaaifbibleebjggkghlmcpcj) |
-| Edge | [Microsoft Edge Add-ons](https://microsoftedge.microsoft.com/addons/detail/%E6%B5%81%E7%95%85%E9%98%85%E8%AF%BB/kakgmllfpjldjhcnkghpplmlbnmcoflp) |
-| Firefox | [Firefox Add-ons](https://addons.mozilla.org/en-US/firefox/addon/%E6%B5%81%E7%95%85%E9%98%85%E8%AF%BB/) |
-| Tampermonkey / Violentmonkey / Via | [Greasy Fork userscript](https://greasyfork.org/zh-CN/scripts/482986-%E6%B5%81%E7%95%85%E9%98%85%E8%AF%BB) |
+## Pictures, files, videos. Those too.
 
-## Start reading
+- **Images & selected areas:** translate text inside a picture or draw around a small area to get text you can copy.
+- **Documents:** open PDF, ePub, DOCX, and other supported files; read both languages, edit translations, and download the result.
+- **Video subtitles:** read bilingual subtitles on YouTube and X. Supported X videos can also use local AI transcription after a model download.
 
-1. Install FluentRead from the store or script manager above.
-2. Open a normal webpage and choose a target language.
-3. Click “Translate page”, or select a sentence for a quick translation.
+[Explore the tools and their requirements →](https://fluent.thinkstu.com/en/guide/)
 
-For menus, buttons, or node labels missed by normal translation, enable **“Detect all nodes”** under **Settings → Advanced options → Page recognition**. It is off by default and stays saved for future translations. Continue using the usual hover or page translation controls; for an already translated page, restore the original and translate again. Try it on the [Epoch AI data center page](https://epoch.ai/data/ai-data-centers), n8n node panels, or expanded navigation trees. During page translation, newly opened menus are also translated. This scans mounted, visible DOM text; text drawn on Canvas or contained in images needs image or area translation. See the [feature guide](https://fluent.thinkstu.com/guide/features#补充翻译菜单和动态界面) for details.
+## Make yourself comfortable
 
-The [official documentation](https://fluent.thinkstu.com/) explains the main features, service choices, website rules, and privacy boundaries in plain language.
+Set your regular sites to translate automatically, change translation styles, or move and hide menu entries. Choose the ready-to-use free translation service, connect your own provider, or use a local Ollama model.
 
-## Privacy
+AI explanations require a configured AI service. Third-party services may charge separately. Cloud translation sends relevant text to the chosen provider; local OCR does not make every feature offline. See [service setup](https://fluent.thinkstu.com/en/config/translation-engines) and [data & privacy](https://fluent.thinkstu.com/en/guide/privacy).
 
-FluentRead does not run an account system or a first-party translation server. When you use a cloud service, the text you ask to translate is sent to that service. You can choose a local Ollama model to keep more content on your computer. See the [data and privacy guide](https://fluent.thinkstu.com/guide/privacy) for the details.
+## Get FluentRead
 
-## Help
+[Chrome](https://chromewebstore.google.com/detail/djnlaiohfaaifbibleebjggkghlmcpcj) · [Edge](https://microsoftedge.microsoft.com/addons/detail/kakgmllfpjldjhcnkghpplmlbnmcoflp) · [Firefox](https://addons.mozilla.org/en-US/firefox/addon/%E6%B5%81%E7%95%85%E9%98%85%E8%AF%BB/) · [Userscript](https://greasyfork.org/en/scripts/482986)
 
-To adjust a website's reading area, follow the [custom website rules tutorial](https://fluent.thinkstu.com/guide/custom-site-rules). To add or improve built-in rules, see the [website adaptation contribution guide](./docs/contributing/site-adaptation.md), including examples, fixtures, and validation steps.
+Install, refresh an article, and open FluentRead. Keep the source on automatic detection, choose your target language, and translate the page. Enable selection translation in the menu if you’d like to check individual passages.
 
-- [Common questions](https://fluent.thinkstu.com/guide/faq)
-- [GitHub Issues](https://github.com/FluentRead/FluentRead/issues)
-- [Bilibili introduction](https://www.bilibili.com/video/BV1ux4y1e73x/)
+Browser and store versions can differ. The userscript provides core webpage tools; image capture, local models, and video features depend on the browser and extension version. [Installation guide →](https://fluent.thinkstu.com/en/guide/getting-started)
 
-FluentRead is released under the [GPL-3.0 license](./LICENSE).
+## Help, contribute, or share
+
+[Troubleshooting](https://fluent.thinkstu.com/en/guide/faq) · [Report an issue](https://github.com/FluentRead/FluentRead/issues) · [Architecture](./docs/architecture.md) · [Testing](./docs/testing.md) · [Website rules](./docs/contributing/site-adaptation.md)
+
+Descriptions and ready-to-upload store images live in the separate [press & store kit](./marketing/README.md).
+
+FluentRead is open source under [GPL-3.0](./LICENSE). See [third-party notices](./public/third-party-notices/) and [maintainer references](./docs/maintainers/README.md) for attribution and implementation notes.

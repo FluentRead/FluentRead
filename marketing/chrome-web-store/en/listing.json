@@ -1,0 +1,7 @@
+{
+  "title": "FluentRead",
+  "shortDescription": "Open-source bilingual reading. Ask about tricky sentences with a browser-adapted DeepSeek Harness session core.",
+  "descriptionFile": "description.txt",
+  "language": "en",
+  "sourceLanguageInScreenshots": "auto"
+}

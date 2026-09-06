@@ -1,84 +1,63 @@
 <div align="center">
 
-<img src="../public/icon/128.png" alt="流畅阅读图标" width="96" />
+<img src="../public/icon/128.png" alt="FluentRead 流畅阅读" width="72" />
 
-# 流畅阅读（FluentRead）
+# FluentRead · 流畅阅读
 
-### 看懂外语网页，不打断阅读。
+### 外语？照样读。
 
-一款帮助你在当前页面读懂外语内容的开源浏览器翻译插件。
+刷到一篇好文章，别被外语劝退。<br />全文对照着读，难句随手翻，喜欢的表达顺便收下。
 
-[![版本](https://img.shields.io/badge/version-0.0.32-6d5dfc?style=flat-square)](https://github.com/FluentRead/FluentRead/releases)
-[![许可证：GPL v3](https://img.shields.io/badge/license-GPL--3.0-22a06b?style=flat-square)](../LICENSE)
-[![GitHub stars](https://img.shields.io/github/stars/FluentRead/FluentRead?style=flat-square)](https://github.com/FluentRead/FluentRead)
+**开源 · GPL-3.0 · DeepSeek Harness 会话内核**
 
-<br />
-
-**[安装](#安装)** · **[功能](#你可以用它做什么)** · **[官方文档](https://fluent.thinkstu.com/)** · **[English](../README.md)**
+[安装](#安装) · [官网](https://fluent.thinkstu.com/) · [使用指南](https://fluent.thinkstu.com/guide/) · [English](../README.md)
 
 </div>
 
-<p align="center">
-  <img src="./screenshots/translation.webp" alt="网页中原文和译文按段落一起显示" width="920" />
-</p>
+[![FluentRead 在英文原文旁显示完整中文译文](../docs/public/screenshots/translation.webp)](../docs/public/screenshots/translation.webp)
 
-流畅阅读把翻译放回阅读流程：保留原文和页面结构，只查你需要的句子，或者直接在当前页面完成长文阅读，不必来回切换标签页。
+## 开源，也接入了 DeepSeek Harness 内核
 
-## 你可以用它做什么
+FluentRead 是一款遵循 **[GPL-3.0](../LICENSE) 的开源浏览器扩展**。代码公开，欢迎查看、修改，也欢迎把你的点子带进来。
 
-| 读得自然 | 控制得清楚 |
-| --- | --- |
-| **网页双语阅读**：原文与译文同时保留，适合新闻、研究、文档和日常阅读。 | **自由选择服务**：可以先用免费翻译，也可以选择微软、谷歌、DeepL、AI 服务或本地 Ollama。 |
-| **全文翻译**：按页面结构翻译文章，随时恢复原文，换语言或服务后还能再次翻译。 | **设置集中明白**：在一个地方调整目标语言、译文样式、主题、网站规则和快捷键。 |
-| **划词翻译**：选中一句话、术语或单词，马上查看聚焦的翻译卡片。 | **隐私边界清楚**：没有账号体系，也没有流畅阅读自己的翻译服务器，翻译请求发往哪里由你选择。 |
-| **支持更多内容**：在支持的场景中翻译图片文字、本地文档和 YouTube 字幕。 | **阅读可以反悔**：译文不会取代原文，恢复后可以重新选择方式。 |
+翻译卡接入 **DeepSeek Harness 会话内核的浏览器适配**。从选中的一句话出发，结合当前段落解释、拆句，再继续追问；AI 模型由你选择。FluentRead 把这段对话接到阅读记录、可选的学习记忆和词句收藏里，让看懂的一句，慢慢变成自己会用的一句。
 
-## 看看它怎么工作
+[看看翻译卡怎么用 →](https://fluent.thinkstu.com/guide/deepseek-harness)
 
-<figure>
-  <img src="./screenshots/popup.webp" alt="流畅阅读弹窗中的语言、服务和翻译操作" width="400" />
-  <figcaption>弹窗：语言、服务和常用阅读操作集中在手边。</figcaption>
-</figure>
+## 整篇读，或者只看这一句
 
-<figure>
-  <img src="./screenshots/settings-general.webp" alt="流畅阅读通用设置页面" width="920" />
-  <figcaption>设置：按自己的习惯调整语言、外观、网站规则和阅读辅助。</figcaption>
-</figure>
+**长文章，一段一段读。** 新闻、帖子、论文，打开就接着读。译文跟在原文旁边，人名、细节随时对照。看完想收起译文，恢复原文就好。
 
-<figure>
-  <img src="./screenshots/settings-services.webp" alt="流畅阅读翻译服务设置页面" width="920" />
-  <figcaption>翻译服务：需要时选择服务并完成连接设置。</figcaption>
-</figure>
+**这句话，再讲讲。** 鼠标悬停在段落上，或选中一句话，随手查看译文。意思大概懂了，但还想知道为什么这样说？让 AI 翻译卡拆拆长句、讲讲语气和用法。
+
+**喜欢的表达，收下来。** 单词、短语、整句话都能收藏到学习中心。下次回到原句看看，试着自己造个句，再复习一下。
+
+## 图片、文件、视频，也能翻
+
+- **图片与圈选**：图片里的字可以翻，也可以只圈出一小块，查看能复制的译文。
+- **本地文档**：打开 PDF、ePub、Word 等文件，对照阅读、校订，再下载保存。
+- **视频字幕**：YouTube 和 X 可以显示双语字幕。支持的 X 视频还可以下载模型后，在本地生成 AI 字幕。
+
+[看看各个功能怎么用 →](https://fluent.thinkstu.com/guide/)
+
+## 怎么顺手，怎么来
+
+常看的站点自动翻，不常用的按钮藏起来。译文换个样式，菜单挪个位置，调成自己用着舒服的样子。
+
+先用现成的免费翻译服务；有自己的偏好，再连接 DeepL、AI 服务或本地 Ollama 模型。AI 讲解需要配置服务，第三方服务可能单独收费。云端翻译会发送待译文字，本地图片识别也不代表所有功能都离线。详见[翻译服务](https://fluent.thinkstu.com/config/translation-engines)与[数据与隐私](https://fluent.thinkstu.com/guide/privacy)。
 
 ## 安装
 
-| 浏览器或管理器 | 链接 |
-| --- | --- |
-| Chrome | [Chrome 应用商店](https://chromewebstore.google.com/detail/%E6%B5%81%E7%95%85%E9%98%85%E8%AF%BB/djnlaiohfaaifbibleebjggkghlmcpcj?hl=zh-CN) · [CrxSoso 国内镜像](https://www.crxsoso.com/webstore/detail/djnlaiohfaaifbibleebjggkghlmcpcj) |
-| Edge | [Microsoft Edge 加载项](https://microsoftedge.microsoft.com/addons/detail/%E6%B5%81%E7%95%85%E9%98%85%E8%AF%BB/kakgmllfpjldjhcnkghpplmlbnmcoflp?hl=zh-CN) |
-| Firefox | [Firefox 附加组件](https://addons.mozilla.org/zh-CN/firefox/addon/%E6%B5%81%E7%95%85%E9%98%85%E8%AF%BB/) |
-| Tampermonkey / Violentmonkey / Via | [Greasy Fork 油猴脚本](https://greasyfork.org/zh-CN/scripts/482986-%E6%B5%81%E7%95%85%E9%98%85%E8%AF%BB) |
+[Chrome](https://chromewebstore.google.com/detail/djnlaiohfaaifbibleebjggkghlmcpcj) · [Edge](https://microsoftedge.microsoft.com/addons/detail/kakgmllfpjldjhcnkghpplmlbnmcoflp) · [Firefox](https://addons.mozilla.org/zh-CN/firefox/addon/%E6%B5%81%E7%95%85%E9%98%85%E8%AF%BB/) · [油猴脚本](https://greasyfork.org/zh-CN/scripts/482986)
 
-## 开始阅读
+安装后刷新文章，打开 FluentRead，源语言保持自动检测，选好目标语言，开始翻译页面。想逐句查词，可以先在菜单里开启划词翻译。
 
-1. 从上面的商店或脚本管理器安装流畅阅读。
-2. 打开一篇普通网页，选择目标语言。
-3. 点击“翻译页面”，或者选中一句话快速翻译。
+不同商店的版本更新可能有时间差。油猴脚本提供核心网页翻译；图片圈选、本地模型和视频功能以对应浏览器与扩展版本为准。[安装指南 →](https://fluent.thinkstu.com/guide/getting-started)
 
-如果菜单、按钮或节点标签仍有漏译，可以在 **设置 → 高级选项 → 页面识别** 中开启 **“识别全部节点”**。默认关闭，开启后会保存，并在下次翻译时生效。继续使用原有悬浮或全文翻译方式即可；已翻译的页面请先恢复原文，再重新翻译。适用场景包括 [Epoch AI 数据中心页面](https://epoch.ai/data/ai-data-centers)、n8n 节点面板以及展开的导航树，全文翻译期间新打开的菜单也会自动翻译。识别范围是已挂载、可见的文本 DOM，Canvas 或图片中的文字请使用图片翻译或圈选翻译，详见[功能介绍](https://fluent.thinkstu.com/guide/features#补充翻译菜单和动态界面)。
+## 遇到问题，或者想一起做点什么
 
-[官方文档](https://fluent.thinkstu.com/)会用简单的说明介绍主要功能、翻译服务、网站规则和隐私边界。
+[常见问题](https://fluent.thinkstu.com/guide/faq) · [反馈问题](https://github.com/FluentRead/FluentRead/issues) · [架构说明](../docs/architecture.md) · [测试说明](../docs/testing.md) · [网站适配贡献](../docs/contributing/site-adaptation.md)
 
-## 隐私
+需要介绍产品或发布商店页面，可以直接使用独立的[宣传与商店素材包](../marketing/README.md)。
 
-流畅阅读没有账号体系，也没有自己的翻译服务器。使用云端服务时，你要求翻译的文字会发送给对应服务；你也可以选择本地 Ollama，让更多内容留在电脑上。详情请查看[数据与隐私](https://fluent.thinkstu.com/guide/privacy)。
-
-## 帮助
-
-想调整某个网站的正文范围，可以跟随[自定义网站适配教程](https://fluent.thinkstu.com/guide/custom-site-rules)操作。欢迎向内置目录新增或改进规则，[网站适配贡献指南](../docs/contributing/site-adaptation.md)提供示例、测试夹具和验证步骤。
-
-- [常见问题](https://fluent.thinkstu.com/guide/faq)
-- [GitHub Issues](https://github.com/FluentRead/FluentRead/issues)
-- [B站视频介绍](https://www.bilibili.com/video/BV1ux4y1e73x/)
-
-流畅阅读遵循 [GPL-3.0](../LICENSE) 开源许可证。
+FluentRead 遵循 [GPL-3.0](../LICENSE) 开源许可证。来源与许可见[第三方声明](../public/third-party-notices/)和[维护参考](../docs/maintainers/README.md)。

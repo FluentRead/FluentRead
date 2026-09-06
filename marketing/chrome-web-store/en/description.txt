@@ -1,0 +1,31 @@
+Another language? Keep reading.
+
+Found something good to read? Don’t let the language put you off. FluentRead puts translation where you’re already reading: compare a whole article, check a tricky sentence, and keep a phrase you like.
+
+OPEN SOURCE, WITH DEEPSEEK HARNESS INSIDE
+FluentRead is an open-source browser extension under GPL-3.0. Its reading card integrates a browser adaptation of the DeepSeek Harness session core, so you can explore a sentence and keep asking follow-up questions with your chosen AI model. The code is open for you to explore and improve.
+
+READ THE WHOLE THING
+Read news, posts, papers, and online resources in two languages on the original page. Keep names, terms, and details close enough to compare. Restore the original whenever you’re done.
+
+THIS SENTENCE. TELL ME MORE.
+Hover over a paragraph or select text for a quick translation. For tone, sentence structure, and natural usage, ask the AI reading card and continue with a follow-up question.
+
+KEEP THE GOOD BITS
+Save words, phrases, and sentences to the learning center. Revisit their original context, write a sentence of your own, and come back for review.
+
+PICTURES, FILES, VIDEOS. THOSE TOO.
+Translate text inside webpage images or draw around an area to get text you can copy. Import PDF, ePub, Word, and other supported files, read both languages, edit translations, and download the result. Use bilingual subtitles on YouTube and X. Supported X videos can also use local AI transcription after a model download.
+
+MAKE YOURSELF COMFORTABLE
+Choose target languages, translation styles, shortcuts, automatic translation sites, and menu layout. Start with the free translation service or connect your own provider, AI service, or local Ollama model.
+
+BEFORE YOU START
+• Enable selection translation and learning collections in settings. The reading card requires a configured AI service and model.
+• Third-party providers may require credentials or paid credits. Free service availability and speed can vary.
+• Image recognition packs and local subtitle models require initial downloads. Scanned PDFs are not directly recognized; some images, videos, and protected pages cannot be read.
+• Cloud translation sends relevant text to your chosen service. File parsing, image text recognition, and X local audio recognition happen in the browser. Independent tools may still use network services.
+
+Guide: https://fluent.thinkstu.com/en/guide/
+Data & privacy: https://fluent.thinkstu.com/en/guide/privacy
+Feedback: https://github.com/FluentRead/FluentRead/issues

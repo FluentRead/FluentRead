@@ -1,0 +1,359 @@
+{
+  "generatedAt": "2026-09-06T06:37:31.858Z",
+  "losslessWebPixelsVerified": true,
+  "rawBytes": 5381125,
+  "webBytes": 2334628,
+  "savingsPercent": 57,
+  "entries": [
+    {
+      "file": "docs/public/screenshots/translation.webp",
+      "source": "marketing/source/screenshots/translation.png",
+      "kind": "web-lossless",
+      "width": 2560,
+      "height": 1600,
+      "format": "webp",
+      "alpha": false,
+      "bytes": 97924
+    },
+    {
+      "file": "docs/public/screenshots/translation-small.webp",
+      "source": "marketing/source/screenshots/translation.png",
+      "kind": "web-responsive",
+      "width": 1280,
+      "height": 800,
+      "format": "webp",
+      "alpha": false,
+      "bytes": 139844
+    },
+    {
+      "file": "docs/public/screenshots/selection.webp",
+      "source": "marketing/source/screenshots/selection.png",
+      "kind": "web-lossless",
+      "width": 2560,
+      "height": 1600,
+      "format": "webp",
+      "alpha": false,
+      "bytes": 243266
+    },
+    {
+      "file": "docs/public/screenshots/selection-detail.webp",
+      "source": "marketing/source/screenshots/selection-detail.png",
+      "kind": "web-lossless",
+      "width": 1400,
+      "height": 960,
+      "format": "webp",
+      "alpha": false,
+      "bytes": 178848
+    },
+    {
+      "file": "docs/public/screenshots/reading-card.webp",
+      "source": "marketing/source/screenshots/reading-card.png",
+      "kind": "web-lossless",
+      "width": 2560,
+      "height": 1600,
+      "format": "webp",
+      "alpha": false,
+      "bytes": 123192
+    },
+    {
+      "file": "docs/public/screenshots/reading-card-detail.webp",
+      "source": "marketing/source/screenshots/reading-card-detail.png",
+      "kind": "web-lossless",
+      "width": 840,
+      "height": 1140,
+      "format": "webp",
+      "alpha": false,
+      "bytes": 58428
+    },
+    {
+      "file": "docs/public/screenshots/popup.webp",
+      "source": "marketing/source/screenshots/popup.png",
+      "kind": "web-lossless",
+      "width": 720,
+      "height": 1120,
+      "format": "webp",
+      "alpha": false,
+      "bytes": 127846
+    },
+    {
+      "file": "docs/public/screenshots/settings-general.webp",
+      "source": "marketing/source/screenshots/settings-general.png",
+      "kind": "web-lossless",
+      "width": 2560,
+      "height": 1600,
+      "format": "webp",
+      "alpha": false,
+      "bytes": 109024
+    },
+    {
+      "file": "docs/public/screenshots/settings-services.webp",
+      "source": "marketing/source/screenshots/settings-services.png",
+      "kind": "web-lossless",
+      "width": 2560,
+      "height": 1600,
+      "format": "webp",
+      "alpha": false,
+      "bytes": 129182
+    },
+    {
+      "file": "docs/public/screenshots/document.webp",
+      "source": "marketing/source/screenshots/document.png",
+      "kind": "web-lossless",
+      "width": 2560,
+      "height": 1600,
+      "format": "webp",
+      "alpha": false,
+      "bytes": 109848
+    },
+    {
+      "file": "marketing/chrome-web-store/zh-CN/screenshots/01-translation.png",
+      "source": "marketing/source/screenshots/translation.png",
+      "kind": "chrome-screenshot",
+      "width": 1280,
+      "height": 800,
+      "format": "png",
+      "alpha": false,
+      "bytes": 229489
+    },
+    {
+      "file": "marketing/chrome-web-store/zh-CN/screenshots/02-reading-card.png",
+      "source": "marketing/source/screenshots/reading-card.png",
+      "kind": "chrome-screenshot",
+      "width": 1280,
+      "height": 800,
+      "format": "png",
+      "alpha": false,
+      "bytes": 202867
+    },
+    {
+      "file": "marketing/chrome-web-store/zh-CN/screenshots/03-selection.png",
+      "source": "marketing/source/screenshots/selection.png",
+      "kind": "chrome-screenshot",
+      "width": 1280,
+      "height": 800,
+      "format": "png",
+      "alpha": false,
+      "bytes": 245610
+    },
+    {
+      "file": "marketing/chrome-web-store/zh-CN/screenshots/04-document.png",
+      "source": "marketing/source/screenshots/document.png",
+      "kind": "chrome-screenshot",
+      "width": 1280,
+      "height": 800,
+      "format": "png",
+      "alpha": false,
+      "bytes": 182972
+    },
+    {
+      "file": "marketing/chrome-web-store/zh-CN/screenshots/05-settings-services.png",
+      "source": "marketing/source/screenshots/settings-services.png",
+      "kind": "chrome-screenshot",
+      "width": 1280,
+      "height": 800,
+      "format": "png",
+      "alpha": false,
+      "bytes": 195914
+    },
+    {
+      "file": "docs/public/screenshots/en/translation.webp",
+      "source": "marketing/source/screenshots-en/translation.png",
+      "kind": "web-lossless",
+      "width": 2560,
+      "height": 1600,
+      "format": "webp",
+      "alpha": false,
+      "bytes": 97282
+    },
+    {
+      "file": "docs/public/screenshots/en/translation-small.webp",
+      "source": "marketing/source/screenshots-en/translation.png",
+      "kind": "web-responsive",
+      "width": 1280,
+      "height": 800,
+      "format": "webp",
+      "alpha": false,
+      "bytes": 139284
+    },
+    {
+      "file": "docs/public/screenshots/en/selection.webp",
+      "source": "marketing/source/screenshots-en/selection.png",
+      "kind": "web-lossless",
+      "width": 2560,
+      "height": 1600,
+      "format": "webp",
+      "alpha": false,
+      "bytes": 216220
+    },
+    {
+      "file": "docs/public/screenshots/en/selection-detail.webp",
+      "source": "marketing/source/screenshots-en/selection-detail.png",
+      "kind": "web-lossless",
+      "width": 1400,
+      "height": 960,
+      "format": "webp",
+      "alpha": false,
+      "bytes": 159210
+    },
+    {
+      "file": "docs/public/screenshots/en/reading-card.webp",
+      "source": "marketing/source/screenshots-en/reading-card.png",
+      "kind": "web-lossless",
+      "width": 2560,
+      "height": 1600,
+      "format": "webp",
+      "alpha": false,
+      "bytes": 119664
+    },
+    {
+      "file": "docs/public/screenshots/en/reading-card-detail.webp",
+      "source": "marketing/source/screenshots-en/reading-card-detail.png",
+      "kind": "web-lossless",
+      "width": 840,
+      "height": 1140,
+      "format": "webp",
+      "alpha": false,
+      "bytes": 65682
+    },
+    {
+      "file": "docs/public/screenshots/en/popup.webp",
+      "source": "marketing/source/screenshots-en/popup.png",
+      "kind": "web-lossless",
+      "width": 720,
+      "height": 1120,
+      "format": "webp",
+      "alpha": false,
+      "bytes": 123756
+    },
+    {
+      "file": "docs/public/screenshots/en/settings-general.webp",
+      "source": "marketing/source/screenshots-en/settings-general.png",
+      "kind": "web-lossless",
+      "width": 2560,
+      "height": 1600,
+      "format": "webp",
+      "alpha": false,
+      "bytes": 108806
+    },
+    {
+      "file": "docs/public/screenshots/en/settings-services.webp",
+      "source": "marketing/source/screenshots-en/settings-services.png",
+      "kind": "web-lossless",
+      "width": 2560,
+      "height": 1600,
+      "format": "webp",
+      "alpha": false,
+      "bytes": 137186
+    },
+    {
+      "file": "docs/public/screenshots/en/document.webp",
+      "source": "marketing/source/screenshots-en/document.png",
+      "kind": "web-lossless",
+      "width": 2560,
+      "height": 1600,
+      "format": "webp",
+      "alpha": false,
+      "bytes": 129264
+    },
+    {
+      "file": "marketing/chrome-web-store/en/screenshots/01-translation.png",
+      "source": "marketing/source/screenshots-en/translation.png",
+      "kind": "chrome-screenshot",
+      "width": 1280,
+      "height": 800,
+      "format": "png",
+      "alpha": false,
+      "bytes": 228272
+    },
+    {
+      "file": "marketing/chrome-web-store/en/screenshots/02-reading-card.png",
+      "source": "marketing/source/screenshots-en/reading-card.png",
+      "kind": "chrome-screenshot",
+      "width": 1280,
+      "height": 800,
+      "format": "png",
+      "alpha": false,
+      "bytes": 191350
+    },
+    {
+      "file": "marketing/chrome-web-store/en/screenshots/03-selection.png",
+      "source": "marketing/source/screenshots-en/selection.png",
+      "kind": "chrome-screenshot",
+      "width": 1280,
+      "height": 800,
+      "format": "png",
+      "alpha": false,
+      "bytes": 218908
+    },
+    {
+      "file": "marketing/chrome-web-store/en/screenshots/04-document.png",
+      "source": "marketing/source/screenshots-en/document.png",
+      "kind": "chrome-screenshot",
+      "width": 1280,
+      "height": 800,
+      "format": "png",
+      "alpha": false,
+      "bytes": 215516
+    },
+    {
+      "file": "marketing/chrome-web-store/en/screenshots/05-settings-services.png",
+      "source": "marketing/source/screenshots-en/settings-services.png",
+      "kind": "chrome-screenshot",
+      "width": 1280,
+      "height": 800,
+      "format": "png",
+      "alpha": false,
+      "bytes": 224106
+    },
+    {
+      "file": "marketing/chrome-web-store/icon-128.png",
+      "source": "public/icon/128.png",
+      "kind": "chrome-icon",
+      "width": 128,
+      "height": 128,
+      "format": "png",
+      "alpha": true,
+      "bytes": 14838
+    },
+    {
+      "file": "marketing/chrome-web-store/promo/zh-CN-small-440x280.png",
+      "source": "marketing/source/promo-zh-CN-small.html",
+      "kind": "chrome-promo",
+      "width": 440,
+      "height": 280,
+      "format": "png",
+      "alpha": false,
+      "bytes": 12086
+    },
+    {
+      "file": "marketing/chrome-web-store/promo/zh-CN-marquee-1400x560.png",
+      "source": "marketing/source/promo-zh-CN-marquee.html",
+      "kind": "chrome-promo",
+      "width": 1400,
+      "height": 560,
+      "format": "png",
+      "alpha": false,
+      "bytes": 72412
+    },
+    {
+      "file": "marketing/chrome-web-store/promo/en-small-440x280.png",
+      "source": "marketing/source/promo-en-small.html",
+      "kind": "chrome-promo",
+      "width": 440,
+      "height": 280,
+      "format": "png",
+      "alpha": false,
+      "bytes": 13380
+    },
+    {
+      "file": "marketing/chrome-web-store/promo/en-marquee-1400x560.png",
+      "source": "marketing/source/promo-en-marquee.html",
+      "kind": "chrome-promo",
+      "width": 1400,
+      "height": 560,
+      "format": "png",
+      "alpha": false,
+      "bytes": 78471
+    }
+  ]
+}

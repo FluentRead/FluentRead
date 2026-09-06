@@ -1,0 +1,1 @@
+Open-source bilingual reading. Ask about tricky sentences with a browser-adapted DeepSeek Harness session core.

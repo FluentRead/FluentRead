@@ -9,6 +9,7 @@ export {
 } from '@/src/features/image-translation/services/remoteImage';
 export {
     downloadImageOcrLanguages,
+    removeImageOcrLanguages,
     recognizeImage,
 } from '@/src/features/image-translation/services/ocrRuntime';
 export {

@@ -7,14 +7,7 @@
 <template>
   <SettingsGroup :title="t('area.settings.title')" :description="t('area.settings.intro')">
     <p v-if="!browserCapabilities.areaTranslation" class="area-settings-note" role="status">{{ t('area.settings.unavailable') }}</p>
-    <SettingsItem :label="t('area.settings.enabled')" :description="t('area.settings.shortcut')">
-      <el-switch
-        :model-value="props.enabled"
-        :disabled="!browserCapabilities.areaTranslation"
-        :aria-label="t('area.settings.enabled')"
-        @update:model-value="emit('update:enabled', Boolean($event))"
-      />
-    </SettingsItem>
+    <FeatureEnableCard :model-value="props.enabled" :title="t('area.settings.enabled')" :description="t('area.settings.shortcut')" :disabled="!browserCapabilities.areaTranslation" @update:model-value="emit('update:enabled', $event)" />
     <SettingsItem :label="t('area.settings.service')" :description="t('area.settings.serviceDescription')">
       <el-select v-model="props.config.areaTranslationService" :aria-label="t('area.settings.service')" :placeholder="t('area.settings.followService')">
         <el-option :value="''" :label="t('area.settings.followService')" />
@@ -43,6 +36,7 @@
 </template>
 
 <script setup lang="ts">
+import FeatureEnableCard from '@/src/ui/components/FeatureEnableCard.vue';
 import {computed} from 'vue';
 import type {Config} from '@/src/core/config/model';
 import {resolveConfiguredModel, servicesType} from '@/src/core/config/catalog';

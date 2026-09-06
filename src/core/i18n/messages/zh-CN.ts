@@ -6,9 +6,26 @@
  * 现有中文用户在切换或升级配置后仍看到兼容文案。
  * 模块边界：资源只描述扩展自己的界面文本；翻译服务的源文本、目标文本和用户内容不属于这里。
  */
-import type {MessageCatalog} from '../types';
+import type {
+MessageCatalog} from '../types';
 
 export const zhCNMessages = {
+    "usage.pageSize": "{size} 条",
+    "featureEnable.imageDescription": "悬停网页图片时显示翻译入口。",
+
+    "modelCache.downloadSize": "预计下载约 {size} MB",
+    "modelCache.remove": "清除模型",
+    "modelCache.removeNamed": "清除 {name}",
+    "modelCache.removing": "清除中…",
+    "modelCache.removeFailed": "清除失败，请重试。",
+
+    "featureEnable.on": "已开启",
+    "featureEnable.off": "未开启",
+    "featureEnable.unavailable": "当前不可用",
+    "featureEnable.enable": "立即开启",
+    "featureEnable.disable": "关闭功能",
+    "featureEnable.hint": "先开启此功能，相关设置才会生效。",
+
     "learning.memory": "学习记忆",
     "learning.memoryAdd": "添加记忆",
     "learning.memoryCharacters": "{count} / 2000 字",

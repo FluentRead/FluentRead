@@ -35,6 +35,8 @@ export function createVideoSubtitleBackgroundHandlers(dependencies: VideoSubtitl
     const offscreen = dependencies.offscreen;
     const cancelled = new VideoAiCanceledGenerationRegistry();
     let owner: Owner | null = null;
+    let activeModelRequests = 0;
+    let removingModel = false;
     releaseOwnerForTab = (tab: number) => {
         if (owner?.tabId !== tab) return;
         const previous = owner;
@@ -149,7 +151,36 @@ export function createVideoSubtitleBackgroundHandlers(dependencies: VideoSubtitl
             };
         },
     };
-    return [transcribe, prepare, cancel, modelState];
+    const removeModel: BackgroundMessageHandler<Context> = {
+        type: 'fluentReadRemoveLocalVideoModel',
+        async handle(message: any) {
+            if (message.model !== 'tiny' && message.model !== 'base') throw new Error('无效的本地字幕模型');
+            if (owner || activeModelRequests || removingModel) throw new Error('模型正在使用或下载，请结束后再清除');
+            removingModel = true;
+            const model = message.model;
+            let models: ReturnType<typeof normalizeVideoLocalTranscriptionModels> = [];
+            const write = stateWriteQueue.then(async () => {
+                const response = await offscreen.send<any>({type: 'VIDEO_AI_REMOVE_MODEL', model}, {timeoutMs: 30_000});
+                if (!response?.success) throw new Error(response?.error || '模型清除失败');
+                const stored = await readStore.get(VIDEO_LOCAL_TRANSCRIPTION_STATE_KEY);
+                models = normalizeVideoLocalTranscriptionModels(stored[VIDEO_LOCAL_TRANSCRIPTION_STATE_KEY]).filter(item => item !== model);
+                await readStore.set({[VIDEO_LOCAL_TRANSCRIPTION_STATE_KEY]: models});
+            });
+            stateWriteQueue = write.then(() => undefined, () => undefined);
+            try { await write; return {success: true, models}; }
+            finally { removingModel = false; }
+        },
+    };
+    const guardModelRequest = (handler: BackgroundMessageHandler<Context>): BackgroundMessageHandler<Context> => ({
+        ...handler,
+        async handle(message, context) {
+            if (removingModel) throw new Error('正在清除模型，请稍后重试');
+            activeModelRequests += 1;
+            try { return await handler.handle(message, context); }
+            finally { activeModelRequests -= 1; }
+        },
+    });
+    return [guardModelRequest(transcribe), guardModelRequest(prepare), cancel, modelState, removeModel];
 }
 
 export function releaseVideoSubtitleOwnerForTab(tabId: number): void {

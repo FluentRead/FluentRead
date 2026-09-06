@@ -250,3 +250,10 @@ describe('selection TTS Offscreen adapter', () => {
         await expect(adapter.stop(route)).rejects.toThrow('Offscreen TTS 停止失败');
     });
 });
+
+it('OCR 清除经离屏端确认且透传失败', async () => {
+ const adapter=createImageTranslationOffscreenAdapter(client);
+ send.mockResolvedValueOnce({success:true}); await adapter.removeLanguages(['eng']);
+ expect(send).toHaveBeenCalledWith({type:'FLUENT_READ_IMAGE_OCR_REMOVE_OFFSCREEN',languages:['eng']});
+ send.mockResolvedValueOnce({success:false,error:'busy'}); await expect(adapter.removeLanguages(['eng'])).rejects.toThrow('busy');
+});

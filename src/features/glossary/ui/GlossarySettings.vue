@@ -6,10 +6,7 @@
  -->
 <template>
   <div class="fluentread-glossary" data-testid="glossary-settings" data-i18n-ignore>
-    <div class="glossary-card glossary-enable">
-      <div><strong>{{ t('glossary.enable') }}</strong><p>{{ t('glossary.intro') }}</p></div>
-      <input type="checkbox" role="switch" :aria-label="t('glossary.enable')" :checked="enabled" :disabled="busy || !ready" @change="setEnabled" />
-    </div>
+    <FeatureEnableCard :model-value="enabled" :title="t('glossary.enable')" :description="t('glossary.intro')" :disabled="busy || !ready" @update:model-value="setEnabled" />
     <p class="glossary-help">{{ t('glossary.services') }}</p>
     <p v-if="error" class="glossary-error" role="alert">{{ error }}</p>
     <p class="glossary-save-state" role="status" aria-live="polite">{{ busy ? t('glossary.saving') : saved && !hasMetadataDraft ? t('glossary.saved') : '' }}</p>
@@ -44,17 +41,17 @@
         <fieldset :disabled="!ready">
           <div class="glossary-metadata">
             <label class="glossary-wide">{{ t('glossary.name') }}<input :value="metadataValue('name')" :maxlength="GLOSSARY_LIMITS.nameLength" @input="editMetadata('name', $event)" @change="updateName" /></label>
-            <label>{{ t('glossary.sourceLanguage') }}<select :value="selected.sourceLanguage" :aria-label="t('glossary.sourceLanguage')" @change="updateLanguage('sourceLanguage', $event)">
-              <option value="">{{ t('glossary.anyLanguage') }}</option><option v-for="item in languageOptions(selected.sourceLanguage)" :key="item.value" :value="item.value">{{ item.label }}</option>
-            </select></label>
-            <label>{{ t('glossary.targetLanguage') }}<select :value="selected.targetLanguage" :aria-label="t('glossary.targetLanguage')" @change="updateLanguage('targetLanguage', $event)">
-              <option value="">{{ t('glossary.anyLanguage') }}</option><option v-for="item in languageOptions(selected.targetLanguage)" :key="item.value" :value="item.value">{{ item.label }}</option>
-            </select></label>
+            <label>{{ t('glossary.sourceLanguage') }}<ElSelect class="glossary-select"  :model-value="selected.sourceLanguage" :aria-label="t('glossary.sourceLanguage')" @change="updateLanguage('sourceLanguage', $event)">
+              <ElOption value="" :label="t('glossary.anyLanguage')" /><ElOption v-for="item in languageOptions(selected.sourceLanguage)" :key="item.value" :value="item.value" :label="item.label" />
+            </ElSelect></label>
+            <label>{{ t('glossary.targetLanguage') }}<ElSelect class="glossary-select"  :model-value="selected.targetLanguage" :aria-label="t('glossary.targetLanguage')" @change="updateLanguage('targetLanguage', $event)">
+              <ElOption value="" :label="t('glossary.anyLanguage')" /><ElOption v-for="item in languageOptions(selected.targetLanguage)" :key="item.value" :value="item.value" :label="item.label" />
+            </ElSelect></label>
             <label class="glossary-wide">{{ t('glossary.domains') }}<textarea rows="2" :value="metadataValue('domains')" :aria-label="t('glossary.domains')" :placeholder="t('glossary.domainsPlaceholder')" @input="editMetadata('domains', $event)" @change="updateDomains" /><small>{{ t('glossary.domainsHelp') }}</small></label>
           </div>
           <div class="glossary-toolbar">
             <label class="glossary-check"><input type="checkbox" :checked="selected.enabled" @change="patchLibrary({enabled: ($event.target as HTMLInputElement).checked})" />{{ t('glossary.libraryEnabled') }}</label>
-            <div class="glossary-actions"><select v-model="exportFormat" :aria-label="t('glossary.exportFormat')"><option>CSV</option><option>TSV</option><option>JSON</option></select><button type="button" @click="downloadLibrary">{{ t('glossary.export') }}</button><button type="button" class="danger" @click="deleteLibrary">{{ t('glossary.deleteLibrary') }}</button></div>
+            <div class="glossary-actions"><ElSelect class="glossary-select"  v-model="exportFormat" :aria-label="t('glossary.exportFormat')"><ElOption label="CSV" :value="'CSV'" /><ElOption label="TSV" :value="'TSV'" /><ElOption label="JSON" :value="'JSON'" /></ElSelect><button type="button" @click="downloadLibrary">{{ t('glossary.export') }}</button><button type="button" class="danger" @click="deleteLibrary">{{ t('glossary.deleteLibrary') }}</button></div>
           </div>
         </fieldset>
         <div class="glossary-entry-toolbar">
@@ -82,8 +79,8 @@
       <h3>{{ t('glossary.preview') }}</h3><p class="glossary-help">{{ t('glossary.previewHelp') }}</p>
       <label>{{ t('glossary.previewText') }}<textarea v-model="previewText" rows="3" placeholder="FluentRead uses a large language model." /></label>
       <div class="glossary-preview-context">
-        <label>{{ t('glossary.sourceLanguage') }}<select v-model="previewSource" :aria-label="t('glossary.sourceLanguage')"><option value="">{{ t('glossary.autoLanguage') }}</option><option v-for="item in languageOptions(previewSource)" :key="item.value" :value="item.value">{{ item.label }}</option></select></label>
-        <label>{{ t('glossary.targetLanguage') }}<select v-model="previewTarget" :aria-label="t('glossary.targetLanguage')"><option v-for="item in languageOptions(previewTarget)" :key="item.value" :value="item.value">{{ item.label }}</option></select></label>
+        <label>{{ t('glossary.sourceLanguage') }}<ElSelect class="glossary-select"  v-model="previewSource" :aria-label="t('glossary.sourceLanguage')"><ElOption value="" :label="t('glossary.autoLanguage')" /><ElOption v-for="item in languageOptions(previewSource)" :key="item.value" :value="item.value" :label="item.label" /></ElSelect></label>
+        <label>{{ t('glossary.targetLanguage') }}<ElSelect class="glossary-select"  v-model="previewTarget" :aria-label="t('glossary.targetLanguage')"><ElOption v-for="item in languageOptions(previewTarget)" :key="item.value" :value="item.value" :label="item.label" /></ElSelect></label>
         <label>{{ t('glossary.previewUrl') }}<input v-model="previewUrl" type="url" placeholder="https://example.com/article" /></label>
       </div>
       <p v-if="!enabled" class="glossary-warning">{{ t('glossary.previewDisabled') }}</p>
@@ -96,7 +93,7 @@
       <div class="fluentread-glossary" data-i18n-ignore>
         <p class="glossary-help">{{ t('glossary.importHelp') }}</p>
         <label>{{ t('glossary.file') }}<input type="file" accept=".csv,.tsv,.json,text/csv,text/tab-separated-values,application/json" @change="readImportFile" /></label>
-        <label>{{ t('glossary.format') }}<select v-model="importFormat" :aria-label="t('glossary.format')" @change="invalidateFileRead"><option value="csv">CSV</option><option value="tsv">TSV</option><option value="json">JSON</option></select></label>
+        <label>{{ t('glossary.format') }}<ElSelect class="glossary-select"  v-model="importFormat" :aria-label="t('glossary.format')" @change="invalidateFileRead"><ElOption value="csv" label="CSV" /><ElOption value="tsv" label="TSV" /><ElOption value="json" label="JSON" /></ElSelect></label>
         <label>{{ t('glossary.importText') }}<textarea v-model="importText" rows="6" placeholder="source,target,tgt_lng&#10;large language model,大语言模型,zh-Hans" @input="invalidateFileRead" /></label>
         <p v-if="fileError" class="glossary-error" role="alert">{{ fileError }}</p>
         <template v-if="importText.trim()">
@@ -113,6 +110,10 @@
 </template>
 
 <script setup lang="ts">
+import ElSelect from '@/src/ui/components/UiSelect.vue';
+import {ElOption} from 'element-plus';
+import 'element-plus/es/components/select/style/css';
+import FeatureEnableCard from '@/src/ui/components/FeatureEnableCard.vue';
 import {computed, onBeforeUnmount, ref, watch} from 'vue';
 import {ElMessageBox} from 'element-plus';
 import browser from 'webextension-polyfill';
@@ -180,7 +181,7 @@ function persist(patch: GlossaryPatch | (() => GlossaryPatch)): Promise<boolean>
   saveQueue = operation;
   return operation;
 }
-function setEnabled(event: Event): void {void persist({glossaryEnabled: (event.target as HTMLInputElement).checked});}
+function setEnabled(value: boolean): void {void persist({glossaryEnabled: value});}
 function selectLibrary(id: string): void {selectedId.value = id; entryDraft.value = null; metadataDrafts.value = {}; query.value = '';}
 async function addLibrary(): Promise<void> {
   const library = createGlossaryLibrary(libraries.value);
@@ -207,7 +208,7 @@ function updateName(event: Event): void {
   if (!name) {error.value = t('glossary.nameRequired'); viewRevision.value++; return;}
   void saveMetadata('name', {name});
 }
-function updateLanguage(field: 'sourceLanguage' | 'targetLanguage', event: Event): void {void patchLibrary({[field]: (event.target as HTMLSelectElement).value});}
+function updateLanguage(field: 'sourceLanguage' | 'targetLanguage', value: string): void {void patchLibrary({[field]: value});}
 function updateDomains(event: Event): void {
   editMetadata('domains', event);
   const values = (event.target as HTMLTextAreaElement).value.split(/\r?\n/u).map(value => value.trim()).filter(Boolean);

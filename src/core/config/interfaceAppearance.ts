@@ -27,7 +27,7 @@ export const interfaceSkinOptions = [
     group: 'utility',
     kind: 'default',
     popupHeight: 'content',
-    popupWidth: 400,
+    popupWidth: 360,
     preview: {canvas: '#f6f7fb', surface: '#ffffff', accent: '#ef4776', ink: '#172033'},
   },
   {
@@ -38,7 +38,7 @@ export const interfaceSkinOptions = [
     group: 'utility',
     kind: 'minimal',
     popupHeight: 'content',
-    popupWidth: 380,
+    popupWidth: 350,
     preview: {canvas: '#ffffff', surface: '#f3f4f6', accent: '#ef4776', ink: '#313743'},
   },
   {
@@ -49,7 +49,7 @@ export const interfaceSkinOptions = [
     group: 'utility',
     kind: 'compact',
     popupHeight: 'content',
-    popupWidth: 360,
+    popupWidth: 340,
     preview: {canvas: '#f5f6f8', surface: '#ffffff', accent: '#dc315f', ink: '#283042'},
   },
   {
@@ -60,7 +60,7 @@ export const interfaceSkinOptions = [
     group: 'utility',
     kind: 'contrast',
     popupHeight: 'content',
-    popupWidth: 400,
+    popupWidth: 360,
     preview: {canvas: '#ffffff', surface: '#f6dd00', accent: '#111111', ink: '#000000'},
   },
   {
@@ -71,7 +71,7 @@ export const interfaceSkinOptions = [
     group: 'palette',
     kind: 'palette',
     popupHeight: 'content',
-    popupWidth: 400,
+    popupWidth: 360,
     preview: {canvas: '#fff9e9', surface: '#fffefa', accent: '#946d2f', ink: '#35322b'},
   },
   {
@@ -82,7 +82,7 @@ export const interfaceSkinOptions = [
     group: 'palette',
     kind: 'palette',
     popupHeight: 'content',
-    popupWidth: 400,
+    popupWidth: 360,
     preview: {canvas: '#f1fbff', surface: '#ffffff', accent: '#0676b7', ink: '#123c52'},
   },
   {
@@ -93,7 +93,7 @@ export const interfaceSkinOptions = [
     group: 'palette',
     kind: 'palette',
     popupHeight: 'content',
-    popupWidth: 400,
+    popupWidth: 360,
     preview: {canvas: '#f7fbed', surface: '#fffffc', accent: '#327b28', ink: '#274025'},
   },
   {
@@ -104,7 +104,7 @@ export const interfaceSkinOptions = [
     group: 'palette',
     kind: 'palette',
     popupHeight: 'content',
-    popupWidth: 400,
+    popupWidth: 360,
     preview: {canvas: '#fff5f7', surface: '#fffefe', accent: '#c83474', ink: '#52263c'},
   },
   {
@@ -115,7 +115,7 @@ export const interfaceSkinOptions = [
     group: 'palette',
     kind: 'palette',
     popupHeight: 'content',
-    popupWidth: 400,
+    popupWidth: 360,
     preview: {canvas: '#fffaf0', surface: '#fffefd', accent: '#7143ca', ink: '#352447'},
   },
   {
@@ -126,7 +126,7 @@ export const interfaceSkinOptions = [
     group: 'palette',
     kind: 'palette',
     popupHeight: 'content',
-    popupWidth: 400,
+    popupWidth: 360,
     preview: {canvas: '#151c26', surface: '#1d2632', accent: '#9eb5d0', ink: '#e5ebf2'},
   },
   {
@@ -137,7 +137,7 @@ export const interfaceSkinOptions = [
     group: 'palette',
     kind: 'palette',
     popupHeight: 'content',
-    popupWidth: 400,
+    popupWidth: 360,
     preview: {canvas: '#f3f0e9', surface: '#fbf9f3', accent: '#806b51', ink: '#37352f'},
   },
   {
@@ -148,7 +148,7 @@ export const interfaceSkinOptions = [
     group: 'palette',
     kind: 'palette',
     popupHeight: 'content',
-    popupWidth: 400,
+    popupWidth: 360,
     preview: {canvas: '#f4f1ff', surface: '#fcfbff', accent: '#5147a8', ink: '#28264a'},
   },
   {
@@ -159,7 +159,7 @@ export const interfaceSkinOptions = [
     group: 'palette',
     kind: 'palette',
     popupHeight: 'content',
-    popupWidth: 400,
+    popupWidth: 360,
     preview: {canvas: '#f1f7f5', surface: '#fbfffd', accent: '#087f65', ink: '#172c32'},
   },
   {
@@ -170,7 +170,7 @@ export const interfaceSkinOptions = [
     group: 'palette',
     kind: 'palette',
     popupHeight: 'content',
-    popupWidth: 400,
+    popupWidth: 360,
     preview: {canvas: '#fff4ee', surface: '#fffdfa', accent: '#b64f3b', ink: '#422b35'},
   },
 ] as const

@@ -159,6 +159,12 @@ export function createVideoPlayerBinding(options: VideoPlayerBindingOptions): Vi
 
   const place = (next: VideoPlayerTarget): void => {
     const preferred = nativeControls(next.player);
+    // X 的控制栏在悬浮后才挂载。等待真实控制栏，避免右下角 fallback 首帧闪现后跳到进度左侧。
+    if (!preferred && next.player.getAttribute('data-testid') === 'videoPlayer') {
+      cleanNodes();
+      removePlayerMark(next.player);
+      return;
+    }
     const currentHostBelongs = host && host.parentElement && next.player.contains(host);
     if (!currentHostBelongs) host = null;
 
@@ -248,6 +254,12 @@ export function createVideoPlayerBinding(options: VideoPlayerBindingOptions): Vi
     if (next?.interacting) activePlayers.add(next.player);
     sync();
   });
+  const controlsObserver = typeof MutationObserver !== 'undefined' ? new MutationObserver(records => {
+    if (!target || !records.some(record => target!.player.contains(record.target)) || records.every(record => [...record.addedNodes, ...record.removedNodes].every(node =>
+      node instanceof Element && (node.classList.contains('fluent-read-video-ui') || node.closest('.fluent-read-video-ui'))))) return;
+    sync();
+  }) : null;
+  controlsObserver?.observe(document, {childList: true, subtree: true});
   sync();
 
   return {
@@ -257,6 +269,7 @@ export function createVideoPlayerBinding(options: VideoPlayerBindingOptions): Vi
       if (destroyed) return;
       destroyed = true;
       unsubscribe();
+      controlsObserver?.disconnect();
       document.removeEventListener('pointerover', onPointerOver, true);
       document.removeEventListener('pointerout', onPointerOut, true);
       document.removeEventListener('focusin', onFocusIn, true);

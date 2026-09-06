@@ -10,9 +10,9 @@
     <div class="translation-center-toolbar">
       <div class="language-picker-group">
         <label for="translation-center-source">源语言</label>
-        <select id="translation-center-source" v-model="sourceLanguage" aria-label="翻译中心源语言" @change="persistTranslationCenterConfig('source')">
-          <option v-for="item in sourceLanguageOptions" :key="item.value" :value="item.value" data-i18n-ignore>{{ languageLabel(item.value) }}</option>
-        </select>
+        <UiSelect id="translation-center-source" v-model="sourceLanguage" aria-label="翻译中心源语言" @change="persistTranslationCenterConfig('source')">
+          <ElOption v-for="item in sourceLanguageOptions" :key="item.value" :value="item.value" data-i18n-ignore :label="languageLabel(item.value)" />
+        </UiSelect>
       </div>
 
       <button
@@ -28,9 +28,9 @@
 
       <div class="language-picker-group">
         <label for="translation-center-target">目标语言</label>
-        <select id="translation-center-target" v-model="targetLanguage" aria-label="翻译中心目标语言" @change="persistTranslationCenterConfig('target')">
-          <option v-for="item in targetLanguageOptions" :key="item.value" :value="item.value" data-i18n-ignore>{{ getMultilingualTargetLanguageLabel(item.value, item.label, language) }}</option>
-        </select>
+        <UiSelect id="translation-center-target" v-model="targetLanguage" aria-label="翻译中心目标语言" @change="persistTranslationCenterConfig('target')">
+          <ElOption v-for="item in targetLanguageOptions" :key="item.value" :value="item.value" data-i18n-ignore :label="getMultilingualTargetLanguageLabel(item.value, item.label, language)" />
+        </UiSelect>
       </div>
 
       <div class="translation-center-toolbar-actions">
@@ -218,6 +218,9 @@
 </template>
 
 <script setup lang="ts">
+import UiSelect from '@/src/ui/components/UiSelect.vue';
+import {ElOption} from 'element-plus';
+
 import { computed, onMounted, onUnmounted, ref } from 'vue'
 import browser from 'webextension-polyfill'
 import ServiceIcon from '@/src/ui/components/ServiceIcon.vue'
@@ -767,10 +770,10 @@ onUnmounted(() => {
 .service-picker-header small { color: var(--muted); font-size: 10px; line-height: 1.5; }
 .service-picker-close { display: grid; place-items: center; width: 26px; height: 26px; flex: none; border: 0; border-radius: 8px; color: var(--muted); background: transparent; cursor: pointer; font-size: 20px; line-height: 1; }
 .service-picker-close:hover { color: var(--brand-strong); background: var(--brand-soft); }
-.service-picker-search { display: flex; align-items: center; gap: 8px; margin: 12px 14px 8px; padding: 0 10px; height: 36px; border: 1px solid #e1e5ee; border-radius: 10px; color: var(--muted); background: var(--surface-soft); }
+.service-picker-search { display: flex; flex: none; min-height: 44px; align-items: center; gap: 8px; margin: 12px 14px 8px; padding: 0 12px; height: 44px; border: 1px solid #e1e5ee; border-radius: 10px; color: var(--muted); background: var(--surface-soft); }
 .service-picker-search:focus-within { border-color: var(--brand); box-shadow: 0 0 0 3px rgba(239, 71, 118, .1); }
 .service-picker-search span { font-size: 18px; }
-.service-picker-search input { width: 100%; min-width: 0; border: 0; outline: 0; color: var(--ink); background: transparent; font: inherit; font-size: 12px; }
+.service-picker-search input { width: 100%; min-width: 0; border: 0; outline: 0; color: var(--ink); background: transparent; font: inherit; font-size: 14px; }
 .service-picker-search input::placeholder { color: #a2a8b5; }
 .service-picker-groups { min-height: 0; flex: 1 1 auto; overflow-y: auto; padding: 0 9px 8px; }
 .service-picker-group + .service-picker-group { margin-top: 8px; }

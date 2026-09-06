@@ -8,7 +8,7 @@ import {
   normalizeVideoLocalTranscriptionModel,
   resampleToWhisperAudio,
 } from '@/src/features/video-subtitle/transcription';
-import { cacheVideoAiQ4ModelFiles } from './modelCache';
+import { cacheVideoAiQ4ModelFiles, removeVideoAiModelFiles } from './modelCache';
 
 type LocalTranscriptionBackend = 'webgpu' | 'wasm';
 
@@ -97,6 +97,7 @@ let workerRequestId = 0;
 const pendingWorkerRequests = new Map<number, PendingWorkerRequest>();
 let decodeAudioContext: AudioContext | null = null;
 let queueRunning = false;
+let removingModel = false;
 let workerDisposing = false;
 let pendingTranscription: PendingTranscriptionJob | null = null;
 const pendingPrepare: PendingPrepareJob[] = [];
@@ -398,6 +399,7 @@ export function prepareLocalVideoTranscriptionModel(model?: unknown, options?: {
   threads?: number;
   dtype?: 'q4' | 'q8';
 }> {
+  if (removingModel) return Promise.reject(new Error('正在清除模型，请稍后重试'));
   const normalizedModel = normalizeVideoLocalTranscriptionModel(model);
   const keepWarm = options?.keepWarm === true;
   const streamId = keepWarm && typeof options?.streamId === 'string' ? options.streamId.trim() : '';
@@ -434,6 +436,7 @@ export function prepareLocalVideoTranscriptionModel(model?: unknown, options?: {
 
 /** 只保留一个待处理分片；Worker 超时会被 terminate，绝不继续堆积音频。 */
 export function transcribeLocalVideoAudio(request: LocalVideoTranscriptionRequest): Promise<LocalVideoTranscriptionResult> {
+  if (removingModel) return Promise.reject(new Error('正在清除模型，请稍后重试'));
   return new Promise((resolve, reject) => {
     clearIdleDisposal();
     const streamId = typeof request.streamId === 'string' && request.streamId.trim()
@@ -490,4 +493,16 @@ export async function cancelLocalVideoTranscription(
   await closeDecodeAudioContext();
   clearIdleDisposal();
   drainQueue();
+}
+
+/** 空闲时释放已加载 Worker，再删除指定模型；使用或下载过程中拒绝删除。 */
+export async function removeLocalVideoTranscriptionModel(model: unknown): Promise<void> {
+  if (model !== 'tiny' && model !== 'base') throw new Error('无效的本地字幕模型');
+  if (removingModel || queueRunning || pendingTranscription || pendingPrepare.length || pendingPreparePromises.size || workerDisposing) throw new Error('模型正在使用或下载，请结束后再清除');
+  removingModel = true;
+  try {
+    clearIdleDisposal();
+    if (transcriptionWorkerModel === model) await disposeLoadedTranscriber();
+    await removeVideoAiModelFiles(model);
+  } finally { removingModel = false; }
 }

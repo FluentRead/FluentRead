@@ -44,9 +44,9 @@
           <label><span>背景透明度 <b>{{ config.videoSubtitleAppearance.backgroundOpacity }}%</b></span><input v-model.number="config.videoSubtitleAppearance.backgroundOpacity" type="range" min="0" max="95" step="1" aria-label="字幕背景透明度" /></label>
           <label><span>行距 <b>{{ config.videoSubtitleAppearance.lineSpacing.toFixed(2) }}</b></span><input v-model.number="config.videoSubtitleAppearance.lineSpacing" type="range" min="1" max="2" step="0.01" aria-label="字幕行距" /></label>
           <label><span>最大宽度 <b>{{ config.videoSubtitleAppearance.maxWidth }}%</b></span><input v-model.number="config.videoSubtitleAppearance.maxWidth" type="range" min="40" max="100" step="1" aria-label="字幕最大宽度" /></label>
-          <label><span>位置</span><select v-model="config.videoSubtitleAppearance.position" aria-label="字幕位置"><option value="bottom">底部</option><option value="center">中部</option><option value="top">顶部</option></select></label>
-          <label><span>原文颜色</span><input v-model="config.videoSubtitleAppearance.textColor" type="color" aria-label="原文颜色" /></label>
-          <label><span>译文颜色</span><input v-model="config.videoSubtitleAppearance.translationColor" type="color" aria-label="译文颜色" /></label>
+          <label><span>位置</span><UiSelect v-model="config.videoSubtitleAppearance.position" aria-label="字幕位置"><ElOption value="bottom" :label="translateControlLabel('底部')" /><ElOption value="center" :label="translateControlLabel('中部')" /><ElOption value="top" :label="translateControlLabel('顶部')" /></UiSelect></label>
+          <label><span>原文颜色</span><ElColorPicker :model-value="config.videoSubtitleAppearance.textColor" aria-label="原文颜色" @update:model-value="value => { if (value) config.videoSubtitleAppearance.textColor = value }" /></label>
+          <label><span>译文颜色</span><ElColorPicker :model-value="config.videoSubtitleAppearance.translationColor" aria-label="译文颜色" @update:model-value="value => { if (value) config.videoSubtitleAppearance.translationColor = value }" /></label>
         </div>
       </details>
     </div>
@@ -54,6 +54,12 @@
 </template>
 
 <script setup lang="ts">
+import UiSelect from '@/src/ui/components/UiSelect.vue';
+import {ElOption, ElColorPicker} from 'element-plus';
+import 'element-plus/es/components/color-picker/style/css';
+import {useUiI18n as useControlI18n} from '@/src/ui/i18n';
+const {translateLegacy: translateControlLabel} = useControlI18n();
+
 import {computed} from 'vue';
 import type {CSSProperties} from 'vue';
 import type {Config} from '@/src/core/config/model';
@@ -114,10 +120,12 @@ function skinSwatchStyle(skin: typeof VIDEO_SUBTITLE_SKINS[number]): Record<stri
 .subtitle-skin-swatch[data-skin="terminal"] { font-family: ui-monospace, monospace; background: rgba(4, 20, 16, .9); }
 .subtitle-preview-scene { position: relative; min-height: 180px; margin-top: 14px; overflow: hidden; border: 1px solid var(--line); border-radius: 10px; background: linear-gradient(135deg, #263449, #111827 58%, #4b3149); }
 .subtitle-preview-scene::before { position: absolute; inset: 16% 12% auto; height: 34%; border-radius: 999px; background: rgba(255,255,255,.1); content: ''; filter: blur(18px); }
-.subtitle-live-preview { position: absolute; left: 50%; display: grid; justify-items: center; gap: 3px; width: min(96%, var(--fluent-read-video-subtitle-max-width)); max-width: var(--fluent-read-video-subtitle-max-width); padding: 8px 12px; border: 1px solid var(--fluent-read-video-subtitle-border); border-radius: 6px; color: var(--fluent-read-video-subtitle-text-color); background: var(--fluent-read-video-subtitle-background); box-shadow: var(--fluent-read-video-subtitle-shadow); backdrop-filter: var(--fluent-read-video-subtitle-backdrop-filter); font-family: var(--fluent-read-video-subtitle-font-family); font-size: var(--fluent-read-video-subtitle-preview-font-size); line-height: var(--fluent-read-video-subtitle-line-spacing); -webkit-text-stroke: var(--fluent-read-video-subtitle-text-stroke); text-shadow: var(--fluent-read-video-subtitle-text-shadow); transform: translateX(-50%); }
+.subtitle-live-preview { position: absolute; left: 50%; display: grid; justify-items: center; gap: 3px; width: min(96%, var(--fluent-read-video-subtitle-max-width)); max-width: var(--fluent-read-video-subtitle-max-width); padding: 8px 12px; border: 1px solid var(--fluent-read-video-subtitle-border); border-radius: 6px; color: var(--fluent-read-video-subtitle-text-color); background: var(--fluent-read-video-subtitle-background); box-shadow: var(--fluent-read-video-subtitle-shadow); backdrop-filter: var(--fluent-read-video-subtitle-backdrop-filter); font-family: var(--fluent-read-video-subtitle-font-family); font-size: var(--fluent-read-video-subtitle-preview-font-size); line-height: var(--fluent-read-video-subtitle-line-spacing); -webkit-text-stroke: var(--fluent-read-video-subtitle-text-stroke); text-shadow: var(--fluent-read-video-subtitle-text-shadow); paint-order: stroke fill; transform: translateX(-50%); }
 .subtitle-preview-scene[data-position="bottom"] .subtitle-live-preview { bottom: var(--fluent-read-video-subtitle-bottom-offset); }
 .subtitle-preview-scene[data-position="center"] .subtitle-live-preview { top: 50%; transform: translate(-50%, -50%); }
 .subtitle-preview-scene[data-position="top"] .subtitle-live-preview { top: var(--fluent-read-video-subtitle-bottom-offset); }
+.subtitle-live-preview > span { color: var(--fluent-read-video-subtitle-text-color); }
+.subtitle-live-preview > span, .subtitle-live-preview > b { paint-order: stroke fill; }
 .subtitle-live-preview b { color: var(--fluent-read-video-subtitle-translation-color); font-weight: 650; }
 .subtitle-appearance-advanced { margin-top: 14px; border-top: 1px solid var(--line); padding-top: 10px; }
 .subtitle-appearance-advanced summary { color: var(--ink); font-size: 12px; cursor: pointer; }
@@ -126,7 +134,6 @@ function skinSwatchStyle(skin: typeof VIDEO_SUBTITLE_SKINS[number]): Record<stri
 .subtitle-appearance-controls label span { display: flex; justify-content: space-between; gap: 8px; }
 .subtitle-appearance-controls b { color: var(--ink); font-weight: 650; }
 .subtitle-appearance-controls input[type="range"] { width: 100%; accent-color: var(--brand); }
-.subtitle-appearance-controls input[type="color"] { width: 100%; height: 30px; padding: 2px; border: 1px solid var(--line); border-radius: 6px; background: transparent; }
 .subtitle-appearance-controls select { min-height: 30px; border: 1px solid var(--line); border-radius: 6px; color: var(--ink); background: var(--surface); }
 @media (max-width: 640px) { .subtitle-skin-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 </style>

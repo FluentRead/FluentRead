@@ -1,7 +1,7 @@
 <!--
  * @file src/features/settings/ui/SettingsSections.vue
  * 文件职责：承载 FluentRead Options 页面各业务设置分区，连接运行时配置、服务选择、快捷键、站点规则、翻译中心、OCR、词书以及导入导出和历史恢复。
- * 主要内容：包含正文/全部节点识别范围；模板按 activeSection 展示业务分区，图片与圈选分别复用仅在当前分区挂载的 OCR 管理组件，在界面布局页组织风格与菜单栏布局，仅在高级选项激活时挂载缓存管理；脚本以独立配置副本隔离编辑与全局差分基线，协调网站入口、配置及凭据保存、历史恢复、能力过滤和离页补丁交接。
+ * 主要内容：包含正文/全部节点识别范围；模板按 activeSection 展示业务分区，图片与圈选分别复用仅在当前分区挂载的 OCR 管理组件，在界面风格页组织风格与菜单栏布局，仅在高级选项激活时挂载缓存管理；脚本以独立配置副本隔离编辑与全局差分基线，协调网站入口、配置及凭据保存、历史恢复、能力过滤和离页补丁交接。
  * 模块边界：该组件负责设置 UI 编排但不实现 provider 网络、配置仓库或 feature 运行时；校验与迁移来自 core/config，持久化经 services/config，复杂子界面保持在各自 feature/组件内。
  -->
 <template>
@@ -97,9 +97,7 @@
     </section>
     <section v-show="props.activeSection === 'settings-image-translation'" id="settings-image-translation" class="settings-section image-translation-settings">
       <SettingsGroup title="功能状态" description="悬停网页图片，从图片上的翻译入口识别文字。">
-        <SettingsItem label="网页图片翻译" description="悬停网页图片时显示翻译入口，默认关闭。">
-          <el-switch v-model="imageTranslationEnabled" class="settings-toggle" aria-label="网页图片翻译" :disabled="!browserCapabilities.imageTranslation" />
-        </SettingsItem>
+        <FeatureEnableCard v-model="imageTranslationEnabled" title="网页图片翻译" :description="t('featureEnable.imageDescription')" :disabled="!browserCapabilities.imageTranslation" />
       </SettingsGroup>
       <ImageOcrSettings v-if="props.activeSection === 'settings-image-translation'" />
     </section>
@@ -114,9 +112,7 @@
     </section>
     <section v-show="props.activeSection === 'settings-video'" id="settings-video" class="settings-section">
       <SettingsGroup>
-        <SettingsItem label="视频字幕翻译" description="翻译 YouTube 或 X 播放器中的字幕，不上传音频或视频内容。">
-          <el-switch v-model="config.videoTranslationEnabled" class="settings-switch" aria-label="视频字幕翻译" />
-        </SettingsItem>
+        <FeatureEnableCard v-model="config.videoTranslationEnabled" title="视频字幕翻译" description="翻译 YouTube 或 X 播放器中的字幕，不上传音频或视频内容。"  />
         <SettingsItem label="视频翻译服务" description="与网页翻译服务相互独立；AI 服务会提前预取字幕。" :disabled="!config.videoTranslationEnabled">
           <el-select v-model="config.videoService" aria-label="视频字幕翻译服务" :disabled="!config.videoTranslationEnabled" placeholder="请选择服务">
             <el-option v-if="selectedVideoServiceUnavailableMessage" label="Chrome内置AI翻译（当前浏览器不可用）" :value="config.videoService" disabled />
@@ -705,6 +701,7 @@
 </template>
 
 <script lang="ts" setup>
+import FeatureEnableCard from '@/src/ui/components/FeatureEnableCard.vue';
 
 // Main 处理配置信息
 import { computed, ref, watch, onUnmounted } from 'vue'

@@ -98,6 +98,7 @@
 </template>
 
 <script setup lang="ts">
+import {filterNavigationItems, isUiLanguageSearch} from '@/src/features/settings/model/navigation';
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import InterfaceBackdrop from '@/src/ui/components/InterfaceBackdrop.vue'
 import {getInterfaceSkinOption} from '@/src/core/config/interfaceAppearance'
@@ -156,15 +157,10 @@ void configReady
   })
   .catch(() => applyInterfaceSkin('default'))
 
-const filteredResults = computed(() => {
-  const keyword = query.value.trim().toLocaleLowerCase()
-  if (!keyword) return []
-  return localizedNavigationItems.value.filter((item) => (
-    `${item.label}${item.description}${item.heading}${item.summary}${item.searchDescription}`
-      .toLocaleLowerCase()
-      .includes(keyword)
-  ))
-})
+const filteredResults = computed(() => filterNavigationItems(query.value, localizedNavigationItems.value).map(item =>
+  item.id === 'settings-general' && isUiLanguageSearch(query.value)
+    ? {...item, label: `${t('language.selectorLabel')} / Language`, searchDescription: t('language.settingsDescription')}
+    : item))
 
 function selectSection(id: string) {
   if (!navigation.some((item) => item.id === id)) return
@@ -176,8 +172,15 @@ function selectSection(id: string) {
   window.scrollTo({ top: 0, behavior: 'smooth' })
 }
 
-function selectResult(id: string) {
+async function selectResult(id: string) {
+  const revealLanguage = id === 'settings-general' && isUiLanguageSearch(query.value)
   selectSection(id)
+  if (revealLanguage) {
+    await nextTick()
+    const control = document.querySelector<HTMLElement>('[data-testid="ui-language-select"] input')
+    control?.scrollIntoView({block: 'center'})
+    control?.focus()
+  }
 }
 
 async function revealActiveNavigation() {

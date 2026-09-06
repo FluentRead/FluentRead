@@ -66,7 +66,7 @@ function contrastRatio(foreground, background) {
 }
 const expectedNavigation = [
   ['settings-general', '通用设置'],
-  ['settings-interface', '界面布局'],
+  ['settings-interface', '界面风格'],
   ['settings-services', '翻译服务'],
   ['settings-translation', '翻译设置'],
   ['settings-harness', '翻译卡'],
@@ -1423,7 +1423,7 @@ async function main() {
     if (!report.assertions.noLegacyIntros) throw new Error('仍存在旧的重复介绍元素');
 
     const interfaceSearchCases = [];
-    for (const query of ['界面布局', '菜单栏布局', '海盐', '樱花', '抹茶', 'Emoji']) {
+    for (const query of ['界面风格', '菜单栏布局', '海盐', '樱花', '抹茶', 'Emoji']) {
       await page.locator('button[data-section="settings-general"]').click();
       await page.locator('.search-box input').fill(query);
       const interfaceResult = page.locator('.search-results button').filter({has: page.locator('strong', {hasText: /^界面布局$/u})});
@@ -1553,20 +1553,20 @@ async function main() {
       throw new Error('界面布局仍向用户显示 Popup 布局旧名称');
     }
     const expectedInterfaceSkins = [
-      {value: 'default', label: '默认风格', kind: 'default', contentHeight: true, popupWidth: 400, brand: '#ef4776', surface: '#fff', darkSurface: '#1d2027'},
-      {value: 'minimal', label: '简约风格', kind: 'minimal', contentHeight: true, popupWidth: 380, brand: '#ef4776', surface: '#fff', darkSurface: '#1d2027'},
-      {value: 'compact', label: '紧凑风格', kind: 'compact', contentHeight: true, popupWidth: 360, brand: '#ef4776', surface: '#fff', darkSurface: '#1d2027'},
-      {value: 'contrast', label: '高对比 ⚡', kind: 'contrast', contentHeight: true, popupWidth: 400, brand: '#111', surface: '#fff', darkSurface: '#050505'},
-      {value: 'cheese', label: '奶酪 🧀', kind: 'palette', contentHeight: true, popupWidth: 400, brand: '#946d2f', surface: '#fffefa', darkSurface: '#28261f'},
-      {value: 'ocean', label: '海盐 🌊', kind: 'palette', contentHeight: true, popupWidth: 400, brand: '#0676b7', surface: '#ffffff', darkSurface: '#102e40'},
-      {value: 'matcha', label: '抹茶 🍵', kind: 'palette', contentHeight: true, popupWidth: 400, brand: '#327b28', surface: '#fffffc', darkSurface: '#22351d'},
-      {value: 'sakura', label: '樱花 🌸', kind: 'palette', contentHeight: true, popupWidth: 400, brand: '#c83474', surface: '#fffefe', darkSurface: '#402335'},
-      {value: 'emoji', label: 'Emoji 乐园 ✨', kind: 'palette', contentHeight: true, popupWidth: 400, brand: '#7143ca', surface: '#fffefd', darkSurface: '#382744'},
-      {value: 'midnight', label: '夜幕 🌙', kind: 'palette', contentHeight: true, popupWidth: 400, brand: '#9eb5d0', surface: '#1d2632', darkSurface: '#1d2632'},
-      {value: 'paper', label: '纸张护眼 📖', kind: 'palette', contentHeight: true, popupWidth: 400, brand: '#806b51', surface: '#fbf9f3', darkSurface: '#292620'},
-      {value: 'aurora', label: '极光舷窗 🛰️', kind: 'palette', contentHeight: true, popupWidth: 400, brand: '#5147a8', surface: '#fcfbff', darkSurface: '#272544'},
-      {value: 'arcade', label: '像素街机 🎮', kind: 'palette', contentHeight: true, popupWidth: 400, brand: '#087f65', surface: '#fbfffd', darkSurface: '#172f35'},
-      {value: 'sunset', label: '落日公路 🛣️', kind: 'palette', contentHeight: true, popupWidth: 400, brand: '#b64f3b', surface: '#fffdfa', darkSurface: '#382b37'},
+      {value: 'default', label: '默认风格', kind: 'default', contentHeight: true, popupWidth: 360, brand: '#ef4776', surface: '#fff', darkSurface: '#1d2027'},
+      {value: 'minimal', label: '简约风格', kind: 'minimal', contentHeight: true, popupWidth: 350, brand: '#ef4776', surface: '#fff', darkSurface: '#1d2027'},
+      {value: 'compact', label: '紧凑风格', kind: 'compact', contentHeight: true, popupWidth: 340, brand: '#ef4776', surface: '#fff', darkSurface: '#1d2027'},
+      {value: 'contrast', label: '高对比 ⚡', kind: 'contrast', contentHeight: true, popupWidth: 360, brand: '#111', surface: '#fff', darkSurface: '#050505'},
+      {value: 'cheese', label: '奶酪 🧀', kind: 'palette', contentHeight: true, popupWidth: 360, brand: '#946d2f', surface: '#fffefa', darkSurface: '#28261f'},
+      {value: 'ocean', label: '海盐 🌊', kind: 'palette', contentHeight: true, popupWidth: 360, brand: '#0676b7', surface: '#ffffff', darkSurface: '#102e40'},
+      {value: 'matcha', label: '抹茶 🍵', kind: 'palette', contentHeight: true, popupWidth: 360, brand: '#327b28', surface: '#fffffc', darkSurface: '#22351d'},
+      {value: 'sakura', label: '樱花 🌸', kind: 'palette', contentHeight: true, popupWidth: 360, brand: '#c83474', surface: '#fffefe', darkSurface: '#402335'},
+      {value: 'emoji', label: 'Emoji 乐园 ✨', kind: 'palette', contentHeight: true, popupWidth: 360, brand: '#7143ca', surface: '#fffefd', darkSurface: '#382744'},
+      {value: 'midnight', label: '夜幕 🌙', kind: 'palette', contentHeight: true, popupWidth: 360, brand: '#9eb5d0', surface: '#1d2632', darkSurface: '#1d2632'},
+      {value: 'paper', label: '纸张护眼 📖', kind: 'palette', contentHeight: true, popupWidth: 360, brand: '#806b51', surface: '#fbf9f3', darkSurface: '#292620'},
+      {value: 'aurora', label: '极光舷窗 🛰️', kind: 'palette', contentHeight: true, popupWidth: 360, brand: '#5147a8', surface: '#fcfbff', darkSurface: '#272544'},
+      {value: 'arcade', label: '像素街机 🎮', kind: 'palette', contentHeight: true, popupWidth: 360, brand: '#087f65', surface: '#fbfffd', darkSurface: '#172f35'},
+      {value: 'sunset', label: '落日公路 🛣️', kind: 'palette', contentHeight: true, popupWidth: 360, brand: '#b64f3b', surface: '#fffdfa', darkSurface: '#382b37'},
     ];
     const skinCards = interfaceSettingsGroup.locator('.interface-skin-option');
     if (await skinCards.count() !== expectedInterfaceSkins.length) {

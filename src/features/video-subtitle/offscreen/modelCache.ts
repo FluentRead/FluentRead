@@ -80,3 +80,13 @@ export function cacheVideoAiQ4ModelFiles(model: unknown): Promise<void> {
 export function cacheVideoAiQ8ModelFiles(model: unknown): Promise<void> {
   return cacheVideoAiModelFiles(model, 'q8');
 }
+
+/** 只清除指定 Whisper 模型的缓存文件，保留其他模型及字幕结果。 */
+export async function removeVideoAiModelFiles(model: unknown): Promise<void> {
+  if (model !== 'tiny' && model !== 'base') throw new Error('无效的本地字幕模型');
+  const cache = await caches.open(TRANSFORMERS_CACHE_NAME);
+  const prefix = getVideoAiModelFileUrl(model, '');
+  for (const request of await cache.keys()) {
+    if (request.url.startsWith(prefix)) await cache.delete(request);
+  }
+}

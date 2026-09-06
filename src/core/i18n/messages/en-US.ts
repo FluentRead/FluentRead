@@ -6,10 +6,27 @@
  * 并保留参数化旧文案的安全回退，支持后续翻译者继续补齐未 key 化区域。
  * 模块边界：资源只描述扩展自己的界面文本；不会翻译网页正文、用户输入、提示词或翻译结果。
  */
-import type {MessageCatalog} from '../types';
+import type {
+MessageCatalog} from '../types';
 import {legacyTextOverrides} from './legacy-overrides';
 
 export const enUSMessages = {
+    "usage.pageSize": "{size} entries",
+    "featureEnable.imageDescription": "Show the translation control when hovering over a webpage image.",
+
+    "modelCache.downloadSize": "Approx. {size} MB download",
+    "modelCache.remove": "Remove model",
+    "modelCache.removeNamed": "Remove {name}",
+    "modelCache.removing": "Removing…",
+    "modelCache.removeFailed": "Could not remove the model. Try again.",
+
+    "featureEnable.on": "On",
+    "featureEnable.off": "Off",
+    "featureEnable.unavailable": "Unavailable",
+    "featureEnable.enable": "Enable now",
+    "featureEnable.disable": "Turn off",
+    "featureEnable.hint": "Enable this feature for its settings to take effect.",
+
     "learning.memory": "Learning memory",
     "learning.memoryAdd": "Add memory",
     "learning.memoryCharacters": "{count} / 2000 characters",
@@ -720,7 +737,7 @@ const enUSLegacyTextBase: Readonly<Record<string, string>> = {
     '选择翻译服务、默认服务、译文显示、网页辅助、AI 智能上下文、默认目标语言、主题': 'Translation services, default service, display, web assistance, AI context, default target language, and theme',
     '选择翻译服务、默认服务、译文显示、双语逐句高亮、网页辅助、AI 精翻、AI 智能上下文、默认目标语言、主题': 'Translation services, default service, display, bilingual sentence highlighting, web assistance, AI context, default target language, and theme',
     '选择翻译服务、默认服务、界面设置、弹窗风格、默认风格、简约风格、弹窗栏目、快捷功能栏、当前网站栏目、底部信息栏、译文显示、双语逐句高亮、网页辅助、AI 智能上下文、默认目标语言、主题': 'Translation services, default service, interface settings, popup style, default style, minimal style, popup sections, quick features, current website section, footer, translation display, bilingual sentence highlighting, web assistance, AI context, default target language, and theme',
-    '界面布局': 'Interface layout',
+    '界面风格': 'Interface style',
     '界面与弹窗、菜单栏布局': 'Interface, popup, and menu bar layout',
     '选择喜欢的界面风格，编排菜单栏中的模块和快捷功能。': 'Choose your interface style and arrange menu bar modules and quick features.',
     '界面设置、界面与弹窗、弹窗风格、默认风格、简约风格、紧凑风格、高对比、奶酪、海盐、抹茶、樱花、夜幕、纸张护眼、Emoji、菜单栏布局、弹窗栏目、快捷功能栏、当前网站栏目、底部信息栏': 'Interface settings, interface and popup, popup style, default style, minimal style, compact style, high contrast, cheese, sea salt, matcha, sakura, midnight, paper comfort, Emoji, menu bar layout, popup sections, quick features, current website, footer',

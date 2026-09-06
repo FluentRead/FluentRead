@@ -612,6 +612,12 @@ describe('后台 feature handlers', () => {
             markLanguagesDownloaded: vi.fn(async () => ['eng' as const, 'chi_sim' as const]),
             now: () => 0,
         };
+        const removeLanguages=vi.fn(async()=>{});
+        const markLanguagesRemoved=vi.fn(async()=>['jpn' as const]);
+        const removalHandlers=createImageTranslationBackgroundHandlers({...dependencies,removeLanguages,markLanguagesRemoved});
+        await expect(removalHandlers.find(h=>h.type==='fluentReadImageOcrRemove')!.handle({type:'fluentReadImageOcrRemove',languages:['eng']})).resolves.toEqual({success:true,languages:['jpn']});
+        expect(removeLanguages).toHaveBeenCalledWith(['eng']);
+        await expect(createImageTranslationBackgroundHandlers(dependencies).find(h=>h.type==='fluentReadImageOcrRemove')!.handle({type:'fluentReadImageOcrRemove',languages:['eng']})).rejects.toThrow('不可用');
         const handlers = createImageTranslationBackgroundHandlers(dependencies);
         const find = (type: string) => handlers.find((handler) => handler.type === type)!;
 

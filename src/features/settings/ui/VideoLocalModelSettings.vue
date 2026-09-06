@@ -32,12 +32,14 @@
           <span v-if="item.value === config.videoLocalModel" class="video-model-selected">当前选择</span>
         </div>
         <p class="video-model-description">{{ item.description }}</p>
+        <p class="video-model-size">{{ t('modelCache.downloadSize', {size: item.downloadSizeMb}) }}</p>
         <div class="video-model-card-footer">
           <span class="video-model-availability" role="status">
             <Check v-if="downloaded.includes(item.value)" aria-hidden="true" />
             {{ !modelStateLoaded ? '读取中…' : downloaded.includes(item.value) ? '可离线使用' : downloading.includes(item.value) ? '正在下载模型' : '尚未下载' }}
           </span>
-          <button type="button" class="video-model-download-button" :aria-label="t(downloaded.includes(item.value) ? 'video.modelDownloadedAria' : 'video.modelDownloadAria', {model: translateLegacy(item.label)})" :disabled="!modelStateLoaded || downloaded.includes(item.value) || downloading.includes(item.value) || !config.videoTranslationEnabled || !browserCapabilities.offscreenDocument" @click="config.videoLocalModel = item.value; download(item.value)">
+          <button v-if="downloaded.includes(item.value)" type="button" class="video-model-download-button" :disabled="removing.includes(item.value) || downloading.includes(item.value)" :aria-label="t('modelCache.removeNamed', {name: translateLegacy(item.label)})" @click="removeModel(item.value)"><Delete aria-hidden="true" />{{ t(removing.includes(item.value) ? 'modelCache.removing' : 'modelCache.remove') }}</button>
+          <button v-else type="button" class="video-model-download-button" :aria-label="t(downloaded.includes(item.value) ? 'video.modelDownloadedAria' : 'video.modelDownloadAria', {model: translateLegacy(item.label)})" :disabled="!modelStateLoaded || downloaded.includes(item.value) || downloading.includes(item.value) || !config.videoTranslationEnabled || !browserCapabilities.offscreenDocument" @click="config.videoLocalModel = item.value; download(item.value)">
             <component :is="downloaded.includes(item.value) ? Check : downloading.includes(item.value) ? Loading : Download" :class="{ 'is-loading': downloading.includes(item.value) }" aria-hidden="true" />
             {{ downloaded.includes(item.value) ? '已下载' : downloading.includes(item.value) ? '下载中…' : '下载模型' }}
           </button>
@@ -89,6 +91,7 @@ const downloaded = ref<VideoLocalTranscriptionModel[]>([]);
 const modelStateLoaded = ref(false);
 const downloading = ref<VideoLocalTranscriptionModel[]>([]);
 const downloadError = ref('');
+const removing = ref<VideoLocalTranscriptionModel[]>([]);
 const cacheStats = ref<{entries: number; bytes: number; maxEntries: number; ttlMs: number} | null>(null);
 const cacheError = ref('');
 const clearingCache = ref(false);
@@ -116,6 +119,18 @@ async function download(model: VideoLocalTranscriptionModel): Promise<void> {
   } finally {
     downloading.value = downloading.value.filter(item => item !== model);
   }
+}
+
+async function removeModel(model: VideoLocalTranscriptionModel): Promise<void> {
+  if (removing.value.includes(model)) return;
+  removing.value.push(model);
+  downloadError.value = '';
+  try {
+    const response = await browser.runtime.sendMessage({type: 'fluentReadRemoveLocalVideoModel', model}) as {success?: boolean; error?: string; models?: unknown} | undefined;
+    if (!response?.success) throw new Error(response?.error || t('modelCache.removeFailed'));
+    downloaded.value = normalizeVideoLocalTranscriptionModels(response.models);
+  } catch (error) { downloadError.value = error instanceof Error ? translateLegacy(error.message) : t('modelCache.removeFailed'); }
+  finally { removing.value = removing.value.filter(item => item !== model); }
 }
 
 async function refreshCacheStats(): Promise<void> {
@@ -153,6 +168,7 @@ onUnmounted(() => browser.storage.onChanged.removeListener(handleStorageChange))
 </script>
 
 <style scoped>
+.video-model-size { margin: 0 0 12px; color: var(--muted); font-size: 12px; }
 .video-model-management {
   display: grid;
   gap: 14px;

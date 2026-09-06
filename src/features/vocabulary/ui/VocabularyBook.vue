@@ -113,19 +113,19 @@
 
         <section class="toolbar" aria-label="筛选单词">
           <label class="search-field"><span aria-hidden="true">⌕</span><input v-model.trim="query" type="search" placeholder="搜索单词、句子、释义或上下文" /></label>
-          <select v-model="statusFilter" aria-label="掌握状态">
-            <option value="all">全部状态</option>
-            <option value="due">待复习</option>
-            <option value="new">新词</option>
-            <option value="learning">学习中</option>
-            <option value="familiar">熟悉</option>
-            <option value="mastered">已掌握</option>
-          </select>
-          <select v-model="sortOrder" aria-label="排序方式">
-            <option value="due">按复习时间</option>
-            <option value="recent">按最近收藏</option>
-            <option value="term">按字母顺序</option>
-          </select>
+          <UiSelect v-model="statusFilter" aria-label="掌握状态">
+            <ElOption value="all" :label="translateControlLabel('全部状态')" />
+            <ElOption value="due" :label="translateControlLabel('待复习')" />
+            <ElOption value="new" :label="translateControlLabel('新词')" />
+            <ElOption value="learning" :label="translateControlLabel('学习中')" />
+            <ElOption value="familiar" :label="translateControlLabel('熟悉')" />
+            <ElOption value="mastered" :label="translateControlLabel('已掌握')" />
+          </UiSelect>
+          <UiSelect v-model="sortOrder" aria-label="排序方式">
+            <ElOption value="due" :label="translateControlLabel('按复习时间')" />
+            <ElOption value="recent" :label="translateControlLabel('按最近收藏')" />
+            <ElOption value="term" :label="translateControlLabel('按字母顺序')" />
+          </UiSelect>
         </section>
 
         <section v-if="loading && entries.length === 0" class="empty-state"><span class="loading-ring" /><p>正在读取本地单词本…</p></section>
@@ -178,6 +178,10 @@
 </template>
 
 <script setup lang="ts">
+import UiSelect from '@/src/ui/components/UiSelect.vue';
+import {ElOption} from 'element-plus';
+function translateControlLabel(value: string): string { return translateLegacyText(value, normalizeUiLanguage(runtimeConfig.uiLanguage)); }
+
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, shallowRef, watch } from 'vue';
 import VocabularyStudy from './VocabularyStudy.vue';
 import {ReadingAnswer} from '@/src/features/reading-assistant/public';
@@ -571,10 +575,12 @@ async function relearn(entry: VocabularyEntry): Promise<void> {
 }
 
 async function removeEntry(entry: VocabularyEntry): Promise<void> {
-  if (actionBusy.value || !window.confirm(translateLegacyText(
-    `确认删除“${entry.term}”及其复习记录吗？`,
-    normalizeUiLanguage(runtimeConfig.uiLanguage),
-  ))) return;
+  if (actionBusy.value) return;
+  try { await ElMessageBox.confirm(translateLegacyText(
+    `确认删除“${entry.term}”及其复习记录吗？`, normalizeUiLanguage(runtimeConfig.uiLanguage)),
+    translateControlLabel('删除'), {type: 'warning', confirmButtonText: translateControlLabel('删除'), cancelButtonText: translateControlLabel('取消')}); }
+  catch { return; }
+  if (actionBusy.value) return;
   actionBusy.value = true;
   try {
     const snapshot = await requestVocabulary<VocabularyRemovalSnapshot | null>({

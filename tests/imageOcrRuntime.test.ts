@@ -1,11 +1,12 @@
 import {afterEach, beforeEach, describe, expect, it, vi} from 'vitest';
 
-const {recognize, ensureLanguages, createRuntime, tesseractCreateWorker} = vi.hoisted(() => ({
-    recognize: vi.fn(), ensureLanguages: vi.fn(), createRuntime: vi.fn(), tesseractCreateWorker: vi.fn(),
+const {recognize, ensureLanguages, clearModels, removeFiles, createRuntime, tesseractCreateWorker} = vi.hoisted(() => ({
+    clearModels: vi.fn(async (remove: () => Promise<void>) => remove()), removeFiles: vi.fn(async () => {}), recognize: vi.fn(), ensureLanguages: vi.fn(), createRuntime: vi.fn(), tesseractCreateWorker: vi.fn(),
 }));
 vi.mock('@/src/features/image-translation/services/ocrWorkerRuntime', () => ({
     createOcrWorkerRuntime: createRuntime,
 }));
+vi.mock('@/src/features/image-translation/services/ocrModelCache', () => ({removeOcrModelFiles: removeFiles}));
 vi.mock('tesseract.js', () => ({createWorker: tesseractCreateWorker, PSM: {SPARSE_TEXT: 11, SINGLE_BLOCK: 6}}));
 
 const blockResult = () => ({data: {blocks: [{paragraphs: [{lines: [{
@@ -20,11 +21,21 @@ describe('图片 OCR 处理与结果缓存', () => {
     let context: {drawImage: ReturnType<typeof vi.fn>; fillRect: ReturnType<typeof vi.fn>; fillStyle: string; imageSmoothingEnabled: boolean; imageSmoothingQuality: string};
     let onImageCreated: (() => void) | undefined;
 
+    it('清除语言包后丢弃 OCR 结果并重新识别', async () => {
+        await recognizeImage('same', 'en');
+        await recognizeImage('same', 'en');
+        expect(recognize).toHaveBeenCalledTimes(1);
+        const {removeImageOcrLanguages} = await import('@/src/features/image-translation/services/ocrRuntime');
+        await removeImageOcrLanguages(['eng']);
+        expect(removeFiles).toHaveBeenCalledWith(['eng']);
+        await recognizeImage('same', 'en');
+        expect(recognize).toHaveBeenCalledTimes(2);
+    });
     beforeEach(async () => {
         vi.resetModules();
         recognize.mockReset().mockResolvedValue(blockResult());
         ensureLanguages.mockReset().mockResolvedValue(undefined);
-        createRuntime.mockReset().mockReturnValue({recognize, ensureLanguages});
+        createRuntime.mockReset().mockReturnValue({recognize, ensureLanguages, clearModels});
         tesseractCreateWorker.mockReset().mockResolvedValue({});
         onImageCreated = undefined;
         dimensions = {width: 100, height: 100};

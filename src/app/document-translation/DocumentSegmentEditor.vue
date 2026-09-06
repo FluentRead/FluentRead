@@ -10,7 +10,7 @@
       <label class="editor-search"><span class="visually-hidden">搜索原文、译文或位置</span><input v-model="query" type="search" placeholder="搜索原文、译文或位置" /></label>
       <label class="editor-filter"><input v-model="onlyPending" type="checkbox" />只看未翻译</label>
       <span>{{ filteredSegments.length }} 个片段</span>
-      <label v-if="pageCount > 1" class="editor-page-select">页码<select v-model.number="page" aria-label="校订页码"><option v-for="index in pageCount" :key="index" :value="index">{{ index }} / {{ pageCount }}</option></select></label>
+      <label v-if="pageCount > 1" class="editor-page-select">页码<ElSelect class="document-select"  append-to=".document-app" v-model="page" aria-label="校订页码"><ElOption v-for="index in pageCount" :key="index" :value="index" :label="`${index} / ${pageCount}`" /></ElSelect></label>
     </div>
     <p class="editor-note">{{ disabled ? '翻译进行中，可查看已完成的片段；暂停后即可校订。' : '修改即时用于本页预览和下载，下载文件后再离开。' }}</p>
     <div v-if="!filteredSegments.length" class="editor-empty">{{ query ? '没有找到匹配内容，试试其他关键词。' : '所有片段都已有译文。' }}</div>
@@ -29,6 +29,9 @@
   </section>
 </template>
 <script setup lang="ts">
+import ElSelect from '@/src/ui/components/UiSelect.vue';
+import {ElOption} from 'element-plus';
+import 'element-plus/es/components/select/style/css';
 import {useUiI18n} from "@/src/ui/i18n";
 const {t, translateLegacy} = useUiI18n();
 import {computed, ref, watch} from 'vue';

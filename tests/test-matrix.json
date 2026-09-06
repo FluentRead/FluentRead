@@ -198,7 +198,8 @@
       "tests/harnessMemorySearch.test.ts",
       "tests/learningMemoryHandler.test.ts",
       "tests/freeTranslationConfig.test.ts",
-      "tests/freeFallback.test.ts"
+      "tests/freeFallback.test.ts",
+      "tests/modelCacheRemoval.test.ts"
     ],
     "functional": [
       "tests/settingsCompositionAutosave.test.ts",

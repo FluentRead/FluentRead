@@ -73,8 +73,7 @@
     <section v-if="moduleId === 'translation'" class="hero-card" data-popup-module="translation">
       <div class="hero-heading">
         <div>
-          <span class="eyebrow">网页翻译</span>
-          <h1>{{ config.on ? '让阅读自然地流动' : '翻译功能已暂停' }}</h1>
+          <h1>{{ config.on ? '网页翻译' : '翻译功能已暂停' }}</h1>
         </div>
         <div class="hero-switches">
           <button class="switch" type="button" role="switch" :aria-checked="config.on" :aria-label="config.on ? '暂停插件' : '启用插件'" @click="setPluginEnabled(!config.on)"><i /></button>
@@ -84,16 +83,16 @@
       <div class="language-pair">
         <label>
           <span>源语言</span>
-          <select v-model="config.from" :disabled="!config.on">
-            <option v-for="item in options.from" :key="item.value" :value="item.value" data-i18n-ignore>{{ item.value === 'auto' ? translateLegacy(item.label) : getMultilingualTargetLanguageLabel(item.value, item.label, language) }}</option>
-          </select>
+          <UiSelect aria-label="源语言" v-model="config.from" :disabled="!config.on">
+            <ElOption v-for="item in options.from" :key="item.value" :value="item.value" data-i18n-ignore :label="item.value === 'auto' ? translateLegacy(item.label) : getMultilingualTargetLanguageLabel(item.value, item.label, language)" />
+          </UiSelect>
         </label>
         <span class="arrow">→</span>
         <label>
           <span>目标语言</span>
-          <select v-model="config.to" :disabled="!config.on">
-            <option v-for="item in options.to" :key="item.value" :value="item.value" data-i18n-ignore>{{ getMultilingualTargetLanguageLabel(item.value, item.label, language) }}</option>
-          </select>
+          <UiSelect aria-label="目标语言" v-model="config.to" :disabled="!config.on">
+            <ElOption v-for="item in options.to" :key="item.value" :value="item.value" data-i18n-ignore :label="getMultilingualTargetLanguageLabel(item.value, item.label, language)" />
+          </UiSelect>
         </label>
       </div>
 
@@ -136,11 +135,6 @@
         </div>
 
         <div v-if="servicePickerOpen" class="service-picker-panel" role="dialog" aria-label="选择翻译服务">
-          <div class="service-picker-heading">
-            <div><strong>选择翻译服务</strong><small>{{ servicePickerSummary }}</small></div>
-            <span>{{ servicePickerCount }}</span>
-          </div>
-
           <label class="service-search">
             <Search aria-hidden="true" />
             <input
@@ -524,10 +518,10 @@
         </div>
         <label class="select-row">
           <span><strong>视频翻译服务</strong><small>与网页翻译服务独立保存</small></span>
-          <select v-model="config.videoService" :disabled="!config.videoTranslationEnabled">
-            <option v-if="selectedVideoServiceUnavailableMessage" :value="config.videoService" disabled>Chrome内置AI翻译（当前浏览器不可用）</option>
-            <option v-for="item in videoServiceOptions" :key="item.value" :value="item.value">{{ item.label }}</option>
-          </select>
+          <UiSelect aria-label="视频翻译服务" v-model="config.videoService" :disabled="!config.videoTranslationEnabled">
+            <ElOption v-if="selectedVideoServiceUnavailableMessage" :value="config.videoService" disabled :label="translateControlLabel('Chrome内置AI翻译（当前浏览器不可用）')" />
+            <ElOption v-for="item in videoServiceOptions" :key="item.value" :value="item.value" :label="translateControlLabel(item.label)" />
+          </UiSelect>
         </label>
         <div v-if="browserCapabilities.offscreenDocument" class="x-video-ai-group">
           <div class="x-video-ai-group-heading">
@@ -536,15 +530,15 @@
           </div>
           <label class="select-row">
             <span><strong>本地 AI 字幕模型</strong><small>X 没有原生字幕时使用；首次请求前下载并缓存</small></span>
-            <select v-model="config.videoLocalModel" :disabled="!config.videoTranslationEnabled">
-              <option v-for="item in videoLocalModelOptions" :key="item.value" :value="item.value">{{ item.label }}</option>
-            </select>
+            <UiSelect aria-label="本地 AI 字幕模型" v-model="config.videoLocalModel" :disabled="!config.videoTranslationEnabled">
+              <ElOption v-for="item in videoLocalModelOptions" :key="item.value" :value="item.value" :label="translateControlLabel(item.label)" />
+            </UiSelect>
           </label>
           <label class="select-row">
             <span><strong>视频原语言</strong><small>独立于网页翻译语言；自动检测适合大多数视频</small></span>
-            <select v-model="config.videoSourceLanguage" :disabled="!config.videoTranslationEnabled" aria-label="视频原语言">
-              <option v-for="item in videoSourceLanguageOptions" :key="item.value" :value="item.value">{{ item.label }}</option>
-            </select>
+            <UiSelect v-model="config.videoSourceLanguage" :disabled="!config.videoTranslationEnabled" aria-label="视频原语言">
+              <ElOption v-for="item in videoSourceLanguageOptions" :key="item.value" :value="item.value" :label="translateControlLabel(item.label)" />
+            </UiSelect>
           </label>
           <button class="video-model-settings-link" type="button" @click="openOptions('settings-video')">下载或管理 Tiny / Base 模型 →</button>
           <button class="video-model-settings-link" type="button" @click="openOptions('settings-video')">调整字幕皮肤与位置 →</button>
@@ -553,9 +547,9 @@
         <small v-if="selectedVideoServiceUnavailableMessage" class="drawer-hint capability-warning">{{ selectedVideoServiceUnavailableMessage }}</small>
         <label class="select-row">
           <span><strong>字幕字号</strong><small>只调整 FluentRead 显示的原文和译文</small></span>
-          <select v-model.number="config.videoSubtitleAppearance.fontScale" aria-label="视频字幕字号" :disabled="!config.videoTranslationEnabled">
-            <option v-for="size in videoSubtitleFontSizeOptions" :key="size" :value="size">{{ size === 100 ? '默认' : `${size}%` }}</option>
-          </select>
+          <UiSelect v-model="config.videoSubtitleAppearance.fontScale" aria-label="视频字幕字号" :disabled="!config.videoTranslationEnabled">
+            <ElOption v-for="size in videoSubtitleFontSizeOptions" :key="size" :value="size" :label="translateControlLabel(size === 100 ? '默认' : `${size}%`)" />
+          </UiSelect>
         </label>
         <small class="drawer-hint">支持 YouTube/X；可切换字幕模式、显示状态，并分别下载原文或译文 SRT。YouTube 使用原生字幕，X 可读取原生字幕或请求本地 AI 生成。</small>
       </div>
@@ -569,11 +563,11 @@
         </div>
         <label v-if="config.display === 1" class="select-row">
           <span><strong>译文样式</strong><small>双语对照时译文的视觉效果</small></span>
-          <select v-model.number="config.style"><option v-for="item in styleOptions" :key="item.value" :value="item.value">{{ item.label }}</option></select>
+          <UiSelect aria-label="译文样式" v-model="config.style"><ElOption v-for="item in styleOptions" :key="item.value" :value="item.value" :label="translateControlLabel(item.label)" /></UiSelect>
         </label>
         <label class="select-row">
           <span><strong>界面主题</strong><small>同时应用到完整设置页面</small></span>
-          <select v-model="config.theme"><option v-for="item in options.theme" :key="item.value" :value="item.value">{{ item.label }}</option></select>
+          <UiSelect aria-label="界面主题" v-model="config.theme"><ElOption v-for="item in options.theme" :key="item.value" :value="item.value" :label="translateControlLabel(item.label)" /></UiSelect>
         </label>
       </div>
 
@@ -588,6 +582,11 @@
 </template>
 
 <script lang="ts" setup>
+import UiSelect from '@/src/ui/components/UiSelect.vue';
+import {ElOption} from 'element-plus';
+import {useUiI18n as useControlI18n} from '@/src/ui/i18n';
+const {translateLegacy: translateControlLabel} = useControlI18n();
+
 import { computed, defineAsyncComponent, nextTick, onMounted, onUnmounted, ref, watch } from 'vue';
 import browser from 'webextension-polyfill';
 import {
@@ -763,12 +762,6 @@ const popularServiceOptions = computed(() => popularServiceValues
   .map(value => serviceSearchResults.value.find((item: any) => item.value === value))
   .filter((item): item is any => Boolean(item)));
 const moreServiceOptions = computed(() => serviceSearchResults.value.filter((item: any) => !popularServiceValues.includes(item.value)));
-const servicePickerCount = computed(() => serviceSearchActive.value
-  ? `${serviceSearchResults.value.length}/${serviceOptions.value.length}`
-  : serviceOptions.value.length);
-const servicePickerSummary = computed(() => serviceSearchActive.value
-  ? '正在按服务名称与模型关键词筛选'
-  : `常用服务优先，更多服务${moreServicesOpen.value ? '已展开' : '已收起'}`);
 const styleOptions = computed(() => options.styles.filter((item: any) => !item.disabled));
 const selectedServiceUnavailableMessage = computed(() => getTranslationServiceUnavailableMessage(config.value.service));
 const selectedVideoServiceUnavailableMessage = computed(() => getTranslationServiceUnavailableMessage(config.value.videoService));

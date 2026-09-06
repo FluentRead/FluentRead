@@ -12,12 +12,16 @@ export const VIDEO_LOCAL_TRANSCRIPTION_MODELS = [
     value: 'tiny',
     label: 'Whisper Tiny（轻量模型）',
     modelId: 'onnx-community/whisper-tiny',
+    // q4 下载清单共约 98.5 MB，向上取整；不代表运行内存占用。
+    downloadSizeMb: 100,
     description: '识别速度较快、内存占用较低，适合快速生成字幕。',
   },
   {
     value: 'base',
     label: 'Whisper Base（标准模型）',
     modelId: 'onnx-community/whisper-base',
+    // q4 下载清单共约 145.6 MB，向上取整。
+    downloadSizeMb: 150,
     description: '侧重识别质量，所需内存更多、处理时间更长。',
   },
 ] as const;

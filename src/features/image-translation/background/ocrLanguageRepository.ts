@@ -20,6 +20,7 @@ export interface ImageOcrLanguageStorage {
 export interface ImageOcrLanguageRepository {
     getDownloaded(): Promise<ImageOcrLanguageCode[]>;
     markDownloaded(languages: ImageOcrLanguageCode[]): Promise<ImageOcrLanguageCode[]>;
+    markRemoved(languages: ImageOcrLanguageCode[]): Promise<ImageOcrLanguageCode[]>;
     assertDownloaded(sourceLanguage: string): Promise<void>;
 }
 
@@ -36,6 +37,7 @@ export function createImageOcrLanguageRepository(
 
     const markDownloaded = async (
         languages: ImageOcrLanguageCode[],
+        remove = false,
     ): Promise<ImageOcrLanguageCode[]> => {
         let releasePendingMark!: () => void;
         const previousMark = pendingMark;
@@ -46,7 +48,7 @@ export function createImageOcrLanguageRepository(
         await previousMark;
         try {
             const downloaded = new Set(await getDownloaded());
-            for (const language of languages) downloaded.add(language);
+            for (const language of languages) { if (remove) downloaded.delete(language); else downloaded.add(language); }
             const next = normalizeImageOcrLanguageCodes([...downloaded]);
             await storage.set({[IMAGE_OCR_LANGUAGE_STATE_KEY]: next});
             return next;
@@ -58,6 +60,7 @@ export function createImageOcrLanguageRepository(
     return {
         getDownloaded,
         markDownloaded,
+        markRemoved: languages => markDownloaded(languages, true),
         async assertDownloaded(sourceLanguage) {
             const downloaded = new Set(await getDownloaded());
             const missing = getRequiredImageOcrLanguages(sourceLanguage)

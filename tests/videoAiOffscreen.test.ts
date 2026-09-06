@@ -1,5 +1,5 @@
 import {afterEach, describe, expect, it, vi} from 'vitest';
-import {cancelLocalVideoTranscription, prepareLocalVideoTranscriptionModel, transcribeLocalVideoAudio} from '@/src/features/video-subtitle/offscreen/transcription';
+import {removeLocalVideoTranscriptionModel, cancelLocalVideoTranscription, prepareLocalVideoTranscriptionModel, transcribeLocalVideoAudio} from '@/src/features/video-subtitle/offscreen/transcription';
 
 class FakeWorker {
     static instances: FakeWorker[] = [];
@@ -81,4 +81,22 @@ describe('video AI offscreen queue', () => {
         await expect(first).resolves.toMatchObject({model: 'tiny', backend: 'wasm'});
         await cancelLocalVideoTranscription('warm');
     });
+});
+
+it('删除模型拒绝活跃工作并在失败后恢复可用状态', async () => {
+ installWorker(); let release!:()=>void;
+ vi.stubGlobal('caches',{open:()=>new Promise<any>(resolve=>{release=()=>resolve({keys:async()=>[]})})});
+ await expect(removeLocalVideoTranscriptionModel('bad')).rejects.toThrow('无效');
+ const clearing=removeLocalVideoTranscriptionModel('tiny');
+ await expect(removeLocalVideoTranscriptionModel('base')).rejects.toThrow('正在');
+ await expect(prepareLocalVideoTranscriptionModel('tiny')).rejects.toThrow('清除');
+ await expect(transcribeLocalVideoAudio({streamId:'busy',audioPcm16Base64:audio,model:'tiny'})).rejects.toThrow('清除');
+ release(); await clearing;
+ vi.stubGlobal('caches',{open:async()=>{throw new Error('disk')}});
+ await expect(removeLocalVideoTranscriptionModel('tiny')).rejects.toThrow('disk');
+ vi.stubGlobal('caches',{open:async()=>({keys:async()=>[]})});
+ const pending=transcribeLocalVideoAudio({streamId:'loaded',audioPcm16Base64:audio,model:'tiny'}); await tick();
+ await expect(removeLocalVideoTranscriptionModel('tiny')).rejects.toThrow('正在');
+ const worker=FakeWorker.instances[0]; worker.reply({requestId:(worker as any).lastMessage.requestId,success:true,text:'hello',segments:[],model:'tiny'});await pending;
+ await removeLocalVideoTranscriptionModel('tiny');expect(worker.terminated).toBe(true);
 });

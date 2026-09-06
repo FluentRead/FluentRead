@@ -28,10 +28,11 @@ export {
 } from '@/src/services/config/store';
 export {createDocumentDownload, translateDocumentSegments} from './runtime';
 export {createUiI18nPlugin, useUiI18n} from '@/src/ui/i18n';
-export {default as UiLanguageSelector} from '@/src/ui/components/UiLanguageSelector.vue';
 export {default as GlossaryLibrarySelect} from '@/src/ui/components/GlossaryLibrarySelect.vue';
 export {
     filterAvailableTranslationServices,
     getTranslationServiceUnavailableMessage,
     supportsTranslationGlossary,
 } from '@/src/services/translation/capabilities';
+
+export {default as ElSelect} from '@/src/ui/components/UiSelect.vue';

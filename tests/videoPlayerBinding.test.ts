@@ -398,3 +398,47 @@ describe('video player binding', () => {
     expect(button.isConnected).toBe(false);
   });
 });
+
+describe('X controls delayed mounting', () => {
+  it('waits for native controls on hover and remount without ever creating a corner fallback', () => {
+    const fixture = createFixture('<div class="player" data-testid="videoPlayer"><video></video></div>');
+    const createButton = vi.fn(() => fixture.document.createElement('button'));
+    const binding = createVideoPlayerBinding({document: fixture.document, locator: fixture.locator, getState: () => ({enabled: true}), createButton});
+    fixture.player.dispatchEvent(new fixture.window.Event('pointerover', {bubbles: true}));
+    expect(createButton).not.toHaveBeenCalled();
+    expect(fixture.player.querySelector('.fluent-read-video-fallback-controls')).toBeNull();
+    const controls = fixture.document.createElement('div');
+    controls.innerHTML = '<button aria-label="Settings"></button><button>fullscreen</button>';
+    fixture.player.appendChild(controls);
+    binding.sync();
+    expect(createButton).toHaveBeenCalledTimes(1);
+    expect(controls.firstElementChild).toBe(createButton.mock.results[0].value);
+    controls.remove(); binding.sync();
+    expect(fixture.player.querySelector('.fluent-read-video-fallback-controls')).toBeNull();
+    expect(createButton.mock.results[0].value.isConnected).toBe(false);
+    fixture.player.appendChild(controls); binding.sync();
+    expect(controls.firstElementChild).toBe(createButton.mock.results[1].value);
+    binding.destroy();
+    expect(controls.querySelectorAll('button')).toHaveLength(2);
+  });
+});
+
+it('controls observer ignores unrelated and owned mutations and rebinds host controls', () => {
+ const fixture=createFixture('<div class="player" data-testid="videoPlayer"><video></video></div>');
+ let notify!:MutationCallback;vi.stubGlobal('MutationObserver',class {constructor(callback:MutationCallback){notify=callback} observe(){} disconnect(){}});
+ const binding=createVideoPlayerBinding({document:fixture.document,locator:fixture.locator,getState:()=>({enabled:true}),createButton:()=>fixture.document.createElement('button')});
+ const external=fixture.document.createElement('div');
+ notify([{target:external,addedNodes:[],removedNodes:[]} as unknown as MutationRecord],{} as MutationObserver);
+ const owned=fixture.document.createElement('div');owned.className='fluent-read-video-ui';fixture.player.appendChild(owned);
+ notify([{target:fixture.player,addedNodes:[owned],removedNodes:[]} as unknown as MutationRecord],{} as MutationObserver);
+ const controls=fixture.document.createElement('div');controls.innerHTML='<button aria-label="Settings"></button>';fixture.player.appendChild(controls);
+ notify([{target:fixture.player,addedNodes:[controls],removedNodes:[]} as unknown as MutationRecord],{} as MutationObserver);
+ expect(controls.children.length).toBe(2);binding.destroy();
+ notify([{target:fixture.player,addedNodes:[controls],removedNodes:[]} as unknown as MutationRecord],{} as MutationObserver);
+});
+
+it('missing MutationObserver still supports explicit sync and clean teardown', () => {
+ const fixture=createFixture();vi.stubGlobal('MutationObserver',undefined);
+ const binding=createVideoPlayerBinding({document:fixture.document,locator:fixture.locator,getState:()=>({enabled:true}),createButton:()=>fixture.document.createElement('button')});
+ binding.sync();binding.destroy();
+});

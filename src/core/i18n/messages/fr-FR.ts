@@ -5,10 +5,27 @@
  * 主要内容：保持语言名称使用各自原生写法，并为尚未 key 化的旧 UI 提供法语映射。
  * 模块边界：资源只描述扩展自己的界面文本；不会翻译网页正文、用户输入或翻译结果。
  */
-import type {enUSMessages} from './en-US';
+import type {
+enUSMessages} from './en-US';
 import {legacyTextOverrides} from './legacy-overrides';
 
 export const frFRMessages = {
+    "usage.pageSize": "{size} entrées",
+    "featureEnable.imageDescription": "Afficher la traduction au survol des images de la page.",
+
+    "modelCache.downloadSize": "Téléchargement : environ {size} Mo",
+    "modelCache.remove": "Supprimer le modèle",
+    "modelCache.removeNamed": "Supprimer {name}",
+    "modelCache.removing": "Suppression…",
+    "modelCache.removeFailed": "Échec de la suppression. Réessayez.",
+
+    "featureEnable.on": "Activé",
+    "featureEnable.off": "Désactivé",
+    "featureEnable.unavailable": "Indisponible",
+    "featureEnable.enable": "Activer",
+    "featureEnable.disable": "Désactiver",
+    "featureEnable.hint": "Activez cette fonctionnalité pour appliquer ses réglages.",
+
     "learning.memory": "Mémoire d’apprentissage",
     "learning.memoryAdd": "Ajouter une mémoire",
     "learning.memoryCharacters": "{count} / 2000 caractères",
@@ -728,7 +745,7 @@ const frFRLegacyTextBase: Readonly<Record<string, string>> = {
     '选择翻译服务，设置译文显示、网页辅助与界面偏好。': 'Configurez le service de traduction, l’affichage, l’assistance web et l’interface.',
     '选择翻译服务、默认服务、译文显示、双语逐句高亮、网页辅助、AI 精翻、AI 智能上下文、默认目标语言、主题': 'Services de traduction, service par défaut, affichage, surlignage bilingue par phrase, assistance web, contexte IA, langue cible par défaut et thème',
     '选择翻译服务、默认服务、界面设置、弹窗风格、默认风格、简约风格、弹窗栏目、快捷功能栏、当前网站栏目、底部信息栏、译文显示、双语逐句高亮、网页辅助、AI 智能上下文、默认目标语言、主题': 'Services de traduction, service par défaut, réglages de l’interface, style de la fenêtre, style par défaut, style minimal, sections de la fenêtre, fonctions rapides, section du site actuel, pied de page, affichage des traductions, surlignage bilingue par phrase, assistance web, contexte IA, langue cible par défaut et thème',
-    '界面布局': 'Disposition de l’interface',
+    '界面风格': 'Style de l’interface',
     '界面与弹窗、菜单栏布局': 'Interface, fenêtre et barre de menus',
     '选择喜欢的界面风格，编排菜单栏中的模块和快捷功能。': 'Choisissez votre style et organisez les modules et raccourcis de la barre de menus.',
     '界面设置、界面与弹窗、弹窗风格、默认风格、简约风格、紧凑风格、高对比、奶酪、海盐、抹茶、樱花、夜幕、纸张护眼、Emoji、菜单栏布局、弹窗栏目、快捷功能栏、当前网站栏目、底部信息栏': 'Réglages de l’interface, interface et fenêtre, style de la fenêtre, style par défaut, minimal, compact, contraste élevé, fromage, sel marin, matcha, sakura, minuit, papier doux, Emoji, disposition de la barre de menus, sections de la fenêtre, fonctions rapides, site actuel, pied de page',

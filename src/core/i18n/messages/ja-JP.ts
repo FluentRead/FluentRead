@@ -5,10 +5,27 @@
  * 主要内容：保持语言名称使用各自原生写法，并为尚未 key 化的旧 UI 提供日语映射。
  * 模块边界：资源只描述扩展自己的界面文本；不会翻译网页正文、用户输入或翻译结果。
  */
-import type {enUSMessages} from './en-US';
+import type {
+enUSMessages} from './en-US';
 import {legacyTextOverrides} from './legacy-overrides';
 
 export const jaJPMessages = {
+    "usage.pageSize": "{size} 件",
+    "featureEnable.imageDescription": "ウェブページの画像にカーソルを合わせると翻訳ボタンを表示します。",
+
+    "modelCache.downloadSize": "ダウンロード約 {size} MB",
+    "modelCache.remove": "モデルを削除",
+    "modelCache.removeNamed": "{name} を削除",
+    "modelCache.removing": "削除中…",
+    "modelCache.removeFailed": "削除できませんでした。再試行してください。",
+
+    "featureEnable.on": "有効",
+    "featureEnable.off": "無効",
+    "featureEnable.unavailable": "利用不可",
+    "featureEnable.enable": "有効にする",
+    "featureEnable.disable": "無効にする",
+    "featureEnable.hint": "この機能を有効にすると、関連設定が適用されます。",
+
     "learning.memory": "学習メモリー",
     "learning.memoryAdd": "メモリーを追加",
     "learning.memoryCharacters": "{count} / 2000 文字",
@@ -728,7 +745,7 @@ const jaJPLegacyTextBase: Readonly<Record<string, string>> = {
     '选择翻译服务，设置译文显示、网页辅助与界面偏好。': '翻訳サービス、表示、ウェブ支援、インターフェースの設定を行います。',
     '选择翻译服务、默认服务、译文显示、双语逐句高亮、网页辅助、AI 精翻、AI 智能上下文、默认目标语言、主题': '翻訳サービス、デフォルトサービス、翻訳表示、二言語の文のハイライト、ウェブ支援、AI コンテキスト、デフォルトの翻訳先言語、テーマ',
     '选择翻译服务、默认服务、界面设置、弹窗风格、默认风格、简约风格、弹窗栏目、快捷功能栏、当前网站栏目、底部信息栏、译文显示、双语逐句高亮、网页辅助、AI 智能上下文、默认目标语言、主题': '翻訳サービス、デフォルトサービス、インターフェース設定、ポップアップのスタイル、デフォルトスタイル、ミニマルスタイル、ポップアップ項目、クイック機能、現在のサイト、フッター、翻訳表示、二言語の文のハイライト、ウェブ支援、AI コンテキスト、デフォルトの翻訳先言語、テーマ',
-    '界面布局': '画面レイアウト',
+    '界面风格': 'インターフェースのスタイル',
     '界面与弹窗、菜单栏布局': '画面とポップアップ、メニューバーのレイアウト',
     '选择喜欢的界面风格，编排菜单栏中的模块和快捷功能。': '好みの画面スタイルを選び、メニューバーのモジュールとクイック機能を並べ替えます。',
     '界面设置、界面与弹窗、弹窗风格、默认风格、简约风格、紧凑风格、高对比、奶酪、海盐、抹茶、樱花、夜幕、纸张护眼、Emoji、菜单栏布局、弹窗栏目、快捷功能栏、当前网站栏目、底部信息栏': '画面設定、画面とポップアップ、ポップアップのスタイル、デフォルト、ミニマル、コンパクト、高コントラスト、チーズ、シーソルト、抹茶、桜、ミッドナイト、紙のやさしさ、Emoji、メニューバーのレイアウト、ポップアップ項目、クイック機能、現在のサイト、フッター',

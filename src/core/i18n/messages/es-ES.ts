@@ -5,10 +5,27 @@
  * 主要内容：以 English 资源作为结构基线，逐项覆盖当前稳定 message key；旧版尚未 key 化的文案由 i18n 迁移层按显式映射处理。
  * 模块边界：资源只描述扩展自己的界面文本；不会翻译网页正文、用户输入、提示词或翻译结果。
  */
-import type {enUSMessages} from './en-US';
+import type {
+enUSMessages} from './en-US';
 import {legacyTextOverrides} from './legacy-overrides';
 
 export const esESMessages = {
+    "usage.pageSize": "{size} entradas",
+    "featureEnable.imageDescription": "Mostrar el control de traducción al pasar sobre una imagen.",
+
+    "modelCache.downloadSize": "Descarga de aprox. {size} MB",
+    "modelCache.remove": "Eliminar modelo",
+    "modelCache.removeNamed": "Eliminar {name}",
+    "modelCache.removing": "Eliminando…",
+    "modelCache.removeFailed": "No se pudo eliminar. Inténtalo de nuevo.",
+
+    "featureEnable.on": "Activado",
+    "featureEnable.off": "Desactivado",
+    "featureEnable.unavailable": "No disponible",
+    "featureEnable.enable": "Activar",
+    "featureEnable.disable": "Desactivar",
+    "featureEnable.hint": "Activa esta función para aplicar sus ajustes.",
+
     "learning.memory": "Memoria de aprendizaje",
     "learning.memoryAdd": "Añadir memoria",
     "learning.memoryCharacters": "{count} / 2000 caracteres",
@@ -767,7 +784,7 @@ const esESLegacyTextBase: Readonly<Record<string, string>> = {
     '选择翻译服务、默认服务、译文显示、网页辅助、AI 智能上下文、默认目标语言、主题': 'Servicios de traducción, servicio predeterminado, visualización, asistencia web, contexto de IA, idioma y tema',
     '选择翻译服务、默认服务、译文显示、双语逐句高亮、网页辅助、AI 精翻、AI 智能上下文、默认目标语言、主题': 'Servicios de traducción, servicio predeterminado, visualización, resaltado bilingüe por oración, asistencia web, contexto de IA, idioma de destino y tema',
     '选择翻译服务、默认服务、界面设置、弹窗风格、默认风格、简约风格、弹窗栏目、快捷功能栏、当前网站栏目、底部信息栏、译文显示、双语逐句高亮、网页辅助、AI 智能上下文、默认目标语言、主题': 'Servicios de traducción, servicio predeterminado, ajustes de la interfaz, estilo de la ventana emergente, estilo predeterminado, estilo minimalista, secciones de la ventana emergente, funciones rápidas, sitio actual, pie de página, visualización, resaltado bilingüe por oración, asistencia web, contexto de IA, idioma de destino y tema',
-    '界面布局': 'Diseño de la interfaz',
+    '界面风格': 'Estilo de la interfaz',
     '界面与弹窗、菜单栏布局': 'Interfaz, ventana y barra de menús',
     '选择喜欢的界面风格，编排菜单栏中的模块和快捷功能。': 'Elige tu estilo y organiza los módulos y accesos rápidos de la barra de menús.',
     '界面设置、界面与弹窗、弹窗风格、默认风格、简约风格、紧凑风格、高对比、奶酪、海盐、抹茶、樱花、夜幕、纸张护眼、Emoji、菜单栏布局、弹窗栏目、快捷功能栏、当前网站栏目、底部信息栏': 'Ajustes de la interfaz, interfaz y ventana, estilo de ventana, predeterminado, minimalista, compacto, alto contraste, queso, sal marina, matcha, sakura, medianoche, papel cómodo, Emoji, diseño de la barra de menús, secciones de la ventana, funciones rápidas, sitio actual, pie de página',

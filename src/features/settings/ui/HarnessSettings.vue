@@ -1,14 +1,16 @@
 <!--
  * @file src/features/settings/ui/HarnessSettings.vue
  * 文件职责：让用户通过翻译卡示例理解功能，并配置网页动作、模型和阅读偏好。
- * 主要内容：提供无需联网的交互示例、服务与模型选择，以及常驻独立分组的学习记忆、网页动作、回答和原文范围设置，末尾注明内核来源和开源链接。
+ * 主要内容：提供无需联网的交互示例、服务与模型选择，以及常驻独立分组的学习记忆、网页动作、回答和原文范围设置，开头注明内核来源和开源链接。
  * 模块边界：只编辑传入 Config 的 harness 字段；阅读记录由学习中心统一呈现，不发起模型请求，不拥有网页选区或提示词。
  -->
 <template>
+  <div class="harness-attribution">
+    <span>翻译卡基于 DeepSeek Harness 内核开发。</span>
+    <a href="https://github.com/deepseek-ai/deepseek-harness" target="_blank" rel="noopener noreferrer">DeepSeek Harness 开源项目 ↗</a>
+  </div>
   <SettingsGroup description="选中网页文字，直接点“读懂”或“拆句”。回答留在原文旁边，读完就继续浏览。">
-    <SettingsItem label="启用翻译卡" description="选中文字后显示学习动作，点击才会调用模型。">
-      <el-switch v-model="config.harness.enabled" aria-label="启用翻译卡" />
-    </SettingsItem>
+    <FeatureEnableCard v-model="config.harness.enabled" title="启用翻译卡" description="选中文字后显示学习动作，点击才会调用模型。" />
     <SettingsItem label="试试翻译卡" description="选中文字 → 点一个动作 → 读懂后继续浏览。" stacked>
       <div class="harness-preview-wrap"><div class="harness-preview">
         <div class="harness-preview-caption"><span>网页中的效果</span><small>演示内容，不调用模型</small></div>
@@ -74,13 +76,11 @@
       <div class="harness-context-limit"><el-input-number v-model="config.harness.maxContextChars" :min="500" :max="4000" :step="100" controls-position="right" aria-label="上下文上限" /><span>字符</span></div>
     </SettingsItem>
   </SettingsGroup></section>
-  <footer class="harness-attribution">
-    <span>翻译卡基于 DeepSeek Harness 内核开发。</span>
-    <a href="https://github.com/deepseek-ai/deepseek-harness" target="_blank" rel="noopener noreferrer">DeepSeek Harness 开源项目 ↗</a>
-  </footer>
+
 </template>
 
 <script setup lang="ts">
+import FeatureEnableCard from '@/src/ui/components/FeatureEnableCard.vue';
 import {computed, ref, toRef, watch} from 'vue'
 import {models, options} from '@/src/core/config/catalog'
 import {getCustomOpenAIProviderLabel, getCustomOpenAIProviderModels, isCustomOpenAIProviderId} from '@/src/core/config/customOpenAI'
@@ -128,7 +128,7 @@ function toggleAction(id: HarnessActionId) {
 </script>
 
 <style scoped>
-.harness-attribution { display:flex; flex-wrap:wrap; align-items:center; gap:6px 12px; padding:4px 4px 12px; color:var(--muted); font-size:12px; line-height:1.7; }
+.harness-attribution { display:flex; flex-wrap:wrap; align-items:center; gap:6px 12px; width:min(100%,1080px); margin:0 auto 10px; padding:4px 4px 12px; color:var(--muted); font-size:12px; line-height:1.7; }
 .harness-attribution a { color:var(--brand); text-decoration:underline; text-underline-offset:3px; overflow-wrap:anywhere; }
 .harness-attribution a:focus-visible { outline:2px solid var(--brand); outline-offset:4px; border-radius:3px; }
 .harness-preview-wrap { display:flex; justify-content:center; }

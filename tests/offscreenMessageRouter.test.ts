@@ -488,3 +488,17 @@ describe('Offscreen 消息静态路由', () => {
 
     });
 });
+
+it('模型清除路由等待删除并阻止同时识别或重复清除', async () => {
+ const base={...mocks,ttsPlayer:{play:mocks.play,stop:mocks.stop}};
+ let release!:()=>void; const removeOcrLanguages=vi.fn(()=>new Promise<void>(resolve=>{release=resolve}));
+ const handler=createOffscreenMessageListener({...base,removeOcrLanguages,videoAi:{prepare:vi.fn(),transcribe:vi.fn(),cancel:vi.fn(),removeModel:vi.fn(async()=>{})}});
+ expect((await dispatch({type:'VIDEO_AI_REMOVE_MODEL'},handler)).response).toEqual({success:true});
+ expect((await dispatch({type:'VIDEO_AI_REMOVE_MODEL'})).response).toMatchObject({success:false});
+ expect((await dispatch({type:'FLUENT_READ_IMAGE_OCR_REMOVE_OFFSCREEN',languages:['eng']})).response).toMatchObject({success:false});
+ const pending=dispatch({type:'FLUENT_READ_IMAGE_OCR_REMOVE_OFFSCREEN',languages:['eng']},handler);
+ await vi.waitFor(()=>expect(removeOcrLanguages).toHaveBeenCalled());
+ expect((await dispatch({type:'FLUENT_READ_IMAGE_OCR_REMOVE_OFFSCREEN',languages:['eng']},handler)).response).toMatchObject({success:false});
+ expect((await dispatch({type:'FLUENT_READ_IMAGE_OCR_OFFSCREEN',image:'data:image/png;base64,AA==',sourceLanguage:'en'},handler)).response).toMatchObject({success:false,error:expect.stringContaining('清除')});
+ release();expect((await pending).response).toEqual({success:true});
+});

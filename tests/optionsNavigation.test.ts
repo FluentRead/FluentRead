@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import {
   DEFAULT_NAVIGATION_SECTION,
   filterNavigationItems,
+  isUiLanguageSearch,
   navigationGroups,
   navigationItems,
   resolveNavigationItem,
@@ -42,7 +43,7 @@ describe('options navigation view-model', () => {
     ])
     expect(navigationItems.map((item) => item.label)).toEqual([
       '通用设置',
-      '界面布局',
+      '界面风格',
       '翻译服务',
       '翻译设置',
       '翻译卡',
@@ -68,7 +69,7 @@ describe('options navigation view-model', () => {
   it('resolves valid sections and falls back for malformed hashes', () => {
     expect(resolveNavigationItem('settings-services').title).toBe('翻译服务')
     expect(resolveNavigationItem('settings-translation').title).toBe('翻译设置')
-    expect(resolveNavigationItem('settings-interface').title).toBe('界面布局')
+    expect(resolveNavigationItem('settings-interface').title).toBe('界面风格')
     expect(resolveRequestedSection('#settings-glossary')).toBe('settings-glossary')
     expect(resolveNavigationItem('settings-glossary').group).toBe('工具与学习')
     expect(resolveNavigationItem('settings-model-usage').detail)
@@ -150,3 +151,20 @@ describe('options navigation view-model', () => {
     ])
   })
 })
+
+ describe('interface language recovery search', () => {
+  it.each(['lan', 'LANGUAGE', '  language  ', '语言', '語言', '言語', '언어', 'langue', 'idioma', 'язык', 'Sprache', 'língua', 'لغة'])('finds the language control across UI locales: %s', query => {
+    expect(isUiLanguageSearch(query)).toBe(true)
+    const translated = navigationItems.map(item => ({...item, label: 'unrelated', description: '', heading: '', summary: '', searchDescription: ''}))
+    expect(filterNavigationItems(query, translated)[0]?.id).toBe('settings-general')
+  })
+  it('does not treat blank or unrelated searches as language recovery', () => {
+    expect(isUiLanguageSearch(' ')).toBe(false)
+    expect(isUiLanguageSearch('OpenAI')).toBe(false)
+    expect(filterNavigationItems('')).toEqual([])
+  })
+})
+
+it('普通搜索维持原导航顺序', () => { expect(filterNavigationItems('翻译').length).toBeGreaterThan(1); });
+
+it('语言搜索在多个匹配项中优先显示通用设置', () => { const matches=filterNavigationItems('语'); expect(matches.length).toBeGreaterThan(1);expect(matches[0].id).toBe('settings-general'); });

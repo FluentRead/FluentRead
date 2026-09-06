@@ -255,14 +255,18 @@ Ko-fi 的 Monthly 按钮把 tooltip 插在按钮内部。回归同时覆盖提�
 
 ## 写作助手回复场景
 
-`tests/writingCore`、`writingBackground`、`writingRuntime`、`writingIntegration` 覆盖配置迁移与网页范围、有界请求、来源校验、取消与超时、冻结模型、用量、编辑器快照和原生输入事件。对应可执行模块进入四维 100% 覆盖率。
+`tests/writingCore`、`writingEditors`、`writingBackground`、`writingRuntime`、`writingIntegration` 覆盖默认开启及旧配置迁移、网页范围、有界请求、来源校验、取消与超时、冻结模型、用量、当前编辑器的会话范围、编辑器快照和原生输入事件。对应可执行模块按四维 100% 覆盖率要求验收；`tests/i18n.test.ts` 的全量界面扫描检查写作卡片与设置中的静态文案。
 
 ```bash
 node scripts/testing/run-writing-assistant-test.cjs \
   --extension-dir .output/chrome-mv3 \
   --playwright-root <path> \
   --focus-safe-helper <path> \
-  --artifacts-dir /private/tmp/fluentread-writing-browser
+ --artifacts-dir /private/tmp/fluentread-writing-browser
 ```
 
-该回归加载生产扩展，以不抢焦点的临时 Edge 验证 Gmail、GitHub Issue/PR 页面夹具中的操作区入口、品牌图标、锚点滚动定位、生成前后稳定尺寸、入口菜单的关闭范围与设置跳转、可审阅正文、流式回复、改进、失败重试、原生插入、草稿变化保护、编辑器重挂载、停止、路由取消、关闭设置页后的持久化、禁用网站、深浅与窄屏。正文与流式模型均为合成测试数据，没有登录真实 Gmail/GitHub，没有发送邮件或评论；结果不能作为真实账号页面或外部 AI 服务质量的证明。报告记录执行范围、窗口位置、前台状态和截图。
+默认 `--suite all` 执行完整流程。`--suite presentation` 可独立验证设置与连接跳转、持久化、站点范围、深色及窄屏；报告会标明套件范围，不将短套件结果当作完整生命周期验证。若防打扰保护中止运行，保留已完成用例与错误，不能将该轮标记为全部通过。
+
+该回归加载生产扩展，使用不抢焦点的临时 Edge 和 Gmail、GitHub Issue/PR 页面夹具。当前流程的验收范围包括：默认自动显示入口；设置只有一个总开关及服务模型配置；网页入口和卡片使用品牌图标、设置侧栏使用普通图标、Popup 无写作入口；已有草稿自动完善、有讨论自动起草、无参考内容时填写要点；基于当前正文调整语言、篇幅、语气和改进要求；失败或停止保留已有草稿；关闭重开恢复本页结果；插入后回到原回复框、复杂格式提供复制操作；以及上下文隔离、草稿变化保护、编辑器重挂载、路由取消、配置持久化、锚点定位、稳定尺寸、深浅主题与窄屏。
+
+以上是验收范围，不能视为新版浏览器验证已经通过。以本次实际执行报告记录的用例、窗口位置、前台状态和截图为准。正文与流式模型均为合成测试数据，不登录真实 Gmail/GitHub，不发送邮件或评论；夹具结果不能作为真实账号页面或外部 AI 服务质量的证明，旧版入口菜单、快捷键和写作网站名单的测试结果也不能代替新版流程验证。

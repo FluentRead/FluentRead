@@ -201,7 +201,8 @@
       "tests/freeTranslationConfig.test.ts",
       "tests/freeFallback.test.ts",
       "tests/modelCacheRemoval.test.ts",
-      "tests/writingCore.test.ts"
+      "tests/writingCore.test.ts",
+      "tests/writingEditors.test.ts"
     ],
     "functional": [
       "tests/settingsCompositionAutosave.test.ts",

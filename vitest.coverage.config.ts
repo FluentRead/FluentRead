@@ -19,6 +19,7 @@ export default defineConfig({
         include: [
             'tests/writingIntegration.test.ts',
             'tests/writingCore.test.ts',
+            'tests/writingEditors.test.ts',
             'tests/writingBackground.test.ts',
             'tests/writingRuntime.test.ts',
             'tests/chineseLanguage.test.ts',

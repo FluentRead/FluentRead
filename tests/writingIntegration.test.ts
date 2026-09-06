@@ -13,7 +13,7 @@ import {mountWritingAssistant, unmountWritingAssistant, isWritingAssistantMounte
 import {installWritingBackgroundRuntime} from '@/src/app/background/writingRuntime';
 const request = {type: 'fluentReadWriting', action: 'run', requestId: 'write', intent: 'reply', instruction: '', draft: 'Draft', context: '', language: 'en', tone: 'natural', history: []} as const;
 function event() { const listeners = new Set<Function>(); return {addListener: (fn: Function) => listeners.add(fn), removeListener: (fn: Function) => listeners.delete(fn), fire: (arg?: unknown) => [...listeners].forEach(fn => fn(arg)), listeners}; }
-beforeEach(() => { vi.clearAllMocks(); Object.assign(m.config, new Config()); m.config.writing.enabled = true; m.handlerFactory.mockReturnValue(m.handler); m.record.mockResolvedValue(undefined); });
+beforeEach(() => { vi.clearAllMocks(); Object.assign(m.config, new Config()); m.handlerFactory.mockReturnValue(m.handler); m.record.mockResolvedValue(undefined); });
 describe('Writing client cleanup', () => {
   function setup() { const port = {onMessage: event(), onDisconnect: event(), disconnect: vi.fn(), postMessage: vi.fn()}; m.connect.mockReturnValue(port); const handlers = {progress: vi.fn(), result: vi.fn()}; return {port, handlers}; }
   it('isolates request ids, streams progress, closes results and ignores late events', () => {
@@ -40,7 +40,7 @@ describe('Writing mounting and background composition', () => {
     expect(deps.eligibility({})).toContain('仅支持'); expect(deps.eligibility({url:'https://example.com'})).toContain('仅支持');
     const sender = {url:'https://github.com/a/b/issues/1',tab:{url:'https://github.com/a/b/issues/1'}};
     expect(deps.eligibility(sender)).toBeUndefined(); m.config.on = false; expect(deps.eligibility(sender)).toContain('停用'); m.config.on = true; m.config.writing.enabled = false; expect(deps.eligibility(sender)).toContain('停用'); m.config.writing.enabled = true;
-    m.config.writing.disabledDomains = ['github.com']; expect(deps.eligibility(sender)).toContain('禁用'); m.config.writing.disabledDomains = []; m.config.disabledExtensionDomains = ['example.com']; expect(deps.eligibility({...sender,tab:{url:'https://example.com'}})).toContain('禁用'); expect(deps.eligibility({url:sender.url})).toBeUndefined();
+    m.config.disabledExtensionDomains = ['github.com']; expect(deps.eligibility(sender)).toContain('禁用'); m.config.disabledExtensionDomains = ['example.com']; expect(deps.eligibility({...sender,tab:{url:'https://example.com'}})).toContain('禁用'); expect(deps.eligibility({url:sender.url})).toBeUndefined();
     const changed = m.subscribe.mock.calls[0][0]; changed(m.config); changed(m.config); expect(m.handler.cancelAll).toHaveBeenCalledOnce(); m.config.writing.tone = 'friendly'; changed(m.config); expect(m.handler.cancelAll).toHaveBeenCalledTimes(2);
     m.onConnect.mock.calls[0][0]('port'); expect(m.handler.connect).toHaveBeenCalledWith('port'); m.removed.mock.calls[0][0](2); m.updated.mock.calls[0][0](3,{status:'complete'}); m.updated.mock.calls[0][0](4,{url:sender.url}); m.updated.mock.calls[0][0](5,{status:'loading'}); expect(m.handler.cancelTab.mock.calls).toEqual([[2],[4],[5]]);
     await deps.run(request,new AbortController().signal,vi.fn()); expect(m.runtimeFactory.mock.calls[0][0]()).toBe(m.config);

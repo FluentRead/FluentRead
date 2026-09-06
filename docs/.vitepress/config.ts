@@ -1,6 +1,8 @@
 import { defineConfig } from 'vitepress'
 import { localeBootstrap } from './theme/locale-preference.mjs'
 
+const supportUrl = 'https://github.com/FluentRead/FluentRead#support'
+
 const guide = (en = false) => {
   const p = en ? '/en' : ''
   const item = (zh: string, english: string, path: string) => ({
@@ -57,7 +59,7 @@ const guide = (en = false) => {
       items: [
         item('常见问题', 'Troubleshooting', '/guide/faq'),
         item('数据与隐私', 'Data & privacy', '/guide/privacy'),
-        item('支持项目', 'Support the project', '/guide/support'),
+        { text: en ? 'Support the project' : '支持项目', link: supportUrl },
       ],
     },
   ]
@@ -84,7 +86,7 @@ const theme = (en = false) => ({
     },
     {
       text: en ? 'Support' : '支持项目',
-      link: en ? '/en/guide/support' : '/guide/support',
+      link: supportUrl,
     },
   ],
   sidebar: en

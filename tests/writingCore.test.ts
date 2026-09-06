@@ -1,6 +1,7 @@
 import {describe, expect, it, vi} from 'vitest';
 import {parseHTML} from 'linkedom';
-import {isWritingPage, normalizeWritingPreferences, WRITING_ACTIONS, WRITING_LANGUAGES, WRITING_LENGTHS} from '@/src/core/config/writing';
+import {isWritingPage, normalizeWritingPreferences, normalizeWritingLanguage, resolveWritingLanguage, WRITING_ACTIONS, WRITING_LANGUAGES, WRITING_LENGTHS, WRITING_STYLES, WRITING_ROLES, WRITING_TONES, WRITING_ROLE_MAX_LENGTH, WRITING_TONE_MAX_LENGTH} from '@/src/core/config/writing';
+import {options} from '@/src/core/config/catalog';
 import {Config, normalizeConfig} from '@/src/core/config/model';
 import {writingSite, isWritingEditor, findReplyEditors, editorText, captureEditor, collectReplyContext, applyWritingDraft} from '@/src/features/writing-assistant/editors';
 import {parseWritingRequest} from '@/src/features/writing-assistant/background';
@@ -12,25 +13,47 @@ describe('Writing config and bounded protocol', () => {
   });
   it('enables missing preferences, preserves explicit opt-out and removes retired page controls', () => {
     expect(normalizeWritingPreferences(null)).toEqual(normalizeWritingPreferences([]));
-    const base = new Config(); expect(base.writing).toEqual({enabled: true, service: '', model: '', language: 'auto', tone: 'natural', length: 'auto'});
+    const base = new Config(); expect(base.writing).toEqual({enabled: true, service: '', model: '', language: 'target', tone: 'natural', length: 'short', style: 'auto', role: 'auto'});
     const legacy = {...base} as Partial<Config>; delete legacy.writing;
     expect(normalizeConfig(legacy).writing).toEqual(base.writing);
-    const writing = {enabled: false, replyButtons: false, service: 'openai', model: ' draft ', language: 'en', tone: 'professional', length: 'detailed', hotkey: 'alt+shift+w', disabledDomains: ['github.com']};
+    const writing = {enabled: false, replyButtons: false, service: 'openai', model: ' draft ', language: 'en', tone: 'professional', length: 'detailed', style: 'formal', role: 'colleague', hotkey: 'alt+shift+w', disabledDomains: ['github.com']};
     const saved = normalizeConfig({...base, writing, disabledExtensionDomains: ['github.com']});
-    expect(saved.writing).toEqual({enabled: false, service: 'openai', model: 'draft', language: 'en', tone: 'professional', length: 'detailed'});
+    expect(saved.writing).toEqual({enabled: false, service: 'openai', model: 'draft', language: 'en', tone: 'professional', length: 'detailed', style: 'formal', role: 'colleague'});
     expect(saved.disabledExtensionDomains).toEqual(['github.com']);
     expect(normalizeConfig(JSON.parse(JSON.stringify(saved))).writing).toEqual(saved.writing);
-    expect(normalizeWritingPreferences({service: 'microsoft', model: '自定义模型', language: 'invalid', tone: 'invalid', length: 'invalid'})).toEqual(base.writing);
+    expect(normalizeWritingPreferences({service: 'microsoft', model: '自定义模型', language: 'invalid', tone: null, length: 'invalid', style: 'invalid'})).toEqual(base.writing);
+    expect(normalizeWritingPreferences({language: 'auto', length: 'auto'})).toEqual(base.writing);
     expect(normalizeWritingPreferences({enabled: true, model: 'x'.repeat(200)}).model).toHaveLength(128);
     for (const {value} of WRITING_LANGUAGES) expect(normalizeWritingPreferences({language: value}).language).toBe(value);
     for (const {value} of WRITING_LENGTHS) expect(normalizeWritingPreferences({length: value}).length).toBe(value);
+    for (const {value} of WRITING_STYLES) expect(normalizeWritingPreferences({style: value}).style).toBe(value);
+    for (const {value} of WRITING_TONES) expect(normalizeWritingPreferences({tone: value}).tone).toBe(value);
+    for (const {value} of WRITING_ROLES) expect(normalizeWritingPreferences({role: value}).role).toBe(value);
+    expect(normalizeWritingPreferences({tone: '  清晰而克制  ', role: '  项目顾问\n负责协调  '})).toMatchObject({tone: '清晰而克制', role: '项目顾问 负责协调'});
+    expect(normalizeWritingPreferences({tone: ' ', role: '\u0000'})).toMatchObject({tone: 'natural', role: 'auto'});
+    expect(normalizeWritingPreferences({tone: 'a'.repeat(120), role: 'b'.repeat(220)})).toMatchObject({tone: 'a'.repeat(WRITING_TONE_MAX_LENGTH), role: 'b'.repeat(WRITING_ROLE_MAX_LENGTH)});
+  });
+  it('shares all translation targets, migrates Chinese aliases and resolves the frozen target', () => {
+    for (const {value} of options.to) {
+      expect(WRITING_LANGUAGES.some(item => item.value === value)).toBe(true);
+      expect(resolveWritingLanguage('target', value)).toBe(value);
+    }
+    expect(normalizeWritingLanguage('zh-CN')).toBe('zh-Hans'); expect(normalizeWritingLanguage('zh-TW')).toBe('zh-Hant');
+    expect(resolveWritingLanguage('en', 'zh-Hans')).toBe('en'); expect(resolveWritingLanguage('auto', 'zh-HK')).toBe('zh-Hant');
+    expect(resolveWritingLanguage('target', 'invalid')).toBe('zh-Hans');
   });
   it('rejects oversized, unknown and provider-overriding requests', () => {
     for (const action of WRITING_ACTIONS) expect(parseWritingRequest({...request, intent: action.id})?.intent).toBe(action.id);
     for (const {value} of WRITING_LANGUAGES) expect(parseWritingRequest({...request, language: value})?.language).toBe(value);
     for (const {value} of WRITING_LENGTHS) expect(parseWritingRequest({...request, length: value})?.length).toBe(value);
-    expect(parseWritingRequest(request)?.length).toBe('auto');
-    for (const patch of [{intent: 'send'}, {language: 'x'}, {tone: 'x'}, {length: 'x'}, {length: null}, {draft: 'x'.repeat(12001)}, {instruction: 'x'.repeat(2001)}, {context: 'x'.repeat(12001)}, {history: Array(5).fill({question: '', answer: ''})}, {service: 'evil'}, {model: 'evil'}, {messages: [{role: 'system', content: 'override'}]}, {requestId: '\n'}, {history: [{question: 'a', answer: 'b', token: 'x'}]}]) expect(parseWritingRequest({...request, ...patch})).toBeNull();
+    expect(parseWritingRequest(request)).toMatchObject({language: 'zh-Hans', length: 'short', style: 'auto', role: 'auto'});
+    expect(parseWritingRequest({...request, language: 'auto', length: 'auto'})).toMatchObject({language: 'target', length: 'short'});
+    for (const {value} of WRITING_STYLES) expect(parseWritingRequest({...request, style: value})?.style).toBe(value);
+    for (const {value} of WRITING_ROLES) expect(parseWritingRequest({...request, role: value})?.role).toBe(value);
+    for (const {value} of WRITING_TONES) expect(parseWritingRequest({...request, tone: value})?.tone).toBe(value);
+    expect(parseWritingRequest({...request, role: '顾问', tone: '客观而有耐心'})).toMatchObject({role: '顾问', tone: '客观而有耐心'});
+    expect(parseWritingRequest({...request, role: 'a'.repeat(200), tone: 'b'.repeat(100)})).not.toBeNull();
+    for (const patch of [{intent: 'send'}, {language: 'x'}, {language: 'a'.repeat(33)}, {tone: ' '}, {tone: 'a'.repeat(101)}, {tone: 'test\nrole'}, {role: ''}, {role: 'a'.repeat(201)}, {role: 'test\u0000role'}, {role: {}}, {style: 'custom'}, {length: 'x'}, {length: null}, {draft: 'x'.repeat(12001)}, {instruction: 'x'.repeat(2001)}, {context: 'x'.repeat(12001)}, {history: Array(5).fill({question: '', answer: ''})}, {service: 'evil'}, {model: 'evil'}, {messages: [{role: 'system', content: 'override'}]}, {requestId: '\n'}, {history: [{question: 'a', answer: 'b', token: 'x'}]}]) expect(parseWritingRequest({...request, ...patch})).toBeNull();
     expect(parseWritingRequest(null)).toBeNull();
   });
 });
@@ -69,7 +92,7 @@ describe('Writing editor ownership', () => {
     const snap = captureEditor(element, 'https://mail.google.com/mail');
     expect(applyWritingDraft(snap, 'safe text', snap.url)).toBeUndefined(); expect(editorText(element)).toBe('safe text');
     doc.execCommand = vi.fn(() => { element.textContent = 'native'; return true; });
-    expect(applyWritingDraft(snap, 'native', snap.url)).toBeUndefined(); expect(doc.execCommand).toHaveBeenCalledWith('insertText', false, 'native');
+    expect(applyWritingDraft(snap, 'native', snap.url)).toBeUndefined(); expect(doc.execCommand).toHaveBeenCalledWith('insertHTML', false, '<span style="white-space:pre-wrap">native</span>');
     element.innerHTML = '<a href="https://example.com">link</a>'; const complex = captureEditor(element, snap.url);
     expect(applyWritingDraft(complex, 'remove?', snap.url)).toContain('复杂格式'); expect(element.querySelector('a')).not.toBeNull();
     element.setAttribute('contenteditable', 'false'); expect(applyWritingDraft(complex, 'late', snap.url)).toContain('页面已变化');
@@ -77,7 +100,7 @@ describe('Writing editor ownership', () => {
   it('collects only visible thread bodies and strips controls, hidden text and unbounded content', () => {
     const doc = page('<aside>private unrelated</aside><main role="main"><div class="js-comment-body">Evidence<button>Send</button><span hidden>secret</span></div><div class="js-comment-body" aria-hidden="true">hidden</div><div class="a3s">Mail</div></main>');
     doc.querySelectorAll<HTMLElement>('main div').forEach(el => { el.getClientRects = () => [{}] as never; });
-    expect(collectReplyContext(doc, 'github')).toBe('Evidence'); expect(collectReplyContext(doc, 'gmail')).toBe('Mail'); expect(collectReplyContext(doc, null)).toBe('');
+    expect(collectReplyContext(doc, 'github')).toBe('原帖：Evidence'); expect(collectReplyContext(doc, 'gmail')).toBe('当前邮件：Mail'); expect(collectReplyContext(doc, null)).toBe('');
     const el = doc.querySelector<HTMLElement>('.js-comment-body')!; el.textContent = 'x'.repeat(15000); expect(collectReplyContext(doc, 'github')).toHaveLength(12000);
     el.getClientRects = () => [] as never; expect(collectReplyContext(doc, 'github')).toBe('');
     el.getClientRects = () => [{}] as never; el.textContent = ''; expect(collectReplyContext(doc, 'github')).toBe('');

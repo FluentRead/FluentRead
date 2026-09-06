@@ -97,6 +97,8 @@ describe('AI 模型编号列表', () => {
         expect(models.get(services.moonshot)).toContain('kimi-k2.7-code');
         expect(models.get(services.yiyan)).toContain('ernie-5.1');
         expect(models.get(services.minimax)).toContain('MiniMax-M2.7');
+        expect(models.get(services.minimax)).toContain('MiniMax-M3');
+        expect(models.get(services.minimax)).toContain('MiniMax-M3.1');
         expect(models.get(services.mimo)).toContain('mimo-v2.5-pro');
         expect(models.get(services.jieyue)).toContain('step-3.5-flash');
         expect(models.get(services.huanYuan)).toContain('hy3');

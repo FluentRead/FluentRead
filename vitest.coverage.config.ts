@@ -17,6 +17,10 @@ export default defineConfig({
     test: {
         environment: 'node',
         include: [
+            'tests/writingIntegration.test.ts',
+            'tests/writingCore.test.ts',
+            'tests/writingBackground.test.ts',
+            'tests/writingRuntime.test.ts',
             'tests/chineseLanguage.test.ts',
             'tests/chineseTranslationProviders.test.ts',
             'tests/areaTextTranslation.test.ts',
@@ -243,6 +247,13 @@ export default defineConfig({
             reportsDirectory: 'coverage/core',
             reporter: ['text', 'json-summary', 'html'],
             include: [
+                'src/app/background/writingRuntime.ts',
+                'src/features/writing-assistant/client.ts',
+                'src/features/writing-assistant/content.ts',
+                'src/core/config/writing.ts',
+                'src/features/writing-assistant/background.ts',
+                'src/features/writing-assistant/editors.ts',
+                'src/services/writing/runtime.ts',
                 'src/features/image-translation/content/presentation.ts',
                 'src/app/background/imageContextMenu.ts',
                 'src/features/full-page-translation/qqMailFrames.ts',

@@ -234,3 +234,17 @@ node scripts/testing/run-area-translation-flow-test.cjs \
 ### 悬浮说明框翻译稳定性
 
 `run-full-page-translation-test.cjs` 在全文翻译会话中动态创建与旧 Bootstrap 相同结构的 tooltip，按原文高度定位，使双语内容增高后覆盖触发图标。真实 CDP 鼠标连续执行两次移入、持续停留和移出，断言每次只打开一次、译文仅一份、图标仍获得鼠标命中，移出后正常关闭。报告的 `tooltipHover` 同时记录语义 tooltip、未翻译提示、交互弹层和恢复原文后的命中边界。该保护只作用于已翻译的纯说明提示框，保留链接、按钮和可聚焦控件的交互。此测试为本地结构夹具，不代表登录后的真实网站验证。
+
+## 写作助手回复场景
+
+`tests/writingCore`、`writingBackground`、`writingRuntime`、`writingIntegration` 覆盖配置迁移与网页范围、有界请求、来源校验、取消与超时、冻结模型、用量、编辑器快照和原生输入事件。对应可执行模块进入四维 100% 覆盖率。
+
+```bash
+node scripts/testing/run-writing-assistant-test.cjs \
+  --extension-dir .output/chrome-mv3 \
+  --playwright-root <path> \
+  --focus-safe-helper <path> \
+  --artifacts-dir /private/tmp/fluentread-writing-browser
+```
+
+该回归加载生产扩展，以不抢焦点的临时 Edge 验证 Gmail、GitHub Issue/PR 页面夹具中的操作区入口、品牌图标、锚点滚动定位、生成前后稳定尺寸、入口菜单的关闭范围与设置跳转、可审阅正文、流式回复、改进、失败重试、原生插入、草稿变化保护、编辑器重挂载、停止、路由取消、关闭设置页后的持久化、禁用网站、深浅与窄屏。正文与流式模型均为合成测试数据，没有登录真实 Gmail/GitHub，没有发送邮件或评论；结果不能作为真实账号页面或外部 AI 服务质量的证明。报告记录执行范围、窗口位置、前台状态和截图。

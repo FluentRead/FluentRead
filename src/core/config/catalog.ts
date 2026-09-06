@@ -317,7 +317,7 @@ export const models = new Map<string, Array<string>>([
     [services.baichuan, [defaultModelIds[services.baichuan], "Baichuan-M3-Plus", "Baichuan4-Air", "Baichuan4-Turbo", "Baichuan4", customModelString]],
     [services.lingyi, [defaultModelIds[services.lingyi], customModelString]],
     [services.deepseek, [currentModelIds.deepseek, "deepseek-v4-pro", customModelString]],
-    [services.minimax, [defaultModelIds[services.minimax], currentModelIds.minimax, "MiniMax-M2.5", "MiniMax-M2.5-highspeed", customModelString]],
+    [services.minimax, [defaultModelIds[services.minimax], "MiniMax-M3.1", "MiniMax-M3", currentModelIds.minimax, "MiniMax-M2.5", "MiniMax-M2.5-highspeed", customModelString]],
     [services.mimo, [defaultModelIds[services.mimo], currentModelIds.mimo, customModelString]],
     [services.jieyue, [currentModelIds.jieyue, "step-3", "step-2", customModelString]],
     [services.huanYuan, [currentModelIds.huanYuan, "hy3-preview", customModelString]],

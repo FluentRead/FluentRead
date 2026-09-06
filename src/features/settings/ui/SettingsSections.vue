@@ -48,6 +48,9 @@
   <section v-show="props.activeSection === 'settings-translation-center'" id="settings-translation-center" class="settings-section translation-center-section">
     <TranslationCenter />
   </section>
+  <section v-if="props.activeSection === 'settings-writing'" id="settings-writing" class="settings-section">
+    <WritingSettings :config="config" @configure-service="openWritingServiceSettings()" />
+  </section>
   <section v-show="props.activeSection === 'settings-harness'" id="settings-harness" class="settings-section">
     <HarnessSettings :config="config" />
   </section>
@@ -776,6 +779,8 @@ import {getServiceWebsite} from '@/src/ui/view-model/serviceCatalog';
 import ServiceConfiguration from './services/ServiceConfiguration.vue';
 import CustomOpenAIProviderDialog from './services/CustomOpenAIProviderDialog.vue';
 import {TranslationCenter} from '@/src/features/translation-center/public';
+const openWritingServiceSettings = () => { window.location.hash = 'settings-services'; };
+import WritingSettings from './WritingSettings.vue';
 import HarnessSettings from './HarnessSettings.vue';
 import {GlossarySettings} from '@/src/features/glossary/public';
 import AlwaysTranslateSites from './AlwaysTranslateSites.vue';

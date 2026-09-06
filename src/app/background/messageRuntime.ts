@@ -41,6 +41,7 @@ import {createConfigImageOcrLanguageStorage, installBrowserConfigStorageBroadcas
 import {modelUsageRepository} from '@/src/platform/storage/modelUsageRepository';
 import {releaseVideoSubtitleOwnerForTab} from '@/src/features/video-subtitle/background/handlers';
 import {createVideoSubtitleBackgroundRuntime} from '@/src/features/video-subtitle/background/runtime';
+import {installWritingBackgroundRuntime} from './writingRuntime';
 import {installHarnessBackgroundRuntime} from './harnessRuntime';
 import {createImageGlossaryContext} from './imageGlossaryContext';
 import {buildGlossaryRevision} from '@/src/core/glossary';
@@ -53,6 +54,7 @@ export interface BackgroundMessageRuntimeOptions {
 }
 /** 用静态 handler registry 组装唯一的 runtime.onMessage 入口。 */
 export function installBackgroundMessageRuntime(options: BackgroundMessageRuntimeOptions): void {
+    installWritingBackgroundRuntime();
     const capabilities = options.capabilities ?? browserCapabilities;
     const translationRequestRegistry = createTranslationRequestRegistry();
     const imageOcrLanguageRepository = createImageOcrLanguageRepository(createConfigImageOcrLanguageStorage());

@@ -34,7 +34,7 @@ describe('options navigation view-model', () => {
       },
       {
         label: '工具与学习',
-        items: ['settings-translation-center', 'settings-vocabulary', 'settings-glossary', 'settings-model-usage'],
+        items: ['settings-writing', 'settings-translation-center', 'settings-vocabulary', 'settings-glossary', 'settings-model-usage'],
       },
       {
         label: '系统与数据',
@@ -51,6 +51,7 @@ describe('options navigation view-model', () => {
       '圈选翻译',
       '视频字幕翻译',
       '网站规则',
+      '写作助手',
       '翻译中心',
       '学习中心',
       '术语库',

@@ -27,7 +27,8 @@
       "tests/userscriptMetadata.test.ts",
       "tests/userscriptPrivacy.test.ts",
       "tests/userscriptViteConfig.test.ts",
-      "tests/freeTranslationSettings.test.ts"
+      "tests/freeTranslationSettings.test.ts",
+      "tests/writingBackground.test.ts"
     ],
     "unit": [
       "tests/modalDialogHost.test.ts",
@@ -199,7 +200,8 @@
       "tests/learningMemoryHandler.test.ts",
       "tests/freeTranslationConfig.test.ts",
       "tests/freeFallback.test.ts",
-      "tests/modelCacheRemoval.test.ts"
+      "tests/modelCacheRemoval.test.ts",
+      "tests/writingCore.test.ts"
     ],
     "functional": [
       "tests/settingsCompositionAutosave.test.ts",
@@ -254,7 +256,9 @@
       "tests/readingPanelLifecycle.test.ts",
       "tests/learningMemoryRepository.test.ts",
       "tests/optionsAppNavigationLifecycle.test.ts",
-      "tests/myMemoryProvider.test.ts"
+      "tests/myMemoryProvider.test.ts",
+      "tests/writingRuntime.test.ts",
+      "tests/writingIntegration.test.ts"
     ],
     "regression": [
       "tests/translationControlOwnership.test.ts",

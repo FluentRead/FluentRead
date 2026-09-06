@@ -55,7 +55,7 @@ const {
 const CONFIG_REVISION_FIELD = '__fluentConfigRevision';
 const TEST_CLIENT_ID = `popup-startup-${process.pid}-${Date.now()}`;
 const MODULE_ORDER = ['quickFeatures', 'translation', 'siteRule', 'footer'];
-const QUICK_FEATURE_ORDER = ['document', 'hover', 'selection', 'appearance', 'video', 'image'];
+const QUICK_FEATURE_ORDER = ['document', 'hover', 'selection', 'appearance', 'video', 'image', 'area'];
 
 function delay(milliseconds) {
   return new Promise(resolve => setTimeout(resolve, milliseconds));
@@ -107,6 +107,7 @@ function startupProbeScript() {
       configReadReleased: 0,
       configReadDelayMs: 0,
       configReadFailures: 0,
+      storageReadKeys: [],
       persistConfigRequests: 0,
       persistConfigModes: [],
       persistConfigResponses: 0,
@@ -165,6 +166,7 @@ function startupProbeScript() {
           state.persistConfigBatchSizes.push(message.patches?.length || 0);
           return original(...args);
         }
+        if (message?.type === 'configStorageRead') state.storageReadKeys.push(message.key);
         if (message?.type !== 'configStorageRead' || message.key !== 'local:config') return original(...args);
         state.configReadRequests += 1;
         const requestedAt = performance.now();
@@ -363,6 +365,11 @@ async function runPopupCase({
   }));
   const startup = await readStartupState(page);
   if (!startup) throw new Error(`${caseName} 没有取得 document_start 首帧状态`);
+  if (!failureMode && !expectFlash) {
+    if (startup.storageReadKeys.some(key => key === 'local:configHistory' || key === 'session:credentials')) {
+      throw new Error(`${caseName} 首屏读取了非必要历史或旧会话凭据：${startup.storageReadKeys}`);
+    }
+  }
   const readSettleDeadline = Date.now() + Math.max(1000, delayMs + 3000);
   while (Date.now() < readSettleDeadline) {
     if (startup.configReadRequests > 0 && startup.configReadReleased >= startup.configReadRequests) break;
@@ -464,6 +471,7 @@ async function runPopupCase({
       failureCount: startup.configReadFailures,
     },
     firstCorrectFrame,
+    storageReadKeys: startup.storageReadKeys,
     mountCount: startup.mountCount,
     renderMutations: startup.renderMutations,
     firstVisibleShell: firstFrame,
@@ -477,6 +485,7 @@ async function runPopupCase({
     firstFrame,
     finalFrame,
     firstCorrectFrame,
+    storageReadKeys: startup.storageReadKeys,
     mountCount: startup.mountCount,
     renderMutations: startup.renderMutations,
     flashObserved,
@@ -531,20 +540,23 @@ async function runPersistenceRegression({context, extensionOrigin, popupPath, pa
   // 冻结首请求给 Popup 的回执，让第二次修改确定停留在页面本地队列。
   // 后台真实处理照常执行；关闭后的成功必须来自补丁链交接，不能依赖机器快慢。
   const modifiedPage = await openReadyPopup('persistence-latest-write-wins', {holdFirstPersistResponse: true});
-  const targetSelect = modifiedPage.locator('.language-pair select').nth(1);
-  const languageValues = await targetSelect.locator('option').evaluateAll(options => options
-    .filter(option => !option.disabled)
-    .map(option => option.value)
-    .filter(Boolean));
-  const initialValue = await targetSelect.inputValue();
-  const candidates = languageValues.filter(value => value !== initialValue);
-  if (candidates.length < 2) throw new Error(`目标语言选项不足以验证连续写入：${JSON.stringify(languageValues)}`);
-  const firstTarget = candidates[0];
-  const finalTarget = candidates[1];
-  await targetSelect.selectOption(firstTarget);
+  const targetSelect = modifiedPage.locator('.language-pair .el-select').nth(1);
+  const initialValue = (await readConfig(pageForConfig, timeout)).to;
+  const candidates = [
+    {value: 'en', label: /English|英语/u},
+    {value: 'ja', label: /日本語|Japanese|日语/u},
+    {value: 'fr', label: /Français|French|法语/u},
+  ].filter(option => option.value !== initialValue);
+  const firstTarget = candidates[0].value;
+  const finalTarget = candidates[1].value;
+  const selectTarget = async candidate => {
+    await targetSelect.locator('.el-select__wrapper').click();
+    await modifiedPage.locator('.el-select-dropdown:visible').getByRole('option', {name: candidate.label}).click();
+  };
+  await selectTarget(candidates[0]);
   await modifiedPage.waitForFunction(() => globalThis.__fluentReadPopupStartup?.persistConfigResponseHolds === 1,
     undefined, {timeout});
-  await targetSelect.selectOption(finalTarget);
+  await selectTarget(candidates[1]);
   // 直接触发短生命周期关闭，不额外等待保存完成。
   await modifiedPage.evaluate(() => window.dispatchEvent(new Event('pagehide')));
   const modifiedState = await readStartupState(modifiedPage);
@@ -579,12 +591,152 @@ async function runPersistenceRegression({context, extensionOrigin, popupPath, pa
     throw new Error(`连续修改后最终目标语言没有胜出：${JSON.stringify(persistence.latestWriteWins)}`);
   }
   const reopenedPage = await openReadyPopup('persistence-reopened');
-  const reopenedValue = await reopenedPage.locator('.language-pair select').nth(1).inputValue();
-  persistence.latestWriteWins.reopenedValue = reopenedValue;
-  if (reopenedValue !== finalTarget) throw new Error(`重新打开后目标语言回滚为 ${reopenedValue}`);
+  const reopenedLabel = await reopenedPage.locator('.language-pair .el-select').nth(1).innerText();
+  persistence.latestWriteWins.reopenedLabel = reopenedLabel;
+  if (!candidates[1].label.test(reopenedLabel)) throw new Error(`重新打开后目标语言显示异常：${reopenedLabel}`);
   persistence.latestWriteWins.screenshot = await screenshot(reopenedPage, 'popup-persistence-reopened.png');
   await reopenedPage.close();
   report.persistence.quickClose = persistence;
+}
+
+/** 首屏不加载快捷键编辑器，首次懒挂载仍能管理焦点并正确关闭。 */
+async function runPopupDeferredUiRegression(context, extensionOrigin, popupPath) {
+  const page = await newPageWithoutForeground(context, timeout);
+  const requestedScripts = new Set();
+  const parsedScripts = new Set();
+  const isEditor = url => /CustomHotkeyInput[^/]*\.js$/u.test(url);
+  page.on('request', request => { if (isEditor(request.url())) requestedScripts.add(request.url()); });
+  const debuggerSession = await context.newCDPSession(page);
+  debuggerSession.on('Debugger.scriptParsed', event => { if (isEditor(event.url)) parsedScripts.add(event.url); });
+  await debuggerSession.send('Debugger.enable');
+  try {
+    await page.setViewportSize({width: 400, height: 600});
+    await page.goto(new URL(popupPath, `${extensionOrigin}/`).href, {waitUntil: 'domcontentloaded'});
+    await page.locator('.popup-shell[data-config-ready="true"]').waitFor({state: 'visible', timeout});
+    // chrome-extension 协议不保证写入 Resource Timing；用网络事件与 V8 实际模块解析共同验证。
+    if (requestedScripts.size || parsedScripts.size) throw new Error('首屏提前加载了快捷键编辑器');
+    await page.locator('[data-popup-quick-feature="hover"]').click();
+    await page.locator('.popup-drawer').getByRole('button', {name: '自定义', exact: true}).click();
+    const dialog = page.locator('.custom-hotkey-dialog');
+    await dialog.waitFor({state: 'visible', timeout});
+    await page.waitForFunction(() => document.activeElement?.closest('.custom-hotkey-dialog'));
+    if (parsedScripts.size !== 1) throw new Error(`快捷键编辑器未按需解析：${JSON.stringify([...parsedScripts])}`);
+    const dialogScreenshot = await screenshot(page, 'popup-deferred-hotkey-dialog.png');
+    await dialog.getByRole('button', {name: '取消', exact: true}).click();
+    await dialog.waitFor({state: 'detached', timeout});
+    await page.waitForFunction(() => document.activeElement?.closest('.popup-drawer'));
+    return {initialEditorResources: 0, editorLoadedOnDemand: true, requestedScripts: [...requestedScripts],
+      parsedScripts: [...parsedScripts], initialFocus: true, restoredFocus: true, dialogScreenshot};
+  } finally { await debuggerSession.detach().catch(() => undefined); await page.close(); }
+}
+
+/** 在真实 content 上验证取消导航、缓存暂停恢复和原生 Shadow API，而非只测试 helper。 */
+async function runContentLifecycleRegression(context, extensionOrigin, popupPath) {
+  const server = require('node:http').createServer((request, response) => {
+    if (request.url === '/image.svg') {
+      response.writeHead(200, {'Content-Type': 'image/svg+xml'});
+      response.end('<svg xmlns="http://www.w3.org/2000/svg" width="400" height="200"><rect width="400" height="200" fill="white"/><text x="20" y="100">Image ownership fixture</text></svg>');
+      return;
+    }
+    response.writeHead(200, {'Content-Type': 'text/html; charset=utf-8'});
+    response.end('<!doctype html><html><body><h1>Page lifecycle fixture</h1><button id=activate>Activate page</button><p>Keep this page and its extension active.</p><img src="/image.svg" width="400" height="200" alt="Image ownership fixture"></body></html>');
+  });
+  await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
+  let page;
+  try {
+    page = await newPageWithoutForeground(context);
+    const fixtureUrl = `http://127.0.0.1:${server.address().port}/`;
+    await page.goto(fixtureUrl, {waitUntil: 'domcontentloaded'});
+    const floating = page.locator('#fluent-read-floating-ball-container');
+    await floating.waitFor({state: 'attached', timeout});
+    const popup = await newPageWithoutForeground(context, timeout);
+    try {
+      await popup.goto(new URL(popupPath, `${extensionOrigin}/`).href, {waitUntil: 'domcontentloaded'});
+      await popup.locator('.popup-shell[data-config-ready="true"]').waitFor({state: 'visible', timeout});
+      await popup.getByRole('switch', {name: '暂停插件', exact: true}).click();
+      await floating.waitFor({state: 'detached', timeout});
+      await popup.getByRole('switch', {name: '启用插件', exact: true}).click();
+      await floating.waitFor({state: 'attached', timeout});
+    } finally { await popup.close(); }
+    // 宿主脚本合成事件不能控制扩展的生命周期。
+    await page.evaluate(() => {
+      window.dispatchEvent(new PageTransitionEvent('pagehide', {persisted: false}));
+      window.dispatchEvent(new PageTransitionEvent('pagehide', {persisted: true}));
+      window.dispatchEvent(new PageTransitionEvent('pageshow', {persisted: true}));
+      document.dispatchEvent(new Event('fluentread-route-change'));
+    });
+    if (await floating.count() !== 1) throw new Error('伪造页面离开事件卸载了扩展');
+    await page.locator('#activate').click();
+    await page.evaluate(() => {
+      window.__leaveGuard = event => { event.preventDefault(); event.returnValue = ''; };
+      window.addEventListener('beforeunload', window.__leaveGuard);
+    });
+    let dismissed = false;
+    page.once('dialog', async dialog => { dismissed = dialog.type() === 'beforeunload'; await dialog.dismiss(); });
+    await page.goto(`${fixtureUrl}cancelled`).catch(error => {
+      if (!String(error).includes('ERR_ABORTED')) throw error;
+    });
+    if (!dismissed || page.url() !== fixtureUrl || await floating.count() !== 1) {
+      throw new Error('取消真实离开确认后页面或扩展状态异常');
+    }
+    await page.evaluate(() => {
+      window.removeEventListener('beforeunload', window.__leaveGuard);
+      window.__persistedTransitions = [];
+      for (const type of ['pagehide', 'pageshow']) window.addEventListener(type, event => {
+        window.__persistedTransitions.push({type, persisted: event.persisted, trusted: event.isTrusted});
+      });
+    });
+    const shadow = await page.evaluate(() => {
+      const host = document.createElement('div');
+      document.body.append(host);
+      let reads = 0;
+      const root = host.attachShadow({get mode() {
+        if (++reads > 1) throw new Error('mode getter read twice');
+        return 'open';
+      }});
+      let missingArgumentsThrow = false;
+      try { history.pushState(); } catch (error) { missingArgumentsThrow = error instanceof TypeError; }
+      return {reads, attached: host.shadowRoot === root, missingArgumentsThrow};
+    });
+    if (shadow.reads !== 1 || !shadow.attached || !shadow.missingArgumentsThrow) throw new Error('Shadow bridge 改变了宿主 API 语义');
+    await page.goto(`${fixtureUrl}next`, {waitUntil: 'domcontentloaded'});
+    // BFCache 恢复已有文档，不会重新触发 DOMContentLoaded；先等导航提交，再验证 pageshow。
+    await page.goBack({waitUntil: 'commit'});
+    await floating.waitFor({state: 'attached', timeout});
+    if (await floating.count() !== 1) throw new Error('往返恢复重复挂载');
+    const transitions = await page.evaluate(() => window.__persistedTransitions || []);
+    if (!transitions.some(event => event.type === 'pageshow' && event.persisted && event.trusted)) {
+      throw new Error(`本轮未命中真实 BFCache 恢复：${JSON.stringify(transitions)}`);
+    }
+    await page.locator('img').hover();
+    await page.locator('#fluent-read-image-translation-root').waitFor({state: 'attached', timeout});
+    await page.evaluate(() => {
+      window.__imageRemoveCount = 0;
+      const reject = () => {
+        const root = document.getElementById('fluent-read-image-translation-root');
+        if (root) {window.__imageRemoveCount++; root.remove();}
+      };
+      window.__imageRejectObserver = new MutationObserver(reject);
+      window.__imageRejectObserver.observe(document.documentElement, {childList: true});
+      reject();
+    });
+    await page.waitForFunction(() => window.__imageRemoveCount >= 3);
+    await page.waitForTimeout(300);
+    const imageRemovals = await page.evaluate(() => window.__imageRemoveCount);
+    if (imageRemovals !== 3 || await page.locator('#fluent-read-image-translation-root').count()) {
+      throw new Error(`图片浮层持续重挂：${imageRemovals}`);
+    }
+    await page.evaluate(() => window.__imageRejectObserver.disconnect());
+    await page.locator('#activate').hover();
+    await page.locator('img').hover();
+    await page.locator('#fluent-read-image-translation-root').waitFor({state: 'attached', timeout});
+    return {imageOwnership: {removals: imageRemovals, recoveredOnNewHover: true},
+      configDrivenGlobalToggle: true, cancelledNavigation: true, forgedEventsIgnored: true, realBackForwardCache: true,
+      transitions, shadow, screenshot: await screenshot(page, 'content-lifecycle-restored.png')};
+  } finally {
+    await page?.close().catch(() => undefined);
+    await new Promise(resolve => server.close(resolve));
+  }
 }
 
 async function main() {
@@ -636,14 +788,27 @@ async function main() {
     const extensionOrigin = `chrome-extension://${new URL(worker.url()).host}`;
     pageForConfig = await newPageWithoutForeground(context, timeout);
     attachDiagnostics(pageForConfig, report.consoleErrors);
-    await pageForConfig.goto(`${extensionOrigin}/options.html#settings-interface`, {
+    await installStartupProbe(pageForConfig, {delayMs: 0});
+    await pageForConfig.setViewportSize({width: 400, height: 600});
+    await pageForConfig.goto(`${extensionOrigin}/${manifestEntrypoints.popup}`, {
       waitUntil: 'domcontentloaded',
       timeout,
     });
+    await pageForConfig.locator('.popup-shell[data-config-ready="true"]').waitFor({state: 'visible', timeout});
+    await pageForConfig.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))));
+    const freshProfileStartup = await readStartupState(pageForConfig);
+    report.firstPopupOnFreshProfile = {
+      firstFrame: freshProfileStartup.firstVisibleShell,
+      storageReadKeys: freshProfileStartup.storageReadKeys,
+      screenshot: await screenshot(pageForConfig, 'popup-first-install.png'),
+    };
     originalConfig = await readConfig(pageForConfig, timeout);
     report.persistence.original = summarizeConfig(originalConfig);
     const targetConfig = {
       on: true,
+      disableFloatingBall: false,
+      disableImageTranslator: false,
+      imageTranslationHoverEnabled: true,
       uiLanguageSetupCompleted: true,
       theme: 'dark',
       interfaceSkin: requestedSkin,
@@ -706,10 +871,15 @@ async function main() {
         report,
       });
     }
+    report.deferredUi = await runPopupDeferredUiRegression(context, extensionOrigin, manifestEntrypoints.popup);
+    report.contentLifecycle = await runContentLifecycleRegression(context, extensionOrigin, manifestEntrypoints.popup);
     report.screenshots = report.startupCases.map(item => item.screenshot);
     // 读回并恢复测试前的公开 UI 配置，避免留下测试状态；凭据始终不参与日志或 patch。
     const restorePatch = {
       on: originalConfig.on,
+      disableFloatingBall: originalConfig.disableFloatingBall,
+      disableImageTranslator: originalConfig.disableImageTranslator,
+      imageTranslationHoverEnabled: originalConfig.imageTranslationHoverEnabled,
       uiLanguageSetupCompleted: originalConfig.uiLanguageSetupCompleted,
       theme: originalConfig.theme,
       interfaceSkin: originalConfig.interfaceSkin,

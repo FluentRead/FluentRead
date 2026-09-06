@@ -75,3 +75,11 @@ describe('legacy page cache migration', () => {
     }
   });
 });
+
+it('读取 localStorage 属性本身被拒绝也不会中断启动', () => {
+  vi.stubGlobal('window', Object.defineProperty({}, 'localStorage', {
+    get() { throw new DOMException('Access denied', 'SecurityError'); },
+  }));
+  try { expect(clearLegacyPageTranslationCache()).toBe(0); }
+  finally { vi.unstubAllGlobals(); }
+});

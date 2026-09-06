@@ -170,6 +170,23 @@ beforeEach(() => {
 afterEach(() => {unmountImageTranslator(); vi.restoreAllMocks(); vi.unstubAllGlobals(); vi.useRealTimers();});
 
 describe('图片翻译前台交互与生命周期', () => {
+    it('宿主持续移除 UI 根时停止恢复循环，归还原图且允许新的主动悬停', async () => {
+        const env = setup(); const background = env.addBackground();
+        env.hover(); env.click(); await flush();
+        expect(background.style.opacity).toBe('0');
+        const host = env.image.ownerDocument.getElementById('fluent-read-image-translation-root')!;
+        for (let attempt = 0; attempt < 3; attempt += 1) {
+            host.remove(); env.notify('', 'childList'); env.runFrames();
+            expect(host.isConnected).toBe(attempt < 2);
+        }
+        expect(background.style.opacity).not.toBe('0');
+        expect(env.observers[0].disconnect).toHaveBeenCalled();
+        const frames = env.windowObject.requestAnimationFrame.mock.calls.length;
+        env.scroll(); env.runFrames();
+        expect(env.windowObject.requestAnimationFrame).toHaveBeenCalledTimes(frames);
+        env.hover();
+        expect(env.image.ownerDocument.getElementById('fluent-read-image-translation-root')).not.toBeNull();
+    });
     it('通过配置仓库通知即时更新品牌提示，不依赖配置对象的 Vue 响应式代理', () => {
         const env = setup(); env.hover();
         expect(env.button().title).toBe('FluentRead · 翻译图片');
@@ -222,6 +239,19 @@ describe('图片翻译前台交互与生命周期', () => {
         expect(host.isConnected).toBe(true); expect(env.bitmap()?.isConnected).toBe(true);
         env.setRect({left: 20, top: -400, width: 400, height: 200, right: 420, bottom: -200});
         env.scroll(); env.runFrames(); expect(background.style.opacity).not.toBe('0');
+    });
+
+    it('空闲不观察整页，首个覆盖层启用观察，移除后断开且下次悬停可重新启用', () => {
+        const env = setup();
+        expect(env.observers).toHaveLength(0);
+        env.hover();
+        expect(env.observers).toHaveLength(1);
+        env.image.remove();
+        env.notify('', 'childList');
+        expect(env.observers[0].disconnect).toHaveBeenCalledOnce();
+        env.parent.appendChild(env.image);
+        env.hover();
+        expect(env.observers).toHaveLength(2);
     });
 
     it('合成与触屏悬浮不创建入口，合成点击不能触发识别；小图不分配状态', async () => {

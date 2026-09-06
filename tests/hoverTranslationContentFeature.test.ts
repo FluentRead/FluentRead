@@ -33,6 +33,7 @@ function trustedEvent(event: Record<string, unknown> = {}): any {
         metaKey: false,
         shiftKey: false,
         repeat: false,
+        button: 0,
         preventDefault: vi.fn(),
         stopPropagation: vi.fn(),
         ...event,
@@ -87,6 +88,22 @@ afterEach(() => {
 });
 
 describe('hover translation content feature', () => {
+    it.each(['blur', 'config-change', 'right-button', 'middle-button'])('长按在 %s 时保留宿主手势，不触发迟到翻译', reason => {
+        vi.useFakeTimers();
+        const {deps, documentTarget, windowTarget} = mountHarness();
+        deps.config.hotkey = deps.constants.LongPress;
+        documentTarget.emit('mousedown', trustedEvent({
+            clientX: 10, clientY: 20,
+            button: reason === 'right-button' ? 2 : reason === 'middle-button' ? 1 : 0,
+        }));
+        if (reason === 'blur') windowTarget.emit('blur');
+        if (reason === 'config-change') deps.config.hotkey = deps.constants.DoubleClick;
+
+        vi.advanceTimersByTime(500);
+
+        expect(deps.handleTranslation).not.toHaveBeenCalled();
+    });
+
     it('可信 mousemove 与 scroll 即使未按热键也推进宿主手势代次', () => {
         const {deps, documentTarget} = mountHarness();
 

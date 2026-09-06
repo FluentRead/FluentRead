@@ -68,6 +68,7 @@ let mounted = false;
 let removeListeners: (() => void) | null = null;
 let imageOverlayHost: HTMLDivElement | null = null;
 let imageOverlayContainer: HTMLDivElement | null = null;
+let overlayRecoveryAttempts = 0;
 let layoutObserver: MutationObserver | null = null;
 let positionFrame: number | null = null;
 let configurationRevision = 0;
@@ -196,6 +197,7 @@ function removeImageOverlayRoot(): void {
     imageOverlayHost?.remove();
     imageOverlayHost = null;
     imageOverlayContainer = null;
+    overlayRecoveryAttempts = 0;
 }
 
 function createImageAbortError(): Error {
@@ -258,6 +260,7 @@ function removeState(state: ImageTranslationState): void {
     state.controls.dispose();
     state.overlay.remove();
     activeStates.delete(state);
+    syncLayoutObservation();
     if (states.get(state.image) === state) states.delete(state.image);
     if (!state.image.isConnected) deleteCachedResult(state.image);
 }
@@ -291,6 +294,12 @@ function invalidateSource(state: ImageTranslationState): void {
 function updateOverlayPosition(state: ImageTranslationState): void {
     if (!state.image.isConnected) {
         removeState(state);
+        return;
+    }
+    if (imageOverlayHost && !imageOverlayHost.isConnected && ++overlayRecoveryAttempts > 2) {
+        // 宿主持续拒绝覆盖层时停止自动重挂，恢复原图并释放观察器；下次主动悬停可重试。
+        Array.from(activeStates).forEach(removeState);
+        removeImageOverlayRoot();
         return;
     }
     ensureImageOverlayRoot();
@@ -421,6 +430,7 @@ function createState(image: HTMLImageElement): ImageTranslationState {
     image.addEventListener('load', state.imageLoadHandler);
     states.set(image, state);
     activeStates.add(state);
+    syncLayoutObservation();
     overlay.addEventListener('pointerenter', () => setStateHovered(state, true));
     overlay.addEventListener('pointerleave', () => setStateHovered(state, false));
     overlay.addEventListener('focusin', () => setStateHovered(state, true));
@@ -821,6 +831,24 @@ function handleLayoutMutations(records: MutationRecord[]): void {
     scheduleViewportChange();
 }
 
+/** 空闲时不接收整页变更；首个覆盖层出现时恢复观察，最后一个移除时释放。 */
+function syncLayoutObservation(): void {
+    if (!mounted || activeStates.size === 0) {
+        layoutObserver?.disconnect();
+        layoutObserver = null;
+        if (positionFrame !== null) window.cancelAnimationFrame(positionFrame);
+        positionFrame = null;
+        return;
+    }
+    if (layoutObserver) return;
+    layoutObserver = new MutationObserver(handleLayoutMutations);
+    layoutObserver.observe(document.documentElement, {
+        attributes: true,
+        attributeFilter: ['class', 'style', 'src', 'srcset', 'sizes', 'media', 'type', 'width', 'height', 'hidden'],
+        childList: true, subtree: true,
+    });
+}
+
 export function mountImageTranslator(): void {
     if (mounted) return;
     mounted = true;
@@ -842,12 +870,6 @@ export function mountImageTranslator(): void {
     document.addEventListener('pointerout', handlePointerOut, true);
     window.addEventListener('scroll', scheduleViewportChange, true);
     window.addEventListener('resize', scheduleViewportChange);
-    layoutObserver = new MutationObserver(handleLayoutMutations);
-    layoutObserver.observe(document.documentElement, {
-        attributes: true,
-        attributeFilter: ['class', 'style', 'src', 'srcset', 'sizes', 'media', 'type', 'width', 'height', 'hidden'],
-        childList: true, subtree: true,
-    });
     removeListeners = () => {
         stopHoverWatch();
         stopLanguageWatch();

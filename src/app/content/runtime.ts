@@ -1,7 +1,7 @@
 /**
  * @file src/app/content/runtime.ts
  * 文件职责：作为内容脚本应用的顶层 composition root，协调配置就绪、站点规则、公共样式、主世界桥、功能注册表、快捷键和消息监听生命周期。
- * 主要内容：安装内联 page.css，构建输入框与页面 feature registry，按 capability 和配置挂载全文周边、悬浮、划词、区域、图片、视频与写作助手等能力；订阅配置变化并处理停用、恢复与销毁。
+ * 主要内容：安装内联 page.css，构建输入框与页面 feature registry，按 capability 和配置挂载全文周边、悬浮、划词、区域、图片、视频与写作助手等能力；订阅配置变化并处理停用、往返缓存暂停恢复与销毁。
  * 模块边界：本文件只负责依赖装配和页面激活所有权，不实现具体翻译算法、组件内部状态、provider 请求或配置存储；这些职责分别属于 features、services 与 platform。
  */
 import {isWritingPage} from '@/src/core/config/writing';
@@ -26,18 +26,14 @@ import {
     inputBoxTranslationConfigKey,
     isAreaTranslatorMounted,
     isFullPageTranslationActive, noteBilingualHostGesture,
-    mountAreaTranslator,
-    mountFloatingBall,
+    mountAreaTranslator, mountFloatingBall,
     mountHoverTranslationContentFeature,
     mountImageTranslator,
-    mountSelectionTranslator,
-    mountTranslationProgressPanel,
+    mountSelectionTranslator, mountTranslationProgressPanel,
     mountVideoSubtitleTranslation,
     isSupportedVideoPage,
     restoreOriginalContent, resetFullPageTranslationRouteState,
-    unmountAreaTranslator,
-    unmountFloatingBall,
-    unmountImageTranslator,
+    unmountAreaTranslator, unmountFloatingBall, unmountImageTranslator,
     unmountSelectionTranslator,
     unmountTranslationProgressPanel,
 } from './features';
@@ -51,27 +47,35 @@ import {
     shouldAutomaticallyTranslatePage,
     type ContentPageAvailabilityRuntime,
 } from './pageAvailability';
+import {installContentPageLifecycle} from './pageLifecycle';
 import {syncBilingualSentenceHighlight} from './bilingualSentenceHighlight';
 import {createContentSiteAdaptationRuntime} from './siteAdaptationRuntime';
 
 export async function startContentApp(ctx: ContentScriptContext,
     capabilities: BrowserCapabilities = browserCapabilities): Promise<void> {
+    const pageEventController = new AbortController();
+    let cleanedUp = false;
+    let pageAvailability: ContentPageAvailabilityRuntime | null = null;
+    let cleanup = (): void => { cleanedUp = true; pageEventController.abort(); };
+    ctx.onInvalidated(() => cleanup());
+    const pageLifecycle = installContentPageLifecycle(window, pageEventController.signal, {
+        suspend: () => { void pageAvailability?.reconcile(); },
+        resume: () => { void pageAvailability?.reconcile(); },
+        dispose: () => cleanup(),
+    });
     await configReady;
+    if (ctx.isInvalid || cleanedUp) { cleanup(); return; }
     const siteAdaptation = createContentSiteAdaptationRuntime(config.siteAdaptation, new URL(window.location.href));
     clearLegacyPageTranslationCache();
-    let currentPageSiteDisabled = isExtensionDisabledOnSite(
-        window.location.href,
-        config.disabledExtensionDomains,
-    );
+    let currentRouteHref = window.location.href;
+    let currentPageSiteDisabled = isExtensionDisabledOnSite(currentRouteHref, config.disabledExtensionDomains);
     let unsubscribeContentConfig: (() => void) | null = null;
     let runtimeMessageListener: ContentRuntimeMessageHandler | null = null;
-    let cleanedUp = false;
     let featureController: AbortController | null = null;
     let activePageFeatureRegistry: ContentFeatureRegistry | null = null;
     let removePageStyles: (() => void) | null = null;
     let inputBoxConfigGeneration = 0;
     let previousInputBoxConfigKey = inputBoxTranslationConfigKey(config);
-    const pageEventController = new AbortController();
     const hotkeys = createContentHotkeyRuntime(() => currentPageSiteDisabled);
     const inputTranslationFeature = createInputTranslationContentFeature({
         context: ctx,
@@ -89,10 +93,9 @@ export async function startContentApp(ctx: ContentScriptContext,
             isDisabled: currentPageSiteDisabled,
         }).catch(() => undefined);
     };
-    const isPageRuntimeEnabled = (): boolean => !cleanedUp && !currentPageSiteDisabled && config.on !== false;
+    const isPageRuntimeEnabled = (): boolean => !cleanedUp && !pageLifecycle.isSuspended() && !currentPageSiteDisabled && config.on !== false;
     const qqMailFullPageToggle = capabilities.browser !== 'userscript'
         ? installQqMailTopFrameBridge(isPageRuntimeEnabled, pageEventController.signal) : undefined;
-    let pageAvailability: ContentPageAvailabilityRuntime | null = null;
     const disposePageFeatures = (): void => {
         featureController?.abort();
         featureController = null;
@@ -111,9 +114,7 @@ export async function startContentApp(ctx: ContentScriptContext,
         syncBilingualSentenceHighlight(document, config.bilingualSentenceHighlightEnabled === true);
         const activationController = new AbortController();
         featureController = activationController;
-        const isActivationCurrent = () => !cleanedUp
-            && !currentPageSiteDisabled
-            && featureController === activationController
+        const isActivationCurrent = () => isPageRuntimeEnabled() && featureController === activationController
             && !activationController.signal.aborted;
 
         inputTranslationFeature.mount(activationController.signal);
@@ -214,13 +215,15 @@ export async function startContentApp(ctx: ContentScriptContext,
     };
 
     document.addEventListener('fluentread-route-change', () => {
+        if (currentRouteHref === window.location.href) return;
+        currentRouteHref = window.location.href;
         siteAdaptation.routeChanged(new URL(window.location.href));
         resetPageTranslationContextCache(); resetFullPageTranslationRouteState();
         pageAvailability!.syncVideoSubtitlePage();
         void activePageFeatureRegistry?.reconcileEnabled();
     }, {signal: pageEventController.signal});
 
-    const cleanup = (): void => {
+    cleanup = (): void => {
         if (cleanedUp) return;
         cleanedUp = true;
         pageEventController.abort();
@@ -230,17 +233,15 @@ export async function startContentApp(ctx: ContentScriptContext,
         unsubscribeContentConfig?.();
         unsubscribeContentConfig = null;
     };
-    ctx.onInvalidated(cleanup);
-    window.addEventListener('beforeunload', cleanup, {once: true, signal: pageEventController.signal});
-
     runtimeMessageListener = createContentRuntimeMessageHandler(ctx, {
         isSiteDisabled: () => currentPageSiteDisabled, updateSiteDisabled: applySiteDisabledState,
+        isPageSuspended: pageLifecycle.isSuspended,
     }, capabilities);
     browser.runtime.onMessage.addListener(runtimeMessageListener);
     reportSiteDisabledState();
     unsubscribeContentConfig = subscribeConfig((nextConfig) => {
         siteAdaptation.update(nextConfig.siteAdaptation, new URL(window.location.href));
-        syncBilingualSentenceHighlight(document, nextConfig.bilingualSentenceHighlightEnabled === true);
+        syncBilingualSentenceHighlight(document, isPageRuntimeEnabled() && nextConfig.bilingualSentenceHighlightEnabled === true);
         const nextInputBoxConfigKey = inputBoxTranslationConfigKey(nextConfig);
         if (nextInputBoxConfigKey !== previousInputBoxConfigKey) {
             previousInputBoxConfigKey = nextInputBoxConfigKey;

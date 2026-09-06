@@ -254,7 +254,7 @@ export function createVideoPlayerLocator(options: VideoPlayerLocatorOptions = {}
     const target = event.target;
     if (!isElement(target)) return;
     const video = interactionVideo(target, document, view, selected);
-    if (video) {
+    if (video && (lastInteraction !== video || activeInteraction !== video)) {
       lastInteraction = video as HTMLVideoElement;
       activeInteraction = video as HTMLVideoElement;
       sync();
@@ -275,7 +275,7 @@ export function createVideoPlayerLocator(options: VideoPlayerLocatorOptions = {}
     const target = event.target;
     if (!isElement(target)) return;
     const video = interactionVideo(target, document, view, selected);
-    if (video) {
+    if (video && (lastInteraction !== video || activeInteraction !== video)) {
       lastInteraction = video;
       activeInteraction = video;
       sync();

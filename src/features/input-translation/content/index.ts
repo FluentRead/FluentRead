@@ -147,6 +147,7 @@ export function createInputTranslationContentFeature(
     const invalidate = (): void => {
         activeInputTranslationRequestId += 1;
         activeInputTranslationElement?.classList.remove('fluent-input-translating');
+        activeInputTranslationElement?.classList.remove('fluent-input-success', 'fluent-input-error');
         activeInputTranslationElement = null;
         removeExistingTooltip();
     };
@@ -392,6 +393,13 @@ export function createInputTranslationContentFeature(
                 resetKeyPresses();
                 return;
             }
+            // IME 的选词/确认和长按属于宿主编辑会话；不能吞键或把此前的三连计数
+            // 带到组合输入结束后。229 兼容部分浏览器的首尾组合事件。
+            if (event.isComposing || event.keyCode === 229 || event.repeat
+                || event.altKey || event.metaKey || event.shiftKey) {
+                resetKeyPresses();
+                return;
+            }
 
             const activeElement = getDeepActiveElement(rootDocument);
             if (!isInputElement(activeElement)) {
@@ -410,7 +418,7 @@ export function createInputTranslationContentFeature(
             }
 
             if (triggerType === 'triple_space' || triggerType === 'triple_equal' || triggerType === 'triple_dash') {
-                if (event.repeat || !matchesInputBoxTrigger(event, triggerType as InputBoxTrigger)) {
+                if (event.ctrlKey || !matchesInputBoxTrigger(event, triggerType as InputBoxTrigger)) {
                     resetKeyPresses();
                     return;
                 }
@@ -436,7 +444,10 @@ export function createInputTranslationContentFeature(
         };
 
         rootDocument.addEventListener('keydown', handleKeyDown, { capture: true, signal });
-        signal.addEventListener('abort', resetKeyPresses, { once: true });
+        signal.addEventListener('abort', () => {
+            resetKeyPresses();
+            invalidate();
+        }, { once: true });
     };
 
     return { mount, invalidate };

@@ -47,8 +47,12 @@ export function createConfigBackgroundHandlers<TContext extends ConfigPersistenc
     });
     return [
         createConfigStorageReadHandler({
-            ready: Promise.all([configReady, configHistoryReady, configAutoBackupsReady]),
-            read: key => configStorage.getItem(key),
+            ready: configReady,
+            read: async key => {
+                if (key === 'local:configHistory') await configHistoryReady;
+                if (key === 'local:configAutoBackups') await configAutoBackupsReady;
+                return configStorage.getItem(key);
+            },
             isExtensionUrl: (url) => url.startsWith(browser.runtime.getURL('/')),
         }),
         createConfigCountIncrementHandler((delta, operationId) => (

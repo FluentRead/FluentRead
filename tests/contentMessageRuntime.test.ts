@@ -84,6 +84,31 @@ beforeEach(() => {
 });
 
 describe('内容脚本 runtime 消息协议', () => {
+    it('往返缓存暂停时拒绝迟到的功能挂载，恢复后允许新的用户操作', async () => {
+        const {createContentRuntimeMessageHandler} = await import('@/src/app/content/messageRuntime');
+        const respond = vi.fn();
+        let suspended = true;
+        mocks.config.disableFloatingBall = true;
+        const handler = createContentRuntimeMessageHandler({} as never, {
+            isSiteDisabled: () => false,
+            isPageSuspended: () => suspended,
+            updateSiteDisabled: vi.fn(async () => undefined),
+        });
+        handler({type: 'toggleFloatingBall', isEnabled: true}, {}, respond);
+        handler({type: 'contextMenuTranslate', action: 'fullPage'}, {}, respond);
+        expect(respond).toHaveBeenLastCalledWith({status: 'disabled'});
+        expect(mocks.mountFloatingBall).not.toHaveBeenCalled();
+        expect(mocks.autoTranslateEnglishPage).not.toHaveBeenCalled();
+        expect(mocks.config.disableFloatingBall).toBe(true);
+        handler({type: 'getFullPageTranslationState'}, {}, respond);
+        expect(respond).toHaveBeenLastCalledWith({status: 'success', isTranslated: false, isSiteDisabled: false});
+        handler({type: 'translationCacheCleared'}, {}, respond);
+        expect(mocks.invalidateFullPageTranslationSessionCache).toHaveBeenCalledOnce();
+        suspended = false;
+        handler({type: 'toggleFloatingBall', isEnabled: true}, {}, respond);
+        expect(mocks.mountFloatingBall).toHaveBeenCalledOnce();
+    });
+
     it('拒绝非对象并为旧 clearCache 明确返回后台成功或失败', async () => {
         const {createContentRuntimeMessageHandler} = await import('@/src/app/content/messageRuntime');
         const updateSiteDisabled = vi.fn(async () => undefined);

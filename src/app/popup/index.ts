@@ -9,76 +9,13 @@ import './popup.css';
 import '@/src/ui/styles/interface-skins.css';
 import App from './PopupApp.vue';
 import 'element-plus/dist/index.css'
-import { ChatDotRound, Setting, Refresh, Edit, Upload, Download, Star, Loading, Coffee, WarningFilled, Warning, CircleCheckFilled } from '@element-plus/icons-vue'
-
-import {
-  ElRow,
-  ElCol,
-  ElContainer,
-  ElHeader,
-  ElMain,
-  ElFooter,
-  ElSelect,
-  ElOption,
-  ElOptionGroup,
-  ElInput,
-  ElSwitch,
-  ElCollapse,
-  ElCollapseItem,
-  ElTooltip,
-  ElEmpty,
-  ElIcon,
-  ElLink,
-  ElText,
-  ElButton,
-  ElDialog,
-  ElDivider,
-  ElInputNumber,
-  ElDrawer
-} from 'element-plus'
+import {Coffee} from '@element-plus/icons-vue'
+import {ElSelect, ElOption, ElInputNumber, ElDrawer} from 'element-plus'
 import {createUiI18nPlugin} from '@/src/ui/i18n'
 import {configReady} from '@/src/services/config/store'
 
-const ELEMENT_COMPONENTS = [
-  ElRow,
-  ElCol,
-  ElContainer,
-  ElHeader,
-  ElMain,
-  ElFooter,
-  ElSelect,
-  ElOption,
-  ElOptionGroup,
-  ElInput,
-  ElSwitch,
-  ElCollapse,
-  ElCollapseItem,
-  ElTooltip,
-  ElEmpty,
-  ElIcon,
-  ElLink,
-  ElText,
-  ElButton,
-  ElDialog,
-  ElDivider,
-  ElInputNumber,
-  ElDrawer
-] as const
-
-const ELEMENT_ICONS = {
-  ChatDotRound,
-  Setting,
-  Refresh,
-  Edit,
-  Upload,
-  Download,
-  Star,
-  Loading,
-  Coffee,
-  WarningFilled,
-  Warning,
-  CircleCheckFilled,
-} as const
+const ELEMENT_COMPONENTS = [ElSelect, ElOption, ElInputNumber, ElDrawer] as const
+const ELEMENT_ICONS = {Coffee} as const
 
 /** Popup 的唯一组装入口：配置就绪后才创建界面，避免默认布局先绘制。 */
 export async function mountPopupApp(selector: string): Promise<void> {

@@ -260,7 +260,8 @@
       "tests/optionsAppNavigationLifecycle.test.ts",
       "tests/myMemoryProvider.test.ts",
       "tests/writingRuntime.test.ts",
-      "tests/writingIntegration.test.ts"
+      "tests/writingIntegration.test.ts",
+      "tests/popupActions.test.ts"
     ],
     "regression": [
       "tests/translationControlOwnership.test.ts",

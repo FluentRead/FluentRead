@@ -134,7 +134,7 @@
 </template>
 
 <script setup lang="ts" name="CustomHotkeyInput">
-import { ref, computed, nextTick, watch } from 'vue';
+import { ref, computed, nextTick, watch, onBeforeUnmount } from 'vue';
 import { ElIcon } from 'element-plus';
 import { Loading, WarningFilled, Warning, CircleCheckFilled } from '@element-plus/icons-vue';
 import {
@@ -225,11 +225,16 @@ watch(dialogVisible, (visible) => {
       : null;
     nextTick(() => dialogRoot.value?.focus({ preventScroll: true }));
   } else {
-    const previous = previouslyFocusedElement.value;
-    previouslyFocusedElement.value = null;
-    nextTick(() => previous?.isConnected && previous.focus({preventScroll: true}));
+    restorePreviousFocus();
   }
-});
+}, {immediate: true});
+
+function restorePreviousFocus() {
+  const previous = previouslyFocusedElement.value;
+  previouslyFocusedElement.value = null;
+  nextTick(() => previous?.isConnected && previous.focus({preventScroll: true}));
+}
+onBeforeUnmount(restorePreviousFocus);
 
 function trapFocus(event: KeyboardEvent) {
   const root = dialogRoot.value;

@@ -1,7 +1,7 @@
 /**
  * @file src/app/content/pageAvailability.ts
  * 文件职责：统一协调 content 总开关、站点禁用、YouTube SPA 路由与页面功能的 activate/dispose 边界。
- * 主要内容：幂等启停 MAIN-world bridge 和页面 feature，维护视频字幕路由挂载，并仅在自动翻译条件由假变真时启动全文会话。
+ * 主要内容：幂等启停 MAIN-world bridge 和页面 feature，限制失效挂载重试次数，维护视频字幕路由挂载，并仅在自动翻译条件由假变真时启动全文会话。
  * 模块边界：本模块不读取全局配置、不操作具体功能 DOM；composition root 注入当前可用性、挂载器和全文状态，具体 feature 保留自己的清理实现。
  */
 import {shouldAutoTranslatePage} from '@/src/features/site-rules/domain';
@@ -84,7 +84,7 @@ export function createContentPageAvailabilityRuntime(
     };
     const reconcileLatest = async (): Promise<void> => {
         // activate 可能跨越配置写入或站点规则变化；每次 await 后都重新读取权威状态。
-        while (true) {
+        for (let attempt = 0; attempt < 2; attempt += 1) {
             if (!dependencies.isEnabled()) {
                 disablePageRuntime();
                 return;
@@ -103,6 +103,8 @@ export function createContentPageAvailabilityRuntime(
             refreshAutoTranslation();
             return;
         }
+        // 持续失效的挂载不能占满微任务队列；释放半挂载状态，等待下一次真实状态变更。
+        disablePageRuntime();
     };
     const reconcile = (): Promise<void> => {
         // 关闭必须同步回收，不能排在仍可能悬挂的 activation 后面。

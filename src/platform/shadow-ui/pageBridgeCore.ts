@@ -89,35 +89,45 @@ export function installShadowRouteBridgeCore(environment: ShadowRouteBridgeEnvir
     const originalPushState = environment.pushState.get();
     const originalReplaceState = environment.replaceState.get();
     let previousHref = environment.getHref();
+    let disposed = false;
     const dispatchRouteChange = () => {
+        if (disposed) return;
         const href = environment.getHref();
         if (href === previousHref) return;
         previousHref = href;
         environment.documentEvents.dispatchEvent(environment.createEvent(ROUTE_CHANGE_EVENT));
     };
-    const attachShadowWrapper: AttachShadowPort = function attachShadow(init) {
-        const root = Reflect.apply(originalAttachShadow, this, [init]);
-        if (init.mode === 'open') {
-            this.dispatchEvent(environment.createEvent(SHADOW_ROOT_EVENT, {
-                bubbles: true,
-                composed: true,
-            }));
-        }
+    const attachShadowWrapper: AttachShadowPort = function attachShadow(_init) {
+        const root = Reflect.apply(originalAttachShadow, this, arguments);
+        // 原生调用只读取一次 Web IDL 参数；通知失败不能把成功创建的 root 变成异常。
+        try {
+            if (!disposed && (root as {mode?: string})?.mode === 'open') {
+                this.dispatchEvent(environment.createEvent(SHADOW_ROOT_EVENT, {
+                    bubbles: true,
+                    composed: true,
+                }));
+            }
+        } catch { /* 页面可改写事件 API；保持原生调用的返回值。 */ }
         return root;
     };
-    const pushStateWrapper: HistoryMutationPort = function pushState(data, unused, url) {
-        const result = Reflect.apply(originalPushState, this, [data, unused, url]);
-        dispatchRouteChange();
+    const pushStateWrapper: HistoryMutationPort = function pushState(_data, _unused, _url) {
+        // 保留参数数量与额外参数；缺参必须仍由原生 API 抛错，已存在的宿主包装器
+        // 也必须收到页面原本提供的参数，而不是扩展补齐的 undefined。
+        const result = Reflect.apply(originalPushState, this, arguments);
+        try { dispatchRouteChange(); } catch { /* 桥通知失败不能改变宿主导航结果。 */ }
         return result;
     };
-    const replaceStateWrapper: HistoryMutationPort = function replaceState(data, unused, url) {
-        const result = Reflect.apply(originalReplaceState, this, [data, unused, url]);
-        dispatchRouteChange();
+    const replaceStateWrapper: HistoryMutationPort = function replaceState(_data, _unused, _url) {
+        const result = Reflect.apply(originalReplaceState, this, arguments);
+        try { dispatchRouteChange(); } catch { /* 桥通知失败不能改变宿主导航结果。 */ }
         return result;
     };
     const dispose = () => {
         const current = environment.stateHost[SHADOW_BRIDGE_STATE_KEY] as ShadowRouteBridgeState | undefined;
         if (current?.owner !== owner) return;
+        // 宿主可能已把我们的 wrapper 包进它自己的方法，不能强行覆盖宿主。
+        // 即使旧 wrapper 仍被持有，也必须停止通知，避免恢复后叠加多代观察。
+        disposed = true;
         restoreMethod(environment.attachShadow, attachShadowWrapper, originalAttachShadow);
         restoreMethod(environment.pushState, pushStateWrapper, originalPushState);
         restoreMethod(environment.replaceState, replaceStateWrapper, originalReplaceState);

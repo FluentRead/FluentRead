@@ -151,6 +151,7 @@ export function mountHoverTranslationContentFeature(
         gestureHotkey: '',
     };
     const mouseHotkeysPressed = new Set<string>();
+    let longPressTimer: ReturnType<typeof setTimeout> | undefined;
     const isMac = /Mac|iPod|iPhone|iPad/.test(runtimeNavigator.platform);
     const noteExternalHostGesture = (event: Event) => {
         if (event.isTrusted) deps.noteBilingualHostGesture();
@@ -203,6 +204,8 @@ export function mountHoverTranslationContentFeature(
 
     rootWindow.addEventListener('blur', () => {
         resetHoverHotkeyState();
+        if (longPressTimer !== undefined) clearTimeout(longPressTimer);
+        longPressTimer = undefined;
         deps.cancelPendingHoverTranslation();
     }, { signal });
 
@@ -269,7 +272,6 @@ export function mountHoverTranslationContentFeature(
         if (mouseHotkeysPressed.size === 0) resetHoverHotkeyState();
     }, { signal, capture: true });
 
-    let longPressTimer: ReturnType<typeof setTimeout> | undefined;
     const longPressStart = { x: 0, y: 0 };
 
     rootDocument.addEventListener('mousemove', event => {
@@ -339,13 +341,13 @@ export function mountHoverTranslationContentFeature(
     rootDocument.addEventListener('mousedown', event => {
         if (!event.isTrusted) return;
         if (deps.isSiteDisabled()) return;
-        if (deps.config.hotkey === deps.constants.LongPress) {
+        if (deps.config.hotkey === deps.constants.LongPress && event.button === 0) {
             if (longPressTimer !== undefined) clearTimeout(longPressTimer);
             longPressStart.x = event.clientX;
             longPressStart.y = event.clientY;
             longPressTimer = setTimeout(() => {
                 longPressTimer = undefined;
-                if (!deps.isSiteDisabled() && deps.config.on) {
+                if (!deps.isSiteDisabled() && deps.config.on && deps.config.hotkey === deps.constants.LongPress) {
                     deps.handleTranslation(event.clientX, event.clientY);
                 }
             }, 500);

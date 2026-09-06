@@ -1,6 +1,7 @@
 import {readdirSync, readFileSync, statSync} from 'node:fs';
 import {relative, resolve, sep} from 'node:path';
 import ts from 'typescript';
+import {Script} from 'node:vm';
 import {describe, expect, it} from 'vitest';
 
 const PROJECT_ROOT = resolve(__dirname, '../..');
@@ -19,6 +20,10 @@ const ROOT_FILES = [
     'vitest.coverage.config.ts',
     'wxt.config.ts',
 ] as const;
+const PRODUCT_TOOL_SCRIPTS = [
+    'scripts/build-product-assets.cjs', 'scripts/capture-product-assets.cjs',
+    'scripts/package-product-kit.cjs', 'scripts/verify-product-site.cjs', 'scripts/verify-support-ui.cjs',
+];
 
 type VerificationOwner =
     | 'chrome-firefox-build'
@@ -95,6 +100,7 @@ function verificationOwners(path: string, strictCoverage: Set<string>): Verifica
         owners.add('isolated-browser-regression');
     }
     if (path.startsWith('scripts/testing/')
+        || PRODUCT_TOOL_SCRIPTS.includes(path)
         || path === 'scripts/verify-userscript-build.mjs'
         || path === 'scripts/export-site-rule-pack.mjs'
         || path.startsWith('vitest.')) {
@@ -246,6 +252,9 @@ const BUILD_ONLY_SRC_ALLOWLIST = new Set([
 ]);
 
 describe('repository verification ownership', () => {
+    it.each(PRODUCT_TOOL_SCRIPTS)('产品工具 %s 保持可解析的 CommonJS 入口', path => {
+        expect(() => new Script(readFileSync(projectPath(path), 'utf8'), {filename: path})).not.toThrow();
+    });
     const strictCoverage = coverageSourcePaths();
     const auditedFiles = [
         ...PRODUCT_ROOTS.flatMap(listFiles),

@@ -85,7 +85,7 @@ function shadowFixture(withNavigation = true) {
     const documentEvents = new FakeEvents();
     const navigationEvents = new FakeEvents();
     const originalAttach = vi.fn(function originalAttach(this: unknown, init: unknown) {
-        return {host: this, init};
+        return {host: this, init, mode: (init as {mode: string}).mode};
     }) as unknown as AttachShadowPort;
     const originalPush = vi.fn(function originalPush(this: unknown, _data: unknown, _unused: string, url?: string | URL | null) {
         if (withNavigation) navigationEvents.emit('navigate');
@@ -196,6 +196,36 @@ function xReplayPolicy(includePageHref = true) {
 }
 
 describe('ShadowRoot 与路由 MAIN world bridge core', () => {
+    it('透明转发宿主方法的真实参数数量，保留缺参异常及既有包装器语义', () => {
+        const fixture = shadowFixture();
+        const expectedError = new TypeError('2 arguments required');
+        const originalHistory = vi.fn(function (this: unknown, ...args: unknown[]) {
+            if (args.length < 2) throw expectedError;
+            return {receiver: this, args};
+        });
+        const originalAttach = vi.fn(function (this: unknown, ...args: unknown[]) {
+            return {receiver: this, args, mode: 'closed'};
+        });
+        fixture.push.value = originalHistory as HistoryMutationPort;
+        fixture.replace.value = originalHistory as HistoryMutationPort;
+        fixture.attach.value = originalAttach as AttachShadowPort;
+        installShadowRouteBridgeCore(fixture.environment);
+        const receiver = {dispatchEvent: vi.fn()};
+
+        for (const method of [fixture.push.value, fixture.replace.value]) {
+            for (const args of [[], [{}]]) {
+                expect(() => Reflect.apply(method, receiver, args)).toThrow(expectedError);
+            }
+            for (const args of [[{}, ''], [{}, '', undefined], [{}, '', '/next', 'host metadata']]) {
+                expect(Reflect.apply(method, receiver, args)).toEqual({receiver, args});
+            }
+        }
+        const shadowArgs = [{mode: 'closed'}, 'host metadata'];
+        expect(Reflect.apply(fixture.attach.value, receiver, shadowArgs)).toEqual({
+            receiver, args: shadowArgs, mode: 'closed',
+        });
+    });
+
     it('发布 open ShadowRoot 与真实路由变化，并在卸载时恢复宿主 API', () => {
         const fixture = shadowFixture();
         const dispose = installShadowRouteBridgeCore(fixture.environment);
@@ -247,7 +277,7 @@ describe('ShadowRoot 与路由 MAIN world bridge core', () => {
         fixture.windowEvents.emit('popstate');
         fixture.windowEvents.emit('hashchange');
         expect(urls).toEqual([]);
-        expect(fixture.originalReplace).toHaveBeenCalledWith(scrollState, '', undefined);
+        expect(fixture.originalReplace).toHaveBeenCalledWith(scrollState, '');
 
         fixture.push.value.call(historyHost, {}, '', '/article?lang=en#intro');
         fixture.navigationEvents.emit('currententrychange');
@@ -319,6 +349,50 @@ describe('ShadowRoot 与路由 MAIN world bridge core', () => {
         expect(fixture.stateHost[SHADOW_BRIDGE_LIFECYCLE_STATE_KEY]).toBeUndefined();
         fixture.documentEvents.emit(SHADOW_BRIDGE_ENABLE_EVENT);
         expect(fixture.attach.value).toBe(fixture.originalAttach);
+    });
+
+    it('宿主后来包装我们的 API 时保留宿主包装，但禁用旧桥通知且恢复后只通知一次', () => {
+        const fixture = shadowFixture(false);
+        const dispose = installShadowRouteBridgeLifecycleCore(fixture.environment);
+        const retainedAttach = fixture.attach.value;
+        const retainedPush = fixture.push.value;
+        const retainedReplace = fixture.replace.value;
+        const pageAttach: AttachShadowPort = function (init) {
+            return retainedAttach.call(this, init);
+        };
+        const pagePush: HistoryMutationPort = function (data, unused, url) {
+            return retainedPush.call(this, data, unused, url);
+        };
+        const pageReplace: HistoryMutationPort = function (data, unused, url) {
+            return retainedReplace.call(this, data, unused, url);
+        };
+        fixture.attach.value = pageAttach;
+        fixture.push.value = pagePush;
+        fixture.replace.value = pageReplace;
+        const host = {dispatchEvent: vi.fn()};
+
+        fixture.documentEvents.emit(SHADOW_BRIDGE_DISPOSE_EVENT);
+        expect(fixture.attach.value).toBe(pageAttach);
+        expect(fixture.push.value).toBe(pagePush);
+        expect(fixture.replace.value).toBe(pageReplace);
+        expect(fixture.attach.value.call(host, {mode: 'open'})).toMatchObject({host, mode: 'open'});
+        fixture.push.value.call({}, {}, '', '/while-disabled');
+        fixture.replace.value.call({}, {}, '', '/also-disabled');
+        expect(host.dispatchEvent).not.toHaveBeenCalled();
+        expect(fixture.documentEvents.dispatched).toHaveLength(0);
+
+        fixture.documentEvents.emit(SHADOW_BRIDGE_ENABLE_EVENT);
+        fixture.attach.value.call(host, {mode: 'open'});
+        fixture.push.value.call({}, {}, '', '/enabled');
+        fixture.replace.value.call({}, {}, '', '/enabled-replace');
+        expect(host.dispatchEvent).toHaveBeenCalledOnce();
+        expect(fixture.documentEvents.dispatched).toHaveLength(2);
+
+        dispose();
+        fixture.attach.value.call(host, {mode: 'open'});
+        fixture.push.value.call({}, {}, '', '/finally-disposed');
+        expect(host.dispatchEvent).toHaveBeenCalledOnce();
+        expect(fixture.documentEvents.dispatched).toHaveLength(2);
     });
 });
 
@@ -608,5 +682,35 @@ describe('YouTube timedtext MAIN world bridge core', () => {
         fixture.xhrSend.value = fixture.originalSend;
         expect(() => dispose()).not.toThrow();
         expect(fixture.pageEvents.listeners.get('pagehide')?.size).toBe(0);
+    });
+});
+
+describe('宿主 API 调用语义', () => {
+    it('只让原生 attachShadow 读取一次 mode getter，桥通知失败仍返回原生 root', () => {
+        const fixture = shadowFixture();
+        installShadowRouteBridgeCore(fixture.environment);
+        let reads = 0;
+        const init = {get mode() {
+            if (++reads > 1) throw new Error('重复读取 mode');
+            return 'open';
+        }};
+        const host = {dispatchEvent: vi.fn(() => { throw new Error('宿主事件 API 故障'); })};
+        expect(fixture.attach.value.call(host, init)).toMatchObject({mode: 'open', host});
+        expect(reads).toBe(1);
+        expect(host.dispatchEvent).toHaveBeenCalledOnce();
+    });
+
+    it('原生 attachShadow 错误仍原样抛出，导航附加通知错误不影响成功返回', () => {
+        const fixture = shadowFixture(false);
+        installShadowRouteBridgeCore(fixture.environment);
+        const error = new Error('原生失败');
+        expect(() => fixture.attach.value.call({dispatchEvent() {}}, {
+            get mode(): string { throw error; },
+        })).toThrow(error);
+        fixture.documentEvents.dispatchEvent = () => { throw new Error('通知失败'); };
+        const receiver = {};
+        expect(fixture.push.value.call(receiver, {}, '', '/next')).toBe(receiver);
+        expect(fixture.replace.value.call(receiver, {}, '', '/other')).toBe(receiver);
+        expect(fixture.environment.getHref()).toBe('https://example.test/other');
     });
 });

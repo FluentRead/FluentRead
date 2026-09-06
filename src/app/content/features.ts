@@ -43,6 +43,7 @@ export {
     unmountAreaTranslator,
 } from '@/src/features/area-translation/public';
 export {
+    toggleContextMenuImage,
     mountImageTranslator,
     unmountImageTranslator,
 } from '@/src/features/image-translation/public';

@@ -96,9 +96,17 @@
       />
     </section>
     <section v-show="props.activeSection === 'settings-image-translation'" id="settings-image-translation" class="settings-section image-translation-settings">
-      <SettingsGroup title="功能状态" description="悬停网页图片，从图片上的翻译入口识别文字。">
-        <SettingsItem label="网页图片翻译" description="悬停网页图片时显示翻译入口，默认关闭。">
+      <SettingsGroup title="功能状态">
+        <SettingsItem label="网页图片翻译">
           <el-switch v-model="imageTranslationEnabled" class="settings-toggle" aria-label="网页图片翻译" :disabled="!browserCapabilities.imageTranslation" />
+        </SettingsItem>
+      </SettingsGroup>
+      <SettingsGroup :title="t('image.entries')">
+        <SettingsItem :label="t('image.hover')" :description="t('image.hoverDescription')">
+          <el-switch v-model="config.imageTranslationHoverEnabled" class="settings-toggle" :aria-label="t('image.hover')" :disabled="!imageTranslationEnabled || !browserCapabilities.imageTranslation" />
+        </SettingsItem>
+        <SettingsItem :label="t('image.context')" :description="t('image.contextDescription')">
+          <el-switch v-model="config.imageTranslationContextMenuEnabled" class="settings-toggle" :aria-label="t('image.context')" :disabled="!imageTranslationEnabled || !browserCapabilities.imageTranslation" />
         </SettingsItem>
       </SettingsGroup>
       <ImageOcrSettings v-if="props.activeSection === 'settings-image-translation'" />

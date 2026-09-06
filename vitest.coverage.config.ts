@@ -138,6 +138,7 @@ export default defineConfig({
             'tests/imageTranslationInpainting.test.ts',
             'tests/imageOcrRuntime.test.ts',
             'tests/imageTranslationFlow.test.ts',
+            'tests/imageContextMenu.test.ts',
             'tests/imageTranslationRuntime.test.ts',
             'tests/imageTranslationPageRead.test.ts',
             'tests/imageTranslationOffscreenRuntime.test.ts',
@@ -240,6 +241,7 @@ export default defineConfig({
             reportsDirectory: 'coverage/core',
             reporter: ['text', 'json-summary', 'html'],
             include: [
+                'src/app/background/imageContextMenu.ts',
                 'src/features/full-page-translation/qqMailFrames.ts',
                 'src/features/full-page-translation/background/qqMailFrameHandlers.ts',
                 'src/features/full-page-translation/content/frameSession.ts',

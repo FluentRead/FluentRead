@@ -259,6 +259,8 @@ export class Config {
     selectionAreaEnabled: boolean; // 是否启用圈选翻译
     areaTranslationMode: 'standard' | 'ai'; // 圈选文字的标准翻译或 AI 上下文增强
     areaTranslationService: string; // 圈选独立翻译服务；空字符串跟随当前服务
+    imageTranslationHoverEnabled: boolean; // 是否显示图片悬浮入口
+    imageTranslationContextMenuEnabled: boolean; // 是否显示图片右键入口
     disableImageTranslator: boolean; // 是否禁用图片翻译
     freeTranslationOrder: string[]; // 免费服务的启用列表与回退顺序
     freeTranslationTimeoutMs: number; // 每路服务最长等待
@@ -379,6 +381,8 @@ export class Config {
         this.selectionAreaEnabled = false; // 圈选翻译需要用户主动开启，避免意外截图
         this.areaTranslationMode = 'standard';
         this.areaTranslationService = '';
+        this.imageTranslationHoverEnabled = true;
+        this.imageTranslationContextMenuEnabled = true;
         this.disableImageTranslator = true; // 默认关闭图片翻译，避免首次安装后扫描网页图片
         this.freeTranslationOrder = [...DEFAULT_FREE_TRANSLATION_ORDER];
         this.freeTranslationTimeoutMs = DEFAULT_FREE_TRANSLATION_TIMEOUT_MS;
@@ -936,6 +940,8 @@ export function normalizeConfig(value: unknown): Config {
     if (typeof normalized.selectionAreaEnabled !== 'boolean') {
         normalized.selectionAreaEnabled = false;
     }
+    normalized.imageTranslationHoverEnabled = typeof normalized.imageTranslationHoverEnabled === 'boolean' ? normalized.imageTranslationHoverEnabled : true;
+    normalized.imageTranslationContextMenuEnabled = typeof normalized.imageTranslationContextMenuEnabled === 'boolean' ? normalized.imageTranslationContextMenuEnabled : true;
     if (typeof normalized.contextMenuEnabled !== 'boolean') {
         normalized.contextMenuEnabled = true;
     }

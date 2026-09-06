@@ -1,10 +1,10 @@
 /**
  * @file src/features/image-translation/content/runtime.ts
- * 文件职责：实现网页图片翻译的悬浮入口、异步请求所有权和原图/译图切换，保持宿主图片与响应式图片资源不变。
+ * 文件职责：实现网页图片翻译的独立悬浮/右键入口、可信目标快照、异步请求所有权和原图/译图切换，保持宿主图片与响应式图片资源不变。
  * 主要内容：在封闭 Shadow DOM 中挂载原生译图，跟随图片盒模型与祖先裁切；合并布局更新，限制像素读取和结果缓存，换图、取消与卸载时停止旧请求并释放资源。
  * 模块边界：本运行时只读取页面允许访问的 Canvas 像素并调用既有图片客户端；识别、文本翻译、图像修复与语言包管理位于 background/services，控件交互由 controls 模块提供。
  */
-import { config } from '@/src/services/config/store';
+import { config, subscribeConfig } from '@/src/services/config/store';
 import {watch, watchEffect} from 'vue';
 import {normalizeUiLanguage, translateLegacyText} from '@/src/core/i18n';
 import {
@@ -688,16 +688,65 @@ async function translateImage(state: ImageTranslationState, prepareLanguages = f
     }
 }
 
+// 仅保存可信右键产生的 DOM 身份；不按 URL 扫描全页，避免同源多图和菜单打开后换图误命中。
+let contextImage: {image: HTMLImageElement; source: string} | null = null;
+let pointerImage: HTMLImageElement | null = null;
+
+function imageAtPointer(event: MouseEvent): HTMLImageElement | null {
+    const target = event.target as Element | null;
+    if (!target || typeof target.closest !== 'function' || target.closest('[data-fluent-read-ui]')) return null;
+    if (target instanceof HTMLImageElement) return target;
+    // 只在局部媒体容器里查找覆盖层下的图片；不穿透弹窗，也不扫描整个页面。
+    for (let container: Element | null = target, depth = 0; container && depth < 4; container = container.parentElement, depth++) {
+        if (container === document.body || container === document.documentElement) break;
+        if (container.matches('button, [role="button"], [role="dialog"]')) break;
+        const candidates = Array.from(container.querySelectorAll('img')).filter(image => {
+            const rect = image.getBoundingClientRect();
+            const style = getComputedStyle(image);
+            return rect.width >= MIN_IMAGE_WIDTH && rect.height >= MIN_IMAGE_HEIGHT
+                && event.clientX >= rect.left && event.clientX < rect.right
+                && event.clientY >= rect.top && event.clientY < rect.bottom
+                && style.visibility !== 'hidden' && style.display !== 'none';
+        });
+        if (candidates.length === 1) return candidates[0];
+        if (candidates.length > 1) return null;
+    }
+    return null;
+}
+
 function handlePointerOver(event: PointerEvent): void {
-    if (!event.isTrusted || event.pointerType === 'touch') return;
-    if (event.target instanceof HTMLImageElement) showImageButton(event.target);
+    if (!event.isTrusted || event.pointerType === 'touch' || config.imageTranslationHoverEnabled === false) return;
+    const image = imageAtPointer(event);
+    if (pointerImage === image && event.type === 'pointermove' && image && states.has(image)) return;
+    if (pointerImage && pointerImage !== image) hideImageButton(pointerImage);
+    pointerImage = image;
+    if (image) showImageButton(image);
 }
 
 function handlePointerOut(event: PointerEvent): void {
     if (!event.isTrusted) return;
-    const image = event.target instanceof HTMLImageElement ? event.target : null;
-    if (image && event.relatedTarget instanceof Node && image.contains(event.relatedTarget)) return;
-    if (image) hideImageButton(image);
+    if (pointerImage) hideImageButton(pointerImage);
+    pointerImage = null;
+}
+
+function handleImageContextMenu(event: MouseEvent): void {
+    if (!event.isTrusted) return;
+    const image = config.imageTranslationContextMenuEnabled !== false ? imageAtPointer(event) : null;
+    contextImage = image ? {image, source: sourceIdentity(image)} : null;
+}
+
+/** 后台只传递原生菜单动作；目标必须匹配本 document 最近一次可信右键的图片快照。 */
+export function toggleContextMenuImage(srcUrl?: unknown): boolean {
+    const target = contextImage;
+    contextImage = null;
+    if (!mounted || !config.on || config.disableImageTranslator || config.imageTranslationContextMenuEnabled === false
+        || !target?.image.isConnected || sourceIdentity(target.image) !== target.source) return false;
+    const image = target.image;
+    if (typeof srcUrl === 'string' && srcUrl !== image.currentSrc && srcUrl !== image.src) return false;
+    const state = states.get(image) || createState(image);
+    if (state.phase === 'translated') restoreImageTranslation(state);
+    else void translateImage(state);
+    return true;
 }
 
 function scheduleViewportChange(): void {
@@ -728,9 +777,16 @@ export function mountImageTranslator(): void {
     if (mounted) return;
     mounted = true;
     stopConfigurationWatch = watchTranslationConfiguration();
+    const stopHoverWatch = subscribeConfig(next => {
+        if (next.imageTranslationHoverEnabled !== false) return;
+        pointerImage = null;
+        activeStates.forEach(state => { if (state.phase === 'idle') removeState(state); });
+    });
     const stopLanguageWatch = watch(() => config.uiLanguage, () => {
         activeStates.forEach(state => state.controls.refreshLanguage());
     });
+    document.addEventListener('contextmenu', handleImageContextMenu, true);
+    document.addEventListener('pointermove', handlePointerOver, true);
     document.addEventListener('pointerover', handlePointerOver, true);
     document.addEventListener('pointerout', handlePointerOut, true);
     window.addEventListener('scroll', scheduleViewportChange, true);
@@ -742,9 +798,12 @@ export function mountImageTranslator(): void {
         childList: true, subtree: true,
     });
     removeListeners = () => {
+        stopHoverWatch();
         stopLanguageWatch();
         stopConfigurationWatch?.();
         stopConfigurationWatch = null;
+        document.removeEventListener('contextmenu', handleImageContextMenu, true);
+        document.removeEventListener('pointermove', handlePointerOver, true);
         document.removeEventListener('pointerover', handlePointerOver, true);
         document.removeEventListener('pointerout', handlePointerOut, true);
         window.removeEventListener('scroll', scheduleViewportChange, true);
@@ -761,6 +820,8 @@ export function mountImageTranslator(): void {
 export function unmountImageTranslator(): void {
     if (!mounted) return;
     mounted = false;
+    contextImage = null;
+    pointerImage = null;
     removeListeners?.();
     removeListeners = null;
     Array.from(activeStates).forEach(removeState);

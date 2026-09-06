@@ -25,6 +25,47 @@ function createWorker(name: string): OcrWorkerPort<RecognitionResult> {
 }
 
 describe('OCR worker runtime', () => {
+    it('真实百分比仅属于当前任务，丢弃非法、重复、倒退和迟到进度，展示错误不影响识别', async () => {
+        const worker = createWorker('eng');
+        const pending = deferred<RecognitionResult>();
+        vi.mocked(worker.recognize).mockReturnValueOnce(pending.promise);
+        let report!: (value: number, jobId: string) => void;
+        const runtime = createOcrWorkerRuntime({sparseTextMode: 11, createWorker: async (_languages, notify) => {
+            report = notify; report(0.5, 'initializing'); return worker;
+        }});
+        const onProgress = vi.fn((percent: number) => {if (percent === 30) throw new Error('detached UI');});
+        const active = runtime.recognize('first', 'eng', undefined, undefined, onProgress);
+        await vi.waitFor(() => expect(worker.recognize).toHaveBeenCalledOnce());
+        const jobId = vi.mocked(worker.recognize).mock.calls[0][3]!;
+        report(0.5, 'another-job');
+        for (const value of [NaN, Infinity, -1, 2]) report(value, jobId);
+        for (const value of [0, 0.301, 0.3015, 0.2, 0.99, 1]) report(value, jobId);
+        expect(onProgress.mock.calls.map(call => call[0])).toEqual([0, 30, 99, 100]);
+        pending.resolve({worker:'eng', image:'first'}); await active;
+        report(1, jobId); expect(onProgress).toHaveBeenCalledTimes(4);
+        vi.mocked(worker.recognize).mockImplementation(async (image, _options, _output, nextJob) => {
+            report(0.5, jobId); report(0.5, nextJob!); return {worker:'eng', image};
+        });
+        await runtime.recognize('next', 'eng');
+        expect(onProgress).toHaveBeenCalledTimes(4);
+    });
+
+    it('取消中的 Worker 不能再发布百分比', async () => {
+        const worker = createWorker('eng'); const pending = deferred<RecognitionResult>();
+        vi.mocked(worker.recognize).mockReturnValueOnce(pending.promise);
+        let report!: (value: number, jobId: string) => void;
+        const runtime = createOcrWorkerRuntime({sparseTextMode:11,createWorker:async (_languages, notify)=>{report=notify;return worker;}});
+        const controller = new AbortController(); const onProgress = vi.fn();
+        const active = runtime.recognize('first','eng',controller.signal,undefined,onProgress);
+        const rejected = expect(active).rejects.toMatchObject({name:'AbortError'});
+        await vi.waitFor(()=>expect(worker.recognize).toHaveBeenCalledOnce());
+        const jobId = vi.mocked(worker.recognize).mock.calls[0][3]!;
+        report(0.1,jobId); controller.abort(); report(0.9,jobId);
+        await rejected; report(1,jobId);
+        expect(onProgress).toHaveBeenCalledOnce(); expect(onProgress).toHaveBeenCalledWith(10);
+        pending.resolve({worker:'eng',image:'first'});
+    });
+
     it('复用同语言 Worker 和稀疏文本参数，连续识别不重复跨 Worker 初始化', async () => {
         const worker = createWorker('eng');
         const factory = vi.fn(async () => worker);
@@ -39,7 +80,7 @@ describe('OCR worker runtime', () => {
             tessedit_pageseg_mode: 11,
             preserve_interword_spaces: '1',
         });
-        expect(worker.recognize).toHaveBeenLastCalledWith('second', {}, {blocks: true});
+        expect(worker.recognize).toHaveBeenLastCalledWith('second', {}, {blocks: true}, 'fluent-read-ocr-2');
     });
 
     it('等待正在进行的识别结束后才终止 Worker 并切换语言', async () => {
@@ -62,7 +103,7 @@ describe('OCR worker runtime', () => {
         await expect(recognizing).resolves.toEqual({worker: 'eng', image: 'active'});
         await expect(switching).resolves.toEqual({worker: 'jpn', image: 'next'});
         expect(english.terminate).toHaveBeenCalledOnce();
-        expect(factory).toHaveBeenLastCalledWith('jpn');
+        expect(factory).toHaveBeenLastCalledWith('jpn', expect.any(Function));
     });
 
     it('圈选单块重试和普通图片参数串行切换，同模式连续任务复用参数', async () => {
@@ -349,7 +390,7 @@ describe('OCR worker runtime', () => {
 
         const nextController = new AbortController();
         const next = runtime.recognize('next', 'fra', nextController.signal);
-        await vi.waitFor(() => expect(factory).toHaveBeenCalledWith('fra'));
+        await vi.waitFor(() => expect(factory).toHaveBeenCalledWith('fra', expect.any(Function)));
 
         oldTermination.resolve(undefined);
         await Promise.resolve();
@@ -364,7 +405,7 @@ describe('OCR worker runtime', () => {
         await Promise.resolve();
         await Promise.resolve();
 
-        expect(factory).not.toHaveBeenCalledWith('jpn');
+        expect(factory).not.toHaveBeenCalledWith('jpn', expect.any(Function));
         await vi.waitFor(() => expect(nextWorker.terminate).toHaveBeenCalledOnce());
         expect(staleWorker.terminate).not.toHaveBeenCalled();
     });

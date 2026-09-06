@@ -12,6 +12,14 @@ export const localizedLegacyPatterns: ReadonlyArray<{
     messages: Record<LocalizedLanguage, string> & {'en-US'?: string};
     localizedCaptures: readonly number[];
 }> = [
+    {pattern: /^图片翻译失败：(.+)$/u, localizedCaptures: [1], messages: {
+        'en-US': 'Image translation failed: {1}',
+        'ja-JP': '画像翻訳に失敗しました：{1}',
+        'ko-KR': '이미지 번역 실패: {1}',
+        'fr-FR': 'Échec de la traduction de l’image : {1}',
+        'ru-RU': 'Не удалось перевести изображение: {1}',
+        'es-ES': 'No se pudo traducir la imagen: {1}',
+    }},
     {pattern: new RegExp("^已完成 (\\d+) 个词条$", 'u'), localizedCaptures: [], messages: {
         'ja-JP': "{1} 件の単語",
         'ko-KR': "단어 {1}개",

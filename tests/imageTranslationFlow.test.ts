@@ -2,7 +2,7 @@ import {afterEach, describe, expect, it, vi} from 'vitest';
 import {parseHTML} from 'linkedom';
 import {translateLegacyText, type UiLanguage} from '@/src/core/i18n';
 import {createImageTranslationBackgroundHandlers, IMAGE_TRANSLATE_MESSAGE_TYPE, IMAGE_TRANSLATE_TEXTS_MESSAGE_TYPE, IMAGE_CANCEL_MESSAGE_TYPE} from '@/src/features/image-translation/background/handlers';
-import {IMAGE_PROGRESS_MESSAGE_TYPE, isImageTranslationStage} from '@/src/features/image-translation/progress';
+import {IMAGE_PROGRESS_MESSAGE_TYPE, isImageTranslationStage, normalizeImageProgress} from '@/src/features/image-translation/progress';
 import {createImageControls} from '@/src/features/image-translation/content/controls';
 import {sendCancellableImageOperation, prepareImageOcrLanguages} from '@/src/features/image-translation/services/client';
 import {imageTranslationProgressTransport} from '@/src/features/image-translation/background/offscreenAdapter';
@@ -29,6 +29,20 @@ function mockProgressClient(sendMessage: ReturnType<typeof vi.fn>) {
 }
 
 describe('图片翻译流程优化',()=>{
+    it('识别进度接受有效百分比，语言刷新保留数值，完成或失败清除百分比', () => {
+        for (const invalid of [undefined, null, '50', NaN, Infinity, -1, 101]) expect(normalizeImageProgress(invalid)).toBeUndefined();
+        expect(normalizeImageProgress(0)).toBe(0); expect(normalizeImageProgress(100)).toBe(100);
+        const {document} = parseHTML('<html><body></body></html>'); vi.stubGlobal('document', document);
+        let language: UiLanguage = 'en-US';
+        const ui = createImageControls({onAction(){},onPrepare(){},translate:source=>translateLegacyText(source,language)});
+        ui.update('loading','正在识别图片文字…',{progress:42.9});
+        expect(ui.status.textContent).toContain('42%');
+        language='ja-JP';ui.refreshLanguage();expect(ui.status.textContent).toContain('42%');
+        ui.update('loading','正在翻译文字…');expect(ui.status.textContent).not.toContain('%');
+        ui.update('error','识别失败',{progress:42});expect(ui.status.textContent).not.toContain('%');
+        ui.dispose();
+    });
+
     it('有限并发乱序完成后仍按原顺序返回，重复文字只请求一次',async()=>{
         const waits=new Map<string,ReturnType<typeof deferred<string>>>();
         const translateTexts=vi.fn((r:{origin:string|string[]})=>{const d=deferred<string>(); waits.set(r.origin as string,d);return d.promise;});
@@ -68,7 +82,7 @@ describe('图片翻译流程优化',()=>{
         const pending=handler(IMAGE_TRANSLATE_MESSAGE_TYPE).handle({type:IMAGE_TRANSLATE_MESSAGE_TYPE,image:'data:image/png,x',sourceLanguage:'en',requestId:'task'},owner);
         await new Promise(r=>setTimeout(r,0));
         const notify=handler(IMAGE_PROGRESS_MESSAGE_TYPE);
-        const message={type:IMAGE_PROGRESS_MESSAGE_TYPE,requestId:'task',stage:'translating'} as const;
+        const message={type:IMAGE_PROGRESS_MESSAGE_TYPE,requestId:'task',stage:'recognizing',progress:37} as const;
         await expect(notify.handle(message)).resolves.toEqual({success:false});
         await expect(notify.handle({...message,stage:'fake'},{sender:{url:'offscreen'}})).resolves.toEqual({success:false});
         await notify.handle(message,{sender:{url:'offscreen'}});
@@ -86,7 +100,8 @@ describe('图片翻译流程优化',()=>{
         const onProgress=vi.fn();const pending=sendCancellableImageOperation({}, {requestId:'request',onProgress},'timeout');
         const callback=[...listeners][0];
         for (const v of [null,1,{}, {type:IMAGE_PROGRESS_MESSAGE_TYPE,requestId:'other',stage:'rendering'}, {type:IMAGE_PROGRESS_MESSAGE_TYPE,requestId:'request',stage:'bad'}]) callback(v);
-        callback({type:IMAGE_PROGRESS_MESSAGE_TYPE,requestId:'request',stage:'rendering'});expect(onProgress).toHaveBeenCalledWith('rendering');
+        callback({type:IMAGE_PROGRESS_MESSAGE_TYPE,requestId:'request',stage:'rendering'});expect(onProgress).toHaveBeenCalledWith('rendering', undefined);
+        callback({type:IMAGE_PROGRESS_MESSAGE_TYPE,requestId:'request',stage:'recognizing',progress:37});expect(onProgress).toHaveBeenLastCalledWith('recognizing',37);
         wait.resolve({success:true});await pending; expect(listeners.size).toBe(0); callback(null);
         await prepareImageOcrLanguages('ja');expect(sendMessage).toHaveBeenLastCalledWith(expect.objectContaining({languages:['jpn','eng']}));
         sendMessage.mockResolvedValueOnce({success:false,error:'network'});await expect(prepareImageOcrLanguages('en')).rejects.toThrow('network');
@@ -333,7 +348,7 @@ describe('图片控件界面语言', () => {
         details.hidden = false;
         language = 'ja-JP'; controls.refreshLanguage();
         expect(controls.button.textContent).toBe('元画像');
-        expect(controls.button.title).toBe('元画像に戻す');
+        expect(controls.button.title).toBe('FluentRead · 元画像に戻す');
         expect(details.textContent).toBe('原文');
         expect(details.hidden).toBe(false);
         language = 'zh-CN'; controls.refreshLanguage();

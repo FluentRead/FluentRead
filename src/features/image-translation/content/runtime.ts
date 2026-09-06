@@ -5,7 +5,7 @@
  * 模块边界：本运行时只读取页面允许访问的 Canvas 像素并调用既有图片客户端；识别、文本翻译、图像修复与语言包管理位于 background/services，控件交互由 controls 模块提供。
  */
 import { config, subscribeConfig } from '@/src/services/config/store';
-import {watch, watchEffect} from 'vue';
+import {watchEffect} from 'vue';
 import {normalizeUiLanguage, translateLegacyText} from '@/src/core/i18n';
 import {
     fetchImageInExtension,
@@ -164,7 +164,10 @@ function cacheResult(state: ImageTranslationState, identity: string): void {
 }
 
 function ensureImageOverlayRoot(): HTMLDivElement {
-    if (imageOverlayContainer) return imageOverlayContainer;
+    if (imageOverlayContainer && imageOverlayHost) {
+        if (!imageOverlayHost.isConnected) document.documentElement.appendChild(imageOverlayHost);
+        return imageOverlayContainer;
+    }
     const host = document.createElement('div');
     host.id = IMAGE_TRANSLATION_ROOT;
     host.setAttribute('data-fluent-read-ui', 'image-translation');
@@ -290,6 +293,7 @@ function updateOverlayPosition(state: ImageTranslationState): void {
         removeState(state);
         return;
     }
+    ensureImageOverlayRoot();
     if (sourceIdentity(state.image) !== state.sourceIdentity || !presentationMatchesSource(state.image, state.presentation)) invalidateSource(state);
     if (state.sourceStyleLease && !ownsHiddenImage(state)) {
         // 宿主重新设置 opacity 后不继续覆盖它；恢复显示权，并保留宿主刚写入的样式。
@@ -309,6 +313,13 @@ function updateOverlayPosition(state: ImageTranslationState): void {
     for (let ancestor = surface.parentElement; ancestor; ancestor = ancestor.parentElement) {
         const ancestorStyle = getComputedStyle(ancestor);
         opacity *= Number.parseFloat(ancestorStyle.opacity || '1');
+        // 根节点的 overflow 作用于视口，其 rect 会随整页滚动移走，不能再次作为普通容器裁切。
+        // body 在 quirks 模式或根 overflow 为 visible 时也可能把滚动交给视口。
+        if (ancestor === document.documentElement || ancestor === document.scrollingElement) continue;
+        if (ancestor === document.body) {
+            const rootStyle = getComputedStyle(document.documentElement);
+            if (rootStyle.overflowX === 'visible' && rootStyle.overflowY === 'visible') continue;
+        }
         const clipsX = /^(hidden|clip|auto|scroll)$/.test(ancestorStyle.overflowX);
         const clipsY = /^(hidden|clip|auto|scroll)$/.test(ancestorStyle.overflowY);
         if (!clipsX && !clipsY) continue;
@@ -331,7 +342,11 @@ function updateOverlayPosition(state: ImageTranslationState): void {
         && right > left && bottom > top && style.visibility !== 'hidden'
         && style.visibility !== 'collapse' && style.display !== 'none' && opacity > 0;
     state.overlay.style.display = visible ? 'block' : 'none';
-    if (!visible) return;
+    if (!visible) {
+        // 译层不可见时释放原图，避免移出视口、宿主裁切或布局变化留下空白。
+        restoreOriginalImage(state);
+        return;
+    }
     state.overlay.style.left = `${rect.left}px`;
     state.overlay.style.top = `${rect.top}px`;
     state.overlay.style.width = `${rect.width}px`;
@@ -363,6 +378,8 @@ function updateOverlayPosition(state: ImageTranslationState): void {
         bitmap.style[`border${side}Style`] = style[`border${side}Style`];
         bitmap.style[`border${side}Color`] = style[`border${side}Color`];
     }
+    // 先挂载并布置已解码的译图，再在同一帧交接显示权；加载和不可见状态不隐藏原图。
+    if (bitmap.isConnected && state.overlay.isConnected) hideOriginalImage(state);
 }
 
 function createState(image: HTMLImageElement): ImageTranslationState {
@@ -558,10 +575,10 @@ function loadImage(dataUrl: string, signal: AbortSignal): Promise<HTMLImageEleme
     });
 }
 
-function setButtonState(state: ImageTranslationState, phase: ImageControlPhase, message: string): void {
+function setButtonState(state: ImageTranslationState, phase: ImageControlPhase, message: string, progress?: number): void {
     state.phase = phase;
     state.controls.update(phase, message, {
-        prepare: phase === 'error' && state.needsPreparation, animations: config.animations,
+        prepare: phase === 'error' && state.needsPreparation, animations: config.animations, progress,
     });
 }
 
@@ -614,7 +631,6 @@ function showTranslatedImage(state: ImageTranslationState): void {
     image.className = 'fluent-read-image-translation-bitmap';
     image.alt = '';
     image.setAttribute('aria-hidden', 'true');
-    hideOriginalImage(state);
     state.overlay.prepend(image);
     state.controls.setLines(state.lines);
     setButtonState(state, 'translated', '已翻译 · 点击恢复原图');
@@ -684,10 +700,10 @@ async function translateImage(state: ImageTranslationState, prepareLanguages = f
         const result = await translateImageInExtension(imageData, sourceLanguage, document.title, {
             signal: controller.signal,
             timeoutMs: IMAGE_TRANSLATION_TIMEOUT_MS,
-            onProgress: stage => {
+            onProgress: (stage, progress) => {
                 if (!requestIsCurrent(state, controller)) return;
                 setButtonState(state, 'loading', stage === 'recognizing' ? '正在识别图片文字…'
-                    : stage === 'translating' ? '正在翻译文字…' : '正在生成译图…');
+                    : stage === 'translating' ? '正在翻译文字…' : '正在生成译图…', stage === 'recognizing' ? progress : undefined);
             },
         });
         if (!requestIsCurrent(state, controller)) return;
@@ -814,7 +830,10 @@ export function mountImageTranslator(): void {
         pointerImage = null;
         activeStates.forEach(state => { if (state.phase === 'idle') removeState(state); });
     });
-    const stopLanguageWatch = watch(() => config.uiLanguage, () => {
+    let currentUiLanguage = config.uiLanguage;
+    const stopLanguageWatch = subscribeConfig(next => {
+        if (next.uiLanguage === currentUiLanguage) return;
+        currentUiLanguage = next.uiLanguage;
         activeStates.forEach(state => state.controls.refreshLanguage());
     });
     document.addEventListener('contextmenu', handleImageContextMenu, true);

@@ -1,20 +1,22 @@
 import { describe, expect, it } from 'vitest';
 import { getOcrLanguages, normalizeOcrLines, scaleOcrBox, selectChangedTranslations } from '@/src/features/image-translation/core';
 import { inpaintTextRegions } from '@/src/features/image-translation/services/inpainting';
-import { normalizeImageOcrLanguageCodes } from '@/src/features/image-translation/ocrLanguages';
+import { IMAGE_OCR_LANGUAGE_PACKS, IMAGE_OCR_RECOMMENDED_LANGUAGES, normalizeImageOcrLanguageCodes } from '@/src/features/image-translation/ocrLanguages';
 import { getImageTextBackgroundColor, getImageTextColor } from '@/src/features/image-translation/services/rendering';
 
 describe('图片翻译 OCR 工具', () => {
     it('按源语言选择最小 OCR 语言集', () => {
         for (const source of ['es', 'es-ES', 'es-MX', ' ES_ar ']) expect(getOcrLanguages(source)).toEqual(['spa', 'eng']);
-        expect(getOcrLanguages('esperanto')).toEqual(['chi_sim', 'chi_tra', 'eng']);
+        expect(getOcrLanguages('esperanto')).toEqual(['chi_sim', 'chi_tra', 'eng', 'jpn']);
         expect(getOcrLanguages('en')).toEqual(['eng']);
         expect(getOcrLanguages('zh-Hans')).toEqual(['chi_sim', 'eng']);
         expect(getOcrLanguages('zh-Hant')).toEqual(['chi_tra', 'eng']);
         expect(getOcrLanguages('zh-TW')).toEqual(['chi_tra', 'eng']);
         expect(getOcrLanguages('zh-Hans-TW')).toEqual(['chi_sim', 'eng']);
         expect(getOcrLanguages('ja')).toEqual(['jpn', 'eng']);
-        expect(getOcrLanguages('auto')).toEqual(['chi_sim', 'chi_tra', 'eng']);
+        expect(IMAGE_OCR_RECOMMENDED_LANGUAGES).toEqual(['chi_sim', 'chi_tra', 'eng', 'jpn']);
+        expect(IMAGE_OCR_LANGUAGE_PACKS.filter(pack => pack.recommended).map(pack => pack.code)).toEqual(IMAGE_OCR_RECOMMENDED_LANGUAGES);
+        expect(getOcrLanguages('auto')).toEqual(['chi_sim', 'chi_tra', 'eng', 'jpn']);
     });
 
     it('只接受支持的语言包并去重，保证下载状态可持久化', () => {

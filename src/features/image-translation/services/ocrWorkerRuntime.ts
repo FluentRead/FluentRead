@@ -1,7 +1,7 @@
 /**
  * @file src/features/image-translation/services/ocrWorkerRuntime.ts
  * 文件职责：实现与具体 OCR 引擎无关的 Worker 生命周期和串行任务队列，保证识别、参数设置、语言切换及销毁不会在并发请求间交叉污染。
- * 主要内容：定义 OcrWorkerPort、依赖与 runtime 契约，复用同语言 worker，按任务串行切换页面分割参数，提供识别和语言预加载；排队取消立即结束调用方等待，执行中取消才释放当前 worker。
+ * 主要内容：定义 OcrWorkerPort、依赖与 runtime 契约，复用同语言 worker，按任务串行切换页面分割参数，提供任务隔离的真实百分比进度、识别和语言预加载；排队取消立即结束调用方等待，执行中取消才释放当前 worker。
  * 模块边界：此层不依赖 Tesseract.js 类型、浏览器 storage 或图片翻译 UI；具体 worker 工厂由 ocrRuntime 注入，语言状态记录和 Offscreen 消息编排位于其他模块。
  */
 /**
@@ -11,12 +11,12 @@
  */
 export interface OcrWorkerPort<TResult> {
     setParameters(parameters: Record<string, string | number>): Promise<unknown>;
-    recognize(image: string, options: Record<string, never>, output: {blocks: true}): Promise<TResult>;
+    recognize(image: string, options: Record<string, never>, output: {blocks: true}, jobId?: string): Promise<TResult>;
     terminate(): Promise<unknown>;
 }
 
 export type OcrWorkerRuntimeDependencies<TResult> = {
-    createWorker: (languages: string) => Promise<OcrWorkerPort<TResult>>;
+    createWorker: (languages: string, onProgress: (progress: number, jobId: string) => void) => Promise<OcrWorkerPort<TResult>>;
     sparseTextMode: string | number;
 };
 
@@ -32,7 +32,7 @@ function normalizeLanguages(languages: string): string {
 }
 
 export type OcrWorkerRuntime<TResult> = {
-    recognize: (image: string, languages: string, signal?: AbortSignal, pageSegmentationMode?: string | number) => Promise<TResult>;
+    recognize: (image: string, languages: string, signal?: AbortSignal, pageSegmentationMode?: string | number, onProgress?: (percent: number) => void) => Promise<TResult>;
     clearModels: (remove: () => Promise<void>) => Promise<void>;
     ensureLanguages: (languages: string[], signal?: AbortSignal) => Promise<void>;
 };
@@ -56,6 +56,17 @@ export function createOcrWorkerRuntime<TResult>(
     let configuredMode: string | number | undefined;
     let workerOwnershipGeneration = 0;
     let operationTail: Promise<void> = Promise.resolve();
+    let jobSequence = 0;
+    let activeProgress: {jobId: string; last: number; signal?: AbortSignal; notify?: (percent: number) => void} | null = null;
+    const reportWorkerProgress = (progress: number, jobId: string) => {
+        const active = activeProgress;
+        if (!active || active.jobId !== jobId || active.signal?.aborted
+            || !Number.isFinite(progress) || progress < 0 || progress > 1) return;
+        const percent = Math.floor(progress * 100);
+        if (percent <= active.last) return;
+        active.last = percent;
+        try { active.notify?.(percent); } catch { /* 进度展示不能中断识别主链。 */ }
+    };
 
     function terminateCurrentWorker(): void {
         const current = workerPromise;
@@ -129,7 +140,7 @@ export function createOcrWorkerRuntime<TResult>(
             configuredWorker = null;
         }
 
-        const nextWorkerPromise = dependencies.createWorker(languages);
+        const nextWorkerPromise = dependencies.createWorker(languages, reportWorkerProgress);
         workerPromise = nextWorkerPromise;
         workerLanguages = languages;
 
@@ -156,7 +167,7 @@ export function createOcrWorkerRuntime<TResult>(
                 await remove();
             });
         },
-        recognize(image, languages, signal, pageSegmentationMode = dependencies.sparseTextMode) {
+        recognize(image, languages, signal, pageSegmentationMode = dependencies.sparseTextMode, onProgress) {
             return runExclusive(async () => {
                 if (signal?.aborted) throw createOcrAbortError();
                 const worker = await runAbortable(getWorker(normalizeLanguages(languages)), signal);
@@ -170,7 +181,13 @@ export function createOcrWorkerRuntime<TResult>(
                     configuredWorker = worker;
                     configuredMode = pageSegmentationMode;
                 }
-                return runAbortable(worker.recognize(image, {}, {blocks: true}), signal);
+                const jobId = `fluent-read-ocr-${++jobSequence}`;
+                activeProgress = {jobId, last: -1, signal, notify: onProgress};
+                try {
+                    return await runAbortable(worker.recognize(image, {}, {blocks: true}, jobId), signal);
+                } finally {
+                    activeProgress = null;
+                }
             }, signal);
         },
         ensureLanguages(languages, signal) {

@@ -3,19 +3,43 @@
 const assert = require('node:assert/strict');
 
 async function verifyXSurface({page, popup, worker, ui, wait, click, shot, report, originalImage}) {
+    let settingsSequence = 0;
+    async function patchSettings(config) {
+        await popup.evaluate(async ({config, sequence}) => {
+            const read=await chrome.runtime.sendMessage({type:'configStorageRead',key:'local:config'});
+            const expected=Object.fromEntries(Object.keys(config).map(key=>[key,read.value[key]]));
+            const response=await chrome.runtime.sendMessage({type:'persistConfig',mode:'patch',config,expected,
+                baseRevision:read.value.__fluentConfigRevision||0,clientId:'x-surface-fixture',sequence});
+            if (!response.success) throw new Error(response.error);
+        }, {config,sequence:++settingsSequence});
+    }
     const surface = page.locator('#x-surface');
     if (originalImage) {
         await page.evaluate(src => {
             const image = document.querySelector('#sample');
             image.src = src;
             document.querySelector('#x-surface').style.backgroundImage = `url("${src}")`;
-            image.parentElement.style.height = '550px';
+            image.parentElement.style.width = '449.796px';
         }, originalImage);
     }
     await page.waitForFunction(() => {
         const image = document.querySelector('#sample');
         return image.complete && image.naturalWidth > 0;
     });
+    // 从用户授权读取的 X DOM 提取：100% 高度的滚动根节点，其 rect 随整页滚动离开视口。
+    await page.evaluate(() => {
+        const image = document.querySelector('#sample');
+        image.parentElement.style.height = `${image.parentElement.clientWidth * image.naturalHeight / image.naturalWidth}px`;
+        document.documentElement.style.cssText = 'height:100%;overflow-x:auto;overflow-y:scroll';
+        document.body.style.height = '100%';
+        const spacer = document.createElement('div'); spacer.style.height = '2700px';
+        document.querySelector('.card').before(spacer);
+        window.scrollTo(0, document.querySelector('#x-surface').getBoundingClientRect().top + window.scrollY - 78);
+    });
+    report.rootScroll = await page.evaluate(() => ({scrollY:window.scrollY,
+        rootBottom:document.documentElement.getBoundingClientRect().bottom,
+        imageTop:document.querySelector('#x-surface').getBoundingClientRect().top}));
+    assert.ok(report.rootScroll.scrollY > 2000); assert.ok(report.rootScroll.rootBottom < 0);
     report.fixture = {kind: 'X snapshot-derived transparent img with matching sibling background', originalImage,
         originalSize: await page.locator('#sample').evaluate(image => [image.naturalWidth, image.naturalHeight])};
     await surface.hover();
@@ -28,15 +52,9 @@ async function verifyXSurface({page, popup, worker, ui, wait, click, shot, repor
     `);
     assert.ok(Math.abs(position.button.left-position.source.left-8)<1);
     assert.ok(Math.abs(position.source.bottom-position.button.bottom-8)<1);
-    report.cases.push('visible bottom-left action on X background surface');
+    report.cases.push('visible bottom-left action after document-root scroll on X background surface');
     await shot('x-01-hover-action');
-    await popup.evaluate(async () => {
-        const read=await chrome.runtime.sendMessage({type:'configStorageRead',key:'local:config'});
-        const response=await chrome.runtime.sendMessage({type:'persistConfig',mode:'patch',
-            config:{imageTranslationHoverEnabled:false}, expected:{imageTranslationHoverEnabled:read.value.imageTranslationHoverEnabled},
-            baseRevision:read.value.__fluentConfigRevision||0,clientId:'x-surface-fixture',sequence:1});
-        if (!response.success) throw new Error(response.error);
-    });
+    await patchSettings({imageTranslationHoverEnabled:false});
     await page.mouse.move(10,10);
     await wait(() => ui("return !this.querySelector('.fr-image-controls')"));
     await surface.hover();
@@ -60,6 +78,20 @@ async function verifyXSurface({page, popup, worker, ui, wait, click, shot, repor
     await page.waitForTimeout(500);
     assert.equal(await ui("return this.querySelector('.fr-image-controls')?.dataset.phase"),'error');
     await shot('x-02-first-use-prompt');
+    for (const [language, title] of [['en-US','Image translation'],['ja-JP','画像翻訳'],['ko-KR','이미지 번역'],['fr-FR','Traduction d’images'],['ru-RU','Перевод изображений'],['es-ES','Traducción de imágenes']]) {
+        await patchSettings({uiLanguage:language});
+        await wait(() => ui(`return this.querySelector('.fr-image-feedback-title').textContent === ${JSON.stringify(`FluentRead · ${title}`)}`));
+        const copy=await ui("return this.querySelector('.fr-image-status').textContent");
+        const firstUse={'en-US':'first use','ja-JP':'初回','ko-KR':'처음','fr-FR':'première','ru-RU':'первого','es-ES':'primer uso'};
+        assert.ok(copy.includes(firstUse[language]));
+        const bounds = await ui(`const card=this.querySelector('.fr-image-feedback');
+            const r=card.getBoundingClientRect();return {width:r.width,scroll:card.scrollWidth,client:card.clientWidth};`);
+        assert.ok(bounds.scroll <= bounds.client + 1);
+        await shot(`x-02-first-use-${language}`);
+    }
+    await patchSettings({uiLanguage:'zh-CN'});
+    await wait(() => ui("return this.querySelector('.fr-image-feedback-title').textContent==='FluentRead · 图片翻译'"));
+    report.cases.push('FluentRead branding and all seven supported UI languages and prompt changes fit without horizontal overflow');
     await click('关闭');
     await wait(() => ui("return !this.querySelector('.fr-image-controls')"));
     await menuAction();
@@ -82,9 +114,19 @@ async function verifyXSurface({page, popup, worker, ui, wait, click, shot, repor
     loading.center.forEach((v,i)=>assert.ok(Math.abs(v-loading.expected[i])<1));
     report.loading=loading;
     await shot('x-03-downloading-models');
+    await wait(() => ui("return /识别.*\\d+%/.test(this.querySelector('.fr-image-status')?.textContent) || this.querySelector('.fr-image-controls')?.dataset.phase!=='loading'"),300000);
+    const recognitionStatus=await ui("return this.querySelector('.fr-image-status').textContent");
+    if (/识别.*\d+%/.test(recognitionStatus)) {
+        assert.equal(await surface.evaluate(el=>getComputedStyle(el).opacity),'1');
+        report.recognitionStatus=recognitionStatus;
+        await shot('x-03-recognizing-progress');
+    }
     await wait(() => ui("return this.querySelector('.fr-image-controls')?.dataset.phase==='translated'"),300000);
     report.coldPreparationAndTranslationMs=Date.now()-began;
     report.progress=await ui('return this.__progress');
+    assert.ok(report.progress.some(text=>/识别.*\d+%/.test(text)), 'OCR must expose real engine percentages');
+    report.downloadedLanguages=await popup.evaluate(async()=>{const read=await chrome.runtime.sendMessage({type:'configStorageRead',key:'local:fluentReadImageOcrLanguages'});return read.value;});
+    assert.ok(report.downloadedLanguages.includes('jpn'), 'one-click automatic preparation must include Japanese');
     const result=await ui(`
         const bitmap=this.querySelector('.fluent-read-image-translation-overlay img');
         return {surfaceOpacity:getComputedStyle(document.querySelector('#x-surface')).opacity,
@@ -95,7 +137,7 @@ async function verifyXSurface({page, popup, worker, ui, wait, click, shot, repor
     assert.equal(result.bitmapOpacity,'1');assert.equal(result.fit,'cover');assert.equal(result.hidden,false);
     assert.deepEqual(result.size,report.fixture.originalSize);
     report.replacement=result;
-    report.cases.push('automatic Chinese/English language preparation continues to real OCR, translation, and visible X replacement');
+    report.cases.push('one-click Chinese/English/Japanese language preparation continues to real OCR, translation, and visible X replacement');
     await shot('x-04-translated');
     await click('文字');
     report.translatedText=await ui("return this.querySelector('.fr-image-details').textContent");

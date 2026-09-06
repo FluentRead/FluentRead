@@ -85,10 +85,10 @@ async function checkImageCancellation(signal?: AbortSignal): Promise<void> {
     throwIfImageOperationAborted(signal);
 }
 
-function reportProgress(requestId: string | undefined, stage: ImageTranslationStage): void {
+function reportProgress(requestId: string | undefined, stage: ImageTranslationStage, progress?: number): void {
     if (!requestId) return;
     // 进度是旁路；页面已关闭时不得影响取消与 OCR 主链。
-    try { chrome.runtime.sendMessage({type: IMAGE_PROGRESS_MESSAGE_TYPE, requestId, stage}, () => void chrome.runtime.lastError); } catch { /* 扩展上下文可能已销毁。 */ }
+    try { chrome.runtime.sendMessage({type: IMAGE_PROGRESS_MESSAGE_TYPE, requestId, stage, progress}, () => void chrome.runtime.lastError); } catch { /* 扩展上下文可能已销毁。 */ }
 }
 
 export async function translateImageTextsInExtension(
@@ -249,7 +249,9 @@ export async function translateImageInOffscreen(
     try {
         throwIfImageOperationAborted(signal);
         reportProgress(requestId, 'recognizing');
-        const lines = await recognizeImage(image, sourceLanguage, signal);
+        const lines = await recognizeImage(image, sourceLanguage, signal, {
+            onProgress: percent => { if (!signal?.aborted) reportProgress(requestId, 'recognizing', percent); },
+        });
         throwIfImageOperationAborted(signal);
         if (lines.length === 0) throw new Error('没有识别到图片文字');
         reportProgress(requestId, 'translating');

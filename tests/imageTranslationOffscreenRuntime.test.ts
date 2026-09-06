@@ -100,13 +100,26 @@ beforeEach(() => {
 afterEach(() => { vi.useRealTimers(); vi.unstubAllGlobals(); vi.restoreAllMocks(); });
 
 describe('Offscreen 图片完整操作生命周期', () => {
+    it.each([false, true])('OCR 百分比只在请求仍有效时发出，带取消信号=%s', async withSignal => {
+        const controller = new AbortController(); let notify!: (percent: number) => void;
+        mocks.recognize.mockImplementationOnce(async (_image, _source, _signal, options) => {
+            notify = options.onProgress; notify(37); return lines;
+        });
+        await translateImageInOffscreen('image','en','Page',withSignal ? controller.signal : undefined,'progress');
+        expect(sendMessage).toHaveBeenCalledWith({type:'fluentReadImageProgress',requestId:'progress',stage:'recognizing',progress:37},expect.any(Function));
+        if (withSignal) {
+            const calls = sendMessage.mock.calls.length; controller.abort(); notify(98);
+            expect(sendMessage).toHaveBeenCalledTimes(calls);
+        }
+    });
+
     it('预检和渲染复用同一次解码，阶段通知、完整译文与原尺寸一致并释放资源', async () => {
         const controller = new AbortController();
         const remove = vi.spyOn(controller.signal, 'removeEventListener');
         const result = await translateImageInOffscreen('original-image', 'en', 'Page', controller.signal, 'image-1');
         expect(result).toEqual({image: 'data:image/png;base64,translated', lines: [{...lines[0], text: '你好', backgroundColor: 'rgb(240,240,240)'}]});
         expect(images).toHaveLength(1);
-        expect(mocks.recognize).toHaveBeenCalledWith('original-image', 'en', controller.signal);
+        expect(mocks.recognize).toHaveBeenCalledWith('original-image', 'en', controller.signal, {onProgress:expect.any(Function)});
         expect(canvases[0].context.drawImage).toHaveBeenCalledWith(images[0], 0, 0, 32, 16);
         expect(mocks.background).toHaveBeenCalledOnce();
         expect(sendMessage.mock.calls.filter(([message]) => message.type === 'fluentReadImageProgress').map(([message]) => message.stage))

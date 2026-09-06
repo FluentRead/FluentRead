@@ -1,7 +1,7 @@
 <!--
  * @file src/ui/components/FeatureEnableCard.vue
- * 文件职责：以简洁设置行展示功能总开关，保留清晰的启停状态。
- * 主要内容：将说明与右侧状态开关对齐，减少重复提示和大面积强调，适配窄屏、键盘操作与亮暗主题。
+ * 文件职责：以带轻边框与柔和阴影的设置卡展示功能总开关，保留清晰的启停状态。
+ * 主要内容：将说明与右侧状态开关对齐，通过轻微层次区分总开关与普通设置，适配窄屏、键盘操作与亮暗主题。
  * 模块边界：仅发送布尔值更新，不保存配置、不判断平台能力；禁用状态由调用方传入。
  -->
 <template>
@@ -22,7 +22,9 @@ const emit = defineEmits<{'update:modelValue': [value: boolean]}>();
 const {t} = useUiI18n();
 </script>
 <style scoped>
-.feature-enable-card { display: flex; align-items: center; justify-content: space-between; gap: 20px; padding: 18px 20px; border-bottom: 1px solid var(--line, #e7e9f0); background: transparent; }
+.feature-enable-card { display: flex; align-items: center; justify-content: space-between; gap: 20px; margin: 12px 12px 8px; padding: 16px; border: 1px solid var(--line, #e7e9f0); border-radius: 12px; background: linear-gradient(135deg, var(--surface, #fff), var(--surface-soft, #f7f8fb)); box-shadow: 0 3px 12px rgba(23, 32, 51, .055), inset 0 1px 0 color-mix(in srgb, var(--surface, #fff) 75%, transparent); }
+.feature-enable-card.enabled { border-color: color-mix(in srgb, var(--brand, #ef4776) 24%, var(--line, #e7e9f0)); box-shadow: 0 3px 12px rgba(23, 32, 51, .055), inset 2px 0 0 color-mix(in srgb, var(--brand, #ef4776) 55%, transparent); }
+.feature-enable-card.unavailable { box-shadow: none; }
 .feature-enable-copy { min-width: 0; }
 .feature-enable-heading strong { color: var(--ink, #172033); font-size: 14px; font-weight: 650; }
 .feature-enable-copy p { margin: 5px 0 0; color: var(--muted, #737c8f); font-size: 12px; line-height: 1.6; }
@@ -34,5 +36,5 @@ const {t} = useUiI18n();
 .enabled i { background: var(--brand, #ef4776); }
 .enabled b { transform: translateX(18px); }
 .feature-enable-card button:disabled { opacity: .55; cursor: not-allowed; }
-@media (max-width: 600px) { .feature-enable-card { gap: 12px; padding: 16px; } .feature-enable-card button { gap: 7px; } }
+@media (max-width: 600px) { .feature-enable-card { gap: 12px; margin: 10px; padding: 14px; } .feature-enable-card button { gap: 7px; } }
 </style>

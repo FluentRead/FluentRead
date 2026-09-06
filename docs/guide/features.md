@@ -125,4 +125,4 @@ X 没有原生字幕时，可以在播放器菜单中点击“生成 AI 字幕�
 
 本地视频模型卡片会在下载前显示预计大小：Whisper Tiny 约 100 MB，Whisper Base 约 150 MB。这是首次下载文件的估算，不代表运行内存；后续运行可能补充兼容文件。估算基于上游 [Tiny 文件清单](https://huggingface.co/onnx-community/whisper-tiny/tree/main/onnx)和 [Base 文件清单](https://huggingface.co/onnx-community/whisper-base/tree/main/onnx)，包括分词配置文件并向上取整。
 
-功能总开关使用简洁设置行：左侧保留一句说明，右侧显示启停状态与开关。仅开启后的开关使用主题色，不再使用整块强调背景或重复启用提示。
+功能总开关使用带淡边框、柔和背景和轻阴影的独立设置卡：左侧保留一句说明，右侧显示启停状态与开关。开启时以主题色开关和细微边缘强调状态，不使用整块强色背景或重复启用提示。

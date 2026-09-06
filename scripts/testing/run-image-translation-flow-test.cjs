@@ -505,6 +505,11 @@ async function verifyGeometryCases({worker, ui, wait, shot}) {
         const {verifyXSurface} = require('./image-translation-x-surface.cjs');
         await verifyXSurface({page, context, popup, worker, ui, wait, click, shot, report,
             originalImage: arg('original-image', null)});
+        assert.ok(report.ocrTargets.some(target => target.type === 'worker' && target.url.includes('/fluent-read-ocr/')),
+            '必须实际监听 dedicated OCR Worker，才能断言不存在语言加载错误');
+        assert.equal(report.ocrConsole.some(entry => entry.diagnosticError), false, 'OCR 控制台监听不得静默失效');
+        assert.equal(report.ocrConsole.some(entry => /Error opening data file|Failed loading language|Tesseract couldn't load/.test(entry.text || '')),
+            false, '显式下载的语言包不应触发子语言文件加载错误');
         if (multilingual) {
             const requests = report.requests.join('\n');
             assert.match(requests, /简体中文/u, '真实 OCR 请求缺少简体中文');

@@ -2,7 +2,7 @@
 
 ## One-line description
 
-FluentRead is an open-source browser extension for bilingual reading and translation.
+FluentRead is an open-source browser extension for bilingual translation.
 
 ## Short introduction
 

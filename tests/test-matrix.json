@@ -108,6 +108,7 @@
       "tests/offscreenTranslation.test.ts",
       "tests/offscreenAdapters.test.ts",
       "tests/offscreenClient.test.ts",
+      "tests/firefoxDocumentRuntime.test.ts",
       "tests/offscreenTtsPlayback.test.ts",
       "tests/pageContext.test.ts",
       "tests/pageContextPolicy.test.ts",

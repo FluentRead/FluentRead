@@ -1,15 +1,15 @@
 <!DOCTYPE html>
 <!--
   @file entrypoints/offscreen/index.html
-  文件职责：提供 Chrome/Edge Offscreen document 的最小 HTML 外壳。
-  主要内容：通过 wxt.include 限定浏览器目标，并加载负责注册离屏能力的 main.ts。
-  模块边界：页面没有可见 UI 或内联业务逻辑，非目标浏览器构建必须跳过该入口。
+  文件职责：提供跨浏览器共用 DOM 运行时的最小 HTML 外壳。
+  主要内容：Chrome/Edge 由 Offscreen API 加载，Firefox 由后台 iframe 加载；所有目标调用同一 main.ts。
+  模块边界：页面没有可见 UI 或内联业务逻辑，其他浏览器目标仍跳过该入口。
 -->
 <html>
 <head>
     <meta charset="utf-8">
-    <meta name="wxt.include" content="['chrome', 'edge']">
-    <title>FluentRead Chrome Translation Offscreen</title>
+    <meta name="wxt.include" content="['chrome', 'edge', 'firefox']">
+    <title>FluentRead Background DOM Runtime</title>
 </head>
 <body>
     <script type="module" src="./main.ts"></script>

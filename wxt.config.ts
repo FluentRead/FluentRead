@@ -140,18 +140,13 @@ export default defineConfig({
     manifest: createExtensionManifest,
     zip: {
         name: 'fluent-read',
-        // coverage 是本地测试产物；Firefox 不启用的 OCR 二进制也无需进入 AMO 源码包。
-        excludeSources: ['coverage/**', 'public/fluent-read-ocr/**'],
+        // 仅排除本地测试产物；Firefox 同样需要可复现的 OCR worker/core 资产。
+        excludeSources: ['coverage/**'],
     },
     hooks: {
-        'build:publicAssets': (wxt, files) => {
+        'build:publicAssets': (_wxt, files) => {
             for (const name of ['ort-wasm-simd-threaded.jsep.mjs', 'ort-wasm-simd-threaded.jsep.wasm']) {
                 files.push({absoluteSrc: resolve(__dirname, `node_modules/@huggingface/transformers/dist/${name}`), relativeDest: `fluent-read-ai/${name}`});
-            }
-            if (wxt.config.browser !== 'firefox') return;
-            for (let index = files.length - 1; index >= 0; index -= 1) {
-                const destination = files[index]?.relativeDest.replaceAll('\\', '/');
-                if (destination?.startsWith('fluent-read-ocr/')) files.splice(index, 1);
             }
         },
     },

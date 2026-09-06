@@ -31,6 +31,7 @@ describe('extension manifest capability contract', () => {
         for (const [browser, manifestVersion] of [
             ['chrome', 3],
             ['edge', 3],
+            ['firefox', 2],
         ] as const) {
             const manifest = createExtensionManifest({browser, manifestVersion} as Parameters<typeof createExtensionManifest>[0]);
             expect(manifest.host_permissions, `${browser}-mv${manifestVersion}`).toContain('<all_urls>');
@@ -61,9 +62,8 @@ describe('extension manifest capability contract', () => {
     it('keeps the Offscreen page entrypoint target-limited and delegates to the app composition root', () => {
         const html = readFileSync(resolve(PROJECT_ROOT, 'entrypoints/offscreen/index.html'), 'utf8');
         const main = sourceBody('entrypoints/offscreen/main.ts');
-        expect(html).toContain('<meta name="wxt.include" content="[\'chrome\', \'edge\']">');
+        expect(html).toContain('<meta name="wxt.include" content="[\'chrome\', \'edge\', \'firefox\']">');
         expect(html).toContain('<script type="module" src="./main.ts"></script>');
-        expect(html).not.toContain('firefox');
         expect(html).not.toContain('opera');
         expect(main).toBe(
             "import {startOffscreenApp} from '@/src/app/offscreen/runtime';\n\nstartOffscreenApp();\n",
@@ -91,13 +91,13 @@ describe('extension manifest capability contract', () => {
         expect(chrome.browser_specific_settings).toBeUndefined();
     });
 
-    it('固定发布包英文名称，并在 Firefox 构建时排除不可用 OCR 资产', () => {
+    it('固定发布包英文名称，并为 Firefox 保留共享 OCR 资产', () => {
         const source = readFileSync(resolve(PROJECT_ROOT, 'wxt.config.ts'), 'utf8');
 
         expect(source).toContain("name: 'fluent-read'");
-        expect(source).toContain("excludeSources: ['coverage/**', 'public/fluent-read-ocr/**']");
+        expect(source).toContain("excludeSources: ['coverage/**']");
         expect(source).toContain("'build:publicAssets'");
-        expect(source).toContain("startsWith('fluent-read-ocr/')");
+        expect(source).not.toContain("files.splice(index, 1)");
     });
 
     it('拒绝当前版本的非期望 Firefox 归档名，但允许其他版本归档留存', async () => {

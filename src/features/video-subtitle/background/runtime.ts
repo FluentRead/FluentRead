@@ -5,14 +5,14 @@
  * 模块边界：只负责平台依赖装配，所有 owner、generation 和消息行为由 handlers.ts 实现。
  */
 import {createVideoSubtitleBackgroundHandlers} from './handlers';
-import {chromeOffscreenClient} from '@/src/platform/offscreen/client';
+import {extensionDomClient} from '@/src/platform/offscreen/extensionClient';
 import {createVideoAiSubtitleCacheHandlers} from './cacheHandlers';
 import {videoAiSubtitleCacheRepository} from './transcriptionCache';
 
 export function createVideoSubtitleBackgroundRuntime() {
     return [
         ...createVideoSubtitleBackgroundHandlers({
-            offscreen: chromeOffscreenClient,
+            offscreen: extensionDomClient,
             storage: {
                 get: async (key) => browser.storage.local.get(key),
                 set: async (value) => { await browser.storage.local.set(value); },

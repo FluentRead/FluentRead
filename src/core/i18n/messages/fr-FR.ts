@@ -2392,7 +2392,7 @@ export const frFRLegacyText: Readonly<Record<string, string>> = {
     "本地运行": "Exécution locale",
     "当前浏览器不支持本地 AI 字幕，无法下载或运行本地模型。": "Ce navigateur ne prend pas en charge les sous-titres IA locaux et ne peut pas télécharger ni exécuter les modèles.",
     "本地 Whisper 模型下载": "Téléchargement des modèles Whisper locaux",
-    "首次下载需要联网；识别速度取决于 CPU 和内存。支持桌面 Chrome / Edge，Firefox 可使用原生字幕翻译。": "Premier téléchargement avec internet ; la vitesse dépend du CPU et de la mémoire. Chrome / Edge de bureau pris en charge ; Firefox peut traduire les sous-titres natifs.",
+    "首次下载需要联网；识别速度取决于 CPU 和内存。支持桌面 Chrome、Edge 和 Firefox。": "Le premier téléchargement nécessite Internet ; la vitesse dépend du processeur et de la mémoire. Chrome, Edge et Firefox sur ordinateur sont pris en charge.",
     "已识别视频缓存": "Cache des vidéos transcrites",
     "最多保留 32 个视频、7 天；只保存字幕文字和时间，不保存音频。": "Jusqu’à 32 vidéos pendant 7 jours ; seuls texte et minutage sont conservés, sans audio.",
     "当前浏览器不支持本地 AI 字幕。": "Ce navigateur ne prend pas en charge les sous-titres IA locaux.",

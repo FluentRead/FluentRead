@@ -80,6 +80,18 @@ async function main() {
           throw new Error(`恢复预算没有终止 DOM 争夺：${JSON.stringify(report.cases[mode])}`);
         }
         if (mode === 'baseline' && second <= first) throw new Error('基线没有复现持续重插');
+        if (mode === 'fixed') {
+          const reopened = await page.evaluate(async () => {
+            window.fixture.observer.disconnect();
+            const dialog = document.querySelector('dialog');
+            dialog.close();
+            await new Promise(resolve => setTimeout(resolve, 0));
+            dialog.showModal();
+            return window.fixture.controller.placeForRange(window.fixture.range);
+          });
+          report.cases[mode].reopened = reopened;
+          if (!reopened) throw new Error('同一对话框关闭后重新打开未能恢复浮层');
+        }
         await page.screenshot({path: path.join(artifacts, `${mode}.png`)});
         await page.evaluate(() => {window.fixture.observer.disconnect(); window.fixture.controller.dispose();});
       } finally {await page.close();}

@@ -164,6 +164,11 @@ export function createModalDialogHostController(host: HTMLElement): ModalDialogH
     let calibrationRetries = 0;
     let ownershipRepairs = 0;
     let rejectedDialog: HTMLDialogElement | null = null;
+    const clearRejectedDialog = (event?: Event) => {
+        if (event && !event.isTrusted && rejectedDialog?.open) return;
+        rejectedDialog?.removeEventListener('close', clearRejectedDialog);
+        rejectedDialog = null;
+    };
 
     const scheduleSync = () => {
         if (!view || disposed || !activeDialog || frame !== null) return;
@@ -218,7 +223,9 @@ export function createModalDialogHostController(host: HTMLElement): ModalDialogH
         if (slot.parentNode !== activeDialog || host.parentNode !== slot) {
             // 宿主框架反复拒绝外来子节点时让出 DOM，不能每一帧都与页面争夺所有权。
             if (ownershipRepairs >= 2) {
+                clearRejectedDialog();
                 rejectedDialog = activeDialog;
+                rejectedDialog.addEventListener('close', clearRejectedDialog);
                 restore();
                 return;
             }
@@ -276,7 +283,7 @@ export function createModalDialogHostController(host: HTMLElement): ModalDialogH
         if (disposed) return false;
         const dialog = findSelectionModalDialog(range);
         if (!dialog) {
-            rejectedDialog = null;
+            clearRejectedDialog();
             restore();
             return false;
         }
@@ -299,6 +306,7 @@ export function createModalDialogHostController(host: HTMLElement): ModalDialogH
 
     const dispose = () => {
         if (disposed) return;
+        clearRejectedDialog();
         restore();
         disposed = true;
     };

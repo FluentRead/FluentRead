@@ -47,6 +47,25 @@ describe('selection modal dialog host', () => {
         expect(host.parentNode).toBe(origin);
         for (let attempt = 0; attempt < 20; attempt += 1) expect(controller.placeForRange(range)).toBe(false);
         expect(dialog.querySelector('[data-fluent-read-modal-dialog-host-slot]')).toBeNull();
+        dialog.dispatchEvent(new window.Event('close'));
+        expect(controller.placeForRange(range)).toBe(false);
+        dialog.open = false;
+        dialog.dispatchEvent(new window.Event('close'));
+        dialog.open = true;
+        expect(controller.placeForRange(range)).toBe(true);
+        for (let attempt = 0; attempt < 3; attempt += 1) {
+            host.parentElement!.remove();
+            controller.placeForRange(range);
+        }
+        // 浏览器 close 通知可能在同节点重新 showModal 后才送达。
+        const trustedClose = new window.Event('close');
+        Object.defineProperty(trustedClose, 'isTrusted', {value: true});
+        dialog.dispatchEvent(trustedClose);
+        expect(controller.placeForRange(range)).toBe(true);
+        for (let attempt = 0; attempt < 3; attempt += 1) {
+            host.parentElement!.remove();
+            controller.placeForRange(range);
+        }
         controller.placeForRange(null);
         expect(controller.placeForRange(range)).toBe(true);
         controller.dispose();

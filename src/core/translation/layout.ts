@@ -2,12 +2,13 @@
  * @file src/core/translation/layout.ts
  *
  * 文件职责：判定页面元素的语义块、内联关系和可重组边界，为候选引擎选择合理翻译粒度并保护页面布局。
- * 主要内容：按正文/全部节点范围区分正文与控件；识别 heading、block、inline、纯文本正文 pre、结构标签、嵌入式 aside 和 reparent 边界，保持交互控件对内部标签的翻译所有权，限制直接子节点探测数量，并提供候选目标及内联 run 相关的布局函数。 可核对的公开符号包括 isSemanticHeadingElement、getElementDisplay、isBlockBoundary、isStructuralContainer、hasStructuralAncestor、isTranslationControlElement、findTranslationControlOwner、hasDirectReadableText、hasReadableBlockChild。
+ * 主要内容：按正文/全部节点范围区分正文与控件；识别 heading、block、inline、纯文本正文 pre、结构标签、嵌入式 aside 和 reparent 边界，保持交互控件对内部标签的翻译所有权，并在 tooltip 边界停止向外归属，限制直接子节点探测数量，并提供候选目标及内联 run 相关的布局函数。 可核对的公开符号包括 isSemanticHeadingElement、getElementDisplay、isBlockBoundary、isStructuralContainer、hasStructuralAncestor、isTranslationControlElement、findTranslationControlOwner、hasDirectReadableText、hasReadableBlockChild。
  * 模块边界：本文件属于可独立测试的 core 候选领域；可以读取传入 DOM 以计算结果，但不访问配置存储、不调用 provider、不注册页面监听器，也不负责译文渲染或 feature 生命周期。
  */
 
 import {
     getComposedParent,
+    isTranslationTooltip,
     isDocumentSurface,
     isPlainTextDocumentPre,
     isProtectedTextElement,
@@ -215,6 +216,7 @@ export function findTranslationControlOwner(element: Element): Element | null {
     let depth = 0;
     while (current && !isDocumentSurface(current)) {
         if (depth > maxComposedAncestorDepth) return null;
+        if (isTranslationTooltip(current)) return null;
         if (isTranslationControlElement(current)) return current;
         current = getComposedParent(current);
         depth += 1;

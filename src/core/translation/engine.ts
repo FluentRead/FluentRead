@@ -2,10 +2,11 @@
  * @file src/core/translation/engine.ts
  *
  * 文件职责：实现 DOM 节点到 TranslationCandidate 的核心解析引擎，协调安全守卫、站点适配器、布局边界和文本有效性。
- * 主要内容：按正文/全部节点范围协调候选；定义 TranslationCandidateCore、候选优选与键值函数，记录发现步骤和原因，处理 hover 屏障、适配优先级、快照省略、缓存及坐标命中，保证全文与悬浮共享决策。 可核对的公开符号包括 TranslationCoreInspection、TranslationDiscoveryStep、getTranslationCandidateKey、selectPreferredTranslationCandidate、TranslationCandidateCore。
+ * 主要内容：按正文/全部节点范围协调候选；定义 TranslationCandidateCore、候选优选与键值函数，记录发现步骤和原因，处理 hover 屏障、适配优先级、快照省略、缓存及坐标命中，让独立 tooltip 不抢占外层控件候选，保证全文与悬浮共享决策。 可核对的公开符号包括 TranslationCoreInspection、TranslationDiscoveryStep、getTranslationCandidateKey、selectPreferredTranslationCandidate、TranslationCandidateCore。
  * 模块边界：本文件属于可独立测试的 core 候选领域；可以读取传入 DOM 以计算结果，但不访问配置存储、不调用 provider、不注册页面监听器，也不负责译文渲染或 feature 生命周期。
  */
 
+import {isTranslationTooltip} from './dom';
 import {
     composedAncestors,
     evaluateElementHardGuard,
@@ -873,7 +874,7 @@ export class TranslationCandidateCore {
                     const hasCandidate = frame.descendantHasCandidate || frame.exitCandidates.length > 0;
                     stack.pop();
                     const parent = stack[stack.length - 1];
-                    if (parent && hasCandidate) {
+                    if (parent && hasCandidate && !isTranslationTooltip(frame.element)) {
                         parent.descendantHasCandidate = true;
                         // 后序发现中，一旦直接子树已经拥有候选，祖先的合成内联 run
                         // 就不能再把该子树移动到第二个候选中。

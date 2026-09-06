@@ -25,6 +25,7 @@ import {
 } from '@/src/core/translation/public';
 import {
     evaluateHardGuard,
+    isTextInNestedTranslationTooltip,
     findElementsAtPoint,
     findNodeAtPoint,
     hasHiddenMarker,
@@ -2652,4 +2653,41 @@ describe('embedded semantic chrome classification', () => {
             expect(ids, `${chromeId} must remain structural chrome`).not.toContain(chromeId);
         }
     });
+});
+
+
+describe('动态 tooltip 与按钮来源隔离', () => {
+    it.each(['role="tooltip"', 'class="tooltip"'])('嵌套提示 %s 独立发现且不进入按钮来源', (attributes) => {
+        const {document, core} = page(`<button id="monthly"><span>Monthly</span><i></i><div ${attributes} id="tip"><div class="tooltip-inner" id="tip-content">Support ThinkStu monthly</div></div></button>`);
+        const button = document.querySelector('#monthly') as HTMLElement;
+        const tip = document.querySelector('#tip-content') as HTMLElement;
+        expect(extractTranslationText(button)).toBe('Monthly');
+        expect(collectLiveTranslationTextSlots(button).map(slot => slot.source)).toEqual(['Monthly']);
+        expect(createTranslationSourceSnapshot(button).slots.map(slot => slot.source)).toEqual(['Monthly']);
+        expect(createTranslationSourceSnapshot(button).clone.querySelector('#tip')).toBeNull();
+        expect(button.querySelector('#tip')).not.toBeNull();
+        expect(extractTranslationText(tip)).toBe('Support ThinkStu monthly');
+        const candidates = core.discover(document);
+        expect(candidates.map(candidate => candidate.element.id)).toEqual(['tip-content', 'monthly']);
+        expect(candidates.map(candidate => candidate.kind)).toEqual(['content', 'control']);
+        expect(core.resolve(tip)?.element).toBe(tip);
+        document.querySelector('#tip')!.remove();
+        expect(extractTranslationText(button)).toBe('Monthly');
+        expect(core.discover(document).map(candidate => candidate.element.id)).toEqual(['monthly']);
+    });
+});
+
+
+it('tooltip 文本边界探测在异常深度下保守退出', () => {
+    const {document} = page('<div id="root"></div>');
+    const root = document.querySelector('#root')!;
+    let parent = root;
+    for (let index = 0; index <= maxComposedAncestorDepth; index++) {
+        const next = document.createElement('span');
+        parent.appendChild(next);
+        parent = next;
+    }
+    const text = document.createTextNode('Deep source');
+    parent.appendChild(text);
+    expect(isTextInNestedTranslationTooltip(text, root)).toBe(true);
 });

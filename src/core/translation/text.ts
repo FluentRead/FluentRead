@@ -2,12 +2,13 @@
  * @file src/core/translation/text.ts
  *
  * 文件职责：提取和校验候选中的可读文本，拒绝标识符、空白、扩展译文及脚本、表单或敏感区域的节点。
- * 主要内容：提供文本规范化、meaningful/identifier 判定、元素与文本节点保护检查、保守的目标语言字符集快判、WeakMap 状态缓存和受预算约束的深度扫描，避免在大型 DOM 上无限遍历。 可核对的公开符号包括 normalizeTranslationText、isIdentifierLikeText、isMeaningfulTranslationText、isClearlyTargetLanguage、isTranslationTextNodeProtected、TranslationTextProtectionCache、createTranslationTextProtectionCache、isTranslationTextElementProtected、hasMeaningfulTranslationTextInNodes。
+ * 主要内容：提供文本规范化、meaningful/identifier 判定、元素与文本节点保护检查、嵌套 tooltip 来源隔离、保守的目标语言字符集快判、WeakMap 状态缓存和受预算约束的深度扫描，避免在大型 DOM 上无限遍历。 可核对的公开符号包括 normalizeTranslationText、isIdentifierLikeText、isMeaningfulTranslationText、isClearlyTargetLanguage、isTranslationTextNodeProtected、TranslationTextProtectionCache、createTranslationTextProtectionCache、isTranslationTextElementProtected、hasMeaningfulTranslationTextInNodes。
  * 模块边界：本文件属于可独立测试的 core 候选领域；可以读取传入 DOM 以计算结果，但不访问配置存储、不调用 provider、不注册页面监听器，也不负责译文渲染或 feature 生命周期。
  */
 
 import {
     composedAncestors,
+    isTextInNestedTranslationTooltip,
     getComposedParent,
     isProtectedDescendantElement,
     maxComposedAncestorDepth,
@@ -93,7 +94,7 @@ function collectReadableText(
         let current = walker.nextNode();
         while (current) {
             const textNode = current as Text;
-            if (!isTranslationTextNodeProtected(
+            if (!isTextInNestedTranslationTooltip(textNode, element) && !isTranslationTextNodeProtected(
                 textNode,
                 shouldStayOriginal,
                 ignoredExtensionElement,

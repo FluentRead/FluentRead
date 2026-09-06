@@ -31,19 +31,23 @@
 
 <script setup lang="ts">
 import {computed, nextTick, ref} from 'vue';
-import {DEFAULT_HARNESS_ACTION_PROMPTS, DEFAULT_HARNESS_SYSTEM_PROMPT, HARNESS_ACTIONS, HARNESS_PROMPT_MAX_LENGTH, HARNESS_PROMPT_VARIABLES, type HarnessActionId, type HarnessPreferences} from '@/src/core/config/harness';
+import {getDefaultHarnessPrompt, resolveHarnessPrompt, type HarnessPromptKind, HARNESS_ACTIONS, HARNESS_PROMPT_MAX_LENGTH, HARNESS_PROMPT_VARIABLES, type HarnessActionId, type HarnessPreferences} from '@/src/core/config/harness';
 import {useUiI18n} from '@/src/ui/i18n';
 import SettingsGroup from './components/SettingsGroup.vue';
 import SegmentedControl from './components/SegmentedControl.vue';
 
 const props = defineProps<{preferences: HarnessPreferences}>();
-const {translateLegacy} = useUiI18n();
+const {translateLegacy, language} = useUiI18n();
 const selected = ref<string | number>('system');
 const editor = ref<HTMLTextAreaElement | null>(null);
 const promptOptions = computed(() => [{value: 'system', label: translateLegacy('通用指令')}, ...HARNESS_ACTIONS.map(action => ({value: action.id, label: translateLegacy(action.label)}))]);
-const defaultPrompt = computed(() => selected.value === 'system' ? DEFAULT_HARNESS_SYSTEM_PROMPT : DEFAULT_HARNESS_ACTION_PROMPTS[selected.value as HarnessActionId]);
+const defaultPrompt = computed(() => getDefaultHarnessPrompt(selected.value as HarnessPromptKind, language.value));
 const prompt = computed({
-  get: () => selected.value === 'system' ? props.preferences.systemPrompt : props.preferences.actionPrompts[selected.value as HarnessActionId],
+  get: () => {
+    const stored = selected.value === 'system' ? props.preferences.systemPrompt : props.preferences.actionPrompts[selected.value as HarnessActionId];
+    // 编辑时允许清空；默认占位文本和运行时回退都使用当前界面语言。
+    return stored.trim() ? resolveHarnessPrompt(stored, selected.value as HarnessPromptKind, language.value) : stored;
+  },
   set: (value: string) => {
     if (selected.value === 'system') props.preferences.systemPrompt = value;
     else props.preferences.actionPrompts[selected.value as HarnessActionId] = value;

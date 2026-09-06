@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest'
-import { HARNESS_ACTIONS, DEFAULT_HARNESS_ACTION_PROMPTS, DEFAULT_HARNESS_SYSTEM_PROMPT, HARNESS_PROMPT_MAX_LENGTH, renderHarnessPrompt, isHarnessService, normalizeHarnessPreferences } from '@/src/core/config/harness'
+import { HARNESS_ACTIONS, DEFAULT_HARNESS_ACTION_PROMPTS, DEFAULT_HARNESS_SYSTEM_PROMPT, HARNESS_PROMPT_MAX_LENGTH, getDefaultHarnessPrompt, resolveHarnessPrompt, renderHarnessPrompt, isHarnessService, normalizeHarnessPreferences } from '@/src/core/config/harness'
+import {UI_LANGUAGE_OPTIONS} from '@/src/core/i18n/language'
+import {type HarnessPromptKind} from '@/src/core/harness/prompts'
 import { Config, normalizeConfig } from '@/src/core/config/model'
 
 describe('Harness config contract', () => {
@@ -109,3 +111,31 @@ describe('翻译卡提示词配置', () => {
       .toBe('{{learningLevel}} {{learningLevel}} beginner concise {{unknown}} {{constructor}}');
   });
 });
+
+
+describe('localized Harness defaults', () => {
+  const kinds: HarnessPromptKind[] = ['system', ...HARNESS_ACTIONS.map(action => action.id)]
+  it.each(UI_LANGUAGE_OPTIONS)('provides all five templates in $value and preserves placeholders', ({value: locale}) => {
+    for (const kind of kinds) {
+      const template = getDefaultHarnessPrompt(kind, locale)
+      expect(template.length).toBeGreaterThan(50)
+      expect(template.length).toBeLessThanOrEqual(HARNESS_PROMPT_MAX_LENGTH)
+      if (kind === 'system') {
+        expect(template.match(/\{\{[^}]+\}\}/gu)?.sort()).toEqual(['{{to}}', '{{learningLevel}}', '{{explanationDepth}}'].sort())
+      } else expect(template).toContain('### ')
+      for (const {value: previous} of UI_LANGUAGE_OPTIONS) {
+        expect(resolveHarnessPrompt(getDefaultHarnessPrompt(kind, previous), kind, locale)).toBe(template)
+      }
+      expect(resolveHarnessPrompt('', kind, locale)).toBe(template)
+      expect(resolveHarnessPrompt(' \n ', kind, locale)).toBe(template)
+      const custom = '  自定义 / My prompt / 私の指示 {{to}} {{unknown}}  '
+      expect(resolveHarnessPrompt(custom, kind, locale)).toBe(custom)
+      expect(resolveHarnessPrompt(template + ' ', kind, locale)).toBe(template + ' ')
+    }
+  })
+  it('retains original Chinese defaults and safely resolves unknown languages', () => {
+    expect(getDefaultHarnessPrompt('system', undefined)).toBe(DEFAULT_HARNESS_SYSTEM_PROMPT)
+    for (const {id} of HARNESS_ACTIONS) expect(getDefaultHarnessPrompt(id, 'unknown')).toBe(DEFAULT_HARNESS_ACTION_PROMPTS[id])
+    for (const kind of kinds) expect(new Set(UI_LANGUAGE_OPTIONS.map(({value}) => getDefaultHarnessPrompt(kind, value))).size).toBe(7)
+  })
+})

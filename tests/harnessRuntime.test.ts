@@ -14,6 +14,8 @@ const {generateText, streamResult, createModel, normalizeError} = vi.hoisted(() 
 vi.mock('ai', () => ({streamText: streamResult, tool: (definition: unknown) => definition}));
 vi.mock('@/src/services/harness/modelGateway', () => ({createHarnessLanguageModel: createModel, normalizeHarnessModelError: normalizeError}));
 
+import {UI_LANGUAGE_OPTIONS} from '@/src/core/i18n/language';
+import {HARNESS_ACTIONS, getDefaultHarnessPrompt, renderHarnessPrompt} from '@/src/core/config/harness';
 import {Config} from '@/src/core/config/model';
 import {createApiKeyRequirementKey} from '@/src/core/config/validation';
 import {createHarnessRuntime} from '@/src/services/harness/runtime';
@@ -33,9 +35,37 @@ describe('Harness runtime', () => {
         createModel.mockClear();
         normalizeError.mockClear();
     });
+    it.each(UI_LANGUAGE_OPTIONS)('uses $value defaults in actual model requests without changing the target language', async ({value: locale}) => {
+        const current = config();
+        current.uiLanguage = locale;
+        current.to = 'de';
+        generateText.mockResolvedValue({text: 'answer'});
+        for (const {id: intent} of HARNESS_ACTIONS) {
+            const result = await createHarnessRuntime(() => current).run({type: 'fluentReadHarness', action: 'run', requestId: `locale-${intent}`, intent, question: '', selection: {text: 'Evidence {{to}}', context: '', sentence: ''}}, new AbortController().signal);
+            expect(result.success).toBe(true);
+            const input = generateText.mock.calls.at(-1)![0];
+            expect(input.system).toContain(renderHarnessPrompt(getDefaultHarnessPrompt('system', locale), {to: 'de', learningLevel: 'intermediate', explanationDepth: 'concise'}));
+            expect(input.system).toContain(getDefaultHarnessPrompt(intent, locale));
+            expect(input.system).not.toContain('{{to}}');
+            expect(input.messages.at(-1).content).toContain('Evidence {{to}}');
+        }
+    });
+    it('snapshots locale before asynchronous memory reads and resolves blank prompts in that locale', async () => {
+        const current = config();
+        current.uiLanguage = 'ja-JP';
+        current.harness.systemPrompt = '';
+        current.harness.actionPrompts.meaning = ' ';
+        current.harness.memoryEnabled = true;
+        const memory = {recall: async () => { current.uiLanguage = 'fr-FR'; return []; }};
+        generateText.mockResolvedValue({text: 'answer'});
+        await createHarnessRuntime(() => current, undefined, memory).run({type: 'fluentReadHarness', action: 'run', requestId: 'locale-snapshot', intent: 'meaning', question: '', selection: {text: 'Evidence', context: '', sentence: ''}}, new AbortController().signal);
+        expect(generateText.mock.calls[0][0].system).toContain(getDefaultHarnessPrompt('meaning', 'ja-JP'));
+        expect(generateText.mock.calls[0][0].system).not.toContain(getDefaultHarnessPrompt('meaning', 'fr-FR'));
+    });
     it.each(['meaning', 'grammar', 'usage', 'practice'] as const)('uses the saved %s template and keeps selected evidence outside system instructions', async intent => {
         const current = config();
         current.to = 'en';
+        current.uiLanguage = 'ko-KR';
         current.harness.systemPrompt = 'Explain in {{to}} for {{learningLevel}}.';
         current.harness.actionPrompts[intent] = 'CUSTOM {{explanationDepth}} {{to}} {{unknown}}';
         generateText.mockResolvedValue({text: 'answer'});

@@ -252,6 +252,7 @@ export default defineConfig({
                 'src/core/config/harness.ts',
                 'src/core/harness/loop.ts',
                 'src/core/harness/prompts.ts',
+                'src/core/harness/promptLocales.ts',
                 'src/core/harness/surface.ts',
                 'src/app/background/harnessRuntime.ts',
                 'src/features/reading-assistant/answerFormat.ts',

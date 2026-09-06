@@ -1865,6 +1865,98 @@ async function runFailureActionScenario({
   };
 }
 
+// 模拟页面按原文高度定位的 Bootstrap tooltip；双语增高后会覆盖触发图标。
+async function verifyTranslatedTooltipHover(page, timeout, artifactsDir) {
+  await page.mouse.move(0, 0);
+  await page.evaluate(() => {
+    const trigger = document.createElement('i');
+    trigger.id = 'tooltip-hover-trigger';
+    trigger.setAttribute('aria-label', 'Information');
+    trigger.style.cssText = 'position:fixed;left:600px;top:350px;width:24px;height:24px;z-index:2147483000;background:#ddd';
+    document.body.appendChild(trigger);
+    window.tooltipHoverCounts = {opens: 0, closes: 0};
+    trigger.addEventListener('mouseenter', () => {
+      window.tooltipHoverCounts.opens++;
+      const tooltip = document.createElement('div');
+      tooltip.id = 'translated-hover-tooltip';
+      tooltip.className = 'tooltip fade top';
+      tooltip.style.cssText = 'position:fixed;left:520px;width:220px;z-index:2147483001;background:white;color:black;padding:8px';
+      tooltip.innerHTML = '<div class="tooltip-arrow"></div><div class="tooltip-inner">Set the lowest amount you are happy to receive. You can use suggested amounts to encourage supporters towards your preferred amounts.</div>';
+      document.body.appendChild(tooltip);
+      tooltip.style.top = `${350 - tooltip.getBoundingClientRect().height - 8}px`;
+    });
+    trigger.addEventListener('mouseleave', () => {
+      window.tooltipHoverCounts.closes++;
+      document.querySelector('#translated-hover-tooltip')?.remove();
+    });
+  });
+  const cycles = [];
+  try {
+    for (let cycle = 0; cycle < 2; cycle++) {
+      await page.mouse.move(612, 362);
+      await page.waitForFunction(() => document.querySelector('#translated-hover-tooltip .fluent-read-bilingual-content'), undefined, {timeout});
+      await page.waitForTimeout(1200);
+      const state = await page.evaluate(() => {
+        const tooltip = document.querySelector('#translated-hover-tooltip');
+        const rect = tooltip?.getBoundingClientRect();
+        return {...window.tooltipHoverCounts,
+          wrappers: tooltip?.querySelectorAll('.fluent-read-bilingual-content').length || 0,
+          coversTrigger: Boolean(rect && rect.top < 362 && rect.bottom > 362),
+          hit: document.elementFromPoint(612, 362)?.id,
+        };
+      });
+      if (state.opens !== cycle + 1 || state.closes !== cycle || state.wrappers !== 1 ||
+          !state.coversTrigger || state.hit !== 'tooltip-hover-trigger') {
+        throw new Error(`翻译后 tooltip 抢占鼠标并闪烁：${JSON.stringify(state)}`);
+      }
+      cycles.push(state);
+      if (artifactsDir && cycle === 0) await page.screenshot({path: path.join(artifactsDir, 'tooltip-hover.png')});
+      await page.mouse.move(0, 0);
+      await page.waitForFunction(() => !document.querySelector('#translated-hover-tooltip'));
+    }
+    const boundaries = await page.evaluate(() => {
+      const results = [];
+      for (const [name, attributes, body, expected] of [
+        ['aria tooltip', 'role="tooltip"', '', 'none'],
+        ['untranslated', 'class="tooltip"', '', 'auto'],
+        ['link', 'role="tooltip"', '<a href="#">Help</a>', 'auto'],
+        ['button', 'role="tooltip"', '<button>Help</button>', 'auto'],
+        ['focusable', 'role="tooltip" tabindex="0"', '', 'auto'],
+        ['dialog', 'role="dialog"', '', 'auto'],
+        ['ordinary content', '', '', 'auto'],
+      ]) {
+        const root = document.createElement('div');
+        root.innerHTML = `<div ${attributes}><div class="tooltip-inner">Source${body}</div></div>`;
+        document.body.appendChild(root);
+        const tip = root.firstElementChild;
+        const wrapper = document.createElement('span');
+        wrapper.className = 'fluent-read-bilingual-content';
+        wrapper.setAttribute('data-fr-translation-owned', 'true');
+        if (name !== 'untranslated') tip.firstElementChild.appendChild(wrapper);
+        const actual = getComputedStyle(tip).pointerEvents;
+        wrapper.remove();
+        const restored = getComputedStyle(tip).pointerEvents;
+        root.remove();
+        results.push({name, expected, actual, restored});
+      }
+      return results;
+    });
+    if (boundaries.some(item => item.actual !== item.expected || item.restored !== 'auto')) {
+      throw new Error(`tooltip 交互边界失败：${JSON.stringify(boundaries)}`);
+    }
+    return {cycles, boundaries};
+  } catch (error) {
+    const counts = await page.evaluate(() => window.tooltipHoverCounts);
+    throw new Error(`${error.message}; tooltip lifecycle=${JSON.stringify(counts)}`);
+  } finally {
+    await page.mouse.move(0, 0);
+    await page.evaluate(() => {
+      document.querySelector('#tooltip-hover-trigger')?.remove();
+      document.querySelector('#translated-hover-tooltip')?.remove();
+    });
+  }
+}
+
 async function main() {
   const args = parseArgs(process.argv.slice(2));
   const extensionDir = path.resolve(args.extensionDir);
@@ -2393,6 +2485,7 @@ async function main() {
         )),
       };
     }
+    const tooltipHover = await verifyTranslatedTooltipHover(page, Math.min(args.timeout, 15000), artifactsDir);
     if (artifactsDir) await page.screenshot({
       path: path.join(artifactsDir, 'full-page-translated.png'),
       fullPage: !args.verifyFloatingUi,
@@ -2574,6 +2667,7 @@ async function main() {
       passiveHoverRemount,
       cancelledHoverGesture,
       unchangedAttributeStability,
+      tooltipHover,
       failureActions,
       floatingUi: floatingUiEvidence,
       loadingStyleIsolation: loadingStyleIsolationEvidence,

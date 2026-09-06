@@ -1,7 +1,7 @@
 /**
  * @file src/core/translation/dom.ts
  *
- * 文件职责：封装翻译候选发现使用的 composed tree 遍历与不可覆盖安全守卫，识别扩展 DOM、脚本、表单、图标字体、Scribble 代码表格、纯文本正文及禁止翻译区域。
+ * 文件职责：封装翻译候选发现使用的 composed tree 遍历与不可覆盖安全守卫，识别扩展 DOM、其他翻译器已接管的段落、脚本、表单、图标字体、代码及禁止翻译区域。
  * 主要内容：提供 Shadow DOM 父级与祖先遍历、硬裁剪标签、受保护文本元素、text/plain 顶层 pre、独立 tooltip 边界、隐藏/可编辑/no-translate 判断，并限制祖先深度以避免异常页面结构拖垮扫描。 可核对的公开符号包括 maxComposedAncestorDepth、getComposedParent、isDocumentSurface、isExtensionElement、isExtensionElementSelf、isHardPruneTag、isProtectedTextElement、isPlainTextDocumentPre、hasNoTranslateMarker、isTopLevelApplicationShell。
  * 模块边界：本文件属于可独立测试的 core 候选领域；可以读取传入 DOM 以计算结果，但不访问配置存储、不调用 provider、不注册页面监听器，也不负责译文渲染或 feature 生命周期。
  */
@@ -61,6 +61,16 @@ export function isExtensionElement(element: Element): boolean {
 
 export function isExtensionElementSelf(element: Element): boolean {
     return element.matches(extensionSelector);
+}
+
+/**
+ * 沉浸式翻译把目标译文插在原文的直属 font wrapper 中。该父节点才是它接管的
+ * 最小原文单元，不能沿 querySelector 把整篇文章或整个页面都视为已翻译。
+ * 不把它标为 FluentRead owned：只停止本插件在这里写入，清理时绝不删除对方 DOM。
+ */
+export function isForeignTranslationBoundary(element: Element): boolean {
+    return element.classList.contains('immersive-translate-target-wrapper') ||
+        (!isDocumentSurface(element) && element.querySelector(':scope > .immersive-translate-target-wrapper') !== null);
 }
 
 export function isHardPruneTag(element: Element): boolean {
@@ -177,6 +187,7 @@ export function isProtectedDescendantElement(
         element.getAttribute('translate')?.toLowerCase() === 'no' &&
         !element.classList.contains('notranslate') && element.getAttribute('data-notranslate') !== 'true';
     return (!ignoreExtensionSelf && !ownSourceSlot && isExtensionElementSelf(element)) ||
+        isForeignTranslationBoundary(element) ||
         isProtectedTextElement(element) ||
         isMathRendererElement(element) ||
         (hasNoTranslateMarker(element) && !ownNoTranslateMarker &&
@@ -194,6 +205,7 @@ export interface HardGuardResult {
 
 export function evaluateElementHardGuard(element: Element): HardGuardResult {
     if (isExtensionElementSelf(element)) return {prune: true, reason: 'fluentread-owned'};
+    if (isForeignTranslationBoundary(element)) return {prune: true, reason: 'foreign-translation'};
     if (isHardPruneTag(element)) return {prune: true, reason: `protected-tag:${element.tagName.toLowerCase()}`};
     if (isMathRendererElement(element)) return {prune: true, reason: 'math-renderer'};
     if (hasNoTranslateMarker(element)) return {prune: true, reason: 'inherited-no-translate'};

@@ -77,6 +77,22 @@ node scripts/testing/run-translation-mutation-test.cjs \
 
 该回归检查宿主为新增链接写入 `tabindex=-1/0` 时保持同一个译文节点，避免把键盘焦点管理误判为内容损坏；正文、链接目的地或隐藏状态变化仍由确定性测试验证失效行为。仅译文模式还检查相邻 DOM 更新不会因原文位于扩展槽内而撤销翻译。固定高度按钮覆盖嵌套 flex/grid 标签、文字边界、点击与“翻译—恢复—再次翻译”，使用确定性翻译服务排除网络响应波动；真实 GitHub 页面结果需单独记录，不能以本地夹具代替。
 
+### Reddit 多翻译器共存
+
+用户页面 HTML 曾同时包含沉浸式翻译的 `font.immersive-translate-target-wrapper` 与 FluentRead 双语 wrapper。旧快照把前者作为受保护原文复制，净化后丢失其标记，形成第三份译文。`translationCore.test.ts` 覆盖该结构的候选边界、快照省略与普通术语/代码保留。
+
+生产扩展回归使用本地最小结构夹具，不执行用户粘贴的脚本，也不访问外部翻译服务：
+
+```bash
+node scripts/testing/run-reddit-translation-test.cjs \
+  --extension-dir .output/chrome-mv3 \
+  --playwright-root <工作区依赖中的 Node.js 包目录> \
+  --focus-safe-helper <浏览器测试技能>/scripts/focus-safe-browser.cjs \
+  --background --artifacts-dir /private/tmp/fluentread-reddit-coexistence
+```
+
+同时检查正文与全部节点范围、悬浮 `[1,0,1]`、全文翻译与恢复、外部译文在请求前/途中/完成后出现、移除外部译文后重新翻译，以及外部 DOM 身份和 URL 保持不变。真实 Reddit 如果返回人机验证页，应单独记录为站点限制，不能把本地结构测试表述为真实帖子验证。
+
 ## 术语库回归
 
 术语库的本地解析、三态选库、配置迁移、冻结版本、缓存身份、消息来源和 provider 协议先由确定性测试验证：
@@ -141,7 +157,7 @@ node scripts/testing/run-model-usage-ui-test.cjs \
 
 ## 简体与繁体中文回归
 
-`tests/chineseLanguage.test.ts` 覆盖语言别名、显式脚本优先、共享字和简繁混排；未收录汉字不作为同语言跳过的证据。供应商协议矩阵、旧配置迁移、术语隔离和并发缓存分别由 `chineseTranslationProviders`、配置测试、`glossary`、`translationBroker` 与 `translationCache` 测试覆盖。缓存版本更新会隔离旧版以繁体身份存储的简体或粤语译文。
+`tests/chineseLanguage.test.ts` 覆盖语言别名、显式脚本优先、共享字和简繁混排；中文语境由明确字形或短语确认，常用中性汉字无需逐字白名单，简繁冲突由人工常用字表与 Unicode 17.0.0 Unihan 单向变体数据共同检查。截图评论语料位于 `tests/fixtures/chinese-language-posts.json`，覆盖普通中文、`OpenAI`/`CoT` 嵌入、同目标跳过和跨语言保留；完整外语、短混排与未确认的罕见字仍允许翻译。供应商协议矩阵、旧配置迁移、术语隔离和并发缓存分别由 `chineseTranslationProviders`、配置测试、`glossary`、`translationBroker` 与 `translationCache` 测试覆盖。
 
 生产扩展可重复运行以下浏览器专项：
 
@@ -153,7 +169,7 @@ node scripts/testing/run-chinese-translation-test.cjs \
   --artifacts-dir /private/tmp/fluentread-chinese-browser
 ```
 
-该脚本在临时 Edge profile 中以不抢焦点方式启动正常尺寸窗口，验证 Popup 原生源语言和目标语言选择、保存与重载、英文分别译成简繁、简繁互译，以及 Control 悬浮和 Alt+T 全文的 `[1,0,1]` 切换、恢复原文和缓存隔离。默认本机 OpenAI 兼容服务只证明请求与交互链路；追加 `--live-google` 后另行验证实际 Google 服务，报告分开记录服务失败与确定性结果。此专项不替代其他站点、真实 OCR 或付费服务验证。
+该脚本在临时 Edge profile 中以不抢焦点方式启动正常尺寸窗口，验证 Popup 源语言和目标语言选择、保存与重载、英文分别译成简繁、简繁互译，以及 Control 悬浮和 Alt+T 全文的 `[1,0,1]` 切换、恢复原文和缓存隔离。默认还用截图评论验证同目标中文零请求、零译文节点，相邻英文和繁体正常翻译，以及动态中文评论改为英文后的重新识别。默认本机 OpenAI 兼容服务只证明请求与交互链路；追加 `--live-google` 后另行验证实际 Google 服务，报告分开记录服务失败与确定性结果。此专项不替代其他站点、真实 OCR 或付费服务验证。
 
 追加 `--spanish` 可运行西班牙语与简体、繁体中文之间的双向翻译矩阵，同样覆盖语言选择持久化、两种快捷键、恢复和缓存。西班牙语识别与朗读映射由 `commonUtilities`、`selectionTranslatorCore` 验证，OCR 语言包选择和保存由 `imageTranslation` 验证。
 

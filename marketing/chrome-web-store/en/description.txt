@@ -1,0 +1,29 @@
+FluentRead is an open-source browser extension under GPL-3.0 for bilingual reading, translation, and AI reading assistance.
+
+Open source and DeepSeek Harness
+The source code is available on GitHub. The AI reading card integrates a browser adaptation of the DeepSeek Harness session core. Conversation-event and message organization components connect to webpage selections, AI models, and learning records, supporting contextual follow-up questions. You can choose different AI providers and models.
+
+Webpage and selection translation
+Display translations alongside the original webpage. Use full-page, hover, or selection translation and restore the original text. The source language defaults to automatic detection and can also be selected manually. Configure automatic translation for individual websites.
+
+AI reading card
+Get explanations, sentence analysis, usage examples, and exercises for selected text. Reference the current paragraph, ask follow-up questions, and manage local reading history.
+
+Learning center
+Save words, phrases, and sentences with their original context for study, expression practice, and review.
+
+Images, documents, and subtitles
+Recognize and translate text in webpage images or selected screen areas. Import PDF, ePub, Word, and other supported files, read both languages, edit translations, and download results. Use bilingual subtitles on YouTube and X. Supported X videos can also use local AI audio transcription.
+
+Services and settings
+Use free translation services, DeepL, AI providers, or local Ollama models. Configure target languages, glossaries, translation styles, shortcuts, automatic translation rules, and menu layout.
+
+Requirements and availability
+• Enable selection translation and learning collections in settings. The reading card requires a configured AI service and model.
+• Third-party providers may require credentials or paid credits. Free service availability and speed can vary.
+• Image recognition packs and local subtitle models require initial downloads. Scanned PDFs are not directly recognized; some images, videos, and protected pages cannot be read.
+• Cloud translation sends relevant text to the selected provider. File parsing, image text recognition, and X local audio recognition happen in the browser.
+
+Guide: https://fluent.thinkstu.com/en/guide/
+Data and privacy: https://fluent.thinkstu.com/en/guide/privacy
+Source and feedback: https://github.com/FluentRead/FluentRead

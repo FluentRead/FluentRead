@@ -162,9 +162,6 @@
           <span>{{ compute.requireApiKey ? '此模型需要 API Key' : '允许无 Key 请求' }}</span>
           <el-switch v-model="compute.requireApiKey" aria-label="当前模型是否需要 API Key" size="small" />
         </div>
-        <small v-if="compute.showAI && compute.requireApiKey && !config.token[service]?.trim()" class="field-warning" role="status">
-          翻译前需要填写 API Key
-        </small>
       </div>
     </div>
     <p v-if="compute.showMiniMaxRegion && minimaxKeyMismatch" class="minimax-key-note is-warning">
@@ -197,9 +194,9 @@
       </el-col>
     </el-row>
 
-    <div v-if="compute.showMiniMaxRegion" class="minimax-endpoint" data-minimax-endpoint>
-      <span>当前 API 地址</span>
-      <code>{{ minimaxEndpoint }}</code>
+    <div v-if="compute.showMiniMaxRegion" class="connection-field minimax-endpoint" data-minimax-endpoint>
+      <div class="connection-field-label"><strong>当前 API 地址</strong></div>
+      <div class="connection-field-control"><code>{{ minimaxEndpoint }}</code></div>
     </div>
 
     <p v-if="compute.showMiMoRegion && mimoKeyMismatch" class="mimo-key-note is-warning">
@@ -232,9 +229,9 @@
       </el-col>
     </el-row>
 
-    <div v-if="compute.showMiMoRegion" class="mimo-endpoint" data-mimo-endpoint>
-      <span>当前 API 地址</span>
-      <code>{{ mimoEndpoint }}</code>
+    <div v-if="compute.showMiMoRegion" class="connection-field mimo-endpoint" data-mimo-endpoint>
+      <div class="connection-field-label"><strong>当前 API 地址</strong></div>
+      <div class="connection-field-control"><code>{{ mimoEndpoint }}</code></div>
     </div>
 
     <div v-if="compute.showAzureOpenaiEndpoint" class="connection-field" data-azure-endpoint>
@@ -290,8 +287,8 @@
 
     <details v-if="compute.showAI" class="custom-advanced-settings" data-testid="custom-service-advanced">
       <summary>
-        <span><strong>高级设置</strong><small>Thinking、代理、提示词和自定义请求体</small></span>
-        <b aria-hidden="true">⌄</b>
+        <strong>高级设置</strong>
+        <svg class="advanced-chevron" viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="m4 6 4 4 4-4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" /></svg>
       </summary>
 
       <div class="custom-advanced-content">
@@ -343,7 +340,7 @@
       <el-col :span="12" class="lightblue rounded-corner"><el-tooltip effect="dark" content="选择 DeepSeek 接口使用的 API 格式。" placement="top-start" :show-after="300"><span class="popup-text popup-vertical-left">API 格式<el-icon class="icon-margin"><InfoFilled /></el-icon></span></el-tooltip></el-col>
       <el-col :span="12"><el-select v-model="config.deepseekApiType" placeholder="请选择 API 格式"><el-option class="select-left" v-for="item in options.deepseekApiType" :key="item.value" :label="item.label" :value="item.value" /></el-select></el-col>
     </el-row>
-    <el-row v-if="compute.showCustomBody && !compute.showCustomOpenAI" class="margin-bottom margin-left-2em">
+    <el-row v-if="compute.showCustomBody && !compute.showAI" class="margin-bottom margin-left-2em">
       <el-col :span="12" class="lightblue rounded-corner"><el-tooltip effect="dark" content="填写要合并到翻译请求中的 JSON 参数对象。" placement="top-start" :show-after="300"><span class="popup-text popup-vertical-left">自定义请求体<el-icon class="icon-margin"><InfoFilled /></el-icon></span></el-tooltip></el-col>
       <el-col :span="12">
         <el-input v-model="config.customBody[service]" :class="{ 'input-error': !isValidCustomBody(config.customBody[service]) }" placeholder='例如：{"thinking": {"type": "disabled"}}' />
@@ -879,6 +876,7 @@ onBeforeUnmount(() => {
 
 .service-connection-section :deep(.el-row) {
   display: flex !important;
+  gap: 20px;
   min-height: 50px !important;
   margin: 0 !important;
   padding: 9px 0 !important;
@@ -967,10 +965,8 @@ onBeforeUnmount(() => {
 
 .custom-advanced-settings {
   margin-top: 14px;
-  border: 1px solid #e5e8ef;
-  border-radius: 12px;
-  overflow: hidden;
-  background: #fbfcfe;
+  border: 0;
+  background: transparent;
 }
 
 .custom-advanced-settings summary {
@@ -978,19 +974,20 @@ onBeforeUnmount(() => {
   align-items: center;
   justify-content: space-between;
   gap: 12px;
-  padding: 12px 14px;
-  color: #46526a;
+  min-height: 44px;
+  padding: 8px 0;
+  color: var(--ink, #263044);
   cursor: pointer;
   list-style: none;
 }
 
 .custom-advanced-settings summary::-webkit-details-marker { display: none; }
-.custom-advanced-settings summary > span { display: flex; flex-direction: column; }
-.custom-advanced-settings summary strong { font-size: 12px; }
-.custom-advanced-settings summary small { margin-top: 2px; color: #9098a8; font-size: 10px; }
-.custom-advanced-settings summary b { color: #c72a56; transition: transform 150ms ease; }
-.custom-advanced-settings[open] summary b { transform: rotate(180deg); }
-.custom-advanced-content { padding: 4px 12px 12px; border-top: 1px solid #eceef3; }
+.custom-advanced-settings summary strong { font-size: 12px; font-weight: 600; }
+.custom-advanced-settings summary:hover { color: var(--brand, #ef4776); }
+.custom-advanced-settings summary:focus-visible { outline: 2px solid var(--brand, #ef4776); outline-offset: 3px; border-radius: 4px; }
+.advanced-chevron { width: 16px; height: 16px; flex: none; color: var(--muted, #8993a5); transition: transform 150ms ease; }
+.custom-advanced-settings[open] .advanced-chevron { transform: rotate(180deg); }
+.custom-advanced-content { padding: 0 0 12px; border-top: 1px solid var(--line, #eceef3); }
 
 .connection-test-button:hover:not(:disabled) {
   color: #fff;
@@ -1066,37 +1063,19 @@ onBeforeUnmount(() => {
   color: #a52c48;
 }
 
-.minimax-endpoint {
-  display: flex;
-  align-items: baseline;
-  gap: 8px;
-  margin: -4px 0 14px 2em;
-  color: #8993a5;
-  font-size: 11px;
-  line-height: 1.5;
-}
-
-.minimax-endpoint code {
-  overflow-wrap: anywhere;
-  color: #59657b;
-  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-}
-
-.mimo-endpoint {
-  display: flex;
-  align-items: baseline;
-  gap: 8px;
-  margin: -4px 0 14px 2em;
-  color: #8993a5;
-  font-size: 11px;
-  line-height: 1.5;
-}
-
+.minimax-endpoint code,
 .mimo-endpoint code {
+  display: block;
+  padding: 9px 12px;
+  border-radius: 8px;
+  background: var(--surface-soft, #f7f8fb);
   overflow-wrap: anywhere;
-  color: #59657b;
+  color: var(--muted, #59657b);
+  font-size: 11px;
+  line-height: 1.6;
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
 }
+
 
 @media (max-width: 700px) {
   .subsection-heading {
@@ -1145,6 +1124,7 @@ onBeforeUnmount(() => {
 
 @media (prefers-reduced-motion: reduce) {
   .credential-warning { animation: none; }
+  .advanced-chevron { transition: none; }
 }
 
 .api-key-policy {
@@ -1226,7 +1206,7 @@ onBeforeUnmount(() => {
 }
 
 :global(:root.dark .credential-warning) { border-color: #735c31; color: #f2d28f; background: #392f1f; }
-:global(:root.dark .custom-advanced-settings) { border-color: var(--line); background: var(--surface-soft); }
+:global(:root.dark .custom-advanced-settings) { background: transparent; }
 :global(:root.dark .custom-advanced-settings summary) { color: var(--ink); }
 :global(:root.dark .custom-advanced-content),
 :global(:root.dark .custom-template-heading) { border-color: var(--line); }

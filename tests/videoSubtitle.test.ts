@@ -33,8 +33,9 @@ import {
     translateVideoSubtitleCues,
     VIDEO_CAPTION_SEGMENT_SELECTOR,
 } from '@/src/features/video-subtitle/content/runtime';
-import {findVideoPlayer, findXSettingsControl} from '@/src/features/video-subtitle/content/ui';
+import {applyVideoDisplayState, findVideoPlayer, findXSettingsControl} from '@/src/features/video-subtitle/content/ui';
 import {validateYoutubeTimedTextMessage} from '@/src/features/video-subtitle/content/youtubeTimedTextMessage';
+import {config} from '@/src/services/config/store';
 import { normalizeVideoSubtitleFontSize } from '@/src/core/config/model';
 
 afterEach(() => {
@@ -353,5 +354,28 @@ describe('YouTube timedtext MAIN bridge 消息边界', () => {
         expect(cues[1]).toMatchObject({ startMs: 1_300, durationMs: 500, text: 'Second sentence' });
         expect(getVisibleVideoAiCue(cues, 1_200)?.text).toBe('First sentence');
         expect(getVisibleVideoAiCue(cues, 1_650)?.text).toBe('Third sentence');
+    });
+});
+
+describe('独立字幕层显示模式', () => {
+    it('双语、仅译文、仅原文和隐藏在 X 与 YouTube 字幕层同步且可恢复', () => {
+        const {document} = parseHTML('<html><body><div id="fluent-read-video-ai-caption-container"></div><div id="fluent-read-video-subtitle-layer"></div></body></html>');
+        vi.stubGlobal('document', document);
+        const container = document.getElementById('fluent-read-video-ai-caption-container')!;
+        const layer = document.getElementById('fluent-read-video-subtitle-layer')!;
+        const previous = {videoSubtitleDisplayMode: config.videoSubtitleDisplayMode, videoSubtitleVisible: config.videoSubtitleVisible};
+        try {
+            for (const mode of ['translation-only', 'original-only', 'bilingual'] as const) {
+                config.videoSubtitleDisplayMode = mode;
+                applyVideoDisplayState(container);
+                for (const node of [container, layer]) {
+                    expect(node.classList.contains('fluent-read-video-display-translation-only')).toBe(mode === 'translation-only');
+                    expect(node.classList.contains('fluent-read-video-display-original-only')).toBe(mode === 'original-only');
+                }
+            }
+            config.videoSubtitleVisible = false;
+            applyVideoDisplayState(container);
+            expect(layer.classList.contains('fluent-read-video-display-hidden')).toBe(true);
+        } finally { Object.assign(config, previous); }
     });
 });

@@ -189,7 +189,7 @@ export function createVideoPlayerBinding(options: VideoPlayerBindingOptions): Vi
       });
     }
     setProgress(button, options.getState());
-    if (button.parentElement !== host) host.insertBefore(button, host.firstElementChild);
+    if (button.parentElement !== host || host.lastElementChild !== button) host.appendChild(button);
 
     if (options.createMenu) {
       if (!menu || menu.parentElement !== next.player) {

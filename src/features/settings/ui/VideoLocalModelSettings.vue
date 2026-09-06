@@ -159,12 +159,24 @@ function handleStorageChange(changes: Record<string, browser.Storage.StorageChan
   if (areaName === 'local' && changes[VIDEO_LOCAL_TRANSCRIPTION_STATE_KEY]) void refresh().catch(() => { downloadError.value = '无法读取模型缓存，请重试。'; });
 }
 
+// 从播放页返回设置时重新读取 IndexedDB 统计，避免一直显示首次挂载时的零条。
+function refreshVisibleCacheStats(): void {
+  if (document.visibilityState === 'hidden') return;
+  void refreshCacheStats().catch(error => { cacheError.value = error instanceof Error ? error.message : '无法读取已识别字幕缓存，请重试。'; });
+}
+
 onMounted(() => {
   void refresh().catch(() => { modelStateLoaded.value = true; downloadError.value = '无法读取模型缓存，请重试。'; });
   void refreshCacheStats().catch((error) => { cacheError.value = error instanceof Error ? error.message : '无法读取已识别字幕缓存，请重试。'; });
   browser.storage.onChanged.addListener(handleStorageChange);
+  document.addEventListener('visibilitychange', refreshVisibleCacheStats);
+  window.addEventListener('focus', refreshVisibleCacheStats);
 });
-onUnmounted(() => browser.storage.onChanged.removeListener(handleStorageChange));
+onUnmounted(() => {
+  browser.storage.onChanged.removeListener(handleStorageChange);
+  document.removeEventListener('visibilitychange', refreshVisibleCacheStats);
+  window.removeEventListener('focus', refreshVisibleCacheStats);
+});
 </script>
 
 <style scoped>

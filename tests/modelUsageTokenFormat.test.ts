@@ -29,6 +29,16 @@ describe('模型用量大数格式', () => {
         expect(formatTokenCount(Number.NaN)).toEqual({compact: '0', exact: '0', isCompact: false});
     });
 
+    it('按界面语言格式化单位与精确数值，不在英文或欧洲语言中残留中文单位', () => {
+        expect(formatTokenCount(59_700, 'en-US')).toEqual({compact: '59.7K', exact: '59,700', isCompact: true});
+        for (const locale of ['en-US', 'fr-FR', 'de-DE', 'es-ES', 'ja-JP', 'zh-TW']) {
+            expect(formatTokenCount(1_234_567, locale).exact).toBe(new Intl.NumberFormat(locale).format(1_234_567));
+            if (!locale.startsWith('zh') && locale !== 'ja-JP') expect(formatTokenCount(59_700, locale).compact).not.toMatch(/万|亿/);
+        }
+        expect(formatTokenCount(123, 'en-US').isCompact).toBe(false);
+        expect(formatUsageRate(.1234, 'de-DE')).toBe(new Intl.NumberFormat('de-DE', {style: 'percent', maximumFractionDigits: 1}).format(.1234));
+    });
+
     it('缓存率保留未知并最多显示一位百分比小数', () => {
         expect(formatUsageRate(null)).toBe('—');
         expect(formatUsageRate(0)).toBe('0%');

@@ -491,6 +491,7 @@ export function applyVideoDisplayState(container: HTMLElement): void {
   container.classList.toggle(VIDEO_DISPLAY_HIDDEN_CLASS, config.videoSubtitleVisible === false);
   container.setAttribute('data-fluent-read-video-display-mode', mode);
   const layer = document.getElementById(VIDEO_TRANSLATION_LAYER_ID);
+  layer?.classList.toggle(VIDEO_DISPLAY_TRANSLATION_ONLY_CLASS, mode === 'translation-only');
   layer?.classList.toggle(VIDEO_DISPLAY_ORIGINAL_ONLY_CLASS, mode === 'original-only');
   layer?.classList.toggle(VIDEO_DISPLAY_HIDDEN_CLASS, config.videoSubtitleVisible === false);
   layer?.setAttribute('data-fluent-read-video-display-mode', mode);

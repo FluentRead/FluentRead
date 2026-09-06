@@ -1,9 +1,10 @@
 /**
  * @file src/features/full-page-translation/content/state.ts
  * 文件职责：维护每个被翻译 DOM 节点的可恢复状态、请求代次、译文工件和共享布局覆盖所有权，确保重复翻译、宿主变更和移除节点都能安全收敛。
- * 主要内容：包含 WeakMap 状态索引、begin/complete/error/discard 状态机、spinner/译文/retry/仅译文槽节点登记、无主槽原文解包、允许宿主管理链接焦点的可信译文复验、同源译文工件有界重挂、截断祖先样式快照与观察器引用计数、文本槽回写以及全量恢复。
+ * 主要内容：包含 WeakMap 状态索引、begin/complete/error/discard 状态机、spinner/译文/retry/仅译文槽节点登记、无主槽原文解包、允许宿主管理链接焦点的可信译文复验、同源译文工件有界重挂、截断祖先样式快照与观察器引用计数、文本槽回写、tooltip 命中保护标记以及全量恢复。
  * 模块边界：该模块不发现候选、不请求翻译也不生成译文 HTML；runtime 负责会话编排，renderer 负责内容创建，本文件仅拥有 DOM 状态与可逆样式资源，避免跨 session 误删新结果。
  */
+import {isTranslationTooltip} from "@/src/core/translation/dom";
 import {
     collectLiveTranslationTextSlots,
     createTranslationTextProtectionCache,
@@ -98,6 +99,8 @@ export interface TranslationState {
     originalStyleAttribute: string | null;
     /** 翻译开始前的 class 属性；恢复时避免留下空 class。 */
     originalClassAttribute: string | null;
+    /** tooltip 内外的控件翻译没有 wrapper，用可恢复标记覆盖完整请求生命周期。 */
+    originalTooltipTranslationAttribute?: string | null;
     /** 插件完成渲染后记录的 style 属性；undefined 表示尚未改动样式。 */
     renderedStyleAttribute?: string | null;
     /** 插件完成渲染后记录的 class 属性，用于过滤自身添加 bilingual class 的 mutation。 */
@@ -265,7 +268,7 @@ export function getTranslationSourceStructureSignature(
         }
         if (current.nodeType !== 1) continue;
         const element = current as Element;
-        if (element !== node && element.matches('[data-fr-translation-owned="true"]')) continue;
+        if (element !== node && (isTranslationTooltip(element) || element.matches('[data-fr-translation-owned="true"]'))) continue;
         if (element !== node && OUTPUT_OMITTED_TAGS.has(element.localName)) {
             if (!pushToken('omitted:' + (element.namespaceURI ?? '') + ':' + element.localName)) return SOURCE_STRUCTURE_OVERFLOW;
             continue;
@@ -461,6 +464,13 @@ export function beginTranslation(
         controller: new AbortController(),
     };
 
+    const tooltipSelector = '[role="tooltip"], .tooltip:has(> .tooltip-inner)';
+    if (node.closest?.(tooltipSelector) || node.querySelector?.(tooltipSelector)) {
+        state.originalTooltipTranslationAttribute = previous?.originalTooltipTranslationAttribute !== undefined
+            ? previous.originalTooltipTranslationAttribute
+            : node.getAttribute('data-fr-tooltip-translation-active');
+        node.setAttribute('data-fr-tooltip-translation-active', 'true');
+    }
     states.set(node, state);
     trackActiveNode(node);
     refreshOwnershipIndex(node, state);
@@ -591,6 +601,11 @@ export function detachFailedTranslationUi(
     if (states.get(node) !== state || state.phase !== "error") return false;
     removeExtensionNode(state.retryWrapper);
     state.retryWrapper = undefined;
+    if (state.originalTooltipTranslationAttribute !== undefined &&
+        node.getAttribute('data-fr-tooltip-translation-active') === 'true') {
+        if (state.originalTooltipTranslationAttribute === null) node.removeAttribute('data-fr-tooltip-translation-active');
+        else node.setAttribute('data-fr-tooltip-translation-active', state.originalTooltipTranslationAttribute);
+    }
     restoreOriginalStyle(node, state);
     restoreOriginalClass(node, state);
     state.renderedStyleAttribute = node.getAttribute("style");
@@ -1559,6 +1574,11 @@ function teardownAttempt(
         });
     }
 
+    if (state.originalTooltipTranslationAttribute !== undefined &&
+        node.getAttribute('data-fr-tooltip-translation-active') === 'true') {
+        if (state.originalTooltipTranslationAttribute === null) node.removeAttribute('data-fr-tooltip-translation-active');
+        else node.setAttribute('data-fr-tooltip-translation-active', state.originalTooltipTranslationAttribute);
+    }
     restoreOriginalStyle(node, state);
     restoreOriginalClass(node, state);
     clearState(node);

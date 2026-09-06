@@ -2,7 +2,7 @@
  * @file src/core/translation/dom.ts
  *
  * 文件职责：封装翻译候选发现使用的 composed tree 遍历与不可覆盖安全守卫，识别扩展 DOM、脚本、表单、图标字体、Scribble 代码表格、纯文本正文及禁止翻译区域。
- * 主要内容：提供 Shadow DOM 父级与祖先遍历、硬裁剪标签、受保护文本元素、text/plain 顶层 pre、隐藏/可编辑/no-translate 判断，并限制祖先深度以避免异常页面结构拖垮扫描。 可核对的公开符号包括 maxComposedAncestorDepth、getComposedParent、isDocumentSurface、isExtensionElement、isExtensionElementSelf、isHardPruneTag、isProtectedTextElement、isPlainTextDocumentPre、hasNoTranslateMarker、isTopLevelApplicationShell。
+ * 主要内容：提供 Shadow DOM 父级与祖先遍历、硬裁剪标签、受保护文本元素、text/plain 顶层 pre、独立 tooltip 边界、隐藏/可编辑/no-translate 判断，并限制祖先深度以避免异常页面结构拖垮扫描。 可核对的公开符号包括 maxComposedAncestorDepth、getComposedParent、isDocumentSurface、isExtensionElement、isExtensionElementSelf、isHardPruneTag、isProtectedTextElement、isPlainTextDocumentPre、hasNoTranslateMarker、isTopLevelApplicationShell。
  * 模块边界：本文件属于可独立测试的 core 候选领域；可以读取传入 DOM 以计算结果，但不访问配置存储、不调用 provider、不注册页面监听器，也不负责译文渲染或 feature 生命周期。
  */
 
@@ -295,4 +295,24 @@ export function findNodeAtPoint(root: Document | ShadowRoot, x: number, y: numbe
         // Chromium 风格的光标命中 API 同样是可选能力。
     }
     return null;
+}
+
+
+/** tooltip 是独立临时阅读面；不能参与外层按钮的来源或几何所有权。 */
+export function isTranslationTooltip(element: Element): boolean {
+    return element.getAttribute('role') === 'tooltip' ||
+        (element.classList.contains('tooltip') && Array.from(element.children)
+            .some(child => child.classList.contains('tooltip-inner')));
+}
+
+/** 相对于本次候选，排除嵌套 tooltip 的文本，仍允许 tooltip 自身独立翻译。 */
+export function isTextInNestedTranslationTooltip(node: Node, root: Element): boolean {
+    let current = node.parentElement;
+    let depth = 0;
+    while (current && current !== root) {
+        if (isTranslationTooltip(current)) return true;
+        if (++depth > maxComposedAncestorDepth) return true;
+        current = current.parentElement;
+    }
+    return false;
 }

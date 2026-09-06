@@ -313,11 +313,12 @@
 }
 
 /* 纯说明 tooltip 按原文高度定位后，译文增高可能盖住触发图标，导致
- * mouseleave -> 关闭 -> mouseenter -> 重建的循环。仅让已翻译且没有交互
+ * mouseleave -> 关闭 -> mouseenter -> 重建的循环。仅让翻译中或已翻译且没有交互
  * 控件的语义 tooltip（含旧 Bootstrap 结构）穿透鼠标；恢复原文后自动失效。
- * 不改宿主属性或监听器，也不影响带链接、表单、可聚焦控件的弹层。 */
-:is([role="tooltip"], .tooltip:has(> .tooltip-inner)):has(:is(.fluent-read-bilingual-content, .fluent-read-single-slot)[data-fr-translation-owned="true"]):not([tabindex], [contenteditable]:not([contenteditable="false"])):not(:has(a[href], button, input, select, textarea, summary, [tabindex], [contenteditable]:not([contenteditable="false"]), [role="button"], [role="link"], [role="dialog"])),
-:is([role="tooltip"], .tooltip:has(> .tooltip-inner)):has(:is(.fluent-read-bilingual-content, .fluent-read-single-slot)[data-fr-translation-owned="true"]):not([tabindex], [contenteditable]:not([contenteditable="false"])):not(:has(a[href], button, input, select, textarea, summary, [tabindex], [contenteditable]:not([contenteditable="false"]), [role="button"], [role="link"], [role="dialog"])) * {
+ * 生命周期标记也覆盖直接改写 Text 的控件翻译，不能只依赖译文 wrapper。
+ * 不改变宿主监听器，也不影响带链接、表单、可聚焦控件的弹层。 */
+:is([role="tooltip"], .tooltip:has(> .tooltip-inner)):is([data-fr-tooltip-translation-active="true"], [data-fr-tooltip-translation-active="true"] *, :has([data-fr-tooltip-translation-active="true"]), :has(:is(.fluent-read-bilingual-content, .fluent-read-single-slot, .fluent-read-loading)[data-fr-translation-owned="true"])):not([tabindex], [contenteditable]:not([contenteditable="false"])):not(:has(a[href], button, input, select, textarea, summary, [tabindex], [contenteditable]:not([contenteditable="false"]), [role="button"], [role="link"], [role="dialog"])),
+:is([role="tooltip"], .tooltip:has(> .tooltip-inner)):is([data-fr-tooltip-translation-active="true"], [data-fr-tooltip-translation-active="true"] *, :has([data-fr-tooltip-translation-active="true"]), :has(:is(.fluent-read-bilingual-content, .fluent-read-single-slot, .fluent-read-loading)[data-fr-translation-owned="true"])):not([tabindex], [contenteditable]:not([contenteditable="false"])):not(:has(a[href], button, input, select, textarea, summary, [tabindex], [contenteditable]:not([contenteditable="false"]), [role="button"], [role="link"], [role="dialog"])) * {
     pointer-events: none !important;
 }
 

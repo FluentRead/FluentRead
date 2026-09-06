@@ -160,10 +160,16 @@ describe('配置领域边界与防御分支', () => {
 
         expect(normalized.custom).toBe(defaultOption.custom);
         expect(normalized.newApiUrl).toBe('http://localhost:3000');
-        expect(normalized.videoTranslationEnabled).toBe(false);
+        expect(normalized.videoTranslationEnabled).toBe(true);
         expect(normalized.deepseekApiType).toBe('auto');
         expect(normalized.selectionTranslatorTrigger).toBe('icon');
         expect(normalized.selectionTranslatorHotkey).toBe('none');
+    });
+
+    it.each([undefined, null, 'false', 0])('缺失或无效的翻译功能开关使用开启默认值：%s', value => {
+        expect(normalizeConfig({videoTranslationEnabled: value, selectionAreaEnabled: value, disableImageTranslator: value})).toMatchObject({
+            videoTranslationEnabled: true, selectionAreaEnabled: true, disableImageTranslator: false,
+        });
     });
 
     it.each([

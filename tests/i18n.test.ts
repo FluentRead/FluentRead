@@ -230,7 +230,7 @@ describe('界面 i18n 契约', () => {
       '推荐先下载简体中文、繁體中文、English 和日本語',
       '自动检测默认使用这四种语言包。识别其他语言图片前，请选择源语言并下载对应语言包。',
     ];
-    sourceCopy.push(IMAGE_OCR_LANGUAGE_PACKS.find(pack => pack.code === 'spa')!.description);
+    sourceCopy.push(...IMAGE_OCR_LANGUAGE_PACKS.map(pack => pack.description));
     for (const source of sourceCopy) {
       const translated = translateLegacyText(source, language);
       expect(translated).not.toBe(source);

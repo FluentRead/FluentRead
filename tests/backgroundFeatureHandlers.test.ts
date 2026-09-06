@@ -955,7 +955,7 @@ describe('后台 feature handlers', () => {
             .rejects.toThrow('OCR 语言包列表不能为空');
         await expect(download.handle({type: IMAGE_OCR_DOWNLOAD_MESSAGE_TYPE, languages: [1]}))
             .rejects.toThrow('包含不支持的语言');
-        await expect(download.handle({type: IMAGE_OCR_DOWNLOAD_MESSAGE_TYPE, languages: ['fra']}))
+        await expect(download.handle({type: IMAGE_OCR_DOWNLOAD_MESSAGE_TYPE, languages: ['unsupported']}))
             .rejects.toThrow('包含不支持的语言');
 
     });

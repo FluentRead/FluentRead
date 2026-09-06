@@ -390,6 +390,30 @@ export function removeTranslationOverlay(): void {
   document.querySelectorAll(`#${VIDEO_NORMALIZED_CAPTION_OVERLAY_ID}`).forEach((node) => node.remove());
 }
 
+/** X 的原生字幕已隐藏，贴底时只避开实际可见的播放控件，不预留原文区域。 */
+export function getXSubtitleBottomInset(player: HTMLElement): number {
+  const playerRect = player.getBoundingClientRect();
+  const settings = Array.from(player.querySelectorAll<HTMLElement>(VIDEO_X_SETTINGS_CONTROL_SELECTOR))
+    .find(control => !control.closest('.fluent-read-video-ui'));
+  const controls = settings ? findXNativeControls(player, settings) : player.querySelector<HTMLElement>(`.${VIDEO_FALLBACK_CONTROLS_CLASS}`);
+  if (controls) {
+    const rect = controls.getBoundingClientRect();
+    let visible = rect.width > 0 && rect.height > 0;
+    for (let node: HTMLElement | null = controls; visible && node; node = node.parentElement) {
+      const style = getComputedStyle(node);
+      visible = style.display !== 'none' && style.visibility !== 'hidden' && style.visibility !== 'collapse' && style.opacity !== '0';
+      if (node === player) break;
+    }
+    if (visible && rect.top >= playerRect.top + playerRect.height * .65 && rect.top < playerRect.bottom) {
+      return Math.max(12, playerRect.bottom - rect.top + 8);
+    }
+  }
+  const video = player.querySelector('video');
+  // 浏览器自带 controls 在 closed shadow tree 中，无法测量；交互时预留一行按钮高度。
+  if (video?.controls && (video.paused || player.matches(':hover') || player.contains(document.activeElement))) return 56;
+  return 12;
+}
+
 export function syncTranslationOverlayPosition(container: HTMLElement | null): void {
   if (!container) return;
   const overlay = document.getElementById(VIDEO_TRANSLATION_OVERLAY_ID);
@@ -425,7 +449,8 @@ export function syncTranslationOverlayPosition(container: HTMLElement | null): v
   panel.style.width = 'max-content';
   panel.style.setProperty('max-width', `${availableWidth}px`, 'important');
   const playerHeight = playerRect.height || 540;
-  const offset = appearance.bottomOffset === 10 ? Math.min(Math.max(playerHeight * .1, 52), 96) : Math.max(12, playerHeight * appearance.bottomOffset / 100);
+  const autoBottom = isXVideoPage() && appearance.position === 'bottom' && appearance.autoBottom;
+  const offset = autoBottom ? getXSubtitleBottomInset(player) : appearance.bottomOffset === 10 ? Math.min(Math.max(playerHeight * .1, 52), 96) : Math.max(12, playerHeight * appearance.bottomOffset / 100);
   panel.style.setProperty('--fluent-read-video-subtitle-bottom', `${offset}px`);
   panel.style.setProperty('top', appearance.position === 'top' ? `${offset}px` : appearance.position === 'center' ? '50%' : 'auto', 'important');
   panel.style.setProperty('bottom', appearance.position === 'bottom' ? 'var(--fluent-read-video-subtitle-bottom)' : 'auto', 'important');
@@ -447,7 +472,7 @@ export function syncTranslationOverlayPosition(container: HTMLElement | null): v
   const layer = document.getElementById(VIDEO_TRANSLATION_LAYER_ID);
   const displayMode = normalizeVideoSubtitleDisplayMode(config.videoSubtitleDisplayMode);
   const normalizedCaptionActive = layer?.classList.contains(VIDEO_NORMALIZED_CAPTION_ACTIVE_CLASS) === true;
-  if (appearance.position === 'bottom' && displayMode === 'bilingual' && !normalizedCaptionActive && visibleCaptionSegments.length > 0) {
+  if (!isXVideoPage() && appearance.position === 'bottom' && displayMode === 'bilingual' && !normalizedCaptionActive && visibleCaptionSegments.length > 0) {
     const playerHeight = playerRect.height || 540;
     const nativeCaptionTop = Math.min(...visibleCaptionSegments.map((rect) => rect.top - playerRect.top));
     const panelHeight = panel.getBoundingClientRect().height;

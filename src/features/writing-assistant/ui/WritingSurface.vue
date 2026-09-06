@@ -5,7 +5,7 @@
  * 模块边界：只拥有网页 DOM 和编辑器快照，不注册写作快捷键或网站停用名单，不执行模型和自动发送操作。
  -->
 <template>
-  <WritingPanel :active="opened" :anchor="anchor" :initial-draft="draft" :initial-context="context" :initial-intent="intent" :session-key="sessionKey" :apply-draft="canInsert ? fillDraft : undefined" @close="close" />
+  <WritingPanel :active="opened" :anchor="anchor" :initial-draft="draft" :initial-context="context" :initial-intent="intent" :session-key="sessionKey" :plain-text-output="snapshot?.site === 'gmail'" :apply-draft="canInsert ? fillDraft : undefined" @close="close" />
 </template>
 <script setup lang="ts">
 import {computed, onBeforeUnmount, onMounted, ref, shallowRef, watch} from 'vue';
@@ -71,8 +71,9 @@ function open(element: HTMLElement) {
   const next = captureEditor(element, location.href);
   if (snapshot.value?.element !== element || snapshot.value.signature !== next.signature || snapshot.value.url !== next.url) {
     snapshot.value = next; draft.value = editorText(element).slice(0, 12000);
-    context.value = collectReplyContext(document, writingSite(location.href), element);
-    intent.value = draft.value.trim() ? 'polish' : context.value.trim() ? 'reply' : 'draft'; sessionKey.value++;
+    context.value = collectReplyContext(document, writingSite(location.href), element, location.href);
+    const hasReply = next.site === 'gmail' ? /(?:^|\n\n)当前邮件：/.test(context.value) : Boolean(context.value.trim());
+    intent.value = draft.value.trim() ? 'polish' : hasReply ? 'reply' : 'draft'; sessionKey.value++;
   }
   opened.value = true;
 }

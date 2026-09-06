@@ -16,7 +16,6 @@
         </span>
       </div>
       <div class="header-actions">
-        <UiLanguageSelector compact />
         <button class="header-settings" type="button" aria-label="打开翻译设置" @click="openSettings"><svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="m9 3-1 3-3 1-2 3 2 2-1 3 3 2 2-1 2 3h3l1-3 3-1 2-3-2-2 1-3-3-2-2 1-2-3H9Z" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"/><circle cx="11.5" cy="11" r="3" stroke="currentColor" stroke-width="1.4"/></svg><span>设置</span></button>
       </div>
     </header>
@@ -80,29 +79,29 @@
         <div class="control-panel">
           <label class="language-control">
             <span>源语言</span>
-            <select v-model="config.from" :disabled="translating" aria-label="文档源语言">
-              <option v-for="item in sourceLanguageOptions" :key="item.value" :value="item.value" data-i18n-ignore>{{ item.value === 'auto' ? translateLegacy(item.label) : getMultilingualTargetLanguageLabel(item.value, item.label, language) }}</option>
-            </select>
+            <ElSelect class="document-select"  append-to=".document-app" v-model="config.from" :disabled="translating" aria-label="文档源语言">
+              <ElOption v-for="item in sourceLanguageOptions" :key="item.value" :value="item.value" data-i18n-ignore :label="item.value === 'auto' ? translateLegacy(item.label) : getMultilingualTargetLanguageLabel(item.value, item.label, language)" />
+            </ElSelect>
           </label>
           <span class="language-arrow" aria-hidden="true">→</span>
           <label class="language-control">
             <span>目标语言</span>
-            <select v-model="config.to" :disabled="translating" aria-label="文档目标语言">
-              <option v-for="item in options.to" :key="item.value" :value="item.value" data-i18n-ignore>{{ getMultilingualTargetLanguageLabel(item.value, item.label, language) }}</option>
-            </select>
+            <ElSelect class="document-select"  append-to=".document-app" v-model="config.to" :disabled="translating" aria-label="文档目标语言">
+              <ElOption v-for="item in options.to" :key="item.value" :value="item.value" data-i18n-ignore :label="getMultilingualTargetLanguageLabel(item.value, item.label, language)" />
+            </ElSelect>
           </label>
           <label class="service-control">
             <span>翻译服务</span>
-            <select v-model="config.documentService" :disabled="translating" aria-label="文档翻译服务">
-              <option v-if="documentServiceUnavailableMessage" :value="config.documentService" disabled>Chrome内置AI翻译（当前浏览器不可用）</option>
-              <option v-for="item in serviceOptions" :key="item.value" :value="item.value">{{ item.label }}</option>
-            </select>
+            <ElSelect class="document-select"  append-to=".document-app" v-model="config.documentService" :disabled="translating" aria-label="文档翻译服务">
+              <ElOption v-if="documentServiceUnavailableMessage" :value="config.documentService" disabled :label="translateLegacy('Chrome内置AI翻译（当前浏览器不可用）')" />
+              <ElOption v-for="item in serviceOptions" :key="item.value" :value="item.value" :label="translateLegacy(item.label)" />
+            </ElSelect>
           </label>
           <label v-if="documentUsesModel" class="model-control">
             <span class="model-control-heading">模型<button v-if="!documentIsCustomOpenAIProvider" type="button" @click.prevent="openSettings">管理模型 ↗</button></span>
-            <select v-model="selectedDocumentModel" :disabled="translating" aria-label="文档翻译模型">
-              <option v-for="model in documentModelOptions" :key="model" :value="model" data-i18n-ignore>{{ model }}</option>
-            </select>
+            <ElSelect class="document-select"  append-to=".document-app" v-model="selectedDocumentModel" :disabled="translating" aria-label="文档翻译模型">
+              <ElOption v-for="model in documentModelOptions" :key="model" :value="model" data-i18n-ignore :label="model" />
+            </ElSelect>
           </label>
         </div>
         <GlossaryLibrarySelect
@@ -112,7 +111,15 @@
           :enabled="config.glossaryEnabled"
           :unsupported="!supportsTranslationGlossary(config.documentService, selectedDocumentModel)"
           :disabled="translating"
-        />
+        >
+          <template #mode-control="{mode, changeMode}">
+            <ElSelect class="document-select"  append-to=".document-app" :model-value="mode" :disabled="translating" :aria-label="t('glossary.mode')" @change="changeMode">
+              <ElOption value="inherit" :label="t('glossary.inherit')" />
+              <ElOption value="none" :label="t('glossary.none')" />
+              <ElOption value="selected" :disabled="!config.glossaryLibraries.length" :label="t('glossary.choose')" />
+            </ElSelect>
+          </template>
+        </GlossaryLibrarySelect>
         <p v-if="credentialWarning" class="notice warning" role="alert">{{ credentialWarning }} <button type="button" @click="openSettings">去配置</button></p>
         <p v-if="settingsChanged" class="notice warning">设置已更改。现有译文仍保留，按新设置翻译会从头开始。</p>
         <p class="setup-privacy">文件在本地解析，文字发送至所选服务。</p>
@@ -163,11 +170,11 @@
             </div>
             <label class="pdf-zoom-control">
               <span>缩放</span>
-              <select v-model.number="pdfZoom" aria-label="PDF 预览缩放">
-                <option :value="1">适合宽度</option>
-                <option :value="1.25">125%</option>
-                <option :value="1.5">150%</option>
-              </select>
+              <ElSelect class="document-select"  append-to=".document-app" v-model="pdfZoom" aria-label="PDF 预览缩放">
+                <ElOption :value="1" :label="translateLegacy('适合宽度')" />
+                <ElOption :value="1.25" label="125%" />
+                <ElOption :value="1.5" label="150%" />
+              </ElSelect>
             </label>
           </div>
 
@@ -359,6 +366,9 @@
 </template>
 
 <script lang="ts" setup>
+
+import {ElOption} from 'element-plus';
+import 'element-plus/es/components/select/style/css';
 import {computed, onMounted, onUnmounted, reactive, ref, watch} from 'vue';
 import DocumentSegmentEditor from './DocumentSegmentEditor.vue';
 import browser from 'webextension-polyfill';
@@ -398,12 +408,12 @@ import {
   subscribeConfig,
   translateDocumentSegments,
   withCustomOpenAIServiceOptions,
-  UiLanguageSelector,
   GlossaryLibrarySelect,
   supportsTranslationGlossary,
   useUiI18n,
   type DocumentRenderMode,
   type ParsedDocument,
+  ElSelect,
 } from '@/src/app/document-translation';
 
 const READER_PAGE_SIZE = 80;

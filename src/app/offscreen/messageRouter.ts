@@ -40,8 +40,10 @@ export interface OffscreenMessageDependencies {
         signal: AbortSignal,
         requestId: string,
     ) => Promise<unknown>;
+    readonly removeOcrLanguages?: (languages: ImageOcrLanguageCode[]) => Promise<void>;
     readonly downloadOcrLanguages: (languages: ImageOcrLanguageCode[]) => Promise<void>;
     readonly videoAi?: {
+        removeModel?(request: Record<string, unknown>): Promise<void>;
         transcribe(request: Record<string, unknown>): Promise<unknown>;
         prepare(request: Record<string, unknown>): Promise<unknown>;
         cancel(streamId: string, reason?: 'cancel' | 'complete'): Promise<void>;
@@ -155,6 +157,7 @@ function respondWith(
 /** 静态路由 Offscreen 消息；未知或非对象消息不会占用其他 runtime listener。 */
 export function createOffscreenMessageListener(dependencies: OffscreenMessageDependencies): OffscreenMessageListener {
     const activeChromeTranslations = new Map<string, AbortController>();
+    let removingOcrModels = false;
     const activeImageOperations = new Map<string, AbortController>();
     const cancelledImageOperations = new Set<string>();
     const cancellationOrder: string[] = [];
@@ -176,6 +179,7 @@ export function createOffscreenMessageListener(dependencies: OffscreenMessageDep
     ): void => {
         let requestId: string;
         try {
+            if (removingOcrModels) throw new Error('正在清除语言包，请稍后重试');
             requestId = message.requestId === undefined
                 ? `legacy-image-${++legacyImageRequestSequence}`
                 : requiredRequestId(message.requestId);
@@ -234,6 +238,12 @@ export function createOffscreenMessageListener(dependencies: OffscreenMessageDep
             case 'VIDEO_AI_TRANSCRIBE':
                 if (!dependencies.videoAi) { sendResponse({success: false, error: '视频 AI 未启用'}); return true; }
                 respondWith(() => dependencies.videoAi!.transcribe(message), sendResponse, (result) => ({success: true, ...resultRecord(result, '视频 AI 转写')}));
+                return true;
+            case 'VIDEO_AI_REMOVE_MODEL':
+                respondWith(async () => {
+                    if (!dependencies.videoAi?.removeModel) throw new Error('模型清除不可用');
+                    await dependencies.videoAi.removeModel(message);
+                }, sendResponse, () => ({success: true}));
                 return true;
             case 'VIDEO_AI_PREPARE':
                 if (!dependencies.videoAi) { sendResponse({success: false, error: '视频 AI 未启用'}); return true; }
@@ -366,6 +376,15 @@ export function createOffscreenMessageListener(dependencies: OffscreenMessageDep
                 }
                 return true;
             }
+            case 'FLUENT_READ_IMAGE_OCR_REMOVE_OFFSCREEN':
+                respondWith(async () => {
+                    if (!dependencies.removeOcrLanguages) throw new Error('语言包清除不可用');
+                    if (activeImageOperations.size || removingOcrModels) throw new Error('图片识别正在运行，请完成后再清除语言包');
+                    removingOcrModels = true;
+                    try { await dependencies.removeOcrLanguages(parseOcrLanguages(message.languages)); }
+                    finally { removingOcrModels = false; }
+                }, sendResponse, () => ({success: true}));
+                return true;
             case 'FLUENT_READ_IMAGE_OCR_DOWNLOAD_OFFSCREEN':
                 respondWith(
                     () => dependencies.downloadOcrLanguages(parseOcrLanguages(message.languages)),

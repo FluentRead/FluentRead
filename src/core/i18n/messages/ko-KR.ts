@@ -5,10 +5,27 @@
  * 主要内容：保持语言名称使用各自原生写法，并为尚未 key 化的旧 UI 提供韩语映射。
  * 模块边界：资源只描述扩展自己的界面文本；不会翻译网页正文、用户输入或翻译结果。
  */
-import type {enUSMessages} from './en-US';
+import type {
+enUSMessages} from './en-US';
 import {legacyTextOverrides} from './legacy-overrides';
 
 export const koKRMessages = {
+    "usage.pageSize": "{size}개",
+    "featureEnable.imageDescription": "웹페이지 이미지 위에 마우스를 올리면 번역 버튼을 표시합니다.",
+
+    "modelCache.downloadSize": "다운로드 약 {size} MB",
+    "modelCache.remove": "모델 삭제",
+    "modelCache.removeNamed": "{name} 삭제",
+    "modelCache.removing": "삭제 중…",
+    "modelCache.removeFailed": "삭제하지 못했습니다. 다시 시도하세요.",
+
+    "featureEnable.on": "켜짐",
+    "featureEnable.off": "꺼짐",
+    "featureEnable.unavailable": "사용 불가",
+    "featureEnable.enable": "지금 켜기",
+    "featureEnable.disable": "끄기",
+    "featureEnable.hint": "관련 설정을 적용하려면 이 기능을 켜세요.",
+
     "learning.memory": "학습 기억",
     "learning.memoryAdd": "기억 추가",
     "learning.memoryCharacters": "{count} / 2000자",
@@ -722,7 +739,7 @@ const koKRLegacyTextBase: Readonly<Record<string, string>> = {
     '选择翻译服务，设置译文显示、网页辅助与界面偏好。': '번역 서비스, 표시, 웹 지원 및 인터페이스를 설정합니다.',
     '选择翻译服务、默认服务、译文显示、双语逐句高亮、网页辅助、AI 精翻、AI 智能上下文、默认目标语言、主题': '번역 서비스, 기본 서비스, 번역 표시, 이중 언어 문장 강조, 웹 지원, AI 컨텍스트, 기본 대상 언어, 테마',
     '选择翻译服务、默认服务、界面设置、弹窗风格、默认风格、简约风格、弹窗栏目、快捷功能栏、当前网站栏目、底部信息栏、译文显示、双语逐句高亮、网页辅助、AI 智能上下文、默认目标语言、主题': '번역 서비스, 기본 서비스, 인터페이스 설정, 팝업 스타일, 기본 스타일, 미니멀 스타일, 팝업 영역, 빠른 기능, 현재 사이트, 하단 정보, 번역 표시, 이중 언어 문장 강조, 웹 지원, AI 컨텍스트, 기본 대상 언어, 테마',
-    '界面布局': '인터페이스 레이아웃',
+    '界面风格': '인터페이스 스타일',
     '界面与弹窗、菜单栏布局': '인터페이스와 팝업, 메뉴 모음 레이아웃',
     '选择喜欢的界面风格，编排菜单栏中的模块和快捷功能。': '원하는 인터페이스 스타일을 선택하고 메뉴 모음의 모듈과 빠른 기능을 배치합니다.',
     '界面设置、界面与弹窗、弹窗风格、默认风格、简约风格、紧凑风格、高对比、奶酪、海盐、抹茶、樱花、夜幕、纸张护眼、Emoji、菜单栏布局、弹窗栏目、快捷功能栏、当前网站栏目、底部信息栏': '인터페이스 설정, 인터페이스와 팝업, 팝업 스타일, 기본, 미니멀, 컴팩트, 고대비, 치즈, 바다 소금, 말차, 벚꽃, 한밤, 편안한 종이, Emoji, 메뉴 모음 레이아웃, 팝업 영역, 빠른 기능, 현재 사이트, 하단 정보',

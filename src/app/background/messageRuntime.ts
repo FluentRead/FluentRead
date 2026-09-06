@@ -120,6 +120,7 @@ export function installBackgroundMessageRuntime(options: BackgroundMessageRuntim
                 getTranslationService: () => config.service,
                 supportsBatchTranslation: supportsTranslationBatch,
                 markLanguagesDownloaded: imageOcrLanguageRepository.markDownloaded,
+                markLanguagesRemoved: imageOcrLanguageRepository.markRemoved,
                 ...imageTranslationProgressTransport,
             }),
         })),

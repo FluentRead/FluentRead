@@ -8,16 +8,16 @@
   <div class="glossary-library-select" data-testid="glossary-library-select">
     <span v-if="showCopy" class="glossary-select-label">{{ t('glossary.title') }}</span>
     <slot name="mode-control" :mode="mode" :change-mode="changeMode">
-      <select
-        :value="mode"
+      <UiSelect
+        :model-value="mode"
         :disabled="disabled"
         :aria-label="t('glossary.mode')"
-        @change="changeMode(($event.target as HTMLSelectElement).value)"
+        @change="changeMode"
       >
-        <option value="inherit">{{ t('glossary.inherit') }}</option>
-        <option value="none">{{ t('glossary.none') }}</option>
-        <option value="selected" :disabled="!libraries.length">{{ t('glossary.choose') }}</option>
-      </select>
+        <ElOption value="inherit" :label="translateControlLabel(t('glossary.inherit'))" />
+        <ElOption value="none" :label="translateControlLabel(t('glossary.none'))" />
+        <ElOption value="selected" :disabled="!libraries.length" :label="translateControlLabel(t('glossary.choose'))" />
+      </UiSelect>
     </slot>
     <fieldset
       v-if="mode === 'selected'"
@@ -38,6 +38,11 @@
 </template>
 
 <script setup lang="ts">
+import UiSelect from '@/src/ui/components/UiSelect.vue';
+import {ElOption} from 'element-plus';
+import {useUiI18n as useControlI18n} from '@/src/ui/i18n';
+const {translateLegacy: translateControlLabel} = useControlI18n();
+
 import {computed} from 'vue';
 import type {GlossaryLibrary} from '@/src/core/glossary';
 import {useUiI18n} from '@/src/ui/i18n';

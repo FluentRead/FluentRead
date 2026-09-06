@@ -43,7 +43,8 @@
             <span :class="['image-ocr-pack-status', {ready: downloadedCodes.includes(pack.code)}]">
               {{ downloadedCodes.includes(pack.code) ? '已下载' : '未下载' }}
             </span>
-            <button type="button" class="image-ocr-download-button"
+            <button v-if="downloadedCodes.includes(pack.code)" type="button" class="image-ocr-download-button" :disabled="removingCodes.includes(pack.code)" :aria-label="t('modelCache.removeNamed', {name: pack.label})" @click="removeLanguage(pack.code)">{{ t(removingCodes.includes(pack.code) ? 'modelCache.removing' : 'modelCache.remove') }}</button>
+            <button v-else type="button" class="image-ocr-download-button"
               :disabled="downloadedCodes.includes(pack.code) || downloadingCodes.includes(pack.code)"
               @click="downloadLanguages([pack.code])">
               {{ downloadedCodes.includes(pack.code) ? '已就绪' : downloadingCodes.includes(pack.code) ? '下载中…' : '下载' }}
@@ -72,7 +73,7 @@ import {
 } from '../ocrLanguages';
 
 const props = withDefaults(defineProps<{idPrefix?: string}>(), {idPrefix: 'image'});
-const {translateLegacy} = useUiI18n();
+const {t, translateLegacy} = useUiI18n();
 const languagePacks = computed(() => IMAGE_OCR_LANGUAGE_PACKS.map(pack => ({
   ...pack,
   label: translateLegacy(pack.label),
@@ -83,6 +84,7 @@ const recommendedCodes = IMAGE_OCR_RECOMMENDED_LANGUAGES;
 const downloadedCodes = ref<ImageOcrLanguageCode[]>([]);
 const downloadingCodes = ref<ImageOcrLanguageCode[]>([]);
 const downloadError = ref('');
+const removingCodes = ref<ImageOcrLanguageCode[]>([]);
 const recommendedReady = computed(() => recommendedCodes.every(code => downloadedCodes.value.includes(code)));
 const recommendedDownloading = computed(() => recommendedCodes.some(code => downloadingCodes.value.includes(code)));
 
@@ -102,6 +104,18 @@ function formatDownloadError(error: unknown): string {
 async function refreshLanguageState() {
   const stored = await configStorage.getItem(`local:${IMAGE_OCR_LANGUAGE_STATE_KEY}`);
   downloadedCodes.value = normalizeImageOcrLanguageCodes(stored);
+}
+
+async function removeLanguage(code: ImageOcrLanguageCode): Promise<void> {
+  if (removingCodes.value.includes(code)) return;
+  removingCodes.value.push(code);
+  downloadError.value = '';
+  try {
+    const response = await browser.runtime.sendMessage({type: 'fluentReadImageOcrRemove', languages: [code]}) as {success?: boolean; error?: string; languages?: unknown} | undefined;
+    if (!response?.success) throw new Error(response?.error || t('modelCache.removeFailed'));
+    downloadedCodes.value = normalizeImageOcrLanguageCodes(response.languages);
+  } catch (error) { downloadError.value = error instanceof Error ? translateLegacy(error.message) : t('modelCache.removeFailed'); }
+  finally { removingCodes.value = removingCodes.value.filter(item => item !== code); }
 }
 
 async function downloadLanguages(languages: ImageOcrLanguageCode[]) {

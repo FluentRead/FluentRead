@@ -14,6 +14,7 @@ import {
     type OcrLine,
 } from '@/src/features/image-translation/core';
 import type { ImageOcrLanguageCode } from '@/src/features/image-translation/ocrLanguages';
+import {removeOcrModelFiles} from './ocrModelCache';
 import { createOcrWorkerRuntime, type OcrWorkerPort } from './ocrWorkerRuntime';
 
 function extensionAsset(path: string): string {
@@ -176,4 +177,10 @@ export async function downloadImageOcrLanguages(
     signal?: AbortSignal,
 ): Promise<void> {
     await ocrWorkerRuntime.ensureLanguages(languages, signal);
+}
+
+export async function removeImageOcrLanguages(languages: ImageOcrLanguageCode[]): Promise<void> {
+    await ocrWorkerRuntime.clearModels(() => removeOcrModelFiles(languages));
+    completedRecognitionCache.clear();
+    cachedRecognitionBytes = 0;
 }

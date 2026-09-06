@@ -69,3 +69,9 @@
 .glossary-dialog-actions { margin-top: 18px; }
 @media (max-width: 800px) { .glossary-workbench { grid-template-columns: minmax(0, 1fr); } .glossary-libraries { max-height: 220px; overflow-y: auto; } .glossary-library-order { flex-direction: row; } }
 @media (max-width: 520px) { .glossary-card { padding: 13px; } .glossary-metadata, .glossary-entry-form, .glossary-preview-context { grid-template-columns: minmax(0, 1fr); } .glossary-entry-toolbar { flex-wrap: wrap; } }
+
+.glossary-select { min-width: 0; width: 100%; }
+.glossary-select :deep(.el-select__wrapper) { min-height: 38px; border: 1px solid var(--line); border-radius: 10px; background: var(--surface); box-shadow: none; }
+.glossary-select :deep(.el-select__wrapper.is-focused) { border-color: var(--brand); box-shadow: 0 0 0 3px var(--brand-soft); }
+.glossary-select :deep(.el-select__selected-item) { color: var(--ink); }
+.glossary-actions .glossary-select { width: 100px; }

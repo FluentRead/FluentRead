@@ -59,6 +59,8 @@
   </section>
 </template>
 <script setup lang="ts">
+import {ElMessageBox} from 'element-plus';
+import 'element-plus/es/components/message-box/style/css';
 import {useUiI18n} from "@/src/ui/i18n"
 const {t, translateLegacy} = useUiI18n()
 import {onBeforeUnmount, onMounted, ref} from 'vue'
@@ -151,7 +153,10 @@ async function removeHistory(id: string) {
   }
 }
 async function clearHistory() {
-  if (historyMutating.value || !window.confirm('清空本机全部阅读记录？删除后无法恢复。')) return
+  if (historyMutating.value) return
+  try { await ElMessageBox.confirm(translateLegacy('清空本机全部阅读记录？删除后无法恢复。'), t('common.confirm'), {type: 'warning', confirmButtonText: t('common.confirm'), cancelButtonText: t('common.cancel')}) }
+  catch { return }
+  if (historyMutating.value) return
   historyMutating.value = true
   historyError.value = ''
   historyGeneration += 1

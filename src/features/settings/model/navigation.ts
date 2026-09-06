@@ -34,9 +34,9 @@ export const navigationGroups = [
         searchDescription: '选择翻译服务、默认服务、译文显示、双语逐句高亮、网页辅助、AI 精翻、AI 智能上下文、默认目标语言、主题',
       },
       {
-        id: 'settings-interface', icon: '▦', label: '界面布局', description: '界面与弹窗、动画与加载、菜单栏布局', group: '基础配置',
-        heading: '界面布局', summary: '选择喜欢的界面风格，调整动画加载效果，并编排菜单栏中的模块和快捷功能。',
-        kicker: '基础配置', title: '界面布局', detail: '选择喜欢的界面风格，调整动画加载效果，并编排菜单栏中的模块和快捷功能。',
+        id: 'settings-interface', icon: '▦', label: '界面风格', description: '界面与弹窗、动画与加载、菜单栏布局', group: '基础配置',
+        heading: '界面风格', summary: '选择喜欢的界面风格，调整动画加载效果，并编排菜单栏中的模块和快捷功能。',
+        kicker: '基础配置', title: '界面风格', detail: '选择喜欢的界面风格，调整动画加载效果，并编排菜单栏中的模块和快捷功能。',
         searchDescription: '界面设置、界面与弹窗、动画与加载效果、界面动画、翻译加载样式、简洁、柔和圆环、跳跃圆点、行星轨道、星光、涟漪扩散、起伏波形、光线扫过、流沙沙漏、小彗星、翻转方块、弹跳小球、打字光标、扫描线、信号柱、弹窗风格、默认风格、简约风格、紧凑风格、高对比、奶酪、海盐、抹茶、樱花、夜幕、纸张护眼、Emoji、菜单栏布局、弹窗栏目、快捷功能栏、当前网站栏目、底部信息栏',
       },
       {
@@ -170,14 +170,19 @@ export function resolveRequestedSection(hash: string): string {
     : DEFAULT_NAVIGATION_SECTION
 }
 
-/** 搜索设置标题、分组说明和帮助文案；空查询不展示结果面板。 */
-export function filterNavigationItems(query: string): NavigationItem[] {
+/** 界面语言恢复词独立于当前界面语言，用户选错语言后仍能搜索回设置。 */
+const UI_LANGUAGE_SEARCH_ALIASES = ['language', 'languages', 'ui language', 'app language', 'interface language', '语言', '語言', '软件语言', '界面语言', '言語', 'げんご', '언어', 'langue', 'idioma', 'язык', 'sprache', 'língua', 'lingua', 'لغة', 'भाषा', 'bahasa', 'ngôn ngữ', 'ภาษา']
+export function isUiLanguageSearch(query: string): boolean {
+  const keyword = query.trim().normalize('NFKC').toLocaleLowerCase()
+  return Boolean(keyword) && UI_LANGUAGE_SEARCH_ALIASES.some(alias => alias.includes(keyword))
+}
+
+/** 搜索标题和说明，同时保持界面语言恢复入口跨语言可发现。 */
+export function filterNavigationItems(query: string, items: readonly NavigationItem[] = navigationItems): NavigationItem[] {
   const keyword = query.trim().toLocaleLowerCase()
   if (!keyword) return []
-
-  return navigationItems.filter((item) =>
-    `${item.label}${item.description}${item.heading}${item.summary}${item.searchDescription}`
-      .toLocaleLowerCase()
-      .includes(keyword),
-  )
+  const languageSearch = isUiLanguageSearch(query)
+  return items.filter(item => (languageSearch && item.id === 'settings-general') ||
+    `${item.label}${item.description}${item.heading}${item.summary}${item.searchDescription}`.toLocaleLowerCase().includes(keyword))
+    .sort((left, right) => languageSearch ? Number(right.id === 'settings-general') - Number(left.id === 'settings-general') : 0)
 }

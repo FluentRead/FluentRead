@@ -35,6 +35,9 @@ function componentMocks(): Plugin {
     name: 'vocabulary-lifecycle-test-mocks',
     enforce: 'pre',
     resolveId(id) {
+      if (id === 'element-plus') return '\0vocabulary-element-mock';
+      if (id.includes('element-plus/') && id.includes('/style')) return '\0vocabulary-style-mock';
+      if (id.endsWith('/UiSelect.vue')) return '\0vocabulary-select-mock';
       if (id === 'webextension-polyfill') return '\0vocabulary-browser-mock';
       if (
         id === '@/src/services/config/store'
@@ -46,6 +49,9 @@ function componentMocks(): Plugin {
       return null;
     },
     load(id) {
+      if (id === '\0vocabulary-element-mock') return 'export const ElMessageBox = {confirm:async()=>{}}; export const ElOption = {render(){return null}};';
+      if (id === '\0vocabulary-style-mock') return 'export {};';
+      if (id === '\0vocabulary-select-mock') return 'export default {render() {return null}};';
       if (id === '\0vocabulary-browser-mock') {
         return `export default globalThis.${TEST_STATE_KEY}.browser;`;
       }
@@ -152,7 +158,7 @@ describe('VocabularyBook mounted lifecycle', () => {
       resolve: { alias: { '@': resolve(process.cwd(), '.') } },
       root: process.cwd(),
       server: { hmr: false, middlewareMode: true },
-      ssr: { noExternal: ['webextension-polyfill'] },
+      ssr: { noExternal: ['webextension-polyfill', 'element-plus'] },
     });
 
     try {

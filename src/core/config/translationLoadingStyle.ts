@@ -7,18 +7,18 @@
 
 export const translationLoadingStyleOptions = [
   {
-    value: 'minimal',
-    label: '简洁',
-    description: '低存在感的轻柔呼吸点，适合长时间阅读。',
-    labelKey: 'settings.advanced.translationLoadingStyle.minimal.label',
-    descriptionKey: 'settings.advanced.translationLoadingStyle.minimal.description',
-  },
-  {
     value: 'ring',
     label: '柔和圆环',
     description: '保留熟悉的旋转反馈，颜色和尺寸更克制。',
     labelKey: 'settings.advanced.translationLoadingStyle.ring.label',
     descriptionKey: 'settings.advanced.translationLoadingStyle.ring.description',
+  },
+  {
+    value: 'minimal',
+    label: '简洁',
+    description: '低存在感的轻柔呼吸点，适合长时间阅读。',
+    labelKey: 'settings.advanced.translationLoadingStyle.minimal.label',
+    descriptionKey: 'settings.advanced.translationLoadingStyle.minimal.description',
   },
   {
     value: 'dots',

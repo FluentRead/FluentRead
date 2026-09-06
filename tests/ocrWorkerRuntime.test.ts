@@ -371,3 +371,16 @@ describe('OCR worker runtime', () => {
         expect(worker.terminate).not.toHaveBeenCalled();
     });
 });
+
+it('模型清除等待识别结束、释放 Worker，失败后仍可重新创建', async () => {
+ const worker=createWorker('eng'); const pending=deferred<RecognitionResult>();
+ vi.mocked(worker.recognize).mockReturnValueOnce(pending.promise);
+ const factory=vi.fn(async()=>worker); const runtime=createOcrWorkerRuntime({createWorker:factory,sparseTextMode:11});
+ const active=runtime.recognize('active','eng'); await vi.waitFor(()=>expect(worker.recognize).toHaveBeenCalled());
+ const remove=vi.fn(async()=>{}); const clearing=runtime.clearModels(remove);
+ expect(remove).not.toHaveBeenCalled(); pending.resolve({worker:'eng',image:'active'}); await active; await clearing;
+ expect(worker.terminate).toHaveBeenCalledOnce(); expect(remove).toHaveBeenCalledOnce();
+ await runtime.clearModels(remove); await runtime.recognize('again','eng'); expect(factory).toHaveBeenCalledTimes(2);
+ await expect(runtime.clearModels(async()=>{throw new Error('disk')})).rejects.toThrow('disk');
+ await runtime.recognize('recover','eng'); expect(factory).toHaveBeenCalledTimes(3);
+});

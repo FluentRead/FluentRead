@@ -326,32 +326,32 @@
           <div class="usage-request-filters" aria-label="请求记录筛选">
             <label>
               <span>场景</span>
-              <select :disabled="loading || requestLogLoading" v-model="requestPurpose" aria-label="按调用场景筛选请求记录">
-                <option value="">全部场景</option>
-                <option value="translation">翻译</option>
-                <option value="page-summary">页面摘要</option>
-                <option value="connection-test">连接测试</option>
-                <option value="reading">阅读理解</option>
-              </select>
+              <UiSelect :disabled="loading || requestLogLoading" v-model="requestPurpose" aria-label="按调用场景筛选请求记录">
+                <ElOption value="" :label="translateLegacy('全部场景')" />
+                <ElOption value="translation" :label="translateLegacy('翻译')" />
+                <ElOption value="page-summary" :label="translateLegacy('页面摘要')" />
+                <ElOption value="connection-test" :label="translateLegacy('连接测试')" />
+                <ElOption value="reading" :label="translateLegacy('阅读理解')" />
+              </UiSelect>
             </label>
             <label>
               <span>状态</span>
-              <select :disabled="loading || requestLogLoading" v-model="requestOutcome" aria-label="按调用状态筛选请求记录">
-                <option value="">全部状态</option>
-                <option value="success">成功</option>
-                <option value="error">错误</option>
-                <option value="timeout">超时</option>
-                <option value="cancelled">已取消</option>
-              </select>
+              <UiSelect :disabled="loading || requestLogLoading" v-model="requestOutcome" aria-label="按调用状态筛选请求记录">
+                <ElOption value="" :label="translateLegacy('全部状态')" />
+                <ElOption value="success" :label="translateLegacy('成功')" />
+                <ElOption value="error" :label="translateLegacy('错误')" />
+                <ElOption value="timeout" :label="translateLegacy('超时')" />
+                <ElOption value="cancelled" :label="translateLegacy('已取消')" />
+              </UiSelect>
             </label>
             <label>
               <span>缓存</span>
-              <select :disabled="loading || requestLogLoading" v-model="requestCacheStatus" aria-label="按模型缓存状态筛选请求记录">
-                <option value="">全部缓存状态</option>
-                <option value="hit">已命中</option>
-                <option value="miss">未命中</option>
-                <option value="unreported">未上报</option>
-              </select>
+              <UiSelect :disabled="loading || requestLogLoading" v-model="requestCacheStatus" aria-label="按模型缓存状态筛选请求记录">
+                <ElOption value="" :label="translateLegacy('全部缓存状态')" />
+                <ElOption value="hit" :label="translateLegacy('已命中')" />
+                <ElOption value="miss" :label="translateLegacy('未命中')" />
+                <ElOption value="unreported" :label="translateLegacy('未上报')" />
+              </UiSelect>
             </label>
           </div>
         </header>
@@ -432,9 +432,9 @@
         <footer v-if="requestLogTotalCount" class="usage-request-log-footer" aria-live="polite">
           <label class="usage-page-size">
             <span>每页</span>
-            <select :disabled="loading || requestLogLoading" v-model.number="requestPageSize" aria-label="每页请求记录数量">
-              <option v-for="size in requestPageSizeOptions" :key="size" :value="size">{{ size }} 条</option>
-            </select>
+            <UiSelect :disabled="loading || requestLogLoading" v-model="requestPageSize" aria-label="每页请求记录数量">
+              <ElOption v-for="size in requestPageSizeOptions" :key="size" :value="size" :label="t('usage.pageSize', {size})" />
+            </UiSelect>
           </label>
           <nav class="usage-request-pagination" aria-label="请求记录分页">
             <button type="button" :disabled="loading || requestLogLoading || requestPageIndex === 0" @click="loadRequestPage(requestPageIndex - 1)">上一页</button>
@@ -474,6 +474,9 @@
 </template>
 
 <script setup lang="ts">
+import UiSelect from '@/src/ui/components/UiSelect.vue';
+import {ElOption} from 'element-plus';
+
 import {computed, nextTick, onBeforeUnmount, onMounted, ref, watch} from 'vue'
 import browser from 'webextension-polyfill'
 import {options} from '@/src/core/config/catalog'

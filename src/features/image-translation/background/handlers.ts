@@ -59,7 +59,7 @@ export interface ImageTranslateTextsMessage {
 }
 
 export interface ImageOcrDownloadMessage {
-    type: typeof IMAGE_OCR_DOWNLOAD_MESSAGE_TYPE;
+    type: typeof IMAGE_OCR_DOWNLOAD_MESSAGE_TYPE | 'fluentReadImageOcrRemove';
     languages?: unknown;
 }
 
@@ -114,6 +114,8 @@ export interface ImageTranslationBackgroundDependencies {
     readonly getTranslationService: () => string;
     readonly supportsBatchTranslation: (service: string) => boolean;
     readonly translateTexts: (request: ImageTextTranslationRequest) => Promise<string | string[]>;
+    readonly removeLanguages?: (languages: ImageOcrLanguageCode[]) => Promise<void>;
+    readonly markLanguagesRemoved?: (languages: ImageOcrLanguageCode[]) => Promise<ImageOcrLanguageCode[]>;
     readonly downloadLanguages: (languages: ImageOcrLanguageCode[]) => Promise<void>;
     readonly markLanguagesDownloaded: (languages: ImageOcrLanguageCode[]) => Promise<ImageOcrLanguageCode[]>;
     readonly now?: () => number;
@@ -379,6 +381,12 @@ export function createImageTranslationBackgroundHandlers(
     const textOperationRegistry = createImageOperationRegistry('image-text');
     const progressOwners = new Map<string, {context: ImageProgressContext}>();
 
+    let modelMutationTail: Promise<unknown> = Promise.resolve();
+    const mutateModels = <T>(operation: () => Promise<T>): Promise<T> => {
+        const result = modelMutationTail.then(operation, operation);
+        modelMutationTail = result.then(() => undefined, () => undefined);
+        return result;
+    };
     return [
         {
             type: IMAGE_PROGRESS_MESSAGE_TYPE,
@@ -462,12 +470,25 @@ export function createImageTranslationBackgroundHandlers(
             },
         },
         {
+            type: 'fluentReadImageOcrRemove',
+            async handle(message: ImageOcrDownloadMessage) {
+                const languages = parseOcrLanguages(message.languages);
+                if (!dependencies.removeLanguages || !dependencies.markLanguagesRemoved) throw new Error('语言包清除不可用');
+                return mutateModels(async () => {
+                    await dependencies.removeLanguages!(languages);
+                    return {success: true, languages: await dependencies.markLanguagesRemoved!(languages)};
+                });
+            },
+        },
+        {
             type: IMAGE_OCR_DOWNLOAD_MESSAGE_TYPE,
             async handle(message: ImageOcrDownloadMessage) {
                 const languages = parseOcrLanguages(message.languages);
-                await dependencies.downloadLanguages(languages);
-                const downloaded = await dependencies.markLanguagesDownloaded(languages);
-                return {success: true, languages: downloaded};
+                return mutateModels(async () => {
+                    await dependencies.downloadLanguages(languages);
+                    const downloaded = await dependencies.markLanguagesDownloaded(languages);
+                    return {success: true, languages: downloaded};
+                });
             },
         },
     ];

@@ -77,13 +77,15 @@ async function settle(): Promise<void> {for (let index = 0; index < 8; index++) 
 function mocks(): Plugin {
   return {name: 'glossary-settings-mocks', enforce: 'pre', resolveId(id) {
     if (id === 'webextension-polyfill') return '\0glossary-browser';
+    if (id.endsWith('/UiSelect.vue')) return '\0glossary-select';
     if (id === 'element-plus') return '\0glossary-element';
     if (/\/src\/services\/config\/store(?:\.ts)?$/u.test(id)) return '\0glossary-config';
     if (/\/src\/ui\/i18n(?:\.ts)?$/u.test(id)) return '\0glossary-i18n';
     return null;
   }, load(id) {
+    if (id === '\0glossary-select') return `import {h} from 'vue'; export default {setup: (_, {slots}) => () => h('select', {}, slots.default?.())};`;
     if (id === '\0glossary-browser') return 'export default {runtime: {sendMessage: async () => undefined}}';
-    if (id === '\0glossary-element') return `export const ElMessageBox = {confirm: globalThis.${stateKey}.confirm};`;
+    if (id === '\0glossary-element') return `import {h} from 'vue'; export const ElSelect = {setup: (_, {slots}) => () => h('select', {}, slots.default?.())}; export const ElOption = {props: ['value', 'label'], setup: props => () => h('option', {value: props.value}, props.label)}; export const ElMessageBox = {confirm: globalThis.${stateKey}.confirm};`;
     if (id === '\0glossary-config') return `const s = globalThis.${stateKey}; export const config = s.config; export const configReady = s.configReady; export const requestConfigPatch = s.requestConfigPatch; export const subscribeConfig = s.subscribeConfig;`;
     if (id === '\0glossary-i18n') return `import {ref} from 'vue'; export const useUiI18n = () => ({language: ref('zh-CN'), t: globalThis.${stateKey}.translate, translateLegacy: text => text});`;
     return null;
@@ -225,7 +227,7 @@ describe('GlossarySettings compiled component', () => {
 
   it('persists master and library enablement and updates an entry without creating a duplicate', async () => {
     await state.persist({glossaryLibraries: [fixture()]});
-    state.setEnabled({target: {checked: true}}); await settle();
+    state.setEnabled(true); await settle();
     expect(config.glossaryEnabled).toBe(true); expect(state.enabled).toBe(true);
     state.previewText = 'token';
     await state.patchLibrary({enabled: false}); expect(state.preview.terms).toEqual([]);
@@ -447,9 +449,9 @@ describe('GlossarySettings compiled component', () => {
 });
 
 describe('Glossary integration and user-content boundaries', () => {
-  it('gives every native select and pagination control an exact accessible name', () => {
+  it('gives every branded select and pagination control an exact accessible name', () => {
     const component = readFileSync(resolve(process.cwd(), 'src/features/glossary/ui/GlossarySettings.vue'), 'utf8');
-    const selects = component.match(/<select\b[^>]*>/gu) || [];
+    const selects = component.match(/<ElSelect\b[^>]*>/gu) || [];
     expect(selects).toHaveLength(6);
     for (const select of selects) expect(select).toContain(':aria-label="t(\'glossary.');
     expect(selects.filter(select => select.includes("t('glossary.sourceLanguage')"))).toHaveLength(2);
@@ -489,13 +491,13 @@ describe('Glossary integration and user-content boundaries', () => {
     expect(summary.profileSummaryDetail({...profile, glossaryIds: ['技术', 'missing']})).toContain('术语库: 技术新版, missing');
   });
 
-  it('reuses the native three-state selector across profiles, documents, and subtitle settings', () => {
+  it('reuses the branded three-state selector across profiles, documents, and subtitle settings', () => {
     const source = (path: string) => readFileSync(resolve(process.cwd(), path), 'utf8');
     for (const path of ['src/features/settings/ui/QuickTranslationProfiles.vue', 'src/app/document-translation/DocumentApp.vue', 'src/features/settings/ui/SettingsSections.vue']) {
       expect(source(path)).toContain('GlossaryLibrarySelect');
     }
     const selector = source('src/ui/components/GlossaryLibrarySelect.vue');
-    expect(selector).toContain('<select'); expect(selector).toContain('type="checkbox"');
+    expect(selector).toContain('<UiSelect'); expect(selector).toContain('type="checkbox"');
     for (const mode of ['inherit', 'none', 'selected']) expect(selector).toContain(`value="${mode}"`);
     expect(selector).not.toContain('<el-select');
     expect(source('src/features/glossary/ui/GlossarySettings.vue')).toContain('data-i18n-ignore');

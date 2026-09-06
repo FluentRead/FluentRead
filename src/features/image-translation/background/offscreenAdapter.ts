@@ -117,6 +117,10 @@ export function createImageTranslationOffscreenAdapter(client: OffscreenClient =
             return parseImageDataResult(response, '远程图片读取失败');
         },
 
+        async removeLanguages(languages: ImageOcrLanguageCode[]): Promise<void> {
+            const response = await client.send<OffscreenResponse>({type: 'FLUENT_READ_IMAGE_OCR_REMOVE_OFFSCREEN', languages});
+            if (!response?.success) throw new Error(errorMessage(response, '图片 OCR 语言包清除失败'));
+        },
         async downloadLanguages(languages: ImageOcrLanguageCode[]): Promise<void> {
             const response = await client.send<OffscreenResponse>({
                 type: 'FLUENT_READ_IMAGE_OCR_DOWNLOAD_OFFSCREEN',

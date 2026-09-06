@@ -22,6 +22,7 @@ export type OcrWorkerRuntimeDependencies<TResult> = {
 
 export type OcrWorkerRuntime<TResult> = {
     recognize: (image: string, languages: string, signal?: AbortSignal, pageSegmentationMode?: string | number) => Promise<TResult>;
+    clearModels: (remove: () => Promise<void>) => Promise<void>;
     ensureLanguages: (languages: string[], signal?: AbortSignal) => Promise<void>;
 };
 
@@ -133,6 +134,17 @@ export function createOcrWorkerRuntime<TResult>(
     }
 
     return {
+        clearModels(remove) {
+            return runExclusive(async () => {
+                const current = workerPromise;
+                workerPromise = null;
+                workerLanguages = '';
+                configuredWorker = null;
+                workerOwnershipGeneration += 1;
+                await current?.then(worker => worker.terminate());
+                await remove();
+            });
+        },
         recognize(image, languages, signal, pageSegmentationMode = dependencies.sparseTextMode) {
             return runExclusive(async () => {
                 if (signal?.aborted) throw createOcrAbortError();

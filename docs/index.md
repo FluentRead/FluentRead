@@ -1,7 +1,7 @@
 ---
 layout: home
 markdownStyles: false
-title: 开源双语阅读与翻译
+title: 开源浏览器双语翻译插件
 ---
 
 <ProductHome />

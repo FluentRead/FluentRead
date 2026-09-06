@@ -131,7 +131,7 @@ export function installBackgroundMessageRuntime(options: BackgroundMessageRuntim
             synthesize: synthesizeEdgeTts,
             playWithOffscreen: selectionTtsTransport.play,
             stopWithOffscreen: selectionTtsTransport.stop,
-            offscreenPlaybackEnabled: capabilities.selectionTtsOffscreen,
+            offscreenPlaybackEnabled: capabilities.selectionTtsExtensionPlayback,
             sendTabMessage: (tabId, message) => browser.tabs.sendMessage(tabId, message),
             warn: (message, error) => console.warn(message, error),
         }),

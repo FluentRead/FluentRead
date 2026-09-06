@@ -42,7 +42,7 @@ describe('content feature registry', () => {
         const mount = vi.fn();
         const feature = {id: 'area', requiredCapability: 'areaTranslation' as const, isEnabled, mount};
         const firefox = createContentFeatureRegistry([feature], {
-            capabilities: resolveBrowserCapabilities({browser: 'firefox', manifestVersion: 2}),
+            capabilities: resolveBrowserCapabilities({browser: 'firefox', manifestVersion: 3}),
         });
         await expect(firefox.mountEnabled(runtime())).resolves.toEqual([{id: 'area', status: 'skipped'}]);
         expect(isEnabled).not.toHaveBeenCalled();

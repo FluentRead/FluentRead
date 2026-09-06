@@ -1,6 +1,6 @@
 /**
  * @file src/app/offscreen/messageRouter.ts
- * 文件职责：解析并分派发送到 Offscreen Document 的可信运行时消息，为 Chrome 翻译、TTS、远程图片读取、OCR、整图和区域翻译提供统一响应纪律。
+ * 文件职责：解析并分派发送到扩展自有 DOM 页面的可信运行时消息，为 Chrome 翻译、TTS、远程图片读取、OCR、整图和区域翻译提供统一响应纪律。
  * 主要内容：提供 ready 握手，校验文本、语言码、图片与 OCR 请求并分派依赖；验证响应形状，保留 Chrome 待准备语言对和模型不可用错误码，并保持取消及异步 listener 语义。
  * 模块边界：路由器不创建 Audio/Worker、不调用 browser.offscreen，也不实现翻译算法；资源实例由 offscreen runtime 构造，具体能力来自 translation、ttsPlayback 和 feature services。
  */

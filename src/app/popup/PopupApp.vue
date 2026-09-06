@@ -33,6 +33,7 @@
         <img src="/icon/128.png" alt="" />
         <div>
           <strong>流畅阅读</strong>
+          <small data-i18n-ignore>v{{ version }}</small>
         </div>
       </div>
       <div class="header-actions">
@@ -529,7 +530,7 @@
             <ElOption v-for="item in videoServiceOptions" :key="item.value" :value="item.value" :label="translateControlLabel(item.label)" />
           </UiSelect>
         </label>
-        <div v-if="browserCapabilities.offscreenDocument" class="x-video-ai-group">
+        <div v-if="browserCapabilities.extensionDom" class="x-video-ai-group">
           <div class="x-video-ai-group-heading">
             <strong>X 视频 · 本地 AI</strong>
             <small>无原生字幕时使用浏览器本地识别</small>
@@ -673,6 +674,7 @@ interface PopupQuickFeatureViewModel {
 }
 const CustomHotkeyInput = defineAsyncComponent(() => import('@/src/ui/components/CustomHotkeyInput.vue'));
 const {language, t, translateLegacy} = useUiI18n();
+const version = process.env.VUE_APP_VERSION;
 // composition root 已等待配置服务；首次渲染直接使用完整快照，不能先暴露默认布局。
 const config = ref(normalizeConfig(runtimeConfig));
 const onboardingLanguage = ref<UiLanguage>('zh-CN');

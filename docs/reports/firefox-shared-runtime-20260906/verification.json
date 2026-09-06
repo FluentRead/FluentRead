@@ -1,0 +1,329 @@
+{
+  "functional": {
+    "scope": "Firefox production artifact; real OCR/canvas; deterministic Google translation response; shared message and cancellation paths",
+    "image": {
+      "success": true,
+      "lines": [
+        {
+          "text": "你好，世界",
+          "bbox": {
+            "x0": 44,
+            "y0": 60,
+            "x1": 274,
+            "y1": 96
+          },
+          "backgroundColor": "rgb(255,255,255)"
+        }
+      ],
+      "imageLength": 7506
+    },
+    "area": {
+      "success": true,
+      "lines": [
+        {
+          "text": "Hello world",
+          "bbox": {
+            "x0": 43,
+            "y0": 60,
+            "x1": 274,
+            "y1": 96
+          }
+        }
+      ],
+      "sourceText": "Hello world",
+      "translatedText": "你好，世界",
+      "mode": "standard",
+      "service": "google",
+      "serviceName": "谷歌翻译",
+      "model": "",
+      "warnings": [
+        "standard-quality"
+      ],
+      "imageLength": 7030
+    },
+    "cancel": {
+      "success": true,
+      "cancelled": true,
+      "requestId": "ff-cancel-real"
+    },
+    "cancelResult": {
+      "value": {
+        "success": false,
+        "error": "图片 OCR 请求已取消"
+      }
+    },
+    "recovery": {
+      "result": {
+        "success": true,
+        "lines": [
+          {
+            "text": "Hello world",
+            "bbox": {
+              "x0": 44,
+              "y0": 60,
+              "x1": 274,
+              "y1": 96
+            }
+          }
+        ]
+      },
+      "frameCount": 1,
+      "replaced": true
+    },
+    "status": "passed"
+  },
+  "capture": {
+    "scope": "native Firefox tabs.captureVisibleTab called from a content script in the active fixture tab; shared crop/OCR and deterministic Google translation; excludes trusted drag gesture",
+    "capture": {
+      "success": true,
+      "imageLength": 53866
+    },
+    "translation": {
+      "success": true,
+      "lines": [
+        {
+          "text": "Hello world",
+          "bbox": {
+            "x0": 87,
+            "y0": 120,
+            "x1": 549,
+            "y1": 192
+          }
+        }
+      ],
+      "sourceText": "Hello world",
+      "translatedText": "你好，世界",
+      "mode": "standard",
+      "service": "google",
+      "serviceName": "谷歌翻译",
+      "model": "",
+      "warnings": [
+        "standard-quality"
+      ],
+      "imageLength": 27874,
+      "viewport": {
+        "width": 1280,
+        "height": 816
+      }
+    },
+    "status": "passed"
+  },
+  "audio": {
+    "scope": "real shared Audio/Blob player; silent WAV at volume 1 and unmuted; Firefox default autoplay preference; native background messaging; excludes external voice synthesis",
+    "play": {
+      "success": true
+    },
+    "audio": {
+      "volume": 1,
+      "muted": false,
+      "paused": false,
+      "duration": 2
+    },
+    "ended": {
+      "type": "selectionTtsPlaybackState",
+      "tabId": 1,
+      "clientRequestId": "ff-silent-audio",
+      "state": "ended"
+    },
+    "playAgain": {
+      "success": true
+    },
+    "stop": {
+      "success": true
+    },
+    "stopped": {
+      "paused": true,
+      "src": null
+    },
+    "status": "passed"
+  },
+  "video": {
+    "scope": "Firefox production shared runtime; real Whisper Tiny model and WASM Worker; local synthesized speech fixture; excludes X page audio capture",
+    "prepare": {
+      "success": true,
+      "model": "tiny",
+      "dtype": "q4",
+      "models": [
+        "tiny"
+      ]
+    },
+    "started": 1788701719690,
+    "transcription": {
+      "success": true,
+      "text": "Hello world, this is a Firefox translation test.",
+      "segments": [
+        {
+          "startMs": 0,
+          "endMs": 3360,
+          "text": "Hello world, this is a Firefox translation test."
+        }
+      ],
+      "model": "tiny",
+      "backend": "wasm",
+      "decodeMs": 3,
+      "inferenceMs": 1463,
+      "audioDurationMs": 3375.25,
+      "threads": 1,
+      "dtype": "q4"
+    },
+    "elapsedMs": 2611,
+    "cancel": {
+      "success": true
+    },
+    "status": "passed"
+  },
+  "firefox": {
+    "version": "155.0b5",
+    "manifestVersion": 2,
+    "autoplayPreference": "Firefox default; no override",
+    "launchMode": "macos-background-firefox-rdp",
+    "focusPolicy": "launchservices-no-foreground",
+    "bounds": {
+      "left": 212,
+      "top": -990,
+      "width": 1280,
+      "height": 900
+    },
+    "focusChecks": 138,
+    "focusViolation": false,
+    "profileRemoved": true,
+    "ownedFirefoxStopped": true
+  },
+  "chromium": {
+    "scope": "real Tesseract OCR + deterministic Google transport + production extension",
+    "cases": [
+      "missing languages exposes preparation action",
+      "real language download, OCR, translation and replacement",
+      "restore and redisplay reuse result without requests or source mutation",
+      "scroll retains same decoded bitmap",
+      "DOM geometry matches source: contain-padding-border",
+      "DOM geometry matches source: cover-padding-border",
+      "DOM geometry matches source: none-padding-border",
+      "DOM geometry matches source: ancestor-clipping",
+      "DOM geometry matches source: ancestor-scroll-clipping",
+      "dynamic source change removes old translation",
+      "cancel never installs a late result",
+      "retry works after cancellation",
+      "transparent PNG hides original letters while translated bitmap remains visible",
+      "restoring transparent source releases only the extension opacity lease",
+      "host opacity change removes old replacement and preserves the host value",
+      "image removal cleans overlay"
+    ],
+    "success": true,
+    "profileRemoved": true,
+    "launchMode": "macos-background-cdp",
+    "focusPolicy": "launchservices-no-foreground",
+    "windowPlacement": {
+      "mode": "background-visible-no-focus",
+      "visible": true,
+      "hidden": false,
+      "centered": true,
+      "windowState": "normal",
+      "bounds": {
+        "left": 212,
+        "top": -990,
+        "width": 1280,
+        "height": 900
+      },
+      "displayTarget": "secondary",
+      "source": "macos-nsscreen",
+      "screenIndex": 1,
+      "browserFrontmost": false,
+      "frontmostBefore": {
+        "pid": 2127,
+        "name": "Google Chrome"
+      },
+      "frontmostAfter": {
+        "pid": 2127,
+        "name": "Google Chrome"
+      }
+    }
+  },
+  "buildSha256": {
+    ".output/chrome-mv3/chunks/offscreen-CccO2YBY.js": "c4c4a8cd4a12c30f9eb5a6992361f1671d1fb66373e3ef0e19c6a0ea8f249831",
+    ".output/chrome-mv3/videoTranscriptionWorker.js": "a32d8206d2064e9b035f06ce59495a501e010ffbe85768ea68572dffcdc0639b",
+    ".output/firefox-mv2/chunks/offscreen-CccO2YBY.js": "c4c4a8cd4a12c30f9eb5a6992361f1671d1fb66373e3ef0e19c6a0ea8f249831",
+    ".output/firefox-mv2/videoTranscriptionWorker.js": "a32d8206d2064e9b035f06ce59495a501e010ffbe85768ea68572dffcdc0639b"
+  },
+  "mergeValidation": {
+    "base": "0c7c5db894407e744ea48eac5fed85c14816b223",
+    "testedProductionCommit": "4cb26a7588948c14d827d30d4930e9553bb06bcb",
+    "strictCoverage": {
+      "files": 224,
+      "tests": 4318,
+      "statements": 100,
+      "branches": 100,
+      "functions": 100,
+      "lines": 100
+    },
+    "allTests": {
+      "files": 274,
+      "tests": 5270,
+      "failed": 0
+    },
+    "checks": [
+      "audit",
+      "compile",
+      "chrome-build",
+      "firefox-build",
+      "manifest",
+      "userscript-build-and-verifier"
+    ],
+    "chromium": {
+      "scope": "real Tesseract OCR + deterministic Google transport + production extension",
+      "cases": [
+        "missing languages exposes preparation action",
+        "real language download, OCR, translation and replacement",
+        "restore and redisplay reuse result without requests or source mutation",
+        "scroll retains same decoded bitmap",
+        "DOM geometry matches source: contain-padding-border",
+        "DOM geometry matches source: cover-padding-border",
+        "DOM geometry matches source: none-padding-border",
+        "DOM geometry matches source: ancestor-clipping",
+        "DOM geometry matches source: ancestor-scroll-clipping",
+        "dynamic source change removes old translation",
+        "cancel never installs a late result",
+        "retry works after cancellation",
+        "transparent PNG hides original letters while translated bitmap remains visible",
+        "restoring transparent source releases only the extension opacity lease",
+        "host opacity change removes old replacement and preserves the host value",
+        "image removal cleans overlay"
+      ],
+      "success": true,
+      "profileRemoved": true,
+      "launchMode": "macos-background-cdp",
+      "focusPolicy": "launchservices-no-foreground",
+      "windowPlacement": {
+        "mode": "background-visible-no-focus",
+        "visible": true,
+        "hidden": false,
+        "centered": true,
+        "windowState": "normal",
+        "bounds": {
+          "left": 212,
+          "top": -990,
+          "width": 1280,
+          "height": 900
+        },
+        "displayTarget": "secondary",
+        "source": "macos-nsscreen",
+        "screenIndex": 1,
+        "browserFrontmost": false,
+        "frontmostBefore": {
+          "pid": 2127,
+          "name": "Google Chrome"
+        },
+        "frontmostAfter": {
+          "pid": 2127,
+          "name": "Google Chrome"
+        }
+      }
+    },
+    "buildSha256": {
+      ".output/chrome-mv3/chunks/offscreen-CccO2YBY.js": "c4c4a8cd4a12c30f9eb5a6992361f1671d1fb66373e3ef0e19c6a0ea8f249831",
+      ".output/chrome-mv3/videoTranscriptionWorker.js": "a32d8206d2064e9b035f06ce59495a501e010ffbe85768ea68572dffcdc0639b",
+      ".output/firefox-mv2/chunks/offscreen-CccO2YBY.js": "c4c4a8cd4a12c30f9eb5a6992361f1671d1fb66373e3ef0e19c6a0ea8f249831",
+      ".output/firefox-mv2/videoTranscriptionWorker.js": "a32d8206d2064e9b035f06ce59495a501e010ffbe85768ea68572dffcdc0639b"
+    }
+  }
+}

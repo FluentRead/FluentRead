@@ -1078,7 +1078,7 @@ export function mountVideoSubtitleTranslation(): () => void {
     refreshVideoUiText(menu, language);
     refreshVideoUiAccessibility(menu, button, document, language, status);
     renderVideoAiMenu(menu, {
-      available: isXVideoPage() && browserCapabilities.offscreenDocument,
+      available: isXVideoPage() && browserCapabilities.extensionDom,
       checking: aiModelChecking,
       active: isAiCaptureActive(), running: isAiCaptureRunning(), requested: isAiCaptureRequested(),
       fullActive: isAiFullActive(), phase: aiFullPhase, progress: aiFullProgress, error: aiCaptureError,
@@ -1164,7 +1164,7 @@ export function mountVideoSubtitleTranslation(): () => void {
 
   const ensureLocalVideoModelReady = async (): Promise<boolean> => {
     if (aiModelChecking) return false;
-    if (!browserCapabilities.offscreenDocument) {
+    if (!browserCapabilities.extensionDom) {
       aiCaptureError = '当前浏览器不支持本地 AI 字幕'; updatePlayerUiState(); return false;
     }
     const model = normalizeVideoLocalTranscriptionModel(config.videoLocalModel);

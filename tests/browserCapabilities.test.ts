@@ -24,11 +24,12 @@ describe('browser capability contract', () => {
             browser: 'chrome',
             manifestVersion: 3,
             offscreenDocument: true,
+            extensionDom: true,
             chromeTranslation: true,
             imageOcr: true,
             imageTranslation: true,
             areaTranslation: true,
-            selectionTtsOffscreen: true,
+            selectionTtsExtensionPlayback: true,
             selectionTtsPageFallback: true,
         });
         expect(Object.isFrozen(chrome)).toBe(true);
@@ -40,13 +41,12 @@ describe('browser capability contract', () => {
             imageOcr: true,
             imageTranslation: true,
             areaTranslation: true,
-            selectionTtsOffscreen: true,
+            selectionTtsExtensionPlayback: true,
         });
     });
 
-    it('conservatively disables extension-only capabilities for Firefox, Opera, MV2 and unknown targets', () => {
+    it('keeps unsupported Firefox MV3, Opera, Chromium MV2 and unknown targets disabled', () => {
         for (const target of [
-            {browser: 'firefox', manifestVersion: 2 as const},
             {browser: 'firefox', manifestVersion: 3 as const},
             {browser: 'opera', manifestVersion: 3 as const},
             {browser: 'chrome', manifestVersion: 2 as const},
@@ -58,10 +58,23 @@ describe('browser capability contract', () => {
                 imageOcr: false,
                 imageTranslation: false,
                 areaTranslation: false,
-                selectionTtsOffscreen: false,
+                selectionTtsExtensionPlayback: false,
                 selectionTtsPageFallback: true,
             });
         }
+    });
+
+    it('Firefox MV2 uses shared DOM features without claiming native Offscreen or Chrome Translator', () => {
+        expect(resolveBrowserCapabilities({browser: 'firefox', manifestVersion: 2})).toMatchObject({
+            offscreenDocument: false,
+            extensionDom: true,
+            chromeTranslation: false,
+            imageOcr: true,
+            imageTranslation: true,
+            areaTranslation: true,
+            selectionTtsExtensionPlayback: true,
+            selectionTtsPageFallback: true,
+        });
     });
 
     it('runtime-gates Chrome Translation when a Chrome build is loaded by Edge', () => {

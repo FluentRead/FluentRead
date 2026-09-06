@@ -10,8 +10,8 @@
       <el-option v-for="item in VIDEO_SOURCE_LANGUAGE_OPTIONS" :key="item.value" :label="item.label" :value="item.value" />
     </el-select>
   </SettingsItem>
-  <SettingsItem label="本地 AI 字幕模型" description="X 没有原生字幕时使用；模型和音频都保留在浏览器本地。" :disabled="!config.videoTranslationEnabled || !browserCapabilities.offscreenDocument">
-    <el-select v-model="config.videoLocalModel" aria-label="本地 AI 字幕模型" :disabled="!config.videoTranslationEnabled || !browserCapabilities.offscreenDocument" placeholder="请选择本地模型">
+  <SettingsItem label="本地 AI 字幕模型" description="X 没有原生字幕时使用；模型和音频都保留在浏览器本地。" :disabled="!config.videoTranslationEnabled || !browserCapabilities.extensionDom">
+    <el-select v-model="config.videoLocalModel" aria-label="本地 AI 字幕模型" :disabled="!config.videoTranslationEnabled || !browserCapabilities.extensionDom" placeholder="请选择本地模型">
       <el-option v-for="item in modelOptions" :key="item.value" class="select-left" :label="item.label" :value="item.value" />
     </el-select>
   </SettingsItem>
@@ -23,7 +23,7 @@
       </div>
       <span class="video-model-local-badge"><Cpu aria-hidden="true" />本地运行</span>
     </div>
-    <p v-if="!browserCapabilities.offscreenDocument" class="capability-warning" role="status">当前浏览器不支持本地 AI 字幕，无法下载或运行本地模型。</p>
+    <p v-if="!browserCapabilities.extensionDom" class="capability-warning" role="status">当前浏览器不支持本地 AI 字幕，无法下载或运行本地模型。</p>
     <div class="video-model-list" aria-label="本地 Whisper 模型下载">
       <article v-for="item in modelOptions" :key="item.value" class="video-model-card" :class="{ selected: item.value === config.videoLocalModel }">
         <div class="video-model-card-heading">
@@ -39,14 +39,14 @@
             {{ !modelStateLoaded ? '读取中…' : downloaded.includes(item.value) ? '可离线使用' : downloading.includes(item.value) ? '正在下载模型' : '尚未下载' }}
           </span>
           <button v-if="downloaded.includes(item.value)" type="button" class="video-model-download-button" :disabled="removing.includes(item.value) || downloading.includes(item.value)" :aria-label="t('modelCache.removeNamed', {name: translateLegacy(item.label)})" @click="removeModel(item.value)"><Delete aria-hidden="true" />{{ t(removing.includes(item.value) ? 'modelCache.removing' : 'modelCache.remove') }}</button>
-          <button v-else type="button" class="video-model-download-button" :aria-label="t(downloaded.includes(item.value) ? 'video.modelDownloadedAria' : 'video.modelDownloadAria', {model: translateLegacy(item.label)})" :disabled="!modelStateLoaded || downloaded.includes(item.value) || downloading.includes(item.value) || !config.videoTranslationEnabled || !browserCapabilities.offscreenDocument" @click="config.videoLocalModel = item.value; download(item.value)">
+          <button v-else type="button" class="video-model-download-button" :aria-label="t(downloaded.includes(item.value) ? 'video.modelDownloadedAria' : 'video.modelDownloadAria', {model: translateLegacy(item.label)})" :disabled="!modelStateLoaded || downloaded.includes(item.value) || downloading.includes(item.value) || !config.videoTranslationEnabled || !browserCapabilities.extensionDom" @click="config.videoLocalModel = item.value; download(item.value)">
             <component :is="downloaded.includes(item.value) ? Check : downloading.includes(item.value) ? Loading : Download" :class="{ 'is-loading': downloading.includes(item.value) }" aria-hidden="true" />
             {{ downloaded.includes(item.value) ? '已下载' : downloading.includes(item.value) ? '下载中…' : '下载模型' }}
           </button>
         </div>
       </article>
     </div>
-    <p class="video-model-guidance">首次下载需要联网；识别速度取决于 CPU 和内存。支持桌面 Chrome / Edge，Firefox 可使用原生字幕翻译。</p>
+    <p class="video-model-guidance">首次下载需要联网；识别速度取决于 CPU 和内存。支持桌面 Chrome、Edge 和 Firefox。</p>
     <p v-if="downloadError" class="video-model-error" role="alert">{{ downloadError }}</p>
   </section>
   <section class="video-ai-cache-panel" data-video-ai-cache aria-labelledby="video-ai-cache-title">
@@ -103,7 +103,7 @@ async function refresh(): Promise<void> {
 }
 
 async function download(model: VideoLocalTranscriptionModel): Promise<void> {
-  if (!browserCapabilities.offscreenDocument) {
+  if (!browserCapabilities.extensionDom) {
     downloadError.value = '当前浏览器不支持本地 AI 字幕。';
     return;
   }

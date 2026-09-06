@@ -12,13 +12,15 @@ export interface BrowserBuildTarget {
 }
 
 export interface BrowserCapabilities extends BrowserBuildTarget {
-    /** Chrome MV3 扩展自有 DOM，供 Translation API、OCR 和符合 CSP 的音频能力使用。 */
+    /** 原生 Chrome/Edge Offscreen API，仅用于权限与浏览器容器选择。 */
     readonly offscreenDocument: boolean;
+    /** 可承载共享 DOM 运行时：Chromium MV3 Offscreen 或 Firefox MV2 后台 iframe。 */
+    readonly extensionDom: boolean;
     readonly chromeTranslation: boolean;
     readonly imageOcr: boolean;
     readonly imageTranslation: boolean;
     readonly areaTranslation: boolean;
-    readonly selectionTtsOffscreen: boolean;
+    readonly selectionTtsExtensionPlayback: boolean;
     /** Edge TTS 始终能够返回合成音频字节，供内容页面播放。 */
     readonly selectionTtsPageFallback: true;
 }
@@ -29,7 +31,8 @@ export type BrowserFeatureCapability =
     | 'imageOcr'
     | 'imageTranslation'
     | 'offscreenDocument'
-    | 'selectionTtsOffscreen'
+    | 'extensionDom'
+    | 'selectionTtsExtensionPlayback'
     | 'selectionTtsPageFallback';
 
 function normalizeBrowser(browser: string): string {
@@ -44,16 +47,19 @@ export function resolveBrowserCapabilities(target: BrowserBuildTarget): BrowserC
     const browser = normalizeBrowser(target.browser);
     const chromiumMv3 = target.manifestVersion === 3 && (browser === 'chrome' || browser === 'edge');
 
+    const extensionDom = chromiumMv3 || (browser === 'firefox' && target.manifestVersion === 2);
+
     return Object.freeze({
         browser,
         manifestVersion: target.manifestVersion,
         offscreenDocument: chromiumMv3,
+        extensionDom,
         // Offscreen 只是传输前提；offscreen runtime 仍会动态检查 Translator API 就绪状态。
         chromeTranslation: target.manifestVersion === 3 && browser === 'chrome',
-        imageOcr: chromiumMv3,
-        imageTranslation: chromiumMv3,
-        areaTranslation: chromiumMv3,
-        selectionTtsOffscreen: chromiumMv3,
+        imageOcr: extensionDom,
+        imageTranslation: extensionDom,
+        areaTranslation: extensionDom,
+        selectionTtsExtensionPlayback: extensionDom,
         selectionTtsPageFallback: true as const,
     });
 }

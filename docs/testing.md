@@ -280,3 +280,9 @@ node scripts/testing/run-writing-assistant-test.cjs \
 - 草稿变化保护、编辑器重挂载、路由取消、配置变更、锚点定位，以及不自动发送邮件或评论。
 
 以上是验收范围，不能视为新版浏览器验证已经通过。以本次实际执行报告记录的用例、窗口位置、前台状态和截图为准。正文与流式模型均为合成测试数据，不登录真实 Gmail/GitHub，不发送邮件或评论；夹具结果不能作为真实账号页面或外部 AI 服务质量的证明，旧版入口菜单、快捷键和写作网站名单的测试结果也不能代替新版流程验证。
+
+## Firefox 共享 DOM 运行时
+
+`tests/firefoxDocumentRuntime.test.ts` 验证 Firefox 后台 iframe 只承载同一个 DOM 页面，功能请求仍经过共享客户端与路由；覆盖按需创建、并发复用、接收端丢失重建、取消及页面资源清理。能力测试分别检查原生 Offscreen 权限与可执行 DOM 能力，Firefox MV2 开启图片/区域/本地字幕与扩展朗读，Chrome Translator 保持禁用。
+
+`pnpm verify:extension-manifests` 要求两个目标都包含共享 DOM 页面和 OCR core/worker，Firefox 不声明 `offscreen` 权限。`--require-firefox-archives` 还检查 Firefox 扩展 ZIP 和源码 ZIP 中的相关资源。单元测试与构建不能替代 Firefox 中的真实 OCR、截图、字幕推理和音频播放验证。

@@ -76,8 +76,14 @@
 }
 .product-hero {
   text-align: center;
-  padding-top: 56px;
+  padding-top: 40px;
   padding-bottom: 40px;
+}
+.product-hero-icon {
+  display: block;
+  width: 152px;
+  height: auto;
+  margin: 0 auto 24px;
 }
 .product-eyebrow {
   font-size: 14px;
@@ -354,6 +360,10 @@
   }
 }
 @media (max-width: 640px) {
+  .product-hero-icon {
+    width: 112px;
+    margin-bottom: 20px;
+  }
   .product-hero,
   .product-story,
   .product-more,

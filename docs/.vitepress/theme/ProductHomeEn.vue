@@ -7,6 +7,14 @@ const chrome =
 <template>
   <div class="product-home">
     <section class="product-hero" aria-labelledby="product-title">
+      <img
+        class="product-hero-icon"
+        :src="withBase('/product-icon.png')"
+        width="896"
+        height="880"
+        alt=""
+        fetchpriority="high"
+      />
       <p class="product-eyebrow">FluentRead</p>
       <h1 id="product-title">
         Another language?<br /><span>Keep reading.</span>

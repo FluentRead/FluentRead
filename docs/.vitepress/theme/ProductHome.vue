@@ -7,6 +7,14 @@ const chrome =
 <template>
   <div class="product-home">
     <section class="product-hero" aria-labelledby="product-title">
+      <img
+        class="product-hero-icon"
+        :src="withBase('/product-icon.png')"
+        width="896"
+        height="880"
+        alt=""
+        fetchpriority="high"
+      />
       <p class="product-eyebrow">FluentRead · 流畅阅读</p>
       <h1 id="product-title">
         外语？<br class="mobile-break" /><span>照样读。</span>

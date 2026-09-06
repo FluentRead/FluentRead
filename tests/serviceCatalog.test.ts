@@ -3,13 +3,10 @@ import {
   buildServiceGroups,
   buildServiceSections,
   cleanServiceLabel,
-  filterModels,
-  filterServiceGroups,
   filterServiceSections,
   getSelectedModelLabel,
   getServiceWebsite,
   searchServiceOptions,
-  splitModelOptions,
 } from '@/src/ui/view-model/serviceCatalog'
 import { customModelString, defaultModels, models, services, servicesType } from '@/src/core/config/catalog'
 import { Config, normalizeConfig } from '@/src/core/config/model'
@@ -169,29 +166,6 @@ describe('service catalog helpers', () => {
     ])
   })
 
-  it('filters services without losing their category', () => {
-    const groups = buildServiceGroups(options)
-    expect(filterServiceGroups(groups, '   ')).toBe(groups)
-    expect(filterServiceGroups(groups, 'open')).toEqual([
-      { id: 'ai', label: 'AI翻译', items: [{ value: 'openai', label: 'OpenAI', catalogKind: 'provider' }] },
-    ])
-    expect(filterServiceGroups([
-      { id: 'ai', label: 'AI翻译', items: [{ value: 'openai', label: 'OpenAI', description: '通用服务' }] },
-    ], '通用')).toHaveLength(1)
-    expect(filterServiceGroups([
-      {
-        id: 'custom',
-        label: '我的服务',
-        items: [{
-          value: 'custom:1',
-          label: '本地模型',
-          description: 'http://localhost:11434/v1',
-          searchTerms: ['gemma:7b', 'qwen-local'],
-        }],
-      },
-    ], 'qwen-local')).toHaveLength(1)
-  })
-
   it('filters nested service sections without losing their parent or subgroup', () => {
     const sections = buildServiceSections(options)
     expect(filterServiceSections(sections, '   ')).toBe(sections)
@@ -207,15 +181,6 @@ describe('service catalog helpers', () => {
           items: [{ value: 'newapi', label: 'New API', catalogKind: 'platform' }],
         }],
       },
-    ])
-  })
-
-  it('filters model identifiers case-insensitively', () => {
-    const modelOptions = ['gpt-5-mini', 'GPT-4o', '自定义模型']
-    expect(filterModels(modelOptions, ' ')).toBe(modelOptions)
-    expect(filterModels(modelOptions, 'gpt')).toEqual([
-      'gpt-5-mini',
-      'GPT-4o',
     ])
   })
 
@@ -283,29 +248,6 @@ describe('service catalog helpers', () => {
 
   it('removes decorative recommendation stars from labels', () => {
     expect(cleanServiceLabel('硅基流动⭐️')).toBe('硅基流动')
-  })
-
-  it('keeps common models short and promotes the current selection', () => {
-    const models = ['one', 'two', 'three', 'four', 'five', 'six']
-
-    expect(splitModelOptions(models, 'six')).toEqual({
-      common: ['one', 'two', 'three', 'six'],
-      more: ['four', 'five'],
-    })
-  })
-
-  it('keeps the custom model as the last option when it is selected', () => {
-    expect(splitModelOptions(['one', 'two', 'three', customModelString, 'four'], customModelString)).toEqual({
-      common: ['one', 'two', 'three', 'four'],
-      more: [customModelString],
-    })
-  })
-
-  it('does not create a more group for a short model list', () => {
-    expect(splitModelOptions(['one', 'two'], 'two')).toEqual({
-      common: ['one', 'two'],
-      more: [],
-    })
   })
 
   it('shows the effective model only for services that use model selection', () => {

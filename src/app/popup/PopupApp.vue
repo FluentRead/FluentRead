@@ -63,7 +63,7 @@
           <h2 id="donation-title">如果你喜欢这款软件，</h2>
           <p class="donation-description">可以扫描微信赞赏码支持作者，感谢鼓励。</p>
           <div class="donation-qr-frame">
-            <img src="/misc/approve.jpg" alt="流畅阅读赞赏码" />
+            <img :src="'/misc/approve.jpg'" alt="流畅阅读赞赏码" />
           </div>
         </section>
       </div>

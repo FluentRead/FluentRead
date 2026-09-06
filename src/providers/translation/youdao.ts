@@ -9,7 +9,7 @@
 import {normalizeChineseLanguageCode} from '@/src/core/language/chinese';
 import { method } from "@/src/core/config/constants";
 import { config } from "@/src/services/config/store";
-import CryptoJS from 'crypto-js';
+import sha256 from 'crypto-js/sha256';
 import {getTranslationLanguages} from '@/src/services/translation/languages';
 import {createHttpStatusError, readJsonResponse} from '@/src/platform/http/errors';
 import {runtimeFetch} from '@/src/platform/http/runtime';
@@ -42,7 +42,7 @@ async function youdao(message: TranslationProviderRequest<string>): Promise<stri
   // 生成签名
   function generateSign(appKey: string, query: string, salt: string, curtime: string, appSecret: string): string {
     let str1 = appKey + truncate(query) + salt + curtime + appSecret;
-    return CryptoJS.SHA256(str1).toString(CryptoJS.enc.Hex);
+    return sha256(str1).toString();
   }
 
   // 截取函数（用于签名计算）

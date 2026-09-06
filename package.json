@@ -37,7 +37,8 @@
     "postinstall": "wxt prepare",
     "docs:dev": "vitepress dev docs",
     "docs:build": "vitepress build docs",
-    "docs:preview": "vitepress preview docs"
+    "docs:preview": "vitepress preview docs",
+    "analyze:bundle": "node scripts/testing/analyze-bundle-size.mjs"
   },
   "dependencies": {
     "@ai-sdk/anthropic": "3.0.116",

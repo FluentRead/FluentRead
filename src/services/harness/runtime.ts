@@ -7,7 +7,7 @@
 import {streamText, tool, type LanguageModel, type ModelMessage, type ToolSet} from 'ai';
 import {z} from 'zod';
 import type {Config} from '@/src/core/config/model';
-import {DEFAULT_HARNESS_ACTION_PROMPTS, DEFAULT_HARNESS_SYSTEM_PROMPT, renderHarnessPrompt, isHarnessService, type HarnessActionId} from '@/src/core/config/harness';
+import {resolveHarnessPrompt, renderHarnessPrompt, isHarnessService, type HarnessActionId} from '@/src/core/config/harness';
 import {resolveConfiguredModel} from '@/src/core/config/catalog';
 import {isApiKeyRequired} from '@/src/core/config/validation';
 import {createHarnessLanguageModel, normalizeHarnessModelError} from './modelGateway';
@@ -85,8 +85,8 @@ function makeGenerate(model: LanguageModel, toolSet: ToolSet, service: string, m
 
 function actionSystem(config: Config, intent: HarnessActionId, followUp: boolean, studyMode?: ReadingRequest['studyMode']): string {
     const variables = {to: config.to, learningLevel: config.harness.learningLevel, explanationDepth: config.harness.explanationDepth};
-    const system = config.harness.systemPrompt.trim() || DEFAULT_HARNESS_SYSTEM_PROMPT;
-    const action = config.harness.actionPrompts[intent].trim() || DEFAULT_HARNESS_ACTION_PROMPTS[intent];
+    const system = resolveHarnessPrompt(config.harness.systemPrompt, 'system', config.uiLanguage).trim();
+    const action = resolveHarnessPrompt(config.harness.actionPrompts[intent], intent, config.uiLanguage).trim();
     return [
         renderHarnessPrompt(system, variables),
         `任务：${studyMode ? vocabularyStudyPrompt(studyMode) : renderHarnessPrompt(action, variables)}`,

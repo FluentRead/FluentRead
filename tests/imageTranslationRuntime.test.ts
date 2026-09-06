@@ -60,7 +60,8 @@ function setup() {
     image.getBoundingClientRect = () => rect as DOMRect;
     const imageStyle = {objectFit: 'contain', objectPosition: 'right 10px bottom 20px', paddingTop: '4px', paddingRight: '6px', paddingBottom: '8px', paddingLeft: '10px', borderTopWidth: '1px', borderRightWidth: '2px', borderBottomWidth: '3px', borderLeftWidth: '4px', borderRadius: '12px', opacity: '1', visibility: 'visible', display: 'block', filter: 'none'};
     const parentStyle = {overflowX: 'visible', overflowY: 'visible', opacity: '1'};
-    const getStyle = (element: Element) => element === image ? {...imageStyle, opacity: image.style.opacity || imageStyle.opacity} : element === parent ? parentStyle : {opacity: '1', overflowX: 'visible', overflowY: 'visible'};
+    const extraStyles = new Map<Element, Record<string, string>>();
+    const getStyle = (element: Element) => extraStyles.has(element) ? {...extraStyles.get(element), opacity: (element as HTMLElement).style.opacity || extraStyles.get(element)!.opacity, backgroundImage: (element as HTMLElement).style.backgroundImage || extraStyles.get(element)!.backgroundImage} : element === image ? {...imageStyle, opacity: image.style.opacity || imageStyle.opacity} : element === parent ? parentStyle : {opacity: '1', overflowX: 'visible', overflowY: 'visible'};
     const draw = vi.fn();
     const canvases: HTMLCanvasElement[] = [];
     vi.spyOn(document, 'createElement').mockImplementation(((tag: string) => {
@@ -108,13 +109,13 @@ function setup() {
         removeEventListener: vi.fn((name: string) => windowHandlers.delete(name)),
     };
     const observers: Array<{callback: MutationCallback; disconnect: ReturnType<typeof vi.fn>}> = [];
-    const resizeObservers: Array<{callback: ResizeObserverCallback; disconnect: ReturnType<typeof vi.fn>}> = [];
+    const resizeObservers: Array<{callback: ResizeObserverCallback; disconnect: ReturnType<typeof vi.fn>; observe: ReturnType<typeof vi.fn>; unobserve: ReturnType<typeof vi.fn>}> = [];
     vi.stubGlobal('MutationObserver', class {
         disconnect = vi.fn(); observe = vi.fn();
         constructor(public callback: MutationCallback) {observers.push(this);}
     });
     vi.stubGlobal('ResizeObserver', class {
-        disconnect = vi.fn(); observe = vi.fn();
+        disconnect = vi.fn(); observe = vi.fn(); unobserve = vi.fn();
         constructor(public callback: ResizeObserverCallback) {resizeObservers.push(this);}
     });
     vi.stubGlobal('document', document);
@@ -136,6 +137,14 @@ function setup() {
     mountImageTranslator();
     return {image, parent, roots, decoded, canvases, draw, imageStyle, parentStyle, observers, resizeObservers, windowObject,
         hover, button, click, bitmap, dispatch, notify, runFrames,
+        addBackground: () => {
+            const background = document.createElement('div'); decorateStyle(background);
+            background.getBoundingClientRect = () => rect as DOMRect;
+            background.style.backgroundImage = `url("${image.src}")`;
+            extraStyles.set(background, {backgroundImage: background.style.backgroundImage, backgroundSize: 'cover', backgroundPosition: 'right bottom', opacity: '1', visibility: 'visible', display: 'block'});
+            parent.prepend(background); imageStyle.opacity = '0';
+            return background;
+        },
         scroll: () => windowHandlers.get('scroll')?.(new domWindow.Event('scroll')),
         setRect: (next: typeof rect) => {rect = next;},
         setAutoDecode: (enabled: boolean) => {autoDecode = enabled;},
@@ -380,13 +389,13 @@ describe('图片翻译前台交互与生命周期', () => {
         env.click(); await flush(); expect(env.button().dataset.phase).toBe('translated');
         env.click(); client.translate.mockRejectedValueOnce(new Error('请求失败')); settings.useCache = false;
         env.click(); await flush(); env.dispatch(env.image, 'pointerout'); vi.advanceTimersByTime(200);
-        expect(env.roots[0].querySelector('.fr-image-controls')).toBeNull();
+        expect(env.roots[0].querySelector('.fr-image-controls')).not.toBeNull();
     });
 
     it('语言包准备从当前图片原地继续，并展示后台真实进度', async () => {
         client.translate.mockRejectedValueOnce(new Error('请先下载语言包'));
         const env = setup(); env.hover(); env.click(); await flush();
-        const prepare = Array.from(env.roots[0].querySelectorAll('button')).find(button => button.textContent === '下载语言包并重试')!;
+        const prepare = Array.from(env.roots[0].querySelectorAll('button')).find(button => button.textContent === '下载语言包并翻译')!;
         expect(prepare.hidden).toBe(false);
         expect(env.roots[0].querySelector('[role="status"]')!.textContent).toBe('首次使用需准备识别语言包，下载后自动继续');
         env.dispatch(prepare, 'click'); await flush(); expect(client.prepare).toHaveBeenCalledWith('auto', expect.any(AbortSignal));
@@ -395,6 +404,24 @@ describe('图片翻译前台交互与生命周期', () => {
         env.click(); await flush(); client.translate.mock.calls.at(-1)![3].onProgress('translating');
         expect(env.roots[0].querySelector('[role="status"]')!.textContent).toBe('正在翻译文字…');
         pending.resolve(result); await flush();
+    });
+
+    it('下载失败可再次准备，下载成功后的翻译失败直接重试而不重复下载', async () => {
+        client.translate.mockRejectedValueOnce(new Error('请先下载语言包'));
+        const env = setup(); env.hover(); env.click(); await flush();
+        const prepare = env.roots[0].querySelector('.fr-image-prepare') as HTMLButtonElement;
+        client.prepare.mockRejectedValueOnce(new Error('下载中断'));
+        env.dispatch(prepare, 'click'); await flush();
+        expect(prepare.hidden).toBe(false);
+        expect(env.roots[0].querySelector('[role="status"]')!.textContent).toContain('下载中断');
+        client.translate.mockRejectedValueOnce(new Error('翻译服务暂不可用'));
+        env.dispatch(prepare, 'click'); await flush();
+        expect(prepare.hidden).toBe(true);
+        expect(env.button().textContent).toBe('重试');
+        const preparations = client.prepare.mock.calls.length;
+        env.click(); await flush();
+        expect(client.prepare).toHaveBeenCalledTimes(preparations);
+        expect(env.button().dataset.phase).toBe('translated');
     });
 
     it('滚动事件合并一帧，位图采用浏览器原生 object-fit 和盒模型，不重新读取或绘制 Canvas', async () => {
@@ -477,4 +504,53 @@ it('悬浮不穿透按钮或弹窗，不在同一区域多图时猜测目标；�
     const cover = document.createElement('div'); env.parent.append(cover);
     env.dispatch(cover, 'pointerover', true, {clientX: 100, clientY: 100}); expect(env.roots).toHaveLength(0);
     env.dispatch(env.image, 'contextmenu'); env.image.remove(); expect(toggleContextMenuImage()).toBe(false);
+});
+
+describe('X 透明 img 与可见背景层的图片翻译', () => {
+    it('实际背景层承载入口、译图与还原，透明原 img 保持不变', async () => {
+        const env = setup(); const background = env.addBackground(); const original = background.getAttribute('style');
+        env.dispatch(background, 'pointerover', true, {clientX: 100, clientY: 100});
+        expect((env.button().closest('.fluent-read-image-translation-overlay') as HTMLElement).style.display).toBe('block');
+        env.click(); await flush();
+        const bitmap = env.bitmap() as HTMLImageElement;
+        expect(bitmap.parentElement!.style.display).toBe('block'); expect(bitmap.style.opacity).toBe('1');
+        expect(bitmap.style.objectFit).toBe('cover'); expect(bitmap.style.objectPosition).toBe('right bottom');
+        expect(background.style.opacity).toBe('0'); expect(env.image.style.opacity).toBeUndefined();
+        env.click(); expect(env.bitmap()).toBeNull(); expect(background.getAttribute('style')).toBe(original);
+        env.click(); await flush(); expect(env.bitmap()).toBeTruthy(); expect(client.translate).toHaveBeenCalledTimes(1);
+    });
+    it('宿主独立换背景后撤下旧译图，不覆盖宿主的新背景或透明度', async () => {
+        const env = setup(); const background = env.addBackground(); env.hover(); env.click(); await flush();
+        background.style.backgroundImage = 'url("https://example.test/new.png")'; background.style.opacity = '0.8';
+        env.notify('style'); env.runFrames();
+        expect(env.bitmap()).toBeNull(); expect(background.style.opacity).toBe('0.8');
+        expect(background.style.backgroundImage).toContain('new.png');
+    });
+    it('背景承载节点被替换后，下一帧前直接重新翻译使用新的承载节点', async () => {
+        const env = setup(); const background = env.addBackground(); env.hover(); env.click(); await flush();
+        env.image.src = 'https://example.test/replaced.png';
+        background.remove();
+        const replacement = env.addBackground();
+        env.notify('src');
+        env.click(); await flush();
+        expect(env.bitmap()).toBeTruthy();
+        expect(client.translate).toHaveBeenCalledTimes(2);
+        expect(env.resizeObservers[0].unobserve).toHaveBeenCalledWith(background);
+        expect(env.resizeObservers[0].observe).toHaveBeenCalledWith(replacement);
+    });
+    it('后台等待期间换背景，旧任务不得写入译图', async () => {
+        const env = setup(); const background = env.addBackground(); const request = deferred<typeof result>(); client.translate.mockReturnValue(request.promise);
+        env.hover(); env.click(); await flush(); background.style.backgroundImage = 'url("https://example.test/replaced.png")';
+        request.resolve(result); await flush(); expect(env.bitmap()).toBeNull(); expect(background.style.opacity).toBeUndefined();
+    });
+    it('仅右键且缺模型时留下可见准备提示，下载完成继续翻译', async () => {
+        const env = setup(); const background = env.addBackground(); settings.imageTranslationHoverEnabled = false;
+        client.translate.mockRejectedValueOnce(new Error('图片文字识别需要先下载简体中文、繁体中文、英语语言包'));
+        env.dispatch(background, 'contextmenu', true, {clientX: 100, clientY: 100}); expect(toggleContextMenuImage(env.image.src)).toBe(true);
+        await flush(); env.dispatch(background, 'pointerout'); vi.advanceTimersByTime(1000);
+        expect((env.roots[0].querySelector('.fr-image-feedback') as HTMLElement).hidden).toBe(false);
+        expect(env.button().textContent).toBe('关闭');
+        const download = Array.from(env.roots[0].querySelectorAll('button')).find(b => b.textContent === '下载语言包并翻译')!;
+        env.dispatch(download, 'click'); await flush(); expect(client.prepare).toHaveBeenCalledOnce(); expect(env.bitmap()).toBeTruthy();
+    });
 });

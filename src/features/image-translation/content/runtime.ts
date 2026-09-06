@@ -14,6 +14,7 @@ import {
 } from '@/src/features/image-translation/services/client';
 import type { OcrLine } from '@/src/features/image-translation/core';
 import {imageBufferToDataUrl, MAX_REMOTE_IMAGE_BYTES, normalizeRemoteImageMimeType} from '@/src/features/image-translation/services/remoteImage';
+import {resolveImagePresentation, surfaceStyleToBitmap, presentationMatchesSource, type ImagePresentation} from './presentation';
 import {createImageControls, IMAGE_CONTROLS_CSS, type ImageControlPhase} from './controls';
 
 const IMAGE_TRANSLATION_OVERLAY = 'fluent-read-image-translation-overlay';
@@ -32,6 +33,8 @@ type ImageControls = ReturnType<typeof createImageControls>;
 
 interface ImageTranslationState {
     image: HTMLImageElement;
+    presentation: ImagePresentation;
+    needsPreparation: boolean;
     overlay: HTMLDivElement;
     controls: ImageControls;
     phase: ImageControlPhase;
@@ -229,10 +232,10 @@ function clearHoverTimer(state: ImageTranslationState): void {
 
 function scheduleIdleStateRemoval(state: ImageTranslationState): void {
     clearHoverTimer(state);
-    if ((state.phase !== 'idle' && state.phase !== 'error') || state.hovered) return;
+    if (state.phase !== 'idle' || state.hovered) return;
     state.hoverTimer = window.setTimeout(() => {
         state.hoverTimer = null;
-        if ((state.phase === 'idle' || state.phase === 'error') && !state.hovered) removeState(state);
+        if (state.phase === 'idle' && !state.hovered) removeState(state);
     }, 180);
 }
 
@@ -256,6 +259,15 @@ function removeState(state: ImageTranslationState): void {
     if (!state.image.isConnected) deleteCachedResult(state.image);
 }
 
+function setPresentation(state: ImageTranslationState, presentation: ImagePresentation): void {
+    const previous = state.presentation;
+    if (previous.element !== presentation.element && state.resizeObserver) {
+        state.resizeObserver.unobserve?.(previous.element);
+        state.resizeObserver.observe(presentation.element);
+    }
+    state.presentation = presentation;
+}
+
 function invalidateSource(state: ImageTranslationState): void {
     deleteCachedResult(state.image);
     state.sourceIdentity = sourceIdentity(state.image);
@@ -263,10 +275,12 @@ function invalidateSource(state: ImageTranslationState): void {
     state.abortController = null;
     state.waitingForImage = false;
     restoreOriginalImage(state);
+    if (!state.sourceStyleLease) setPresentation(state, resolveImagePresentation(state.image));
     state.translatedImage?.remove();
     state.translatedImage = null;
     state.lines = [];
     state.controls.setLines([]);
+    state.needsPreparation = false;
     setButtonState(state, 'idle', '翻译图片');
     scheduleIdleStateRemoval(state);
 }
@@ -276,20 +290,23 @@ function updateOverlayPosition(state: ImageTranslationState): void {
         removeState(state);
         return;
     }
-    if (sourceIdentity(state.image) !== state.sourceIdentity) invalidateSource(state);
+    if (sourceIdentity(state.image) !== state.sourceIdentity || !presentationMatchesSource(state.image, state.presentation)) invalidateSource(state);
     if (state.sourceStyleLease && !ownsHiddenImage(state)) {
         // 宿主重新设置 opacity 后不继续覆盖它；恢复显示权，并保留宿主刚写入的样式。
         restoreImageTranslation(state);
         return;
     }
-    const rect = state.image.getBoundingClientRect();
-    const style = getComputedStyle(state.image);
+    if (!state.sourceStyleLease) setPresentation(state, resolveImagePresentation(state.image));
+    const surface = state.presentation.element;
+    if (!surface.isConnected) { invalidateSource(state); return; }
+    const rect = surface.getBoundingClientRect();
+    const style = getComputedStyle(surface);
     let left = Math.max(0, rect.left);
     let top = Math.max(0, rect.top);
     let right = Math.min(window.innerWidth, rect.right);
     let bottom = Math.min(window.innerHeight, rect.bottom);
     let opacity = Number.parseFloat(state.sourceStyleLease?.computedOpacity || style.opacity || '1');
-    for (let ancestor = state.image.parentElement; ancestor; ancestor = ancestor.parentElement) {
+    for (let ancestor = surface.parentElement; ancestor; ancestor = ancestor.parentElement) {
         const ancestorStyle = getComputedStyle(ancestor);
         opacity *= Number.parseFloat(ancestorStyle.opacity || '1');
         const clipsX = /^(hidden|clip|auto|scroll)$/.test(ancestorStyle.overflowX);
@@ -322,13 +339,19 @@ function updateOverlayPosition(state: ImageTranslationState): void {
     state.overlay.style.clipPath = `inset(${top - rect.top}px ${rect.right - right}px ${rect.bottom - bottom}px ${left - rect.left}px)`;
     state.controls.element.style.setProperty('left', `${left - rect.left + 8}px`, 'important');
     state.controls.element.style.setProperty('bottom', `${rect.bottom - bottom + 8}px`, 'important');
+    state.controls.feedback.style.left = `${(left + right) / 2 - rect.left}px`;
+    state.controls.feedback.style.top = `${(top + bottom) / 2 - rect.top}px`;
+    state.controls.feedback.style.maxHeight = `${Math.max(0, bottom - top - 16)}px`;
+    state.controls.feedback.style.maxWidth = `${Math.max(0, right - left - 16)}px`;
     if (!state.translatedImage || state.phase !== 'translated') return;
     const bitmap = state.translatedImage;
-    const scaleX = state.image.offsetWidth ? rect.width / state.image.offsetWidth : 1;
-    const scaleY = state.image.offsetHeight ? rect.height / state.image.offsetHeight : 1;
+    const scaleX = surface.offsetWidth ? rect.width / surface.offsetWidth : 1;
+    const scaleY = surface.offsetHeight ? rect.height / surface.offsetHeight : 1;
     // 原生 replaced element 负责 object-fit 与完整 object-position 语法；滚动仅移动层，不重复解码或绘制整幅 Canvas。
-    bitmap.style.objectFit = style.objectFit || 'fill';
-    bitmap.style.objectPosition = style.objectPosition || '50% 50%';
+    const fitting = state.presentation.kind === 'background' ? surfaceStyleToBitmap(style)
+        : {objectFit: style.objectFit || 'fill', objectPosition: style.objectPosition || '50% 50%'};
+    bitmap.style.objectFit = fitting.objectFit;
+    bitmap.style.objectPosition = fitting.objectPosition;
     bitmap.style.borderRadius = style.borderRadius;
     bitmap.style.backgroundColor = style.backgroundColor;
     bitmap.style.opacity = String(opacity);
@@ -354,15 +377,16 @@ function createState(image: HTMLImageElement): ImageTranslationState {
             if (state.phase === 'translated' || state.phase === 'loading') restoreImageTranslation(state);
             else void translateImage(state);
         },
+        onDismiss: () => { const state = states.get(image); if (state) removeState(state); },
         onPrepare: () => {
             const state = states.get(image);
             if (state) void translateImage(state, true);
         },
     });
-    overlay.append(controls.element);
+    overlay.append(controls.feedback, controls.element);
     ensureImageOverlayRoot().appendChild(overlay);
     const state: ImageTranslationState = {
-        image, overlay, controls, phase: 'idle', abortController: null, hovered: true,
+        image, presentation: resolveImagePresentation(image), needsPreparation: false, overlay, controls, phase: 'idle', abortController: null, hovered: true,
         hoverTimer: null, resizeObserver: null, imageLoadHandler: null,
         sourceIdentity: sourceIdentity(image), waitingForImage: false,
         lines: [], translatedImage: null, sourceStyleLease: null,
@@ -376,6 +400,7 @@ function createState(image: HTMLImageElement): ImageTranslationState {
     state.resizeObserver = typeof ResizeObserver === 'undefined'
         ? null : new ResizeObserver(scheduleViewportChange);
     state.resizeObserver?.observe(image);
+    if (state.presentation.element !== image) state.resizeObserver?.observe(state.presentation.element);
     image.addEventListener('load', state.imageLoadHandler);
     states.set(image, state);
     activeStates.add(state);
@@ -536,25 +561,26 @@ function loadImage(dataUrl: string, signal: AbortSignal): Promise<HTMLImageEleme
 function setButtonState(state: ImageTranslationState, phase: ImageControlPhase, message: string): void {
     state.phase = phase;
     state.controls.update(phase, message, {
-        prepare: phase === 'error' && message.includes('语言包'), animations: config.animations,
+        prepare: phase === 'error' && state.needsPreparation, animations: config.animations,
     });
 }
 
 function ownsHiddenImage(state: ImageTranslationState): boolean {
-    return state.image.style.getPropertyValue('opacity') === '0'
-        && state.image.style.getPropertyPriority('opacity') === 'important';
+    return state.presentation.element.style.getPropertyValue('opacity') === '0'
+        && state.presentation.element.style.getPropertyPriority('opacity') === 'important';
 }
 
 function hideOriginalImage(state: ImageTranslationState): void {
     if (state.sourceStyleLease) return;
-    const style = state.image.style;
+    const surface = state.presentation.element;
+    const style = surface.style;
     state.sourceStyleLease = {
         opacity: {value: style.getPropertyValue('opacity'), priority: style.getPropertyPriority('opacity')},
         transition: ['transition', 'transition-property', 'transition-duration', 'transition-timing-function', 'transition-delay', 'transition-behavior']
             .map(property => ({property, value: style.getPropertyValue(property), priority: style.getPropertyPriority(property)}))
             .filter(property => Boolean(property.value)),
-        computedOpacity: getComputedStyle(state.image).opacity || '1',
-        hadStyleAttribute: state.image.hasAttribute('style'),
+        computedOpacity: getComputedStyle(surface).opacity || '1',
+        hadStyleAttribute: surface.hasAttribute('style'),
     };
     // 在同一帧关闭过渡并隐藏原图，透明译图的擦除区域不会透出下层原文字。
     style.setProperty('transition', 'none', 'important');
@@ -564,7 +590,8 @@ function hideOriginalImage(state: ImageTranslationState): void {
 function restoreOriginalImage(state: ImageTranslationState): void {
     const lease = state.sourceStyleLease;
     if (!lease) return;
-    const style = state.image.style;
+    const surface = state.presentation.element;
+    const style = surface.style;
     const ownsOpacity = ownsHiddenImage(state);
     const ownsTransition = style.getPropertyValue('transition') === 'none'
         && style.getPropertyPriority('transition') === 'important';
@@ -572,13 +599,13 @@ function restoreOriginalImage(state: ImageTranslationState): void {
         if (lease.opacity.value) style.setProperty('opacity', lease.opacity.value, lease.opacity.priority);
         else style.removeProperty('opacity');
         // 先在过渡关闭时结算原透明度，再归还 transition，避免恢复原图时发生意外淡入。
-        if (ownsTransition) void getComputedStyle(state.image).opacity;
+        if (ownsTransition) void getComputedStyle(surface).opacity;
     }
     if (ownsTransition) {
         style.removeProperty('transition');
         lease.transition.forEach(property => style.setProperty(property.property, property.value, property.priority));
     }
-    if (ownsOpacity && ownsTransition && !lease.hadStyleAttribute && style.length === 0) state.image.removeAttribute('style');
+    if (ownsOpacity && ownsTransition && !lease.hadStyleAttribute && style.length === 0) surface.removeAttribute('style');
     state.sourceStyleLease = null;
 }
 
@@ -603,6 +630,7 @@ function restoreImageTranslation(state: ImageTranslationState): void {
     state.translatedImage = null;
     state.lines = [];
     state.controls.setLines([]);
+    state.needsPreparation = false;
     setButtonState(state, 'idle', resultCache.has(state.image) ? '查看译图' : '翻译图片');
     updateOverlayPosition(state);
     scheduleIdleStateRemoval(state);
@@ -611,13 +639,13 @@ function restoreImageTranslation(state: ImageTranslationState): void {
 function requestIsCurrent(state: ImageTranslationState, controller: AbortController): boolean {
     if (controller.signal.aborted || state.abortController !== controller || states.get(state.image) !== state) return false;
     if (!state.image.isConnected) { removeState(state); return false; }
-    if (sourceIdentity(state.image) !== state.sourceIdentity) { invalidateSource(state); return false; }
+    if (sourceIdentity(state.image) !== state.sourceIdentity || !presentationMatchesSource(state.image, state.presentation)) { invalidateSource(state); return false; }
     return true;
 }
 
 async function translateImage(state: ImageTranslationState, prepareLanguages = false): Promise<void> {
     if (state.phase === 'loading' || !state.image.isConnected || !config.on || config.disableImageTranslator) return;
-    if (sourceIdentity(state.image) !== state.sourceIdentity) invalidateSource(state);
+    if (sourceIdentity(state.image) !== state.sourceIdentity || !presentationMatchesSource(state.image, state.presentation)) invalidateSource(state);
     clearHoverTimer(state);
     const identity = configurationIdentity();
     const cached = resultCache.get(state.image);
@@ -630,13 +658,16 @@ async function translateImage(state: ImageTranslationState, prepareLanguages = f
         return;
     }
     deleteCachedResult(state.image);
+    state.needsPreparation = false;
     const controller = new AbortController();
     const sourceLanguage = config.from;
     state.abortController = controller;
+    let preparingLanguages = prepareLanguages;
     setButtonState(state, 'loading', prepareLanguages ? '正在准备识别语言包…' : '正在读取图片…');
     try {
         if (prepareLanguages) {
             await prepareImageOcrLanguages(sourceLanguage, controller.signal);
+            preparingLanguages = false;
             if (!requestIsCurrent(state, controller)) return;
             setButtonState(state, 'loading', '正在读取图片…');
         }
@@ -676,6 +707,7 @@ async function translateImage(state: ImageTranslationState, prepareLanguages = f
         controller.abort();
         const message = error instanceof Error ? error.message : String(error);
         const missingLanguages = /^图片文字识别需要先下载.+语言包/u.test(message) || message === '请先下载语言包';
+        state.needsPreparation = missingLanguages || preparingLanguages;
         setButtonState(state, 'error', missingLanguages
             ? '首次使用需准备识别语言包，下载后自动继续'
             : `图片翻译失败：${message}`);

@@ -245,6 +245,7 @@
       "tests/harnessSessionRepository.test.ts",
       "tests/harnessConversationPersistence.test.ts",
       "tests/imageOcrRuntime.test.ts",
+      "tests/imageTranslationPresentation.test.ts",
       "tests/imageTranslationFlow.test.ts",
       "tests/imageTranslationRuntime.test.ts",
       "tests/imageTranslationPageRead.test.ts",

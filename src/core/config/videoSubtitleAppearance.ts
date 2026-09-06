@@ -26,6 +26,7 @@ export interface VideoSubtitleAppearance {
     translationColor: string;
     position: VideoSubtitlePosition;
     bottomOffset: number;
+    autoBottom: boolean;
     backgroundOpacity: number;
     lineSpacing: number;
     maxWidth: number;
@@ -38,6 +39,7 @@ export const DEFAULT_VIDEO_SUBTITLE_APPEARANCE: VideoSubtitleAppearance = {
     translationColor: '#ffe45c',
     position: 'bottom',
     bottomOffset: 10,
+    autoBottom: true,
     backgroundOpacity: 56,
     lineSpacing: 1.28,
     maxWidth: 96,
@@ -70,12 +72,15 @@ export function normalizeVideoSubtitleAppearance(value: unknown): VideoSubtitleA
     const position: VideoSubtitlePosition = source.position === 'top' || source.position === 'center'
         ? source.position
         : 'bottom';
+    const bottomOffset = normalizeNumber(source.bottomOffset, DEFAULT_VIDEO_SUBTITLE_APPEARANCE.bottomOffset, 0, 25, 1);
     return {
         skin,
         textColor: normalizeColor(source.textColor, skinPreset.textColor),
         translationColor: normalizeColor(source.translationColor, skinPreset.translationColor),
         position,
-        bottomOffset: normalizeNumber(source.bottomOffset, DEFAULT_VIDEO_SUBTITLE_APPEARANCE.bottomOffset, 0, 25, 1),
+        bottomOffset,
+        // 旧默认偏移升级为自动贴底，已调整的偏移及显式手动选择继续保留。
+        autoBottom: typeof source.autoBottom === 'boolean' ? source.autoBottom : bottomOffset === 10,
         backgroundOpacity: normalizeNumber(source.backgroundOpacity, skinPreset.backgroundOpacity, 0, 95, 1),
         lineSpacing: normalizeNumber(source.lineSpacing, DEFAULT_VIDEO_SUBTITLE_APPEARANCE.lineSpacing, 1, 2, 0.01),
         maxWidth: normalizeNumber(source.maxWidth, DEFAULT_VIDEO_SUBTITLE_APPEARANCE.maxWidth, 40, 100, 1),

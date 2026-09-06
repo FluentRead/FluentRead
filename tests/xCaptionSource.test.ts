@@ -2,7 +2,7 @@ import {afterEach, describe, expect, it, vi} from 'vitest';
 import {parseHTML} from 'linkedom';
 vi.mock('@/src/services/config/store', () => ({config: {uiLanguage: 'zh-CN'}}));
 import {XCaptionSource} from '@/src/features/video-subtitle/content/xCaptionSource';
-import {VIDEO_AI_CAPTION_CONTAINER_ID} from '@/src/features/video-subtitle/content/ui';
+import {getXSubtitleBottomInset, VIDEO_AI_CAPTION_CONTAINER_ID} from '@/src/features/video-subtitle/content/ui';
 
 afterEach(() => vi.unstubAllGlobals());
 function fixture() {
@@ -22,6 +22,50 @@ function fixture() {
 }
 
 describe('X 原生字幕来源', () => {
+  it('自动贴底只避让下方可见控件，失焦隐藏后回到底边', () => {
+    const {state, document} = fixture();
+    const player = state.player;
+    player.getBoundingClientRect = () => ({top: 100, bottom: 680, height: 580}) as DOMRect;
+    vi.stubGlobal('getComputedStyle', (node: HTMLElement) => ({display: node.style.display || 'block', visibility: node.style.visibility || 'visible', opacity: node.style.opacity || '1'}));
+    expect(getXSubtitleBottomInset(player)).toBe(12);
+    const bar = document.createElement('div');
+    bar.innerHTML = '<button aria-label="Settings"></button><button>Play</button>';
+    bar.getBoundingClientRect = () => ({top: 628, bottom: 672, height: 44, width: 900}) as DOMRect;
+    player.appendChild(bar);
+    expect(getXSubtitleBottomInset(player)).toBe(60);
+    bar.style.opacity = '0';
+    expect(getXSubtitleBottomInset(player)).toBe(12);
+    bar.style.opacity = '1';
+    player.style.visibility = 'hidden';
+    expect(getXSubtitleBottomInset(player)).toBe(12);
+    player.style.visibility = 'visible';
+    bar.getBoundingClientRect = () => ({top: 110, bottom: 150, height: 40, width: 900}) as DOMRect;
+    expect(getXSubtitleBottomInset(player)).toBe(12);
+    bar.remove();
+    const ownMenu = document.createElement('div');
+    ownMenu.className = 'fluent-read-video-ui';
+    ownMenu.innerHTML = '<button aria-label="Settings">Options</button><button>Close</button>';
+    player.appendChild(ownMenu);
+    const fallback = document.createElement('div');
+    fallback.className = 'fluent-read-video-controls';
+    fallback.getBoundingClientRect = () => ({top: 636, height: 36, width: 36}) as DOMRect;
+    player.appendChild(fallback);
+    expect(getXSubtitleBottomInset(player)).toBe(52);
+    fallback.style.opacity = '0';
+    state.video.controls = true;
+    Object.assign(state.video, {paused: true});
+    expect(getXSubtitleBottomInset(player)).toBe(56);
+  });
+  it('原生轨道显示与完整导出只保留正文，不泄漏 X 逐词时间标记', () => {
+    const {source, korean} = fixture();
+    korean.activeCues[0].text = '<X-word-ms ms=419,60,340 index=1 character_ranges=0-7,8-10,11-13>Teleport to SF</X-word-ms>';
+    expect(source.sync()!.textContent).toBe('Teleport to SF');
+    expect(source.readNativeTrack()!.cues).toEqual([{startMs: 0, durationMs: 2000, text: 'Teleport to SF'}]);
+    korean.activeCues[0].text = '<X-word-ms ms=419 index=1> </X-word-ms>';
+    expect(source.readNativeTrack()).toBeNull();
+    expect(source.sync()!.textContent).toBe('');
+  });
+
   it('主页直接读取宿主已选韩语原字幕，并导出完整韩语轨道', () => {
     const {source, korean, english} = fixture();
     const container = source.sync()!;

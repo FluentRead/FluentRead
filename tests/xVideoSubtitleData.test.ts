@@ -14,6 +14,19 @@ import {
 } from '@/src/features/video-subtitle/content/xVideoSubtitleData';
 
 describe('X 视频字幕资源', () => {
+  it('清理逐词元数据及其实体形式，保留正文和 cue 原始时间', () => {
+    const tagged = '<X-word-ms ms=419,60,340 index=1 character_ranges=0-7,8-10,11-13>Teleport to SF</X-word-ms>';
+    const encoded = tagged.replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    for (const text of [tagged, encoded]) {
+      expect(cleanSubtitleText(text)).toBe('Teleport to SF');
+      expect(parseWebVttSubtitleResponse(`WEBVTT\n\n00:00:00.419 --> 00:00:01.159\n${text}`))
+        .toEqual([{startMs: 419, durationMs: 740, text: 'Teleport to SF'}]);
+    }
+    expect(cleanSubtitleText('&lt;x-word-ms ms=10&gt;A &amp; B&lt;/x-word-ms&gt;')).toBe('A & B');
+    expect(cleanSubtitleText('&lt;vector&gt; &amp; 1 &lt; 2')).toBe('<vector> & 1 < 2');
+    expect(cleanSubtitleText('<v Speaker><b>Hello</b><br><00:00:01.000>world</v>')).toBe('Hello\nworld');
+  });
+
   it('解析 WebVTT sidecar，并解码 HTML 文本', () => {
     const cues = parseWebVttSubtitleResponse(`WEBVTT\n\n1\n00:00:01.200 --> 00:00:03.400\nHello &amp; welcome<br>to X\n`);
     expect(cues).toEqual([{

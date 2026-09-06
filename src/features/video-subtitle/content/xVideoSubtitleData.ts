@@ -36,13 +36,17 @@ export function decodeHtmlEntities(value: string, useDom = true): string {
 }
 
 export function cleanSubtitleText(value: string): string {
-  return decodeHtmlEntities(value
+  const decoded = decodeHtmlEntities(value
     .replace(/<br\s*\/?>/gi, '\n')
-    .replace(/<[^>]*>/g, '')
+    .replace(/<[^>]*>/g, ''));
+  // X 的逐词时间扩展有时经过实体转义；只移除解码后的该元数据，
+  // 不把字幕里有意转义的 <vector> 等正文再按 HTML 标签剥离。
+  return decoded
+    .replace(/<\/?x-word-ms(?:\s[^<>]*)?\/?>/gi, '')
     .replace(/[\u200b\ufeff]/g, '')
     .replace(/[ \t]+/g, ' ')
     .replace(/\n[ \t]+/g, '\n')
-    .trim());
+    .trim();
 }
 
 export function parseTimestamp(value: string): number | null {

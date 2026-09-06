@@ -2345,6 +2345,8 @@ export const enUSLegacyText: Readonly<Record<string, string>> = {
     "视频字幕预览": "Video subtitle preview",
     "高级调整": "Advanced adjustments",
     "字号": "Font size",
+    "X 自动": "Auto on X",
+    "X 字幕自动贴底": "Auto-position X subtitles at the bottom",
     "底部偏移": "Bottom offset",
     "字幕底部偏移": "Subtitle bottom offset",
     "背景透明度": "Background opacity",

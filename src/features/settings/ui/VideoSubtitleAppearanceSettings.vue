@@ -29,7 +29,7 @@
         </button>
       </div>
 
-      <div class="subtitle-preview-scene" :data-position="config.videoSubtitleAppearance.position" data-video-subtitle-preview-scene>
+      <div class="subtitle-preview-scene" :data-position="config.videoSubtitleAppearance.position" :data-auto-bottom="config.videoSubtitleAppearance.autoBottom" data-video-subtitle-preview-scene>
         <div class="subtitle-live-preview" :style="previewStyle" data-video-subtitle-preview>
           <span>Video subtitle preview</span>
           <b>视频字幕预览</b>
@@ -40,7 +40,8 @@
         <summary>高级调整</summary>
         <div class="subtitle-appearance-controls">
           <label><span>字号 <b>{{ config.videoSubtitleAppearance.fontScale }}%</b></span><input v-model.number="config.videoSubtitleAppearance.fontScale" type="range" min="80" max="160" step="10" aria-label="字幕字号" /></label>
-          <label><span>底部偏移 <b>{{ config.videoSubtitleAppearance.bottomOffset }}%</b></span><input v-model.number="config.videoSubtitleAppearance.bottomOffset" type="range" min="0" max="25" step="1" aria-label="字幕底部偏移" /></label>
+          <label><span>底部偏移 <b>{{ config.videoSubtitleAppearance.position === 'bottom' && config.videoSubtitleAppearance.autoBottom ? 'X 自动' : `${config.videoSubtitleAppearance.bottomOffset}%` }}</b></span><input v-model.number="config.videoSubtitleAppearance.bottomOffset" type="range" min="0" max="25" step="1" aria-label="字幕底部偏移" @input="config.videoSubtitleAppearance.autoBottom = false" /></label>
+          <label v-if="config.videoSubtitleAppearance.position === 'bottom'"><span>X 字幕自动贴底</span><input v-model="config.videoSubtitleAppearance.autoBottom" type="checkbox" aria-label="X 字幕自动贴底" /></label>
           <label><span>背景透明度 <b>{{ config.videoSubtitleAppearance.backgroundOpacity }}%</b></span><input v-model.number="config.videoSubtitleAppearance.backgroundOpacity" type="range" min="0" max="95" step="1" aria-label="字幕背景透明度" /></label>
           <label><span>行距 <b>{{ config.videoSubtitleAppearance.lineSpacing.toFixed(2) }}</b></span><input v-model.number="config.videoSubtitleAppearance.lineSpacing" type="range" min="1" max="2" step="0.01" aria-label="字幕行距" /></label>
           <label><span>最大宽度 <b>{{ config.videoSubtitleAppearance.maxWidth }}%</b></span><input v-model.number="config.videoSubtitleAppearance.maxWidth" type="range" min="40" max="100" step="1" aria-label="字幕最大宽度" /></label>
@@ -116,6 +117,7 @@ function skinSwatchStyle(skin: typeof VIDEO_SUBTITLE_SKINS[number]): Record<stri
 .subtitle-preview-scene::before { position: absolute; inset: 16% 12% auto; height: 34%; border-radius: 999px; background: rgba(255,255,255,.1); content: ''; filter: blur(18px); }
 .subtitle-live-preview { position: absolute; left: 50%; display: grid; justify-items: center; gap: 3px; width: min(96%, var(--fluent-read-video-subtitle-max-width)); max-width: var(--fluent-read-video-subtitle-max-width); padding: 8px 12px; border: 1px solid var(--fluent-read-video-subtitle-border); border-radius: 6px; color: var(--fluent-read-video-subtitle-text-color); background: var(--fluent-read-video-subtitle-background); box-shadow: var(--fluent-read-video-subtitle-shadow); backdrop-filter: var(--fluent-read-video-subtitle-backdrop-filter); font-family: var(--fluent-read-video-subtitle-font-family); font-size: var(--fluent-read-video-subtitle-preview-font-size); line-height: var(--fluent-read-video-subtitle-line-spacing); -webkit-text-stroke: var(--fluent-read-video-subtitle-text-stroke); text-shadow: var(--fluent-read-video-subtitle-text-shadow); transform: translateX(-50%); }
 .subtitle-preview-scene[data-position="bottom"] .subtitle-live-preview { bottom: var(--fluent-read-video-subtitle-bottom-offset); }
+.subtitle-preview-scene[data-position="bottom"][data-auto-bottom="true"] .subtitle-live-preview { bottom: 12px; }
 .subtitle-preview-scene[data-position="center"] .subtitle-live-preview { top: 50%; transform: translate(-50%, -50%); }
 .subtitle-preview-scene[data-position="top"] .subtitle-live-preview { top: var(--fluent-read-video-subtitle-bottom-offset); }
 .subtitle-live-preview b { color: var(--fluent-read-video-subtitle-translation-color); font-weight: 650; }

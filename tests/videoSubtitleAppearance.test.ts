@@ -39,6 +39,7 @@ describe('video subtitle appearance contract', () => {
       translationColor: '#123456',
       position: 'top',
       bottomOffset: 25,
+      autoBottom: false,
       backgroundOpacity: 0,
       lineSpacing: 1.35,
       maxWidth: 67,
@@ -56,6 +57,10 @@ describe('video subtitle appearance contract', () => {
       fontScale: undefined,
     })).toEqual(DEFAULT_VIDEO_SUBTITLE_APPEARANCE);
     expect(normalizeVideoSubtitleAppearance({position: 'center'}).position).toBe('center');
+    expect(normalizeVideoSubtitleAppearance({bottomOffset: 10}).autoBottom).toBe(true);
+    expect(normalizeVideoSubtitleAppearance({bottomOffset: 16}).autoBottom).toBe(false);
+    expect(normalizeVideoSubtitleAppearance({autoBottom: false}).autoBottom).toBe(false);
+    expect(normalizeVideoSubtitleAppearance({autoBottom: true, bottomOffset: 16}).autoBottom).toBe(true);
     expect(normalizeVideoSubtitleAppearance({skin: 'clean'})).toMatchObject({
       textColor: '#1f2937',
       translationColor: '#0f766e',

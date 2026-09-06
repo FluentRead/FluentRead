@@ -43,13 +43,13 @@ let browser;
 let page;
 let control;
 
-async function persistConfig(controlPage, fontScale = 100) {
-  return controlPage.evaluate(async (fontScale) => {
+async function persistConfig(controlPage, fontScale = 100, appearanceOverrides = {}) {
+  return controlPage.evaluate(async ({fontScale, appearanceOverrides}) => {
     const read = await chrome.runtime.sendMessage({type: 'configStorageRead', key: 'local:config'});
     if (!read?.success) throw new Error(`configStorageRead failed: ${JSON.stringify(read)}`);
     const current = typeof read.value === 'string' ? JSON.parse(read.value) : read.value || {};
     return chrome.runtime.sendMessage({
-      type: 'persistConfig', clientId: 'x-native-subtitle-proof', sequence: fontScale,
+      type: 'persistConfig', clientId: 'x-native-subtitle-proof', sequence: Date.now(),
       config: {
         ...current, on: true, from: 'en', videoSourceLanguage: 'auto', to: 'zh-Hans',
         videoTranslationEnabled: true, videoSubtitleVisible: true,
@@ -58,12 +58,12 @@ async function persistConfig(controlPage, fontScale = 100) {
         videoSubtitleAppearance: {
           ...(current.videoSubtitleAppearance || {}), skin: 'clean', textColor: '#1f2937',
           translationColor: '#0f766e', backgroundOpacity: 88, fontScale,
-          position: 'top', maxWidth: 78,
+          position: 'top', maxWidth: 78, ...appearanceOverrides,
         },
       },
       ...(Number.isSafeInteger(current.__fluentConfigRevision) ? {baseRevision: current.__fluentConfigRevision} : {}),
     });
-  }, fontScale);
+  }, {fontScale, appearanceOverrides});
 }
 
 async function waitForNativeText(pageRef, expected) {
@@ -120,6 +120,7 @@ async function main() {
     globalThis.proofAsrCalls = 0;
     globalThis.proofPrepareCalls = 0;
     globalThis.proofTranslationCalls = 0;
+    globalThis.proofTranslationSources = [];
     chrome.runtime.onMessage.addListener(message => {
       if (message?.type === 'fluentReadTranscribeLocalVideoAudio') globalThis.proofAsrCalls += 1;
       if (message?.type === 'fluentReadPrepareLocalVideoModel') globalThis.proofPrepareCalls += 1;
@@ -130,6 +131,7 @@ async function main() {
       if (!url.startsWith('https://edge.microsoft.com/translate/translatetext')) return originalFetch(input, init);
       globalThis.proofTranslationCalls += 1;
       const source = JSON.parse(init.body)[0];
+      globalThis.proofTranslationSources.push(source);
       return new Response(JSON.stringify([{translations: [{text: `译文：${source}`}]}]), {
         status: 200, headers: {'content-type': 'application/json'},
       });
@@ -171,9 +173,9 @@ async function main() {
     const video = document.querySelector('video');
     video.poster = 'https://pbs.twimg.com/ext_tw_video_thumb/424242/pu/img/fixture.jpg';
     const native = video.addTextTrack('captions', 'Korean', 'ko');
-    native.addCue(new VTTCue(0, 1.4, '오늘은 좋은 날입니다.'));
-    native.addCue(new VTTCue(2.7, 5.1, '커피를 마시고 친구를 만났습니다.'));
-    native.addCue(new VTTCue(6.4, 8.65, '내일은 함께 공원에 가려고 합니다.'));
+    native.addCue(new VTTCue(0, 1.4, '<X-word-ms ms=419,60,340 index=1 character_ranges=0-7,8-10,11-13>오늘은 좋은 날입니다.</X-word-ms>'));
+    native.addCue(new VTTCue(2.7, 5.1, '&lt;X-word-ms ms=419 index=1&gt;커피를 마시고 친구를 만났습니다.&lt;/X-word-ms&gt;'));
+    native.addCue(new VTTCue(6.4, 8.65, '<v Speaker><b>내일은 함께 공원에 가려고 합니다.</b></v>'));
     native.mode = 'showing';
     const alternative = video.addTextTrack('captions', 'French', 'fr');
     alternative.addCue(new VTTCue(0, 1.2, 'French native fixture'));
@@ -276,10 +278,72 @@ async function main() {
   await download.saveAs(srtPath);
   report.srtPath = srtPath;
   report.srt = fs.readFileSync(srtPath, 'utf8');
+  assert.doesNotMatch(report.srt, /X-word-ms|character_ranges|&lt;|<v /i);
+  report.translationSources = await worker.evaluate(() => globalThis.proofTranslationSources);
+  assert.ok(report.translationSources.length > 0);
+  for (const source of report.translationSources) assert.doesNotMatch(source, /X-word-ms|character_ranges|&lt;|<v /i);
   assert.match(report.srt, /오늘은 좋은 날입니다\./u);
   assert.match(report.srt, /커피를 마시고 친구를 만났습니다\./u);
   assert.match(report.srt, /내일은 함께 공원에 가려고 합니다\./u);
 
+  await persistConfig(control, 100, {position: 'bottom', autoBottom: true, bottomOffset: 10});
+  await page.locator('h1').click();
+  await page.evaluate(() => {
+    const video = document.querySelector('video');
+    video.controls = false;
+    const bar = document.createElement('div');
+    bar.id = 'fixture-x-controls';
+    bar.style.cssText = 'position:absolute;bottom:0;left:0;width:100%;height:48px;opacity:0;pointer-events:none;background:#202020';
+    bar.innerHTML = '<button aria-label="Play">Play</button><button aria-label="Settings">Settings</button>';
+    video.parentElement.appendChild(bar);
+  });
+  const readPlacement = () => page.evaluate(() => {
+    const player = document.querySelector('[data-testid="videoPlayer"]');
+    const panel = document.querySelector('#fluent-read-video-subtitle-panel');
+    const a = player.getBoundingClientRect();
+    const b = panel.getBoundingClientRect();
+    return {gap: a.bottom - b.bottom, top: b.top - a.top, height: b.height, playerHeight: a.height};
+  });
+  const waitBottom = expected => page.waitForFunction(value => {
+    const panel = document.querySelector('#fluent-read-video-subtitle-panel');
+    const player = document.querySelector('[data-testid="videoPlayer"]');
+    return panel && Math.abs(player.getBoundingClientRect().bottom - panel.getBoundingClientRect().bottom - value) < 2;
+  }, expected, {timeout: 10000});
+  await waitBottom(12);
+  report.autoBottomHidden = await readPlacement();
+  await screenshot(page, 'native-bottom-hidden-controls');
+  await page.evaluate(() => { const bar = document.querySelector('#fixture-x-controls'); bar.style.opacity = '1'; bar.style.pointerEvents = 'auto'; });
+  await waitBottom(56);
+  report.autoBottomVisible = await readPlacement();
+  await screenshot(page, 'native-bottom-visible-controls');
+  await page.evaluate(() => {
+    document.querySelector('#fixture-x-controls').style.opacity = '0';
+    const player = document.querySelector('[data-testid="videoPlayer"]');
+    player.style.width = '480px'; player.style.height = '270px';
+  });
+  await waitBottom(12);
+  report.autoBottomResized = await readPlacement();
+  assert.ok(report.autoBottomResized.top >= 0);
+  await page.evaluate(() => {
+    const button = document.createElement('button');
+    button.id = 'fixture-fullscreen';
+    button.textContent = 'Fullscreen';
+    button.onclick = () => document.querySelector('[data-testid="videoPlayer"]').requestFullscreen();
+    document.body.prepend(button);
+  });
+  await helper.activateExtensionTabWithoutForeground({serviceWorkers: () => [worker]}, page);
+  await page.locator('#fixture-fullscreen').click();
+  await page.waitForFunction(() => Boolean(document.fullscreenElement));
+  await waitBottom(12);
+  report.autoBottomFullscreen = await readPlacement();
+  await screenshot(page, 'native-bottom-fullscreen');
+  await page.evaluate(() => document.exitFullscreen());
+  await persistConfig(control, 100, {position: 'bottom', autoBottom: false, bottomOffset: 16});
+  await waitBottom(270 * .16);
+  report.manualBottomOffset = await readPlacement();
+  await page.locator('video').hover();
+  await page.evaluate(() => { const bar = document.querySelector('#fixture-x-controls'); bar.style.opacity = '1'; bar.style.pointerEvents = 'auto'; });
+  await page.locator('#fluent-read-video-subtitle-button').click();
   await page.locator('[data-action="toggle-translation"]').click();
   await page.waitForFunction(() => document.querySelector('video').textTracks[0].mode === 'showing');
   assert.equal(await page.evaluate(() => document.querySelector('video').textTracks[1].mode), 'disabled');

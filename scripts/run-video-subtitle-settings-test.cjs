@@ -204,18 +204,15 @@ async function main() {
       await reloadedTranslationToggle.locator('xpath=ancestor::*[contains(@class, "el-switch")]').click({force: true});
     }
     await optionsPage.waitForFunction(() => document.querySelector('.video-model-status')?.textContent.includes('当前模型已下载'));
-    if (await optionsPage.locator('.video-model-management').getAttribute('open') !== null) fail('已下载模型的管理面板应默认收起');
-    result.modelState = {fixtureMetadata:true,downloaded:['tiny','base'],managementCollapsed:true};
+    result.modelState = {fixtureMetadata:true,downloaded:['tiny','base'],managementCollapsed:false};
     await screenshot(optionsPage, path.join(options.artifactsDir, 'options-model-downloaded.png'));
     result.screenshots.push(path.join(options.artifactsDir, 'options-model-downloaded.png'));
 
     const modelManagement = optionsPage.locator('.video-model-management');
-    await modelManagement.locator('summary').click();
     await modelManagement.locator('.video-model-card').first().waitFor({state: 'visible'});
-    result.modelDescriptions = await modelManagement.locator('.video-model-copy').allTextContents();
+    result.modelDescriptions = await modelManagement.locator('.video-model-description').allTextContents();
     await screenshot(optionsPage, path.join(options.artifactsDir, 'options-model-descriptions.png'));
     result.screenshots.push(path.join(options.artifactsDir, 'options-model-descriptions.png'));
-    await modelManagement.locator('summary').click();
 
     const skinButtons = optionsPage.locator('[data-video-subtitle-appearance] button[data-skin]');
     const skinIds = await skinButtons.evaluateAll(items => items.map(item => item.getAttribute('data-skin')).filter(Boolean));
@@ -230,12 +227,14 @@ async function main() {
     await optionsPage.locator('details.subtitle-appearance-advanced').evaluate(element => { element.open = true; });
     await setRange(optionsPage, '字幕字号', 130);
     await setRange(optionsPage, '字幕底部偏移', 16);
+    if (await optionsPage.getByRole('checkbox', {name: 'X 字幕自动贴底'}).isChecked()) fail('手动偏移应关闭 X 自动贴底');
     await setRange(optionsPage, '字幕背景透明度', 44);
     await setRange(optionsPage, '字幕行距', 1.45);
     await setRange(optionsPage, '字幕最大宽度', 78);
     await optionsPage.locator('[data-video-subtitle-appearance] select[aria-label="字幕位置"]').selectOption('top');
     const reset = optionsPage.getByRole('button', {name: '恢复默认'});
     await reset.click();
+    if (!(await optionsPage.getByRole('checkbox', {name: 'X 字幕自动贴底'}).isChecked())) fail('恢复默认应启用 X 自动贴底');
     const resetState = await optionsPage.locator('[data-video-subtitle-appearance]').evaluate(element => ({
       skin: element.querySelector('[data-skin].selected')?.getAttribute('data-skin'),
       fontScale: element.querySelector('input[aria-label="字幕字号"]')?.value,
@@ -254,9 +253,8 @@ async function main() {
       enabled: element.querySelector('[aria-label="视频字幕翻译"]')?.getAttribute('aria-checked'),
     }));
     const cachePanel = optionsPage.locator('[data-video-ai-cache]');
-    await cachePanel.locator('summary').click();
     const cacheStatus = await cachePanel.locator('[role="status"]').textContent();
-    const clearCacheButton = cachePanel.getByRole('button', {name: '清除已识别字幕'});
+    const clearCacheButton = cachePanel.getByRole('button', {name: '清除缓存'});
     const cacheBeforeClear = {status: cacheStatus?.trim() || '', disabled: await clearCacheButton.isDisabled()};
     if (!cacheBeforeClear.status || !/个视频|读取缓存状态/.test(cacheBeforeClear.status)) fail(`X 字幕缓存状态缺失：${JSON.stringify(cacheBeforeClear)}`);
     if (!cacheBeforeClear.disabled) {

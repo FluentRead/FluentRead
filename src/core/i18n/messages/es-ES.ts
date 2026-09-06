@@ -2392,6 +2392,8 @@ export const esESLegacyText: Readonly<Record<string, string>> = {
     "视频字幕预览": "Vista previa de subtítulos de vídeo",
     "高级调整": "Ajustes avanzados",
     "字号": "Tamaño de letra",
+    "X 自动": "Auto en X",
+    "X 字幕自动贴底": "Colocar automáticamente los subtítulos de X abajo",
     "底部偏移": "Desplazamiento inferior",
     "字幕底部偏移": "Desplazamiento inferior de subtítulos",
     "背景透明度": "Opacidad del fondo",

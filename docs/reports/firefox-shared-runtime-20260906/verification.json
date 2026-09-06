@@ -244,5 +244,86 @@
     ".output/chrome-mv3/videoTranscriptionWorker.js": "a32d8206d2064e9b035f06ce59495a501e010ffbe85768ea68572dffcdc0639b",
     ".output/firefox-mv2/chunks/offscreen-CccO2YBY.js": "c4c4a8cd4a12c30f9eb5a6992361f1671d1fb66373e3ef0e19c6a0ea8f249831",
     ".output/firefox-mv2/videoTranscriptionWorker.js": "a32d8206d2064e9b035f06ce59495a501e010ffbe85768ea68572dffcdc0639b"
+  },
+  "mergeValidation": {
+    "base": "0c7c5db894407e744ea48eac5fed85c14816b223",
+    "testedProductionCommit": "4cb26a7588948c14d827d30d4930e9553bb06bcb",
+    "strictCoverage": {
+      "files": 224,
+      "tests": 4318,
+      "statements": 100,
+      "branches": 100,
+      "functions": 100,
+      "lines": 100
+    },
+    "allTests": {
+      "files": 274,
+      "tests": 5270,
+      "failed": 0
+    },
+    "checks": [
+      "audit",
+      "compile",
+      "chrome-build",
+      "firefox-build",
+      "manifest",
+      "userscript-build-and-verifier"
+    ],
+    "chromium": {
+      "scope": "real Tesseract OCR + deterministic Google transport + production extension",
+      "cases": [
+        "missing languages exposes preparation action",
+        "real language download, OCR, translation and replacement",
+        "restore and redisplay reuse result without requests or source mutation",
+        "scroll retains same decoded bitmap",
+        "DOM geometry matches source: contain-padding-border",
+        "DOM geometry matches source: cover-padding-border",
+        "DOM geometry matches source: none-padding-border",
+        "DOM geometry matches source: ancestor-clipping",
+        "DOM geometry matches source: ancestor-scroll-clipping",
+        "dynamic source change removes old translation",
+        "cancel never installs a late result",
+        "retry works after cancellation",
+        "transparent PNG hides original letters while translated bitmap remains visible",
+        "restoring transparent source releases only the extension opacity lease",
+        "host opacity change removes old replacement and preserves the host value",
+        "image removal cleans overlay"
+      ],
+      "success": true,
+      "profileRemoved": true,
+      "launchMode": "macos-background-cdp",
+      "focusPolicy": "launchservices-no-foreground",
+      "windowPlacement": {
+        "mode": "background-visible-no-focus",
+        "visible": true,
+        "hidden": false,
+        "centered": true,
+        "windowState": "normal",
+        "bounds": {
+          "left": 212,
+          "top": -990,
+          "width": 1280,
+          "height": 900
+        },
+        "displayTarget": "secondary",
+        "source": "macos-nsscreen",
+        "screenIndex": 1,
+        "browserFrontmost": false,
+        "frontmostBefore": {
+          "pid": 2127,
+          "name": "Google Chrome"
+        },
+        "frontmostAfter": {
+          "pid": 2127,
+          "name": "Google Chrome"
+        }
+      }
+    },
+    "buildSha256": {
+      ".output/chrome-mv3/chunks/offscreen-CccO2YBY.js": "c4c4a8cd4a12c30f9eb5a6992361f1671d1fb66373e3ef0e19c6a0ea8f249831",
+      ".output/chrome-mv3/videoTranscriptionWorker.js": "a32d8206d2064e9b035f06ce59495a501e010ffbe85768ea68572dffcdc0639b",
+      ".output/firefox-mv2/chunks/offscreen-CccO2YBY.js": "c4c4a8cd4a12c30f9eb5a6992361f1671d1fb66373e3ef0e19c6a0ea8f249831",
+      ".output/firefox-mv2/videoTranscriptionWorker.js": "a32d8206d2064e9b035f06ce59495a501e010ffbe85768ea68572dffcdc0639b"
+    }
   }
 }

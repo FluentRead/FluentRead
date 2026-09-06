@@ -2,7 +2,19 @@
 
 Firefox MV2 通过后台页面中的隐藏 iframe 加载与 Chromium 相同的 `offscreen.html`。OCR、图片和区域翻译、Whisper Worker、TTS 播放器与业务消息协议均复用现有实现；新增平台文件只选择文档容器并管理 Firefox iframe。准备、并发复用、握手、超时、取消和丢失重建继续使用同一个 `createOffscreenClient`。
 
-基础提交：`f04a0fb`。Chrome Translator 仍只在支持它的 Chrome 中开放；此适配不开放 Firefox MV3。
+首次浏览器验证的基础提交：`f04a0fb`。Chrome Translator 仍只在支持它的 Chrome 中开放；此适配不开放 Firefox MV3。
+
+## 合并前复验
+
+用户授权上传并合并后，将任务分支接到最新主分支 `0c7c5db894407e744ea48eac5fed85c14816b223`，没有冲突。生产代码验证提交为 `4cb26a7588948c14d827d30d4930e9553bb06bcb`，之后仅补充本报告与结构化证据。
+
+- 全套测试：274 个文件、5,270 项测试全部通过。首次验证记录中的测试归属问题已由主分支 PR #485 修复；一次因 Finder 在工作树生成 `.DS_Store` 导致的文件头审计失败，在将该未跟踪元数据移至临时备份后复验通过，没有修改审计规则。
+- 严格覆盖率：224 个文件、4,318 项测试通过，语句、分支、函数、行均为 100%。
+- 测试审计、类型检查、Chrome/Firefox 构建、manifest 校验、userscript 构建和验证通过。
+- 更新后 Chrome 产物再次通过 Edge 的 16 项图片交互回归，临时配置已删除，测试窗口在第二块屏幕正常显示且未抢占前台。
+- Chrome 与 Firefox 的共享 DOM 核心和 Whisper Worker SHA-256 仍与下方真实 Firefox 测试产物完全相同。Firefox 的运行证据来自首次验证的生产构建，未声称已重跑整个 Firefox 网站交互层。
+
+结构化证据的 `mergeValidation` 字段记录此轮测试与浏览器结果。下文保留首次验证范围和当时发现的问题，不能将历史基线失败视为最终待合并版本的失败。
 
 ## 真实浏览器证据
 
@@ -21,7 +33,7 @@ Firefox MV2 通过后台页面中的隐藏 iframe 加载与 Chromium 相同的 `
 
 ![Firefox 实际生成的译图](./firefox-shared-runtime-20260906/translated-image.png)
 
-## 自动化与打包
+## 首次验证的自动化与打包
 
 - `pnpm test:audit` 通过。
 - 严格覆盖率：223 个文件、4,271 个测试通过，语句、分支、函数与行覆盖率均为 100%；新平台文件纳入严格覆盖率。

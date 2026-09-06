@@ -20,6 +20,17 @@ export type OcrWorkerRuntimeDependencies<TResult> = {
     sparseTextMode: string | number;
 };
 
+function normalizeLanguages(languages: string): string {
+    const normalized = languages
+        .split('+')
+        .map(language => language.trim())
+        .filter(Boolean);
+    if (normalized.length === 0 || normalized.some(language => !/^[a-z][a-z0-9_]*$/iu.test(language))) {
+        throw new Error('图片 OCR 语言包配置无效，请重新下载语言包');
+    }
+    return [...new Set(normalized)].join('+');
+}
+
 export type OcrWorkerRuntime<TResult> = {
     recognize: (image: string, languages: string, signal?: AbortSignal, pageSegmentationMode?: string | number) => Promise<TResult>;
     clearModels: (remove: () => Promise<void>) => Promise<void>;
@@ -148,7 +159,7 @@ export function createOcrWorkerRuntime<TResult>(
         recognize(image, languages, signal, pageSegmentationMode = dependencies.sparseTextMode) {
             return runExclusive(async () => {
                 if (signal?.aborted) throw createOcrAbortError();
-                const worker = await runAbortable(getWorker(languages), signal);
+                const worker = await runAbortable(getWorker(normalizeLanguages(languages)), signal);
                 if (configuredWorker !== worker || configuredMode !== pageSegmentationMode) {
                     // 设置失败时不再认为旧参数可信；下一任务必须重新配置。
                     configuredWorker = null;
@@ -166,7 +177,8 @@ export function createOcrWorkerRuntime<TResult>(
             if (languages.length === 0) return Promise.resolve();
             return runExclusive(async () => {
                 if (signal?.aborted) throw createOcrAbortError();
-                await runAbortable(getWorker(languages.join('+')), signal);
+                const normalized = normalizeLanguages(languages.join('+'));
+                await runAbortable(getWorker(normalized), signal);
             }, signal);
         },
     };

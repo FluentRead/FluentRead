@@ -148,6 +148,27 @@ describe('OCR worker runtime', () => {
         expect(factory).not.toHaveBeenCalled();
     });
 
+    it('拒绝分号或路径片段语言标识，避免生成 ./;.traineddata', async () => {
+        const factory = vi.fn(async () => createWorker('invalid'));
+        const runtime = createOcrWorkerRuntime({createWorker: factory, sparseTextMode: 11});
+
+        await expect(runtime.ensureLanguages(['eng;chi_sim' as never])).rejects.toThrow('语言包配置无效');
+        await expect(runtime.recognize('image', 'eng;chi_sim')).rejects.toThrow('语言包配置无效');
+        expect(factory).not.toHaveBeenCalled();
+    });
+
+    it('规范化重复语言并保持稳定顺序，避免重复下载同一语言包', async () => {
+        const worker = createWorker('eng+chi_sim');
+        const factory = vi.fn(async (languages: string) => {
+            expect(languages).toBe('eng+chi_sim');
+            return worker;
+        });
+        const runtime = createOcrWorkerRuntime({createWorker: factory, sparseTextMode: 11});
+
+        await runtime.ensureLanguages(['eng', 'eng', 'chi_sim']);
+        expect(factory).toHaveBeenCalledOnce();
+    });
+
     it('排队请求立即取消，不终止仍在识别的 Worker，也不让后续请求插队', async () => {
         const recognition = deferred<RecognitionResult>();
         const worker = createWorker('active');

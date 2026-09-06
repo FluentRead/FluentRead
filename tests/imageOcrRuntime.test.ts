@@ -85,11 +85,11 @@ describe('图片 OCR 处理与结果缓存', () => {
     it('扩展 Worker 使用本地资源目录并复用语言下载边界及取消信号', async () => {
         vi.stubGlobal('chrome', {runtime: {getURL: (path: string) => `chrome-extension://test${path}`}});
         await createRuntime.mock.calls[0][0].createWorker('jpn+eng');
-        expect(tesseractCreateWorker).toHaveBeenCalledWith('jpn+eng', 1, {
+        expect(tesseractCreateWorker).toHaveBeenCalledWith(['jpn', 'eng'], 1, {
             workerPath: 'chrome-extension://test/fluent-read-ocr/worker/worker.min.js',
             corePath: 'chrome-extension://test/fluent-read-ocr/core',
             cachePath: 'fluent-read-image-ocr', workerBlobURL: false,
-        });
+        }, {tessedit_load_sublangs: ''});
         const {downloadImageOcrLanguages} = await import('@/src/features/image-translation/services/ocrRuntime');
         const controller = new AbortController();
         await downloadImageOcrLanguages(['jpn', 'eng'], controller.signal);

@@ -94,14 +94,28 @@ describe('图片翻译流程优化',()=>{
     });
     it('操作条有可见阶段、取消、准备和完整文字，拒绝宿主页合成点击',()=>{
         const {document,window}=parseHTML('<html></html>');vi.stubGlobal('document',document);
-        const onAction=vi.fn(),onPrepare=vi.fn(),onInspect=vi.fn();const ui=createImageControls({onAction,onPrepare,onInspect});document.body.append(ui.element);
+        const onAction=vi.fn(),onPrepare=vi.fn(),onDismiss=vi.fn(),onInspect=vi.fn();const ui=createImageControls({onAction,onPrepare,onDismiss,onInspect});document.body.append(ui.feedback, ui.element);
         const click=(target:Element,trusted:boolean)=>{const e=new window.Event('click',{bubbles:true});Object.defineProperty(e,'isTrusted',{value:trusted});target.dispatchEvent(e);};
         ui.update('loading','正在识别文字');expect(ui.button.textContent).toBe('取消');expect(ui.status.hidden).toBe(false);
+        expect(ui.element.className).toBe('fr-image-controls');
+        expect(ui.feedback.hidden).toBe(false);
+        expect(ui.spinner.getAttribute('aria-hidden')).toBe('true');
+        ui.update('loading','正在识别文字',{animations:false});expect(ui.spinner.dataset.animated).toBe('false');
         click(ui.button,false);expect(onAction).not.toHaveBeenCalled();click(ui.button,true);expect(onAction).toHaveBeenCalledOnce();
-        ui.update('error','缺少语言包',{prepare:true});const buttons=ui.element.querySelectorAll('button');expect(buttons[1].hidden).toBe(false);click(buttons[1],true);expect(onPrepare).toHaveBeenCalledOnce();
+        ui.update('error','首次使用需准备识别语言包，下载后自动继续',{prepare:true});const buttons=ui.feedback.querySelectorAll('button');expect(buttons).toHaveLength(4);expect(buttons[1].hidden).toBe(false);expect(buttons[1].textContent).toBe('下载语言包并翻译');expect(buttons[1].className).toBe('fr-image-prepare');expect(buttons[0].textContent).toBe('关闭');expect(ui.element.dataset.preparation).toBe('true');expect(ui.feedback.querySelector('.fr-image-actions')).not.toBeNull();click(buttons[1],true);expect(onPrepare).toHaveBeenCalledOnce();click(buttons[0],true);expect(onDismiss).toHaveBeenCalledOnce();
+        expect(ui.feedback.hidden).toBe(false);
+        ui.update('error','图片翻译失败：网络错误');expect(ui.dismiss.hidden).toBe(false);click(ui.dismiss,true);expect(onDismiss).toHaveBeenCalledTimes(2);
         ui.setLines([{text:'完整译文 <script>不执行</script>'}]);ui.update('translated','已翻译');expect(ui.status.hidden).toBe(true);click(buttons[2],true);expect(buttons[2].getAttribute('aria-expanded')).toBe('true');expect(ui.element.querySelector('script')).toBeNull();expect(onInspect).toHaveBeenCalledOnce();
+        expect(ui.feedback.hidden).toBe(true);
         ui.element.dispatchEvent(new window.Event('wheel',{bubbles:true}));ui.update('idle','翻译图片');ui.setLines([]);ui.dispose();click(ui.button,true);expect(onAction).toHaveBeenCalledOnce();expect(ui.element.isConnected).toBe(false);
         const optional=createImageControls({onAction,onPrepare});optional.setLines([{text:'x'}]);optional.update('translated','完成');click(optional.element.querySelectorAll('button')[2],true);optional.dispose();
+        const noDismiss = createImageControls({onAction, onPrepare});
+        document.body.append(noDismiss.feedback, noDismiss.element);
+        noDismiss.update('error', '首次使用需准备识别语言包，下载后自动继续', {prepare: true});
+        expect(() => click(noDismiss.button, true)).not.toThrow();
+        noDismiss.update('error', '图片翻译失败：网络错误');
+        expect(() => click(noDismiss.dismiss, true)).not.toThrow();
+        noDismiss.dispose();
     });
 
     it('进度回调异常不影响后续进度或业务成功', async () => {
@@ -255,7 +269,7 @@ describe('图片翻译流程优化',()=>{
         });
         const onAction = vi.fn();
         const ui = createImageControls({onAction, onPrepare: vi.fn()});
-        document.body.append(ui.element);
+        document.body.append(ui.feedback, ui.element);
         const inspect = ui.element.querySelectorAll('button')[2];
         ui.update('translated', '完成');
         expect(inspect.hidden).toBe(true);
@@ -312,7 +326,7 @@ describe('图片控件界面语言', () => {
         const controls = createImageControls({onAction() {}, onPrepare() {}, translate: source => translateLegacyText(source, language)});
         controls.update('error', '没有识别到圈选区域文字', {prepare: true});
         expect(controls.status.textContent).toBe('No text was recognized in the selected region.');
-        expect(controls.element.querySelectorAll('button')[1].textContent).toBe('Download language pack and retry');
+        expect(controls.feedback.querySelectorAll('button')[1].textContent).toBe('Download language pack and translate');
         controls.setLines([{text: '原文'}]);
         controls.update('translated', '翻译完成');
         const details = controls.element.querySelector('pre')!;

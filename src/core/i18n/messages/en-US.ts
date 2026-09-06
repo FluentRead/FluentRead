@@ -2437,6 +2437,8 @@ export const enUSLegacyText: Readonly<Record<string, string>> = {
     "点击“开始翻译”，只会填充每个 JSON 路径对应的字符串译文。": "Choose Start translation to fill only string translations for each JSON path.",
     "点击“开始翻译”，译文会按当前文档的阅读结构显示。": "Choose Start translation to display results in this document’s reading structure.",
     "下载语言包并重试": "Download language pack and retry",
+    "下载语言包并翻译": "Download language pack and translate",
+    "关闭图片翻译提示": "Dismiss image translation notice",
     "查看完整译文": "View full translation",
     "图片完整译文": "Full image translation",
     "原图": "Original image",

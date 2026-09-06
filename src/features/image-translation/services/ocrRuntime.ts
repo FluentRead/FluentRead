@@ -23,10 +23,14 @@ function extensionAsset(path: string): string {
 }
 
 type TesseractRecognitionResult = Awaited<ReturnType<Worker['recognize']>>;
+// 6.1.2 内置 core 在遍历语言 vector 时追加 CJK 模型声明的竖排子语言，会使迭代器失效并误读为「;」。
+// 所需语言已由 getOcrLanguages 显式传入；初始化时关闭隐式子语言，保留这些已下载主模型。
+// 上游同类修复：https://github.com/tesseract-ocr/tesseract/issues/4002；JS 类型未列出此 core 初始化参数。
+const OCR_INIT_CONFIG = {tessedit_load_sublangs: ''} as unknown as Parameters<typeof createWorker>[3];
 
 const ocrWorkerRuntime = createOcrWorkerRuntime<TesseractRecognitionResult>({
     sparseTextMode: PSM.SPARSE_TEXT,
-    createWorker: async languages => createWorker(languages, 1, {
+    createWorker: async languages => createWorker(languages.split('+'), 1, {
         workerPath: extensionAsset('worker/worker.min.js'),
         corePath: extensionAsset('core'),
         cachePath: 'fluent-read-image-ocr',
@@ -34,7 +38,7 @@ const ocrWorkerRuntime = createOcrWorkerRuntime<TesseractRecognitionResult>({
         // 并将解压后的语言包缓存到 Offscreen Document 的 IndexedDB。
         // Offscreen 页面拥有扩展源，直接加载本地 worker 可避免 Blob Worker 的 CSP/源限制。
         workerBlobURL: false,
-    }) as unknown as Promise<OcrWorkerPort<TesseractRecognitionResult>>,
+    }, OCR_INIT_CONFIG) as unknown as Promise<OcrWorkerPort<TesseractRecognitionResult>>,
 });
 
 const MAX_CACHED_OCR_IMAGES = 3;

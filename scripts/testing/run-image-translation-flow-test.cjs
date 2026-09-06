@@ -21,13 +21,16 @@ const extensionDir = path.resolve(arg('extension-dir', '.output/chrome-mv3'));
 const artifacts = path.resolve(arg('artifacts-dir', '/private/tmp/fluentread-image-flow'));
 const playwrightRoot = arg('playwright-root', process.env.PLAYWRIGHT_ROOT);
 const focusHelper = arg('focus-safe-helper', process.env.FLUENTREAD_FOCUS_SAFE_HELPER);
+const xSurface = process.argv.includes('--x-surface');
+const liveTranslation = process.argv.includes('--live-translation');
+const multilingual = process.argv.includes('--multilingual');
 if (!playwrightRoot || !focusHelper)
     throw new Error('必须提供 --playwright-root 与 --focus-safe-helper');
 const { chromium } = require(path.join(playwrightRoot, 'playwright'));
 const { launchFocusSafePersistentContext, newPageWithoutForeground } = require(focusHelper);
 fs.mkdirSync(artifacts, { recursive: true });
 const report = {
-    scope: 'real Tesseract OCR + deterministic Google transport + production extension',
+    scope: `real Tesseract OCR + ${liveTranslation ? 'live Google transport' : 'deterministic Google transport'} + production extension`,
     cases: [], errors: [], screenshots: [], geometry: [], cleanupErrors: [],
     profileMode: 'automatically-created-temporary-profile',
 };
@@ -47,7 +50,7 @@ button {background:red;color:black;border:30px solid green}
 body>div {animation:none}
 </style></head><body>
 <h1>图片翻译 · 端到端验证</h1>
-<p>真实 OCR / 确定性翻译 / 原图与译图切换</p>
+<p>真实 OCR / ${liveTranslation ? '在线翻译' : '确定性翻译'} / 原图与译图切换</p>
 <div class="card"><img id="sample" alt="英文截图"></div>
 <div style="height:1000px"></div>
 <script>
@@ -56,9 +59,24 @@ canvas.width = 1400; canvas.height = 700;
 const context = canvas.getContext('2d');
 context.fillStyle = '#fff'; context.fillRect(0, 0, 1400, 700);
 context.fillStyle = '#19304b'; context.font = '48px Arial';
-['Welcome to FluentRead', 'Translate images with one click', 'Read every word in your language']
+${JSON.stringify(multilingual
+    ? ['简体中文阅读测试', '繁體中文閱讀測試', 'English OCR language test']
+    : ['Welcome to FluentRead', 'Translate images with one click', 'Read every word in your language'])}
     .forEach((text, index) => context.fillText(text, 70, 145 + index * 155));
 document.querySelector('#sample').src = canvas.toDataURL();
+${xSurface ? `
+const image = document.querySelector('#sample');
+const photo = document.createElement('div');
+photo.dataset.testid = 'tweetPhoto';
+photo.style.cssText = 'position:relative;width:700px;height:350px;overflow:hidden;border-radius:16px';
+image.before(photo); photo.append(image);
+const background = document.createElement('div');
+background.id = 'x-surface';
+background.style.cssText = 'position:absolute;inset:0;background-size:cover;background-position:center';
+background.style.backgroundImage = 'url("' + image.src + '")';
+photo.prepend(background);
+image.style.cssText = 'position:absolute;inset:0;width:100%;height:100%;opacity:0;z-index:-1';
+` : ''}
 </script></body></html>`;
 const server = http.createServer((_request, response) => {
     response.setHeader('content-type', 'text/html; charset=utf-8');
@@ -68,6 +86,7 @@ let launched;
 let launchAttempted = false;
 let page;
 let cdp;
+let diagnosticCdp;
 let readUi;
 let currentCase = 'launch';
 
@@ -265,21 +284,122 @@ async function verifyGeometryCases({worker, ui, wait, shot}) {
     assert.equal(launched.windowPlacement.mode, 'background-visible-no-focus');
     assert.equal(launched.windowPlacement.browserFrontmost, false);
     const context = launched.context;
+    report.console = [];
+    context.on('console', message => {
+        if (['warning', 'error'].includes(message.type())) report.console.push({type: message.type(), text: message.text().slice(0, 1500)});
+    });
+    // Offscreen / dedicated OCR Worker 不一定由 Playwright 作为 Page 暴露，直接订阅其 CDP 控制台。
+    if (xSurface) {
+        diagnosticCdp = await context.browser().newBrowserCDPSession();
+        const observed = new Set();
+        const enabledSessions = new Set();
+        const sessionParents = new Map();
+        let diagnosticMessageId = 0;
+        report.ocrConsole = [];
+        report.ocrTargets = [];
+        const targetIsOcr = targetInfo => targetInfo.url.includes('/fluent-read-ocr/') || targetInfo.url.endsWith('/offscreen.html');
+        const sendToTargetSession = async (sessionId, method, params = {}) => {
+            const id = ++diagnosticMessageId;
+            const message = JSON.stringify({id, method, params});
+            const parentSessionId = sessionParents.get(sessionId);
+            if (parentSessionId) {
+                await sendToTargetSession(parentSessionId, 'Target.sendMessageToTarget', {
+                    sessionId,
+                    message,
+                });
+                return;
+            }
+            await diagnosticCdp.send('Target.sendMessageToTarget', {sessionId, message});
+        };
+        const enableNestedTargets = async sessionId => {
+            if (enabledSessions.has(sessionId)) return;
+            enabledSessions.add(sessionId);
+            await sendToTargetSession(sessionId, 'Runtime.enable');
+            await sendToTargetSession(sessionId, 'Target.setAutoAttach', {
+                autoAttach: true,
+                waitForDebuggerOnStart: false,
+                flatten: false,
+            });
+        };
+        const recordTarget = (targetInfo, parentSessionId) => {
+            if (!targetIsOcr(targetInfo)) return;
+            if (observed.has(targetInfo.targetId)) return;
+            observed.add(targetInfo.targetId);
+            report.ocrTargets.push({
+                targetId: targetInfo.targetId,
+                parentSessionId: parentSessionId || null,
+                type: targetInfo.type,
+                url: targetInfo.url,
+            });
+        };
+        const attachTarget = async (targetInfo, parentSessionId = null) => {
+            if (!targetIsOcr(targetInfo) || observed.has(targetInfo.targetId)) return;
+            try {
+                const {sessionId} = await diagnosticCdp.send('Target.attachToTarget', {
+                    targetId: targetInfo.targetId,
+                    flatten: false,
+                });
+                sessionParents.set(sessionId, parentSessionId);
+                recordTarget(targetInfo, parentSessionId);
+                await enableNestedTargets(sessionId);
+            } catch (error) {
+                report.ocrConsole.push({diagnosticError: error.message, targetUrl: targetInfo.url});
+            }
+        };
+        const handleTargetEvent = async (event, parentSessionId = null) => {
+            if (event.method === 'Target.attachedToTarget') {
+                const {sessionId, targetInfo} = event.params;
+                if (!targetIsOcr(targetInfo)) return;
+                sessionParents.set(sessionId, parentSessionId);
+                recordTarget(targetInfo, parentSessionId);
+                try {
+                    await enableNestedTargets(sessionId);
+                } catch (error) {
+                    report.ocrConsole.push({diagnosticError: error.message, targetUrl: targetInfo.url});
+                }
+                return;
+            }
+            if (event.method === 'Target.detachedFromTarget') return;
+            if (event.method === 'Runtime.consoleAPICalled' && ['warning','error'].includes(event.params.type)) {
+                report.ocrConsole.push({
+                    type: event.params.type,
+                    targetSessionId: parentSessionId,
+                    text: event.params.args.map(arg=>arg.value ?? arg.description ?? '').join(' ').slice(0,2000),
+                });
+            }
+        };
+        diagnosticCdp.on('Target.receivedMessageFromTarget', async ({sessionId, message}) => {
+            try {
+                await handleTargetEvent(JSON.parse(message), sessionId);
+            } catch (error) {
+                report.ocrConsole.push({diagnosticError: error.message, targetSessionId: sessionId});
+            }
+        });
+        diagnosticCdp.on('Target.attachedToTarget', event => {
+            void handleTargetEvent(event).catch(error => report.ocrConsole.push({diagnosticError: error.message}));
+        });
+        const observeTarget = ({targetInfo}) => void attachTarget(targetInfo);
+        diagnosticCdp.on('Target.targetCreated', observeTarget);
+        diagnosticCdp.on('Target.targetInfoChanged', observeTarget);
+        await diagnosticCdp.send('Target.setDiscoverTargets',{discover:true});
+        const {targetInfos}=await diagnosticCdp.send('Target.getTargets');
+        await Promise.all(targetInfos.map(targetInfo=>attachTarget(targetInfo)));
+    }
     const worker = context.serviceWorkers().find(w => w.url().startsWith('chrome-extension://')) || await context.waitForEvent('serviceworker', { timeout: 30000 });
     const popup = await newPageWithoutForeground(context, 30000);
     await popup.goto(`chrome-extension://${new URL(worker.url()).host}/popup.html`);
-    await popup.evaluate(async () => {
+    await popup.evaluate(async xSurface => {
         const read = await chrome.runtime.sendMessage({type: 'configStorageRead', key: 'local:config'});
         const config = read.value;
-        const patch = {on: true, disableImageTranslator: false, from: 'en', to: 'zh-Hans', service: 'google'};
+        const patch = {on: true, disableImageTranslator: false, from: xSurface ? 'auto' : 'en', to: 'zh-Hans', service: 'google'};
         const response = await chrome.runtime.sendMessage({
             type: 'persistConfig', mode: 'patch', config: patch,
             expected: Object.fromEntries(Object.keys(patch).map(key => [key, config[key]])),
             clientId: 'image-flow-fixture', sequence: 1, baseRevision: config.__fluentConfigRevision || 0,
         });
         if (!response.success) throw new Error(response.error);
-    });
-    await worker.evaluate(() => {
+    }, xSurface);
+    await worker.evaluate(liveTranslation => {
         const originalFetch = globalThis.fetch.bind(globalThis);
         globalThis.__imageFixture = {requests: [], delay: 250};
         globalThis.fetch = async (input, options) => {
@@ -290,6 +410,7 @@ async function verifyGeometryCases({worker, ui, wait, shot}) {
                 const origin = JSON.parse(rpc[1])[0][0];
                 if (typeof origin !== 'string') throw new Error('Unexpected Google batchexecute payload');
                 globalThis.__imageFixture.requests.push(origin);
+                if (liveTranslation) return originalFetch(input, options);
                 await new Promise((resolve, reject) => {
                     const signal = options.signal;
                     const onAbort = () => {
@@ -315,7 +436,7 @@ async function verifyGeometryCases({worker, ui, wait, shot}) {
             // OCR worker、wasm 和语言包仍沿真实生产路径加载，不 mock Tesseract。
             return originalFetch(input, options);
         };
-    });
+    }, liveTranslation);
     page = await newPageWithoutForeground(context, 30000);
     page.on('pageerror', e => report.errors.push(e.message));
     await page.goto(`http://127.0.0.1:${server.address().port}/`);
@@ -379,6 +500,27 @@ async function verifyGeometryCases({worker, ui, wait, shot}) {
         report.screenshots.push(file);
     }
     const image = page.locator('#sample');
+    if (xSurface) {
+        currentCase = 'X snapshot surface and first-use automatic OCR languages';
+        const {verifyXSurface} = require('./image-translation-x-surface.cjs');
+        await verifyXSurface({page, context, popup, worker, ui, wait, click, shot, report,
+            originalImage: arg('original-image', null)});
+        assert.ok(report.ocrTargets.some(target => target.type === 'worker' && target.url.includes('/fluent-read-ocr/')),
+            '必须实际监听 dedicated OCR Worker，才能断言不存在语言加载错误');
+        assert.equal(report.ocrConsole.some(entry => entry.diagnosticError), false, 'OCR 控制台监听不得静默失效');
+        assert.equal(report.ocrConsole.some(entry => /Error opening data file|Failed loading language|Tesseract couldn't load/.test(entry.text || '')),
+            false, '显式下载的语言包不应触发子语言文件加载错误');
+        if (multilingual) {
+            const requests = report.requests.join('\n');
+            assert.match(requests, /简体中文/u, '真实 OCR 请求缺少简体中文');
+            assert.match(requests, /繁體中文/u, '真实 OCR 请求缺少繁體中文');
+            assert.match(requests, /English|OCR|language/u, '真实 OCR 请求缺少英文');
+            report.cases.push('multilingual OCR requests include simplified Chinese, traditional Chinese, and English');
+        }
+        assert.equal(report.errors.length, 0);
+        report.success = true;
+        return;
+    }
     currentCase = 'first-use language preparation';
     await image.hover();
     await wait(() => ui("return !!this.querySelector('.fr-image-controls')"));
@@ -396,7 +538,7 @@ async function verifyGeometryCases({worker, ui, wait, shot}) {
     await wait(() => ui("return this.querySelector('.fr-image-controls')?.dataset.phase==='error'"));
     await shot('01-language-preparation');
     report.cases.push('missing languages exposes preparation action');
-    await click('下载语言包并重试');
+    await click('下载语言包并翻译');
     const began = Date.now();
     await wait(() => ui("return this.querySelector('.fr-image-controls')?.dataset.phase==='translated'"), 300000);
     report.coldPreparationAndTranslationMs = Date.now() - began;
@@ -531,6 +673,7 @@ async function verifyGeometryCases({worker, ui, wait, shot}) {
         if (readUi) report.failure.ui = await readUi('return this.textContent').catch(() => null);
     }
 }).finally(async () => {
+    if (diagnosticCdp) await diagnosticCdp.detach().catch(error=>report.cleanupErrors.push(`OCR console detach: ${error.message}`));
     if (cdp) {
         if (readUi) await readUi('this.__progressObserver?.disconnect(); return true;').catch(() => undefined);
         await cdp.detach().catch(error => report.cleanupErrors.push(`CDP session detach: ${error.message}`));

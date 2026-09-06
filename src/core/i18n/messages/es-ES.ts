@@ -2484,6 +2484,8 @@ export const esESLegacyText: Readonly<Record<string, string>> = {
     "点击“开始翻译”，只会填充每个 JSON 路径对应的字符串译文。": "Inicia la traducción para rellenar solo cadenas de cada ruta JSON.",
     "点击“开始翻译”，译文会按当前文档的阅读结构显示。": "Inicia la traducción para ver resultados según la estructura del documento.",
     "下载语言包并重试": "Descargar paquete de idioma y reintentar",
+    "下载语言包并翻译": "Descargar paquete de idioma y traducir",
+    "关闭图片翻译提示": "Cerrar aviso de traducción de imagen",
     "查看完整译文": "Ver traducción completa",
     "图片完整译文": "Traducción completa de la imagen",
     "原图": "Imagen original",

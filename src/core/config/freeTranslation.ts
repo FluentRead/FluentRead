@@ -10,6 +10,7 @@ export const FREE_TRANSLATION_PROVIDERS = [
     {id: 'deeplx', label: 'DeepLX', description: '非官方公共接口，无需密钥', official: false},
     {id: 'google', label: '谷歌翻译', description: '网页接口，非官方公开 API', official: false},
     {id: 'myMemory', label: 'MyMemory', description: '官方 API，匿名每天 5,000 字符', official: true},
+    {id: 'apertium', label: 'Apertium', description: '免密钥开源翻译，支持部分欧洲语言对；不支持中日韩。', official: true},
 ] as const;
 
 export const DEFAULT_FREE_TRANSLATION_ORDER = ['microsoft', 'deeplx', 'google', 'myMemory'] as const;

@@ -89,7 +89,7 @@ export function getMissingCredentialMessage(
 ): string | null {
     const serviceLabel = getServiceLabel(service, config);
 
-    if (servicesType.isUseToken(service) && service !== services.deeplx && isApiKeyRequired(service, config)) {
+    if (servicesType.isUseToken(service) && service !== services.deeplx && service !== services.libreTranslate && isApiKeyRequired(service, config)) {
         if (!config.token?.[service]?.trim()) {
             return `${serviceLabel} 需要 API Key（访问令牌），当前尚未配置；请先在设置中填写，再开始翻译。`;
         }

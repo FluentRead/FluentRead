@@ -18,6 +18,8 @@ const serviceGuide = 'https://fluent.thinkstu.com/config/translation-engines'
 const serviceWebsites = {
   microsoft: 'https://www.bing.com/translator',
   freeTranslation: serviceGuide,
+  apertium: 'https://apertium.org/',
+  libreTranslate: 'https://docs.libretranslate.com/',
   myMemory: 'https://mymemory.translated.net/doc/spec.php',
   deepL: 'https://www.deepl.com/en/products/api',
   deeplx: 'https://deeplx.owo.network/',

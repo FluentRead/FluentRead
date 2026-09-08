@@ -2870,7 +2870,7 @@ async function main() {
       'siliconCloud', 'newapi', 'infini', 'openrouter', 'groq', 'azureOpenai',
     ];
     const expectedMachineServices = [
-      'freeTranslation', 'myMemory', 'microsoft', 'google', 'deepL', 'deeplx', 'xiaoniu', 'youdao', 'tencent',
+      'freeTranslation', 'apertium', 'libreTranslate', 'myMemory', 'microsoft', 'google', 'deepL', 'deeplx', 'xiaoniu', 'youdao', 'tencent',
     ];
     const providerServices = await serviceCatalog
       .locator('[data-service-subgroup="ai-providers"] .service-item')

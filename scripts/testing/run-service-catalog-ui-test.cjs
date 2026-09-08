@@ -2,9 +2,9 @@
 
 /**
  * @file scripts/testing/run-service-catalog-ui-test.cjs
- * 文件职责：在屏幕外隔离 Edge 中验证翻译服务目录的二级分类、顺序、折叠、搜索与响应式布局。
+ * 文件职责：在不抢焦点的隔离 Edge 中验证翻译服务目录的二级分类、顺序、折叠、搜索与响应式布局。
  * 主要内容：加载生产扩展，检查动态自定义服务入口、模型服务商和聚合平台清单，覆盖机器翻译手动折叠、搜索自动展开、编辑状态与窄屏无横向溢出。
- * 模块边界：脚本只操作本次创建的临时浏览器 profile，不访问用户日常浏览器，也不修改扩展持久配置或调用翻译服务。
+ * 模块边界：脚本只操作本次创建的临时浏览器 profile，不访问用户日常浏览器，也仅在临时 profile 中验证实例地址持久化，不调用翻译服务。
  */
 
 const fs = require('node:fs');
@@ -32,7 +32,7 @@ const expectedPlatformServices = [
   'siliconCloud', 'newapi', 'infini', 'openrouter', 'groq', 'azureOpenai',
 ];
 const expectedMachineServices = [
-  'freeTranslation', 'myMemory', 'microsoft', 'google', 'deepL', 'deeplx', 'xiaoniu', 'youdao', 'tencent',
+  'freeTranslation', 'apertium', 'libreTranslate', 'myMemory', 'microsoft', 'google', 'deepL', 'deeplx', 'xiaoniu', 'youdao', 'tencent',
 ];
 
 if (!fs.existsSync(path.join(extensionDir, 'manifest.json'))) throw new Error(`扩展产物不存在：${extensionDir}`);
@@ -214,6 +214,35 @@ async function main() {
       clearSearchRestoredCollapse: true,
       aiSelectionPreservedCollapse: true,
     };
+
+    await serviceSearch.fill('Apertium');
+    await catalog.locator('[data-service-value="apertium"]').click();
+    const apertiumConfiguration = page.locator('[data-service-configuration-service="apertium"]');
+    await apertiumConfiguration.waitFor({state: 'visible', timeout});
+    if (!await apertiumConfiguration.getByText('Apertium 支持部分欧洲语言对，不支持中日韩。短文本请手动选择来源语言；不支持的语言对会提示切换服务。', {exact: true}).isVisible()
+      || await apertiumConfiguration.locator('input[type="password"]').count()) {
+      throw new Error('Apertium 语言限制说明或免密钥配置异常');
+    }
+    await screenshot(page, 'apertium-settings.png', report);
+    await serviceSearch.fill('LibreTranslate');
+    await catalog.locator('[data-service-value="libreTranslate"]').click();
+    const instanceInput = page.getByRole('textbox', {name: 'LibreTranslate 实例地址', exact: true});
+    await instanceInput.fill('http://localhost:5000/translate');
+    await instanceInput.blur();
+    await page.waitForTimeout(600);
+    await page.reload({waitUntil: 'domcontentloaded'});
+    await catalog.waitFor({state: 'visible', timeout});
+    await serviceSearch.fill('LibreTranslate');
+    await catalog.locator('[data-service-value="libreTranslate"]').click();
+    if (await instanceInput.inputValue() !== 'http://localhost:5000/translate') {
+      throw new Error('LibreTranslate 实例地址重开后未保留');
+    }
+    const libreConfiguration = page.locator('[data-service-configuration-service="libreTranslate"]');
+    if (await libreConfiguration.locator('input[type="password"]').count() !== 1) {
+      throw new Error('LibreTranslate 缺少可选密钥输入');
+    }
+    report.openTranslationServices = {apertiumKeyless: true, languageLimitVisible: true, libreEndpointPersisted: true, libreOptionalKeyVisible: true};
+    await screenshot(page, 'libretranslate-settings.png', report);
 
     for (const viewport of [
       {width: 820, height: 900},

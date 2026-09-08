@@ -55,3 +55,10 @@ Choosing a local model determines where that translation goes. Dictionary, read-
 ## Connection failed?
 
 Check the key, address, model, and provider balance. If short sentences work but long pages do not, reduce concurrency or try another service. Never include real credentials in feedback. See [Troubleshooting](/en/guide/faq).
+
+## More open-source translation services
+
+- **Apertium** requires no key and supports selected European language pairs, such as English–Spanish. Chinese, Japanese and Korean are not supported. Select it directly or enable it in the free fallback settings. Set the source language for short text.
+- **LibreTranslate** connects to your own instance. Enter the full `/translate` URL. Self-hosted instances can run without a key; official hosting requires one. Supported languages and quotas depend on the instance.
+
+Existing service selections and fallback order are preserved. Neither service is enabled in the default fallback order.

@@ -191,8 +191,8 @@ export function createTranslationBroker(deps: TranslationBrokerDependencies): Tr
     }
 
     function getProviderEndpoint(current: TranslationProviderConfigSnapshot, service: string): string {
-        // 这两条路径固定使用匿名端点，残留代理不能分裂缓存或在途去重。
-        if (service === 'freeTranslation' || service === 'myMemory') return '';
+        // 这些路径固定使用匿名端点，残留代理不能分裂缓存或在途去重。
+        if (service === 'freeTranslation' || service === 'myMemory' || service === 'apertium') return '';
         if (deps.serviceTypes.isAiSdk(service)) {
             try {
                 return deps.endpointResolver.resolveOpenAICompatibleEndpoint(service, current).endpoint;

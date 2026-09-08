@@ -46,6 +46,8 @@ export function getMimoEndpoint(billingPlan: string, region: string): string {
 
 // 常量工具类
 export const urls: any = {
+    [services.apertium]: "https://apertium.org/apy/translate",
+    [services.libreTranslate]: "",
     [services.myMemory]: "https://api.mymemory.translated.net/get",
     [services.deepL]: "https://api-free.deepl.com/v2/translate",
     [services.deeplx]: DEFAULT_DEEPLX_ENDPOINT,

@@ -1,17 +1,19 @@
 import {afterEach, beforeEach, describe, expect, it, vi} from 'vitest';
 
-const {mockConfig, microsoftMock, deeplxMock, googleMock, myMemoryMock} = vi.hoisted(() => ({
+const {mockConfig, microsoftMock, deeplxMock, googleMock, myMemoryMock, apertiumMock} = vi.hoisted(() => ({
     mockConfig: {} as Record<string, any>,
     microsoftMock: vi.fn(),
     deeplxMock: vi.fn(),
     googleMock: vi.fn(),
     myMemoryMock: vi.fn(),
+    apertiumMock: vi.fn(),
 }));
 vi.mock('@/src/services/config/store', () => ({config: mockConfig}));
 vi.mock('@/src/providers/translation/microsoft', () => ({translateMicrosoftTexts: microsoftMock}));
 vi.mock('@/src/providers/translation/deeplx', () => ({translateDeepLXText: deeplxMock}));
 vi.mock('@/src/providers/translation/google', () => ({translateGoogleText: googleMock}));
 vi.mock('@/src/providers/translation/mymemory', () => ({default: myMemoryMock}));
+vi.mock('@/src/providers/translation/apertium', () => ({default: apertiumMock}));
 
 import type {TranslationConfigSource} from '@/src/services/translation/types';
 import {DEFAULT_DEEPLX_ENDPOINT} from '@/src/core/config/deeplx';
@@ -340,4 +342,17 @@ describe('免费翻译服务', () => {
         await expect(freeTranslation({origin: 42 as unknown as string})).rejects.toThrow('仅支持文本输入');
         expect(microsoftMock).not.toHaveBeenCalled();
     });
+});
+
+it('uses explicitly enabled Apertium then falls back for unsupported language pairs', async () => {
+    mockConfig.freeTranslationOrder = ['apertium', 'google'];
+    apertiumMock.mockRejectedValue(httpFailure(400));
+    googleMock.mockResolvedValue('译文');
+    await expect(translateFreeText('Hello')).resolves.toBe('译文');
+    const request = apertiumMock.mock.calls[0]![0];
+    expect(request.serviceOverride).toBe('apertium');
+    expect(readSnapshot(request).token).toEqual({});
+    expect(readSnapshot(request).proxy).toEqual({});
+    apertiumMock.mockResolvedValue('Hola');
+    await expect(translateFreeText('Hello again')).resolves.toBe('Hola');
 });

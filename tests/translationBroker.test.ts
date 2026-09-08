@@ -57,6 +57,7 @@ const mocks = vi.hoisted(() => {
         '': service,
         freeTranslation: service,
         myMemory: service,
+        apertium: service,
         ai: service,
         aiSdk: service,
         azureOpenai: service,
@@ -383,7 +384,7 @@ describe('translation broker', () => {
         expect(mocks.service).toHaveBeenCalledTimes(2);
     });
 
-    it.each(['freeTranslation', 'myMemory'])('%s 在途去重归一默认值且忽略实际不用的 Key 与代理', async service => {
+    it.each(['freeTranslation', 'myMemory', 'apertium'])('%s 在途去重归一默认值且忽略实际不用的 Key 与代理', async service => {
         Object.assign(mocks.config, {service, useCache: false});
         const pending = deferred<string>();
         mocks.service.mockReturnValue(pending.promise);

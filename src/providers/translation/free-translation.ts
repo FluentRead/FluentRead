@@ -8,6 +8,7 @@ import sha256 from 'crypto-js/sha256';
 import {translateMicrosoftTexts} from './microsoft';
 import {translateDeepLXText} from './deeplx';
 import {translateGoogleText} from './google';
+import apertium from './apertium';
 import myMemory from './mymemory';
 import {services} from '@/src/core/config/catalog';
 import {urls} from '@/src/core/config/constants';
@@ -48,6 +49,7 @@ const providerTranslators: Record<FreeProviderId, (request: TranslationProviderR
     deeplx: request => translateDeepLXText(request.origin, services.deeplx, request),
     google: request => translateGoogleText(request.origin, request.sourceLanguage!, request.targetLanguage!, request.abortSignal),
     myMemory,
+    apertium,
 };
 
 function prepareRequest(message: FreeTranslationRequest): PreparedRequest {

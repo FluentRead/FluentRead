@@ -50,6 +50,11 @@
           <p v-if="draft.service === services.deepL" class="hint">选择与 API Key 对应的套餐；代理地址优先于套餐默认接口。</p>
           <label v-if="isCustomOpenAIService"><span>自定义接口地址</span><input v-model.trim="customOpenAIEndpoint" inputmode="url" :maxlength="MAX_CUSTOM_OPENAI_PROVIDER_ENDPOINT_LENGTH" /></label>
           <label v-if="draft.service === services.deeplx"><span>DeepLX 地址</span><input v-model.trim="draft.deeplx" inputmode="url" /></label>
+          <p v-if="draft.service === services.apertium" class="hint">Apertium 支持部分欧洲语言对，不支持中日韩。短文本请手动选择来源语言；不支持的语言对会提示切换服务。</p>
+          <template v-if="draft.service === services.libreTranslate">
+            <label><span>LibreTranslate 实例地址</span><input v-model.trim="draft.proxy[draft.service]" placeholder="http://localhost:5000/translate" /></label>
+            <p class="hint">填写完整 /translate 地址；自建实例可免密钥，官方托管服务需要密钥。</p>
+          </template>
           <template v-if="draft.service === services.myMemory">
             <label><span>MyMemory 邮箱（可选）</span><input v-model.trim="draft.myMemoryEmail" type="email" /></label>
             <p class="hint">官方 API：匿名每天 5,000 字符，有效邮箱每天 50,000 字符。</p>

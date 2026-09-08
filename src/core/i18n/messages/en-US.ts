@@ -2026,6 +2026,12 @@ const enUSLegacyTextBase: Readonly<Record<string, string>> = {
 };
 
 export const enUSLegacyText: Readonly<Record<string, string>> = {
+    "免密钥开源翻译，支持部分欧洲语言对；不支持中日韩。": "Keyless open-source translation for selected European language pairs; no Chinese, Japanese or Korean.",
+    "连接自建免费实例；需填写实例地址，密钥按实例要求选填。": "Connect a free self-hosted instance. Enter its URL and a key only if required.",
+    "Apertium 支持部分欧洲语言对，不支持中日韩。短文本请手动选择来源语言；不支持的语言对会提示切换服务。": "Apertium supports selected European language pairs, excluding Chinese, Japanese and Korean. Select the source language for short text; switch services for unsupported pairs.",
+    "LibreTranslate 实例地址": "LibreTranslate instance URL",
+    "填写完整 /translate 地址；自建实例可免密钥，官方托管服务需要密钥。": "Enter the full /translate URL. Self-hosted instances can work without a key; official hosting requires one.",
+
     "非官方公共接口，无需密钥": "Unofficial public endpoint; no API key required",
     '请输入有效邮箱，或留空。': 'Enter a valid email address, or leave this blank.',
     '按设置顺序自动切换可用服务；支持每路超时和失败冷却。': 'Automatically tries available services in your chosen order, with a timeout and cooldown for each service.',

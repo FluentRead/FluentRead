@@ -22,6 +22,12 @@
       <path d="M5 7h10M5 12h7M5 17h5" />
       <path d="m15 9 4 3-4 3M19 12H9" />
     </svg>
+    <svg v-else-if="service === 'apertium'" viewBox="0 0 24 24" role="img">
+      <path d="m4 18 8-13 8 13M7 13h10M8 19h8" />
+    </svg>
+    <svg v-else-if="service === 'libreTranslate'" viewBox="0 0 24 24" role="img">
+      <path d="M4 5h9v9H4zM11 10h9v9h-9M6 8h5M8 6v5M14 13l3 4M17 13l-3 4" />
+    </svg>
     <svg v-else-if="service === 'myMemory'" viewBox="0 0 24 24" role="img">
       <path d="M4 5h6a3 3 0 0 1 3 3v12a4 4 0 0 0-3-2H4V5ZM13 8a3 3 0 0 1 3-3h4v13h-4a4 4 0 0 0-3 2" />
       <path d="M7 9h3M7 12h3M16 9h1M16 12h1" />

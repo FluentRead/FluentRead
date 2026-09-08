@@ -9,6 +9,8 @@
 import {services} from "@/src/core/config/catalog";
 import {isCustomOpenAIProviderId, LEGACY_CUSTOM_OPENAI_PROVIDER_ID} from '@/src/core/config/customOpenAI';
 import {AI_SDK_SERVICE_IDS} from './ai-sdk/endpoints';
+import apertium from "./apertium";
+import libreTranslate from "./libretranslate";
 import myMemory from "./mymemory";
 import microsoft from "./microsoft";
 import freeTranslation from "./free-translation";
@@ -33,6 +35,8 @@ export type TranslationProviderRegistry = Record<string, TranslationProvider>;
 
 const legacyServices: TranslationProviderRegistry = {
     // 机器翻译
+    [services.apertium]: apertium,
+    [services.libreTranslate]: libreTranslate,
     [services.myMemory]: myMemory,
     [services.microsoft]: microsoft,
     [services.freeTranslation]: freeTranslation,

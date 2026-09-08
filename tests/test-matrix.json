@@ -261,6 +261,7 @@
       "tests/learningMemoryRepository.test.ts",
       "tests/optionsAppNavigationLifecycle.test.ts",
       "tests/myMemoryProvider.test.ts",
+      "tests/openTranslationProviders.test.ts",
       "tests/writingRuntime.test.ts",
       "tests/writingIntegration.test.ts",
       "tests/popupActions.test.ts",

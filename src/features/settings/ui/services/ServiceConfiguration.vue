@@ -68,6 +68,12 @@
 
     <FreeTranslationSettings v-if="service === services.freeTranslation" :config="config" />
 
+    <p v-if="service === services.apertium" class="official-translation-help">Apertium 支持部分欧洲语言对，不支持中日韩。短文本请手动选择来源语言；不支持的语言对会提示切换服务。</p>
+    <div v-if="service === services.libreTranslate" class="connection-field">
+      <div class="connection-field-label"><strong>LibreTranslate 实例地址</strong><small>填写完整 /translate 地址；自建实例可免密钥，官方托管服务需要密钥。</small></div>
+      <div class="connection-field-control"><el-input v-model.trim="config.proxy[service]" placeholder="http://localhost:5000/translate" aria-label="LibreTranslate 实例地址" /></div>
+    </div>
+
     <template v-if="service === services.myMemory">
       <div class="connection-field" data-mymemory-email>
         <div class="connection-field-label"><strong>联系邮箱（可选）</strong><small>不填写也可以使用</small></div>

@@ -2073,6 +2073,12 @@ const esESLegacyTextBase: Readonly<Record<string, string>> = {
 };
 
 export const esESLegacyText: Readonly<Record<string, string>> = {
+    "免密钥开源翻译，支持部分欧洲语言对；不支持中日韩。": "Traducción de código abierto sin clave para algunos pares de idiomas europeos; no admite chino, japonés ni coreano.",
+    "连接自建免费实例；需填写实例地址，密钥按实例要求选填。": "Conecta una instancia gratuita propia. Introduce su URL y una clave solo si es necesaria.",
+    "Apertium 支持部分欧洲语言对，不支持中日韩。短文本请手动选择来源语言；不支持的语言对会提示切换服务。": "Apertium admite algunos pares de idiomas europeos, excepto chino, japonés y coreano. Selecciona el idioma de origen para textos cortos; usa otro servicio para pares no compatibles.",
+    "LibreTranslate 实例地址": "URL de la instancia LibreTranslate",
+    "填写完整 /translate 地址；自建实例可免密钥，官方托管服务需要密钥。": "Introduce la URL completa con /translate. Las instancias propias pueden funcionar sin clave; el alojamiento oficial requiere una.",
+
     "非官方公共接口，无需密钥": "Interfaz pública no oficial, sin clave API",
     '请输入有效邮箱，或留空。': 'Introduce un correo electrónico válido o deja el campo vacío.',
     "按设置顺序自动切换可用服务；支持每路超时和失败冷却。": "Prueba automáticamente los servicios disponibles en el orden elegido, con un tiempo límite y una pausa tras cada fallo.",

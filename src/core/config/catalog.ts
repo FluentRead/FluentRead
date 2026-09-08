@@ -15,6 +15,8 @@ export const services = {
     microsoft: "microsoft",
     freeTranslation: "freeTranslation",
     myMemory: "myMemory",
+    apertium: "apertium",
+    libreTranslate: "libreTranslate",
     deepL: "deepL",
     deeplx: "deeplx",
     google: "google",
@@ -51,7 +53,7 @@ export const services = {
 
 export const servicesType = {
     // 阵营划分
-    machine: new Set([services.myMemory, services.microsoft, services.freeTranslation, services.deepL, services.deeplx, services.google, services.xiaoniu, services.youdao, services.tencent, services.chromeTranslator,]),
+    machine: new Set([services.apertium, services.libreTranslate, services.myMemory, services.microsoft, services.freeTranslation, services.deepL, services.deeplx, services.google, services.xiaoniu, services.youdao, services.tencent, services.chromeTranslator,]),
     AI: new Set([
         services.openai,
         services.azureOpenai,
@@ -101,6 +103,7 @@ export const servicesType = {
     ]),
     // 需要 token
     useToken: new Set([
+        services.libreTranslate,
         services.openai,
         services.azureOpenai,
         services.gemini,
@@ -429,6 +432,8 @@ export const options = {
             label: "免费翻译服务",
             description: "按设置顺序自动切换可用服务；支持每路超时和失败冷却。",
         },
+        {value: services.apertium, label: "Apertium", description: "免密钥开源翻译，支持部分欧洲语言对；不支持中日韩。"},
+        {value: services.libreTranslate, label: "LibreTranslate", description: "连接自建免费实例；需填写实例地址，密钥按实例要求选填。"},
         {value: services.myMemory, label: "MyMemory", description: "官方免费 API，匿名每天 5,000 字符；可选邮箱提升额度。"},
         {value: services.microsoft, label: "微软翻译"},
         {value: services.google, label: "谷歌翻译"},

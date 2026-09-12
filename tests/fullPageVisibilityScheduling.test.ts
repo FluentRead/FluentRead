@@ -50,6 +50,8 @@ const runtime = vi.hoisted(() => ({
         style: 0,
         fullPageTranslationMode: "viewport" as "viewport" | "all",
         translationScope: "content" as "content" | "all",
+        // 这些用例验证纯视口门禁，关闭免滚动预翻译预算以隔离被测调度路径。
+        eagerTranslationCharacters: 0,
         maxConcurrentTranslations: 3,
     },
     ensureTranslationTruncationLayout: vi.fn(() => true),

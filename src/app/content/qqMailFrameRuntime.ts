@@ -23,7 +23,7 @@ import {createContentHotkeyRuntime} from './hotkeyRuntime';
 import {mountConfiguredQuickTranslation} from './quickTranslationRuntime';
 import {installPageStyles} from './pageStyles';
 import {syncBilingualSentenceHighlight} from './bilingualSentenceHighlight';
-import {createContentSiteAdaptationRuntime} from './siteAdaptationRuntime';
+import {applyCoreTranslationPreferences, createContentSiteAdaptationRuntime} from './siteAdaptationRuntime';
 
 /** 顶层消息仅通过扩展后台到达；页面事件只提示读取真实会话，不能设置快照。 */
 export function installQqMailTopFrameBridge(isEnabled: () => boolean, signal: AbortSignal): ((invocation?: PageTranslationInvocation) => void) | undefined {
@@ -135,7 +135,9 @@ export async function startQqMailFrameApp(ctx: ContentScriptContext): Promise<vo
         if (siteAdaptation.routeChanged(new URL(window.location.href)) && enabled()) void controller.refresh();
     }, {signal: lifetime.signal});
     browser.runtime.onMessage.addListener(listener);
+    applyCoreTranslationPreferences(config);
     const unsubscribe = subscribeConfig(() => {
+        applyCoreTranslationPreferences(config);
         siteAdaptation.update(config.siteAdaptation, new URL(window.location.href));
         syncBilingualSentenceHighlight(document, enabled() && authorized && config.bilingualSentenceHighlightEnabled === true);
         if (!enabled()) controller.suspend();

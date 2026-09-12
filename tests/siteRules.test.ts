@@ -5,8 +5,10 @@ import {
     getSiteBaseDomain,
     isAlwaysTranslateSite,
     isExtensionDisabledOnSite,
+    isFloatingBallDisabledOnSite,
     normalizeAlwaysTranslateDomains,
     normalizeDisabledExtensionDomains,
+    normalizeFloatingBallDisabledDomains,
     shouldAutoTranslatePage,
 } from '@/src/features/site-rules/domain';
 
@@ -130,5 +132,29 @@ describe('始终翻译网站规则', () => {
             autoTranslate: false,
             alwaysTranslateDomains: ['example.com'],
         })).toBe(false);
+    });
+});
+
+describe('悬浮球禁用网站规则', () => {
+    it('按主域名匹配子域，并忽略非法或非数组输入', () => {
+        expect(normalizeFloatingBallDisabledDomains([
+            'https://mail.example.com/inbox',
+            'mail.example.com',
+            'invalid host',
+        ])).toEqual(['example.com']);
+        expect(normalizeFloatingBallDisabledDomains('example.com')).toEqual([]);
+        expect(isFloatingBallDisabledOnSite('https://mail.example.com/inbox', ['example.com'])).toBe(true);
+        expect(isFloatingBallDisabledOnSite('https://example.org/', ['example.com'])).toBe(false);
+        expect(isFloatingBallDisabledOnSite('file:///tmp/article.html', ['example.com'])).toBe(false);
+    });
+
+    it('只影响悬浮球，不改变扩展禁用与自动翻译判定', () => {
+        expect(isExtensionDisabledOnSite('https://mail.example.com/', ['example.com'])).toBe(true);
+        expect(shouldAutoTranslatePage('https://news.example.com/', {
+            on: true,
+            autoTranslate: false,
+            alwaysTranslateDomains: ['example.com'],
+        })).toBe(true);
+        expect(isAlwaysTranslateSite('https://news.example.com/', ['example.com'])).toBe(true);
     });
 });

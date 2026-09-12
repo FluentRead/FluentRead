@@ -2,13 +2,23 @@ import { describe, expect, it } from 'vitest';
 
 import {
     Config,
+    DEFAULT_FLOATING_BALL_COLLAPSED_OPACITY,
+    DEFAULT_FLOATING_BALL_HOVER_DELAY,
     DEFAULT_MOUSE_HOVER_TRANSLATION_DELAY,
     DEFAULT_SELECTION_TRANSLATOR_DELAY,
+    FLOATING_BALL_COLLAPSED_OPACITY_MAX,
+    FLOATING_BALL_COLLAPSED_OPACITY_MIN,
+    FLOATING_BALL_HOVER_DELAY_MAX,
+    FLOATING_BALL_HOVER_DELAY_MIN,
     MOUSE_HOVER_TRANSLATION_DELAY_MAX,
     MOUSE_HOVER_TRANSLATION_DELAY_MIN,
     SELECTION_TRANSLATOR_DELAY_MAX,
     SELECTION_TRANSLATOR_DELAY_MIN,
     normalizeConfig,
+    normalizeFloatingBallClickAction,
+    normalizeFloatingBallCollapsedOpacity,
+    normalizeFloatingBallHoverDelay,
+    normalizeFloatingBallToolsDisplay,
 } from '@/src/core/config/model';
 import { getMimoEndpoint, MIMO_ENDPOINTS, MINIMAX_ENDPOINTS, tongyiTokenPlanUrl, urls } from '@/src/core/config/constants';
 import { currentModelIds, customModelString, defaultModelIds, defaultModels, defaultOption, models, options, resolveConfiguredModel, services, servicesType } from '@/src/core/config/catalog';
@@ -936,6 +946,80 @@ describe('鼠标悬浮翻译延迟配置', () => {
             .toBe(MOUSE_HOVER_TRANSLATION_DELAY_MAX);
         expect(normalizeConfig({mouseHoverTranslationDelay: 'invalid'}).mouseHoverTranslationDelay)
             .toBe(DEFAULT_MOUSE_HOVER_TRANSLATION_DELAY);
+    });
+});
+
+describe('悬浮球进阶外观配置', () => {
+    it('默认保持既有观感：悬停展开、立即响应、点击翻译、标准尺寸并显示设置入口', () => {
+        const defaults = new Config();
+        expect(defaults.floatingBallToolsDisplay).toBe('hover');
+        expect(defaults.floatingBallHoverDelay).toBe(DEFAULT_FLOATING_BALL_HOVER_DELAY);
+        expect(defaults.floatingBallClickAction).toBe('translate');
+        expect(defaults.floatingBallCompact).toBe(false);
+        expect(defaults.floatingBallSettingsEntryVisible).toBe(true);
+        expect(defaults.floatingBallCollapsedOpacity).toBe(DEFAULT_FLOATING_BALL_COLLAPSED_OPACITY);
+        expect(defaults.floatingBallDisabledDomains).toEqual([]);
+
+        const normalized = normalizeConfig({});
+        expect(normalized.floatingBallToolsDisplay).toBe('hover');
+        expect(normalized.floatingBallHoverDelay).toBe(DEFAULT_FLOATING_BALL_HOVER_DELAY);
+        expect(normalized.floatingBallClickAction).toBe('translate');
+        expect(normalized.floatingBallCompact).toBe(false);
+        expect(normalized.floatingBallSettingsEntryVisible).toBe(true);
+        expect(normalized.floatingBallCollapsedOpacity).toBe(DEFAULT_FLOATING_BALL_COLLAPSED_OPACITY);
+        expect(normalized.floatingBallDisabledDomains).toEqual([]);
+    });
+
+    it('接受合法的显示方式与点击行为，并把其他值收敛为默认值', () => {
+        expect(normalizeFloatingBallToolsDisplay('always')).toBe('always');
+        expect(normalizeFloatingBallToolsDisplay('hidden')).toBe('hidden');
+        expect(normalizeFloatingBallToolsDisplay('sidebar')).toBe('hover');
+        expect(normalizeFloatingBallToolsDisplay(undefined)).toBe('hover');
+        expect(normalizeFloatingBallClickAction('settings')).toBe('settings');
+        expect(normalizeFloatingBallClickAction('none')).toBe('none');
+        expect(normalizeFloatingBallClickAction(12)).toBe('translate');
+        expect(normalizeConfig({floatingBallToolsDisplay: 'always', floatingBallClickAction: 'none'}))
+            .toMatchObject({floatingBallToolsDisplay: 'always', floatingBallClickAction: 'none'});
+        expect(normalizeConfig({floatingBallToolsDisplay: 'panel', floatingBallClickAction: 'panel'}))
+            .toMatchObject({floatingBallToolsDisplay: 'hover', floatingBallClickAction: 'translate'});
+    });
+
+    it('按步长归一化展开延迟与收起不透明度，并限制越界值', () => {
+        expect(normalizeFloatingBallHoverDelay(480)).toBe(500);
+        expect(normalizeFloatingBallHoverDelay('250')).toBe(250);
+        expect(normalizeFloatingBallHoverDelay(-100)).toBe(FLOATING_BALL_HOVER_DELAY_MIN);
+        expect(normalizeFloatingBallHoverDelay(99999)).toBe(FLOATING_BALL_HOVER_DELAY_MAX);
+        for (const value of [null, false, '', '   ', 'invalid', Number.NaN]) {
+            expect(normalizeFloatingBallHoverDelay(value)).toBe(DEFAULT_FLOATING_BALL_HOVER_DELAY);
+        }
+
+        expect(normalizeFloatingBallCollapsedOpacity(50)).toBe(52);
+        expect(normalizeFloatingBallCollapsedOpacity('100')).toBe(FLOATING_BALL_COLLAPSED_OPACITY_MAX);
+        expect(normalizeFloatingBallCollapsedOpacity(0)).toBe(FLOATING_BALL_COLLAPSED_OPACITY_MIN);
+        expect(normalizeFloatingBallCollapsedOpacity(400)).toBe(FLOATING_BALL_COLLAPSED_OPACITY_MAX);
+        expect(normalizeFloatingBallCollapsedOpacity('very light')).toBe(DEFAULT_FLOATING_BALL_COLLAPSED_OPACITY);
+        expect(normalizeConfig({floatingBallHoverDelay: 510, floatingBallCollapsedOpacity: 31}))
+            .toMatchObject({floatingBallHoverDelay: 500, floatingBallCollapsedOpacity: 32});
+    });
+
+    it('布尔开关只接受真实布尔值，设置入口默认保持开启', () => {
+        expect(normalizeConfig({floatingBallCompact: true}).floatingBallCompact).toBe(true);
+        expect(normalizeConfig({floatingBallCompact: 'true'}).floatingBallCompact).toBe(false);
+        expect(normalizeConfig({floatingBallSettingsEntryVisible: false}).floatingBallSettingsEntryVisible).toBe(false);
+        expect(normalizeConfig({floatingBallSettingsEntryVisible: 'no'}).floatingBallSettingsEntryVisible).toBe(true);
+    });
+
+    it('禁用悬浮球网站统一归并为可注册域名并去重', () => {
+        expect(normalizeConfig({
+            floatingBallDisabledDomains: [
+                'https://mail.example.com/inbox',
+                'MAIL.EXAMPLE.COM',
+                'not a domain',
+                42,
+                'news.bbc.co.uk',
+            ],
+        }).floatingBallDisabledDomains).toEqual(['example.com', 'bbc.co.uk']);
+        expect(normalizeConfig({floatingBallDisabledDomains: 'example.com'}).floatingBallDisabledDomains).toEqual([]);
     });
 });
 

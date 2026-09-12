@@ -1,7 +1,7 @@
 <!--
  * @file src/features/settings/ui/AlwaysTranslateSites.vue
- * 文件职责：实现“始终翻译”与“从不翻译”网站列表编辑器，接收可配置文案和域名数组，并通过 v-model 更新规范化后的规则集合。
- * 主要内容：组件解析用户输入或当前站点为 eTLD+1 基础域名，处理重复、无效域名、添加反馈、删除与输入聚焦，并展示网站数量和空状态。
+ * 文件职责：实现“始终翻译”、“禁用扩展”与“不显示悬浮球”三类网站名单编辑器，接收域名数组并通过 v-model 更新规范化后的规则集合。
+ * 主要内容：组件按 variant 选择成套文案与图标，解析用户输入或当前站点为 eTLD+1 基础域名，处理重复、无效域名、添加反馈、删除与输入聚焦，并展示网站数量和空状态。
  * 模块边界：它不直接读取当前标签页、不持久化配置也不决定规则优先级；调用方提供 currentDomain 和 labels，域名算法来自 core/site-rules，保存由 SettingsSections 统一触发。
  -->
 <template>
@@ -53,7 +53,7 @@
         role="listitem"
         :data-site-rule="domain"
       >
-        <span class="site-rule-icon" aria-hidden="true"><UiIcon :name="variant === 'disable-extension' ? 'shield' : 'globe'" /></span>
+        <span class="site-rule-icon" aria-hidden="true"><UiIcon :name="iconName" /></span>
         <span class="site-rule-copy">
           <strong :title="domain">{{ domain }}</strong>
           <small>{{ labels.itemDescription }}</small>
@@ -78,9 +78,31 @@ import { computed, nextTick, ref } from 'vue';
 import { getSiteBaseDomain } from '@/src/core/site-rules/domain';
 import {useUiI18n} from '@/src/ui/i18n';
 
+type SiteRulesVariant = 'always-translate' | 'disable-extension' | 'disable-floating-ball';
+
+interface SiteRulesLabels {
+  settingId: string;
+  titleId: string;
+  feedbackId: string;
+  title: string;
+  description: string;
+  countLabel: string;
+  inputLabel: string;
+  placeholder: string;
+  addButton: string;
+  listLabel: string;
+  iconName: string;
+  itemDescription: string;
+  emptyTitle: string;
+  emptyDescription: string;
+  duplicateMessage: (domain: string) => string;
+  addedMessage: (domain: string) => string;
+  removedMessage: (domain: string) => string;
+}
+
 const props = withDefaults(defineProps<{
   modelValue?: string[];
-  variant?: 'always-translate' | 'disable-extension';
+  variant?: SiteRulesVariant;
 }>(), {
   modelValue: () => [],
   variant: 'always-translate',
@@ -97,8 +119,8 @@ const statusMessage = ref('');
 const domainInput = ref<HTMLInputElement | null>(null);
 const domains = computed(() => props.modelValue ?? []);
 const normalizedPreview = computed(() => inputValue.value ? getSiteBaseDomain(inputValue.value) : null);
-const labels = computed(() => props.variant === 'disable-extension'
-  ? {
+const VARIANT_LABELS: Record<SiteRulesVariant, SiteRulesLabels> = {
+  'disable-extension': {
     settingId: 'disabled-extension-sites',
     titleId: 'disabled-extension-sites-title',
     feedbackId: 'disabled-extension-sites-feedback',
@@ -109,15 +131,34 @@ const labels = computed(() => props.variant === 'disable-extension'
     placeholder: '例如：https://docs.example.com/article',
     addButton: '添加网站',
     listLabel: '禁用扩展网站名单',
-    icon: '禁',
+    iconName: 'shield',
     itemDescription: '该主域名及其所有子域不会运行扩展功能',
     emptyTitle: '还没有禁用扩展的网站',
     emptyDescription: '可从上方手动添加，也可在扩展弹窗中为当前网站快速禁用。',
     duplicateMessage: (domain: string) => `${domain} 已在禁用扩展名单中。`,
     addedMessage: (domain: string) => `已添加 ${domain}。`,
     removedMessage: (domain: string) => `已删除 ${domain}。`,
-  }
-  : {
+  },
+  'disable-floating-ball': {
+    settingId: 'disabled-floating-ball-sites',
+    titleId: 'disabled-floating-ball-sites-title',
+    feedbackId: 'disabled-floating-ball-sites-feedback',
+    title: '不显示悬浮球的网站',
+    description: '输入任意域名或网址，保存时统一归并到主域名；该网站及其所有子域不显示悬浮球，快捷键、右键菜单和其他功能仍然可用。',
+    countLabel: '不显示悬浮球的网站数量',
+    inputLabel: '添加不显示悬浮球的网站',
+    placeholder: '例如：https://mail.example.com/inbox',
+    addButton: '添加网站',
+    listLabel: '不显示悬浮球的网站名单',
+    iconName: 'close',
+    itemDescription: '该主域名及其所有子域不显示悬浮球',
+    emptyTitle: '所有网站都会显示悬浮球',
+    emptyDescription: '在阅读工具、邮箱或编辑器等界面密集的网站上，可以只隐藏悬浮球而保留其他功能。',
+    duplicateMessage: (domain: string) => `${domain} 已在不显示悬浮球名单中。`,
+    addedMessage: (domain: string) => `已添加 ${domain}。`,
+    removedMessage: (domain: string) => `已删除 ${domain}。`,
+  },
+  'always-translate': {
     settingId: 'always-translate-sites',
     titleId: 'always-translate-sites-title',
     feedbackId: 'always-translate-sites-feedback',
@@ -128,14 +169,18 @@ const labels = computed(() => props.variant === 'disable-extension'
     placeholder: '例如：https://docs.example.com/article',
     addButton: '添加网站',
     listLabel: '始终翻译网站名单',
-    icon: '译',
+    iconName: 'globe',
     itemDescription: '该主域名及其所有子域会自动翻译',
     emptyTitle: '还没有始终翻译的网站',
     emptyDescription: '可从上方手动添加，也可在扩展弹窗中为当前网站快速开启。',
     duplicateMessage: (domain: string) => `${domain} 已在始终翻译名单中。`,
     addedMessage: (domain: string) => `已添加 ${domain}。`,
     removedMessage: (domain: string) => `已删除 ${domain}。`,
-  });
+  },
+};
+
+const labels = computed(() => VARIANT_LABELS[props.variant] ?? VARIANT_LABELS['always-translate']);
+const iconName = computed(() => labels.value.iconName);
 
 function clearFeedback() {
   errorMessage.value = '';

@@ -32,6 +32,7 @@ import type {
 import {shouldSkipTranslationForTarget} from '@/src/core/language/detect';
 import { config } from "@/src/services/config/store";
 import type { FullPageTranslationMode } from "@/src/core/config/model";
+import { consumeEagerTranslationBudget } from "@/src/features/full-page-translation/content/eagerTranslation";
 import {normalizeMaxConcurrentTranslations} from "@/src/core/config/scheduling";
 import {
     cancelTranslationQueueSession,
@@ -665,9 +666,8 @@ function refreshCandidateVisibilityBinding(
     key: Node,
     candidate: TranslationCandidate,
 ): void {
-    if (session.translationMode === "all" || (session.modal && isWithinTranslationModal(session.modal, candidate.element))) {
-        // “翻译到网页底部”只绕过视口门禁，不操纵页面滚动位置。
-        // 初次扫描和 MutationObserver 后续发现的内容都会进入同一受限队列。
+    if (session.translationMode === "all" || (session.modal && isWithinTranslationModal(session.modal, candidate.element)) || consumeEagerTranslationBudget(session, key, candidate)) {
+        // “翻译到网页底部”和免滚动预翻译都只绕过视口门禁，不操纵页面滚动位置；初次扫描和后续 mutation 发现的内容都进入同一受限队列。
         removeCandidateObservation(session, key);
         session.pending.set(key, candidate);
         scheduleFullPageDrain(session);

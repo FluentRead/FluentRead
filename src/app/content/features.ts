@@ -19,6 +19,7 @@ export {
     unmountTranslationProgressPanel,
 } from '@/src/features/full-page-translation/public';
 export {
+    isFloatingBallAllowedOnPage,
     mountFloatingBall,
     toggleFloatingBallTranslation,
     unmountFloatingBall,

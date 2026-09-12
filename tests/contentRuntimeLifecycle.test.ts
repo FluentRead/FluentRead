@@ -15,6 +15,7 @@ const mocks = vi.hoisted(() => ({
     addRuntimeListener: vi.fn(), removeRuntimeListener: vi.fn(), createMessageHandler: vi.fn(),
     setBridges: vi.fn(),
     mountWriting: vi.fn(), unmountWriting: vi.fn(), writingMounted: false,
+    floatingBallAllowed: true,
 }));
 vi.mock('@/src/features/writing-assistant/public', () => ({
     mountWritingAssistant: () => {mocks.writingMounted = true; mocks.mountWriting();},
@@ -35,6 +36,7 @@ vi.mock('@/src/app/content/features', () => ({
         'unmountAreaTranslator', 'unmountFloatingBall',
         'unmountImageTranslator', 'unmountSelectionTranslator', 'unmountTranslationProgressPanel',
     ].map(name => [name, vi.fn()])),
+    isFloatingBallAllowedOnPage: () => mocks.floatingBallAllowed,
     restoreOriginalContent: mocks.restoreOriginal,
     resetFullPageTranslationRouteState: mocks.resetRouteState,
     createInputTranslationContentFeature: () => ({mount: mocks.mountInput, invalidate: mocks.invalidateInput}),
@@ -54,6 +56,7 @@ vi.mock('@/src/app/content/messageRuntime', () => ({createContentRuntimeMessageH
 vi.mock('@/src/app/content/bilingualSentenceHighlight', () => ({syncBilingualSentenceHighlight: mocks.syncHighlight}));
 vi.mock('@/src/app/content/siteAdaptationRuntime', () => ({
     createContentSiteAdaptationRuntime: () => ({routeChanged: vi.fn(), update: vi.fn()}),
+    applyCoreTranslationPreferences: vi.fn(() => false),
 }));
 
 function transition(target: EventTarget, type: string, persisted = false, trusted = true): void {

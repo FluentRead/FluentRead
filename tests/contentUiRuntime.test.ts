@@ -4,10 +4,19 @@ const mocks = vi.hoisted(() => ({
   config: {
     disableFloatingBall: false,
     floatingBallPosition: '' as '' | 'left' | 'right',
+    floatingBallToolsDisplay: 'hover',
+    floatingBallHoverDelay: 0,
+    floatingBallClickAction: 'translate',
+    floatingBallCompact: false,
+    floatingBallSettingsEntryVisible: true,
+    floatingBallCollapsedOpacity: 52,
+    floatingBallDisabledDomains: [] as string[],
     translationProgressPanelEnabled: true,
   },
   createVueShadowUi: vi.fn(),
   requestConfigPatch: vi.fn(),
+  subscribeConfig: vi.fn(),
+  unsubscribeConfig: vi.fn(),
   sendMessage: vi.fn(),
   autoTranslateEnglishPage: vi.fn(),
   isFullPageTranslationActive: vi.fn(),
@@ -19,6 +28,7 @@ const mocks = vi.hoisted(() => ({
 vi.mock('@/src/services/config/store', () => ({
   config: mocks.config,
   requestConfigPatch: mocks.requestConfigPatch,
+  subscribeConfig: mocks.subscribeConfig,
 }));
 vi.mock('@/src/platform/shadow-ui', () => ({createVueShadowUi: mocks.createVueShadowUi}));
 vi.mock('webextension-polyfill', () => ({
@@ -64,6 +74,13 @@ beforeEach(() => {
   Object.assign(mocks.config, {
     disableFloatingBall: false,
     floatingBallPosition: '',
+    floatingBallToolsDisplay: 'hover',
+    floatingBallHoverDelay: 0,
+    floatingBallClickAction: 'translate',
+    floatingBallCompact: false,
+    floatingBallSettingsEntryVisible: true,
+    floatingBallCollapsedOpacity: 52,
+    floatingBallDisabledDomains: [],
     translationProgressPanelEnabled: true,
   });
   for (const mock of [
@@ -75,6 +92,8 @@ beforeEach(() => {
     mocks.restoreOriginalContent,
     mocks.subscribeFullPageTranslationProgress,
     mocks.unsubscribeFullPageTranslationProgress,
+    mocks.subscribeConfig,
+    mocks.unsubscribeConfig,
   ]) mock.mockReset();
   mocks.requestConfigPatch.mockImplementation(async (patch: Record<string, unknown>) => {
     Object.assign(mocks.config, patch);
@@ -83,6 +102,7 @@ beforeEach(() => {
   mocks.autoTranslateEnglishPage.mockResolvedValue(undefined);
   mocks.isFullPageTranslationActive.mockReturnValue(false);
   mocks.subscribeFullPageTranslationProgress.mockReturnValue(mocks.unsubscribeFullPageTranslationProgress);
+  mocks.subscribeConfig.mockReturnValue(mocks.unsubscribeConfig);
 });
 
 describe('悬浮球 content runtime', () => {
@@ -115,6 +135,14 @@ describe('悬浮球 content runtime', () => {
       logoUrl: 'chrome-extension://fixture/icon/128.png',
       initialTranslating: false,
     }));
+    expect(options.props.presentation).toEqual({
+      toolsDisplay: 'hover',
+      hoverDelay: 0,
+      clickAction: 'translate',
+      compact: false,
+      settingsEntryVisible: true,
+      collapsedOpacity: 52,
+    });
     expect(runtime.mountFloatingBall()).toBeNull();
     expect(mocks.subscribeFullPageTranslationProgress).toHaveBeenCalledOnce();
     const progressListener = mocks.subscribeFullPageTranslationProgress.mock.calls[0][0];
@@ -147,7 +175,65 @@ describe('悬浮球 content runtime', () => {
     runtime.unmountFloatingBall();
     expect(mountedUi.remove).toHaveBeenCalledOnce();
     expect(mocks.unsubscribeFullPageTranslationProgress).toHaveBeenCalledOnce();
+    expect(mocks.unsubscribeConfig).toHaveBeenCalledOnce();
     expect(mocks.restoreOriginalContent).toHaveBeenCalledTimes(2);
+  });
+
+  it('设置页改动高级外观后不重新挂载即同步展示契约', async () => {
+    const mountedUi = ui({toggleTranslation: vi.fn(), setTranslationState: vi.fn()});
+    mocks.createVueShadowUi.mockResolvedValue(mountedUi);
+    const runtime = await import('@/src/features/floating-ball/content/runtime');
+
+    await runtime.mountFloatingBall({} as never);
+    const [, options] = mocks.createVueShadowUi.mock.calls[0];
+    const presentation = options.props.presentation;
+    const listener = mocks.subscribeConfig.mock.calls[0][0];
+
+    listener({
+      floatingBallToolsDisplay: 'always',
+      floatingBallHoverDelay: 500,
+      floatingBallClickAction: 'none',
+      floatingBallCompact: true,
+      floatingBallSettingsEntryVisible: false,
+      floatingBallCollapsedOpacity: 20,
+    });
+
+    expect(presentation).toEqual({
+      toolsDisplay: 'always',
+      hoverDelay: 500,
+      clickAction: 'none',
+      compact: true,
+      settingsEntryVisible: false,
+      collapsedOpacity: 20,
+    });
+    expect(mocks.createVueShadowUi).toHaveBeenCalledOnce();
+
+    // 卸载后到达的配置广播不得继续写回已经释放的展示契约。
+    runtime.unmountFloatingBall();
+    listener({...mocks.config, floatingBallCompact: false, floatingBallToolsDisplay: 'hidden'});
+    expect(presentation.toolsDisplay).toBe('always');
+  });
+
+  it('站点在悬浮球禁用名单中时不挂载，移出名单后恢复', async () => {
+    const originalLocation = Reflect.get(globalThis, 'location');
+    Reflect.set(globalThis, 'location', {href: 'https://mail.example.com/inbox'});
+    mocks.config.floatingBallDisabledDomains = ['example.com'];
+    const mountedUi = ui({toggleTranslation: vi.fn()});
+    mocks.createVueShadowUi.mockResolvedValue(mountedUi);
+    const runtime = await import('@/src/features/floating-ball/content/runtime');
+
+    expect(runtime.isFloatingBallAllowedOnPage()).toBe(false);
+    expect(runtime.mountFloatingBall({} as never)).toBeNull();
+    expect(mocks.createVueShadowUi).not.toHaveBeenCalled();
+
+    mocks.config.floatingBallDisabledDomains = [];
+    expect(runtime.isFloatingBallAllowedOnPage('https://mail.example.com/inbox')).toBe(true);
+    await expect(runtime.mountFloatingBall({} as never)).resolves.toEqual(expect.objectContaining({
+      toggleTranslation: expect.any(Function),
+    }));
+    runtime.unmountFloatingBall();
+    if (originalLocation === undefined) Reflect.deleteProperty(globalThis, 'location');
+    else Reflect.set(globalThis, 'location', originalLocation);
   });
 
   it('隔离设置、保存和挂载失败，并允许重试', async () => {

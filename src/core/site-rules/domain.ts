@@ -122,6 +122,10 @@ export function normalizeDisabledExtensionDomains(value: unknown): string[] {
     return normalizeSiteDomains(value);
 }
 
+export function normalizeFloatingBallDisabledDomains(value: unknown): string[] {
+    return normalizeSiteDomains(value);
+}
+
 function isSiteInDomainList(input: string | URL, domains: unknown): boolean {
     const currentDomain = getSiteBaseDomain(input);
     if (!currentDomain) return false;
@@ -136,6 +140,14 @@ export function isAlwaysTranslateSite(
 }
 
 export function isExtensionDisabledOnSite(
+    input: string | URL,
+    domains: unknown,
+): boolean {
+    return isSiteInDomainList(input, domains);
+}
+
+/** 悬浮球按网站名单隐藏；扩展其余能力仍然可用。 */
+export function isFloatingBallDisabledOnSite(
     input: string | URL,
     domains: unknown,
 ): boolean {

@@ -221,6 +221,16 @@ const SIDE_LABELS = new Map<unknown, string>([
     ['left', '左侧'],
     ['right', '右侧'],
 ]);
+const FLOATING_BALL_TOOLS_DISPLAY_LABELS = new Map<unknown, string>([
+    ['hover', '悬停时显示'],
+    ['always', '始终显示'],
+    ['hidden', '不显示'],
+]);
+const FLOATING_BALL_CLICK_ACTION_LABELS = new Map<unknown, string>([
+    ['translate', '翻译/显示原文'],
+    ['settings', '打开设置页'],
+    ['none', '仅拖动'],
+]);
 
 function formatEnum(value: unknown, labels: Map<unknown, string>): string {
     return labels.get(value) ?? formatValue(value);
@@ -428,6 +438,12 @@ const FIELD_DEFINITIONS: Record<string, FieldDefinition> = {
     display: {group: 'general', label: '翻译模式', format: (value) => formatEnum(value, DISPLAY_LABELS)},
     style: {group: 'general', label: '译文样式', format: (value) => formatEnum(value, STYLE_LABELS)},
     disableFloatingBall: {group: 'general', label: '全文翻译悬浮球', format: (value) => formatBoolean(value, true)},
+    floatingBallToolsDisplay: {group: 'general', label: '悬浮球按钮显示方式', format: (value) => formatEnum(value, FLOATING_BALL_TOOLS_DISPLAY_LABELS)},
+    floatingBallHoverDelay: {group: 'general', label: '悬浮球展开延迟', format: (value) => formatNumber(value, ' ms')},
+    floatingBallClickAction: {group: 'general', label: '悬浮球点击行为', format: (value) => formatEnum(value, FLOATING_BALL_CLICK_ACTION_LABELS)},
+    floatingBallCompact: {group: 'general', label: '缩小悬浮球', format: formatBoolean},
+    floatingBallSettingsEntryVisible: {group: 'general', label: '悬浮球设置入口', format: formatBoolean},
+    floatingBallCollapsedOpacity: {group: 'general', label: '悬浮球收起不透明度', format: (value) => formatNumber(value, '%')},
     translationProgressPanelEnabled: {group: 'general', label: '翻译进度面板', format: formatBoolean},
     bilingualSentenceHighlightEnabled: {group: 'general', label: '双语逐句高亮', format: formatBoolean},
 
@@ -478,6 +494,7 @@ const FIELD_DEFINITIONS: Record<string, FieldDefinition> = {
     autoTranslate: {group: 'siteRules', label: '所有网站自动翻译', format: formatBoolean},
     alwaysTranslateDomains: {group: 'siteRules', label: '始终翻译网站'},
     disabledExtensionDomains: {group: 'siteRules', label: '禁用扩展网站'},
+    floatingBallDisabledDomains: {group: 'siteRules', label: '禁用悬浮球网站'},
 
     imageTranslationHoverEnabled: {group: 'imageTranslation', label: '图片悬浮按钮', format: formatBoolean},
     imageTranslationContextMenuEnabled: {group: 'imageTranslation', label: '图片右键菜单', format: formatBoolean},
@@ -513,6 +530,11 @@ const FIELD_DEFINITIONS: Record<string, FieldDefinition> = {
     animations: {group: 'advanced', label: '动画效果', format: formatBoolean},
     translationScope: {group: 'advanced', label: '识别全部节点', format: (value) => formatEnum(value, TRANSLATION_SCOPE_LABELS)},
     pageTitleTranslationEnabled: {group: 'advanced', label: '翻译页面标题', format: formatBoolean},
+    sidebarTranslationEnabled: {group: 'advanced', label: '侧边栏翻译', format: formatBoolean},
+    minTranslationTextLength: {group: 'advanced', label: '翻译段落最少字符数', format: (value) => formatNumber(value, ' 字符')},
+    eagerTranslationCharacters: {group: 'advanced', label: '免滚动预翻译字符数', format: (value) => formatNumber(value, ' 字符')},
+    longParagraphLineBreakEnabled: {group: 'advanced', label: '长段落自动换行', format: formatBoolean},
+    translationBeforeOriginal: {group: 'advanced', label: '译文在原文之前', format: formatBoolean},
     translationLoadingStyle: {group: 'advanced', label: '段落加载样式', format: (value) => formatEnum(value, TRANSLATION_LOADING_STYLE_LABELS)},
 
     documentService: {group: 'tools', label: '文档翻译服务', format: formatService},

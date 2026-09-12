@@ -37,8 +37,10 @@ export {
     extractTranslationText,
     extractTranslationTextFromNodes,
     isClearlyTargetLanguage,
+    getMinimumTranslationTextLength,
     isMeaningfulTranslationText,
     isTranslationTextElementProtected,
+    setMinimumTranslationTextLength,
 } from './text';
 export type {TranslationTextProtectionCache} from './text';
 export {
@@ -63,6 +65,7 @@ export {createDeclarativeAdapter} from './adapters/declarative';
 export {
     getCurrentTranslationCore,
     setCurrentTranslationAdapters,
+    setCurrentTranslationSidebarRegions,
     resolveTranslationCandidate,
     resolveTranslationCandidateAtPoint,
 } from './current';

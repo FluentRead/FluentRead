@@ -1,8 +1,8 @@
 <!--
  * @file src/features/floating-ball/ui/FloatingBall.vue
- * 文件职责：呈现低干扰、可拖拽和按需展开的页面悬浮球，并把全文翻译状态、拖动停靠、打开设置和键盘关闭整合为可复用 Vue 组件。
- * 主要内容：组件根据停靠位置控制收起透明度与勾选标记，使用指针位移阈值区分点击与拖拽，限制球体在视口内，发出位置变更与动作事件，并通过受控状态同步图标和文案。
- * 模块边界：它只负责视觉与局部交互，不直接调用浏览器消息、保存配置或执行全文翻译；这些副作用由 content/runtime 通过 props、事件和 defineExpose 桥接。
+ * 文件职责：呈现低干扰、可拖拽和按需展开的页面悬浮球，并把全文翻译状态、拖动停靠、打开设置、高级外观参数和键盘关闭整合为可复用 Vue 组件。
+ * 主要内容：组件按展示契约控制按钮显示方式、展开延迟、点击行为、紧凑尺寸与收起不透明度，使用指针位移阈值区分点击与拖拽，限制球体在视口内，发出位置变更与动作事件，并通过受控状态同步图标和文案。
+ * 模块边界：它只负责视觉与局部交互，不直接调用浏览器消息、保存配置或执行全文翻译；这些副作用由 content/runtime 通过 props、事件和 defineExpose 桥接，外观配置的归一化留在 core/config。
  -->
 <template>
   <div
@@ -10,19 +10,21 @@
     ref="floatingBall"
     class="fr-floating-ball"
     :class="{
-      'floating-ball-expanded': isExpanded,
+      'floating-ball-expanded': isMenuExpanded,
       dragging: isDragging,
       'is-translating': isTranslating,
+      'is-compact': presentation.compact,
     }"
     :data-position="currentDisplayPosition"
-    :style="positionStyle"
+    :data-tools-display="presentation.toolsDisplay"
+    :style="rootStyle"
     @mouseenter="expandBall"
     @mouseleave="collapseBall"
-    @focusin="expandBall"
+    @focusin="expandBallImmediately"
     @focusout="collapseBall"
   >
     <button
-      v-if="showMenu"
+      v-if="showTranslateTool"
       class="floating-ball-tool floating-ball-translate floating-ball-item"
       type="button"
       :aria-label="isTranslating ? '恢复网页原文' : '翻译整个网页'"
@@ -42,12 +44,14 @@
     <div
       ref="floatingBallMain"
       class="floating-ball-main floating-ball-item"
-      role="img"
-      aria-label="FluentRead"
-      title="按住拖动调整位置"
+      :role="isMainActionable ? 'button' : 'img'"
+      :tabindex="isMainActionable ? 0 : undefined"
+      :aria-label="mainActionLabel"
+      :title="mainActionTitle"
       @pointerdown="startDrag"
       @pointerup="finishPointerInteraction"
       @pointercancel="cancelPointerInteraction"
+      @keydown="handleMainKeydown"
     >
       <svg class="floating-ball-mascot" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
         <image v-if="logoUrl" :href="logoUrl" x="0" y="0" width="32" height="32" preserveAspectRatio="none" image-rendering="auto" />
@@ -56,7 +60,7 @@
     </div>
 
     <button
-      v-if="showMenu"
+      v-if="showSettingsTool"
       class="floating-ball-tool floating-ball-settings floating-ball-item"
       type="button"
       aria-label="打开 FluentRead 设置"
@@ -75,9 +79,21 @@
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import type { PropType, CSSProperties } from 'vue';
+import type { FloatingBallPresentation } from '@/src/features/floating-ball/types';
 
 const DRAG_THRESHOLD = 6;
 const BALL_SIZE = 48;
+const COMPACT_BALL_SIZE = 36;
+
+/** 展示契约的保守默认值：与历史外观一致，供未传入配置的挂载方使用。 */
+const DEFAULT_PRESENTATION: FloatingBallPresentation = {
+  toolsDisplay: 'hover',
+  hoverDelay: 0,
+  clickAction: 'translate',
+  compact: false,
+  settingsEntryVisible: true,
+  collapsedOpacity: 52,
+};
 
 const props = defineProps({
   position: {
@@ -92,6 +108,11 @@ const props = defineProps({
   logoUrl: {
     type: String,
     default: '',
+  },
+  // defineProps 的默认值会被提升到 setup 之外，不能引用模块内常量；缺省值交由下方计算属性补齐。
+  presentation: {
+    type: Object as PropType<Partial<FloatingBallPresentation>>,
+    default: undefined,
   },
   onSettingsClick: {
     type: Function as PropType<(event: MouseEvent) => void>,
@@ -132,14 +153,68 @@ const isTranslating = ref(props.initialTranslating);
 const floatingBall = ref<HTMLElement | null>(null);
 const floatingBallMain = ref<HTMLElement | null>(null);
 const dragState = ref<PointerDragState | null>(null);
+let expandTimer: ReturnType<typeof setTimeout> | null = null;
 
+// 缺失字段按默认值补齐，避免旧配置或部分更新让模板读到 undefined。
+const presentation = computed<FloatingBallPresentation>(() => ({
+  ...DEFAULT_PRESENTATION,
+  ...(props.presentation ?? {}),
+}));
 const currentDisplayPosition = computed(() => internalPosition.value || props.position);
+const isAlwaysExpanded = computed(() => presentation.value.toolsDisplay === 'always');
+const showTranslateTool = computed(() => props.showMenu && presentation.value.toolsDisplay !== 'hidden');
+const showSettingsTool = computed(() => showTranslateTool.value && presentation.value.settingsEntryVisible);
+const isMenuExpanded = computed(() => showTranslateTool.value && (isAlwaysExpanded.value || isExpanded.value));
+const isMainActionable = computed(() => presentation.value.clickAction !== 'none');
+const mainActionLabel = computed(() => {
+  if (presentation.value.clickAction === 'settings') return '打开 FluentRead 设置';
+  if (presentation.value.clickAction === 'translate') {
+    return isTranslating.value ? '恢复网页原文' : '翻译整个网页';
+  }
+  return 'FluentRead';
+});
+const mainActionTitle = computed(() => {
+  if (presentation.value.clickAction === 'settings') return '打开设置，按住可拖动';
+  if (presentation.value.clickAction === 'translate') {
+    return isTranslating.value ? '恢复网页原文，按住可拖动' : '翻译整个网页，按住可拖动';
+  }
+  return '按住拖动调整位置';
+});
+const rootStyle = computed<CSSProperties>(() => ({
+  ...positionStyle.value,
+  '--fr-ball-collapsed-opacity': String(presentation.value.collapsedOpacity / 100),
+} as CSSProperties));
+
+function clearExpandTimer() {
+  if (expandTimer === null) return;
+  clearTimeout(expandTimer);
+  expandTimer = null;
+}
 
 function expandBall() {
-  if (!isDragging.value) isExpanded.value = true;
+  if (isDragging.value || isAlwaysExpanded.value) return;
+  const delay = Math.max(0, presentation.value.hoverDelay);
+  clearExpandTimer();
+  if (delay === 0) {
+    isExpanded.value = true;
+    return;
+  }
+  // 悬停延迟只推迟展开，不改变已展开状态；越过页面边缘时不再误触工具按钮。
+  expandTimer = setTimeout(() => {
+    expandTimer = null;
+    if (!isDragging.value) isExpanded.value = true;
+  }, delay);
+}
+
+/** 键盘聚焦必须立即展开，延迟只服务于鼠标悬停。 */
+function expandBallImmediately() {
+  if (isDragging.value || isAlwaysExpanded.value) return;
+  clearExpandTimer();
+  isExpanded.value = true;
 }
 
 function collapseBall() {
+  clearExpandTimer();
   if (!isDragging.value && !floatingBall.value?.matches(':focus-within')) isExpanded.value = false;
 }
 
@@ -163,7 +238,11 @@ function applyDockPositionStyle(containerHeight: number) {
 
 function updatePositionStyle() {
   if (isDragging.value) return;
-  applyDockPositionStyle(floatingBall.value?.getBoundingClientRect().height || BALL_SIZE);
+  applyDockPositionStyle(floatingBall.value?.getBoundingClientRect().height || fallbackBallSize());
+}
+
+function fallbackBallSize() {
+  return presentation.value.compact ? COMPACT_BALL_SIZE : BALL_SIZE;
 }
 
 function startDrag(event: PointerEvent) {
@@ -172,8 +251,8 @@ function startDrag(event: PointerEvent) {
   event.preventDefault();
   const dockRect = floatingBall.value?.getBoundingClientRect();
   const rect = floatingBallMain.value?.getBoundingClientRect() || dockRect;
-  const mainWidth = rect?.width || BALL_SIZE;
-  const mainHeight = rect?.height || BALL_SIZE;
+  const mainWidth = rect?.width || fallbackBallSize();
+  const mainHeight = rect?.height || fallbackBallSize();
   dragState.value = {
     pointerId: event.pointerId,
     startX: event.clientX,
@@ -198,6 +277,7 @@ function handlePointerMove(event: PointerEvent) {
   if (!currentDrag.moved) {
     if (Math.hypot(event.clientX - currentDrag.startX, event.clientY - currentDrag.startY) <= DRAG_THRESHOLD) return;
     currentDrag.moved = true;
+    clearExpandTimer();
     isExpanded.value = false;
     isDragging.value = true;
   }
@@ -228,6 +308,8 @@ function finishPointerInteraction(event: PointerEvent) {
   dragState.value = null;
   if (!currentDrag.moved) {
     isDragging.value = false;
+    // 未越过拖动阈值即视为点击；点击行为由配置决定，默认切换全文翻译。
+    runMainAction(event);
     return;
   }
 
@@ -266,6 +348,24 @@ function removePointerListeners() {
   window.removeEventListener('pointercancel', cancelPointerInteraction);
 }
 
+/** 悬浮球主体的点击与回车行为；'none' 保留纯拖动手柄语义。 */
+function runMainAction(event: PointerEvent | KeyboardEvent) {
+  const action = presentation.value.clickAction;
+  if (action === 'translate') {
+    props.onTranslationToggle(!isTranslating.value);
+    return;
+  }
+  if (action === 'settings') {
+    props.onSettingsClick(event as unknown as MouseEvent);
+  }
+}
+
+function handleMainKeydown(event: KeyboardEvent) {
+  if (!isMainActionable.value || (event.key !== 'Enter' && event.key !== ' ')) return;
+  event.preventDefault();
+  runMainAction(event);
+}
+
 function toggleTranslation(event?: MouseEvent) {
   if (event && event.detail > 0) {
     (event.currentTarget as HTMLElement | null)?.blur();
@@ -298,6 +398,7 @@ onMounted(() => {
 });
 
 onBeforeUnmount(() => {
+  clearExpandTimer();
   removePointerListeners();
   window.removeEventListener('resize', updatePositionStyle);
   document.removeEventListener('keydown', handleDocumentKeydown);
@@ -313,14 +414,28 @@ watch(() => props.position, (newPosition) => {
 watch(() => props.initialTranslating, (nextState) => {
   isTranslating.value = nextState;
 });
+
+// 尺寸切换会改变停靠高度，必须重新计算纵向居中，避免紧凑模式下出现偏移。
+watch(() => presentation.value.compact, () => {
+  nextTick(updatePositionStyle);
+});
+
+watch(() => presentation.value.toolsDisplay, (display) => {
+  if (display !== 'hover') clearExpandTimer();
+  if (display === 'hidden') isExpanded.value = false;
+});
 </script>
 
 <style scoped>
 .fr-floating-ball {
+  --fr-ball-size: 48px;
+  --fr-ball-tool-size: 32px;
+  --fr-ball-icon-size: 18px;
+  --fr-ball-mascot-size: 24px;
   position: fixed;
   z-index: 2147483647;
   display: flex;
-  width: 48px;
+  width: var(--fr-ball-size);
   flex-direction: column;
   align-items: flex-end;
   gap: 8px;
@@ -330,6 +445,14 @@ watch(() => props.initialTranslating, (nextState) => {
   user-select: none;
   touch-action: none;
   will-change: transform;
+}
+
+.fr-floating-ball.is-compact {
+  --fr-ball-size: 36px;
+  --fr-ball-tool-size: 26px;
+  --fr-ball-icon-size: 15px;
+  --fr-ball-mascot-size: 19px;
+  gap: 6px;
 }
 
 .fr-floating-ball[data-position="left"] {
@@ -346,13 +469,13 @@ watch(() => props.initialTranslating, (nextState) => {
 .floating-ball-item {
   position: relative;
   flex: 0 0 auto;
-  transform: translateX(48px);
+  transform: translateX(var(--fr-ball-size));
   transition: transform 0.46s cubic-bezier(0.22, 1, 0.36, 1), opacity 0.24s ease, box-shadow 0.24s ease, border-color 0.24s ease, background 0.24s ease;
   will-change: transform;
 }
 
 .fr-floating-ball[data-position="left"] .floating-ball-item {
-  transform: translateX(-48px);
+  transform: translateX(calc(var(--fr-ball-size) * -1));
 }
 
 .fr-floating-ball.floating-ball-expanded .floating-ball-item {
@@ -368,8 +491,8 @@ watch(() => props.initialTranslating, (nextState) => {
   position: relative;
   z-index: 1;
   display: flex;
-  width: 48px;
-  height: 48px;
+  width: var(--fr-ball-size);
+  height: var(--fr-ball-size);
   align-items: center;
   justify-content: center;
   padding: 0;
@@ -382,12 +505,12 @@ watch(() => props.initialTranslating, (nextState) => {
 }
 
 .fr-floating-ball:not(.floating-ball-expanded):not(.dragging)[data-position="right"] .floating-ball-main {
-  opacity: 0.52;
+  opacity: var(--fr-ball-collapsed-opacity, 0.52);
   transform: translateX(50%);
 }
 
 .fr-floating-ball:not(.floating-ball-expanded):not(.dragging)[data-position="left"] .floating-ball-main {
-  opacity: 0.52;
+  opacity: var(--fr-ball-collapsed-opacity, 0.52);
   transform: translateX(-50%);
 }
 
@@ -406,21 +529,21 @@ watch(() => props.initialTranslating, (nextState) => {
 
 .floating-ball-mascot {
   display: block;
-  width: 24px;
-  height: 24px;
+  width: var(--fr-ball-mascot-size);
+  height: var(--fr-ball-mascot-size);
   pointer-events: none;
   image-rendering: auto;
 }
 
 .translation-icon {
-  width: 18px;
-  height: 18px;
+  width: var(--fr-ball-icon-size);
+  height: var(--fr-ball-icon-size);
 }
 
 .floating-ball-tool {
   display: inline-flex;
-  width: 32px;
-  height: 32px;
+  width: var(--fr-ball-tool-size);
+  height: var(--fr-ball-tool-size);
   align-items: center;
   justify-content: center;
   padding: 0;
@@ -489,8 +612,8 @@ watch(() => props.initialTranslating, (nextState) => {
 }
 
 .floating-ball-settings svg {
-  width: 18px;
-  height: 18px;
+  width: var(--fr-ball-icon-size);
+  height: var(--fr-ball-icon-size);
 }
 
 .dragging {

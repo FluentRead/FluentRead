@@ -88,6 +88,7 @@ import {
 import {
     normalizeAlwaysTranslateDomains,
     normalizeDisabledExtensionDomains,
+    normalizeFloatingBallDisabledDomains,
 } from "@/src/core/site-rules/domain";
 import {normalizeSiteAdaptationSettings} from '@/src/core/site-adaptation/schema';
 import type {SiteAdaptationSettings} from '@/src/core/site-adaptation/types';
@@ -105,6 +106,12 @@ import {
     normalizeTranslationRequestsPerMinute,
     normalizeTranslationRequestsPerSecond,
 } from './scheduling';
+import {
+    DEFAULT_EAGER_TRANSLATION_CHARACTERS,
+    DEFAULT_MIN_TRANSLATION_TEXT_LENGTH,
+    normalizeEagerTranslationCharacters,
+    normalizeMinTranslationTextLength,
+} from './pageTranslation';
 import {normalizeWritingPreferences, type WritingPreferences} from './writing';
 import {DEFAULT_HARNESS_PREFERENCES, normalizeHarnessPreferences, type HarnessPreferences} from './harness';
 import {
@@ -114,6 +121,7 @@ import {
 } from './videoSubtitleAppearance';
 
 export * from './scheduling';
+export * from './pageTranslation';
 
 export type DeepSeekApiType = 'auto' | 'responses' | 'chat';
 export type DeepSeekThinkingMode = 'enabled' | 'disabled';
@@ -160,6 +168,64 @@ export function normalizeMouseHoverTranslationDelay(value: unknown): number {
         MOUSE_HOVER_TRANSLATION_DELAY_MAX,
         Math.max(MOUSE_HOVER_TRANSLATION_DELAY_MIN, rounded),
     );
+}
+
+export type FloatingBallToolsDisplay = 'hover' | 'always' | 'hidden';
+export type FloatingBallClickAction = 'translate' | 'settings' | 'none';
+export const FLOATING_BALL_TOOLS_DISPLAY_VALUES: readonly FloatingBallToolsDisplay[] = ['hover', 'always', 'hidden'];
+export const FLOATING_BALL_CLICK_ACTION_VALUES: readonly FloatingBallClickAction[] = ['translate', 'settings', 'none'];
+export const DEFAULT_FLOATING_BALL_HOVER_DELAY = 0;
+export const FLOATING_BALL_HOVER_DELAY_MIN = 0;
+export const FLOATING_BALL_HOVER_DELAY_MAX = 2000;
+export const FLOATING_BALL_HOVER_DELAY_STEP = 50;
+export const DEFAULT_FLOATING_BALL_COLLAPSED_OPACITY = 52;
+export const FLOATING_BALL_COLLAPSED_OPACITY_MIN = 20;
+export const FLOATING_BALL_COLLAPSED_OPACITY_MAX = 100;
+export const FLOATING_BALL_COLLAPSED_OPACITY_STEP = 4;
+
+function clampStepped(value: unknown, fallback: number, min: number, max: number, step: number): number {
+    const number = typeof value === 'number'
+        ? value
+        : typeof value === 'string' && value.trim() !== ''
+            ? Number(value)
+            : Number.NaN;
+    if (!Number.isFinite(number)) return fallback;
+    const rounded = Math.round(number / step) * step;
+    return Math.min(max, Math.max(min, rounded));
+}
+
+/** 悬浮球工具按钮展开前的指针停留时间，避免划过页面边缘时误展开。 */
+export function normalizeFloatingBallHoverDelay(value: unknown): number {
+    return clampStepped(
+        value,
+        DEFAULT_FLOATING_BALL_HOVER_DELAY,
+        FLOATING_BALL_HOVER_DELAY_MIN,
+        FLOATING_BALL_HOVER_DELAY_MAX,
+        FLOATING_BALL_HOVER_DELAY_STEP,
+    );
+}
+
+/** 悬浮球收起时的不透明度百分比；数值越小越不遮挡网页内容。 */
+export function normalizeFloatingBallCollapsedOpacity(value: unknown): number {
+    return clampStepped(
+        value,
+        DEFAULT_FLOATING_BALL_COLLAPSED_OPACITY,
+        FLOATING_BALL_COLLAPSED_OPACITY_MIN,
+        FLOATING_BALL_COLLAPSED_OPACITY_MAX,
+        FLOATING_BALL_COLLAPSED_OPACITY_STEP,
+    );
+}
+
+export function normalizeFloatingBallToolsDisplay(value: unknown): FloatingBallToolsDisplay {
+    return FLOATING_BALL_TOOLS_DISPLAY_VALUES.includes(value as FloatingBallToolsDisplay)
+        ? value as FloatingBallToolsDisplay
+        : 'hover';
+}
+
+export function normalizeFloatingBallClickAction(value: unknown): FloatingBallClickAction {
+    return FLOATING_BALL_CLICK_ACTION_VALUES.includes(value as FloatingBallClickAction)
+        ? value as FloatingBallClickAction
+        : 'translate';
 }
 
 export function normalizeSelectionTranslatorDelay(value: unknown): number {
@@ -254,11 +320,23 @@ export class Config {
     contextMenuEnabled: boolean; // 是否显示右键全文翻译菜单
     pageTitleTranslationEnabled: boolean; // 全文翻译时是否一并翻译页面标题
     translationScope: TranslationScope; // 页面识别正文或全部可见界面文字
+    sidebarTranslationEnabled: boolean; // 正文范围下是否一并翻译侧边栏与导航区域
+    minTranslationTextLength: number; // 段落参与翻译所需的最少字符数
+    eagerTranslationCharacters: number; // 进入网页后无需滚动即可直接翻译的字符数
+    longParagraphLineBreakEnabled: boolean; // 长段落译文是否按句插入换行
+    translationBeforeOriginal: boolean; // 双语模式下译文是否排在原文之前
     fullPageTranslationMode: FullPageTranslationMode; // 全文翻译按视口加载或立即处理整页
     disableFloatingBall: boolean; // 是否禁用悬浮球
     floatingBallPosition: 'left' | 'right'; // 悬浮球位置
     floatingBallHotkey: string; // 悬浮球快捷键
     customFloatingBallHotkey: string; // 自定义悬浮球快捷键
+    floatingBallToolsDisplay: FloatingBallToolsDisplay; // 悬浮球上翻译与设置按钮的显示方式
+    floatingBallHoverDelay: number; // 指针停留多久后展开悬浮球按钮（毫秒）
+    floatingBallClickAction: FloatingBallClickAction; // 点击悬浮球主体时执行的动作
+    floatingBallCompact: boolean; // 是否使用更小的悬浮球尺寸，减少对网页内容的遮挡
+    floatingBallSettingsEntryVisible: boolean; // 是否在悬浮球上显示打开设置页的入口
+    floatingBallCollapsedOpacity: number; // 悬浮球收起时的不透明度百分比
+    floatingBallDisabledDomains: string[]; // 不显示悬浮球的可注册域名（eTLD+1）
     customHotkey: string; // 自定义鼠标悬浮快捷键
     quickTranslationProfiles: QuickTranslationProfile[]; // 额外快捷翻译方案；悬浮与全文各最多 8 项
     mouseHoverTranslationDelay: number; // 鼠标悬浮翻译触发延迟（毫秒）
@@ -380,11 +458,23 @@ export class Config {
         this.contextMenuEnabled = true; // 默认显示右键全文翻译入口
         this.pageTitleTranslationEnabled = true; // 默认随全文翻译一并翻译标题，可在高级设置关闭
         this.translationScope = 'content'; // 默认只识别正文，全部节点由高级设置显式开启
+        this.sidebarTranslationEnabled = false; // 默认跳过侧边栏和导航，保持正文阅读边界
+        this.minTranslationTextLength = DEFAULT_MIN_TRANSLATION_TEXT_LENGTH; // 默认过滤单字符碎片
+        this.eagerTranslationCharacters = DEFAULT_EAGER_TRANSLATION_CHARACTERS; // 默认先翻译页面开头的一段内容
+        this.longParagraphLineBreakEnabled = false; // 默认保持原段落排版
+        this.translationBeforeOriginal = false; // 默认译文排在每段原文之后
         this.fullPageTranslationMode = 'viewport'; // 默认按阅读进度翻译，避免一次发出过多请求
         this.disableFloatingBall = true; // 默认关闭悬浮球
         this.floatingBallPosition = 'right'; // 默认在右侧
         this.floatingBallHotkey = 'Alt+T'; // 默认快捷键为 Alt+T
         this.customFloatingBallHotkey = ''; // 自定义快捷键为空
+        this.floatingBallToolsDisplay = 'hover'; // 默认指针悬停时才展开翻译与设置按钮
+        this.floatingBallHoverDelay = DEFAULT_FLOATING_BALL_HOVER_DELAY; // 默认立即展开，保持既有手感
+        this.floatingBallClickAction = 'translate'; // 默认点击悬浮球即切换全文翻译
+        this.floatingBallCompact = false; // 默认使用标准尺寸
+        this.floatingBallSettingsEntryVisible = true; // 默认保留设置入口
+        this.floatingBallCollapsedOpacity = DEFAULT_FLOATING_BALL_COLLAPSED_OPACITY; // 默认保持既有半透明收起效果
+        this.floatingBallDisabledDomains = []; // 默认所有网站都显示悬浮球
         this.customHotkey = ''; // 自定义鼠标悬浮快捷键为空
         this.quickTranslationProfiles = []; // 默认仅保留旧快捷键，新方案由用户按需添加
         this.mouseHoverTranslationDelay = DEFAULT_MOUSE_HOVER_TRANSLATION_DELAY;
@@ -905,6 +995,22 @@ export function normalizeConfig(value: unknown): Config {
 
     normalized.mouseHoverTranslationDelay = normalizeMouseHoverTranslationDelay(
         source.mouseHoverTranslationDelay,
+    );
+    normalized.sidebarTranslationEnabled = source.sidebarTranslationEnabled === true;
+    normalized.minTranslationTextLength = normalizeMinTranslationTextLength(source.minTranslationTextLength);
+    normalized.eagerTranslationCharacters = normalizeEagerTranslationCharacters(source.eagerTranslationCharacters);
+    normalized.longParagraphLineBreakEnabled = source.longParagraphLineBreakEnabled === true;
+    normalized.translationBeforeOriginal = source.translationBeforeOriginal === true;
+    normalized.floatingBallToolsDisplay = normalizeFloatingBallToolsDisplay(source.floatingBallToolsDisplay);
+    normalized.floatingBallHoverDelay = normalizeFloatingBallHoverDelay(source.floatingBallHoverDelay);
+    normalized.floatingBallClickAction = normalizeFloatingBallClickAction(source.floatingBallClickAction);
+    normalized.floatingBallCompact = source.floatingBallCompact === true;
+    normalized.floatingBallSettingsEntryVisible = source.floatingBallSettingsEntryVisible !== false;
+    normalized.floatingBallCollapsedOpacity = normalizeFloatingBallCollapsedOpacity(
+        source.floatingBallCollapsedOpacity,
+    );
+    normalized.floatingBallDisabledDomains = normalizeFloatingBallDisabledDomains(
+        source.floatingBallDisabledDomains,
     );
     normalized.alwaysTranslateDomains = normalizeAlwaysTranslateDomains(source.alwaysTranslateDomains);
     normalized.disabledExtensionDomains = normalizeDisabledExtensionDomains(source.disabledExtensionDomains);

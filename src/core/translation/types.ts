@@ -61,6 +61,8 @@ export interface TranslationCandidate {
 
 export interface TranslationCoreOptions {
     scope?: TranslationScope;
+    /** 正文范围下把侧边栏与导航一并纳入候选发现。 */
+    includeSidebarRegions?: boolean;
     url?: URL;
     adapters?: readonly TranslationSiteAdapter[];
 }

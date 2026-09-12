@@ -26,7 +26,7 @@ import {
     inputBoxTranslationConfigKey,
     isAreaTranslatorMounted,
     isFullPageTranslationActive, noteBilingualHostGesture,
-    mountAreaTranslator, mountFloatingBall,
+    mountAreaTranslator, mountFloatingBall, isFloatingBallAllowedOnPage,
     mountHoverTranslationContentFeature,
     mountImageTranslator,
     mountSelectionTranslator, mountTranslationProgressPanel,
@@ -49,7 +49,7 @@ import {
 } from './pageAvailability';
 import {installContentPageLifecycle} from './pageLifecycle';
 import {syncBilingualSentenceHighlight} from './bilingualSentenceHighlight';
-import {createContentSiteAdaptationRuntime} from './siteAdaptationRuntime';
+import {applyCoreTranslationPreferences, createContentSiteAdaptationRuntime} from './siteAdaptationRuntime';
 
 export async function startContentApp(ctx: ContentScriptContext,
     capabilities: BrowserCapabilities = browserCapabilities): Promise<void> {
@@ -66,7 +66,7 @@ export async function startContentApp(ctx: ContentScriptContext,
     await configReady;
     if (ctx.isInvalid || cleanedUp) { cleanup(); return; }
     const siteAdaptation = createContentSiteAdaptationRuntime(config.siteAdaptation, new URL(window.location.href));
-    clearLegacyPageTranslationCache();
+    applyCoreTranslationPreferences(config); clearLegacyPageTranslationCache();
     let currentRouteHref = window.location.href;
     let currentPageSiteDisabled = isExtensionDisabledOnSite(currentRouteHref, config.disabledExtensionDomains);
     let unsubscribeContentConfig: (() => void) | null = null;
@@ -146,7 +146,7 @@ export async function startContentApp(ctx: ContentScriptContext,
             },
             {
                 id: 'floating-ball',
-                isEnabled: () => config.on && config.disableFloatingBall !== true,
+                isEnabled: () => config.on && config.disableFloatingBall !== true && isFloatingBallAllowedOnPage(),
                 mount: () => mountFloatingBall(ctx),
                 unmount: unmountFloatingBall,
                 isMounted: () => Boolean(document.getElementById('fluent-read-floating-ball-container')),
@@ -240,7 +240,7 @@ export async function startContentApp(ctx: ContentScriptContext,
     browser.runtime.onMessage.addListener(runtimeMessageListener);
     reportSiteDisabledState();
     unsubscribeContentConfig = subscribeConfig((nextConfig) => {
-        siteAdaptation.update(nextConfig.siteAdaptation, new URL(window.location.href));
+        applyCoreTranslationPreferences(nextConfig); siteAdaptation.update(nextConfig.siteAdaptation, new URL(window.location.href));
         syncBilingualSentenceHighlight(document, isPageRuntimeEnabled() && nextConfig.bilingualSentenceHighlightEnabled === true);
         const nextInputBoxConfigKey = inputBoxTranslationConfigKey(nextConfig);
         if (nextInputBoxConfigKey !== previousInputBoxConfigKey) {

@@ -2,7 +2,7 @@
  * @file src/core/translation/layout.ts
  *
  * 文件职责：判定页面元素的语义块、内联关系和可重组边界，为候选引擎选择合理翻译粒度并保护页面布局。
- * 主要内容：按正文/全部节点范围区分正文与控件；识别 heading、block、inline、纯文本正文 pre、结构标签、嵌入式 aside 和 reparent 边界，保持交互控件对内部标签的翻译所有权，并在 tooltip 边界停止向外归属，限制直接子节点探测数量，并提供候选目标及内联 run 相关的布局函数。 可核对的公开符号包括 isSemanticHeadingElement、getElementDisplay、isBlockBoundary、isStructuralContainer、hasStructuralAncestor、isTranslationControlElement、findTranslationControlOwner、hasDirectReadableText、hasReadableBlockChild。
+ * 主要内容：按正文/全部节点范围区分正文与控件；识别 heading、block、inline、纯文本正文 pre、结构标签、嵌入式 aside、可选放开的侧边栏区域和 reparent 边界，保持交互控件对内部标签的翻译所有权，并在 tooltip 边界停止向外归属，限制直接子节点探测数量，并提供候选目标及内联 run 相关的布局函数。 可核对的公开符号包括 isSemanticHeadingElement、getElementDisplay、isBlockBoundary、isStructuralContainer、hasStructuralAncestor、isTranslationControlElement、findTranslationControlOwner、hasDirectReadableText、hasReadableBlockChild。
  * 模块边界：本文件属于可独立测试的 core 候选领域；可以读取传入 DOM 以计算结果，但不访问配置存储、不调用 provider、不注册页面监听器，也不负责译文渲染或 feature 生命周期。
  */
 
@@ -128,9 +128,19 @@ function isEmbeddedContentAside(element: Element): boolean {
         embeddedAsideClassTokens.has(token.toLowerCase()));
 }
 
-export function isStructuralContainer(element: Element): boolean {
+/** 侧边栏翻译开启后，aside 与 nav 不再被当作只读页面框架。 */
+export interface StructuralRegionOptions {
+    includeSidebarRegions?: boolean;
+}
+
+export function isStructuralContainer(
+    element: Element,
+    regionOptions?: StructuralRegionOptions,
+): boolean {
     const tag = getElementTagName(element);
     if (!structuralTags.has(tag)) return false;
+    // 用户显式要求翻译侧边栏时，只放开侧栏与导航；header/footer 仍是页面框架。
+    if (regionOptions?.includeSidebarRegions && (tag === 'aside' || tag === 'nav')) return false;
     // 导航即使挂在文章内容内，仍属于页面框架控件。
     if (tag === 'nav') return true;
     // article 拥有其相关 aside；文档引擎也会在没有 article 的 <main> 下输出 note/callout
@@ -141,14 +151,17 @@ export function isStructuralContainer(element: Element): boolean {
     return true;
 }
 
-export function hasStructuralAncestor(element: Element): boolean {
+export function hasStructuralAncestor(
+    element: Element,
+    regionOptions?: StructuralRegionOptions,
+): boolean {
     let current: Element | null = getComposedParent(element);
     let depth = 0;
     while (current && !isDocumentSurface(current)) {
         depth += 1;
         // 对恶意超深子树保守按结构区域处理；全文发现也会通过同一硬深度守卫裁剪它。
         if (depth > maxComposedAncestorDepth) return true;
-        if (isStructuralContainer(current)) return true;
+        if (isStructuralContainer(current, regionOptions)) return true;
         current = getComposedParent(current);
     }
     return false;
@@ -349,10 +362,11 @@ export function classifyGenericCandidate(
     protectionCache?: TranslationTextProtectionCache,
     protectionOptions?: TranslationTextProtectionOptions,
     scope: TranslationScope = 'content',
+    regionOptions?: StructuralRegionOptions,
 ): GenericClassification | null {
     const semanticHeading = isSemanticHeadingElement(element);
-    if (isDocumentSurface(element) || (scope === 'content' && (isStructuralContainer(element) ||
-        (!skipStructuralAncestorCheck && hasStructuralAncestor(element) && !semanticHeading)))) {
+    if (isDocumentSurface(element) || (scope === 'content' && (isStructuralContainer(element, regionOptions) ||
+        (!skipStructuralAncestorCheck && hasStructuralAncestor(element, regionOptions) && !semanticHeading)))) {
         return null;
     }
     if (shouldStayOriginal?.(element) || isProtectedTextElement(element)) return null;

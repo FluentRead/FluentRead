@@ -40,6 +40,7 @@ vi.mock('@/src/app/content/pageStyles', () => ({installPageStyles: mocks.install
 vi.mock('@/src/app/content/bilingualSentenceHighlight', () => ({syncBilingualSentenceHighlight: mocks.syncHighlight}));
 vi.mock('@/src/app/content/siteAdaptationRuntime', () => ({
     createContentSiteAdaptationRuntime: () => ({routeChanged: vi.fn(), update: vi.fn()}),
+    applyCoreTranslationPreferences: vi.fn(() => false),
 }));
 
 const topUrl = 'https://mail.qq.com/cgi-bin/frame_html?legacy=1';

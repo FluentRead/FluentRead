@@ -1,12 +1,13 @@
 /**
  * @file src/features/full-page-translation/content/renderer.ts
  * 文件职责：把翻译返回的受限 HTML 或纯文本安全插入原页面，构造 FluentRead 双语与仅译文节点，同时保护链接属性并触发布局截断修复。
- * 主要内容：包含 URL 协议白名单、可复制属性集合、递归节点净化、本地公式可视骨架的受限克隆与辅助副本排除、DocumentFragment 创建、不改写宿主 class 的双语 wrapper，以及通过 Shadow DOM 保留宿主原文的仅译文文本槽。
+ * 主要内容：包含 URL 协议白名单、可复制属性集合、递归节点净化、本地公式可视骨架的受限克隆与辅助副本排除、DocumentFragment 创建、不改写宿主 class 的双语 wrapper、可选的译文前置与长段落按句换行，以及通过 Shadow DOM 保留宿主原文的仅译文文本槽。
  * 模块边界：本文件只负责安全渲染，不发起翻译或管理请求状态；服务调用归 runtime，节点所有权归 state，配置仅用于展示选项，任意脚本、事件属性和危险链接都不得穿过净化边界。
  */
 import { options } from "@/src/core/config/catalog";
 import { config } from "@/src/services/config/store";
 import {ensureTranslationTruncationLayout} from "@/src/features/full-page-translation/content/layout";
+import {applyLongParagraphLineBreaks} from "@/src/core/translation/lineBreak";
 
 /**
  * 译文允许保留的内联元素。
@@ -158,6 +159,10 @@ function createSafeTranslationFragment(text: string): DocumentFragment {
 export interface BilingualTranslationRenderOptions {
     /** 全文会话启动时冻结的目标语言；普通悬浮翻译缺省仍读取当前配置。 */
     targetLanguage?: string;
+    /** 全文会话启动时冻结的长段落换行开关；缺省读取当前配置。 */
+    longParagraphLineBreak?: boolean;
+    /** 全文会话启动时冻结的译文位置；缺省读取当前配置。 */
+    translationBeforeOriginal?: boolean;
     /** 仅接受本地 createTranslationSourceSnapshot 的克隆，文本槽已经安全写入。 */
     sourceSkeleton?: HTMLElement;
     /** 全文会话启动时冻结的译文样式。 */
@@ -237,6 +242,10 @@ function createBilingualTranslationContent(
             .forEach((child) => fragment.appendChild(child));
     }
     content.appendChild(fragment);
+    // 换行只作用于本次渲染出的译文容器，原文 DOM 不受影响。
+    if (renderOptions.longParagraphLineBreak ?? config.longParagraphLineBreakEnabled) {
+        applyLongParagraphLineBreaks(content);
+    }
     return content;
 }
 
@@ -253,7 +262,12 @@ export function appendBilingualTranslation(
         ))
         .forEach((child) => child.remove());
     ensureTranslationTruncationLayout(node);
-    node.appendChild(content);
+    // 译文在先只改变插入位置；节点所有权、恢复和重挂载仍按同一个 wrapper 处理。
+    if (renderOptions.translationBeforeOriginal ?? config.translationBeforeOriginal) {
+        node.insertBefore(content, node.firstChild);
+    } else {
+        node.appendChild(content);
+    }
     return content;
 }
 

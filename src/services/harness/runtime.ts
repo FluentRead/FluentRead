@@ -99,7 +99,7 @@ export function createHarnessRuntime(getConfig: () => Config, createUsageSink?: 
             if (!text) return {success: false, error: '没有可理解的选中文本'};
             const service = prefs.service || current.service;
             const modelId = prefs.model || resolveConfiguredModel(current.model[service], current.customModel[service]);
-            if (!isHarnessService(service, current.customOpenAIProviders)) return {success: false, error: '当前默认服务不支持阅读理解，请在专项翻译的“翻译卡”设置中选择 AI 服务。'};
+            if (!isHarnessService(service, current.customOpenAIProviders)) return {success: false, error: '当前默认服务不支持阅读理解，请在专项翻译的“翻译卡片”设置中选择 AI 服务。'};
             if (!modelId.trim()) return {success: false, error: '请先在设置中选择阅读理解模型。'};
             if (isApiKeyRequired(service, {...current, model: {...current.model, [service]: modelId}}) && !current.token[service]?.trim()) return {success: false, error: '这个模型服务尚未配置 API Key，请在翻译服务中完成配置。'};
             const history = question && Array.isArray(request.history) ? request.history.slice(-MAX_HISTORY).flatMap(turn => {

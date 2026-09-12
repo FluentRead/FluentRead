@@ -126,7 +126,7 @@ fs.mkdirSync(output, {recursive: true});
     await open(usage, 'usage-service-menu'); check(await popup().evaluate(el => el.classList.contains('usage-select-popper')), '模型用量菜单保留专属类名');
     check(await popup().evaluate(el => el.getBoundingClientRect().width > 250), '没有服务记录时模型用量菜单仍保持可读宽度'); await close(usage);
     await nav('settings-harness');
-    const model = page.getByRole('combobox', {name:'翻译卡模型',exact:true});
+    const model = page.getByRole('combobox', {name:'翻译卡片模型',exact:true});
     await open(model); await model.fill('fluentread-test-model'); await model.press('Enter'); await popup().waitFor({state:'hidden'});
     check((await root(model).innerText()).includes('fluentread-test-model'), 'allow-create 模型输入仍然可用');
     await nav('settings-services');

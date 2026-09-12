@@ -39,8 +39,8 @@
     </div>
     <p v-if="busy" class="study-status" role="status">{{ mode === 'use' ? '正在检查你的表达…' : '正在结合语境讲解…' }} <button type="button" @click="stop">停止</button></p>
     <p v-if="error" class="study-error" role="alert">{{ error }} <button type="button" @click="run(mode)">重试</button></p>
-    <p v-if="!enabled" class="study-hint">按需讲解使用翻译卡的服务与模型。<button type="button" @click="emit('navigate', 'settings-harness')">开启翻译卡</button></p>
-    <p v-else class="study-hint">{{ contextAllowed ? '点击时发送当前表达和收藏原句。' : '当前仅发送表达；可在翻译卡设置中允许参考原句。' }}<button type="button" @click="emit('navigate', 'settings-harness')">服务与原文范围</button></p>
+    <p v-if="!enabled" class="study-hint">按需讲解使用翻译卡片的服务与模型。<button type="button" @click="emit('navigate', 'settings-harness')">开启翻译卡片</button></p>
+    <p v-else class="study-hint">{{ contextAllowed ? '点击时发送当前表达和收藏原句。' : '当前仅发送表达；可在翻译卡片设置中允许参考原句。' }}<button type="button" @click="emit('navigate', 'settings-harness')">服务与原文范围</button></p>
     <p v-if="model" class="study-hint">{{ model }} · AI 讲解与反馈，掌握程度由你在复习时确认。</p>
     <p v-if="notice" class="study-hint" role="status">{{ notice }}</p>
   </section>

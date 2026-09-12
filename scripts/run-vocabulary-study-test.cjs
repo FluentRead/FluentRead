@@ -125,7 +125,7 @@ async function main() {
     await persist(page,{harness:{...original.harness,enabled:false}});
     const disabledBefore=requests.length;
     await page.getByRole('button',{name:'重新讲解',exact:true}).click();
-    await page.locator('#settings-harness').waitFor();assert(requests.length===disabledBefore,'关闭翻译卡仍发起请求');
+    await page.locator('#settings-harness').waitFor();assert(requests.length===disabledBefore,'关闭翻译卡片仍发起请求');
     await persist(page,{harness:original.harness});
     await page.goto(`${url}#settings-vocabulary`);await page.locator('.word-list').waitFor();record('disabled-feature-opens-settings-without-request');
     await open('resilient');assert((await page.locator('.study-source').innerText()).includes('没有可用的原句'),'单独一个词被当成原句');await back();
@@ -139,8 +139,8 @@ async function main() {
     await page.locator('.review-actions .good').click();
     await waitFor(async()=>{const next=await send(page,{type:'fluentReadVocabularyBook',action:'list'});return next.data.reduce((sum,entry)=>sum+entry.reviewCount,0)===before+1;},'复习没有持久化');
     await shot('learning-review');record('recall-reveal-persist-rating');
-    await page.goto(`${url}#settings-harness`);await page.getByRole('heading',{name:'翻译卡',exact:true}).waitFor();
-    const group=page.locator('.nav-group').filter({has:page.locator('.nav-group-label',{hasText:'专项翻译'})});assert(await group.locator('[data-section="settings-harness"]').count()===1,'翻译卡分组错误');
+    await page.goto(`${url}#settings-harness`);await page.getByRole('heading',{name:'翻译卡片',exact:true}).waitFor();
+    const group=page.locator('.nav-group').filter({has:page.locator('.nav-group-label',{hasText:'专项翻译'})});assert(await group.locator('[data-section="settings-harness"]').count()===1,'翻译卡片分组错误');
     await page.locator('.harness-attribution').scrollIntoViewIfNeeded();assert(await page.locator('.harness-attribution a').getAttribute('href')==='https://github.com/deepseek-ai/deepseek-harness','来源链接错误');await shot('translation-card-source');record('translation-card-name-group-attribution');
     assert(report.consoleErrors.length===0,JSON.stringify(report.consoleErrors));
     report.ok=true;

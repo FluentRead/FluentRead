@@ -1140,10 +1140,10 @@ async function main() {
       result.cases.push({id: 'target-change-and-selection-replacement', status: 'passed'});
       await configure({selectionTranslatorTrigger: 'icon', harness: {...saved.harness, enabled: true, trigger: 'click'}});
       await select('Hello world');
-      assert((await readSelectionUi(page)).readingIndicator, '外语翻译卡入口未恢复');
+      assert((await readSelectionUi(page)).readingIndicator, '外语翻译卡片入口未恢复');
       await select('你好');
       const finalUi = await readSelectionUi(page);
-      assert(!finalUi.readingIndicator && !finalUi.tooltip, '中文翻译卡入口未隐藏');
+      assert(!finalUi.readingIndicator && !finalUi.tooltip, '中文翻译卡片入口未隐藏');
       result.cases.push({id: 'reading-indicator-restores-for-foreign-selection', status: 'passed', ui: finalUi});
       const screenshot = path.join(args.artifactsDir, 'chinese-selection-no-card.png');
       await page.screenshot({path: screenshot}); result.screenshots.push(screenshot);

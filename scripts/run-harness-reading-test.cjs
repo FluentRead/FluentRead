@@ -358,11 +358,11 @@ async function verifyCardTriggers({page, configPage, requests, record, args, res
     const darkScreenshot = path.join(args.artifactsDir, 'card-trigger-dark.png');
     await page.screenshot({path: darkScreenshot}); result.screenshots.push(darkScreenshot);
     await configPage.reload({waitUntil: 'domcontentloaded'});
-    const triggerGroup = configPage.getByRole('radiogroup', {name: '打开翻译卡', exact: true});
+    const triggerGroup = configPage.getByRole('radiogroup', {name: '打开翻译卡片', exact: true});
     await triggerGroup.getByRole('radio', {name: '延迟悬停', exact: true}).click();
     const delayInput = configPage.getByRole('spinbutton', {name: '悬停等待（毫秒）', exact: true});
     await delayInput.fill('1100'); await delayInput.press('Tab');
-    await waitUntil(async () => {const reading = (await readConfig(configPage)).harness; return reading.trigger === 'hover' && reading.hoverDelay === 1100;}, '翻译卡触发设置未保存');
+    await waitUntil(async () => {const reading = (await readConfig(configPage)).harness; return reading.trigger === 'hover' && reading.hoverDelay === 1100;}, '翻译卡片触发设置未保存');
     await configPage.reload({waitUntil: 'domcontentloaded'});
     assert(await triggerGroup.getByRole('radio', {name: '延迟悬停', exact: true}).getAttribute('aria-checked') === 'true', '重开设置后丢失悬停方式');
     assert(await delayInput.inputValue() === '1100', '重开设置后丢失悬停延迟');
@@ -501,8 +501,8 @@ async function verifyHarnessSaveRace({newPage, configPage, extensionId, args, re
         });
         await editedPage.addInitScript(harnessSaveProbeScript);
         await editedPage.goto(`chrome-extension://${extensionId}/options.html#settings-harness`, {waitUntil: 'domcontentloaded'});
-        const enabled = editedPage.getByRole('switch', {name: '启用翻译卡'});
-        await editedPage.waitForFunction(() => document.querySelector('[role="switch"][aria-label="启用翻译卡"]')?.getAttribute('aria-checked') === 'false');
+        const enabled = editedPage.getByRole('switch', {name: '启用翻译卡片'});
+        await editedPage.waitForFunction(() => document.querySelector('[role="switch"][aria-label="启用翻译卡片"]')?.getAttribute('aria-checked') === 'false');
         assert(await editedPage.evaluate(() => globalThis.__fluentReadHarnessSaveProbe.installed && globalThis.__fluentReadHarnessSaveProbe.requests.length === 0), '保存观察器未在首次 UI 修改前就绪');
         await enabled.locator('xpath=ancestor::*[contains(@class, "el-switch")][1]').locator('.el-switch__core').click();
         await editedPage.waitForFunction(() => globalThis.__fluentReadHarnessSaveProbe.heldResponses === 1);
@@ -537,7 +537,7 @@ async function verifyHarnessSaveRace({newPage, configPage, extensionId, args, re
         if (editedPage) { await editedPage.close(); editedPage = null; }
         reopenedPage = await newPage();
         await reopenedPage.goto(`chrome-extension://${extensionId}/options.html#settings-harness`, {waitUntil: 'domcontentloaded'});
-        await reopenedPage.waitForFunction(() => document.querySelector('[role="switch"][aria-label="启用翻译卡"]')?.getAttribute('aria-checked') === 'true');
+        await reopenedPage.waitForFunction(() => document.querySelector('[role="switch"][aria-label="启用翻译卡片"]')?.getAttribute('aria-checked') === 'true');
         assert(await reopenedPage.getByRole('radio', {name: '仅选中文字', exact: true}).getAttribute('aria-checked') === 'true', '重开后最终上下文选择回滚');
         details.reopened = (await readConfig(reopenedPage)).harness;
         const screenshot = path.join(args.artifactsDir, `${id}.png`);
@@ -702,7 +702,7 @@ async function main() {
         const actualSelection = await page.evaluate(() => getSelection()?.toString().trim() || '');
         assert(actualSelection && /lthough the task was difficult/.test(actualSelection) && !actualSelection.includes('WXT Shadow Root'), `真实选区未落在目标文本: ${actualSelection.slice(0, 180)}`);
         const selected = await shadowSnapshot(page);
-        assert(selected.host, '启用翻译卡 后没有 closed Shadow UI');
+        assert(selected.host, '启用翻译卡片 后没有 closed Shadow UI');
         assert(requests.length === beforeSelection, '仅选择文本就发起了 Harness 请求');
         const actionToolbar = find(selected.host, node => attr(node, 'class').split(' ').includes('fr-reading-indicator'));
         const toolbarLabels = findAll(actionToolbar, node => node.nodeName?.toLowerCase() === 'button').map(node => text(node).trim());
@@ -899,7 +899,7 @@ async function main() {
         const toolLabels = await toolsGroup.locator('button strong').allTextContents();
         assert(JSON.stringify(toolLabels) === JSON.stringify(['翻译中心', '学习中心', '术语库', '模型用量']), `工具与学习导航顺序不符: ${toolLabels}`);
         const specializedGroup = settingsPage.locator('.nav-group').filter({has: settingsPage.locator('.nav-group-label', {hasText: '专项翻译'})});
-        assert(await specializedGroup.locator('[data-section="settings-harness"]').count() === 1, '翻译卡没有进入专项翻译');
+        assert(await specializedGroup.locator('[data-section="settings-harness"]').count() === 1, '翻译卡片没有进入专项翻译');
         for (const [label, section] of [['翻译中心', 'settings-translation-center'], ['学习中心', 'settings-vocabulary'], ['术语库', 'settings-glossary'], ['模型用量', 'settings-model-usage']]) {
             await toolsGroup.getByRole('button', {name: label, exact: false}).click();
             await settingsPage.waitForFunction(id => location.hash === `#${id}`, section);
@@ -1182,7 +1182,7 @@ async function main() {
             for (const target of context.pages().filter(target => !target.isClosed() && target.url().endsWith('#settings-harness'))) {
                 await target.goto(`chrome-extension://${extensionId}/options.html#settings-general`, {waitUntil: 'domcontentloaded'});
             }
-            await clickShadowButton(page, '打开翻译卡设置');
+            await clickShadowButton(page, '打开翻译卡片设置');
             const harnessSettings = await optionsTarget(context, 'settings-harness');
             record('reading-footer-opens-harness-settings', 'passed', {url: harnessSettings.url(), foregroundActivationVerified: args.headed});
         } finally {
@@ -1295,11 +1295,11 @@ async function main() {
         uiPersistPage.on('console', message => {if (message.type() === 'warning') (result.warnings ||= []).push(message.text())});
         await uiPersistPage.goto(`chrome-extension://${extensionId}/options.html#settings-harness`, { waitUntil: 'domcontentloaded' });
         await uiPersistPage.waitForTimeout(1000);
-        const enabledSwitch = uiPersistPage.getByRole('switch', { name: '启用翻译卡' });
+        const enabledSwitch = uiPersistPage.getByRole('switch', { name: '启用翻译卡片' });
         const beforeSwitch = await enabledSwitch.getAttribute('aria-checked');
         assert(beforeSwitch === 'true', '持久化测试起始开关应开启');
         await enabledSwitch.locator('xpath=ancestor::*[contains(@class, "el-switch")][1]').locator('.el-switch__core').click();
-        await uiPersistPage.waitForFunction(() => document.querySelector('[role="switch"][aria-label="启用翻译卡"]')?.getAttribute('aria-checked') === 'false');
+        await uiPersistPage.waitForFunction(() => document.querySelector('[role="switch"][aria-label="启用翻译卡片"]')?.getAttribute('aria-checked') === 'false');
         await uiPersistPage.getByRole('radio', { name: '可参考本段' }).click();
         await uiPersistPage.waitForTimeout(900);
         result.persistenceBeforeClose = {harness: (await readConfig(uiPersistPage)).harness, checked: await enabledSwitch.getAttribute('aria-checked')};
@@ -1307,7 +1307,7 @@ async function main() {
         const reopened = await newPage();
         await reopened.goto(`chrome-extension://${extensionId}/options.html#settings-harness`, { waitUntil: 'domcontentloaded' });
         await reopened.waitForTimeout(1000);
-        const reopenedSwitch = reopened.getByRole('switch', { name: '启用翻译卡' });
+        const reopenedSwitch = reopened.getByRole('switch', { name: '启用翻译卡片' });
         const reopenedConfig = await readConfig(reopened);
         const switchState = await reopenedSwitch.getAttribute('aria-checked');
         result.persistenceAfterReopen = {harness: reopenedConfig.harness, checked: switchState};

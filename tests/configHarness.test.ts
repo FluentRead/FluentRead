@@ -105,7 +105,7 @@ describe('Harness config contract', () => {
 })
 
 
-describe('翻译卡提示词配置', () => {
+describe('翻译卡片提示词配置', () => {
   it('旧配置使用实际默认提示词，非法类型回退且动作白名单和长度限制生效', () => {
     for (const actionPrompts of [undefined, null, [], false, 'bad']) {
       expect(normalizeHarnessPreferences({systemPrompt: 123, actionPrompts})).toMatchObject({systemPrompt: DEFAULT_HARNESS_SYSTEM_PROMPT, actionPrompts: DEFAULT_HARNESS_ACTION_PROMPTS});

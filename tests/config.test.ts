@@ -463,7 +463,7 @@ describe('统一配置存储', () => {
         expect(storageState.get('local:config')).toMatchObject({areaTranslationMode: 'ai', areaTranslationService: 'openai'});
     });
 
-    it('翻译卡提示词经过保存与重载保持，占位符和用户空白不被改写', async () => {
+    it('翻译卡片提示词经过保存与重载保持，占位符和用户空白不被改写', async () => {
         const store = await loadConfigModule(storedConfig);
         await store.configReady;
         const harness = {...store.config.harness, systemPrompt: 'Use {{to}}', actionPrompts: {...store.config.harness.actionPrompts, grammar: '  Custom {{learningLevel}}  '}};

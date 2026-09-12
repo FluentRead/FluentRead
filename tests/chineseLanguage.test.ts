@@ -138,7 +138,7 @@ describe('中文书写体系与语言代码', () => {
     });
 });
 
-describe('划词和翻译卡的纯中文选区', () => {
+describe('划词和翻译卡片的纯中文选区', () => {
     it.each(['你好', '人', '中文人口', '未来', '你好，世界！123 🎉', '繁體中文', '这是繁體混排', '𱀀', '你好 👨‍👩‍👧‍👦'])('中文目标下跳过 %s', text => {
         for (const target of ['zh', 'zh-CN', 'zh-Hans', 'zh-TW', 'zh-Hant']) {
             expect(shouldSkipChineseSelection(text, target)).toBe(true);

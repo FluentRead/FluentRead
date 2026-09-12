@@ -77,7 +77,7 @@
     <p v-if="feedback" class="fr-reading-feedback" role="status">{{ feedback }}</p>
     <p v-if="sessionWarning" class="fr-reading-feedback" role="status">{{ sessionWarning }}</p>
     </template>
-    <div class="fr-reading-context"><span>{{ privateContext ? '隐私模式：不保存记录' : '阅读记录保存在本机 30 天' }}</span><button type="button" aria-label="打开翻译卡设置" @click="openSettings()">设置</button></div>
+    <div class="fr-reading-context"><span>{{ privateContext ? '隐私模式：不保存记录' : '阅读记录保存在本机 30 天' }}</span><button type="button" aria-label="打开翻译卡片设置" @click="openSettings()">设置</button></div>
   </div>
 </template>
 
@@ -347,7 +347,7 @@ async function openSettings(section = 'settings-harness'): Promise<void> {
   try {
     const response = await browser.runtime.sendMessage({type: 'openOptionsPage', section}) as {success?: unknown} | undefined;
     if (response?.success !== true) throw new Error('打开设置失败');
-  } catch { feedback.value = section === 'settings-services' ? '打开设置失败，请从扩展菜单进入“翻译服务”。' : '打开设置失败，请从专项翻译进入“翻译卡”。'; }
+  } catch { feedback.value = section === 'settings-services' ? '打开设置失败，请从扩展菜单进入“翻译服务”。' : '打开设置失败，请从专项翻译进入“翻译卡片”。'; }
 }
 async function copyAnswer(): Promise<void> {
   try {

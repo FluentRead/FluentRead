@@ -2,7 +2,7 @@
  * @file src/core/language/detect.ts
  *
  * 文件职责：对待翻译文本执行轻量语言识别，并提供只在高置信度时跳过同语言翻译的保守判定。
- * 主要内容：detectlang 调用 franc-min 得到 ISO 639-3 识别结果，普通话仅凭明确字形映射简体或繁体，不明确时保留 cmn；shouldSkipTranslationForTarget 对短文本、共享 Han、简繁混排和未知结果 fail-open，仅接受明确书写体系或足够长的统计结果；划词与翻译卡额外按纯 Han 选区跳过中文目标，不将该交互规则用于全文检测；共享 Chrome 现代语言检测的最低置信度边界。 可核对的公开符号包括 detectlang、shouldSkipTranslationForTarget、MIN_CHROME_LANGUAGE_CONFIDENCE。
+ * 主要内容：detectlang 调用 franc-min 得到 ISO 639-3 识别结果，普通话仅凭明确字形映射简体或繁体，不明确时保留 cmn；shouldSkipTranslationForTarget 对短文本、共享 Han、简繁混排和未知结果 fail-open，仅接受明确书写体系或足够长的统计结果；划词与翻译卡片额外按纯 Han 选区跳过中文目标，不将该交互规则用于全文检测；共享 Chrome 现代语言检测的最低置信度边界。 可核对的公开符号包括 detectlang、shouldSkipTranslationForTarget、MIN_CHROME_LANGUAGE_CONFIDENCE。
  * 模块边界：本文件属于 core 领域层，只定义规则、类型与纯转换；不直接读写浏览器存储、不发起网络请求、不挂载 Vue/WXT 入口，持久化、协议调用和界面编排分别由 services、providers 与 features 承担。
  */
 
@@ -59,7 +59,7 @@ export function shouldSkipTranslationForTarget(origin: string, targetLanguage: s
 }
 
 /**
- * 中文目标下，划词与翻译卡不为纯汉字选区提供翻译入口，包括短词、简繁汉字和
+ * 中文目标下，划词与翻译卡片不为纯汉字选区提供翻译入口，包括短词、简繁汉字和
  * 伴随的标点、数字、表情。只依据选区本身，不让页面语言掩盖其中的外语内容。
  * 这是选区交互规则，不作为通用语言识别结论；外语目标仍允许翻译中文。
  */

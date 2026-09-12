@@ -1,28 +1,28 @@
 <!--
  * @file src/features/settings/ui/HarnessSettings.vue
- * 文件职责：让用户通过翻译卡示例理解功能，并配置网页动作、模型和阅读偏好。
+ * 文件职责：让用户通过翻译卡片示例理解功能，并配置网页动作、模型和阅读偏好。
  * 主要内容：提供无需联网的交互示例、开关下方并排强调的服务与模型选择，以及独立的点击/悬停/快捷键触发、学习记忆、网页动作、回答和原文范围设置，开头注明内核来源和开源链接。
  * 模块边界：只编辑传入 Config 的 harness 字段；阅读记录由学习中心统一呈现，不发起模型请求，不拥有网页选区或提示词。
  -->
 <template>
   <div class="harness-attribution">
-    <span>翻译卡基于 DeepSeek Harness 内核开发。</span>
+    <span>翻译卡片基于 DeepSeek Harness 内核开发。</span>
     <a href="https://github.com/deepseek-ai/deepseek-harness" target="_blank" rel="noopener noreferrer">DeepSeek Harness 开源项目 ↗</a>
   </div>
   <SettingsGroup description="选中网页文字，直接点“读懂”或“拆句”。回答留在原文旁边，读完就继续浏览。">
-    <FeatureEnableCard v-model="config.harness.enabled" title="启用翻译卡" :description="t('reading.enableHelp')" />
+    <FeatureEnableCard v-model="config.harness.enabled" title="启用翻译卡片" :description="t('reading.enableHelp')" />
     <div class="harness-provider-panel">
       <div class="harness-provider-row">
         <div class="harness-provider-field">
           <label id="harness-service-label">翻译服务</label>
-          <el-select v-model="config.harness.service" class="harness-select" @change="config.harness.model = ''" clearable aria-labelledby="harness-service-label" aria-label="翻译卡服务" placeholder="跟随当前默认服务" filterable>
+          <el-select v-model="config.harness.service" class="harness-select" @change="config.harness.model = ''" clearable aria-labelledby="harness-service-label" aria-label="翻译卡片服务" placeholder="跟随当前默认服务" filterable>
             <el-option v-for="item in serviceOptions" :key="item.value" :label="item.label" :value="item.value" />
           </el-select>
           <small>仅支持大模型，使用已配置的服务和密钥。</small>
         </div>
         <div class="harness-provider-field">
           <label id="harness-model-label">模型</label>
-          <el-select v-model="config.harness.model" class="harness-select" clearable filterable allow-create default-first-option aria-labelledby="harness-model-label" aria-label="翻译卡模型" placeholder="跟随服务模型">
+          <el-select v-model="config.harness.model" class="harness-select" clearable filterable allow-create default-first-option aria-labelledby="harness-model-label" aria-label="翻译卡片模型" placeholder="跟随服务模型">
             <el-option v-for="model in modelOptions" :key="model" :label="model" :value="model" />
           </el-select>
           <small>默认沿用服务的模型，也可以选择或输入模型名称。</small>
@@ -30,7 +30,7 @@
       </div>
       <small v-if="!effectiveServiceSupportsHarness" class="service-hint" role="status">当前默认服务不能回答学习问题，请在这里选择一个 AI 服务。</small>
     </div>
-    <SettingsItem label="试试翻译卡" description="选中文字 → 点一个动作 → 读懂后继续浏览。" stacked>
+    <SettingsItem label="试试翻译卡片" description="选中文字 → 点一个动作 → 读懂后继续浏览。" stacked>
       <div class="harness-preview-wrap"><div class="harness-preview">
         <div class="harness-preview-caption"><span>网页中的效果</span><small>演示内容，不调用模型</small></div>
         <p class="harness-sentence"><mark>Although the task was difficult, she finished it on time.</mark></p>
@@ -42,7 +42,7 @@
           </button>
         </div>
         <div class="harness-preview-answer" aria-live="polite"><ReadingAnswer :text="previewResults[previewAction]" /></div>
-        <p class="harness-preview-footer">还想问一句？在翻译卡下方输入问题，继续围绕这段原文学习。</p>
+        <p class="harness-preview-footer">还想问一句？在翻译卡片下方输入问题，继续围绕这段原文学习。</p>
       </div></div>
     </SettingsItem>
   </SettingsGroup>

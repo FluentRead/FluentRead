@@ -1,11 +1,11 @@
 <!--
  * @file src/features/settings/ui/HarnessPromptSettings.vue
- * 文件职责：提供翻译卡通用指令和四种学习动作的提示词编辑界面。
+ * 文件职责：提供翻译卡片通用指令和四种学习动作的提示词编辑界面。
  * 主要内容：使用可折叠编辑器切换模板、插入已登记占位符、显示字符限制并恢复当前模板的默认内容。
  * 模块边界：仅编辑传入的 HarnessPreferences，保存沿用设置页配置流程；不调用模型，不翻译或执行用户提示词内容。
  -->
 <template>
-  <SettingsGroup title="提示词" description="自定义通用指令和各个学习动作，调整翻译卡的回答方式。">
+  <SettingsGroup title="提示词" description="自定义通用指令和各个学习动作，调整翻译卡片的回答方式。">
     <details class="harness-prompts">
       <summary>编辑提示词</summary>
       <div class="harness-prompt-body">

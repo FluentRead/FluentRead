@@ -113,33 +113,33 @@ const chrome =
           :href="withBase('/screenshots/reading-card-detail.webp')"
           target="_blank"
           rel="noopener noreferrer"
-          aria-label="查看 AI 翻译卡的高清截图（新标签页）"
+          aria-label="查看 AI 翻译卡片的高清截图（新标签页）"
           ><img
             :src="withBase('/screenshots/reading-card-detail.webp')"
             width="840"
             height="1140"
             loading="lazy"
             decoding="async"
-            alt="FluentRead 翻译卡解释选中句子的含义与表达用法，并提供继续追问入口"
+            alt="FluentRead 翻译卡片解释选中句子的含义与表达用法，并提供继续追问入口"
         /></a>
         <figcaption>选中文字的上下文讲解与连续追问。</figcaption>
       </figure>
       <div class="product-story-copy">
         <p class="product-eyebrow">DeepSeek Harness</p>
-        <h2 id="selection-title">AI 翻译卡</h2>
+        <h2 id="selection-title">AI 翻译卡片</h2>
         <p>
           解释选中文字的含义、分析句子结构、说明表达用法并提供练习，支持连续追问与词句收藏。
         </p>
         <p>
-          翻译卡接入 DeepSeek Harness
+          翻译卡片接入 DeepSeek Harness
           会话内核的浏览器适配，连接当前选区、允许参考的段落和阅读记录。可选择已配置的
           AI 服务与模型。
         </p>
         <p class="product-subnote">
-          翻译卡的讲解与练习需要配置 AI 服务，点击动作后才开始生成。
+          翻译卡片的讲解与练习需要配置 AI 服务，点击动作后才开始生成。
         </p>
         <a class="product-text-link" :href="withBase('/guide/deepseek-harness')"
-          >翻译卡使用指南 <span aria-hidden="true">→</span></a
+          >翻译卡片使用指南 <span aria-hidden="true">→</span></a
         >
       </div>
     </section>

@@ -57,10 +57,10 @@ export const navigationGroups = [
     label: '专项翻译',
     items: [
       {
-        id: 'settings-harness', icon: '文', label: '翻译卡', description: '选区学习辅助', group: '专项翻译',
-        heading: '翻译卡', summary: '选中文本后按需调用 AI，帮助理解、拆句、掌握用法和练习。',
-        kicker: '专项翻译', title: '翻译卡', detail: '配置选区学习辅助的服务、上下文范围和回答偏好。',
-        searchDescription: '翻译卡、阅读卡、Harness、DeepSeek、读懂、拆句、用法、练习、选区、段落、学习辅助、解释深度、学习程度、学习记忆、记忆开关',
+        id: 'settings-harness', icon: '文', label: '翻译卡片', description: '选区学习辅助', group: '专项翻译',
+        heading: '翻译卡片', summary: '选中文本后按需调用 AI，帮助理解、拆句、掌握用法和练习。',
+        kicker: '专项翻译', title: '翻译卡片', detail: '配置选区学习辅助的服务、上下文范围和回答偏好。',
+        searchDescription: '翻译卡片、阅读卡、Harness、DeepSeek、读懂、拆句、用法、练习、选区、段落、学习辅助、解释深度、学习程度、学习记忆、记忆开关',
       },
       {
         id: 'settings-image-translation', icon: '图', label: '图片翻译', description: '网页图片与 OCR', group: '专项翻译',

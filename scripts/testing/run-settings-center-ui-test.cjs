@@ -69,7 +69,7 @@ const expectedNavigation = [
   ['settings-interface', '界面风格'],
   ['settings-services', '翻译服务'],
   ['settings-translation', '翻译设置'],
-  ['settings-harness', '翻译卡'],
+  ['settings-harness', '翻译卡片'],
   ['settings-image-translation', '图片翻译'],
   ['settings-area-translation', '圈选翻译'],
   ['settings-video', '视频字幕翻译'],

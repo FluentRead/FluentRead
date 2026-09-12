@@ -1,7 +1,7 @@
 /**
  * @file src/app/content/hotkeyRuntime.ts
  * 文件职责：在宿主页面统一接管 FluentRead 的键盘与鼠标快捷手势，并按配置、站点禁用状态和冲突优先级路由到相应翻译动作。
- * 主要内容：规范化特殊按键，监听 keydown/keyup、pointer 与 touch 状态，匹配悬浮、全文、划词、翻译卡和区域快捷键，以纯中文选区过滤和保守同语言预检处理选择文本占用与默认行为阻止，并提供 dispose 清理监听器。
+ * 主要内容：规范化特殊按键，监听 keydown/keyup、pointer 与 touch 状态，匹配悬浮、全文、划词、翻译卡片和区域快捷键，以纯中文选区过滤和保守同语言预检处理选择文本占用与默认行为阻止，并提供 dispose 清理监听器。
  * 模块边界：这里判定并分派手势，不实现语言检测算法、翻译请求、UI 挂载或配置持久化；具体动作由注入/导入的 feature 公共函数完成。
  */
 import {config} from '@/src/services/config/store';

@@ -218,7 +218,7 @@ describe('划词翻译快捷键语言预检', () => {
     });
 });
 
- describe('翻译卡快捷键优先级', () => {
+ describe('翻译卡片快捷键优先级', () => {
     it('在普通划词关闭时为 AI 阅读保留外语选区，禁用站点和不可用文档不占用', async () => {
         mocks.config.selectionTranslatorMode = 'disabled';
         mocks.config.harness = {enabled: true, trigger: 'shortcut', customHotkey: 'Alt+R'};
@@ -236,7 +236,7 @@ describe('划词翻译快捷键语言预检', () => {
     });
 });
 
-describe('纯中文选区不占用划词或翻译卡快捷键', () => {
+describe('纯中文选区不占用划词或翻译卡片快捷键', () => {
     it.each(['你好', '你好，世界！123 🎉', '繁體中文'])('跳过 %s，但切换外语目标后恢复', async text => {
         mocks.config.selectionTranslatorTrigger = 'Control';
         mocks.getSelection.mockReturnValue(visibleSelection(text));

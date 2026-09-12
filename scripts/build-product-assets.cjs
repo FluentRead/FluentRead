@@ -164,7 +164,7 @@ const mkdir = (p) => fs.mkdirSync(p, { recursive: true })
             ? `<p>${
                 en
                   ? 'Open source · GPL-3.0<br>AI reading card with a browser adaptation of DeepSeek Harness.'
-                  : 'GPL-3.0 开源项目<br>AI 翻译卡接入 DeepSeek Harness 会话内核的浏览器适配。'
+                  : 'GPL-3.0 开源项目<br>AI 翻译卡片接入 DeepSeek Harness 会话内核的浏览器适配。'
               }</p>`
             : `<p>${
                 en ? 'Open-source bilingual translation' : '开源浏览器双语翻译插件'

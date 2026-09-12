@@ -10,7 +10,7 @@
 
 </div>
 
-FluentRead 支持在原网页中对照阅读原文与译文，并提供划词翻译、AI 阅读辅助、图片翻译、文档翻译和视频双语字幕。翻译卡接入了 **DeepSeek Harness 会话内核的浏览器适配**，支持结合上下文解释选中文字并连续追问。
+FluentRead 支持在原网页中对照阅读原文与译文，并提供划词翻译、AI 阅读辅助、图片翻译、文档翻译和视频双语字幕。翻译卡片接入了 **DeepSeek Harness 会话内核的浏览器适配**，支持结合上下文解释选中文字并连续追问。
 
 [![FluentRead 网页双语对照效果](../docs/public/screenshots/translation.webp)](../docs/public/screenshots/translation.webp)
 
@@ -19,7 +19,7 @@ FluentRead 支持在原网页中对照阅读原文与译文，并提供划词翻
 | 功能 | 说明 |
 | --- | --- |
 | 网页翻译 | 全文双语对照、悬浮翻译与划词翻译，支持恢复原文和网站自动翻译规则。 |
-| AI 翻译卡 | 解释含义、分析句子、说明用法与生成练习，支持上下文参考和连续追问。 |
+| AI 翻译卡片 | 解释含义、分析句子、说明用法与生成练习，支持上下文参考和连续追问。 |
 | 学习中心 | 收藏单词、短语和句子，保留原文语境，支持学习与复习。 |
 | 图片与圈选翻译 | 识别网页图片或选定区域中的文字，并显示可复制的译文。 |
 | 文档翻译 | 支持 PDF、ePub、DOCX 等格式，提供双语阅读、译文校订与文件导出。 |
@@ -30,11 +30,11 @@ FluentRead 支持在原网页中对照阅读原文与译文，并提供划词翻
 
 ## DeepSeek Harness
 
-翻译卡采用 DeepSeek Harness 会话内核中会话事件与消息组织部分的浏览器适配，由 FluentRead 连接网页选区、允许参考的段落、模型服务和本地阅读记录。支持选择不同 AI 服务与模型，并提供可选的学习记忆。
+翻译卡片采用 DeepSeek Harness 会话内核中会话事件与消息组织部分的浏览器适配，由 FluentRead 连接网页选区、允许参考的段落、模型服务和本地阅读记录。支持选择不同 AI 服务与模型，并提供可选的学习记忆。
 
 该适配用于选区阅读辅助。全文、悬浮和普通划词翻译使用各自的翻译流程。接入范围和上游来源见[内核集成说明](../docs/reports/harness-embedding-map-20260905.md)，MIT 许可见[第三方声明](../public/third-party-notices/deepseek-harness-MIT.txt)。
 
-[翻译卡使用指南](https://fluent.thinkstu.com/guide/deepseek-harness)
+[翻译卡片使用指南](https://fluent.thinkstu.com/guide/deepseek-harness)
 
 ## 安装
 

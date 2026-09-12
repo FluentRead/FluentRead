@@ -153,14 +153,14 @@ export const zhCNMessages = {
     "popup.quickSettings.videoSettings": "视频翻译设置",
     "popup.quickSettings.videoSettingsHint": "翻译服务、字幕外观与本地 AI",
 
-    "reading.triggerTitle": "打开翻译卡",
+    "reading.triggerTitle": "打开翻译卡片",
     "reading.triggerHelp": "默认点击动作打开；快捷键使用优先动作，悬停使用指向的动作。",
     "reading.triggerClick": "点击动作",
     "reading.triggerHover": "延迟悬停",
     "reading.triggerShortcut": "快捷键",
     "reading.hoverDelay": "悬停等待（毫秒）",
     "reading.hoverHelp": "将鼠标停在选区浮条的学习动作上，等待后打开；移开即取消。",
-    "reading.shortcut": "翻译卡快捷键",
+    "reading.shortcut": "翻译卡片快捷键",
     "reading.shortcutHelp": "先选中文字，再按快捷键。点击按键名称可修改。",
     "reading.enableHelp": "选中文字后，通过学习动作或你设置的触发方式打开。",
 

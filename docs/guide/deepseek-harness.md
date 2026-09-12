@@ -1,18 +1,18 @@
-# AI 翻译卡
+# AI 翻译卡片
 
-AI 翻译卡结合选中的原文提供含义解释、句子分析、表达用法和练习，支持围绕同一段内容继续追问。
+AI 翻译卡片结合选中的原文提供含义解释、句子分析、表达用法和练习，支持围绕同一段内容继续追问。
 
 ## DeepSeek Harness
 
-FluentRead 开源，翻译卡接入了 **DeepSeek Harness 会话内核的浏览器适配**。通过保存会话上下文，支持连续问答与阅读记录。
+FluentRead 开源，翻译卡片接入了 **DeepSeek Harness 会话内核的浏览器适配**。通过保存会话上下文，支持连续问答与阅读记录。
 
 这里采用的是上游的会话记录与消息组织部分，由 FluentRead 连接网页选区、AI 模型和学习记录。它不会把你绑定到 DeepSeek 模型；在设置里选择自己使用的 AI 服务即可。[查看 FluentRead 源码](https://github.com/FluentRead/FluentRead) · [DeepSeek Harness 来源与许可](https://github.com/FluentRead/FluentRead/blob/main/public/third-party-notices/deepseek-harness-MIT.txt)
 
-<a href="/screenshots/reading-card.webp" target="_blank" rel="noopener noreferrer"><img class="doc-screenshot" src="/screenshots/reading-card.webp" alt="翻译卡结合选中的原文讲解含义与表达用法，底部可以继续追问" width="2560" height="1600" loading="lazy" /></a>
+<a href="/screenshots/reading-card.webp" target="_blank" rel="noopener noreferrer"><img class="doc-screenshot" src="/screenshots/reading-card.webp" alt="翻译卡片结合选中的原文讲解含义与表达用法，底部可以继续追问" width="2560" height="1600" loading="lazy" /></a>
 
 ## 启用与配置
 
-进入 **设置 → 专项翻译 → 翻译卡**，开启功能，选择已配置的 AI 服务和模型。连接信息在[翻译服务](/config/translation-engines)中填写。
+进入 **设置 → 专项翻译 → 翻译卡片**，开启功能，选择已配置的 AI 服务和模型。连接信息在[翻译服务](/config/translation-engines)中填写。
 
 ## 网页中的使用方式
 
@@ -25,7 +25,7 @@ FluentRead 开源，翻译卡接入了 **DeepSeek Harness 会话内核的浏览�
 | 用法 | 想学一个表达的搭配和自然说法 |
 | 练习 | 结合原文进行表达练习 |
 
-默认选中文字只显示动作，点击后才调用 AI。也可以在翻译卡设置的 **打开翻译卡** 中选择：
+默认选中文字只显示动作，点击后才调用 AI。也可以在翻译卡片设置的 **打开翻译卡片** 中选择：
 
 - **延迟悬停**：将鼠标停在浮条的“读懂”等动作上，等待后打开并开始生成；移开鼠标或点击网页其他位置即可取消等待。等待时间可在 200–3000 毫秒之间调整。
 - **快捷键**：选中文字后按 **Alt+R**（Mac 上为 Option+R），直接打开优先动作。点击设置中的按键名称可以录制自己的组合键。
@@ -44,7 +44,7 @@ FluentRead 开源，翻译卡接入了 **DeepSeek Harness 会话内核的浏览�
 
 ## 讲解设置
 
-在翻译卡设置中调整学习程度、解释长短和默认动作。不常用的动作可以隐藏。
+在翻译卡片设置中调整学习程度、解释长短和默认动作。不常用的动作可以隐藏。
 
 **结合哪些原文** 决定模型能参考什么：默认可参考当前段落，选择“当前选区”则只使用选中文字。参考更多内容有助于理解指代，也会发送更多文本。
 
@@ -54,7 +54,7 @@ FluentRead 开源，翻译卡接入了 **DeepSeek Harness 会话内核的浏览�
 
 ## 学习记忆是可选的
 
-开启学习记忆后，翻译卡可以记住你确认保留的学习偏好或提示，在后续讲解中参考。你可以查看、停用、删除或清空；不需要时保持关闭。记忆被用于 AI 讲解时，相关内容会随请求发送给所选服务。
+开启学习记忆后，翻译卡片可以记住你确认保留的学习偏好或提示，在后续讲解中参考。你可以查看、停用、删除或清空；不需要时保持关闭。记忆被用于 AI 讲解时，相关内容会随请求发送给所选服务。
 
 ## 数据与回答
 

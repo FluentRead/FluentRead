@@ -14,6 +14,17 @@ describe('配置差异预览', () => {
         expect(changes).toEqual([{key: 'videoSubtitleOffsetMs', label: '字幕时间偏移', before: '-500ms', after: '1000ms'}]);
     });
 
+    it('不翻译的语言以可读语言名预览，清空或非法旧值显示为无', () => {
+        const changes = group(buildConfigDiff({excludedLanguages: []}, {excludedLanguages: ['ja', 'zh-Hant']}), 'translation')?.changes;
+        expect(changes).toHaveLength(1);
+        expect(changes?.[0]).toMatchObject({key: 'excludedLanguages', label: '不翻译的语言', before: '无'});
+        expect(changes?.[0].after.split('、')).toHaveLength(2);
+        expect(changes?.[0].after).not.toMatch(/\bja\b|zh-Hant/u);
+        const legacy = group(buildConfigDiff({excludedLanguages: 'ja'}, {excludedLanguages: ['ja']}), 'translation')?.changes;
+        expect(legacy?.[0]).toMatchObject({key: 'excludedLanguages', before: '无'});
+        expect(legacy?.[0].after).toBe(changes?.[0].after.split('、')[0]);
+    });
+
     it('常用服务的添加与删除记录为独立偏好，缺失旧值也能预览', () => {
         const changes = group(buildConfigDiff({favoriteServices: []}, {favoriteServices: ['openai']}), 'translationServices')?.changes;
         expect(changes).toEqual([{key: 'favoriteServices', label: '常用翻译服务', before: '无', after: 'OpenAI'}]);

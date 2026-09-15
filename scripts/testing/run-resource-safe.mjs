@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 
-import {mkdir, readFile, rm, stat, writeFile} from 'node:fs/promises';
+import {mkdir, readFile, rename, rm, stat, writeFile} from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import process from 'node:process';
@@ -113,16 +113,17 @@ function processIsRunning(pid) {
 }
 
 async function removeStaleLock() {
-    const owner = await readOwner();
-    if (owner?.pid && processIsRunning(owner.pid)) return false;
+    // 先固定锁目录这一代的 inode，再读取 owner；二者都来自同一代时才可能判定为陈旧。
     let lockStat;
     try {
         lockStat = await stat(LOCK_DIR);
-        if (!owner && Date.now() - lockStat.mtimeMs < STALE_LOCK_MS) return false;
     } catch (error) {
         if (error?.code === 'ENOENT') return true;
         throw error;
     }
+    const owner = await readOwner();
+    if (owner?.pid && processIsRunning(owner.pid)) return false;
+    if (!owner && Date.now() - lockStat.mtimeMs < STALE_LOCK_MS) return false;
     // 多个等待者不能同时删除旧锁：在锁目录内部竞争一次清理权，随后重读
     // owner 和 inode，避免晚到的清理者误删另一个进程刚建立的新锁。
     const reaping = path.join(LOCK_DIR, 'reaping');
@@ -133,17 +134,27 @@ async function removeStaleLock() {
         if (error?.code === 'EEXIST') return false;
         throw error;
     }
+    let reaped = false;
     try {
         const currentStat = await stat(LOCK_DIR);
         const currentOwner = await readOwner();
+        // owner 与首次读取不同，说明中途换代或新锁仍在写 owner，不能按陈旧锁回收。
         if (currentStat.ino !== lockStat.ino || currentStat.dev !== lockStat.dev ||
+            JSON.stringify(currentOwner) !== JSON.stringify(owner) ||
             processIsRunning(currentOwner?.pid)) return false;
-        await rm(LOCK_DIR, {recursive: true, force: true});
+        // 原子改名让整代锁一次性消失；原地递归删除时 reaping 已删而目录仍在，
+        // 其他等待者可再建 reaping，使 rmdir 以 ENOTEMPTY 失败并让等待进程崩溃。
+        const tombstone = path.join(LOCK_ROOT, `reaped-${randomUUID()}`);
+        await rename(LOCK_DIR, tombstone);
+        reaped = true;
+        await rm(tombstone, {recursive: true, force: true}).catch(() => undefined);
         return true;
     } finally {
-        const currentStat = await stat(LOCK_DIR).catch(() => undefined);
-        if (currentStat?.ino === lockStat.ino && currentStat.dev === lockStat.dev) {
-            await rm(reaping, {recursive: true, force: true});
+        if (!reaped) {
+            const currentStat = await stat(LOCK_DIR).catch(() => undefined);
+            if (currentStat?.ino === lockStat.ino && currentStat.dev === lockStat.dev) {
+                await rm(reaping, {recursive: true, force: true});
+            }
         }
     }
 }

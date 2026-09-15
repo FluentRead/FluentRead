@@ -169,9 +169,9 @@ function integration(batch: boolean, texts = ['API', 'other']) {
     const broker = createTranslationBroker({
         ready: Promise.resolve(), getConfig: () => config, providers: {openai: provider},
         cache: {get: async () => null, set: async () => true, clear: async () => {}, cleanup: async () => {}},
-        serviceIds: {minimax: 'minimax', mimo: 'mimo'}, serviceTypes: servicesType,
+        serviceTypes: servicesType,
         endpointResolver: {resolveOpenAICompatibleEndpoint: () => ({endpoint: 'https://fixture.invalid/v1'}),
-            getMimoEndpoint: () => '', minimaxEndpoints: {}, aiSdkTransportProfile: 'fixture'},
+            aiSdkTransportProfile: 'fixture'},
         promptBuilder: {buildPageSummaryPrompt: text => text, buildPageSummarySystemPrompt: () => ''},
         getMissingCredentialMessage: () => null,
         getTranslationLanguages: request => ({sourceLanguage: request?.sourceLanguage ?? config.from, targetLanguage: config.to}),

@@ -52,10 +52,6 @@ const mocks = vi.hoisted(() => {
     const aiServices = new Set(['ai', 'aiSdk', 'brokenAiSdk']);
     const aiSdkServices = new Set(['aiSdk', 'brokenAiSdk']);
     const service = vi.fn();
-    const minimaxEndpoints = {
-        payg: {cn: 'https://minimax.payg.cn', global: 'https://minimax.payg.global'},
-        'token-plan': {cn: 'https://minimax.token.cn', global: 'https://minimax.token.global'},
-    } as Record<string, Record<string, string>>;
     const providers = {
         '': service,
         freeTranslation: service,
@@ -132,7 +128,6 @@ const mocks = vi.hoisted(() => {
         }),
         getMissingCredentialMessage: vi.fn(() => null as string | null),
         machineServices,
-        minimaxEndpoints,
         recordModelUsage: vi.fn(async (_events: readonly TranslationModelUsageRecord[]) => undefined),
         service,
         cacheGet: vi.fn(async (key: string) => cacheStore.get(key) ?? null),
@@ -167,7 +162,6 @@ function installBroker(
             clear: mocks.cacheClear,
             cleanup: mocks.cacheCleanup,
         },
-        serviceIds: {minimax: 'minimax', mimo: 'mimo'},
         serviceTypes: {
             machine: mocks.machineServices,
             isAI: (service: string) => mocks.aiServices.has(service),
@@ -176,8 +170,6 @@ function installBroker(
         },
         endpointResolver: {
             resolveOpenAICompatibleEndpoint: mocks.endpointResolver,
-            getMimoEndpoint: (plan: string, region: string) => `https://mimo.${plan}.${region}.test`,
-            minimaxEndpoints: mocks.minimaxEndpoints,
             aiSdkTransportProfile: 'ai-sdk-profile',
         },
         promptBuilder: {
@@ -429,10 +421,6 @@ describe('translation broker', () => {
         mocks.endpointResolver.mockImplementation((serviceName: string, _current?: unknown) => {
             if (serviceName === 'brokenAiSdk') throw new Error('endpoint missing');
             return {endpoint: `https://${serviceName}.endpoint.test`};
-        });
-        Object.assign(mocks.minimaxEndpoints, {
-            payg: {cn: 'https://minimax.payg.cn', global: 'https://minimax.payg.global'},
-            'token-plan': {cn: 'https://minimax.token.cn', global: 'https://minimax.token.global'},
         });
         installBroker();
     });
@@ -1294,48 +1282,20 @@ describe('translation broker', () => {
         ]);
     });
 
-    it('builds provider cache identities for proxy, custom endpoints, Minimax, Mimo, and AI SDK services', async () => {
+    it('builds provider cache identities for proxy, DeepLX and AI SDK services without legacy endpoint fields', async () => {
         mocks.config.proxy.mock = 'https://proxy.example';
         await translateWithCache({origin: 'Proxy'});
         expect(translationCacheIdentities().at(-1)).toMatchObject({endpoint: 'https://proxy.example'});
-
-        mocks.config.service = 'custom';
-        mocks.config.custom = 'https://custom.example';
-        await translateWithCache({origin: 'Custom'});
-        expect(translationCacheIdentities().at(-1)).toMatchObject({service: 'custom', endpoint: 'https://custom.example'});
 
         mocks.config.service = 'deeplx';
         mocks.config.deeplx = 'https://deeplx.example';
         await translateWithCache({origin: 'DeepLX'});
         expect(translationCacheIdentities().at(-1)).toMatchObject({service: 'deeplx', endpoint: 'https://deeplx.example'});
 
-        mocks.config.service = 'newapi';
-        mocks.config.newApiUrl = 'https://newapi.example';
-        await translateWithCache({origin: 'New API'});
-        expect(translationCacheIdentities().at(-1)).toMatchObject({service: 'newapi', endpoint: 'https://newapi.example'});
-
-        mocks.config.service = 'minimax';
-        mocks.config.minimaxBillingPlan = 'token-plan';
-        mocks.config.minimaxRegion = 'global';
-        await translateWithCache({origin: 'Minimax'});
-        expect(translationCacheIdentities().at(-1)).toMatchObject({service: 'minimax', endpoint: 'https://minimax.token.global'});
-
-        mocks.config.minimaxBillingPlan = 'unknown';
-        mocks.config.minimaxRegion = 'cn';
-        await translateWithCache({origin: 'Minimax default'});
-        expect(translationCacheIdentities().at(-1)).toMatchObject({service: 'minimax', endpoint: 'https://minimax.payg.cn'});
-
-        mocks.minimaxEndpoints.payg = {};
-        installBroker();
-        await translateWithCache({origin: 'Minimax missing endpoint'});
-        expect(translationCacheIdentities().at(-1)).toMatchObject({service: 'minimax', endpoint: ''});
-
-        mocks.config.service = 'mimo';
-        mocks.config.mimoBillingPlan = 'subscription';
-        mocks.config.mimoRegion = 'global';
-        await translateWithCache({origin: 'Mimo'});
-        expect(translationCacheIdentities().at(-1)).toMatchObject({service: 'mimo', endpoint: 'https://mimo.subscription.global.test'});
-
+        // 旧适配器字段不能决定 AI SDK 服务的地址身份；端点解析器是唯一来源。
+        mocks.config.custom = 'https://legacy-custom.example';
+        mocks.config.newApiUrl = 'https://legacy-newapi.example';
+        mocks.config.proxy.aiSdk = 'https://legacy-proxy.example';
         mocks.config.service = 'aiSdk';
         await translateWithCache({origin: 'AI SDK'});
         expect(mocks.endpointResolver).toHaveBeenCalledWith('aiSdk', expect.any(Object));

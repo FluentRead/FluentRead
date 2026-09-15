@@ -290,6 +290,19 @@ describe('site adaptation compilation', () => {
         }
     });
 
+    it('computes each compiled rule observation filter on demand with the same result, including unobservable null', () => {
+        const [unobservable] = compileSiteRulePack(pack([rule({content: [{css: ['p:has(+ .description)']}]})]));
+        expect(unobservable!.observedAttributes).toBeNull();
+        expect(unobservable!.observedAttributes).toBeNull();
+        const compiled = compileSiteRulePack(builtinSiteRulePack);
+        expect(compiled).toHaveLength(builtinSiteRulePack.rules.length);
+        compiled.forEach((adapter, index) => {
+            const expected = getSiteRuleObservedAttributes(resolveSiteRule(builtinSiteRulePack, builtinSiteRulePack.rules[index]!));
+            expect(adapter.observedAttributes, adapter.id).toEqual(expected);
+            expect(adapter.observedAttributes, adapter.id).toBe(adapter.observedAttributes);
+        });
+    });
+
     it('observes selector dependencies in targets, protection, exclusions and mutation exclusions', () => {
         expect(getSiteRuleObservedAttributes({})).toEqual(['id', 'class']);
         expect(getSiteRuleObservedAttributes({

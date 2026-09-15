@@ -786,11 +786,12 @@ function imageAtPointer(event: Pick<MouseEvent, 'target' | 'clientX' | 'clientY'
         if (container.matches('button, [role="button"], [role="dialog"]')) break;
         const candidates = Array.from(container.querySelectorAll('img')).filter(image => {
             const rect = image.getBoundingClientRect();
-            const style = getComputedStyle(image);
-            return rect.width >= MIN_IMAGE_WIDTH && rect.height >= MIN_IMAGE_HEIGHT
+            if (!(rect.width >= MIN_IMAGE_WIDTH && rect.height >= MIN_IMAGE_HEIGHT
                 && event.clientX >= rect.left && event.clientX < rect.right
-                && event.clientY >= rect.top && event.clientY < rect.bottom
-                && style.visibility !== 'hidden' && style.display !== 'none';
+                && event.clientY >= rect.top && event.clientY < rect.bottom)) return false;
+            // 指针每帧都会扫描容器内图片；只有覆盖指针的图片才需要读取计算样式。
+            const style = getComputedStyle(image);
+            return style.visibility !== 'hidden' && style.display !== 'none';
         });
         if (candidates.length === 1) return candidates[0];
         if (candidates.length > 1) return null;

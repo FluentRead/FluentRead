@@ -7,7 +7,6 @@
  */
 
 import {
-    composedAncestors,
     getTranslatableControlValueAttribute,
     isTextInNestedTranslationTooltip,
     getComposedParent,
@@ -64,21 +63,18 @@ export function isTranslationTextNodeProtected(
     shouldStayOriginal?: (element: Element) => boolean,
     ignoredExtensionElement?: Element,
     protectionOptions?: TranslationTextProtectionOptions,
+    protectionCache = createTranslationTextProtectionCache(),
 ): boolean {
     const parent = node.parentElement;
     if (!parent) return true;
-    let depth = 0;
-    for (const ancestor of composedAncestors(parent)) {
-        depth += 1;
-        if (depth > maxComposedAncestorDepth) return true;
-        if (isProtectedDescendantElement(
-            ancestor,
-            ancestor === ignoredExtensionElement,
-            protectionOptions,
-        )) return true;
-        if (shouldStayOriginal?.(ancestor)) return true;
-    }
-    return false;
+    // 同一次同步提取中的文本节点共享祖先；调用方传入缓存时只在相同判定参数下复用。
+    return isTranslationTextElementProtected(
+        parent,
+        shouldStayOriginal,
+        protectionCache,
+        protectionOptions,
+        ignoredExtensionElement,
+    );
 }
 
 function collectReadableText(
@@ -88,6 +84,8 @@ function collectReadableText(
     protectionOptions?: TranslationTextProtectionOptions,
 ): string {
     const parts: string[] = [];
+    // 每个文本节点都要复核完整祖先链；长文章中相邻文本共享祖先，逐节点重算会随正文规模二次增长。
+    const protectionCache = createTranslationTextProtectionCache();
     for (const root of roots) {
         if (root.nodeType === 3) {
             const textNode = root as Text;
@@ -96,6 +94,7 @@ function collectReadableText(
                 shouldStayOriginal,
                 ignoredExtensionElement,
                 protectionOptions,
+                protectionCache,
             )) {
                 const value = normalizeTranslationText(textNode.nodeValue ?? '');
                 if (value) parts.push(value);
@@ -124,6 +123,7 @@ function collectReadableText(
                 shouldStayOriginal,
                 ignoredExtensionElement,
                 protectionOptions,
+                protectionCache,
             )) {
                 const value = normalizeTranslationText(textNode.nodeValue ?? '');
                 if (value) parts.push(value);
@@ -159,6 +159,7 @@ export function isTranslationTextElementProtected(
     shouldStayOriginal: ((element: Element) => boolean) | undefined,
     protectionCache: TranslationTextProtectionCache,
     protectionOptions?: TranslationTextProtectionOptions,
+    ignoredExtensionElement?: Element,
 ): boolean {
     const cached = protectionCache.get(element);
     if (cached) return cached.protected;
@@ -185,7 +186,7 @@ export function isTranslationTextElementProtected(
         depth += 1;
         protectedByAncestor = protectedByAncestor ||
             depth > maxComposedAncestorDepth ||
-            isProtectedDescendantElement(item, false, protectionOptions) ||
+            isProtectedDescendantElement(item, item === ignoredExtensionElement, protectionOptions) ||
             shouldStayOriginal?.(item) === true;
         protectionCache.set(item, {depth, protected: protectedByAncestor});
     }

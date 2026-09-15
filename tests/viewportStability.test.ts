@@ -253,7 +253,8 @@ describe('全文翻译视口稳定性', () => {
         const anchor = document.createElement('p');
         document.body.append(changed, anchor);
         Object.defineProperty(window, 'scrollY', {configurable: true, value: scrollY});
-        Object.defineProperty(document, 'elementFromPoint', {configurable: true, value: () => anchor});
+        const hitTest = vi.fn(() => anchor);
+        Object.defineProperty(document, 'elementFromPoint', {configurable: true, value: hitTest});
         Object.defineProperty(changed, 'getBoundingClientRect', {value: () => ({width: 200, height: 40, top, bottom})});
         let after = false;
         Object.defineProperty(anchor, 'getBoundingClientRect', {value: () => ({width: 200, height: 40, top: after ? 445 : 400})});
@@ -262,6 +263,61 @@ describe('全文翻译视口稳定性', () => {
         withFullPageViewportAnchor(() => { after = true; }, [changed]);
         expect(scrollBy).toHaveBeenCalledTimes(expected);
         if (expected) expect(scrollBy).toHaveBeenCalledWith(0, 45);
+        // 页面内逐段写入最常见；不可能补偿时不能为每次写入付出命中测试与强制布局。
+        expect(hitTest).toHaveBeenCalledTimes(expected);
+    });
+
+    it('可能补偿的变化仍需锚点与变化同属一个已滚动视口，命中变化自身时不以其祖先为锚点', () => {
+        const scroller = document.createElement('div');
+        const changed = document.createElement('p');
+        const documentAnchor = document.createElement('p');
+        scroller.append(changed);
+        document.body.append(scroller, documentAnchor);
+        Object.defineProperties(scroller, {
+            scrollHeight: {value: 1000}, clientHeight: {value: 200}, clientTop: {value: 0},
+            getBoundingClientRect: {value: () => ({top: 100})},
+        });
+        scroller.scrollTop = 300;
+        Object.defineProperty(window, 'getComputedStyle', {configurable: true, value: (element: Element) => ({overflowY: element === scroller ? 'auto' : 'visible'})});
+        Object.defineProperty(window, 'scrollY', {configurable: true, value: 0});
+        Object.defineProperty(changed, 'getBoundingClientRect', {value: () => ({width: 200, height: 40, top: 20, bottom: 60})});
+        let after = false;
+        Object.defineProperty(documentAnchor, 'getBoundingClientRect', {value: () => ({width: 200, height: 40, top: after ? 480 : 400})});
+        const scrollBy = vi.fn();
+        Object.defineProperty(window, 'scrollBy', {configurable: true, value: scrollBy});
+
+        // 变化在内层滚动面上方，但锚点属于尚在页首的文档滚动面：不能跨滚动面补偿。
+        const documentHit = vi.fn(() => documentAnchor);
+        Object.defineProperty(document, 'elementFromPoint', {configurable: true, value: documentHit});
+        withFullPageViewportAnchor(() => { after = true; }, [changed]);
+        expect(documentHit).toHaveBeenCalled();
+        expect(scrollBy).not.toHaveBeenCalled();
+        expect(scroller.scrollTop).toBe(300);
+
+        // 命中的就是变化节点时，其祖先都包含该变化，不能作为稳定锚点。
+        after = false;
+        const changedHit = vi.fn(() => changed);
+        Object.defineProperty(document, 'elementFromPoint', {configurable: true, value: changedHit});
+        withFullPageViewportAnchor(() => { after = true; }, [changed]);
+        expect(changedHit).toHaveBeenCalledTimes(3);
+        expect(scroller.scrollTop).toBe(300);
+        expect(scrollBy).not.toHaveBeenCalled();
+    });
+
+    it('变化节点几何读取异常时回到完整锚点路径，且不阻断写入', () => {
+        const changed = document.createElement('p');
+        const anchor = document.createElement('p');
+        document.body.append(changed, anchor);
+        Object.defineProperty(window, 'scrollY', {configurable: true, value: 250});
+        const hitTest = vi.fn(() => anchor);
+        Object.defineProperty(document, 'elementFromPoint', {configurable: true, value: hitTest});
+        Object.defineProperty(changed, 'getBoundingClientRect', {value: () => { throw new Error('detached layout'); }});
+        Object.defineProperty(anchor, 'getBoundingClientRect', {value: () => ({width: 200, height: 40, top: 400})});
+        const scrollBy = vi.fn();
+        Object.defineProperty(window, 'scrollBy', {configurable: true, value: scrollBy});
+        expect(withFullPageViewportAnchor(() => 'written', [changed])).toBe('written');
+        expect(hitTest).toHaveBeenCalled();
+        expect(scrollBy).not.toHaveBeenCalled();
     });
 
     it('整页恢复保住上沿原文，不抵消屏幕下半部译文的收缩', () => {

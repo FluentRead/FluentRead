@@ -2393,6 +2393,15 @@ describe('translation candidate core', () => {
                 value: {href: 'not a url'},
             });
             expect(new TranslationCandidateCore().url.href).toBe('https://invalid.local/');
+            expect(getCurrentTranslationCore().url.href).toBe('https://invalid.local/');
+            // 同一原始地址复用规范化结果；地址变化后仍按规范化 URL 建立新核心。
+            Object.defineProperty(globalThis, 'location', {
+                configurable: true,
+                value: {href: 'HTTPS://Example.test/third page'},
+            });
+            const thirdCore = getCurrentTranslationCore();
+            expect(thirdCore.url.href).toBe('https://example.test/third%20page');
+            expect(getCurrentTranslationCore()).toBe(thirdCore);
 
             if (documentDescriptor) Object.defineProperty(globalThis, 'document', documentDescriptor);
             else Reflect.deleteProperty(globalThis, 'document');

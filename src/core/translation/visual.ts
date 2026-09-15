@@ -11,7 +11,7 @@ import {
     getElementTagName,
     isTextInNestedTranslationTooltip,
 } from './dom';
-import {isTranslationTextNodeProtected, normalizeTranslationText} from './text';
+import {createTranslationTextProtectionCache, isTranslationTextNodeProtected, normalizeTranslationText} from './text';
 import type {TranslationCandidate, TranslationTextRange} from './types';
 
 const HOVER_REFINEMENT_THRESHOLD = 4096;
@@ -56,12 +56,13 @@ function collectTextEntries(
     if (!document?.createTreeWalker) return [];
     const entries: TextEntry[] = [];
     const walker = document.createTreeWalker(owner, 4);
+    const protectionCache = createTranslationTextProtectionCache();
     let offset = 0;
     let current = walker.nextNode();
     while (current) {
         const node = current as Text;
         if (!isTextInNestedTranslationTooltip(node, owner) &&
-            !isTranslationTextNodeProtected(node, shouldStayOriginal)) {
+            !isTranslationTextNodeProtected(node, shouldStayOriginal, undefined, undefined, protectionCache)) {
             const value = node.data;
             if (value) {
                 entries.push({node, start: offset, end: offset + value.length});

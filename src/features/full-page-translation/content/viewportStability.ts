@@ -52,6 +52,23 @@ function findScrollableAncestor(element: HTMLElement): HTMLElement | null {
     return null;
 }
 
+function viewportTopOf(scrollContainer: HTMLElement | null): number {
+    return scrollContainer
+        ? scrollContainer.getBoundingClientRect().top + scrollContainer.clientTop
+        : 0;
+}
+
+function changedElement(node: Node): HTMLElement | null {
+    const element = asHTMLElement(node) ?? asHTMLElement(node.parentElement);
+    return element?.isConnected ? element : null;
+}
+
+/** 变化元素完全位于给定滚动面视口上沿之上时才会推动该滚动面中的阅读位置。 */
+function isAboveViewportTop(element: HTMLElement, scrollContainer: HTMLElement | null): boolean {
+    const rect = element.getBoundingClientRect();
+    return (rect.width > 0 || rect.height > 0) && rect.bottom <= viewportTopOf(scrollContainer);
+}
+
 /**
  * 译文在可见段落后展开时，下面的内容自然下移；这不是需要滚动抵消的偏移。
  * 只有变化完全发生在当前滚动面的视口上方时，才主动维持阅读位置。
@@ -63,20 +80,36 @@ function shouldCompensateViewportChange(
 ): boolean {
     if ((scrollContainer?.scrollTop ?? window.scrollY) === 0) return false;
     if (changedNodes.length === 0) return true;
-    const viewportTop = scrollContainer
-        ? scrollContainer.getBoundingClientRect().top + scrollContainer.clientTop
-        : 0;
     return changedNodes.some((node) => {
-        const element = asHTMLElement(node) ?? asHTMLElement(node.parentElement);
-        if (!element?.isConnected || findScrollableAncestor(element) !== scrollContainer) return false;
-        const rect = element.getBoundingClientRect();
-        return (rect.width > 0 || rect.height > 0) && rect.bottom <= viewportTop;
+        const element = changedElement(node);
+        return Boolean(element && findScrollableAncestor(element) === scrollContainer &&
+            isAboveViewportTop(element, scrollContainer));
     });
+}
+
+/**
+ * 命中测试需要最新布局与绘制属性，在逐段写入译文时代价最高。局部变化只有落在
+ * 自身已离开顶部的滚动面视口上方时才可能补偿；这是任一锚点返回补偿的必要条件，
+ * 全部不满足时结果必然为空，因此跳过命中测试。读取异常时回到完整路径处理。
+ */
+function mayCompensateLocalViewportChange(changedNodes: readonly Node[]): boolean {
+    try {
+        return changedNodes.some((node) => {
+            const element = changedElement(node);
+            if (!element) return false;
+            const scrollContainer = findScrollableAncestor(element);
+            return (scrollContainer?.scrollTop ?? window.scrollY) !== 0 &&
+                isAboveViewportTop(element, scrollContainer);
+        });
+    } catch {
+        return true;
+    }
 }
 
 function captureViewportAnchor(excludedNodes: readonly Node[] = []): FullPageViewportAnchor | null {
     if (typeof document === 'undefined' || typeof window === 'undefined' ||
         typeof document.elementFromPoint !== 'function') return null;
+    if (excludedNodes.length > 0 && !mayCompensateLocalViewportChange(excludedNodes)) return null;
 
     // 整页恢复同时移除屏幕上下方的译文，保住中部会把下方收缩也算作滚动量。
     const anchorRatios = excludedNodes.length === 0 ? [0.01, 0.02, 0.04] : [0.5, 0.33, 0.66];

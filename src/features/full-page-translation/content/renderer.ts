@@ -194,6 +194,8 @@ function applyTranslationFontFamily(
     sourceText: string | undefined,
 ): void {
     if (!sourceText) return;
+    // 是否改写只取决于原文与目标书写体系；常见的拉丁原文不能为每次提交强制计算宿主样式。
+    if (!resolveTranslationFontFamily(sourceText, translated.lang)) return;
     const fontFamily = resolveTranslationFontFamily(sourceText, translated.lang, hostFontFamily(host));
     if (fontFamily) translated.style.fontFamily = fontFamily;
 }

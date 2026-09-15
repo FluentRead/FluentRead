@@ -6,7 +6,8 @@
  * 模块边界：本文件属于可独立测试的 core 候选领域；可以读取传入 DOM 以计算结果，但不访问配置存储、不调用 provider、不注册页面监听器，也不负责译文渲染或 feature 生命周期。
  */
 
-import {isTranslationTextNodeProtected} from './text';
+import {createTranslationTextProtectionCache, isTranslationTextNodeProtected} from './text';
+import type {TranslationTextProtectionCache} from './text';
 import {
     hasContentEditableMarker,
     isForeignTranslationBoundary,
@@ -209,9 +210,10 @@ type TranslationTextSlotParts = Omit<TranslationTextSlot, 'node'>;
 
 function translationTextSlotParts(
     node: Text,
-    shouldStayOriginal?: (element: Element) => boolean,
-    ignoredExtensionElement?: Element,
-    protectionOptions?: TranslationTextProtectionOptions,
+    shouldStayOriginal: ((element: Element) => boolean) | undefined,
+    ignoredExtensionElement: Element | undefined,
+    protectionOptions: TranslationTextProtectionOptions | undefined,
+    protectionCache: TranslationTextProtectionCache,
 ): TranslationTextSlotParts | null {
     const value = node.nodeValue ?? '';
     const match = value.match(/^(\s*)([\s\S]*?\S)(\s*)$/u);
@@ -220,6 +222,7 @@ function translationTextSlotParts(
         shouldStayOriginal,
         ignoredExtensionElement,
         protectionOptions,
+        protectionCache,
     )) return null;
     return {prefix: match[1], source: match[2], suffix: match[3]};
 }
@@ -234,6 +237,7 @@ function collectSlots(
     const document = root.ownerDocument;
     if (!document?.createTreeWalker) return slots;
     const walker = document.createTreeWalker(root, 4);
+    const protectionCache = createTranslationTextProtectionCache();
     let current = walker.nextNode();
     while (current) {
         const node = current as Text;
@@ -242,6 +246,7 @@ function collectSlots(
             shouldStayOriginal,
             ignoredExtensionElement,
             protectionOptions,
+            protectionCache,
         );
         if (parts && !isTextInNestedTranslationTooltip(node, root)) slots.push({node, ...parts});
         current = walker.nextNode();
@@ -264,6 +269,7 @@ function collectSnapshotSlots(
     const liveWalker = document.createTreeWalker(liveRoot, 4);
     const cloneWalker = document.createTreeWalker(cloneRoot, 4);
     const slots: TranslationTextSlot[] = [];
+    const protectionCache = createTranslationTextProtectionCache();
     let liveNode = liveWalker.nextNode();
     let cloneNode = cloneWalker.nextNode();
     while (liveNode && cloneNode) {
@@ -272,6 +278,7 @@ function collectSnapshotSlots(
             shouldStayOriginal,
             ignoredExtensionElement,
             protectionOptions,
+            protectionCache,
         );
         if (parts && !isTextInNestedTranslationTooltip(liveNode, liveRoot)) slots.push({node: cloneNode as Text, ...parts});
         liveNode = liveWalker.nextNode();

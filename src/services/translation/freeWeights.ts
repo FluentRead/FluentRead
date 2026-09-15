@@ -87,7 +87,7 @@ function roundedPercentages(values: readonly number[]): number[] {
     const order = exact.map((value, index) => ({index, fraction: value - Math.floor(value)}))
         .sort((left, right) => right.fraction - left.fraction || left.index - right.index);
     for (let index = 0; index < order.length && remaining > 0; index += 1, remaining -= 1) {
-        rounded[order[index]!.index] = (rounded[order[index]!.index] ?? 0) + 1;
+        rounded[order[index]!.index] += 1;
     }
     return rounded.map(value => value / 10);
 }
@@ -113,7 +113,7 @@ export function calculateFreeTranslationWeightSnapshot(
             const cooling = providerHealth && providerHealth.retryAt > now;
             return {
                 providerId: provider.id,
-                weight: percentages[index] ?? 0,
+                weight: percentages[index]!,
                 status: statusOf(enabled.has(provider.id), providerHealth, now),
                 ...(cooling ? {retryAt: providerHealth!.retryAt} : {}),
             };

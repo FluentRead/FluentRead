@@ -4,7 +4,7 @@
  * 主要内容：创建图片 OCR 语言仓库和能力门控传输，绑定图片与圈选事务的真实页面及术语版本；注入配置、翻译、模型用量和词典依赖，注册类型化 router 并管理响应与错误。
  * 模块边界：本文件是 composition root，只决定依赖装配和监听生命周期，不实现各 feature 的业务算法、provider 协议或存储事务；具体实现均来自 features、services、providers 与 platform。
  */
-import {formatConnectionTestError, runTranslationServiceConnectionTestWithUsage} from './providerRuntime';
+import {formatConnectionTestError, getFreeTranslationWeightSnapshot, runTranslationServiceConnectionTestWithUsage} from './providerRuntime';
 import {config, configReady} from '@/src/services/config/store';
 import {lookupWord} from '@/src/features/selection-translation/services/wordDictionary';
 import {synthesizeEdgeTts} from '@/src/features/selection-translation/services/edgeTts';
@@ -49,7 +49,6 @@ import {installWritingBackgroundRuntime} from './writingRuntime';
 import {installHarnessBackgroundRuntime} from './harnessRuntime';
 import {createImageGlossaryContext} from './imageGlossaryContext';
 import {buildGlossaryRevision} from '@/src/core/glossary';
-import {getFreeTranslationWeightSnapshot} from '@/src/providers/translation/free-translation';
 type BackgroundRuntimeContext = QQMailFrameBackgroundContext & ConfigPersistenceContext & VocabularyBackgroundContext & SelectionTtsContext
     & FullPageBackgroundContext & AreaTranslationBackgroundContext;
 export interface BackgroundMessageRuntimeOptions {

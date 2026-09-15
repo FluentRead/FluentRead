@@ -26,7 +26,7 @@ describe('free translation weight snapshots', () => {
     it('drops a failed service to zero during its cooldown and renormalizes the rest', () => {
         const now = 10_000;
         const snapshot = calculateFreeTranslationWeightSnapshot(enabledProviderIds, [{
-            providerId: 'microsoft', retryAt: now + 1_000, failures: 1, category: 'request',
+            providerId: 'microsoft', retryAt: now + 1_000, failures: 1, category: 'unavailable',
         }], now);
         const enabled = snapshot.entries.filter(item => enabledProviderSet.has(item.providerId));
 
@@ -39,7 +39,7 @@ describe('free translation weight snapshots', () => {
     it('gives a cooled service a lower recovering weight after the probe window', () => {
         const now = 20_000;
         const snapshot = calculateFreeTranslationWeightSnapshot(enabledProviderIds, [{
-            providerId: 'microsoft', retryAt: 0, failures: 1, category: 'request',
+            providerId: 'microsoft', retryAt: 0, failures: 1, category: 'unavailable',
             performance: {reliability: 0.75, latencyMs: 1_000, observedAt: now},
         }], now);
 
@@ -58,5 +58,34 @@ describe('free translation weight snapshots', () => {
 
         expect(snapshot.total).toBe(0);
         expect(snapshot.entries.filter(item => enabledProviderSet.has(item.providerId)).every(item => item.weight === 0 && item.status === 'cooling')).toBe(true);
+    });
+
+    it('decays legacy failure records without performance by bounded failure counts after cooldown', () => {
+        const now = 40_000;
+        const weightFor = (failures: number) => entry('microsoft', calculateFreeTranslationWeightSnapshot(enabledProviderIds, [{
+            providerId: 'microsoft', retryAt: now - 1, failures, category: 'unavailable',
+        }], now));
+        const healthy = entry('microsoft', calculateFreeTranslationWeightSnapshot(enabledProviderIds, [], now)).weight;
+
+        expect(weightFor(1)).toMatchObject({status: 'recovering'});
+        expect(weightFor(1).weight).toBeLessThan(healthy);
+        // 连续失败越多权重越低，但不低于默认权重的 10%；非整数计数视为无效，不制造额外惩罚。
+        expect(weightFor(4).weight).toBeLessThan(weightFor(1).weight);
+        expect(weightFor(100).weight).toBe(weightFor(4).weight);
+        expect(weightFor(1.5)).toMatchObject({status: 'recovering'});
+        expect(weightFor(1.5).weight).toBe(healthy);
+    });
+
+    it('keeps a fully reliable or performance-free healthy record ready', () => {
+        const now = 50_000;
+        const snapshot = calculateFreeTranslationWeightSnapshot(enabledProviderIds, [
+            {providerId: 'microsoft', retryAt: 0, failures: 0, category: 'unavailable', performance: {reliability: 1, latencyMs: 1_000, observedAt: now}},
+            {providerId: 'google', retryAt: 0, failures: 0, category: 'unavailable'},
+            {providerId: 'myMemory', retryAt: 0, failures: 0, category: 'unavailable', performance: {reliability: 0.9, latencyMs: 1_000, observedAt: now}},
+        ], now);
+
+        expect(entry('microsoft', snapshot).status).toBe('ready');
+        expect(entry('google', snapshot).status).toBe('ready');
+        expect(entry('myMemory', snapshot).status).toBe('recovering');
     });
 });

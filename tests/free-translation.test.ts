@@ -1,7 +1,8 @@
 import {afterEach, beforeEach, describe, expect, it, vi} from 'vitest';
 
-const {mockConfig, microsoftMock, deeplxMock, googleMock, myMemoryMock, webMock, chineseMock, extraMock} = vi.hoisted(() => ({
+const {mockConfig, storedHealth, microsoftMock, deeplxMock, googleMock, myMemoryMock, webMock, chineseMock, extraMock} = vi.hoisted(() => ({
     mockConfig: {} as Record<string, any>,
+    storedHealth: {records: null as unknown},
     microsoftMock: vi.fn(),
     deeplxMock: vi.fn(),
     googleMock: vi.fn(),
@@ -10,7 +11,7 @@ const {mockConfig, microsoftMock, deeplxMock, googleMock, myMemoryMock, webMock,
     chineseMock: vi.fn(),
     extraMock: vi.fn(),
 }));
-vi.mock('@/src/platform/storage/freeTranslationHealthStorage', () => ({freeTranslationHealthStorage: {load: async () => null, save: async () => undefined}}));
+vi.mock('@/src/platform/storage/freeTranslationHealthStorage', () => ({freeTranslationHealthStorage: {load: async () => storedHealth.records, save: async () => undefined}}));
 vi.mock('@/src/services/config/store', () => ({config: mockConfig}));
 vi.mock('@/src/providers/translation/microsoft', () => ({translateMicrosoftTexts: microsoftMock}));
 vi.mock('@/src/providers/translation/deeplx', () => ({translateDeepLXText: deeplxMock}));
@@ -25,6 +26,7 @@ import {DEFAULT_DEEPLX_ENDPOINT} from '@/src/core/config/deeplx';
 
 let freeTranslation: typeof import('@/src/providers/translation/free-translation').default;
 let FREE_TRANSLATION_BATCH_CONCURRENCY: number;
+let getFreeTranslationWeightSnapshot: typeof import('@/src/providers/translation/free-translation').getFreeTranslationWeightSnapshot;
 let attachTranslationProviderConfig: typeof import('@/src/services/translation/requestSnapshot').attachTranslationProviderConfig;
 let createTranslationProviderConfigSnapshot: typeof import('@/src/services/translation/requestSnapshot').createTranslationProviderConfigSnapshot;
 let getTranslationProviderConfig: typeof import('@/src/services/translation/requestSnapshot').getTranslationProviderConfig;
@@ -46,6 +48,7 @@ beforeEach(async () => {
     vi.resetModules();
     vi.useFakeTimers();
     vi.setSystemTime(new Date('2026-09-05T00:00:00Z'));
+    storedHealth.records = null;
     for (const key of Object.keys(mockConfig)) delete mockConfig[key];
     Object.assign(mockConfig, {
         service: 'freeTranslation', from: 'auto', to: 'zh-Hans',
@@ -58,7 +61,7 @@ beforeEach(async () => {
     for (const mock of [microsoftMock, deeplxMock, googleMock, myMemoryMock, chineseMock, extraMock]) {
         mock.mockRejectedValue(httpFailure());
     }
-    ({default: freeTranslation, FREE_TRANSLATION_BATCH_CONCURRENCY}
+    ({default: freeTranslation, FREE_TRANSLATION_BATCH_CONCURRENCY, getFreeTranslationWeightSnapshot}
         = await import('@/src/providers/translation/free-translation'));
     ({attachTranslationProviderConfig, createTranslationProviderConfigSnapshot, getTranslationProviderConfig}
         = await import('@/src/services/translation/requestSnapshot'));
@@ -376,6 +379,45 @@ it.each(['transmart', 'yandexFree', 'volcengineFree'])('routes %s only via free 
     await expect(settle(translateFreeText('Hello', {sourceLanguage: 'en', targetLanguage: 'zh-Hant', abortSignal: abort.signal}))).resolves.toBe('新译文');
     expect(webMock).toHaveBeenCalledWith(id, 'Hello', 'en', 'zh-Hant', expect.any(AbortSignal));
 });
+it('maps background health to the enabled services of the current settings for the weight snapshot', async () => {
+    mockConfig.freeTranslationMode = 'balanced';
+    mockConfig.freeTranslationOrder = ['microsoft', 'google', 'myMemory'];
+    mockConfig.myMemoryEmail = 'old@example.com';
+    microsoftMock.mockRejectedValue(httpFailure(503));
+    googleMock.mockRejectedValue(httpFailure(413));
+    myMemoryMock.mockResolvedValue('MyMemory 译文');
+    await expect(settle(translateFreeText('Hello'))).resolves.toBe('MyMemory 译文');
+
+    const snapshot = await getFreeTranslationWeightSnapshot(Date.now());
+    const byId = new Map(snapshot.entries.map(entry => [entry.providerId, entry]));
+    expect(snapshot.total).toBe(100);
+    expect(byId.get('microsoft')).toMatchObject({weight: 0, status: 'cooling'});
+    // 文本级 413 不产生健康记录，谷歌仍按默认权重参与分配。
+    expect(byId.get('google')).toMatchObject({status: 'ready'});
+    expect(byId.get('google')!.weight).toBeGreaterThan(0);
+    expect(byId.get('myMemory')).toMatchObject({status: 'ready'});
+    expect(byId.get('deeplx')).toMatchObject({weight: 0, status: 'disabled'});
+    expect(JSON.stringify(snapshot)).not.toMatch(/[a-f0-9]{64}|old@example\.com/u);
+
+    // MyMemory 邮箱属于连接身份；换邮箱后不能把旧身份的健康记录展示给新配置。
+    mockConfig.freeTranslationOrder = ['microsoft', 'myMemory'];
+    mockConfig.myMemoryEmail = 'new@example.com';
+    const changed = await getFreeTranslationWeightSnapshot(Date.now());
+    expect(changed.entries.find(entry => entry.providerId === 'google')).toMatchObject({weight: 0, status: 'disabled'});
+    expect(changed.entries.find(entry => entry.providerId === 'myMemory')).toMatchObject({weight: 100, status: 'ready'});
+});
+
+it('shows a persisted legacy cooling record without performance data after a background restart', async () => {
+    const {default: sha256} = await import('crypto-js/sha256');
+    const retryAt = Date.now() + 60_000;
+    storedHealth.records = [{identity: `google:${sha256(JSON.stringify(['google'])).toString()}`, retryAt, failures: 2, category: 'blocked'}];
+    mockConfig.freeTranslationOrder = ['microsoft', 'google'];
+
+    const snapshot = await getFreeTranslationWeightSnapshot(Date.now());
+    expect(snapshot.entries.find(entry => entry.providerId === 'google')).toEqual({providerId: 'google', weight: 0, status: 'cooling', retryAt});
+    expect(snapshot.entries.find(entry => entry.providerId === 'microsoft')).toMatchObject({weight: 100, status: 'ready'});
+});
+
 it('falls back and cools down a failed new route while keeping language errors request-local', async () => {
     mockConfig.freeTranslationOrder = ['transmart', 'yandexFree', 'volcengineFree'];
     webMock.mockImplementation(async id => {if (id === 'transmart') throw httpFailure(429); if (id === 'yandexFree') throw httpFailure(400); return '译文';});

@@ -53,7 +53,7 @@ describe('balanced free fallback routing', () => {
     expect(times).toHaveLength(2);
   });
 
-  it('temporarily removes a provider after one request failure and persists its recovery state', async () => {
+  it('keeps request errors local to one text while transient failures cool down in the health snapshot', async () => {
     const saved: PersistedFreeHealth[][] = [];
     const runner = createFreeFallbackRunner(1, {
       random: () => 0,
@@ -62,16 +62,39 @@ describe('balanced free fallback routing', () => {
         save: vi.fn(async (entries: readonly PersistedFreeHealth[]) => { saved.push([...entries]); }),
       },
     });
-    const bad = candidate('bad-request', async () => { throw Object.assign(new Error('bad request'), {status: 400}); });
-    const good = candidate('good-request', async () => 'ok');
+    const requestCalls: string[] = [];
+    const tooLong = candidate('too-long', async () => { requestCalls.push('too-long'); throw Object.assign(new Error('payload too large'), {status: 413}); });
+    const good = candidate('good-request', async () => { requestCalls.push('good-request'); return 'ok'; });
+    const options = {mode: 'sequential' as const, timeoutMs: 100, cooldownMs: 60_000};
 
-    await expect(runner([bad, good], {mode: 'sequential', timeoutMs: 100, cooldownMs: 1})).resolves.toBe('ok');
-    const health = await runner.getHealthSnapshot();
-    const failed = health.find(item => item.identity === 'bad-request');
+    // 文本级 413 只让本段换服务：不暂停、不降权，下一段仍按用户顺序先试它。
+    await expect(runner([tooLong, good], options)).resolves.toBe('ok');
+    await expect(runner([tooLong, good], options)).resolves.toBe('ok');
+    expect(requestCalls).toEqual(['too-long', 'good-request', 'too-long', 'good-request']);
+    const afterRequestError = await runner.getHealthSnapshot();
+    expect(afterRequestError.find(item => item.identity === 'too-long')).toBeUndefined();
+    expect(saved.flat().some(item => item.identity === 'too-long')).toBe(false);
 
-    expect(failed).toMatchObject({identity: 'bad-request', failures: 1, category: 'request', performance: {reliability: 0.75}});
-    expect(failed?.retryAt).toBeGreaterThan(Date.now());
-    expect(saved.at(-1)).toEqual(expect.arrayContaining([expect.objectContaining({identity: 'bad-request', category: 'request'})]));
+    const unavailable = candidate('unavailable', async () => { throw Object.assign(new Error('down'), {status: 503}); });
+    await expect(runner([unavailable, good], options)).resolves.toBe('ok');
+    const cooling = (await runner.getHealthSnapshot()).find(item => item.identity === 'unavailable');
+    expect(cooling).toMatchObject({failures: 1, category: 'unavailable', performance: {reliability: 0.75}});
+    expect(cooling?.retryAt).toBeGreaterThan(Date.now());
+    expect(saved.at(-1)).toEqual(expect.arrayContaining([expect.objectContaining({identity: 'unavailable', category: 'unavailable'})]));
+  });
+
+  it('reports in-memory health without persistence and omits untouched providers', async () => {
+    const legacy = {identity: 'legacy-cooling', retryAt: Date.now() + 100_000, failures: 1, category: 'blocked'};
+    await expect(createFreeFallbackRunner(1, {persistence: {load: async () => [legacy], save: async () => undefined}})
+      .getHealthSnapshot()).resolves.toEqual([legacy]);
+    const runner = createFreeFallbackRunner(1, {random: () => 0});
+    await expect(runner.getHealthSnapshot()).resolves.toEqual([]);
+    const limited = candidate('limited', async () => { throw Object.assign(new Error('slow down'), {status: 429, retryAfterMs: 5_000}); });
+    await expect(runner([limited, candidate('fallback', async () => 'ok')], {mode: 'sequential', timeoutMs: 100, cooldownMs: 10})).resolves.toBe('ok');
+    const snapshot = await runner.getHealthSnapshot();
+    expect(snapshot.map(item => item.identity).sort()).toEqual(['fallback', 'limited']);
+    expect(snapshot.find(item => item.identity === 'limited')).toMatchObject({failures: 1, category: 'rate-limit'});
+    expect(snapshot.find(item => item.identity === 'limited')!.retryAt).toBeGreaterThanOrEqual(Date.now() + 4_900);
   });
 
   it('waits for the same candidate interval between sequential requests', async () => {

@@ -5,11 +5,15 @@ const mocks = vi.hoisted(() => ({
     recordMany: vi.fn(async (_events: unknown, _generation: number) => 1),
     resolveConfiguredModel: vi.fn((_selected?: string, _custom?: string) => 'resolved-model'),
     runConnectionTest: vi.fn(async (_service: string, _options: any) => ({durationMs: 25})),
+    getFreeTranslationWeightSnapshot: vi.fn(async () => ({total: 100, observedAt: 1, entries: []})),
 }));
 
 vi.mock('@/src/providers/translation/connectionTest', () => ({
     formatConnectionTestError: vi.fn(),
     runTranslationServiceConnectionTest: mocks.runConnectionTest,
+}));
+vi.mock('@/src/providers/translation/free-translation', () => ({
+    getFreeTranslationWeightSnapshot: mocks.getFreeTranslationWeightSnapshot,
 }));
 vi.mock('@/src/app/translation/runtime', () => ({
     translationRequestScheduler: {
@@ -36,7 +40,7 @@ vi.mock('@/src/platform/storage/modelUsageRepository', () => ({
     },
 }));
 
-import {runTranslationServiceConnectionTestWithUsage} from '@/src/app/background/providerRuntime';
+import {getFreeTranslationWeightSnapshot, runTranslationServiceConnectionTestWithUsage} from '@/src/app/background/providerRuntime';
 
 describe('background provider runtime', () => {
     beforeEach(() => {
@@ -60,5 +64,10 @@ describe('background provider runtime', () => {
         options.warn('usage warning', failure);
         expect(warn).toHaveBeenCalledWith('usage warning', failure);
         warn.mockRestore();
+    });
+
+    it('exposes the provider-owned free translation weight snapshot through the composition root', async () => {
+        await expect(getFreeTranslationWeightSnapshot()).resolves.toEqual({total: 100, observedAt: 1, entries: []});
+        expect(mocks.getFreeTranslationWeightSnapshot).toHaveBeenCalledOnce();
     });
 });

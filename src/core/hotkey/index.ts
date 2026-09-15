@@ -113,6 +113,43 @@ export function normalizeHotkeyEventKey(event: Pick<KeyboardEvent, 'key' | 'code
   return codeKey || key;
 }
 
+const PRESSED_NAMED_KEYS: ReadonlySet<string> = new Set([
+  'escape', 'enter', 'space', 'tab', 'backspace', 'delete', 'insert',
+  'home', 'end', 'pageup', 'pagedown', 'arrowup', 'arrowdown', 'arrowleft', 'arrowright',
+]);
+
+/** 修饰键由事件标志维护，CapsLock、AltGraph 等不可配置键不进入组合，避免改变既有匹配范围。 */
+function pressedHotkeyEventKey(event: Pick<KeyboardEvent, 'key' | 'code'>): string {
+  const key = normalizeHotkeyEventKey(event);
+  return key.length === 1 || /^f\d+$/u.test(key) || PRESSED_NAMED_KEYS.has(key) ? key : '';
+}
+
+/**
+ * 记录按住组合中的非修饰键。页面运行时必须与录制器使用同一逻辑按键，并按物理 code
+ * 记住按下时的结果：先松开 Shift 或 Option 会改变同一物理键 keyup 的 event.key。
+ */
+export function addPressedHotkeyEventKey(
+  event: Pick<KeyboardEvent, 'key' | 'code'>,
+  pressed: Set<string>,
+  keyByCode: Map<string, string>,
+): void {
+  const key = pressedHotkeyEventKey(event);
+  if (!key) return;
+  pressed.add(key);
+  if (event.code) keyByCode.set(event.code, key);
+}
+
+/** 按物理 code 移除按下时记录的逻辑键；缺少记录时退回当前事件的归一化结果。 */
+export function deletePressedHotkeyEventKey(
+  event: Pick<KeyboardEvent, 'key' | 'code'>,
+  pressed: Set<string>,
+  keyByCode: Map<string, string>,
+): void {
+  const key = (event.code && keyByCode.get(event.code)) || pressedHotkeyEventKey(event);
+  if (event.code) keyByCode.delete(event.code);
+  if (key) pressed.delete(key);
+}
+
 /**
  * 解析快捷键字符串
  * @param hotkeyString 快捷键字符串，如 "Ctrl+Alt+T"

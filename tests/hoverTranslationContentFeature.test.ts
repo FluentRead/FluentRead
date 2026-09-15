@@ -414,6 +414,35 @@ describe('hover translation content feature', () => {
         expect(customCombo.deps.handleTranslation).toHaveBeenCalledWith(0, 0);
     });
 
+    it('自定义悬浮快捷键与录制器使用同一逻辑按键：Shift 数字、Option 字形与非 QWERTY 字母', () => {
+        const shiftDigit = mountHarness();
+        Object.assign(shiftDigit.deps.config, {hotkey: 'custom', customHotkey: 'Alt+Shift+1'});
+        shiftDigit.windowTarget.emit('keydown', trustedEvent({key: '!', code: 'Digit1', altKey: true, shiftKey: true}));
+        // 先松开 Shift 时 keyup 的 key 变为 1，仍须按物理键移除，完整释放后触发一次。
+        shiftDigit.windowTarget.emit('keyup', trustedEvent({key: 'Shift', code: 'ShiftLeft', altKey: true}));
+        shiftDigit.windowTarget.emit('keyup', trustedEvent({key: '1', code: 'Digit1', altKey: true}));
+        shiftDigit.windowTarget.emit('keyup', trustedEvent({key: 'Alt', code: 'AltLeft'}));
+        expect(shiftDigit.deps.handleTranslation).toHaveBeenCalledOnce();
+
+        const optionGlyph = mountHarness();
+        Object.assign(optionGlyph.deps.config, {hotkey: 'custom', customHotkey: 'Alt+/'});
+        optionGlyph.windowTarget.emit('keydown', trustedEvent({key: '÷', code: 'Slash', altKey: true}));
+        optionGlyph.windowTarget.emit('keyup', trustedEvent({key: '÷', code: 'Slash', altKey: true}));
+        optionGlyph.windowTarget.emit('keyup', trustedEvent({key: 'Alt', code: 'AltLeft'}));
+        expect(optionGlyph.deps.handleTranslation).toHaveBeenCalledOnce();
+
+        const dvorak = mountHarness();
+        Object.assign(dvorak.deps.config, {hotkey: 'custom', customHotkey: 'Alt+T'});
+        dvorak.windowTarget.emit('keydown', trustedEvent({key: 'y', code: 'KeyT', altKey: true}));
+        dvorak.windowTarget.emit('keyup', trustedEvent({key: 'y', code: 'KeyT', altKey: true}));
+        dvorak.windowTarget.emit('keyup', trustedEvent({key: 'Alt', code: 'AltLeft'}));
+        expect(dvorak.deps.handleTranslation).not.toHaveBeenCalled();
+        dvorak.windowTarget.emit('keydown', trustedEvent({key: 't', code: 'KeyK', altKey: true}));
+        dvorak.windowTarget.emit('keyup', trustedEvent({key: 't', code: 'KeyK', altKey: true}));
+        dvorak.windowTarget.emit('keyup', trustedEvent({key: 'Alt', code: 'AltLeft'}));
+        expect(dvorak.deps.handleTranslation).toHaveBeenCalledOnce();
+    });
+
     it('划词明确预留快捷键时清空 hover 状态并不阻止后续 selection 监听', () => {
         const {deps, windowTarget} = mountHarness({shouldReserveSelectionShortcut: () => true});
 

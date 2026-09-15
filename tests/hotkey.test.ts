@@ -1,7 +1,9 @@
 import {afterEach, describe, expect, it, vi} from 'vitest';
 
 import {
+    addPressedHotkeyEventKey,
     canonicalizeHotkey,
+    deletePressedHotkeyEventKey,
     matchesConfiguredHotkey,
     matchesHotkey,
     matchesModifierOnlyHotkey,
@@ -88,6 +90,29 @@ describe('hotkey parsing', () => {
 });
 
 describe('hotkey matching', () => {
+    it('按住组合按物理 code 移除按下时的逻辑键，并忽略修饰键与不可配置按键', () => {
+        const pressed = new Set<string>();
+        const keyByCode = new Map<string, string>();
+        addPressedHotkeyEventKey(keyboardEvent({key: '!', code: 'Digit1', shiftKey: true}), pressed, keyByCode);
+        addPressedHotkeyEventKey(keyboardEvent({key: ' ', code: 'Space'}), pressed, keyByCode);
+        addPressedHotkeyEventKey(keyboardEvent({key: 'F13', code: 'F13'}), pressed, keyByCode);
+        addPressedHotkeyEventKey(keyboardEvent({key: 'x', code: ''}), pressed, keyByCode);
+        for (const [key, code] of [['Shift', 'ShiftLeft'], ['CapsLock', 'CapsLock'], ['AltGraph', 'AltRight'], ['Unidentified', '']]) {
+            addPressedHotkeyEventKey(keyboardEvent({key, code}), pressed, keyByCode);
+        }
+        expect([...pressed]).toEqual(['1', 'space', 'f13', 'x']);
+        expect([...keyByCode]).toEqual([['Digit1', '1'], ['Space', 'space'], ['F13', 'f13']]);
+
+        // Shift 先松开后同一物理键 keyup 为 “1”；Option 字形也必须按按下时的记录移除。
+        pressed.add('shift');
+        deletePressedHotkeyEventKey(keyboardEvent({key: 'Shift', code: 'ShiftLeft'}), pressed, keyByCode);
+        expect(pressed.has('shift')).toBe(true);
+        deletePressedHotkeyEventKey(keyboardEvent({key: '¡', code: 'Digit1', altKey: true}), pressed, keyByCode);
+        deletePressedHotkeyEventKey(keyboardEvent({key: 'x', code: ''}), pressed, keyByCode);
+        expect([...pressed]).toEqual(['space', 'f13', 'shift']);
+        expect(keyByCode.has('Digit1')).toBe(false);
+    });
+
     it('优先解释可配置逻辑字符，并为未知键值或 Option 变形字形回退 code', () => {
         expect(normalizeHotkeyEventKey(keyboardEvent({key: 'y', code: 'KeyT'}))).toBe('y');
         expect(normalizeHotkeyEventKey(keyboardEvent({key: 'f', code: 'KeyY'}))).toBe('f');

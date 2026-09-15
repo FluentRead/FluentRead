@@ -908,18 +908,17 @@ async function verifyZeroDelayHoverStability(page, selector, activatePage, scree
   }, selector);
   if (!initial) throw new Error(`0ms 连续悬浮目标或译文不存在：${selector}`);
 
+  // 逐句高亮使用原生 CSS Highlight 文字范围（不创建盒子、不改宿主样式），因此读取注册表中
+  // 实际绘制的范围，而不是旧版整段 :hover 背景与 ::before 色标。
   const readHighlightStyle = () => page.locator(selector).evaluate(owner => {
-    const style = getComputedStyle(owner);
     const translation = owner.querySelector(':scope > .fluent-read-bilingual-content');
-    const marker = translation ? getComputedStyle(translation, '::before') : null;
+    const ranges = [...(globalThis.CSS?.highlights?.get('fluentread-bilingual-sentence') || [])];
+    const inTranslation = range => Boolean(translation && translation.contains(range.startContainer));
+    const text = ranges => ranges.map(range => range.toString()).join('').replace(/\s+/gu, ' ').trim();
     return {
-      backgroundColor: style.backgroundColor,
-      boxShadow: style.boxShadow,
-      translationMarker: marker ? {
-        content: marker.content,
-        width: marker.width,
-        backgroundColor: marker.backgroundColor,
-      } : null,
+      source: text(ranges.filter(range => !inTranslation(range) && owner.contains(range.startContainer))),
+      translation: text(ranges.filter(inTranslation)),
+      outside: ranges.filter(range => !owner.contains(range.startContainer)).length,
     };
   });
 
@@ -989,7 +988,6 @@ async function verifyZeroDelayHoverStability(page, selector, activatePage, scree
     Math.abs(final.ownerRect.width - initial.ownerRect.width),
     Math.abs(final.ownerRect.height - initial.ownerRect.height),
   );
-  const transparent = new Set(['rgba(0, 0, 0, 0)', 'transparent']);
   if (!final.sameOwner || !final.sameWrapper || !final.wrapperConnected ||
       final.wrapperCount !== 1 || !final.htmlStable || final.mutations !== 0) {
     throw new Error(`0ms 连续悬浮改变了已译 DOM：${JSON.stringify(final)}`);
@@ -997,25 +995,14 @@ async function verifyZeroDelayHoverStability(page, selector, activatePage, scree
   if (geometryDelta > 0.5) {
     throw new Error(`双语高亮改变了段落几何尺寸：${geometryDelta}px`);
   }
-  if (!sourceHighlight || !translationHighlight ||
-      transparent.has(sourceHighlight.backgroundColor) ||
-      sourceHighlight.backgroundColor !== translationHighlight.backgroundColor ||
-      sourceHighlight.boxShadow !== translationHighlight.boxShadow ||
-      !sourceHighlight.translationMarker ||
-      sourceHighlight.translationMarker.content === 'none' ||
-      sourceHighlight.translationMarker.width !== '2px' ||
-      transparent.has(sourceHighlight.translationMarker.backgroundColor) ||
-      JSON.stringify(sourceHighlight.translationMarker) !== JSON.stringify(translationHighlight.translationMarker)) {
-    throw new Error(`原文与译文没有触发同一个高亮效果：${JSON.stringify({sourceHighlight, translationHighlight})}`);
+  const pairedHighlight = highlight => Boolean(highlight && highlight.source && highlight.translation && highlight.outside === 0);
+  if (!pairedHighlight(sourceHighlight) || !pairedHighlight(translationHighlight)) {
+    throw new Error(`原文与译文没有同时高亮对应句子：${JSON.stringify({sourceHighlight, translationHighlight})}`);
   }
-  if (transparent.has(passiveHighlight.source.backgroundColor) ||
-      passiveHighlight.source.backgroundColor !== passiveHighlight.translation.backgroundColor ||
-      passiveHighlight.source.boxShadow !== passiveHighlight.translation.boxShadow ||
-      JSON.stringify(passiveHighlight.source.translationMarker) !== JSON.stringify(passiveHighlight.translation.translationMarker) ||
-      JSON.stringify(passiveHighlight) !== JSON.stringify({
-        source: sourceHighlight,
-        translation: translationHighlight,
-      })) {
+  if (JSON.stringify(passiveHighlight) !== JSON.stringify({
+    source: sourceHighlight,
+    translation: translationHighlight,
+  })) {
     throw new Error(`普通 hover 与连续翻译手势的高亮效果不一致：${JSON.stringify({passiveHighlight, sourceHighlight, translationHighlight})}`);
   }
 

@@ -424,6 +424,9 @@ describe('video player locator', () => {
       fixture.document.dispatchEvent(event);
     }
     fixture.document.body.dispatchEvent(new (fixture.window as unknown as {Event: typeof Event}).Event('focusout', {bubbles: true}));
+    // 非元素目标不能把播放器误标为交互中，也不能打断后续定位。
+    expect(locator.getTarget()?.interacting).not.toBe(true);
+    expect(locator.sync()?.video).toBe(fixture.videos[0]);
     locator.destroy();
   });
 

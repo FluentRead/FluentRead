@@ -4,7 +4,7 @@ import {webcrypto} from 'node:crypto'
 import {afterEach, describe, expect, it, vi} from 'vitest'
 import {interfaceFontOptions} from '@/src/core/config/interfaceAppearance'
 import {getInterfaceFontAssets, getInterfaceFontUrl, interfaceFontSources, INTERFACE_FONT_REVISION} from '@/src/core/config/interfaceFontAssets'
-import {createInterfaceFontLoader, getCachedInterfaceFonts, getInterfaceFontCacheSize, verifyInterfaceFont, type InterfaceFontLoadState} from '@/src/services/interfaceFonts'
+import {createInterfaceFontLoader, getCachedInterfaceFonts, verifyInterfaceFont, type InterfaceFontLoadState} from '@/src/services/interfaceFonts'
 
 const digest = (data: ArrayBuffer) => webcrypto.subtle.digest('SHA-256', data)
 const bytes = (file: string) => Uint8Array.from(readFileSync(resolve(__dirname, '../assets/interface-fonts', file))).buffer
@@ -226,33 +226,7 @@ describe('字体下载、缓存和切换生命周期', () => {
 
 
 describe('字体缓存维护', () => {
-  it('统计全部已下载字体，共享中文不重复计入，读取失败不伪装为零', async () => {
-    const h = harness()
-    expect(await getInterfaceFontCacheSize(h.deps.openCache)).toBe(0)
-    await h.loader.load('inter')
-    await h.loader.load('roboto')
-    const assets = new Map([...getInterfaceFontAssets('inter'), ...getInterfaceFontAssets('roboto')].map(asset => [asset.file, asset.bytes]))
-    expect(await getInterfaceFontCacheSize(h.deps.openCache)).toBe([...assets.values()].reduce((a, b) => a + b, 0))
-    expect(await getInterfaceFontCacheSize(async () => { throw new Error('denied') })).toBeNull()
-  })
-
-  it('清理磁盘缓存但保留当前字体，下次打开重新下载且共享字体不会假报已缓存', async () => {
-    const h = harness()
-    await h.loader.load('inter')
-    await h.loader.clearCache()
-    expect(h.entries.size).toBe(0)
-    expect(h.states.at(-1)).toMatchObject({font: 'inter', status: 'ready', persistent: false})
-    await h.loader.load('system')
-    await h.loader.load('inter')
-    expect(h.deps.fetch).toHaveBeenCalledTimes(2)
-    expect(h.deps.install).toHaveBeenCalledTimes(2)
-    expect(h.states.at(-1)?.persistent).toBe(false)
-    await createInterfaceFontLoader(h.deps).load('inter')
-    expect(h.deps.fetch).toHaveBeenCalledTimes(4)
-    expect(h.states.at(-1)?.persistent).toBe(true)
-  })
-
-  it('等待正在写入的下载完成后再清理，期间的新选择在清理后执行', async () => {
+  it('等待正在写入的下载完成后再清除该字体，期间的新选择在清除后执行', async () => {
     const h = harness()
     let release!: () => void
     h.cache.put.mockImplementationOnce(async (key, response) => {
@@ -261,31 +235,30 @@ describe('字体缓存维护', () => {
     })
     const download = h.loader.load('noto-sans-sc')
     await vi.waitFor(() => expect(release).toBeTypeOf('function'))
-    const clear = h.loader.clearCache()
-    expect(h.loader.clearCache()).toBe(clear)
+    const clear = h.loader.clearFont('noto-sans-sc')
+    expect(h.loader.clearFont('noto-sans-sc')).toBe(clear)
     const select = h.loader.load('system')
     release()
     await Promise.all([download, clear, select])
+    // 迟到的下载写入不能在清除后把同一字体放回缓存。
     expect(h.entries.size).toBe(0)
     expect(h.states.at(-1)?.status).toBe('system')
   })
 
-  it('清理失败保留可重试状态，并不阻塞后续字体选择', async () => {
+  it('清除失败释放清理锁，重试成功且不阻塞后续字体选择', async () => {
     const h = harness()
     await h.loader.load('inter')
     h.cache.delete.mockRejectedValueOnce(new Error('delete denied'))
-    await expect(h.loader.clearCache()).rejects.toThrow('delete denied')
-    expect(h.states.at(-1)?.persistent).toBe(false)
-    await h.loader.load('system')
-    await h.loader.clearCache()
-    expect(h.entries.size).toBe(0)
-    expect(h.states.at(-1)?.status).toBe('system')
+    await expect(h.loader.clearFont('inter')).rejects.toThrow('delete denied')
+    await h.loader.clearFont('inter')
+    expect(h.entries.has('https://fluentread.app/__interface_fonts__/' + getInterfaceFontAssets('inter')[0].sha256)).toBe(false)
+    expect(h.states.at(-1)).toMatchObject({font: 'inter', status: 'ready', persistent: false})
     h.deps.openCache.mockRejectedValueOnce(new Error('cache denied'))
-    const clear = h.loader.clearCache()
-    const select = h.loader.load('inter')
+    const clear = h.loader.clearFont('inter')
+    const select = h.loader.load('roboto')
     await expect(clear).rejects.toThrow('cache denied')
     await select
-    expect(h.states.at(-1)?.status).toBe('ready')
+    expect(h.states.at(-1)).toMatchObject({font: 'roboto', status: 'ready'})
   })
 
   it('可以只清除指定字体，并保留其他字体共享的中文资源', async () => {
@@ -308,7 +281,6 @@ describe('字体缓存维护', () => {
     await h.loader.load('inter')
     const clear = h.loader.clearFont('inter')
     expect(h.loader.clearFont('noto-sans-sc')).toBe(clear)
-    expect(h.loader.clearCache()).toBe(clear)
     await clear
     expect(h.states.at(-1)).toMatchObject({font: 'inter', status: 'ready', persistent: false})
   })

@@ -1,7 +1,7 @@
 /**
  * @file src/services/interfaceFonts.ts
  * 文件职责：在扩展自有页面按需下载、验证并缓存已选择的界面字体。
- * 主要内容：有界流式下载、固定 SHA-256 校验、备用源重试、离线缓存、缓存清理和切换取消。
+ * 主要内容：有界流式下载、固定 SHA-256 校验、备用源重试、离线缓存、按字体清理共享资源安全的缓存和切换取消。
  * 模块边界：不读取业务配置或凭据，不注入宿主网页；DOM 字体注册由调用方提供。
  */
 import {interfaceFontOptions, type InterfaceFont} from '@/src/core/config/interfaceAppearance'
@@ -37,18 +37,6 @@ export async function getCachedInterfaceFonts(openCache: () => Promise<Cache>): 
       .every(asset => keys.has(cacheKey(asset)))).map(font => font.value)
   } catch {
     return ['system']
-  }
-}
-
-/** 按缓存键统计固定版本资源，共享字体只计一次；不可读取时返回 null。 */
-export async function getInterfaceFontCacheSize(openCache: () => Promise<Cache>): Promise<number | null> {
-  try {
-    const keys = new Set((await (await openCache()).keys()).map(request => request.url))
-    const assets = new Map(interfaceFontOptions.flatMap(font => getInterfaceFontAssets(font.value))
-      .map(asset => [cacheKey(asset), asset.bytes]))
-    return [...assets].reduce((total, [key, bytes]) => total + (keys.has(key) ? bytes : 0), 0)
-  } catch {
-    return null
   }
 }
 
@@ -179,27 +167,6 @@ export function createInterfaceFontLoader(deps: Dependencies) {
       const promise = Promise.resolve(clearing).catch(() => {}).then(() => run(font, controller.signal, preferred))
       active = {font, controller, promise}
       return promise
-    },
-    clearCache(): Promise<void> {
-      if (clearing) return clearing
-      // 等待本页正在进行的缓存写入，新选择等待清理结束，避免迟到写入恢复已清缓存。
-      const pending = active?.promise
-      clearing = (async () => {
-        await pending
-        const cache = await deps.openCache()
-        const keys = await cache.keys()
-        try {
-          for (const key of keys) await cache.delete(key)
-        } finally {
-          // 保留当前页已加载的字体，但不能再宣称它们可跨页面离线使用。
-          for (const file of installed.keys()) installed.set(file, false)
-          if (lastState?.status === 'ready') {
-            lastState = {...lastState, persistent: false}
-            deps.onState(lastState)
-          }
-        }
-      })().finally(() => { clearing = undefined })
-      return clearing
     },
     clearFont(font: InterfaceFont): Promise<void> {
       if (font === 'system') return Promise.resolve()

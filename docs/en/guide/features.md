@@ -4,7 +4,7 @@ FluentRead supports bilingual webpage translation, selection translation, and ho
 
 ## Page translation
 
-Open FluentRead and choose the page translation button. In bilingual mode, each translation sits beside its original paragraph. Headings, links, and article structure remain available for comparison. Common inline formulas are preserved where supported.
+Open FluentRead and choose the page translation button. In bilingual mode, each translation sits beside its original paragraph. The original keeps its headings, links, and article structure, while the translation is shown as one readable passage. Paragraphs containing links, bold, italics, or footnote markers are translated as a single unit, so a sentence is never split apart by inline formatting; machine translation services receive one request per such paragraph instead of one per fragment. Common inline formulas are preserved where supported.
 
 By default, translation follows your reading position. Choose whole-page processing in settings if you want the entire page translated at once. Restore the original whenever you like, then translate again with another language or service.
 

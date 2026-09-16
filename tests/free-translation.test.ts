@@ -116,8 +116,12 @@ describe('免费翻译服务', () => {
         const first = translateFreeText('Hello');
         await vi.advanceTimersByTimeAsync(1_000);
         await expect(first).resolves.toBe('备用');
-        await expect(settle(translateFreeText('World'))).resolves.toBe('备用');
+        // 冷却时长带抖动，且到期后允许再次探测；断言必须落在冷却窗口内，
+        // 否则 settle 推进的时钟可能越过冷却终点，把合法探测当成未跳过。
+        const second = translateFreeText('World');
+        await vi.advanceTimersByTimeAsync(900);
         expect(microsoftMock).toHaveBeenCalledOnce();
+        await expect(settle(second)).resolves.toBe('备用');
         expect(microsoftMock.mock.calls[0][3].aborted).toBe(true);
     });
 

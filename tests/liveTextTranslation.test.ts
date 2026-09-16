@@ -23,7 +23,9 @@ vi.mock('@/src/features/full-page-translation/content/translationRequest', () =>
 }));
 
 import {parseHTML} from 'linkedom';
-import {createTranslationRequest, translateControlValue, translateLiveText} from '@/src/features/full-page-translation/content/liveTextTranslation';
+import {createTranslationRequest, buildWholeBlockSourceText, translateControlValue, translateLiveText} from '@/src/features/full-page-translation/content/liveTextTranslation';
+// 真实槽位收集器绕过上方对 public 的替身，用于直接验证整块来源文本的 DOM 边界规则。
+import {collectLiveTranslationTextSlots as collectRealSlots} from '@/src/core/translation/serialization';
 
 const snapshot = {service: 'microsoft', model: 'default', thinking: false, sourceLanguage: 'en', targetLanguage: 'zh',
     useCache: true, enableAIContext: false, enableAIMultiSegment: false, displayMode: 'single' as const, style: 0};
@@ -126,5 +128,105 @@ describe('实时文本翻译快照', () => {
         runtime.slots = [{node, prefix: '', source: '', suffix: ''}];
         runtime.translations = ['译文'];
         expect((await translateLiveText(document.body, snapshot)).changed).toBe(true);
+    });
+});
+
+describe('双语正文整块翻译', () => {
+    const bilingual = {...snapshot, displayMode: 'bilingual' as const};
+    beforeEach(() => {
+        runtime.slots = [];
+        runtime.translations = [];
+        runtime.translateTextSlots.mockReset();
+        runtime.translateTextSlots.mockImplementation(async () => runtime.translations);
+    });
+    const paragraph = () => {
+        const {document} = parseHTML('<html><body><p id="t">Read <a href="/g">the guide</a>.</p></body></html>');
+        const owner = document.querySelector<HTMLElement>('#t')!;
+        const link = owner.querySelector('a')!;
+        return {
+            owner,
+            slots: [
+                {node: owner.firstChild as Text, prefix: '', source: 'Read', suffix: ' '},
+                {node: link.firstChild as Text, prefix: '', source: 'the guide', suffix: ''},
+                {node: owner.lastChild as Text, prefix: '', source: '.', suffix: ''},
+            ],
+        };
+    };
+
+    it('多槽候选整块请求，整段译文只回填首个槽位', async () => {
+        const {owner, slots} = paragraph();
+        runtime.slots = slots;
+        runtime.translateTextSlots.mockImplementation(async () => ['读完这份指南。']);
+
+        const result = await createTranslationRequest(owner, 'content', 'bilingual', bilingual);
+        expect(runtime.translateTextSlots).toHaveBeenCalledTimes(1);
+        expect(runtime.translateTextSlots).toHaveBeenCalledWith(
+            ['Read the guide.'], bilingual, undefined, undefined, undefined, false);
+        expect(result).toEqual({
+            kind: 'snapshot',
+            sources: ['Read', 'the guide', '.'],
+            translations: ['读完这份指南。', '', ''],
+        });
+    });
+
+    it('整块请求没有译文时回退逐槽请求', async () => {
+        const {owner, slots} = paragraph();
+        runtime.slots = slots;
+        runtime.translateTextSlots
+            .mockImplementationOnce(async () => [''])
+            .mockImplementation(async () => runtime.translations);
+        runtime.translations = ['译:Read', '译:the guide', '译:.'];
+
+        const result = await createTranslationRequest(owner, 'content', 'bilingual', bilingual);
+        expect(runtime.translateTextSlots).toHaveBeenNthCalledWith(2,
+            ['Read', 'the guide', '.'], bilingual, undefined, undefined, undefined, false);
+        expect(result).toEqual({
+            kind: 'snapshot',
+            sources: ['Read', 'the guide', '.'],
+            translations: ['译:Read', '译:the guide', '译:.'],
+        });
+    });
+
+    it('整块译文与原文一致时按未变化上报，不再逐槽请求', async () => {
+        const {owner, slots} = paragraph();
+        runtime.slots = slots;
+        runtime.translateTextSlots.mockImplementation(async () => ['Read the guide.']);
+
+        const result = await createTranslationRequest(owner, 'content', 'bilingual', bilingual);
+        expect(runtime.translateTextSlots).toHaveBeenCalledTimes(1);
+        expect(result).toEqual({
+            kind: 'snapshot',
+            sources: ['Read', 'the guide', '.'],
+            translations: ['Read', 'the guide', '.'],
+        });
+    });
+});
+
+describe('整块来源文本拼接', () => {
+    const source = (html: string) => {
+        const {document} = parseHTML(`<html><body>${html}</body></html>`);
+        const root = document.body.firstElementChild as HTMLElement;
+        return buildWholeBlockSourceText(root, collectRealSlots(root));
+    };
+
+    it('内联格式无缝拼接，替换元素与换行保留词边界', () => {
+        expect(source('<p><b>one</b><i>two</i></p>')).toBe('onetwo');
+        expect(source('<p>Hello <b>world</b>!</p>')).toBe('Hello world!');
+        expect(source('<p>one<br>two</p>')).toBe('one\ntwo');
+        expect(source('<p>one<img src="a.png">s</p>')).toBe('one s');
+    });
+
+    it('受保护文本、相邻空白与换行边界不重复分隔', () => {
+        expect(source('<p>one<span translate="no">X</span>s</p>')).toBe('one s');
+        expect(source('<p>one<span translate="no">X</span> two</p>')).toBe('one two');
+        expect(source('<p>one <span translate="no">X</span> two</p>')).toBe('one  two');
+        expect(source('<p>one\n<br>two</p>')).toBe('one\ntwo');
+        expect(source('<p>one<br>\ntwo</p>')).toBe('one\ntwo');
+        expect(source('<p>one<br><img src="a.png">two</p>')).toBe('one\ntwo');
+    });
+
+    it('首个槽位之前的换行或分隔不产生前导空白', () => {
+        expect(source('<p><br>two</p>')).toBe('two');
+        expect(source('<p><span translate="no">X</span>two</p>')).toBe('two');
     });
 });

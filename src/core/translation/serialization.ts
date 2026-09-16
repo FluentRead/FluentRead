@@ -2,11 +2,11 @@
  * @file src/core/translation/serialization.ts
  *
  * 文件职责：把候选 DOM 安全序列化为可翻译文本槽，并在异步请求后依据源快照恢复到仍然匹配的真实节点。
- * 主要内容：定义 TranslationTextSlot、TranslationSourceSnapshot 与样式覆盖规则，负责槽位编码解析、活节点收集（排除候选内的独立 tooltip）、译文写入克隆、隐藏/编辑/宿主 metadata 省略、可见公式骨架保全、译文产物过滤，以及识别 line-clamp 与溢出截断并提供临时解除截断的样式覆盖规则。 可核对的公开符号包括 TranslationTextSlot、TranslationSourceSnapshot、SerializedTranslationSlots、TranslationStyleOverride、translationTruncationStyleOverrides、serializeTranslationSlots、parseTranslationSlots、createTranslationSourceSnapshot。
+ * 主要内容：定义 TranslationTextSlot、TranslationSourceSnapshot 与样式覆盖规则，负责槽位编码解析、活节点收集（排除候选内的独立 tooltip）、译文写入克隆、整块译文纯文本降级、隐藏/编辑/宿主 metadata 省略、可见公式骨架保全、译文产物过滤，以及识别 line-clamp 与溢出截断并提供临时解除截断的样式覆盖规则。 可核对的公开符号包括 TranslationTextSlot、TranslationSourceSnapshot、SerializedTranslationSlots、TranslationStyleOverride、translationTruncationStyleOverrides、serializeTranslationSlots、parseTranslationSlots、createTranslationSourceSnapshot。
  * 模块边界：本文件属于可独立测试的 core 候选领域；可以读取传入 DOM 以计算结果，但不访问配置存储、不调用 provider、不注册页面监听器，也不负责译文渲染或 feature 生命周期。
  */
 
-import {isTranslationTextNodeProtected} from './text';
+import {isTranslationTextNodeProtected, normalizeTranslationText} from './text';
 import {
     hasContentEditableMarker,
     isForeignTranslationBoundary,
@@ -353,11 +353,29 @@ export function collectLiveTranslationTextSlots(
     );
 }
 
+/**
+ * 整块译文：多槽候选改为一次整块请求后，整段译文落在首个槽位、其余槽位为空。
+ * 此时逐槽骨架已经不对应任何译文，直接输出纯译文：否则整段译文会被塞进首个内联元素
+ * （链接、加粗）的样式里，并留下一串空的内联骨架，既让译文本体变成可点击链接，
+ * 又把站点悬停脚本引入译文内部。空槽判定按“规范化后为空”，以覆盖空格、换行与 &nbsp;。
+ */
+function isWholeBlockTranslation(snapshot: TranslationSourceSnapshot, translations: readonly string[]): boolean {
+    return snapshot.slots.length > 1
+        && translations.length === snapshot.slots.length
+        && Boolean(normalizeTranslationText(translations[0]!))
+        && translations.slice(1).every((translation) => !normalizeTranslationText(translation));
+}
+
 /** 只修改脱离文档的快照文本节点；没有对应译文的槽位保持原文。 */
 export function applyTranslationsToSnapshot(
     snapshot: TranslationSourceSnapshot,
     translations: readonly string[],
 ): string {
+    if (isWholeBlockTranslation(snapshot, translations)) {
+        const document = snapshot.clone.ownerDocument;
+        snapshot.clone.replaceChildren(document.createTextNode(translations[0]!));
+        return snapshot.clone.innerHTML;
+    }
     snapshot.slots.forEach((slot, index) => {
         const translation = translations[index];
         if (translation !== undefined) slot.node.nodeValue = `${slot.prefix}${translation}${slot.suffix}`;

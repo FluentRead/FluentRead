@@ -3313,3 +3313,31 @@ describe('悬浮视觉文本块的边界条件', () => {
         }
     });
 });
+
+describe('整块译文的纯文本渲染', () => {
+    const render = (html: string, translations: readonly string[]) => {
+        const {document} = parseHTML(`<html><body>${html}</body></html>`);
+        const target = document.body.firstElementChild as HTMLElement;
+        return applyTranslationsToSnapshot(createTranslationSourceSnapshot(target), translations);
+    };
+
+    it('多槽候选的整块译文输出纯文本，不把整段译文塞进首个链接', () => {
+        const html = '<p>Read <a href="/g">the guide</a>.</p>';
+        expect(render(html, ['读完这份指南。', '', ''])).toBe('读完这份指南。');
+        // 其余槽位只是空白同样按整块处理，覆盖模型返回空格与 &nbsp; 的情形。
+        expect(render(html, ['读完这份指南。', ' ', '\u00a0'])).toBe('读完这份指南。');
+        // 逐槽译文仍按内联骨架回填，链接与加粗保留。
+        expect(render(html, ['读', '指南', '。'])).toContain('<a href="/g">指南</a>');
+    });
+
+    it('长度不符、首槽为空或后续槽仍有译文时不走整块降级', () => {
+        const html = '<p>Read <a href="/g">the guide</a>.</p>';
+        expect(render(html, ['读'])).toContain('the guide');
+        expect(render(html, ['', '', ''])).toBe(' <a href="/g"></a>');
+        expect(render(html, ['整段。', '次槽', ''])).toContain('次槽');
+    });
+
+    it('单槽候选不触发整块降级', () => {
+        expect(render('<p>Single.</p>', ['单个。'])).toBe('单个。');
+    });
+});

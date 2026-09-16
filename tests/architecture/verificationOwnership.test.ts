@@ -104,6 +104,7 @@ function verificationOwners(path: string, strictCoverage: Set<string>): Verifica
         || PRODUCT_TOOL_SCRIPTS.includes(path)
         || path === 'scripts/verify-userscript-build.mjs'
         || path === 'scripts/export-site-rule-pack.mjs'
+        || path === 'scripts/update-readme-contributors.mjs'
         || path.startsWith('vitest.')) {
         owners.add('test-infrastructure-contract');
     }

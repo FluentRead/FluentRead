@@ -175,6 +175,7 @@
       "tests/vocabularyLearningModel.test.ts",
       "tests/vocabularyRepositoryEdges.test.ts",
       "tests/viewportStability.test.ts",
+      "tests/readmeContributors.test.ts",
       "tests/wordDictionary.test.ts",
       "tests/wordDictionaryEdge.test.ts",
       "tests/youtubeSubtitleData.test.ts",

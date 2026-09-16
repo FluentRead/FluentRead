@@ -77,13 +77,20 @@ describe('XSubtitleLoader', () => {
     expect(cues).toHaveLength(1);
   });
   it('无 content-length 时仍按 1MB 实际流大小中止', async () => {
+    const cues: string[] = [];
+    const oversized = `${cueText}${'x'.repeat(1_000_001)}`;
     const loader = new XSubtitleLoader({
-      fetch: async () => new Response(new ReadableStream({start(controller) { controller.enqueue(new Uint8Array(1_000_001)); controller.close(); }})),
-      language: () => 'en', onCues: () => undefined,
+      fetch: async () => new Response(new ReadableStream({start(controller) { controller.enqueue(new TextEncoder().encode(oversized)); controller.close(); }})),
+      language: () => 'en', onCues: url => cues.push(url),
     });
     loader.load(resource('stream-large'));
     await new Promise<void>(resolve => setTimeout(resolve, 0));
-    loader.load(resource('inline-large'), 'x'.repeat(1_000_001));
+    loader.load(resource('inline-large'), oversized);
     await new Promise<void>(resolve => setTimeout(resolve, 0));
+    // 有效 WEBVTT 头也不能让超限正文进入解析；同一加载器仍可处理正常字幕。
+    expect(cues).toEqual([]);
+    loader.load(resource('inline-normal'), cueText);
+    await new Promise<void>(resolve => setTimeout(resolve, 0));
+    expect(cues).toEqual([resource('inline-normal').url]);
   });
 });

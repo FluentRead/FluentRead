@@ -189,6 +189,48 @@ describe('全文翻译快捷键状态联动', () => {
     });
 });
 
+describe('全文快捷键与录制器使用同一逻辑按键', () => {
+    async function installFullPageHotkey() {
+        const {createContentHotkeyRuntime} = await import('@/src/app/content/hotkeyRuntime');
+        const toggleFullPage = vi.fn();
+        createContentHotkeyRuntime(() => false, {toggleFullPage}).installFloatingBallHotkey(new AbortController().signal);
+        const listeners = (document as typeof document & {__listeners: Map<string, Listener[]>}).__listeners;
+        // 同一用例可安装多个独立运行时，只驱动最近一次安装的监听器。
+        return {toggleFullPage, keydown: listeners.get('keydown')!.at(-1)!, keyup: listeners.get('keyup')!.at(-1)!};
+    }
+
+    it('Shift 数字按录制的数字匹配，先松开 Shift 时仍按物理键清除按键状态', async () => {
+        Object.assign(mocks.config, {floatingBallHotkey: 'custom', customFloatingBallHotkey: 'Alt+Shift+1'});
+        const {toggleFullPage, keydown, keyup} = await installFullPageHotkey();
+        keydown(keyboardEvent({key: 'Alt', code: 'AltLeft'}));
+        keydown(keyboardEvent({key: 'Shift', code: 'ShiftLeft', shiftKey: true}));
+        keydown(keyboardEvent({key: '!', code: 'Digit1', shiftKey: true}));
+        expect(toggleFullPage).toHaveBeenCalledOnce();
+
+        keyup(keyboardEvent({key: 'Shift', code: 'ShiftLeft', shiftKey: false}));
+        keyup(keyboardEvent({key: '1', code: 'Digit1', shiftKey: false}));
+        keydown(keyboardEvent({key: 'Shift', code: 'ShiftLeft', shiftKey: true}));
+        keydown(keyboardEvent({key: '!', code: 'Digit1', shiftKey: true}));
+        expect(toggleFullPage).toHaveBeenCalledTimes(2);
+    });
+
+    it('macOS Option 字形回退到物理键，非 QWERTY 布局按实际字符而非物理位置匹配', async () => {
+        Object.assign(mocks.config, {floatingBallHotkey: 'custom', customFloatingBallHotkey: 'Alt+/'});
+        const optionGlyph = await installFullPageHotkey();
+        optionGlyph.keydown(keyboardEvent({key: '÷', code: 'Slash'}));
+        expect(optionGlyph.toggleFullPage).toHaveBeenCalledOnce();
+
+        Object.assign(mocks.config, {floatingBallHotkey: 'Alt+T', customFloatingBallHotkey: ''});
+        const dvorak = await installFullPageHotkey();
+        // Dvorak 的 T 位于 QWERTY K 键；原物理 T 键输出 y，不能误触发。
+        dvorak.keydown(keyboardEvent({key: 'y', code: 'KeyT'}));
+        dvorak.keyup(keyboardEvent({key: 'y', code: 'KeyT'}));
+        expect(dvorak.toggleFullPage).not.toHaveBeenCalled();
+        dvorak.keydown(keyboardEvent({key: 't', code: 'KeyK'}));
+        expect(dvorak.toggleFullPage).toHaveBeenCalledOnce();
+    });
+});
+
 describe('划词翻译快捷键语言预检', () => {
     it.each([
         'Hallo Welt.',

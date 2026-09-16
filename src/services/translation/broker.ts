@@ -244,19 +244,11 @@ export function createTranslationBroker(deps: TranslationBrokerDependencies): Tr
                 return '';
             }
         }
+        // custom、New API、MiniMax 与 MiMo 都经 AI SDK 端点解析；这里只保留仍走旧适配器的地址来源，
+        // 避免同一服务出现第二套默认区域或地址补全规则。
         if (service === 'deepL') return getDeepLEndpoint(current.deeplApiPlan, current.proxy[service]);
         if (current.proxy[service]) return current.proxy[service];
-        if (service === 'custom') return current.custom;
         if (service === 'deeplx') return current.deeplx;
-        if (service === 'newapi') return current.newApiUrl;
-        if (service === deps.serviceIds.minimax) {
-            const plan = current.minimaxBillingPlan === 'token-plan' ? 'token-plan' : 'payg';
-            const region = current.minimaxRegion === 'cn' ? 'cn' : 'global';
-            return deps.endpointResolver.minimaxEndpoints[plan]?.[region] || '';
-        }
-        if (service === deps.serviceIds.mimo) {
-            return deps.endpointResolver.getMimoEndpoint(current.mimoBillingPlan, current.mimoRegion);
-        }
         return '';
     }
 

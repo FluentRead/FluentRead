@@ -1,7 +1,7 @@
 /**
  * @file src/ui/interfaceAppearance.ts
  * 文件职责：把已经归一化的界面皮肤和字体配置应用到扩展页面根节点，为 Popup 和 Options 共享同一套界面切换入口。
- * 主要内容：应用皮肤与字体变量，按当前选择启动字体下载服务并公开下载和缓存清理状态；配置异常时安全回退。
+ * 主要内容：应用皮肤与字体变量，按当前选择启动字体下载服务并公开下载状态、可用字体与单个字体清理；配置异常时安全回退。
  * 模块边界：本文件只负责扩展自身页面的 DOM 属性，不读取或保存配置，不影响网页内容脚本和宿主页面样式。
  */
 
@@ -13,7 +13,7 @@ import {
   type InterfaceSkin,
 } from '@/src/core/config/interfaceAppearance'
 import {readonly, shallowRef} from 'vue'
-import {createInterfaceFontLoader, getCachedInterfaceFonts, getInterfaceFontCacheSize, type InterfaceFontLoadState} from '@/src/services/interfaceFonts'
+import {createInterfaceFontLoader, getCachedInterfaceFonts, type InterfaceFontLoadState} from '@/src/services/interfaceFonts'
 import {getInterfaceFontAssets, type InterfaceFontSourceId} from '@/src/core/config/interfaceFontAssets'
 
 const fontLoadState = shallowRef<InterfaceFontLoadState>({font: 'system', status: 'system', loaded: 0, total: 0, persistent: true})
@@ -22,8 +22,6 @@ const availableFonts = shallowRef<InterfaceFont[]>(['system'])
 export const availableInterfaceFonts = readonly(availableFonts)
 const installedFiles = new Set<string>()
 const openFontCache = async () => caches.open('fluentread-interface-fonts-v1')
-const cacheSize = shallowRef<number | null>(null)
-export const interfaceFontCacheSize = readonly(cacheSize)
 let availabilityVersion = 0
 
 function removeInstalledFontFiles(font: InterfaceFont): void {
@@ -40,9 +38,8 @@ function removeInstalledFontFiles(font: InterfaceFont): void {
 
 export async function refreshInterfaceFontAvailability(): Promise<void> {
   const version = ++availabilityVersion
-  const [cached, size] = await Promise.all([getCachedInterfaceFonts(openFontCache), getInterfaceFontCacheSize(openFontCache)])
+  const cached = await getCachedInterfaceFonts(openFontCache)
   if (version !== availabilityVersion) return
-  cacheSize.value = size
   const installed = interfaceFontOptions.filter(font => getInterfaceFontAssets(font.value)
     .every(asset => installedFiles.has(asset.file))).map(font => font.value)
   availableFonts.value = [...new Set([...installed, ...cached])]
@@ -66,14 +63,6 @@ const fontLoader = createInterfaceFontLoader({
     if (state.status !== 'loading') void refreshInterfaceFontAvailability()
   },
 })
-
-export async function clearInterfaceFontCache(): Promise<void> {
-  try {
-    await fontLoader.clearCache()
-  } finally {
-    await refreshInterfaceFontAvailability()
-  }
-}
 
 export async function clearInterfaceFont(font: InterfaceFont): Promise<void> {
   let cleared = false

@@ -4,6 +4,8 @@
  * 主要内容：定义可注入的配置、常量与依赖接口，提供快捷键字符串规范化和匹配函数，并在 mountHoverTranslationContentFeature 中监听 keydown、keyup、mousemove、blur 与 abort，显式区分单次切换和连续移动手势；手势绑定开始时的快捷键配置，取消后不得由后续移动复活。
  * 模块边界：该模块只识别手势和调用注入的 handleTranslation/cancelPending，不读取具体翻译服务或创建译文；配置源、站点禁用判断和全文运行时由 app composition root 提供。
  */
+import {addPressedHotkeyEventKey, deletePressedHotkeyEventKey} from '@/src/core/hotkey';
+
 export interface HoverTranslationContentConfig {
     on?: boolean;
     hotkey?: string;
@@ -58,24 +60,6 @@ interface HoverTranslationScreenState {
     gestureHotkey: string;
 }
 
-const SPECIAL_KEYS: Record<string, string> = {
-    escape: 'escape',
-    enter: 'enter',
-    space: 'space',
-    tab: 'tab',
-    backspace: 'backspace',
-    delete: 'delete',
-    insert: 'insert',
-    home: 'home',
-    end: 'end',
-    pageup: 'pageup',
-    pagedown: 'pagedown',
-    arrowup: 'arrowup',
-    arrowdown: 'arrowdown',
-    arrowleft: 'arrowleft',
-    arrowright: 'arrowright',
-};
-
 export function normalizeHoverHotkeyParts(hotkeyString: string | undefined): string[] {
     if (!hotkeyString || hotkeyString === 'none') return [];
 
@@ -98,38 +82,16 @@ export function matchesPressedHotkeyParts(
         && hotkeyParts.length === pressed.size;
 }
 
-function addPressedKey(event: KeyboardEvent, pressed: Set<string>, isMac: boolean): void {
+function addPressedKey(event: KeyboardEvent, pressed: Set<string>, keyByCode: Map<string, string>, isMac: boolean): void {
     if (event.altKey) pressed.add('alt');
     if (event.ctrlKey) pressed.add('control');
     if (event.metaKey && !isMac) pressed.add('control');
     if (event.shiftKey) pressed.add('shift');
-
-    const key = event.key.toLowerCase();
-    const code = event.code?.toLowerCase();
-    if (code && code.startsWith('key')) {
-        pressed.add(code.slice(3).toLowerCase());
-    } else if (key.length === 1) {
-        pressed.add(key);
-    } else if (/^f\d+$/.test(key)) {
-        pressed.add(key);
-    } else if (SPECIAL_KEYS[key]) {
-        pressed.add(SPECIAL_KEYS[key]);
-    }
+    addPressedHotkeyEventKey(event, pressed, keyByCode);
 }
 
-function removeReleasedKey(event: KeyboardEvent, pressed: Set<string>, isMac: boolean): void {
-    const releasedKey = event.key.toLowerCase();
-    const releasedCode = event.code?.toLowerCase();
-    if (releasedCode && releasedCode.startsWith('key')) {
-        pressed.delete(releasedCode.slice(3).toLowerCase());
-    } else if (releasedKey.length === 1) {
-        pressed.delete(releasedKey);
-    } else if (/^f\d+$/.test(releasedKey)) {
-        pressed.delete(releasedKey);
-    } else if (SPECIAL_KEYS[releasedKey]) {
-        pressed.delete(SPECIAL_KEYS[releasedKey]);
-    }
-
+function removeReleasedKey(event: KeyboardEvent, pressed: Set<string>, keyByCode: Map<string, string>, isMac: boolean): void {
+    deletePressedHotkeyEventKey(event, pressed, keyByCode);
     if (!event.altKey) pressed.delete('alt');
     if (!event.ctrlKey && (isMac || !event.metaKey)) pressed.delete('control');
     if (!event.shiftKey) pressed.delete('shift');
@@ -151,6 +113,7 @@ export function mountHoverTranslationContentFeature(
         gestureHotkey: '',
     };
     const mouseHotkeysPressed = new Set<string>();
+    const mouseHotkeyByCode = new Map<string, string>();
     let longPressTimer: ReturnType<typeof setTimeout> | undefined;
     const isMac = /Mac|iPod|iPhone|iPad/.test(runtimeNavigator.platform);
     const noteExternalHostGesture = (event: Event) => {
@@ -176,6 +139,7 @@ export function mountHoverTranslationContentFeature(
         screen.hasSlideTranslation = false;
         screen.gestureHotkey = '';
         mouseHotkeysPressed.clear();
+        mouseHotkeyByCode.clear();
     };
     const cancelAndResetHoverHotkeyState = () => {
         resetHoverHotkeyState();
@@ -229,7 +193,7 @@ export function mountHoverTranslationContentFeature(
         }
 
         // 步骤 1：记录当前可信按键集合，只有与配置完全一致时才进入悬浮候选态。
-        addPressedKey(event, mouseHotkeysPressed, isMac);
+        addPressedKey(event, mouseHotkeysPressed, mouseHotkeyByCode, isMac);
         if (matchesPressed(getConfiguredMouseHotkeyParts()) && !screen.otherKeyPressed) {
             screen.hotkeyPressed = true;
             screen.otherKeyPressed = false;
@@ -258,7 +222,7 @@ export function mountHoverTranslationContentFeature(
 
     rootWindow.addEventListener('keyup', event => {
         if (!event.isTrusted) return;
-        removeReleasedKey(event, mouseHotkeysPressed, isMac);
+        removeReleasedKey(event, mouseHotkeysPressed, mouseHotkeyByCode, isMac);
         if (discardUnavailableHoverGesture()) return;
 
         if (screen.hotkeyPressed && mouseHotkeysPressed.size === 0 && !screen.otherKeyPressed && !screen.hasSlideTranslation) {

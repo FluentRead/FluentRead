@@ -545,8 +545,13 @@ it('controls observer ignores unrelated and owned mutations and rebinds host con
 
 it('missing MutationObserver still supports explicit sync and clean teardown', () => {
  const fixture=createFixture();vi.stubGlobal('MutationObserver',undefined);
- const binding=createVideoPlayerBinding({document:fixture.document,locator:fixture.locator,getState:()=>({enabled:true}),createButton:()=>fixture.document.createElement('button')});
- binding.sync();binding.destroy();
+ const button=fixture.document.createElement('button');
+ const binding=createVideoPlayerBinding({document:fixture.document,locator:fixture.locator,getState:()=>({enabled:true}),createButton:()=>button});
+ binding.sync();
+ // 没有观察器时仍靠显式 sync 挂在播放器控件内，销毁后不能遗留图标。
+ expect(fixture.player.contains(button)).toBe(true);
+ binding.destroy();
+ expect(button.isConnected).toBe(false);
 });
 
 

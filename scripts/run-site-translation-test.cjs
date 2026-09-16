@@ -763,12 +763,15 @@ function validateCoverageRevealStatuses(statuses, phase) {
 // 有界收敛后仍在重试、服务结果未变化、节点断开或缺少 wrapper，测试都会失败。
 async function settleCoverageByReveal(page, timeout, phase) {
   const startedAt = Date.now();
-  const deadline = startedAt + timeout;
   const maxAttempts = 128;
+  const dwellMs = 900;
   const batch = await page.evaluate(
     (trackerKey) => window[trackerKey]?.snapshotMissing?.() || [],
     COVERAGE_TRACKER_KEY,
   );
+  // 每个叶节点固定停留一次，整批停留之外再保留 timeout 等待共享队列收敛。
+  // 若只给固定 timeout，67–128 个节点的合法批次会在逐节点阶段必然耗尽预算。
+  const deadline = startedAt + batch.length * dwellMs + timeout;
   if (batch.length === 0) return [];
   if (batch.length > maxAttempts) {
     throw new Error(`${phase} 缺失节点超过有界唤醒上限：${JSON.stringify({
@@ -802,7 +805,7 @@ async function settleCoverageByReveal(page, timeout, phase) {
     attempted += 1;
     // 让精确叶节点在视口中停留足够久，以等待浏览器 IO 回调和下一轮分时发现任务；
     // 存在嵌套滚动容器时，scrollIntoView 会自然选择最近的一层。
-    await page.waitForTimeout(Math.min(900, Math.max(1, deadline - Date.now())));
+    await page.waitForTimeout(Math.min(dwellMs, Math.max(1, deadline - Date.now())));
     await observeCoverage(page);
   }
 

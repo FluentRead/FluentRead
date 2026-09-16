@@ -32,6 +32,8 @@ const extensionSelector = [
     '[data-fr-translation-owned="true"]',
 ].join(',');
 
+const foreignTranslationWrapperClass = 'immersive-translate-target-wrapper';
+
 const hardPruneTags = new Set([
     'head', 'script', 'style', 'noscript', 'iframe', 'input', 'textarea',
     'select', 'option', 'math', 'svg', 'canvas', 'audio', 'video', 'object',
@@ -76,10 +78,17 @@ export function isExtensionElementSelf(element: Element): boolean {
  * 外部译文可能插在原文的直属 font wrapper 中。该父节点才是已被接管的
  * 最小原文单元，不能沿 querySelector 把整篇文章或整个页面都视为已翻译。
  * 不把它标为 FluentRead owned：只停止本插件在这里写入，清理时绝不删除对方 DOM。
+ * 该判断位于每个文本节点的祖先守卫热路径上；Blink 的 `querySelector(':scope > …')`
+ * 会匹配整棵后代树，因此直接检查直属子元素，避免长文章的祖先检查随正文规模二次增长。
  */
 export function isForeignTranslationBoundary(element: Element): boolean {
-    return element.classList.contains('immersive-translate-target-wrapper') ||
-        (!isDocumentSurface(element) && element.querySelector(':scope > .immersive-translate-target-wrapper') !== null);
+    if (element.classList.contains(foreignTranslationWrapperClass)) return true;
+    if (isDocumentSurface(element)) return false;
+    const children = element.children;
+    for (let index = 0; index < children.length; index += 1) {
+        if (children[index]!.classList.contains(foreignTranslationWrapperClass)) return true;
+    }
+    return false;
 }
 
 const valueControlInputTypes = new Set(['button', 'reset', 'submit']);

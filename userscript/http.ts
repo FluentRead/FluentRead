@@ -7,9 +7,30 @@ export function parseResponseHeaders(rawHeaders = ''): Headers {
         if (separator <= 0) continue;
         const name = line.slice(0, separator).trim();
         const value = line.slice(separator + 1).trim();
-        if (name) headers.append(name, value);
+        if (!name) continue;
+        try {
+            headers.append(name, value);
+        } catch {
+            // 脚本管理器可能按 UTF-8 解码出非 ByteString 值；单个无法表示的头不应作废响应。
+        }
     }
     return headers;
+}
+
+// Fetch 规范禁止这些状态携带响应体，即使脚本管理器给出空 responseText。
+const NULL_BODY_STATUSES = new Set([204, 205, 304]);
+
+function responseFromUserscript(response: UserscriptXmlHttpResponse): Response {
+    const status = response.status >= 200 && response.status <= 599 ? response.status : 200;
+    // Via 只明确支持 responseText，未声明桌面脚本管理器提供的可选
+    // responseType/anonymous 扩展，因此以文本作为可移植基线。
+    const body = NULL_BODY_STATUSES.has(status) ? null : response.responseText ?? String(response.response || '');
+    const statusText = /^[\t\x20-\x7e\x80-\xff]*$/u.test(response.statusText || '') ? response.statusText || '' : '';
+    return new Response(body as BodyInit | null, {
+        status,
+        statusText,
+        headers: parseResponseHeaders(response.responseHeaders),
+    });
 }
 
 function abortError(): DOMException {
@@ -110,16 +131,13 @@ export const userscriptFetch: RuntimeFetch = async (input, init) => {
                 headers: headersToRecord(request.headers),
                 data: request.body ?? undefined,
                 onload(response) {
+                    // 完成门先关闭再构造 Response；构造失败必须 reject，否则调用方与后续 abort 都无法结算。
                     finish(() => {
-                        const status = response.status >= 200 && response.status <= 599 ? response.status : 200;
-                        // Via 只明确支持 responseText，未声明桌面脚本管理器提供的可选
-                        // responseType/anonymous 扩展，因此以文本作为可移植基线。
-                        const body = response.responseText ?? String(response.response || '');
-                        resolve(new Response(body as BodyInit | null, {
-                            status,
-                            statusText: response.statusText || '',
-                            headers: parseResponseHeaders(response.responseHeaders),
-                        }));
+                        try {
+                            resolve(responseFromUserscript(response));
+                        } catch (error) {
+                            reject(error);
+                        }
                     });
                 },
                 onerror(response) {

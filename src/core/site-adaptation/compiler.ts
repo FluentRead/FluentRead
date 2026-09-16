@@ -126,10 +126,16 @@ function compileRule(pack: SiteRulePack, rule: SiteRule): TranslationSiteAdapter
         omitFromTranslation: [{selector: recipe.omit!, reason: `${rule.id}:omit`}],
         mutationExclude: [{selector: recipe.watchIgnore!, reason: `${rule.id}:watch-ignore`}],
     });
+    // 每个页面都会编译全部内置规则，但只有匹配当前 URL 的适配器会被 mutation 观察读取；
+    // 选择器扫描延迟到首次读取，并缓存 null 这一“无法穷举属性”的合法结果。
+    let observedAttributes: string[] | null | undefined;
     return {
         ...adapter,
         allScopes: rule.allScopes,
-        observedAttributes: getSiteRuleObservedAttributes(recipe),
+        get observedAttributes(): string[] | null {
+            if (observedAttributes === undefined) observedAttributes = getSiteRuleObservedAttributes(recipe);
+            return observedAttributes;
+        },
         decide(element, context) {
             return isLiteralLabel(element, recipe.literalLabels!)
                 ? {kind: 'prune-subtree', reason: `${rule.id}:literal-label`}

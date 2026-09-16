@@ -203,11 +203,6 @@ export type TranslationProviderConfigSnapshot = Readonly<TranslationConfigSnapsh
 /** 测试或迁移期配置源可以省略凭据字段，snapshot factory 会补安全默认值。 */
 export type TranslationConfigSource = TranslationConfigSnapshot & Partial<TranslationProviderConfigFields>;
 
-export interface TranslationServiceIds {
-    minimax: string;
-    mimo: string;
-}
-
 export interface TranslationServiceTypes {
     machine: {has: (service: string) => boolean};
     isAI: (service: string) => boolean;
@@ -220,8 +215,6 @@ export interface TranslationEndpointResolver {
         service: string,
         config?: TranslationProviderConfigSnapshot,
     ) => {endpoint: string};
-    getMimoEndpoint: (plan: string, region: string) => string;
-    minimaxEndpoints: Record<string, Record<string, string>>;
     aiSdkTransportProfile: string;
 }
 
@@ -235,7 +228,6 @@ export interface TranslationBrokerDependencies {
     getConfig: () => TranslationConfigSource;
     providers: TranslationProviderRegistry;
     cache: TranslationCachePort;
-    serviceIds: TranslationServiceIds;
     serviceTypes: TranslationServiceTypes;
     endpointResolver: TranslationEndpointResolver;
     promptBuilder: TranslationPromptBuilder;

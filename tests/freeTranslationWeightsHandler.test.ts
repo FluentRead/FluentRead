@@ -33,7 +33,7 @@ describe('free translation weights background handler', () => {
             isOptionsUrl: url => url.startsWith('chrome-extension://fluentread/options.html'),
         });
 
-        for (const context of [{sender: {url: 'https://example.com'}}, {}, undefined]) {
+        for (const context of [{sender: {url: 'https://example.com'}}, {sender: {url: 42}}, {sender: 'options'}, {}, undefined]) {
             await expect(handler.handle({type: FREE_TRANSLATION_WEIGHTS_MESSAGE_TYPE}, context)).rejects.toThrow('无权访问');
         }
         expect(getSnapshot).not.toHaveBeenCalled();

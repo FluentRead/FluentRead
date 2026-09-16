@@ -1528,6 +1528,8 @@ onBeforeUnmount(() => {
   stopPopupGesture();
   if (selectionFrame !== null) window.cancelAnimationFrame(selectionFrame);
   if (positionFrame !== null) window.cancelAnimationFrame(positionFrame);
+  // 悬停延迟可能跨过卸载；卸载后不能再按旧选区打开阅读卡片。
+  cancelReadingHover();
   cancelSelectionLoss();
   cancelSelectionPresentation();
   clearCopyFeedback();

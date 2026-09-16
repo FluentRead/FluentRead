@@ -72,7 +72,6 @@ describe('持久缓存策略与配置生命周期', () => {
                 clear: async () => undefined,
                 cleanup: async () => undefined,
             },
-            serviceIds: {minimax: 'minimax', mimo: 'mimo'},
             serviceTypes: {
                 machine: new Set(['fixture']),
                 isAI: () => false,
@@ -81,8 +80,6 @@ describe('持久缓存策略与配置生命周期', () => {
             },
             endpointResolver: {
                 resolveOpenAICompatibleEndpoint: () => ({endpoint: ''}),
-                getMimoEndpoint: () => '',
-                minimaxEndpoints: {},
                 aiSdkTransportProfile: '',
             },
             promptBuilder: {buildPageSummaryPrompt: () => '', buildPageSummarySystemPrompt: () => ''},

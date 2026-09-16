@@ -637,6 +637,43 @@ describe('site translation coverage contract', () => {
     expect(page.evaluate).toHaveBeenCalledTimes(1);
   });
 
+  it('budgets one dwell per bounded missing leaf before the shared idle wait', async () => {
+    const batch = Array.from({length: 100}, (_, index) => ({
+      token: `0:${index}:0`,
+      rule: 'paragraphs',
+      source: `Natural paragraph ${index}`,
+      connected: true,
+      eligible: true,
+      translated: false,
+      loading: false,
+      retry: false,
+    }));
+    let now = Date.parse('2026-09-16T00:00:00Z');
+    const dateNow = vi.spyOn(Date, 'now').mockImplementation(() => now);
+    let snapshots = 0;
+    const page = {
+      evaluate: vi.fn(async (_fn: unknown, argument: unknown) => {
+        if (argument === COVERAGE_TRACKER_KEY) return snapshots++ === 0 ? batch : undefined;
+        if (typeof argument === 'string') return [];
+        const request = argument as {token?: string; requestedTokens?: string[]};
+        if (request.token) return {found: true, token: request.token, alreadyTranslated: false};
+        return request.requestedTokens!.map((token) => ({...batch[Number(token.split(':')[1])], translated: true}));
+      }),
+      // 模拟真实停留耗时；旧预算 60s 在第 67 个叶节点前就会耗尽，与译文是否完成无关。
+      waitForTimeout: vi.fn(async (ms: number) => { now += ms; }),
+      waitForFunction: vi.fn(async () => undefined),
+    };
+    try {
+      const statuses = await settleCoverageByReveal(page, 60_000, 'coverage');
+      expect(statuses).toHaveLength(100);
+      expect(page.waitForTimeout).toHaveBeenCalledTimes(100);
+      expect(page.waitForTimeout.mock.calls.every(([ms]) => ms === 900)).toBe(true);
+      expect(page.waitForFunction).toHaveBeenCalledOnce();
+    } finally {
+      dateNow.mockRestore();
+    }
+  });
+
   it('normalizes only adjacent Text runs around protected MathJax roots', async () => {
     const {document, window} = parseHTML(`
       <html><body><main>

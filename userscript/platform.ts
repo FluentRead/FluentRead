@@ -5,6 +5,8 @@ import {
     configReady,
     CONFIG_HISTORY_MESSAGE,
     CONFIG_PERSIST_MESSAGE,
+    getConfigRevision,
+    prepareConfigPatchRequest,
     saveConfig,
 } from '@/src/services/config/store';
 import {
@@ -48,8 +50,20 @@ export function createPlatformMessageHandler(openSettings: () => void) {
         if (message.type === 'fullPageTranslationState') return {success: true};
 
         if (message.type === CONFIG_PERSIST_MESSAGE) {
-            await saveConfig(message.config, {recordHistory: true});
-            return {success: true};
+            await configReady;
+            // userscript 没有独立后台 store：发送方已在同一份运行时 config 上乐观合并 patch，
+            // message.config 只是字段子集，必须合并回当前配置，不能按整份配置归一化而重置其余设置和凭据。
+            const next = message.mode === 'patch' && message.config && typeof message.config === 'object'
+                ? prepareConfigPatchRequest(
+                    message.config,
+                    Object.fromEntries(Object.keys(message.config).map((key) => [key, config[key as keyof typeof config]])),
+                    config,
+                    true,
+                )
+                : message.config;
+            await saveConfig(next, {recordHistory: true});
+            // 与扩展后台契约一致返回提交 revision，发送方据此确认而不是回滚乐观状态。
+            return {success: true, revision: getConfigRevision()};
         }
 
         if (message.type === CONFIG_COUNT_INCREMENT_MESSAGE) {

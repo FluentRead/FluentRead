@@ -30,13 +30,20 @@ export function setCurrentTranslationSidebarRegions(enabled: boolean): void {
     cachedCores.clear();
 }
 
+let lastRawHref: string | undefined;
+let lastNormalizedHref = 'https://invalid.local/';
+
 function currentHref(): string {
     const href = globalThis.location?.href ?? 'https://invalid.local/';
+    // 全文提交热路径每个候选会多次取核心；地址未变时复用上次规范化结果，不重复解析 URL。
+    if (href === lastRawHref) return lastNormalizedHref;
+    lastRawHref = href;
     try {
-        return new URL(href).href;
+        lastNormalizedHref = new URL(href).href;
     } catch {
-        return 'https://invalid.local/';
+        lastNormalizedHref = 'https://invalid.local/';
     }
+    return lastNormalizedHref;
 }
 
 /** 返回所有内容脚本入口共享、按 URL 和翻译范围隔离的候选核心。 */

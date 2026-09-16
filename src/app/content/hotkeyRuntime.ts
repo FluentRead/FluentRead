@@ -1,12 +1,17 @@
 /**
  * @file src/app/content/hotkeyRuntime.ts
  * 文件职责：在宿主页面统一接管 FluentRead 的键盘与鼠标快捷手势，并按配置、站点禁用状态和冲突优先级路由到相应翻译动作。
- * 主要内容：规范化特殊按键，监听 keydown/keyup、pointer 与 touch 状态，匹配悬浮、全文、划词、翻译卡片和区域快捷键，以纯中文选区过滤和保守同语言预检处理选择文本占用与默认行为阻止，并提供 dispose 清理监听器。
+ * 主要内容：按录制器同一逻辑按键记录组合键，监听 keydown/keyup、pointer 与 touch 状态，匹配悬浮、全文、划词、翻译卡片和区域快捷键，以纯中文选区过滤和保守同语言预检处理选择文本占用与默认行为阻止，并提供 dispose 清理监听器。
  * 模块边界：这里判定并分派手势，不实现语言检测算法、翻译请求、UI 挂载或配置持久化；具体动作由注入/导入的 feature 公共函数完成。
  */
 import {config} from '@/src/services/config/store';
 import {shouldSkipChineseSelection, shouldSkipTranslationForTarget} from '@/src/core/language/detect';
-import {matchesConfiguredHotkey, shouldClaimConfiguredHotkey} from '@/src/core/hotkey';
+import {
+    addPressedHotkeyEventKey,
+    deletePressedHotkeyEventKey,
+    matchesConfiguredHotkey,
+    shouldClaimConfiguredHotkey,
+} from '@/src/core/hotkey';
 import {
     autoTranslateEnglishPage,
     isFullPageTranslationActive,
@@ -14,24 +19,6 @@ import {
     restoreOriginalContent,
     shouldIgnoreSelection,
 } from './features';
-
-const SPECIAL_KEYS: Readonly<Record<string, string>> = {
-    escape: 'escape',
-    enter: 'enter',
-    space: 'space',
-    tab: 'tab',
-    backspace: 'backspace',
-    delete: 'delete',
-    arrowup: 'arrowup',
-    arrowdown: 'arrowdown',
-    arrowleft: 'arrowleft',
-    arrowright: 'arrowright',
-    home: 'home',
-    end: 'end',
-    pageup: 'pageup',
-    pagedown: 'pagedown',
-    insert: 'insert',
-};
 
 /** 悬浮、快捷翻译与邮件 frame 共享的划词快捷键仲裁端口，组合根整体注入，避免逐项重复接线。 */
 export interface SelectionShortcutPorts {
@@ -106,8 +93,9 @@ export function createContentHotkeyRuntime(isSiteDisabled: () => boolean,
 
     const installFloatingBallHotkey = (signal: AbortSignal): (() => void) => {
         const hotkeysPressed = new Set<string>();
+        const hotkeyByCode = new Map<string, string>();
         let pendingFullPageToggle = false;
-        const resetKeyboardGesture = () => { pendingFullPageToggle = false; hotkeysPressed.clear(); };
+        const resetKeyboardGesture = () => { pendingFullPageToggle = false; hotkeysPressed.clear(); hotkeyByCode.clear(); };
         const isDev = process.env.NODE_ENV === 'development';
         const isMac = /Mac|iPod|iPhone|iPad/.test(navigator.platform);
 
@@ -124,22 +112,6 @@ export function createContentHotkeyRuntime(isSiteDisabled: () => boolean,
             });
         };
 
-        const addEventKey = (event: KeyboardEvent): void => {
-            const key = event.key.toLowerCase();
-            const code = event.code?.toLowerCase();
-            if (code?.startsWith('key')) hotkeysPressed.add(code.slice(3).toLowerCase());
-            else if (key.length === 1 || /^f\d+$/.test(key)) hotkeysPressed.add(key);
-            else if (SPECIAL_KEYS[key]) hotkeysPressed.add(SPECIAL_KEYS[key]);
-        };
-
-        const removeEventKey = (event: KeyboardEvent): void => {
-            const key = event.key.toLowerCase();
-            const code = event.code?.toLowerCase();
-            if (code?.startsWith('key')) hotkeysPressed.delete(code.slice(3).toLowerCase());
-            else if (key.length === 1 || /^f\d+$/.test(key)) hotkeysPressed.delete(key);
-            else if (SPECIAL_KEYS[key]) hotkeysPressed.delete(SPECIAL_KEYS[key]);
-        };
-
         if (isDev) {
             console.log(`[FluentRead] 设置悬浮球快捷键: ${config.floatingBallHotkey}, 系统: ${isMac ? 'macOS' : '其他'}`);
         }
@@ -150,8 +122,7 @@ export function createContentHotkeyRuntime(isSiteDisabled: () => boolean,
 
             // 划词与全文快捷键冲突时，有有效选区的划词翻译拥有本次按键。
             if (shouldReserveSelectionShortcut(event)) {
-                pendingFullPageToggle = false;
-                hotkeysPressed.clear();
+                resetKeyboardGesture();
                 return;
             }
 
@@ -159,7 +130,7 @@ export function createContentHotkeyRuntime(isSiteDisabled: () => boolean,
             if (event.ctrlKey) hotkeysPressed.add('control');
             if (event.metaKey && !isMac) hotkeysPressed.add('control');
             if (event.shiftKey) hotkeysPressed.add('shift');
-            addEventKey(event);
+            addPressedHotkeyEventKey(event, hotkeysPressed, hotkeyByCode);
 
             const parts = configuredParts();
             if (parts.length === 0
@@ -194,7 +165,7 @@ export function createContentHotkeyRuntime(isSiteDisabled: () => boolean,
                     toggleFullPageTranslation();
                 }
             }
-            removeEventKey(event);
+            deletePressedHotkeyEventKey(event, hotkeysPressed, hotkeyByCode);
             if (!event.altKey) hotkeysPressed.delete('alt');
             if (!event.ctrlKey) hotkeysPressed.delete('control');
             if (!event.metaKey) hotkeysPressed.delete('control');

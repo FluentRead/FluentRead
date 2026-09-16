@@ -270,16 +270,13 @@ export function createFreeFallbackRunner(maxConcurrency = 3, dependencies: FreeF
                     if (options.signal?.aborted) throw abortErrorFromSignal(options.signal);
                     if (error instanceof Error && error.name === 'AbortError') throw error;
                     if (error instanceof AttemptTimeoutError && remaining < options.timeoutMs && Date.now() >= deadline) throw error;
-                    if (state.generation === generation) {
-                        const cooldown = getFreeFailureCooldown(error, state.failures + 1, options.cooldownMs, random());
-                        // 任意一次真实 provider 失败都先快速摘除；request 类错误也需要短暂冷却，
-                        // 避免同一服务在下一段文本中持续消耗尝试机会。取消不经过这里。
-                        const durationMs = cooldown.durationMs > 0
-                            ? cooldown.durationMs
-                            : Math.max(1_000, Number.isFinite(options.cooldownMs) ? options.cooldownMs : 1_000);
+                    const cooldown = getFreeFailureCooldown(error, state.failures + 1, options.cooldownMs, random());
+                    // 文本长度、语言方向等 request 类错误只属于当前原文：本次换用备用服务，
+                    // 但不暂停该服务、不降低其性能权重，后续段落仍按原顺序或权重调度。
+                    if (state.generation === generation && cooldown.durationMs > 0) {
                         state.performance = observeFreeProviderPerformance(state.performance, false, Date.now() - startedAt, Date.now());
                         state.generation += 1;
-                        state.retryAt = Date.now() + durationMs;
+                        state.retryAt = Date.now() + cooldown.durationMs;
                         state.failures = Math.min(100, state.failures + 1);
                         state.category = cooldown.category;
                         await persistHealth(deadline, options.signal);

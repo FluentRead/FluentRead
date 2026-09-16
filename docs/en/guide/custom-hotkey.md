@@ -33,4 +33,6 @@ The browser’s extension shortcut page controls the extension commands listed b
 
 Check that translation works through the menu first. Avoid keys already used by the browser, input method, or website. Some shortcuts intentionally do not run in input fields.
 
+Custom combinations match the character your keyboard layout produced when you recorded them, including Dvorak or AZERTY layouts. When Option on a Mac turns a key into a special symbol, the physical key is matched instead.
+
 Try a regular webpage; browser internal pages and extension stores generally cannot be translated.

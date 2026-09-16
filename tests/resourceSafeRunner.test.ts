@@ -86,9 +86,10 @@ describe('resource safe runner', () => {
         const code = `const fs = require('node:fs'); const p = ${JSON.stringify(critical)};
             fs.writeFileSync(p, 'held', {flag:'wx'});
             setTimeout(() => {fs.unlinkSync(p); console.log('completed');}, 100);`;
-        const jobs = Array.from({length: 3}, () => launch(directory, [runner, '--', process.execPath, '-e', code]));
+        // 5 个竞争者让“递归删除中途他人重建 reaping”的交错更容易暴露；旧实现约 7% 概率令其中一个等待者崩溃。
+        const jobs = Array.from({length: 5}, () => launch(directory, [runner, '--', process.execPath, '-e', code]));
         const results = await Promise.all(jobs.map(job => job.done));
-        expect(results.map(result => result.code)).toEqual([0, 0, 0]);
+        expect(results.map(result => result.code), results.map(result => result.stderr).join('\n')).toEqual([0, 0, 0, 0, 0]);
         expect(results.every(result => result.stdout.includes('completed'))).toBe(true);
         await expect(readFile(join(directory, 'lock/owner.json'))).rejects.toMatchObject({code: 'ENOENT'});
     }, 10_000);

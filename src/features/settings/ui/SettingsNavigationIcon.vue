@@ -22,6 +22,7 @@ const icons: Record<string, string> = {
   'settings-translation-center': 'swap',
   'settings-vocabulary': 'book',
   'settings-glossary': 'glossary',
+  'settings-translation-stats': 'gauge',
   'settings-model-usage': 'chart',
   'settings-advanced': 'sliders',
   'settings-data': 'history',

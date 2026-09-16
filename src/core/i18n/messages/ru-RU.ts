@@ -11,6 +11,7 @@ import {legacyTextOverrides} from './legacy-overrides';
 import {createLegacyCorrectionText} from './legacy-corrections';
 import {createRuntimeFeedbackLegacyText} from './runtime-feedback';
 import {localTtsRussianMessages} from './localTts';
+import {translationStatsRussianMessages} from './translationStats';
 import {localTranslationRussianMessages} from './localTranslation';
 
 export const ruRUMessages = {
@@ -21,6 +22,7 @@ export const ruRUMessages = {
     "settings.excludedLanguages.clear": "Очистить выбор",
     "settings.excludedLanguages.hint": "Сохраняется автоматически и применяется при следующем запуске перевода. Короткий текст или текст с неопределённым языком может переводиться.",
     ...localTtsRussianMessages,
+    ...translationStatsRussianMessages,
     "settings.services.library.freeReady": "Ключ API не нужен. Доступные бесплатные сервисы выбираются автоматически.",
     "settings.services.library.keepOne": "Оставьте хотя бы один сервис включённым.",
     "settings.services.library.memoryEmail": "Контактный адрес MyMemory (необязательно)",

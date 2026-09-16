@@ -9,6 +9,7 @@
 import type {
 MessageCatalog} from '../types';
 import {localTtsChineseMessages} from './localTts';
+import {translationStatsChineseMessages} from './translationStats';
 import {localTranslationChineseMessages} from './localTranslation';
 
 export const zhCNMessages = {
@@ -19,6 +20,7 @@ export const zhCNMessages = {
     "settings.excludedLanguages.clear": "清空选择",
     "settings.excludedLanguages.hint": "自动保存，下次开始翻译时生效。短文本或无法确定语言的内容仍会翻译。",
     ...localTtsChineseMessages,
+    ...translationStatsChineseMessages,
     "settings.services.library.freeReady": "无需 API Key，自动选择可用的免费服务。",
     "settings.services.library.keepOne": "至少保留一个服务。",
     "settings.services.library.memoryEmail": "MyMemory 联系邮箱（可选）",

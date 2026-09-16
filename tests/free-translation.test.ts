@@ -80,6 +80,21 @@ describe('免费翻译服务', () => {
         expect(myMemoryMock).toHaveBeenCalledWith(expect.objectContaining({origin: 'Hello', serviceOverride: 'myMemory', abortSignal: expect.any(AbortSignal)}));
     });
 
+    it('每次线路尝试上报免费服务标识、结果、耗时与文本长度', async () => {
+        const {attachTranslationRouteObserver} = await import('@/src/services/translation/requestSnapshot');
+        const observations: Array<Record<string, unknown>> = [];
+        microsoftMock.mockRejectedValue(httpFailure());
+        deeplxMock.mockResolvedValue('DeepLX 译文');
+        const message = attachTranslationRouteObserver({origin: 'Hello route'}, observation => observations.push({...observation}));
+
+        await expect(settle(freeTranslation(message) as Promise<string>)).resolves.toBe('DeepLX 译文');
+
+        expect(observations).toEqual([
+            {route: 'microsoft', outcome: 'error', durationMs: expect.any(Number), chars: 11},
+            {route: 'deeplx', outcome: 'success', durationMs: expect.any(Number), chars: 11},
+        ]);
+    });
+
     it('首个服务成功即返回，不会外发给后续服务', async () => {
         microsoftMock.mockResolvedValue(['微软译文']);
         await expect(settle(freeTranslation({origin: 'Hello'}))).resolves.toBe('微软译文');

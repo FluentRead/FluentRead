@@ -12,6 +12,7 @@ import {legacyTextOverrides} from './legacy-overrides';
 import {createLegacyCorrectionText} from './legacy-corrections';
 import {createRuntimeFeedbackLegacyText} from './runtime-feedback';
 import {localTtsEnglishMessages} from './localTts';
+import {translationStatsEnglishMessages} from './translationStats';
 import {localTranslationEnglishMessages} from './localTranslation';
 
 export const enUSMessages = {
@@ -22,6 +23,7 @@ export const enUSMessages = {
     "settings.excludedLanguages.clear": "Clear selection",
     "settings.excludedLanguages.hint": "Saved automatically for the next translation session. Short text or text with an uncertain language may still be translated.",
     ...localTtsEnglishMessages,
+    ...translationStatsEnglishMessages,
     "settings.services.library.freeReady": "No API key needed. Available free services are selected automatically.",
     "settings.services.library.keepOne": "Keep at least one service enabled.",
     "settings.services.library.memoryEmail": "MyMemory contact email (optional)",

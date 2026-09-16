@@ -395,6 +395,20 @@ node scripts/testing/run-model-usage-ui-test.cjs \
 
 该专项不替代完整设置中心与其他翻译功能的浏览器回归。
 
+## 翻译统计界面
+
+翻译统计的生产扩展回归同样使用临时 Edge profile 与防抢焦点 helper：
+
+```bash
+node scripts/testing/run-translation-stats-ui-test.cjs \
+  --extension-dir .output/chrome-mv3 \
+  --playwright-root <path> \
+  --focus-safe-helper <path> \
+  --artifacts-dir /private/tmp/fluentread-translation-stats-ui
+```
+
+脚本启动本地 DeepLX 与 OpenAI 兼容夹具，从设置页经真实 runtime 消息发起单条、缓存命中、429 限流、并发复用、AI 单条、批量与部分缓存请求，再验证面板概览（成功率、复用率、平均与最长耗时）、服务表现排序、失败原因、请求记录的来源/状态筛选与最慢排序、服务与今日筛选、趋势指标切换、1440/1024/820/390 与深色布局、英文界面无中文残留，以及清除确认后三张统计表清空。免费链会请求公共接口，因此线路表使用写入本次临时 profile 的线路汇总夹具，验证线路排序与无成功尝试线路的排位。报告同时检查统计库只含数值与标识字段、窗口位置、前台应用和控制台错误。夹具耗时只用于构造分布，不代表真实服务速度。
+
 ## 简体与繁体中文回归
 
 `tests/chineseLanguage.test.ts` 覆盖语言别名、显式脚本优先、共享字和简繁混排；中文语境由明确字形或短语确认，常用中性汉字无需逐字白名单，简繁冲突由人工常用字表与 Unicode 17.0.0 Unihan 单向变体数据共同检查。截图评论语料位于 `tests/fixtures/chinese-language-posts.json`，覆盖普通中文、`OpenAI`/`CoT` 嵌入、同目标跳过和跨语言保留；完整外语、短混排与未确认的罕见字仍允许翻译。供应商协议矩阵、旧配置迁移、术语隔离和并发缓存分别由 `chineseTranslationProviders`、配置测试、`glossary`、`translationBroker` 与 `translationCache` 测试覆盖。

@@ -11,6 +11,7 @@ import {legacyTextOverrides} from './legacy-overrides';
 import {createLegacyCorrectionText} from './legacy-corrections';
 import {createRuntimeFeedbackLegacyText} from './runtime-feedback';
 import {localTtsKoreanMessages} from './localTts';
+import {translationStatsKoreanMessages} from './translationStats';
 import {localTranslationKoreanMessages} from './localTranslation';
 
 export const koKRMessages = {
@@ -21,6 +22,7 @@ export const koKRMessages = {
     "settings.excludedLanguages.clear": "선택 지우기",
     "settings.excludedLanguages.hint": "자동 저장되며 다음 번역부터 적용됩니다. 짧거나 언어를 판별할 수 없는 텍스트는 번역될 수 있습니다.",
     ...localTtsKoreanMessages,
+    ...translationStatsKoreanMessages,
     "settings.services.library.freeReady": "API 키 없이 사용 가능한 무료 서비스를 자동으로 선택합니다.",
     "settings.services.library.keepOne": "서비스를 하나 이상 활성화해 두세요.",
     "settings.services.library.memoryEmail": "MyMemory 연락처 이메일(선택 사항)",

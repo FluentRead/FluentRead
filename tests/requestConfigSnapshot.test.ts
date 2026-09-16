@@ -11,8 +11,11 @@ import {
     createTranslationProviderConfigSnapshot,
     getTranslationProviderConfig,
     getTranslationRequestControl,
+    attachTranslationRouteObserver,
     reportTranslationModelUsage,
     reportTranslationModelUsageFailure,
+    reportTranslationRoute,
+    TRANSLATION_ROUTE_OBSERVER,
     getTranslationGlossaryTerms,
     getTranslationGlossarySourceText,
 } from '@/src/services/translation/requestSnapshot';
@@ -273,6 +276,27 @@ describe('translation provider request config snapshot', () => {
             signal: controller.signal,
             ownershipKey: '  ',
         })).toThrow('ownershipKey');
+    });
+
+    it('keeps route observers process-local and isolates observer failures', () => {
+        const observer = vi.fn();
+        const message = attachTranslationRouteObserver({origin: 'hello'}, observer);
+        const observation = {route: 'microsoft', outcome: 'success' as const, durationMs: 120, chars: 5};
+
+        expect(message[TRANSLATION_ROUTE_OBSERVER]).toBe(observer);
+        expect(JSON.stringify(message)).toBe('{"origin":"hello"}');
+        reportTranslationRoute(message, observation);
+        expect(observer).toHaveBeenCalledWith(observation);
+
+        reportTranslationRoute(null, observation);
+        reportTranslationRoute('not-an-object', observation);
+        reportTranslationRoute({}, observation);
+        expect(observer).toHaveBeenCalledOnce();
+
+        const throwingMessage = attachTranslationRouteObserver({origin: 'safe'}, () => {
+            throw new Error('route telemetry failed');
+        });
+        expect(() => reportTranslationRoute(throwingMessage, observation)).not.toThrow();
     });
 
     it('keeps model usage observers process-local and isolates observer failures', () => {

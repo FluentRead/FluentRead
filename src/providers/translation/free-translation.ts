@@ -1,7 +1,7 @@
 /**
  * @file src/providers/translation/free-translation.ts
  * 文件职责：按冻结的用户设置编排免费翻译，并接入有界请求、取消和跨段冷却。
- * 主要内容：装配免密钥服务、冻结匿名请求配置与批量预算，并生成匿名连接身份。
+ * 主要内容：装配免密钥服务、冻结匿名请求配置与批量预算，生成匿名连接身份，并把每次线路尝试的结果与耗时上报给调用方观察器。
  * 模块边界：只装配已有 provider；健康状态与并发调度由 freeFallback 服务持有。
  */
 import sha256 from 'crypto-js/sha256';
@@ -31,6 +31,7 @@ import {
     attachTranslationProviderConfig,
     createTranslationProviderConfigSnapshot,
     getTranslationProviderConfig,
+    reportTranslationRoute,
     type TranslationProviderRequest,
 } from '@/src/services/translation/requestSnapshot';
 import type {TranslationProviderConfigSnapshot} from '@/src/services/translation/types';
@@ -115,12 +116,18 @@ export async function getFreeTranslationWeightSnapshot(now = Date.now()): Promis
     return calculateFreeTranslationWeightSnapshot(enabledProviderIds, health, now);
 }
 
-function candidatesFor(text: string, message: PreparedRequest): FreeFallbackCandidate[] {
+function candidatesFor(text: string, message: PreparedRequest): {
+    candidates: FreeFallbackCandidate[];
+    routeByIdentity: Map<string, string>;
+} {
     const current = getTranslationProviderConfig(message, config);
-    return normalizeFreeTranslationOrder(current.freeTranslationOrder).map(id => {
+    const routeByIdentity = new Map<string, string>();
+    const candidates = normalizeFreeTranslationOrder(current.freeTranslationOrder).map(id => {
         const provider = FREE_TRANSLATION_PROVIDERS.find(item => item.id === id)!;
+        const identity = providerIdentity(id, current);
+        routeByIdentity.set(identity, id);
         return {
-            identity: providerIdentity(id, current),
+            identity,
             label: provider.label,
             weight: provider.defaultWeight,
             maxConcurrency: id === 'microsoft' ? 2 : 1,
@@ -130,13 +137,22 @@ function candidatesFor(text: string, message: PreparedRequest): FreeFallbackCand
             }),
         };
     });
+    return {candidates, routeByIdentity};
 }
 
 async function translatePreparedText(text: string, message: PreparedRequest): Promise<string> {
     if (typeof text !== 'string') throw new Error('免费翻译服务仅支持文本输入');
     const current = getTranslationProviderConfig(message, config);
-    return runFallback(candidatesFor(text, message), {
+    const {candidates, routeByIdentity} = candidatesFor(text, message);
+    return runFallback(candidates, {
         signal: message.abortSignal,
+        // 每条线路的真实表现只按标识与耗时上报，供设置页比较免费服务。
+        onAttempt: attempt => reportTranslationRoute(message, {
+            route: routeByIdentity.get(attempt.identity)!,
+            outcome: attempt.outcome,
+            durationMs: attempt.durationMs,
+            chars: text.length,
+        }),
         timeoutMs: normalizeFreeTranslationTimeoutMs(current.freeTranslationTimeoutMs),
         cooldownMs: normalizeFreeTranslationCooldownMs(current.freeTranslationCooldownMs),
         mode: normalizeFreeTranslationMode(current.freeTranslationMode),

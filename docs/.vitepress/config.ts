@@ -45,6 +45,7 @@ const guide = (en = false) => {
           '/guide/custom-hotkey'
         ),
         item('网站阅读范围', 'Website reading area', '/config/site-adaptation'),
+        item('翻译统计', 'Translation statistics', '/guide/translation-stats'),
         item('模型用量', 'AI usage', '/guide/model-usage'),
         item(
           'Chrome 本地翻译',

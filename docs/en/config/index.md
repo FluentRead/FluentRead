@@ -42,4 +42,4 @@ Webpages, documents, subtitles, and the reading card can use different services.
 
 Before changing browsers or uninstalling, save the configuration and learning data you want through backup and restore. Backups may contain credentials and saved text.
 
-Translation cache settings let you view and clear recent results. Clearing that cache does not delete learning collections. See [AI usage](/en/guide/model-usage) for request statistics.
+Translation cache settings let you view and clear recent results. Clearing that cache does not delete learning collections. See [Translation statistics](/en/guide/translation-stats) for request size, duration, and service performance, and [AI usage](/en/guide/model-usage) for token use.

@@ -2,7 +2,7 @@
  * @file src/services/translation/requestSnapshot.ts
  *
  * 文件职责：在翻译消息上附加只读 provider 配置快照，消除异步缓存读取期间全局配置变化造成的请求身份错配。
- * 主要内容：定义配置快照、剩余预算、内部取消与可信术语来源 symbol，冻结术语规则并从完整文本槽协议恢复纯匹配原文，供后台 broker 安全传递进程内状态。
+ * 主要内容：定义配置快照、剩余预算、内部取消、线路观察与可信术语来源 symbol，冻结术语规则并从完整文本槽协议恢复纯匹配原文，供后台 broker 安全传递进程内状态。
  * 模块边界：本文件位于翻译 application service 层，负责用例编排和端口契约；不挂载页面 UI，且不应把某家供应商的网络细节扩散到 feature，具体 HTTP 协议由 providers/platform 实现。
  */
 
@@ -25,6 +25,7 @@ import type {TranslationRequestScheduler, TranslationRequestIdentity} from './re
 export const TRANSLATION_PROVIDER_CONFIG = Symbol('fluentread.translation-provider-config');
 export const TRANSLATION_REMAINING_BUDGET = Symbol('fluentread.translation-remaining-budget');
 export const TRANSLATION_MODEL_USAGE_OBSERVER = Symbol('fluentread.translation-model-usage-observer');
+export const TRANSLATION_ROUTE_OBSERVER = Symbol('fluentread.translation-route-observer');
 export const TRANSLATION_REQUEST_CONTROL = Symbol('fluentread.translation-request-control');
 export const TRANSLATION_REQUEST_SCHEDULER = Symbol('fluentread.translation-scheduler');
 export const TRANSLATION_GLOSSARY_CONTEXT = Symbol('fluentread.translation-glossary-context');
@@ -107,6 +108,16 @@ export function getTranslationGlossaryTerms(current: TranslationProviderConfigSn
 
 export type TranslationModelUsageObserver = (observation: TranslationModelUsageObservation) => void;
 
+/** 免费翻译链等内部多线路 provider 对单次线路尝试的无文本观察。 */
+export interface TranslationRouteObservation {
+    readonly route: string;
+    readonly outcome: TranslationRouteOutcome;
+    readonly durationMs: number;
+    readonly chars: number;
+}
+export type TranslationRouteOutcome = 'success' | 'error' | 'timeout' | 'cancelled';
+export type TranslationRouteObserver = (observation: TranslationRouteObservation) => void;
+
 export type TranslationRemainingBudgetContext = {
     readonly [TRANSLATION_REMAINING_BUDGET]?: true;
 };
@@ -124,6 +135,7 @@ export type TranslationRequestControlContext = {
 export type TranslationProviderRequestContext = {
     readonly [TRANSLATION_PROVIDER_CONFIG]?: TranslationProviderConfigSnapshot;
     readonly [TRANSLATION_MODEL_USAGE_OBSERVER]?: TranslationModelUsageObserver;
+    readonly [TRANSLATION_ROUTE_OBSERVER]?: TranslationRouteObserver;
     /** 仅由 broker 在后台注入；provider 必须向底层 transport 继续传递。 */
     readonly abortSignal?: AbortSignal;
     /** 后台注入的共享调度器；provider 仅用于真实 HTTP attempt，不取得嵌套并发槽。 */
@@ -173,6 +185,26 @@ export function attachTranslationModelUsageObserver<T extends object>(
     observer: TranslationModelUsageObserver,
 ): T & TranslationProviderRequestContext {
     return Object.assign(message, {[TRANSLATION_MODEL_USAGE_OBSERVER]: observer});
+}
+
+/** 把线路观察器附到 provider 请求；symbol 不会通过 runtime 或 JSON 越过边界。 */
+export function attachTranslationRouteObserver<T extends object>(
+    message: T,
+    observer: TranslationRouteObserver,
+): T & TranslationProviderRequestContext {
+    return Object.assign(message, {[TRANSLATION_ROUTE_OBSERVER]: observer});
+}
+
+/** 只交付线路标识与数值；与用量观察一样，统计旁路不得影响翻译结果。 */
+export function reportTranslationRoute(message: unknown, observation: TranslationRouteObservation): void {
+    if (!message || typeof message !== 'object') return;
+    const observer = (message as TranslationProviderRequestContext)[TRANSLATION_ROUTE_OBSERVER];
+    if (!observer) return;
+    try {
+        observer(observation);
+    } catch {
+        // 线路观察器是旁路，不允许反向影响免费链的回退决策。
+    }
 }
 
 /** Provider 直调时没有观察器；统计旁路也绝不能让正常翻译失败。 */

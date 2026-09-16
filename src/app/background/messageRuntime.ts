@@ -1,7 +1,7 @@
 /**
  * @file src/app/background/messageRuntime.ts
  * 文件职责：构建并安装后台消息总运行时，把配置、翻译、OCR、TTS、生词本和标签页状态等公开 handler 连接到 browser.runtime。
- * 主要内容：创建图片 OCR 语言仓库和能力门控传输，绑定图片与圈选事务的真实页面及术语版本；注入配置、翻译、模型用量和词典依赖，注册类型化 router 并管理响应与错误。
+ * 主要内容：创建图片 OCR 语言仓库和能力门控传输，绑定图片与圈选事务的真实页面及术语版本；注入配置、翻译、本机统计（模型用量与翻译统计）和词典依赖，注册类型化 router 并管理响应与错误。
  * 模块边界：本文件是 composition root，只决定依赖装配和监听生命周期，不实现各 feature 的业务算法、provider 协议或存储事务；具体实现均来自 features、services、providers 与 platform。
  */
 import {formatConnectionTestError, runTranslationServiceConnectionTestWithUsage} from './providerRuntime';
@@ -23,7 +23,7 @@ import {
 } from './handlers/fullPageTranslationState';
 import {createImageOcrLanguageRepository, createImageTranslationBackgroundHandlers} from './handlers/imageTranslation';
 import {createInputBoxTranslationHandler} from './handlers/inputTranslation';
-import {createModelUsageHandler} from './handlers/modelUsage';
+import {createLocalInsightsHandlers} from './localInsightsHandlers';
 import {createFreeTranslationWeightsHandler} from './handlers/freeTranslationWeights';
 import {createOpenOptionsPageHandler} from './handlers/openOptions';
 import {createTranslationCancelHandler, createTranslationRequestFallback, createTranslationRequestRegistry} from './handlers/translation';
@@ -38,7 +38,6 @@ import {selectionTtsOffscreenAdapter} from '@/src/features/selection-translation
 import {createCapabilityGatedBackgroundHandlers, createCapabilityGatedSelectionTtsTransport} from './capabilityRegistry';
 import {createConfigBackgroundHandlers} from './configMessageHandlers';
 import {createConfigImageOcrLanguageStorage, installBrowserConfigStorageBroadcast} from './configStorageRuntime';
-import {modelUsageRepository} from '@/src/platform/storage/modelUsageRepository';
 import {releaseVideoSubtitleOwnerForTab} from '@/src/features/video-subtitle/background/handlers';
 import {createVideoSubtitleBackgroundRuntime} from '@/src/features/video-subtitle/background/runtime';
 import {createLocalTranslationBackgroundRuntime} from '@/src/features/local-translation/background/runtime';
@@ -86,7 +85,7 @@ export function installBackgroundMessageRuntime(options: BackgroundMessageRuntim
             sendTabMessage: (tabId, message) => browser.tabs.sendMessage(tabId, message),
             warn: (message, error) => console.warn(message, error),
         })),
-        createModelUsageHandler(modelUsageRepository, (url) => url.startsWith(browser.runtime.getURL('/options.html'))),
+        ...createLocalInsightsHandlers<BackgroundRuntimeContext>((url) => url.startsWith(browser.runtime.getURL('/options.html'))),
         createFreeTranslationWeightsHandler({
             ready: configReady,
             getSnapshot: getFreeTranslationWeightSnapshot,

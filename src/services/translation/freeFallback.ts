@@ -1,7 +1,7 @@
 /**
  * @file src/services/translation/freeFallback.ts
  * 文件职责：在健康免费服务间加权均衡并自动回退，持久遵守各类错误的恢复窗口。
- * 主要内容：协调总预算、单次超时、服务并发与间隔、错误退避、恢复单探测、持久化及取消代际保护。
+ * 主要内容：协调总预算、单次超时、服务并发与间隔、错误退避、恢复单探测、持久化、取消代际保护，并向调用方旁路上报每次线路尝试的结果与耗时。
  * 模块边界：只接收匿名身份、provider 回调和注入的存储端口；不读取用户配置或供应商凭据。
  */
 import {abortErrorFromSignal} from '@/src/platform/http/runtime';
@@ -20,8 +20,16 @@ export interface FreeFallbackCandidate {
     readonly minIntervalMs?: number;
     readonly translate: (signal: AbortSignal) => Promise<unknown>;
 }
+export type FreeFallbackAttemptOutcome = 'success' | 'error' | 'timeout' | 'cancelled';
+export interface FreeFallbackAttempt {
+    readonly identity: string;
+    readonly outcome: FreeFallbackAttemptOutcome;
+    readonly durationMs: number;
+}
 export interface FreeFallbackOptions {
     readonly signal?: AbortSignal;
+    /** 每次真实线路尝试结束后的旁路观察；只接收身份、结果和耗时。 */
+    readonly onAttempt?: (attempt: FreeFallbackAttempt) => void;
     readonly timeoutMs: number;
     readonly cooldownMs: number;
     readonly mode?: 'balanced' | 'sequential';
@@ -59,6 +67,11 @@ interface Health {
     performance?: FreeProviderPerformance;
 }
 class AttemptTimeoutError extends Error { constructor() { super('请求超时'); } }
+
+function attemptOutcome(error: unknown, signal?: AbortSignal): FreeFallbackAttemptOutcome {
+    if (signal?.aborted || (error instanceof Error && error.name === 'AbortError')) return 'cancelled';
+    return error instanceof AttemptTimeoutError ? 'timeout' : 'error';
+}
 class InvalidTranslationError extends Error { constructor() { super('未返回有效译文'); } }
 
 function safeFailure(error: unknown): string {
@@ -258,6 +271,7 @@ export function createFreeFallbackRunner(maxConcurrency = 3, dependencies: FreeF
                 const startedAt = Date.now();
                 try {
                     const result = await runAttempt(candidate, Math.min(options.timeoutMs, remaining), options.signal);
+                    options.onAttempt?.({identity: candidate.identity, outcome: 'success', durationMs: Date.now() - startedAt});
                     if (options.signal?.aborted) throw abortErrorFromSignal(options.signal);
                     state.generation += 1;
                     state.retryAt = 0;
@@ -267,6 +281,7 @@ export function createFreeFallbackRunner(maxConcurrency = 3, dependencies: FreeF
                     if (options.signal?.aborted) throw abortErrorFromSignal(options.signal);
                     return result;
                 } catch (error) {
+                    options.onAttempt?.({identity: candidate.identity, outcome: attemptOutcome(error, options.signal), durationMs: Date.now() - startedAt});
                     if (options.signal?.aborted) throw abortErrorFromSignal(options.signal);
                     if (error instanceof Error && error.name === 'AbortError') throw error;
                     if (error instanceof AttemptTimeoutError && remaining < options.timeoutMs && Date.now() >= deadline) throw error;

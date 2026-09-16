@@ -1,5 +1,5 @@
 import {afterEach, beforeEach, describe, expect, it, vi} from 'vitest';
-import {createFreeFallbackRunner, type FreeFallbackCandidate} from '@/src/services/translation/freeFallback';
+import {createFreeFallbackRunner, type FreeFallbackAttempt, type FreeFallbackCandidate} from '@/src/services/translation/freeFallback';
 
 const options = {timeoutMs: 100, cooldownMs: 1_000};
 const failure = (statusCode: number) => Object.assign(new Error('secret text https://secret.example/?key=hidden'), {statusCode});
@@ -30,6 +30,42 @@ describe('free provider fallback coordinator', () => {
         await expect(request).resolves.toBe('译:second');
         expect(signal.aborted).toBe(true);
         expect(second.translate).toHaveBeenCalledOnce();
+    });
+
+    it('逐次线路尝试按成功、失败、超时和取消上报身份与耗时', async () => {
+        const attempts: FreeFallbackAttempt[] = [];
+        const onAttempt = (attempt: FreeFallbackAttempt) => attempts.push(attempt);
+
+        const failing = createFreeFallbackRunner(3, {random: () => 0});
+        await expect(failing([
+            candidate('first', vi.fn().mockRejectedValue(failure(500))),
+            candidate('second'),
+        ], {...options, onAttempt})).resolves.toBe('译:second');
+
+        const timing = createFreeFallbackRunner(3, {random: () => 0});
+        const pendingRequest = timing([
+            candidate('slow', vi.fn(() => new Promise(() => {}))),
+            candidate('quick'),
+        ], {...options, onAttempt});
+        await flush();
+        await vi.advanceTimersByTimeAsync(100);
+        await expect(pendingRequest).resolves.toBe('译:quick');
+
+        const cancelling = createFreeFallbackRunner(3, {random: () => 0});
+        const controller = new AbortController();
+        const cancelled = cancelling([candidate('cancelled', vi.fn(() => new Promise(() => {})))], {...options, onAttempt, signal: controller.signal});
+        const rejection = expect(cancelled).rejects.toThrow('用户取消');
+        await flush();
+        controller.abort(new Error('用户取消'));
+        await rejection;
+
+        expect(attempts).toEqual([
+            {identity: 'first', outcome: 'error', durationMs: expect.any(Number)},
+            {identity: 'second', outcome: 'success', durationMs: expect.any(Number)},
+            {identity: 'slow', outcome: 'timeout', durationMs: 100},
+            {identity: 'quick', outcome: 'success', durationMs: expect.any(Number)},
+            {identity: 'cancelled', outcome: 'cancelled', durationMs: expect.any(Number)},
+        ]);
     });
 
     it('429 后跨段跳过冷却服务，到期仅探测一次，成功恢复正常优先级', async () => {

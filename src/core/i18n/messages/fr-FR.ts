@@ -11,6 +11,7 @@ import {legacyTextOverrides} from './legacy-overrides';
 import {createLegacyCorrectionText} from './legacy-corrections';
 import {createRuntimeFeedbackLegacyText} from './runtime-feedback';
 import {localTtsFrenchMessages} from './localTts';
+import {translationStatsFrenchMessages} from './translationStats';
 import {localTranslationFrenchMessages} from './localTranslation';
 
 export const frFRMessages = {
@@ -21,6 +22,7 @@ export const frFRMessages = {
     "settings.excludedLanguages.clear": "Effacer la sélection",
     "settings.excludedLanguages.hint": "Enregistré automatiquement pour la prochaine traduction. Les textes courts ou dont la langue est incertaine peuvent être traduits.",
     ...localTtsFrenchMessages,
+    ...translationStatsFrenchMessages,
     "settings.services.library.freeReady": "Aucune clé API requise. Les services gratuits disponibles sont sélectionnés automatiquement.",
     "settings.services.library.keepOne": "Gardez au moins un service activé.",
     "settings.services.library.memoryEmail": "Adresse e-mail MyMemory (facultatif)",

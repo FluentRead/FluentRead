@@ -11,6 +11,7 @@ import {legacyTextOverrides} from './legacy-overrides';
 import {createLegacyCorrectionText} from './legacy-corrections';
 import {createRuntimeFeedbackLegacyText} from './runtime-feedback';
 import {localTtsJapaneseMessages} from './localTts';
+import {translationStatsJapaneseMessages} from './translationStats';
 import {localTranslationJapaneseMessages} from './localTranslation';
 
 export const jaJPMessages = {
@@ -21,6 +22,7 @@ export const jaJPMessages = {
     "settings.excludedLanguages.clear": "選択を解除",
     "settings.excludedLanguages.hint": "自動保存され、次回の翻訳から適用されます。短い文章や言語を判別できない内容は翻訳される場合があります。",
     ...localTtsJapaneseMessages,
+    ...translationStatsJapaneseMessages,
     "settings.services.library.freeReady": "API キーは不要です。利用可能な無料サービスを自動で選択します。",
     "settings.services.library.keepOne": "少なくとも1つのサービスを有効にしてください。",
     "settings.services.library.memoryEmail": "MyMemory 連絡先メール（任意）",

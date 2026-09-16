@@ -2,7 +2,7 @@
  * @file src/services/translation/types.ts
  *
  * 文件职责：定义翻译 broker、缓存和 provider 之间的端口与消息契约，约束单条、批量、语言和配置快照的数据形状。
- * 主要内容：包含 TranslationRequestMessage、runtime 请求/取消协议、ProviderRegistry、CachePort、ConfigSnapshot、ProviderConfigFields 及 BrokerDependencies/Broker 等接口，并允许 Chrome 内置翻译携带不含结构哨兵的源语言检测样本，为依赖注入和测试替身提供稳定边界。 可核对的公开符号包括 TranslationRequestMessageBase、TranslationRuntimeRequestMessage、TranslationCancelMessage、TranslationProvider、TranslationProviderRegistry、TranslationLanguageOverride、TranslationLanguages。
+ * 主要内容：包含 TranslationRequestMessage、runtime 请求/取消协议、ProviderRegistry、CachePort、ConfigSnapshot、ProviderConfigFields 及含模型用量与翻译统计端口的 BrokerDependencies/Broker 等接口，并允许 Chrome 内置翻译携带不含结构哨兵的源语言检测样本，为依赖注入和测试替身提供稳定边界。 可核对的公开符号包括 TranslationRequestMessageBase、TranslationRuntimeRequestMessage、TranslationCancelMessage、TranslationProvider、TranslationProviderRegistry、TranslationLanguageOverride、TranslationLanguages。
  * 模块边界：本文件位于翻译 application service 层，负责用例编排和端口契约；不挂载页面 UI，且不应把某家供应商的网络细节扩散到 feature，具体 HTTP 协议由 providers/platform 实现。
  */
 
@@ -10,6 +10,7 @@ import type {CustomOpenAIProvider} from '@/src/core/config/customOpenAI';
 import type {DeepLApiPlan} from '@/src/core/config/deepl';
 import type {ModelThinkingMapping} from '@/src/core/config/modelThinking';
 import type {GlossaryLibrary} from '@/src/core/glossary';
+import type {TranslationRequestStatsEvent} from '@/src/services/translation-stats/types';
 
 export type TranslationGlossaryContext = 'page' | 'document' | 'video';
 export interface TranslationGlossaryTerm {
@@ -250,6 +251,10 @@ export interface TranslationBrokerDependencies {
         events: readonly TranslationModelUsageRecord[],
         generation: number,
     ) => Promise<void>;
+    /** 请求开始时捕获翻译统计代次，清除统计后才结束的旧请求不会写回。 */
+    captureTranslationStatsGeneration?: () => number;
+    /** 翻译请求结束后同步交付统计事件；实现方自行缓冲写入，不能阻塞或改变翻译结果。 */
+    recordTranslationRequest?: (event: TranslationRequestStatsEvent, generation: number) => void;
     /** 响应前等待本地缓存和用量写入的最长宽限期；主要供测试和受限运行时注入。 */
     persistenceGraceMs?: number;
     now?: () => number;

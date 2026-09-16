@@ -635,6 +635,11 @@
       </SettingsGroup>
     </section>
 
+    <TranslationStatsDashboard
+      v-if="hasVisitedSection('settings-translation-stats')"
+      v-show="props.activeSection === 'settings-translation-stats'"
+      :active="props.activeSection === 'settings-translation-stats'"
+    />
     <ModelUsageDashboard
       v-if="hasVisitedSection('settings-model-usage')"
       v-show="props.activeSection === 'settings-model-usage'"
@@ -759,6 +764,7 @@ const VideoLocalModelSettings = defineAsyncComponent(() => import('./VideoLocalM
 const LocalTtsSettings = defineAsyncComponent(() => import('./LocalTtsSettings.vue'));
 const VideoSubtitleAppearanceSettings = defineAsyncComponent(() => import('./VideoSubtitleAppearanceSettings.vue'));
 const ModelUsageDashboard = defineAsyncComponent(() => import('@/src/features/model-usage/public').then(module => module.ModelUsageDashboard));
+const TranslationStatsDashboard = defineAsyncComponent(() => import('@/src/features/translation-stats/public').then(module => module.TranslationStatsDashboard));
 const InterfaceSettings = defineAsyncComponent(() => import('./InterfaceSettings.vue'));
 const AreaTranslationSettings = defineAsyncComponent(() => import('./AreaTranslationSettings.vue'));
 const InputTranslationSettings = defineAsyncComponent(() => import('./InputTranslationSettings.vue'));

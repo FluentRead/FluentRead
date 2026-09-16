@@ -34,7 +34,7 @@ describe('options navigation view-model', () => {
       },
       {
         label: '工具与学习',
-        items: ['settings-writing', 'settings-translation-center', 'settings-vocabulary', 'settings-glossary', 'settings-model-usage'],
+        items: ['settings-writing', 'settings-translation-center', 'settings-vocabulary', 'settings-glossary', 'settings-translation-stats', 'settings-model-usage'],
       },
       {
         label: '系统与数据',
@@ -55,6 +55,7 @@ describe('options navigation view-model', () => {
       '翻译中心',
       '学习中心',
       '术语库',
+      '翻译统计',
       '模型用量',
       '高级选项',
       '备份与恢复',
@@ -75,6 +76,8 @@ describe('options navigation view-model', () => {
     expect(resolveNavigationItem('settings-glossary').group).toBe('工具与学习')
     expect(resolveNavigationItem('settings-model-usage').detail)
       .toBe('查看发起的大模型调用、Token 消耗与使用趋势。')
+    expect(resolveRequestedSection('#settings-translation-stats')).toBe('settings-translation-stats')
+    expect(resolveNavigationItem('settings-translation-stats')).toMatchObject({group: '工具与学习', title: '翻译统计'})
     expect(resolveRequestedSection('#settings-harness')).toBe('settings-harness')
     expect(resolveNavigationItem('settings-harness').group).toBe('专项翻译')
     expect(resolveNavigationItem('settings-vocabulary').title).toBe('学习中心')
@@ -137,6 +140,11 @@ describe('options navigation view-model', () => {
     expect(filterNavigationItems('Token')).toEqual(expect.arrayContaining([
       expect.objectContaining({ id: 'settings-model-usage' }),
     ]))
+    for (const keyword of ['翻译统计', '平均耗时', '最长耗时', 'P95', '请求规模']) {
+      expect(filterNavigationItems(keyword)).toEqual(expect.arrayContaining([
+        expect.objectContaining({ id: 'settings-translation-stats' }),
+      ]))
+    }
     expect(filterNavigationItems('备份与恢复')).toEqual([
       expect.objectContaining({ id: 'settings-data' }),
     ])

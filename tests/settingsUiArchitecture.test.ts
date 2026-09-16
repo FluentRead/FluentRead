@@ -186,7 +186,7 @@ describe('options UI composition architecture', () => {
     expect(sections).toContain('if (attempts < 20) window.requestAnimationFrame(scrollWhenMounted)')
     for (const component of [
       'ServiceCatalog', 'ServiceConfiguration', 'InterfaceSettings', 'VideoLocalModelSettings',
-      'LocalTtsSettings', 'ModelUsageDashboard', 'ConfigManagement', 'TranslationCenter',
+      'LocalTtsSettings', 'ModelUsageDashboard', 'TranslationStatsDashboard', 'ConfigManagement', 'TranslationCenter',
     ]) {
       expect(sections).toContain(`const ${component} = defineAsyncComponent(`)
     }
@@ -216,6 +216,29 @@ describe('options UI composition architecture', () => {
   it('keeps the WXT popup entrypoint as a thin app composition shell', () => {
     const entrypoint = sourceBody('entrypoints/popup/main.ts')
     expect(entrypoint).toBe("import {mountPopupApp} from '@/src/app/popup';\n\nmountPopupApp('#app');\n")
+  })
+
+  it('mounts translation statistics lazily and keeps its copy in message keys', () => {
+    const settingsSections = source('src/features/settings/ui/SettingsSections.vue')
+    const statsPublic = source('src/features/translation-stats/public.ts')
+    const dashboard = source('src/features/translation-stats/ui/TranslationStatsDashboard.vue')
+    const dashboardBody = dashboard.replace(/^<!--[\s\S]*?-->\s*/u, '')
+
+    expect(settingsSections).toContain("const TranslationStatsDashboard = defineAsyncComponent(() => import('@/src/features/translation-stats/public').then(module => module.TranslationStatsDashboard))")
+    expect(settingsSections).toContain("v-if=\"hasVisitedSection('settings-translation-stats')\"")
+    expect(settingsSections).toContain(":active=\"props.activeSection === 'settings-translation-stats'\"")
+    expect(statsPublic).toContain("from './ui/TranslationStatsDashboard.vue'")
+    expect(dashboard).toContain('id="settings-translation-stats"')
+    expect(dashboard).toContain("type: 'translationStats'")
+    for (const action of ['query', 'list', 'reset']) expect(dashboard).toContain(`action: '${action}'`)
+    expect(dashboard).toContain('<style scoped src="./translation-stats-dashboard.css"></style>')
+    // 面板只经后台消息读取数值快照；界面文案全部走 message key，避免遗漏其他界面语言。
+    expect(dashboardBody).not.toMatch(/from 'dexie'|platform\/storage|indexedDB/u)
+    const template = dashboardBody.match(/^<template>([\s\S]*)<\/template>/u)?.[1] ?? ''
+    const script = dashboardBody.match(/<script setup lang="ts">([\s\S]*)<\/script>/u)?.[1] ?? ''
+    expect(template).toContain('stats-summary')
+    expect(template).not.toMatch(/[\u3400-\u9fff]/u)
+    expect(script).not.toMatch(/['"`][^'"`\n]*[\u3400-\u9fff][^'"`\n]*['"`]/u)
   })
 
   it('owns settings, feature UI and shared components in their target layers', () => {

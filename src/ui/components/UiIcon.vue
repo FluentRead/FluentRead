@@ -26,6 +26,7 @@ const paths: Record<string, string> = {
   'book': 'M12 6c-3-2-6-2-9-1v14c3-1 6-1 9 1 3-2 6-2 9-1V5c-3-1-6-1-9 1z M12 6v14',
   'glossary': 'M6 3h13v18H6a3 3 0 0 1 0-6h13 M3 18V6a3 3 0 0 1 3-3 M10 6v6l2-1 2 1V6',
   'chart': 'M4 3v17h17 M8 16v-5 M13 16V6 M18 16v-8',
+  'gauge': 'M3.5 17a9 9 0 1 1 17 0 M12 14l4-5 M12 14h.01 M7 17h10',
   'sliders': 'M4 6h4 M12 6h8 M4 12h9 M17 12h3 M4 18h2 M10 18h10 M8 3v6 M13 9v6 M6 15v6',
   'history': 'M7 8H3V4 M3 8a9 9 0 1 1 0 8 M12 7v5l3 2',
   'info': 'M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0z M12 11v6 M12 7h.01',

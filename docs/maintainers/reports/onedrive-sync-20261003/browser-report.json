@@ -1,0 +1,35 @@
+{
+  "ok": true,
+  "evidence": "production extension with synthetic OAuth and Graph; no live Microsoft or Google account",
+  "cases": [
+    "trusted config patch 1: ",
+    "opening settings does not authorize or contact either cloud",
+    "one cloud backup heading and only the selected provider are rendered",
+    "preview performs no write",
+    "preview identifies the selected Microsoft account",
+    "Microsoft token is excluded from encrypted config",
+    "trusted config patch 2: ",
+    "existing cloud requires explicit direction selection",
+    "preview never reveals service credentials",
+    "OneDrive restore preserves full service credentials through real storage",
+    "restore applies cloud settings through real configuration persistence",
+    "canceling a different account preserves the last successful account",
+    "switch and cancel do not modify either account backup",
+    "sync baseline is unavailable through the settings storage read proxy",
+    "Google sync does not change the OneDrive account record",
+    "reopening settings does not reconnect to cloud",
+    "trusted config patch 3: ",
+    "English card has no Chinese source copy",
+    "390px English dark settings have no horizontal overflow",
+    "English preview is fully localized",
+    "mobile preview keeps Cancel accessible",
+    "no options page errors"
+  ],
+  "screenshots": [
+    "../../onedrive-sync-assets/fluentread-onedrive-entry-fixture.png",
+    "../../onedrive-sync-assets/fluentread-onedrive-review-fixture.png"
+  ],
+  "consoleErrors": [],
+  "launchMode": "macos-background-cdp",
+  "focusPolicy": "launchservices-no-foreground"
+}

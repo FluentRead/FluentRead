@@ -61,7 +61,7 @@ flowchart TB
     J --> K[清除临时令牌和待确认状态]
 ```
 
-如果阅读器没有 Mermaid 插件，代码块仍保留完整流程；操作步骤与下方截图不依赖 Mermaid 才能理解。
+如果阅读器没有 Mermaid 插件，可打开[已渲染的授权流程 SVG](./onedrive-sync-assets/authorization-flow.svg)。原始 Mermaid 代码仍保留，便于后续修改。
 
 ## 4. 先准备什么？
 
@@ -207,6 +207,14 @@ pnpm build:firefox
 5. 恢复会替换本机设置与服务凭据；保存会替换云端配置。私密内容不会直接出现在差异列表。
 6. 确认后才修改配置或上传；“取消”结束本次操作。完成后显示上次成功同步账号与时间，不显示持续连接状态或退出登录按钮。
 
+下面是本次代码在隔离 Edge 扩展中的实际界面截图，使用虚构账号与模拟云盘响应，**不代表已经登录真实微软账号**。同一入口选择存储方式；记录只显示该方式上次成功同步的账号与时间。
+
+![统一云备份入口中选择 OneDrive，并查看上次同步账号](./onedrive-sync-assets/fluentread-onedrive-entry-fixture.png)
+
+恢复前显示方向、替换影响和差异入口；底部“恢复到本机”才执行操作，“取消”结束预览。
+
+![恢复确认：云端到本机的方向、影响提示和确认按钮](./onedrive-sync-assets/fluentread-onedrive-review-fixture.png)
+
 本次授权的内存缓存会清理，但微软账号在浏览器中的登录状态及已经授予应用的同意不会因此退出或撤销。每次点击仍重新进入账号选择；在 worker 休眠、令牌过期等情况下，确认阶段可能需要重新授权或重新预览。
 
 ```mermaid
@@ -233,6 +241,8 @@ sequenceDiagram
     BG-->>UI: 上次账号与成功时间
     BG->>BG: 清除临时状态和令牌
 ```
+
+[查看已渲染的同步时序 SVG](./onedrive-sync-assets/sync-sequence.svg)。
 
 ## 8. 安全与同步边界
 

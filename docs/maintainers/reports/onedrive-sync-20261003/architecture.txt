@@ -1,0 +1,125 @@
+
+ RUN  v2.1.9 /Users/thinkstu/Desktop/copy/FluentRead-onedrive-guide-20261003
+
+ ✓ tests/settingsUiArchitecture.test.ts (33 tests) 84ms
+ ❯ tests/architecture/verificationOwnership.test.ts (9 tests | 2 failed) 659ms
+   × repository verification ownership > 每个产品、构建和测试基础设施文件都有明确验证归属 6ms
+     → expected [ { …(2) } ] to deeply equal []
+   × repository verification ownership > src 中每个可执行非组装模块都进入四维 100% 覆盖率边界 447ms
+     → expected [ Array(8) ] to deeply equal []
+ ❯ tests/architecture/moduleBoundaries.test.ts (13 tests | 2 failed) 2535ms
+   ✓ architecture module boundaries > src 的静态依赖图不存在跨文件循环 906ms
+   ✓ architecture module boundaries > src 只能通过精确登记的 composition/browser/provider 迁移边界读取 entrypoints 702ms
+   ✓ architecture module boundaries > feature 不能跨目录读取另一个 feature 的内部实现 361ms
+   × architecture module boundaries > 文档 WXT 页面只通过 app public API 进入垂直功能切片 24ms
+     → expected [ …(2) ] to deeply equal [ '@/src/app/document-translation' ]
+   ✓ architecture module boundaries > 按需加载的大体积资源不得被扩展运行时代码静态引入 347ms
+   × architecture module boundaries > 历史巨型文件不得继续增长，后续迁移只降低债务上限 3ms
+     → expected [ { …(3) } ] to deeply equal []
+ ✓ tests/architecture/sourceFileHeaders.test.ts (749 tests) 218ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 4 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  tests/architecture/moduleBoundaries.test.ts > architecture module boundaries > 文档 WXT 页面只通过 app public API 进入垂直功能切片
+AssertionError: expected [ …(2) ] to deeply equal [ '@/src/app/document-translation' ]
+
+- Expected
++ Received
+
+  Array [
++   "@/src/services/translation/errors",
+    "@/src/app/document-translation",
+  ]
+
+ ❯ tests/architecture/moduleBoundaries.test.ts:372:35
+    370|             .filter((specifier) => specifier.startsWith('@/entrypoints…
+    371| 
+    372|         expect(documentUiImports).toEqual(['@/src/app/document-transla…
+       |                                   ^
+    373|         expect(featureEntrypointImports).toEqual([]);
+    374|     });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/4]⎯
+
+ FAIL  tests/architecture/moduleBoundaries.test.ts > architecture module boundaries > 历史巨型文件不得继续增长，后续迁移只降低债务上限
+AssertionError: expected [ { …(3) } ] to deeply equal []
+
+- Expected
++ Received
+
+- Array []
++ Array [
++   Object {
++     "ceiling": 277,
++     "lines": 282,
++     "path": "src/app/content/runtime.ts",
++   },
++ ]
+
+ ❯ tests/architecture/moduleBoundaries.test.ts:430:24
+    428|             .filter(({lines, ceiling}) => lines > ceiling);
+    429| 
+    430|         expect(growth).toEqual([]);
+       |                        ^
+    431|     });
+    432| });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/4]⎯
+
+ FAIL  tests/architecture/verificationOwnership.test.ts > repository verification ownership > 每个产品、构建和测试基础设施文件都有明确验证归属
+AssertionError: expected [ { …(2) } ] to deeply equal []
+
+- Expected
++ Received
+
+- Array []
++ Array [
++   Object {
++     "owners": Array [],
++     "path": "scripts/verify-brand-copy.mjs",
++   },
++ ]
+
+ ❯ tests/architecture/verificationOwnership.test.ts:319:25
+    317|     it('每个产品、构建和测试基础设施文件都有明确验证归属', () => {
+    318|         const unowned = ownership.filter(({owners}) => owners.length =…
+    319|         expect(unowned).toEqual([]);
+       |                         ^
+    320|     });
+    321| 
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/4]⎯
+
+ FAIL  tests/architecture/verificationOwnership.test.ts > repository verification ownership > src 中每个可执行非组装模块都进入四维 100% 覆盖率边界
+AssertionError: expected [ Array(8) ] to deeply equal []
+
+- Expected
++ Received
+
+- Array []
++ Array [
++   "src/core/config/shareCard.ts",
++   "src/core/i18n/messages/siteRules.ts",
++   "src/features/full-page-translation/content/excerpt.ts",
++   "src/features/share-card/content/runtime.ts",
++   "src/features/share-card/core.ts",
++   "src/features/share-card/export.ts",
++   "src/features/share-card/render.ts",
++   "src/features/share-card/themes.ts",
++ ]
+
+ ❯ tests/architecture/verificationOwnership.test.ts:328:27
+    326|             && !strictCoverage.has(path));
+    327| 
+    328|         expect(uncovered).toEqual([]);
+       |                           ^
+    329|     });
+    330| 
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[4/4]⎯
+
+ Test Files  2 failed | 2 passed (4)
+      Tests  4 failed | 800 passed (804)
+   Start at  16:23:38
+   Duration  4.64s (transform 81ms, setup 0ms, collect 609ms, tests 3.50s, environment 0ms, prepare 133ms)
+

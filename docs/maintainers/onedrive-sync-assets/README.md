@@ -12,3 +12,7 @@
 原图保留微软示例内容。annotated 文件通过 imagegen 加中文注释、编号、红框及箭头，逐张检查字段指向：注册第 3 种账号类型、Application (client) ID、Authentication、API permissions、SPA。标注图是教学示意，完整原图用于核对文字和示例值。不要从示例图复制 UUID、租户、应用名或默认选择。
 
 使用的标注要求：保留原始 UI 结构与字段；不伪造已填写、已选择或已通过授权的状态；新增白色边缘区域放置中文提示；红框与箭头指出真实操作位置。注册图提醒先留空回调，平台图选择 SPA，概览图明确 Client ID 与 Tenant ID 的区别。
+
+授权流程和同步时序 SVG 由教程中的 Mermaid 原文通过 Mermaid 12.1.0 渲染，未经过生成式编辑。
+
+`fluentread-onedrive-entry-fixture.png` 和 `fluentread-onedrive-review-fixture.png` 是隔离 Edge 中加载本项目 Chrome 生产构建后捕获的界面；账号为虚构 `example.invalid` 地址，微软授权及 Graph 响应由测试夹具模拟。它们展示实际 UI，不是实际微软注册或在线同步成功的证明。

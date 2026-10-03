@@ -7,6 +7,7 @@
  */
 import brandTaglines from './brand-taglines.json';
 import googleDriveText from './google-drive/ru-RU.json';
+import oneDriveText from './onedrive/ru-RU.json';
 import cloudBackupText from './cloud-backup/ru-RU.json';
 import type {
 enUSMessages} from './en-US';
@@ -23,6 +24,7 @@ export const ruRUMessages = {
     "settings.backup.fileDescription": "Файлы резервных копий содержат ключи API и другие личные данные и не зашифрованы. Храните их в безопасном месте и не публикуйте.",
     "settings.backup.restoreHint": "Выберите файл резервной копии FluentRead. Старые файлы JSON также можно восстановить.",
     ...googleDriveText.messages,
+    ...oneDriveText.messages,
     ...cloudBackupText.messages,
     "brand.tagline": brandTaglines['ru-RU'],
     "popup.translationCount": "Переводов: {count}",

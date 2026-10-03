@@ -8,6 +8,7 @@
  */
 import brandTaglines from './brand-taglines.json';
 import googleDriveText from './google-drive/en-US.json';
+import oneDriveText from './onedrive/en-US.json';
 import cloudBackupText from './cloud-backup/en-US.json';
 import type {
 MessageCatalog} from '../types';
@@ -24,6 +25,7 @@ export const enUSMessages = {
     "settings.backup.fileDescription": "Backup files include API keys and other private information and are not encrypted. Keep them safe and do not share them publicly.",
     "settings.backup.restoreHint": "Choose a FluentRead backup file. Older JSON files can also be restored.",
     ...googleDriveText.messages,
+    ...oneDriveText.messages,
     ...cloudBackupText.messages,
     "brand.tagline": brandTaglines['en-US'],
     "popup.translationCount": "{count} translations",

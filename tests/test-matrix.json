@@ -322,7 +322,9 @@
       "tests/webDavConnection.test.ts",
       "tests/webDavApi.test.ts",
       "tests/backgroundWebDavBackup.test.ts",
-      "tests/webDavBackupClient.test.ts"
+      "tests/webDavBackupClient.test.ts",
+      "tests/oneDriveAuth.test.ts",
+      "tests/oneDriveApi.test.ts"
     ],
     "functional": [
       "tests/translationCenterComponent.test.ts",

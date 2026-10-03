@@ -2,7 +2,7 @@
 
 Updated: October 3, 2026.
 
-This policy describes how the FluentRead browser extension handles translation content, local records, service credentials, and optional Google Drive / WebDAV cloud configuration backups. FluentRead is a bilingual translation and reading-assistance tool maintained by its open-source project contributors. The website and this policy are publicly accessible without signing in. Translation does not require connecting a Google account.
+This policy describes how the FluentRead browser extension handles translation content, local records, service credentials, and optional Google Drive / OneDrive / WebDAV cloud configuration backups. FluentRead is a bilingual translation and reading-assistance tool maintained by its open-source project contributors. The website and this policy are publicly accessible without signing in. Translation does not require connecting a Google account.
 
 The feature and service you choose determine which content leaves the browser. FluentRead does not run its own translation server; cloud translation is handled by the selected provider.
 
@@ -103,6 +103,29 @@ WebDAV and Google Drive share the cloud configuration backup entry and preview, 
 - **Stopping and deletion:** stop manual operations to stop new requests. Clear connection settings removes local WebDAV connection details, the app password, and sync records while retaining device configuration and server files. Delete the cloud file separately through your server and revoke its app password to end authorization. Clearing local data, uninstalling, or revoking a password does not delete the server file; deleting that file does not erase configurations already restored elsewhere.
 
 WebDAV data is used only for requested configuration backup, restore, and comparison, not advertising, sale, profiling, or model training. Restored service credentials continue to authenticate your chosen translation services as described above. See the [WebDAV backup guide](./webdav) for setup and server requirements.
+
+## OneDrive configuration sync
+
+Extension builds configured with a Microsoft public client ID offer OneDrive in **Settings → Backup and restore**. Unconfigured builds show a local-backup alternative. Availability requires the browser identity API; successful sign-in also depends on registered callbacks and Microsoft account or organization policies.
+
+Only clicking sync opens Microsoft account selection and consent. FluentRead requests `Files.ReadWrite.AppFolder` for its own application folder and `User.Read` to identify the account and display the email or user principal name returned by Microsoft. It does not request access to other Drive files, mail, or contacts.
+
+The backup includes the same saved configuration as Google Drive sync, including service API keys, OAuth tokens, authentication headers, custom request bodies and URL authentication parameters. Wordbooks, chat history and usage statistics are excluded. HTTPS transfers go directly to your own OneDrive application folder, normally `Apps/FluentRead/fluentread-config.encrypted.json`, without a FluentRead developer configuration server. Reading generates a preview with private values hidden; only confirmation saves, restores or merges settings.
+
+The same local encryption format and fixed public application passphrase apply. **Anyone who obtains the encrypted file can decrypt it.** Protection primarily depends on Microsoft account access, application permissions and device security; this is not end-to-end encryption with a user-exclusive key. The OneDrive application folder is visible. Do not share the file or folder.
+
+| Data | Purpose and retention |
+| --- | --- |
+| Encrypted complete configuration, file ID, version and modification time | Backup, preview, restore and detect changes; the cloud file remains until you delete it |
+| Microsoft account ID, returned email or user principal name, and successful-sync time | Bind the account, prevent mixed backups and show the last successful account in this browser; retained until relevant local data is cleared or the extension is uninstalled |
+| Comparison baseline and pending configuration | Encrypted locally; the baseline supports comparisons and previews expire after ten minutes; completion, failure, cancellation or leaving settings clears pending state |
+| Short-lived Microsoft access token and signed transfer URLs | Used in background memory for these requests only; excluded from backups, reports and translation requests; no refresh token is requested or stored |
+
+**Change Microsoft account** cancels the preview and opens account selection again; **Cancel** ends the operation. Ending clears in-memory authorization information without signing out of Microsoft in the browser, revoking prior consent or deleting the cloud file. Opening settings does not contact OneDrive. Google Drive and OneDrive keep separate account records and comparison baselines, with no automatic synchronization between them.
+
+Stop initiating sync to stop new access. Personal accounts can revoke FluentRead in [Microsoft account application permissions](https://account.live.com/consent/Manage); work or school accounts use their organization’s app management or administrator. Delete the backup from FluentRead’s OneDrive application folder, and clear the recycle bin or recoverable versions if needed. Revocation, uninstalling and deleting local records do not automatically delete cloud backups.
+
+Microsoft account data and backups serve only sync and account verification. FluentRead does not sell them, use them for advertising or profiling, or send complete backups to translation services. Restored service credentials are subsequently used by your selected translation services. Microsoft’s own processing is governed by the [Microsoft Privacy Statement](https://privacy.microsoft.com/privacystatement); folder permissions are described in the [Microsoft Graph app-folder documentation](https://learn.microsoft.com/en-us/graph/onedrive-sharepoint-appfolder).
 
 ## Control and remove other data
 

@@ -6,3 +6,6 @@
  */
 import {createCloudBackupClient} from './cloudBackupClient';
 export const googleDriveSyncClient = createCloudBackupClient('googleDriveEncryptedSync');
+
+/** 微软云盘使用独立的消息协议和事务身份，不复用 Google 的账号记录。 */
+export const oneDriveSyncClient = createCloudBackupClient('oneDriveEncryptedSync');

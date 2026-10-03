@@ -49,6 +49,7 @@ export function createConfigBackgroundHandlers<TContext extends ConfigPersistenc
     });
     return [
         createGoogleDriveSyncRuntime(mutations),
+        createGoogleDriveSyncRuntime(mutations, 'onedrive'),
         createWebDavBackupRuntime(mutations),
         createConfigStorageReadHandler({
             ready: configReady,

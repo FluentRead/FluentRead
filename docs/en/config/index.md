@@ -44,6 +44,8 @@ Before changing browsers or uninstalling, save the configuration and learning da
 
 Translation cache settings let you view and clear recent results. Clearing that cache does not delete learning collections. See [Translation statistics](/en/guide/translation-stats) for request size, duration, and service performance, and [AI usage](/en/guide/model-usage) for token use.
 
+Cloud configuration backup offers Google Drive, OneDrive and WebDAV. OneDrive requires an extension build configured with the Microsoft client ID. Sign in, preview, then confirm save, restore or merge. It includes service credentials and excludes learning records, conversations and usage data; each provider shows its own last successful account and time. See the [privacy policy](/en/guide/privacy).
+
 ## Reading aids
 
 Enable bilingual sentence highlighting under **Translation → Reading aids**, then adjust its appearance under **Interface style → Translation style**. See [appearance and reading aids](/en/config/appearance).

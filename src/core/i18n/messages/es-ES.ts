@@ -7,6 +7,7 @@
  */
 import brandTaglines from './brand-taglines.json';
 import googleDriveText from './google-drive/es-ES.json';
+import oneDriveText from './onedrive/es-ES.json';
 import cloudBackupText from './cloud-backup/es-ES.json';
 import type {
 enUSMessages} from './en-US';
@@ -23,6 +24,7 @@ export const esESMessages = {
     "settings.backup.fileDescription": "Los archivos de copia incluyen claves API y otra información privada y no están cifrados. Guárdalos en un lugar seguro y no los compartas públicamente.",
     "settings.backup.restoreHint": "Elige un archivo de copia de FluentRead. También puedes restaurar archivos JSON antiguos.",
     ...googleDriveText.messages,
+    ...oneDriveText.messages,
     ...cloudBackupText.messages,
     "brand.tagline": brandTaglines['es-ES'],
     "popup.translationCount": "{count} traducciones",

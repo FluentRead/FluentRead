@@ -62,7 +62,10 @@
     "settings.drive.mergeReviewTitle": "逐项合并",
     "settings.drive.differenceCount": "{count} 项配置存在差异",
     "settings.drive.back": "上一步",
-    "settings.drive.continue": "继续"
+    "settings.drive.continue": "继续",
+    "settings.drive.title": "Google Drive 配置同步",
+    "settings.drive.syncNow": "立即与Google Drive同步",
+    "settings.drive.success": "Google Drive 配置同步完成"
   },
   "legacy": {}
 }

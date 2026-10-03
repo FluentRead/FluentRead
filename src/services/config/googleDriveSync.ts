@@ -1,9 +1,9 @@
 /**
  * @file src/services/config/googleDriveSync.ts
- * 文件职责：编排完整配置的 Google Drive 加密同步与用户确认事务。
+ * 文件职责：编排完整配置的 Google Drive 与 Dropbox 加密同步与用户确认事务。
  * 主要内容：单次授权、账号绑定、上次成功同步的账号记录、密文基线、三方合并、
  * 掩码预览、过期检查与自动清理授权缓存；换号失败不改动成功记录。
- * 模块边界：通过端口读写配置与 Drive；不持久化口令，不向设置页面传递完整配置。
+ * 模块边界：通过端口读写配置与各自云端文件；不持久化口令，不向设置页面传递完整配置。
  */
 import {buildDriveSyncDiff, driveSyncPayload, driveValuesEqual, parseDriveSyncPayload, resolveDriveSyncDiff, toDriveSyncConfig, type DriveSyncConfig, type DriveSyncDiff} from '@/src/core/config/driveSync';
 import {decryptDriveConfig, encryptDriveConfig, decryptDrivePreview, encryptDrivePreview, validateDrivePassphrase} from '@/src/platform/google-drive/encryption';
@@ -31,7 +31,7 @@ export interface DriveSyncPreview {
 }
 export type DriveSyncDirection = 'upload' | 'download' | 'merge';
 export interface DriveSyncPorts {
-    auth: {availability(): {available: boolean; reason: string}; open(interactive?: boolean): Promise<DriveSession>; disconnect(): Promise<void>};
+    auth: {availability(): {available: boolean; reason: string}; open(interactive?: boolean, selectAccount?: boolean): Promise<DriveSession>; disconnect(): Promise<void>};
     api: {read(session: DriveSession): Promise<DriveRemote | null>; write(session: DriveSession, content: string, previous: DriveFile | null): Promise<DriveFile>};
     snapshot(): Promise<Record<string, unknown>>;
     apply(config: DriveSyncConfig): Promise<void>;
@@ -90,10 +90,10 @@ export function createGoogleDriveSync(ports: DriveSyncPorts) {
         if (state.connected && (!state.prepared || state.prepared.expiresAt <= ports.now())) await finishSession();
         return {...availability, account: state.lastSyncedAccount ?? null, lastSyncedAt: state.lastSyncedAt};
     }
-    async function prepare(passphrase: string, tabId?: number, clientId?: string): Promise<DriveSyncPreview> {
+    async function prepare(passphrase: string, tabId?: number, clientId?: string, selectAccount = false): Promise<DriveSyncPreview> {
         validateDrivePassphrase(passphrase);
         pending = null;
-        const session = await ports.auth.open(true);
+        const session = await (selectAccount ? ports.auth.open(true, true) : ports.auth.open(true));
         const previous = readState(await ports.readState());
         // 换账号只重置合并基线；取消或授权失败时仍能看到上次成功同步的账号及时间。
         const state = previous.accountId === session.account.id ? previous : {...emptyState(), lastSyncedAt: previous.lastSyncedAt, ...(previous.lastSyncedAccount ? {lastSyncedAccount: previous.lastSyncedAccount} : {})};
@@ -162,12 +162,12 @@ export function createGoogleDriveSync(ports: DriveSyncPorts) {
     }
     return {
         status: () => exclusive(status),
-        prepare: (passphrase: string, tabId?: number, clientId?: string) => exclusive(async () => {
+        prepare: (passphrase: string, tabId?: number, clientId?: string, selectAccount = false) => exclusive(async () => {
             const state = readState(await ports.readState());
             if (state.prepared && state.prepared.expiresAt > ports.now() && !owns(state, tabId, clientId)) {
                 throw new DriveError('另一个设置页面正在确认同步，请先完成或取消该页面的预览。');
             }
-            try {return await prepare(passphrase, tabId, clientId);} catch (error) {await finishSession(); throw error;}
+            try {return await prepare(passphrase, tabId, clientId, selectAccount);} catch (error) {await finishSession(); throw error;}
         }),
         commit: (id: string, passphrase: string, direction: DriveSyncDirection, choices: Record<string, unknown>, tabId?: number, clientId?: string) => exclusive(async () => {
             const state = readState(await ports.readState());

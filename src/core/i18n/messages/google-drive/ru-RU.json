@@ -62,7 +62,10 @@
     "settings.drive.mergeReviewTitle": "Объединить по пунктам",
     "settings.drive.differenceCount": "Различаются настройки: {count}",
     "settings.drive.back": "Назад",
-    "settings.drive.continue": "Продолжить"
+    "settings.drive.continue": "Продолжить",
+    "settings.drive.title": "Синхронизация настроек с Google Drive",
+    "settings.drive.syncNow": "Синхронизировать с Google Drive сейчас",
+    "settings.drive.success": "Синхронизация Google Drive завершена"
   },
   "legacy": {
     "Google Drive 配置同步": "Синхронизация настроек с Google Drive",

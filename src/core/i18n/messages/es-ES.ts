@@ -6,6 +6,7 @@
  * 模块边界：资源只描述扩展自己的界面文本；不会翻译网页正文、用户输入、提示词或翻译结果。
  */
 import brandTaglines from './brand-taglines.json';
+import dropboxText from './dropbox/es-ES.json';
 import googleDriveText from './google-drive/es-ES.json';
 import type {
 enUSMessages} from './en-US';
@@ -22,6 +23,7 @@ export const esESMessages = {
     "settings.backup.fileDescription": "Los archivos de copia incluyen claves API y otra información privada y no están cifrados. Guárdalos en un lugar seguro y no los compartas públicamente.",
     "settings.backup.restoreHint": "Elige un archivo de copia de FluentRead. También puedes restaurar archivos JSON antiguos.",
     ...googleDriveText.messages,
+    ...dropboxText,
     "brand.tagline": brandTaglines['es-ES'],
     "popup.translationCount": "{count} traducciones",
     "translationCenter.endpointMissing": "Primero configura la dirección del servicio personalizado.",

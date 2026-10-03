@@ -314,6 +314,10 @@
       "tests/googleDriveEncryption.test.ts",
       "tests/googleDriveConfig.test.ts",
       "tests/googleDriveAuth.test.ts",
+      "tests/dropboxAuth.test.ts",
+      "tests/dropboxApi.test.ts",
+      "tests/dropboxSyncClient.test.ts",
+      "tests/backgroundDropboxSync.test.ts",
       "tests/googleDriveApi.test.ts",
       "tests/googleDriveSyncClient.test.ts",
       "tests/googleDrivePreview.test.ts",
@@ -406,6 +410,7 @@
       "tests/sectionTranslationPicker.test.ts",
       "tests/videoCaptionPlatformRuntime.test.ts",
       "tests/googleDriveSync.test.ts",
+      "tests/dropboxSync.test.ts",
       "tests/backgroundGoogleDriveSync.test.ts"
     ],
     "regression": [

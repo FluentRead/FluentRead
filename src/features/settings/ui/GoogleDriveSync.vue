@@ -1,14 +1,14 @@
 <!--
 @file src/features/settings/ui/GoogleDriveSync.vue
-文件职责：用清晰的保存、恢复与逐项合并流程完成一次 Google Drive 配置同步。
+文件职责：用清晰的保存、恢复与逐项合并流程完成一次 Google Drive 或 Dropbox 配置同步。
 主要内容：将上次同步账号和时间对齐卡片右侧，窄屏改为上下排列；隐私徽标支持悬停及聚焦查看保护措施；显示本次账号并提供更换账号入口；按两步流程说明影响范围，
 先选择操作再确认影响；差异按需展开，合并仅突出待确认项，小屏保留操作区。
 模块边界：只消费后台脱敏预览和同步记录；不获取完整配置、令牌或用户口令。
 -->
 <template>
-  <section class="drive-sync" data-testid="google-drive-sync" aria-labelledby="drive-sync-title" :aria-busy="busy">
+  <section class="drive-sync" :data-testid="`${testPrefix}-sync`" :aria-labelledby="`${testPrefix}-title`" :aria-busy="busy">
     <header class="drive-heading">
-      <h2 id="drive-sync-title">Google Drive 配置同步</h2>
+      <h2 :id="`${testPrefix}-title`">{{ t('settings.drive.title') }}</h2>
       <el-tooltip effect="light" placement="bottom-end" :show-after="150" :trigger="['hover', 'focus']">
         <template #content>
           <div class="drive-privacy-help">
@@ -21,24 +21,25 @@
             </ul>
           </div>
         </template>
-        <button type="button" class="drive-badge" data-testid="google-drive-privacy" :aria-label="t('settings.drive.privacyTitle')"><svg viewBox="0 0 24 24" fill="none" aria-hidden="true" focusable="false"><path d="M12 3 4 6v5c0 5 3.5 8.5 8 10 4.5-1.5 8-5 8-10V6l-8-3Z" /><path d="m8.5 11.5 2.5 2.5 4.5-5" /></svg>{{ t('settings.drive.privacyBadge') }}</button>
+        <button type="button" class="drive-badge" :data-testid="`${testPrefix}-privacy`" :aria-label="t('settings.drive.privacyTitle')"><svg viewBox="0 0 24 24" fill="none" aria-hidden="true" focusable="false"><path d="M12 3 4 6v5c0 5 3.5 8.5 8 10 4.5-1.5 8-5 8-10V6l-8-3Z" /><path d="m8.5 11.5 2.5 2.5 4.5-5" /></svg>{{ t('settings.drive.privacyBadge') }}</button>
       </el-tooltip>
     </header>
     <p class="drive-boundary">{{ t('settings.drive.description') }}</p>
     <el-alert v-if="error && !previewVisible" :title="error" type="error" :closable="false" show-icon class="drive-error" />
     <div class="drive-actions">
-      <el-button v-if="status?.available" type="primary" :loading="busy" :disabled="busy" data-testid="google-drive-sync-now" @click="prepare">立即与Google Drive同步</el-button>
+      <el-button v-if="status?.available" type="primary" :loading="busy" :disabled="busy" :data-testid="`${testPrefix}-sync-now`" @click="prepare">{{ t('settings.drive.syncNow') }}</el-button>
       <div v-if="status?.account?.email || statusText" class="drive-record" role="status">
-        <p v-if="status?.account?.email" data-testid="google-drive-last-account">{{ t('settings.drive.lastAccount', {email: status.account.email}) }}</p>
+        <p v-if="status?.account?.email" :data-testid="`${testPrefix}-last-account`">{{ t('settings.drive.lastAccount', {email: status.account.email}) }}</p>
         <p v-if="statusText" class="drive-status">{{ statusText }}</p>
       </div>
     </div>
+    <a v-if="props.provider === 'dropbox' && !status?.available" class="drive-setup-guide" href="https://read.thinkstu.com/config/dropbox-sync" target="_blank" rel="noopener noreferrer">{{ translate('settings.dropbox.setupGuide') }}</a>
     <el-dialog class="drive-dialog" v-model="previewVisible" :title="t('settings.drive.previewTitle')" width="min(820px, calc(100vw - 24px))" :close-on-click-modal="!busy" :close-on-press-escape="!busy" :show-close="!busy" :before-close="cancelPreview" destroy-on-close @closed="clearPreview">
       <template v-if="preview">
         <div class="drive-account-bar">
           <el-icon class="drive-account-icon"><User /></el-icon>
           <p>{{ preview.account.email ? t('settings.drive.account', {email: preview.account.email}) : t('settings.drive.selectedAccount') }}</p>
-          <el-button link :loading="switchingAccount" :disabled="busy" data-testid="google-drive-switch-account" @click="switchAccount">{{ t('settings.drive.switchAccount') }}</el-button>
+          <el-button link :loading="switchingAccount" :disabled="busy" :data-testid="`${testPrefix}-switch-account`" @click="switchAccount">{{ t('settings.drive.switchAccount') }}</el-button>
         </div>
         <el-alert v-if="error" :title="error" type="error" :closable="false" show-icon class="drive-error" />
 
@@ -55,13 +56,13 @@
           <div class="drive-intent-heading"><h3>{{ t('settings.drive.chooseTitle') }}</h3><p>{{ t(preview.hasBaseline ? 'settings.drive.returningDescription' : 'settings.drive.firstRestoreDescription') }}</p></div>
           <div class="drive-operation-list" role="radiogroup" :aria-label="t('settings.drive.chooseStep')">
             <label v-for="operation in ['download', 'upload'] as const" :key="operation" class="drive-operation" :class="{'is-selected': direction === operation, 'is-disabled': busy}">
-              <input v-model="direction" type="radio" name="drive-operation" :value="operation" :disabled="busy" :data-testid="`google-drive-direction-${operation}`" />
+              <input v-model="direction" type="radio" :name="`${testPrefix}-operation`" :value="operation" :disabled="busy" :data-testid="`${testPrefix}-direction-${operation}`" />
               <span><strong>{{ t(`settings.drive.${operation}Title`) }}</strong><span>{{ t(`settings.drive.${operation}Description`) }}</span></span>
             </label>
           </div>
           <div class="drive-advanced">
             <p>{{ t('settings.drive.mergeQuestion') }}</p>
-            <el-button link :disabled="busy" data-testid="google-drive-direction-merge" @click="selectMerge"><el-icon><Switch /></el-icon>{{ t('settings.drive.mergeReviewTitle') }}<el-icon><ArrowRight /></el-icon></el-button>
+            <el-button link :disabled="busy" :data-testid="`${testPrefix}-direction-merge`" @click="selectMerge"><el-icon><Switch /></el-icon>{{ t('settings.drive.mergeReviewTitle') }}<el-icon><ArrowRight /></el-icon></el-button>
           </div>
         </template>
         <template v-else>
@@ -87,14 +88,14 @@
             <button v-else-if="automaticRows.length" type="button" class="drive-details-toggle" :aria-expanded="automaticVisible" @click="toggleAutomatic"><span>{{ t(automaticVisible ? 'settings.drive.hideAutomatic' : 'settings.drive.showAutomatic', {count: automaticCount}) }}</span><el-icon><component :is="automaticVisible ? ArrowUp : ArrowDown" /></el-icon></button>
             <template v-if="direction === 'merge' ? activeRows.length > 0 : detailsVisible">
               <p class="drive-private-hint">{{ t('settings.drive.privateHint') }}</p>
-              <div class="drive-differences" data-testid="google-drive-differences">
+              <div class="drive-differences" :data-testid="`${testPrefix}-differences`">
                 <article v-for="row in visibleRows" :key="row.id" class="drive-change" :data-change-id="row.id">
                   <div class="drive-change-heading"><strong>{{ row.label === '私密或自定义设置' ? t('settings.drive.otherSettings') : translateLegacy(row.label) }}</strong>
                     <span v-if="direction === 'merge'" :class="{'is-pending': !rowChoice(row)}">{{ t(rowChoice(row) ? (rowChoice(row) === 'local' ? 'settings.drive.localSelected' : 'settings.drive.remoteSelected') : 'settings.drive.needsChoice') }}</span>
                   </div>
                   <div class="drive-values" :role="direction === 'merge' ? 'radiogroup' : undefined" :aria-label="direction === 'merge' ? t('settings.drive.choice', {label: row.label === '私密或自定义设置' ? t('settings.drive.otherSettings') : translateLegacy(row.label)}) : undefined">
                     <component :is="direction === 'merge' ? 'label' : 'div'" v-for="source in ['local', 'remote'] as const" :key="source" class="drive-value" :class="{'is-selected': direction === 'merge' ? rowChoice(row) === source : direction === (source === 'local' ? 'upload' : 'download')}">
-                      <input v-if="direction === 'merge'" type="radio" :name="`drive-choice-${row.id}`" :checked="rowChoice(row) === source" :disabled="busy" :value="source" @change="chooseRow(row, source)" />
+                      <input v-if="direction === 'merge'" type="radio" :name="`${testPrefix}-choice-${row.id}`" :checked="rowChoice(row) === source" :disabled="busy" :value="source" @change="chooseRow(row, source)" />
                       <span><strong>{{ t(source === 'local' ? 'settings.drive.deviceLabel' : 'settings.drive.cloudLabel') }}</strong><span>{{ row.changes.length === 1 ? previewValueLabel(row.changes[0][source]) : t('settings.drive.groupedContent', {count: row.changes.length}) }}</span></span>
                     </component>
                   </div>
@@ -107,8 +108,8 @@
       <template #footer>
         <p v-if="step === 'review' && direction === 'merge' && unresolved" class="drive-footer-hint" role="status">{{ t('settings.drive.remaining', {count: unresolved}) }}</p>
         <div class="drive-footer-row">
-          <el-button v-if="step === 'review' && preview?.hasRemote && !identical" link :disabled="busy" data-testid="google-drive-back" @click="backToChoose"><el-icon><ArrowLeft /></el-icon>{{ t('settings.drive.back') }}</el-button>
-          <div class="drive-footer-actions"><el-button :disabled="busy" @click="cancelPreview">{{ t('settings.drive.cancelSync') }}</el-button><el-button v-if="step === 'choose'" type="primary" :disabled="busy || !direction" data-testid="google-drive-continue" @click="step = 'review'">{{ t('settings.drive.continue') }}</el-button><el-button v-else type="primary" :loading="busy && !switchingAccount" :disabled="busy || !canCommit" data-testid="google-drive-confirm" @click="commit">{{ commitLabel }}</el-button></div>
+          <el-button v-if="step === 'review' && preview?.hasRemote && !identical" link :disabled="busy" :data-testid="`${testPrefix}-back`" @click="backToChoose"><el-icon><ArrowLeft /></el-icon>{{ t('settings.drive.back') }}</el-button>
+          <div class="drive-footer-actions"><el-button :disabled="busy" @click="cancelPreview">{{ t('settings.drive.cancelSync') }}</el-button><el-button v-if="step === 'choose'" type="primary" :disabled="busy || !direction" :data-testid="`${testPrefix}-continue`" @click="step = 'review'">{{ t('settings.drive.continue') }}</el-button><el-button v-else type="primary" :loading="busy && !switchingAccount" :disabled="busy || !canCommit" :data-testid="`${testPrefix}-confirm`" @click="commit">{{ commitLabel }}</el-button></div>
         </div>
       </template>
     </el-dialog>
@@ -123,12 +124,21 @@ import 'element-plus/es/components/alert/style/css';
 import 'element-plus/es/components/pagination/style/css';
 import 'element-plus/es/components/tooltip/style/css';
 import {useUiI18n} from '@/src/ui/i18n';
-import {googleDriveSyncClient as client} from '@/src/services/config/googleDriveSyncClient';
+import {dropboxSyncClient} from '@/src/services/config/dropboxSyncClient';
+import {googleDriveSyncClient} from '@/src/services/config/googleDriveSyncClient';
 import {chooseDriveRow, driveRowChoice, groupDrivePreviewChanges, initialDriveDirection, unresolvedDriveChanges, type DrivePreviewRow} from '../model/googleDrivePreview';
 import type {DriveChoice} from '@/src/core/config/driveSync';
 import type {DriveSyncDirection, DriveSyncPreview, DriveSyncStatus} from '@/src/services/config/googleDriveSync';
 
-const {t, translateLegacy, language} = useUiI18n();
+const props = withDefaults(defineProps<{provider?: 'google' | 'dropbox'}>(), {provider: 'google'});
+const client = props.provider === 'dropbox' ? dropboxSyncClient : googleDriveSyncClient;
+const testPrefix = props.provider === 'dropbox' ? 'dropbox' : 'google-drive';
+const {t: translate, translateLegacy, language} = useUiI18n();
+const providerKeys = new Set(['title', 'syncNow', 'success', 'privacyStorage', 'description', 'selectedAccount', 'switchAccount', 'firstTitle', 'downloadDescription', 'uploadDescription']);
+function t(key: string, values?: Record<string, string | number>) {
+  return translate(props.provider === 'dropbox' && providerKeys.has(key.replace('settings.drive.', '')) ? key.replace('settings.drive.', 'settings.dropbox.') : key, values);
+}
+function errorText(message: string) {return message.startsWith('settings.dropbox.') ? translate(message) : translateLegacy(message);}
 const status = ref<DriveSyncStatus | null>(null);
 const busy = ref(false);
 const switchingAccount = ref(false);
@@ -149,7 +159,7 @@ const automaticCount = computed(() => automaticRows.value.reduce((count, row) =>
 const activeRows = computed(() => direction.value === 'merge' ? (automaticVisible.value ? automaticRows.value : conflictRows.value) : rows.value);
 const visibleRows = computed(() => activeRows.value.slice((page.value - 1) * 20, page.value * 20));
 const unresolved = computed(() => preview.value ? unresolvedDriveChanges(preview.value, choices.value) : 0);
-const statusText = computed(() => !status.value ? translateLegacy('正在检查同步状态…') : !status.value.available ? translateLegacy(status.value.reason) : status.value.lastSyncedAt ? t('settings.drive.lastSync', {time: new Date(status.value.lastSyncedAt).toLocaleString(language.value)}) : '');
+const statusText = computed(() => !status.value ? translateLegacy('正在检查同步状态…') : !status.value.available ? errorText(status.value.reason) : status.value.lastSyncedAt ? t('settings.drive.lastSync', {time: new Date(status.value.lastSyncedAt).toLocaleString(language.value)}) : '');
 const directionHint = computed(() => direction.value === 'merge' && !preview.value?.hasBaseline ? t('settings.drive.firstMergeDescription') : direction.value ? t(`settings.drive.${direction.value}Description`) : '');
 const summaryTitle = computed(() => t('settings.drive.mergeReady'));
 const commitLabel = computed(() => t(identical.value ? 'settings.drive.finishSync' : direction.value ? `settings.drive.${direction.value}Action` : 'settings.drive.chooseAction'));
@@ -167,11 +177,11 @@ let alive = true;
 async function perform(operation: () => Promise<void>) {
   if (busy.value) return;
   busy.value = true; error.value = '';
-  try {await operation();} catch (failure) {if (alive) error.value = failure instanceof Error ? translateLegacy(failure.message) : translateLegacy('同步未完成，请重试。');}
+  try {await operation();} catch (failure) {if (alive) error.value = failure instanceof Error ? errorText(failure.message) : translateLegacy('同步未完成，请重试。');}
   finally {if (alive) busy.value = false;}
 }
-async function requestPreview() {
-  const result = await client.prepare();
+async function requestPreview(switchAccount = false) {
+  const result = await client.prepare(switchAccount);
   if (!alive) {await client.cancel(result.id); return;}
   preview.value = result;
   choices.value = Object.fromEntries(result.changes.filter(change => change.recommended).map(change => [change.id, change.recommended!]));
@@ -179,14 +189,14 @@ async function requestPreview() {
   step.value = direction.value ? 'review' : 'choose';
   page.value = 1; detailsVisible.value = false; automaticVisible.value = false; previewVisible.value = true;
 }
-async function prepare() {await perform(requestPreview);}
+async function prepare() {await perform(() => requestPreview());}
 async function switchAccount() {
   await perform(async () => {
     switchingAccount.value = true;
     try {
       await client.cancel(preview.value?.id);
       if (!alive) return;
-      try {await requestPreview();} catch (failure) {previewVisible.value = false; throw failure;}
+      try {await requestPreview(true);} catch (failure) {previewVisible.value = false; throw failure;}
     } finally {if (alive) switchingAccount.value = false;}
   });
 }
@@ -197,7 +207,7 @@ async function commit() {
     if (!alive) return;
     try {
       const result = await client.commit(selected.id, selected.direction, selected.choices);
-      if (alive) {status.value = result; ElMessage.success(translateLegacy('Google Drive 配置同步完成'));}
+      if (alive) {status.value = result; ElMessage.success(t('settings.drive.success'));}
     } finally {if (alive) previewVisible.value = false;}
   });
 }
@@ -206,7 +216,7 @@ function clearPreview() {preview.value = null; choices.value = {}; direction.val
 function endSession() {if (preview.value || busy.value) void client.cancel(preview.value?.id).catch(() => undefined);}
 onMounted(() => {void perform(async () => {
   try {status.value = await client.status();}
-  catch (failure) {status.value = {available: false, reason: 'Google Drive 同步需要 Chrome 扩展后台；当前环境可使用完整数据备份。', account: null, lastSyncedAt: null}; throw failure;}
+  catch (failure) {status.value = {available: false, reason: props.provider === 'dropbox' ? 'settings.dropbox.error.unsupported' : 'Google Drive 同步需要 Chrome 扩展后台；当前环境可使用完整数据备份。', account: null, lastSyncedAt: null}; throw failure;}
 });});
 onUnmounted(() => {alive = false; endSession(); clearPreview();});
 </script>
@@ -232,6 +242,7 @@ onUnmounted(() => {alive = false; endSession(); clearPreview();});
 .drive-record {display:grid; gap:4px; flex:1 1 240px; min-width:0; margin-inline-start:auto; text-align:right;}
 .drive-record p {margin:0; overflow-wrap:anywhere; font-size:13px; line-height:1.5;}
 .drive-status {color:var(--el-text-color-secondary);}
+.drive-setup-guide {display:inline-block; margin-top:12px; color:var(--el-color-primary); font-size:13px;}
 .drive-error,.drive-actions {margin-top:16px;}
 .drive-actions {display:flex; flex-wrap:wrap; align-items:center; gap:12px 20px;}
 .drive-actions>.el-button {flex-shrink:0; max-width:100%; min-height:32px; height:auto; white-space:normal; line-height:1.5; padding:8px 15px;}

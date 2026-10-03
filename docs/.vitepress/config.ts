@@ -38,6 +38,7 @@ const guide = (en = false) => {
       text: en ? 'Settings' : '设置',
       items: [
         item('设置', 'Settings', '/config/'),
+        ...(!en ? [{text: 'Dropbox 同步接入', link: '/config/dropbox-sync'}] : []),
         item('翻译服务', 'Translation services', '/config/translation-engines'),
         item('术语库', 'Glossaries', '/guide/glossary'),
         item(

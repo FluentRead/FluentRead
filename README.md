@@ -104,3 +104,4 @@ Thank you to everyone who has contributed to FluentRead, including the many we c
 FluentRead is released under [GPL-3.0](./LICENSE). See [third-party notices](./public/third-party-notices/) for component attribution and licenses.
 
 Settings and learning records stay local by default; cloud translation uses your selected provider. Optional Google Drive configuration sync (Chrome testing feature) backs up complete settings, including service credentials, to your own Drive, excluding wordbooks, conversations, and usage statistics. See the [privacy policy](https://read.thinkstu.com/en/guide/privacy) for permissions, encryption, and deletion details.
+Dropbox configuration sync is available in builds configured by the maintainer. [Setup guide](https://read.thinkstu.com/config/dropbox-sync).

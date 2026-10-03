@@ -8,6 +8,7 @@
   <section class="config-management">
     <SettingsPanel name="backup" :active="props.activePanel">
 <GoogleDriveSync v-if="props.active && (!props.activePanel || props.activePanel === 'backup')" />
+<GoogleDriveSync v-if="props.active && (!props.activePanel || props.activePanel === 'backup')" provider="dropbox" />
 <LocalDataManagement :config="config" />
 </SettingsPanel>
 

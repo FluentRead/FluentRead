@@ -1,0 +1,23 @@
+{
+  "date": "2026-10-03",
+  "note": "官方文档示例经 imagegen 增加圈选、箭头和说明，并经人工核对；非 FluentRead 实时控制台截图。",
+  "create-app-annotated.png": {
+    "source": "https://learn.microsoft.com/en-us/microsoftsearch/dropbox-admin-setup",
+    "image": "https://learn.microsoft.com/en-us/microsoftsearch/media/dropbox-prerequisites-2.png",
+    "correction": "保留示例选中 Full Dropbox 的状态；标注明确要求改选 App folder。"
+  },
+  "permissions-annotated.png": {
+    "source": "https://docs.dropboxapi.com/dropbox-api/docs/oauth",
+    "image": "https://docs.dropboxapi.com/_fern-img/29f4f3e3aff0e7960997121d0017f2713ceb0ddad52a87cee8507db17f45bac0.webp",
+    "note": "旧示例未展示 files.metadata.read 和 Submit，标注说明实际仍需选择并保存。"
+  },
+  "settings-annotated.png": {
+    "source": "https://docs.dropboxapi.com/dropbox-api/docs/oauth",
+    "image": "https://docs.dropboxapi.com/_fern-img/05d03c33297f3deacfa04918f4fef3291831400c60dd08dfe582603779262f14.webp",
+    "note": "标注回调输入框与 Add，Allow public clients 保留 PKCE，无需 Generate。"
+  },
+  "sync-flow.svg": {
+    "source": "FluentRead 同步代码",
+    "note": "独立绘制的流程示意图，非截图。"
+  }
+}

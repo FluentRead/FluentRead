@@ -124,7 +124,7 @@ export function createExtensionManifest(
             'unlimitedStorage',
             'alarms',
             'contextMenus',
-            ...(env.browser === 'chrome' ? ['identity'] : []),
+            ...(['chrome', 'edge', 'firefox'].includes(env.browser) ? ['identity'] : []),
             ...(capabilities.offscreenDocument ? ['offscreen'] : []),
         ],
         content_security_policy: {

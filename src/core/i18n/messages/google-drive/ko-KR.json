@@ -62,7 +62,10 @@
     "settings.drive.mergeReviewTitle": "항목별 병합",
     "settings.drive.differenceCount": "설정 {count}개가 다릅니다",
     "settings.drive.back": "뒤로",
-    "settings.drive.continue": "계속"
+    "settings.drive.continue": "계속",
+    "settings.drive.title": "Google Drive 설정 동기화",
+    "settings.drive.syncNow": "지금 Google Drive와 동기화",
+    "settings.drive.success": "Google Drive 설정 동기화 완료"
   },
   "legacy": {
     "Google Drive 配置同步": "Google Drive 설정 동기화",

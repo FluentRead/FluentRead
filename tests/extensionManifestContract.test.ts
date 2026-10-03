@@ -83,7 +83,7 @@ describe('extension manifest capability contract', () => {
         for (const browser of ['edge', 'firefox', 'safari']) {
             const manifest = createExtensionManifest({browser, manifestVersion: browser === 'firefox' ? 2 : 3});
             expect(manifest.oauth2).toBeUndefined(); expect(manifest.key).toBeUndefined();
-            expect(manifest.permissions).not.toContain('identity');
+            expect(manifest.permissions?.includes('identity')).toBe(browser !== 'safari');
         }
     });
     it('builds a separate Thunderbird package with mail display access and no browser page injection', async () => {

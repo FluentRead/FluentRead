@@ -2,7 +2,7 @@
 
 Updated: October 3, 2026.
 
-This policy describes how the FluentRead browser extension handles translation content, local records, service credentials, and optional Google Drive configuration backups. FluentRead is a bilingual translation and reading-assistance tool maintained by its open-source project contributors. The website and this policy are publicly accessible without signing in. Translation does not require connecting a Google account.
+This policy describes how the FluentRead browser extension handles translation content, local records, service credentials, and optional Google Drive and Dropbox configuration backups. FluentRead is a bilingual translation and reading-assistance tool maintained by its open-source project contributors. The website and this policy are publicly accessible without signing in. Translation does not require connecting a Google account.
 
 The feature and service you choose determine which content leaves the browser. FluentRead does not run its own translation server; cloud translation is handled by the selected provider.
 
@@ -97,6 +97,22 @@ Turn off automatic translation, extra AI context, memories, or saving if you do 
 Clearing translation cache does not delete learning collections. Manage collections, reading history, and memories in their own pages. Uninstalling or clearing browser data may remove local records.
 
 Backups can include credentials, source sentences, and source information. Check export scope and file contents before sharing. Refer to each cloud provider’s policy for its retention and use of submitted content.
+
+## Dropbox configuration sync
+
+Dropbox is an optional backup destination, available when enabled in the installed build. Opening settings does not access Dropbox. Choosing sync starts authorization and reads the backup for a preview; saving, restoring or merging requires confirmation.
+
+The backup includes configured API keys, OAuth tokens, authentication headers, custom request bodies and URL authentication parameters. It excludes wordbooks, chat history and usage statistics. The Dropbox access token for this operation is excluded.
+
+We request `account_info.read`, `files.metadata.read`, `files.content.read` and `files.content.write`. Account ID and email identify and display the account. File metadata, revision and contents support preview, restore and conditional updates. File access is limited to the FluentRead app folder, not other files, sharing or team data.
+
+The encrypted file `fluentread-config.encrypted.json` is sent over HTTPS directly to your Dropbox Apps / app-name folder, without a developer configuration server. The fixed application passphrase is public in source code: anyone holding the encrypted backup can decrypt it. Protection depends on account, authorization and device security. This folder is visible in Dropbox.
+
+The successful account ID, email, time and encrypted comparison baseline remain in extension storage until it is cleared or the extension is uninstalled, separately from Google Drive. Canceling does not replace a successful record. Pending previews last ten minutes and are cleared on completion, failure, cancellation or leaving settings. Short-lived Dropbox tokens are temporarily held in extension session storage and deleted during cleanup. No refresh token or background polling is used.
+
+Dropbox data is used only for configuration sync, not sold, used for advertising or model training, or sent to translation providers. Restored service credentials are used only for the translation providers you select, as described above.
+
+Canceling ends the operation; changing accounts opens authentication again. Neither logs you out of the Dropbox website or deletes backups. Revoke access in [Dropbox connected apps](https://www.dropbox.com/account/connected_apps), and delete the backup in your Apps folder. Cloud files remain until you delete them; uninstalling or clearing local data does not delete cloud backups or configurations restored on other devices. Dropbox’s own processing is governed by its [privacy policy](https://www.dropbox.com/privacy).
 
 ## Website and external links
 

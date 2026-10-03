@@ -21,6 +21,7 @@ import {
 } from '@/src/services/config/autoBackupStore';
 import {configStorage} from '@/src/platform/storage/configStorageRuntime';
 import type {BackgroundMessageHandler} from './messageRouter';
+import {createDropboxSyncRuntime} from './dropboxSyncRuntime';
 import {createGoogleDriveSyncRuntime} from './googleDriveSyncRuntime';
 import {createConfigAutoBackupRestoreHandler} from './handlers/configAutoBackup';
 import {createConfigStorageReadHandler} from './handlers/configStorage';
@@ -48,6 +49,7 @@ export function createConfigBackgroundHandlers<TContext extends ConfigPersistenc
     });
     return [
         createGoogleDriveSyncRuntime(mutations),
+        createDropboxSyncRuntime(mutations),
         createConfigStorageReadHandler({
             ready: configReady,
             read: async key => {

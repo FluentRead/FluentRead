@@ -62,7 +62,10 @@
     "settings.drive.mergeReviewTitle": "Merge individually",
     "settings.drive.differenceCount": "{count} settings differ",
     "settings.drive.back": "Back",
-    "settings.drive.continue": "Continue"
+    "settings.drive.continue": "Continue",
+    "settings.drive.title": "Google Drive configuration sync",
+    "settings.drive.syncNow": "Sync with Google Drive now",
+    "settings.drive.success": "Google Drive configuration sync completed"
   },
   "legacy": {
     "Google Drive 配置同步": "Google Drive configuration sync",

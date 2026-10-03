@@ -57,6 +57,20 @@ describe('图片翻译流程优化',()=>{
         ui.dispose();
     });
 
+    it('漫画处理不显示卡片或取消工具条，失败仅保留轻量重试，普通图片仍有明确反馈', () => {
+        const {document} = parseHTML('<html><body></body></html>');vi.stubGlobal('document', document);
+        const ui = createImageControls({onAction(){},onPrepare(){}});
+        ui.update('loading', '正在识别图片文字…', {quiet:true, progress:42});
+        expect(ui.feedback.hidden).toBe(true);expect(ui.element.hidden).toBe(true);
+        expect(ui.element.getAttribute('aria-busy')).toBe('true');expect(ui.status.textContent).toContain('42%');
+        ui.update('error', '翻译失败', {quiet:true});
+        expect(ui.feedback.hidden).toBe(true);expect(ui.element.hidden).toBe(false);
+        expect(ui.button.parentElement!.parentElement).toBe(ui.element);expect(ui.button.textContent).toBe('重试');
+        ui.update('translated', '查看译图', {quiet:true});expect(ui.element.hidden).toBe(false);
+        ui.update('loading', '正在读取图片…');expect(ui.feedback.hidden).toBe(false);expect(ui.element.hidden).toBe(false);
+        expect(ui.button.parentElement!.parentElement).toBe(ui.feedback);ui.dispose();
+    });
+
     it('有限并发乱序完成后仍按原顺序返回，重复文字只请求一次',async()=>{
         const waits=new Map<string,ReturnType<typeof deferred<string>>>();
         const translateTexts=vi.fn((r:{origin:string|string[]})=>{const d=deferred<string>(); waits.set(r.origin as string,d);return d.promise;});

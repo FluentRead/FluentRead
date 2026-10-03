@@ -56,6 +56,11 @@ async function observeModelDownloads(extensionId) {
     socket.addEventListener('message',event=>{
         const message=JSON.parse(String(event.data));
         if(message.id){const callback=pending.get(message.id);if(callback){pending.delete(message.id);message.error?callback.reject(new Error(message.error.message)):callback.resolve(message.result);}}
+        if(message.method==='Runtime.consoleAPICalled'){
+            const text=message.params.args.map(a=>a.value ?? a.description ?? '').join(' ');
+            (report.offscreenDiagnostics ??= []).push({level:message.params.type,text});
+            if(message.params.type==='error')report.consoleErrors.push(text);
+        }
         if(message.method==='Network.requestWillBeSent'){
             const url=new URL(message.params.request.url);
             if(['huggingface.co','hf-mirror.net'].includes(url.host))report.modelRequests.push({source:url.host,file:url.pathname.split('/').pop(),target:'offscreen'});
@@ -66,6 +71,7 @@ async function observeModelDownloads(extensionId) {
     assert.ok(target,'Own isolated extension Offscreen target exists');
     const {sessionId}=await command('Target.attachToTarget',{targetId:target.targetId,flatten:true});
     await command('Network.enable',{},sessionId);
+    await command('Runtime.enable',{},sessionId);
     if(blockedOfficial || blockedAll)await command('Network.setBlockedURLs',{urls:blockedAll?['https://huggingface.co/*','https://hf-mirror.net/*']:['https://huggingface.co/*']},sessionId);
     socket.command=(method,params)=>command(method,params,sessionId);return socket;
 }
@@ -146,6 +152,12 @@ async function patch(config) {
         if(!response.success)throw new Error(response.error);
     },config);
 }
+async function assertQuietReading() {
+    assert.equal(await mangaEntry('return !!this.querySelector(".fr-manga-entry")'),false,'No automatic reader panel');
+    assert.equal(await imageUi('return [...this.querySelectorAll(".fr-image-feedback")].some(e=>!e.hidden && getComputedStyle(e).display!=="none")'),false,'No per-image progress or error cards');
+    assert.equal(await imageUi('return [...this.querySelectorAll(".fr-image-controls[data-phase=loading]")].some(e=>!e.hidden && getComputedStyle(e).display!=="none")'),false,'No per-image cancel popup while reading');
+}
+
 async function verifyReadAhead() {
     report.currentCase='reader detects real image pages and default upcoming-page option';
     const images=page.locator(readerSelector);
@@ -158,6 +170,8 @@ async function verifyReadAhead() {
     await screenshot('read-ahead-original');report.cases.push(report.currentCase);
     report.currentCase='current page is shown before upcoming preparation finishes';
     const started=Date.now();await toggle();
+    await wait(async()=>(await ball('return this.querySelector(".floating-ball-manga")?.getAttribute("aria-busy")'))==='true');
+    await assertQuietReading();await screenshot('read-ahead-processing-unobstructed');
     await wait(async()=>await first.evaluate(i=>i.style.opacity==='0'));
     report.firstPageMs=Date.now()-started;report.cases.push(report.currentCase);
     await screenshot('read-ahead-first-visible');
@@ -179,9 +193,7 @@ async function verifyReadAhead() {
     report.progress=await worker.evaluate(()=>globalThis.__mangaTest.progress);
     const rectangles=await imageUi('return [...this.querySelectorAll(".fluent-read-image-translation-bitmap")].map(i=>{const r=i.getBoundingClientRect();return {top:r.top,bottom:r.bottom,width:r.width}})');
     if(!pixiv)assert.ok(rectangles.some(r=>r.width>80&&r.bottom>0&&r.top<900),'Translated bitmap follows the prepared image into the viewport');
-    const spot=await mangaEntry('const r=this.querySelector(".fr-manga-entry").getBoundingClientRect();return {x:r.x+r.width/2,y:r.y+r.height/2}');
-    await page.mouse.move(spot.x,spot.y);await wait(async()=>await mangaEntry('return !!this.querySelector("header")'));
-    assert.equal(await mangaEntry('const r=this.querySelector(".fr-manga-entry").getBoundingClientRect();return document.elementFromPoint(r.left+20,r.top+r.height/2)?.id === "fluent-read-manga-entry-container"'),true);
+    await assertQuietReading();
     await screenshot('read-ahead-next-visible');report.cases.push(report.currentCase);
     report.currentCase='original pause restores all prepared host images';await toggle();
     await wait(async()=>await imageUi('return this.querySelectorAll(".fluent-read-image-translation-bitmap").length === 0'));
@@ -194,6 +206,7 @@ async function verifyReadAhead() {
     const select=popup.getByRole('combobox',{name:'提前翻译后续页面',exact:true});assert.equal(await select.inputValue(),String(prefetchPages));
     await select.selectOption('0');await popup.reload();assert.equal(await select.inputValue(),'0');report.cases.push('upcoming-page setting persists and allows current-page-only mode');
     report.textBatches=await worker.evaluate(()=>globalThis.__mangaTest.textBatches);
+    assert.ok(!(report.offscreenDiagnostics || []).some(d=>['warning','error'].includes(d.level)&&d.text.includes('Unknown CPU vendor')),'Known WASM CPU diagnostic is not a warning or error');
     if(blockedAll){assert.equal(report.modelRequests.length,0);report.cases.push('no model downloads during prepared local reading');}
     assert.deepEqual(report.errors,[]);assert.deepEqual(report.consoleErrors,[]);
 }
@@ -280,6 +293,7 @@ async function verifyReadAhead() {
     await toolScreenshot('idle');await toggle();
     await wait(async()=>(await ball(`return this.querySelector('.floating-ball-manga').getAttribute('aria-busy')`))==='true',10000);
     await toolScreenshot('pending');
+    if(!baseline){await assertQuietReading();await screenshot('pending-unobstructed');}
     if(report.buttonStates.pending.busy==='true')assert.equal(report.buttonStates.pending.badge,undefined,'Pending shows progress instead of a completion check');
     if(!skipFirstCancel){
     report.currentCase='cancel first preparation restores originals and can resume';
@@ -297,14 +311,7 @@ async function verifyReadAhead() {
     if(!liveSite){assert.ok((await ops())<=2,'Only the visible page and its canceled preparation/retry run');
         assert.equal(await imageUi(`return this.querySelectorAll('.fluent-read-image-translation-overlay').length`),1);}
     report.firstOperationCount=await ops();report.cases.push(report.currentCase);
-    if(!baseline){
-        report.currentCase='translated bitmap never covers expanded manga progress or options';
-        const spot=await mangaEntry('const r=this.querySelector(".fr-manga-entry").getBoundingClientRect();return {x:r.x+r.width/2,y:r.y+r.height/2}');
-        await page.mouse.move(spot.x,spot.y);await wait(async()=>await mangaEntry('return !!this.querySelector("header")'));
-        assert.equal(await mangaEntry('const r=this.querySelector(".fr-manga-entry").getBoundingClientRect();return document.elementFromPoint(r.left+20,r.top+r.height/2)?.id === "fluent-read-manga-entry-container"'),true);
-        await screenshot('reading-panel-above-bitmap');report.cases.push(report.currentCase);
-        await page.mouse.move(30,30);await wait(async()=>await mangaEntry('return !!this.querySelector(".compact")'));
-    }
+    if(!baseline){await assertQuietReading();report.cases.push('translated reading has no automatic panel');}
     await screenshot('01-translated');
     report.currentCase='original pauses and repeated toggles reuse visible results';
     await toggle();await wait(async()=>(await imageUi(`return this.querySelectorAll('.fluent-read-image-translation-bitmap').length`))===0);
@@ -352,27 +359,14 @@ async function verifyReadAhead() {
         await wait(async()=>!!await ball(`return this.querySelector('.manga-error')`),60000,true);
         assert.notEqual(await page.locator('#blank-page').evaluate(i=>i.style.opacity),'0');
         await toolScreenshot('partial-error');report.cases.push(report.currentCase);
-        if(!baseline){
-            await page.mouse.move(30,30);await page.waitForTimeout(1200);
-            assert.equal(await mangaEntry('return !!this.querySelector(".compact")'),false);
-            assert.equal(await mangaEntry('return !!this.querySelector("header")'),true);
-            report.cases.push('failed page keeps reading status expanded');
-        }
+        if(!baseline){await assertQuietReading();report.cases.push('failed page never opens a reading panel');}
         report.currentCase='chapter change resets continuous mode and restores originals';
         await page.evaluate(()=>history.pushState({},'', '/viewer/555'));
         await wait(async()=>(await ball(`return this.querySelector('.floating-ball-manga').getAttribute('aria-pressed')`))==='false');
         assert.equal(await imageUi(`return this.querySelectorAll('.fluent-read-image-translation-bitmap').length`),0);report.cases.push(report.currentCase);
     }
     if(!baseline){
-        if(liveSite){
-        report.currentCase='reading status collapses, expands and stays open while adjusting options';
-        await page.mouse.move(30,30);await wait(async()=>await mangaEntry('return !!this.querySelector(".compact")'),5000);
-        const point=await mangaEntry('const r=this.querySelector(".fr-manga-entry").getBoundingClientRect();return {x:r.x+r.width/2,y:r.y+r.height/2}');
-        await page.mouse.move(point.x,point.y);await wait(async()=>await mangaEntry('return !!this.querySelector("header")'),5000);
-        const summary=await mangaEntry('const r=this.querySelector("summary").getBoundingClientRect();return {x:r.x+r.width/2,y:r.y+r.height/2}');
-        await page.mouse.click(summary.x,summary.y);await page.mouse.move(30,30);await page.waitForTimeout(1200);
-        assert.equal(await mangaEntry('return !!this.querySelector(".compact")'),false);report.cases.push(report.currentCase);
-        }
+        if(liveSite){await assertQuietReading();report.cases.push('scroll and hover never open a reading panel');}
         report.currentCase='manga button matches brand button size and progress ring stays inside';
         const metrics=await ball(`const a=this.querySelector('.floating-ball-manga').getBoundingClientRect(),b=this.querySelector('.floating-ball-main').getBoundingClientRect();return {manga:a.width,brand:b.width}`);
         assert.equal(metrics.manga,metrics.brand);assert.equal(metrics.manga,40);report.buttonSize=metrics;report.cases.push(report.currentCase);

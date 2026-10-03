@@ -9,6 +9,12 @@ function fluentReadWasmStderr(message) {
     const onnx = !/[\r\n]/.test(text.trim())
         && /^(?:\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}\.\d+ )?\[([VIWEF]):onnxruntime[:\]]/.exec(text);
     if (onnx) {
+        // 浏览器 WASM 不暴露 CPU 厂商；上游 https://github.com/microsoft/onnxruntime/pull/27399 已确认此单行提示无操作价值。
+        // 只降低 vendor=0 的已知初始化提示，其他警告、错误和多行输出保持原级别。
+        if (onnx[1] === 'W' && /\[W:onnxruntime:Default, cpuid_info\.cc:\d+ LogEarlyWarning\] Unknown CPU vendor\. cpuinfo_vendor value: 0\s*$/.test(text)) {
+            console.debug(text);
+            return;
+        }
         const level = {V: 'debug', I: 'info', W: 'warn', E: 'error', F: 'error'}[onnx[1]];
         console[level](text);
         return;

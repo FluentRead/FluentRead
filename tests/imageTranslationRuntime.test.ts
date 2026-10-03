@@ -1002,6 +1002,28 @@ describe('视频预览不自动显示图片翻译', () => {
         env.image.className = 'zao-image'; env.parent.className = 'zao-image-container';
         return env;
     }
+    it('漫画每个处理阶段都保持原图可见且无逐图弹窗，会话仍发布进度并支持暂停', async () => {
+        const env = readerPage();const pending = deferred<typeof result>();client.translate.mockReturnValueOnce(pending.promise);
+        const listener=vi.fn(),stop=subscribeMangaTranslation(listener);
+        toggleMangaTranslation();await flush();
+        const feedback=env.roots[0].querySelector('.fr-image-feedback') as HTMLElement;
+        const controls=env.roots[0].querySelector('.fr-image-controls') as HTMLElement;
+        for (const stage of ['preparing','recognizing','translating','cleaning','rendering'] as const) {
+            client.translate.mock.calls[0][3].onProgress(stage,42);await flush();
+            expect(feedback.hidden).toBe(true);expect(controls.hidden).toBe(true);expect(env.image.style.opacity).not.toBe('0');
+            expect(listener).toHaveBeenLastCalledWith(expect.objectContaining({pending:true,stage}));
+        }
+        toggleMangaTranslation();pending.resolve(result);await flush();
+        expect(env.bitmap()).toBeNull();expect(feedback.hidden).toBe(true);expect(env.image.style.opacity).not.toBe('0');stop();
+    });
+    it('漫画失败不弹出卡片，原图可读，图片重试仍恢复翻译', async () => {
+        const env=readerPage();client.translate.mockRejectedValueOnce(new Error('翻译服务暂时不可用'));
+        const listener=vi.fn(),stop=subscribeMangaTranslation(listener);toggleMangaTranslation();await flush();
+        expect((env.roots[0].querySelector('.fr-image-feedback') as HTMLElement).hidden).toBe(true);
+        expect(env.image.style.opacity).not.toBe('0');expect(env.button().textContent).toBe('重试');
+        expect(listener).toHaveBeenLastCalledWith(expect.objectContaining({errors:1,pending:false}));
+        env.click();await flush();expect(env.bitmap()).not.toBeNull();stop();
+    });
     it('一次开启、原图暂停、重新开启复用已解码结果，即使持久缓存关闭', async () => {
         const env = readerPage(); settings.useCache = false;
         const listener = vi.fn(); const stop = subscribeMangaTranslation(listener);

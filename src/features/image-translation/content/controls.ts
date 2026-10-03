@@ -1,6 +1,6 @@
 /**
  * @file src/features/image-translation/content/controls.ts
- * 文件职责：创建图片翻译的轻量操作条，持续展示读取、识别、翻译与失败状态，支持取消、重试和首次语言准备。
+ * 文件职责：创建图片翻译的轻量操作条，支持单图反馈和不遮挡阅读的漫画模式，支持取消、重试和首次语言准备。
  * 主要内容：提供低透明度灰度入口、隔离样式、可信手势按钮、识别百分比与可选全文详情；长译文在独立视口面板内可核对原文和一键复制，减少只能看位图的阅读障碍。
  * 模块边界：仅操作所属 Shadow DOM，不读取配置、不访问网络、不持有图片请求；业务动作及生命周期由 content/runtime 注入。
  */
@@ -14,7 +14,7 @@ export const IMAGE_CONTROLS_CSS = IMAGE_READER_CSS + `
 .fr-image-controls,.fr-image-feedback {--fr-image-brand:#dc315f;--fr-image-brand-soft:#fff0f4;--fr-image-ink:#172033;--fr-image-muted:#737c8f;--fr-image-line:#e5e8ef;--fr-image-surface:#fff;color:var(--fr-image-ink);font:13px/1.5 system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;box-sizing:border-box;}
 .fr-image-controls {position:absolute;left:8px;bottom:8px;max-width:calc(100% - 16px);display:flex;flex-direction:column;align-items:flex-start;gap:6px;pointer-events:auto;z-index:2;}
 .fr-image-feedback {position:absolute;left:50%;top:50%;width:max-content;display:flex;flex-direction:column;gap:8px;transform:translate(-50%,-50%);padding:12px 14px;border:1px solid var(--fr-image-line);border-radius:12px;background:var(--fr-image-surface);box-shadow:0 8px 28px rgba(27,36,57,.12),0 2px 6px rgba(27,36,57,.04);pointer-events:none;}
-.fr-image-feedback[hidden],.fr-image-controls [hidden],.fr-image-feedback [hidden] {display:none!important;}
+.fr-image-controls[hidden],.fr-image-feedback[hidden],.fr-image-controls [hidden],.fr-image-feedback [hidden] {display:none!important;}
 .fr-image-feedback-title {font-size:14px;line-height:1.4;font-weight:650;}
 .fr-image-status {display:flex;align-items:center;gap:9px;min-width:0;overflow-wrap:anywhere;white-space:normal;}
 .fr-image-spinner {width:16px;height:16px;flex:0 0 auto;box-sizing:border-box;border:2px solid #f4c8d5;border-top-color:#dc315f;border-radius:50%;animation:fr-image-spin .75s linear infinite;}
@@ -136,7 +136,7 @@ export function createImageControls(actions: {onAction(): void; onPrepare(): voi
     row.append(button, prepare, inspect, dismiss);
     feedback.append(heading, status);
     element.append(details, row);
-    const update = (next: ImageControlPhase, message: string, options: {prepare?: boolean; animations?: boolean; progress?: number} = {}) => {
+    const update = (next: ImageControlPhase, message: string, options: {prepare?: boolean; animations?: boolean; progress?: number; quiet?: boolean} = {}) => {
         phase = next;
         element.dataset.phase = next;
         button.dataset.phase = next;
@@ -149,12 +149,13 @@ export function createImageControls(actions: {onAction(): void; onPrepare(): voi
         progress = next === 'loading' ? normalizeImageProgress(options.progress) : undefined;
         refreshLanguage();
         status.hidden = next === 'idle' || next === 'translated';
-        feedback.hidden = status.hidden;
+        feedback.hidden = options.quiet === true || status.hidden;
+        element.hidden = options.quiet === true && next === 'loading';
         element.setAttribute('aria-busy', String(next === 'loading'));
         element.dataset.animations = String(options.animations !== false);
         prepare.hidden = next !== 'error' || !options.prepare;
         dismiss.hidden = next !== 'error' || options.prepare === true;
-        const feedbackOwnsActions = next === 'error' || next === 'loading';
+        const feedbackOwnsActions = options.quiet !== true && (next === 'error' || next === 'loading');
         const actionsOwner = feedbackOwnsActions ? feedback : element;
         // 进度更新会频繁刷新状态；仅在状态容器变化时移动操作条，避免重挂载打断悬停与焦点。
         if (row.parentElement !== actionsOwner) actionsOwner.append(row);

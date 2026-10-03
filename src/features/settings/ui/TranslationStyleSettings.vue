@@ -24,6 +24,7 @@
             :appearance-style="appearanceStyle"
             :highlight-enabled="config.bilingualSentenceHighlightEnabled"
             :highlight-style="config.bilingualSentenceHighlightStyle"
+            :highlight-appearance="config.bilingualSentenceHighlightAppearance"
             :translation-before-original="config.translationBeforeOriginal"
             :page-theme="pageTheme"
             :caption="t('settings.translationStyle.currentPreset', { name: activeProfile?.name ?? translateLegacy(selectedPreset.label) })"

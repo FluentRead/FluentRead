@@ -304,8 +304,8 @@ export interface TranslationCustomCssResult {
     readonly invalidCount: number;
 }
 
-/** 逐条验证声明再重建样式表，绝不直接拼接用户输入的 CSS 文本。 */
-export function parseTranslationCustomCss(value: unknown): TranslationCustomCssResult {
+/** 逐条验证声明再重建样式表；调用方可限定高亮绘制属性，绝不直接拼接用户输入的 CSS 文本。 */
+export function parseTranslationCustomCss(value: unknown, allowedProperties: ReadonlySet<string> = TRANSLATION_CUSTOM_CSS_PROPERTIES): TranslationCustomCssResult {
     const source = normalizeTranslationCustomCss(value);
     const declarations: TranslationAppearanceDeclaration[] = [];
     let invalidCount = 0;
@@ -315,7 +315,7 @@ export function parseTranslationCustomCss(value: unknown): TranslationCustomCssR
         const separator = entry.indexOf(':');
         const property = entry.slice(0, separator).trim().toLowerCase();
         const cssValue = entry.slice(separator + 1).trim();
-        if (separator < 1 || !TRANSLATION_CUSTOM_CSS_PROPERTIES.has(property) || cssValue.length > 200
+        if (separator < 1 || !allowedProperties.has(property) || cssValue.length > 200
             || !/^[a-z\d\s#.,()%+'"\/_*-]+$/iu.test(cssValue)
             || /(?:url|image-set|expression|attr|var)\s*\(|\/\*|\*\/|!important/iu.test(cssValue)
             || declarations.length >= 24) {

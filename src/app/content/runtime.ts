@@ -119,7 +119,7 @@ export async function startContentApp(ctx: ContentScriptContext,
     const activatePageFeatures = async (): Promise<void> => {
         if (!isPageRuntimeEnabled() || featureController) return;
         removePageStyles = installPageStyles(ctx);
-        syncBilingualSentenceHighlight(document, config.bilingualSentenceHighlightEnabled === true, config.bilingualSentenceHighlightStyle);
+        syncBilingualSentenceHighlight(document, config.bilingualSentenceHighlightEnabled === true, config.bilingualSentenceHighlightStyle, config.bilingualSentenceHighlightAppearance);
         const activationController = new AbortController();
         featureController = activationController;
         const isActivationCurrent = () => isPageRuntimeEnabled() && featureController === activationController
@@ -253,7 +253,7 @@ export async function startContentApp(ctx: ContentScriptContext,
     unsubscribeContentConfig = subscribeConfig((nextConfig) => {
         void ensureUiLanguageBundle(nextConfig.uiLanguage); applyCoreTranslationPreferences(nextConfig);
         siteAdaptation.update(nextConfig.siteAdaptation, new URL(window.location.href));
-        syncBilingualSentenceHighlight(document, isPageRuntimeEnabled() && nextConfig.bilingualSentenceHighlightEnabled === true, nextConfig.bilingualSentenceHighlightStyle);
+        syncBilingualSentenceHighlight(document, isPageRuntimeEnabled() && nextConfig.bilingualSentenceHighlightEnabled === true, nextConfig.bilingualSentenceHighlightStyle, nextConfig.bilingualSentenceHighlightAppearance);
         const nextInputBoxConfigKey = inputBoxTranslationConfigKey(nextConfig);
         if (nextInputBoxConfigKey !== previousInputBoxConfigKey) {
             previousInputBoxConfigKey = nextInputBoxConfigKey;

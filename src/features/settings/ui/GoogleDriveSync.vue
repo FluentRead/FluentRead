@@ -8,14 +8,14 @@
 <template>
   <section class="drive-sync" :data-testid="`${testPrefix}-sync`" :aria-labelledby="`${testPrefix}-title`" :aria-busy="busy">
     <header class="drive-heading">
-      <h2 :id="`${testPrefix}-title`">{{ t('settings.drive.title') }}</h2>
+      <h2 :id="`${testPrefix}-title`">{{ providerText('title') }}</h2>
       <el-tooltip effect="light" placement="bottom-end" :show-after="150" :trigger="['hover', 'focus']">
         <template #content>
           <div class="drive-privacy-help">
             <strong>{{ t('settings.drive.privacyTitle') }}</strong>
             <ul>
               <li>{{ t('settings.drive.privacyEncryption') }}</li>
-              <li>{{ t('settings.drive.privacyStorage') }}</li>
+              <li>{{ providerText('privacyStorage') }}</li>
               <li>{{ t('settings.drive.privacyAuthorization') }}</li>
               <li>{{ t('settings.drive.privacyExcluded') }}</li>
             </ul>
@@ -24,22 +24,22 @@
         <button type="button" class="drive-badge" :data-testid="`${testPrefix}-privacy`" :aria-label="t('settings.drive.privacyTitle')"><svg viewBox="0 0 24 24" fill="none" aria-hidden="true" focusable="false"><path d="M12 3 4 6v5c0 5 3.5 8.5 8 10 4.5-1.5 8-5 8-10V6l-8-3Z" /><path d="m8.5 11.5 2.5 2.5 4.5-5" /></svg>{{ t('settings.drive.privacyBadge') }}</button>
       </el-tooltip>
     </header>
-    <p class="drive-boundary">{{ t('settings.drive.description') }}</p>
+    <p class="drive-boundary">{{ providerText('description') }}</p>
     <el-alert v-if="error && !previewVisible" :title="error" type="error" :closable="false" show-icon class="drive-error" />
     <div class="drive-actions">
-      <el-button v-if="status?.available" type="primary" :loading="busy" :disabled="busy" :data-testid="`${testPrefix}-sync-now`" @click="prepare">{{ t('settings.drive.syncNow') }}</el-button>
+      <el-button v-if="status?.available" type="primary" :loading="busy" :disabled="busy" :data-testid="`${testPrefix}-sync-now`" @click="prepare">{{ providerText('syncNow') }}</el-button>
       <div v-if="status?.account?.email || statusText" class="drive-record" role="status">
         <p v-if="status?.account?.email" :data-testid="`${testPrefix}-last-account`">{{ t('settings.drive.lastAccount', {email: status.account.email}) }}</p>
         <p v-if="statusText" class="drive-status">{{ statusText }}</p>
       </div>
     </div>
-    <a v-if="props.provider === 'dropbox' && !status?.available" class="drive-setup-guide" href="https://read.thinkstu.com/config/dropbox-sync" target="_blank" rel="noopener noreferrer">{{ translate('settings.dropbox.setupGuide') }}</a>
+    <a v-if="props.provider === 'dropbox' && !status?.available" class="drive-setup-guide" href="https://read.thinkstu.com/config/dropbox-sync" target="_blank" rel="noopener noreferrer">{{ t('settings.dropbox.setupGuide') }}</a>
     <el-dialog class="drive-dialog" v-model="previewVisible" :title="t('settings.drive.previewTitle')" width="min(820px, calc(100vw - 24px))" :close-on-click-modal="!busy" :close-on-press-escape="!busy" :show-close="!busy" :before-close="cancelPreview" destroy-on-close @closed="clearPreview">
       <template v-if="preview">
         <div class="drive-account-bar">
           <el-icon class="drive-account-icon"><User /></el-icon>
-          <p>{{ preview.account.email ? t('settings.drive.account', {email: preview.account.email}) : t('settings.drive.selectedAccount') }}</p>
-          <el-button link :loading="switchingAccount" :disabled="busy" :data-testid="`${testPrefix}-switch-account`" @click="switchAccount">{{ t('settings.drive.switchAccount') }}</el-button>
+          <p>{{ preview.account.email ? t('settings.drive.account', {email: preview.account.email}) : providerText('selectedAccount') }}</p>
+          <el-button link :loading="switchingAccount" :disabled="busy" :data-testid="`${testPrefix}-switch-account`" @click="switchAccount">{{ providerText('switchAccount') }}</el-button>
         </div>
         <el-alert v-if="error" :title="error" type="error" :closable="false" show-icon class="drive-error" />
 
@@ -50,14 +50,14 @@
 
         <div v-if="!preview.hasRemote || identical" class="drive-summary drive-summary-positive">
           <el-icon><CircleCheck /></el-icon>
-          <div><h3>{{ t(identical ? 'settings.drive.identicalTitle' : 'settings.drive.firstTitle') }}</h3><p>{{ t(identical ? 'settings.drive.identicalDescription' : 'settings.drive.firstDescription') }}</p></div>
+          <div><h3>{{ identical ? t('settings.drive.identicalTitle') : providerText('firstTitle') }}</h3><p>{{ t(identical ? 'settings.drive.identicalDescription' : 'settings.drive.firstDescription') }}</p></div>
         </div>
         <template v-else-if="step === 'choose'">
           <div class="drive-intent-heading"><h3>{{ t('settings.drive.chooseTitle') }}</h3><p>{{ t(preview.hasBaseline ? 'settings.drive.returningDescription' : 'settings.drive.firstRestoreDescription') }}</p></div>
           <div class="drive-operation-list" role="radiogroup" :aria-label="t('settings.drive.chooseStep')">
             <label v-for="operation in ['download', 'upload'] as const" :key="operation" class="drive-operation" :class="{'is-selected': direction === operation, 'is-disabled': busy}">
               <input v-model="direction" type="radio" :name="`${testPrefix}-operation`" :value="operation" :disabled="busy" :data-testid="`${testPrefix}-direction-${operation}`" />
-              <span><strong>{{ t(`settings.drive.${operation}Title`) }}</strong><span>{{ t(`settings.drive.${operation}Description`) }}</span></span>
+              <span><strong>{{ t(`settings.drive.${operation}Title`) }}</strong><span>{{ providerText(`${operation}Description`) }}</span></span>
             </label>
           </div>
           <div class="drive-advanced">
@@ -133,12 +133,9 @@ import type {DriveSyncDirection, DriveSyncPreview, DriveSyncStatus} from '@/src/
 const props = withDefaults(defineProps<{provider?: 'google' | 'dropbox'}>(), {provider: 'google'});
 const client = props.provider === 'dropbox' ? dropboxSyncClient : googleDriveSyncClient;
 const testPrefix = props.provider === 'dropbox' ? 'dropbox' : 'google-drive';
-const {t: translate, translateLegacy, language} = useUiI18n();
-const providerKeys = new Set(['title', 'syncNow', 'success', 'privacyStorage', 'description', 'selectedAccount', 'switchAccount', 'firstTitle', 'downloadDescription', 'uploadDescription']);
-function t(key: string, values?: Record<string, string | number>) {
-  return translate(props.provider === 'dropbox' && providerKeys.has(key.replace('settings.drive.', '')) ? key.replace('settings.drive.', 'settings.dropbox.') : key, values);
-}
-function errorText(message: string) {return message.startsWith('settings.dropbox.') ? translate(message) : translateLegacy(message);}
+const {t, translateLegacy, language} = useUiI18n();
+function providerText(key: string) {return t(`settings.${props.provider === 'dropbox' ? 'dropbox' : 'drive'}.${key}`);}
+function errorText(message: string) {return message.startsWith('settings.dropbox.') ? t(message) : translateLegacy(message);}
 const status = ref<DriveSyncStatus | null>(null);
 const busy = ref(false);
 const switchingAccount = ref(false);
@@ -160,7 +157,7 @@ const activeRows = computed(() => direction.value === 'merge' ? (automaticVisibl
 const visibleRows = computed(() => activeRows.value.slice((page.value - 1) * 20, page.value * 20));
 const unresolved = computed(() => preview.value ? unresolvedDriveChanges(preview.value, choices.value) : 0);
 const statusText = computed(() => !status.value ? translateLegacy('正在检查同步状态…') : !status.value.available ? errorText(status.value.reason) : status.value.lastSyncedAt ? t('settings.drive.lastSync', {time: new Date(status.value.lastSyncedAt).toLocaleString(language.value)}) : '');
-const directionHint = computed(() => direction.value === 'merge' && !preview.value?.hasBaseline ? t('settings.drive.firstMergeDescription') : direction.value ? t(`settings.drive.${direction.value}Description`) : '');
+const directionHint = computed(() => direction.value === 'merge' ? t(preview.value?.hasBaseline ? 'settings.drive.mergeDescription' : 'settings.drive.firstMergeDescription') : direction.value ? providerText(`${direction.value}Description`) : '');
 const summaryTitle = computed(() => t('settings.drive.mergeReady'));
 const commitLabel = computed(() => t(identical.value ? 'settings.drive.finishSync' : direction.value ? `settings.drive.${direction.value}Action` : 'settings.drive.chooseAction'));
 const canCommit = computed(() => Boolean(preview.value && direction.value && (direction.value !== 'merge' || unresolved.value === 0)));
@@ -207,7 +204,7 @@ async function commit() {
     if (!alive) return;
     try {
       const result = await client.commit(selected.id, selected.direction, selected.choices);
-      if (alive) {status.value = result; ElMessage.success(t('settings.drive.success'));}
+      if (alive) {status.value = result; ElMessage.success(providerText('success'));}
     } finally {if (alive) previewVisible.value = false;}
   });
 }

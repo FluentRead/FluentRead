@@ -19,5 +19,13 @@
   "sync-flow.svg": {
     "source": "FluentRead 同步代码",
     "note": "独立绘制的流程示意图，非截图。"
+  },
+  "sync-choice-fixture.png": {
+    "source": "FluentRead 隔离扩展 UI 回归",
+    "note": "真实界面截图，虚构账号与 Dropbox HTTP 响应，非真实 OAuth 证据。"
+  },
+  "sync-review-fixture.png": {
+    "source": "FluentRead 隔离扩展 UI 回归",
+    "note": "真实界面截图，虚构账号与 Dropbox HTTP 响应，非真实 OAuth 证据。"
   }
 }

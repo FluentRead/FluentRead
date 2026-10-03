@@ -66,7 +66,7 @@ const compressedUiLanguageBundles = greasyForkSource ? {} : Object.fromEntries(O
     .filter(([language]) => language === 'en-US')
     .map(([language, bundle]) => [
     language,
-    gzipSync(Buffer.from(JSON.stringify(bundle))).toString('base64'),
+    gzipSync(Buffer.from(JSON.stringify(bundle)), {level: 9}).toString('base64'),
 ]));
 const remoteUiLanguageBundles = Object.fromEntries(Object.entries(UI_LANGUAGE_BUNDLES)
     .filter(([language]) => language !== 'en-US')
@@ -117,7 +117,7 @@ export function createUserscriptCatalogCompressionPlugin(): Plugin {
                 return `export default globalThis.__FLUENTREAD_USERSCRIPT_DATA__.siteCatalogs.${basename(sourcePath, '.json')};`;
             }
             const contents = JSON.stringify(JSON.parse(fs.readFileSync(sourcePath, 'utf8')));
-            const compressed = gzipSync(Buffer.from(contents)).toString('base64');
+            const compressed = gzipSync(Buffer.from(contents), {level: 9}).toString('base64');
             const digest = createHash('sha256').update(contents).digest('hex');
             return [
                 `/* Non-code site rules: ${normalizePath(sourcePath).slice(projectRoot.length)}; sha256 ${digest}. */`,
@@ -339,7 +339,7 @@ function bundleUserscriptCss(): Plugin {
           handler(_options, bundle) {
             const cssEntries = Object.entries(bundle).filter(([, item]) => item.type === 'asset' && item.fileName.endsWith('.css'));
             const css = cssEntries.map(([, item]) => String(item.type === 'asset' ? item.source : '')).join('\n');
-            const compressedCss = greasyForkSource ? '' : gzipSync(Buffer.from(css, 'utf8')).toString('base64');
+            const compressedCss = greasyForkSource ? '' : gzipSync(Buffer.from(css, 'utf8'), {level: 9}).toString('base64');
             cssEntries.forEach(([fileName]) => delete bundle[fileName]);
 
             if (greasyForkSource) {

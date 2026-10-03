@@ -171,6 +171,12 @@ Firefox 使用 `pnpm build:firefox`，并加载其生成的包。代码只有在
 
 ## 9. 同步产品流程
 
+下面两张截图来自隔离浏览器的虚构账号演示。真实界面会展示你选择的 Dropbox 账号，示例不代表真实授权已完成。
+
+![同步第一步：选择恢复、保存或逐项合并，显示本次账号](/images/dropbox/sync-choice-fixture.png)
+
+![同步第二步：确认方向、替换影响和脱敏差异](/images/dropbox/sync-review-fixture.png)
+
 ![Dropbox 单次同步：授权、预览、确认、清理](/images/dropbox/sync-flow.svg)
 
 下方 Mermaid 描述完整分支，便于维护和在 GitHub 中查看。

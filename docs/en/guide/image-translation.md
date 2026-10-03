@@ -46,3 +46,8 @@ For one small part, try [area translation](/en/guide/area-translation). Unreadab
 ## What gets sent?
 
 Recognition happens locally. Recognized text goes to the selected translation service; image pixels are not uploaded as part of text translation. Initial language-pack downloads require a network connection. See [Data & privacy](/en/guide/privacy).
+
+## Next steps
+
+- [All guides](/en/docs/)
+- [Troubleshooting](/en/guide/faq)

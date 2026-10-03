@@ -1,0 +1,18 @@
+{
+  "ok": true,
+  "routes": [
+    "/docs/",
+    "/config/backup-sync",
+    "/guide/privacy",
+    "/guide/webdav",
+    "/en/docs/",
+    "/en/config/backup-sync",
+    "/en/guide/privacy",
+    "/en/guide/webdav"
+  ],
+  "errors": [],
+  "sourceRevision": "6471ccc1c3e7e731d1cb8ad3bcaf0a816044d6b4",
+  "launchMode": "chromium-headless",
+  "focusPolicy": "isolated-contexts-no-foreground",
+  "windowPlacement": "headless-no-visible-window"
+}

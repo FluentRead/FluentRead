@@ -1,4 +1,3 @@
-
 > FluentRead-流畅阅读@0.0.35 test /private/tmp/fluentread-onedrive-baseline-20261003
 > node scripts/testing/run-resource-safe.mjs -- vitest run "tests/architecture/moduleBoundaries.test.ts" "tests/architecture/verificationOwnership.test.ts"
 
@@ -36,7 +35,7 @@ AssertionError: expected [ …(2) ] to deeply equal [ '@/src/app/document-transl
 
  ❯ tests/architecture/moduleBoundaries.test.ts:372:35
     370|             .filter((specifier) => specifier.startsWith('@/entrypoints…
-    371| 
+    371|
     372|         expect(documentUiImports).toEqual(['@/src/app/document-transla…
        |                                   ^
     373|         expect(featureEntrypointImports).toEqual([]);
@@ -61,7 +60,7 @@ AssertionError: expected [ { …(3) } ] to deeply equal []
 
  ❯ tests/architecture/moduleBoundaries.test.ts:430:24
     428|             .filter(({lines, ceiling}) => lines > ceiling);
-    429| 
+    429|
     430|         expect(growth).toEqual([]);
        |                        ^
     431|     });
@@ -89,7 +88,7 @@ AssertionError: expected [ { …(2) } ] to deeply equal []
     317|         expect(unowned).toEqual([]);
        |                         ^
     318|     });
-    319| 
+    319|
 
 ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/4]⎯
 
@@ -113,11 +112,11 @@ AssertionError: expected [ Array(8) ] to deeply equal []
 
  ❯ tests/architecture/verificationOwnership.test.ts:326:27
     324|             && !strictCoverage.has(path));
-    325| 
+    325|
     326|         expect(uncovered).toEqual([]);
        |                           ^
     327|     });
-    328| 
+    328|
 
 ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[4/4]⎯
 

@@ -43,7 +43,7 @@ FluentRead 免费开源，第三方服务可能单独收费。服务商的订阅
 
 免费翻译服务通过多个免费接口生成译文。接口卡片按页面宽度排列，可选择参与调用的接口；实验候选单独展示，已启用项会显示在摘要中。自动均衡会分配请求，优先顺序模式则按编号依次尝试。
 
-<figure class="doc-figure"><a href="/screenshots/settings-services.webp" target="_blank" rel="noopener"><img class="doc-screenshot" src="/screenshots/settings-services.webp" width="2560" height="1600" alt="翻译服务目录，可选择服务并查看所需的连接设置" loading="lazy" /></a><figcaption>先配置连接，再选择要用的服务。</figcaption></figure>
+<figure class="doc-figure"><a href="/screenshots/ui/zh-CN/settings-services.webp" target="_blank" rel="noopener"><img class="doc-screenshot" src="/screenshots/ui/zh-CN/settings-services.webp" width="2560" height="1600" alt="翻译服务目录，可选择服务并查看所需的连接设置" loading="lazy" /></a><figcaption>先配置连接，再选择要用的服务。</figcaption></figure>
 
 ## 免费翻译如何工作？
 

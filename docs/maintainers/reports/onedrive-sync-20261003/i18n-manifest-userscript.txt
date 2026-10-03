@@ -1,5 +1,4 @@
-
- RUN  v2.1.9 /Users/thinkstu/Desktop/copy/FluentRead-onedrive-guide-20261003
+RUN  v2.1.9 /Users/thinkstu/Desktop/copy/FluentRead-onedrive-guide-20261003
 
  ✓ tests/i18n.test.ts (57 tests) 2593ms
    ✓ i18n 全量界面扫描 > Vue 文案和展示注册表在非中文界面有本地化结果 934ms
@@ -12,4 +11,3 @@
       Tests  84 passed (84)
    Start at  16:20:59
    Duration  6.05s (transform 1.04s, setup 0ms, collect 2.88s, tests 2.68s, environment 0ms, prepare 113ms)
-

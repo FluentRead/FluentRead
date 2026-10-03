@@ -45,3 +45,8 @@ Request history lists recent translation requests with time, service and model, 
 Statistics stay in this browser. The latest 5,000 requests are kept in request history, and hourly summaries are kept for 90 days, so longer ranges are not limited by the history size. **Clear statistics** deletes all statistics without affecting the translation cache, model usage, or settings.
 
 For AI token usage, see [AI usage](/en/guide/model-usage).
+
+## Next steps
+
+- [All guides](/en/docs/)
+- [Troubleshooting](/en/guide/faq)

@@ -18,3 +18,8 @@ Availability depends on Chrome version, device, browser policy, language, and do
 Initial downloads require a network connection. A language that has not been prepared is not yet ready for offline use.
 
 For deeper diagnosis, see [Chrome’s local model help](https://developer.chrome.com/docs/ai/debug-built-in-model).
+
+## Next steps
+
+- [All guides](/en/docs/)
+- [Troubleshooting](/en/guide/faq)

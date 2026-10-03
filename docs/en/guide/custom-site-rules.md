@@ -28,3 +28,8 @@ First check a complete HTTP(S) URL in the effective preview. It explains saved s
 ## Detailed examples
 
 The [repository contribution guide](https://github.com/FluentRead/FluentRead/blob/main/docs/contributing/site-adaptation.md) contains selectors, formats, and validation steps. It also explains how to share a tested rule with the project.
+
+## Next steps
+
+- [All guides](/en/docs/)
+- [Troubleshooting](/en/guide/faq)

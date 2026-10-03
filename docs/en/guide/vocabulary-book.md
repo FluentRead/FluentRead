@@ -29,3 +29,8 @@ Check your answer against the saved reference, then choose whether you remembere
 Collections and review records stay in this browser. Turning off saving or clearing the translation cache does not delete them. Private windows do not offer persistent collections.
 
 Use **Backup & restore** to move your data. The learning center also offers Anki export, with a choice about including source sentences and source information.
+
+## Next steps
+
+- [All guides](/en/docs/)
+- [Troubleshooting](/en/guide/faq)

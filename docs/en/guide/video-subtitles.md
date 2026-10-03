@@ -56,3 +56,8 @@ Check that subtitles are enabled and the video has a native track. For X AI subt
 Recognition can mishear names or background audio, and translations can be wrong. Check important details against the original subtitles and audio.
 
 Open **Subtitle options → Regenerate this video** to bypass its saved subtitles without clearing other videos or downloading an already installed model again. Existing subtitles remain available until model confirmation. Translation failures keep the recognized original and timeline; use **Retry** to recover without repeating speech recognition.
+
+## Next steps
+
+- [All guides](/en/docs/)
+- [Troubleshooting](/en/guide/faq)

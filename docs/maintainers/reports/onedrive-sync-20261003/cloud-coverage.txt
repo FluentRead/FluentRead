@@ -1,5 +1,4 @@
-
- RUN  v2.1.9 /Users/thinkstu/Desktop/copy/FluentRead-onedrive-guide-20261003
+RUN  v2.1.9 /Users/thinkstu/Desktop/copy/FluentRead-onedrive-guide-20261003
       Coverage enabled with v8
 
  ✓ tests/googleDriveSync.test.ts (22 tests) 28460ms
@@ -44,26 +43,26 @@
 
  % Coverage report from v8
 -------------------|---------|----------|---------|---------|-------------------
-File               | % Stmts | % Branch | % Funcs | % Lines | Uncovered Line #s 
+File               | % Stmts | % Branch | % Funcs | % Lines | Uncovered Line #s
 -------------------|---------|----------|---------|---------|-------------------
-All files          |     100 |      100 |     100 |     100 |                   
- ...round/handlers |     100 |      100 |     100 |     100 |                   
-  ...eDriveSync.ts |     100 |      100 |     100 |     100 |                   
-  webDavBackup.ts  |     100 |      100 |     100 |     100 |                   
- core/config       |     100 |      100 |     100 |     100 |                   
-  cloudSync.ts     |     100 |      100 |     100 |     100 |                   
- platform/onedrive |     100 |      100 |     100 |     100 |                   
-  api.ts           |     100 |      100 |     100 |     100 |                   
-  auth.ts          |     100 |      100 |     100 |     100 |                   
-  constants.ts     |     100 |      100 |     100 |     100 |                   
- platform/webdav   |     100 |      100 |     100 |     100 |                   
-  api.ts           |     100 |      100 |     100 |     100 |                   
-  connection.ts    |     100 |      100 |     100 |     100 |                   
- services/config   |     100 |      100 |     100 |     100 |                   
-  ...ckupClient.ts |     100 |      100 |     100 |     100 |                   
-  ...eDriveSync.ts |     100 |      100 |     100 |     100 |                   
-  ...SyncClient.ts |     100 |      100 |     100 |     100 |                   
-  ...ConfigSync.ts |     100 |      100 |     100 |     100 |                   
-  webDavBackup.ts  |     100 |      100 |     100 |     100 |                   
-  ...ckupClient.ts |     100 |      100 |     100 |     100 |                   
+All files          |     100 |      100 |     100 |     100 |
+ ...round/handlers |     100 |      100 |     100 |     100 |
+  ...eDriveSync.ts |     100 |      100 |     100 |     100 |
+  webDavBackup.ts  |     100 |      100 |     100 |     100 |
+ core/config       |     100 |      100 |     100 |     100 |
+  cloudSync.ts     |     100 |      100 |     100 |     100 |
+ platform/onedrive |     100 |      100 |     100 |     100 |
+  api.ts           |     100 |      100 |     100 |     100 |
+  auth.ts          |     100 |      100 |     100 |     100 |
+  constants.ts     |     100 |      100 |     100 |     100 |
+ platform/webdav   |     100 |      100 |     100 |     100 |
+  api.ts           |     100 |      100 |     100 |     100 |
+  connection.ts    |     100 |      100 |     100 |     100 |
+ services/config   |     100 |      100 |     100 |     100 |
+  ...ckupClient.ts |     100 |      100 |     100 |     100 |
+  ...eDriveSync.ts |     100 |      100 |     100 |     100 |
+  ...SyncClient.ts |     100 |      100 |     100 |     100 |
+  ...ConfigSync.ts |     100 |      100 |     100 |     100 |
+  webDavBackup.ts  |     100 |      100 |     100 |     100 |
+  ...ckupClient.ts |     100 |      100 |     100 |     100 |
 -------------------|---------|----------|---------|---------|-------------------

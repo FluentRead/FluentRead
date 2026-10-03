@@ -73,3 +73,8 @@ DeepSeek 的 `deepseek-flash` 及仍可调用的旧别名 `deepseek-v4-flash`、
 想在整张图片上保留排版，可以改用[图片翻译](/guide/image-translation)，该功能继续使用本地 OCR 定位文字。
 
 图片识别使用专门的识图提示词和图片请求格式，不套用服务中的自定义请求体；后续文字翻译仍按该服务的设置执行。
+
+## 接下来
+
+- [返回完整文档](/docs/)
+- [遇到问题](/guide/faq)

@@ -18,3 +18,8 @@
 本地模型的首次下载仍需要联网，不能把尚未准备的语言当作已经离线可用。
 
 需要深入排查时，Chrome 的[本地模型帮助](https://developer.chrome.com/docs/ai/debug-built-in-model)提供诊断入口。
+
+## 接下来
+
+- [返回完整文档](/docs/)
+- [遇到问题](/guide/faq)

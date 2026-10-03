@@ -1,5 +1,4 @@
-
- RUN  v2.1.9 /Users/thinkstu/Desktop/copy/FluentRead-onedrive-guide-20261003
+RUN  v2.1.9 /Users/thinkstu/Desktop/copy/FluentRead-onedrive-guide-20261003
 
  ✓ tests/settingsUiArchitecture.test.ts (33 tests) 84ms
  ❯ tests/architecture/verificationOwnership.test.ts (9 tests | 2 failed) 659ms
@@ -33,7 +32,7 @@ AssertionError: expected [ …(2) ] to deeply equal [ '@/src/app/document-transl
 
  ❯ tests/architecture/moduleBoundaries.test.ts:372:35
     370|             .filter((specifier) => specifier.startsWith('@/entrypoints…
-    371| 
+    371|
     372|         expect(documentUiImports).toEqual(['@/src/app/document-transla…
        |                                   ^
     373|         expect(featureEntrypointImports).toEqual([]);
@@ -58,7 +57,7 @@ AssertionError: expected [ { …(3) } ] to deeply equal []
 
  ❯ tests/architecture/moduleBoundaries.test.ts:430:24
     428|             .filter(({lines, ceiling}) => lines > ceiling);
-    429| 
+    429|
     430|         expect(growth).toEqual([]);
        |                        ^
     431|     });
@@ -86,7 +85,7 @@ AssertionError: expected [ { …(2) } ] to deeply equal []
     319|         expect(unowned).toEqual([]);
        |                         ^
     320|     });
-    321| 
+    321|
 
 ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/4]⎯
 
@@ -110,11 +109,11 @@ AssertionError: expected [ Array(8) ] to deeply equal []
 
  ❯ tests/architecture/verificationOwnership.test.ts:328:27
     326|             && !strictCoverage.has(path));
-    327| 
+    327|
     328|         expect(uncovered).toEqual([]);
        |                           ^
     329|     });
-    330| 
+    330|
 
 ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[4/4]⎯
 
@@ -122,4 +121,3 @@ AssertionError: expected [ Array(8) ] to deeply equal []
       Tests  4 failed | 800 passed (804)
    Start at  16:23:38
    Duration  4.64s (transform 81ms, setup 0ms, collect 609ms, tests 3.50s, environment 0ms, prepare 133ms)
-

@@ -25,3 +25,8 @@ To reduce use, translate only the sentences you need or turn off extra AI contex
 Output speed (token/s) divides the total output tokens of eligible successful requests by their summed duration in seconds, including waiting and transfer time. It is not pure generation speed. Missing output or valid duration displays `—`; zero output displays `0`. The overview shows the aggregate speed and eligible request count, and request details show individual speed. Average duration still includes all calls.
 
 Request records are expanded by default and each row shows output speed (token/s). Each service/model breakdown row also shows its aggregate output speed. Request records can still be collapsed manually.
+
+## Next steps
+
+- [All guides](/en/docs/)
+- [Troubleshooting](/en/guide/faq)

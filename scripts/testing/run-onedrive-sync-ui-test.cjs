@@ -89,13 +89,14 @@ async function main() {
         },{config,sequence:++sequence});check(result.success===true,'trusted config patch '+sequence+': '+(result.error??''));}
         await patch({uiLanguage:'zh-CN',uiLanguageSetupCompleted:true,theme:'light',token:{openai:'synthetic-service-key'},apiKeys:{openai:['synthetic-service-key']},customBody:{openai:'{"auth":"synthetic-body"}'},proxy:{openai:'https://fixture.invalid/?key=synthetic-url'}});await page.reload({waitUntil:'domcontentloaded'});
         await page.locator('button[data-section="settings-data"]').click();
+        await page.getByTestId('cloud-method-onedrive').check();
         const card=page.getByTestId('onedrive-sync'),dialog=page.locator('.el-dialog').filter({has:page.getByTestId('onedrive-switch-account')});
         const begin=async()=>{await page.getByTestId('onedrive-sync-now').click();await dialog.waitFor({state:'visible'});};
         const finish=async()=>{await page.getByTestId('onedrive-confirm').click();await dialog.waitFor({state:'hidden'});};
-        const shot=async name=>{await page.waitForTimeout(350);const output=path.join(artifactsDir,name+'.png');await page.screenshot({path:output});report.screenshots.push(output);};
+        const shot=async name=>{for(const toast of await page.locator('.el-message').all())await toast.waitFor({state:'hidden'});await page.waitForTimeout(350);const output=path.join(artifactsDir,name+'.png');await page.screenshot({path:output});report.screenshots.push(output);};
         await page.getByTestId('onedrive-sync-now').waitFor();
         check(await worker.evaluate(()=>__cloudFixture.auth===0&&__cloudFixture.requests===0),'opening settings does not authorize or contact either cloud');
-        check(await page.locator('[id="onedrive-title"]').count()===1&&await page.locator('[id="google-drive-title"]').count()===1,'provider cards have unique accessible headings');
+        check(await page.locator('[id="cloud-backup-title"]').count()===1&&await page.getByTestId('google-drive-sync').count()===0,'one cloud backup heading and only the selected provider are rendered');
         await begin();check(await worker.evaluate(()=>__cloudFixture.uploads===0),'preview performs no write');
         check((await dialog.innerText()).includes('fixture-a@example.invalid'),'preview identifies the selected Microsoft account');
         await shot('onedrive-first-save-desktop');await finish();
@@ -126,12 +127,14 @@ async function main() {
         await worker.evaluate(()=>{__cloudFixture.deny=false;__cloudFixture.fail=true;});await page.getByTestId('onedrive-sync-now').click();
         await card.getByText('OneDrive 请求失败',{exact:false}).waitFor();
         await worker.evaluate(()=>{__cloudFixture.fail=false;__cloudFixture.user='a';});
+        await page.getByTestId('cloud-method-google-drive').check();
         await page.getByTestId('google-drive-sync-now').click();const googleDialog=page.locator('.el-dialog').filter({has:page.getByTestId('google-drive-switch-account')});await googleDialog.waitFor({state:'visible'});await page.getByTestId('google-drive-confirm').click();await googleDialog.waitFor({state:'hidden'});
+        await page.getByTestId('cloud-method-onedrive').check();await card.getByText('fixture-a@example.invalid',{exact:false}).waitFor();
         check((await card.innerText()).includes('fixture-a@example.invalid'),'Google sync does not change the OneDrive account record');
         const before=await worker.evaluate(()=>({requests:__cloudFixture.requests,auth:__cloudFixture.auth}));await page.reload({waitUntil:'domcontentloaded'});await page.getByTestId('onedrive-sync-now').waitFor();
         check(await worker.evaluate(v=>__cloudFixture.requests===v.requests&&__cloudFixture.auth===v.auth,before),'reopening settings does not reconnect to cloud');
         await shot('onedrive-idle-desktop');
-        await patch({uiLanguage:'en-US',theme:'dark'});await page.reload({waitUntil:'domcontentloaded'});await card.getByRole('heading',{name:'OneDrive configuration sync',exact:true}).waitFor();
+        await patch({uiLanguage:'en-US',theme:'dark'});await page.reload({waitUntil:'domcontentloaded'});await card.getByTestId('onedrive-sync-now').waitFor();
         check(!/[\u3400-\u9fff]/u.test(await card.innerText()),'English card has no Chinese source copy');
         await page.setViewportSize({width:390,height:900});await activateExtensionTabWithoutForeground(context,page);
         check(await page.evaluate(()=>document.documentElement.scrollWidth<=document.documentElement.clientWidth),'390px English dark settings have no horizontal overflow');

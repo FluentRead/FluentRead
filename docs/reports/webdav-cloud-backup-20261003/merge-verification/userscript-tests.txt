@@ -1,0 +1,15 @@
+
+> FluentRead-流畅阅读@0.0.35 test <task-worktree>
+> node scripts/testing/run-resource-safe.mjs -- vitest run "tests/userscriptViteConfig.test.ts" "tests/userscriptLanguageBundles.test.ts"
+
+[resource-safe] CPU target 60%, maxWorkers 2, concurrency 5, command: vitest run tests/userscriptViteConfig.test.ts tests/userscriptLanguageBundles.test.ts
+
+ RUN  v2.1.9 <task-worktree>
+
+ ✓ tests/userscriptViteConfig.test.ts (9 tests) 54ms
+ ✓ tests/userscriptLanguageBundles.test.ts (3 tests) 103ms
+
+ Test Files  2 passed (2)
+      Tests  12 passed (12)
+   Start at  15:56:09
+   Duration  2.08s (transform 682ms, setup 0ms, collect 1.57s, tests 157ms, environment 0ms, prepare 81ms)

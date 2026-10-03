@@ -1,11 +1,12 @@
 <!--
 @file src/features/settings/ui/GoogleDriveSync.vue
-文件职责：保留既有 Google Drive 配置同步入口并注入原生 Chrome 同步客户端。
-主要内容：将 Google 云盘标识和独立消息端口传入共用确认界面，继续复用已有单次授权、上次账号与两步确认的体验。
-模块边界：只负责 Google 产品入口的装配；不访问完整配置、授权令牌或隐藏云端文件，事务仍由后台服务执行。
+文件职责：把 Google Drive 作为配置云备份的一种存储方式接入共用界面。
+主要内容：提供已有后台客户端、供应商名称和动作标记；保留单次授权与更换账号入口。
+模块边界：不读取配置或令牌；预览和确认交互由 RemoteConfigSync 统一实现。
 -->
-<template><CloudConfigSync provider="google-drive" :client="googleDriveSyncClient" /></template>
+<template><RemoteConfigSync :client="googleDriveSyncClient" provider="Google Drive" kind="google-drive" @busy="$emit('busy', $event)" /></template>
 <script setup lang="ts">
-import CloudConfigSync from './CloudConfigSync.vue';
+import RemoteConfigSync from './RemoteConfigSync.vue';
 import {googleDriveSyncClient} from '@/src/services/config/googleDriveSyncClient';
+defineEmits<{busy: [value: boolean]}>();
 </script>

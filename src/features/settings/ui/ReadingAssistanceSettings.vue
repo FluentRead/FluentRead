@@ -19,6 +19,7 @@
         :appearance-style="{}"
         :highlight-enabled="config.bilingualSentenceHighlightEnabled"
         :highlight-style="config.bilingualSentenceHighlightStyle"
+        :highlight-appearance="config.bilingualSentenceHighlightAppearance"
         :initial-sentence="0"
         :translation-before-original="config.translationBeforeOriginal"
         :page-theme="pageTheme"

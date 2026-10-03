@@ -8,6 +8,7 @@
 import brandTaglines from './brand-taglines.json';
 import googleDriveText from './google-drive/fr-FR.json';
 import oneDriveText from './onedrive/fr-FR.json';
+import cloudBackupText from './cloud-backup/fr-FR.json';
 import type {
 enUSMessages} from './en-US';
 import {legacyTextOverrides} from './legacy-overrides';
@@ -24,6 +25,7 @@ export const frFRMessages = {
     "settings.backup.restoreHint": "Choisissez un fichier de sauvegarde FluentRead. Les anciens fichiers JSON peuvent aussi être restaurés.",
     ...googleDriveText.messages,
     ...oneDriveText.messages,
+    ...cloudBackupText.messages,
     "brand.tagline": brandTaglines['fr-FR'],
     "popup.translationCount": "{count} traductions",
     "translationCenter.endpointMissing": "Renseignez d’abord l’adresse du service personnalisé.",
@@ -92,6 +94,25 @@ export const frFRMessages = {
     "options.panel.statsOverview": "Vue d’ensemble",
     "options.panel.modelUsage": "Utilisation des modèles",
     "options.panel.reading": "Aide à la lecture",
+    "sentenceHighlight.savedTitle": "Surlignages de phrases enregistrés",
+    "sentenceHighlight.customCssHint": "Saisissez des déclarations CSS sans sélecteur. Couleurs, fonds, soulignements et ombres du texte sont pris en charge ; les déclarations valides remplacent les réglages correspondants.",
+    "sentenceHighlight.customCssInvalid": "Les déclarations non prises en charge ou non reconnues sont ignorées. Utilisez couleurs, fonds, soulignements ou ombres du texte.",
+    "sentenceHighlight.customTitle": "Personnaliser l’apparence",
+    "sentenceHighlight.customHint": "Les valeurs suivent le préréglage choisi. Les changements sont visibles immédiatement ; choisir un préréglage restaure son apparence.",
+    "sentenceHighlight.reset": "Rétablir le préréglage",
+    "sentenceHighlight.backgroundColor": "Couleur de surlignage",
+    "sentenceHighlight.backgroundOpacity": "Opacité du fond",
+    "sentenceHighlight.lineColor": "Couleur du soulignement",
+    "sentenceHighlight.lineOpacity": "Opacité du soulignement",
+    "sentenceHighlight.lineStyle": "Style du soulignement",
+    "sentenceHighlight.lineThickness": "Épaisseur du trait",
+    "sentenceHighlight.line.default": "Suivre le préréglage",
+    "sentenceHighlight.line.none": "Sans soulignement",
+    "sentenceHighlight.line.solid": "Continu",
+    "sentenceHighlight.line.dotted": "Pointillé",
+    "sentenceHighlight.line.dashed": "Tirets",
+    "sentenceHighlight.line.double": "Ligne double",
+    "sentenceHighlight.line.wavy": "Ondulé",
     "sentenceHighlight.title": "Style du surlignage par phrase",
     "sentenceHighlight.description": "Choisissez un accent discret pour les phrases source et traduite correspondantes.",
     "sentenceHighlight.tryHint": "Survolez une phrase pour souligner ensemble sa source et sa traduction.",

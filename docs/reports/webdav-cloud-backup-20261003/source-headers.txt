@@ -1,0 +1,14 @@
+
+> FluentRead-流畅阅读@0.0.35 test <task-worktree>
+> node scripts/testing/run-resource-safe.mjs -- vitest run "tests/architecture/sourceFileHeaders.test.ts"
+
+[resource-safe] CPU target 60%, maxWorkers 2, concurrency 5, command: vitest run tests/architecture/sourceFileHeaders.test.ts
+
+ RUN  v2.1.9 <task-worktree>
+
+ ✓ tests/architecture/sourceFileHeaders.test.ts (745 tests) 330ms
+
+ Test Files  1 passed (1)
+      Tests  745 passed (745)
+   Start at  15:19:41
+   Duration  587ms (transform 41ms, setup 0ms, collect 40ms, tests 330ms, environment 0ms, prepare 42ms)

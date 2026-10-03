@@ -195,12 +195,12 @@ pnpm build:firefox
 | `src/platform/onedrive/auth.ts` | 授权窗口、state、PKCE、短期令牌、账号校验 |
 | `src/platform/onedrive/api.ts` | 应用文件夹、密文读写、版本校验、超时与大小限制 |
 | `src/app/background/googleDriveSyncRuntime.ts` | 按提供商装配后台，复用现有配置存储和修改队列 |
-| `src/services/config/googleDriveSync.ts` | 共用确认事务、快照与合并逻辑 |
-| `src/features/settings/ui/CloudConfigSync.vue` | 共用两步预览界面，只接收脱敏数据 |
+| `src/services/config/remoteConfigSync.ts` | 共用确认事务、快照与合并逻辑 |
+| `src/features/settings/ui/RemoteConfigSync.vue` | 共用两步预览界面，只接收脱敏数据 |
 
 ## 7. 用户实际怎么用？
 
-1. 打开 **设置 → 备份与恢复 → OneDrive 配置同步**，点击“立即与OneDrive同步”。
+1. 打开 **设置 → 备份与恢复 → 配置云备份 → OneDrive**，点击“立即与OneDrive同步”。
 2. 微软窗口让用户选择账号、登录并允许必要权限。扩展不会自动勾选或代替用户同意。
 3. 扩展核对账号、读取应用文件夹，显示本次账号和配置预览。可以点“更换 Microsoft 账号”，结束当前预览并重新选择。
 4. 云端没有文件时，明确确认保存本机配置。已有文件时先选择“恢复云端配置”或“保存本机配置”，再检查替换范围；希望保留两边部分修改时进入“逐项合并”。

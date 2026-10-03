@@ -3,12 +3,13 @@ import {Config, normalizeConfig} from '@/src/core/config/model';
 import {driveSyncPayload, parseDriveSyncPayload, toDriveSyncConfig} from '@/src/core/config/driveSync';
 import {decryptDriveConfig, encryptDriveConfig} from '@/src/platform/google-drive/encryption';
 import {createGoogleDriveSync, type DriveSyncPorts, type DriveSyncState} from '@/src/services/config/googleDriveSync';
+import {createRemoteConfigSync} from '@/src/services/config/remoteConfigSync';
 import type {DriveRemote} from '@/src/platform/google-drive/api';
 
 const password = 'fixture cross device password';
 const owner = {id: 'fixture-account-a', email: 'tester@fixture.invalid'};
 function config(patch: Record<string, unknown> = {}) {return toDriveSyncConfig(normalizeConfig({...new Config(), videoServiceDefaultMigrated: true, ...patch}));}
-function fixture(accountChangedMessage?: string) {
+function fixture(accountChangedError?: string) {
     let local = config({customOpenAIProviders: [{id: 'custom:fixture', name: 'Fixture', endpoint: 'https://fixture.invalid/v1', models: ['fixture-model']}], token: {openai: 'fixture-key-a'}, customHeaders: {'custom:fixture': '{"Authorization":"fixture-header-a"}'}, customBody: {openai: '{"auth":"fixture-body-a"}'}, proxy: {openai: 'https://fixture.invalid/?key=fixture-url-a'}, extra: {oauth: 'fixture-oauth-a'}});
     let remote: DriveRemote | null = null;
     let state: unknown = null;
@@ -16,7 +17,7 @@ function fixture(accountChangedMessage?: string) {
     let clock = 1000;
     const session = () => ({account, request: async <T>(operation: (token: string) => Promise<T>) => operation('fixture-auth-token')});
     const ports: DriveSyncPorts = {
-        ...(accountChangedMessage ? {accountChangedMessage} : {}),
+        ...(accountChangedError ? {accountChangedError} : {}),
         auth: {availability: vi.fn(() => ({available: true, reason: ''})), open: vi.fn(async () => session()), disconnect: vi.fn(async () => undefined)},
         api: {
             read: vi.fn(async () => remote),
@@ -26,7 +27,7 @@ function fixture(accountChangedMessage?: string) {
         apply: vi.fn(async value => {local = structuredClone(value);}),
         readState: vi.fn(async () => state), writeState: vi.fn(async value => {state = value;}), now: () => clock,
     };
-    const service = createGoogleDriveSync(ports);
+    const service = accountChangedError ? createRemoteConfigSync(ports) : createGoogleDriveSync(ports);
     return {service, ports, get local() {return local;}, set local(value) {local = value;}, get remote() {return remote;}, set remote(value) {remote = value;}, get state() {return state;}, set state(value) {state = value;}, set account(value: typeof owner) {account = value;}, set clock(value: number) {clock = value;}};
 }
 async function synced() {

@@ -10,6 +10,7 @@ import type {createGoogleDriveSync} from '@/src/services/config/googleDriveSync'
 import {GOOGLE_DRIVE_APPLICATION_PASSPHRASE} from '@/src/platform/google-drive/constants';
 import {DriveError} from '@/src/platform/google-drive/auth';
 import {DriveEncryptionError} from '@/src/platform/google-drive/encryption';
+import {CloudSyncError} from '@/src/core/config/cloudSync';
 import {DriveConfigError} from '@/src/core/config/driveSync';
 
 export const GOOGLE_DRIVE_SYNC_MESSAGE_TYPE = 'googleDriveEncryptedSync';
@@ -44,7 +45,7 @@ export function createGoogleDriveSyncHandler(service: Service, trusted: (sender:
                 } else return {success: false, error: oneDrive ? 'settings.onedrive.invalidOperation' : '无效的 Google Drive 同步操作。'};
                 return {success: true, data};
             } catch (error) {
-                return {success: false, error: error instanceof DriveEncryptionError ? error.message === '同步配置过大，请减少自定义设置后重试' ? error.message : '同步文件无法解密或已损坏；请检查云端备份，本机配置未被修改。' : error instanceof DriveError || error instanceof DriveConfigError ? error.message : '同步未完成，请检查网络和配置存储后重新预览。'};
+                return {success: false, error: error instanceof DriveEncryptionError ? error.message === '同步配置过大，请减少自定义设置后重试' ? error.message : '同步文件无法解密或已损坏；请检查云端备份，本机配置未被修改。' : error instanceof DriveError || error instanceof CloudSyncError || error instanceof DriveConfigError ? error.message : '同步未完成，请检查网络和配置存储后重新预览。'};
             }
         },
     };

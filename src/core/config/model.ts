@@ -6,7 +6,7 @@
  * 模块边界：本文件属于 core 领域层，只定义规则、类型与纯转换；不直接读写浏览器存储、不发起网络请求、不挂载 Vue/WXT 入口，持久化、协议调用和界面编排分别由 services、providers 与 features 承担。
  */
 
-import {DEFAULT_SENTENCE_HIGHLIGHT_STYLE, normalizeSentenceHighlightStyle, type SentenceHighlightStyle} from './sentenceHighlight';
+import {DEFAULT_SENTENCE_HIGHLIGHT_STYLE, DEFAULT_SENTENCE_HIGHLIGHT_APPEARANCE, normalizeSentenceHighlightStyle, normalizeSentenceHighlightAppearance, normalizeSentenceHighlightProfiles, type SentenceHighlightStyle, type SentenceHighlightAppearance, type SentenceHighlightProfile} from './sentenceHighlight';
 import {normalizeShareCardPreferences, type ShareCardPreferences} from '@/src/core/config/shareCard';
 import type {TranslationScope} from '@/src/core/translation/types';
 import {
@@ -415,6 +415,9 @@ export class Config {
     videoGlossaryIds: string[] | null; // 字幕术语选择；null 跟随全局，空数组停用
     enableAIMultiSegment: boolean; // 是否把相邻全文段落合并为一次 AI 翻译请求
     bilingualSentenceHighlightEnabled: boolean; // 是否在双语翻译中同步高亮原文与译文
+    bilingualSentenceHighlightProfiles: SentenceHighlightProfile[]; // 命名的逐句高亮快照，包含 CSS
+    activeSentenceHighlightProfileId: string; // 当前选中快照，编辑草稿不覆盖已保存内容
+    bilingualSentenceHighlightAppearance: SentenceHighlightAppearance; // 逐句高亮自定义绘制外观
     bilingualSentenceHighlightStyle: SentenceHighlightStyle; // 逐句高亮外观，与译文整体样式独立
     contextMenuEnabled: boolean; // 右键菜单总开关
     contextMenuEntries: ContextMenuEntryPreferences; // 右键菜单各入口的显示偏好；未设置的入口按产品默认值
@@ -605,6 +608,9 @@ export class Config {
         this.enableAIMultiSegment = false; // 默认逐段请求，由用户按需开启 AI 多段翻译
         this.bilingualSentenceHighlightEnabled = false; // 默认关闭双语逐句高亮，避免改变现有网页视觉
         this.bilingualSentenceHighlightStyle = DEFAULT_SENTENCE_HIGHLIGHT_STYLE;
+        this.bilingualSentenceHighlightAppearance = {...DEFAULT_SENTENCE_HIGHLIGHT_APPEARANCE};
+        this.bilingualSentenceHighlightProfiles = [];
+        this.activeSentenceHighlightProfileId = '';
         this.contextMenuEnabled = true; // 默认显示右键菜单入口
         this.contextMenuEntries = {}; // 默认全部跟随产品默认值，用户改动才写入偏好
         this.contextMenuShowTargetLanguage = true; // 默认标出译入语言，让菜单说清会翻成什么
@@ -1032,6 +1038,11 @@ export function normalizeConfig(value: unknown): Config {
     }
     normalized.bilingualSentenceHighlightEnabled = source.bilingualSentenceHighlightEnabled === true;
     normalized.bilingualSentenceHighlightStyle = normalizeSentenceHighlightStyle(source.bilingualSentenceHighlightStyle);
+    normalized.bilingualSentenceHighlightAppearance = normalizeSentenceHighlightAppearance(source.bilingualSentenceHighlightAppearance);
+    normalized.bilingualSentenceHighlightProfiles = normalizeSentenceHighlightProfiles(source.bilingualSentenceHighlightProfiles);
+    normalized.activeSentenceHighlightProfileId = typeof source.activeSentenceHighlightProfileId === 'string'
+        && normalized.bilingualSentenceHighlightProfiles.some(profile => profile.id === source.activeSentenceHighlightProfileId)
+        ? source.activeSentenceHighlightProfileId : '';
     normalized.translationAppearance = normalizeTranslationAppearance(source.translationAppearance);
     normalized.translationStyleProfiles = normalizeTranslationStyleProfiles(source.translationStyleProfiles);
     normalized.activeTranslationStyleProfileId = typeof source.activeTranslationStyleProfileId === 'string'

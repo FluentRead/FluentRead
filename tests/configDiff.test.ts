@@ -198,6 +198,25 @@ describe('配置差异预览', () => {
         expect(group(result, 'translation')?.changes).toContainEqual({key: 'bilingualSentenceHighlightStyle', label: '逐句高亮样式', before: '柔光粉', after: '薄荷清风'});
     });
 
+    it('逐句高亮 CSS 和命名快照使用可读的配置差异', () => {
+        const profile = {id: 'night', name: '夜间阅读', style: 'slate', appearance: {customCss: 'color: navy;'}};
+        const added = buildConfigDiff({bilingualSentenceHighlightProfiles: [], activeSentenceHighlightProfileId: '', bilingualSentenceHighlightAppearance: {customCss: ''}}, {
+            bilingualSentenceHighlightProfiles: [profile], activeSentenceHighlightProfileId: 'night', bilingualSentenceHighlightAppearance: {customCss: 'color: navy;\ntext-decoration: underline;'},
+        });
+        expect(group(added, 'translation')?.changes).toEqual(expect.arrayContaining([
+            {key: 'bilingualSentenceHighlightProfiles', label: '已保存的逐句高亮样式', before: '无', after: '夜间阅读'},
+            {key: 'activeSentenceHighlightProfileId', label: '当前逐句高亮配置', before: '未选择', after: '已选择保存的配置'},
+            {key: 'bilingualSentenceHighlightAppearance.customCss', label: 'CSS', before: '跟随预设', after: 'color: navy; text-decoration: underline;'},
+        ]));
+        const updated = buildConfigDiff({bilingualSentenceHighlightProfiles: [profile], activeSentenceHighlightProfileId: 'night'}, {
+            bilingualSentenceHighlightProfiles: [{...profile, appearance: {customCss: 'color: red;'}}], activeSentenceHighlightProfileId: 'another',
+        });
+        expect(group(updated, 'translation')?.changes).toEqual(expect.arrayContaining([
+            {key: 'bilingualSentenceHighlightProfiles', label: '已保存的逐句高亮样式', before: '夜间阅读', after: '夜间阅读（内容已更新）'},
+            {key: 'activeSentenceHighlightProfileId', label: '当前逐句高亮配置', before: '已选择保存的配置', after: '已选择保存的配置（内容已更新）'},
+        ]));
+    });
+
     it('逐项预览译文外观微调，默认颜色与百分比使用可读文案', () => {
         const defaults = {textColor: '', backgroundColor: '', lineColor: '', fillColor: '', fontScale: 100, fontWeight: 'default', fontFamily: 'default', opacity: 100, customCss: ''};
         const result = buildConfigDiff({style: 1, translationAppearance: defaults}, {
@@ -1107,4 +1126,24 @@ it('previews area recognition choices, user prompt edits, and per-model capabili
 it('previews per-service API key rotation switches', () => {
     expect(group(buildConfigDiff({apiKeyRotationEnabled: {}}, {apiKeyRotationEnabled: {openai: true}}), 'translationServices')?.changes)
         .toEqual([{key: 'apiKeyRotationEnabled', label: '自动轮换', before: '无', after: 'OpenAI：开启'}]);
+});
+
+
+describe('逐句高亮自定义外观差异', () => {
+    it('按字段展示颜色、透明度、线型与粗细，并识别回到预设', () => {
+        const before = {bilingualSentenceHighlightAppearance: {backgroundColor: '', backgroundOpacity: null, lineStyle: 'default', lineThickness: null}};
+        const after = {bilingualSentenceHighlightAppearance: {backgroundColor: '#123456', backgroundOpacity: 34, lineStyle: 'dashed', lineThickness: 3}};
+        expect(group(buildConfigDiff(before, after), 'translation')?.changes).toEqual([
+            {key: 'bilingualSentenceHighlightAppearance.backgroundColor', label: '高亮底色', before: '跟随预设', after: '#123456'},
+            {key: 'bilingualSentenceHighlightAppearance.backgroundOpacity', label: '底色不透明度', before: '跟随预设', after: '34%'},
+            {key: 'bilingualSentenceHighlightAppearance.lineStyle', label: '下划线形态', before: '跟随预设', after: '虚线'},
+            {key: 'bilingualSentenceHighlightAppearance.lineThickness', label: '线条粗细', before: '跟随预设', after: '3px'},
+        ]);
+        expect(group(buildConfigDiff(after, before), 'translation')?.changes.every(item => item.after === '跟随预设')).toBe(true);
+        expect(group(buildConfigDiff({}, {bilingualSentenceHighlightAppearance: {lineColor: '#abcdef', lineOpacity: 0, unknown: true}}), 'translation')?.changes).toEqual([
+            {key: 'bilingualSentenceHighlightAppearance.lineColor', label: '下划线颜色', before: '跟随预设', after: '#abcdef'},
+            {key: 'bilingualSentenceHighlightAppearance.lineOpacity', label: '下划线不透明度', before: '跟随预设', after: '0%'},
+            {key: 'bilingualSentenceHighlightAppearance.unknown', label: 'unknown', before: '跟随预设', after: '开启'},
+        ]);
+    });
 });

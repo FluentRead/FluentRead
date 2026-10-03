@@ -22,6 +22,7 @@ import {
 import {configStorage} from '@/src/platform/storage/configStorageRuntime';
 import type {BackgroundMessageHandler} from './messageRouter';
 import {createGoogleDriveSyncRuntime} from './googleDriveSyncRuntime';
+import {createWebDavBackupRuntime} from './webDavBackupRuntime';
 import {createConfigAutoBackupRestoreHandler} from './handlers/configAutoBackup';
 import {createConfigStorageReadHandler} from './handlers/configStorage';
 import {createConfigCountIncrementHandler} from './handlers/configCount';
@@ -49,6 +50,7 @@ export function createConfigBackgroundHandlers<TContext extends ConfigPersistenc
     return [
         createGoogleDriveSyncRuntime(mutations),
         createGoogleDriveSyncRuntime(mutations, 'onedrive'),
+        createWebDavBackupRuntime(mutations),
         createConfigStorageReadHandler({
             ready: configReady,
             read: async key => {

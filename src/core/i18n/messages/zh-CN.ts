@@ -9,6 +9,7 @@
 import brandTaglines from './brand-taglines.json';
 import googleDriveText from './google-drive/zh-CN.json';
 import oneDriveText from './onedrive/zh-CN.json';
+import cloudBackupText from './cloud-backup/zh-CN.json';
 import type {
 MessageCatalog} from '../types';
 import {localTtsChineseMessages} from './localTts';
@@ -22,6 +23,7 @@ export const zhCNMessages = {
     "settings.backup.restoreHint": "选择 FluentRead 备份文件，旧版 JSON 文件也可恢复。",
     ...googleDriveText.messages,
     ...oneDriveText.messages,
+    ...cloudBackupText.messages,
     "brand.tagline": brandTaglines['zh-CN'],
     "popup.translationCount": "已完成 {count} 次翻译",
     "translationCenter.endpointMissing": "请先填写自定义服务的接口地址。",
@@ -90,6 +92,25 @@ export const zhCNMessages = {
     "options.panel.statsOverview": "翻译概览",
     "options.panel.modelUsage": "模型用量",
     "options.panel.reading": "阅读辅助",
+    "sentenceHighlight.savedTitle": "已保存的逐句高亮",
+    "sentenceHighlight.customCssHint": "只写 CSS 声明，无需选择器。支持颜色、底色、下划线和文字阴影；有效声明覆盖上方控件的对应值。",
+    "sentenceHighlight.customCssInvalid": "不支持或无法解析的声明已忽略。请使用颜色、底色、下划线或文字阴影属性。",
+    "sentenceHighlight.customTitle": "自定义外观",
+    "sentenceHighlight.customHint": "默认沿用所选预设。调整后即时预览；选择预设会恢复该预设的外观。",
+    "sentenceHighlight.reset": "恢复预设外观",
+    "sentenceHighlight.backgroundColor": "高亮底色",
+    "sentenceHighlight.backgroundOpacity": "底色不透明度",
+    "sentenceHighlight.lineColor": "下划线颜色",
+    "sentenceHighlight.lineOpacity": "下划线不透明度",
+    "sentenceHighlight.lineStyle": "下划线形态",
+    "sentenceHighlight.lineThickness": "线条粗细",
+    "sentenceHighlight.line.default": "跟随预设",
+    "sentenceHighlight.line.none": "无下划线",
+    "sentenceHighlight.line.solid": "实线",
+    "sentenceHighlight.line.dotted": "点线",
+    "sentenceHighlight.line.dashed": "虚线",
+    "sentenceHighlight.line.double": "双线",
+    "sentenceHighlight.line.wavy": "波浪线",
     "sentenceHighlight.title": "逐句高亮样式",
     "sentenceHighlight.description": "为对应的原文与译文选择一种轻柔强调，跟随视线阅读。",
     "sentenceHighlight.tryHint": "移到一句话上，原文与译文会同步高亮。",

@@ -33,6 +33,7 @@
             :key="index"
             :class="{ 'is-sentence-highlighted': highlightEnabled && activeSentence === index }"
             :tabindex="highlightEnabled ? 0 : -1"
+            :style="highlightEnabled && activeSentence === index ? highlightAppearanceStyle : undefined"
             @pointerenter="activeSentence = index"
             @focus="activeSentence = index"
             @blur="activeSentence = null"
@@ -49,6 +50,7 @@
             :key="index"
             :class="{ 'is-sentence-highlighted': highlightEnabled && activeSentence === index }"
             :tabindex="highlightEnabled ? 0 : -1"
+            :style="highlightEnabled && activeSentence === index ? highlightAppearanceStyle : undefined"
             @pointerenter="activeSentence = index"
             @focus="activeSentence = index"
             @blur="activeSentence = null"
@@ -67,7 +69,7 @@
 <script setup lang="ts">
 import {computed, ref, watch} from 'vue'
 import {useUiI18n} from '@/src/ui/i18n'
-import {normalizeSentenceHighlightStyle, type SentenceHighlightStyle} from '@/src/core/config/sentenceHighlight'
+import {normalizeSentenceHighlightStyle, getSentenceHighlightAppearanceStyle, type SentenceHighlightStyle, type SentenceHighlightAppearance} from '@/src/core/config/sentenceHighlight'
 import '@/src/ui/styles/bilingual-sentence-highlight.css'
 import SegmentedControl from './SegmentedControl.vue'
 
@@ -78,6 +80,7 @@ const props = defineProps<{
   appearanceStyle: Record<string, string>
   highlightEnabled: boolean
   highlightStyle?: SentenceHighlightStyle
+  highlightAppearance?: SentenceHighlightAppearance
   initialSentence?: number
   translationBeforeOriginal: boolean
   pageTheme: PreviewPageTheme
@@ -92,6 +95,7 @@ const emit = defineEmits<{
 
 const {t} = useUiI18n()
 const activeSentence = ref<number | null>(null)
+const highlightAppearanceStyle = computed(() => getSentenceHighlightAppearanceStyle(props.highlightStyle, props.highlightAppearance))
 watch(() => [props.highlightEnabled, props.initialSentence] as const, ([enabled, sentence]) => {
   activeSentence.value = enabled && sentence !== undefined ? sentence : null
 }, {immediate: true})

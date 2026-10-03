@@ -48,7 +48,8 @@
     "docs:build": "node scripts/testing/run-resource-safe.mjs -- vitepress build docs",
     "docs:preview": "vitepress preview docs",
     "docs:contributors": "node scripts/update-readme-contributors.mjs",
-    "analyze:bundle": "node scripts/testing/run-resource-safe.mjs -- node scripts/testing/analyze-bundle-size.mjs"
+    "analyze:bundle": "node scripts/testing/run-resource-safe.mjs -- node scripts/testing/analyze-bundle-size.mjs",
+    "test:cloud-backup": "node scripts/testing/run-resource-safe.mjs -- vitest run --config vitest.cloud-backup.config.ts"
   },
   "dependencies": {
     "@ai-sdk/anthropic": "3.0.116",

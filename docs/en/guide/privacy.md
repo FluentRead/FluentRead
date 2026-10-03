@@ -2,7 +2,7 @@
 
 Updated: October 3, 2026.
 
-This policy describes how the FluentRead browser extension handles translation content, local records, service credentials, and optional Google Drive and OneDrive configuration backups. FluentRead is a bilingual translation and reading-assistance tool maintained by its open-source project contributors. The website and this policy are publicly accessible without signing in. Translation does not require connecting a Google account.
+This policy describes how the FluentRead browser extension handles translation content, local records, service credentials, and optional Google Drive / OneDrive / WebDAV cloud configuration backups. FluentRead is a bilingual translation and reading-assistance tool maintained by its open-source project contributors. The website and this policy are publicly accessible without signing in. Translation does not require connecting a Google account.
 
 The feature and service you choose determine which content leaves the browser. FluentRead does not run its own translation server; cloud translation is handled by the selected provider.
 
@@ -20,6 +20,7 @@ The feature and service you choose determine which content leaves the browser. F
 | Documents | Files are parsed locally; text to translate goes to the selected service |
 | Video subtitles | Subtitle text goes to the subtitle service. X local AI audio recognition happens on the device |
 | Dictionary and read-aloud | Requested words or text go to the corresponding dictionary or voice service |
+| WebDAV cloud configuration backup | Connection tests send your username and app password to your chosen server; confirmed operations read or write encrypted configuration without passing through a developer server |
 | Google Drive configuration sync (Chrome testing feature) | After explicit confirmation, an encrypted complete configuration backup is saved to your own Google Drive; the scope is described below |
 
 Initial recognition-pack and local-model preparation requires network downloads. Input translation is disabled by default and handles text you deliberately submit from ordinary fields, not password fields.
@@ -30,7 +31,7 @@ Sites configured for automatic translation can start requests automatically. Cho
 
 ## What stays in the browser?
 
-Settings, rules, glossaries, collections, and review records are stored in this browser’s extension storage. Free-translation health, error, and performance statistics are also stored locally for background balancing and cooldown recovery. Service credentials are stored locally by default. When you deliberately use Drive sync, they are also included in the configuration backup described below. Someone with access to the browser profile or backups may still access them.
+Settings, rules, glossaries, collections, and review records are stored in this browser’s extension storage. Free-translation health, error, and performance statistics are also stored locally for background balancing and cooldown recovery. Service credentials are stored locally by default. When you deliberately use cloud configuration backup, they are also included in the configuration backup described below. Someone with access to the browser profile or backups may still access them.
 
 Regular-window reading-card conversations are retained for 30 days and can be viewed or deleted. Private windows do not read or save this history and do not provide persistent learning collections.
 
@@ -89,6 +90,19 @@ The cloud backup remains until you delete it. In Google Drive on the web, use **
 Google account identifiers and configuration backups are used only to check the selected account and synchronize or restore settings. During sync, the account identifier and complete backup are not sent to third parties other than Google. FluentRead does not sell this data or use it for advertising, profiling, or generating content unrelated to sync. Google Workspace API data is not used to develop, improve, or train non-personalized AI or machine-learning models. Developers do not inspect your backup through the sync service. You may voluntarily submit a report after removing credentials and private content. Restored service credentials continue to be used with your selected translation services; the first section explains what those requests send.
 
 FluentRead's use of information received from Google APIs adheres to the [Google API Services User Data Policy](https://developers.google.com/terms/api-services-user-data-policy), including applicable Limited Use requirements. Google APIs support configuration backup and restoration, not the generation of non-consensual intimate imagery. Google's own handling of cloud storage and account data is also governed by [Google's Privacy Policy](https://policies.google.com/privacy).
+
+## WebDAV cloud configuration backup
+
+WebDAV and Google Drive share the cloud configuration backup entry and preview, confirmation, restore, and merge workflow, with separate records. The extension contacts your chosen WebDAV server only when you test or save a connection or start a backup operation. Opening settings reads a local connection summary; there is no polling or automatic backup.
+
+- **Data and purpose:** your username and app password form the Basic authentication header for the chosen directory. Connection tests and connection saving only perform a read-only `PROPFIND`. Starting sync reads FluentRead’s fixed backup file; directory creation and writing happen only after confirming save or merge.
+- **Backup scope:** the same complete configuration as Google Drive, including configured API keys, OAuth tokens, authentication headers, custom request bodies, and authentication parameters in URLs. Wordbooks, chat history, and usage statistics are excluded. The WebDAV connection URL, username, app password, and its authentication header are excluded from configuration backups.
+- **Destination and access:** requests go directly to your chosen drive, NAS, or server, without a FluentRead developer server or Google. Its operator and anyone with file access can read the backup. Its logs, retention, and other processing are governed by the service you choose. Requests omit browser cookies and do not forward credentials through redirects.
+- **Storage and retention:** the fixed file is `FluentRead/fluentread-config.encrypted.json` under the chosen directory and remains until you delete it. Connection details and the app password are kept in the background’s private encrypted configuration store on this device, are not returned to the form, and are not exported. The successful account, time, and encrypted comparison copy remain until clearing connection settings, related browser data, or uninstalling. Pending snapshots are cleared on completion, failure, cancellation, leaving settings, or expiry.
+- **Protection:** upload uses the same fixed public application passphrase as Google Drive; no extra encryption password is required. Anyone obtaining the file can decrypt it with the public passphrase. HTTPS protects transport. HTTP does not protect the username, password, or transferred file and requires explicit acknowledgement. Server account security, directory permissions, and device security provide the main access protection.
+- **Stopping and deletion:** stop manual operations to stop new requests. Clear connection settings removes local WebDAV connection details, the app password, and sync records while retaining device configuration and server files. Delete the cloud file separately through your server and revoke its app password to end authorization. Clearing local data, uninstalling, or revoking a password does not delete the server file; deleting that file does not erase configurations already restored elsewhere.
+
+WebDAV data is used only for requested configuration backup, restore, and comparison, not advertising, sale, profiling, or model training. Restored service credentials continue to authenticate your chosen translation services as described above. See the [WebDAV backup guide](./webdav) for setup and server requirements.
 
 ## OneDrive configuration sync
 

@@ -40,6 +40,7 @@ const guide = (en = false) => {
         item('设置', 'Settings', '/config/'),
         item('翻译服务', 'Translation services', '/config/translation-engines'),
         item('术语库', 'Glossaries', '/guide/glossary'),
+        item('WebDAV 云备份', 'WebDAV cloud backup', '/guide/webdav'),
         item(
           '快捷键与触发方式',
           'Shortcuts & triggers',

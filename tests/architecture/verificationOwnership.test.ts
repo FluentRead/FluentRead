@@ -18,6 +18,7 @@ const PRODUCT_ROOTS = [
 const ROOT_FILES = [
     'vitest.config.ts',
     'vitest.coverage.config.ts',
+    'vitest.cloud-backup.config.ts',
     'wxt.config.ts',
 ] as const;
 const PRODUCT_TOOL_SCRIPTS = [
@@ -145,6 +146,7 @@ const BUILD_ONLY_SRC_ALLOWLIST = new Set([
     'src/features/settings/ui/services/useVisionProbeStatus.ts',
     // 后台同步 composition root 仅装配已有配置端口；协议和事务经严格覆盖，真实端口由隔离浏览器专项验证。
     'src/app/background/googleDriveSyncRuntime.ts',
+    'src/app/background/webDavBackupRuntime.ts',
     // i18n 资源和 Vue 文案适配由纯资源测试、扩展双浏览器构建与隔离 UI 回归共同验证。
     'src/core/i18n/index.ts',
     'src/core/i18n/language.ts',

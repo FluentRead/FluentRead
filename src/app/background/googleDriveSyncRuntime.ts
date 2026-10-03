@@ -10,7 +10,7 @@ import {createDriveAuth, type DriveIdentity} from '@/src/platform/google-drive/a
 import {createDriveApi} from '@/src/platform/google-drive/api';
 import {GOOGLE_DRIVE_SYNC_STATE_KEY} from '@/src/platform/google-drive/constants';
 import {configStorage} from '@/src/platform/storage/configStorageRuntime';
-import {createCloudConfigSync} from '@/src/services/config/googleDriveSync';
+import {createRemoteConfigSync} from '@/src/services/config/remoteConfigSync';
 import {createGoogleDriveSyncHandler, isGoogleDriveSettingsSender} from './handlers/googleDriveSync';
 import {createOneDriveAuth} from '@/src/platform/onedrive/auth';
 import {createOneDriveApi} from '@/src/platform/onedrive/api';
@@ -21,10 +21,10 @@ export function createGoogleDriveSyncRuntime(mutations: ConfigMutationCoordinato
     const nativeChrome = (globalThis as unknown as {chrome?: {identity?: DriveIdentity}}).chrome;
     const oneDrive = provider === 'onedrive';
     const stateKey = oneDrive ? ONEDRIVE_STATE_KEY : GOOGLE_DRIVE_SYNC_STATE_KEY;
-    const service = createCloudConfigSync({
+    const service = createRemoteConfigSync({
         auth: oneDrive ? createOneDriveAuth({clientId: ONEDRIVE_CLIENT_ID, identity: browser.identity, fetch: (...args) => fetch(...args), now: Date.now}) : createDriveAuth({userAgent: () => navigator.userAgent, identity: nativeChrome?.identity, runtime: browser.runtime, fetch: (...args) => fetch(...args)}),
         api: oneDrive ? createOneDriveApi((...args) => fetch(...args)) : createDriveApi((...args) => fetch(...args)),
-        ...(oneDrive ? {accountChangedMessage: 'settings.onedrive.accountChanged'} : {}),
+        accountChangedError: oneDrive ? 'settings.onedrive.accountChanged' : 'Google 账号已切换，请重新生成同步预览。',
         snapshot: prepareHydratedConfigForExport,
         async apply(value) {
             await configReady;

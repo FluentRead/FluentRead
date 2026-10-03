@@ -8,6 +8,7 @@
 import brandTaglines from './brand-taglines.json';
 import googleDriveText from './google-drive/es-ES.json';
 import oneDriveText from './onedrive/es-ES.json';
+import cloudBackupText from './cloud-backup/es-ES.json';
 import type {
 enUSMessages} from './en-US';
 import {legacyTextOverrides} from './legacy-overrides';
@@ -24,6 +25,7 @@ export const esESMessages = {
     "settings.backup.restoreHint": "Elige un archivo de copia de FluentRead. También puedes restaurar archivos JSON antiguos.",
     ...googleDriveText.messages,
     ...oneDriveText.messages,
+    ...cloudBackupText.messages,
     "brand.tagline": brandTaglines['es-ES'],
     "popup.translationCount": "{count} traducciones",
     "translationCenter.endpointMissing": "Primero configura la dirección del servicio personalizado.",
@@ -92,6 +94,25 @@ export const esESMessages = {
     "options.panel.statsOverview": "Resumen de traducción",
     "options.panel.modelUsage": "Uso de modelos",
     "options.panel.reading": "Ayuda de lectura",
+    "sentenceHighlight.savedTitle": "Resaltados de frases guardados",
+    "sentenceHighlight.customCssHint": "Escribe declaraciones CSS sin selector. Se admiten colores, fondos, subrayados y sombras de texto; las declaraciones válidas reemplazan los controles correspondientes.",
+    "sentenceHighlight.customCssInvalid": "Las declaraciones no admitidas o no reconocidas se ignoran. Usa colores, fondos, subrayados o sombras de texto.",
+    "sentenceHighlight.customTitle": "Personalizar apariencia",
+    "sentenceHighlight.customHint": "Los valores siguen el estilo elegido. Los cambios se ven al instante; elegir un estilo restaura su apariencia.",
+    "sentenceHighlight.reset": "Restaurar estilo",
+    "sentenceHighlight.backgroundColor": "Color de resaltado",
+    "sentenceHighlight.backgroundOpacity": "Opacidad del fondo",
+    "sentenceHighlight.lineColor": "Color del subrayado",
+    "sentenceHighlight.lineOpacity": "Opacidad del subrayado",
+    "sentenceHighlight.lineStyle": "Tipo de subrayado",
+    "sentenceHighlight.lineThickness": "Grosor de línea",
+    "sentenceHighlight.line.default": "Seguir estilo",
+    "sentenceHighlight.line.none": "Sin subrayado",
+    "sentenceHighlight.line.solid": "Continua",
+    "sentenceHighlight.line.dotted": "Punteada",
+    "sentenceHighlight.line.dashed": "Discontinua",
+    "sentenceHighlight.line.double": "Doble",
+    "sentenceHighlight.line.wavy": "Ondulada",
     "sentenceHighlight.title": "Estilo de resaltado por oración",
     "sentenceHighlight.description": "Elige un acento suave para las oraciones correspondientes del original y la traducción.",
     "sentenceHighlight.tryHint": "Pasa el cursor sobre una oración para resaltar su original y traducción juntos.",

@@ -1,0 +1,81 @@
+
+ RUN  v2.1.9 /Users/thinkstu/Desktop/copy/FluentRead-dropbox-sync-20261003
+
+ ✓ tests/i18n.test.ts (56 tests) 3481ms
+   ✓ i18n 全量界面扫描 > Vue 文案和展示注册表在非中文界面有本地化结果 1356ms
+   ✓ 运行期反馈文案资源 > 每条精确反馈都来自真实源码，不重复，并在每种界面语言中完整本地化 786ms
+   ✓ 旧界面译文人工校正 > 校正原文仍在界面源码中使用，不重复，并覆盖此前的译文 926ms
+ ❯ tests/architecture/verificationOwnership.test.ts (9 tests | 2 failed) 926ms
+   × repository verification ownership > 每个产品、构建和测试基础设施文件都有明确验证归属 6ms
+     → expected [ { …(2) }, { …(2) }, { …(2) } ] to deeply equal []
+   × repository verification ownership > src 中每个可执行非组装模块都进入四维 100% 覆盖率边界 635ms
+     → expected [ Array(8) ] to deeply equal []
+ ✓ tests/extensionManifestContract.test.ts (18 tests) 62ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  tests/architecture/verificationOwnership.test.ts > repository verification ownership > 每个产品、构建和测试基础设施文件都有明确验证归属
+AssertionError: expected [ { …(2) }, { …(2) }, { …(2) } ] to deeply equal []
+
+- Expected
++ Received
+
+- Array []
++ Array [
++   Object {
++     "owners": Array [],
++     "path": "scripts/capture-docs-ui.cjs",
++   },
++   Object {
++     "owners": Array [],
++     "path": "scripts/verify-brand-copy.mjs",
++   },
++   Object {
++     "owners": Array [],
++     "path": "scripts/verify-docs-build.mjs",
++   },
++ ]
+
+ ❯ tests/architecture/verificationOwnership.test.ts:321:25
+    319|     it('每个产品、构建和测试基础设施文件都有明确验证归属', () => {
+    320|         const unowned = ownership.filter(({owners}) => owners.length =…
+    321|         expect(unowned).toEqual([]);
+       |                         ^
+    322|     });
+    323| 
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/2]⎯
+
+ FAIL  tests/architecture/verificationOwnership.test.ts > repository verification ownership > src 中每个可执行非组装模块都进入四维 100% 覆盖率边界
+AssertionError: expected [ Array(8) ] to deeply equal []
+
+- Expected
++ Received
+
+- Array []
++ Array [
++   "src/core/config/shareCard.ts",
++   "src/core/i18n/messages/siteRules.ts",
++   "src/features/full-page-translation/content/excerpt.ts",
++   "src/features/share-card/content/runtime.ts",
++   "src/features/share-card/core.ts",
++   "src/features/share-card/export.ts",
++   "src/features/share-card/render.ts",
++   "src/features/share-card/themes.ts",
++ ]
+
+ ❯ tests/architecture/verificationOwnership.test.ts:330:27
+    328|             && !strictCoverage.has(path));
+    329| 
+    330|         expect(uncovered).toEqual([]);
+       |                           ^
+    331|     });
+    332| 
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/2]⎯
+
+ Test Files  1 failed | 2 passed (3)
+      Tests  2 failed | 81 passed (83)
+   Start at  16:36:17
+   Duration  9.32s (transform 1.86s, setup 0ms, collect 4.12s, tests 4.47s, environment 0ms, prepare 164ms)
+

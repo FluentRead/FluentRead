@@ -45,7 +45,7 @@ Cancelling a preview ends that operation. Revoking permission or uninstalling do
 
 Select **Dropbox** under **Cloud configuration backup** in a build that enables this provider. Start sync, check the account, choose save, restore, or merge, then confirm. Opening settings does not authorize Dropbox. Canceling or finishing clears the temporary session; use **Change Dropbox account** in the preview if needed.
 
-Only FluentRead's App folder is accessed. Backup contents match Google Drive, while account records and comparison baselines stay separate. See the [illustrated maintainer setup guide (Chinese)](/config/dropbox-sync) and [privacy policy](/en/guide/privacy#dropbox-configuration-sync).
+Only FluentRead's App folder is accessed. Backup contents match Google Drive, while account records and comparison baselines stay separate. See the [maintainer setup guide](/en/config/dropbox-sync) and [privacy policy](/en/guide/privacy#dropbox-configuration-sync).
 
 ## WebDAV configuration backup
 

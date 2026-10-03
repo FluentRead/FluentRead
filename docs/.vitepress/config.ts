@@ -58,7 +58,7 @@ const guide = (en = false): DefaultTheme.SidebarItem[] => {
         item('网站规则与阅读范围', 'Site rules & reading area', '/config/site-adaptation'),
         item('备份与同步', 'Backup & sync', '/config/backup-sync'),
         item('WebDAV 云备份', 'WebDAV cloud backup', '/guide/webdav'),
-        ...(!en ? [{text: 'Dropbox 同步接入', link: '/config/dropbox-sync'}] : []),
+        item('Dropbox 同步接入', 'Dropbox sync setup', '/config/dropbox-sync'),
         item('翻译统计', 'Translation statistics', '/guide/translation-stats'),
         item('模型用量', 'AI usage', '/guide/model-usage'),
       ],

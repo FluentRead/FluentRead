@@ -20,7 +20,7 @@ const {launchFocusSafePersistentContext, newPageWithoutForeground} = require(hel
 fs.mkdirSync(artifactsDir, {recursive: true});
 async function main() {
     const profileDir = fs.mkdtempSync(path.join(os.tmpdir(), 'fluentread-dropbox-profile-'));
-    const report = {ok: false, evidence: 'production extension with synthetic public App key, isolated Edge; synthetic Dropbox OAuth and HTTP responses', cases: [], screenshots: [], consoleErrors: []};
+    const report = {ok: false, evidence: process.argv.includes('--unconfigured') ? 'default production extension without an App key; isolated Edge, no Dropbox requests' : 'production extension with synthetic public App key, isolated Edge; synthetic Dropbox OAuth and HTTP responses', cases: [], screenshots: [], consoleErrors: []};
     let launched;
     function check(value, label) {if (!value) throw new Error(label); report.cases.push(label);}
     try {
@@ -62,6 +62,17 @@ async function main() {
         await page.locator('button[data-section="settings-data"]').click();
         await page.locator('[data-testid="cloud-method-dropbox"]').check();
         const card = page.locator('[data-testid="dropbox-sync"]'); const now = page.locator('[data-testid="dropbox-sync-now"]');
+        if (process.argv.includes('--unconfigured')) {
+            await card.getByText('此版本尚未启用 Dropbox 同步', {exact: false}).waitFor();
+            check(await now.count() === 0, 'unconfigured build has no misleading sync button');
+            check(await worker.evaluate(() => globalThis.__dropboxFixture.requests === 0), 'unconfigured status never contacts Dropbox');
+            await page.screenshot({animations: 'disabled', path: path.join(artifactsDir, 'unconfigured-zh.png')}); report.screenshots.push('unconfigured-zh.png');
+            await savePatch({uiLanguage: 'en-US'}, 1);
+            await card.getByText('Dropbox sync is not enabled in this build.', {exact: false}).waitFor();
+            check(!(await card.innerText()).includes('settings.dropbox.'), 'unconfigured hint is localized instead of exposing message keys');
+            check(report.consoleErrors.length === 0, 'unconfigured build has no uncaught page errors');
+            report.ok = true; console.log(JSON.stringify(report)); return;
+        }
         await now.waitFor(); check(await worker.evaluate(() => globalThis.__dropboxFixture.requests === 0), 'opening settings never authorizes or accesses Dropbox');
         check(await page.locator('[data-testid="cloud-method-google-drive"]').count() === 1 && await page.locator('[data-testid="cloud-method-webdav"]').count() === 1 && await card.count() === 1, 'Google, Dropbox and WebDAV share one cloud backup selector');
         check(await page.locator('#cloud-backup-title').innerText() === '配置云备份', 'shared cloud backup heading is localized');
@@ -76,7 +87,7 @@ async function main() {
         check(await worker.evaluate(async () => !(await chrome.storage.session.get('fluentreadDropboxSyncSession')).fluentreadDropboxSyncSession), 'successful sync removes temporary token');
         await page.locator('[data-testid="dropbox-last-account"]').getByText('fixture-a@example.invalid', {exact: false}).waitFor();
         await page.locator('[data-testid="cloud-method-google-drive"]').check();
-        await page.locator('[data-testid="google-drive-sync-now"]').waitFor();
+        await page.locator('[data-testid="google-drive-sync"]').waitFor();
         check(!(await page.locator('[data-testid="google-drive-sync"]').innerText()).includes('fixture-a'), 'Dropbox history never becomes Google history');
         await page.locator('[data-testid="cloud-method-dropbox"]').check(); await now.waitFor();
         async function savePatch(patch, sequence) {
@@ -92,15 +103,15 @@ async function main() {
         await page.locator('[data-testid="dropbox-direction-download"]').waitFor();
         check(!(await dialog.innerText()).includes('fixture-private'), 'private values remain masked');
         check(await dialog.getByRole('button', {name: '继续', exact: true}).isDisabled(), 'existing backup requires explicit direction selection');
-        await page.screenshot({path: path.join(artifactsDir, 'choose-desktop.png')}); report.screenshots.push('choose-desktop.png');
+        await page.screenshot({animations: 'disabled', path: path.join(artifactsDir, 'choose-desktop.png')}); report.screenshots.push('choose-desktop.png');
         await page.locator('[data-testid="dropbox-direction-download"]').check(); await dialog.getByRole('button', {name: '继续', exact: true}).click();
         check((await dialog.innerText()).includes('Dropbox'), 'review explains Dropbox restore impact');
         await dialog.getByRole('button', {name: /查看.*差异/}).click();
         check(!(await dialog.innerText()).includes('fixture-private'), 'expanded differences stay masked');
-        await page.screenshot({path: path.join(artifactsDir, 'review-desktop.png')}); report.screenshots.push('review-desktop.png');
+        await page.screenshot({animations: 'disabled', path: path.join(artifactsDir, 'review-desktop.png')}); report.screenshots.push('review-desktop.png');
         await page.setViewportSize({width: 390, height: 844});
         check(await page.evaluate(() => document.documentElement.scrollWidth <= 390), '390px layout does not overflow');
-        await page.screenshot({path: path.join(artifactsDir, 'review-mobile.png')}); report.screenshots.push('review-mobile.png');
+        await page.screenshot({animations: 'disabled', path: path.join(artifactsDir, 'review-mobile.png')}); report.screenshots.push('review-mobile.png');
         await page.locator('[data-testid="dropbox-confirm"]').click(); await dialog.waitFor({state: 'hidden'});
         const restored = await page.evaluate(() => chrome.runtime.sendMessage({type: 'configStorageRead', key: 'local:credentials'}));
         check(!JSON.stringify(restored.value).includes('fixture-private-key'), 'restore replaces service credentials');
@@ -115,7 +126,7 @@ async function main() {
         await worker.evaluate(() => {globalThis.__dropboxFixture.failure = false;});
         await savePatch({uiLanguage: 'en-US'}, 2); await now.getByText('Sync with Dropbox now', {exact: true}).waitFor();
         check(!(await card.innerText()).includes('配置同步'), 'English card does not retain the Chinese heading');
-        await page.screenshot({path: path.join(artifactsDir, 'card-english.png')}); report.screenshots.push('card-english.png');
+        await page.screenshot({animations: 'disabled', path: path.join(artifactsDir, 'card-english.png')}); report.screenshots.push('card-english.png');
         check(report.consoleErrors.length === 0, 'no uncaught page errors'); report.ok = true;
     } catch (error) {report.error = error.message; throw error;}
     finally {fs.writeFileSync(path.join(artifactsDir, 'report.json'), JSON.stringify(report, null, 2)); if (launched) await launched.close(); fs.rmSync(profileDir, {recursive: true, force: true});}

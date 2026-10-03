@@ -1,0 +1,42 @@
+{
+  "ok": true,
+  "evidence": "default production extension without an App key; isolated Edge, no Dropbox requests",
+  "cases": [
+    "unconfigured build has no misleading sync button",
+    "unconfigured status never contacts Dropbox",
+    "real config storage accepts fixture patch",
+    "unconfigured hint is localized instead of exposing message keys",
+    "unconfigured build has no uncaught page errors"
+  ],
+  "screenshots": [
+    "unconfigured-zh.png"
+  ],
+  "consoleErrors": [],
+  "launchMode": "macos-background-cdp",
+  "focusPolicy": "launchservices-no-foreground",
+  "windowPlacement": {
+    "mode": "background-visible-no-focus",
+    "visible": true,
+    "hidden": false,
+    "centered": true,
+    "windowState": "normal",
+    "bounds": {
+      "left": 1041,
+      "top": -1040,
+      "width": 1440,
+      "height": 1000
+    },
+    "displayTarget": "secondary",
+    "source": "macos-nsscreen",
+    "screenIndex": 1,
+    "browserFrontmost": false,
+    "frontmostBefore": {
+      "pid": 65472,
+      "name": "ChatGPT"
+    },
+    "frontmostAfter": {
+      "pid": 65472,
+      "name": "ChatGPT"
+    }
+  }
+}

@@ -55,7 +55,7 @@ sequenceDiagram
 
 打开 [创建应用页面](https://www.dropbox.com/developers/apps/create)，登录后按下图操作。
 
-![创建应用：Scoped access、App folder、唯一名称、Create app](/images/dropbox/create-app-annotated.png)
+<img src="/images/dropbox/create-app-annotated.png" alt="创建应用：Scoped access、App folder、唯一名称、Create app" width="1519" height="1036" loading="lazy" />
 
 1. **Choose an API**：选择 **Scoped access**。
 2. **Choose the type of access you need**：选择 **App folder**。本功能只保存自身配置，不需要访问用户其他文件。
@@ -70,7 +70,7 @@ sequenceDiagram
 
 进入刚创建的应用，点击 **Permissions**。勾选四项用户 API 权限，然后滚动到页底点击 **Submit** 保存。
 
-![Permissions 页：选择四项权限并保存](/images/dropbox/permissions-annotated.png)
+<img src="/images/dropbox/permissions-annotated.png" alt="Permissions 页：选择四项权限并保存" width="1669" height="942" loading="lazy" />
 
 | Scope | 本功能中的用途 |
 | --- | --- |
@@ -121,7 +121,7 @@ Firefox 地址由浏览器生成，不能照抄 Chromium 的地址或凭空拼�
 
 ### 6.3 注册回调并允许 PKCE
 
-![Settings 页：Redirect URIs、Allow public clients、无需生成测试令牌](/images/dropbox/settings-annotated.png)
+<img src="/images/dropbox/settings-annotated.png" alt="Settings 页：Redirect URIs、Allow public clients、无需生成测试令牌" width="1618" height="972" loading="lazy" />
 
 1. 在 **OAuth 2 → Redirect URIs** 的输入框中粘贴完整回调地址。
 2. 点击右侧 **Add**。Chrome、Edge、Firefox分别测试时，把各自实际回调都添加进去。
@@ -173,11 +173,11 @@ Firefox 使用 `pnpm build:firefox`，并加载其生成的包。代码只有在
 
 下面两张截图来自隔离浏览器的虚构账号演示。真实界面会展示你选择的 Dropbox 账号，示例不代表真实授权已完成。
 
-![同步第一步：选择恢复、保存或逐项合并，显示本次账号](/images/dropbox/sync-choice-fixture.png)
+<img src="/images/dropbox/sync-choice-fixture.png" alt="同步第一步：选择恢复、保存或逐项合并，显示本次账号" width="2864" height="1832" loading="lazy" />
 
-![同步第二步：确认方向、替换影响和脱敏差异](/images/dropbox/sync-review-fixture.png)
+<img src="/images/dropbox/sync-review-fixture.png" alt="同步第二步：确认方向、替换影响和脱敏差异" width="2864" height="1832" loading="lazy" />
 
-![Dropbox 单次同步：授权、预览、确认、清理](/images/dropbox/sync-flow.svg)
+<img src="/images/dropbox/sync-flow.svg" alt="Dropbox 单次同步：授权、预览、确认、清理" width="960" height="380" loading="lazy" />
 
 下方 Mermaid 描述完整分支，便于维护和在 GitHub 中查看。
 

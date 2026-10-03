@@ -27,5 +27,9 @@
   "sync-review-fixture.png": {
     "source": "FluentRead 隔离扩展 UI 回归",
     "note": "真实界面截图，虚构账号与 Dropbox HTTP 响应，非真实 OAuth 证据。"
+  },
+  "sync-card-en-fixture.png": {
+    "source": "FluentRead isolated extension UI regression",
+    "note": "Real English interface; fictional account and synthetic Dropbox responses, not live OAuth evidence."
   }
 }

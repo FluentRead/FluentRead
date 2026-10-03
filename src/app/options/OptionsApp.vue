@@ -1,19 +1,19 @@
 <!--
  @file src/app/options/OptionsApp.vue
  文件职责：实现扩展 Options 页的顶层布局，组织设置导航、全局搜索结果和学习中心入口，并把选中分区交给对应 feature UI。
- 主要内容：侧栏品牌图标右侧纵向展示名称与小字多语言宣传语，关于页复用品牌文案；渲染默认展开的分组侧栏、窄屏分类选择和全局搜索；普通设置连续展示，服务目录使用完整工作区，统计与网站规则按任务保留视图切换，复用 settingsNavigation 的项目解析/过滤逻辑，在 SettingsSections 与 LearningCenter 之间切换并重置内容区滚动，同步 URL hash 的深链接与前进后退导航，兼容模型用量迁入翻译统计后的旧链接。
+ 主要内容：侧栏品牌图标右侧纵向展示名称与小字多语言宣传语，品牌区域与关于页提供统一官网入口，关于页以一张整体卡片展示简短介绍与版本、并排项目链接和赞赏方式；渲染默认展开的分组侧栏、窄屏分类选择和全局搜索；普通设置连续展示，服务目录使用完整工作区，统计与网站规则按任务保留视图切换，复用 settingsNavigation 的项目解析/过滤逻辑，在 SettingsSections 与 LearningCenter 之间切换并重置内容区滚动，同步 URL hash 的深链接与前进后退导航，兼容模型用量迁入翻译统计后的旧链接。
  模块边界：组件负责页面壳、导航状态和界面皮肤根属性同步，不定义具体配置字段、不直接写 browser.storage，也不实现词汇仓库；设置表单、收藏与阅读记录业务由各 feature 组件拥有。
 -->
 <template>
   <div class="settings-app" :class="{'has-overlay-close': Boolean(props.onClose)}">
     <aside class="sidebar">
-      <div class="brand">
+      <a class="brand" :href="websiteUrl" target="_blank" rel="noopener noreferrer" :aria-label="t('options.aboutWebsite')" :title="t('options.aboutWebsite')">
         <img :src="iconUrl" alt="" />
         <div class="brand-copy">
           <strong>流畅阅读</strong>
           <p class="sidebar-tagline" data-testid="brand-tagline" data-i18n-ignore>{{ t('brand.tagline') }}</p>
         </div>
-      </div>
+      </a>
 
           <label class="search-box">
             <UiIcon name="search" :size="16" />
@@ -75,61 +75,69 @@
           <h2>{{ t('options.userscriptUnavailableTitle') }}</h2>
           <p>{{ t('options.userscriptUnavailableDescription') }}</p>
         </section>
-        <section v-else-if="activeSection === 'settings-about'" id="settings-about" class="about-page" aria-labelledby="about-title">
-          <div class="about-hero">
-            <img class="about-logo" :src="iconUrl" alt="流畅阅读图标" />
-            <div>
-              <h3 id="about-title" class="about-tagline" data-testid="about-brand-tagline" data-i18n-ignore>{{ t('brand.tagline') }}</h3>
-              <p>{{ t('options.aboutHeroDescription') }}</p>
-              <span class="about-version">FluentRead · V{{ version }}</span>
-            </div>
-          </div>
-
+        <section v-else-if="activeSection === 'settings-about'" id="settings-about" class="about-page" :aria-label="t('options.aboutTitle')">
           <div class="about-grid">
-            <article class="about-panel about-support-panel">
-              <span class="about-panel-kicker">{{ t('popup.donationEyebrow') }}</span>
-              <h3>{{ t('popup.donationTitle') }}</h3>
-              <p>{{ t('options.aboutThanks') }}</p>
-              <div class="about-support-options">
-                <section class="about-support-option about-support-wechat-option">
-                  <h4>{{ t('popup.donationWechat') }}</h4>
-                  <a
-                    class="about-support-method about-support-wechat"
-                    data-support-method="wechat"
-                    :href="approveUrl"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    :aria-label="t('popup.donationOpenCode')"
-                  >
-                    <!-- 绑定表达式让模板编译器保留 public 路径，避免再打包一份带 hash 的同图。 -->
-                    <img class="about-support-qr" :src="approveUrl" :alt="t('popup.donationCodeAlt')" width="1152" height="1152" />
-                  </a>
-                </section>
-                <section class="about-support-option about-support-kofi-option">
-                  <h4>Ko-fi</h4>
-                  <a
-                    class="about-support-method about-support-kofi-link"
-                    data-support-method="kofi"
-                    href="https://ko-fi.com/thinkstu"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                  >
-                    <strong>{{ t('popup.donationKofi') }}</strong>
-                    <UiIcon name="external" :size="16" />
-                  </a>
-                  <span class="about-support-account">ko-fi.com/thinkstu</span>
-                </section>
+            <div class="about-overview">
+              <div class="about-hero">
+                <img class="about-logo" :src="iconUrl" alt="流畅阅读图标" />
+                <div class="about-intro">
+                  <p>{{ t('options.aboutHeroDescription') }}</p>
+                  <span class="about-version">FluentRead · V{{ version }}</span>
+                </div>
               </div>
-            </article>
+              <article class="about-panel about-links-panel">
+                <h3>{{ t('options.aboutLearnMore') }}</h3>
+                <div class="about-links">
+                  <a class="about-website" :href="websiteUrl" target="_blank" rel="noopener noreferrer">
+                    <UiIcon name="globe" :size="18" />
+                    <span>{{ t('options.aboutWebsite') }}</span>
+                    <UiIcon name="external" :size="14" />
+                  </a>
+                  <a href="https://fluent.thinkstu.com/" target="_blank" rel="noopener noreferrer">
+                    <UiIcon name="book" :size="18" />
+                    <span>{{ t('options.aboutDocs') }}</span>
+                    <UiIcon name="external" :size="14" />
+                  </a>
+                  <a href="https://github.com/Bistutu/FluentRead" target="_blank" rel="noopener noreferrer">
+                    <UiIcon name="card" :size="18" />
+                    <span>{{ t('options.aboutProject') }}</span>
+                    <UiIcon name="external" :size="14" />
+                  </a>
+                  <a href="https://github.com/Bistutu/FluentRead/issues" target="_blank" rel="noopener noreferrer">
+                    <UiIcon name="info" :size="18" />
+                    <span>{{ t('options.aboutFeedback') }}</span>
+                    <UiIcon name="external" :size="14" />
+                  </a>
+                </div>
+              </article>
+            </div>
 
-            <article class="about-panel about-links-panel">
-              <span class="about-panel-kicker">{{ t('options.aboutLearnMore') }}</span>
-              <h3>{{ t('options.aboutMakeBetter') }}</h3>
-              <p>{{ t('options.aboutLinksDescription') }}</p>
-              <div class="about-links">
-                <a href="https://github.com/Bistutu/FluentRead" target="_blank" rel="noreferrer">{{ t('options.aboutProject') }} <span>↗</span></a>
-                <a href="https://fluent.thinkstu.com/" target="_blank" rel="noreferrer">{{ t('options.aboutDocs') }} <span>↗</span></a>
-                <a href="https://github.com/Bistutu/FluentRead/issues" target="_blank" rel="noreferrer">{{ t('options.aboutFeedback') }} <span>↗</span></a>
+            <article class="about-panel about-support-panel">
+              <h3>{{ t('popup.donationTitle') }}</h3>
+              <div class="about-support-options">
+                <a
+                  class="about-support-method about-support-wechat"
+                  data-support-method="wechat"
+                  :href="approveUrl"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  :aria-label="t('popup.donationOpenCode')"
+                  :title="t('popup.donationOpenCode')"
+                >
+                  <!-- 绑定表达式让模板编译器保留 public 路径，避免再打包一份带 hash 的同图。 -->
+                  <img class="about-support-qr" :src="approveUrl" :alt="t('popup.donationCodeAlt')" width="1152" height="1152" />
+                  <span>{{ t('popup.donationWechat') }}</span>
+                </a>
+                <a
+                  class="about-support-method about-support-kofi-link"
+                  data-support-method="kofi"
+                  href="https://ko-fi.com/thinkstu"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                >
+                  <span>{{ t('popup.donationKofi') }}</span>
+                  <UiIcon name="external" :size="14" />
+                </a>
               </div>
             </article>
           </div>
@@ -181,6 +189,7 @@ const props = defineProps<{
   onClose?: () => void
 }>()
 const version = process.env.VUE_APP_VERSION
+const websiteUrl = 'https://read.thinkstu.com'
 const iconUrl = globalThis.__FLUENTREAD_ICON_DATA__ || '/icon/128.png'
 const approveUrl = globalThis.__FLUENTREAD_APPROVE_DATA__ || '/misc/approve.jpg'
 const {t, translateLegacy} = useUiI18n()

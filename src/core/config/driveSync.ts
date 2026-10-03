@@ -140,7 +140,7 @@ const VISIBLE_FIELDS: Record<string, string> = {
     sectionTranslationHotkeyEnabled: '局部翻译快捷键',
     selectionAreaEnabled: '圈选翻译',
     imageTranslationMangaEnabled: '漫画连续翻译入口',
-    imageTranslationMangaPromptEnabled: '进入漫画网站时提示',
+    imageTranslationMangaPromptEnabled: '独立漫画按钮',
     imageTranslationMangaDownloadConfirmed: '已了解漫画资源下载',
     imageTranslationMangaSites: '自定义漫画网站',
     imageTranslationMangaPrefetchPages: '提前翻译后续页面',

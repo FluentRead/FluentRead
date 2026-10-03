@@ -1,14 +1,14 @@
 <!--
  * @file src/features/image-translation/ui/MangaSettings.vue
- * 文件职责：组织漫画连续阅读的设置，优先展示是否开启、进入提示和翻译选择，同页展示其他图片翻译常用开关，再按需展开资源与网站规则。
- * 主要内容：漫画开关独立于单张图片和悬浮球；可恢复永久关闭的提示；资源按用途分组，自定义网站规则按精确地址与图片选择器添加和删除，非法输入给出就地反馈。
+ * 文件职责：组织漫画连续阅读的设置，优先展示是否开启、独立按钮和翻译选择，同页展示其他图片翻译常用开关，再按需展开资源与网站规则。
+ * 主要内容：漫画开关独立于单张图片和悬浮球；可关闭或恢复独立按钮；资源按用途分组，自定义网站规则按精确地址与图片选择器添加和删除，非法输入给出就地反馈。
  * 模块边界：编辑父级配置副本，由既有设置持久化负责保存；不调用漫画翻译、不扫描其他网站、不访问会员或章节接口。
  -->
 <template>
   <div class="manga-settings" data-testid="manga-settings">
     <section class="manga-settings-card">
       <header><div><h2>{{ t('漫画连续翻译') }}</h2><p>{{ t('一次开启，滚动阅读时自动继续。随时切回原图。') }}</p></div><el-switch v-model="settings.imageTranslationMangaEnabled" :disabled="!available" :aria-label="t('启用漫画连续翻译')" /></header>
-      <div class="manga-setting-row"><div><strong>{{ t('进入漫画网站时提示') }}</strong><p>{{ t('关闭悬浮球后仍可看到漫画入口。选择“以后不再提示”后，可在这里重新开启。') }}</p></div><el-switch v-model="settings.imageTranslationMangaPromptEnabled" :disabled="!available || !settings.imageTranslationMangaEnabled" :aria-label="t('进入漫画网站时提示')" /></div>
+      <div class="manga-setting-row"><div><strong>{{ t('独立漫画按钮') }}</strong><p>{{ t('关闭悬浮球时显示小漫画按钮。阅读和翻译时不自动弹出面板。') }}</p></div><el-switch v-model="settings.imageTranslationMangaPromptEnabled" :disabled="!available || !settings.imageTranslationMangaEnabled" :aria-label="t('独立漫画按钮')" /></div>
       <div class="manga-setting-fields">
         <label class="manga-prefetch-setting">{{ t('提前翻译后续页面') }}<select v-model.number="settings.imageTranslationMangaPrefetchPages" :disabled="!available || !settings.imageTranslationMangaEnabled" :aria-label="t('提前翻译后续页面')"><option :value="0">{{ t('只翻译当前页面') }}</option><option v-for="count in 5" :key="count" :value="count">{{ count }} {{ t('张图片') }}</option></select><small>{{ t('当前页优先，后台准备后续页面。只处理网站已加载的图片；更多页面会增加设备资源和翻译服务用量。') }}</small></label>
         <label>{{ t('翻译成') }}<select v-model="settings.to" :aria-label="t('漫画目标语言')"><option v-for="item in targetLanguages" :key="item.value" :value="item.value" data-i18n-ignore>{{ t(item.label) }}</option></select><small>{{ t('与网页默认目标语言同步') }}</small></label>

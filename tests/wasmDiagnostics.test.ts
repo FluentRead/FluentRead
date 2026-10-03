@@ -75,6 +75,19 @@ describe('packaged WASM diagnostic severity', () => {
         expect(output.error).toHaveBeenCalledTimes(2);
     });
 
+    it('浏览器 CPU 厂商未知的已知提示仅进入 debug，错误、其他 vendor 和多行失败保持可见', () => {
+        const {output,write}=createLog();
+        const prefix='2026-10-03 23:48:59.693198 [W:onnxruntime:Default, cpuid_info.cc:91 LogEarlyWarning] ';
+        const known=prefix+'Unknown CPU vendor. cpuinfo_vendor value: 0';
+        write(known);expect(output.debug).toHaveBeenCalledWith(known);expect(output.warn).not.toHaveBeenCalled();expect(output.error).not.toHaveBeenCalled();
+        for (const warning of [known.replace('value: 0','value: 15'),known.replace('LogEarlyWarning','AnotherWarning'),known+' additional details']) {
+            write(warning);expect(output.warn).toHaveBeenCalledWith(warning);
+        }
+        for (const error of [known.replace('[W:','[E:'),known+'\nFailed loading model',known+'\nAborted(out of memory)']) {
+            write(error);expect(output.error).toHaveBeenCalledWith(error);
+        }
+    });
+
     it('仅把已知 LSTM 旧参数和分辨率提示降为 debug，未知警告与失败保持可见', () => {
         const {output, write} = createLog();
         for (const parameter of ['language_model_ngram_on', 'segsearch_max_char_wh_ratio', 'language_model_ngram_space_delimited_language', 'language_model_ngram_scale_factor', 'language_model_use_sigmoidal_certainty', 'language_model_ngram_nonmatch_score', 'classify_integer_matcher_multiplier', 'assume_fixed_pitch_char_segment', 'chop_enable', 'allow_blob_division']) {

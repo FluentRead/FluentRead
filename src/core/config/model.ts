@@ -466,7 +466,7 @@ export class Config {
     areaVisionPrompt: string; // 模型识图时发送的图片文字提取指令
     modelVision: ModelVisionOverrides; // 按服务和精确模型保存的视觉能力显式覆盖
     imageTranslationMangaEnabled: boolean; // 是否在已适配阅读器显示漫画连续翻译入口
-    imageTranslationMangaPromptEnabled: boolean; // 进入漫画阅读页提示，独立于悬浮球显示
+    imageTranslationMangaPromptEnabled: boolean; // 悬浮球关闭时显示独立漫画按钮；旧提示偏好沿用，不自动弹出面板
     imageTranslationMangaDownloadConfirmed: boolean; // 已阅读首次下载说明
     imageTranslationMangaSites: MangaSiteRule[]; // 用户添加的精确阅读页规则
     imageTranslationMangaPrefetchPages: number; // 当前页之后提前准备的图片数量，0 至 5

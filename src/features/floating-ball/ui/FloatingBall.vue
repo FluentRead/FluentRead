@@ -47,7 +47,7 @@
       class="floating-ball-tool floating-ball-manga floating-ball-item"
       :class="{'manga-active': manga.active, 'manga-pending': manga.pending}"
       type="button"
-      :aria-label="manga.active ? '查看漫画翻译进度与选项' : '漫画翻译'"
+      :aria-label="t(manga.active ? '暂停并显示原图' : '漫画翻译')"
       :aria-pressed="manga.active"
       :aria-busy="manga.pending"
       :title="mangaTitle"
@@ -102,9 +102,12 @@
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import type { PropType, CSSProperties } from 'vue';
+import {useUiI18n} from '@/src/ui/i18n';
 import type {MangaTranslationStatus} from '@/src/features/image-translation/public';
 import type { FloatingBallPresentation } from '@/src/features/floating-ball/types';
 import {resolveFloatingBallCenterY, toFloatingBallVerticalPosition} from '@/src/features/floating-ball/position';
+
+const {translateLegacy: t} = useUiI18n();
 
 const DRAG_THRESHOLD = 6;
 const BALL_SIZE = 40;
@@ -200,7 +203,10 @@ const showSettingsTool = computed(() => showTranslateTool.value && presentation.
 const isMenuExpanded = computed(() => isAlwaysExpanded.value || isExpanded.value || touchExpanded.value);
 const isMainActionable = computed(() => presentation.value.clickAction !== 'none');
 const mangaTitle = computed(() => {
-  return props.manga?.active ? '查看漫画翻译进度与选项' : '漫画翻译 · 自动翻译新页面';
+  const manga = props.manga;
+  if (!manga?.active) return t('漫画翻译 · 自动翻译新页面');
+  const message = manga.pending ? manga.message || '正在处理当前漫画页' : manga.errors ? '部分页面未完成，可在图片上重试' : '连续翻译已开启';
+  return `${t(message)} · ${t('暂停并显示原图')}`;
 });
 const mainActionLabel = computed(() => {
   if (presentation.value.clickAction === 'settings') return '打开 FluentRead 设置';

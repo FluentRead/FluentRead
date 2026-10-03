@@ -6,9 +6,9 @@ import {normalizeConfig} from '@/src/core/config/model';
 
 const flush = async () => { for (let i = 0; i < 30; i++) await Promise.resolve(); };
 function deferred() { let resolve!: () => void; const promise = new Promise<void>(yes => {resolve = yes;}); return {promise, resolve}; }
-function sessionFixture() {
+function sessionFixture(extra: {reuse?: (image: HTMLImageElement) => boolean} = {}) {
     const one = {} as HTMLImageElement, two = {} as HTMLImageElement;
-    const ports = {translate: vi.fn().mockResolvedValue(undefined), restore: vi.fn(), release: vi.fn(), failed: vi.fn().mockReturnValue(false), changed: vi.fn()};
+    const ports = {translate: vi.fn().mockResolvedValue(undefined), restore: vi.fn(), release: vi.fn(), failed: vi.fn().mockReturnValue(false), changed: vi.fn(), ...extra};
     const session = createMangaSession(ports);
     const snapshot: MangaSnapshot = {route: 'chapter-1', available: true, pages: [
         {image: one, identity: '1', visible: true}, {image: two, identity: '2', visible: false},
@@ -20,6 +20,15 @@ function sessionFixture() {
 afterEach(() => {vi.restoreAllMocks(); vi.unstubAllGlobals();});
 
 describe('漫画会话所有权与可见页调度', () => {
+    it('上一张已完成译图立即复用，不等待另一张识别结束', async () => {
+        const reuse=vi.fn().mockReturnValue(false),f=sessionFixture({reuse}),pending=deferred();
+        f.start();await flush();f.ports.translate.mockReturnValueOnce(pending.promise);
+        f.snapshot.pages[0].visible=false;f.snapshot.pages[1].visible=true;f.session.refresh(f.snapshot);await flush();
+        reuse.mockImplementation(image=>image===f.one);
+        f.snapshot.pages[0].visible=true;f.session.refresh(f.snapshot);
+        expect(reuse).toHaveBeenCalledWith(f.one);expect(f.session.status()).toMatchObject({completed:1,pending:true});
+        expect(f.ports.translate).toHaveBeenCalledTimes(2);pending.resolve();await flush();f.session.dispose();
+    });
     it('可见页优先于排队预译页，已经准备好的页进入视口不会再识别', async () => {
         const f=sessionFixture(),pending=deferred(),three={} as HTMLImageElement;
         f.snapshot.pages[1].prefetch=true;f.ports.translate.mockReturnValueOnce(pending.promise);
@@ -147,6 +156,43 @@ function readerFixture(withIntersection = true, initialUrl = 'https://mangaplus.
         setHidden: (v: boolean) => {hidden = v;}};
 }
 describe('漫画站点适配与 DOM 生命周期', () => {
+    it('过期可见性通知不能释放屏幕里已完成的译图', async () => {
+        const f=readerFixture();f.intersect(true);f.reader.toggle();await flush();
+        f.intersect(false);await flush();
+        expect(f.ports.release).not.toHaveBeenCalled();expect(f.ports.translate).toHaveBeenCalledTimes(1);f.reader.dispose();
+    });
+    it.each(['display','visibility','collapse','opacity','clipX','clipY','both'])('祖先隐藏或裁切时不处理不可见正文 %s', async kind => {
+        const f=readerFixture(false),parent=f.image.parentElement!,normal={display:'block',visibility:'visible',opacity:'1',overflowX:'visible',overflowY:'visible'};
+        const changed={...normal};
+        if (kind==='display') changed.display='none';
+        if (kind==='visibility') changed.visibility='hidden';
+        if (kind==='collapse') changed.visibility='collapse';
+        if (kind==='opacity') changed.opacity='0';
+        if (kind==='clipX' || kind==='both') changed.overflowX='hidden';
+        if (kind==='clipY' || kind==='both') changed.overflowY='clip';
+        parent.getBoundingClientRect=()=>({left:1600,right:2000,top:1600,bottom:2000}) as DOMRect;
+        vi.stubGlobal('getComputedStyle',(e:Element)=>e===parent?changed:normal);
+        f.reader.toggle();await flush();expect(f.ports.translate).not.toHaveBeenCalled();f.reader.dispose();
+    });
+    it('历史页只保留不主动识别；像素预算限制长条页，前后视口共享祖先样式', async () => {
+        const f=readerFixture(false),parents=f.image.parentElement!,images=[f.image];let anchor=3;
+        f.image.getBoundingClientRect=()=>({left:0,right:800,top:-3900,bottom:-2700,width:800,height:1200}) as DOMRect;
+        for(let index=1;index<=3;index++) {
+            const image=f.document.createElement('img') as HTMLImageElement;image.className='zao-image';image.src=`blob:p${index}`;
+            Object.defineProperties(image,{complete:{value:true,writable:true},naturalWidth:{value:index===1?10000:800,writable:true},naturalHeight:{value:1200}});
+            image.getBoundingClientRect=()=>({left:0,right:800,top:(index-anchor)*1300,bottom:(index-anchor)*1300+1200,width:800,height:1200}) as DOMRect;
+            parents.append(image);images.push(image);
+        }
+        f.reader.toggle();await flush();expect(f.ports.translate.mock.calls.map(c=>c[0])).toEqual([images[3]]);
+        // 同时可见两张时，父容器样式只读取一次；IO 通知不决定是否保留译图。
+        anchor=2.5;const styles=vi.fn((_e:Element)=>({display:'block',visibility:'visible',overflowX:'visible',overflowY:'visible'}));vi.stubGlobal('getComputedStyle',styles);
+        f.reader.schedule();f.run();await flush();expect(styles.mock.calls.filter(([e])=>e===parents)).toHaveLength(1);
+        f.reader.dispose();
+    });
+    it('仅历史保留项不启动识别，也不计入后续页准备数量', async () => {
+        const f=sessionFixture();f.snapshot.pages[1].retain=true;f.start();await flush();
+        expect(f.ports.translate).toHaveBeenCalledTimes(1);expect(f.session.status().ahead).toBe(0);f.session.dispose();
+    });
     it('默认窗口翻译当前与随后三张，排除更后页；改变窗口不会重识别当前页', async () => {
         let ahead=3;const f=readerFixture(false,undefined,undefined,()=>ahead),images=[f.image];
         for(let i=1;i<6;i++){
@@ -204,10 +250,10 @@ describe('漫画站点适配与 DOM 生命周期', () => {
     });
     it('观察可见正文、不处理 logo，关闭后释放观察器与事件', async () => {
         const f = readerFixture(); expect(f.io.observe).toHaveBeenCalledWith(f.image);
-        f.reader.toggle(); await flush(); expect(f.ports.translate).not.toHaveBeenCalled();
+        f.reader.toggle(); await flush(); expect(f.ports.translate).toHaveBeenCalledTimes(1);
         f.intersect(true); await flush(); expect(f.ports.translate).toHaveBeenCalledWith(f.image);
-        f.intersect(false); expect(f.ports.release).toHaveBeenCalledWith(f.image);
-        f.intersect(true); await flush(); expect(f.ports.translate).toHaveBeenCalledTimes(2);
+        f.setRect({top:-1200,bottom:0});f.intersect(false); expect(f.ports.release).toHaveBeenCalledWith(f.image);
+        f.setRect({top:0,bottom:1200});f.intersect(true); await flush(); expect(f.ports.translate).toHaveBeenCalledTimes(2);
         f.reader.schedule(); f.reader.schedule(); f.reader.dispose(); f.run(); f.reader.schedule();
         expect(f.window.cancelAnimationFrame).toHaveBeenCalled(); expect(f.io.disconnect).toHaveBeenCalled();
         expect(f.mo.disconnect).toHaveBeenCalled(); expect(f.window.removeEventListener).toHaveBeenCalledTimes(2);

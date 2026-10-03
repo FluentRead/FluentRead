@@ -1,7 +1,7 @@
 /**
  * @file src/features/image-translation/content/runtime.ts
  * 文件职责：实现网页图片翻译的独立悬浮/右键入口、可信目标快照、异步请求所有权和单图及漫画连续模式的原图/译图切换，保持宿主图片与响应式图片资源不变。
- * 主要内容：在封闭 Shadow DOM 中挂载原生译图，跟随图片盒模型与祖先裁切；合并布局更新并复核待显示图片的指针位置，限制像素读取和结果缓存，按图片独立服务及模型变化失效缓存，装配漫画可见页串行调度和原图暂停，换图、取消与卸载时停止旧请求并释放资源。
+ * 主要内容：在封闭 Shadow DOM 中挂载原生译图，跟随图片盒模型与祖先裁切；合并布局更新并复核待显示图片的指针位置，限制像素读取和结果缓存，按图片独立服务及模型变化失效缓存，装配漫画可见页串行调度和原图暂停，返回已有译图时同步复用、不等待其他页推理；漫画任务使用不遮挡画面的轻量控件，换图、取消与卸载时停止旧请求并释放资源。
  * 模块边界：本运行时先读取页面允许访问的 Canvas/CORS 像素，失败时授权后台读取当前任务图片并调用既有图片客户端；识别、文本翻译、图像修复与语言包管理位于 background/services，控件交互由 controls 模块提供。
  */
 import type {ImageTranslationStage} from '../progress';
@@ -127,6 +127,25 @@ async function translateMangaImage(image: HTMLImageElement): Promise<void> {
     const state = states.get(image) || createState(image);
     state.manga = true;
     await translateImage(state);
+}
+
+/** 同步交接已完成的漫画结果；不能因其他页在推理而让用户等待或重新识别。 */
+function reuseMangaImage(image: HTMLImageElement): boolean {
+    const state=states.get(image);
+    if (state?.phase==='loading' || !image.isConnected || !imageTranslationAllowed(true)) return false;
+    if (state && (sourceIdentity(image)!==state.sourceIdentity || !presentationMatchesSource(image,state.presentation))) return false;
+    const identity=configurationIdentity(true);
+    if (state && sourceIdentity(image)===state.sourceIdentity && presentationMatchesSource(image,state.presentation) && state.resultIdentity===identity) {
+        if (state.translatedImage) showTranslatedImage(state);
+        return true;
+    }
+    const cached=resultCache.get(image);
+    if (!config.useCache || !cached || cached.sourceIdentity!==sourceIdentity(image) || cached.configurationIdentity!==identity) return false;
+    const current=state || createState(image);current.manga=true;
+    current.resultIdentity=identity;current.translatedImage=cached.translatedImage;current.lines=cached.lines;
+    resultCache.delete(image);resultCache.set(image,cached);
+    showTranslatedImage(current);
+    return true;
 }
 
 function sourceIdentity(image: HTMLImageElement): string {
@@ -628,7 +647,7 @@ function setButtonState(state: ImageTranslationState, phase: ImageControlPhase, 
     state.phase = phase;
     if (state.manga && phase === 'loading') publishMangaStatus({...mangaStatus, message, progress, stage});
     state.controls.update(phase, message, {
-        prepare: phase === 'error' && state.needsPreparation, animations: config.animations, progress,
+        prepare: phase === 'error' && state.needsPreparation, animations: config.animations, progress, quiet: state.manga === true,
     });
 }
 
@@ -1005,6 +1024,7 @@ export function mountImageTranslator(): void {
         prefetchPages: () => config.imageTranslationMangaPrefetchPages,
         identity: image => `${sourceIdentity(image)}:${configurationIdentity()}`,
         translate: translateMangaImage,
+        reuse: reuseMangaImage,
         restore: restoreMangaImage,
         release: image => { const state = states.get(image); if (state) removeState(state); },
         failed: image => states.get(image)?.phase === 'error',

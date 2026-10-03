@@ -48,6 +48,7 @@ export function createConfigBackgroundHandlers<TContext extends ConfigPersistenc
     });
     return [
         createGoogleDriveSyncRuntime(mutations),
+        createGoogleDriveSyncRuntime(mutations, 'onedrive'),
         createConfigStorageReadHandler({
             ready: configReady,
             read: async key => {

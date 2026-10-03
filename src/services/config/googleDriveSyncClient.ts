@@ -7,17 +7,22 @@
 import browser from 'webextension-polyfill';
 import type {DriveSyncDirection, DriveSyncPreview, DriveSyncStatus} from './googleDriveSync';
 
-const clientId = crypto.randomUUID();
-async function request<T>(action: string, data: Record<string, unknown> = {}): Promise<T> {
-    let response: {success?: boolean; data?: T; error?: string} | undefined;
-    try {response = await browser.runtime.sendMessage({type: 'googleDriveEncryptedSync', action, clientId, ...data});}
-    catch {throw new Error('扩展后台暂时不可用，请重新打开设置后重试。');}
-    if (!response?.success) throw new Error(response?.error || '同步请求未完成，请重试。');
-    return response.data as T;
+export function createCloudSyncClient(type: string) {
+    const clientId = crypto.randomUUID();
+    async function request<T>(action: string, data: Record<string, unknown> = {}): Promise<T> {
+        let response: {success?: boolean; data?: T; error?: string} | undefined;
+        try {response = await browser.runtime.sendMessage({type, action, clientId, ...data});}
+        catch {throw new Error('扩展后台暂时不可用，请重新打开设置后重试。');}
+        if (!response?.success) throw new Error(response?.error || '同步请求未完成，请重试。');
+        return response.data as T;
+    }
+    return {
+        status: () => request<DriveSyncStatus>('status'),
+        prepare: () => request<DriveSyncPreview>('prepare'),
+        commit: (id: string, direction: DriveSyncDirection, choices: Record<string, string>) => request<DriveSyncStatus>('commit', {id, direction, choices}),
+        cancel: (id?: string) => request<void>('cancel', {id}),
+    };
 }
-export const googleDriveSyncClient = {
-    status: () => request<DriveSyncStatus>('status'),
-    prepare: () => request<DriveSyncPreview>('prepare'),
-    commit: (id: string, direction: DriveSyncDirection, choices: Record<string, string>) => request<DriveSyncStatus>('commit', {id, direction, choices}),
-    cancel: (id?: string) => request<void>('cancel', {id}),
-};
+export type CloudSyncClient = ReturnType<typeof createCloudSyncClient>;
+export const googleDriveSyncClient = createCloudSyncClient('googleDriveEncryptedSync');
+export const oneDriveSyncClient = createCloudSyncClient('oneDriveEncryptedSync');

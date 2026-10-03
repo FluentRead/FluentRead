@@ -43,3 +43,5 @@ Webpages, documents, subtitles, and the reading card can use different services.
 Before changing browsers or uninstalling, save the configuration and learning data you want through backup and restore. Backups may contain credentials and saved text.
 
 Translation cache settings let you view and clear recent results. Clearing that cache does not delete learning collections. See [Translation statistics](/en/guide/translation-stats) for request size, duration, and service performance, and [AI usage](/en/guide/model-usage) for token use.
+
+Cloud configuration sync offers Google Drive and OneDrive in configured extension builds. Sign in, preview, then confirm save, restore or merge. It includes service credentials and excludes learning records, conversations and usage data; each provider shows its own last successful account and time. See the [privacy policy](/en/guide/privacy).

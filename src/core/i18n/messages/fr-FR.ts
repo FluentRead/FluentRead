@@ -7,6 +7,7 @@
  */
 import brandTaglines from './brand-taglines.json';
 import googleDriveText from './google-drive/fr-FR.json';
+import oneDriveText from './onedrive/fr-FR.json';
 import type {
 enUSMessages} from './en-US';
 import {legacyTextOverrides} from './legacy-overrides';
@@ -22,6 +23,7 @@ export const frFRMessages = {
     "settings.backup.fileDescription": "Les fichiers de sauvegarde contiennent des clés API et d’autres informations privées et ne sont pas chiffrés. Conservez-les en lieu sûr et ne les partagez pas publiquement.",
     "settings.backup.restoreHint": "Choisissez un fichier de sauvegarde FluentRead. Les anciens fichiers JSON peuvent aussi être restaurés.",
     ...googleDriveText.messages,
+    ...oneDriveText.messages,
     "brand.tagline": brandTaglines['fr-FR'],
     "popup.translationCount": "{count} traductions",
     "translationCenter.endpointMissing": "Renseignez d’abord l’adresse du service personnalisé.",

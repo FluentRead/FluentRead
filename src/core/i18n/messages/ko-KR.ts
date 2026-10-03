@@ -7,6 +7,7 @@
  */
 import brandTaglines from './brand-taglines.json';
 import googleDriveText from './google-drive/ko-KR.json';
+import oneDriveText from './onedrive/ko-KR.json';
 import type {
 enUSMessages} from './en-US';
 import {legacyTextOverrides} from './legacy-overrides';
@@ -22,6 +23,7 @@ export const koKRMessages = {
     "settings.backup.fileDescription": "백업 파일에는 API 키 등 개인 정보가 포함되며 암호화되지 않습니다. 안전하게 보관하고 공개적으로 공유하지 마세요.",
     "settings.backup.restoreHint": "FluentRead 백업 파일을 선택하세요. 이전 버전의 JSON 파일도 복원할 수 있습니다.",
     ...googleDriveText.messages,
+    ...oneDriveText.messages,
     "brand.tagline": brandTaglines['ko-KR'],
     "popup.translationCount": "번역 {count}회",
     "translationCenter.endpointMissing": "먼저 사용자 지정 서비스 주소를 설정하세요.",

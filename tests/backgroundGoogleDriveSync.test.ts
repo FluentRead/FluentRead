@@ -11,6 +11,16 @@ function fixture(trusted = true) {
     return {service, handler: createGoogleDriveSyncHandler(service, () => trusted)};
 }
 describe('Google Drive 可信消息协议', () => {
+    it('OneDrive 复用可信边界并返回对应多语言错误键', async () => {
+        const f = fixture();
+        const denied = createGoogleDriveSyncHandler(f.service, () => false, 'oneDriveEncryptedSync');
+        expect(await denied.handle({type: 'oneDriveEncryptedSync', action: 'prepare'}, {})).toEqual({success: false, error: 'settings.onedrive.notTrusted'});
+        const allowed = createGoogleDriveSyncHandler(f.service, () => true, 'oneDriveEncryptedSync');
+        expect(await allowed.handle({type: 'oneDriveEncryptedSync', action: 'prepare'}, {})).toEqual({success: false, error: 'settings.onedrive.invalidOperation'});
+        expect(await allowed.handle({type: 'oneDriveEncryptedSync', action: 'bad', clientId: 'id'}, {})).toEqual({success: false, error: 'settings.onedrive.invalidOperation'});
+        await allowed.handle({type: 'oneDriveEncryptedSync', action: 'prepare', clientId: 'id'}, {});
+        expect(f.service.prepare).toHaveBeenCalledWith(GOOGLE_DRIVE_APPLICATION_PASSPHRASE, undefined, 'id');
+    });
     it('设置页可操作，其他扩展、网页、popup、路径前缀和非法 URL 都不能操作', () => {
         const options = 'chrome-extension://fixture/options.html';
         expect(isGoogleDriveSettingsSender({id: 'fixture', url: `${options}?test=1#backup`}, 'fixture', options)).toBe(true);

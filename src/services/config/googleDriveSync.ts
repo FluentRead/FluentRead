@@ -1,6 +1,6 @@
 /**
  * @file src/services/config/googleDriveSync.ts
- * 文件职责：编排完整配置的 Google Drive 加密同步与用户确认事务。
+ * 文件职责：编排完整配置的多云端加密同步与用户确认事务。
  * 主要内容：单次授权、账号绑定、上次成功同步的账号记录、密文基线、三方合并、
  * 掩码预览、过期检查与自动清理授权缓存；换号失败不改动成功记录。
  * 模块边界：通过端口读写配置与 Drive；不持久化口令，不向设置页面传递完整配置。
@@ -38,6 +38,7 @@ export interface DriveSyncPorts {
     readState(): Promise<unknown>;
     writeState(state: DriveSyncState): Promise<void>;
     now(): number;
+    accountChangedMessage?: string;
 }
 interface Pending {
     preview: DriveSyncPreview;
@@ -138,7 +139,7 @@ export function createGoogleDriveSync(ports: DriveSyncPorts) {
         if (await proof(id, passphrase) !== current.proof) throw new DriveError('同步口令已修改，请重新生成预览。');
         if (!state.connected) throw new DriveError('本次同步授权已结束，请重新生成预览。');
         const session = await ports.auth.open(false);
-        if (session.account.id !== current.preview.account.id) throw new DriveError('Google 账号已切换，请重新生成同步预览。');
+        if (session.account.id !== current.preview.account.id) throw new DriveError(ports.accountChangedMessage ?? 'Google 账号已切换，请重新生成同步预览。');
         if (!driveValuesEqual(toDriveSyncConfig(await ports.snapshot()), current.local)) throw new DriveError('本机配置已变化，请重新生成同步预览。');
         let next: DriveSyncConfig;
         if (direction === 'upload') next = current.local;
@@ -191,3 +192,6 @@ export function createGoogleDriveSync(ports: DriveSyncPorts) {
         }),
     };
 }
+
+/** 云端端口共用同一确认事务；每个提供商由装配层注入独立状态键。 */
+export const createCloudConfigSync = createGoogleDriveSync;

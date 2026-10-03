@@ -100,6 +100,19 @@ describe('界面 i18n 契约', () => {
     }
   });
 
+  it('OneDrive 权限、换账号及全部错误文案在七种语言中完整本地化', () => {
+    const directory = 'src/core/i18n/messages/onedrive/';
+    const base = JSON.parse(readFileSync(directory + 'zh-CN.json', 'utf8')).messages;
+    for (const {value: language} of UI_LANGUAGE_OPTIONS) {
+      const catalog = JSON.parse(readFileSync(directory + language + '.json', 'utf8')).messages;
+      expect(Object.keys(catalog).sort()).toEqual(Object.keys(base).sort());
+      for (const key of Object.keys(base)) {
+        expect(translate(key, language)).not.toBe(key);
+        if (language !== 'zh-CN') expect(translate(key, language)).not.toBe(base[key]);
+      }
+    }
+  });
+
   it('Google Drive 全部固定反馈和设置名称覆盖六种非中文界面语言', () => {
     const files = ['src/platform/google-drive/auth.ts', 'src/platform/google-drive/api.ts', 'src/core/config/driveSync.ts', 'src/services/config/googleDriveSync.ts', 'src/services/config/googleDriveSyncClient.ts', 'src/app/background/handlers/googleDriveSync.ts'];
     const sources = new Set(files.flatMap(file => [...readFileSync(file, 'utf8').matchAll(/'([^'\n]*[\u4e00-\u9fff][^'\n]*)'/gu)].map(match => match[1])));

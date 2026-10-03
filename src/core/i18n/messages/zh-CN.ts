@@ -8,6 +8,7 @@
  */
 import brandTaglines from './brand-taglines.json';
 import googleDriveText from './google-drive/zh-CN.json';
+import oneDriveText from './onedrive/zh-CN.json';
 import type {
 MessageCatalog} from '../types';
 import {localTtsChineseMessages} from './localTts';
@@ -20,6 +21,7 @@ export const zhCNMessages = {
     "settings.backup.fileDescription": "备份文件包含 API Key 等私密信息，且未加密，请妥善保存，不要公开分享。",
     "settings.backup.restoreHint": "选择 FluentRead 备份文件，旧版 JSON 文件也可恢复。",
     ...googleDriveText.messages,
+    ...oneDriveText.messages,
     "brand.tagline": brandTaglines['zh-CN'],
     "popup.translationCount": "已完成 {count} 次翻译",
     "translationCenter.endpointMissing": "请先填写自定义服务的接口地址。",

@@ -1,0 +1,109 @@
+
+> FluentRead-流畅阅读@0.0.35 test <task-worktree>
+> node scripts/testing/run-resource-safe.mjs -- vitest run "tests/config.test.ts" "tests/configDiff.test.ts" "tests/googleDriveConfig.test.ts" "tests/googleDrivePreview.test.ts" "tests/i18n.test.ts" "tests/userscriptViteConfig.test.ts" "tests/userscriptLanguageBundles.test.ts"
+
+[resource-safe] CPU target 60%, maxWorkers 2, concurrency 5, command: vitest run tests/config.test.ts tests/configDiff.test.ts tests/googleDriveConfig.test.ts tests/googleDrivePreview.test.ts tests/i18n.test.ts tests/userscriptViteConfig.test.ts tests/userscriptLanguageBundles.test.ts
+
+ RUN  v2.1.9 <task-worktree>
+
+stderr | tests/config.test.ts > 统一配置存储 > 凭据水合失败前收到更高 revision 时 fallback 也采用最新公开配置
+[FluentRead] 配置读取或安全迁移失败，保留已读取的公开配置 Error: storage.local credentials unavailable
+    at Object.<anonymous> (<task-worktree>/tests/config.test.ts:73:19)
+    at processTicksAndRejections (node:internal/process/task_queues:95:5)
+
+stderr | tests/config.test.ts > 统一配置存储 > 前驱与队尾 patch 都失败且队尾回读失败时不复活前驱乐观字段
+[FluentRead] 配置保存失败后的权威快照回读失败 Error: config read unavailable
+    at Object.<anonymous> (<task-worktree>/tests/config.test.ts:1458:65)
+    at Object.mockCall (file:///Users/thinkstu/Desktop/copy/FluentRead/node_modules/.pnpm/@vitest+spy@2.1.9/node_modules/@vitest/spy/dist/index.js:61:17)
+    at Object.spy [as getItem] (file:///Users/thinkstu/Desktop/copy/FluentRead/node_modules/.pnpm/tinyspy@3.0.2/node_modules/tinyspy/dist/index.js:45:80)
+    at reconcileFailedConfigRequest (<task-worktree>/src/services/config/store.ts:1259:29)
+    at <task-worktree>/src/services/config/store.ts:1597:23
+
+stderr | tests/config.test.ts > 统一配置存储 > 后台重启后旧 session 读取失败仍先水合计数操作日志
+[FluentRead] 旧会话凭据暂不可读，保留原记录并暂停配置写入 Error: storage.session unavailable
+    at Object.<anonymous> (<task-worktree>/tests/config.test.ts:79:19)
+    at Object.mockCall (file:///Users/thinkstu/Desktop/copy/FluentRead/node_modules/.pnpm/@vitest+spy@2.1.9/node_modules/@vitest/spy/dist/index.js:61:17)
+    at Object.spy [as getItem] (file:///Users/thinkstu/Desktop/copy/FluentRead/node_modules/.pnpm/tinyspy@3.0.2/node_modules/tinyspy/dist/index.js:45:80)
+    at initializeConfig (<task-worktree>/src/services/config/store.ts:645:35)
+    at processTicksAndRejections (node:internal/process/task_queues:95:5)
+    at operation (<task-worktree>/src/services/config/store.ts:806:9)
+    at Module.incrementConfigCount (<task-worktree>/src/services/config/store.ts:848:16)
+    at <task-worktree>/tests/config.test.ts:1595:9
+    at file:///Users/thinkstu/Desktop/copy/FluentRead/node_modules/.pnpm/@vitest+runner@2.1.9/node_modules/@vitest/runner/dist/index.js:533:5
+    at runTest (file:///Users/thinkstu/Desktop/copy/FluentRead/node_modules/.pnpm/@vitest+runner@2.1.9/node_modules/@vitest/runner/dist/index.js:1056:11)
+
+stderr | tests/config.test.ts > 统一配置存储 > 后台重启后local 检查点写入失败仍先水合计数操作日志
+[FluentRead] 配置安全迁移未完成，保留当前运行时与旧存储以便重试 Error: persistent credentials unavailable
+    at Object.<anonymous> (<task-worktree>/tests/config.test.ts:86:19)
+    at Object.mockCall (file:///Users/thinkstu/Desktop/copy/FluentRead/node_modules/.pnpm/@vitest+spy@2.1.9/node_modules/@vitest/spy/dist/index.js:61:17)
+    at Object.spy [as setItem] (file:///Users/thinkstu/Desktop/copy/FluentRead/node_modules/.pnpm/tinyspy@3.0.2/node_modules/tinyspy/dist/index.js:45:80)
+    at writeAndVerifyCredentials (<task-worktree>/src/services/config/store.ts:384:19)
+    at initializeConfig (<task-worktree>/src/services/config/store.ts:704:19)
+    at processTicksAndRejections (node:internal/process/task_queues:95:5)
+    at operation (<task-worktree>/src/services/config/store.ts:806:9)
+    at Module.incrementConfigCount (<task-worktree>/src/services/config/store.ts:848:16)
+    at <task-worktree>/tests/config.test.ts:1595:9
+    at file:///Users/thinkstu/Desktop/copy/FluentRead/node_modules/.pnpm/@vitest+runner@2.1.9/node_modules/@vitest/runner/dist/index.js:533:5
+
+stderr | tests/config.test.ts > 统一配置存储 > 凭据载体读取失败时保留已读取的公开配置并禁止覆盖旧存储
+[FluentRead] 配置读取或安全迁移失败，保留已读取的公开配置 Error: storage.local credentials unavailable
+    at Object.<anonymous> (<task-worktree>/tests/config.test.ts:73:19)
+    at Object.mockCall (file:///Users/thinkstu/Desktop/copy/FluentRead/node_modules/.pnpm/@vitest+spy@2.1.9/node_modules/@vitest/spy/dist/index.js:61:17)
+    at Object.spy [as getItem] (file:///Users/thinkstu/Desktop/copy/FluentRead/node_modules/.pnpm/tinyspy@3.0.2/node_modules/tinyspy/dist/index.js:45:80)
+    at initializeConfig (<task-worktree>/src/services/config/store.ts:629:53)
+    at processTicksAndRejections (node:internal/process/task_queues:95:5)
+
+stderr | tests/config.test.ts > 统一配置存储 > 失败请求回读失败时同样消费等待期间 deferred 的权威快照
+[FluentRead] 配置保存失败后的回读失败，采用并发到达的权威快照 Error: config read unavailable
+    at <task-worktree>/tests/config.test.ts:2128:20
+    at processTicksAndRejections (node:internal/process/task_queues:95:5)
+    at file:///Users/thinkstu/Desktop/copy/FluentRead/node_modules/.pnpm/@vitest+runner@2.1.9/node_modules/@vitest/runner/dist/index.js:533:5
+    at runTest (file:///Users/thinkstu/Desktop/copy/FluentRead/node_modules/.pnpm/@vitest+runner@2.1.9/node_modules/@vitest/runner/dist/index.js:1056:11)
+    at runSuite (file:///Users/thinkstu/Desktop/copy/FluentRead/node_modules/.pnpm/@vitest+runner@2.1.9/node_modules/@vitest/runner/dist/index.js:1205:15)
+    at runSuite (file:///Users/thinkstu/Desktop/copy/FluentRead/node_modules/.pnpm/@vitest+runner@2.1.9/node_modules/@vitest/runner/dist/index.js:1205:15)
+    at runFiles (file:///Users/thinkstu/Desktop/copy/FluentRead/node_modules/.pnpm/@vitest+runner@2.1.9/node_modules/@vitest/runner/dist/index.js:1262:5)
+    at startTests (file:///Users/thinkstu/Desktop/copy/FluentRead/node_modules/.pnpm/@vitest+runner@2.1.9/node_modules/@vitest/runner/dist/index.js:1271:3)
+    at file:///Users/thinkstu/Desktop/copy/FluentRead/node_modules/.pnpm/vitest@2.1.9_@types+node@22.10.7/node_modules/vitest/dist/chunks/runBaseTests.3qpJUEJM.js:126:11
+    at withEnv (file:///Users/thinkstu/Desktop/copy/FluentRead/node_modules/.pnpm/vitest@2.1.9_@types+node@22.10.7/node_modules/vitest/dist/chunks/runBaseTests.3qpJUEJM.js:90:5)
+
+stderr | tests/config.test.ts > 统一配置存储 > local 凭据写入失败时不删除或改写旧载体
+[FluentRead] 配置安全迁移未完成，保留当前运行时与旧存储以便重试 Error: persistent credentials unavailable
+    at Object.<anonymous> (<task-worktree>/tests/config.test.ts:86:19)
+    at Object.mockCall (file:///Users/thinkstu/Desktop/copy/FluentRead/node_modules/.pnpm/@vitest+spy@2.1.9/node_modules/@vitest/spy/dist/index.js:61:17)
+    at Object.spy [as setItem] (file:///Users/thinkstu/Desktop/copy/FluentRead/node_modules/.pnpm/tinyspy@3.0.2/node_modules/tinyspy/dist/index.js:45:80)
+    at writeAndVerifyCredentials (<task-worktree>/src/services/config/store.ts:384:19)
+    at initializeConfig (<task-worktree>/src/services/config/store.ts:704:19)
+    at processTicksAndRejections (node:internal/process/task_queues:95:5)
+
+stderr | tests/config.test.ts > 统一配置存储 > local 凭据读回校验失败时不删除或改写旧载体
+[FluentRead] 配置安全迁移未完成，保留当前运行时与旧存储以便重试 Error: local:credentials 凭据写入校验失败
+    at verifyStoredCredentials (<task-worktree>/src/services/config/store.ts:393:15)
+    at processTicksAndRejections (node:internal/process/task_queues:95:5)
+    at writeAndVerifyCredentials (<task-worktree>/src/services/config/store.ts:385:5)
+    at initializeConfig (<task-worktree>/src/services/config/store.ts:704:13)
+
+stderr | tests/config.test.ts > 统一配置存储 > 凭据安全水合失败时不交接乐观补丁
+[FluentRead] 配置读取或安全迁移失败，保留已读取的公开配置 Error: storage.local credentials unavailable
+    at Object.<anonymous> (<task-worktree>/tests/config.test.ts:73:19)
+    at Object.mockCall (file:///Users/thinkstu/Desktop/copy/FluentRead/node_modules/.pnpm/@vitest+spy@2.1.9/node_modules/@vitest/spy/dist/index.js:61:17)
+    at Object.spy [as getItem] (file:///Users/thinkstu/Desktop/copy/FluentRead/node_modules/.pnpm/tinyspy@3.0.2/node_modules/tinyspy/dist/index.js:45:80)
+    at initializeConfig (<task-worktree>/src/services/config/store.ts:629:53)
+    at processTicksAndRejections (node:internal/process/task_queues:95:5)
+
+ ✓ tests/config.test.ts (128 tests) 11441ms
+   ✓ 统一配置存储 > 补丁链超过后台批次上限时不发出部分链 3096ms
+   ✓ 统一配置存储 > 记录配置版本、时间，并限制为最近十条快照 444ms
+ ✓ tests/i18n.test.ts (56 tests) 2546ms
+   ✓ i18n 全量界面扫描 > Vue 文案和展示注册表在非中文界面有本地化结果 889ms
+   ✓ 运行期反馈文案资源 > 每条精确反馈都来自真实源码，不重复，并在每种界面语言中完整本地化 696ms
+   ✓ 旧界面译文人工校正 > 校正原文仍在界面源码中使用，不重复，并覆盖此前的译文 629ms
+ ✓ tests/configDiff.test.ts (47 tests) 24ms
+ ✓ tests/googleDriveConfig.test.ts (9 tests) 77ms
+ ✓ tests/userscriptViteConfig.test.ts (8 tests) 38ms
+ ✓ tests/userscriptLanguageBundles.test.ts (3 tests) 117ms
+ ✓ tests/googleDrivePreview.test.ts (3 tests) 3ms
+
+ Test Files  7 passed (7)
+      Tests  254 passed (254)
+   Start at  15:37:43
+   Duration  18.28s (transform 1.20s, setup 0ms, collect 2.97s, tests 14.25s, environment 1ms, prepare 273ms)

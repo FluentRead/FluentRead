@@ -8,6 +8,7 @@
 import brandTaglines from './brand-taglines.json';
 import dropboxText from './dropbox/es-ES.json';
 import googleDriveText from './google-drive/es-ES.json';
+import cloudBackupText from './cloud-backup/es-ES.json';
 import type {
 enUSMessages} from './en-US';
 import {legacyTextOverrides} from './legacy-overrides';
@@ -24,6 +25,7 @@ export const esESMessages = {
     "settings.backup.restoreHint": "Elige un archivo de copia de FluentRead. También puedes restaurar archivos JSON antiguos.",
     ...googleDriveText.messages,
     ...dropboxText,
+    ...cloudBackupText.messages,
     "brand.tagline": brandTaglines['es-ES'],
     "popup.translationCount": "{count} traducciones",
     "translationCenter.endpointMissing": "Primero configura la dirección del servicio personalizado.",

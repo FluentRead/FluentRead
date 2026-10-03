@@ -9,6 +9,7 @@ on:
       - 'package.json'
       - 'pnpm-lock.yaml'
       - 'scripts/testing/run-resource-safe.mjs'
+      - 'scripts/verify-docs-build.mjs'
       - '.github/workflows/deploy-docs.yml'
   pull_request:
     branches: [main]
@@ -18,6 +19,7 @@ on:
       - 'package.json'
       - 'pnpm-lock.yaml'
       - 'scripts/testing/run-resource-safe.mjs'
+      - 'scripts/verify-docs-build.mjs'
       - '.github/workflows/deploy-docs.yml'
   workflow_dispatch:
 
@@ -49,6 +51,10 @@ jobs:
         run: pnpm rebuild esbuild
       - name: Build documentation
         run: pnpm docs:build
+      - name: Check website types
+        run: pnpm docs:typecheck
+      - name: Check website links and assets
+        run: pnpm docs:check
       - name: Upload website
         if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
         uses: actions/upload-pages-artifact@v4

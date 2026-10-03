@@ -32,7 +32,7 @@ Simplified and Traditional Chinese are separate language options. Text clearly m
 
 Keep **Free translation service** to begin. It needs no API key. If the service is busy or unavailable on your network, retry later or [choose another service](/en/config/translation-engines).
 
-<figure class="doc-figure"><a href="/screenshots/en/popup.webp" target="_blank" rel="noopener"><img class="doc-screenshot popup" src="/screenshots/en/popup.webp" width="720" height="1120" alt="FluentRead menu with source and target language, translation service, and page translation" /></a><figcaption>The everyday controls live in the extension menu. Open the image for full resolution.</figcaption></figure>
+<figure class="doc-figure"><a href="/screenshots/ui/en-US/popup.webp" target="_blank" rel="noopener"><img class="doc-screenshot popup" src="/screenshots/ui/en-US/popup.webp" width="760" height="984" alt="FluentRead menu with source and target language, translation service, and page translation" /></a><figcaption>The everyday controls live in the extension menu. Open the image for full resolution.</figcaption></figure>
 
 ### 3. Translate the page
 
@@ -51,3 +51,9 @@ For sentence breakdowns and explanations, set up the [reading card](/en/guide/de
 ## Nothing happened?
 
 Check that the extension is on, refresh the page, and retry. Then follow [Troubleshooting](/en/guide/faq).
+
+## Next steps
+
+- [Explore the guides](/en/docs/)
+- [Adjust appearance and triggers](/en/config/)
+- [Connect your own provider](/en/config/translation-engines)

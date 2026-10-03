@@ -322,7 +322,11 @@
       "tests/googleDriveSyncClient.test.ts",
       "tests/googleDrivePreview.test.ts",
       "tests/visionProbe.test.ts",
-      "tests/visionProbeStorage.test.ts"
+      "tests/visionProbeStorage.test.ts",
+      "tests/webDavConnection.test.ts",
+      "tests/webDavApi.test.ts",
+      "tests/backgroundWebDavBackup.test.ts",
+      "tests/webDavBackupClient.test.ts"
     ],
     "functional": [
       "tests/translationCenterComponent.test.ts",
@@ -411,7 +415,9 @@
       "tests/videoCaptionPlatformRuntime.test.ts",
       "tests/googleDriveSync.test.ts",
       "tests/dropboxSync.test.ts",
-      "tests/backgroundGoogleDriveSync.test.ts"
+      "tests/backgroundGoogleDriveSync.test.ts",
+      "tests/webDavBackup.test.ts",
+      "tests/webDavHttpIntegration.test.ts"
     ],
     "regression": [
       "tests/discordServerIconBoundary.test.ts",

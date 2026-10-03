@@ -37,3 +37,8 @@ Use **More → Import glossary** for CSV, TSV, or JSON files or pasted content. 
 Export under **Glossary settings**. JSON preserves all settings; CSV and TSV support spreadsheet editing. Configuration backups also include glossaries.
 
 Editing, matching, and target restoration happen locally. Translation sends protected source text and marker-preservation constraints, not the whole glossary. Surrounding text, configured page context, and custom request bodies still follow normal service behavior; placeholders do not anonymize an entire request.
+
+## Next steps
+
+- [All guides](/en/docs/)
+- [Troubleshooting](/en/guide/faq)

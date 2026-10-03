@@ -8,6 +8,7 @@
 import brandTaglines from './brand-taglines.json';
 import dropboxText from './dropbox/ru-RU.json';
 import googleDriveText from './google-drive/ru-RU.json';
+import cloudBackupText from './cloud-backup/ru-RU.json';
 import type {
 enUSMessages} from './en-US';
 import {legacyTextOverrides} from './legacy-overrides';
@@ -24,6 +25,7 @@ export const ruRUMessages = {
     "settings.backup.restoreHint": "Выберите файл резервной копии FluentRead. Старые файлы JSON также можно восстановить.",
     ...googleDriveText.messages,
     ...dropboxText,
+    ...cloudBackupText.messages,
     "brand.tagline": brandTaglines['ru-RU'],
     "popup.translationCount": "Переводов: {count}",
     "translationCenter.endpointMissing": "Сначала укажите адрес пользовательского сервиса.",

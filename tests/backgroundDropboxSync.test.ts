@@ -1,7 +1,7 @@
 import {describe, expect, it, vi} from 'vitest';
 import {createGoogleDriveSyncHandler} from '@/src/app/background/handlers/googleDriveSync';
 import {DropboxError} from '@/src/platform/dropbox/auth';
-import {DriveError} from '@/src/platform/google-drive/auth';
+import {CloudSyncError} from '@/src/core/config/cloudSync';
 import {GOOGLE_DRIVE_APPLICATION_PASSPHRASE} from '@/src/platform/google-drive/constants';
 import type {createGoogleDriveSync} from '@/src/services/config/googleDriveSync';
 describe('Dropbox 设置消息边界', () => {
@@ -15,7 +15,7 @@ describe('Dropbox 设置消息边界', () => {
         expect(await handler.handle({type: handler.type, action: 'prepare', clientId: 'fixture-client', switchAccount: 'true'}, {})).toEqual({success: false, error: 'settings.dropbox.error.invalidAction'});
         vi.mocked(service.status).mockRejectedValueOnce(new DropboxError('settings.dropbox.error.expired'));
         expect(await handler.handle({type: handler.type, action: 'status'}, {})).toEqual({success: false, error: 'settings.dropbox.error.expired'});
-        vi.mocked(service.status).mockRejectedValueOnce(new DriveError('Google 账号已切换，请重新生成同步预览。'));
+        vi.mocked(service.status).mockRejectedValueOnce(new CloudSyncError('settings.dropbox.error.accountChanged'));
         expect(await handler.handle({type: handler.type, action: 'status'}, {})).toEqual({success: false, error: 'settings.dropbox.error.accountChanged'});
         expect(await createGoogleDriveSyncHandler(service, () => false, 'dropbox').handle({type: handler.type}, {})).toEqual({success: false, error: 'settings.dropbox.error.settingsOnly'});
         expect(await handler.handle({type: handler.type, action: 'prepare', clientId: ''}, {})).toMatchObject({success: false, error: 'settings.dropbox.error.invalidAction'});

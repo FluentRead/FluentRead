@@ -43,6 +43,26 @@ import {registerAllUiLanguageBundles} from '@/src/core/i18n/bundles';
 registerAllUiLanguageBundles();
 
 describe('界面 i18n 契约', () => {
+  it('配置云备份和 WebDAV 七种语言的键与插值一致，供应商可互换', () => {
+    const languages = ['zh-CN', 'en-US', 'ja-JP', 'ko-KR', 'fr-FR', 'ru-RU', 'es-ES'] as const;
+    const catalogs = languages.map(language => JSON.parse(readFileSync(join(process.cwd(), 'src/core/i18n/messages/cloud-backup', language + '.json'), 'utf8')).messages as Record<string, string>);
+    const keys = Object.keys(catalogs[0]).sort();
+    for (const [index, catalog] of catalogs.entries()) {
+      expect(Object.keys(catalog).sort()).toEqual(keys);
+      for (const key of keys) {
+        expect(catalog[key].trim()).not.toBe('');
+        expect([...catalog[key].matchAll(/\{(\w+)\}/gu)].map(match => match[1]).sort()).toEqual([...catalogs[0][key].matchAll(/\{(\w+)\}/gu)].map(match => match[1]).sort());
+        expect(translate(key, languages[index], {provider: 'WebDAV', status: 502})).not.toBe(key);
+      }
+      expect(translate('settings.cloud.syncNow', languages[index], {provider: 'WebDAV'})).toContain('WebDAV');
+      expect(translate('settings.cloud.syncNow', languages[index], {provider: 'Google Drive'})).toContain('Google Drive');
+      expect(translate('settings.webdav.error.http', languages[index], {status: 502})).toContain('502');
+      if (languages[index] !== 'zh-CN') for (const source of ['请先设置 WebDAV 服务器和应用密码。', '同步连接已变化，请重新生成预览。']) expect(translateLegacyText(source, languages[index])).not.toBe(source);
+    }
+    expect(JSON.stringify(catalogs[1])).not.toMatch(/[\u3400-\u9fff]/u);
+    expect(translate('settings.cloud.syncNow', 'zh-CN', {provider: 'Google Drive'})).toBe('立即与Google Drive同步');
+  });
+
   it('issue #626：自定义地址提示与嵌套 HTML 错误覆盖全部界面语言', () => {
     const hint = '支持完整 Chat Completions 地址或以 /v1 结尾的 Base URL；模型须支持 Chat Completions。';
     const detail = '服务返回了 HTML 网页。请检查 Base URL、接口路径，以及所选模型是否支持 Chat Completions。';

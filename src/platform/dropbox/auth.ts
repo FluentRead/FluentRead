@@ -5,10 +5,12 @@
  * session storage 暂存一次同步的授权，支持后台重启与主动换号，不请求 refresh token。
  * 模块边界：不读取配置，不向设置页返回令牌；结构上适配现有同步事务的会话端口。
  */
-import {DriveError, type DriveAccount, type DriveSession} from '../google-drive/auth';
+import {CloudSyncError, type CloudSyncAccount as DriveAccount, type CloudSyncSession as DriveSession} from '@/src/core/config/cloudSync';
 import {DROPBOX_SCOPES, DROPBOX_REDIRECT_PATH} from './constants';
 
-export class DropboxError extends DriveError {}
+export class DropboxError extends CloudSyncError {
+    constructor(message: string, readonly status?: number) {super(message);}
+}
 export interface DropboxIdentity {
     getRedirectURL(path: string): string;
     launchWebAuthFlow(details: {url: string; interactive: boolean}): Promise<string | undefined>;

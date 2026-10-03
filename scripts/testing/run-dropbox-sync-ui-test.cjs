@@ -60,10 +60,11 @@ async function main() {
         page.on('pageerror', error => report.consoleErrors.push(error.message));
         await page.goto(`chrome-extension://${extensionId}/options.html#settings-data`, {waitUntil: 'domcontentloaded'});
         await page.locator('button[data-section="settings-data"]').click();
+        await page.locator('[data-testid="cloud-method-dropbox"]').check();
         const card = page.locator('[data-testid="dropbox-sync"]'); const now = page.locator('[data-testid="dropbox-sync-now"]');
         await now.waitFor(); check(await worker.evaluate(() => globalThis.__dropboxFixture.requests === 0), 'opening settings never authorizes or accesses Dropbox');
-        check(await page.locator('[data-testid="google-drive-sync"]').count() === 1 && await card.count() === 1, 'independent Google and Dropbox cards coexist');
-        check(await page.locator('#dropbox-title').innerText() === 'Dropbox 配置同步', 'Dropbox provider heading is localized');
+        check(await page.locator('[data-testid="cloud-method-google-drive"]').count() === 1 && await page.locator('[data-testid="cloud-method-webdav"]').count() === 1 && await card.count() === 1, 'Google, Dropbox and WebDAV share one cloud backup selector');
+        check(await page.locator('#cloud-backup-title').innerText() === '配置云备份', 'shared cloud backup heading is localized');
         check(!(await card.innerText()).includes('Google'), 'Dropbox description contains no Google provider text');
         const dialog = page.locator('.drive-dialog:visible');
         await now.click(); await page.locator('[data-testid="dropbox-confirm"]').waitFor();
@@ -74,7 +75,10 @@ async function main() {
         await page.locator('.el-message').waitFor({state: 'hidden'});
         check(await worker.evaluate(async () => !(await chrome.storage.session.get('fluentreadDropboxSyncSession')).fluentreadDropboxSyncSession), 'successful sync removes temporary token');
         await page.locator('[data-testid="dropbox-last-account"]').getByText('fixture-a@example.invalid', {exact: false}).waitFor();
+        await page.locator('[data-testid="cloud-method-google-drive"]').check();
+        await page.locator('[data-testid="google-drive-sync-now"]').waitFor();
         check(!(await page.locator('[data-testid="google-drive-sync"]').innerText()).includes('fixture-a'), 'Dropbox history never becomes Google history');
+        await page.locator('[data-testid="cloud-method-dropbox"]').check(); await now.waitFor();
         async function savePatch(patch, sequence) {
             const result = await page.evaluate(async ({patch, sequence}) => {
                 const config = await chrome.runtime.sendMessage({type: 'configStorageRead', key: 'local:config'});

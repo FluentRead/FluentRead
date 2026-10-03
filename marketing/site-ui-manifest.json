@@ -1,0 +1,96 @@
+{
+  "extension": ".output/chrome-mv3",
+  "scale": 2,
+  "screenshots": [
+    {
+      "locale": "zh-CN",
+      "name": "popup",
+      "source": "marketing/source/site-ui/zh-CN/popup.png",
+      "web": "docs/public/screenshots/ui/zh-CN/popup.webp",
+      "width": 640,
+      "height": 874,
+      "bytes": 67118,
+      "losslessPixels": true
+    },
+    {
+      "locale": "zh-CN",
+      "name": "settings-general",
+      "source": "marketing/source/site-ui/zh-CN/settings-general.png",
+      "web": "docs/public/screenshots/ui/zh-CN/settings-general.webp",
+      "width": 2560,
+      "height": 1600,
+      "bytes": 89354,
+      "losslessPixels": true
+    },
+    {
+      "locale": "zh-CN",
+      "name": "settings-services",
+      "source": "marketing/source/site-ui/zh-CN/settings-services.png",
+      "web": "docs/public/screenshots/ui/zh-CN/settings-services.webp",
+      "width": 2560,
+      "height": 1600,
+      "bytes": 104066,
+      "losslessPixels": true
+    },
+    {
+      "locale": "en-US",
+      "name": "popup",
+      "source": "marketing/source/site-ui/en-US/popup.png",
+      "web": "docs/public/screenshots/ui/en-US/popup.webp",
+      "width": 760,
+      "height": 984,
+      "bytes": 72656,
+      "losslessPixels": true
+    },
+    {
+      "locale": "en-US",
+      "name": "settings-general",
+      "source": "marketing/source/site-ui/en-US/settings-general.png",
+      "web": "docs/public/screenshots/ui/en-US/settings-general.webp",
+      "width": 2560,
+      "height": 1600,
+      "bytes": 95346,
+      "losslessPixels": true
+    },
+    {
+      "locale": "en-US",
+      "name": "settings-services",
+      "source": "marketing/source/site-ui/en-US/settings-services.png",
+      "web": "docs/public/screenshots/ui/en-US/settings-services.webp",
+      "width": 2560,
+      "height": 1600,
+      "bytes": 116314,
+      "losslessPixels": true
+    }
+  ],
+  "errors": [],
+  "launchMode": "macos-background-cdp",
+  "focusPolicy": "launchservices-no-foreground",
+  "windowPlacement": {
+    "mode": "background-visible-no-focus",
+    "visible": true,
+    "hidden": false,
+    "centered": true,
+    "windowState": "normal",
+    "bounds": {
+      "left": 1121,
+      "top": -940,
+      "width": 1280,
+      "height": 800
+    },
+    "displayTarget": "secondary",
+    "source": "macos-nsscreen",
+    "screenIndex": 1,
+    "browserFrontmost": false,
+    "frontmostBefore": {
+      "pid": 44386,
+      "name": "Google Chrome"
+    },
+    "frontmostAfter": {
+      "pid": 44386,
+      "name": "Google Chrome"
+    }
+  },
+  "sourceRevision": "99393c773413c6b384efeccab4704e35019f58a6",
+  "version": "0.0.35"
+}

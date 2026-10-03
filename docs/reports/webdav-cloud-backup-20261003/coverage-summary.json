@@ -1,0 +1,320 @@
+{
+  "total": {
+    "lines": {
+      "total": 458,
+      "covered": 458,
+      "skipped": 0,
+      "pct": 100
+    },
+    "statements": {
+      "total": 458,
+      "covered": 458,
+      "skipped": 0,
+      "pct": 100
+    },
+    "functions": {
+      "total": 70,
+      "covered": 70,
+      "skipped": 0,
+      "pct": 100
+    },
+    "branches": {
+      "total": 506,
+      "covered": 506,
+      "skipped": 0,
+      "pct": 100
+    },
+    "branchesTrue": {
+      "total": 0,
+      "covered": 0,
+      "skipped": 0,
+      "pct": 100
+    }
+  },
+  "src/app/background/handlers/googleDriveSync.ts": {
+    "lines": {
+      "total": 35,
+      "covered": 35,
+      "skipped": 0,
+      "pct": 100
+    },
+    "functions": {
+      "total": 3,
+      "covered": 3,
+      "skipped": 0,
+      "pct": 100
+    },
+    "statements": {
+      "total": 35,
+      "covered": 35,
+      "skipped": 0,
+      "pct": 100
+    },
+    "branches": {
+      "total": 50,
+      "covered": 50,
+      "skipped": 0,
+      "pct": 100
+    }
+  },
+  "src/app/background/handlers/webDavBackup.ts": {
+    "lines": {
+      "total": 36,
+      "covered": 36,
+      "skipped": 0,
+      "pct": 100
+    },
+    "functions": {
+      "total": 2,
+      "covered": 2,
+      "skipped": 0,
+      "pct": 100
+    },
+    "statements": {
+      "total": 36,
+      "covered": 36,
+      "skipped": 0,
+      "pct": 100
+    },
+    "branches": {
+      "total": 55,
+      "covered": 55,
+      "skipped": 0,
+      "pct": 100
+    }
+  },
+  "src/core/config/cloudSync.ts": {
+    "lines": {
+      "total": 1,
+      "covered": 1,
+      "skipped": 0,
+      "pct": 100
+    },
+    "functions": {
+      "total": 0,
+      "covered": 0,
+      "skipped": 0,
+      "pct": 100
+    },
+    "statements": {
+      "total": 1,
+      "covered": 1,
+      "skipped": 0,
+      "pct": 100
+    },
+    "branches": {
+      "total": 0,
+      "covered": 0,
+      "skipped": 0,
+      "pct": 100
+    }
+  },
+  "src/platform/webdav/api.ts": {
+    "lines": {
+      "total": 99,
+      "covered": 99,
+      "skipped": 0,
+      "pct": 100
+    },
+    "functions": {
+      "total": 11,
+      "covered": 11,
+      "skipped": 0,
+      "pct": 100
+    },
+    "statements": {
+      "total": 99,
+      "covered": 99,
+      "skipped": 0,
+      "pct": 100
+    },
+    "branches": {
+      "total": 106,
+      "covered": 106,
+      "skipped": 0,
+      "pct": 100
+    }
+  },
+  "src/platform/webdav/connection.ts": {
+    "lines": {
+      "total": 55,
+      "covered": 55,
+      "skipped": 0,
+      "pct": 100
+    },
+    "functions": {
+      "total": 10,
+      "covered": 10,
+      "skipped": 0,
+      "pct": 100
+    },
+    "statements": {
+      "total": 55,
+      "covered": 55,
+      "skipped": 0,
+      "pct": 100
+    },
+    "branches": {
+      "total": 64,
+      "covered": 64,
+      "skipped": 0,
+      "pct": 100
+    }
+  },
+  "src/services/config/cloudBackupClient.ts": {
+    "lines": {
+      "total": 21,
+      "covered": 21,
+      "skipped": 0,
+      "pct": 100
+    },
+    "functions": {
+      "total": 7,
+      "covered": 7,
+      "skipped": 0,
+      "pct": 100
+    },
+    "statements": {
+      "total": 21,
+      "covered": 21,
+      "skipped": 0,
+      "pct": 100
+    },
+    "branches": {
+      "total": 17,
+      "covered": 17,
+      "skipped": 0,
+      "pct": 100
+    }
+  },
+  "src/services/config/googleDriveSync.ts": {
+    "lines": {
+      "total": 4,
+      "covered": 4,
+      "skipped": 0,
+      "pct": 100
+    },
+    "functions": {
+      "total": 1,
+      "covered": 1,
+      "skipped": 0,
+      "pct": 100
+    },
+    "statements": {
+      "total": 4,
+      "covered": 4,
+      "skipped": 0,
+      "pct": 100
+    },
+    "branches": {
+      "total": 1,
+      "covered": 1,
+      "skipped": 0,
+      "pct": 100
+    }
+  },
+  "src/services/config/googleDriveSyncClient.ts": {
+    "lines": {
+      "total": 2,
+      "covered": 2,
+      "skipped": 0,
+      "pct": 100
+    },
+    "functions": {
+      "total": 0,
+      "covered": 0,
+      "skipped": 0,
+      "pct": 100
+    },
+    "statements": {
+      "total": 2,
+      "covered": 2,
+      "skipped": 0,
+      "pct": 100
+    },
+    "branches": {
+      "total": 0,
+      "covered": 0,
+      "skipped": 0,
+      "pct": 100
+    }
+  },
+  "src/services/config/remoteConfigSync.ts": {
+    "lines": {
+      "total": 137,
+      "covered": 137,
+      "skipped": 0,
+      "pct": 100
+    },
+    "functions": {
+      "total": 16,
+      "covered": 16,
+      "skipped": 0,
+      "pct": 100
+    },
+    "statements": {
+      "total": 137,
+      "covered": 137,
+      "skipped": 0,
+      "pct": 100
+    },
+    "branches": {
+      "total": 158,
+      "covered": 158,
+      "skipped": 0,
+      "pct": 100
+    }
+  },
+  "src/services/config/webDavBackup.ts": {
+    "lines": {
+      "total": 59,
+      "covered": 59,
+      "skipped": 0,
+      "pct": 100
+    },
+    "functions": {
+      "total": 16,
+      "covered": 16,
+      "skipped": 0,
+      "pct": 100
+    },
+    "statements": {
+      "total": 59,
+      "covered": 59,
+      "skipped": 0,
+      "pct": 100
+    },
+    "branches": {
+      "total": 51,
+      "covered": 51,
+      "skipped": 0,
+      "pct": 100
+    }
+  },
+  "src/services/config/webDavBackupClient.ts": {
+    "lines": {
+      "total": 9,
+      "covered": 9,
+      "skipped": 0,
+      "pct": 100
+    },
+    "functions": {
+      "total": 4,
+      "covered": 4,
+      "skipped": 0,
+      "pct": 100
+    },
+    "statements": {
+      "total": 9,
+      "covered": 9,
+      "skipped": 0,
+      "pct": 100
+    },
+    "branches": {
+      "total": 4,
+      "covered": 4,
+      "skipped": 0,
+      "pct": 100
+    }
+  }
+}

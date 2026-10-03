@@ -9,6 +9,7 @@
 import brandTaglines from './brand-taglines.json';
 import dropboxText from './dropbox/zh-CN.json';
 import googleDriveText from './google-drive/zh-CN.json';
+import cloudBackupText from './cloud-backup/zh-CN.json';
 import type {
 MessageCatalog} from '../types';
 import {localTtsChineseMessages} from './localTts';
@@ -22,6 +23,7 @@ export const zhCNMessages = {
     "settings.backup.restoreHint": "选择 FluentRead 备份文件，旧版 JSON 文件也可恢复。",
     ...googleDriveText.messages,
     ...dropboxText,
+    ...cloudBackupText.messages,
     "brand.tagline": brandTaglines['zh-CN'],
     "popup.translationCount": "已完成 {count} 次翻译",
     "translationCenter.endpointMissing": "请先填写自定义服务的接口地址。",

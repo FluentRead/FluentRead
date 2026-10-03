@@ -52,3 +52,8 @@ Translated PDF pages are rendered as images for visual reading. Copying text fro
 ## Does the file leave my computer?
 
 The browser parses the file locally. Text to translate is sent to your selected service. Cloud translation therefore sends the relevant text outside your computer. See [Data & privacy](/en/guide/privacy).
+
+## Next steps
+
+- [All guides](/en/docs/)
+- [Troubleshooting](/en/guide/faq)

@@ -1,0 +1,67 @@
+
+> FluentRead-流畅阅读@0.0.35 test:cloud-backup <task-worktree>
+> node scripts/testing/run-resource-safe.mjs -- vitest run --config vitest.cloud-backup.config.ts
+
+[resource-safe] CPU target 60%, maxWorkers 2, concurrency 5, command: vitest run --config vitest.cloud-backup.config.ts
+
+ RUN  v2.1.9 <task-worktree>
+      Coverage enabled with v8
+
+ ✓ tests/googleDriveSync.test.ts (21 tests) 27914ms
+   ✓ Google Drive 同步事务 > MV3 后台重启后仍可用口令恢复一次性预览，暂存中没有明文凭据 1908ms
+   ✓ Google Drive 同步事务 > 拒绝损坏预览元数据与被人为延长的过期预览 399ms
+   ✓ Google Drive 同步事务 > 每次点击只授权一次，结束后清理缓存且保留密文基线与同步时间 802ms
+   ✓ Google Drive 同步事务 > 第二设备必须明确下载，精确恢复凭据及其删除，口令错误不产生任何写入 673ms
+   ✓ Google Drive 同步事务 > 基于共同基线合并独立设置变化，私密连接冲突必须整组选择 1545ms
+   ✓ Google Drive 同步事务 > 拒绝过期、取消、口令变化、本机修改和账号切换的预览 669ms
+   ✓ Google Drive 同步事务 > 云端新增、删除和修改均使旧预览失效，上传失败保留本机和基线 2119ms
+   ✓ Google Drive 同步事务 > 本机写入失败先恢复原设置，不把失败记录为同步成功 1196ms
+   ✓ Google Drive 同步事务 > 旧基线无法解密和换账号时不隐含合并；再次同步同账号保留基线 1195ms
+   ✓ Google Drive 同步事务 > 升级为 Drive 账号标识时不能按同邮箱复用旧 OAuth 基线，确认前保留两端配置 1193ms
+   ✓ Google Drive 同步事务 > 防御未配置浏览器、无效状态、授权失败、已结束事务和不存在的同步方向 397ms
+   ✓ Google Drive 同步事务 > 旧连接及过期事务在状态检查时清理，不发起 Google 请求 675ms
+   ✓ Google Drive 同步事务 > 无关页面的取消、确认和新预览都不能破坏当前页事务；所属页面仍可确认 410ms
+   ✓ Google Drive 同步事务 > 没有页签编号也按客户端绑定，取消空事务不清理其他授权，过期事务可由新页面重建 399ms
+   ✓ Google Drive 同步事务 > 删除自定义服务和另一端选择它形成整组冲突，确认后备份可再次读取 1954ms
+   ✓ Google Drive 同步事务 > 最终快照无效时，在任何云端写入及本机应用之前拒绝 546ms
+   ✓ Google Drive 同步事务 > 6MiB 合法请求体首次上传后可再次预览，后台重启后可合并及跨设备恢复 10489ms
+   ✓ Google Drive 同步事务 > 成功同步记录账号，重开不授权；换号取消或失败仍保留上次成功记录 802ms
+ ✓ tests/webDavBackup.test.ts (4 tests) 4671ms
+   ✓ WebDAV 配置云备份事务 > 后台重启后恢复一次性预览，完整凭据可在第二设备恢复；连接密码不进入备份 814ms
+   ✓ WebDAV 配置云备份事务 > 相同连接保留基线，换连接使预览失效；另一页面不能更改连接或取消事务 1460ms
+   ✓ WebDAV 配置云备份事务 > 合并单边修改，云端和本机变化使预览失效；失败不更新成功记录 2384ms
+ ✓ tests/webDavApi.test.ts (5 tests) 28ms
+ ✓ tests/backgroundGoogleDriveSync.test.ts (5 tests) 14ms
+ ✓ tests/webDavConnection.test.ts (4 tests) 7ms
+ ✓ tests/backgroundWebDavBackup.test.ts (3 tests) 15ms
+ ✓ tests/webDavHttpIntegration.test.ts (1 test) 350ms
+   ✓ WebDAV 真实 HTTP 协议夹具 > 使用真实 fetch 校验鉴权、目录、条件创建和覆盖，并拒绝跳转到其他地址 349ms
+ ✓ tests/googleDriveSyncClient.test.ts (2 tests) 4ms
+ ✓ tests/webDavBackupClient.test.ts (1 test) 3ms
+
+ Test Files  9 passed (9)
+      Tests  46 passed (46)
+   Start at  15:13:10
+   Duration  36.06s (transform 418ms, setup 0ms, collect 909ms, tests 33.01s, environment 1ms, prepare 405ms)
+
+ % Coverage report from v8
+-------------------|---------|----------|---------|---------|-------------------
+File               | % Stmts | % Branch | % Funcs | % Lines | Uncovered Line #s
+-------------------|---------|----------|---------|---------|-------------------
+All files          |     100 |      100 |     100 |     100 |
+ ...round/handlers |     100 |      100 |     100 |     100 |
+  ...eDriveSync.ts |     100 |      100 |     100 |     100 |
+  webDavBackup.ts  |     100 |      100 |     100 |     100 |
+ core/config       |     100 |      100 |     100 |     100 |
+  cloudSync.ts     |     100 |      100 |     100 |     100 |
+ platform/webdav   |     100 |      100 |     100 |     100 |
+  api.ts           |     100 |      100 |     100 |     100 |
+  connection.ts    |     100 |      100 |     100 |     100 |
+ services/config   |     100 |      100 |     100 |     100 |
+  ...ckupClient.ts |     100 |      100 |     100 |     100 |
+  ...eDriveSync.ts |     100 |      100 |     100 |     100 |
+  ...SyncClient.ts |     100 |      100 |     100 |     100 |
+  ...ConfigSync.ts |     100 |      100 |     100 |     100 |
+  webDavBackup.ts  |     100 |      100 |     100 |     100 |
+  ...ckupClient.ts |     100 |      100 |     100 |     100 |
+-------------------|---------|----------|---------|---------|-------------------

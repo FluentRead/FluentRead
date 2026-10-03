@@ -46,7 +46,7 @@ function installedVersion(name: string): string {
 // 脚本管理器在安装时缓存固定版本的通用库；仓库资源固定到已发布提交，更新资源时同步换提交。
 const userscriptResourceCommit = '184a3d74f61b9d2a8d47080787f7e0180b98414d';
 // 语言文件的内容哈希来自合并后的消息目录，固定到首次包含这些文件的提交。
-const userscriptLanguageResourceCommit = '8bfcad1e6e9e3cb90bfff2269d508a41ddbaae3e';
+const userscriptLanguageResourceCommit = '56d7f62808470d8f746545bb93f99702ce5d0c76';
 const iconMetaUrl = greasyForkSource
     ? `https://cdn.jsdelivr.net/gh/FluentRead/FluentRead@${userscriptResourceCommit}/public/icon/64.png`
     : iconDataUrl;
@@ -66,7 +66,7 @@ const compressedUiLanguageBundles = greasyForkSource ? {} : Object.fromEntries(O
     .filter(([language]) => language === 'en-US')
     .map(([language, bundle]) => [
     language,
-    gzipSync(Buffer.from(JSON.stringify(bundle)), {level: 9}).toString('base64'),
+    gzipSync(Buffer.from(JSON.stringify(bundle))).toString('base64'),
 ]));
 const remoteUiLanguageBundles = Object.fromEntries(Object.entries(UI_LANGUAGE_BUNDLES)
     .filter(([language]) => language !== 'en-US')
@@ -93,13 +93,13 @@ const siteCatalogData = Object.fromEntries([...siteCatalogFiles]
 const compressedCatalogPrefix = '\0fluentread-userscript-site-catalog:';
 const externalChineseMessagesId = '\0fluentread-userscript-zh-cn.js';
 
-/** 只压缩站点规则 JSON；产品逻辑仍留在可审查的 userscript 主文件中。 */
+/** 只压缩站点规则与中文文案数据；产品逻辑仍留在可审查的 userscript 主文件中。 */
 export function createUserscriptCatalogCompressionPlugin(): Plugin {
     return {
         name: 'compress-userscript-site-catalog',
         enforce: 'pre',
         resolveId(source, importer) {
-            if (greasyForkSource && source === './messages/zh-CN'
+            if (source === './messages/zh-CN'
                 && importer?.split('?')[0] === resolve(root, 'src/core/i18n/index.ts')) return externalChineseMessagesId;
             if (!importer || !source.endsWith('.json')) return null;
             const sourcePath = resolve(dirname(importer.split('?')[0]), source);
@@ -108,7 +108,15 @@ export function createUserscriptCatalogCompressionPlugin(): Plugin {
         },
         load(id) {
             if (id === externalChineseMessagesId) {
-                return 'export const zhCNMessages = globalThis.__FLUENTREAD_USERSCRIPT_DATA__.zhCNMessages;';
+                if (greasyForkSource) return 'export const zhCNMessages = globalThis.__FLUENTREAD_USERSCRIPT_DATA__.zhCNMessages;';
+                const contents = JSON.stringify(zhCNMessages);
+                const compressed = gzipSync(Buffer.from(contents)).toString('base64');
+                return [
+                    `/* Non-code Chinese UI messages; sha256 ${createHash('sha256').update(contents).digest('hex')}. */`,
+                    "import {inflateWithPako} from '@/userscript/pakoRuntime';",
+                    `const bytes = Uint8Array.from(atob(${JSON.stringify(compressed)}), (character) => character.charCodeAt(0));`,
+                    'export const zhCNMessages = JSON.parse(inflateWithPako(bytes));',
+                ].join('\n');
             }
             if (!id.startsWith(compressedCatalogPrefix)) return null;
             const sourcePath = id.slice(compressedCatalogPrefix.length, -'.js'.length);
@@ -117,7 +125,7 @@ export function createUserscriptCatalogCompressionPlugin(): Plugin {
                 return `export default globalThis.__FLUENTREAD_USERSCRIPT_DATA__.siteCatalogs.${basename(sourcePath, '.json')};`;
             }
             const contents = JSON.stringify(JSON.parse(fs.readFileSync(sourcePath, 'utf8')));
-            const compressed = gzipSync(Buffer.from(contents), {level: 9}).toString('base64');
+            const compressed = gzipSync(Buffer.from(contents)).toString('base64');
             const digest = createHash('sha256').update(contents).digest('hex');
             return [
                 `/* Non-code site rules: ${normalizePath(sourcePath).slice(projectRoot.length)}; sha256 ${digest}. */`,
@@ -339,7 +347,7 @@ function bundleUserscriptCss(): Plugin {
           handler(_options, bundle) {
             const cssEntries = Object.entries(bundle).filter(([, item]) => item.type === 'asset' && item.fileName.endsWith('.css'));
             const css = cssEntries.map(([, item]) => String(item.type === 'asset' ? item.source : '')).join('\n');
-            const compressedCss = greasyForkSource ? '' : gzipSync(Buffer.from(css, 'utf8'), {level: 9}).toString('base64');
+            const compressedCss = greasyForkSource ? '' : gzipSync(Buffer.from(css, 'utf8')).toString('base64');
             cssEntries.forEach(([fileName]) => delete bundle[fileName]);
 
             if (greasyForkSource) {

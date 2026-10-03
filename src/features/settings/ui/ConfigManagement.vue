@@ -1,14 +1,13 @@
 <!--
 @file src/features/settings/ui/ConfigManagement.vue
-文件职责：提供备份与恢复页面的 Google Drive 配置同步、完整数据备份和设置历史。
+文件职责：提供备份与恢复页面的配置云备份、完整数据备份和设置历史。
 主要内容：按页内分类切换完整备份入口与设置历史，展示相邻版本的具体修改与自动设置快照，区分当时的修改和恢复时的差异，并保留动态服务名称、多语言与安全恢复。
-模块边界：本组件拥有设置历史的预览与恢复；本机备份与导入由 LocalDataManagement 编排，加密云同步由独立 GoogleDriveSync 组件及后台服务负责。
+模块边界：本组件拥有设置历史的预览与恢复；本机备份与导入由 LocalDataManagement 编排，配置云备份由独立 CloudConfigBackup 组件及后台服务负责。
 -->
 <template>
   <section class="config-management">
     <SettingsPanel name="backup" :active="props.activePanel">
-<GoogleDriveSync v-if="props.active && (!props.activePanel || props.activePanel === 'backup')" />
-<GoogleDriveSync v-if="props.active && (!props.activePanel || props.activePanel === 'backup')" provider="dropbox" />
+<CloudConfigBackup v-if="props.active && (!props.activePanel || props.activePanel === 'backup')" />
 <LocalDataManagement :config="config" />
 </SettingsPanel>
 
@@ -149,7 +148,7 @@
 
 <script setup lang="ts">
 import {computed, onUnmounted, ref} from 'vue';
-import GoogleDriveSync from './GoogleDriveSync.vue';
+import CloudConfigBackup from './CloudConfigBackup.vue';
 import {ElMessage, ElMessageBox} from 'element-plus';
 import browser from 'webextension-polyfill';
 import {getMultilingualTargetLanguageLabel, options} from '@/src/core/config/catalog';

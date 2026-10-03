@@ -1,0 +1,34 @@
+{
+  "ok": true,
+  "launchMode": "chromium-headless",
+  "focusPolicy": "isolated-contexts-no-foreground",
+  "windowPlacement": "headless-no-visible-window",
+  "pages": 73,
+  "links": 3109,
+  "assets": 88,
+  "cases": [
+    "Public server-rendered app identity, single-language slogans, policy links and data disclosures",
+    "Chinese and English guide parity; built local links; anchors; actual 2x source images; Chrome sizes",
+    "Every public page renders at desktop and mobile widths without document overflow",
+    "zh-CN: bilingual / translation / restore / selection / replay; phrase keyboard navigation; AI example; subtitle switch",
+    "zh-CN: documentation hub, local search, input demonstration, mobile sidebar navigation, 320/390/768/1024/1440 widths",
+    "en-US: bilingual / translation / restore / selection / replay; phrase keyboard navigation; AI example; subtitle switch",
+    "en-US: documentation hub, local search, input demonstration, mobile sidebar navigation, 320/390/768/1024/1440 widths",
+    "Both browser locales: fixed homepage URL, explicit language routes, real HiDPI display, desktop/mobile layout, dark theme",
+    "Manual desktop/mobile switching and corresponding document routes",
+    "An English browser and a legacy English preference cannot redirect the submitted homepage",
+    "Reduced-motion preference disables demonstration animation while keeping all content readable"
+  ],
+  "screenshots": [
+    "zh-CN-hero.png",
+    "en-US-hero.png",
+    "zh-CN-grammar.png",
+    "en-US-grammar.png",
+    "zh-CN-docs-desktop.png",
+    "zh-CN-mobile--fr-hero.png"
+  ],
+  "pageErrors": [],
+  "consoleErrors": [],
+  "sourceRevision": "e83cd76986b785ae64f837afc77613b34cd79d8b",
+  "builtArtifactSha256": "45c8c80ec863d7ad3dee54e9682f6855a47ba6140eb9407ccf0334b7cf2e00b3"
+}

@@ -2,7 +2,10 @@ import {readFileSync} from 'node:fs';
 import {createHash} from 'node:crypto';
 import {resolve} from 'node:path';
 import {gunzipSync} from 'node:zlib';
-import {describe, expect, it} from 'vitest';
+import {describe, expect, it, vi} from 'vitest';
+import {ungzip} from 'pako';
+import {zhCNMessages} from '@/src/core/i18n/messages/zh-CN';
+import {inflateWithPako} from '@/userscript/pakoRuntime';
 import {
     executionGuardEnd,
     executionGuardStart,
@@ -19,6 +22,27 @@ const sourceModuleId = resolve(process.cwd(), 'src/app/content/runtime.ts');
 const vueScriptModuleId = `${resolve(process.cwd(), 'src/features/selection-translation/ui/SelectionTranslator.vue')}?vue&type=script&setup=true&lang.ts`;
 
 describe('userscript browser shim injection', () => {
+    it('embeds the complete Chinese fallback catalog as lossless static data', () => {
+        const plugin = createUserscriptCatalogCompressionPlugin() as unknown as {
+            resolveId: (source: string, importer: string) => string | null;
+            load: (id: string) => string | null;
+        };
+        const id = plugin.resolveId('./messages/zh-CN', resolve(process.cwd(), 'src/core/i18n/index.ts'));
+        expect(id).toBeTruthy();
+        const moduleSource = plugin.load(id!);
+        const base64 = moduleSource?.match(/atob\("([A-Za-z0-9+/=]+)"\)/u)?.[1];
+        expect(base64).toBeTruthy();
+        const restored = JSON.parse(gunzipSync(Buffer.from(base64!, 'base64')).toString('utf8'));
+        expect(restored).toEqual(zhCNMessages);
+        vi.stubGlobal('pako', {ungzip});
+        try {
+            expect(JSON.parse(inflateWithPako(new Uint8Array(Buffer.from(base64!, 'base64'))))).toEqual(zhCNMessages);
+        } finally {
+            vi.unstubAllGlobals();
+        }
+        expect(moduleSource).toContain(createHash('sha256').update(JSON.stringify(zhCNMessages)).digest('hex'));
+    });
+
     it('keeps all site rule JSON data intact when embedding compressed offline catalogs', () => {
         const plugin = createUserscriptCatalogCompressionPlugin() as unknown as {
             resolveId: (source: string, importer: string) => string | null;

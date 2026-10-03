@@ -28,3 +28,8 @@
 ## 需要具体字段和示例
 
 [仓库里的完整规则教程](https://github.com/FluentRead/FluentRead/blob/main/docs/contributing/site-adaptation.md)包含选择器、规则格式与验证方法。验证过的规则也可以按该指南分享给社区。
+
+## 接下来
+
+- [返回完整文档](/docs/)
+- [遇到问题](/guide/faq)

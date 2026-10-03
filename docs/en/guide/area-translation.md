@@ -50,3 +50,8 @@ Automatic capability selection uses manual overrides first, then a valid local t
 The test sends a small locally generated PNG containing random characters through the same adapter used for image recognition. It confirms support only when the model reads those characters exactly. HTTP 200 or a successful text connection test alone does not prove image recognition. Testing may incur model usage charges, can be cancelled, and never sends a webpage screenshot or changes a manual capability override.
 
 Results expire after seven days and are tied to the service, model, endpoint, API protocol and a fingerprint of the credential configuration. Only the fingerprint, capability and time are stored locally; images, answers, credentials and error bodies are not saved or included in config exports, history or cloud sync. An explicit rejection of image input records unsupported capability. A mismatched answer leaves capability unknown and uses local OCR. Authentication, quota, network and response errors remain visible errors and do not silently switch to OCR.
+
+## Next steps
+
+- [All guides](/en/docs/)
+- [Troubleshooting](/en/guide/faq)

@@ -33,7 +33,7 @@ FluentRead is free and open source. Third-party services may charge separately. 
 Clicking a service in the directory only opens its configuration. The **Check connection** action is on the right side of the service details title bar. It does not change the webpage default; choose the default service from General settings or the extension menu. Documents, subtitles, and the reading card have their own selections.
 :::
 
-<figure class="doc-figure"><a href="/screenshots/en/settings-services.webp" target="_blank" rel="noopener"><img class="doc-screenshot" src="/screenshots/en/settings-services.webp" width="2560" height="1600" alt="Translation service directory and connection settings" loading="lazy" /></a><figcaption>Configure a connection, then select the service you want to use.</figcaption></figure>
+<figure class="doc-figure"><a href="/screenshots/ui/en-US/settings-services.webp" target="_blank" rel="noopener"><img class="doc-screenshot" src="/screenshots/ui/en-US/settings-services.webp" width="2560" height="1600" alt="Translation service directory and connection settings" loading="lazy" /></a><figcaption>Configure a connection, then select the service you want to use.</figcaption></figure>
 
 ## Use several API keys
 

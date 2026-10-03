@@ -18,6 +18,7 @@ const PRODUCT_ROOTS = [
 const ROOT_FILES = [
     'vitest.config.ts',
     'vitest.coverage.config.ts',
+    'vitest.cloud-backup.config.ts',
     'wxt.config.ts',
 ] as const;
 const PRODUCT_TOOL_SCRIPTS = [
@@ -147,6 +148,7 @@ const BUILD_ONLY_SRC_ALLOWLIST = new Set([
     'src/app/background/googleDriveSyncRuntime.ts',
     // Dropbox 同样是端口装配；授权和文件业务模块有 strict coverage，后台写入与清理由隔离扩展 UI 联调验证。
     'src/app/background/dropboxSyncRuntime.ts',
+    'src/app/background/webDavBackupRuntime.ts',
     // i18n 资源和 Vue 文案适配由纯资源测试、扩展双浏览器构建与隔离 UI 回归共同验证。
     'src/core/i18n/index.ts',
     'src/core/i18n/language.ts',

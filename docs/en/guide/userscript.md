@@ -48,3 +48,8 @@ The script manager and webpage permissions limit available features. Image recog
 ## Data
 
 Configuration stays in the script manager’s private storage. Translation text goes to the service you select. UI libraries and language files come from jsDelivr or GitHub as described above. Keep credentials out of shared screenshots and public feedback; see [Data & privacy](/en/guide/privacy).
+
+## Next steps
+
+- [All guides](/en/docs/)
+- [Troubleshooting](/en/guide/faq)

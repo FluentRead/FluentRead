@@ -1,0 +1,19 @@
+{
+  "docsBuild": "passed",
+  "docsTypecheck": "passed",
+  "compile": "passed",
+  "buildWithoutWxtPreparation": "passed with existing root tsconfig warning",
+  "staticArtifact": {
+    "pages": 75,
+    "links": 3810,
+    "anchors": 708,
+    "images": 90
+  },
+  "uiImages": {
+    "sourceBytes": 1529902,
+    "webBytes": 544854,
+    "losslessPixels": true
+  },
+  "finalArtifactSha256": "d2999c6fe0d9d2a34ad44246ee485d90e98681b3339654acd54979fe58e1c066",
+  "finalSourceRevision": "6471ccc1c3e7e731d1cb8ad3bcaf0a816044d6b4"
+}

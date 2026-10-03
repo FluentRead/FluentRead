@@ -12,13 +12,14 @@ import {createDropboxAuth} from '@/src/platform/dropbox/auth';
 import {createDropboxApi} from '@/src/platform/dropbox/api';
 import {DROPBOX_APP_KEY, DROPBOX_AUTH_SESSION_KEY, DROPBOX_SYNC_STATE_KEY} from '@/src/platform/dropbox/constants';
 import {configStorage} from '@/src/platform/storage/configStorageRuntime';
-import {createGoogleDriveSync} from '@/src/services/config/googleDriveSync';
+import {createRemoteConfigSync} from '@/src/services/config/remoteConfigSync';
 import {createGoogleDriveSyncHandler, isGoogleDriveSettingsSender} from './handlers/googleDriveSync';
 import type {ConfigMutationCoordinator} from './handlers/configPersistence';
 
 export function createDropboxSyncRuntime(mutations: ConfigMutationCoordinator) {
     const session = browser.storage?.session;
-    const service = createGoogleDriveSync({
+    const service = createRemoteConfigSync({
+        accountChangedError: 'settings.dropbox.error.accountChanged',
         auth: createDropboxAuth({
             appKey: DROPBOX_APP_KEY,
             identity: session ? browser.identity : undefined,

@@ -8,6 +8,7 @@
 import brandTaglines from './brand-taglines.json';
 import dropboxText from './dropbox/fr-FR.json';
 import googleDriveText from './google-drive/fr-FR.json';
+import cloudBackupText from './cloud-backup/fr-FR.json';
 import type {
 enUSMessages} from './en-US';
 import {legacyTextOverrides} from './legacy-overrides';
@@ -24,6 +25,7 @@ export const frFRMessages = {
     "settings.backup.restoreHint": "Choisissez un fichier de sauvegarde FluentRead. Les anciens fichiers JSON peuvent aussi être restaurés.",
     ...googleDriveText.messages,
     ...dropboxText,
+    ...cloudBackupText.messages,
     "brand.tagline": brandTaglines['fr-FR'],
     "popup.translationCount": "{count} traductions",
     "translationCenter.endpointMissing": "Renseignez d’abord l’adresse du service personnalisé.",

@@ -12,7 +12,7 @@ Open full settings from the gear in the extension menu. Search for a setting whe
 | Hover and selection triggers | You want quicker access or fewer accidental popups |
 | Automatic translation and site rules | Some sites should always translate; others should stay as they are |
 
-<figure class="doc-figure"><a href="/screenshots/en/settings-general.webp" target="_blank" rel="noopener"><img class="doc-screenshot" src="/screenshots/en/settings-general.webp" width="2560" height="1600" alt="FluentRead settings for language, theme, service, and bilingual display" loading="lazy" /></a><figcaption>Start with your reading habits, then adjust the extras.</figcaption></figure>
+<figure class="doc-figure"><a href="/screenshots/ui/en-US/settings-general.webp" target="_blank" rel="noopener"><img class="doc-screenshot" src="/screenshots/ui/en-US/settings-general.webp" width="2560" height="1600" alt="FluentRead settings for language, theme, service, and bilingual display" loading="lazy" /></a><figcaption>Start with your reading habits, then adjust the extras.</figcaption></figure>
 
 ## Languages to skip
 
@@ -43,3 +43,31 @@ Webpages, documents, subtitles, and the reading card can use different services.
 Before changing browsers or uninstalling, save the configuration and learning data you want through backup and restore. Backups may contain credentials and saved text.
 
 Translation cache settings let you view and clear recent results. Clearing that cache does not delete learning collections. See [Translation statistics](/en/guide/translation-stats) for request size, duration, and service performance, and [AI usage](/en/guide/model-usage) for token use.
+
+## Reading aids
+
+Enable bilingual sentence highlighting under **Translation → Reading aids**, then adjust its appearance under **Interface style → Translation style**. See [appearance and reading aids](/en/config/appearance).
+
+## Request limits
+
+If a provider reports too many requests, or your API has a quota, adjust concurrency and request rates under **Advanced settings → Request limits**.
+
+| Limit | Default |
+| --- | --- |
+| Concurrent translation requests | 10 |
+| Requests per second | 10 |
+| Requests per minute | 250 |
+
+Set a per-second or per-minute limit to **0** to remove that limit. Requests wait in a queue when a limit is reached. Existing custom values are preserved.
+
+- **Per model**: in **Translation services**, expand **Advanced settings** and turn off **Follow global settings** for the selected model.
+- **Per service**: use **Service request limits** when models share one provider quota. A model's own limit also remains subject to the service-wide limit; unconfigured models inherit the service limit.
+- **Restore inheritance**: turn following back on. Previously entered values stay available for later use.
+
+Retry count and intervals are configured globally in advanced settings.
+
+## Next steps
+
+- [Providers and connections](/en/config/translation-engines)
+- [Appearance and reading aids](/en/config/appearance)
+- [Backup and sync](/en/config/backup-sync)

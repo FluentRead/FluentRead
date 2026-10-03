@@ -39,3 +39,8 @@ Check that translation works through the menu first. Avoid keys already used by 
 Custom combinations match the character your keyboard layout produced when you recorded them, including Dvorak or AZERTY layouts. When Option on a Mac turns a key into a special symbol, the physical key is matched instead.
 
 Try a regular webpage; browser internal pages and extension stores generally cannot be translated.
+
+## Next steps
+
+- [All guides](/en/docs/)
+- [Troubleshooting](/en/guide/faq)

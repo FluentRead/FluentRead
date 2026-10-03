@@ -318,3 +318,7 @@ Google Auth Platform 的 Production 与 Chrome Web Store 发布是两个独立�
 ### 大小限制
 
 完整配置 JSON 最多 **20 MiB**，云端加密文件最多 **32 MiB**。本机预览暂存独立预留 1 MiB 元数据空间，云端文件和基线不重复封装；能上传的配置可再次预览、合并和跨设备恢复。超出限制时停止操作，不覆盖本机或已有云端配置，可使用完整数据备份。
+
+## 与 WebDAV 共用的配置云备份
+
+设置页入口统一为“配置云备份”，Google Drive 与 WebDAV 只是存储方式。共用事务在 `src/services/config/remoteConfigSync.ts`，共用界面在 `RemoteConfigSync.vue`；各供应商保留独立连接、状态和网络适配器。WebDAV 使用本机连接密码鉴权，不使用 Google OAuth，其连接参数不进入配置导出。用户操作见[WebDAV 云备份指南](../guide/webdav.md)。

@@ -8,6 +8,7 @@
 import brandTaglines from './brand-taglines.json';
 import dropboxText from './dropbox/ja-JP.json';
 import googleDriveText from './google-drive/ja-JP.json';
+import cloudBackupText from './cloud-backup/ja-JP.json';
 import type {
 enUSMessages} from './en-US';
 import {legacyTextOverrides} from './legacy-overrides';
@@ -24,6 +25,7 @@ export const jaJPMessages = {
     "settings.backup.restoreHint": "FluentRead のバックアップファイルを選択してください。旧バージョンの JSON ファイルも復元できます。",
     ...googleDriveText.messages,
     ...dropboxText,
+    ...cloudBackupText.messages,
     "brand.tagline": brandTaglines['ja-JP'],
     "popup.translationCount": "翻訳 {count} 回",
     "translationCenter.endpointMissing": "先にカスタムサービスの URL を設定してください。",

@@ -1,0 +1,131 @@
+
+> FluentRead-流畅阅读@0.0.35 test <task-worktree>
+> node scripts/testing/run-resource-safe.mjs -- vitest run "tests/architecture/moduleBoundaries.test.ts" "tests/architecture/verificationOwnership.test.ts"
+
+[resource-safe] CPU target 60%, maxWorkers 2, concurrency 5, command: vitest run tests/architecture/moduleBoundaries.test.ts tests/architecture/verificationOwnership.test.ts
+
+ RUN  v2.1.9 <task-worktree>
+
+ ❯ tests/architecture/verificationOwnership.test.ts (9 tests | 2 failed) 1368ms
+   × repository verification ownership > 每个产品、构建和测试基础设施文件都有明确验证归属 6ms
+     → expected [ { …(2) } ] to deeply equal []
+   × repository verification ownership > src 中每个可执行非组装模块都进入四维 100% 覆盖率边界 1022ms
+     → expected [ Array(8) ] to deeply equal []
+   ✓ repository verification ownership > 覆盖率清单不能引用不存在的源码或把组装根伪装成业务覆盖 332ms
+ ❯ tests/architecture/moduleBoundaries.test.ts (13 tests | 2 failed) 5535ms
+   ✓ architecture module boundaries > src 的静态依赖图不存在跨文件循环 1399ms
+   ✓ architecture module boundaries > src 只能通过精确登记的 composition/browser/provider 迁移边界读取 entrypoints 1436ms
+   ✓ architecture module boundaries > core 与 shared 保持低层，不依赖 app、feature、service、provider、platform 或 UI 415ms
+   ✓ architecture module boundaries > feature 不能跨目录读取另一个 feature 的内部实现 854ms
+   × architecture module boundaries > 文档 WXT 页面只通过 app public API 进入垂直功能切片 57ms
+     → expected [ …(2) ] to deeply equal [ '@/src/app/document-translation' ]
+   ✓ architecture module boundaries > 按需加载的大体积资源不得被扩展运行时代码静态引入 1304ms
+   × architecture module boundaries > 历史巨型文件不得继续增长，后续迁移只降低债务上限 44ms
+     → expected [ { …(3) } ] to deeply equal []
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 4 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  tests/architecture/moduleBoundaries.test.ts > architecture module boundaries > 文档 WXT 页面只通过 app public API 进入垂直功能切片
+AssertionError: expected [ …(2) ] to deeply equal [ '@/src/app/document-translation' ]
+
+- Expected
++ Received
+
+  Array [
++   "@/src/services/translation/errors",
+    "@/src/app/document-translation",
+  ]
+
+ ❯ tests/architecture/moduleBoundaries.test.ts:372:35
+    370|             .filter((specifier) => specifier.startsWith('@/entrypoints…
+    371|
+    372|         expect(documentUiImports).toEqual(['@/src/app/document-transla…
+       |                                   ^
+    373|         expect(featureEntrypointImports).toEqual([]);
+    374|     });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/4]⎯
+
+ FAIL  tests/architecture/moduleBoundaries.test.ts > architecture module boundaries > 历史巨型文件不得继续增长，后续迁移只降低债务上限
+AssertionError: expected [ { …(3) } ] to deeply equal []
+
+- Expected
++ Received
+
+- Array []
++ Array [
++   Object {
++     "ceiling": 277,
++     "lines": 282,
++     "path": "src/app/content/runtime.ts",
++   },
++ ]
+
+ ❯ tests/architecture/moduleBoundaries.test.ts:430:24
+    428|             .filter(({lines, ceiling}) => lines > ceiling);
+    429|
+    430|         expect(growth).toEqual([]);
+       |                        ^
+    431|     });
+    432| });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/4]⎯
+
+ FAIL  tests/architecture/verificationOwnership.test.ts > repository verification ownership > 每个产品、构建和测试基础设施文件都有明确验证归属
+AssertionError: expected [ { …(2) } ] to deeply equal []
+
+- Expected
++ Received
+
+- Array []
++ Array [
++   Object {
++     "owners": Array [],
++     "path": "scripts/verify-brand-copy.mjs",
++   },
++ ]
+
+ ❯ tests/architecture/verificationOwnership.test.ts:319:25
+    317|     it('每个产品、构建和测试基础设施文件都有明确验证归属', () => {
+    318|         const unowned = ownership.filter(({owners}) => owners.length =…
+    319|         expect(unowned).toEqual([]);
+       |                         ^
+    320|     });
+    321|
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/4]⎯
+
+ FAIL  tests/architecture/verificationOwnership.test.ts > repository verification ownership > src 中每个可执行非组装模块都进入四维 100% 覆盖率边界
+AssertionError: expected [ Array(8) ] to deeply equal []
+
+- Expected
++ Received
+
+- Array []
++ Array [
++   "src/core/config/shareCard.ts",
++   "src/core/i18n/messages/siteRules.ts",
++   "src/features/full-page-translation/content/excerpt.ts",
++   "src/features/share-card/content/runtime.ts",
++   "src/features/share-card/core.ts",
++   "src/features/share-card/export.ts",
++   "src/features/share-card/render.ts",
++   "src/features/share-card/themes.ts",
++ ]
+
+ ❯ tests/architecture/verificationOwnership.test.ts:328:27
+    326|             && !strictCoverage.has(path));
+    327|
+    328|         expect(uncovered).toEqual([]);
+       |                           ^
+    329|     });
+    330|
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[4/4]⎯
+
+ Test Files  2 failed (2)
+      Tests  4 failed | 18 passed (22)
+   Start at  15:14:45
+   Duration  8.76s (transform 80ms, setup 0ms, collect 860ms, tests 6.90s, environment 0ms, prepare 125ms)
+
+ ELIFECYCLE  Test failed. See above for more details.

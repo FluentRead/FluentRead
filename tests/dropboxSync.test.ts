@@ -2,7 +2,7 @@ import {describe, expect, it, vi} from 'vitest';
 import {createDropboxAuth, type DropboxAuthPorts} from '@/src/platform/dropbox/auth';
 import {createDropboxApi} from '@/src/platform/dropbox/api';
 import {DROPBOX_SCOPES} from '@/src/platform/dropbox/constants';
-import {createGoogleDriveSync, type DriveSyncPorts} from '@/src/services/config/googleDriveSync';
+import {createRemoteConfigSync, type DriveSyncPorts} from '@/src/services/config/remoteConfigSync';
 import {GOOGLE_DRIVE_APPLICATION_PASSPHRASE as password} from '@/src/platform/google-drive/constants';
 import {Config, normalizeConfig} from '@/src/core/config/model';
 import {toDriveSyncConfig, driveSyncPayload} from '@/src/core/config/driveSync';
@@ -27,26 +27,26 @@ function fixture() {
 }
 describe('Dropbox 端口与配置事务联调', () => {
     it('首次备份不提前写入，后台重启后确认、恢复凭据并清理令牌，换号独立基线', async () => {
-        const f = fixture(); const preview = await createGoogleDriveSync(f.ports()).prepare(password, 8, 'fixture-ui');
+        const f = fixture(); const preview = await createRemoteConfigSync(f.ports()).prepare(password, 8, 'fixture-ui');
         expect(preview.account.email).toBe('fixture-a@example.invalid'); expect(f.content).toBeNull(); expect(f.session).toBeTruthy();
         expect(JSON.stringify(f.state)).not.toMatch(/fixture-sync-token|fixture-only-api-key/);
-        const first = await createGoogleDriveSync(f.ports()).commit(preview.id, password, 'upload', {}, 8, 'fixture-ui');
+        const first = await createRemoteConfigSync(f.ports()).commit(preview.id, password, 'upload', {}, 8, 'fixture-ui');
         expect(first.account?.email).toBe('fixture-a@example.invalid'); expect(f.session).toBeUndefined(); expect(f.content).not.toMatch(/fixture-sync-token|fixture-only-api-key/);
         expect(JSON.stringify(await decryptDriveConfig(f.content!, password))).toContain('fixture-only-api-key');
         f.local = {...f.local, to: 'fr', token: {openai: 'fixture-new-key'}};
-        const restored = createGoogleDriveSync(f.ports()); const download = await restored.prepare(password, 8, 'fixture-ui'); await restored.commit(download.id, password, 'download', {}, 8, 'fixture-ui');
+        const restored = createRemoteConfigSync(f.ports()); const download = await restored.prepare(password, 8, 'fixture-ui'); await restored.commit(download.id, password, 'download', {}, 8, 'fixture-ui');
         expect((f.local.token as Record<string, string>).openai).toBe('fixture-only-api-key'); expect(f.session).toBeUndefined();
-        f.account = 'fixture-b'; const switcher = createGoogleDriveSync(f.ports()); const changed = await switcher.prepare(password, 8, 'fixture-ui', true);
+        f.account = 'fixture-b'; const switcher = createRemoteConfigSync(f.ports()); const changed = await switcher.prepare(password, 8, 'fixture-ui', true);
         expect(changed.hasBaseline).toBe(false); expect(new URL(vi.mocked(f.authPorts.identity!.launchWebAuthFlow).mock.calls.at(-1)![0].url).searchParams.get('force_reauthentication')).toBe('true');
         await switcher.cancel(changed.id, 8, 'fixture-ui'); expect(f.session).toBeUndefined(); expect((await switcher.status()).account?.email).toBe('fixture-a@example.invalid');
     });
     it('并发云端变化不覆盖；丢失临时会话不会再次弹登录或写入', async () => {
-        const f = fixture(); const service = createGoogleDriveSync(f.ports()); const initial = await service.prepare(password); await service.commit(initial.id, password, 'upload', {});
+        const f = fixture(); const service = createRemoteConfigSync(f.ports()); const initial = await service.prepare(password); await service.commit(initial.id, password, 'upload', {});
         const preview = await service.prepare(password); await f.replaceCloud({...f.local, to: 'de'}); const updated = f.content;
         await expect(service.commit(preview.id, password, 'upload', {})).rejects.toThrow('云端'); expect(f.content).toBe(updated); expect(f.session).toBeUndefined();
         const pending = await service.prepare(password, 8, 'fixture-ui'); await createDropboxAuth(f.authPorts).disconnect();
         const authorizations = vi.mocked(f.authPorts.identity!.launchWebAuthFlow).mock.calls.length;
-        await expect(createGoogleDriveSync(f.ports()).commit(pending.id, password, 'download', {}, 8, 'fixture-ui')).rejects.toThrow('expired');
+        await expect(createRemoteConfigSync(f.ports()).commit(pending.id, password, 'download', {}, 8, 'fixture-ui')).rejects.toThrow('expired');
         expect(vi.mocked(f.authPorts.identity!.launchWebAuthFlow).mock.calls.length).toBe(authorizations); expect(f.content).toBe(updated);
     });
 });

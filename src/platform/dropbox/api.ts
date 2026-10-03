@@ -5,8 +5,7 @@
  * 禁止自动重命名或无条件覆盖；设置超时和流式大小预算，错误不反射供应商私密响应。
  * 模块边界：不执行 OAuth 或读取本机配置；沿用现有同步事务的文件与会话结构。
  */
-import type {DriveSession} from '../google-drive/auth';
-import type {DriveFile, DriveRemote} from '../google-drive/api';
+import type {CloudSyncSession as DriveSession, CloudSyncFile as DriveFile, CloudSyncRemote as DriveRemote} from '@/src/core/config/cloudSync';
 import {DRIVE_ENCRYPTION_FORMAT} from '../google-drive/encryption';
 import {GOOGLE_DRIVE_MAX_BYTES} from '../google-drive/constants';
 import {DropboxError} from './auth';

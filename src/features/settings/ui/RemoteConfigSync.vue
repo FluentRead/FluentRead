@@ -1,6 +1,6 @@
 <!--
 @file src/features/settings/ui/RemoteConfigSync.vue
-文件职责：用清晰的保存、恢复与逐项合并流程完成Google Drive 与 WebDAV 共用的配置云备份。
+文件职责：用清晰的保存、恢复与逐项合并流程完成Google Drive、Dropbox 与 WebDAV 共用的配置云备份。
 主要内容：在同步按钮右侧显示上次同步账号和时间，窄屏改为上下排列；显示本次账号并提供更换账号入口；按两步流程说明影响范围，
 先选择操作再确认影响；差异按需展开，合并仅突出待确认项，小屏保留操作区。
 模块边界：只消费后台脱敏预览和同步记录；不获取完整配置、令牌或用户口令，由父级提供存储方式和客户端。
@@ -21,7 +21,7 @@
         <div class="drive-account-bar">
           <el-icon class="drive-account-icon"><User /></el-icon>
           <p>{{ preview.account.email ? t('settings.drive.account', {email: preview.account.email}) : t('settings.drive.selectedAccount') }}</p>
-          <el-button v-if="kind === 'google-drive'" link :loading="switchingAccount" :disabled="busy" :data-testid="`${kind}-switch-account`" @click="switchAccount">{{ t('settings.drive.switchAccount') }}</el-button>
+          <el-button v-if="kind !== 'webdav'" link :loading="switchingAccount" :disabled="busy" :data-testid="`${kind}-switch-account`" @click="switchAccount">{{ t(kind === 'dropbox' ? 'settings.dropbox.switchAccount' : 'settings.drive.switchAccount') }}</el-button>
         </div>
         <el-alert v-if="error" :title="error" type="error" :closable="false" show-icon class="drive-error" />
 
@@ -38,7 +38,7 @@
           <div class="drive-intent-heading"><h3>{{ t('settings.drive.chooseTitle') }}</h3><p>{{ t(preview.hasBaseline ? 'settings.drive.returningDescription' : 'settings.drive.firstRestoreDescription') }}</p></div>
           <div class="drive-operation-list" role="radiogroup" :aria-label="t('settings.drive.chooseStep')">
             <label v-for="operation in ['download', 'upload'] as const" :key="operation" class="drive-operation" :class="{'is-selected': direction === operation, 'is-disabled': busy}">
-              <input v-model="direction" type="radio" name="drive-operation" :value="operation" :disabled="busy" :data-testid="`${kind}-direction-${operation}`" />
+              <input v-model="direction" type="radio" :name="`${kind}-operation`" :value="operation" :disabled="busy" :data-testid="`${kind}-direction-${operation}`" />
               <span><strong>{{ t(`settings.drive.${operation}Title`) }}</strong><span>{{ t(`settings.drive.${operation}Description`) }}</span></span>
             </label>
           </div>
@@ -77,7 +77,7 @@
                   </div>
                   <div class="drive-values" :role="direction === 'merge' ? 'radiogroup' : undefined" :aria-label="direction === 'merge' ? t('settings.drive.choice', {label: row.label === '私密或自定义设置' ? t('settings.drive.otherSettings') : translateLegacy(row.label)}) : undefined">
                     <component :is="direction === 'merge' ? 'label' : 'div'" v-for="source in ['local', 'remote'] as const" :key="source" class="drive-value" :class="{'is-selected': direction === 'merge' ? rowChoice(row) === source : direction === (source === 'local' ? 'upload' : 'download')}">
-                      <input v-if="direction === 'merge'" type="radio" :name="`drive-choice-${row.id}`" :checked="rowChoice(row) === source" :disabled="busy" :value="source" @change="chooseRow(row, source)" />
+                      <input v-if="direction === 'merge'" type="radio" :name="`${kind}-choice-${row.id}`" :checked="rowChoice(row) === source" :disabled="busy" :value="source" @change="chooseRow(row, source)" />
                       <span><strong>{{ t(source === 'local' ? 'settings.drive.deviceLabel' : 'settings.drive.cloudLabel') }}</strong><span>{{ row.changes.length === 1 ? previewValueLabel(row.changes[0][source]) : t('settings.drive.groupedContent', {count: row.changes.length}) }}</span></span>
                     </component>
                   </div>
@@ -110,7 +110,7 @@ import {chooseDriveRow, driveRowChoice, groupDrivePreviewChanges, initialDriveDi
 import type {DriveChoice} from '@/src/core/config/driveSync';
 import type {DriveSyncDirection, DriveSyncPreview, DriveSyncStatus} from '@/src/services/config/googleDriveSync';
 
-const props = defineProps<{client: Pick<ReturnType<typeof createCloudBackupClient>, 'status' | 'prepare' | 'commit' | 'cancel'>; provider: string; kind: 'google-drive' | 'webdav'}>();
+const props = defineProps<{client: Pick<ReturnType<typeof createCloudBackupClient>, 'status' | 'prepare' | 'commit' | 'cancel'>; provider: string; kind: 'google-drive' | 'dropbox' | 'webdav'}>();
 const emit = defineEmits<{busy: [value: boolean]}>();
 const {t: baseT, translateLegacy, language} = useUiI18n();
 const client = props.client;
@@ -138,7 +138,7 @@ const automaticCount = computed(() => automaticRows.value.reduce((count, row) =>
 const activeRows = computed(() => direction.value === 'merge' ? (automaticVisible.value ? automaticRows.value : conflictRows.value) : rows.value);
 const visibleRows = computed(() => activeRows.value.slice((page.value - 1) * 20, page.value * 20));
 const unresolved = computed(() => preview.value ? unresolvedDriveChanges(preview.value, choices.value) : 0);
-const statusText = computed(() => !status.value ? translateLegacy('正在检查同步状态…') : !status.value.available ? translateLegacy(status.value.reason) : status.value.lastSyncedAt ? t('settings.drive.lastSync', {time: new Date(status.value.lastSyncedAt).toLocaleString(language.value)}) : '');
+const statusText = computed(() => !status.value ? translateLegacy('正在检查同步状态…') : !status.value.available ? status.value.reason.startsWith('settings.dropbox.') ? t(status.value.reason) : translateLegacy(status.value.reason) : status.value.lastSyncedAt ? t('settings.drive.lastSync', {time: new Date(status.value.lastSyncedAt).toLocaleString(language.value)}) : '');
 const directionHint = computed(() => direction.value === 'merge' && !preview.value?.hasBaseline ? t('settings.drive.firstMergeDescription') : direction.value ? t(`settings.drive.${direction.value}Description`) : '');
 const summaryTitle = computed(() => t('settings.drive.mergeReady'));
 const commitLabel = computed(() => t(identical.value ? 'settings.drive.finishSync' : direction.value ? `settings.drive.${direction.value}Action` : 'settings.drive.chooseAction'));
@@ -156,11 +156,11 @@ let alive = true;
 async function perform(operation: () => Promise<void>) {
   if (busy.value) return;
   busy.value = true; error.value = '';
-  try {await operation();} catch (failure) {if (alive) error.value = failure instanceof CloudBackupRequestError && failure.errorKey ? t(failure.errorKey, failure.params) : failure instanceof Error ? translateLegacy(failure.message) : translateLegacy('同步未完成，请重试。');}
+  try {await operation();} catch (failure) {if (alive) error.value = failure instanceof CloudBackupRequestError && failure.errorKey ? t(failure.errorKey, failure.params) : failure instanceof Error ? failure.message.startsWith('settings.dropbox.') ? t(failure.message) : translateLegacy(failure.message) : translateLegacy('同步未完成，请重试。');}
   finally {if (alive) busy.value = false;}
 }
-async function requestPreview() {
-  const result = await client.prepare();
+async function requestPreview(switching = false) {
+  const result = await (switching ? client.prepare(true) : client.prepare());
   if (!alive) {await client.cancel(result.id); return;}
   preview.value = result;
   choices.value = Object.fromEntries(result.changes.filter(change => change.recommended).map(change => [change.id, change.recommended!]));
@@ -168,14 +168,14 @@ async function requestPreview() {
   step.value = direction.value ? 'review' : 'choose';
   page.value = 1; detailsVisible.value = false; automaticVisible.value = false; previewVisible.value = true;
 }
-async function prepare() {await perform(requestPreview);}
+async function prepare() {await perform(() => requestPreview());}
 async function switchAccount() {
   await perform(async () => {
     switchingAccount.value = true;
     try {
       await client.cancel(preview.value?.id);
       if (!alive) return;
-      try {await requestPreview();} catch (failure) {previewVisible.value = false; throw failure;}
+      try {await requestPreview(true);} catch (failure) {previewVisible.value = false; throw failure;}
     } finally {if (alive) switchingAccount.value = false;}
   });
 }

@@ -21,6 +21,7 @@ import {
 } from '@/src/services/config/autoBackupStore';
 import {configStorage} from '@/src/platform/storage/configStorageRuntime';
 import type {BackgroundMessageHandler} from './messageRouter';
+import {createDropboxSyncRuntime} from './dropboxSyncRuntime';
 import {createGoogleDriveSyncRuntime} from './googleDriveSyncRuntime';
 import {createWebDavBackupRuntime} from './webDavBackupRuntime';
 import {createConfigAutoBackupRestoreHandler} from './handlers/configAutoBackup';
@@ -49,6 +50,7 @@ export function createConfigBackgroundHandlers<TContext extends ConfigPersistenc
     });
     return [
         createGoogleDriveSyncRuntime(mutations),
+        createDropboxSyncRuntime(mutations),
         createWebDavBackupRuntime(mutations),
         createConfigStorageReadHandler({
             ready: configReady,

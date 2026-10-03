@@ -6,6 +6,7 @@
  * 模块边界：资源只描述扩展自己的界面文本；不会翻译网页正文、用户输入或翻译结果。
  */
 import brandTaglines from './brand-taglines.json';
+import dropboxText from './dropbox/fr-FR.json';
 import googleDriveText from './google-drive/fr-FR.json';
 import cloudBackupText from './cloud-backup/fr-FR.json';
 import type {
@@ -23,6 +24,7 @@ export const frFRMessages = {
     "settings.backup.fileDescription": "Les fichiers de sauvegarde contiennent des clés API et d’autres informations privées et ne sont pas chiffrés. Conservez-les en lieu sûr et ne les partagez pas publiquement.",
     "settings.backup.restoreHint": "Choisissez un fichier de sauvegarde FluentRead. Les anciens fichiers JSON peuvent aussi être restaurés.",
     ...googleDriveText.messages,
+    ...dropboxText,
     ...cloudBackupText.messages,
     "brand.tagline": brandTaglines['fr-FR'],
     "popup.translationCount": "{count} traductions",

@@ -30,7 +30,7 @@ export interface DriveSyncPreview {
 }
 export type DriveSyncDirection = 'upload' | 'download' | 'merge';
 export interface DriveSyncPorts<Session extends DriveSession = DriveSession> {
-    auth: {availability(): {available: boolean; reason: string}; open(interactive?: boolean): Promise<Session>; disconnect(): Promise<void>};
+    auth: {availability(): {available: boolean; reason: string}; open(interactive?: boolean, selectAccount?: boolean): Promise<Session>; disconnect(): Promise<void>};
     api: {read(session: Session): Promise<DriveRemote | null>; write(session: Session, content: string, previous: DriveFile | null): Promise<DriveFile>};
     snapshot(): Promise<Record<string, unknown>>;
     apply(config: DriveSyncConfig): Promise<void>;
@@ -90,10 +90,10 @@ export function createRemoteConfigSync<Session extends DriveSession>(ports: Driv
         if (state.connected && (!state.prepared || state.prepared.expiresAt <= ports.now())) await finishSession();
         return {...availability, account: state.lastSyncedAccount ?? null, lastSyncedAt: state.lastSyncedAt};
     }
-    async function prepare(passphrase: string, tabId?: number, clientId?: string): Promise<DriveSyncPreview> {
+    async function prepare(passphrase: string, tabId?: number, clientId?: string, selectAccount = false): Promise<DriveSyncPreview> {
         validateDrivePassphrase(passphrase);
         pending = null;
-        const session = await ports.auth.open(true);
+        const session = await (selectAccount ? ports.auth.open(true, true) : ports.auth.open(true));
         const previous = readState(await ports.readState());
         // 换账号只重置合并基线；取消或授权失败时仍能看到上次成功同步的账号及时间。
         const state = previous.accountId === session.account.id ? previous : {...emptyState(), lastSyncedAt: previous.lastSyncedAt, ...(previous.lastSyncedAccount ? {lastSyncedAccount: previous.lastSyncedAccount} : {})};
@@ -162,12 +162,12 @@ export function createRemoteConfigSync<Session extends DriveSession>(ports: Driv
     }
     return {
         status: () => exclusive(status),
-        prepare: (passphrase: string, tabId?: number, clientId?: string) => exclusive(async () => {
+        prepare: (passphrase: string, tabId?: number, clientId?: string, selectAccount = false) => exclusive(async () => {
             const state = readState(await ports.readState());
             if (state.prepared && state.prepared.expiresAt > ports.now() && !owns(state, tabId, clientId)) {
                 throw new CloudSyncError('另一个设置页面正在确认同步，请先完成或取消该页面的预览。');
             }
-            try {return await prepare(passphrase, tabId, clientId);} catch (error) {await finishSession(); throw error;}
+            try {return await prepare(passphrase, tabId, clientId, selectAccount);} catch (error) {await finishSession(); throw error;}
         }),
         commit: (id: string, passphrase: string, direction: DriveSyncDirection, choices: Record<string, unknown>, tabId?: number, clientId?: string) => exclusive(async () => {
             const state = readState(await ports.readState());

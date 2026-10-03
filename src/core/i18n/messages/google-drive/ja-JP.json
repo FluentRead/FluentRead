@@ -62,7 +62,10 @@
     "settings.drive.mergeReviewTitle": "項目ごとにマージ",
     "settings.drive.differenceCount": "{count} 件の設定が異なります",
     "settings.drive.back": "戻る",
-    "settings.drive.continue": "続ける"
+    "settings.drive.continue": "続ける",
+    "settings.drive.title": "Google Drive 設定同期",
+    "settings.drive.syncNow": "今すぐGoogle Driveと同期",
+    "settings.drive.success": "Google Drive 設定同期が完了しました"
   },
   "legacy": {
     "Google Drive 配置同步": "Google Drive 設定同期",

@@ -7,6 +7,7 @@
  * 模块边界：资源只描述扩展自己的界面文本；翻译服务的源文本、目标文本和用户内容不属于这里。
  */
 import brandTaglines from './brand-taglines.json';
+import dropboxText from './dropbox/zh-CN.json';
 import googleDriveText from './google-drive/zh-CN.json';
 import cloudBackupText from './cloud-backup/zh-CN.json';
 import type {
@@ -21,6 +22,7 @@ export const zhCNMessages = {
     "settings.backup.fileDescription": "备份文件包含 API Key 等私密信息，且未加密，请妥善保存，不要公开分享。",
     "settings.backup.restoreHint": "选择 FluentRead 备份文件，旧版 JSON 文件也可恢复。",
     ...googleDriveText.messages,
+    ...dropboxText,
     ...cloudBackupText.messages,
     "brand.tagline": brandTaglines['zh-CN'],
     "popup.translationCount": "已完成 {count} 次翻译",

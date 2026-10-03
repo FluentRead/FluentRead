@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="960" height="380" viewBox="0 0 960 380" role="img" aria-labelledby="title desc">
+<title id="title">Dropbox 单次同步流程</title><desc id="desc">用户授权后预览账号和差异，确认后条件写入或恢复，结束清理临时令牌。</desc>
+<defs><marker id="arrow" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto"><path d="M0 0L8 4L0 8" fill="#2563eb"/></marker></defs>
+<rect width="960" height="380" rx="20" fill="#f8fafc"/>
+<g font-family="system-ui, sans-serif" text-anchor="middle"><text x="480" y="42" font-size="23" font-weight="700" fill="#0f172a">Dropbox：用户主动触发的一次同步</text>
+<g fill="#fff" stroke="#cbd5e1" stroke-width="2"><rect x="28" y="88" width="265" height="95" rx="14"/><rect x="348" y="88" width="265" height="95" rx="14"/><rect x="668" y="88" width="265" height="95" rx="14"/></g>
+<g fill="#0f172a" font-size="19" font-weight="600"><text x="160" y="123">① 登录并授权</text><text x="480" y="123">② 预览账号和差异</text><text x="800" y="123">③ 确认同步操作</text></g>
+<g fill="#475569" font-size="15"><text x="160" y="153">App folder + S256 PKCE</text><text x="480" y="153">私密内容隐藏，确认前不写入</text><text x="800" y="153">保存 / 恢复 / 逐项合并</text></g>
+<g stroke="#2563eb" stroke-width="2.5" fill="none" marker-end="url(#arrow)"><path d="M297 135H340"/><path d="M618 135H660"/><path d="M801 192V225H580"/></g>
+<rect x="310" y="208" width="260" height="88" rx="14" fill="#eff6ff" stroke="#93c5fd"/>
+<text x="440" y="242" font-size="18" font-weight="600" fill="#1d4ed8">执行并清理临时授权</text><text x="440" y="268" font-size="14" fill="#475569">先检查本机与云端版本</text>
+<text x="480" y="341" font-size="15" fill="#475569">更换账号会重新登录；取消不改配置。没有持续同步或后台轮询。</text></g></svg>

@@ -2,7 +2,7 @@
 
 更新日期：2026 年 10 月 3 日。
 
-本政策说明 FluentRead（流畅阅读）浏览器扩展如何处理翻译内容、本地记录、服务凭据和可选的 Google Drive / WebDAV 配置云备份。FluentRead 是由开源项目维护者开发的双语翻译与阅读辅助工具。官网与本政策无需登录即可查看；使用翻译功能不要求连接 Google 账号。
+本政策说明 FluentRead（流畅阅读）浏览器扩展如何处理翻译内容、本地记录、服务凭据和可选的 Google Drive、Dropbox、WebDAV 配置备份。FluentRead 是由开源项目维护者开发的双语翻译与阅读辅助工具。官网与本政策无需登录即可查看；使用翻译功能不要求连接 Google 账号。
 
 你选择的功能和服务，决定哪些内容会发送出去。FluentRead 没有自建翻译服务器；云端翻译由对应的第三方服务处理。
 
@@ -92,6 +92,18 @@ Google 账号标识和配置备份仅用于账号核对、配置同步与恢复�
 
 FluentRead 使用 Google API 收到的信息遵守 [Google API 服务用户数据政策](https://developers.google.com/terms/api-services-user-data-policy)，包括适用的 Limited Use（有限使用）要求。Google API 用于配置备份与恢复，不用于生成未经同意的私密影像。Google 自身对云端存储与账号数据的处理还适用 [Google 隐私政策](https://policies.google.com/privacy)。
 
+## Dropbox 配置同步
+
+Dropbox 是另一种可选配置备份方式，是否启用以所安装版本为准。只有主动点击“立即与Dropbox同步”时才进行授权并读取备份生成预览；确认后才保存、恢复或合并，打开设置不会访问 Dropbox。
+
+- **范围**：与 Google Drive 配置同步相同，包含API Key、OAuth Token、鉴权请求头、自定义请求体及URL中的鉴权参数，不包含单词本、聊天记录和用量统计。本次 Dropbox 访问令牌不进入备份。
+- **权限和用途**：只申请 `account_info.read`、`files.metadata.read`、`files.content.read`、`files.content.write`。账号标识及邮箱用于核对和展示同步账号；文件元数据、修订号和配置内容用于预览、恢复及避免覆盖其他设备的修改。文件访问限制在 FluentRead 自己的 App folder，不访问其他文件、分享或团队数据。
+- **保存与保护**：配置通过 HTTPS 直接存入你自己的 Dropbox 的 Apps / 应用名文件夹，文件名为 `fluentread-config.encrypted.json`，不经过开发者的配置服务器。上传前本机加密，使用源码公开的固定应用口令；持有密文的人可以据此解密，访问保护依赖账号、授权和设备安全。该文件夹可在 Dropbox 中看到。
+- **本机保留**：成功账号标识、邮箱、时间与加密比较基线保留至清除扩展数据或卸载；与 Google Drive 记录分开。切换账号不混用基线，取消不会覆盖成功记录。待确认预览有效期十分钟，完成、失败、取消或离开页面清理。短期访问令牌只暂存于扩展会话存储，清理时删除；不请求 refresh token，不持续后台同步。
+- **使用与披露**：Dropbox 账号信息和备份只用于配置同步，不出售、不用于广告或模型训练，也不发送给其他翻译服务。恢复后的服务凭据只按你选择的翻译服务使用，范围见本政策第一节。
+- **控制与删除**：取消结束当前操作；更换账号重新登录。它们不会退出 Dropbox 网站或删除云端文件。可以在 [Dropbox 已连接应用](https://www.dropbox.com/account/connected_apps) 撤销访问，在 Apps 文件夹删除上述备份。云端文件保留至你删除；撤销授权、卸载扩展或清除本机记录不会自动删除云端备份，也不清除其他设备已恢复的配置。
+
+Dropbox 自身的存储与账号处理适用 [Dropbox 隐私政策](https://www.dropbox.com/privacy)。维护者接入和用户流程见 [Dropbox 同步指南](/config/dropbox-sync)。
 ## WebDAV 配置云备份
 
 WebDAV 与 Google Drive 同属配置云备份，设置入口与预览、确认、恢复和合并流程一致，但两者分别保存记录。只有你主动测试连接、保存连接或开始备份操作时，扩展才访问你指定的 WebDAV 服务器。打开设置只读取本机连接摘要；不会轮询服务器或自动备份。

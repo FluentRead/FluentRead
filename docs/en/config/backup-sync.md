@@ -41,6 +41,12 @@ Opening settings does not access Drive automatically. The permission covers only
 
 Cancelling a preview ends that operation. Revoking permission or uninstalling does not delete a cloud backup.
 
+## Dropbox configuration sync
+
+Select **Dropbox** under **Cloud configuration backup** in a build that enables this provider. Start sync, check the account, choose save, restore, or merge, then confirm. Opening settings does not authorize Dropbox. Canceling or finishing clears the temporary session; use **Change Dropbox account** in the preview if needed.
+
+Only FluentRead's App folder is accessed. Backup contents match Google Drive, while account records and comparison baselines stay separate. See the [maintainer setup guide](/en/config/dropbox-sync) and [privacy policy](/en/guide/privacy#dropbox-configuration-sync).
+
 ## WebDAV configuration backup
 
 To use your own cloud drive, NAS, or server, select **WebDAV** in **Cloud configuration backup**. Configure a directory URL and app password, test and save the connection, then review and confirm the backup operation.

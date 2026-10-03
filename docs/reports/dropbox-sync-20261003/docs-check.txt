@@ -1,0 +1,5 @@
+
+> FluentRead-流畅阅读@0.0.35 docs:check /Users/thinkstu/Desktop/copy/FluentRead-dropbox-sync-20261003
+> node scripts/verify-docs-build.mjs
+
+{"ok":true,"pages":77,"links":4005,"anchors":749,"images":99}

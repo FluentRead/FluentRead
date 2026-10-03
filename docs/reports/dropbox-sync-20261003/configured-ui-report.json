@@ -1,0 +1,62 @@
+{
+  "ok": true,
+  "evidence": "production extension with synthetic public App key, isolated Edge; synthetic Dropbox OAuth and HTTP responses",
+  "cases": [
+    "opening settings never authorizes or accesses Dropbox",
+    "Google, Dropbox and WebDAV share one cloud backup selector",
+    "shared cloud backup heading is localized",
+    "Dropbox description contains no Google provider text",
+    "preview shows the selected Dropbox account",
+    "preview never writes the cloud",
+    "cancel label is concise",
+    "successful sync removes temporary token",
+    "Dropbox history never becomes Google history",
+    "real config storage accepts fixture patch",
+    "private values remain masked",
+    "existing backup requires explicit direction selection",
+    "review explains Dropbox restore impact",
+    "expanded differences stay masked",
+    "390px layout does not overflow",
+    "restore replaces service credentials",
+    "canceling new account preserves last successful account",
+    "cancel clears temporary session",
+    "upstream failures are sanitized",
+    "real config storage accepts fixture patch",
+    "English card does not retain the Chinese heading",
+    "no uncaught page errors"
+  ],
+  "screenshots": [
+    "choose-desktop.png",
+    "review-desktop.png",
+    "review-mobile.png",
+    "card-english.png"
+  ],
+  "consoleErrors": [],
+  "launchMode": "macos-background-cdp",
+  "focusPolicy": "launchservices-no-foreground",
+  "windowPlacement": {
+    "mode": "background-visible-no-focus",
+    "visible": true,
+    "hidden": false,
+    "centered": true,
+    "windowState": "normal",
+    "bounds": {
+      "left": 1041,
+      "top": -1040,
+      "width": 1440,
+      "height": 1000
+    },
+    "displayTarget": "secondary",
+    "source": "macos-nsscreen",
+    "screenIndex": 1,
+    "browserFrontmost": false,
+    "frontmostBefore": {
+      "pid": 65472,
+      "name": "ChatGPT"
+    },
+    "frontmostAfter": {
+      "pid": 65472,
+      "name": "ChatGPT"
+    }
+  }
+}

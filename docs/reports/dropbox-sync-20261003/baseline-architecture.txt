@@ -1,0 +1,76 @@
+
+ RUN  v2.1.9 /private/tmp/fluentread-dropbox-baseline-current-20261003
+
+ ❯ tests/architecture/verificationOwnership.test.ts (9 tests | 2 failed) 719ms
+   × repository verification ownership > 每个产品、构建和测试基础设施文件都有明确验证归属 6ms
+     → expected [ { …(2) }, { …(2) }, { …(2) } ] to deeply equal []
+   × repository verification ownership > src 中每个可执行非组装模块都进入四维 100% 覆盖率边界 501ms
+     → expected [ Array(8) ] to deeply equal []
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  tests/architecture/verificationOwnership.test.ts > repository verification ownership > 每个产品、构建和测试基础设施文件都有明确验证归属
+AssertionError: expected [ { …(2) }, { …(2) }, { …(2) } ] to deeply equal []
+
+- Expected
++ Received
+
+- Array []
++ Array [
++   Object {
++     "owners": Array [],
++     "path": "scripts/capture-docs-ui.cjs",
++   },
++   Object {
++     "owners": Array [],
++     "path": "scripts/verify-brand-copy.mjs",
++   },
++   Object {
++     "owners": Array [],
++     "path": "scripts/verify-docs-build.mjs",
++   },
++ ]
+
+ ❯ tests/architecture/verificationOwnership.test.ts:319:25
+    317|     it('每个产品、构建和测试基础设施文件都有明确验证归属', () => {
+    318|         const unowned = ownership.filter(({owners}) => owners.length =…
+    319|         expect(unowned).toEqual([]);
+       |                         ^
+    320|     });
+    321| 
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/2]⎯
+
+ FAIL  tests/architecture/verificationOwnership.test.ts > repository verification ownership > src 中每个可执行非组装模块都进入四维 100% 覆盖率边界
+AssertionError: expected [ Array(8) ] to deeply equal []
+
+- Expected
++ Received
+
+- Array []
++ Array [
++   "src/core/config/shareCard.ts",
++   "src/core/i18n/messages/siteRules.ts",
++   "src/features/full-page-translation/content/excerpt.ts",
++   "src/features/share-card/content/runtime.ts",
++   "src/features/share-card/core.ts",
++   "src/features/share-card/export.ts",
++   "src/features/share-card/render.ts",
++   "src/features/share-card/themes.ts",
++ ]
+
+ ❯ tests/architecture/verificationOwnership.test.ts:328:27
+    326|             && !strictCoverage.has(path));
+    327| 
+    328|         expect(uncovered).toEqual([]);
+       |                           ^
+    329|     });
+    330| 
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/2]⎯
+
+ Test Files  1 failed (1)
+      Tests  2 failed | 7 passed (9)
+   Start at  16:49:42
+   Duration  1.19s (transform 42ms, setup 0ms, collect 304ms, tests 719ms, environment 0ms, prepare 36ms)
+

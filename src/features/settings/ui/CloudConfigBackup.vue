@@ -1,12 +1,12 @@
 <!--
 @file src/features/settings/ui/CloudConfigBackup.vue
-文件职责：将 Google Drive 与 WebDAV 归入同一个配置云备份入口。
+文件职责：将 Google Drive、Dropbox 与 WebDAV 归入同一个配置云备份入口。
 主要内容：统一备份范围说明，提供有主次的存储方式选择，记住本机选择并锁定操作中的切换。
 模块边界：只拥有 UI 选择状态；供应商连接和云备份事务交给各自客户端及共用预览界面。
 -->
 <template>
   <section class="cloud-backup" aria-labelledby="cloud-backup-title" data-testid="cloud-config-backup">
-    <header><h2 id="cloud-backup-title">{{ t('settings.cloud.title') }}</h2><el-tooltip effect="light" placement="bottom-end" :show-after="150" :trigger="['hover', 'focus']"><template #content><div class="cloud-privacy-help"><strong>{{ t('settings.drive.privacyTitle') }}</strong><ul><li>{{ t('settings.cloud.privacyEncryption') }}</li><li>{{ t(selected === 'google-drive' ? 'settings.drive.privacyStorage' : 'settings.cloud.privacyWebDavStorage') }}</li><li>{{ t(selected === 'google-drive' ? 'settings.drive.privacyAuthorization' : 'settings.cloud.privacyWebDavConnection') }}</li><li>{{ t('settings.drive.privacyExcluded') }}</li></ul></div></template><button type="button" class="cloud-privacy" :aria-label="t('settings.drive.privacyTitle')" data-testid="cloud-backup-privacy"><el-icon><Lock /></el-icon>{{ t('settings.drive.privacyBadge') }}</button></el-tooltip></header>
+    <header><h2 id="cloud-backup-title">{{ t('settings.cloud.title') }}</h2><el-tooltip effect="light" placement="bottom-end" :show-after="150" :trigger="['hover', 'focus']"><template #content><div class="cloud-privacy-help"><strong>{{ t('settings.drive.privacyTitle') }}</strong><ul><li>{{ t('settings.cloud.privacyEncryption') }}</li><li>{{ t(selected === 'dropbox' ? 'settings.dropbox.privacyStorage' : selected === 'google-drive' ? 'settings.drive.privacyStorage' : 'settings.cloud.privacyWebDavStorage') }}</li><li>{{ t(selected !== 'webdav' ? 'settings.drive.privacyAuthorization' : 'settings.cloud.privacyWebDavConnection') }}</li><li>{{ t('settings.drive.privacyExcluded') }}</li></ul></div></template><button type="button" class="cloud-privacy" :aria-label="t('settings.drive.privacyTitle')" data-testid="cloud-backup-privacy"><el-icon><Lock /></el-icon>{{ t('settings.drive.privacyBadge') }}</button></el-tooltip></header>
     <p class="cloud-description">{{ t('settings.cloud.description') }}</p>
     <div v-if="hasExtensionBackground" class="cloud-methods" role="radiogroup" :aria-label="t('settings.cloud.method')">
       <label v-for="item in methods" :key="item.id" :class="{'is-selected': selected === item.id, 'is-disabled': busy}">
@@ -15,6 +15,7 @@
     </div>
     <el-alert v-if="!hasExtensionBackground" :title="t('settings.cloud.unavailable')" type="info" :closable="false" show-icon />
     <GoogleDriveSync v-else-if="selected === 'google-drive'" @busy="busy = $event" />
+    <DropboxSync v-else-if="selected === 'dropbox'" @busy="busy = $event" />
     <WebDavBackup v-else @busy="busy = $event" />
   </section>
 </template>
@@ -27,12 +28,13 @@ import {Lock} from '@element-plus/icons-vue';
 import {useUiI18n} from '@/src/ui/i18n';
 import GoogleDriveSync from './GoogleDriveSync.vue';
 import WebDavBackup from './WebDavBackup.vue';
+import DropboxSync from './DropboxSync.vue';
 const {t} = useUiI18n();
 const hasExtensionBackground = import.meta.env.BROWSER !== 'userscript';
-const methods = [{id: 'google-drive', name: 'Google Drive'}, {id: 'webdav', name: 'WebDAV'}] as const;
-const selected = ref<'google-drive' | 'webdav'>('google-drive');
+const methods = [{id: 'google-drive', name: 'Google Drive'}, {id: 'dropbox', name: 'Dropbox'}, {id: 'webdav', name: 'WebDAV'}] as const;
+const selected = ref<'google-drive' | 'dropbox' | 'webdav'>('google-drive');
 const busy = ref(false);
-try {if (localStorage.getItem('fluentread-cloud-backup-method') === 'webdav') selected.value = 'webdav';} catch { /* 存储受限时仍可使用默认选择。 */ }
+try {const method = localStorage.getItem('fluentread-cloud-backup-method'); if (method === 'webdav' || method === 'dropbox') selected.value = method;} catch { /* 存储受限时仍可使用默认选择。 */ }
 watch(selected, value => {try {localStorage.setItem('fluentread-cloud-backup-method', value);} catch { /* 选择仍对本次页面有效。 */ }});
 </script>
 <style scoped>

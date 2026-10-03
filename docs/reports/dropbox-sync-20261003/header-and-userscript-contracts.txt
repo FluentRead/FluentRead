@@ -1,0 +1,11 @@
+
+ RUN  v2.1.9 /Users/thinkstu/Desktop/copy/FluentRead-dropbox-sync-20261003
+
+ ✓ tests/userscriptViteConfig.test.ts (9 tests) 59ms
+ ✓ tests/architecture/sourceFileHeaders.test.ts (751 tests) 215ms
+
+ Test Files  2 passed (2)
+      Tests  760 passed (760)
+   Start at  16:39:41
+   Duration  2.05s (transform 720ms, setup 0ms, collect 1.40s, tests 275ms, environment 0ms, prepare 94ms)
+

@@ -1,6 +1,6 @@
 import base from './vitest.coverage.config';
 
-// 针对 Google Drive / WebDAV 的事务与协议验证；保持完整覆盖率阈值，不运行无关产品套件。
+// 针对 Google Drive / Dropbox / WebDAV 的事务与协议验证；保持完整覆盖率阈值，不运行无关产品套件。
 export default {
     ...base,
     test: {
@@ -8,6 +8,11 @@ export default {
         // 多次真实 PBKDF2 派生在限流或并行构建时可能超过默认 5 秒。
         testTimeout: 30_000,
         include: [
+            'tests/dropboxAuth.test.ts',
+            'tests/dropboxApi.test.ts',
+            'tests/dropboxSyncClient.test.ts',
+            'tests/backgroundDropboxSync.test.ts',
+            'tests/dropboxSync.test.ts',
             'tests/webDavBackup.test.ts',
             'tests/webDavHttpIntegration.test.ts',
             'tests/webDavConnection.test.ts',
@@ -22,6 +27,10 @@ export default {
             ...base.test?.coverage,
             reportsDirectory: 'coverage/cloud-backup',
             include: [
+                'src/platform/dropbox/auth.ts',
+                'src/platform/dropbox/api.ts',
+                'src/platform/dropbox/constants.ts',
+                'src/services/config/dropboxSyncClient.ts',
                 'src/core/config/cloudSync.ts',
                 'src/platform/webdav/connection.ts',
                 'src/platform/webdav/api.ts',

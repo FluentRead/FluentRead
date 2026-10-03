@@ -21,7 +21,7 @@ export function createCloudBackupClient(type: string) {
     return {
         request,
         status: () => request<DriveSyncStatus>('status'),
-        prepare: () => request<DriveSyncPreview>('prepare'),
+        prepare: (switchAccount = false) => request<DriveSyncPreview>('prepare', switchAccount ? {switchAccount: true} : {}),
         commit: (id: string, direction: DriveSyncDirection, choices: Record<string, string>) => request<DriveSyncStatus>('commit', {id, direction, choices}),
         cancel: (id?: string) => request<void>('cancel', {id}),
     };

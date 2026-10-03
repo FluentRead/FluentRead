@@ -41,6 +41,14 @@ Opening settings does not access Drive automatically. The permission covers only
 
 Cancelling a preview ends that operation. Revoking permission or uninstalling does not delete a cloud backup.
 
+## OneDrive configuration sync
+
+Choose **OneDrive** under **Cloud configuration backup**, click **Sync with OneDrive now**, sign in and check the Microsoft account, then review and confirm save, restore or individual merge. **Change Microsoft account** opens account selection again; **Cancel** ends the preview.
+
+Users do not register an application, enter a Client ID or supply an encryption password. Availability depends on the installed build; an unconfigured build offers other backup methods. Opening settings does not contact OneDrive, and completed operations show the last successful account and time.
+
+The backup includes settings and provider credentials, excluding vocabulary, chat records and usage statistics. It lives in your own OneDrive application folder. Google Drive, OneDrive and WebDAV keep separate sync records. See the [OneDrive privacy explanation](/en/guide/privacy#onedrive-configuration-sync) for permissions, protection and deletion.
+
 ## WebDAV configuration backup
 
 To use your own cloud drive, NAS, or server, select **WebDAV** in **Cloud configuration backup**. Configure a directory URL and app password, test and save the connection, then review and confirm the backup operation.
@@ -58,4 +66,3 @@ Translation cache reuses completed translations. Clearing it does not delete voc
 - [Learning data](/en/guide/vocabulary-book)
 - [Translation statistics](/en/guide/translation-stats)
 - [Data and privacy](/en/guide/privacy)
-

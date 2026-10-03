@@ -66,8 +66,8 @@ export function createOneDriveAuth(ports: OneDriveAuthPorts) {
         if (!result) throw failure('authCanceled');
         let callback: URL;
         try {callback = new URL(result);} catch {throw failure('invalidRedirect');}
-        if (callback.origin !== expected.origin || callback.pathname !== expected.pathname || callback.username || callback.password || callback.searchParams.getAll('state').length !== 1 || callback.searchParams.get('state') !== nonce) throw failure('invalidRedirect');
-        if (callback.searchParams.has('error')) throw failure(interactive ? 'authCanceled' : 'authorizationExpired');
+        if (callback.origin !== expected.origin || callback.pathname !== expected.pathname || callback.username || callback.password || callback.hash || callback.searchParams.getAll('state').length !== 1 || callback.searchParams.get('state') !== nonce) throw failure('invalidRedirect');
+        if (callback.searchParams.has('error')) throw failure(interactive ? callback.searchParams.get('error') === 'access_denied' ? 'authCanceled' : 'authFailed' : 'authorizationExpired');
         const code = callback.searchParams.get('code');
         if (!code || callback.searchParams.getAll('code').length !== 1) throw failure('invalidRedirect');
         const value = await json(`${ONEDRIVE_AUTHORITY}/token`, {method: 'POST', headers: {'Content-Type': 'application/x-www-form-urlencoded'}, body: new URLSearchParams({client_id: ports.clientId, grant_type: 'authorization_code', code, redirect_uri: redirect, code_verifier: verifier}).toString()});

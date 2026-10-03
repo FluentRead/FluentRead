@@ -16,6 +16,7 @@
     "canceling a different account preserves the last successful account",
     "switch and cancel do not modify either account backup",
     "sync baseline is unavailable through the settings storage read proxy",
+    "application configuration errors are distinguished from user cancellation",
     "Google sync does not change the OneDrive account record",
     "reopening settings does not reconnect to cloud",
     "trusted config patch 3: ",

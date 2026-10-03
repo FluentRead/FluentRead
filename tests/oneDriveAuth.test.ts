@@ -60,9 +60,9 @@ describe('OneDrive browser OAuth + PKCE', () => {
             const f = fixture(); vi.mocked(f.identity.launchWebAuthFlow).mockResolvedValue(callback);
             await expect(f.auth.open(true)).rejects.toThrow('invalidRedirect'); expect(f.fetcher).not.toHaveBeenCalled();
         }
-        for (const query of ['code=', 'code=x&code=y', 'error=access_denied']) {
+        for (const query of ['code=', 'code=x&code=y', 'code=y#fragment', 'error=access_denied', 'error=invalid_client']) {
             const f = fixture(); vi.mocked(f.identity.launchWebAuthFlow).mockImplementation(async ({url}) => `${redirect}?state=${new URL(url).searchParams.get('state')}&${query}`);
-            await expect(f.auth.open(true)).rejects.toThrow(query.startsWith('error') ? 'authCanceled' : 'invalidRedirect');
+            await expect(f.auth.open(true)).rejects.toThrow(query === 'error=access_denied' ? 'authCanceled' : query === 'error=invalid_client' ? 'authFailed' : 'invalidRedirect');
         }
     });
     it('handles dismissal, silent expiry and cancellation while authorization is pending', async () => {
@@ -70,7 +70,7 @@ describe('OneDrive browser OAuth + PKCE', () => {
             const f = fixture(); vi.mocked(f.identity.launchWebAuthFlow).mockRejectedValue(new Error('synthetic-private-provider-error'));
             await expect(f.auth.open(interactive)).rejects.toThrow(interactive ? 'authCanceled' : 'authorizationExpired');
             vi.mocked(f.identity.launchWebAuthFlow).mockImplementation(async ({url}) => `${redirect}?state=${new URL(url).searchParams.get('state')}&error=login_required`);
-            await expect(f.auth.open(interactive)).rejects.toThrow(interactive ? 'authCanceled' : 'authorizationExpired');
+            await expect(f.auth.open(interactive)).rejects.toThrow(interactive ? 'authFailed' : 'authorizationExpired');
         }
         const f = fixture(); vi.mocked(f.identity.launchWebAuthFlow).mockResolvedValue(undefined);
         await expect(f.auth.open(true)).rejects.toThrow('authCanceled');

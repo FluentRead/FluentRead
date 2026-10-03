@@ -34,7 +34,7 @@ async function main() {
                 const s=globalThis.__cloudFixture;s.auth++;
                 const url=new URL(details.url);
                 if(url.searchParams.get('code_challenge_method')!=='S256'||url.searchParams.get('scope')!=='Files.ReadWrite.AppFolder User.Read')throw new Error('wrong OAuth contract');
-                const result=`${url.searchParams.get('redirect_uri')}?state=${url.searchParams.get('state')}&${s.deny?'error=access_denied':'code=synthetic-code'}`;
+                const result=`${url.searchParams.get('redirect_uri')}?state=${url.searchParams.get('state')}&${s.deny=== 'configuration'?'error=invalid_client':s.deny?'error=access_denied':'code=synthetic-code'}`;
                 if(callback)callback(result);return Promise.resolve(result);
             };
             chrome.identity.getAuthToken=async()=>({token:'synthetic-google-token',grantedScopes:['https://www.googleapis.com/auth/drive.appdata']});
@@ -124,6 +124,9 @@ async function main() {
         check(privateState.success===false,'sync baseline is unavailable through the settings storage read proxy');
         await worker.evaluate(()=>{__cloudFixture.deny=true;});await page.getByTestId('onedrive-sync-now').click();
         await card.getByText('已取消微软账号授权',{exact:false}).waitFor();
+        await worker.evaluate(()=>{__cloudFixture.deny='configuration';});await page.getByTestId('onedrive-sync-now').click();
+        await card.getByText('微软授权未完成',{exact:false}).waitFor();
+        check(!(await card.innerText()).includes('已取消微软账号授权'),'application configuration errors are distinguished from user cancellation');
         await worker.evaluate(()=>{__cloudFixture.deny=false;__cloudFixture.fail=true;});await page.getByTestId('onedrive-sync-now').click();
         await card.getByText('OneDrive 请求失败',{exact:false}).waitFor();
         await worker.evaluate(()=>{__cloudFixture.fail=false;__cloudFixture.user='a';});

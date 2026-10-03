@@ -6,9 +6,11 @@
 
 - OneDrive、Google Drive、WebDAV 相关 67 个协议及事务测试通过；指定模块的语句、分支、函数、行覆盖率均为 100%。见 [cloud-coverage.txt](./cloud-coverage.txt) 和 [coverage-summary.json](./coverage-summary.json)。本机 HTTP 集成测试经沙箱授权运行临时服务，没有连接真实云盘。
 - 84 个 i18n、扩展清单和 userscript 构建契约测试通过。另一个包含源文件头、设置页架构和仓库边界的检查组通过 800 项，失败 4 项，见下文。
-- 类型检查、Chrome MV3、Firefox MV2、VitePress 文档和 userscript 生产构建通过。扩展清单校验通过；userscript 验证见 [userscript-verifier.txt](./userscript-verifier.txt)。没有进行完整仓库回归。
-- 隔离 Edge 中加载 Chrome 生产扩展，22 项断言通过，见 [browser-report.json](./browser-report.json)。使用虚构 Client ID、账号及 OAuth/Graph 响应：真实后台执行配置加密、存储、应用、历史记录与消息校验；验证保存、完整凭据恢复、换账号、取消、失败、多云记录隔离、重开不请求云盘、英文深色 390px 排版及页面无错误。
+- 类型检查、Chrome MV3、Firefox MV2、VitePress 文档和 userscript 生产构建通过。新文档网站静态校验通过（75 页、3819 个链接、714 个锚点、90 张图片）。扩展清单校验通过；userscript 验证见 [userscript-verifier.txt](./userscript-verifier.txt)。没有进行完整仓库回归。
+- 隔离 Edge 中加载 Chrome 生产扩展，23 项断言通过，见 [browser-report.json](./browser-report.json)。使用虚构 Client ID、账号及 OAuth/Graph 响应：真实后台执行配置加密、存储、应用、历史记录与消息校验；验证保存、完整凭据恢复、换账号、取消、失败、多云记录隔离、重开不请求云盘、英文深色 390px 排版及页面无错误。
 - 两张 Mermaid 图在隔离浏览器成功渲染，所有教学截图加载成功；390px 文档无横向溢出。官方门户截图、生成式箭头标注和实际扩展夹具截图在教程中明确区分。
+
+架构检查记录来自集成 WebDAV 的提交 `9c61f14e93a258657e37375cc7e67891b7305945`。后来集成官网重构 `87320918` 仅带来文档与网站工具变化，没有修改扩展运行时；已重新构建并校验网站。最后授权错误分类变更经云备份覆盖率、类型检查、双浏览器构建及隔离界面重新验证。
 
 ## 已有架构检查失败
 

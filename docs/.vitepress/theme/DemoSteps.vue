@@ -6,9 +6,14 @@ const props = defineProps<{
   playing: boolean
   reduced?: boolean
   en?: boolean
+  runStages?: readonly number[]
 }>()
 defineEmits<{ select: [index: number] }>()
 function action(index: number) {
+  if (props.runStages?.includes(index)) {
+    if (props.reduced) return props.en ? 'View the translation result' : '查看翻译结果'
+    return props.en ? 'Play the translation' : '演示翻译过程'
+  }
   if (props.reduced) return props.en ? 'View this step' : '查看此步骤'
   if (index !== props.active) return props.en ? 'Go to this step and pause' : '跳转到此步骤并暂停'
   if (props.playing) return props.en ? 'Pause at this step' : '暂停在此步骤'

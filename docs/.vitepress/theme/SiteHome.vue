@@ -3,6 +3,7 @@ import { withBase } from 'vitepress'
 import FeatureDemo from './FeatureDemo.vue'
 import HeroOrbit from './HeroOrbit.vue'
 import BrowserInstall from './BrowserInstall.vue'
+import PromoVideo from './PromoVideo.vue'
 import brandTaglines from '../../../src/core/i18n/messages/brand-taglines.json'
 const props = defineProps<{ en?: boolean }>()
 const t = (zh: string, english: string) => (props.en ? english : zh)
@@ -149,37 +150,7 @@ const faqs = [
     <section class="bv-section bv-promo" aria-labelledby="bv-promo-title">
       <span class="bv-section-number">{{ t('56 秒介绍', 'A 56-SECOND TOUR') }}</span>
       <h2 id="bv-promo-title">{{ t('先看一遍，再往下读', 'Watch first, then read on') }}</h2>
-      <div v-if="!en" class="bv-promo-video bv-promo-embed">
-        <iframe
-          src="https://player.bilibili.com/player.html?bvid=BV1VLHE6hEnB&p=1&autoplay=0&danmaku=0&poster=1"
-          title="流畅阅读 56 秒介绍视频（哔哩哔哩）"
-          loading="lazy"
-          allow="fullscreen; picture-in-picture; encrypted-media"
-          allowfullscreen
-        ></iframe>
-      </div>
-      <video
-        v-else
-        class="bv-promo-video"
-        controls
-        playsinline
-        preload="none"
-        width="1920"
-        height="1080"
-        :poster="withBase('/videos/fluentread-promo-en-poster.webp')"
-        aria-label="FluentRead 56-second introduction video"
-      >
-        <source :src="withBase('/videos/fluentread-promo-en.mp4')" type="video/mp4" />
-        <a :href="withBase('/videos/fluentread-promo-en.mp4')">Download the introduction video</a>
-      </video>
-      <a
-        v-if="!en"
-        class="bv-text-link bv-promo-link"
-        href="https://www.bilibili.com/video/BV1VLHE6hEnB/"
-        target="_blank"
-        rel="noopener noreferrer"
-        >在 B 站观看 <span aria-hidden="true">↗</span></a
-      >
+      <PromoVideo :en="en" />
     </section>
     <section
       v-for="feature in features"

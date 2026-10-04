@@ -40,6 +40,10 @@ Use a PDF with selectable text. Scanned PDFs are not directly recognized; conver
 
 Translated PDF pages are rendered as images for visual reading. Copying text from those translated pages is not currently supported. Check complex tables, formulas, and unusual fonts carefully.
 
+PDF downloads show the number of completed pages, followed by a saving stage. Longer documents take more time. Choose **Cancel export** to stop generation; translations and edits are kept so you can download again. Very large or tall pages use a lower image resolution to limit memory use while preserving the original page dimensions.
+
+ePub, DOCX and batch ZIP downloads show packaging progress and allow cancellation without losing translations or edits. Large JSON download previews show text excerpts while the exported file keeps its complete structure. Text download previews only encode the excerpt needed by the dialog. Reading previews refresh after translation pauses or finishes to reduce repeated work on long documents.
+
 ## Does the file leave my computer?
 
 The browser parses the file locally. Text to translate is sent to your selected service. Cloud translation therefore sends the relevant text outside your computer. See [Data & privacy](/en/guide/privacy).

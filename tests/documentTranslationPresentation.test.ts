@@ -26,6 +26,21 @@ function parsed(format: DocumentFormat, binary?: BinaryDocumentData): ParsedDocu
 }
 
 describe('document translation presentation', () => {
+    it('does not read the rest of a large text document to produce its download excerpt', () => {
+        const document = parseDocument('long.txt', 'A'.repeat(1700));
+        document.parts = [
+            {kind: 'literal', value: 'A'.repeat(1700)},
+            {get kind() {throw new Error('preview read beyond limit');}} as any,
+        ];
+        expect(getDocumentExportPreview(document, [], 'translated')).toBe(`${'A'.repeat(1600)}\n…`);
+    });
+
+    it('does not clone a large JSON tree for a download excerpt', () => {
+        const document = parseDocument('large.json', JSON.stringify(Array.from({length: 1000}, (_, index) => `Value ${index}`)));
+        Object.defineProperty(document, 'jsonValue', {get: () => {throw new Error('preview cloned the tree');}});
+        expect(getDocumentExportPreview(document, ['翻译结果'], 'translated')).toBe('翻译结果\n\nValue 1\n\nValue 2');
+    });
+
     it('local samples use the normal parser and preserve structure when exported', () => {
         for (const sample of DOCUMENT_QUICK_SAMPLES) {
             const document = parseDocument(sample.name, sample.content);

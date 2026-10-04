@@ -1,8 +1,8 @@
 import {readFileSync} from 'node:fs';
 
 import JSZip from 'jszip';
-import {PDFDocument} from 'pdf-lib';
-import {describe, expect, it} from 'vitest';
+import {PDFDocument, PDFImage} from 'pdf-lib';
+import {describe, expect, it, vi} from 'vitest';
 
 import {
     getDocumentAcceptAttribute,
@@ -34,6 +34,87 @@ function copyArrayBuffer(bytes: Uint8Array): ArrayBuffer {
 }
 
 describe('binary document translation formats', () => {
+    it.each(['sample.epub', 'sample.docx'])('%s can cancel active compression and retry while preserving contents', async name => {
+        const parsed = await parseBinaryDocument(name, loadBytes(name));
+        const controller = new AbortController();
+        await expect(createDocumentDownload(parsed, [], 'translated', {
+            signal: controller.signal, onArchiveProgress: () => controller.abort(),
+        })).rejects.toMatchObject({name: 'AbortError'});
+        const progress = vi.fn();
+        const download = await createDocumentDownload(parsed, [], 'translated', {
+            signal: new AbortController().signal, onArchiveProgress: progress,
+        });
+        expect(progress).toHaveBeenLastCalledWith(100);
+        expect((await parseBinaryDocument(download.fileName, download.data as Uint8Array)).segments).toHaveLength(parsed.segments.length);
+    });
+
+    it('preserves blank pages in a bilingual PDF without failing to embed them', async () => {
+        const source = await PDFDocument.create();
+        source.addPage([400, 600]).drawText('First page');
+        source.addPage([400, 600]);
+        source.addPage([400, 600]).drawText('Last page');
+        const parsed = await parseBinaryDocument('blank-page.pdf', await source.save());
+        const download = await createDocumentDownload(parsed, [], 'bilingual', {pdfPageRasterizer: testRasterizer});
+        expect((await PDFDocument.load(download.data as Uint8Array)).getPageCount()).toBe(3);
+    });
+
+    it.each(['bilingual', 'translated'] as const)('exports 40 PDF pages in %s mode with ordered progress', async mode => {
+        const source = await PDFDocument.create();
+        for (let page = 1; page <= 40; page += 1) source.addPage([400, 600]).drawText(`Page ${page}`);
+        const parsed = await parseBinaryDocument('long.pdf', await source.save());
+        const progress: Array<{phase: string; completedPages: number; totalPages: number}> = [];
+        const rasterizer = vi.fn(testRasterizer);
+        const download = await createDocumentDownload(parsed, [], mode, {
+            pdfPageRasterizer: rasterizer, onPdfProgress: value => progress.push(value),
+        });
+        const result = await PDFDocument.load(download.data as Uint8Array);
+        expect(result.getPageCount()).toBe(40);
+        expect(result.getPages().every(page => page.getHeight() === 600 && page.getWidth() === (mode === 'bilingual' ? 810 : 400))).toBe(true);
+        expect(rasterizer.mock.calls.map(([input]) => input.pageNumber)).toEqual(Array.from({length: 40}, (_, index) => index + 1));
+        expect(progress.slice(0, -1).map(value => value.completedPages)).toEqual(Array.from({length: 41}, (_, index) => index));
+        expect(progress.at(-1)).toEqual({phase: 'saving', completedPages: 40, totalPages: 40});
+    });
+
+    it('cancels between PDF pages and retries without changing translations', async () => {
+        const parsed = await parseBinaryDocument('sample.pdf', loadBytes('sample.pdf'));
+        const controller = new AbortController();
+        const translations = parsed.segments.map(() => '译文');
+        const rasterizer = vi.fn(testRasterizer);
+        await expect(createDocumentDownload(parsed, translations, 'translated', {
+            pdfPageRasterizer: rasterizer, signal: controller.signal,
+            onPdfProgress: value => { if (value.completedPages === 1) controller.abort(); },
+        })).rejects.toMatchObject({name: 'AbortError'});
+        expect(rasterizer).toHaveBeenCalledOnce();
+        expect(translations.every(value => value === '译文')).toBe(true);
+        const download = await createDocumentDownload(parsed, translations, 'translated', {
+            pdfPageRasterizer: testRasterizer, signal: new AbortController().signal,
+        });
+        expect((await PDFDocument.load(download.data as Uint8Array)).getPageCount()).toBe(2);
+    });
+
+    it('releases decoded PNG pixels before rendering the next PDF page', async () => {
+        const parsed = await parseBinaryDocument('sample.pdf', loadBytes('sample.pdf'));
+        const images: PDFImage[] = [];
+        const embed = PDFDocument.prototype.embedPng;
+        const spy = vi.spyOn(PDFDocument.prototype, 'embedPng').mockImplementation(async function (this: PDFDocument, bytes) {
+            const image = await embed.call(this, bytes);
+            images.push(image);
+            return image;
+        });
+        try {
+            await createDocumentDownload(parsed, [], 'translated', {
+                pdfPageRasterizer: async () => {
+                    // pdf-lib clears its PNG embedder only after embed(), releasing RGB pixels.
+                    for (const image of images) expect((image as any).embedder).toBeUndefined();
+                    return onePixelPng;
+                },
+            });
+            expect(images).toHaveLength(2);
+        } finally {
+            spy.mockRestore();
+        }
+    });
+
     it('识别 PDF、ePub、DOCX 并提供正确 MIME 与上传 accept', () => {
         expect(getDocumentFormat('paper.PDF')).toBe('pdf');
         expect(getDocumentFormat('book.epub')).toBe('epub');

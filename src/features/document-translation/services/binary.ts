@@ -1,11 +1,13 @@
 /**
  * @file src/features/document-translation/services/binary.ts
  * 文件职责：处理 PDF、EPUB 与 DOCX 二进制文档的受限解析和导出，把压缩包或页面文本转换为统一 ParsedDocument，并生成可下载的双语产物。
- * 主要内容：按格式使用时加载 PDF.js、pdf-lib 与 JSZip，包含归档条目/字节安全上限、XML 与 ZIP 路径工具、PDF 文本原子到行块的重建、EPUB 章节和 DOCX 段落提取、译文回填，以及 PDF rasterizer 注入式导出。
+ * 主要内容：按需加载二进制依赖，包含归档安全上限、文本提取与译文回填；PDF 导出逐页压缩释放解码像素，支持进度回调和取消；ePub/DOCX 导出在内容回填间让出主线程，并通过可取消的归档流编码。
  * 模块边界：此服务可以依赖 JSZip、pdf-lib 和二进制 I/O，但不负责调用翻译服务或渲染设置页；文本格式规则归 core/document，浏览器 Canvas 光栅实现由 ui/pdfPreview 通过接口注入。
  */
 import type JSZip from 'jszip';
+import type {PDFEmbeddedPage} from 'pdf-lib';
 import pdfWorkerUrl from 'pdfjs-dist/legacy/build/pdf.worker.min.mjs?url';
+import {generateDocumentArchive} from './archive';
 
 import {
     createDocumentDownloadName,
@@ -85,14 +87,20 @@ export interface PdfRasterPageInput {
     height: number;
     sourceBytes: Uint8Array;
     blocks: PdfDocumentBlock[];
-    translations: string[];
+    translations: readonly string[];
+    signal?: AbortSignal;
 }
 
 export type PdfPageRasterizer = (input: PdfRasterPageInput) => Promise<Uint8Array>;
 
 export interface CreateDocumentDownloadOptions {
     pdfPageRasterizer?: PdfPageRasterizer;
+    signal?: AbortSignal;
+    onPdfProgress?: (progress: {phase: 'rendering' | 'saving'; completedPages: number; totalPages: number}) => void;
+    onArchiveProgress?: (percent: number) => void;
 }
+
+const yieldDocumentTask = () => new Promise<void>(resolve => setTimeout(resolve, 0));
 
 function toUint8Array(value: ArrayBuffer | Uint8Array): Uint8Array {
     if (value instanceof Uint8Array) return new Uint8Array(value);
@@ -648,28 +656,49 @@ async function renderPdf(
     document: ParsedDocument,
     translations: readonly string[],
     mode: DocumentRenderMode,
-    rasterizer: PdfPageRasterizer,
+    options: CreateDocumentDownloadOptions,
 ): Promise<Uint8Array> {
     const binary = document.binary as Extract<NonNullable<ParsedDocument['binary']>, {kind: 'pdf'}>;
     const {PDFDocument} = await import('pdf-lib');
-    const sourcePdf = await PDFDocument.load(binary.bytes);
+    options.signal?.throwIfAborted();
     const outputPdf = await PDFDocument.create();
     outputPdf.setTitle(`${document.fileName} - FluentRead`);
     outputPdf.setProducer('FluentRead document translation');
 
-    for (const pageData of binary.pages) {
-        const png = await rasterizer({
+    const totalPages = binary.pages.length;
+    options.onPdfProgress?.({phase: 'rendering', completedPages: 0, totalPages});
+    // 让浏览器绘制进度并处理取消，避免仅等待已解决的 Promise 连续占用主线程。
+    const yieldToBrowser = () => new Promise<void>(resolve => setTimeout(resolve, 0));
+    await yieldToBrowser();
+    options.signal?.throwIfAborted();
+    // 一次复制共享资源；逐页 embedPage 会反复复制同一套字体与图片。
+    const sourcePages = new Map<number, PDFEmbeddedPage>();
+    if (mode === 'bilingual') {
+        const sourcePdf = await PDFDocument.load(binary.bytes);
+        const pages = sourcePdf.getPages().map((page, index) => ({page, pageNumber: index + 1}))
+            .filter(({page}) => page.node.Contents());
+        // 无内容流的空白页不需要嵌入；pdf-lib 会拒绝嵌入这类页。
+        const embedded = await outputPdf.embedPages(pages.map(({page}) => page));
+        pages.forEach(({pageNumber}, index) => sourcePages.set(pageNumber, embedded[index]));
+    }
+    for (const [index, pageData] of binary.pages.entries()) {
+        options.signal?.throwIfAborted();
+        const png = await options.pdfPageRasterizer!({
             ...pageData,
             sourceBytes: binary.bytes,
-            translations: [...translations],
+            translations,
+            signal: options.signal,
         });
+        options.signal?.throwIfAborted();
         const image = await outputPdf.embedPng(png);
+        // embedPng 只解码，默认等到 save 才压缩；提前 embed 释放每页 RGB 像素。
+        await image.embed();
         if (mode === 'bilingual') {
-            const sourcePage = sourcePdf.getPage(pageData.pageNumber - 1);
-            const embeddedSource = await outputPdf.embedPage(sourcePage);
+            const embeddedSource = sourcePages.get(pageData.pageNumber);
+            if (embeddedSource) await embeddedSource.embed();
             const gap = Math.max(8, Math.min(24, pageData.width * 0.025));
             const page = outputPdf.addPage([pageData.width * 2 + gap, pageData.height]);
-            page.drawPage(embeddedSource, {x: 0, y: 0, width: pageData.width, height: pageData.height});
+            if (embeddedSource) page.drawPage(embeddedSource, {x: 0, y: 0, width: pageData.width, height: pageData.height});
             page.drawImage(image, {
                 x: pageData.width + gap,
                 y: 0,
@@ -680,27 +709,36 @@ async function renderPdf(
             const page = outputPdf.addPage([pageData.width, pageData.height]);
             page.drawImage(image, {x: 0, y: 0, width: pageData.width, height: pageData.height});
         }
+        options.onPdfProgress?.({phase: 'rendering', completedPages: index + 1, totalPages});
+        await yieldToBrowser();
     }
-    return outputPdf.save({useObjectStreams: true});
+    options.signal?.throwIfAborted();
+    options.onPdfProgress?.({phase: 'saving', completedPages: totalPages, totalPages});
+    await yieldToBrowser();
+    options.signal?.throwIfAborted();
+    const bytes = await outputPdf.save({useObjectStreams: true, objectsPerTick: 20});
+    options.signal?.throwIfAborted();
+    return bytes;
 }
 
-async function renderEpub(document: ParsedDocument, translations: readonly string[], mode: DocumentRenderMode): Promise<Uint8Array> {
+async function renderEpub(document: ParsedDocument, translations: readonly string[], mode: DocumentRenderMode, options: CreateDocumentDownloadOptions): Promise<Uint8Array> {
     if (document.binary?.kind !== 'epub') throw new Error('ePub 文档状态无效，请重新打开文件');
     const {default: JSZip} = await import('jszip');
     const zip = await JSZip.loadAsync(document.binary.bytes);
     assertArchiveSafety(zip, 'ePub');
     for (const chapter of document.binary.chapters) {
+        await yieldDocumentTask();
+        options.signal?.throwIfAborted();
         const parsedChapter = parseDocument('chapter.html', chapter.source);
         const chapterTranslations = translations.slice(chapter.segmentOffset, chapter.segmentOffset + chapter.segmentCount);
         zip.file(chapter.path, renderDocument(parsedChapter, chapterTranslations, mode));
     }
     zip.file('mimetype', 'application/epub+zip', {compression: 'STORE'});
-    return zip.generateAsync({
-        type: 'uint8array',
+    return generateDocumentArchive(zip, {
         mimeType: 'application/epub+zip',
         compression: 'DEFLATE',
-        compressionOptions: {level: 6},
-    });
+        compressionOptions: {level: 3},
+    }, {signal: options.signal, onProgress: options.onArchiveProgress});
 }
 
 export function docxTextNodes(value: string): string {
@@ -746,20 +784,21 @@ export function renderDocxPart(
     });
 }
 
-async function renderDocx(document: ParsedDocument, translations: readonly string[], mode: DocumentRenderMode): Promise<Uint8Array> {
+async function renderDocx(document: ParsedDocument, translations: readonly string[], mode: DocumentRenderMode, options: CreateDocumentDownloadOptions): Promise<Uint8Array> {
     if (document.binary?.kind !== 'docx') throw new Error('DOCX 文档状态无效，请重新打开文件');
     const {default: JSZip} = await import('jszip');
     const zip = await JSZip.loadAsync(document.binary.bytes);
     assertArchiveSafety(zip, 'DOCX');
-    document.binary.parts.forEach((part) => {
+    for (const part of document.binary.parts) {
+        await yieldDocumentTask();
+        options.signal?.throwIfAborted();
         zip.file(part.path, renderDocxPart(document, part, translations, mode));
-    });
-    return zip.generateAsync({
-        type: 'uint8array',
+    }
+    return generateDocumentArchive(zip, {
         mimeType: getDocumentMimeType('docx'),
         compression: 'DEFLATE',
-        compressionOptions: {level: 6},
-    });
+        compressionOptions: {level: 3},
+    }, {signal: options.signal, onProgress: options.onArchiveProgress});
 }
 
 export async function createDocumentDownload(
@@ -768,6 +807,9 @@ export async function createDocumentDownload(
     mode: DocumentRenderMode,
     options: CreateDocumentDownloadOptions = {},
 ): Promise<DocumentDownload> {
+    // 首次编码之前给下载进度、取消按钮和浏览器事件一个可执行的时间片。
+    await yieldDocumentTask();
+    options.signal?.throwIfAborted();
     // UI 的完成度按非空译文计算；各格式导出必须采用相同规则。
     const resolved = document.segments.map(segment => resolveDocumentTranslation(segment.source, translations[segment.id]));
     let data: string | Uint8Array;
@@ -776,14 +818,15 @@ export async function createDocumentDownload(
         if (!options.pdfPageRasterizer) {
             throw new Error('当前环境未提供 PDF 页面渲染器，请在浏览器扩展中下载');
         }
-        data = await renderPdf(document, resolved, mode, options.pdfPageRasterizer);
+        data = await renderPdf(document, resolved, mode, options);
     } else if (document.format === 'epub') {
-        data = await renderEpub(document, resolved, mode);
+        data = await renderEpub(document, resolved, mode, options);
     } else if (document.format === 'docx') {
-        data = await renderDocx(document, resolved, mode);
+        data = await renderDocx(document, resolved, mode, options);
     } else {
         data = renderDocument(document, resolved, mode);
     }
+    options.signal?.throwIfAborted();
     return {
         data,
         fileName: createDocumentDownloadName(document.fileName, mode),

@@ -175,6 +175,26 @@ describe('document translation parser', () => {
         expect(preview).not.toContain('>Second<');
     });
 
+    it('TXT reading preview does not generate unused whole-file export strings', () => {
+        const document = parseDocument('notes.txt', 'First\n\nSecond');
+        Object.defineProperty(document, 'parts', {get: () => {throw new Error('unused full export');}});
+        expect(createDocumentPreviewHtml(document, ['第一', '第二'], 'translated')).toContain('第一');
+    });
+
+    it('Markdown source preview retains readable text without requiring translated output', () => {
+        const document = parseDocument('source.md', '# A title\n\nA paragraph');
+        const preview = createDocumentPreviewHtml(document, ['# 译文', '译文'], 'source');
+        expect(preview).toContain('A title');
+        expect(preview).toContain('A paragraph');
+        expect(preview).not.toContain('译文');
+    });
+
+    it('falls back to a source line when a multiline Markdown fragment has fewer translated lines', () => {
+        const document = parseDocument('fragment.md', 'First');
+        document.parts = [{kind: 'segment', source: 'First\nSecond', segmentIndex: 0, prefix: '', suffix: ''}];
+        expect(createDocumentPreviewHtml(document, ['第一'], 'bilingual')).toContain('Second');
+    });
+
     it('HTML 文本实体以可读文本翻译且预览不会双重转义', () => {
         const document = parseDocument('guide.html', '<p>Hello&nbsp;world &amp; friends</p>');
 

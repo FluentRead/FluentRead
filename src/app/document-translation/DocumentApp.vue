@@ -1,7 +1,7 @@
 <!--
  @file src/app/document-translation/DocumentApp.vue
  文件职责：实现独立文档翻译页面的完整 Vue 应用，承载文件导入、格式化预览、分段翻译、人工校订和双语文件导出的用户流程。
- 主要内容：围绕正文组织紧凑任务栏、按需设置弹窗、折叠文件队列和本地范例；联动全局启停、批量翻译、暂停续译、校订、内容预览与 ZIP 下载，维护设置快照、增量译文、未下载保护及异步提交所有权。
+ 主要内容：组织文档阅读与翻译任务，增量统计完成段落，维护校订和未下载保护；PDF 逐页导出与 ePub/DOCX/ZIP 打包显示进度，支持取消、重试和离开时中止，保留异步提交所有权。
  模块边界：组件负责页面交互与响应式状态，不自行解析二进制格式、不实现片段翻译队列、配置存储协议或导出编码；解析渲染来自 document-translation feature，配置协调来自 services/config，运行时适配由本目录 runtime 注入。
 -->
 <!-- 文档页面归 app 层所有；WXT 入口只负责启动。 -->
@@ -33,6 +33,7 @@
           <span v-if="!queueExpanded && documentQueue.some(item => !item.document)" class="queue-error">有文件导入失败，请展开查看</span>
           <label v-if="queueExpanded && batchCompletedCount">{{ t('document.batch.output') }}<ElSelect class="batch-output" v-model="outputMode" :disabled="queueBusy" :aria-label="t('document.batch.output')" append-to=".document-app"><ElOption value="bilingual" :label="translateLegacy('双语')" /><ElOption value="translated" :label="translateLegacy('仅译文')" /></ElSelect></label>
           <button v-if="queueExpanded && batchCompletedCount" type="button" :disabled="queueBusy" @click="downloadBatch">{{ t('document.batch.zip') }}</button>
+          <button v-if="preparingDownload && !downloadOpen" type="button" :disabled="cancelingDownload" @click="cancelDownload">{{ t(cancelingDownload ? 'document.export.canceling' : 'document.export.cancel') }}</button>
         </div>
         <ul v-show="queueExpanded" id="document-queue-files" class="batch-files">
           <li v-for="item in documentQueue" :key="item.id" :class="{ selected: item.id === activeDocumentId }">
@@ -365,15 +366,16 @@
       </div>
       <p class="export-file-name" data-i18n-ignore>{{ downloadFileName }}</p>
       <section v-if="downloadOpen" class="export-preview" aria-label="文件内容预览">
-        <strong>{{ parsedDocument?.binary ? '文字摘录 · 下载时保留原文件格式' : '文件内容预览' }}</strong><pre data-i18n-ignore>{{ downloadPreview }}</pre>
+        <strong>{{ parsedDocument && isDocumentExportExcerpt(parsedDocument) ? '文字摘录 · 下载时保留原文件格式' : '文件内容预览' }}</strong><pre data-i18n-ignore>{{ downloadPreview }}</pre>
       </section>
       <p v-if="!translationComplete" class="notice warning">{{ t("document.untranslatedWarning", {count: (parsedDocument?.segments.length || 0) - completedSegments}) }}</p>
       <label v-if="!translationComplete" class="partial-export"><input v-model="partialExportAcknowledged" type="checkbox" :disabled="queueBusy" />我已了解，下载当前结果</label>
       <p v-if="settingsChanged" class="notice warning">设置已更改，本次下载仍是当前保留的译文。</p>
       <p v-if="isSubtitleDocument" class="export-note">保留字幕序号和时间轴。仅译文替换字幕文字，双语在同一时间段内保留原文和译文。</p>
       <p v-if="isPdfDocument" class="export-note">PDF 译页以图像呈现，适合保留版面阅读，暂不支持复制译文。</p>
+      <p v-if="downloadProgress" class="notice export-progress" role="status" aria-live="polite">{{ downloadProgress }}</p>
       <p v-if="downloadError" class="notice error" role="alert">{{ downloadError }}</p>
-      <div class="dialog-actions"><button class="ghost-button" type="button" :disabled="queueBusy" @click="downloadDialog?.close()">返回文档</button><button class="translate-document-button" type="button" :disabled="queueBusy || !hasTranslation || (!translationComplete && !partialExportAcknowledged)" @click="downloadDocument">{{ preparingDownload ? '正在生成文件…' : `下载${outputMode === 'bilingual' ? '双语' : '译文'}文件` }}</button></div>
+      <div class="dialog-actions"><button v-if="preparingDownload" class="ghost-button" type="button" :disabled="cancelingDownload" @click="cancelDownload">{{ t(cancelingDownload ? 'document.export.canceling' : 'document.export.cancel') }}</button><button v-else class="ghost-button" type="button" :disabled="queueBusy" @click="downloadDialog?.close()">返回文档</button><button class="translate-document-button" type="button" :disabled="queueBusy || !hasTranslation || (!translationComplete && !partialExportAcknowledged)" @click="downloadDocument">{{ preparingDownload ? '正在生成文件…' : `下载${outputMode === 'bilingual' ? '双语' : '译文'}文件` }}</button></div>
     </dialog>
     <footer v-if="!parsedDocument" class="document-footer">
       <span>让语言更近，让世界更大。</span>
@@ -396,6 +398,7 @@ import {
   DOCUMENT_MAX_BYTES,
   DOCUMENT_QUICK_SAMPLES,
   createDocumentDownload,
+  generateDocumentArchive,
   createDocumentDownloadName,
   createDocumentFileLoadGuard,
   createDocumentPreviewHtml,
@@ -413,6 +416,7 @@ import {
   getMultilingualTargetLanguageLabel,
   getTranslationServiceUnavailableMessage,
   isRichDocumentFormat,
+  isDocumentExportExcerpt,
   isSubtitleDocumentFormat,
   customModelString,
   configReady,
@@ -499,10 +503,14 @@ const downloadedRevision = ref(0);
 const readingModes = [{value: 'source', label: '原文'}, {value: 'bilingual', label: '双语'}, {value: 'translated', label: '译文'}] as const;
 const isDragging = ref(false);
 const translating = ref(false);
+const liveCompletedSegments = ref(0);
 
 const errorMessage = ref('');
 const openingFile = ref(false);
 const preparingDownload = ref(false);
+const cancelingDownload = ref(false);
+const downloadProgress = ref('');
+let downloadController: AbortController | null = null;
 const pdfZoom = ref(1);
 const pdfPreviewLoading = ref(false);
 const pdfPreviewPageStates = ref<PdfPreviewPageState[]>([]);
@@ -642,6 +650,9 @@ async function downloadBatch(): Promise<void> {
   const items = documentQueue.value.filter(completeItem);
   if (!items.length) return;
   preparingDownload.value = true;
+  const controller = new AbortController();
+  downloadController = controller;
+  cancelingDownload.value = false;
   batchNotice.value = '';
   const generation = batchGeneration;
   const mode = outputMode.value;
@@ -649,13 +660,24 @@ async function downloadBatch(): Promise<void> {
     const {default: JSZip} = await import('jszip');
     const zip = new JSZip();
     for (const [index, item] of items.entries()) {
-      const download = await createDocumentDownload(item.document!, item.translations, mode);
+      const download = await createDocumentDownload(item.document!, item.translations, mode, {
+        signal: controller.signal,
+        onPdfProgress: progress => { batchNotice.value = `${item.name} · ${pdfExportProgress(progress)}`; },
+        onArchiveProgress: percent => { batchNotice.value = `${item.name} · ${archiveExportProgress(percent)}`; },
+      });
+      controller.signal.throwIfAborted();
       if (generation !== batchGeneration) return;
       // 独立目录避免同名文件覆盖，文件名不能在 ZIP 中创建任意路径。
       const name = download.fileName.replace(/[\\/\x00-\x1f]/g, '_');
       zip.file(`${index + 1}/${name}`, download.data);
     }
-    const blob = await zip.generateAsync({type: 'blob'});
+    batchNotice.value = t('document.export.saving');
+    const bytes = await generateDocumentArchive(zip, {streamFiles: true}, {
+      signal: controller.signal,
+      onProgress: percent => { batchNotice.value = archiveExportProgress(percent); },
+    });
+    const blob = new Blob([bytes], {type: 'application/zip'});
+    controller.signal.throwIfAborted();
     if (generation !== batchGeneration) return;
     const url = URL.createObjectURL(blob);
     const anchor = window.document.createElement('a');
@@ -668,9 +690,15 @@ async function downloadBatch(): Promise<void> {
     if (active) downloadedRevision.value = active.revision;
     batchNotice.value = t('document.batch.downloaded', {count: items.length});
   } catch (error) {
-    if (generation === batchGeneration) batchNotice.value = t('document.batch.downloadFailed', {error: error instanceof Error ? error.message : String(error)});
+    if (generation === batchGeneration) batchNotice.value = controller.signal.aborted
+      ? t('document.export.canceled')
+      : t('document.batch.downloadFailed', {error: error instanceof Error ? error.message : String(error)});
   } finally {
-    if (generation === batchGeneration) preparingDownload.value = false;
+    if (downloadController === controller) {
+      preparingDownload.value = false;
+      cancelingDownload.value = false;
+      downloadController = null;
+    }
   }
 }
 
@@ -769,7 +797,8 @@ const rowForSegment = (segment: ParsedDocument['segments'][number]) => ({
 const pageRows = <T,>(rows: readonly T[]) => rows.slice((readerPage.value - 1) * READER_PAGE_SIZE, readerPage.value * READER_PAGE_SIZE);
 const previewRows = computed(() => pageRows(parsedDocument.value?.segments || []).map(rowForSegment));
 const hasTranslation = computed(() => translatedSegments.value.some((item) => Boolean(item?.trim())));
-const completedSegments = computed(() => parsedDocument.value?.segments.filter(segment => translatedSegments.value[segment.id]?.trim()).length || 0);
+const completedSegments = computed(() => translating.value ? liveCompletedSegments.value
+  : parsedDocument.value?.segments.filter(segment => translatedSegments.value[segment.id]?.trim()).length || 0);
 const translationComplete = computed(() => Boolean(parsedDocument.value && completedSegments.value === parsedDocument.value.segments.length));
 const progress = computed(() => parsedDocument.value ? Math.floor(completedSegments.value / parsedDocument.value.segments.length * 100) : 0);
 const effectivePreviewMode = computed(() => hasTranslation.value ? previewMode.value : 'source');
@@ -992,11 +1021,12 @@ watch(parsedDocument, () => {
   if (isPdfDocument.value) void refreshPdfPreviews();
 }, {flush: 'post'});
 
-watch([translatedSegments, translating], () => {
-  if (translating.value) return;
-  settledTranslations.value = [...translatedSegments.value];
+// 翻译期间不订阅整份数组，避免每个片段都触发 O(n) 的深度遍历。
+watch(() => translating.value ? null : [...translatedSegments.value], (translations) => {
+  if (!translations) return;
+  settledTranslations.value = translations;
   if (isPdfDocument.value) schedulePdfPreview();
-}, {deep: true});
+});
 watch(docxPartIndex, () => { readerPage.value = 1; });
 
 function openFilePicker(): void {
@@ -1054,6 +1084,10 @@ function handleDrop(event: DragEvent): void {
 }
 
 function resetDocument(): void {
+  downloadController?.abort();
+  downloadController = null;
+  cancelingDownload.value = false;
+  downloadProgress.value = '';
   downloadDialog.value?.close();
   documentSettingsDialog.value?.close();
   downloadOpen.value = false;
@@ -1148,6 +1182,7 @@ async function startTranslation(restart = false): Promise<void> {
   const glossaryIds = config.documentGlossaryIds === null ? null : [...config.documentGlossaryIds];
   const glossaryRevision = buildGlossaryRevision(config.glossaryLibraries, config.glossaryEnabled);
   runState.value = 'ready';
+  liveCompletedSegments.value = completedSegments.value;
   translating.value = true;
   errorMessage.value = '';
   downloadNotice.value = '';
@@ -1165,6 +1200,7 @@ async function startTranslation(restart = false): Promise<void> {
       signal: controller.signal,
       onSegment: ({id, translation}) => {
         if (requestId !== translationRequestId || parsedDocument.value !== document || controller.signal.aborted) return;
+        liveCompletedSegments.value += Number(Boolean(translation.trim())) - Number(Boolean(translatedSegments.value[id]?.trim()));
         translatedSegments.value[id] = translation;
         editRevision.value += 1;
       },
@@ -1199,19 +1235,44 @@ function openDownload(): void {
   if (previewMode.value !== 'source') outputMode.value = previewMode.value;
   partialExportAcknowledged.value = false;
   downloadError.value = '';
+  downloadProgress.value = '';
   downloadOpen.value = true;
   downloadDialog.value?.showModal();
+}
+
+function pdfExportProgress(progress: {phase: 'rendering' | 'saving'; completedPages: number; totalPages: number}): string {
+  return progress.phase === 'saving' ? t('document.export.saving')
+    : t('document.export.pages', {completed: progress.completedPages, total: progress.totalPages});
+}
+
+function archiveExportProgress(percent: number): string {
+  return t('document.export.packaging', {percent: Math.floor(percent)});
+}
+
+function cancelDownload(): void {
+  if (!downloadController) return;
+  cancelingDownload.value = true;
+  downloadController.abort();
 }
 
 async function downloadDocument(): Promise<void> {
   const document = parsedDocument.value;
   if (!document || !hasTranslation.value || queueBusy.value || (!translationComplete.value && !partialExportAcknowledged.value)) return;
   preparingDownload.value = true;
+  const controller = new AbortController();
+  downloadController = controller;
+  cancelingDownload.value = false;
+  downloadProgress.value = '';
   downloadError.value = '';
   const revision = editRevision.value;
   const requestId = translationRequestId;
   try {
-    const download = await createDocumentDownload(document, [...translatedSegments.value], outputMode.value);
+    const download = await createDocumentDownload(document, [...translatedSegments.value], outputMode.value, {
+      signal: controller.signal,
+      onPdfProgress: progress => { downloadProgress.value = pdfExportProgress(progress); },
+      onArchiveProgress: percent => { downloadProgress.value = archiveExportProgress(percent); },
+    });
+    controller.signal.throwIfAborted();
     if (document !== parsedDocument.value || requestId !== translationRequestId) return;
     const url = URL.createObjectURL(new Blob([download.data], {type: download.mimeType}));
     const anchor = window.document.createElement('a');
@@ -1221,11 +1282,19 @@ async function downloadDocument(): Promise<void> {
     window.setTimeout(() => URL.revokeObjectURL(url), 1000);
     downloadedRevision.value = revision;
     downloadNotice.value = '已生成下载文件，请在浏览器下载列表中查看。';
+    downloadProgress.value = '';
     downloadDialog.value?.close();
   } catch (error) {
-    if (document === parsedDocument.value) downloadError.value = error instanceof Error ? error.message : String(error);
+    if (document === parsedDocument.value) {
+      downloadProgress.value = controller.signal.aborted ? t('document.export.canceled') : '';
+      if (!controller.signal.aborted) downloadError.value = error instanceof Error ? error.message : String(error);
+    }
   } finally {
-    if (document === parsedDocument.value) preparingDownload.value = false;
+    if (downloadController === controller) {
+      preparingDownload.value = false;
+      cancelingDownload.value = false;
+      downloadController = null;
+    }
   }
 }
 
@@ -1250,6 +1319,8 @@ onMounted(() => {
 });
 
 onUnmounted(() => {
+  downloadController?.abort();
+  downloadController = null;
   batchGeneration += 1;
   unsubscribeConfig?.();
   documentFileLoads.invalidate();

@@ -1,7 +1,7 @@
 /**
  * @file src/features/document-translation/ui/pdfPreview.ts
  * 文件职责：在浏览器 Canvas 环境中为 PDF 文档生成页面预览，并把译文按原页面文本块位置绘制成可嵌入导出 PDF 的 PNG 光栅页。
- * 主要内容：首次渲染时加载 PDF.js 并配置随包 worker，加载页面与 viewport，采样背景和前景颜色、换行与缩放译文、生成 PdfPagePreview，并实现 rasterizePdfTranslationPage 适配 services/binary 所需接口。
+ * 主要内容：按需加载 PDF.js，限制页面像素与边长、复用单页 Canvas 绘制译文，并在成功、失败或取消时释放画布；生成预览及注入式 PDF 导出光栅页。
  * 模块边界：这里负责视觉光栅化而不决定片段翻译或文件结构；PDF 文本块来自 binary 服务，领域类型来自 core，Canvas/PDF.js 仅应在文档 UI 环境调用，不能进入通用纯算法层。
  */
 import pdfWorkerUrl from 'pdfjs-dist/legacy/build/pdf.worker.min.mjs?url';
@@ -102,24 +102,47 @@ function browserPdfDocument(bytes: Uint8Array): Promise<any> {
     return promise;
 }
 
-async function renderPdfSourceCanvas(bytes: Uint8Array, pageNumber: number, width: number): Promise<HTMLCanvasElement> {
+async function renderPdfSourceCanvas(bytes: Uint8Array, pageNumber: number, width: number, signal?: AbortSignal): Promise<HTMLCanvasElement> {
     if (typeof globalThis.document === 'undefined' || typeof globalThis.window === 'undefined') {
         throw new Error('当前环境无法渲染 PDF 页面，请在浏览器扩展中打开');
     }
+    signal?.throwIfAborted();
     const pdf = await browserPdfDocument(bytes);
+    signal?.throwIfAborted();
     const page = await pdf.getPage(pageNumber);
-    const scale = Math.min(2.4, Math.max(1.45, 1440 / Math.max(1, width)));
-    const viewport = page.getViewport({scale});
     const canvas = globalThis.document.createElement('canvas');
-    canvas.width = Math.max(1, Math.round(viewport.width));
-    canvas.height = Math.max(1, Math.round(viewport.height));
-    const context = canvas.getContext('2d', {alpha: false});
-    if (!context) throw new Error('浏览器 Canvas 初始化失败');
-    context.fillStyle = '#ffffff';
-    context.fillRect(0, 0, canvas.width, canvas.height);
-    await page.render({canvas, canvasContext: context, viewport}).promise;
-    page.cleanup();
-    return canvas;
+    try {
+        signal?.throwIfAborted();
+        const base = page.getViewport({scale: 1});
+        // 常规 A4 保持原有清晰度；海报/超长页不能按最低 1.45 倍无限分配像素。
+        const scale = Math.min(
+            Math.min(2.4, Math.max(1.45, 1440 / Math.max(1, width))),
+            Math.sqrt(4_000_000 / Math.max(1, base.width * base.height)),
+            8192 / Math.max(1, base.width, base.height),
+        );
+        const viewport = page.getViewport({scale});
+        canvas.width = Math.max(1, Math.floor(viewport.width));
+        canvas.height = Math.max(1, Math.floor(viewport.height));
+        const context = canvas.getContext('2d', {alpha: false});
+        if (!context) throw new Error('浏览器 Canvas 初始化失败');
+        context.fillStyle = '#ffffff';
+        context.fillRect(0, 0, canvas.width, canvas.height);
+        const task = page.render({canvas, canvasContext: context, viewport});
+        const cancel = () => task.cancel();
+        signal?.addEventListener('abort', cancel, {once: true});
+        try {
+            await task.promise;
+            signal?.throwIfAborted();
+        } finally {
+            signal?.removeEventListener('abort', cancel);
+        }
+        return canvas;
+    } catch (error) {
+        canvas.width = canvas.height = 0;
+        throw error;
+    } finally {
+        page.cleanup();
+    }
 }
 
 function sampledBackgroundRgb(
@@ -191,12 +214,10 @@ function paintPdfTranslation(
     sourceCanvas: HTMLCanvasElement,
     input: PdfRasterPageInput,
 ): HTMLCanvasElement {
-    const canvas = globalThis.document.createElement('canvas');
-    canvas.width = sourceCanvas.width;
-    canvas.height = sourceCanvas.height;
+    // 原图编码完毕后可以原位绘制；导出不再同时保留两张全尺寸画布。
+    const canvas = sourceCanvas;
     const context = canvas.getContext('2d', {alpha: false});
     if (!context) throw new Error('浏览器 Canvas 初始化失败');
-    context.drawImage(sourceCanvas, 0, 0);
     const scaleX = canvas.width / input.width;
     const scaleY = canvas.height / input.height;
 
@@ -288,20 +309,31 @@ export async function createPdfPagePreview(
     const page = document.binary.pages.find((entry) => entry.pageNumber === pageNumber);
     if (!page) throw new Error(`PDF 第 ${pageNumber} 页不存在`);
     const sourceCanvas = await renderPdfSourceCanvas(document.binary.bytes, pageNumber, page.width);
-    const original = await canvasToPng(sourceCanvas);
-    if (!translations) return {original};
-    const translatedCanvas = paintPdfTranslation(sourceCanvas, {
-        ...page,
-        sourceBytes: document.binary.bytes,
-        translations: [...translations],
-    });
-    return {original, translated: await canvasToPng(translatedCanvas)};
+    try {
+        const original = await canvasToPng(sourceCanvas);
+        if (!translations) return {original};
+        const translatedCanvas = paintPdfTranslation(sourceCanvas, {
+            ...page,
+            sourceBytes: document.binary.bytes,
+            translations,
+        });
+        return {original, translated: await canvasToPng(translatedCanvas)};
+    } finally {
+        sourceCanvas.width = sourceCanvas.height = 0;
+    }
 }
 
 export async function rasterizePdfTranslationPage(input: PdfRasterPageInput): Promise<Uint8Array> {
     if (typeof globalThis.document === 'undefined') {
         throw new Error('当前环境无法生成 PDF 译文页面，请在浏览器扩展中下载');
     }
-    const sourceCanvas = await renderPdfSourceCanvas(input.sourceBytes, input.pageNumber, input.width);
-    return canvasToPng(paintPdfTranslation(sourceCanvas, input));
+    const sourceCanvas = await renderPdfSourceCanvas(input.sourceBytes, input.pageNumber, input.width, input.signal);
+    try {
+        input.signal?.throwIfAborted();
+        const png = await canvasToPng(paintPdfTranslation(sourceCanvas, input));
+        input.signal?.throwIfAborted();
+        return png;
+    } finally {
+        sourceCanvas.width = sourceCanvas.height = 0;
+    }
 }

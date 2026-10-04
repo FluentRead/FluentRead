@@ -110,8 +110,10 @@ async function beginLoading(page, base) {
     const url = new URL(await fallback(page).getAttribute('src'))
     assert.equal(url.origin, 'https://player.bilibili.com')
     assert.equal(url.searchParams.get('bvid'), 'BV1VLHE6hEnB')
-    assert.equal(url.searchParams.get('autoplay'), '0')
+    assert.equal(url.searchParams.get('autoplay'), '1')
+    assert.equal(url.searchParams.get('muted'), '1')
     assert.equal(url.searchParams.get('danmaku'), '0')
+    assert((await fallback(page).getAttribute('allow')).split(';').map(value => value.trim()).includes('autoplay'))
     assert.equal(await original.evaluate(video => video.querySelector('source').hasAttribute('src')), false)
     for (const width of [1440, 768, 390, 320]) {
       await page.setViewportSize({ width, height: 960 })

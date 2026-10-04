@@ -4,6 +4,7 @@ import { withBase } from 'vitepress'
 
 // 原视频接近视野后才开始加载；中文视频 8 秒内仍不可播放或加载失败时切换到 B 站。
 // 只等待首次可播放状态，不等待整个文件下载，也不在正常播放时因后续缓冲而切换。
+// B 站回退播放器静音自动播放，避免未点击页面的访客被浏览器拦截有声自动播放。
 const props = defineProps<{ en?: boolean }>()
 const primaryVideo = ref<HTMLVideoElement | null>(null)
 const showBilibili = ref(false)
@@ -95,10 +96,10 @@ onBeforeUnmount(() => {
 <template>
   <div v-if="showBilibili && !en" class="bv-promo-video bv-promo-embed">
     <iframe
-      src="https://player.bilibili.com/player.html?bvid=BV1VLHE6hEnB&p=1&autoplay=0&danmaku=0&poster=1"
+      src="https://player.bilibili.com/player.html?bvid=BV1VLHE6hEnB&p=1&autoplay=1&muted=1&danmaku=0&poster=1"
       title="流畅阅读 56 秒介绍视频（哔哩哔哩）"
       loading="lazy"
-      allow="fullscreen; picture-in-picture; encrypted-media"
+      allow="autoplay; fullscreen; picture-in-picture; encrypted-media"
       allowfullscreen
     ></iframe>
   </div>

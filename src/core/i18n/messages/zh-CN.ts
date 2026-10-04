@@ -1609,6 +1609,7 @@ export const zhCNMessages = {
     'settings.data.backupRestore': '备份与恢复',
     'settings.vocabulary.book': '单词本',
     'settings.usage.modelUsage': '模型用量',
+    "document.export.packaging": "正在打包文件：{percent}%",
     "document.export.pages": "正在生成 PDF：{completed} / {total} 页",
     "document.export.saving": "正在保存文件…",
     "document.export.cancel": "取消生成",

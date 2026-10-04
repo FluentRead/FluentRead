@@ -1615,6 +1615,7 @@ export const ruRUMessages = {
     "glossary.disabledHint": "Глоссарии выключены. Включите общий переключатель в настройках глоссариев.",
     "glossary.unsupportedHint": "Этот сервис не поддерживает глоссарии. Выберите совместимый сервис ИИ.",
     "glossary.scopeHint": "Применяются только включённые глоссарии, соответствующие языку и сайту.",
+    "document.export.packaging": "Создание файла: {percent}%",
     "document.export.pages": "Создание PDF: {completed} / {total} страниц",
     "document.export.saving": "Сохранение файла…",
     "document.export.cancel": "Отменить создание",

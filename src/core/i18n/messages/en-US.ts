@@ -1612,6 +1612,7 @@ export const enUSMessages = {
     'settings.data.backupRestore': 'Backup and restore',
     'settings.vocabulary.book': 'Wordbook',
     'settings.usage.modelUsage': 'Model usage',
+    "document.export.packaging": "Packaging file: {percent}%",
     "document.export.pages": "Generating PDF: {completed} / {total} pages",
     "document.export.saving": "Saving file…",
     "document.export.cancel": "Cancel export",

@@ -1615,6 +1615,7 @@ export const esESMessages = {
     "glossary.disabledHint": "Los glosarios están desactivados. Activa el interruptor general en sus ajustes.",
     "glossary.unsupportedHint": "Este servicio no admite glosarios. Elige un servicio de IA compatible.",
     "glossary.scopeHint": "Solo se aplican glosarios activos que coincidan con el idioma y el sitio.",
+    "document.export.packaging": "Creando archivo: {percent}%",
     "document.export.pages": "Generando PDF: {completed} / {total} páginas",
     "document.export.saving": "Guardando archivo…",
     "document.export.cancel": "Cancelar generación",

@@ -1615,6 +1615,7 @@ export const koKRMessages = {
     "glossary.disabledHint": "용어집 전체 스위치가 꺼져 있습니다. 용어집 설정에서 켜세요.",
     "glossary.unsupportedHint": "이 서비스는 용어집을 지원하지 않습니다. 지원하는 AI 서비스를 선택하세요.",
     "glossary.scopeHint": "활성화되어 있고 언어 및 사이트 범위와 일치하는 용어집만 적용합니다.",
+    "document.export.packaging": "파일 패키징 중: {percent}%",
     "document.export.pages": "PDF 생성 중: {completed} / {total}페이지",
     "document.export.saving": "파일 저장 중…",
     "document.export.cancel": "생성 취소",

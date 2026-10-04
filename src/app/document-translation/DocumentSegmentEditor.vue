@@ -1,7 +1,7 @@
 <!--
  @file src/app/document-translation/DocumentSegmentEditor.vue
  文件职责：提供覆盖整份文档的译文校订视图，使长文档、章节、字幕与结构化文件都可以查找和修改任意片段。
- 主要内容：按原文、译文和路径搜索，筛选未翻译片段，以每页 40 段限制 DOM 数量；页码与筛选联动，并通过事件向页面提交人工校订。
+ 主要内容：按原文、译文和路径搜索，筛选未翻译片段，默认直接分页引用原始片段而不扫描译文，以每页 40 段限制 DOM 数量；页码与筛选联动，并通过事件向页面提交人工校订。
  模块边界：只消费文档模型与译文，不调用翻译服务、不保存配置、不直接修改父级数据；任务所有权和导出由 DocumentApp 管理。
 -->
 <template>
@@ -44,6 +44,7 @@ const page = ref(1);
 const editingId = ref<number | null>(null);
 const filteredSegments = computed(() => {
   const search = query.value.trim().toLocaleLowerCase();
+  if (!search && !onlyPending.value) return props.document.segments;
   return props.document.segments.filter((segment) => {
     if (segment.id === editingId.value) return true;
     const translation = props.translations[segment.id] || '';

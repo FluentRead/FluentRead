@@ -1615,6 +1615,7 @@ export const frFRMessages = {
     "glossary.disabledHint": "Les glossaires sont désactivés. Activez l’interrupteur général dans leurs paramètres.",
     "glossary.unsupportedHint": "Ce service ne prend pas en charge les glossaires. Choisissez un service d’IA compatible.",
     "glossary.scopeHint": "Seuls les glossaires activés correspondant à la langue et au site sont appliqués.",
+    "document.export.packaging": "Création du fichier : {percent}%",
     "document.export.pages": "Génération du PDF : {completed} / {total} pages",
     "document.export.saving": "Enregistrement du fichier…",
     "document.export.cancel": "Annuler la génération",

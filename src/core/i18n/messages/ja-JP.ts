@@ -1615,6 +1615,7 @@ export const jaJPMessages = {
     "glossary.disabledHint": "用語集の全体スイッチがオフです。用語集の設定で有効にしてください。",
     "glossary.unsupportedHint": "このサービスは用語集に対応していません。対応する AI サービスを選択してください。",
     "glossary.scopeHint": "有効で、言語とサイト範囲に一致する用語集のみを適用します。",
+    "document.export.packaging": "ファイルを生成中：{percent}%",
     "document.export.pages": "PDF を生成中：{completed} / {total} ページ",
     "document.export.saving": "ファイルを保存中…",
     "document.export.cancel": "生成をキャンセル",

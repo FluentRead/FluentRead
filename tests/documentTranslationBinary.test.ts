@@ -34,6 +34,20 @@ function copyArrayBuffer(bytes: Uint8Array): ArrayBuffer {
 }
 
 describe('binary document translation formats', () => {
+    it.each(['sample.epub', 'sample.docx'])('%s can cancel active compression and retry while preserving contents', async name => {
+        const parsed = await parseBinaryDocument(name, loadBytes(name));
+        const controller = new AbortController();
+        await expect(createDocumentDownload(parsed, [], 'translated', {
+            signal: controller.signal, onArchiveProgress: () => controller.abort(),
+        })).rejects.toMatchObject({name: 'AbortError'});
+        const progress = vi.fn();
+        const download = await createDocumentDownload(parsed, [], 'translated', {
+            signal: new AbortController().signal, onArchiveProgress: progress,
+        });
+        expect(progress).toHaveBeenLastCalledWith(100);
+        expect((await parseBinaryDocument(download.fileName, download.data as Uint8Array)).segments).toHaveLength(parsed.segments.length);
+    });
+
     it('preserves blank pages in a bilingual PDF without failing to embed them', async () => {
         const source = await PDFDocument.create();
         source.addPage([400, 600]).drawText('First page');

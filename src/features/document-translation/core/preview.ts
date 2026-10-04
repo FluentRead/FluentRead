@@ -1,7 +1,7 @@
 /**
  * @file src/features/document-translation/core/preview.ts
  * 文件职责：把已解析文档与对应译文转换成安全、可阅读的预览 HTML，统一支持原文、双语和纯译文三种预览模式。
- * 主要内容：包含主动 HTML 剥离、阅读器外壳、行内 Markdown 渲染、标题/列表/引用标记处理、原译配对单元，以及针对 Markdown、HTML、字幕、JSON 和普通文本的预览分派。
+ * 主要内容：包含主动 HTML 剥离、阅读器外壳、行内 Markdown 渲染、标题/列表/引用标记处理、原译配对单元，以及针对 Markdown、HTML、字幕、JSON 和普通文本的预览分派，按所需格式生成内容，避免构建未使用的整份导出字符串。
  * 模块边界：本模块只生成展示字符串，不操作真实 DOM、不执行脚本也不修改文档模型；源文件解析由 document.ts 完成，二进制分页预览由 pdfPreview.ts 负责，页面样式由上层 UI 提供。
  */
 import {
@@ -183,8 +183,6 @@ export function createDocumentPreviewHtml(
     translations: readonly string[],
     mode: DocumentPreviewMode,
 ): string {
-    const sourceTranslations = document.segments.map((segment) => segment.source);
-    const source = renderDocument(document, sourceTranslations, 'translated');
     const previewTranslations = ['markdown', 'txt'].includes(document.format)
         ? Array.from({length: document.segments.length}, (_, index) => {
             const translation = translations[index];
@@ -193,15 +191,14 @@ export function createDocumentPreviewHtml(
                 : translation.replace(/\r\n?|\n/gu, PREVIEW_SOFT_BREAK);
         })
         : translations;
-    const translated = renderDocument(document, previewTranslations, 'translated');
-
     if (document.format === 'html') {
-        const content = mode === 'source'
-            ? source
-            : renderDocument(document, translations, mode);
-        return readerShell(content);
+        return readerShell(renderDocument(document, mode === 'source' ? [] : translations, mode === 'source' ? 'translated' : mode));
     }
-    if (document.format === 'markdown') return renderMarkdownPreview(source, translated, mode);
+    if (document.format === 'markdown') {
+        const source = renderDocument(document, [], 'translated');
+        const translated = mode === 'source' ? source : renderDocument(document, previewTranslations, 'translated');
+        return renderMarkdownPreview(source, translated, mode);
+    }
     if (document.format === 'txt') {
         return renderTextPreview(
             document.segments.map((segment) => segment.source),

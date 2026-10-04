@@ -9,6 +9,7 @@ import * as catalog from '@/src/core/config/catalog';
 import * as documentCore from '@/src/features/document-translation/core/document';
 import * as presentation from '@/src/features/document-translation/ui/presentation';
 import {createDocumentFileLoadGuard} from '@/src/features/document-translation/services/translation';
+import {generateDocumentArchive} from '@/src/features/document-translation/services/archive';
 import {TranslationRequestError} from '@/src/services/translation/errors';
 
 // 编译真实页面 setup，注入可控解析/翻译边界；可见控件与下载文件另由真实浏览器套件验证。
@@ -46,7 +47,7 @@ beforeEach(async () => {
     fileName: documentCore.createDocumentDownloadName(document.fileName, mode), mimeType: 'text/plain'}));
   persist = vi.fn().mockResolvedValue(undefined);
   const api = {...catalog, ...documentCore, ...presentation, Config, TranslationRequestError, createDocumentFileLoadGuard,
-    parseDocumentFile: parseFile, translateDocumentSegments: translate, createDocumentDownload: download,
+    parseDocumentFile: parseFile, translateDocumentSegments: translate, createDocumentDownload: download, generateDocumentArchive,
     buildGlossaryRevision: () => '', runtimeConfig: new Config(), configReady: Promise.resolve(),
     subscribeConfig: () => () => {}, requestConfigPatch: persist,
     getMissingCredentialMessage: () => '', getTranslationServiceUnavailableMessage: () => '',
@@ -74,6 +75,53 @@ afterEach(() => {
 });
 
 describe('document batch page lifecycle', () => {
+  it('keeps progress accurate across existing translations, duplicate updates and clearing a result', async () => {
+    await state.loadFiles([file('a.txt', 'First.\n\nSecond.\n\nThird.')]);
+    state.editSegment(0, '已校订');
+    const pending = deferred<void>();
+    let options: any;
+    translate.mockImplementationOnce(async (_segments, controls) => {
+      options = controls;
+      await pending.promise;
+    });
+    const work = state.startTranslation();
+    expect(state.completedSegments).toBe(1);
+    options.onSegment({id: 1, translation: '第二段'});
+    expect(state.completedSegments).toBe(2);
+    options.onSegment({id: 1, translation: '第二段再次更新'});
+    expect(state.completedSegments).toBe(2);
+    options.onSegment({id: 1, translation: '  '});
+    expect(state.completedSegments).toBe(1);
+    state.pauseTranslation();
+    pending.resolve();
+    await work;
+    expect(state.completedSegments).toBe(1);
+    expect(state.translatedSegments[0]).toBe('已校订');
+    await state.startTranslation(true);
+    expect(state.completedSegments).toBe(3);
+    expect(state.translationComplete).toBe(true);
+  });
+
+  it('does not traverse or copy the whole translation array during incremental translation', async () => {
+    await state.loadFiles([file('a.txt', 'First.')]);
+    state.translating = true;
+    await vue.nextTick();
+    let reads = 0;
+    state.translatedSegments = new Proxy(new Array(20_000), {get: (target, key, receiver) => {
+      if (typeof key === 'string' && /^\d+$/u.test(key)) reads += 1;
+      return Reflect.get(target, key, receiver);
+    }});
+    state.translatedSegments[0] = '第一段';
+    reads = 0;
+    await vue.nextTick();
+    expect(reads).toBe(0);
+    expect(state.settledTranslations).toEqual([]);
+    state.translating = false;
+    await vue.nextTick();
+    expect(state.settledTranslations[0]).toBe('第一段');
+    expect(reads).toBeGreaterThan(0);
+  });
+
   it('cancels a ZIP export without marking queue items downloaded and can retry', async () => {
     await state.loadFiles([file('a.txt'), file('b.txt')]);
     await state.startBatch();
@@ -152,7 +200,7 @@ describe('document batch page lifecycle', () => {
     expect(state.downloadPreview).not.toContain('Hello there.');
     await state.downloadDocument();
     expect(download).toHaveBeenCalledWith(state.parsedDocument, ['校订后的字幕'], 'translated', {
-      signal: expect.any(AbortSignal), onPdfProgress: expect.any(Function),
+      signal: expect.any(AbortSignal), onPdfProgress: expect.any(Function), onArchiveProgress: expect.any(Function),
     });
     expect((await download.mock.results[0].value).data).toContain('00:00:01,000 --> 00:00:03,000\n校订后的字幕');
     expect(state.downloadedRevision).toBe(state.editRevision);

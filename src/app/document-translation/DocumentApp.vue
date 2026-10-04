@@ -1,7 +1,7 @@
 <!--
  @file src/app/document-translation/DocumentApp.vue
  文件职责：实现独立文档翻译页面的完整 Vue 应用，承载文件导入、格式化预览、分段翻译、人工校订和双语文件导出的用户流程。
- 主要内容：组织文档阅读与翻译任务，维护校订和未下载保护；PDF 与 ZIP 导出显示逐页进度，支持取消、重试和离开时中止，保留异步提交所有权。
+ 主要内容：组织文档阅读与翻译任务，增量统计完成段落，维护校订和未下载保护；PDF 逐页导出与 ePub/DOCX/ZIP 打包显示进度，支持取消、重试和离开时中止，保留异步提交所有权。
  模块边界：组件负责页面交互与响应式状态，不自行解析二进制格式、不实现片段翻译队列、配置存储协议或导出编码；解析渲染来自 document-translation feature，配置协调来自 services/config，运行时适配由本目录 runtime 注入。
 -->
 <!-- 文档页面归 app 层所有；WXT 入口只负责启动。 -->
@@ -366,7 +366,7 @@
       </div>
       <p class="export-file-name" data-i18n-ignore>{{ downloadFileName }}</p>
       <section v-if="downloadOpen" class="export-preview" aria-label="文件内容预览">
-        <strong>{{ parsedDocument?.binary ? '文字摘录 · 下载时保留原文件格式' : '文件内容预览' }}</strong><pre data-i18n-ignore>{{ downloadPreview }}</pre>
+        <strong>{{ parsedDocument && isDocumentExportExcerpt(parsedDocument) ? '文字摘录 · 下载时保留原文件格式' : '文件内容预览' }}</strong><pre data-i18n-ignore>{{ downloadPreview }}</pre>
       </section>
       <p v-if="!translationComplete" class="notice warning">{{ t("document.untranslatedWarning", {count: (parsedDocument?.segments.length || 0) - completedSegments}) }}</p>
       <label v-if="!translationComplete" class="partial-export"><input v-model="partialExportAcknowledged" type="checkbox" :disabled="queueBusy" />我已了解，下载当前结果</label>
@@ -398,6 +398,7 @@ import {
   DOCUMENT_MAX_BYTES,
   DOCUMENT_QUICK_SAMPLES,
   createDocumentDownload,
+  generateDocumentArchive,
   createDocumentDownloadName,
   createDocumentFileLoadGuard,
   createDocumentPreviewHtml,
@@ -415,6 +416,7 @@ import {
   getMultilingualTargetLanguageLabel,
   getTranslationServiceUnavailableMessage,
   isRichDocumentFormat,
+  isDocumentExportExcerpt,
   isSubtitleDocumentFormat,
   customModelString,
   configReady,
@@ -501,6 +503,7 @@ const downloadedRevision = ref(0);
 const readingModes = [{value: 'source', label: '原文'}, {value: 'bilingual', label: '双语'}, {value: 'translated', label: '译文'}] as const;
 const isDragging = ref(false);
 const translating = ref(false);
+const liveCompletedSegments = ref(0);
 
 const errorMessage = ref('');
 const openingFile = ref(false);
@@ -660,6 +663,7 @@ async function downloadBatch(): Promise<void> {
       const download = await createDocumentDownload(item.document!, item.translations, mode, {
         signal: controller.signal,
         onPdfProgress: progress => { batchNotice.value = `${item.name} · ${pdfExportProgress(progress)}`; },
+        onArchiveProgress: percent => { batchNotice.value = `${item.name} · ${archiveExportProgress(percent)}`; },
       });
       controller.signal.throwIfAborted();
       if (generation !== batchGeneration) return;
@@ -668,7 +672,11 @@ async function downloadBatch(): Promise<void> {
       zip.file(`${index + 1}/${name}`, download.data);
     }
     batchNotice.value = t('document.export.saving');
-    const blob = await zip.generateAsync({type: 'blob'}, () => controller.signal.throwIfAborted());
+    const bytes = await generateDocumentArchive(zip, {streamFiles: true}, {
+      signal: controller.signal,
+      onProgress: percent => { batchNotice.value = archiveExportProgress(percent); },
+    });
+    const blob = new Blob([bytes], {type: 'application/zip'});
     controller.signal.throwIfAborted();
     if (generation !== batchGeneration) return;
     const url = URL.createObjectURL(blob);
@@ -789,7 +797,8 @@ const rowForSegment = (segment: ParsedDocument['segments'][number]) => ({
 const pageRows = <T,>(rows: readonly T[]) => rows.slice((readerPage.value - 1) * READER_PAGE_SIZE, readerPage.value * READER_PAGE_SIZE);
 const previewRows = computed(() => pageRows(parsedDocument.value?.segments || []).map(rowForSegment));
 const hasTranslation = computed(() => translatedSegments.value.some((item) => Boolean(item?.trim())));
-const completedSegments = computed(() => parsedDocument.value?.segments.filter(segment => translatedSegments.value[segment.id]?.trim()).length || 0);
+const completedSegments = computed(() => translating.value ? liveCompletedSegments.value
+  : parsedDocument.value?.segments.filter(segment => translatedSegments.value[segment.id]?.trim()).length || 0);
 const translationComplete = computed(() => Boolean(parsedDocument.value && completedSegments.value === parsedDocument.value.segments.length));
 const progress = computed(() => parsedDocument.value ? Math.floor(completedSegments.value / parsedDocument.value.segments.length * 100) : 0);
 const effectivePreviewMode = computed(() => hasTranslation.value ? previewMode.value : 'source');
@@ -1012,11 +1021,12 @@ watch(parsedDocument, () => {
   if (isPdfDocument.value) void refreshPdfPreviews();
 }, {flush: 'post'});
 
-watch([translatedSegments, translating], () => {
-  if (translating.value) return;
-  settledTranslations.value = [...translatedSegments.value];
+// 翻译期间不订阅整份数组，避免每个片段都触发 O(n) 的深度遍历。
+watch(() => translating.value ? null : [...translatedSegments.value], (translations) => {
+  if (!translations) return;
+  settledTranslations.value = translations;
   if (isPdfDocument.value) schedulePdfPreview();
-}, {deep: true});
+});
 watch(docxPartIndex, () => { readerPage.value = 1; });
 
 function openFilePicker(): void {
@@ -1172,6 +1182,7 @@ async function startTranslation(restart = false): Promise<void> {
   const glossaryIds = config.documentGlossaryIds === null ? null : [...config.documentGlossaryIds];
   const glossaryRevision = buildGlossaryRevision(config.glossaryLibraries, config.glossaryEnabled);
   runState.value = 'ready';
+  liveCompletedSegments.value = completedSegments.value;
   translating.value = true;
   errorMessage.value = '';
   downloadNotice.value = '';
@@ -1189,6 +1200,7 @@ async function startTranslation(restart = false): Promise<void> {
       signal: controller.signal,
       onSegment: ({id, translation}) => {
         if (requestId !== translationRequestId || parsedDocument.value !== document || controller.signal.aborted) return;
+        liveCompletedSegments.value += Number(Boolean(translation.trim())) - Number(Boolean(translatedSegments.value[id]?.trim()));
         translatedSegments.value[id] = translation;
         editRevision.value += 1;
       },
@@ -1233,6 +1245,10 @@ function pdfExportProgress(progress: {phase: 'rendering' | 'saving'; completedPa
     : t('document.export.pages', {completed: progress.completedPages, total: progress.totalPages});
 }
 
+function archiveExportProgress(percent: number): string {
+  return t('document.export.packaging', {percent: Math.floor(percent)});
+}
+
 function cancelDownload(): void {
   if (!downloadController) return;
   cancelingDownload.value = true;
@@ -1254,6 +1270,7 @@ async function downloadDocument(): Promise<void> {
     const download = await createDocumentDownload(document, [...translatedSegments.value], outputMode.value, {
       signal: controller.signal,
       onPdfProgress: progress => { downloadProgress.value = pdfExportProgress(progress); },
+      onArchiveProgress: percent => { downloadProgress.value = archiveExportProgress(percent); },
     });
     controller.signal.throwIfAborted();
     if (document !== parsedDocument.value || requestId !== translationRequestId) return;

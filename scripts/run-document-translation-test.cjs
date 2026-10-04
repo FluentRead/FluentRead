@@ -2,7 +2,7 @@
 'use strict';
 
 // 文档产品流程回归：临时 profile、生产扩展、真实 UI 输入和下载，网络仅连接本机确定性服务。
-// 覆盖所有支持格式、暂停续译、失败恢复、完整校订、设置变化、离开保护及响应式外观。
+// 覆盖所有支持格式、长 PDF/归档取消重试、暂停续译、失败恢复、完整校订、设置变化、离开保护及响应式外观。
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const http = require('node:http');
@@ -40,7 +40,7 @@ async function main() {
   const extensionDir = path.resolve(arg('extension-dir', '.output/chrome-mv3'));
   const artifactsDir = path.resolve(arg('artifacts-dir', '/private/tmp/fluentread-document-experience'));
   const suite = arg('suite', 'full');
-  assert(['full', 'formats', 'experience', 'pdf-export'].includes(suite), 'suite 仅支持 full、formats、experience 或 pdf-export');
+  assert(['full', 'formats', 'archives', 'experience', 'pdf-export'].includes(suite), 'suite 仅支持 full、formats、archives、experience 或 pdf-export');
   const formats = arg('formats', 'sample.pdf,sample.epub,sample.docx,sample.html,sample.txt,sample.md,sample.srt,sample.vtt,sample.ass,sample.ssa,sample.lrc,sample.json').split(',');
   const exampleDir = path.resolve(arg('example-dir', 'examples/document-translation'));
   const packages = arg('playwright-root');
@@ -337,7 +337,7 @@ async function main() {
       } else assert(bytes.toString().includes('人工校订'));
       report.exampleLoads[name] = {translated: true, edited: true, exported: true, bytes: bytes.length};
       if (['sample.pdf', 'sample.epub', 'sample.docx', 'sample.md', 'sample.srt', 'sample.json'].includes(name)) await shot(`reader-${name.replace('.', '-')}`);
-      if (suite === 'formats' && name === formats.at(-1)) {
+      if (['formats', 'archives'].includes(suite) && name === formats.at(-1)) {
         if (!await page.locator('.document-batch').count()) {
           await page.locator('input[type=file]').setInputFiles({name: 'batch-extra.txt', mimeType: 'text/plain', buffer: Buffer.from('An extra document.')});
           await page.getByRole('button', {name: '翻译剩余文件', exact: true}).click();
@@ -356,7 +356,60 @@ async function main() {
       await newFile();
     }
     report.cases.push(`${formats.length} formats parse, translate through provider, edit via UI and export original format`);
-    if (suite === 'formats') {
+    if (suite === 'archives') {
+      const JSZip = require('jszip');
+      const {randomBytes} = require('node:crypto');
+      const resource = randomBytes(4 * 1024 * 1024);
+      for (const format of ['epub', 'docx']) {
+        const zip = await JSZip.loadAsync(fs.readFileSync(path.join(exampleDir, `sample.${format}`)));
+        const bodyPath = format === 'epub' ? 'OEBPS/chapter-1.xhtml' : 'word/document.xml';
+        const resourcePath = format === 'epub' ? 'OEBPS/performance.bin' : 'word/media/performance.bin';
+        const paragraphCount = format === 'epub' ? 2000 : 8000;
+        const paragraphs = Array.from({length: paragraphCount}, (_, index) => {
+          const source = `Archive paragraph ${index + 1}. ${randomBytes(96).toString('hex')}`;
+          return format === 'epub' ? `<p>${source}</p>` : `<w:p><w:r><w:t>${source}</w:t></w:r></w:p>`;
+        }).join('');
+        const body = await zip.file(bodyPath).async('string');
+        zip.file(bodyPath, body.replace(format === 'epub' ? /<body[^>]*>/u : /<w:body[^>]*>/u, opening => opening + paragraphs));
+        zip.file(resourcePath, resource);
+        const manifestPath = format === 'epub' ? 'OEBPS/content.opf' : '[Content_Types].xml';
+        const manifest = await zip.file(manifestPath).async('string');
+        zip.file(manifestPath, format === 'epub'
+          ? manifest.replace('</manifest>', '<item id="performance" href="performance.bin" media-type="application/octet-stream"/></manifest>')
+          : manifest.replace('</Types>', '<Default Extension="bin" ContentType="application/octet-stream"/></Types>'));
+        const input = await zip.generateAsync({type: 'nodebuffer', compression: 'DEFLATE', compressionOptions: {level: 3}});
+        const name = `long-document.${format}`;
+        await load(name, input);
+        await page.getByRole('button', {name: '校订译文', exact: true}).click();
+        const correction = `Large ${format} reviewed translation`;
+        await page.locator('textarea.document-translation').first().fill(correction);
+        await page.getByRole('button', {name: '阅读', exact: true}).click();
+        await page.getByRole('button', {name: '下载文件 ↓', exact: true}).click();
+        const dialog = page.locator('.download-dialog[open]');
+        await dialog.getByRole('checkbox').check();
+        await dialog.getByRole('button', {name: '下载双语文件', exact: true}).click();
+        await dialog.locator('.export-progress').filter({hasText: '正在打包文件'}).waitFor();
+        await dialog.getByRole('button', {name: '取消生成', exact: true}).click();
+        await dialog.locator('.export-progress').filter({hasText: '已取消生成'}).waitFor();
+        assert.equal(await dialog.getByRole('button', {name: '下载双语文件', exact: true}).isEnabled(), true);
+        await shot(`${format}-large-canceled`);
+        await dialog.getByRole('button', {name: '返回文档', exact: true}).click();
+        const start = Date.now();
+        const dest = await download('translated', true);
+        const output = await JSZip.loadAsync(fs.readFileSync(dest));
+        const renderedBody = await output.file(bodyPath).async('string');
+        assert(renderedBody.includes(correction));
+        assert(renderedBody.includes(`Archive paragraph ${paragraphCount}.`), '部分翻译导出仍应保留末段原文');
+        assert.deepEqual(await output.file(resourcePath).async('nodebuffer'), resource);
+        if (format === 'epub') assert.equal(await output.file('mimetype').async('string'), 'application/epub+zip');
+        report.exampleLoads[name] = {paragraphCount, inputBytes: input.length, outputBytes: fs.statSync(dest).size, retryElapsedMs: Date.now() - start, canceledDuringPackaging: true};
+        await page.getByRole('button', {name: '校订译文', exact: true}).click();
+        assert.equal(await page.locator('textarea.document-translation').first().inputValue(), correction);
+        report.cases.push(`large ${format} packaging shows progress, cancels and retries with all paragraphs, binary resources and corrections intact`);
+        await newFile();
+      }
+    }
+    if (['formats', 'archives'].includes(suite)) {
       assert.equal(report.consoleErrors.length, 0, '文档导入导出不得产生控制台错误');
       report.ok = true;
       return;

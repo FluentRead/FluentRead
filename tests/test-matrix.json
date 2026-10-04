@@ -359,6 +359,7 @@
       "tests/documentTranslationApi.test.ts",
       "tests/documentTranslationBinary.test.ts",
       "tests/documentPdfRasterizer.test.ts",
+      "tests/documentArchive.test.ts",
       "tests/obsidianDocumentIntegration.test.ts",
       "tests/obsidianTranslationGateway.test.ts",
       "tests/obsidianVault.test.ts",

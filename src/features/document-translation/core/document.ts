@@ -1,7 +1,7 @@
 /**
  * @file src/features/document-translation/core/document.ts
  * 文件职责：定义文档翻译的纯领域模型，并负责把多种文本格式解析为可翻译片段，再按双语或纯译文模式无损还原原格式结构。
- * 主要内容：覆盖文本格式识别、片段切分、Markdown 元数据及链接保护、字幕标签保留、JSON 路径替换、空译文回退、MIME 信息和下载文件命名。
+ * 主要内容：覆盖文本格式识别、片段切分、Markdown 元数据及链接保护、字幕标签保留、JSON 路径替换、空译文回退、MIME 信息和下载文件命名；文本导出支持有界编码，下载摘录无需处理全文。
  * 模块边界：该文件不读取 File、不解析 PDF/EPUB/DOCX 二进制，也不发起翻译请求；文件 I/O 与压缩包处理归 services/binary，批处理归 services/translation，展示归 preview/presentation。
  */
 export const DOCUMENT_MAX_BYTES = 10 * 1024 * 1024;
@@ -692,9 +692,15 @@ function formatBilingualTranslation(document: ParsedDocument, part: SegmentPart,
     return `${part.prefix}${source}${part.suffix}\n${formattedTranslation}`;
 }
 
-function renderParts(document: ParsedDocument, translations: readonly string[], mode: DocumentRenderMode): string {
+function renderParts(document: ParsedDocument, translations: readonly string[], mode: DocumentRenderMode, maxLength: number): string {
     const output: string[] = [];
-    for (let index = 0; index < document.parts.length; index += 1) {
+    let length = 0;
+    const append = (value: string) => {
+        const text = value.slice(0, maxLength - length);
+        output.push(text);
+        length += text.length;
+    };
+    for (let index = 0; index < document.parts.length && length < maxLength; index += 1) {
         const part = document.parts[index];
         if (mode === 'bilingual' && document.format === 'markdown' && part.bilingualGroup !== undefined) {
             // 行内链接或代码会被切成多个 part；双语模式按源行重组，避免把一行引用拆成多段。
@@ -709,33 +715,33 @@ function renderParts(document: ParsedDocument, translations: readonly string[], 
                 ? entry.value
                 : `${entry.prefix}${originalPartSource(entry)}${entry.suffix}`).join('');
             if (!groupParts.some((entry) => entry.kind === 'segment')) {
-                output.push(source);
+                append(source);
                 continue;
             }
             const translated = groupParts.map((entry) => {
                 if (entry.kind === 'literal') return entry.value;
                 return `${entry.prefix}${resolveDocumentTranslation(entry.source, translations[entry.segmentIndex])}${entry.suffix}`;
             }).join('').replace(/\r\n?|\n/gu, '\n> ');
-            output.push(`${source}\n> ${translated}`);
+            append(`${source}\n> ${translated}`);
             continue;
         }
         if (part.kind === 'literal') {
-            output.push(part.value);
+            append(part.value);
             continue;
         }
         const translation = resolveDocumentTranslation(part.source, translations[part.segmentIndex]);
         if (mode === 'bilingual') {
-            output.push(formatBilingualTranslation(document, part, translation));
+            append(formatBilingualTranslation(document, part, translation));
             continue;
         }
         if (document.format === 'html') {
-            output.push(`${part.prefix}${escapeHtml(translation)}${part.suffix}`);
+            append(`${part.prefix}${escapeHtml(translation)}${part.suffix}`);
             continue;
         }
         const formattedTranslation = ['srt', 'vtt', 'ass'].includes(document.format)
             ? preserveSubtitleMarkup(part.source, translation)
             : translation;
-        output.push(`${part.prefix}${formattedTranslation}${part.suffix}`);
+        append(`${part.prefix}${formattedTranslation}${part.suffix}`);
     }
     return output.join('');
 }
@@ -763,8 +769,9 @@ export function renderDocument(
     document: ParsedDocument,
     translations: readonly string[],
     mode: DocumentRenderMode = 'bilingual',
+    maxLength = Infinity,
 ): string {
-    if (document.format !== 'json') return renderParts(document, translations, mode);
+    if (document.format !== 'json') return renderParts(document, translations, mode, maxLength);
 
     let output = cloneJsonValue(document.jsonValue);
     document.jsonEntries?.forEach((entry) => {
@@ -776,7 +783,7 @@ export function renderDocument(
             : `${entry.prefix}${translation}${entry.suffix}`;
         output = setAtPath(output, entry.path, value);
     });
-    return JSON.stringify(output, null, 2);
+    return JSON.stringify(output, null, 2).slice(0, maxLength);
 }
 
 export function createDocumentDownloadName(fileName: string, mode: DocumentRenderMode): string {

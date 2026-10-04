@@ -10,7 +10,8 @@ const props = defineProps<{
 }>()
 const t = (zh: string, english: string) => (props.en ? english : zh)
 const root = ref<HTMLElement | null>(null)
-const { step, playing, running, reduced, choose, select, replay } = useDemoPlayback(
+const translationDemo = props.kind === 'webpage' || props.kind === 'image'
+const { step, playing, running, reduced, choose, select, playThrough, replay } = useDemoPlayback(
   root,
   props.kind === 'selection' ? 11 : 6,
   true,
@@ -18,9 +19,14 @@ const { step, playing, running, reduced, choose, select, replay } = useDemoPlayb
     ? [550, 400, 1400, 1600, 1600, 1300, 1300, 1300, 650, 1800, 1300]
     : props.kind === 'document'
     ? [1400, 1000, 1100, 1100, 2200, 2600]
+    : translationDemo
+    ? [600, 1200, 900, 1600, 1600, 1800]
     : [600, 450, 900, 1600, 1600, 1800]
 )
 const revealed = computed(() => step.value >= 2)
+const loading = computed(
+  () => translationDemo && step.value >= 1 && step.value < (props.kind === 'webpage' ? 3 : 2)
+)
 const workflow = computed(
   () =>
     ({
@@ -58,6 +64,13 @@ const stageStarts = computed(() => {
   if (props.kind === 'document') return [0, 1, 4]
   return [0, 1, 2]
 })
+function selectStage(index: number) {
+  if (translationDemo && index === 1) {
+    playThrough(1, stageStarts.value[2])
+  } else {
+    select(index, stageStarts.value)
+  }
+}
 const word = computed(() => props.kind === 'selection' && step.value >= 8)
 const structure = computed(() => props.kind === 'selection' && step.value >= 5 && step.value <= 7)
 const activePart = computed(() => Math.min(2, Math.max(0, step.value - 5)))
@@ -112,6 +125,7 @@ const contexts = {
     :data-step="step"
     :data-playing="playing"
     :data-running="running"
+    :data-loading="loading"
     :data-revealed="revealed"
     :data-word="word"
     :data-structure="structure"
@@ -133,14 +147,22 @@ const contexts = {
       :playing="playing"
       :reduced="reduced"
       :en="en"
-      @select="select($event, stageStarts)"
+      :run-stages="translationDemo ? [1] : undefined"
+      @select="selectStage"
     />
-    <div class="fd-stage">
+    <div class="fd-stage" :aria-busy="loading">
       <template v-if="kind === 'webpage'">
         <div class="fd-meta">
           <span>{{ t('英语 → 简体中文', 'Chinese → English') }}</span>
-          <span>
-            {{ revealed ? t('双语对照', 'Bilingual result') : t('正在翻译…', 'Translating…') }}
+          <span class="fd-status" role="status">
+            <i v-if="loading" class="fd-spinner" aria-hidden="true"></i>
+            {{
+              loading
+                ? t('正在翻译…', 'Translating…')
+                : revealed
+                ? t('双语对照', 'Bilingual result')
+                : t('等待翻译', 'Ready to translate')
+            }}
           </span>
         </div>
         <article class="fd-article">
@@ -149,16 +171,34 @@ const contexts = {
             <p>
               {{ t('Reading opens a window to the world.', '阅读为我们打开一扇了解世界的窗。') }}
             </p>
-            <p class="fd-translation fd-reveal" :aria-hidden="!revealed">
-              {{ t('阅读为我们打开一扇了解世界的窗。', 'Reading opens a window to the world.') }}
+            <p
+              class="fd-translation fd-reveal"
+              :class="{ 'fd-loading-line': loading && !revealed }"
+              :aria-hidden="!revealed"
+            >
+              <span
+                v-if="loading && !revealed"
+                class="fd-loading-bar"
+                aria-hidden="true"
+              ></span>
+              <template v-else>
+                {{ t('阅读为我们打开一扇了解世界的窗。', 'Reading opens a window to the world.') }}
+              </template>
             </p>
           </div>
           <div class="fd-paragraph">
             <p>
               {{ t('A good book can take you somewhere new.', '一本好书能带你发现新的天地。') }}
             </p>
-            <p class="fd-translation fd-reveal fd-second" :aria-hidden="step < 3">
-              {{ t('一本好书能带你发现新的天地。', 'A good book can take you somewhere new.') }}
+            <p
+              class="fd-translation fd-reveal fd-second"
+              :class="{ 'fd-loading-line': loading }"
+              :aria-hidden="step < 3"
+            >
+              <span v-if="loading" class="fd-loading-bar" aria-hidden="true"></span>
+              <template v-else>
+                {{ t('一本好书能带你发现新的天地。', 'A good book can take you somewhere new.') }}
+              </template>
             </p>
           </div>
         </article>
@@ -307,16 +347,20 @@ const contexts = {
       <template v-else-if="kind === 'image'">
         <div class="fd-meta">
           <span>{{ t('漫画原图', 'Comic image') }}</span>
-          <span>
+          <span class="fd-status" role="status">
+            <i v-if="loading" class="fd-spinner" aria-hidden="true"></i>
             {{
-              revealed
+              loading
+                ? t('识别并翻译中…', 'Reading & translating…')
+                : revealed
                 ? t('译文回到原图', 'Translation on the image')
-                : t('识别文字…', 'Reading the text…')
+                : t('等待识别', 'Ready to read the text')
             }}
           </span>
         </div>
         <div class="fd-comic">
           <div class="fd-bubble">
+            <span v-if="loading" class="fd-comic-scan" aria-hidden="true"></span>
             <span class="fd-layer" :class="{ 'fd-hidden': revealed }" :aria-hidden="revealed">
               Let's explore the world!
             </span>

@@ -450,6 +450,81 @@
 .fd-meta > span:last-child {
   color: var(--vp-c-brand-1);
 }
+.fd-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.fd-spinner {
+  flex: none;
+  width: 13px;
+  height: 13px;
+  border: 2px solid #cf44752e;
+  border-top-color: currentColor;
+  border-radius: 50%;
+  animation: fd-loading-spin 0.8s linear infinite;
+}
+.fd-loading-bar {
+  position: relative;
+  display: inline-block;
+  width: min(78%, 280px);
+  height: 10px;
+  overflow: hidden;
+  border-radius: 5px;
+  background: #cf44751a;
+}
+.fd-loading-bar::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(90deg, transparent, #cf447540, transparent);
+  animation: fd-loading-shimmer 1.2s ease-in-out infinite;
+}
+.fd-comic-scan {
+  position: absolute;
+  inset: -5px;
+  border: 1px dashed #cf447580;
+  border-radius: 24px;
+  overflow: hidden;
+  pointer-events: none;
+}
+.fd-comic-scan::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 2px;
+  background: #cf4475;
+  box-shadow: 0 -8px 16px 6px #cf44752e;
+  animation: fd-loading-scan 1.2s ease-in-out infinite alternate;
+}
+.fd[data-running='false'] .fd-spinner,
+.fd[data-running='false'] .fd-loading-bar::after,
+.fd[data-running='false'] .fd-comic-scan::after {
+  animation-play-state: paused;
+}
+@keyframes fd-loading-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+@keyframes fd-loading-shimmer {
+  from {
+    transform: translateX(-100%);
+  }
+  to {
+    transform: translateX(100%);
+  }
+}
+@keyframes fd-loading-scan {
+  from {
+    top: 0;
+  }
+  to {
+    top: calc(100% - 2px);
+  }
+}
 .fd .fd-article h3 {
   font: 600 29px/1.3 Georgia, 'Noto Serif SC', serif;
   margin: 18px 0 24px;
@@ -475,6 +550,10 @@
 }
 .fd[data-step='2'] .fd-second {
   opacity: 0;
+}
+.fd[data-loading='true'] .fd-loading-line {
+  opacity: 1;
+  transform: none;
 }
 .fd-hidden,
 .fd[data-revealed='true'] .fd-hidden {
@@ -1088,7 +1167,10 @@
   .bv-hero-orbit > * {
     animation: none;
   }
-  .fd-sound-wave i {
+  .fd-sound-wave i,
+  .fd-spinner,
+  .fd-loading-bar::after,
+  .fd-comic-scan::after {
     animation: none;
   }
   .fd-reveal,

@@ -74,6 +74,72 @@ afterEach(() => {
 });
 
 describe('document batch page lifecycle', () => {
+  it('cancels a ZIP export without marking queue items downloaded and can retry', async () => {
+    await state.loadFiles([file('a.txt'), file('b.txt')]);
+    await state.startBatch();
+    const pending = deferred<any>();
+    download.mockReturnValueOnce(pending.promise);
+    const work = state.downloadBatch();
+    await vi.waitFor(() => expect(download).toHaveBeenCalledOnce());
+    const options = download.mock.calls[0][3];
+    options.onPdfProgress({phase: 'saving', completedPages: 2, totalPages: 2});
+    expect(state.batchNotice).toContain('document.export.saving');
+    state.cancelDownload();
+    pending.resolve({data: 'stale', fileName: 'a.txt', mimeType: 'text/plain'});
+    await work;
+    expect(options.signal.aborted).toBe(true);
+    expect(state.batchNotice).toBe('document.export.canceled');
+    expect(state.documentQueue.every((item: any) => item.downloaded === 0)).toBe(true);
+    expect(state.preparingDownload).toBe(false);
+    await state.downloadBatch();
+    expect(state.batchNotice).toBe('document.batch.downloaded');
+    expect(state.documentQueue.every((item: any) => item.downloaded === item.revision)).toBe(true);
+  });
+
+  it('keeps reviewed translations on export cancellation and permits retry', async () => {
+    await state.loadFiles([file('a.txt', 'First.')]);
+    state.editSegment(0, '第一段');
+    state.partialExportAcknowledged = true;
+    state.downloadDialog = {close: vi.fn()};
+    const pending = deferred<any>();
+    download.mockReturnValueOnce(pending.promise);
+    const work = state.downloadDocument();
+    const options = download.mock.calls[0][3];
+    options.onPdfProgress({phase: 'rendering', completedPages: 1, totalPages: 50});
+    expect(state.downloadProgress).toBe('document.export.pages');
+    state.cancelDownload();
+    expect(options.signal.aborted).toBe(true);
+    expect(state.cancelingDownload).toBe(true);
+    pending.resolve({data: 'stale', fileName: 'a.txt', mimeType: 'text/plain'});
+    await work;
+    expect(state.preparingDownload).toBe(false);
+    expect(state.cancelingDownload).toBe(false);
+    expect(state.downloadError).toBe('');
+    expect(state.downloadProgress).toBe('document.export.canceled');
+    expect(state.translatedSegments).toEqual(['第一段']);
+    expect(state.downloadedRevision).toBe(0);
+    expect(state.downloadDialog.close).not.toHaveBeenCalled();
+    await state.downloadDocument();
+    expect(state.downloadDialog.close).toHaveBeenCalledOnce();
+    expect(state.downloadedRevision).toBe(state.editRevision);
+  });
+
+  it('stops export when the page unloads and does not mark it downloaded', async () => {
+    await state.loadFiles([file('a.txt', 'First.')]);
+    state.editSegment(0, '第一段');
+    const pending = deferred<any>();
+    download.mockReturnValueOnce(pending.promise);
+    const work = state.downloadDocument();
+    const options = download.mock.calls[0][3];
+    state.resetDocument();
+    expect(options.signal.aborted).toBe(true);
+    pending.resolve({data: 'stale', fileName: 'a.txt', mimeType: 'text/plain'});
+    await work;
+    expect(state.preparingDownload).toBe(false);
+    expect(state.downloadedRevision).toBe(0);
+    expect(state.parsedDocument).toBe(null);
+  });
+
   it('opens subtitle export in the reading mode and downloads the reviewed translation', async () => {
     await state.loadFiles([file('episode.srt', '1\n00:00:01,000 --> 00:00:03,000\nHello there.\n')]);
     state.editSegment(0, '校订后的字幕');
@@ -85,7 +151,9 @@ describe('document batch page lifecycle', () => {
     expect(state.downloadPreview).toContain('校订后的字幕');
     expect(state.downloadPreview).not.toContain('Hello there.');
     await state.downloadDocument();
-    expect(download).toHaveBeenCalledWith(state.parsedDocument, ['校订后的字幕'], 'translated');
+    expect(download).toHaveBeenCalledWith(state.parsedDocument, ['校订后的字幕'], 'translated', {
+      signal: expect.any(AbortSignal), onPdfProgress: expect.any(Function),
+    });
     expect((await download.mock.results[0].value).data).toContain('00:00:01,000 --> 00:00:03,000\n校订后的字幕');
     expect(state.downloadedRevision).toBe(state.editRevision);
     state.previewMode = 'bilingual';

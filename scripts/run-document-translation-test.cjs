@@ -40,7 +40,7 @@ async function main() {
   const extensionDir = path.resolve(arg('extension-dir', '.output/chrome-mv3'));
   const artifactsDir = path.resolve(arg('artifacts-dir', '/private/tmp/fluentread-document-experience'));
   const suite = arg('suite', 'full');
-  assert(['full', 'formats', 'experience'].includes(suite), 'suite 仅支持 full、formats 或 experience');
+  assert(['full', 'formats', 'experience', 'pdf-export'].includes(suite), 'suite 仅支持 full、formats、experience 或 pdf-export');
   const formats = arg('formats', 'sample.pdf,sample.epub,sample.docx,sample.html,sample.txt,sample.md,sample.srt,sample.vtt,sample.ass,sample.ssa,sample.lrc,sample.json').split(',');
   const exampleDir = path.resolve(arg('example-dir', 'examples/document-translation'));
   const packages = arg('playwright-root');
@@ -131,10 +131,55 @@ async function main() {
         assert.equal(await dialog.getByRole('button', {name: mode === 'bilingual' ? '下载双语文件' : '下载译文文件', exact: true}).isDisabled(), true);
         await dialog.getByRole('checkbox').check();
       }
-      const [file] = await Promise.all([page.waitForEvent('download'), dialog.getByRole('button', {name: mode === 'bilingual' ? '下载双语文件' : '下载译文文件', exact: true}).click()]);
+      const [file] = await Promise.all([page.waitForEvent('download', {timeout: suite === 'pdf-export' ? 120000 : 30000}), dialog.getByRole('button', {name: mode === 'bilingual' ? '下载双语文件' : '下载译文文件', exact: true}).click()]);
       const dest = path.join(artifactsDir, file.suggestedFilename()); await file.saveAs(dest); report.downloads.push(dest); return dest;
     };
     assert.equal(await page.locator('.format-card').count(), 8);
+    if (suite === 'pdf-export') {
+      const {PDFDocument, rgb} = require('pdf-lib');
+      const pdf = await PDFDocument.create();
+      for (let index = 1; index <= 100; index++) {
+        const sheet = pdf.addPage([595, 842]);
+        sheet.drawText(`Long document page ${index}`, {x: 45, y: 760, size: 18});
+        sheet.drawText('Export must preserve every page and all reviewed translations.', {x: 45, y: 700, size: 11});
+        sheet.drawRectangle({x: 45, y: 500, width: 300, height: 120, color: rgb(0.8, 0.9, 1)});
+      }
+      await load('long-100.pdf', Buffer.from(await pdf.save()));
+      await page.getByRole('button', {name: '开始翻译', exact: true}).click();
+      await page.locator('.document-status').filter({hasText: '翻译完成'}).waitFor({timeout: 120000});
+      await page.getByRole('button', {name: '校订译文', exact: true}).click();
+      await page.locator('textarea.document-translation').first().fill('100 页导出校订保留测试');
+      await page.getByRole('button', {name: '阅读', exact: true}).click();
+      await page.getByRole('button', {name: '下载文件 ↓', exact: true}).click();
+      const dialog = page.locator('.download-dialog[open]');
+      await dialog.getByRole('button', {name: '下载双语文件', exact: true}).click();
+      await dialog.locator('.export-progress').filter({hasText: /\d+ \/ 100 页/}).waitFor();
+      await shot('pdf-100-progress');
+      await dialog.getByRole('button', {name: '取消生成', exact: true}).click();
+      await dialog.locator('.export-progress').filter({hasText: '已取消生成'}).waitFor();
+      assert.equal(await dialog.getByRole('button', {name: '下载双语文件', exact: true}).isEnabled(), true);
+      await shot('pdf-100-canceled');
+      await dialog.getByRole('button', {name: '返回文档', exact: true}).click();
+      report.cases.push('100-page export displays progress, cancels and keeps reviewed translations');
+      for (const mode of ['bilingual', 'translated']) {
+        const start = Date.now();
+        const dest = await download(mode);
+        const bytes = fs.readFileSync(dest);
+        const output = await PDFDocument.load(bytes);
+        assert.equal(output.getPageCount(), 100);
+        assert.equal(output.getPage(99).getWidth(), mode === 'bilingual' ? 1204.875 : 595);
+        report.exampleLoads[mode] = {pages: 100, bytes: bytes.length, elapsedMs: Date.now() - start};
+      }
+      await page.getByRole('button', {name: '校订译文', exact: true}).click();
+      assert.equal(await page.locator('textarea.document-translation').first().inputValue(), '100 页导出校订保留测试');
+      await page.setViewportSize({width: 390, height: 844});
+      await page.getByRole('button', {name: '下载文件 ↓', exact: true}).click();
+      await noOverflow(); await shot('pdf-100-export-mobile');
+      report.cases.push('100-page bilingual and translated-only downloads reopen with correct page count and dimensions');
+      assert.equal(report.consoleErrors.length, 0);
+      report.ok = true;
+      return;
+    }
     if (suite === 'experience') {
       await shot('import-desktop');
       await page.setViewportSize({width: 390, height: 844}); await noOverflow(); await shot('import-mobile');

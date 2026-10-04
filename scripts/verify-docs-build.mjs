@@ -252,40 +252,28 @@ for (const prefix of ['', '/en']) {
     !home.querySelector('.bv-hero video,.bv-hero iframe'),
     'Introduction video belongs below the hero'
   )
-  if (prefix) {
-    const promo = home.querySelector('.bv-promo video')
-    assert(promo, 'English homepage introduction video missing')
+  const promo = home.querySelector('.bv-promo video')
+  assert(promo, 'Homepage must initially show the original introduction video')
+  assert(
+    promo.hasAttribute('controls') &&
+      !promo.hasAttribute('autoplay') &&
+      promo.getAttribute('preload') === 'none',
+    'Introduction video must stay visitor-controlled and avoid loading before it is needed'
+  )
+  for (const src of [
+    promo.getAttribute('poster'),
+    promo.querySelector('source')?.getAttribute('src'),
+  ])
     assert(
-      promo.hasAttribute('controls') &&
-        !promo.hasAttribute('autoplay') &&
-        promo.getAttribute('preload') === 'none',
-      'English introduction video must stay visitor-controlled and load only on play'
+      src?.includes(`fluentread-promo-${prefix ? 'en' : 'zh'}`) && resolve(src),
+      `Missing introduction video asset ${src}`
     )
-    for (const src of [
-      promo.getAttribute('poster'),
-      promo.querySelector('source')?.getAttribute('src'),
-    ])
-      assert(
-        src?.includes('fluentread-promo-en') && resolve(src),
-        `Missing introduction video asset ${src}`
-      )
-  } else {
-    const promo = home.querySelector('.bv-promo iframe')
-    assert(promo, 'Chinese homepage Bilibili introduction video missing')
-    const player = new URL(promo.getAttribute('src'))
-    assert.equal(player.origin, 'https://player.bilibili.com')
-    assert.equal(player.pathname, '/player.html')
-    assert.equal(player.searchParams.get('bvid'), 'BV1VLHE6hEnB')
-    assert.equal(player.searchParams.get('autoplay'), '0')
-    assert.equal(player.searchParams.get('danmaku'), '0')
-    assert.equal(promo.getAttribute('loading'), 'lazy')
-    assert(promo.getAttribute('title'), 'Embedded video needs an accessible title')
-    assert(promo.hasAttribute('allowfullscreen'), 'Embedded video must support fullscreen')
+  assert(!home.querySelector('.bv-promo iframe'), 'Bilibili must only load after the original fails')
+  if (!prefix) {
     const fallback = home.querySelector('.bv-promo-link')
     assert.equal(fallback?.getAttribute('href'), 'https://www.bilibili.com/video/BV1VLHE6hEnB/')
     assert.equal(fallback?.getAttribute('target'), '_blank')
     assert(fallback?.getAttribute('rel')?.includes('noopener'))
-    assert(!home.querySelector('video'), 'Chinese homepage must use the Bilibili player')
   }
   assert(
     !home.querySelector('.bv-pointer,.bv-end'),

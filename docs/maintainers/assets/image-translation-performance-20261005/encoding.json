@@ -1,0 +1,120 @@
+{
+  "scope": "isolated visible Edge, 2048x2048 deterministic opaque noise, PNG only; one warmup + seven samples",
+  "cases": [
+    {
+      "asyncEncoding": false,
+      "blockingMs": 361.69999980926514,
+      "totalMs": 361.80000019073486,
+      "timerLatencyMs": 362,
+      "digest": "5e245b05",
+      "expected": "5e245b05",
+      "outputBytes": 18763450,
+      "samples": [
+        {
+          "blockingMs": 362.7999997138977,
+          "totalMs": 362.7999997138977,
+          "timerLatencyMs": 363.19999980926514
+        },
+        {
+          "blockingMs": 361.69999980926514,
+          "totalMs": 361.80000019073486,
+          "timerLatencyMs": 362
+        },
+        {
+          "blockingMs": 361.90000009536743,
+          "totalMs": 361.90000009536743,
+          "timerLatencyMs": 362
+        },
+        {
+          "blockingMs": 359,
+          "totalMs": 359,
+          "timerLatencyMs": 359.09999990463257
+        },
+        {
+          "blockingMs": 362.30000019073486,
+          "totalMs": 362.30000019073486,
+          "timerLatencyMs": 363.2000002861023
+        },
+        {
+          "blockingMs": 358.69999980926514,
+          "totalMs": 358.69999980926514,
+          "timerLatencyMs": 358.8999996185303
+        },
+        {
+          "blockingMs": 356.1000003814697,
+          "totalMs": 356.1000003814697,
+          "timerLatencyMs": 356.1000003814697
+        }
+      ]
+    },
+    {
+      "asyncEncoding": true,
+      "blockingMs": 0,
+      "totalMs": 375.3999996185303,
+      "timerLatencyMs": 0.09999990463256836,
+      "digest": "5e245b05",
+      "expected": "5e245b05",
+      "outputBytes": 18763450,
+      "samples": [
+        {
+          "blockingMs": 0,
+          "totalMs": 383.2000002861023,
+          "timerLatencyMs": 0.09999990463256836
+        },
+        {
+          "blockingMs": 0.09999990463256836,
+          "totalMs": 375.3999996185303,
+          "timerLatencyMs": 0.09999990463256836
+        },
+        {
+          "blockingMs": 0.10000038146972656,
+          "totalMs": 378.2000002861023,
+          "timerLatencyMs": 0.10000038146972656
+        },
+        {
+          "blockingMs": 0,
+          "totalMs": 374.19999980926514,
+          "timerLatencyMs": 0.09999990463256836
+        },
+        {
+          "blockingMs": 0,
+          "totalMs": 374.40000009536743,
+          "timerLatencyMs": 0
+        },
+        {
+          "blockingMs": 0,
+          "totalMs": 375.09999990463257,
+          "timerLatencyMs": 0
+        },
+        {
+          "blockingMs": 0,
+          "totalMs": 377,
+          "timerLatencyMs": 0.10000038146972656
+        }
+      ]
+    }
+  ],
+  "cancellation": {
+    "error": "AbortError",
+    "elapsedMs": 0.5999999046325684
+  },
+  "launchMode": "macos-background-cdp",
+  "focusPolicy": "launchservices-no-foreground",
+  "windowPlacement": {
+    "mode": "background-visible-no-focus",
+    "visible": true,
+    "hidden": false,
+    "centered": true,
+    "windowState": "normal",
+    "bounds": {
+      "left": 1121,
+      "top": -990,
+      "width": 1280,
+      "height": 900
+    },
+    "displayTarget": "secondary",
+    "source": "macos-nsscreen",
+    "screenIndex": 1,
+    "browserFrontmost": false
+  }
+}

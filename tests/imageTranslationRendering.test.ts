@@ -18,9 +18,34 @@ function canvasContext() {
     return context;
 }
 
-afterEach(() => { vi.unstubAllGlobals(); vi.resetModules(); });
+afterEach(() => { vi.unstubAllGlobals(); vi.restoreAllMocks(); vi.resetModules(); });
 
 describe('图片译文排版与绘制', () => {
+    it('重复长段落减少测宽次数，完整单词换行后无需逐字测量', () => {
+        const text = 'Translate each complete paragraph and keep the original reading order. '.repeat(30);
+        const countedMeasure = vi.fn((value: string, size: number) => Array.from(value).length * size * 0.55);
+        const layout = layoutImageTranslationText(text, 200, 100, countedMeasure, 16);
+        expect(layout.lines.join(' ').replace(/\s+/g, ' ').trim()).toBe(text.trim());
+        expect(countedMeasure.mock.calls.length).toBeLessThan(1200);
+        expect(layout.lineHeight * layout.lines.length).toBeLessThanOrEqual(100);
+    });
+
+    it('长单词字素只分割一次，多个字号搜索仍保留组合字符', () => {
+        const split = vi.spyOn(Intl.Segmenter.prototype, 'segment');
+        const text = 'e\u0301'.repeat(600) + '👨‍👩‍👧‍👦'.repeat(50);
+        const layout = layoutImageTranslationText(text, 200, 100, (value, size) => Array.from(value).length * size * 0.55, 16);
+        expect(layout.lines.join('')).toBe(text);
+        expect(split).toHaveBeenCalledOnce();
+    });
+
+    it('零宽度也命中缓存，超过缓存容量的唯一文字仍完整排版', () => {
+        const zero = vi.fn(() => 0);
+        expect(layoutImageTranslationText('zero', 10, 10, zero).lines).toEqual(['zero']);
+        expect(zero).toHaveBeenCalledOnce();
+        const text = Array.from({length: 600}, (_, i) => `word${i}`).join(' ');
+        const layout = layoutImageTranslationText(text, 100_000, 100, (value, size) => value.length * size, 1);
+        expect(layout.lines).toEqual([text]);
+    });
     it.each(['left', 'right', 'center'] as const)('整段回填保留 %s 对齐、常规字重和源文字字号上限', alignment => {
         const context = canvasContext();
         drawTranslatedImageText(context as unknown as CanvasRenderingContext2D, '完整段落回填文字', 10, 20, 100, 60, 'rgb(255,255,255)', 12, alignment);

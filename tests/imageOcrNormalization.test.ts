@@ -67,6 +67,19 @@ describe('普通图片按完整段落翻译', () => {
         expect(groupImageParagraphs(input)).toHaveLength(3);
         expect(groupImageParagraphs([])).toEqual([]);
     });
+
+    it('千个分散标签只检查纵向邻域，避免逐标签扫描整图', () => {
+        let coordinateReads = 0;
+        const input = Array.from({length: 1000}, (_, index) => {
+            const region = line(`Label ${index}`, index % 4 * 400, Math.floor(index / 4) * 30);
+            const y0 = region.bbox.y0;
+            Object.defineProperty(region.bbox, 'y0', {get: () => {coordinateReads++; return y0;}, enumerable: true});
+            return region;
+        });
+        const output = groupImageParagraphs(input);
+        expect(output).toEqual(input);
+        expect(coordinateReads).toBeLessThan(30_000);
+    });
 });
 
 describe('图片 OCR 有界尺寸和可信文本', () => {

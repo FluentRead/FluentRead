@@ -94,7 +94,7 @@ beforeEach(() => {
     nullContext = false;
     runtime.lastError = undefined;
     mocks.recognize.mockResolvedValue(lines);
-    mocks.inpaint.mockImplementation(pixels => new Uint8ClampedArray(pixels));
+    mocks.inpaint.mockImplementation((pixels, _width, _height, _lines, inPlace) => inPlace ? pixels : new Uint8ClampedArray(pixels));
     mocks.background.mockReturnValue('rgb(240,240,240)');
     sendMessage.mockImplementation((message, callback) => {
         callback(message.type === 'fluentReadImageTranslateTexts' ? {success: true, translations: ['你好']} : undefined);
@@ -358,18 +358,19 @@ describe('Offscreen 图片完整操作生命周期', () => {
             });
             if (stage === 'inpainting') mocks.inpaint.mockImplementation(pixels => {controller.abort(); return pixels;});
             if (stage === 'draw-event') mocks.draw.mockImplementation(() => {setTimeout(() => controller.abort(), 0);});
-            if (stage === 'pixel-read' || stage === 'encoding') vi.stubGlobal('document', {createElement: () => {
+            if (stage === 'encoding') mocks.encode.mockImplementationOnce(async () => {controller.abort(); return 'cancelled-image';});
+            if (stage === 'pixel-read') vi.stubGlobal('document', {createElement: () => {
                 const canvas = makeCanvas();
-                if (stage === 'pixel-read') canvas.context.getImageData.mockImplementation(() => {
+                canvas.context.getImageData.mockImplementation(() => {
                     controller.abort(); return {data: new Uint8ClampedArray(32 * 16 * 4)};
                 });
-                else canvas.toDataURL.mockImplementation(() => {controller.abort(); return 'cancelled-image';});
                 return canvas;
             }});
             await expect(translateImageInOffscreen('image', 'en', '', controller.signal, 'cancel-render')).rejects.toMatchObject({name: 'AbortError'});
             expect(images[0].src).toBe('');
             expect(canvases.every(canvas => canvas.width === 0 && canvas.height === 0)).toBe(true);
-            if (stage !== 'encoding') expect(canvases.every(canvas => canvas.toDataURL.mock.calls.length === 0)).toBe(true);
+            if (stage !== 'encoding') expect(mocks.encode).not.toHaveBeenCalled();
+            expect(canvases.every(canvas => canvas.toDataURL.mock.calls.length === 0)).toBe(true);
         },
     );
 
@@ -385,14 +386,29 @@ describe('Offscreen 图片完整操作生命周期', () => {
             if (message.type === 'fluentReadImageProgress') throw new Error('page closed');
             callback({success: true, translations: ['你好']});
         });
-        vi.stubGlobal('document', {createElement: () => {
-            const canvas = makeCanvas();
-            canvas.toDataURL.mockImplementation(() => {throw new Error('encode failed');});
-            return canvas;
-        }});
+        mocks.encode.mockRejectedValueOnce(new Error('encode failed'));
         await expect(translateImageInOffscreen('image', 'en', '', undefined, 'progress')).rejects.toThrow('encode failed');
         expect(images[0].src).toBe('');
         expect(canvases[0].width).toBe(0);
+    });
+
+    it('普通图片复用独占像素，等待异步编码时保留画布，完成后释放', async () => {
+        let finish!: (value: string) => void;
+        let started!: () => void;
+        const encoding = new Promise<void>(resolve => {started = resolve;});
+        mocks.encode.mockImplementationOnce(() => new Promise<string>(resolve => {finish = resolve; started();}));
+        const operation = translateImageInOffscreen('image', 'en', '');
+        await encoding;
+        const canvas = canvases[0];
+        const source = canvas.context.getImageData.mock.results[0].value;
+        expect(mocks.inpaint).toHaveBeenCalledWith(source.data, 32, 16, expect.any(Array), true);
+        expect(canvas.context.putImageData).toHaveBeenCalledWith(source, 0, 0);
+        expect(canvas.width).toBe(32);
+        expect(mocks.encode).toHaveBeenCalledWith(canvas, undefined);
+        expect(canvas.toDataURL).not.toHaveBeenCalled();
+        finish('encoded-image');
+        await expect(operation).resolves.toHaveProperty('image', 'encoded-image');
+        expect([canvas.width, canvas.height]).toEqual([0, 0]);
     });
 });
 

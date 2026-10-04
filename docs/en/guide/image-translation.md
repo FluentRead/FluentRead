@@ -10,6 +10,8 @@ For single images, choose **General text · Tesseract** for screenshots, charts 
 
 For ordinary images, nearby wrapped lines with similar sizes and alignment are translated as a complete paragraph. Headings, list items and separate columns are kept apart where possible. Translations wrap within the paragraph area with bounded font sizes and matching alignment. Only the original line boxes are erased, reducing changes to artwork between lines. **Text → Compare original** also presents complete paragraphs. Complex layouts or recognition errors can still affect grouping; switch back to the original to check.
 
+Local layout and background repair now reduce repeated work and memory use for large ordinary images. Translated images use asynchronous lossless PNG encoding, so you can cancel while waiting. Initial model preparation and translation service response times still affect the overall wait.
+
 ## Continuous manga translation
 
 The manga reader on [MANGA Plus by SHUEISHA](https://mangaplus.shueisha.co.jp/) and artwork pages on [Pixiv](https://www.pixiv.net/) have dedicated adapters. Click the manga button to start. No reading panel opens automatically. On first use with missing resources, a confirmation explains about 30 MB for recognition and an optional 197 MB for text removal. Confirming closes it and starts preparation. Choosing **Later** or closing it starts no download.

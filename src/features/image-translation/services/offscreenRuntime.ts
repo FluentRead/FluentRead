@@ -1,7 +1,7 @@
 /**
  * @file src/features/image-translation/services/offscreenRuntime.ts
  * 文件职责：在隔离 Offscreen 文档中编排图片重绘翻译，并为圈选文本翻译提供仅裁剪和本地 OCR 的独立入口。
- * 主要内容：单图可选与漫画共用的 PaddleOCR，两种引擎均按普通段落合行翻译、限制字号并保留对齐，擦除只使用原始行框；保留单图完整译图与原文对照，不自动加载漫画修补模型；图片解码时前置尺寸校验和取消/超时清理，复用解码位图完成真实阶段通知；漫画修补与绘字共享原图背景分类，只异步编码最终局部图块；完成或失败后释放临时图像与画布。
+ * 主要内容：单图可选与漫画共用的 PaddleOCR，两种引擎均按普通段落合行翻译、限制字号并保留对齐，擦除只使用原始行框；保留单图完整译图与原文对照，不自动加载漫画修补模型；图片解码时前置尺寸校验和取消/超时清理，普通修补复用独占像素并异步编码完整 PNG，漫画修补与绘字共享原图背景分类并异步编码局部图块；完成或失败后释放临时图像与画布。
  * 模块边界：该运行时只在具备 Canvas/DOM 的 Offscreen 环境执行，不直接接收 browser.runtime 事件；消息入口由 app/offscreen 组装，翻译函数由依赖注入，几何算法来自 area feature。
  */
 import {IMAGE_PROGRESS_MESSAGE_TYPE, type ImageTranslationStage} from '../progress';
@@ -245,8 +245,8 @@ async function prepareTranslatedImage(
             }
             return {image: '', mangaPatches: {width: canvas.width, height: canvas.height, patches}, lines: readingLines};
         }
-        const pixels = inpaintTextRegions(sourcePixels.data, canvas.width, canvas.height, translatedLines);
-        sourcePixels.data.set(pixels);
+        // ImageData 仅归本次 Canvas 所有，直接修补以避免复制整图 RGBA 后再拷回。
+        const pixels = inpaintTextRegions(sourcePixels.data, canvas.width, canvas.height, translatedLines, true);
         await checkImageCancellation(signal);
         context.putImageData(sourcePixels, 0, 0);
 
@@ -278,7 +278,7 @@ async function prepareTranslatedImage(
         });
 
         await checkImageCancellation(signal);
-        const image = canvas.toDataURL('image/png');
+        const image = await encodeMangaCanvas(canvas, signal);
         throwIfImageOperationAborted(signal);
         return { image, lines: readingLines };
     } finally {

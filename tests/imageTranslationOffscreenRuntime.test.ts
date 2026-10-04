@@ -94,7 +94,7 @@ beforeEach(() => {
     nullContext = false;
     runtime.lastError = undefined;
     mocks.recognize.mockResolvedValue(lines);
-    mocks.inpaint.mockImplementation(pixels => new Uint8ClampedArray(pixels));
+    mocks.inpaint.mockImplementation((pixels, _width, _height, _lines, inPlace) => inPlace ? pixels : new Uint8ClampedArray(pixels));
     mocks.background.mockReturnValue('rgb(240,240,240)');
     sendMessage.mockImplementation((message, callback) => {
         callback(message.type === 'fluentReadImageTranslateTexts' ? {success: true, translations: ['你好']} : undefined);
@@ -191,7 +191,7 @@ describe('Offscreen 图片完整操作生命周期', () => {
         expect(images[0].src).toBe('');
     });
 
-    it('竖排区域只留最小边距，横排仍按行高外扩 (#654)', async () => {
+    it('竖排区域只留最小边距，普通横排不按段落总高外扩 (#654)', async () => {
         imageOptions.push({width: 900, height: 700});
         mocks.recognize.mockResolvedValueOnce([
             {text: '第三話', bbox: {x0: 60, y0: 50, x1: 320, y1: 90}},
@@ -202,8 +202,26 @@ describe('Offscreen 图片完整操作生命周期', () => {
         });
         const result = await translateImageInOffscreen('manga', 'ja', 'Page');
         expect(result.lines[1]).toMatchObject({text: '今天真的很开心。', vertical: true});
-        expect(mocks.draw).toHaveBeenNthCalledWith(1, expect.anything(), '第三话', 54, 43, 272, 54, 'rgb(240,240,240)');
-        expect(mocks.draw).toHaveBeenNthCalledWith(2, expect.anything(), '今天真的很开心。', 595, 99, 170, 193, 'rgb(240,240,240)');
+        expect(mocks.draw).toHaveBeenNthCalledWith(1, expect.anything(), '第三话', 58, 43, 264, 54, 'rgb(240,240,240)', 48, 'left');
+        expect(mocks.draw).toHaveBeenNthCalledWith(2, expect.anything(), '今天真的很开心。', 595, 99, 170, 193, 'rgb(240,240,240)', Infinity, 'center');
+    });
+
+    it.each(['tesseract', 'paddle'] as const)('%s 普通图片将跨行说明整段送翻译，擦除和字号保持源行粒度', async engine => {
+        imageOptions.push({width: 390, height: 300});
+        const source = [
+            {text: 'Calculate the best filament grouping to minimize', bbox: {x0: 61, y0: 78, x1: 325, y1: 90}},
+            {text: 'filament waste. Need to manually place filaments on the', bbox: {x0: 61, y0: 92, x1: 367, y1: 104}},
+            {text: 'printer based on slicing results.', bbox: {x0: 62, y0: 106, x1: 227, y1: 118}},
+        ];
+        mocks.recognize.mockResolvedValue(source); mocks.mangaRecognize.mockResolvedValue(source);
+        const result = await translateImageInOffscreen('bambu', 'en', 'Bambu', undefined, 'paragraph', false, engine);
+        const request = sendMessage.mock.calls.find(([m]) => m.type === 'fluentReadImageTranslateTexts')![0];
+        expect(request.texts).toEqual([source.map(line => line.text).join(' ')]);
+        expect(result.lines).toHaveLength(1);
+        expect(result.lines[0].sourceText).toBe(request.texts[0]);
+        expect(mocks.inpaint.mock.calls[0][3][0].sourceBoxes).toEqual(source.map(line => line.bbox));
+        expect(mocks.draw).toHaveBeenCalledWith(expect.anything(), '你好', 59, 76, 310, 44, 'rgb(240,240,240)', 12 * 1.2, 'left');
+        if (engine === 'paddle') expect(mocks.mangaRecognize.mock.calls[0][7]).toBe('image');
     });
 
     it('允许预算边界图像继续 OCR，natural 尺寸不可用时使用已解码尺寸', async () => {
@@ -340,18 +358,19 @@ describe('Offscreen 图片完整操作生命周期', () => {
             });
             if (stage === 'inpainting') mocks.inpaint.mockImplementation(pixels => {controller.abort(); return pixels;});
             if (stage === 'draw-event') mocks.draw.mockImplementation(() => {setTimeout(() => controller.abort(), 0);});
-            if (stage === 'pixel-read' || stage === 'encoding') vi.stubGlobal('document', {createElement: () => {
+            if (stage === 'encoding') mocks.encode.mockImplementationOnce(async () => {controller.abort(); return 'cancelled-image';});
+            if (stage === 'pixel-read') vi.stubGlobal('document', {createElement: () => {
                 const canvas = makeCanvas();
-                if (stage === 'pixel-read') canvas.context.getImageData.mockImplementation(() => {
+                canvas.context.getImageData.mockImplementation(() => {
                     controller.abort(); return {data: new Uint8ClampedArray(32 * 16 * 4)};
                 });
-                else canvas.toDataURL.mockImplementation(() => {controller.abort(); return 'cancelled-image';});
                 return canvas;
             }});
             await expect(translateImageInOffscreen('image', 'en', '', controller.signal, 'cancel-render')).rejects.toMatchObject({name: 'AbortError'});
             expect(images[0].src).toBe('');
             expect(canvases.every(canvas => canvas.width === 0 && canvas.height === 0)).toBe(true);
-            if (stage !== 'encoding') expect(canvases.every(canvas => canvas.toDataURL.mock.calls.length === 0)).toBe(true);
+            if (stage !== 'encoding') expect(mocks.encode).not.toHaveBeenCalled();
+            expect(canvases.every(canvas => canvas.toDataURL.mock.calls.length === 0)).toBe(true);
         },
     );
 
@@ -367,14 +386,29 @@ describe('Offscreen 图片完整操作生命周期', () => {
             if (message.type === 'fluentReadImageProgress') throw new Error('page closed');
             callback({success: true, translations: ['你好']});
         });
-        vi.stubGlobal('document', {createElement: () => {
-            const canvas = makeCanvas();
-            canvas.toDataURL.mockImplementation(() => {throw new Error('encode failed');});
-            return canvas;
-        }});
+        mocks.encode.mockRejectedValueOnce(new Error('encode failed'));
         await expect(translateImageInOffscreen('image', 'en', '', undefined, 'progress')).rejects.toThrow('encode failed');
         expect(images[0].src).toBe('');
         expect(canvases[0].width).toBe(0);
+    });
+
+    it('普通图片复用独占像素，等待异步编码时保留画布，完成后释放', async () => {
+        let finish!: (value: string) => void;
+        let started!: () => void;
+        const encoding = new Promise<void>(resolve => {started = resolve;});
+        mocks.encode.mockImplementationOnce(() => new Promise<string>(resolve => {finish = resolve; started();}));
+        const operation = translateImageInOffscreen('image', 'en', '');
+        await encoding;
+        const canvas = canvases[0];
+        const source = canvas.context.getImageData.mock.results[0].value;
+        expect(mocks.inpaint).toHaveBeenCalledWith(source.data, 32, 16, expect.any(Array), true);
+        expect(canvas.context.putImageData).toHaveBeenCalledWith(source, 0, 0);
+        expect(canvas.width).toBe(32);
+        expect(mocks.encode).toHaveBeenCalledWith(canvas, undefined);
+        expect(canvas.toDataURL).not.toHaveBeenCalled();
+        finish('encoded-image');
+        await expect(operation).resolves.toHaveProperty('image', 'encoded-image');
+        expect([canvas.width, canvas.height]).toEqual([0, 0]);
     });
 });
 

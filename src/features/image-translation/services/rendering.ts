@@ -1,7 +1,7 @@
 /**
  * @file src/features/image-translation/services/rendering.ts
  * 文件职责：采样 OCR 框周边背景并在有限图片区域中排版、绘制完整译文，避免混合语言空格损坏、强制横向压缩和行数截断。
- * 主要内容：按周长采样不透明主色、依据相对亮度选择文字颜色、按单词与字素换行，通过字号二分适配区域并隔离 Canvas 绘图状态。
+ * 主要内容：按周长采样主色、依据亮度选择文字颜色、按单词与字素换行；每次排版有界复用同字号测宽和字素分割，避免字号搜索中的重复工作，保留正文对齐及字号上限并隔离 Canvas 状态。
  * 模块边界：颜色和排版算法无浏览器副作用；绘制函数仅操作调用方传入的 Canvas context，不读取配置、不请求翻译、不修补背景或修改宿主图片元素。
  */
 import type { OcrLine } from '@/src/shared/image/types';
@@ -102,6 +102,22 @@ export function layoutImageTranslationText(
     }
     const paragraphs = normalized.split('\n').map(paragraph => paragraph.trim());
     const tokens = paragraphs.map(paragraph => paragraph.match(CJK_TOKENS) || []);
+    const segments = new Map<string, string[]>();
+    let measuredSize = 0;
+    const widths = new Map<string, number>();
+    const textWidth = (value: string, size: number) => {
+        if (size !== measuredSize) {
+            widths.clear();
+            measuredSize = size;
+        }
+        const cached = widths.get(value);
+        if (cached !== undefined) return cached;
+        const result = measure(value, size);
+        // 缓存只属于本段和当前字号，长段落也不累积无限多中间字符串。
+        if (widths.size >= 512) widths.delete(widths.keys().next().value!);
+        widths.set(value, result);
+        return result;
+    };
     const lineSpacing = 1.18;
     const wrap = (fontSize: number): ImageTranslationTextLayout => {
         const lines: string[] = [];
@@ -115,7 +131,7 @@ export function layoutImageTranslationText(
                 }
                 const candidate = current + space + token;
                 space = '';
-                if (measure(candidate, fontSize) <= width) {
+                if (textWidth(candidate, fontSize) <= width) {
                     current = candidate;
                     continue;
                 }
@@ -123,8 +139,17 @@ export function layoutImageTranslationText(
                     lines.push(current);
                     current = '';
                 }
-                for (const part of graphemes(token)) {
-                    if (current && measure(current + part, fontSize) > width) {
+                if (textWidth(token, fontSize) <= width) {
+                    current = token;
+                    continue;
+                }
+                let parts = segments.get(token);
+                if (!parts) {
+                    parts = graphemes(token);
+                    segments.set(token, parts);
+                }
+                for (const part of parts) {
+                    if (current && textWidth(current + part, fontSize) > width) {
                         lines.push(current);
                         current = '';
                     }
@@ -136,13 +161,13 @@ export function layoutImageTranslationText(
         return { lines, fontSize, lineHeight: fontSize * lineSpacing };
     };
     const fits = (layout: ImageTranslationTextLayout) => layout.lines.length * layout.lineHeight <= height
-        && layout.lines.every(line => measure(line, layout.fontSize) <= width);
+        && layout.lines.every(line => textWidth(line, layout.fontSize) <= width);
 
     let high = Math.min(height / lineSpacing, maxFontSize);
     const largest = wrap(high);
     if (fits(largest)) return largest;
     // 根据完整段落在 1px 字号的宽度推导可容纳下限；极长译文可缩小但始终保留全部文字。
-    const paragraphWidth = Math.max(1, ...paragraphs.map(paragraph => measure(paragraph, 1)));
+    const paragraphWidth = Math.max(1, ...paragraphs.map(paragraph => textWidth(paragraph, 1)));
     let low = Math.min(1, width / paragraphWidth, height / (paragraphs.length * lineSpacing)) * 0.99;
     let best = wrap(low);
     for (let iteration = 0; iteration < 12; iteration += 1) {
@@ -167,6 +192,7 @@ export function drawTranslatedImageText(
     height: number,
     backgroundColor: string,
     maxFontSize = Infinity,
+    textAlign: 'left' | 'center' | 'right' = 'center',
 ): void {
     const paddingX = Math.min(2, width * 0.03);
     const paddingY = Math.min(1, height * 0.05);
@@ -175,7 +201,7 @@ export function drawTranslatedImageText(
         let measuredFont = 0;
         const layout = layoutImageTranslationText(text, width - paddingX * 2, height - paddingY * 2, (line, fontSize) => {
             if (fontSize !== measuredFont) {
-                context.font = `500 ${fontSize}px ${IMAGE_TEXT_FONT}`;
+                context.font = `400 ${fontSize}px ${IMAGE_TEXT_FONT}`;
                 measuredFont = fontSize;
             }
             return context.measureText(line).width;
@@ -184,18 +210,21 @@ export function drawTranslatedImageText(
         context.beginPath();
         context.rect(left, top, width, height);
         context.clip();
-        context.font = `500 ${layout.fontSize}px ${IMAGE_TEXT_FONT}`;
-        context.textAlign = 'center';
+        context.font = `400 ${layout.fontSize}px ${IMAGE_TEXT_FONT}`;
+        context.textAlign = textAlign;
         context.textBaseline = 'middle';
         context.fillStyle = getImageTextColor(backgroundColor);
         context.strokeStyle = backgroundColor;
         context.lineWidth = Math.max(0.35, layout.fontSize * 0.06);
         context.lineJoin = 'round';
-        const firstLine = top + (height - layout.lineHeight * layout.lines.length) / 2 + layout.lineHeight / 2;
+        const firstLine = textAlign === 'center'
+            ? top + (height - layout.lineHeight * layout.lines.length) / 2 + layout.lineHeight / 2
+            : top + paddingY + layout.lineHeight / 2;
+        const x = textAlign === 'left' ? left + paddingX : textAlign === 'right' ? left + width - paddingX : left + width / 2;
         layout.lines.forEach((line, index) => {
             const y = firstLine + index * layout.lineHeight;
-            context.strokeText(line, left + width / 2, y);
-            context.fillText(line, left + width / 2, y);
+            context.strokeText(line, x, y);
+            context.fillText(line, x, y);
         });
     } finally {
         context.restore();

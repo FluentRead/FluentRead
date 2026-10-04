@@ -28,9 +28,9 @@ describe('Google Drive 可信消息协议', () => {
             if (action === 'cancel') expect(allowed.service.cancel).toHaveBeenCalledWith(undefined, undefined, 'fixture-client');
         }
         await allowed.handler.handle({type, clientId: 'fixture-client', action: 'prepare'}, {});
-        expect(allowed.service.prepare).toHaveBeenCalledWith(GOOGLE_DRIVE_APPLICATION_PASSPHRASE, undefined, 'fixture-client');
+        expect(allowed.service.prepare).toHaveBeenCalledWith(GOOGLE_DRIVE_APPLICATION_PASSPHRASE, undefined, 'fixture-client', false);
         await allowed.handler.handle({type, clientId: 'fixture-client', action: 'prepare'}, {sender: {tab: {id: 73}}});
-        expect(allowed.service.prepare).toHaveBeenLastCalledWith(GOOGLE_DRIVE_APPLICATION_PASSPHRASE, 73, 'fixture-client');
+        expect(allowed.service.prepare).toHaveBeenLastCalledWith(GOOGLE_DRIVE_APPLICATION_PASSPHRASE, 73, 'fixture-client', false);
         await allowed.handler.handle({type, clientId: 'fixture-client', action: 'commit', id: 'fixture-id', direction: 'merge', choices: {'0': 'local', '1': 'remote'}}, {});
         expect(allowed.service.commit).toHaveBeenCalledWith('fixture-id', GOOGLE_DRIVE_APPLICATION_PASSPHRASE, 'merge', {'0': 'local', '1': 'remote'}, undefined, 'fixture-client');
     });
@@ -60,4 +60,17 @@ describe('Google Drive 可信消息协议', () => {
             expect(JSON.stringify(await f.handler.handle({type, clientId: 'fixture-client', action: 'status'}, {}))).not.toContain('fixture-private');
         }
     });
+});
+
+
+it('Google Drive prepare 的敏感信息同意只能是 boolean，旧消息缺省安全关闭', async () => {
+    const f = fixture();
+    for (const includeSensitive of [null, 0, 1, 'false', 'true', {}, []]) {
+        expect(await f.handler.handle({type, clientId: 'fixture-client', action: 'prepare', includeSensitive}, {})).toMatchObject({success: false});
+    }
+    expect(f.service.prepare).not.toHaveBeenCalled();
+    for (const includeSensitive of [undefined, false, true]) {
+        expect(await f.handler.handle({type, clientId: 'fixture-client', action: 'prepare', includeSensitive}, {sender: {tab: {id: 7}}})).toMatchObject({success: true});
+        expect(f.service.prepare).toHaveBeenLastCalledWith(GOOGLE_DRIVE_APPLICATION_PASSPHRASE, 7, 'fixture-client', includeSensitive ?? false);
+    }
 });

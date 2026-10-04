@@ -41,7 +41,7 @@ async function main() {
         }
         res.writeHead(405).end();
     });
-    const report = {ok:false,evidence:'production extension and real fetch to a local WebDAV HTTP fixture',extensionDir,launchMode:null,focusPolicy:null,windowPlacement:null,cases:[],consoleErrors:[],screenshots:[]};
+    const report = {ok:false,evidence:'real extension and fetch to a local WebDAV HTTP fixture',extensionDir,buildKind:extensionDir.endsWith('-dev')?'development':'production',launchMode:null,focusPolicy:null,windowPlacement:null,cases:[],consoleErrors:[],screenshots:[]};
     let launched;
     const check = (condition,label) => {if (!condition) throw new Error(label); report.cases.push(label);};
     try {
@@ -95,6 +95,97 @@ async function main() {
         }
         const dialog=page.locator('.drive-dialog');
         async function chooseIntent(direction) {if (await page.locator('[data-testid="webdav-back"]').count()) await page.locator('[data-testid="webdav-back"]').click(); if (direction==='merge') await page.locator('[data-testid="webdav-direction-merge"]').click(); else {await page.locator(`[data-testid="webdav-direction-${direction}"]`).check();await page.locator('[data-testid="webdav-continue"]').click();}}
+        if (process.argv.includes('--sensitive-only')) {
+            const toggle=page.locator('[data-testid="cloud-include-sensitive"]');
+            const switchInput=toggle.locator('input[role="switch"]');
+            const consent=page.locator('.cloud-consent-dialog');
+            async function expectOff(label) {check(await switchInput.getAttribute('aria-checked')==='false',label);}
+            async function allowSensitive() {
+                await toggle.click();await consent.waitFor();
+                check(!(await page.locator('[data-testid="cloud-consent-confirm"]').isEnabled()),'sensitive confirmation requires an unchecked acknowledgement');
+                await page.locator('[data-testid="cloud-risk-acknowledgement"]').check();
+                await page.locator('[data-testid="cloud-consent-confirm"]').click();await consent.waitFor({state:'hidden'});
+                check(await switchInput.getAttribute('aria-checked')==='true','explicit acknowledgement enables only this operation');
+            }
+            async function readPayload() {
+                return page.evaluate(async content=>{
+                    const envelope=JSON.parse(content);const decode=value=>Uint8Array.from(atob(value),c=>c.charCodeAt(0));
+                    const material=await crypto.subtle.importKey('raw',new TextEncoder().encode('FluentReadEncryption'),'PBKDF2',false,['deriveKey']);
+                    const key=await crypto.subtle.deriveKey({name:'PBKDF2',hash:'SHA-256',iterations:envelope.iterations,salt:decode(envelope.salt)},material,{name:'AES-GCM',length:256},false,['decrypt']);
+                    const plain=await crypto.subtle.decrypt({name:'AES-GCM',iv:decode(envelope.iv),additionalData:new TextEncoder().encode('fluentread-drive-encrypted:1:PBKDF2:SHA-256:600000:AES-256-GCM'),tagLength:128},key,decode(envelope.ciphertext));
+                    return JSON.parse(new TextDecoder().decode(plain));
+                },state.content);
+            }
+            async function credentials() {return page.evaluate(async()=> (await chrome.runtime.sendMessage({type:'configStorageRead',key:'local:credentials'})).value);}
+            async function confirm() {await page.locator('[data-testid="webdav-confirm"]').click();await dialog.waitFor({state:'hidden'});await expectOff('completing an operation resets sensitive consent');}
+            const beforeConsent=state.calls.length;
+            await expectOff('sensitive information is excluded by default');await shot('cloud-default-scope-desktop');
+            await toggle.click();await consent.waitFor();
+            check((await consent.innerText()).includes('公开的应用口令')&&(await consent.innerText()).includes('第三方账号被盗'),'risk dialog explains public encryption and stolen third-party accounts');
+            await shot('cloud-sensitive-consent-desktop');
+            await page.locator('[data-testid="cloud-consent-cancel"]').click();await consent.waitFor({state:'hidden'});
+            await expectOff('cancelling risk acknowledgement leaves sensitive sync disabled');
+            check(state.calls.length===beforeConsent,'opening and cancelling risk dialog makes no provider requests');
+            await savePatch({proxy:{openai:'https://fixture.invalid/?key=fixture-private-url'},system_role:'fixture-private-prompt'});
+            await page.locator('[data-testid="webdav-sync-now"]').click();await dialog.waitFor();
+            check((await dialog.locator('[data-testid="cloud-preview-scope"]').innerText()).includes('仅普通设置'),'preview repeats the selected settings-only scope');
+            await confirm();
+            const ordinary=await readPayload();const ordinaryText=JSON.stringify(ordinary);
+            check(!ordinaryText.includes('fixture-private')&&!ordinaryText.includes('fixture-app-password'),'default decrypted backup excludes keys, bodies, authenticated URLs, private prompts and connection password');
+            check(!Object.hasOwn(ordinary.config,'token')&&!Object.hasOwn(ordinary.config,'proxy'),'settings-only payload omits sensitive fields instead of empty deletion placeholders');
+            await savePatch({to:'de',token:{openai:'fixture-device-key'},apiKeys:{openai:['fixture-device-key']},proxy:{openai:'https://device.fixture.invalid/v1'},customBody:{openai:'{"auth":"fixture-device-body"}'}});
+            await page.locator('[data-testid="webdav-sync-now"]').click();await dialog.waitFor();await chooseIntent('download');await confirm();
+            const device=await credentials();
+            check(JSON.stringify(device).includes('fixture-device-key'),'restoring a settings-only backup preserves device credentials');
+            check((await page.evaluate(()=>chrome.runtime.sendMessage({type:'configStorageRead',key:'local:config'}))).value.proxy.openai==='https://device.fixture.invalid/v1','settings-only restore preserves the endpoint bound to local credentials');
+            await allowSensitive();await page.locator('[data-testid="webdav-sync-now"]').click();await dialog.waitFor();await chooseIntent('upload');await confirm();
+            const complete=await readPayload();
+            check(complete.version===1&&JSON.stringify(complete).includes('fixture-device-key')&&JSON.stringify(complete).includes('fixture-device-body'),'explicit consent creates a legacy-compatible complete backup');
+            await savePatch({to:'ja',token:{openai:'fixture-new-device-key'},apiKeys:{openai:['fixture-new-device-key']},proxy:{openai:'https://new-device.fixture.invalid/v1'}});
+            const legacyContent=state.content;const legacyVersion=state.version;
+            await page.locator('[data-testid="webdav-sync-now"]').click();await dialog.waitFor();
+            check(await dialog.locator('[data-testid="cloud-legacy-sensitive"]').isVisible(),'old complete backup has a visible sensitive-content warning');
+            await chooseIntent('download');await shot('cloud-legacy-restore-desktop');await confirm();
+            check(JSON.stringify(await credentials()).includes('fixture-new-device-key'),'default restore from a legacy complete backup preserves local keys');
+            check((await page.evaluate(()=>chrome.runtime.sendMessage({type:'configStorageRead',key:'local:config'}))).value.proxy.openai==='https://new-device.fixture.invalid/v1','legacy restore cannot bind local keys to the old cloud endpoint');
+            check(state.version===legacyVersion&&state.content===legacyContent,'default restore leaves the existing sensitive cloud file untouched');
+            await allowSensitive();await page.locator('[data-testid="webdav-sync-now"]').click();await dialog.waitFor();await chooseIntent('download');await confirm();
+            check(JSON.stringify(await credentials()).includes('fixture-device-key'),'explicit sensitive restore still imports complete legacy credentials');
+            // 普通设置完全一致时，仍要允许用户主动替换含敏感信息的旧云文件。
+            await page.locator('[data-testid="webdav-sync-now"]').click();await dialog.waitFor();
+            check(await page.locator('[data-testid="webdav-direction-upload"]').isVisible(),'scope change remains actionable even when ordinary settings are identical');
+            await chooseIntent('upload');await confirm();
+            check(!JSON.stringify(await readPayload()).includes('fixture-device-key'),'saving settings-only removes secrets from the current cloud file');
+            check(JSON.stringify(await credentials()).includes('fixture-device-key'),'downgrading cloud scope does not erase local credentials');
+            await allowSensitive();await page.locator('[data-testid="webdav-sync-now"]').click();await dialog.waitFor();
+            await dialog.getByRole('button',{name:'取消',exact:true}).click();await dialog.waitFor({state:'hidden'});await expectOff('cancelling preview resets sensitive consent');
+            await allowSensitive();await page.locator('[data-testid="cloud-method-google-drive"]').check();
+            await expectOff('switching provider cannot reuse sensitive consent');
+            await page.locator('[data-testid="cloud-method-webdav"]').check();await expectOff('returning to provider keeps safe default');
+            await allowSensitive();await page.reload({waitUntil:'domcontentloaded'});await navigate();await expectOff('reopening settings never restores a previous sensitive consent');
+            await page.setViewportSize({width:390,height:900});await activateExtensionTabWithoutForeground(context,page);await shot('cloud-default-scope-mobile');
+            await toggle.click();await consent.waitFor();
+            check(await consent.evaluate(el=>el.scrollWidth<=el.clientWidth),'risk dialog wraps without horizontal overflow at 390px');await shot('cloud-sensitive-consent-mobile');
+            await page.keyboard.press('Escape');await consent.waitFor({state:'hidden'});await expectOff('Escape cancels risk acknowledgement');
+            for (const language of ['en-US','ja-JP','ko-KR','fr-FR','ru-RU','es-ES']) {
+                await savePatch({uiLanguage:language,uiLanguageSetupCompleted:true});await page.reload({waitUntil:'domcontentloaded'});await navigate();
+                await toggle.click();await consent.waitFor();
+                const text=await consent.innerText();
+                check(!text.includes('settings.cloud.')&&!/[\u3400-\u9fff]/u.test(language==='en-US'?text:''),'consent strings resolve in '+language);
+                check(await consent.evaluate(el=>el.scrollWidth<=el.clientWidth),'localized consent wraps at 390px: '+language);
+                if(language==='en-US')await shot('cloud-sensitive-consent-english-mobile');
+                await page.locator('[data-testid="cloud-consent-cancel"]').click();await consent.waitFor({state:'hidden'});
+            }
+            await savePatch({uiLanguage:'zh-CN',theme:'dark'});await page.reload({waitUntil:'domcontentloaded'});await navigate();await page.setViewportSize({width:1440,height:1000});
+            await toggle.click();await consent.waitFor();await shot('cloud-sensitive-consent-dark-desktop');
+            const riskContrast=await consent.locator('.cloud-consent-risk').evaluate(el=>{
+                const luminance=color=>{const [r,g,b]=color.match(/[\d.]+/g).slice(0,3).map(Number).map(value=>{const c=value/255;return c<=.04045?c/12.92:((c+.055)/1.055)**2.4;});return .2126*r+.7152*g+.0722*b;};
+                const background=luminance(getComputedStyle(el).backgroundColor);const text=luminance(getComputedStyle(el.querySelector('p')).color);
+                return (Math.max(background,text)+.05)/(Math.min(background,text)+.05);
+            });
+            check(riskContrast>=4.5,'dark risk message has readable text contrast');
+            check(report.consoleErrors.length===0,'sensitive scope UI has no unhandled console errors');report.ok=true;return;
+        }
         await page.locator('[data-testid="webdav-sync-now"]').click();await dialog.waitFor();
         check(!state.folder && writes()===0 && state.calls.some(c => c.method==='PROPFIND' && c.url==='/dav/FluentRead/'),'missing-parent 409 reaches first-backup preview without creating a folder or file');
         await shot('webdav-first-backup-409-preview');
@@ -152,11 +243,11 @@ async function main() {
         await chooseIntent('download');
         check((await dialog.innerText()).includes('WebDAV'),'restore review describes the correct provider');
         check(await dialog.locator('.drive-change').count()>0,'restore review shows changed settings by default');
-        check((await dialog.innerText()).includes('API Key、OAuth Token 与鉴权信息') && !(await dialog.innerText()).includes('fixture-private'),'connection changes have useful categories and keep secrets hidden');
+        check(!(await dialog.innerText()).includes('API Key、OAuth Token 与鉴权信息') && !(await dialog.innerText()).includes('fixture-private'),'settings-only preview omits connection differences and secrets');
         await shot('webdav-restore-review');
         await page.locator('[data-testid="webdav-confirm"]').click();await dialog.waitFor({state:'hidden'});
         const restored=await page.evaluate(async () => ({config:await chrome.runtime.sendMessage({type:'configStorageRead',key:'local:config'}),credentials:await chrome.runtime.sendMessage({type:'configStorageRead',key:'local:credentials'})}));
-        check(restored.config.value.to==='fr' && JSON.stringify(restored.credentials.value).includes('fixture-private-key'),'restore applies full configuration and credentials through real persistence');
+        check(restored.config.value.to==='fr' && !JSON.stringify(restored.credentials.value).includes('fixture-private-key'),'settings-only restore does not import excluded credentials');
         check(state.version===1,'restoring does not rewrite the server file');
         await savePatch({to:'de'});await page.locator('[data-testid="webdav-sync-now"]').click();await dialog.waitFor();
         await chooseIntent('upload');

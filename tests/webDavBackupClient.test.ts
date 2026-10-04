@@ -15,3 +15,17 @@ describe('WebDAV 设置客户端',()=>{
         expect(new CloudBackupRequestError('fixture') instanceof Error).toBe(true);
     });
 });
+
+
+it('WebDAV 客户端 prepare 默认排除且明确传递单次同意，拒绝非 boolean', async () => {
+    mocks.send.mockClear();
+    mocks.send.mockResolvedValue({success: true, data: {}});
+    await client.prepare();
+    expect(mocks.send).toHaveBeenLastCalledWith(expect.objectContaining({action: 'prepare', includeSensitive: false}));
+    await client.prepare(true);
+    expect(mocks.send).toHaveBeenLastCalledWith(expect.objectContaining({includeSensitive: true}));
+    await client.prepare();
+    expect(mocks.send).toHaveBeenLastCalledWith(expect.objectContaining({includeSensitive: false}));
+    for (const consent of [null, 1, 'true', {}, []]) expect(() => client.prepare(consent as boolean)).toThrow('布尔值');
+    expect(mocks.send).toHaveBeenCalledTimes(3);
+});

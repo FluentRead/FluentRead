@@ -27,3 +27,17 @@ describe('同步设置请求端口', () => {
         await expect(client.status()).rejects.toThrow('fixture safe error');
     });
 });
+
+
+it('Google Drive 客户端 prepare 默认排除且明确传递单次同意，拒绝非 boolean', async () => {
+    mocks.send.mockClear();
+    mocks.send.mockResolvedValue({success: true, data: {}});
+    await client.prepare();
+    expect(mocks.send).toHaveBeenLastCalledWith(expect.objectContaining({action: 'prepare', includeSensitive: false}));
+    await client.prepare(true);
+    expect(mocks.send).toHaveBeenLastCalledWith(expect.objectContaining({includeSensitive: true}));
+    await client.prepare();
+    expect(mocks.send).toHaveBeenLastCalledWith(expect.objectContaining({includeSensitive: false}));
+    for (const consent of [null, 1, 'true', {}, []]) expect(() => client.prepare(consent as boolean)).toThrow('布尔值');
+    expect(mocks.send).toHaveBeenCalledTimes(3);
+});

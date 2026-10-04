@@ -19,7 +19,7 @@ describe('WebDAV 可信设置消息', () => {
         const f=fixture();
         for(const id of [undefined,null,'','bad/id','x'.repeat(65)]) expect(await f.handler.handle({type,clientId:id,action:'settings'},{})).toMatchObject({success:false});
         for(const action of ['status','settings','prepare','clear','cancel']) expect(await f.handler.handle({type,clientId,action},{sender:{tab:{id:7}}})).toMatchObject({success:true});
-        expect(f.service.prepare).toHaveBeenCalledWith(GOOGLE_DRIVE_APPLICATION_PASSPHRASE,7,clientId);
+        expect(f.service.prepare).toHaveBeenCalledWith(GOOGLE_DRIVE_APPLICATION_PASSPHRASE,7,clientId, false);
         expect(f.service.clear).toHaveBeenCalledWith(undefined,7,clientId);
         for(const action of ['save','test']) {
             await f.handler.handle({type,clientId,action,connection:{url:'fixture'}},{});
@@ -47,4 +47,17 @@ describe('WebDAV 可信设置消息', () => {
             if(error instanceof WebDavError) expect(result).toMatchObject({errorKey:`settings.webdav.error.${error.code}`,errorParams:{status:error.status??0}});
         }
     });
+});
+
+
+it('WebDAV prepare 的敏感信息同意只能是 boolean，旧消息缺省安全关闭', async () => {
+    const f = fixture();
+    for (const includeSensitive of [null, 0, 1, 'false', 'true', {}, []]) {
+        expect(await f.handler.handle({type, clientId: 'fixture-client', action: 'prepare', includeSensitive}, {})).toMatchObject({success: false});
+    }
+    expect(f.service.prepare).not.toHaveBeenCalled();
+    for (const includeSensitive of [undefined, false, true]) {
+        expect(await f.handler.handle({type, clientId: 'fixture-client', action: 'prepare', includeSensitive}, {sender: {tab: {id: 7}}})).toMatchObject({success: true});
+        expect(f.service.prepare).toHaveBeenLastCalledWith(GOOGLE_DRIVE_APPLICATION_PASSPHRASE, 7, 'fixture-client', includeSensitive ?? false);
+    }
 });

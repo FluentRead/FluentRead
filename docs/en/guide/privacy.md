@@ -1,6 +1,6 @@
 # Privacy policy
 
-Updated: October 3, 2026.
+Updated: October 4, 2026.
 
 This policy describes how the FluentRead browser extension handles translation content, local records, service credentials, and optional Google Drive / WebDAV cloud configuration backups. FluentRead is a bilingual translation and reading-assistance tool maintained by its open-source project contributors. The website and this policy are publicly accessible without signing in. Translation does not require connecting a Google account.
 
@@ -23,7 +23,7 @@ The feature and service you choose determine which content leaves the browser. F
 | Video subtitles | Subtitle text goes to the subtitle service. X local AI audio recognition happens on the device |
 | Dictionary and read-aloud | Requested words or text go to the corresponding dictionary or voice service |
 | WebDAV cloud configuration backup | Connection tests send your username and app password to your chosen server; confirmed operations read or write encrypted configuration without passing through a developer server |
-| Google Drive configuration sync (Chrome testing feature) | After explicit confirmation, an encrypted complete configuration backup is saved to your own Google Drive; the scope is described below |
+| Google Drive configuration sync (Chrome testing feature) | After confirmation, an encrypted backup within this operation’s scope is saved to your own Google Drive; general settings are the default, and sensitive information requires separate consent for this operation |
 
 Initial recognition-pack and local-model preparation requires network downloads. Input translation is disabled by default and handles text you deliberately submit from ordinary fields, not password fields.
 
@@ -33,7 +33,7 @@ Sites configured for automatic translation can start requests automatically. Cho
 
 ## What stays in the browser?
 
-Settings, rules, glossaries, collections, and review records are stored in this browser’s extension storage. Free-translation health, error, and performance statistics are also stored locally for background balancing and cooldown recovery. Service credentials are stored locally by default. When you deliberately use cloud configuration backup, they are also included in the configuration backup described below. Someone with access to the browser profile or backups may still access them.
+Settings, rules, glossaries, collections, and review records are stored in this browser’s extension storage. Free-translation health, error, and performance statistics are also stored locally for background balancing and cooldown recovery. Service credentials are stored locally by default. Cloud backups exclude them by default; they are included in saving or merging only after explicit consent for that operation. Older cloud backups may still contain credentials, and turning the option off does not delete them. Someone with access to the browser profile or backups may still access them.
 
 Regular-window reading-card conversations are retained for 30 days and can be viewed or deleted. Private windows do not read or save this history and do not provide persistent learning collections.
 
@@ -51,27 +51,34 @@ Drive configuration sync is currently being tested in the Chrome extension. Avai
 
 Only choosing the Google Drive sync action starts authorization for that operation and reads the backup to prepare a preview. Uploading or applying downloaded settings requires your confirmation of the direction and changes. Opening settings does not automatically access Google Drive.
 
-- **Configuration:** includes API keys, OAuth tokens, authentication headers, custom request bodies, and authentication parameters in URLs. Wordbooks, conversations, and usage statistics are excluded. These OAuth tokens are your configured service credentials; the access token for Google sync is excluded from the backup.
+- **Default configuration scope:** only general settings, such as language, appearance, shortcuts, and website rules. The entire sensitive connection configuration is excluded: API keys, service OAuth tokens, authentication headers, service URLs, translation service selections and models, custom request bodies, and authentication parameters in URLs. Private prompts and unrecognized fields are also excluded. Restoring or merging general settings preserves this device’s keys, translation services, URLs, and custom connections.
+- **Consent for sensitive information:** enable “Include API keys and other sensitive information this time”, read the risks, and check the acknowledgement before all sensitive connections and private prompts can be included in saving or merging for this operation. Restoring applies only what the backup actually contains; a general-settings backup does not replace this device’s sensitive connections. Wordbooks, chat history, and usage statistics are excluded. The access token for Google sync is never backed up; optional OAuth tokens refer to your configured service credentials.
 - **Google permissions:** only `drive.appdata`, which manages FluentRead's own hidden application data. The extension does not request access to your other Drive files, Gmail messages, or contacts. See [Google's application-data documentation](https://developers.google.com/workspace/drive/api/guides/appdata).
 - **Account information:** the selected account's Drive identifier prevents mixing configurations from different accounts. Email, when returned by Google, identifies the account in the preview and is saved locally with the time after successful sync, as the last synced account. No separate email identity permission is requested, and sync works without an email response.
 - **Authorization tokens:** Chrome's identity API manages them for Google API requests. Completion, failure, cancellation, or leaving settings clears the extension's identity cache. Clearing that cache does not revoke the permission in your Google account or delete a backup.
+
+Google authorization and consent to include sensitive information are separate steps. The sensitive-information option is off by default, and consent applies only to this operation. Completion, failure (including preview preparation failure), cancellation, leaving or reopening settings, or switching providers or Google accounts turns it off again.
+
+The current extension still reads older complete v1 backups. General-settings mode applies only their general settings and keeps this device’s connections. Complete sensitive backups saved with consent keep v1, which older extensions can still read. New general-settings backups use v2; older extensions safely reject them and must be upgraded. Unconfirmed transactions from before the upgrade expire and require a new preview.
+
+Reading or restoring an older backup does not remove its sensitive information. Sensitive information is removed from the current cloud file only after you confirm saving or merging general settings. Turning the option off does not delete old files or versions retained by the provider; manage historical copies separately.
 
 The operation handles the following data. Backup access is limited to FluentRead's own hidden application data folder.
 
 | Data category | Specific content | Purpose |
 | --- | --- | --- |
-| Configuration backup content | Translation providers and models, languages and appearance, shortcuts, website rules, glossaries, custom prompts, and the service credentials and request parameters listed above | Upload to back up settings; download to preview differences, then restore or merge settings in the direction you confirm |
+| Configuration backup content | General settings by default; explicit consent for this operation can add all sensitive connections, service credentials, request parameters, and private prompts. Older files being read may still contain sensitive information | Upload settings within this operation’s scope; download to preview differences, then restore or merge within the scope and direction you confirm |
 | Google account information | Drive account identifier and email address when Google returns it | The identifier prevents mixing backups from different accounts; email identifies the current account and the locally saved record of the last successful sync |
 | FluentRead backup file information | File ID, name, version, modification time, and available version-check information | Locate the configuration file and check for changes during sync to avoid overwriting newer settings from another device |
 | Google access token for this operation | A short-lived authorization token obtained through Chrome's identity API | Authenticate authorized requests to Google; it is not uploaded as configuration or provided to translation services |
 
-Content you enter into prompts, custom request bodies, or URLs is also part of the configuration backup. Sync does not scan webpages or read downloaded documents, learning records, conversations, or usage records as backup content.
+Content you enter into private prompts, custom request bodies, or service URLs participates in saving or merging only after explicit consent to include sensitive information for this operation. Sync does not scan webpages or read downloaded documents, learning records, conversations, or usage records as backup content.
 
 ### Storage and protection
 
 The backup is sent over HTTPS directly to your own Google Drive hidden application data folder as `fluentread-config.encrypted.json`. It does not pass through a FluentRead developer configuration server or appear as a regular My Drive file. The account identifier, last successfully synced account's email when returned by Google, last-sync time, and an encrypted copy used to compare changes remain in this browser.
 
-The configuration is encrypted on the device before upload using a fixed, publicly available application passphrase. You do not enter a password. **Anyone who obtains the encrypted backup can decrypt it using the public passphrase.** Access protection primarily depends on your Google account, application permissions, and device security. Protect your account, browser profile, and exported backups. Do not attach a backup or complete configuration to a public report.
+The configuration is encrypted on the device before upload using a fixed, publicly available application passphrase. You do not enter a password. **Anyone who obtains the encrypted backup can decrypt it using the public passphrase.** Access protection primarily depends on your Google account, application permissions, and device security. If a third-party account is compromised, someone accesses a shared directory, or a backup leaks, API keys and other sensitive information in that backup could be exposed. We recommend syncing only general settings. When migrating keys, protect your account, directory permissions, browser profile, and exported backups, and avoid sharing files. Do not attach a backup or complete configuration to a public report.
 
 | Storage location | Content and retention |
 | --- | --- |
@@ -98,13 +105,13 @@ FluentRead's use of information received from Google APIs adheres to the [Google
 WebDAV and Google Drive share the cloud configuration backup entry and preview, confirmation, restore, and merge workflow, with separate records. The extension contacts your chosen WebDAV server only when you test or save a connection or start a backup operation. Opening settings reads a local connection summary; there is no polling or automatic backup.
 
 - **Data and purpose:** your username and app password form the Basic authentication header for the chosen directory. Connection tests and connection saving only perform a read-only `PROPFIND`. Starting sync reads FluentRead’s fixed backup file; directory creation and writing happen only after confirming save or merge.
-- **Backup scope:** the same complete configuration as Google Drive, including configured API keys, OAuth tokens, authentication headers, custom request bodies, and authentication parameters in URLs. Wordbooks, chat history, and usage statistics are excluded. The WebDAV connection URL, username, app password, and its authentication header are excluded from configuration backups.
+- **Backup scope:** as with Google Drive, only general settings by default, excluding the entire sensitive connection configuration, private prompts, and unrecognized fields. Restoring or merging general settings keeps this device’s connections. Saving or merging can include all sensitive connections only with explicit consent for this operation; restoring applies only what the backup actually contains. Wordbooks, chat history, and usage statistics are excluded. The WebDAV URL, username, app password, and authentication header used to access the backup server are always excluded from configuration backups.
 - **Destination and access:** requests go directly to your chosen drive, NAS, or server, without a FluentRead developer server or Google. Its operator and anyone with file access can read the backup. Its logs, retention, and other processing are governed by the service you choose. Requests omit browser cookies and do not forward credentials through redirects.
 - **Storage and retention:** the fixed file is `FluentRead/fluentread-config.encrypted.json` under the chosen directory and remains until you delete it. Connection details and the app password are kept in the background’s private encrypted configuration store on this device, are not returned to the form, and are not exported. The successful account, time, and encrypted comparison copy remain until clearing connection settings, related browser data, or uninstalling. Pending snapshots are cleared on completion, failure, cancellation, leaving settings, or expiry.
-- **Protection:** upload uses the same fixed public application passphrase as Google Drive; no extra encryption password is required. Anyone obtaining the file can decrypt it with the public passphrase. HTTPS protects transport. HTTP does not protect the username, password, or transferred file and requires explicit acknowledgement. Server account security, directory permissions, and device security provide the main access protection.
+- **Protection:** upload uses the same fixed public application passphrase as Google Drive; no extra encryption password is required. Anyone obtaining the file can decrypt it with the public passphrase. A compromised third-party account, access to a shared directory, or a leaked backup could expose API keys and other sensitive information in that backup. HTTPS protects transport. HTTP does not protect the username, password, or transferred file and requires explicit acknowledgement. Server account security, directory permissions, and device security provide the main access protection.
 - **Stopping and deletion:** stop manual operations to stop new requests. Clear connection settings removes local WebDAV connection details, the app password, and sync records while retaining device configuration and server files. Delete the cloud file separately through your server and revoke its app password to end authorization. Clearing local data, uninstalling, or revoking a password does not delete the server file; deleting that file does not erase configurations already restored elsewhere.
 
-WebDAV data is used only for requested configuration backup, restore, and comparison, not advertising, sale, profiling, or model training. Restored service credentials continue to authenticate your chosen translation services as described above. See the [WebDAV backup guide](./webdav) for setup and server requirements.
+WebDAV follows the same consent reset, v1/v2 compatibility, and older-file rules as Google Drive. Turning the option off or restoring general settings does not clear old backups. Confirming save or merge of general settings updates only the current file and cannot delete versions retained by the provider. WebDAV data is used only for requested configuration backup, restore, and comparison, not advertising, sale, profiling, or model training. Restored service credentials continue to authenticate your chosen translation services as described above. See the [WebDAV backup guide](./webdav) for setup and server requirements.
 
 ## Control and remove other data
 

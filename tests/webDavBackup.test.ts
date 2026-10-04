@@ -1,11 +1,13 @@
 import {describe,expect,it,vi} from 'vitest';
 import {Config,normalizeConfig} from '@/src/core/config/model';
-import {driveSyncPayload,toDriveSyncConfig} from '@/src/core/config/driveSync';
+import {driveSyncPayload as completePayload,toDriveSyncConfig,projectDriveSyncConfig} from '@/src/core/config/driveSync';
 import {decryptDriveConfig,encryptDriveConfig} from '@/src/platform/google-drive/encryption';
 import {createWebDavConnectionStore,parseWebDavConnection,WEBDAV_CONNECTION_KEY} from '@/src/platform/webdav/connection';
 import {createWebDavBackup,type WebDavBackupPorts} from '@/src/services/config/webDavBackup';
 import type {CloudSyncRemote} from '@/src/core/config/cloudSync';
 import type {DriveSyncState} from '@/src/services/config/remoteConfigSync';
+// 旧完整备份回归使用明确完整范围，默认普通范围另行覆盖。
+const driveSyncPayload = (config: Record<string, unknown>) => completePayload(config, true);
 const password='FluentReadEncryption';
 const input={url:'https://dav.fixture.invalid/base/',username:'fixture-user',password:'fixture-app-password',revision:null};
 const config=(patch:Record<string,unknown>={})=>toDriveSyncConfig(normalizeConfig({...new Config(),videoServiceDefaultMigrated:true,...patch}));
@@ -23,7 +25,7 @@ describe('WebDAV 配置云备份事务',()=>{
         const f=fixture();
         expect(await f.service.status()).toMatchObject({available:false,account:null});
         expect(await f.service.settings()).toBeNull();
-        await expect(f.service.prepare(password)).rejects.toMatchObject({code:'missing'});
+        await expect(f.service.prepare(password, undefined, undefined, true)).rejects.toMatchObject({code:'missing'});
         expect(f.ports.api.read).not.toHaveBeenCalled();
         await f.service.test(input);expect(await f.service.settings()).toBeNull();
         const saved=await f.service.save(input,7,'fixture-page');
@@ -42,7 +44,7 @@ describe('WebDAV 配置云备份事务',()=>{
         const appearance={backgroundColor:'#fce7f3',customCss:'color: #123456;'};
         f.local=config({...f.local,bilingualSentenceHighlightAppearance:appearance,bilingualSentenceHighlightProfiles:[{id:'fixture-highlight',name:'Fixture highlight',style:'mint',appearance}],activeSentenceHighlightProfileId:'fixture-highlight'});
         await f.service.save(input);
-        const preview=await f.service.prepare(password,7,'fixture-page');
+        const preview=await f.service.prepare(password, 7, 'fixture-page', true);
         expect(preview).toMatchObject({hasRemote:false,hasBaseline:false,changes:[]});
         expect(f.ports.api.write).not.toHaveBeenCalled();
         expect(JSON.stringify(f.state)).not.toMatch(/fixture-api-key|fixture-app-password|fixture-oauth-token/u);
@@ -54,7 +56,7 @@ describe('WebDAV 配置云备份事务',()=>{
         expect(JSON.stringify(payload)).not.toContain(input.password);
         const last=await f.service.status();expect(last.account?.email).toContain('fixture-user');
         const second=fixture(f.shared);await second.service.save(input);second.local=config({token:{openai:'fixture-old-key'},key:'fixture-delete-key'});
-        const restore=await second.service.prepare(password,8,'fixture-other');
+        const restore=await second.service.prepare(password, 8, 'fixture-other', true);
         expect(restore.hasBaseline).toBe(false);
         await second.service.commit(restore.id,password,'download',{},8,'fixture-other');
         expect(second.local).toEqual(f.local);
@@ -66,23 +68,23 @@ describe('WebDAV 配置云备份事务',()=>{
     it('相同连接保留基线，换连接使预览失效；另一页面不能更改连接或取消事务',async()=>{
         const f=fixture();
         let saved=await f.service.save(input,7,'fixture-page');
-        let preview=await f.service.prepare(password,7,'fixture-page');
+        let preview=await f.service.prepare(password, 7, 'fixture-page', true);
         for(const action of ['save','clear'] as const) await expect(action==='save'?f.service.save({...saved,password:''},8,'fixture-other'):f.service.clear(saved.revision,8,'fixture-other')).rejects.toThrow('另一个设置页面');
         await expect(f.service.save({...saved,password:''},7,'fixture-other')).rejects.toThrow('另一个设置页面');
         await f.service.cancel(preview.id,8,'fixture-other');expect(f.state.prepared?.id).toBe(preview.id);
         await f.service.cancelTab(99);expect(f.state.prepared?.id).toBe(preview.id);
         await f.service.cancelTab(7);expect(f.state.prepared).toBeUndefined();
-        preview=await f.service.prepare(password,7,'fixture-page');await f.service.commit(preview.id,password,'upload',{},7,'fixture-page');
+        preview=await f.service.prepare(password, 7, 'fixture-page', true);await f.service.commit(preview.id,password,'upload',{},7,'fixture-page');
         const same=await f.service.save({...saved,password:''},7,'fixture-page');expect(same.revision).toBe(saved.revision);
-        preview=await f.service.prepare(password,7,'fixture-page');expect(preview.hasBaseline).toBe(true);await f.service.cancel(preview.id,7,'fixture-page');
-        preview=await f.service.prepare(password,7,'fixture-page');
+        preview=await f.service.prepare(password, 7, 'fixture-page', true);expect(preview.hasBaseline).toBe(true);await f.service.cancel(preview.id,7,'fixture-page');
+        preview=await f.service.prepare(password, 7, 'fixture-page', true);
         const changed=parseWebDavConnection({...saved,password:'fixture-other-password'},await f.connections.read());
         // 模拟后台外部连接修改，旧确认不能写入任一服务器。
         await f.connections.write(changed);
         const writes=vi.mocked(f.ports.api.write).mock.calls.length;
         await expect(f.service.commit(preview.id,password,'upload',{},7,'fixture-page')).rejects.toThrow('同步连接已变化');
         expect(vi.mocked(f.ports.api.write).mock.calls.length).toBe(writes);
-        const firstForNewConnection=await f.service.prepare(password,7,'fixture-page');expect(firstForNewConnection.hasBaseline).toBe(false);
+        const firstForNewConnection=await f.service.prepare(password, 7, 'fixture-page', true);expect(firstForNewConnection.hasBaseline).toBe(false);
         await f.service.cancel(firstForNewConnection.id,7,'fixture-page');
         saved=(await f.service.settings())!;
         const changedSummary=await f.service.save({...saved,password:'fixture-new-password'},7,'fixture-page');
@@ -99,18 +101,42 @@ describe('WebDAV 配置云备份事务',()=>{
     });
     it('合并单边修改，云端和本机变化使预览失效；失败不更新成功记录',async()=>{
         const f=fixture();await f.service.save(input);
-        let preview=await f.service.prepare(password);await f.service.commit(preview.id,password,'upload',{});
+        let preview=await f.service.prepare(password, undefined, undefined, true);await f.service.commit(preview.id,password,'upload',{});
         const baseline=f.state;const original=f.local;
         f.local=config({...original,theme:'dark'});
         f.shared.remote={file:{...f.shared.remote!.file,version:'2'},content:await encryptDriveConfig(driveSyncPayload(config({...original,to:'fr'})),password)};
-        preview=await f.service.prepare(password);await f.service.commit(preview.id,password,'merge',{});
+        preview=await f.service.prepare(password, undefined, undefined, true);await f.service.commit(preview.id,password,'merge',{});
         expect(f.local).toMatchObject({theme:'dark',to:'fr'});
-        preview=await f.service.prepare(password);f.local=config({...f.local,to:'de'});
+        preview=await f.service.prepare(password, undefined, undefined, true);f.local=config({...f.local,to:'de'});
         await expect(f.service.commit(preview.id,password,'upload',{})).rejects.toThrow('本机配置已变化');
-        preview=await f.service.prepare(password);f.shared.remote={...f.shared.remote!,file:{...f.shared.remote!.file,version:'changed'}};
+        preview=await f.service.prepare(password, undefined, undefined, true);f.shared.remote={...f.shared.remote!,file:{...f.shared.remote!.file,version:'changed'}};
         await expect(f.service.commit(preview.id,password,'upload',{})).rejects.toThrow('云端配置已变化');
-        const previous=f.state;preview=await f.service.prepare(password);vi.mocked(f.ports.api.write).mockRejectedValueOnce(new Error('fixture upstream'));
+        const previous=f.state;preview=await f.service.prepare(password, undefined, undefined, true);vi.mocked(f.ports.api.write).mockRejectedValueOnce(new Error('fixture upstream'));
         await expect(f.service.commit(preview.id,password,'upload',{})).rejects.toThrow('fixture upstream');expect(f.state).toEqual(previous);
         expect(baseline.lastSyncedAt).toBe(1000);
     });
+});
+
+
+it('WebDAV 默认普通范围经 worker 休眠仍去密，单次同意完整备份可明确删除凭据', async () => {
+    const f = fixture(); await f.service.save(input);
+    const original = structuredClone(f.local);
+    let preview = await f.service.prepare(password);
+    expect(preview).toMatchObject({includeSensitive: false, remoteIncludesSensitive: false});
+    await createWebDavBackup(f.ports).commit(preview.id, password, 'upload', {});
+    expect(await decryptDriveConfig(f.shared.remote!.content, password)).toEqual({format: 'fluentread-complete-config', version: 2, scope: 'settings', config: projectDriveSyncConfig(original)});
+    expect(f.local).toEqual(original);
+    f.local = config({...f.local, token: {}, apiKeys: {}, customHeaders: {}});
+    preview = await f.service.prepare(password, undefined, undefined, true);
+    await createWebDavBackup(f.ports).commit(preview.id, password, 'upload', {});
+    expect(await decryptDriveConfig(f.shared.remote!.content, password)).toMatchObject({version: 1, config: {token: {}, apiKeys: {}, customHeaders: {}}});
+    const restore = fixture(f.shared); await restore.service.save(input);
+    preview = await restore.service.prepare(password);
+    await createWebDavBackup(restore.ports).commit(preview.id, password, 'download', {});
+    expect(restore.local.token).toEqual(original.token);
+    preview = await restore.service.prepare(password, undefined, undefined, true);
+    await createWebDavBackup(restore.ports).commit(preview.id, password, 'download', {});
+    expect(restore.local.token).toEqual({});
+    expect(restore.local.apiKeys).toEqual({});
+    expect(restore.ports.api.write).not.toHaveBeenCalled();
 });

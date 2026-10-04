@@ -1,13 +1,23 @@
 <!--
 @file src/features/settings/ui/RemoteConfigSync.vue
 文件职责：用清晰的保存、恢复与逐项合并流程完成Google Drive 与 WebDAV 共用的配置云备份。
-主要内容：通过右侧记录插槽统一显示账号和时间，窄屏改为上下排列；显示本次账号并提供更换账号入口；按两步流程说明影响范围，
+主要内容：默认只同步普通设置，敏感信息须阅读风险并明确同意且只对本次操作有效；预览说明旧备份范围和恢复保护。
+通过右侧记录插槽统一显示账号和时间，窄屏改为上下排列；显示本次账号并提供更换账号入口；按两步流程说明影响范围，
 先选择操作再确认影响；缺少安全覆盖版本时明确提示只读恢复；默认展示差异与连接变更类别，小屏保留操作区。
 模块边界：只消费后台脱敏预览和同步记录；不获取完整配置、令牌或用户口令，由父级提供存储方式和客户端。
 -->
 <template>
   <section class="drive-sync" :data-testid="`${kind}-sync`" :aria-busy="busy">
     <slot name="connection" :busy="busy" />
+    <div class="cloud-scope" data-testid="cloud-sync-scope">
+      <div class="cloud-scope-heading"><strong>{{ t('settings.cloud.scopeTitle') }}</strong><span :class="{'includes-sensitive': includeSensitive}">{{ t(includeSensitive ? 'settings.cloud.scopeSensitive' : 'settings.cloud.scopeSettings') }}</span></div>
+      <p>{{ t('settings.cloud.scopeSettingsDescription') }}</p>
+      <div class="cloud-sensitive-option">
+        <label :for="`${kind}-include-sensitive`"><strong>{{ t('settings.cloud.includeSensitive') }}</strong><span>{{ t('settings.cloud.sensitiveDescription') }}</span></label>
+        <el-switch :id="`${kind}-include-sensitive`" :model-value="includeSensitive" :disabled="busy || previewVisible" :aria-label="t('settings.cloud.includeSensitive')" data-testid="cloud-include-sensitive" @change="toggleSensitive" />
+      </div>
+      <p class="cloud-scope-note" role="status">{{ t(includeSensitive ? 'settings.cloud.consentOnce' : 'settings.cloud.preserveLocal') }}</p>
+    </div>
     <el-alert v-if="error && !previewVisible" :title="error" type="error" :closable="false" show-icon class="drive-error" />
     <el-alert v-if="status?.cleanupPending && !previewVisible" :title="t('settings.cloud.cleanupPending')" type="warning" :closable="false" show-icon class="drive-error" />
     <div class="drive-actions">
@@ -19,6 +29,13 @@
       </div>
       </slot>
     </div>
+    <el-dialog v-model="consentVisible" class="cloud-consent-dialog fluentread-cloud-sync-dialog" :title="t('settings.cloud.consentTitle')" width="min(560px, calc(100vw - 24px))" destroy-on-close @closed="riskAcknowledged = false">
+      <p class="cloud-consent-intro">{{ t('settings.cloud.consentStorage', {provider}) }}</p>
+      <div class="cloud-consent-risk"><el-icon><Warning /></el-icon><p>{{ t('settings.cloud.consentRisk') }}</p></div>
+      <p class="cloud-consent-advice">{{ t('settings.cloud.consentAdvice') }}</p>
+      <label class="cloud-consent-checkbox"><input v-model="riskAcknowledged" type="checkbox" data-testid="cloud-risk-acknowledgement" /><span>{{ t('settings.cloud.consentAcknowledgement') }}</span></label>
+      <template #footer><div class="cloud-consent-actions"><el-button data-testid="cloud-consent-cancel" @click="consentVisible = false">{{ t('settings.cloud.keepSettingsOnly') }}</el-button><el-button type="primary" :disabled="!riskAcknowledged" data-testid="cloud-consent-confirm" @click="confirmSensitive">{{ t('settings.cloud.consentConfirm') }}</el-button></div></template>
+    </el-dialog>
     <el-dialog class="drive-dialog fluentread-cloud-sync-dialog" v-model="previewVisible" :title="t('settings.drive.previewTitle')" width="min(820px, calc(100vw - 24px))" :close-on-click-modal="!busy" :close-on-press-escape="!busy" :show-close="!busy" :before-close="cancelPreview" destroy-on-close @closed="clearPreview">
       <template v-if="preview">
         <div class="drive-account-bar">
@@ -26,6 +43,9 @@
           <p>{{ preview.account.email ? t('settings.drive.account', {email: preview.account.email}) : t('settings.drive.selectedAccount') }}</p>
           <el-button v-if="kind === 'google-drive'" link :loading="switchingAccount" :disabled="busy" :data-testid="`${kind}-switch-account`" @click="switchAccount">{{ t('settings.drive.switchAccount') }}</el-button>
         </div>
+        <div class="cloud-preview-scope" role="status" data-testid="cloud-preview-scope"><strong>{{ t(preview.includeSensitive ? 'settings.cloud.scopeSensitive' : 'settings.cloud.scopeSettings') }}</strong><p>{{ t(preview.includeSensitive ? 'settings.cloud.previewSensitive' : 'settings.cloud.preserveLocal') }}</p></div>
+        <el-alert v-if="preview.remoteIncludesSensitive && !preview.includeSensitive" :title="t('settings.cloud.legacySensitive')" type="warning" :closable="false" show-icon class="drive-error drive-preview-notice" data-testid="cloud-legacy-sensitive" />
+        <el-alert v-else-if="preview.hasRemote && preview.includeSensitive && !preview.remoteIncludesSensitive" :title="t('settings.cloud.remoteSettingsOnly')" type="info" :closable="false" show-icon class="drive-error drive-preview-notice" />
         <el-alert v-if="error" :title="error" type="error" :closable="false" show-icon class="drive-error drive-preview-notice" />
         <el-alert v-if="preview.canUpload === false" :title="t('settings.cloud.restoreOnly')" type="warning" :closable="false" show-icon class="drive-error drive-preview-notice" :data-testid="`${kind}-restore-only`" />
 
@@ -105,10 +125,11 @@
 
 <script setup lang="ts">
 import {computed, onMounted, onUnmounted, ref, watch} from 'vue';
-import {ElAlert, ElIcon, ElMessage, ElPagination} from 'element-plus';
+import {ElAlert, ElIcon, ElMessage, ElPagination, ElSwitch} from 'element-plus';
 import {ArrowDown, ArrowLeft, ArrowRight, ArrowUp, CircleCheck, Cloudy, Download, Monitor, Switch, Upload, User, Warning} from '@element-plus/icons-vue';
 import 'element-plus/es/components/alert/style/css';
 import 'element-plus/es/components/pagination/style/css';
+import 'element-plus/es/components/switch/style/css';
 import {useUiI18n} from '@/src/ui/i18n';
 import {CloudBackupRequestError, type createCloudBackupClient} from '@/src/services/config/cloudBackupClient';
 import {chooseDriveRow, driveRowChoice, groupDrivePreviewChanges, initialDriveDirection, localizeDrivePreviewLanguage, unresolvedDriveChanges, type DrivePreviewRow} from '../model/googleDrivePreview';
@@ -124,18 +145,21 @@ function t(key: string, params?: Record<string, string | number>) {return baseT(
 
 const status = ref<DriveSyncStatus | null>(null);
 const busy = ref(false);
-watch(busy, value => emit('busy', value));
+const includeSensitive = ref(false);
+const consentVisible = ref(false);
+const riskAcknowledged = ref(false);
 const switchingAccount = ref(false);
 const error = ref('');
 const preview = ref<DriveSyncPreview | null>(null);
 const previewVisible = ref(false);
+watch(() => busy.value || consentVisible.value || previewVisible.value, value => emit('busy', value));
 const direction = ref<DriveSyncDirection | ''>('');
 const step = ref<'choose' | 'review'>('review');
 const choices = ref<Record<string, string>>({});
 const page = ref(1);
 const detailsVisible = ref(false);
 const automaticVisible = ref(false);
-const identical = computed(() => Boolean(preview.value?.hasRemote && !preview.value.changes.length));
+const identical = computed(() => Boolean(preview.value?.hasRemote && !preview.value.changes.length && preview.value.includeSensitive === preview.value.remoteIncludesSensitive));
 const rows = computed(() => groupDrivePreviewChanges(preview.value?.changes ?? []));
 const conflictRows = computed(() => rows.value.filter(row => !row.recommended));
 const automaticRows = computed(() => rows.value.filter(row => row.recommended));
@@ -165,21 +189,32 @@ async function perform(operation: () => Promise<void>) {
   finally {if (alive) busy.value = false;}
 }
 async function requestPreview() {
-  const result = await client.prepare();
+  const result = await client.prepare(includeSensitive.value);
   if (!alive) {await client.cancel(result.id); return;}
   preview.value = result;
   choices.value = Object.fromEntries(result.changes.filter(change => change.recommended).map(change => [change.id, change.recommended!]));
   direction.value = initialDriveDirection(result);
+  if (result.hasRemote && result.canUpload !== false && result.includeSensitive !== result.remoteIncludesSensitive) direction.value = '';
   step.value = direction.value ? 'review' : 'choose';
   page.value = 1; detailsVisible.value = true; automaticVisible.value = true; previewVisible.value = true;
 }
-async function prepare() {await perform(requestPreview);}
+async function prepare() {await perform(async () => {try {await requestPreview();} catch (failure) {includeSensitive.value = false; throw failure;}});}
+function toggleSensitive(value: boolean | string | number) {
+  if (busy.value || previewVisible.value) return;
+  if (value === true) {riskAcknowledged.value = false; consentVisible.value = true;}
+  else includeSensitive.value = false;
+}
+function confirmSensitive() {
+  if (!riskAcknowledged.value) return;
+  includeSensitive.value = true; consentVisible.value = false;
+}
 async function switchAccount() {
   await perform(async () => {
     switchingAccount.value = true;
     try {
       await client.cancel(preview.value?.id);
       if (!alive) return;
+      includeSensitive.value = false;
       try {await requestPreview();} catch (failure) {previewVisible.value = false; throw failure;}
     } finally {if (alive) switchingAccount.value = false;}
   });
@@ -196,7 +231,7 @@ async function commit() {
   });
 }
 async function cancelPreview() {await perform(async () => {await client.cancel(preview.value?.id); previewVisible.value = false;});}
-function clearPreview() {preview.value = null; choices.value = {}; direction.value = '';}
+function clearPreview() {preview.value = null; choices.value = {}; direction.value = ''; includeSensitive.value = false;}
 function endSession() {if (preview.value || busy.value) void client.cancel(preview.value?.id).catch(() => undefined);}
 async function refreshStatus() {await perform(async () => {
   try {status.value = await client.status();}
@@ -214,6 +249,26 @@ onUnmounted(() => {alive = false; endSession(); clearPreview();});
 :global(.fluentread-cloud-sync-dialog .el-dialog__title) {font-size:18px; font-weight:600;}
 :global(.fluentread-cloud-sync-dialog .el-dialog__footer) {border-top:1px solid var(--el-border-color-lighter); padding-top:16px;}
 .drive-sync {color:var(--el-text-color-primary);}
+.cloud-scope {border:1px solid var(--el-border-color-lighter); border-radius:10px; padding:16px; background:var(--el-fill-color-blank);}
+.cloud-scope-heading {display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:8px; font-size:14px;}
+.cloud-scope-heading>span {font-size:12px; padding:4px 8px; border-radius:6px; background:var(--el-color-success-light-9); color:var(--el-color-success-dark-2);}
+.cloud-scope-heading>span.includes-sensitive {background:var(--el-color-warning-light-9); color:var(--el-color-warning-dark-2);}
+.cloud-scope p,.cloud-preview-scope p {font-size:12px; line-height:1.7; color:var(--el-text-color-secondary); margin:8px 0 0;}
+.cloud-sensitive-option {display:flex; gap:16px; align-items:center; margin-top:12px; padding-top:12px; border-top:1px solid var(--el-border-color-lighter);}
+.cloud-sensitive-option>label {display:grid; gap:5px; flex:1; min-width:0; cursor:pointer;}
+.cloud-sensitive-option strong {font-size:13px; font-weight:500;}
+.cloud-sensitive-option label>span {font-size:12px; line-height:1.7; color:var(--el-text-color-secondary);}
+.cloud-sensitive-option>.el-switch {flex-shrink:0;}
+.cloud-scope .cloud-scope-note {margin-top:12px;}
+.cloud-preview-scope {padding:12px 14px; margin-bottom:16px; border:1px solid var(--el-border-color-lighter); border-radius:8px; font-size:13px;}
+.cloud-consent-intro,.cloud-consent-advice {margin:0 0 16px; font-size:13px; line-height:1.8; color:var(--el-text-color-regular);}
+.cloud-consent-risk {display:flex; align-items:flex-start; gap:10px; padding:14px; margin-bottom:16px; background:var(--el-fill-color-light); border:1px solid var(--el-border-color); border-inline-start:3px solid var(--el-color-warning); border-radius:8px;}
+.cloud-consent-risk>.el-icon {color:var(--el-color-warning); font-size:20px; flex-shrink:0; margin-top:3px;}
+.cloud-consent-risk p {margin:0; font-size:13px; line-height:1.8; color:var(--el-text-color-primary);}
+.cloud-consent-checkbox {display:flex; align-items:flex-start; gap:10px; cursor:pointer; font-size:13px; line-height:1.7;}
+.cloud-consent-checkbox input {accent-color:var(--el-color-primary); margin:4px 0 0; flex-shrink:0;}
+.cloud-consent-actions {display:flex; flex-wrap:wrap; justify-content:flex-end; gap:8px;}
+.cloud-consent-actions>.el-button {margin:0; max-width:100%; height:auto; min-height:32px; white-space:normal; line-height:1.5;}
 .drive-heading {display:flex; justify-content:space-between; align-items:flex-start; gap:16px;}
 .drive-heading h2 {margin:0; font-size:19px;}
 .drive-boundary {color:var(--el-text-color-secondary); font-size:13px; line-height:1.7;}

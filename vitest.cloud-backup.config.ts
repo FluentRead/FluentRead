@@ -9,6 +9,7 @@ export default {
         testTimeout: 30_000,
         include: [
             'tests/googleDrivePreview.test.ts',
+            'tests/googleDriveConfig.test.ts',
             'tests/webDavBackup.test.ts',
             'tests/webDavHttpIntegration.test.ts',
             'tests/webDavConnection.test.ts',
@@ -29,6 +30,7 @@ export default {
             include: [
                 'src/features/settings/model/googleDrivePreview.ts',
                 'src/core/config/cloudSync.ts',
+                'src/core/config/driveSync.ts',
                 'src/platform/webdav/connection.ts',
                 'src/platform/webdav/api.ts',
                 'src/platform/webdav/properties.ts',

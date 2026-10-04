@@ -14,7 +14,7 @@ import {CloudSyncError} from '@/src/core/config/cloudSync';
 import {DriveConfigError} from '@/src/core/config/driveSync';
 
 export const GOOGLE_DRIVE_SYNC_MESSAGE_TYPE = 'googleDriveEncryptedSync';
-export interface DriveSyncMessage {type: typeof GOOGLE_DRIVE_SYNC_MESSAGE_TYPE; action?: unknown; clientId?: unknown; id?: unknown; direction?: unknown; choices?: unknown}
+export interface DriveSyncMessage {type: typeof GOOGLE_DRIVE_SYNC_MESSAGE_TYPE; action?: unknown; clientId?: unknown; id?: unknown; direction?: unknown; includeSensitive?: unknown; choices?: unknown}
 type Service = ReturnType<typeof createGoogleDriveSync>;
 export function isGoogleDriveSettingsSender(sender: ConfigPersistenceContext['sender'], extensionId: string, optionsUrl: string): boolean {
     if (!sender?.url || sender.id !== extensionId) return false;
@@ -36,7 +36,7 @@ export function createGoogleDriveSyncHandler(service: Service, trusted: (sender:
                 const clientId = message.clientId as string;
                 if (message.action === 'status') data = await service.status();
                 else if (message.action === 'cancel' && (message.id === undefined || (typeof message.id === 'string' && message.id.length <= 64))) data = await service.cancel(message.id as string | undefined, tabId, clientId);
-                else if (message.action === 'prepare') data = await service.prepare(GOOGLE_DRIVE_APPLICATION_PASSPHRASE, tabId, clientId);
+                else if (message.action === 'prepare' && (message.includeSensitive === undefined || typeof message.includeSensitive === 'boolean')) data = await service.prepare(GOOGLE_DRIVE_APPLICATION_PASSPHRASE, tabId, clientId, message.includeSensitive ?? false);
                 else if (message.action === 'commit' && typeof message.id === 'string' && message.id.length <= 64 && ['upload', 'download', 'merge'].includes(message.direction as string)) {
                     const choices = message.choices;
                     if (!choices || typeof choices !== 'object' || Array.isArray(choices) || Object.keys(choices).length > 50_000 || !Object.entries(choices).every(([key, value]) => /^\d+$/u.test(key) && (value === 'local' || value === 'remote'))) return {success: false, error: '无效的同步差异选择。'};

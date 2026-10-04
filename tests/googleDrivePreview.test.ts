@@ -3,7 +3,7 @@ import {chooseDriveRow, driveRowChoice, groupDrivePreviewChanges, initialDriveDi
 import type {DriveSyncChange} from '@/src/core/config/driveSync';
 import type {DriveSyncPreview} from '@/src/services/config/googleDriveSync';
 const change = (id: string, label: string, recommended: 'local' | 'remote' | null = null): DriveSyncChange => ({id, label, sensitive: true, local: 'hidden', remote: 'hidden', conflict: recommended === null, recommended});
-const preview = (patch: Partial<DriveSyncPreview> = {}): DriveSyncPreview => ({id: 'fixture', account: {id: 'a', email: 'a@fixture.invalid'}, hasRemote: true, hasBaseline: false, changes: [change('0', 'theme')], expiresAt: 1000, ...patch});
+const preview = (patch: Partial<DriveSyncPreview> = {}): DriveSyncPreview => ({id: 'fixture', account: {id: 'a', email: 'a@fixture.invalid'}, includeSensitive: false, remoteIncludesSensitive: false, hasRemote: true, hasBaseline: false, changes: [change('0', 'theme')], expiresAt: 1000, ...patch});
 describe('Google Drive 操作和预览模型', () => {
     it('预览语言名称跟随界面语言，英文不残留中文组合名称，其他摘要保持原样', () => {
         expect(localizeDrivePreviewLanguage('Deutsch / German / 德语', 'en-US')).toBe('German');

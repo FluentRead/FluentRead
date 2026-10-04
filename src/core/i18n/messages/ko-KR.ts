@@ -2229,6 +2229,7 @@ const koKRLegacyTextBase: Readonly<Record<string, string>> = {
 
 export const koKRLegacyText: Readonly<Record<string, string>> = {
     ...googleDriveText.legacy,
+    ...cloudBackupText.legacy,
     "腾讯交互翻译": "Tencent TranSmart",
     "火山翻译": "Volcengine 번역",
     "免密钥网页接口，与腾讯云翻译不同": "키가 필요 없는 웹 인터페이스로 Tencent Cloud 번역과 별개입니다",

@@ -5,6 +5,7 @@
  * 模块边界：不读取配置或存储，不调用云端 API；连接密码仅随可信设置请求发送给本机后台。
  */
 import browser from 'webextension-polyfill';
+import {validateDriveSyncConsent} from '@/src/core/config/driveSync';
 import type {DriveSyncDirection, DriveSyncPreview, DriveSyncStatus} from './remoteConfigSync';
 export class CloudBackupRequestError extends Error {
     constructor(message: string, readonly errorKey?: string, readonly params?: Record<string, string | number>) {super(message);}
@@ -21,7 +22,7 @@ export function createCloudBackupClient(type: string) {
     return {
         request,
         status: () => request<DriveSyncStatus>('status'),
-        prepare: () => request<DriveSyncPreview>('prepare'),
+        prepare: (includeSensitive = false) => {validateDriveSyncConsent(includeSensitive); return request<DriveSyncPreview>('prepare', {includeSensitive});},
         commit: (id: string, direction: DriveSyncDirection, choices: Record<string, string>) => request<DriveSyncStatus>('commit', {id, direction, choices}),
         cancel: (id?: string) => request<void>('cancel', {id}),
     };

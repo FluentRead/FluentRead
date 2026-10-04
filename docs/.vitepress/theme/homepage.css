@@ -318,7 +318,7 @@
   }
 }
 
-/* 首屏下方的介绍视频：点击播放后才加载文件，宽度不超过功能区，始终保持 16:9。 */
+/* 首屏下方的介绍视频：中文嵌入 B 站播放器，英文按需加载本地视频，始终保持 16:9。 */
 .bv-site .bv-promo {
   max-width: 1180px;
   padding: 64px 32px;
@@ -336,6 +336,20 @@
   box-shadow:
     0 30px 80px rgba(120, 40, 80, 0.14),
     0 6px 18px rgba(120, 40, 80, 0.06);
+}
+.bv-promo-embed {
+  position: relative;
+  overflow: hidden;
+}
+.bv-promo-embed iframe {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  border: 0;
+}
+.bv-promo-link {
+  margin-top: 18px;
 }
 @media (max-width: 760px) {
   .bv-site .bv-promo {

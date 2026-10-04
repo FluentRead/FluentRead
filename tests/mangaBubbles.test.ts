@@ -5,6 +5,14 @@ function rect(p:Uint8ClampedArray,w:number,x:number,y:number,width:number,height
 const text=(value:string,x:number,y:number,width=40,height=12)=>({text:value,confidence:.99,box:{x,y,width,height}});
 const box=(x:number,y:number,w=80,h=80)=>({x0:x,y0:y,x1:x+w,y1:y+h});
 describe('漫画局部气泡识别边界',()=>{
+    it('普通截图 Paddle 保留源行供严格段落分组，局部放大结果替换重复检测', () => {
+        const page = {results: [text('wrong small', 25, 30), text('Title', 160, 180, 90, 16), text('Body line', 160, 200, 200, 12)],
+            bubbles: [{bbox: box(10, 10), results: [text('First', 20, 20), text('second', 20, 34)]}]};
+        const lines = collectMangaRegions(page, 'en', 400, 400, 'image');
+        expect(lines.map(line => line.text)).toEqual(['First', 'second', 'Title', 'Body line']);
+        expect(lines.every(line => line.sourceBoxes === undefined)).toBe(true);
+        expect(collectMangaRegions({results: []}, 'en', 400, 400, 'image')).toEqual([]);
+    });
     it('拒绝无效尺寸和像素预算，定位封闭浅色气泡而非页面背景',()=>{
         for(const [w,h] of [[0,100],[1.5,100],[100,NaN],[4097,4097],[200,200]])expect(findMangaBubbles(image(1,1),w,h)).toEqual([]);
         const p=image(300,300);rect(p,300,30,40,40,40);rect(p,300,170,150,60,40);rect(p,300,0,0,20,300);

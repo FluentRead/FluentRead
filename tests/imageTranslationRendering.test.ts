@@ -21,6 +21,16 @@ function canvasContext() {
 afterEach(() => { vi.unstubAllGlobals(); vi.resetModules(); });
 
 describe('图片译文排版与绘制', () => {
+    it.each(['left', 'right', 'center'] as const)('整段回填保留 %s 对齐、常规字重和源文字字号上限', alignment => {
+        const context = canvasContext();
+        drawTranslatedImageText(context as unknown as CanvasRenderingContext2D, '完整段落回填文字', 10, 20, 100, 60, 'rgb(255,255,255)', 12, alignment);
+        expect(context.font.startsWith('400 ')).toBe(true);
+        expect(Number(context.font.match(/([\d.]+)px/)![1])).toBeLessThanOrEqual(12);
+        for (const [, x, y] of context.fillText.mock.calls) {
+            expect(x).toBe(alignment === 'left' ? 12 : alignment === 'right' ? 108 : 60);
+            expect(y).toBeGreaterThan(20); expect(y).toBeLessThan(80);
+        }
+    });
     it('中英日混排保留空格、词语和标点，大字号不再固定限制为 30px', () => {
         const text = '使用 FluentRead 翻译 AI images；こんにちは';
         const layout = layoutImageTranslationText(text, 3000, 100, measure);

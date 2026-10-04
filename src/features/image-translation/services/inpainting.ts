@@ -1,10 +1,11 @@
 /**
  * @file src/features/image-translation/services/inpainting.ts
  * 文件职责：依据有效 OCR 文本框在像素缓冲区中修复原文字，保留修复区域以外的图像内容。
- * 主要内容：约束文字边缘扩张、构造去重蒙版，并使用分层边界队列和预乘透明度插值完成局部背景扩散；每个蒙版像素只入队一次，避免重复扫描和分配整图缓冲区。
+ * 主要内容：整段译文仍仅按原始文字行框修补，保留行间及短行旁图案；约束文字边缘扩张、构造去重蒙版，并使用分层边界队列和预乘透明度插值完成局部背景扩散，每个蒙版像素只入队一次。
  * 模块边界：本模块是无 DOM、无网络的轻量像素算法，不进行 OCR 或译文绘制，也不宣称能够重建复杂纹理；输入和输出保持原图尺寸，无法取得已知边界时保留原像素。
  */
 import type { OcrLine } from '@/src/shared/image/types';
+import type {ImageTextRegion} from '../paragraphs';
 
 interface MaskRectangle {
     left: number;
@@ -19,7 +20,7 @@ function getMaskRectangle(line: OcrLine, width: number, height: number): MaskRec
         || x1 <= x0 || y1 <= y0 || x1 <= 0 || y1 <= 0 || x0 >= width || y0 >= height) return;
 
     // 扩张仅用于清除字形的抗锯齿边缘，避免大字号把邻近图案和其他行一并抹掉。
-    const padding = Math.max(1, Math.min(4, Math.round((y1 - y0) * 0.1)));
+    const padding = Math.max(2, Math.min(4, Math.round((y1 - y0) * 0.1)));
     return {
         left: Math.max(0, Math.floor(x0 - padding)),
         top: Math.max(0, Math.floor(y0 - padding)),
@@ -33,13 +34,14 @@ export function inpaintTextRegions(
     source: Uint8ClampedArray,
     width: number,
     height: number,
-    lines: OcrLine[],
+    lines: ImageTextRegion[],
 ): Uint8ClampedArray {
     const result = new Uint8ClampedArray(source);
     if (!Number.isSafeInteger(width) || !Number.isSafeInteger(height)
         || width <= 0 || height <= 0 || source.length < width * height * 4 || lines.length === 0) return result;
 
-    const rectangles = lines.map(line => getMaskRectangle(line, width, height))
+    const rectangles = lines.flatMap(line => (line.sourceBoxes ?? [line.bbox])
+        .map(bbox => getMaskRectangle({text: line.text, bbox}, width, height)))
         .filter((rectangle): rectangle is MaskRectangle => rectangle !== undefined);
     if (rectangles.length === 0) return result;
 

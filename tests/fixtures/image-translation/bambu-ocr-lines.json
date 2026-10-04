@@ -1,0 +1,110 @@
+[
+  {
+    "text": "(© Filament-Saving Mode",
+    "bbox": {
+      "x0": 41,
+      "y0": 54,
+      "x1": 223,
+      "y1": 73
+    }
+  },
+  {
+    "text": "Calculate the best filament grouping to minimize",
+    "bbox": {
+      "x0": 61,
+      "y0": 78,
+      "x1": 325,
+      "y1": 90
+    }
+  },
+  {
+    "text": "filament waste. Need to manually place filaments on the",
+    "bbox": {
+      "x0": 61,
+      "y0": 92,
+      "x1": 367,
+      "y1": 104
+    }
+  },
+  {
+    "text": "printer based on slicing results.",
+    "bbox": {
+      "x0": 62,
+      "y0": 106,
+      "x1": 227,
+      "y1": 118
+    }
+  },
+  {
+    "text": "Convenient Mode",
+    "bbox": {
+      "x0": 65,
+      "y0": 136,
+      "x1": 188,
+      "y1": 147
+    }
+  },
+  {
+    "text": "Calculate the filament grouping based on the printers",
+    "bbox": {
+      "x0": 61,
+      "y0": 156,
+      "x1": 354,
+      "y1": 168
+    }
+  },
+  {
+    "text": "filaments, reducing the need for adjusting filaments at",
+    "bbox": {
+      "x0": 61,
+      "y0": 170,
+      "x1": 355,
+      "y1": 182
+    }
+  },
+  {
+    "text": "the printer.",
+    "bbox": {
+      "x0": 61,
+      "y0": 184,
+      "x1": 118,
+      "y1": 196
+    }
+  },
+  {
+    "text": "Custom Mode &",
+    "bbox": {
+      "x0": 65,
+      "y0": 212,
+      "x1": 184,
+      "y1": 228
+    }
+  },
+  {
+    "text": "Manually assign filament to the left or right nozzle.",
+    "bbox": {
+      "x0": 62,
+      "y0": 234,
+      "x1": 332,
+      "y1": 246
+    }
+  },
+  {
+    "text": "Video tutorial",
+    "bbox": {
+      "x0": 60,
+      "y0": 264,
+      "x1": 133,
+      "y1": 273
+    }
+  },
+  {
+    "text": "Lear more",
+    "bbox": {
+      "x0": 306,
+      "y0": 264,
+      "x1": 368,
+      "y1": 273
+    }
+  }
+]

@@ -1,8 +1,9 @@
 import {describe, expect, it} from 'vitest';
 import {Config, normalizeConfig} from '@/src/core/config/model';
 import {CONFIG_CREDENTIAL_FIELDS} from '@/src/core/config/credentials';
-import {buildDriveSyncDiff, driveSyncPayload, driveValuesEqual, parseDriveSyncPayload, resolveDriveSyncDiff, toDriveSyncConfig} from '@/src/core/config/driveSync';
+import {buildDriveSyncDiff, driveSyncPayload as completePayload, driveValuesEqual, parseDriveSyncPayload, resolveDriveSyncDiff, toDriveSyncConfig, projectDriveSyncConfig, restoreDriveSyncSettings, parseDriveSyncSnapshot, validateDriveSyncConsent} from '@/src/core/config/driveSync';
 
+const driveSyncPayload = (config: Record<string, unknown>) => completePayload(config, true);
 function complete(patch: Record<string, unknown> = {}) {return toDriveSyncConfig(normalizeConfig({...new Config(), videoServiceDefaultMigrated: true, ...patch}));}
 describe('Google Drive 完整快照和安全合并', () => {
     it('备份差异复用设置名称，连接整组说明变更类别而不暴露凭据', () => {
@@ -128,4 +129,54 @@ describe('Google Drive 完整快照和安全合并', () => {
         }
     });
 
+});
+
+
+describe('普通云备份范围与 v1 兼容', () => {
+    it('默认 v2 明确排除整个连接组、私密字段及未知根字段，任意请求体内容也不会泄露', () => {
+        const local = complete({token: {openai: 'fixture-key'}, apiKeys: {openai: ['fixture-key']},
+            customBody: {openai: '{"opaque":"fixture-arbitrary-secret"}'}, customHeaders: {openai: '{}'},
+            proxy: {openai: 'https://fixture.invalid'}, system_role: {openai: 'fixture-private-prompt'},
+            areaVisionPrompt: 'fixture-private-vision', inputBoxTranslationPrompt: 'fixture-private-writing',
+            future: {opaque: 'fixture-future-secret'}, theme: 'dark'});
+        const payload = completePayload(local) as {version: number; scope: string; config: Record<string, unknown>};
+        expect(payload).toMatchObject({version: 2, scope: 'settings', config: {theme: 'dark'}});
+        for (const key of [...CONFIG_CREDENTIAL_FIELDS, 'service', 'proxy', 'customBody', 'customOpenAIProviders',
+            'writing', 'harness', 'system_role', 'areaVisionPrompt', 'inputBoxTranslationPrompt', 'future']) expect(payload.config).not.toHaveProperty(key);
+        expect(JSON.stringify(payload)).not.toMatch(/fixture-key|fixture-arbitrary-secret|fixture-private|fixture-future-secret/u);
+        expect(parseDriveSyncSnapshot(payload)).toEqual({config: payload.config, includesSensitive: false});
+        expect(parseDriveSyncPayload(payload)).toEqual(payload.config);
+        expect(parseDriveSyncSnapshot(completePayload(local, true))).toEqual({config: local, includesSensitive: true});
+        // 旧 v1 解码器只接受 version === 1，v2 会安全失败且 service 没有补默认值。
+        expect(payload.version).not.toBe(1);
+        expect(payload.config).not.toHaveProperty('service');
+    });
+    it('嵌套凭据与未知结构整组排除，恢复保留本机整组并更新普通设置', () => {
+        const base = complete();
+        const local = {...base, translationAppearance: {...base.translationAppearance as object, token: {opaque: 'fixture-nested-secret'}},
+            shareCard: {...base.shareCard as object, futureOpaque: 'fixture-unknown-nested'}, hotkey: {opaque: 'fixture-disguised-object'}};
+        const settings = projectDriveSyncConfig(local);
+        for (const key of ['translationAppearance', 'shareCard', 'hotkey']) expect(settings).not.toHaveProperty(key);
+        const restored = restoreDriveSyncSettings(local, {...projectDriveSyncConfig(base), theme: 'dark'});
+        expect(restored).toMatchObject({theme: 'dark', translationAppearance: local.translationAppearance, shareCard: local.shareCard, hotkey: local.hotkey});
+        expect(restored.token).toEqual(base.token);
+        expect(projectDriveSyncConfig({glossaryLibraries: [{id: 'invalid', opaque: 'fixture-unknown'}]})).toEqual({});
+        expect(projectDriveSyncConfig({theme: null, alwaysTranslateDomains: []})).toEqual({theme: null, alwaysTranslateDomains: []});
+        expect(projectDriveSyncConfig(local, true)).toEqual(local);
+    });
+    it('普通 payload 拒绝私密、未知、嵌套和恶意字段，范围不能靠 truthy 值开启', () => {
+        const payload = completePayload(complete()) as {config: Record<string, unknown>};
+        for (const config of [{...payload.config, token: {}}, {...payload.config, unknown: 'fixture'},
+            {...payload.config, shareCard: {token: 'fixture'}}, {...payload.config, on: 1},
+            {...payload.config, display: 2}, {...payload.config, from: ''}, {...payload.config, to: ''}]) {
+            expect(() => parseDriveSyncSnapshot({...payload, config})).toThrow();
+        }
+        const malicious = JSON.parse('{"__proto__":{"polluted":true}}');
+        expect(() => parseDriveSyncSnapshot({...payload, config: {...payload.config, ...malicious}})).toThrow('无效字段');
+        for (const consent of [null, 0, 1, 'true', {}, []]) {
+            expect(() => validateDriveSyncConsent(consent)).toThrow('布尔值');
+            expect(() => completePayload(complete(), consent as boolean)).toThrow('布尔值');
+        }
+        validateDriveSyncConsent(false); validateDriveSyncConsent(true);
+    });
 });

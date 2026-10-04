@@ -1,10 +1,22 @@
 # WebDAV cloud configuration backup
 
+Updated: October 4, 2026.
+
 Google Drive and WebDAV share **Settings → Backup and restore → Cloud configuration backup**. WebDAV stores your configuration on the cloud drive, NAS, or server you choose. Saving, restoring, and merging are manual operations. Each method keeps its own comparison baseline; selecting WebDAV does not transfer a Google Drive backup.
 
-Backups include API keys, configured OAuth tokens, authentication headers, custom request bodies, and authentication parameters in URLs. Wordbooks, chat history, and usage statistics are excluded. The WebDAV URL, username, and app password stay on this device and are excluded from backups. This feature requires the browser extension background; use local backup files in the userscript.
+Backups sync only general settings by default. Sensitive connections can be included only with explicit consent for this operation. Wordbooks, chat history, and usage statistics are excluded. The WebDAV URL, username, and app password used to access the backup server always stay on this device and are excluded from backups. This feature requires the browser extension background; use local backup files in the userscript.
 
 <GuideVisual kind="sync" en />
+
+## Scope of this operation
+
+The default scope includes general settings such as language, appearance, shortcuts, and website rules. It excludes the entire sensitive connection configuration: API keys, configured OAuth tokens, authentication information, translation service selections and models, service URLs, custom request bodies, and authentication parameters in URLs. Private prompts and unrecognized fields are also excluded. Restoring or merging general settings keeps this device’s keys, translation services, URLs, and custom connections unchanged.
+
+To migrate sensitive connections, enable **Include API keys and other sensitive information this time**, read the risks, check the acknowledgement, then choose **Agree, include this time only**. Saving or merging includes this device’s sensitive information. Restoring applies only what the cloud backup actually contains; a general-settings backup still preserves this device’s keys and connections. Completion, failure (including preview preparation failure), cancellation, leaving or reopening settings, or switching providers or accounts turns the option off again and requires new consent.
+
+The current extension still reads older complete v1 backups and applies only their general settings by default. Complete sensitive backups saved with consent keep the original v1 format, which older extensions can still read. New general-settings backups use v2; older extensions safely reject them and must be upgraded. Unconfirmed transactions from before the upgrade expire and require a new preview.
+
+Turning the option off or restoring only general settings does not change an older complete backup. Sensitive information is removed from the current cloud file only after you confirm saving or merging general settings. This does not delete old files or versions retained by the provider; manage those copies separately.
 
 ## Prepare a connection
 
@@ -28,7 +40,7 @@ For Nutstore, use `https://dav.jianguoyun.com/dav/`, your account email, and a [
 2. Enter the directory URL, username, and app password. HTTP requires acknowledging unencrypted transport; prefer HTTPS.
 3. Choose **Test connection**. This only checks directory access, changes no cloud files, and does not prove write permission.
 4. Choose **Test and save** to store the connection on this device. This still creates no cloud backup.
-5. Choose **Sync with WebDAV now**. If no backup exists, review saving this device’s configuration and confirm.
+5. Check this operation’s scope and choose **Sync with WebDAV now**. If no backup exists, review saving this device’s configuration, with general settings only by default, and confirm.
 
 The file is stored under your chosen directory at:
 
@@ -42,7 +54,7 @@ Previews expire after 10 minutes. **Cancel** or leaving settings ends the previe
 
 Configure the same directory and account on the other device. Read the backup, choose **Restore cloud configuration** or **Save device configuration**, then continue to review and confirm.
 
-Restoring replaces this device’s settings and credentials. Saving replaces the cloud configuration. If both sides contain changes you want to keep, use the secondary **Review and merge** action and resolve conflicts. Credentials and custom connections are masked and selected as a group.
+General-settings mode restores or merges only general settings, preserving this device’s keys, translation services, URLs, and custom connections. Saving replaces the current cloud file within this operation’s scope. With consent to include sensitive information, saving or merging can include all sensitive connections; restoring still depends on the backup’s actual content. If both sides contain changes you want to keep, use the secondary **Review and merge** action and resolve conflicts. In sensitive-information mode, credentials, services, models, and custom connections are masked and selected as a group.
 
 Before committing, the extension rechecks both configurations. A change on either side requires a fresh preview. Updates use ETag conditions to reject stale writes. A successful operation records the account and time locally.
 
@@ -66,7 +78,7 @@ Use **Edit connection** to change the server, account, or password. Changing the
 
 ## Protection and troubleshooting
 
-Backups use AES-GCM encryption before upload with the same fixed public application passphrase as Google Drive. No additional encryption password is required. **Anyone who obtains the file can decrypt it using the public passphrase.** Protect the server account, directory permissions, HTTPS connection, and device. Do not publicly share backup files. See the [privacy policy](./privacy).
+Backups use AES-GCM encryption before upload with the same fixed public application passphrase as Google Drive. No additional encryption password is required. **Anyone who obtains the file can decrypt it using the public passphrase.** A compromised third-party account, access to a shared directory, or a leaked backup could expose API keys and other sensitive information in that backup. Protection primarily depends on the server account, directory permissions, HTTPS, and device security. We recommend syncing only general settings. When migrating keys, protect your account and directory permissions and avoid sharing backup files. See the [privacy policy](./privacy).
 
 | Message | What to check |
 | --- | --- |

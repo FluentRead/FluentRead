@@ -1,12 +1,13 @@
 /**
  * @file src/core/config/driveSync.ts
- * 文件职责：定义包含全部配置凭据的云同步快照和不泄露凭据的差异预览。
- * 主要内容：验证完整快照、保留凭据明确删除语义、执行三方字段合并，并将请求体、
+ * 文件职责：定义默认排除敏感信息的云同步范围、兼容完整快照和不泄露凭据的差异预览。
+ * 主要内容：投影普通设置、读取 v1 完整与 v2 普通快照、保留凭据明确删除语义、执行三方字段合并，并将请求体、
  * 地址、请求头、密钥和未知字段统一隐藏，普通设置展示稳定名称和值；数组整体合并。
  * 模块边界：只处理纯数据；不拥有口令、加密、存储、浏览器消息或 Google API。
  */
 import {options, servicesType} from './catalog';
-import {CONFIG_CREDENTIAL_FIELDS} from './credentials';
+import {CONFIG_CREDENTIAL_FIELDS, isSensitiveConfigKey} from './credentials';
+import {Config} from './model';
 import {isConfiguredCustomOpenAIProvider, isCustomOpenAIProviderId, normalizeCustomOpenAIProviders} from './customOpenAI';
 import {isConfigImportValid, prepareConfigForExport} from './transfer';
 import {configDiffFieldLabel} from './diff';
@@ -71,7 +72,29 @@ export function toDriveSyncConfig(value: unknown): DriveSyncConfig {
     return result;
 }
 
+export interface DriveSyncSnapshot {config: DriveSyncConfig; includesSensitive: boolean}
+
+/** v2 普通快照不经过完整配置补默认值，避免把未备份连接解释为明确删除。 */
+export function parseDriveSyncSnapshot(value: unknown): DriveSyncSnapshot {
+    if (record(value) && value.format === 'fluentread-complete-config' && value.version === 2 && value.scope === 'settings'
+        && record(value.config) && typeof value.config.on === 'boolean'
+        && (value.config.display === 0 || value.config.display === 1)
+        && typeof value.config.from === 'string' && value.config.from.trim()
+        && typeof value.config.to === 'string' && value.config.to.trim()) {
+        validateTree(value.config);
+        const config = projectDriveSyncConfig(value.config);
+        if (!driveValuesEqual(config, value.config)) throw new DriveConfigError('普通云备份包含不属于此范围的字段，请重新生成备份。');
+        return {config, includesSensitive: false};
+    }
+    return {config: parseCompleteDriveSyncPayload(value), includesSensitive: true};
+}
+
+/** 保留纯编解码器的完整 v1 读取契约；恢复范围由事务中的本次确认决定。 */
 export function parseDriveSyncPayload(value: unknown): DriveSyncConfig {
+    return parseDriveSyncSnapshot(value).config;
+}
+
+function parseCompleteDriveSyncPayload(value: unknown): DriveSyncConfig {
     if (!record(value) || value.format !== 'fluentread-complete-config' || value.version !== 1
         || !isConfigImportValid(value.config)
         || !CONFIG_CREDENTIAL_FIELDS.every(field => Object.hasOwn(value.config as object, field))) {
@@ -95,8 +118,11 @@ export function parseDriveSyncPayload(value: unknown): DriveSyncConfig {
     return toDriveSyncConfig({...value.config, videoServiceDefaultMigrated: true});
 }
 
-export function driveSyncPayload(config: DriveSyncConfig): unknown {
-    return {format: 'fluentread-complete-config', version: 1, config};
+export function driveSyncPayload(config: DriveSyncConfig, includeSensitive = false): unknown {
+    validateDriveSyncConsent(includeSensitive);
+    return includeSensitive
+        ? {format: 'fluentread-complete-config', version: 1, config}
+        : {format: 'fluentread-complete-config', version: 2, scope: 'settings', config: projectDriveSyncConfig(config)};
 }
 
 const SERVICE_FIELDS = ['service', 'hoverTranslationService', 'selectionTranslationService', 'imageTranslationService', 'documentService', 'videoService', 'areaTranslationService', 'inputBoxTranslationService'];
@@ -182,6 +208,45 @@ const CONNECTION_FIELDS = new Set<string>([
     'mimoBillingPlan', 'mimoRegion', 'model', 'customModel', 'documentModel', 'documentCustomModel',
 ]);
 const PRIVATE_FIELDS = new Set(['system_role', 'user_role', 'activeTranslationStyleProfileId', 'myMemoryEmail', 'areaVisionPrompt', 'inputBoxTranslationPrompt', 'inputBoxTranslationSystemPrompt']);
+const SETTINGS_SCHEMA = new Config() as unknown as DriveSyncConfig;
+const KNOWN_SETTINGS = new Set(Object.keys(SETTINGS_SCHEMA));
+
+export function validateDriveSyncConsent(includeSensitive: unknown): asserts includeSensitive is boolean {
+    if (typeof includeSensitive !== 'boolean') throw new DriveConfigError('敏感信息同步选项必须为布尔值。');
+}
+
+/** 已知连接整个排除，未知根字段保守排除；嵌套秘密使所属偏好整组排除。 */
+function containsExcludedSettings(value: unknown): boolean {
+    if (!value || typeof value !== 'object') return false;
+    return Object.entries(value).some(([key, child]) => CONNECTION_FIELDS.has(key) || PRIVATE_FIELDS.has(key)
+        || isSensitiveConfigKey(key) || containsExcludedSettings(child));
+}
+/** 归一化器是已知嵌套设置的结构边界；额外字段或伪装成标量的对象整组排除。 */
+function hasUnknownStructure(value: unknown, normalized: unknown): boolean {
+    if (Array.isArray(value)) return !Array.isArray(normalized) || value.length !== normalized.length
+        || value.some((child, index) => hasUnknownStructure(child, normalized[index]));
+    if (!record(value)) return false;
+    return !record(normalized) || Object.keys(value).some(key => !Object.hasOwn(normalized, key) || hasUnknownStructure(value[key], normalized[key]));
+}
+export function projectDriveSyncConfig(config: DriveSyncConfig, includeSensitive = false): DriveSyncConfig {
+    validateDriveSyncConsent(includeSensitive);
+    validateTree(config);
+    if (includeSensitive) return structuredClone(config);
+    const normalized = toDriveSyncConfig(config);
+    return Object.fromEntries(Object.entries(config).filter(([key, value]) => KNOWN_SETTINGS.has(key)
+        && !CONNECTION_FIELDS.has(key) && !PRIVATE_FIELDS.has(key) && !containsExcludedSettings(value)
+        && (!(value && typeof value === 'object') || SETTINGS_SCHEMA[key] !== null && typeof SETTINGS_SCHEMA[key] === 'object')
+        && !hasUnknownStructure(value, normalized[key]))
+        .map(([key, value]) => [key, structuredClone(value)]));
+}
+
+/** 普通范围仅替换可备份设置；本机完整连接、未知字段和私密偏好保持原子性。 */
+export function restoreDriveSyncSettings(local: DriveSyncConfig, settings: DriveSyncConfig): DriveSyncConfig {
+    const projected = projectDriveSyncConfig(local);
+    const preserved = Object.fromEntries(Object.entries(local).filter(([key]) => !Object.hasOwn(projected, key)));
+    return {...structuredClone(settings), ...structuredClone(preserved)};
+}
+
 const fieldLabel = (field: string) => Object.hasOwn(VISIBLE_FIELDS, field) ? VISIBLE_FIELDS[field] : configDiffFieldLabel(field);
 const CONNECTION_SUMMARIES: [string, readonly string[]][] = [
     ['settings.cloud.changed.credentials', CONFIG_CREDENTIAL_FIELDS],

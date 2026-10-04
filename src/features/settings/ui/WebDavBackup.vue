@@ -70,9 +70,9 @@ const client = {
     await refreshConnection();
     return result;
   },
-  async prepare() {
+  async prepare(includeSensitive = false) {
     await refreshConnection();
-    const result = await connectionClient.prepare();
+    const result = await connectionClient.prepare(includeSensitive);
     try {
       const saved = await refreshConnection();
       if (!saved || result.account.id !== `webdav:${saved.revision}`) throw new CloudBackupRequestError('同步连接已变化，请重新生成预览', 'settings.cloud.connectionChanged');

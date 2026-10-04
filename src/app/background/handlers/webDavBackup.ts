@@ -14,7 +14,7 @@ import {DriveEncryptionError} from '@/src/platform/google-drive/encryption';
 import {GOOGLE_DRIVE_APPLICATION_PASSPHRASE} from '@/src/platform/google-drive/constants';
 
 export const WEBDAV_BACKUP_MESSAGE_TYPE = 'webDavConfigBackup';
-export interface WebDavBackupMessage {type: typeof WEBDAV_BACKUP_MESSAGE_TYPE; action?: unknown; clientId?: unknown; id?: unknown; direction?: unknown; choices?: unknown; connection?: unknown; revision?: unknown}
+export interface WebDavBackupMessage {type: typeof WEBDAV_BACKUP_MESSAGE_TYPE; action?: unknown; clientId?: unknown; id?: unknown; direction?: unknown; includeSensitive?: unknown; choices?: unknown; connection?: unknown; revision?: unknown}
 export function createWebDavBackupHandler(service: ReturnType<typeof createWebDavBackup>, trusted: (sender: ConfigPersistenceContext['sender']) => boolean): BackgroundMessageHandler<ConfigPersistenceContext, WebDavBackupMessage> {
     return {
         type: WEBDAV_BACKUP_MESSAGE_TYPE,
@@ -32,7 +32,7 @@ export function createWebDavBackupHandler(service: ReturnType<typeof createWebDa
                     if (!message.connection || typeof message.connection !== 'object' || Array.isArray(message.connection)) return {success: false, errorKey: 'settings.webdav.error.action'};
                     const input = message.connection as WebDavConnectionInput;
                     data = message.action === 'save' ? await service.save(input, tabId, clientId) : await service.test(input);
-                } else if (message.action === 'prepare') data = await service.prepare(GOOGLE_DRIVE_APPLICATION_PASSPHRASE, tabId, clientId);
+                } else if (message.action === 'prepare' && (message.includeSensitive === undefined || typeof message.includeSensitive === 'boolean')) data = await service.prepare(GOOGLE_DRIVE_APPLICATION_PASSPHRASE, tabId, clientId, message.includeSensitive ?? false);
                 else if (message.action === 'cancel' && (message.id === undefined || (typeof message.id === 'string' && message.id.length <= 64))) data = await service.cancel(message.id as string | undefined, tabId, clientId);
                 else if (message.action === 'commit' && typeof message.id === 'string' && message.id.length <= 64 && ['upload', 'download', 'merge'].includes(message.direction as string)) {
                     const choices = message.choices;

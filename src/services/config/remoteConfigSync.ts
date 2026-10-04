@@ -1,11 +1,11 @@
 /**
  * @file src/services/config/remoteConfigSync.ts
- * 文件职责：编排 Google Drive 与 WebDAV 共用的完整配置云备份和用户确认事务。
+ * 文件职责：编排 Google Drive 与 WebDAV 共用的范围化云备份和单次用户确认事务。
  * 主要内容：单次授权、账号绑定、上次成功同步的账号记录、密文基线、三方合并、
  * 掩码预览、只读恢复能力、过期检查与授权缓存清理；清理失败独立提示，不掩盖同步结果或原错误。
  * 模块边界：通过端口读写配置与云端存储；不持久化口令，不向设置页面传递完整配置。
  */
-import {buildDriveSyncDiff, driveSyncPayload, driveValuesEqual, parseDriveSyncPayload, resolveDriveSyncDiff, toDriveSyncConfig, type DriveSyncConfig, type DriveSyncDiff} from '@/src/core/config/driveSync';
+import {buildDriveSyncDiff, driveSyncPayload, driveValuesEqual, parseDriveSyncPayload, resolveDriveSyncDiff, toDriveSyncConfig, parseDriveSyncSnapshot, projectDriveSyncConfig, restoreDriveSyncSettings, validateDriveSyncConsent, type DriveSyncConfig, type DriveSyncDiff} from '@/src/core/config/driveSync';
 import {decryptDriveConfig, encryptDriveConfig, decryptDrivePreview, encryptDrivePreview, validateDrivePassphrase} from '@/src/platform/google-drive/encryption';
 import {CloudSyncError, type CloudSyncAccount as DriveAccount, type CloudSyncSession as DriveSession, type CloudSyncFile as DriveFile, type CloudSyncRemote as DriveRemote} from '@/src/core/config/cloudSync';
 
@@ -18,13 +18,15 @@ export interface DriveSyncState {
     lastSyncedAt: number | null;
     lastSyncedAccount?: DriveAccount;
     cleanupPending?: true;
-    prepared?: {id: string; expiresAt: number; content: string; tabId?: number; clientId?: string; format?: 2; remote?: DriveRemote | null};
+    prepared?: {id: string; expiresAt: number; content: string; tabId?: number; clientId?: string; format?: 2; scope?: 'settings' | 'complete'; remote?: DriveRemote | null};
 }
 export interface DriveSyncStatus {available: boolean; reason: string; account: DriveAccount | null; lastSyncedAt: number | null; cleanupPending?: true}
 export interface DriveSyncPreview {
     id: string;
     account: DriveAccount;
     hasRemote: boolean;
+    includeSensitive: boolean;
+    remoteIncludesSensitive: boolean;
     hasBaseline: boolean;
     canUpload?: false;
     changes: DriveSyncDiff['changes'];
@@ -44,6 +46,7 @@ export interface DriveSyncPorts<Session extends DriveSession = DriveSession> {
 interface Pending {
     preview: DriveSyncPreview;
     local: DriveSyncConfig;
+    originalLocal: DriveSyncConfig;
     remote: DriveRemote | null;
     remoteConfig: DriveSyncConfig | null;
     diff: DriveSyncDiff | null;
@@ -109,7 +112,8 @@ export function createRemoteConfigSync<Session extends DriveSession>(ports: Driv
         }
         return {...availability, account: state.lastSyncedAccount ?? null, lastSyncedAt: state.lastSyncedAt, ...(cleanupPending ? {cleanupPending} : {})};
     }
-    async function prepare(passphrase: string, tabId?: number, clientId?: string): Promise<DriveSyncPreview> {
+    async function prepare(passphrase: string, tabId?: number, clientId?: string, includeSensitive = false): Promise<DriveSyncPreview> {
+        validateDriveSyncConsent(includeSensitive);
         validateDrivePassphrase(passphrase);
         pending = null;
         const session = await ports.auth.open(true);
@@ -117,38 +121,50 @@ export function createRemoteConfigSync<Session extends DriveSession>(ports: Driv
         // 换账号只重置合并基线；取消或授权失败时仍能看到上次成功同步的账号及时间。
         const state = previous.accountId === session.account.id ? previous : {...emptyState(), lastSyncedAt: previous.lastSyncedAt, ...(previous.lastSyncedAccount ? {lastSyncedAccount: previous.lastSyncedAccount} : {})};
         delete state.prepared;
-        const local = toDriveSyncConfig(await ports.snapshot());
+        const originalLocal = structuredClone(await ports.snapshot());
+        const local = toDriveSyncConfig(originalLocal);
         const remote = await ports.api.read(session);
-        const remoteConfig = remote ? parseDriveSyncPayload(await decryptDriveConfig(remote.content, passphrase)) : null;
+        const remoteSnapshot = remote ? parseDriveSyncSnapshot(await decryptDriveConfig(remote.content, passphrase)) : null;
+        const remoteIncludesSensitive = remoteSnapshot?.includesSensitive ?? false;
+        const sensitiveDiff = includeSensitive && remoteIncludesSensitive;
+        const remoteConfig = remoteSnapshot ? projectDriveSyncConfig(remoteSnapshot.config, sensitiveDiff) : null;
         let baseline: DriveSyncConfig | null = null;
         if (remote && state.accountId === session.account.id && state.baseline) {
-            // 云端在其他设备重新加密后，旧基线不再可信，回到明确选择方向的首次同步流程。
-            try {baseline = parseDriveSyncPayload(await decryptDriveConfig(state.baseline, passphrase));} catch {baseline = null;}
+            // 普通基线不能给新增的敏感差异提供删除建议；完整基线可安全投影成普通设置。
+            try {
+                const snapshot = parseDriveSyncSnapshot(await decryptDriveConfig(state.baseline, passphrase));
+                if (!sensitiveDiff || snapshot.includesSensitive) baseline = projectDriveSyncConfig(snapshot.config, sensitiveDiff);
+            } catch {baseline = null;}
         }
-        const diff = remoteConfig ? buildDriveSyncDiff(baseline, local, remoteConfig) : null;
-        const preview: DriveSyncPreview = {id: crypto.randomUUID(), account: session.account, hasRemote: Boolean(remote), hasBaseline: Boolean(baseline), ...(remote?.file.readOnly ? {canUpload: false as const} : {}), changes: diff?.changes ?? [], expiresAt: ports.now() + 10 * 60_000};
-        pending = {preview, local, remote, remoteConfig, diff, proof: await proof(preview.id, passphrase)};
-        // MV3 worker 可能在用户阅读预览时休眠；待确认快照仅以口令密文保存。
-        // 本机快照只封装一次；云端已经是密文，基线已经存在状态中，避免再次加密放大三倍。
-        const content = await encryptDrivePreview({preview: {...preview, changes: []}, local, proof: pending.proof}, passphrase);
-        await ports.writeState({...state, connected: true, accountId: session.account.id, prepared: {id: preview.id, expiresAt: preview.expiresAt, content, tabId, clientId, format: 2, remote}});
+        const diff = remoteConfig ? buildDriveSyncDiff(baseline, projectDriveSyncConfig(local, sensitiveDiff), remoteConfig) : null;
+        const preview: DriveSyncPreview = {id: crypto.randomUUID(), account: session.account, hasRemote: Boolean(remote), includeSensitive, remoteIncludesSensitive, hasBaseline: Boolean(baseline), ...(remote?.file.readOnly ? {canUpload: false as const} : {}), changes: diff?.changes ?? [], expiresAt: ports.now() + 10 * 60_000};
+        pending = {preview, local, originalLocal, remote, remoteConfig, diff, proof: await proof(preview.id, passphrase)};
+        // MV3 休眠后的授权范围同时保存在密文与事务元数据中；完整原始本机快照供检测与回滚。
+        const content = await encryptDrivePreview({preview: {...preview, changes: []}, local: originalLocal, proof: pending.proof}, passphrase);
+        await ports.writeState({...state, connected: true, accountId: session.account.id, prepared: {id: preview.id, expiresAt: preview.expiresAt, content, tabId, clientId, format: 2, scope: includeSensitive ? 'complete' : 'settings', remote}});
         return preview;
     }
     async function commit(id: string, passphrase: string, direction: DriveSyncDirection, choices: Record<string, unknown>): Promise<DriveSyncStatus> {
         validateDrivePassphrase(passphrase);
         const state = readState(await ports.readState());
         if (!state.prepared || state.prepared.id !== id || state.prepared.expiresAt <= ports.now()) throw new CloudSyncError('同步预览已失效，请重新生成。');
+        // 旧 worker 的待确认事务没有明确的本次范围，绝不能默认解释为允许上传秘密。
+        if (state.prepared.scope !== 'settings' && state.prepared.scope !== 'complete') throw new CloudSyncError('同步预览缺少敏感信息范围，请重新生成。');
         if (!pending) {
-            const restored = await decryptDrivePreview(state.prepared.content, passphrase) as {preview: DriveSyncPreview; local: DriveSyncConfig; remote: DriveRemote | null; baseline: string; proof: string};
-            if (state.prepared.format === 2) {
-                restored.remote = state.prepared.remote ?? null;
-                restored.baseline = restored.preview.hasBaseline ? state.baseline : '';
-            }
-            const local = parseDriveSyncPayload(driveSyncPayload(restored.local));
-            const remoteConfig = restored.remote ? parseDriveSyncPayload(await decryptDriveConfig(restored.remote.content, passphrase)) : null;
-            const baseline = restored.baseline ? parseDriveSyncPayload(await decryptDriveConfig(restored.baseline, passphrase)) : null;
-            pending = {...restored, local, remoteConfig, diff: remoteConfig ? buildDriveSyncDiff(baseline, local, remoteConfig) : null};
+            const restored = await decryptDrivePreview(state.prepared.content, passphrase) as {preview: DriveSyncPreview; local: DriveSyncConfig; proof: string};
+            if (!restored.preview || typeof restored.preview.includeSensitive !== 'boolean'
+                || typeof restored.preview.remoteIncludesSensitive !== 'boolean'
+                || !restored.local || typeof restored.local !== 'object' || Array.isArray(restored.local)) throw new CloudSyncError('同步预览缺少敏感信息范围，请重新生成。');
+            const local = parseDriveSyncPayload(driveSyncPayload(restored.local, true));
+            const remote = state.prepared.remote ?? null;
+            const snapshot = remote ? parseDriveSyncSnapshot(await decryptDriveConfig(remote.content, passphrase)) : null;
+            if ((snapshot?.includesSensitive ?? false) !== restored.preview.remoteIncludesSensitive) throw new CloudSyncError('同步预览范围已变化，请重新生成。');
+            const sensitiveDiff = restored.preview.includeSensitive && restored.preview.remoteIncludesSensitive;
+            const remoteConfig = snapshot ? projectDriveSyncConfig(snapshot.config, sensitiveDiff) : null;
+            const baseline = restored.preview.hasBaseline ? projectDriveSyncConfig(parseDriveSyncPayload(await decryptDriveConfig(state.baseline, passphrase)), sensitiveDiff) : null;
+            pending = {...restored, originalLocal: restored.local, local, remote, remoteConfig, diff: remoteConfig ? buildDriveSyncDiff(baseline, projectDriveSyncConfig(local, sensitiveDiff), remoteConfig) : null};
         }
+        if (pending.preview.includeSensitive !== (state.prepared.scope === 'complete')) throw new CloudSyncError('同步预览范围已变化，请重新生成。');
         const current = pending;
         pending = null; // 一次性确认；任何失败都要求重新预览。
         delete state.prepared;
@@ -158,16 +174,22 @@ export function createRemoteConfigSync<Session extends DriveSession>(ports: Driv
         if (!state.connected) throw new CloudSyncError('本次同步授权已结束，请重新生成预览。');
         const session = await ports.auth.open(false);
         if (session.account.id !== current.preview.account.id) throw new CloudSyncError(ports.accountChangedError ?? '同步连接已变化，请重新生成预览。');
-        if (!driveValuesEqual(toDriveSyncConfig(await ports.snapshot()), current.local)) throw new CloudSyncError('本机配置已变化，请重新生成同步预览。');
+        if (!driveValuesEqual(await ports.snapshot(), current.originalLocal)) throw new CloudSyncError('本机配置已变化，请重新生成同步预览。');
+        const sensitiveDiff = current.preview.includeSensitive && current.preview.remoteIncludesSensitive;
         let next: DriveSyncConfig;
         if (direction === 'upload') next = current.local;
-        else if (direction === 'download' && current.remoteConfig) next = current.remoteConfig;
-        else if (direction === 'merge' && current.diff) next = resolveDriveSyncDiff(current.diff, choices);
+        else if (direction === 'download' && current.remoteConfig) next = sensitiveDiff ? current.remoteConfig : restoreDriveSyncSettings(current.local, current.remoteConfig);
+        else if (direction === 'merge' && current.diff) {
+            const merged = resolveDriveSyncDiff(current.diff, choices);
+            next = sensitiveDiff ? merged : restoreDriveSyncSettings(current.local, merged);
+        }
         else throw new CloudSyncError('无效的同步方向，请重新选择。');
         // 必须在任何云端写入之前验证完整配置及服务引用；不能依赖 apply 才发现无效合并。
-        next = parseDriveSyncPayload(driveSyncPayload(next));
-        const remoteChanged = !current.remoteConfig || !driveValuesEqual(next, current.remoteConfig);
-        const content = !remoteChanged ? current.remote!.content : await encryptDriveConfig(driveSyncPayload(next), passphrase);
+        next = parseDriveSyncPayload(driveSyncPayload(next, true));
+        const cloudConfig = projectDriveSyncConfig(next, current.preview.includeSensitive);
+        const remoteChanged = !current.remoteConfig || current.preview.includeSensitive !== current.preview.remoteIncludesSensitive
+            || !driveValuesEqual(cloudConfig, current.remoteConfig);
+        const content = direction === 'download' || !remoteChanged ? current.remote!.content : await encryptDriveConfig(driveSyncPayload(next, current.preview.includeSensitive), passphrase);
         if (!sameRemote(await ports.api.read(session), current.remote)) throw new CloudSyncError('云端配置已变化，请重新生成同步预览。');
         if (direction !== 'download' && remoteChanged) {
             if (current.remote?.file.readOnly) throw new CloudSyncError('云端备份缺少安全覆盖所需的版本信息；仍可恢复，请重新读取后重试。');
@@ -176,7 +198,7 @@ export function createRemoteConfigSync<Session extends DriveSession>(ports: Driv
         const localChanged = !driveValuesEqual(next, current.local);
         if (localChanged) {
             try {await ports.apply(next);} catch {
-                try {await ports.apply(current.local);} catch {throw new CloudSyncError('本机保存和恢复失败，请重新打开设置检查配置；云端保留本次加密快照。');}
+                try {await ports.apply(current.originalLocal);} catch {throw new CloudSyncError('本机保存和恢复失败，请重新打开设置检查配置；云端保留本次加密快照。');}
                 throw new CloudSyncError('本机保存失败，已恢复原配置；请重新预览后重试。');
             }
         }
@@ -185,12 +207,12 @@ export function createRemoteConfigSync<Session extends DriveSession>(ports: Driv
     }
     return {
         status: () => exclusive(status),
-        prepare: (passphrase: string, tabId?: number, clientId?: string) => exclusive(async () => {
+        prepare: (passphrase: string, tabId?: number, clientId?: string, includeSensitive = false) => exclusive(async () => {
             const state = readState(await ports.readState());
             if (state.prepared && state.prepared.expiresAt > ports.now() && !owns(state, tabId, clientId)) {
                 throw new CloudSyncError('另一个设置页面正在确认同步，请先完成或取消该页面的预览。');
             }
-            try {return await prepare(passphrase, tabId, clientId);} catch (error) {await finishSession().catch(() => undefined); throw error;}
+            try {return await prepare(passphrase, tabId, clientId, includeSensitive);} catch (error) {await finishSession().catch(() => undefined); throw error;}
         }),
         commit: (id: string, passphrase: string, direction: DriveSyncDirection, choices: Record<string, unknown>, tabId?: number, clientId?: string) => exclusive(async () => {
             const state = readState(await ports.readState());

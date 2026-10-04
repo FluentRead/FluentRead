@@ -16,4 +16,4 @@
 
 图片采集、压缩、商店规格与验证命令见 `marketing/README.md`。
 
-[Google Drive 同步开发教程](./google-drive-sync-guide.md) 说明完整配置的本机加密、Google Cloud 申请步骤、Chrome 客户端配置、同步确认与验证边界。
+[Google Drive 同步开发教程](./google-drive-sync-guide.md) 说明默认普通设置与单次敏感信息同意、v1/v2 兼容、本机加密风险、Google Cloud 申请步骤、Chrome 客户端配置、同步确认与验证边界。

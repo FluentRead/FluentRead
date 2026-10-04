@@ -2219,6 +2219,7 @@ const enUSLegacyTextBase: Readonly<Record<string, string>> = {
 
 export const enUSLegacyText: Readonly<Record<string, string>> = {
     ...googleDriveText.legacy,
+    ...cloudBackupText.legacy,
     "腾讯交互翻译": "Tencent TranSmart",
     "火山翻译": "Volcengine Translate",
     "免密钥网页接口，与腾讯云翻译不同": "Keyless web endpoint, separate from Tencent Cloud Translation",

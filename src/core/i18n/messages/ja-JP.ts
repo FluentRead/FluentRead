@@ -2229,6 +2229,7 @@ const jaJPLegacyTextBase: Readonly<Record<string, string>> = {
 
 export const jaJPLegacyText: Readonly<Record<string, string>> = {
     ...googleDriveText.legacy,
+    ...cloudBackupText.legacy,
     "腾讯交互翻译": "Tencent TranSmart",
     "火山翻译": "Volcengine 翻訳",
     "免密钥网页接口，与腾讯云翻译不同": "キー不要のウェブ接口。Tencent Cloud 翻訳とは別です",

@@ -1,7 +1,7 @@
 /**
  * @file src/features/image-translation/services/rendering.ts
  * 文件职责：采样 OCR 框周边背景并在有限图片区域中排版、绘制完整译文，避免混合语言空格损坏、强制横向压缩和行数截断。
- * 主要内容：按周长采样不透明主色、依据相对亮度选择文字颜色、按单词与字素换行，通过字号二分适配区域并隔离 Canvas 绘图状态。
+ * 主要内容：按周长采样不透明主色、依据相对亮度选择文字颜色、按单词与字素换行，通过字号二分适配区域、保留正文对齐和字号上限并隔离 Canvas 绘图状态。
  * 模块边界：颜色和排版算法无浏览器副作用；绘制函数仅操作调用方传入的 Canvas context，不读取配置、不请求翻译、不修补背景或修改宿主图片元素。
  */
 import type { OcrLine } from '@/src/shared/image/types';
@@ -167,6 +167,7 @@ export function drawTranslatedImageText(
     height: number,
     backgroundColor: string,
     maxFontSize = Infinity,
+    textAlign: 'left' | 'center' | 'right' = 'center',
 ): void {
     const paddingX = Math.min(2, width * 0.03);
     const paddingY = Math.min(1, height * 0.05);
@@ -175,7 +176,7 @@ export function drawTranslatedImageText(
         let measuredFont = 0;
         const layout = layoutImageTranslationText(text, width - paddingX * 2, height - paddingY * 2, (line, fontSize) => {
             if (fontSize !== measuredFont) {
-                context.font = `500 ${fontSize}px ${IMAGE_TEXT_FONT}`;
+                context.font = `400 ${fontSize}px ${IMAGE_TEXT_FONT}`;
                 measuredFont = fontSize;
             }
             return context.measureText(line).width;
@@ -184,18 +185,21 @@ export function drawTranslatedImageText(
         context.beginPath();
         context.rect(left, top, width, height);
         context.clip();
-        context.font = `500 ${layout.fontSize}px ${IMAGE_TEXT_FONT}`;
-        context.textAlign = 'center';
+        context.font = `400 ${layout.fontSize}px ${IMAGE_TEXT_FONT}`;
+        context.textAlign = textAlign;
         context.textBaseline = 'middle';
         context.fillStyle = getImageTextColor(backgroundColor);
         context.strokeStyle = backgroundColor;
         context.lineWidth = Math.max(0.35, layout.fontSize * 0.06);
         context.lineJoin = 'round';
-        const firstLine = top + (height - layout.lineHeight * layout.lines.length) / 2 + layout.lineHeight / 2;
+        const firstLine = textAlign === 'center'
+            ? top + (height - layout.lineHeight * layout.lines.length) / 2 + layout.lineHeight / 2
+            : top + paddingY + layout.lineHeight / 2;
+        const x = textAlign === 'left' ? left + paddingX : textAlign === 'right' ? left + width - paddingX : left + width / 2;
         layout.lines.forEach((line, index) => {
             const y = firstLine + index * layout.lineHeight;
-            context.strokeText(line, left + width / 2, y);
-            context.fillText(line, left + width / 2, y);
+            context.strokeText(line, x, y);
+            context.fillText(line, x, y);
         });
     } finally {
         context.restore();

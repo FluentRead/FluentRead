@@ -20,7 +20,7 @@ function normalizeTranslationComparison(text: string): string {
  * 这样中文原文、品牌名或微软原样返回的内容不会被重新绘制成一张
  * 看似“已翻译”但实际没有变化的覆盖层。
  */
-export function selectChangedTranslations(lines: OcrLine[], translations: string[]): OcrLine[] {
+export function selectChangedTranslations<T extends OcrLine>(lines: T[], translations: string[]): T[] {
     return lines.flatMap((line, index) => {
         const text = translations[index]?.trim() || line.text;
         return normalizeTranslationComparison(text) === normalizeTranslationComparison(line.text)

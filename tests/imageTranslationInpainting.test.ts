@@ -12,6 +12,26 @@ function line(x0: number, y0: number, x1: number, y1: number) {
 }
 
 describe('图片文字背景修复', () => {
+    it('小字两像素边缘清理覆盖 OCR 未含的链接下划线，不把绿色向背景扩散', () => {
+        const source = solidPixels(60, 25, [255, 255, 255, 255]);
+        for (let x = 10; x < 40; x++) source.set([0, 180, 70, 255], (16 * 60 + x) * 4);
+        source.set([0, 180, 70, 255], (8 * 60 + 20) * 4);
+        expect(inpaintTextRegions(source, 60, 25, [line(10, 6, 40, 15)])).toEqual(solidPixels(60, 25, [255, 255, 255, 255]));
+    });
+    it('整段排版只擦除源行框，行间图案与短末行旁的像素保持原样', () => {
+        const source = solidPixels(60, 40);
+        const boxes = [line(5, 5, 45, 13).bbox, line(5, 25, 25, 33).bbox];
+        source.set([0, 0, 0, 255], (9 * 60 + 10) * 4);
+        source.set([0, 0, 0, 255], (29 * 60 + 10) * 4);
+        source.set([255, 0, 0, 255], (19 * 60 + 30) * 4);
+        source.set([0, 255, 0, 255], (29 * 60 + 40) * 4);
+        const result = inpaintTextRegions(source, 60, 40, [{...line(5, 5, 45, 33), sourceBoxes: boxes}]);
+        const pixel = (x: number, y: number) => Array.from(result.slice((y * 60 + x) * 4, (y * 60 + x) * 4 + 4));
+        expect(pixel(10, 9)).toEqual([180, 200, 220, 255]);
+        expect(pixel(10, 29)).toEqual([180, 200, 220, 255]);
+        expect(pixel(30, 19)).toEqual([255, 0, 0, 255]);
+        expect(pixel(40, 29)).toEqual([0, 255, 0, 255]);
+    });
     it('忽略不安全尺寸、无效边界和图片以外的识别框，始终保持独立输出', () => {
         const source = solidPixels(4, 4);
         for (const [width, height] of [[NaN, 4], [4, Infinity], [1.5, 4], [0, 4], [4, 0], [-1, 4], [10, 10]]) {

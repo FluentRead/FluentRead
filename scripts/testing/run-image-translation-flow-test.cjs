@@ -25,6 +25,7 @@ const xSurface = process.argv.includes('--x-surface');
 const liveTranslation = process.argv.includes('--live-translation');
 const multilingual = process.argv.includes('--multilingual');
 const harFixture = process.argv.includes('--har-fixture');
+const paragraphImage = arg('paragraph-image', null);
 if (!playwrightRoot || !focusHelper)
     throw new Error('必须提供 --playwright-root 与 --focus-safe-helper');
 const { chromium } = require(path.join(playwrightRoot, 'playwright'));
@@ -401,7 +402,7 @@ async function verifyGeometryCases({worker, ui, wait, shot}) {
         });
         if (!response.success) throw new Error(response.error);
     }, xSurface);
-    await worker.evaluate(liveTranslation => {
+    await worker.evaluate(({liveTranslation, paragraphFixture}) => {
         const originalFetch = globalThis.fetch.bind(globalThis);
         // Keep the real OCR path intact while giving the loading controls enough time to sample.
         const fixture = globalThis.__imageFixture = {requests: [], endpointHosts: [], rejectPrimaryXsrf: false, operationIds: [], delay: 1800, replayProgress: false, progressTimer: null, progressRequestId: null};
@@ -470,7 +471,23 @@ async function verifyGeometryCases({worker, ui, wait, shot}) {
                     if (signal?.aborted) onAbort();
                     else signal?.addEventListener('abort', onAbort, {once: true});
                 });
-                const text = origin.toLowerCase().includes('welcome') ? '欢迎使用流畅阅读'
+                const text = paragraphFixture ? (() => {
+                    if (origin.startsWith('Calculate the best filament grouping')) {
+                        assertParagraph(origin.includes('printer based on slicing results.'));
+                        return '计算最佳耗材分组，尽量减少耗材浪费。需要根据切片结果，手动将耗材放到打印机上。';
+                    }
+                    if (origin.startsWith('Calculate the filament grouping')) {
+                        assertParagraph(origin.endsWith('at the printer.'));
+                        return '根据打印机中的耗材计算分组，减少在打印机上调整耗材的需要。';
+                    }
+                    if (/filament waste|printer based|filaments, reducing|^the printer\./.test(origin)) throw new Error('说明文字仍被逐行送翻译');
+                    return /Filament-Saving Mode/.test(origin) ? '节省耗材模式'
+                        : /Convenient Mode/.test(origin) ? '便捷模式'
+                        : /Custom Mode/.test(origin) ? '自定义模式'
+                        : /Manually assign/.test(origin) ? '手动将耗材分配到左侧或右侧喷嘴。'
+                        : /Video tutorial/.test(origin) ? '视频教程' : '了解更多';
+                    function assertParagraph(complete) {if (!complete) throw new Error('未收到完整说明段落');}
+                })() : origin.toLowerCase().includes('welcome') ? '欢迎使用流畅阅读'
                     : origin.toLowerCase().includes('click') ? '单击即可翻译图片' : '用自己的语言读懂每一个字';
                 const entry = [null, null, null, null, null, [[text]]];
                 return new Response(JSON.stringify([['wrb.fr', 'MkEWBc', JSON.stringify([null, [[entry]]])]]), {status: 200});
@@ -481,7 +498,7 @@ async function verifyGeometryCases({worker, ui, wait, shot}) {
             // OCR worker、wasm 和语言包仍沿真实生产路径加载，不 mock Tesseract。
             return originalFetch(input, options);
         };
-    }, liveTranslation);
+    }, {liveTranslation, paragraphFixture: Boolean(paragraphImage)});
     if (harFixture) {
         if (liveTranslation) throw new Error('--har-fixture 只用于确定性响应验证');
         currentCase = 'HAR identifier filtering and Google XSRF cooldown';
@@ -577,6 +594,45 @@ async function verifyGeometryCases({worker, ui, wait, shot}) {
         report.screenshots.push(file);
     }
     const image = page.locator('#sample');
+    if (paragraphImage) {
+        currentCase = 'ordinary image complete paragraphs';
+        const original = `data:image/png;base64,${fs.readFileSync(paragraphImage).toString('base64')}`;
+        await image.evaluate((image, source) => {image.src = source;}, original);
+        await image.hover();
+        await wait(() => ui("return !!this.querySelector('.fr-image-controls')"));
+        await click('翻译');
+        await wait(() => ui("return ['error','translated'].includes(this.querySelector('.fr-image-controls')?.dataset.phase)"));
+        if (await ui("return this.querySelector('.fr-image-controls')?.dataset.phase==='error'")) {
+            await click('下载语言包并翻译');
+            await wait(() => ui("return this.querySelector('.fr-image-controls')?.dataset.phase==='translated'"), 300_000);
+        }
+        await shot('paragraph-translated');
+        const bitmap = await ui("return this.querySelector('.fluent-read-image-translation-overlay img')?.src");
+        assert.ok(bitmap?.startsWith('data:image/png;base64,'));
+        fs.writeFileSync(path.join(artifacts, 'paragraph-translated-bitmap.png'), Buffer.from(bitmap.split(',')[1], 'base64'));
+        await click('文字'); await click('原文对照');
+        const sourceParagraphs = await ui("return [...this.querySelectorAll('.fr-image-reader-source')].map(line=>line.textContent)");
+        assert.ok(sourceParagraphs.includes('Calculate the best filament grouping to minimize filament waste. Need to manually place filaments on the printer based on slicing results.'));
+        assert.ok(sourceParagraphs.includes('Calculate the filament grouping based on the printers filaments, reducing the need for adjusting filaments at the printer.'));
+        assert.ok(sourceParagraphs.includes('Convenient Mode'));
+        await shot('paragraph-original-comparison');
+        await click('文字');
+        const count = await worker.evaluate(() => globalThis.__imageFixture.requests.length);
+        await click('原图');
+        await wait(() => ui("return this.querySelector('.fr-image-controls')?.dataset.phase==='idle'"));
+        assert.equal(await image.getAttribute('src'), original);
+        assert.equal(await ui("return this.querySelectorAll('.fluent-read-image-translation-overlay img').length"), 0);
+        await shot('paragraph-restored');
+        await click('翻译');
+        await wait(() => ui("return this.querySelector('.fr-image-controls')?.dataset.phase==='translated'"));
+        assert.equal(await ui("return this.querySelectorAll('.fluent-read-image-translation-overlay img').length"), 1);
+        assert.equal(await worker.evaluate(() => globalThis.__imageFixture.requests.length), count);
+        report.paragraphs = {sourceParagraphs, requests: await worker.evaluate(() => globalThis.__imageFixture.requests),
+            bitmap: path.join(artifacts, 'paragraph-translated-bitmap.png'), switchCounts: [1, 0, 1]};
+        report.cases.push('real OCR groups wrapped body lines and retains headings and links', 'paragraph reader retains complete recognized originals', 'restore and cached redisplay preserve source with one bitmap');
+        assert.equal(report.errors.length, 0); report.success = true;
+        return;
+    }
     if (xSurface) {
         currentCase = 'X snapshot surface and first-use automatic OCR languages';
         const {verifyXSurface} = require('./image-translation-x-surface.cjs');

@@ -1,4 +1,6 @@
 import {describe, expect, it} from 'vitest';
+import {groupImageParagraphs, type ImageTextRegion} from '@/src/features/image-translation/paragraphs';
+import bambuLines from './fixtures/image-translation/bambu-ocr-lines.json';
 import {
     getOcrImageSize,
     getAreaOcrImageSize,
@@ -6,6 +8,66 @@ import {
     restoreOcrLineCoordinates,
     selectChangedTranslations,
 } from '@/src/features/image-translation/core';
+
+describe('普通图片按完整段落翻译', () => {
+    const line = (text: string, x0: number, y0: number, width = 200, h = 12): ImageTextRegion =>
+        ({text, bbox: {x0, y0, x1: x0 + width, y1: y0 + h}});
+
+    it('Bambu 原图的真实稀疏 OCR：两段三行说明合为整段，标题和底部链接分离', () => {
+        const regions = groupImageParagraphs(bambuLines);
+        expect(regions).toHaveLength(bambuLines.length - 4);
+        expect(regions.filter(region => region.sourceBoxes)).toMatchObject([
+            {text: 'Calculate the best filament grouping to minimize filament waste. Need to manually place filaments on the printer based on slicing results.',
+                bbox: {x0: 61, y0: 78, x1: 367, y1: 118}, textAlign: 'left', sourceBoxes: [expect.anything(), expect.anything(), expect.anything()]},
+            {text: 'Calculate the filament grouping based on the printers filaments, reducing the need for adjusting filaments at the printer.',
+                bbox: {x0: 61, y0: 156, x1: 355, y1: 196}, textAlign: 'left'},
+        ]);
+        expect(regions.some(region => region.text === 'Convenient Mode')).toBe(true);
+        expect(regions.some(region => region.text === 'Video tutorial')).toBe(true);
+    });
+
+    it('中文换行不加入空格，英文续行、标点与断词恢复为完整句子', () => {
+        expect(groupImageParagraphs([line('这是一个', 0, 0), line('完整段落。', 0, 14)])[0].text).toBe('这是一个完整段落。');
+        expect(groupImageParagraphs([line('A filament-', 0, 0), line('saving mode', 0, 14), line(', with words.', 0, 28)])[0].text).toBe('A filament-saving mode, with words.');
+        expect(groupImageParagraphs([line('soft\u00ad', 0, 0), line('wrap', 0, 14)])[0].text).toBe('softwrap');
+        expect(groupImageParagraphs([line('Mixed 中文', 0, 0), line('and English', 0, 14)])[0].text).toBe('Mixed 中文 and English');
+    });
+
+    it('乱序识别恢复阅读顺序，独立两栏不串段且不会修改输入', () => {
+        const input = [line('Right second', 250, 14), line('Left first', 0, 0), line('Right first', 250, 0), line('Left second', 0, 14)];
+        const before = structuredClone(input);
+        expect(groupImageParagraphs(input).map(region => region.text)).toEqual(['Left first Left second', 'Right first Right second']);
+        expect(input).toEqual(before);
+    });
+
+    it('字号层级、段间留白、同一行控件和新列表项形成边界', () => {
+        const inputs = [
+            [line('Heading', 0, 0, 150, 20), line('Body', 0, 22)],
+            [line('First paragraph.', 0, 0), line('Second paragraph.', 0, 24)],
+            [line('Left button', 0, 0, 80), line('Right button', 100, 0, 80)],
+            [line('1. First item', 0, 0), line('2. Second item', 0, 14)],
+            [line('• First item', 0, 0), line('• Second item', 0, 14)],
+        ];
+        for (const input of inputs) expect(groupImageParagraphs(input)).toHaveLength(2);
+        expect(groupImageParagraphs([line('• A long item', 0, 0), line('continues here.', 2, 14)])).toHaveLength(1);
+    });
+
+    it('居中和右对齐段落保留对齐，不靠横向重叠强行合并', () => {
+        expect(groupImageParagraphs([line('Centered first', 0, 0, 200), line('Centered last', 50, 14, 100)])[0].textAlign).toBe('center');
+        expect(groupImageParagraphs([line('Right first', 0, 0, 200), line('Right last', 100, 14, 100)])[0].textAlign).toBe('right');
+        expect(groupImageParagraphs([line('First', 0, 0, 200), line('Different', 40, 14, 140)])).toHaveLength(2);
+    });
+
+    it('保留竖排和已经合并的区域，阻止跨遮挡标签合段', () => {
+        const vertical = {...line('縦書き', 0, 0), vertical: true as const};
+        const grouped = {...line('Existing group', 0, 0), sourceBoxes: [line('', 0, 0).bbox]};
+        expect(groupImageParagraphs([vertical, line('body', 0, 14)])).toEqual([vertical, line('body', 0, 14)]);
+        expect(groupImageParagraphs([grouped, line('body', 0, 14)])).toHaveLength(2);
+        const input = [line('First', 0, 0), line('label', 50, 12, 50, 1), line('Second', 0, 14)];
+        expect(groupImageParagraphs(input)).toHaveLength(3);
+        expect(groupImageParagraphs([])).toEqual([]);
+    });
+});
 
 describe('图片 OCR 有界尺寸和可信文本', () => {
     it('普通图片保留原始尺寸，大图同时受像素总数和最长边约束', () => {

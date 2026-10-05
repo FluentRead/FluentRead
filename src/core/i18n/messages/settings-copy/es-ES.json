@@ -60,7 +60,10 @@
     "settings.requestLimits.initialRetryWait": "Espera inicial entre reintentos",
     "settings.requestLimits.maximumRetryWait": "Espera máxima entre reintentos",
     "learning.history.description": "Recupera frases y respuestas. Se guardan localmente 30 días; consultarlas no llama al modelo.",
-    "learning.history.emptyHint": "Selecciona una frase y pulsa Comprender o Analizar frase. Las respuestas se guardan aquí automáticamente."
+    "learning.history.emptyHint": "Selecciona una frase y pulsa Comprender o Analizar frase. Las respuestas se guardan aquí automáticamente.",
+    "settings.services.freeWeights.testDuration": "Duración de esta prueba: {duration} ms",
+    "settings.services.freeWeights.share": "Cuota",
+    "settings.services.freeWeights.noChinese": "Sin soporte para chino"
   },
   "legacy": {
     "同步连接已变化，请重新生成预览。": "La conexión ha cambiado. Genera una nueva vista previa.",

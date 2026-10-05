@@ -14,8 +14,18 @@ beforeEach(() => {fetchMock.mockReset().mockImplementation(async () => reply());
 afterEach(() => setRuntimeFetch());
 
 describe('free-only web providers', () => {
+    it('names Yandex network failures and preserves cooperative cancellation', async () => {
+        fetchMock.mockRejectedValueOnce(new TypeError('Failed to fetch'));
+        await expect(translateFreeWebText('yandexFree', 'Hello', 'en', 'zh-Hans')).rejects.toThrow('Yandex 网络连接失败');
+        const controller = new AbortController();
+        fetchMock.mockImplementationOnce(async () => {controller.abort(); throw new TypeError('Failed to fetch');});
+        await expect(translateFreeWebText('yandexFree', 'Hello', 'en', 'zh-Hans', controller.signal)).rejects.toMatchObject({name: 'AbortError'});
+        fetchMock.mockRejectedValueOnce(new Error('existing'));
+        await expect(translateFreeWebText('yandexFree', 'Hello', 'en', 'zh-Hans')).rejects.toThrow('existing');
+    });
+
     it('only accepts new IDs inside the free policy, preserves existing policy and round-trips selections', () => {
-        expect(new Config().freeTranslationOrder).toEqual(['microsoft', 'transmart', 'volcengineFree', 'google', 'youdaoFree', 'icibaFree', 'yandexFree', 'deeplx', 'myMemory']);
+        expect(new Config().freeTranslationOrder).toEqual(['microsoft', 'transmart', 'volcengineFree', 'google', 'youdaoFree', 'icibaFree', 'yandexFree', 'deeplx', 'myMemory', 'sogouFree', 'reversoFree', 'lingvaFree', 'apertiumFree']);
         for (const id of providers) {
             expect(Object.values(services)).not.toContain(id);
             expect(options.services.some(item => item.value === id)).toBe(false);

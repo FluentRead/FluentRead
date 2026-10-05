@@ -1,7 +1,7 @@
 /**
  * @file src/providers/translation/free-extra-web.ts
  * 文件职责：适配搜狗、Reverso、Lingva 和 Apertium 四个匿名网页翻译候选。
- * 主要内容：读取搜狗网页参数，构造 Reverso 请求，调用 Lingva REST 与 Apertium 动态语言对，保留文本槽/换行/边缘空白并响应取消。
+ * 主要内容：读取搜狗网页参数并识别内层业务错误，构造 Reverso 请求，明确 Lingva 公共实例的访问限制，调用 Apertium 动态语言对；保留文本槽/换行/边缘空白并响应取消。
  * 模块边界：不读取用户 Cookie、凭据或代理；免费链的超时、冷却和并发由上层编排负责。
  */
 import MD5 from 'crypto-js/md5';
@@ -59,7 +59,7 @@ async function getSogouSecret(signal?: AbortSignal): Promise<string> {
 
 type SogouResponse = {
     status?: unknown;
-    data?: {translate?: {dit?: unknown}};
+    data?: {translate?: {dit?: unknown; errorCode?: unknown}};
 };
 
 async function translateSogouChunk(text: string, source: string, target: string, signal?: AbortSignal): Promise<string> {
@@ -77,9 +77,16 @@ async function translateSogouChunk(text: string, source: string, target: string,
     if (!response.ok) throw createHttpStatusError(response, '搜狗翻译请求失败');
     const result = await readJsonResponse<SogouResponse | null>(response, '搜狗翻译返回的不是有效 JSON');
     checkAbort(signal);
-    if (result?.status !== 0) throw failure('搜狗翻译业务请求失败');
+    if (result?.status !== 0 && result?.status !== '0') throw failure('搜狗翻译业务请求失败');
     const translated = result.data?.translate?.dit;
-    if (typeof translated !== 'string' || !translated.trim()) throw failure('搜狗翻译结果为空');
+    const errorCode = result.data?.translate?.errorCode;
+    // 官方外层 status=0 仍可能返回空译文；只展示短格式内层错误码，不回显第三方正文。
+    if (typeof translated !== 'string' || !translated.trim()) {
+        if (typeof errorCode === 'string' && /^s\d{1,6}$/u.test(errorCode)) {
+            throw failure(`搜狗翻译未返回译文（错误码 ${errorCode}）；请稍后重试或停用此服务`);
+        }
+        throw failure('搜狗翻译结果为空');
+    }
     return translated.trim();
 }
 
@@ -127,7 +134,14 @@ async function translateLingvaChunk(text: string, source: string, target: string
     const url = `${LINGVA_INSTANCE}/api/v1/${encodeURIComponent(from)}/${encodeURIComponent(to)}/${encodeURIComponent(text)}`;
     const response = await runtimeFetch(url, {method: 'GET', credentials: 'omit', signal, headers: {Accept: 'application/json'}});
     checkAbort(signal);
-    if (!response.ok) throw createHttpStatusError(response, 'Lingva 翻译请求失败');
+    if (!response.ok) {
+        const label = response.status === 403
+            ? 'Lingva 公共实例拒绝自动访问，请稍后重试或停用此服务'
+            : response.status === 429
+                ? 'Lingva 公共实例限流，请稍后重试'
+                : 'Lingva 公共实例暂时不可用，请稍后重试';
+        throw createHttpStatusError(response, label);
+    }
     const result = await readJsonResponse<{translation?: unknown; error?: unknown} | null>(response, 'Lingva 返回的不是有效 JSON');
     checkAbort(signal);
     if (result?.error) throw failure('Lingva 翻译业务请求失败');

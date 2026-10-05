@@ -1,7 +1,7 @@
 <!--
  * @file src/features/settings/ui/services/FreeTranslationSettings.vue
  * 文件职责：编辑免费翻译服务的启停、选择策略、邮箱与等待时间。
- * 主要内容：普通态统一展示全部服务的启停、连接结果、单次测试耗时与分流参考；邮箱作为独立紧凑字段常驻，高级态显示等待上限。
+ * 主要内容：以等宽等高卡片统一展示全部服务的启停、连接结果、单次测试耗时与分流参考；失败说明集中显示，邮箱作为独立紧凑字段常驻，高级态显示等待上限。
  * 模块边界：只修改传入的配置，由设置页统一持久化；只读取不含凭据的后台权重快照，不请求翻译。
  -->
 <template>
@@ -25,7 +25,7 @@
               <span v-if="isSequential" class="provider-position" aria-hidden="true">{{ isEnabled(provider.id) ? order.indexOf(provider.id) + 1 : '—' }}</span>
               <ServiceIcon :service="provider.id" :label="translateLegacy(provider.label)" size="small" />
               <div class="provider-copy">
-                <el-tooltip :content="translateLegacy(provider.description)"><strong tabindex="0">{{ translateLegacy(provider.label) }}</strong></el-tooltip>
+                <el-tooltip :content="`${translateLegacy(provider.label)} · ${translateLegacy(provider.description)}`"><strong tabindex="0">{{ translateLegacy(provider.label) }}</strong></el-tooltip>
                 <div class="provider-result">
                   <span class="provider-state" :class="`is-${providerState(provider.id)}`" :data-provider-state="provider.id" :data-provider-check-status="providerState(provider.id)" :title="providerStateTitle(provider.id)" role="status">{{ providerStateLabel(provider.id) }}</span>
                   <output v-if="providerDuration(provider.id) !== undefined" class="provider-duration" :data-provider-duration="provider.id" :aria-label="t('settings.services.freeWeights.testDuration', {duration: providerDuration(provider.id)})">{{ providerDuration(provider.id) }} ms</output>
@@ -41,9 +41,11 @@
               <span v-if="provider.id === 'apertiumFree'" class="provider-language">{{ t('settings.services.freeWeights.noChinese') }}</span>
               <span v-if="!isSequential && isEnabled(provider.id)" class="provider-allocation">{{ t('settings.services.freeWeights.share') }} <output class="provider-weight" :data-provider-weight="provider.id" :data-weight-status="weightStatus(provider.id)" :aria-label="weightAriaLabel(provider.id)">{{ formatProviderWeight(provider.id) }}</output></span>
             </div>
-            <el-tooltip v-if="checks?.[provider.id]?.error" :content="checks[provider.id]!.error"><p class="provider-error" :data-provider-error="provider.id" tabindex="0">{{ checks[provider.id]!.error }}</p></el-tooltip>
           </li>
         </ol>
+        <ul v-if="failedProviders.length" class="check-failures" :aria-label="t('settings.services.keys.failed')">
+          <li v-for="provider in failedProviders" :key="provider.id" :data-provider-error="provider.id"><strong>{{ translateLegacy(provider.label) }}</strong><span>{{ checks?.[provider.id]?.error }}</span></li>
+        </ul>
       </section>
       <p class="fallback-footnote">{{ t('settings.services.library.keepOne') }}</p>
       <section class="provider-settings" :aria-label="t('settings.services.library.memoryEmail')">
@@ -91,6 +93,7 @@ const mode = computed<FreeTranslationMode>(() => normalizeFreeTranslationMode(fr
 const isSequential = computed(() => mode.value === 'sequential')
 const order = computed(() => normalizeFreeTranslationOrder(config.value.freeTranslationOrder))
 const providers = computed(() => mode.value === 'sequential' ? [...order.value.flatMap(id => FREE_TRANSLATION_PROVIDERS.filter(provider => provider.id === id)), ...FREE_TRANSLATION_PROVIDERS.filter(provider => !order.value.includes(provider.id))] : [...FREE_TRANSLATION_PROVIDERS])
+const failedProviders = computed(() => providers.value.filter(provider => props.checks?.[provider.id]?.status === 'error' && props.checks[provider.id]?.error))
 const weightSnapshot = ref<FreeTranslationWeightSnapshot | null>(null)
 const localWeightSnapshot = computed(() => calculateFreeTranslationWeightSnapshot(order.value))
 const displayedWeightSnapshot = computed(() => weightSnapshot.value || localWeightSnapshot.value)
@@ -196,27 +199,31 @@ onBeforeUnmount(() => {
 .allocation-total { white-space: nowrap; }
 .fallback-list { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 280px), 1fr)); align-items: start; gap: 7px; margin: 0; padding: 0; list-style: none; }
 .fallback-list.is-sequential { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-.fallback-list > li { min-width: 0; padding: 10px; border: 1px solid var(--el-border-color-lighter); border-radius: 9px; background: var(--el-fill-color-blank); }
+.fallback-list > li { box-sizing: border-box; display: flex; flex-direction: column; justify-content: space-between; gap: 5px; height: 88px; min-width: 0; padding: 10px; border: 1px solid var(--el-border-color-lighter); border-radius: 9px; background: var(--el-fill-color-blank); }
 .fallback-list > li.is-disabled { background: var(--el-fill-color-extra-light); }
 .provider-row { display: flex; align-items: center; gap: 8px; }
 .provider-position { width: 14px; flex: none; color: var(--el-text-color-secondary); font-variant-numeric: tabular-nums; }
 .provider-copy { display: flex; min-width: 0; flex: 1; flex-direction: column; gap: 5px; }
-.provider-copy strong { font-size: 12px; overflow-wrap: anywhere; }
-.provider-result { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; min-height: 19px; }
+.provider-copy strong { overflow: hidden; font-size: 12px; text-overflow: ellipsis; white-space: nowrap; }
+.provider-result { display: flex; align-items: center; gap: 4px 8px; min-height: 19px; }
 .provider-state { padding: 2px 5px; border-radius: 4px; color: var(--el-text-color-secondary); background: var(--el-fill-color-light); font-size: 10px; white-space: nowrap; }
 .provider-state.is-success { color: var(--el-color-success-dark-2); background: var(--el-color-success-light-9); }
 .provider-state.is-error { color: var(--el-color-danger-dark-2); background: var(--el-color-danger-light-9); }
 .provider-state.is-checking { color: var(--el-color-primary); background: var(--el-color-primary-light-9); }
 .provider-state.is-cooling, .provider-state.is-recovering { color: var(--el-color-warning-dark-2); background: var(--el-color-warning-light-9); }
 .provider-duration { color: var(--el-text-color-regular); font-size: 11px; font-variant-numeric: tabular-nums; white-space: nowrap; }
-.provider-meta { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 5px 8px; min-height: 16px; margin: 5px 0 0 28px; color: var(--el-text-color-secondary); font-size: 10px; }
-.provider-allocation { margin-left: auto; white-space: nowrap; }
+.provider-meta { display: flex; align-items: center; justify-content: space-between; gap: 5px 8px; min-height: 16px; margin-left: 28px; color: var(--el-text-color-secondary); font-size: 10px; }
+.provider-language { overflow: hidden; min-width: 0; text-overflow: ellipsis; white-space: nowrap; }
+.provider-allocation { flex: none; margin-left: auto; white-space: nowrap; }
 .provider-weight { color: var(--el-text-color-regular); font-variant-numeric: tabular-nums; }
 .provider-actions { display: flex; flex: none; align-items: center; gap: 5px; }
 .provider-actions button { width: 24px; height: 26px; padding: 0; border: 1px solid var(--el-border-color); border-radius: 7px; color: var(--el-text-color-regular); background: var(--el-fill-color-blank); cursor: pointer; }
 .provider-actions button svg { width: 14px; height: 14px; fill: none; stroke: currentColor; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; vertical-align: middle; }
 .provider-actions button:disabled { opacity: .35; cursor: default; }
-.provider-error { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; margin: 5px 0 0 28px; color: var(--el-color-danger-dark-2); font-size: 10px; line-height: 1.5; overflow-wrap: anywhere; }
+.check-failures { display: grid; gap: 7px; margin: 10px 0 0; padding: 9px 12px; list-style: none; border-left: 2px solid var(--el-color-danger-light-5); background: var(--el-color-danger-light-9); color: var(--el-color-danger-dark-2); font-size: 11px; line-height: 1.6; }
+.check-failures li { display: flex; flex-wrap: wrap; gap: 0 10px; }
+.check-failures strong { flex: none; font-weight: 600; }
+.check-failures span { min-width: 0; flex: 1 1 180px; overflow-wrap: anywhere; }
 .provider-settings { margin-top: 12px; padding-top: 10px; border-top: 1px solid var(--el-border-color-lighter); }
 .provider-settings p { margin: 6px 0 0; line-height: 1.5; font-size: 11px; color: var(--el-text-color-secondary); }
 .provider-settings .provider-note { color: var(--el-color-warning-dark-2); }
@@ -225,7 +232,7 @@ onBeforeUnmount(() => {
 .provider-settings .compact-field { margin-top: 0; }
 .compact-field :deep(.el-input), .compact-field :deep(.el-input-number) { width: min(100%, 260px); max-width: 260px; }
 .recovery-copy { margin: 8px 0 0; color: var(--el-text-color-secondary); line-height: 1.5; }
-.mode-option:focus-within, .provider-actions button:focus-visible, .provider-copy strong:focus-visible, .provider-error:focus-visible { outline: 2px solid var(--brand); outline-offset: 2px; }
+.mode-option:focus-within, .provider-actions button:focus-visible, .provider-copy strong:focus-visible { outline: 2px solid var(--brand); outline-offset: 2px; }
 @container (min-width: 900px) { .fallback-list { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
 @container (max-width: 650px) { .fallback-list.is-sequential { grid-template-columns: 1fr; } }
 @media (max-width: 700px) {

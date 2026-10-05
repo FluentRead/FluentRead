@@ -69,7 +69,7 @@ fs.mkdirSync(artifactsDir, {recursive: true});
     const before = (await readConfig()).freeTranslationOrder;
     await page.locator('[data-connection-test-button]').click();
     await page.waitForFunction(() => document.querySelectorAll('[data-provider-duration]').length === 13, undefined, {timeout: 45000});
-    report.results = await basic().locator('[data-fallback-provider]').evaluateAll(nodes => nodes.map(node => ({id: node.dataset.fallbackProvider, status: node.querySelector('[data-provider-state]').dataset.providerCheckStatus, duration: node.querySelector('[data-provider-duration]')?.textContent, error: node.querySelector('[data-provider-error]')?.textContent})));
+    report.results = await basic().locator('[data-fallback-provider]').evaluateAll(nodes => nodes.map(node => ({id: node.dataset.fallbackProvider, status: node.querySelector('[data-provider-state]').dataset.providerCheckStatus, duration: node.querySelector('[data-provider-duration]')?.textContent, error: document.querySelector(`[data-provider-error="${node.dataset.fallbackProvider}"]`)?.textContent})));
     assert.deepEqual((await readConfig()).freeTranslationOrder, before);
     assert.equal(report.results.every(r => /^\d+ ms$/u.test(r.duration)), true);
     if (!live) {
@@ -93,15 +93,15 @@ fs.mkdirSync(artifactsDir, {recursive: true});
     assert.equal(await basic().locator('[data-provider-duration]').count(), 0);
     await page.waitForFunction(() => document.querySelectorAll('[data-provider-duration]').length === 13);
     report.caseCoverage.push('retest immediately clears old durations');
-    for (const width of [1024, 820, 390]) {
+    for (const width of [1440, 1024, 820, 390]) {
       await page.setViewportSize({width, height: 960});
       const layout = await basic().evaluate(node => ({width: innerWidth, overflow: document.documentElement.scrollWidth > innerWidth, cardOverflow: [...node.querySelectorAll('[data-fallback-provider]')].some(card => card.scrollWidth > card.clientWidth), cardHeights: [...node.querySelectorAll('[data-fallback-provider]')].map(card => Math.round(card.getBoundingClientRect().height))}));
-      assert.equal(layout.overflow, false); assert.equal(layout.cardOverflow, false); report.layouts.push(layout);
+      assert.equal(layout.overflow, false); assert.equal(layout.cardOverflow, false); assert.equal(new Set(layout.cardHeights).size, 1); report.layouts.push(layout);
       await shot(`checks-${width}`);
     }
     await page.evaluate(() => document.documentElement.classList.add('dark'));
     await shot('checks-390-dark');
-    await basic().locator('[data-fallback-provider="lingvaFree"]').scrollIntoViewIfNeeded();
+    await basic().locator('[data-provider-error="lingvaFree"]').scrollIntoViewIfNeeded();
     await shot('checks-390-dark-failures');
     await page.setViewportSize({width: 1440, height: 960});
     await page.evaluate(() => document.documentElement.classList.remove('dark'));
@@ -127,6 +127,18 @@ fs.mkdirSync(artifactsDir, {recursive: true});
     report.caseCoverage.push('priority reorder and valid email persist after immediate close; partial email stays local');
     await basic().locator('input[type="email"]').scrollIntoViewIfNeeded();
     await shot('reopened-settings');
+    const latest = await readConfig();
+    assert.equal((await popup.evaluate(expected => chrome.runtime.sendMessage({type: 'persistConfig', mode: 'patch', config: {uiLanguage: 'en-US', freeTranslationMode: 'balanced'}, expected, clientId: `free-settings-${crypto.randomUUID()}`, sequence: 1}), {uiLanguage: latest.uiLanguage, freeTranslationMode: latest.freeTranslationMode})).success, true);
+    await page.reload();
+    await page.locator('button[data-section="settings-services"]').click();
+    await basic().locator('[data-fallback-provider]').last().waitFor();
+    for (const width of [1440, 390]) {
+      await page.setViewportSize({width, height: 960});
+      const layout = await basic().evaluate(node => ({width: innerWidth, language: 'en-US', overflow: document.documentElement.scrollWidth > innerWidth, cardOverflow: [...node.querySelectorAll('[data-fallback-provider]')].some(card => card.scrollWidth > card.clientWidth), cardHeights: [...node.querySelectorAll('[data-fallback-provider]')].map(card => Math.round(card.getBoundingClientRect().height))}));
+      assert.equal(layout.overflow, false); assert.equal(layout.cardOverflow, false); assert.equal(new Set(layout.cardHeights).size, 1); report.layouts.push(layout);
+      await shot(`english-${width}`);
+    }
+    report.caseCoverage.push('equal card heights in Chinese/English at desktop and narrow widths');
     assert.deepEqual(report.consoleErrors, []);
     report.ok = true;
   } catch (error) {report.error = error.stack || String(error); process.exitCode = 1;}

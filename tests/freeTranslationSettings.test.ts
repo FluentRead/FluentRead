@@ -77,6 +77,7 @@ describe('free translation settings compiled component', () => {
     expect(elements.find(element => element.props['data-provider-duration'] === 'transmart')?.text).toBe('1200 ms');
     expect(state.providerStateTitle('microsoft')).toBe('连接正常 · en → zh-Hans · 35 ms');
     expect(state.providerStateLabel('transmart')).toBe('连接失败');
+    expect(state.failedProviders.map((provider: {id: string}) => provider.id)).toEqual(['transmart']);
     expect(state.providerStateTitle('transmart')).toBe('服务限流 · en → zh-Hans · 1200 ms');
     expect(state.providerStateLabel('google')).toBe('settings.services.keys.checking');
     state.setMode('sequential');

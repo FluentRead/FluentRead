@@ -114,6 +114,9 @@ async function main() {
             await page.locator('[data-testid="google-drive-sync-now"]').click();await sync.waitFor();await page.locator('[data-testid="google-drive-confirm"]').click();await sync.waitFor({state:'hidden'});
             await openDelete();check((await deletion.innerText()).includes('tester@fixture.invalid'),'Google deletion names the actual authorized account');
             check(await verification.inputValue()===''&&!(await deleteButton.isEnabled())&&(await deleteButton.innerText())==='确认','Google deletion starts with an empty confirmation field');
+            check(await verification.getAttribute('placeholder')==='输入「确定删除」'&&await verification.getAttribute('aria-label')==='输入「确定删除」','Google confirmation field provides a concise accessible hint');
+            check(await deletion.locator('[data-testid="cloud-delete-verification"]').evaluate(el=>Math.abs(el.querySelector('.el-input').getBoundingClientRect().width-el.getBoundingClientRect().width)<=1),'Google confirmation field fills the dialog content despite global settings width limits');
+            await shot('cloud-delete-drive-empty-field');
             await verification.fill('确认删除');check(!(await deleteButton.isEnabled()),'Google deletion rejects a different confirmation phrase');
             await verification.fill('确定删除');check(await deleteButton.isEnabled(),'Google deletion enables confirmation for the exact phrase');
             await verification.press('Enter');check(await deletion.isVisible()&&await worker.evaluate(()=>globalThis.__driveFixture.removes===0),'Google Enter in the field does not delete a backup');

@@ -94,7 +94,7 @@
     "settings.cloud.restoreOnly": "이 백업은 복원할 수 있지만 서비스가 안전한 덮어쓰기에 필요한 버전 정보를 제공하지 않았습니다. 현재 저장과 병합은 사용할 수 없습니다.",
     "settings.cloud.deleteBackup": "클라우드 백업 삭제",
     "settings.cloud.deleteTitle": "클라우드 백업을 삭제할까요?",
-    "settings.cloud.deleteDescription": "삭제 후에는 이 클라우드 백업을 복원할 수 없습니다.",
+    "settings.cloud.deleteDescription": "삭제는 되돌릴 수 없습니다. 기기의 설정과 API 키는 유지됩니다.",
     "settings.cloud.deleteLocalPreserved": "기기의 설정과 API 키는 유지됩니다.",
     "settings.cloud.deleteHistory": "현재 백업 파일만 삭제합니다. 휴지통, 이전 버전 및 다른 기기의 사본은 별도로 정리해야 합니다.",
     "settings.cloud.deleteRecreate": "나중에 수동 동기화하면 새 백업을 만들 수 있습니다. 다른 기기에서 다시 업로드할 수도 있습니다.",
@@ -109,7 +109,7 @@
     "settings.cloud.deleteDetails": "자세히 보기",
     "settings.cloud.changeAccount": "계정 변경",
     "settings.cloud.deletePhrase": "삭제",
-    "settings.cloud.deleteVerification": "삭제하려면 “{phrase}”를 입력하세요"
+    "settings.cloud.deleteVerification": "“{phrase}” 입력"
   },
   "legacy": {
     "普通云备份包含不属于此范围的字段，请重新生成备份。": "일반 설정 클라우드 백업에 해당 범위에 속하지 않는 필드가 포함되어 있습니다. 백업을 다시 생성하세요.",

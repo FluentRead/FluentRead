@@ -94,7 +94,7 @@
     "settings.cloud.restoreOnly": "Эту резервную копию можно восстановить, но сервис не предоставил идентификатор версии для безопасной замены. Сохранение и объединение сейчас недоступны.",
     "settings.cloud.deleteBackup": "Удалить облачную копию",
     "settings.cloud.deleteTitle": "Удалить облачную копию?",
-    "settings.cloud.deleteDescription": "После удаления эту облачную копию нельзя восстановить.",
+    "settings.cloud.deleteDescription": "Удаление необратимо. Локальные настройки и API-ключи сохранятся.",
     "settings.cloud.deleteLocalPreserved": "Локальные настройки и ключи API сохранятся.",
     "settings.cloud.deleteHistory": "Удаляется только текущий файл. Корзину, сохранённые версии и копии на других устройствах нужно очистить отдельно.",
     "settings.cloud.deleteRecreate": "Ручная синхронизация может создать новую копию. Другие устройства также могут загрузить её повторно.",
@@ -109,7 +109,7 @@
     "settings.cloud.deleteDetails": "Подробнее",
     "settings.cloud.changeAccount": "Сменить аккаунт",
     "settings.cloud.deletePhrase": "УДАЛИТЬ",
-    "settings.cloud.deleteVerification": "Введите «{phrase}», чтобы подтвердить удаление"
+    "settings.cloud.deleteVerification": "Введите «{phrase}»"
   },
   "legacy": {
     "普通云备份包含不属于此范围的字段，请重新生成备份。": "Облачная копия обычных настроек содержит поля за пределами допустимого объёма. Создайте новую резервную копию.",

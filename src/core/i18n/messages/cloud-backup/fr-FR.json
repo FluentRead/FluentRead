@@ -94,7 +94,7 @@
     "settings.cloud.restoreOnly": "Vous pouvez restaurer cette sauvegarde, mais le service ne fournit pas d’identifiant de version pour la remplacer en toute sécurité. L’enregistrement et la fusion sont actuellement indisponibles.",
     "settings.cloud.deleteBackup": "Supprimer la sauvegarde cloud",
     "settings.cloud.deleteTitle": "Supprimer la sauvegarde cloud ?",
-    "settings.cloud.deleteDescription": "Cette sauvegarde ne pourra plus être restaurée après suppression.",
+    "settings.cloud.deleteDescription": "La suppression est irréversible. Les réglages locaux et les clés API sont conservés.",
     "settings.cloud.deleteLocalPreserved": "Les paramètres locaux et clés API sont conservés.",
     "settings.cloud.deleteHistory": "Seul le fichier actuel est supprimé. Videz séparément la corbeille, les versions conservées et les copies sur les autres appareils.",
     "settings.cloud.deleteRecreate": "Une synchronisation manuelle ultérieure peut créer une nouvelle sauvegarde. Les autres appareils peuvent aussi la téléverser à nouveau.",
@@ -109,7 +109,7 @@
     "settings.cloud.deleteDetails": "Plus de détails",
     "settings.cloud.changeAccount": "Changer de compte",
     "settings.cloud.deletePhrase": "SUPPRIMER",
-    "settings.cloud.deleteVerification": "Saisissez « {phrase} » pour confirmer la suppression"
+    "settings.cloud.deleteVerification": "Saisissez « {phrase} »"
   },
   "legacy": {
     "普通云备份包含不属于此范围的字段，请重新生成备份。": "La sauvegarde cloud des paramètres généraux contient des champs hors de sa portée. Créez une nouvelle sauvegarde.",

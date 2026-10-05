@@ -127,7 +127,8 @@ async function main() {
             await page.evaluate(async()=>{await new Promise(requestAnimationFrame);await Promise.all(document.getAnimations().filter(animation=>animation.effect?.getComputedTiming().iterations!==Infinity).map(animation=>animation.finished.catch(()=>undefined)));});
             check(await deleteButton.evaluate(el=>getComputedStyle(el).backgroundColor)===await page.locator('[data-testid="webdav-sync-now"]').evaluate(el=>getComputedStyle(el).backgroundColor),'deletion confirmation follows the existing primary button theme');
             await verification.fill('');check(!(await deleteButton.isEnabled()),'clearing the phrase disables confirmation again');
-            check((await deletion.innerText()).includes('本机配置和 API Key 会保留')&&!(await deletion.locator('.cloud-delete-note').first().isVisible()),'deletion prioritizes local preservation and collapses secondary details');
+            check((await deletion.innerText()).includes('删除后无法恢复，本机配置与密钥保留。')&&!(await deletion.locator('.cloud-delete-note').first().isVisible()),'deletion combines irreversible impact and local preservation into one concise statement');
+            check(await verification.getAttribute('placeholder')==='输入「确定删除」'&&await verification.getAttribute('aria-label')==='输入「确定删除」','confirmation hint stays concise and accessible without a duplicate label');
             const detailsToggle=deletion.locator('[data-testid="cloud-delete-details-toggle"]');
             check(await detailsToggle.getAttribute('aria-expanded')==='false','secondary deletion details start collapsed');
             await detailsToggle.press('Enter');check((await deletion.innerText()).includes('历史版本')&&await detailsToggle.getAttribute('aria-expanded')==='true','keyboard opens retained-copy details');await detailsToggle.press('Space');
@@ -147,8 +148,9 @@ async function main() {
             for (const [lang,theme,width] of [['en-US','light',390],['ja-JP','light',390],['ko-KR','light',390],['fr-FR','light',390],['es-ES','light',390],['ru-RU','light',390],['zh-CN','dark',1440]]) {
                 await savePatch({uiLanguage:lang,theme});await page.reload({waitUntil:'domcontentloaded'});await navigate();await page.setViewportSize({width,height:1000});await openDelete();
                 const text=await deletion.innerText();const copy=require(`../../src/core/i18n/messages/cloud-backup/${lang}.json`).messages;
-                check(!text.includes('settings.cloud.')&&text.includes(copy['settings.cloud.deleteTitle'])&&text.includes(copy['settings.cloud.deleteLocalPreserved']),`${lang} deletion copy resolves in the selected language`);
-                check(text.includes(copy['settings.cloud.deletePhrase'])&&!(await deleteButton.isEnabled()),`${lang} deletion requests the localized confirmation phrase`);
+                check(!text.includes('settings.cloud.')&&text.includes(copy['settings.cloud.deleteTitle'])&&text.includes(copy['settings.cloud.deleteDescription']),`${lang} deletion copy resolves in the selected language`);
+                const hint=copy['settings.cloud.deleteVerification'].replace('{phrase}',copy['settings.cloud.deletePhrase']);
+                check(await verification.getAttribute('placeholder')===hint&&await verification.getAttribute('aria-label')===hint&&!(await deleteButton.isEnabled()),`${lang} deletion requests the localized confirmation phrase accessibly`);
                 await verification.fill(copy['settings.cloud.deletePhrase']);check(await deleteButton.isEnabled(),`${lang} matching confirmation enables deletion`);
                 check(await deletion.evaluate(el=>el.scrollWidth<=el.clientWidth+1&&document.documentElement.scrollWidth<=innerWidth+1),`${lang} deletion dialog has no horizontal overflow`);
                 await deletion.locator('[data-testid="cloud-delete-details-toggle"]').click();const contrasts=await deletion.evaluate(el=>{

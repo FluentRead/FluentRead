@@ -101,13 +101,15 @@
     "settings.cloud.deleteUnsupported": "Le service ne fournit pas les informations de version nécessaires à une suppression sûre. La suppression est indisponible ici.",
     "settings.cloud.deleteManualDrive": "Dans Google Drive, ouvrez Paramètres → Gérer les applications → FluentRead pour effacer les données de l’application.",
     "settings.cloud.deleteManualWebDav": "Supprimez manuellement FluentRead/fluentread-config.encrypted.json chez votre fournisseur WebDAV et conservez les autres fichiers.",
-    "settings.cloud.deleteConfirm": "Supprimer",
+    "settings.cloud.deleteConfirm": "Confirmer",
     "settings.cloud.deleteFinish": "Terminer",
     "settings.cloud.deleteAbsent": "Aucune sauvegarde cloud",
     "settings.cloud.deleteAbsentDescription": "Rien à supprimer. Terminez pour effacer l’ancienne trace de synchronisation.",
     "settings.cloud.deleteSuccess": "Sauvegarde cloud supprimée. Paramètres locaux conservés.",
     "settings.cloud.deleteDetails": "Plus de détails",
-    "settings.cloud.changeAccount": "Changer de compte"
+    "settings.cloud.changeAccount": "Changer de compte",
+    "settings.cloud.deletePhrase": "SUPPRIMER",
+    "settings.cloud.deleteVerification": "Saisissez « {phrase} » pour confirmer la suppression"
   },
   "legacy": {
     "普通云备份包含不属于此范围的字段，请重新生成备份。": "La sauvegarde cloud des paramètres généraux contient des champs hors de sa portée. Créez une nouvelle sauvegarde.",

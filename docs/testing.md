@@ -87,7 +87,7 @@ node scripts/testing/run-webdav-backup-ui-test.cjs \
 
 更新日期：2026 年 10 月 5 日。`pnpm test:cloud-backup --coverage` 覆盖两阶段删除确认、页面所有权、账号绑定、MV3 重启、旧/未知/损坏密文、空文件、重放、版本冲突、强 ETag、清理失败和本机配置保留；真实 WebDAV HTTP 夹具分别验证 GET、PROPFIND、HEAD 三种 ETag 来源的条件 DELETE、冲突、缺失幂等与重新创建。
 
-生产扩展构建后运行 `run-webdav-backup-ui-test.cjs --delete-only` 和 `run-google-drive-sync-ui-test.cjs --delete-only`，其余参数同上。两者均使用 focus-safe helper 和临时 Edge profile。WebDAV 使用本机服务器验证真实请求、取消/Escape/重开、版本变化、七语言、390px、深色和本机配置保留，并用 Enter/Space 检查“更多说明”文字入口的展开与收起；Google 使用虚构 Chrome Identity 与 Drive 响应验证实际账号展示、更换账号、缺少版本、v2 ETag 条件删除与窄屏。报告与截图写入各自证据目录；夹具不能代替真实 Google 登录、第三方账号或 Firefox 实机验证。
+生产扩展构建后运行 `run-webdav-backup-ui-test.cjs --delete-only` 和 `run-google-drive-sync-ui-test.cjs --delete-only`，其余参数同上。两者均使用 focus-safe helper 和临时 Edge profile。WebDAV 使用本机服务器验证真实请求、取消/Escape/重开、版本变化、七语言、390px、深色和本机配置保留，还检查输入确认文本前后、输入错误、清空及 Enter 不执行删除，并验证按钮使用已有主色样式，并用 Enter/Space 检查“更多说明”文字入口的展开与收起；Google 使用虚构 Chrome Identity 与 Drive 响应验证实际账号展示、更换账号后重新输入确认文本、缺少版本、v2 ETag 条件删除与窄屏。报告与截图写入各自证据目录；夹具不能代替真实 Google 登录、第三方账号或 Firefox 实机验证。
 
 ## 双语逐句高亮
 

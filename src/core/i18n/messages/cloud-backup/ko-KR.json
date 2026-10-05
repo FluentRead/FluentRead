@@ -101,13 +101,15 @@
     "settings.cloud.deleteUnsupported": "안전한 삭제에 필요한 버전 정보가 없어 여기서는 삭제할 수 없습니다.",
     "settings.cloud.deleteManualDrive": "Google Drive 설정 → 앱 관리 → FluentRead에서 앱 데이터를 삭제하세요.",
     "settings.cloud.deleteManualWebDav": "WebDAV 서비스에서 FluentRead/fluentread-config.encrypted.json을 직접 삭제하고 다른 파일은 유지하세요.",
-    "settings.cloud.deleteConfirm": "삭제 확인",
+    "settings.cloud.deleteConfirm": "확인",
     "settings.cloud.deleteFinish": "완료",
     "settings.cloud.deleteAbsent": "클라우드 백업 없음",
     "settings.cloud.deleteAbsentDescription": "삭제할 백업이 없습니다. 완료하면 이전 동기화 기록을 지웁니다.",
     "settings.cloud.deleteSuccess": "클라우드 백업이 삭제되었습니다. 기기의 설정은 유지됩니다.",
     "settings.cloud.deleteDetails": "자세히 보기",
-    "settings.cloud.changeAccount": "계정 변경"
+    "settings.cloud.changeAccount": "계정 변경",
+    "settings.cloud.deletePhrase": "삭제",
+    "settings.cloud.deleteVerification": "삭제하려면 “{phrase}”를 입력하세요"
   },
   "legacy": {
     "普通云备份包含不属于此范围的字段，请重新生成备份。": "일반 설정 클라우드 백업에 해당 범위에 속하지 않는 필드가 포함되어 있습니다. 백업을 다시 생성하세요.",

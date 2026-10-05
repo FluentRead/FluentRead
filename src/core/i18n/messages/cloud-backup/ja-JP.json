@@ -101,13 +101,15 @@
     "settings.cloud.deleteUnsupported": "安全な削除に必要なバージョン情報がないため、ここでは削除できません。",
     "settings.cloud.deleteManualDrive": "Google Drive の設定 → アプリの管理 → FluentRead でアプリのデータを削除してください。",
     "settings.cloud.deleteManualWebDav": "WebDAV サービスで FluentRead/fluentread-config.encrypted.json を手動削除し、他のファイルは保持してください。",
-    "settings.cloud.deleteConfirm": "削除する",
+    "settings.cloud.deleteConfirm": "確認",
     "settings.cloud.deleteFinish": "完了",
     "settings.cloud.deleteAbsent": "クラウドバックアップはありません",
     "settings.cloud.deleteAbsentDescription": "削除は不要です。完了すると古い同期記録を消去します。",
     "settings.cloud.deleteSuccess": "クラウドバックアップを削除しました。端末の設定は保持されています。",
     "settings.cloud.deleteDetails": "詳細",
-    "settings.cloud.changeAccount": "アカウントを変更"
+    "settings.cloud.changeAccount": "アカウントを変更",
+    "settings.cloud.deletePhrase": "削除",
+    "settings.cloud.deleteVerification": "削除するには「{phrase}」と入力してください"
   },
   "legacy": {
     "普通云备份包含不属于此范围的字段，请重新生成备份。": "一般設定のクラウドバックアップに対象範囲外の項目が含まれています。バックアップを作成し直してください。",

@@ -3,7 +3,7 @@
 文件职责：用清晰的保存、恢复与逐项合并流程完成Google Drive 与 WebDAV 共用的配置云备份。
 主要内容：默认只同步普通设置，敏感信息须阅读风险并明确同意且只对本次操作有效；预览说明旧备份范围和恢复保护。
 风险确认集中展示存储方式、泄露风险与单次授权；删除确认以紧凑账号行和影响说明展示目标，次要信息按需展开。
-仅确认后删除已核验版本的备份文件，并保留本机配置。
+删除前须输入本次界面语言的确认文本，再点击确认；只删除已核验版本的备份文件，并保留本机配置。
 通过右侧记录插槽统一显示账号和时间，窄屏改为上下排列；显示本次账号并提供更换账号入口；按两步流程说明影响范围，
 先选择操作再确认影响；缺少安全覆盖版本时明确提示只读恢复；默认展示差异与连接变更类别，小屏保留操作区。
 模块边界：只消费后台脱敏预览和同步记录；不获取完整配置、令牌或用户口令，由父级提供存储方式和客户端。
@@ -36,10 +36,11 @@
       <template v-if="deletion">
         <div class="cloud-delete-account"><div class="cloud-delete-target"><strong><slot name="delete-account">{{ deletion.account.email || t('settings.cloud.selectedAccount') }}</slot></strong><slot name="delete-location" /></div><el-button v-if="kind === 'google-drive'" link :disabled="busy" data-testid="google-drive-delete-switch-account" @click="changeDeletionAccount">{{ t('settings.cloud.changeAccount') }}</el-button></div>
         <div class="cloud-delete-impact"><p class="cloud-delete-description">{{ t(deletion.hasRemote ? 'settings.cloud.deleteDescription' : 'settings.cloud.deleteAbsentDescription') }}</p><p class="cloud-delete-preserved">{{ t('settings.cloud.deleteLocalPreserved') }}</p></div>
+        <div v-if="deletion.hasRemote && deletion.canDelete" class="cloud-delete-verification" data-testid="cloud-delete-verification"><label :for="`${kind}-delete-verification`">{{ t('settings.cloud.deleteVerification', {phrase: t('settings.cloud.deletePhrase')}) }}</label><el-input :id="`${kind}-delete-verification`" v-model="deleteConfirmation" :disabled="busy" :maxlength="64" autocomplete="off" :spellcheck="false" @keydown.enter.prevent /></div>
         <div v-if="deletion.hasRemote" class="cloud-delete-details"><el-button link :aria-expanded="deleteDetailsVisible" :aria-controls="`${kind}-delete-details`" data-testid="cloud-delete-details-toggle" @click="deleteDetailsVisible = !deleteDetailsVisible">{{ t('settings.cloud.deleteDetails') }}<el-icon><component :is="deleteDetailsVisible ? ArrowUp : ArrowDown" /></el-icon></el-button><div v-show="deleteDetailsVisible" :id="`${kind}-delete-details`"><p class="cloud-delete-note">{{ t('settings.cloud.deleteHistory') }}</p><p class="cloud-delete-note">{{ t('settings.cloud.deleteRecreate') }}</p></div></div>
         <el-alert v-if="deletion.hasRemote && !deletion.canDelete" :title="t('settings.cloud.deleteUnsupported')" :description="t(kind === 'google-drive' ? 'settings.cloud.deleteManualDrive' : 'settings.cloud.deleteManualWebDav')" type="warning" :closable="false" show-icon data-testid="cloud-delete-unsupported" />
       </template>
-      <template #footer><div class="cloud-consent-actions"><el-button :disabled="busy" data-testid="cloud-delete-cancel" @click="cancelDeletion">{{ t('settings.drive.cancelSync') }}</el-button><el-button :type="deletion?.hasRemote ? 'danger' : 'primary'" :class="{'cloud-delete-confirm': deletion?.hasRemote}" :loading="busy" :disabled="busy || !deletion?.canDelete" data-testid="cloud-delete-confirm" @click="confirmDeletion">{{ t(deletion?.hasRemote ? 'settings.cloud.deleteConfirm' : 'settings.cloud.deleteFinish') }}</el-button></div></template>
+      <template #footer><div class="cloud-consent-actions"><el-button :disabled="busy" data-testid="cloud-delete-cancel" @click="cancelDeletion">{{ t('settings.drive.cancelSync') }}</el-button><el-button type="primary" :loading="busy" :disabled="busy || !canConfirmDeletion" data-testid="cloud-delete-confirm" @click="confirmDeletion">{{ t(deletion?.hasRemote ? 'settings.cloud.deleteConfirm' : 'settings.cloud.deleteFinish') }}</el-button></div></template>
     </el-dialog>
     <el-dialog v-model="consentVisible" class="cloud-consent-dialog cloud-compact-dialog fluentread-cloud-sync-dialog" :title="t('settings.cloud.consentTitle')" width="min(480px, calc(100vw - 24px))" destroy-on-close @closed="riskAcknowledged = false">
       <p class="cloud-consent-intro">{{ t('settings.cloud.consentStorage', {provider}) }}</p>
@@ -136,9 +137,10 @@
 
 <script setup lang="ts">
 import {computed, onMounted, onUnmounted, ref, watch} from 'vue';
-import {ElAlert, ElIcon, ElMessage, ElPagination, ElSwitch} from 'element-plus';
+import {ElAlert, ElIcon, ElInput, ElMessage, ElPagination, ElSwitch} from 'element-plus';
 import {ArrowDown, ArrowLeft, ArrowRight, ArrowUp, CircleCheck, Cloudy, Delete, Download, Monitor, Switch, Upload, User, Warning} from '@element-plus/icons-vue';
 import 'element-plus/es/components/alert/style/css';
+import 'element-plus/es/components/input/style/css';
 import 'element-plus/es/components/pagination/style/css';
 import 'element-plus/es/components/switch/style/css';
 import {useUiI18n} from '@/src/ui/i18n';
@@ -167,6 +169,8 @@ const previewVisible = ref(false);
 const deletion = ref<CloudBackupDeletePreview | null>(null);
 const deleteVisible = ref(false);
 const deleteDetailsVisible = ref(false);
+const deleteConfirmation = ref('');
+const canConfirmDeletion = computed(() => Boolean(deleteVisible.value && deletion.value?.canDelete && (!deletion.value.hasRemote || deleteConfirmation.value === t('settings.cloud.deletePhrase'))));
 watch(() => busy.value || consentVisible.value || previewVisible.value || deleteVisible.value, value => emit('busy', value));
 const direction = ref<DriveSyncDirection | ''>('');
 const step = ref<'choose' | 'review'>('review');
@@ -215,6 +219,7 @@ async function requestPreview() {
 }
 async function prepare() {await perform(async () => {try {await requestPreview();} catch (failure) {includeSensitive.value = false; throw failure;}});}
 async function requestDeletion() {
+  deleteConfirmation.value = '';
   const result = await client.prepareDelete();
   if (!alive) {await client.cancel(result.id); return;}
   deletion.value = result; deleteDetailsVisible.value = false; deleteVisible.value = true;
@@ -230,7 +235,7 @@ async function changeDeletionAccount() {await perform(async () => {
   try {await requestDeletion();} catch (failure) {deleteVisible.value = false; throw failure;}
 });}
 async function confirmDeletion() {
-  if (!deletion.value?.canDelete) return;
+  if (!canConfirmDeletion.value || !deletion.value) return;
   const id = deletion.value.id;
   await perform(async () => {
     try {
@@ -327,7 +332,8 @@ onUnmounted(() => {alive = false; endSession(); clearPreview();});
 .cloud-delete-details>.el-button .el-icon {margin-inline-start:4px;}
 .cloud-delete-details>.el-button:focus-visible {outline:2px solid var(--el-color-primary); outline-offset:3px;}
 .cloud-delete-note {font-size:12px; line-height:1.7; color:var(--el-text-color-regular); margin:8px 0 0;}
-:global(.fluentread-cloud-sync-dialog.cloud-delete-dialog .cloud-delete-confirm:not(.is-disabled)) {background:#b54444; border-color:#b54444; color:#fff;}
+.cloud-delete-verification {display:grid; gap:6px; margin-top:12px;}
+.cloud-delete-verification label {font-size:12px; line-height:1.7; color:var(--el-text-color-regular);}
 .drive-heading {display:flex; justify-content:space-between; align-items:flex-start; gap:16px;}
 .drive-heading h2 {margin:0; font-size:19px;}
 .drive-boundary {color:var(--el-text-color-secondary); font-size:13px; line-height:1.7;}

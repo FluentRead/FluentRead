@@ -101,13 +101,15 @@
     "settings.cloud.deleteUnsupported": "服务商未提供安全删除所需的版本信息，本次无法删除。",
     "settings.cloud.deleteManualDrive": "请前往 Google Drive 设置 → 管理应用 → FluentRead，清理该应用的数据。",
     "settings.cloud.deleteManualWebDav": "请在 WebDAV 服务商页面手动删除 FluentRead/fluentread-config.encrypted.json，保留目录内其他文件。",
-    "settings.cloud.deleteConfirm": "确定删除",
+    "settings.cloud.deleteConfirm": "确认",
     "settings.cloud.deleteFinish": "完成",
     "settings.cloud.deleteAbsent": "没有云端备份",
     "settings.cloud.deleteAbsentDescription": "无需删除。点击完成可清除旧同步记录。",
     "settings.cloud.deleteSuccess": "云端备份已删除，本机配置已保留",
     "settings.cloud.deleteDetails": "更多说明",
-    "settings.cloud.changeAccount": "更换账号"
+    "settings.cloud.changeAccount": "更换账号",
+    "settings.cloud.deletePhrase": "确定删除",
+    "settings.cloud.deleteVerification": "输入「{phrase}」以确认删除"
   },
   "legacy": {
     "普通云备份包含不属于此范围的字段，请重新生成备份。": "普通云备份包含不属于此范围的字段，请重新生成备份。",

@@ -97,9 +97,11 @@ async function main() {
         await page.screenshot({path: disconnected}); report.screenshots.push(disconnected);
         if (process.argv.includes('--delete-only')) {
             const deletion=page.locator('.cloud-delete-dialog');const sync=page.locator('.drive-dialog');
+            const verification=deletion.locator('[data-testid="cloud-delete-verification"] input');
+            const deleteButton=page.locator('[data-testid="cloud-delete-confirm"]');
             async function openDelete() {await page.locator('[data-testid="google-drive-delete-backup"]').click();await deletion.waitFor();}
             async function cancelDelete() {await page.locator('[data-testid="cloud-delete-cancel"]').click();await deletion.waitFor({state:'hidden'});}
-            async function confirmDelete() {await page.locator('[data-testid="cloud-delete-confirm"]').click();await deletion.waitFor({state:'hidden'});}
+            async function confirmDelete() {if (await verification.count()) await verification.fill('确定删除');await deleteButton.click();await deletion.waitFor({state:'hidden'});}
             async function shot(name) {
                 await page.waitForFunction(()=>!document.querySelector('.el-message'),null,{timeout:6000});
                 await page.evaluate(async()=>{await new Promise(requestAnimationFrame);await Promise.all(document.getAnimations().filter(animation=>animation.effect?.getComputedTiming().iterations!==Infinity).map(animation=>animation.finished.catch(()=>undefined)));});
@@ -110,17 +112,23 @@ async function main() {
             await openDelete();check((await deletion.innerText()).includes('没有云端备份'),'Google empty backup can finish without deleting');await confirmDelete();
             check(await worker.evaluate(()=>globalThis.__driveFixture.removes===0),'empty Google deletion makes no DELETE request');
             await page.locator('[data-testid="google-drive-sync-now"]').click();await sync.waitFor();await page.locator('[data-testid="google-drive-confirm"]').click();await sync.waitFor({state:'hidden'});
-            await openDelete();check((await deletion.innerText()).includes('tester@fixture.invalid'),'Google deletion names the actual authorized account');await shot('cloud-delete-drive-desktop');await cancelDelete();
+            await openDelete();check((await deletion.innerText()).includes('tester@fixture.invalid'),'Google deletion names the actual authorized account');
+            check(await verification.inputValue()===''&&!(await deleteButton.isEnabled())&&(await deleteButton.innerText())==='确认','Google deletion starts with an empty confirmation field');
+            await verification.fill('确认删除');check(!(await deleteButton.isEnabled()),'Google deletion rejects a different confirmation phrase');
+            await verification.fill('确定删除');check(await deleteButton.isEnabled(),'Google deletion enables confirmation for the exact phrase');
+            await verification.press('Enter');check(await deletion.isVisible()&&await worker.evaluate(()=>globalThis.__driveFixture.removes===0),'Google Enter in the field does not delete a backup');
+            await shot('cloud-delete-drive-desktop');await cancelDelete();
             check(await worker.evaluate(()=>Boolean(globalThis.__driveFixture.content)&&globalThis.__driveFixture.removes===0),'Google cancel keeps cloud data');
-            await openDelete();await worker.evaluate(()=>{globalThis.__driveFixture.email='other@fixture.invalid';globalThis.__driveFixture.accountId='fixture-other';});
+            await openDelete();check(await verification.inputValue()===''&&!(await deleteButton.isEnabled()),'Google reopening clears the typed confirmation');await verification.fill('确定删除');await worker.evaluate(()=>{globalThis.__driveFixture.email='other@fixture.invalid';globalThis.__driveFixture.accountId='fixture-other';});
             await page.locator('[data-testid="google-drive-delete-switch-account"]').click();await deletion.getByText('other@fixture.invalid',{exact:true}).waitFor();
+            check(await verification.inputValue()===''&&!(await deleteButton.isEnabled()),'changing Google account requires a new typed confirmation');
             check(await worker.evaluate(()=>globalThis.__driveFixture.removes===0),'changing deletion account only opens a fresh preview');await cancelDelete();
             await worker.evaluate(()=>{globalThis.__driveFixture.email='tester@fixture.invalid';globalThis.__driveFixture.accountId='fixture-account';});
             await openDelete();await worker.evaluate(()=>{globalThis.__driveFixture.version++;});await confirmDelete();await card.getByText('云端备份已变化',{exact:false}).waitFor();
             check(await worker.evaluate(()=>Boolean(globalThis.__driveFixture.content)&&globalThis.__driveFixture.removes===0),'Google version drift does not delete the new backup');
             await worker.evaluate(()=>{globalThis.__driveFixture.etagMode='none';});await openDelete();check(await page.locator('[data-testid="cloud-delete-unsupported"]').isVisible()&&!(await page.locator('[data-testid="cloud-delete-confirm"]').isEnabled()),'Google missing strong version shows management guidance');await cancelDelete();
             await worker.evaluate(()=>{globalThis.__driveFixture.etagMode='v2';globalThis.__driveFixture.content='unreadable backup';globalThis.__driveFixture.version++;});
-            await openDelete();check(await page.locator('[data-testid="cloud-delete-confirm"]').isEnabled(),'Google unreadable backup is deletable using matching v2 ETag');
+            await openDelete();await verification.fill('确定删除');check(await deleteButton.isEnabled(),'Google unreadable backup is deletable using matching v2 ETag after typed confirmation');
             await page.setViewportSize({width:390,height:900});check(await deletion.evaluate(el=>el.scrollWidth<=el.clientWidth+1),'Google deletion dialog fits narrow screens');await shot('cloud-delete-drive-mobile');
             const before=await page.evaluate(async()=>({config:(await chrome.runtime.sendMessage({type:'configStorageRead',key:'local:config'})).value,credentials:(await chrome.runtime.sendMessage({type:'configStorageRead',key:'local:credentials'})).value}));await confirmDelete();
             const after=await page.evaluate(async()=>({config:(await chrome.runtime.sendMessage({type:'configStorageRead',key:'local:config'})).value,credentials:(await chrome.runtime.sendMessage({type:'configStorageRead',key:'local:credentials'})).value}));

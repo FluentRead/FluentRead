@@ -101,13 +101,15 @@
     "settings.cloud.deleteUnsupported": "Нет сведений о версии для безопасного удаления. Удаление здесь недоступно.",
     "settings.cloud.deleteManualDrive": "В Google Drive откройте Настройки → Управление приложениями → FluentRead, чтобы удалить данные приложения.",
     "settings.cloud.deleteManualWebDav": "У провайдера WebDAV вручную удалите FluentRead/fluentread-config.encrypted.json, сохранив остальные файлы.",
-    "settings.cloud.deleteConfirm": "Удалить копию",
+    "settings.cloud.deleteConfirm": "Подтвердить",
     "settings.cloud.deleteFinish": "Готово",
     "settings.cloud.deleteAbsent": "Облачной копии нет",
     "settings.cloud.deleteAbsentDescription": "Удалять нечего. Завершите, чтобы очистить старую запись синхронизации.",
     "settings.cloud.deleteSuccess": "Облачная копия удалена. Локальные настройки сохранены.",
     "settings.cloud.deleteDetails": "Подробнее",
-    "settings.cloud.changeAccount": "Сменить аккаунт"
+    "settings.cloud.changeAccount": "Сменить аккаунт",
+    "settings.cloud.deletePhrase": "УДАЛИТЬ",
+    "settings.cloud.deleteVerification": "Введите «{phrase}», чтобы подтвердить удаление"
   },
   "legacy": {
     "普通云备份包含不属于此范围的字段，请重新生成备份。": "Облачная копия обычных настроек содержит поля за пределами допустимого объёма. Создайте новую резервную копию.",

@@ -101,13 +101,15 @@
     "settings.cloud.deleteUnsupported": "The provider did not supply the version information required for safe deletion. This backup cannot be deleted here.",
     "settings.cloud.deleteManualDrive": "Open Google Drive Settings → Manage apps → FluentRead to clear the application data.",
     "settings.cloud.deleteManualWebDav": "In your WebDAV provider, delete FluentRead/fluentread-config.encrypted.json manually and keep other files in the folder.",
-    "settings.cloud.deleteConfirm": "Delete backup",
+    "settings.cloud.deleteConfirm": "Confirm",
     "settings.cloud.deleteFinish": "Done",
     "settings.cloud.deleteAbsent": "No cloud backup",
     "settings.cloud.deleteAbsentDescription": "Nothing to delete. Finish to clear the old sync record.",
     "settings.cloud.deleteSuccess": "Cloud backup deleted. Local settings kept.",
     "settings.cloud.deleteDetails": "More details",
-    "settings.cloud.changeAccount": "Change account"
+    "settings.cloud.changeAccount": "Change account",
+    "settings.cloud.deletePhrase": "DELETE",
+    "settings.cloud.deleteVerification": "Type “{phrase}” to confirm deletion"
   },
   "legacy": {
     "普通云备份包含不属于此范围的字段，请重新生成备份。": "The general-settings cloud backup contains fields outside its scope. Generate a new backup.",

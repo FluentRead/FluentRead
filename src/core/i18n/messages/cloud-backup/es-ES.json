@@ -101,13 +101,15 @@
     "settings.cloud.deleteUnsupported": "El proveedor no facilita la información de versión necesaria para eliminar de forma segura. No se puede eliminar aquí.",
     "settings.cloud.deleteManualDrive": "En Google Drive, abre Configuración → Administrar aplicaciones → FluentRead para eliminar los datos de la aplicación.",
     "settings.cloud.deleteManualWebDav": "Elimina manualmente FluentRead/fluentread-config.encrypted.json en tu proveedor WebDAV y conserva los demás archivos.",
-    "settings.cloud.deleteConfirm": "Eliminar copia",
+    "settings.cloud.deleteConfirm": "Confirmar",
     "settings.cloud.deleteFinish": "Finalizar",
     "settings.cloud.deleteAbsent": "No hay copia en la nube",
     "settings.cloud.deleteAbsentDescription": "No hay nada que eliminar. Finaliza para borrar el registro anterior.",
     "settings.cloud.deleteSuccess": "Copia en la nube eliminada. Ajustes locales conservados.",
     "settings.cloud.deleteDetails": "Más detalles",
-    "settings.cloud.changeAccount": "Cambiar cuenta"
+    "settings.cloud.changeAccount": "Cambiar cuenta",
+    "settings.cloud.deletePhrase": "ELIMINAR",
+    "settings.cloud.deleteVerification": "Escribe «{phrase}» para confirmar la eliminación"
   },
   "legacy": {
     "普通云备份包含不属于此范围的字段，请重新生成备份。": "La copia en la nube de ajustes generales contiene campos fuera de su alcance. Genera una nueva copia.",

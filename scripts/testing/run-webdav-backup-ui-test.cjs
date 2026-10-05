@@ -107,10 +107,12 @@ async function main() {
         async function chooseIntent(direction) {if (await page.locator('[data-testid="webdav-back"]').count()) await page.locator('[data-testid="webdav-back"]').click(); if (direction==='merge') await page.locator('[data-testid="webdav-direction-merge"]').click(); else {await page.locator(`[data-testid="webdav-direction-${direction}"]`).check();await page.locator('[data-testid="webdav-continue"]').click();}}
         if (process.argv.includes('--delete-only')) {
             const deletion=page.locator('.cloud-delete-dialog');
+            const verification=deletion.locator('[data-testid="cloud-delete-verification"] input');
+            const deleteButton=page.locator('[data-testid="cloud-delete-confirm"]');
             const deletionCount=()=>state.calls.filter(call=>call.method==='DELETE').length;
             async function openDelete() {await page.locator('[data-testid="webdav-delete-backup"]').click();await deletion.waitFor();}
             async function cancelDelete() {await page.locator('[data-testid="cloud-delete-cancel"]').click();await deletion.waitFor({state:'hidden'});}
-            async function confirmDelete() {await page.locator('[data-testid="cloud-delete-confirm"]').click();await deletion.waitFor({state:'hidden'});}
+            async function confirmDelete() {if (await verification.count()) await verification.fill('确定删除');await deleteButton.click();await deletion.waitFor({state:'hidden'});}
             async function readLocal() {return page.evaluate(async()=>({config:(await chrome.runtime.sendMessage({type:'configStorageRead',key:'local:config'})).value,credentials:(await chrome.runtime.sendMessage({type:'configStorageRead',key:'local:credentials'})).value}));}
             await openDelete();check((await deletion.innerText()).includes('没有云端备份'),'empty backup has an explicit harmless finish state');
             await confirmDelete();check(writes()===0&&deletionCount()===0,'finishing an empty target makes no cloud writes');
@@ -118,6 +120,13 @@ async function main() {
             const cloud=state.content;
             await openDelete();
             check((await deletion.innerText()).includes('fixture-user')&&(await page.locator('[data-testid="webdav-delete-server"]').innerText())===url,'delete confirmation identifies the actual account and server');
+            check(await verification.inputValue()===''&&!(await deleteButton.isEnabled())&&(await deleteButton.innerText())==='确认','deletion requires typed confirmation and uses the concise button label');
+            await verification.fill('确认删除');check(!(await deleteButton.isEnabled()),'a different confirmation phrase cannot enable deletion');
+            await verification.fill('确定删除');check(await deleteButton.isEnabled()&&deletionCount()===0,'matching the exact phrase enables confirmation without deleting');
+            await verification.press('Enter');check(await deletion.isVisible()&&state.content===cloud&&deletionCount()===0,'Enter in the confirmation field cannot delete a backup');
+            await page.evaluate(async()=>{await new Promise(requestAnimationFrame);await Promise.all(document.getAnimations().filter(animation=>animation.effect?.getComputedTiming().iterations!==Infinity).map(animation=>animation.finished.catch(()=>undefined)));});
+            check(await deleteButton.evaluate(el=>getComputedStyle(el).backgroundColor)===await page.locator('[data-testid="webdav-sync-now"]').evaluate(el=>getComputedStyle(el).backgroundColor),'deletion confirmation follows the existing primary button theme');
+            await verification.fill('');check(!(await deleteButton.isEnabled()),'clearing the phrase disables confirmation again');
             check((await deletion.innerText()).includes('本机配置和 API Key 会保留')&&!(await deletion.locator('.cloud-delete-note').first().isVisible()),'deletion prioritizes local preservation and collapses secondary details');
             const detailsToggle=deletion.locator('[data-testid="cloud-delete-details-toggle"]');
             check(await detailsToggle.getAttribute('aria-expanded')==='false','secondary deletion details start collapsed');
@@ -125,9 +134,9 @@ async function main() {
             check(!(await deletion.locator('.cloud-delete-note').first().isVisible()),'keyboard closes retained-copy details');
             check(await page.locator('[data-testid="cloud-method-google-drive"]').isDisabled(),'provider switching is locked during deletion confirmation');
             check(deletionCount()===0&&state.content===cloud,'opening deletion confirmation does not delete a file');
-            await shot('cloud-delete-webdav-desktop');await cancelDelete();
+            await shot('cloud-delete-webdav-desktop');await verification.fill('确定删除');await cancelDelete();
             check(state.content===cloud&&deletionCount()===0,'cancel preserves the cloud backup');
-            await openDelete();await deletion.press('Escape');await deletion.waitFor({state:'hidden'});check(state.content===cloud,'Escape cancels deletion');
+            await openDelete();check(await verification.inputValue()===''&&!(await deleteButton.isEnabled()),'reopening deletion clears its typed confirmation');await deletion.press('Escape');await deletion.waitFor({state:'hidden'});check(state.content===cloud,'Escape cancels deletion');
             await openDelete();await page.reload({waitUntil:'domcontentloaded'});await navigate();await openDelete();await cancelDelete();
             check(deletionCount()===0&&state.content===cloud,'reopening settings releases a pending deletion without deleting');
             state.etagMode='none';await openDelete();check(await page.locator('[data-testid="cloud-delete-unsupported"]').isVisible()&&!(await page.locator('[data-testid="cloud-delete-confirm"]').isEnabled()),'missing version blocks deletion and explains manual cleanup');await cancelDelete();state.etagMode='prop';
@@ -139,20 +148,23 @@ async function main() {
                 await savePatch({uiLanguage:lang,theme});await page.reload({waitUntil:'domcontentloaded'});await navigate();await page.setViewportSize({width,height:1000});await openDelete();
                 const text=await deletion.innerText();const copy=require(`../../src/core/i18n/messages/cloud-backup/${lang}.json`).messages;
                 check(!text.includes('settings.cloud.')&&text.includes(copy['settings.cloud.deleteTitle'])&&text.includes(copy['settings.cloud.deleteLocalPreserved']),`${lang} deletion copy resolves in the selected language`);
+                check(text.includes(copy['settings.cloud.deletePhrase'])&&!(await deleteButton.isEnabled()),`${lang} deletion requests the localized confirmation phrase`);
+                await verification.fill(copy['settings.cloud.deletePhrase']);check(await deleteButton.isEnabled(),`${lang} matching confirmation enables deletion`);
                 check(await deletion.evaluate(el=>el.scrollWidth<=el.clientWidth+1&&document.documentElement.scrollWidth<=innerWidth+1),`${lang} deletion dialog has no horizontal overflow`);
                 await deletion.locator('[data-testid="cloud-delete-details-toggle"]').click();const contrasts=await deletion.evaluate(el=>{
                     const luminance=color=>{const [r,g,b]=color.match(/[\d.]+/g).slice(0,3).map(Number).map(value=>{const c=value/255;return c<=.04045?c/12.92:((c+.055)/1.055)**2.4;});return .2126*r+.7152*g+.0722*b;};
                     const ratio=(a,b)=>(Math.max(a,b)+.05)/(Math.min(a,b)+.05);
                     const button=el.querySelector('[data-testid="cloud-delete-confirm"]');const style=getComputedStyle(button);
-                    return [ratio(luminance(getComputedStyle(el.querySelector('.cloud-delete-note')).color),luminance(getComputedStyle(el).backgroundColor)),ratio(luminance(style.color),luminance(style.backgroundColor))];
-                });check(contrasts.every(value=>value>=4.5),`${lang} deletion notes and confirmation have readable contrast`);await deletion.locator('[data-testid="cloud-delete-details-toggle"]').click();
+                    const primary=getComputedStyle(document.querySelector('[data-testid="webdav-sync-now"]'));
+                    return [ratio(luminance(getComputedStyle(el.querySelector('.cloud-delete-note')).color),luminance(getComputedStyle(el).backgroundColor)),ratio(luminance(style.color),luminance(style.backgroundColor)),ratio(luminance(primary.color),luminance(primary.backgroundColor))];
+                });check(contrasts[0]>=4.5&&contrasts[1]>=contrasts[2]-.01,`${lang} deletion notes are readable and confirmation matches native primary contrast`);await deletion.locator('[data-testid="cloud-delete-details-toggle"]').click();
                 if (lang==='en-US') await shot('cloud-delete-webdav-english-mobile');
                 if (lang==='zh-CN') await shot('cloud-delete-webdav-dark-desktop');
                 await cancelDelete();
             }
             await savePatch({uiLanguage:'zh-CN',theme:'light'});await page.reload({waitUntil:'domcontentloaded'});await navigate();await page.setViewportSize({width:390,height:900});
             state.content='broken or future format backup';state.version++;
-            await openDelete();check(await page.locator('[data-testid="cloud-delete-confirm"]').isEnabled(),'unreadable backup can be deleted without decrypting');await shot('cloud-delete-webdav-mobile');
+            await openDelete();await verification.fill('确定删除');check(await deleteButton.isEnabled(),'unreadable backup can be deleted without decrypting after typed confirmation');await shot('cloud-delete-webdav-mobile');
             const before=await readLocal();const version=state.version;await confirmDelete();
             const after=await readLocal();check(state.content===null&&state.folder,'confirmed deletion removes only the file and keeps its directory');
             check(state.calls.some(call=>call.method==='DELETE'&&call.match===`"v${version}"`),'deletion sends the confirmed strong ETag');

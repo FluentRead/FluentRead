@@ -60,7 +60,10 @@
     "settings.requestLimits.initialRetryWait": "初次重试等待",
     "settings.requestLimits.maximumRetryWait": "最长重试等待",
     "learning.history.description": "查看本机保存的句子和回答，记录保留 30 天，查看时不会调用模型",
-    "learning.history.emptyHint": "在网页中选中文字后点击“读懂”或“拆句”，回答会自动保存在这里，方便回看"
+    "learning.history.emptyHint": "在网页中选中文字后点击“读懂”或“拆句”，回答会自动保存在这里，方便回看",
+    "settings.services.freeWeights.testDuration": "本次测试耗时 {duration} ms",
+    "settings.services.freeWeights.share": "分流",
+    "settings.services.freeWeights.noChinese": "不支持中文"
   },
   "legacy": {}
 }

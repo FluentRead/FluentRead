@@ -13,6 +13,7 @@ import {buildConfigDiff} from '@/src/core/config/diff';
 describe('keyless free translation configuration', () => {
     it('migrates old settings while keeping explicit opt-outs and never automatically adding paid-capable accounts', () => {
         expect(new Config().freeTranslationOrder).toEqual(DEFAULT_FREE_TRANSLATION_ORDER);
+        expect(new Config().freeTranslationOrder).toEqual(FREE_TRANSLATION_PROVIDERS.map(provider => provider.id));
         for (const value of [undefined, null, 'myMemory', [], ['untrusted', 42]]) {
             expect(normalizeFreeTranslationOrder(value)).toEqual(DEFAULT_FREE_TRANSLATION_ORDER);
         }

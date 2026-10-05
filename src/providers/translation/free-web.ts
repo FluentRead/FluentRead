@@ -63,9 +63,18 @@ async function translateChunk(provider: FreeWebProvider, text: string, from: str
     } else {
         init.body = JSON.stringify({source_language: from, target_language: to, text});
     }
-    const response = await runtimeFetch(url, init);
+    let response: Response;
+    try {
+        response = await runtimeFetch(url, init);
+    } catch (error) {
+        if (signal?.aborted) throw abortErrorFromSignal(signal);
+        if (provider === 'yandexFree' && error instanceof TypeError) {
+            throw new Error('Yandex 网络连接失败，请检查网络后重试或停用此服务');
+        }
+        throw error;
+    }
     if (signal?.aborted) throw abortErrorFromSignal(signal);
-    if (!response.ok) throw createHttpStatusError(response);
+    if (!response.ok) throw createHttpStatusError(response, provider === 'yandexFree' ? 'Yandex 翻译请求失败' : '请求失败');
     const result = await readJsonResponse<WebResponse | null>(response);
     if (signal?.aborted) throw abortErrorFromSignal(signal);
     let value: unknown;

@@ -18,23 +18,29 @@ export async function checkAllFreeTranslationProviders(options: {
     update: (providerId: FreeTranslationProviderId, state: FreeTranslationCheckState) => void;
     isCurrent: () => boolean;
     failureMessage: string;
+    now?: () => number;
 }): Promise<void> {
     let next = 0;
+    const now = options.now ?? (() => performance.now());
     for (const provider of FREE_TRANSLATION_PROVIDERS) options.update(provider.id, {status: 'queued'});
     async function worker(): Promise<void> {
         while (options.isCurrent()) {
             const provider = FREE_TRANSLATION_PROVIDERS[next++];
             if (!provider) return;
             options.update(provider.id, {status: 'checking'});
+            const startedAt = now();
+            const elapsed = () => Math.max(0, Math.round(now() - startedAt));
             try {
                 const result = await options.check(provider.id);
                 if (!options.isCurrent()) return;
+                const durationMs = typeof result?.durationMs === 'number' && Number.isFinite(result.durationMs) && result.durationMs >= 0
+                    ? Math.round(result.durationMs) : elapsed();
                 options.update(provider.id, result?.success === true
-                    ? {status: 'success', durationMs: result.durationMs}
-                    : {status: 'error', error: result?.error || options.failureMessage});
+                    ? {status: 'success', durationMs}
+                    : {status: 'error', durationMs, error: result?.error || options.failureMessage});
             } catch (error) {
                 if (!options.isCurrent()) return;
-                options.update(provider.id, {status: 'error', error: error instanceof Error ? error.message : String(error)});
+                options.update(provider.id, {status: 'error', durationMs: elapsed(), error: error instanceof Error ? error.message : String(error)});
             }
         }
     }

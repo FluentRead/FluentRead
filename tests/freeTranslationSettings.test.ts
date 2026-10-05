@@ -64,18 +64,21 @@ afterAll(async () => server?.close());
 function control(ariaLabel: string): Node { const element = [...elements].reverse().find(node => node.props['aria-label'] === ariaLabel); expect(element, ariaLabel).toBeDefined(); return element!; }
 
 describe('free translation settings compiled component', () => {
-  it('已开启服务的开关旁展示未检查、逐项结果与失败原因，停用服务隐藏状态', async () => {
+  it('所有服务直接展示逐项结果与测试耗时，停用服务也保留本轮检查', async () => {
     const badges = elements.filter(element => element.props['data-provider-state']);
-    expect(badges.map(node => node.props['data-provider-state'])).toEqual(config.freeTranslationOrder);
+    expect(badges.map(node => node.props['data-provider-state'])).toEqual(FREE_TRANSLATION_PROVIDERS.map(provider => provider.id));
     expect(badges.every(node => node.text === 'settings.services.keys.unchecked')).toBe(true);
     checks.microsoft = {status: 'success', durationMs: 35};
-    checks.transmart = {status: 'error', error: '服务限流'};
+    checks.transmart = {status: 'error', error: '服务限流', durationMs: 1200};
     checks.google = {status: 'checking'};
     await runtime.nextTick();
     expect(state.providerStateLabel('microsoft')).toBe('连接正常');
-    expect(state.providerStateTitle('microsoft')).toBe('en → zh-Hans · 35 ms');
+    expect(elements.find(element => element.props['data-provider-duration'] === 'microsoft')?.text).toBe('35 ms');
+    expect(elements.find(element => element.props['data-provider-duration'] === 'transmart')?.text).toBe('1200 ms');
+    expect(state.providerStateTitle('microsoft')).toBe('连接正常 · en → zh-Hans · 35 ms');
     expect(state.providerStateLabel('transmart')).toBe('连接失败');
-    expect(state.providerStateTitle('transmart')).toBe('服务限流');
+    expect(state.failedProviders.map((provider: {id: string}) => provider.id)).toEqual(['transmart']);
+    expect(state.providerStateTitle('transmart')).toBe('服务限流 · en → zh-Hans · 1200 ms');
     expect(state.providerStateLabel('google')).toBe('settings.services.keys.checking');
     state.setMode('sequential');
     await runtime.nextTick();
@@ -83,10 +86,11 @@ describe('free translation settings compiled component', () => {
     checks.apertiumFree = {status: 'success', durationMs: 40};
     state.toggle('apertiumFree', true);
     await runtime.nextTick();
-    expect(state.providerStateTitle('apertiumFree')).toBe('en → es · 40 ms');
+    expect(state.providerStateTitle('apertiumFree')).toBe('连接正常 · en → es · 40 ms');
   });
 
-  it('完整目录检查包含停用与折叠服务，独立失败仍继续检查其余服务', async () => {
+  it('完整目录检查包含停用服务，独立失败仍继续检查其余服务', async () => {
+    state.toggle('apertiumFree', false);
     const called: string[] = [];
     let active = 0, peak = 0;
     await checkAllFreeTranslationProviders({
@@ -99,16 +103,44 @@ describe('free translation settings compiled component', () => {
         if (id === 'youdaoFree') throw '连接中断';
         return {success: true, durationMs: 10};
       },
-      update: (id, state) => { checks[id] = state; }, isCurrent: () => true, failureMessage: '检查失败',
+      update: (id, state) => { checks[id] = state; }, isCurrent: () => true, failureMessage: '检查失败', now: () => 0,
     });
     expect(called).toEqual(FREE_TRANSLATION_PROVIDERS.map(provider => provider.id));
     expect(peak).toBe(3);
-    expect(checks.microsoft).toEqual({status: 'error', error: '网络不可用'});
-    expect(checks.transmart).toEqual({status: 'error', error: '服务限流'});
-    expect(checks.google).toEqual({status: 'error', error: '检查失败'});
-    expect(checks.youdaoFree).toEqual({status: 'error', error: '连接中断'});
+    expect(checks.microsoft).toEqual({status: 'error', error: '网络不可用', durationMs: 0});
+    expect(checks.transmart).toEqual({status: 'error', error: '服务限流', durationMs: 0});
+    expect(checks.google).toEqual({status: 'error', error: '检查失败', durationMs: 0});
+    expect(checks.youdaoFree).toEqual({status: 'error', error: '连接中断', durationMs: 0});
     expect(checks.apertiumFree).toEqual({status: 'success', durationMs: 10});
     expect(config.freeTranslationOrder).not.toContain('apertiumFree');
+  });
+
+  it('measures each dispatched test without including queue time and clears timing while retesting', async () => {
+    let clock = 100;
+    const pending: Array<{resolve: (value: {success: boolean; durationMs?: number; error?: string}) => void; reject: (error: Error) => void}> = [];
+    const run = checkAllFreeTranslationProviders({
+      check: id => ['microsoft', 'transmart', 'volcengineFree'].includes(id)
+        ? new Promise((resolve, reject) => pending.push({resolve, reject}))
+        : Promise.resolve({success: true, durationMs: Number.NaN}),
+      update: (id, value) => {checks[id] = value;},
+      isCurrent: () => true, failureMessage: '检查失败', now: () => clock,
+    });
+    clock = 125;
+    pending[0].resolve({success: true, durationMs: 7.4});
+    pending[1].resolve({success: false, error: '超时'});
+    pending[2].reject(new Error('断开'));
+    await run;
+    expect(checks.microsoft?.durationMs).toBe(7);
+    expect(checks.transmart?.durationMs).toBe(25);
+    expect(checks.volcengineFree?.durationMs).toBe(25);
+    expect(checks.apertiumFree?.durationMs).toBe(0);
+    checks.microsoft = {status: 'checking', durationMs: 7};
+    await runtime.nextTick();
+    expect(state.providerDuration('microsoft')).toBeUndefined();
+    checks.microsoft = {status: 'success', durationMs: -1};
+    expect(state.providerDuration('microsoft')).toBeUndefined();
+    checks.microsoft = {status: 'success'};
+    expect(state.providerDuration('microsoft')).toBeUndefined();
   });
 
   it('切换服务后不发起后续检查，迟到响应不能覆盖新状态', async () => {
@@ -137,8 +169,8 @@ describe('free translation settings compiled component', () => {
     expect(elements.some(element => element.props['aria-label'] === 'settings.services.freeWeights.mode')).toBe(true);
     expect(elements.filter(element => element.props['data-fallback-provider'])).toHaveLength(FREE_TRANSLATION_PROVIDERS.length);
     expect(elements.some(element => element.props['aria-label'] === '每个服务最多等待（秒）')).toBe(false);
-    expect(control('MyMemory 联系邮箱')).toBeDefined();
-    expect(elements.some(element => element.tag === 'details' && element.props.class === 'provider-settings')).toBe(true);
+    expect(control('settings.services.library.memoryEmail')).toBeDefined();
+    expect(elements.some(element => element.tag === 'section' && element.props.class === 'provider-settings')).toBe(true);
     expect(readFileSync(resolve(process.cwd(), componentPath), 'utf8')).not.toContain('my-memory-advanced');
   });
 
@@ -150,9 +182,9 @@ describe('free translation settings compiled component', () => {
     expect(elements.some(element => element.props['data-testid'] === 'free-translation-weight-summary')).toBe(true);
     expect(elements.filter(element => element.props['data-provider-weight'])).toHaveLength(config.freeTranslationOrder.length);
     const details = elements.find(element => element.props['data-testid'] === 'free-routing-details');
-    expect(details?.tag).toBe('details');
-    expect(details?.props.open).toBeUndefined();
-    expect(elements.find(element => element.props['data-provider-weight'] === 'microsoft')?.text).toBe('20.8%');
+    expect(details).toBeUndefined();
+    expect(elements.some(element => element.tag === 'details')).toBe(false);
+    expect(elements.find(element => element.props['data-provider-weight'] === 'microsoft')?.text).toBe('17.2%');
     expect(readFileSync(resolve(process.cwd(), componentPath), 'utf8')).not.toContain('setWeight');
   });
 
@@ -166,7 +198,7 @@ describe('free translation settings compiled component', () => {
     expect(config.freeTranslationMode).toBe('balanced');
   });
 
-  it('shows cooling only for an enabled service and keeps allocation details collapsed', async () => {
+  it('shows cooling only for an enabled service and exposes allocation beside services', async () => {
     state.weightSnapshot = {total: 100, observedAt: Date.now(), entries: [{providerId: 'microsoft', weight: 0, status: 'cooling'}]};
     await runtime.nextTick();
     expect(state.weightStatus('microsoft')).toBe('cooling');
@@ -189,7 +221,7 @@ describe('free translation settings compiled component', () => {
   });
 
   it('keeps partial email local and commits only valid email', async () => {
-    const email = control('MyMemory 联系邮箱');
+    const email = control('settings.services.library.memoryEmail');
     email.props['onUpdate:modelValue']('contact@'); email.props.onChange();
     expect(config.myMemoryEmail).toBe('');
     email.props['onUpdate:modelValue']('contact@example.test'); email.props.onChange();

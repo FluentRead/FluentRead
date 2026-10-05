@@ -1,7 +1,7 @@
 <!--
  * @file src/features/settings/ui/services/FreeTranslationSettings.vue
  * 文件职责：编辑免费翻译服务的启停、选择策略、邮箱与等待时间。
- * 主要内容：普通态说明自动选择和服务启停，在已开启服务的开关左侧展示逐项检查或运行异常状态；分流比例默认折叠在运行情况中，高级态显示等待上限。
+ * 主要内容：以等宽等高卡片统一展示全部服务的启停、连接结果、单次测试耗时与分流参考；失败说明集中显示，邮箱作为独立紧凑字段常驻，高级态显示等待上限。
  * 模块边界：只修改传入的配置，由设置页统一持久化；只读取不含凭据的后台权重快照，不请求翻译。
  -->
 <template>
@@ -13,74 +13,46 @@
       </div>
       <p class="mode-help">{{ mode === 'balanced' ? t('settings.services.freeWeights.strategy') : translateLegacy('依次调用启用的免费接口；可使用上下按钮调整顺序') }}</p>
       <p v-if="!isSequential && displayedWeightSnapshot.total === 0" class="service-unavailable" role="status">{{ t('settings.services.freeWeights.unavailable') }}</p>
-      <section class="provider-section" :aria-label="translateLegacy(mode === 'sequential' ? '免费翻译优先顺序' : '常用候选')">
+      <section class="provider-section" :aria-label="translateLegacy(isSequential ? '免费翻译优先顺序' : '免费翻译服务')">
         <div class="section-heading"><h3>{{ isSequential ? translateLegacy('服务优先顺序') : t('settings.services.freeWeights.services') }}</h3><p>{{ t('settings.services.freeWeights.enabledCount', {count: order.length}) }}</p></div>
-        <ol class="fallback-list" :class="{ 'is-sequential': isSequential }" :aria-label="translateLegacy(mode === 'balanced' ? '免费翻译服务' : '免费翻译优先顺序')">
-          <li v-for="provider in commonProviders" :key="provider.id" :data-fallback-provider="provider.id" :title="translateLegacy(provider.description)" :class="{'is-disabled': !isEnabled(provider.id)}">
+        <div v-if="!isSequential" class="routing-summary" data-testid="free-translation-weight-summary" :data-weight-total="displayedWeightSnapshot.total" :data-weight-observed-at="displayedWeightSnapshot.observedAt">
+          <span>{{ t('settings.services.freeWeights.description') }}</span>
+          <el-tooltip :content="t('settings.services.freeWeights.refresh', {minutes: refreshMinutes})"><span class="allocation-total">{{ t('settings.services.freeWeights.total', {total: formatPercentage(displayedWeightSnapshot.total)}) }}</span></el-tooltip>
+        </div>
+        <ol class="fallback-list" :class="{ 'is-sequential': isSequential }" :aria-label="translateLegacy(isSequential ? '免费翻译优先顺序' : '免费翻译服务')">
+          <li v-for="provider in providers" :key="provider.id" :data-fallback-provider="provider.id" :class="{'is-disabled': !isEnabled(provider.id)}">
             <div class="provider-row">
               <span v-if="isSequential" class="provider-position" aria-hidden="true">{{ isEnabled(provider.id) ? order.indexOf(provider.id) + 1 : '—' }}</span>
               <ServiceIcon :service="provider.id" :label="translateLegacy(provider.label)" size="small" />
-              <div class="provider-copy"><strong>{{ translateLegacy(provider.label) }}</strong></div>
+              <div class="provider-copy">
+                <el-tooltip :content="`${translateLegacy(provider.label)} · ${translateLegacy(provider.description)}`"><strong tabindex="0">{{ translateLegacy(provider.label) }}</strong></el-tooltip>
+                <div class="provider-result">
+                  <span class="provider-state" :class="`is-${providerState(provider.id)}`" :data-provider-state="provider.id" :data-provider-check-status="providerState(provider.id)" :title="providerStateTitle(provider.id)" role="status">{{ providerStateLabel(provider.id) }}</span>
+                  <output v-if="providerDuration(provider.id) !== undefined" class="provider-duration" :data-provider-duration="provider.id" :aria-label="t('settings.services.freeWeights.testDuration', {duration: providerDuration(provider.id)})">{{ providerDuration(provider.id) }} ms</output>
+                </div>
+              </div>
               <div class="provider-actions">
                 <button v-if="isSequential" type="button" :disabled="!isEnabled(provider.id) || order.indexOf(provider.id) === 0" :aria-label="`${translateLegacy('上移')} ${translateLegacy(provider.label)}`" :title="translateLegacy('上移')" @click="move(provider.id, -1)"><svg aria-hidden="true" viewBox="0 0 16 16"><path d="m4 9 4-4 4 4" /></svg></button>
                 <button v-if="isSequential" type="button" :disabled="!isEnabled(provider.id) || order.indexOf(provider.id) === order.length - 1" :aria-label="`${translateLegacy('下移')} ${translateLegacy(provider.label)}`" :title="translateLegacy('下移')" @click="move(provider.id, 1)"><svg aria-hidden="true" viewBox="0 0 16 16"><path d="m4 7 4 4 4-4" /></svg></button>
-                <span v-if="isEnabled(provider.id)" class="provider-state" :class="`is-${providerState(provider.id)}`" :data-provider-state="provider.id" :data-provider-check-status="providerState(provider.id)" :title="providerStateTitle(provider.id)" role="status">{{ providerStateLabel(provider.id) }}</span>
                 <el-switch :model-value="isEnabled(provider.id)" :disabled="toggleDisabled(provider.id)" :aria-label="`${translateLegacy('启用')} ${translateLegacy(provider.label)}`" @update:model-value="toggle(provider.id, Boolean($event))" />
               </div>
             </div>
-            <p v-if="provider.id === 'myMemory' || provider.id === 'apertiumFree'" class="provider-description">{{ translateLegacy(provider.description) }}</p>
-            <details v-if="provider.id === 'myMemory'" class="provider-settings">
-              <summary><span>{{ translateLegacy('连接设置') }}</span><small v-if="config.myMemoryEmail">{{ translateLegacy('邮箱已配置') }}</small><svg class="details-chevron" aria-hidden="true" viewBox="0 0 16 16"><path d="m4 6 4 4 4-4" /></svg></summary>
-              <label class="compact-field"><span>{{ t('settings.services.library.memoryEmail') }}</span><el-input v-model="myMemoryEmailDraft" type="email" :placeholder="translateLegacy('不填写也可以使用')" aria-label="MyMemory 联系邮箱" :aria-invalid="myMemoryEmailInvalid" @change="commitMyMemoryEmail" /></label>
-              <p v-if="myMemoryEmailInvalid" class="provider-note" role="status">{{ translateLegacy('请输入有效邮箱，或留空') }}</p>
-              <p>{{ translateLegacy('提供邮箱后可提升额度；邮箱会随请求发送给 MyMemory') }} <a href="https://mymemory.translated.net/doc/usagelimits.php" target="_blank" rel="noreferrer">{{ translateLegacy('官方额度说明') }}</a></p>
-            </details>
+            <div class="provider-meta">
+              <span v-if="provider.id === 'apertiumFree'" class="provider-language">{{ t('settings.services.freeWeights.noChinese') }}</span>
+              <span v-if="!isSequential && isEnabled(provider.id)" class="provider-allocation">{{ t('settings.services.freeWeights.share') }} <output class="provider-weight" :data-provider-weight="provider.id" :data-weight-status="weightStatus(provider.id)" :aria-label="weightAriaLabel(provider.id)">{{ formatProviderWeight(provider.id) }}</output></span>
+            </div>
           </li>
         </ol>
+        <ul v-if="failedProviders.length" class="check-failures" :aria-label="t('settings.services.keys.failed')">
+          <li v-for="provider in failedProviders" :key="provider.id" :data-provider-error="provider.id"><strong>{{ translateLegacy(provider.label) }}</strong><span>{{ checks?.[provider.id]?.error }}</span></li>
+        </ul>
       </section>
-      <details v-if="mode === 'balanced'" class="experimental-section">
-        <summary><span>{{ t('settings.services.freeWeights.moreServices') }}</span><small>{{ experimentalSummary }}</small><svg class="details-chevron" aria-hidden="true" viewBox="0 0 16 16"><path d="m4 6 4 4 4-4" /></svg></summary>
-        <p class="section-help">{{ translateLegacy('可能受访问验证、公共实例稳定性或语言范围影响；启用后会参与当前策略') }}</p>
-        <ol class="fallback-list" :class="{ 'is-sequential': isSequential }" :aria-label="translateLegacy('实验候选服务')">
-          <li v-for="provider in experimentalProviders" :key="provider.id" :data-fallback-provider="provider.id" :title="translateLegacy(provider.description)" :class="{'is-disabled': !isEnabled(provider.id)}">
-            <div class="provider-row">
-              <span v-if="isSequential" class="provider-position" aria-hidden="true">{{ isEnabled(provider.id) ? order.indexOf(provider.id) + 1 : '—' }}</span>
-              <ServiceIcon :service="provider.id" :label="translateLegacy(provider.label)" size="small" />
-              <div class="provider-copy"><strong>{{ translateLegacy(provider.label) }}</strong></div>
-              <div class="provider-actions">
-                <button v-if="isSequential" type="button" :disabled="!isEnabled(provider.id) || order.indexOf(provider.id) === 0" :aria-label="`${translateLegacy('上移')} ${translateLegacy(provider.label)}`" :title="translateLegacy('上移')" @click="move(provider.id, -1)"><svg aria-hidden="true" viewBox="0 0 16 16"><path d="m4 9 4-4 4 4" /></svg></button>
-                <button v-if="isSequential" type="button" :disabled="!isEnabled(provider.id) || order.indexOf(provider.id) === order.length - 1" :aria-label="`${translateLegacy('下移')} ${translateLegacy(provider.label)}`" :title="translateLegacy('下移')" @click="move(provider.id, 1)"><svg aria-hidden="true" viewBox="0 0 16 16"><path d="m4 7 4 4 4-4" /></svg></button>
-                <span v-if="isEnabled(provider.id)" class="provider-state" :class="`is-${providerState(provider.id)}`" :data-provider-state="provider.id" :data-provider-check-status="providerState(provider.id)" :title="providerStateTitle(provider.id)" role="status">{{ providerStateLabel(provider.id) }}</span>
-                <el-switch :model-value="isEnabled(provider.id)" :disabled="toggleDisabled(provider.id)" :aria-label="`${translateLegacy('启用')} ${translateLegacy(provider.label)}`" @update:model-value="toggle(provider.id, Boolean($event))" />
-              </div>
-            </div>
-          </li>
-        </ol>
-      </details>
       <p class="fallback-footnote">{{ t('settings.services.library.keepOne') }}</p>
-      <details v-if="!isSequential" class="routing-details" data-testid="free-routing-details">
-        <summary><span>{{ t('settings.services.freeWeights.details') }}</span><svg class="details-chevron" aria-hidden="true" viewBox="0 0 16 16"><path d="m4 6 4 4 4-4" /></svg></summary>
-        <section
-          class="weight-summary"
-          data-testid="free-translation-weight-summary"
-          :data-weight-total="displayedWeightSnapshot.total"
-          :data-weight-observed-at="displayedWeightSnapshot.observedAt"
-        >
-          <div class="weight-summary-heading">
-            <strong>{{ t('settings.services.freeWeights.title') }}</strong>
-            <b>{{ t('settings.services.freeWeights.total', { total: formatPercentage(displayedWeightSnapshot.total) }) }}</b>
-          </div>
-          <p>{{ t('settings.services.freeWeights.description') }}</p>
-          <small>{{ t('settings.services.freeWeights.refresh', { minutes: refreshMinutes }) }}</small>
-          <ul class="routing-status-list">
-            <li v-for="providerId in order" :key="providerId">
-              <span>{{ translateLegacy(FREE_TRANSLATION_PROVIDERS.find(item => item.id === providerId)!.label) }}</span>
-              <span class="routing-state">{{ t(`settings.services.freeWeights.state.${weightStatus(providerId)}`) }}</span>
-              <output class="provider-weight" :data-provider-weight="providerId" :data-weight-status="weightStatus(providerId)" :aria-label="weightAriaLabel(providerId)">{{ formatProviderWeight(providerId) }}</output>
-            </li>
-          </ul>
-        </section>
-      </details>
+      <section class="provider-settings" :aria-label="t('settings.services.library.memoryEmail')">
+        <label class="compact-field"><span>{{ t('settings.services.library.memoryEmail') }}</span><el-input v-model="myMemoryEmailDraft" type="email" :placeholder="translateLegacy('不填写也可以使用')" :aria-label="t('settings.services.library.memoryEmail')" :aria-invalid="myMemoryEmailInvalid" @change="commitMyMemoryEmail" /></label>
+        <p v-if="myMemoryEmailInvalid" class="provider-note" role="status">{{ translateLegacy('请输入有效邮箱，或留空') }}</p>
+        <p>{{ translateLegacy('提供邮箱后可提升额度；邮箱会随请求发送给 MyMemory') }} <a href="https://mymemory.translated.net/doc/usagelimits.php" target="_blank" rel="noreferrer">{{ translateLegacy('官方额度说明') }}</a></p>
+      </section>
     </template>
     <template v-if="advanced">
       <label class="compact-field"><span>{{ translateLegacy('每个服务最多等待（秒）') }}</span><el-input-number :model-value="config.freeTranslationTimeoutMs / 1000" :min="1" :max="15" :step="1" :aria-label="translateLegacy('每个服务最多等待（秒）')" @update:model-value="setDuration($event)" /></label>
@@ -121,12 +93,7 @@ const mode = computed<FreeTranslationMode>(() => normalizeFreeTranslationMode(fr
 const isSequential = computed(() => mode.value === 'sequential')
 const order = computed(() => normalizeFreeTranslationOrder(config.value.freeTranslationOrder))
 const providers = computed(() => mode.value === 'sequential' ? [...order.value.flatMap(id => FREE_TRANSLATION_PROVIDERS.filter(provider => provider.id === id)), ...FREE_TRANSLATION_PROVIDERS.filter(provider => !order.value.includes(provider.id))] : [...FREE_TRANSLATION_PROVIDERS])
-const commonProviders = computed(() => mode.value === 'sequential' ? providers.value : providers.value.filter(provider => !provider.description.startsWith('实验性')))
-const experimentalProviders = computed(() => providers.value.filter(provider => provider.description.startsWith('实验性')))
-const experimentalSummary = computed(() => {
-  const enabled = experimentalProviders.value.filter(provider => isEnabled(provider.id)).map(provider => translateLegacy(provider.label))
-  return enabled.length ? `${enabled.length} ${translateLegacy('项已启用')}：${enabled.join('、')}` : translateLegacy('默认关闭')
-})
+const failedProviders = computed(() => providers.value.filter(provider => props.checks?.[provider.id]?.status === 'error' && props.checks[provider.id]?.error))
 const weightSnapshot = ref<FreeTranslationWeightSnapshot | null>(null)
 const localWeightSnapshot = computed(() => calculateFreeTranslationWeightSnapshot(order.value))
 const displayedWeightSnapshot = computed(() => weightSnapshot.value || localWeightSnapshot.value)
@@ -159,10 +126,17 @@ function providerStateLabel(providerId: FreeTranslationProviderId): string {
   if (state === 'cooling' || state === 'recovering') return t(`settings.services.freeWeights.state.${state}`)
   return t(`settings.services.keys.${state === 'idle' ? 'unchecked' : state}`)
 }
+function providerDuration(providerId: FreeTranslationProviderId): number | undefined {
+  const check = props.checks?.[providerId]
+  if (check?.status !== 'success' && check?.status !== 'error') return undefined
+  const duration = check.durationMs
+  return typeof duration === 'number' && Number.isFinite(duration) && duration >= 0 ? Math.round(duration) : undefined
+}
 function providerStateTitle(providerId: FreeTranslationProviderId): string {
   const check = props.checks?.[providerId]
   const pair = providerId === 'apertiumFree' ? 'en → es' : 'en → zh-Hans'
-  return check?.error || (check?.status === 'success' ? `${pair} · ${check.durationMs ?? 0} ms` : providerStateLabel(providerId))
+  const duration = providerDuration(providerId)
+  return [check?.error || providerStateLabel(providerId), pair, duration === undefined ? '' : `${duration} ms`].filter(Boolean).join(' · ')
 }
 function weightAriaLabel(providerId: string): string {
   return t('settings.services.freeWeights.aria', {
@@ -210,94 +184,59 @@ onBeforeUnmount(() => {
 
 <style scoped>
 .free-translation-settings { container-type: inline-size; color: var(--el-text-color-primary); font-size: 12px; }
-.fallback-intro, .fallback-footnote, .mode-help { margin: 10px 0; color: var(--el-text-color-secondary); line-height: 1.55; }
+.fallback-footnote, .mode-help { margin: 10px 0; color: var(--el-text-color-secondary); line-height: 1.55; }
 .mode-picker { max-width: 320px; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; margin: 10px 0 3px; }
 .mode-option { display: flex; align-items: center; gap: 6px; min-height: 30px; padding: 0 9px; border: 1px solid var(--el-border-color); border-radius: 8px; background: var(--el-fill-color-blank); cursor: pointer; }
 .mode-option.is-selected { border-color: var(--el-color-primary); color: var(--el-color-primary); background: var(--el-color-primary-light-9); }
 .mode-option input { margin: 0; accent-color: var(--el-color-primary); }
 .mode-help { margin-top: 7px; }
-.weight-summary { display: grid; gap: 5px; margin-top: 12px; padding: 10px 12px; border: 1px solid var(--el-border-color-lighter); border-radius: 10px; background: var(--el-fill-color-extra-light); }
-.routing-details { margin-top: 12px; border-top: 1px solid var(--el-border-color-lighter); }
-.routing-details > summary { display: flex; align-items: center; justify-content: space-between; padding: 12px 0 4px; color: var(--el-text-color-secondary); cursor: pointer; font-size: 12px; }
-.routing-details > summary:focus-visible { outline: 2px solid var(--brand); outline-offset: 2px; }
-.routing-status-list { margin: 5px 0 0; padding: 0; list-style: none; }
-.routing-status-list li { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; gap: 8px; align-items: center; padding: 7px 0; border-top: 1px solid var(--el-border-color-lighter); font-size: 11px; }
-.routing-state { color: var(--el-text-color-secondary); }
-.provider-state { flex-shrink: 0; padding: 2px 5px; border-radius: 4px; color: var(--el-text-color-secondary); background: var(--el-fill-color-light); font-size: 10px; white-space: nowrap; }
+.service-unavailable { color: var(--el-color-warning-dark-2); line-height: 1.6; }
+.provider-section { margin-top: 14px; }
+.section-heading { display: flex; align-items: baseline; gap: 12px; margin-bottom: 6px; }
+.section-heading h3 { margin: 0; font-size: 13px; font-weight: 600; }
+.section-heading p { margin: 0; color: var(--el-text-color-secondary); font-size: 11px; }
+.routing-summary { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 4px 12px; margin-bottom: 9px; color: var(--el-text-color-secondary); font-size: 11px; line-height: 1.5; }
+.allocation-total { white-space: nowrap; }
+.fallback-list { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 280px), 1fr)); align-items: start; gap: 7px; margin: 0; padding: 0; list-style: none; }
+.fallback-list.is-sequential { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.fallback-list > li { box-sizing: border-box; display: flex; flex-direction: column; justify-content: space-between; gap: 5px; height: 88px; min-width: 0; padding: 10px; border: 1px solid var(--el-border-color-lighter); border-radius: 9px; background: var(--el-fill-color-blank); }
+.fallback-list > li.is-disabled { background: var(--el-fill-color-extra-light); }
+.provider-row { display: flex; align-items: center; gap: 8px; }
+.provider-position { width: 14px; flex: none; color: var(--el-text-color-secondary); font-variant-numeric: tabular-nums; }
+.provider-copy { display: flex; min-width: 0; flex: 1; flex-direction: column; gap: 5px; }
+.provider-copy strong { overflow: hidden; font-size: 12px; text-overflow: ellipsis; white-space: nowrap; }
+.provider-result { display: flex; align-items: center; gap: 4px 8px; min-height: 19px; }
+.provider-state { padding: 2px 5px; border-radius: 4px; color: var(--el-text-color-secondary); background: var(--el-fill-color-light); font-size: 10px; white-space: nowrap; }
 .provider-state.is-success { color: var(--el-color-success-dark-2); background: var(--el-color-success-light-9); }
 .provider-state.is-error { color: var(--el-color-danger-dark-2); background: var(--el-color-danger-light-9); }
 .provider-state.is-checking { color: var(--el-color-primary); background: var(--el-color-primary-light-9); }
 .provider-state.is-cooling, .provider-state.is-recovering { color: var(--el-color-warning-dark-2); background: var(--el-color-warning-light-9); }
-.service-unavailable { color: var(--el-color-warning-dark-2); font-size: 12px; line-height: 1.6; }
-.weight-summary-heading { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
-.weight-summary-heading strong { font-size: 12px; font-weight: 650; }
-.weight-summary-heading b { color: var(--el-color-primary); font-size: 12px; font-variant-numeric: tabular-nums; }
-.weight-summary p, .weight-summary small, .mode-note { margin: 0; color: var(--el-text-color-secondary); font-size: 11px; line-height: 1.5; }
-.weight-summary small { color: var(--el-color-primary); }
-.weight-summary .weight-unavailable { color: var(--el-color-warning-dark-2); }
-.mode-note { margin: 9px 0 0; }
-.provider-section { margin-top: 14px; }
-.section-heading { display: flex; align-items: baseline; gap: 12px; margin-bottom: 6px; }
-.section-heading h3 { margin: 0; font-size: 13px; font-weight: 600; }
-.section-heading p, .section-help { margin: 0; color: var(--el-text-color-secondary); font-size: 11px; line-height: 1.45; }
-.fallback-list { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 270px), 1fr)); gap: 6px; margin: 0; padding: 0; list-style: none; }
-.fallback-list.is-sequential { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-.fallback-list > li { min-width: 0; padding: 7px 8px; border: 1px solid var(--el-border-color-lighter); border-radius: 8px; background: var(--el-fill-color-blank); }
-.fallback-list > li.is-disabled { background: var(--el-fill-color-extra-light); }
-.experimental-section { margin-top: 12px; border: 1px solid var(--el-border-color-lighter); border-radius: 8px; background: var(--el-fill-color-blank); }
-.experimental-section summary { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; padding: 9px 10px; color: var(--el-text-color-primary); cursor: pointer; list-style-position: inside; }
-.experimental-section summary::marker { color: var(--el-text-color-secondary); }
-.experimental-section summary small { margin-left: auto; min-width: 0; overflow: hidden; color: var(--el-text-color-secondary); font-size: 10px; text-overflow: ellipsis; white-space: nowrap; }
-.experimental-section[open] summary { border-bottom: 1px solid var(--el-border-color-lighter); }
-.experimental-section .section-help { padding: 8px 10px 0; }
-.experimental-section .fallback-list { padding: 8px 10px 10px; }
-.provider-row { display: flex; align-items: center; gap: 7px; }
-.provider-position { width: 14px; flex: 0 0 auto; color: var(--el-text-color-secondary); font-variant-numeric: tabular-nums; }
-.provider-copy { display: flex; min-width: 0; flex: 1; flex-wrap: wrap; align-items: baseline; gap: 4px 9px; }
-.provider-copy strong { font-size: 12px; overflow-wrap: anywhere; }
-.provider-copy > span { color: var(--el-text-color-secondary); font-size: 10px; }
-.provider-weight { display: inline-flex; min-width: 48px; justify-content: flex-end; color: var(--el-color-primary); font-size: 11px; font-variant-numeric: tabular-nums; font-weight: 650; white-space: nowrap; }
-.provider-weight.is-cooling { color: var(--el-text-color-secondary); }
-.provider-weight.is-recovering { color: var(--el-color-warning-dark-2); }
-.provider-weight.is-disabled { color: var(--el-text-color-secondary); font-weight: 500; }
-.provider-actions { display: flex; flex: 0 0 auto; align-items: center; gap: 5px; }
-.provider-actions button { width: 26px; height: 26px; padding: 0; border: 1px solid var(--el-border-color); border-radius: 7px; color: var(--el-text-color-regular); background: var(--el-fill-color-blank); cursor: pointer; }
+.provider-duration { color: var(--el-text-color-regular); font-size: 11px; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.provider-meta { display: flex; align-items: center; justify-content: space-between; gap: 5px 8px; min-height: 16px; margin-left: 28px; color: var(--el-text-color-secondary); font-size: 10px; }
+.provider-language { overflow: hidden; min-width: 0; text-overflow: ellipsis; white-space: nowrap; }
+.provider-allocation { flex: none; margin-left: auto; white-space: nowrap; }
+.provider-weight { color: var(--el-text-color-regular); font-variant-numeric: tabular-nums; }
+.provider-actions { display: flex; flex: none; align-items: center; gap: 5px; }
+.provider-actions button { width: 24px; height: 26px; padding: 0; border: 1px solid var(--el-border-color); border-radius: 7px; color: var(--el-text-color-regular); background: var(--el-fill-color-blank); cursor: pointer; }
 .provider-actions button svg { width: 14px; height: 14px; fill: none; stroke: currentColor; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; vertical-align: middle; }
 .provider-actions button:disabled { opacity: .35; cursor: default; }
-.provider-actions :deep(.el-switch) { margin-left: 5px; }
-.allocation-note { color: var(--el-text-color-secondary); font-size: 11px; white-space: nowrap; }
-.provider-description, .provider-note { margin: 4px 0 0 25px; color: var(--el-text-color-secondary); font-size: 10px; line-height: 1.4; }
-.provider-note { color: var(--el-color-warning-dark-2); }
-.provider-settings { margin: 6px 0 0 25px; border-top: 1px solid var(--el-border-color-lighter); }
-.provider-settings summary { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; padding: 5px 0 0; color: var(--el-text-color-secondary); cursor: pointer; }
-.provider-settings summary small { margin-left: auto; color: var(--el-color-success); font-size: 10px; }
-.provider-settings p { margin: 6px 0 0; line-height: 1.45; font-size: 10px; color: var(--el-text-color-secondary); }
+.check-failures { display: grid; gap: 7px; margin: 10px 0 0; padding: 9px 12px; list-style: none; border-left: 2px solid var(--el-color-danger-light-5); background: var(--el-fill-color-light); color: var(--el-color-danger); font-size: 11px; line-height: 1.6; }
+.check-failures li { display: flex; flex-wrap: wrap; gap: 0 10px; }
+.check-failures strong { flex: none; font-weight: 600; }
+.check-failures span { min-width: 0; flex: 1 1 180px; overflow-wrap: anywhere; }
+.provider-settings { margin-top: 12px; padding-top: 10px; border-top: 1px solid var(--el-border-color-lighter); }
+.provider-settings p { margin: 6px 0 0; line-height: 1.5; font-size: 11px; color: var(--el-text-color-secondary); }
+.provider-settings .provider-note { color: var(--el-color-warning-dark-2); }
 .provider-settings a { color: var(--el-color-primary); }
-.provider-settings .compact-field { flex-direction: column; align-items: stretch; gap: 6px; }
-.provider-settings .compact-field :deep(.el-input) { width: 100%; max-width: none; }
-.details-chevron { width: 14px; height: 14px; flex: none; fill: none; stroke: currentColor; stroke-width: 1.5; stroke-linecap: round; stroke-linejoin: round; }
-details[open] > summary > .details-chevron { transform: rotate(180deg); }
-.provider-settings summary:focus-visible { outline: 2px solid var(--brand); outline-offset: 2px; }
 .compact-field { display: flex; align-items: center; justify-content: space-between; gap: 14px; margin-top: 12px; }
-.compact-field :deep(.el-input), .compact-field :deep(.el-input-number) { width: min(100%, 220px); max-width: 220px; }
+.provider-settings .compact-field { margin-top: 0; }
+.compact-field :deep(.el-input), .compact-field :deep(.el-input-number) { width: min(100%, 260px); max-width: 260px; }
 .recovery-copy { margin: 8px 0 0; color: var(--el-text-color-secondary); line-height: 1.5; }
-@media (max-width: 1200px) {
-  .section-heading { align-items: flex-start; flex-direction: column; gap: 2px; }
-}
+.mode-option:focus-within, .provider-actions button:focus-visible, .provider-copy strong:focus-visible { outline: 2px solid var(--brand); outline-offset: 2px; }
+@container (min-width: 900px) { .fallback-list { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+@container (max-width: 650px) { .fallback-list.is-sequential { grid-template-columns: 1fr; } }
 @media (max-width: 700px) {
-  .mode-picker { grid-template-columns: 1fr; }
-  .provider-row { gap: 6px; align-items: flex-start; }
-  .provider-copy { flex-direction: column; gap: 2px; }
-  .provider-weight { min-width: 42px; }
-  .provider-actions { gap: 3px; flex-wrap: wrap; justify-content: flex-end; }
-  .provider-actions button { width: 24px; }
-  .provider-description, .provider-note, .provider-settings { margin-left: 0; }
   .compact-field { flex-wrap: wrap; gap: 7px; }
   .compact-field :deep(.el-input), .compact-field :deep(.el-input-number) { width: 100%; max-width: none; }
-  .experimental-section summary small { max-width: 58%; }
 }
-.mode-option:focus-within, .provider-actions button:focus-visible, .experimental-section summary:focus-visible { outline: 2px solid var(--brand); outline-offset: 2px; }
-.experimental-section summary small { white-space: normal; overflow: visible; text-overflow: clip; line-height: 1.6; }
-@container (min-width: 840px) { .fallback-list:not(.is-sequential) { grid-template-columns: repeat(3, minmax(270px, 1fr)); } }
-@container (max-width: 580px) { .fallback-list.is-sequential { grid-template-columns: 1fr; } }
 </style>

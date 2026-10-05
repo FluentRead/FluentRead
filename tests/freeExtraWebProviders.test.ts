@@ -113,6 +113,22 @@ describe('extra anonymous web providers', () => {
         await expect(translateExtraFreeWebText('sogouFree', 'Hello', 'en', 'zh-Hans')).rejects.toMatchObject({freeFailure: 'unavailable'});
     });
 
+    it('reports Sogou inner business errors even when its outer status is successful', async () => {
+        fetchMock.mockResolvedValueOnce(home()).mockResolvedValueOnce(Response.json({status: 0, data: {translate: {errorCode: 's10', dit: ''}}}));
+        await expect(translateExtraFreeWebText('sogouFree', 'Hello', 'en', 'zh-Hans')).rejects.toThrow('错误码 s10');
+        fetchMock.mockReset().mockResolvedValueOnce(home()).mockResolvedValueOnce(Response.json({status: '0', data: {translate: {errorCode: 's0', dit: '你好'}}}));
+        await expect(translateExtraFreeWebText('sogouFree', 'Hello', 'en', 'zh-Hans')).resolves.toBe('你好');
+        fetchMock.mockReset().mockResolvedValueOnce(home()).mockResolvedValueOnce(Response.json({status: 0, data: {translate: {errorCode: 'secret arbitrary body', dit: ''}}}));
+        await expect(translateExtraFreeWebText('sogouFree', 'Hello', 'en', 'zh-Hans')).rejects.toThrow('结果为空');
+    });
+
+    it('distinguishes Lingva access restrictions, rate limits and instance outages', async () => {
+        for (const [status, message] of [[403, '拒绝自动访问'], [429, '限流'], [503, '暂时不可用']] as const) {
+            fetchMock.mockReset().mockResolvedValueOnce(new Response('', {status, headers: {'Retry-After': '60'}}));
+            await expect(translateExtraFreeWebText('lingvaFree', 'Hello', 'en', 'zh-Hans')).rejects.toMatchObject({message: expect.stringContaining(message), statusCode: status, retryAfterMs: 60000});
+        }
+    });
+
     it('covers provider language mappings and empty results', async () => {
         fetchMock.mockReset().mockResolvedValueOnce(home()).mockResolvedValueOnce(result('繁'));
         await translateExtraFreeWebText('sogouFree', 'Hello', 'en', 'zh-TW');

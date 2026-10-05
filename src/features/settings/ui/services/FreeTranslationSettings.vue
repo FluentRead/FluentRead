@@ -220,7 +220,7 @@ onBeforeUnmount(() => {
 .provider-actions button { width: 24px; height: 26px; padding: 0; border: 1px solid var(--el-border-color); border-radius: 7px; color: var(--el-text-color-regular); background: var(--el-fill-color-blank); cursor: pointer; }
 .provider-actions button svg { width: 14px; height: 14px; fill: none; stroke: currentColor; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; vertical-align: middle; }
 .provider-actions button:disabled { opacity: .35; cursor: default; }
-.check-failures { display: grid; gap: 7px; margin: 10px 0 0; padding: 9px 12px; list-style: none; border-left: 2px solid var(--el-color-danger-light-5); background: var(--el-color-danger-light-9); color: var(--el-color-danger-dark-2); font-size: 11px; line-height: 1.6; }
+.check-failures { display: grid; gap: 7px; margin: 10px 0 0; padding: 9px 12px; list-style: none; border-left: 2px solid var(--el-color-danger-light-5); background: var(--el-fill-color-light); color: var(--el-color-danger); font-size: 11px; line-height: 1.6; }
 .check-failures li { display: flex; flex-wrap: wrap; gap: 0 10px; }
 .check-failures strong { flex: none; font-weight: 600; }
 .check-failures span { min-width: 0; flex: 1 1 180px; overflow-wrap: anywhere; }

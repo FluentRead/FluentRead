@@ -78,7 +78,7 @@ fs.mkdirSync(artifactsDir, {recursive: true});
       assert.deepEqual(fixture.calls, ids); assert.equal(fixture.peak, 3);
       assert.equal(report.results.find(r => r.id === 'microsoft').duration, '35 ms');
       assert.equal(await basic().locator('[data-provider-error="sogouFree"]').isVisible(), true);
-      const lingvaSwitch = basic().getByRole('switch', {name: '启用 Lingva', exact: true});
+      const lingvaSwitch = basic().locator('[data-fallback-provider="lingvaFree"] .el-switch');
       await lingvaSwitch.click();
       assert.equal(await basic().locator('[data-provider-state="lingvaFree"]').getAttribute('data-provider-check-status'), 'error');
       assert.equal(await basic().locator('[data-provider-duration="lingvaFree"]').isVisible(), true);
@@ -86,6 +86,7 @@ fs.mkdirSync(artifactsDir, {recursive: true});
     }
     report.caseCoverage.push('success and failure duration; disabled-provider results; all-provider checks keep enabled list');
     const shot = async name => {const p = path.join(artifactsDir, `${name}.png`); await page.screenshot({path: p, animations: 'disabled'}); report.screenshots.push(p);};
+    await basic().locator('.section-heading').scrollIntoViewIfNeeded();
     await shot(live ? 'live-checks-desktop' : 'checks-desktop');
     if (live) {report.ok = true; return;}
     await page.evaluate(() => {window.__freeChecks.delay = 400;});

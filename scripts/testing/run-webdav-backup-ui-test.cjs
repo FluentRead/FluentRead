@@ -72,7 +72,12 @@ async function main() {
             check(result.success===true,`production configuration persistence ${sequence}`);
         }
         async function navigate() {const navigation=page.locator('button[data-section="settings-data"]');if (await navigation.isVisible()) await navigation.click();await page.locator('[data-testid="cloud-config-backup"]').waitFor();}
-        async function shot(name) {await page.waitForTimeout(200);await page.waitForFunction(()=>!document.querySelector('.el-message'),null,{timeout:6000});const target=path.join(artifactsDir,name+'.png');await page.screenshot({path:target,animations:'disabled'});report.screenshots.push(target);}
+        async function shot(name) {
+            await page.waitForTimeout(200);await page.waitForFunction(()=>!document.querySelector('.el-message'),null,{timeout:6000});
+            const target=path.join(artifactsDir,name+'.png');await page.screenshot({path:target,animations:'disabled'});report.screenshots.push(target);
+            const compact=page.locator('.cloud-compact-dialog:visible');
+            if (await compact.count()) {const detail=path.join(artifactsDir,name+'-dialog.png');await compact.first().screenshot({path:detail,animations:'disabled'});report.screenshots.push(detail);}
+        }
         const writes=() => state.calls.filter(c => ['PUT','MKCOL'].includes(c.method)).length;
         await savePatch({uiLanguage:'zh-CN',uiLanguageSetupCompleted:true,token:{openai:'fixture-private-key'},apiKeys:{openai:['fixture-private-key']},customBody:{openai:'{"auth":"fixture-private-body"}'},to:'fr'});
         await page.reload({waitUntil:'domcontentloaded'}); await navigate();
@@ -114,7 +119,10 @@ async function main() {
             await openDelete();
             check((await deletion.innerText()).includes('fixture-user')&&(await page.locator('[data-testid="webdav-delete-server"]').innerText())===url,'delete confirmation identifies the actual account and server');
             check((await deletion.innerText()).includes('本机配置和 API Key 会保留')&&!(await deletion.locator('.cloud-delete-note').first().isVisible()),'deletion prioritizes local preservation and collapses secondary details');
-            await deletion.locator('summary').click();check((await deletion.innerText()).includes('历史版本'),'retained copies are available in expanded details');await deletion.locator('summary').click();
+            const detailsToggle=deletion.locator('[data-testid="cloud-delete-details-toggle"]');
+            check(await detailsToggle.getAttribute('aria-expanded')==='false','secondary deletion details start collapsed');
+            await detailsToggle.press('Enter');check((await deletion.innerText()).includes('历史版本')&&await detailsToggle.getAttribute('aria-expanded')==='true','keyboard opens retained-copy details');await detailsToggle.press('Space');
+            check(!(await deletion.locator('.cloud-delete-note').first().isVisible()),'keyboard closes retained-copy details');
             check(await page.locator('[data-testid="cloud-method-google-drive"]').isDisabled(),'provider switching is locked during deletion confirmation');
             check(deletionCount()===0&&state.content===cloud,'opening deletion confirmation does not delete a file');
             await shot('cloud-delete-webdav-desktop');await cancelDelete();
@@ -132,12 +140,12 @@ async function main() {
                 const text=await deletion.innerText();const copy=require(`../../src/core/i18n/messages/cloud-backup/${lang}.json`).messages;
                 check(!text.includes('settings.cloud.')&&text.includes(copy['settings.cloud.deleteTitle'])&&text.includes(copy['settings.cloud.deleteLocalPreserved']),`${lang} deletion copy resolves in the selected language`);
                 check(await deletion.evaluate(el=>el.scrollWidth<=el.clientWidth+1&&document.documentElement.scrollWidth<=innerWidth+1),`${lang} deletion dialog has no horizontal overflow`);
-                await deletion.locator('summary').click();const contrasts=await deletion.evaluate(el=>{
+                await deletion.locator('[data-testid="cloud-delete-details-toggle"]').click();const contrasts=await deletion.evaluate(el=>{
                     const luminance=color=>{const [r,g,b]=color.match(/[\d.]+/g).slice(0,3).map(Number).map(value=>{const c=value/255;return c<=.04045?c/12.92:((c+.055)/1.055)**2.4;});return .2126*r+.7152*g+.0722*b;};
                     const ratio=(a,b)=>(Math.max(a,b)+.05)/(Math.min(a,b)+.05);
                     const button=el.querySelector('[data-testid="cloud-delete-confirm"]');const style=getComputedStyle(button);
                     return [ratio(luminance(getComputedStyle(el.querySelector('.cloud-delete-note')).color),luminance(getComputedStyle(el).backgroundColor)),ratio(luminance(style.color),luminance(style.backgroundColor))];
-                });check(contrasts.every(value=>value>=4.5),`${lang} deletion notes and confirmation have readable contrast`);await deletion.locator('summary').click();
+                });check(contrasts.every(value=>value>=4.5),`${lang} deletion notes and confirmation have readable contrast`);await deletion.locator('[data-testid="cloud-delete-details-toggle"]').click();
                 if (lang==='en-US') await shot('cloud-delete-webdav-english-mobile');
                 if (lang==='zh-CN') await shot('cloud-delete-webdav-dark-desktop');
                 await cancelDelete();
@@ -182,7 +190,7 @@ async function main() {
             const beforeConsent=state.calls.length;
             await expectOff('sensitive information is excluded by default');await shot('cloud-default-scope-desktop');
             await toggle.click();await consent.waitFor();
-            check((await consent.innerText()).includes('公开的应用口令')&&(await consent.innerText()).includes('第三方账号被盗'),'risk dialog explains public encryption and stolen third-party accounts');
+            check((await consent.innerText()).includes('加密口令公开')&&(await consent.innerText()).includes('第三方账号被盗'),'risk dialog explains public encryption and stolen third-party accounts');
             await shot('cloud-sensitive-consent-desktop');
             await page.locator('[data-testid="cloud-consent-cancel"]').click();await consent.waitFor({state:'hidden'});
             await expectOff('cancelling risk acknowledgement leaves sensitive sync disabled');

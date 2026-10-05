@@ -81,13 +81,13 @@ node scripts/testing/run-webdav-backup-ui-test.cjs \
 
 `--sensitive-only` 限定为云备份范围与单次同意专项。使用临时 Edge profile、第二屏后台可见窗口与 focus-safe helper；不读取日常浏览器配置，不使用真实账号或服务凭据。检查默认普通范围、风险勾选与取消、保存后的解密载荷不含密钥/鉴权地址/自定义请求体/私密提示词、普通备份及旧完整 v1 恢复保留本机密钥与地址、本次同意后仍写兼容的完整 v1，以及普通设置相同时仍可确认保存普通范围、从当前云文件移除敏感信息。
 
-还检查完成、取消预览、切换供应商与重开设置时的同意重置，以及七语言风险文案解析、390px 无横向溢出、Escape 取消、深色风险文字对比度至少 4.5:1 和控制台异常。保存普通范围只更新当前云文件，不证明服务商历史版本被删除。此专项使用受控 WebDAV 夹具，不代表真实 Google 授权、真实第三方账号、商店版本或跨设备联调结果；Google 账号切换、生成预览失败、旧扩展拒绝 v2 与旧事务失效还需对应领域回归验证。
+还检查完成、取消预览、切换供应商与重开设置时的同意重置，以及七语言风险文案解析、390px 无横向溢出、Escape 取消、深色风险文字对比度至少 4.5:1 和控制台异常。紧凑风险弹窗保留本机加密与存储位置、公开口令和泄露风险、默认未勾选的本次同意，省去重复建议。保存普通范围只更新当前云文件，不证明服务商历史版本被删除。此专项使用受控 WebDAV 夹具，不代表真实 Google 授权、真实第三方账号、商店版本或跨设备联调结果；Google 账号切换、生成预览失败、旧扩展拒绝 v2 与旧事务失效还需对应领域回归验证。
 
 ## 云端备份删除专项
 
 更新日期：2026 年 10 月 5 日。`pnpm test:cloud-backup --coverage` 覆盖两阶段删除确认、页面所有权、账号绑定、MV3 重启、旧/未知/损坏密文、空文件、重放、版本冲突、强 ETag、清理失败和本机配置保留；真实 WebDAV HTTP 夹具分别验证 GET、PROPFIND、HEAD 三种 ETag 来源的条件 DELETE、冲突、缺失幂等与重新创建。
 
-生产扩展构建后运行 `run-webdav-backup-ui-test.cjs --delete-only` 和 `run-google-drive-sync-ui-test.cjs --delete-only`，其余参数同上。两者均使用 focus-safe helper 和临时 Edge profile。WebDAV 使用本机服务器验证真实请求、取消/Escape/重开、版本变化、七语言、390px、深色和本机配置保留；Google 使用虚构 Chrome Identity 与 Drive 响应验证实际账号展示、更换账号、缺少版本、v2 ETag 条件删除与窄屏。报告与截图写入各自证据目录；夹具不能代替真实 Google 登录、第三方账号或 Firefox 实机验证。
+生产扩展构建后运行 `run-webdav-backup-ui-test.cjs --delete-only` 和 `run-google-drive-sync-ui-test.cjs --delete-only`，其余参数同上。两者均使用 focus-safe helper 和临时 Edge profile。WebDAV 使用本机服务器验证真实请求、取消/Escape/重开、版本变化、七语言、390px、深色和本机配置保留，并用 Enter/Space 检查“更多说明”文字入口的展开与收起；Google 使用虚构 Chrome Identity 与 Drive 响应验证实际账号展示、更换账号、缺少版本、v2 ETag 条件删除与窄屏。报告与截图写入各自证据目录；夹具不能代替真实 Google 登录、第三方账号或 Firefox 实机验证。
 
 ## 双语逐句高亮
 

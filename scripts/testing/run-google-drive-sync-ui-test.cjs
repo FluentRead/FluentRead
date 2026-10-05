@@ -104,6 +104,8 @@ async function main() {
                 await page.waitForFunction(()=>!document.querySelector('.el-message'),null,{timeout:6000});
                 await page.evaluate(async()=>{await new Promise(requestAnimationFrame);await Promise.all(document.getAnimations().filter(animation=>animation.effect?.getComputedTiming().iterations!==Infinity).map(animation=>animation.finished.catch(()=>undefined)));});
                 const target=path.join(artifactsDir,name+'.png');await page.screenshot({path:target});report.screenshots.push(target);
+                const compact=page.locator('.cloud-compact-dialog:visible');
+                if (await compact.count()) {const detail=path.join(artifactsDir,name+'-dialog.png');await compact.first().screenshot({path:detail});report.screenshots.push(detail);}
             }
             await openDelete();check((await deletion.innerText()).includes('没有云端备份'),'Google empty backup can finish without deleting');await confirmDelete();
             check(await worker.evaluate(()=>globalThis.__driveFixture.removes===0),'empty Google deletion makes no DELETE request');

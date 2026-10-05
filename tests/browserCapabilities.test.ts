@@ -190,7 +190,7 @@ describe('translation service capability contract', () => {
         expect(supportsTranslationBatch(services.microsoft)).toBe(true);
         expect(supportsTranslationBatch(services.freeTranslation)).toBe(true);
         expect(supportsTranslationBatch(services.openai)).toBe(true);
-        expect(supportsTranslationBatch(services.google)).toBe(false);
+        expect(supportsTranslationBatch(services.google)).toBe(true);
         expect(supportsTranslationBatch(services.deeplx)).toBe(false);
         expect(supportsTranslationBatch(services.chromeTranslator)).toBe(false);
         expect(supportsTranslationBatch(services.tongyi)).toBe(false);

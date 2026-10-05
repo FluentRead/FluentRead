@@ -678,7 +678,8 @@ async function translateTextSlotsDirectly(
     if (snapshot.service === services.localTranslation) {
         return translateSlotsIndividually(origins, snapshot, signal, queueSession);
     }
-    const batchFriendly = snapshot.service === services.microsoft
+    const batchFriendly = snapshot.service === services.google
+        || snapshot.service === services.microsoft
         || snapshot.service === services.freeTranslation;
     if (batchFriendly) {
         if (!fullPageSession?.active || fullPageSession.retainSettledResults === false) {

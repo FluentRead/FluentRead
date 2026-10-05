@@ -1,6 +1,6 @@
 /**
  * @file tests/sameTargetLanguageSlots.test.ts
- * 全文富文本槽与批量请求在真实语言识别下的一致性：微软批量、免费聚合会话缓存、普通供应商文本包、本地模型逐槽、
+ * 全文富文本槽与批量请求在真实语言识别下的一致性：谷歌/微软批量、免费聚合会话缓存、普通供应商文本包、本地模型逐槽、
  * AI 跨候选合并与 $$$ 公式拆分都只提交未被同一判断跳过的槽，并按原索引回填；是否配置排除语言不改变识别深度；
  * 快照切换目标或排除语言后重新判断，不复用旧会话结果；取消与失败重试同样只涉及外语槽。只替换翻译客户端与配置存储。
  */
@@ -104,7 +104,7 @@ describe('各请求路径共用逐槽判断', () => {
     it.each([
         ['microsoft', 'batch'],
         ['freeTranslation', 'batch'],
-        ['google', 'text'],
+        ['google', 'batch'],
         ['localTranslation', 'text'],
     ] as const)('%s 只提交判断为需要翻译的槽并按原索引回填', async (service, kind) => {
         runtime.config.service = service;
@@ -119,8 +119,8 @@ describe('各请求路径共用逐槽判断', () => {
         expect(result).toEqual(origins.map(origin => expectedSubmitted.includes(origin) ? `T:${origin}` : origin));
     });
 
-    it('活跃全文会话复用逐槽缓存时仍先过滤同目标槽', async () => {
-        runtime.config.service = 'freeTranslation';
+    it.each(['freeTranslation', 'google'])('%s 活跃全文会话复用逐槽缓存时仍先过滤同目标槽', async service => {
+        runtime.config.service = service;
         const snapshot = captureFullPageTranslationConfig();
         const session = {active: true, translationSlotCache: new Map(), translationRequestCache: new Map(),
             requestSignal: new AbortController().signal, requestControllers: new Set<AbortController>(), requestQueueSessions: new Set()};

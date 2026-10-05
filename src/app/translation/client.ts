@@ -1,7 +1,7 @@
 /**
  * @file src/app/translation/client.ts
  * 文件职责：作为页面与后台翻译 broker 之间的客户端代理，统一管理单条、批量和视频字幕翻译的队列、取消、重试、超时、上下文与统计。
- * 主要内容：冻结服务/模型与语言参数，单条与批量文本共用同目标预检，批量只发送待译片段并按原索引回填，显式 skipLanguageDetection 可强制发送；免费聚合免除外层重复重试，验证凭据与页面摘要上下文，使用 runtime 协议分派请求；为可取消的视频及 Chrome 内置翻译携带随机 clientRequestId，auto 时转发纯检测样本，并在页面取消/超时时通知后台停止真实 provider。
+ * 主要内容：冻结服务/模型与语言参数，单条与批量文本共用同目标预检，批量只发送待译片段并按原索引回填，显式 skipLanguageDetection 可强制发送；免费聚合及谷歌内部换线免除外层重复重试，验证凭据与页面摘要上下文，使用 runtime 协议分派请求；为可取消的视频及 Chrome 内置翻译携带随机 clientRequestId，auto 时转发纯检测样本，并在页面取消/超时时通知后台停止真实 provider。
  * 模块边界：客户端不实现供应商协议、不直接读写翻译缓存，也不修改全文 DOM；后台 runtime/broker 负责 provider 与缓存，调用它的各 feature 负责展示和会话状态。
  */
 /**
@@ -164,8 +164,8 @@ function getTranslationRetryPolicy(options: TranslateOptions, service: string): 
   // AI SDK 已在 provider 内部处理 HTTP 429/5xx；不显式覆盖 maxRetries 时仍沿用
   // 其外围只对浏览器网络失败做额外兜底的判定，调用方显式传值才会改变该边界。
   return {
-    // 免费聚合已在一个总预算内换线，不能再按全局重试次数重跑整个服务池。
-    maxRetries: service === services.freeTranslation ? 0 : maxRetries,
+    // 免费聚合和谷歌已在一个总预算内换线，不能再按全局重试次数重跑候选池。
+    maxRetries: service === services.freeTranslation || service === services.google ? 0 : maxRetries,
     baseDelayMs,
     maxDelayMs,
     explicitRetryPolicy: options.maxRetries !== undefined,

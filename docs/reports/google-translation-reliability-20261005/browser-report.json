@@ -1,0 +1,127 @@
+{
+  "ok": true,
+  "profileMode": "generated-temporary",
+  "service": "google",
+  "counts": [],
+  "screenshots": [
+    "final-live-translation.png"
+  ],
+  "launchMode": "macos-background-cdp",
+  "focusPolicy": "launchservices-no-foreground",
+  "windowPlacement": {
+    "mode": "background-visible-no-focus",
+    "visible": true,
+    "hidden": false,
+    "centered": true,
+    "windowState": "normal",
+    "bounds": {
+      "left": 1121,
+      "top": -990,
+      "width": 1280,
+      "height": 900
+    },
+    "displayTarget": "secondary",
+    "source": "macos-nsscreen",
+    "screenIndex": 1,
+    "browserFrontmost": false
+  },
+  "hover": [
+    1,
+    0,
+    1
+  ],
+  "full": [
+    {
+      "count": 6,
+      "ms": 294
+    },
+    {
+      "count": 0,
+      "ms": 9
+    },
+    {
+      "count": 6,
+      "ms": 1157
+    }
+  ],
+  "translations": [
+    "对于每个人来说，浏览网页都应该快速可靠。",
+    "河流穿城而过，最终汇入大海。",
+    "人们每天都通过读书学习新语言。",
+    "图书馆清晨开门，晚上关门。",
+    "本段包含指向另一篇有用文章的链接。",
+    "好的翻译能够保留原文的含义。"
+  ],
+  "liveTraffic": [
+    {
+      "host": "translate-pa.googleapis.com",
+      "path": "/v1/translateHtml",
+      "start": 1455.9000000953674,
+      "items": 1,
+      "status": 200,
+      "ms": 875
+    },
+    {
+      "host": "translate-pa.googleapis.com",
+      "path": "/v1/translateHtml",
+      "start": 2467.199999809265,
+      "items": 6,
+      "status": 200,
+      "ms": 202
+    },
+    {
+      "host": "translate-pa.googleapis.com",
+      "path": "/v1/translateHtml",
+      "start": 2758.5999999046326,
+      "items": 4,
+      "status": 200,
+      "ms": 235
+    },
+    {
+      "host": "translate-pa.googleapis.com",
+      "path": "/v1/translateHtml",
+      "start": 3473.5999999046326,
+      "items": 2,
+      "status": 200,
+      "ms": 358
+    }
+  ],
+  "fastFailure": [
+    {
+      "result": "绿树长在安静的房子旁边。",
+      "ms": 923
+    },
+    {
+      "result": "一只小鸟在古老的木桥附近唱歌。",
+      "ms": 194
+    }
+  ],
+  "faultTraffic": [
+    {
+      "host": "translate-pa.googleapis.com",
+      "path": "/v1/translateHtml",
+      "start": 4012.4000000953674,
+      "items": 1,
+      "status": 503,
+      "ms": 0,
+      "injected": true
+    },
+    {
+      "host": "translate.googleapis.com",
+      "path": "/translate_a/t",
+      "start": 4012.7999997138977,
+      "items": 1,
+      "status": 200,
+      "ms": 907
+    },
+    {
+      "host": "translate.googleapis.com",
+      "path": "/translate_a/t",
+      "start": 4934.900000095367,
+      "items": 1,
+      "status": 200,
+      "ms": 179
+    }
+  ],
+  "failoverDelayMs": 0.39999961853027344
+}

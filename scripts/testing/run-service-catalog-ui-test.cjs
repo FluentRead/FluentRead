@@ -4,7 +4,7 @@
  * @file scripts/testing/run-service-catalog-ui-test.cjs
  * 文件职责：在第二屏后台隔离 Edge 中验证翻译服务完整目录的分类层级、服务顺序与免费翻译候选配置。
  * 主要内容：加载生产扩展，检查直接展示的完整目录、机器翻译、云服务厂商、模型服务商和聚合平台的目录顺序与计数，
- * 覆盖跨分类搜索、查看服务不改默认服务、窄屏无横向溢出，以及免费翻译的自动均衡/优先顺序、实验候选默认停用、启停、排序和重载持久化。
+ * 覆盖跨分类搜索、查看服务不改默认服务、窄屏无横向溢出，以及免费翻译的自动均衡/优先顺序、DeepLX 默认停用、启停、排序和重载持久化。
  * 模块边界：星标、自定义服务分类、主题与多语言归 run-service-library-ui-test.cjs；本脚本只操作本次创建的临时 profile，
  * 仅修改其中的免费候选配置，默认不请求任何翻译服务，只有显式 --live true 时才调用匿名测试翻译。
  */
@@ -50,8 +50,8 @@ const expectedFreeCandidates = [
   'microsoft', 'transmart', 'volcengineFree', 'google', 'youdaoFree', 'icibaFree', 'yandexFree', 'deeplx', 'myMemory',
   'sogouFree', 'reversoFree', 'lingvaFree', 'apertiumFree',
 ];
-const expectedEnabledFreeCandidates = expectedFreeCandidates.slice(0, 9);
-const experimentalFreeCandidates = ['sogouFree', 'reversoFree', 'lingvaFree', 'apertiumFree'];
+const defaultDisabledFreeCandidates = ['deeplx'];
+const expectedEnabledFreeCandidates = expectedFreeCandidates.filter(id => !defaultDisabledFreeCandidates.includes(id));
 // 免密钥网页接口只能作为免费翻译内部候选，不能泄漏成目录中的独立服务。
 const candidateOnlyServices = expectedFreeCandidates.filter(id => !['microsoft', 'google', 'deeplx', 'myMemory'].includes(id));
 
@@ -252,7 +252,7 @@ async function main() {
       }
     }
 
-    // 免费翻译：候选按注册表展示，实验候选默认停用；改为优先顺序后可启停、排序并在重载后保持。
+    // 免费翻译：候选按注册表展示，DeepLX 默认停用；改为优先顺序后可启停、排序并在重载后保持。
     await page.setViewportSize({width: 1440, height: 1000});
     const openFreeTranslation = async () => {
       await rail.locator('[data-service-value="freeTranslation"]').click();
@@ -268,23 +268,23 @@ async function main() {
     const initialCandidates = await readCandidates();
     assertSameOrder(initialCandidates.map(row => row.id), expectedFreeCandidates, '免费候选');
     assertSameOrder(initialCandidates.filter(row => row.enabled).map(row => row.id), expectedEnabledFreeCandidates, '默认启用免费候选');
-    const enabledExperimental = initialCandidates.filter(row => experimentalFreeCandidates.includes(row.id) && row.enabled);
-    if (enabledExperimental.length) throw new Error(`实验候选默认启用：${JSON.stringify(enabledExperimental)}`);
+    const enabledOptional = initialCandidates.filter(row => defaultDisabledFreeCandidates.includes(row.id) && row.enabled);
+    if (enabledOptional.length) throw new Error(`可选候选默认启用：${JSON.stringify(enabledOptional)}`);
     const modeRadio = mode => freeSettings.locator(`input[name="free-translation-mode"][value="${mode}"]`);
     if (!await modeRadio('balanced').isChecked() || await freeSettings.getByRole('button', {name: /^上移 /u}).count()) {
       throw new Error('免费翻译默认不是自动均衡，或自动均衡仍显示排序按钮');
     }
 
-    await freeSettings.locator('[data-fallback-provider="sogouFree"] .el-switch').click();
+    await freeSettings.locator('[data-fallback-provider="deeplx"] .el-switch').click();
     await modeRadio('sequential').check();
-    await freeSettings.getByRole('button', {name: '上移 搜狗翻译', exact: true}).click();
+    await freeSettings.getByRole('button', {name: '上移 DeepLX', exact: true}).click();
     await freeSettings.locator('[data-fallback-provider="yandexFree"] .el-switch').click();
-    const expectedOrder = ['microsoft', 'transmart', 'volcengineFree', 'google', 'youdaoFree', 'icibaFree', 'deeplx', 'sogouFree', 'myMemory'];
+    const expectedOrder = ['microsoft', 'transmart', 'volcengineFree', 'google', 'youdaoFree', 'icibaFree', 'myMemory', 'sogouFree', 'reversoFree', 'lingvaFree', 'deeplx', 'apertiumFree'];
     const sequentialCandidates = await readCandidates();
     assertSameOrder(sequentialCandidates.filter(row => row.enabled).map(row => row.id), expectedOrder, '优先顺序');
     assertSameOrder(sequentialCandidates.map(row => row.id).slice(0, expectedOrder.length), expectedOrder, '优先顺序中启用候选置顶');
     const positions = await freeSettings.locator('.provider-position').allTextContents();
-    if (positions[expectedOrder.indexOf('sogouFree')]?.trim() !== String(expectedOrder.indexOf('sogouFree') + 1)) {
+    if (positions[expectedOrder.indexOf('deeplx')]?.trim() !== String(expectedOrder.indexOf('deeplx') + 1)) {
       throw new Error(`优先顺序序号异常：${JSON.stringify(positions)}`);
     }
     if (!await freeSettings.getByRole('button', {name: '上移 微软翻译', exact: true}).isDisabled()) throw new Error('首个候选仍可上移');
@@ -301,7 +301,7 @@ async function main() {
     report.freeCandidates = {
       candidateIds: initialCandidates.map(row => row.id),
       defaultEnabled: expectedEnabledFreeCandidates,
-      experimentalDefaultDisabled: experimentalFreeCandidates,
+      defaultDisabled: defaultDisabledFreeCandidates,
       stored,
       reloaded: reloadedCandidates.filter(row => row.enabled).map(row => row.id),
       standaloneEntries: 0,

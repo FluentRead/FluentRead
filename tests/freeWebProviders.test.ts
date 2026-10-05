@@ -25,7 +25,7 @@ describe('free-only web providers', () => {
     });
 
     it('only accepts new IDs inside the free policy, preserves existing policy and round-trips selections', () => {
-        expect(new Config().freeTranslationOrder).toEqual(['microsoft', 'transmart', 'volcengineFree', 'google', 'youdaoFree', 'icibaFree', 'yandexFree', 'deeplx', 'myMemory', 'sogouFree', 'reversoFree', 'lingvaFree', 'apertiumFree']);
+        expect(new Config().freeTranslationOrder).toEqual(['microsoft', 'transmart', 'volcengineFree', 'google', 'youdaoFree', 'icibaFree', 'yandexFree', 'myMemory', 'sogouFree', 'reversoFree', 'lingvaFree', 'apertiumFree']);
         for (const id of providers) {
             expect(Object.values(services)).not.toContain(id);
             expect(options.services.some(item => item.value === id)).toBe(false);

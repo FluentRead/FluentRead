@@ -63,7 +63,8 @@
     "learning.history.emptyHint": "Select a sentence on a webpage and choose Understand or Analyze sentence. Answers are saved here automatically.",
     "settings.services.freeWeights.testDuration": "This test took {duration} ms",
     "settings.services.freeWeights.share": "Share",
-    "settings.services.freeWeights.noChinese": "No Chinese support"
+    "settings.services.freeWeights.noChinese": "No Chinese support",
+    "settings.services.library.freeUnofficial": "Free · Unofficial"
   },
   "legacy": {
     "同步连接已变化，请重新生成预览。": "The sync connection changed. Generate a new preview.",

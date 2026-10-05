@@ -13,6 +13,7 @@ const artifactsDir = path.resolve(arg('artifacts-dir', '/private/tmp/fluentread-
 const {chromium} = require(path.join(arg('playwright-root'), 'playwright'));
 const {launchFocusSafePersistentContext, newPageWithoutForeground} = require(arg('focus-safe-helper'));
 const ids = ['microsoft', 'transmart', 'volcengineFree', 'google', 'youdaoFree', 'icibaFree', 'yandexFree', 'deeplx', 'myMemory', 'sogouFree', 'reversoFree', 'lingvaFree', 'apertiumFree'];
+const defaultIds = ids.filter(id => id !== 'deeplx');
 const report = {ok: false, extensionDir, evidenceBoundary: live ? 'Real anonymous connection tests on a fixed synthetic sentence; one network and one run.' : 'Production extension UI with controlled connection-message results; provider behavior is tested separately.', caseCoverage: [], screenshots: [], consoleErrors: [], layouts: []};
 fs.mkdirSync(artifactsDir, {recursive: true});
 (async () => {
@@ -37,9 +38,9 @@ fs.mkdirSync(artifactsDir, {recursive: true});
     const readConfig = () => popup.evaluate(async () => {const r = await chrome.runtime.sendMessage({type: 'configStorageRead', key: 'local:config'}); return typeof r.value === 'string' ? JSON.parse(r.value) : r.value;});
     await popup.waitForFunction(async () => {const r = await chrome.runtime.sendMessage({type: 'configStorageRead', key: 'local:config'}); return typeof r.value === 'string' ? JSON.parse(r.value)?.service : r.value?.service;});
     const existing = await readConfig();
-    assert.deepEqual(existing.freeTranslationOrder, ids);
-    report.caseCoverage.push('fresh configuration enables all 13 providers');
-    const patch = {uiLanguage: 'zh-CN', uiLanguageSetupCompleted: true, service: 'freeTranslation', from: 'en', to: 'zh-Hans', freeTranslationMode: 'balanced', freeTranslationOrder: ids, freeTranslationTimeoutMs: 5000};
+    assert.deepEqual(existing.freeTranslationOrder, defaultIds);
+    report.caseCoverage.push('fresh configuration enables 12 providers and leaves DeepLX off');
+    const patch = {uiLanguage: 'zh-CN', uiLanguageSetupCompleted: true, service: 'freeTranslation', from: 'en', to: 'zh-Hans', freeTranslationMode: 'balanced', freeTranslationOrder: defaultIds, freeTranslationTimeoutMs: 5000};
     assert.equal((await popup.evaluate(({patch, expected}) => chrome.runtime.sendMessage({type: 'persistConfig', mode: 'patch', config: patch, expected, clientId: `free-settings-${crypto.randomUUID()}`, sequence: 1}), {patch, expected: Object.fromEntries(Object.keys(patch).map(k => [k, existing[k]]))})).success, true);
     let page = await create(`${origin}/options.html`);
     await page.locator('button[data-section="settings-services"]').click();
@@ -48,8 +49,20 @@ fs.mkdirSync(artifactsDir, {recursive: true});
     assert.equal(await basic().locator('[data-fallback-provider]').count(), 13);
     assert.equal(await basic().locator('details').count(), 0);
     assert.equal(await basic().locator('[data-provider-state]').count(), 13);
-    assert.equal(await basic().locator('[data-provider-weight]').count(), 13);
+    assert.equal(await basic().locator('[data-provider-weight]').count(), 12);
     assert.equal(await basic().locator('input[type="email"]').isVisible(), true);
+    const deepLXCard = basic().locator('[data-fallback-provider="deeplx"]');
+    assert.equal(await deepLXCard.getByRole('switch').isChecked(), false);
+    assert.equal(await deepLXCard.locator('[data-service-nature-badge]').textContent(), '免费 · 非官方');
+    assert.equal(await page.locator('[data-service-value="deeplx"] strong').textContent(), 'DeepLX');
+    assert.equal(await page.locator('[data-service-value="deeplx"] [data-service-nature-badge]').textContent(), '免费 · 非官方');
+    const defaultShot = path.join(artifactsDir, 'default-deeplx-off.png');
+    await page.screenshot({path: defaultShot, animations: 'disabled'}); report.screenshots.push(defaultShot);
+    await deepLXCard.locator('.el-switch').click();
+    assert.equal(await deepLXCard.getByRole('switch').isChecked(), true);
+    await popup.waitForFunction(async () => {const r = await chrome.runtime.sendMessage({type: 'configStorageRead', key: 'local:config'}); const config = typeof r.value === 'string' ? JSON.parse(r.value) : r.value; return config.freeTranslationOrder.includes('deeplx');});
+    assert.equal(await basic().locator('[data-provider-weight]').count(), 13);
+    report.caseCoverage.push('DeepLX remains visible, is off by default, and can be enabled and saved explicitly');
     report.caseCoverage.push('13 services, states and allocation visible without expansion; email outside cards');
     if (!live) await page.evaluate(() => {
       const original = chrome.runtime.sendMessage.bind(chrome.runtime);
@@ -139,6 +152,25 @@ fs.mkdirSync(artifactsDir, {recursive: true});
       assert.equal(layout.overflow, false); assert.equal(layout.cardOverflow, false); assert.equal(new Set(layout.cardHeights).size, 1); report.layouts.push(layout);
       await shot(`english-${width}`);
     }
+    for (const [language, label] of [['zh-CN', '免费 · 非官方'], ['en-US', 'Free · Unofficial']]) {
+      const config = await readConfig();
+      assert.equal((await popup.evaluate(expected => chrome.runtime.sendMessage({type: 'persistConfig', mode: 'patch', config: {uiLanguage: expected.next}, expected: {uiLanguage: expected.current}, clientId: `free-settings-${crypto.randomUUID()}`, sequence: 1}), {current: config.uiLanguage, next: language})).success, true);
+      await page.reload();
+      await page.setViewportSize({width: 1440, height: 960});
+      await page.locator('button[data-section="settings-services"]').click();
+      await page.locator('[data-service-value="deeplx"]').click();
+      assert.equal(await page.locator('.detail-title-row h4').textContent(), 'DeepLX');
+      assert.equal(await page.locator('.detail-title-row [data-service-nature-badge]').textContent(), label);
+      assert.equal((await readConfig()).service, 'freeTranslation');
+      await shot(`deeplx-badge-${language}-desktop`);
+      await page.setViewportSize({width: 390, height: 960});
+      assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth), false);
+      await shot(`deeplx-badge-${language}-390`);
+      await page.evaluate(() => document.documentElement.classList.add('dark'));
+      await shot(`deeplx-badge-${language}-390-dark`);
+      await page.evaluate(() => document.documentElement.classList.remove('dark'));
+    }
+    report.caseCoverage.push('separate DeepLX nature badges in the directory, free card and details; Chinese/English desktop, narrow and dark layouts');
     report.caseCoverage.push('equal card heights in Chinese/English at desktop and narrow widths');
     assert.deepEqual(report.consoleErrors, []);
     report.ok = true;

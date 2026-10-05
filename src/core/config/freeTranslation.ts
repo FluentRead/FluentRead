@@ -1,7 +1,7 @@
 /**
  * @file src/core/config/freeTranslation.ts
  * 文件职责：定义免费翻译服务池、默认智能加速策略及请求预算的合法范围。
- * 主要内容：维护默认全开的免密钥目录、冷启动先验权重、均衡与顺序模式，规范启用列表、超时及可选邮箱；保留已有明确停用选择，权重由后台根据请求表现动态计算。
+ * 主要内容：维护免密钥目录及默认启用列表（DeepLX 默认停用）、冷启动先验权重、均衡与顺序模式，规范启用列表、超时及可选邮箱；保留已有明确选择，权重由后台根据请求表现动态计算。
  * 模块边界：本文件只包含纯配置规则，不读取存储、调用供应商或持有请求健康状态；运行时降级由翻译服务编排。
  */
 
@@ -29,7 +29,7 @@ export function isFreeTranslationProviderId(value: unknown): value is FreeTransl
 
 export type FreeTranslationMode = 'balanced' | 'sequential';
 export const DEFAULT_FREE_TRANSLATION_MODE: FreeTranslationMode = 'balanced';
-export const DEFAULT_FREE_TRANSLATION_ORDER = FREE_TRANSLATION_PROVIDERS.map(provider => provider.id);
+export const DEFAULT_FREE_TRANSLATION_ORDER = FREE_TRANSLATION_PROVIDERS.filter(provider => provider.id !== 'deeplx').map(provider => provider.id);
 export const DEFAULT_FREE_TRANSLATION_TIMEOUT_MS = 5_000;
 export const DEFAULT_FREE_TRANSLATION_COOLDOWN_MS = 60_000;
 export const FREE_TRANSLATION_TOTAL_TIMEOUT_MS = 20_000;

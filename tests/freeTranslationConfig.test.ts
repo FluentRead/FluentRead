@@ -13,7 +13,7 @@ import {buildConfigDiff} from '@/src/core/config/diff';
 describe('keyless free translation configuration', () => {
     it('migrates old settings while keeping explicit opt-outs and never automatically adding paid-capable accounts', () => {
         expect(new Config().freeTranslationOrder).toEqual(DEFAULT_FREE_TRANSLATION_ORDER);
-        expect(new Config().freeTranslationOrder).toEqual(FREE_TRANSLATION_PROVIDERS.map(provider => provider.id));
+        expect(new Config().freeTranslationOrder).toEqual(FREE_TRANSLATION_PROVIDERS.filter(provider => provider.id !== 'deeplx').map(provider => provider.id));
         for (const value of [undefined, null, 'myMemory', [], ['untrusted', 42]]) {
             expect(normalizeFreeTranslationOrder(value)).toEqual(DEFAULT_FREE_TRANSLATION_ORDER);
         }
@@ -24,6 +24,13 @@ describe('keyless free translation configuration', () => {
         expect(FREE_TRANSLATION_PROVIDERS.map(item => item.id)).toEqual(['microsoft', 'transmart', 'volcengineFree', 'google', 'youdaoFree', 'icibaFree', 'yandexFree', 'deeplx', 'myMemory', 'sogouFree', 'reversoFree', 'lingvaFree', 'apertiumFree']);
         expect(normalizeFreeTranslationOrder(['azureTranslator', 'myMemory', 'deepL', 'openai'])).toEqual(['myMemory']);
         expect(normalizeFreeTranslationOrder(['azureTranslator', 'deepL'])).toEqual(DEFAULT_FREE_TRANSLATION_ORDER);
+    });
+
+    it('keeps DeepLX opt-in across normalization and configuration round-trips', () => {
+        expect(new Config().freeTranslationOrder).not.toContain('deeplx');
+        const enabled = normalizeConfig({freeTranslationOrder: ['deeplx', 'google']});
+        expect(enabled.freeTranslationOrder).toEqual(['deeplx', 'google']);
+        expect(prepareConfigForImport(prepareConfigForExport(enabled), new Config()).freeTranslationOrder).toEqual(['deeplx', 'google']);
     });
 
     it('bounds timing and validates optional contact fields', () => {

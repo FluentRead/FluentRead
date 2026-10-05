@@ -21,6 +21,7 @@ function fixture() {
         auth: {availability: vi.fn(() => ({available: true, reason: ''})), open: vi.fn(async () => session()), disconnect: vi.fn(async () => undefined)},
         api: {
             read: vi.fn(async () => remote),
+            remove: vi.fn(async () => {remote = null;}),
             write: vi.fn(async (_session, content) => {const file = {id: 'fixture-file', version: String(Number(remote?.file.version ?? 0) + 1), modifiedTime: 'fixture-time'}; remote = {file, content}; return file;}),
         },
         snapshot: vi.fn(async () => structuredClone(local)),
@@ -436,6 +437,121 @@ describe('Google Drive 同步事务', () => {
         expect(await f.service.status()).toMatchObject({account: null, lastSyncedAt: 1000});
     });
 
+});
+
+describe('云备份删除确认事务', () => {
+    function backup(f: ReturnType<typeof fixture>, content = 'broken or future encrypted backup') {
+        f.remote = {file: {id: 'fixture-backup', version: '1', modifiedTime: 'fixture-time', etag: '"one"'}, content};
+    }
+    it('损坏、未知格式与旧完整备份可删除，重启后仅删除确认的文件并清除基线，本机凭据保持不变', async () => {
+        for (const content of ['broken backup', JSON.stringify({version: 99}), await encryptDriveConfig(driveSyncPayload(config()), password)]) {
+            const f = await synced(); backup(f, content);
+            const previous = structuredClone(f.local);
+            vi.mocked(f.ports.snapshot).mockClear(); vi.mocked(f.ports.apply).mockClear();
+            const preview = await f.service.prepareDelete(7, 'page-a');
+            expect(preview).toMatchObject({account: owner, hasRemote: true, canDelete: true});
+            expect(f.ports.api.remove).not.toHaveBeenCalled();
+            expect(f.state).toMatchObject({prepared: {operation: 'delete', content: ''}});
+            expect(JSON.stringify(f.state)).not.toContain('fixture-key-a');
+            expect(await createGoogleDriveSync(f.ports).commitDelete(preview.id, 7, 'page-a')).toMatchObject({deleted: true, account: null, lastSyncedAt: null});
+            expect(f.remote).toBeNull();
+            expect(f.state).toEqual({version: 1, connected: false, accountId: '', baseline: '', lastSyncedAt: null});
+            expect(f.local).toEqual(previous);
+            expect(f.ports.snapshot).not.toHaveBeenCalled(); expect(f.ports.apply).not.toHaveBeenCalled();
+            await expect(f.service.commitDelete(preview.id, 7, 'page-a')).rejects.toThrow('失效');
+            const fresh = await f.service.prepare(password);
+            expect(fresh).toMatchObject({hasRemote: false, hasBaseline: false, includeSensitive: false});
+            await f.service.cancel(fresh.id);
+        }
+    });
+    it('取消和关闭所属页签只结束授权，保留云端数据与上次同步记录', async () => {
+        const f = await synced(); backup(f);
+        const original = structuredClone(f.remote); const baseline = f.state as DriveSyncState;
+        let preview = await f.service.prepareDelete(7, 'page-a');
+        await f.service.cancel(preview.id, 8, 'page-b'); expect((f.state as DriveSyncState).prepared?.id).toBe(preview.id);
+        await f.service.cancel(preview.id, 7, 'page-a');
+        preview = await f.service.prepareDelete(7, 'page-a'); await createGoogleDriveSync(f.ports).cancelTab(7);
+        expect(f.remote).toEqual(original); expect(f.ports.api.remove).not.toHaveBeenCalled();
+        expect(await f.service.status()).toMatchObject({account: owner, lastSyncedAt: baseline.lastSyncedAt});
+        expect((f.state as DriveSyncState).baseline).toBe(baseline.baseline);
+        await expect(f.service.commitDelete(preview.id, 7, 'page-a')).rejects.toThrow('失效');
+    });
+    it('空备份与确认前已经删除都幂等完成，但空预览后新建的文件必须重新确认', async () => {
+        const f = await synced(); f.remote = null;
+        let preview = await f.service.prepareDelete(); expect(preview).toMatchObject({hasRemote: false, canDelete: true});
+        expect(await f.service.commitDelete(preview.id)).toMatchObject({deleted: false, account: null, lastSyncedAt: null});
+        backup(f); preview = await f.service.prepareDelete(); f.remote = null;
+        expect(await f.service.commitDelete(preview.id)).toMatchObject({deleted: false});
+        expect(f.ports.api.remove).not.toHaveBeenCalled();
+        preview = await f.service.prepareDelete(); backup(f);
+        await expect(f.service.commitDelete(preview.id)).rejects.toThrow('云端备份已变化');
+        expect(f.ports.api.remove).not.toHaveBeenCalled(); expect(f.remote).not.toBeNull();
+    });
+    it('另一页面、另一个确认 ID、账号切换与过期事务不能删除或夺取正在预览的授权', async () => {
+        const f = fixture(); backup(f);
+        let preview = await f.service.prepareDelete(7, 'page-a');
+        await expect(f.service.prepareDelete(8, 'page-b')).rejects.toThrow('另一个设置页面');
+        for (const [id, tabId, clientId] of [[preview.id, 8, 'page-b'], ['wrong-id', 7, 'page-a']] as const) await expect(f.service.commitDelete(id, tabId, clientId)).rejects.toThrow('其他页面');
+        expect((f.state as DriveSyncState).prepared?.id).toBe(preview.id); expect(f.ports.auth.disconnect).not.toHaveBeenCalled();
+        f.account = {id: 'account-b', email: 'b@fixture.invalid'};
+        await expect(f.service.commitDelete(preview.id, 7, 'page-a')).rejects.toThrow('目标账号');
+        preview = await f.service.prepareDelete(7, 'page-a'); f.clock = preview.expiresAt;
+        await expect(f.service.commitDelete(preview.id, 7, 'page-a')).rejects.toThrow('失效');
+        expect(f.ports.api.remove).not.toHaveBeenCalled();
+    });
+    it('同步与删除确认不能混用，也不能绕过缺失删除元数据或已经结束的会话', async () => {
+        const f = fixture(); backup(f);
+        let preview = await f.service.prepareDelete();
+        await expect(f.service.commit(preview.id, password, 'upload', {})).rejects.toThrow('范围');
+        f.remote = null;
+        const sync = await f.service.prepare(password);
+        await expect(f.service.commitDelete(sync.id)).rejects.toThrow('失效');
+        for (const patch of [{prepared: undefined}, {connected: false}, {deletion: undefined}]) {
+            preview = await f.service.prepareDelete();
+            const state = f.state as DriveSyncState;
+            f.state = 'deletion' in patch ? {...state, prepared: {...state.prepared!, deletion: undefined}} : {...state, ...patch};
+            await expect(f.service.commitDelete(preview.id)).rejects.toThrow('失效');
+        }
+        expect(f.ports.api.remove).not.toHaveBeenCalled();
+    });
+    it('身份、密文、版本或 ETag 变化都需要重新确认，缺少强版本只提供手动清理', async () => {
+        for (const patch of [{id: 'other-file'}, {version: '2'}, {etag: '"two"'}]) {
+            const f = fixture(); backup(f); const preview = await f.service.prepareDelete();
+            f.remote = {...f.remote!, file: {...f.remote!.file, ...patch}};
+            await expect(f.service.commitDelete(preview.id)).rejects.toThrow('云端备份已变化'); expect(f.ports.api.remove).not.toHaveBeenCalled();
+        }
+        const f = fixture(); backup(f); const preview = await f.service.prepareDelete(); f.remote = {...f.remote!, content: 'updated backup'};
+        await expect(f.service.commitDelete(preview.id)).rejects.toThrow('云端备份已变化');
+        for (const patch of [{etag: undefined}, {etag: 'W/"one"'}, {readOnly: true as const}]) {
+            backup(f); f.remote = {...f.remote!, file: {...f.remote!.file, ...patch}};
+            const blocked = await f.service.prepareDelete(); expect(blocked.canDelete).toBe(false);
+            await expect(f.service.commitDelete(blocked.id)).rejects.toThrow('安全删除');
+        }
+        expect(f.ports.api.remove).not.toHaveBeenCalled();
+    });
+    it('读取、删除或回读失败不清除成功记录，原始错误不被授权清理错误掩盖', async () => {
+        const f = await synced(); backup(f); const baseline = (f.state as DriveSyncState).baseline;
+        vi.mocked(f.ports.api.read).mockRejectedValueOnce(new Error('fixture read failure'));
+        vi.mocked(f.ports.auth.disconnect).mockRejectedValueOnce(new Error('fixture cleanup failure'));
+        await expect(f.service.prepareDelete()).rejects.toThrow('fixture read failure');
+        let preview = await f.service.prepareDelete(); vi.mocked(f.ports.api.remove).mockRejectedValueOnce(new Error('fixture remove failure'));
+        vi.mocked(f.ports.auth.disconnect).mockRejectedValueOnce(new Error('fixture cleanup failure'));
+        await expect(f.service.commitDelete(preview.id)).rejects.toThrow('fixture remove failure');
+        expect((f.state as DriveSyncState).baseline).toBe(baseline); expect(f.remote).not.toBeNull();
+        preview = await f.service.prepareDelete(); vi.mocked(f.ports.api.remove).mockResolvedValueOnce(undefined);
+        await expect(f.service.commitDelete(preview.id)).rejects.toThrow('删除后仍检测到');
+        expect((f.state as DriveSyncState).lastSyncedAt).toBe(1000);
+        preview = await f.service.prepareDelete(); vi.mocked(f.ports.writeState).mockRejectedValueOnce(new Error('fixture storage failure'));
+        const calls = vi.mocked(f.ports.api.remove).mock.calls.length;
+        await expect(f.service.commitDelete(preview.id)).rejects.toThrow('fixture storage failure');
+        expect(f.ports.api.remove).toHaveBeenCalledTimes(calls);
+    });
+    it('确认删除后授权清理失败只提示缓存未清理，不能误报备份仍存在', async () => {
+        const f = fixture(); backup(f); const preview = await f.service.prepareDelete();
+        vi.mocked(f.ports.auth.disconnect).mockRejectedValueOnce(new Error('fixture cleanup failure'));
+        expect(await f.service.commitDelete(preview.id)).toMatchObject({deleted: true, cleanupPending: true, account: null, lastSyncedAt: null});
+        expect(f.remote).toBeNull(); expect(await f.service.status()).not.toHaveProperty('cleanupPending');
+    });
 });
 
 

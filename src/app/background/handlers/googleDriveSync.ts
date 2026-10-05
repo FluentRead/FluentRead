@@ -1,7 +1,7 @@
 /**
  * @file src/app/background/handlers/googleDriveSync.ts
- * 文件职责：将加密同步协议限制在扩展设置页面的可信消息边界。
- * 主要内容：校验发送者、动作、预览 ID 与冲突选择，自动使用固定应用口令，屏蔽外部异常原文。
+ * 文件职责：将加密同步与备份删除协议限制在扩展设置页面的可信消息边界。
+ * 主要内容：校验发送者、同步或删除动作、预览 ID 与冲突选择，自动使用固定应用口令，屏蔽外部异常原文。
  * 模块边界：不读取配置或令牌；依赖服务执行同步，返回值仅含状态与隐藏内容的预览。
  */
 import type {BackgroundMessageHandler} from '../messageRouter';
@@ -35,6 +35,8 @@ export function createGoogleDriveSyncHandler(service: Service, trusted: (sender:
                 if (message.action !== 'status' && (typeof message.clientId !== 'string' || !/^[a-zA-Z0-9-]{1,64}$/u.test(message.clientId))) return {success: false, error: '无效的 Google Drive 同步操作。'};
                 const clientId = message.clientId as string;
                 if (message.action === 'status') data = await service.status();
+                else if (message.action === 'prepareDelete') data = await service.prepareDelete(tabId, clientId);
+                else if (message.action === 'commitDelete' && typeof message.id === 'string' && message.id.length > 0 && message.id.length <= 64) data = await service.commitDelete(message.id, tabId, clientId);
                 else if (message.action === 'cancel' && (message.id === undefined || (typeof message.id === 'string' && message.id.length <= 64))) data = await service.cancel(message.id as string | undefined, tabId, clientId);
                 else if (message.action === 'prepare' && (message.includeSensitive === undefined || typeof message.includeSensitive === 'boolean')) data = await service.prepare(GOOGLE_DRIVE_APPLICATION_PASSPHRASE, tabId, clientId, message.includeSensitive ?? false);
                 else if (message.action === 'commit' && typeof message.id === 'string' && message.id.length <= 64 && ['upload', 'download', 'merge'].includes(message.direction as string)) {

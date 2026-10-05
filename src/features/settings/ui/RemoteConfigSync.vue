@@ -2,6 +2,8 @@
 @file src/features/settings/ui/RemoteConfigSync.vue
 文件职责：用清晰的保存、恢复与逐项合并流程完成Google Drive 与 WebDAV 共用的配置云备份。
 主要内容：默认只同步普通设置，敏感信息须阅读风险并明确同意且只对本次操作有效；预览说明旧备份范围和恢复保护。
+风险确认集中展示存储方式、泄露风险与单次授权；删除确认以账号、一句后果说明和确认输入突出关键操作，次要说明在页脚按需展开。
+删除前须输入本次界面语言的确认文本，再点击确认；只删除已核验版本的备份文件，并保留本机配置。
 通过右侧记录插槽统一显示账号和时间，窄屏改为上下排列；显示本次账号并提供更换账号入口；按两步流程说明影响范围，
 先选择操作再确认影响；缺少安全覆盖版本时明确提示只读恢复；默认展示差异与连接变更类别，小屏保留操作区。
 模块边界：只消费后台脱敏预览和同步记录；不获取完整配置、令牌或用户口令，由父级提供存储方式和客户端。
@@ -29,10 +31,20 @@
       </div>
       </slot>
     </div>
-    <el-dialog v-model="consentVisible" class="cloud-consent-dialog fluentread-cloud-sync-dialog" :title="t('settings.cloud.consentTitle')" width="min(560px, calc(100vw - 24px))" destroy-on-close @closed="riskAcknowledged = false">
+    <div v-if="status?.available" class="cloud-delete-entry"><el-button link type="danger" :disabled="busy || previewVisible || consentVisible || deleteVisible" :data-testid="`${kind}-delete-backup`" @click="prepareDeletion"><el-icon><Delete /></el-icon>{{ t('settings.cloud.deleteBackup') }}</el-button></div>
+    <el-dialog v-model="deleteVisible" class="cloud-delete-dialog cloud-compact-dialog fluentread-cloud-sync-dialog" :title="t(deletion?.hasRemote ? 'settings.cloud.deleteTitle' : 'settings.cloud.deleteAbsent')" width="min(480px, calc(100vw - 24px))" :close-on-click-modal="!busy" :close-on-press-escape="!busy" :show-close="!busy" :before-close="cancelDeletion" destroy-on-close @closed="deletion = null">
+      <template v-if="deletion">
+        <div class="cloud-delete-account"><div class="cloud-delete-target"><strong><slot name="delete-account">{{ deletion.account.email || t('settings.cloud.selectedAccount') }}</slot></strong><slot name="delete-location" /></div><el-button v-if="kind === 'google-drive'" link :disabled="busy" data-testid="google-drive-delete-switch-account" @click="changeDeletionAccount">{{ t('settings.cloud.changeAccount') }}</el-button></div>
+        <p class="cloud-delete-description">{{ t(deletion.hasRemote ? 'settings.cloud.deleteDescription' : 'settings.cloud.deleteAbsentDescription') }}</p>
+        <div v-if="deletion.hasRemote && deletion.canDelete" class="cloud-delete-verification" data-testid="cloud-delete-verification"><el-input :id="`${kind}-delete-verification`" v-model="deleteConfirmation" :placeholder="t('settings.cloud.deleteVerification', {phrase: t('settings.cloud.deletePhrase')})" :aria-label="t('settings.cloud.deleteVerification', {phrase: t('settings.cloud.deletePhrase')})" :disabled="busy" :maxlength="64" autocomplete="off" :spellcheck="false" @keydown.enter.prevent /></div>
+        <div v-if="deletion.hasRemote" v-show="deleteDetailsVisible" :id="`${kind}-delete-details`" class="cloud-delete-details"><p class="cloud-delete-note">{{ t('settings.cloud.deleteHistory') }}</p><p class="cloud-delete-note">{{ t('settings.cloud.deleteRecreate') }}</p></div>
+        <el-alert v-if="deletion.hasRemote && !deletion.canDelete" :title="t('settings.cloud.deleteUnsupported')" :description="t(kind === 'google-drive' ? 'settings.cloud.deleteManualDrive' : 'settings.cloud.deleteManualWebDav')" type="warning" :closable="false" show-icon data-testid="cloud-delete-unsupported" />
+      </template>
+      <template #footer><div class="cloud-delete-footer"><el-button v-if="deletion?.hasRemote" link class="cloud-delete-details-toggle" :aria-expanded="deleteDetailsVisible" :aria-controls="`${kind}-delete-details`" data-testid="cloud-delete-details-toggle" @click="deleteDetailsVisible = !deleteDetailsVisible">{{ t('settings.cloud.deleteDetails') }}<el-icon><component :is="deleteDetailsVisible ? ArrowUp : ArrowDown" /></el-icon></el-button><div class="cloud-consent-actions"><el-button :disabled="busy" data-testid="cloud-delete-cancel" @click="cancelDeletion">{{ t('settings.drive.cancelSync') }}</el-button><el-button type="primary" :loading="busy" :disabled="busy || !canConfirmDeletion" data-testid="cloud-delete-confirm" @click="confirmDeletion">{{ t(deletion?.hasRemote ? 'settings.cloud.deleteConfirm' : 'settings.cloud.deleteFinish') }}</el-button></div></div></template>
+    </el-dialog>
+    <el-dialog v-model="consentVisible" class="cloud-consent-dialog cloud-compact-dialog fluentread-cloud-sync-dialog" :title="t('settings.cloud.consentTitle')" width="min(480px, calc(100vw - 24px))" destroy-on-close @closed="riskAcknowledged = false">
       <p class="cloud-consent-intro">{{ t('settings.cloud.consentStorage', {provider}) }}</p>
       <div class="cloud-consent-risk"><el-icon><Warning /></el-icon><p>{{ t('settings.cloud.consentRisk') }}</p></div>
-      <p class="cloud-consent-advice">{{ t('settings.cloud.consentAdvice') }}</p>
       <label class="cloud-consent-checkbox"><input v-model="riskAcknowledged" type="checkbox" data-testid="cloud-risk-acknowledgement" /><span>{{ t('settings.cloud.consentAcknowledgement') }}</span></label>
       <template #footer><div class="cloud-consent-actions"><el-button data-testid="cloud-consent-cancel" @click="consentVisible = false">{{ t('settings.cloud.keepSettingsOnly') }}</el-button><el-button type="primary" :disabled="!riskAcknowledged" data-testid="cloud-consent-confirm" @click="confirmSensitive">{{ t('settings.cloud.consentConfirm') }}</el-button></div></template>
     </el-dialog>
@@ -125,9 +137,10 @@
 
 <script setup lang="ts">
 import {computed, onMounted, onUnmounted, ref, watch} from 'vue';
-import {ElAlert, ElIcon, ElMessage, ElPagination, ElSwitch} from 'element-plus';
-import {ArrowDown, ArrowLeft, ArrowRight, ArrowUp, CircleCheck, Cloudy, Download, Monitor, Switch, Upload, User, Warning} from '@element-plus/icons-vue';
+import {ElAlert, ElIcon, ElInput, ElMessage, ElPagination, ElSwitch} from 'element-plus';
+import {ArrowDown, ArrowLeft, ArrowRight, ArrowUp, CircleCheck, Cloudy, Delete, Download, Monitor, Switch, Upload, User, Warning} from '@element-plus/icons-vue';
 import 'element-plus/es/components/alert/style/css';
+import 'element-plus/es/components/input/style/css';
 import 'element-plus/es/components/pagination/style/css';
 import 'element-plus/es/components/switch/style/css';
 import {useUiI18n} from '@/src/ui/i18n';
@@ -135,8 +148,9 @@ import {CloudBackupRequestError, type createCloudBackupClient} from '@/src/servi
 import {chooseDriveRow, driveRowChoice, groupDrivePreviewChanges, initialDriveDirection, localizeDrivePreviewLanguage, unresolvedDriveChanges, type DrivePreviewRow} from '../model/googleDrivePreview';
 import type {DriveChoice} from '@/src/core/config/driveSync';
 import type {DriveSyncDirection, DriveSyncPreview, DriveSyncStatus} from '@/src/services/config/googleDriveSync';
+import type {CloudBackupDeletePreview} from '@/src/services/config/remoteConfigSync';
 
-const props = defineProps<{client: Pick<ReturnType<typeof createCloudBackupClient>, 'status' | 'prepare' | 'commit' | 'cancel'>; provider: string; kind: 'google-drive' | 'webdav'}>();
+const props = defineProps<{client: Pick<ReturnType<typeof createCloudBackupClient>, 'status' | 'prepare' | 'commit' | 'cancel' | 'prepareDelete' | 'commitDelete'>; provider: string; kind: 'google-drive' | 'webdav'}>();
 const emit = defineEmits<{busy: [value: boolean]}>();
 const {t: baseT, translateLegacy, language} = useUiI18n();
 const client = props.client;
@@ -152,7 +166,12 @@ const switchingAccount = ref(false);
 const error = ref('');
 const preview = ref<DriveSyncPreview | null>(null);
 const previewVisible = ref(false);
-watch(() => busy.value || consentVisible.value || previewVisible.value, value => emit('busy', value));
+const deletion = ref<CloudBackupDeletePreview | null>(null);
+const deleteVisible = ref(false);
+const deleteDetailsVisible = ref(false);
+const deleteConfirmation = ref('');
+const canConfirmDeletion = computed(() => Boolean(deleteVisible.value && deletion.value?.canDelete && (!deletion.value.hasRemote || deleteConfirmation.value === t('settings.cloud.deletePhrase'))));
+watch(() => busy.value || consentVisible.value || previewVisible.value || deleteVisible.value, value => emit('busy', value));
 const direction = ref<DriveSyncDirection | ''>('');
 const step = ref<'choose' | 'review'>('review');
 const choices = ref<Record<string, string>>({});
@@ -199,8 +218,35 @@ async function requestPreview() {
   page.value = 1; detailsVisible.value = true; automaticVisible.value = true; previewVisible.value = true;
 }
 async function prepare() {await perform(async () => {try {await requestPreview();} catch (failure) {includeSensitive.value = false; throw failure;}});}
+async function requestDeletion() {
+  deleteConfirmation.value = '';
+  const result = await client.prepareDelete();
+  if (!alive) {await client.cancel(result.id); return;}
+  deletion.value = result; deleteDetailsVisible.value = false; deleteVisible.value = true;
+}
+async function prepareDeletion() {
+  if (previewVisible.value || consentVisible.value || deleteVisible.value) return;
+  includeSensitive.value = false;
+  await perform(requestDeletion);
+}
+async function changeDeletionAccount() {await perform(async () => {
+  await client.cancel(deletion.value?.id);
+  if (!alive) return;
+  try {await requestDeletion();} catch (failure) {deleteVisible.value = false; throw failure;}
+});}
+async function confirmDeletion() {
+  if (!canConfirmDeletion.value || !deletion.value) return;
+  const id = deletion.value.id;
+  await perform(async () => {
+    try {
+      const result = await client.commitDelete(id);
+      if (alive) {status.value = result; ElMessage.success(t(result.deleted ? 'settings.cloud.deleteSuccess' : 'settings.cloud.deleteAbsent'));}
+    } finally {if (alive) deleteVisible.value = false;}
+  });
+}
+async function cancelDeletion() {await perform(async () => {await client.cancel(deletion.value?.id); deleteVisible.value = false;});}
 function toggleSensitive(value: boolean | string | number) {
-  if (busy.value || previewVisible.value) return;
+  if (busy.value || previewVisible.value || deleteVisible.value) return;
   if (value === true) {riskAcknowledged.value = false; consentVisible.value = true;}
   else includeSensitive.value = false;
 }
@@ -232,7 +278,7 @@ async function commit() {
 }
 async function cancelPreview() {await perform(async () => {await client.cancel(preview.value?.id); previewVisible.value = false;});}
 function clearPreview() {preview.value = null; choices.value = {}; direction.value = ''; includeSensitive.value = false;}
-function endSession() {if (preview.value || busy.value) void client.cancel(preview.value?.id).catch(() => undefined);}
+function endSession() {if (preview.value || deletion.value || busy.value) void client.cancel(preview.value?.id ?? deletion.value?.id).catch(() => undefined);}
 async function refreshStatus() {await perform(async () => {
   try {status.value = await client.status();}
   catch (failure) {status.value = {available: false, reason: t('settings.cloud.unavailable'), account: null, lastSyncedAt: null}; throw failure;}
@@ -248,6 +294,7 @@ onUnmounted(() => {alive = false; endSession(); clearPreview();});
 :global(.fluentread-cloud-sync-dialog .el-dialog__header), :global(.fluentread-cloud-sync-dialog .el-dialog__footer) {flex-shrink:0;}
 :global(.fluentread-cloud-sync-dialog .el-dialog__title) {font-size:18px; font-weight:600;}
 :global(.fluentread-cloud-sync-dialog .el-dialog__footer) {border-top:1px solid var(--el-border-color-lighter); padding-top:16px;}
+:global(.fluentread-cloud-sync-dialog.cloud-compact-dialog .el-dialog__body) {padding-bottom:16px;}
 .drive-sync {color:var(--el-text-color-primary);}
 .cloud-scope {border:1px solid var(--el-border-color-lighter); border-radius:10px; padding:16px; background:var(--el-fill-color-blank);}
 .cloud-scope-heading {display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:8px; font-size:14px;}
@@ -261,14 +308,33 @@ onUnmounted(() => {alive = false; endSession(); clearPreview();});
 .cloud-sensitive-option>.el-switch {flex-shrink:0;}
 .cloud-scope .cloud-scope-note {margin-top:12px;}
 .cloud-preview-scope {padding:12px 14px; margin-bottom:16px; border:1px solid var(--el-border-color-lighter); border-radius:8px; font-size:13px;}
-.cloud-consent-intro,.cloud-consent-advice {margin:0 0 16px; font-size:13px; line-height:1.8; color:var(--el-text-color-regular);}
-.cloud-consent-risk {display:flex; align-items:flex-start; gap:10px; padding:14px; margin-bottom:16px; background:var(--el-fill-color-light); border:1px solid var(--el-border-color); border-inline-start:3px solid var(--el-color-warning); border-radius:8px;}
-.cloud-consent-risk>.el-icon {color:var(--el-color-warning); font-size:20px; flex-shrink:0; margin-top:3px;}
-.cloud-consent-risk p {margin:0; font-size:13px; line-height:1.8; color:var(--el-text-color-primary);}
-.cloud-consent-checkbox {display:flex; align-items:flex-start; gap:10px; cursor:pointer; font-size:13px; line-height:1.7;}
+.cloud-consent-intro {margin:0 0 14px; font-size:13px; line-height:1.7; color:var(--el-text-color-regular);}
+.cloud-consent-risk {display:flex; align-items:flex-start; gap:8px; padding:12px; margin-bottom:16px; background:var(--el-fill-color-light); border-radius:8px;}
+.cloud-consent-risk>.el-icon {color:var(--el-color-warning); font-size:16px; flex-shrink:0; margin-top:3px;}
+.cloud-consent-risk p {margin:0; font-size:13px; line-height:1.7; color:var(--el-text-color-primary);}
+.cloud-consent-checkbox {display:flex; align-items:flex-start; gap:8px; cursor:pointer; font-size:13px; line-height:1.7;}
 .cloud-consent-checkbox input {accent-color:var(--el-color-primary); margin:4px 0 0; flex-shrink:0;}
 .cloud-consent-actions {display:flex; flex-wrap:wrap; justify-content:flex-end; gap:8px;}
 .cloud-consent-actions>.el-button {margin:0; max-width:100%; height:auto; min-height:32px; white-space:normal; line-height:1.5;}
+.cloud-delete-entry {display:flex; justify-content:flex-end; padding-top:12px; margin-top:12px; border-top:1px solid var(--el-border-color-lighter);}
+.cloud-delete-entry .el-icon {margin-inline-end:5px;}
+.cloud-delete-entry :deep(.el-button:not(.is-disabled)) {color:#b54444;}
+:global(.dark) .cloud-delete-entry :deep(.el-button:not(.is-disabled)) {color:var(--el-color-danger);}
+.cloud-delete-account {display:flex; align-items:flex-start; gap:12px; margin-bottom:10px;}
+.cloud-delete-target {flex:1; min-width:0; font-size:13px; line-height:1.7; overflow-wrap:anywhere;}
+.cloud-delete-target strong {display:block; font-weight:600; color:var(--el-text-color-primary);}
+.cloud-delete-target :deep(p) {margin:2px 0 0; overflow-wrap:anywhere; font-size:12px; line-height:1.7; color:var(--el-text-color-regular);}
+.cloud-delete-account>.el-button {flex-shrink:0; padding:0; min-height:22px; margin:0; font-size:12px; color:var(--el-text-color-regular);}
+.cloud-delete-description {font-size:13px; line-height:1.7; margin:0; color:var(--el-text-color-primary);}
+.cloud-delete-details {font-size:12px; line-height:1.7; color:var(--el-text-color-regular); margin-top:8px;}
+.cloud-delete-footer {display:flex; align-items:center; flex-wrap:wrap; gap:8px 12px;}
+.cloud-delete-footer>.cloud-consent-actions {margin-inline-start:auto;}
+.cloud-delete-details-toggle {padding:4px 0; min-height:28px; font-size:12px; font-weight:400; color:var(--el-text-color-regular);}
+.cloud-delete-details-toggle .el-icon {margin-inline-start:4px;}
+.cloud-delete-details-toggle:focus-visible {outline:2px solid var(--el-color-primary); outline-offset:3px;}
+.cloud-delete-note {font-size:12px; line-height:1.7; color:var(--el-text-color-regular); margin:8px 0 0;}
+.cloud-delete-verification {margin-top:10px;}
+.cloud-delete-verification :deep(.el-input) {width:100%; max-width:none;}
 .drive-heading {display:flex; justify-content:space-between; align-items:flex-start; gap:16px;}
 .drive-heading h2 {margin:0; font-size:19px;}
 .drive-boundary {color:var(--el-text-color-secondary); font-size:13px; line-height:1.7;}

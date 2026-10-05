@@ -1,7 +1,7 @@
 /**
  * @file src/services/config/webDavBackup.ts
  * 文件职责：编排 WebDAV 连接管理与共用配置云备份事务。
- * 主要内容：只读连接测试、带修订号的保存与清除、预览页面所有权、后台重启恢复；
+ * 主要内容：只读连接测试、带修订号的保存与清除、同步与删除预览的页面所有权、后台重启恢复；
  * 连接密码单独保存在本机，切换服务器或账号会使旧预览和共同基线失效。
  * 模块边界：通过端口调用 WebDAV 和配置仓库，不直接访问浏览器，不向 UI 返回密码。
  */
@@ -68,6 +68,8 @@ export function createWebDavBackup(ports: WebDavBackupPorts) {
             await ports.removeState();
         }),
         prepare: (...args: Parameters<typeof sync.prepare>) => exclusive(() => sync.prepare(...args)),
+        prepareDelete: (...args: Parameters<typeof sync.prepareDelete>) => exclusive(() => sync.prepareDelete(...args)),
+        commitDelete: (...args: Parameters<typeof sync.commitDelete>) => exclusive(() => sync.commitDelete(...args)),
         commit: (...args: Parameters<typeof sync.commit>) => exclusive(() => sync.commit(...args)),
         cancel: (...args: Parameters<typeof sync.cancel>) => exclusive(() => sync.cancel(...args)),
         cancelTab: (...args: Parameters<typeof sync.cancelTab>) => exclusive(() => sync.cancelTab(...args)),

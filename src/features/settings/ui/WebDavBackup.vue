@@ -1,11 +1,13 @@
 <!--
 @file src/features/settings/ui/WebDavBackup.vue
 文件职责：在同步操作右侧统一显示账号、服务器、同步时间和修改连接入口，接入 WebDAV 配置云备份。
-主要内容：应用密码输入、只读测试、测试后保存、多语言错误；同步时刷新跨页面连接摘要，密码不回显。
+主要内容：应用密码输入、只读测试、测试后保存、多语言错误；同步或删除时刷新并核对连接摘要，密码不回显。
 模块边界：只向可信后台发送连接参数，不直接请求 WebDAV；共用 RemoteConfigSync 的预览和确认流程。
 -->
 <template>
   <RemoteConfigSync ref="syncUi" :client="client" provider="WebDAV" kind="webdav" @busy="setSyncBusy">
+    <template #delete-account>{{ connection?.username }}</template>
+    <template #delete-location><p v-if="connection" data-testid="webdav-delete-server">{{ connection.url }}</p></template>
     <template #connection>
       <div v-if="!connection" class="webdav-connection">
         <div><strong>{{ t('settings.webdav.notConfigured') }}</strong><p>{{ t('settings.webdav.connectionHint') }}</p></div>
@@ -81,6 +83,15 @@ const client = {
       await connectionClient.cancel(result.id).catch(() => undefined);
       throw failure;
     }
+  },
+  async prepareDelete() {
+    await refreshConnection();
+    const result = await connectionClient.prepareDelete();
+    try {
+      const saved = await refreshConnection();
+      if (!saved || result.account.id !== `webdav:${saved.revision}`) throw new CloudBackupRequestError('同步连接已变化，请重新生成预览', 'settings.cloud.connectionChanged');
+      return result;
+    } catch (failure) {await connectionClient.cancel(result.id).catch(() => undefined); throw failure;}
   },
 };
 const draft = reactive({url: '', username: '', password: '', allowInsecure: false, revision: null as string | null});

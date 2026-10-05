@@ -16,11 +16,32 @@ function fixture(shared={remote:null as CloudSyncRemote|null}) {
     let local=config({token:{openai:'fixture-api-key'},customHeaders:{openai:'{"Authorization":"fixture-header"}'},customBody:{openai:'{"auth":"fixture-body"}'},proxy:{openai:'https://fixture.invalid/?auth=fixture-url-token'},extra:{oauth:'fixture-oauth-token'}});
     let state:unknown=null;
     const connections=createWebDavConnectionStore({getItem:async<T>(key:string)=>(records.get(key)??null) as T|null,setItem:async(key,value)=>{records.set(key,value);},removeItem:async key=>{records.delete(key);}});
-    const ports:WebDavBackupPorts={connections,api:{test:vi.fn(async()=>undefined),read:vi.fn(async()=>shared.remote),write:vi.fn(async(_session,content)=>{shared.remote={file:{id:'fixture-file',version:crypto.randomUUID(),modifiedTime:''},content};return shared.remote.file;})},snapshot:vi.fn(async()=>structuredClone(local)),apply:vi.fn(async value=>{local=structuredClone(value);}),readState:vi.fn(async()=>state),writeState:vi.fn(async value=>{state=value;}),removeState:vi.fn(async()=>{state=null;}),now:()=>1000};
+    const ports:WebDavBackupPorts={connections,api:{remove:vi.fn(async()=>{shared.remote=null;}),test:vi.fn(async()=>undefined),read:vi.fn(async()=>shared.remote),write:vi.fn(async(_session,content)=>{shared.remote={file:{id:'fixture-file',version:crypto.randomUUID(),modifiedTime:''},content};return shared.remote.file;})},snapshot:vi.fn(async()=>structuredClone(local)),apply:vi.fn(async value=>{local=structuredClone(value);}),readState:vi.fn(async()=>state),writeState:vi.fn(async value=>{state=value;}),removeState:vi.fn(async()=>{state=null;}),now:()=>1000};
     const service=createWebDavBackup(ports);
     return {service,ports,records,connections,shared,get state(){return state as DriveSyncState;},get local(){return local;},set local(value){local=value;}};
 }
 describe('WebDAV 配置云备份事务',()=>{
+    it('WebDAV 删除确认跨 worker 重启保留版本和连接，实际删除后可重新创建备份',async()=>{
+        const f=fixture();await f.service.save(input);
+        const initial=await f.service.prepare(password);await f.service.commit(initial.id,password,'upload',{});
+        f.shared.remote={...f.shared.remote!,file:{...f.shared.remote!.file,etag:'"one"'}};
+        const connection=await f.service.settings();const local=structuredClone(f.local);
+        const preview=await f.service.prepareDelete(7,'delete-page');
+        await createWebDavBackup(f.ports).commitDelete(preview.id,7,'delete-page');
+        expect(f.shared.remote).toBeNull();expect(await f.service.settings()).toEqual(connection);expect(f.local).toEqual(local);
+        expect(f.state.baseline).toBe('');expect(f.state.lastSyncedAt).toBeNull();
+        const fresh=await f.service.prepare(password);expect(fresh).toMatchObject({hasRemote:false,hasBaseline:false});
+        await f.service.commit(fresh.id,password,'upload',{});expect(f.shared.remote).not.toBeNull();
+    });
+    it('删除预览期间其他设置页不能清除连接，外部连接切换使删除确认失效',async()=>{
+        const f=fixture();const saved=await f.service.save(input);
+        f.shared.remote={file:{id:'fixture-file',version:'1',modifiedTime:'',etag:'"one"'},content:'invalid backup'};
+        const preview=await f.service.prepareDelete(7,'delete-page');
+        await expect(f.service.clear(saved.revision,8,'other-page')).rejects.toThrow('另一个设置页面');
+        await f.connections.write(parseWebDavConnection({...saved,password:'fixture-changed'},await f.connections.read()));
+        await expect(f.service.commitDelete(preview.id,7,'delete-page')).rejects.toThrow('目标账号');
+        expect(f.ports.api.remove).not.toHaveBeenCalled();expect(f.shared.remote).not.toBeNull();
+    });
     it('打开页面只读本机摘要；测试和保存连接均不创建云端文件',async()=>{
         const f=fixture();
         expect(await f.service.status()).toMatchObject({available:false,account:null});

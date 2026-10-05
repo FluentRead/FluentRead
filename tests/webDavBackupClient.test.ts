@@ -4,6 +4,13 @@ vi.mock('webextension-polyfill',()=>({default:{runtime:{sendMessage:mocks.send}}
 import {webDavBackupClient as client} from '@/src/services/config/webDavBackupClient';
 import {CloudBackupRequestError} from '@/src/services/config/cloudBackupClient';
 describe('WebDAV 设置客户端',()=>{
+    it('WebDAV 删除只发送同一客户端的确认 ID',async()=>{
+        mocks.send.mockClear();mocks.send.mockResolvedValue({success:true,data:{}});
+        await client.prepareDelete();await client.commitDelete('delete-id');
+        expect(mocks.send.mock.calls.map(([message])=>message.action)).toEqual(['prepareDelete','commitDelete']);
+        expect(mocks.send).toHaveBeenLastCalledWith({type:'webDavConfigBackup',action:'commitDelete',id:'delete-id',clientId:expect.any(String)});
+        mocks.send.mockClear();
+    });
     it('连接和同步动作共用客户端身份，读取不会返回密码',async()=>{
         mocks.send.mockResolvedValue({success:true,data:{fixture:true}});
         await client.settings();await client.test({});await client.save({});await client.clear(null);await client.status();await client.prepare();await client.cancel();await client.commit('id','upload',{});

@@ -4,6 +4,13 @@ vi.mock('webextension-polyfill', () => ({default: {runtime: {sendMessage: mocks.
 import {googleDriveSyncClient as client} from '@/src/services/config/googleDriveSyncClient';
 
 describe('同步设置请求端口', () => {
+    it('Google Drive 删除只发送准备和确认事务 ID，不携带云端地址或口令', async () => {
+        mocks.send.mockClear();mocks.send.mockResolvedValue({success:true,data:{}});
+        await client.prepareDelete();await client.commitDelete('delete-id');
+        expect(mocks.send.mock.calls.map(([message])=>message.action)).toEqual(['prepareDelete','commitDelete']);
+        expect(mocks.send).toHaveBeenLastCalledWith({type:'googleDriveEncryptedSync',action:'commitDelete',id:'delete-id',clientId:expect.any(String)});
+        mocks.send.mockClear();
+    });
     it('所有动作使用同一加密同步协议，不在客户端读取配置', async () => {
         mocks.send.mockResolvedValue({success: true, data: {fixture: true}});
         expect(await client.status()).toEqual({fixture: true});

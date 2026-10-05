@@ -2,12 +2,12 @@
  * @file src/services/config/remoteConfigSync.ts
  * 文件职责：编排 Google Drive 与 WebDAV 共用的范围化云备份和单次用户确认事务。
  * 主要内容：单次授权、账号绑定、上次成功同步的账号记录、密文基线、三方合并、
- * 掩码预览、只读恢复能力、过期检查与授权缓存清理；清理失败独立提示，不掩盖同步结果或原错误。
+ * 掩码预览、只读恢复能力、绑定账号与文件版本的删除确认、过期检查与授权缓存清理；清理失败独立提示。
  * 模块边界：通过端口读写配置与云端存储；不持久化口令，不向设置页面传递完整配置。
  */
 import {buildDriveSyncDiff, driveSyncPayload, driveValuesEqual, parseDriveSyncPayload, resolveDriveSyncDiff, toDriveSyncConfig, parseDriveSyncSnapshot, projectDriveSyncConfig, restoreDriveSyncSettings, validateDriveSyncConsent, type DriveSyncConfig, type DriveSyncDiff} from '@/src/core/config/driveSync';
 import {decryptDriveConfig, encryptDriveConfig, decryptDrivePreview, encryptDrivePreview, validateDrivePassphrase} from '@/src/platform/google-drive/encryption';
-import {CloudSyncError, type CloudSyncAccount as DriveAccount, type CloudSyncSession as DriveSession, type CloudSyncFile as DriveFile, type CloudSyncRemote as DriveRemote} from '@/src/core/config/cloudSync';
+import {CloudSyncError, strongCloudEtag, type CloudSyncAccount as DriveAccount, type CloudSyncSession as DriveSession, type CloudSyncFile as DriveFile, type CloudSyncRemote as DriveRemote} from '@/src/core/config/cloudSync';
 
 export interface DriveSyncState {
     version: 1;
@@ -18,9 +18,11 @@ export interface DriveSyncState {
     lastSyncedAt: number | null;
     lastSyncedAccount?: DriveAccount;
     cleanupPending?: true;
-    prepared?: {id: string; expiresAt: number; content: string; tabId?: number; clientId?: string; format?: 2; scope?: 'settings' | 'complete'; remote?: DriveRemote | null};
+    prepared?: {id: string; expiresAt: number; content: string; tabId?: number; clientId?: string; format?: 2; scope?: 'settings' | 'complete'; remote?: DriveRemote | null; operation?: 'delete'; deletion?: {account: DriveAccount; remote: DriveRemote | null}};
 }
 export interface DriveSyncStatus {available: boolean; reason: string; account: DriveAccount | null; lastSyncedAt: number | null; cleanupPending?: true}
+export interface CloudBackupDeletePreview {id: string; account: DriveAccount; hasRemote: boolean; canDelete: boolean; expiresAt: number}
+export interface CloudBackupDeleteResult extends DriveSyncStatus {deleted: boolean}
 export interface DriveSyncPreview {
     id: string;
     account: DriveAccount;
@@ -35,7 +37,7 @@ export interface DriveSyncPreview {
 export type DriveSyncDirection = 'upload' | 'download' | 'merge';
 export interface DriveSyncPorts<Session extends DriveSession = DriveSession> {
     auth: {availability(): {available: boolean; reason: string}; open(interactive?: boolean): Promise<Session>; disconnect(): Promise<void>};
-    api: {read(session: Session): Promise<DriveRemote | null>; write(session: Session, content: string, previous: DriveFile | null): Promise<DriveFile>};
+    api: {read(session: Session): Promise<DriveRemote | null>; write(session: Session, content: string, previous: DriveFile | null): Promise<DriveFile>; remove(session: Session, previous: DriveFile): Promise<void>};
     snapshot(): Promise<Record<string, unknown>>;
     apply(config: DriveSyncConfig): Promise<void>;
     readState(): Promise<unknown>;
@@ -111,6 +113,44 @@ export function createRemoteConfigSync<Session extends DriveSession>(ports: Driv
             try {await finishSession(); cleanupPending = undefined;} catch {cleanupPending = true;}
         }
         return {...availability, account: state.lastSyncedAccount ?? null, lastSyncedAt: state.lastSyncedAt, ...(cleanupPending ? {cleanupPending} : {})};
+    }
+    async function assertAvailable(tabId?: number, clientId?: string) {
+        const state = readState(await ports.readState());
+        if (state.prepared && state.prepared.expiresAt > ports.now() && !owns(state, tabId, clientId)) throw new CloudSyncError('另一个设置页面正在确认同步，请先完成或取消该页面的预览。');
+    }
+    async function prepareDelete(tabId?: number, clientId?: string): Promise<CloudBackupDeletePreview> {
+        pending = null;
+        const session = await ports.auth.open(true);
+        const state = readState(await ports.readState());
+        // 只读取不透明密文和版本，不解密或导入；旧版、未知格式和损坏密文均可清理。
+        const remote = await ports.api.read(session);
+        const preview = {id: crypto.randomUUID(), account: session.account, hasRemote: Boolean(remote), canDelete: !remote || !remote.file.readOnly && Boolean(strongCloudEtag(remote.file.etag)), expiresAt: ports.now() + 10 * 60_000};
+        // 不设置 scope：旧客户端不能把删除事务误认为同步同意。MV3 重启后仍能核对同一账号及版本。
+        await ports.writeState({...state, connected: true, prepared: {id: preview.id, expiresAt: preview.expiresAt, content: '', operation: 'delete', tabId, clientId, deletion: {account: session.account, remote}}});
+        return preview;
+    }
+    async function commitDelete(id: string): Promise<CloudBackupDeleteResult> {
+        const state = readState(await ports.readState());
+        const prepared = state.prepared;
+        if (!prepared || prepared.id !== id || prepared.expiresAt <= ports.now() || prepared.operation !== 'delete' || !prepared.deletion || !state.connected) throw new CloudSyncError('删除预览已失效，请重新检查云端备份。');
+        const {account, remote} = prepared.deletion;
+        // 在网络删除前消费确认；失败或重试都必须重新展示目标。
+        delete state.prepared;
+        state.connected = false;
+        pending = null;
+        await ports.writeState(state);
+        const session = await ports.auth.open(false);
+        if (session.account.id !== account.id) throw new CloudSyncError('删除目标账号或连接已变化，请重新检查云端备份。');
+        const current = await ports.api.read(session);
+        if (current && (!sameRemote(current, remote) || current.file.etag !== remote?.file.etag)) throw new CloudSyncError('云端备份已变化，请重新检查后再删除。');
+        if (current) {
+            if (current.file.readOnly || !strongCloudEtag(current.file.etag)) throw new CloudSyncError('云端备份缺少安全删除所需的版本信息，请到服务商管理页面手动删除。');
+            await ports.api.remove(session, current.file);
+            if (await ports.api.read(session)) throw new CloudSyncError('删除后仍检测到云端备份，可能已被其他设备重新创建，请重新检查。');
+        }
+        // 服务器确认不存在后才清除本机合并基线及同步记录；不读写用户配置或连接设置。
+        await ports.writeState(emptyState());
+        return {...ports.auth.availability(), account: null, lastSyncedAt: null, deleted: Boolean(current)};
     }
     async function prepare(passphrase: string, tabId?: number, clientId?: string, includeSensitive = false): Promise<DriveSyncPreview> {
         validateDriveSyncConsent(includeSensitive);
@@ -207,11 +247,20 @@ export function createRemoteConfigSync<Session extends DriveSession>(ports: Driv
     }
     return {
         status: () => exclusive(status),
-        prepare: (passphrase: string, tabId?: number, clientId?: string, includeSensitive = false) => exclusive(async () => {
+        prepareDelete: (tabId?: number, clientId?: string) => exclusive(async () => {
+            await assertAvailable(tabId, clientId);
+            try {return await prepareDelete(tabId, clientId);} catch (error) {await finishSession().catch(() => undefined); throw error;}
+        }),
+        commitDelete: (id: string, tabId?: number, clientId?: string) => exclusive(async () => {
             const state = readState(await ports.readState());
-            if (state.prepared && state.prepared.expiresAt > ports.now() && !owns(state, tabId, clientId)) {
-                throw new CloudSyncError('另一个设置页面正在确认同步，请先完成或取消该页面的预览。');
-            }
+            if (state.prepared && (!owns(state, tabId, clientId) || state.prepared.id !== id)) throw new CloudSyncError('删除预览属于其他页面或已失效，请在原设置页面继续。');
+            let result: CloudBackupDeleteResult;
+            try {result = await commitDelete(id);} catch (error) {await finishSession().catch(() => undefined); throw error;}
+            try {await finishSession();} catch {return {...result, cleanupPending: true};}
+            return result;
+        }),
+        prepare: (passphrase: string, tabId?: number, clientId?: string, includeSensitive = false) => exclusive(async () => {
+            await assertAvailable(tabId, clientId);
             try {return await prepare(passphrase, tabId, clientId, includeSensitive);} catch (error) {await finishSession().catch(() => undefined); throw error;}
         }),
         commit: (id: string, passphrase: string, direction: DriveSyncDirection, choices: Record<string, unknown>, tabId?: number, clientId?: string) => exclusive(async () => {

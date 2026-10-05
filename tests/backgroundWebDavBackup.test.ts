@@ -8,10 +8,16 @@ import {DriveConfigError} from '@/src/core/config/driveSync';
 import {GOOGLE_DRIVE_APPLICATION_PASSPHRASE} from '@/src/platform/google-drive/constants';
 const clientId = 'fixture-client';
 function fixture(trusted = true) {
-    const service = Object.fromEntries(['status','settings','save','test','clear','prepare','commit','cancel'].map(key => [key,vi.fn()])) as unknown as ReturnType<typeof createWebDavBackup>;
+    const service = Object.fromEntries(['status','settings','save','test','clear','prepare','commit','cancel','prepareDelete','commitDelete'].map(key => [key,vi.fn()])) as unknown as ReturnType<typeof createWebDavBackup>;
     return {service, handler: createWebDavBackupHandler(service, () => trusted)};
 }
 describe('WebDAV 可信设置消息', () => {
+    it('WebDAV 删除动作绑定可信页面身份和非空确认 ID', async () => {
+        const denied=fixture(false);await denied.handler.handle({type,clientId,action:'prepareDelete'},{});expect(denied.service.prepareDelete).not.toHaveBeenCalled();
+        const f=fixture();await f.handler.handle({type,clientId,action:'prepareDelete'},{sender:{tab:{id:7}}});expect(f.service.prepareDelete).toHaveBeenCalledWith(7,clientId);
+        for(const id of [undefined,null,1,'','x'.repeat(65)]) expect(await f.handler.handle({type,clientId,action:'commitDelete',id},{})).toMatchObject({success:false});
+        await f.handler.handle({type,clientId,action:'commitDelete',id:'delete-id'},{sender:{tab:{id:7}}});expect(f.service.commitDelete).toHaveBeenCalledWith('delete-id',7,clientId);
+    });
     it('拒绝未授权发送者和无效身份，合法动作只传递必需参数', async () => {
         const denied=fixture(false);
         expect(await denied.handler.handle({type,clientId,action:'settings'},{})).toMatchObject({success:false,errorKey:'settings.webdav.error.trusted'});

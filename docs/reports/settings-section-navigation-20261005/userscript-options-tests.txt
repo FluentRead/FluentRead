@@ -1,0 +1,15 @@
+
+> FluentRead-流畅阅读@0.0.35 test /Users/thinkstu/Desktop/copy/FluentRead-settings-section-navigation
+> node scripts/testing/run-resource-safe.mjs -- vitest run "tests/userscriptFullOptions.test.ts"
+
+[resource-safe] CPU target 60%, maxWorkers 2, concurrency 5, command: vitest run tests/userscriptFullOptions.test.ts
+
+ RUN  v2.1.9 /Users/thinkstu/Desktop/copy/FluentRead-settings-section-navigation
+
+ ✓ tests/userscriptFullOptions.test.ts (7 tests) 6ms
+
+ Test Files  1 passed (1)
+      Tests  7 passed (7)
+   Start at  12:59:11
+   Duration  273ms (transform 72ms, setup 0ms, collect 57ms, tests 6ms, environment 0ms, prepare 43ms)
+

@@ -1,12 +1,12 @@
 <!--
  * @file src/features/settings/ui/SelectionSettings.vue
  * 文件职责：作为统一划词翻译的设置入口，解释普通翻译与可选卡片模式，并提供即时预览。
- * 主要内容：管理统一开关和默认呈现偏好，按使用顺序组织触发、显示、AI 学习与朗读设置；预览不发送请求。
+ * 主要内容：管理统一开关和默认呈现偏好，按使用顺序组织触发、显示、AI 学习与朗读设置；主要模块标记页内导航目标，朗读折叠区可由顶部导航展开；预览不发送请求。
  * 模块边界：仅编辑父级配置副本，沿用 SettingsSections 的保存和快捷键校验；不建立第二份存储或调用供应商。
  -->
 <template>
   <div class="selection-settings">
-    <SettingsGroup>
+    <SettingsGroup data-settings-anchor="presentation" data-settings-anchor-label="选择默认呈现">
       <FeatureEnableCard v-model="enabled" title="启用划词翻译" description="选中文字后查看译文，也可切换卡片模式查词或学习句子" />
       <div class="selection-setup">
         <div class="selection-choices">
@@ -38,8 +38,8 @@
       </div>
     </SettingsGroup>
     <slot />
-    <HarnessSettings :config="config" />
-    <details class="selection-advanced">
+    <div data-settings-anchor="learning" data-settings-anchor-label="AI 深入讲解"><HarnessSettings :config="config" /></div>
+    <details class="selection-advanced" data-settings-anchor="speech" data-settings-anchor-label="朗读与更多偏好">
       <summary>朗读与更多偏好</summary>
       <slot name="advanced" />
     </details>

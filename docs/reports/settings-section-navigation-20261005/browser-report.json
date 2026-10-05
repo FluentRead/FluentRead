@@ -1,0 +1,749 @@
+{
+  "ok": true,
+  "artifact": "production",
+  "extensionDir": "/Users/thinkstu/Desktop/copy/FluentRead-settings-section-navigation/.output/chrome-mv3",
+  "caseCoverage": [
+    {
+      "section": "#settings-general",
+      "anchor": "basics",
+      "top": 135,
+      "expected": 135.1953125,
+      "delta": 0.1953125,
+      "current": "basics",
+      "open": true
+    },
+    {
+      "section": "#settings-general",
+      "anchor": "services",
+      "top": 511.5,
+      "expected": 511.5078125,
+      "delta": 0.0078125,
+      "current": "services",
+      "open": true
+    },
+    {
+      "section": "#settings-general",
+      "anchor": "assistance",
+      "top": 1185,
+      "expected": 1185,
+      "delta": 0,
+      "current": "assistance",
+      "open": true
+    },
+    {
+      "section": "#settings-general",
+      "anchor": "preferences",
+      "top": 1185,
+      "expected": 1185,
+      "delta": 0,
+      "current": "preferences",
+      "open": true
+    },
+    {
+      "section": "#settings-general",
+      "anchor": "basics",
+      "top": 135,
+      "expected": 135.1953125,
+      "delta": 0.1953125,
+      "current": "basics",
+      "open": true
+    },
+    {
+      "section": "#settings-translation",
+      "anchor": "reading",
+      "top": 0,
+      "expected": 0,
+      "delta": 0,
+      "current": "reading",
+      "open": true
+    },
+    {
+      "section": "#settings-translation",
+      "anchor": "hover",
+      "top": 414.5,
+      "expected": 414.65625,
+      "delta": 0.15625,
+      "current": "hover",
+      "open": true
+    },
+    {
+      "section": "#settings-translation",
+      "anchor": "page",
+      "top": 1145.5,
+      "expected": 1145.9375,
+      "delta": 0.4375,
+      "current": "page",
+      "open": true
+    },
+    {
+      "section": "#settings-translation",
+      "anchor": "tools",
+      "top": 2253,
+      "expected": 2253.453125,
+      "delta": 0.453125,
+      "current": "tools",
+      "open": true
+    },
+    {
+      "section": "#settings-translation",
+      "anchor": "reading",
+      "top": 0,
+      "expected": 0,
+      "delta": 0,
+      "current": "reading",
+      "open": true
+    },
+    {
+      "section": "#settings-interface",
+      "anchor": "translation",
+      "top": 0,
+      "expected": 0,
+      "delta": 0,
+      "current": "translation",
+      "open": true
+    },
+    {
+      "section": "#settings-interface",
+      "anchor": "skin",
+      "top": 1123.5,
+      "expected": 1123.9140625,
+      "delta": 0.4140625,
+      "current": "skin",
+      "open": true
+    },
+    {
+      "section": "#settings-interface",
+      "anchor": "motion",
+      "top": 1926.5,
+      "expected": 1926.5078125,
+      "delta": 0.0078125,
+      "current": "motion",
+      "open": true
+    },
+    {
+      "section": "#settings-interface",
+      "anchor": "layout",
+      "top": 2562,
+      "expected": 2562.390625,
+      "delta": 0.390625,
+      "current": "layout",
+      "open": true
+    },
+    {
+      "section": "#settings-interface",
+      "anchor": "font",
+      "top": 2980.5,
+      "expected": 2981,
+      "delta": 0.5,
+      "current": "font",
+      "open": true
+    },
+    {
+      "section": "#settings-interface",
+      "anchor": "translation",
+      "top": 0,
+      "expected": 0,
+      "delta": 0,
+      "current": "translation",
+      "open": true
+    },
+    {
+      "section": "#settings-selection",
+      "anchor": "presentation",
+      "top": 0,
+      "expected": 0,
+      "delta": 0,
+      "current": "presentation",
+      "open": true
+    },
+    {
+      "section": "#settings-selection",
+      "anchor": "learning",
+      "top": 436.5,
+      "expected": 436.9765625,
+      "delta": 0.4765625,
+      "current": "learning",
+      "open": true
+    },
+    {
+      "section": "#settings-selection",
+      "anchor": "speech",
+      "top": 1060,
+      "expected": 1060,
+      "delta": 0,
+      "current": "speech",
+      "open": true
+    },
+    {
+      "section": "#settings-selection",
+      "anchor": "presentation",
+      "top": 0,
+      "expected": 0,
+      "delta": 0,
+      "current": "presentation",
+      "open": true
+    },
+    {
+      "section": "#settings-image-translation",
+      "anchor": "language-service",
+      "top": 0,
+      "expected": 0,
+      "delta": 0,
+      "current": "language-service",
+      "open": true
+    },
+    {
+      "section": "#settings-image-translation",
+      "anchor": "image",
+      "top": 92,
+      "expected": 92,
+      "delta": 0,
+      "current": "image",
+      "open": true
+    },
+    {
+      "section": "#settings-image-translation",
+      "anchor": "manga",
+      "top": 92,
+      "expected": 92,
+      "delta": 0,
+      "current": "manga",
+      "open": true
+    },
+    {
+      "section": "#settings-image-translation",
+      "anchor": "area",
+      "top": 92,
+      "expected": 92,
+      "delta": 0,
+      "current": "area",
+      "open": true
+    },
+    {
+      "section": "#settings-image-translation",
+      "anchor": "entry-cache",
+      "top": 417.5,
+      "expected": 418,
+      "delta": 0.5,
+      "current": "entry-cache",
+      "open": true
+    },
+    {
+      "section": "#settings-image-translation",
+      "anchor": "resources",
+      "top": 1030.5,
+      "expected": 1030.578125,
+      "delta": 0.078125,
+      "current": "resources",
+      "open": true
+    },
+    {
+      "section": "#settings-image-translation",
+      "anchor": "sites",
+      "top": 1511.5,
+      "expected": 1512,
+      "delta": 0.5,
+      "current": "sites",
+      "open": true
+    },
+    {
+      "section": "#settings-image-translation",
+      "anchor": "language-service",
+      "top": 0,
+      "expected": 0,
+      "delta": 0,
+      "current": "language-service",
+      "open": true
+    },
+    {
+      "section": "#settings-video",
+      "anchor": "general",
+      "top": 0,
+      "expected": 0,
+      "delta": 0,
+      "current": "general",
+      "open": true
+    },
+    {
+      "section": "#settings-video",
+      "anchor": "appearance",
+      "top": 516.5,
+      "expected": 516.6328125,
+      "delta": 0.1328125,
+      "current": "appearance",
+      "open": true
+    },
+    {
+      "section": "#settings-video",
+      "anchor": "local",
+      "top": 1038,
+      "expected": 1038,
+      "delta": 0,
+      "current": "local",
+      "open": true
+    },
+    {
+      "section": "#settings-video",
+      "anchor": "general",
+      "top": 0,
+      "expected": 0,
+      "delta": 0,
+      "current": "general",
+      "open": true
+    },
+    {
+      "section": "#settings-writing",
+      "anchor": "service",
+      "top": 95,
+      "expected": 95,
+      "delta": 0,
+      "current": "service",
+      "open": true
+    },
+    {
+      "section": "#settings-writing",
+      "anchor": "style",
+      "top": 95,
+      "expected": 95,
+      "delta": 0,
+      "current": "style",
+      "open": true
+    },
+    {
+      "section": "#settings-writing",
+      "anchor": "service",
+      "top": 95,
+      "expected": 95,
+      "delta": 0,
+      "current": "service",
+      "open": true
+    },
+    {
+      "section": "#settings-advanced",
+      "anchor": "recognition",
+      "top": 0,
+      "expected": 0,
+      "delta": 0,
+      "current": "recognition",
+      "open": true
+    },
+    {
+      "section": "#settings-advanced",
+      "anchor": "cache",
+      "top": 705,
+      "expected": 705,
+      "delta": 0,
+      "current": "cache",
+      "open": true
+    },
+    {
+      "section": "#settings-advanced",
+      "anchor": "requests",
+      "top": 705,
+      "expected": 705,
+      "delta": 0,
+      "current": "requests",
+      "open": true
+    },
+    {
+      "section": "#settings-advanced",
+      "anchor": "recognition",
+      "top": 0,
+      "expected": 0,
+      "delta": 0,
+      "current": "recognition",
+      "open": true
+    },
+    {
+      "section": "#settings-data",
+      "anchor": "backup",
+      "top": 0,
+      "expected": 0,
+      "delta": 0,
+      "current": "backup",
+      "open": true
+    },
+    {
+      "section": "#settings-data",
+      "anchor": "history",
+      "top": 104,
+      "expected": 104,
+      "delta": 0,
+      "current": "history",
+      "open": true
+    },
+    {
+      "section": "#settings-data",
+      "anchor": "backup",
+      "top": 0,
+      "expected": 0,
+      "delta": 0,
+      "current": "backup",
+      "open": true
+    },
+    {
+      "section": "#settings-selection",
+      "anchor": "trigger",
+      "top": 436.5,
+      "expected": 436.9765625,
+      "delta": 0.4765625,
+      "current": "trigger",
+      "open": true
+    },
+    {
+      "section": "#settings-selection",
+      "anchor": "learning",
+      "top": 911.5,
+      "expected": 911.5703125,
+      "delta": 0.0703125,
+      "current": "learning",
+      "open": true
+    },
+    {
+      "section": "#settings-translation",
+      "anchor": "input",
+      "top": 719.5,
+      "expected": 721.546875,
+      "delta": 2.046875,
+      "current": "input",
+      "open": true
+    },
+    {
+      "section": "#settings-advanced",
+      "anchor": "recognition",
+      "top": 0,
+      "expected": 0,
+      "delta": 0,
+      "current": "recognition",
+      "open": true
+    },
+    {
+      "section": "#settings-advanced",
+      "anchor": "recognition",
+      "top": 0,
+      "expected": 0,
+      "delta": 0,
+      "current": "recognition",
+      "open": true
+    },
+    {
+      "section": "#settings-interface",
+      "anchor": "font",
+      "top": 3693.5,
+      "expected": 3694,
+      "delta": 0.5,
+      "current": "font",
+      "open": true
+    },
+    {
+      "section": "#settings-interface",
+      "anchor": "font",
+      "top": 4674,
+      "expected": 4674.328125,
+      "delta": 0.328125,
+      "current": "font",
+      "open": true
+    },
+    {
+      "section": "#settings-interface",
+      "anchor": "font",
+      "top": 6232,
+      "expected": 6232.203125,
+      "delta": 0.203125,
+      "current": "font",
+      "open": true
+    }
+  ],
+  "layouts": [
+    {
+      "label": "general",
+      "width": 1432,
+      "height": 876,
+      "documentWidth": 1432,
+      "documentHeight": 876,
+      "scrollX": 0,
+      "scrollY": 0,
+      "contentWidth": 1148,
+      "contentScrollWidth": 1148,
+      "contentHeight": 767,
+      "navHeight": 42
+    },
+    {
+      "label": "translation",
+      "width": 1432,
+      "height": 876,
+      "documentWidth": 1432,
+      "documentHeight": 876,
+      "scrollX": 0,
+      "scrollY": 0,
+      "contentWidth": 1148,
+      "contentScrollWidth": 1148,
+      "contentHeight": 767,
+      "navHeight": 42
+    },
+    {
+      "label": "interface",
+      "width": 1432,
+      "height": 876,
+      "documentWidth": 1432,
+      "documentHeight": 876,
+      "scrollX": 0,
+      "scrollY": 0,
+      "contentWidth": 1148,
+      "contentScrollWidth": 1148,
+      "contentHeight": 767,
+      "navHeight": 42
+    },
+    {
+      "label": "selection",
+      "width": 1432,
+      "height": 876,
+      "documentWidth": 1432,
+      "documentHeight": 876,
+      "scrollX": 0,
+      "scrollY": 0,
+      "contentWidth": 1148,
+      "contentScrollWidth": 1148,
+      "contentHeight": 767,
+      "navHeight": 42
+    },
+    {
+      "label": "image-translation",
+      "width": 1432,
+      "height": 876,
+      "documentWidth": 1432,
+      "documentHeight": 876,
+      "scrollX": 0,
+      "scrollY": 0,
+      "contentWidth": 1148,
+      "contentScrollWidth": 1148,
+      "contentHeight": 767,
+      "navHeight": 42
+    },
+    {
+      "label": "video",
+      "width": 1432,
+      "height": 876,
+      "documentWidth": 1432,
+      "documentHeight": 876,
+      "scrollX": 0,
+      "scrollY": 0,
+      "contentWidth": 1148,
+      "contentScrollWidth": 1148,
+      "contentHeight": 767,
+      "navHeight": 42
+    },
+    {
+      "label": "writing",
+      "width": 1432,
+      "height": 876,
+      "documentWidth": 1432,
+      "documentHeight": 876,
+      "scrollX": 0,
+      "scrollY": 0,
+      "contentWidth": 1148,
+      "contentScrollWidth": 1148,
+      "contentHeight": 767,
+      "navHeight": 42
+    },
+    {
+      "label": "advanced",
+      "width": 1432,
+      "height": 876,
+      "documentWidth": 1432,
+      "documentHeight": 876,
+      "scrollX": 0,
+      "scrollY": 0,
+      "contentWidth": 1148,
+      "contentScrollWidth": 1148,
+      "contentHeight": 767,
+      "navHeight": 42
+    },
+    {
+      "label": "data",
+      "width": 1432,
+      "height": 876,
+      "documentWidth": 1432,
+      "documentHeight": 876,
+      "scrollX": 0,
+      "scrollY": 0,
+      "contentWidth": 1148,
+      "contentScrollWidth": 1148,
+      "contentHeight": 767,
+      "navHeight": 42
+    },
+    {
+      "label": "interface-1024",
+      "width": 1024,
+      "height": 960,
+      "documentWidth": 1024,
+      "documentHeight": 960,
+      "scrollX": 0,
+      "scrollY": 0,
+      "contentWidth": 780,
+      "contentScrollWidth": 780,
+      "contentHeight": 851,
+      "navHeight": 42
+    },
+    {
+      "label": "interface-820",
+      "width": 820,
+      "height": 960,
+      "documentWidth": 820,
+      "documentHeight": 960,
+      "scrollX": 0,
+      "scrollY": 0,
+      "contentWidth": 576,
+      "contentScrollWidth": 576,
+      "contentHeight": 851,
+      "navHeight": 42
+    },
+    {
+      "label": "interface-390",
+      "width": 390,
+      "height": 960,
+      "documentWidth": 390,
+      "documentHeight": 960,
+      "scrollX": 0,
+      "scrollY": 0,
+      "contentWidth": 362,
+      "contentScrollWidth": 362,
+      "contentHeight": 761,
+      "navHeight": 41
+    },
+    {
+      "label": "interface-mobile-english",
+      "width": 390,
+      "height": 960,
+      "documentWidth": 390,
+      "documentHeight": 960,
+      "scrollX": 0,
+      "scrollY": 0,
+      "contentWidth": 362,
+      "contentScrollWidth": 362,
+      "contentHeight": 718,
+      "navHeight": 41
+    }
+  ],
+  "screenshots": [
+    "general-desktop.png",
+    "translation-desktop.png",
+    "image-translation-desktop.png",
+    "translation-input.png",
+    "interface-mobile-dark.png",
+    "interface-mobile-english.png"
+  ],
+  "consoleErrors": [],
+  "manifest": {
+    "options": "options.html",
+    "popup": "popup.html"
+  },
+  "launchMode": "macos-background-cdp",
+  "focusPolicy": "launchservices-no-foreground",
+  "windowPlacement": {
+    "mode": "background-visible-no-focus",
+    "visible": true,
+    "hidden": false,
+    "centered": true,
+    "windowState": "normal",
+    "bounds": {
+      "left": 1041,
+      "top": -1020,
+      "width": 1440,
+      "height": 960
+    },
+    "displayTarget": "secondary",
+    "source": "macos-nsscreen",
+    "screenIndex": 1,
+    "browserFrontmost": false
+  },
+  "navigationPreservesConfig": true,
+  "conditionalAnchors": true,
+  "keyboardNavigation": true,
+  "scrollHighlight": true,
+  "searchAndCrossPageLinks": true,
+  "existingViewTabsPreserved": true,
+  "localizedAnchors": [
+    {
+      "section": "general",
+      "labels": [
+        "Basics",
+        "Translation service selection",
+        "Web assistance",
+        "Basic preferences"
+      ]
+    },
+    {
+      "section": "translation",
+      "labels": [
+        "Reading assistance",
+        "Hover",
+        "Input fields",
+        "Full page",
+        "Page tools"
+      ]
+    },
+    {
+      "section": "interface",
+      "labels": [
+        "Translation style",
+        "Interface skin",
+        "Animation",
+        "Menu layout",
+        "Interface font"
+      ]
+    },
+    {
+      "section": "selection",
+      "labels": [
+        "Choose a default view",
+        "AI explanations",
+        "Speech & more preferences"
+      ]
+    },
+    {
+      "section": "image-translation",
+      "labels": [
+        "Translation services",
+        "Web image translation",
+        "Continuous manga translation",
+        "Area translation settings",
+        "Controls and cache",
+        "Recognition resources and downloads",
+        "Supported sites"
+      ]
+    },
+    {
+      "section": "video",
+      "labels": [
+        "Translation & display",
+        "Subtitle appearance",
+        "Local AI subtitles"
+      ]
+    },
+    {
+      "section": "writing",
+      "labels": [
+        "Writing service",
+        "Response style"
+      ]
+    },
+    {
+      "section": "advanced",
+      "labels": [
+        "Content detection",
+        "Translation cache",
+        "Requests & retries"
+      ]
+    },
+    {
+      "section": "data",
+      "labels": [
+        "Backup & import",
+        "Settings history"
+      ]
+    }
+  ],
+  "testedBase": "373572174a4253744a5d02049d11c238909ca92d",
+  "testedSourceTree": "0e2143d2d47513715641bee903b5cd5ba8a3e3a2"
+}

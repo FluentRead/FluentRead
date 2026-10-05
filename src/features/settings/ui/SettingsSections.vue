@@ -1,7 +1,7 @@
 <!--
  * @file src/features/settings/ui/SettingsSections.vue
  * 文件职责：承载 FluentRead Options 页面各业务设置分区，连接运行时配置、服务选择、快捷键、站点规则、翻译中心、OCR、词书以及导入导出和历史恢复。
- * 主要内容：图片设置优先展示语言、服务与识别选择，资源与入口按需展开；翻译设置首先展示带交互示例的阅读辅助，普通页面连续展示任务分组，统计与网站规则保留按任务切换的视图，集中分配功能服务并将模型用量合并到翻译统计，保留已访问表单实例；包含正文/全部节点识别范围；模板按 activeSection 展示业务分区，通用设置首先展示全局翻译开关，再按基础配置、网页辅助、基本偏好组织控件，软件语言保留固定英文标题与说明以便选错语言后恢复，提供当前默认服务的配置入口并保留译文样式跨页入口；图片与圈选合并在同页，共享仅在当前分区挂载的 OCR 管理组件；服务连接在主页面的服务目录内编辑，在界面风格页组织译文样式、风格与菜单栏布局，仅在高级选项激活时挂载缓存管理；脚本以独立配置副本隔离编辑与全局差分基线，协调网站入口、配置及凭据保存、历史恢复、能力过滤和离页补丁交接。
+ * 主要内容：图片设置优先展示语言、服务与识别选择，资源与入口按需展开；翻译设置首先展示带交互示例的阅读辅助，普通页面连续展示任务分组并标记顶部导航的滚动定位目标，统计与网站规则保留按任务切换的视图，集中分配功能服务并将模型用量合并到翻译统计，保留已访问表单实例；包含正文/全部节点识别范围；模板按 activeSection 展示业务分区，通用设置首先展示全局翻译开关，再按基础配置、网页辅助、基本偏好组织控件，软件语言保留固定英文标题与说明以便选错语言后恢复，提供当前默认服务的配置入口并保留译文样式跨页入口；图片与圈选合并在同页，共享仅在当前分区挂载的 OCR 管理组件；服务连接在主页面的服务目录内编辑，在界面风格页组织译文样式、风格与菜单栏布局，仅在高级选项激活时挂载缓存管理；脚本以独立配置副本隔离编辑与全局差分基线，协调网站入口、配置及凭据保存、历史恢复、能力过滤和离页补丁交接。
  * 模块边界：该组件负责设置 UI 编排但不实现 provider 网络、配置仓库或 feature 运行时；校验与迁移来自 core/config，持久化经 services/config，复杂子界面保持在各自 feature/组件内。
  -->
 <template>
@@ -12,6 +12,7 @@
     <SettingsGroup
       title="基础配置"
       data-testid="translation-display-settings"
+      data-settings-anchor="basics" data-settings-anchor-label="基础配置"
     >
       <SettingsItem label="默认网页翻译服务" :description="t('quickTranslation.defaultServiceDescription')">
         <div
@@ -66,7 +67,7 @@
       <strong>当前默认服务在此浏览器不可用</strong>
       <p>{{ selectedTextServiceUnavailableMessage }}请在上方选择可用服务。</p>
     </div>
-    <section id="feature-services" class="service-assignments-section" :aria-label="t('featureServices.assignments')">
+    <section id="feature-services" class="service-assignments-section" data-settings-anchor="services" :data-settings-anchor-label="t('featureServices.assignments')" :aria-label="t('featureServices.assignments')">
       <FeatureServiceSettings :config="config" :service-options="availableServiceOptions" @configure-service="openInputServiceSettings" />
     </section>
   </section>
@@ -89,7 +90,7 @@
   </section>
   <section v-if="hasVisitedSection('settings-selection')" v-show="props.activeSection === 'settings-selection'" id="settings-selection" class="settings-section">
     <SelectionSettings :config="config">
-    <SettingsGroup v-if="config.selectionTranslatorMode !== 'disabled'" title="触发与显示" description="推荐选择“点击图标”，选中文字后点击入口再翻译；选择快捷键或仅右键菜单时不显示浮动入口">
+    <SettingsGroup v-if="config.selectionTranslatorMode !== 'disabled'" title="触发与显示" data-settings-anchor="trigger" data-settings-anchor-label="触发与显示" description="推荐选择“点击图标”，选中文字后点击入口再翻译；选择快捷键或仅右键菜单时不显示浮动入口">
     <SettingsItem v-if="config.selectionTranslatorMode !== 'disabled'" label="显示内容" description="两种呈现均可保留原文或只显示译文">
       <SegmentedControl v-model="config.selectionTranslatorMode" :options="selectionTranslatorModeOptions.filter(item => item.value !== 'disabled')" label="划词显示内容" />
     </SettingsItem>
@@ -247,7 +248,7 @@
     </section>
     <section v-if="hasVisitedSection('settings-image-translation')" v-show="props.activeSection === 'settings-image-translation'" id="settings-image-translation" class="settings-section image-translation-settings">
       <MangaSettings v-if="props.activeSection === 'settings-image-translation'" v-model:image-enabled="imageTranslationEnabled" :settings="config" :available="browserCapabilities.imageTranslation" :service-options="availableServiceOptions">
-        <div id="settings-area-translation">
+        <div id="settings-area-translation" data-settings-anchor="area" :data-settings-anchor-label="t('area.settings.title')">
           <AreaTranslationSettings :config="config" :service-options="availableServiceOptions" :enabled="selectionAreaTranslationEnabled" :active="props.activeSection === 'settings-image-translation'" :show-ocr="false" compact @update:enabled="selectionAreaTranslationEnabled = $event" />
         </div>
       <template #resources><ImageOcrSettings v-if="props.activeSection === 'settings-image-translation'" compact v-model:source-language="config.from" /></template>
@@ -434,7 +435,7 @@
     </section>
 
     <section v-if="hasVisitedSection('settings-general')" v-show="props.activeSection === 'settings-general'" class="settings-section settings-section-continuation">
-      <SettingsGroup title="网页辅助">
+      <SettingsGroup title="网页辅助" data-settings-anchor="assistance" data-settings-anchor-label="网页辅助">
         <SettingsItem
           :label="t('settings.general.translationSettingsShortcut')"
           :description="t('settings.general.translationSettingsShortcutDescription')"
@@ -517,7 +518,7 @@
         </el-row>
 
       </SettingsGroup>
-      <SettingsGroup title="基本偏好">
+      <SettingsGroup title="基本偏好" data-settings-anchor="preferences" data-settings-anchor-label="基本偏好">
         <SettingsItem data-testid="ui-language-setting" :label="t('settings.general.language')" :description="t('language.settingsDescription')">
           <template #copy>
             <strong data-i18n-ignore>{{ t('settings.general.language') }}<span v-if="language !== 'en-US'" lang="en"> / App language</span></strong>

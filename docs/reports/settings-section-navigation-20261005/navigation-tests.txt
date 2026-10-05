@@ -1,0 +1,19 @@
+
+> FluentRead-流畅阅读@0.0.35 test /Users/thinkstu/Desktop/copy/FluentRead-settings-section-navigation
+> node scripts/testing/run-resource-safe.mjs -- vitest run "tests/optionsNavigation.test.ts" "tests/settingsUiArchitecture.test.ts" "tests/optionsAppNavigationLifecycle.test.ts" "tests/userscriptFullOptions.test.ts"
+
+[resource-safe] CPU target 60%, maxWorkers 2, concurrency 5, command: vitest run tests/optionsNavigation.test.ts tests/settingsUiArchitecture.test.ts tests/optionsAppNavigationLifecycle.test.ts tests/userscriptFullOptions.test.ts
+
+ RUN  v2.1.9 /Users/thinkstu/Desktop/copy/FluentRead-settings-section-navigation
+
+ ✓ tests/settingsUiArchitecture.test.ts (33 tests) 174ms
+ ✓ tests/optionsNavigation.test.ts (24 tests) 14ms
+ ✓ tests/optionsAppNavigationLifecycle.test.ts (6 tests) 1185ms
+   ✓ OptionsApp mounted hash navigation > isolates website tasks while preserving the continuous layout of ordinary settings 492ms
+ ✓ tests/userscriptFullOptions.test.ts (7 tests) 6ms
+
+ Test Files  4 passed (4)
+      Tests  70 passed (70)
+   Start at  13:12:15
+   Duration  2.84s (transform 231ms, setup 0ms, collect 605ms, tests 1.38s, environment 2ms, prepare 237ms)
+

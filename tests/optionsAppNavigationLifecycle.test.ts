@@ -56,7 +56,7 @@ async function mountOptions(hash = '#settings-selection') {
       if (id === '\0options-child-component') return 'export default {render: () => null};';
       if (id === '\0options-i18n') return 'export const useUiI18n = () => ({t: key => key, translateLegacy: text => text});';
       if (id === '\0options-config') return `export const {config, configReady, subscribeConfig} = globalThis.${TEST_KEY};`;
-      if (id === '\0options-appearance') return 'export const applyInterfaceSkin = () => {}; export const applyInterfaceFont = () => {};';
+      if (id === '\0options-appearance') return 'export const applyInterfaceSkin = () => {}; export const applyInterfaceFont = () => {}; export const applyInterfaceTheme = () => {}; export const setInterfaceAppearanceRoot = () => {};';
       return null;
     },
   };
@@ -152,8 +152,8 @@ describe('OptionsApp mounted hash navigation', () => {
     unmount?.();
     unmount = undefined;
     expect(removeEventListener).toHaveBeenCalledWith('hashchange', hashListener);
-    expect(mediaAdd).toHaveBeenCalledOnce();
-    expect(mediaRemove).toHaveBeenCalledOnce();
+    expect(mediaAdd).toHaveBeenCalledTimes(2);
+    expect(mediaRemove).toHaveBeenCalledTimes(2);
     expect(unsubscribeConfig).toHaveBeenCalledOnce();
     await navigateHash('#settings-vocabulary');
     expect(state.activeSection).toBe('settings-selection');
@@ -176,7 +176,7 @@ it('reveals collapsed groups and the correct page category for a cross-page cont
   state.selectSection('settings-translation', 'floating-ball-settings');
   expect(state.activePanel).toBe('tools');
   state.selectSection('settings-translation');
-  expect(state.activePanel).toBe('hover');
+  expect(state.activePanel).toBe('reading');
   state.toggleGroup(3);
   expect(state.isGroupOpen(3)).toBe(false);
   state.toggleGroup(3);

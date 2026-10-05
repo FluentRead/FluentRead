@@ -514,6 +514,8 @@ node scripts/testing/run-settings-hierarchy-ui-test.cjs \
 
 该专项在独立临时 Edge profile 中验证默认服务配置直达、浏览目录不改变默认服务、键盘展开、多 Key 保留、模型偏好与提示词保存、请求限制、快速关闭后的持久化、连续写入与两个设置页同步。还检查 18 个设置分区、1024/820/390 像素布局、窄屏目录及图标、深色和英文界面，并导出截图、布局尺寸与控制台错误。
 
+连续设置页的顶部同页导航可单独运行 `scripts/testing/run-settings-section-navigation-test.cjs`，传入 `--extension-dir .output/chrome-mv3`、`--playwright-root <bundled-node-packages>`、`--focus-safe-helper <skill>/scripts/focus-safe-browser.cjs` 和 `--artifacts-dir <evidence-dir>`。该专项覆盖通用、翻译、界面、划词、图片、视频、写作、高级及备份九个长表单的入口点击、滚动高亮、键盘操作、条件模块、折叠展开、搜索与跨页定位交接，并检查统计/网站规则原有视图切换、1024/820/390 像素布局和英文标签。仅使用临时 profile、第二屏可见后台窗口；导航本身不得写配置或更改 URL。Firefox 实机不在该专项范围内。
+
 浏览器使用第二屏可见但不抢焦点窗口，结束后仅清理测试 profile。所有凭据都是测试占位符，不调用真实翻译服务；桌面窄屏验证不等同于手机或 Firefox 实机验证。
 
 ## 翻译服务目录

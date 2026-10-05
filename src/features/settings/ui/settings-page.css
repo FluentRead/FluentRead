@@ -1,7 +1,7 @@
 /**
  * @file src/features/settings/ui/settings-page.css
  * 文件职责：定义 Options 设置应用的全局页面骨架与 Element Plus 外观覆盖，包括分组侧边栏与搜索、页内分类、滚动工作区、设置卡片和特殊全宽业务视图。
- * 主要内容：样式引入共享 token，将品牌名称与小字宣传语排列在固定尺寸图标右侧；关于页使用宽幅品牌介绍与体验入口，下方以项目链接卡片和独立赞赏区利用内容空间；配置桌面与窄屏响应式布局、焦点态、导航分组、数字输入的独立操作区、支持多语言换行的表单与操作控件、服务/翻译中心视图、深色主题及固定标签列和控件列。
+ * 主要内容：样式引入共享 token，将品牌名称与小字宣传语排列在固定尺寸图标右侧；关于页使用宽幅品牌介绍与体验入口，下方以项目链接卡片和独立赞赏区利用内容空间；配置桌面与窄屏响应式布局、焦点态、导航分组、顶部同页定位导航、数字输入的独立操作区、支持多语言换行的表单与操作控件、服务/翻译中心视图、深色主题及固定标签列和控件列。
  * 模块边界：该文件只作用于扩展设置页面的整体布局，不承载配置逻辑或 feature 内部组件细节；分区专属样式在 settings-sections.css，通用设计变量位于 src/ui/styles/tokens.css。
  */
 @import "../../../ui/styles/tokens.css";
@@ -660,6 +660,10 @@ h1 { margin-bottom: 6px; font-size: 26px; line-height: 1.25; letter-spacing: -.0
 .settings-app .settings-card .el-button > span { white-space: normal; overflow-wrap: anywhere; line-height: 1.4; }
 .settings-app .settings-page-tabs { flex-wrap: wrap; gap: 8px 20px; }
 .settings-app .settings-page-tabs button { white-space: normal; overflow-wrap: anywhere; line-height: 1.4; }
+/* 连续表单的分区入口保持一行，窄屏只滚动导航本身，保留设置内容的阅读高度。 */
+.settings-app .settings-section-navigation { flex-wrap: nowrap; gap: 24px; overscroll-behavior-x: contain; }
+.settings-app .settings-section-navigation button { white-space: nowrap; overflow-wrap: normal; }
+.settings-app .settings-section-navigation button:focus-visible { outline-offset: -3px; border-radius: 4px; }
 .settings-app .settings-card .el-collapse-item__header { height: auto; min-height: 56px; padding-block: 12px; line-height: 1.5; }
 @media (max-width: 700px) {
   .settings-app .sidebar { flex-wrap: wrap; gap: 10px; }

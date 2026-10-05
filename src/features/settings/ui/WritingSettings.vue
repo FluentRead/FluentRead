@@ -1,7 +1,7 @@
 <!--
  * @file src/features/settings/ui/WritingSettings.vue
  * 文件职责：提供写作助手总开关、默认回复偏好和 AI 服务连接设置。
- * 主要内容：用单层开关、紧凑的服务语言网格与并排风格示例组织设置，提前提示缺失配置，清楚区分默认偏好与真实生成。
+ * 主要内容：用单层开关、紧凑的服务语言网格与并排风格示例组织设置，提前提示缺失配置，清楚区分默认偏好与真实生成；服务与风格模块提供同页导航目标。
  * 模块边界：只编辑设置中心持久化的同一份写作配置并恢复被禁用的网站；不提供快捷键或重复入口开关，不请求模型也不生成真实正文。
  -->
 <template>
@@ -13,7 +13,7 @@
       <p class="writing-site-help">{{ t('writing.entry.siteHelp') }}</p>
       <div v-for="domain in config.writing.disabledDomains" :key="domain" class="writing-disabled-site" :data-writing-disabled-site="domain"><span>{{ domain }}</span><button type="button" :aria-label="t('writing.entry.restoreSite', {domain})" @click="config.writing.disabledDomains = config.writing.disabledDomains.filter(item => item !== domain)">{{ t('writing.entry.restore') }}</button></div>
     </SettingsGroup>
-    <SettingsGroup title="写作服务">
+    <SettingsGroup title="写作服务" data-settings-anchor="service" data-settings-anchor-label="写作服务">
       <div class="writing-service-grid">
         <SettingsItem label="AI 服务" stacked>
           <el-select v-model="config.writing.service" :empty-values="[null, undefined]" aria-label="写作服务" placeholder="选择 AI 服务" @change="config.writing.model = ''" filterable>
@@ -45,7 +45,7 @@
         <p class="writing-setup-message" role="status">{{ readiness.message }}</p>
       </div>
     </SettingsGroup>
-    <SettingsGroup title="回答风格">
+    <SettingsGroup title="回答风格" data-settings-anchor="style" data-settings-anchor-label="回答风格">
       <div class="writing-default-style">
         <div class="writing-style-controls">
         <section><h3>长度</h3><WritingChoices v-model="config.writing.length" :options="WRITING_LENGTHS" label="长度" /></section>

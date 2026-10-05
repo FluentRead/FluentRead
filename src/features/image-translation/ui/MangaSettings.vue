@@ -1,41 +1,41 @@
 <!--
  * @file src/features/image-translation/ui/MangaSettings.vue
  * 文件职责：组织漫画连续阅读的设置，优先展示公共语言与翻译服务、单图识别方式和漫画提前翻译；入口、缓存、资源和网站规则按需展开。
- * 主要内容：图片可选择通用 Tesseract 或与漫画共用的 PaddleOCR；漫画开关独立于单张图片和悬浮球，资源按用途分组，自定义网站规则按精确地址与图片选择器添加和删除，非法输入给出就地反馈。
+ * 主要内容：图片可选择通用 Tesseract 或与漫画共用的 PaddleOCR；漫画开关独立于单张图片和悬浮球，资源按用途分组，自定义网站规则按精确地址与图片选择器添加和删除，非法输入给出就地反馈；主要模块标记页内导航目标，保留折叠区的渐进展开。
  * 模块边界：编辑父级配置副本，由既有设置持久化负责保存；不调用漫画翻译、不扫描其他网站、不访问会员或章节接口。
  -->
 <template>
   <div class="manga-settings" data-testid="manga-settings">
-    <section class="manga-settings-card manga-translation-options">
+    <section class="manga-settings-card manga-translation-options" data-settings-anchor="language-service" :data-settings-anchor-label="t('翻译服务')">
       <div class="manga-setting-fields">
         <label>{{ t('area.settings.sourceLanguage') }}<UiSelect v-model="settings.from" :aria-label="t('area.settings.sourceLanguage')"><el-option v-for="item in sourceLanguages" :key="item.value" :value="item.value" :label="t(item.label)" /></UiSelect></label>
         <label>{{ t('翻译成') }}<UiSelect v-model="settings.to" :aria-label="t('漫画目标语言')"><el-option v-for="item in targetLanguages" :key="item.value" :value="item.value" :label="t(item.label)" data-i18n-ignore>{{ t(item.label) }}</el-option></UiSelect></label>
         <label>{{ t('翻译服务') }}<UiSelect v-model="settings.imageTranslationService" :empty-values="[null, undefined]" :placeholder="t('跟随网页翻译服务')" :aria-label="t('漫画翻译服务')"><el-option value="" :label="t('跟随网页翻译服务')" /><el-option v-for="item in serviceOptions" :key="item.value" :value="item.value" :disabled="item.disabled" :label="t(item.label)" data-i18n-ignore>{{ t(item.label) }}</el-option></UiSelect></label>
       </div>
     </section>
-    <section class="manga-settings-card image-recognition-settings" data-testid="image-recognition-settings">
+    <section class="manga-settings-card image-recognition-settings" data-testid="image-recognition-settings" data-settings-anchor="image" :data-settings-anchor-label="t('网页图片翻译')">
       <header><div><h2>{{ t('网页图片翻译') }}</h2><p>{{ t('悬停图片或右键翻译，随时对照原图。') }}</p></div><el-switch :model-value="imageEnabled" :disabled="!available" :aria-label="t('网页图片翻译')" @update:model-value="emit('update:imageEnabled', Boolean($event))" /></header>
       <label class="manga-setting-inline">{{ t('图片识别方式') }}<UiSelect v-model="settings.imageTranslationOcrEngine" :disabled="!available" :aria-label="t('图片识别方式')"><el-option value="tesseract" :label="t('通用文字 · Tesseract')" /><el-option value="paddle" :label="t('漫画文字 · PaddleOCR')" /></UiSelect></label>
       <p class="image-engine-hint">{{ t(settings.imageTranslationOcrEngine === 'paddle' ? '适合漫画与气泡文字。首次翻译下载约 30 MB，与漫画共用，已下载无需重复下载。' : '适合截图、图表与清晰排版文字。按原文语言准备语言包。') }}</p>
     </section>
-    <section class="manga-settings-card">
+    <section class="manga-settings-card" data-settings-anchor="manga" :data-settings-anchor-label="t('漫画连续翻译')">
       <header><div><h2>{{ t('漫画连续翻译') }}</h2><p>{{ t('开启后随滚动自动翻译新页面，可随时切回原图') }}</p></div><el-switch v-model="settings.imageTranslationMangaEnabled" :disabled="!available" :aria-label="t('启用漫画连续翻译')" /></header>
       <label class="manga-setting-inline manga-prefetch-setting">{{ t('提前翻译后续页面') }}<UiSelect v-model="settings.imageTranslationMangaPrefetchPages" :disabled="!available || !settings.imageTranslationMangaEnabled" :aria-label="t('提前翻译后续页面')"><el-option :value="0" :label="t('只翻译当前页面')" /><el-option v-for="count in 5" :key="count" :value="count" :label="`${count} ${t('张图片')}`" /></UiSelect></label>
       <p>{{ t('使用 PaddleOCR，当前页优先，只提前处理已加载的图片。') }}</p>
     </section>
     <slot />
-    <details class="manga-settings-card manga-advanced">
+    <details class="manga-settings-card manga-advanced" data-settings-anchor="entry-cache" :data-settings-anchor-label="t('入口与缓存')">
       <summary>{{ t('入口与缓存') }}</summary>
       <div class="manga-setting-row"><strong>{{ t('image.hover') }}</strong><el-switch v-model="settings.imageTranslationHoverEnabled" :disabled="!available || settings.disableImageTranslator" :aria-label="t('image.hover')" /></div>
       <div class="manga-setting-row"><strong>{{ t('image.context') }}</strong><el-switch v-model="settings.imageTranslationContextMenuEnabled" :disabled="!available || settings.disableImageTranslator" :aria-label="t('image.context')" /></div>
       <div class="manga-setting-row"><div><strong>{{ t('独立漫画按钮') }}</strong><p>{{ t('隐藏悬浮球时显示独立漫画按钮，阅读和翻译过程中不会自动弹出面板') }}</p></div><el-switch v-model="settings.imageTranslationMangaPromptEnabled" :disabled="!available || !settings.imageTranslationMangaEnabled" :aria-label="t('独立漫画按钮')" /></div>
       <label class="manga-setting-inline manga-cache-setting">{{ t('快速缓存图片数量') }}<UiSelect v-model="settings.imageTranslationMangaCachePages" :disabled="!available || !settings.imageTranslationMangaEnabled || !settings.useCache" :aria-label="t('快速缓存图片数量')"><el-option v-for="count in 24" :key="count" :value="count" :label="`${count} ${t('张图片')}`" /></UiSelect></label><small>{{ t('最近页面直接显示。较早页面保留轻量缓存，返回时自动恢复；大图会按内存预算减少快速缓存数量。') }}</small>
     </details>
-    <details v-if="available" class="manga-settings-card manga-resources" @toggle="resourcesOpen = ($event.target as HTMLDetailsElement).open">
+    <details v-if="available" class="manga-settings-card manga-resources" data-settings-anchor="resources" :data-settings-anchor-label="t('识别资源与下载')" @toggle="resourcesOpen = ($event.target as HTMLDetailsElement).open">
       <summary>{{ t('识别资源与下载') }}</summary>
       <template v-if="resourcesOpen"><MangaModelSettings v-if="settings.imageTranslationMangaEnabled || settings.imageTranslationOcrEngine === 'paddle'" :show-inpainting="settings.imageTranslationMangaEnabled" /><slot name="resources" /></template>
     </details>
-    <details class="manga-settings-card manga-sites">
+    <details class="manga-settings-card manga-sites" data-settings-anchor="sites" :data-settings-anchor-label="t('支持的网站')">
       <summary>{{ t('支持的网站') }}</summary>
       <div class="manga-site"><span><strong data-i18n-ignore>MANGA Plus</strong><small>{{ t('阅读器页面 · 滚动自动翻译') }}</small></span><span class="manga-site-badge">{{ t('内置适配') }}</span></div>
       <div class="manga-site"><span><strong data-i18n-ignore>Pixiv</strong><small>{{ t('作品阅读页 · 自动识别正文图片') }}</small></span><span class="manga-site-badge">{{ t('内置适配') }}</span></div>

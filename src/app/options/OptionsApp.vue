@@ -1,7 +1,7 @@
 <!--
  @file src/app/options/OptionsApp.vue
  文件职责：实现扩展 Options 页的顶层布局，组织设置导航、全局搜索结果和学习中心入口，并把选中分区交给对应 feature UI。
- 主要内容：侧栏展示品牌与多语言宣传语；关于页以宽幅品牌介绍、核心体验快捷入口、项目链接卡片和独立赞赏区组织内容；渲染默认展开的分组侧栏、窄屏分类选择和全局搜索；普通设置连续展示，服务目录使用完整工作区，统计与网站规则按任务保留视图切换，复用 settingsNavigation 的项目解析/过滤逻辑，在 SettingsSections 与 LearningCenter 之间切换并重置内容区滚动，同步 URL hash 的深链接与前进后退导航，兼容模型用量迁入翻译统计后的旧链接。
+ 主要内容：侧栏展示品牌与多语言宣传语；关于页以宽幅品牌介绍、核心体验快捷入口、项目链接卡片和独立赞赏区组织内容；渲染默认展开的分组侧栏、窄屏分类选择和全局搜索；普通设置连续展示并提供顶部滚动定位导航，服务目录使用完整工作区，统计与网站规则按任务保留视图切换，复用 settingsNavigation 的项目解析/过滤逻辑，在 SettingsSections 与 LearningCenter 之间切换并重置内容区滚动，同步 URL hash 的深链接与前进后退导航，兼容模型用量迁入翻译统计后的旧链接。
  模块边界：组件负责页面壳、导航状态和主题、界面皮肤根属性同步，不定义具体配置字段、不直接写 browser.storage，也不实现词汇仓库；设置表单、收藏与阅读记录业务由各 feature 组件拥有。
 -->
 <template>
@@ -51,10 +51,19 @@
     <main class="workspace">
       <InterfaceBackdrop :motif="interfaceSkin.motif" />
       <h1 class="settings-content-title">{{ activeItem.title }}</h1>
-      <header v-if="(activePanels.length && !userscriptUnavailableSection) || props.onClose" class="topbar">
+      <header v-show="((activePanels.length || hasSectionAnchors) && !userscriptUnavailableSection) || props.onClose" class="topbar">
         <nav v-if="activePanels.length && !userscriptUnavailableSection" class="settings-page-tabs" :aria-label="t('options.categories')">
         <button v-for="panel in activePanels" :key="panel.id" type="button" :data-settings-category="panel.id" :aria-current="activePanel === panel.id ? 'true' : undefined" @click="selectPanel(panel.id)">{{ t(panel.labelKey) }}</button>
       </nav>
+        <SettingsSectionNavigation
+          v-else-if="!userscriptUnavailableSection"
+          ref="sectionNavigationElement"
+          :container="settingsContentElement"
+          :section-id="activeSection"
+          :panels="settingsPagePanels[activeSection] || []"
+          @availability-change="hasSectionAnchors = $event"
+          @navigate="cancelPendingSearchReveal?.()"
+        />
         <button v-if="props.onClose" type="button" class="userscript-settings-close" :aria-label="t('common.close')" :title="t('common.close')" @click="props.onClose()">
           <UiIcon name="close" :size="18" />
         </button>
@@ -159,6 +168,7 @@ import { computed, defineAsyncComponent, nextTick, onBeforeUnmount, onMounted, r
 import InterfaceBackdrop from '@/src/ui/components/InterfaceBackdrop.vue'
 import {getInterfaceSkinOption} from '@/src/core/config/interfaceAppearance'
 import SettingsNavigationIcon from '@/src/features/settings/ui/SettingsNavigationIcon.vue'
+import SettingsSectionNavigation from '@/src/features/settings/ui/components/SettingsSectionNavigation.vue'
 const SettingsSections = defineAsyncComponent(() => import('@/src/features/settings/ui/SettingsSections.vue'))
 const LearningCenter = defineAsyncComponent(() => import('@/src/features/settings/ui/LearningCenter.vue'))
 import {useUiI18n} from '@/src/ui/i18n'
@@ -242,6 +252,8 @@ const userscriptUnavailableSection = computed(() => browserCapabilities.browser 
   && userscriptUnavailableSections.has(activeSection.value))
 const navigationElement = ref<HTMLElement | null>(null)
 const settingsContentElement = ref<HTMLElement | null>(null)
+const hasSectionAnchors = ref(false)
+const sectionNavigationElement = ref<{cancelPendingAnchor: () => void; highlightAnchor: (id: string) => void} | null>(null)
 const mobileNavigationMedia = window.matchMedia('(max-width: 700px)')
 const systemThemeMedia = window.matchMedia('(prefers-color-scheme: dark)')
 function syncInterfaceTheme(theme: string | undefined): void {
@@ -341,6 +353,7 @@ function selectSection(requestedId: string, panelOrTargetId?: string) {
   if (requestedId === 'settings-model-usage') panelOrTargetId = 'usage'
   if (requestedId === 'settings-area-translation') panelOrTargetId = 'area'
   if (!navigation.some((item) => item.id === id)) return
+  sectionNavigationElement.value?.cancelPendingAnchor()
   searchRevealGeneration += 1
   cancelPendingSearchReveal?.()
   selectedPanels.value[id] = resolveSettingsPanel(id, panelOrTargetId)
@@ -384,17 +397,19 @@ async function revealSettingsTarget(result: SearchResult) {
         return
       }
       const selector = result.targetId ? `#${result.targetId}` : `[data-settings-panel="${result.panelId}"]`
-      const target = content.querySelector<HTMLElement>(`#${result.sectionId}`)?.querySelector<HTMLElement>(selector)
+      // 连续表单可能由多个同级 section 组成，目标不一定是首个 section 的后代。
+      const target = Array.from(content.querySelectorAll<HTMLElement>(selector)).find(element => element.getClientRects().length)
       if (!target?.getClientRects().length) return
       const targetRect = target.getBoundingClientRect()
       const contentTop = content.getBoundingClientRect().top
-      const centerOffset = targetRect.height < content.clientHeight
+      const centerOffset = result.targetId && !target.matches('.settings-section, .settings-page-panel') && targetRect.height < content.clientHeight
         ? (content.clientHeight - targetRect.height) / 2
         : 0
       content.scrollTo({
         top: Math.max(0, content.scrollTop + targetRect.top - contentTop - centerOffset),
         behavior: 'instant',
       })
+      if (result.panelId) sectionNavigationElement.value?.highlightAnchor(result.panelId)
       target.querySelector<HTMLElement>('[role="switch"]')?.focus({preventScroll: true})
     }
     const observer = new MutationObserver(revealTarget)

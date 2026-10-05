@@ -2,7 +2,7 @@
 /**
  * @file scripts/testing/run-google-drive-sync-ui-test.cjs
  * 文件职责：在临时 Edge 的后台可见窗口验证生产构建的加密同步页面与后台端口。
- * 主要内容：验证浏览器支持提示，再用虚构身份和 Drive HTTP 夹具覆盖确认、失败、恢复与窄屏。
+ * 主要内容：验证浏览器支持提示，再用虚构身份和 Drive HTTP 夹具覆盖同步、条件删除、账号切换与窄屏。
  * 模块边界：不连接真实 Google 账号，不读取日常 profile；报告只保存断言与虚构测试截图。
  */
 const fs = require('node:fs');
@@ -46,7 +46,7 @@ async function main() {
         // 夹具只修改本次临时 profile 的 worker，不授权或访问任何真实账号。
         await worker.evaluate(() => {
             Object.defineProperty(navigator, 'userAgent', {get: () => 'Chrome/142.0.0.0 fixture'});
-            globalThis.__driveFixture = {content: null, version: 0, authorizations: 0, clears: 0, requests: 0, uploads: 0, networkFailure: false};
+            globalThis.__driveFixture = {content: null, version: 0, authorizations: 0, clears: 0, requests: 0, uploads: 0, removes: 0, networkFailure: false, etagMode: 'v3', accountId: 'fixture-account', email: 'tester@fixture.invalid'};
             chrome.identity.getAuthToken = async ({interactive, scopes}) => {
                 if (JSON.stringify(scopes) !== JSON.stringify(['https://www.googleapis.com/auth/drive.appdata'])) throw new Error('fixture rejected extra OAuth scopes');
                 if (interactive) globalThis.__driveFixture.authorizations++;
@@ -59,11 +59,17 @@ async function main() {
                 const url = new URL(String(input));
                 const state = globalThis.__driveFixture;
                 const metadata = () => ({id: 'fixture-file', version: String(state.version), modifiedTime: '2026-10-02T00:00:00Z'});
-                const json = value => new Response(JSON.stringify(value), {headers: {'content-type': 'application/json'}});
+                const json = (value,etag) => new Response(JSON.stringify(value), {headers: {'content-type': 'application/json',...(etag ? {etag} : {})}});
                 if (url.hostname !== 'www.googleapis.com') return original(input, init);
                 state.requests++;
                 if (state.networkFailure) return new Response('fixture upstream failure', {status: 503});
-                if (url.pathname === '/drive/v3/about' && url.searchParams.get('fields') === 'user(permissionId,emailAddress)') return json({user: {permissionId: 'fixture-account', ...(state.omitEmail ? {} : {emailAddress: 'tester@fixture.invalid'})}});
+                if (url.pathname === '/drive/v3/about' && url.searchParams.get('fields') === 'user(permissionId,emailAddress)') return json({user: {permissionId: state.accountId, ...(state.omitEmail ? {} : {emailAddress: state.email})}});
+                if (init.method === 'DELETE' && /^\/drive\/v[23]\/files\/fixture-file$/u.test(url.pathname)) {
+                    state.removes++;state.lastDeleteApi=url.pathname;state.lastDeleteMatch=init.headers['If-Match'];
+                    if (!state.content) return new Response(null,{status:404});
+                    if (state.failDelete || init.headers['If-Match'] !== `"v${state.version}"`) return new Response(null,{status:412});
+                    state.content=null;return new Response(null,{status:204});
+                }
                 if (url.pathname.startsWith('/upload/drive/v3/files')) {
                     const body = String(init.body);
                     const marker = 'Content-Type: application/json\r\n\r\n';
@@ -72,11 +78,12 @@ async function main() {
                     const envelope = JSON.parse(content);
                     if (envelope.format !== 'fluentread-drive-encrypted' || !envelope.ciphertext) throw new Error('fixture rejected plaintext upload');
                     state.content = content; state.version++; state.uploads++;
-                    return json(metadata());
+                    return json(metadata(),`"v${state.version}"`);
                 }
                 if (url.pathname === '/drive/v3/files') return json({files: state.content ? [metadata()] : []});
                 if (url.searchParams.get('alt') === 'media') return new Response(state.content);
-                if (url.pathname === '/drive/v3/files/fixture-file') return json(metadata());
+                if (url.pathname === '/drive/v3/files/fixture-file') return json(metadata(),state.etagMode==='v3'?`"v${state.version}"`:undefined);
+                if (url.pathname === '/drive/v2/files/fixture-file') return json({...metadata(),modifiedDate:'2026-10-02T00:00:00Z',...(state.etagMode==='v2'?{etag:`"v${state.version}"`}:{})});
                 throw new Error('unexpected fixture Google endpoint');
             };
         });
@@ -88,6 +95,39 @@ async function main() {
         check(!(await card.innerText()).includes('固定应用口令') && !(await card.innerText()).includes('隐藏应用数据区'), 'card omits the two removed technical paragraphs');
         const disconnected = path.join(artifactsDir, 'sync-disconnected-desktop.png');
         await page.screenshot({path: disconnected}); report.screenshots.push(disconnected);
+        if (process.argv.includes('--delete-only')) {
+            const deletion=page.locator('.cloud-delete-dialog');const sync=page.locator('.drive-dialog');
+            async function openDelete() {await page.locator('[data-testid="google-drive-delete-backup"]').click();await deletion.waitFor();}
+            async function cancelDelete() {await page.locator('[data-testid="cloud-delete-cancel"]').click();await deletion.waitFor({state:'hidden'});}
+            async function confirmDelete() {await page.locator('[data-testid="cloud-delete-confirm"]').click();await deletion.waitFor({state:'hidden'});}
+            async function shot(name) {
+                await page.waitForFunction(()=>!document.querySelector('.el-message'),null,{timeout:6000});
+                await page.evaluate(async()=>{await new Promise(requestAnimationFrame);await Promise.all(document.getAnimations().filter(animation=>animation.effect?.getComputedTiming().iterations!==Infinity).map(animation=>animation.finished.catch(()=>undefined)));});
+                const target=path.join(artifactsDir,name+'.png');await page.screenshot({path:target});report.screenshots.push(target);
+            }
+            await openDelete();check((await deletion.innerText()).includes('没有云端备份'),'Google empty backup can finish without deleting');await confirmDelete();
+            check(await worker.evaluate(()=>globalThis.__driveFixture.removes===0),'empty Google deletion makes no DELETE request');
+            await page.locator('[data-testid="google-drive-sync-now"]').click();await sync.waitFor();await page.locator('[data-testid="google-drive-confirm"]').click();await sync.waitFor({state:'hidden'});
+            await openDelete();check((await deletion.innerText()).includes('tester@fixture.invalid'),'Google deletion names the actual authorized account');await shot('cloud-delete-drive-desktop');await cancelDelete();
+            check(await worker.evaluate(()=>Boolean(globalThis.__driveFixture.content)&&globalThis.__driveFixture.removes===0),'Google cancel keeps cloud data');
+            await openDelete();await worker.evaluate(()=>{globalThis.__driveFixture.email='other@fixture.invalid';globalThis.__driveFixture.accountId='fixture-other';});
+            await page.locator('[data-testid="google-drive-delete-switch-account"]').click();await deletion.getByText('other@fixture.invalid',{exact:true}).waitFor();
+            check(await worker.evaluate(()=>globalThis.__driveFixture.removes===0),'changing deletion account only opens a fresh preview');await cancelDelete();
+            await worker.evaluate(()=>{globalThis.__driveFixture.email='tester@fixture.invalid';globalThis.__driveFixture.accountId='fixture-account';});
+            await openDelete();await worker.evaluate(()=>{globalThis.__driveFixture.version++;});await confirmDelete();await card.getByText('云端备份已变化',{exact:false}).waitFor();
+            check(await worker.evaluate(()=>Boolean(globalThis.__driveFixture.content)&&globalThis.__driveFixture.removes===0),'Google version drift does not delete the new backup');
+            await worker.evaluate(()=>{globalThis.__driveFixture.etagMode='none';});await openDelete();check(await page.locator('[data-testid="cloud-delete-unsupported"]').isVisible()&&!(await page.locator('[data-testid="cloud-delete-confirm"]').isEnabled()),'Google missing strong version shows management guidance');await cancelDelete();
+            await worker.evaluate(()=>{globalThis.__driveFixture.etagMode='v2';globalThis.__driveFixture.content='unreadable backup';globalThis.__driveFixture.version++;});
+            await openDelete();check(await page.locator('[data-testid="cloud-delete-confirm"]').isEnabled(),'Google unreadable backup is deletable using matching v2 ETag');
+            await page.setViewportSize({width:390,height:900});check(await deletion.evaluate(el=>el.scrollWidth<=el.clientWidth+1),'Google deletion dialog fits narrow screens');await shot('cloud-delete-drive-mobile');
+            const before=await page.evaluate(async()=>({config:(await chrome.runtime.sendMessage({type:'configStorageRead',key:'local:config'})).value,credentials:(await chrome.runtime.sendMessage({type:'configStorageRead',key:'local:credentials'})).value}));await confirmDelete();
+            const after=await page.evaluate(async()=>({config:(await chrome.runtime.sendMessage({type:'configStorageRead',key:'local:config'})).value,credentials:(await chrome.runtime.sendMessage({type:'configStorageRead',key:'local:credentials'})).value}));
+            check(JSON.stringify(before)===JSON.stringify(after),'Google deletion keeps real local configuration and credentials');
+            check(await worker.evaluate(()=>!globalThis.__driveFixture.content&&globalThis.__driveFixture.lastDeleteApi==='/drive/v2/files/fixture-file'&&globalThis.__driveFixture.lastDeleteMatch===`"v${globalThis.__driveFixture.version}"`),'Google deletes through the same v2 API with If-Match');
+            check(!(await card.innerText()).includes('上次同步'),'Google successful deletion clears account and sync record');
+            await openDelete();await confirmDelete();check(await worker.evaluate(()=>globalThis.__driveFixture.removes===1),'Google repeated absent deletion is harmless');
+            check(report.consoleErrors.length===0,'Google deletion has no console errors');report.ok=true;return;
+        }
         const initialClears = await worker.evaluate(() => globalThis.__driveFixture.clears);
         await worker.evaluate(() => {globalThis.__driveFixture.scopes = ['email'];});
         await page.locator('[data-testid="google-drive-sync-now"]').click();

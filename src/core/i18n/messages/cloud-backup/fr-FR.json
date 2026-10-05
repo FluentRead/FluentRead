@@ -88,15 +88,36 @@
     "settings.cloud.fieldLabel.2": "Raccourci de survol enregistré",
     "settings.cloud.fieldLabel.3": "Mode de sélection enregistré",
     "settings.cloud.fieldLabel.4": "Modèle local de reconnaissance vocale",
-    "settings.cloud.cleanupPending": "Configuration synchronisée, mais le nettoyage du cache d’autorisation reste à effectuer. Rouvrez les paramètres pour réessayer.",
+    "settings.cloud.cleanupPending": "L’opération est terminée, mais le cache d’autorisation n’a pas été effacé. Rouvrez les paramètres pour réessayer.",
     "settings.cloud.versionMissing": "La sauvegarde ne fournit pas de version permettant un remplacement sûr. Vous pouvez la restaurer ; relisez-la avant de réessayer.",
     "settings.cloud.verifyFailed": "La vérification de la sauvegarde a échoué. Relisez-la avant de réessayer ; la configuration de cet appareil n’a pas changé.",
-    "settings.cloud.restoreOnly": "Vous pouvez restaurer cette sauvegarde, mais le service ne fournit pas d’identifiant de version pour la remplacer en toute sécurité. L’enregistrement et la fusion sont actuellement indisponibles."
+    "settings.cloud.restoreOnly": "Vous pouvez restaurer cette sauvegarde, mais le service ne fournit pas d’identifiant de version pour la remplacer en toute sécurité. L’enregistrement et la fusion sont actuellement indisponibles.",
+    "settings.cloud.deleteBackup": "Supprimer la sauvegarde cloud",
+    "settings.cloud.deleteTitle": "Supprimer la sauvegarde cloud ?",
+    "settings.cloud.deleteDescription": "Cette sauvegarde ne pourra plus être restaurée après suppression.",
+    "settings.cloud.deleteLocalPreserved": "Les paramètres locaux et clés API sont conservés.",
+    "settings.cloud.deleteHistory": "Seul le fichier actuel est supprimé. Videz séparément la corbeille, les versions conservées et les copies sur les autres appareils.",
+    "settings.cloud.deleteRecreate": "Une synchronisation manuelle ultérieure peut créer une nouvelle sauvegarde. Les autres appareils peuvent aussi la téléverser à nouveau.",
+    "settings.cloud.deleteUnsupported": "Le service ne fournit pas les informations de version nécessaires à une suppression sûre. La suppression est indisponible ici.",
+    "settings.cloud.deleteManualDrive": "Dans Google Drive, ouvrez Paramètres → Gérer les applications → FluentRead pour effacer les données de l’application.",
+    "settings.cloud.deleteManualWebDav": "Supprimez manuellement FluentRead/fluentread-config.encrypted.json chez votre fournisseur WebDAV et conservez les autres fichiers.",
+    "settings.cloud.deleteConfirm": "Supprimer",
+    "settings.cloud.deleteFinish": "Terminer",
+    "settings.cloud.deleteAbsent": "Aucune sauvegarde cloud",
+    "settings.cloud.deleteAbsentDescription": "Rien à supprimer. Terminez pour effacer l’ancienne trace de synchronisation.",
+    "settings.cloud.deleteSuccess": "Sauvegarde cloud supprimée. Paramètres locaux conservés.",
+    "settings.cloud.deleteDetails": "Plus de détails"
   },
   "legacy": {
     "普通云备份包含不属于此范围的字段，请重新生成备份。": "La sauvegarde cloud des paramètres généraux contient des champs hors de sa portée. Créez une nouvelle sauvegarde.",
     "敏感信息同步选项必须为布尔值。": "L’option de synchronisation des informations sensibles doit être une valeur booléenne.",
     "同步预览缺少敏感信息范围，请重新生成。": "La portée des informations sensibles manque dans l’aperçu de synchronisation. Créez un nouvel aperçu.",
-    "同步预览范围已变化，请重新生成。": "La portée de l’aperçu de synchronisation a changé. Créez un nouvel aperçu."
+    "同步预览范围已变化，请重新生成。": "La portée de l’aperçu de synchronisation a changé. Créez un nouvel aperçu.",
+    "删除预览已失效，请重新检查云端备份。": "L’aperçu a expiré. Vérifiez à nouveau la sauvegarde.",
+    "删除目标账号或连接已变化，请重新检查云端备份。": "Le compte ou la connexion cible a changé. Vérifiez à nouveau.",
+    "云端备份已变化，请重新检查后再删除。": "La sauvegarde a changé. Vérifiez-la avant de la supprimer.",
+    "云端备份缺少安全删除所需的版本信息，请到服务商管理页面手动删除。": "Les informations de version nécessaires sont absentes. Supprimez la copie dans la page de gestion du service.",
+    "删除后仍检测到云端备份，可能已被其他设备重新创建，请重新检查。": "Une copie est encore présente après suppression. Un autre appareil l’a peut-être recréée. Vérifiez à nouveau.",
+    "删除预览属于其他页面或已失效，请在原设置页面继续。": "Cet aperçu appartient à une autre page ou a expiré. Continuez dans la page d’origine."
   }
 }

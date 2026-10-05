@@ -9,6 +9,21 @@ const session = {account: {id: 'fixture-account', email: 'tester@fixture.invalid
 function json(value: unknown, etag?: string) {return new Response(JSON.stringify(value), {headers: etag ? {etag} : {}});}
 afterEach(() => vi.useRealTimers());
 describe('Google Drive appDataFolder HTTP 边界', () => {
+    it('删除使用同版本 API 的 If-Match，缺失文件幂等成功，冲突和鉴权失败保留错误', async () => {
+        for (const conditionalApi of [undefined, 'v2'] as const) {
+            for (const status of [204, 404]) {
+                const fetcher = vi.fn<typeof fetch>(async () => new Response(null, {status}));
+                await createDriveApi(fetcher).remove(session, {...metadata, etag: '"delete-one"', conditionalApi});
+                expect(fetcher).toHaveBeenCalledWith(`https://www.googleapis.com/drive/${conditionalApi ?? 'v3'}/files/fixture%2Ffile`, expect.objectContaining({method: 'DELETE', headers: {'If-Match': '"delete-one"', Authorization: 'Bearer fixture-token'}, redirect: 'error', credentials: 'omit'}));
+            }
+        }
+        for (const status of [401, 403, 412, 500]) {
+            await expect(createDriveApi(vi.fn(async () => new Response('private failure', {status}))).remove(session, {...metadata, etag: '"one"'})).rejects.toMatchObject({status});
+        }
+        const blocked = vi.fn();
+        for (const patch of [{etag: undefined}, {etag: 'W/"weak"'}, {readOnly: true as const, etag: '"strong"'}]) await expect(createDriveApi(blocked).remove(session, {...metadata, ...patch})).rejects.toThrow('安全删除');
+        expect(blocked).not.toHaveBeenCalled();
+    });
     it('v3 不返回 ETag 时从相同文件版本的 v2 元数据补取，并在 v2 上条件更新及回读', async () => {
         let version = '1';
         let saved = await encryptDriveConfig({to:'fr'}, 'fixture secure passphrase');

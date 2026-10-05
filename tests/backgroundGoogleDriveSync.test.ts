@@ -7,10 +7,17 @@ import {DriveConfigError} from '@/src/core/config/driveSync';
 import type {createGoogleDriveSync} from '@/src/services/config/googleDriveSync';
 
 function fixture(trusted = true) {
-    const service = {status: vi.fn(), cancel: vi.fn(), prepare: vi.fn(), commit: vi.fn()} as unknown as ReturnType<typeof createGoogleDriveSync>;
+    const service = {status: vi.fn(), cancel: vi.fn(), prepare: vi.fn(), commit: vi.fn(), prepareDelete: vi.fn(), commitDelete: vi.fn()} as unknown as ReturnType<typeof createGoogleDriveSync>;
     return {service, handler: createGoogleDriveSyncHandler(service, () => trusted)};
 }
 describe('Google Drive 可信消息协议', () => {
+    it('Google Drive 删除动作绑定设置页身份和非空确认 ID，不接受任意文件地址', async () => {
+        const denied=fixture(false); await denied.handler.handle({type,clientId:'delete-page',action:'prepareDelete'},{});expect(denied.service.prepareDelete).not.toHaveBeenCalled();
+        const f=fixture();await f.handler.handle({type,clientId:'delete-page',action:'prepareDelete'},{sender:{tab:{id:7}}});
+        expect(f.service.prepareDelete).toHaveBeenCalledWith(7,'delete-page');
+        for(const id of [undefined,null,1,'','x'.repeat(65)]) expect(await f.handler.handle({type,clientId:'delete-page',action:'commitDelete',id},{})).toMatchObject({success:false});
+        await f.handler.handle({type,clientId:'delete-page',action:'commitDelete',id:'delete-id'},{sender:{tab:{id:7}}});expect(f.service.commitDelete).toHaveBeenCalledWith('delete-id',7,'delete-page');
+    });
     it('设置页可操作，其他扩展、网页、popup、路径前缀和非法 URL 都不能操作', () => {
         const options = 'chrome-extension://fixture/options.html';
         expect(isGoogleDriveSettingsSender({id: 'fixture', url: `${options}?test=1#backup`}, 'fixture', options)).toBe(true);

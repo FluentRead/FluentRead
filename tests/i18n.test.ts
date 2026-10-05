@@ -57,7 +57,7 @@ describe('界面 i18n 契约', () => {
       expect(translate('settings.cloud.syncNow', languages[index], {provider: 'WebDAV'})).toContain('WebDAV');
       expect(translate('settings.cloud.syncNow', languages[index], {provider: 'Google Drive'})).toContain('Google Drive');
       expect(translate('settings.webdav.error.http', languages[index], {status: 502})).toContain('502');
-      if (languages[index] !== 'zh-CN') for (const source of ['请先设置 WebDAV 服务器和应用密码。', '同步连接已变化，请重新生成预览。']) expect(translateLegacyText(source, languages[index])).not.toBe(source);
+      if (languages[index] !== 'zh-CN') for (const source of ['请先设置 WebDAV 服务器和应用密码。', '同步连接已变化，请重新生成预览。', '删除预览已失效，请重新检查云端备份。', '删除目标账号或连接已变化，请重新检查云端备份。', '云端备份已变化，请重新检查后再删除。', '云端备份缺少安全删除所需的版本信息，请到服务商管理页面手动删除。', '删除后仍检测到云端备份，可能已被其他设备重新创建，请重新检查。', '删除预览属于其他页面或已失效，请在原设置页面继续。']) expect(translateLegacyText(source, languages[index])).not.toBe(source);
     }
     expect(JSON.stringify(catalogs[1])).not.toMatch(/[\u3400-\u9fff]/u);
     expect(translate('settings.cloud.syncNow', 'zh-CN', {provider: 'Google Drive'})).toBe('立即与Google Drive同步');

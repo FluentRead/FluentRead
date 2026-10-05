@@ -1,7 +1,7 @@
 /**
  * @file src/platform/webdav/api.ts
- * 文件职责：在用户指定的 WebDAV 目录下读写 FluentRead 配置密文并验证服务器能力。
- * 主要内容：只读 PROPFIND 测试、首次备份识别、从文件属性或 HEAD 补取并核验 ETag、缺少写入能力的只读恢复、条件 PUT 与大小限制；
+ * 文件职责：在用户指定的 WebDAV 目录下读写、条件删除 FluentRead 配置密文并验证服务器能力。
+ * 主要内容：只读 PROPFIND 测试、首次备份识别、从文件属性或 HEAD 补取并核验 ETag、只读恢复、条件 PUT/DELETE 与大小限制；
  * 禁止跟随重定向、携带浏览器 Cookie 或返回服务器异常正文，防止连接凭据流向其他地址。
  * 模块边界：只消费后台会话与密文，不读取配置或保存密码；冲突合并由云备份服务处理。
  */
@@ -130,5 +130,12 @@ export function createWebDavApi(fetcher: typeof fetch, options: {timeoutMs?: num
         if (!verified || verified.content !== content) throw new WebDavError('verify');
         return verified.file;
     }
-    return {test, read, write};
+    async function remove(session: WebDavSession, previous: CloudSyncFile): Promise<void> {
+        if (previous.readOnly || !strongCloudEtag(previous.etag) || previous.id !== filename(session)) throw new WebDavError('etag');
+        // 只删除固定备份文件；保留目录和其中的其他文件。缺失视为幂等成功，412 保留新版本。
+        await request(session, filename(session), {method: 'DELETE', headers: {'If-Match': previous.etag!}}, async response => {
+            if (![200, 204, 404].includes(response.status)) throw failure(response.status);
+        });
+    }
+    return {test, read, write, remove};
 }

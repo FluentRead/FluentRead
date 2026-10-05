@@ -29,6 +29,14 @@ Backups are encrypted on this device using a public application passphrase. **An
 - Unconfirmed sync transactions from before the upgrade expire. Generate a new preview and check its scope again.
 - Turning the sensitive-information option off or restoring only general settings does not change an existing cloud file. Sensitive information is removed from the current cloud file only after you confirm saving or merging general settings. This does not delete old files or versions retained by the provider; manage those copies separately.
 
+## Delete a cloud backup
+
+Select Google Drive or WebDAV in **Cloud configuration backup**, then click **Delete cloud backup**. The extension first checks the target and shows the actual account; WebDAV also shows its server address. Confirm to delete only the current FluentRead backup file, including any sensitive information already in it. Local settings, API keys and connection settings are kept. Successful deletion clears this provider’s local sync time and comparison baseline.
+
+Canceling, closing settings or changing the Google account does not delete a file. If no backup exists, choose **Done** to clear the old local sync record. An account, connection or version change requires a new preview. Deletion does not decrypt the backup, so old v1, v2 and unreadable backups can be removed. If safe version information is unavailable, the dialog offers manual cleanup instructions instead.
+
+The dialog prioritizes the target account, loss of the cloud backup and preservation of local settings. **More details** is collapsed by default. Manage provider trash, retained versions and copies on other devices separately. A later manual sync or another device can create a new backup. Clearing connection settings, revoking permission and uninstalling do not automatically delete cloud files.
+
 ## Local full backup
 
 Open **Settings → Backup & restore**, export a full data backup, and save the file. When importing, review the preview and its scope before restoring.

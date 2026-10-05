@@ -1,7 +1,7 @@
 /**
  * @file src/app/background/handlers/webDavBackup.ts
  * 文件职责：把 WebDAV 连接管理与配置云备份限制在扩展设置页的可信消息边界。
- * 主要内容：校验动作、客户端身份、连接字段和冲突选择；返回受控错误 key 或脱敏摘要。
+ * 主要内容：校验同步或删除动作、客户端身份、连接字段和冲突选择；返回受控错误 key 或脱敏摘要。
  * 模块边界：不读取配置或发起网络请求；不向 popup、content 或外部页面返回连接密码。
  */
 import type {BackgroundMessageHandler} from '../messageRouter';
@@ -26,6 +26,8 @@ export function createWebDavBackupHandler(service: ReturnType<typeof createWebDa
                 const clientId = message.clientId;
                 let data: unknown;
                 if (message.action === 'status') data = await service.status();
+                else if (message.action === 'prepareDelete') data = await service.prepareDelete(tabId, clientId);
+                else if (message.action === 'commitDelete' && typeof message.id === 'string' && message.id.length > 0 && message.id.length <= 64) data = await service.commitDelete(message.id, tabId, clientId);
                 else if (message.action === 'settings') data = await service.settings();
                 else if (message.action === 'clear') data = await service.clear(message.revision, tabId, clientId);
                 else if (message.action === 'save' || message.action === 'test') {

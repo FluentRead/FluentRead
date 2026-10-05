@@ -1,7 +1,7 @@
 /**
  * @file src/platform/google-drive/api.ts
- * 文件职责：在 Google Drive 的 appDataFolder 中读取与写入唯一的加密配置文件。
- * 主要内容：固定 Google 请求地址、超时和大小限制、重复文件检测、v3 缺少 ETag 时按相同版本补取 v2 元数据及条件更新、保存后回读校验。
+ * 文件职责：在 Google Drive 的 appDataFolder 中读取、写入与条件删除唯一的加密配置文件。
+ * 主要内容：固定 Google 请求地址、超时和大小限制、重复文件检测、v3 缺少 ETag 时按相同版本补取 v2 元数据及条件更新/删除、保存后回读校验。
  * 模块边界：只接受加密封装，账号会话由 auth 管理，配置合并由同步服务管理。
  */
 import {DriveError, type DriveSession} from './auth';
@@ -26,13 +26,13 @@ function v2File(value: unknown): DriveFile {
     return {...file({...value, modifiedTime: value.modifiedDate}, etag ?? null), ...(etag ? {conditionalApi: 'v2' as const} : {readOnly: true as const})};
 }
 export function createDriveApi(fetcher: typeof fetch) {
-    async function request<T>(session: DriveSession, url: string, init: RequestInit, consume: (response: Response) => Promise<T>): Promise<T> {
+    async function request<T>(session: DriveSession, url: string, init: RequestInit, consume: (response: Response) => Promise<T>, allowMissing = false): Promise<T> {
         return session.request(async token => {
             const controller = new AbortController();
             const timer = setTimeout(() => controller.abort(), 30_000);
             const operation = (async () => {
                 const response = await fetcher(url, {...init, headers: {...init.headers, Authorization: `Bearer ${token}`}, signal: controller.signal, redirect: 'error', credentials: 'omit', cache: 'no-store', referrerPolicy: 'no-referrer'});
-                if (!response.ok) {
+                if (!response.ok && !(allowMissing && response.status === 404)) {
                     if (response.status === 412) throw new DriveError('云端配置已变化，请重新生成预览。', 412);
                     if (response.status === 403) throw new DriveError('Google Drive 拒绝访问，请检查授权范围、测试用户及 API 配额。', 403);
                     throw new DriveError(`Google Drive 请求失败（HTTP ${response.status}），请重试。`, response.status);
@@ -111,5 +111,10 @@ export function createDriveApi(fetcher: typeof fetch) {
             throw error;
         }
     }
-    return {read, write};
+    async function remove(session: DriveSession, previous: DriveFile): Promise<void> {
+        if (previous.readOnly || !strongCloudEtag(previous.etag)) throw new DriveError('云端备份缺少安全删除所需的版本信息，请到服务商管理页面手动删除。');
+        // v2 资源的 ETag 必须配合同版本 API；禁止降级成无条件删除，也不删除整个应用空间。
+        await request(session, `${previous.conditionalApi === 'v2' ? V2_BASE : BASE}/${encodeURIComponent(previous.id)}`, {method: 'DELETE', headers: {'If-Match': previous.etag!}}, async () => undefined, true);
+    }
+    return {read, write, remove};
 }

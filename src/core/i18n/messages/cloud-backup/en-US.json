@@ -88,15 +88,36 @@
     "settings.cloud.fieldLabel.2": "Saved hover shortcut",
     "settings.cloud.fieldLabel.3": "Saved selection mode",
     "settings.cloud.fieldLabel.4": "Local speech recognition model",
-    "settings.cloud.cleanupPending": "Configuration synced, but authorization cache cleanup is pending. Reopen settings to retry.",
+    "settings.cloud.cleanupPending": "The operation completed, but its authorization cache could not be cleared. Reopening settings will retry.",
     "settings.cloud.versionMissing": "The backup lacks a version identifier for safe replacement. You can still restore it; read it again before retrying.",
     "settings.cloud.verifyFailed": "Cloud backup verification failed. Read the backup again before retrying; this device’s configuration was not changed.",
-    "settings.cloud.restoreOnly": "You can restore this backup, but the service has not provided a version identifier for safe replacement. Saving and merging are currently unavailable."
+    "settings.cloud.restoreOnly": "You can restore this backup, but the service has not provided a version identifier for safe replacement. Saving and merging are currently unavailable.",
+    "settings.cloud.deleteBackup": "Delete cloud backup",
+    "settings.cloud.deleteTitle": "Delete cloud backup?",
+    "settings.cloud.deleteDescription": "This cloud backup cannot be restored after deletion.",
+    "settings.cloud.deleteLocalPreserved": "Local settings and API keys are kept.",
+    "settings.cloud.deleteHistory": "Only the current backup file is deleted. Clear provider trash, retained versions and copies on other devices separately.",
+    "settings.cloud.deleteRecreate": "A later manual sync can create a new backup. Other devices may also upload it again.",
+    "settings.cloud.deleteUnsupported": "The provider did not supply the version information required for safe deletion. This backup cannot be deleted here.",
+    "settings.cloud.deleteManualDrive": "Open Google Drive Settings → Manage apps → FluentRead to clear the application data.",
+    "settings.cloud.deleteManualWebDav": "In your WebDAV provider, delete FluentRead/fluentread-config.encrypted.json manually and keep other files in the folder.",
+    "settings.cloud.deleteConfirm": "Delete backup",
+    "settings.cloud.deleteFinish": "Done",
+    "settings.cloud.deleteAbsent": "No cloud backup",
+    "settings.cloud.deleteAbsentDescription": "Nothing to delete. Finish to clear the old sync record.",
+    "settings.cloud.deleteSuccess": "Cloud backup deleted. Local settings kept.",
+    "settings.cloud.deleteDetails": "More details"
   },
   "legacy": {
     "普通云备份包含不属于此范围的字段，请重新生成备份。": "The general-settings cloud backup contains fields outside its scope. Generate a new backup.",
     "敏感信息同步选项必须为布尔值。": "The sensitive-information sync option must be a boolean.",
     "同步预览缺少敏感信息范围，请重新生成。": "The sync preview is missing its sensitive-information scope. Generate a new preview.",
-    "同步预览范围已变化，请重新生成。": "The sync preview’s scope has changed. Generate a new preview."
+    "同步预览范围已变化，请重新生成。": "The sync preview’s scope has changed. Generate a new preview.",
+    "删除预览已失效，请重新检查云端备份。": "The deletion preview expired. Check the cloud backup again.",
+    "删除目标账号或连接已变化，请重新检查云端备份。": "The target account or connection changed. Check the cloud backup again.",
+    "云端备份已变化，请重新检查后再删除。": "The cloud backup changed. Check it again before deleting.",
+    "云端备份缺少安全删除所需的版本信息，请到服务商管理页面手动删除。": "The backup lacks the version information required for safe deletion. Delete it manually in the provider management page.",
+    "删除后仍检测到云端备份，可能已被其他设备重新创建，请重新检查。": "A backup is still present after deletion. Another device may have recreated it. Check again.",
+    "删除预览属于其他页面或已失效，请在原设置页面继续。": "This deletion preview belongs to another page or expired. Continue in the original settings page."
   }
 }

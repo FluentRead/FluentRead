@@ -88,15 +88,36 @@
     "settings.cloud.fieldLabel.2": "已保存的悬浮快捷键",
     "settings.cloud.fieldLabel.3": "已保存的划词模式",
     "settings.cloud.fieldLabel.4": "本地语音识别模型",
-    "settings.cloud.cleanupPending": "配置已同步，但本次授权缓存暂未清理；重新打开设置时会重试",
+    "settings.cloud.cleanupPending": "本次操作已完成，但授权缓存暂未清理；重新打开设置时会重试",
     "settings.cloud.versionMissing": "云端备份缺少安全覆盖所需的版本信息；仍可恢复，请重新读取后重试",
     "settings.cloud.verifyFailed": "云端保存后校验未通过，请重新读取备份后重试；本机配置未修改",
-    "settings.cloud.restoreOnly": "云端备份可恢复到本机，但缺少安全覆盖所需的版本信息；本次暂不能保存或合并"
+    "settings.cloud.restoreOnly": "云端备份可恢复到本机，但缺少安全覆盖所需的版本信息；本次暂不能保存或合并",
+    "settings.cloud.deleteBackup": "删除云端备份",
+    "settings.cloud.deleteTitle": "删除云端备份？",
+    "settings.cloud.deleteDescription": "删除后，这份云端备份将无法恢复。",
+    "settings.cloud.deleteLocalPreserved": "本机配置和 API Key 会保留。",
+    "settings.cloud.deleteHistory": "只删除当前备份文件。服务商保留的回收站、历史版本及其他设备上的副本需另行清理。",
+    "settings.cloud.deleteRecreate": "之后手动同步仍可创建新备份；其他设备也可能重新上传。",
+    "settings.cloud.deleteUnsupported": "服务商未提供安全删除所需的版本信息，本次无法删除。",
+    "settings.cloud.deleteManualDrive": "请前往 Google Drive 设置 → 管理应用 → FluentRead，清理该应用的数据。",
+    "settings.cloud.deleteManualWebDav": "请在 WebDAV 服务商页面手动删除 FluentRead/fluentread-config.encrypted.json，保留目录内其他文件。",
+    "settings.cloud.deleteConfirm": "确定删除",
+    "settings.cloud.deleteFinish": "完成",
+    "settings.cloud.deleteAbsent": "没有云端备份",
+    "settings.cloud.deleteAbsentDescription": "无需删除。点击完成可清除旧同步记录。",
+    "settings.cloud.deleteSuccess": "云端备份已删除，本机配置已保留",
+    "settings.cloud.deleteDetails": "更多说明"
   },
   "legacy": {
     "普通云备份包含不属于此范围的字段，请重新生成备份。": "普通云备份包含不属于此范围的字段，请重新生成备份。",
     "敏感信息同步选项必须为布尔值。": "敏感信息同步选项必须为布尔值。",
     "同步预览缺少敏感信息范围，请重新生成。": "同步预览缺少敏感信息范围，请重新生成。",
-    "同步预览范围已变化，请重新生成。": "同步预览范围已变化，请重新生成。"
+    "同步预览范围已变化，请重新生成。": "同步预览范围已变化，请重新生成。",
+    "删除预览已失效，请重新检查云端备份。": "删除预览已失效，请重新检查云端备份。",
+    "删除目标账号或连接已变化，请重新检查云端备份。": "删除目标账号或连接已变化，请重新检查云端备份。",
+    "云端备份已变化，请重新检查后再删除。": "云端备份已变化，请重新检查后再删除。",
+    "云端备份缺少安全删除所需的版本信息，请到服务商管理页面手动删除。": "云端备份缺少安全删除所需的版本信息，请到服务商管理页面手动删除。",
+    "删除后仍检测到云端备份，可能已被其他设备重新创建，请重新检查。": "删除后仍检测到云端备份，可能已被其他设备重新创建，请重新检查。",
+    "删除预览属于其他页面或已失效，请在原设置页面继续。": "删除预览属于其他页面或已失效，请在原设置页面继续。"
   }
 }

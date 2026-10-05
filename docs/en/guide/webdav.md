@@ -69,7 +69,11 @@ If none of these methods provides a strong ETag, the preview still shows differe
 
 Use **Edit connection** to change the server, account, or password. Changing the URL or username requires entering the password again. Old previews and baselines cannot apply to a new connection. Saved passwords are not returned to the form.
 
-**Clear connection settings** removes this device’s WebDAV connection, app password, and sync record, while keeping device configuration and cloud files. Delete the backup file using your server or drive interface. Revoke an app password with the service to stop its authorization. Uninstalling the extension does not delete server files.
+Click **Delete cloud backup**, check the account and server address, then confirm. The extension deletes only the fixed backup file using a strong ETag and `If-Match`; an updated file requires a new preview. Old-format or unreadable backups can also be deleted. Canceling or closing confirmation keeps the file. Successful deletion clears local sync records while keeping local settings, API keys, the connection password and other files in the directory. Manual sync can create a new backup later.
+
+Deletion requires `DELETE` and conditional request support. When safe version information is unavailable, delete the file through your server interface. Manage provider trash, retained versions and copies on other devices separately.
+
+**Clear connection settings** removes this device’s WebDAV connection, app password, and sync record, while keeping device configuration and cloud files. Revoke an app password with the service to stop its authorization. Uninstalling the extension does not delete server files.
 
 </details>
 

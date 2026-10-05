@@ -10,6 +10,19 @@ const xml = '<d:multistatus xmlns:d="DAV:"><d:response><d:href>/base/</d:href><d
 const response = (body: string | null, status = 200, headers: Record<string, string> = {}) => new Response(body, {status, headers});
 const metadata = (etag = '&quot;one&quot;', href = '/base/FluentRead/fluentread-config.encrypted.json') => `<d:multistatus xmlns:d="DAV:"><d:response><d:href>${href}</d:href><d:propstat><d:prop><d:getetag>${etag}</d:getetag></d:prop><d:status>HTTP/1.1 200 OK</d:status></d:propstat></d:response></d:multistatus>`;
 describe('WebDAV 文件协议', () => {
+    it('仅条件删除固定备份文件，保留目录与其他文件；缺失幂等、冲突拒绝、异步或多状态不冒充成功', async () => {
+        const file = {id: connection.url + 'FluentRead/fluentread-config.encrypted.json', version: '1', modifiedTime: '', etag: '"one"'};
+        for (const status of [200, 204, 404]) {
+            const fetcher = vi.fn<typeof fetch>(async () => response(null, status));
+            await createWebDavApi(fetcher).remove(session, file);
+            expect(fetcher).toHaveBeenCalledOnce();
+            expect(fetcher).toHaveBeenCalledWith(file.id, expect.objectContaining({method: 'DELETE', headers: expect.objectContaining({'If-Match': '"one"'}), redirect: 'error', credentials: 'omit'}));
+        }
+        for (const [status, code] of [[401, 'auth'], [403, 'forbidden'], [412, 'conflict'], [423, 'locked'], [405, 'http'], [202, 'http'], [207, 'http']] as const) await expect(createWebDavApi(vi.fn(async () => response('private failure', status))).remove(session, file)).rejects.toMatchObject({status, code});
+        const blocked = vi.fn();
+        for (const patch of [{id: connection.url}, {etag: undefined}, {etag: 'W/"weak"'}, {readOnly: true as const}]) await expect(createWebDavApi(blocked).remove(session, {...file, ...patch})).rejects.toMatchObject({code: 'etag'});
+        expect(blocked).not.toHaveBeenCalled();
+    });
     it('GET 和属性均未返回 ETag 时补查 HEAD，核对原密文后才可条件覆盖', async () => {
         const fetcher=vi.fn().mockResolvedValueOnce(response(content)).mockResolvedValueOnce(response(metadata('W/&quot;weak&quot;'),207)).mockResolvedValueOnce(response(null,200,{etag:'"head"'})).mockResolvedValueOnce(response(content));
         const remote=await createWebDavApi(fetcher).read(session);

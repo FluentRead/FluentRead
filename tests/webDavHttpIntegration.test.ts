@@ -23,6 +23,11 @@ describe('WebDAV 真实 HTTP 协议夹具',()=>{
             if(req.method==='PROPFIND') {res.writeHead(207,{'Content-Type':'application/xml'}).end(`<d:multistatus xmlns:d="DAV:"><d:response><d:href>${req.url}</d:href><d:propstat><d:prop>${etagSource==='prop'?`<d:getetag>&quot;v${version}&quot;</d:getetag>`:''}</d:prop><d:status>HTTP/1.1 200 OK</d:status></d:propstat></d:response></d:multistatus>`);return;}
             if(req.method==='HEAD'){res.writeHead(200,etagSource==='head'?{ETag:`"v${version}"`}:{}).end();return;}
             if(req.method==='GET'){if(!content){res.writeHead(folder?404:409).end();return;}if(req.headers['if-match']&&req.headers['if-match']!==`"v${version}"`){res.writeHead(412).end();return;}res.writeHead(200,etagSource==='get'?{ETag:`"v${version}"`}:{}).end(content);return;}
+            if(req.method==='DELETE'){
+                if(!content){res.writeHead(404).end();return;}
+                if(req.headers['if-match']!==`"v${version}"`){res.writeHead(412).end();return;}
+                content=null;res.writeHead(204).end();return;
+            }
             if(req.method==='PUT'){
                 if((req.headers['if-none-match']==='*'&&content)||(req.headers['if-match']&&req.headers['if-match']!==`"v${version}"`)){res.writeHead(412).end();return;}
                 const chunks=[];for await(const chunk of req)chunks.push(Buffer.from(chunk));content=Buffer.concat(chunks).toString();version++;res.writeHead(201).end();return;
@@ -49,6 +54,11 @@ describe('WebDAV 真实 HTTP 协议夹具',()=>{
             await expect(api.test({...connection,url:origin+'/redirect/'})).rejects.toMatchObject({code:'network'});
             expect(calls.some(c=>c.url==='/private-other/')).toBe(false);
             expect(content).not.toContain('fixture-http-password');
+            await expect(api.remove(session,first)).rejects.toMatchObject({code:'conflict'});expect(content).toBe(changed);
+            await api.remove(session,second);expect(content).toBeNull();expect(folder).toBe(true);expect(await api.read(session)).toBeNull();
+            await api.remove(session,second);
+            expect(calls.filter(c=>c.method==='DELETE').every(c=>c.url==='/dav/FluentRead/fluentread-config.encrypted.json')).toBe(true);
+            await api.write(session,encrypted,null);expect(content).toBe(encrypted);
         }finally{await new Promise<void>((resolve,reject)=>server.close(error=>error?reject(error):resolve()));}
     });
 });

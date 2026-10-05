@@ -1,0 +1,455 @@
+{
+  "ok": true,
+  "evidenceMode": "production-extension-with-simulated-network-latency",
+  "profileMode": "generated-temporary",
+  "service": "google",
+  "plannedLatenciesMs": [
+    1400,
+    100,
+    1800,
+    100
+  ],
+  "requests": [
+    {
+      "index": 0,
+      "ms": 1447
+    },
+    {
+      "index": 1,
+      "ms": 122
+    },
+    {
+      "index": 2,
+      "ms": 1861
+    },
+    {
+      "index": 3,
+      "ms": 118
+    },
+    {
+      "index": 4,
+      "ms": 48
+    },
+    {
+      "index": 5,
+      "ms": 50
+    },
+    {
+      "index": 6,
+      "ms": 44
+    },
+    {
+      "index": 7,
+      "ms": 60
+    },
+    {
+      "index": 8,
+      "ms": 48
+    },
+    {
+      "index": 9,
+      "ms": 48
+    },
+    {
+      "index": 10,
+      "ms": 49
+    },
+    {
+      "index": 11,
+      "ms": 51
+    },
+    {
+      "index": 12,
+      "ms": 49
+    },
+    {
+      "index": 13,
+      "ms": 489
+    },
+    {
+      "index": 14,
+      "ms": 115
+    },
+    {
+      "index": 15,
+      "ms": 49
+    },
+    {
+      "index": 16,
+      "ms": 54
+    },
+    {
+      "index": 17,
+      "ms": 45
+    },
+    {
+      "index": 18,
+      "ms": 51
+    },
+    {
+      "index": 19,
+      "ms": 52
+    },
+    {
+      "index": 20,
+      "ms": 50
+    },
+    {
+      "index": 21,
+      "ms": 44
+    },
+    {
+      "index": 22,
+      "ms": 53
+    },
+    {
+      "index": 23,
+      "ms": 495
+    },
+    {
+      "index": 24,
+      "ms": 114
+    },
+    {
+      "index": 25,
+      "ms": 51
+    },
+    {
+      "index": 26,
+      "ms": 47
+    },
+    {
+      "index": 27,
+      "ms": 47
+    },
+    {
+      "index": 28,
+      "ms": 58
+    },
+    {
+      "index": 29,
+      "ms": 52
+    }
+  ],
+  "launchMode": "macos-background-cdp",
+  "focusPolicy": "launchservices-no-foreground",
+  "windowPlacement": {
+    "mode": "background-visible-no-focus",
+    "visible": true,
+    "hidden": false,
+    "centered": true,
+    "windowState": "normal",
+    "bounds": {
+      "left": 1121,
+      "top": -990,
+      "width": 1280,
+      "height": 900
+    },
+    "displayTarget": "secondary",
+    "source": "macos-nsscreen",
+    "screenIndex": 1,
+    "browserFrontmost": false
+  },
+  "traffic": [
+    {
+      "index": 0,
+      "host": "translate-pa.googleapis.com",
+      "path": "/v1/translateHtml",
+      "items": 1,
+      "plannedLatencyMs": 1400,
+      "start": 897.3000001907349,
+      "ms": 1408,
+      "status": 200
+    },
+    {
+      "index": 1,
+      "host": "translate.googleapis.com",
+      "path": "/translate_a/t",
+      "items": 1,
+      "plannedLatencyMs": 100,
+      "start": 2337.1000003814697,
+      "ms": 103,
+      "status": 200
+    },
+    {
+      "index": 2,
+      "host": "translate.googleapis.com",
+      "path": "/translate_a/t",
+      "items": 1,
+      "plannedLatencyMs": 1800,
+      "start": 2456.800000190735,
+      "ms": 1805,
+      "status": 200
+    },
+    {
+      "index": 3,
+      "host": "translate-pa.googleapis.com",
+      "path": "/v1/translateHtml",
+      "items": 1,
+      "plannedLatencyMs": 100,
+      "start": 4317.10000038147,
+      "ms": 102,
+      "status": 200
+    },
+    {
+      "index": 4,
+      "host": "translate-pa.googleapis.com",
+      "path": "/v1/translateHtml",
+      "items": 1,
+      "plannedLatencyMs": 25,
+      "start": 4435.800000190735,
+      "ms": 29,
+      "status": 200
+    },
+    {
+      "index": 5,
+      "host": "translate-pa.googleapis.com",
+      "path": "/v1/translateHtml",
+      "items": 1,
+      "plannedLatencyMs": 25,
+      "start": 4484.5,
+      "ms": 28,
+      "status": 200
+    },
+    {
+      "index": 6,
+      "host": "translate-pa.googleapis.com",
+      "path": "/v1/translateHtml",
+      "items": 1,
+      "plannedLatencyMs": 25,
+      "start": 4533,
+      "ms": 27,
+      "status": 200
+    },
+    {
+      "index": 7,
+      "host": "translate-pa.googleapis.com",
+      "path": "/v1/translateHtml",
+      "items": 1,
+      "plannedLatencyMs": 25,
+      "start": 4582.800000190735,
+      "ms": 30,
+      "status": 200
+    },
+    {
+      "index": 8,
+      "host": "translate-pa.googleapis.com",
+      "path": "/v1/translateHtml",
+      "items": 1,
+      "plannedLatencyMs": 25,
+      "start": 4639.400000095367,
+      "ms": 30,
+      "status": 200
+    },
+    {
+      "index": 9,
+      "host": "translate.google.com",
+      "path": "/_/TranslateWebserverUi/data/batchexecute",
+      "items": 1,
+      "plannedLatencyMs": 25,
+      "start": 4685.300000190735,
+      "ms": 28,
+      "status": 200
+    },
+    {
+      "index": 10,
+      "host": "translate-pa.googleapis.com",
+      "path": "/v1/translateHtml",
+      "items": 1,
+      "plannedLatencyMs": 25,
+      "start": 4733,
+      "ms": 26,
+      "status": 200
+    },
+    {
+      "index": 11,
+      "host": "translate-pa.googleapis.com",
+      "path": "/v1/translateHtml",
+      "items": 1,
+      "plannedLatencyMs": 25,
+      "start": 4786,
+      "ms": 30,
+      "status": 200
+    },
+    {
+      "index": 12,
+      "host": "translate-pa.googleapis.com",
+      "path": "/v1/translateHtml",
+      "items": 1,
+      "plannedLatencyMs": 25,
+      "start": 4832.900000095367,
+      "ms": 32,
+      "status": 200
+    },
+    {
+      "index": 13,
+      "host": "translate-pa.googleapis.com",
+      "path": "/v1/translateHtml",
+      "items": 1,
+      "plannedLatencyMs": 25,
+      "start": 5324.300000190735,
+      "ms": 30,
+      "status": 200
+    },
+    {
+      "index": 14,
+      "host": "translate-pa.googleapis.com",
+      "path": "/v1/translateHtml",
+      "items": 1,
+      "plannedLatencyMs": 25,
+      "start": 5441,
+      "ms": 28,
+      "status": 200
+    },
+    {
+      "index": 15,
+      "host": "translate-pa.googleapis.com",
+      "path": "/v1/translateHtml",
+      "items": 1,
+      "plannedLatencyMs": 25,
+      "start": 5490.300000190735,
+      "ms": 27,
+      "status": 200
+    },
+    {
+      "index": 16,
+      "host": "translate-pa.googleapis.com",
+      "path": "/v1/translateHtml",
+      "items": 1,
+      "plannedLatencyMs": 25,
+      "start": 5540.60000038147,
+      "ms": 30,
+      "status": 200
+    },
+    {
+      "index": 17,
+      "host": "translate-pa.googleapis.com",
+      "path": "/v1/translateHtml",
+      "items": 1,
+      "plannedLatencyMs": 25,
+      "start": 5590.900000095367,
+      "ms": 27,
+      "status": 200
+    },
+    {
+      "index": 18,
+      "host": "translate-pa.googleapis.com",
+      "path": "/v1/translateHtml",
+      "items": 1,
+      "plannedLatencyMs": 25,
+      "start": 5643.300000190735,
+      "ms": 26,
+      "status": 200
+    },
+    {
+      "index": 19,
+      "host": "translate.google.co.uk",
+      "path": "/_/TranslateWebserverUi/data/batchexecute",
+      "items": 1,
+      "plannedLatencyMs": 25,
+      "start": 5689.200000286102,
+      "ms": 30,
+      "status": 200
+    },
+    {
+      "index": 20,
+      "host": "translate-pa.googleapis.com",
+      "path": "/v1/translateHtml",
+      "items": 1,
+      "plannedLatencyMs": 25,
+      "start": 5740.900000095367,
+      "ms": 30,
+      "status": 200
+    },
+    {
+      "index": 21,
+      "host": "translate-pa.googleapis.com",
+      "path": "/v1/translateHtml",
+      "items": 1,
+      "plannedLatencyMs": 25,
+      "start": 5786.400000095367,
+      "ms": 28,
+      "status": 200
+    },
+    {
+      "index": 22,
+      "host": "translate-pa.googleapis.com",
+      "path": "/v1/translateHtml",
+      "items": 1,
+      "plannedLatencyMs": 25,
+      "start": 5837.5,
+      "ms": 29,
+      "status": 200
+    },
+    {
+      "index": 23,
+      "host": "translate-pa.googleapis.com",
+      "path": "/v1/translateHtml",
+      "items": 1,
+      "plannedLatencyMs": 25,
+      "start": 6328.800000190735,
+      "ms": 31,
+      "status": 200
+    },
+    {
+      "index": 24,
+      "host": "translate-pa.googleapis.com",
+      "path": "/v1/translateHtml",
+      "items": 1,
+      "plannedLatencyMs": 25,
+      "start": 6444.60000038147,
+      "ms": 30,
+      "status": 200
+    },
+    {
+      "index": 25,
+      "host": "translate-pa.googleapis.com",
+      "path": "/v1/translateHtml",
+      "items": 1,
+      "plannedLatencyMs": 25,
+      "start": 6494.400000095367,
+      "ms": 26,
+      "status": 200
+    },
+    {
+      "index": 26,
+      "host": "translate-pa.googleapis.com",
+      "path": "/v1/translateHtml",
+      "items": 1,
+      "plannedLatencyMs": 25,
+      "start": 6544.10000038147,
+      "ms": 25,
+      "status": 200
+    },
+    {
+      "index": 27,
+      "host": "translate-pa.googleapis.com",
+      "path": "/v1/translateHtml",
+      "items": 1,
+      "plannedLatencyMs": 25,
+      "start": 6592,
+      "ms": 30,
+      "status": 200
+    },
+    {
+      "index": 28,
+      "host": "translate-pa.googleapis.com",
+      "path": "/v1/translateHtml",
+      "items": 1,
+      "plannedLatencyMs": 25,
+      "start": 6649.800000190735,
+      "ms": 30,
+      "status": 200
+    },
+    {
+      "index": 29,
+      "host": "translate.google.com",
+      "path": "/_/TranslateWebserverUi/data/batchexecute",
+      "items": 1,
+      "plannedLatencyMs": 25,
+      "start": 6695.700000286102,
+      "ms": 30,
+      "status": 200
+    }
+  ]
+}

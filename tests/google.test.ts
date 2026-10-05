@@ -20,6 +20,24 @@ function rpcResponse(texts: string[], ids = texts.map((_, i) => String(i))): str
     ]), null, null, null, ids[i]]);
     return `)]}'\n\n${JSON.stringify(records)}`;
 }
+function requestData(input: RequestInfo | URL, init?: RequestInit): {texts: string[]; from: string; to: string} {
+    const url = new URL(String(input));
+    if (url.hostname === HTML) {
+        const payload = JSON.parse(String(init?.body))[0];
+        return {texts: payload[0], from: payload[1], to: payload[2]};
+    }
+    if (url.hostname === LIST) return {
+        texts: new URLSearchParams(String(init?.body)).getAll('q'),
+        from: url.searchParams.get('sl')!, to: url.searchParams.get('tl')!,
+    };
+    const records = JSON.parse(new URLSearchParams(String(init?.body)).get('f.req')!)[0];
+    const requests = records.map((record: unknown[]) => JSON.parse(String(record[1]))[0]);
+    return {texts: requests.map((item: string[]) => item[0]), from: requests[0][1], to: requests[0][2]};
+}
+function successfulResponse(input: RequestInfo | URL, texts: string[]): Response {
+    const host = new URL(String(input)).hostname;
+    return response(host === HTML ? [texts] : host === LIST ? texts : rpcResponse(texts));
+}
 function hosts(): string[] { return fetchMock.mock.calls.map(([url]) => new URL(String(url)).hostname); }
 async function flush<T>(promise: Promise<T>): Promise<T> {
     void promise.catch(() => undefined);
@@ -59,18 +77,18 @@ describe('Google 批量传输与换线', () => {
     });
     it('不同语言隔离，中文书写系统与 Google 别名正确映射', async () => {
         fetchMock.mockImplementation(async (_url, init) => {
-            const payload = JSON.parse(String(init?.body));
-            return response([payload[0][0].map(() => payload[0].slice(1).join(':'))]);
+            const data = requestData(_url, init);
+            return successfulResponse(_url, data.texts.map(() => `${data.from}:${data.to}`));
         });
         const tasks = [api.translateGoogleText('Hello', 'nb', 'zh-Hant'), api.translateGoogleText('Hello', 'fil', 'zh-Hans')];
         await expect(flush(Promise.all(tasks))).resolves.toEqual(['no:zh-TW', 'tl:zh-CN']);
         expect(fetchMock).toHaveBeenCalledTimes(2);
     });
     it('合批同时限制条数与转义后的大小，空槽原样保留', async () => {
-        fetchMock.mockImplementation(async (_url, init) => response([JSON.parse(String(init?.body))[0][0].map(() => '译文')]));
+        fetchMock.mockImplementation(async (url, init) => successfulResponse(url, requestData(url, init).texts.map(() => '译文')));
         const many = Array.from({length: 65}, (_, i) => `Paragraph ${i}`);
         await expect(flush(api.translateGoogleTexts(many, 'en', 'zh'))).resolves.toHaveLength(65);
-        expect(fetchMock.mock.calls.map(([, init]) => JSON.parse(String(init?.body))[0][0].length)).toEqual([32, 32, 1]);
+        expect(fetchMock.mock.calls.map(([url, init]) => requestData(url, init).texts.length)).toEqual([32, 32, 1]);
         fetchMock.mockClear();
         await expect(flush(api.translateGoogleTexts(['&'.repeat(500), '&'.repeat(500), '  \n', ''], 'en', 'zh')))
             .resolves.toEqual(['译文', '译文', '  \n', '']);
@@ -134,14 +152,14 @@ describe('Google 端点健康与预算', () => {
         await expect(probe).resolves.toBe('恢复译文');
         fetchMock.mockResolvedValue(response([['正常译文']]));
         await expect(flush(api.translateGoogleText('Next', 'en', 'zh'))).resolves.toBe('正常译文');
-        expect(hosts().at(-1)).toBe(HTML);
+        expect(hosts().at(-1)).toBe(LIST);
     });
     it('429、403 与 XSRF 拒绝冷却五分钟，普通 400 不淘汰入口', async () => {
         fetchMock.mockResolvedValueOnce(response('bad language', 400)).mockResolvedValueOnce(response(['后备']))
-            .mockResolvedValueOnce(response([['下一段']]));
+            .mockResolvedValueOnce(response('bad language', 400)).mockResolvedValueOnce(response([['下一段']]));
         await expect(flush(api.translateGoogleText('First', 'en', 'zh'))).resolves.toBe('后备');
         await expect(flush(api.translateGoogleText('Second', 'en', 'zh'))).resolves.toBe('下一段');
-        expect(hosts()).toEqual([HTML, LIST, HTML]);
+        expect(hosts()).toEqual([HTML, LIST, LIST, HTML]);
         fetchMock.mockReset();
         fetchMock.mockResolvedValueOnce(response('<html>private</html>', 429)).mockResolvedValueOnce(response('', 403))
             .mockResolvedValueOnce(response('["xsrf"]', 400)).mockResolvedValue(response(rpcResponse(['备用'])));
@@ -154,6 +172,9 @@ describe('Google 端点健康与预算', () => {
         expect(hosts().at(-1)).toBe(HTML);
     });
     it('较早请求迟到成功不会清掉新请求记录的故障', async () => {
+        fetchMock.mockResolvedValueOnce(response([['初始成功']]));
+        await flush(api.translateGoogleText('Initial paragraph', 'en', 'zh'));
+        fetchMock.mockReset();
         let resolveOld!: (response: Response) => void;
         fetchMock.mockImplementationOnce(() => new Promise(resolve => { resolveOld = resolve; }))
             .mockResolvedValueOnce(response('', 503)).mockResolvedValue(response(['后备']));
@@ -198,6 +219,56 @@ describe('Google 端点健康与预算', () => {
         expect(hosts()).toEqual([HTML, LIST, RPC, UK]);
         expect(signals.every(signal => signal.aborted)).toBe(true);
         expect(vi.getTimerCount()).toBe(0);
+    });
+});
+
+describe('Google 动态优先级', () => {
+    it('接口仍成功但变慢时降级；更快的备用接口和恢复变快的入口会自动上升', async () => {
+        let delayMs = 1400;
+        fetchMock.mockImplementation((url, init) => new Promise((resolve, reject) => {
+            const onAbort = () => { clearTimeout(timer); reject(init?.signal?.reason); };
+            const timer = setTimeout(() => {
+                init?.signal?.removeEventListener('abort', onAbort);
+                resolve(successfulResponse(url, requestData(url, init).texts.map(() => '有效译文')));
+            }, delayMs);
+            init?.signal?.addEventListener('abort', onAbort, {once:true});
+        }));
+        for (const delay of [1400, 100, 1800, 100]) {
+            delayMs = delay;
+            const assertion = expect(api.translateGoogleText(`Readable paragraph ${delay} ${hosts().length}`, 'en', 'zh')).resolves.toBe('有效译文');
+            await vi.advanceTimersByTimeAsync(delay + 10);
+            await assertion;
+        }
+        expect(hosts()).toEqual([HTML, LIST, LIST, HTML]);
+    });
+    it('每十批用真实请求探索较少使用的备用接口，不额外发探测请求', async () => {
+        fetchMock.mockImplementation(async (url, init) => successfulResponse(url, requestData(url, init).texts.map(() => '译文')));
+        for (let index = 0; index < 30; index++) {
+            await expect(flush(api.translateGoogleText(`Readable paragraph ${index}`, 'en', 'zh'))).resolves.toBe('译文');
+        }
+        expect(fetchMock).toHaveBeenCalledTimes(30);
+        expect([hosts()[9], hosts()[19], hosts()[29]]).toEqual([LIST, RPC, UK]);
+        expect(hosts().filter(host => host === HTML)).toHaveLength(27);
+    });
+    it('健康主接口有在途负载时分流；完成后负载计数释放并重新参与排序', async () => {
+        let resolveFirst!: (response: Response) => void;
+        fetchMock.mockImplementationOnce(() => new Promise(resolve => {resolveFirst = resolve;}))
+            .mockImplementation(async (url, init) => successfulResponse(url, requestData(url, init).texts.map(() => '译文')));
+        const first = api.translateGoogleText('First paragraph', 'en', 'zh');
+        await vi.advanceTimersByTimeAsync(10);
+        await expect(flush(api.translateGoogleText('Second paragraph', 'en', 'zh'))).resolves.toBe('译文');
+        expect(hosts()).toEqual([HTML, LIST]);
+        resolveFirst(response([['第一段']])); await expect(first).resolves.toBe('第一段');
+        await expect(flush(api.translateGoogleText('Third paragraph', 'en', 'zh'))).resolves.toBe('译文');
+        expect(hosts()).toEqual([HTML, LIST, HTML]);
+    });
+    it('定期探索也跳过限流冷却的接口', async () => {
+        fetchMock.mockImplementation(async (url, init) => new URL(String(url)).hostname === LIST
+            ? response('', 429) : successfulResponse(url, requestData(url, init).texts.map(() => '译文')));
+        for (let index = 0; index < 30; index++) await flush(api.translateGoogleText(`Readable paragraph ${index}`, 'en', 'zh'));
+        expect(hosts().filter(host => host === LIST)).toHaveLength(1);
+        expect(hosts()).toContain(RPC);
+        expect(hosts()).toContain(UK);
     });
 });
 

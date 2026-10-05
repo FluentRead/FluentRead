@@ -2,13 +2,18 @@
  * @file src/providers/translation/google.ts
  *
  * 文件职责：适配无需用户密钥的 Google 浏览器批量接口与网页 RPC，在统一截止时间内合批、换线和冷却失败入口。
- * 主要内容：编码 translateHtml、translate_a/t 与带编号的 batchexecute 批次，严格校验结果数量与槽位，保护纯文本、换行及取消所有权；短时间合并同语言请求并共享端点健康状态，避免每个段落重复访问失效入口。公开符号包括 parseGoogleBatchResponse、translateGoogleTexts、translateGoogleText、default:google。
+ * 主要内容：编码 translateHtml、translate_a/t 与带编号的 batchexecute 批次，严格校验结果数量与槽位，保护纯文本、换行及取消所有权；短时间合并同语言请求，按近期可靠性、延迟和在途负载动态排序，定期探索备用入口并单独探测冷却恢复，避免每个段落重复访问失效入口。公开符号包括 parseGoogleBatchResponse、translateGoogleTexts、translateGoogleText、default:google。
  * 模块边界：本文件位于 provider 适配层，只把统一翻译请求转换为外部或浏览器服务协议；不管理页面 DOM、UI 生命周期或配置持久化，缓存、去重和超时总预算由 translation broker 统一协调。
  */
 
 import {normalizeChineseLanguageCode} from '@/src/core/language/chinese';
 import {getTranslationLanguages} from '@/src/services/translation/languages';
 import {createHttpStatusError} from '@/src/platform/http/errors';
+import {
+    getDynamicFreeProviderWeight,
+    observeFreeProviderPerformance,
+    type FreeProviderPerformance,
+} from '@/src/services/translation/freeRoutingPolicy';
 import {
     abortErrorFromSignal,
     createRuntimeAbortContext,
@@ -34,15 +39,57 @@ const GOOGLE_FAILURE_COOLDOWN_MS = 30_000;
 const GOOGLE_BATCH_MAX_ITEMS = 32;
 const GOOGLE_BATCH_MAX_CHARACTERS = 4_000;
 const GOOGLE_BATCH_WINDOW_MS = 10;
+const GOOGLE_EXPLORATION_INTERVAL = 10;
 
-type EndpointHealth = {retryAt: number; failures: number; version: number; statusCode?: number; probing: boolean};
+type EndpointHealth = {
+    retryAt: number; failures: number; version: number; statusCode?: number; probing: boolean;
+    active: number; observations: number; lastAttemptAt: number; performance?: FreeProviderPerformance;
+};
 // 仅保存固定入口的状态；不保存用户原文、密钥或服务端响应。
 const endpointHealth = new Map<string, EndpointHealth>();
+let googleSelectionSequence = 0;
 type GoogleProvider = {
     name: string;
     endpoint: string;
+    baseWeight: number;
     translate: (timeoutMs: number) => Promise<string[]>;
 };
+
+function getEndpointHealth(endpoint: string): EndpointHealth {
+    let state = endpointHealth.get(endpoint);
+    if (!state) {
+        state = {retryAt: 0, failures: 0, version: 0, probing: false, active: 0, observations: 0, lastAttemptAt: 0};
+        endpointHealth.set(endpoint, state);
+    }
+    return state;
+}
+
+function prioritizeGoogleProviders(providers: readonly GoogleProvider[], explore: boolean): GoogleProvider[] {
+    const now = Date.now();
+    const eligible = providers.filter(provider => {
+        const state = getEndpointHealth(provider.endpoint);
+        return state.retryAt <= now && !state.probing;
+    });
+    const scores = new Map(providers.map(provider => {
+        const state = getEndpointHealth(provider.endpoint);
+        return [provider.endpoint, getDynamicFreeProviderWeight(provider.baseWeight, state.performance, now) / (1 + state.active)];
+    }));
+    // 冷却到期的入口先获得一次受控恢复机会，不能因历史失败一直排在最后。
+    const recovery = eligible.find(provider => getEndpointHealth(provider.endpoint).retryAt > 0);
+    const exploratory = explore ? [...eligible].sort((left, right) => {
+        const a = getEndpointHealth(left.endpoint), b = getEndpointHealth(right.endpoint);
+        return a.observations - b.observations || a.lastAttemptAt - b.lastAttemptAt;
+    })[0] : undefined;
+    const probe = recovery ?? exploratory;
+    const ranked = [...providers].sort((left, right) => {
+        const a = getEndpointHealth(left.endpoint), b = getEndpointHealth(right.endpoint);
+        const unavailableA = a.retryAt > now || a.probing;
+        const unavailableB = b.retryAt > now || b.probing;
+        return Number(unavailableA) - Number(unavailableB) || scores.get(right.endpoint)! - scores.get(left.endpoint)!;
+    });
+    // 探索消费这一批的真实请求，不额外发送后台测试，也不绕过冷却窗口。
+    return probe ? [probe, ...ranked.filter(provider => provider !== probe)] : ranked;
+}
 
 function createGoogleBatchRequest(texts: readonly string[], fromLang: string, toLang: string): string {
     return JSON.stringify([texts.map((text, index) => [
@@ -290,34 +337,45 @@ async function translateGoogleList(
 
 async function executeGoogleTexts(texts: readonly string[], fromLang: string, toLang: string, signal: AbortSignal): Promise<string[]> {
     const providers: GoogleProvider[] = [
-        {name: '浏览器批量接口', endpoint: GOOGLE_TRANSLATE_HTML_URL,
+        {name: '浏览器批量接口', endpoint: GOOGLE_TRANSLATE_HTML_URL, baseWeight: 1.2,
             translate: timeout => translateGoogleHtml(texts, fromLang, toLang, timeout, signal)},
-        {name: '网页批量接口', endpoint: GOOGLE_TRANSLATE_LIST_URL,
+        {name: '网页批量接口', endpoint: GOOGLE_TRANSLATE_LIST_URL, baseWeight: 1,
             translate: timeout => translateGoogleList(texts, fromLang, toLang, timeout, signal)},
         ...GOOGLE_TRANSLATE_BATCH_URLS.map((endpoint, index) => ({
-            name: index === 0 ? '主网页 RPC' : '备用网页 RPC', endpoint,
+            name: index === 0 ? '主网页 RPC' : '备用网页 RPC', endpoint, baseWeight: index === 0 ? 0.8 : 0.7,
             translate: (timeout: number) => translateGoogleBatch(endpoint, texts, fromLang, toLang, timeout, signal),
         })),
     ];
     const deadline = Date.now() + GOOGLE_TRANSLATE_TOTAL_TIMEOUT_MS;
     const failures: string[] = [];
     const failureStatuses: Array<number | undefined> = [];
-    for (const provider of providers) {
+    const ranked = prioritizeGoogleProviders(providers, ++googleSelectionSequence % GOOGLE_EXPLORATION_INTERVAL === 0);
+    for (const provider of ranked) {
         if (signal.aborted) throw abortErrorFromSignal(signal);
-        const health = endpointHealth.get(provider.endpoint);
-        if (health && (health.retryAt > Date.now() || health.probing)) {
+        const health = getEndpointHealth(provider.endpoint);
+        if (health.retryAt > Date.now() || health.probing) {
             failures.push(`${provider.name}: 入口暂时冷却`);
             failureStatuses.push(health.statusCode);
             continue;
         }
         const remainingTime = deadline - Date.now();
         if (remainingTime <= 0) break;
-        const version = health?.version ?? 0;
-        if (health) health.probing = true;
+        const version = health.version;
+        const recovering = health.retryAt > 0;
+        if (recovering) health.probing = true;
+        const startedAt = Date.now();
+        health.lastAttemptAt = startedAt;
+        health.active += 1;
         try {
             const result = await provider.translate(Math.min(GOOGLE_TRANSLATE_ATTEMPT_TIMEOUT_MS, remainingTime));
             // 较早的在途成功不能清掉后来请求记录的故障。
-            if ((endpointHealth.get(provider.endpoint)?.version ?? 0) === version) endpointHealth.delete(provider.endpoint);
+            if (health.version === version) {
+                health.performance = observeFreeProviderPerformance(health.performance, true, Date.now() - startedAt, Date.now());
+                health.observations += 1;
+                health.retryAt = 0;
+                health.failures = 0;
+                health.statusCode = undefined;
+            }
             return result;
         } catch (error) {
             if (signal.aborted) throw abortErrorFromSignal(signal);
@@ -325,20 +383,22 @@ async function executeGoogleTexts(texts: readonly string[], fromLang: string, to
             const xsrfRejected = (error as {googleXsrfRejected?: boolean}).googleXsrfRejected;
             // 参数、语言或过大输入错误属于这次请求，不应淘汰正常接口。
             if (xsrfRejected || ![400, 413, 415, 422].includes(statusCode ?? 0)) {
-                const previous = endpointHealth.get(provider.endpoint);
-                const failureCount = (previous?.failures ?? 0) + 1;
+                const failureCount = health.failures + 1;
                 const blocked = xsrfRejected || statusCode === 403 || statusCode === 429;
                 const cooldown = blocked ? GOOGLE_BLOCKED_COOLDOWN_MS
                     : Math.min(GOOGLE_BLOCKED_COOLDOWN_MS, GOOGLE_FAILURE_COOLDOWN_MS * 2 ** Math.min(failureCount - 1, 4));
-                endpointHealth.set(provider.endpoint, {
-                    retryAt: Date.now() + cooldown, failures: failureCount,
-                    version: (previous?.version ?? 0) + 1, statusCode, probing: false,
-                });
+                health.performance = observeFreeProviderPerformance(health.performance, false, Date.now() - startedAt, Date.now());
+                health.observations += 1;
+                health.retryAt = Date.now() + cooldown;
+                health.failures = failureCount;
+                health.version += 1;
+                health.statusCode = statusCode;
             }
             failures.push(`${provider.name}: ${getErrorMessage(error)}`);
             failureStatuses.push(statusCode);
         } finally {
-            if (health) health.probing = false;
+            health.active -= 1;
+            if (recovering) health.probing = false;
         }
     }
     const summary = failures.length > 0 ? failures.join('；') : '总请求时间已耗尽';

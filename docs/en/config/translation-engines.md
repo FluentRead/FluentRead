@@ -23,7 +23,9 @@ In General settings, **Configure service** beside the default service opens its 
 
 ## Google translation speed and fallback
 
-Google translation requires no user API key. Full-page translation briefly groups paragraphs with the same language settings and tries the browser batch endpoint first. If it fails, FluentRead switches to other Google batch or web endpoints. The unsuccessful legacy single-text endpoint has been removed. Failed or rate-limited endpoints cool down so later paragraphs can use a working endpoint directly. The fallback chain shares a 8-second budget, with at most 2 seconds per endpoint and is not repeated by the outer retry policy. No additional speed setting is needed.
+Google translation requires no user API key. Full-page translation briefly groups paragraphs with the same language settings. The first request favors the browser batch endpoint; later requests rank the four endpoints by recent success rate, response time, and current load. Every tenth batch uses a less-observed available endpoint to discover faster or recovered routes. No additional speed setting is needed.
+
+Failures immediately trigger another endpoint. The unsuccessful legacy single-text endpoint has been removed. Failed or rate-limited endpoints cool down so later paragraphs can use a working endpoint directly. Only one recovery probe can run when an endpoint's cooldown expires. The fallback chain shares an 8-second budget, with at most 2 seconds per endpoint, and is not repeated by the outer retry policy.
 
 These are internal Google web endpoints. Availability depends on your network, region, and service limits; Chrome’s built-in page translation and Google Cloud Translation use different paths.
 

@@ -2,6 +2,7 @@
   "ok": true,
   "profileMode": "generated-temporary",
   "service": "google",
+  "counts": [],
   "screenshots": [
     "final-live-translation.png"
   ],
@@ -32,15 +33,15 @@
   "full": [
     {
       "count": 6,
-      "ms": 313
+      "ms": 294
     },
     {
       "count": 0,
-      "ms": 7
+      "ms": 9
     },
     {
       "count": 6,
-      "ms": 1025
+      "ms": 1157
     }
   ],
   "translations": [
@@ -55,70 +56,72 @@
     {
       "host": "translate-pa.googleapis.com",
       "path": "/v1/translateHtml",
-      "start": 2288.800000190735,
+      "start": 1455.9000000953674,
       "items": 1,
       "status": 200,
-      "ms": 854
+      "ms": 875
     },
     {
       "host": "translate-pa.googleapis.com",
       "path": "/v1/translateHtml",
-      "start": 3262.9000000953674,
+      "start": 2467.199999809265,
       "items": 6,
       "status": 200,
-      "ms": 214
+      "ms": 202
     },
     {
       "host": "translate-pa.googleapis.com",
       "path": "/v1/translateHtml",
-      "start": 3571.4000000953674,
+      "start": 2758.5999999046326,
       "items": 4,
       "status": 200,
-      "ms": 198
+      "ms": 235
     },
     {
       "host": "translate-pa.googleapis.com",
       "path": "/v1/translateHtml",
-      "start": 4267.599999904633,
+      "start": 3473.5999999046326,
       "items": 2,
       "status": 200,
-      "ms": 253
+      "ms": 358
     }
   ],
   "fastFailure": [
     {
       "result": "绿树长在安静的房子旁边。",
-      "ms": 1156
+      "ms": 923
     },
     {
       "result": "一只小鸟在古老的木桥附近唱歌。",
-      "ms": 273
+      "ms": 194
     }
   ],
   "faultTraffic": [
     {
       "host": "translate-pa.googleapis.com",
       "path": "/v1/translateHtml",
-      "start": 4685.800000190735,
+      "start": 4012.4000000953674,
       "items": 1,
       "status": 503,
-      "ms": 0
+      "ms": 0,
+      "injected": true
     },
     {
       "host": "translate.googleapis.com",
       "path": "/translate_a/t",
-      "start": 4686.300000190735,
+      "start": 4012.7999997138977,
       "items": 1,
       "status": 200,
-      "ms": 1139
+      "ms": 907
     },
     {
       "host": "translate.googleapis.com",
       "path": "/translate_a/t",
-      "start": 5840.700000286102,
+      "start": 4934.900000095367,
       "items": 1,
       "status": 200,
-      "ms": 257
+      "ms": 179
     }
-  ]
+  ],
+  "failoverDelayMs": 0.39999961853027344
 }

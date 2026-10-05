@@ -63,7 +63,8 @@
     "learning.history.emptyHint": "Выделите предложение и нажмите «Понять» или «Разобрать предложение». Ответы автоматически сохранятся здесь.",
     "settings.services.freeWeights.testDuration": "Время этого теста: {duration} мс",
     "settings.services.freeWeights.share": "Доля",
-    "settings.services.freeWeights.noChinese": "Без поддержки китайского"
+    "settings.services.freeWeights.noChinese": "Без поддержки китайского",
+    "settings.services.library.freeUnofficial": "Бесплатно · Неофициально"
   },
   "legacy": {
     "同步连接已变化，请重新生成预览。": "Подключение изменилось. Создайте новый предварительный просмотр.",

@@ -63,7 +63,8 @@
     "learning.history.emptyHint": "ページで文を選び「意味を理解」か「文を分析」を押すと、回答がここに自動保存されます。",
     "settings.services.freeWeights.testDuration": "今回のテスト所要時間 {duration} ms",
     "settings.services.freeWeights.share": "配分",
-    "settings.services.freeWeights.noChinese": "中国語非対応"
+    "settings.services.freeWeights.noChinese": "中国語非対応",
+    "settings.services.library.freeUnofficial": "無料 · 非公式"
   },
   "legacy": {
     "同步连接已变化，请重新生成预览。": "同期接続が変更されました。プレビューを再作成してください。",

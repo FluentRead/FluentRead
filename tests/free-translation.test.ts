@@ -204,7 +204,7 @@ describe('免费翻译服务', () => {
         mockConfig.token = {azureTranslator: 'configured-key', deepL: 'free-key:fx'};
         myMemoryMock.mockResolvedValue('备用');
         await expect(settle(translateFreeText('Hello'))).resolves.toBe('备用');
-        expect(readSnapshot(myMemoryMock.mock.calls[0][0]).freeTranslationOrder).toEqual(['microsoft', 'transmart', 'volcengineFree', 'google', 'youdaoFree', 'icibaFree', 'yandexFree', 'deeplx', 'myMemory', 'sogouFree', 'reversoFree', 'lingvaFree', 'apertiumFree']);
+        expect(readSnapshot(myMemoryMock.mock.calls[0][0]).freeTranslationOrder).toEqual(['microsoft', 'transmart', 'volcengineFree', 'google', 'youdaoFree', 'icibaFree', 'yandexFree', 'myMemory', 'sogouFree', 'reversoFree', 'lingvaFree', 'apertiumFree']);
     });
 
     it('上游挂起时局部超时继续降级，下一段跳过正在冷却的上游', async () => {

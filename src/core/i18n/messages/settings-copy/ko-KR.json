@@ -63,7 +63,8 @@
     "learning.history.emptyHint": "웹페이지에서 문장을 선택하고 이해하기 또는 문장 분석을 누르면 답변이 여기에 자동 저장됩니다.",
     "settings.services.freeWeights.testDuration": "이번 테스트 소요 시간 {duration} ms",
     "settings.services.freeWeights.share": "배분",
-    "settings.services.freeWeights.noChinese": "중국어 미지원"
+    "settings.services.freeWeights.noChinese": "중국어 미지원",
+    "settings.services.library.freeUnofficial": "무료 · 비공식"
   },
   "legacy": {
     "同步连接已变化，请重新生成预览。": "동기화 연결이 변경되었습니다. 미리보기를 다시 생성하세요.",

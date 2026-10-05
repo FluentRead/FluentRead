@@ -1,7 +1,7 @@
 <!--
  * @file src/features/settings/ui/services/ServiceCatalog.vue
  * 文件职责：以服务目录和清晰分层的配置工作区呈现翻译服务，窄屏按需展开目录，保持配置与默认使用分离。
- * 主要内容：侧栏展示全部内置及自定义服务；搜索过滤目录，自定义按钮直接打开创建表单；右侧集中展示服务、模型、官网帮助和连接配置。
+ * 主要内容：侧栏展示全部内置及自定义服务；搜索过滤目录，自定义按钮直接打开创建表单；右侧集中展示服务名称及接口性质徽章、模型、官网帮助和连接配置。
  * 模块边界：目录提供“配置服务”和“自定义服务”入口，标题栏承载当前服务的检查连接操作，不编辑凭据、不测试连接也不保存配置；详细表单归 ServiceConfiguration.vue，服务定义来自 core/config，外层 SettingsSections 处理持久化。
  -->
 <template>
@@ -56,6 +56,7 @@
           <div class="detail-heading">
             <div class="detail-title-row">
               <h4>{{ selectedService?.label || '尚未配置服务' }}</h4>
+              <ServiceNatureBadge :service="service" />
               <span v-if="service === defaultService" class="active-badge">{{ t('settings.services.library.default') }}</span>
               <span v-else class="editing-badge">{{ t('settings.services.library.viewing') }}</span>
               <a
@@ -154,6 +155,7 @@
 <script setup lang="ts">
 import { computed, nextTick, ref, useId, watch } from 'vue'
 import ServiceIcon from '@/src/ui/components/ServiceIcon.vue'
+import ServiceNatureBadge from './ServiceNatureBadge.vue'
 import { useUiI18n } from '@/src/ui/i18n'
 import { isCustomOpenAIProviderId } from '@/src/core/config/customOpenAI'
 import {

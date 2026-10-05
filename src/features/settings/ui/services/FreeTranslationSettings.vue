@@ -25,7 +25,7 @@
               <span v-if="isSequential" class="provider-position" aria-hidden="true">{{ isEnabled(provider.id) ? order.indexOf(provider.id) + 1 : '—' }}</span>
               <ServiceIcon :service="provider.id" :label="translateLegacy(provider.label)" size="small" />
               <div class="provider-copy">
-                <el-tooltip :content="`${translateLegacy(provider.label)} · ${translateLegacy(provider.description)}`"><strong tabindex="0">{{ translateLegacy(provider.label) }}</strong></el-tooltip>
+                <div class="provider-name"><el-tooltip :content="`${translateLegacy(provider.label)} · ${translateLegacy(provider.description)}`"><strong tabindex="0">{{ translateLegacy(provider.label) }}</strong></el-tooltip><ServiceNatureBadge :service="provider.id" /></div>
                 <div class="provider-result">
                   <span class="provider-state" :class="`is-${providerState(provider.id)}`" :data-provider-state="provider.id" :data-provider-check-status="providerState(provider.id)" :title="providerStateTitle(provider.id)" role="status">{{ providerStateLabel(provider.id) }}</span>
                   <output v-if="providerDuration(provider.id) !== undefined" class="provider-duration" :data-provider-duration="provider.id" :aria-label="t('settings.services.freeWeights.testDuration', {duration: providerDuration(provider.id)})">{{ providerDuration(provider.id) }} ms</output>
@@ -76,6 +76,7 @@ import {
 } from '@/src/services/translation/freeWeights'
 import { useUiI18n } from '@/src/ui/i18n'
 import ServiceIcon from '@/src/ui/components/ServiceIcon.vue'
+import ServiceNatureBadge from './ServiceNatureBadge.vue'
 import type { FreeTranslationChecks } from './freeTranslationChecks'
 
 type FreeTranslationMode = 'balanced' | 'sequential'
@@ -204,7 +205,8 @@ onBeforeUnmount(() => {
 .provider-row { display: flex; align-items: center; gap: 8px; }
 .provider-position { width: 14px; flex: none; color: var(--el-text-color-secondary); font-variant-numeric: tabular-nums; }
 .provider-copy { display: flex; min-width: 0; flex: 1; flex-direction: column; gap: 5px; }
-.provider-copy strong { overflow: hidden; font-size: 12px; text-overflow: ellipsis; white-space: nowrap; }
+.provider-name { display: flex; align-items: center; gap: 6px; min-width: 0; }
+.provider-copy strong { min-width: 0; overflow: hidden; font-size: 12px; text-overflow: ellipsis; white-space: nowrap; }
 .provider-result { display: flex; align-items: center; gap: 4px 8px; min-height: 19px; }
 .provider-state { padding: 2px 5px; border-radius: 4px; color: var(--el-text-color-secondary); background: var(--el-fill-color-light); font-size: 10px; white-space: nowrap; }
 .provider-state.is-success { color: var(--el-color-success-dark-2); background: var(--el-color-success-light-9); }

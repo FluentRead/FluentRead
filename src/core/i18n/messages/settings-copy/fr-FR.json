@@ -63,7 +63,8 @@
     "learning.history.emptyHint": "Sélectionnez une phrase et choisissez Comprendre ou Analyser la phrase. Les réponses sont enregistrées ici automatiquement.",
     "settings.services.freeWeights.testDuration": "Durée de ce test : {duration} ms",
     "settings.services.freeWeights.share": "Part",
-    "settings.services.freeWeights.noChinese": "Chinois non pris en charge"
+    "settings.services.freeWeights.noChinese": "Chinois non pris en charge",
+    "settings.services.library.freeUnofficial": "Gratuit · Non officiel"
   },
   "legacy": {
     "同步连接已变化，请重新生成预览。": "La connexion a changé. Générez un nouvel aperçu.",

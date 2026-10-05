@@ -78,7 +78,7 @@ The default **Automatic balance** mode places Microsoft first and prefers it for
 
 The scheduler maintains these allocation signals automatically. Users configure only enabled services and the mode; health and performance records used for balancing stay local.
 
-Microsoft, Tencent TranSmart, Volcengine, Google, Youdao Web, ICIBA, Yandex, DeepLX, and MyMemory are enabled by default without API keys. Sogou, Reverso, Lingva, and Apertium are optional. The first three remain experimental; Apertium currently has no Chinese language pairs.
+Microsoft, Tencent TranSmart, Volcengine, Google, Youdao Web, ICIBA, Yandex, MyMemory, Sogou, Reverso, Lingva, and Apertium are enabled by default without API keys. DeepLX uses an unofficial public endpoint and is off by default; you can enable it manually. Sogou, Reverso, and Lingva remain experimental, and Apertium currently has no Chinese language pairs. Existing saved selections are preserved.
 
 Rate limits normally pause a provider for minutes, blocked access for hours, and exhausted daily quotas for about a day. Recovery records are stored locally and survive background restarts. Each attempt has a five-second timeout by default.
 

@@ -63,7 +63,8 @@
     "learning.history.emptyHint": "在网页中选中文字后点击“读懂”或“拆句”，回答会自动保存在这里，方便回看",
     "settings.services.freeWeights.testDuration": "本次测试耗时 {duration} ms",
     "settings.services.freeWeights.share": "分流",
-    "settings.services.freeWeights.noChinese": "不支持中文"
+    "settings.services.freeWeights.noChinese": "不支持中文",
+    "settings.services.library.freeUnofficial": "免费 · 非官方"
   },
   "legacy": {}
 }

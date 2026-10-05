@@ -1,428 +1,246 @@
 import {afterEach, beforeEach, describe, expect, it, vi} from 'vitest';
 
-const {mockConfig} = vi.hoisted(() => ({
-    mockConfig: {
-        from: 'auto',
-        to: 'zh-Hans',
-    },
-}));
-
-vi.mock('@/src/services/config/store', () => ({config: mockConfig}));
-
-import google, {
-    parseGoogleBatchResponse,
-    parseGoogleLegacyResponse,
-    translateGoogleText,
-} from '@/src/providers/translation/google';
-import {createFreeFallbackRunner} from '@/src/services/translation/freeFallback';
+vi.mock('@/src/services/config/store', () => ({config: {from: 'auto', to: 'zh-Hans'}}));
 
 const fetchMock = vi.fn<typeof fetch>();
+let api: typeof import('@/src/providers/translation/google');
+const HTML = 'translate-pa.googleapis.com';
+const LIST = 'translate.googleapis.com';
+const RPC = 'translate.google.com';
+const UK = 'translate.google.co.uk';
 
-function createBatchResponse(translations: string[]): string {
-    const payload = [
-        null,
-        [[[
-            null,
-            null,
-            null,
-            null,
-            null,
-            translations.map(text => [text]),
-        ]]],
-    ];
-    const records = [
-        ['wrb.fr', 'MkEWBc', JSON.stringify(payload), null, null, null, 'generic'],
-        ['di', 123],
-    ];
-    return `)]}'\n\n${JSON.stringify(records)}`;
-}
-
-function createLegacyResponse(translations: string[]): string {
-    return JSON.stringify([
-        translations.map(text => [text, null, null, null]),
-        null,
-        'en',
-    ]);
-}
-
-function mockResponse(responseBody: string, overrides: Partial<Response> = {}): Response {
-    return {
-        ok: true,
-        status: 200,
-        statusText: 'OK',
-        text: vi.fn().mockResolvedValue(responseBody),
-        ...overrides,
+function response(body: unknown, status = 200): Response {
+    return {ok: status === 200, status, statusText: 'HTTP error',
+        text: vi.fn().mockResolvedValue(typeof body === 'string' ? body : JSON.stringify(body)),
     } as unknown as Response;
 }
+function rpcResponse(texts: string[], ids = texts.map((_, i) => String(i))): string {
+    const records = texts.map((text, i) => ['wrb.fr', 'MkEWBc', JSON.stringify([
+        null, [[[null, null, null, null, null, [[text]]]]],
+    ]), null, null, null, ids[i]]);
+    return `)]}'\n\n${JSON.stringify(records)}`;
+}
+function hosts(): string[] { return fetchMock.mock.calls.map(([url]) => new URL(String(url)).hostname); }
+async function flush<T>(promise: Promise<T>): Promise<T> {
+    void promise.catch(() => undefined);
+    await vi.advanceTimersByTimeAsync(10);
+    return promise;
+}
 
-beforeEach(() => {
+beforeEach(async () => {
+    vi.resetModules();
+    vi.useFakeTimers();
     fetchMock.mockReset();
     vi.stubGlobal('fetch', fetchMock);
+    api = await import('@/src/providers/translation/google');
 });
+afterEach(() => { vi.useRealTimers(); vi.restoreAllMocks(); vi.unstubAllGlobals(); });
 
-afterEach(() => {
-    vi.useRealTimers();
-    vi.restoreAllMocks();
-    vi.unstubAllGlobals();
-});
-
-describe('谷歌翻译适配器', () => {
-    it('普通参数错误不暂停入口，两个 RPC 均拒绝匿名请求时仍可使用 gtx', async () => {
-        vi.resetModules();
-        const {translateGoogleText: translate} = await import('@/src/providers/translation/google');
-        fetchMock
-            .mockResolvedValueOnce(mockResponse('bad language', {ok: false, status: 400}))
-            .mockResolvedValueOnce(mockResponse(createBatchResponse(['第一段译文'])))
-            .mockResolvedValueOnce(mockResponse(createBatchResponse(['第二段译文'])));
-        await translate('First paragraph', 'en', 'zh-Hans');
-        await translate('Second paragraph', 'en', 'zh-Hans');
-        expect(new URL(String(fetchMock.mock.calls[2][0])).hostname).toBe('translate.google.com');
-        fetchMock.mockReset();
-        fetchMock
-            .mockResolvedValueOnce(mockResponse('["xsrf"]', {ok: false, status: 400}))
-            .mockResolvedValueOnce(mockResponse('["xsrf"]', {ok: false, status: 400}))
-            .mockResolvedValue(mockResponse(createLegacyResponse(['旧版译文'])));
-        await expect(translate('Third paragraph', 'en', 'zh-Hans')).resolves.toBe('旧版译文');
-        await expect(translate('Fourth paragraph', 'en', 'zh-Hans')).resolves.toBe('旧版译文');
-        expect(fetchMock).toHaveBeenCalledTimes(4);
-        expect(new URL(String(fetchMock.mock.calls[3][0])).hostname).toBe('translate.googleapis.com');
-    });
-    it('HTTP 400 的 XSRF 拒绝只冷却该入口，后续段落使用备用入口并在五分钟后恢复探测', async () => {
-        vi.resetModules();
-        vi.useFakeTimers();
-        const {translateGoogleText: translate} = await import('@/src/providers/translation/google');
-        fetchMock
-            .mockResolvedValueOnce(mockResponse(`)]}'\n\n[["er",null,null,null,null,400,null,null,null,3,[{"test":["xsrf","private-token"]}]]]`, {ok: false, status: 400}))
-            .mockResolvedValue(mockResponse(createBatchResponse(['译文'])));
-        await expect(translate('First paragraph', 'en', 'zh-Hans')).resolves.toBe('译文');
-        await expect(translate('Second paragraph', 'en', 'zh-Hans')).resolves.toBe('译文');
-        expect(fetchMock.mock.calls.map(([url]) => new URL(String(url)).hostname))
-            .toEqual(['translate.google.com', 'translate.google.co.uk', 'translate.google.co.uk']);
-        await vi.advanceTimersByTimeAsync(300_000);
-        await expect(translate('Third paragraph', 'en', 'zh-Hans')).resolves.toBe('译文');
-        expect(new URL(String(fetchMock.mock.calls[3][0])).hostname).toBe('translate.google.com');
-    });
-    it('优先通过无需 API Key 的主网页 RPC 返回译文', async () => {
-        fetchMock.mockResolvedValue(mockResponse(createBatchResponse(['此域名仅用于文档中的示例。'])));
-
-        await expect(google({origin: 'This domain is for use in documents.'}))
-            .resolves.toBe('此域名仅用于文档中的示例。');
-
-        expect(fetchMock).toHaveBeenCalledOnce();
-        const [url, init] = fetchMock.mock.calls[0]!;
-        expect(url).toBe('https://translate.google.com/_/TranslateWebserverUi/data/batchexecute?rpcids=MkEWBc');
-        expect(init).toMatchObject({
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/x-www-form-urlencoded;charset=UTF-8',
-            },
-        });
-        expect(init?.headers).not.toHaveProperty('X-Goog-API-Key');
-
-        const requestBody = new URLSearchParams(String(init?.body)).get('f.req');
-        expect(requestBody).not.toBeNull();
-        const batchRequest = JSON.parse(requestBody!);
-        expect(batchRequest[0][0][0]).toBe('MkEWBc');
-        expect(batchRequest[0][0][2]).toBeNull();
-        expect(batchRequest[0][0][3]).toBe('generic');
-        expect(JSON.parse(batchRequest[0][0][1])).toEqual([
-            ['This domain is for use in documents.', 'auto', 'zh-CN', true],
-            [null],
+describe('Google 批量传输与换线', () => {
+    it('优先浏览器批量接口，纯文本转义、换行与实体只还原一次', async () => {
+        fetchMock.mockResolvedValue(response([['<pre>第一行 &amp; &lt;b&gt;\n  第二行\n\n&amp;lt;</pre>']]));
+        const request = api.default({origin: '<b>Hello & world</b>\n  Next line\n\n&lt;'});
+        await expect(flush(request)).resolves.toBe('第一行 & <b>\n  第二行\n\n&lt;');
+        expect(hosts()).toEqual([HTML]);
+        const init = fetchMock.mock.calls[0]![1]!;
+        expect(init.method).toBe('POST');
+        expect(init.headers).toMatchObject({'Content-Type': 'application/json+protobuf'});
+        expect(JSON.parse(String(init.body))).toEqual([
+            [['<pre>&lt;b&gt;Hello &amp; world&lt;/b&gt;\n  Next line\n\n&amp;lt;</pre>'], 'auto', 'zh-CN'], 'wt_lib',
         ]);
     });
-
-    it('主网页 RPC 失败后切换到备用区域 RPC', async () => {
-        fetchMock
-            .mockResolvedValueOnce(mockResponse('temporarily unavailable', {
-                ok: false,
-                status: 503,
-                statusText: 'Service Unavailable',
-            }))
-            .mockResolvedValueOnce(mockResponse(createBatchResponse(['备用接口成功'])));
-
-        await expect(translateGoogleText('hello', 'en', 'zh-Hans'))
-            .resolves.toBe('备用接口成功');
-
-        expect(fetchMock).toHaveBeenCalledTimes(2);
-        expect(fetchMock.mock.calls[1]?.[0]).toBe(
-            'https://translate.google.co.uk/_/TranslateWebserverUi/data/batchexecute?rpcids=MkEWBc',
-        );
-    });
-
-    it('两个网页 RPC 都失败后使用旧版 gtx 接口', async () => {
-        fetchMock
-            .mockResolvedValueOnce(mockResponse('bad gateway', {
-                ok: false,
-                status: 502,
-                statusText: 'Bad Gateway',
-            }))
-            .mockResolvedValueOnce(mockResponse(`)]}'\n\n[["unexpected", true]]`))
-            .mockResolvedValueOnce(mockResponse(createLegacyResponse(['旧版', '接口成功'])));
-
-        await expect(translateGoogleText('hello & goodbye', 'en', 'zh-Hans'))
-            .resolves.toBe('旧版接口成功');
-
-        expect(fetchMock).toHaveBeenCalledTimes(3);
-        const [url, init] = fetchMock.mock.calls[2]!;
-        expect(url).toBeInstanceOf(URL);
-        const legacyUrl = url as URL;
-        expect(legacyUrl.origin + legacyUrl.pathname).toBe(
-            'https://translate.googleapis.com/translate_a/single',
-        );
-        expect(legacyUrl.searchParams.get('client')).toBe('gtx');
-        expect(legacyUrl.searchParams.get('q')).toBe('hello & goodbye');
-        expect(init).toMatchObject({method: 'GET'});
-        expect(init?.headers).toBeUndefined();
-    });
-
-    it('所有接口失败时保留 CAPTCHA 分类但不暴露响应内容', async () => {
-        fetchMock
-            .mockResolvedValueOnce(mockResponse('<!doctype html><html>captcha details</html>', {
-                ok: false,
-                status: 429,
-                statusText: 'Too Many Requests',
-            }))
-            .mockResolvedValueOnce(mockResponse(`)]}'\n\n[["unexpected", true]]`))
-            .mockResolvedValueOnce(mockResponse('not-json'));
-
-        const error = await translateGoogleText('hello', 'en', 'zh-Hans').catch(cause => cause);
-
-        expect(error).toBeInstanceOf(Error);
-        expect((error as Error).message).toBe(
-            `谷歌翻译所有匿名接口均失败：主网页 RPC: 请求失败: 429（可能触发了 CAPTCHA，请稍后重试）；备用网页 RPC: 返回格式异常；旧版 gtx 接口: 返回的不是 JSON`,
-        );
-        expect((error as Error).message).not.toContain('captcha details');
-        expect((error as Error).message).not.toContain('unexpected');
-        expect((error as Error).message).not.toContain('not-json');
-    });
-
-    it.each([
-        [400, 400, 400],
-        [429, 429, 429],
-        [400, 413, 422],
-        [503, 503, 503],
-    ])('HTML/CAPTCHA 包装与最终汇总保留安全 HTTP 分类 %j/%j/%j', async (...statuses) => {
-        for (const status of statuses) {
-            fetchMock.mockResolvedValueOnce(mockResponse('<html>private original https://secret.example/key</html>', {ok: false, status}));
-        }
-        const request = translateGoogleText('private original', 'en', 'zh-Hans');
-        await expect(request).rejects.toMatchObject({statusCode: statuses[0]});
-        await expect(request).rejects.toThrow('可能触发了 CAPTCHA');
-        await expect(request).rejects.not.toThrow('private original');
-        await expect(request).rejects.not.toThrow('secret.example');
-    });
-
-    it.each([429, 503, undefined])('汇总参数错误与可用性故障时不让 400 掩盖 %s', async status => {
-        fetchMock.mockResolvedValueOnce(mockResponse('', {ok: false, status: 400}));
-        if (status === undefined) fetchMock.mockRejectedValueOnce(new Error('private transport URL'));
-        else fetchMock.mockResolvedValueOnce(mockResponse('', {ok: false, status}));
-        fetchMock.mockResolvedValueOnce(mockResponse('', {ok: false, status: 400}));
-        const request = translateGoogleText('hello', 'en', 'zh-Hans');
-        await expect(request).rejects.not.toHaveProperty('statusCode');
-        await expect(request).rejects.toThrow('主网页 RPC: 请求失败: 400；备用网页 RPC:');
-        await expect(request).rejects.not.toThrow('private transport URL');
-    });
-
-    it.each([400, 413, 422])('真实 Google 适配器的 HTTP %i 不会让免费链熔断后续文本', async status => {
-        const run = createFreeFallbackRunner();
-        for (let index = 0; index < 3; index += 1) {
-            fetchMock.mockResolvedValueOnce(mockResponse('<html>request rejected</html>', {ok: false, status}));
-        }
-        fetchMock.mockResolvedValue(mockResponse(createBatchResponse(['下一段正常'])));
-        const candidates = [
-            {identity: 'google', label: '谷歌翻译', translate: (signal: AbortSignal) => translateGoogleText('sample', 'en', 'zh-Hans', signal)},
-            {identity: 'backup', label: '备用服务', translate: async () => '备用译文'},
-        ];
-        const options = {timeoutMs: 1_000, cooldownMs: 60_000};
-        await expect(run(candidates, options)).resolves.toBe('备用译文');
-        await expect(run(candidates, options)).resolves.toBe('下一段正常');
-        expect(fetchMock).toHaveBeenCalledTimes(4);
-    });
-
-    it('真实 Google 适配器的 CAPTCHA 429 会使免费链跳过下一段重复请求', async () => {
-        const run = createFreeFallbackRunner();
-        fetchMock.mockResolvedValue(mockResponse('<html>rate limit</html>', {ok: false, status: 429}));
-        const candidates = [
-            {identity: 'google', label: '谷歌翻译', translate: (signal: AbortSignal) => translateGoogleText('sample', 'en', 'zh-Hans', signal)},
-            {identity: 'backup', label: '备用服务', translate: async () => '备用译文'},
-        ];
-        const options = {timeoutMs: 1_000, cooldownMs: 60_000};
-        await expect(run(candidates, options)).resolves.toBe('备用译文');
-        await expect(run(candidates, options)).resolves.toBe('备用译文');
-        expect(fetchMock).toHaveBeenCalledTimes(3);
-    });
-
-    it('读取响应体失败时继续故障转移并汇总错误', async () => {
-        fetchMock.mockResolvedValue(mockResponse('', {
-            text: vi.fn().mockRejectedValue(new Error('stream error')),
-        }));
-
-        await expect(translateGoogleText('hello', 'en', 'zh-Hans'))
-            .rejects.toThrow(
-                '谷歌翻译所有匿名接口均失败：主网页 RPC: 响应读取失败；备用网页 RPC: 响应读取失败；旧版 gtx 接口: 响应读取失败',
-            );
-        expect(fetchMock).toHaveBeenCalledTimes(3);
-    });
-
-    it('单接口超时后继续故障转移，并遵守 15 秒总预算', async () => {
-        vi.useFakeTimers();
-        const signals: AbortSignal[] = [];
-        fetchMock.mockImplementation((_input, init) => {
-            const signal = init?.signal;
-            if (!signal) {
-                return Promise.reject(new Error('缺少 AbortSignal'));
-            }
-            signals.push(signal);
-            return new Promise((_resolve, reject) => {
-                signal.addEventListener('abort', () => {
-                    reject(new DOMException('The operation was aborted.', 'AbortError'));
-                }, {once: true});
-            });
-        });
-
-        const translationPromise = translateGoogleText('hello', 'en', 'zh-Hans');
-        const assertion = expect(translationPromise).rejects.toThrow(
-            '谷歌翻译所有匿名接口均失败：主网页 RPC: 请求超时（8 秒）；备用网页 RPC: 请求超时（7 秒）',
-        );
-
-        await vi.runAllTimersAsync();
-        await assertion;
-
-        expect(fetchMock).toHaveBeenCalledTimes(2);
-        expect(signals).toHaveLength(2);
-        expect(signals.every(signal => signal.aborted)).toBe(true);
-    });
-
-    it('调用方短预算取消会终止当前网络请求，且不再启动备用接口', async () => {
-        vi.useFakeTimers();
-        const controller = new AbortController();
-        let transportSignal: AbortSignal | undefined;
-        fetchMock.mockImplementation((_input, init) => {
-            transportSignal = init?.signal ?? undefined;
-            return new Promise((_resolve, reject) => {
-                transportSignal?.addEventListener('abort', () => reject(transportSignal?.reason), {once: true});
-            });
-        });
-
-        const request = translateGoogleText('hello', 'en', 'zh-Hans', controller.signal);
-        const rejection = expect(request).rejects.toThrow('broker 预算耗尽');
-        await vi.advanceTimersByTimeAsync(499);
-        expect(transportSignal?.aborted).toBe(false);
-        controller.abort(new Error('broker 预算耗尽'));
-        await rejection;
-
-        expect(transportSignal?.aborted).toBe(true);
+    it('并发段落与显式数组共享一批请求，并按原调用者顺序返回', async () => {
+        fetchMock.mockResolvedValue(response([['第一段', '第二段', '第三段']]));
+        const single = api.translateGoogleText('First paragraph', 'en', 'zh-Hans');
+        const batch = api.default({origin: ['Second paragraph', 'Third paragraph'], sourceLanguage: 'en', targetLanguage: 'zh-Hans'});
+        await expect(flush(Promise.all([single, batch]))).resolves.toEqual(['第一段', ['第二段', '第三段']]);
         expect(fetchMock).toHaveBeenCalledOnce();
+        expect(JSON.parse(String(fetchMock.mock.calls[0]![1]!.body))[0][0]).toHaveLength(3);
     });
-
-    it('调用前已取消时不启动网络请求', async () => {
-        const controller = new AbortController();
-        controller.abort('stop');
-
-        await expect(translateGoogleText('hello', 'en', 'zh-Hans', controller.signal))
-            .rejects.toMatchObject({name: 'AbortError'});
-        expect(fetchMock).not.toHaveBeenCalled();
+    it('不同语言隔离，中文书写系统与 Google 别名正确映射', async () => {
+        fetchMock.mockImplementation(async (_url, init) => {
+            const payload = JSON.parse(String(init?.body));
+            return response([payload[0][0].map(() => payload[0].slice(1).join(':'))]);
+        });
+        const tasks = [api.translateGoogleText('Hello', 'nb', 'zh-Hant'), api.translateGoogleText('Hello', 'fil', 'zh-Hans')];
+        await expect(flush(Promise.all(tasks))).resolves.toEqual(['no:zh-TW', 'tl:zh-CN']);
+        expect(fetchMock).toHaveBeenCalledTimes(2);
     });
-
-    it('按网页 RPC 服务端片段原样拼接译文，不额外插入空格', () => {
-        expect(parseGoogleBatchResponse(createBatchResponse(['第一句话。', '第二句话！'])))
-            .toBe('第一句话。第二句话！');
+    it('合批同时限制条数与转义后的大小，空槽原样保留', async () => {
+        fetchMock.mockImplementation(async (_url, init) => response([JSON.parse(String(init?.body))[0][0].map(() => '译文')]));
+        const many = Array.from({length: 65}, (_, i) => `Paragraph ${i}`);
+        await expect(flush(api.translateGoogleTexts(many, 'en', 'zh'))).resolves.toHaveLength(65);
+        expect(fetchMock.mock.calls.map(([, init]) => JSON.parse(String(init?.body))[0][0].length)).toEqual([32, 32, 1]);
+        fetchMock.mockClear();
+        await expect(flush(api.translateGoogleTexts(['&'.repeat(500), '&'.repeat(500), '  \n', ''], 'en', 'zh')))
+            .resolves.toEqual(['译文', '译文', '  \n', '']);
+        expect(fetchMock).toHaveBeenCalledTimes(2);
+        await expect(api.translateGoogleTexts([], 'en', 'zh')).resolves.toEqual([]);
     });
-
-    it('按旧版 gtx 服务端片段原样拼接译文', () => {
-        expect(parseGoogleLegacyResponse(createLegacyResponse(['第一句话。', '第二句话！'])))
-            .toBe('第一句话。第二句话！');
+    it('浏览器接口失败后整批换到网页批量接口，不访问淘汰的 single', async () => {
+        fetchMock.mockResolvedValueOnce(response('unavailable', 503)).mockResolvedValueOnce(response([['第一段', 'en'], ['第二段', 'en']]));
+        await expect(flush(api.translateGoogleTexts(['First paragraph', 'Second paragraph'], 'auto', 'zh'))).resolves.toEqual(['第一段', '第二段']);
+        expect(hosts()).toEqual([HTML, LIST]);
+        const [url, init] = fetchMock.mock.calls[1]!;
+        expect(new URL(String(url)).pathname).toBe('/translate_a/t');
+        expect(new URLSearchParams(String(init?.body)).getAll('q')).toEqual(['First paragraph', 'Second paragraph']);
     });
-
-    it('保留换行和普通文本中的 HTML 字符', async () => {
-        fetchMock.mockResolvedValue(mockResponse(
-            createBatchResponse(['如果 x < 3 && y > 1\n', '下一行']),
-        ));
-
-        await expect(translateGoogleText('if x < 3 && y > 1\nNext line', 'en', 'zh-Hans'))
-            .resolves.toBe('如果 x < 3 && y > 1\n下一行');
-    });
-
-    it('多行请求沿用实际 batchexecute RPC 并原样携带换行', async () => {
-        fetchMock.mockResolvedValue(mockResponse(createBatchResponse(['第一行\n第二行'])));
-
-        await expect(translateGoogleText('First line\nSecond line', 'en', 'zh-Hans'))
-            .resolves.toBe('第一行\n第二行');
-
-        const [url, init] = fetchMock.mock.calls[0]!;
-        expect(url).toBe('https://translate.google.com/_/TranslateWebserverUi/data/batchexecute?rpcids=MkEWBc');
-        const requestBody = new URLSearchParams(String(init?.body)).get('f.req');
-        const batchRequest = JSON.parse(requestBody!);
-        const translationRequest = JSON.parse(batchRequest[0][0][1]);
-        expect(translationRequest[0][0]).toBe('First line\nSecond line');
-    });
-
-    it('忽略网页 RPC 的防劫持前缀、长度行和无关记录', () => {
-        const response = createBatchResponse(['测试成功']).replace('\n\n', '\n\n1234\nnot-json\n');
-        expect(parseGoogleBatchResponse(response)).toBe('测试成功');
-    });
-
-    it('拒绝无法识别的网页 RPC 与旧版响应结构', () => {
-        expect(() => parseGoogleBatchResponse(`)]}'\n\n[["unexpected", true]]`))
-            .toThrow('返回格式异常');
-        expect(() => parseGoogleLegacyResponse('{"unexpected":true}'))
-            .toThrow('返回格式异常');
-    });
-
-    it('三个接口均发生网络异常时返回完整故障转移信息', async () => {
-        fetchMock.mockRejectedValue(new TypeError('Failed to fetch'));
-
-        await expect(translateGoogleText('hello', 'en', 'zh-Hans'))
-            .rejects.toThrow(
-                '谷歌翻译所有匿名接口均失败：主网页 RPC: 网络请求失败；备用网页 RPC: 网络请求失败；旧版 gtx 接口: 网络请求失败',
-            );
-        expect(fetchMock).toHaveBeenCalledTimes(3);
-    });
-
-    it('拒绝批量文本输入', async () => {
-        await expect(google({origin: ['hello']} as unknown as {origin: string}))
-            .rejects.toThrow('谷歌翻译仅支持单条文本');
-        expect(fetchMock).not.toHaveBeenCalled();
-    });
-});
-
-describe('Google 中文脚本协议', () => {
-    it.each([
-        ['zh-Hans', 'zh-Hant', 'zh-CN', 'zh-TW'],
-        ['zh-Hant', 'zh-Hans', 'zh-TW', 'zh-CN'],
-        ['zh-HK', 'en', 'zh-TW', 'en'],
-    ])('%s → %s 的 RPC 与 legacy 回退使用相同脚本', async (source, target, sl, tl) => {
-        fetchMock.mockResolvedValueOnce(mockResponse('unavailable', {ok: false, status: 503}))
-            .mockResolvedValueOnce(mockResponse('unavailable', {ok: false, status: 503}))
-            .mockResolvedValueOnce(mockResponse(JSON.stringify([[['translated']]])));
-        await expect(translateGoogleText('test', source, target)).resolves.toBe('translated');
-        for (const call of fetchMock.mock.calls.slice(0, 2)) {
-            const batch = JSON.parse(new URLSearchParams(String(call[1]?.body)).get('f.req')!);
-            expect(JSON.parse(batch[0][0][1])[0]).toEqual(['test', sl, tl, true]);
+    it('批量返回缺槽、空译文或错误类型时继续换线，不能错配原文', async () => {
+        for (const bad of [[['只有一段']], [['', '第二段']], [['<pre></pre>', '第二段']], [[12, '第二段']]]) {
+            vi.resetModules(); api = await import('@/src/providers/translation/google'); fetchMock.mockReset();
+            fetchMock.mockResolvedValueOnce(response(bad)).mockResolvedValueOnce(response(['第一段', '第二段']));
+            await expect(flush(api.translateGoogleTexts(['First', 'Second'], 'en', 'zh'))).resolves.toEqual(['第一段', '第二段']);
+            expect(hosts()).toEqual([HTML, LIST]);
         }
-        const url = new URL(String(fetchMock.mock.calls[2]?.[0]));
-        expect(url.searchParams.get('sl')).toBe(sl);
-        expect(url.searchParams.get('tl')).toBe(tl);
+    });
+    it('RPC 整批回退按编号还原乱序结果，保留换行与服务端片段', async () => {
+        fetchMock.mockResolvedValueOnce(response('', 502)).mockResolvedValueOnce(response('', 502))
+            .mockResolvedValueOnce(response(rpcResponse(['第二段', '第一段'], ['1', '0'])));
+        await expect(flush(api.translateGoogleTexts(['First', 'Second'], 'en', 'zh'))).resolves.toEqual(['第一段', '第二段']);
+        expect(hosts()).toEqual([HTML, LIST, RPC]);
+        const payload = JSON.parse(new URLSearchParams(String(fetchMock.mock.calls[2]![1]!.body)).get('f.req')!);
+        expect(payload[0].map((record: unknown[]) => record[3])).toEqual(['0', '1']);
+        expect(JSON.parse(payload[0][1][1])[0]).toEqual(['Second', 'en', 'zh-CN', true]);
+    });
+    it.each([['0', '0'], ['1'], ['unexpected', '0']].map(ids => ({ids})))('RPC 重复、缺失或非法编号 $ids 不会静默接受', async ({ids}) => {
+        fetchMock.mockResolvedValueOnce(response('', 503)).mockResolvedValueOnce(response('', 503))
+            .mockResolvedValueOnce(response(rpcResponse(ids.map(() => '错误槽'), ids)))
+            .mockResolvedValueOnce(response(rpcResponse(['第一段', '第二段'])));
+        await expect(flush(api.translateGoogleTexts(['First', 'Second'], 'en', 'zh'))).resolves.toEqual(['第一段', '第二段']);
+        expect(hosts()).toEqual([HTML, LIST, RPC, UK]);
+    });
+    it('解析 RPC 帧忽略无关记录，且不额外插入空格', () => {
+        const payload = [null, [[[null, null, null, null, null, [['第一句。'], ['第二句！']]]]]];
+        const body = `)]}'\n\n120\nnot json\n[broken\n${JSON.stringify([['other'], ['wrb.fr', 'Other', '{}'], ['wrb.fr', 'MkEWBc', '{broken'], ['wrb.fr', 'MkEWBc', JSON.stringify(payload)]])}`;
+        expect(api.parseGoogleBatchResponse(body)).toBe('第一句。第二句！');
+        expect(() => api.parseGoogleBatchResponse('[]')).toThrow('返回格式异常');
     });
 });
 
-describe('谷歌扩展语言协议', () => {
-    it.each(['de', 'pt', 'it', 'ar', 'hi', 'bn', 'ur', 'fa', 'he', 'tr', 'vi', 'th', 'id', 'ms', 'nl', 'pl', 'uk', 'cs', 'sk', 'da', 'sv', 'nb', 'fi', 'el', 'ro', 'hu', 'bg', 'hr', 'sr', 'sl', 'et', 'lv', 'lt', 'ta', 'te', 'mr', 'gu', 'kn', 'ml', 'pa', 'ne', 'si', 'sw', 'fil'])('网页 RPC 正确发送新增语言 %s', async language => {
-        fetchMock.mockResolvedValue(mockResponse(createBatchResponse(['result'])));
-        await translateGoogleText('Hello', language, language);
-        const body = new URLSearchParams(String(fetchMock.mock.calls[0]?.[1]?.body));
-        const rpc = JSON.parse(body.get('f.req')!);
-        const payload = JSON.parse(rpc[0][0][1]);
-        const expected = language === 'nb' ? 'no' : language === 'fil' ? 'tl' : language;
-        expect(payload[0].slice(0, 3)).toEqual(['Hello', expected, expected]);
+describe('Google 端点健康与预算', () => {
+    it('网络失败和 5xx 对后续段落冷却，到期仅一个探测请求', async () => {
+        fetchMock.mockRejectedValueOnce(new Error('private transport URL')).mockResolvedValue(response(['后备译文']));
+        await expect(flush(api.translateGoogleText('First', 'en', 'zh'))).resolves.toBe('后备译文');
+        await expect(flush(api.translateGoogleText('Second', 'en', 'zh'))).resolves.toBe('后备译文');
+        expect(hosts()).toEqual([HTML, LIST, LIST]);
+        await vi.advanceTimersByTimeAsync(30_000);
+        let resolveProbe!: (response: Response) => void;
+        fetchMock.mockImplementationOnce(() => new Promise(resolve => { resolveProbe = resolve; }));
+        const probe = api.translateGoogleText('Recovery probe', 'en', 'zh');
+        await vi.advanceTimersByTimeAsync(10);
+        await expect(flush(api.translateGoogleText('Concurrent paragraph', 'en', 'zh'))).resolves.toBe('后备译文');
+        expect(hosts()).toEqual([HTML, LIST, LIST, HTML, LIST]);
+        resolveProbe(response([['恢复译文']]));
+        await expect(probe).resolves.toBe('恢复译文');
+        fetchMock.mockResolvedValue(response([['正常译文']]));
+        await expect(flush(api.translateGoogleText('Next', 'en', 'zh'))).resolves.toBe('正常译文');
+        expect(hosts().at(-1)).toBe(HTML);
     });
-    it('RPC 失败后 gtx 仍使用相同的语言别名', async () => {
-        fetchMock.mockRejectedValueOnce(new Error('RPC unavailable'))
-            .mockRejectedValueOnce(new Error('RPC unavailable'))
-            .mockResolvedValue(mockResponse(JSON.stringify([[['result', 'Hello', null, null, 1]], null, 'no'])));
-        await expect(translateGoogleText('Hello', 'nb', 'fil')).resolves.toBe('result');
-        const url = new URL(String(fetchMock.mock.calls[2]?.[0]));
-        expect(url.searchParams.get('sl')).toBe('no');
-        expect(url.searchParams.get('tl')).toBe('tl');
+    it('429、403 与 XSRF 拒绝冷却五分钟，普通 400 不淘汰入口', async () => {
+        fetchMock.mockResolvedValueOnce(response('bad language', 400)).mockResolvedValueOnce(response(['后备']))
+            .mockResolvedValueOnce(response([['下一段']]));
+        await expect(flush(api.translateGoogleText('First', 'en', 'zh'))).resolves.toBe('后备');
+        await expect(flush(api.translateGoogleText('Second', 'en', 'zh'))).resolves.toBe('下一段');
+        expect(hosts()).toEqual([HTML, LIST, HTML]);
+        fetchMock.mockReset();
+        fetchMock.mockResolvedValueOnce(response('<html>private</html>', 429)).mockResolvedValueOnce(response('', 403))
+            .mockResolvedValueOnce(response('["xsrf"]', 400)).mockResolvedValue(response(rpcResponse(['备用'])));
+        await expect(flush(api.translateGoogleText('Third', 'en', 'zh'))).resolves.toBe('备用');
+        await expect(flush(api.translateGoogleText('Fourth', 'en', 'zh'))).resolves.toBe('备用');
+        expect(hosts()).toEqual([HTML, LIST, RPC, UK, UK]);
+        await vi.advanceTimersByTimeAsync(300_000);
+        fetchMock.mockResolvedValue(response([['恢复']]));
+        await expect(flush(api.translateGoogleText('Fifth', 'en', 'zh'))).resolves.toBe('恢复');
+        expect(hosts().at(-1)).toBe(HTML);
+    });
+    it('较早请求迟到成功不会清掉新请求记录的故障', async () => {
+        let resolveOld!: (response: Response) => void;
+        fetchMock.mockImplementationOnce(() => new Promise(resolve => { resolveOld = resolve; }))
+            .mockResolvedValueOnce(response('', 503)).mockResolvedValue(response(['后备']));
+        const old = api.translateGoogleText('Old paragraph', 'en', 'zh');
+        await vi.advanceTimersByTimeAsync(10);
+        await expect(flush(api.translateGoogleText('New paragraph', 'en', 'zh'))).resolves.toBe('后备');
+        resolveOld(response([['迟到成功']])); await expect(old).resolves.toBe('迟到成功');
+        await expect(flush(api.translateGoogleText('Next paragraph', 'en', 'zh'))).resolves.toBe('后备');
+        expect(hosts()).toEqual([HTML, HTML, LIST, LIST]);
+    });
+    it.each([[400,400,413,422], [429,429,429,429], [503,503,503,503]].map(statuses => ({statuses})))('所有接口失败保留一致 HTTP 分类 $statuses 且不泄露正文', async ({statuses}) => {
+        for (const status of statuses) fetchMock.mockResolvedValueOnce(response('<html>private original secret.example/key</html>', status));
+        const failure = await flush(api.translateGoogleText('private original', 'en', 'zh')).catch(error => error);
+        expect(failure).toMatchObject({statusCode: statuses[0]});
+        expect(failure.message).toContain('CAPTCHA');
+        expect(failure.message).not.toMatch(/private original|secret.example/);
+    });
+    it('混合参数错误与服务故障不让单个 400 掩盖可用性问题', async () => {
+        for (const status of [400,503,400,400]) fetchMock.mockResolvedValueOnce(response('', status));
+        const failure = await flush(api.translateGoogleText('Hello', 'en', 'zh')).catch(error => error);
+        expect(failure.statusCode).toBeUndefined();
+    });
+    it('读取响应体失败与无效 JSON 均会换线，错误只包含安全文案', async () => {
+        fetchMock.mockResolvedValueOnce({...response(''), text: vi.fn().mockRejectedValue(new Error('private stream'))} as unknown as Response)
+            .mockResolvedValueOnce(response('private malformed JSON')).mockResolvedValueOnce(response('invalid RPC'))
+            .mockResolvedValueOnce(response('invalid RPC'));
+        const failure = await flush(api.translateGoogleText('Hello', 'en', 'zh')).catch(error => error);
+        expect(failure.message).toContain('响应读取失败');
+        expect(failure.message).not.toContain('private');
+        expect(hosts()).toEqual([HTML, LIST, RPC, UK]);
+    });
+    it('每个接口最多两秒，四个候选共享八秒总预算', async () => {
+        const signals: AbortSignal[] = [];
+        fetchMock.mockImplementation((_url, init) => new Promise((_resolve, reject) => {
+            signals.push(init!.signal!);
+            init!.signal!.addEventListener('abort', () => reject(init!.signal!.reason), {once:true});
+        }));
+        const request = api.translateGoogleText('Hello', 'en', 'zh');
+        const assertion = expect(request).rejects.toThrow('请求超时');
+        await vi.advanceTimersByTimeAsync(8_010);
+        await assertion;
+        expect(hosts()).toEqual([HTML, LIST, RPC, UK]);
+        expect(signals.every(signal => signal.aborted)).toBe(true);
+        expect(vi.getTimerCount()).toBe(0);
+    });
+});
+
+describe('Google 合批取消所有权', () => {
+    it('排队前/排队中取消不会发送请求', async () => {
+        const first = new AbortController(); first.abort();
+        await expect(api.translateGoogleText('Hello', 'en', 'zh', first.signal)).rejects.toMatchObject({name:'AbortError'});
+        const second = new AbortController();
+        const request = api.translateGoogleText('Hello', 'en', 'zh', second.signal);
+        const assertion = expect(request).rejects.toMatchObject({name:'AbortError'});
+        second.abort(); await assertion;
+        await vi.advanceTimersByTimeAsync(10);
+        expect(fetchMock).not.toHaveBeenCalled();
+    });
+    it('一个调用者取消不影响共用请求的另一个调用者，监听器完成后清理', async () => {
+        let resolve!: (response: Response) => void;
+        fetchMock.mockImplementationOnce(() => new Promise(done => {resolve = done;}));
+        const owner = new AbortController();
+        const remove = vi.spyOn(owner.signal, 'removeEventListener');
+        const one = api.translateGoogleText('First', 'en', 'zh', owner.signal);
+        const assertion = expect(one).rejects.toMatchObject({name:'AbortError'});
+        const two = api.translateGoogleText('Second', 'en', 'zh');
+        await vi.advanceTimersByTimeAsync(10);
+        const transportSignal = fetchMock.mock.calls[0]![1]!.signal!;
+        owner.abort(); await assertion;
+        expect(transportSignal.aborted).toBe(false);
+        resolve(response([['第一段', '第二段']]));
+        await expect(two).resolves.toBe('第二段');
+        expect(remove).toHaveBeenCalled();
+        expect(vi.getTimerCount()).toBe(0);
+    });
+    it('全部调用者取消会终止网络；不会换线或把取消计为端点故障', async () => {
+        fetchMock.mockImplementationOnce((_url, init) => new Promise((_resolve, reject) => {
+            init!.signal!.addEventListener('abort', () => reject(init!.signal!.reason), {once:true});
+        }));
+        const owner = new AbortController();
+        const request = api.translateGoogleTexts(['First', 'Second'], 'en', 'zh', owner.signal);
+        const assertion = expect(request).rejects.toThrow('broker 预算耗尽');
+        await vi.advanceTimersByTimeAsync(10); owner.abort(new Error('broker 预算耗尽')); await assertion;
+        expect(fetchMock).toHaveBeenCalledOnce();
+        expect(fetchMock.mock.calls[0]![1]!.signal!.aborted).toBe(true);
+        fetchMock.mockResolvedValue(response([['正常']]));
+        await expect(flush(api.translateGoogleText('Next', 'en', 'zh'))).resolves.toBe('正常');
+        expect(hosts()).toEqual([HTML, HTML]);
     });
 });

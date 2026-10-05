@@ -19,6 +19,7 @@ export const LOCAL_TRANSLATION_UNAVAILABLE_MESSAGE =
 
 const NATIVE_BATCH_TRANSLATION_SERVICES = new Set<string>([
     services.microsoft,
+    services.google,
     services.freeTranslation,
 ]);
 

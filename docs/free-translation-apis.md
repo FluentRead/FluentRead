@@ -10,7 +10,7 @@
 | --- | --- | --- |
 | 微软翻译 | Edge 网页内部接口，不是正式公开翻译 API | 保留已有免密钥调用方式 |
 | DeepLX | 非官方公共接口 | 免费链固定使用默认公共匿名地址，不继承单独 DeepLX 服务的地址、代理或 Token |
-| 谷歌翻译 | Google 网页接口，不是 Google Cloud Translation 官方 API | 保留已有免密钥调用方式 |
+| 谷歌翻译 | Google 网页接口，不是 Google Cloud Translation 官方 API | 优先 `translateHtml` 原生批量，保留 `translate_a/t` 与两个网页 RPC 回退，移除零成功的 `translate_a/single`；无需用户密钥 |
 | MyMemory | 官方公开查询 API | 无需注册、密钥或邮箱即可调用 |
 
 网页端点的可调用性不等同于官方 API 额度或可用性承诺，可以在设置中停用。更多默认候选和可选候选见下文。

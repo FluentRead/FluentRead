@@ -1,0 +1,124 @@
+{
+  "ok": true,
+  "profileMode": "generated-temporary",
+  "service": "google",
+  "screenshots": [
+    "final-live-translation.png"
+  ],
+  "launchMode": "macos-background-cdp",
+  "focusPolicy": "launchservices-no-foreground",
+  "windowPlacement": {
+    "mode": "background-visible-no-focus",
+    "visible": true,
+    "hidden": false,
+    "centered": true,
+    "windowState": "normal",
+    "bounds": {
+      "left": 1121,
+      "top": -990,
+      "width": 1280,
+      "height": 900
+    },
+    "displayTarget": "secondary",
+    "source": "macos-nsscreen",
+    "screenIndex": 1,
+    "browserFrontmost": false
+  },
+  "hover": [
+    1,
+    0,
+    1
+  ],
+  "full": [
+    {
+      "count": 6,
+      "ms": 313
+    },
+    {
+      "count": 0,
+      "ms": 7
+    },
+    {
+      "count": 6,
+      "ms": 1025
+    }
+  ],
+  "translations": [
+    "对于每个人来说，浏览网页都应该快速可靠。",
+    "河流穿城而过，最终汇入大海。",
+    "人们每天都通过读书学习新语言。",
+    "图书馆清晨开门，晚上关门。",
+    "本段包含指向另一篇有用文章的链接。",
+    "好的翻译能够保留原文的含义。"
+  ],
+  "liveTraffic": [
+    {
+      "host": "translate-pa.googleapis.com",
+      "path": "/v1/translateHtml",
+      "start": 2288.800000190735,
+      "items": 1,
+      "status": 200,
+      "ms": 854
+    },
+    {
+      "host": "translate-pa.googleapis.com",
+      "path": "/v1/translateHtml",
+      "start": 3262.9000000953674,
+      "items": 6,
+      "status": 200,
+      "ms": 214
+    },
+    {
+      "host": "translate-pa.googleapis.com",
+      "path": "/v1/translateHtml",
+      "start": 3571.4000000953674,
+      "items": 4,
+      "status": 200,
+      "ms": 198
+    },
+    {
+      "host": "translate-pa.googleapis.com",
+      "path": "/v1/translateHtml",
+      "start": 4267.599999904633,
+      "items": 2,
+      "status": 200,
+      "ms": 253
+    }
+  ],
+  "fastFailure": [
+    {
+      "result": "绿树长在安静的房子旁边。",
+      "ms": 1156
+    },
+    {
+      "result": "一只小鸟在古老的木桥附近唱歌。",
+      "ms": 273
+    }
+  ],
+  "faultTraffic": [
+    {
+      "host": "translate-pa.googleapis.com",
+      "path": "/v1/translateHtml",
+      "start": 4685.800000190735,
+      "items": 1,
+      "status": 503,
+      "ms": 0
+    },
+    {
+      "host": "translate.googleapis.com",
+      "path": "/translate_a/t",
+      "start": 4686.300000190735,
+      "items": 1,
+      "status": 200,
+      "ms": 1139
+    },
+    {
+      "host": "translate.googleapis.com",
+      "path": "/translate_a/t",
+      "start": 5840.700000286102,
+      "items": 1,
+      "status": 200,
+      "ms": 257
+    }
+  ]
+}

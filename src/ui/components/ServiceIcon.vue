@@ -21,6 +21,7 @@
       <rect x="3" y="13" width="8" height="8" fill="#05a6f0" />
       <rect x="13" y="13" width="8" height="8" fill="#ffba08" />
     </svg>
+    <svg v-else-if="service === 'bilibili' || service === 'bilibiliFree'" viewBox="0 0 24 24" role="img"><path d="M7 6h10a4 4 0 0 1 4 4v6a4 4 0 0 1-4 4H7a4 4 0 0 1-4-4v-6a4 4 0 0 1 4-4Z" /><path d="m8 2 3 4m5-4-3 4M8 11v4m8-4v4m-6 2h4" /></svg>
     <svg v-else-if="service === 'freeTranslation'" viewBox="0 0 24 24" role="img">
       <path d="M5 7h10M5 12h7M5 17h5" />
       <path d="m15 9 4 3-4 3M19 12H9" />

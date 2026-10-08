@@ -47,7 +47,7 @@
     </section>
     </Teleport>
     <section v-if="service !== services.freeTranslation && service !== services.localTranslation" class="connection-card" data-configuration-group="connection">
-      <p v-if="service === services.microsoft || service === services.google" class="configuration-scope" data-service-no-setup>{{ t('settings.organization.noSetup') }}</p>
+      <p v-if="service === services.microsoft || service === services.google || service === services.bilibili" class="configuration-scope" data-service-no-setup>{{ t('settings.organization.noSetup') }}</p>
     <template v-if="service === services.myMemory">
       <div class="connection-field" data-mymemory-email>
         <div class="connection-field-label"><strong>联系邮箱（可选）</strong><small>不填写也可以使用</small></div>

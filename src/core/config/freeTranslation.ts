@@ -9,8 +9,8 @@
 export const BILIBILI_FREE_TRANSLATION_DOMAIN = 'index-translate.bilibili.com';
 
 export const FREE_TRANSLATION_PROVIDERS = [
-    {id: 'bilibiliFree', label: 'B站翻译', description: '官方免费文本 API，Index-Translate-35B-A3B，无需密钥', official: true, defaultWeight: 2},
     {id: 'microsoft', label: '微软翻译', description: 'Edge 网页接口，非官方公开 API', official: true, defaultWeight: 5},
+    {id: 'bilibiliFree', label: 'B站翻译', description: '官方免费文本 API，Index-Translate-35B-A3B，无需密钥', official: true, defaultWeight: 2},
     {id: 'transmart', label: '腾讯交互翻译', description: '免密钥网页接口，与腾讯云翻译不同', official: true, defaultWeight: 3},
     {id: 'volcengineFree', label: '火山翻译', description: '免密钥网页接口，无需配置火山云账号', official: true, defaultWeight: 3},
     {id: 'google', label: '谷歌翻译', description: '网页接口，非官方公开 API', official: true, defaultWeight: 3},

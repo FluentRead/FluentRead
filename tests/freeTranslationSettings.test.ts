@@ -67,8 +67,8 @@ afterAll(async () => server?.close());
 function control(ariaLabel: string): Node { const element = [...elements].reverse().find(node => node.props['aria-label'] === ariaLabel); expect(element, ariaLabel).toBeDefined(); return element!; }
 
 describe('free translation settings compiled component', () => {
-  it('B站在智能加速列表首位展示推荐标记，手动顺序仍可调整', async () => {
-    expect(state.providers[0].id).toBe('bilibiliFree');
+  it('微软第一、B站第二展示推荐标记，手动顺序仍可调整', async () => {
+    expect(state.providers.slice(0, 2).map((provider: {id: string}) => provider.id)).toEqual(['microsoft', 'bilibiliFree']);
     expect(elements.filter(node => node.props['data-provider-recommended']).map(node => node.text)).toEqual(['推荐']);
     state.setMode('sequential');
     config.freeTranslationOrder = ['google', 'bilibiliFree'];
@@ -159,8 +159,8 @@ describe('free translation settings compiled component', () => {
     pending[1].resolve({success: false, error: '超时'});
     pending[2].reject(new Error('断开'));
     await run;
-    expect(checks.bilibiliFree?.durationMs).toBe(7);
-    expect(checks.microsoft?.durationMs).toBe(25);
+    expect(checks.microsoft?.durationMs).toBe(7);
+    expect(checks.bilibiliFree?.durationMs).toBe(25);
     expect(checks.transmart?.durationMs).toBe(25);
     expect(checks.apertiumFree?.durationMs).toBe(0);
     checks.microsoft = {status: 'checking', durationMs: 7};

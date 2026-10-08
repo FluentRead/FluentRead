@@ -21,6 +21,7 @@ const NATIVE_BATCH_TRANSLATION_SERVICES = new Set<string>([
     services.microsoft,
     services.google,
     services.freeTranslation,
+    services.bilibili,
 ]);
 
 /**

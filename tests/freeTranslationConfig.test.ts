@@ -21,7 +21,7 @@ describe('keyless free translation configuration', () => {
             .toEqual(['myMemory', 'google']);
         expect(normalizeConfig({freeTranslationOrder: ['myMemory']}).freeTranslationOrder).toEqual(['bilibiliFree', 'myMemory']);
         expect(FREE_TRANSLATION_PROVIDERS.find(item => item.id === 'myMemory')?.official).toBe(true);
-        expect(FREE_TRANSLATION_PROVIDERS.map(item => item.id)).toEqual(['bilibiliFree', 'microsoft', 'transmart', 'volcengineFree', 'google', 'youdaoFree', 'icibaFree', 'yandexFree', 'myMemory', 'sogouFree', 'reversoFree', 'apertiumFree', 'alibabaFree', 'modernMtFree', 'laraFree', 'lingvanexFree']);
+        expect(FREE_TRANSLATION_PROVIDERS.map(item => item.id)).toEqual(['microsoft', 'bilibiliFree', 'transmart', 'volcengineFree', 'google', 'youdaoFree', 'icibaFree', 'yandexFree', 'myMemory', 'sogouFree', 'reversoFree', 'apertiumFree', 'alibabaFree', 'modernMtFree', 'laraFree', 'lingvanexFree']);
         expect(normalizeFreeTranslationOrder(['azureTranslator', 'myMemory', 'deepL', 'openai'])).toEqual(['myMemory']);
         expect(normalizeFreeTranslationOrder(['azureTranslator', 'deepL'])).toEqual(DEFAULT_FREE_TRANSLATION_ORDER);
     });
@@ -107,10 +107,11 @@ describe('keyless free translation configuration', () => {
     });
 });
 
- it('defaults to Bilibili-first balanced policy and rejects user supplied weights', () => {
+ it('defaults to Microsoft-first balanced policy and rejects user supplied weights', () => {
     expect(new Config().freeTranslationMode).toBe('balanced');
     expect(new Config()).not.toHaveProperty('freeTranslationWeights');
-    expect(DEFAULT_FREE_TRANSLATION_ORDER[0]).toBe('bilibiliFree');
+    expect(DEFAULT_FREE_TRANSLATION_ORDER.slice(0, 2)).toEqual(['microsoft', 'bilibiliFree']);
+    expect(normalizeConfig({freeTranslationOrder: ['microsoft', 'google']}).freeTranslationOrder).toEqual(['microsoft', 'bilibiliFree', 'google']);
     expect(normalizeFreeTranslationMode('sequential')).toBe('sequential');
     expect(normalizeFreeTranslationMode('invalid')).toBe('balanced');
     const supplied = {freeTranslationMode: 'sequential', freeTranslationWeights: {microsoft: 0, google: 999999}};

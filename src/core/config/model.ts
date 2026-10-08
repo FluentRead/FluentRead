@@ -1127,8 +1127,10 @@ export function normalizeConfig(value: unknown): Config {
     normalized.freeTranslationOrder = normalizeFreeTranslationOrder(source.freeTranslationOrder);
     // 旧配置首次升级默认开启 B站；标记写入后尊重用户后续的手动关闭。
     if (source.freeTranslationBilibiliDefaultApplied !== true) {
-        normalized.freeTranslationOrder = ['bilibiliFree',
-            ...normalized.freeTranslationOrder.filter(id => id !== 'bilibiliFree')];
+        const order = normalized.freeTranslationOrder.filter(id => id !== 'bilibiliFree');
+        const microsoftIndex = order.indexOf('microsoft');
+        order.splice(microsoftIndex < 0 ? 0 : microsoftIndex + 1, 0, 'bilibiliFree');
+        normalized.freeTranslationOrder = order;
     }
     normalized.freeTranslationBilibiliDefaultApplied = true;
     normalized.freeTranslationMode = normalizeFreeTranslationMode(source.freeTranslationMode);

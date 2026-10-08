@@ -18,6 +18,7 @@ const serviceGuide = 'https://fluent.thinkstu.com/config/translation-engines'
 const serviceWebsites = {
   microsoft: 'https://www.bing.com/translator',
   freeTranslation: serviceGuide,
+  bilibili: 'https://github.com/bilibili/Index-Translate',
   myMemory: 'https://mymemory.translated.net/doc/spec.php',
   deepL: 'https://www.deepl.com/en/products/api',
   deeplx: 'https://deeplx.owo.network/',
@@ -191,7 +192,7 @@ export function getServiceWebsite(
     url: service === services.minimax && context.minimaxRegion === 'global'
       ? 'https://platform.minimax.io/login'
       : serviceWebsites[service as keyof typeof serviceWebsites],
-    kind: [services.freeTranslation, services.chromeTranslator, services.myMemory, services.localTranslation].includes(service)
+    kind: [services.freeTranslation, services.bilibili, services.chromeTranslator, services.myMemory, services.localTranslation].includes(service)
       ? 'documentation'
       : 'website',
   }

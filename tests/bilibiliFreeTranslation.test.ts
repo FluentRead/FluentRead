@@ -5,15 +5,40 @@
  * 模块边界：使用共享 HTTP 端口注入响应，不连接真实服务，不读取用户配置。
  */
 import {afterEach, describe, expect, it, vi} from 'vitest';
-import {translateBilibiliFree, BILIBILI_FREE_TRANSLATION_URL} from '@/src/providers/translation/bilibili-free';
+import bilibili, {translateBilibiliFree, BILIBILI_FREE_TRANSLATION_URL} from '@/src/providers/translation/bilibili-free';
 import {setRuntimeFetch} from '@/src/platform/http/runtime';
+import {Config, normalizeConfig} from '@/src/core/config/model';
+import {services, servicesType, options} from '@/src/core/config/catalog';
+import {getMissingCredentialMessage} from '@/src/core/config/validation';
+import {attachTranslationProviderConfig, createTranslationProviderConfigSnapshot} from '@/src/services/translation/requestSnapshot';
 import {parseTranslationSlots, serializeTranslationSlots} from '@/src/core/translation/slotProtocol';
+
+vi.mock('@/src/services/config/store', () => ({config: {from: 'auto', to: 'zh-Hans'}}));
 
 const request = (origin = 'Hello', extra = {}) => ({origin, sourceLanguage: 'en', targetLanguage: 'zh-Hans', ...extra});
 const reply = (content: unknown = '你好', finish_reason = 'stop') => Response.json({choices: [{message: {content}, finish_reason}]});
 afterEach(() => {setRuntimeFetch(); vi.restoreAllMocks();});
 
 describe('B站官方免费翻译', () => {
+    it('独立服务归属机器翻译、无需密钥并可保存为默认服务', () => {
+        expect(options.services.find(item => item.value === services.bilibili)?.label).toBe('B站翻译');
+        expect(servicesType.isMachine(services.bilibili)).toBe(true);
+        expect(servicesType.isAI(services.bilibili)).toBe(false);
+        expect(normalizeConfig({...new Config(), service: services.bilibili}).service).toBe(services.bilibili);
+        expect(getMissingCredentialMessage(services.bilibili, new Config())).toBeNull();
+    });
+    it('独立入口遵守冻结配置中的繁体目标与批量顺序，覆盖语言优先', async () => {
+        const fetch = vi.fn().mockImplementation(async () => reply('翻譯'));
+        setRuntimeFetch(fetch);
+        const current = new Config(); current.from = 'en'; current.to = 'zh-Hant';
+        const frozen = attachTranslationProviderConfig({origin: ['Hello', 'World']}, createTranslationProviderConfigSnapshot(current));
+        expect(await bilibili(frozen)).toEqual(['翻譯', '翻譯']);
+        expect(JSON.parse(fetch.mock.calls[0][1].body).messages[0].content).toContain('繁體中文');
+        await bilibili({...frozen, origin: 'Hello', targetLanguage: 'ja'});
+        expect(JSON.parse(fetch.mock.calls[2][1].body).messages[0].content).toContain('日本語');
+        await expect(bilibili({...frozen, origin: 42 as any})).rejects.toMatchObject({statusCode: 400});
+        await expect(bilibili({...frozen, origin: [42] as any})).rejects.toMatchObject({statusCode: 400});
+    });
     it('匿名直连固定官方模型，关闭思考，忽略用户凭据和服务覆盖', async () => {
         const fetch = vi.fn().mockResolvedValue(reply());
         setRuntimeFetch(fetch);

@@ -22,6 +22,7 @@ export const services = {
     // 机器翻译
     microsoft: "microsoft",
     freeTranslation: "freeTranslation",
+    bilibili: "bilibili", // B站官方匿名文本翻译，独立服务与免费池共用适配器
     myMemory: "myMemory",
     deepL: "deepL",
     deeplx: "deeplx",
@@ -119,7 +120,7 @@ export const referenceAiPlatformServices = Object.freeze([
 export const servicesType = {
     // 阵营划分
     machine: new Set([
-        services.myMemory, services.microsoft, services.freeTranslation, services.deepL, services.deeplx,
+        services.myMemory, services.microsoft, services.freeTranslation, services.bilibili, services.deepL, services.deeplx,
         services.google, services.xiaoniu, services.youdao, services.chromeTranslator,
         services.localTranslation,
         ...cloudVendorServices,
@@ -602,6 +603,7 @@ export const options = {
             label: "免费翻译服务",
             description: "后台自动均衡可用服务；根据响应表现调整分配，失败后自动切换。",
         },
+        {value: services.bilibili, label: "B站翻译", description: "官方免费文本 API，Index-Translate-35B-A3B，无需密钥"},
         {value: services.myMemory, label: "MyMemory", description: "官方免费 API，匿名每天 5,000 字符；可选邮箱提升额度。"},
         {value: services.microsoft, label: "微软翻译"},
         {value: services.google, label: "谷歌翻译"},

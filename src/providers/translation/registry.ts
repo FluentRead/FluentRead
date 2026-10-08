@@ -11,6 +11,7 @@ import {AI_SDK_SERVICE_IDS} from './ai-sdk/endpoints';
 import myMemory from "./mymemory";
 import microsoft from "./microsoft";
 import freeTranslation from "./free-translation";
+import bilibili from "./bilibili-free";
 import deepl from "./deepl";
 import deeplx from "./deeplx";
 import {translateWithOpenAICompatibleAiSdk} from './ai-sdk/openai-compatible';
@@ -42,6 +43,7 @@ const legacyServices: TranslationProviderRegistry = {
     [services.myMemory]: myMemory,
     [services.microsoft]: microsoft,
     [services.freeTranslation]: freeTranslation,
+    [services.bilibili]: bilibili,
     [services.deepL]: deepl,
     [services.deeplx]: deeplx,
     [services.google]: google,

@@ -1,0 +1,195 @@
+{
+  "initialCommit": "6817ebb340ee821efdac51d5eb27466965c43f8e",
+  "integratedBaseCommit": "bbae410069e32d2fdcafc19744daf2dfee77fcb1",
+  "verifiedRuntimeCommit": "e45b5c6861bb773a761c41f0d673262ee5d9f8da",
+  "sourceSha256": {
+    "src/features/input-translation/content/index.ts": "ebc0b0cb96c828e9b508682f1758561b54df6d19e2dc72f809ca02251cff30df",
+    "src/features/input-translation/content/editableHost.ts": "8e287109c392842c6909d7167a77a928181657e7c4bc96e117028603d24a2412",
+    "src/features/input-translation/content/inputBox.ts": "3edbabc7aaeb1b1ab1f5a0498087901f5dcd33a7f46086a160474a97408b6689",
+    "src/features/input-translation/background/handler.ts": "dfa4898e8b4fc4d5070380a63822194443665295c8b5b5e8e03b401ad131c9c5",
+    "src/app/background/messageRuntime.ts": "cfbf02e3031844b5797cdc3db4bfb40339271d3b0477f58615dece650abcb269",
+    "userscript/platform.ts": "f8baae21074a0d04a9f8c080b9991392ac40e7ea76b3d14c520033d624cf044b",
+    "userscript/platformFull.ts": "67dff42ec010ac54275875d7f213ea98f6158b608164912502c46a5090da84fb",
+    "scripts/verify-userscript-build.mjs": "558092cdbd82711e6a1187e14076bec1d3603a7e7d75e66b78a068264dba0b0c",
+    "src/app/content/messageRuntime.ts": "30108d91f5b2f7bb55f3ba189442e991d2146ecb45e60f7c0c52cdfea670ae4b",
+    "src/app/content/contextMenuCommands.ts": "c35476ca6f6ab16b0306a32791a75d0fd50d01defdc8ee2a23d57fd8be1b1694",
+    "src/features/page-notice/content/notice.ts": "0f1d7f28d7f2c626a9f3dde7f876bc2e3cbb3ee5cb3bc179a24d63a75a118028",
+    "userscript/languageBundles.ts": "96fb0ba87983cfc572971db2fffac3f64b08ed7e13c85fbea0a2ea04f97c7fe4"
+  },
+  "unchangedInitialBusinessModules": [
+    "src/features/input-translation/content/index.ts",
+    "src/features/input-translation/content/editableHost.ts",
+    "src/features/input-translation/content/inputBox.ts",
+    "src/features/input-translation/background/handler.ts",
+    "src/app/background/messageRuntime.ts",
+    "userscript/platform.ts",
+    "userscript/platformFull.ts"
+  ],
+  "artifactSha256": {
+    "chrome-mv3": {
+      "manifest.json": "fd80314b160701ed5500e584e1373f5eed44a19acdc6f8b76f9a12c1565970d8",
+      "background.js": "1c1f6991c202ce525aa8bdbb6a9f559a2fcab2f2be16a30cbf1c2f7f397c8817",
+      "content-scripts/content.js": "38180be94d552289e8ca7ef49ba986fdc6b34e2ade48b82e41254a52c2c8a296"
+    },
+    "firefox-mv2": {
+      "manifest.json": "2f4d6388a66e23f052933d6a4f972e3f65e841806a20f6b1d274fcf14d21a3ef",
+      "background.js": "d22edb30d96abff1c771723a363505bf768a80a7ec28277987fcfdf5557cda53",
+      "content-scripts/content.js": "fb65cc385a981cf288d50708c6670c708f21cc733872c236da5d4c02d754620a"
+    }
+  },
+  "userscript": {
+    "baselineBytes": 2001158,
+    "baselineSha256": "1d6483b3d44b30bcedce79fc4937fba7a6eb875e6280365ea82b4fe655854d5b",
+    "candidateBytes": 2009853,
+    "candidateSha256": "858a55742bd4928dd5674d9c120129db27700113b1a8229224b9cb9bb37b88d3",
+    "deltaBytes": 8695,
+    "deltaPercent": 0.4344984254116866,
+    "oldBudgetBytes": 2002000,
+    "newBudgetBytes": 2010000,
+    "candidateMarginBytes": 147
+  },
+  "lockSha256": "dca737aeb9c264e2c3078588ff01c85dd52d48636f7fa24b2451f9444a8ccc3a",
+  "relatedTests": {
+    "files": 21,
+    "passed": 1518,
+    "failed": 0,
+    "addedIntegrationSuites": [
+      "tests/contentMessageRuntime.test.ts",
+      "tests/userscriptViteConfig.test.ts"
+    ]
+  },
+  "testAudit": {
+    "status": "ok",
+    "files": 640,
+    "cases": 10630
+  },
+  "checks": [
+    {
+      "command": "pnpm test (21 related files)",
+      "exitCode": 0,
+      "evidenceLog": "/private/tmp/fluentread-input-pr-integration2-tests-20261011.log"
+    },
+    {
+      "command": "pnpm compile",
+      "exitCode": 0,
+      "evidenceLog": "/private/tmp/fluentread-input-pr-integration2-compile-20261011.log"
+    },
+    {
+      "command": "pnpm build",
+      "exitCode": 0,
+      "evidenceLog": "/private/tmp/fluentread-input-pr-integration2-chrome-20261011.log"
+    },
+    {
+      "command": "pnpm build:firefox",
+      "exitCode": 0,
+      "evidenceLog": "/private/tmp/fluentread-input-pr-integration2-firefox-20261011.log"
+    },
+    {
+      "command": "pnpm build:userscript",
+      "exitCode": 0,
+      "evidenceLog": "/private/tmp/fluentread-input-pr-integration2-userscript-20261011.log"
+    },
+    {
+      "command": "node scripts/verify-userscript-build.mjs",
+      "exitCode": 0,
+      "evidenceLog": "/private/tmp/fluentread-input-pr-integration2-userscript-verify-20261011.log"
+    },
+    {
+      "command": "pnpm test:audit",
+      "exitCode": 0,
+      "evidenceLog": "/private/tmp/fluentread-input-pr-integration2-test-audit-20261011.log"
+    },
+    {
+      "command": "pnpm docs:build",
+      "exitCode": 0,
+      "evidenceLog": "/private/tmp/fluentread-input-pr-integration2-docs-build-20261011.log"
+    },
+    {
+      "command": "pnpm storybook:build",
+      "exitCode": 0,
+      "evidenceLog": "/private/tmp/fluentread-input-pr-integration2-storybook-build-20261011.log"
+    },
+    {
+      "command": "pnpm storybook:check",
+      "exitCode": 0,
+      "evidenceLog": "/private/tmp/fluentread-input-pr-integration2-storybook-check-20261011.log"
+    },
+    {
+      "command": "pnpm docs:check",
+      "exitCode": 0,
+      "evidenceLog": "/private/tmp/fluentread-input-pr-integration2-docs-check-20261011.log"
+    },
+    {
+      "command": "node scripts/testing/verify-extension-manifests.mjs",
+      "exitCode": 0,
+      "evidenceLog": "/private/tmp/fluentread-input-pr-integration2-manifests-20261011.json"
+    }
+  ],
+  "docsCheck": {
+    "ok": true,
+    "pages": 81,
+    "links": 4328,
+    "anchors": 792,
+    "images": 158
+  },
+  "storybookCheck": {
+    "groups": 12,
+    "stories": 28,
+    "docs": 12,
+    "assets": 13
+  },
+  "review": {
+    "inputLifecycle": "no blocking findings; original and integrated patches identical",
+    "editableHost": "no blocking findings; event handling and model-commit boundaries verified",
+    "latestMainContextMenus": "no blocking findings; input messages, notice ownership and userscript input language preservation reviewed"
+  },
+  "evidenceBoundary": {
+    "browser": "isolated Edge with Chrome MV3 production artifacts",
+    "provider": "deterministic local fixture; no live provider account certification",
+    "otherTargets": "Firefox/userscript build and artifact verification only"
+  },
+  "baselineMetadata": {
+    "baselineSha": "bbae410069e32d2fdcafc19744daf2dfee77fcb1",
+    "baselineLockSha256": "dca737aeb9c264e2c3078588ff01c85dd52d48636f7fa24b2451f9444a8ccc3a",
+    "candidateLockSha256": "dca737aeb9c264e2c3078588ff01c85dd52d48636f7fa24b2451f9444a8ccc3a",
+    "nodeModulesSource": "/Users/thinkstu/Desktop/copy/FluentRead-input-translation-quality-20261011/node_modules",
+    "artifactPath": "/private/tmp/fluentread-input-pr-latest2-baseline-20261011/.output/userscript/fluent-read.user.js",
+    "artifactBytes": 2001158,
+    "artifactSha256": "1d6483b3d44b30bcedce79fc4937fba7a6eb875e6280365ea82b4fe655854d5b",
+    "maxUserscriptBytes": 2002000,
+    "marginBytes": 842,
+    "prepareExit": 0,
+    "buildExit": 0,
+    "verifyExit": 0,
+    "prepareLog": "/private/tmp/fluentread-input-pr-latest2-baseline-prepare-20261011.log",
+    "buildLog": "/private/tmp/fluentread-input-pr-latest2-baseline-build-20261011.log",
+    "verifyLog": "/private/tmp/fluentread-input-pr-latest2-baseline-verify-20261011.log"
+  },
+  "browser": {
+    "input": {
+      "exitCode": 0,
+      "completed": true,
+      "passed": 29,
+      "providerAbortCount": 6,
+      "repeatedShortcutCount": 5,
+      "repeatedShortcutRequests": 1,
+      "pageErrors": [],
+      "browserFrontmost": false,
+      "report": "input-browser-report.json"
+    },
+    "realEditors": {
+      "exitCode": 0,
+      "completed": true,
+      "passed": 5,
+      "slateFastCachePassed": 5,
+      "slateProviderRequests": 4,
+      "slateCacheHits": 1,
+      "lastRoundRequests": 0,
+      "pageErrors": [],
+      "browserFrontmost": false,
+      "report": "real-editors-report.json"
+    },
+    "foregroundBeforeAndAfter": "ChatGPT",
+    "providerBoundary": "deterministic local fixture"
+  }
+}

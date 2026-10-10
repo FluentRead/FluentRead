@@ -2,10 +2,11 @@
  * @file src/features/input-translation/content/index.ts
  * 文件职责：实现网页输入框翻译 feature 的可注入生命周期，根据配置识别三连触发符、冻结请求所有权、调用后台并把译文安全提交回原控件或富文本编辑器。
  * 主要内容：相同译文保留原文且不重复展示；定义配置、依赖和 feature 契约，提供启用判断、配置键与替换/双语输出顺序写回，原生控件用原生 setter 与 input/change 事件写回，编辑宿主按光标文本度量推进三连序列并经 editableHost.ts 的原生编辑路径保留原文、清理触发符并写回；
- * 创建 closed Shadow tooltip 展示翻译中/成功/失败与恢复原文，并防止元素或配置变化后的迟到提交。
+ * 以请求 ID 复用共享 broker 取消，抑制重复请求并限制消息等待；提示与翻译并行启动，用 closed Shadow tooltip 提供取消、重试与恢复原文，随视口定位并清理临时资源，防止失焦、编辑或配置变化后的迟到提交。
  * 模块边界：本文件拥有内容页事件与临时 UI，不直接调用 provider 或全局 browser API；sendMessage、Shadow UI、站点禁用和 generation 均由 composition root 注入，输入纯算法来自 inputBox.ts，编辑宿主度量与写回来自 editableHost.ts。
  */
 import {hasDistinctTranslation} from '@/src/core/translation/result';
+import {TRANSLATION_CANCEL_MESSAGE_TYPE} from '@/src/services/translation/types';
 import type { ContentScriptContext } from 'wxt/utils/content-script-context';
 import type { ShadowRootContentScriptUi } from 'wxt/utils/content-script-ui/shadow-root';
 import {services as translationServices} from '@/src/core/config/catalog';
@@ -120,6 +121,9 @@ function inputBoxTranslationConnectionKey(value: InputTranslationContentConfig):
         requireApiKey: Object.keys(selectedRequireApiKey).length ? selectedRequireApiKey : undefined,
         proxy: serviceValue('proxy'),
         token: serviceValue('token'),
+        apiKeys: serviceValue('apiKeys'),
+        apiKeyRotationEnabled: serviceValue('apiKeyRotationEnabled'),
+        secret: serviceValue('secret'),
         customHeaders: serviceValue('customHeaders'),
         customBody: serviceValue('customBody'),
         customProvider,
@@ -140,6 +144,7 @@ function inputBoxTranslationConnectionKey(value: InputTranslationContentConfig):
             : undefined,
         deeplPlan: service === translationServices.deepL ? source.deeplApiPlan : undefined,
         freeTranslationOrder: service === translationServices.freeTranslation ? source.freeTranslationOrder : undefined,
+        freeTranslationMode: service === translationServices.freeTranslation ? source.freeTranslationMode : undefined,
         minimaxPlan: service === translationServices.minimax ? source.minimaxBillingPlan : undefined,
         minimaxRegion: service === translationServices.minimax ? source.minimaxRegion : undefined,
         mimoPlan: service === translationServices.mimo ? source.mimoBillingPlan : undefined,
@@ -185,6 +190,7 @@ export async function setInputBoxText(
     text: string,
     isCurrent: () => boolean = () => true,
     outputMode: InputBoxTranslationOutputMode = 'replace',
+    signal?: AbortSignal,
 ): Promise<boolean> {
     // 写回本身也是安全边界：异步期间页面可能把普通输入框改成 password 或只读，
     // 直接调用者也不能绕过资格判定。
@@ -210,7 +216,7 @@ export async function setInputBoxText(
     // 富文本编辑器由自身模型渲染 DOM；直接改写 innerText 会被回滚或删除链接、mention 等结构。
     const value = outputMode === 'append' ? `\n${text}` : outputMode === 'prepend' ? `${text}\n` : text;
     const selectionMode = outputMode === 'append' ? 'end' : outputMode === 'prepend' ? 'start' : 'all';
-    return await replaceEditableText(element, value, isCurrent, selectionMode) === 'replaced';
+    return await replaceEditableText(element, value, isCurrent, selectionMode, '', signal) === 'replaced';
 }
 
 function getTooltipIcon(type: 'translating' | 'success' | 'error'): string {
@@ -222,15 +228,36 @@ function getTooltipIcon(type: 'translating' | 'success' | 'error'): string {
     return icons[type];
 }
 
+/** 包含后台唤醒与配置水合的页面等待上限，避免消息故障让编辑器永久停留在翻译中。 */
+export const INPUT_TRANSLATION_TIMEOUT_MS = 60_000;
+let featureSequence = 0;
+
 async function translateInputBox(
     sendMessage: (message: unknown) => Promise<unknown>,
     text: string,
     targetLang: string,
+    clientRequestId: string,
+    signal: AbortSignal,
+    cancelRemote: () => void,
 ): Promise<string> {
-    const result = await sendMessage({
-        type: 'inputBoxTranslation',
-        text,
-        targetLang,
+    const result = await new Promise<unknown>((resolve, reject) => {
+        let timer: ReturnType<typeof setTimeout>;
+        const cleanup = () => {
+            clearTimeout(timer);
+            signal.removeEventListener('abort', abort);
+        };
+        const abort = () => { cleanup(); reject(new DOMException('输入框翻译已取消', 'AbortError')); };
+        if (signal.aborted) { abort(); return; }
+        signal.addEventListener('abort', abort, {once: true});
+        timer = setTimeout(() => {
+            cleanup();
+            cancelRemote();
+            reject(new DOMException('输入框翻译等待超时', 'TimeoutError'));
+        }, INPUT_TRANSLATION_TIMEOUT_MS);
+        Promise.resolve().then(() => {
+            if (signal.aborted) throw new DOMException('输入框翻译已取消', 'AbortError');
+            return sendMessage({type: 'inputBoxTranslation', text, targetLang, clientRequestId});
+        }).then(resolve, reject).finally(cleanup);
     }) as { success?: boolean; translatedText?: string; error?: string } | undefined;
 
     if (result?.success === true && typeof result.translatedText === 'string' && result.translatedText.trim()) {
@@ -247,18 +274,37 @@ export function createInputTranslationContentFeature(
     const logger = deps.logger;
     let inputTooltipUi: ShadowRootContentScriptUi<HTMLElement> | null = null;
     let inputTooltipOwnerRequestId: number | null = null;
+    let tooltipRevision = 0;
+    let removeTooltipPositionListeners: (() => void) | null = null;
     let activeInputTranslationRequestId = 0;
     let activeInputTranslationElement: HTMLElement | null = null;
     let activeRequestController: AbortController | null = null;
+    let activeRequestSnapshot: string | null = null;
+    // 取消 ID 由 sender scope 隔离；时间、实例序号与 nonce 保持唯一，普通 HTTP 页面也能创建 feature。
+    const requestPrefix = `input:${Date.now().toString(36)}:${++featureSequence}:${Math.random().toString(36).slice(2)}`;
     let internalWriteElement: HTMLElement | null = null;
+    let internalWriteToken: symbol | null = null;
     const editGenerations = new WeakMap<HTMLElement, number>();
     const observedInputValues = new WeakMap<HTMLElement, string>();
     const bilingualOutputs = new WeakMap<HTMLElement, string>();
+    const visualTimers = new Set<ReturnType<typeof setTimeout>>();
+    const fadingUis = new Set<ShadowRootContentScriptUi<HTMLElement>>();
+    const later = (callback: () => void, delay: number): void => {
+        const timer = setTimeout(() => { visualTimers.delete(timer); callback(); }, delay);
+        visualTimers.add(timer);
+    };
 
     const isEnabled = () => isInputBoxTranslationEnabled(deps.config, deps.isSiteDisabled());
+    const dismissTooltipLater = (requestId: number): void => {
+        // UI 创建的异步等待可能跨越取消；迟到 continuation 不再注册计时器。
+        if (requestId === activeInputTranslationRequestId) later(() => removeExistingTooltip(requestId), 8000);
+    };
 
-    const removeExistingTooltip = (ownerRequestId?: number): void => {
+    const removeExistingTooltip = (ownerRequestId?: number, immediately = false): void => {
         if (ownerRequestId !== undefined && inputTooltipOwnerRequestId !== ownerRequestId) return;
+        tooltipRevision += 1;
+        removeTooltipPositionListeners?.();
+        removeTooltipPositionListeners = null;
 
         const ui = inputTooltipUi;
         const existing = ui?.mounted;
@@ -266,23 +312,31 @@ export function createInputTranslationContentFeature(
         inputTooltipOwnerRequestId = null;
         if (!ui) return;
 
-        if (!existing || !deps.config.animations) {
+        if (immediately || !existing || !deps.config.animations) {
             ui.remove();
             return;
         }
 
         existing.classList.add('hide');
-        setTimeout(() => ui.remove(), 300);
+        fadingUis.add(ui);
+        later(() => { fadingUis.delete(ui); ui.remove(); }, 300);
     };
 
     const invalidate = (): void => {
+        // abort 的同步监听会释放活动宿主，先冻结引用以完整移除成功/错误样式。
+        const element = activeInputTranslationElement;
         activeRequestController?.abort();
+        visualTimers.forEach(clearTimeout);
+        visualTimers.clear();
+        fadingUis.forEach(ui => ui.remove());
+        fadingUis.clear();
         activeRequestController = null;
+        activeRequestSnapshot = null;
         activeInputTranslationRequestId += 1;
-        activeInputTranslationElement?.classList.remove('fluent-input-translating');
-        activeInputTranslationElement?.classList.remove('fluent-input-success', 'fluent-input-error');
+        element?.classList.remove('fluent-input-translating');
+        element?.classList.remove('fluent-input-success', 'fluent-input-error');
         activeInputTranslationElement = null;
-        removeExistingTooltip();
+        removeExistingTooltip(undefined, true);
     };
 
     const readEditGeneration = (element: HTMLElement): number => editGenerations.get(element) || 0;
@@ -297,18 +351,29 @@ export function createInputTranslationContentFeature(
         isCurrent: () => boolean,
         outputMode: InputBoxTranslationOutputMode = 'replace',
     ): Promise<boolean> => {
+        const token = Symbol('input-write');
+        internalWriteToken = token;
         internalWriteElement = element;
+        const ownsController = activeRequestController === null;
+        const controller = activeRequestController || new AbortController();
+        if (ownsController) {
+            activeRequestController = controller;
+            activeInputTranslationElement = element;
+        }
         try {
-            return await setInputBoxText(element, text, isCurrent, outputMode);
+            return await setInputBoxText(element, text, isCurrent, outputMode, controller.signal);
         } finally {
-            internalWriteElement = null;
+            if (ownsController && activeRequestController === controller) activeRequestController = null;
+            if (internalWriteToken === token) {
+                internalWriteElement = null;
+                internalWriteToken = null;
+            }
         }
     };
 
     const addInputBoxAnimation = (
         element: HTMLElement,
         animationType: 'translating' | 'success' | 'error',
-        ownerRequestId: number,
     ): void => {
         if (!deps.config.animations) return;
 
@@ -316,8 +381,7 @@ export function createInputTranslationContentFeature(
         element.classList.add(`fluent-input-${animationType}`);
 
         if (animationType !== 'translating') {
-            setTimeout(() => {
-                if (ownerRequestId !== activeInputTranslationRequestId) return;
+            later(() => {
                 element.classList.remove(`fluent-input-${animationType}`);
             }, animationType === 'success' ? 1000 : 600);
         }
@@ -330,10 +394,11 @@ export function createInputTranslationContentFeature(
         requestId: number,
         signal: AbortSignal,
         restore?: {label: string; onRestore: () => Promise<void>},
+        previewText?: string,
     ): Promise<HTMLElement | null> => {
         removeExistingTooltip();
         inputTooltipOwnerRequestId = requestId;
-        const rect = element.getBoundingClientRect();
+        const revision = tooltipRevision;
 
         const ui = await createUi<HTMLElement>(deps.context, {
             name: 'fluent-read-input-tooltip-ui',
@@ -361,7 +426,7 @@ export function createInputTranslationContentFeature(
                 .fluent-input-tooltip {
                     position: fixed;
                     opacity: 0;
-                    transform: translateX(-50%) translateY(3px);
+                    transform: translateY(3px);
                     box-sizing: border-box;
                     background: rgba(17, 24, 39, 0.88);
                     color: #fff;
@@ -372,35 +437,28 @@ export function createInputTranslationContentFeature(
                     white-space: normal;
                     max-width: min(360px, calc(100vw - 24px));
                     z-index: 2147483647;
-                    pointer-events: ${restore ? 'auto' : 'none'};
+                    pointer-events: ${restore || previewText ? 'auto' : 'none'};
                     transition: opacity 0.2s ease, transform 0.2s ease;
                     backdrop-filter: blur(8px);
                     box-shadow: 0 8px 24px rgba(15, 23, 42, 0.2);
                 }
-                .fluent-input-tooltip.show { opacity: 1; transform: translateX(-50%) translateY(0); }
-                .fluent-input-tooltip.hide { opacity: 0; transform: translateX(-50%) translateY(-5px); }
-                .fluent-input-tooltip.translating { background: rgba(59, 130, 246, 0.9); }
-                .fluent-input-tooltip.success { background: rgba(34, 197, 94, 0.9); }
-                .fluent-input-tooltip.error { background: rgba(239, 68, 68, 0.9); }
+                .fluent-input-tooltip.show { opacity: 1; transform: translateY(0); }
+                .fluent-input-tooltip.hide { opacity: 0; transform: translateY(-5px); }
+                .fluent-input-tooltip.translating { background: rgba(29, 78, 216, 0.96); }
+                .fluent-input-tooltip.success { background: rgba(22, 101, 52, 0.96); }
+                .fluent-input-tooltip.error { background: rgba(185, 28, 28, 0.96); }
             `,
             onMount(container) {
                 const tooltip = rootDocument.createElement('div');
                 tooltip.className = `fluent-input-tooltip ${type}`;
                 tooltip.id = 'fluent-input-translation-tooltip';
+                tooltip.setAttribute('role', 'status');
+                tooltip.setAttribute('aria-live', 'polite');
                 tooltip.textContent = `${getTooltipIcon(type)} ${translateLegacyText(
                     message,
                     normalizeUiLanguage(deps.config.uiLanguage),
                 )}`;
-                const viewportWidth = rootDocument.defaultView?.innerWidth || 1024;
-                const viewportHeight = rootDocument.defaultView?.innerHeight || 768;
-                const center = Math.max(12, Math.min(viewportWidth - 12, rect.left + (rect.width / 2)));
-                const below = rect.bottom + 12;
-                const top = below + 56 <= viewportHeight
-                    ? below
-                    : Math.max(12, (rect.top || 0) - 56);
-                tooltip.style.top = `${top}px`;
-                tooltip.style.left = `${center}px`;
-                tooltip.style.transform = 'translateX(-50%) translateY(3px)';
+                tooltip.style.transform = 'translateY(3px)';
                 tooltip.style.opacity = deps.config.animations ? '0' : '1';
                 container.appendChild(tooltip);
                 if (restore) {
@@ -411,13 +469,25 @@ export function createInputTranslationContentFeature(
                         normalizeUiLanguage(deps.config.uiLanguage),
                     );
                     restoreButton.style.cssText = 'margin-left:8px;padding:0;border:0;background:transparent;color:inherit;font:inherit;text-decoration:underline;cursor:pointer;';
+                    restoreButton.addEventListener?.('mousedown', (event: Event) => event.preventDefault());
                     restoreButton.addEventListener?.('click', (event: Event) => {
                         if (!(event as Event & {isTrusted?: boolean}).isTrusted) return;
                         event.preventDefault();
                         event.stopPropagation();
-                        void restore.onRestore();
+                        const reportFailure = (error: unknown) => {
+                            if (!signal.aborted) logger.error('输入框翻译操作失败:', error);
+                        };
+                        void restore.onRestore().catch(reportFailure);
                     });
                     tooltip.appendChild(restoreButton);
+                }
+                if (previewText) {
+                    const preview = rootDocument.createElement('textarea');
+                    preview.readOnly = true;
+                    preview.value = previewText;
+                    preview.setAttribute('aria-label', translateLegacyText('译文', normalizeUiLanguage(deps.config.uiLanguage)));
+                    preview.style.cssText = 'display:block;box-sizing:border-box;width:100%;min-width:220px;max-width:100%;height:5em;margin-top:8px;padding:6px;border:1px solid rgba(255,255,255,.4);border-radius:4px;background:transparent;color:inherit;font:inherit;resize:vertical;';
+                    tooltip.appendChild(preview);
                 }
                 return tooltip;
             },
@@ -426,6 +496,7 @@ export function createInputTranslationContentFeature(
         if (
             signal.aborted
             || requestId !== activeInputTranslationRequestId
+            || revision !== tooltipRevision
             || inputTooltipOwnerRequestId !== requestId
             || !isEnabled()
         ) {
@@ -439,17 +510,46 @@ export function createInputTranslationContentFeature(
         ui.mount();
 
         const tooltip = ui.mounted!;
+        const position = () => {
+            const view = rootDocument.defaultView;
+            const rect = element.getBoundingClientRect();
+            const viewportWidth = view?.innerWidth || 1024;
+            const viewportHeight = view?.innerHeight || 768;
+            const bounds = tooltip.getBoundingClientRect();
+            const width = bounds.width || 120;
+            const height = bounds.height || 44;
+            tooltip.style.left = `${Math.max(12, Math.min(viewportWidth - width - 12, rect.left + (rect.width - width) / 2))}px`;
+            tooltip.style.top = `${Math.max(12, Math.min(viewportHeight - height - 12,
+                rect.bottom + height + 12 <= viewportHeight ? rect.bottom + 12 : (rect.top || 0) - height - 12))}px`;
+        };
+        position();
+        const view = rootDocument.defaultView;
+        view?.addEventListener?.('scroll', position, {capture: true, passive: true});
+        view?.addEventListener?.('resize', position, {passive: true});
+        removeTooltipPositionListeners = () => {
+            view?.removeEventListener?.('scroll', position, true);
+            view?.removeEventListener?.('resize', position);
+        };
         if (!deps.config.animations) {
             tooltip.style.opacity = '1';
-            tooltip.style.transform = 'translateX(-50%) translateY(0)';
+            tooltip.style.transform = 'translateY(0)';
         } else {
             // 动画由 show/hide 类控制，清除初始行内值，避免行内 opacity:0 永久压住成功提示。
             tooltip.style.opacity = '';
             tooltip.style.transform = '';
-            setTimeout(() => tooltip.classList.add('show'), 10);
+            later(() => tooltip.classList.add('show'), 10);
         }
 
         return tooltip;
+    };
+
+    // 提示 UI 故障不能阻断翻译或造成未处理拒绝；临时节点仍由请求与状态 revision 共同拥有。
+    const showTooltip: typeof createTranslationTooltip = async (...args) => {
+        try { return await createTranslationTooltip(...args); }
+        catch (error) {
+            if (!args[4].aborted) logger.error('输入框翻译提示创建失败:', error);
+            return null;
+        }
     };
 
     const handleInputBoxTranslation = async (
@@ -461,6 +561,8 @@ export function createInputTranslationContentFeature(
         const outputMode = normalizeInputBoxTranslationOutputMode(deps.config.inputBoxTranslationOutputMode);
         const bilingual = outputMode !== 'replace';
         if (bilingual && bilingualOutputs.get(element) === originalText) return;
+        if (activeRequestController && activeInputTranslationElement === element
+            && activeRequestSnapshot === getInputBoxValueSnapshot(element)) return;
         invalidate();
         const requestId = activeInputTranslationRequestId;
         const requestController = new AbortController();
@@ -469,6 +571,8 @@ export function createInputTranslationContentFeature(
         activeInputTranslationElement = element;
         const configGeneration = deps.readConfigGeneration();
         const inputSnapshot = getInputBoxValueSnapshot(element);
+        activeRequestSnapshot = inputSnapshot;
+        const clientRequestId = `${requestPrefix}:${requestId}`;
         const editGeneration = readEditGeneration(element);
         observedInputValues.set(element, inputSnapshot);
         const targetLanguage = deps.config.inputBoxTranslationTarget;
@@ -476,6 +580,7 @@ export function createInputTranslationContentFeature(
         const isCurrentAndUnchanged = () => requestId === activeInputTranslationRequestId
             && isInputElement(element)
             && element.isConnected !== false
+            && (isFormControl(element) || getDeepActiveElement(rootDocument) === element)
             && canCommitInputBoxTranslation({
                 signal: {aborted: signal.aborted || requestSignal.aborted} as AbortSignal,
                 expectedValue: inputSnapshot,
@@ -494,6 +599,12 @@ export function createInputTranslationContentFeature(
             removeExistingTooltip(requestId);
         };
         const handleAbort = () => clearOwnedVisuals();
+        const cancelRemote = () => {
+            try {
+                void Promise.resolve(deps.sendMessage({type: TRANSLATION_CANCEL_MESSAGE_TYPE, clientRequestId})).catch(() => undefined);
+            } catch { /* 卸载期间取消通知只能尽力发送，页面仍立即释放请求。 */ }
+        };
+        requestSignal.addEventListener('abort', cancelRemote, {once: true});
         signal.addEventListener('abort', handleAbort, { once: true });
         requestSignal.addEventListener('abort', handleAbort, { once: true });
 
@@ -502,112 +613,110 @@ export function createInputTranslationContentFeature(
             if (!isCurrentAndUnchanged() || !originalText) return;
             if (!originalText.trim()) return;
             if (bilingual && element.tagName.toLowerCase() === 'input') {
-                await createTranslationTooltip(element, '双语追加需要支持换行的输入框', 'error', requestId, requestSignal);
-                setTimeout(() => removeExistingTooltip(requestId), 8000);
+                await showTooltip(element, '双语追加需要支持换行的输入框', 'error', requestId, requestSignal);
+                dismissTooltipLater(requestId);
                 return;
             }
 
             // 步骤 2：只让当前请求拥有输入框动画和 tooltip，旧请求不能清理新提示。
             removeExistingTooltip();
-            addInputBoxAnimation(element, 'translating', requestId);
-            const loadingTooltip = await createTranslationTooltip(
-                element,
-                '翻译中',
-                'translating',
-                requestId,
-                requestSignal,
-            );
-            if (!loadingTooltip || !isCurrentAndUnchanged()) {
-                clearOwnedVisuals();
-                return;
-            }
+            addInputBoxAnimation(element, 'translating');
+            void showTooltip(element, '翻译中', 'translating', requestId, requestSignal, {
+                label: '取消',
+                onRestore: async () => { if (requestId === activeInputTranslationRequestId) invalidate(); },
+            });
 
-            try {
-                // 步骤 3：background 消息不能中断，结果落地前再次校验快照和 feature signal。
-                const translatedText = await translateInputBox(deps.sendMessage, originalText, targetLanguage);
-                if (!isCurrentAndUnchanged()) {
-                    clearOwnedVisuals();
-                    return;
-                }
-
-                if (hasDistinctTranslation(originalText, translatedText)) {
-                    // 步骤 4：编辑宿主写回需要等待编辑器同步选区，期间继续由当前请求持有提示和动画。
-                    // 原生控件一次写入原文和译文；富文本只在首尾插入，保留原文 DOM 与格式。
-                    const output = isFormControl(element) && bilingual
-                        ? outputMode === 'prepend' ? `${translatedText}\n${originalText}` : `${originalText}\n${translatedText}`
-                        : translatedText;
-                    const written = await writeOwnedText(element, output, isCurrentAndUnchanged, isFormControl(element) ? 'replace' : outputMode);
-                    if (!written && !isCurrentAndUnchanged()) {
-                        clearOwnedVisuals();
-                        return;
-                    }
-                    element.classList.remove('fluent-input-translating');
-                    removeExistingTooltip(requestId);
-                    if (!written) {
-                        addInputBoxAnimation(element, 'error', requestId);
-                        await createTranslationTooltip(element, '无法把译文写入当前编辑器', 'error', requestId, requestSignal);
-                        setTimeout(() => removeExistingTooltip(requestId), 8000);
-                        return;
-                    }
-                    const translatedSnapshot = getInputBoxValueSnapshot(element);
-                    if (bilingual) bilingualOutputs.set(element, getInputBoxText(element));
-                    observedInputValues.set(element, translatedSnapshot);
-                    const translatedEditGeneration = readEditGeneration(element);
-                    const canRestore = () => !signal.aborted
-                        && !requestSignal.aborted
-                        && requestId === activeInputTranslationRequestId
-                        && isInputElement(element)
-                        && element.isConnected !== false
-                        && deps.readConfigGeneration() === configGeneration
-                        && readEditGeneration(element) === translatedEditGeneration
-                        && getInputBoxValueSnapshot(element) === translatedSnapshot
-                        && isEnabled()
-                        && !deps.isSiteDisabled();
-                    addInputBoxAnimation(element, 'success', requestId);
-                    await createTranslationTooltip(element, '翻译成功', 'success', requestId, requestSignal, {
-                        label: '恢复原文',
-                        onRestore: async () => {
-                            if (!canRestore()) return;
-                            if (!await writeOwnedText(element, originalText, canRestore)) return;
-                            bilingualOutputs.delete(element);
-                            observedInputValues.set(element, getInputBoxValueSnapshot(element));
-                            removeExistingTooltip(requestId);
-                        },
-                    });
-                } else {
-                    element.classList.remove('fluent-input-translating');
-                    removeExistingTooltip(requestId);
-                    addInputBoxAnimation(element, 'error', requestId);
-                    await createTranslationTooltip(element, '内容无需翻译', 'error', requestId, requestSignal);
-                }
-            } catch (translationError) {
-                if (!isCurrentAndUnchanged()) {
-                    clearOwnedVisuals();
-                    return;
-                }
-                element.classList.remove('fluent-input-translating');
-                addInputBoxAnimation(element, 'error', requestId);
-                removeExistingTooltip(requestId);
-                await createTranslationTooltip(element, '翻译失败', 'error', requestId, requestSignal);
-                logger.error('输入框翻译失败:', translationError);
-            }
-
-            setTimeout(() => removeExistingTooltip(requestId), 8000);
-        } catch (error) {
+            // 步骤 3：请求与提示并行启动；取消向共享 broker 传递，落地前再次校验快照。
+            const translatedText = await translateInputBox(deps.sendMessage, originalText, targetLanguage, clientRequestId, requestSignal, cancelRemote);
             if (!isCurrentAndUnchanged()) {
                 clearOwnedVisuals();
                 return;
             }
-            logger.error('输入框翻译失败:', error);
+
+            if (hasDistinctTranslation(originalText, translatedText)) {
+                // 步骤 4：编辑宿主写回需要等待编辑器同步选区，期间继续由当前请求持有提示和动画。
+                // 原生控件一次写入原文和译文；富文本只在首尾插入，保留原文 DOM 与格式。
+                const output = isFormControl(element) && bilingual
+                    ? outputMode === 'prepend' ? `${translatedText}\n${originalText}` : `${originalText}\n${translatedText}`
+                    : translatedText;
+                const written = await writeOwnedText(element, output, isCurrentAndUnchanged, isFormControl(element) ? 'replace' : outputMode);
+                // 自身写入会改变快照；只检验请求/配置所有权，避免宿主同步事件作废请求后继续显示旧成功。
+                if (requestId !== activeInputTranslationRequestId
+                    || deps.readConfigGeneration() !== configGeneration || !isEnabled() || deps.isSiteDisabled()
+                    || !isInputElement(element) || element.isConnected === false
+                    || (!written && !isCurrentAndUnchanged())) {
+                    clearOwnedVisuals();
+                    return;
+                }
+                element.classList.remove('fluent-input-translating');
+                removeExistingTooltip(requestId);
+                if (!written) {
+                    addInputBoxAnimation(element, 'error');
+                    // 宿主拒绝自动写入时保留可选择复制的译文，避免强行写 DOM 或丢弃结果。
+                    await showTooltip(element, '无法把译文写入当前编辑器', 'error', requestId, requestSignal, {
+                        label: '关闭',
+                        onRestore: async () => removeExistingTooltip(requestId),
+                    }, translatedText);
+                    return;
+                }
+                const translatedSnapshot = getInputBoxValueSnapshot(element);
+                if (bilingual) bilingualOutputs.set(element, getInputBoxText(element));
+                observedInputValues.set(element, translatedSnapshot);
+                const translatedEditGeneration = readEditGeneration(element);
+                const canRestore = () => !signal.aborted
+                    && !requestSignal.aborted
+                    && requestId === activeInputTranslationRequestId
+                    && isInputElement(element)
+                    && element.isConnected !== false
+                    && deps.readConfigGeneration() === configGeneration
+                    && readEditGeneration(element) === translatedEditGeneration
+                    && getInputBoxValueSnapshot(element) === translatedSnapshot
+                    && isEnabled()
+                    && !deps.isSiteDisabled();
+                addInputBoxAnimation(element, 'success');
+                await showTooltip(element, '翻译成功', 'success', requestId, requestSignal, {
+                    label: '恢复原文',
+                    onRestore: async () => {
+                        // 选区同步或宿主提交等待中重复点击，只保留一次恢复写入。
+                        if (activeRequestController) return;
+                        if (!canRestore()) return;
+                        if (!await writeOwnedText(element, originalText, canRestore)) return;
+                        bilingualOutputs.delete(element);
+                        observedInputValues.set(element, getInputBoxValueSnapshot(element));
+                        removeExistingTooltip(requestId);
+                    },
+                });
+            } else {
+                element.classList.remove('fluent-input-translating');
+                removeExistingTooltip(requestId);
+                addInputBoxAnimation(element, 'error');
+                await showTooltip(element, '内容无需翻译', 'error', requestId, requestSignal);
+            }
+            dismissTooltipLater(requestId);
+        } catch (translationError) {
+            if (!isCurrentAndUnchanged()) {
+                clearOwnedVisuals();
+                return;
+            }
             element.classList.remove('fluent-input-translating');
-            addInputBoxAnimation(element, 'error', requestId);
+            addInputBoxAnimation(element, 'error');
             removeExistingTooltip(requestId);
-            await createTranslationTooltip(element, '翻译服务暂时不可用', 'error', requestId, requestSignal);
-            setTimeout(() => removeExistingTooltip(requestId), 8000);
+            await showTooltip(element, '翻译失败，请重试', 'error', requestId, requestSignal, {
+                label: '重试',
+                onRestore: async () => {
+                    if (isCurrentAndUnchanged()) await handleInputBoxTranslation(element, signal, originalText);
+                },
+            });
+            logger.error('输入框翻译失败:', translationError);
+            dismissTooltipLater(requestId);
         } finally {
             signal.removeEventListener('abort', handleAbort);
             requestSignal.removeEventListener('abort', handleAbort);
-            if (activeRequestController === requestController) activeRequestController = null;
+            requestSignal.removeEventListener('abort', cancelRemote);
+            if (activeRequestController === requestController) {
+                activeRequestController = null;
+                activeRequestSnapshot = null;
+            }
         }
     };
 
@@ -668,6 +777,7 @@ export function createInputTranslationContentFeature(
         const handleMutation = (event: Event) => {
             const element = activeEventElement(event);
             if (!element || !isInputElement(element)) return;
+            if (element !== activeInputTranslationElement && element !== triggerSequence?.element) return;
             const currentValue = getInputBoxValueSnapshot(element);
             const valueChanged = observedInputValues.get(element) !== currentValue;
             if (valueChanged) {
@@ -676,9 +786,9 @@ export function createInputTranslationContentFeature(
             }
             if (valueChanged
                 && internalWriteElement !== element
-                && activeInputTranslationElement === element
-                && activeRequestController) {
-                invalidate();
+                && activeInputTranslationElement === element) {
+                if (activeRequestController) invalidate();
+                else removeExistingTooltip();
             }
             if (!triggerSequence || triggerSequence.element !== element) return;
             if (!sequenceStillMatches(triggerSequence)) resetKeyPresses();
@@ -693,8 +803,12 @@ export function createInputTranslationContentFeature(
             resetKeyPresses();
             handleMutation(event);
             if (activeRequestElement
-                && internalWriteElement !== activeRequestElement
                 && activeRequestController) invalidate();
+        };
+
+        const handleClipboardEdit = (event: Event) => {
+            if (event.isTrusted && activeRequestController && internalWriteElement
+                && activeEventElement(event) === internalWriteElement) invalidate();
         };
 
         /** 推进原生控件的三连序列，返回清理本次插入符号后的原文；选区不可用时返回 null。 */
@@ -760,8 +874,14 @@ export function createInputTranslationContentFeature(
                 resetKeyPresses();
                 return;
             }
+            // 编辑器同步模型选区时可能临时选中全文；先取消并同步还原旧光标，
+            // 再把用户的新按键交给宿主，避免默认输入直接覆盖整篇草稿。
+            if (internalWriteElement === activeInputTranslationElement && activeRequestController
+                && !['Control', 'Shift', 'Alt', 'Meta'].includes(event.key)
+                && !(deps.config.inputBoxTranslationTrigger === 'ctrl_enter' && event.ctrlKey && event.key === 'Enter')
+                && event.key !== 'Escape') invalidate();
             if (event.key === 'Escape') {
-                if (activeRequestController) {
+                if (activeRequestController && getDeepActiveElement(rootDocument) === activeInputTranslationElement) {
                     event.preventDefault();
                     event.stopPropagation();
                     invalidate();
@@ -817,34 +937,42 @@ export function createInputTranslationContentFeature(
                     event.preventDefault();
                     event.stopPropagation();
                     resetKeyPresses();
-                    if (normalizeInputBoxTranslationOutputMode(deps.config.inputBoxTranslationOutputMode) !== 'replace') {
-                        invalidate();
-                        if (isFormControl(activeElement)) {
-                            await writeOwnedText(activeElement, sourceText, () => true);
-                            await handleInputBoxTranslation(activeElement, signal, sourceText);
-                            return;
-                        }
-                        const snapshot = getInputBoxValueSnapshot(activeElement);
-                        const generation = deps.readConfigGeneration();
-                        const cleanupRequestId = activeInputTranslationRequestId;
-                        const editGeneration = readEditGeneration(activeElement);
-                        const cleanupController = new AbortController();
-                        activeRequestController = cleanupController;
-                        activeInputTranslationElement = activeElement;
-                        internalWriteElement = activeElement;
-                        try {
-                            const cleaned = await replaceEditableText(activeElement, '', () => !signal.aborted && !cleanupController.signal.aborted
-                                && cleanupRequestId === activeInputTranslationRequestId
-                                && isEnabled() && !deps.isSiteDisabled() && isInputElement(activeElement) && activeElement.isConnected !== false
-                                && readEditGeneration(activeElement) === editGeneration
-                                && deps.readConfigGeneration() === generation
-                                && getInputBoxValueSnapshot(activeElement) === snapshot, 'trigger', symbol);
-                            if (cleaned !== 'replaced') return;
-                        } finally {
-                            internalWriteElement = null;
-                            if (activeRequestController === cleanupController) activeRequestController = null;
-                        }
+                    invalidate();
+                    const generation = deps.readConfigGeneration();
+                    const cleanupRequestId = activeInputTranslationRequestId;
+                    if (isFormControl(activeElement)) {
+                        await writeOwnedText(activeElement, sourceText, () => true);
+                        if (cleanupRequestId !== activeInputTranslationRequestId
+                            || generation !== deps.readConfigGeneration() || !isEnabled()) return;
+                        await handleInputBoxTranslation(activeElement, signal, sourceText);
+                        return;
                     }
+                    const snapshot = getInputBoxValueSnapshot(activeElement);
+                    const editGeneration = readEditGeneration(activeElement);
+                    const cleanupController = new AbortController();
+                    activeRequestController = cleanupController;
+                    activeInputTranslationElement = activeElement;
+                    const token = Symbol('trigger-cleanup');
+                    internalWriteToken = token;
+                    internalWriteElement = activeElement;
+                    try {
+                        const cleaned = await replaceEditableText(activeElement, '', () => !signal.aborted && !cleanupController.signal.aborted
+                            && cleanupRequestId === activeInputTranslationRequestId
+                            && getDeepActiveElement(rootDocument) === activeElement
+                            && isEnabled() && !deps.isSiteDisabled() && isInputElement(activeElement) && activeElement.isConnected !== false
+                            && readEditGeneration(activeElement) === editGeneration
+                            && deps.readConfigGeneration() === generation
+                            && getInputBoxValueSnapshot(activeElement) === snapshot, 'trigger', symbol, cleanupController.signal);
+                        if (cleaned !== 'replaced') return;
+                    } finally {
+                        if (internalWriteToken === token) {
+                            internalWriteElement = null;
+                            internalWriteToken = null;
+                        }
+                        if (activeRequestController === cleanupController) activeRequestController = null;
+                    }
+                    if (cleanupRequestId !== activeInputTranslationRequestId
+                        || generation !== deps.readConfigGeneration() || !isEnabled()) return;
                     await handleInputBoxTranslation(activeElement, signal, sourceText);
                     return;
                 }
@@ -861,9 +989,17 @@ export function createInputTranslationContentFeature(
         rootDocument.addEventListener('input', handleMutation, { capture: true, signal });
         rootDocument.addEventListener('change', handleMutation, { capture: true, signal });
         rootDocument.addEventListener('compositionstart', handleCompositionStart, { capture: true, signal });
+        rootDocument.addEventListener('paste', handleClipboardEdit, { capture: true, signal });
+        rootDocument.addEventListener('cut', handleClipboardEdit, { capture: true, signal });
         rootDocument.addEventListener('compositionend', resetKeyPresses, { capture: true, signal });
         rootDocument.addEventListener('focusin', resetKeyPresses, { capture: true, signal });
-        rootDocument.addEventListener('focusout', resetKeyPresses, { capture: true, signal });
+        rootDocument.addEventListener('focusout', (event: FocusEvent) => {
+            resetKeyPresses();
+            // 仅富文本需要聚焦并改选区；离开编辑器后取消，避免迟到结果夺回用户焦点。
+            if (activeRequestController && activeInputTranslationElement
+                && !isFormControl(activeInputTranslationElement)
+                && activeEventElement(event) === activeInputTranslationElement) invalidate();
+        }, { capture: true, signal });
         rootDocument.addEventListener('selectionchange', handleSelectionChange, { capture: true, signal });
         signal.addEventListener('abort', () => {
             resetKeyPresses();

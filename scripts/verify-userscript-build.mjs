@@ -41,11 +41,17 @@ const artifactBytes = Buffer.byteLength(source);
 // 右键来源保护及通知交互的原始对照增加 3,443 字节（0.1734%）；原生菜单专属逻辑和文案按目标剔除。
 // 整合区域与悬浮优化后：同依赖 main 为 1,997,714，候选为 2,001,158，预算最小增加 4 KB。
 // 保留全部协议/兼容性检查；证据见 docs/reports/context-menu-experience-20261011/。
-
+// 输入框请求取消、有限等待及富文本标准事件写回的初始验证增加 8,638 字节（0.4351%）：
+// 同依赖独立基线 fe7005dd9 为 1,985,367，初始候选为 1,994,005；该阶段预算增加 9 KB。
+// 原始验证及最新主线集成证据见 docs/reports/input-translation-quality-20261011/。
+// PR 合并前整合 982f09df：同依赖独立 main 为 1,997,714，输入集成产物为 2,006,364。
+// 增加 8,650 字节（0.4330%），按实测最小增加 9 KB 预算，余量 636 字节；见报告 pr-integration/。
+// 最终整合右键与通知更新 bbae4100：同依赖 main 为 2,001,158，输入候选为 2,009,853。
+// 增加 8,695 字节（0.4345%），利用主线余量后预算最小增加 8 KB，余 147 字节；见报告 pr-integration-933/。
 // 多文字名称证据、外语否决、准确 DOM 语言副本和受保护字面量的排版回显兜底；
-// 同依赖独立基线 bbae41006 与最终候选的精确增量见
+// 同依赖独立基线 dc335c698 与最终候选的精确增量见
 // docs/reports/target-language-quality-20261011/userscript-size.json；不引入额外检测模型。
-const MAX_USERSCRIPT_BYTES = 2_010_000;
+const MAX_USERSCRIPT_BYTES = 2_020_000;
 const preludeStartMarker = '/* FluentRead userscript compatibility prelude:start */';
 const preludeEndMarker = '/* FluentRead userscript compatibility prelude:end */';
 const preludeStart = source.indexOf(preludeStartMarker);

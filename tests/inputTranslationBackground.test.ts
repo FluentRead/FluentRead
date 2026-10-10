@@ -1,13 +1,15 @@
 /**
  * @file tests/inputTranslationBackground.test.ts
- * 文件职责：验证输入框翻译后台 handler 从本地配置建立冻结独立请求，并拒绝网页侧伪造服务、模型或凭据。
- * 主要内容：覆盖 AI prompt 的默认与自定义变量、机器翻译忽略 prompt/model、源语言/上下文/词库隔离、缓存开关和 userscript 共用返回语义。
+ * 文件职责：验证输入框翻译后台 handler 从本地配置建立冻结独立请求，拒绝网页侧伪造配置，并将可取消请求交给按发送者隔离的共享注册表。
+ * 主要内容：覆盖 AI prompt 的默认与自定义变量、机器翻译忽略 prompt/model、源语言/上下文/词库隔离、缓存开关、取消字段收窄、配置水合取消、先取消后触发及 provider 迟到响应。
  * 模块边界：本文件使用内存 mock 翻译函数，不发起网络请求；provider 的真实协议由 translation broker 与 provider 专项测试负责。
  */
 import {describe, expect, it, vi} from 'vitest';
 import {Config} from '@/src/core/config/model';
 import {services} from '@/src/core/config/catalog';
-import {getTranslationProviderConfig} from '@/src/services/translation/requestSnapshot';
+import {getTranslationProviderConfig, getTranslationRequestControl} from '@/src/services/translation/requestSnapshot';
+import {createTranslationCancelHandler, createTranslationRequestRegistry} from '@/src/app/background/handlers/translation';
+import {TRANSLATION_CANCEL_MESSAGE_TYPE} from '@/src/services/translation/types';
 import type {TranslationSingleRequestMessage} from '@/src/services/translation/types';
 import {
     createInputBoxTranslationHandler,
@@ -210,5 +212,120 @@ describe('输入框翻译后台配置绑定', () => {
             .rejects.toThrow('targetLang 必须是字符串');
         await expect(handler.handle({type: 'inputBoxTranslation', text: 'hello', targetLang: 'zh'}))
             .rejects.toThrow('有效译文');
+    });
+
+    it('可取消请求保留独立配置，并剥离公开请求标识与伪造 signal', async () => {
+        const config = new Config();
+        const requestRegistry = createTranslationRequestRegistry();
+        const translate = vi.fn(async (_request: TranslationSingleRequestMessage) => ' 译文 ');
+        const handler = createInputBoxTranslationHandler({ready: Promise.resolve(), getConfig: () => config, translate, requestRegistry});
+        await expect(handler.handle({
+            type: 'inputBoxTranslation', text: 'Hello', targetLang: 'ja', clientRequestId: 'input-success',
+            signal: 'forged', ownershipKey: 'forged',
+        } as never, {sender: {tab: {id: 7}, frameId: 1, documentId: 'document-a'}}))
+            .resolves.toEqual({success: true, translatedText: ' 译文 '});
+        const request = translate.mock.calls[0][0];
+        const control = getTranslationRequestControl(request)!;
+        expect(control.signal.aborted).toBe(false);
+        expect(control.ownershipKey).toContain('tab:7:frame:1:document:document-a');
+        expect(request).not.toHaveProperty('clientRequestId');
+        expect(request).not.toHaveProperty('signal');
+        expect(request).not.toHaveProperty('ownershipKey');
+    });
+
+    it('严格校验可选取消标识，缺少取消注册表时拒绝可取消请求', async () => {
+        const config = new Config();
+        const translate = vi.fn(async () => '译文');
+        const handler = createInputBoxTranslationHandler({ready: Promise.resolve(), getConfig: () => config, translate});
+        for (const clientRequestId of [null, 1, '', 'bad id', 'a'.repeat(129)]) {
+            await expect(handler.handle({type: 'inputBoxTranslation', text: 'Hello', targetLang: 'ja', clientRequestId}))
+                .rejects.toThrow('clientRequestId 格式无效');
+        }
+        await expect(handler.handle({type: 'inputBoxTranslation', text: 'Hello', targetLang: 'ja', clientRequestId: 'valid-id'}))
+            .rejects.toThrow('取消注册表未配置');
+        expect(translate).not.toHaveBeenCalled();
+    });
+
+    it('取消正在执行的 provider 请求，发送者不同的同 ID 取消保持隔离', async () => {
+        const config = new Config();
+        const requestRegistry = createTranslationRequestRegistry();
+        const cancel = createTranslationCancelHandler(requestRegistry);
+        let signal!: AbortSignal;
+        let started!: () => void;
+        const providerStarted = new Promise<void>(resolve => {started = resolve;});
+        const translate = vi.fn(async (request: TranslationSingleRequestMessage) => {
+            signal = getTranslationRequestControl(request)!.signal;
+            started();
+            return new Promise<string>((_resolve, reject) => signal.addEventListener('abort', () => {
+                const error = new Error('provider cancelled'); error.name = 'AbortError'; reject(error);
+            }, {once: true}));
+        });
+        const handler = createInputBoxTranslationHandler({ready: Promise.resolve(), getConfig: () => config, translate, requestRegistry});
+        const owner = {sender: {tab: {id: 8}, frameId: 2, documentId: 'document-b'}};
+        const request = handler.handle({type: 'inputBoxTranslation', text: 'Hello', targetLang: 'ja', clientRequestId: 'input-active'}, owner);
+        const cancelled = expect(request).rejects.toMatchObject({name: 'AbortError'});
+        await providerStarted;
+        expect(cancel.handle({type: TRANSLATION_CANCEL_MESSAGE_TYPE, clientRequestId: 'input-active'}, {sender: {tab: {id: 9}}}))
+            .toMatchObject({cancelled: false});
+        expect(signal.aborted).toBe(false);
+        expect(cancel.handle({type: TRANSLATION_CANCEL_MESSAGE_TYPE, clientRequestId: 'input-active'}, owner))
+            .toMatchObject({cancelled: true});
+        await cancelled;
+    });
+
+    it('配置水合尚未结束时立即取消，随后水合完成也不启动翻译', async () => {
+        let resolveReady!: () => void;
+        const ready = new Promise<void>(resolve => {resolveReady = resolve;});
+        const requestRegistry = createTranslationRequestRegistry();
+        const getConfig = vi.fn(() => new Config());
+        const translate = vi.fn(async () => '译文');
+        const handler = createInputBoxTranslationHandler({ready, getConfig, translate, requestRegistry});
+        const request = handler.handle({type: 'inputBoxTranslation', text: 'Hello', targetLang: 'ja', clientRequestId: 'input-waiting'});
+        const cancelled = expect(request).rejects.toMatchObject({name: 'AbortError'});
+        expect(requestRegistry.cancel('input-waiting', {})).toMatchObject({cancelled: true});
+        await cancelled;
+        resolveReady();
+        await Promise.resolve();
+        expect(getConfig).not.toHaveBeenCalled();
+        expect(translate).not.toHaveBeenCalled();
+    });
+
+    it('cancel-before-start 不读取配置，已取消请求标识无法再次使用', async () => {
+        const requestRegistry = createTranslationRequestRegistry();
+        const getConfig = vi.fn(() => new Config());
+        const translate = vi.fn(async () => '译文');
+        const handler = createInputBoxTranslationHandler({ready: Promise.resolve(), getConfig, translate, requestRegistry});
+        requestRegistry.cancel('input-before-start', {});
+        const message = {type: 'inputBoxTranslation' as const, text: 'Hello', targetLang: 'ja', clientRequestId: 'input-before-start'};
+        await expect(handler.handle(message)).rejects.toMatchObject({name: 'AbortError'});
+        await expect(handler.handle(message)).rejects.toThrow('clientRequestId 已在使用');
+        expect(getConfig).not.toHaveBeenCalled();
+        expect(translate).not.toHaveBeenCalled();
+    });
+
+    it('水合失败保留原始错误并释放取消注册记录', async () => {
+        const requestRegistry = createTranslationRequestRegistry();
+        const config = new Config();
+        const ready = Promise.reject(new Error('config failed'));
+        const handler = createInputBoxTranslationHandler({ready, getConfig: () => config, translate: vi.fn(), requestRegistry});
+        await expect(handler.handle({type: 'inputBoxTranslation', text: 'Hello', targetLang: 'ja', clientRequestId: 'input-ready-failed'}))
+            .rejects.toThrow('config failed');
+        expect(requestRegistry.cancel('input-ready-failed', {})).toMatchObject({cancelled: false});
+    });
+
+    it('旧 provider 忽略取消并迟到返回时，handler 仍拒绝成功响应', async () => {
+        const requestRegistry = createTranslationRequestRegistry();
+        const config = new Config();
+        let resolveProvider!: (value: string) => void;
+        let started!: () => void;
+        const providerStarted = new Promise<void>(resolve => {started = resolve;});
+        const translate = vi.fn(() => {started(); return new Promise<string>(resolve => {resolveProvider = resolve;});});
+        const handler = createInputBoxTranslationHandler({ready: Promise.resolve(), getConfig: () => config, translate, requestRegistry});
+        const request = handler.handle({type: 'inputBoxTranslation', text: 'Hello', targetLang: 'ja', clientRequestId: 'input-late'});
+        const cancelled = expect(request).rejects.toMatchObject({name: 'AbortError'});
+        await providerStarted;
+        requestRegistry.cancel('input-late', {});
+        resolveProvider('迟到译文');
+        await cancelled;
     });
 });

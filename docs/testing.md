@@ -290,11 +290,13 @@ X 另覆盖未预取句子等待原译文成对显示、seek 后迟到结果丢�
 
 ## 输入框翻译
 
-`node scripts/run-input-translation-test.cjs --extension-dir .output/chrome-mv3 --playwright-root <Node包目录> --focus-safe-helper <focus-safe-browser.cjs路径> --artifacts-dir /private/tmp/fluentread-input-translation` 使用生产扩展和临时 Edge profile，在第二屏后台验证输入框配置保存、三击间隔与恢复默认、独立模型和提示词、窄屏与深色布局，以及真实按键的翻译、取消、恢复和失败重试。
+`node scripts/run-input-translation-test.cjs --extension-dir .output/chrome-mv3 --playwright-root <Node包目录> --focus-safe-helper <focus-safe-browser.cjs路径> --artifacts-dir /private/tmp/fluentread-input-translation` 使用生产扩展和临时 Edge profile，在第二屏后台验证输入框配置保存、三击间隔与恢复默认、独立模型和提示词、窄屏与深色布局，以及真实按键的翻译、重复请求去重、后台 AbortSignal 取消、恢复和失败重试。还检查富文本失焦不夺回焦点、原生输入保持其他控件的焦点与选区、写回和恢复期间的新输入保护、390px 提示边距与滚动跟随，以及编辑器拒绝写入时可手动复制的译文。
 
 供应商响应与网页均为本地夹具，报告中的请求记录用于核对模型、提示词和原文；不代表外部服务连通性或模型翻译质量。`tests/inputTranslationConfig.test.ts`、`tests/inputTranslationBackground.test.ts` 和输入框内容脚本测试覆盖配置迁移、缓存隔离、输入快照、选区、输入法和迟到结果保护；`tests/inputEditableHost.test.ts` 覆盖编辑宿主的光标度量、选区同步等待、合成粘贴与原生插入回退。
 
 同一专项还验证富文本编辑区：原生 contenteditable 通过可撤销的原生插入写回，撤销后恢复粗体结构；模拟 Lexical/Draft.js 的模型驱动编辑器只在 selectionchange 后同步选区，报告中的 `modelEditorLog` 用于确认整段粘贴发生在选区同步之后、没有重复插入；plaintext-only 支持三连触发，密码框和代码编辑器保持不参与。`node scripts/run-rich-text-input-editors-test.cjs --extension-dir .output/chrome-mv3 --playwright-root <Node包目录> --focus-safe-helper <focus-safe-browser.cjs路径> --artifacts-dir /private/tmp/fluentread-rich-text-editors` 从 esm.sh 与 jsDelivr 加载真实的 Quill、ProseMirror、Lexical、Slate 和 Draft.js，逐个验证三连触发后编辑器自身模型只含译文、原文不含触发符，以及恢复原文；该脚本需要联网获取编辑器，结果不代表具体网站的定制编辑器。Firefox 与用户脚本构建需另外执行，Edge 结果不能替代其运行时验证。
+
+给真实编辑器脚本追加 `--slate-fast-cache`，会在 Slate 连续执行五轮翻译与恢复：前三轮供应商立即返回，第四轮开启缓存并预热，第五轮断言缓存命中且不发送供应商请求。每轮都精确检查编辑器模型与 DOM 文字，避免只看到页面变化却留下旧模型内容。专项结果见 [输入框翻译质量报告](./reports/input-translation-quality-20261011/README.md)。
 
 ## 设置页视口与滚动
 

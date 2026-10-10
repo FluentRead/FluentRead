@@ -1,0 +1,135 @@
+# 输入框翻译性能与交互可靠性
+
+输入框翻译沿用 FluentRead 的 WXT、Vue、可注入内容 feature 和共享翻译 broker。优化集中在减少重复请求与无关事件的工作、取消真实后台请求，以及在异步写入期间保护用户草稿、焦点和光标。双语输出保留原文与段落，继续支持原文在前或译文在前。
+
+## 请求与性能
+
+相同宿主、相同内容的在途翻译只保留一个请求。请求与提示 UI 并行启动，提示挂载变慢或失败不再阻挡请求和写入。无关输入目标的 input/change 事件不读取编辑区快照，富文本快照使用 DOM markup 比较，避免每次校验都读取可能触发布局的 innerText。
+
+输入入口复用共享、按发送者隔离的取消注册表，取消信号沿原有 broker 传递到 provider。配置水合之前也能取消，取消后不启动 provider；忽略取消的迟到 provider 返回不能写入。后台协议保留没有请求标识的旧调用方。Chrome、Firefox 和两种 userscript 入口共用业务处理器，没有新增依赖、配置迁移或框架私有 API。
+
+页面消息最长等待 60 秒，包含后台唤醒与配置水合；共享 broker 的原有超时、缓存、并发与服务策略继续生效。超时后释放页面状态并显示重试，重试使用新请求标识。性能改进来自请求去重和减少无关事件工作，供应商的既有超时和并发策略得到保留。
+
+## 写入与用户交互
+
+翻译中可以按 Esc 或点击取消；用户编辑、输入法组合、配置变化和页面卸载都会作废请求。普通输入框完成后保持其他控件的焦点和选区；富文本失焦会取消写入。写回或恢复期间的实际编辑按键、粘贴和剪切会在宿主默认编辑之前取消写入。临时选区仍归本次写入占用，且原节点与内容仍有效时，同步恢复原选区；用户已经改变的选区继续保留。重复点击恢复只产生一次在途写入。
+
+三连触发只清理本次插入的两个符号，原文中的空格、等号和短横线继续保留。富文本通过编辑器接管的标准输入事件与原生编辑路径提交，不直接覆盖其 innerHTML。非空文本使用 insertText 字符串事件，折叠光标处的单个非换行字符使用 insertReplacementText，避免字符延后到下一次输入重放。编辑器已接管事件后，只确认预期提交或安全停止，不再追加第二次写入。
+
+状态提示提供取消、失败重试和恢复原文，具有 status/polite 无障碍状态，跟随滚动与视口尺寸变化，并限制在视口边距内。状态背景加深，提高白色小字的对比度。编辑器拒绝自动写入时，提示保留准确、只读且可选择复制的译文，直到用户关闭或改变输入状态。
+
+富文本的“恢复原文”恢复文字；原有链接、提及与格式需通过宿主支持的撤销功能恢复。双语追加和前置保留原文内容、结构和格式，编辑器可按自身模型重新渲染。
+
+## 初始验证结果（6817ebb）
+
+本节保留 fe7005dd9 基线与初始实现提交 6817ebb 的原始证据。PR 整合最新主线后的复验见下节，原始报告与指纹不作覆盖。
+
+输入翻译核心的 204 个定向测试通过：内容生命周期 96 个，编辑宿主与资格判定 94 个，后台与输入集成 14 个。四个业务模块的 statements、branches、functions、lines 均为 100%。其中后台集成使用“输入框”用例过滤，其余 52 个用例未执行。
+
+定向架构与相关回归共 998 个用例，997 个通过；optionalContentFeatures 另有 7 个通过。唯一失败是 providerBoundaries 对 Microsoft 适配器旧函数签名的字符串断言（第 188 行），已在未修改的 fe7005dd9 基线上重现。本次没有修改该适配器和断言文件，两者内容与基线逐字相同。这个结果不记作全套回归通过。
+
+初始实现的生产构建浏览器终验全部通过；两个 runner 均以 exit 0 结束，无页面错误，浏览器保持第二屏后台可见且没有抢前台。
+
+| 检查 | 初始结果 | 证据 |
+| --- | --- | --- |
+| 输入交互 | 29/29；6 次实际 AbortSignal 终止；连续 5 次快捷键仅 1 个请求 | [浏览器报告](./input-browser-report.json) |
+| 真实编辑器 | Quill、ProseMirror、Lexical、Slate、Draft.js 5/5；译文与恢复均核对模型和 DOM | [编辑器报告](./real-editors-report.json) |
+| Slate 即时返回与缓存 | 连续 5/5；4 次供应商请求、1 次实际缓存命中；最后一轮零请求 | [连续轮次](./real-editors-report.json) |
+| 提示文字对比度 | 蓝 6.19:1、绿 6.49:1、红 6.13:1；状态、按钮和只读译文均达到 4.5:1 检查阈值 | [实际计算样式](./input-browser-report.json) |
+| 定向覆盖率 | 4 个业务模块的四项指标均为 100% | [覆盖率摘要](./coverage-summary.json) |
+| 类型与构建 | compile、Chrome MV3、Firefox MV2、userscript 全部通过 | [构建指纹与基线](./verification.json) |
+| 产物守门 | Chrome/Firefox manifest 检查与完整 userscript verifier 通过 | [Manifest](./extension-manifests.json)、[指纹](./verification.json) |
+| 测试归类审计 | 638 个测试文件、10,444 个用例条目；审计通过 | [审计摘要](./verification.json) |
+| 文档与组件预览 | 构建与校验通过；81 页、4,328 条链接；28 个 stories | [检查记录](./verification.json) |
+
+对比度使用浏览器实际 computed style，将半透明背景按最差白色背底合成后计算。窄屏截图：[翻译中与取消](./loading-390.png)、[手动复制译文](./manual-preview-390.png)。原文格式与恢复截图：[双语原文结构](./bilingual-rich-formatting.png)、[五种编辑器恢复原文](./editors-restored.png)。
+
+真实编辑器版本固定为 Quill 2.0.3、ProseMirror state 1.4.3 / view 1.38.1、Lexical 0.28.0、Slate / slate-react 0.112.0、Draft.js 0.11.7。
+
+userscript 使用相同锁文件与依赖独立重建基线：1,985,367 → 1,994,005 字节，增加 8,638 字节（0.4351%）。体积预算按实测增量向上取千字节，从 1,986,000 调整为 1,995,000，最终余量 995 字节；协议、依赖固定提交、执行隔离、兼容性与功能排除检查全部保留。基线与候选 SHA256、锁文件指纹保存在 [verification.json](./verification.json)。
+
+定向覆盖率可复现命令：
+
+```bash
+pnpm test:coverage tests/inputTranslationContentFeature.test.ts \
+  --coverage.include=src/features/input-translation/content/index.ts
+pnpm test:coverage tests/inputEditableHost.test.ts tests/inputBox.test.ts \
+  --coverage.include=src/features/input-translation/content/editableHost.ts \
+  --coverage.include=src/features/input-translation/content/inputBox.ts
+pnpm test:coverage tests/inputTranslationBackground.test.ts tests/backgroundFeatureHandlers.test.ts \
+  --testNamePattern='输入框' \
+  --coverage.include=src/features/input-translation/background/handler.ts
+```
+
+类型、构建、产物与文档检查：
+
+```bash
+pnpm compile
+pnpm test:audit
+pnpm build
+pnpm build:firefox
+pnpm build:userscript
+node scripts/verify-userscript-build.mjs
+pnpm verify:extension-manifests
+pnpm docs:build
+pnpm storybook:build
+pnpm storybook:check
+pnpm docs:check
+```
+
+浏览器回归命令（先执行 pnpm build，使用隔离的生产 Chrome MV3 产物）：
+
+```bash
+node scripts/run-input-translation-test.cjs \
+  --extension-dir .output/chrome-mv3 \
+  --playwright-root <Node包目录> \
+  --focus-safe-helper scripts/testing/focus-safe-browser.cjs \
+  --artifacts-dir /private/tmp/fluentread-input-translation
+node scripts/run-rich-text-input-editors-test.cjs \
+  --extension-dir .output/chrome-mv3 \
+  --playwright-root <Node包目录> \
+  --focus-safe-helper scripts/testing/focus-safe-browser.cjs \
+  --artifacts-dir /private/tmp/fluentread-rich-text-editors \
+  --slate-fast-cache
+```
+
+## PR 主线整合复验（982f09df）
+
+合并前将最新 main 的 982f09df 整合为 2e4d34fbc。两个独立审核覆盖输入请求生命周期、后台取消、富文本标准事件提交、焦点与选区保护；整合复核未发现阻塞问题。七个业务源码文件的 SHA256 与初始验证完全一致，相对最新 main 的业务补丁也与初始补丁相同。原覆盖率证据因此对应同一业务实现；本节重新验证更新后的运行时与构建产物，后续证据提交只修改报告。
+
+19 个相关测试文件的 1,388 个用例全部通过，含输入前后台、编辑宿主、热键/UI/配置/userscript 协议与四个架构测试文件。最新主线已修正初始 providerBoundaries 静态断言，本轮该文件 6/6 通过，当前无这项测试失败。实际命令和结果见 [定向测试日志](./pr-integration/related-tests.txt)。
+
+| 检查 | 整合后结果 | 证据 |
+| --- | --- | --- |
+| 生产包输入交互 | 29/29；6 次实际取消；5 次快捷键仅 1 个请求 | [输入浏览器报告](./pr-integration/input-browser-report.json) |
+| 真实编辑器 DOM 与模型 | Quill、ProseMirror、Lexical、Slate、Draft.js 5/5，核对翻译及恢复 | [编辑器报告](./pr-integration/real-editors-report.json) |
+| Slate 连续即时返回与缓存 | 5/5；4 次供应商请求、1 次缓存命中，第五轮零请求 | [连续轮次](./pr-integration/real-editors-report.json) |
+| 浏览器错误与焦点 | 两个 runner 均 exit 0，无页面错误，browserFrontmost=false，前台前后均为 ChatGPT | [浏览器记录](./pr-integration/verification.json) |
+| 类型与产物 | compile、Chrome、Firefox、userscript 构建及完整产物守门通过 | [指纹与检查记录](./pr-integration/verification.json)、[Manifest](./pr-integration/extension-manifests.json) |
+| 文档及测试归类 | 文档/Storybook 构建和校验通过；640 文件、10,568 条用例归类审计通过 | [检查记录](./pr-integration/verification.json) |
+
+同锁独立重建最新 main 与候选 userscript：1,997,714 → 2,006,364 字节，增量 8,650 字节（0.4330%）。预算从 1,998,000 最小增加 9 KB 至 2,007,000，余量 636 字节。锁文件、基线与候选 SHA256 见 [整合指纹](./pr-integration/verification.json)，所有原有协议、执行隔离、固定依赖和功能排除断言保留。
+
+浏览器使用固定的整合生产构建副本，供应商仍为确定性本地夹具；Firefox/userscript 验证限于构建与产物。本节证据不表示外部供应商或 GitHub 托管 CI 通过。
+
+## PR 最终整合复验（bbae4100 / #933）
+
+PR 创建后的合并门禁发现 main 已合入右键菜单与通知优化 #933，导致体积预算冲突。再次将 bbae4100 整合为 e45b5c686，保留两侧的体积记录和全部守门断言。输入七个业务文件的补丁依然与原审核版本相同；独立复核确认新消息路由不截获输入翻译及取消消息，通知不共用输入提示的节点、焦点与定时器，userscript 文案裁剪保留输入协议与文案。
+
+相关回归增加 contentMessageRuntime 与 userscriptViteConfig，21 文件、1,518 个用例全部通过。类型检查、Chrome/Firefox/userscript 构建、完整 userscript verifier、manifest 检查、文档和 Storybook 构建校验均通过。测试归类审计为 640 文件、10,630 条用例。
+
+最终固定生产包的隔离 Edge 复验：输入交互 29/29、五种真实编辑器翻译及恢复 DOM/模型 5/5、Slate 连续操作及缓存 5/5。两脚本均 exit 0，无页面错误或前台抢占；连续五次快捷键仅一个请求，观察到六次实际请求取消。最终证据：[输入报告](./pr-integration-933/input-browser-report.json)、[编辑器报告](./pr-integration-933/real-editors-report.json)、[测试日志](./pr-integration-933/related-tests.txt)、[构建与审核记录](./pr-integration-933/verification.json)。
+
+同锁独立 main 为 2,001,158 字节，输入候选为 2,009,853 字节，增加 8,695 字节（0.4345%）。利用主线余量后，将 2,002,000 预算最小增加 8 KB 至 2,010,000，剩余 147 字节。所有基线、源码、产物和锁文件指纹保存在最终记录；前两节原始证据继续保留。
+
+后续提交仅添加报告，业务源码和构建产物不变。供应商响应使用确定性本地夹具，Firefox/userscript 限于构建与产物检查；无 GitHub 托管检查记录不记作 CI 通过。
+
+## 验证边界
+
+浏览器验证使用生产 Chrome MV3 构建、临时 Edge profile、第二屏后台窗口和真实键盘/指针事件。供应商响应由本地确定性夹具提供，验证请求次数、参数、AbortSignal 和写入交互，不衡量外部服务连通性、账号认证或模型翻译质量。真实编辑器验证使用 Quill、ProseMirror、Lexical、Slate 和 Draft.js 的公开实现，不能覆盖具体网站的所有定制插件。
+
+Firefox 和 userscript 的构建与产物检查不能代替其运行时验证。没有以本地结果宣称 GitHub CI 通过。
+
+## 初始本地交付
+
+基线为 origin/main 的 fe7005dd9；实现位于分支 codex/input-translation-quality-20261011 的独立 worktree。没有修改主检出目录或参考仓库，也没有借用参考项目代码。依赖按既有锁文件安装，package.json 与 pnpm-lock.yaml 均未改变。

@@ -1,0 +1,186 @@
+{
+  "initialCommit": "6817ebb340ee821efdac51d5eb27466965c43f8e",
+  "integratedBaseCommit": "982f09df6674004cc3843384a834b67ce0f0d992",
+  "verifiedRuntimeCommit": "2e4d34fbc32e0e6f388397e618e07a7aa8864233",
+  "sourceSha256": {
+    "src/features/input-translation/content/index.ts": "ebc0b0cb96c828e9b508682f1758561b54df6d19e2dc72f809ca02251cff30df",
+    "src/features/input-translation/content/editableHost.ts": "8e287109c392842c6909d7167a77a928181657e7c4bc96e117028603d24a2412",
+    "src/features/input-translation/content/inputBox.ts": "3edbabc7aaeb1b1ab1f5a0498087901f5dcd33a7f46086a160474a97408b6689",
+    "src/features/input-translation/background/handler.ts": "dfa4898e8b4fc4d5070380a63822194443665295c8b5b5e8e03b401ad131c9c5",
+    "src/app/background/messageRuntime.ts": "cfbf02e3031844b5797cdc3db4bfb40339271d3b0477f58615dece650abcb269",
+    "userscript/platform.ts": "f8baae21074a0d04a9f8c080b9991392ac40e7ea76b3d14c520033d624cf044b",
+    "userscript/platformFull.ts": "67dff42ec010ac54275875d7f213ea98f6158b608164912502c46a5090da84fb",
+    "scripts/verify-userscript-build.mjs": "2d247005374f526697b8a3740be9cb1b657866d2d23f1a6ffffdbe8edc4cb7b6"
+  },
+  "unchangedInitialBusinessModules": [
+    "src/features/input-translation/content/index.ts",
+    "src/features/input-translation/content/editableHost.ts",
+    "src/features/input-translation/content/inputBox.ts",
+    "src/features/input-translation/background/handler.ts",
+    "src/app/background/messageRuntime.ts",
+    "userscript/platform.ts",
+    "userscript/platformFull.ts"
+  ],
+  "artifactSha256": {
+    "chrome-mv3": {
+      "manifest.json": "fd80314b160701ed5500e584e1373f5eed44a19acdc6f8b76f9a12c1565970d8",
+      "background.js": "7710c2dcb8fcde9bd91df9d2f8a11ccccbd1e744582be1903c055d3cad5f91a9",
+      "content-scripts/content.js": "88bf33161e61c4bf6747a93c0a2937cefcfed07cf3bf302cb5f7a1bbf072b08f"
+    },
+    "firefox-mv2": {
+      "manifest.json": "2f4d6388a66e23f052933d6a4f972e3f65e841806a20f6b1d274fcf14d21a3ef",
+      "background.js": "bef901aaeabd09660a2ad9e14634c36fe4fb5a75ea4d038747684c5936e9f2ed",
+      "content-scripts/content.js": "fe4a81ec93d2ce8e8cbf9a89816016cd3e8dfbeec0009114375a9f15e3b433e4"
+    }
+  },
+  "userscript": {
+    "baselineBytes": 1997714,
+    "baselineSha256": "9901bf983411fc1b0971a2e1822916e235054c4e1713bf2729bd07483e6db3a4",
+    "candidateBytes": 2006364,
+    "candidateSha256": "593ae0406927a42c0cc4d846662f1059eb216438ae5e904c1116c5887c349929",
+    "deltaBytes": 8650,
+    "deltaPercent": 0.4329949132,
+    "oldBudgetBytes": 1998000,
+    "newBudgetBytes": 2007000,
+    "candidateMarginBytes": 636
+  },
+  "lockSha256": "dca737aeb9c264e2c3078588ff01c85dd52d48636f7fa24b2451f9444a8ccc3a",
+  "relatedTests": {
+    "files": 19,
+    "passed": 1388,
+    "failed": 0
+  },
+  "testAudit": {
+    "status": "ok",
+    "files": 640,
+    "cases": 10568
+  },
+  "checks": [
+    {
+      "command": "pnpm test (19 related files)",
+      "exitCode": 0,
+      "evidenceLog": "/private/tmp/fluentread-input-pr-integration-tests-20261011.log"
+    },
+    {
+      "command": "pnpm compile",
+      "exitCode": 0,
+      "evidenceLog": "/private/tmp/fluentread-input-pr-integration-compile-20261011.log"
+    },
+    {
+      "command": "pnpm build",
+      "exitCode": 0,
+      "evidenceLog": "/private/tmp/fluentread-input-pr-integration-chrome-20261011.log"
+    },
+    {
+      "command": "pnpm build:firefox",
+      "exitCode": 0,
+      "evidenceLog": "/private/tmp/fluentread-input-pr-integration-firefox-20261011.log"
+    },
+    {
+      "command": "pnpm build:userscript",
+      "exitCode": 0,
+      "evidenceLog": "/private/tmp/fluentread-input-pr-integration-userscript-20261011.log"
+    },
+    {
+      "command": "node scripts/verify-userscript-build.mjs",
+      "exitCode": 0,
+      "evidenceLog": "/private/tmp/fluentread-input-pr-integration-userscript-verify-20261011.log"
+    },
+    {
+      "command": "pnpm test:audit",
+      "exitCode": 0,
+      "evidenceLog": "/private/tmp/fluentread-input-pr-integration-test-audit-20261011.log"
+    },
+    {
+      "command": "pnpm docs:build",
+      "exitCode": 0,
+      "evidenceLog": "/private/tmp/fluentread-input-pr-integration-docs-build-20261011.log"
+    },
+    {
+      "command": "pnpm storybook:build",
+      "exitCode": 0,
+      "evidenceLog": "/private/tmp/fluentread-input-pr-integration-storybook-build-20261011.log"
+    },
+    {
+      "command": "pnpm storybook:check",
+      "exitCode": 0,
+      "evidenceLog": "/private/tmp/fluentread-input-pr-integration-storybook-check-20261011.log"
+    },
+    {
+      "command": "pnpm docs:check",
+      "exitCode": 0,
+      "evidenceLog": "/private/tmp/fluentread-input-pr-integration-docs-check-20261011.log"
+    },
+    {
+      "command": "node scripts/testing/verify-extension-manifests.mjs",
+      "exitCode": 0,
+      "evidenceLog": "/private/tmp/fluentread-input-pr-integration-manifests-20261011.json"
+    }
+  ],
+  "docsCheck": {
+    "ok": true,
+    "pages": 81,
+    "links": 4328,
+    "anchors": 792,
+    "images": 158
+  },
+  "storybookCheck": {
+    "groups": 12,
+    "stories": 28,
+    "docs": 12,
+    "assets": 13
+  },
+  "review": {
+    "inputLifecycle": "no blocking findings; original and integrated patches identical",
+    "editableHost": "no blocking findings; event handling and model-commit boundaries verified"
+  },
+  "evidenceBoundary": {
+    "browser": "isolated Edge with Chrome MV3 production artifacts",
+    "provider": "deterministic local fixture; no live provider account certification",
+    "otherTargets": "Firefox/userscript build and artifact verification only"
+  },
+  "browser": {
+    "input": {
+      "exitCode": 0,
+      "completed": true,
+      "passed": 29,
+      "providerAbortCount": 6,
+      "repeatedShortcutCount": 5,
+      "repeatedShortcutRequests": 1,
+      "pageErrors": [],
+      "browserFrontmost": false,
+      "report": "input-browser-report.json"
+    },
+    "realEditors": {
+      "exitCode": 0,
+      "completed": true,
+      "passed": 5,
+      "slateFastCachePassed": 5,
+      "slateProviderRequests": 4,
+      "slateCacheHits": 1,
+      "lastRoundRequests": 0,
+      "pageErrors": [],
+      "browserFrontmost": false,
+      "report": "real-editors-report.json"
+    },
+    "foregroundBeforeAndAfter": "ChatGPT",
+    "providerBoundary": "deterministic local fixture"
+  },
+  "baselineMetadata": {
+    "baselineSha": "982f09df6674004cc3843384a834b67ce0f0d992",
+    "baselineLockSha256": "dca737aeb9c264e2c3078588ff01c85dd52d48636f7fa24b2451f9444a8ccc3a",
+    "candidateLockSha256": "dca737aeb9c264e2c3078588ff01c85dd52d48636f7fa24b2451f9444a8ccc3a",
+    "nodeModulesSource": "/Users/thinkstu/Desktop/copy/FluentRead-input-translation-quality-20261011/node_modules",
+    "artifactPath": "/private/tmp/fluentread-input-pr-latest-baseline-20261011/.output/userscript/fluent-read.user.js",
+    "artifactBytes": 1997714,
+    "artifactSha256": "9901bf983411fc1b0971a2e1822916e235054c4e1713bf2729bd07483e6db3a4",
+    "maxUserscriptBytes": 1998000,
+    "marginBytes": 286,
+    "prepareExit": 0,
+    "buildExit": 0,
+    "verifyExit": 0,
+    "prepareLog": "/private/tmp/fluentread-input-pr-latest-baseline-prepare-20261011.log",
+    "buildLog": "/private/tmp/fluentread-input-pr-latest-baseline-build-20261011.log",
+    "verifyLog": "/private/tmp/fluentread-input-pr-latest-baseline-verify-20261011.log"
+  }
+}

@@ -269,7 +269,7 @@ export const enUSMessages = {
     "video.back": "Back to display modes",
     "video.closeMenu": "Close subtitle menu",
     "video.sourceOff": "Subtitles are off",
-    "video.source.native": "Native captions · {count} cues",
+    "video.source.native": "Loaded subtitles · {count} cues",
     "video.source.cache": "Saved subtitles · {count} cues",
     "video.source.ai": "AI subtitles · {count} cues",
     "video.sourcePreparing": "Generating subtitles",

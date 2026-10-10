@@ -267,7 +267,7 @@ export const frFRMessages = {
     "video.back": "Retour à l’affichage",
     "video.closeMenu": "Fermer le menu des sous-titres",
     "video.sourceOff": "Sous-titres désactivés",
-    "video.source.native": "Sous-titres natifs · {count} segments",
+    "video.source.native": "Sous-titres chargés · {count} segments",
     "video.source.cache": "Sous-titres enregistrés · {count} segments",
     "video.source.ai": "Sous-titres IA · {count} segments",
     "video.sourcePreparing": "Génération des sous-titres",

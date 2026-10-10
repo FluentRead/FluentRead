@@ -1,7 +1,7 @@
 <!--
 @file src/features/settings/ui/InformationHighlightPreferences.vue
 文件职责：提供智能高亮的开关与阅读偏好控件，让用户直接比较密度、渐变配色和绘制效果。
-主要内容：首行设置只作用于当前页面的开关快捷键，可单独停用并校验与其他功能的冲突；其下的开关决定是否在所有网页与 PDF 自动高亮；保留按需模式说明与模型插槽，以三档密度、六套真实浓淡色阶卡、三档颜色浓度和三种绘制方式控制外观；所有写入绑定活跃配置归属，关闭或切换页面后不接受旧控件回调。
+主要内容：首行设置当前页面的开关快捷键，其下开关决定是否自动高亮；分析方式后提供两张模型资源卡的插槽，模型选择由父级处理；以密度、色阶卡、浓度和绘制方式控制外观，所有写入绑定活跃配置归属。
 模块边界：只修改已有 Config.informationHighlight，不分析正文、不下载模型；设置持久化由父级现有配置服务负责。
 -->
 <template>
@@ -20,7 +20,7 @@
       <UiSelect :model-value="config.informationHighlight.mode" :disabled="!context.active.value" :aria-label="t('informationHighlight.mode')" :onUpdate:modelValue="actions.mode" data-information-highlight-mode-select>
         <ElOption v-for="mode in modes" :key="mode" :value="mode" :label="t(`informationHighlight.mode.${mode}`)" :data-information-highlight-mode="mode" />
       </UiSelect>
-      <small>{{ t(`informationHighlight.mode.${config.informationHighlight.mode}.description`) }}</small>
+      <small v-if="config.informationHighlight.mode === 'keywords'">{{ t('informationHighlight.mode.keywords.description') }}</small>
     </label>
     <slot name="after-mode" />
     <div v-if="showDensity" class="highlight-field">

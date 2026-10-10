@@ -1,12 +1,12 @@
 /**
  * @file src/features/information-highlight/offscreen/runtime.ts
  * 文件职责：在共享离屏文档看守信息高亮模型下载、独立评分 Worker 和有界暖机复用。
- * 主要内容：显式准备才下载、状态读缓存、不偷偷补文件、串行公平排队、共享资源预算、立即取消等待及短收尾看守、180 秒空闲释放。
- * 模块边界：不访问宿主 DOM、不持有页面偏好、不另建 offscreen 文档；仅消费固定模型清单与 platform 缓存。
+ * 主要内容：每种模型独立管理下载与状态，显式准备才下载；所有评分共用串行队列，切换时释放旧模型 Worker，任意时刻只暖驻一个模型；取消、短收尾看守及 180 秒空闲释放沿用共享资源预算。
+ * 模块边界：不访问宿主 DOM、不持有页面偏好、不另建 offscreen 文档；仅消费模型清单与 platform 缓存。
  */
-import {INFORMATION_HIGHLIGHT_MODEL_BYTES, INFORMATION_HIGHLIGHT_MODEL_NAME} from '@/src/core/config/informationHighlightModel';
+import {DEFAULT_INFORMATION_HIGHLIGHT_MODEL_ID, getInformationHighlightModel, type InformationHighlightModelId} from '@/src/core/config/informationHighlightModel';
 import {withLocalInferenceBudget} from '@/src/shared/onnx/resources';
-import {informationHighlightArtifacts, informationHighlightArtifactStore} from './artifacts';
+import {getInformationHighlightArtifacts, getInformationHighlightArtifactStore, informationHighlightArtifactStore} from './artifacts';
 import type {InformationHighlightModelErrorCode, InformationHighlightModelStatus, InformationHighlightResult} from '../protocol';
 import type {InformationHighlightWorkerRequest, InformationHighlightWorkerResponse} from './worker';
 const RECOVERABLE_INPUT_ERRORS = new Set(['INFORMATION_HIGHLIGHT_TOKEN_LIMIT', 'INFORMATION_HIGHLIGHT_TEXT_LIMIT', 'INFORMATION_HIGHLIGHT_ALIGNMENT']);
@@ -21,6 +21,7 @@ export async function probeInformationHighlightWebGpu(): Promise<InformationHigh
     } catch {return {supported: false, reason: 'INFORMATION_HIGHLIGHT_WEBGPU_UNAVAILABLE'};}
 }
 export interface InformationHighlightRuntimeDependencies {
+    modelId?: InformationHighlightModelId;
     store: typeof informationHighlightArtifactStore;
     createWorker(): Worker;
     probe(): Promise<InformationHighlightCapability>;
@@ -35,6 +36,7 @@ function downloadErrorCode(error: unknown): InformationHighlightModelErrorCode {
     return 'INFORMATION_HIGHLIGHT_DOWNLOAD_FAILED';
 }
 export function createInformationHighlightModelRuntime(dependencies: InformationHighlightRuntimeDependencies) {
+    const model = getInformationHighlightModel(dependencies.modelId), artifacts = getInformationHighlightArtifacts(model.id);
     let phase: InformationHighlightModelStatus['phase'] = 'absent', errorCode: InformationHighlightModelErrorCode | undefined;
     let capability: Promise<InformationHighlightCapability> | undefined;
     let job: {controller: AbortController; done: Promise<void>} | undefined;
@@ -49,7 +51,7 @@ export function createInformationHighlightModelRuntime(dependencies: Information
         // 就绪文件变化只发生在显式管理动作或外部驱逐；冷加载还会逐块复核，状态轮询不重读整套权重。
         if (!fileSnapshot || Date.now() - snapshotAt >= (phase === 'ready' ? 60_000 : 1_000)) {
             snapshotAt = Date.now();
-            fileSnapshot = Promise.all(informationHighlightArtifacts.map(async file => {
+            fileSnapshot = Promise.all(artifacts.map(async file => {
                 const complete = await dependencies.store.complete(file);
                 return {complete, bytes: complete ? file.size : await dependencies.store.downloaded(file)};
             })).catch(error => {fileSnapshot = undefined; throw error;});
@@ -57,7 +59,7 @@ export function createInformationHighlightModelRuntime(dependencies: Information
         const files = await fileSnapshot;
         const downloaded = files.every(file => file.complete), downloadedBytes = files.reduce((sum, file) => sum + file.bytes, 0);
         if (!job && !removing && phase !== 'error') phase = downloaded ? 'ready' : downloadedBytes ? 'paused' : 'absent';
-        return {phase: removing ? 'removing' : phase, downloaded, initialized, downloadedBytes, totalBytes: INFORMATION_HIGHLIGHT_MODEL_BYTES, downloadSizeBytes: INFORMATION_HIGHLIGHT_MODEL_BYTES, modelName: INFORMATION_HIGHLIGHT_MODEL_NAME, ...await support(), ...(errorCode ? {errorCode} : {})};
+        return {modelId: model.id, phase: removing ? 'removing' : phase, downloaded, initialized, downloadedBytes, totalBytes: model.bytes, downloadSizeBytes: model.bytes, modelName: model.name, ...await support(), ...(errorCode ? {errorCode} : {})};
     };
     const prepare = async () => {
         const current = await status();
@@ -71,13 +73,13 @@ export function createInformationHighlightModelRuntime(dependencies: Information
             try {
                 const quota = await navigator.storage?.estimate?.();
                 if (quota?.quota && quota.quota - (quota.usage || 0) < current.totalBytes - current.downloadedBytes + 32 * 1024 * 1024) throw new DOMException('模型存储空间不足', 'QuotaExceededError');
-                for (const file of informationHighlightArtifacts) bytes.set(file.url, await dependencies.store.downloaded(file));
-                for (const file of informationHighlightArtifacts) {
+                for (const file of artifacts) bytes.set(file.url, await dependencies.store.downloaded(file));
+                for (const file of artifacts) {
                     phase = 'downloading';
                     await dependencies.store.download(file, controller.signal, (loaded, verifying) => {
                         bytes.set(file.url, loaded); phase = verifying ? 'verifying' : 'downloading';
                         fileSnapshot = undefined;
-                        dependencies.notify({loaded: [...bytes.values()].reduce((sum, value) => sum + value, 0), total: INFORMATION_HIGHLIGHT_MODEL_BYTES});
+                        dependencies.notify({loaded: [...bytes.values()].reduce((sum, value) => sum + value, 0), total: model.bytes});
                     });
                 }
                 phase = 'ready';
@@ -93,7 +95,7 @@ export function createInformationHighlightModelRuntime(dependencies: Information
     const remove = async () => {
         if (removing) return status();
         removing = true; phase = 'removing'; job?.controller.abort();
-        try {await job?.done; stop(); for (const file of informationHighlightArtifacts) await dependencies.store.remove(file); phase = 'absent'; errorCode = undefined;}
+        try {await job?.done; stop(); for (const file of artifacts) await dependencies.store.remove(file); phase = 'absent'; errorCode = undefined;}
         catch (error) {phase = 'error'; errorCode = 'INFORMATION_HIGHLIGHT_REMOVE_FAILED'; throw error;}
         finally {removing = false; fileSnapshot = undefined;}
         return status();
@@ -136,7 +138,7 @@ export function createInformationHighlightModelRuntime(dependencies: Information
             current.onerror = event => {if (worker === current) {phase = 'error'; errorCode = 'INFORMATION_HIGHLIGHT_MODEL_RUNTIME_FAILED'; finish(new Error(event.message)); stop();}};
             signal.addEventListener('abort', cancel, {once: true});
             watch(initializing ? 30_000 : 120_000);
-            try {current.postMessage({type: 'score', requestId, text} satisfies InformationHighlightWorkerRequest);}
+            try {current.postMessage({type: 'score', requestId, text, modelId: model.id} satisfies InformationHighlightWorkerRequest);}
             catch (error) {phase = 'error'; errorCode = 'INFORMATION_HIGHLIGHT_MODEL_RUNTIME_FAILED'; finish(error instanceof Error ? error : new Error('INFORMATION_HIGHLIGHT_WORKER_FAILED')); stop();}
         });
     };
@@ -157,5 +159,50 @@ export function createInformationHighlightModelRuntime(dependencies: Information
             void result.then(resolve, reject).finally(() => signal.removeEventListener('abort', abort));
         });
     };
-    return {status, prepare, pause, remove, score, dispose: () => {job?.controller.abort(); stop();}};
+    return {status, prepare, pause, remove, score, releaseWorker: stop, dispose: () => {job?.controller.abort(); stop();}};
+}
+
+export interface InformationHighlightModelsRuntimeDependencies extends Omit<InformationHighlightRuntimeDependencies, 'store' | 'modelId' | 'notify'> {
+    notify(progress: {loaded: number; total: number} | undefined, modelId: InformationHighlightModelId): void;
+    store?(modelId: InformationHighlightModelId): typeof informationHighlightArtifactStore;
+}
+
+/** 状态查询不加载权重；每个模型独立下载，GPU 会话只在评分队列切换时交接。 */
+export function createInformationHighlightModelsRuntime(dependencies: InformationHighlightModelsRuntimeDependencies) {
+    const models = new Map<InformationHighlightModelId, ReturnType<typeof createInformationHighlightModelRuntime>>();
+    let active: InformationHighlightModelId | undefined, disposed = false;
+    let tail: Promise<void> = Promise.resolve();
+    const runtime = (modelId: InformationHighlightModelId) => {
+        if (disposed) throw new Error('INFORMATION_HIGHLIGHT_DISPOSED');
+        let model = models.get(modelId);
+        if (!model) {
+            model = createInformationHighlightModelRuntime({...dependencies, modelId,
+                store: dependencies.store?.(modelId) ?? getInformationHighlightArtifactStore(modelId),
+                notify: progress => dependencies.notify(progress, modelId)});
+            models.set(modelId, model);
+        }
+        return model;
+    };
+    return {
+        status: (modelId = DEFAULT_INFORMATION_HIGHLIGHT_MODEL_ID) => runtime(modelId).status(),
+        prepare: (modelId = DEFAULT_INFORMATION_HIGHLIGHT_MODEL_ID) => runtime(modelId).prepare(),
+        pause: (modelId = DEFAULT_INFORMATION_HIGHLIGHT_MODEL_ID) => runtime(modelId).pause(),
+        remove: (modelId = DEFAULT_INFORMATION_HIGHLIGHT_MODEL_ID) => runtime(modelId).remove(),
+        score(text: string, signal: AbortSignal, modelId: InformationHighlightModelId = DEFAULT_INFORMATION_HIGHLIGHT_MODEL_ID): Promise<InformationHighlightResult> {
+            const result = tail.then(() => {
+                if (signal.aborted) throw new DOMException('信息高亮已取消', 'AbortError');
+                const selected = runtime(modelId);
+                if (active !== modelId) {if (active) models.get(active)!.releaseWorker(); active = modelId;}
+                return selected.score(text, signal);
+            });
+            tail = result.then(() => undefined, () => undefined);
+            return new Promise((resolve, reject) => {
+                const abort = () => reject(new DOMException('信息高亮已取消', 'AbortError'));
+                signal.addEventListener('abort', abort, {once: true});
+                if (signal.aborted) abort();
+                void result.then(resolve, reject).finally(() => signal.removeEventListener('abort', abort));
+            });
+        },
+        dispose() {disposed = true; for (const model of models.values()) model.dispose(); models.clear();},
+    };
 }

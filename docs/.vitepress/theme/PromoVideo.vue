@@ -127,12 +127,4 @@ onBeforeUnmount(() => {
       en ? 'Download the introduction video' : '下载介绍视频'
     }}</a>
   </video>
-  <a
-    v-if="!en"
-    class="bv-text-link bv-promo-link"
-    href="https://www.bilibili.com/video/BV1VLHE6hEnB/"
-    target="_blank"
-    rel="noopener noreferrer"
-    >在 B 站观看 <span aria-hidden="true">↗</span></a
-  >
 </template>

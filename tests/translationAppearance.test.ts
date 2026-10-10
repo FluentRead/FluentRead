@@ -27,16 +27,16 @@ import {
 } from '@/src/core/config/translationAppearance';
 
 describe('译文样式预设注册表', () => {
-    it('保持稳定编号与唯一类名，并按四个分类组织全部预设', () => {
+    it('保持稳定编号与唯一类名，并按五个分类组织全部预设', () => {
         const values = TRANSLATION_STYLE_PRESETS.map((preset) => preset.value);
-        expect([...values].sort((left, right) => left - right)).toEqual(Array.from({length: 29}, (_, index) => index));
-        expect(new Set(TRANSLATION_STYLE_PRESETS.map((preset) => preset.className)).size).toBe(29);
+        expect([...values].sort((left, right) => left - right)).toEqual(Array.from({length: 49}, (_, index) => index));
+        expect(new Set(TRANSLATION_STYLE_PRESETS.map((preset) => preset.className)).size).toBe(49);
         expect(TRANSLATION_STYLE_PRESETS.every((preset) => preset.className.startsWith('fluent-display-'))).toBe(true);
         const counts = Object.fromEntries(TRANSLATION_STYLE_CATEGORIES.map((category) => [
             category.value,
             TRANSLATION_STYLE_PRESETS.filter((preset) => preset.category === category.value).length,
         ]));
-        expect(counts).toEqual({text: 8, line: 10, mark: 7, card: 4});
+        expect(counts).toEqual({text: 12, line: 14, mark: 9, card: 5, fun: 9});
         const groups = new Set(TRANSLATION_STYLE_LEGACY_GROUPS.map((group) => group.value));
         expect(TRANSLATION_STYLE_PRESETS.every((preset) => groups.has(preset.legacyGroup))).toBe(true);
         expect(TRANSLATION_STYLE_PRESETS.filter((preset) => preset.category === 'line').every((preset) => preset.usesLine)).toBe(true);
@@ -47,6 +47,7 @@ describe('译文样式预设注册表', () => {
     it('按编号查找预设，未知值和字符串编号不命中', () => {
         expect(getTranslationStylePreset(6)?.className).toBe('fluent-display-wavy');
         expect(getTranslationStylePreset(28)).toMatchObject({label: '模糊遮罩', category: 'text'});
+        expect(getTranslationStylePreset(48)).toMatchObject({label: '黑幕遮挡', category: 'fun', inlineText: true, revealOnHover: true});
         expect(getTranslationStylePreset(99)).toBeUndefined();
         expect(getTranslationStylePreset('6')).toBeUndefined();
     });
@@ -56,12 +57,15 @@ describe('译文样式预设注册表', () => {
         expect(options.styles).toEqual(legacy);
         expect(legacy.filter((item) => item.disabled).map((item) => [item.value, item.label])).toEqual([
             ['basic', '基础样式'], ['underline', '下划线系列'], ['card', '卡片系列'], ['highlight', '高亮系列'],
-            ['background', '背景色系列'], ['special', '特殊效果'], ['pro', '专业样式'], ['transparent', '透明效果'],
+            ['background', '背景色系列'], ['special', '特殊效果'], ['pro', '专业样式'], ['transparent', '透明效果'], ['fun', '趣味效果'],
         ]);
         expect(legacy.filter((item) => !item.disabled).map((item) => item.value)).toEqual([
-            0, 1, 2, 3, 4, 5, 6, 24, 25, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 26, 27, 28, 20, 21, 22, 23,
+            0, 1, 2, 3, 29, 30, 31, 32, 4, 5, 6, 24, 25, 33, 7, 8, 9, 39, 10, 11, 12, 13, 14, 15, 37, 38,
+            16, 17, 18, 19, 26, 27, 28, 34, 35, 36, 20, 21, 22, 23, 40, 41, 42, 43, 44, 45, 46, 47, 48,
         ]);
         expect(legacy.find((item) => item.value === 1)).toEqual({value: 1, label: '加粗显示', class: 'fluent-display-bold', group: 'basic'});
+        // 逐行绘制的预设把标记带到旧版选项，渲染器据此包裹行内译文。
+        expect(legacy.filter((item) => item.inlineText).map((item) => item.value)).toEqual([10, 11, 38, 42, 43, 48]);
     });
 });
 

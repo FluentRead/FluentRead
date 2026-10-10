@@ -25,11 +25,25 @@ const artifactBytes = Buffer.byteLength(source);
 // 原生合批独立开关及冻结策略增加 2,560 字节（0.1291%）：
 // 同依赖基线 e4932521f 为 1,982,807，候选为 1,985,367；预算最小增加 1 KB。
 // 增量与语言固定提交验证见 docs/reports/native-batch-setting-20261011/。
-// 输入框请求取消、有限等待及富文本标准事件写回增加 8,638 字节（0.4351%）：
-// 同依赖独立基线 fe7005dd9 为 1,985,367，最终候选为 1,994,005；
-// 预算仅按真实增量向上取千字节增加 9 KB，最终候选余量 995 字节。
-// 增量、依赖与构建证据见 docs/reports/input-translation-quality-20261011/。
-const MAX_USERSCRIPT_BYTES = 1_995_000;
+// 悬浮手势按帧合并、停留调度与取消域完整清理的原始验证增加 4,576 字节（0.2305%）：
+// 同依赖独立基线 fe7005dd9 为 1,985,367，候选为 1,989,943；该阶段预算最小增加 5 KB。
+// 体积与生产包真实事件回归见 docs/reports/hover-reliability-20261011/。
+// 20 个译文样式预设（规则、注册表与中文名称）增加 8,193 字节（0.4127%）：
+// 同依赖独立基线 fe7005dd9 为 1,985,255，候选为 1,993,448；预算增加 8 KB。
+// 实测与截图见 docs/reports/translation-style-presets-20261010/。
+// 合并前整合 b14baf4b 的全文优化与样式预设：同依赖 main 为 1,987,953，集成后为 1,992,441。
+// 增加 4,488 字节（0.2258%），保持 main 的 1,994,000 预算；证据见悬浮报告 pr-integration/。
+// 区域分片、精确取消与动态选择协作在独立基线 fe7005dd9 上增加 5,222 字节（0.2630%）。
+// 合入最新主线后复验体积，沿用主线预算；保留全部协议与执行边界校验。
+// 原始对照与集成证据见 docs/reports/section-translation-quality-20261011/。
+// 随后整合区域翻译 0a69bfc3：同依赖 main 为 1,993,179，悬浮集成产物为 1,997,758。
+// 增加 4,579 字节（0.2297%），原预算余量 821 字节，按实测最小增加 4 KB；见悬浮报告 pr-integration-931/。
+// 输入框请求取消、有限等待及富文本标准事件写回的初始验证增加 8,638 字节（0.4351%）：
+// 同依赖独立基线 fe7005dd9 为 1,985,367，初始候选为 1,994,005；该阶段预算增加 9 KB。
+// 原始验证及最新主线集成证据见 docs/reports/input-translation-quality-20261011/。
+// PR 合并前整合 982f09df：同依赖独立 main 为 1,997,714，输入集成产物为 2,006,364。
+// 增加 8,650 字节（0.4330%），按实测最小增加 9 KB 预算，余量 636 字节；见报告 pr-integration/。
+const MAX_USERSCRIPT_BYTES = 2_007_000;
 const preludeStartMarker = '/* FluentRead userscript compatibility prelude:start */';
 const preludeEndMarker = '/* FluentRead userscript compatibility prelude:end */';
 const preludeStart = source.indexOf(preludeStartMarker);

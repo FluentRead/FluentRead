@@ -2,7 +2,7 @@ import {afterEach, beforeEach, describe, expect, it, vi} from "vitest";
 import {parseHTML} from "linkedom";
 import chinesePosts from './fixtures/chinese-language-posts.json';
 import technicalPr906Posts from './fixtures/chinese-technical-pr-906.json';
-import type {TranslationSiteAdapter} from '@/src/core/translation/types';
+import type {TranslationCandidate, TranslationSiteAdapter} from '@/src/core/translation/types';
 import {TranslationCandidateCore} from '@/src/core/translation/engine';
 import {compileSiteRulePack} from '@/src/core/site-adaptation/compiler';
 import {collapseMutationRescanRoot, isOwnSyntheticSegmentMarkerMutation, mutationRootContains} from '@/src/features/full-page-translation/content/mutationObservation';
@@ -22,6 +22,8 @@ const runtime = vi.hoisted(() => ({
         scope?: "content" | "all";
         nodes?: readonly Node[];
         adapterId?: string;
+        visualRange?: TranslationCandidate['visualRange'];
+        visualSourceText?: string;
     }>,
     pointCandidate: null as {
         element: HTMLElement;
@@ -30,6 +32,8 @@ const runtime = vi.hoisted(() => ({
         scope?: "content" | "all";
         nodes?: readonly Node[];
         adapterId?: string;
+        visualRange?: TranslationCandidate['visualRange'];
+        visualSourceText?: string;
     } | null,
     requests: vi.fn<(origins: readonly string[]) => Promise<string[]>>(async (origins) =>
         origins.map((origin) => `译:${origin}`),
@@ -351,11 +355,13 @@ import {
     type FullPageTranslationSessionCache,
 } from '@/src/features/full-page-translation/content/translationRequest';
 import {
+    bindFullPageRequestSessionAttempt,
     createFullPageRequestSessionState,
     disposeFullPageRequestSession,
     getHoverTranslationRequestSession,
     invalidateContextSensitiveRequestCache,
     invalidateFullPageRequestSessionCache,
+    invalidateFullPageRequestSessionForRoute,
     resetHoverTranslationRequestSession,
 } from '@/src/features/full-page-translation/content/requestSession';
 import type {TranslationQueueSession} from '@/src/services/translation/queue';
@@ -823,6 +829,147 @@ describe("全文翻译可见性锚点", () => {
             expect(getTranslationState(paragraph)?.bilingualContent).toBe(wrapper);
         }
         timer.mockRestore();
+    });
+
+    it('全属性关系规则的 80 个兄弟 class/style 变化只为 120 个 owner 各排一次复验', async () => {
+        replaceGlobal('performance', {now: () => Date.now()});
+        runtime.config.display = 1;
+        runtime.config.fullPageTranslationMode = 'all';
+        document.body.innerHTML = '<aside>' + Array.from({length: 80}, (_, index) => `<i id="flag-${index}"></i>`).join('') +
+            '</aside><main>' + Array.from({length: 120}, (_, index) => `<p>Stable translated paragraph ${index}.</p>`).join('') + '</main>';
+        const owners = Array.from(document.querySelectorAll<HTMLElement>('p'));
+        const flags = Array.from(document.querySelectorAll<HTMLElement>('i'));
+        owners.forEach(element => setLayoutBox(element, 600, 60));
+        runtime.adapters = [{id: 'related-full-attribute-fixture', matches: () => true,
+            decide: () => ({kind: 'pass'}), observedAttributes: null}];
+        runtime.candidates = owners.map(element => ({element, kind: 'content', reason: 'wide-attribute-storm'}));
+        autoTranslateEnglishPage();
+        await finishScheduledWork();
+        const states = owners.map(getTranslationState);
+        expect(states.every(state => state?.phase === 'translated')).toBe(true);
+        expect(runtime.requests).toHaveBeenCalledTimes(owners.length);
+        const records = flags.map((target, index) => {
+            const attributeName = index % 2 ? 'class' : 'style';
+            target.setAttribute(attributeName, index % 2 ? 'host-theme' : 'opacity: 0.9;');
+            return {type: 'attributes', target, attributeName, oldValue: null,
+                addedNodes: [], removedNodes: []} as unknown as MutationRecord;
+        });
+        const timer = vi.spyOn(window, 'setTimeout');
+        const clearTimer = vi.spyOn(window, 'clearTimeout');
+        const originalFrom = Array.from;
+        let ownerSetCopies = 0;
+        const copy = vi.spyOn(Array, 'from').mockImplementation((...args: Parameters<typeof Array.from>) => {
+            const input = args[0];
+            if (input instanceof Set && input.size === owners.length && input.has(owners[0])) ownerSetCopies += 1;
+            return Reflect.apply(originalFrom, Array, args);
+        });
+        try {
+            TestMutationObserver.instances[0]!.emit(records);
+            expect({
+                ownerSetCopies,
+                trailingAndBoundaryTimers: timer.mock.calls.filter(([, delay]) => delay === 500).length,
+                clearedTimers: clearTimer.mock.calls.length,
+            }).toEqual({ownerSetCopies: 1, trailingAndBoundaryTimers: 240, clearedTimers: 0});
+            expect(owners.map(getTranslationState)).toEqual(states);
+        } finally {
+            timer.mockRestore(); clearTimer.mockRestore(); copy.mockRestore();
+        }
+        await finishScheduledWork();
+        expect(owners.map(getTranslationState)).toEqual(states);
+        expect(runtime.requests).toHaveBeenCalledTimes(owners.length);
+        expect(owners.every(owner => owner.querySelectorAll('.fluent-read-bilingual-content').length === 1)).toBe(true);
+    });
+
+    it('同批关系 class 与局部 style 合并时保留首次边界 timer', async () => {
+        replaceGlobal('performance', {now: () => Date.now()});
+        runtime.config.display = 1;
+        runtime.config.fullPageTranslationMode = 'all';
+        document.body.innerHTML = '<p>A translated owner with both site and local attribute changes.</p>';
+        const owner = document.querySelector<HTMLElement>('p')!;
+        setLayoutBox(owner, 600, 60);
+        runtime.adapters = [{id: 'class-dependent-fixture', matches: () => true,
+            decide: () => ({kind: 'pass'}), observedAttributes: ['class']}];
+        runtime.candidates = [{element: owner, kind: 'content', reason: 'mixed-boundary-flags'}];
+        autoTranslateEnglishPage();
+        await finishScheduledWork();
+        const previous = getTranslationState(owner)!;
+        document.body.className = 'host-theme';
+        owner.setAttribute('style', 'opacity: 0.9;');
+        const timer = vi.spyOn(window, 'setTimeout');
+        const clear = vi.spyOn(window, 'clearTimeout');
+        try {
+            TestMutationObserver.instances[0]!.emit([
+                {type: 'attributes', target: document.body, attributeName: 'class', oldValue: null,
+                    addedNodes: [], removedNodes: []} as unknown as MutationRecord,
+                {type: 'attributes', target: owner, attributeName: 'style', oldValue: null,
+                    addedNodes: [], removedNodes: []} as unknown as MutationRecord,
+            ]);
+            expect(timer.mock.calls.filter(([, delay]) => delay === 500)).toHaveLength(2);
+            expect(clear).not.toHaveBeenCalled();
+        } finally { timer.mockRestore(); clear.mockRestore(); }
+        await finishScheduledWork();
+        expect(getTranslationState(owner)).toBe(previous);
+        expect(runtime.requests).toHaveBeenCalledTimes(1);
+    });
+
+    it.each(['source', 'boundary', 'remove'] as const)('同批 class/style 排时遇到后续 %s 变更时不跨越旧 generation', async change => {
+        replaceGlobal('performance', {now: () => Date.now()});
+        runtime.config.display = 1;
+        runtime.config.fullPageTranslationMode = 'all';
+        document.body.innerHTML = '<aside><i id="first"></i><i id="last"></i></aside>' +
+            '<main><p id="changed">The original host paragraph.</p><p id="stable">A stable neighboring paragraph.</p></main>';
+        const changed = document.querySelector<HTMLElement>('#changed')!;
+        const stable = document.querySelector<HTMLElement>('#stable')!;
+        const first = document.querySelector<HTMLElement>('#first')!;
+        const last = document.querySelector<HTMLElement>('#last')!;
+        [changed, stable].forEach(element => setLayoutBox(element, 600, 60));
+        runtime.adapters = [{id: 'related-full-attribute-fixture', matches: () => true,
+            decide: () => ({kind: 'pass'}), observedAttributes: null}];
+        runtime.candidates = [changed, stable].map(element => ({element, kind: 'content', reason: 'mixed-mutation-order'}));
+        autoTranslateEnglishPage();
+        await finishScheduledWork();
+        const previous = getTranslationState(changed)!;
+        const stableState = getTranslationState(stable)!;
+        const firstRecord = {type: 'attributes', target: first, attributeName: 'class', oldValue: null,
+            addedNodes: [], removedNodes: []} as unknown as MutationRecord;
+        const lastRecord = {type: 'attributes', target: last, attributeName: 'style', oldValue: null,
+            addedNodes: [], removedNodes: []} as unknown as MutationRecord;
+        first.className = 'host-theme'; last.setAttribute('style', 'opacity: 0.9;');
+        let changedRecord: MutationRecord;
+        if (change === 'source') {
+            const source = changed.firstChild!;
+            source.textContent = 'The host published a different paragraph.';
+            changedRecord = {type: 'characterData', target: source, oldValue: previous.sourceText,
+                addedNodes: [], removedNodes: []} as unknown as MutationRecord;
+        } else if (change === 'boundary') {
+            changed.setAttribute('translate', 'no');
+            changedRecord = {type: 'attributes', target: changed, attributeName: 'translate', oldValue: null,
+                addedNodes: [], removedNodes: []} as unknown as MutationRecord;
+        } else {
+            changed.remove();
+            changedRecord = {type: 'childList', target: document.querySelector('main')!,
+                addedNodes: [], removedNodes: [changed]} as unknown as MutationRecord;
+        }
+        const timer = vi.spyOn(window, 'setTimeout');
+        try {
+            TestMutationObserver.instances[0]!.emit([firstRecord, changedRecord, lastRecord]);
+            expect(previous.controller.signal.aborted).toBe(true);
+            expect(getTranslationState(changed)).toBeUndefined();
+            expect(getTranslationState(stable)).toBe(stableState);
+            // 只有仍有效的邻居拥有一个 trailing timer 和一个首次边界 timer。
+            expect(timer.mock.calls.filter(([, delay]) => delay === 500)).toHaveLength(2);
+        } finally { timer.mockRestore(); }
+        await finishScheduledWork();
+        expect(getTranslationState(stable)).toBe(stableState);
+        expect(stable.querySelectorAll('.fluent-read-bilingual-content')).toHaveLength(1);
+        if (change === 'source') {
+            expect(getTranslationState(changed)).not.toBe(previous);
+            expect(changed.textContent).toContain('The host published a different paragraph.');
+            expect(runtime.requests).toHaveBeenCalledTimes(3);
+        } else {
+            expect(getTranslationState(changed)).toBeUndefined();
+            expect(runtime.requests).toHaveBeenCalledTimes(2);
+        }
     });
 
     it.each([0, 1])('模式 %s 的连续计数更新停止重译，邻段稳定且新正文可恢复', async display => {
@@ -1800,6 +1947,55 @@ describe("全文翻译可见性锚点", () => {
             expect(getTranslationState(paragraph)).toBeUndefined();
         },
     );
+
+    it('跨 light/ShadowRoot 的 class/style 合并仍立即撤销 shadow 硬边界并保留正文邻居', async () => {
+        replaceGlobal('performance', {now: () => Date.now()});
+        runtime.config.fullPageTranslationMode = 'all';
+        runtime.config.display = 1;
+        document.body.innerHTML = '<i id="light-flag"></i><p id="light-prose">A light DOM paragraph remains readable.</p><div id="shadow-host"></div>';
+        const host = document.querySelector('#shadow-host')!;
+        const shadow = host.attachShadow({mode: 'open'});
+        shadow.innerHTML = '<i id="shadow-flag"></i><p id="shadow-prose">A shadow DOM paragraph has its own boundary.</p>';
+        const light = document.querySelector<HTMLElement>('#light-prose')!;
+        const shadowProse = shadow.querySelector<HTMLElement>('#shadow-prose')!;
+        const lightFlag = document.querySelector<HTMLElement>('#light-flag')!;
+        const shadowFlag = shadow.querySelector<HTMLElement>('#shadow-flag')!;
+        [light, shadowProse].forEach(element => setLayoutBox(element, 420, 60));
+        runtime.realCore = new TranslationCandidateCore({url: new URL('https://example.com'), adapters: [
+            {id: 'tree-independent-full-attributes', matches: () => true,
+                decide: () => ({kind: 'pass'}), observedAttributes: null},
+        ]});
+        autoTranslateEnglishPage();
+        await finishScheduledWork();
+        const lightState = getTranslationState(light)!;
+        const shadowState = getTranslationState(shadowProse)!;
+        expect([lightState.phase, shadowState.phase]).toEqual(['translated', 'translated']);
+        const observer = TestMutationObserver.instances.at(-1)!;
+        expect(observer.observe).toHaveBeenCalledWith(shadow, expect.objectContaining({subtree: true, attributes: true}));
+        lightFlag.className = 'host-theme'; shadowFlag.setAttribute('style', 'opacity: 0.9;');
+        shadowProse.setAttribute('translate', 'no');
+        const timer = vi.spyOn(window, 'setTimeout');
+        try {
+            observer.emit([
+                {type: 'attributes', target: lightFlag, attributeName: 'class', oldValue: null,
+                    addedNodes: [], removedNodes: []} as unknown as MutationRecord,
+                {type: 'attributes', target: shadowFlag, attributeName: 'style', oldValue: null,
+                    addedNodes: [], removedNodes: []} as unknown as MutationRecord,
+                {type: 'attributes', target: shadowProse, attributeName: 'translate', oldValue: null,
+                    addedNodes: [], removedNodes: []} as unknown as MutationRecord,
+            ]);
+            expect(shadowState.controller.signal.aborted).toBe(true);
+            expect(getTranslationState(shadowProse)).toBeUndefined();
+            expect(getTranslationState(light)).toBe(lightState);
+            expect(timer.mock.calls.filter(([, delay]) => delay === 500)).toHaveLength(2);
+        } finally { timer.mockRestore(); }
+        await finishScheduledWork();
+        expect(getTranslationState(light)).toBe(lightState);
+        expect(getTranslationState(shadowProse)).toBeUndefined();
+        expect(light.querySelectorAll('.fluent-read-bilingual-content')).toHaveLength(1);
+        expect(shadowProse.querySelector('[data-fr-translation-owned]')).toBeNull();
+        expect(runtime.requests).toHaveBeenCalledTimes(2);
+    });
 
     it.each([[1, 'translated'], [1, 'loading'], [0, 'translated'], [0, 'loading']] as const)(
         'ShadowRoot 顶层兄弟属性变化会发现正文，并取消失去匹配的 display=%s %s 状态', async (display, phase) => {
@@ -2892,6 +3088,39 @@ describe("全文翻译可见性锚点", () => {
         expect(session.requestQueueSessions.size).toBe(0);
         response.resolve(['late A', 'late B']);
         await Promise.resolve();
+    });
+
+    it('节点取消绑定只响应当前会话，结算释放后不再持有节点，路由更新保留 active 并启用新取消域', () => {
+        const detached = new AbortController();
+        const releaseDetached = bindFullPageRequestSessionAttempt({active: true, translationSlotCache: new Map()}, detached);
+        releaseDetached();
+        expect(detached.signal.aborted).toBe(false);
+
+        const session = {active: true, translationSlotCache: new Map(), ...createFullPageRequestSessionState()};
+        const settled = new AbortController();
+        const releaseSettled = bindFullPageRequestSessionAttempt(session, settled);
+        releaseSettled();
+        const pending = new AbortController();
+        const releasePending = bindFullPageRequestSessionAttempt(session, pending);
+        const previousSignal = session.requestSignal;
+        invalidateFullPageRequestSessionForRoute(session);
+        expect(settled.signal.aborted).toBe(false);
+        expect(pending.signal.aborted).toBe(true);
+        expect(previousSignal.aborted).toBe(true);
+        expect(session).toMatchObject({active: true, pageContextGeneration: 1, renderCommitGeneration: 1});
+        expect(session.requestSignal).not.toBe(previousSignal);
+        expect(session.requestSignal.aborted).toBe(false);
+        releasePending();
+
+        const next = new AbortController();
+        const releaseNext = bindFullPageRequestSessionAttempt(session, next);
+        session.requestController.abort();
+        expect(next.signal.aborted).toBe(true);
+        releaseNext();
+        const afterCancellation = new AbortController();
+        const releaseAborted = bindFullPageRequestSessionAttempt(session, afterCancellation);
+        expect(afterCancellation.signal.aborted).toBe(true);
+        releaseAborted();
     });
 
     it('原生单候选最终结构异常直接失败，普通网络错误不在前端拆分放大', async () => {
@@ -4324,6 +4553,140 @@ describe("全文翻译可见性锚点", () => {
         expect(getTranslationState(tweetText)).toBeUndefined();
         expect(tweetText.classList.contains("fluent-read-bilingual")).toBe(false);
         expect(tweetText.querySelector(".fluent-read-bilingual-content")).toBeNull();
+    });
+
+    it('同一段落内持续移动保留首次停留截止时间，跨段后重新等待', async () => {
+        runtime.config.display = 1;
+        document.body.innerHTML = '<p id="dwell-a">The first paragraph should finish its hover dwell.</p><p id="dwell-b">The second paragraph needs its own hover dwell.</p>';
+        const first = document.querySelector<HTMLElement>('#dwell-a')!;
+        const second = document.querySelector<HTMLElement>('#dwell-b')!;
+        const firstCandidate = {element: first, kind: 'content' as const, reason: 'paragraph'};
+        const secondCandidate = {element: second, kind: 'content' as const, reason: 'paragraph'};
+        runtime.candidates = [firstCandidate, secondCandidate];
+        runtime.pointCandidate = firstCandidate;
+
+        handleTranslation(20, 20, {delayMs: 120, continuous: true});
+        await vi.advanceTimersByTimeAsync(40);
+        handleTranslation(30, 20, {delayMs: 120, continuous: true});
+        await vi.advanceTimersByTimeAsync(40);
+        handleTranslation(40, 20, {delayMs: 120, continuous: true});
+        await vi.advanceTimersByTimeAsync(39);
+        expect(runtime.requests).not.toHaveBeenCalled();
+        await vi.advanceTimersByTimeAsync(1);
+        expect(runtime.requests).toHaveBeenCalledTimes(1);
+        expect(getTranslationState(first)?.phase).toBe('translated');
+
+        runtime.pointCandidate = firstCandidate;
+        handleTranslation(20, 20, {delayMs: 120, continuous: true});
+        await vi.advanceTimersByTimeAsync(60);
+        runtime.pointCandidate = secondCandidate;
+        handleTranslation(20, 160, {delayMs: 120, continuous: true});
+        await vi.advanceTimersByTimeAsync(119);
+        expect(runtime.requests).toHaveBeenCalledTimes(1);
+        await vi.advanceTimersByTimeAsync(1);
+        expect(runtime.requests).toHaveBeenCalledTimes(2);
+        expect(getTranslationState(second)?.phase).toBe('translated');
+    });
+
+    it.each(['another-candidate', 'no-candidate'] as const)('停留期间滚动或布局改变为 %s 时不翻译坐标下的新内容', async (next) => {
+        document.body.innerHTML = '<p id="dwell-original">The original hover target moves away.</p><p id="dwell-replacement">A different paragraph moves under the old pointer.</p>';
+        const original = document.querySelector<HTMLElement>('#dwell-original')!;
+        const replacement = document.querySelector<HTMLElement>('#dwell-replacement')!;
+        const candidate = {element: original, kind: 'content' as const, reason: 'paragraph'};
+        const replacementCandidate = {element: replacement, kind: 'content' as const, reason: 'paragraph'};
+        runtime.candidates = [candidate, replacementCandidate];
+        runtime.pointCandidate = candidate;
+
+        handleTranslation(20, 20, {delayMs: 120, continuous: true});
+        await vi.advanceTimersByTimeAsync(119);
+        runtime.pointCandidate = next === 'another-candidate' ? replacementCandidate : null;
+        await vi.advanceTimersByTimeAsync(1);
+
+        expect(runtime.requests).not.toHaveBeenCalled();
+        expect(getTranslationState(original)).toBeUndefined();
+        expect(getTranslationState(replacement)).toBeUndefined();
+    });
+
+    it('离开可翻译候选立即撤销旧停留，返回同一段落重新等待', async () => {
+        document.body.innerHTML = '<p id="dwell-return">Returning to a paragraph starts another complete hover dwell.</p>';
+        const owner = document.querySelector<HTMLElement>('#dwell-return')!;
+        const candidate = {element: owner, kind: 'content' as const, reason: 'paragraph'};
+        runtime.candidates = [candidate];
+        runtime.pointCandidate = candidate;
+        handleTranslation(20, 20, {delayMs: 120, continuous: true});
+        await vi.advanceTimersByTimeAsync(60);
+        runtime.pointCandidate = null;
+        handleTranslation(20, 140, {delayMs: 120, continuous: true});
+        await vi.advanceTimersByTimeAsync(60);
+        runtime.pointCandidate = candidate;
+        handleTranslation(20, 20, {delayMs: 120, continuous: true});
+        await vi.advanceTimersByTimeAsync(119);
+        expect(runtime.requests).not.toHaveBeenCalled();
+        await vi.advanceTimersByTimeAsync(1);
+        expect(runtime.requests).toHaveBeenCalledTimes(1);
+    });
+
+    it('同一宿主内视觉文字块或内联段范围变化不能沿用旧停留', async () => {
+        document.body.innerHTML = '<div id="dwell-chunks">First source sentence. Second source sentence.<strong>Another inline source.</strong></div>';
+        const owner = document.querySelector<HTMLElement>('#dwell-chunks')!;
+        const text = owner.firstChild as Text;
+        const candidate = {element: owner, kind: 'content' as const, reason: 'visual-text-chunk',
+            visualRange: {startContainer: text, startOffset: 0, endContainer: text, endOffset: 22},
+            visualSourceText: 'First source sentence.'};
+        runtime.pointCandidate = candidate;
+        runtime.candidates = [candidate];
+        handleTranslation(20, 20, {delayMs: 120, continuous: true});
+        await vi.advanceTimersByTimeAsync(119);
+        runtime.pointCandidate = {...candidate,
+            visualRange: {...candidate.visualRange, startOffset: 23, endOffset: text.length},
+            visualSourceText: 'Second source sentence.'};
+        await vi.advanceTimersByTimeAsync(1);
+        expect(runtime.requests).not.toHaveBeenCalled();
+
+        const inline = {element: owner, kind: 'content' as const, reason: 'generic-inline-run', nodes: [text]};
+        runtime.pointCandidate = inline;
+        runtime.candidates = [inline];
+        handleTranslation(20, 20, {delayMs: 120, continuous: true});
+        await vi.advanceTimersByTimeAsync(119);
+        runtime.pointCandidate = {...inline, nodes: [text, owner.lastChild!]};
+        await vi.advanceTimersByTimeAsync(1);
+        expect(runtime.requests).not.toHaveBeenCalled();
+    });
+
+    it('同段切换快捷方案重新停留，并保持新方案自己的冻结参数', async () => {
+        document.body.innerHTML = '<p id="dwell-profile">Each hover profile starts an independent dwell.</p>';
+        const owner = document.querySelector<HTMLElement>('#dwell-profile')!;
+        const candidate = {element: owner, kind: 'content' as const, reason: 'paragraph'};
+        runtime.candidates = [candidate];
+        runtime.pointCandidate = candidate;
+        handleTranslation(20, 20, {delayMs: 120, continuous: true,
+            profileId: 'first', service: 'freeTranslation', model: 'first-model'});
+        await vi.advanceTimersByTimeAsync(60);
+        handleTranslation(20, 20, {delayMs: 120, continuous: true,
+            profileId: 'second', service: 'google', model: 'second-model', targetLanguage: 'ja'});
+        await vi.advanceTimersByTimeAsync(119);
+        expect(runtime.requests).not.toHaveBeenCalled();
+        await vi.advanceTimersByTimeAsync(1);
+        expect(runtime.requests).toHaveBeenCalledTimes(1);
+        expect(runtime.requestOptions.at(-1)).toMatchObject({serviceOverride: 'google', modelOverride: 'second-model', targetLanguage: 'ja'});
+    });
+
+    it('route reset 撤销尚未启动的悬浮停留，新路由手势仍可翻译', async () => {
+        document.body.innerHTML = '<p id="dwell-route">A pending hover gesture belongs to its original route.</p>';
+        const owner = document.querySelector<HTMLElement>('#dwell-route')!;
+        const candidate = {element: owner, kind: 'content' as const, reason: 'paragraph'};
+        runtime.candidates = [candidate];
+        runtime.pointCandidate = candidate;
+        handleTranslation(20, 20, {delayMs: 120, continuous: true});
+        await vi.advanceTimersByTimeAsync(119);
+        resetFullPageTranslationRouteState();
+        await vi.advanceTimersByTimeAsync(1);
+        expect(runtime.requests).not.toHaveBeenCalled();
+        expect(getTranslationState(owner)).toBeUndefined();
+
+        handleTranslation(20, 20, {delayMs: 120, continuous: true});
+        await vi.advanceTimersByTimeAsync(120);
+        expect(runtime.requests).toHaveBeenCalledTimes(1);
     });
 
     it("候选自身有布局盒时直接观察候选，不改用内部标签", async () => {
@@ -6552,9 +6915,15 @@ describe("全文翻译可见性锚点", () => {
         expect(readFullPageUnchangedCompletion(owner, sessionId, 'Spec').status).toBe('unavailable');
         expect(readFullPageUnchangedCompletion(owner, sessionId, 'PUT').status).toBe('unavailable');
         runtime.requests.mockImplementation(async () => ['卖权']);
-        const attempt = translateTarget({element: owner, kind: 'content', reason: 'heading'}, 'bilingual', false);
+        TestMutationObserver.instances.at(-1)!.emit([{
+            type: 'characterData', target: owner.firstChild!, addedNodes: [] as unknown as NodeList,
+            removedNodes: [] as unknown as NodeList,
+        } as unknown as MutationRecord]);
+        await vi.advanceTimersByTimeAsync(51);
+        expect(runtime.requests).toHaveBeenCalledTimes(1);
+        expect(getTranslationState(owner)).toBeUndefined();
+        expect(readFullPageUnchangedCompletion(owner, sessionId, 'PUT').status).toBe('unavailable');
         await finishScheduledWork();
-        expect(await attempt).toMatchObject({status: 'unchanged', source: 'PUT'});
         expect(readFullPageUnchangedCompletion(owner, sessionId, 'Spec').status).toBe('unavailable');
         expect(runtime.requests).toHaveBeenCalledTimes(2);
         expect(readFullPageUnchangedCompletion(owner, sessionId, 'Spec').status).toBe('unavailable');
@@ -7619,6 +7988,69 @@ describe("悬停重挂请求与 synthetic 提交回归", () => {
         replacedGlobals.clear();
     });
 
+    it.each([false, true])('hover continuous=%s 等待期间同槽 owner 改为新原文，旧响应退出后 fresh 手势可立即翻译新 owner', async continuous => {
+        const original = 'Alpha paragraph keeps the original reading context while the pointer settles and translation appears only once.';
+        const replacement = 'A newly mounted paragraph replaces the original source before the first provider response completes.';
+        document.body.innerHTML = `<p id="alpha">${original}</p>`;
+        const oldOwner = document.querySelector<HTMLElement>('#alpha')!;
+        runtime.pointCandidate = {element: oldOwner, kind: 'content', reason: 'paragraph', scope: 'content'};
+        runtime.candidates = [runtime.pointCandidate];
+        const oldProvider = deferred<string[]>();
+        runtime.requests.mockImplementationOnce(() => oldProvider.promise);
+        handleTranslation(20, 20, {continuous});
+        await waitForRequestCount(1);
+
+        oldOwner.outerHTML = `<p id="alpha">${replacement}</p>`;
+        const newOwner = document.querySelector<HTMLElement>('#alpha')!;
+        runtime.pointCandidate = {element: newOwner, kind: 'content', reason: 'paragraph', scope: 'content'};
+        runtime.candidates = [runtime.pointCandidate];
+        await vi.advanceTimersByTimeAsync(180);
+        oldProvider.resolve([`旧译:${original}`]);
+        await vi.advanceTimersByTimeAsync(470);
+        expect(newOwner.textContent).toBe(replacement);
+        expect(newOwner.querySelector('.fluent-read-bilingual-content')).toBeNull();
+        expect(runtime.requests).toHaveBeenCalledTimes(1);
+
+        handleTranslation(20, 20, {continuous});
+        await vi.advanceTimersByTimeAsync(0);
+        expect(runtime.requests).toHaveBeenCalledTimes(2);
+        expect(getTranslationState(newOwner)?.phase).toBe('translated');
+        expect(newOwner.textContent).toContain(`译:${replacement}`);
+        expect(newOwner.textContent).not.toContain(`旧译:${original}`);
+    });
+
+    it('全文会话活跃时，宿主替换后的显式 hover 仍立即使用自己的方案，不转交自动全文安静队列', async () => {
+        runtime.config.fullPageTranslationMode = 'all';
+        const original = 'An automatic full-page source can be replaced before its provider settles.';
+        const replacement = 'The user explicitly chooses an independent hover profile for this new source.';
+        document.body.innerHTML = `<p id="alpha">${original}</p>`;
+        const oldOwner = document.querySelector<HTMLElement>('#alpha')!;
+        setLayoutBox(oldOwner, 620, 96);
+        runtime.pointCandidate = {element: oldOwner, kind: 'content', reason: 'paragraph', scope: 'content'};
+        runtime.candidates = [runtime.pointCandidate];
+        const oldProvider = deferred<string[]>();
+        runtime.requests.mockImplementationOnce(() => oldProvider.promise);
+        autoTranslateEnglishPage();
+        await vi.advanceTimersByTimeAsync(51);
+        await waitForRequestCount(1);
+
+        oldOwner.outerHTML = `<p id="alpha">${replacement}</p>`;
+        const newOwner = document.querySelector<HTMLElement>('#alpha')!;
+        setLayoutBox(newOwner, 620, 96);
+        runtime.pointCandidate = {element: newOwner, kind: 'content', reason: 'paragraph', scope: 'content'};
+        runtime.candidates = [runtime.pointCandidate];
+        oldProvider.resolve([`旧译:${original}`]);
+        await vi.advanceTimersByTimeAsync(650);
+
+        handleTranslation(20, 20, {continuous: true, profileId: 'new-source-profile',
+            service: 'freeTranslation', model: 'independent-model', targetLanguage: 'ja'});
+        await vi.advanceTimersByTimeAsync(0);
+        expect(runtime.requests).toHaveBeenCalledTimes(2);
+        expect(runtime.requestOptions.at(-1)).toMatchObject({serviceOverride: 'freeTranslation', modelOverride: 'independent-model', targetLanguage: 'ja'});
+        expect(newOwner.querySelector('.fluent-read-bilingual-content')?.getAttribute('lang')).toBe('ja');
+        expect(isFullPageTranslationActive()).toBe(true);
+    });
+
     it("hover waiter 退出后刚结算的结果在固定 250ms 重挂窗口内复用，过期与 reset 后失效", async () => {
         const source = "A hover owner can disappear while its provider request settles.";
         const snapshot = translationSnapshot({service: "custom-provider", model: "hover-model"});
@@ -7682,6 +8114,36 @@ describe("悬停重挂请求与 synthetic 提交回归", () => {
             await finishScheduledWork();
             expect(runtime.requestOptions.at(-1)).toMatchObject({serviceOverride: 'freeTranslation', modelOverride: 'profile-model'});
         } finally { runtime.config.hoverTranslationService = ''; }
+    });
+
+    it('route reset 立即撤销旧路由 loading，旧 provider 未回复时同一 owner 可由新手势翻译', async () => {
+        const source = 'A persistent SPA owner must not wait for the previous route provider.';
+        document.body.innerHTML = `<p id="route-loading-owner">${source}</p>`;
+        const owner = document.querySelector<HTMLElement>('#route-loading-owner')!;
+        const candidate = {element: owner, kind: 'content' as const, reason: 'paragraph'};
+        runtime.candidates = [candidate];
+        runtime.pointCandidate = candidate;
+        const oldProvider = deferred<string[]>();
+        runtime.requests.mockImplementationOnce(() => oldProvider.promise);
+
+        handleTranslation(20, 20, {continuous: true});
+        await waitForRequestCount(1);
+        const oldState = getTranslationState(owner)!;
+        expect(oldState.phase).toBe('loading');
+
+        resetFullPageTranslationRouteState();
+        handleTranslation(20, 20, {continuous: true});
+        await vi.advanceTimersByTimeAsync(0);
+        await Promise.resolve();
+        expect(oldState.controller.signal.aborted).toBe(true);
+        expect(runtime.requests).toHaveBeenCalledTimes(2);
+        expect(getTranslationState(owner)?.phase).toBe('translated');
+
+        oldProvider.resolve(['Late provider from the previous route.']);
+        await finishScheduledWork();
+        expect(getTranslationState(owner)?.phase).toBe('translated');
+        expect(owner.textContent).toContain(`译:${source}`);
+        expect(owner.textContent).not.toContain('Late provider from the previous route.');
     });
 
     it("route reset 后纯 hover 在途结果不得提交，下一代请求仍可正常翻译", async () => {

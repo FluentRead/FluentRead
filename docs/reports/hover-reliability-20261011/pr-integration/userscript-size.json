@@ -1,0 +1,17 @@
+{
+  "baselineCommit": "b14baf4b267f1bdace40fff13652bf9568ba1d5f",
+  "originalHoverHead": "6ee4b1c8283fdb1efa01cb6161245cc2f0ba6840",
+  "baselineBytes": 1987953,
+  "candidateBytes": 1992441,
+  "deltaBytes": 4488,
+  "deltaPercent": 0.22575986454408128,
+  "baselineSha256": "1f4baf74828413c6dbaa2d3ea979a803a1f71c3facc6830654076b801554e874",
+  "candidateSha256": "f8aed0ae8a7124160247c8ead982190dd2e122aeba2e8eaa57f06cca60f26d44",
+  "sameLockedDependencies": true,
+  "mainBudgetBytes": 1994000,
+  "candidateBudgetBytes": 1994000,
+  "budgetIncreaseBytes": 0,
+  "remainingBudgetBytes": 1559,
+  "candidateVerifier": "passed",
+  "method": "git archive latest main, same locked node_modules, unmodified snapshot Vite config and language resource pin; raw artifact byte counts"
+}

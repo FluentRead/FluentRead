@@ -1,0 +1,52 @@
+{
+  "baseline": false,
+  "extensionDir": "/private/tmp/fluentread-hover-idle-final-20261011-4kV6MF/chrome-mv3",
+  "selectedCases": [
+    "pointer-performance",
+    "latest-point",
+    "repeat-loading",
+    "viewport-leave",
+    "hidden-tab",
+    "route-change",
+    "dom-replacement",
+    "failure-retry"
+  ],
+  "profileMode": "new-temporary-profile",
+  "cdpDefaultOverrides": "disabled-for-native-visibility-and-focus",
+  "evidence": "Production extension; trusted Playwright/CDP gestures; local deterministic Microsoft transport, no live provider claims",
+  "buildSha256": "046659066a31c150e36e166331ef5cdaf93f43705cbf88444afb1b9493a98a0b",
+  "cases": [],
+  "consoleErrors": [],
+  "observations": [],
+  "unexpectedNetworkRequests": [],
+  "launchMode": "macos-background-cdp",
+  "focusPolicy": "launchservices-no-foreground",
+  "windowPlacement": {
+    "mode": "background-visible-no-focus",
+    "visible": true,
+    "hidden": false,
+    "centered": true,
+    "windowState": "normal",
+    "bounds": {
+      "left": 212,
+      "top": -990,
+      "width": 1280,
+      "height": 900
+    },
+    "displayTarget": "secondary",
+    "source": "macos-nsscreen",
+    "screenIndex": 1,
+    "browserFrontmost": false,
+    "frontmostBefore": {
+      "pid": 33441,
+      "name": "系统设置"
+    },
+    "frontmostAfter": {
+      "pid": 33441,
+      "name": "系统设置"
+    }
+  },
+  "ok": false,
+  "failure": "browserContext.waitForEvent: Timeout 30000ms exceeded while waiting for event \"serviceworker\"\n    at /Users/thinkstu/Desktop/copy/FluentRead-hover-reliability-20261011/scripts/testing/run-hover-reliability-test.cjs:361:121",
+  "failedObservations": []
+}

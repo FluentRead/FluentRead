@@ -465,7 +465,7 @@ async function main() {
     track.addCue(new VTTCue(6, 10, 'Native second caption.'));
     track.mode = 'showing';
   });
-  await page.waitForFunction(() => document.querySelector('[data-source-status]')?.textContent === '原生字幕 · 2 条');
+  await page.waitForFunction(() => document.querySelector('[data-source-status]')?.textContent === '已加载字幕 · 2 条');
   await page.waitForFunction(() => document.querySelector('#fluent-read-video-subtitle-original')?.textContent === 'Native captions arrived.');
   await page.evaluate(() => { document.querySelector('video').currentTime = 5; });
   await page.waitForFunction(() => Math.abs(document.querySelector('video').currentTime - 5) < .01 && !document.querySelector('video').seeking);

@@ -1,7 +1,7 @@
 /**
  * @file src/features/section-translation/content/picker.ts
  * 文件职责：实现局部翻译的区域选择模式，稳定预览鼠标下的内容块，点击锁定后用可见按钮调整并确认翻译或恢复的区域，并在选择期间拦截网页自身的点击与悬停反应。
- * 主要内容：在封闭 Shadow Root 中创建高亮框、自然语言范围标签与固定操作条；用边界容差和短暂稳定窗口消除选区抖动，点击锁定后保持区域，按钮与方向键调整范围；识别封闭组件重定向到宿主的按键，操作条焦点不经过网页输入保护；按每帧 150 步预算发现开放 ShadowRoot，动态插入只扫描新增子树，换选与退出取消扫描；延迟盘点并提供原文预览，确认前刷新区域状态；确认按钮或 Enter 执行、Esc/右键/关闭按钮/页面隐藏退出；确认后短暂收束动画再移除界面。
+ * 主要内容：在封闭 Shadow Root 中创建高亮框、自然语言范围标签与固定操作条；用边界容差和短暂稳定窗口消除选区抖动，点击锁定后保持区域，按钮与方向键调整范围；识别封闭组件重定向到宿主的按键，操作条焦点不经过网页输入保护；按每帧 150 步预算发现开放 ShadowRoot，动态插入只扫描新增子树，换选与退出取消扫描；原文预览仅在换区或正文变更时重新读取，区域盘点延迟合并；观察正文及布局、保护属性，布局变化时立即按静止指针刷新预览而锁定范围保持不变，隐藏或失效选区解除锁定，排除自身浮层避免观察反馈；确认前刷新区域状态与可见盒子；确认按钮或 Enter 执行、Esc/右键/关闭按钮/页面隐藏退出；确认后短暂收束动画再移除界面。
  * 模块边界：本模块只处理手势、高亮和选择生命周期，所有事件先校验 isTrusted；区域判定规则来自 ../core，区域盘点、翻译和提示文案由调用方注入，不直接发起翻译、不读取配置存储。
  */
 import pickerStyles from './picker.css?inline';
@@ -50,6 +50,15 @@ const BOX_OUTSET = 3;
 const VIEWPORT_MARGIN = 4;
 const MAX_SHADOW_DEPTH = 16;
 const SHADOW_SCAN_STEPS_PER_FRAME = 150;
+const RECT_KEYS = ['left', 'top', 'width', 'height'] as const;
+/** 只监听会改变布局、可见性或原文保护的属性，避免任意 data-* 计数驱动整页重绘。 */
+const TARGET_OBSERVATION: MutationObserverInit = {
+    childList: true,
+    characterData: true,
+    subtree: true,
+    attributes: true,
+    attributeFilter: ['class', 'style', 'hidden', 'open', 'aria-hidden', 'translate', 'contenteditable', 'lang', 'dir', 'slot'],
+};
 
 /** 选择期间这些指针事件不交给网页，避免链接跳转、按钮触发、拖拽或划词浮层。 */
 const INTERCEPTED_MOUSE_EVENTS = ['mousedown', 'mouseup', 'click', 'dblclick', 'auxclick'] as const;
@@ -125,6 +134,18 @@ function createElement(tag: string, className: string, text?: string): HTMLEleme
 function containsPoint(rect: SectionRect, point: SectionPickerPoint, tolerance = 0): boolean {
     return point.x >= rect.left - tolerance && point.x <= rect.left + rect.width + tolerance
         && point.y >= rect.top - tolerance && point.y <= rect.top + rect.height + tolerance;
+}
+
+function hasVisibleBox(element: Element, rect: SectionRect): boolean {
+    if (rect.width <= 0 || rect.height <= 0) return false;
+    try {
+        // visibility 可从祖先继承，而且 hidden/collapse 仍可能保留非零布局盒子。
+        const visibility = element.ownerDocument.defaultView!.getComputedStyle(element).visibility;
+        return visibility !== 'hidden' && visibility !== 'collapse';
+    } catch {
+        // 与区域几何端口一致：旧文档无法读取样式时保留有尺寸的选区。
+        return true;
+    }
 }
 
 /** DOM contains 不穿过 ShadowRoot；沿组合祖先判断内容归属，并限制恶意超深树。 */
@@ -210,10 +231,14 @@ function createPickerSession(options: SectionPickerOptions): PickerSession {
     let snapNextRender = false;
     let frame = 0;
     let rendering = false;
+    let renderedTarget: Element | null = null;
+    let renderedRect: SectionRect | null = null;
     let inspectTimer: ReturnType<typeof setTimeout> | undefined;
     let topmostTimer: ReturnType<typeof setTimeout> | undefined;
     let disposed = false;
     const summaries = new WeakMap<Element, SectionLabelSummary>();
+    let previewTarget: Element | null = null;
+    let previewDirty = true;
     let shadowScanFrame = 0;
     let shadowScans: {root: Node; walker: TreeWalker; current: Element | null}[] = [];
     let shadowScanIndex = 0;
@@ -259,7 +284,12 @@ function createPickerSession(options: SectionPickerOptions): PickerSession {
         confirm.disabled = !locked || !summary || (summary.action !== 'translate' && summary.action !== 'restore');
         confirm.textContent = options.text(summary?.action === 'restore' ? 'sectionTranslation.picker.restore' : 'sectionTranslation.picker.confirm');
         confirm.classList.toggle('tone-restore', summary?.action === 'restore');
-        preview.textContent = current ? sectionSourcePreview(current) : '';
+        // 锁定和标签计数只改动作，不改原文；避免每次更新控件都重复扫描当前子树。
+        if (previewTarget !== current || previewDirty) {
+            previewTarget = current;
+            previewDirty = false;
+            preview.textContent = current ? sectionSourcePreview(current) : '';
+        }
         preview.hidden = !current;
     }
 
@@ -283,7 +313,10 @@ function createPickerSession(options: SectionPickerOptions): PickerSession {
         if (inspectTimer !== undefined) clearTimeout(inspectTimer);
         inspectTimer = undefined;
         const current = target;
-        if (!current) return;
+        if (!current) {
+            updateControls();
+            return;
+        }
         updateLabel(current);
         if (summaries.has(current) && !refresh) return;
         // 快速划过时只盘点停下来的区域，避免每经过一个元素就遍历一次子树。
@@ -302,6 +335,7 @@ function createPickerSession(options: SectionPickerOptions): PickerSession {
         resizeObserver?.disconnect();
         mutationObserver?.disconnect();
         target = next;
+        previewDirty = true;
         if (next) resizeObserver?.observe(next);
         observeTarget();
         targetChanged = true;
@@ -389,20 +423,26 @@ function createPickerSession(options: SectionPickerOptions): PickerSession {
     }
 
     function draw(): void {
-        if (target && !target.isConnected) {
-            // 网页替换了内容（如单页应用切换路由）：丢弃失效区域，按当前指针重新选择。
+        const previousTarget = target;
+        let rect = target?.isConnected ? geometry.rect(target) : null;
+        if (target && (!rect || !hasVisibleBox(target, rect))) {
+            // 网页替换或隐藏了内容：丢弃失效区域，不能保留 6px 空框或确认不可见内容。
             locked = false;
             commitBase(null);
             targetDirty = true;
         }
         if (targetDirty) refreshTarget(snapNextRender);
         if (!target) {
+            renderedTarget = null;
+            renderedRect = null;
             box.classList.remove('is-visible');
             label.classList.remove('is-visible');
             updateControls();
             return;
         }
-        const rect = geometry.rect(target);
+        rect = target === previousTarget && rect ? rect : geometry.rect(target);
+        renderedTarget = target;
+        renderedRect = rect;
         // 只为换选区域过渡颜色；位置和尺寸始终立即贴合真实盒子。
         if (targetChanged || snapNextRender) {
             box.classList.toggle('is-following', targetChanged && !snapNextRender && box.classList.contains('is-visible'));
@@ -467,7 +507,7 @@ function createPickerSession(options: SectionPickerOptions): PickerSession {
     }
 
     function pick(element: Element): void {
-        if (!element.isConnected) {
+        if (!element.isConnected || !hasVisibleBox(element, geometry.rect(element))) {
             locked = false;
             commitBase(null);
             return;
@@ -475,6 +515,7 @@ function createPickerSession(options: SectionPickerOptions): PickerSession {
         // 确认时重新盘点，避免页面动态更新后仍执行过时的恢复或翻译提示。
         const summary = options.inspect(element);
         summaries.set(element, summary);
+        previewDirty = true;
         updateLabel(element);
         if (summary.action === 'empty' || summary.action === 'settled') return;
         dispose(true);
@@ -610,24 +651,32 @@ function createPickerSession(options: SectionPickerOptions): PickerSession {
     onButton(confirm, () => {if (target) pick(target);});
     // 锁定后网页仍可能替换选中的节点；立即解除失效选区，禁止把旧节点交给翻译引擎。
     const mutationObserver = typeof MutationObserver === 'function' ? new MutationObserver((records) => {
-        if (disposed || !target) return;
+        if (disposed) return;
+        // 高亮渲染会改宿主属性；自有节点不可反过来触发下一次渲染或区域盘点。
+        const contentRecords = records.filter(record => !containsContent(host, record.target));
+        if (contentRecords.length === 0) return;
         // 区域外插入横幅也会移动锁定内容，因此任何文档结构变化都重新贴合高亮。
+        targetDirty = !locked;
+        snapNextRender = true;
         scheduleRender();
+        if (!target) return;
         if (!target.isConnected) {
             locked = false;
             commitBase(null);
             targetDirty = true;
             scheduleRender();
-        } else if (records.some(record => containsContent(target!, record.target))) {
+        } else if (contentRecords.some(record => containsContent(target!, record.target)
+            || (record.type === 'attributes' && record.target.nodeType === 1 && containsContent(record.target as Element, target!)))) {
             if (locked) {
                 // 不重新扫描锁定范围；只发现已插入子树中的新宿主和嵌套开放根。
-                for (const record of records) {
+                for (const record of contentRecords) {
                     if (record.type !== 'childList' || !containsContent(target, record.target)) continue;
                     for (const added of record.addedNodes) enqueueShadowScan(added);
                 }
                 if (!shadowScanFrame) scanShadowRoots();
             }
             // 保留上一份可执行摘要直到新盘点完成；确认仍会同步复核，动态正文不会让按钮一直禁用。
+            previewDirty = true;
             scheduleInspect(true);
             scheduleRender();
         }
@@ -671,7 +720,7 @@ function createPickerSession(options: SectionPickerOptions): PickerSession {
             const root = element.shadowRoot;
             if (root && !observedShadowRoots.has(root)) {
                 observedShadowRoots.add(root);
-                mutationObserver!.observe(root, {childList: true, characterData: true, subtree: true});
+                mutationObserver!.observe(root, TARGET_OBSERVATION);
                 enqueueShadowScan(root);
                 found = true;
             }
@@ -690,11 +739,10 @@ function createPickerSession(options: SectionPickerOptions): PickerSession {
     }
 
     function observeTarget(): void {
-        const observation = {childList: true, characterData: true, subtree: true};
-        mutationObserver?.observe(document.documentElement, observation);
+        mutationObserver?.observe(document.documentElement, TARGET_OBSERVATION);
         // 文档观察不会穿透 ShadowRoot，额外监听目标所在树，覆盖同尺寸内容替换与祖先移除。
         const root = target?.getRootNode();
-        if (root?.nodeType === 11) mutationObserver?.observe(root, observation);
+        if (root?.nodeType === 11) mutationObserver?.observe(root, TARGET_OBSERVATION);
         // 锁定后才发现范围内的开放 ShadowRoot；大范围分帧完成，不阻塞一次点击。
         if (locked && target) {
             enqueueShadowScan(target);
@@ -704,6 +752,12 @@ function createPickerSession(options: SectionPickerOptions): PickerSession {
     observeTarget();
     const resizeObserver = typeof ResizeObserver === 'function' ? new ResizeObserver(() => {
         if (disposed) return;
+        // observe 后的初始通知不代表网页刚发生布局变化，不能因此跳过正在等待的 hover 稳定窗。
+        if (target?.isConnected && target === renderedTarget && renderedRect) {
+            const currentRect = geometry.rect(target);
+            if (RECT_KEYS.every(key => currentRect[key] === renderedRect![key])) return;
+        }
+        targetDirty = !locked;
         snapNextRender = true;
         scheduleRender();
     }) : null;

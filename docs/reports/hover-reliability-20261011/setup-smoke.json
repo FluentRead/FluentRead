@@ -1,0 +1,214 @@
+{
+  "baseline": false,
+  "extensionDir": "/private/tmp/fluentread-hover-idle-final-20261011-4kV6MF/chrome-mv3",
+  "selectedCases": [
+    "dom-replacement"
+  ],
+  "profileMode": "new-temporary-profile",
+  "cdpDefaultOverrides": "disabled-for-native-visibility-and-focus",
+  "evidence": "Production extension; trusted Playwright/CDP gestures; local deterministic Microsoft transport, no live provider claims",
+  "buildSha256": "046659066a31c150e36e166331ef5cdaf93f43705cbf88444afb1b9493a98a0b",
+  "cases": [
+    {
+      "id": "dom-replacement",
+      "requestsBefore": 0,
+      "newSource": "Replacement paragraph belongs to the new host DOM and must never receive a stale translation of the removed source.",
+      "checks": [
+        {
+          "case": "dom-replacement",
+          "passed": true,
+          "message": "Removed owner response does not translate replacement DOM"
+        },
+        {
+          "case": "dom-replacement",
+          "passed": true,
+          "message": "Replacement DOM translates its own current source"
+        },
+        {
+          "case": "dom-replacement",
+          "passed": true,
+          "message": "Removed owner translation never reappears"
+        },
+        {
+          "case": "dom-replacement",
+          "passed": true,
+          "message": "No nested translation wrappers"
+        },
+        {
+          "case": "dom-replacement",
+          "passed": true,
+          "message": "At most one translation per owner"
+        },
+        {
+          "case": "dom-replacement",
+          "passed": true,
+          "message": "Original source remains exact"
+        },
+        {
+          "case": "dom-replacement",
+          "passed": true,
+          "message": "Hover translation preserves native input value"
+        },
+        {
+          "case": "dom-replacement",
+          "passed": true,
+          "message": "Native input remains editable with platform select-all"
+        },
+        {
+          "case": "dom-replacement",
+          "passed": true,
+          "message": "Hover shortcut inside input creates no translation work"
+        },
+        {
+          "case": "dom-replacement",
+          "passed": true,
+          "message": "Source link keeps its original href"
+        },
+        {
+          "case": "dom-replacement",
+          "passed": true,
+          "message": "Native source link click still navigates"
+        }
+      ],
+      "translation": "测试译文：Replacement paragraph belongs to the new host DOM and must never receive a stale translation of the removed source.",
+      "requests": 2,
+      "wrappers": {
+        "alpha": 1,
+        "beta": 0,
+        "gamma": 0
+      },
+      "hostEvents": [
+        {
+          "type": "visibilitychange",
+          "trusted": true,
+          "relatedNull": true,
+          "visibility": "visible"
+        },
+        {
+          "type": "keydown",
+          "key": "Control",
+          "trusted": true,
+          "relatedNull": true,
+          "visibility": "visible"
+        },
+        {
+          "type": "keyup",
+          "key": "Control",
+          "trusted": true,
+          "relatedNull": true,
+          "visibility": "visible"
+        },
+        {
+          "type": "keydown",
+          "key": "Control",
+          "trusted": true,
+          "relatedNull": true,
+          "visibility": "visible"
+        },
+        {
+          "type": "keyup",
+          "key": "Control",
+          "trusted": true,
+          "relatedNull": true,
+          "visibility": "visible"
+        }
+      ],
+      "url": "http://127.0.0.1:55427/dom-replacement",
+      "originalSource": {
+        "alpha": "Replacement paragraph belongs to the new host DOM and must never receive a stale translation of the removed source.",
+        "beta": "Beta paragraph should stay unchanged when the reader is pointing at another paragraph nearby.",
+        "gamma": "Gamma paragraph is the final reading target after a fast pointer move across several source paragraphs."
+      },
+      "nestedWrappers": 0,
+      "hostLinkURLAfterClick": "http://127.0.0.1:55427/dom-replacement#host-link-destination"
+    }
+  ],
+  "consoleErrors": [],
+  "observations": [
+    {
+      "case": "dom-replacement",
+      "passed": true,
+      "message": "Removed owner response does not translate replacement DOM"
+    },
+    {
+      "case": "dom-replacement",
+      "passed": true,
+      "message": "Replacement DOM translates its own current source"
+    },
+    {
+      "case": "dom-replacement",
+      "passed": true,
+      "message": "Removed owner translation never reappears"
+    },
+    {
+      "case": "dom-replacement",
+      "passed": true,
+      "message": "No nested translation wrappers"
+    },
+    {
+      "case": "dom-replacement",
+      "passed": true,
+      "message": "At most one translation per owner"
+    },
+    {
+      "case": "dom-replacement",
+      "passed": true,
+      "message": "Original source remains exact"
+    },
+    {
+      "case": "dom-replacement",
+      "passed": true,
+      "message": "Hover translation preserves native input value"
+    },
+    {
+      "case": "dom-replacement",
+      "passed": true,
+      "message": "Native input remains editable with platform select-all"
+    },
+    {
+      "case": "dom-replacement",
+      "passed": true,
+      "message": "Hover shortcut inside input creates no translation work"
+    },
+    {
+      "case": "dom-replacement",
+      "passed": true,
+      "message": "Source link keeps its original href"
+    },
+    {
+      "case": "dom-replacement",
+      "passed": true,
+      "message": "Native source link click still navigates"
+    }
+  ],
+  "unexpectedNetworkRequests": [],
+  "launchMode": "macos-background-cdp",
+  "focusPolicy": "launchservices-no-foreground",
+  "windowPlacement": {
+    "mode": "background-visible-no-focus",
+    "visible": true,
+    "hidden": false,
+    "centered": true,
+    "windowState": "normal",
+    "bounds": {
+      "left": 212,
+      "top": -990,
+      "width": 1280,
+      "height": 900
+    },
+    "displayTarget": "secondary",
+    "source": "macos-nsscreen",
+    "screenIndex": 1,
+    "browserFrontmost": false,
+    "frontmostBefore": {
+      "pid": 73685,
+      "name": "ChatGPT"
+    },
+    "frontmostAfter": {
+      "pid": 73685,
+      "name": "ChatGPT"
+    }
+  },
+  "ok": true,
+  "failedObservations": []
+}

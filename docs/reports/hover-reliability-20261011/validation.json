@@ -1,0 +1,120 @@
+{
+  "date": "2026-10-11",
+  "baselineCommit": "fe7005dd9",
+  "contentSha256": "046659066a31c150e36e166331ef5cdaf93f43705cbf88444afb1b9493a98a0b",
+  "targetedOnly": true,
+  "unitFiles": [
+    {
+      "file": "tests/hoverTranslationContentFeature.test.ts",
+      "cases": 102,
+      "result": "passed"
+    },
+    {
+      "file": "tests/contentHotkeyRuntime.test.ts",
+      "cases": 62,
+      "result": "passed"
+    },
+    {
+      "file": "tests/quickTranslationContentFeature.test.ts",
+      "cases": 40,
+      "result": "passed"
+    },
+    {
+      "file": "tests/contentTrustBoundary.test.ts",
+      "cases": 5,
+      "result": "passed"
+    },
+    {
+      "file": "tests/hoverTranslationConfig.test.ts",
+      "cases": 16,
+      "result": "passed"
+    },
+    {
+      "file": "tests/contentRuntimeLifecycle.test.ts",
+      "cases": 43,
+      "result": "passed"
+    },
+    {
+      "file": "tests/qqMailFrameRuntime.test.ts",
+      "cases": 27,
+      "result": "passed"
+    },
+    {
+      "file": "tests/issue146EmbeddedFrames.test.ts",
+      "cases": 3,
+      "result": "passed"
+    },
+    {
+      "file": "tests/fullPageVisibilityScheduling.test.ts",
+      "cases": 308,
+      "result": "passed"
+    },
+    {
+      "file": "tests/translationState.test.ts",
+      "cases": 93,
+      "result": "passed"
+    },
+    {
+      "file": "tests/hoverTranslationScheduler.test.ts",
+      "cases": 34,
+      "result": "passed"
+    },
+    {
+      "file": "tests/quickTranslationRuntime.test.ts",
+      "cases": 5,
+      "result": "passed"
+    }
+  ],
+  "uniqueTargetedCases": 738,
+  "architecture": [
+    {
+      "file": "tests/architecture/moduleBoundaries.test.ts",
+      "cases": 13,
+      "result": "passed"
+    },
+    {
+      "file": "tests/architecture/verificationOwnership.test.ts",
+      "cases": 16,
+      "result": "passed"
+    },
+    {
+      "file": "tests/architecture/sourceFileHeaders.test.ts",
+      "cases": 896,
+      "result": "passed"
+    }
+  ],
+  "architectureCeilingsChanged": false,
+  "bodyLines": {
+    "src/app/content/runtime.ts": 277,
+    "src/features/full-page-translation/content/runtime.ts": 2194
+  },
+  "compile": "passed",
+  "build": {
+    "chromeMV3": "passed",
+    "firefoxMV2": "passed",
+    "userscript": "passed"
+  },
+  "userscriptVerifier": "passed",
+  "testClassificationAudit": {
+    "result": "passed",
+    "files": 640,
+    "cases": 10425
+  },
+  "documentationBuild": "passed",
+  "browser": {
+    "defaultCases": 8,
+    "checks": 87,
+    "result": "passed",
+    "deterministicLocalProvider": true,
+    "liveProviderValidation": false,
+    "firefoxAndUserscriptRuntimeValidation": false
+  },
+  "harnessSetupSmoke": {
+    "cases": 1,
+    "checks": 11,
+    "result": "passed",
+    "change": "register exact service worker before wake request; no case or performance phase changes"
+  },
+  "latestMainReviewedAtDelivery": "5dbe587ee2eb741b69c9c855f852006eea23c6f8",
+  "mainDeltaReview": "Subtitle count wording only; no overlapping hover, scheduling, cancellation or configuration paths."
+}

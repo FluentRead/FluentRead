@@ -1,0 +1,145 @@
+{
+  "scope": "production extension, trusted CDP pointer/keyboard gestures, deterministic Google transport; not live provider latency or quality",
+  "sourceProjectRoot": "/Users/thinkstu/Desktop/copy/FluentRead-section-translation-quality-20261011",
+  "caseSet": "core",
+  "qualityCases": [],
+  "cases": [
+    "popup shows the section entry next to the page action",
+    "locked closed-shadow toolbar handles range keys and Escape after webpage input focus",
+    "toolbar buttons keep range keys and native Enter activation after Tab",
+    "stable boundary preview, explicit locking, visible range buttons and reselect",
+    "picker highlights the paragraph under the pointer and widens with ArrowUp",
+    "click locks the section without navigation or requests; Enter confirms only that section",
+    "picking the translated section again restores only that section",
+    "Escape, right-click and forged events leave the page untouched",
+    "picking page chrome translates it even though page translation keeps it original",
+    "same-language and empty sections explain why nothing was requested",
+    "optional shortcut enters and leaves picking, and yields to typing",
+    "restoring page translation also restores translated sections",
+    "independent section shortcut selects a container before requesting its target language",
+    "another section profile switches the container language, and the same profile restores it",
+    "section profile yields while editing and cancels without translation",
+    "narrow layout keeps all range controls and confirmation within the viewport",
+    "new nested open ShadowRoots keep locked empty-to-source summaries current",
+    "turning the plugin off exits picking and rejects new requests"
+  ],
+  "screenshots": [
+    "/private/tmp/fluentread-section-pr-integration-browser-20261011/00-popup.png",
+    "/private/tmp/fluentread-section-pr-integration-browser-20261011/00-locked-keyboard-range.png",
+    "/private/tmp/fluentread-section-pr-integration-browser-20261011/00-locked-range-controls.png",
+    "/private/tmp/fluentread-section-pr-integration-browser-20261011/01-picker-readme.png",
+    "/private/tmp/fluentread-section-pr-integration-browser-20261011/02-readme-translated.png",
+    "/private/tmp/fluentread-section-pr-integration-browser-20261011/03-picker-restore-label.png",
+    "/private/tmp/fluentread-section-pr-integration-browser-20261011/04-sidebar-translated.png",
+    "/private/tmp/fluentread-section-pr-integration-browser-20261011/07-profile-container-translated.png",
+    "/private/tmp/fluentread-section-pr-integration-browser-20261011/09-narrow-locked-controls.png",
+    "/private/tmp/fluentread-section-pr-integration-browser-20261011/10-dynamic-shadow-locked.png"
+  ],
+  "errors": [],
+  "consoleErrors": [],
+  "errorCoverage": "errors contains uncaught page exceptions; console.error messages are recorded separately, including intentionally failed fixture requests",
+  "profileMode": "automatically-created-temporary-profile",
+  "focusDiagnostic": "/private/tmp/fluentread-section-pr-integration-browser-20261011/focus-diagnostic.private.jsonl",
+  "buildFreshness": {
+    "ok": true,
+    "production": true,
+    "latestSource": {
+      "path": "/Users/thinkstu/Desktop/copy/FluentRead-section-translation-quality-20261011/src/ui/styles/translation-display.css",
+      "mtimeMs": 1791656976750.1802
+    },
+    "manifestMtimeMs": 1791657142295.5283
+  },
+  "launchMode": "macos-background-cdp",
+  "focusPolicy": "launchservices-no-foreground",
+  "windowPlacement": {
+    "mode": "background-visible-no-focus",
+    "visible": true,
+    "hidden": false,
+    "centered": true,
+    "windowState": "normal",
+    "bounds": {
+      "left": 212,
+      "top": -990,
+      "width": 1280,
+      "height": 900
+    },
+    "displayTarget": "secondary",
+    "source": "macos-nsscreen",
+    "screenIndex": 1,
+    "browserFrontmost": false,
+    "frontmostBefore": {
+      "pid": 44386,
+      "name": "Google Chrome"
+    },
+    "frontmostAfter": {
+      "pid": 44386,
+      "name": "Google Chrome"
+    }
+  },
+  "popupGeometry": {
+    "mainRight": 234,
+    "sectionLeft": 241,
+    "sameTop": true,
+    "sameHeight": true,
+    "overflow": false
+  },
+  "readmeLabel": "翻译此区域 · 7 段",
+  "requestOrder": [
+    "FluentRead keeps the original text beside every ",
+    "FluentRead is an open source browser extension f",
+    "It places the translation next to the original p",
+    "Translate a whole page with one shortcut.",
+    "Translate only the part of the page you care abo",
+    "Every provider can be switched without reloading",
+    "This paragraph starts far below the first screen"
+  ],
+  "narrowControls": [
+    {
+      "text": "×",
+      "left": 337,
+      "right": 363,
+      "top": 591.5,
+      "bottom": 617.5
+    },
+    {
+      "text": "扩大范围",
+      "left": 27,
+      "right": 133.6640625,
+      "top": 671,
+      "bottom": 705
+    },
+    {
+      "text": "缩小范围",
+      "left": 141.6640625,
+      "right": 248.328125,
+      "top": 671,
+      "bottom": 705
+    },
+    {
+      "text": "重新选择",
+      "left": 256.328125,
+      "right": 362.9921875,
+      "top": 671,
+      "bottom": 705
+    },
+    {
+      "text": "翻译所选区域",
+      "left": 27,
+      "right": 362.9921875,
+      "top": 713,
+      "bottom": 747
+    }
+  ],
+  "dynamicShadow": {
+    "paragraphs": 2,
+    "originalPreserved": true,
+    "requestCountStableForMs": 1000
+  },
+  "success": true,
+  "focusEvents": {
+    "monitoring": "native macOS activation events throughout the test",
+    "browserActivations": 0,
+    "observerClosed": true
+  },
+  "profileRemoved": true
+}

@@ -20,15 +20,17 @@
 
 富文本的“恢复原文”恢复文字；原有链接、提及与格式需通过宿主支持的撤销功能恢复。双语追加和前置保留原文内容、结构和格式，编辑器可按自身模型重新渲染。
 
-## 验证结果
+## 初始验证结果（6817ebb）
+
+本节保留 fe7005dd9 基线与初始实现提交 6817ebb 的原始证据。PR 整合最新主线后的复验见下节，原始报告与指纹不作覆盖。
 
 输入翻译核心的 204 个定向测试通过：内容生命周期 96 个，编辑宿主与资格判定 94 个，后台与输入集成 14 个。四个业务模块的 statements、branches、functions、lines 均为 100%。其中后台集成使用“输入框”用例过滤，其余 52 个用例未执行。
 
 定向架构与相关回归共 998 个用例，997 个通过；optionalContentFeatures 另有 7 个通过。唯一失败是 providerBoundaries 对 Microsoft 适配器旧函数签名的字符串断言（第 188 行），已在未修改的 fe7005dd9 基线上重现。本次没有修改该适配器和断言文件，两者内容与基线逐字相同。这个结果不记作全套回归通过。
 
-最终生产构建的浏览器终验全部通过；两个 runner 均以 exit 0 结束，无页面错误，浏览器保持第二屏后台可见且没有抢前台。
+初始实现的生产构建浏览器终验全部通过；两个 runner 均以 exit 0 结束，无页面错误，浏览器保持第二屏后台可见且没有抢前台。
 
-| 检查 | 最终结果 | 证据 |
+| 检查 | 初始结果 | 证据 |
 | --- | --- | --- |
 | 输入交互 | 29/29；6 次实际 AbortSignal 终止；连续 5 次快捷键仅 1 个请求 | [浏览器报告](./input-browser-report.json) |
 | 真实编辑器 | Quill、ProseMirror、Lexical、Slate、Draft.js 5/5；译文与恢复均核对模型和 DOM | [编辑器报告](./real-editors-report.json) |
@@ -97,6 +99,6 @@ node scripts/run-rich-text-input-editors-test.cjs \
 
 Firefox 和 userscript 的构建与产物检查不能代替其运行时验证。没有以本地结果宣称 GitHub CI 通过。
 
-## 本地交付
+## 初始本地交付
 
 基线为 origin/main 的 fe7005dd9；实现位于分支 codex/input-translation-quality-20261011 的独立 worktree。没有修改主检出目录或参考仓库，也没有借用参考项目代码。依赖按既有锁文件安装，package.json 与 pnpm-lock.yaml 均未改变。

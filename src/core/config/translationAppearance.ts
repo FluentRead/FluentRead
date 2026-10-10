@@ -1,7 +1,7 @@
 /**
  * @file src/core/config/translationAppearance.ts
  * 文件职责：定义网页双语译文的样式预设注册表，以及用户对译文颜色、独立背景、字号和自定义 CSS 声明等外观的微调契约。
- * 主要内容：维护预设的稳定编号、页面类名、旧版分组与设置页分类，并标注预设是否使用线条或底色；提供外观默认值、
+ * 主要内容：维护预设的稳定编号、页面类名、旧版分组与设置页分类，并标注预设是否使用线条或底色、是否逐行绘制、是否悬停才显示；提供外观默认值、
  * 存储与导入值归一化、精选色板和颜色换算，以及把外观转换为 CSS 声明和页面样式表文本的纯函数，供设置预览与内容脚本共用。
  * 模块边界：只处理纯数据与字符串，不访问 DOM、浏览器存储或配置仓库；预设的视觉规则位于 src/ui/styles/translation-display.css，
  * 页面样式表由 content composition root 注入，设置界面只消费这里导出的元数据与声明。
@@ -9,8 +9,8 @@
 
 import {TinyColor} from '@ctrl/tinycolor';
 
-export type TranslationStyleCategory = 'text' | 'line' | 'mark' | 'card';
-export type TranslationStyleLegacyGroup = 'basic' | 'underline' | 'card' | 'highlight' | 'background' | 'special' | 'pro' | 'transparent';
+export type TranslationStyleCategory = 'text' | 'line' | 'mark' | 'card' | 'fun';
+export type TranslationStyleLegacyGroup = 'basic' | 'underline' | 'card' | 'highlight' | 'background' | 'special' | 'pro' | 'transparent' | 'fun';
 
 export interface TranslationStylePreset {
     /** 持久化到 Config.style 的稳定编号；已发布的编号不得复用或改变含义。 */
@@ -27,6 +27,10 @@ export interface TranslationStylePreset {
     readonly usesLine: boolean;
     /** 预设含标记或底色，可被“标记底色”覆盖。 */
     readonly usesFill: boolean;
+    /** 效果需要逐行绘制：渲染器把译文包进行内的 .fluent-read-translation-text，块容器只负责换行。 */
+    readonly inlineText?: true;
+    /** 译文先被遮住，指针移到译文上才显示；设置页据此给出操作提示。 */
+    readonly revealOnHover?: true;
 }
 
 /** 与 options.styles 兼容的旧版选项：分组标题行 disabled，预设行携带 class 与 group。 */
@@ -36,6 +40,8 @@ export interface TranslationStyleOption {
     readonly disabled?: boolean;
     readonly class?: string;
     readonly group?: TranslationStyleLegacyGroup;
+    /** 仅逐行绘制的预设携带，渲染器据此包裹行内译文。 */
+    readonly inlineText?: true;
 }
 
 export const TRANSLATION_STYLE_LEGACY_GROUPS: ReadonlyArray<{readonly value: TranslationStyleLegacyGroup; readonly label: string}> = [
@@ -47,6 +53,7 @@ export const TRANSLATION_STYLE_LEGACY_GROUPS: ReadonlyArray<{readonly value: Tra
     {value: 'special', label: '特殊效果'},
     {value: 'pro', label: '专业样式'},
     {value: 'transparent', label: '透明效果'},
+    {value: 'fun', label: '趣味效果'},
 ];
 
 export const TRANSLATION_STYLE_CATEGORIES: ReadonlyArray<{readonly value: TranslationStyleCategory; readonly labelKey: string}> = [
@@ -54,11 +61,13 @@ export const TRANSLATION_STYLE_CATEGORIES: ReadonlyArray<{readonly value: Transl
     {value: 'line', labelKey: 'settings.translationStyle.category.line'},
     {value: 'mark', labelKey: 'settings.translationStyle.category.mark'},
     {value: 'card', labelKey: 'settings.translationStyle.category.card'},
+    {value: 'fun', labelKey: 'settings.translationStyle.category.fun'},
 ];
 
 /**
  * 数组顺序即设置页卡片顺序；旧版下拉按分组内编号排序，已有预设的相对位置保持不变。
  * 24 以后的编号为新增预设，线条类改用 text-decoration，使多行译文逐行带线。
+ * 29 以后的预设以网页文字颜色调配线条与底色，浅色和深色网页无需分别适配。
  */
 export const TRANSLATION_STYLE_PRESETS: readonly TranslationStylePreset[] = [
     {value: 0, className: 'fluent-display-default', label: '朴素模式', legacyGroup: 'basic', category: 'text', usesLine: false, usesFill: false},
@@ -68,7 +77,11 @@ export const TRANSLATION_STYLE_PRESETS: readonly TranslationStylePreset[] = [
     {value: 21, className: 'fluent-display-elegant', label: '书籍风格', legacyGroup: 'pro', category: 'text', usesLine: false, usesFill: false},
     {value: 22, className: 'fluent-display-dimmed', label: '半透明弱化', legacyGroup: 'transparent', category: 'text', usesLine: false, usesFill: false},
     {value: 23, className: 'fluent-display-transparent-mode', label: '轻透明感', legacyGroup: 'transparent', category: 'text', usesLine: false, usesFill: false},
-    {value: 28, className: 'fluent-display-blur-reveal', label: '模糊遮罩', legacyGroup: 'special', category: 'text', usesLine: false, usesFill: false},
+    {value: 28, className: 'fluent-display-blur-reveal', label: '模糊遮罩', legacyGroup: 'special', category: 'text', usesLine: false, usesFill: false, revealOnHover: true},
+    {value: 29, className: 'fluent-display-muted-note', label: '批注小字', legacyGroup: 'basic', category: 'text', usesLine: false, usesFill: false},
+    {value: 30, className: 'fluent-display-kaiti', label: '楷体手札', legacyGroup: 'basic', category: 'text', usesLine: false, usesFill: false},
+    {value: 31, className: 'fluent-display-airy', label: '宽松行距', legacyGroup: 'basic', category: 'text', usesLine: false, usesFill: false},
+    {value: 32, className: 'fluent-display-indent', label: '首行缩进', legacyGroup: 'basic', category: 'text', usesLine: false, usesFill: false},
 
     {value: 4, className: 'fluent-display-solid-underline', label: '蓝色实线', legacyGroup: 'underline', category: 'line', usesLine: true, usesFill: false},
     {value: 5, className: 'fluent-display-dot-underline', label: '优雅虚线', legacyGroup: 'underline', category: 'line', usesLine: true, usesFill: false},
@@ -80,19 +93,36 @@ export const TRANSLATION_STYLE_PRESETS: readonly TranslationStylePreset[] = [
     {value: 26, className: 'fluent-display-side-bar', label: '侧边色条', legacyGroup: 'special', category: 'line', usesLine: true, usesFill: false},
     {value: 17, className: 'fluent-display-border', label: '轻巧边框', legacyGroup: 'special', category: 'line', usesLine: true, usesFill: false},
     {value: 27, className: 'fluent-display-dashed-border', label: '虚线边框', legacyGroup: 'special', category: 'line', usesLine: true, usesFill: false},
+    {value: 33, className: 'fluent-display-thick-underline', label: '粗底划线', legacyGroup: 'underline', category: 'line', usesLine: true, usesFill: false},
+    {value: 34, className: 'fluent-display-top-divider', label: '分隔细线', legacyGroup: 'special', category: 'line', usesLine: true, usesFill: false},
+    {value: 35, className: 'fluent-display-arrow-guide', label: '箭头引导', legacyGroup: 'special', category: 'line', usesLine: true, usesFill: false},
+    {value: 36, className: 'fluent-display-gradient-bar', label: '渐变色条', legacyGroup: 'special', category: 'line', usesLine: true, usesFill: false},
 
-    {value: 10, className: 'fluent-display-learning-mode', label: '学习标记', legacyGroup: 'highlight', category: 'mark', usesLine: false, usesFill: true},
-    {value: 11, className: 'fluent-display-marker', label: '荧光标记', legacyGroup: 'highlight', category: 'mark', usesLine: false, usesFill: true},
+    {value: 10, className: 'fluent-display-learning-mode', label: '学习标记', legacyGroup: 'highlight', category: 'mark', usesLine: false, usesFill: true, inlineText: true},
+    {value: 11, className: 'fluent-display-marker', label: '荧光标记', legacyGroup: 'highlight', category: 'mark', usesLine: false, usesFill: true, inlineText: true},
     {value: 12, className: 'fluent-display-highlight-fade', label: '柔和渐变', legacyGroup: 'highlight', category: 'mark', usesLine: false, usesFill: true},
     {value: 18, className: 'fluent-display-focus', label: '阅读焦点', legacyGroup: 'special', category: 'mark', usesLine: false, usesFill: true},
     {value: 13, className: 'fluent-display-lightyellow', label: '温暖黄底', legacyGroup: 'background', category: 'mark', usesLine: false, usesFill: true},
     {value: 14, className: 'fluent-display-lightblue', label: '清新蓝底', legacyGroup: 'background', category: 'mark', usesLine: false, usesFill: true},
     {value: 15, className: 'fluent-display-lightgray', label: '素雅灰底', legacyGroup: 'background', category: 'mark', usesLine: false, usesFill: true},
+    {value: 37, className: 'fluent-display-adaptive-tint', label: '自适应底色', legacyGroup: 'background', category: 'mark', usesLine: false, usesFill: true},
+    {value: 38, className: 'fluent-display-line-pill', label: '逐行色块', legacyGroup: 'background', category: 'mark', usesLine: false, usesFill: true, inlineText: true},
 
     {value: 7, className: 'fluent-display-card-mode', label: '简约卡片', legacyGroup: 'card', category: 'card', usesLine: false, usesFill: true},
     {value: 8, className: 'fluent-display-modern-card', label: '渐变卡片', legacyGroup: 'card', category: 'card', usesLine: false, usesFill: true},
     {value: 9, className: 'fluent-display-paper', label: '纸张卡片', legacyGroup: 'card', category: 'card', usesLine: true, usesFill: false},
     {value: 20, className: 'fluent-display-tech', label: '代码风格', legacyGroup: 'pro', category: 'card', usesLine: true, usesFill: false},
+    {value: 39, className: 'fluent-display-glass', label: '毛玻璃卡片', legacyGroup: 'card', category: 'card', usesLine: false, usesFill: true},
+
+    {value: 40, className: 'fluent-display-gradient-text', label: '渐变文字', legacyGroup: 'fun', category: 'fun', usesLine: false, usesFill: false},
+    {value: 41, className: 'fluent-display-neon', label: '霓虹微光', legacyGroup: 'fun', category: 'fun', usesLine: false, usesFill: false},
+    {value: 42, className: 'fluent-display-rainbow-marker', label: '彩虹荧光', legacyGroup: 'fun', category: 'fun', usesLine: false, usesFill: false, inlineText: true},
+    {value: 43, className: 'fluent-display-rainbow-underline', label: '彩虹底线', legacyGroup: 'fun', category: 'fun', usesLine: false, usesFill: false, inlineText: true},
+    {value: 44, className: 'fluent-display-hand-drawn', label: '手绘圈注', legacyGroup: 'fun', category: 'fun', usesLine: true, usesFill: false},
+    {value: 45, className: 'fluent-display-sticky-note', label: '便利贴', legacyGroup: 'fun', category: 'fun', usesLine: false, usesFill: true},
+    {value: 46, className: 'fluent-display-chat-bubble', label: '对话气泡', legacyGroup: 'fun', category: 'fun', usesLine: false, usesFill: true},
+    {value: 47, className: 'fluent-display-terminal', label: '终端风格', legacyGroup: 'fun', category: 'fun', usesLine: true, usesFill: false},
+    {value: 48, className: 'fluent-display-spoiler', label: '黑幕遮挡', legacyGroup: 'fun', category: 'fun', usesLine: false, usesFill: false, inlineText: true, revealOnHover: true},
 ];
 
 export function getTranslationStylePreset(value: unknown): TranslationStylePreset | undefined {
@@ -106,7 +136,13 @@ export function buildTranslationStyleOptions(): TranslationStyleOption[] {
         ...TRANSLATION_STYLE_PRESETS
             .filter((preset) => preset.legacyGroup === group.value)
             .sort((left, right) => left.value - right.value)
-            .map((preset) => ({value: preset.value, label: preset.label, class: preset.className, group: preset.legacyGroup})),
+            .map((preset) => ({
+                value: preset.value,
+                label: preset.label,
+                class: preset.className,
+                group: preset.legacyGroup,
+                ...(preset.inlineText ? {inlineText: true as const} : {}),
+            })),
     ]);
 }
 

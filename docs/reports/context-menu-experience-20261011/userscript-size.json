@@ -1,0 +1,24 @@
+{
+  "baseCommit": "fe7005dd9597d566d83fe2ad5a276706b12ad0ca",
+  "lockfileChanged": false,
+  "baseArtifactBytes": 1985367,
+  "candidateArtifactBytes": 1988810,
+  "candidateArtifactSha256": "5111fbd3cd5b506f924a44f17c245dffd6d03a09766f330f4d00c72afff7dca3",
+  "increaseBytes": 3443,
+  "previousBudgetBytes": 1986000,
+  "budgetBytes": 1989000,
+  "retainedChecks": "Metadata, immutable resources, compatibility polyfills, browser globals, feature exclusions and byte budget remain enabled.",
+  "changes": "Preserve shared Range safety and existing userscript live-selection messages; add notice hover/focus pause, local Escape, focus cleanup, compact/theme styling. Native context-menu capture/notice dispatcher and notice-only language strings are excluded for userscript.",
+  "languageResourceCommit": "93759ec4387415a6cd12864a2f825bf5abc7353e",
+  "languageResourceContentsChanged": false,
+  "reproduction": [
+    "git archive fe7005dd9597d566d83fe2ad5a276706b12ad0ca into an independent temporary directory",
+    "Use the same locked dependencies as the candidate",
+    "pnpm build:userscript",
+    "node scripts/verify-userscript-build.mjs",
+    "Compare final wrapped artifact byte length"
+  ],
+  "baseArtifactSha256": "590651db4da5f8bf864920ecdf0a81869f321ac4508864dc81e56480cebddea9",
+  "increasePercent": 0.1734,
+  "verifier": "passed"
+}

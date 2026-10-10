@@ -31,6 +31,8 @@ const artifactBytes = Buffer.byteLength(source);
 // 区域分片、精确取消与动态选择协作在独立基线 fe7005dd9 上增加 5,222 字节（0.2630%）。
 // 合入最新主线后复验体积，沿用主线预算；保留全部协议与执行边界校验。
 // 原始对照与集成证据见 docs/reports/section-translation-quality-20261011/。
+// 右键来源保护及通知交互的原始对照增加 3,443 字节（0.1734%）；原生菜单专属逻辑和文案按目标剔除。
+// 合入新版主分支后沿用现有预算，不另行增加；原始对照与集成实测见 docs/reports/context-menu-experience-20261011/。
 const MAX_USERSCRIPT_BYTES = 1_994_000;
 const preludeStartMarker = '/* FluentRead userscript compatibility prelude:start */';
 const preludeEndMarker = '/* FluentRead userscript compatibility prelude:end */';

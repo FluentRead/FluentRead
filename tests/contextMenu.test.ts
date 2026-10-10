@@ -30,6 +30,9 @@ import {renderContextMenuTitle} from '@/src/core/context-menu/presentation';
 import {imageMenuEnabled} from '@/src/app/background/imageContextMenu';
 import {readContextMenuSettings} from '@/src/app/background/contextMenuPreferences';
 import {runContextMenuAction, toggleSiteExtensionDisabled} from '@/src/app/background/contextMenuActions';
+import {reportContextMenuFailure} from '@/src/app/background/contextMenuFeedback';
+import {withContextMenuDeadline} from '@/src/app/background/contextMenuDelivery';
+import {isContextMenuFailureReason} from '@/src/core/context-menu/feedback';
 import {
     setSelectionContextMenuHandler,
     translateSelectionFromContextMenu,
@@ -92,6 +95,7 @@ beforeEach(() => {
 afterEach(() => {
     vi.unstubAllGlobals();
     vi.restoreAllMocks();
+    vi.useRealTimers();
 });
 
 describe('右键菜单入口偏好', () => {
@@ -356,7 +360,7 @@ describe('右键菜单动作执行', () => {
     });
 
     it('划词、圈选和图片只发往用户右键所在的 frame', async () => {
-        const sendMessage = vi.fn().mockResolvedValue({});
+        const sendMessage = vi.fn().mockResolvedValue({status: 'success'});
         vi.stubGlobal('browser', {tabs: {sendMessage}});
         await runContextMenuAction('translateSelection', 7, {frameId: 3}, {id: 7}, false);
         expect(sendMessage).toHaveBeenLastCalledWith(7, {type: 'contextMenuTranslate', action: 'selection'}, {frameId: 3});
@@ -365,6 +369,25 @@ describe('右键菜单动作执行', () => {
         const image = await runContextMenuAction('translateImage', 7, {frameId: -1, srcUrl: 'https://img.test/a.png'}, {id: 7}, false);
         expect(sendMessage).toHaveBeenLastCalledWith(7, {type: 'contextMenuTranslateImage', srcUrl: 'https://img.test/a.png'}, {frameId: 0});
         expect(image).toEqual({handled: true});
+    });
+
+    it('把浏览器的选区文本仅转发到点击所在 frame', async () => {
+        const sendMessage = vi.fn().mockResolvedValue({status: 'success'});
+        vi.stubGlobal('browser', {tabs: {sendMessage}});
+        expect(await runContextMenuAction('translateSelection', 7, {frameId: 3, selectionText: 'Selected text'}, {id: 7}, false)).toEqual({handled: true});
+        expect(sendMessage).toHaveBeenCalledWith(7, {type: 'contextMenuTranslate', action: 'selection', selectionText: 'Selected text'}, {frameId: 3});
+    });
+
+    it.each([
+        ['translateSelection', undefined, 'selectionUnavailable'],
+        ['translateSelection', {status: 'failed'}, 'selectionUnavailable'],
+        ['translateArea', {status: 'failed'}, 'areaUnavailable'],
+        ['translateImage', {}, 'imageUnavailable'],
+        ['translateImage', {status: 'disabled'}, 'disabled'],
+        ['translateArea', {status: 'disabled'}, 'disabled'],
+    ] as const)('%s 对未成功的回复 %j 据实返回失败原因', async (action, response, reason) => {
+        vi.stubGlobal('browser', {tabs: {sendMessage: vi.fn().mockResolvedValue(response)}});
+        expect(await runContextMenuAction(action, 7, {}, {id: 7}, false)).toEqual({handled: false, reason});
     });
 
     it('整页翻译与恢复原文始终作用于顶层文档，并回传新的翻译状态', async () => {
@@ -543,4 +566,95 @@ describe('内容脚本右键触发桥', () => {
         releaseFirstArea();
         expect(startAreaTranslationFromContextMenu()).toBe(true);
     });
+});
+
+
+describe('右键失败反馈交付', () => {
+    it('只接受有限原因，不展示任意异常或选区文本', () => {
+        for (const reason of ['selectionUnavailable', 'imageUnavailable', 'areaUnavailable', 'disabled', 'unavailable', 'failed']) {
+            expect(isContextMenuFailureReason(reason)).toBe(true);
+        }
+        for (const value of [null, {}, 42, '', 'Unknown API key: secret']) expect(isContextMenuFailureReason(value)).toBe(false);
+    });
+    it('在原 frame 成功显示时不重复向顶层提示', async () => {
+        const sendMessage = vi.fn().mockResolvedValue({status: 'success'});
+        vi.stubGlobal('browser', {tabs: {sendMessage}});
+        await reportContextMenuFailure(7, {frameId: 3, selectionText: 'private text'}, 'selectionUnavailable', () => true);
+        expect(sendMessage).toHaveBeenCalledOnce();
+        expect(sendMessage).toHaveBeenCalledWith(7, {type: 'contextMenuNotice', reason: 'selectionUnavailable'}, {frameId: 3});
+    });
+    it.each([undefined, {status: 'failed'}, 'rejected'])('子 frame 无法交付 %j 时向顶层显示一次', async result => {
+        const sendMessage = vi.fn().mockResolvedValue({status: 'success'});
+        if (result === 'rejected') sendMessage.mockRejectedValueOnce(new Error('Frame removed'));
+        else sendMessage.mockResolvedValueOnce(result);
+        vi.stubGlobal('browser', {tabs: {sendMessage}});
+        await reportContextMenuFailure(7, {frameId: 3}, 'unavailable', () => true);
+        expect(sendMessage).toHaveBeenCalledTimes(2);
+        expect(sendMessage).toHaveBeenLastCalledWith(7, {type: 'contextMenuNotice', reason: 'unavailable'}, {frameId: 0});
+    });
+    it.each([undefined, -1, 0, 1.5])('无效或顶层 frame %s 只尝试顶层一次，接收者不存在受控结束', async frameId => {
+        const sendMessage = vi.fn().mockRejectedValue(new Error('No receiver'));
+        vi.stubGlobal('browser', {tabs: {sendMessage}});
+        await reportContextMenuFailure(7, {frameId}, 'unavailable', () => true);
+        expect(sendMessage).toHaveBeenCalledOnce();
+        expect(sendMessage).toHaveBeenCalledWith(7, {type: 'contextMenuNotice', reason: 'unavailable'}, {frameId: 0});
+    });
+    it('导航使文档失效后不把提示发送到新页面', async () => {
+        let current = true;
+        const sendMessage = vi.fn().mockImplementation(async () => {current = false; return undefined;});
+        vi.stubGlobal('browser', {tabs: {sendMessage}});
+        await reportContextMenuFailure(7, {frameId: 3}, 'unavailable', () => current);
+        expect(sendMessage).toHaveBeenCalledOnce();
+        sendMessage.mockClear();
+        await reportContextMenuFailure(7, {}, 'failed', () => false);
+        expect(sendMessage).not.toHaveBeenCalled();
+    });
+});
+
+
+describe('右键消息等待期限', () => {
+    it('成功和拒绝都立即释放计时器', async () => {
+        vi.useFakeTimers();
+        expect(await withContextMenuDeadline(Promise.resolve('ready'), 3000)).toBe('ready');
+        expect(vi.getTimerCount()).toBe(0);
+        await expect(withContextMenuDeadline(Promise.reject(new Error('closed')), 3000)).rejects.toThrow('closed');
+        expect(vi.getTimerCount()).toBe(0);
+    });
+    it('超时结束等待，迟到回复不复活已经拒绝的动作', async () => {
+        vi.useFakeTimers();
+        let resolve!: (value: string) => void;
+        const request = new Promise<string>(release => {resolve = release;});
+        const result = withContextMenuDeadline(request, 3000);
+        const rejected = expect(result).rejects.toThrow('Context menu response timed out');
+        await vi.advanceTimersByTimeAsync(3000);
+        await rejected;
+        resolve('late');
+        await Promise.resolve();
+        expect(vi.getTimerCount()).toBe(0);
+    });
+    it('通知没有回复也会按期限退回顶层，且不重发翻译动作', async () => {
+        vi.useFakeTimers();
+        const sendMessage = vi.fn().mockReturnValueOnce(new Promise(() => {})).mockResolvedValue({status: 'success'});
+        vi.stubGlobal('browser', {tabs: {sendMessage}});
+        const result = reportContextMenuFailure(7, {frameId: 3}, 'unavailable', () => true);
+        await vi.advanceTimersByTimeAsync(1500);
+        await result;
+        expect(sendMessage).toHaveBeenCalledTimes(2);
+        expect(sendMessage.mock.calls.map(call => call[1].type)).toEqual(['contextMenuNotice', 'contextMenuNotice']);
+        expect(vi.getTimerCount()).toBe(0);
+    });
+});
+
+
+it('右键操作反馈在六种非中文界面中完整本地化', async () => {
+    const {UI_LANGUAGE_BUNDLES, registerAllUiLanguageBundles} = await import('@/src/core/i18n/bundles');
+    const {translate} = await import('@/src/core/i18n');
+    registerAllUiLanguageBundles();
+    for (const [language, bundle] of Object.entries(UI_LANGUAGE_BUNDLES)) {
+        for (const reason of ['selectionUnavailable', 'imageUnavailable', 'areaUnavailable', 'disabled', 'unavailable', 'failed']) {
+            const key = `contextMenu.notice.${reason}`;
+            expect(bundle.messages[key], `${language} ${key}`).toBeTruthy();
+            expect(translate(key, language as never)).toBe(bundle.messages[key]);
+        }
+    }
 });

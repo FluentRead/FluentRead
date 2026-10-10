@@ -1,19 +1,20 @@
 /**
  * @file src/app/background/contextMenuRuntime.ts
  * 文件职责：管理后台右键菜单的安装、状态同步和点击路由，让菜单结构随设置重建，让标题随当前标签页的翻译与网站状态更新。
- * 主要内容：等待配置就绪后按菜单结构创建条目，串行执行原生菜单写入与重建，以配置、结构及活动页查询归属屏蔽迟到回复，冷启动点击等待菜单就绪后交给动作模块执行。
+ * 主要内容：等待配置就绪后创建菜单并记录已落地属性，串行执行原生写入与重建；冷启动点击只等待结构就绪，轻量动作直接发往目标 frame，全文和网站开关按文档排队，旧文档回复及失败提示均受归属门禁保护。
  * 模块边界：这里只编排 browser.contextMenus、tabs 与 app 层状态，不推导菜单结构、不渲染文案、不执行翻译；结构归 core/context-menu，文案归 core/context-menu/presentation，动作归 contextMenuActions。
  */
 import {buildContextMenuPlan, resolveContextMenuPresentation, type ContextMenuPlanItem} from '@/src/core/context-menu/domain';
 import {configReady, subscribeConfig} from '@/src/services/config/store';
-import {runContextMenuAction, type ContextMenuClickInfo, type ContextMenuClickTab} from './contextMenuActions';
+import {type ContextMenuClickInfo, type ContextMenuClickTab} from './contextMenuActions';
 import {readContextMenuSettings, type ContextMenuSettingsSnapshot} from './contextMenuPreferences';
 import {renderContextMenuTitle} from '@/src/core/context-menu/presentation';
 import {isBrowserTabId, type TabTranslationState, TabTranslationStateStore} from './tabTranslationState';
 import {createTabTranslationStateReader} from './tabTranslationQuery';
 import {ensureUiLanguageBundle} from '@/src/platform/i18n/uiLanguageBundles';
 import {browserCapabilities} from '@/src/platform/browser/capabilities';
-import {createContextMenuUpdater} from './contextMenuUpdates';
+import {createContextMenuUpdater, type ContextMenuNativePresentation} from './contextMenuUpdates';
+import {createContextMenuClickHandler} from './contextMenuClicks';
 
 const NEUTRAL_STATE: TabTranslationState = {isTranslated: false, isSiteDisabled: false};
 
@@ -41,6 +42,7 @@ export function installBackgroundContextMenus(
     let plan: readonly ContextMenuPlanItem[] = [];
     let syncQueue: Promise<void> = Promise.resolve(), initialized: Promise<void> = Promise.resolve();
     let mutationQueue: Promise<void> = Promise.resolve();
+    const appliedPresentations = new Map<string, ContextMenuNativePresentation>();
     const readTabTranslationState = createTabTranslationStateReader(tabTranslationStates);
 
     // 已发出的原生写入无法取消；让后续更新和结构重建排在它之后，保证最新结果最后落地。
@@ -49,7 +51,7 @@ export function installBackgroundContextMenus(
         return mutationQueue;
     };
     const update = createContextMenuUpdater({
-        isSupported, getSettings: () => settings, getPlan: () => plan, mutate, readTabTranslationState,
+        isSupported, getSettings: () => settings, getPlan: () => plan, mutate, readTabTranslationState, appliedPresentations,
     });
 
     const createItems = async (snapshot: ContextMenuSettingsSnapshot): Promise<ContextMenuPlanItem[]> => {
@@ -57,12 +59,16 @@ export function installBackgroundContextMenus(
         const initial = resolveContextMenuPresentation(items, NEUTRAL_STATE, snapshot.display);
         for (const [index, item] of items.entries()) {
             if (snapshot !== settings) break;
-            await menus.create({
-                id: item.menuItemId,
+            const properties = {
                 title: renderContextMenuTitle(initial[index], snapshot.titleContext),
                 visible: initial[index].visible,
+            };
+            await menus.create({
+                id: item.menuItemId,
+                ...properties,
                 contexts: [...item.contexts],
             });
+            appliedPresentations.set(item.menuItemId, properties);
         }
         return items;
     };
@@ -78,19 +84,24 @@ export function installBackgroundContextMenus(
                 await mutate(async () => {
                     if (requested !== settings) return;
                     plan = [];
+                    appliedPresentations.clear();
                     await menus.removeAll();
                     const items = await createItems(requested);
                     // 重建期间设置又变了：撤掉本轮已创建项，让后一次同步重新生成。
                     if (requested !== settings) {
+                        appliedPresentations.clear();
                         await menus.removeAll();
                         return;
                     }
                     plan = items;
                 });
                 if (requested !== settings) return;
-                const active = (await browser.tabs.query({active: true, lastFocusedWindow: true}) as ContextMenuClickTab[])
-                    .find((tab) => typeof tab.id === 'number');
-                if (active?.id !== undefined) await update(active.id);
+                // 已创建的菜单即可响应点击；活动页状态查询不能拖住冷启动首击或下一轮设置同步。
+                void browser.tabs.query({active: true, lastFocusedWindow: true}).then(async (tabs: ContextMenuClickTab[]) => {
+                    if (requested !== settings) return;
+                    const active = (tabs as ContextMenuClickTab[]).find(tab => isBrowserTabId(tab.id));
+                    if (active?.id !== undefined) await update(active.id);
+                }).catch((error: unknown) => console.error('Error querying context menu active tab:', error));
             })
             .catch((error) => {
                 // 结构写入前已清空 plan；活动页查询失败则保留已创建的有效路由。
@@ -99,28 +110,8 @@ export function installBackgroundContextMenus(
         return syncQueue;
     };
 
-    const handleClick = async (info: ContextMenuClickInfo, tab: ContextMenuClickTab): Promise<void> => {
-        if (!isBrowserTabId(tab.id)) return;
-        const currentDocument = tabTranslationStates.captureDocument(tab.id);
-        try {
-            // 原生菜单在 MV3 worker 休眠后仍存在，唤醒它的首个点击不能被空 plan 丢弃。
-            await initialized; await syncQueue;
-            const snapshot = settings, items = plan;
-            const item = items.find((entry) => entry.menuItemId === info.menuItemId);
-            if (!item || !currentDocument()) return;
-            const state = await readTabTranslationState(tab.id, true);
-            if (!currentDocument() || snapshot !== settings || items !== plan) return;
-            const [presentation] = resolveContextMenuPresentation([item], state, snapshot.display);
-            if (!presentation.visible) return;
-            const result = await runContextMenuAction(presentation.action, tab.id, info, tab, state.isTranslated);
-            if (!currentDocument() || !result.handled) return;
-            if (typeof result.isSiteDisabled === 'boolean') tabTranslationStates.setSiteDisabled(tab.id, result.isSiteDisabled);
-            if (typeof result.isTranslated === 'boolean') tabTranslationStates.setTranslated(tab.id, result.isTranslated);
-            await update(tab.id, tabTranslationStates.get(tab.id));
-        } catch (error) {
-            console.error('Failed to send message to content script:', error);
-        }
-    };
+    const clicks = createContextMenuClickHandler({ready: async () => {await initialized; await syncQueue;},
+        getSettings: () => settings, getPlan: () => plan, tabTranslationStates, readTabTranslationState, update});
 
     if (!isSupported) {
         console.log('不支持右键菜单');
@@ -137,12 +128,12 @@ export function installBackgroundContextMenus(
             return initialSync;
         }).catch(error => console.error('Error initializing context menu:', error));
 
-        browser.contextMenus.onClicked.addListener((info: any, tab: any) => void handleClick(info as ContextMenuClickInfo, (tab ?? {}) as ContextMenuClickTab));
+        browser.contextMenus.onClicked.addListener((info: any, tab: any) => void clicks.handleClick(info as ContextMenuClickInfo, (tab ?? {}) as ContextMenuClickTab));
     }
 
     browser.tabs.onActivated.addListener((activeInfo: any) => { if (isSupported) void update(activeInfo.tabId); });
-    browser.tabs.onUpdated.addListener((tabId: any, changeInfo: any) => { if (changeInfo.status !== 'loading') return; tabTranslationStates.reset(tabId); if (isSupported) void update(tabId); });
-    browser.tabs.onRemoved.addListener((tabId: any) => tabTranslationStates.delete(tabId));
+    browser.tabs.onUpdated.addListener((tabId: any, changeInfo: any) => { if (changeInfo.status !== 'loading') return; clicks.reset(tabId); tabTranslationStates.reset(tabId); if (isSupported) void update(tabId); });
+    browser.tabs.onRemoved.addListener((tabId: any) => {clicks.reset(tabId); tabTranslationStates.delete(tabId);});
 
     return {isSupported, update};
 }

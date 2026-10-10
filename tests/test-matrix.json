@@ -37,6 +37,7 @@
       "tests/extensionSizeBudget.test.ts"
     ],
     "unit": [
+      "tests/googleRequestGate.test.ts",
       "tests/implementationAudit48H.test.ts",
       "tests/translationCenterSession.test.ts",
       "tests/featureTranslationServices.test.ts",
@@ -451,6 +452,7 @@
       "tests/featureTranslationClients.test.ts",
       "tests/gemini.test.ts",
       "tests/google.test.ts",
+      "tests/googleBackoffIntegration.test.ts",
       "tests/mimo.test.ts",
       "tests/modelUsageRepository.test.ts",
       "tests/translationStatsRepository.test.ts",

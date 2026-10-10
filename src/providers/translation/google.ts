@@ -2,7 +2,7 @@
  * @file src/providers/translation/google.ts
  *
  * 文件职责：适配无需用户密钥的 Google 浏览器批量接口与网页 RPC，在统一截止时间内合批、换线和冷却失败入口。
- * 主要内容：编码 translateHtml、translate_a/t 与带编号的 batchexecute 批次，严格校验结果数量与槽位，保护纯文本、换行及取消所有权；短时间合并同语言请求，按近期可靠性、延迟和在途负载动态排序，定期探索备用入口并单独探测冷却恢复，避免每个段落重复访问失效入口。为免费池提供不跨 owner 合批的数组传输入口。公开符号包括 parseGoogleBatchResponse、translateGoogleOwnerTexts、translateGoogleTexts、translateGoogleText、default:google。
+ * 主要内容：编码 translateHtml、translate_a/t 与带编号的 batchexecute 批次，严格校验结果数量与槽位，保护纯文本、换行及取消所有权；120 毫秒合并同语言请求，满批提前发送，通过共享 HTTP 队列暂停全部限流入口并按 Retry-After 单独探测恢复；按近期可靠性、延迟和在途负载动态排序，定期探索备用入口，保留非限流入口故障的独立冷却。为免费池提供不跨 owner 合批的数组传输入口。公开符号包括 parseGoogleBatchResponse、translateGoogleOwnerTexts、translateGoogleTexts、translateGoogleText、default:google。
  * 模块边界：本文件位于 provider 适配层，只把统一翻译请求转换为外部或浏览器服务协议；不管理页面 DOM、UI 生命周期或配置持久化，缓存、去重和超时总预算由 translation broker 统一协调。
  */
 
@@ -20,6 +20,7 @@ import {
     runtimeFetch,
 } from '@/src/platform/http/runtime';
 import type {TranslationProviderRequest} from '@/src/services/translation/requestSnapshot';
+import {createGoogleRequestGate, googleRequestDeadlineError} from './googleRequestGate';
 
 const GOOGLE_TRANSLATE_RPC_ID = 'MkEWBc';
 const GOOGLE_TRANSLATE_BATCH_URLS = [
@@ -37,9 +38,10 @@ const GOOGLE_CAPTCHA_HINT = '可能触发了 CAPTCHA，请稍后重试';
 const GOOGLE_BLOCKED_COOLDOWN_MS = 300_000;
 const GOOGLE_FAILURE_COOLDOWN_MS = 30_000;
 const GOOGLE_BATCH_MAX_ITEMS = 32;
-const GOOGLE_BATCH_MAX_CHARACTERS = 4_000;
-const GOOGLE_BATCH_WINDOW_MS = 10;
+const GOOGLE_BATCH_MAX_CHARACTERS = 10_000;
+const GOOGLE_BATCH_WINDOW_MS = 120;
 const GOOGLE_EXPLORATION_INTERVAL = 10;
+const googleRequestGate = createGoogleRequestGate();
 
 type EndpointHealth = {
     retryAt: number; failures: number; version: number; statusCode?: number; probing: boolean;
@@ -52,7 +54,7 @@ type GoogleProvider = {
     name: string;
     endpoint: string;
     baseWeight: number;
-    translate: (timeoutMs: number) => Promise<string[]>;
+    translate: (deadlineAt: number) => Promise<string[]>;
 };
 
 function getEndpointHealth(endpoint: string): EndpointHealth {
@@ -216,10 +218,28 @@ function createGoogleParseError(error: unknown, responseBody: string): Error {
 async function fetchGoogleResponse(
     url: string | URL,
     init: RequestInit,
-    timeoutMs: number,
-    callerSignal?: AbortSignal,
+    deadlineAt: number,
+    callerSignal: AbortSignal,
 ): Promise<{responseBody: string}> {
+    let lease = await googleRequestGate.acquire(callerSignal, deadlineAt);
+    // 其他在途响应可能在交付许可后的微任务中返回 429；真实 fetch 前再核对暂停版本。
+    while (!lease.isCurrent()) {
+        lease.finish(false, false);
+        lease = await googleRequestGate.acquire(callerSignal, deadlineAt);
+    }
+    // 许可交付后的微任务边界仍可能取消；不得因排队结束而发出失去所有者的请求。
+    if (callerSignal.aborted) {
+        lease.finish(false, false);
+        throw abortErrorFromSignal(callerSignal);
+    }
+    const remainingTime = deadlineAt - Date.now();
+    if (remainingTime <= 0) {
+        lease.finish(false, false);
+        throw googleRequestDeadlineError();
+    }
+    const timeoutMs = Math.min(GOOGLE_TRANSLATE_ATTEMPT_TIMEOUT_MS, remainingTime);
     const abortContext = createRuntimeAbortContext(timeoutMs, callerSignal);
+    let success = false;
 
     try {
         let response: Response;
@@ -233,6 +253,12 @@ async function fetchGoogleResponse(
             throw new Error('网络请求失败');
         }
 
+        // 在读取响应体之前冻结整个 Google 队列；慢速错误响应也不能让别的入口继续突发请求。
+        const statusError = !response.ok ? createHttpStatusError(response) : undefined;
+        if (response.status === 429) googleRequestGate.pause(statusError!);
+        // 自定义 transport 可能忽略 abort 后仍返回响应；迟到响应不得标记探测成功。
+        if (callerSignal.aborted) throw abortErrorFromSignal(callerSignal);
+        if (abortContext.didTimeout()) throw new Error(`请求超时（${timeoutMs / 1000} 秒）`);
         let responseBody: string;
         try {
             responseBody = await response.text();
@@ -243,20 +269,23 @@ async function fetchGoogleResponse(
             }
             throw new Error('响应读取失败');
         }
+        if (callerSignal.aborted) throw abortErrorFromSignal(callerSignal);
+        if (abortContext.didTimeout()) throw new Error(`请求超时（${timeoutMs / 1000} 秒）`);
         if (!response.ok) {
-            const statusError = createHttpStatusError(response);
             if (response.status === 400 && /"xsrf"/u.test(responseBody)) {
-                Object.assign(statusError, {googleXsrfRejected: true});
+                Object.assign(statusError!, {googleXsrfRejected: true});
             }
             if (response.status === 429 || isHtmlResponse(responseBody)) {
                 // CAPTCHA 提示只扩展安全文案，保留标准 HTTP 状态供外层判断冷却。
-                statusError.message = `${statusError.message}（${GOOGLE_CAPTCHA_HINT}）`;
+                statusError!.message = `${statusError!.message}（${GOOGLE_CAPTCHA_HINT}）`;
             }
             throw statusError;
         }
+        success = true;
         return {responseBody};
     } finally {
         abortContext.cleanup();
+        lease.finish(success);
     }
 }
 
@@ -265,14 +294,14 @@ async function translateGoogleBatch(
     texts: readonly string[],
     fromLang: string,
     toLang: string,
-    timeoutMs: number,
-    callerSignal?: AbortSignal,
+    deadlineAt: number,
+    callerSignal: AbortSignal,
 ): Promise<string[]> {
     const {responseBody} = await fetchGoogleResponse(endpoint, {
         method: 'POST',
         headers: {'Content-Type': 'application/x-www-form-urlencoded;charset=UTF-8'},
         body: new URLSearchParams({'f.req': createGoogleBatchRequest(texts, fromLang, toLang)}).toString(),
-    }, timeoutMs, callerSignal);
+    }, deadlineAt, callerSignal);
     try {
         // RPC 响应可能乱序；只按请求编号还原，不按服务端返回顺序猜测文本槽。
         const translations = new Array<string>(texts.length);
@@ -298,14 +327,14 @@ async function translateGoogleBatch(
 }
 
 async function translateGoogleHtml(
-    texts: readonly string[], fromLang: string, toLang: string, timeoutMs: number, signal?: AbortSignal,
+    texts: readonly string[], fromLang: string, toLang: string, deadlineAt: number, signal: AbortSignal,
 ): Promise<string[]> {
     const {responseBody} = await fetchGoogleResponse(GOOGLE_TRANSLATE_HTML_URL, {
         method: 'POST',
         headers: {'Content-Type': 'application/json+protobuf', 'X-Goog-API-Key': GOOGLE_BROWSER_PUBLIC_KEY},
         // pre 保留换行、缩进和空行；原文始终作为转义后的纯文本，不执行任意 HTML。
         body: JSON.stringify([[texts.map(text => `<pre>${escapeGoogleText(text)}</pre>`), fromLang, toLang], 'wt_lib']),
-    }, timeoutMs, signal);
+    }, deadlineAt, signal);
     try {
         const translations = requireGoogleTexts(getArrayItem(JSON.parse(responseBody), 0), texts.length);
         return requireGoogleTexts(translations.map(text => decodeGoogleText(text.replace(/^<pre(?:\s[^>]*)?>([\s\S]*)<\/pre>$/i, '$1'))), texts.length);
@@ -315,7 +344,7 @@ async function translateGoogleHtml(
 }
 
 async function translateGoogleList(
-    texts: readonly string[], fromLang: string, toLang: string, timeoutMs: number, signal?: AbortSignal,
+    texts: readonly string[], fromLang: string, toLang: string, deadlineAt: number, signal: AbortSignal,
 ): Promise<string[]> {
     const url = new URL(GOOGLE_TRANSLATE_LIST_URL);
     url.search = new URLSearchParams({client: 'gtx', sl: fromLang, tl: toLang, dt: 't'}).toString();
@@ -325,7 +354,7 @@ async function translateGoogleList(
         method: 'POST',
         headers: {'Content-Type': 'application/x-www-form-urlencoded;charset=UTF-8'},
         body: body.toString(),
-    }, timeoutMs, signal);
+    }, deadlineAt, signal);
     try {
         const result: unknown = JSON.parse(responseBody);
         // auto 源语言时服务端可返回 [译文, 检测语言]，显式源语言时返回字符串。
@@ -335,7 +364,8 @@ async function translateGoogleList(
     }
 }
 
-async function executeGoogleTexts(texts: readonly string[], fromLang: string, toLang: string, signal: AbortSignal): Promise<string[]> {
+async function executeGoogleTexts(texts: readonly string[], fromLang: string, toLang: string, signal: AbortSignal,
+    deadline = Date.now() + GOOGLE_TRANSLATE_TOTAL_TIMEOUT_MS): Promise<string[]> {
     const providers: GoogleProvider[] = [
         {name: '浏览器批量接口', endpoint: GOOGLE_TRANSLATE_HTML_URL, baseWeight: 1.2,
             translate: timeout => translateGoogleHtml(texts, fromLang, toLang, timeout, signal)},
@@ -346,11 +376,11 @@ async function executeGoogleTexts(texts: readonly string[], fromLang: string, to
             translate: (timeout: number) => translateGoogleBatch(endpoint, texts, fromLang, toLang, timeout, signal),
         })),
     ];
-    const deadline = Date.now() + GOOGLE_TRANSLATE_TOTAL_TIMEOUT_MS;
     const failures: string[] = [];
     const failureStatuses: Array<number | undefined> = [];
     const ranked = prioritizeGoogleProviders(providers, ++googleSelectionSequence % GOOGLE_EXPLORATION_INTERVAL === 0);
-    for (const provider of ranked) {
+    for (let index = 0; index < ranked.length; index++) {
+        const provider = ranked[index]!;
         if (signal.aborted) throw abortErrorFromSignal(signal);
         const health = getEndpointHealth(provider.endpoint);
         if (health.retryAt > Date.now() || health.probing) {
@@ -367,7 +397,9 @@ async function executeGoogleTexts(texts: readonly string[], fromLang: string, to
         health.lastAttemptAt = startedAt;
         health.active += 1;
         try {
-            const result = await provider.translate(Math.min(GOOGLE_TRANSLATE_ATTEMPT_TIMEOUT_MS, remainingTime));
+            const result = await provider.translate(deadline);
+            if (signal.aborted) throw abortErrorFromSignal(signal);
+            if (Date.now() >= deadline) throw googleRequestDeadlineError();
             // 较早的在途成功不能清掉后来请求记录的故障。
             if (health.version === version) {
                 health.performance = observeFreeProviderPerformance(health.performance, true, Date.now() - startedAt, Date.now());
@@ -379,12 +411,19 @@ async function executeGoogleTexts(texts: readonly string[], fromLang: string, to
             return result;
         } catch (error) {
             if (signal.aborted) throw abortErrorFromSignal(signal);
+            if ((error as {googleQueueError?: boolean}).googleQueueError) throw error;
             const statusCode = (error as {statusCode?: number}).statusCode;
             const xsrfRejected = (error as {googleXsrfRejected?: boolean}).googleXsrfRejected;
+            if (statusCode === 429) {
+                // 429 属于所有 Google 入口共享的访问限制，不能立即换域名继续请求。
+                // gate 在真实 HTTP 时记录恢复时间；预算不足的 gate 错误直接交给免费池。
+                index -= 1;
+                continue;
+            }
             // 参数、语言或过大输入错误属于这次请求，不应淘汰正常接口。
             if (xsrfRejected || ![400, 413, 415, 422].includes(statusCode ?? 0)) {
                 const failureCount = health.failures + 1;
-                const blocked = xsrfRejected || statusCode === 403 || statusCode === 429;
+                const blocked = xsrfRejected || statusCode === 403;
                 const cooldown = blocked ? GOOGLE_BLOCKED_COOLDOWN_MS
                     : Math.min(GOOGLE_BLOCKED_COOLDOWN_MS, GOOGLE_FAILURE_COOLDOWN_MS * 2 ** Math.min(failureCount - 1, 4));
                 health.performance = observeFreeProviderPerformance(health.performance, false, Date.now() - startedAt, Date.now());
@@ -413,7 +452,7 @@ async function executeGoogleTexts(texts: readonly string[], fromLang: string, to
 }
 
 type PendingGoogleText = {
-    text: string; fromLang: string; toLang: string; signal?: AbortSignal;
+    text: string; fromLang: string; toLang: string; signal: AbortSignal; deadlineAt: number;
     settled: boolean; resolve: (text: string) => void; reject: (error: unknown) => void;
     removeAbortListener: () => void; cancelBatch?: () => void;
 };
@@ -424,6 +463,15 @@ function settleGoogleText(task: PendingGoogleText, result: string | Error, faile
     if (task.settled) return;
     task.settled = true;
     task.removeAbortListener();
+    // 排队取消立即摘除原文并回收最后一个收集计时器，不等下一次 flush 才释放。
+    const pendingIndex = pendingTexts.indexOf(task);
+    if (pendingIndex >= 0) {
+        pendingTexts.splice(pendingIndex, 1);
+        if (!pendingTexts.length) {
+            clearTimeout(flushTimer);
+            flushTimer = undefined;
+        }
+    }
     if (failed) task.reject(result);
     else task.resolve(result as string);
 }
@@ -434,12 +482,14 @@ function dispatchGoogleBatch(tasks: PendingGoogleText[]): void {
         // 独立调用者取消只移除自身；全部调用者离开后才终止共享网络请求。
         if (tasks.every(item => item.settled)) controller.abort();
     };
-    void executeGoogleTexts(tasks.map(task => task.text), tasks[0]!.fromLang, tasks[0]!.toLang, controller.signal)
+    void executeGoogleTexts(tasks.map(task => task.text), tasks[0]!.fromLang, tasks[0]!.toLang, controller.signal,
+        Math.max(...tasks.map(task => task.deadlineAt)))
         .then(results => tasks.forEach((task, index) => settleGoogleText(task, results[index]!, false)),
             error => tasks.forEach(task => settleGoogleText(task, error, true)));
 }
 
 function flushGoogleTexts(): void {
+    clearTimeout(flushTimer);
     flushTimer = undefined;
     const tasks = pendingTexts;
     pendingTexts = [];
@@ -465,19 +515,23 @@ function flushGoogleTexts(): void {
 
 function enqueueGoogleText(
     text: string, fromLang: string, toLang: string, signal: AbortSignal,
-    subscribeAbort: (callback: VoidFunction) => VoidFunction,
+    subscribeAbort: (callback: VoidFunction) => VoidFunction, deadlineAt: number,
 ): Promise<string> {
     if (signal?.aborted) return Promise.reject(abortErrorFromSignal(signal));
     if (!text.trim()) return Promise.resolve(text);
     return new Promise((resolve, reject) => {
-        const task: PendingGoogleText = {text, fromLang, toLang, signal, settled: false, resolve, reject, removeAbortListener: () => undefined};
+        const task: PendingGoogleText = {text, fromLang, toLang, signal, deadlineAt,
+            settled: false, resolve, reject, removeAbortListener: () => undefined};
         const onAbort = () => {
             settleGoogleText(task, abortErrorFromSignal(signal), true);
             task.cancelBatch?.();
         };
         task.removeAbortListener = subscribeAbort(onAbort);
         pendingTexts.push(task);
-        flushTimer ??= setTimeout(flushGoogleTexts, GOOGLE_BATCH_WINDOW_MS);
+        const matching = pendingTexts.filter(item => item.fromLang === fromLang && item.toLang === toLang);
+        const characters = matching.reduce((total, item) => total + escapeGoogleText(item.text).length + 11, 0);
+        if (matching.length >= GOOGLE_BATCH_MAX_ITEMS || characters >= GOOGLE_BATCH_MAX_CHARACTERS) flushGoogleTexts();
+        else flushTimer ??= setTimeout(flushGoogleTexts, GOOGLE_BATCH_WINDOW_MS);
     });
 }
 
@@ -488,7 +542,8 @@ export function translateGoogleOwnerTexts(
     return executeGoogleTexts([...texts], googleLanguage(fromLang), googleLanguage(toLang), signal);
 }
 
-export async function translateGoogleTexts(texts: readonly string[], fromLang: string, toLang: string, signal?: AbortSignal): Promise<string[]> {
+export async function translateGoogleTexts(texts: readonly string[], fromLang: string, toLang: string, signal?: AbortSignal,
+    requestTimeoutMs?: number): Promise<string[]> {
     const controller = new AbortController();
     const abortCallbacks = new Set<VoidFunction>();
     const cancelTasks = () => { for (const callback of [...abortCallbacks]) callback(); };
@@ -498,14 +553,23 @@ export async function translateGoogleTexts(texts: readonly string[], fromLang: s
         return () => { abortCallbacks.delete(callback); };
     };
     const onAbort = () => controller.abort(signal?.reason);
+    const timeoutMs = typeof requestTimeoutMs === 'number' && Number.isFinite(requestTimeoutMs)
+        ? Math.min(GOOGLE_TRANSLATE_TOTAL_TIMEOUT_MS, Math.max(0, requestTimeoutMs)) : GOOGLE_TRANSLATE_TOTAL_TIMEOUT_MS;
+    const deadlineAt = Date.now() + timeoutMs;
+    const timer = setTimeout(() => controller.abort(new Error('谷歌翻译请求超时：总请求时间已耗尽')), timeoutMs);
     if (signal?.aborted) onAbort();
     else signal?.addEventListener('abort', onAbort, {once: true});
     try {
-        return await Promise.all(texts.map(text => enqueueGoogleText(text, googleLanguage(fromLang), googleLanguage(toLang), controller.signal, subscribeAbort)));
+        const requests = texts.map(text => enqueueGoogleText(text, googleLanguage(fromLang), googleLanguage(toLang),
+            controller.signal, subscribeAbort, deadlineAt));
+        // 显式大数组无需额外等收集窗；最后一个未满批次也立即进入有序 HTTP 队列。
+        if (texts.length >= GOOGLE_BATCH_MAX_ITEMS) flushGoogleTexts();
+        return await Promise.all(requests);
     } catch (error) {
         controller.abort(error);
         throw error;
     } finally {
+        clearTimeout(timer);
         signal?.removeEventListener('abort', onAbort);
         controller.signal.removeEventListener('abort', cancelTasks);
     }
@@ -518,7 +582,7 @@ export async function translateGoogleText(text: string, fromLang: string, toLang
 async function google(message: TranslationProviderRequest) {
     const {sourceLanguage, targetLanguage} = getTranslationLanguages(message);
     const texts = typeof message.origin === 'string' ? [message.origin] : message.origin;
-    const results = await translateGoogleTexts(texts, sourceLanguage, targetLanguage, message.abortSignal);
+    const results = await translateGoogleTexts(texts, sourceLanguage, targetLanguage, message.abortSignal, message.requestTimeoutMs);
     return typeof message.origin === 'string' ? results[0]! : results;
 }
 

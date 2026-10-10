@@ -1,7 +1,7 @@
 /**
  * @file src/core/i18n/messages/informationHighlight.ts
  * 文件职责：维护信息高亮控制、阅读偏好和本地模型下载的七种语言文案。
- * 主要内容：提供稳定语义键、真实段落与字节进度标签，区分关键词排序、模型意外度和外观示意。
+ * 主要内容：提供稳定语义键、真实段落与字节进度标签，区分关键词排序、模型意外度和外观示意，说明两张模型卡的选用状态与下载确认。
  * 模块边界：静态界面资源，不读取正文、不下载模型、不声明高亮能提升理解或阅读速度。
  */
 export const informationHighlightMessages = {
@@ -105,6 +105,11 @@ export const informationHighlightMessages = {
         "informationHighlight.starting": "正在开启…",
         "informationHighlight.stopping": "正在关闭…",
         "informationHighlight.model.select": "本地模型",
+        "informationHighlight.model.selected": "已选用",
+        "informationHighlight.model.selectAction": "选择{name}作为分析模型",
+        "informationHighlight.model.download.confirmTitle": "下载模型",
+        "informationHighlight.model.download.confirmBody": "确认后下载模型文件，完成后可离线使用。",
+        "informationHighlight.model.download.confirmAction": "下载模型",
         "informationHighlight.model.remove.confirmBody": "删除 {name} 的本地模型文件？再次使用时需要重新下载。"
     },
     "en-US": {
@@ -207,6 +212,11 @@ export const informationHighlightMessages = {
         "informationHighlight.starting": "Turning on…",
         "informationHighlight.stopping": "Turning off…",
         "informationHighlight.model.select": "Local model",
+        "informationHighlight.model.selected": "Selected",
+        "informationHighlight.model.selectAction": "Select {name} for analysis",
+        "informationHighlight.model.download.confirmTitle": "Download model",
+        "informationHighlight.model.download.confirmBody": "Confirm to download the model files. Once complete, the model can be used offline.",
+        "informationHighlight.model.download.confirmAction": "Download model",
         "informationHighlight.model.remove.confirmBody": "Delete the local model files for {name}? You will need to download them again to use this model."
     },
     "ja-JP": {
@@ -309,6 +319,11 @@ export const informationHighlightMessages = {
         "informationHighlight.starting": "有効にしています…",
         "informationHighlight.stopping": "無効にしています…",
         "informationHighlight.model.select": "ローカルモデル",
+        "informationHighlight.model.selected": "選択中",
+        "informationHighlight.model.selectAction": "{name}を分析モデルに選択",
+        "informationHighlight.model.download.confirmTitle": "モデルをダウンロード",
+        "informationHighlight.model.download.confirmBody": "確認するとモデルファイルをダウンロードします。完了後はオフラインで使用できます。",
+        "informationHighlight.model.download.confirmAction": "モデルをダウンロード",
         "informationHighlight.model.remove.confirmBody": "{name} のローカルモデルファイルを削除しますか？再利用するには再ダウンロードが必要です。"
     },
     "ko-KR": {
@@ -411,6 +426,11 @@ export const informationHighlightMessages = {
         "informationHighlight.starting": "켜는 중…",
         "informationHighlight.stopping": "끄는 중…",
         "informationHighlight.model.select": "로컬 모델",
+        "informationHighlight.model.selected": "선택됨",
+        "informationHighlight.model.selectAction": "{name}을 분석 모델로 선택",
+        "informationHighlight.model.download.confirmTitle": "모델 다운로드",
+        "informationHighlight.model.download.confirmBody": "확인하면 모델 파일을 다운로드합니다. 완료 후에는 오프라인으로 사용할 수 있습니다.",
+        "informationHighlight.model.download.confirmAction": "모델 다운로드",
         "informationHighlight.model.remove.confirmBody": "{name}의 로컬 모델 파일을 삭제할까요? 다시 사용하려면 다시 다운로드해야 합니다."
     },
     "fr-FR": {
@@ -513,6 +533,11 @@ export const informationHighlightMessages = {
         "informationHighlight.starting": "Activation…",
         "informationHighlight.stopping": "Désactivation…",
         "informationHighlight.model.select": "Modèle local",
+        "informationHighlight.model.selected": "Sélectionné",
+        "informationHighlight.model.selectAction": "Choisir {name} pour l’analyse",
+        "informationHighlight.model.download.confirmTitle": "Télécharger le modèle",
+        "informationHighlight.model.download.confirmBody": "Confirmez pour télécharger les fichiers du modèle. Une fois le téléchargement terminé, le modèle fonctionne hors ligne.",
+        "informationHighlight.model.download.confirmAction": "Télécharger le modèle",
         "informationHighlight.model.remove.confirmBody": "Supprimer les fichiers locaux de {name} ? Vous devrez les télécharger à nouveau pour utiliser ce modèle."
     },
     "ru-RU": {
@@ -615,6 +640,11 @@ export const informationHighlightMessages = {
         "informationHighlight.starting": "Включение…",
         "informationHighlight.stopping": "Отключение…",
         "informationHighlight.model.select": "Локальная модель",
+        "informationHighlight.model.selected": "Выбрана",
+        "informationHighlight.model.selectAction": "Выбрать {name} для анализа",
+        "informationHighlight.model.download.confirmTitle": "Скачать модель",
+        "informationHighlight.model.download.confirmBody": "Подтвердите загрузку файлов модели. После завершения модель можно использовать без интернета.",
+        "informationHighlight.model.download.confirmAction": "Скачать модель",
         "informationHighlight.model.remove.confirmBody": "Удалить локальные файлы модели {name}? Для повторного использования их нужно будет скачать заново."
     },
     "es-ES": {
@@ -717,6 +747,11 @@ export const informationHighlightMessages = {
         "informationHighlight.starting": "Activando…",
         "informationHighlight.stopping": "Desactivando…",
         "informationHighlight.model.select": "Modelo local",
+        "informationHighlight.model.selected": "Seleccionado",
+        "informationHighlight.model.selectAction": "Elegir {name} para el análisis",
+        "informationHighlight.model.download.confirmTitle": "Descargar modelo",
+        "informationHighlight.model.download.confirmBody": "Confirma para descargar los archivos del modelo. Al terminar, podrás usarlo sin conexión.",
+        "informationHighlight.model.download.confirmAction": "Descargar modelo",
         "informationHighlight.model.remove.confirmBody": "¿Eliminar los archivos locales de {name}? Tendrás que descargarlos de nuevo para usar este modelo."
     }
 } as const;

@@ -1,7 +1,7 @@
 <!--
 @file src/features/settings/ui/InformationHighlightSettings.vue
 文件职责：将智能高亮的阅读预览、持久偏好与本地模型管理组织到独立设置分组。
-主要内容：标题旁以可悬停、聚焦和点击的标签解释关键词、预测意外度与阅读提示，信息图标说明意外度理论并链接到论文；并排展示示意文本与阅读偏好，模型卡紧跟模型选择；只有选择意外度模式才读取资源状态。
+主要内容：标题旁以可悬停、聚焦和点击的标签解释关键词、预测意外度与阅读提示，信息图标说明意外度理论并链接到论文；并排展示示意文本与阅读偏好，本地模式上下排列可单选的独立模型卡；只有选择意外度模式才读取资源状态。
 模块边界：组件不分析正文或自动下载；开关与偏好写入由共享控件处理，资源状态由独立模型卡读取。
 -->
 <template>
@@ -18,14 +18,22 @@
     </template>
     <div class="information-highlight-workspace">
       <div class="information-highlight-example"><InformationHighlightPreview :preferences="config.informationHighlight" /></div>
-      <InformationHighlightPreferences :config="config" :active="active"><template #after-mode><InformationHighlightModelCard v-if="config.informationHighlight.mode === 'surprisal-local'" :active="active" :model-id="config.informationHighlight.model" /></template></InformationHighlightPreferences>
+      <InformationHighlightPreferences :config="config" :active="active">
+        <template #after-mode>
+          <div v-if="config.informationHighlight.mode === 'surprisal-local'" class="information-highlight-models" role="radiogroup" :aria-label="t('informationHighlight.model.select')" data-information-highlight-models>
+            <span class="information-highlight-models-label">{{ t('informationHighlight.model.select') }}</span>
+            <InformationHighlightModelCard v-for="item in modelChoices" :key="item.model.id" :active="active" :model-id="item.model.id" :selected="config.informationHighlight.model === item.model.id" selectable :context-identity="context.revision.value" :onSelect="item.choose" />
+          </div>
+        </template>
+      </InformationHighlightPreferences>
     </div>
   </SettingsGroup>
 </template>
 <script setup lang="ts">
-import {ref, watch} from 'vue'
+import {computed, ref, watch} from 'vue'
 import {ElTooltip, type TooltipInstance} from 'element-plus'
 import type {Config} from '@/src/core/config/model'
+import {INFORMATION_HIGHLIGHT_MODELS} from '@/src/core/config/informationHighlightModel'
 import {useUiI18n} from '@/src/ui/i18n'
 import SettingsGroup from './components/SettingsGroup.vue'
 import FieldHelp from './components/FieldHelp.vue'
@@ -40,6 +48,12 @@ const tags = ['keywords', 'surprisal', 'reading'] as const
 const paperUrl = 'https://doi.org/10.1016/j.cognition.2013.02.013'
 const tagTooltips = ref<TooltipInstance[]>([])
 const context = useSettingsActionContext(() => props.active, () => [props.config, props.config.informationHighlight])
+const modelChoices = computed(() => {
+  const current = context.capture()
+  return Object.values(INFORMATION_HIGHLIGHT_MODELS).map(model => ({model, choose: () => {
+    if (current()) props.config.informationHighlight = {...props.config.informationHighlight, model: model.id}
+  }}))
+})
 watch(context.active, active => {
   if (!active) tagTooltips.value.forEach(tooltip => {tooltip.onClose(); tooltip.hide()})
 }, {flush: 'sync'})
@@ -49,6 +63,7 @@ watch(context.active, active => {
 :global(.information-highlight-paper) { color: inherit; font-weight: 600; text-decoration: underline; text-underline-offset: 2px; white-space: nowrap; }
 :global(.fluentread-information-highlight-tag-popper) { max-width: min(320px, calc(100vw - 32px)); font-size: 12px; line-height: 1.65; overflow-wrap: anywhere; }
 .information-highlight-workspace { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 24px; padding: 20px; align-items: start; }.information-highlight-example { min-width: 0; }
+.information-highlight-models { display: grid; gap: 12px; min-width: 0; }.information-highlight-models-label { color: var(--ink); font-size: 12px; font-weight: 600; }
 @media (max-width: 850px) { .information-highlight-workspace { grid-template-columns: minmax(0, 1fr); gap: 20px; padding: 16px; } }
 @media (max-width: 480px) { .information-highlight-workspace { padding: 12px; } }
 </style>

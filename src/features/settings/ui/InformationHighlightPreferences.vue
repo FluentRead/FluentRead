@@ -1,7 +1,7 @@
 <!--
 @file src/features/settings/ui/InformationHighlightPreferences.vue
 文件职责：提供智能高亮的开关与阅读偏好控件，让用户直接比较密度、渐变配色和绘制效果。
-主要内容：首行设置当前页面的开关快捷键，其下开关决定是否自动高亮；本地模式提供模型选择和资源卡插槽，选择只写偏好；以密度、色阶卡、浓度和绘制方式控制外观，所有写入绑定活跃配置归属。
+主要内容：首行设置当前页面的开关快捷键，其下开关决定是否自动高亮；分析方式后提供两张模型资源卡的插槽，模型选择由父级处理；以密度、色阶卡、浓度和绘制方式控制外观，所有写入绑定活跃配置归属。
 模块边界：只修改已有 Config.informationHighlight，不分析正文、不下载模型；设置持久化由父级现有配置服务负责。
 -->
 <template>
@@ -21,12 +21,6 @@
         <ElOption v-for="mode in modes" :key="mode" :value="mode" :label="t(`informationHighlight.mode.${mode}`)" :data-information-highlight-mode="mode" />
       </UiSelect>
       <small v-if="config.informationHighlight.mode === 'keywords'">{{ t('informationHighlight.mode.keywords.description') }}</small>
-    </label>
-    <label v-if="showMode && config.informationHighlight.mode === 'surprisal-local'" class="highlight-field">
-      <span>{{ t('informationHighlight.model.select') }}</span>
-      <UiSelect :model-value="config.informationHighlight.model" :disabled="!context.active.value" :aria-label="t('informationHighlight.model.select')" :onUpdate:modelValue="actions.model" data-information-highlight-model-select>
-        <ElOption v-for="model in models" :key="model.id" :value="model.id" :label="model.name" />
-      </UiSelect>
     </label>
     <slot name="after-mode" />
     <div v-if="showDensity" class="highlight-field">
@@ -68,7 +62,6 @@ import {ElOption, ElSwitch} from 'element-plus'
 import UiSelect from '@/src/ui/components/UiSelect.vue'
 import type {Config} from '@/src/core/config/model'
 import type {InformationHighlightMode, InformationHighlightDensity, InformationHighlightColor, InformationHighlightIntensity, InformationHighlightStyle} from '@/src/core/config/informationHighlight'
-import {INFORMATION_HIGHLIGHT_MODELS, type InformationHighlightModelId} from '@/src/core/config/informationHighlightModel'
 import {INFORMATION_HIGHLIGHT_COLORS, INFORMATION_HIGHLIGHT_PALETTES, informationHighlightOpacity} from '@/src/features/information-highlight/domain/public'
 import {useSettingsActionContext} from '../model/useSettingsActionContext'
 import {useUiI18n} from '@/src/ui/i18n'
@@ -82,7 +75,6 @@ const props = withDefaults(defineProps<{config: Config; active?: boolean; compac
 const {t} = useUiI18n()
 const context = useSettingsActionContext(() => props.active, () => [props.config, props.config.informationHighlight])
 const modes: InformationHighlightMode[] = ['keywords', 'surprisal-local']
-const models = Object.values(INFORMATION_HIGHLIGHT_MODELS)
 const densities: InformationHighlightDensity[] = ['low', 'medium', 'high']
 const colors: readonly InformationHighlightColor[] = INFORMATION_HIGHLIGHT_COLORS
 const styles: InformationHighlightStyle[] = ['heatmap', 'background', 'underline']
@@ -116,8 +108,6 @@ const actions = computed(() => {
     if (current()) props.config.informationHighlight = {...props.config.informationHighlight, enabled: value === true}
   }, mode: (value: unknown) => {
     if (current() && modes.includes(value as InformationHighlightMode)) props.config.informationHighlight = {...props.config.informationHighlight, mode: value as InformationHighlightMode}
-  }, model: (value: unknown) => {
-    if (current() && models.some(model => model.id === value)) props.config.informationHighlight = {...props.config.informationHighlight, model: value as InformationHighlightModelId}
   }}
 })
 const densityChoices = computed(() => {const current = context.capture(); return densities.map(value => ({value, choose: () => {

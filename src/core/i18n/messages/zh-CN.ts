@@ -1376,6 +1376,7 @@ export const zhCNMessages = {
     'settings.translationStyle.category.line': '线条',
     'settings.translationStyle.category.mark': '标记',
     'settings.translationStyle.category.card': '卡片',
+    'settings.translationStyle.category.fun': '趣味',
     'settings.translationStyle.applyHint': "新样式从下一次翻译开始使用；外观微调会立即应用到已打开的网页",
     'settings.translationStyle.customizeTitle': '自定义外观',
     'settings.translationStyle.customizeDescription': "颜色选择“默认”时沿用样式自带的配色",

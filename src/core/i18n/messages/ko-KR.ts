@@ -1151,6 +1151,7 @@ export const koKRMessages = {
     'settings.translationStyle.category.line': '선',
     'settings.translationStyle.category.mark': '강조',
     'settings.translationStyle.category.card': '카드',
+    'settings.translationStyle.category.fun': '재미',
     'settings.translationStyle.applyHint': '새 스타일은 다음 번역부터 적용되며, 모양 조정은 열려 있는 페이지에 바로 반영됩니다.',
     'settings.translationStyle.customizeTitle': '모양 사용자 지정',
     'settings.translationStyle.customizeDescription': '색상을 ‘기본값’으로 두면 스타일 고유의 색상을 사용합니다.',

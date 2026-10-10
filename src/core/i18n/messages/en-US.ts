@@ -1379,6 +1379,7 @@ export const enUSMessages = {
     'settings.translationStyle.category.line': 'Lines',
     'settings.translationStyle.category.mark': 'Highlights',
     'settings.translationStyle.category.card': 'Cards',
+    'settings.translationStyle.category.fun': 'Fun',
     'settings.translationStyle.applyHint': 'New styles apply from the next translation. Appearance tweaks update open pages right away.',
     'settings.translationStyle.customizeTitle': 'Customize appearance',
     'settings.translationStyle.customizeDescription': 'Choose “Default” to keep the colors that come with the style.',

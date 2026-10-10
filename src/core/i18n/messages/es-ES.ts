@@ -1151,6 +1151,7 @@ export const esESMessages = {
     'settings.translationStyle.category.line': 'Líneas',
     'settings.translationStyle.category.mark': 'Resaltado',
     'settings.translationStyle.category.card': 'Tarjetas',
+    'settings.translationStyle.category.fun': 'Divertidos',
     'settings.translationStyle.applyHint': 'Un estilo nuevo se aplica desde la próxima traducción; los ajustes de apariencia se reflejan al instante en las páginas abiertas.',
     'settings.translationStyle.customizeTitle': 'Personalizar la apariencia',
     'settings.translationStyle.customizeDescription': 'Elige «Predeterminado» para mantener los colores propios del estilo.',

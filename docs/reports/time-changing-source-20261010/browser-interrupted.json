@@ -1,0 +1,693 @@
+{
+  "ok": false,
+  "extensionDir": "/Users/thinkstu/Desktop/copy/FluentRead-time-changing-text-20261010/.output/chrome-mv3",
+  "evidenceBoundary": "Production extension, isolated real Edge, deterministic local Microsoft transport; no live-provider or Firefox runtime claims.",
+  "coverage": {
+    "displayValues": 42,
+    "modes": [
+      "bilingual",
+      "single"
+    ],
+    "changingSourceMinimumQuietWindowMs": 1800,
+    "changingSourceMaximumQuietWindowMs": 10000
+  },
+  "cases": [
+    {
+      "name": "continuous-numeric-label",
+      "mode": "bilingual",
+      "requestsWhileChanging": 0,
+      "neighborUnchanged": true
+    },
+    {
+      "name": "continuous-numeric-prose",
+      "mode": "bilingual",
+      "requestsWhileChanging": 0,
+      "neighborUnchanged": true
+    },
+    {
+      "name": "continuous-nonnumeric-prose",
+      "mode": "bilingual",
+      "requestsWhileChanging": 0,
+      "neighborUnchanged": true
+    },
+    {
+      "name": "continuous-owner-numeric-label",
+      "mode": "bilingual",
+      "requestsWhileChanging": 0,
+      "neighborUnchanged": true
+    },
+    {
+      "name": "continuous-owner-nonnumeric-prose",
+      "mode": "bilingual",
+      "requestsWhileChanging": 0,
+      "neighborUnchanged": true
+    },
+    {
+      "name": "latest-stable-prose",
+      "mode": "bilingual",
+      "settledRequests": 3,
+      "numericLabelArtifacts": 0,
+      "replacedNumericOwnerArtifacts": 0
+    },
+    {
+      "name": "standalone-display",
+      "id": "clock",
+      "mode": "bilingual",
+      "initial": "12:34 PM",
+      "latest": "12:35 PM",
+      "translationArtifacts": 0,
+      "providerItems": 0,
+      "originalNodesPreserved": true,
+      "restoreShowsLatest": true
+    },
+    {
+      "name": "standalone-display",
+      "id": "clock-prefix",
+      "mode": "bilingual",
+      "initial": "AM 08:17",
+      "latest": "AM 08:18",
+      "translationArtifacts": 0,
+      "providerItems": 0,
+      "originalNodesPreserved": true,
+      "restoreShowsLatest": true
+    },
+    {
+      "name": "standalone-display",
+      "id": "clock-dotted",
+      "mode": "bilingual",
+      "initial": "8:19 a.m.",
+      "latest": "8:20 p.m.",
+      "translationArtifacts": 0,
+      "providerItems": 0,
+      "originalNodesPreserved": true,
+      "restoreShowsLatest": true
+    },
+    {
+      "name": "standalone-display",
+      "id": "clock-24h",
+      "mode": "bilingual",
+      "initial": "23:57",
+      "latest": "23:58",
+      "translationArtifacts": 0,
+      "providerItems": 0,
+      "originalNodesPreserved": true,
+      "restoreShowsLatest": true
+    },
+    {
+      "name": "standalone-display",
+      "id": "clock-seconds",
+      "mode": "bilingual",
+      "initial": "14:35:26",
+      "latest": "14:35:27",
+      "translationArtifacts": 0,
+      "providerItems": 0,
+      "originalNodesPreserved": true,
+      "restoreShowsLatest": true
+    },
+    {
+      "name": "standalone-display",
+      "id": "clock-fraction",
+      "mode": "bilingual",
+      "initial": "01:02:03.456",
+      "latest": "01:02:03.457",
+      "translationArtifacts": 0,
+      "providerItems": 0,
+      "originalNodesPreserved": true,
+      "restoreShowsLatest": true
+    },
+    {
+      "name": "standalone-display",
+      "id": "clock-fullwidth",
+      "mode": "bilingual",
+      "initial": "１２：４１ ＰＭ",
+      "latest": "１２：４２ ＰＭ",
+      "translationArtifacts": 0,
+      "providerItems": 0,
+      "originalNodesPreserved": true,
+      "restoreShowsLatest": true
+    },
+    {
+      "name": "standalone-display",
+      "id": "clock-offset",
+      "mode": "bilingual",
+      "initial": "14:43 +08:00",
+      "latest": "14:44 +08:00",
+      "translationArtifacts": 0,
+      "providerItems": 0,
+      "originalNodesPreserved": true,
+      "restoreShowsLatest": true
+    },
+    {
+      "name": "standalone-display",
+      "id": "clock-utc",
+      "mode": "bilingual",
+      "initial": "14:45 UTC",
+      "latest": "14:46 UTC",
+      "translationArtifacts": 0,
+      "providerItems": 0,
+      "originalNodesPreserved": true,
+      "restoreShowsLatest": true
+    },
+    {
+      "name": "standalone-display",
+      "id": "clock-gmt-offset",
+      "mode": "bilingual",
+      "initial": "14:47 GMT+0800",
+      "latest": "14:48 GMT+0800",
+      "translationArtifacts": 0,
+      "providerItems": 0,
+      "originalNodesPreserved": true,
+      "restoreShowsLatest": true
+    },
+    {
+      "name": "standalone-display",
+      "id": "clock-us-zone",
+      "mode": "bilingual",
+      "initial": "8:49 AM PST",
+      "latest": "8:50 AM PST",
+      "translationArtifacts": 0,
+      "providerItems": 0,
+      "originalNodesPreserved": true,
+      "restoreShowsLatest": true
+    },
+    {
+      "name": "standalone-display",
+      "id": "date-iso",
+      "mode": "bilingual",
+      "initial": "2026-10-10",
+      "latest": "2026-10-11",
+      "translationArtifacts": 0,
+      "providerItems": 0,
+      "originalNodesPreserved": true,
+      "restoreShowsLatest": true
+    },
+    {
+      "name": "standalone-display",
+      "id": "date-slash",
+      "mode": "bilingual",
+      "initial": "2026/10/12",
+      "latest": "2026/10/13",
+      "translationArtifacts": 0,
+      "providerItems": 0,
+      "originalNodesPreserved": true,
+      "restoreShowsLatest": true
+    },
+    {
+      "name": "standalone-display",
+      "id": "datetime-z",
+      "mode": "bilingual",
+      "initial": "2026-10-10T14:51:26.789Z",
+      "latest": "2026-10-10T14:51:27.789Z",
+      "translationArtifacts": 0,
+      "providerItems": 0,
+      "originalNodesPreserved": true,
+      "restoreShowsLatest": true
+    },
+    {
+      "name": "standalone-display",
+      "id": "datetime-offset",
+      "mode": "bilingual",
+      "initial": "2026-10-10 14:52:26 +08:00",
+      "latest": "2026-10-10 14:52:27 +08:00",
+      "translationArtifacts": 0,
+      "providerItems": 0,
+      "originalNodesPreserved": true,
+      "restoreShowsLatest": true
+    },
+    {
+      "name": "standalone-display",
+      "id": "date-localized",
+      "mode": "bilingual",
+      "initial": "2026年10月14日",
+      "latest": "2026年10月15日",
+      "translationArtifacts": 0,
+      "providerItems": 0,
+      "originalNodesPreserved": true,
+      "restoreShowsLatest": true
+    },
+    {
+      "name": "standalone-display",
+      "id": "datetime-traditional",
+      "mode": "bilingual",
+      "initial": "2026年10月10日 14時53分26秒",
+      "latest": "2026年10月10日 14時53分27秒",
+      "translationArtifacts": 0,
+      "providerItems": 0,
+      "originalNodesPreserved": true,
+      "restoreShowsLatest": true
+    },
+    {
+      "name": "standalone-display",
+      "id": "social-clock-date",
+      "mode": "bilingual",
+      "initial": "14:54 · 2026年10月10日",
+      "latest": "14:55 · 2026年10月10日",
+      "translationArtifacts": 0,
+      "providerItems": 0,
+      "originalNodesPreserved": true,
+      "restoreShowsLatest": true
+    },
+    {
+      "name": "standalone-display",
+      "id": "social-date-clock",
+      "mode": "bilingual",
+      "initial": "2026年10月10日 · 14:56",
+      "latest": "2026年10月10日 · 14:57",
+      "translationArtifacts": 0,
+      "providerItems": 0,
+      "originalNodesPreserved": true,
+      "restoreShowsLatest": true
+    },
+    {
+      "name": "standalone-display",
+      "id": "duration",
+      "mode": "bilingual",
+      "initial": "5 minutes",
+      "latest": "4 minutes",
+      "translationArtifacts": 0,
+      "providerItems": 0,
+      "originalNodesPreserved": true,
+      "restoreShowsLatest": true
+    },
+    {
+      "name": "standalone-display",
+      "id": "duration-seconds",
+      "mode": "bilingual",
+      "initial": "27 seconds",
+      "latest": "26 seconds",
+      "translationArtifacts": 0,
+      "providerItems": 0,
+      "originalNodesPreserved": true,
+      "restoreShowsLatest": true
+    },
+    {
+      "name": "standalone-display",
+      "id": "duration-milliseconds",
+      "mode": "bilingual",
+      "initial": "0.25 ms",
+      "latest": "0.24 ms",
+      "translationArtifacts": 0,
+      "providerItems": 0,
+      "originalNodesPreserved": true,
+      "restoreShowsLatest": true
+    },
+    {
+      "name": "standalone-display",
+      "id": "duration-dotted-sec",
+      "mode": "bilingual",
+      "initial": "28 sec.",
+      "latest": "29 sec.",
+      "translationArtifacts": 0,
+      "providerItems": 0,
+      "originalNodesPreserved": true,
+      "restoreShowsLatest": true
+    },
+    {
+      "name": "standalone-display",
+      "id": "duration-dotted-min",
+      "mode": "bilingual",
+      "initial": "6 min.",
+      "latest": "7 min.",
+      "translationArtifacts": 0,
+      "providerItems": 0,
+      "originalNodesPreserved": true,
+      "restoreShowsLatest": true
+    },
+    {
+      "name": "standalone-display",
+      "id": "duration-dotted-hour",
+      "mode": "bilingual",
+      "initial": "3 hr.",
+      "latest": "4 hr.",
+      "translationArtifacts": 0,
+      "providerItems": 0,
+      "originalNodesPreserved": true,
+      "restoreShowsLatest": true
+    },
+    {
+      "name": "standalone-display",
+      "id": "duration-compact",
+      "mode": "bilingual",
+      "initial": "1h 15m 31s",
+      "latest": "1h 15m 32s",
+      "translationArtifacts": 0,
+      "providerItems": 0,
+      "originalNodesPreserved": true,
+      "restoreShowsLatest": true
+    },
+    {
+      "name": "standalone-display",
+      "id": "duration-mixed",
+      "mode": "bilingual",
+      "initial": "2 hours, 16 minutes",
+      "latest": "2 hours, 17 minutes",
+      "translationArtifacts": 0,
+      "providerItems": 0,
+      "originalNodesPreserved": true,
+      "restoreShowsLatest": true
+    },
+    {
+      "name": "standalone-display",
+      "id": "duration-future",
+      "mode": "bilingual",
+      "initial": "in 18 minutes",
+      "latest": "in 17 minutes",
+      "translationArtifacts": 0,
+      "providerItems": 0,
+      "originalNodesPreserved": true,
+      "restoreShowsLatest": true
+    },
+    {
+      "name": "standalone-display",
+      "id": "duration-ago",
+      "mode": "bilingual",
+      "initial": "19 minutes ago",
+      "latest": "20 minutes ago",
+      "translationArtifacts": 0,
+      "providerItems": 0,
+      "originalNodesPreserved": true,
+      "restoreShowsLatest": true
+    },
+    {
+      "name": "standalone-display",
+      "id": "duration-traditional-minute",
+      "mode": "bilingual",
+      "initial": "21分鐘",
+      "latest": "22分鐘",
+      "translationArtifacts": 0,
+      "providerItems": 0,
+      "originalNodesPreserved": true,
+      "restoreShowsLatest": true
+    },
+    {
+      "name": "standalone-display",
+      "id": "duration-traditional-second",
+      "mode": "bilingual",
+      "initial": "32秒鐘",
+      "latest": "33秒鐘",
+      "translationArtifacts": 0,
+      "providerItems": 0,
+      "originalNodesPreserved": true,
+      "restoreShowsLatest": true
+    },
+    {
+      "name": "standalone-display",
+      "id": "duration-traditional-hour",
+      "mode": "bilingual",
+      "initial": "5小時",
+      "latest": "6小時",
+      "translationArtifacts": 0,
+      "providerItems": 0,
+      "originalNodesPreserved": true,
+      "restoreShowsLatest": true
+    },
+    {
+      "name": "standalone-display",
+      "id": "duration-traditional-future",
+      "mode": "bilingual",
+      "initial": "23分鐘後",
+      "latest": "22分鐘後",
+      "translationArtifacts": 0,
+      "providerItems": 0,
+      "originalNodesPreserved": true,
+      "restoreShowsLatest": true
+    },
+    {
+      "name": "standalone-display",
+      "id": "duration-chinese-past",
+      "mode": "bilingual",
+      "initial": "34秒前",
+      "latest": "35秒前",
+      "translationArtifacts": 0,
+      "providerItems": 0,
+      "originalNodesPreserved": true,
+      "restoreShowsLatest": true
+    },
+    {
+      "name": "standalone-display",
+      "id": "number",
+      "mode": "bilingual",
+      "initial": "1,234.56",
+      "latest": "1,234.57",
+      "translationArtifacts": 0,
+      "providerItems": 0,
+      "originalNodesPreserved": true,
+      "restoreShowsLatest": true
+    },
+    {
+      "name": "standalone-display",
+      "id": "number-percent",
+      "mode": "bilingual",
+      "initial": "98.5%",
+      "latest": "98.6%",
+      "translationArtifacts": 0,
+      "providerItems": 0,
+      "originalNodesPreserved": true,
+      "restoreShowsLatest": true
+    },
+    {
+      "name": "standalone-display",
+      "id": "number-currency",
+      "mode": "bilingual",
+      "initial": "$12.75",
+      "latest": "$12.76",
+      "translationArtifacts": 0,
+      "providerItems": 0,
+      "originalNodesPreserved": true,
+      "restoreShowsLatest": true
+    },
+    {
+      "name": "standalone-display",
+      "id": "split-timer",
+      "mode": "bilingual",
+      "initial": "5 minutes 12 seconds",
+      "latest": "4 minutes 13 seconds",
+      "translationArtifacts": 0,
+      "providerItems": 0,
+      "originalNodesPreserved": true,
+      "restoreShowsLatest": true
+    },
+    {
+      "name": "standalone-display",
+      "id": "split-duration",
+      "mode": "bilingual",
+      "initial": "24 minutes 36 seconds",
+      "latest": "25 minutes 37 seconds",
+      "translationArtifacts": 0,
+      "providerItems": 0,
+      "originalNodesPreserved": true,
+      "restoreShowsLatest": true
+    },
+    {
+      "name": "standalone-display",
+      "id": "split-clock",
+      "mode": "bilingual",
+      "initial": "14:58:38",
+      "latest": "14:59:39",
+      "translationArtifacts": 0,
+      "providerItems": 0,
+      "originalNodesPreserved": true,
+      "restoreShowsLatest": true
+    },
+    {
+      "name": "standalone-display",
+      "id": "split-date",
+      "mode": "bilingual",
+      "initial": "2026-10-16 15:01 UTC",
+      "latest": "2026-10-17 15:02 UTC",
+      "translationArtifacts": 0,
+      "providerItems": 0,
+      "originalNodesPreserved": true,
+      "restoreShowsLatest": true
+    },
+    {
+      "name": "standalone-display",
+      "id": "time-element",
+      "mode": "bilingual",
+      "initial": "26 minutes ago",
+      "latest": "27 minutes ago",
+      "translationArtifacts": 0,
+      "providerItems": 0,
+      "originalNodesPreserved": true,
+      "restoreShowsLatest": true
+    },
+    {
+      "name": "restore-with-pending-quiet-window",
+      "mode": "bilingual",
+      "requestsAfterRestore": 0
+    },
+    {
+      "name": "restore-and-retranslate",
+      "mode": "bilingual",
+      "normalArtifacts": 1,
+      "displayArtifacts": 0
+    },
+    {
+      "name": "restore-while-continuously-changing",
+      "mode": "bilingual",
+      "requestsAfterRestore": 0,
+      "latestSources": {
+        "cancel-counter": "Visitors: 208",
+        "cancel-changing": "Loading the stylesheet."
+      }
+    },
+    {
+      "name": "slow-nonnumeric-source-cadence",
+      "mode": "bilingual",
+      "cadenceMs": 2200,
+      "samples": [
+        {
+          "source": "The chapter is loading its glossary.",
+          "translatedItems": 31,
+          "artifacts": 1
+        },
+        {
+          "source": "The chapter is arranging its illustrations.",
+          "translatedItems": 31,
+          "artifacts": 0
+        },
+        {
+          "source": "The chapter is checking its references.",
+          "translatedItems": 31,
+          "artifacts": 0
+        },
+        {
+          "source": "The chapter is updating its outline.",
+          "translatedItems": 31,
+          "artifacts": 0
+        },
+        {
+          "source": "The chapter is preparing the final preview.",
+          "translatedItems": 31,
+          "artifacts": 0
+        }
+      ],
+      "requestsBeforeRecognition": 1,
+      "requestsAfterRecognition": 0,
+      "settledRequests": 1
+    },
+    {
+      "name": "stale-provider-result",
+      "mode": "bilingual",
+      "oldSourceNeverCommitted": true,
+      "latestSourceTranslated": true
+    },
+    {
+      "name": "restore-with-inflight-request",
+      "mode": "bilingual",
+      "translationArtifacts": 0,
+      "latestSource": "The current host text must survive cancellation unchanged."
+    }
+  ],
+  "errors": [
+    "Error: 测试 Edge 进程 72675 成为了前台应用；测试已停止\n    at newPageWithoutForeground (/Users/thinkstu/Desktop/copy/FluentRead-time-changing-text-20261010/scripts/testing/focus-safe-browser.cjs:550:13)\n    at process.processTicksAndRejections (node:internal/process/task_queues:95:5)\n    at async openPage (/Users/thinkstu/Desktop/copy/FluentRead-time-changing-text-20261010/scripts/testing/run-changing-source-test.cjs:134:26)\n    at async /Users/thinkstu/Desktop/copy/FluentRead-time-changing-text-20261010/scripts/testing/run-changing-source-test.cjs:176:26"
+  ],
+  "launchMode": "macos-background-cdp",
+  "focusPolicy": "launchservices-no-foreground",
+  "windowPlacement": {
+    "mode": "background-visible-no-focus",
+    "visible": true,
+    "hidden": false,
+    "centered": true,
+    "windowState": "normal",
+    "bounds": {
+      "left": 212,
+      "top": -990,
+      "width": 1280,
+      "height": 900
+    },
+    "displayTarget": "secondary",
+    "source": "macos-nsscreen",
+    "screenIndex": 1,
+    "browserFrontmost": false,
+    "frontmostBefore": {
+      "pid": 44386,
+      "name": "Google Chrome"
+    },
+    "frontmostAfter": {
+      "pid": 44386,
+      "name": "Google Chrome"
+    }
+  },
+  "dynamicSamples": [
+    {
+      "mode": "bilingual",
+      "sameNeighbor": true,
+      "lastSamples": [
+        {
+          "counter": 0,
+          "changing": 0,
+          "changing-words": 0,
+          "counter-owner": 0,
+          "changing-owner": 0
+        },
+        {
+          "counter": 0,
+          "changing": 0,
+          "changing-words": 0,
+          "counter-owner": 0,
+          "changing-owner": 0
+        },
+        {
+          "counter": 0,
+          "changing": 0,
+          "changing-words": 0,
+          "counter-owner": 0,
+          "changing-owner": 0
+        },
+        {
+          "counter": 0,
+          "changing": 0,
+          "changing-words": 0,
+          "counter-owner": 0,
+          "changing-owner": 0
+        },
+        {
+          "counter": 0,
+          "changing": 0,
+          "changing-words": 0,
+          "counter-owner": 0,
+          "changing-owner": 0
+        },
+        {
+          "counter": 0,
+          "changing": 0,
+          "changing-words": 0,
+          "counter-owner": 0,
+          "changing-owner": 0
+        },
+        {
+          "counter": 0,
+          "changing": 0,
+          "changing-words": 0,
+          "counter-owner": 0,
+          "changing-owner": 0
+        },
+        {
+          "counter": 0,
+          "changing": 0,
+          "changing-words": 0,
+          "counter-owner": 0,
+          "changing-owner": 0
+        },
+        {
+          "counter": 0,
+          "changing": 0,
+          "changing-words": 0,
+          "counter-owner": 0,
+          "changing-owner": 0
+        },
+        {
+          "counter": 0,
+          "changing": 0,
+          "changing-words": 0,
+          "counter-owner": 0,
+          "changing-owner": 0
+        }
+      ],
+      "clicks": 1,
+      "duplicates": 0
+    }
+  ],
+  "caseCount": 54
+}

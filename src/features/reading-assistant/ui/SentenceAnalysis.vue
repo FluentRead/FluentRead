@@ -1,20 +1,23 @@
 <!--
  * @file src/features/reading-assistant/ui/SentenceAnalysis.vue
  * 文件职责：在原文片段下展示当前界面语言的句中作用和词性，让学习者先总览结构，再点击查看含义。
- * 主要内容：保留原文顺序和未标注文字，双行片段呈现主语、谓语等明确作用及词性，不混入英文角色名称；完整作用和含义点击可查，通用说明按需展开，支持方向键切换及深浅主题。
+ * 主要内容：以紧凑双行片段保留原文顺序，将间隔和标点与前一片段一起排版；常见作用及词性本地化，未识别名称保留模型已有摘要，去掉未知或重复维度的冗余标签；完整作用和含义点击可查，支持方向键切换及深浅主题。
  * 模块边界：只接收已经锚定的标注，不进行词性猜测、不发起请求，不写入宿主网页。
  -->
 <template>
   <section class="fr-sentence-analysis" :aria-label="translateLegacy('词性与句法')">
     <div class="fr-sentence-tokens" role="group" :aria-label="translateLegacy('原文词性标注')" :title="translateLegacy('点击原文片段，查看词性和句中作用')" @keydown="navigateAnnotations">
-      <template v-for="(annotation, index) in annotations" :key="`${annotation.start}-${annotation.end}`">
-        <span class="fr-sentence-gap">{{ source.slice(index ? annotations[index - 1].end : 0, annotation.start) }}</span>
+      <span class="fr-sentence-gap">{{ source.slice(0, annotations[0]?.start || 0) }}</span>
+      <template v-for="({annotation, punctuation, remaining}, index) in units" :key="`${annotation.start}-${annotation.end}`">
+      <span class="fr-sentence-unit">
         <button type="button" :data-pos="annotation.part.id" :data-role="describeSentenceRole(annotation.role).id" :aria-pressed="selected === index" :tabindex="selected === index ? 0 : -1" :aria-label="`${annotation.text} · ${annotationLabel(annotation)}`" :title="annotationLabel(annotation)" @click="selectAnnotation(index)">
           <span class="fr-sentence-token-text">{{ annotation.text }}</span>
           <span class="fr-sentence-token-meta">{{ annotationLabel(annotation) }}</span>
         </button>
+        <span class="fr-sentence-gap">{{ punctuation }}</span>
+      </span>
+      <span class="fr-sentence-gap">{{ remaining }}</span>
       </template>
-      <span>{{ source.slice(annotations[annotations.length - 1]?.end || 0) }}</span>
     </div>
     <div v-if="active" ref="detail" class="fr-sentence-detail" aria-live="polite">
       <div class="fr-sentence-detail-heading"><strong>{{ active.text }}</strong><span>{{ partLabel(active) }}</span></div>
@@ -36,11 +39,21 @@ const props = defineProps<{source: string; annotations: SentenceAnnotation[]}>()
 const {translateLegacy} = useUiI18n();
 const selected = ref(0);
 const detail = ref<HTMLElement>();
+const units = computed(() => props.annotations.map((annotation, index) => {
+  const gap = props.source.slice(annotation.end, props.annotations[index + 1]?.start ?? props.source.length);
+  // 只将紧邻的标点和横向空白附在片段后，未标注正文独立换行，避免挤窄部分标注。
+  const punctuation = gap.match(/^[\p{P}\p{Zs}\t]*/u)![0];
+  return {annotation, punctuation, remaining: gap.slice(punctuation.length)};
+}));
+const unknownLabel = (value: string) => /^(?:unknown|other|其他|未知|未明确)$/iu.test(value.trim());
 function partLabel(annotation: SentenceAnnotation): string {
-  return translateLegacy(annotation.part.id === 'other' ? '其他' : annotation.part.label);
+  return translateLegacy(unknownLabel(annotation.part.label) ? '其他' : annotation.part.label);
 }
 function annotationLabel(annotation: SentenceAnnotation): string {
-  return `${translateLegacy(describeSentenceRole(annotation.role).label)} · ${partLabel(annotation)}`;
+  const role = describeSentenceRole(annotation.role);
+  const roleLabel = role.id === 'other' ? summarizeSentenceRole(annotation.role) : translateLegacy(role.label);
+  const labels = [unknownLabel(roleLabel) ? '' : roleLabel, unknownLabel(annotation.part.label) ? '' : partLabel(annotation)].filter(Boolean);
+  return [...new Set(labels)].join(' · ') || translateLegacy('其他');
 }
 function roleDescription(annotation: SentenceAnnotation): string {
   const role = describeSentenceRole(annotation.role);
@@ -75,11 +88,13 @@ watch(() => [props.source, props.annotations.length] as const, ([source, length]
 });
 </script>
 <style scoped>
-.fr-sentence-analysis { margin: 10px 0; }
+.fr-sentence-analysis { margin: 8px 0; }
 .fr-sentence-tokens { line-height: 1.6; white-space: pre-wrap; overflow-wrap: anywhere; }
-.fr-sentence-tokens button { --pos-color: #846242; font: inherit; display: inline-flex; flex-direction: column; align-items: flex-start; vertical-align: top; gap: 3px; max-width: 100%; margin: 3px 0; padding: 6px 8px; border: 0; border-bottom: 3px solid color-mix(in srgb,var(--pos-color) 55%,transparent); border-radius: 7px 7px 0 0; background: color-mix(in srgb,var(--pos-color) 5%,transparent); color: inherit; cursor: pointer; text-align: start; white-space: normal; overflow-wrap: anywhere; }
-.fr-sentence-token-text { max-width: 100%; font-size: 14px; line-height: 1.5; }
-.fr-sentence-token-meta { max-width: 100%; font-size: 11px; line-height: 1.5; color: var(--fr-reading-muted, var(--el-text-color-secondary, #756a74)); white-space: normal; overflow-wrap: anywhere; user-select: none; }
+.fr-sentence-unit { display: inline-flex; align-items: flex-start; max-width: 100%; vertical-align: top; margin-block: 3px; }
+.fr-sentence-gap { white-space: pre-wrap; padding-top: 6px; }
+.fr-sentence-tokens button { --pos-color: #846242; font: inherit; display: inline-flex; flex-direction: column; align-items: flex-start; gap: 3px; min-width: 0; max-width: 100%; margin: 0; padding: 6px 9px; border: 1px solid color-mix(in srgb,var(--pos-color) 18%,transparent); border-bottom: 2px solid color-mix(in srgb,var(--pos-color) 45%,transparent); border-radius: 8px; background: color-mix(in srgb,var(--pos-color) 5%,transparent); color: inherit; cursor: pointer; text-align: start; white-space: normal; overflow-wrap: anywhere; }
+.fr-sentence-token-text { max-width: 100%; font-size: 13px; line-height: 1.5; }
+.fr-sentence-token-meta { max-width: 100%; font-size: 11px; line-height: 1.45; color: var(--fr-reading-muted, var(--el-text-color-secondary, #756a74)); white-space: normal; overflow-wrap: anywhere; user-select: none; }
 .fr-dark-theme .fr-sentence-token-meta { color: #b6a9b5; }
 .fr-sentence-tokens button[data-pos=noun], .fr-sentence-tokens button[data-pos=pronoun] { --pos-color:#3c7fbb; }
 .fr-sentence-tokens button[data-pos=verb], .fr-sentence-tokens button[data-pos=auxiliary] { --pos-color:#bd5481; }
@@ -90,15 +105,15 @@ watch(() => [props.source, props.annotations.length] as const, ([source, length]
 .fr-sentence-tokens button[data-role=predicate] { --pos-color:#bd5481; }
 .fr-sentence-tokens button[data-role=object], .fr-sentence-tokens button[data-role=indirect-object] { --pos-color:#527fbb; }
 .fr-sentence-tokens button[data-role=attribute], .fr-sentence-tokens button[data-role=postmodifier] { --pos-color:#a4792c; }
-.fr-sentence-tokens button[aria-pressed=true] { border-bottom-color: var(--pos-color); box-shadow: inset 0 0 0 1.5px var(--pos-color); background: color-mix(in srgb,var(--pos-color) 7%,transparent); }
+.fr-sentence-tokens button[aria-pressed=true] { border-color: var(--pos-color); background: color-mix(in srgb,var(--pos-color) 8%,transparent); }
 .fr-sentence-tokens button:hover { background: color-mix(in srgb,var(--pos-color) 10%,transparent); }
 .fr-sentence-tokens button:focus-visible, .fr-sentence-reference summary:focus-visible { outline: 2px solid currentColor; outline-offset: 2px; }
-.fr-sentence-detail { margin: 10px 0 0; border-top: 1px solid var(--fr-answer-border,#e9e9ef); padding-top: 10px; }
+.fr-sentence-detail { margin: 8px 0 0; padding: 9px 10px; border: 1px solid var(--fr-answer-border,#e9e9ef); border-radius: 8px; background: var(--fr-answer-soft,#f8f8fa); }
 .fr-sentence-detail-heading { display: flex; align-items: baseline; flex-wrap: wrap; gap: 4px 8px; }
-.fr-sentence-detail-heading strong { font-size: 13px; }
+.fr-sentence-detail-heading strong { font-size: 12px; line-height: 1.5; overflow-wrap: anywhere; }
 .fr-sentence-detail-heading > span { font-size: 11px; opacity: .75; }
 .fr-sentence-detail p { margin: 4px 0 0; overflow-wrap: anywhere; }
-.fr-sentence-meaning { font-size: 14px; line-height: 1.7; }
+.fr-sentence-meaning { font-size: 13px; line-height: 1.7; }
 .fr-sentence-role { font-size: 12px; }
 .fr-sentence-role > span { margin-inline-end: 8px; opacity: .65; }
 .fr-sentence-reference { margin-top: 6px; font-size: 11px; color: var(--fr-reading-muted, var(--el-text-color-secondary, #756a74)); }

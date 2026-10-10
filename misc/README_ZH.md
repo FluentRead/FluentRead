@@ -18,7 +18,9 @@ FluentRead 支持在原网页中对照阅读原文与译文，并提供划词翻
 
 [![流畅阅读介绍视频](../docs/public/videos/fluentread-promo-zh-poster.webp)](https://read.thinkstu.com/videos/fluentread-promo-zh.mp4)
 
-[▶ 观看 56 秒介绍视频](https://read.thinkstu.com/videos/fluentread-promo-zh.mp4) · [English](https://read.thinkstu.com/videos/fluentread-promo-en.mp4)
+[▶ 观看 56 秒介绍视频](https://read.thinkstu.com/videos/fluentread-promo-zh.mp4)
+
+想进一步了解流畅阅读，可以[观看完整官方介绍片（4 分多钟 · B 站）](https://www.bilibili.com/video/BV1qhHJ6uEiF/)。
 
 </div>
 

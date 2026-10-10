@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// 学习面板专项：在隔离生产扩展中检查四个动作的按需原文对照、历史逐轮展开、选中状态、点词、键盘和追问；所有子集均使用划词卡的外部导航模式。
+// 学习面板专项：在隔离生产扩展中检查四个动作的按需原文对照、历史逐轮展开、结构置顶、选中状态、点词、键盘和追问；所有子集均使用划词卡的外部导航模式。
 const fs = require('node:fs');
 const path = require('node:path');
 const os = require('node:os');
@@ -16,12 +16,24 @@ const output = path.resolve(arg('artifacts-dir'));
 const extensionDir = path.resolve(arg('extension-dir'));
 const {chromium} = createRequire(path.join(arg('playwright-root'), 'package.json'))('playwright');
 const helper = require(path.resolve(arg('focus-safe-helper')));
-const sentence = 'Different printing sequences have different filament switching sequences';
+const syntaxLayoutOnly = process.argv.includes('--syntax-layout-only');
+const syntaxSentence = 'When switching between different filaments for printing on a single nozzle (hotend) printer, it is necessary to use a certain amount of new filament.';
+const sentence = syntaxLayoutOnly ? syntaxSentence : 'Different printing sequences have different filament switching sequences';
 const grammar = '| Text | POS | Role | Meaning |\n| --- | --- | --- | --- |\n| Different | adjective | 定语，修饰 printing sequences | 不同的 |\n| printing sequences | phrase | 主语 | 打印顺序 |\n| have | verb | 谓语 | 具有、带来 |\n| different | adjective | 定语，修饰后面的名词短语 | 不同的 |\n| filament switching sequences | phrase | 宾语 | 耗材切换顺序 |\n\n### 句子主干\n打印顺序不同，耗材的切换顺序也会不同。\n\n这里的 switching 修饰 sequences，说明是“切换的顺序”。';
-let nextAnswer = grammar;
+// 有意把表格放在长前言与句子主干之后，复现需要滚动到回答中段才能看到结构的问题。
+const syntaxGrammar = '### 词性与句法\n\n' + ('这句话讨论单喷嘴打印机更换耗材时的必要操作。开头给出切换不同耗材的场景，主句解释为什么需要用一段新的耗材完成切换。\n\n'.repeat(7))
+ + '### 句子主干\n\n主句采用 it is necessary to do 的结构：it 是形式主语，真正要说明的动作放在不定式短语里。When 引出的部分补充动作发生的时间和条件。\n\n'
+ + '| Text | POS | Role | Meaning |\n| --- | --- | --- | --- |\n'
+ + '| When switching between different filaments for printing on a single nozzle (hotend) printer | adverbial clause | 时间状语，说明切换耗材的场景 | 在单喷嘴打印机上切换不同耗材时 |\n'
+ + '| it | pronoun | 形式主语 | 形式主语，代指后面的不定式动作 |\n'
+ + '| is | auxiliary verb | 谓语 | 是 |\n'
+ + '| necessary | adjective | 表语 | 必要的 |\n'
+ + '| to use a certain amount of new filament | infinitive phrase | 真正主语 | 使用一定量的新耗材 |\n\n'
+ + '### 结构说明\n\n结构总览保留原句的逗号、空格与句号；点击片段查看其含义和句中作用。';
+let nextAnswer = syntaxLayoutOnly ? syntaxGrammar : grammar;
 let chunkDelay = 15;
 let translationDelay = 0;
-const translationFixture = '不同的打印顺序会带来不同的耗材切换顺序。';
+const translationFixture = syntaxLayoutOnly ? '在单喷嘴（热端）打印机上切换不同耗材时，需要使用一定量的新耗材。' : '不同的打印顺序会带来不同的耗材切换顺序。';
 const report = {providerEvidence:'Production extension in isolated Edge; translation and AI responses use deterministic local fixtures. No live translation or AI quality claim.',ok:false,cases:[],screenshots:[],consoleErrors:[],translationRequests:0,aiRequests:0,focusSamples:[],ownedBrowserClosed:false,profileRemoved:false};
 const record = name => {report.cases.push(name); console.log('PASS',name);};
 const wait = ms => new Promise(resolve=>setTimeout(resolve,ms));
@@ -77,7 +89,8 @@ async function shot(name) {
 }
 async function layout() {return ui(function(){
  const area=this.querySelector('.fr-reading-result').getBoundingClientRect(),tokens=this.querySelector('.fr-sentence-tokens'),detail=this.querySelector('.fr-sentence-detail').getBoundingClientRect(),card=this.getBoundingClientRect();
- return{cardHeight:card.height,cardWidth:card.width,answerHeight:area.height,tokensHeight:tokens.getBoundingClientRect().height,sourceCopies:this.querySelectorAll('.fr-reading-source').length,sourceText:[...tokens.children].map(element=>element.matches('button') ? (element.querySelector('.fr-sentence-token-text')||element).textContent : element.textContent).join(''),labels:[...tokens.querySelectorAll('.fr-sentence-token-meta')].map(element=>({text:element.textContent.trim(),visible:element.getBoundingClientRect().bottom<=area.bottom&&element.getBoundingClientRect().top>=area.top,clipped:element.scrollWidth>element.clientWidth+1})),detailVisible:detail.top>=area.top&&detail.bottom<=area.bottom,overflow:this.scrollWidth>this.clientWidth+1,hostScroll:scrollY};
+ const source=tokens.cloneNode(true);source.querySelectorAll('.fr-sentence-token-meta').forEach(element=>element.remove());
+ return{cardHeight:card.height,cardWidth:card.width,answerHeight:area.height,tokensHeight:tokens.getBoundingClientRect().height,sourceCopies:this.querySelectorAll('.fr-reading-source').length,sourceText:source.textContent,labels:[...tokens.querySelectorAll('.fr-sentence-token-meta')].map(element=>({text:element.textContent.trim(),visible:element.getBoundingClientRect().bottom<=area.bottom&&element.getBoundingClientRect().top>=area.top,clipped:element.scrollWidth>element.clientWidth+1})),detailVisible:detail.top>=area.top&&detail.bottom<=area.bottom,overflow:this.scrollWidth>this.clientWidth+1,hostScroll:scrollY};
 });}
 async function sourceLayout() {return ui(function(){
  const scroll=this.querySelector('.fr-reading-result'),area=scroll.getBoundingClientRect(),source=scroll.querySelector('.fr-reading-source'),text=source.querySelector('p').getBoundingClientRect(),body=scroll.querySelector('.fr-reading-body').getBoundingClientRect();
@@ -124,6 +137,67 @@ async function returnFromSource(expected=sentence) {
 async function wheelResult(delta) {
  const point=await ui(function(){const rect=this.querySelector('.fr-reading-result').getBoundingClientRect();return{x:rect.left+Math.min(40,rect.width/2),y:rect.top+rect.height/2};});
  await page.mouse.move(point.x,point.y);await page.mouse.wheel(0,delta);await wait(100);
+}
+async function syntaxLayout() {return ui(function(){
+ const scroll=this.querySelector('.fr-reading-result'),area=scroll.getBoundingClientRect(),answer=this.querySelector('.fr-reading-answer'),markdown=answer?.querySelector('.fr-reading-markdown'),structure=markdown?.querySelector('.fr-reading-structure'),tokens=structure?.querySelector('.fr-sentence-tokens'),card=this.getBoundingClientRect();
+ if(!structure||!tokens)return{present:false,busy:answer?.getAttribute('aria-busy')==='true'};
+ const source=tokens.cloneNode(true);source.querySelectorAll('.fr-sentence-token-meta').forEach(element=>element.remove());
+ const first=tokens.querySelector('button').getBoundingClientRect(),bounds=structure.getBoundingClientRect();
+ return{present:true,first:markdown.firstElementChild===structure,scrollTop:scroll.scrollTop,sourceText:source.textContent,busy:answer.getAttribute('aria-busy')==='true',bodyLength:markdown.textContent.length,structureTop:bounds.top-area.top,firstTokenWidth:first.width,firstTokenVisible:first.top>=area.top-1&&first.bottom<=area.bottom+1,selected:tokens.querySelector('button[aria-pressed="true"] .fr-sentence-token-text')?.textContent,detail:structure.querySelector('.fr-sentence-detail-heading strong')?.textContent,labels:[...tokens.querySelectorAll('.fr-sentence-token-meta')].map(element=>element.textContent.trim()),overflow:this.scrollWidth>this.clientWidth+1,tokensOverflow:tokens.scrollWidth>tokens.clientWidth+1,unitsOverflow:[...tokens.querySelectorAll('.fr-sentence-unit')].some(element=>element.getBoundingClientRect().right>tokens.getBoundingClientRect().right+1),hostScroll:scrollY,card:{width:card.width,height:card.height}};
+});}
+async function clickSyntaxToken(text) {
+ const point=await ui(function(text){const token=[...this.querySelectorAll('.fr-sentence-token-text')].find(element=>element.textContent===text);if(!token)return null;const r=token.closest('button').getBoundingClientRect();return{x:r.left+r.width/2,y:r.top+r.height/2};},text);
+ assert(point,`Missing sentence fragment: ${text}`);await page.mouse.click(point.x,point.y);await wait(60);
+}
+function assertSyntaxLayout(state,{atTop=true}={}) {
+ assert(state.present,'structure was not rendered');assert(state.first,'structure is not the first ReadingAnswer element');
+ assert.equal(state.sourceText,syntaxSentence,'structure changed source order, punctuation or spacing');
+ assert.equal(state.labels.length,5);assert(state.labels.every(label=>!label.includes('其他 · 其他')),'unhelpful duplicate fallback label remains');
+ for(const [index,role] of ['时间状语','形式主语','谓语','表语','真正主语'].entries())assert(state.labels[index].includes(role),`fragment ${index} lost its stated role: ${state.labels[index]}`);
+ assert(state.labels[0].includes('adverbial clause')||state.labels[0].includes('状语从句'),'the supplied clause POS is hidden');
+ assert.equal(state.overflow,false,'card has horizontal overflow');assert.equal(state.tokensOverflow,false,'structure has horizontal overflow');assert.equal(state.unitsOverflow,false,'a fragment exceeds the structure width');assert.equal(state.hostScroll,0);
+ if(atTop){assert.equal(state.scrollTop,0,'structure requires scrolling');assert(state.structureTop>=-1&&state.firstTokenVisible,'structure is clipped at the initial answer position');}
+}
+async function verifySyntaxLayout() {
+ await collapsedSource();report.syntaxInitial=await syntaxLayout();assertSyntaxLayout(report.syntaxInitial);
+ assert(await ui(function(){const body=this.querySelector('.fr-reading-answer .fr-reading-markdown');return body.textContent.includes('主句采用 it is necessary to do')&&body.textContent.includes('这句话讨论单喷嘴打印机');}),'moving the structure removed the original explanation');
+ await shot('syntax-desktop-light');record('a table after long introduction and main-clause prose renders first at scroll zero with complete source order and useful labels');
+ await clickSyntaxToken('it');assert.equal((await syntaxLayout()).detail,'it');
+ await page.keyboard.press('ArrowRight');assert.equal((await syntaxLayout()).detail,'is');
+ await page.keyboard.press('End');assert.equal((await syntaxLayout()).detail,'to use a certain amount of new filament');
+ await page.keyboard.press('Home');assert.equal((await syntaxLayout()).detail,'When switching between different filaments for printing on a single nozzle (hotend) printer');
+ assert.equal(await page.evaluate(()=>scrollY),0);record('fragment click, arrows, Home and End update the selected detail without scrolling the host');
+ report.syntaxWidths=[];
+ for(const theme of ['light','dark']) {
+  await page.setViewportSize({width:390,height:800});await patch({theme});await wheelResult(-5000);
+  const state=await syntaxLayout();assertSyntaxLayout(state);report.syntaxWidths.push({viewport:390,theme,...state});
+  await shot(`syntax-390-${theme}`);record(`390px ${theme}: the structure starts in view and long fragments wrap without horizontal overflow`);
+ }
+ const beforeResize=await syntaxLayout(),handle=await ui(function(){const r=this.querySelector('.fr-popup-resize-se').getBoundingClientRect();return{x:r.x+r.width/2,y:r.y+r.height/2};});
+ await page.mouse.move(handle.x,handle.y);await page.mouse.down();await page.mouse.move(handle.x+280-beforeResize.card.width,handle.y,{steps:8});await page.mouse.up();await wait(150);await wheelResult(-5000);
+ const narrow=await syntaxLayout();assertSyntaxLayout(narrow);assert(Math.abs(narrow.card.width-280)<1,'manual narrow-card fixture was not applied');report.syntaxWidths.push({viewport:390,manualWidth:280,theme:'dark',...narrow});
+ await shot('syntax-280-dark');record('280px manual card preserves the full sentence and wraps the structure without horizontal overflow');
+ // 再生响应先完成表格，再持续追加普通正文；用户点选的 it 不应被后续 Markdown 更新重置。
+ await page.setViewportSize({width:1440,height:960});await patch({theme:'light'});
+ const current=await syntaxLayout(),resize=await ui(function(){const r=this.querySelector('.fr-popup-resize-se').getBoundingClientRect();return{x:r.x+r.width/2,y:r.y+r.height/2};});
+ await page.mouse.move(resize.x,resize.y);await page.mouse.down();await page.mouse.move(resize.x+520-current.card.width,resize.y,{steps:8});await page.mouse.up();await wait(120);
+ chunkDelay=40;nextAnswer=syntaxGrammar+'\n\n### 流式补充\n\n'+('追加正文继续解释耗材切换，已选中的句法片段保持不变。\n\n'.repeat(80));
+ await externalTool('重新生成');await until(async()=>{const state=await syntaxLayout();return state.present&&state.labels.length===5&&state.busy;},'complete structure did not appear during the fixture stream');
+ await wheelResult(-5000);await clickSyntaxToken('it');const streaming=await syntaxLayout();assert.equal(streaming.selected,'it');assert.equal(streaming.detail,'it');assert(streaming.busy,'fixture stream finished before selecting a fragment');
+ await until(async()=>{const state=await syntaxLayout();return state.bodyLength>streaming.bodyLength+40;},'fixture did not append prose after the fragment selection');
+ const appended=await syntaxLayout();assert.equal(appended.selected,'it');assert.equal(appended.detail,'it');await settled();
+ const complete=await syntaxLayout();assertSyntaxLayout(complete,{atTop:false});assert.equal(complete.selected,'it');assert.equal(complete.detail,'it');report.syntaxStream={before:streaming,appended,complete};
+ await wheelResult(-5000);await shot('syntax-stream-selection-preserved');record('selected fragment and detail remain unchanged through subsequent streamed prose and completion');
+ // 只标注 When 开头的首个长片段，其余整段正文仍保留；长尾不能成为片段 unit 的 flex 子项并挤窄按钮。
+ chunkDelay=15;nextAnswer='### 结构分析\n\n'+syntaxGrammar.split('\n').filter(line=>line.startsWith('|')).slice(0,3).join('\n');
+ await page.setViewportSize({width:390,height:800});await wait(120);
+ const partialBefore=await syntaxLayout(),partialHandle=await ui(function(){const r=this.querySelector('.fr-popup-resize-se').getBoundingClientRect();return{x:r.x+r.width/2,y:r.y+r.height/2};});
+ await page.mouse.move(partialHandle.x,partialHandle.y);await page.mouse.down();await page.mouse.move(partialHandle.x+280-partialBefore.card.width,partialHandle.y,{steps:8});await page.mouse.up();await wait(120);
+ await externalTool('重新生成');await settled();await wheelResult(-5000);report.syntaxPartial=await syntaxLayout();
+ const partial=report.syntaxPartial;assert(partial.present&&partial.first);assert.equal(partial.labels.length,1);assert.equal(partial.sourceText,syntaxSentence,'partial annotation lost the unannotated sentence tail');
+ assert(partial.firstTokenWidth>=100,`unannotated tail squeezed the long fragment to ${partial.firstTokenWidth}px`);assert.equal(partial.overflow,false);assert.equal(partial.tokensOverflow,false);assert.equal(partial.unitsOverflow,false);assert.equal(partial.hostScroll,0);
+ await shot('syntax-partial-280-light');record('a partial long-fragment annotation preserves the full unannotated tail without squeezing the button or causing horizontal overflow');
+ assert.equal(report.consoleErrors.length,0);report.ok=true;
 }
 async function verifyExternalSource() {
  report.sourcePositions=[];
@@ -284,11 +358,12 @@ async function main(){
    await patch({on:true,uiLanguage:'zh-CN',uiLanguageSetupCompleted:true,service:'microsoft',from:'auto',to:'zh-Hans',selectionTranslatorMode:'bilingual',selectionTranslatorPresentation:'card',selectionTranslatorTrigger:'icon',selectionTranslatorDelay:0,hotkey:'none',floatingBallHotkey:'none',useCache:false,harness:{...saved.harness,enabled:true,service:'custom:fixture',model:'learning-fixture',trigger:'click'},customOpenAIProviders:[{id:'custom:fixture',name:'Local fixture',endpoint:`http://127.0.0.1:${port}/v1/chat/completions`,models:['learning-fixture']}],token:{'custom:fixture':'fixture-token'},model:{...saved.model,'custom:fixture':'learning-fixture'}});
    await worker.evaluate(url=>{const native=fetch.bind(globalThis);globalThis.__selectionTestNativeFetch=native;globalThis.fetch=(input,init)=>String(input).startsWith('https://edge.microsoft.com/translate/translatetext')?native(url,init):native(input,init);},`http://127.0.0.1:${port}/translate`);
 
-  await context.route('https://example.com/**',route=>route.fulfill({contentType:'text/html',body:`<!doctype html><html lang="en"><head><style>body{margin:50px;font:20px/1.8 system-ui;color:#253248}p{max-width:730px}button{font-size:32px!important}section{padding:50px!important}</style></head><body><p><span id="sentence">${sentence}</span>.</p><p>Keep reading without losing your place.</p><div style="height:2400px"></div></body></html>`}));
+  await context.route('https://example.com/**',route=>route.fulfill({contentType:'text/html',body:`<!doctype html><html lang="en"><head><style>body{margin:50px;font:20px/1.8 system-ui;color:#253248}p{max-width:730px}button{font-size:32px!important}section{padding:50px!important}</style></head><body><p><span id="sentence">${sentence}</span>${syntaxLayoutOnly?'':'.'}</p><p>Keep reading without losing your place.</p><div style="height:2400px"></div></body></html>`}));
   page=await newPage();await page.goto('https://example.com/');await page.locator('#fluent-read-selection-translator-container').waitFor({state:'attached'});
   await select('#sentence');await until(()=>node(cls('fr-study-toolbar')),'learning entry missing');
   if(process.argv.includes('--history-only')){await verifyHistory();return;}
   await clickNode(button('词性与句法'));await settled();
+  if(syntaxLayoutOnly){await verifySyntaxLayout();return;}
   report.initial=await layout();
   if(process.argv.includes('--baseline')){await shot('before');report.ok=true;return;}
   if(process.argv.includes('--source-scroll-only')) {await verifyExternalSource();return;}
@@ -343,7 +418,7 @@ async function main(){
   assert.equal(await ui(function(){return this.querySelector('.fr-study-toolbar button[aria-pressed=true]').textContent}),'Parts of speech & syntax');
   assert((await ui(function(){return this.querySelector('.fr-sentence-detail').textContent})).includes('adjective'));await shot('grammar-english-dark');record('390px, dark theme and English remain compact and localized');
   await patch({theme:'light',uiLanguage:'zh-CN'});await page.setViewportSize({width:1440,height:960});
-  await menu();await clickNode(button('理解整句'));await settled();assert.equal(await ui(function(){return [...this.querySelector('.fr-sentence-tokens').children].map(element=>element.matches('button') ? element.querySelector('.fr-sentence-token-text').textContent : element.textContent).join('').trim()}),sentence+'.');record('sentence expansion remains available without a permanent toolbar row');
+  await menu();await clickNode(button('理解整句'));await settled();assert.equal((await layout()).sourceText.trim(),sentence+'.');record('sentence expansion remains available without a permanent toolbar row');
   await menu();await clickNode(n=>n.nodeName==='BUTTON'&&support.cdpAttribute(n,'aria-label')==='打开划词翻译设置');await until(async()=>context.pages().some(p=>p.url().includes('options.html')),'settings did not open');record('settings remain accessible through secondary actions');
   await helper.activateExtensionTabWithoutForeground(context,page);
   nextAnswer=grammar+'\n\n'+('Additional explanatory detail. '.repeat(90));await menu();await clickNode(button('重新生成'));await settled();

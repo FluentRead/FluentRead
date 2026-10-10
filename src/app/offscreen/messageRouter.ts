@@ -1,13 +1,14 @@
 /**
  * @file src/app/offscreen/messageRouter.ts
  * 文件职责：解析并分派发送到扩展自有 DOM 页面的可信运行时消息，为 Chrome 翻译、本地模型、TTS、远程图片读取、OCR 语言包、整图和区域翻译提供统一响应纪律。
- * 主要内容：校验并传递单图本地识别方式；提供 ready 与 TTS 一次性许可握手，在播放器前拒绝失效 PLAY，校验文本、语言码、图片与 OCR 语言包请求并分派依赖；验证 TTS 播放控制来自同扩展且不属于网页 tab，以共用的可取消请求表管理取消与单次回复，校验本地语音句段时间并保留 Chrome 待准备语言对、模型不可用和本地 TTS 错误码。
+ * 主要内容：智能高亮消息携带所选模型，模型下载与状态互相独立、推理共用单 Worker 预算；校验并传递单图本地识别方式；提供 ready 与 TTS 一次性许可握手，在播放器前拒绝失效 PLAY，校验文本、语言码、图片与 OCR 语言包请求并分派依赖；验证 TTS 播放控制来自同扩展且不属于网页 tab，以共用的可取消请求表管理取消与单次回复，校验本地语音句段时间并保留 Chrome 待准备语言对、模型不可用和本地 TTS 错误码。
  * 模块边界：路由器不创建 Audio/Worker、不调用 browser.offscreen，也不实现翻译算法；资源实例由 offscreen runtime 构造，具体能力来自 translation、ttsPlayback 和 feature services。
  */
 import {parseSpeechCues} from '@/src/core/tts/speechProgress';
 import type {AreaTranslationSelection} from '@/src/features/area-translation/protocol';
 import {imageTranslationFailureResponse} from '@/src/features/image-translation/failure';
 import {isLocalTranslationModel} from '@/src/core/config/localTranslation';
+import {DEFAULT_INFORMATION_HIGHLIGHT_MODEL_ID, getInformationHighlightModel, type InformationHighlightModelId} from '@/src/core/config/informationHighlightModel';
 import {
     IMAGE_OCR_LANGUAGE_PACKS,
     normalizeImageOcrLanguageCodes,
@@ -29,8 +30,8 @@ export type OffscreenSendResponse = (response: unknown) => void;
 
 export interface OffscreenMessageDependencies {
     readonly informationHighlight?: {
-        status(): Promise<unknown>; prepare(): Promise<unknown>; pause(): Promise<unknown>; remove(): Promise<unknown>;
-        score(text: string, signal: AbortSignal): Promise<unknown>;
+        status(modelId?: InformationHighlightModelId): Promise<unknown>; prepare(modelId?: InformationHighlightModelId): Promise<unknown>; pause(modelId?: InformationHighlightModelId): Promise<unknown>; remove(modelId?: InformationHighlightModelId): Promise<unknown>;
+        score(text: string, signal: AbortSignal, modelId?: InformationHighlightModelId): Promise<unknown>;
     };
     /** 生产组合根注入自身扩展 ID，TTS 播放控制仅接受同扩展且无 tab 的发送方。 */
     readonly runtimeId?: string;
@@ -336,9 +337,13 @@ export function createOffscreenMessageListener(dependencies: OffscreenMessageDep
                 sendResponse({success: false, error: 'INFORMATION_HIGHLIGHT_UNTRUSTED_SENDER'}); return true;
             }
             const feature = dependencies.informationHighlight;
+            const modelId = message.modelId === undefined ? DEFAULT_INFORMATION_HIGHLIGHT_MODEL_ID : getInformationHighlightModel(message.modelId).id;
+            if (message.modelId !== undefined && modelId !== message.modelId) {
+                sendResponse({success: false, error: 'INFORMATION_HIGHLIGHT_INVALID_MODEL'}); return true;
+            }
             const commands: Record<string, () => Promise<unknown>> = {
-                INFORMATION_HIGHLIGHT_STATUS_OFFSCREEN: () => feature.status(), INFORMATION_HIGHLIGHT_PREPARE_OFFSCREEN: () => feature.prepare(),
-                INFORMATION_HIGHLIGHT_PAUSE_OFFSCREEN: () => feature.pause(), INFORMATION_HIGHLIGHT_REMOVE_OFFSCREEN: () => feature.remove(),
+                INFORMATION_HIGHLIGHT_STATUS_OFFSCREEN: () => feature.status(modelId), INFORMATION_HIGHLIGHT_PREPARE_OFFSCREEN: () => feature.prepare(modelId),
+                INFORMATION_HIGHLIGHT_PAUSE_OFFSCREEN: () => feature.pause(modelId), INFORMATION_HIGHLIGHT_REMOVE_OFFSCREEN: () => feature.remove(modelId),
             };
             if (commands[message.type]) {respondWith(commands[message.type], sendResponse, status => ({success: true, status})); return true;}
             let requestId: string;
@@ -354,7 +359,7 @@ export function createOffscreenMessageListener(dependencies: OffscreenMessageDep
                 || activeInformationHighlights.has(requestId)) {sendResponse({success: false, error: 'INFORMATION_HIGHLIGHT_INVALID_REQUEST'}); return true;}
             if (cancelledInformationHighlights.delete(requestId)) {sendResponse({success: false, error: '信息高亮已取消'}); return true;}
             runCancellableRequest(activeInformationHighlights, requestId, sendResponse, '信息高亮已取消',
-                signal => feature.score(message.text as string, signal), result => ({success: true, result}), error => ({success: false, error: errorMessage(error)}));
+                signal => feature.score(message.text as string, signal, modelId), result => ({success: true, result}), error => ({success: false, error: errorMessage(error)}));
             return true;
         }
         if (dependencies.runtimeId !== undefined

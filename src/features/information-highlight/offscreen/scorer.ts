@@ -1,7 +1,7 @@
 /**
  * @file src/features/information-highlight/offscreen/scorer.ts
  * 文件职责：以可注入因果模型端口执行有界分块评分并明确管理每段的张量所有权。
- * 主要内容：BOS 起点、全词表意外度、跨块 KV 缓存、准确 UTF-16 映射、取消及所有成功/失败出口释放；不截断输入，无上文的首个 token 取其余 token 的中位数。
+ * 主要内容：模型标识、BOS 起点、全词表意外度、跨块 KV 缓存、准确 UTF-16 映射及取消释放；不截断输入，无上文的首个 token 取其余 token 的中位数。
  * 模块边界：不下载、不创建 Worker、不访问 DOM；模型持久会话由 Worker 持有，每段缓存只属于一次请求。
  */
 import {alignQwenByteTokens, floatLogits, scoreCausalChunk, scoredTokenSpans} from '@/src/core/information-highlight/scoring';
@@ -9,6 +9,7 @@ import {INFORMATION_HIGHLIGHT_CHUNK_TOKENS, INFORMATION_HIGHLIGHT_MAX_CHARACTERS
 export interface ScoringTensor {dims: readonly number[]; type: string; data: ArrayLike<number>; dispose(): void}
 export type ScoringPast = Record<string, ScoringTensor>;
 export interface CausalScoringEngine {
+    name?: string;
     tokenize(text: string): {ids: number[]; pieces: string[]; addedTokens: ReadonlyMap<string, string>};
     bosId: number;
     forward(ids: number[], attentionLength: number, past: ScoringPast | null): Promise<Record<string, ScoringTensor>>;
@@ -73,6 +74,6 @@ export async function scoreLocalSurprisal(engine: CausalScoringEngine, text: str
         // 首个 token 只有 BOS 作前文，得到的是与正文无关的词表先验（固定模型在此近乎均匀，约 17 bits），
         // 会让每段开头恒为最深色；改用其余 token 的中位数作中性值，单 token 文本保持原值。
         if (scores.length > 1) {const rest = scores.slice(1).sort((a, b) => a - b); scores[0] = rest[rest.length >> 1];}
-        return {spans: scoredTokenSpans(offsets, scores), engine: 'Qwen2.5 0.5B · local WebGPU · q4f16'};
+        return {spans: scoredTokenSpans(offsets, scores), engine: engine.name ?? 'Qwen2.5 0.5B · local WebGPU · q4f16'};
     } finally {if (past) dispose(past);}
 }

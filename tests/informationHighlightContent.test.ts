@@ -1,7 +1,7 @@
 /**
  * @file tests/informationHighlightContent.test.ts
  * 文件职责：验证信息高亮的文本算法、只读收集及页内会话的实际行为和所有权。
- * 主要内容：使用真实 DOM Text 身份与可控原生绘制端口，覆盖内联链接、保护区域、开放及闭合译文、分帧/稳定窗口、异步取消与同文本替换，断言原文和宿主节点不变。
+ * 主要内容：使用真实 DOM Text 身份与可控原生绘制端口，覆盖模型切换隔离、内联链接、保护区域、开放及闭合译文、分帧/稳定窗口、异步取消与同文本替换，断言原文和宿主节点不变。
  * 模块边界：模型端口为可控响应，测试不声称真实模型速度或用户理解收益；真实浏览器 CSS 绘制由独立回归验证。
  */
 import {informationHighlightOpacity} from '@/src/features/information-highlight/domain/presentation';
@@ -329,6 +329,32 @@ describe('page-owned scoring, paint and cancellation', () => {
         controller.updatePreferences({...defaults, mode: 'surprisal-local'}); await f.settle(); expect(segment).toHaveBeenCalledTimes(5);
         controller.dispose(); register.mockRestore(); segment.mockRestore();
     });
+    it('isolates same-text model caches and aborts stale scores when the selected model changes', async () => {
+        const f = fixture('<article><p>alpha bravo charlie delta echo foxtrot</p></article>');
+        const late = deferred<InformationHighlightResult>();
+        const signals: AbortSignal[] = [];
+        let first = true;
+        const score = vi.fn((_text: string, signal: AbortSignal, modelId?: string) => {
+            signals.push(signal);
+            if (first) {first = false; return late.promise;}
+            return Promise.resolve({engine: modelId!, spans: [{start: modelId === 'qwen3-0.6b' ? 6 : 0, end: modelId === 'qwen3-0.6b' ? 11 : 5, score: 10}]});
+        });
+        const preferences = {...defaults, mode: 'surprisal-local' as const};
+        const controller = installInformationHighlight(f.document, preferences, {scoreLocal: score});
+        controller.setEnabled(true); await f.settle(); expect(score).toHaveBeenCalledOnce();
+        expect(score.mock.calls[0][2]).toBe('qwen2.5-0.5b');
+        controller.updatePreferences({...preferences, model: 'qwen3-0.6b'});
+        expect(signals[0].aborted).toBe(true);
+        await f.settle(); expect(f.painted()).toEqual(['bravo']);
+        expect(score.mock.calls[1][2]).toBe('qwen3-0.6b');
+        late.resolve({engine: 'late-old-model', spans: [{start: 0, end: 5, score: 10}]});
+        await f.settle(); expect(f.painted()).toEqual(['bravo']);
+        controller.updatePreferences(preferences); await f.settle(); expect(f.painted()).toEqual(['alpha']);
+        expect(score.mock.calls[2][2]).toBe('qwen2.5-0.5b');
+        controller.updatePreferences({...preferences, model: 'qwen3-0.6b'}); await f.settle();
+        expect(f.painted()).toEqual(['bravo']); expect(score).toHaveBeenCalledTimes(3);
+        controller.dispose();
+    });
     it('keeps screenshot caret and editor/code/form updates from interrupting reading, then rescans eligibility, body styles and controlled translation text', async () => {
         const f = fixture('<article><p>Scientific original paragraphs preserve readable vocabulary.</p><span class="fluent-read-single-slot" data-fr-translation-owned="true"></span></article>'
             + '<div id="editor" contenteditable="true"><p>Editable scientific paragraphs should initially be excluded.</p></div>'
@@ -358,14 +384,14 @@ describe('page-owned scoring, paint and cancellation', () => {
         expect(controller.getState().phase).toBe('active'); expect(f.frames.size).toBe(0); expect(vi.getTimerCount()).toBe(0);
         editor.removeAttribute('contenteditable'); attribute(editor, 'contenteditable', 'true');
         expect(controller.getState().phase).toBe('paused'); expect(f.painted()).toEqual(painted);
-        await f.settle(); expect(score).toHaveBeenCalledTimes(3); expect(score).toHaveBeenLastCalledWith(editorText.data, expect.any(AbortSignal));
+        await f.settle(); expect(score).toHaveBeenCalledTimes(3); expect(score).toHaveBeenLastCalledWith(editorText.data, expect.any(AbortSignal), 'qwen2.5-0.5b');
         expect(controller.getState().processedParagraphs).toBe(3);
         editor.setAttribute('contenteditable', 'true'); attribute(editor, 'contenteditable', null); await f.settle(); expect(controller.getState().processedParagraphs).toBe(2);
         editor.setAttribute('contenteditable', 'false'); attribute(editor, 'contenteditable', 'true'); await f.settle(); expect(controller.getState().processedParagraphs).toBe(3);
         f.document.body.setAttribute('class', 'reader-theme'); attribute(f.document.body, 'class', null); expect(controller.getState().phase).toBe('paused'); await f.settle();
         f.document.body.setAttribute('style', 'font-size: 22px'); attribute(f.document.body, 'style', null); expect(controller.getState().phase).toBe('paused'); await f.settle();
         const translated = root.querySelector('p')!.firstChild as Text; translated.data += ' Meaningful updated translation.'; f.mutate(translated); await f.settle();
-        expect(score).toHaveBeenCalledTimes(4); expect(score).toHaveBeenLastCalledWith(translated.data, expect.any(AbortSignal));
+        expect(score).toHaveBeenCalledTimes(4); expect(score).toHaveBeenLastCalledWith(translated.data, expect.any(AbortSignal), 'qwen2.5-0.5b');
         f.mutate(f.document, 'childList', [f.document.createComment('document lifecycle marker')]); expect(controller.getState().phase).toBe('paused'); controller.dispose();
     });
     it('ignores redundant framework style writes and duplicate state notifications while invalidating real attribute changes', async () => {

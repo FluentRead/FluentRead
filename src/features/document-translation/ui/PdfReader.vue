@@ -1,7 +1,7 @@
 <!--
  @file src/features/document-translation/ui/PdfReader.vue
  文件职责：以左右对照的连续页面显示可划词的 PDF 原页和保持原版排版的译文页，并保留“重排阅读”作为可选的显示方式。
- 主要内容：页面占满阅读区且不再附带逐页标题；原版排版在原页像素上按段落叠加可选择的译文文字层，译文逐段到达时只更新对应段落，等待中的段落显示设置中选定的翻译加载样式；公式、图表和页眉页脚保持原样，放不下的段落悬停展开；悬停译文高亮对应原文；拖选原文时把选区终点钉在指针附近，避免划过空白选中整页；重排阅读按统一计划显示完整段落并保持阅读位置；目录按阅读顺序列出识别到的章节标题并标出当前位置，点击即跳转，可自行展开或传送到页面侧栏；缩放与显示方式使用与页面一致的菜单而非浏览器原生下拉；搜索同时匹配原文与译文并逐处跳转，译文样式可调字号与字体；只挂载附近五页，目录开关、页码、缩放和显示方式控件可以传送到页面工具栏；卸载时释放全部页面资源；显式开启的信息高亮只评分真实可选文字，进度放在按钮提示里、只有出错才在工具栏显示并可重试，配置、页面和文档失效时取消旧绘制。
+ 主要内容：智能高亮按所选模型重新评分，模型切换传递固定请求身份；页面占满阅读区且不再附带逐页标题；原版排版在原页像素上按段落叠加可选择的译文文字层，译文逐段到达时只更新对应段落，等待中的段落显示设置中选定的翻译加载样式；公式、图表和页眉页脚保持原样，放不下的段落悬停展开；悬停译文高亮对应原文；拖选原文时把选区终点钉在指针附近，避免划过空白选中整页；重排阅读按统一计划显示完整段落并保持阅读位置；目录按阅读顺序列出识别到的章节标题并标出当前位置，点击即跳转，可自行展开或传送到页面侧栏；缩放与显示方式使用与页面一致的菜单而非浏览器原生下拉；搜索同时匹配原文与译文并逐处跳转，译文样式可调字号与字体；只挂载附近五页，目录开关、页码、缩放和显示方式控件可以传送到页面工具栏；卸载时释放全部页面资源；显式开启的信息高亮只评分真实可选文字，进度放在按钮提示里、只有出错才在工具栏显示并可重试，配置、页面和文档失效时取消旧绘制。
  模块边界：组件只组织阅读布局、叠加层与页面调度；文档由组合根导入、翻译由既有服务提供，划词卡片由页面组合根复用统一翻译卡。
 -->
 <template>
@@ -120,10 +120,11 @@ import {sampledBackgroundRgb, sampledForegroundColor} from '@/src/features/docum
 import {createPdfReaderRenderPort, pdfReaderPageKey, pdfReaderPageWindow, PdfReaderScheduler, type PdfReaderMode, type PdfReaderPageState} from '@/src/features/document-translation/ui/pdfReader';
 import {installInformationHighlight, type InformationHighlightController} from '@/src/features/information-highlight/public';
 import {DEFAULT_INFORMATION_HIGHLIGHT_PREFERENCES, type InformationHighlightPreferences} from '@/src/core/config/informationHighlight';
+import type {InformationHighlightModelId} from '@/src/core/config/informationHighlightModel';
 import {matchesConfiguredHotkey} from '@/src/core/hotkey';
 import type {InformationHighlightResult, InformationHighlightState} from '@/src/features/information-highlight/protocol';
 
-const props = withDefaults(defineProps<{document: ParsedDocument; translations?: readonly string[]; mode: PdfReaderMode; sourceUrl?: string; presentation?: PdfReadingPresentation; translating?: boolean; controlsTarget?: HTMLElement | null; outlineTarget?: HTMLElement | null; loadingStyle?: TranslationLoadingStyle; animated?: boolean; informationHighlight?: {preferences: InformationHighlightPreferences; scoreLocal(text: string, signal: AbortSignal): Promise<InformationHighlightResult>; available: boolean}}>(), {translations: () => [], sourceUrl: '', presentation: 'layout', translating: false, controlsTarget: null, outlineTarget: null, loadingStyle: DEFAULT_TRANSLATION_LOADING_STYLE, animated: true});
+const props = withDefaults(defineProps<{document: ParsedDocument; translations?: readonly string[]; mode: PdfReaderMode; sourceUrl?: string; presentation?: PdfReadingPresentation; translating?: boolean; controlsTarget?: HTMLElement | null; outlineTarget?: HTMLElement | null; loadingStyle?: TranslationLoadingStyle; animated?: boolean; informationHighlight?: {preferences: InformationHighlightPreferences; scoreLocal(text: string, signal: AbortSignal, modelId?: InformationHighlightModelId): Promise<InformationHighlightResult>; available: boolean}}>(), {translations: () => [], sourceUrl: '', presentation: 'layout', translating: false, controlsTarget: null, outlineTarget: null, loadingStyle: DEFAULT_TRANSLATION_LOADING_STYLE, animated: true});
 const emit = defineEmits<{ 'update:presentation': [value: PdfReadingPresentation]; 'page-change': [page: number] }>();
 const ZOOM_STEPS = [0.5, 0.75, 1, 1.25, 1.5, 2, 3];
 const PRESENTATIONS: PdfReadingPresentation[] = ['layout', 'readable'];
@@ -152,7 +153,7 @@ function syncInformationHighlight(): void {
   if (!settings || !viewport.value) {informationController?.dispose(); informationController = undefined; informationWanted = false; return;}
   informationController ??= installInformationHighlight(viewport.value.ownerDocument, settings.preferences, {
     scope: viewport.value, isCurrent: () => !closed && Boolean(props.informationHighlight?.available),
-    scoreLocal: (text, signal) => props.informationHighlight!.scoreLocal(text, signal), changed: state => {informationState.value = state;},
+    scoreLocal: (text, signal, modelId) => props.informationHighlight!.scoreLocal(text, signal, modelId), changed: state => {informationState.value = state;},
   });
   informationController.updatePreferences(settings.preferences);
   // 设置中的开关决定文档打开时的初始状态；工具栏按钮只临时切换当前文档。
@@ -161,7 +162,7 @@ function syncInformationHighlight(): void {
   else if (wanted !== informationWanted) informationController.setEnabled(wanted);
   informationWanted = wanted;
 }
-watch(() => [props.informationHighlight?.available, props.informationHighlight?.preferences.enabled, props.informationHighlight?.preferences.mode, props.informationHighlight?.preferences.density, props.informationHighlight?.preferences.color, props.informationHighlight?.preferences.style, props.informationHighlight?.preferences.intensity], syncInformationHighlight, {flush: 'post'});
+watch(() => [props.informationHighlight?.available, props.informationHighlight?.preferences.enabled, props.informationHighlight?.preferences.mode, props.informationHighlight?.preferences.model, props.informationHighlight?.preferences.density, props.informationHighlight?.preferences.color, props.informationHighlight?.preferences.style, props.informationHighlight?.preferences.intensity], syncInformationHighlight, {flush: 'post'});
 const zoom = ref('fit');
 /** 工具栏菜单同一时间只展开一个；点击别处或按 Esc 收起。 */
 const openMenu = ref<'zoom' | 'presentation' | 'search' | 'style' | null>(null);

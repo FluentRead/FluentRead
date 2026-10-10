@@ -54,6 +54,7 @@ const assertions = [
   [!source.includes('fluent-read-area-translator-container'), 'area translator must be excluded from userscript'],
   [!source.includes('fluent-read-image-translation-root'), 'image translator must be excluded from userscript'],
   [!source.includes('fluent-read-video-subtitle-style'), 'video subtitle runtime must be excluded from userscript'],
+  [!source.includes('onnx-community/Qwen3-0.6B-ONNX') && !source.includes('onnx-community/Qwen2.5-0.5B'), 'highlight model artifacts must be excluded from userscript while retaining preference compatibility'],
   [!source.includes('fluent-read-writing-assistant'), 'writing assistant runtime must be excluded from userscript'],
   [!source.includes('fluent-read-vocabulary-reencounter'), 'vocabulary reencounter runtime must be excluded from userscript'],
   [!source.includes('fluent-read-sentence-actions'), 'sentence actions runtime must be excluded from userscript'],

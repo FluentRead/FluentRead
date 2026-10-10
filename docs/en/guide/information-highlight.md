@@ -29,15 +29,15 @@ Surprisal is `−log₂ P(word | preceding text)`. A higher value means the mode
 
 ## Appearance and performance
 
-Manage mode, density, colour and drawing style in **Settings → Translation settings → Smart Highlighting**. In local-model mode, model status and download actions appear immediately after the mode selector. You can explicitly choose **Use keywords instead** when the model is unavailable. The preview illustrates appearance rather than model output.
+Manage mode, density, colour and drawing style in **Settings → Translation settings → Smart Highlighting**. In local-model mode, choose **Qwen2.5 0.5B** or **Qwen3 0.6B** from the **Local model** selector. Qwen2.5 0.5B is the default. A single action button shows **Download model (size)** before download and **Remove model** afterward. Deletion requires confirmation. Choose **Keywords** from the analysis mode selector when a model is unavailable. The preview illustrates appearance rather than model output.
 
 Choose low, medium or high density (high by default; low marks only the key words, medium adds the next tier, high tints every informative word), amber, mint or blue, and a soft background or underline. Appearance and density changes reuse existing scores.
 
-The local model is downloaded and run by FluentRead. It does not depend on AI built into Edge, Firefox or another browser. The current Qwen2.5 0.5B model needs about 490 MB on first download. The extension uses ONNX Runtime Web in a dedicated Worker and your device's WebGPU to compute scores; analysis works offline once the files are downloaded.
+The local model is downloaded and run by FluentRead. It does not depend on AI built into Edge, Firefox or another browser. Qwen2.5 0.5B needs about 490 MB and is the default; the optional Qwen3 0.6B needs about 579 MB. Each uses its own pinned q4f16 ONNX files. Selecting a model does not start a download, and downloaded files are kept separately. The extension uses ONNX Runtime Web in a dedicated Worker and your device's WebGPU to compute scores; analysis works offline once the files are downloaded.
 
-Model download starts only after you choose the download action. Model mode requires supported WebGPU capabilities. An unavailable page or model displays a reason; you can choose Keywords manually. Page text is never automatically sent to a cloud scorer.
+Model download starts only after you choose the download action. Model mode requires WebGPU with shader-f16 support. An unavailable page or model displays a reason; you can choose Keywords manually. Page text is never automatically sent to a cloud scorer.
 
-Saved parts are retained when a download is paused or interrupted, so you can resume it. Verification, storage and model-start errors display recovery guidance. Retrying when all model files are already complete does not download them again.
+Saved parts are retained when a download is paused or interrupted, so you can resume it. Verification, storage and model-start errors display recovery guidance. Complete model files are not downloaded again. Highlight choices, speed and memory usage depend on the device and text; the newer model does not guarantee more useful reading cues.
 
 Long pages prioritize nearby text and defer analysis during fast scrolling. Turning the feature off cancels work and discards late results. Changes to page text trigger fresh analysis. Editors, forms, code and formulas are excluded from normal body highlighting.
 

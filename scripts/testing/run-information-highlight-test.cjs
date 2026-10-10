@@ -1,8 +1,8 @@
 #!/usr/bin/env node
 /**
  * @file scripts/testing/run-information-highlight-test.cjs
- * 文件职责：在独立真实 Edge 中验证生产信息高亮的页面保护、启停、动态正文与设置持久化。
- * 主要内容：通过现有后台无焦点浏览器 helper 加载本地扩展和只读正文 fixture，在连续设置页真实点击锚点、搜索结果、说明标签、自动高亮开关及六套渐变配色，以真实按键验证快捷键只开关当前页面且不写入开关，验证开关即时作用于已打开网页、滚动时保留绘制、热力绘制的分档强度与偏好持久化；分阶段保存证据，显式选择真实下载或校验后的本地导入。
+ * 文件职责：在独立真实 Edge 中验证生产信息高亮的页面保护、启停、动态正文、可选模型与设置持久化。
+ * 主要内容：通过现有后台无焦点浏览器 helper 加载本地扩展和只读正文 fixture，真实点击设置、说明、渐变与模型选项，以真实按键验证快捷键作用范围；按 --model-id 选择固定 Qwen2.5 或 Qwen3，校验各自缓存、离线推理标签、单按钮文案及取消/确认删除流程；分阶段保存证据，显式选择真实下载或校验后的本地导入。
  * 模块边界：只清理本次 profile；本地导入与产品下载证据分开记录，下载后的推理和 PDF 复用已有页签；不修改共享焦点策略，超时和断开均失败，网络观察不冒充全机流量或阅读效果证明。
  */
 'use strict';
@@ -25,6 +25,14 @@ for(let i=2;i<process.argv.length;i++){
   }else{assert(next&&!next.startsWith('--'),`Missing --${field} value`);args[field]=next;i++;}
 }
 assert(!(args['download-model']&&args['model-dir']),'--download-model and --model-dir are mutually exclusive');
+const models={
+  'qwen2.5-0.5b':{id:'qwen2.5-0.5b',name:'Qwen2.5 0.5B',repository:'onnx-community/Qwen2.5-0.5B',revision:'bae5ceaee026f0d0592858b2bd27645a06f19c42',bytes:490043908,cacheName:'fluent-read-information-highlight-model-v1'},
+  'qwen3-0.6b':{id:'qwen3-0.6b',name:'Qwen3 0.6B',repository:'onnx-community/Qwen3-0.6B-ONNX',revision:'1e0a4a196ecabdf9a879664110574563d3f372d3',bytes:578918894,cacheName:'fluent-read-information-highlight-model-qwen3-0.6b-v1'},
+};
+const modelId=args['model-id']||'qwen2.5-0.5b';assert(Object.hasOwn(models,modelId),`Unsupported --model-id: ${modelId}`);
+const model=models[modelId],otherModel=Object.values(models).find(value=>value.id!==modelId);
+const modelUrlPrefix=`https://huggingface.co/${model.repository}/resolve/${model.revision}/`;
+const downloadLabel=`下载模型（${(model.bytes/1_000_000).toFixed(0)} MB）`;
 for(const field of ['extension-dir','playwright-root','artifacts-dir']) assert(args[field],`Missing --${field}`);
 const downloadTimeout=Number(args['download-timeout-ms']||15*60*1000);
 assert(Number.isFinite(downloadTimeout)&&downloadTimeout>=15000,'--download-timeout-ms must be at least 15000');
@@ -38,6 +46,7 @@ const manifest=JSON.parse(fs.readFileSync(path.join(extensionDir,'manifest.json'
 fs.mkdirSync(artifacts,{recursive:true});
 const profileDir=fs.mkdtempSync(path.join(os.tmpdir(),'fluentread-information-highlight-'));
 const report={ok:false,extensionDir,profileDir,stages:[],surface:'options-continuous-smart-highlight-group',build:extensionDir.endsWith('-dev')?'development':'production',
+  selectedModel:model,
   evidence:'real-extension-controlled-pages',cases:[],screenshots:[],consoleErrors:[],persistenceCases:[],consoleWarnings:[],
   quickClose:false,crossPageSync:false,latestWriteWins:false,
   modelAcquisition:args['download-model']?'production-settings-download':args['model-dir']?'verified-local-artifact-import':'not-requested',
@@ -51,6 +60,11 @@ const fixture=`<!doctype html><html lang="zh"><head><meta charset="utf-8"><title
 <button id="excluded">浏览器模型与关键词按钮</button><p hidden>隐藏的模型文字</p></main>
 <script>const root=document.querySelector('#shadow-anchor').attachShadow({mode:'open'});root.innerHTML='<p style="font:18px/1.8 system-ui">开放 Shadow DOM 的本地语言模型正文需要正确定位原文与意外度词语。</p>';</script></body></html>`;
 const modelManifest=args['model-dir']?JSON.parse(fs.readFileSync(path.join(args['model-dir'],'manifest.json'),'utf8')):[];
+if(modelManifest.length){
+  assert.equal(modelManifest.length,6,'A verified local model must provide the six production artifacts');
+  assert(modelManifest.every(file=>file.url===`${modelUrlPrefix}${file.path}`&&/^[a-f0-9]{64}$/u.test(file.sha256)),'Local artifact manifest must match the selected pinned model');
+  assert.equal(modelManifest.reduce((sum,file)=>sum+file.size,0),model.bytes,'Local artifact sizes must match the selected production model');
+}
 const server=http.createServer((req,res)=>{
   const model=modelManifest.find(file=>req.url===`/models/${file.path}`);
   if(model){
@@ -280,7 +294,7 @@ function popupSourceContract(){
       report.cases.push({id:`smart-highlight-help-tags-${language}-${viewportWidth}`,language,viewportWidth,layout,interactions:evidence,tooltip:narrowTooltip});
     },45000);
     await step('translation-anchors-ready',()=>control.locator('[data-settings-anchor-link="reading"]').waitFor());
-    await step('fixture-config',()=>support.patchStoredConfig(control,{on:true,disableFloatingBall:false,uiLanguage:'zh-CN',uiLanguageSetupCompleted:true,theme:'light',informationHighlight:{enabled:false,hotkey:'Alt+H',hotkeyEnabled:true,mode:'keywords',density:'medium',color:'amber',style:'background',intensity:'standard'}}));
+    await step('fixture-config',()=>support.patchStoredConfig(control,{on:true,disableFloatingBall:false,uiLanguage:'zh-CN',uiLanguageSetupCompleted:true,theme:'light',informationHighlight:{enabled:false,hotkey:'Alt+H',hotkeyEnabled:true,mode:'keywords',model:modelId,density:'medium',color:'amber',style:'background',intensity:'standard'}}));
     const patchConfig=patch=>step('fixture-config-patch',()=>support.patchStoredConfig(control,patch));
     await openHighlightSettings(control,{verifyReading:true});report.cases.push({id:'smart-highlight-exact-title-zh',...await highlightTitle(control,'zh-CN')});
     await helpTags(control,'zh-CN',{screenshot:'smart-highlight-help-zh'});
@@ -303,14 +317,14 @@ function popupSourceContract(){
     await step('hotkey-clears-current-page',()=>page.waitForFunction(()=>![...CSS.highlights.keys()].some(name=>name.startsWith('fluentread-information-highlight')),null,{timeout:30000}));
     await step('hotkey-off-notice',()=>page.waitForFunction(()=>(document.querySelector('#fluent-read-page-notice-host')?.shadowRoot?.textContent||'').includes('智能高亮已关闭'),null,{timeout:15000}));
     // 模型尚未下载时用快捷键开启：页面给出明确提示，而不是毫无反应。
-    await step('model-mode-before-download',()=>support.patchStoredConfig(control,{informationHighlight:{enabled:false,hotkey:'Alt+H',hotkeyEnabled:true,mode:'surprisal-local',density:'medium',color:'amber',style:'background',intensity:'standard'}}));
+    await step('model-mode-before-download',()=>support.patchStoredConfig(control,{informationHighlight:{enabled:false,hotkey:'Alt+H',hotkeyEnabled:true,mode:'surprisal-local',model:modelId,density:'medium',color:'amber',style:'background',intensity:'standard'}}));
     await delay(600);await step('hotkey-on-without-model',()=>page.keyboard.press('Alt+KeyH'));
     await step('hotkey-model-not-ready-notice',()=>page.waitForFunction(()=>(document.querySelector('#fluent-read-page-notice-host')?.shadowRoot?.textContent||'').includes('本地模型尚未下载'),null,{timeout:30000}));
     const missingModelNotice=await step('hotkey-model-not-ready-text',noticeText);
     // 没有模型时本页改用关键词方式，读者仍然得到高亮。
     await step('hotkey-without-model-keyword-fallback',()=>page.waitForFunction(()=>[...CSS.highlights].some(([name,paint])=>name.startsWith('fluentread-information-highlight')&&paint.size>0),null,{timeout:30000}));
     await step('hotkey-off-without-model',()=>page.keyboard.press('Alt+KeyH'));
-    await step('keywords-mode-restored',()=>support.patchStoredConfig(control,{informationHighlight:{enabled:false,hotkey:'Alt+H',hotkeyEnabled:true,mode:'keywords',density:'medium',color:'amber',style:'background',intensity:'standard'}}));
+    await step('keywords-mode-restored',()=>support.patchStoredConfig(control,{informationHighlight:{enabled:false,hotkey:'Alt+H',hotkeyEnabled:true,mode:'keywords',model:modelId,density:'medium',color:'amber',style:'background',intensity:'standard'}}));
     await delay(600);report.cases.push({id:'hotkey-without-downloaded-model-falls-back-to-keywords-with-notice',missingModelNotice});
     assert.equal(await step('hotkey-settings-row',()=>control.locator('#information-highlight-settings [data-information-highlight-hotkey]').innerText()),'Alt+H');
     const hotkeySwitch=control.locator('#information-highlight-settings [data-information-highlight-hotkey-enabled]').first();
@@ -463,12 +477,47 @@ function popupSourceContract(){
     await chooseMode('surprisal-local');
     assert.equal((await step('selected-mode-config',()=>support.readStoredConfig(control))).informationHighlight.mode,'surprisal-local');
     await step('settings-model-card-visible',()=>control.locator('#information-highlight-settings [data-testid="information-highlight-model-card"]').waitFor());
-    const readModelStatus=()=>step('model-status-rpc',async()=>{
-      const envelope=await control.evaluate(()=>chrome.runtime.sendMessage({type:'GET_INFORMATION_HIGHLIGHT_MODEL_STATUS'}));assert(envelope?.success&&envelope.status,JSON.stringify(envelope));return envelope;
+    const readModelStatus=(selectedId=modelId)=>step(`model-status-rpc:${selectedId}`,async()=>{
+      const envelope=await control.evaluate(modelId=>chrome.runtime.sendMessage({type:'GET_INFORMATION_HIGHLIGHT_MODEL_STATUS',modelId}),selectedId);
+      assert(envelope?.success&&envelope.status,JSON.stringify(envelope));assert.equal(envelope.status.modelId,selectedId);assert.equal(envelope.status.modelName,models[selectedId].name);assert.equal(envelope.status.totalBytes,models[selectedId].bytes);return envelope;
     });
+    const chooseModel=selectedId=>step(`native-settings-model:${selectedId}`,async()=>{
+      const descriptor=models[selectedId],selector=control.locator('#information-highlight-settings [data-information-highlight-model-select]');
+      await selector.waitFor();await selector.scrollIntoViewIfNeeded();await selector.click();
+      await control.getByRole('option',{name:descriptor.name,exact:true}).click();
+      await control.waitForFunction(name=>document.querySelector('[data-testid="information-highlight-model-card"] .highlight-model-heading strong')?.textContent.trim()===name,descriptor.name);
+      for(const deadline=Date.now()+8000;;){const stored=(await support.readStoredConfig(control)).informationHighlight;if(stored.model===selectedId)break;assert(Date.now()<deadline,`Model selection was not persisted: ${stored.model}`);await delay(100);}
+      return {modelId:selectedId,name:descriptor.name,selection:'native-model-option-click'};
+    });
+    const inspectModelCard=(descriptor,expectedAction)=>step(`model-card-single-action:${descriptor.id}:${expectedAction}`,async()=>{
+      await control.waitForFunction(({name,label})=>{
+        const card=document.querySelector('[data-testid="information-highlight-model-card"]'),actions=card?.querySelectorAll('.highlight-model-actions button');
+        return card?.querySelector('.highlight-model-heading strong')?.textContent.trim()===name&&actions?.length===1&&actions[0].textContent.trim()===label;
+      },{name:descriptor.name,label:expectedAction},{timeout:30000});
+      const snapshot=await control.locator('[data-testid="information-highlight-model-card"]').evaluate(element=>({
+        name:element.querySelector('.highlight-model-heading strong').textContent.trim(),description:element.querySelector('.highlight-model-heading small')?.textContent.trim(),text:element.textContent.trim(),
+        actions:[...element.querySelectorAll('.highlight-model-actions button')].map(button=>({text:button.textContent.trim(),disabled:button.disabled,download:button.hasAttribute('data-information-highlight-download'),remove:button.hasAttribute('data-information-highlight-remove'),pause:button.hasAttribute('data-information-highlight-pause')})),
+      }));
+      assert.equal(snapshot.actions.length,1);assert.equal(snapshot.actions[0].text,expectedAction);
+      assert.equal(snapshot.description,'下载 Qwen，在本机离线计算词语意外度，需要支持 shader-f16 的WebGPU环境。');
+      const groupText=await control.locator('#information-highlight-settings').innerText();
+      assert(!/模型文件已就绪|下载只获取模型文件|分析正文不离开此设备|已下载\s*[·•]\s*可离线使用|由\s*FluentRead\s*下载|FluentRead\s*下载\s*Qwen/u.test(groupText),'Removed model helpers and duplicate descriptions must be absent');
+      return snapshot;
+    },35000);
+    for(const selectedId of [otherModel.id,modelId]){
+      const selection=await chooseModel(selectedId),status=(await readModelStatus(selectedId)).status;
+      assert.equal(status.downloaded,false);assert.equal(status.downloadedBytes,0,'Selecting a model must not download or reuse another model artifacts');
+      const descriptor=models[selectedId],card=await inspectModelCard(descriptor,`下载模型（${(descriptor.bytes/1_000_000).toFixed(0)} MB）`);
+      report.cases.push({id:`native-model-choice-no-automatic-download:${selectedId}`,selection,status,card});
+    }
+    await step('settings-reload-after-model-choice',()=>control.reload({timeout:30000}),35000);await openHighlightSettings(control);
+    assert((await control.locator('[data-information-highlight-model-select]').innerText()).includes(model.name));
+    assert.equal((await support.readStoredConfig(control)).informationHighlight.model,modelId);
+    report.persistenceCases.push({id:'native-model-selection-reload-persists',modelId,name:model.name});
     const absent=await readModelStatus();assert.equal(absent.status.downloaded,false);assert.equal(absent.status.downloadedBytes,0,'Choosing local mode must not download artifacts');
-    report.cases.push({id:'settings-real-model-mode-selector-no-automatic-download',status:absent.status});
+    report.cases.push({id:'settings-real-model-mode-selector-no-automatic-download',modelId,status:absent.status,card:await inspectModelCard(model,downloadLabel)});
     await step('settings-model-card-scroll',()=>control.locator('[data-testid="information-highlight-model-card"]').scrollIntoViewIfNeeded());await shot(control,'settings-model-mode');
+    await shot(control.locator('[data-testid="information-highlight-model-card"]'),'model-card-download');
     if(args['download-model']){
       assert(absent.status.supported,`Real download validation requires WebGPU shader-f16: ${absent.status.reason||'unsupported'}`);
       networkStage='production-settings-download';report.model={artifactAcquisition:'production-settings-download',statusHistory:[],actions:[],pauseAfterBytes:8*1024*1024,networkObservationScope:report.networkObservation.scope,fixtureArtifactImport:false};save();
@@ -501,15 +550,16 @@ function popupSourceContract(){
       await step('settings-resume-label',()=>control.getByRole('button',{name:'继续下载',exact:true}).waitFor());
       report.model.actions.push({at:Date.now(),action:'resume',via:'native-reopened-settings-button',metrics:await settingButton('[data-information-highlight-download]','model-resume'),retainedBytes:reopened.downloadedBytes});
       const ready=await waitModel(status=>status.downloaded&&status.phase==='ready','resumed-download');assert.equal(ready.downloadedBytes,ready.totalBytes);assert.equal(ready.totalBytes,before.downloadSizeBytes);
-      const receipts=await step('production-artifact-receipts',()=>control.evaluate(async()=>{
-        const cache=await caches.open('fluent-read-information-highlight-model-v1'),files=[];
+      const receipts=await step('production-artifact-receipts',()=>control.evaluate(async cacheName=>{
+        const cache=await caches.open(cacheName),files=[];
         for(const key of await cache.keys()){const url=new URL(key.url);if(!url.searchParams.has('fluent-read-verified'))continue;const response=await cache.match(key);files.push({url:`${url.origin}${url.pathname}`,receipt:await response.json()});}return files;
-      }));
+      },model.cacheName));
       assert(receipts.length>0);assert.equal(receipts.reduce((total,file)=>total+file.receipt.size,0),ready.downloadedBytes);
-      assert(receipts.every(file=>/^https:\/\/huggingface\.co\/onnx-community\/Qwen2\.5-0\.5B\/resolve\/[a-f0-9]{40}\//u.test(file.url)&&/^[a-f0-9]{64}$/u.test(file.receipt.sha256)));
+      assert(receipts.every(file=>file.url.startsWith(modelUrlPrefix)&&/^[a-f0-9]{64}$/u.test(file.receipt.sha256)));
       report.model.artifacts={evidence:'production-cache-verification-receipts',files:receipts,totalBytes:ready.downloadedBytes};report.cases.push({id:'product-model-settings-reopen-resume-to-ready',reopened,ready,artifactCount:receipts.length,reusedTarget:true});
       report.unverified=report.unverified.filter(item=>item!=='product model download/pause/resume');
       await step('download-action-hidden-after-ready',()=>control.locator('[data-information-highlight-download]').waitFor({state:'hidden',timeout:30000}));
+      report.cases.push({id:'native-download-action-becomes-single-delete-action',modelId,card:await inspectModelCard(model,'删除模型')});
       await step('ready-card-scroll',()=>control.locator('[data-testid="information-highlight-model-card"]').scrollIntoViewIfNeeded());await shot(control,'settings-model-downloaded');save();
     }
     if(modelManifest.length){
@@ -517,8 +567,8 @@ function popupSourceContract(){
       await step('local-model-sha-verification',async()=>{
         for(const file of modelManifest){assert.equal(fs.statSync(path.join(args['model-dir'],file.path)).size,file.size);const hash=createHash('sha256');for await(const chunk of fs.createReadStream(path.join(args['model-dir'],file.path)))hash.update(chunk);assert.equal(hash.digest('hex'),file.sha256);}
       },120000);
-      const imported=await step('verified-local-artifact-import',()=>control.evaluate(async({manifest,localOrigin})=>{
-        const cache=await caches.open('fluent-read-information-highlight-model-v1');let total=0;
+      const imported=await step('verified-local-artifact-import',()=>control.evaluate(async({manifest,localOrigin,cacheName})=>{
+        const cache=await caches.open(cacheName);let total=0;
         for(const file of manifest){
           for(let offset=0,index=0;offset<file.size;offset+=4*1024*1024,index++){
             const end=Math.min(file.size-1,offset+4*1024*1024-1),response=await fetch(`${localOrigin}/models/${file.path}`,{headers:{Range:`bytes=${offset}-${end}`}});
@@ -526,12 +576,16 @@ function popupSourceContract(){
             await cache.put(`${file.url}?fluent-read-part=${index}`,new Response(bytes,{headers:{'Content-Length':String(bytes.byteLength)}}));total+=bytes.byteLength;
           }await cache.put(`${file.url}?fluent-read-verified=${file.sha256}`,new Response(JSON.stringify({size:file.size,sha256:file.sha256})));
         }return total;
-      },{manifest:modelManifest,localOrigin:`http://127.0.0.1:${server.address().port}`}),180000);
-      report.model={artifactImport:'sha-verified-local-files-to-temporary-extension-cache',importedBytes:imported,files:modelManifest};save();
+      },{manifest:modelManifest,localOrigin:`http://127.0.0.1:${server.address().port}`,cacheName:model.cacheName}),180000);
+      report.model={modelId,cacheName:model.cacheName,artifactImport:'sha-verified-local-files-to-temporary-extension-cache',importedBytes:imported,files:modelManifest};save();
     }
     if(modelManifest.length||args['download-model']){
       let status;for(let attempt=0;attempt<5;attempt++){status=await readModelStatus();if(status.status.downloaded)break;await delay(500);}
       report.model.status=status;assert(status.success&&status.status.downloaded);
+      report.cases.push({id:'prepared-artifacts-change-single-download-to-delete',modelId,artifactAcquisition:report.model.artifactImport||report.model.artifactAcquisition,card:await inspectModelCard(model,'删除模型')});
+      await shot(control.locator('[data-testid="information-highlight-model-card"]'),'model-card-downloaded');
+      if(modelManifest.length){await step('prepared-model-card-scroll',()=>control.locator('[data-testid="information-highlight-model-card"]').scrollIntoViewIfNeeded());await shot(control,'settings-model-downloaded');}
+      assert.equal((await readModelStatus(otherModel.id)).status.downloaded,false,'The other model must not report this model files as ready');
       if(status.status.supported){
         networkStage='local-model-inference';const forbidden=[];
         await step('local-inference-page-network-guard',()=>context.route(/^https:\/\/(?:huggingface\.co|hf-mirror\.com)\//u,route=>{forbidden.push(route.request().url());return route.abort('blockedbyclient');}));
@@ -540,23 +594,23 @@ function popupSourceContract(){
         report.model.scoreSender='existing-tab-navigated-to-document-page';save();
         for(const [index,text]of ['浏览器本地模型计算信息意外度，不上传正文。','A local model scores cafe\u0301 and 👩🏽‍💻 in the browser.'].entries()){
           const started=performance.now();
-          const response=await step(index?'score:warm-unicode':'score:cold-chinese',()=>control.evaluate(({text,id})=>chrome.runtime.sendMessage({type:'SCORE_INFORMATION_HIGHLIGHT',text,requestId:id}),{text,id:randomUUID()}),150000);
-          assert(response.success,JSON.stringify(response));assert(response.result.spans.length>0);assert(response.result.spans.every(span=>Number.isFinite(span.score)&&span.score>=0&&span.start>=0&&span.end<=text.length&&span.end>span.start));
+          const response=await step(index?'score:warm-unicode':'score:cold-chinese',()=>control.evaluate(({text,id,modelId})=>chrome.runtime.sendMessage({type:'SCORE_INFORMATION_HIGHLIGHT',text,requestId:id,modelId}),{text,id:randomUUID(),modelId}),150000);
+          assert(response.success,JSON.stringify(response));assert.equal(response.result.engine,`${model.name} · local WebGPU · q4f16`);assert(response.result.spans.length>0);assert(response.result.spans.every(span=>Number.isFinite(span.score)&&span.score>=0&&span.start>=0&&span.end<=text.length&&span.end>span.start));
           report.cases.push({id:index?'real-model-warm-unicode':'real-model-cold-chinese',milliseconds:performance.now()-started,text,result:response.result,surface:'existing-tab-navigated-to-document-page'});save();
         }
         const repeated=report.cases.find(item=>item.id==='real-model-cold-chinese'),repeatStarted=performance.now();
-        const repeat=await step('score:warm-repeat',()=>control.evaluate(({text,id})=>chrome.runtime.sendMessage({type:'SCORE_INFORMATION_HIGHLIGHT',text,requestId:id}),{text:repeated.text,id:randomUUID()}),150000);
+        const repeat=await step('score:warm-repeat',()=>control.evaluate(({text,id,modelId})=>chrome.runtime.sendMessage({type:'SCORE_INFORMATION_HIGHLIGHT',text,requestId:id,modelId}),{text:repeated.text,id:randomUUID(),modelId}),150000);
         assert(repeat.success);assert.deepEqual(repeat.result,repeated.result);report.cases.push({id:'real-model-warm-repeat-identical-result',milliseconds:performance.now()-repeatStarted,text:repeated.text});
-        const cancellation=await step('score:cancel',()=>control.evaluate(async({id})=>{
-          const score=chrome.runtime.sendMessage({type:'SCORE_INFORMATION_HIGHLIGHT',text:'浏览器本地语言模型支持离线分析，但不能改变原文。'.repeat(35),requestId:id});await new Promise(resolve=>setTimeout(resolve,30));
-          return{cancel:await chrome.runtime.sendMessage({type:'CANCEL_INFORMATION_HIGHLIGHT',requestId:id}),score:await score};
-        },{id:randomUUID()}),150000);
+        const cancellation=await step('score:cancel',()=>control.evaluate(async({id,modelId})=>{
+          const score=chrome.runtime.sendMessage({type:'SCORE_INFORMATION_HIGHLIGHT',text:'浏览器本地语言模型支持离线分析，但不能改变原文。'.repeat(35),requestId:id,modelId});await new Promise(resolve=>setTimeout(resolve,30));
+          return{cancel:await chrome.runtime.sendMessage({type:'CANCEL_INFORMATION_HIGHLIGHT',requestId:id,modelId}),score:await score};
+        },{id:randomUUID(),modelId}),150000);
         assert(cancellation.cancel.success);assert(!cancellation.score.success);report.cases.push({id:'real-model-cancel',response:cancellation});assert.equal(forbidden.length,0);
         report.model.observedInterceptedModelRequests=forbidden;report.model.inferenceRequestInterceptionScope='page-routes-only; extension workers rely on verified local-only model configuration';report.model.networkObservationScope=report.networkObservation.scope;
         report.unverified=report.unverified.filter(item=>item!=='local model inference');save();
       }else report.model.gpuInferenceUnavailable=status.status.reason;
     }
-    networkStage='pdf-reading-tests';await patchConfig({informationHighlight:{enabled:false,hotkey:'Alt+H',hotkeyEnabled:true,mode:'keywords',density:'medium',color:'amber',style:'background',intensity:'standard'}});
+    networkStage='pdf-reading-tests';await patchConfig({informationHighlight:{enabled:false,hotkey:'Alt+H',hotkeyEnabled:true,mode:'keywords',model:modelId,density:'medium',color:'amber',style:'background',intensity:'standard'}});
     // 同一现有 Options 页改为阅读器；仍通过正常导航、上传与阅读按钮完成产品流程。
     const documentReader=control;if(documentReader.url()!==`${origin}/document.html`)await navigate(documentReader,`${origin}/document.html`,'reuse-settings-tab-for-pdf');await activate(documentReader,'pdf-reader');
     await step('pdf-drop-zone',()=>documentReader.locator('.file-drop-zone').waitFor());
@@ -577,11 +631,79 @@ function popupSourceContract(){
     report.cases.push({id:'pdf-keywords-native-text-layer-preservation',ranges:pdfRanges,protection:pdfAfter});await shot(documentReader,'pdf-keywords');
     await step('pdf-keywords-disable',()=>pdfToggle.click());assert.equal((await step('pdf-disabled-ranges',()=>textRanges(documentReader))).length,0);report.cases.push({id:'pdf-disable-clears'});
     if(!report.unverified.includes('local model inference')){
-      await patchConfig({informationHighlight:{enabled:false,hotkey:'Alt+H',hotkeyEnabled:true,mode:'surprisal-local',density:'medium',color:'amber',style:'background',intensity:'standard'}});
+      await patchConfig({informationHighlight:{enabled:false,hotkey:'Alt+H',hotkeyEnabled:true,mode:'surprisal-local',model:modelId,density:'medium',color:'amber',style:'background',intensity:'standard'}});
       await step('pdf-local-toggle-ready',()=>documentReader.waitForFunction(()=>document.querySelector('.pdf-information-highlight')?.getAttribute('aria-pressed')==='false'));
       await step('pdf-local-enable',()=>pdfToggle.click());await step('pdf-local-paint',()=>documentReader.waitForFunction(()=>CSS.highlights?.get('fluentread-information-highlight')?.size>0,null,{timeout:120000}),125000);
       report.cases.push({id:'pdf-real-model-text-layer-highlights',ranges:await step('pdf-local-ranges',()=>textRanges(documentReader))});await shot(documentReader,'pdf-local-model');
       await step('pdf-local-disable',()=>pdfToggle.click());assert.equal((await step('pdf-local-disabled-ranges',()=>textRanges(documentReader))).length,0);
+    }
+    // 推理与 PDF 都完成后才删除；取消与确认通过真正的 MessageBox 按钮，不伪造响应或模型就绪状态。
+    if(modelManifest.length||args['download-model']){
+      networkStage='model-choice-and-delete-tests';
+      await navigate(control,optionsUrl,'reuse-document-tab-for-model-delete');await activate(control,'model-delete-settings');await openHighlightSettings(control);
+      await chooseMode('surprisal-local');
+      const preparedBeforeSwitch=(await readModelStatus()).status;assert.equal(preparedBeforeSwitch.downloaded,true);
+      await chooseModel(otherModel.id);const otherStatus=(await readModelStatus(otherModel.id)).status;
+      assert.equal(otherStatus.downloaded,false);assert.equal(otherStatus.downloadedBytes,0);
+      const otherCard=await inspectModelCard(otherModel,`下载模型（${(otherModel.bytes/1_000_000).toFixed(0)} MB）`);
+      await chooseModel(modelId);const preparedAfterSwitch=(await readModelStatus()).status;
+      assert.equal(preparedAfterSwitch.downloaded,true);assert.equal(preparedAfterSwitch.downloadedBytes,preparedBeforeSwitch.downloadedBytes);
+      const readyCard=await inspectModelCard(model,'删除模型');
+      report.cases.push({id:'native-model-switch-keeps-downloaded-artifacts-isolated',modelId,otherModelId:otherModel.id,preparedBeforeSwitch,otherStatus,otherCard,preparedAfterSwitch,readyCard});
+      const cacheKeys=cacheName=>control.evaluate(async name=>(await (await caches.open(name)).keys()).map(request=>request.url).sort(),cacheName);
+      // 此标记只证明另一模型的命名缓存没有被清空；它不是第二份模型，也不用于推断其可用状态。
+      const retentionMarker=`${fixtureUrl}/__information-highlight-cache-retention-${randomUUID()}`,markerText='temporary-runner-cache-retention-marker';
+      await step('other-model-cache-retention-marker',()=>control.evaluate(async({cacheName,url,text})=>(await caches.open(cacheName)).put(url,new Response(text)),{cacheName:otherModel.cacheName,url:retentionMarker,text:markerText}));
+      const beforeDelete={selected:await cacheKeys(model.cacheName),other:await cacheKeys(otherModel.cacheName)};
+      assert(beforeDelete.selected.some(url=>url.startsWith(modelUrlPrefix)&&url.includes('fluent-read-verified=')));
+      const dialog=control.getByRole('dialog',{name:'删除模型',exact:true});
+      await settingButton('[data-information-highlight-remove]','model-delete-open-cancel');
+      await step('model-delete-confirmation-visible',()=>dialog.waitFor());
+      const confirmationText=(await dialog.innerText()).trim();assert(confirmationText.includes(`删除 ${model.name} 的本地模型文件？再次使用时需要重新下载。`));
+      const waitingForConfirmation=(await readModelStatus()).status;assert.equal(waitingForConfirmation.downloaded,true,'Opening the confirmation dialog must retain the model');
+      const confirmationAppearance=await step('model-delete-confirmation-animation-settled',async()=>{
+        await control.waitForFunction(async()=>{
+          const box=document.querySelector('.el-message-box'),dialog=box?.closest('[role="dialog"]'),overlay=dialog?.closest('.el-overlay');
+          if(!box||!dialog||!overlay||overlay.getAnimations({subtree:true}).some(animation=>animation.pending||animation.playState==='running'))return false;
+          for(const element of [overlay,dialog,box]){
+            const style=getComputedStyle(element);if(Number(style.opacity)<0.999||style.visibility!=='visible'||style.display==='none')return false;
+            if(style.transform!=='none'&&!new DOMMatrix(style.transform).isIdentity)return false;
+          }
+          const before=box.getBoundingClientRect();await new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve)));const after=box.getBoundingClientRect();
+          return before.width>0&&before.height>0&&['x','y','width','height'].every(field=>Math.abs(before[field]-after[field])<0.1);
+        },null,{timeout:10000});
+        return dialog.locator('.el-message-box').evaluate(box=>{
+          const overlay=box.closest('.el-overlay'),dialog=box.closest('[role="dialog"]'),style=getComputedStyle(box);
+          return {rect:box.getBoundingClientRect().toJSON(),viewport:{width:innerWidth,height:innerHeight},backgroundColor:style.backgroundColor,
+            layers:[overlay,dialog,box].map(element=>({opacity:getComputedStyle(element).opacity,transform:getComputedStyle(element).transform})),
+            runningAnimations:overlay.getAnimations({subtree:true}).filter(animation=>animation.pending||animation.playState==='running').length};
+        });
+      },15000);
+      assert(confirmationAppearance.layers.every(layer=>Number(layer.opacity)>=0.999));assert.equal(confirmationAppearance.runningAnimations,0);
+      assert(!['transparent','rgba(0, 0, 0, 0)'].includes(confirmationAppearance.backgroundColor),'Confirmation box must have an opaque readable surface');
+      assert(confirmationAppearance.rect.x>=0&&confirmationAppearance.rect.y>=0&&confirmationAppearance.rect.right<=confirmationAppearance.viewport.width+1&&confirmationAppearance.rect.bottom<=confirmationAppearance.viewport.height+1);
+      report.cases.push({id:'native-model-delete-confirmation-settled-and-readable',modelId,appearance:confirmationAppearance});
+      await shot(control,'settings-model-delete-confirmation');
+      await step('model-delete-cancel',()=>dialog.getByRole('button',{name:'取消',exact:true}).click());
+      await step('model-delete-cancel-closes-dialog',()=>dialog.waitFor({state:'hidden'}));
+      const canceledStatus=(await readModelStatus()).status;assert.equal(canceledStatus.downloaded,true);assert.equal(canceledStatus.downloadedBytes,preparedAfterSwitch.downloadedBytes);
+      assert.deepEqual(await cacheKeys(model.cacheName),beforeDelete.selected);assert.deepEqual(await cacheKeys(otherModel.cacheName),beforeDelete.other);
+      report.cases.push({id:'native-model-delete-cancel-retains-artifacts',modelId,confirmationText,status:canceledStatus,card:await inspectModelCard(model,'删除模型')});
+      await settingButton('[data-information-highlight-remove]','model-delete-open-confirm');await step('model-delete-second-confirmation',()=>dialog.waitFor());
+      await step('model-delete-confirm',()=>dialog.getByRole('button',{name:'删除模型',exact:true}).click());
+      await step('model-delete-confirm-closes-dialog',()=>dialog.waitFor({state:'hidden'}));
+      const deleted=await step('model-delete-removes-selected-artifacts',async()=>{
+        for(const deadline=Date.now()+30000;;){const status=(await readModelStatus()).status;if(!status.downloaded&&status.downloadedBytes===0)return status;assert(Date.now()<deadline,'Confirmed model deletion did not remove selected artifacts');await delay(200);}
+      },35000);
+      const deletedCard=await inspectModelCard(model,downloadLabel),afterDelete={selected:await cacheKeys(model.cacheName),other:await cacheKeys(otherModel.cacheName)};
+      assert(!afterDelete.selected.some(url=>url.startsWith(modelUrlPrefix)));assert.deepEqual(afterDelete.other,beforeDelete.other);
+      const retainedText=await control.evaluate(async({cacheName,url})=>(await (await caches.open(cacheName)).match(url))?.text(),{cacheName:otherModel.cacheName,url:retentionMarker});assert.equal(retainedText,markerText);
+      assert.equal((await readModelStatus(otherModel.id)).status.downloaded,false);
+      report.cases.push({id:'native-model-delete-confirm-restores-single-download-action',modelId,status:deleted,card:deletedCard,selectedCacheArtifactKeysBefore:beforeDelete.selected.length,selectedCacheArtifactKeysAfter:afterDelete.selected.length,
+        otherCacheRetention:{cacheName:otherModel.cacheName,markerRetained:true,keysBefore:beforeDelete.other.length,keysAfter:afterDelete.other.length,evidence:'synthetic-cache-retention-marker; second complete model was not imported'}});
+      await shot(control,'settings-model-deleted');
+      await shot(control.locator('[data-testid="information-highlight-model-card"]'),'model-card-download');
+      await step('cleanup-other-cache-retention-marker',()=>control.evaluate(async({cacheName,url})=>(await caches.open(cacheName)).delete(url),{cacheName:otherModel.cacheName,url:retentionMarker}));
     }
     await step('final-focus-check',()=>checkFocus());assert(!fatalError);assert.equal(report.consoleErrors.length,0,JSON.stringify(report.consoleErrors));
     assert(!report.consoleWarnings.some(item=>item.message.includes('Failed to resolve component')),JSON.stringify(report.consoleWarnings));report.ok=true;checkpoint('validation-complete','after');
@@ -601,6 +723,9 @@ function popupSourceContract(){
       if(focusMonitor.error){report.focusObserverError=String(focusMonitor.error);report.ok=false;primaryError||=focusMonitor.error;save();}}
     if(server.listening)try{await step('cleanup-fixture-server',()=>new Promise((resolve,reject)=>server.close(error=>error?reject(error):resolve())),5000,{ignoreFatal:true});}
     catch(error){report.serverCleanupError=String(error);report.ok=false;primaryError||=error;server.closeAllConnections?.();save();}
+    if(report.browserCloseReceipt==='shared-guard-fulfilled')try{
+      await step('cleanup-owned-profile',()=>fs.rmSync(profileDir,{recursive:true,force:true}),15000,{ignoreFatal:true});report.profileRemoved=true;
+    }catch(error){report.profileCleanupError=String(error);report.ok=false;primaryError||=error;save();}
     checkpoint('cleanup','after');save();
   }
   console.log(JSON.stringify({ok:report.ok,cases:report.cases.length,report:path.join(artifacts,'report.json'),error:report.error}));

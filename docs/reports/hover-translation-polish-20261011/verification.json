@@ -1,7 +1,7 @@
 {
   "date": "2026-10-11",
   "scope": "Hover translation responsiveness, interaction and lifecycle reliability; targeted verification, no full-suite or live-provider acceptance.",
-  "productionBuildSourceCommit": "6c5752f57c584f7b5f66989c4542931d4133a892",
+  "productionBuildSourceCommit": "d9abcc7e93a6ac817f99d5b9851dcac1858fcb44",
   "testHarnessCommit": "12ec05d7463df41802a2bd39b1ff145498c27c83",
   "architecture": "Existing WXT/Vue/TypeScript and shared candidates, requests and rendering; synchronous resolver reuse has no cross-gesture DOM cache; mutable glossary fields are revalidated every capture. No new dependencies or reference-repository code.",
   "strictCoverage": {
@@ -23,7 +23,7 @@
         "lines": 100
       },
       "sourceSha256": "9fea2a6240f454b07690d51cef83ec3b6483419418b13b4fd5c12ef1ddf371db",
-      "verification": "Final integrated source: 537 tests / 7 files"
+      "verification": "Final integrated source: 631 tests / 8 files"
     },
     "src/features/hover-translation/content/index.ts": {
       "percent": {
@@ -33,7 +33,7 @@
         "lines": 100
       },
       "sourceSha256": "d353fb871065922aa64f24f41ac890890643279bd1ae3286ee2ea1ed892e7bbd",
-      "verification": "Final integrated source: 537 tests / 7 files"
+      "verification": "Final integrated source: 631 tests / 8 files"
     },
     "src/features/quick-translation/content/index.ts": {
       "percent": {
@@ -43,7 +43,7 @@
         "lines": 100
       },
       "sourceSha256": "a14481ac4d24dbcdacfc87a0fd0c9520d8d7593f3504fbec2a9da4cb696bbe58",
-      "verification": "Final integrated source: 537 tests / 7 files"
+      "verification": "Final integrated source: 631 tests / 8 files"
     },
     "src/core/glossary/revisionMemo.ts": {
       "percent": {
@@ -53,7 +53,7 @@
         "lines": 100
       },
       "sourceSha256": "ffc0c01f45d0f18ff8c52fdd34da9d55b8f6a2c5101adb8152508159335a0292",
-      "verification": "Final integrated source: 537 tests / 7 files"
+      "verification": "Final integrated source: 631 tests / 8 files"
     },
     "src/features/full-page-translation/content/translationRequest.ts": {
       "percent": {
@@ -63,7 +63,7 @@
         "lines": 100
       },
       "sourceSha256": "6b444bbe7f3bd5a56f41134b3c319eac36af98002327ab894188369b56dfa349",
-      "verification": "Final integrated source: 537 tests / 7 files"
+      "verification": "Final integrated source: 631 tests / 8 files"
     }
   },
   "targetedRuns": [
@@ -73,14 +73,15 @@
       "passed": 969
     },
     {
-      "scope": "Final integrated request, snapshot, glossary memo, default/quick gestures, scheduling and visibility",
-      "files": 7,
-      "passed": 537
+      "scope": "Final integrated request, snapshot, glossary memo, default/quick gestures, scheduling, visibility and shared translation state",
+      "files": 8,
+      "passed": 631
     },
     {
-      "scope": "Final integrated QQ/NetEase/embedded frame routes and shared hotkey arbitration",
+      "scope": "QQ/NetEase/embedded frame routes and shared hotkey arbitration; all modified frame/controller/hotkey source hashes unchanged after the last main integration",
       "files": 4,
-      "passed": 134
+      "passed": 134,
+      "sourceCommit": "6c5752f57c584f7b5f66989c4542931d4133a892"
     },
     {
       "scope": "Final integrated architecture: module/provider boundaries, source headers and verification ownership",
@@ -104,7 +105,7 @@
       "regression": 40
     },
     "files": 641,
-    "cases": 10443
+    "cases": 10495
   },
   "builds": {
     "compile": "passed",
@@ -116,14 +117,15 @@
     "docs": "passed"
   },
   "userscriptBudget": {
-    "baselineCommit": "b14baf4b267f1bdace40fff13652bf9568ba1d5f",
-    "baselineBytes": 1987953,
-    "finalBytes": 1990973,
-    "deltaBytes": 3020,
-    "deltaPercent": 0.1519,
-    "budgetBytes": 1994000,
-    "allowanceIncreaseBytes": 0,
-    "verification": "Upstream verifier and byte budget unchanged; protocol, compatibility and runtime exclusion assertions passed."
+    "baselineCommit": "0a69bfc3d2335c03cd22778af2bcebccdc8d0664",
+    "baselineBytes": 1993179,
+    "finalBytes": 1996290,
+    "deltaBytes": 3111,
+    "deltaPercent": 0.1561,
+    "previousBudgetBytes": 1994000,
+    "budgetBytes": 1997000,
+    "allowanceIncreaseBytes": 3000,
+    "verification": "Measured 3,111-byte feature delta; all protocol, compatibility and runtime exclusion assertions retained. The original allowance failed after integration and the measured 3 KB allowance passes."
   },
   "browser": {
     "evidence": "Production extension; local deterministic transport, temporary background-visible Edge",
@@ -444,7 +446,12 @@
       },
       "5000EntryMedianReductionPercent": 81.6
     },
-    "buildSourceCommit": "6c5752f57c584f7b5f66989c4542931d4133a892"
+    "buildSourceCommit": "6c5752f57c584f7b5f66989c4542931d4133a892",
+    "postRunIntegration": {
+      "mainCommit": "0a69bfc3d2335c03cd22778af2bcebccdc8d0664",
+      "browserRunSourceCommit": "6c5752f57c584f7b5f66989c4542931d4133a892",
+      "sourceVerification": "All six covered hover/request/candidate/memo modules plus full-page runtime, requestSession and frame roots are unchanged from the native browser run. The new shared-state notification adds an optional previousState argument on clearing; cancellation, generation and DOM restore order are unchanged. Independent review and 631 targeted tests confirm integration compatibility; browser timing is the recorded 6c5752f57 production run, not a rerun of the final merged bundle."
+    }
   },
   "limitations": [
     "Deterministic local transport isolates browser behavior and input cost; live translation quality/network/provider availability unverified.",
@@ -468,13 +475,19 @@
     "browser": "node scripts/testing/run-resource-safe.mjs -- node scripts/testing/run-hover-visual-range-test.cjs --extension-dir .output/chrome-mv3 --focus-safe-helper scripts/testing/focus-safe-browser.cjs --background --gesture-lifecycle --hover-sweep --artifacts-dir /private/tmp/fluentread-hover-delivery",
     "browserBaseline": "Use the same script and dependencies against a clean archive of performanceBaselineCommit, replacing extension-dir and using --background --baseline --hover-sweep --sweep-only.",
     "cliContracts": "pnpm test tests/documentationToolContracts.test.ts -t 'hover-visual-range-test'",
-    "integrationCoverage": "node scripts/testing/run-resource-safe.mjs -- pnpm exec vitest run --config vitest.coverage.config.ts tests/fullPageVisibilityScheduling.test.ts tests/hoverTranslationContentFeature.test.ts tests/quickTranslationContentFeature.test.ts tests/translationSlotEchoRegression.test.ts tests/glossaryRevisionMemo.test.ts tests/fullPageTranslationConfigSnapshot.test.ts tests/hoverTranslationScheduling.test.ts --coverage --coverage.include=src/features/full-page-translation/content/translationRequest.ts --coverage.include=src/core/glossary/revisionMemo.ts --coverage.include=src/features/hover-translation/content/index.ts --coverage.include=src/features/quick-translation/content/index.ts --coverage.include=src/features/full-page-translation/content/hoverScheduling.ts --coverage.reportsDirectory=/private/tmp/fluentread-hover-integration-coverage",
+    "integrationCoverage": "node scripts/testing/run-resource-safe.mjs -- pnpm exec vitest run --config vitest.coverage.config.ts tests/fullPageVisibilityScheduling.test.ts tests/hoverTranslationContentFeature.test.ts tests/quickTranslationContentFeature.test.ts tests/translationSlotEchoRegression.test.ts tests/glossaryRevisionMemo.test.ts tests/fullPageTranslationConfigSnapshot.test.ts tests/hoverTranslationScheduling.test.ts tests/translationState.test.ts --coverage --coverage.include=src/features/full-page-translation/content/translationRequest.ts --coverage.include=src/core/glossary/revisionMemo.ts --coverage.include=src/features/hover-translation/content/index.ts --coverage.include=src/features/quick-translation/content/index.ts --coverage.include=src/features/full-page-translation/content/hoverScheduling.ts --coverage.reportsDirectory=/private/tmp/fluentread-hover-integration-coverage",
     "frameAndHotkey": "node scripts/testing/run-resource-safe.mjs -- pnpm exec vitest run --maxWorkers=1 tests/qqMailFrameRuntime.test.ts tests/qqMailFrameSession.test.ts tests/issue146EmbeddedFrames.test.ts tests/contentHotkeyRuntime.test.ts"
   },
   "performanceBaselineCommit": "86a7ab6f29e8567394a70f0c11a4b8a620295531",
-  "testedMainCommit": "b14baf4b267f1bdace40fff13652bf9568ba1d5f",
+  "testedMainCommit": "0a69bfc3d2335c03cd22778af2bcebccdc8d0664",
   "resolvedBaselineAssertion": {
     "file": "tests/architecture/providerBoundaries.test.ts",
     "reason": "Upstream b14baf4b2 corrected the prior native-batch signature assertion; all four architecture files pass on the final integrated source."
+  },
+  "builtArtifactSha256": {
+    ".output/chrome-mv3/content-scripts/content.js": "e566f7b78f1d59e02f480b1d5d0866dc16699dbfe1730c15cd24a0b98c0147ed",
+    ".output/chrome-mv3/manifest.json": "fd80314b160701ed5500e584e1373f5eed44a19acdc6f8b76f9a12c1565970d8",
+    ".output/firefox-mv2/manifest.json": "2f4d6388a66e23f052933d6a4f972e3f65e841806a20f6b1d274fcf14d21a3ef",
+    ".output/userscript/fluent-read.user.js": "368749dee70dd22b9ec5a66d09396f51278a1d271e2881b8846a258153ae9c7e"
   }
 }

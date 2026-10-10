@@ -51,4 +51,4 @@
 
 微软免费端点的批量和逐条结果都会把本例原文 `&lt;` 改写为 `&;`。3 次无凭据公开端点诊断确认损坏发生在服务原始响应内；命名转义、数字转义、双重转义和 `textType=plain` 探测均不能可靠保真，见 [原始响应摘要](./microsoft-entity-diagnostic.json)。因此不按猜测位置修复文本：对原文实体字面值逐 token 检查保留数量，损坏结果按协议异常拒收；同预算逐段恢复仍损坏时返回失败、保留原文，拒收结果不进入缓存。这是保守失败保护，并非对上游翻译内容的自动修复。
 
-可重现入口：`scripts/testing/run-native-batch-live-test.cjs`。必须传入生产扩展、Playwright 包目录、focus-safe helper 和证据目录；默认仅合成云响应，`--live` 增加两条免费服务的六槽批量与顺序逐条对照，`--full-page` 增加六段全文翻译、恢复、再翻译。不会读取日常 profile 或用户凭据；后台正常窗口置于第二屏，校验 `browserFrontmost=false`，只清理本轮临时配置。
+可重现入口：`scripts/testing/run-native-batch-live-test.cjs`。必须传入生产扩展、Playwright 包目录、focus-safe helper 和证据目录；默认仅合成云响应，`--live` 增加 Google 六槽、微软普通五槽的批量与顺序逐条对照，以及微软实体保真或明确拒收检查；`--full-page` 增加六段全文翻译、恢复、再翻译。不会读取日常 profile 或用户凭据；后台正常窗口置于第二屏，校验 `browserFrontmost=false`，只清理本轮临时配置。

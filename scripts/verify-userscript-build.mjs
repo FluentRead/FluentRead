@@ -25,10 +25,15 @@ const artifactBytes = Buffer.byteLength(source);
 // 原生合批独立开关及冻结策略增加 2,560 字节（0.1291%）：
 // 同依赖基线 e4932521f 为 1,982,807，候选为 1,985,367；预算最小增加 1 KB。
 // 增量与语言固定提交验证见 docs/reports/native-batch-setting-20261011/。
-// 悬浮手势按帧合并、停留调度与取消域完整清理增加 4,576 字节（0.2305%）：
-// 同依赖独立基线 fe7005dd9 为 1,985,367，候选为 1,989,943；预算最小增加 5 KB。
+// 悬浮手势按帧合并、停留调度与取消域完整清理的原始验证增加 4,576 字节（0.2305%）：
+// 同依赖独立基线 fe7005dd9 为 1,985,367，候选为 1,989,943；该阶段预算最小增加 5 KB。
 // 体积与生产包真实事件回归见 docs/reports/hover-reliability-20261011/。
-const MAX_USERSCRIPT_BYTES = 1_991_000;
+// 20 个译文样式预设（规则、注册表与中文名称）增加 8,193 字节（0.4127%）：
+// 同依赖独立基线 fe7005dd9 为 1,985,255，候选为 1,993,448；预算增加 8 KB。
+// 实测与截图见 docs/reports/translation-style-presets-20261010/。
+// 合并前整合 b14baf4b 的全文优化与样式预设：同依赖 main 为 1,987,953，集成后为 1,992,441。
+// 增加 4,488 字节（0.2258%），保持 main 的 1,994,000 预算；证据见悬浮报告 pr-integration/。
+const MAX_USERSCRIPT_BYTES = 1_994_000;
 const preludeStartMarker = '/* FluentRead userscript compatibility prelude:start */';
 const preludeEndMarker = '/* FluentRead userscript compatibility prelude:end */';
 const preludeStart = source.indexOf(preludeStartMarker);

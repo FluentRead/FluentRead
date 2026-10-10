@@ -297,7 +297,7 @@ function createBilingualTranslationContent(
     if (renderOptions.longParagraphLineBreak ?? config.longParagraphLineBreakEnabled) {
         applyLongParagraphLineBreaks(content);
     }
-    if (style?.class === 'fluent-display-learning-mode' || style?.class === 'fluent-display-marker') {
+    if (style?.inlineText) {
         // 块容器负责换行，行内副本负责逐行标记；避免渐变覆盖整个段落底部和行尾留白。
         const markedText = node.ownerDocument.createElement('span');
         markedText.className = 'fluent-read-translation-text';

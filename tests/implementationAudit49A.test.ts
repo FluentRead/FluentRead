@@ -33,7 +33,7 @@ vi.mock('tldts', async importOriginal => {
   return {...actual, getDomain: (...args: Parameters<typeof actual.getDomain>) => {ports.domainCalls++; return actual.getDomain(...args);}};
 });
 
-import {createApp, nextTick, reactive, type App} from 'vue';
+import {createApp, h, nextTick, reactive, ref, type App} from 'vue';
 import FloatingBall from '@/src/features/floating-ball/ui/FloatingBall.vue';
 import AreaTranslator from '@/src/features/area-translation/ui/AreaTranslator.vue';
 import {canonicalizeHotkey, matchesConfiguredHotkey, normalizeHotkeyEventKey, parseHotkey} from '@/src/core/hotkey';
@@ -60,14 +60,16 @@ function event(type: string, values: Record<string, unknown> = {}) {
 function mountBall(clickAction?: FloatingBallPresentation['clickAction']) {
   const toggle = vi.fn(), position = vi.fn(), settings = vi.fn();
   const props = reactive({onTranslationToggle: toggle, onPositionChanged: position, onSettingsClick: settings, initialTranslating: false,
+    initialTranslationStatus: 'idle' as 'idle' | 'translating' | 'translated' | 'error',
     ...(clickAction ? {presentation: {clickAction}} : {})});
   const container = dom.document.createElement('div'); dom.document.body.append(container);
-  app = createApp(FloatingBall, props); app.directive('ui-i18n', {}); app.mount(container);
+  const instance = ref<{setTranslationState(value: boolean): void; setTranslationStatus(value: 'idle' | 'translating' | 'translated' | 'error'): void} | null>(null);
+  app = createApp({setup: () => () => h(FloatingBall, {...props, ref: instance})}); app.directive('ui-i18n', {}); app.mount(container);
   const root = container.querySelector<HTMLElement>('.fr-floating-ball')!;
   const main = container.querySelector<HTMLElement>('.floating-ball-main')!;
   root.getBoundingClientRect = () => ({left: 950, top: 330, width: 40, height: 136}) as DOMRect;
   main.getBoundingClientRect = () => ({left: 950, top: 380, width: 40, height: 40}) as DOMRect;
-  return {container, root, main, props, toggle, position, settings};
+  return {container, root, main, props, toggle, position, settings, instance: instance.value!};
 }
 
 describe('49A production hotkey and site boundaries', () => {
@@ -134,6 +136,40 @@ describe('49A production hotkey and site boundaries', () => {
 });
 
 describe('49A real floating-ball client template', () => {
+  it('仅真实成功显示勾选，加载和失败可区分且保持恢复原文入口', async () => {
+    const f = mountBall();
+    const button = f.container.querySelector<HTMLElement>('.floating-ball-translate')!;
+    expect(f.root.dataset.translationStatus).toBe('idle');
+    expect(f.container.querySelector('.check-mark')).toBeNull();
+    f.props.initialTranslating = true; f.props.initialTranslationStatus = 'translating';
+    await nextTick();
+    expect(f.root.dataset.translationStatus).toBe('translating');
+    expect(button.getAttribute('aria-busy')).toBe('true');
+    expect(button.getAttribute('aria-pressed')).toBe('true');
+    expect(f.container.querySelector('.translation-progress')).not.toBeNull();
+    expect(f.container.querySelector('.check-mark')).toBeNull();
+    f.props.initialTranslationStatus = 'error'; await nextTick();
+    expect(f.root.dataset.translationStatus).toBe('error');
+    expect(f.container.querySelector('.translation-error')).not.toBeNull();
+    expect(button.getAttribute('aria-label')).toContain('fullPage.progress.failuresTitle');
+    expect(f.container.querySelector('.check-mark')).toBeNull();
+    f.props.initialTranslationStatus = 'translated'; await nextTick();
+    expect(f.root.dataset.translationStatus).toBe('translated');
+    expect(f.container.querySelector('.check-mark')).not.toBeNull();
+    button.dispatchEvent(event('click')); await nextTick();
+    expect(f.toggle).toHaveBeenCalledWith(false);
+    f.props.initialTranslating = false; await nextTick();
+    expect(f.root.dataset.translationStatus).toBe('idle');
+    expect(button.getAttribute('aria-pressed')).toBe('false');
+    expect(f.container.querySelector('.check-mark')).toBeNull();
+    f.instance.setTranslationState(true); f.instance.setTranslationStatus('error'); await nextTick();
+    expect(f.root.dataset.translationStatus).toBe('error');
+    expect(f.container.querySelector('.check-mark')).toBeNull();
+    f.instance.setTranslationStatus('translated'); await nextTick();
+    expect(f.container.querySelector('.check-mark')).not.toBeNull();
+    f.instance.setTranslationState(false); await nextTick();
+    expect(f.root.dataset.translationStatus).toBe('idle');
+  });
   it('retains the first pointer when a second touch arrives', async () => {
     const f = mountBall();
     f.main.dispatchEvent(event('pointerdown', {pointerId: 1, pointerType: 'touch'}));

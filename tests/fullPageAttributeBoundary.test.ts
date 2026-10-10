@@ -3,6 +3,8 @@ import {parseHTML} from 'linkedom';
 import {TranslationCandidateCore} from '@/src/core/translation/engine';
 import {createDeclarativeAdapter} from '@/src/core/translation/adapters/declarative';
 import {compileSiteRulePack, getSiteAdapterAttributeFilter} from '@/src/core/site-adaptation/compiler';
+import {createAttributeMutationBatch, type AttributeMutationBatchPorts} from '@/src/features/full-page-translation/content/attributeMutationBatch';
+import type {TranslationState} from '@/src/features/full-page-translation/content/state';
 
 // Only the transport, configuration and layout environment are controlled.
 // Runtime, candidate core/selector adapter, state, source snapshot, renderer and failed UI are real.
@@ -405,5 +407,160 @@ describe('full page site attribute boundary lifecycle', () => {
             expect(owner.firstChild).toBe(nextText);
             expect(owner.textContent).toBe(nextSource);
         } finally { inspect.mockRestore(); nextSourceReads.mockRestore(); fixture.config.display = 1; }
+    });
+});
+
+describe('属性检查点排时与硬门禁的 ports 契约', () => {
+    function batchFixture() {
+        const {document} = parseHTML('<html><body><main><p>Readable source.</p><i></i></main></body></html>');
+        const root = document.querySelector('main')!;
+        const owner = document.querySelector<HTMLElement>('p')!;
+        const flag = document.querySelector('i')!;
+        const state = {syntheticSegment: false} as TranslationState;
+        const states = new Map<HTMLElement, TranslationState>([[owner, state]]);
+        const ports: AttributeMutationBatchPorts = {
+            resolveTargets: vi.fn(element => element === root || element === owner ? [owner] : []),
+            readState: vi.fn(target => states.get(target)),
+            restoreOutsideScope: vi.fn(() => false),
+            sourceIsCurrent: vi.fn(() => true),
+            isArtifact: vi.fn(() => false),
+            refreshSkeleton: vi.fn(() => false),
+            restart: vi.fn(), rescan: vi.fn(), schedule: vi.fn(),
+            isActive: vi.fn(() => true), hasTargetsOnlyAdapter: false,
+        };
+        const batch = createAttributeMutationBatch(ports);
+        return {root, owner, flag, state, states, ports, batch};
+    }
+
+    it('不同目标的 class/style 只枚举一次影响根，合并边界意图且 flush 只消费一次', () => {
+        const {root, owner, flag, state, ports, batch} = batchFixture();
+        batch.process(root, flag, flag, 'class', true);
+        batch.process(root, owner, owner, 'style', true);
+        expect(ports.resolveTargets).toHaveBeenCalledTimes(1);
+        expect(ports.schedule).not.toHaveBeenCalled();
+        // 同根从站点规则变化降为普通布局变化仍须保留首次边界意图。
+        batch.process(root, owner, owner, 'style', false);
+        batch.process(root, flag, flag, 'class', false);
+        expect(ports.resolveTargets).toHaveBeenCalledTimes(2);
+        expect(ports.restoreOutsideScope).not.toHaveBeenCalled();
+        batch.flush(); batch.flush();
+        expect(ports.schedule).toHaveBeenCalledTimes(1);
+        expect(ports.schedule).toHaveBeenCalledWith(owner, true);
+        expect(ports.readState).toHaveReturnedWith(state);
+    });
+
+    it('无 owner 的根只做既有扫描，缓存空列表不额外扩展下一条兄弟的扫描边界', () => {
+        const {root, owner, flag, ports, batch} = batchFixture();
+        vi.mocked(ports.resolveTargets).mockReturnValue([]);
+        batch.process(root, flag, flag, 'class', true);
+        batch.process(root, owner, owner, 'style', true);
+        expect(ports.rescan).toHaveBeenNthCalledWith(1, flag);
+        expect(ports.rescan).toHaveBeenNthCalledWith(2, root);
+        expect(ports.rescan).toHaveBeenNthCalledWith(3, root);
+        batch.process(root, flag, flag, 'hidden', false);
+        expect(ports.rescan).toHaveBeenLastCalledWith(flag);
+        batch.flush();
+        expect(ports.schedule).not.toHaveBeenCalled();
+    });
+
+    it('局部布局记录后出现站点规则变化时补上边界检查，新 state 不继承旧意图', () => {
+        const {root, owner, flag, states, ports, batch} = batchFixture();
+        batch.process(root, flag, flag, 'style', false);
+        batch.process(root, flag, flag, 'class', true);
+        batch.flush();
+        expect(ports.schedule).toHaveBeenCalledTimes(1);
+        expect(ports.schedule).toHaveBeenCalledWith(owner, true);
+        vi.mocked(ports.schedule).mockClear();
+        batch.invalidate(); batch.process(root, flag, flag, 'class', true);
+        states.set(owner, {syntheticSegment: false} as TranslationState);
+        batch.invalidate(); batch.process(root, flag, flag, 'style', false);
+        batch.flush();
+        expect(ports.schedule).toHaveBeenCalledTimes(1);
+        expect(ports.schedule).toHaveBeenCalledWith(owner, false);
+    });
+
+    it.each(['synthetic', 'shell'] as const)('同根重复变化保留 %s owner 的逐记录即时门禁', kind => {
+        const {root, owner, flag, state, ports, batch} = batchFixture();
+        if (kind === 'synthetic') state.syntheticSegment = true;
+        else state.allowTopLevelApplicationShell = true;
+        batch.process(root, flag, flag, 'class', true);
+        batch.process(root, flag, flag, 'style', true);
+        expect(ports.restoreOutsideScope).toHaveBeenCalledTimes(2);
+        expect(ports.resolveTargets).toHaveBeenCalledTimes(1);
+        batch.flush();
+        expect(ports.schedule).toHaveBeenCalledTimes(1);
+        expect(ports.schedule).toHaveBeenCalledWith(owner, false);
+    });
+
+    it('即时恢复引发 invalidate 时不保存旧根快照，也不排时失效 owner', () => {
+        const {root, owner, flag, state, states, ports, batch} = batchFixture();
+        state.syntheticSegment = true;
+        vi.mocked(ports.restoreOutsideScope).mockImplementation(() => {
+            states.delete(owner); batch.invalidate(); return true;
+        });
+        batch.process(root, flag, flag, 'class', true);
+        batch.process(root, flag, flag, 'style', true);
+        expect(ports.resolveTargets).toHaveBeenCalledTimes(2);
+        batch.flush();
+        expect(ports.schedule).not.toHaveBeenCalled();
+        expect(ports.restart).not.toHaveBeenCalled();
+    });
+
+    it('失去 state 的普通布局 owner 不产生延迟动作', () => {
+        const {root, flag, states, ports, batch} = batchFixture();
+        states.clear(); batch.process(root, flag, flag, 'style', false); batch.flush();
+        expect(ports.schedule).not.toHaveBeenCalled();
+        expect(ports.restoreOutsideScope).not.toHaveBeenCalled();
+    });
+
+    it.each(['inactive', 'detached', 'replaced-state'] as const)('%s 会在 flush 撤销当前回调的旧排时', change => {
+        const {root, owner, flag, states, ports, batch} = batchFixture();
+        batch.process(root, flag, flag, 'style', false);
+        if (change === 'inactive') vi.mocked(ports.isActive).mockReturnValue(false);
+        else if (change === 'detached') owner.remove();
+        else states.set(owner, {syntheticSegment: false} as TranslationState);
+        batch.flush();
+        expect(ports.schedule).not.toHaveBeenCalled();
+        vi.mocked(ports.isActive).mockReturnValue(true);
+        batch.flush();
+        expect(ports.schedule).not.toHaveBeenCalled();
+    });
+
+    it.each(['ordinary', 'synthetic'] as const)('非布局关系记录可保留来源稳定的间接 %s owner', kind => {
+        const {root, flag, state, ports, batch} = batchFixture();
+        state.syntheticSegment = kind === 'synthetic';
+        batch.process(root, flag, flag, 'data-ready', true);
+        expect(ports.restoreOutsideScope).toHaveBeenCalled();
+        expect(ports.sourceIsCurrent).toHaveBeenCalled();
+        expect(ports.restart).not.toHaveBeenCalled();
+        expect(ports.refreshSkeleton).not.toHaveBeenCalled();
+    });
+
+    it('focus 模式不凭相同原文放过间接合成 owner 的资格变化', () => {
+        const {root, owner, flag, state, ports, batch} = batchFixture();
+        state.syntheticSegment = true; ports.hasTargetsOnlyAdapter = true;
+        batch.process(root, flag, flag, 'data-ready', true);
+        expect(ports.restart).toHaveBeenCalledTimes(1);
+        expect(ports.restart).toHaveBeenCalledWith(owner);
+        expect(ports.refreshSkeleton).not.toHaveBeenCalled();
+    });
+
+    it.each([true, false])('直属非布局来源变化先尝试骨架刷新（成功=%s）', success => {
+        const {root, owner, ports, batch} = batchFixture();
+        vi.mocked(ports.sourceIsCurrent).mockReturnValue(false);
+        vi.mocked(ports.refreshSkeleton).mockReturnValue(success);
+        batch.process(root, owner, owner, 'title', true);
+        expect(ports.refreshSkeleton).toHaveBeenCalledTimes(1);
+        expect(ports.restart).toHaveBeenCalledTimes(success ? 0 : 1);
+    });
+
+    it.each(['artifact', 'no-state', 'unchanged-direct'] as const)('非布局 %s 仍经即时重启路径处理', reason => {
+        const {root, owner, states, ports, batch} = batchFixture();
+        if (reason === 'artifact') vi.mocked(ports.isArtifact).mockReturnValue(true);
+        else if (reason === 'no-state') states.clear();
+        batch.process(root, owner, owner, null, false);
+        expect(ports.refreshSkeleton).not.toHaveBeenCalled();
+        expect(ports.restart).toHaveBeenCalledTimes(1);
+        expect(ports.restart).toHaveBeenCalledWith(owner);
     });
 });

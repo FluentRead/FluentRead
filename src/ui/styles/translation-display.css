@@ -1,8 +1,10 @@
 /**
  * @file src/ui/styles/translation-display.css
  * 文件职责：定义网页双语译文容器的基础排版与全部“译文样式”预设，是内容脚本注入网页和设置页实时预览共用的唯一视觉来源。
- * 主要内容：先声明 .fluent-read-bilingual-content 基础规则，再按文字、线条、标记与卡片四类定义预设；线条与底色读取
- * --fluent-read-translation-* 自定义属性并回退到各预设原有配色，使“自定义外观”无需改写类名即可生效。
+ * 主要内容：先声明 .fluent-read-bilingual-content 基础规则，再按文字、线条、标记、卡片与趣味五类定义预设；线条与底色读取
+ * --fluent-read-translation-* 自定义属性并回退到各预设原有配色，使“自定义外观”无需改写类名即可生效。29 号以后的预设
+ * 不写死浅色网页的配色：线条与底色用 currentColor 调配，随网页文字颜色在浅色和深色网页上自动取得合适的深浅；
+ * 自带表面的卡片则同时声明文字颜色。
  * 模块边界：只包含 fluent 前缀约束的选择器，不决定何时添加类名，也不写入用户外观；外观变量由内容脚本的样式同步器或
  * 设置页预览提供，加载、重试、图片与提示框等其他页面状态仍在 src/app/content/page.css。
  */
@@ -216,4 +218,229 @@
     border-radius: 3px;
     border: 1px solid var(--fluent-read-translation-line, #eee);
     color: #24292f;
+}
+
+/*
+ * 以下为 29 号以后的预设。译文继承网页的文字颜色，因此用 color-mix 把 currentColor 调成线条和底色：
+ * 浅色网页得到浅灰，深色网页得到浅白，无需判断网页主题，也不依赖系统的深色模式。
+ */
+
+/* 文字：阅读向 */
+.fluent-display-muted-note {
+    font-size: 0.92em;
+    line-height: 1.6;
+    opacity: 0.76;
+}
+
+.fluent-display-kaiti {
+    font-family: "Kaiti SC", "STKaiti", "KaiTi", "AR PL UKai CN", "Klee One", "YuKyokasho", serif;
+    line-height: 1.7;
+}
+
+/* 原文与译文书写体系不同时渲染器会写入内联字体；网页上的楷体需要胜过它，同时仍排在用户的字体微调之前。 */
+.fluent-display-kaiti[data-fr-translation-owned="true"] {
+    font-family: "Kaiti SC", "STKaiti", "KaiTi", "AR PL UKai CN", "Klee One", "YuKyokasho", serif !important;
+}
+
+.fluent-display-airy {
+    line-height: 1.9;
+    letter-spacing: 0.03em;
+}
+
+.fluent-display-indent {
+    text-indent: 2em;
+}
+
+/* 线条：阅读向 */
+.fluent-display-thick-underline {
+    text-decoration: underline solid var(--fluent-read-translation-line, rgba(64, 158, 255, 0.42));
+    text-decoration-thickness: 0.36em;
+    text-underline-offset: -0.16em;
+    text-decoration-skip-ink: none;
+}
+
+.fluent-display-top-divider {
+    border-top: 1px dashed var(--fluent-read-translation-line, color-mix(in srgb, currentColor 30%, transparent));
+    padding-top: 6px;
+}
+
+.fluent-display-arrow-guide {
+    position: relative;
+    padding-inline-start: 1.5em;
+}
+
+.fluent-display-arrow-guide::before {
+    content: "↳";
+    position: absolute;
+    inset-inline-start: 0.15em;
+    top: 0;
+    color: var(--fluent-read-translation-line, color-mix(in srgb, currentColor 50%, transparent));
+    font-style: normal;
+    font-weight: normal;
+    text-indent: 0;
+}
+
+.fluent-display-gradient-bar {
+    border-style: solid;
+    border-width: 0 0 0 3px;
+    border-image: linear-gradient(to bottom, var(--fluent-read-translation-line, #4f8cff), #a855f7 55%, #ec4899) 1;
+    padding-left: 10px;
+}
+
+/* 标记：底色跟随网页文字颜色 */
+.fluent-display-adaptive-tint {
+    background: var(--fluent-read-translation-fill-faint, color-mix(in srgb, currentColor 7%, transparent));
+    padding: 4px 10px;
+    border-radius: 8px;
+}
+
+.fluent-display-line-pill {
+    background: transparent;
+    line-height: 1.8;
+}
+
+.fluent-display-line-pill > .fluent-read-translation-text {
+    display: inline !important;
+    padding: 0.12em 0.5em;
+    border-radius: 0.5em;
+    background: var(--fluent-read-translation-fill-soft, color-mix(in srgb, currentColor 10%, transparent));
+    -webkit-box-decoration-break: clone;
+    box-decoration-break: clone;
+}
+
+/* 卡片 */
+.fluent-display-glass {
+    background: var(--fluent-read-translation-fill-faint, color-mix(in srgb, currentColor 5%, transparent));
+    border: 1px solid color-mix(in srgb, currentColor 14%, transparent);
+    border-radius: 12px;
+    padding: 8px 14px;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.06);
+    -webkit-backdrop-filter: blur(8px) saturate(1.2);
+    backdrop-filter: blur(8px) saturate(1.2);
+}
+
+/* 趣味 */
+.fluent-display-sticky-note {
+    background: var(--fluent-read-translation-surface-deep, #fff1a3);
+    color: #3b3320;
+    padding: 8px 12px 10px;
+    border-radius: 2px 2px 16px 2px / 2px 2px 5px 2px;
+    box-shadow: 0 1px 1px rgba(0, 0, 0, 0.08), 0 8px 10px -8px rgba(0, 0, 0, 0.35);
+}
+
+/* 自带浅色表面的卡片在深色网页上会继承网页的浅色链接，看不清；链接统一改用深色。 */
+.fluent-display-modern-card a,
+.fluent-display-paper a,
+.fluent-display-tech a,
+.fluent-display-sticky-note a {
+    color: #0b57d0;
+}
+
+.fluent-display-chat-bubble {
+    width: fit-content;
+    max-width: 100%;
+    background: var(--fluent-read-translation-fill-soft, color-mix(in srgb, currentColor 9%, transparent));
+    border-radius: 4px 16px 16px 16px;
+    padding: 6px 12px;
+}
+
+/* 终端自带深色表面与浅色文字，浅色和深色网页上观感一致。 */
+.fluent-display-terminal {
+    position: relative;
+    font-family: ui-monospace, SFMono-Regular, "Cascadia Mono", Menlo, Consolas, "Liberation Mono", monospace;
+    font-size: 0.94em;
+    line-height: 1.6;
+    background: #10151c;
+    color: #a6e3b4;
+    border: 1px solid #263242;
+    border-radius: 6px;
+    padding: 6px 12px 6px 2em;
+}
+
+.fluent-display-terminal::before {
+    content: "❯";
+    position: absolute;
+    left: 0.75em;
+    top: 6px;
+    color: var(--fluent-read-translation-line, #38bdf8);
+    text-indent: 0;
+}
+
+.fluent-display-terminal a {
+    color: #7dd3fc;
+}
+
+/* 渐变色与网页文字颜色混合：浅色网页偏深、深色网页偏亮，两边都保持可读。不支持时保持普通文字，避免文字被填成透明后消失。 */
+@supports (color: color-mix(in srgb, red, blue)) and ((-webkit-background-clip: text) or (background-clip: text)) {
+    .fluent-display-gradient-text {
+        background: linear-gradient(90deg,
+            color-mix(in srgb, #3b82f6 72%, currentColor),
+            color-mix(in srgb, #a855f7 72%, currentColor) 50%,
+            color-mix(in srgb, #ec4899 72%, currentColor));
+        -webkit-background-clip: text;
+        background-clip: text;
+        -webkit-text-fill-color: transparent;
+    }
+}
+
+.fluent-display-neon {
+    text-shadow: 0 0 0.3em rgba(236, 72, 153, 0.7), 0 0 0.85em rgba(139, 92, 246, 0.65);
+}
+
+.fluent-display-rainbow-marker {
+    background: transparent;
+    line-height: 1.6;
+}
+
+.fluent-display-rainbow-marker > .fluent-read-translation-text {
+    display: inline !important;
+    background: linear-gradient(90deg,
+        rgba(244, 63, 94, 0.3),
+        rgba(245, 158, 11, 0.3) 25%,
+        rgba(34, 197, 94, 0.3) 50%,
+        rgba(59, 130, 246, 0.3) 75%,
+        rgba(168, 85, 247, 0.3));
+    -webkit-box-decoration-break: clone;
+    box-decoration-break: clone;
+}
+
+.fluent-display-rainbow-underline {
+    line-height: 1.7;
+}
+
+.fluent-display-rainbow-underline > .fluent-read-translation-text {
+    display: inline !important;
+    padding-bottom: 3px;
+    background: linear-gradient(90deg, #f43f5e, #f59e0b 25%, #22c55e 50%, #3b82f6 75%, #a855f7) 0 100% / 100% 2px no-repeat;
+    -webkit-box-decoration-break: clone;
+    box-decoration-break: clone;
+}
+
+.fluent-display-hand-drawn {
+    border: 1.5px solid var(--fluent-read-translation-line, color-mix(in srgb, currentColor 55%, transparent));
+    border-radius: 255px 15px 225px 15px / 15px 225px 15px 255px;
+    padding: 4px 14px;
+}
+
+/* 黑幕遮挡：底色与文字同色，逐行遮住译文；指针移到译文上再揭开。 */
+.fluent-display-spoiler > .fluent-read-translation-text {
+    display: inline !important;
+    border-radius: 3px;
+    -webkit-box-decoration-break: clone;
+    box-decoration-break: clone;
+    transition: background-color 0.2s ease;
+}
+
+.fluent-display-spoiler:not(:hover) > .fluent-read-translation-text {
+    background-color: currentColor;
+}
+
+.fluent-display-spoiler:not(:hover) > .fluent-read-translation-text * {
+    color: inherit !important;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .fluent-display-spoiler > .fluent-read-translation-text {
+        transition: none;
+    }
 }

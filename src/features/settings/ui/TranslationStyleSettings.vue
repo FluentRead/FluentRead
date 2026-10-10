@@ -29,7 +29,7 @@
             :page-theme="pageTheme"
             :caption="t('settings.translationStyle.currentPreset', { name: activeProfile?.name ?? translateLegacy(selectedPreset.label) })"
             :customized="customized"
-            :hint="selectedPreset.className === 'fluent-display-blur-reveal' ? t('settings.translationStyle.blurRevealHint') : ''"
+            :hint="selectedPreset.revealOnHover ? t('settings.translationStyle.blurRevealHint') : ''"
             @update:page-theme="pageTheme = $event"
           />
         </div>
@@ -479,7 +479,7 @@ function resetAppearance(): void {
   width: auto;
   min-width: min(100%, 260px);
   flex: 1 1 260px;
-  max-width: 340px;
+  max-width: 400px;
 }
 
 .translation-style-categories :deep(button) {

@@ -204,7 +204,7 @@ describe('video player menu composition', () => {
     download.disabled = true;
     download.setAttribute('aria-busy', 'true');
     renderVideoSourceStatus(menu, {...state, source: 'native', cueCount: 2}, 'en-US');
-    expect(status.textContent).toBe('Native captions · 2 cues');
+    expect(status.textContent).toBe('Loaded subtitles · 2 cues');
     expect(menu.dataset.panel).toBe('tools');
     expect(download.disabled).toBe(true);
     expect(retry.hidden && regenerate.hidden).toBe(true);

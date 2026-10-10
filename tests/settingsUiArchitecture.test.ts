@@ -1138,6 +1138,17 @@ describe('options UI composition architecture', () => {
     expect(displayCss.indexOf('.fluent-read-bilingual-content {')).toBeGreaterThanOrEqual(0)
     expect(displayCss.indexOf('.fluent-read-bilingual-content {')).toBeLessThan(displayCss.indexOf('.fluent-display-'))
     expect(displayCss).toContain('var(--fluent-read-translation-line, #409eff)')
+    // 朴素模式不需要规则；其余预设都必须在共享样式表中有对应类，逐行绘制的预设还要有行内译文规则。
+    const presetSource = source('src/core/config/translationAppearance.ts')
+    const presetClasses = [...presetSource.matchAll(/className: '(fluent-display-[a-z-]+)'[^\n]*/gu)]
+    expect(presetClasses).toHaveLength(49)
+    for (const [line, className] of presetClasses) {
+      if (className === 'fluent-display-default') continue
+      expect(displayCss, className).toMatch(new RegExp(`\\.${className}[\\s\\[:>{]`, 'u'))
+      if (line.includes('inlineText: true')) expect(displayCss, className).toContain(`.${className} > .fluent-read-translation-text`)
+    }
+    // 新预设的线条与底色跟随网页文字颜色，不能写死只适合浅色网页的配色。
+    expect(displayCss).toContain('color-mix(in srgb, currentColor')
     expect(popup).toContain("appearance: 'settings-interface'")
   })
 

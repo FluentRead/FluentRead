@@ -1,7 +1,7 @@
 <!--
  * @file src/features/full-page-translation/ui/TranslationProgressPanel.vue
  * 文件职责：以半透明工作面板和低存在感状态勾选展示全文翻译进度，并允许用户临时收起，同时跟随扩展主题与系统深浅色偏好。
- * 主要内容：组件订阅实时进度和配置更新，通过展示控制器延迟短任务的展开并等待连续空闲后收起；失败时保留完成/失败摘要和局部重试入口；弹窗等待时保留静态提示，仅剩离屏候选且悬浮球关闭时退化为淡勾选。
+ * 主要内容：组件订阅实时进度和配置更新，通过展示控制器延迟短任务的展开并等待连续空闲后收起；失败时保留完成/失败摘要和局部重试入口；弹窗等待时保留静态提示，仅剩离屏候选且悬浮球关闭或被站点名单隐藏时退化为淡勾选。
  * 模块边界：组件通过会话限定端口请求失败重试或定位，不直接发出翻译请求，也不保存业务进度；数据只来自 progress.ts，是否创建 Shadow UI 由 content/progressPanel.ts 决定，样式局限于组件作用域。
  -->
 <template>
@@ -92,6 +92,7 @@ import {
   subscribeFullPageTranslationProgress,
 } from '@/src/features/full-page-translation/progress';
 import {config, subscribeConfig} from '@/src/services/config/store';
+import {isFloatingBallDisabledOnSite} from '@/src/core/site-rules/domain';
 import {useUiI18n} from '@/src/ui/i18n';
 import {createProgressPanelVisibility, type ProgressPanelDisplayMode} from './progressPanelVisibility';
 
@@ -99,7 +100,11 @@ const progress = ref(getFullPageTranslationProgress());
 const dismissedSessionId = ref<number | null>(null);
 const animationsEnabled = ref(config.animations !== false);
 const configuredTheme = ref(config.theme || 'auto');
-const floatingBallEnabled = ref(config.disableFloatingBall !== true);
+function isFloatingBallEnabled(source: typeof config): boolean {
+  return source.disableFloatingBall !== true
+    && !isFloatingBallDisabledOnSite(window.location.href, source.floatingBallDisabledDomains);
+}
+const floatingBallEnabled = ref(isFloatingBallEnabled(config));
 const prefersDark = ref(false);
 const darkModeMediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
 const {t} = useUiI18n();
@@ -160,7 +165,7 @@ onMounted(() => {
   unsubscribeConfig = subscribeConfig((nextConfig) => {
     animationsEnabled.value = nextConfig.animations !== false;
     configuredTheme.value = nextConfig.theme || 'auto';
-    floatingBallEnabled.value = nextConfig.disableFloatingBall !== true;
+    floatingBallEnabled.value = isFloatingBallEnabled(nextConfig);
   });
 });
 

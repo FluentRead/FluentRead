@@ -31,7 +31,10 @@ const artifactBytes = Buffer.byteLength(source);
 // 区域分片、精确取消与动态选择协作在独立基线 fe7005dd9 上增加 5,222 字节（0.2630%）。
 // 合入最新主线后复验体积，沿用主线预算；保留全部协议与执行边界校验。
 // 原始对照与集成证据见 docs/reports/section-translation-quality-20261011/。
-const MAX_USERSCRIPT_BYTES = 1_994_000;
+// 悬浮手势生命周期校验、独立调度与有界可变术语镜像增加约 3 KB（0.15%）。
+// 与区域翻译优化整合后按实际产物增加 3 KB 预算，协议及兼容边界校验保持完整。
+// 基线/候选实测与复现命令见 docs/reports/hover-translation-polish-20261011/verification.json。
+const MAX_USERSCRIPT_BYTES = 1_997_000;
 const preludeStartMarker = '/* FluentRead userscript compatibility prelude:start */';
 const preludeEndMarker = '/* FluentRead userscript compatibility prelude:end */';
 const preludeStart = source.indexOf(preludeStartMarker);

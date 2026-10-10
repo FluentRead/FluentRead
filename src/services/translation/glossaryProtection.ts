@@ -17,7 +17,7 @@ export function getGlossaryProtectionEntries(current: TranslationProviderConfigS
         glossaryIds: context.glossaryIds ? [...context.glossaryIds] : null,
         text: source,
     }).terms : [];
-    return context.context === 'document' ? [...entries, ...findDocumentLiteralTerms(source)] : entries;
+    return context.context === 'document' ? [...entries, ...findDocumentLiteralTerms(source, entries)] : entries;
 }
 
 export function prepareGlossaryRequest(message: TranslationRequestMessage, current: TranslationProviderConfigSnapshot) {

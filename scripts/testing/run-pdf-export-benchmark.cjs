@@ -5,6 +5,8 @@
 // Edge profile and uses only a deterministic loopback translation fixture.
 // Export timing starts at the actual UI click and stops at the download event;
 // import, translation, save and PDF reopening have separate measurements.
+// A native activation observer spans every stage and permanently fails/closes
+// the owned browser on activation; it never restores or changes user focus.
 const assert = require('node:assert/strict');
 const crypto = require('node:crypto');
 const fs = require('node:fs');
@@ -14,7 +16,7 @@ const path = require('node:path');
 const {createRequire} = require('node:module');
 const {execFile} = require('node:child_process');
 const {promisify} = require('node:util');
-const {launchFocusSafePersistentContext, newPageWithoutForeground, activateExtensionTabWithoutForeground, queryMacFrontmostApplication} = require('./focus-safe-browser.cjs');
+const {launchFocusSafePersistentContext, newPageWithoutForeground, activateExtensionTabWithoutForeground, queryMacFrontmostApplication, startFocusEventMonitor} = require('./focus-safe-browser.cjs');
 const {getGuardedBrowserPid} = require('./owned-browser-close.cjs');
 const arg = (name, fallback) => {const index = process.argv.indexOf(`--${name}`); return index < 0 ? fallback : process.argv[index + 1];};
 const sha = value => crypto.createHash('sha256').update(value).digest('hex');
@@ -152,16 +154,47 @@ async function main() {
     parameters: {modes, layout, overflowRepeat, cancelAfterPages, exportTimeout, translationTimeout, cancelTimeout, fixtureDelayMs: 0, documentBatchTranslation: 'default true when available', viewport: {width: 1440, height: 960}},
     timingContract: 'exportMs: actual export UI click to Playwright download event; excludes import, translation, saveAs, reopening and screenshots',
     limitations: ['Deterministic loopback translation, not an online provider.', 'Cancellation invokes the visible UI button from a progress observer; heartbeat measures main-thread responsiveness.', 'Source text fingerprints validate order/completeness; rendering requires visual inspection.'],
-    inputs: [], screenshots: [], consoleErrors: [], cleanupErrors: []};
+    inputs: [], screenshots: [], consoleErrors: [], cleanupErrors: [], focusEvents: [], focusChecks: []};
   const profileDir = fs.mkdtempSync(path.join(os.tmpdir(), 'fluentread-pdf-export-'));
-  let fixture, launched, page, launchAttempted = false;
+  let fixture, launched, page, launchAttempted = false, focusMonitor, ownedPid, focusFailure;
+  const persist = () => fs.writeFileSync(path.join(artifactsDir, 'report.json'), JSON.stringify(report, null, 2));
+  const stopForFocus = error => {
+    focusFailure ||= error; report.focusFailure ||= error.message; report.ok = false; persist();
+    // Permanently fail and close only this guarded instance; never activate another app or restore foreground focus.
+    if (launched) void launched.close().catch(error => {report.cleanupErrors.push(`focus close: ${error.stack || error}`); persist();});
+  };
+  const checkFocus = async phase => {
+    report.currentPhase = phase;
+    if (focusFailure) throw focusFailure;
+    const application = await queryMacFrontmostApplication();
+    report.focusChecks.push({phase, document: report.currentDocument ?? null, mode: report.currentMode ?? null, time: Date.now(), application});
+    if (!application || application.pid === ownedPid) {
+      const error = new Error(!application ? `Cannot confirm foreground application during ${phase}` : `Owned Edge ${ownedPid} became foreground during ${phase}`);
+      stopForFocus(error); throw error;
+    }
+    if (focusFailure) throw focusFailure;
+  };
   try {
-    fixture = await fixtureServer(overflowRepeat); launchAttempted = true;
+    report.currentPhase = 'launch';
+    focusMonitor = startFocusEventMonitor({
+      onEvent: event => {
+        report.focusEvents.push({...event, phase: report.currentPhase, document: report.currentDocument ?? null, mode: report.currentMode ?? null});
+        if (ownedPid && event.pid === ownedPid) stopForFocus(new Error(`Owned Edge ${ownedPid} activation during ${report.currentPhase}`));
+      },
+      onError: error => stopForFocus(error),
+    });
+    report.focusObserver = await focusMonitor.ready;
+    fixture = await fixtureServer(overflowRepeat);
+    if (focusFailure) throw focusFailure;
+    launchAttempted = true;
     launched = await launchFocusSafePersistentContext({chromium, profileDir, browserPath: arg('browser-path', '/Applications/Microsoft Edge.app/Contents/MacOS/Microsoft Edge'),
       background: true, headless: false, displayTarget: arg('display', 'secondary'), viewport: {width: 1440, height: 960}, timeout: 30000,
       browserArgs: [`--disable-extensions-except=${extensionDir}`, `--load-extension=${extensionDir}`, '--no-first-run', '--no-default-browser-check']});
     Object.assign(report, {launchMode: launched.launchMode, focusPolicy: launched.focusPolicy, windowPlacement: launched.windowPlacement});
-    assert.equal(report.launchMode, 'macos-background-cdp'); assert.equal(report.windowPlacement.browserFrontmost, false);
+    ownedPid = await getGuardedBrowserPid(launched); report.ownedBrowserPid = ownedPid;
+    if (report.focusEvents.some(event => event.pid === ownedPid)) stopForFocus(new Error(`Owned Edge ${ownedPid} activation during launch`));
+    assert.equal(report.launchMode, 'macos-background-cdp'); assert.equal(report.focusPolicy, 'launchservices-no-foreground'); assert.equal(report.windowPlacement.browserFrontmost, false);
+    await checkFocus('initialization');
     const context = launched.context, worker = context.serviceWorkers()[0] || await context.waitForEvent('serviceworker', {timeout: 30000});
     const origin = /^chrome-extension:\/\/[^/]+/u.exec(worker.url())[0];
     page = await newPageWithoutForeground(context, 30000); page.setDefaultTimeout(30000);
@@ -206,22 +239,29 @@ async function main() {
     const stopMonitor = () => page.evaluate(() => {clearInterval(window.__pdfExportTimer); window.__pdfExportObserver?.disconnect(); const state = window.__pdfExportBenchmark; return {...state, cancelLatencyMs: state.canceledAt !== null && state.cancelRequestedAt !== null ? state.canceledAt - state.cancelRequestedAt : null};});
     const translated = [];
     for (const input of inputs) {
+      report.currentDocument = path.basename(input);
+      await checkFocus('inspect-source');
       const bytes = fs.readFileSync(input), inspectStart = Date.now(), sourcePages = await inspectPdf(bytes, requireRepo);
       const evidence = {input, sha256: sha(bytes), inputBytes: bytes.length, sourcePages: sourcePages.length, sourceInspectMs: Date.now() - inspectStart, exports: []}; report.inputs.push(evidence);
       fixture.resetDocument();
-      const name = path.basename(input), requestStart = fixture.requests.length, importStart = Date.now();
+      const name = path.basename(input), requestStart = fixture.requests.length;
+      await checkFocus('import');
+      const importStart = Date.now();
       await page.locator('input[type=file]').setInputFiles({name, mimeType: 'application/pdf', buffer: bytes});
       await page.locator('.workspace-heading h1').filter({hasText: name}).waitFor({timeout: translationTimeout});
       await page.locator('.pdf-page-row[data-render-state="ready"] canvas').first().waitFor({timeout: translationTimeout}); evidence.importMs = Date.now() - importStart;
       console.log(JSON.stringify({stage: 'imported', label, name, pages: sourcePages.length, importMs: evidence.importMs}));
       evidence.batchTranslation = await page.locator('.document-batch-translation input').count() ? await page.locator('.document-batch-translation input').isChecked() : null;
+      await checkFocus('translation');
       const translationStart = Date.now(); await page.locator('.taskbar-actions .translate-document-button').filter({hasText: '开始翻译'}).click();
       await page.locator('.document-status').filter({hasText: '翻译完成'}).waitFor({state: 'attached', timeout: translationTimeout});
       evidence.translationMs = Date.now() - translationStart; evidence.translationRequests = fixture.requests.length - requestStart;
       evidence.fixtureProtocol = {batchRequests: fixture.requests.slice(requestStart).filter(request => request.slots.length > 1).length, singleRequests: fixture.requests.slice(requestStart).filter(request => request.slots.length === 1).length};
       evidence.fixture = {expandedMarker: fixture.expandedMarker, expandedChars: fixture.responses.get(fixture.expandedMarker)?.length}; translated.push(name);
       console.log(JSON.stringify({stage: 'translated', label, name, translationMs: evidence.translationMs, requests: evidence.translationRequests, protocol: evidence.fixtureProtocol}));
+      await checkFocus('translation-evidence');
       await shot(`${label}-${name}-translated`);
+      await checkFocus('cancel-export');
       const cancelDialog = await openDialog(modes[0]); await startMonitor(true);
       const cancellationDownloads = []; const onCanceledDownload = download => cancellationDownloads.push(download.suggestedFilename()); page.on('download', onCanceledDownload);
       await cancelDialog.locator('.translate-document-button').click();
@@ -234,27 +274,35 @@ async function main() {
       if (layout === 'side-by-side') {assert(cancellation.responsive, `Cancellation did not complete within ${cancelTimeout}ms: ${JSON.stringify(cancellation)}`); assert.equal(cancellationDownloads.length, 0); assert(cancellation.retryEnabled);}
       if (cancelError) throw new Error(`Cancellation attempt did not settle: ${cancelError}`);
       for (const mode of modes) {
+        report.currentMode = mode;
+        await checkFocus('export');
         const dialog = await openDialog(mode); await startMonitor(false);
         const result = {mode}; evidence.exports.push(result);
         const downloadPromise = page.waitForEvent('download', {timeout: exportTimeout}).then(download => ({download, at: Date.now()}));
+        void downloadPromise.catch(() => {}); // Guarded focus closure may reject the click before this promise is awaited.
         await dialog.locator('.translate-document-button').click();
         let downloaded;
         try {downloaded = await downloadPromise;} catch (error) {result.error = error.message; result.monitor = await stopMonitor(); await shot(`${label}-${name}-${mode}-timeout`); throw error;}
         result.monitor = await stopMonitor(); result.exportMs = downloaded.at - result.monitor.startedAt;
         console.log(JSON.stringify({stage: 'exported', label, name, mode, exportMs: result.exportMs, heartbeatGapMs: result.monitor.maxHeartbeatGapMs}));
+        await checkFocus('save-download');
         const saveStart = Date.now(), output = path.join(artifactsDir, `${label}-${name.replace(/\.pdf$/iu, '')}-${mode}.pdf`);
         await downloaded.download.saveAs(output); result.saveMs = Date.now() - saveStart; result.output = output;
         const outputBytes = fs.readFileSync(output); result.bytes = outputBytes.length; result.sha256 = sha(outputBytes);
+        await checkFocus('reopen-validate');
         const reopenStart = Date.now(), outputPages = await inspectPdf(outputBytes, requireRepo); result.reopenMs = Date.now() - reopenStart; result.pages = outputPages.length;
         result.validation = validateOutput(sourcePages, outputPages, fixture, mode, layout);
+        await checkFocus('render-previews');
         const renderStart = Date.now(); result.previews = await renderPdfSamples(output, outputPages.length, artifactsDir, `${label}-${name.replace(/\.pdf$/iu, '')}-${mode}`, pdftoppm); result.renderMs = Date.now() - renderStart;
         fs.writeFileSync(path.join(artifactsDir, `${label}-${name}-${mode}-page-validation.json`), JSON.stringify(result.validation, null, 2));
         // Evidence is emitted before an assertion so baseline/fixed failures
         // retain the output PDF and timing for independent investigation.
-        fs.writeFileSync(path.join(artifactsDir, 'report.json'), JSON.stringify(report, null, 2));
+        await checkFocus('validate-output'); persist();
         if (layout === 'side-by-side') assert(result.validation.semanticOk, `Export page/content validation failed for ${name}/${mode}: ${JSON.stringify(result.validation.checks)}`);
       }
+      delete report.currentMode;
       if (input !== inputs.at(-1)) {
+        await checkFocus('change-document');
         const settings = page.locator('aside.document-sidebar').getByRole('button', {name: '调整文档翻译设置', exact: true});
         if (!await settings.isVisible()) await page.locator('.sidebar-toggle').click(); await settings.click();
         await page.locator('.document-settings-dialog[open] .sidebar-change-file').click();
@@ -262,19 +310,23 @@ async function main() {
         if (await confirm.count()) await confirm.locator('.translate-document-button').click(); await page.locator('.file-drop-zone').waitFor();
       }
     }
+    delete report.currentDocument;
     report.fixtureRequests = fixture.requests.length;
-    const frontmost = await queryMacFrontmostApplication(); assert(frontmost); assert.notEqual(frontmost.pid, await getGuardedBrowserPid(launched)); report.finalFrontmostApplication = frontmost;
+    await checkFocus('completed'); report.finalFrontmostApplication = report.focusChecks.at(-1).application;
     assert.equal(report.consoleErrors.length, 0, JSON.stringify(report.consoleErrors)); report.ok = true;
   } catch (error) {
-    report.failure = error.stack || String(error); if (page) await page.screenshot({path: path.join(artifactsDir, 'failure.png')}).catch(() => {}); throw error;
+    report.failure = (focusFailure || error).stack || String(focusFailure || error); if (page && !focusFailure) await page.screenshot({path: path.join(artifactsDir, 'failure.png')}).catch(() => {}); throw focusFailure || error;
   } finally {
+    report.currentPhase = 'cleanup';
     let closed = false;
     if (launched) {try {await launched.close(); closed = true;} catch (error) {report.cleanupErrors.push(`browser close: ${error.stack || error}`);}}
     try {await fixture?.close();} catch (error) {report.cleanupErrors.push(`fixture close: ${error.message}`);}
     if (closed) {try {fs.rmSync(profileDir, {recursive: true, force: true});} catch (error) {report.cleanupErrors.push(`profile removal: ${error.message}`); report.retainedProfile = profileDir;}}
     else if (!launchAttempted) fs.rmdirSync(profileDir); else report.retainedProfile = profileDir;
+    if (focusMonitor) {try {await focusMonitor.stop();} catch (error) {report.cleanupErrors.push(`focus observer close: ${error.stack || error}`);}}
+    if (focusFailure) {report.ok = false; process.exitCode = 1;}
     if (report.cleanupErrors.length) {report.ok = false; process.exitCode = 1;}
-    fs.writeFileSync(path.join(artifactsDir, 'report.json'), JSON.stringify(report, null, 2));
+    persist();
     console.log(JSON.stringify({ok: report.ok, label, report: path.join(artifactsDir, 'report.json'), inputs: report.inputs.map(input => ({input: input.input, pages: input.sourcePages, cancellationMs: input.cancellation?.cancelLatencyMs, exports: input.exports.map(result => ({mode: result.mode, exportMs: result.exportMs, pages: result.pages, bytes: result.bytes, semanticOk: result.validation?.semanticOk}))})), failure: report.failure, cleanupErrors: report.cleanupErrors}));
   }
 }

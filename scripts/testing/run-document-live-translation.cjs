@@ -4,7 +4,7 @@
 /**
  * @file scripts/testing/run-document-live-translation.cjs
  * 文件职责：在独立生产 Edge 配置中真实验证免费服务翻译普通文档、PDF 阅读与左右对照导出。
- * 主要内容：复用后台焦点保护启动器与原生激活事件观察器，只设置免费服务与英译中公开选项；按输入文件逐份导入、真实翻译、阅读、下载，保存完整段落、状态、脱敏网络统计和截图。PDF 用 PDF.js 重开校验页数、左右对照尺寸与页序，再用 Poppler 渲染；普通格式重新解析下载文件，DOCX/ePub 解包核对译文、结构与图片。默认运行实际 Attention 15 页及仓库八种普通格式，--inputs 可缩小范围。
+ * 主要内容：复用后台焦点保护启动器与原生激活事件观察器，只设置免费服务与英译中公开选项；按输入文件逐份导入、真实翻译、阅读、下载，保存完整段落、状态、脱敏网络统计和截图。PDF 用 PDF.js 重开校验页数、左右对照尺寸与页序，再用 Poppler 渲染；普通格式重新解析下载文件，DOCX/ePub 解包核对译文、结构与图片。默认运行实际 Attention 15 页、仓库八种普通格式及英文产品指南，--inputs 可缩小范围。Markdown 严格核对代码、链接、译文强调及指南容器、组件标记，仅读取这些内容，不执行组件。
  * 模块边界：不创建请求路由、不替换 fetch、不伪造译文、不配置付费账户，不读取或输出任何凭据；只使用本次新建的临时浏览器配置，不操作用户浏览器。中文及无测试标记只能证明实际结果，译文质量和排版需结合保存的数据与图片人工复核。
  */
 const assert = require('node:assert/strict');
@@ -120,9 +120,11 @@ function validatePdf(source, output) {
 async function validateOtherDownload(sourceBytes, outputBytes, snapshot, requireRepo) {
   const format = snapshot.format, {parseHTML} = requireRepo('linkedom'), {SaxesParser} = requireRepo('saxes');
   const decode = bytes => new TextDecoder('utf-8', {fatal: true}).decode(bytes);
+  const canonicalSlots = text => text.replace(/(?:&lt;|[＜〈（(])\s*([\/／]?)\s*g\s*(\d+)\s*([\/／]?)\s*(?:&gt;|[＞〉）)])/giu,
+    (_match, open, id, close) => `<${open ? '/' : ''}g${id}${close ? '/' : ''}>`);
   const withoutSlots = text => text.replace(/<\/?g\d+\s*\/?>/gu, '');
   const markdownText = text => text.replace(/\[([^\]]+)\]\([^)]*\)/gu, '$1').replace(/(?:^|\n)\s*(?:#{1,6}\s+|>\s*)/gu, '\n').replace(/[*_`]/gu, '');
-  const visible = text => compact(markdownText(withoutSlots(text).replace(/<\/?(?:i|b|u|em|strong|font|span)\b[^>]*>/gu, '')));
+  const visible = text => compact(markdownText(withoutSlots(canonicalSlots(text)).replace(/<\/?(?:i|b|u|em|strong|font|span)\b[^>]*>/gu, '')));
   const xmlText = xml => {
     let text = ''; const parser = new SaxesParser({xmlns: true});
     parser.on('text', value => {text += value;}); parser.on('cdata', value => {text += value;});
@@ -183,17 +185,51 @@ async function validateOtherDownload(sourceBytes, outputBytes, snapshot, require
       [...original.querySelectorAll('pre,code')].forEach(node => {assert(output.body.textContent.includes(node.textContent), 'HTML code changed');});
       text = output.body.textContent; checks.linksAndImagesPreserved = true;
     } else if (format === 'markdown') {
+      const lineCounts = value => value.split(/\r?\n/u).filter(line => line.trim()).reduce((counts, line) => counts.set(line, (counts.get(line) || 0) + 1), new Map());
+      const sourceLines = lineCounts(source), outputLines = lineCounts(text);
+      sourceLines.forEach((count, line) => assert((outputLines.get(line) || 0) >= count, `Markdown bilingual output changed a source line: ${line.slice(0, 80)}`));
       const code = source.match(/^\s*```[^\n]*\n[\s\S]*?^\s*```/gmu) || [];
       code.forEach(value => assert(text.includes(value), 'Markdown fenced code changed'));
+      const inlineCode = [...source.matchAll(/(?<!`)(`+)(?!`)([^\n]*?)\1(?!`)/gu)].map(match => match[0]);
+      inlineCode.forEach(value => assert(text.includes(value), 'Markdown inline code changed'));
       const refs = [...source.matchAll(/\]\(([^)]*)\)/gu)].map(match => match[1]); refs.forEach(value => assert(text.includes(`](${value})`), 'Markdown destination changed'));
-      checks.fencedCodeBlocks = code.length; checks.linkDestinations = refs.length;
+      const sourceEmphasis = [...source.matchAll(/(?<![\\*])(\*\*|\*)(?![\s*])([^*\n]*?\S)\1(?!\*)|(?<![\\\p{L}\p{N}])(__|_)(?![\s_])([^_\n]*?\S)\3(?![\p{L}\p{N}_])/gu)].map(match => match[0]);
+      sourceEmphasis.forEach(value => assert(text.includes(value), 'Markdown source emphasis changed'));
+      let translatedEmphasis = 0;
+      for (const part of snapshot.markdownParts || []) {
+        const segment = snapshot.segments.find(segment => segment.id === part.segmentIndex);
+        assert(segment, `Markdown metadata has no source segment ${part.segmentIndex}`);
+        for (const [index, token] of part.tokens.entries()) {
+          if (!['*', '**', '_', '__'].includes(token.open) || token.close !== token.open) continue;
+          const id = index + 1, translated = new RegExp(`<\\s*g\\s*${id}\\s*>([\\s\\S]*?)<\\s*\\/\\s*g\\s*${id}\\s*>`, 'iu').exec(canonicalSlots(segment.translation));
+          assert(translated, `Live service dropped Markdown emphasis in segment ${part.segmentIndex}, marker ${id}`);
+          assert(compact(text).includes(compact(`${token.open}${translated[1]}${token.close}`)), `Markdown export lost translated emphasis in segment ${part.segmentIndex}, marker ${id}`);
+          translatedEmphasis++;
+        }
+      }
+      const components = source.match(/<GuideVisual\b[^>]*\/\s*>/gu) || [];
+      components.forEach(value => assert(text.includes(value), 'Markdown guide component changed'));
+      const directives = value => value.split(/\r?\n/u).filter(line => /^\s*(?:>\s*)*:::/u.test(line));
+      assert.deepEqual(directives(text), directives(source), 'Markdown directive syntax was changed or duplicated');
+      const structure = source.match(/<\/?(?:details|summary)\b[^>]*>/gu) || [];
+      structure.forEach(value => assert(text.includes(value), 'Markdown HTML container changed'));
+      checks.fencedCodeBlocks = code.length; checks.inlineCodeSpans = inlineCode.length; checks.linkDestinations = refs.length;
+      checks.sourceEmphasis = sourceEmphasis.length; checks.translatedEmphasis = translatedEmphasis;
+      checks.originalLinesPreserved = true; checks.guideComponents = components.length; checks.directives = directives(source); checks.htmlContainerTags = structure.length;
       text = markdownText(text);
     } else assert.equal(format, 'txt', 'Unsupported download validation format');
   }
   const content = visible(text);
   for (const segment of snapshot.segments) {
-    const translation = visible(segment.translation);
-    assert(translation && content.includes(translation), `Actual download lost translation segment ${segment.id}`);
+    // 单个 g 标记在导出中会还原成代码/网址；按这些插入位置核对译文连续片段，不能要求插入前后相邻。
+    const pieces = canonicalSlots(segment.translation).split(/<\s*g\s*\d+\s*\/\s*>/iu).map(visible).filter(Boolean);
+    assert(pieces.length, `Actual download has no translated text for segment ${segment.id}`);
+    let offset = 0;
+    for (const piece of pieces) {
+      const found = content.indexOf(piece, offset);
+      assert(found >= 0, `Actual download lost translation segment ${segment.id}`);
+      offset = found + piece.length;
+    }
     checks.translationSegments++;
   }
   assert.equal(checks.translationSegments, snapshot.segments.length); checks.validStructure = true; checks.ok = true;
@@ -210,6 +246,7 @@ async function historySnapshot(page, name) {
       const parsed = record.parsed;
       return {name: record.name, format: parsed.format, parsedVersion: record.parsedVersion, updatedAt: record.updatedAt,
         segments: parsed.segments.map((segment, index) => ({...segment, translation: record.translations[segment.id ?? index] ?? ''})),
+        ...(parsed.format === 'markdown' ? {markdownParts: parsed.parts.filter(part => part.kind === 'segment' && part.markdownTokens).map(part => ({segmentIndex: part.segmentIndex, tokens: part.markdownTokens}))} : {}),
         pages: parsed.binary?.kind === 'pdf' ? parsed.binary.pages.map(({pageNumber, width, height, rotation, sourceRotation, segmentIndexes}) => ({pageNumber, width, height, rotation, sourceRotation, segmentIndexes})) : undefined};
     } finally {database.close();}
   }, name);
@@ -219,7 +256,8 @@ async function main() {
   const repository = path.resolve(__dirname, '../..'), requireRepo = createRequire(path.join(repository, 'package.json'));
   const examples = path.resolve(arg('example-dir', path.join(repository, 'examples/document-translation')));
   const defaults = [path.resolve(repository, '../BabelDOC-APP/docs/1706.03762v7.pdf'),
-    ...['pdf', 'docx', 'html', 'epub', 'md', 'txt', 'srt', 'json'].map(extension => path.join(examples, `sample.${extension}`))];
+    ...['pdf', 'docx', 'html', 'epub', 'md', 'txt', 'srt', 'json'].map(extension => path.join(examples, `sample.${extension}`)),
+    path.join(repository, 'docs/en/guide/document-translation.md')];
   const inputs = arg('inputs', defaults.join(',')).split(',').map(file => path.resolve(file.trim())).filter(Boolean);
   assert(inputs.length && inputs.every(file => fs.existsSync(file) && fs.statSync(file).isFile()), '--inputs must name existing files (comma separated)');
   assert.equal(new Set(inputs.map(file => path.basename(file))).size, inputs.length, 'Input basenames must be unique for unambiguous history evidence');

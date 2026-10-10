@@ -4,12 +4,16 @@
  * 主要内容：检验重复、数组、标点、普通词与空输入，沿用严格术语占位符恢复及缺项拒绝，不把模型术语猜成中文译名。
  * 模块边界：纯规则及保护链测试，实际免费服务结果由隔离浏览器测试另行验证。
  */
-import {describe, expect, it} from 'vitest';
+import {describe, expect, it, vi} from 'vitest';
 import {findDocumentLiteralTerms} from '@/src/core/translation/public';
 import {validateGlossaryProtectedTokens} from '@/src/core/glossary';
 import {Config} from '@/src/core/config/model';
+import {resolveConfiguredModel, servicesType} from '@/src/core/config/catalog';
+import {createTranslationBroker} from '@/src/services/translation/broker';
 import {prepareGlossaryRequest, getGlossaryProtectionEntries} from '@/src/services/translation/glossaryProtection';
-import {createTranslationProviderConfigSnapshot, getTranslationGlossaryTerms} from '@/src/services/translation/requestSnapshot';
+import {createTranslationProviderConfigSnapshot, getTranslationGlossaryTerms, getTranslationProviderConfig} from '@/src/services/translation/requestSnapshot';
+
+vi.mock('@/src/services/config/store', () => ({config: {to: 'zh-Hans'}}));
 
 const documentConfig = () => ({...createTranslationProviderConfigSnapshot(new Config()),
     glossaryMatchContext: {context: 'document' as const, sourceLanguage: 'en', targetLanguage: 'zh-hans'}});
@@ -19,6 +23,10 @@ describe('document literal protection', () => {
         const terms = findDocumentLiteralTerms('Use FluentRead with GNMT+RL and https://github.com/tensorflow/tensor2tensor. Email ai+docs@example.org!');
         expect(terms.map(term => term.source)).toEqual(['FluentRead', 'GNMT+RL', 'https://github.com/tensorflow/tensor2tensor', 'ai+docs@example.org']);
         expect(terms.every(term => term.target === term.source && term.caseSensitive)).toBe(true);
+        expect(findDocumentLiteralTerms('访问 https://example.com。请继续翻译后面的说明。参阅（https://example.org）后继续。'))
+            .toEqual(['https://example.com', 'https://example.org'].map(source => ({source, target: source, caseSensitive: true})));
+        expect(findDocumentLiteralTerms('https://example.com、下一项需要翻译'))
+            .toEqual([{source: 'https://example.com', target: 'https://example.com', caseSensitive: true}]);
     });
     it('deduplicates repeated literals across paragraphs and leaves normal prose and incomplete identifiers alone', () => {
         expect(findDocumentLiteralTerms(['FluentRead and DeepSeek', 'FluentRead again', 'ABSTRACT Transformer line structure snake_case', 'GNMT+ and no@address']))
@@ -47,5 +55,59 @@ describe('document literal protection', () => {
         expect(() => packet.restore('模型名称已经丢失')).toThrow('未完整保留术语');
         expect(getGlossaryProtectionEntries({...current, glossaryMatchContext: {...current.glossaryMatchContext, context: 'page'}}, origin)).toEqual([]);
         expect(getTranslationGlossaryTerms({...current, glossaryMatchContext: {...current.glossaryMatchContext, context: 'page'}}, origin)).toEqual([]);
+    });
+
+    it('lets explicit short user terms win over automatic long names with the same boundaries, case and NFC rules', () => {
+        const term = {source: 'GNMT', target: '用户译法', caseSensitive: true};
+        expect(findDocumentLiteralTerms('GNMT+RL GNMT+RL FluentRead', [term]))
+            .toEqual([{source: 'FluentRead', target: 'FluentRead', caseSensitive: true}]);
+        expect(findDocumentLiteralTerms('GNMT+RL', [{...term, source: 'gnmt', caseSensitive: false}])).toEqual([]);
+        for (const source of ['gnmt', 'NMT', 'unrelated'])
+            expect(findDocumentLiteralTerms('GNMT+RL', [{...term, source}]))
+                .toEqual([{source: 'GNMT+RL', target: 'GNMT+RL', caseSensitive: true}]);
+        expect(findDocumentLiteralTerms('GNMT+RL model GNMT+RL', [{...term, source: 'model'}]))
+            .toEqual([{source: 'GNMT+RL', target: 'GNMT+RL', caseSensitive: true}]);
+        expect(findDocumentLiteralTerms('https://example.com/Cafe\u0301', [{source: 'Café', target: '用户拼写', caseSensitive: true}])).toEqual([]);
+        expect(findDocumentLiteralTerms('https://example.com/Café', [{source: 'Cafe\u0301', target: '用户拼写', caseSensitive: true}])).toEqual([]);
+        expect(findDocumentLiteralTerms('https://example.com/Cafe\u0301', [{source: 'different', target: '', caseSensitive: true}]))
+            .toEqual([{source: 'https://example.com/Cafe\u0301', target: 'https://example.com/Cafe\u0301', caseSensitive: true}]);
+    });
+
+    it('restores GNMT user spelling through broker, provider tokens and cache without changing page requests', async () => {
+        const config = Object.assign(new Config(), {service: 'microsoft', from: 'en', to: 'zh-Hans', useCache: true, glossaryEnabled: true,
+            glossaryLibraries: [{id: 'user', name: 'User terms', enabled: true, sourceLanguage: '', targetLanguage: 'zh-hans', domains: [],
+                entries: [{id: 'gnmt', source: 'GNMT', target: '用户译法', caseSensitive: true}]}]});
+        const before = JSON.stringify(config.glossaryLibraries);
+        const cache = new Map<string, string>(), identities: Record<string, unknown>[] = [];
+        const provider = vi.fn(async (message: Record<string, unknown>) => {
+            const snapshot = getTranslationProviderConfig(message, createTranslationProviderConfigSnapshot(config));
+            expect(snapshot.glossaryProtectedTokens).toHaveLength(2);
+            expect(message.origin).not.toContain('GNMT'); expect(message.origin).not.toContain('FluentRead');
+            expect(message.origin).toContain('+RL');
+            return `译文:${message.origin}`;
+        });
+        const broker = createTranslationBroker({ready: Promise.resolve(), getConfig: () => config, providers: {microsoft: provider},
+            cache: {get: async key => cache.get(key) ?? null, set: async (key, value) => {cache.set(key, value); return true;}, clear: async () => {cache.clear();}, cleanup: async () => {}},
+            serviceTypes: servicesType, resolveConfiguredModel, getMissingCredentialMessage: () => null,
+            endpointResolver: {resolveOpenAICompatibleEndpoint: () => ({endpoint: 'https://fixture.invalid/v1'}), aiSdkTransportProfile: 'fixture'},
+            promptBuilder: {buildPageSummaryPrompt: text => text, buildPageSummarySystemPrompt: () => ''},
+            getTranslationLanguages: request => ({sourceLanguage: request?.sourceLanguage ?? 'en', targetLanguage: request?.targetLanguage ?? 'zh-Hans'}),
+            buildTranslationCacheKey: identity => {identities.push(identity); return JSON.stringify(identity);}, logger: {warn: vi.fn()},
+        });
+        const origin = 'Use GNMT+RL with FluentRead.';
+        await expect(broker.translateWithCache({origin, glossaryContext: 'document'})).resolves.toBe('译文:Use 用户译法+RL with FluentRead.');
+        expect(identities[0]).toMatchObject({glossaryTerms: [{source: 'GNMT', target: '用户译法'}, {source: 'FluentRead', target: 'FluentRead'}],
+            glossaryProtection: {entries: [{source: 'GNMT', target: '用户译法', caseSensitive: true}, {source: 'FluentRead', target: 'FluentRead', caseSensitive: true}]}});
+        await expect(broker.translateWithCache({origin, glossaryContext: 'document'})).resolves.toBe('译文:Use 用户译法+RL with FluentRead.');
+        expect(provider).toHaveBeenCalledOnce();
+        expect(JSON.stringify(config.glossaryLibraries)).toBe(before);
+
+        const current = {...documentConfig(), glossaryTerms: [{source: 'GNMT', target: 'GNMT'}],
+            glossaryLibraries: [{...config.glossaryLibraries[0], entries: [{id: 'gnmt', source: 'GNMT', target: '', caseSensitive: true}]}]};
+        const entries = getGlossaryProtectionEntries(current, origin);
+        expect(entries.map(entry => entry.source)).toEqual(['GNMT', 'FluentRead']);
+        expect(getTranslationGlossaryTerms(current, origin)).toEqual(entries.map(({source, target}) => ({source, target: target || source})));
+        const packet = prepareGlossaryRequest({origin}, current);
+        expect(packet.restore(packet.message.origin)).toBe(origin);
     });
 });

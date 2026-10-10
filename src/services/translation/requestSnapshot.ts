@@ -18,7 +18,7 @@ import {normalizeFreeTranslationOrder, normalizeFreeTranslationMode} from '@/src
 import {normalizeApiKeyRecoveryMs} from '@/src/core/config/scheduling';
 import type {CustomOpenAIProvider} from '@/src/core/config/customOpenAI';
 import {normalizeDeepLApiPlan} from '@/src/core/config/deepl';
-import {resolveGlossary} from '@/src/core/glossary';
+import {resolveGlossaryEntries} from '@/src/core/glossary';
 import {findDocumentLiteralTerms, parseTranslationSlots} from '@/src/core/translation/public';
 import type {TranslationRequestScheduler, TranslationRequestIdentity} from './requestScheduler';
 
@@ -154,12 +154,13 @@ export function getTranslationGlossaryTerms(current: TranslationProviderConfigSn
     const context = current.glossaryMatchContext;
     if (!context) return current.glossaryTerms ?? [];
     const source = getTranslationGlossarySourceText(origin);
-    const terms = current.glossaryTerms?.length ? resolveGlossary(current.glossaryLibraries ?? [], {
+    const entries = current.glossaryTerms?.length ? resolveGlossaryEntries(current.glossaryLibraries ?? [], {
         ...context,
         glossaryIds: context.glossaryIds ? [...context.glossaryIds] : null,
         text: source,
     }).terms : [];
-    return context.context === 'document' ? [...terms, ...findDocumentLiteralTerms(source).map(({source, target}) => ({source, target}))] : terms;
+    const terms = context.context === 'document' ? [...entries, ...findDocumentLiteralTerms(source, entries)] : entries;
+    return terms.map(({source, target}) => ({source, target: target || source}));
 }
 
 export type TranslationModelUsageObserver = (observation: TranslationModelUsageObservation) => void;

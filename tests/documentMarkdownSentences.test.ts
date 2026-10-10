@@ -63,6 +63,18 @@ describe('Markdown whole-sentence translation', () => {
         expect(output('**B**', ['<g1>粗</g1>'])).toBe('**粗**');
     });
 
+    it('preserves guide container directives once while translating their body, including quoted and nested containers', () => {
+        const guide = '::: tip Refreshing keeps your progress\nYour translation is saved.\n::: details More\nOpen the guide.\n::: \n:::\n> ::: note Extra\n> Keep reading.\n> :::';
+        const parsed = parse(guide);
+        expect(parsed.segments.map(({source}) => source)).toEqual(['Your translation is saved.', 'Open the guide.', '> Keep reading.']);
+        const result = renderDocument(parsed, ['译文已保存。', '打开指南。', '> 继续阅读。'], 'bilingual');
+        const directives = (value: string) => value.split('\n').filter(line => /^\s*(?:>\s*)*:::/u.test(line));
+        expect(directives(result)).toEqual(directives(guide));
+        expect(result).toContain('> 译文已保存。');
+        expect(result).toContain('> 打开指南。');
+        expect(renderDocument(parsed, [], 'translated')).toBe(guide);
+    });
+
     it('falls back to the whole sentence and re-appends protected content the service dropped', () => {
         const expectPlain = (translation: string, expected: string) => expect(output(line, [translation]), translation).toBe(expected);
         // 两个占位符都丢了：代码补在句末，链接地址无法安放，保留译文文字。

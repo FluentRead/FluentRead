@@ -1,7 +1,7 @@
 /**
  * @file src/features/document-translation/core/document.ts
  * 文件职责：定义文档翻译的纯领域模型，并负责把多种文本格式解析为可翻译片段，再按双语或纯译文模式无损还原原格式结构。
- * 主要内容：覆盖文本格式识别、片段切分、HTML 中被链接或强调等行内标签隔开的文字合成整句并以编号占位符保留标签（句中的行内代码整个保留、不翻译）、给出带占位符片段替换前的原文供校订显示、字幕译文丢了硬换行时按原文行数重新断行、被翻译服务转成实体的字幕样式标签还原成标签、纯文本里按固定宽度折行的段落合成一个片段、Markdown 可选地把一行作为一个片段整句翻译并以成对占位符保护强调和链接，以单占位符保护行内代码与网址、Markdown 容器围栏及受控缩进代码与行内位置保护、字幕标签保留、有界深度的非递归 JSON 遍历、空译文回退、MIME 信息、按格式区分的文件大小上限和下载文件命名；文本导出支持有界编码，下载摘录无需处理全文；相同译文保留原文且不重复展示。
+ * 主要内容：覆盖文本格式识别、片段切分、HTML 中被链接或强调等行内标签隔开的文字合成整句并以编号占位符保留标签（句中的行内代码整个保留、不翻译）、给出带占位符片段替换前的原文供校订显示、字幕译文丢了硬换行时按原文行数重新断行、被翻译服务转成实体的字幕样式标签还原成标签、纯文本里按固定宽度折行的段落合成一个片段、Markdown 可选地把一行作为一个片段整句翻译并以成对占位符保护强调和链接，以单占位符保护行内代码与网址、Markdown 容器指令、围栏及受控缩进代码与行内位置保护、字幕标签保留、有界深度的非递归 JSON 遍历、空译文回退、MIME 信息、按格式区分的文件大小上限和下载文件命名；文本导出支持有界编码，下载摘录无需处理全文；相同译文保留原文且不重复展示。
  * 模块边界：该文件不读取 File、不解析 PDF/EPUB/DOCX 二进制，也不发起翻译请求；文件 I/O 与压缩包处理归 services/binary，批处理归 services/translation，展示归 preview/presentation。
  */
 import {hasDistinctTranslation} from '@/src/core/translation/result';
@@ -670,7 +670,9 @@ function parseTextDocument(content: string, format: 'txt' | 'markdown', sentence
             const isMathLine = /^\$\$\s*$/u.test(info.content);
             const horizontalRule = /^(?:[-*_]\s*){3,}$/u.test(info.content);
             const calloutHeader = info.quoteDepth > 0 && /^\[![^\]]+\]/u.test(info.content);
-            if (marker || isMathLine || horizontalRule || calloutHeader) {
+            // Markdown 扩展容器的类型、参数与闭合标记属于语法；双语下载不能复制一份译后的 ::: 开头。
+            const directive = /^:{3,}(?:\s*[a-zA-Z][\w-]*(?:\s.*)?|\s*)$/u.test(info.content);
+            if (marker || isMathLine || horizontalRule || calloutHeader || directive) {
                 paragraph = null;
                 if (marker) {
                     const block: CodeBlock = {

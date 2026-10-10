@@ -1,3 +1,9 @@
+/**
+ * @file scripts/verify-userscript-build.mjs
+ * 文件职责：校验 userscript 产物的元信息、资源协议、体积与兼容性运行边界。
+ * 主要内容：静态断言及隔离 VM 兼容层检查；体积预算按已测量的共享功能增量调整。
+ * 模块边界：只读取构建产物，不安装脚本、不访问外部页面或修改运行配置。
+ */
 import fs from 'node:fs';
 import path from 'node:path';
 import process from 'node:process';
@@ -12,7 +18,9 @@ const artifactBytes = Buffer.byteLength(source);
 // 相对 main 的 1,960,000 字节预算增加 4 KB，继续校验协议、体积和运行边界。
 // 智能高亮的共享偏好（快捷键、开关、配色与浓度的归一化）使脚本增至 1,964,630 字节；功能本身不进入脚本。
 // 为保持与扩展的配置导入导出兼容，预算再放宽 1 KB。
-const MAX_USERSCRIPT_BYTES = 1_965_000;
+// 文档字面值校验及免费线路分段共用 provider 代码，产物实测 1,966,476 字节；
+// 预算增加 3 KB 容纳这次修复，保留所有协议与兼容性检查。
+const MAX_USERSCRIPT_BYTES = 1_968_000;
 const preludeStartMarker = '/* FluentRead userscript compatibility prelude:start */';
 const preludeEndMarker = '/* FluentRead userscript compatibility prelude:end */';
 const preludeStart = source.indexOf(preludeStartMarker);

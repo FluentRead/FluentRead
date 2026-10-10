@@ -32,8 +32,8 @@ const artifactBytes = Buffer.byteLength(source);
 // 合入最新主线后复验体积，沿用主线预算；保留全部协议与执行边界校验。
 // 原始对照与集成证据见 docs/reports/section-translation-quality-20261011/。
 // 右键来源保护及通知交互的原始对照增加 3,443 字节（0.1734%）；原生菜单专属逻辑和文案按目标剔除。
-// 合入新版主分支后沿用现有预算，不另行增加；原始对照与集成实测见 docs/reports/context-menu-experience-20261011/。
-const MAX_USERSCRIPT_BYTES = 1_994_000;
+// 叠加段落优化后按当前独立基线与候选实测，仅增加 3 KB 预算，保留全部协议/兼容性检查；证据见 docs/reports/context-menu-experience-20261011/。
+const MAX_USERSCRIPT_BYTES = 1_997_000;
 const preludeStartMarker = '/* FluentRead userscript compatibility prelude:start */';
 const preludeEndMarker = '/* FluentRead userscript compatibility prelude:end */';
 const preludeStart = source.indexOf(preludeStartMarker);

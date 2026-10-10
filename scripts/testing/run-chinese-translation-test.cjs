@@ -376,10 +376,12 @@ async function runLiveTargetReleaseCase({context, createPage, patchConfig, activ
   try {
     await page.locator('.markdown-body').first().waitFor({state: 'visible', timeout: 45000});
     await page.locator('#fluent-read-page-styles').waitFor({state: 'attached'});
-    const needles = ['拒绝扩展包的打包兼容问题', '翻译语言扩展至 52 种', '漫画重运算移入 Worker', 'Thunderbird 邮件翻译', '另附 Firefox 构建源码'];
+    const needles = ['拒绝扩展包的打包兼容问题', '翻译语言扩展至 52 种', '漫画重运算移入 Worker', 'Thunderbird 邮件翻译',
+      '另附 Firefox 构建源码', 'Google Meet', 'YouTube、Udemy、Disney+', '多个 API Key'];
     const matches = await page.locator('.markdown-body p, .markdown-body li').evaluateAll((elements, needles) =>
       needles.map((needle, probe) => {
-        const index = elements.findIndex(element => (element.textContent || '').includes(needle));
+        const index = elements.findIndex(element => (element.textContent || '').includes(needle)
+          && /\p{Script=Han}/u.test(element.textContent || ''));
         if (index >= 0) elements[index].setAttribute('data-fr-target-language-probe', String(probe));
         return {needle, index, probe, source: index < 0 ? '' : elements[index].textContent.trim()};
       }), needles);

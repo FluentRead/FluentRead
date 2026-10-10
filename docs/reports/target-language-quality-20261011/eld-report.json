@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-10-10T18:17:43.212Z",
+  "generatedAt": "2026-10-10T18:46:10.986Z",
   "nodeVersion": "v20.11.1",
   "method": "No detector receives selected target, allowed languages, corpus labels, or language subset. ELD uses shipped isReliable() with its default threshold; input is raw text. Only ELD zh is mapped by existing classifyChineseHan(source), independently of target. All 52 catalog targets are checked; mixed/ambiguous negative cases remain negative. Current pipeline is measured uncached. Timing covers detection + reliability + Chinese/code normalization, not target-loop comparisons. Node measurements are local relative evidence, not browser/device claims.",
   "package": {
@@ -40,10 +40,10 @@
   },
   "adversarialSource": {
     "file": "tests/targetLanguageAdversarial.test.ts",
-    "sha256": "3f8475657e737b7bd3ee2f0abe2a6dd96b5042f172acf73c059950dcb438603c"
+    "sha256": "e443f254d1d262cfe7750546aec233611d8aef51b0eeca08a62d564cfe478682"
   },
   "projectSourceHashes": {
-    "identify.ts": "70bfc80fe8536b5366c717b805b94a253ab1e9491204499500617a995ccf0a85",
+    "identify.ts": "338326cdfd4d1303ea513672cb39fb3f9cadca9f431f65a1f2a0fb814b899760",
     "technicalTokens.ts": "8551daf82bc503038ac8adb9991ee68d953af82b267616749a460be7a8328908",
     "statistical.ts": "4a450f3e3646e987448142c271f64ba3630a8c2e41b6348c22f4e197e2e5f8da",
     "chinese.ts": "8bf08265376671df97f3f5559429caab5b148df09af8b7bb8917b477e5c6c0ea",
@@ -112,9 +112,9 @@
       "timings": {
         "calls": 3245,
         "rounds": 5,
-        "medianMs": 0.10391700000002402,
-        "p95Ms": 0.7434999999999263,
-        "maxMs": 2.5162090000000035
+        "medianMs": 0.11024999999995089,
+        "p95Ms": 0.7936249999999063,
+        "maxMs": 7.611667000000011
       },
       "suites": {
         "releaseCorpus": {
@@ -1071,8 +1071,8 @@
       "browserBundleBytes": 977990,
       "browserBundleGzipBytes": 285363,
       "initialization": {
-        "importMs": 74.282917,
-        "heapDeltaBytes": 23576128
+        "importMs": 96.04504199999997,
+        "heapDeltaBytes": 20727232
       },
       "languageCount": 60,
       "unsupportedTargets": [
@@ -1152,9 +1152,9 @@
       "timings": {
         "calls": 3245,
         "rounds": 5,
-        "medianMs": 0.022834000000102606,
-        "p95Ms": 0.06854100000009566,
-        "maxMs": 0.6668340000001081
+        "medianMs": 0.02437499999996362,
+        "p95Ms": 0.07241600000020298,
+        "maxMs": 0.7808749999999236
       },
       "suites": {
         "releaseCorpus": {
@@ -5140,8 +5140,8 @@
       "browserBundleBytes": 1633453,
       "browserBundleGzipBytes": 458416,
       "initialization": {
-        "importMs": 135.11975000000007,
-        "heapDeltaBytes": 50588192
+        "importMs": 189.69987500000002,
+        "heapDeltaBytes": 37659720
       },
       "languageCount": 60,
       "unsupportedTargets": [
@@ -5221,9 +5221,9 @@
       "timings": {
         "calls": 3245,
         "rounds": 5,
-        "medianMs": 0.023000000000138243,
-        "p95Ms": 0.06658299999980954,
-        "maxMs": 1.2476660000002084
+        "medianMs": 0.02454200000011042,
+        "p95Ms": 0.07145900000023175,
+        "maxMs": 2.0468329999998787
       },
       "suites": {
         "releaseCorpus": {

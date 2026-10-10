@@ -10,7 +10,7 @@ import {identifyTextLanguage} from '@/src/core/language/identify';
 import {shouldSkipTranslationForTarget} from '@/src/core/language/detect';
 import {segmentScriptWords} from '@/src/core/language/scripts';
 import {hasTranslatableText} from '@/src/core/translation/resultValidation';
-import {resolveGlossaryEntries, type GlossaryLibrary} from '@/src/core/glossary';
+import {buildGlossaryRevision, resolveGlossaryEntries, type GlossaryLibrary} from '@/src/core/glossary';
 import {IMAGE_PROGRESS_MESSAGE_TYPE, isImageTranslationStage, normalizeImageProgress, type ImageTranslationStage} from '../progress';
 import {
     IMAGE_OCR_LANGUAGE_PACKS,
@@ -310,6 +310,10 @@ async function translateImageTexts(
     const sourceLanguage = glossaryContext ? parseRequiredString(message.sourceLanguage, 'sourceLanguage') : undefined;
     const glossaryConfig = dependencies.getGlossaryConfig?.();
     const targetLanguage = glossaryConfig?.to;
+    const glossaryRevision = glossaryContext ? parseRequiredString(message.glossaryRevision, 'glossaryRevision') : undefined;
+    // OCR 事务冻结的词库版本仍须经过 broker 校验；期间关闭或删除词库不能被同目标早退吞掉。
+    const glossaryChanged = glossaryRevision !== undefined && glossaryConfig !== undefined
+        && glossaryRevision !== buildGlossaryRevision(glossaryConfig.glossaryLibraries, glossaryConfig.glossaryEnabled);
     const uniqueTexts = [...new Set(texts)].filter(text => {
         const hasExplicitGlossary = glossaryConfig?.glossaryEnabled && resolveGlossaryEntries(glossaryConfig.glossaryLibraries, {
             text, sourceLanguage: sourceLanguage ?? glossaryConfig.from, targetLanguage: glossaryConfig.to,
@@ -317,7 +321,7 @@ async function translateImageTexts(
         }).terms.length > 0;
         if (hasExplicitGlossary) return true;
         return hasTranslatableText(text)
-            && (!targetLanguage || !shouldSkipTranslationForTarget(text, targetLanguage));
+            && (!targetLanguage || glossaryChanged || !shouldSkipTranslationForTarget(text, targetLanguage));
     });
     // 不删 OCR 行，阅读面板与图片坐标仍以原行对齐；纯标识整图无需外发请求。
     if (uniqueTexts.length === 0) return [...texts];
@@ -336,7 +340,7 @@ async function translateImageTexts(
         serviceOverride: service,
         ...(targetLanguage ? {targetLanguage} : {}),
         ...(glossaryContext ? {
-            glossaryRevision: parseRequiredString(message.glossaryRevision, 'glossaryRevision'),
+            glossaryRevision,
             sourceLanguage: parseRequiredString(message.sourceLanguage, 'sourceLanguage'),
         } : {}),
     };

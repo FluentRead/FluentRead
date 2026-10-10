@@ -133,7 +133,7 @@ Popup 赞赏窗口内的微信二维码点击后原位从 164px 放大到 200px�
 
 PR #906 技术中文专项将上述模式参数替换为 `--technical-pr-906`，只验证反馈中的四段原文及相邻英文。它分别使用普通文本和交替 `code`/`strong` 包装，检查简体中文目标下悬浮、全文均零中文请求和零译文节点，恢复、再次触发、动态改写为英文与切换英文目标后按新文本及目标重新判断。结果和复现说明见 [技术中文重复翻译回归报告](./reports/chinese-technical-pr-906-20261009/README.md)。
 
-发行说明专项将模式参数替换为 `--target-release`，验证截图对应的十段中文、普通与行内 `code`/`strong` 结构、中文目标零请求、相邻英文翻译—恢复—再翻译、动态正文改写和目标切换，并单独打开真实 GitHub Releases 页面复核截图中的五个中文段落。翻译端点仍为回环夹具，真实页面证据不能作为线上供应商译文质量证明。
+发行说明专项将模式参数替换为 `--target-release`，验证截图对应的十段中文、普通与行内 `code`/`strong` 结构、中文目标零请求、相邻英文翻译—恢复—再翻译、动态正文改写和目标切换，并单独打开真实 GitHub Releases 页面复核八个中文段落，包含产品名称枚举。翻译端点仍为回环夹具，真实页面证据不能作为线上供应商译文质量证明。
 
 `targetLanguageReleaseCorpus` 覆盖 52 个目录目标的自然段落、短标题、标记外壳和 Unicode 空白；所有文本逐一检查各目标与排除语言。`targetLanguageDetector` 和独立 `targetLanguageAdversarial` 覆盖名称预算、大写提示、引述、跨语种混合与代码字面量；`imageTargetLanguage`、`inputTranslationBackground`、`areaTextTranslation` 验证直接后台文本入口同目标零调用、原行映射、冻结目标和 AI 纠错协议保留。
 

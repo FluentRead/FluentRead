@@ -7,6 +7,8 @@ import {describe, expect, it} from 'vitest';
 import {identifyTextLanguage} from '@/src/core/language/identify';
 import {shouldSkipTranslationForTarget} from '@/src/core/language/detect';
 import {hasDistinctTargetTranslation} from '@/src/core/translation/targetResult';
+import releases from './fixtures/target-language-releases.json';
+import {createLanguageDetectionCopy} from '@/src/core/language/technicalTokens';
 
 const foreignCases: readonly (readonly [string, string])[] = [
     ['这是中文的错误说明，DO NOT 后面仍然是中文正文。', 'zh-Hans'],
@@ -90,5 +92,105 @@ describe('独立反例：展示兜底保留实质变化', () => {
         ['이 기능은 원문을 유지합니다.', '이 기능은 원문을 유지하지 않습니다.', 'ko'],
     ])('保留实质变化 %#：%s → %s', (source, translation, target) => {
         expect(hasDistinctTargetTranslation(source, translation, target)).toBe(true);
+    });
+});
+
+describe('外语文本语境优先于名称枚举和后缀', () => {
+    it.each([
+        ['以下列表中的每一项都是英文标题：Birds Fly、Teams、Zoom 都是原文内容。', 'zh-Hans'],
+        ['以下列表中的每一项都是外语标题：Birds Fly、Teams、Zoom 都是原文内容。', 'zh-Hans'],
+        ['以下这些英语标题 Birds Fly、Teams、Zoom 都是需要翻译的完整原文。', 'zh-Hans'],
+        ['以下这些英文题目 Birds Fly、Teams、Zoom 都是需要翻译的完整原文。', 'zh-Hans'],
+        ['以下这些英文短句 Birds Fly、Teams、Zoom 都是需要翻译的完整原文。', 'zh-Hans'],
+        ['这些内容包括 Birds Fly、Teams、Zoom，是几个需要翻译的英文标题。', 'zh-Hans'],
+        ['这些内容包括 Birds Fly、DO NOT、Zoom，后面仍是完整中文说明。', 'zh-Hans'],
+        ['新增可访问字幕驱动的 Birds Fly、The Sun、Zoom 网页会议双语字幕。', 'zh-Hans'],
+        ['这些内容包括“Birds Fly、Teams、Zoom”，后面仍是完整中文说明。', 'zh-Hans'],
+        ['这些内容包括“Birds Fly”、Teams、Zoom，后面仍是完整中文说明。', 'zh-Hans'],
+        ['新增字幕功能Google Meet、Teams、Zoom、Slack、Discord、Webex会议。', 'zh-Hans'],
+        ['新增可访问字幕驱动的 Google Cloud Platform Guide、Teams、Zoom 网页会议双语字幕。', 'zh-Hans'],
+        ['这些内容包括 Aether Nimbus Orison、Mirabelle Willow Summit、Constantine Magnolia Orchard，后面仍是完整中文说明。', 'zh-Hans'],
+        ['Google Meet、Teams、Zoom', 'zh-Hans'],
+        ['这个页面提供完整中文功能说明。\nGoogle Meet、Teams、Zoom', 'zh-Hans'],
+        ['下面显示 Google Meet、Teams、Zoom + 之后的内容。', 'zh-Hans'],
+        ['下面是一个需要翻译的英文错误提示：Error+之后仍然是完整中文原文。', 'zh-Hans'],
+        ['下面是一个需要翻译的英文错误提示：“Error+”之后仍然是完整中文原文。', 'zh-Hans'],
+        ['次の英語タイトル Birds Fly、Teams、Zoom は翻訳する必要があります。', 'ja'],
+        ['다음 영어 제목 Birds Fly、Teams、Zoom 은 번역해야 하는 원문입니다.', 'ko'],
+        ['这是下面一个英文提示的完整说明：Unknown 的原文仍然需要翻译。', 'zh-Hans'],
+        ['这里需要解释：Unknown 的原文仍然需要完整翻译。', 'zh-Hans'],
+        ['这些配置中的英文短语 remote adapter 需要安装到 API 服务。', 'zh-Hans'],
+        ['這些設定中的外文標題 Birds Fly、Teams、Zoom 仍須提供完整翻譯。', 'zh-Hant'],
+        ['英語の見出し Birds Fly、Teams、Zoom は翻訳対象の文章です。', 'ja'],
+        ['다음 영문 메시지 Unknown 은 번역해야 하는 원문입니다.', 'ko'],
+        ['这些完整原文包含 Birds Fly、Teams、Zoom 它们都是英文标题并且需要翻译。', 'zh-Hans'],
+        ['这些完整原文包含 Birds Fly、Teams、Zoom 它们都是英语题目并且需要翻译。', 'zh-Hans'],
+        ['这是完整的原文 Error+它是英文错误提示并且需要翻译。', 'zh-Hans'],
+        ['この原文には Birds Fly、Teams、Zoom が含まれすべて英語タイトルなので翻訳が必要です。', 'ja'],
+        ['이 원문에는 Birds Fly、Teams、Zoom 이 포함되어 모두 영어 제목이며 번역해야 합니다.', 'ko'],
+        ['Следующие английские заголовки Birds Fly、Teams、Zoom необходимо перевести на русский язык.', 'ru'],
+        ['هذه العناوين الإنجليزية Birds Fly、Teams、Zoom يجب ترجمتها إلى العربية.', 'ar'],
+        ['Οι ακόλουθοι αγγλικοί τίτλοι Birds Fly、Teams、Zoom πρέπει να μεταφραστούν στα ελληνικά.', 'el'],
+        ['ये अंग्रेज़ी शीर्षक Birds Fly、Teams、Zoom हिंदी में अनुवाद करने के लिए दिए गए हैं।', 'hi'],
+        ['Следующий английский заголовок Birds Fly необходимо перевести на русский язык.', 'ru'],
+        ['هذا العنوان الإنجليزي Birds Fly يجب ترجمته إلى العربية.', 'ar'],
+        ['Ο ακόλουθος αγγλικός τίτλος Birds Fly πρέπει να μεταφραστεί στα ελληνικά.', 'el'],
+        ['यह अंग्रेज़ी शीर्षक Birds Fly हिंदी में अनुवाद करने के लिए दिया गया है।', 'hi'],
+    ])('明确外语标记、引用或名称预算保留翻译：%s', (source, target) => {
+        expect(shouldSkipTranslationForTarget(source, target), JSON.stringify(identifyTextLanguage(source))).toBe(false);
+        expect(shouldSkipTranslationForTarget(source, 'und', [target])).toBe(false);
+    });
+
+    it.each(releases)('真实发行说明仍在源头跳过：%s', source => {
+        expect(shouldSkipTranslationForTarget(source, 'zh-Hans')).toBe(true);
+    });
+
+    it.each([
+        ['Этот абзац объясняет, как расширение BlueWave Cloud сохраняет исходный текст и показывает перевод прямо под ним.', 'ru'],
+        ['Το BlueWave Cloud υποστηρίζει την επέκταση και διατηρεί το αρχικό κείμενο.', 'el'],
+        ['يدعم التطبيق BlueWave Cloud ويحافظ على النص الأصلي في الصفحة.', 'ar'],
+        ['यह ऐप BlueWave Cloud में मूल पाठ को सुरक्षित रखता है और अनुवाद दिखाता है।', 'hi'],
+        ['Το πρόγραμμα υποστηρίζει BlueWave Cloud、Teams、Zoom και διατηρεί το αρχικό κείμενο.', 'el'],
+    ])('未覆盖角色标记的文字仍接受独立结构名称：%s', (source, target) => {
+        expect(shouldSkipTranslationForTarget(source, target), JSON.stringify(identifyTextLanguage(source))).toBe(true);
+    });
+
+    it.each([
+        '这里先展示英文标题，新增可访问字幕驱动的 Google Meet、Teams、Zoom 网页会议双语字幕。',
+        '这里先展示英文标题。新增可访问字幕驱动的 Google Meet、Teams、Zoom 网页会议双语字幕。',
+        '这里先展示英文标题；新增可访问字幕驱动的 Google Meet、Teams、Zoom 网页会议双语字幕。',
+        'ここでは英語のタイトルを説明します。アプリは Chrome と Firefox に対応しています。',
+        '이 페이지에서 영어 제목을 설명합니다. 이 확장 프로그램은 Chrome 및 Firefox 브라우저를 지원합니다.',
+        '新增可访问字幕驱动的 Google Meet、Teams、Zoom 网页会议双语字幕，这里随后解释英文标题。',
+        '新增可访问字幕驱动的 Google Meet、Teams、Zoom 网页会议双语字幕。这里随后解释英文标题。',
+        'アプリは Chrome と Firefox に対応しています。次に英語タイトルを説明します。',
+        '이 확장 프로그램은 Chrome 및 Firefox 브라우저를 지원합니다. 다음에 영어 제목을 설명합니다.',
+        'Google Meet、Teams、Zoom 提供英文标题翻译功能并保留完整原文。',
+        'アプリの Chrome は英語タイトルを表示して元の文章を保持します。',
+        '이 확장 프로그램의 Chrome 은 영어 제목을 표시하며 원문을 보존합니다.',
+    ])('已结束的标记不影响后续本族名称正文：%s', source => {
+        const target = /\p{Script=Hangul}/u.test(source) ? 'ko' : /\p{Script=Hiragana}/u.test(source) ? 'ja' : 'zh-Hans';
+        expect(shouldSkipTranslationForTarget(source, target), JSON.stringify(identifyTextLanguage(source))).toBe(true);
+    });
+});
+
+describe('合并后技术标识符扫描保持原有边界', () => {
+    it('协议候选失败后仍可识别该候选中的 www URL', () => {
+        const source = '详见 prefix-www.example.com/path 的说明';
+        expect(createLanguageDetectionCopy(source)).toEqual({text: '详见 prefix-  的说明', identifiers: 1, versionedNames: 0});
+        expect(source).toContain('www.example.com/path');
+    });
+    it('Latin 附加字母与过长 ASCII 单词相邻时不会被误当独立厂商前缀', () => {
+        const prefix = 'é' + 'AA'.repeat(26);
+        expect(createLanguageDetectionCopy(prefix + ' GPT-6')).toEqual({text: prefix + '  ', identifiers: 0, versionedNames: 1});
+    });
+    it('超过候选上限的连续大写厂商前缀不让内层版本名称独立计权', () => {
+        const prefix = 'AA'.repeat(100);
+        expect(createLanguageDetectionCopy(prefix + ' GPT-6')).toEqual({text: prefix + '  ', identifiers: 1, versionedNames: 0});
+    });
+    it('已被版本名称后缀消费的重叠起点不重复计权，也不吞掉后续裸数值', () => {
+        const source = 'GPT-6 Sol 2';
+        expect(createLanguageDetectionCopy(source)).toEqual({text: '  2', identifiers: 0, versionedNames: 1});
+        expect(source).toBe('GPT-6 Sol 2');
     });
 });

@@ -57,17 +57,29 @@ describe('名称句架适用于其他非 Latin 文字', () => {
         ['Microsoft Edge の拡張機能に対応しています。', 'ja'],
         ['Chrome 및 Edge 브라우저에서 새로운 기능을 사용할 수 있습니다.', 'ko'],
         ['Microsoft Edge 확장 프로그램의 호환성을 개선했습니다.', 'ko'],
+        ['Этот абзац объясняет, как расширение BlueWave Cloud сохраняет исходный текст и показывает перевод прямо под ним.', 'ru'],
+        ['Το BlueWave Cloud υποστηρίζει την επέκταση και διατηρεί το αρχικό κείμενο.', 'el'],
+        ['התוסף תומך בדפדפן BlueWave Cloud ושומר את הטקסט המקורי בדף.', 'he'],
+        ['รองรับ BlueWave Cloud และแสดงข้อความต้นฉบับในหน้าเว็บ', 'th'],
+        ['يدعم التطبيق BlueWave Cloud ويحافظ على النص الأصلي في الصفحة.', 'ar'],
+        ['यह ऐप BlueWave Cloud में मूल पाठ को सुरक्षित रखता है और अनुवाद दिखाता है।', 'hi'],
+    ])('%s → %s', (source, language) => {
+        expect(identifyTextLanguage(source)).toMatchObject({status: 'identified', languages: [language]});
+        expect(shouldSkipTranslationForTarget(source, language)).toBe(true);
+        expect(shouldSkipTranslationForTarget(source, 'und', [language])).toBe(true);
+        expect(shouldSkipTranslationForTarget(source, language === 'en' ? 'zh-Hans' : 'en')).toBe(false);
+    });
+    it.each([
         ['Этот абзац объясняет, как расширение Microsoft Edge сохраняет исходный текст и показывает перевод прямо под ним.', 'ru'],
         ['Το Microsoft Edge υποστηρίζει την επέκταση και διατηρεί το αρχικό κείμενο.', 'el'],
         ['התוסף תומך בדפדפן Microsoft Edge ושומר את הטקסט המקורי בדף.', 'he'],
         ['รองรับ Microsoft Edge และแสดงข้อความต้นฉบับในหน้าเว็บ', 'th'],
         ['يدعم التطبيق Microsoft Edge ويحافظ على النص الأصلي في الصفحة.', 'ar'],
         ['यह ऐप Microsoft Edge में मूल पाठ को सुरक्षित रखता है और अनुवाद दिखाता है।', 'hi'],
-    ])('%s → %s', (source, language) => {
-        expect(identifyTextLanguage(source)).toMatchObject({status: 'identified', languages: [language]});
-        expect(shouldSkipTranslationForTarget(source, language)).toBe(true);
-        expect(shouldSkipTranslationForTarget(source, 'und', [language])).toBe(true);
-        expect(shouldSkipTranslationForTarget(source, language === 'en' ? 'zh-Hans' : 'en')).toBe(false);
+    ])('普通多词 TitleCase 在未覆盖角色标记的文字中保留请求：%s', (source, language) => {
+        expect(identifyTextLanguage(source)).toMatchObject({status: 'mixed', languages: []});
+        expect(shouldSkipTranslationForTarget(source, language)).toBe(false);
+        expect(shouldSkipTranslationForTarget(source, 'und', [language])).toBe(false);
     });
 });
 

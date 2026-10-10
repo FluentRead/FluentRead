@@ -1,10 +1,24 @@
 /**
  * @file tests/imageTargetLanguage.test.ts
- * 真实识别验证 OCR 普通文本的同目标过滤、单条与批量映射、冻结目标以及未知和混合文本的保留。
+ * 真实识别验证 OCR 普通文本的同目标过滤、单条与批量映射、冻结目标以及未知和混合文本的保留；
+ * 真实事务 wrapper 与 broker 验证 OCR 等待期间词库变更仍拒绝旧版本，不被同目标早退吞掉。
  */
 import {describe, expect, it, vi} from 'vitest';
-import {createImageTranslationBackgroundHandlers} from '@/src/features/image-translation/background/handlers';
+import {
+    createImageTranslationBackgroundHandlers, IMAGE_TRANSLATE_MESSAGE_TYPE, IMAGE_TRANSLATE_TEXTS_MESSAGE_TYPE,
+} from '@/src/features/image-translation/background/handlers';
 import {Config} from '@/src/core/config/model';
+import {resolveConfiguredModel, servicesType} from '@/src/core/config/catalog';
+import {buildGlossaryRevision} from '@/src/core/glossary';
+import {createImageGlossaryContext, type ImageGlossarySenderContext} from '@/src/app/background/imageGlossaryContext';
+import type {BackgroundMessageHandler} from '@/src/app/background/messageRouter';
+import {createTranslationBroker, type TranslationRequestMessage} from '@/src/services/translation/broker';
+import {getTranslationGlossaryContext} from '@/src/services/translation/requestSnapshot';
+
+vi.mock('@/src/platform/storage/configStorageRuntime', () => ({configStorage: {
+    writeOwner: false, getItem: vi.fn(async () => null), setItem: vi.fn(async () => {}),
+    removeItem: vi.fn(async () => {}), watch: vi.fn(() => () => {}),
+}}));
 
 function setup(batch: boolean, target: string) {
     const current = new Config();
@@ -64,5 +78,56 @@ describe('图片 OCR 同目标源头过滤', () => {
         const texts = [samples[1][1], `${samples[0][1]} ${samples[2][1]}`, 'Settings'];
         await call(texts);
         expect(translate).toHaveBeenCalledWith(expect.objectContaining({origin: texts}));
+    });
+});
+
+describe('图片同目标过滤保留冻结的词库版本协议', () => {
+    it.each(['disabled', 'deleted'] as const)('OCR期间词库%s时仍向真实broker转发旧版本并拒绝事务', async change => {
+        const source = '这个页面说明文档翻译的功能和设置。';
+        const current = Object.assign(new Config(), {service: 'openai', from: 'auto', to: 'zh-Hans', glossaryEnabled: true,
+            glossaryLibraries: [{id: 'site', name: '页面库', enabled: true, sourceLanguage: '', targetLanguage: '',
+                domains: ['docs.example.com'], entries: [{id: 'term', source: '文档', target: '文件', caseSensitive: false}]}],
+        });
+        const revision = buildGlossaryRevision(current.glossaryLibraries, current.glossaryEnabled);
+        const provider = vi.fn(async () => '这个页面说明文件翻译的功能和设置。');
+        const broker = createTranslationBroker({
+            ready: Promise.resolve(), getConfig: () => current, providers: {openai: provider},
+            cache: {get: async () => null, set: async () => true, clear: async () => {}, cleanup: async () => {}},
+            serviceTypes: servicesType,
+            endpointResolver: {resolveOpenAICompatibleEndpoint: () => ({endpoint: 'https://fixture.invalid/v1'}), aiSdkTransportProfile: 'fixture'},
+            promptBuilder: {buildPageSummaryPrompt: text => text, buildPageSummarySystemPrompt: () => ''},
+            getMissingCredentialMessage: () => null,
+            getTranslationLanguages: request => ({sourceLanguage: request?.sourceLanguage ?? current.from,
+                targetLanguage: request?.targetLanguage ?? current.to}),
+            resolveConfiguredModel, buildTranslationCacheKey: identity => JSON.stringify(identity), logger: {warn: vi.fn()},
+        });
+        const translate = vi.fn((request: TranslationRequestMessage) => broker.translateWithCache(request));
+        const offscreenUrl = 'chrome-extension://fixture/offscreen.html';
+        let wrapped: BackgroundMessageHandler<ImageGlossarySenderContext>[];
+        const call = (type: string, message: Record<string, unknown>, context: ImageGlossarySenderContext) =>
+            wrapped.find(handler => handler.type === type)!.handle({type, ...message}, context);
+        const handlers = createImageTranslationBackgroundHandlers({
+            assertLanguagesDownloaded: async () => {}, fetchImage: async () => '',
+            translateImage: async (_image, _language, _title, options) => {
+                if (change === 'disabled') current.glossaryEnabled = false;
+                else current.glossaryLibraries[0]!.entries = [];
+                return call(IMAGE_TRANSLATE_TEXTS_MESSAGE_TYPE, {requestId: options.requestId, texts: [source]}, {sender: {url: offscreenUrl}});
+            },
+            getTranslationService: () => 'openai', getGlossaryConfig: () => current,
+            supportsBatchTranslation: () => true, translateTexts: translate,
+            downloadLanguages: async () => {}, markLanguagesDownloaded: async () => [],
+        });
+        wrapped = createImageGlossaryContext<ImageGlossarySenderContext>({
+            ready: Promise.resolve(), offscreenUrl, getSourceLanguage: () => current.from,
+            getGlossaryRevision: () => buildGlossaryRevision(current.glossaryLibraries, current.glossaryEnabled),
+        }).wrap(handlers as BackgroundMessageHandler<ImageGlossarySenderContext>[]);
+        await expect(call(IMAGE_TRANSLATE_MESSAGE_TYPE, {requestId: 'image-glossary-change', image: 'data:image/png;base64,source', sourceLanguage: 'auto'},
+            {sender: {url: 'https://docs.example.com/article', tab: {id: 7}}})).rejects.toThrow('术语库已更新');
+        expect(buildGlossaryRevision(current.glossaryLibraries, current.glossaryEnabled)).not.toBe(revision);
+        expect(translate).toHaveBeenCalledOnce();
+        expect(translate).toHaveBeenCalledWith(expect.objectContaining({origin: [source], targetLanguage: 'zh-Hans',
+            sourceLanguage: 'auto', glossaryRevision: revision}));
+        expect(getTranslationGlossaryContext(translate.mock.calls[0]![0])).toEqual({pageUrl: 'https://docs.example.com/article', context: 'page'});
+        expect(provider).not.toHaveBeenCalled();
     });
 });

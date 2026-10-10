@@ -17,7 +17,10 @@ const artifactBytes = Buffer.byteLength(source);
 // 失败摘要、受限局部重试及对应文案增加 7,324 字节（0.3722%）：
 // 同依赖独立基线 ce36085f7 为 1,967,852，候选为 1,975,176；预算增加 8 KB。
 // 实测与重现步骤见 docs/reports/reading-reliability-experience-20261010/。
-const MAX_USERSCRIPT_BYTES = 1_976_000;
+// 20 个译文样式预设（规则、注册表与中文名称）增加 8,185 字节（0.4144%）：
+// 同依赖独立基线 f3f6016e8 为 1,975,140，候选为 1,983,325；预算增加 9 KB。
+// 实测与截图见 docs/reports/translation-style-presets-20261010/。
+const MAX_USERSCRIPT_BYTES = 1_985_000;
 const preludeStartMarker = '/* FluentRead userscript compatibility prelude:start */';
 const preludeEndMarker = '/* FluentRead userscript compatibility prelude:end */';
 const preludeStart = source.indexOf(preludeStartMarker);

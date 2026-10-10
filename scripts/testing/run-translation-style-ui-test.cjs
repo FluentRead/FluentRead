@@ -259,7 +259,7 @@ async function main() {
     await shot(group, '03b-custom-css-and-saved-style');
     report.checks.push('direct CSS previews live, unsupported declarations are ignored, and saved style cards show their own effect');
 
-    await options.locator('.translation-style-preview-theme').getByRole('radio', {name: '深色网页', exact: true}).click();
+    await group.locator('.translation-style-preview-theme').getByRole('radio', {name: '深色网页', exact: true}).click();
     // 网页配色切换带短暂淡入，等待计算样式稳定后再断言。
     await options.waitForFunction(() => getComputedStyle(document.querySelector('.translation-style-preview-page')).backgroundColor === 'rgb(23, 25, 30)');
     assert.equal(await options.locator('.translation-style-grid .translation-style-card-sample[data-page-theme="dark"]').count(), await options.locator('.translation-style-card').count());

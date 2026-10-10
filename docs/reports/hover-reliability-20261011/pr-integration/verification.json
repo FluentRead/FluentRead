@@ -1,0 +1,97 @@
+{
+  "date": "2026-10-11",
+  "integratedMain": "b14baf4b267f1bdace40fff13652bf9568ba1d5f",
+  "originalHoverHead": "6ee4b1c8283fdb1efa01cb6161245cc2f0ba6840",
+  "targetedOnly": true,
+  "unitFiles": [
+    {
+      "file": "tests/fullPageVisibilityScheduling.test.ts",
+      "cases": 314,
+      "result": "passed"
+    },
+    {
+      "file": "tests/fullPageAttributeBoundary.test.ts",
+      "cases": 25,
+      "result": "passed"
+    },
+    {
+      "file": "tests/hoverTranslationScheduler.test.ts",
+      "cases": 34,
+      "result": "passed"
+    },
+    {
+      "file": "tests/hoverTranslationContentFeature.test.ts",
+      "cases": 102,
+      "result": "passed"
+    },
+    {
+      "file": "tests/contentHotkeyRuntime.test.ts",
+      "cases": 62,
+      "result": "passed"
+    },
+    {
+      "file": "tests/quickTranslationContentFeature.test.ts",
+      "cases": 40,
+      "result": "passed"
+    },
+    {
+      "file": "tests/contentTrustBoundary.test.ts",
+      "cases": 5,
+      "result": "passed"
+    },
+    {
+      "file": "tests/hoverTranslationConfig.test.ts",
+      "cases": 16,
+      "result": "passed"
+    },
+    {
+      "file": "tests/translationAppearance.test.ts",
+      "cases": 13,
+      "result": "passed"
+    },
+    {
+      "file": "tests/translationTruncation.test.ts",
+      "cases": 62,
+      "result": "passed"
+    }
+  ],
+  "uniqueTargetedCases": 673,
+  "architecture": {
+    "moduleBoundaries": 13,
+    "verificationOwnership": 16,
+    "sourceFileHeaders": 897,
+    "passedChecks": 926,
+    "ceilingsChanged": false,
+    "bodyLines": {
+      "src/app/content/runtime.ts": 277,
+      "src/features/full-page-translation/content/runtime.ts": 2182
+    }
+  },
+  "compile": "passed",
+  "build": {
+    "chromeMV3": "passed",
+    "firefoxMV2": "passed",
+    "userscript": "passed"
+  },
+  "extensionManifests": "passed",
+  "userscriptVerifier": "passed",
+  "testClassificationAudit": {
+    "result": "passed",
+    "files": 640,
+    "staticallyEnumeratedCases": 10452
+  },
+  "documentationBuild": "passed",
+  "browser": {
+    "result": "passed",
+    "cases": 8,
+    "checks": 87,
+    "contentSha256": "769229ae8806138c6c059f09edfc15bcc5ee1ac4a3eaca17367c45fee5343480",
+    "deterministicLocalProvider": true,
+    "liveProviderValidation": false,
+    "firefoxAndUserscriptRuntimeValidation": false,
+    "summary": "summary.json",
+    "fullReport": "browser.json"
+  },
+  "staticIntegrationReview": "main #925 static style registry keeps frozen snapshot.style; #930 attribute batch is automatic observer scope; route and manual hover cancellation guards retained",
+  "originalPerformanceEvidence": "../performance-repeats.json; original baseline fe7005dd9 and content hash046659...; integration browser data are one behavior regression, not new repeated performance comparison"
+}

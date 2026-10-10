@@ -1,0 +1,841 @@
+{
+  "scope": "Three unchanged 320 trusted mouse move samples per phase/version. Baseline original paired collection reused unchanged. Final after3 use only 046659 final frozen idle-fastpath package. First sample full8, remaining2 pointer-only. Old after CPU excluded and preserved pre-idle-fastpath.",
+  "harnessSha256": "f570c2c96420f2f0c3e8995a0a671310e87f7a78b2e0ce6cd7abaf14b42bf41c",
+  "versions": {
+    "baseline": {
+      "directories": [
+        "baseline",
+        "baseline-perf2",
+        "baseline-perf3"
+      ],
+      "hash": "d72fa719d8de1cfa677f78242228c08e4a356d0ca52db39f9c3f3b3d7375fece",
+      "pointerChecks": [
+        11,
+        11,
+        11
+      ],
+      "cleanup": "Owned browser close confirmed, temporary profile removed, no cleanup errors or retained profile in all 3 reports",
+      "browserFrontmost": [
+        false,
+        false,
+        false
+      ],
+      "phases": {
+        "idle-disabled": {
+          "ScriptDurationMs": {
+            "median": 10.973,
+            "min": 9.854,
+            "max": 12.906,
+            "samples": [
+              10.973,
+              12.906,
+              9.854
+            ]
+          },
+          "TaskDurationMs": {
+            "median": 160.238,
+            "min": 144.792,
+            "max": 161.733,
+            "samples": [
+              161.733,
+              160.238,
+              144.792
+            ]
+          },
+          "LayoutDurationMs": {
+            "median": 0,
+            "min": 0,
+            "max": 0,
+            "samples": [
+              0,
+              0,
+              0
+            ]
+          },
+          "RecalcStyleDurationMs": {
+            "median": 0,
+            "min": 0,
+            "max": 0,
+            "samples": [
+              0,
+              0,
+              0
+            ]
+          },
+          "LayoutCount": {
+            "median": 0,
+            "min": 0,
+            "max": 0,
+            "samples": [
+              0,
+              0,
+              0
+            ]
+          },
+          "RecalcStyleCount": {
+            "median": 0,
+            "min": 0,
+            "max": 0,
+            "samples": [
+              0,
+              0,
+              0
+            ]
+          },
+          "elapsedMs": {
+            "median": 5318.5,
+            "min": 5306.599999904633,
+            "max": 5351.800000190735,
+            "samples": [
+              5318.5,
+              5351.800000190735,
+              5306.599999904633
+            ]
+          },
+          "totalBlockingMs": {
+            "median": 0,
+            "min": 0,
+            "max": 0,
+            "samples": [
+              0,
+              0,
+              0
+            ]
+          },
+          "maxHeartbeatGapMs": {
+            "median": 23.700000286102295,
+            "min": 21.899999618530273,
+            "max": 24.300000190734863,
+            "samples": [
+              21.899999618530273,
+              23.700000286102295,
+              24.300000190734863
+            ]
+          },
+          "p95HeartbeatGapMs": {
+            "median": 21.09999990463257,
+            "min": 21.09999990463257,
+            "max": 21.199999809265137,
+            "samples": [
+              21.09999990463257,
+              21.199999809265137,
+              21.09999990463257
+            ]
+          },
+          "longTaskCounts": [
+            0,
+            0,
+            0
+          ]
+        },
+        "idle-enabled": {
+          "ScriptDurationMs": {
+            "median": 15.898,
+            "min": 15.379,
+            "max": 16.078,
+            "samples": [
+              16.078,
+              15.898,
+              15.379
+            ]
+          },
+          "TaskDurationMs": {
+            "median": 165.618,
+            "min": 156.128,
+            "max": 176.646,
+            "samples": [
+              176.646,
+              165.618,
+              156.128
+            ]
+          },
+          "LayoutDurationMs": {
+            "median": 0,
+            "min": 0,
+            "max": 0,
+            "samples": [
+              0,
+              0,
+              0
+            ]
+          },
+          "RecalcStyleDurationMs": {
+            "median": 0,
+            "min": 0,
+            "max": 0,
+            "samples": [
+              0,
+              0,
+              0
+            ]
+          },
+          "LayoutCount": {
+            "median": 0,
+            "min": 0,
+            "max": 0,
+            "samples": [
+              0,
+              0,
+              0
+            ]
+          },
+          "RecalcStyleCount": {
+            "median": 0,
+            "min": 0,
+            "max": 0,
+            "samples": [
+              0,
+              0,
+              0
+            ]
+          },
+          "elapsedMs": {
+            "median": 5309.799999713898,
+            "min": 5309.300000190735,
+            "max": 5477.900000095367,
+            "samples": [
+              5477.900000095367,
+              5309.300000190735,
+              5309.799999713898
+            ]
+          },
+          "totalBlockingMs": {
+            "median": 0,
+            "min": 0,
+            "max": 0,
+            "samples": [
+              0,
+              0,
+              0
+            ]
+          },
+          "maxHeartbeatGapMs": {
+            "median": 24,
+            "min": 21.800000190734863,
+            "max": 24.90000009536743,
+            "samples": [
+              21.800000190734863,
+              24,
+              24.90000009536743
+            ]
+          },
+          "p95HeartbeatGapMs": {
+            "median": 21.09999990463257,
+            "min": 21,
+            "max": 21.09999990463257,
+            "samples": [
+              21,
+              21.09999990463257,
+              21.09999990463257
+            ]
+          },
+          "longTaskCounts": [
+            0,
+            0,
+            0
+          ]
+        },
+        "continuous-translated": {
+          "ScriptDurationMs": {
+            "median": 292.769,
+            "min": 234.38400000000001,
+            "max": 319.502,
+            "samples": [
+              292.769,
+              319.502,
+              234.38400000000001
+            ]
+          },
+          "TaskDurationMs": {
+            "median": 511.34000000000003,
+            "min": 376.149,
+            "max": 533.5810000000001,
+            "samples": [
+              511.34000000000003,
+              533.5810000000001,
+              376.149
+            ]
+          },
+          "LayoutDurationMs": {
+            "median": 0,
+            "min": 0,
+            "max": 0,
+            "samples": [
+              0,
+              0,
+              0
+            ]
+          },
+          "RecalcStyleDurationMs": {
+            "median": 0.36000000000000004,
+            "min": 0.243,
+            "max": 0.423,
+            "samples": [
+              0.36000000000000004,
+              0.423,
+              0.243
+            ]
+          },
+          "LayoutCount": {
+            "median": 0,
+            "min": 0,
+            "max": 0,
+            "samples": [
+              0,
+              0,
+              0
+            ]
+          },
+          "RecalcStyleCount": {
+            "median": 3,
+            "min": 3,
+            "max": 3,
+            "samples": [
+              3,
+              3,
+              3
+            ]
+          },
+          "elapsedMs": {
+            "median": 5548.400000095367,
+            "min": 5529.699999809265,
+            "max": 5602,
+            "samples": [
+              5602,
+              5529.699999809265,
+              5548.400000095367
+            ]
+          },
+          "totalBlockingMs": {
+            "median": 0,
+            "min": 0,
+            "max": 0,
+            "samples": [
+              0,
+              0,
+              0
+            ]
+          },
+          "maxHeartbeatGapMs": {
+            "median": 23.40000009536743,
+            "min": 22.300000190734863,
+            "max": 34,
+            "samples": [
+              34,
+              22.300000190734863,
+              23.40000009536743
+            ]
+          },
+          "p95HeartbeatGapMs": {
+            "median": 21.299999713897705,
+            "min": 21.200000286102295,
+            "max": 21.300000190734863,
+            "samples": [
+              21.300000190734863,
+              21.200000286102295,
+              21.299999713897705
+            ]
+          },
+          "longTaskCounts": [
+            0,
+            0,
+            0
+          ]
+        }
+      },
+      "idleEnabledMinusDisabled": {
+        "ScriptDurationMs": {
+          "median": 5.104999999999999,
+          "min": 2.991999999999998,
+          "max": 5.525,
+          "samples": [
+            5.104999999999999,
+            2.991999999999998,
+            5.525
+          ]
+        },
+        "TaskDurationMs": {
+          "median": 11.335999999999984,
+          "min": 5.3799999999999955,
+          "max": 14.912999999999982,
+          "samples": [
+            14.912999999999982,
+            5.3799999999999955,
+            11.335999999999984
+          ]
+        },
+        "LayoutDurationMs": {
+          "median": 0,
+          "min": 0,
+          "max": 0,
+          "samples": [
+            0,
+            0,
+            0
+          ]
+        },
+        "RecalcStyleDurationMs": {
+          "median": 0,
+          "min": 0,
+          "max": 0,
+          "samples": [
+            0,
+            0,
+            0
+          ]
+        }
+      }
+    },
+    "after": {
+      "directories": [
+        "after",
+        "after-perf2",
+        "after-perf3"
+      ],
+      "hash": "046659066a31c150e36e166331ef5cdaf93f43705cbf88444afb1b9493a98a0b",
+      "pointerChecks": [
+        11,
+        11,
+        11
+      ],
+      "cleanup": "Owned browser close confirmed, temporary profile removed, no cleanup errors or retained profile in all 3 reports",
+      "browserFrontmost": [
+        false,
+        false,
+        false
+      ],
+      "phases": {
+        "idle-disabled": {
+          "ScriptDurationMs": {
+            "median": 10.515,
+            "min": 10.167,
+            "max": 11.333,
+            "samples": [
+              11.333,
+              10.167,
+              10.515
+            ]
+          },
+          "TaskDurationMs": {
+            "median": 150.13,
+            "min": 150.04500000000002,
+            "max": 159.609,
+            "samples": [
+              159.609,
+              150.04500000000002,
+              150.13
+            ]
+          },
+          "LayoutDurationMs": {
+            "median": 0,
+            "min": 0,
+            "max": 0,
+            "samples": [
+              0,
+              0,
+              0
+            ]
+          },
+          "RecalcStyleDurationMs": {
+            "median": 0,
+            "min": 0,
+            "max": 0,
+            "samples": [
+              0,
+              0,
+              0
+            ]
+          },
+          "LayoutCount": {
+            "median": 0,
+            "min": 0,
+            "max": 0,
+            "samples": [
+              0,
+              0,
+              0
+            ]
+          },
+          "RecalcStyleCount": {
+            "median": 0,
+            "min": 0,
+            "max": 0,
+            "samples": [
+              0,
+              0,
+              0
+            ]
+          },
+          "elapsedMs": {
+            "median": 5371.200000286102,
+            "min": 5343.800000190735,
+            "max": 5452.199999809265,
+            "samples": [
+              5343.800000190735,
+              5452.199999809265,
+              5371.200000286102
+            ]
+          },
+          "totalBlockingMs": {
+            "median": 0,
+            "min": 0,
+            "max": 0,
+            "samples": [
+              0,
+              0,
+              0
+            ]
+          },
+          "maxHeartbeatGapMs": {
+            "median": 22.59999990463257,
+            "min": 21.799999713897705,
+            "max": 24.59999990463257,
+            "samples": [
+              24.59999990463257,
+              21.799999713897705,
+              22.59999990463257
+            ]
+          },
+          "p95HeartbeatGapMs": {
+            "median": 21.199999809265137,
+            "min": 21.09999990463257,
+            "max": 21.299999713897705,
+            "samples": [
+              21.299999713897705,
+              21.09999990463257,
+              21.199999809265137
+            ]
+          },
+          "longTaskCounts": [
+            0,
+            0,
+            0
+          ]
+        },
+        "idle-enabled": {
+          "ScriptDurationMs": {
+            "median": 17.155,
+            "min": 14.611,
+            "max": 18.343,
+            "samples": [
+              18.343,
+              17.155,
+              14.611
+            ]
+          },
+          "TaskDurationMs": {
+            "median": 165.5,
+            "min": 160.103,
+            "max": 186.821,
+            "samples": [
+              186.821,
+              165.5,
+              160.103
+            ]
+          },
+          "LayoutDurationMs": {
+            "median": 0,
+            "min": 0,
+            "max": 0,
+            "samples": [
+              0,
+              0,
+              0
+            ]
+          },
+          "RecalcStyleDurationMs": {
+            "median": 0,
+            "min": 0,
+            "max": 0,
+            "samples": [
+              0,
+              0,
+              0
+            ]
+          },
+          "LayoutCount": {
+            "median": 0,
+            "min": 0,
+            "max": 0,
+            "samples": [
+              0,
+              0,
+              0
+            ]
+          },
+          "RecalcStyleCount": {
+            "median": 0,
+            "min": 0,
+            "max": 0,
+            "samples": [
+              0,
+              0,
+              0
+            ]
+          },
+          "elapsedMs": {
+            "median": 5341.900000095367,
+            "min": 5314,
+            "max": 6446.099999904633,
+            "samples": [
+              6446.099999904633,
+              5314,
+              5341.900000095367
+            ]
+          },
+          "totalBlockingMs": {
+            "median": 0,
+            "min": 0,
+            "max": 0,
+            "samples": [
+              0,
+              0,
+              0
+            ]
+          },
+          "maxHeartbeatGapMs": {
+            "median": 21.699999809265137,
+            "min": 21.699999809265137,
+            "max": 23,
+            "samples": [
+              21.699999809265137,
+              23,
+              21.699999809265137
+            ]
+          },
+          "p95HeartbeatGapMs": {
+            "median": 21,
+            "min": 21,
+            "max": 21.09999990463257,
+            "samples": [
+              21,
+              21.09999990463257,
+              21
+            ]
+          },
+          "longTaskCounts": [
+            0,
+            0,
+            0
+          ]
+        },
+        "continuous-translated": {
+          "ScriptDurationMs": {
+            "median": 274.854,
+            "min": 245.16299999999998,
+            "max": 327.664,
+            "samples": [
+              245.16299999999998,
+              327.664,
+              274.854
+            ]
+          },
+          "TaskDurationMs": {
+            "median": 457.544,
+            "min": 418.976,
+            "max": 534.734,
+            "samples": [
+              418.976,
+              534.734,
+              457.544
+            ]
+          },
+          "LayoutDurationMs": {
+            "median": 0,
+            "min": 0,
+            "max": 0,
+            "samples": [
+              0,
+              0,
+              0
+            ]
+          },
+          "RecalcStyleDurationMs": {
+            "median": 0.187,
+            "min": 0.186,
+            "max": 0.49799999999999994,
+            "samples": [
+              0.49799999999999994,
+              0.187,
+              0.186
+            ]
+          },
+          "LayoutCount": {
+            "median": 0,
+            "min": 0,
+            "max": 0,
+            "samples": [
+              0,
+              0,
+              0
+            ]
+          },
+          "RecalcStyleCount": {
+            "median": 3,
+            "min": 3,
+            "max": 3,
+            "samples": [
+              3,
+              3,
+              3
+            ]
+          },
+          "elapsedMs": {
+            "median": 5517,
+            "min": 5480.5,
+            "max": 5584,
+            "samples": [
+              5584,
+              5480.5,
+              5517
+            ]
+          },
+          "totalBlockingMs": {
+            "median": 0,
+            "min": 0,
+            "max": 0,
+            "samples": [
+              0,
+              0,
+              0
+            ]
+          },
+          "maxHeartbeatGapMs": {
+            "median": 24.200000286102295,
+            "min": 21.5,
+            "max": 24.90000009536743,
+            "samples": [
+              21.5,
+              24.200000286102295,
+              24.90000009536743
+            ]
+          },
+          "p95HeartbeatGapMs": {
+            "median": 21.100000381469727,
+            "min": 21.09999990463257,
+            "max": 21.299999713897705,
+            "samples": [
+              21.09999990463257,
+              21.299999713897705,
+              21.100000381469727
+            ]
+          },
+          "longTaskCounts": [
+            0,
+            0,
+            0
+          ]
+        }
+      },
+      "idleEnabledMinusDisabled": {
+        "ScriptDurationMs": {
+          "median": 6.9879999999999995,
+          "min": 4.096000000000001,
+          "max": 7.0100000000000025,
+          "samples": [
+            7.0100000000000025,
+            6.9879999999999995,
+            4.096000000000001
+          ]
+        },
+        "TaskDurationMs": {
+          "median": 15.454999999999997,
+          "min": 9.97300000000001,
+          "max": 27.211999999999986,
+          "samples": [
+            27.211999999999986,
+            15.454999999999997,
+            9.97300000000001
+          ]
+        },
+        "LayoutDurationMs": {
+          "median": 0,
+          "min": 0,
+          "max": 0,
+          "samples": [
+            0,
+            0,
+            0
+          ]
+        },
+        "RecalcStyleDurationMs": {
+          "median": 0,
+          "min": 0,
+          "max": 0,
+          "samples": [
+            0,
+            0,
+            0
+          ]
+        }
+      }
+    }
+  },
+  "comparison": {
+    "idle-disabled": {
+      "ScriptDurationMs": {
+        "baselineMedian": 10.973,
+        "afterMedian": 10.515,
+        "deltaMs": -0.4580000000000002,
+        "changePercent": -4.173881345119845
+      },
+      "TaskDurationMs": {
+        "baselineMedian": 160.238,
+        "afterMedian": 150.13,
+        "deltaMs": -10.108000000000004,
+        "changePercent": -6.308116676443798
+      }
+    },
+    "idle-enabled": {
+      "ScriptDurationMs": {
+        "baselineMedian": 15.898,
+        "afterMedian": 17.155,
+        "deltaMs": 1.2570000000000014,
+        "changePercent": 7.906654925147816
+      },
+      "TaskDurationMs": {
+        "baselineMedian": 165.618,
+        "afterMedian": 165.5,
+        "deltaMs": -0.117999999999995,
+        "changePercent": -0.071248294267523
+      }
+    },
+    "continuous-translated": {
+      "ScriptDurationMs": {
+        "baselineMedian": 292.769,
+        "afterMedian": 274.854,
+        "deltaMs": -17.91500000000002,
+        "changePercent": -6.11915879071897
+      },
+      "TaskDurationMs": {
+        "baselineMedian": 511.34000000000003,
+        "afterMedian": 457.544,
+        "deltaMs": -53.79600000000005,
+        "changePercent": -10.520592951852004
+      }
+    },
+    "idleIncrementScriptDurationMs": {
+      "baselineMedian": 5.104999999999999,
+      "afterMedian": 6.9879999999999995,
+      "deltaMs": 1.883000000000001,
+      "deltaMicrosecondsPerMove": 5.884375000000003
+    },
+    "idleIncrementTaskDurationMs": {
+      "baselineMedian": 11.335999999999984,
+      "afterMedian": 15.454999999999997,
+      "deltaMs": 4.119000000000012,
+      "deltaMicrosecondsPerMove": 12.871875000000037
+    }
+  },
+  "excludedEvidence": [
+    "after-setup-worker-timeout (0case setup failure)",
+    "pre-idle-fastpath (older product package)"
+  ],
+  "postEvidenceHarnessSetupFix": {
+    "metadata": "harness-setup-fix/metadata.json",
+    "default8AndCpuHarnessSha256": "f570c2c96420f2f0c3e8995a0a671310e87f7a78b2e0ce6cd7abaf14b42bf41c",
+    "finalHarnessSha256": "28ef49c261654adfc78577b1ba722fe975c1b05ee7c23942e6be82832a81590a",
+    "fixtureCasesAndPhaseUnchanged": true,
+    "coldProfileSmokeOnly": true
+  }
+}

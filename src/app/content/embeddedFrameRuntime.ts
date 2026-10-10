@@ -30,6 +30,7 @@ import {mountConfiguredQuickTranslation} from './quickTranslationRuntime';
 import {installPageStyles} from './pageStyles';
 import {syncBilingualSentenceHighlight} from './bilingualSentenceHighlight';
 import {applyCoreTranslationPreferences, createContentSiteAdaptationRuntime} from './siteAdaptationRuntime';
+import {createHoverTranslationConfigSubscription} from './hoverTranslationConfig';
 
 /** 页面事件只提示刷新；frame 必须经后台校验 tab、URL 和 frameId 后读取顶层真实状态。 */
 export function installEmbeddedTopFrameBridge(isEnabled: () => boolean, signal: AbortSignal): void {
@@ -108,6 +109,7 @@ export async function startEmbeddedFrameApp(ctx: ContentScriptContext): Promise<
         syncBilingualSentenceHighlight(document, config.bilingualSentenceHighlightEnabled === true, config.bilingualSentenceHighlightStyle, config.bilingualSentenceHighlightAppearance);
         const resetHover = mountHoverTranslationContentFeature({
             config, constants, document, window, navigator, getCenterPoint,
+            subscribeConfig: createHoverTranslationConfigSubscription(config, subscribeConfig, cancelPendingHoverTranslation),
             isSiteDisabled: () => !enabled() || !authorized,
             handleTranslation, noteBilingualHostGesture, cancelPendingHoverTranslation,
             ...hotkeys.selectionShortcutPorts,

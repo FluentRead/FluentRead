@@ -20,6 +20,8 @@ FluentRead displays translations alongside the original webpage and provides sel
 
 [▶ Watch the 56-second introduction](https://read.thinkstu.com/videos/fluentread-promo-en.mp4) · [中文版](https://read.thinkstu.com/videos/fluentread-promo-zh.mp4)
 
+For a closer look, [watch the full official introduction (4+ minutes, in Chinese on Bilibili)](https://www.bilibili.com/video/BV1qhHJ6uEiF/).
+
 </div>
 
 [![FluentRead bilingual webpage translation](./docs/public/screenshots/en/translation.webp)](./docs/public/screenshots/en/translation.webp)

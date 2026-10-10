@@ -2,7 +2,7 @@
 /**
  * @file scripts/testing/run-information-highlight-test.cjs
  * 文件职责：在独立真实 Edge 中验证生产信息高亮的页面保护、启停、动态正文、可选模型与设置持久化。
- * 主要内容：通过现有后台无焦点浏览器 helper 加载本地扩展和只读正文 fixture，真实点击设置、说明、渐变与模型选项，以真实按键验证快捷键作用范围；按 --model-id 选择固定 Qwen2.5 或 Qwen3，校验各自缓存、离线推理标签、单按钮文案及取消/确认删除流程；分阶段保存证据，显式选择真实下载或校验后的本地导入。
+ * 主要内容：通过现有后台无焦点浏览器 helper 加载本地扩展和只读正文 fixture，真实点击设置、说明、渐变与模型选项，以真实按键验证快捷键作用范围；按 --model-id 选择固定 Qwen2.5 或 Qwen3，校验各自缓存、离线推理标签、单按钮文案及取消/确认删除流程；--model-only 只复验模型管理、推理与 PDF，显式选择真实下载或校验后的本地导入。
  * 模块边界：只清理本次 profile；本地导入与产品下载证据分开记录，下载后的推理和 PDF 复用已有页签；不修改共享焦点策略，超时和断开均失败，网络观察不冒充全机流量或阅读效果证明。
  */
 'use strict';
@@ -19,7 +19,7 @@ const args={};
 for(let i=2;i<process.argv.length;i++){
   const argument=process.argv[i];assert(argument.startsWith('--'),`Unexpected argument: ${argument}`);
   const field=argument.slice(2),next=process.argv[i+1];
-  if(['download-model','paint-diagnose'].includes(field)){
+  if(['download-model','paint-diagnose','model-only'].includes(field)){
     if(next&&!next.startsWith('--')){assert(['true','false','1','0'].includes(next),`Invalid --${field} value`);args[field]=next==='true'||next==='1';i++;}
     else args[field]=true;
   }else{assert(next&&!next.startsWith('--'),`Missing --${field} value`);args[field]=next;i++;}
@@ -47,6 +47,7 @@ fs.mkdirSync(artifacts,{recursive:true});
 const profileDir=fs.mkdtempSync(path.join(os.tmpdir(),'fluentread-information-highlight-'));
 const report={ok:false,extensionDir,profileDir,stages:[],surface:'options-continuous-smart-highlight-group',build:extensionDir.endsWith('-dev')?'development':'production',
   selectedModel:model,
+  suite:args['model-only']?'model-management-inference-pdf':'information-highlight-settings-pages-and-model',
   evidence:'real-extension-controlled-pages',cases:[],screenshots:[],consoleErrors:[],persistenceCases:[],consoleWarnings:[],
   quickClose:false,crossPageSync:false,latestWriteWins:false,
   modelAcquisition:args['download-model']?'production-settings-download':args['model-dir']?'verified-local-artifact-import':'not-requested',
@@ -296,6 +297,14 @@ function popupSourceContract(){
     await step('translation-anchors-ready',()=>control.locator('[data-settings-anchor-link="reading"]').waitFor());
     await step('fixture-config',()=>support.patchStoredConfig(control,{on:true,disableFloatingBall:false,uiLanguage:'zh-CN',uiLanguageSetupCompleted:true,theme:'light',informationHighlight:{enabled:false,hotkey:'Alt+H',hotkeyEnabled:true,mode:'keywords',model:modelId,density:'medium',color:'amber',style:'background',intensity:'standard'}}));
     const patchConfig=patch=>step('fixture-config-patch',()=>support.patchStoredConfig(control,patch));
+    const settingButton=async(selector,name,{click=true}={})=>step(`settings-control:${name}`,async()=>{
+      const button=control.locator(`#information-highlight-settings ${selector}`);await button.waitFor();await button.scrollIntoViewIfNeeded();assert(await button.isEnabled());
+      const metrics=await button.evaluate(element=>{const rect=element.getBoundingClientRect(),hit=document.elementFromPoint(rect.x+rect.width/2,rect.y+rect.height/2);return{rect:rect.toJSON(),viewport:{width:innerWidth,height:innerHeight},hit:hit===element||element.contains(hit),label:element.textContent.trim(),visibility:document.visibilityState};});
+      assert(metrics.rect.width>0&&metrics.rect.height>0&&metrics.rect.x>=0&&metrics.rect.y>=0&&metrics.rect.right<=metrics.viewport.width+1&&metrics.rect.bottom<=metrics.viewport.height+1&&metrics.hit&&metrics.visibility==='visible','Settings control must be visible and clickable after normal scrolling');
+      if(click)await control.mouse.click(metrics.rect.x+metrics.rect.width/2,metrics.rect.y+metrics.rect.height/2);return metrics;
+    });
+    let popup;
+    if(!args['model-only']){
     await openHighlightSettings(control,{verifyReading:true});report.cases.push({id:'smart-highlight-exact-title-zh',...await highlightTitle(control,'zh-CN')});
     await helpTags(control,'zh-CN',{screenshot:'smart-highlight-help-zh'});
     await patchConfig({uiLanguage:'en-US'});report.cases.push({id:'smart-highlight-exact-title-en',...await highlightTitle(control,'en-US')});
@@ -372,7 +381,7 @@ function popupSourceContract(){
     const secondId=await step('second-tab-id',()=>control.evaluate(async url=>(await chrome.tabs.query({})).find(tab=>tab.url===url)?.id,`${fixtureUrl}?second`));
     const secondState=await step('second-disabled-state',()=>control.evaluate(async id=>chrome.tabs.sendMessage(id,{type:'GET_INFORMATION_HIGHLIGHT_STATE'}),secondId));
     assert.equal((secondState.state||secondState).enabled,false);report.cases.push({id:'new-tab-does-not-inherit-enabled'});await shot(second,'disabled-page');
-    const popup=await open(popupUrl,'ordinary-popup');
+    popup=await open(popupUrl,'ordinary-popup');
     for(const layout of [{width:400,language:'zh-CN',theme:'light',name:'popup-400-zh'},
       {width:320,language:'zh-CN',theme:'light',name:'popup-320-zh'},
       {width:400,language:'en-US',theme:'light',name:'popup-400-en'},
@@ -390,12 +399,6 @@ function popupSourceContract(){
       report.cases.push({id:`${layout.name}-no-information-highlight`,absence,messageEvidence:'popup-source-contract-and-production-static-js-graph'});await shot(popup,layout.name);
     }
     await patchConfig({uiLanguage:'zh-CN',theme:'light'});await activate(control,'settings-preferences');
-    const settingButton=async(selector,name,{click=true}={})=>step(`settings-control:${name}`,async()=>{
-      const button=control.locator(`#information-highlight-settings ${selector}`);await button.waitFor();await button.scrollIntoViewIfNeeded();assert(await button.isEnabled());
-      const metrics=await button.evaluate(element=>{const rect=element.getBoundingClientRect(),hit=document.elementFromPoint(rect.x+rect.width/2,rect.y+rect.height/2);return{rect:rect.toJSON(),viewport:{width:innerWidth,height:innerHeight},hit:hit===element||element.contains(hit),label:element.textContent.trim(),visibility:document.visibilityState};});
-      assert(metrics.rect.width>0&&metrics.rect.height>0&&metrics.rect.x>=0&&metrics.rect.y>=0&&metrics.rect.right<=metrics.viewport.width+1&&metrics.rect.bottom<=metrics.viewport.height+1&&metrics.hit&&metrics.visibility==='visible','Settings control must be visible and clickable after normal scrolling');
-      if(click)await control.mouse.click(metrics.rect.x+metrics.rect.width/2,metrics.rect.y+metrics.rect.height/2);return metrics;
-    });
     const paletteIds=['rose','amber','mint','blue','violet','slate'];
     assert.equal(await step('settings-six-palette-cards',()=>control.locator('#information-highlight-settings [data-information-highlight-color]').count()),paletteIds.length);
     for(const color of paletteIds){
@@ -469,6 +472,12 @@ function popupSourceContract(){
     await delay(500);assert.equal((await step('disabled-stable-ranges',()=>textRanges(page))).length,0);report.cases.push({id:'disable-clears-and-does-not-repaint'});
     await send('SET_INFORMATION_HIGHLIGHT_ENABLED',{enabled:true});await send('SET_INFORMATION_HIGHLIGHT_ENABLED',{enabled:false});await delay(500);
     assert.equal((await step('rapid-toggle-ranges',()=>textRanges(page))).length,0);report.cases.push({id:'rapid-enable-disable'});
+    }else{
+      report.skippedMatrices=['help tags and language/layout matrix','page hotkey and keyword painting','ordinary popup matrix','palette/heatmap/style preferences','dynamic article and rapid toggles'];
+      await openHighlightSettings(control);
+      // 真下载验证关闭/重开设置时保留同一浏览器的一个已有页签；不执行旧页面或 Popup 测试矩阵。
+      popup=await open(fixtureUrl,'model-resume-spare-tab');
+    }
     await activate(control,'settings-mode');
     const chooseMode=mode=>step(`settings-mode:${mode}`,async()=>{
       const selector=control.locator('#information-highlight-settings [data-information-highlight-mode-select]');await selector.scrollIntoViewIfNeeded();assert((await selector.boundingBox()).height>20);
@@ -662,22 +671,40 @@ function popupSourceContract(){
       const confirmationText=(await dialog.innerText()).trim();assert(confirmationText.includes(`删除 ${model.name} 的本地模型文件？再次使用时需要重新下载。`));
       const waitingForConfirmation=(await readModelStatus()).status;assert.equal(waitingForConfirmation.downloaded,true,'Opening the confirmation dialog must retain the model');
       const confirmationAppearance=await step('model-delete-confirmation-animation-settled',async()=>{
-        await control.waitForFunction(async()=>{
+        const isSettled=()=>{
           const box=document.querySelector('.el-message-box'),dialog=box?.closest('[role="dialog"]'),overlay=dialog?.closest('.el-overlay');
           if(!box||!dialog||!overlay||overlay.getAnimations({subtree:true}).some(animation=>animation.pending||animation.playState==='running'))return false;
           for(const element of [overlay,dialog,box]){
             const style=getComputedStyle(element);if(Number(style.opacity)<0.999||style.visibility!=='visible'||style.display==='none')return false;
             if(style.transform!=='none'&&!new DOMMatrix(style.transform).isIdentity)return false;
           }
-          const before=box.getBoundingClientRect();await new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve)));const after=box.getBoundingClientRect();
-          return before.width>0&&before.height>0&&['x','y','width','height'].every(field=>Math.abs(before[field]-after[field])<0.1);
-        },null,{timeout:10000});
-        return dialog.locator('.el-message-box').evaluate(box=>{
-          const overlay=box.closest('.el-overlay'),dialog=box.closest('[role="dialog"]'),style=getComputedStyle(box);
+          const rect=box.getBoundingClientRect();return rect.width>0&&rect.height>0;
+        };
+        const readAppearance=()=>{
+          const box=document.querySelector('.el-message-box'),dialog=box?.closest('[role="dialog"]'),overlay=dialog?.closest('.el-overlay');
+          if(!box||!dialog||!overlay)return {missing:true};
+          const style=getComputedStyle(box);
           return {rect:box.getBoundingClientRect().toJSON(),viewport:{width:innerWidth,height:innerHeight},backgroundColor:style.backgroundColor,
-            layers:[overlay,dialog,box].map(element=>({opacity:getComputedStyle(element).opacity,transform:getComputedStyle(element).transform})),
+            layers:[overlay,dialog,box].map(element=>{const style=getComputedStyle(element);return{opacity:style.opacity,transform:style.transform,transformIdentity:style.transform==='none'||new DOMMatrix(style.transform).isIdentity,visibility:style.visibility,display:style.display};}),
             runningAnimations:overlay.getAnimations({subtree:true}).filter(animation=>animation.pending||animation.playState==='running').length};
-        });
+        };
+        const deadline=Date.now()+10000;
+        try{
+          while(Date.now()<deadline){
+            // waitForFunction 始终只接收同步布尔谓词；两帧等待独立完成，再重新检查动画与真实样式。
+            await control.waitForFunction(isSettled,null,{timeout:Math.max(1,deadline-Date.now())});
+            const before=await control.evaluate(readAppearance);
+            await control.evaluate(()=>new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve))));
+            await control.waitForFunction(isSettled,null,{timeout:Math.max(1,deadline-Date.now())});
+            const after=await control.evaluate(readAppearance);
+            after.rectBefore=before.rect;after.rectStable=Boolean(before.rect&&after.rect&&['x','y','width','height'].every(field=>Math.abs(before.rect[field]-after.rect[field])<0.1));
+            report.model.confirmationAppearance=after;save();
+            if(!after.missing&&after.rectStable&&after.runningAnimations===0&&after.layers.every(layer=>Number(layer.opacity)>=0.999&&layer.transformIdentity&&layer.visibility==='visible'&&layer.display!=='none'))return after;
+          }
+          throw new Error('Confirmation animation and geometry did not remain settled across two frames');
+        }catch(error){
+          report.model.confirmationAppearance=await control.evaluate(readAppearance).catch(snapshotError=>({snapshotError:String(snapshotError)}));save();throw error;
+        }
       },15000);
       assert(confirmationAppearance.layers.every(layer=>Number(layer.opacity)>=0.999));assert.equal(confirmationAppearance.runningAnimations,0);
       assert(!['transparent','rgba(0, 0, 0, 0)'].includes(confirmationAppearance.backgroundColor),'Confirmation box must have an opaque readable surface');

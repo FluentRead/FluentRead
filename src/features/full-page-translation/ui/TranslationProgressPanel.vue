@@ -1,8 +1,8 @@
 <!--
  * @file src/features/full-page-translation/ui/TranslationProgressPanel.vue
  * 文件职责：以半透明工作面板和低存在感状态勾选展示全文翻译进度，并允许用户临时收起，同时跟随扩展主题与系统深浅色偏好。
- * 主要内容：组件订阅实时进度和配置更新，通过展示控制器延迟短任务的展开并等待连续空闲后收起；弹窗等待时保留静态提示，仅剩离屏候选且悬浮球关闭时退化为淡勾选。
- * 模块边界：组件不启动、取消或重试翻译，也不保存业务进度；数据只来自 progress.ts，是否创建 Shadow UI 由 content/progressPanel.ts 决定，样式局限于组件作用域。
+ * 主要内容：组件订阅实时进度和配置更新，通过展示控制器延迟短任务的展开并等待连续空闲后收起；失败时保留完成/失败摘要和局部重试入口；弹窗等待时保留静态提示，仅剩离屏候选且悬浮球关闭时退化为淡勾选。
+ * 模块边界：组件通过会话限定端口请求失败重试或定位，不直接发出翻译请求，也不保存业务进度；数据只来自 progress.ts，是否创建 Shadow UI 由 content/progressPanel.ts 决定，样式局限于组件作用域。
  -->
 <template>
   <Transition name="fr-progress-panel">
@@ -10,7 +10,7 @@
       v-ui-i18n
       v-if="isVisible"
       class="fr-translation-progress"
-      :class="{ 'fr-dark': isDark, 'fr-static': !animationsEnabled, 'fr-modal-waiting': isModalWaiting, 'fr-compact': isCompact }"
+      :class="{ 'fr-dark': isDark, 'fr-static': !animationsEnabled, 'fr-modal-waiting': isModalWaiting, 'fr-compact': isCompact, 'fr-failed': hasFailures, 'fr-idle': progress.running === 0 && progress.queued === 0 }"
       :data-session-id="progress.sessionId"
       :data-running="progress.running"
       :data-remaining="progress.remaining"
@@ -18,6 +18,9 @@
       :data-offscreen="progress.offscreen"
       :data-deferred="progress.deferred"
       :data-modal-phase="progress.modalPhase"
+      :data-completed="progress.completed ?? 0"
+      :data-failed="progress.failed ?? 0"
+      :data-retryable="progress.retryable ?? 0"
     >
       <span
         v-if="isCompact"
@@ -33,7 +36,8 @@
       </span>
 
       <template v-else>
-        <span class="fr-progress-indicator" aria-hidden="true">
+        <span v-if="hasFailures && progress.running === 0" class="fr-progress-warning" aria-hidden="true">!</span>
+        <span v-else class="fr-progress-indicator" aria-hidden="true">
           <i />
           <i />
           <i />
@@ -52,6 +56,15 @@
             <span class="fr-progress-divider" aria-hidden="true" />
             <span>{{ t('fullPage.progress.remaining') }} <b>{{ progress.remaining }}</b></span>
           </span>
+          <span class="fr-progress-counts" v-if="(progress.completed ?? 0) > 0 || hasFailures">
+            <span>{{ t('fullPage.progress.completed') }} <b>{{ progress.completed ?? 0 }}</b></span>
+            <span class="fr-progress-divider" aria-hidden="true" />
+            <span>{{ t('fullPage.progress.failed') }} <b>{{ progress.failed ?? 0 }}</b></span>
+          </span>
+          <span v-if="hasFailures" class="fr-progress-actions">
+            <button type="button" class="fr-progress-action" :disabled="!canRecover" @click="runFailureAction('retry')">{{ t('fullPage.progress.retryFailed') }}</button>
+            <button type="button" class="fr-progress-action" :disabled="!canRecover" @click="runFailureAction('locate')">{{ t('fullPage.progress.locateFailed') }}</button>
+          </span>
           <small v-if="isModalWaiting">
             {{ t('fullPage.progress.modalWaiting') }}
           </small>
@@ -60,7 +73,7 @@
           </small>
         </span>
 
-        <button type="button" :aria-label="t('fullPage.progress.hide')" :title="t('fullPage.progress.hideTitle')" @click="dismiss">
+        <button type="button" class="fr-progress-dismiss" :aria-label="t('fullPage.progress.hide')" :title="t('fullPage.progress.hideTitle')" @click="dismiss">
           <svg viewBox="0 0 16 16" aria-hidden="true">
             <path d="m4 4 8 8m0-8-8 8" />
           </svg>
@@ -74,6 +87,8 @@
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import {
   getFullPageTranslationProgress,
+  runFullPageFailureAction,
+  type FullPageFailureAction,
   subscribeFullPageTranslationProgress,
 } from '@/src/features/full-page-translation/progress';
 import {config, subscribeConfig} from '@/src/services/config/store';
@@ -102,7 +117,11 @@ watch([progress, floatingBallEnabled, dismissedSessionId], () => {
   visibility.update(progress.value, floatingBallEnabled.value, progress.value.sessionId === dismissedSessionId.value);
 }, {immediate: true, flush: 'sync'});
 const isModalWaiting = computed(() => progress.value.modalPhase === 'waiting');
-const panelTitle = computed(() => progress.value.modalPhase === 'translating'
+const hasFailures = computed(() => (progress.value.failed ?? 0) > 0);
+const canRecover = computed(() => (progress.value.retryable ?? progress.value.failed ?? 0) > 0);
+const panelTitle = computed(() => hasFailures.value && progress.value.running === 0 && progress.value.queued === 0
+  ? t('fullPage.progress.failuresTitle')
+  : progress.value.modalPhase === 'translating'
   ? t('fullPage.progress.modalTranslating')
   : t('fullPage.progress.title'));
 const isCompact = computed(() => displayMode.value === 'compact');
@@ -117,11 +136,15 @@ const statusLabel = computed(() => {
     running: progress.value.running,
     remaining: progress.value.remaining,
     offscreen: progress.value.offscreen,
-  });
+  }) + (hasFailures.value ? ` · ${t('fullPage.progress.summaryAria', {completed: progress.value.completed ?? 0, failed: progress.value.failed ?? 0})}` : '');
 });
 
 function updatePreferredTheme(event?: MediaQueryListEvent): void {
   prefersDark.value = event?.matches ?? darkModeMediaQuery.matches;
+}
+
+function runFailureAction(action: FullPageFailureAction): void {
+  if (canRecover.value) runFullPageFailureAction(progress.value.sessionId, action);
 }
 
 function dismiss(): void {
@@ -284,7 +307,7 @@ onBeforeUnmount(() => {
   white-space: nowrap;
 }
 
-button {
+.fr-progress-dismiss {
   display: grid;
   width: 28px;
   height: 28px;
@@ -298,18 +321,18 @@ button {
   cursor: pointer;
 }
 
-button:hover,
-button:focus-visible {
+.fr-progress-dismiss:hover,
+.fr-progress-dismiss:focus-visible {
   background: #f8e9ef;
   color: #cf3e73;
   outline: none;
 }
 
-button:focus-visible {
+.fr-progress-dismiss:focus-visible {
   box-shadow: 0 0 0 2px rgba(232, 79, 135, 0.28);
 }
 
-button svg {
+.fr-progress-dismiss svg {
   width: 14px;
   height: 14px;
   fill: none;
@@ -353,12 +376,12 @@ button svg {
 }
 
 .fr-dark .fr-progress-copy small,
-.fr-dark button {
+.fr-dark .fr-progress-dismiss {
   color: #bfaeb7;
 }
 
-.fr-dark button:hover,
-.fr-dark button:focus-visible {
+.fr-dark .fr-progress-dismiss:hover,
+.fr-dark .fr-progress-dismiss:focus-visible {
   background: #523242;
   color: #ff91b8;
 }
@@ -412,4 +435,13 @@ button svg {
     transition: none;
   }
 }
+
+
+.fr-progress-warning { display: grid; place-items: center; width: 34px; height: 34px; border-radius: 10px; background: #fff1d6; color: #9a5800; font-size: 22px; font-weight: 700; }
+.fr-progress-actions { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 6px; }
+.fr-progress-action { border: 1px solid currentColor; border-radius: 5px; padding: 3px 6px; background: transparent; color: inherit; cursor: pointer; font: inherit; }
+.fr-progress-action:disabled { opacity: .45; cursor: default; }
+.fr-progress-action:focus-visible { outline: 2px solid currentColor; outline-offset: 2px; }
+.fr-idle .fr-progress-indicator i { animation: none; }
+.fr-dark .fr-progress-warning { background: #493620; color: #ffd18c; }
 </style>

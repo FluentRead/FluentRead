@@ -69,12 +69,11 @@ export async function startEmbeddedFrameApp(ctx: ContentScriptContext): Promise<
     const lifetime = new AbortController();
     let lifecycleController: ReturnType<typeof createFrameSessionController> | undefined;
     let cleanup = () => { disposed = true; lifetime.abort(); };
-    ctx.onInvalidated(() => cleanup());
     const pageLifecycle = installContentPageLifecycle(window, lifetime.signal, {
         suspend: () => lifecycleController?.suspend(),
         resume: () => { void lifecycleController?.refresh(); },
         dispose: () => cleanup(),
-    });
+    }, ctx, document);
     await configReady;
     await ensureUiLanguageBundle(config.uiLanguage);
     if (ctx.isInvalid || disposed) { cleanup(); return; }

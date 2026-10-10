@@ -299,6 +299,97 @@ describe('QQ legacy frame startup 生命周期', () => {
 });
 
 describe('frame bridge cleanup after extension reload', () => {
+    async function readingFrame(kind: 'qq' | 'netease' | 'embedded') {
+        const href = kind === 'qq' ? 'https://mail.qq.com/cgi-bin/readmail?mailid=x'
+            : kind === 'netease' ? 'about:blank'
+                : 'https://www.kaggleusercontent.com/kf/126670518/signed-token/__results__.html';
+        const globals = installGlobals(href);
+        globals.window.top = kind === 'netease'
+            ? {location: {href: 'https://mail.163.com/js6/main.jsp?sid=redacted#module=read.ReadModule%7C%7B%7D'}} : {};
+        vi.stubGlobal('navigator', {});
+        const mail = await load();
+        const {startEmbeddedFrameApp} = await import('@/src/app/content/embeddedFrameRuntime');
+        const start = kind === 'qq' ? mail.startQqMailFrameApp
+            : kind === 'netease' ? mail.startNeteaseMailFrameApp : startEmbeddedFrameApp;
+        return {...globals, start};
+    }
+
+    it.each(['qq', 'netease', 'embedded'] as const)(
+        'detects passive WXT invalidation and releases an idle %s frame without another gesture', async kind => {
+            vi.useFakeTimers();
+            try {
+                const {start, listeners, document, window} = await readingFrame(kind);
+                const removeWindowListener = vi.spyOn(window, 'removeEventListener');
+                mocks.sendMessage.mockResolvedValue({enabled: true, revision: 0, sessionId: null});
+                let invalid = false;
+                const releaseContextListener = vi.fn();
+                await start({get isInvalid() { return invalid; }, onInvalidated: () => releaseContextListener} as never);
+                const unsubscribe = mocks.subscribeConfig.mock.results[0].value;
+                expect(mocks.installStyles).toHaveBeenCalledOnce();
+                invalid = true;
+                Reflect.deleteProperty(browser, 'runtime');
+                vi.advanceTimersByTime(1000);
+                expect(mocks.removeStyles).toHaveBeenCalledOnce();
+                expect(mocks.removeRuntimeListener).toHaveBeenCalledOnce();
+                expect(unsubscribe).toHaveBeenCalledOnce();
+                expect(releaseContextListener).toHaveBeenCalledOnce();
+                expect(mocks.syncHighlight).toHaveBeenLastCalledWith(document, false);
+                expect([...listeners.values()].every(set => set.size === 0)).toBe(true);
+                expect(removeWindowListener.mock.calls.map(([name]) => name)).toEqual(expect.arrayContaining(['pagehide', 'pageshow']));
+                expect(vi.getTimerCount()).toBe(0);
+            } finally { vi.useRealTimers(); }
+        },
+    );
+
+    it.each(['qq', 'netease', 'embedded'] as const)(
+        'does not revive the %s frame when authorization returns after context disposal', async kind => {
+            vi.useFakeTimers();
+            try {
+                const {start, listeners} = await readingFrame(kind);
+                let resolve!: (value: unknown) => void;
+                mocks.sendMessage.mockReturnValue(new Promise(value => { resolve = value; }));
+                let invalid = false;
+                const releaseContextListener = vi.fn();
+                const starting = start({get isInvalid() { return invalid; }, onInvalidated: () => releaseContextListener} as never);
+                for (let tick = 0; tick < 12; tick += 1) await Promise.resolve();
+                expect(mocks.sendMessage).toHaveBeenCalledOnce();
+                invalid = true;
+                vi.advanceTimersByTime(1000);
+                resolve({enabled: true, revision: 1, sessionId: 1, fullPageMode: 'all', translationConfig: {
+                    service: 'freeTranslation', model: '', sourceLanguage: 'en', targetLanguage: 'zh-CN',
+                    thinking: false, useCache: true, enableAIContext: false, enableAIMultiSegment: false,
+                    displayMode: 'bilingual', style: 0,
+                }});
+                await starting;
+                expect(mocks.autoTranslateEnglishPage).not.toHaveBeenCalled();
+                expect(mocks.installStyles).not.toHaveBeenCalled();
+                expect(mocks.removeRuntimeListener).toHaveBeenCalledOnce();
+                expect(mocks.subscribeConfig.mock.results[0].value).toHaveBeenCalledOnce();
+                expect(releaseContextListener).toHaveBeenCalledOnce();
+                expect([...listeners.values()].every(set => set.size === 0)).toBe(true);
+                expect(vi.getTimerCount()).toBe(0);
+            } finally { vi.useRealTimers(); }
+        },
+    );
+
+    it('repeated short-lived embedded frames leave no polling or document listeners', async () => {
+        vi.useFakeTimers();
+        try {
+            for (let index = 0; index < 24; index += 1) {
+                const {start, listeners} = await readingFrame('embedded');
+                mocks.sendMessage.mockResolvedValue({enabled: true, revision: 0, sessionId: null});
+                let invalid = false;
+                await start({get isInvalid() { return invalid; }, onInvalidated: vi.fn()} as never);
+                invalid = true;
+                vi.advanceTimersByTime(1000);
+                expect(vi.getTimerCount()).toBe(0);
+                expect([...listeners.values()].every(set => set.size === 0)).toBe(true);
+            }
+            expect(mocks.removeStyles).toHaveBeenCalledTimes(24);
+            expect(mocks.removeRuntimeListener).toHaveBeenCalledTimes(24);
+        } finally { vi.useRealTimers(); }
+    });
+
     it.each(['qq', 'netease', 'embedded'] as const)(
         'releases the %s top bridge when runtime is removed or listener removal fails', async kind => {
             const href = kind === 'qq' ? topUrl : kind === 'netease'

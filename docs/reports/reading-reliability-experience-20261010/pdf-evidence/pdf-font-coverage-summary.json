@@ -1,0 +1,34 @@
+{
+  "verifiedAt": "2026-10-10T22:23:26+08:00",
+  "scope": "src/features/document-translation/services/pdfReadingFont.ts",
+  "tests": {
+    "file": "tests/pdfTextExport.test.ts",
+    "passed": 11
+  },
+  "coverage": {
+    "lines": {
+      "total": 29,
+      "covered": 29,
+      "skipped": 0,
+      "pct": 100
+    },
+    "functions": {
+      "total": 3,
+      "covered": 3,
+      "skipped": 0,
+      "pct": 100
+    },
+    "statements": {
+      "total": 29,
+      "covered": 29,
+      "skipped": 0,
+      "pct": 100
+    },
+    "branches": {
+      "total": 19,
+      "covered": 19,
+      "skipped": 0,
+      "pct": 100
+    }
+  }
+}

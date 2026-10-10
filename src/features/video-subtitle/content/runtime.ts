@@ -1,7 +1,7 @@
 /**
  * @file src/features/video-subtitle/content/runtime.ts
  * 文件职责：装配视频及会议字幕运行时，并协调 YouTube/X 原生字幕、目标语言人工轨、逐条翻译、校时、菜单和下载。
- * 主要内容：相同译文保留原文且不重复展示；协调字幕校时和预翻译；X 分片加载尊重原生轨道优先级，播放器内换模型必须确认且保留取消焦点，完整 AI 识别提前展示稳定句，完成后才缓存和导出。
+ * 主要内容：相同译文保留原文且不重复展示；协调字幕校时、预翻译与补译导出确认；X 分片加载尊重原生轨道优先级，播放器内换模型必须确认且保留取消焦点，完整 AI 识别提前展示稳定句，完成后才缓存和导出。
  * 模块边界：本文件只在 content 页面编排，不拦截 fetch/XHR 也不实现翻译 provider；MAIN-world bridge 在独立模块捕获 timedtext，解析算法在 youtubeSubtitleData，翻译经 app client。
  */
 import {hasDistinctTranslation} from '@/src/core/translation/result';
@@ -117,6 +117,7 @@ import {getCaptionPlatform} from './platforms';
 import {mountPlatformCaptions} from './platformRuntime';
 import {YoutubeHumanCaptions} from './youtubeHumanCaptions';
 import {createVideoSubtitleDownloads} from './downloads';
+import {confirmVideoSubtitleExport} from './exportPrompt';
 
 // 兼容既有测试与外部调用方；AI 时间轴的实现位于 video-ai 目录。
 export {
@@ -662,7 +663,7 @@ export function mountVideoSubtitleTranslation(): () => void {
     const {sameMedia, identity: nextObservedIdentity, key: nextObservedKey} = getVideoTranscriptionMediaTransition(
       observedMediaIdentity, nextIdentity, Boolean(previousVideo && previousVideo === nextVideo), observedMediaSource, nextSource);
     if (nextVideo === observedVideo && nextSource === observedMediaSource && nextObservedKey === observedStableMediaKey) return;
-    if (!sameMedia) observedMediaEpoch += 1;
+    if (!sameMedia) { observedMediaEpoch += 1; if (previousVideo) downloads.cancel(); }
     const identityChanged = nextObservedKey !== observedStableMediaKey;
     if (sameMedia && identityChanged && !isAiCaptureActive()) { cacheEpoch += 1; cacheLookup = undefined; }
     xCaptionSource.restoreTracks();
@@ -686,7 +687,6 @@ export function mountVideoSubtitleTranslation(): () => void {
       xSubtitleCues = [];
       aiCues = [];
       capturedSubtitleTracks.clear();
-      downloads.cancel();
       clearPretranslationState(true);
     }
     if (!observedVideo) return;
@@ -1009,6 +1009,7 @@ export function mountVideoSubtitleTranslation(): () => void {
     const menu = menuElement?.isConnected ? menuElement : document.getElementById(VIDEO_TRANSLATION_MENU_ID);
     const button = buttonElement?.isConnected ? buttonElement : document.getElementById(VIDEO_TRANSLATION_BUTTON_ID);
     aiModelSetup.cancel();
+    downloads.cancel();
     if (menu) { menu.hidden = true; setVideoMenuToolsOpen(menu, false); }
     button?.setAttribute('aria-expanded', 'false');
     syncTranslationOverlayPosition(findCaptionContainer());
@@ -1112,8 +1113,15 @@ export function mountVideoSubtitleTranslation(): () => void {
     isAiActive: isAiCaptureActive,
     isAiComplete: () => aiFullPhase === 'ready' || (!isAiFullActive() && aiCues.length === 0),
     nativeX: () => xCaptionSource.readNativeTrack(), aiCues: () => aiCues,
-    captured: () => Array.from(capturedSubtitleTracks.values()).reverse(), human: humanCaptions,
-    translate: source => videoTranslator.request(source), ui: videoUi, status: setVideoMenuDownloadStatus, save: downloadSubtitleSrt, refreshButtons: updatePlayerUiState,
+    captured: () => Array.from(capturedSubtitleTracks.values()).reverse(),
+    human: {ready: async () => {
+      if (isYouTubeVideoPage()) humanCaptions.sync(document, window.location, config.to, config.videoPreferHumanSubtitles);
+      await humanCaptions.ready();
+    }, at: time => humanCaptions.at(time)},
+    translate: source => videoTranslator.request(source), peek: source => pretranslationConfigKey === getVideoTranslationConfigFingerprint(config) ? videoTranslator.peek(source) : undefined,
+    cancelTranslations: () => videoTranslator.cancelPending(),
+    contextKey: () => `${getVideoPageKey()}:${observedMediaEpoch}`,
+    confirm: (menu, preview, bilingual, signal) => confirmVideoSubtitleExport(menu, preview, bilingual, signal, videoUi), ui: videoUi, status: setVideoMenuDownloadStatus, save: downloadSubtitleSrt, refreshButtons: updatePlayerUiState,
     remember: entry => { const key = getTimedTextCacheKey(entry.url); capturedSubtitleTracks.delete(key); capturedSubtitleTracks.set(key, entry);
       if (canTranslateVideo()) setPretranslationTrack(key, entry); },
   });
@@ -1248,32 +1256,12 @@ export function mountVideoSubtitleTranslation(): () => void {
       return;
     }
     if (target.dataset.action === 'download-subtitles') {
-      const downloadButton = target as HTMLButtonElement;
-      downloadButton.disabled = true;
-      downloadButton.setAttribute('aria-busy', 'true');
-      setVideoMenuDownloadStatus(menu, videoUi('video.fetching'));
-      const slowFeedbackTimer = window.setTimeout(() => {
-        if (downloadButton.getAttribute('aria-busy') === 'true') setVideoMenuDownloadStatus(menu, videoUi('video.reading'));
-      }, 2000);
-      let feedback = '';
-      let feedbackDelay = 2400;
-      try {
-        const result = await downloads.resolve();
-        downloadSubtitleSrt(result.cues, result.languageCode);
-        feedback = videoUi('video.downloaded', {count: result.cues.length});
-      } catch (error) {
-        feedback = getVideoSubtitleDownloadErrorMessage(error, getVideoUiLanguage(config.uiLanguage));
-        feedbackDelay = 3200;
-        console.warn('[FluentRead] 字幕下载失败', error);
-      } finally {
-        window.clearTimeout(slowFeedbackTimer);
-        downloadButton.removeAttribute('aria-busy');
-        setVideoMenuDownloadStatus(menu, feedback, feedbackDelay);
-        downloads.restoreButton(downloadButton, feedbackDelay);
-      }
+      await downloads.original(menu, target as HTMLButtonElement,
+        error => getVideoSubtitleDownloadErrorMessage(error, getVideoUiLanguage(config.uiLanguage)));
       return;
     }
     if (target.dataset.action === 'download-translated-subtitles' || target.dataset.action === 'download-bilingual-subtitles') {
+      syncPretranslationConfig();
       await downloads.translated(menu, target as HTMLButtonElement, target.dataset.action === 'download-bilingual-subtitles');
       return;
     }
@@ -1366,7 +1354,8 @@ export function mountVideoSubtitleTranslation(): () => void {
     if (event.key !== 'Escape' || !menuElement || menuElement.hidden) return;
     event.preventDefault();
     event.stopPropagation();
-    // 模型确认视图先退回主菜单，再按一次才关闭整个菜单。
+    // 导出/模型确认先退回原菜单，再按一次才关闭整个菜单。
+    if (menuElement.dataset.view === 'export-prompt') { downloads.cancel(); return; }
     if (menuElement && !menuElement.hidden && isVideoModelPromptOpen(menuElement)) {
       aiModelMenu.finish(menuElement, false);
     } else if (menuElement.dataset.panel === 'tools') {

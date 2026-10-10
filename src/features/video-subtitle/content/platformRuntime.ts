@@ -1,13 +1,14 @@
 /**
  * @file src/features/video-subtitle/content/platformRuntime.ts
  * 文件职责：在会议、Udemy 与 Disney+ 网页中挂载隔离的双语字幕，复用现有视频配置及翻译缓存。
- * 主要内容：观察原生字幕、读取浏览器字幕轨、自动开启明确的会议字幕按钮、优先目标语言人工轨；处理显示切换、失败重试、全屏、动态页面与所有权恢复。
+ * 主要内容：观察原生字幕、读取浏览器字幕轨、自动开启明确的会议字幕按钮、优先目标语言人工轨；处理显示切换、失败重试、全屏、动态页面、大字号高度适配与所有权恢复。
  * 模块边界：只通过注入端口读取配置、翻译和保存设置，不采集音频、不访问账号接口，不修改网站播放器实现。
  */
 import type {Config} from '@/src/core/config/model';
 import {getVideoSubtitleAppearanceCssVars} from '@/src/core/config/videoSubtitleAppearance';
 import {getVideoTranslationConfigFingerprint, normalizeVideoCaptionText} from './subtitleLogic';
 import {VideoTranslationCache} from './translationCache';
+import {fitVideoSubtitleFontSize} from './subtitleLayout';
 import {isVideoSubtitleInTargetLanguage} from './subtitleLanguage';
 import {chooseTargetHumanCaptionTrack, getCaptionPlatform, isMeetingCaptionPlatform, PLATFORM_CAPTION_SELECTORS, findCaptionEnableButton, findTeamsCaptionMenuStep, captionLanguageMatch} from './platforms';
 
@@ -106,7 +107,7 @@ export function mountPlatformCaptions(ports: PlatformCaptionPorts): () => void {
         host.style.cssText = 'all:initial!important;position:fixed!important;z-index:2147483646!important;pointer-events:none!important;box-sizing:border-box!important;';
         const shadow = host.attachShadow({mode: 'open'});
         const style = document.createElement('style');
-        style.textContent = `:host([hidden]){display:none!important}*{box-sizing:border-box}.panel{font-family:var(--fluent-read-video-subtitle-font-family);text-align:center;line-height:var(--fluent-read-video-subtitle-line-spacing);font-size:calc(20px * var(--fluent-read-video-subtitle-font-scale) / 100%);text-shadow:var(--fluent-read-video-subtitle-text-shadow);background:var(--fluent-read-video-subtitle-background);border-radius:8px;padding:8px 12px;white-space:pre-wrap;overflow-wrap:anywhere;max-height:45vh;overflow:hidden}.source{color:var(--fluent-read-video-subtitle-text-color)}.translation{color:var(--fluent-read-video-subtitle-translation-color)}.tools{display:flex;justify-content:center;gap:8px;margin-top:4px;opacity:.8;pointer-events:auto}select,button{font:12px system-ui;color:#fff;background:#17222e;border:1px solid #8c98a5;border-radius:5px;padding:3px 7px}select:focus-visible,button:focus-visible{outline:2px solid #ffe45c}[hidden]{display:none!important}`;
+        style.textContent = `:host([hidden]){display:none!important}*{box-sizing:border-box}.panel{font-family:var(--fluent-read-video-subtitle-font-family);text-align:center;line-height:var(--fluent-read-video-subtitle-line-spacing);font-size:20px;text-shadow:var(--fluent-read-video-subtitle-text-shadow);background:var(--fluent-read-video-subtitle-background);border-radius:8px;padding:8px 12px;white-space:pre-wrap;overflow-wrap:anywhere;max-height:45vh;overflow:hidden}.source{color:var(--fluent-read-video-subtitle-text-color)}.translation{color:var(--fluent-read-video-subtitle-translation-color)}.tools{display:flex;justify-content:center;gap:8px;margin-top:4px;opacity:.8;pointer-events:auto}select,button{font:12px system-ui;color:#fff;background:#17222e;border:1px solid #8c98a5;border-radius:5px;padding:3px 7px}select:focus-visible,button:focus-visible{outline:2px solid #ffe45c}[hidden]{display:none!important}`;
         const panel = document.createElement('div');
         panel.className = 'panel';
         panel.setAttribute('role', 'region');
@@ -209,12 +210,17 @@ export function mountPlatformCaptions(ports: PlatformCaptionPorts): () => void {
         host.style.setProperty('left', `${left}px`, 'important'); host.style.setProperty('width', `${width}px`, 'important');
         const position = config.videoSubtitleAppearance.position;
         host.style.setProperty('top', `${top + height * (position === 'top' ? .08 : position === 'center' ? .5 : 1 - Math.max(.08, config.videoSubtitleAppearance.bottomOffset / 100))}px`, 'important');
-        host.style.setProperty('transform', position === 'top' ? 'none' : 'translateY(-100%)', 'important');
+        host.style.setProperty('transform', position === 'top' ? 'none' : position === 'center' ? 'translateY(-50%)' : 'translateY(-100%)', 'important');
         host.hidden = false;
         mode.value = config.videoSubtitleDisplayMode;
         sourceLine.hidden = config.videoSubtitleDisplayMode === 'translation-only';
-        sourceLine.parentElement!.style.fontSize = `${20 * config.videoSubtitleAppearance.fontScale / 100}px`;
+        const panel = sourceLine.parentElement!;
+        const maximumHeight = Math.max(24, height * (position === 'center' ? .9 : .84));
+        panel.style.maxHeight = `${maximumHeight}px`;
+        const fit = () => fitVideoSubtitleFontSize(20 * config.videoSubtitleAppearance.fontScale / 100, maximumHeight,
+            size => { panel.style.fontSize = `${size}px`; }, () => panel.scrollHeight);
         sourceLine.textContent = source;
+        fit();
         nodes.forEach(node => {
             if (!captionVisibility.has(node)) captionVisibility.set(node, {value: node.style.getPropertyValue('visibility'), priority: node.style.getPropertyPriority('visibility')});
             node.style.setProperty('visibility', 'hidden', 'important');
@@ -229,6 +235,7 @@ export function mountPlatformCaptions(ports: PlatformCaptionPorts): () => void {
         const show = (text: string) => {
             if (disposed || current !== generation || !translatedLine) return;
             translatedLine.textContent = text === source && config.videoSubtitleDisplayMode === 'bilingual' ? '' : text;
+            fit();
         };
         if (human) { show(human); return; }
         void cache.request(source).then(show).catch(() => {

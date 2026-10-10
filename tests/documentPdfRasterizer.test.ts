@@ -1,5 +1,5 @@
 import {afterEach, beforeEach, describe, expect, it, vi} from 'vitest';
-import {createPdfPagePreview, paintPdfTranslation, rasterizePdfReadingPages, rasterizePdfTranslationPage} from '@/src/features/document-translation/ui/pdfPreview';
+import {createPdfPagePreview, paintPdfTranslation, rasterizePdfReadingPages, rasterizePdfTranslationPage, renderPdfReadingPages} from '@/src/features/document-translation/ui/pdfPreview';
 import type {ParsedDocument} from '@/src/features/document-translation/core/document';
 
 const pdf = vi.hoisted(() => ({width: 600, height: 800, render: vi.fn(), cleanup: vi.fn()}));
@@ -56,6 +56,54 @@ beforeEach(() => {
     }});
 });
 afterEach(() => vi.unstubAllGlobals());
+
+describe('PDF visible-text renderer resource lifecycle', () => {
+    const text = {kind: 'text' as const, id: 't', pageNumber: 1, segmentIndex: 0, role: 'paragraph',
+        source: 'source', text: '中文可复制。'.repeat(1000), translated: true, sourceRect: {x: 20, y: 30, width: 100, height: 20}};
+    const region = {kind: 'region' as const, id: 'r', pageNumber: 1, role: 'figure', segmentIndexes: [],
+        sourceRect: {x: 20, y: 30, width: 100, height: 750}};
+    const rendererInput = (regions = true) => ({...input(), measureText: (value: string) => value.length * 12,
+        plan: {pageNumber: 1, hasTranslation: true, entries: regions ? [region, text] : [text]},
+    });
+
+    it('does not create Canvas or rasterize any text for text-only continuation pages', async () => {
+        const pages = [];
+        for await (const page of renderPdfReadingPages(rendererInput(false))) pages.push(page);
+        expect(pages.length).toBeGreaterThan(1);
+        expect(pages.every(page => !page.regionImage && page.items.every(item => item.kind === 'text'))).toBe(true);
+        expect(canvases).toHaveLength(0);
+        expect(pdf.render).not.toHaveBeenCalled();
+    });
+
+    it('keeps two bounded canvases for many continuation pages and releases pixel memory', async () => {
+        const pages = [];
+        for await (const page of renderPdfReadingPages(rendererInput())) pages.push(page);
+        expect(pages.length).toBeGreaterThan(4);
+        expect(pages.some(page => page.regionImage)).toBe(true);
+        expect(pages.some(page => page.items.some(item => item.kind === 'text'))).toBe(true);
+        expect(canvases).toHaveLength(2);
+        expect(canvases.every(canvas => canvas.width === 0 && canvas.height === 0)).toBe(true);
+        expect(paintedTextCountsAtEncoding.every(count => count === 0)).toBe(true);
+        expect(sizes.every(([width, height]) => width === 1224 && height === 1584)).toBe(true);
+        expect(pdf.cleanup).toHaveBeenCalledOnce();
+    });
+
+    it.each(['break', 'cancel', 'encoding failure'] as const)('releases source and region canvases after %s', async reason => {
+        const controller = new AbortController();
+        const run = async () => {
+            if (reason === 'encoding failure') failEncoding = true;
+            for await (const _page of renderPdfReadingPages({...rendererInput(), signal: controller.signal})) {
+                if (reason === 'break') break;
+                controller.abort(new Error('Canceled region export'));
+            }
+        };
+        if (reason === 'cancel') await expect(run()).rejects.toThrow('Canceled region export');
+        else if (reason === 'encoding failure') await expect(run()).rejects.toThrow('无法生成');
+        else await run();
+        expect(canvases).toHaveLength(2);
+        expect(canvases.every(canvas => canvas.width === 0 && canvas.height === 0)).toBe(true);
+    });
+});
 
 describe('PDF translation painter rotated geometry', () => {
     const block = {segmentIndex: 0, x: 10, y: 20, width: 30, height: 40, fontSize: 12, lineHeight: 12, lineCount: 1, fontFamily: 'sans-serif', fontWeight: 400 as const, textAlign: 'left' as const};

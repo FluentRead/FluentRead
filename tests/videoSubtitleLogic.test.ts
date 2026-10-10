@@ -209,6 +209,14 @@ describe('video subtitle logic', () => {
     await expect(translateVideoSubtitleCues(cues, async text => `译-${text.trim()}`, {concurrency: 2, onProgress: n => progress.push(n)})).resolves.toEqual([{...cues[0], text: '译-a'}, {...cues[1], text: '译-a'}, {...cues[2], text: '译-b'}]);
     expect(progress).toEqual([0, 1, 2]);
   });
+  it('配置指纹保留免费回退与 Minimax、Mimo、DeepL 计费地区身份', () => {
+    const config = new Config();
+    const identities = ['free', 'minimax', 'mimo', 'deepl'].map(service => {
+      config.videoService = service as Config['videoService'];
+      return getVideoTranslationConfigFingerprint(config);
+    });
+    expect(new Set(identities).size).toBe(4);
+  });
 
   it('空时间轴直接返回，空白 cue 保留原文', async () => {
     await expect(translateVideoSubtitleCues([], async text => text)).resolves.toEqual([]);

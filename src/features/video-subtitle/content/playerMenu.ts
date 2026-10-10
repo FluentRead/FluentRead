@@ -612,6 +612,7 @@ function renderModelOption(option: VideoModelPromptOption, state: VideoModelProm
 export function renderVideoModelPrompt(menu: HTMLElement, state: VideoModelPromptState | null, language: UiLanguage): void {
     const prompt = menu.querySelector<HTMLElement>('[data-model-prompt]');
     if (!prompt) return;
+    if (menu.dataset.view === 'export-prompt' && !state) return;
     const main = menu.querySelector<HTMLElement>('.fluent-read-video-menu-main')!;
     menu.querySelector<HTMLElement>('[data-action="select-ai-model"]')?.setAttribute('aria-expanded', String(state?.purpose === 'selection'));
     if (!state) {
@@ -680,7 +681,7 @@ export function syncVideoPlayerMenuLayout(menu: HTMLElement): void {
     const height = player.clientHeight;
     if (!width || !height) return;
     // X 观看首页已精简，不再因为少量说明把菜单拉成 440px 的横向面板。
-    if (menu.dataset.compact === 'true' && menu.dataset.panel === 'watch' && menu.dataset.view !== 'model-prompt') {
+    if (menu.dataset.compact === 'true' && menu.dataset.panel === 'watch' && menu.dataset.view === 'main') {
         menu.dataset.layout = 'stack';
         return;
     }

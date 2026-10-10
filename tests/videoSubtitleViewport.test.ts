@@ -258,4 +258,22 @@ describe('X video subtitle viewport', () => {
     expect(document.getElementById(VIDEO_TRANSLATION_LAYER_ID)).toBeNull();
     expect(document.getElementById(VIDEO_TRANSLATION_OVERLAY_ID)).toBeNull();
   });
+  it('500% 长双语字幕按可见画面适配，换短句后恢复请求字号', () => {
+    const {document, layer} = fixture({intrinsic: [1080, 1920], objectFit: 'contain'});
+    config.videoSubtitleAppearance = {...DEFAULT_VIDEO_SUBTITLE_APPEARANCE, fontScale: 500};
+    const panel = document.createElement('div'); panel.id = VIDEO_SUBTITLE_PANEL_ID;
+    const overlay = document.createElement('div'); overlay.id = VIDEO_TRANSLATION_OVERLAY_ID; overlay.textContent = 'Long bilingual subtitle';
+    panel.appendChild(overlay); layer.appendChild(panel);
+    let lines = 20;
+    Object.defineProperty(panel, 'scrollHeight', {get: () => Number.parseFloat(panel.style.getPropertyValue('--fluent-read-video-subtitle-font-size')) * lines + 16});
+    const container = document.createElement('div'); document.body.appendChild(container);
+    syncTranslationOverlayPosition(container);
+    const requested = 16 * 5;
+    expect(Number.parseFloat(panel.style.getPropertyValue('--fluent-read-video-subtitle-font-size'))).toBeLessThan(requested);
+    expect(panel.scrollHeight).toBeLessThanOrEqual(Number.parseFloat(panel.style.getPropertyValue('max-height')));
+    lines = 2; overlay.textContent = 'Short'; syncTranslationOverlayPosition(container);
+    expect(panel.style.getPropertyValue('--fluent-read-video-subtitle-font-size')).toBe(`${requested}px`);
+    expect(config.videoSubtitleAppearance.fontScale).toBe(500);
+  });
+
 });

@@ -1,7 +1,7 @@
 /**
  * @file src/features/full-page-translation/content/state.ts
  * 文件职责：维护每个被翻译 DOM 节点的可恢复状态、请求代次、译文工件和共享布局覆盖所有权，确保重复翻译、宿主变更和移除节点都能安全收敛。
- * 主要内容：包含 WeakMap 状态索引、begin/complete/error/discard 状态机、spinner/译文/retry/仅译文槽节点登记、无主槽原文解包、兼容字体标记与链接提示的译文复验及有界重挂、离线模板仅省略外层属性自比较并保留内容与复制工件复验、已提交译文的前后位置及骨架重放换行快照、含固定高度 line-clamp 的共享样式租约、同批布局与来源保护读数复用及写入失效（释放最后一个旧祖先租约也立即失效）、祖先观察器引用计数、文本槽回写、按钮型 input 标签属性的原值记录与回滚、逐父节点单次读取子列表的移除子树所有者枚举，以及沿用当前 owner 快照并保护各滚动面的全量恢复。
+ * 主要内容：包含 WeakMap 状态索引、begin/complete/error/discard 状态机、spinner/译文/retry/仅译文槽节点登记、无主槽原文解包、兼容字体标记与链接提示的译文复验及有界重挂、离线模板仅省略外层属性自比较并保留内容与复制工件复验、已提交译文的前后位置及骨架重放换行快照、含固定高度 line-clamp 的共享样式租约、同批布局与来源保护读数复用及写入失效（释放最后一个旧祖先租约也立即失效）、祖先观察器引用计数、文本槽回写、按钮型 input 标签属性的原值记录与回滚、逐父节点单次读取子列表的移除子树所有者枚举、按真实状态变更发布增量阶段通知，以及沿用当前 owner 快照并保护各滚动面的全量恢复。
  * 模块边界：该模块不发现候选、不请求翻译也不生成译文 HTML；runtime 负责会话编排，renderer 负责内容创建，本文件仅拥有 DOM 状态与可逆样式资源，避免跨 session 误删新结果。
  */
 import {getTranslatableControlValueAttribute, isTranslationTooltip} from "@/src/core/translation/dom";
@@ -476,6 +476,20 @@ function hasTranslationTooltip(node: HTMLElement): boolean {
     return false;
 }
 
+type TranslationStateChangeListener = (node: HTMLElement, state: TranslationState | undefined) => void;
+const translationStateChangeListeners = new Set<TranslationStateChangeListener>();
+
+/** 仅交付成功的状态变更，供全文会话增量计数；取消订阅后不再持有页面运行时。 */
+export function subscribeTranslationStateChanges(listener: TranslationStateChangeListener): () => void {
+    translationStateChangeListeners.add(listener);
+    return () => { translationStateChangeListeners.delete(listener); };
+}
+function notifyTranslationStateChange(node: HTMLElement, state: TranslationState | undefined): void {
+    for (const listener of translationStateChangeListeners) {
+        try { listener(node, state); } catch { /* 展示订阅异常不能阻断恢复原文。 */ }
+    }
+}
+
 /**
  * 开始一次新的节点翻译请求。
  * loading 状态不能重复发起请求；error 状态可以被调用方先恢复后重试。
@@ -549,6 +563,7 @@ export function beginTranslation(
     states.set(node, state);
     trackActiveNode(node);
     refreshOwnershipIndex(node, state);
+    notifyTranslationStateChange(node, state);
     return { state, generation: state.generation };
 }
 
@@ -603,6 +618,7 @@ function transitionPhase(
     state.settledSpinner = state.spinner;
     state.spinner = undefined;
     refreshOwnershipIndex(node, state);
+    notifyTranslationStateChange(node, state);
     return true;
 }
 
@@ -1753,6 +1769,7 @@ function clearState(node: HTMLElement): void {
     const ref = activeRefsByNode.get(node);
     if (ref) activeNodeRefs.delete(ref);
     activeRefsByNode.delete(node);
+    notifyTranslationStateChange(node, undefined);
 }
 
 function unwrapSyntheticSegment(node: HTMLElement, state: TranslationState): void {

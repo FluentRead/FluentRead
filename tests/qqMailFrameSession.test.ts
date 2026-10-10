@@ -61,9 +61,132 @@ describe('QQ mail frame session snapshots', () => {
 
     it('lets the newest refresh win and prevents pending work after suspend/dispose', async () => {
         const first = deferred<unknown>(); const second = deferred<unknown>(); const deps = {readState: vi.fn().mockReturnValueOnce(first.promise).mockReturnValueOnce(second.promise), isEnabled: vi.fn(() => true), setAvailable: vi.fn(), start: vi.fn(), restore: vi.fn()}; const c = createFrameSessionController(deps);
-        const a = c.refresh(); const b = c.refresh(); first.resolve(state({revision: 1})); second.resolve(state({revision: 2})); await Promise.all([a, b]); expect(deps.start).toHaveBeenCalledTimes(1); expect(deps.start).toHaveBeenCalledWith(expect.objectContaining({revision: 2}));
-        const pending = deferred<unknown>(); deps.readState.mockReturnValueOnce(pending.promise); const stale = c.refresh(); c.suspend(); pending.resolve(state({revision: 9})); await stale; expect(deps.start).toHaveBeenCalledTimes(1);
-        const disposed = deferred<unknown>(); deps.readState.mockReturnValueOnce(disposed.promise); const late = c.refresh(); c.dispose(); disposed.resolve(state({revision: 10})); await late; expect(deps.setAvailable).toHaveBeenLastCalledWith(false);
+        const a = c.refresh(); await Promise.resolve(); const b = c.refresh(); first.resolve(state({revision: 1})); second.resolve(state({revision: 2})); await Promise.all([a, b]); expect(deps.start).toHaveBeenCalledTimes(1); expect(deps.start).toHaveBeenCalledWith(expect.objectContaining({revision: 2}));
+        const pending = deferred<unknown>(); deps.readState.mockReturnValueOnce(pending.promise); const stale = c.refresh(); await Promise.resolve(); c.suspend(); pending.resolve(state({revision: 9})); await stale; expect(deps.start).toHaveBeenCalledTimes(1);
+        const disposed = deferred<unknown>(); deps.readState.mockReturnValueOnce(disposed.promise); const late = c.refresh(); await Promise.resolve(); c.dispose(); disposed.resolve(state({revision: 10})); await late; expect(deps.setAvailable).toHaveBeenLastCalledWith(false);
         await c.refresh(); expect(deps.readState).toHaveBeenCalledTimes(4);
+    });
+
+    it('coalesces a burst of frame notifications into one in-flight read and one fresh follow-up', async () => {
+        const first = deferred<unknown>();
+        const latest = deferred<unknown>();
+        const deps = {readState: vi.fn().mockReturnValueOnce(first.promise).mockReturnValue(latest.promise),
+            isEnabled: vi.fn(() => true), setAvailable: vi.fn(), start: vi.fn(), restore: vi.fn()};
+        const c = createFrameSessionController(deps);
+        const tasks = [c.refresh()];
+        await Promise.resolve();
+        for (let index = 0; index < 20; index += 1) tasks.push(c.refresh());
+        expect(deps.readState).toHaveBeenCalledOnce();
+        first.resolve(state({revision: 1}));
+        await Promise.resolve(); await Promise.resolve();
+        expect(deps.start).not.toHaveBeenCalled();
+        expect(deps.readState).toHaveBeenCalledTimes(2);
+        latest.resolve(state({revision: 2}));
+        await Promise.all(tasks);
+        expect(deps.start).toHaveBeenCalledOnce();
+        expect(deps.start).toHaveBeenCalledWith(expect.objectContaining({revision: 2}));
+    });
+
+    it('does not read authorization while disabled, and a new activation is not held by an old read', async () => {
+        const old = deferred<unknown>();
+        const deps = {readState: vi.fn().mockReturnValueOnce(old.promise).mockResolvedValue(state({revision: 2})),
+            isEnabled: vi.fn(() => false), setAvailable: vi.fn(), start: vi.fn(), restore: vi.fn()};
+        const c = createFrameSessionController(deps);
+        await c.refresh();
+        expect(deps.readState).not.toHaveBeenCalled();
+        deps.isEnabled.mockReturnValue(true);
+        const stale = c.refresh();
+        await Promise.resolve();
+        c.suspend();
+        await c.refresh();
+        expect(deps.start).toHaveBeenCalledWith(expect.objectContaining({revision: 2}));
+        old.resolve(state({revision: 1})); await stale;
+        expect(deps.start).toHaveBeenCalledOnce();
+    });
+
+    it('does not start a stale session if restoring DOM synchronously suspends the frame', async () => {
+        const deps = {readState: vi.fn(async () => state()), isEnabled: vi.fn(() => true),
+            setAvailable: vi.fn(), start: vi.fn(), restore: vi.fn()};
+        const c = createFrameSessionController(deps);
+        deps.restore.mockImplementationOnce(() => c.suspend());
+        await c.refresh();
+        expect(deps.start).not.toHaveBeenCalled();
+        expect(deps.setAvailable).toHaveBeenLastCalledWith(false);
+        await c.refresh();
+        expect(deps.start).toHaveBeenCalledOnce();
+    });
+
+    it('does not send a queued state read if the short-lived frame was already disposed', async () => {
+        const deps = {readState: vi.fn(async () => state()), isEnabled: vi.fn(() => true),
+            setAvailable: vi.fn(), start: vi.fn(), restore: vi.fn()};
+        const c = createFrameSessionController(deps);
+        const queued = c.refresh(); c.dispose();
+        await queued;
+        expect(deps.readState).not.toHaveBeenCalled();
+        expect(deps.start).not.toHaveBeenCalled();
+    });
+
+    it('settles frame initialization on suspend without waiting for an abandoned authorization response', async () => {
+        const abandoned = deferred<unknown>();
+        const deps = {readState: vi.fn(() => abandoned.promise), isEnabled: vi.fn(() => true),
+            setAvailable: vi.fn(), start: vi.fn(), restore: vi.fn()};
+        const c = createFrameSessionController(deps);
+        const initializing = c.refresh();
+        await Promise.resolve();
+        let settled = false;
+        void initializing.then(() => { settled = true; });
+        c.suspend();
+        for (let tick = 0; tick < 12; tick += 1) await Promise.resolve();
+        expect(settled).toBe(true);
+        abandoned.resolve(state());
+        await initializing;
+        expect(deps.start).not.toHaveBeenCalled();
+    });
+
+    it.each(['enabled', 'availability', 'restore'] as const)('a synchronous %s refresh commits only the newly read revision', async phase => {
+        const deps = {readState: vi.fn().mockResolvedValueOnce(state({revision: 1})).mockResolvedValue(state({revision: 2})),
+            isEnabled: vi.fn(() => true), setAvailable: vi.fn(), start: vi.fn(), restore: vi.fn()};
+        const c = createFrameSessionController(deps);
+        const refresh = () => { void c.refresh(); };
+        if (phase === 'enabled') deps.isEnabled.mockImplementationOnce(() => true).mockImplementationOnce(() => { refresh(); return true; });
+        else if (phase === 'availability') deps.setAvailable.mockImplementationOnce(refresh);
+        else deps.restore.mockImplementationOnce(refresh);
+        await c.refresh();
+        expect(deps.readState).toHaveBeenCalledTimes(2);
+        expect(deps.start).toHaveBeenCalledOnce();
+        expect(deps.start).toHaveBeenCalledWith(expect.objectContaining({revision: 2}));
+    });
+
+    it.each(['read', 'enabled', 'availability'] as const)('synchronous %s invalidation prevents frame reactivation', async phase => {
+        const deps = {readState: vi.fn(async () => state()), isEnabled: vi.fn(() => true),
+            setAvailable: vi.fn(), start: vi.fn(), restore: vi.fn()};
+        const c = createFrameSessionController(deps);
+        if (phase === 'read') deps.readState.mockImplementationOnce(() => { c.dispose(); return Promise.resolve(state()); });
+        else if (phase === 'enabled') deps.isEnabled.mockImplementationOnce(() => true).mockImplementationOnce(() => { c.dispose(); return true; });
+        else deps.setAvailable.mockImplementationOnce(() => c.dispose());
+        await c.refresh();
+        expect(deps.start).not.toHaveBeenCalled();
+        expect(deps.setAvailable).toHaveBeenLastCalledWith(false);
+    });
+
+    it('synchronous authorization transport failure clears availability and permits a later retry', async () => {
+        const deps = {readState: vi.fn(async () => state()), isEnabled: vi.fn(() => true),
+            setAvailable: vi.fn(), start: vi.fn(), restore: vi.fn()};
+        const c = createFrameSessionController(deps);
+        deps.readState.mockImplementationOnce(() => { throw new Error('Extension message port disappeared'); });
+        await c.refresh();
+        expect(deps.setAvailable).toHaveBeenLastCalledWith(false);
+        await c.refresh();
+        expect(deps.start).toHaveBeenCalledOnce();
+    });
+
+    it('enabled-state evaluation can synchronously dispose initialization before any transport is opened', async () => {
+        const deps = {readState: vi.fn(async () => state()), isEnabled: vi.fn(() => true),
+            setAvailable: vi.fn(), start: vi.fn(), restore: vi.fn()};
+        const c = createFrameSessionController(deps);
+        deps.isEnabled.mockImplementationOnce(() => { c.dispose(); return true; });
+        await c.refresh();
+        expect(deps.readState).not.toHaveBeenCalled();
+        expect(deps.start).not.toHaveBeenCalled();
     });
 });

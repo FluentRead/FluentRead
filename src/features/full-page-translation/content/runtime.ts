@@ -1,7 +1,7 @@
 /**
  * @file src/features/full-page-translation/content/runtime.ts
  * 文件职责：实现全文翻译的页面级会话引擎，负责候选发现、可见性调度、批量请求、动态 DOM 重扫、失败重试、缓存复用和恢复原文。
- * 主要内容：相同译文保留原文且不重复展示；维护 FullPageSession、AbortController、Intersection/Mutation 观察器、弹窗优先调度、精确属性写入过滤、候选所有权和生命周期重试；对变化来源等待安静窗口、跳过持续变化的计数，并清理延迟重扫，只有真实宿主删除启动候选回收，同批重复属性变化只处理一次；按时间片派发并在全文结果提交前让出主线程，合并同段 DOM 写入并在重挂时复用同批布局读数与单文本来源快照；已拥有状态的发现候选直接登记复验，取消记录命中后才提取原文，避免整批重扫重复计算熔断签名；按阅读进度撤回离开预取区的待派发候选，冻结请求/展示配置与识别范围，在弹窗关闭后继续正文，按实际节点阶段发布进度及工具栏结果；悬浮调用冻结独立服务且保留快捷方案覆盖优先级；同目标预检单独读取受保护规则约束的行内代码语言上下文，发送与渲染仍只使用可翻译文本槽；向局部翻译开放单候选 translateTarget 与单个译文所有者的恢复入口。
+ * 主要内容：相同译文保留原文且不重复展示；以增量计数发布完成与失败摘要，仅对本会话失败目标重试和定位；维护 FullPageSession、AbortController、Intersection/Mutation 观察器、弹窗优先调度、精确属性写入过滤、候选所有权和生命周期重试；对变化来源等待安静窗口、跳过持续变化的计数，并清理延迟重扫，只有真实宿主删除启动候选回收，同批重复属性变化只处理一次；按时间片派发并在全文结果提交前让出主线程，合并同段 DOM 写入并在重挂时复用同批布局读数与单文本来源快照；已拥有状态的发现候选直接登记复验，取消记录命中后才提取原文，避免整批重扫重复计算熔断签名；按阅读进度撤回离开预取区的待派发候选，冻结请求/展示配置与识别范围，在弹窗关闭后继续正文，按实际节点阶段发布进度及工具栏结果；悬浮调用冻结独立服务且保留快捷方案覆盖优先级；同目标预检单独读取受保护规则约束的行内代码语言上下文，发送与渲染仍只使用可翻译文本槽；向局部翻译开放单候选 translateTarget 与单个译文所有者的恢复入口。
  * 模块边界：这是 content 侧编排层，不实现 provider 协议、纯候选算法或底层状态存储；翻译调用经 app client，发现规则来自 core/translation，渲染与状态分别交给 renderer、liveTextRender 和 state。
  */
 import {resolveTranslationToolbarStatus, countFullPageTranslationWork} from '../toolbarStatus';
@@ -42,6 +42,8 @@ import {
     startFullPageTranslationProgress,
     updateFullPageTranslationProgress,
 } from '@/src/features/full-page-translation/progress';
+import {createFullPageOutcomeRegistry} from '../core/outcomes';
+import {bindFullPageOutcomeRecovery, getFullPageOutcomeSummary, getFullPageModalOutcomePhases, registerFullPageOutcomeTarget} from './outcomeSession';
 import {
     appendBilingualTranslation,
     materializeCandidate,
@@ -96,7 +98,7 @@ import {
     withFullPageViewportAnchor,
     type FullPageScrollController,
 } from '@/src/features/full-page-translation/content/viewportStability';
-import {clearFullPageQueueState, createFullPageQueueState, noteFullPageScroll, queueFullPageCandidate, removeFullPagePending, createFullPageDispatchPlan, type FullPageQueueState, type FullPageDispatchPlan} from '@/src/features/full-page-translation/content/fullPageQueue';
+import {clearFullPageQueueState, createFullPageQueueState, noteFullPageScroll, queueFullPageCandidate, queueFullPageFailedCandidate, removeFullPagePending, createFullPageDispatchPlan, type FullPageQueueState, type FullPageDispatchPlan} from '@/src/features/full-page-translation/content/fullPageQueue';
 import {FULL_PAGE_PREFETCH_MARGIN_PX} from '@/src/features/full-page-translation/content/fullPagePriority';
 import {
     createLifecycleRetry, sameLifecycleRetry, createAcceptedUnchangedCompletion, readAcceptedUnchangedCompletion,
@@ -150,6 +152,8 @@ interface FullPageSession extends FullPageRequestSessionState, ModalPrioritySess
     translationConfig: FullPageTranslationConfigSnapshot;
     progressSessionId: number;
     progressPublishScheduled: boolean;
+    outcomes: ReturnType<typeof createFullPageOutcomeRegistry<HTMLElement>>;
+    unsubscribeOutcomeChanges: () => void;
     observer: IntersectionObserver;
     mutationObserver: MutationObserver;
     shadowEventController: AbortController;
@@ -236,18 +240,15 @@ function scheduleFullPageProgressPublish(session: FullPageSession): void {
         }
         const work = countFullPageTranslationWork(session.inFlightCandidates, scheduled, pending);
         const deferred = session.scheduled.size - scheduled.size;
+        const outcomes = getFullPageOutcomeSummary(session);
         const busy = work.running > 0 || work.queued > 0;
-        // 惰性产出阶段：整页译文可达数千个，而 busy 或首个 loading 都会让
-        // resolveTranslationToolbarStatus 立即短路，不应为此预先分配整张数组。
-        const status = resolveTranslationToolbarStatus(busy, (function* () {
-            for (const target of session.statefulTargetsByAncestor.get(document.documentElement) ?? []) {
-                yield target.isConnected && eligible(target) ? getTranslationState(target)?.phase ?? '' : '';
-            }
-        })());
+        // 普通页面直接用增量摘要；弹窗仅惰性检查其内部目标，不预先分配整页数组。
+        const status = resolveTranslationToolbarStatus(busy, !modal ? outcomes.phases : getFullPageModalOutcomePhases(
+            session, session.statefulTargetsByAncestor.get(document.documentElement) ?? [], getTranslationInvocationIdentity(session.translationConfig)));
         notifyTranslationToolbarStatus(session.modal && status === 'translated' ? 'idle' : status);
         const modalPhase = session.modal ? busy ? 'translating' : 'waiting' : 'none';
         syncModalTranslationHint(session.modal, modalPhase, config.translationProgressPanelEnabled === true);
-        updateFullPageTranslationProgress(session.progressSessionId, {...work, deferred, modalPhase});
+        updateFullPageTranslationProgress(session.progressSessionId, {...work, deferred, modalPhase, completed: outcomes.completed, failed: outcomes.failed, retryable: outcomes.retryable});
     });
 }
 
@@ -364,20 +365,26 @@ function markFailedTranslation(
             attemptNode: node,
         };
     }
+    const retryIsCurrent = () => node.isConnected && getTranslationState(node) === attempt.state && attempt.state.phase === 'error'
+        && (!owner || owner.active && fullPageSession === owner);
+    const retry = (): boolean => {
+        if (!retryIsCurrent()) return false;
+        if (owner) return queueFullPageFailedCandidate(owner, candidate, attempt.state.sourceText,
+            () => { scheduleFullPageProgressPublish(owner); scheduleFullPageDrain(owner); }, retryIsCurrent);
+        const retrySnapshot = snapshot?.requestOverridesApplied ? snapshot : undefined;
+        void translateTarget(candidate,
+            retrySnapshot?.displayMode ?? (config.display === styles.bilingualTranslation ? "bilingual" : "single"),
+            false, undefined, retrySnapshot, true);
+        return true;
+    };
     const retryWrapper = withFullPageViewportAnchor(() => {
         spinner?.remove();
-        return insertFailedTip(
-            node,
-            error instanceof Error ? error.message : String(error || "翻译失败"),
-            () => {
-                const retryOwner = owner?.active ? owner : undefined;
-                const retrySnapshot = snapshot?.requestOverridesApplied ? snapshot : undefined;
-                void translateTarget(candidate,
-                    retryOwner?.translationConfig.displayMode ?? retrySnapshot?.displayMode ?? (config.display === styles.bilingualTranslation ? "bilingual" : "single"),
-                    false, retryOwner, retrySnapshot, true);
-            },
-        );
+        return insertFailedTip(node, error instanceof Error ? error.message : String(error || "翻译失败"), retry);
     }, [node]);
+    if (owner?.active) {
+        owner.outcomes.setRetry(node, retry);
+        scheduleFullPageProgressPublish(owner);
+    }
     setRetryWrapper(node, retryWrapper);
     setRenderedStyleAttribute(node);
     return {status: "failed"};
@@ -558,8 +565,9 @@ function removeCandidateOwnerKey(session: FullPageSession, owner: HTMLElement, k
     if (keys?.size === 0) session.candidateOwnerKeys.delete(owner);
 }
 
-function unregisterSessionStatefulTarget(session: FullPageSession | undefined, target: HTMLElement): void {
+function unregisterSessionStatefulTarget(session: FullPageSession | undefined, target: HTMLElement, preserveOutcome = false): void {
     if (!session) return;
+    if (!preserveOutcome) session.outcomes.update(target);
     const ancestors = session.statefulAncestorsByTarget.get(target);
     if (!ancestors) return;
     scheduleFullPageProgressPublish(session);
@@ -621,7 +629,7 @@ function registerSessionStatefulTarget(
     target: HTMLElement,
 ): void {
     if (!session?.active) return;
-    unregisterSessionStatefulTarget(session, target);
+    unregisterSessionStatefulTarget(session, target, true);
     const ancestors: Element[] = [];
     let current: Element | null = candidateOwner;
     let depth = 0;
@@ -637,6 +645,7 @@ function registerSessionStatefulTarget(
         current = getComposedParent(current);
     }
     session.statefulAncestorsByTarget.set(target, ancestors);
+    registerFullPageOutcomeTarget(session, target, getTranslationInvocationIdentity(session.translationConfig));
     scheduleFullPageProgressPublish(session);
 }
 
@@ -1073,11 +1082,16 @@ function drainFullPage(session: FullPageSession): void {
         const selection = plan.next();
         if (!selection) break;
         const {key, candidate, priority} = selection;
+        if (session.pendingMetadata.get(key)?.retryIsCurrent?.() === false) {
+            forgetCandidate(session, candidate);
+            continue;
+        }
+        const forceFailedRequest = session.pendingMetadata.get(key)?.forceFailedRequest === true;
         removeFullPagePending(session, key, candidate);
         session.inFlightCandidates.set(key, candidate);
         if (priority.band === 'background') session.foregroundDispatchesSinceBackground = 0;
         else session.foregroundDispatchesSinceBackground += 1;
-        void translateTarget(candidate, session.translationConfig.displayMode, true, session)
+        void translateTarget(candidate, session.translationConfig.displayMode, !forceFailedRequest, session, undefined, forceFailedRequest)
             .then(
                 (outcome) => finalizeFullPageCandidate(session, candidate, outcome),
                 () => {
@@ -1970,6 +1984,8 @@ function createFullPageSession(
         translationConfig: inheritedConfig ? {...inheritedConfig} : captureFullPageTranslationConfig(invocation),
         progressSessionId: startFullPageTranslationProgress(),
         progressPublishScheduled: false,
+        outcomes: createFullPageOutcomeRegistry<HTMLElement>(),
+        unsubscribeOutcomeChanges: () => {},
         observer,
         mutationObserver,
         shadowEventController: new AbortController(),
@@ -2003,11 +2019,15 @@ function createFullPageSession(
         statefulAttributeTimers: new Map(),
         statefulAttributeRescanTargets: new WeakSet(),
     };
+    session.unsubscribeOutcomeChanges = bindFullPageOutcomeRecovery(session,
+        () => fullPageSession === session, () => scheduleFullPageProgressPublish(session));
     return session;
 }
 
 function disposeFullPageSession(session: FullPageSession): void {
     session.active = false;
+    session.unsubscribeOutcomeChanges();
+    session.outcomes.clear();
     syncModalTranslationHint(null, 'none', false);
     session.modal = null;
     session.modalDirty = false;

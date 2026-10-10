@@ -3,6 +3,7 @@ import {parseHTML} from "linkedom";
 import {
     acquireTranslationLayoutOverride,
     beginTranslation,
+    subscribeTranslationStateChanges,
     detachFailedTranslationUi,
     discardTranslation,
     ensureTranslationTruncationLayout,
@@ -82,6 +83,30 @@ describe("指定节点翻译状态机", () => {
 
     beforeEach(() => {
         node = new FakeElement();
+    });
+
+    it("阶段订阅按真实转换发布，异常观察者不影响完成和恢复，解除后不持有通知", () => {
+        const target = node as unknown as HTMLElement;
+        const phases: Array<string | undefined> = [];
+        const bad = subscribeTranslationStateChanges(() => { throw new Error('observer'); });
+        const stop = subscribeTranslationStateChanges((owner, state) => {
+            expect(owner).toBe(target);
+            expect(getTranslationState(owner)).toBe(state);
+            phases.push(state?.phase);
+        });
+        try {
+            const first = beginTranslation(target, 'single')!;
+            expect(beginTranslation(target, 'single')).toBeNull();
+            markTranslationError(target, first.state, first.generation);
+            const next = beginTranslation(target, 'single')!;
+            markTranslationComplete(target, next.state, next.generation);
+            restoreTranslation(target);
+            expect(phases).toEqual(['loading', 'error', 'loading', 'translated', undefined]);
+            stop();
+            beginTranslation(target, 'single');
+            restoreTranslation(target);
+            expect(phases).toHaveLength(5);
+        } finally {stop(); bad();}
     });
 
     it("同一个节点在 loading 期间不会重复发起请求", () => {

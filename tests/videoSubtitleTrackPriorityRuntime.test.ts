@@ -391,6 +391,10 @@ describe('public mounted X subtitle track priority and lifecycle', () => {
     const download = menu.querySelector<HTMLButtonElement>(`[data-action="${action}"]`)!;
     expect(download.disabled).toBe(false);
     clickMenu(f, `[data-action="${action}"]`); await settle();
+    if (action !== 'download-subtitles') {
+      expect(menu.querySelector('[data-export-prompt]')).not.toBeNull();
+      clickMenu(f, '[data-export-choice="complete"]'); await settle();
+    }
     expect(menu.querySelector('[data-download-status]')?.textContent).toContain('已下载');
     clickMenu(f, '[data-action="regenerate-ai-subtitle"]'); await settle();
     expect(count).toBe(2);

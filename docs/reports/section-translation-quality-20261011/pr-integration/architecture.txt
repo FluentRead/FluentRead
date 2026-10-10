@@ -1,0 +1,20 @@
+
+> FluentRead-流畅阅读@0.0.37 test /Users/thinkstu/Desktop/copy/FluentRead-section-translation-quality-20261011
+> node scripts/testing/run-resource-safe.mjs -- vitest run "tests/architecture/moduleBoundaries.test.ts" "tests/architecture/sourceFileHeaders.test.ts"
+
+[resource-safe] 等待全局测试锁（3 个并发槽已占满，当前: wxt build -b firefox; vitest run tests/i18n.test.ts tests/implementationAudit48A.test.ts; wxt build）
+[resource-safe] CPU target 60%, maxWorkers 1, concurrency 3, command: vitest run tests/architecture/moduleBoundaries.test.ts tests/architecture/sourceFileHeaders.test.ts
+
+ RUN  v2.1.9 /Users/thinkstu/Desktop/copy/FluentRead-section-translation-quality-20261011
+
+ ✓ tests/architecture/moduleBoundaries.test.ts (13 tests) 4185ms
+   ✓ architecture module boundaries > src 的静态依赖图不存在跨文件循环 1405ms
+   ✓ architecture module boundaries > src 只能通过精确登记的 composition/browser/provider 迁移边界读取 entrypoints 1152ms
+   ✓ architecture module boundaries > feature 不能跨目录读取另一个 feature 的内部实现 684ms
+   ✓ architecture module boundaries > 按需加载的大体积资源不得被扩展运行时代码静态引入 591ms
+ ✓ tests/architecture/sourceFileHeaders.test.ts (895 tests) 549ms
+
+ Test Files  2 passed (2)
+      Tests  908 passed (908)
+   Start at  02:32:15
+   Duration  5.64s (transform 76ms, setup 0ms, collect 379ms, tests 4.73s, environment 0ms, prepare 127ms)

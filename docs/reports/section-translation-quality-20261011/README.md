@@ -54,3 +54,11 @@
 ## 油猴体积
 
 [体积记录](./userscript-size.json)：同依赖独立基线 1,985,411 字节，候选 1,990,633 字节，增加 5,222 字节（0.2630%）。原预算 1,986,000 字节，按 1 KB 步长最小增加 5 KB 至 1,991,000；所有协议、资源固定提交、重复注入与执行边界断言继续保留，见 [verifier](./userscript-verifier.txt)。
+
+## 最新主线合入验证
+
+获得合并授权后，将主线 `b14baf4b2`（全文运行时优化与样式预设）合入任务分支，产品源码冻结在 `65ac50ebc`。五个区域／共享状态文件与原始验证的 SHA256 均一致；新增 [集成清单](./pr-integration/verification.json) 保留源码树、产物哈希及实际执行范围，原始报告继续作为当时的基线快照。
+
+集成定向测试 20 个文件、1,680 项断言通过，其中 895 项为源文件头断言；类型检查、Chrome／Firefox／油猴构建、manifest、userscript verifier 与测试归类审计通过。[核心浏览器](./pr-integration/browser-core.json) 的本地 18 项及 [边界、Shadow DOM、重试、取消](./pr-integration/browser-quality.json) 四组通过，合计 22 个不同用例描述。两轮产物新鲜度校验通过，未捕获异常、控制台错误及测试浏览器原生激活均为 0，观察器关闭且临时 profile 删除。见 [区域译文](./pr-integration/readme-translated.png) 与 [部分失败恢复](./pr-integration/partial-failure-recovered.png) 截图。
+
+只复测主线改动直接影响的共享恢复与区域交互，没有重复性能测量、远端 GitHub 或全部质量组。最终油猴体积为 1,993,179 字节，保留最新主线的 1,994,000 字节预算；原始分支的预算增量记录保留历史含义。这些后续通过证据不改变前述焦点中断、资源 404 及运行环境边界。

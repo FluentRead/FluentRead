@@ -1,0 +1,1591 @@
+{
+  "baseline": true,
+  "extensionDir": "/private/tmp/fluentread-hover-baseline-20261011/.output/chrome-mv3",
+  "selectedCases": [
+    "pointer-performance",
+    "latest-point",
+    "repeat-loading",
+    "viewport-leave",
+    "hidden-tab",
+    "route-change",
+    "dom-replacement",
+    "failure-retry"
+  ],
+  "profileMode": "new-temporary-profile",
+  "cdpDefaultOverrides": "disabled-for-native-visibility-and-focus",
+  "evidence": "Production extension; trusted Playwright/CDP gestures; local deterministic Microsoft transport, no live provider claims",
+  "buildSha256": "d72fa719d8de1cfa677f78242228c08e4a356d0ca52db39f9c3f3b3d7375fece",
+  "cases": [
+    {
+      "id": "pointer-performance",
+      "requestsBefore": 0,
+      "phases": [
+        {
+          "name": "idle-disabled",
+          "elapsedMs": 5318.5,
+          "longTasksMs": [],
+          "totalBlockingMs": 0,
+          "maxHeartbeatGapMs": 21.899999618530273,
+          "p95HeartbeatGapMs": 21.09999990463257,
+          "metrics": {
+            "ScriptDuration": 0.010973,
+            "TaskDuration": 0.16173300000000002,
+            "LayoutDuration": 0,
+            "RecalcStyleDuration": 0,
+            "LayoutCount": 0,
+            "RecalcStyleCount": 0
+          }
+        },
+        {
+          "name": "idle-enabled",
+          "elapsedMs": 5477.900000095367,
+          "longTasksMs": [],
+          "totalBlockingMs": 0,
+          "maxHeartbeatGapMs": 21.800000190734863,
+          "p95HeartbeatGapMs": 21,
+          "metrics": {
+            "ScriptDuration": 0.016078,
+            "TaskDuration": 0.176646,
+            "LayoutDuration": 0,
+            "RecalcStyleDuration": 0,
+            "LayoutCount": 0,
+            "RecalcStyleCount": 0
+          }
+        },
+        {
+          "name": "continuous-translated",
+          "elapsedMs": 5602,
+          "longTasksMs": [],
+          "totalBlockingMs": 0,
+          "maxHeartbeatGapMs": 34,
+          "p95HeartbeatGapMs": 21.300000190734863,
+          "metrics": {
+            "ScriptDuration": 0.292769,
+            "TaskDuration": 0.51134,
+            "LayoutDuration": 0,
+            "RecalcStyleDuration": 0.00036,
+            "LayoutCount": 0,
+            "RecalcStyleCount": 3
+          }
+        }
+      ],
+      "extraContinuousRequests": 0,
+      "checks": [
+        {
+          "case": "pointer-performance",
+          "passed": true,
+          "message": "Continuous same-owner movement reuses settled translation"
+        },
+        {
+          "case": "pointer-performance",
+          "passed": true,
+          "message": "Continuous movement keeps exactly one translation"
+        },
+        {
+          "case": "pointer-performance",
+          "passed": true,
+          "message": "Host click remains responsive"
+        },
+        {
+          "case": "pointer-performance",
+          "passed": true,
+          "message": "No nested translation wrappers"
+        },
+        {
+          "case": "pointer-performance",
+          "passed": true,
+          "message": "At most one translation per owner"
+        },
+        {
+          "case": "pointer-performance",
+          "passed": true,
+          "message": "Original source remains exact"
+        },
+        {
+          "case": "pointer-performance",
+          "passed": true,
+          "message": "Hover translation preserves native input value"
+        },
+        {
+          "case": "pointer-performance",
+          "passed": true,
+          "message": "Native input remains editable with platform select-all"
+        },
+        {
+          "case": "pointer-performance",
+          "passed": true,
+          "message": "Hover shortcut inside input creates no translation work"
+        },
+        {
+          "case": "pointer-performance",
+          "passed": true,
+          "message": "Source link keeps its original href"
+        },
+        {
+          "case": "pointer-performance",
+          "passed": true,
+          "message": "Native source link click still navigates"
+        }
+      ],
+      "requests": 1,
+      "wrappers": {
+        "alpha": 1,
+        "beta": 0,
+        "gamma": 0
+      },
+      "hostEvents": [
+        {
+          "type": "visibilitychange",
+          "trusted": true,
+          "relatedNull": true,
+          "visibility": "visible"
+        },
+        {
+          "type": "keydown",
+          "key": "Control",
+          "trusted": true,
+          "relatedNull": true,
+          "visibility": "visible"
+        },
+        {
+          "type": "keyup",
+          "key": "Control",
+          "trusted": true,
+          "relatedNull": true,
+          "visibility": "visible"
+        },
+        {
+          "type": "keydown",
+          "key": "Control",
+          "trusted": true,
+          "relatedNull": true,
+          "visibility": "visible"
+        },
+        {
+          "type": "keyup",
+          "key": "Control",
+          "trusted": true,
+          "relatedNull": true,
+          "visibility": "visible"
+        },
+        {
+          "type": "pointerleave",
+          "trusted": true,
+          "relatedNull": false,
+          "visibility": "visible"
+        },
+        {
+          "type": "pointerleave",
+          "trusted": true,
+          "relatedNull": false,
+          "visibility": "visible"
+        },
+        {
+          "type": "mouseout",
+          "trusted": true,
+          "relatedNull": false,
+          "visibility": "visible"
+        },
+        {
+          "type": "mouseleave",
+          "trusted": true,
+          "relatedNull": false,
+          "visibility": "visible"
+        },
+        {
+          "type": "mouseleave",
+          "trusted": true,
+          "relatedNull": false,
+          "visibility": "visible"
+        }
+      ],
+      "url": "http://127.0.0.1:60815/pointer-performance",
+      "originalSource": {
+        "alpha": "Alpha paragraph keeps the original reading context while the pointer settles and translation appears only once.",
+        "beta": "Beta paragraph should stay unchanged when the reader is pointing at another paragraph nearby.",
+        "gamma": "Gamma paragraph is the final reading target after a fast pointer move across several source paragraphs."
+      },
+      "nestedWrappers": 0,
+      "hostLinkURLAfterClick": "http://127.0.0.1:60815/pointer-performance#host-link-destination"
+    },
+    {
+      "id": "latest-point",
+      "requestsBefore": 1,
+      "counts": {
+        "alpha": 0,
+        "beta": 0,
+        "gamma": 1
+      },
+      "checks": [
+        {
+          "case": "latest-point",
+          "passed": true,
+          "message": "Only final settled paragraph translates"
+        },
+        {
+          "case": "latest-point",
+          "passed": true,
+          "message": "Only final settled paragraph reaches provider"
+        },
+        {
+          "case": "latest-point",
+          "passed": true,
+          "message": "No nested translation wrappers"
+        },
+        {
+          "case": "latest-point",
+          "passed": true,
+          "message": "At most one translation per owner"
+        },
+        {
+          "case": "latest-point",
+          "passed": true,
+          "message": "Original source remains exact"
+        },
+        {
+          "case": "latest-point",
+          "passed": true,
+          "message": "Hover translation preserves native input value"
+        },
+        {
+          "case": "latest-point",
+          "passed": true,
+          "message": "Native input remains editable with platform select-all"
+        },
+        {
+          "case": "latest-point",
+          "passed": true,
+          "message": "Hover shortcut inside input creates no translation work"
+        },
+        {
+          "case": "latest-point",
+          "passed": true,
+          "message": "Source link keeps its original href"
+        },
+        {
+          "case": "latest-point",
+          "passed": true,
+          "message": "Native source link click still navigates"
+        }
+      ],
+      "requests": 1,
+      "wrappers": {
+        "alpha": 0,
+        "beta": 0,
+        "gamma": 1
+      },
+      "hostEvents": [
+        {
+          "type": "visibilitychange",
+          "trusted": true,
+          "relatedNull": true,
+          "visibility": "visible"
+        },
+        {
+          "type": "keydown",
+          "key": "Control",
+          "trusted": true,
+          "relatedNull": true,
+          "visibility": "visible"
+        },
+        {
+          "type": "pointerleave",
+          "trusted": true,
+          "relatedNull": false,
+          "visibility": "visible"
+        },
+        {
+          "type": "mouseout",
+          "trusted": true,
+          "relatedNull": false,
+          "visibility": "visible"
+        },
+        {
+          "type": "mouseleave",
+          "trusted": true,
+          "relatedNull": false,
+          "visibility": "visible"
+        },
+        {
+          "type": "pointerleave",
+          "trusted": true,
+          "relatedNull": false,
+          "visibility": "visible"
+        },
+        {
+          "type": "mouseout",
+          "trusted": true,
+          "relatedNull": false,
+          "visibility": "visible"
+        },
+        {
+          "type": "mouseleave",
+          "trusted": true,
+          "relatedNull": false,
+          "visibility": "visible"
+        },
+        {
+          "type": "keyup",
+          "key": "Control",
+          "trusted": true,
+          "relatedNull": true,
+          "visibility": "visible"
+        }
+      ],
+      "url": "http://127.0.0.1:60815/latest-point",
+      "originalSource": {
+        "alpha": "Alpha paragraph keeps the original reading context while the pointer settles and translation appears only once.",
+        "beta": "Beta paragraph should stay unchanged when the reader is pointing at another paragraph nearby.",
+        "gamma": "Gamma paragraph is the final reading target after a fast pointer move across several source paragraphs."
+      },
+      "nestedWrappers": 0,
+      "hostLinkURLAfterClick": "http://127.0.0.1:60815/latest-point#host-link-destination"
+    },
+    {
+      "id": "repeat-loading",
+      "requestsBefore": 2,
+      "checks": [
+        {
+          "case": "repeat-loading",
+          "passed": true,
+          "message": "Rapid repeat while loading sends one upstream request"
+        },
+        {
+          "case": "repeat-loading",
+          "passed": true,
+          "message": "Rapid repeat creates one translation"
+        },
+        {
+          "case": "repeat-loading",
+          "passed": true,
+          "message": "Explicit restore and retranslate remains available without duplicate work"
+        },
+        {
+          "case": "repeat-loading",
+          "passed": true,
+          "message": "No nested translation wrappers"
+        },
+        {
+          "case": "repeat-loading",
+          "passed": true,
+          "message": "At most one translation per owner"
+        },
+        {
+          "case": "repeat-loading",
+          "passed": true,
+          "message": "Original source remains exact"
+        },
+        {
+          "case": "repeat-loading",
+          "passed": true,
+          "message": "Hover translation preserves native input value"
+        },
+        {
+          "case": "repeat-loading",
+          "passed": true,
+          "message": "Native input remains editable with platform select-all"
+        },
+        {
+          "case": "repeat-loading",
+          "passed": true,
+          "message": "Hover shortcut inside input creates no translation work"
+        },
+        {
+          "case": "repeat-loading",
+          "passed": true,
+          "message": "Source link keeps its original href"
+        },
+        {
+          "case": "repeat-loading",
+          "passed": true,
+          "message": "Native source link click still navigates"
+        }
+      ],
+      "requests": 2,
+      "wrappers": {
+        "alpha": 1,
+        "beta": 0,
+        "gamma": 0
+      },
+      "hostEvents": [
+        {
+          "type": "visibilitychange",
+          "trusted": true,
+          "relatedNull": true,
+          "visibility": "visible"
+        },
+        {
+          "type": "keydown",
+          "key": "Control",
+          "trusted": true,
+          "relatedNull": true,
+          "visibility": "visible"
+        },
+        {
+          "type": "keyup",
+          "key": "Control",
+          "trusted": true,
+          "relatedNull": true,
+          "visibility": "visible"
+        },
+        {
+          "type": "keydown",
+          "key": "Control",
+          "trusted": true,
+          "relatedNull": true,
+          "visibility": "visible"
+        },
+        {
+          "type": "keyup",
+          "key": "Control",
+          "trusted": true,
+          "relatedNull": true,
+          "visibility": "visible"
+        },
+        {
+          "type": "keydown",
+          "key": "Control",
+          "trusted": true,
+          "relatedNull": true,
+          "visibility": "visible"
+        },
+        {
+          "type": "keyup",
+          "key": "Control",
+          "trusted": true,
+          "relatedNull": true,
+          "visibility": "visible"
+        },
+        {
+          "type": "keydown",
+          "key": "Control",
+          "trusted": true,
+          "relatedNull": true,
+          "visibility": "visible"
+        },
+        {
+          "type": "keyup",
+          "key": "Control",
+          "trusted": true,
+          "relatedNull": true,
+          "visibility": "visible"
+        },
+        {
+          "type": "keydown",
+          "key": "Control",
+          "trusted": true,
+          "relatedNull": true,
+          "visibility": "visible"
+        },
+        {
+          "type": "keyup",
+          "key": "Control",
+          "trusted": true,
+          "relatedNull": true,
+          "visibility": "visible"
+        }
+      ],
+      "url": "http://127.0.0.1:60815/repeat-loading",
+      "originalSource": {
+        "alpha": "Alpha paragraph keeps the original reading context while the pointer settles and translation appears only once.",
+        "beta": "Beta paragraph should stay unchanged when the reader is pointing at another paragraph nearby.",
+        "gamma": "Gamma paragraph is the final reading target after a fast pointer move across several source paragraphs."
+      },
+      "nestedWrappers": 0,
+      "hostLinkURLAfterClick": "http://127.0.0.1:60815/repeat-loading#host-link-destination"
+    },
+    {
+      "id": "viewport-leave",
+      "requestsBefore": 4,
+      "leftViewport": true,
+      "checks": [
+        {
+          "case": "viewport-leave",
+          "passed": false,
+          "message": "Leaving viewport cancels delayed hover"
+        },
+        {
+          "case": "viewport-leave",
+          "passed": false,
+          "message": "No stale-coordinate translation after viewport leave"
+        },
+        {
+          "case": "viewport-leave",
+          "passed": true,
+          "message": "Fresh gesture works after pointer re-entry"
+        },
+        {
+          "case": "viewport-leave",
+          "passed": true,
+          "message": "No nested translation wrappers"
+        },
+        {
+          "case": "viewport-leave",
+          "passed": true,
+          "message": "At most one translation per owner"
+        },
+        {
+          "case": "viewport-leave",
+          "passed": true,
+          "message": "Original source remains exact"
+        },
+        {
+          "case": "viewport-leave",
+          "passed": true,
+          "message": "Hover translation preserves native input value"
+        },
+        {
+          "case": "viewport-leave",
+          "passed": true,
+          "message": "Native input remains editable with platform select-all"
+        },
+        {
+          "case": "viewport-leave",
+          "passed": true,
+          "message": "Hover shortcut inside input creates no translation work"
+        },
+        {
+          "case": "viewport-leave",
+          "passed": true,
+          "message": "Source link keeps its original href"
+        },
+        {
+          "case": "viewport-leave",
+          "passed": true,
+          "message": "Native source link click still navigates"
+        }
+      ],
+      "requests": 2,
+      "wrappers": {
+        "alpha": 1,
+        "beta": 1,
+        "gamma": 0
+      },
+      "hostEvents": [
+        {
+          "type": "visibilitychange",
+          "trusted": true,
+          "relatedNull": true,
+          "visibility": "visible"
+        },
+        {
+          "type": "keydown",
+          "key": "Control",
+          "trusted": true,
+          "relatedNull": true,
+          "visibility": "visible"
+        },
+        {
+          "type": "pointerleave",
+          "trusted": true,
+          "relatedNull": true,
+          "visibility": "visible"
+        },
+        {
+          "type": "pointerleave",
+          "trusted": true,
+          "relatedNull": true,
+          "visibility": "visible"
+        },
+        {
+          "type": "pointerleave",
+          "trusted": true,
+          "relatedNull": true,
+          "visibility": "visible"
+        },
+        {
+          "type": "pointerleave",
+          "trusted": true,
+          "relatedNull": true,
+          "visibility": "visible"
+        },
+        {
+          "type": "pointerleave",
+          "trusted": true,
+          "relatedNull": true,
+          "visibility": "visible"
+        },
+        {
+          "type": "mouseout",
+          "trusted": true,
+          "relatedNull": true,
+          "visibility": "visible"
+        },
+        {
+          "type": "mouseleave",
+          "trusted": true,
+          "relatedNull": true,
+          "visibility": "visible"
+        },
+        {
+          "type": "mouseleave",
+          "trusted": true,
+          "relatedNull": true,
+          "visibility": "visible"
+        },
+        {
+          "type": "mouseleave",
+          "trusted": true,
+          "relatedNull": true,
+          "visibility": "visible"
+        },
+        {
+          "type": "mouseleave",
+          "trusted": true,
+          "relatedNull": true,
+          "visibility": "visible"
+        },
+        {
+          "type": "mouseleave",
+          "trusted": true,
+          "relatedNull": true,
+          "visibility": "visible"
+        },
+        {
+          "type": "keyup",
+          "key": "Control",
+          "trusted": true,
+          "relatedNull": true,
+          "visibility": "visible"
+        },
+        {
+          "type": "keydown",
+          "key": "Control",
+          "trusted": true,
+          "relatedNull": true,
+          "visibility": "visible"
+        },
+        {
+          "type": "keyup",
+          "key": "Control",
+          "trusted": true,
+          "relatedNull": true,
+          "visibility": "visible"
+        }
+      ],
+      "url": "http://127.0.0.1:60815/viewport-leave",
+      "originalSource": {
+        "alpha": "Alpha paragraph keeps the original reading context while the pointer settles and translation appears only once.",
+        "beta": "Beta paragraph should stay unchanged when the reader is pointing at another paragraph nearby.",
+        "gamma": "Gamma paragraph is the final reading target after a fast pointer move across several source paragraphs."
+      },
+      "nestedWrappers": 0,
+      "hostLinkURLAfterClick": "http://127.0.0.1:60815/viewport-leave#host-link-destination"
+    },
+    {
+      "id": "hidden-tab",
+      "requestsBefore": 6,
+      "tabPlacement": {
+        "windowId": 1742510165,
+        "ownerTabId": 1742510177,
+        "otherTabId": 1742510178
+      },
+      "hidden": true,
+      "checks": [
+        {
+          "case": "hidden-tab",
+          "passed": true,
+          "message": "Hidden tab cancels delayed hover without upstream work"
+        },
+        {
+          "case": "hidden-tab",
+          "passed": true,
+          "message": "Fresh gesture works after returning to tab"
+        },
+        {
+          "case": "hidden-tab",
+          "passed": true,
+          "message": "No nested translation wrappers"
+        },
+        {
+          "case": "hidden-tab",
+          "passed": true,
+          "message": "At most one translation per owner"
+        },
+        {
+          "case": "hidden-tab",
+          "passed": true,
+          "message": "Original source remains exact"
+        },
+        {
+          "case": "hidden-tab",
+          "passed": true,
+          "message": "Hover translation preserves native input value"
+        },
+        {
+          "case": "hidden-tab",
+          "passed": true,
+          "message": "Native input remains editable with platform select-all"
+        },
+        {
+          "case": "hidden-tab",
+          "passed": true,
+          "message": "Hover shortcut inside input creates no translation work"
+        },
+        {
+          "case": "hidden-tab",
+          "passed": true,
+          "message": "Source link keeps its original href"
+        },
+        {
+          "case": "hidden-tab",
+          "passed": true,
+          "message": "Native source link click still navigates"
+        }
+      ],
+      "requests": 1,
+      "wrappers": {
+        "alpha": 0,
+        "beta": 1,
+        "gamma": 0
+      },
+      "hostEvents": [
+        {
+          "type": "visibilitychange",
+          "trusted": true,
+          "relatedNull": true,
+          "visibility": "visible"
+        },
+        {
+          "type": "keydown",
+          "key": "Control",
+          "trusted": true,
+          "relatedNull": true,
+          "visibility": "visible"
+        },
+        {
+          "type": "blur",
+          "trusted": true,
+          "relatedNull": true,
+          "visibility": "visible"
+        },
+        {
+          "type": "visibilitychange",
+          "trusted": true,
+          "relatedNull": true,
+          "visibility": "hidden"
+        },
+        {
+          "type": "keyup",
+          "key": "Control",
+          "trusted": true,
+          "relatedNull": true,
+          "visibility": "hidden"
+        },
+        {
+          "type": "visibilitychange",
+          "trusted": true,
+          "relatedNull": true,
+          "visibility": "visible"
+        },
+        {
+          "type": "pointerleave",
+          "trusted": true,
+          "relatedNull": false,
+          "visibility": "visible"
+        },
+        {
+          "type": "mouseout",
+          "trusted": true,
+          "relatedNull": false,
+          "visibility": "visible"
+        },
+        {
+          "type": "mouseleave",
+          "trusted": true,
+          "relatedNull": false,
+          "visibility": "visible"
+        },
+        {
+          "type": "keydown",
+          "key": "Control",
+          "trusted": true,
+          "relatedNull": true,
+          "visibility": "visible"
+        },
+        {
+          "type": "keyup",
+          "key": "Control",
+          "trusted": true,
+          "relatedNull": true,
+          "visibility": "visible"
+        }
+      ],
+      "url": "http://127.0.0.1:60815/hidden-tab",
+      "originalSource": {
+        "alpha": "Alpha paragraph keeps the original reading context while the pointer settles and translation appears only once.",
+        "beta": "Beta paragraph should stay unchanged when the reader is pointing at another paragraph nearby.",
+        "gamma": "Gamma paragraph is the final reading target after a fast pointer move across several source paragraphs."
+      },
+      "nestedWrappers": 0,
+      "hostLinkURLAfterClick": "http://127.0.0.1:60815/hidden-tab#host-link-destination"
+    },
+    {
+      "id": "route-change",
+      "requestsBefore": 7,
+      "checks": [
+        {
+          "case": "route-change",
+          "passed": false,
+          "message": "SPA route change cancels old delayed hover"
+        },
+        {
+          "case": "route-change",
+          "passed": true,
+          "message": "Fresh gesture works on new route"
+        },
+        {
+          "case": "route-change",
+          "passed": true,
+          "message": "No nested translation wrappers"
+        },
+        {
+          "case": "route-change",
+          "passed": true,
+          "message": "At most one translation per owner"
+        },
+        {
+          "case": "route-change",
+          "passed": true,
+          "message": "Original source remains exact"
+        },
+        {
+          "case": "route-change",
+          "passed": true,
+          "message": "Hover translation preserves native input value"
+        },
+        {
+          "case": "route-change",
+          "passed": true,
+          "message": "Native input remains editable with platform select-all"
+        },
+        {
+          "case": "route-change",
+          "passed": true,
+          "message": "Hover shortcut inside input creates no translation work"
+        },
+        {
+          "case": "route-change",
+          "passed": true,
+          "message": "Source link keeps its original href"
+        },
+        {
+          "case": "route-change",
+          "passed": true,
+          "message": "Native source link click still navigates"
+        }
+      ],
+      "requests": 2,
+      "wrappers": {
+        "alpha": 1,
+        "beta": 1,
+        "gamma": 0
+      },
+      "hostEvents": [
+        {
+          "type": "visibilitychange",
+          "trusted": true,
+          "relatedNull": true,
+          "visibility": "visible"
+        },
+        {
+          "type": "keydown",
+          "key": "Control",
+          "trusted": true,
+          "relatedNull": true,
+          "visibility": "visible"
+        },
+        {
+          "type": "keyup",
+          "key": "Control",
+          "trusted": true,
+          "relatedNull": true,
+          "visibility": "visible"
+        },
+        {
+          "type": "pointerleave",
+          "trusted": true,
+          "relatedNull": false,
+          "visibility": "visible"
+        },
+        {
+          "type": "mouseout",
+          "trusted": true,
+          "relatedNull": false,
+          "visibility": "visible"
+        },
+        {
+          "type": "mouseleave",
+          "trusted": true,
+          "relatedNull": false,
+          "visibility": "visible"
+        },
+        {
+          "type": "keydown",
+          "key": "Control",
+          "trusted": true,
+          "relatedNull": true,
+          "visibility": "visible"
+        },
+        {
+          "type": "keyup",
+          "key": "Control",
+          "trusted": true,
+          "relatedNull": true,
+          "visibility": "visible"
+        }
+      ],
+      "url": "http://127.0.0.1:60815/route-change-new",
+      "originalSource": {
+        "alpha": "Alpha paragraph keeps the original reading context while the pointer settles and translation appears only once.",
+        "beta": "Beta paragraph should stay unchanged when the reader is pointing at another paragraph nearby.",
+        "gamma": "Gamma paragraph is the final reading target after a fast pointer move across several source paragraphs."
+      },
+      "nestedWrappers": 0,
+      "hostLinkURLAfterClick": "http://127.0.0.1:60815/route-change-new#host-link-destination"
+    },
+    {
+      "id": "dom-replacement",
+      "requestsBefore": 9,
+      "newSource": "Replacement paragraph belongs to the new host DOM and must never receive a stale translation of the removed source.",
+      "checks": [
+        {
+          "case": "dom-replacement",
+          "passed": true,
+          "message": "Removed owner response does not translate replacement DOM"
+        },
+        {
+          "case": "dom-replacement",
+          "passed": false,
+          "message": "A required translation state did not arrive before the timeout"
+        }
+      ],
+      "failure": "locator.waitFor: Timeout 15000ms exceeded.\nCall log:\n\u001b[2m  - waiting for locator('#alpha .fluent-read-bilingual-content')\u001b[22m\n\n    at waitTranslation (/Users/thinkstu/Desktop/copy/FluentRead-hover-reliability-20261011/scripts/testing/run-hover-reliability-test.cjs:125:63)\n    at runCase (/Users/thinkstu/Desktop/copy/FluentRead-hover-reliability-20261011/scripts/testing/run-hover-reliability-test.cjs:302:60)\n    at async /Users/thinkstu/Desktop/copy/FluentRead-hover-reliability-20261011/scripts/testing/run-hover-reliability-test.cjs:367:7",
+      "requestsAtFailure": 1,
+      "hostEventsAtFailure": [
+        {
+          "type": "visibilitychange",
+          "trusted": true,
+          "relatedNull": true,
+          "visibility": "visible"
+        },
+        {
+          "type": "keydown",
+          "key": "Control",
+          "trusted": true,
+          "relatedNull": true,
+          "visibility": "visible"
+        },
+        {
+          "type": "keyup",
+          "key": "Control",
+          "trusted": true,
+          "relatedNull": true,
+          "visibility": "visible"
+        },
+        {
+          "type": "keydown",
+          "key": "Control",
+          "trusted": true,
+          "relatedNull": true,
+          "visibility": "visible"
+        },
+        {
+          "type": "keyup",
+          "key": "Control",
+          "trusted": true,
+          "relatedNull": true,
+          "visibility": "visible"
+        }
+      ]
+    },
+    {
+      "id": "failure-retry",
+      "requestsBefore": 10,
+      "newSource": "This block link fails once while preserving the source and offering an explicit keyboard accessible retry action.",
+      "failuresBeforeRetry": 1,
+      "checks": [
+        {
+          "case": "failure-retry",
+          "passed": true,
+          "message": "Continuous movement does not retry failed request automatically"
+        },
+        {
+          "case": "failure-retry",
+          "passed": true,
+          "message": "Retry remains keyboard accessible"
+        },
+        {
+          "case": "failure-retry",
+          "passed": true,
+          "message": "Explicit retry sends one new request"
+        },
+        {
+          "case": "failure-retry",
+          "passed": true,
+          "message": "Successful retry clears failure UI"
+        },
+        {
+          "case": "failure-retry",
+          "passed": true,
+          "message": "Retry preserves source ownership"
+        },
+        {
+          "case": "failure-retry",
+          "passed": true,
+          "message": "No nested translation wrappers"
+        },
+        {
+          "case": "failure-retry",
+          "passed": true,
+          "message": "At most one translation per owner"
+        },
+        {
+          "case": "failure-retry",
+          "passed": true,
+          "message": "Original source remains exact"
+        },
+        {
+          "case": "failure-retry",
+          "passed": true,
+          "message": "Hover translation preserves native input value"
+        },
+        {
+          "case": "failure-retry",
+          "passed": true,
+          "message": "Native input remains editable with platform select-all"
+        },
+        {
+          "case": "failure-retry",
+          "passed": true,
+          "message": "Hover shortcut inside input creates no translation work"
+        },
+        {
+          "case": "failure-retry",
+          "passed": true,
+          "message": "Source link keeps its original href"
+        },
+        {
+          "case": "failure-retry",
+          "passed": true,
+          "message": "Native source link click still navigates"
+        }
+      ],
+      "translation": "测试译文：This block link fails once while preserving the source and offering an explicit keyboard accessible retry action.",
+      "requests": 2,
+      "wrappers": {
+        "alpha": 1,
+        "beta": 0,
+        "gamma": 0
+      },
+      "hostEvents": [
+        {
+          "type": "visibilitychange",
+          "trusted": true,
+          "relatedNull": true,
+          "visibility": "visible"
+        },
+        {
+          "type": "keydown",
+          "key": "Control",
+          "trusted": true,
+          "relatedNull": true,
+          "visibility": "visible"
+        },
+        {
+          "type": "keyup",
+          "key": "Control",
+          "trusted": true,
+          "relatedNull": true,
+          "visibility": "visible"
+        },
+        {
+          "type": "keydown",
+          "key": "Control",
+          "trusted": true,
+          "relatedNull": true,
+          "visibility": "visible"
+        },
+        {
+          "type": "keyup",
+          "key": "Control",
+          "trusted": true,
+          "relatedNull": true,
+          "visibility": "visible"
+        },
+        {
+          "type": "keydown",
+          "key": "Enter",
+          "trusted": true,
+          "relatedNull": true,
+          "visibility": "visible"
+        },
+        {
+          "type": "blur",
+          "trusted": true,
+          "relatedNull": true,
+          "visibility": "visible"
+        },
+        {
+          "type": "keyup",
+          "key": "Enter",
+          "trusted": true,
+          "relatedNull": true,
+          "visibility": "visible"
+        }
+      ],
+      "url": "http://127.0.0.1:60815/failure-retry",
+      "originalSource": {
+        "alpha": "This block link fails once while preserving the source and offering an explicit keyboard accessible retry action.",
+        "beta": "Beta paragraph should stay unchanged when the reader is pointing at another paragraph nearby.",
+        "gamma": "Gamma paragraph is the final reading target after a fast pointer move across several source paragraphs."
+      },
+      "nestedWrappers": 0,
+      "hostLinkURLAfterClick": "http://127.0.0.1:60815/failure-retry#host-link-destination"
+    }
+  ],
+  "consoleErrors": [],
+  "observations": [
+    {
+      "case": "pointer-performance",
+      "passed": true,
+      "message": "Continuous same-owner movement reuses settled translation"
+    },
+    {
+      "case": "pointer-performance",
+      "passed": true,
+      "message": "Continuous movement keeps exactly one translation"
+    },
+    {
+      "case": "pointer-performance",
+      "passed": true,
+      "message": "Host click remains responsive"
+    },
+    {
+      "case": "pointer-performance",
+      "passed": true,
+      "message": "No nested translation wrappers"
+    },
+    {
+      "case": "pointer-performance",
+      "passed": true,
+      "message": "At most one translation per owner"
+    },
+    {
+      "case": "pointer-performance",
+      "passed": true,
+      "message": "Original source remains exact"
+    },
+    {
+      "case": "pointer-performance",
+      "passed": true,
+      "message": "Hover translation preserves native input value"
+    },
+    {
+      "case": "pointer-performance",
+      "passed": true,
+      "message": "Native input remains editable with platform select-all"
+    },
+    {
+      "case": "pointer-performance",
+      "passed": true,
+      "message": "Hover shortcut inside input creates no translation work"
+    },
+    {
+      "case": "pointer-performance",
+      "passed": true,
+      "message": "Source link keeps its original href"
+    },
+    {
+      "case": "pointer-performance",
+      "passed": true,
+      "message": "Native source link click still navigates"
+    },
+    {
+      "case": "latest-point",
+      "passed": true,
+      "message": "Only final settled paragraph translates"
+    },
+    {
+      "case": "latest-point",
+      "passed": true,
+      "message": "Only final settled paragraph reaches provider"
+    },
+    {
+      "case": "latest-point",
+      "passed": true,
+      "message": "No nested translation wrappers"
+    },
+    {
+      "case": "latest-point",
+      "passed": true,
+      "message": "At most one translation per owner"
+    },
+    {
+      "case": "latest-point",
+      "passed": true,
+      "message": "Original source remains exact"
+    },
+    {
+      "case": "latest-point",
+      "passed": true,
+      "message": "Hover translation preserves native input value"
+    },
+    {
+      "case": "latest-point",
+      "passed": true,
+      "message": "Native input remains editable with platform select-all"
+    },
+    {
+      "case": "latest-point",
+      "passed": true,
+      "message": "Hover shortcut inside input creates no translation work"
+    },
+    {
+      "case": "latest-point",
+      "passed": true,
+      "message": "Source link keeps its original href"
+    },
+    {
+      "case": "latest-point",
+      "passed": true,
+      "message": "Native source link click still navigates"
+    },
+    {
+      "case": "repeat-loading",
+      "passed": true,
+      "message": "Rapid repeat while loading sends one upstream request"
+    },
+    {
+      "case": "repeat-loading",
+      "passed": true,
+      "message": "Rapid repeat creates one translation"
+    },
+    {
+      "case": "repeat-loading",
+      "passed": true,
+      "message": "Explicit restore and retranslate remains available without duplicate work"
+    },
+    {
+      "case": "repeat-loading",
+      "passed": true,
+      "message": "No nested translation wrappers"
+    },
+    {
+      "case": "repeat-loading",
+      "passed": true,
+      "message": "At most one translation per owner"
+    },
+    {
+      "case": "repeat-loading",
+      "passed": true,
+      "message": "Original source remains exact"
+    },
+    {
+      "case": "repeat-loading",
+      "passed": true,
+      "message": "Hover translation preserves native input value"
+    },
+    {
+      "case": "repeat-loading",
+      "passed": true,
+      "message": "Native input remains editable with platform select-all"
+    },
+    {
+      "case": "repeat-loading",
+      "passed": true,
+      "message": "Hover shortcut inside input creates no translation work"
+    },
+    {
+      "case": "repeat-loading",
+      "passed": true,
+      "message": "Source link keeps its original href"
+    },
+    {
+      "case": "repeat-loading",
+      "passed": true,
+      "message": "Native source link click still navigates"
+    },
+    {
+      "case": "viewport-leave",
+      "passed": false,
+      "message": "Leaving viewport cancels delayed hover"
+    },
+    {
+      "case": "viewport-leave",
+      "passed": false,
+      "message": "No stale-coordinate translation after viewport leave"
+    },
+    {
+      "case": "viewport-leave",
+      "passed": true,
+      "message": "Fresh gesture works after pointer re-entry"
+    },
+    {
+      "case": "viewport-leave",
+      "passed": true,
+      "message": "No nested translation wrappers"
+    },
+    {
+      "case": "viewport-leave",
+      "passed": true,
+      "message": "At most one translation per owner"
+    },
+    {
+      "case": "viewport-leave",
+      "passed": true,
+      "message": "Original source remains exact"
+    },
+    {
+      "case": "viewport-leave",
+      "passed": true,
+      "message": "Hover translation preserves native input value"
+    },
+    {
+      "case": "viewport-leave",
+      "passed": true,
+      "message": "Native input remains editable with platform select-all"
+    },
+    {
+      "case": "viewport-leave",
+      "passed": true,
+      "message": "Hover shortcut inside input creates no translation work"
+    },
+    {
+      "case": "viewport-leave",
+      "passed": true,
+      "message": "Source link keeps its original href"
+    },
+    {
+      "case": "viewport-leave",
+      "passed": true,
+      "message": "Native source link click still navigates"
+    },
+    {
+      "case": "hidden-tab",
+      "passed": true,
+      "message": "Hidden tab cancels delayed hover without upstream work"
+    },
+    {
+      "case": "hidden-tab",
+      "passed": true,
+      "message": "Fresh gesture works after returning to tab"
+    },
+    {
+      "case": "hidden-tab",
+      "passed": true,
+      "message": "No nested translation wrappers"
+    },
+    {
+      "case": "hidden-tab",
+      "passed": true,
+      "message": "At most one translation per owner"
+    },
+    {
+      "case": "hidden-tab",
+      "passed": true,
+      "message": "Original source remains exact"
+    },
+    {
+      "case": "hidden-tab",
+      "passed": true,
+      "message": "Hover translation preserves native input value"
+    },
+    {
+      "case": "hidden-tab",
+      "passed": true,
+      "message": "Native input remains editable with platform select-all"
+    },
+    {
+      "case": "hidden-tab",
+      "passed": true,
+      "message": "Hover shortcut inside input creates no translation work"
+    },
+    {
+      "case": "hidden-tab",
+      "passed": true,
+      "message": "Source link keeps its original href"
+    },
+    {
+      "case": "hidden-tab",
+      "passed": true,
+      "message": "Native source link click still navigates"
+    },
+    {
+      "case": "route-change",
+      "passed": false,
+      "message": "SPA route change cancels old delayed hover"
+    },
+    {
+      "case": "route-change",
+      "passed": true,
+      "message": "Fresh gesture works on new route"
+    },
+    {
+      "case": "route-change",
+      "passed": true,
+      "message": "No nested translation wrappers"
+    },
+    {
+      "case": "route-change",
+      "passed": true,
+      "message": "At most one translation per owner"
+    },
+    {
+      "case": "route-change",
+      "passed": true,
+      "message": "Original source remains exact"
+    },
+    {
+      "case": "route-change",
+      "passed": true,
+      "message": "Hover translation preserves native input value"
+    },
+    {
+      "case": "route-change",
+      "passed": true,
+      "message": "Native input remains editable with platform select-all"
+    },
+    {
+      "case": "route-change",
+      "passed": true,
+      "message": "Hover shortcut inside input creates no translation work"
+    },
+    {
+      "case": "route-change",
+      "passed": true,
+      "message": "Source link keeps its original href"
+    },
+    {
+      "case": "route-change",
+      "passed": true,
+      "message": "Native source link click still navigates"
+    },
+    {
+      "case": "dom-replacement",
+      "passed": true,
+      "message": "Removed owner response does not translate replacement DOM"
+    },
+    {
+      "case": "dom-replacement",
+      "passed": false,
+      "message": "A required translation state did not arrive before the timeout"
+    },
+    {
+      "case": "failure-retry",
+      "passed": true,
+      "message": "Continuous movement does not retry failed request automatically"
+    },
+    {
+      "case": "failure-retry",
+      "passed": true,
+      "message": "Retry remains keyboard accessible"
+    },
+    {
+      "case": "failure-retry",
+      "passed": true,
+      "message": "Explicit retry sends one new request"
+    },
+    {
+      "case": "failure-retry",
+      "passed": true,
+      "message": "Successful retry clears failure UI"
+    },
+    {
+      "case": "failure-retry",
+      "passed": true,
+      "message": "Retry preserves source ownership"
+    },
+    {
+      "case": "failure-retry",
+      "passed": true,
+      "message": "No nested translation wrappers"
+    },
+    {
+      "case": "failure-retry",
+      "passed": true,
+      "message": "At most one translation per owner"
+    },
+    {
+      "case": "failure-retry",
+      "passed": true,
+      "message": "Original source remains exact"
+    },
+    {
+      "case": "failure-retry",
+      "passed": true,
+      "message": "Hover translation preserves native input value"
+    },
+    {
+      "case": "failure-retry",
+      "passed": true,
+      "message": "Native input remains editable with platform select-all"
+    },
+    {
+      "case": "failure-retry",
+      "passed": true,
+      "message": "Hover shortcut inside input creates no translation work"
+    },
+    {
+      "case": "failure-retry",
+      "passed": true,
+      "message": "Source link keeps its original href"
+    },
+    {
+      "case": "failure-retry",
+      "passed": true,
+      "message": "Native source link click still navigates"
+    }
+  ],
+  "unexpectedNetworkRequests": [],
+  "launchMode": "macos-background-cdp",
+  "focusPolicy": "launchservices-no-foreground",
+  "windowPlacement": {
+    "mode": "background-visible-no-focus",
+    "visible": true,
+    "hidden": false,
+    "centered": true,
+    "windowState": "normal",
+    "bounds": {
+      "left": 212,
+      "top": -990,
+      "width": 1280,
+      "height": 900
+    },
+    "displayTarget": "secondary",
+    "source": "macos-nsscreen",
+    "screenIndex": 1,
+    "browserFrontmost": false,
+    "frontmostBefore": {
+      "pid": 1449,
+      "name": "Snipaste"
+    },
+    "frontmostAfter": {
+      "pid": 1208,
+      "name": "WindowManager"
+    }
+  },
+  "ok": true,
+  "failedObservations": [
+    {
+      "case": "viewport-leave",
+      "passed": false,
+      "message": "Leaving viewport cancels delayed hover"
+    },
+    {
+      "case": "viewport-leave",
+      "passed": false,
+      "message": "No stale-coordinate translation after viewport leave"
+    },
+    {
+      "case": "route-change",
+      "passed": false,
+      "message": "SPA route change cancels old delayed hover"
+    },
+    {
+      "case": "dom-replacement",
+      "passed": false,
+      "message": "A required translation state did not arrive before the timeout"
+    }
+  ]
+}

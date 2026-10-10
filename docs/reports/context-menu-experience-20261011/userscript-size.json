@@ -35,7 +35,7 @@
     "sameLockfileSha256": "dca737aeb9c264e2c3078588ff01c85dd52d48636f7fa24b2451f9444a8ccc3a",
     "baseAndCandidateVerifiers": "passed"
   },
-  "latestMainIntegration": {
+  "previousSectionIntegration": {
     "baseCommit": "0a69bfc3d2335c03cd22778af2bcebccdc8d0664",
     "baseArtifactBytes": 1993223,
     "baseArtifactSha256": "027ee618ec560883cc6bb1bdb8cb15d9c6ed781000b09ed87e0ffb10540f2462",
@@ -52,5 +52,24 @@
     "historicalMainReportDifferenceBytes": 44,
     "comparison": "Use the current independent fixed-main build instead of assuming historical byte reproducibility across build directories.",
     "baseAndCandidateVerifiers": "passed after minimum 3 KB budget adjustment"
+  },
+  "latestMainIntegration": {
+    "baseCommit": "982f09df6674004cc3843384a834b67ce0f0d992",
+    "productBuildCommit": "837edce4cf40483d7ba3f9c3cb6fbadbb32c173f",
+    "baseArtifactBytes": 1997714,
+    "baseArtifactSha256": "9901bf983411fc1b0971a2e1822916e235054c4e1713bf2729bd07483e6db3a4",
+    "candidateArtifactBytes": 2001158,
+    "candidateArtifactSha256": "1d6483b3d44b30bcedce79fc4937fba7a6eb875e6280365ea82b4fe655854d5b",
+    "increaseBytes": 3444,
+    "previousBudgetBytes": 1998000,
+    "budgetBytes": 2002000,
+    "budgetIncreaseBytes": 4000,
+    "languageResourceCommit": "cf1941d43f406bb5118952066da5f9399400dd37",
+    "languageResourceContentsChanged": false,
+    "sameLockfileSha256": "dca737aeb9c264e2c3078588ff01c85dd52d48636f7fa24b2451f9444a8ccc3a",
+    "historicalMainReportBytes": 1997758,
+    "historicalMainReportDifferenceBytes": -44,
+    "comparison": "Use the current independent fixed-main build instead of assuming historical byte reproducibility across build directories.",
+    "baseAndCandidateVerifiers": "passed after minimum 4 KB budget adjustment"
   }
 }

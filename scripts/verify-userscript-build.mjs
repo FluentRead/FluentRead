@@ -25,7 +25,10 @@ const artifactBytes = Buffer.byteLength(source);
 // 原生合批独立开关及冻结策略增加 2,560 字节（0.1291%）：
 // 同依赖基线 e4932521f 为 1,982,807，候选为 1,985,367；预算最小增加 1 KB。
 // 增量与语言固定提交验证见 docs/reports/native-batch-setting-20261011/。
-const MAX_USERSCRIPT_BYTES = 1_986_000;
+// 悬浮手势生命周期、同帧候选复用和保真词库摘要另增加 3,029 字节（0.1526%）：
+// 同依赖基线 fe7005dd9 为 1,985,411，候选为 1,988,440；预算最小增加 3 KB。
+// 定向验证与可重现增量见 docs/reports/hover-translation-polish-20261011/verification.json。
+const MAX_USERSCRIPT_BYTES = 1_989_000;
 const preludeStartMarker = '/* FluentRead userscript compatibility prelude:start */';
 const preludeEndMarker = '/* FluentRead userscript compatibility prelude:end */';
 const preludeStart = source.indexOf(preludeStartMarker);

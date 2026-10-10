@@ -1,7 +1,7 @@
 /**
  * @file src/features/floating-ball/content/runtime.ts
  * 文件职责：协调悬浮球组件在网页中的创建、恢复位置、显隐、全屏避让、高级外观同步、权威翻译状态同步和卸载，并向组件注入全文翻译、漫画连续翻译切换与打开设置页的动作。
- * 主要内容：维护单例 Shadow UI、迟到挂载 requestId、站点名单守卫、页面全屏显隐监听、响应式展示契约与配置订阅、全文与漫画会话订阅，并将拖动后的停靠侧和纵向比例作为同一配置补丁保存，提供 mountFloatingBall、toggleFloatingBallTranslation、unmountFloatingBall 三个生命周期入口。
+ * 主要内容：维护单例 Shadow UI、迟到挂载 requestId、站点名单守卫、页面全屏显隐监听、响应式展示契约与配置订阅、全文活动及结果状态和漫画会话订阅，并将拖动后的停靠侧和纵向比例作为同一配置补丁保存；卸载入口只释放自身 UI，不恢复独立的全文会话。
  * 模块边界：运行时只拥有挂载和桥接职责，不实现拖拽视觉、外观归一化或全文翻译算法；FloatingBall.vue 负责交互，core/config 负责字段归一化，full-page feature 提供翻译动作，配置持久化通过 services/config 完成。
  */
 import FloatingBall from '@/src/features/floating-ball/ui/FloatingBall.vue';
@@ -14,9 +14,12 @@ import {subscribeMangaTranslation, openMangaEntry, type MangaTranslationStatus} 
 import browser from 'webextension-polyfill';
 import {
   autoTranslateEnglishPage,
+  getTranslationToolbarStatus,
   isFullPageTranslationActive,
   restoreOriginalContent,
   subscribeFullPageTranslationProgress,
+  subscribeTranslationToolbarStatus,
+  type TranslationToolbarStatus,
 } from '@/src/features/full-page-translation/public';
 import type { ContentScriptContext } from 'wxt/utils/content-script-context';
 import type { ShadowRootContentScriptUi } from 'wxt/utils/content-script-ui/shadow-root';
@@ -25,6 +28,7 @@ import {createVueShadowUi, type VueShadowMount} from '@/src/platform/shadow-ui';
 interface FloatingBallExposed {
   toggleTranslation: () => void;
   setTranslationState: (isTranslating: boolean) => void;
+  setTranslationStatus: (status: TranslationToolbarStatus) => void;
   setPosition: (side: 'left' | 'right', verticalPosition: number | null) => void;
 }
 
@@ -34,6 +38,7 @@ let mountingPromise: Promise<FloatingBallExposed | null> | null = null;
 let mountRequestId = 0;
 let contentScriptContext: ContentScriptContext | null = null;
 let unsubscribeFullPageTranslationProgress: (() => void) | null = null;
+let unsubscribeTranslationToolbarStatus: (() => void) | null = null;
 let unsubscribePresentationConfig: (() => void) | null = null;
 let floatingBallPresentation: FloatingBallPresentation | null = null;
 let removeFullscreenListener: (() => void) | null = null;
@@ -122,6 +127,7 @@ export function mountFloatingBall(ctx?: ContentScriptContext) {
       showMenu: true,
       logoUrl: browser.runtime.getURL('/icon/128.png'),
       initialTranslating: isFullPageTranslationActive(),
+      initialTranslationStatus: getTranslationToolbarStatus(),
       presentation,
       manga,
       onMangaToggle: (event: MouseEvent) => { if (event.isTrusted) openMangaEntry(); },
@@ -148,7 +154,7 @@ export function mountFloatingBall(ctx?: ContentScriptContext) {
     mode: 'closed',
   }).then((ui) => {
     // 异步挂载返回时重新核对请求所有权，禁止已禁用的旧实例回到页面。
-    if (requestId !== mountRequestId || config.disableFloatingBall) {
+    if (requestId !== mountRequestId || config.disableFloatingBall || !isFloatingBallAllowedOnPage()) {
       ui.remove();
       return null;
     }
@@ -165,9 +171,13 @@ export function mountFloatingBall(ctx?: ContentScriptContext) {
     });
     floatingBallInstance = (ui.mounted?.instance as FloatingBallExposed | null | undefined) ?? null;
     if (floatingBallInstance) {
+      const instance = floatingBallInstance;
       unsubscribeFullPageTranslationProgress?.();
       unsubscribeFullPageTranslationProgress = subscribeFullPageTranslationProgress((progress) => {
-        floatingBallInstance?.setTranslationState(progress.active);
+        if (floatingBallInstance === instance) instance.setTranslationState(progress.active);
+      });
+      unsubscribeTranslationToolbarStatus = subscribeTranslationToolbarStatus((status) => {
+        if (floatingBallInstance === instance) instance.setTranslationStatus(status);
       });
     }
 
@@ -206,15 +216,14 @@ export function unmountFloatingBall() {
   unsubscribeMangaTranslation = null;
   unsubscribeFullPageTranslationProgress?.();
   unsubscribeFullPageTranslationProgress = null;
+  unsubscribeTranslationToolbarStatus?.();
+  unsubscribeTranslationToolbarStatus = null;
   unsubscribePresentationConfig?.();
   unsubscribePresentationConfig = null;
   removeFullscreenListener?.();
   removeFullscreenListener = null;
   floatingBallPresentation = null;
   if (floatingBallUi || floatingBallInstance) {
-    if (isFullPageTranslationActive()) {
-      restoreOriginalContent();
-    }
     floatingBallUi?.remove();
     floatingBallUi = null;
     floatingBallInstance = null;

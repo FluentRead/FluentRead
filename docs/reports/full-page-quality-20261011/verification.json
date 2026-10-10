@@ -1,0 +1,74 @@
+{
+  "baseline": "fe7005dd9597d566d83fe2ad5a276706b12ad0ca",
+  "date": "2026-10-11",
+  "scope": "Local code, controlled runtime tests, production Edge extension and bounded Google/Microsoft samples; no release or upload",
+  "performance": {
+    "files": 7,
+    "tests": 468,
+    "filesIncluded": [
+      "fullPageVisibilityScheduling",
+      "translationStability",
+      "fullPageAttributeBoundary",
+      "fullPagePriority",
+      "architecture/moduleBoundaries",
+      "fullPageRemountPreparation",
+      "syntheticSegmentFreshness"
+    ]
+  },
+  "interaction": {
+    "tests": 111
+  },
+  "reliability": {
+    "nativeAndBrokerTests": 31,
+    "contentLifecycleTests": 140,
+    "profileSwitchTests": 5
+  },
+  "architecture": {
+    "files": 33,
+    "tests": 1593
+  },
+  "testAudit": {
+    "files": 638,
+    "declaredCases": 10407
+  },
+  "strictCoverageModules": [
+    "src/features/full-page-translation/content/attributeMutationBatch.ts",
+    "src/features/full-page-translation/content/stateNotification.ts"
+  ],
+  "userscript": {
+    "bytes": 1979720,
+    "budget": 1986000,
+    "metadataIcon": "Existing immutable CDN resource; exact local committed PNG equality tested",
+    "runtimeIcon": "Embedded PNG; standalone metadata remains embedded"
+  },
+  "builds": {
+    "compile": "passed",
+    "chrome": "passed",
+    "firefox": "passed",
+    "userscript": "passed",
+    "userscriptVerifier": "passed",
+    "extensionManifests": "passed",
+    "docs": "passed"
+  },
+  "browser": {
+    "statusCases": 12,
+    "lifecycle": "passed",
+    "providerCases": 19,
+    "engine": "Edge 131.0.2903.147",
+    "launchMode": "macos-background-cdp",
+    "focusPolicy": "launchservices-no-foreground",
+    "browserFrontmost": false
+  },
+  "limits": [
+    "Operation counts do not prove whole-page CPU or network latency reductions.",
+    "Firefox build is not Firefox runtime evidence.",
+    "Cloud provider fixtures do not prove real paid API acceptance.",
+    "Microsoft literal entity sample was safely rejected and original text preserved; upstream corruption was not repaired.",
+    "No hosted CI, release, stores or all-site/device guarantee."
+  ],
+  "artifactsSha256": {
+    ".output/chrome-mv3/manifest.json": "fd80314b160701ed5500e584e1373f5eed44a19acdc6f8b76f9a12c1565970d8",
+    ".output/firefox-mv2/manifest.json": "2f4d6388a66e23f052933d6a4f972e3f65e841806a20f6b1d274fcf14d21a3ef",
+    ".output/userscript/fluent-read.user.js": "f5dd176da5f596f51691fc3ae7a2831859e4757ef0f3673bf0d4db70651b767f"
+  }
+}

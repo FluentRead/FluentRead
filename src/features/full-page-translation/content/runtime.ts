@@ -131,6 +131,7 @@ import {getSiteAdapterAttributeFilter} from '@/src/core/site-adaptation/compiler
 import {isElementNode, asHTMLElement, mutationTargetElement, allMutationNodesMatch, createTranslationAttributeMutationFilter, createTranslationMutationObserverOptions, isOwnSyntheticSegmentMarkerMutation, mutationRootContains as nodeContains, collapseMutationRescanRoot as broadRescanRoot} from './mutationObservation';
 import {isWithinTranslationModal, mayChangeTranslationModal} from './modalPriority';
 import {refreshModalSession, type ModalPrioritySession} from './modalSession';
+import {createAttributeMutationBatch} from './attributeMutationBatch';
 const translationSourceStability = new TranslationSourceStabilityGate<FullPageSession>({
     isCurrent: session => session.active && fullPageSession === session,
     resolve: resolveFullPageRetryCandidate, discover: scheduleDiscoveredCandidate, source: candidateLifecycleSource,
@@ -1791,7 +1792,31 @@ function createFullPageMutationObserver(
         // Preview <-> staging-span 记录反复遍历很长的 P。
         const shouldCheckAttribute = createTranslationAttributeMutationFilter();
         const resolveRemovedOwners = transferEquivalentBilingualOwners(session, mutations);
-        const reads = createTranslationMutationStabilityChecks();
+        const stabilityReads = createTranslationMutationStabilityChecks();
+        const attributeBatch = createAttributeMutationBatch({
+            resolveTargets: root => resolveStatefulMutationTargets(session, root),
+            readState: getTranslationState,
+            restoreOutsideScope: target => restoreStatefulTargetOutsideScope(session, target, reads),
+            sourceIsCurrent: (target, state) => reads.sourceIsCurrent(target, state),
+            isArtifact: isTranslationArtifact,
+            refreshSkeleton: (target, state) => withFullPageViewportAnchor(() =>
+                (reads.invalidate(), refreshBilingualTranslationSkeleton(target, state)), [target]),
+            restart: target => {
+                reads.invalidate();
+                restartStatefulTarget(session, target);
+            },
+            rescan: root => enqueueFullPageRescan(session, root),
+            schedule: (target, boundary) => scheduleStatefulAttributeReevaluation(session, target, boundary),
+            isActive: () => session.active && fullPageSession === session,
+            hasTargetsOnlyAdapter: core.adapters.some(adapter => adapter.genericCandidatePolicy === 'targets-only'),
+        });
+        const reads = {
+            ...stabilityReads,
+            invalidate: () => {
+                stabilityReads.invalidate();
+                attributeBatch.invalidate();
+            },
+        };
         for (const mutation of mutations) {
             if (isOwnMutation(mutation, loadingSyntheticChecks)) continue;
             const mutationElement = mutationTargetElement(mutation.target);
@@ -1888,42 +1913,11 @@ function createFullPageMutationObserver(
                 const affectedRoot = siteAttributeMutation
                     ? siteAttributes === null ? document.documentElement : getComposedParent(mutationElement) ?? mutationElement
                     : mutationElement;
-                const targets = resolveStatefulMutationTargets(session, affectedRoot);
-                const directTargets = siteAttributeMutation
-                    ? new Set(resolveStatefulMutationTargets(session, mutationElement))
-                    : null;
-                if (targets.length > 0) {
-                    for (const target of targets) {
-                        const targetState = getTranslationState(target);
-                        const deferBoundary = (mutation.attributeName === "class" || mutation.attributeName === "style") &&
-                            Boolean(targetState && !targetState.syntheticSegment && targetState.allowTopLevelApplicationShell !== true);
-                        if (siteAttributeMutation && !deferBoundary && restoreStatefulTargetOutsideScope(session, target, reads)) continue;
-                        if (mutation.attributeName === "class" || mutation.attributeName === "style") {
-                            scheduleStatefulAttributeReevaluation(session, target, siteAttributeMutation && deferBoundary);
-                        } else {
-                            const state = getTranslationState(target);
-                            // 关系选择器需要广域复验，但不相关节点的属性写入不应取消有效请求。
-                            // 普通 owner 已在上面通过候选边界复验；focus 的合成段保持保守重扫，
-                            // 因其来源已物化，不能只用原文相同推断仍命中显式正文 selector。
-                            if (state && directTargets && !directTargets.has(target) &&
-                                (!state.syntheticSegment || !core.adapters.some(adapter => adapter.genericCandidatePolicy === 'targets-only')) &&
-                                reads.sourceIsCurrent(target, state)) continue;
-                            if (state && !isTranslationArtifact(mutation.target) &&
-                                !reads.sourceIsCurrent(target, state) &&
-                                withFullPageViewportAnchor(() =>
-                                    (reads.invalidate(), refreshBilingualTranslationSkeleton(target, state)), [target])) continue;
-                            reads.invalidate();
-                            restartStatefulTarget(session, target);
-                        }
-                    }
-                } else {
-                    // hidden/aria-hidden/style/class 变化可能让原先被屏蔽的子树重新可见。
-                    enqueueFullPageRescan(session, mutationElement);
-                }
-                if (siteAttributeMutation) enqueueFullPageRescan(session, affectedRoot);
+                attributeBatch.process(affectedRoot, mutationElement, mutation.target, mutation.attributeName, siteAttributeMutation);
             }
         }
         refreshFullPageModal(session);
+        attributeBatch.flush();
     });
 }
 

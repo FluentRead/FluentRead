@@ -63,4 +63,13 @@ describe('PDF fixed-font complete-text pagination', () => {
         const narrow = {...plan, entries: [{kind: 'region' as const, id: 'wide', pageNumber: 1, role: 'table', sourceRect: {x: 0, y: 0, width: 1000, height: 10}, segmentIndexes: []}]};
         expect(paginatePdfReadingPlan(narrow, measure)[0].items[0]).toMatchObject({width: 528, height: 5.28});
     });
+    it('rejects unbounded source strips and consumes subpixel tails without extra loops', () => {
+        const region = (width: number, height: number): PdfReadingPlan => ({pageNumber: 1, hasTranslation: true, entries: [{kind: 'region', id: 'r', pageNumber: 1, role: 'figure', sourceRect: {x: 0, y: 0, width, height}, segmentIndexes: []}]});
+        expect(() => paginatePdfReadingPlan(region(100, Number.MAX_VALUE), measure)).toThrow('合理页数');
+        const pages = paginatePdfReadingPlan(region(100, 944.0000000000001), measure);
+        const strips = pages.flatMap(page => page.items).filter(item => item.kind === 'region');
+        expect(strips.length).toBeLessThanOrEqual(3);
+        expect(strips.reduce((sum, item) => sum + item.sourceRect.height, 0)).toBeCloseTo(944.0000000000001);
+        expect(paginatePdfReadingPlan(region(Number.MAX_VALUE, Number.MIN_VALUE), measure)).toEqual([]);
+    });
 });

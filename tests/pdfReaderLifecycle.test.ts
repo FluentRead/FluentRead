@@ -396,6 +396,57 @@ const click = (element: Element | null | undefined): void => {element!.dispatchE
 const classes = (element: Element | null | undefined): string[] => (element!.getAttribute('class') ?? '').split(/\s+/).filter(Boolean);
 function flushFrames(): void {const callbacks = [...frames.values()]; frames.clear(); callbacks.forEach(callback => callback(0));}
 
+describe('PDF document pinch zoom integration', () => {
+    it('keeps the pointer over the same page point and reuses raster output until the pinch settles', async () => {
+        const {root, viewport, state} = mountReader(model());
+        await componentFlush();
+        viewport.scrollTop = 0; viewport.scrollLeft = 0;
+        viewport.getBoundingClientRect = () => ({left: 100, top: 50, width: 920, height: 600} as DOMRect);
+        const column = root.querySelector('.pdf-page-column') as HTMLElement;
+        column.getBoundingClientRect = () => {
+            const stage = column.parentElement!, row = stage.parentElement!;
+            const width = parseFloat(stage.style.getPropertyValue('--pdf-page-width'));
+            const height = parseFloat(stage.style.getPropertyValue('--pdf-page-height'));
+            const listWidth = Math.max(920, parseFloat(row.parentElement!.style.getPropertyValue('width')));
+            const left = 100 + (listWidth - width) / 2 - viewport.scrollLeft;
+            const top = 50 + parseFloat(row.style.getPropertyValue('top')) - viewport.scrollTop;
+            return {left, right: left + width, top, bottom: top + height, width, height} as DOMRect;
+        };
+        const before = column.getBoundingClientRect(), point = {clientX: 400, clientY: 400};
+        const x = (point.clientX - before.left) / before.width, y = (point.clientY - before.top) / before.height;
+        const raster = state.rasterScale, renders = pdfPage.render.mock.calls.length;
+        vi.useFakeTimers();
+        try {
+            state.setGestureZoom(2, point); await componentFlush(); flushFrames(); await componentFlush();
+            const after = column.getBoundingClientRect();
+            expect(after.left + after.width * x).toBeCloseTo(point.clientX, 8);
+            expect(after.top + after.height * y).toBeCloseTo(point.clientY, 8);
+            expect(viewport.scrollLeft).toBeGreaterThan(0);
+            expect(state.rasterScale).toBe(raster); expect(pdfPage.render).toHaveBeenCalledTimes(renders);
+            expect(root.querySelector('.pdf-page-list')!.getAttribute('style')).toContain('width:1248px');
+            await vi.advanceTimersByTimeAsync(160); await componentFlush();
+            expect(state.rasterScale).toBe(2); expect(pdfPage.render.mock.calls.length).toBeGreaterThan(renders);
+            state.resetZoom(); await componentFlush();
+            expect(state.zoom).toBe('fit'); expect(state.rasterScale).toBe(state.scale);
+        } finally {vi.useRealTimers();}
+    });
+
+    it('cancels a queued gesture when replacing or closing the document', async () => {
+        const {viewport, state, currentDocument} = mountReader(model(2));
+        await componentFlush();
+        const wheel = () => {
+            const event = new document.defaultView!.Event('wheel', {bubbles: true, cancelable: true});
+            Object.assign(event, {ctrlKey: true, metaKey: false, deltaY: -100, deltaMode: 0, clientX: 300, clientY: 300});
+            viewport.dispatchEvent(event); expect(event.defaultPrevented).toBe(true);
+        };
+        const initial = state.scale;
+        wheel(); currentDocument.value = model(2); await componentFlush(); flushFrames(); await componentFlush();
+        expect(state.zoom).toBe('fit'); expect(state.scale).toBe(initial);
+        wheel(); mountedApp.unmount(); mountedApp = undefined; flushFrames(); await componentFlush();
+        expect(frames.size).toBe(0); expect(state.zoom).toBe('fit');
+    });
+});
+
 function nativeInformationPaint() {
     const original = document.defaultView!; const registry = new Map<string, Set<Range>>();
     Object.defineProperty(document, 'defaultView', {configurable: true, value: new Proxy(original, {get(target, key) {

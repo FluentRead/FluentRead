@@ -116,6 +116,8 @@ export interface PdfDocumentPage {
     segmentIndexes: number[];
     blocks: PdfDocumentBlock[];
     preservedRegions?: PdfPreservedRegion[];
+    /** 细分隔线只限制原位译文的可用空白，不作为重排阅读的图形区域。 */
+    layoutBoundaries?: Array<Pick<PdfDocumentRun, 'x' | 'y' | 'width' | 'height'>>;
     /** 整页是一张图像且没有任何文字（扫描页），等待文字识别；识别之后不再标记。 */
     scanned?: boolean;
 }

@@ -222,6 +222,28 @@ afterEach(async () => {
 });
 
 describe('document user actions: configuration consumers', () => {
+    it('defaults to batching for each document and retains a local opt-out without saving global settings', async () => {
+        const globalBatching = ports.config.enableAIMultiSegment;
+        await importFiles(file('batch-first.txt', 'First passage.\n\nSecond passage.'), file('batch-second.txt', 'Third passage.\n\nFourth passage.'));
+        const localToggle = () => find(node => node.tag === 'input' && node.type === 'checkbox', find(node => String(node.props.class).includes('document-batch-translation')));
+        expect(localToggle().checked).toBe(true);
+        await fire(localToggle(), 'change', {checked: false});
+        await fire(translateButton(), 'click');
+        await vi.waitFor(() => expect(ports.single).toHaveBeenCalledTimes(2));
+        expect(ports.batch).not.toHaveBeenCalled();
+        await vi.waitFor(() => expect(button('下载文件 ↓', taskbar()).props.disabled).toBe(false));
+        await selectFile('batch-second.txt');
+        expect(localToggle().checked).toBe(true);
+        await fire(translateButton(), 'click');
+        await vi.waitFor(() => expect(ports.batch).toHaveBeenCalledOnce());
+        expect(ports.batch.mock.calls[0][0]).toEqual(['Third passage.', 'Fourth passage.']);
+        await flush();
+        await selectFile('batch-first.txt');
+        expect(localToggle().checked).toBe(false);
+        expect(ports.config.enableAIMultiSegment).toBe(globalBatching);
+        expect(ports.send).not.toHaveBeenCalled();
+    });
+
     it('retains the latest successful language after an older failed save and its authoritative current-state rollback broadcast', async () => {
         await importFiles(file('late-save.txt'));
         const old = deferred<unknown>(undefined); ports.send.mockReturnValueOnce(old.promise);
@@ -240,13 +262,14 @@ describe('document user actions: configuration consumers', () => {
     it('saves document service, language and explicit empty glossary selection through the rendered form and uses them in translation', async () => {
         broadcast({glossaryEnabled: true}); await flush();
         await importFiles(file('form.txt'));
+        await fire(button('翻译设置', taskbar()), 'click');
+        expect(dialog('document-settings-heading').open).toBe(true);
         await fire(labelled('文档翻译服务'), 'change', {value: 'freeTranslation'});
         await fire(labelled('文档源语言'), 'change', {value: 'en'});
         await fire(labelled('document glossary port'), 'click');
         expect(ports.send.mock.calls.map(([message]) => message.patch)).toEqual([
             {documentService: 'freeTranslation'}, {from: 'en'}, {documentGlossaryIds: []},
         ]);
-        await fire(labelled('调整文档翻译设置'), 'click');
         await fire(button('开始翻译', dialog('document-settings-heading')), 'click');
         expect(dialog('document-settings-heading').open).toBe(false);
         expect(ports.batch).toHaveBeenCalledWith(['Original text.'], 'form.txt', expect.objectContaining({
@@ -318,7 +341,7 @@ describe('document user actions: configuration consumers', () => {
         await fire(labelled('文档翻译模型'), 'change', {value: models.get('openai')![0]});
         expect(ports.send.mock.calls.at(-1)![0].patch.documentModel.openai).toBe(models.get('openai')![0]);
         await fire(translateButton(), 'click');
-        expect(ports.single).toHaveBeenCalledWith('Original text.', 'model.txt', expect.objectContaining({modelOverride: models.get('openai')![0]}));
+        expect(ports.batch).toHaveBeenCalledWith(['Original text.'], 'model.txt', expect.objectContaining({modelOverride: models.get('openai')![0], aiMultiSegment: true}));
     });
 });
 
@@ -792,14 +815,14 @@ describe('document user actions: confirmation and task consumers', () => {
         const content = Array.from({length: 18}, (_, i) => `Paragraph ${i}`).join('\n\n');
         await importFiles(file('resume.txt', content));
         const late = deferred<string[]>(['late 16', 'late 17']);
-        // 每批 8 段、三批同时在途：前两批完成并保留，第三批在暂停之后才返回。
-        ports.batch.mockResolvedValueOnce(Array.from({length: 8}, (_, i) => `kept ${i}`)).mockResolvedValueOnce(Array.from({length: 8}, (_, i) => `kept ${i + 8}`)).mockReturnValueOnce(late.promise);
+        // 一批 16 段完成并保留，余下两段在暂停之后才返回。
+        ports.batch.mockResolvedValueOnce(Array.from({length: 16}, (_, i) => `kept ${i}`)).mockReturnValueOnce(late.promise);
         await fire(translateButton(), 'click');
-        expect(ports.batch).toHaveBeenCalledTimes(3);
-        expect(ports.batch.mock.calls.map(call => call[0].length)).toEqual([8, 8, 2]);
+        expect(ports.batch).toHaveBeenCalledTimes(2);
+        expect(ports.batch.mock.calls.map(call => call[0].length)).toEqual([16, 2]);
         expect(labelled('文档翻译进度').props['aria-valuenow']).toBe(88);
         await fire(button('暂停翻译'), 'click');
-        const signal = ports.batch.mock.calls[2][2].signal;
+        const signal = ports.batch.mock.calls[1][2].signal;
         expect(signal.aborted).toBe(true);
         late.resolve(['late 16', 'late 17']); await flush();
         expect(textOf(taskbar())).toContain('已暂停');

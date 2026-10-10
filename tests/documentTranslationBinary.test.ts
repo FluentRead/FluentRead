@@ -1,7 +1,7 @@
 import {readFileSync} from 'node:fs';
 
 import JSZip from 'jszip';
-import {PDFDocument, PDFImage} from 'pdf-lib';
+import {PDFArray, PDFDict, PDFDocument, PDFHexString, PDFImage, PDFName, PDFNumber, PDFRawStream} from 'pdf-lib';
 import {describe, expect, it, vi} from 'vitest';
 
 import {
@@ -24,6 +24,7 @@ const onePixelPng = Uint8Array.from(Buffer.from(
     'base64',
 ));
 const testRasterizer: PdfPageRasterizer = async () => onePixelPng;
+const onePixelJpeg = Uint8Array.from(Buffer.from('/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAAIBAQEBAQIBAQECAgICAgQDAgICAgUEBAMEBgUGBgYFBgYGBwkIBgcJBwYGCAsICQoKCgoKBggLDAsKDAkKCgr/2wBDAQICAgICAgUDAwUKBwYHCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgr/wAARCAABAAEDASIAAhEBAxEB/8QAFQABAQAAAAAAAAAAAAAAAAAAAAn/xAAUEAEAAAAAAAAAAAAAAAAAAAAA/8QAFAEBAAAAAAAAAAAAAAAAAAAAAP/EABQRAQAAAAAAAAAAAAAAAAAAAAD/2gAMAwEAAhEDEQA/AL+AA//Z', 'base64'));
 
 it('reports PDF import page progress, yields to input, and supports page-boundary cancellation', async () => {
     const pdf = await PDFDocument.create();
@@ -57,6 +58,115 @@ function copyArrayBuffer(bytes: Uint8Array): ArrayBuffer {
 }
 
 describe('binary document translation formats', () => {
+    it.each(['bilingual', 'translated'] as const)('exports one original-layout %s page per source page without reflow snapshots', async mode => {
+        const parsed = await parseBinaryDocument('sample.pdf', loadBytes('sample.pdf'));
+        const raster = vi.fn(testRasterizer);
+        const reading = vi.fn(async function* () {yield {bytes: onePixelPng, width: 612, height: 792};});
+        const download = await createDocumentDownload(parsed, parsed.segments.map(() => '完整译文'), mode, {
+            pdfPageRasterizer: raster, pdfReadingRasterizer: reading, pdfPresentation: 'layout',
+        });
+        const result = await PDFDocument.load(download.data as Uint8Array);
+        const binary = parsed.binary;
+        const sourcePages = binary?.kind === 'pdf' ? binary.pages : [];
+        expect(result.getPageCount()).toBe(sourcePages.length);
+        expect(result.getPages().map(page => page.getSize())).toEqual(sourcePages.map(page => ({
+            width: mode === 'bilingual' ? page.width * 2 + Math.max(8, Math.min(24, page.width * 0.025)) : page.width, height: page.height,
+        })));
+        expect(raster.mock.calls.map(([page]) => page.pageNumber)).toEqual([1, 2]);
+        expect(raster.mock.calls.every(([page]) => page.imageFormat === 'jpeg')).toBe(true);
+        expect(reading).not.toHaveBeenCalled();
+    });
+
+    it.each([0, 90, 180, 270] as const)('embeds JPEG data directly and preserves full Unicode overflow notes on the translated side at %s degrees', async rotation => {
+        const source = await PDFDocument.create();
+        source.addPage([400, 600]).drawText('First page', {x: 40, y: 300});
+        const parsed = await parseBinaryDocument('notes.pdf', await source.save());
+        if (parsed.binary?.kind !== 'pdf') throw new Error('PDF expected');
+        const quarter = rotation === 90 || rotation === 270;
+        const pageData = {...parsed.binary.pages[0], rotation, width: quarter ? 600 : 400, height: quarter ? 400 : 600};
+        const model = {...parsed, binary: {...parsed.binary, pages: [pageData]}};
+        const full = '全文 中文 👩‍💻 beyond the visible excerpt '.repeat(40);
+        const png = vi.spyOn(PDFDocument.prototype, 'embedPng');
+        const jpeg = vi.spyOn(PDFDocument.prototype, 'embedJpg');
+        try {
+            // 外部端口可返回共享 buffer 的切片；JPEG 解析仍必须从切片开头读取。
+            const backing = new Uint8Array(onePixelJpeg.length + 4); backing.set(onePixelJpeg, 2);
+            const download = await createDocumentDownload(model, parsed.segments.map(() => full), 'bilingual', {
+                pdfPageRasterizer: async () => ({data: backing.subarray(2, -2), format: 'jpeg', overflowNotes: [{segmentIndex: 0, text: full, x: 40, y: 60, width: 200, height: 80}]}),
+            });
+            expect(jpeg).toHaveBeenCalledOnce(); expect(png).not.toHaveBeenCalled();
+            const result = await PDFDocument.load(download.data as Uint8Array);
+            expect(result.getPageCount()).toBe(1);
+            const page = result.getPage(0);
+            const annotation = page.node.Annots()!.lookup(0, PDFDict);
+            expect(annotation.lookup(PDFName.of('Subtype'), PDFName).asString()).toBe('/Text');
+            expect(annotation.lookup(PDFName.of('Contents'), PDFHexString).decodeText()).toBe(full);
+            expect(annotation.lookup(PDFName.of('F'), PDFNumber).asNumber()).toBe(0);
+            const rect = annotation.lookup(PDFName.of('Rect'), PDFArray).asArray().map(value => Number(value.toString()));
+            const offset = pageData.width + Math.max(8, Math.min(24, pageData.width * 0.025));
+            expect(rect[0]).toBeGreaterThanOrEqual(offset);
+            expect([offset + 4, offset + pageData.width - 18]).toContain(rect[0]);
+            expect(rect[2]).toBeLessThanOrEqual(page.getWidth());
+            expect(rect[1]).toBeGreaterThanOrEqual(0); expect(rect[3]).toBeLessThanOrEqual(page.getHeight());
+        } finally {png.mockRestore(); jpeg.mockRestore();}
+    });
+
+    it.each(['bilingual', 'translated'] as const)('keeps full-bleed overflow annotations accessible without painting icons on source content in %s output', async mode => {
+        const source = await PDFDocument.create();
+        source.addPage([400, 600]).drawText('Original', {x: 40, y: 300, size: 12});
+        const parsed = await parseBinaryDocument('full-bleed.pdf', await source.save());
+        if (parsed.binary?.kind !== 'pdf') throw new Error('PDF expected');
+        const pageData = parsed.binary.pages[0];
+        const model = {...parsed, binary: {...parsed.binary, pages: [{...pageData, blocks: [{...pageData.blocks[0], x: 0, y: 0, width: 400, height: 600}]}]}};
+        const full = 'Full long translation 中文';
+        const download = await createDocumentDownload(model, [full], mode, {pdfPageRasterizer: async () => ({data: onePixelJpeg, format: 'jpeg', overflowNotes: [
+            {segmentIndex: 0, text: full, x: 0, y: 0, width: 400, height: 600}, {segmentIndex: 1, text: full, x: 0, y: 0, width: 400, height: 600},
+        ]})});
+        const result = await PDFDocument.load(download.data as Uint8Array);
+        const annotations = result.getPage(0).node.Annots()!;
+        expect(annotations.size()).toBe(2);
+        const rectangles = [];
+        for (let index = 0; index < annotations.size(); index += 1) {
+            const note = annotations.lookup(index, PDFDict);
+            expect(note.lookup(PDFName.of('Contents'), PDFHexString).decodeText()).toBe(full);
+            expect(note.lookup(PDFName.of('F'), PDFNumber).asNumber() & 4).toBe(0);
+            const appearance = note.lookup(PDFName.of('AP'), PDFDict).lookup(PDFName.of('N'));
+            if (!(appearance instanceof PDFRawStream)) throw new Error('Appearance stream expected');
+            const rect = note.lookup(PDFName.of('Rect'), PDFArray).asArray().map(value => Number(value.toString()));
+            rectangles.push(rect);
+            if (mode === 'bilingual') {
+                expect(rect[0]).toBeGreaterThanOrEqual(400); expect(rect[2]).toBeLessThanOrEqual(410);
+                expect(appearance.getContentsSize()).toBeGreaterThan(0);
+            } else expect(appearance.getContentsSize()).toBe(0);
+        }
+        if (mode === 'bilingual') expect(Math.abs(rectangles[0][1] - rectangles[1][1])).toBeGreaterThanOrEqual(18);
+    });
+
+    it('cancels a pending custom rasterizer and an active PDF save promptly', async () => {
+        const parsed = await parseBinaryDocument('sample.pdf', loadBytes('sample.pdf'));
+        const translations = parsed.segments.map(() => '译文');
+        const controller = new AbortController();
+        let resolveRaster!: (value: Uint8Array) => void;
+        const raster = vi.fn(() => new Promise<Uint8Array>(resolve => {resolveRaster = resolve;}));
+        const pending = createDocumentDownload(parsed, translations, 'translated', {pdfPageRasterizer: raster, signal: controller.signal});
+        void pending.catch(() => undefined);
+        await vi.waitFor(() => expect(raster).toHaveBeenCalledOnce());
+        controller.abort(new Error('raster canceled'));
+        await expect(pending).rejects.toThrow('raster canceled');
+        resolveRaster(onePixelPng);
+        const savingController = new AbortController();
+        let resolveSave!: (value: Uint8Array) => void;
+        const save = vi.spyOn(PDFDocument.prototype, 'save').mockImplementationOnce(() => new Promise<Uint8Array>(resolve => {resolveSave = resolve;}));
+        try {
+            const saving = createDocumentDownload(parsed, translations, 'translated', {pdfPageRasterizer: testRasterizer, signal: savingController.signal});
+            void saving.catch(() => undefined);
+            await vi.waitFor(() => expect(save).toHaveBeenCalledOnce());
+            savingController.abort(new Error('save canceled'));
+            await expect(saving).rejects.toThrow('save canceled');
+            resolveSave(new Uint8Array([1]));
+        } finally {save.mockRestore();}
+    });
+
     it.each(['bilingual', 'translated'] as const)('streams complete reading continuation pages in %s output', async mode => {
         const parsed = await parseBinaryDocument('sample.pdf', loadBytes('sample.pdf'));
         const translations = parsed.segments.map(segment => `完整译文 ${segment.source} 尾文`);
@@ -78,25 +188,25 @@ describe('binary document translation formats', () => {
         expect(result.getPages().filter(page => page.getWidth() === 612).every(page => page.getHeight() === 792)).toBe(true);
     });
 
-    it('keeps layout preview plus full reading pages and closes an active iterator on cancellation', async () => {
+    it('closes an explicitly requested reading iterator on cancellation without adding a layout snapshot', async () => {
         const parsed = await parseBinaryDocument('sample.pdf', loadBytes('sample.pdf'));
         const translations = parsed.segments.map(() => '完整尾文');
         const raster = vi.fn(testRasterizer);
         const controller = new AbortController();
         let released = false;
         await expect(createDocumentDownload(parsed, translations, 'translated', {
-            pdfPresentation: 'layout', pdfPageRasterizer: raster, signal: controller.signal,
+            pdfPresentation: 'readable', pdfPageRasterizer: raster, signal: controller.signal,
             pdfReadingRasterizer: async function* () {
                 try {yield {bytes: onePixelPng, width: 612, height: 792}; controller.abort(new Error('canceled')); yield {bytes: onePixelPng, width: 612, height: 792};}
                 finally {released = true;}
             },
         })).rejects.toThrow('canceled');
-        expect(released).toBe(true); expect(raster).toHaveBeenCalledOnce();
+        expect(released).toBe(true); expect(raster).not.toHaveBeenCalled();
         const download = await createDocumentDownload(parsed, translations, 'translated', {
-            pdfPresentation: 'layout', pdfPageRasterizer: raster,
+            pdfPresentation: 'readable', pdfPageRasterizer: raster,
             pdfReadingRasterizer: async function* () {yield {bytes: onePixelPng, width: 612, height: 792};},
         });
-        expect((await PDFDocument.load(download.data as Uint8Array)).getPageCount()).toBe(4);
+        expect((await PDFDocument.load(download.data as Uint8Array)).getPageCount()).toBe(2);
         expect(translations.every(value => value === '完整尾文')).toBe(true);
     });
 
@@ -189,7 +299,7 @@ describe('binary document translation formats', () => {
             return image;
         });
         try {
-            await createDocumentDownload(parsed, [], 'translated', {
+            await createDocumentDownload(parsed, parsed.segments.map(() => '译文'), 'translated', {
                 pdfPageRasterizer: async () => {
                     // pdf-lib clears its PNG embedder only after embed(), releasing RGB pixels.
                     for (const image of images) expect((image as any).embedder).toBeUndefined();
@@ -444,14 +554,14 @@ describe('binary document translation formats', () => {
     });
 });
 
-it('全页译文相同的双语 PDF 保留一张原页并跳过光栅重绘', async () => {
+it('全页译文相同的双语 PDF 保留左右对照尺寸并跳过光栅重绘', async () => {
     const source = await PDFDocument.create(); source.addPage([400, 600]).drawText('Same original page');
     const parsed = await parseBinaryDocument('same.pdf', await source.save());
     const rasterizer = vi.fn(testRasterizer);
     const output = await createDocumentDownload(parsed, parsed.segments.map(segment => ` ${segment.source} `), 'bilingual', {pdfPageRasterizer: rasterizer});
     expect(rasterizer).not.toHaveBeenCalled();
     const result = await PDFDocument.load(output.data as Uint8Array);
-    expect(result.getPageCount()).toBe(1); expect(result.getPage(0).getSize()).toEqual({width: 400, height: 600});
+    expect(result.getPageCount()).toBe(1); expect(result.getPage(0).getSize()).toEqual({width: 810, height: 600});
 });
 
 it('相同 DOCX 译文在双语和仅译文导出均保留原有结构', async () => {

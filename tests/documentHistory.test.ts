@@ -1,15 +1,79 @@
 /**
  * @file tests/documentHistory.test.ts
- * 文件职责：验证“最近翻译”的本地存取：稳定标识、摘要列表、恢复、淘汰与存储不可用时的安静降级。
- * 主要内容：使用内存 IndexedDB 真实执行读写；检查列表不含文件字节并按最近更新时间排序，保存的是调用方数据的副本，条数与总字节超限时淘汰最旧记录，过大或没有标识的记录不保存，数据库缺失或出错时返回空结果而不抛出。
+ * 文件职责：验证“最近翻译”的本地存取与解析迁移：稳定标识、摘要列表、按原文恢复独立校订、淘汰与存储不可用时的安静降级。
+ * 主要内容：使用内存 IndexedDB 真实执行读写；检查解析版本和分段位置变化时只复用未变化原文，重复片段逐次恢复而不跳过空译文，没有旧原文时仅采用同版本同数量的兼容恢复；检查列表不含文件字节并按最近更新时间排序，保存的是调用方数据的副本，条数与总字节超限时淘汰最旧记录，过大或没有标识的记录不保存，数据库缺失或出错时返回空结果而不抛出。
  * 模块边界：只测试历史存储服务，不挂载页面、不解析文档、不发起翻译。
  */
 import {IDBFactory} from 'fake-indexeddb';
 import {describe, expect, it} from 'vitest';
-import {createDocumentHistory, documentHistoryId, DOCUMENT_HISTORY_MAX_BYTES, DOCUMENT_HISTORY_MAX_ENTRIES, type DocumentHistoryRecord} from '@/src/features/document-translation/services/history';
+import {parseDocument} from '@/src/features/document-translation/core/document';
+import {createDocumentHistory, documentHistoryId, restoreDocumentHistoryTranslations, DOCUMENT_HISTORY_MAX_BYTES, DOCUMENT_HISTORY_MAX_ENTRIES, type DocumentHistoryRecord} from '@/src/features/document-translation/services/history';
 
 const record = (id: string, updatedAt: number, extra: Partial<DocumentHistoryRecord> = {}): DocumentHistoryRecord => ({id, name: `${id}.pdf`, format: 'pdf', size: 3, total: 4, completed: 2, updatedAt,
     bytes: new Uint8Array([1, 2, 3]), mimeType: 'application/pdf', translations: ['甲', '', '丙', ''], fingerprint: 'fp', ...extra});
+const parsed = (sources: string[]) => ({...parseDocument('restored.txt', ''), segments: sources.map((source, id) => ({id, source}))});
+
+describe('document history translation migration', () => {
+    it('restores by source after a reorder even when the version and segment count still match', () => {
+        const saved = record('reordered', 1, {parsed: parsed(['First', 'Second']), parsedVersion: 7, total: 2, translations: ['第一段校订', '第二段校订']});
+        const before = JSON.stringify(saved);
+        expect(restoreDocumentHistoryTranslations(saved, parsed(['Second', 'First']), 7)).toEqual(['第二段校订', '第一段校订']);
+        expect(JSON.stringify(saved)).toBe(before);
+    });
+    it('keeps unchanged sources across inserted, removed and changed segments without synthesizing a merged translation', () => {
+        const saved = record('changed', 1, {parsed: parsed(['Left', 'Right', 'Case', ' Spaced ']), parsedVersion: 6, total: 4,
+            translations: ['左侧校订', '右侧校订', '大小写校订', '空格校订']});
+        expect(restoreDocumentHistoryTranslations(saved, parsed(['Inserted', 'Right', 'Left Right', 'case', 'Spaced', 'Left']), 7))
+            .toEqual(['', '右侧校订', '', '', '', '左侧校订']);
+    });
+    it('preserves independent duplicate revisions in occurrence order when repetitions are removed or added', () => {
+        const saved = record('duplicates', 1, {parsed: parsed(['Repeat', 'Between', 'Repeat', 'Repeat']), total: 4,
+            translations: ['第一次校订', '中间校订', '第二次校订', '第三次校订']});
+        expect(restoreDocumentHistoryTranslations(saved, parsed(['Repeat', 'Repeat']), 7)).toEqual(['第一次校订', '第二次校订']);
+        expect(restoreDocumentHistoryTranslations(saved, parsed(['Repeat', 'New', 'Repeat', 'Between', 'Repeat', 'Repeat']), 7))
+            .toEqual(['第一次校订', '', '第二次校订', '中间校订', '第三次校订', '']);
+    });
+    it('consumes empty and whitespace duplicate slots without borrowing later completed revisions', () => {
+        const saved = record('empty-duplicates', 1, {parsed: parsed(['Repeat', 'Repeat', 'Repeat', 'Sparse']), total: 4,
+            translations: ['', ' \n ', '第三次校订']});
+        expect(restoreDocumentHistoryTranslations(saved, parsed(['Repeat', 'Repeat', 'Repeat', 'Sparse']), 7))
+            .toEqual(['', ' \n ', '第三次校订', '']);
+        expect(restoreDocumentHistoryTranslations(saved, parsed(['Repeat']), 7)).toEqual(['']);
+    });
+    it('uses stored segment identifiers and tolerates legacy source snapshots without identifiers', () => {
+        const saved = record('identifiers', 1, {parsed: {segments: [{id: 2, source: 'Third slot'}, {id: 0, source: 'First slot'}, {id: 99, source: 'Missing slot'}]},
+            total: 3, translations: ['第一槽校订', '', '第三槽校订']});
+        expect(restoreDocumentHistoryTranslations(saved, parsed(['First slot', 'Third slot', 'Missing slot']), 7))
+            .toEqual(['第一槽校订', '第三槽校订', '']);
+        const legacy = record('legacy-identifiers', 1, {parsed: {segments: [{source: 'Legacy slot'}, {id: -1, source: 'Invalid id'}, {id: 1.5, source: 'Fractional id'}]},
+            total: 3, translations: ['旧索引校订', '负标识校订', '非整数标识校订']});
+        expect(restoreDocumentHistoryTranslations(legacy, parsed(['Invalid id', 'Fractional id', 'Legacy slot']), 7))
+            .toEqual(['负标识校订', '非整数标识校订', '旧索引校订']);
+    });
+    it('does not fall back to indexes when only part of the old source snapshot is usable', () => {
+        const saved = record('partial-snapshot', 1, {parsed: {segments: [null, 12, {source: 'Known'}, {source: ''}]},
+            parsedVersion: 7, total: 4, translations: ['错位旧译文', '另一错位旧译文', '已知校订', '空原文校订']});
+        expect(restoreDocumentHistoryTranslations(saved, parsed(['Unknown', '', 'Known', 'Different']), 7))
+            .toEqual(['', '空原文校订', '已知校订', '']);
+        expect(restoreDocumentHistoryTranslations(saved, parsed([]), 7)).toEqual([]);
+    });
+    it.each([undefined, null, 12, 'old snapshot', {}, {segments: null}, {segments: []}, {segments: [null, {source: 12}]}])
+        ('allows index compatibility only for missing sources from the same known parsing version: %j', snapshot => {
+            const saved = record('legacy', 1, {parsed: snapshot, parsedVersion: 7, total: 2, translations: ['第一槽校订']});
+            expect(restoreDocumentHistoryTranslations(saved, parsed(['First', 'Second']), 7)).toEqual(['第一槽校订', '']);
+        });
+    it.each([
+        {parsedVersion: undefined, currentVersion: 7, total: 2},
+        {parsedVersion: 6, currentVersion: 7, total: 2},
+        {parsedVersion: 7, currentVersion: 7, total: 3},
+        {parsedVersion: Infinity, currentVersion: Infinity, total: 2},
+        {parsedVersion: -1, currentVersion: -1, total: 2},
+        {parsedVersion: 1.5, currentVersion: 1.5, total: 2},
+    ])('refuses unsafe index recovery with unknown versions or mismatched counts: %j', ({parsedVersion, currentVersion, total}) => {
+        const saved = record('unsafe', 1, {parsedVersion, total, translations: ['错位旧译文', '另一错位旧译文']});
+        expect(restoreDocumentHistoryTranslations(saved, parsed(['First', 'Second']), currentVersion)).toEqual(['', '']);
+    });
+});
 
 describe('document history identity', () => {
     it('derives the same short identifier from the same bytes and a different one from different bytes', async () => {

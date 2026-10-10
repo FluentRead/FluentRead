@@ -1,9 +1,10 @@
 /**
  * @file src/features/document-translation/services/history.ts
  * 文件职责：在浏览器本地保存最近翻译过的文档及其译文，使文档翻译首页可以列出记录并一键恢复阅读。
- * 主要内容：以文件内容摘要为稳定标识，在独立的 IndexedDB 库中保存原始文件字节、解析结果快照、译文、进度与设置指纹；列表只返回不含文件字节的摘要并按最近更新时间排序；超过条数或总字节上限时淘汰最旧的记录；数据库不可用、被其他标签页占用而超时或读写失败时安静降级为“没有记录”，并在其他标签页需要升级或删除时让出连接，不影响打开和翻译文档。
- * 模块边界：只负责本地存取，不解析文档、不发起翻译、不读取配置，也不把任何内容发送到网络；页面状态与何时保存由文档页面组合根决定。
+ * 主要内容：以文件内容摘要为稳定标识，在独立的 IndexedDB 库中保存原始文件字节、解析结果快照、译文、进度与设置指纹；解析规则变化后按原文和重复出现次序恢复未变化片段的独立校订；列表只返回不含文件字节的摘要并按最近更新时间排序；超过条数或总字节上限时淘汰最旧的记录；数据库不可用、被其他标签页占用而超时或读写失败时安静降级为“没有记录”，并在其他标签页需要升级或删除时让出连接，不影响打开和翻译文档。
+ * 模块边界：只负责本地存取与已有译文匹配，不解析文档、不发起翻译、不读取配置，也不把任何内容发送到网络；页面状态、解析版本与何时保存由文档页面组合根决定。
  */
+import type {ParsedDocument} from '../core/document';
 
 export const DOCUMENT_HISTORY_MAX_ENTRIES = 20;
 export const DOCUMENT_HISTORY_MAX_BYTES = 80 * 1024 * 1024;
@@ -37,6 +38,47 @@ export interface DocumentHistory {
     save(record: DocumentHistoryRecord): Promise<boolean>;
     remove(id: string): Promise<void>;
     clear(): Promise<void>;
+}
+
+/**
+ * 重新解析时只复用原文完全相同的片段；重复原文逐次消费，空译文也占据自己的出现位置。
+ * 没有原文快照的旧记录仅在解析版本已知且一致、片段总数一致时按索引恢复。
+ */
+export function restoreDocumentHistoryTranslations(
+    record: Pick<DocumentHistoryRecord, 'parsed' | 'parsedVersion' | 'total' | 'translations'>,
+    document: ParsedDocument,
+    currentVersion: number,
+): string[] {
+    const snapshot = record.parsed && typeof record.parsed === 'object'
+        ? record.parsed as {segments?: unknown} : undefined;
+    const previous = Array.isArray(snapshot?.segments) ? snapshot.segments : [];
+    const bySource = new Map<string, {translations: string[]; next: number}>();
+    previous.forEach((segment: unknown, index: number) => {
+        if (!segment || typeof segment !== 'object') return;
+        const candidate = segment as {source?: unknown; id?: unknown};
+        if (typeof candidate.source !== 'string') return;
+        const slot = typeof candidate.id === 'number' && Number.isInteger(candidate.id) && candidate.id >= 0
+            ? candidate.id : index;
+        const translation = record.translations[slot];
+        let occurrences = bySource.get(candidate.source);
+        if (!occurrences) {
+            occurrences = {translations: [], next: 0};
+            bySource.set(candidate.source, occurrences);
+        }
+        occurrences.translations.push(typeof translation === 'string' ? translation : '');
+    });
+    if (bySource.size) {
+        return document.segments.map(segment => {
+            const occurrences = bySource.get(segment.source);
+            return occurrences ? occurrences.translations[occurrences.next++] ?? '' : '';
+        });
+    }
+    const compatible = Number.isInteger(currentVersion) && currentVersion >= 0
+        && record.parsedVersion === currentVersion && record.total === document.segments.length;
+    return document.segments.map((_segment, index) => {
+        const translation = compatible ? record.translations[index] : undefined;
+        return typeof translation === 'string' ? translation : '';
+    });
 }
 
 /** 文件名可以重复，内容摘要不会；同一份文件再次打开时接着上次的译文继续。 */

@@ -93,8 +93,10 @@ export function pdfLayoutLines(atoms: readonly PdfLayoutAtom[]): LayoutLine[] {
     for (const atom of [...unique].sort((a, b) => a.baseline - b.baseline || a.x - b.x)) {
         const row = rows.at(-1);
         const tolerance = row ? Math.max(2, Math.max(row.font, atom.fontSize) * 0.55) : 0;
+        // 同一行同时含抬高的上标与降低的下标时，二者跨度稍大；下标仍须贴近主行基线，不能单凭早来的上标将它切成下一行。
+        const firstTolerance = row && atom.fontSize <= row.font * 0.8 ? Math.max(tolerance, row.font * 0.8) : tolerance;
         // 双栏行距不同时，一栏的基线会落在另一栏两行之间；只与行首基线比较，避免它把上下两行接力串成一行。
-        if (!row || Math.abs(atom.baseline - row.baseline) > tolerance || atom.baseline - row.first > tolerance) rows.push({runs: [atom], font: atom.fontSize, baseline: atom.baseline, samples: 1, first: atom.baseline});
+        if (!row || Math.abs(atom.baseline - row.baseline) > tolerance || atom.baseline - row.first > firstTolerance) rows.push({runs: [atom], font: atom.fontSize, baseline: atom.baseline, samples: 1, first: atom.baseline});
         else {
             row.runs.push(atom);
             if (atom.fontSize > row.font * 1.15) {row.font = atom.fontSize; row.baseline = atom.baseline; row.samples = 1;}
@@ -204,7 +206,7 @@ const coversLine = (region: Rectangle, line: LayoutLine) => overlaps(region, lin
 function formulaLine(line: LayoutLine, pageWidth: number, lines: readonly LayoutLine[], font: number): boolean {
     // 与上下行同栏等宽、行距正常的行是两端对齐的正文，即使含有等号也不是独立公式。
     if (lines.some(near => near !== line && near.text.split(/\s+/u).length >= 5 && Math.abs(near.x - line.x) <= 1 && Math.abs(near.width - line.width) <= 2 && Math.abs(near.baseline - line.baseline) <= font * 1.6)) return false;
-    return line.text.length < 150 && line.width < pageWidth * 0.75 && /[=∑∫√∈¼]|ð[^Þ]*Þ|(?:softmax|Concat|FFN|MultiHead)\s*\(/u.test(line.text)
+    return line.text.length < 150 && line.width < pageWidth * 0.75 && /[=∑∫√∈≃≅≈≡≤≥≠¼]|ð[^Þ]*Þ|(?:softmax|Concat|FFN|MultiHead)\s*\(/u.test(line.text)
         && (Math.abs(line.x + line.width / 2 - pageWidth / 2) < pageWidth * 0.23 || /^[A-Za-z][\w (){},.]*\s*=/u.test(line.text) || /¼|ð[^Þ]*Þ/u.test(line.text))
         && !/^(?:Figure|Table)\s+\d/iu.test(line.text)
         && !/\b(?:the|we|our|of|to|and|is|in|this|with|for|that|use|each|are|from|used)\b/iu.test(line.text);
@@ -276,7 +278,8 @@ export function analyzePdfPageLayout(input: {atoms: readonly PdfLayoutAtom[]; gr
         const labels = inside.filter(line => textUnits(line.text) < 4 && line.fontSize < Math.min(font * 0.9, 11)).length;
         if (labels > Math.max(3, inside.length * 0.15)) return false;
         if (inside.some(line => textUnits(line.text) >= 4) && inside.reduce((sum, line) => sum + line.width * line.height, 0) >= area * 0.3) return true;
-        return area >= input.width * input.height * 0.35 && (median(inside.map(line => line.fontSize)) >= 12 || inside.filter(line => textUnits(line.text) >= 6).length >= inside.length / 2);
+        // 单个大字号标签不足以把整张图变成文字容器（嵌入图有时仍带被裁掉的标题文字层）。
+        return area >= input.width * input.height * 0.35 && (inside.length >= 3 && median(inside.map(line => line.fontSize)) >= 12 || inside.filter(line => textUnits(line.text) >= 6).length >= inside.length / 2);
     };
     const figures = mergedFigures(input.graphics, input.width, input.height, container);
     // 图形对象的包围盒常把题注一并圈入，上下相邻的两张图还会连同中间的题注并成一个区域；题注是需要翻译的正文，图形在题注处断开。
@@ -298,9 +301,10 @@ export function analyzePdfPageLayout(input: {atoms: readonly PdfLayoutAtom[]; gr
     // 插图上方的短居中标签属于图形本身；保留它们能让左右子图在裁剪后仍有完整标题。
     for (let index = 0; index < figures.length; index += 1) {
         const figure = figures[index];
-        const labels = lines.filter(line => bottom(line) <= figure.y && figure.y - line.baseline <= font * 2.5
-            && Math.abs(line.x + line.width / 2 - figure.x - figure.width / 2) <= font * 2
-            && line.height <= font * 1.7 && line.width < input.width * .45 && line.text.length <= 80
+        const labels = lines.filter(line => bottom(line) <= figure.y && figure.y - line.baseline <= Math.max(font, line.fontSize) * 2.5
+            && (Math.abs(line.x + line.width / 2 - figure.x - figure.width / 2) <= font * 2 || Math.abs(line.x - figure.x) <= font * 0.25)
+            && line.height <= Math.max(font, line.fontSize) * 1.7 && line.width < input.width * .45 && line.text.length <= 80
+            && !/^(?:\d+(?:\.\d+)*\.?|[IVXLC]+\.|[A-Z]\.)\s+\p{Lu}/u.test(line.text)
             && !/^(?:Figure|Table)\s+\d/iu.test(line.text) && !/[.!?。！？]$/u.test(line.text) && !/[=∑∫√∈]/u.test(line.text));
         labels.sort((a, b) => b.baseline - a.baseline);
         if (labels.length) figures[index] = union(figure, labels[0]);

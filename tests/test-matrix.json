@@ -170,6 +170,7 @@
       "tests/quickTranslationRuntime.test.ts",
       "tests/requestConfigSnapshot.test.ts",
       "tests/documentTranslationPresentation.test.ts",
+      "tests/documentZoom.test.ts",
       "tests/selectionTranslatorCore.test.ts",
       "tests/selectionTranslatorLifecycle.test.ts",
       "tests/selectionTtsContentController.test.ts",

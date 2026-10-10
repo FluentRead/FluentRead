@@ -198,10 +198,12 @@ describe('real rotated PDF import and download', () => {
         expect(rasterizer).not.toHaveBeenCalled();
         const output = await PDFDocument.load(download.data as Uint8Array);
         expect(output.getPages().map(page => page.getSize())).toEqual([
-            {width: 420, height: 640}, {width: 640, height: 420},
-            {width: 420, height: 640}, {width: 640, height: 420},
+            {width: 850.5, height: 640}, {width: 1296, height: 420},
+            {width: 850.5, height: 640}, {width: 1296, height: 420},
         ]);
-        expectRotatedSources(await outputText(download.data as Uint8Array));
+        const paired = await outputText(download.data as Uint8Array);
+        expectRotatedSources(paired.map(items => items.slice(0, 3)));
+        expect(paired.every(items => items.map(item => item.str).join('|') === [heading, firstParagraph, secondParagraph, heading, firstParagraph, secondParagraph].join('|'))).toBe(true);
         expect(bytes).toEqual(originalBytes);
         expect(parsed.binary?.bytes).toEqual(originalBytes);
     });
@@ -219,11 +221,14 @@ describe('real rotated PDF import and download', () => {
             const exported = (await displayedText(result.data as Uint8Array)).filter(page => page.text.length > 0);
             expect(exported).toHaveLength(rotations.length);
             for (const [index, page] of exported.entries()) {
-                expect([page.width, page.height]).toEqual([original[index].width, original[index].height]);
-                expect(page.text.map(item => item.str)).toEqual(original[index].text.map(item => item.str));
-                expect(page.text.some(item => item.str === 'Outside cropped page')).toBe(box === 'empty');
-                expect(page.text.some(item => item.str === 'Visible source target')).toBe(true);
-                for (const [textIndex, item] of page.text.entries()) {
+                const paired = result === download;
+                const expectedWidth = paired ? original[index].width * 2 + Math.max(8, Math.min(24, original[index].width * 0.025)) : original[index].width;
+                expect([page.width, page.height]).toEqual([expectedWidth, original[index].height]);
+                const left = paired ? page.text.slice(0, original[index].text.length) : page.text;
+                expect(left.map(item => item.str)).toEqual(original[index].text.map(item => item.str));
+                expect(left.some(item => item.str === 'Outside cropped page')).toBe(box === 'empty');
+                expect(left.some(item => item.str === 'Visible source target')).toBe(true);
+                for (const [textIndex, item] of left.entries()) {
                     for (const [coordinate, value] of item.transform.entries()) expect(value).toBeCloseTo(original[index].text[textIndex].transform[coordinate], 6);
                 }
             }

@@ -1,7 +1,7 @@
 <!--
  @file src/app/document-translation/DocumentApp.vue
  文件职责：实现独立文档翻译页面的完整 Vue 应用，承载文件导入、格式化预览、分段翻译、人工校订和双语文件导出的用户流程。
- 主要内容：相同译文保留原文且不重复展示；文档打开后用一行工具栏承载文件、阅读方式、页码缩放、翻译服务与目标语言、翻译与下载，左侧可折叠的侧栏放文件列表与目录，其余空间留给正文；首页列出保存在本机的最近翻译，重新打开同一份文件时接着上次的译文继续；PDF 默认按原版排版左右对照，各种格式都从正在阅读的位置开始翻译；没有文字层的扫描版 PDF 在开始翻译时先逐页识别文字并显示进度；HTML、Markdown、纯文本与 ePub 的隔离预览只载入一次，译文逐段到达后原位更新并保留滚动位置，整篇译文几乎都与原文相同时状态里提示可换目标语言，带标题的文档（含 Word）在侧栏提供可按原文或译文显示的目录，Word 里的表格在阅读视图中仍按表格排版、只有一个部分时不显示部分切换，ePub 的全部章节列在侧栏目录里（按译文显示时用章内标题的译文）、当前章节下接着它其余的各级标题，正文上方不再占一行章节按钮，Word 与文本类预览在宽窗口左右对照；组织文档阅读与翻译、增量统计和人工校订；导入与在线下载绑定独立取消所有权；PDF 清晰阅读流式显示完整段落和原图区域，源页文字层与译文更新分离，下载按固定字号续页；切换、删除、重置及卸载释放 PDF 任务和 URL；PDF/ePub/DOCX/ZIP 导出显示进度、支持取消重试，迟到结果不得回写。
+ 主要内容：相同译文保留原文且不重复展示；文档打开后按窗口宽度用一行或多行工具栏承载文件、阅读方式、页码缩放、翻译服务与目标语言、翻译与下载，窄窗口用翻译设置弹窗，矮小窗口用覆盖式侧栏保留正文高度；各种格式支持只缩放正文的触控板捏合与键盘操作，复用富文本预览并保持阅读位置；左侧可折叠的侧栏放文件列表与目录，其余空间留给正文；首页列出保存在本机的最近翻译，重新打开同一份文件时接着上次的译文继续；PDF 默认按原版排版左右对照，各种格式都从正在阅读的位置开始翻译；没有文字层的扫描版 PDF 在开始翻译时先逐页识别文字并显示进度；HTML、Markdown、纯文本与 ePub 的隔离预览只载入一次，译文逐段到达后原位更新并保留滚动位置，整篇译文几乎都与原文相同时状态里提示可换目标语言，带标题的文档（含 Word）在侧栏提供可按原文或译文显示的目录，Word 里的表格在阅读视图中仍按表格排版、只有一个部分时不显示部分切换，ePub 的全部章节列在侧栏目录里（按译文显示时用章内标题的译文）、当前章节下接着它其余的各级标题，正文上方不再占一行章节按钮，Word 与文本类预览在宽窗口左右对照；组织文档阅读与翻译、增量统计和人工校订；导入与在线下载绑定独立取消所有权；PDF 清晰阅读流式显示完整段落和原图区域，源页文字层与译文更新分离，下载按原版布局左右配对，长译文以完整批注保留；切换、删除、重置及卸载释放 PDF 任务和 URL；PDF/ePub/DOCX/ZIP 导出显示进度、支持取消重试，迟到结果不得回写。
  模块边界：组件负责页面交互与响应式状态，不自行解析二进制格式、不实现片段翻译队列、配置存储协议或导出编码；解析渲染来自 document-translation feature，配置协调来自 services/config，运行时适配由本目录 runtime 注入。
 -->
 <!-- 文档页面归 app 层所有；WXT 入口只负责启动。 -->
@@ -124,7 +124,7 @@
       </section>
 
       <section v-else class="workspace-section">
-        <section class="document-taskbar" aria-label="当前文档与翻译任务">
+        <section class="document-taskbar" :class="{'has-pdf-controls': readerTab === 'read' && isPdfDocument}" aria-label="当前文档与翻译任务">
           <div class="workspace-heading">
             <button class="sidebar-toggle" type="button" :class="{active: sidebarOpen}" :aria-expanded="sidebarOpen" :aria-label="translateLegacy('文件与目录')" :title="translateLegacy('文件与目录')" @click="sidebarOpen = !sidebarOpen"><svg viewBox="0 0 20 20" fill="none" aria-hidden="true"><rect x="2.5" y="3.5" width="15" height="13" rx="2.5" stroke="currentColor" stroke-width="1.4"/><path d="M7.5 3.5v13" stroke="currentColor" stroke-width="1.4"/></svg><small v-if="documentQueue.length > 1">{{ documentQueue.length }}</small></button>
             <img class="taskbar-logo" src="/icon/128.png" alt="" />
@@ -135,15 +135,23 @@
               <button type="button" :class="{ selected: readerTab === 'read' }" :aria-pressed="readerTab === 'read'" @click="readerTab = 'read'">阅读</button>
               <button type="button" :class="{ selected: readerTab === 'edit' }" :aria-pressed="readerTab === 'edit'" @click="readerTab = 'edit'">校订译文</button>
             </div>
+            <div class="reader-reading-controls">
             <div v-if="readerTab === 'read'" class="mode-buttons" role="group" aria-label="阅读方式">
               <button v-for="mode in readingModes" :key="mode.value" type="button" :class="{ selected: effectivePreviewMode === mode.value }" :aria-pressed="effectivePreviewMode === mode.value" :disabled="!canCompare && mode.value !== 'source'" @click="previewMode = mode.value">{{ mode.label }}</button>
             </div>
-            <!-- PDF 的页码、缩放和显示方式由阅读器传送到这里，与文档操作共用一行。 -->
+            <!-- PDF 的页码、缩放和显示方式由阅读器传送到这里，随阅读功能组响应式分行。 -->
             <div v-show="readerTab === 'read' && isPdfDocument" ref="readerControls" class="reader-controls-slot" />
+            <div v-if="readerTab === 'read' && !isPdfDocument" class="document-zoom-control" role="group" :aria-label="t('document.readerZoom.label')">
+              <button type="button" :disabled="readerScale <= .5" :aria-label="t('document.pdfReading.zoomOut')" :title="t('document.pdfReading.zoomOut')" @click="stepReaderZoom(-1)">−</button>
+              <button type="button" class="document-zoom-reset" data-document-zoom :aria-label="t('document.readerZoom.reset')" :title="t('document.readerZoom.hint')" @click="resetReaderZoom">{{ Math.round(readerScale * 100) }}%</button>
+              <button type="button" :disabled="readerScale >= 3" :aria-label="t('document.pdfReading.zoomIn')" :title="t('document.pdfReading.zoomIn')" @click="stepReaderZoom(1)">+</button>
+            </div>
             <button class="focus-toggle" type="button" :aria-label="translateLegacy('专注阅读')" :title="translateLegacy('专注阅读')" @click="setFocusMode(true)"><svg viewBox="0 0 20 20" fill="none" aria-hidden="true"><path d="M7.5 3.5h-4v4M12.5 3.5h4v4M7.5 16.5h-4v-4M12.5 16.5h4v-4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+            </div>
           </div>
           <div class="taskbar-actions">
-            <!-- 服务、模型与目标语言直接在工具栏选择；源语言和术语库在侧栏底部的“调整设置”里。 -->
+            <!-- 宽窗口直接在工具栏选择服务、模型与目标语言，窄窗口打开既有翻译设置弹窗；源语言和术语库在侧栏底部的“调整设置”里。 -->
+            <div class="toolbar-translation-settings">
             <label class="toolbar-field"><span>翻译服务</span><ElSelect class="document-select toolbar-select toolbar-service" :wrap-label="false" :show-search-icon="false" append-to=".document-app" v-model="config.documentService" :empty-values="[null, undefined]" :disabled="queueBusy" aria-label="翻译服务" filterable>
               <ElOption :label="followDefaultLabel" value="" />
               <ElOption v-if="config.documentService && documentServiceUnavailableMessage" :value="config.documentService" disabled :label="translateLegacy('Chrome内置AI翻译（当前浏览器不可用）')" />
@@ -155,10 +163,14 @@
             <label v-if="documentUsesModel" class="toolbar-field"><span>模型</span><ElSelect class="document-select toolbar-select toolbar-model" :wrap-label="false" :show-search-icon="false" append-to=".document-app" v-model="selectedDocumentModel" :disabled="queueBusy" aria-label="模型" filterable>
               <ElOption v-for="model in documentModelOptions" :key="model" :value="model" data-i18n-ignore :label="model" />
             </ElSelect></label>
+            </div>
+            <div class="toolbar-primary-actions">
+            <button class="ghost-button toolbar-settings-toggle" type="button" :title="translationSettingsSummary" @click="openDocumentSettings">{{ translateLegacy('翻译设置') }}</button>
             <button class="download-button" type="button" :disabled="!hasTranslation || queueBusy" @click="openDownload">下载文件 ↓</button>
             <div class="translation-actions">
               <button v-if="translating" class="ghost-button pause-button" type="button" @click="pauseTranslation"><i class="spinner dark-spinner" aria-hidden="true" />暂停翻译</button>
               <button v-else-if="(parsedDocument.segments.length || needsOcr) && (!translationComplete || settingsChanged)" class="translate-document-button" type="button" :disabled="!config.on || !hydrated || queueBusy || Boolean(credentialWarning)" @click="requestTranslation">{{ translationActionLabel }}</button>
+            </div>
             </div>
           </div>
           <div class="task-progress" :class="{ complete: translationComplete }" role="progressbar" aria-label="文档翻译进度" :aria-valuenow="progress" :aria-valuemin="0" :aria-valuemax="100"><i :style="{width: `${progress}%`}" /></div>
@@ -173,7 +185,7 @@
         </section>
         <article class="document-reading-pane" aria-label="文档内容">
         <DocumentSegmentEditor :key="activeDocumentId ?? 0" v-show="readerTab === 'edit'" :document="parsedDocument" :translations="translatedSegments" :disabled="queueBusy" @update="editSegment" />
-        <div v-show="readerTab === 'read'" class="reading-content" :class="{'reading-pdf': isPdfDocument}">
+        <div v-show="readerTab === 'read'" ref="readingContent" class="reading-content" :class="{'reading-pdf': isPdfDocument}" :data-reader-zoom="isPdfDocument ? undefined : readerScale" :tabindex="isPdfDocument || isRichDocument ? undefined : 0" @pointerdown="focusNativeReader">
         <PdfReader
           v-if="isPdfDocument"
           :key="activeDocumentId ?? 0"
@@ -204,7 +216,7 @@
             class="rich-preview-frame"
             :srcdoc="richFrameHtml"
             sandbox="allow-same-origin"
-            @load="refreshRichPreview"
+            @load="handleRichFrameLoad"
             :title="t('document.layoutPreview', {format: parsedDocument.label})"
           />
         </section>
@@ -229,7 +241,7 @@
             </button>
           </nav>
           <div class="docx-page-stage">
-            <article class="docx-page">
+            <article class="docx-page" :style="readerZoomStyle">
               <span v-if="docxParts.length > 1" class="docx-page-label">{{ docxPartLabel(currentDocxPart?.path || '') }}</span>
               <template v-for="block in currentDocxBlocks" :key="block.key">
                 <table v-if="block.table" class="docx-table">
@@ -262,7 +274,7 @@
           aria-label="字幕时间轴翻译表格"
         >
           <div class="subtitle-table-scroll">
-            <table>
+            <table :style="readerZoomStyle" data-native-zoom-content>
               <thead><tr><th>#</th><th>时间范围</th><th v-if="effectivePreviewMode !== 'translated'">原文</th><th v-if="effectivePreviewMode !== 'source'">译文</th></tr></thead>
               <tbody>
                 <tr v-for="row in subtitleRows" :key="row.index">
@@ -285,15 +297,17 @@
           :data-segment-count="parsedDocument.segments.length"
           aria-label="JSON 字符串路径翻译表格"
         >
+          <div :style="readerZoomStyle" data-native-zoom-content>
           <div class="json-table-header" :class="{ single: effectivePreviewMode !== 'bilingual' }"><span>JSONPath</span><span v-if="effectivePreviewMode !== 'translated'">原字符串</span><span v-if="effectivePreviewMode !== 'source'">译文</span></div>
           <article v-for="row in jsonRows" :key="row.index" class="json-table-row" :class="{ single: effectivePreviewMode !== 'bilingual' || (row.translation && !hasDistinctTranslation(row.source, row.translation)) }">
             <code>{{ row.pathLabel || '$' }}</code>
             <p v-if="effectivePreviewMode !== 'translated' || (row.translation && !hasDistinctTranslation(row.source, row.translation))" class="json-source document-source" data-i18n-ignore>{{ row.source }}</p>
             <p v-if="effectivePreviewMode !== 'source' && (!row.translation || hasDistinctTranslation(row.source, row.translation))" class="json-translation document-translation" data-i18n-ignore>{{ row.translation || translateLegacy('等待翻译…') }}</p>
           </article>
+          </div>
         </section>
 
-        <div v-else class="document-reader" data-document-reader="generic" :data-segment-count="parsedDocument.segments.length" :class="`reader-${parsedDocument.format}`" aria-label="文档双语阅读预览">
+        <div v-else class="document-reader" data-document-reader="generic" :data-segment-count="parsedDocument.segments.length" :class="`reader-${parsedDocument.format}`" :style="readerZoomStyle" data-native-zoom-content aria-label="文档双语阅读预览">
           <article v-for="row in previewRows" :key="row.index" class="reader-block">
             <span v-if="row.contextLabel" class="reader-context">{{ row.contextLabel }}</span>
             <div v-if="effectivePreviewMode !== 'translated' || (row.translation && !hasDistinctTranslation(row.source, row.translation))" class="reader-source document-source" data-i18n-ignore :class="readerSourceClass(row.source)">
@@ -346,6 +360,7 @@
             </ElSelect>
           </label>
         </div>
+        <label class="document-batch-translation"><input v-model="documentBatchTranslation" type="checkbox" :disabled="queueBusy" /><span><strong>{{ t('document.batchTranslation.label') }}</strong><small>{{ t('document.batchTranslation.hint') }}</small></span></label>
         <GlossaryLibrarySelect
           v-if="config.glossaryLibraries.length || config.glossaryEnabled"
           v-model="config.documentGlossaryIds"
@@ -382,15 +397,19 @@
         <button type="button" :disabled="queueBusy" :aria-pressed="outputMode === 'translated'" :class="{ selected: outputMode === 'translated' }" @click="outputMode = 'translated'"><strong>仅译文</strong><span>适合直接阅读和分享</span></button>
       </div>
       <p class="export-file-name" data-i18n-ignore>{{ downloadFileName }}</p>
-      <section v-if="downloadOpen" class="export-preview" aria-label="文件内容预览">
+      <section v-if="downloadOpen && isPdfDocument" class="pdf-export-summary" :aria-label="t('document.pdfReading.layoutPresentation')">
+        <div class="pdf-export-page-pair" :class="{single: outputMode === 'translated'}" aria-hidden="true"><div v-if="outputMode === 'bilingual'" class="pdf-export-page"><span>{{ t('document.pdfReading.original') }}</span><i /><i /><i /><i /></div><div class="pdf-export-page translated"><span>{{ t('document.pdfReading.translated') }}</span><i /><i /><i /><i /></div></div>
+        <div><strong>{{ outputMode === 'bilingual' ? t('document.pdfReading.exportBilingualHint') : t('document.pdfReading.layoutPresentation') }}</strong><p>{{ t('document.pdfReading.exportPageCount', {count: pdfExportPageCount}) }}</p></div>
+      </section>
+      <section v-else-if="downloadOpen" class="export-preview" aria-label="文件内容预览">
         <strong>{{ parsedDocument && isDocumentExportExcerpt(parsedDocument) ? '文字摘录 · 下载时保留原文件格式' : '文件内容预览' }}</strong><pre data-i18n-ignore>{{ downloadPreview }}</pre>
       </section>
       <p v-if="!translationComplete" class="notice warning">{{ t("document.untranslatedWarning", {count: (parsedDocument?.segments.length || 0) - completedSegments}) }}</p>
       <label v-if="!translationComplete" class="partial-export"><input v-model="partialExportAcknowledged" type="checkbox" :disabled="queueBusy" />我已了解，下载当前结果</label>
       <p v-if="settingsChanged" class="notice warning">设置已更改，本次下载仍是当前保留的译文。</p>
       <p v-if="isSubtitleDocument" class="export-note">保留字幕序号和时间轴。仅译文替换字幕文字，双语在同一时间段内保留原文和译文。</p>
-      <p v-if="isPdfDocument" class="export-note">{{ pdfPresentation === 'layout' ? t('document.pdfReading.layoutExportHint') : '' }}{{ t('document.pdfReading.exportHint') }}</p>
-      <p v-if="downloadProgress" class="notice export-progress" role="status" aria-live="polite">{{ downloadProgress }}</p>
+      <p v-if="isPdfDocument" class="export-note">{{ t('document.pdfReading.exportHint') }}</p>
+      <div v-if="downloadProgress" class="export-progress"><p class="notice" role="status" aria-live="polite">{{ downloadProgress }}</p><progress v-if="downloadPdfProgress" :value="downloadPdfProgress.phase === 'rendering' ? downloadPdfProgress.completedPages : undefined" :max="downloadPdfProgress.totalPages || 1" :aria-label="downloadProgress" /></div>
       <p v-if="downloadError" class="notice error" role="alert">{{ downloadError }}</p>
       <div class="dialog-actions"><button v-if="preparingDownload" class="ghost-button" type="button" :disabled="cancelingDownload" @click="cancelDownload">{{ t(cancelingDownload ? 'document.export.canceling' : 'document.export.cancel') }}</button><button v-else class="ghost-button" type="button" :disabled="queueBusy" @click="downloadDialog?.close()">返回文档</button><button class="translate-document-button" type="button" :disabled="queueBusy || !hasTranslation || (!translationComplete && !partialExportAcknowledged)" @click="downloadDocument">{{ preparingDownload ? '正在生成文件…' : `下载${outputMode === 'bilingual' ? '双语' : '译文'}文件` }}</button></div>
     </dialog>
@@ -417,9 +436,11 @@ import {
   scrollRichOutline,
   markRichPreviewBusy,
   richPreviewPosition,
+  installDocumentZoomGestures,
   pdfPagesNeedingOcr,
   recognizePdfDocument,
   type RichOutlineItem,
+  type PdfExportProgress,
   scoreDocumentInformation,
   hasDistinctTranslation,
   TranslationRequestError,
@@ -436,6 +457,7 @@ import {
   createDocumentFileLoadGuard,
   createDocumentHistory,
   documentHistoryId,
+  restoreDocumentHistoryTranslations,
   createDocumentPreviewHtml,
   fetchOnlinePdf,
   readPdfSourceFragment,
@@ -535,6 +557,9 @@ const richOutline = ref<RichOutlineItem[]>([]);
 const richOutlineLanguage = ref<'source' | 'translated'>('translated');
 const pdfPage = ref(1);
 const readerTab = ref<'read' | 'edit'>('read');
+const readingContent = ref<HTMLElement | null>(null);
+const readerScale = ref(1);
+const readerZoomStyle = computed(() => ({zoom: String(readerScale.value)}));
 const readerPage = ref(1);
 const runState = ref<'ready' | 'paused' | 'failed'>('ready');
 const taskFingerprint = ref('');
@@ -564,6 +589,7 @@ const openingFile = ref(false);
 const preparingDownload = ref(false);
 const cancelingDownload = ref(false);
 const downloadProgress = ref('');
+const downloadPdfProgress = ref<PdfExportProgress | null>(null);
 let downloadController: AbortController | null = null;
 const onlinePdfUrl = ref('');
 const downloadingPdf = ref(false);
@@ -604,7 +630,10 @@ interface DocumentQueueItem {
   revision: number;
   downloaded: number;
   error: string;
+  /** 仅在本页为这份文档保留批量选择，不写入全局配置或本地历史。 */
+  batchTranslation?: boolean;
 }
+const documentBatchTranslation = ref(true);
 const documentQueue = ref<DocumentQueueItem[]>([]);
 const activeDocumentId = ref<number | null>(null);
 const batchRunning = ref(false);
@@ -620,7 +649,7 @@ function saveActiveDocument(): void {
   const item = documentQueue.value.find(item => item.id === activeDocumentId.value);
   if (!item) return;
   Object.assign(item, {translations: [...translatedSegments.value], fingerprint: taskFingerprint.value,
-    state: runState.value, revision: editRevision.value, downloaded: downloadedRevision.value, error: errorMessage.value});
+    state: runState.value, revision: editRevision.value, downloaded: downloadedRevision.value, error: errorMessage.value, batchTranslation: documentBatchTranslation.value});
 }
 
 function selectDocument(item: DocumentQueueItem): void {
@@ -628,6 +657,7 @@ function selectDocument(item: DocumentQueueItem): void {
   saveActiveDocument();
   releaseDocumentPreview(parsedDocument.value);
   activeDocumentId.value = item.id;
+  documentBatchTranslation.value = item.batchTranslation !== false;
   rememberOpenDocument(item.historyId);
   parsedDocument.value = item.document;
   translatedSegments.value = [...item.translations];
@@ -679,7 +709,7 @@ function scheduleHistorySave(): void {
 // 刷新后回到正在阅读的文档：当前标签页记住它在本地历史里的标识，新开的标签页仍从首页开始。
 const SESSION_KEY = 'fluentread.document.open';
 /** 版面分析或分段规则变化时递增：旧快照作废，改为按原始文件重新解析。 */
-const PARSED_VERSION = 6;
+const PARSED_VERSION = 7;
 function rememberOpenDocument(id: string | undefined | null): void {
   try {
     if (id) globalThis.sessionStorage?.setItem(SESSION_KEY, id);
@@ -704,12 +734,12 @@ async function openHistory(entry: DocumentHistorySummary): Promise<void> {
   if (disposed || queueBusy.value) return;
   const snapshot = record.parsedVersion === PARSED_VERSION ? record.parsed as ParsedDocument | undefined : undefined;
   if (!snapshot?.segments) {
-    // 没有快照或解析规则已经更新：按原始文件重新解析，译文数量一致时仍会接上。
+    // 没有快照或解析规则已经更新：重新解析原文件，按原文匹配恢复未改变段落的译文。
     await loadFiles([new File([record.bytes], record.name, {type: record.mimeType})], record.sourceUrl);
     return;
   }
   const item: DocumentQueueItem = {id: ++nextDocumentId, name: record.name, sourceUrl: record.sourceUrl, document: markRaw(snapshot), historyId: record.id, bytes: record.bytes, mimeType: record.mimeType,
-    translations: record.total === snapshot.segments.length ? [...record.translations] : [], fingerprint: record.fingerprint, state: 'ready', revision: 0, savedRevision: 0, downloaded: 0, error: ''};
+    translations: restoreDocumentHistoryTranslations(record, snapshot, PARSED_VERSION), fingerprint: record.fingerprint, state: 'ready', revision: 0, savedRevision: 0, downloaded: 0, error: ''};
   documentQueue.value.push(item);
   if (documentQueue.value.length > 1) {sidebarOpen.value = true; sidebarTab.value = 'files';}
   selectDocument(item);
@@ -810,7 +840,7 @@ async function downloadBatch(): Promise<void> {
     const zip = new JSZip();
     for (const [index, item] of items.entries()) {
       const download = await createDocumentDownload(item.document!, item.translations, mode, {
-        pdfPresentation: pdfPresentation.value,
+        pdfPresentation: 'layout',
         signal: controller.signal,
         onPdfProgress: progress => { if (!controller.signal.aborted && downloadController === controller) batchNotice.value = `${item.name} · ${pdfExportProgress(progress)}`; },
         onArchiveProgress: percent => { if (!controller.signal.aborted && downloadController === controller) batchNotice.value = `${item.name} · ${archiveExportProgress(percent)}`; },
@@ -976,6 +1006,7 @@ const statusLabel = computed(() => recognitionProgress.value ? recognitionProgre
 const hasUnsavedWork = computed(() => translating.value || batchRunning.value || openingFile.value || editRevision.value > downloadedRevision.value
   || documentQueue.value.some(item => item.id !== activeDocumentId.value && item.revision > item.downloaded));
 const isPdfDocument = computed(() => parsedDocument.value?.binary?.kind === 'pdf');
+const pdfExportPageCount = computed(() => parsedDocument.value?.binary?.kind === 'pdf' ? parsedDocument.value.binary.pages.length : 0);
 const isEpubDocument = computed(() => parsedDocument.value?.binary?.kind === 'epub');
 const isDocxDocument = computed(() => parsedDocument.value?.binary?.kind === 'docx');
 const isSubtitleDocument = computed(() => isSubtitleDocumentFormat(parsedDocument.value?.format));
@@ -1017,6 +1048,113 @@ function buildRichPreview(): string {
 }
 const richFrame = ref<HTMLIFrameElement | null>(null);
 const richFrameHtml = ref('');
+type ReaderZoomPoint = {clientX: number; clientY: number};
+type ReaderZoomSurface = {content: HTMLElement; viewport: HTMLElement; xScroller: HTMLElement; yScroller: HTMLElement; document: Document; frame: boolean};
+let readerZoomDisposer: (() => void) | undefined;
+let loadedRichDocument: Document | null = null;
+let readerZoomRevision = 0;
+
+/** 缩放只影响正文，工具栏和滚动视口保持原尺寸。 */
+function applyRichReaderZoom(): void {
+  richFrame.value?.contentDocument?.body?.style.setProperty('zoom', String(readerScale.value));
+}
+/** 不同格式和窄窗口的横向、纵向滚动容器可能不同。 */
+function nativeReaderScroller(content: HTMLElement, axis: 'x' | 'y'): HTMLElement {
+  const viewport = readingContent.value!;
+  for (let element = content.parentElement; element && viewport.contains(element); element = element.parentElement) {
+    const style = element.ownerDocument.defaultView?.getComputedStyle?.(element);
+    const overflow = axis === 'x' ? style?.overflowX : style?.overflowY;
+    const overflows = axis === 'x' ? element.scrollWidth > element.clientWidth + 1 : element.scrollHeight > element.clientHeight + 1;
+    if (overflows && (element === viewport || overflow === 'auto' || overflow === 'scroll' || overflow === 'overlay')) return element;
+    if (element === viewport) break;
+  }
+  return viewport;
+}
+function readerZoomSurface(): ReaderZoomSurface | null {
+  if (isRichDocument.value) {
+    const document = richFrame.value?.contentDocument;
+    const scroller = document?.scrollingElement as HTMLElement | null;
+    return document?.body && scroller ? {content: document.body, viewport: scroller, xScroller: scroller, yScroller: scroller, document, frame: true} : null;
+  }
+  const viewport = readingContent.value;
+  const content = viewport?.querySelector?.<HTMLElement>('.docx-page,[data-native-zoom-content]');
+  if (!viewport || !content) return null;
+  return {content, viewport, xScroller: nativeReaderScroller(content, 'x'), yScroller: nativeReaderScroller(content, 'y'), document: content.ownerDocument, frame: false};
+}
+function clearReaderZoomGestures(): void {
+  readerZoomRevision += 1;
+  readerZoomDisposer?.();
+  readerZoomDisposer = undefined;
+}
+
+/** 保留指针下的正文位置；键盘和工具栏缩放以当前视口中央为锚点。 */
+function setReaderScale(value: number, point?: ReaderZoomPoint): void {
+  if (!parsedDocument.value || isPdfDocument.value || readerTab.value !== 'read' || !Number.isFinite(value)) return;
+  const next = Math.round(Math.min(3, Math.max(.5, value)) * 10000) / 10000;
+  if (next === readerScale.value) return;
+  const surface = readerZoomSurface();
+  let anchor: {element: Element; x: number; y: number; point: ReaderZoomPoint} | undefined;
+  if (surface && typeof surface.content.getBoundingClientRect === 'function') {
+    const viewport = surface.frame ? {left: 0, top: 0, width: surface.viewport.clientWidth, height: surface.viewport.clientHeight} : surface.viewport.getBoundingClientRect();
+    const position = point || {clientX: viewport.left + viewport.width / 2, clientY: viewport.top + viewport.height / 2};
+    const hit = surface.document.elementFromPoint?.(position.clientX, position.clientY);
+    const unit = hit?.closest('p,h1,h2,h3,h4,h5,h6,img,pre,td,th,[data-reader-unit],.json-table-row,.docx-paragraph') || surface.content;
+    const element = surface.content.contains(unit) ? unit : surface.content;
+    const rect = element.getBoundingClientRect();
+    if (rect.width && rect.height) anchor = {element, point: position, x: (position.clientX - rect.left) / rect.width, y: (position.clientY - rect.top) / rect.height};
+  }
+  readerScale.value = next;
+  applyRichReaderZoom();
+  const revision = ++readerZoomRevision;
+  void nextTick().then(() => {
+    if (revision !== readerZoomRevision || !surface || !anchor || !anchor.element.isConnected || readerTab.value !== 'read') return;
+    const rect = anchor.element.getBoundingClientRect();
+    const xScroller = surface.frame ? surface.xScroller : nativeReaderScroller(surface.content, 'x');
+    const yScroller = surface.frame ? surface.yScroller : nativeReaderScroller(surface.content, 'y');
+    xScroller.scrollLeft += rect.left + rect.width * anchor.x - anchor.point.clientX;
+    yScroller.scrollTop += rect.top + rect.height * anchor.y - anchor.point.clientY;
+  });
+}
+function resetReaderZoom(): void {
+  // 工具栏复位也应撤销尚未提交的触控板手势。
+  bindReaderZoomGestures();
+  setReaderScale(1);
+}
+function stepReaderZoom(direction: 1 | -1): void {
+  const steps = [.5, .75, 1, 1.25, 1.5, 2, 3];
+  const next = direction > 0 ? steps.find(value => value > readerScale.value + .001) : steps.reverse().find(value => value < readerScale.value - .001);
+  if (next !== undefined) {bindReaderZoomGestures(); setReaderScale(next);}
+}
+function bindReaderZoomGestures(): void {
+  clearReaderZoomGestures();
+  if (!parsedDocument.value || isPdfDocument.value || readerTab.value !== 'read') return;
+  const target = isRichDocument.value
+    ? loadedRichDocument === richFrame.value?.contentDocument ? loadedRichDocument?.documentElement : null
+    : readingContent.value;
+  if (!target?.ownerDocument) return;
+  readerZoomDisposer = installDocumentZoomGestures(target, {
+    getScale: () => readerScale.value, setScale: setReaderScale, minScale: .5, maxScale: 3, reset: resetReaderZoom,
+  });
+}
+function focusNativeReader(event: PointerEvent): void {
+  if (isRichDocument.value || isPdfDocument.value || readerTab.value !== 'read') return;
+  const target = event.composedPath().find(node => (node as Node)?.nodeType === 1) as Element | undefined;
+  if (target?.closest('button,a,input,textarea,select,[contenteditable]:not([contenteditable="false"]),[role="textbox"],[data-fluent-read-ui]')) return;
+  readingContent.value?.focus?.({preventScroll: true});
+}
+function handleRichFrameLoad(): void {
+  loadedRichDocument = richFrame.value?.contentDocument || null;
+  refreshRichPreview();
+  bindReaderZoomGestures();
+}
+watch([parsedDocument, readerTab], ([document], [previousDocument]) => {
+  clearReaderZoomGestures();
+  if (document !== previousDocument) {readerScale.value = 1; loadedRichDocument = null;}
+  const revision = readerZoomRevision;
+  void nextTick().then(() => {if (revision === readerZoomRevision) bindReaderZoomGestures();});
+}, {flush: 'sync'});
+onUnmounted(clearReaderZoomGestures);
+
 let richPreviewTimer: ReturnType<typeof setTimeout> | undefined;
 /** 译文或阅读方式变化时原位更新预览框，保留滚动位置；预览框不可访问时才整页重载。 */
 function refreshRichPreview(): void {
@@ -1025,6 +1163,7 @@ function refreshRichPreview(): void {
   if (!richPreviewDocument.value) return;
   const html = buildRichPreview();
   if (!syncRichPreview(richFrame.value, html)) {richFrameHtml.value = html; return;}
+  applyRichReaderZoom();
   markRichPreviewBusy(richFrame.value, translating.value);
   richOutline.value = collectRichOutline(richFrame.value);
 }
@@ -1313,8 +1452,8 @@ async function loadFiles(files: File[], sourceUrl?: string): Promise<void> {
           if (!loadRequest.isCurrent()) return;
           Object.assign(item, {historyId, bytes, mimeType: file.type});
           if (item.id === activeDocumentId.value) rememberOpenDocument(historyId);
-          // 译文数量与当前解析结果一致时才恢复；解析规则变化后的旧记录不能错位套用。
-          if (saved && saved.total === parsed.segments.length) Object.assign(item, {translations: [...saved.translations], fingerprint: saved.fingerprint});
+          // 分段规则变化时按原文恢复校订；片段数相等也不能按旧索引错位套用。
+          if (saved) Object.assign(item, {translations: restoreDocumentHistoryTranslations(saved, parsed, PARSED_VERSION), fingerprint: saved.fingerprint});
         }
       } catch (error) {
         if (!loadRequest.isCurrent()) return;
@@ -1401,6 +1540,7 @@ function resetDocument(): void {
   downloadController = null;
   cancelingDownload.value = false;
   downloadProgress.value = '';
+  downloadPdfProgress.value = null;
   downloadDialog.value?.close();
   documentSettingsDialog.value?.close();
   downloadOpen.value = false;
@@ -1408,6 +1548,7 @@ function resetDocument(): void {
   batchRunning.value = false;
   documentQueue.value = [];
   activeDocumentId.value = null;
+  documentBatchTranslation.value = true;
   batchNotice.value = '';
   documentFileLoads.invalidate();
   translationRequestId += 1;
@@ -1498,6 +1639,10 @@ async function startTranslation(restart = false): Promise<void> {
   taskFingerprint.value = currentFingerprint.value;
   const glossaryIds = config.documentGlossaryIds === null ? null : [...config.documentGlossaryIds];
   const glossaryRevision = buildGlossaryRevision(config.glossaryLibraries, config.glossaryEnabled);
+  // OCR 可能持续较久；整个任务使用同一设置快照，外部配置更新不混入正在处理的文件。
+  const settings = {serviceOverride: effectiveDocumentService.value,
+    modelOverride: documentUsesModel.value ? documentModelValue.value : undefined,
+    sourceLanguage: config.from, targetLanguage: config.to, batchTranslation: documentBatchTranslation.value};
   runState.value = 'ready';
   liveCompletedSegments.value = completedSegments.value;
   translating.value = true;
@@ -1509,7 +1654,7 @@ async function startTranslation(restart = false): Promise<void> {
   try {
     if (scanned) {
       const source = document;
-      const recognized = await recognizePdfDocument(source, createPdfPageRecognizer(config.from), {
+      const recognized = await recognizePdfDocument(source, createPdfPageRecognizer(settings.sourceLanguage), {
         signal: controller.signal, startPage: pdfPage.value - 1,
         onProgress: ({completed, total}) => { if (requestId === translationRequestId) recognitionProgress.value = t('document.pdfReading.recognizing', {completed, total}); },
       });
@@ -1535,9 +1680,7 @@ async function startTranslation(restart = false): Promise<void> {
     const current = document;
     await translateDocumentSegments(document.segments, {
       fileName: document.fileName,
-      serviceOverride: effectiveDocumentService.value,
-      modelOverride: documentUsesModel.value ? documentModelValue.value : undefined,
-      sourceLanguage: config.from, targetLanguage: config.to,
+      ...settings,
       glossaryIds, glossaryRevision,
       initialTranslations: [...translatedSegments.value],
       signal: controller.signal,
@@ -1546,8 +1689,7 @@ async function startTranslation(restart = false): Promise<void> {
       onRetry: ({delayMs, reason}) => {
         if (requestId === translationRequestId && !controller.signal.aborted) retryNotice.value = `${translateLegacy('翻译服务暂时没有响应，将自动重试')} · ${Math.ceil(delayMs / 1000)}s · ${reason}`;
       },
-      // 每批少一些，第一批译文更快出现；几批同时在途，整篇用时不会因此变长。
-      batchLimits: {items: 8, characters: 2400},
+      // 默认合并多段，使用 feature 的有界批量与并发；开关只作用于当前文档。
       prioritize: prioritizeReadingPosition,
       onSegment: ({id, translation}) => {
         if (requestId !== translationRequestId || parsedDocument.value !== current || controller.signal.aborted) return;
@@ -1594,11 +1736,12 @@ function openDownload(): void {
   partialExportAcknowledged.value = false;
   downloadError.value = '';
   downloadProgress.value = '';
+  downloadPdfProgress.value = null;
   downloadOpen.value = true;
   downloadDialog.value?.showModal();
 }
 
-function pdfExportProgress(progress: {phase: 'rendering' | 'saving'; completedPages: number; totalPages: number}): string {
+function pdfExportProgress(progress: PdfExportProgress): string {
   return progress.phase === 'saving' ? t('document.export.saving')
     : t('document.export.pages', {completed: progress.completedPages, total: progress.totalPages});
 }
@@ -1621,14 +1764,15 @@ async function downloadDocument(): Promise<void> {
   downloadController = controller;
   cancelingDownload.value = false;
   downloadProgress.value = '';
+  downloadPdfProgress.value = null;
   downloadError.value = '';
   const revision = editRevision.value;
   const requestId = translationRequestId;
   try {
     const download = await createDocumentDownload(document, [...translatedSegments.value], outputMode.value, {
-      pdfPresentation: pdfPresentation.value,
+      pdfPresentation: 'layout',
       signal: controller.signal,
-      onPdfProgress: progress => { if (!controller.signal.aborted && downloadController === controller) downloadProgress.value = pdfExportProgress(progress); },
+      onPdfProgress: progress => { if (!controller.signal.aborted && downloadController === controller) {downloadPdfProgress.value = progress; downloadProgress.value = pdfExportProgress(progress);} },
       onArchiveProgress: percent => { if (!controller.signal.aborted && downloadController === controller) downloadProgress.value = archiveExportProgress(percent); },
     });
     controller.signal.throwIfAborted();
@@ -1641,9 +1785,11 @@ async function downloadDocument(): Promise<void> {
     if (downloadNoticeTimer !== undefined) clearTimeout(downloadNoticeTimer);
     downloadNoticeTimer = setTimeout(() => {downloadNoticeTimer = undefined; if (downloadNotice.value === shown) downloadNotice.value = '';}, 5000);
     downloadProgress.value = '';
+    downloadPdfProgress.value = null;
     downloadDialog.value?.close();
   } catch (error) {
     if (document === parsedDocument.value) {
+      downloadPdfProgress.value = null;
       downloadProgress.value = controller.signal.aborted ? t('document.export.canceled') : '';
       if (!controller.signal.aborted) downloadError.value = error instanceof Error ? error.message : String(error);
     }

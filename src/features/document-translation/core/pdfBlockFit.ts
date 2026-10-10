@@ -35,18 +35,33 @@ const bottom = (box: {y: number; height: number}) => box.y + box.height;
 export function pdfOverlayBlocks(page: PdfDocumentPage): PdfOverlayBlock[] {
     // 图内标签、公式与数字单元格已由版面分析标记；图形包围盒常比可见图形大，不再按重叠面积排除正文。
     const regions = page.preservedRegions ?? [];
+    const neighbours = [...page.blocks, ...regions, ...(page.layoutBoundaries ?? [])];
     const quarterTurn = page.rotation === 90 || page.rotation === 270;
     const contentHeight = quarterTurn ? page.width : page.height;
     const contentWidth = quarterTurn ? page.height : page.width;
-    return page.blocks.flatMap(block => {
-        if (block.preserveSource || PROTECTED_KINDS.has(block.kind ?? '') || !(block.width > 0) || !(block.height > 0)) return [];
+    return page.blocks.flatMap(sourceBlock => {
+        if (sourceBlock.preserveSource || PROTECTED_KINDS.has(sourceBlock.kind ?? '') || !(sourceBlock.width > 0) || !(sourceBlock.height > 0)) return [];
+        // 段落末行旁的 QED/式号可能落在该段的外接矩形里；让出右侧这一小条，不能将译文排到保留符号上。
+        const rightInset = page.blocks.reduce((edge, other) => {
+            const protectedSource = other.preserveSource || PROTECTED_KINDS.has(other.kind ?? '');
+            return other !== sourceBlock && protectedSource && other.y < bottom(sourceBlock) && bottom(other) > sourceBlock.y
+                && other.x > sourceBlock.x + sourceBlock.width * 0.75 && other.x < right(sourceBlock) && right(other) >= right(sourceBlock) - sourceBlock.fontSize * 2
+                ? Math.min(edge, other.x - 1.5) : edge;
+        }, right(sourceBlock));
+        const block = rightInset < right(sourceBlock) ? {...sourceBlock, width: Math.max(1, rightInset - sourceBlock.x)} : sourceBlock;
         let limit = contentHeight, edge = Math.max(right(block), contentWidth - Math.max(0, block.x));
-        for (const other of [...page.blocks, ...regions]) {
-            if (other === block) continue;
+        for (const other of neighbours) {
+            if (other === sourceBlock) continue;
             if (other.y >= bottom(block) - 1 && other.x < right(block) && right(other) > block.x) limit = Math.min(limit, other.y);
             if (other.x >= right(block) - 1 && other.y < bottom(block) && bottom(other) > block.y) edge = Math.min(edge, other.x);
         }
-        return [{block, spaceBelow: Math.max(0, limit - bottom(block) - 1.5), spaceRight: Math.max(0, edge - right(block) - 6)}];
+        // 居中/右对齐文字扩宽会移动它的对齐锚点；延长一行的右边界也不能侵入下方错开的另一栏。
+        const spaceRight = block.lineCount <= 1 && block.textAlign === 'left' ? Math.max(0, edge - right(block) - 6) : 0;
+        for (const other of neighbours) {
+            if (other === sourceBlock) continue;
+            if (other.y >= bottom(block) - 1 && other.x < right(block) + spaceRight && right(other) > block.x) limit = Math.min(limit, other.y);
+        }
+        return [{block, spaceBelow: Math.max(0, limit - bottom(block) - 1.5), spaceRight}];
     });
 }
 
@@ -55,10 +70,12 @@ export function pdfOverlayBlocks(page: PdfDocumentPage): PdfOverlayBlock[] {
  * 行距沿用原文的行距比例，并限制在适合中日韩文字阅读的范围内；字号缩到原来的四分之三以下后行距收紧到 1.12 倍。
  */
 export function fitPdfBlockText(input: PdfBlockFitInput, measure: PdfBlockMeasure): PdfBlockFit {
-    const width = Math.max(1, input.width);
-    const start = Math.max(1, input.fontSize);
-    const floor = Math.min(start, Math.max(1, input.minFontSize));
-    const ratio = Math.min(1.6, Math.max(1.25, input.lineHeight / start));
+    const positive = (value: number, fallback: number) => Number.isFinite(value) ? Math.max(1, value) : fallback;
+    const width = positive(input.width, 1);
+    const height = Number.isFinite(input.height) ? Math.max(0, input.height) : 0;
+    const start = positive(input.fontSize, 12);
+    const floor = Math.min(start, positive(input.minFontSize, 6));
+    const ratio = Math.min(1.6, Math.max(1.25, positive(input.lineHeight, start) / start));
     let fontSize = start;
     for (let step = 0; ; step += 1) {
         // 字号已经明显缩小时收紧行距：原本一行高的位置可以排下两行小字，译文比原文长一倍的单行条目不必被截断。
@@ -66,8 +83,12 @@ export function fitPdfBlockText(input: PdfBlockFitInput, measure: PdfBlockMeasur
         const lines = wrapPdfReadingText(input.text, width, {size: fontSize, weight: input.weight, lineHeight}, (text, font) => measure(text, font.size, font.weight));
         const needed = lines.length * lineHeight;
         // 末行下方本就没有行间空白，允许超出四分之一行而不缩小字号。
-        const fits = needed <= input.height + lineHeight * 0.25;
+        const widest = lines.reduce((max, line) => {
+            const measured = measure(line, fontSize, input.weight);
+            return Math.max(max, Number.isFinite(measured) ? measured : Infinity);
+        }, 0);
+        const fits = needed <= height + lineHeight * 0.25 && widest <= width;
         if (fits || fontSize <= floor || step >= 12) return {fontSize, lineHeight, lines, overflow: !fits};
-        fontSize = Math.max(floor, fontSize * Math.min(0.97, Math.max(0.8, Math.sqrt(input.height / needed))));
+        fontSize = Math.max(floor, fontSize * Math.min(0.97, Math.max(0.8, Math.min(Math.sqrt(height / needed), width / widest))));
     }
 }

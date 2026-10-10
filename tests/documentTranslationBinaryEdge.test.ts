@@ -326,6 +326,6 @@ describe('binary document low-level contracts', () => {
 
         await expect(createDocumentDownload(document, [], 'translated', {pdfPageRasterizer: raster}))
             .resolves.toMatchObject({fileName: 'sample.translated.pdf'});
-        expect(raster).toHaveBeenCalledOnce();
+        expect(raster).not.toHaveBeenCalled();
     });
 });

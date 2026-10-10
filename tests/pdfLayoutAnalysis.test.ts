@@ -133,6 +133,57 @@ describe('PDF baseline and structural reading analysis', () => {
         const math = analyze([atom('F(x) = QK', 310, 70, 80)], [{kind: 'image', x: 300, y: 84, width: 100, height: 100}]);
         expect(math.preservedRegions.find(region => region.kind === 'figure')?.y).toBe(84);
     });
+    it('keeps the two clipped embedded titles in Attention page fifteen inside its preserved diagram', () => {
+        // 实际源图的两个 Form 上下接在一起；文字层含大字号 Input-Input 标题，但它们被图形裁掉，不能重新印到图内竖排标签上。
+        const first = {...atom('Input-Input Layer5', 106.973484208, 127.7375646, 171.135371154, 19.618866348), y: 112.042471529};
+        const second = {...atom('Input-Input Layer5', 106.765759931, 345.994745345, 171.219290714, 19.628486841), y: 330.291955873};
+        const result = analyze([first, second,
+            atom('Figure 5: Many of the attention heads exhibit behaviour that seems related to the structure of the sentence.', 108, 611.169, 396, 9.9626),
+            atom('We give two such examples above, from two different heads from the encoder self-attention', 108, 622.079, 396, 9.9626),
+            atom('at layer 5 of 6. The heads clearly learned to perform different tasks.', 108, 632.989, 396, 9.9626),
+        ], [{kind: 'form', x: 108, y: 158.07028396, width: 396.0208858, height: 218.93571604},
+            {kind: 'form', x: 108, y: 377.006, width: 396.0208858, height: 218.93571604}]);
+        expect(result.blocks.filter(block => block.source === 'Input-Input Layer5')).toHaveLength(2);
+        expect(result.blocks.filter(block => block.source === 'Input-Input Layer5').every(block => block.kind === 'figure-label' && block.preserveSource)).toBe(true);
+        expect(result.blocks.find(block => block.source.startsWith('Figure 5:'))).toMatchObject({kind: 'caption', preserveSource: false});
+        const section = analyze([atom('2 Results', 108, 90, 80), atom('Ordinary text anchors the body font.', 108, 400, 396)],
+            [{kind: 'image', x: 108, y: 104, width: 396, height: 150}]);
+        expect(section.blocks.find(block => block.source === '2 Results')).toMatchObject({kind: 'heading', preserveSource: false});
+    });
+    it('preserves the equivalence display equation from the actual ninety-two-page paper', () => {
+        const result = analyze([atom('The theorem establishes the following recovery equation.', 70.86614, 100, 453.5433, 11),
+            atom('𝑔𝑢(𝛾𝑢) ≃ (Ψ𝑡𝑙 ∘ ⋯ ∘ Ψ𝑡1)(𝛾𝑏) (55)', 225.24985, 127.10103, 299.15959, 11),
+            atom('That is, applying the accumulator leaves every table where those same steps would have left it.', 70.86614, 151.37996, 453.5433, 11)]);
+        expect(result.blocks.find(block => block.source.includes('(55)'))).toMatchObject({kind: 'formula', preserveSource: true});
+        expect(result.blocks.filter(block => block.kind === 'text')).toHaveLength(2);
+    });
+    it('keeps raised and lowered scripts with the real page-forty-six body line instead of manufacturing overlapping tail blocks', () => {
+        const real = (text: string, x: number, y: number, width: number, fontSize: number, baseline: number) => ({...atom(text, x, baseline, width, fontSize), y});
+        const atoms = [
+            real('outside the two declarations, and the instantiating iteration is the case where the two states', 70.86614, 454.3126, 453.543307536, 11, 462.2986),
+            real('differ in an entry with an empty table that', 70.86614, 467.9746, 207.699113072, 11, 475.9606),
+            real('≃', 281.80164, 467.0946, 8.558, 11, 475.9606),
+            real('𝐾', 290.35965, 472.4714, 7.392, 7.7, 478.6776),
+            real('does not compare. Since', 301.965939134, 467.9746, 118.543167402, 11, 475.9606),
+            real('𝑔', 423.74548, 467.0946, 5.247, 11, 475.9606),
+            real('𝑢', 429.2675, 465.7614, 5.1975, 7.7, 471.9676),
+            real('𝑛', 428.9925, 472.4714, 5.4362, 7.7, 478.6776),
+            real('carries', 438.317389134, 467.9746, 32.164, 11, 475.9606),
+            real('≃', 473.71777, 467.0946, 8.558, 11, 475.9606),
+            real('𝐾', 482.27576, 472.4714, 7.392, 7.7, 478.6776),
+            real('by the', 493.882049134, 467.9746, 30.527389134, 11, 475.9606),
+            real('paragraph above,', 70.86614, 481.6366, 84.623, 11, 489.6226),
+        ];
+        const lines = pdfLayoutLines(atoms);
+        expect(lines).toHaveLength(3);
+        expect(lines[1].text).toContain('does not compare. Since');
+        expect(lines[1].text).toContain('carries ≃𝐾 by the');
+        expect(lines[1].runs).toHaveLength(11);
+        const result = analyze(atoms, [], 595.2756, 841.8898);
+        expect(result.blocks).toHaveLength(1);
+        expect(result.blocks[0]).toMatchObject({kind: 'text', lineCount: 3, preserveSource: false});
+        expect(result.blocks[0].source).toContain('does not compare. Since');
+    });
 });
 
 describe('PDF layout analysis on real paper typography', () => {

@@ -137,6 +137,13 @@ button:focus-visible, select:focus-visible, textarea:focus-visible, [role="butto
 .reader-native-toolbar button span { display: grid; width: 19px; height: 19px; place-items: center; border-radius: 6px; color: var(--brand-strong); background: var(--brand-soft); font-size: 9px; }
 .reader-native-toolbar button.selected { border-color: rgba(239, 71, 118, .38); color: var(--brand-strong); background: var(--brand-soft); }
 .rich-preview-frame { display: block; width: 100%; height: min(760px, 72vh); border: 0; background: #fff; }
+.document-zoom-control { display: flex; align-items: center; gap: 4px; flex: none; }
+.document-zoom-control button { min-width: 28px; height: 30px; padding: 0 7px; border: 1px solid var(--line); border-radius: 7px; color: var(--ink); background: var(--surface); font-size: 14px; cursor: pointer; }
+.document-zoom-control .document-zoom-reset { min-width: 55px; font-size: 11px; font-variant-numeric: tabular-nums; }
+.document-zoom-control button:hover:enabled { color: var(--brand); border-color: var(--brand); }
+.document-zoom-control button:disabled { opacity: .4; cursor: default; }
+.document-reading-pane .reading-content:focus-visible { outline: 2px solid var(--brand); outline-offset: -2px; }
+.json-document-reader { overflow: visible; }
 .docx-page-stage { padding: 34px 24px 48px; overflow: auto; background: #e8edf5; }
 .dark .docx-page-stage { background: #151a23; }
 .docx-page { overflow-wrap: anywhere; position: relative; width: min(794px, 100%); min-height: 980px; margin: 0 auto; padding: 78px 82px 92px; color: #20242d; background: #fff; box-shadow: 0 9px 28px rgba(28, 38, 61, .18); }
@@ -307,6 +314,25 @@ input { accent-color: var(--brand); }input:focus-visible { outline: 3px solid va
 .export-preview { margin-top: 16px; border: 1px solid var(--line); border-radius: 12px; overflow: hidden; }
 .export-preview > strong { display: block; padding: 10px 14px; color: var(--muted); background: var(--surface-soft); font-size: 11px; font-weight: 600; }
 .export-preview pre { max-height: 180px; overflow-y: auto; margin: 0; padding: 14px; color: var(--ink); font: 12px/1.7 ui-monospace, SFMono-Regular, Menlo, monospace; white-space: pre-wrap; overflow-wrap: anywhere; }
+.document-batch-translation { display: flex; align-items: flex-start; gap: 9px; margin-top: 18px; font-size: 12px; cursor: pointer; }
+.document-batch-translation input { flex: none; margin-top: 3px; }
+.document-batch-translation strong, .document-batch-translation small { display: block; }
+.document-batch-translation small { margin-top: 4px; color: var(--muted); font-size: 11px; line-height: 1.6; }
+.pdf-export-summary { display: flex; align-items: center; gap: 20px; padding: 18px; border: 1px solid var(--line); border-radius: 12px; background: var(--surface-soft); }
+.pdf-export-summary strong { font-size: 13px; }
+.document-dialog .pdf-export-summary p { margin: 6px 0 0; font-size: 11px; }
+.pdf-export-page-pair { display: flex; flex: none; gap: 6px; }
+.pdf-export-page { width: 64px; height: 82px; padding: 8px 7px; border: 1px solid var(--line); border-radius: 5px; background: var(--surface); box-shadow: 0 2px 5px #10182808; }
+.pdf-export-page span { display: block; margin-bottom: 10px; font-size: 9px; color: var(--muted); }
+.pdf-export-page i { display: block; height: 3px; margin-top: 5px; border-radius: 2px; background: var(--line); }
+.pdf-export-page i:last-child { width: 65%; }
+.pdf-export-page.translated { border-color: var(--brand); }
+.pdf-export-page.translated span { color: var(--brand); }
+.pdf-export-page.translated i { background: var(--brand-soft); }
+.export-progress progress { display: block; width: 100%; height: 6px; margin: 10px 0 0; border: 0; border-radius: 3px; overflow: hidden; accent-color: var(--brand); }
+.export-progress progress::-webkit-progress-bar { border-radius: 3px; background: var(--line); }
+.export-progress progress::-webkit-progress-value { border-radius: 3px; background: var(--brand); }
+.export-progress progress::-moz-progress-bar { border-radius: 3px; background: var(--brand); }
 .export-options button:disabled { opacity: .55; cursor: wait; }
 @media (max-width: 760px) {
   .document-samples { grid-template-columns: 1fr; gap: 16px; padding: 18px; }
@@ -603,38 +629,90 @@ input { accent-color: var(--brand); }input:focus-visible { outline: 3px solid va
 .document-taskbar .taskbar-notices > .notice.error { border-color: #f3c8d2; background: #fff5f7; }
 .dark .document-taskbar .taskbar-notices > .notice.warning, .dark .document-taskbar .taskbar-notices > .notice.error { background: var(--surface); }
 @keyframes taskbar-notice-in { from { opacity: 0; transform: translateY(-6px); } }
-/* 窄窗口：依次收起次要元素，尽量保持一行。 */
-.document-taskbar .workspace-heading { max-width: 300px; }
-@media (max-width: 1760px) {
-  .reader-controls-slot .pdf-zoom-control > button { display: none; }
-  .document-taskbar .workspace-heading { max-width: 230px; }
-}
-@media (max-width: 1600px) {
-  .document-taskbar .toolbar-field > span { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
-  .document-taskbar .toolbar-service { width: 140px; }
-}
-@media (max-width: 1400px) {
-  .document-taskbar .workspace-heading { max-width: 170px; }
-  .document-taskbar .document-status { display: none; }
-  .document-taskbar .toolbar-service { width: 118px; }
-  .document-taskbar .toolbar-language { width: 96px; }
-  .reader-controls-slot .pdf-page-total { display: none; }
-}
-@media (max-width: 1240px) {
+/* 工具栏按完整功能组排布；宽度不足时明确分行，阅读和任务入口始终可达。 */
+.document-taskbar { display: grid; grid-template-columns: minmax(100px, 170px) minmax(0, 1fr) auto; gap: 8px 10px; overflow: visible; }
+.document-taskbar .workspace-heading { grid-column: 1; grid-row: 1; width: 100%; max-width: none; min-width: 0; flex-wrap: nowrap; gap: 8px; }
+.document-taskbar .file-heading, .document-taskbar .file-heading > div { min-width: 0; }
+.document-taskbar .document-status { overflow: hidden; text-overflow: ellipsis; }
+.document-taskbar .reader-toolbar { grid-column: 2; grid-row: 1; flex-wrap: nowrap; gap: 8px; min-width: 0; padding-left: 10px; }
+.document-taskbar .reader-tabs { flex: none; }
+.document-taskbar .reader-reading-controls { display: flex; flex: 1 1 auto; align-items: center; gap: 8px; min-width: 0; }
+.document-taskbar .reader-reading-controls > .mode-buttons, .document-taskbar .focus-toggle { flex: none; }
+.document-taskbar .reader-controls-slot { flex: 0 1 auto; min-width: 0; padding-left: 8px; overflow: visible; }
+.document-taskbar .reader-controls-slot .pdf-viewer-toolbar { gap: 8px; flex-wrap: nowrap; }
+.document-taskbar .taskbar-actions { display: flex; grid-column: 3; grid-row: 1; align-items: center; min-width: 0; margin-left: 0; gap: 10px; flex-wrap: nowrap; }
+.toolbar-translation-settings, .toolbar-primary-actions { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.toolbar-primary-actions { flex: none; }
+.document-taskbar .toolbar-settings-toggle { display: none; }
+.document-taskbar .toolbar-field { min-width: 0; }
+.document-taskbar .toolbar-field > span { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
+.document-taskbar .toolbar-service { width: 150px; }
+.document-taskbar .toolbar-language { width: 110px; }
+.document-taskbar .toolbar-model { width: 130px; }
+.document-taskbar .translation-actions { flex: none; width: auto; }
+.document-taskbar .translation-actions button { width: auto; }
+@media (min-width: 1000px) and (max-width: 1759px) {
+  .document-taskbar { grid-template-columns: minmax(120px, 1fr) auto auto auto auto; gap: 8px 12px; }
   .document-taskbar .taskbar-logo { display: none; }
-  .document-taskbar .workspace-heading { max-width: 130px; }
-  .document-taskbar .reader-tabs button:not(.selected) { display: none; }
+  .document-taskbar .reader-toolbar, .document-taskbar .reader-reading-controls { display: contents; }
+  .document-taskbar .reader-tabs { grid-column: 2; grid-row: 1; }
+  .document-taskbar .reader-reading-controls > .mode-buttons { grid-column: 3; grid-row: 1; }
+  .document-taskbar .document-zoom-control { grid-column: 4; grid-row: 1; }
+  .document-taskbar .focus-toggle { grid-column: 5; grid-row: 1; }
+  .document-taskbar .reader-controls-slot { grid-column: 1 / -1; grid-row: 2; padding: 8px 0 0; border: 0; border-top: 1px solid var(--line); }
+  .document-taskbar .taskbar-actions { display: grid; grid-column: 1 / -1; grid-row: 2; grid-template-columns: minmax(0, 1fr) auto; padding-top: 7px; border-top: 1px solid var(--line); }
+  .document-taskbar.has-pdf-controls .taskbar-actions { grid-row: 3; }
+  .toolbar-translation-settings { gap: 12px; }
+  .document-taskbar .toolbar-field > span { position: static; width: auto; height: auto; overflow: visible; clip: auto; }
+  .document-taskbar .toolbar-service { width: 168px; }
+  .document-taskbar .toolbar-language { width: 120px; }
+  .document-taskbar .toolbar-model { width: 150px; }
 }
-@media (max-width: 1320px) {
-  .document-taskbar { gap: 6px 8px; padding-inline: 10px; }
+@media (max-width: 999px) {
+  .document-taskbar { grid-template-columns: minmax(0, 1fr) auto auto; gap: 8px; padding: 8px 10px; }
+  .document-taskbar .workspace-heading { grid-column: 1; grid-row: 1; }
   .document-taskbar .taskbar-logo { display: none; }
-  .document-taskbar .workspace-heading { max-width: 120px; }
-  .document-taskbar .reader-toolbar { gap: 6px; padding-left: 8px; }
-  .document-taskbar .reader-controls-slot { padding-left: 6px; }
+  .document-taskbar .reader-toolbar, .document-taskbar .reader-reading-controls { display: contents; }
+  .document-taskbar .reader-tabs { grid-column: 2 / -1; grid-row: 1; justify-self: end; }
+  .document-taskbar .reader-reading-controls > .mode-buttons { grid-column: 1; grid-row: 2; justify-self: start; }
+  .document-taskbar .document-zoom-control { grid-column: 2; grid-row: 2; }
+  .document-taskbar .reader-controls-slot { grid-column: 1 / -1; grid-row: 3; padding: 7px 0 0; border-left: 0; border-top: 1px solid var(--line); }
+  .document-taskbar .reader-controls-slot .pdf-viewer-toolbar { gap: 7px; }
+  .document-taskbar .focus-toggle { grid-column: 3; grid-row: 2; justify-self: end; margin-left: 0; }
+  .document-taskbar .taskbar-actions { display: block; grid-column: 1 / -1; grid-row: 3; padding-top: 7px; border-top: 1px solid var(--line); }
+  .document-taskbar.has-pdf-controls .taskbar-actions { grid-row: 4; }
+  .document-taskbar .toolbar-translation-settings { display: none; }
+  .toolbar-primary-actions { width: 100%; }
+  .document-taskbar .toolbar-settings-toggle { display: inline-flex; align-items: center; justify-content: center; margin-right: auto; }
+  .document-taskbar .toolbar-primary-actions .translation-actions { flex: 0 1 auto; min-width: 0; }
+  .document-taskbar .toolbar-primary-actions button { overflow: hidden; text-overflow: ellipsis; }
+  .document-taskbar .toolbar-primary-actions .translation-actions button { max-width: 100%; }
   .document-taskbar .mode-buttons button { padding: 0 8px; }
-  .reader-controls-slot .pdf-viewer-toolbar { gap: 6px; }
-  .reader-controls-slot .pdf-style, .document-taskbar .focus-toggle { display: none; }
-  .reader-controls-slot .pdf-page-navigation > button { display: none; }
+  .is-workspace .document-reading-pane .reading-content, .document-reading-pane .reading-content.reading-pdf { min-height: 0; }
+}
+@media (max-width: 599px) {
+  .document-taskbar .reader-controls-slot .pdf-viewer-toolbar { display: grid; width: 100%; grid-template-columns: auto auto auto minmax(0, 1fr); gap: 7px; }
+  .reader-controls-slot .pdf-page-navigation { grid-column: 1 / 3; grid-row: 1; justify-self: start; }
+  .reader-controls-slot .pdf-zoom-control { grid-column: 3 / -1; grid-row: 1; justify-self: start; }
+  .reader-controls-slot .pdf-presentation-control { grid-column: 1; grid-row: 2; justify-self: start; }
+  .reader-controls-slot .pdf-search { grid-column: 2; grid-row: 2; }
+  .reader-controls-slot .pdf-style { grid-column: 3; grid-row: 2; }
+  .reader-controls-slot .pdf-information-highlight { grid-column: 4; grid-row: 2; justify-self: start; }
+  .reader-controls-slot .pdf-information-status { grid-column: 1 / -1; grid-row: 3; }
+}
+@media (max-width: 760px) {
+  .is-workspace .document-sidebar { width: auto; max-height: min(28dvh, 200px); }
+}
+@media (max-width: 420px) {
+  .document-taskbar { padding-inline: 8px; }
+  .document-taskbar .mode-buttons button { padding: 0 7px; font-size: 11px; }
+  .document-app .document-taskbar :is(.ghost-button, .translate-document-button, .download-button) { padding-inline: 9px; font-size: 11px; }
+  .toolbar-primary-actions { gap: 6px; }
+}
+@media (max-width: 760px) and (max-height: 520px) {
+  .is-workspace .document-layout { position: relative; grid-template-rows: auto minmax(0, 1fr); }
+  .is-workspace .document-reading-pane { grid-row: 2; }
+  .is-workspace .document-sidebar { position: absolute; grid-column: 1; grid-row: 2; inset: 0 auto 0 0; z-index: 8; width: min(264px, 100%); max-height: none; border-right: 1px solid var(--line); border-bottom: 0; box-shadow: 8px 0 24px #10182820; }
 }
 
 /* 非 PDF 文档的目录：与 PDF 目录同样的密度和选中样式。 */

@@ -1,11 +1,28 @@
 import {afterEach, beforeEach, describe, expect, it, vi, type MockInstance} from 'vitest';
-import {createRenderer, h, nextTick, ref} from 'vue';
+import {createRenderer, h, markRaw, nextTick, ref} from 'vue';
+import {parseHTML} from 'linkedom';
 import {Config} from '@/src/core/config/model';
 import {parseDocument} from '@/src/features/document-translation/core/document';
+import * as binaryService from '@/src/features/document-translation/services/binary';
+import {acquirePdfDocument} from '@/src/features/document-translation/ui/pdfPreview';
+import {createDocumentDownload as createRuntimeDownload} from '@/src/app/document-translation/runtime';
 import DocumentApp from '@/src/app/document-translation/DocumentApp.vue';
 import DocumentSegmentEditor from '@/src/app/document-translation/DocumentSegmentEditor.vue';
 
-const ports = vi.hoisted(() => ({tasks: [] as any[], renderPending: undefined as any, pagePending: undefined as any, pageProvider: undefined as undefined | ((pageNumber: number, page: any) => Promise<any>), pageCount: 1, fetchPdf: vi.fn(), i18n: vi.fn(), sendMessage: vi.fn(), translate: vi.fn(), unsubscribe: vi.fn(), observer: undefined as any, config: undefined as any}));
+const ports = vi.hoisted(() => ({tasks: [] as any[], zoomBindings: [] as any[], renderPending: undefined as any, pagePending: undefined as any, pageProvider: undefined as undefined | ((pageNumber: number, page: any) => Promise<any>), pageCount: 1, fetchPdf: vi.fn(), i18n: vi.fn(), sendMessage: vi.fn(), translate: vi.fn(), batch: vi.fn(), recognize: vi.fn(), createRecognizer: vi.fn(), actualRecognize: undefined as any, actualCreateRecognizer: undefined as any, unsubscribe: vi.fn(), observer: undefined as any, config: undefined as any}));
+vi.mock('@/src/features/document-translation/services/pdfOcr', async () => {
+    const actual = await vi.importActual<typeof import('@/src/features/document-translation/services/pdfOcr')>('@/src/features/document-translation/services/pdfOcr');
+    ports.actualRecognize = actual.recognizePdfDocument;
+    return {...actual, recognizePdfDocument: ports.recognize};
+});
+vi.mock('@/src/app/document-translation/runtime', async () => {
+    const actual = await vi.importActual<typeof import('@/src/app/document-translation/runtime')>('@/src/app/document-translation/runtime');
+    ports.actualCreateRecognizer = actual.createPdfPageRecognizer;
+    return {...actual, createPdfPageRecognizer: ports.createRecognizer};
+});
+vi.mock('@/src/features/document-translation/ui/documentZoom', () => ({installDocumentZoomGestures: (target: HTMLElement, options: unknown) => {
+    const dispose = vi.fn(); ports.zoomBindings.push({target, options, dispose}); return dispose;
+}}));
 vi.mock('@/src/features/document-translation/services/pdfSource', async () => ({...await vi.importActual<typeof import('@/src/features/document-translation/services/pdfSource')>('@/src/features/document-translation/services/pdfSource'), fetchOnlinePdf: ports.fetchPdf}));
 vi.mock('@/src/features/document-translation/ui/PdfReader.vue', () => ({default: {props: ['document', 'translations', 'mode', 'sourceUrl'], setup: () => () => h('div', {'data-document-reader': 'pdf'})}}));
 vi.mock('@/src/app/document-translation/selectionRuntime', () => ({mountDocumentSelectionTranslation: () => ({dispose: () => {}})}));
@@ -15,7 +32,7 @@ vi.mock('@/src/services/config/store', async () => {
     const config = new Config(); ports.config = config;
     return {config, configReady: Promise.resolve(), subscribeConfig: (observer: any) => {ports.observer = observer; return ports.unsubscribe;}, requestConfigPatch: (patch: any, send: any) => send({patch})};
 });
-vi.mock('@/src/app/translation/client', () => ({translateText: ports.translate, translateTextBatch: vi.fn()}));
+vi.mock('@/src/app/translation/client', () => ({translateText: ports.translate, translateTextBatch: ports.batch}));
 vi.mock('@/src/ui/i18n', () => ({createUiI18nPlugin: (options: unknown) => options, useUiI18n: () => ({language: ref('zh-CN'), t: (key: string, values?: unknown) => {ports.i18n(key, values); return key;}, translateLegacy: (text: string) => text})}));
 vi.mock('@/src/ui/components/UiSelect.vue', () => ({default: {props: ['modelValue'], setup: (_props: any, {slots}: any) => () => h('select', slots.default?.())}}));
 vi.mock('@/src/ui/components/GlossaryLibrarySelect.vue', () => ({default: {setup: () => () => h('div')}}));
@@ -55,9 +72,12 @@ let win: any;
 const windowTimers = new Set<ReturnType<typeof setTimeout>>();
 
 beforeEach(async () => {
-    ports.tasks = []; ports.renderPending = undefined; ports.pagePending = undefined; ports.pageProvider = undefined; ports.pageCount = 1;
+    ports.tasks = []; ports.zoomBindings = []; ports.renderPending = undefined; ports.pagePending = undefined; ports.pageProvider = undefined; ports.pageCount = 1;
     ports.fetchPdf.mockReset().mockResolvedValue(file('online.pdf')); ports.i18n.mockClear();
     ports.sendMessage.mockReset().mockResolvedValue(undefined); ports.translate.mockReset().mockResolvedValue('translated'); ports.unsubscribe.mockReset();
+    ports.batch.mockReset().mockImplementation(async (sources: string[]) => sources.map(source => `译 ${source}`));
+    ports.recognize.mockReset().mockImplementation(ports.actualRecognize);
+    ports.createRecognizer.mockReset().mockImplementation(ports.actualCreateRecognizer);
     Object.assign(ports.config, new Config());
     win = Object.assign(new EventTarget(), {matchMedia: () => Object.assign(new EventTarget(), {matches: false}), document: {createElement: () => ({click: vi.fn()})}, location: {origin: 'chrome-extension://fixture'}, setTimeout: (callback: () => void, delay: number) => {
         const timer = setTimeout(() => {windowTimers.delete(timer); callback();}, delay); windowTimers.add(timer); return timer;
@@ -75,6 +95,199 @@ beforeEach(async () => {
 afterEach(async () => {ports.pagePending?.resolve(ports.tasks.find(value => value.role === 'preview')?.page); ports.renderPending?.resolve(); app?.unmount(); await flush(); await vi.dynamicImportSettled(); windowTimers.forEach(timer => clearTimeout(timer)); windowTimers.clear(); vi.restoreAllMocks(); vi.unstubAllGlobals();});
 
 describe('documentbinaryAudit actual DocumentApp SFC ownership', () => {
+    it.each(['success', 'failure', 'cancel'] as const)('releases a background PDF export worker after %s through the actual App/runtime', async outcome => {
+        await state.loadFiles([file('export.pdf')]);
+        state.editSegment(0, '译文需要导出'); await flush();
+        const encoding = deferred<binaryService.DocumentDownload>();
+        let signal: AbortSignal | undefined;
+        vi.spyOn(binaryService, 'createDocumentDownload').mockImplementationOnce((_document, _translations, _mode, options) => {
+            signal = options?.signal;
+            signal?.addEventListener('abort', () => encoding.reject(signal!.reason), {once: true});
+            return encoding.promise;
+        });
+        const running = state.downloadDocument();
+        await vi.waitFor(() => expect(ports.tasks.filter(task => task.role === 'preview')).toHaveLength(1));
+        const worker = ports.tasks.find(task => task.role === 'preview')!;
+        expect(worker.destroy).not.toHaveBeenCalled();
+        if (outcome === 'success') encoding.resolve({data: new Uint8Array([1]), fileName: 'export.translated.pdf', mimeType: 'application/pdf'});
+        else if (outcome === 'failure') encoding.reject(new Error('encoding failed'));
+        else state.cancelDownload();
+        await running; await flush();
+        expect(worker.destroy).toHaveBeenCalledOnce();
+        expect(state.preparingDownload).toBe(false);
+        if (outcome === 'success') {
+            expect(createUrl).toHaveBeenCalledOnce();
+            expect(state.downloadedRevision).toBe(state.editRevision);
+        } else {
+            expect(createUrl).not.toHaveBeenCalled();
+            expect(state.downloadedRevision).toBe(0);
+            expect(outcome === 'cancel' ? state.downloadProgress : state.downloadError).toBe(outcome === 'cancel' ? 'document.export.canceled' : 'encoding failed');
+        }
+        expect(signal?.aborted).toBe(outcome === 'cancel');
+    });
+
+    it('keeps the PDF reader worker usable when its shared export finishes, then destroys it after the reader closes', async () => {
+        await state.loadFiles([file('shared.pdf')]);
+        state.editSegment(0, '共享译文'); await flush();
+        const reader = acquirePdfDocument(state.parsedDocument.binary.bytes);
+        try {
+            const pdf = await reader.promise;
+            const worker = ports.tasks.find(task => task.role === 'preview')!;
+            const encoding = deferred<binaryService.DocumentDownload>();
+            vi.spyOn(binaryService, 'createDocumentDownload').mockReturnValueOnce(encoding.promise);
+            const running = state.downloadDocument(); await flush();
+            expect(ports.tasks.filter(task => task.role === 'preview')).toHaveLength(1);
+            encoding.resolve({data: new Uint8Array([1]), fileName: 'shared.translated.pdf', mimeType: 'application/pdf'});
+            await running; await flush();
+            expect(worker.destroy).not.toHaveBeenCalled();
+            expect(reader.signal.aborted).toBe(false);
+            expect(await pdf.getPage(1)).toBe(worker.page);
+            reader.release();
+            expect(worker.destroy).toHaveBeenCalledOnce();
+            expect(reader.signal.aborted).toBe(true);
+        } finally {reader.release();}
+    });
+
+    it.each(['unchanged', 'custom-layout', 'custom-readable'] as const)('does not preload a browser PDF worker for %s output', async kind => {
+        await state.loadFiles([file('custom.pdf')]);
+        const document = state.parsedDocument;
+        const translations = kind === 'unchanged' ? document.segments.map((segment: any) => segment.source) : ['独立端口译文'];
+        const options: binaryService.CreateDocumentDownloadOptions = kind === 'custom-layout'
+            ? {pdfPresentation: 'layout', pdfPageRasterizer: async () => new Uint8Array([1])}
+            : kind === 'custom-readable' ? {pdfPresentation: 'readable', pdfReadingRasterizer: async function* () {yield {bytes: new Uint8Array([1]), width: 612, height: 792};}} : {};
+        const encoding = deferred<binaryService.DocumentDownload>();
+        vi.spyOn(binaryService, 'createDocumentDownload').mockReturnValueOnce(encoding.promise);
+        const running = createRuntimeDownload(document, translations, 'translated', options);
+        await flush();
+        const workerCount = ports.tasks.filter(task => task.role === 'preview').length;
+        encoding.resolve({data: new Uint8Array([1]), fileName: 'custom.translated.pdf', mimeType: 'application/pdf'});
+        await running; await flush();
+        expect(workerCount).toBe(0);
+        expect(ports.tasks.filter(task => task.role === 'preview')).toHaveLength(0);
+    });
+
+    it('keeps the task language, service, model and document batch snapshot across delayed scanned-PDF OCR and external settings updates', async () => {
+        const initial = JSON.parse(JSON.stringify(ports.config));
+        Object.assign(initial, {from: 'en', to: 'zh-CN', documentService: 'openai', enableAIMultiSegment: false});
+        initial.documentModel.openai = 'document-before';
+        initial.token.openai = 'fixture-only-token';
+        Object.assign(ports.config, initial);
+        ports.observer(initial); await flush();
+        await state.loadFiles([file('scanned.pdf')]);
+        const original = state.parsedDocument;
+        const scanned = markRaw({...original, segments: [], binary: {...original.binary,
+            pages: original.binary.pages.map((page: any) => ({...page, scanned: true, segmentIndexes: [], blocks: []})),
+        }});
+        state.parsedDocument = scanned; state.documentQueue[0].document = scanned; await flush();
+        expect(state.needsOcr).toBe(true);
+        expect(state.documentBatchTranslation).toBe(true);
+        expect(state.credentialWarning).toBeNull();
+        const recognizing = deferred<any>();
+        const recognizer = vi.fn();
+        ports.createRecognizer.mockReturnValue(recognizer);
+        ports.recognize.mockReturnValue(recognizing.promise);
+        ports.sendMessage.mockClear();
+        const running = state.startTranslation();
+        await vi.waitFor(() => expect(ports.recognize).toHaveBeenCalledOnce());
+        const fingerprint = state.taskFingerprint;
+        expect(ports.createRecognizer).toHaveBeenCalledWith('en');
+        expect(ports.recognize).toHaveBeenCalledWith(scanned, recognizer, expect.objectContaining({signal: expect.any(AbortSignal)}));
+        expect(ports.batch).not.toHaveBeenCalled();
+        expect(ports.translate).not.toHaveBeenCalled();
+
+        const external = JSON.parse(JSON.stringify(initial));
+        Object.assign(external, {from: 'fr', to: 'de', documentService: 'google', enableAIMultiSegment: true});
+        external.documentModel.openai = 'document-after';
+        Object.assign(ports.config, external);
+        const sharedAfterUpdate = JSON.stringify(ports.config);
+        ports.observer(external); await flush();
+        expect(state.config.from).toBe('fr'); expect(state.config.documentService).toBe('google');
+        expect(state.translating).toBe(true);
+        expect(state.taskFingerprint).toBe(fingerprint);
+
+        const sources = ['Recognized first paragraph', 'Recognized second paragraph'];
+        const recognized = {...scanned, segments: sources.map((source, id) => ({id, source})), binary: {...scanned.binary,
+            pages: scanned.binary.pages.map((page: any) => ({...page, scanned: false, segmentIndexes: [0, 1]})),
+        }};
+        recognizing.resolve(recognized); await running; await flush();
+        expect(ports.batch).toHaveBeenCalledOnce();
+        expect(ports.batch).toHaveBeenCalledWith(sources, 'scanned.pdf', expect.objectContaining({
+            serviceOverride: 'openai', modelOverride: 'document-before', sourceLanguage: 'en', targetLanguage: 'zh-CN', aiMultiSegment: true,
+        }));
+        expect(ports.translate).not.toHaveBeenCalled();
+        expect(state.translationComplete).toBe(true);
+        expect(state.translatedSegments).toEqual(sources.map(source => `译 ${source}`));
+        expect(state.taskFingerprint).toBe(fingerprint);
+        expect(state.settingsChanged).toBe(true);
+        expect(state.config.documentModel.openai).toBe('document-after');
+        expect(JSON.stringify(ports.config)).toBe(sharedAfterUpdate);
+        expect(ports.sendMessage).not.toHaveBeenCalled();
+    });
+
+    it('keeps rich-reader zoom through in-place translation updates and releases gestures on frame, tab and document changes', async () => {
+        await state.loadFiles([file('article.txt', 'Original paragraph')]); await flush();
+        const rich = parseHTML('<!doctype html><html><head></head><body><p>Original</p></body></html>').document;
+        const scroller = rich.documentElement;
+        Object.assign(scroller, {scrollTop: 400, scrollLeft: 0});
+        Object.defineProperties(scroller, {clientWidth: {value: 800}, clientHeight: {value: 600}});
+        Object.defineProperty(rich, 'scrollingElement', {value: scroller});
+        rich.body.getBoundingClientRect = () => ({left: -scroller.scrollLeft, top: -scroller.scrollTop,
+            width: 800 * Number(rich.body.style.getPropertyValue('zoom') || 1), height: 2000 * Number(rich.body.style.getPropertyValue('zoom') || 1)}) as DOMRect;
+        vi.stubGlobal('DOMParser', class {parseFromString(html: string) {return parseHTML(html).document;}});
+        state.richFrame.contentDocument = markRaw(rich); state.handleRichFrameLoad();
+        expect(ports.zoomBindings).toHaveLength(1);
+        const first = ports.zoomBindings[0];
+        expect(first.target).toBe(scroller); expect(first.options.minScale).toBe(.5); expect(first.options.maxScale).toBe(3);
+        first.options.setScale(2, {clientX: 100, clientY: 200}); await flush();
+        expect(state.readerScale).toBe(2); expect(rich.body.style.getPropertyValue('zoom')).toBe('2');
+        expect(scroller.scrollTop).toBeCloseTo(1000); expect(scroller.scrollLeft).toBeCloseTo(100);
+        state.translatedSegments = ['新的译文']; state.settledTranslations = ['新的译文']; await flush();
+        expect(rich.body.textContent).toContain('新的译文');
+        expect(rich.body.style.getPropertyValue('zoom')).toBe('2'); expect(ports.zoomBindings).toHaveLength(1);
+        state.handleRichFrameLoad();
+        expect(first.dispose).toHaveBeenCalledOnce(); expect(ports.zoomBindings).toHaveLength(2);
+        const second = ports.zoomBindings[1];
+        state.readerTab = 'edit'; await flush(); expect(second.dispose).toHaveBeenCalledOnce();
+        second.options.setScale(3); expect(state.readerScale).toBe(2);
+        state.readerTab = 'read'; await flush(); expect(ports.zoomBindings).toHaveLength(3);
+        const third = ports.zoomBindings[2];
+        third.options.setScale(1.5, {clientX: 100, clientY: 200});
+        const beforeResetScroll = scroller.scrollTop;
+        state.resetDocument(); await flush();
+        expect(third.dispose).toHaveBeenCalledOnce(); expect(state.readerScale).toBe(1);
+        expect(scroller.scrollTop).toBe(beforeResetScroll);
+    });
+
+    it('offers bounded non-PDF toolbar zoom while native reading and proofreading keep separate gesture ownership', async () => {
+        await state.loadFiles([file('captions.srt', '1\n00:00:01,000 --> 00:00:03,000\nOriginal caption\n')]); await flush();
+        const page = parseHTML('<html><body><div class="reading-content"><div class="subtitle-table-scroll"><table data-native-zoom-content><tr><td>Caption</td></tr></table></div></div></body></html>').document;
+        const domViewport = page.querySelector('.reading-content')!;
+        const viewport = state.readingContent;
+        Object.assign(viewport, {ownerDocument: markRaw(page), querySelector: domViewport.querySelector.bind(domViewport), contains: domViewport.contains.bind(domViewport),
+            getBoundingClientRect: () => ({left: 0, top: 0, width: 800, height: 600})});
+        state.bindReaderZoomGestures();
+        const binding = ports.zoomBindings.at(-1); expect(binding.target).toBe(viewport);
+        const walk = (entry: HostNode): HostNode[] => [entry, ...entry.children.flatMap(walk)];
+        const toolbar = walk(root).find(entry => String(entry.props.class).includes('document-zoom-control'))!;
+        const zoomOut = toolbar.children.find(entry => entry.props['aria-label'] === 'document.pdfReading.zoomOut')!;
+        const zoomIn = toolbar.children.find(entry => entry.props['aria-label'] === 'document.pdfReading.zoomIn')!;
+        const reset = toolbar.children.find(entry => entry.props['data-document-zoom'] !== undefined)!;
+        zoomIn.props.onClick(); await flush(); expect(state.readerScale).toBe(1.25);
+        expect(binding.dispose).toHaveBeenCalledOnce();
+        expect(state.readerZoomStyle).toEqual({zoom: '1.25'});
+        const beforeReset = ports.zoomBindings.at(-1);
+        reset.props.onClick(); await flush(); expect(state.readerScale).toBe(1);
+        expect(beforeReset.dispose).toHaveBeenCalledOnce();
+        for (let index = 0; index < 10; index += 1) zoomOut.props.onClick();
+        await flush(); expect(state.readerScale).toBe(.5); expect(zoomOut.props.disabled).toBe(true);
+        binding.options.setScale(999); await flush(); expect(state.readerScale).toBe(3); expect(zoomIn.props.disabled).toBe(true);
+        state.readerTab = 'edit'; await flush(); expect(binding.dispose).toHaveBeenCalledOnce();
+        binding.options.reset(); expect(state.readerScale).toBe(3);
+        state.readerTab = 'read'; await flush();
+        expect(ports.zoomBindings.at(-1).target).toBe(viewport);
+        app.unmount(); app = null; await flush(); expect(ports.zoomBindings.every(entry => entry.dispose.mock.calls.length === 1)).toBe(true);
+    });
+
     it('opens a text-based formula-only PDF for source reading without provider requests or invalid progress', async () => {
         ports.pageProvider = async (_pageNumber, page) => ({...page, getTextContent: async () => ({items: [{str: 'f(x)=x', transform: [1, 0, 0, 12, 20, 50], width: 60, height: 12, fontName: 'body'}], styles: {}})});
         await state.loadFiles([file('formula-only.pdf')]); await flush();

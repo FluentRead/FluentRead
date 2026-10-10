@@ -37,7 +37,7 @@ describe('PDF layout overlay block selection', () => {
         expect(result.map(entry => entry.block.segmentIndex)).toEqual([0, 1]);
     });
     it('measures the free space below and to the right up to the nearest neighbouring content', () => {
-        const blocks = [block(0, 40, 40, 200, 24), block(1, 40, 80, 200, 24), block(2, 320, 40, 200, 24), block(3, 320, 300, 200, 24)];
+        const blocks = [block(0, 40, 40, 200, 24), block(1, 40, 80, 200, 24), block(2, 320, 40, 200, 24), block(3, 320, 300, 200, 24)].map(entry => ({...entry, lineCount: 1}));
         const [first, second, third, fourth] = pdfOverlayBlocks(page(blocks, {preservedRegions: [{id: 'figure-1', kind: 'figure', x: 40, y: 130, width: 200, height: 60}]}));
         // 下方最近的是同栏的下一段；右侧最近的是同一行高度上的右栏。
         expect(first.spaceBelow).toBeCloseTo(80 - 64 - 1.5); expect(first.spaceRight).toBeCloseTo(320 - 240 - 6);
@@ -47,13 +47,37 @@ describe('PDF layout overlay block selection', () => {
         expect(fourth.spaceBelow).toBeCloseTo(800 - 324 - 1.5);
     });
     it('uses the unrotated content size for quarter-turn pages and never reports negative space', () => {
-        const rotated = pdfOverlayBlocks(page([block(0, 40, 560, 500, 30)], {rotation: 90, width: 800, height: 600}))[0];
+        const rotated = pdfOverlayBlocks(page([block(0, 40, 560, 500, 30, {lineCount: 1})], {rotation: 90, width: 800, height: 600}))[0];
         // 旋转 90 度时内容坐标的高度是展示宽度 800，宽度是展示高度 600。
         expect(rotated.spaceBelow).toBeCloseTo(800 - 590 - 1.5); expect(rotated.spaceRight).toBeCloseTo(600 - 40 - 540 - 6);
         const reversed = pdfOverlayBlocks(page([block(0, 40, 560, 500, 30)], {rotation: 270, width: 800, height: 600}))[0];
         expect(reversed.spaceBelow).toBeCloseTo(208.5);
         const tight = pdfOverlayBlocks(page([block(0, -20, 40, 700, 790), block(1, 40, 829.5, 100, 10)]))[0];
         expect(tight.spaceBelow).toBe(0); expect(tight.spaceRight).toBe(0);
+    });
+    it('stops expanded copyright and centred titles before the real Attention page-one rules', () => {
+        const copyright = block(0, 124.313, 73.8573744, 363.5815424, 39.8502, {lineCount: 3});
+        const title = block(1, 204, 150.164, 204, 17.215, {lineCount: 1, textAlign: 'center'});
+        const [first, second] = pdfOverlayBlocks(page([copyright, title], {width: 612, height: 792, layoutBoundaries: [
+            {x: 108, y: 128.197, width: 396, height: 3.985}, {x: 108, y: 178.148, width: 396, height: 0},
+        ]}));
+        expect(first.block.y + first.block.height + first.spaceBelow).toBeLessThan(128.197);
+        expect(second.block.y + second.block.height + second.spaceBelow).toBeLessThan(178.148);
+        expect(second.spaceRight).toBe(0);
+    });
+    it('checks the expanded one-line width against lower content before borrowing vertical space', () => {
+        const first = pdfOverlayBlocks(page([block(0, 40, 40, 100, 12, {lineCount: 1}), block(1, 240, 65, 200, 24)]))[0];
+        expect(first.spaceRight).toBeGreaterThan(100);
+        expect(first.block.y + first.block.height + first.spaceBelow).toBeLessThan(65);
+        expect(pdfOverlayBlocks(page([block(0, 40, 40, 100, 12, {lineCount: 1, textAlign: 'right'})]))[0].spaceRight).toBe(0);
+    });
+    it('keeps a paragraph beside its preserved QED mark without changing source line erasure geometry', () => {
+        const source = block(0, 70.86614, 686.88898, 455.55796, 26.87523, {lines: [{text: 'Source line', x: 70.86614, y: 686.88898, width: 455.55796, height: 11}]});
+        const mark = block(-1, 515.85144, 701.88421, 8.558, 11, {kind: 'formula', preserveSource: true});
+        const overlay = pdfOverlayBlocks(page([source, mark]))[0];
+        expect(overlay.block.x + overlay.block.width).toBeLessThan(mark.x);
+        expect(overlay.block.lines).toBe(source.lines);
+        expect(source.width).toBe(455.55796);
     });
 });
 
@@ -89,6 +113,13 @@ describe('PDF layout overlay text fitting', () => {
         // 字宽随字号缩小而反向增大，任何字号都放不下；循环必须有界。
         const fit = fitPdfBlockText({text: '字'.repeat(40), width: 100, height: 12, fontSize: 100, lineHeight: 120, minFontSize: 1, weight: 400}, (text, fontSize) => {calls += 1; return Array.from(text).length * 1000 / fontSize;});
         expect(fit.overflow).toBe(true); expect(fit.fontSize).toBeGreaterThan(1); expect(calls).toBeGreaterThan(0);
+    });
+    it('bounds fitting for invalid dimensions and reports a single glyph wider than the floor box', () => {
+        const invalid = fitPdfBlockText({text: '尾文', width: Infinity, height: NaN, fontSize: Infinity, lineHeight: NaN, minFontSize: Infinity, weight: 400}, monospace);
+        expect(Number.isFinite(invalid.fontSize)).toBe(true); expect(invalid.overflow).toBe(true);
+        expect(invalid.lines.join('')).toBe('尾文');
+        const narrow = fitPdfBlockText({text: '字', width: 2, height: 200, fontSize: 12, lineHeight: 12, minFontSize: 6, weight: 400}, monospace);
+        expect(narrow.fontSize).toBe(6); expect(narrow.overflow).toBe(true);
     });
     it('tightens the leading once the text has shrunk, so a doubled translation fits two small lines into a one-line box', () => {
         const measure = (text: string, size: number) => text.length * size * 0.5;

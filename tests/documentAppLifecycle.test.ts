@@ -1,9 +1,11 @@
 import {afterEach, beforeEach, describe, expect, it, vi, type MockInstance} from 'vitest';
 import {createRenderer, h, markRaw, nextTick, ref} from 'vue';
+import {IDBFactory} from 'fake-indexeddb';
 import {parseHTML} from 'linkedom';
 import {Config} from '@/src/core/config/model';
 import {parseDocument} from '@/src/features/document-translation/core/document';
 import * as binaryService from '@/src/features/document-translation/services/binary';
+import {createDocumentHistory, documentHistoryId} from '@/src/features/document-translation/services/history';
 import {acquirePdfDocument} from '@/src/features/document-translation/ui/pdfPreview';
 import {createDocumentDownload as createRuntimeDownload} from '@/src/app/document-translation/runtime';
 import DocumentApp from '@/src/app/document-translation/DocumentApp.vue';
@@ -95,6 +97,82 @@ beforeEach(async () => {
 afterEach(async () => {ports.pagePending?.resolve(ports.tasks.find(value => value.role === 'preview')?.page); ports.renderPending?.resolve(); app?.unmount(); await flush(); await vi.dynamicImportSettled(); windowTimers.forEach(timer => clearTimeout(timer)); windowTimers.clear(); vi.restoreAllMocks(); vi.unstubAllGlobals();});
 
 describe('documentbinaryAudit actual DocumentApp SFC ownership', () => {
+    it.each(['scanned', 'mixed'] as const)('preserves multi-page %s PDF OCR revisions across a parsing-version upgrade and subsequent reopening', async format => {
+        const base = await binaryService.parseDocumentFile(file('history.pdf'));
+        if (base.binary?.kind !== 'pdf') throw new Error('expected PDF');
+        const bytes = base.binary.bytes;
+        const makeDocument = (native: string[]) => {
+            const segments: Array<{id: number; source: string}> = [];
+            const pageSources: Array<string[] | null> = format === 'mixed' ? [native, null, null] : [null, null];
+            const pages = pageSources.map((sources, index) => {
+                const blocks = (sources ?? []).map((source, position) => {
+                    const id = segments.length;
+                    segments.push({id, source});
+                    return {segmentIndex: id, x: 5, y: 10 + position * 35, width: 90, height: 12, fontSize: 11,
+                        lineHeight: 12, lineCount: 1, fontFamily: 'sans-serif', fontWeight: 400 as const, textAlign: 'left' as const};
+                });
+                return {pageNumber: index + 1, width: 100, height: 100, blocks, segmentIndexes: blocks.map(block => block.segmentIndex),
+                    ...(sources === null ? {scanned: true} : {layoutBoundaries: [{x: 5, y: 30, width: 90, height: 1}]}),
+                    ...(index === pageSources.length - 1 ? {rotation: 90 as const} : {})};
+            });
+            return {...base, segments, binary: {kind: 'pdf' as const, bytes, pages}};
+        };
+        const fresh = makeDocument(['New native title', 'Stable native']);
+        const old = await ports.actualRecognize(makeDocument(['Old native title', 'Stable native']), async ({pageNumber}: {pageNumber: number}) => [
+            {text: 'Repeated OCR', x: 5, y: 10, width: 90, height: 12},
+            {text: `Page ${pageNumber} paragraph`, x: 5, y: 55, width: 90, height: 12},
+        ], {startPage: 1});
+        let repeat = 0;
+        const edits = old.segments.map(({source}: {source: string}) => source === 'Repeated OCR' ? `第 ${++repeat} 次独立校订`
+            : source === 'Old native title' ? '旧标题校订不能乱填新标题' : source === 'Stable native' ? '未变文字页校订'
+                : source === `Page ${fresh.binary.pages.length} paragraph` ? '' : '扫描正文校订');
+        const id = await documentHistoryId(bytes);
+        const factory = new IDBFactory();
+        const history = createDocumentHistory(factory);
+        await history.save({id, name: 'history.pdf', format: 'pdf', size: bytes.length, total: old.segments.length,
+            completed: edits.filter((value: string) => value.trim()).length, updatedAt: 1, bytes, mimeType: 'application/pdf',
+            translations: edits, fingerprint: 'old-settings', parsed: old, parsedVersion: 6});
+        app.unmount();
+        vi.stubGlobal('indexedDB', factory);
+        vi.stubGlobal('File', class extends Blob {name: string; constructor(parts: BlobPart[], name: string, options?: BlobPropertyBag) {super(parts, options); this.name = name;}});
+        root = node('root'); app = renderer.createApp(DocumentApp); app.mount(root); state = (app._instance as any).setupState;
+        await flush();
+        const parsing = deferred<typeof fresh>();
+        const parse = vi.spyOn(binaryService, 'parseDocumentFile').mockReturnValueOnce(parsing.promise);
+        const opening = state.openHistory({id});
+        await vi.waitFor(() => expect(parse).toHaveBeenCalledOnce());
+        expect((await history.load(id))?.translations).toEqual(edits);
+        expect((await history.load(id))?.parsedVersion).toBe(6);
+        parsing.resolve(fresh); await opening; await flush();
+        const expectedSources = old.segments.map(({source}: {source: string}) => source === 'Old native title' ? 'New native title' : source);
+        const expectedTranslations = edits.map((value: string, index: number) => old.segments[index].source === 'Old native title' ? '' : value);
+        expect(state.parsedDocument.segments.map((segment: any) => segment.source)).toEqual(expectedSources);
+        expect(state.translatedSegments).toEqual(expectedTranslations);
+        expect(state.needsOcr).toBe(false);
+        expect(state.parsedDocument.binary.bytes).toBe(bytes);
+        expect(state.parsedDocument.binary.pages.map((page: any) => page.pageNumber)).toEqual(fresh.binary.pages.map(page => page.pageNumber));
+        expect(state.parsedDocument.binary.pages.at(-1)).toMatchObject({scanned: false, sourceRotation: 90});
+        if (format === 'mixed') expect(state.parsedDocument.binary.pages[0].layoutBoundaries).toEqual(fresh.binary.pages[0].layoutBoundaries);
+        for (const page of state.parsedDocument.binary.pages) {
+            expect(page.blocks.filter((block: any) => block.segmentIndex >= 0).map((block: any) => block.segmentIndex)).toEqual(page.segmentIndexes);
+            expect(page.segmentIndexes.every((index: number) => state.parsedDocument.segments[index].id === index)).toBe(true);
+        }
+        await vi.waitFor(async () => {
+            const saved = await history.load(id);
+            expect(saved?.parsedVersion).toBe(7);
+            expect(saved?.translations).toEqual(expectedTranslations);
+            expect((saved?.parsed as any).segments.map((segment: any) => segment.source)).toEqual(expectedSources);
+        });
+        state.resetDocument(); await flush();
+        await state.openHistory({id}); await flush();
+        expect(state.translatedSegments).toEqual(expectedTranslations);
+        expect(state.needsOcr).toBe(false);
+        expect(parse).toHaveBeenCalledOnce();
+        expect(ports.recognize).not.toHaveBeenCalled();
+        expect(ports.createRecognizer).not.toHaveBeenCalled();
+        expect(ports.translate).not.toHaveBeenCalled();
+        expect(ports.batch).not.toHaveBeenCalled();
+    });
     it.each(['success', 'failure', 'cancel'] as const)('releases a background PDF export worker after %s through the actual App/runtime', async outcome => {
         await state.loadFiles([file('export.pdf')]);
         state.editSegment(0, '译文需要导出'); await flush();

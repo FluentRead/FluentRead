@@ -347,7 +347,9 @@ async function main() {
         });
         assert(rows.primary.workspaceTabs && rows.primary.readingModes, 'Read/edit tabs and reading modes must both remain available');
         const sameCenter = (values, message) => {const centers = values.map(value => value.centerY); assert(Math.max(...centers) - Math.min(...centers) <= 3, `${message}: ${JSON.stringify(rows.primary)}`);};
-        const compact = await page.evaluate(() => innerWidth < 1000);
+        const viewportWidth = await page.evaluate(() => innerWidth);
+        const compact = viewportWidth < 1000;
+        const desktop = viewportWidth >= 1760;
         const firstRow = compact ? [rows.primary.file, rows.primary.workspaceTabs] : Object.values(rows.primary);
         sameCenter(firstRow, compact ? 'File and read/edit tabs must share the first row' : 'File, read/edit, reading modes and focus must share one row');
         const readingRow = compact ? [rows.primary.readingModes, rows.primary.focus, rows.primary.nativeZoom].filter(Boolean) : firstRow;
@@ -356,7 +358,11 @@ async function main() {
           assert(Math.min(...readingRow.map(value => value.y)) >= Math.max(...firstRow.map(value => value.bottom)) - 1, 'The reading row must follow the file/tabs row');
         }
         if (kind === 'pdf') {
-          assert(rows.pdfSlot && rows.pdfGroups.length, 'PDF controls must have their own complete row');
+          assert(rows.pdfSlot && rows.pdfGroups.length, 'PDF controls must remain available as complete groups');
+          if (desktop) {
+            sameCenter([...Object.values(rows.primary), ...rows.pdfGroups, rows.actions], 'Desktop file, reading, PDF and translation controls must share one row');
+            return rows;
+          }
           if (compact) {
             const pageAndZoom = rows.pdfGroups.filter(value => /pdf-page-navigation|pdf-zoom-control/u.test(value.name));
             const displayAndTools = rows.pdfGroups.filter(value => !/pdf-page-navigation|pdf-zoom-control/u.test(value.name));
@@ -404,7 +410,7 @@ async function main() {
           await page.locator('.document-status').filter({hasText: '翻译完成'}).waitFor({state: 'attached'});
           responsiveEvidence.push({name, state: 'translating', ...pausedLayout, pauseReached: true});
         }
-        for (const width of extremeOnly ? [] : [1024, 820, 640, 390]) {
+        for (const width of extremeOnly ? [] : [1920, 1760, 1759, 1024, 820, 640, 390]) {
           await page.setViewportSize({width, height: width < 640 ? 844 : 960}); await waitFrames();
           const layout = await visibleControls();
           assert(layout.bodyWidth <= width, `Body overflow at ${width}px: ${layout.bodyWidth}`);
@@ -509,7 +515,7 @@ async function main() {
         await page.locator('.download-dialog[open]').getByRole('button', {name: '返回文档', exact: true}).click();
         responsiveEvidence.push({name, state: 'extreme-height-dialogs', width: 390, height: 320, menus});
       }
-      if (responsiveEvidence.length) record('PDF and Word responsive toolbar: pause, read/edit, zoom, settings, menus and download', {viewports: extremeOnly ? ['390x320'] : ['1024x960', '820x960', '640x960', '390x844', '820x480', '390x320'], formats: formats.filter(name => ['sample.pdf', 'sample.docx'].includes(name))});
+      if (responsiveEvidence.length) record('PDF and Word responsive toolbar: pause, read/edit, zoom, settings, menus and download', {viewports: extremeOnly ? ['390x320'] : ['1920x960', '1760x960', '1759x960', '1024x960', '820x960', '640x960', '390x844', '820x480', '390x320'], formats: formats.filter(name => ['sample.pdf', 'sample.docx'].includes(name))});
       await page.setViewportSize({width: 1440, height: 960});
     }
     report.finalBrowserScale = await browserScale();

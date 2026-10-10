@@ -1,10 +1,10 @@
 /**
  * @file src/features/document-translation/services/history.ts
  * 文件职责：在浏览器本地保存最近翻译过的文档及其译文，使文档翻译首页可以列出记录并一键恢复阅读。
- * 主要内容：以文件内容摘要为稳定标识，在独立的 IndexedDB 库中保存原始文件字节、解析结果快照、译文、进度与设置指纹；解析规则变化后按原文和重复出现次序恢复未变化片段的独立校订；列表只返回不含文件字节的摘要并按最近更新时间排序；超过条数或总字节上限时淘汰最旧的记录；数据库不可用、被其他标签页占用而超时或读写失败时安静降级为“没有记录”，并在其他标签页需要升级或删除时让出连接，不影响打开和翻译文档。
+ * 主要内容：以文件内容摘要为稳定标识，在独立的 IndexedDB 库中保存原始文件字节、解析结果快照、译文、进度与设置指纹；解析规则变化后按原文和重复出现次序恢复未变化片段的独立校订，复用同文件中页号、展示尺寸与旋转一致的已识别扫描页，同时保留新解析的文字页并重新编号全文片段，避免空扫描快照覆盖旧 OCR 校订；列表只返回不含文件字节的摘要并按最近更新时间排序；超过条数或总字节上限时淘汰最旧的记录；数据库不可用、被其他标签页占用而超时或读写失败时安静降级为“没有记录”，并在其他标签页需要升级或删除时让出连接，不影响打开和翻译文档。
  * 模块边界：只负责本地存取与已有译文匹配，不解析文档、不发起翻译、不读取配置，也不把任何内容发送到网络；页面状态、解析版本与何时保存由文档页面组合根决定。
  */
-import type {ParsedDocument} from '../core/document';
+import type {DocumentSegment, ParsedDocument} from '../core/document';
 
 export const DOCUMENT_HISTORY_MAX_ENTRIES = 20;
 export const DOCUMENT_HISTORY_MAX_BYTES = 80 * 1024 * 1024;
@@ -79,6 +79,48 @@ export function restoreDocumentHistoryTranslations(
         const translation = compatible ? record.translations[index] : undefined;
         return typeof translation === 'string' ? translation : '';
     });
+}
+
+/** 同一文件重新解析时复用已识别的扫描页；文字页采用新解析结果，全文片段重新按页顺序编号。 */
+export function restoreDocumentHistoryPdfOcr(
+    record: Pick<DocumentHistoryRecord, 'parsed' | 'bytes'>,
+    document: ParsedDocument,
+): ParsedDocument {
+    const binary = document.binary;
+    if (binary?.kind !== 'pdf' || !binary.pages.some(page => page.scanned)) return document;
+    const snapshot = record.parsed && typeof record.parsed === 'object'
+        ? record.parsed as Partial<ParsedDocument> : undefined;
+    const previous = snapshot?.binary;
+    if (previous?.kind !== 'pdf' || !Array.isArray(previous.pages) || !Array.isArray(snapshot?.segments)) return document;
+    // 历史条目的原始字节与快照都必须属于当前文件，不能把另一份文件的识别框搬过来。
+    if (record.bytes?.length !== binary.bytes.length || previous.bytes?.length !== binary.bytes.length
+        || binary.bytes.some((byte, index) => byte !== record.bytes[index] || byte !== previous.bytes[index])) return document;
+    const oldSegments = snapshot.segments;
+    const restored = binary.pages.map(page => {
+        if (!page.scanned || ![page.width, page.height].every(value => Number.isFinite(value) && value > 0)) return undefined;
+        const cached = previous.pages.find(candidate => candidate && typeof candidate === 'object' && candidate.pageNumber === page.pageNumber);
+        if (cached?.scanned !== false || cached.width !== page.width || cached.height !== page.height
+            || (cached.sourceRotation ?? cached.rotation ?? 0) !== (page.rotation ?? page.sourceRotation ?? 0)
+            || !Array.isArray(cached.blocks) || !cached.blocks.every(block => block && typeof block === 'object'
+                && Number.isInteger(block.segmentIndex) && (block.segmentIndex < 0 || typeof oldSegments[block.segmentIndex]?.source === 'string'))) return undefined;
+        return cached;
+    });
+    if (!restored.some(Boolean)) return document;
+    const segments: DocumentSegment[] = [];
+    const pages = binary.pages.map((page, index) => {
+        const selected = restored[index] ?? page;
+        const sources = restored[index] ? oldSegments : document.segments;
+        const segmentIndexes: number[] = [];
+        const blocks = selected.blocks.map(block => {
+            if (block.segmentIndex < 0) return block;
+            const id = segments.length;
+            segments.push({...sources[block.segmentIndex], id});
+            segmentIndexes.push(id);
+            return {...block, segmentIndex: id};
+        });
+        return {...selected, blocks, segmentIndexes};
+    });
+    return {...document, segments, binary: {...binary, pages}};
 }
 
 /** 文件名可以重复，内容摘要不会；同一份文件再次打开时接着上次的译文继续。 */

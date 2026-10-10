@@ -7,11 +7,24 @@
 import {IDBFactory} from 'fake-indexeddb';
 import {describe, expect, it} from 'vitest';
 import {parseDocument} from '@/src/features/document-translation/core/document';
-import {createDocumentHistory, documentHistoryId, restoreDocumentHistoryTranslations, DOCUMENT_HISTORY_MAX_BYTES, DOCUMENT_HISTORY_MAX_ENTRIES, type DocumentHistoryRecord} from '@/src/features/document-translation/services/history';
+import {createDocumentHistory, documentHistoryId, restoreDocumentHistoryPdfOcr, restoreDocumentHistoryTranslations, DOCUMENT_HISTORY_MAX_BYTES, DOCUMENT_HISTORY_MAX_ENTRIES, type DocumentHistoryRecord} from '@/src/features/document-translation/services/history';
 
 const record = (id: string, updatedAt: number, extra: Partial<DocumentHistoryRecord> = {}): DocumentHistoryRecord => ({id, name: `${id}.pdf`, format: 'pdf', size: 3, total: 4, completed: 2, updatedAt,
     bytes: new Uint8Array([1, 2, 3]), mimeType: 'application/pdf', translations: ['甲', '', '丙', ''], fingerprint: 'fp', ...extra});
 const parsed = (sources: string[]) => ({...parseDocument('restored.txt', ''), segments: sources.map((source, id) => ({id, source}))});
+const pdf = (pageSources: Array<string[] | null>) => {
+    const segments: Array<{id: number; source: string}> = [];
+    const pages = pageSources.map((sources, index) => {
+        const blocks = (sources ?? []).map((source, position) => {
+            const id = segments.length;
+            segments.push({id, source});
+            return {segmentIndex: id, x: 10, y: 10 + position * 30, width: 80, height: 12, fontSize: 11, lineHeight: 12,
+                lineCount: 1, fontFamily: 'sans-serif', fontWeight: 400 as const, textAlign: 'left' as const};
+        });
+        return {pageNumber: index + 1, width: 100, height: 100, blocks, segmentIndexes: blocks.map(block => block.segmentIndex), ...(sources === null ? {scanned: true} : {})};
+    });
+    return {...parsed([]), format: 'pdf' as const, segments, binary: {kind: 'pdf' as const, bytes: new Uint8Array([1, 2, 3]), pages}};
+};
 
 describe('document history translation migration', () => {
     it('restores by source after a reorder even when the version and segment count still match', () => {
@@ -72,6 +85,80 @@ describe('document history translation migration', () => {
     ])('refuses unsafe index recovery with unknown versions or mismatched counts: %j', ({parsedVersion, currentVersion, total}) => {
         const saved = record('unsafe', 1, {parsedVersion, total, translations: ['错位旧译文', '另一错位旧译文']});
         expect(restoreDocumentHistoryTranslations(saved, parsed(['First', 'Second']), currentVersion)).toEqual(['', '']);
+    });
+});
+
+describe('document history scanned-PDF migration', () => {
+    it('reuses recognized scans in page order while keeping newly parsed native pages and original current bytes', () => {
+        const current = pdf([['New native'], null, null]);
+        current.binary.pages[2] = {...current.binary.pages[2], rotation: 90} as any;
+        const previous = pdf([['Old native'], ['First OCR'], ['Second OCR']]);
+        previous.binary.pages[1].scanned = false;
+        previous.binary.pages[1].blocks.push({...previous.binary.pages[1].blocks[0], segmentIndex: -1});
+        previous.binary.pages[2] = {...previous.binary.pages[2], scanned: false, sourceRotation: 90} as any;
+        const saved = record('mixed', 1, {bytes: previous.binary.bytes, parsed: previous, translations: ['旧文字页校订', '第一页扫描校订', '第二页扫描校订']});
+        const before = JSON.stringify(saved);
+        const restored = restoreDocumentHistoryPdfOcr(saved, current);
+        expect(restored.segments.map(segment => segment.source)).toEqual(['New native', 'First OCR', 'Second OCR']);
+        expect(restored.binary?.bytes).toBe(current.binary.bytes);
+        if (restored.binary?.kind !== 'pdf') throw new Error('expected PDF');
+        expect(restored.binary.pages.map(page => page.segmentIndexes)).toEqual([[0], [1], [2]]);
+        expect(restored.binary.pages[1].blocks.map(block => block.segmentIndex)).toEqual([1, -1]);
+        expect(restored.binary.pages[2]).toMatchObject({sourceRotation: 90, scanned: false});
+        expect(restoreDocumentHistoryTranslations(saved, restored, 7)).toEqual(['', '第一页扫描校订', '第二页扫描校订']);
+        expect(JSON.stringify(saved)).toBe(before);
+        expect(current.binary.pages[1].scanned).toBe(true);
+    });
+    it('retains a completed empty OCR result and accepts the equivalent older rotation field without another recognition', () => {
+        const current = pdf([null, null]);
+        current.binary.pages[1] = {...current.binary.pages[1], sourceRotation: 90} as any;
+        const previous = pdf([[], ['Rotated OCR']]);
+        previous.binary.pages[0].scanned = false;
+        previous.binary.pages[1] = {...previous.binary.pages[1], scanned: false, rotation: 90} as any;
+        const restored = restoreDocumentHistoryPdfOcr(record('rotated', 1, {bytes: previous.binary.bytes, parsed: previous}), current);
+        expect(restored.segments.map(segment => segment.source)).toEqual(['Rotated OCR']);
+        expect(restored.binary?.kind === 'pdf' && restored.binary.pages.every(page => page.scanned === false)).toBe(true);
+    });
+    it('leaves non-PDF documents and already parsed native PDFs untouched', () => {
+        const text = parsed(['Native']);
+        expect(restoreDocumentHistoryPdfOcr(record('text', 1), text)).toBe(text);
+        const native = pdf([['Native']]);
+        expect(restoreDocumentHistoryPdfOcr(record('native', 1), native)).toBe(native);
+    });
+    it.each([
+        ['missing snapshot', (saved: any) => {saved.parsed = undefined;}],
+        ['null snapshot', (saved: any) => {saved.parsed = null;}],
+        ['primitive snapshot', (saved: any) => {saved.parsed = 12;}],
+        ['missing PDF', (saved: any) => {saved.parsed = {};}],
+        ['different format', (saved: any) => {saved.parsed.binary.kind = 'epub';}],
+        ['missing pages', (saved: any) => {saved.parsed.binary.pages = null;}],
+        ['missing segments', (saved: any) => {saved.parsed.segments = null;}],
+        ['missing record bytes', (saved: any) => {saved.bytes = undefined;}],
+        ['changed record length', (saved: any) => {saved.bytes = new Uint8Array([1]);}],
+        ['missing snapshot bytes', (saved: any) => {saved.parsed.binary.bytes = undefined;}],
+        ['changed snapshot length', (saved: any) => {saved.parsed.binary.bytes = new Uint8Array([1]);}],
+        ['different record file', (saved: any) => {saved.bytes = new Uint8Array([1, 2, 4]);}],
+        ['different snapshot file', (saved: any) => {saved.parsed.binary.bytes = new Uint8Array([1, 2, 4]);}],
+        ['wrong or invalid pages', (saved: any) => {saved.parsed.binary.pages = [null, 12, {...saved.parsed.binary.pages[0], pageNumber: 2}];}],
+        ['scan was not recognized', (saved: any) => {saved.parsed.binary.pages[0].scanned = true;}],
+        ['different width', (saved: any) => {saved.parsed.binary.pages[0].width = 110;}],
+        ['different height', (saved: any) => {saved.parsed.binary.pages[0].height = 110;}],
+        ['different rotation', (saved: any) => {saved.parsed.binary.pages[0].sourceRotation = 90;}],
+        ['missing blocks', (saved: any) => {saved.parsed.binary.pages[0].blocks = null;}],
+        ['null block', (saved: any) => {saved.parsed.binary.pages[0].blocks = [null];}],
+        ['primitive block', (saved: any) => {saved.parsed.binary.pages[0].blocks = [12];}],
+        ['invalid segment identifier', (saved: any) => {saved.parsed.binary.pages[0].blocks[0].segmentIndex = 1.5;}],
+        ['missing source segment', (saved: any) => {saved.parsed.binary.pages[0].blocks[0].segmentIndex = 99;}],
+        ['invalid source', (saved: any) => {saved.parsed.segments[0].source = 12;}],
+        ['non-finite page size', (_saved: any, current: any) => {current.binary.pages[0].width = NaN;}],
+        ['non-positive page size', (_saved: any, current: any) => {current.binary.pages[0].height = 0;}],
+    ] as const)('refuses unsafe scan reuse: %s', (_name, change) => {
+        const current = pdf([null]);
+        const previous = pdf([['OCR']]);
+        previous.binary.pages[0].scanned = false;
+        const saved = record('unsafe-scan', 1, {bytes: previous.binary.bytes.slice(), parsed: previous});
+        change(saved, current);
+        expect(restoreDocumentHistoryPdfOcr(saved, current)).toBe(current);
     });
 });
 

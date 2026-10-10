@@ -1,10 +1,11 @@
 /**
  * @file src/features/information-highlight/content/runtime.ts
  * 文件职责：拥有单个阅读页面的信息高亮会话，协调只读分帧扫描、评分取消、文本缓存和原生 CSS Highlight 绘制。
- * 主要内容：开启和改偏好立即扫描，滚动与动态内容经过 180ms 稳定窗口后扫描，连续变化最迟 600ms 开始一次，页面不断变化而正文没有变时逐步放慢到约 5 秒一次，每帧工作预算约 4ms；整轮收集完成后按离视口的距离评分，可见段落最先出现；评分与选区按纯文本缓存，热力按八档强度分桶绘制，每轮扫描按正文文字颜色判断深色页面并加浓；滚动和页面自身变化都沿用未变化段落的绘制，进行中的扫描不被打断（模型评分完成当前段落后按新视口重排），扫描完成后再回收离开阅读区域的范围，避免闪烁和丢弃模型已做的工作；迟到结果复验代次和 Text 身份，关闭时清理所有绘制、观察器、计时器和请求，样式表保留到释放时移除以免反复开关时整页重算样式。
+ * 主要内容：按视口优先分帧扫描和绘制，滚动复用未变化段落；评分与选区按分析方式、模型和纯文本缓存，切换模型取消旧请求并重新评分，迟到结果复验代次和 Text 身份；关闭或释放清理本实例的绘制、观察器和请求。
  * 模块边界：不访问配置存储或扩展消息、不改变宿主原文、class 和布局；本地模型评分、翻译根及状态通知由应用组合根注入，无原生绘制支持时诚实返回 unsupported。
  */
 import type {InformationHighlightPreferences} from '@/src/core/config/informationHighlight';
+import type {InformationHighlightModelId} from '@/src/core/config/informationHighlightModel';
 import type {InformationHighlightResult, InformationHighlightSpan, InformationHighlightState} from '../protocol';
 import {scoreInformationKeywords, selectInformationSpans} from '../domain/keywords';
 import {INFORMATION_HIGHLIGHT_LEVELS, INFORMATION_HIGHLIGHT_PALETTES, informationHighlightOpacity, presentInformationHeatmap} from '../domain/presentation';
@@ -26,7 +27,7 @@ export interface InformationHighlightController {
     dispose(): void;
 }
 export interface InformationHighlightPorts {
-    scoreLocal(text: string, signal: AbortSignal): Promise<InformationHighlightResult>;
+    scoreLocal(text: string, signal: AbortSignal, modelId?: InformationHighlightModelId): Promise<InformationHighlightResult>;
     isCurrent?(): boolean;
     readTranslationRoot?(host: Element): ShadowRoot | undefined;
     changed?(state: InformationHighlightState): void;
@@ -136,16 +137,16 @@ export function installInformationHighlight(document: Document, initial: Informa
         }
         return paragraph;
     }
-    async function scoreComplete(text: string, signal: AbortSignal): Promise<InformationHighlightResult> {
+    async function scoreComplete(text: string, signal: AbortSignal, modelId: InformationHighlightModelId): Promise<InformationHighlightResult> {
         if (signal.aborted) throw new Error('INFORMATION_HIGHLIGHT_CANCELLED');
-        try {return await ports.scoreLocal(text, signal);}
+        try {return await ports.scoreLocal(text, signal, modelId);}
         catch (error) {
             // tokenizer 的真实 token 上限可能先于字符预算；完整重分字素安全的子段，绝不截去剩余正文。
             if (signal.aborted || !(error instanceof Error) || !['INFORMATION_HIGHLIGHT_TOKEN_LIMIT', 'INFORMATION_HIGHLIGHT_TEXT_LIMIT'].includes(error.message)) throw error;
             const middle = informationSliceEnd(text, 0, Math.max(1, Math.floor(text.length / 2)));
             if (middle >= text.length) throw error;
-            const first = await scoreComplete(text.slice(0, middle), signal);
-            const second = await scoreComplete(text.slice(middle), signal);
+            const first = await scoreComplete(text.slice(0, middle), signal, modelId);
+            const second = await scoreComplete(text.slice(middle), signal, modelId);
             return {engine: first.engine, spans: [...first.spans, ...second.spans.map(span => ({...span, start: span.start + middle, end: span.end + middle}))]};
         }
     }
@@ -157,8 +158,9 @@ export function installInformationHighlight(document: Document, initial: Informa
         // 整轮段落按离视口的距离排序：可见正文最先评分，同距离保持文档顺序。
         for (const paragraph of paragraphs.sort((a, b) => a.distance - b.distance)) {
             if (!current() || version !== generation) return;
-            const mode = preferences.mode, key = `${mode}:${paragraph.text}`, heat = preferences.style === 'heatmap';
-            const signature = `${mode}:${heat ? 'heatmap' : 'flat'}:${preferences.density}`;
+            const mode = preferences.mode, model = preferences.model, identity = mode === 'surprisal-local' ? `${mode}:${model}` : mode;
+            const key = `${identity}:${paragraph.text}`, heat = preferences.style === 'heatmap';
+            const signature = `${identity}:${heat ? 'heatmap' : 'flat'}:${preferences.density}`;
             const first = paragraph.runs[0], previous = painted.get(first.node)?.get(first.offset);
             scoreAbort = new AbortController(); const signal = scoreAbort.signal;
             try {
@@ -170,7 +172,7 @@ export function installInformationHighlight(document: Document, initial: Informa
                 } else {
                     let cached = cache.get(key);
                     const waited = !cached && mode !== 'keywords';
-                    const result = cached?.result ?? (waited ? await scoreComplete(paragraph.text, signal) : scoreInformationKeywords(paragraph.text));
+                    const result = cached?.result ?? (waited ? await scoreComplete(paragraph.text, signal, model) : scoreInformationKeywords(paragraph.text));
                     if (!current() || version !== generation) return;
                     if (!isInformationParagraphCurrent(paragraph)) {schedule(); return;}
                     cached ??= remember(key, result);
@@ -281,7 +283,8 @@ export function installInformationHighlight(document: Document, initial: Informa
         },
         retry() {schedule(true, 0); return snapshot();},
         updatePreferences(next) {
-            const rescore = preferences.mode !== next.mode || preferences.density !== next.density || (preferences.style === 'heatmap') !== (next.style === 'heatmap');
+            const rescore = preferences.mode !== next.mode || (next.mode === 'surprisal-local' && preferences.model !== next.model)
+                || preferences.density !== next.density || (preferences.style === 'heatmap') !== (next.style === 'heatmap');
             preferences = {...next}; notify({});
             for (const root of styles.keys()) styleRoot(root);
             if (rescore) schedule(true, 0);

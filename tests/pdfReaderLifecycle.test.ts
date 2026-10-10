@@ -411,6 +411,19 @@ function nativeInformationPaint() {
 function clickInformation(root: HTMLElement): void {const event = document.createEvent('Event'); event.initEvent('click', true, true); root.querySelector('.pdf-information-highlight')!.dispatchEvent(event);}
 
 describe('PDF reader information highlight composition', () => {
+    it('rescores an already active PDF with the selected model identity', async () => {
+        nativeInformationPaint();
+        const score = vi.fn(async (text: string, _signal: AbortSignal, _modelId?: string) => scoreInformationKeywords(text));
+        const reader = mountReader(model(2), 'source', [], {information: {preferences: {...DEFAULT_INFORMATION_HIGHLIGHT_PREFERENCES, enabled: true, mode: 'surprisal-local'}, scoreLocal: score, available: true}});
+        await vi.waitFor(async () => {flushFrames(); await componentFlush(); expect(reader.state.informationState.phase).toBe('active');}, {timeout: 3000});
+        expect(score.mock.calls.length).toBeGreaterThan(0);
+        expect(score.mock.calls.every(([, , modelId]) => modelId === 'qwen2.5-0.5b')).toBe(true);
+        score.mockClear();
+        reader.currentInformation.value = {...reader.currentInformation.value!, preferences: {...reader.currentInformation.value!.preferences, model: 'qwen3-0.6b'}};
+        await vi.waitFor(async () => {flushFrames(); await componentFlush(); expect(score.mock.calls.length).toBeGreaterThan(0); expect(reader.state.informationState.phase).toBe('active');}, {timeout: 3000});
+        expect(score.mock.calls.every(([, , modelId]) => modelId === 'qwen3-0.6b')).toBe(true);
+        expect(reader.state.informationState.enabled).toBe(true);
+    });
     it('starts by explicit action, independently scores selectable original and translated text, and cleans paint across zoom and document replacement', async () => {
         const registry = nativeInformationPaint(), score = vi.fn(async (text: string) => scoreInformationKeywords(text));
         const reader = mountReader(model(8), 'bilingual', Array(8).fill('Translated paragraphs preserve readable scientific vocabulary.'), {information: {preferences: {...DEFAULT_INFORMATION_HIGHLIGHT_PREFERENCES, mode: 'surprisal-local', style: 'background'}, scoreLocal: score, available: true}});

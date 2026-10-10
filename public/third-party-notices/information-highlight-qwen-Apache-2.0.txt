@@ -1,9 +1,14 @@
-Information highlighting local model
+Information highlighting local models
 
 Qwen2.5-0.5B base model: https://huggingface.co/Qwen/Qwen2.5-0.5B
 ONNX conversion: https://huggingface.co/onnx-community/Qwen2.5-0.5B
 Pinned ONNX revision: bae5ceaee026f0d0592858b2bd27645a06f19c42
-License: Apache License 2.0 (as declared by the upstream base model).
+
+Qwen3-0.6B chat model: https://huggingface.co/Qwen/Qwen3-0.6B
+ONNX conversion: https://huggingface.co/onnx-community/Qwen3-0.6B-ONNX
+Pinned ONNX revision: 1e0a4a196ecabdf9a879664110574563d3f372d3
+
+License: Apache License 2.0 (as declared by each upstream model).
 Weights are downloaded only on explicit request; they are not bundled with FluentRead.
 The InfoLens design reference is documented in the information highlighting guide; its source is not a runtime dependency.
 

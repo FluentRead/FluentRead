@@ -2,7 +2,8 @@ import {afterEach, beforeEach, describe, expect, it, vi} from 'vitest';
 import {huggingFaceDownloadOrigins} from '@/src/platform/http/modelDownloads';
 import {sha256} from '@noble/hashes/sha256';
 import {createModelArtifactStore, MODEL_ARTIFACT_CHUNK_BYTES, type ModelArtifact} from '@/src/platform/storage/modelArtifacts';
-import {INFORMATION_HIGHLIGHT_MODEL_FILES, INFORMATION_HIGHLIGHT_MODEL_REVISION, INFORMATION_HIGHLIGHT_MODEL_BYTES} from '@/src/core/config/informationHighlightModel';
+import {DEFAULT_INFORMATION_HIGHLIGHT_MODEL_ID, getInformationHighlightModel, INFORMATION_HIGHLIGHT_MODELS, INFORMATION_HIGHLIGHT_MODEL_FILES, INFORMATION_HIGHLIGHT_MODEL_REVISION, INFORMATION_HIGHLIGHT_MODEL_BYTES} from '@/src/core/config/informationHighlightModel';
+import {getInformationHighlightArtifacts, getInformationHighlightArtifactStore, informationHighlightArtifacts, informationHighlightArtifactStore, INFORMATION_HIGHLIGHT_CACHE} from '@/src/features/information-highlight/offscreen/artifacts';
 
 describe('fixed model artifacts integrity and bounded resumable cache', () => {
     let entries: Map<string, Response>, cache: {match: ReturnType<typeof vi.fn>; put: ReturnType<typeof vi.fn>; delete: ReturnType<typeof vi.fn>};
@@ -16,6 +17,57 @@ describe('fixed model artifacts integrity and bounded resumable cache', () => {
         expect(INFORMATION_HIGHLIGHT_MODEL_REVISION).toMatch(/^[a-f0-9]{40}$/u); expect(INFORMATION_HIGHLIGHT_MODEL_BYTES).toBe(490043908);
         expect(INFORMATION_HIGHLIGHT_MODEL_FILES).toHaveLength(6); expect(INFORMATION_HIGHLIGHT_MODEL_FILES.every(file => /^[a-f0-9]{64}$/u.test(file.sha256))).toBe(true);
         expect(INFORMATION_HIGHLIGHT_MODEL_FILES.at(-1)).toMatchObject({size: 483003582, sha256: '30a39f89fab8f30d0f99aa1e28d3e3be6fca66a3fab915f77584ac52a8361d25'});
+    });
+    it('pins both model manifests and resolves unknown persisted model choices to the existing default', () => {
+        expect(DEFAULT_INFORMATION_HIGHLIGHT_MODEL_ID).toBe('qwen2.5-0.5b');
+        expect(INFORMATION_HIGHLIGHT_MODELS.map(model => model.id)).toEqual(['qwen2.5-0.5b', 'qwen3-0.6b']);
+        for (const model of INFORMATION_HIGHLIGHT_MODELS) {
+            expect(model.revision).toMatch(/^[a-f0-9]{40}$/u);
+            expect(model.files).toHaveLength(6);
+            expect(model.files.every(file => /^[a-f0-9]{64}$/u.test(file.sha256))).toBe(true);
+            expect(model.bytes).toBe(model.files.reduce((sum, file) => sum + file.size, 0));
+            expect(getInformationHighlightModel(model.id)).toBe(model);
+        }
+        expect(getInformationHighlightModel('qwen3-0.6b')).toMatchObject({name: 'Qwen3 0.6B', repository: 'onnx-community/Qwen3-0.6B-ONNX', revision: '1e0a4a196ecabdf9a879664110574563d3f372d3', bytes: 578918894, kvCacheDtype: 'float16'});
+        expect(getInformationHighlightModel('qwen3-0.6b').files.at(-1)).toMatchObject({size: 569789750, sha256: '9e33a5911974174761d0dfdcc0bec975d9c45af0eae5e9eb647b8ba9442a8f91'});
+        for (const value of [undefined, null, 'unsupported-model', {}, 1]) expect(getInformationHighlightModel(value)).toBe(INFORMATION_HIGHLIGHT_MODELS[0]);
+        expect(getInformationHighlightModel(DEFAULT_INFORMATION_HIGHLIGHT_MODEL_ID)).toMatchObject({bytes: INFORMATION_HIGHLIGHT_MODEL_BYTES, kvCacheDtype: 'float32'});
+    });
+    it('keeps the default v1 URL/cache readable and isolates deletion and reads between the two model stores', async () => {
+        const cachesByName = new Map<string, Map<string, Response>>();
+        const open = vi.fn(async (name: string) => {
+            const values = cachesByName.get(name) ?? new Map<string, Response>();
+            cachesByName.set(name, values);
+            return {match: async (key: string) => values.get(key)?.clone(), put: async (key: string, response: Response) => {values.set(key, response.clone());}, delete: async (key: string) => values.delete(key)};
+        });
+        vi.stubGlobal('caches', {open});
+        const oldFile = informationHighlightArtifacts[0], newFile = getInformationHighlightArtifacts('qwen3-0.6b')[0];
+        expect(oldFile.url).toBe(`https://huggingface.co/onnx-community/Qwen2.5-0.5B/resolve/${INFORMATION_HIGHLIGHT_MODEL_REVISION}/config.json`);
+        expect(getInformationHighlightArtifacts()).toEqual(informationHighlightArtifacts);
+        expect(newFile.url).toBe('https://huggingface.co/onnx-community/Qwen3-0.6B-ONNX/resolve/1e0a4a196ecabdf9a879664110574563d3f372d3/config.json');
+        const oldStore = getInformationHighlightArtifactStore(), newStore = getInformationHighlightArtifactStore('qwen3-0.6b');
+        expect(oldStore).toBe(informationHighlightArtifactStore);
+        expect(getInformationHighlightArtifactStore('qwen3-0.6b')).toBe(newStore);
+        expect(newStore).not.toBe(oldStore);
+        for (const [name, file] of [[INFORMATION_HIGHLIGHT_CACHE, oldFile], ['fluent-read-information-highlight-model-qwen3-0.6b-v1', newFile]] as const) {
+            const cacheForModel = await open(name);
+            await cacheForModel.put(`${file.url}?fluent-read-verified=${file.sha256}`, new Response(JSON.stringify({size: file.size, sha256: file.sha256})));
+            await cacheForModel.put(`${file.url}?fluent-read-part=0`, new Response(new Uint8Array(file.size), {headers: {'Content-Length': String(file.size)}}));
+        }
+        expect(await oldStore.complete(oldFile)).toBe(true);
+        expect(await newStore.complete(newFile)).toBe(true);
+        expect(await oldStore.match(newFile.url)).toBeUndefined();
+        expect(await newStore.match(oldFile.url)).toBeUndefined();
+        await newStore.remove(newFile);
+        expect(await newStore.complete(newFile)).toBe(false);
+        expect(await oldStore.complete(oldFile)).toBe(true);
+        expect(open).toHaveBeenCalledWith(INFORMATION_HIGHLIGHT_CACHE);
+        const newCache = await open('fluent-read-information-highlight-model-qwen3-0.6b-v1');
+        await newCache.put(`${newFile.url}?fluent-read-verified=${newFile.sha256}`, new Response(JSON.stringify({size: newFile.size, sha256: newFile.sha256})));
+        await newCache.put(`${newFile.url}?fluent-read-part=0`, new Response(new Uint8Array(newFile.size), {headers: {'Content-Length': String(newFile.size)}}));
+        await oldStore.remove(oldFile);
+        expect(await oldStore.complete(oldFile)).toBe(false);
+        expect(await newStore.complete(newFile)).toBe(true);
     });
     it('streams verified bytes, emits verifying progress and serves only canonical prepared artifacts', async () => {
         const body = new TextEncoder().encode('fixed bytes'), file = fileFor(body), store = createModelArtifactStore('models', [file]), progress = vi.fn();

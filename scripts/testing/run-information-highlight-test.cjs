@@ -1,9 +1,9 @@
 #!/usr/bin/env node
 /**
  * @file scripts/testing/run-information-highlight-test.cjs
- * 文件职责：在独立真实 Edge 中验证生产信息高亮的页面保护、启停、动态正文与设置持久化。
- * 主要内容：通过现有后台无焦点浏览器 helper 加载本地扩展和只读正文 fixture，在连续设置页真实点击锚点、搜索结果、说明标签、自动高亮开关及六套渐变配色，以真实按键验证快捷键只开关当前页面且不写入开关，验证开关即时作用于已打开网页、滚动时保留绘制、热力绘制的分档强度与偏好持久化；分阶段保存证据，显式选择真实下载或校验后的本地导入。
- * 模块边界：只清理本次 profile；本地导入与产品下载证据分开记录，下载后的推理和 PDF 复用已有页签；不修改共享焦点策略，超时和断开均失败，网络观察不冒充全机流量或阅读效果证明。
+ * 文件职责：在独立真实 Edge 中验证生产信息高亮的页面保护、启停、动态正文、可选模型与设置持久化。
+ * 主要内容：通过现有后台无焦点浏览器 helper 加载本地扩展和只读正文 fixture，真实点击设置、说明、渐变与模型选项，以真实按键验证快捷键作用范围；按 --model-id 选择固定 Qwen2.5 或 Qwen3，校验两张卡的独立缓存、简洁描述与右下单按钮、原生单选、下载/续传确认、离线推理标签和单按钮删除流程；--model-only 只复验模型管理、推理与 PDF，显式选择真实下载或校验后的本地导入，--verify-download-confirmation 先验证部分真实下载再导入完整模型。
+ * 模块边界：只清理本次 profile；本地导入与产品下载证据分开记录，藕荷深色下载确认验证皮肤文字色与可读对比度，下载后的推理和 PDF 复用已有页签；不修改共享焦点策略，超时和断开均失败，网络观察不冒充全机流量或阅读效果证明。
  */
 'use strict';
 const fs=require('node:fs');
@@ -19,12 +19,26 @@ const args={};
 for(let i=2;i<process.argv.length;i++){
   const argument=process.argv[i];assert(argument.startsWith('--'),`Unexpected argument: ${argument}`);
   const field=argument.slice(2),next=process.argv[i+1];
-  if(['download-model','paint-diagnose'].includes(field)){
+  if(['download-model','paint-diagnose','model-only','verify-download-confirmation'].includes(field)){
     if(next&&!next.startsWith('--')){assert(['true','false','1','0'].includes(next),`Invalid --${field} value`);args[field]=next==='true'||next==='1';i++;}
     else args[field]=true;
   }else{assert(next&&!next.startsWith('--'),`Missing --${field} value`);args[field]=next;i++;}
 }
 assert(!(args['download-model']&&args['model-dir']),'--download-model and --model-dir are mutually exclusive');
+assert(!args['verify-download-confirmation']||args['model-dir'],'--verify-download-confirmation requires --model-dir for subsequent verified full-model import');
+const models={
+  'qwen2.5-0.5b':{id:'qwen2.5-0.5b',name:'Qwen2.5 0.5B',repository:'onnx-community/Qwen2.5-0.5B',revision:'bae5ceaee026f0d0592858b2bd27645a06f19c42',bytes:490043908,cacheName:'fluent-read-information-highlight-model-v1'},
+  'qwen3-0.6b':{id:'qwen3-0.6b',name:'Qwen3 0.6B',repository:'onnx-community/Qwen3-0.6B-ONNX',revision:'1e0a4a196ecabdf9a879664110574563d3f372d3',bytes:578918894,cacheName:'fluent-read-information-highlight-model-qwen3-0.6b-v1'},
+};
+const modelId=args['model-id']||'qwen2.5-0.5b';assert(Object.hasOwn(models,modelId),`Unsupported --model-id: ${modelId}`);
+const model=models[modelId],otherModel=Object.values(models).find(value=>value.id!==modelId);
+const modelUrlPrefix=`https://huggingface.co/${model.repository}/resolve/${model.revision}/`;
+const downloadLabel=`下载模型（${(model.bytes/1_000_000).toFixed(0)} MB）`;
+const modelDescriptions={
+  'qwen2.5-0.5b':'基础模型，需 WebGPU（shader-f16）。',
+  'qwen3-0.6b':'进阶模型，需 WebGPU（shader-f16）。',
+};
+const modelDescription=selectedId=>modelDescriptions[selectedId];
 for(const field of ['extension-dir','playwright-root','artifacts-dir']) assert(args[field],`Missing --${field}`);
 const downloadTimeout=Number(args['download-timeout-ms']||15*60*1000);
 assert(Number.isFinite(downloadTimeout)&&downloadTimeout>=15000,'--download-timeout-ms must be at least 15000');
@@ -38,9 +52,11 @@ const manifest=JSON.parse(fs.readFileSync(path.join(extensionDir,'manifest.json'
 fs.mkdirSync(artifacts,{recursive:true});
 const profileDir=fs.mkdtempSync(path.join(os.tmpdir(),'fluentread-information-highlight-'));
 const report={ok:false,extensionDir,profileDir,stages:[],surface:'options-continuous-smart-highlight-group',build:extensionDir.endsWith('-dev')?'development':'production',
+  selectedModel:model,
+  suite:args['model-only']?'model-management-inference-pdf':'information-highlight-settings-pages-and-model',
   evidence:'real-extension-controlled-pages',cases:[],screenshots:[],consoleErrors:[],persistenceCases:[],consoleWarnings:[],
   quickClose:false,crossPageSync:false,latestWriteWins:false,
-  modelAcquisition:args['download-model']?'production-settings-download':args['model-dir']?'verified-local-artifact-import':'not-requested',
+  modelAcquisition:args['download-model']?'production-settings-download':args['verify-download-confirmation']?'production-partial-download-then-verified-local-artifact-import':args['model-dir']?'verified-local-artifact-import':'not-requested',
   unverified:['Firefox browser execution','reading-speed benefit','arbitrary-site compatibility','local model inference','product model download/pause/resume']};
 const fixture=`<!doctype html><html lang="zh"><head><meta charset="utf-8"><title>Information highlighting fixture</title>
 <style>body{margin:0;background:#fafaf7;color:#24312b;font:18px/1.8 system-ui}main{max-width:760px;margin:40px auto;padding:24px}p{margin:20px 0}a{color:inherit}pre{background:#eee}#excluded{position:fixed;right:10px;bottom:10px}</style></head>
@@ -51,6 +67,11 @@ const fixture=`<!doctype html><html lang="zh"><head><meta charset="utf-8"><title
 <button id="excluded">浏览器模型与关键词按钮</button><p hidden>隐藏的模型文字</p></main>
 <script>const root=document.querySelector('#shadow-anchor').attachShadow({mode:'open'});root.innerHTML='<p style="font:18px/1.8 system-ui">开放 Shadow DOM 的本地语言模型正文需要正确定位原文与意外度词语。</p>';</script></body></html>`;
 const modelManifest=args['model-dir']?JSON.parse(fs.readFileSync(path.join(args['model-dir'],'manifest.json'),'utf8')):[];
+if(modelManifest.length){
+  assert.equal(modelManifest.length,6,'A verified local model must provide the six production artifacts');
+  assert(modelManifest.every(file=>file.url===`${modelUrlPrefix}${file.path}`&&/^[a-f0-9]{64}$/u.test(file.sha256)),'Local artifact manifest must match the selected pinned model');
+  assert.equal(modelManifest.reduce((sum,file)=>sum+file.size,0),model.bytes,'Local artifact sizes must match the selected production model');
+}
 const server=http.createServer((req,res)=>{
   const model=modelManifest.find(file=>req.url===`/models/${file.path}`);
   if(model){
@@ -280,8 +301,18 @@ function popupSourceContract(){
       report.cases.push({id:`smart-highlight-help-tags-${language}-${viewportWidth}`,language,viewportWidth,layout,interactions:evidence,tooltip:narrowTooltip});
     },45000);
     await step('translation-anchors-ready',()=>control.locator('[data-settings-anchor-link="reading"]').waitFor());
-    await step('fixture-config',()=>support.patchStoredConfig(control,{on:true,disableFloatingBall:false,uiLanguage:'zh-CN',uiLanguageSetupCompleted:true,theme:'light',informationHighlight:{enabled:false,hotkey:'Alt+H',hotkeyEnabled:true,mode:'keywords',density:'medium',color:'amber',style:'background',intensity:'standard'}}));
+    await step('fixture-config',()=>support.patchStoredConfig(control,{on:true,disableFloatingBall:false,uiLanguage:'zh-CN',uiLanguageSetupCompleted:true,theme:'light',informationHighlight:{enabled:false,hotkey:'Alt+H',hotkeyEnabled:true,mode:'keywords',model:modelId,density:'medium',color:'amber',style:'background',intensity:'standard'}}));
     const patchConfig=patch=>step('fixture-config-patch',()=>support.patchStoredConfig(control,patch));
+    const settingButton=async(selector,name,{click=true,selectedId=modelId}={})=>step(`settings-control:${name}`,async()=>{
+      const scope=/data-information-highlight-(?:download|pause|remove)/u.test(selector)?`section[data-information-highlight-model-id="${selectedId}"] `:'';
+      const fullSelector=`#information-highlight-settings ${scope}${selector}`,button=control.locator(fullSelector);await button.waitFor();await button.scrollIntoViewIfNeeded();
+      await control.waitForFunction(selector=>{const element=document.querySelector(selector);return element&&!element.disabled;},fullSelector,{timeout:15000});assert(await button.isEnabled());
+      const metrics=await button.evaluate(element=>{const rect=element.getBoundingClientRect(),hit=document.elementFromPoint(rect.x+rect.width/2,rect.y+rect.height/2);return{rect:rect.toJSON(),viewport:{width:innerWidth,height:innerHeight},hit:hit===element||element.contains(hit),label:element.textContent.trim(),visibility:document.visibilityState};});
+      assert(metrics.rect.width>0&&metrics.rect.height>0&&metrics.rect.x>=0&&metrics.rect.y>=0&&metrics.rect.right<=metrics.viewport.width+1&&metrics.rect.bottom<=metrics.viewport.height+1&&metrics.hit&&metrics.visibility==='visible','Settings control must be visible and clickable after normal scrolling');
+      if(click)await control.mouse.click(metrics.rect.x+metrics.rect.width/2,metrics.rect.y+metrics.rect.height/2);return metrics;
+    });
+    let popup;
+    if(!args['model-only']){
     await openHighlightSettings(control,{verifyReading:true});report.cases.push({id:'smart-highlight-exact-title-zh',...await highlightTitle(control,'zh-CN')});
     await helpTags(control,'zh-CN',{screenshot:'smart-highlight-help-zh'});
     await patchConfig({uiLanguage:'en-US'});report.cases.push({id:'smart-highlight-exact-title-en',...await highlightTitle(control,'en-US')});
@@ -303,14 +334,14 @@ function popupSourceContract(){
     await step('hotkey-clears-current-page',()=>page.waitForFunction(()=>![...CSS.highlights.keys()].some(name=>name.startsWith('fluentread-information-highlight')),null,{timeout:30000}));
     await step('hotkey-off-notice',()=>page.waitForFunction(()=>(document.querySelector('#fluent-read-page-notice-host')?.shadowRoot?.textContent||'').includes('智能高亮已关闭'),null,{timeout:15000}));
     // 模型尚未下载时用快捷键开启：页面给出明确提示，而不是毫无反应。
-    await step('model-mode-before-download',()=>support.patchStoredConfig(control,{informationHighlight:{enabled:false,hotkey:'Alt+H',hotkeyEnabled:true,mode:'surprisal-local',density:'medium',color:'amber',style:'background',intensity:'standard'}}));
+    await step('model-mode-before-download',()=>support.patchStoredConfig(control,{informationHighlight:{enabled:false,hotkey:'Alt+H',hotkeyEnabled:true,mode:'surprisal-local',model:modelId,density:'medium',color:'amber',style:'background',intensity:'standard'}}));
     await delay(600);await step('hotkey-on-without-model',()=>page.keyboard.press('Alt+KeyH'));
     await step('hotkey-model-not-ready-notice',()=>page.waitForFunction(()=>(document.querySelector('#fluent-read-page-notice-host')?.shadowRoot?.textContent||'').includes('本地模型尚未下载'),null,{timeout:30000}));
     const missingModelNotice=await step('hotkey-model-not-ready-text',noticeText);
     // 没有模型时本页改用关键词方式，读者仍然得到高亮。
     await step('hotkey-without-model-keyword-fallback',()=>page.waitForFunction(()=>[...CSS.highlights].some(([name,paint])=>name.startsWith('fluentread-information-highlight')&&paint.size>0),null,{timeout:30000}));
     await step('hotkey-off-without-model',()=>page.keyboard.press('Alt+KeyH'));
-    await step('keywords-mode-restored',()=>support.patchStoredConfig(control,{informationHighlight:{enabled:false,hotkey:'Alt+H',hotkeyEnabled:true,mode:'keywords',density:'medium',color:'amber',style:'background',intensity:'standard'}}));
+    await step('keywords-mode-restored',()=>support.patchStoredConfig(control,{informationHighlight:{enabled:false,hotkey:'Alt+H',hotkeyEnabled:true,mode:'keywords',model:modelId,density:'medium',color:'amber',style:'background',intensity:'standard'}}));
     await delay(600);report.cases.push({id:'hotkey-without-downloaded-model-falls-back-to-keywords-with-notice',missingModelNotice});
     assert.equal(await step('hotkey-settings-row',()=>control.locator('#information-highlight-settings [data-information-highlight-hotkey]').innerText()),'Alt+H');
     const hotkeySwitch=control.locator('#information-highlight-settings [data-information-highlight-hotkey-enabled]').first();
@@ -358,7 +389,7 @@ function popupSourceContract(){
     const secondId=await step('second-tab-id',()=>control.evaluate(async url=>(await chrome.tabs.query({})).find(tab=>tab.url===url)?.id,`${fixtureUrl}?second`));
     const secondState=await step('second-disabled-state',()=>control.evaluate(async id=>chrome.tabs.sendMessage(id,{type:'GET_INFORMATION_HIGHLIGHT_STATE'}),secondId));
     assert.equal((secondState.state||secondState).enabled,false);report.cases.push({id:'new-tab-does-not-inherit-enabled'});await shot(second,'disabled-page');
-    const popup=await open(popupUrl,'ordinary-popup');
+    popup=await open(popupUrl,'ordinary-popup');
     for(const layout of [{width:400,language:'zh-CN',theme:'light',name:'popup-400-zh'},
       {width:320,language:'zh-CN',theme:'light',name:'popup-320-zh'},
       {width:400,language:'en-US',theme:'light',name:'popup-400-en'},
@@ -376,12 +407,6 @@ function popupSourceContract(){
       report.cases.push({id:`${layout.name}-no-information-highlight`,absence,messageEvidence:'popup-source-contract-and-production-static-js-graph'});await shot(popup,layout.name);
     }
     await patchConfig({uiLanguage:'zh-CN',theme:'light'});await activate(control,'settings-preferences');
-    const settingButton=async(selector,name,{click=true}={})=>step(`settings-control:${name}`,async()=>{
-      const button=control.locator(`#information-highlight-settings ${selector}`);await button.waitFor();await button.scrollIntoViewIfNeeded();assert(await button.isEnabled());
-      const metrics=await button.evaluate(element=>{const rect=element.getBoundingClientRect(),hit=document.elementFromPoint(rect.x+rect.width/2,rect.y+rect.height/2);return{rect:rect.toJSON(),viewport:{width:innerWidth,height:innerHeight},hit:hit===element||element.contains(hit),label:element.textContent.trim(),visibility:document.visibilityState};});
-      assert(metrics.rect.width>0&&metrics.rect.height>0&&metrics.rect.x>=0&&metrics.rect.y>=0&&metrics.rect.right<=metrics.viewport.width+1&&metrics.rect.bottom<=metrics.viewport.height+1&&metrics.hit&&metrics.visibility==='visible','Settings control must be visible and clickable after normal scrolling');
-      if(click)await control.mouse.click(metrics.rect.x+metrics.rect.width/2,metrics.rect.y+metrics.rect.height/2);return metrics;
-    });
     const paletteIds=['rose','amber','mint','blue','violet','slate'];
     assert.equal(await step('settings-six-palette-cards',()=>control.locator('#information-highlight-settings [data-information-highlight-color]').count()),paletteIds.length);
     for(const color of paletteIds){
@@ -455,6 +480,12 @@ function popupSourceContract(){
     await delay(500);assert.equal((await step('disabled-stable-ranges',()=>textRanges(page))).length,0);report.cases.push({id:'disable-clears-and-does-not-repaint'});
     await send('SET_INFORMATION_HIGHLIGHT_ENABLED',{enabled:true});await send('SET_INFORMATION_HIGHLIGHT_ENABLED',{enabled:false});await delay(500);
     assert.equal((await step('rapid-toggle-ranges',()=>textRanges(page))).length,0);report.cases.push({id:'rapid-enable-disable'});
+    }else{
+      report.skippedMatrices=['help tags and language/layout matrix','page hotkey and keyword painting','ordinary popup matrix','palette/heatmap/style preferences','dynamic article and rapid toggles'];
+      await openHighlightSettings(control);
+      // 真下载验证关闭/重开设置时保留同一浏览器的一个已有页签；不执行旧页面或 Popup 测试矩阵。
+      popup=await open(fixtureUrl,'model-resume-spare-tab');
+    }
     await activate(control,'settings-mode');
     const chooseMode=mode=>step(`settings-mode:${mode}`,async()=>{
       const selector=control.locator('#information-highlight-settings [data-information-highlight-mode-select]');await selector.scrollIntoViewIfNeeded();assert((await selector.boundingBox()).height>20);
@@ -462,16 +493,185 @@ function popupSourceContract(){
     });
     await chooseMode('surprisal-local');
     assert.equal((await step('selected-mode-config',()=>support.readStoredConfig(control))).informationHighlight.mode,'surprisal-local');
-    await step('settings-model-card-visible',()=>control.locator('#information-highlight-settings [data-testid="information-highlight-model-card"]').waitFor());
-    const readModelStatus=()=>step('model-status-rpc',async()=>{
-      const envelope=await control.evaluate(()=>chrome.runtime.sendMessage({type:'GET_INFORMATION_HIGHLIGHT_MODEL_STATUS'}));assert(envelope?.success&&envelope.status,JSON.stringify(envelope));return envelope;
+    await step('settings-model-card-visible',()=>control.locator('#information-highlight-settings [data-testid="information-highlight-model-card"]').first().waitFor());
+    const readModelStatus=(selectedId=modelId)=>step(`model-status-rpc:${selectedId}`,async()=>{
+      const envelope=await control.evaluate(modelId=>chrome.runtime.sendMessage({type:'GET_INFORMATION_HIGHLIGHT_MODEL_STATUS',modelId}),selectedId);
+      assert(envelope?.success&&envelope.status,JSON.stringify(envelope));assert.equal(envelope.status.modelId,selectedId);assert.equal(envelope.status.modelName,models[selectedId].name);assert.equal(envelope.status.totalBytes,models[selectedId].bytes);return envelope;
     });
+    const cardFor=selectedId=>control.locator(`section[data-information-highlight-model-id="${selectedId}"]`);
+    const modelCards=()=>control.locator('[data-information-highlight-models]');
+    const chooseModel=selectedId=>step(`native-settings-model:${selectedId}`,async()=>{
+      const descriptor=models[selectedId],radio=cardFor(selectedId).locator('input[type="radio"][data-information-highlight-model-radio]');
+      await radio.waitFor({state:'attached'});await radio.locator('..').scrollIntoViewIfNeeded();
+      await radio.locator('..').click();assert(await radio.isChecked());
+      assert.equal(await control.locator('[data-information-highlight-model-radio]:checked').count(),1);
+      for(const deadline=Date.now()+8000;;){const stored=(await support.readStoredConfig(control)).informationHighlight;if(stored.model===selectedId)break;assert(Date.now()<deadline,`Model selection was not persisted: ${stored.model}`);await delay(100);}
+      return {modelId:selectedId,name:descriptor.name,selection:'native-model-title-radio-click'};
+    });
+    const inspectModelCard=(descriptor,expectedAction)=>step(`model-card-single-action:${descriptor.id}:${expectedAction}`,async()=>{
+      await control.waitForFunction(({id,name,label})=>{
+        const card=document.querySelector(`section[data-information-highlight-model-id="${id}"]`),actions=card?.querySelectorAll('.highlight-model-actions button');
+        return card?.querySelector('.highlight-model-heading strong')?.textContent.trim()===name&&actions?.length===1&&actions[0].textContent.trim()===label;
+      },{id:descriptor.id,name:descriptor.name,label:expectedAction},{timeout:30000});
+      const snapshot=await cardFor(descriptor.id).evaluate(element=>({
+        name:element.querySelector('.highlight-model-heading strong').textContent.trim(),description:element.querySelector('.highlight-model-heading small')?.textContent.trim(),text:element.textContent.trim(),selected:element.querySelector('input[type="radio"]')?.checked,
+        actions:[...element.querySelectorAll('.highlight-model-actions button')].map(button=>({text:button.textContent.trim(),disabled:button.disabled,download:button.hasAttribute('data-information-highlight-download'),remove:button.hasAttribute('data-information-highlight-remove'),pause:button.hasAttribute('data-information-highlight-pause')})),
+      }));
+      assert.equal(snapshot.actions.length,1);assert.equal(snapshot.actions[0].text,expectedAction);
+      assert.equal(snapshot.description,modelDescription(descriptor.id));
+      const groupText=await control.locator('#information-highlight-settings').innerText();
+      assert(!/模型文件已就绪|下载只获取模型文件|分析正文不离开此设备|已下载\s*[·•]\s*可离线使用|由\s*FluentRead\s*下载|FluentRead\s*下载\s*Qwen/u.test(groupText),'Removed model helpers and duplicate descriptions must be absent');
+      return snapshot;
+    },35000);
+    const confirmationFor=(action,selectedId=modelId)=>control.locator(`[data-information-highlight-model-dialog][data-information-highlight-model-id="${selectedId}"][data-information-highlight-action="${action}"]`);
+    const settleConfirmation=(action,name,selectedId=modelId)=>step(`model-confirmation-settled:${name}`,async()=>{
+      const selector=`[data-information-highlight-model-dialog][data-information-highlight-model-id="${selectedId}"][data-information-highlight-action="${action}"]`;
+      const isSettled=selector=>{
+        const content=document.querySelector(selector),box=content?.closest('.el-dialog'),overlay=box?.closest('.el-overlay');
+        if(!content||!box||!overlay||overlay.getAnimations({subtree:true}).some(animation=>animation.pending||animation.playState==='running'))return false;
+        for(const element of [overlay,box,content]){const style=getComputedStyle(element);if(Number(style.opacity)<0.999||style.visibility!=='visible'||style.display==='none')return false;}
+        const rect=box.getBoundingClientRect();return rect.width>0&&rect.height>0;
+      };
+      const readAppearance=selector=>{
+        const content=document.querySelector(selector),box=content?.closest('.el-dialog'),overlay=box?.closest('.el-overlay');
+        if(!content||!box||!overlay)return {missing:true,selector};
+        return {selector,rect:box.getBoundingClientRect().toJSON(),viewport:{width:innerWidth,height:innerHeight},backgroundColor:getComputedStyle(box).backgroundColor,
+          layers:[overlay,box,content].map(element=>{const style=getComputedStyle(element);return{opacity:style.opacity,transform:style.transform,visibility:style.visibility,display:style.display};}),
+          runningAnimations:overlay.getAnimations({subtree:true}).filter(animation=>animation.pending||animation.playState==='running').length};
+      };
+      const deadline=Date.now()+10000;report.model??={};report.model.confirmationAppearances??={};
+      try{
+        while(Date.now()<deadline){
+          // 同步谓词等待动画结束，再独立等两帧并重新确认几何，避免 Promise 被误当成稳定条件。
+          await control.waitForFunction(isSettled,selector,{timeout:Math.max(1,deadline-Date.now())});const before=await control.evaluate(readAppearance,selector);
+          await control.evaluate(()=>new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve))));
+          await control.waitForFunction(isSettled,selector,{timeout:Math.max(1,deadline-Date.now())});const after=await control.evaluate(readAppearance,selector);
+          after.rectBefore=before.rect;after.rectStable=Boolean(before.rect&&after.rect&&['x','y','width','height'].every(field=>Math.abs(before.rect[field]-after.rect[field])<0.1));
+          report.model.confirmationAppearances[name]=after;save();
+          if(!after.missing&&after.rectStable&&after.runningAnimations===0&&after.layers.every(layer=>Number(layer.opacity)>=0.999&&layer.visibility==='visible'&&layer.display!=='none')){
+            assert(!['transparent','rgba(0, 0, 0, 0)'].includes(after.backgroundColor),'Confirmation dialog needs an opaque readable surface');
+            assert(after.rect.x>=0&&after.rect.y>=0&&after.rect.right<=after.viewport.width+1&&after.rect.bottom<=after.viewport.height+1,'Confirmation dialog must fit the viewport');return after;
+          }
+        }throw new Error('Confirmation animation and geometry did not remain settled across two frames');
+      }catch(error){report.model.confirmationAppearances[name]=await control.evaluate(readAppearance,selector).catch(snapshotError=>({snapshotError:String(snapshotError)}));save();throw error;}
+    },15000);
+    const layoutModelCards=async(name,{width=1440,theme='light'}={})=>{
+      await step(`model-layout-size:${name}`,()=>control.setViewportSize({width,height:1000}));await patchConfig({theme});
+      await step(`model-layout-scroll:${name}`,()=>modelCards().scrollIntoViewIfNeeded());
+      const layout=await step(`model-layout:${name}`,()=>modelCards().evaluate(element=>({width:innerWidth,height:innerHeight,scrollWidth:document.documentElement.scrollWidth,scrollHeight:document.documentElement.scrollHeight,
+        cards:[...element.querySelectorAll('section[data-information-highlight-model-id]')].map(card=>{
+          const style=getComputedStyle(card),actions=card.querySelector('.highlight-model-actions'),buttons=actions.querySelectorAll('button');
+          return {modelId:card.dataset.informationHighlightModelId,rect:card.getBoundingClientRect().toJSON(),actionsRect:actions.getBoundingClientRect().toJSON(),resourceButtonCount:buttons.length,buttonRect:buttons[0]?.getBoundingClientRect().toJSON(),
+            paddingRight:parseFloat(style.paddingRight)||0,borderRightWidth:parseFloat(style.borderRightWidth)||0,description:card.querySelector('.highlight-model-heading small')?.textContent.trim(),text:card.textContent.trim(),selected:card.querySelector('input[type="radio"]')?.checked};
+        }),
+        background:getComputedStyle(element.querySelector('section')).backgroundColor,theme:document.documentElement.dataset.theme||document.documentElement.className})));
+      assert.equal(layout.cards.length,2);assert(layout.scrollWidth<=width+1);assert(layout.scrollHeight<=layout.height+1);
+      assert(layout.cards.every(card=>card.rect.width>0&&card.rect.x>=0&&card.rect.right<=width+1));
+      for(const card of layout.cards){
+        assert.equal(card.description,modelDescription(card.modelId));assert.equal(card.resourceButtonCount,1,'Every model card must have one resource action button');
+        const contentRight=card.rect.right-card.paddingRight-card.borderRightWidth;
+        assert(Math.abs(card.buttonRect.right-contentRight)<=1,'Resource action must align with the card’s inner right edge');
+        assert(Math.abs(card.buttonRect.bottom-card.actionsRect.bottom)<=1,'Resource action must align with the bottom of the action row');
+      }
+      const [firstCard,secondCard]=layout.cards.map(card=>card.rect);
+      if(width===1440){
+        assert(Math.abs(firstCard.top-secondCard.top)<=1,'Wide model cards must share the same row');
+        assert(Math.abs(firstCard.width-secondCard.width)<=1,'Wide model cards must have equal widths');
+        assert(Math.abs(firstCard.height-secondCard.height)<=1,'Wide model cards must have equal heights');
+        assert(secondCard.left>=firstCard.right-1,'Wide model cards must sit side by side without overlap');
+        assert(Math.abs(layout.cards[0].actionsRect.bottom-layout.cards[1].actionsRect.bottom)<=1,'Wide model cards must align their actions along the bottom');
+        layout.arrangement='two-equal-cards-in-one-row';
+      }else if(width===390){
+        assert(secondCard.top>=firstCard.bottom-1,'Narrow model cards must stack vertically without overlap');
+        assert(Math.abs(firstCard.left-secondCard.left)<=1,'Narrow model cards must align at the left edge');
+        assert(Math.abs(firstCard.width-secondCard.width)<=1,'Narrow model cards must have equal widths');
+        layout.arrangement='two-cards-stacked-vertically';
+      }
+      report.cases.push({id:`two-model-cards-layout:${name}`,layout});await shot(modelCards(),`model-cards-${name}`);await shot(control,`settings-model-cards-${name}`);
+    };
+    const verifyPrepareConfirmation=async(stage,{dismissals=true,screenshot=true}={})=>{
+      const baseline=(await readModelStatus()).status,selectionBefore=(await support.readStoredConfig(control)).informationHighlight.model;
+      const startRequests=report.networkObservation.requests.filter(request=>request.url.startsWith(modelUrlPrefix)).length;
+      const dialog=confirmationFor('prepare'),expectedAction=baseline.downloadedBytes>0?'继续下载':'下载模型';
+      const openDialog=async suffix=>{
+        await settingButton('[data-information-highlight-download]',`model-${stage}-open-${suffix}`);await dialog.waitFor();
+        const appearance=await settleConfirmation('prepare',`${stage}-${suffix}`),text=(await dialog.innerText()).trim();
+        assert(text.includes(model.name)&&text.includes(`${(model.bytes/1_000_000).toFixed(0)} MB`));assert(text.includes('确认后下载模型文件，完成后可离线使用。'));
+        const status=(await readModelStatus()).status;assert.equal(status.downloadedBytes,baseline.downloadedBytes);assert.equal(status.phase,baseline.phase);assert.equal(status.downloaded,false);
+        assert.equal(report.networkObservation.requests.filter(request=>request.url.startsWith(modelUrlPrefix)).length,startRequests,'Opening download confirmation must not start model requests');
+        assert.equal((await support.readStoredConfig(control)).informationHighlight.model,selectionBefore,'Managing a card must not change the selected analysis model');
+        return {appearance,text,status};
+      };
+      if(dismissals)for(const dismissal of ['cancel','close','Escape']){
+        const layoutName=dismissal==='cancel'?'desktop':dismissal==='close'?'390':'dark';
+        await step(`confirmation-layout:${stage}:${layoutName}`,()=>control.setViewportSize({width:dismissal==='close'?390:1440,height:1000}));await patchConfig({theme:dismissal==='Escape'?'dark':'light'});
+        const opened=await openDialog(dismissal);if(screenshot){await shot(control,`settings-model-${stage}-confirmation-${layoutName}`);await shot(control.locator('.fluentread-information-highlight-model-dialog.el-dialog'),`model-${stage}-confirmation-${layoutName}`);}
+        if(dismissal==='Escape')await control.keyboard.press('Escape');
+        else await dialog.locator(dismissal==='cancel'?'[data-information-highlight-cancel]':'[data-information-highlight-close]').click();
+        await dialog.waitFor({state:'hidden'});await delay(350);const after=(await readModelStatus()).status;
+        assert.equal(after.downloadedBytes,baseline.downloadedBytes);assert.equal(after.phase,baseline.phase);assert.equal(after.downloaded,false);
+        assert.equal(report.networkObservation.requests.filter(request=>request.url.startsWith(modelUrlPrefix)).length,startRequests);
+        report.cases.push({id:`model-${stage}-confirmation-${dismissal}-preserves-download-state`,modelId,baseline,opened,after,networkEvidenceScope:report.networkObservation.scope});
+      }
+      await step(`confirmation-layout:${stage}:restore`,()=>control.setViewportSize({width:1440,height:1000}));await patchConfig({theme:'light'});
+      const opened=await openDialog('confirm');assert.equal((await dialog.locator('[data-information-highlight-confirm]').innerText()).trim(),expectedAction);
+      await step(`model-${stage}-confirm`,()=>dialog.locator('[data-information-highlight-confirm]').click());await dialog.waitFor({state:'hidden'});
+      assert.equal((await support.readStoredConfig(control)).informationHighlight.model,selectionBefore);
+      report.cases.push({id:`model-${stage}-confirmation-confirm-starts-operation`,modelId,baseline,opened});
+    };
+    for(const selectedId of [otherModel.id,modelId]){
+      const selection=await chooseModel(selectedId),status=(await readModelStatus(selectedId)).status;
+      assert.equal(status.downloaded,false);assert.equal(status.downloadedBytes,0,'Selecting a model must not download or reuse another model artifacts');
+      const descriptor=models[selectedId],card=await inspectModelCard(descriptor,`下载模型（${(descriptor.bytes/1_000_000).toFixed(0)} MB）`);
+      report.cases.push({id:`native-model-choice-no-automatic-download:${selectedId}`,selection,status,card});
+    }
+    await step('settings-reload-after-model-choice',()=>control.reload({timeout:30000}),35000);await openHighlightSettings(control);
+    assert(await cardFor(modelId).locator('[data-information-highlight-model-radio]').isChecked());
+    assert.equal(await control.locator('[data-information-highlight-model-select]').count(),0,'Model cards must replace the dropdown');
+    assert.equal((await support.readStoredConfig(control)).informationHighlight.model,modelId);
+    report.persistenceCases.push({id:'native-model-selection-reload-persists',modelId,name:model.name});
     const absent=await readModelStatus();assert.equal(absent.status.downloaded,false);assert.equal(absent.status.downloadedBytes,0,'Choosing local mode must not download artifacts');
-    report.cases.push({id:'settings-real-model-mode-selector-no-automatic-download',status:absent.status});
-    await step('settings-model-card-scroll',()=>control.locator('[data-testid="information-highlight-model-card"]').scrollIntoViewIfNeeded());await shot(control,'settings-model-mode');
-    if(args['download-model']){
+    report.cases.push({id:'settings-real-model-mode-selector-no-automatic-download',modelId,status:absent.status,card:await inspectModelCard(model,downloadLabel)});
+    await layoutModelCards('absent');await layoutModelCards('absent-390',{width:390});await layoutModelCards('absent-dark',{theme:'dark'});
+    await step('restore-model-layout',()=>control.setViewportSize({width:1440,height:1000}));await patchConfig({theme:'light'});
+    await shot(cardFor(modelId),'model-card-download');
+    if(modelManifest.length&&!args['download-model']&&!args['verify-download-confirmation']){
+      // 本地导入分支只检查下载确认的取消及皮肤颜色；不发起产品下载命令。
+      const exerciseCancelledDownload=async(name)=>{
+        const before=(await readModelStatus()).status,selectedBefore=(await support.readStoredConfig(control)).informationHighlight.model,dialog=confirmationFor('prepare');
+        await settingButton('[data-information-highlight-download]',`model-download-open-${name}`);await dialog.waitFor();await settleConfirmation('prepare',name);
+        assert((await dialog.innerText()).includes(model.name));
+        return {before,selectedBefore,dialog};
+      };
+      const initial=await exerciseCancelledDownload('cancel-before-local-import');
+      await initial.dialog.locator('[data-information-highlight-cancel]').click();await initial.dialog.waitFor({state:'hidden'});
+      assert.equal((await readModelStatus()).status.downloadedBytes,initial.before.downloadedBytes);
+      report.cases.push({id:'local-import-download-confirmation-cancel-preserves-artifacts',modelId,before:initial.before});
+      await patchConfig({interfaceSkin:'ouhe',theme:'dark'});
+      await step('ouhe-dark-interface-applied',()=>control.waitForFunction(()=>document.documentElement.dataset.interfaceSkin==='ouhe'&&document.documentElement.classList.contains('dark')));
+      const skinCheck=await exerciseCancelledDownload('ouhe-dark');
+      const colors=await step('ouhe-dark-primary-action-contrast',()=>skinCheck.dialog.locator('[data-information-highlight-confirm]').evaluate(element=>{
+        const style=getComputedStyle(element),token=style.getPropertyValue('--skin-action-text').trim();
+        const rgb=value=>{
+          const hex=/^#([a-f\d]{6})$/iu.exec(value);if(hex)return [0,2,4].map(index=>parseInt(hex[1].slice(index,index+2),16));
+          const match=/^rgba?\(([^)]+)\)$/iu.exec(value);if(!match)throw Error(`Unsupported computed action color: ${value}`);
+          return match[1].split(/[,\s/]+/u).filter(Boolean).slice(0,3).map(Number);
+        };
+        const luminance=value=>rgb(value).map(channel=>channel/255).map(channel=>channel<=0.04045?channel/12.92:((channel+0.055)/1.055)**2.4).reduce((sum,value,index)=>sum+value*[0.2126,0.7152,0.0722][index],0);
+        const foreground=luminance(style.color),background=luminance(style.backgroundColor);
+        return {skin:document.documentElement.dataset.interfaceSkin,theme:document.documentElement.classList.contains('dark')?'dark':'light',token,color:style.color,background:style.backgroundColor,
+          matchesSkinToken:JSON.stringify(rgb(style.color))===JSON.stringify(rgb(token)),contrastRatio:(Math.max(foreground,background)+0.05)/(Math.min(foreground,background)+0.05)};
+      }));
+      assert.equal(colors.skin,'ouhe');assert.equal(colors.theme,'dark');assert(colors.matchesSkinToken,'Primary action color must use the active --skin-action-text token');assert(colors.contrastRatio>=4.5,`Primary action text contrast must be at least 4.5:1: ${colors.contrastRatio}`);
+      await shot(control.locator('.fluentread-information-highlight-model-dialog.el-dialog'),'model-download-confirmation-ouhe-dark');
+      await skinCheck.dialog.locator('[data-information-highlight-cancel]').click();await skinCheck.dialog.waitFor({state:'hidden'});
+      assert.equal((await readModelStatus()).status.downloadedBytes,skinCheck.before.downloadedBytes);assert.equal((await support.readStoredConfig(control)).informationHighlight.model,skinCheck.selectedBefore);
+      report.cases.push({id:'model-download-confirmation-ouhe-dark-primary-token-and-contrast',modelId,colors});
+      await patchConfig({interfaceSkin:'default',theme:'light'});
+    }
+    if(args['download-model']||args['verify-download-confirmation']){
       assert(absent.status.supported,`Real download validation requires WebGPU shader-f16: ${absent.status.reason||'unsupported'}`);
-      networkStage='production-settings-download';report.model={artifactAcquisition:'production-settings-download',statusHistory:[],actions:[],pauseAfterBytes:8*1024*1024,networkObservationScope:report.networkObservation.scope,fixtureArtifactImport:false};save();
+      networkStage='production-settings-download';report.model={...report.model,artifactAcquisition:args['verify-download-confirmation']?'production-partial-download':'production-settings-download',statusHistory:[],actions:[],pauseAfterBytes:8*1024*1024,networkObservationScope:report.networkObservation.scope,fixtureArtifactImport:false};save();
       const recordStatus=(envelope,name)=>{
         const status=envelope.status,previous=report.model.statusHistory.at(-1);
         if(!previous||previous.stage!==name||previous.status.phase!==status.phase||previous.status.downloadedBytes!==status.downloadedBytes||previous.status.downloaded!==status.downloaded)report.model.statusHistory.push({at:Date.now(),stage:name,status});
@@ -484,41 +684,56 @@ function popupSourceContract(){
         }throw new Error(`Timed out waiting for genuine model download: ${name}`);
       },timeout+1000);
       const before=recordStatus(await readModelStatus(),'before-prepare');assert.equal(before.downloadedBytes,0);assert.equal(before.downloaded,false);
-      report.model.actions.push({at:Date.now(),action:'prepare',via:'native-settings-button',metrics:await settingButton('[data-information-highlight-download]','model-prepare')});
+      // 在未选用的卡片启动下载，证明资源操作不会悄悄改变分析模型。
+      await chooseModel(otherModel.id);await verifyPrepareConfirmation('download');
+      report.model.actions.push({at:Date.now(),action:'prepare',via:'native-settings-confirmation',selectionAtPrepare:otherModel.id});
       const partial=await waitModel(status=>status.downloadedBytes>=report.model.pauseAfterBytes&&!status.downloaded,'partial-download',Math.min(downloadTimeout,180000));
       assert(partial.downloadedBytes<partial.totalBytes);
-      await step('settings-progress-positive',()=>control.waitForFunction(()=>document.querySelector('[data-testid="information-highlight-model-progress"] progress')?.value>0));
-      report.model.visibleDownloadProgress=await step('settings-progress-snapshot',()=>control.locator('[data-testid="information-highlight-model-progress"]').evaluate(element=>({loaded:element.querySelector('progress').value,total:element.querySelector('progress').max,text:element.textContent.trim()})));
+      await step('settings-progress-positive',()=>control.waitForFunction(id=>document.querySelector(`section[data-information-highlight-model-id="${id}"] [data-testid="information-highlight-model-progress"] progress`)?.value>0,modelId));
+      report.model.visibleDownloadProgress=await step('settings-progress-snapshot',()=>cardFor(modelId).locator('[data-testid="information-highlight-model-progress"]').evaluate(element=>({loaded:element.querySelector('progress').value,total:element.querySelector('progress').max,text:element.textContent.trim()})));
       assert.equal(report.model.visibleDownloadProgress.total,partial.totalBytes);await shot(control,'settings-model-download-progress');
       report.model.actions.push({at:Date.now(),action:'pause',via:'native-settings-button',metrics:await settingButton('[data-information-highlight-pause]','model-pause'),downloadedBytesBefore:partial.downloadedBytes});
       const paused=await waitModel(status=>status.phase==='paused'&&status.downloadedBytes>0&&!status.downloaded,'paused',30000);await delay(1500);
       const settled=recordStatus(await readModelStatus(),'paused-settled');assert.equal(settled.phase,'paused');assert(settled.downloadedBytes>=paused.downloadedBytes);
-      report.cases.push({id:'product-model-settings-download-and-pause',before,partial,paused:settled});await shot(control,'settings-model-download-paused');
+      report.cases.push({id:'product-model-settings-download-and-pause',before,partial,paused:settled,card:await inspectModelCard(model,'继续下载'),otherCard:await inspectModelCard(otherModel,`下载模型（${(otherModel.bytes/1_000_000).toFixed(0)} MB）`)});await shot(modelCards(),'model-cards-download-paused');await shot(control,'settings-model-download-paused');
       await step('settings-close-after-pause',()=>control.close());
       // 重用先前检查过的普通 Popup 页签作为真正重开的设置页，不为续传新增窗口或 Target。
       control=popup;await step('reopened-settings-size',()=>control.setViewportSize({width:1440,height:1000}));await navigate(control,optionsUrl,'reopen-settings-after-pause');await activate(control,'resume-settings');await openHighlightSettings(control);
       const reopened=recordStatus(await readModelStatus(),'reopened-paused');assert.equal(reopened.phase,'paused');assert.equal(reopened.downloadedBytes,settled.downloadedBytes);
       await step('settings-resume-label',()=>control.getByRole('button',{name:'继续下载',exact:true}).waitFor());
-      report.model.actions.push({at:Date.now(),action:'resume',via:'native-reopened-settings-button',metrics:await settingButton('[data-information-highlight-download]','model-resume'),retainedBytes:reopened.downloadedBytes});
+      await verifyPrepareConfirmation('resume');
+      report.model.actions.push({at:Date.now(),action:'resume',via:'native-reopened-settings-confirmation',retainedBytes:reopened.downloadedBytes});
+      if(args['verify-download-confirmation']){
+        const resumed=await waitModel(status=>status.downloadedBytes>=reopened.downloadedBytes+4*1024*1024&&!status.downloaded,'resumed-partial-download',Math.min(downloadTimeout,180000));
+        await settingButton('[data-information-highlight-pause]','resumed-model-pause');
+        const pausedAgain=await waitModel(status=>status.phase==='paused'&&status.downloadedBytes>=resumed.downloadedBytes&&!status.downloaded,'resumed-paused',30000);
+        assert.equal((await readModelStatus(otherModel.id)).status.downloadedBytes,0);assert.equal((await support.readStoredConfig(control)).informationHighlight.model,otherModel.id);
+        report.unverified=report.unverified.filter(item=>item!=='product model download/pause/resume');report.unverified.push('latest production UI full network download to completion (partial only; full files imported separately)');
+        report.model.partialDownloadEvidence={evidence:'genuine-product-download-confirm-start-pause-reopen-confirm-resume-pause; complete model comes from separate SHA-verified local import',before,partial,paused:settled,reopened,resumed,pausedAgain};
+        report.cases.push({id:'product-model-confirmed-resume-and-second-pause',modelId,pausedAgain,card:await inspectModelCard(model,'继续下载'),otherCard:await inspectModelCard(otherModel,`下载模型（${(otherModel.bytes/1_000_000).toFixed(0)} MB）`)});
+        await shot(modelCards(),'model-cards-resume-paused');await chooseModel(modelId);
+      }else{
       const ready=await waitModel(status=>status.downloaded&&status.phase==='ready','resumed-download');assert.equal(ready.downloadedBytes,ready.totalBytes);assert.equal(ready.totalBytes,before.downloadSizeBytes);
-      const receipts=await step('production-artifact-receipts',()=>control.evaluate(async()=>{
-        const cache=await caches.open('fluent-read-information-highlight-model-v1'),files=[];
+      const receipts=await step('production-artifact-receipts',()=>control.evaluate(async cacheName=>{
+        const cache=await caches.open(cacheName),files=[];
         for(const key of await cache.keys()){const url=new URL(key.url);if(!url.searchParams.has('fluent-read-verified'))continue;const response=await cache.match(key);files.push({url:`${url.origin}${url.pathname}`,receipt:await response.json()});}return files;
-      }));
+      },model.cacheName));
       assert(receipts.length>0);assert.equal(receipts.reduce((total,file)=>total+file.receipt.size,0),ready.downloadedBytes);
-      assert(receipts.every(file=>/^https:\/\/huggingface\.co\/onnx-community\/Qwen2\.5-0\.5B\/resolve\/[a-f0-9]{40}\//u.test(file.url)&&/^[a-f0-9]{64}$/u.test(file.receipt.sha256)));
+      assert(receipts.every(file=>file.url.startsWith(modelUrlPrefix)&&/^[a-f0-9]{64}$/u.test(file.receipt.sha256)));
       report.model.artifacts={evidence:'production-cache-verification-receipts',files:receipts,totalBytes:ready.downloadedBytes};report.cases.push({id:'product-model-settings-reopen-resume-to-ready',reopened,ready,artifactCount:receipts.length,reusedTarget:true});
       report.unverified=report.unverified.filter(item=>item!=='product model download/pause/resume');
-      await step('download-action-hidden-after-ready',()=>control.locator('[data-information-highlight-download]').waitFor({state:'hidden',timeout:30000}));
-      await step('ready-card-scroll',()=>control.locator('[data-testid="information-highlight-model-card"]').scrollIntoViewIfNeeded());await shot(control,'settings-model-downloaded');save();
+      await step('download-action-hidden-after-ready',()=>cardFor(modelId).locator('[data-information-highlight-download]').waitFor({state:'hidden',timeout:30000}));
+      report.cases.push({id:'native-download-action-becomes-single-delete-action',modelId,card:await inspectModelCard(model,'删除模型')});
+      await chooseModel(modelId);await step('ready-card-scroll',()=>cardFor(modelId).scrollIntoViewIfNeeded());await shot(control,'settings-model-downloaded');save();
+      }
     }
     if(modelManifest.length){
       networkStage='verified-local-artifact-import';
       await step('local-model-sha-verification',async()=>{
         for(const file of modelManifest){assert.equal(fs.statSync(path.join(args['model-dir'],file.path)).size,file.size);const hash=createHash('sha256');for await(const chunk of fs.createReadStream(path.join(args['model-dir'],file.path)))hash.update(chunk);assert.equal(hash.digest('hex'),file.sha256);}
       },120000);
-      const imported=await step('verified-local-artifact-import',()=>control.evaluate(async({manifest,localOrigin})=>{
-        const cache=await caches.open('fluent-read-information-highlight-model-v1');let total=0;
+      const imported=await step('verified-local-artifact-import',()=>control.evaluate(async({manifest,localOrigin,cacheName})=>{
+        const cache=await caches.open(cacheName);let total=0;
         for(const file of manifest){
           for(let offset=0,index=0;offset<file.size;offset+=4*1024*1024,index++){
             const end=Math.min(file.size-1,offset+4*1024*1024-1),response=await fetch(`${localOrigin}/models/${file.path}`,{headers:{Range:`bytes=${offset}-${end}`}});
@@ -526,12 +741,17 @@ function popupSourceContract(){
             await cache.put(`${file.url}?fluent-read-part=${index}`,new Response(bytes,{headers:{'Content-Length':String(bytes.byteLength)}}));total+=bytes.byteLength;
           }await cache.put(`${file.url}?fluent-read-verified=${file.sha256}`,new Response(JSON.stringify({size:file.size,sha256:file.sha256})));
         }return total;
-      },{manifest:modelManifest,localOrigin:`http://127.0.0.1:${server.address().port}`}),180000);
-      report.model={artifactImport:'sha-verified-local-files-to-temporary-extension-cache',importedBytes:imported,files:modelManifest};save();
+      },{manifest:modelManifest,localOrigin:`http://127.0.0.1:${server.address().port}`,cacheName:model.cacheName}),180000);
+      report.model={...report.model,modelId,cacheName:model.cacheName,artifactImport:'sha-verified-local-files-to-temporary-extension-cache',importedBytes:imported,files:modelManifest};save();
     }
     if(modelManifest.length||args['download-model']){
       let status;for(let attempt=0;attempt<5;attempt++){status=await readModelStatus();if(status.status.downloaded)break;await delay(500);}
       report.model.status=status;assert(status.success&&status.status.downloaded);
+      report.cases.push({id:'prepared-artifacts-change-single-download-to-delete',modelId,artifactAcquisition:report.model.artifactImport||report.model.artifactAcquisition,card:await inspectModelCard(model,'删除模型')});
+      await shot(cardFor(modelId),'model-card-downloaded');await layoutModelCards('downloaded');await layoutModelCards('downloaded-390',{width:390});
+      await step('restore-ready-model-layout',()=>control.setViewportSize({width:1440,height:1000}));
+      if(modelManifest.length){await step('prepared-model-card-scroll',()=>cardFor(modelId).scrollIntoViewIfNeeded());await shot(control,'settings-model-downloaded');}
+      assert.equal((await readModelStatus(otherModel.id)).status.downloaded,false,'The other model must not report this model files as ready');
       if(status.status.supported){
         networkStage='local-model-inference';const forbidden=[];
         await step('local-inference-page-network-guard',()=>context.route(/^https:\/\/(?:huggingface\.co|hf-mirror\.com)\//u,route=>{forbidden.push(route.request().url());return route.abort('blockedbyclient');}));
@@ -540,23 +760,23 @@ function popupSourceContract(){
         report.model.scoreSender='existing-tab-navigated-to-document-page';save();
         for(const [index,text]of ['浏览器本地模型计算信息意外度，不上传正文。','A local model scores cafe\u0301 and 👩🏽‍💻 in the browser.'].entries()){
           const started=performance.now();
-          const response=await step(index?'score:warm-unicode':'score:cold-chinese',()=>control.evaluate(({text,id})=>chrome.runtime.sendMessage({type:'SCORE_INFORMATION_HIGHLIGHT',text,requestId:id}),{text,id:randomUUID()}),150000);
-          assert(response.success,JSON.stringify(response));assert(response.result.spans.length>0);assert(response.result.spans.every(span=>Number.isFinite(span.score)&&span.score>=0&&span.start>=0&&span.end<=text.length&&span.end>span.start));
+          const response=await step(index?'score:warm-unicode':'score:cold-chinese',()=>control.evaluate(({text,id,modelId})=>chrome.runtime.sendMessage({type:'SCORE_INFORMATION_HIGHLIGHT',text,requestId:id,modelId}),{text,id:randomUUID(),modelId}),150000);
+          assert(response.success,JSON.stringify(response));assert.equal(response.result.engine,`${model.name} · local WebGPU · q4f16`);assert(response.result.spans.length>0);assert(response.result.spans.every(span=>Number.isFinite(span.score)&&span.score>=0&&span.start>=0&&span.end<=text.length&&span.end>span.start));
           report.cases.push({id:index?'real-model-warm-unicode':'real-model-cold-chinese',milliseconds:performance.now()-started,text,result:response.result,surface:'existing-tab-navigated-to-document-page'});save();
         }
         const repeated=report.cases.find(item=>item.id==='real-model-cold-chinese'),repeatStarted=performance.now();
-        const repeat=await step('score:warm-repeat',()=>control.evaluate(({text,id})=>chrome.runtime.sendMessage({type:'SCORE_INFORMATION_HIGHLIGHT',text,requestId:id}),{text:repeated.text,id:randomUUID()}),150000);
+        const repeat=await step('score:warm-repeat',()=>control.evaluate(({text,id,modelId})=>chrome.runtime.sendMessage({type:'SCORE_INFORMATION_HIGHLIGHT',text,requestId:id,modelId}),{text:repeated.text,id:randomUUID(),modelId}),150000);
         assert(repeat.success);assert.deepEqual(repeat.result,repeated.result);report.cases.push({id:'real-model-warm-repeat-identical-result',milliseconds:performance.now()-repeatStarted,text:repeated.text});
-        const cancellation=await step('score:cancel',()=>control.evaluate(async({id})=>{
-          const score=chrome.runtime.sendMessage({type:'SCORE_INFORMATION_HIGHLIGHT',text:'浏览器本地语言模型支持离线分析，但不能改变原文。'.repeat(35),requestId:id});await new Promise(resolve=>setTimeout(resolve,30));
-          return{cancel:await chrome.runtime.sendMessage({type:'CANCEL_INFORMATION_HIGHLIGHT',requestId:id}),score:await score};
-        },{id:randomUUID()}),150000);
+        const cancellation=await step('score:cancel',()=>control.evaluate(async({id,modelId})=>{
+          const score=chrome.runtime.sendMessage({type:'SCORE_INFORMATION_HIGHLIGHT',text:'浏览器本地语言模型支持离线分析，但不能改变原文。'.repeat(35),requestId:id,modelId});await new Promise(resolve=>setTimeout(resolve,30));
+          return{cancel:await chrome.runtime.sendMessage({type:'CANCEL_INFORMATION_HIGHLIGHT',requestId:id,modelId}),score:await score};
+        },{id:randomUUID(),modelId}),150000);
         assert(cancellation.cancel.success);assert(!cancellation.score.success);report.cases.push({id:'real-model-cancel',response:cancellation});assert.equal(forbidden.length,0);
         report.model.observedInterceptedModelRequests=forbidden;report.model.inferenceRequestInterceptionScope='page-routes-only; extension workers rely on verified local-only model configuration';report.model.networkObservationScope=report.networkObservation.scope;
         report.unverified=report.unverified.filter(item=>item!=='local model inference');save();
       }else report.model.gpuInferenceUnavailable=status.status.reason;
     }
-    networkStage='pdf-reading-tests';await patchConfig({informationHighlight:{enabled:false,hotkey:'Alt+H',hotkeyEnabled:true,mode:'keywords',density:'medium',color:'amber',style:'background',intensity:'standard'}});
+    networkStage='pdf-reading-tests';await patchConfig({informationHighlight:{enabled:false,hotkey:'Alt+H',hotkeyEnabled:true,mode:'keywords',model:modelId,density:'medium',color:'amber',style:'background',intensity:'standard'}});
     // 同一现有 Options 页改为阅读器；仍通过正常导航、上传与阅读按钮完成产品流程。
     const documentReader=control;if(documentReader.url()!==`${origin}/document.html`)await navigate(documentReader,`${origin}/document.html`,'reuse-settings-tab-for-pdf');await activate(documentReader,'pdf-reader');
     await step('pdf-drop-zone',()=>documentReader.locator('.file-drop-zone').waitFor());
@@ -577,11 +797,73 @@ function popupSourceContract(){
     report.cases.push({id:'pdf-keywords-native-text-layer-preservation',ranges:pdfRanges,protection:pdfAfter});await shot(documentReader,'pdf-keywords');
     await step('pdf-keywords-disable',()=>pdfToggle.click());assert.equal((await step('pdf-disabled-ranges',()=>textRanges(documentReader))).length,0);report.cases.push({id:'pdf-disable-clears'});
     if(!report.unverified.includes('local model inference')){
-      await patchConfig({informationHighlight:{enabled:false,hotkey:'Alt+H',hotkeyEnabled:true,mode:'surprisal-local',density:'medium',color:'amber',style:'background',intensity:'standard'}});
+      await patchConfig({informationHighlight:{enabled:false,hotkey:'Alt+H',hotkeyEnabled:true,mode:'surprisal-local',model:modelId,density:'medium',color:'amber',style:'background',intensity:'standard'}});
       await step('pdf-local-toggle-ready',()=>documentReader.waitForFunction(()=>document.querySelector('.pdf-information-highlight')?.getAttribute('aria-pressed')==='false'));
       await step('pdf-local-enable',()=>pdfToggle.click());await step('pdf-local-paint',()=>documentReader.waitForFunction(()=>CSS.highlights?.get('fluentread-information-highlight')?.size>0,null,{timeout:120000}),125000);
       report.cases.push({id:'pdf-real-model-text-layer-highlights',ranges:await step('pdf-local-ranges',()=>textRanges(documentReader))});await shot(documentReader,'pdf-local-model');
       await step('pdf-local-disable',()=>pdfToggle.click());assert.equal((await step('pdf-local-disabled-ranges',()=>textRanges(documentReader))).length,0);
+    }
+    // 推理与 PDF 都完成后才删除；取消与确认通过产品自定义对话框，不伪造响应或模型就绪状态。
+    if(modelManifest.length||args['download-model']){
+      networkStage='model-choice-and-delete-tests';
+      await navigate(control,optionsUrl,'reuse-document-tab-for-model-delete');await activate(control,'model-delete-settings');await openHighlightSettings(control);
+      await chooseMode('surprisal-local');
+      const preparedBeforeSwitch=(await readModelStatus()).status;assert.equal(preparedBeforeSwitch.downloaded,true);
+      await chooseModel(otherModel.id);const otherStatus=(await readModelStatus(otherModel.id)).status;
+      assert.equal(otherStatus.downloaded,false);assert.equal(otherStatus.downloadedBytes,0);
+      const otherCard=await inspectModelCard(otherModel,`下载模型（${(otherModel.bytes/1_000_000).toFixed(0)} MB）`);
+      await chooseModel(modelId);const preparedAfterSwitch=(await readModelStatus()).status;
+      assert.equal(preparedAfterSwitch.downloaded,true);assert.equal(preparedAfterSwitch.downloadedBytes,preparedBeforeSwitch.downloadedBytes);
+      const readyCard=await inspectModelCard(model,'删除模型');
+      report.cases.push({id:'native-model-switch-keeps-downloaded-artifacts-isolated',modelId,otherModelId:otherModel.id,preparedBeforeSwitch,otherStatus,otherCard,preparedAfterSwitch,readyCard});
+      const cacheKeys=cacheName=>control.evaluate(async name=>(await (await caches.open(name)).keys()).map(request=>request.url).sort(),cacheName);
+      // 此标记只证明另一模型的命名缓存没有被清空；它不是第二份模型，也不用于推断其可用状态。
+      const retentionMarker=`${fixtureUrl}/__information-highlight-cache-retention-${randomUUID()}`,markerText='temporary-runner-cache-retention-marker';
+      await step('other-model-cache-retention-marker',()=>control.evaluate(async({cacheName,url,text})=>(await caches.open(cacheName)).put(url,new Response(text)),{cacheName:otherModel.cacheName,url:retentionMarker,text:markerText}));
+      const beforeDelete={selected:await cacheKeys(model.cacheName),other:await cacheKeys(otherModel.cacheName)};
+      assert(beforeDelete.selected.some(url=>url.startsWith(modelUrlPrefix)&&url.includes('fluent-read-verified=')));
+      await chooseModel(otherModel.id);const selectionAtDelete=otherModel.id;
+      const dialog=confirmationFor('remove');
+      await settingButton('[data-information-highlight-remove]','model-delete-open-cancel');
+      await step('model-delete-confirmation-visible',()=>dialog.waitFor());
+      const confirmationText=(await dialog.innerText()).trim();assert(confirmationText.includes(`删除 ${model.name} 的本地模型文件？再次使用时需要重新下载。`));
+      const waitingForConfirmation=(await readModelStatus()).status;assert.equal(waitingForConfirmation.downloaded,true,'Opening the confirmation dialog must retain the model');
+      const confirmationAppearance=await settleConfirmation('remove','delete');
+      report.cases.push({id:'native-model-delete-confirmation-settled-and-readable',modelId,appearance:confirmationAppearance});
+      await shot(control,'settings-model-delete-confirmation');await shot(control.locator('.fluentread-information-highlight-model-dialog.el-dialog'),'model-delete-confirmation');
+      await step('model-delete-cancel',()=>dialog.locator('[data-information-highlight-cancel]').click());
+      await step('model-delete-cancel-closes-dialog',()=>dialog.waitFor({state:'hidden'}));
+      assert.equal((await support.readStoredConfig(control)).informationHighlight.model,selectionAtDelete);
+      const canceledStatus=(await readModelStatus()).status;assert.equal(canceledStatus.downloaded,true);assert.equal(canceledStatus.downloadedBytes,preparedAfterSwitch.downloadedBytes);
+      assert.deepEqual(await cacheKeys(model.cacheName),beforeDelete.selected);assert.deepEqual(await cacheKeys(otherModel.cacheName),beforeDelete.other);
+      report.cases.push({id:'native-model-delete-cancel-retains-artifacts',modelId,confirmationText,status:canceledStatus,card:await inspectModelCard(model,'删除模型')});
+      for(const [dismissal,width,theme]of [['close',390,'light'],['Escape',1440,'dark']]){
+        await step(`delete-confirmation-layout:${dismissal}`,()=>control.setViewportSize({width,height:1000}));await patchConfig({theme});
+        await settingButton('[data-information-highlight-remove]',`model-delete-open-${dismissal}`);await dialog.waitFor();
+        await settleConfirmation('remove',`delete-${dismissal}`);await shot(control,`settings-model-delete-confirmation-${dismissal}`);await shot(control.locator('.fluentread-information-highlight-model-dialog.el-dialog'),`model-delete-confirmation-${dismissal}`);
+        if(dismissal==='Escape')await control.keyboard.press('Escape');else await dialog.locator('[data-information-highlight-close]').click();await dialog.waitFor({state:'hidden'});
+        assert.equal((await readModelStatus()).status.downloaded,true);assert.deepEqual(await cacheKeys(model.cacheName),beforeDelete.selected);assert.deepEqual(await cacheKeys(otherModel.cacheName),beforeDelete.other);
+        assert.equal((await support.readStoredConfig(control)).informationHighlight.model,selectionAtDelete);
+        report.cases.push({id:`native-model-delete-${dismissal}-retains-artifacts`,modelId,selectedModelId:selectionAtDelete,width,theme});
+      }
+      await step('delete-confirmation-layout:restore',()=>control.setViewportSize({width:1440,height:1000}));await patchConfig({theme:'light'});
+      await settingButton('[data-information-highlight-remove]','model-delete-open-confirm');await step('model-delete-second-confirmation',()=>dialog.waitFor());
+      await settleConfirmation('remove','delete-confirm');
+      await step('model-delete-confirm',()=>dialog.locator('[data-information-highlight-confirm]').click());
+      await step('model-delete-confirm-closes-dialog',()=>dialog.waitFor({state:'hidden'}));
+      const deleted=await step('model-delete-removes-selected-artifacts',async()=>{
+        for(const deadline=Date.now()+30000;;){const status=(await readModelStatus()).status;if(!status.downloaded&&status.downloadedBytes===0)return status;assert(Date.now()<deadline,'Confirmed model deletion did not remove selected artifacts');await delay(200);}
+      },35000);
+      assert.equal((await support.readStoredConfig(control)).informationHighlight.model,selectionAtDelete,'Deletion of an unselected card must keep the selected analysis model');
+      const deletedCard=await inspectModelCard(model,downloadLabel),afterDelete={selected:await cacheKeys(model.cacheName),other:await cacheKeys(otherModel.cacheName)};
+      assert(!afterDelete.selected.some(url=>url.startsWith(modelUrlPrefix)));assert.deepEqual(afterDelete.other,beforeDelete.other);
+      const retainedText=await control.evaluate(async({cacheName,url})=>(await (await caches.open(cacheName)).match(url))?.text(),{cacheName:otherModel.cacheName,url:retentionMarker});assert.equal(retainedText,markerText);
+      assert.equal((await readModelStatus(otherModel.id)).status.downloaded,false);
+      report.cases.push({id:'native-model-delete-confirm-restores-single-download-action',modelId,status:deleted,card:deletedCard,selectedCacheArtifactKeysBefore:beforeDelete.selected.length,selectedCacheArtifactKeysAfter:afterDelete.selected.length,
+        otherCacheRetention:{cacheName:otherModel.cacheName,markerRetained:true,keysBefore:beforeDelete.other.length,keysAfter:afterDelete.other.length,evidence:'synthetic-cache-retention-marker; second complete model was not imported'}});
+      await shot(control,'settings-model-deleted');await shot(modelCards(),'model-cards-deleted');
+      await shot(cardFor(modelId),'model-card-download');
+      await step('cleanup-other-cache-retention-marker',()=>control.evaluate(async({cacheName,url})=>(await caches.open(cacheName)).delete(url),{cacheName:otherModel.cacheName,url:retentionMarker}));
     }
     await step('final-focus-check',()=>checkFocus());assert(!fatalError);assert.equal(report.consoleErrors.length,0,JSON.stringify(report.consoleErrors));
     assert(!report.consoleWarnings.some(item=>item.message.includes('Failed to resolve component')),JSON.stringify(report.consoleWarnings));report.ok=true;checkpoint('validation-complete','after');
@@ -601,6 +883,9 @@ function popupSourceContract(){
       if(focusMonitor.error){report.focusObserverError=String(focusMonitor.error);report.ok=false;primaryError||=focusMonitor.error;save();}}
     if(server.listening)try{await step('cleanup-fixture-server',()=>new Promise((resolve,reject)=>server.close(error=>error?reject(error):resolve())),5000,{ignoreFatal:true});}
     catch(error){report.serverCleanupError=String(error);report.ok=false;primaryError||=error;server.closeAllConnections?.();save();}
+    if(report.browserCloseReceipt==='shared-guard-fulfilled')try{
+      await step('cleanup-owned-profile',()=>fs.rmSync(profileDir,{recursive:true,force:true}),15000,{ignoreFatal:true});report.profileRemoved=true;
+    }catch(error){report.profileCleanupError=String(error);report.ok=false;primaryError||=error;save();}
     checkpoint('cleanup','after');save();
   }
   console.log(JSON.stringify({ok:report.ok,cases:report.cases.length,report:path.join(artifacts,'report.json'),error:report.error}));

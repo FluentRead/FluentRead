@@ -96,7 +96,7 @@ function home(prefix: string) {
         ${['document', 'image', 'video', 'selection'].map(kind => `<div class="bv-feature-row"><div data-visual="${kind}" data-playing="true">${workflow}</div></div>`).join('')}
         <div class="bv-video-platforms">YouTube X Google Meet Teams Zoom</div><div class="bv-browser-options"><a>1</a><a>2</a><a>3</a></div>
         <div class="fd-selection"><button aria-label="${english ? 'Preview reading the original' : '演示朗读原文'}"></button><button aria-label="${english ? 'Preview reading the translation' : '演示朗读译文'}"></button></div>
-        <div class="bv-promo"><video controls preload="none" poster="/videos/fluentread-promo-${english ? 'en' : 'zh'}-poster.webp"><source src="/videos/fluentread-promo-${english ? 'en' : 'zh'}.mp4"></video></div><a class="bv-promo-link" href="https://www.bilibili.com/video/BV1VLHE6hEnB/" target="_blank" rel="noopener">Video</a></div>`;
+        <div class="bv-promo"><video controls preload="none" poster="/videos/fluentread-promo-${english ? 'en' : 'zh'}-poster.webp"><source src="/videos/fluentread-promo-${english ? 'en' : 'zh'}.mp4"></video><p class="bv-promo-more"><a href="https://www.bilibili.com/video/BV1qhHJ6uEiF/" target="_blank" rel="noopener">Official introduction</a></p></div></div>`;
 }
 function docsFixture(extra = '') {
     const root = fixture(), dist = 'docs/.vitepress/dist';

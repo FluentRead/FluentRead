@@ -10,7 +10,7 @@ const http = require('node:http');
 const crypto = require('node:crypto');
 const assert = require('node:assert/strict');
 const {startTranslationFixtureServer, installTranslationFixtureOnWorker} = require('../run-full-page-translation-test.cjs');
-const {guardBrowserClose} = require('./owned-browser-close.cjs');
+const {guardBrowserClose, getGuardedBrowserPid} = require('./owned-browser-close.cjs');
 const arg = (name, fallback) => {const index = process.argv.indexOf(`--${name}`); return index < 0 ? fallback : process.argv[index + 1];};
 const extensionDir = path.resolve(arg('extension-dir', '.output/chrome-mv3'));
 const artifactsDir = path.resolve(arg('artifacts-dir', '/private/tmp/fluentread-hover-window'));
@@ -19,6 +19,8 @@ const profileCPU = process.argv.includes('--cpu-profile');
 const gestureLifecycle = process.argv.includes('--gesture-lifecycle');
 const gestureOnly = process.argv.includes('--gesture-only');
 if(gestureOnly && !gestureLifecycle)throw new Error('--gesture-only requires --gesture-lifecycle');
+const lifecycleBoundary = arg('lifecycle-boundary', 'all');
+assert.ok(['all', 'route', 'visibility'].includes(lifecycleBoundary), 'Lifecycle boundary must be all, route or visibility');
 const hoverSweep = process.argv.includes('--hover-sweep');
 const sweepOnly = process.argv.includes('--sweep-only');
 if(sweepOnly && !hoverSweep)throw new Error('--sweep-only requires --hover-sweep');
@@ -33,7 +35,12 @@ const nestedScale = Number(arg('nested-scale','1'));
 assert.ok(Number.isFinite(nestedScale) && nestedScale>=0.25 && nestedScale<=2,'Nested scale must be from 0.25 to 2');
 const cpuSessions = new WeakMap();
 const {chromium} = require(path.join(arg('playwright-root', path.join(os.homedir(), '.cache/codex-runtimes/codex-primary-runtime/dependencies/node/node_modules')), 'playwright'));
-const {launchFocusSafePersistentContext, newPageWithoutForeground, activateExtensionTabWithoutForeground} = require(arg('focus-safe-helper', path.join(__dirname, 'focus-safe-browser.cjs')));
+// 连接临时浏览器时保留原生 tab 可见性，不启用 Playwright 默认的 focus/media 覆盖。
+const nativeContextChromium = {
+  connectOverCDP: (endpoint, options) => chromium.connectOverCDP(endpoint, {...options, noDefaults: true}),
+  launchPersistentContext: (...args) => chromium.launchPersistentContext(...args),
+};
+const {launchFocusSafePersistentContext, newPageWithoutForeground, activateExtensionTabWithoutForeground, queryMacFrontmostApplication} = require(arg('focus-safe-helper', path.join(__dirname, 'focus-safe-browser.cjs')));
 const profileDir = fs.mkdtempSync(path.join(os.tmpdir(), 'fluentread-hover-window-'));
 const sha256 = file => crypto.createHash('sha256').update(fs.readFileSync(file)).digest('hex');
 const cases = [
@@ -44,8 +51,9 @@ const cases = [
 const html = '<!doctype html><meta charset="utf-8"><title>Hover range fixture</title><style>body{font:16px/1.7 system-ui;margin:40px}#target{max-width:740px;overflow-wrap:anywhere}#probe{position:fixed;right:20px;top:20px;z-index:100000}</style><button id="probe" translate="no">Host click</button><main><div id="target"></div></main><script>window.probeClicks=0;document.querySelector("#probe").onclick=()=>window.probeClicks++;</script>';
 const server = http.createServer((_request, response) => {response.writeHead(200, {'content-type':'text/html;charset=utf-8'}); response.end(html);});
 const report = {baseline, profileCPU, gestureLifecycle, hoverSweep, nestedViewport, evidence:'Production extension; local deterministic transport, temporary background-visible Edge',
+  cdpDefaults:'noDefaults:true; native focus, tab visibility and media',
   buildSha256:sha256(path.join(extensionDir,'content-scripts/content.js')),
-  cachePolicy:'Microsoft hover disables persistent cache; continuous hover reuses its active request',
+  cachePolicy:'Microsoft hover disables persistent cache; active requests and brief remount grace reuse work',
   cases:[], consoleErrors:[]};
 fs.mkdirSync(artifactsDir,{recursive:true});
 
@@ -126,7 +134,7 @@ async function patchFixtureConfig(setup, patch) {
 }
 
 /** Compare lifecycle cancellation with real input and browser visibility, retaining native geometry. */
-async function runHoverLifecycleCancellation(context, setup, provider, port, result) {
+async function runHoverLifecycleCancellation(context, setup, provider, port, result, browserPid) {
   const delayMs = 1200;
   const value = 'This ordinary paragraph keeps its source and the selected shortcut after a real route or visibility boundary.';
   const profiles = [
@@ -138,7 +146,7 @@ async function runHoverLifecycleCancellation(context, setup, provider, port, res
   ];
   result.lifecycleCancellation = [];
   for (const profile of profiles) {
-    for (const boundary of ['route', 'visibility']) {
+    for (const boundary of lifecycleBoundary === 'all' ? ['route', 'visibility'] : [lifecycleBoundary]) {
       await patchFixtureConfig(setup, {on: true, hotkey: 'Control', mouseHoverTranslationDelay: delayMs,
         quickTranslationProfiles: profile.quickTranslationProfiles});
       const page = await newPageWithoutForeground(context);
@@ -155,11 +163,37 @@ async function runHoverLifecycleCancellation(context, setup, provider, port, res
         document.addEventListener('mousemove', record, {capture: true});
         window.addEventListener('keydown', record, {capture: true});
       }, value);
+      const entry = {profile: profile.id, shortcut: profile.shortcut, boundary, delayMs, phases: []};
+      result.lifecycleCancellation.push(entry);
+      let companion;
+      if (boundary === 'visibility') {
+        entry.nativeTabVisibility = true;
+        companion = await newPageWithoutForeground(context);
+        await companion.goto(`${setup.url()}?lifecycle=${profile.id}`);
+        const companionId = await companion.evaluate(async () => {
+          const tab = await chrome.tabs.getCurrent();
+          if (typeof tab?.id !== 'number') throw new Error('Lifecycle companion unavailable');
+          return tab.id;
+        });
+        entry.windows = await setup.evaluate(async ({targetUrl, companionId}) => {
+          const tabs = await chrome.tabs.query({});
+          const target = tabs.find(tab => tab.url === targetUrl || tab.pendingUrl === targetUrl);
+          if (typeof target?.id !== 'number') throw new Error('Lifecycle target unavailable');
+          const other = await chrome.tabs.get(companionId);
+          await chrome.tabs.move(other.id, {windowId: target.windowId, index: -1});
+          const moved = await chrome.tabs.get(other.id);
+          return {target: target.windowId, targetTabId: target.id, companionTabId: other.id,
+            companionBefore: other.windowId, companionAfter: moved.windowId};
+        }, {targetUrl: page.url(), companionId});
+        assert.equal(entry.windows.companionAfter, entry.windows.target, 'Visibility switch must use two tabs in the same window');
+        const frontmost = await queryMacFrontmostApplication();
+        assert.ok(frontmost && frontmost.pid !== browserPid, 'Moving the temporary companion must preserve OS foreground focus');
+        entry.companionMovePreservedFocus = true;
+      }
       await activateExtensionTabWithoutForeground(context, page);
       await page.waitForFunction(() => document.visibilityState === 'visible');
       await page.waitForTimeout(500);
-      const entry = {profile: profile.id, shortcut: profile.shortcut, boundary, delayMs, phases: []};
-      result.lifecycleCancellation.push(entry);
+      await page.evaluate(() => {window.__hoverLifecycleEvents = [];});
       const point = await sourcePoint(page, 25);
       await page.mouse.move(point.x, point.y);
       const before = provider.requestCount();
@@ -175,8 +209,14 @@ async function runHoverLifecycleCancellation(context, setup, provider, port, res
           entry.urlAfter = page.url();
           assert.notEqual(entry.urlAfter, entry.urlBefore, 'History boundary must actually change the page route');
         } else {
-          await activateExtensionTabWithoutForeground(context, setup);
-          await page.waitForFunction(() => document.visibilityState === 'hidden');
+          await activateExtensionTabWithoutForeground(context, companion);
+          await page.waitForFunction(() => document.visibilityState === 'hidden', undefined, {polling: 50, timeout: 5000});
+          entry.tabSwitch = await setup.evaluate(async ({targetTabId, companionTabId}) => {
+            const target = await chrome.tabs.get(targetTabId), companion = await chrome.tabs.get(companionTabId);
+            return {targetActive: target.active, companionActive: companion.active};
+          }, entry.windows);
+          assert.equal(entry.tabSwitch.targetActive, false);
+          assert.equal(entry.tabSwitch.companionActive, true);
         }
         entry.boundaryDispatchMs = Date.now() - queued;
         assert.ok(entry.boundaryDispatchMs < delayMs, `${profile.id}/${boundary}: boundary must precede the pending deadline`);
@@ -207,21 +247,27 @@ async function runHoverLifecycleCancellation(context, setup, provider, port, res
       await patchFixtureConfig(setup, {mouseHoverTranslationDelay: 0});
       await page.waitForTimeout(100);
       entry.counts = [];
+      entry.settledGestureGapMs = 300;
       for (const count of [1, 0, 1]) {
         const currentPoint = await sourcePoint(page, 25);
         await page.mouse.move(0, 0); await page.mouse.move(currentPoint.x, currentPoint.y, {steps: 4});
         await page.keyboard.press(profile.shortcut);
-        await page.waitForFunction(count => document.querySelectorAll('#target .fluent-read-bilingual-content').length === count,
-          count, {timeout: 15000});
+        await page.waitForFunction(count => {
+          const wrappers = [...document.querySelectorAll('#target .fluent-read-bilingual-content')];
+          return wrappers.length === count && wrappers.every(wrapper => /[\u3400-\u9fff]/u.test(wrapper.textContent));
+        }, count, {timeout: 15000});
         entry.counts.push(await page.locator('#target .fluent-read-bilingual-content').count());
         assert.equal(await page.locator('#target .fluent-read-bilingual-content .fluent-read-bilingual-content').count(), 0);
         assert.equal(await originalSource(page), value);
+        // 已结算 hover 请求保留短暂重挂宽限；明确的新手势在宽限结束后验证再次请求。
+        await page.waitForTimeout(entry.settledGestureGapMs);
       }
       assert.deepEqual(entry.counts, [1, 0, 1]);
       entry.freshGestureRequests = provider.requestCount() - before;
       assert.equal(entry.freshGestureRequests, 2, 'Fresh default and quick gestures each translate once after restore');
       await page.screenshot({path: path.join(artifactsDir, `lifecycle-${profile.id}-${boundary}.png`)});
       entry.originalPreserved = true; entry.staleGestureCancelled = true; entry.freshGesturePreserved = true;
+      await companion?.close();
       await page.close();
     }
   }
@@ -449,7 +495,7 @@ async function runNestedViewport(context, setup, provider, port, worker) {
     });
     provider=await startTranslationFixtureServer([],5);
     launchAttempted = true;
-    launched=await launchFocusSafePersistentContext({chromium,profileDir,
+    launched=await launchFocusSafePersistentContext({chromium:nativeContextChromium,profileDir,
       browserPath:arg('browser-path','/Applications/Microsoft Edge.app/Contents/MacOS/Microsoft Edge'),
       headless:false,background:true,viewport:{width:1280,height:900},
       browserArgs:[`--disable-extensions-except=${extensionDir}`,`--load-extension=${extensionDir}`,'--no-first-run','--no-default-browser-check']});
@@ -605,7 +651,7 @@ async function runNestedViewport(context, setup, provider, port, worker) {
       assert.deepEqual(result.reenabledCounts,[1,0,1]);
       result.reenabledGestureWorks=true;result.originalPreserved=true;
       await page.close();
-      await runHoverLifecycleCancellation(context,setup,provider,server.address().port,result);
+      await runHoverLifecycleCancellation(context,setup,provider,server.address().port,result,await getGuardedBrowserPid(launched));
     }
     if(hoverSweep)await runHoverSweep(context,setup,provider,server.address().port);
     if(nestedViewport)await runNestedViewport(context,setup,provider,server.address().port,worker);

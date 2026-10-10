@@ -1,0 +1,15 @@
+
+> FluentRead-流畅阅读@0.0.37 test:audit /Users/thinkstu/Desktop/copy/FluentRead-section-translation-quality-20261011
+> node scripts/testing/audit-test-suite.mjs
+
+{
+  "status": "ok",
+  "groups": {
+    "architecture": 33,
+    "unit": 369,
+    "functional": 197,
+    "regression": 39
+  },
+  "files": 638,
+  "cases": 10432
+}

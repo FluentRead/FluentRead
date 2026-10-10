@@ -1,0 +1,101 @@
+{
+  "scope": "production extension, trusted CDP pointer/keyboard gestures, deterministic Google transport; not live provider latency or quality",
+  "sourceProjectRoot": "/private/tmp/fluentread-section-baseline-20261011",
+  "caseSet": "quality",
+  "qualityCases": [
+    "performance"
+  ],
+  "cases": [
+    "popup shows the section entry next to the page action",
+    "large selected region yields rendering frames, honors provider concurrency and preserves neighbors"
+  ],
+  "screenshots": [
+    "/private/tmp/fluentread-section-baseline-performance-20261011/00-popup.png",
+    "/private/tmp/fluentread-section-baseline-performance-20261011/quality-05-large-region.png"
+  ],
+  "errors": [],
+  "consoleErrors": [],
+  "errorCoverage": "errors contains uncaught page exceptions; console.error messages are recorded separately, including intentionally failed fixture requests",
+  "profileMode": "automatically-created-temporary-profile",
+  "buildFreshness": {
+    "ok": true,
+    "production": true,
+    "latestSource": {
+      "path": "/private/tmp/fluentread-section-baseline-20261011/src/app/background/areaRuntime.ts",
+      "mtimeMs": 1791652250000
+    },
+    "manifestMtimeMs": 1791654013606.0188
+  },
+  "launchMode": "macos-background-cdp",
+  "focusPolicy": "launchservices-no-foreground",
+  "windowPlacement": {
+    "mode": "background-visible-no-focus",
+    "visible": true,
+    "hidden": false,
+    "centered": true,
+    "windowState": "normal",
+    "bounds": {
+      "left": 212,
+      "top": -990,
+      "width": 1280,
+      "height": 900
+    },
+    "displayTarget": "secondary",
+    "source": "macos-nsscreen",
+    "screenIndex": 1,
+    "browserFrontmost": false,
+    "frontmostBefore": {
+      "pid": 4664,
+      "name": "GoLand"
+    },
+    "frontmostAfter": {
+      "pid": 4664,
+      "name": "GoLand"
+    }
+  },
+  "popupGeometry": {
+    "mainRight": 234,
+    "sectionLeft": 241,
+    "sameTop": true,
+    "sameHeight": true,
+    "overflow": false
+  },
+  "largePreview": {
+    "elapsedMs": 385.80000019073486,
+    "frameCount": 24,
+    "requestsBeforeConfirm": 0
+  },
+  "largeFirstRequest": {
+    "observedAfterConfirmationMs": 1239.2999997138977,
+    "frameCount": 67
+  },
+  "largeFirstProgress": {
+    "elapsedAfterConfirmationMs": 1253.9000000953674,
+    "frameCount": 68
+  },
+  "largeRegion": {
+    "paragraphs": 180,
+    "originalInlineNodes": 2160,
+    "requestCount": 180,
+    "maxProviderConcurrency": 1,
+    "frameCount": 1101,
+    "maxFrameGapMs": 533.3,
+    "maxTimerDelayMs": 540.9000000953674,
+    "timerCount": 1049,
+    "longTasks": [
+      {
+        "startTime": 1925.9000000953674,
+        "duration": 545
+      }
+    ],
+    "elapsedMs": 18856.200000286102,
+    "longTaskTotalMs": 545
+  },
+  "success": true,
+  "focusEvents": {
+    "monitoring": "native macOS activation events throughout the test",
+    "browserActivations": 0,
+    "observerClosed": true
+  },
+  "profileRemoved": true
+}

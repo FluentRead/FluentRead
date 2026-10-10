@@ -1,0 +1,110 @@
+{
+  "scope": "production extension, trusted CDP pointer/keyboard gestures, deterministic Google transport; not live provider latency or quality",
+  "sourceProjectRoot": "/Users/thinkstu/Desktop/copy/FluentRead-section-translation-quality-20261011",
+  "caseSet": "quality",
+  "qualityCases": [
+    "retry",
+    "cancel",
+    "narrow"
+  ],
+  "cases": [
+    "popup shows the section entry next to the page action",
+    "partial transport failure keeps successful paragraphs and region retry only requests failed content",
+    "restoring during delayed section translation cancels undispatched work and ignores late transport results",
+    "light and dark 390px controls stay visible through lock, range adjustments, reselect and Escape"
+  ],
+  "screenshots": [
+    "/private/tmp/fluentread-section-quality-recovery-completed-20261011/00-popup.png",
+    "/private/tmp/fluentread-section-quality-recovery-completed-20261011/quality-04-partial-failure-recovered.png",
+    "/private/tmp/fluentread-section-quality-recovery-completed-20261011/quality-06-narrow-light.png",
+    "/private/tmp/fluentread-section-quality-recovery-completed-20261011/quality-06-narrow-dark.png"
+  ],
+  "errors": [],
+  "consoleErrors": [],
+  "errorCoverage": "errors contains uncaught page exceptions; console.error messages are recorded separately, including intentionally failed fixture requests",
+  "profileMode": "automatically-created-temporary-profile",
+  "focusDiagnostic": "/private/tmp/fluentread-section-quality-recovery-completed-20261011/focus-diagnostic.private.jsonl",
+  "buildFreshness": {
+    "ok": true,
+    "production": true,
+    "latestSource": {
+      "path": "/Users/thinkstu/Desktop/copy/FluentRead-section-translation-quality-20261011/src/features/full-page-translation/content/sectionTranslation.ts",
+      "mtimeMs": 1791655015945.0693
+    },
+    "manifestMtimeMs": 1791655139903.7478
+  },
+  "launchMode": "macos-background-cdp",
+  "focusPolicy": "launchservices-no-foreground",
+  "windowPlacement": {
+    "mode": "background-visible-no-focus",
+    "visible": true,
+    "hidden": false,
+    "centered": true,
+    "windowState": "normal",
+    "bounds": {
+      "left": 212,
+      "top": -990,
+      "width": 1280,
+      "height": 900
+    },
+    "displayTarget": "secondary",
+    "source": "macos-nsscreen",
+    "screenIndex": 1,
+    "browserFrontmost": false,
+    "frontmostBefore": {
+      "pid": 73685,
+      "name": "ChatGPT"
+    },
+    "frontmostAfter": {
+      "pid": 73685,
+      "name": "ChatGPT"
+    }
+  },
+  "popupGeometry": {
+    "mainRight": 234,
+    "sectionLeft": 241,
+    "sameTop": true,
+    "sameHeight": true,
+    "overflow": false
+  },
+  "partialFailure": {
+    "failureMode": "controlled per-request HTTP 400",
+    "nativeGoogleBatching": false,
+    "configuredConcurrency": 1,
+    "initialRequestCount": 5,
+    "retryRequestCount": 1,
+    "successfulParagraphPreserved": true
+  },
+  "cancellation": {
+    "paragraphs": 36,
+    "dispatchedRequests": 2,
+    "lateResultsIgnored": true
+  },
+  "narrowThemes": [
+    {
+      "theme": "light",
+      "viewport": {
+        "width": 390,
+        "height": 780
+      },
+      "controlsInsideViewport": true,
+      "cancelledWithoutRequest": true
+    },
+    {
+      "theme": "dark",
+      "viewport": {
+        "width": 390,
+        "height": 780
+      },
+      "controlsInsideViewport": true,
+      "cancelledWithoutRequest": true
+    }
+  ],
+  "success": true,
+  "focusEvents": {
+    "monitoring": "native macOS activation events throughout the test",
+    "browserActivations": 0,
+    "observerClosed": true
+  },
+  "profileRemoved": true
+}

@@ -70,6 +70,19 @@ describe('局部翻译区域判定', () => {
         expect(resolveSectionElement(byId('para'), geometry)).toBe(byId('para'));
     });
 
+    it('表单命名控件遮蔽 tagName 时仍能预览、描述和扩大选区', () => {
+        const {document, byId, geometry} = setup();
+        const form = document.createElement('form');
+        form.innerHTML = '<input name="tagName"><p>Readable source in a form</p>';
+        byId('readme').appendChild(form);
+        Object.defineProperty(form, 'tagName', {value: form.querySelector('input')});
+        expect(resolveSectionElement(form, geometry)).toBe(form);
+        expect(describeSectionScope(form)).toBe('sectionTranslation.scope.region');
+        expect(describeSectionElement(form)).toBe('form');
+        expect(sectionSourcePreview(form)).toBe('Readable source in a form');
+        expect(expandSectionElement(form, geometry)).toBe(byId('readme'));
+    });
+
     it('命中译文、图片和图标时回到它们所在的内容块', () => {
         const {byId, geometry} = setup();
         expect(resolveSectionElement(byId('translation'), geometry)).toBe(byId('translated'));
@@ -219,6 +232,42 @@ describe('局部翻译范围与原文预览', () => {
         expect(sectionSourcePreview(document.getElementById('source')!)).toBe('Hello world this page');
         expect(sectionSourcePreview(document.querySelector('.fluent-read-bilingual-content')!)).toBe('');
         expect(sectionSourcePreview(document.querySelector('script')!)).toBe('');
+    });
+
+    it('锁定网页组件宿主或祖先时预览开放 Shadow DOM 原文，排除扩展界面及译文', () => {
+        const {document} = setup();
+        const region = document.createElement('section');
+        const host = document.createElement('div');
+        const root = host.attachShadow({mode: 'open'});
+        root.innerHTML = '<style>shadow styles</style><p>Source inside shadow <span class="fluent-read-bilingual-content">译文</span></p>';
+        const nestedHost = document.createElement('div');
+        nestedHost.attachShadow({mode: 'open'}).innerHTML = '<p>Nested component source</p>';
+        root.appendChild(nestedHost);
+        const extension = document.createElement('div');
+        extension.id = 'fluent-read-owned-card';
+        extension.attachShadow({mode: 'open'}).innerHTML = '<p>Extension words must be skipped</p>';
+        region.append(host, extension);
+        expect(sectionSourcePreview(host)).toBe('Source inside shadow Nested component source');
+        expect(sectionSourcePreview(region)).toBe('Source inside shadow Nested component source');
+        expect(sectionSourcePreview(extension)).toBe('');
+        const closed = document.createElement('div');
+        closed.attachShadow({mode: 'closed'}).innerHTML = '<p>Inaccessible source</p>';
+        expect(sectionSourcePreview(closed)).toBe('');
+    });
+
+    it('影子根与 light DOM 共用 160 节点预算，不为预览继续访问深处的组件', () => {
+        const {document} = setup();
+        const region = document.createElement('section');
+        const host = document.createElement('div');
+        const root = host.attachShadow({mode: 'open'});
+        for (let index = 0; index < 157; index++) root.appendChild(document.createElement('span'));
+        const lateText = document.createTextNode('Beyond the composed node budget');
+        const read = vi.fn(() => {throw new Error('preview passed composed node budget');});
+        Object.defineProperty(lateText, 'textContent', {get: read});
+        root.appendChild(lateText);
+        region.appendChild(host);
+        expect(sectionSourcePreview(region)).toBe('');
+        expect(read).not.toHaveBeenCalled();
     });
 
     it('88 字边界保留完整原文，超长文本截断含省略号，后续节点不再读取', () => {

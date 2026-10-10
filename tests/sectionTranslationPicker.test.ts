@@ -28,6 +28,7 @@ interface PickerHarness {
     windowListeners: Listener[];
     mutationObserver: {observe: ReturnType<typeof vi.fn>; disconnect: ReturnType<typeof vi.fn>};
     emitMutation(target: Node, addedNodes?: Node[]): void;
+    emitAttribute(target: Element): void;
     resizeObserver: {observe: ReturnType<typeof vi.fn>; disconnect: ReturnType<typeof vi.fn>};
     emitResize(): void;
 }
@@ -194,6 +195,7 @@ async function createHarness(options: {withAnimationFrame?: boolean; withObserve
         windowListeners,
         mutationObserver,
         emitMutation: (target, addedNodes = []) => mutationCallback([{type: target.nodeType === 3 ? 'characterData' : 'childList', target, addedNodes} as unknown as MutationRecord], mutationObserver as unknown as MutationObserver),
+        emitAttribute: target => mutationCallback([{type: 'attributes', target, addedNodes: []} as unknown as MutationRecord], mutationObserver as unknown as MutationObserver),
         resizeObserver,
         emitResize: () => resizeCallback([], resizeObserver as unknown as ResizeObserver),
     };
@@ -513,7 +515,7 @@ describe('局部翻译选择模式', () => {
             harness.emit('click', {clientX: 10, clientY: useAncestor ? 270 : 290});
             vi.advanceTimersByTime(90);
             expect(button(harness, 'confirm').disabled).toBe(true);
-            expect(harness.mutationObserver.observe).toHaveBeenCalledWith(root, {childList: true, characterData: true, subtree: true});
+            expect(harness.mutationObserver.observe).toHaveBeenCalledWith(root, expect.objectContaining({childList: true, characterData: true, subtree: true, attributes: true}));
             // innerHTML 替换的 childList target 是 ShadowRoot 本身，不能依赖 parentElement。
             root.innerHTML = '<p>Shadow content became translatable</p>';
             harness.emitMutation(root);
@@ -1018,7 +1020,7 @@ describe('局部翻译选择模式', () => {
         const para = harness.byId('para');
         harness.picker.startSectionPicker(harness.options as never);
         harness.flushFrames();
-        expect(harness.mutationObserver.observe).toHaveBeenCalledWith(harness.document.documentElement, {childList: true, characterData: true, subtree: true});
+        expect(harness.mutationObserver.observe).toHaveBeenCalledWith(harness.document.documentElement, expect.objectContaining({childList: true, characterData: true, subtree: true, attributes: true}));
         expect(harness.resizeObserver.observe).toHaveBeenCalledWith(para);
         harness.emit('click', {clientX: 50, clientY: 70});
         vi.advanceTimersByTime(90);
@@ -1067,6 +1069,168 @@ describe('局部翻译选择模式', () => {
         vi.advanceTimersByTime(200);
         expect(harness.inspect).toHaveBeenCalledOnce();
         expect(harness.host()).toBeNull();
+    });
+
+    it.each(['mutation', 'resize'])('未锁定时 %s 改变指针下内容便即时换选，不把新布局下的旧框交给 Enter', async mode => {
+        const harness = await createHarness();
+        harness.picker.startSectionPicker(harness.options as never);
+        harness.flushFrames();
+        harness.hit.current = harness.byId('second');
+        harness.byId('para').getBoundingClientRect = () => rect(30, 200, 400, 40) as DOMRect;
+        harness.byId('second').getBoundingClientRect = () => rect(30, 60, 400, 40) as DOMRect;
+        if (mode === 'mutation') harness.emitMutation(harness.document.body);
+        else harness.emitResize();
+        harness.flushFrames();
+        expect(query(harness.shadow(), '.fr-section-box').style.transform).toBe('translate(27px, 57px)');
+        expect(query(harness.shadow(), '.fr-section-bar-preview').textContent).toBe('Second paragraph');
+        expect(query(harness.shadow(), '.fr-section-box').classList.contains('is-following')).toBe(false);
+        harness.emit('keydown', {key: 'Enter'});
+        expect(harness.onPick).toHaveBeenCalledWith(harness.byId('second'));
+    });
+
+    it('ResizeObserver 的初始或重复通知不提前结束 hover 稳定窗', async () => {
+        const harness = await createHarness();
+        harness.picker.startSectionPicker(harness.options as never);
+        harness.flushFrames();
+        harness.hit.current = harness.byId('second');
+        harness.emit('pointermove', {clientX: 60, clientY: 130});
+        harness.flushFrames();
+        harness.emitResize();
+        harness.flushFrames();
+        vi.advanceTimersByTime(79);
+        expect(query(harness.shadow(), '.fr-section-box').style.transform).toBe('translate(27px, 57px)');
+        vi.advanceTimersByTime(1);
+        harness.flushFrames();
+        expect(query(harness.shadow(), '.fr-section-box').style.transform).toBe('translate(27px, 117px)');
+        harness.picker.stopSectionPicker();
+    });
+
+    it('指针在空白处保持静止时，网页插入新的内容仍会显示可选预览', async () => {
+        const harness = await createHarness({initialPoint: {x: 50, y: 70}});
+        harness.hit.current = harness.document.body;
+        harness.picker.startSectionPicker(harness.options as never);
+        harness.flushFrames();
+        expect(query(harness.shadow(), '.fr-section-box').classList.contains('is-visible')).toBe(false);
+        harness.hit.current = harness.byId('para');
+        harness.emitMutation(harness.document.body, [harness.byId('para')]);
+        harness.flushFrames();
+        expect(query(harness.shadow(), '.fr-section-box').classList.contains('is-visible')).toBe(true);
+        expect(query(harness.shadow(), '.fr-section-bar-preview').textContent).toBe('Hello world');
+        harness.picker.stopSectionPicker();
+    });
+
+    it('观察可改变布局和原文保护的属性，祖先变化刷新锁定摘要，自有浮层样式不形成重绘循环', async () => {
+        const harness = await createHarness();
+        harness.picker.startSectionPicker(harness.options as never);
+        harness.flushFrames();
+        expect(harness.mutationObserver.observe).toHaveBeenCalledWith(harness.document.documentElement,
+            expect.objectContaining({attributes: true, attributeFilter: expect.arrayContaining(['class', 'style', 'hidden', 'translate', 'contenteditable'])}));
+        harness.emit('click', {clientX: 50, clientY: 70});
+        vi.advanceTimersByTime(90);
+        harness.flushFrames();
+        harness.inspect.mockClear();
+        harness.byId('readme').setAttribute('translate', 'no');
+        harness.inspect.mockReturnValue(summary({action: 'empty', pending: 0}));
+        harness.emitAttribute(harness.byId('readme'));
+        vi.advanceTimersByTime(90);
+        harness.flushFrames();
+        expect(harness.inspect).toHaveBeenCalledOnce();
+        expect(button(harness, 'confirm').disabled).toBe(true);
+        harness.emitAttribute(harness.byId('second'));
+        harness.flushFrames();
+        vi.advanceTimersByTime(90);
+        // 范围外 class/style 也可能改变布局，但无需重复盘点锁定正文。
+        expect(harness.inspect).toHaveBeenCalledOnce();
+        harness.emitAttribute(harness.host()!);
+        expect(harness.frames).toHaveLength(0);
+        vi.advanceTimersByTime(90);
+        expect(harness.inspect).toHaveBeenCalledOnce();
+        harness.picker.stopSectionPicker();
+    });
+
+    it('锁定与标签盘点复用原文预览，只有正文变化或确认复核时重新读取', async () => {
+        const harness = await createHarness();
+        const source = harness.byId('para').firstChild!;
+        const originalText = source.textContent;
+        const reads = vi.fn(() => originalText);
+        Object.defineProperty(source, 'textContent', {get: reads});
+        harness.picker.startSectionPicker(harness.options as never);
+        harness.flushFrames();
+        expect(reads).toHaveBeenCalledOnce();
+        harness.emit('click', {clientX: 50, clientY: 70});
+        vi.advanceTimersByTime(90);
+        harness.flushFrames();
+        expect(reads).toHaveBeenCalledOnce();
+        harness.emitMutation(source);
+        expect(reads).toHaveBeenCalledTimes(2);
+        vi.advanceTimersByTime(90);
+        expect(reads).toHaveBeenCalledTimes(2);
+        clickButton(harness, 'confirm');
+        expect(reads).toHaveBeenCalledTimes(3);
+        expect(harness.onPick).toHaveBeenCalledWith(harness.byId('para'));
+    });
+
+    it.each([['attribute', 0, 0], ['resize', 400, 0]] as const)('锁定目标被隐藏时 %s 更新解除锁定并清理空框，不能确认不可见区域', async (mode, width, height) => {
+        const harness = await createHarness();
+        harness.picker.startSectionPicker(harness.options as never);
+        harness.flushFrames();
+        harness.emit('click', {clientX: 50, clientY: 70});
+        vi.advanceTimersByTime(90);
+        harness.flushFrames();
+        expect(button(harness, 'confirm').disabled).toBe(false);
+        harness.byId('para').setAttribute('hidden', '');
+        harness.byId('para').getBoundingClientRect = () => rect(0, 0, width, height) as DOMRect;
+        harness.hit.current = harness.document.body;
+        if (mode === 'attribute') harness.emitAttribute(harness.byId('para'));
+        else harness.emitResize();
+        harness.flushFrames();
+        expect(harness.host()!.getAttribute('data-selection-state')).toBe('preview');
+        expect(button(harness, 'confirm').disabled).toBe(true);
+        expect(query(harness.shadow(), '.fr-section-box').classList.contains('is-visible')).toBe(false);
+        harness.emit('keydown', {key: 'Enter'});
+        expect(harness.onPick).not.toHaveBeenCalled();
+        harness.picker.stopSectionPicker();
+    });
+
+    it('隐藏之后尚未收到观察回调时确认仍同步拒绝，不沿用可翻译摘要', async () => {
+        const harness = await createHarness();
+        harness.picker.startSectionPicker(harness.options as never);
+        harness.flushFrames();
+        harness.emit('click', {clientX: 50, clientY: 70});
+        vi.advanceTimersByTime(90);
+        harness.byId('para').getBoundingClientRect = () => rect(0, 0, 0, 0) as DOMRect;
+        clickButton(harness, 'confirm');
+        expect(harness.onPick).not.toHaveBeenCalled();
+        expect(harness.host()!.getAttribute('data-selection-state')).toBe('preview');
+        expect(button(harness, 'confirm').disabled).toBe(true);
+        harness.picker.stopSectionPicker();
+    });
+
+    it.each([['hidden', 'attribute'], ['collapse', 'confirm']] as const)('visibility:%s 保留非零盒子时 %s 仍拒绝隐藏正文及其继承状态', async (visibility, mode) => {
+        const harness = await createHarness();
+        const originalStyle = harness.view.getComputedStyle as (element: Element) => Record<string, unknown>;
+        harness.view.getComputedStyle = (element: Element) => ({
+            ...originalStyle(element),
+            visibility: harness.byId('readme').style.visibility || 'visible',
+        });
+        harness.picker.startSectionPicker(harness.options as never);
+        harness.flushFrames();
+        harness.emit('click', {clientX: 50, clientY: 70});
+        vi.advanceTimersByTime(90);
+        harness.flushFrames();
+        expect(button(harness, 'confirm').disabled).toBe(false);
+        harness.byId('readme').style.visibility = visibility;
+        // 两类 CSS 都保留原几何；属性来自祖先，目标自身没有 hidden 标记。
+        expect(harness.byId('para').getBoundingClientRect().width).toBe(400);
+        harness.hit.current = harness.document.body;
+        if (mode === 'attribute') {
+            harness.emitAttribute(harness.byId('readme'));
+            harness.flushFrames();
+        } else clickButton(harness, 'confirm');
+        expect(harness.host()!.getAttribute('data-selection-state')).toBe('preview');
+        expect(button(harness, 'confirm').disabled).toBe(true);
+        expect(harness.onPick).not.toHaveBeenCalled();
+        harness.picker.stopSectionPicker();
     });
 
     it('观察器发现锁定节点被替换时立即解锁并禁用确认，重绘后只能选择新的连接节点', async () => {
@@ -1149,7 +1313,7 @@ describe('局部翻译选择模式', () => {
         harness.emit('click', {clientX: 120, clientY: 320});
         vi.advanceTimersByTime(90);
         expect(button(harness, 'confirm').disabled).toBe(true);
-        expect(harness.mutationObserver.observe).toHaveBeenCalledWith(root, {childList: true, characterData: true, subtree: true});
+        expect(harness.mutationObserver.observe).toHaveBeenCalledWith(root, expect.objectContaining({childList: true, characterData: true, subtree: true, attributes: true}));
         expect(harness.resizeObserver.observe).toHaveBeenLastCalledWith(inner);
         inner.textContent = 'New English source inside shadow DOM';
         harness.emitMutation(inner);
@@ -1164,7 +1328,7 @@ describe('局部翻译选择模式', () => {
         clickButton(harness, 'reselect');
         expect(harness.mutationObserver.disconnect).toHaveBeenCalledOnce();
         expect(harness.resizeObserver.disconnect).toHaveBeenCalledOnce();
-        expect(harness.mutationObserver.observe).toHaveBeenLastCalledWith(harness.document.documentElement, {childList: true, characterData: true, subtree: true});
+        expect(harness.mutationObserver.observe).toHaveBeenLastCalledWith(harness.document.documentElement, expect.objectContaining({childList: true, characterData: true, subtree: true, attributes: true}));
         harness.picker.stopSectionPicker();
         expect(harness.mutationObserver.disconnect).toHaveBeenCalledTimes(2);
         expect(harness.resizeObserver.disconnect).toHaveBeenCalledTimes(2);

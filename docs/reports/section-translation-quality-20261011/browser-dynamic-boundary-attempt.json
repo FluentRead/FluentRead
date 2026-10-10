@@ -1,0 +1,102 @@
+{
+  "scope": "production extension, trusted CDP pointer/keyboard gestures, deterministic Google transport; not live provider latency or quality",
+  "sourceProjectRoot": "/Users/thinkstu/Desktop/copy/FluentRead-section-translation-quality-20261011",
+  "caseSet": "quality",
+  "qualityCases": [
+    "nested-scroll",
+    "replacement",
+    "boundary",
+    "shadow",
+    "retry",
+    "cancel",
+    "narrow"
+  ],
+  "cases": [
+    "popup shows the section entry next to the page action",
+    "nested scrolling re-hits an unlocked preview and keeps a locked paragraph attached",
+    "removing a locked source cannot translate detached content and permits selecting its replacement",
+    "connected pending paragraphs moved outside the selected region never reach the provider in light or Shadow DOM",
+    "open Shadow DOM previews only original text and restores then translates without duplicate wrappers"
+  ],
+  "screenshots": [
+    "/private/tmp/fluentread-section-quality-remaining-20261011/00-popup.png",
+    "/private/tmp/fluentread-section-quality-remaining-20261011/quality-02-nested-scroll-selected.png",
+    "/private/tmp/fluentread-section-quality-remaining-20261011/quality-03-pending-boundary.png",
+    "/private/tmp/fluentread-section-quality-remaining-20261011/quality-03-shadow-original-preview.png",
+    "/private/tmp/fluentread-section-quality-remaining-20261011/failure.png"
+  ],
+  "errors": [],
+  "consoleErrors": [],
+  "errorCoverage": "errors contains uncaught page exceptions; console.error messages are recorded separately, including intentionally failed fixture requests",
+  "profileMode": "automatically-created-temporary-profile",
+  "buildFreshness": {
+    "ok": true,
+    "production": true,
+    "latestSource": {
+      "path": "/Users/thinkstu/Desktop/copy/FluentRead-section-translation-quality-20261011/src/features/full-page-translation/content/sectionTranslation.ts",
+      "mtimeMs": 1791655015945.0693
+    },
+    "manifestMtimeMs": 1791655139903.7478
+  },
+  "launchMode": "macos-background-cdp",
+  "focusPolicy": "launchservices-no-foreground",
+  "windowPlacement": {
+    "mode": "background-visible-no-focus",
+    "visible": true,
+    "hidden": false,
+    "centered": true,
+    "windowState": "normal",
+    "bounds": {
+      "left": 212,
+      "top": -990,
+      "width": 1280,
+      "height": 900
+    },
+    "displayTarget": "secondary",
+    "source": "macos-nsscreen",
+    "screenIndex": 1,
+    "browserFrontmost": false,
+    "frontmostBefore": {
+      "pid": 44386,
+      "name": "Google Chrome"
+    },
+    "frontmostAfter": {
+      "pid": 44386,
+      "name": "Google Chrome"
+    }
+  },
+  "popupGeometry": {
+    "mainRight": 234,
+    "sectionLeft": 241,
+    "sameTop": true,
+    "sameHeight": true,
+    "overflow": false
+  },
+  "pendingBoundary": [
+    {
+      "structure": "light",
+      "movedSourceStayedConnected": true,
+      "movedSourceRequested": false,
+      "selectedParagraphsTranslated": 2,
+      "dispatchedRequests": 2
+    },
+    {
+      "structure": "shadow",
+      "movedSourceStayedConnected": true,
+      "movedSourceRequested": false,
+      "selectedParagraphsTranslated": 2,
+      "dispatchedRequests": 2
+    }
+  ],
+  "success": false,
+  "failure": {
+    "case": "partial transport failure keeps successful paragraphs and region retry only requests failed content",
+    "message": "Error: partial transport failure keeps successful paragraphs and region retry only requests failed content: 等待超时\n    at wait (/Users/thinkstu/Desktop/copy/FluentRead-section-translation-quality-20261011/scripts/testing/run-section-translation-flow-test.cjs:99:9)\n    at async Object.runSectionQualityCases (/Users/thinkstu/Desktop/copy/FluentRead-section-translation-quality-20261011/scripts/testing/section-translation-quality-cases.cjs:300:3)\n    at async /Users/thinkstu/Desktop/copy/FluentRead-section-translation-quality-20261011/scripts/testing/run-section-translation-flow-test.cjs:555:5"
+  },
+  "focusEvents": {
+    "monitoring": "native macOS activation events throughout the test",
+    "browserActivations": 0,
+    "observerClosed": true
+  },
+  "profileRemoved": true
+}

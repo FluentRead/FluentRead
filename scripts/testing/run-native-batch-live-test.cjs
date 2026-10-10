@@ -11,7 +11,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const os = require('node:os');
 const http = require('node:http');
-const {randomUUID} = require('node:crypto');
+const {createHash, randomUUID} = require('node:crypto');
 
 function argument(name, fallback) {
   const index = process.argv.indexOf(`--${name}`);
@@ -58,6 +58,7 @@ const report = {
   evidenceLimits: ['Synthetic cloud fixtures do not prove real cloud API acceptance.', 'Small live samples do not prove complete translation quality or all sites/devices.'],
 };
 let launched, optionsPage, articlePage, worker, profileDir, launchAttempted = false, server;
+let liveSample;
 
 async function send(message) {
   return optionsPage.evaluate(message => chrome.runtime.sendMessage(message), message);
@@ -97,10 +98,11 @@ async function shot(page, name) {
   report.screenshots.push(file);
 }
 
-function verifyLiveCorrespondence(translations, repeatMustMatch) {
-  assert.ok(Array.isArray(translations) && translations.length === sourceTexts.length, 'live 译文数量不匹配');
+function verifyLiveCorrespondence(translations, repeatMustMatch, origins = sourceTexts) {
+  assert.ok(Array.isArray(translations) && translations.length === origins.length, 'live 译文数量不匹配');
   translations.forEach((translation, index) => {
-    const sample = samples[index % samples.length];
+    const sample = samples.find(sample => sample.source === origins[index]);
+    assert.ok(sample, '未知对照源槽');
     assert.equal(typeof translation, 'string');
     assert.match(translation, /[\u3400-\u9fff]/u, '样本未返回中文译文');
     for (const number of sample.numbers) assert.ok(translation.includes(number), `源槽 ${index} 的数字 ${number} 缺失或错位`);
@@ -114,15 +116,24 @@ function verifyLiveCorrespondence(translations, repeatMustMatch) {
   assert.match(translations[3], /书/u, '多行源槽没有保留图书主题');
   assert.match(translations[3], /植物|株|花草/u, '多行源槽没有保留园丁主题');
   assert.equal(translations[3].split('\n').length, 2, '多行源槽的换行没有保留');
-  assert.ok(translations[4].includes('<b>66</b>') && translations[4].includes('&lt;'), 'HTML 字面文本被当作标签或实体解释');
+  const literalIndex = origins.indexOf(samples[4].source);
+  if (literalIndex >= 0) assertLiteralPreserved(translations[literalIndex]);
+}
+
+function assertLiteralPreserved(translation) {
+  assert.equal(typeof translation, 'string');
+  assert.ok(translation.includes('<b>66</b>') && translation.includes('&lt;'), 'HTML 字面文本被当作标签或实体解释');
 }
 
 async function runLive(service) {
+  liveSample = {service, batchTranslations: [], individualTranslations: []};
+  // 微软当前会改写实体字面值：普通批量对照与下方明确拒收验证分别记录。
+  const origins = service === 'microsoft' ? sourceTexts.filter((_, index) => index !== 4) : sourceTexts;
   await clearCache();
   await fixtureMode(service);
   const started = Date.now();
-  const batchTranslations = await translate(service, sourceTexts);
-  verifyLiveCorrespondence(batchTranslations, true);
+  const batchTranslations = await translate(service, origins);
+  liveSample.batchTranslations = batchTranslations;
   const batchCalls = await calls();
   const batchMs = Date.now() - started;
   assert.ok(batchCalls.some(call => call.inputs.length > 1), `${service}没有发出真实数组请求`);
@@ -130,13 +141,40 @@ async function runLive(service) {
   const individualStarted = Date.now();
   const individualTranslations = [];
   // 顺序请求，防止 Google 的 10ms transport 窗口把“逐条对照”再次合成一批。
-  for (const source of sourceTexts) individualTranslations.push(await translate(service, source));
-  verifyLiveCorrespondence(individualTranslations, false);
+  for (const source of origins) individualTranslations.push(await translate(service, source));
+  liveSample.individualTranslations = individualTranslations;
+  verifyLiveCorrespondence(batchTranslations, true, origins);
+  verifyLiveCorrespondence(individualTranslations, false, origins);
   const individualCalls = await calls();
   assert.ok(batchCalls.length < individualCalls.length, `${service}小样本未减少 HTTP 请求`);
   report.cases.push({name: `${service}:bounded-live-batch-vs-scalar`, evidence: 'live-provider', ok: true,
-    sourceCount: sourceTexts.length, batchRequests: batchCalls, individualRequests: individualCalls,
+    sourceCount: origins.length, batchRequests: batchCalls, individualRequests: individualCalls,
     batchMs, individualMs: Date.now() - individualStarted, batchTranslations, individualTranslations});
+}
+
+async function runMicrosoftLiteralSafety() {
+  await clearCache();
+  await fixtureMode('microsoft');
+  const origins = [samples[0].source, samples[4].source];
+  const outcomes = [];
+  for (const [mode, source] of [['batch', origins], ['scalar', origins[1]]]) {
+    if (mode === 'scalar') await clearCache();
+    try {
+      const result = await translate('microsoft', source, true);
+      assertLiteralPreserved(mode === 'batch' ? result[1] : result);
+      outcomes.push({mode, outcome: 'literal-preserved', translations: result});
+    } catch (error) {
+      assert.equal(error.kind, 'response', '实体测试不能把网络或鉴权失败计为安全拒收');
+      assert.equal(error.code, 'NATIVE_BATCH_RESPONSE_INVALID', '损坏的实体未被协议层明确拒收');
+      outcomes.push({mode, outcome: 'invalid-literal-rejected', error: {kind: error.kind, code: error.code}});
+      assert.equal((await cacheStats()).entries, 0, '损坏实体或前面的成功槽不得写入部分缓存');
+    }
+  }
+  const requests = await calls();
+  assert.ok(requests.some(call => call.inputs.length === 2), '未执行实体数组对照');
+  assert.ok(requests.some(call => call.inputs.length === 1), '未执行实体单槽对照');
+  report.cases.push({name: 'microsoft:literal-entity-preservation-or-safe-rejection', evidence: 'live-provider', ok: true,
+    outcomes, requests, limitation: 'Safe rejection preserves the original text; it does not repair upstream semantic corruption.'});
 }
 
 async function runSynthetic(service) {
@@ -227,27 +265,31 @@ async function runFullPage(context) {
     launched = await launchFocusSafePersistentContext({chromium, profileDir,
       browserPath: argument('browser-path', '/Applications/Microsoft Edge.app/Contents/MacOS/Microsoft Edge'),
       background: true, headless: false, viewport: {width: 1280, height: 900}, timeout,
-      browserArgs: ['--enable-unsafe-extension-debugging', '--no-first-run', '--no-default-browser-check']});
+      browserArgs: [`--disable-extensions-except=${extensionDir}`, `--load-extension=${extensionDir}`, '--enable-unsafe-extension-debugging', '--no-first-run', '--no-default-browser-check']});
     Object.assign(report, {launchMode: launched.launchMode, focusPolicy: launched.focusPolicy, windowPlacement: launched.windowPlacement});
     assert.equal(report.launchMode, 'macos-background-cdp');
     assert.equal(report.focusPolicy, 'launchservices-no-foreground');
     assert.equal(report.windowPlacement.mode, 'background-visible-no-focus');
     assert.equal(report.windowPlacement.browserFrontmost, false);
     const context = launched.context;
-    const install = await context.browser().newBrowserCDPSession();
-    try {
-      report.extensionInstall = {method: 'cdp-load-unpacked', id: (await install.send('Extensions.loadUnpacked', {path: extensionDir})).id};
-    } finally {await install.detach();}
-    worker = context.serviceWorkers().find(candidate => candidate.url().startsWith('chrome-extension://'))
-      || await context.waitForEvent('serviceworker', {timeout});
-    const extensionOrigin = `chrome-extension://${new URL(worker.url()).host}`;
+    report.extensionInstall = {method: 'isolated-cli-load-unpacked'};
+    report.browserVersion = context.browser().version();
+    assert.equal(typeof manifest.key, 'string', '生产 manifest 必须包含可计算扩展身份的公钥');
+    const extensionId = createHash('sha256').update(Buffer.from(manifest.key, 'base64')).digest('hex')
+      .slice(0, 32).replace(/[0-9a-f]/gu, digit => String.fromCharCode(97 + parseInt(digit, 16)));
+    const extensionOrigin = `chrome-extension://${extensionId}`;
+    // Worker 可能在后台窗口定位期间休眠；先打开固定身份的 options 页唤醒消息链路。
     optionsPage = await newPageWithoutForeground(context, timeout);
     optionsPage.on('pageerror', error => report.pageErrors.push(error.message));
     await optionsPage.goto(`${extensionOrigin}/${manifest.options_page || manifest.options_ui.page}#settings-services`, {waitUntil: 'domcontentloaded'});
     await optionsPage.locator('.service-catalog').waitFor({timeout});
+    worker = context.serviceWorkers().find(candidate => candidate.url().startsWith('chrome-extension://'))
+      || await context.waitForEvent('serviceworker', {timeout});
+    assert.equal(new URL(worker.url()).host, extensionId);
     await patchStoredConfig(optionsPage, {on: true, from: 'en', to: 'zh-Hans', service: 'google', useCache: true,
       token: {deepL: '00000000-0000-4000-8000-000000000000:fx', googleCloudTranslation: 'fixture-native-gcp-key', azureTranslator: 'fixture-native-azure-key'},
-      apiKeys: {}, apiKeyRotationEnabled: {}, proxy: {}, deeplApiPlan: 'free', serviceRegion: {azureTranslator: 'global'},
+      apiKeys: {deepL: ['00000000-0000-4000-8000-000000000000:fx'], googleCloudTranslation: ['fixture-native-gcp-key'], azureTranslator: ['fixture-native-azure-key']},
+      apiKeyRotationEnabled: {}, proxy: {}, deeplApiPlan: 'free', serviceRegion: {azureTranslator: 'global'},
       translationMaxRetries: 0, maxConcurrentTranslations: 8, translationRequestsPerSecond: 0, translationRequestsPerMinute: 0,
       enableAIMultiSegment: false, enableAIContext: false, autoTranslate: false, glossaryEnabled: false,
       uiLanguage: 'zh-CN', uiLanguageSetupCompleted: true, disableSelectionTranslator: true, disableFloatingBall: true, display: 1});
@@ -294,7 +336,14 @@ async function runFullPage(context) {
       try { await runLive(service); }
       catch (error) {
         report.cases.push({name: `${service}:bounded-live-batch-vs-scalar`, evidence: 'live-provider', ok: false,
-          limitation: 'Live service/response or sample assertion failed; synthetic results are separate.', error: {message: error.message, kind: error.kind, code: error.code, statusCode: error.statusCode}, requests: await calls()});
+          limitation: 'Live service/response or sample assertion failed; synthetic results are separate.', error: {message: error.message, kind: error.kind, code: error.code, statusCode: error.statusCode}, samples: liveSample, requests: await calls()});
+      }
+    }
+    if (live) {
+      try { await runMicrosoftLiteralSafety(); }
+      catch (error) {
+        report.cases.push({name: 'microsoft:literal-entity-preservation-or-safe-rejection', evidence: 'live-provider', ok: false,
+          error: {message: error.message, kind: error.kind, code: error.code}, requests: await calls()});
       }
     }
     await shot(optionsPage, 'native-batch-options-production');

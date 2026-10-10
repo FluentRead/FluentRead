@@ -138,13 +138,12 @@ function getArrayItem(value: unknown, index: number): unknown {
 }
 
 function joinTranslationSegments(value: unknown): string | null {
-    if (!Array.isArray(value)) {
+    if (!Array.isArray(value) || Array.from(value).some(segment =>
+        !Array.isArray(segment) || typeof segment[0] !== 'string')) {
         return null;
     }
 
-    const translatedText = value
-        .map(segment => Array.isArray(segment) && typeof segment[0] === 'string' ? segment[0] : '')
-        .join('');
+    const translatedText = value.map(segment => segment[0]).join('');
     return translatedText.length > 0 ? translatedText : null;
 }
 

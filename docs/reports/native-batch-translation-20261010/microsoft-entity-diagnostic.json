@@ -1,0 +1,131 @@
+{
+  "source": "Use the literal text <b>66</b> & &lt; in the manual.",
+  "provider": "public-edge-microsoft-translatetext",
+  "credentials": "none",
+  "evidence": "live-public-endpoint-raw-http",
+  "requestCount": 3,
+  "cases": [
+    {
+      "name": "encoding-comparison-explicit-en",
+      "from": "en",
+      "query": {},
+      "status": 200,
+      "inputs": [
+        {
+          "name": "current-named-escape",
+          "payload": "Use the literal text &lt;b&gt;66&lt;/b&gt; &amp; &amp;lt; in the manual."
+        },
+        {
+          "name": "numeric-ampersand-named-tags",
+          "payload": "Use the literal text &lt;b&gt;66&lt;/b&gt; &#38; &#38;lt; in the manual."
+        },
+        {
+          "name": "numeric-all-special-characters",
+          "payload": "Use the literal text &#60;b&#62;66&#60;/b&#62; &#38; &#38;lt; in the manual."
+        },
+        {
+          "name": "double-named-escape",
+          "payload": "Use the literal text &amp;lt;b&amp;gt;66&amp;lt;/b&amp;gt; &amp;amp; &amp;amp;lt; in the manual."
+        }
+      ],
+      "results": [
+        {
+          "variant": "current-named-escape",
+          "rawText": "使用字面文本 &lt;b&gt;66&lt;/b&gt; &amp; &amp;;在手册里。",
+          "currentDecoded": "使用字面文本 <b>66</b> & &;在手册里。"
+        },
+        {
+          "variant": "numeric-ampersand-named-tags",
+          "rawText": "使用字面文本 &lt;b&gt;66&lt;/b&gt; &#38; &#38;;在手册里。",
+          "currentDecoded": "使用字面文本 <b>66</b> &#38; &#38;;在手册里。"
+        },
+        {
+          "variant": "numeric-all-special-characters",
+          "rawText": "使用字面文本 &#60;b&#62;66&#60;/b&#62; &#38; &#38;;在手册里。",
+          "currentDecoded": "使用字面文本 &#60;b&#62;66&#60;/b&#62; &#38; &#38;;在手册里。"
+        },
+        {
+          "variant": "double-named-escape",
+          "rawText": "请使用字面文字 &amp;;b>66&amp;&amp;它;在手册里。",
+          "currentDecoded": "请使用字面文字 &;b>66&&它;在手册里。"
+        }
+      ]
+    },
+    {
+      "name": "encoding-comparison-auto",
+      "from": "",
+      "query": {},
+      "status": 200,
+      "inputs": [
+        {
+          "name": "current-named-escape",
+          "payload": "Use the literal text &lt;b&gt;66&lt;/b&gt; &amp; &amp;lt; in the manual."
+        },
+        {
+          "name": "numeric-ampersand-named-tags",
+          "payload": "Use the literal text &lt;b&gt;66&lt;/b&gt; &#38; &#38;lt; in the manual."
+        },
+        {
+          "name": "numeric-all-special-characters",
+          "payload": "Use the literal text &#60;b&#62;66&#60;/b&#62; &#38; &#38;lt; in the manual."
+        },
+        {
+          "name": "double-named-escape",
+          "payload": "Use the literal text &amp;lt;b&amp;gt;66&amp;lt;/b&amp;gt; &amp;amp; &amp;amp;lt; in the manual."
+        }
+      ],
+      "results": [
+        {
+          "variant": "current-named-escape",
+          "rawText": "使用字面文本 &lt;b&gt;66&lt;/b&gt; &amp; &amp;;在手册里。",
+          "currentDecoded": "使用字面文本 <b>66</b> & &;在手册里。"
+        },
+        {
+          "variant": "numeric-ampersand-named-tags",
+          "rawText": "使用字面文本 &lt;b&gt;66&lt;/b&gt; &#38; &#38;;在手册里。",
+          "currentDecoded": "使用字面文本 <b>66</b> &#38; &#38;;在手册里。"
+        },
+        {
+          "variant": "numeric-all-special-characters",
+          "rawText": "使用字面文本 &#60;b&#62;66&#60;/b&#62; &#38; &#38;;在手册里。",
+          "currentDecoded": "使用字面文本 &#60;b&#62;66&#60;/b&#62; &#38; &#38;;在手册里。"
+        },
+        {
+          "variant": "double-named-escape",
+          "rawText": "请使用字面文字 &amp;;b>66&amp;&amp;它;在手册里。",
+          "currentDecoded": "请使用字面文字 &;b>66&&它;在手册里。"
+        }
+      ]
+    },
+    {
+      "name": "textType-plain-capability-probe",
+      "from": "en",
+      "query": {
+        "textType": "plain"
+      },
+      "status": 200,
+      "inputs": [
+        {
+          "name": "unescaped-source",
+          "payload": "Use the literal text <b>66</b> & &lt; in the manual."
+        },
+        {
+          "name": "current-named-escape",
+          "payload": "Use the literal text &lt;b&gt;66&lt;/b&gt; &amp; &amp;lt; in the manual."
+        }
+      ],
+      "results": [
+        {
+          "variant": "unescaped-source",
+          "rawText": "请使用说明书中的字面文字<b>66</b>和&lt;。",
+          "currentDecoded": "请使用说明书中的字面文字<b>66</b>和<。"
+        },
+        {
+          "variant": "current-named-escape",
+          "rawText": "使用字面文本 &lt;b&gt;66&lt;/b&gt; &amp; &amp;;在手册里。",
+          "currentDecoded": "使用字面文本 <b>66</b> & &;在手册里。"
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,10 @@
+{
+  "baselineRevision": "55d1219bd62e059f921b639b658a2a0a8e36d53d",
+  "sameDependencies": true,
+  "lockSha256": "dca737aeb9c264e2c3078588ff01c85dd52d48636f7fa24b2451f9444a8ccc3a",
+  "baselineBytes": 1975252,
+  "candidateBytes": 1979716,
+  "increaseBytes": 4464,
+  "previousBudgetBytes": 1976000,
+  "budgetBytes": 1982000
+}

@@ -23,6 +23,14 @@ describe('原生批次 JSON 与读取故障分类', () => {
         await expect(readNativeBatchJson(broken, '坏 JSON', controller.signal))
             .rejects.toMatchObject({name: 'AbortError'});
     });
+
+    it('明确的HTML或XML拦截页不能触发逐段恢复', async () => {
+        for (const contentType of ['text/html; charset=utf-8', 'application/xhtml+xml']) {
+            const page = new Response('<html>private challenge</html>', {headers: {'content-type': contentType}});
+            await expect(readNativeBatchJson(page, '坏 JSON'))
+                .rejects.toMatchObject({message: '翻译服务返回网页或验证页，请稍后重试'});
+        }
+    });
 });
 
 describe('原生机器批量响应契约', () => {

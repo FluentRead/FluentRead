@@ -2,7 +2,7 @@
  * @file src/providers/translation/native-batch.ts
  *
  * 文件职责：为支持原生文本数组的机器翻译适配器顺序分包并按源槽位原子回填。
- * 主要内容：复制输入、在本地保留空白槽、按 32 项和 4000 字符限制常规组；超长单槽独立请求且不切割正文，逐组检查完整响应和取消，所有组成功才返回对应的字符串或数组。
+ * 主要内容：复制输入、在本地保留空白槽、按 32 项和 4000 字符限制常规组；超长单槽独立请求且不切割正文，逐组检查完整响应和取消，所有组成功才返回对应形状；JSON 语法、网页拦截与读取故障分类避免网络异常拆批。
  * 模块边界：不选择供应商、不读取凭据、不重试、不拼接占位符；供应商 callback 只转换原生协议，broker 统一处理恢复、缓存和总截止时间。
  */
 
@@ -22,10 +22,14 @@ interface NativeBatchEntry {
 
 /** JSON 语法损坏可拆批；读取中断、网络与取消不能冒充结构错误放大请求。 */
 export async function readNativeBatchJson<T>(
-    response: Pick<Response, 'json'>,
+    response: Pick<Response, 'json'> & Partial<Pick<Response, 'headers'>>,
     invalidResponseMessage: string,
     signal?: AbortSignal,
 ): Promise<T> {
+    throwIfNativeBatchAborted(signal);
+    if (/\b(?:html|xml)\b/iu.test(response.headers?.get('content-type') ?? '')) {
+        throw new Error('翻译服务返回网页或验证页，请稍后重试');
+    }
     try {
         return await response.json() as T;
     } catch (error) {

@@ -2797,7 +2797,8 @@ describe("全文翻译可见性锚点", () => {
         expect(runtime.requests).toHaveBeenCalledOnce();
     });
 
-    it('原生 broker 最终恢复失败时全文 runtime 保留原文并呈现失败状态', async () => {
+    it.each(['NATIVE_BATCH_RESPONSE_INVALID', 'TRANSLATION_SLOT_RESPONSE_INVALID'])(
+        '原生 broker 最终恢复失败 code=%s 时全文 runtime 保留原文并呈现失败状态', async code => {
         runtime.nativeBatchEnabled = true;
         runtime.config.display = 1;
         runtime.config.fullPageTranslationMode = 'all';
@@ -2805,7 +2806,7 @@ describe("全文翻译可见性锚点", () => {
         const owners = Array.from(document.querySelectorAll<HTMLElement>('p'));
         owners.forEach(owner => setLayoutBox(owner, 600, 60));
         runtime.candidates = owners.map(element => ({element, kind: 'content', reason: 'native-final-failure'}));
-        runtime.requests.mockRejectedValueOnce({kind: 'response', code: 'NATIVE_BATCH_RESPONSE_INVALID', message: 'bad scalar recovery'});
+        runtime.requests.mockRejectedValueOnce({kind: 'response', code, message: 'bad scalar recovery'});
         autoTranslateEnglishPage();
         await finishScheduledWork();
         expect(runtime.requests).toHaveBeenCalledOnce();
@@ -2885,14 +2886,18 @@ describe("全文翻译可见性锚点", () => {
         expect(runtime.requestOptions.every(options => !options.validateTranslationSlots && !options.aiMultiSegment)).toBe(true);
     });
 
-    it('AI 协议失败熔断当前会话同快照，其他模型仍可合批', async () => {
-        const session = {active: true, translationSlotCache: new Map()};
+    it.each(['AI_MULTI_SEGMENT_RESPONSE_INVALID', 'TRANSLATION_SLOT_RESPONSE_INVALID'])(
+        'AI 协议失败 %s 在正文 mutation 后仍熔断同会话同快照，其他模型仍可合批', async code => {
         const snapshot = translationSnapshot({service: 'ai', model: 'first-model', enableAIMultiSegment: true});
-        runtime.requests.mockRejectedValueOnce({kind: 'response', code: 'AI_MULTI_SEGMENT_RESPONSE_INVALID'});
+        const session = {active: true, translationSlotCache: new Map(), translationConfig: snapshot,
+            ...createFullPageRequestSessionState()};
+        runtime.requests.mockRejectedValueOnce({kind: 'response', code});
         await Promise.all([
             translateTextSlots(['A'], snapshot, undefined, undefined, session),
             translateTextSlots(['B'], snapshot, undefined, undefined, session),
         ]);
+        invalidateContextSensitiveRequestCache(session);
+        expect(session.pageContextGeneration).toBe(1);
         runtime.requests.mockClear();
         runtime.requestOptions = [];
         runtime.requestContexts = [];
@@ -2901,6 +2906,16 @@ describe("全文翻译可见性锚点", () => {
             translateTextSlots(['E'], snapshot, undefined, undefined, session),
         ]);
         expect(runtime.requests.mock.calls.map(([texts]) => texts)).toEqual([['C'], ['D'], ['E']]);
+        expect(runtime.requestOptions.every(options => !options.aiMultiSegment)).toBe(true);
+        invalidateContextSensitiveRequestCache(session);
+        expect(session.pageContextGeneration).toBe(2);
+        runtime.requests.mockClear();
+        runtime.requestOptions = [];
+        await Promise.all([
+            translateTextSlots(['H', 'I'], snapshot, undefined, undefined, session),
+            translateTextSlots(['J'], snapshot, undefined, undefined, session),
+        ]);
+        expect(runtime.requests.mock.calls.map(([texts]) => texts)).toEqual([['H'], ['I'], ['J']]);
         expect(runtime.requestOptions.every(options => !options.aiMultiSegment)).toBe(true);
         runtime.requests.mockClear();
         const other = {...snapshot, model: 'second-model'};

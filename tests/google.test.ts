@@ -94,6 +94,15 @@ describe('Google 批量传输与换线', () => {
         expect(requestData(...fetchMock.mock.calls[0]!).texts[0]).toBe(`<pre>${'C'.repeat(12_000)}</pre>`);
     });
 
+    it('rejects an RPC slot containing a malformed middle subsegment instead of dropping prose', () => {
+        const records = JSON.parse(rpcResponse(['whole']).split('\n').at(-1)!);
+        const payload = JSON.parse(records[0][2]);
+        for (const bad of [null, [7], []]) {
+            payload[1][0][0][5] = [['前半句'], bad, ['后半句']];
+            records[0][2] = JSON.stringify(payload);
+            expect(() => api.parseGoogleBatchResponse(JSON.stringify(records))).toThrow('返回格式异常');
+        }
+    });
     it('all endpoints with broken arrays expose a structural error and permit standalone recovery', async () => {
         fetchMock.mockImplementation(async (url, init) => {
             const data = requestData(url, init);

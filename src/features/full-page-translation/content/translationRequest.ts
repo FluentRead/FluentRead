@@ -90,6 +90,7 @@ export interface FullPageTranslationSessionCache {
 
 interface TranslationBatchTask {
     batchKey: string;
+    aiCircuitKey: string;
     context: string;
     owner?: Element;
     origins: readonly string[];
@@ -523,6 +524,12 @@ function createBatchScopeKey(snapshot: FullPageTranslationConfigSnapshot, sessio
         document.location?.href ?? document.URL ?? '', session.pageContextGeneration ?? 0]);
 }
 
+function createAIBatchCircuitKey(snapshot: FullPageTranslationConfigSnapshot): string {
+    // 正文变动需要隔离分组和缓存，却不能让同会话、同配置重新试用已经失败的协议。
+    return JSON.stringify([createTranslationBatchSnapshotKey(snapshot), document.title,
+        document.location?.href ?? document.URL ?? '']);
+}
+
 function createInvalidAIResponse(): Error {
     return Object.assign(new Error('批量翻译返回结构异常'), {
         kind: 'response',
@@ -586,7 +593,7 @@ async function executeTranslationBatch(tasks: TranslationBatchTask[], queue: Tra
     const activeTasks = tasks.filter((task) => !task.settled && !task.signal?.aborted);
     if (activeTasks.length === 0) return;
     const native = supportsNativeTranslationBatch(activeTasks[0]!.snapshot.service);
-    if (!native && queue.disabledAIKeys.has(activeTasks[0]!.batchKey)) {
+    if (!native && queue.disabledAIKeys.has(activeTasks[0]!.aiCircuitKey)) {
         await fallbackTranslationBatchTasks(activeTasks);
         return;
     }
@@ -599,12 +606,12 @@ async function executeTranslationBatch(tasks: TranslationBatchTask[], queue: Tra
                 task.signal,
                 task.queueSession,
                 undefined,
-                () => queue.disabledAIKeys.add(task.batchKey),
+                () => queue.disabledAIKeys.add(task.aiCircuitKey),
                 task.context,
             ));
         } catch (error) {
-            if (shouldFallbackAITranslationBatch(error)) {
-                if (!native) queue.disabledAIKeys.add(task.batchKey);
+            if (!native && shouldFallbackAITranslationBatch(error)) {
+                queue.disabledAIKeys.add(task.aiCircuitKey);
                 await fallbackTranslationBatchTasks([task]);
                 return;
             }
@@ -651,8 +658,8 @@ async function executeTranslationBatch(tasks: TranslationBatchTask[], queue: Tra
             offset = nextOffset;
         });
     } catch (error) {
-        if (shouldFallbackAITranslationBatch(error)) {
-            if (!native) queue.disabledAIKeys.add(activeTasks[0]!.batchKey);
+        if (!native && shouldFallbackAITranslationBatch(error)) {
+            queue.disabledAIKeys.add(activeTasks[0]!.aiCircuitKey);
             await fallbackTranslationBatchTasks(activeTasks);
         } else if (!isAbortError(error) || activeTasks.some((task) => !task.settled)) {
             activeTasks.forEach((task) => rejectTranslationBatchTask(task, error));
@@ -691,6 +698,7 @@ function enqueueTranslationBatchTask(
     return new Promise<string[]>((resolve, reject) => {
         const task: TranslationBatchTask = {
             batchKey: createBatchScopeKey(snapshot, session),
+            aiCircuitKey: createAIBatchCircuitKey(snapshot),
             context: document.title,
             owner,
             origins,

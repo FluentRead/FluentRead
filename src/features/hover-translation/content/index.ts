@@ -1,7 +1,7 @@
 /**
  * @file src/features/hover-translation/content/index.ts
  * 文件职责：实现按住配置快捷键并移动鼠标触发的悬浮翻译手势控制器，统一管理按键集合、平台差异、节流采样和启停清理。
- * 主要内容：定义可注入的配置、常量与依赖接口，按配置原值复用鼠标快捷键的规范化结果，在 mountHoverTranslationContentFeature 中监听键盘、鼠标与触摸并区分单次切换和连续移动；仲裁、失焦和中止统一撤销键盘状态、长按、触摸连击及运行时延迟，触摸手势绑定开始时的快捷键配置。
+ * 主要内容：定义可注入的配置、常量与依赖接口，按配置原值复用鼠标快捷键的规范化结果，在 mountHoverTranslationContentFeature 中监听键盘、鼠标与触摸并区分单次切换和连续移动；仅使用可信鼠标采样的位置，换路由、隐藏或离页时清除位置与手势，仲裁、失焦和中止统一撤销键盘状态、长按、触摸连击及运行时延迟，触摸手势绑定开始时的快捷键配置。
  * 模块边界：该模块只识别手势和调用注入的 handleTranslation/cancelPending，不读取具体翻译服务或创建译文；配置源、站点禁用判断和全文运行时由 app composition root 提供。
  */
 import {addPressedHotkeyEventKey, deletePressedHotkeyEventKey} from '@/src/core/hotkey';
@@ -116,6 +116,8 @@ export function mountHoverTranslationContentFeature(
     };
     const mouseHotkeysPressed = new Set<string>();
     const mouseHotkeyByCode = new Map<string, string>();
+    // (0,0) 是合法坐标；首次可信指针事件之前不能把初始值当作当前位置。
+    let pointerPositionKnown = false;
     let longPressTimer: ReturnType<typeof setTimeout> | undefined;
     let touchCount = 0;
     let touchTimer: ReturnType<typeof setTimeout> | undefined;
@@ -170,6 +172,23 @@ export function mountHoverTranslationContentFeature(
         resetTouchGesture();
         deps.cancelPendingHoverTranslation();
     };
+    const forgetPointerAndCancelGesture = () => {
+        pointerPositionKnown = false;
+        cancelAndResetHoverHotkeyState();
+    };
+    rootDocument.addEventListener('fluentread-route-change', forgetPointerAndCancelGesture, {signal});
+    rootDocument.addEventListener('visibilitychange', () => {
+        if (rootDocument.visibilityState === 'hidden') forgetPointerAndCancelGesture();
+    }, {signal});
+    rootDocument.addEventListener('mouseout', event => {
+        if (event.isTrusted && event.relatedTarget === null) forgetPointerAndCancelGesture();
+    }, {signal});
+    rootDocument.addEventListener('mouseover', event => {
+        if (!event.isTrusted) return;
+        screen.mouseX = event.clientX;
+        screen.mouseY = event.clientY;
+        pointerPositionKnown = true;
+    }, {signal});
     const discardUnavailableHoverGesture = (): boolean => {
         const unavailable = deps.isSiteDisabled()
             || (screen.hotkeyPressed && (!deps.config.on || screen.gestureHotkey !== getConfiguredMouseShortcut().identity));
@@ -192,7 +211,7 @@ export function mountHoverTranslationContentFeature(
 
     rootDocument.addEventListener('selectionchange', cancelHoverForActiveSelection, { signal });
 
-    rootWindow.addEventListener('blur', cancelAndResetHoverHotkeyState, { signal });
+    rootWindow.addEventListener('blur', forgetPointerAndCancelGesture, { signal });
 
     rootWindow.addEventListener('keydown', event => {
         if (!event.isTrusted) return;
@@ -248,7 +267,7 @@ export function mountHoverTranslationContentFeature(
         if (discardUnavailableHoverGesture()) return;
 
         if (screen.hotkeyPressed && mouseHotkeysPressed.size === 0 && !screen.otherKeyPressed && !screen.hasSlideTranslation) {
-            if (deps.config.on) {
+            if (deps.config.on && pointerPositionKnown) {
                 event.preventDefault();
                 // 共享归属绑定手势开始；释放修饰键后仍须让 Document 清理划词/全文按键状态。
                 if (!screen.gestureSharedWithSelection) event.stopPropagation();
@@ -266,6 +285,7 @@ export function mountHoverTranslationContentFeature(
         if (discardUnavailableHoverGesture()) return;
         screen.mouseX = event.clientX;
         screen.mouseY = event.clientY;
+        pointerPositionKnown = true;
         if (longPressTimer !== undefined
             && (Math.abs(event.clientX - longPressStart.x) > 10 || Math.abs(event.clientY - longPressStart.y) > 10)) {
             cancelLongPress();

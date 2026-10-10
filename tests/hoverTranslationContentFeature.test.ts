@@ -11,6 +11,7 @@ type Listener = (event: any) => unknown;
 
 class FakeTarget {
     listeners = new Map<string, Listener[]>();
+    visibilityState = 'visible';
 
     addEventListener(type: string, listener: Listener, options?: AddEventListenerOptions): void {
         const listeners = this.listeners.get(type) || [];
@@ -41,7 +42,7 @@ function trustedEvent(event: Record<string, unknown> = {}): any {
     };
 }
 
-function mountHarness(overrides: Partial<HoverTranslationContentDependencies> = {}) {
+function mountHarness(overrides: Partial<HoverTranslationContentDependencies> = {}, seedPointer = true) {
     const documentTarget = new FakeTarget();
     const windowTarget = new FakeTarget();
     const config = {
@@ -80,6 +81,8 @@ function mountHarness(overrides: Partial<HoverTranslationContentDependencies> = 
     const controller = new AbortController();
 
     const resetKeyboardGesture = mountHoverTranslationContentFeature(deps, controller.signal);
+    // 既有手势用例从已进入页面的真实指针样本开始；冷启动用例显式关闭采样。
+    if (seedPointer) documentTarget.emit('mouseover', trustedEvent({clientX: 0, clientY: 0}));
 
     return {deps, documentTarget, windowTarget, controller, resetKeyboardGesture};
 }
@@ -89,7 +92,73 @@ afterEach(() => {
 });
 
 describe('hover translation content feature', () => {
-    it.each(['reset', 'blur', 'selection-reserved', 'abort'])(
+    it('没有可信指针样本的纯键盘手势不会翻译页面左上角，进入页面后可直接翻译', () => {
+        const {deps, documentTarget, windowTarget} = mountHarness({}, false);
+        const pressAndRelease = () => {
+            windowTarget.emit('keydown', trustedEvent({key: 'Control', code: 'ControlLeft', ctrlKey: true}));
+            windowTarget.emit('keyup', trustedEvent({key: 'Control', code: 'ControlLeft'}));
+        };
+        documentTarget.emit('mouseover', trustedEvent({isTrusted: false, clientX: 99, clientY: 99}));
+        pressAndRelease();
+        expect(deps.handleTranslation).not.toHaveBeenCalled();
+        documentTarget.emit('mouseover', trustedEvent({clientX: 17, clientY: 31}));
+        pressAndRelease();
+        expect(deps.handleTranslation).toHaveBeenCalledOnce();
+        expect(deps.handleTranslation).toHaveBeenCalledWith(17, 31);
+    });
+
+    it.each(['route', 'hidden', 'pointer-exit', 'blur'])(
+        '已排队的连续悬浮在 %s 后取消，回来必须重新采样和开始手势', reason => {
+            vi.useFakeTimers();
+            const upstream = vi.fn();
+            let pending: ReturnType<typeof setTimeout> | undefined;
+            const {deps, documentTarget, windowTarget} = mountHarness({
+                handleTranslation: vi.fn((_x, _y, invocation) => {
+                    pending = setTimeout(upstream, invocation?.delayMs ?? 0);
+                }),
+                cancelPendingHoverTranslation: vi.fn(() => clearTimeout(pending)),
+            });
+            const press = () => windowTarget.emit('keydown', trustedEvent({key: 'Control', code: 'ControlLeft', ctrlKey: true}));
+            const release = () => windowTarget.emit('keyup', trustedEvent({key: 'Control', code: 'ControlLeft'}));
+            press();
+            documentTarget.emit('mousemove', trustedEvent({clientX: 10, clientY: 20}));
+            if (reason === 'route') documentTarget.emit('fluentread-route-change');
+            if (reason === 'hidden') {
+                documentTarget.visibilityState = 'hidden';
+                documentTarget.emit('visibilitychange');
+                documentTarget.visibilityState = 'visible';
+                documentTarget.emit('visibilitychange');
+            }
+            if (reason === 'pointer-exit') documentTarget.emit('mouseout', trustedEvent({relatedTarget: null}));
+            if (reason === 'blur') windowTarget.emit('blur');
+            release();
+            press(); release();
+            vi.advanceTimersByTime(500);
+            expect(upstream).not.toHaveBeenCalled();
+            expect(deps.handleTranslation).toHaveBeenCalledOnce();
+            // 回来后移动并不会复活已失效的 Control 手势。
+            documentTarget.emit('mousemove', trustedEvent({clientX: 31, clientY: 41}));
+            expect(deps.handleTranslation).toHaveBeenCalledOnce();
+            press(); release();
+            vi.advanceTimersByTime(500);
+            expect(upstream).toHaveBeenCalledOnce();
+            expect(deps.handleTranslation).toHaveBeenLastCalledWith(31, 41);
+        },
+    );
+
+    it('页面内切换元素、伪造离开和可见事件不作废当前悬浮手势', () => {
+        const {deps, documentTarget, windowTarget} = mountHarness();
+        windowTarget.emit('keydown', trustedEvent({key: 'Control', code: 'ControlLeft', ctrlKey: true}));
+        documentTarget.emit('mouseout', trustedEvent({relatedTarget: {}}));
+        documentTarget.emit('mouseout', trustedEvent({isTrusted: false, relatedTarget: null}));
+        documentTarget.emit('visibilitychange');
+        windowTarget.emit('keyup', trustedEvent({key: 'Control', code: 'ControlLeft'}));
+        expect(deps.handleTranslation).toHaveBeenCalledOnce();
+        expect(deps.handleTranslation).toHaveBeenCalledWith(0, 0);
+        expect(deps.cancelPendingHoverTranslation).not.toHaveBeenCalled();
+    });
+
+    it.each(['reset', 'blur', 'selection-reserved', 'abort', 'route', 'hidden', 'pointer-exit'])(
         '长按在 %s 仲裁后不会发出迟到翻译', reason => {
             vi.useFakeTimers();
             const {deps, documentTarget, windowTarget, controller, resetKeyboardGesture} = mountHarness();
@@ -98,6 +167,12 @@ describe('hover translation content feature', () => {
             if (reason === 'reset') resetKeyboardGesture();
             if (reason === 'blur') windowTarget.emit('blur');
             if (reason === 'abort') controller.abort();
+            if (reason === 'route') documentTarget.emit('fluentread-route-change');
+            if (reason === 'hidden') {
+                documentTarget.visibilityState = 'hidden';
+                documentTarget.emit('visibilitychange');
+            }
+            if (reason === 'pointer-exit') documentTarget.emit('mouseout', trustedEvent({relatedTarget: null}));
             if (reason === 'selection-reserved') {
                 vi.mocked(deps.shouldReserveSelectionShortcut).mockReturnValue(true);
                 windowTarget.emit('keydown', trustedEvent({key: 'Control', ctrlKey: true}));
@@ -108,7 +183,7 @@ describe('hover translation content feature', () => {
         },
     );
 
-    it.each(['reset', 'blur', 'selection-reserved'])(
+    it.each(['reset', 'blur', 'selection-reserved', 'route', 'hidden', 'pointer-exit'])(
         '触摸连击在 %s 后重新计数，不借用取消前的触摸', reason => {
             vi.useFakeTimers();
             const {deps, documentTarget, windowTarget, resetKeyboardGesture} = mountHarness();
@@ -117,6 +192,13 @@ describe('hover translation content feature', () => {
             tap();
             if (reason === 'reset') resetKeyboardGesture();
             if (reason === 'blur') windowTarget.emit('blur');
+            if (reason === 'route') documentTarget.emit('fluentread-route-change');
+            if (reason === 'hidden') {
+                documentTarget.visibilityState = 'hidden';
+                documentTarget.emit('visibilitychange');
+                documentTarget.visibilityState = 'visible';
+            }
+            if (reason === 'pointer-exit') documentTarget.emit('mouseout', trustedEvent({relatedTarget: null}));
             if (reason === 'selection-reserved') {
                 vi.mocked(deps.shouldReserveSelectionShortcut).mockReturnValue(true);
                 windowTarget.emit('keydown', trustedEvent({key: 'Control', ctrlKey: true}));
@@ -866,6 +948,7 @@ describe('shared hover shortcut release ownership', () => {
         vi.mocked(deps.shouldReserveSelectionShortcut).mockReturnValue(false);
         vi.mocked(deps.hasActiveSelectionTranslationCandidate).mockReturnValue(false);
         documentKeyup.mockClear();
+        if (reason === 'blur') documentTarget.emit('mouseover', trustedEvent({clientX: 0, clientY: 0}));
         dispatch('keydown', trustedEvent({key: 'F9', code: 'F9'}));
         const ordinaryUp = trustedEvent({key: 'F9', code: 'F9'});
         dispatch('keyup', ordinaryUp);

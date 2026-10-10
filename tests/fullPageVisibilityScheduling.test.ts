@@ -42,6 +42,7 @@ const runtime = vi.hoisted(() => ({
     cancelQueue: vi.fn(),
     retryCallbacks: [] as Array<() => void>,
     config: {
+        on: true,
         service: "microsoft",
         hoverTranslationService: "",
         model: {microsoft: "microsoft-default", freeTranslation: "free-default"} as Record<string, string>,
@@ -356,6 +357,7 @@ import {
     getHoverTranslationRequestSession,
     invalidateContextSensitiveRequestCache,
     invalidateFullPageRequestSessionCache,
+    invalidateHoverTranslationRequestSession,
     resetHoverTranslationRequestSession,
 } from '@/src/features/full-page-translation/content/requestSession';
 import type {TranslationQueueSession} from '@/src/services/translation/queue';
@@ -501,6 +503,7 @@ describe("全文翻译可见性锚点", () => {
         runtime.nativeBatchEnabled = false;
         runtime.cancelQueue.mockReset();
         runtime.retryCallbacks = [];
+        runtime.config.on = true;
         runtime.config.service = "microsoft";
         runtime.config.model = {microsoft: "microsoft-default", freeTranslation: "free-default"};
         runtime.config.customModel = {};
@@ -533,6 +536,7 @@ describe("全文翻译可见性锚点", () => {
         runtime.sourceReads.mockClear();
 
         const {window, document} = parseHTML("<html><head><title>Fixture</title></head><body></body></html>");
+        Object.defineProperty(document, 'visibilityState', {configurable: true, writable: true, value: 'visible'});
         replaceGlobal("window", window);
         replaceGlobal("document", document);
         replaceGlobal("Node", window.Node);
@@ -1458,6 +1462,72 @@ describe("全文翻译可见性锚点", () => {
         handleTranslation(20, 20, {scope: 'all'}); await finishScheduledWork();
         expect(button.textContent).toBe('译:Execute workflow');
     });
+
+    it('路由切换撤回悬浮延时，不把旧坐标用于新页面，新的手势可正常执行', async () => {
+        document.body.innerHTML = '<p>Old route paragraph.</p>';
+        const oldTarget = document.querySelector<HTMLElement>('p')!;
+        setLayoutBox(oldTarget, 200, 30);
+        runtime.pointCandidate = {element: oldTarget, kind: 'content', reason: 'old route'};
+        runtime.candidates = [runtime.pointCandidate];
+        handleTranslation(20, 20, {delayMs: 100});
+        resetFullPageTranslationRouteState();
+        document.body.innerHTML = '<p>New route paragraph.</p>';
+        const newTarget = document.querySelector<HTMLElement>('p')!;
+        setLayoutBox(newTarget, 200, 30);
+        runtime.pointCandidate = {element: newTarget, kind: 'content', reason: 'new route'};
+        runtime.candidates = [runtime.pointCandidate];
+        await finishScheduledWork();
+        expect(runtime.requests).not.toHaveBeenCalled();
+        expect(newTarget.textContent).toBe('New route paragraph.');
+        handleTranslation(20, 20, {delayMs: 0, continuous: true});
+        await finishScheduledWork();
+        expect(runtime.requests).toHaveBeenCalledOnce();
+        expect(runtime.requests).toHaveBeenCalledWith(['New route paragraph.']);
+        expect(singleTranslationText(newTarget)).toBe('译:New route paragraph.');
+    });
+
+    it.each(['hidden', 'disabled', 'session-reset', 'generation-invalidated'])(
+        '悬浮 timer 在 %s 后失效，迟到回调不能启动新的请求', async reason => {
+            document.body.innerHTML = '<p>Delayed hover paragraph.</p>';
+            const target = document.querySelector<HTMLElement>('p')!;
+            setLayoutBox(target, 200, 30);
+            runtime.pointCandidate = {element: target, kind: 'content', reason: 'delayed hover'};
+            runtime.candidates = [runtime.pointCandidate];
+            handleTranslation(20, 20, {delayMs: 100});
+            if (reason === 'hidden') Object.defineProperty(document, 'visibilityState', {value: 'hidden'});
+            if (reason === 'disabled') runtime.config.on = false;
+            if (reason === 'session-reset') resetHoverTranslationRequestSession(new Error('hover owner disposed'));
+            if (reason === 'generation-invalidated') invalidateHoverTranslationRequestSession();
+            await finishScheduledWork();
+            expect(runtime.requests).not.toHaveBeenCalled();
+            expect(target.textContent).toBe('Delayed hover paragraph.');
+            Object.defineProperty(document, 'visibilityState', {value: 'visible'});
+            runtime.config.on = true;
+            handleTranslation(20, 20);
+            await finishScheduledWork();
+            expect(runtime.requests).toHaveBeenCalledOnce();
+            expect(runtime.requests).toHaveBeenCalledWith(['Delayed hover paragraph.']);
+            expect(singleTranslationText(target)).toBe('译:Delayed hover paragraph.');
+        },
+    );
+
+    it.each(['hidden', 'disabled'])(
+        '在 %s 状态触发悬浮时撤回之前排队的任务且不新建 timer', async reason => {
+            document.body.innerHTML = '<p>Pending hover paragraph.</p>';
+            const target = document.querySelector<HTMLElement>('p')!;
+            setLayoutBox(target, 200, 30);
+            runtime.pointCandidate = {element: target, kind: 'content', reason: 'pending hover'};
+            runtime.candidates = [runtime.pointCandidate];
+            handleTranslation(20, 20, {delayMs: 100});
+            if (reason === 'hidden') Object.defineProperty(document, 'visibilityState', {value: 'hidden'});
+            if (reason === 'disabled') runtime.config.on = false;
+            handleTranslation(20, 20);
+            Object.defineProperty(document, 'visibilityState', {value: 'visible'});
+            runtime.config.on = true;
+            await finishScheduledWork();
+            expect(runtime.requests).not.toHaveBeenCalled();
+        },
+    );
 
     it('Issue 422 全部节点设置仍保护输入内容，普通全文与悬浮只翻译旁边可见标签', async () => {
         runtime.config.translationScope = 'all'; runtime.config.fullPageTranslationMode = 'all';

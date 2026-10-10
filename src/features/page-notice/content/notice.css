@@ -1,28 +1,68 @@
 /**
  * @file src/features/page-notice/content/notice.css
- * 文件职责：定义页面级 FluentRead 通知在 Shadow Root 内的布局和视觉状态，包括普通、成功、凭据提醒、离场动画、关闭及设置操作按钮。
- * 主要内容：样式覆盖固定顶部堆栈、品牌图标与标题、可滚动长文案、warning 配色、hover/focus 状态，并在 prefers-reduced-motion 下关闭过渡。
- * 模块边界：该 CSS 仅注入 notice.ts 创建的隔离 Shadow Root，不控制通知时长或消息解析，也不得影响宿主页面；宿主 host 的抗覆盖关键属性由 TypeScript 以内联 important 设置。
+ * 文件职责：定义隔离页面通知的紧凑布局、清晰层级和浅色/深色外观，避免堆栈裁切阴影形成方形边缘。
+ * 主要内容：堆栈为柔和阴影预留空间，正文自然换行，关闭与设置按钮有完整点击和键盘焦点区域；长内容独立滚动，窄屏保留视口边距，减少动态效果时关闭过渡。
+ * 模块边界：只注入 notice.ts 的 Shadow Root，不影响网页样式、不决定计时与操作；主题由宿主属性及系统配色解析。
  */
 :host {
     color-scheme: light;
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+    --notice-bg: #fff;
+    --notice-border: #e6e8ee;
+    --notice-text: #293244;
+    --notice-muted: #687286;
+    --notice-brand: #d73568;
+    --notice-hover: #f1f3f7;
+    --notice-focus: #d73568;
+    --notice-warning-bg: #fffaf2;
+    --notice-warning-border: #ead8b7;
+    --notice-warning-text: #75551f;
+    --notice-shadow: 0 4px 14px rgba(26, 35, 52, .12);
 }
 
-*,
-*::before,
-*::after {
-    box-sizing: border-box;
+:host([data-fr-theme="dark"]) {
+    color-scheme: dark;
+    --notice-bg: #252a35;
+    --notice-border: #414857;
+    --notice-text: #eef0f6;
+    --notice-muted: #abb3c4;
+    --notice-brand: #ff91b1;
+    --notice-hover: #343b49;
+    --notice-focus: #ff91b1;
+    --notice-warning-bg: #302b23;
+    --notice-warning-border: #61513a;
+    --notice-warning-text: #eed5a5;
+    --notice-shadow: 0 4px 14px rgba(0, 0, 0, .3);
 }
+
+@media (prefers-color-scheme: dark) {
+    :host([data-fr-theme="auto"]) {
+        color-scheme: dark;
+        --notice-bg: #252a35;
+        --notice-border: #414857;
+        --notice-text: #eef0f6;
+        --notice-muted: #abb3c4;
+        --notice-brand: #ff91b1;
+        --notice-hover: #343b49;
+        --notice-focus: #ff91b1;
+        --notice-warning-bg: #302b23;
+        --notice-warning-border: #61513a;
+        --notice-warning-text: #eed5a5;
+        --notice-shadow: 0 4px 14px rgba(0, 0, 0, .3);
+    }
+}
+
+*, *::before, *::after {box-sizing: border-box;}
 
 .notice-stack {
     position: fixed;
-    top: 18px;
+    top: 4px;
     left: 50vw;
     z-index: 2147483647;
     display: flex;
-    width: min(480px, calc(100vw - 32px));
-    max-height: calc(100dvh - 36px);
+    width: min(504px, calc(100vw - 8px));
+    max-height: calc(100dvh - 8px);
+    padding: 12px;
     overflow: auto;
     overscroll-behavior: contain;
     flex-direction: column;
@@ -34,44 +74,35 @@
 .page-notice {
     display: flex;
     flex-shrink: 0;
-    align-items: center;
+    align-items: flex-start;
+    gap: 10px;
     width: 100%;
-    min-height: 58px;
-    padding: 10px 12px 10px 10px;
-    border: 1px solid #e8dff0;
-    border-radius: 14px;
-    color: #273247;
-    background: rgba(255, 255, 255, .98);
-    box-shadow: 0 12px 30px rgba(39, 29, 55, .14), 0 0 0 4px rgba(239, 71, 118, .07);
+    padding: 12px;
+    border: 1px solid var(--notice-border);
+    border-radius: 12px;
+    color: var(--notice-text);
+    background: var(--notice-bg);
+    box-shadow: var(--notice-shadow);
     opacity: 0;
     pointer-events: auto;
-    transform: translateY(-12px);
+    transform: translateY(-6px);
     transition: opacity .18s ease, transform .18s ease;
 }
 
-.page-notice.is-visible {
-    opacity: 1;
-    transform: translateY(0);
-}
-
-.page-notice.is-leaving {
-    opacity: 0;
-    transform: translateY(-8px);
-}
-
+.page-notice.is-visible {opacity: 1; transform: translateY(0);}
+.page-notice.is-leaving {opacity: 0; transform: translateY(-4px);}
 .page-notice-warning {
-    border-color: #f0d49f;
-    background: linear-gradient(135deg, #fffdf8, #fff9ef);
-    box-shadow: 0 12px 30px rgba(122, 86, 20, .13), 0 0 0 4px rgba(243, 209, 158, .16);
+    border-color: var(--notice-warning-border);
+    background: var(--notice-warning-bg);
 }
 
 .notice-mark {
     display: block;
-    width: 30px;
-    height: 30px;
-    flex: 0 0 auto;
-    margin-right: 10px;
-    border-radius: 9px;
+    width: 28px;
+    height: 28px;
+    flex: 0 0 28px;
+    margin-top: 2px;
+    border-radius: 8px;
     object-fit: cover;
 }
 
@@ -80,119 +111,100 @@
     align-items: center;
     justify-content: center;
     color: #fff;
-    background: linear-gradient(135deg, #ed5d87, #d83263);
-    box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .28);
-    font-size: 15px;
-    font-weight: 850;
+    background: #df4878;
+    font-size: 14px;
+    font-weight: 700;
     line-height: 1;
 }
 
 .notice-copy {
     display: flex;
-    width: 0;
     min-width: 0;
     flex: 1 1 0%;
     flex-direction: column;
-    gap: 2px;
+    gap: 3px;
 }
 
 .notice-heading {
     display: flex;
     min-width: 0;
-    align-items: center;
-    gap: 5px;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 4px 6px;
     font-size: 11px;
     line-height: 1.4;
 }
-
-.notice-brand {
-    color: #dc315f;
-    font-weight: 800;
-}
-
-.notice-divider {
-    color: #b0a7b8;
-}
-
-.notice-title {
-    color: #737c8f;
-    font-weight: 700;
-}
+.notice-brand {color: var(--notice-brand); font-weight: 650;}
+.notice-divider {color: var(--notice-muted);}
+.notice-title {color: var(--notice-muted); font-weight: 500;}
 
 .notice-body {
     display: flex;
     min-width: 0;
-    align-items: center;
-    gap: 10px;
+    flex-wrap: wrap;
+    align-items: flex-start;
+    gap: 8px;
 }
-
 .notice-detail {
-    max-height: min(40vh, 240px);
+    min-width: 0;
+    max-width: 100%;
+    max-height: min(40dvh, 240px);
     overflow: auto;
     overflow-wrap: anywhere;
-    color: #273247;
+    color: var(--notice-text);
     font-size: 13px;
-    font-weight: 550;
-    line-height: 1.4;
+    font-weight: 450;
+    line-height: 1.55;
     user-select: text;
     white-space: pre-wrap;
 }
-
 .page-notice-warning .notice-title,
-.page-notice-warning .notice-detail {
-    color: #795b27;
-}
+.page-notice-warning .notice-detail {color: var(--notice-warning-text);}
 
-.notice-action,
-.notice-close {
+.notice-action, .notice-close {
     flex: 0 0 auto;
+    min-height: 28px;
     font: inherit;
     cursor: pointer;
+    touch-action: manipulation;
 }
-
 .notice-action {
-    padding: 3px 8px;
-    border: 1px solid rgba(180, 107, 0, .28);
+    padding: 4px 9px;
+    border: 1px solid var(--notice-warning-border);
     border-radius: 7px;
-    color: #a86500;
-    background: rgba(255, 255, 255, .72);
-    font-size: 11px;
-    font-weight: 800;
+    color: var(--notice-warning-text);
+    background: var(--notice-bg);
+    font-size: 12px;
+    font-weight: 600;
     white-space: nowrap;
 }
-
-.notice-action:hover,
-.notice-action:focus-visible {
-    border-color: rgba(180, 107, 0, .46);
-    background: #fff;
-    outline: none;
-}
-
 .notice-close {
     display: inline-flex;
-    width: 22px;
-    height: 22px;
-    margin-left: 8px;
+    width: 28px;
+    height: 28px;
+    margin: -3px -3px 0 0;
     padding: 0;
     border: 0;
     align-items: center;
     justify-content: center;
-    border-radius: 6px;
-    color: #9da4b2;
+    border-radius: 7px;
+    color: var(--notice-muted);
     background: transparent;
-    font-size: 18px;
+    font-size: 20px;
     line-height: 1;
 }
-
-.notice-close:hover,
-.notice-close:focus-visible {
-    color: #596274;
-    background: rgba(39, 50, 71, .07);
-    outline: none;
+.notice-action:hover, .notice-close:hover {
+    color: var(--notice-text);
+    background: var(--notice-hover);
+}
+.notice-action:focus-visible, .notice-close:focus-visible {
+    outline: 2px solid var(--notice-focus);
+    outline-offset: 2px;
 }
 
+@media (max-width: 420px) {
+    .page-notice {gap: 9px; padding: 11px;}
+}
 @media (prefers-reduced-motion: reduce) {
-    .page-notice {
-        transition: none;
-    }
+    .page-notice {transition: none;}
 }

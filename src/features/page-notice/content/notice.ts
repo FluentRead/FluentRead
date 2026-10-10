@@ -1,7 +1,7 @@
 /**
  * @file src/features/page-notice/content/notice.ts
  * 文件职责：在任意宿主页面的隔离 Shadow Root 中显示 FluentRead 成功或错误通知，并把缺少 API 凭据的错误转换为可直接前往设置的提醒。
- * 主要内容：包含凭据文案识别、通知标题与详情生成、扩展上下文失效时的本地品牌占位、宿主抗样式污染、堆栈复用、进入/离场计时和关闭按钮，导出 showPageNotice 与一秒节流的 sendErrorMessage。
+ * 主要内容：包含凭据文案识别、通知标题与详情生成、扩展上下文失效时的本地品牌占位、宿主抗样式污染与设置主题、堆栈复用、有界停留时长、悬停和键盘焦点暂停、局部 Escape 关闭与焦点返回，导出 showPageNotice、按功能 key 撤销的 dismissPageNotice 与一秒节流的 sendErrorMessage。
  * 模块边界：本文件只拥有通知 DOM 和打开设置消息，不记录凭据、不处理翻译重试；外观来自 notice.css，后台 openOptions handler 处理导航，调用方传入的文本一律通过 textContent 展示。
  */
 import {throttle} from '@/src/shared/function/throttle';
@@ -20,12 +20,15 @@ interface MissingCredentialNotice {
 const PAGE_NOTICE_HOST_ID = 'fluent-read-page-notice-host';
 const NOTICE_EXIT_DURATION = 180;
 const MAX_PAGE_NOTICES = 3;
+const MIN_READING_REMAINDER = 1500;
 
 export interface PageNoticeOptions {
     /** 同一功能的反馈原地更新；独立提示仍保留自己的内容。 */
     key?: string;
     /** 功能结束时立即撤销它拥有的反馈。 */
     signal?: AbortSignal;
+    /** 明确的阅读时长；有限正数限制在 1–30 秒，无效值沿用默认时长。 */
+    durationMs?: number;
 }
 interface NoticeEntry {
     node: HTMLElement;
@@ -45,6 +48,12 @@ interface NoticeEntry {
     exitTimer?: number;
     revealFrame?: number;
     reveal?: () => void;
+    remainingMs: number;
+    dismissAt: number;
+    hovered: boolean;
+    focused: boolean;
+    returnFocus: HTMLElement | null;
+    interactions: Array<readonly [string, EventListener]>;
     signal?: AbortSignal;
     abort?: () => void;
 }
@@ -104,6 +113,7 @@ function createNoticeMark(language: Parameters<typeof translate>[1]): HTMLElemen
         mark.className = 'notice-mark';
         mark.src = iconUrl;
         mark.alt = translate('common.brand', language);
+        mark.setAttribute('aria-hidden', 'true');
         return mark;
     }
 
@@ -195,8 +205,10 @@ function clearNoticeTasks(entry: NoticeEntry): void {
 function disposeNotice(entry: NoticeEntry): void {
     if (entries.get(entry.node) !== entry) return;
     clearNoticeTasks(entry);
+    for (const [type, listener] of entry.interactions) entry.node.removeEventListener(type, listener);
     if (entry.abort) entry.signal?.removeEventListener('abort', entry.abort);
     entries.delete(entry.node);
+    restoreNoticeFocus(entry);
     entry.node.remove();
     if (entries.size === 0 && entry.stack === noticeStack) {
         noticeHost?.remove();
@@ -211,6 +223,61 @@ function removeNotice(entry: NoticeEntry): void {
     entry.node.classList.remove('is-visible');
     entry.node.classList.add('is-leaving');
     entry.exitTimer = window.setTimeout(() => disposeNotice(entry), NOTICE_EXIT_DURATION);
+    restoreNoticeFocus(entry);
+}
+
+function restoreNoticeFocus(entry: NoticeEntry): void {
+    if (!entry.node.contains(deepActiveElement(document))) return;
+    const target = entry.returnFocus;
+    if (target?.isConnected && target.ownerDocument === document && typeof target.focus === 'function') {
+        target.focus({preventScroll: true});
+    }
+}
+
+function scheduleNoticeDismissal(entry: NoticeEntry): void {
+    if (entry.hovered || entry.focused) return;
+    entry.dismissAt = Date.now() + entry.remainingMs;
+    entry.dismissTimer = window.setTimeout(() => removeNotice(entry), entry.remainingMs);
+}
+
+function updateNoticeInteraction(entry: NoticeEntry, kind: 'hovered' | 'focused', active: boolean): void {
+    if (entries.get(entry.node) !== entry) return;
+    entry[kind] = active;
+    if (entry.exitTimer !== undefined) return;
+    if (entry.hovered || entry.focused) {
+        if (entry.dismissTimer !== undefined) {
+            entry.remainingMs = Math.max(0, entry.dismissAt - Date.now());
+            window.clearTimeout(entry.dismissTimer);
+            entry.dismissTimer = undefined;
+        }
+    } else if (entry.dismissTimer === undefined) {
+        entry.remainingMs = Math.max(MIN_READING_REMAINDER, entry.remainingMs);
+        scheduleNoticeDismissal(entry);
+    }
+}
+
+function bindNoticeInteractions(entry: NoticeEntry): void {
+    const focusWithin = (target: EventTarget | null) => target !== null && entry.node.contains(target as Node);
+    const listeners: Array<readonly [string, EventListener]> = [
+        ['mouseenter', () => updateNoticeInteraction(entry, 'hovered', true)],
+        ['mouseleave', () => updateNoticeInteraction(entry, 'hovered', false)],
+        ['focusin', event => {
+            const previous = (event as FocusEvent).relatedTarget;
+            if (previous && !focusWithin(previous)) entry.returnFocus = previous as HTMLElement;
+            updateNoticeInteraction(entry, 'focused', true);
+        }],
+        ['focusout', event => {
+            if (!focusWithin((event as FocusEvent).relatedTarget)) updateNoticeInteraction(entry, 'focused', false);
+        }],
+        ['keydown', event => {
+            if ((event as KeyboardEvent).key !== 'Escape') return;
+            event.preventDefault();
+            event.stopPropagation();
+            removeNotice(entry);
+        }],
+    ];
+    for (const [type, listener] of listeners) entry.node.addEventListener(type, listener);
+    entry.interactions = listeners;
 }
 
 function bindNoticeSignal(entry: NoticeEntry, signal?: AbortSignal): void {
@@ -223,12 +290,14 @@ function bindNoticeSignal(entry: NoticeEntry, signal?: AbortSignal): void {
     if (entry.abort) signal!.addEventListener('abort', entry.abort, {once: true});
 }
 
-function paintNotice(entry: NoticeEntry, message: string, type: NoticeType): void {
+function paintNotice(entry: NoticeEntry, message: string, type: NoticeType, durationMs?: number): void {
     const language = normalizeUiLanguage(config.uiLanguage);
     const missingCredential = getMissingCredentialNotice(message);
     const credential = missingCredential !== null;
     const tone = credential ? 'warning' : type;
     const node = entry.node;
+    const theme = config.theme === 'light' || config.theme === 'dark' ? config.theme : 'auto';
+    if (noticeHost!.getAttribute('data-fr-theme') !== theme) noticeHost!.setAttribute('data-fr-theme', theme);
     const visible = node.classList.contains('is-visible');
     const className = `page-notice page-notice-${tone}${visible ? ' is-visible' : ''}`;
     if (node.className !== className) node.className = className;
@@ -276,13 +345,16 @@ function paintNotice(entry: NoticeEntry, message: string, type: NoticeType): voi
     if (entry.dismissTimer !== undefined) window.clearTimeout(entry.dismissTimer);
     if (entry.exitTimer !== undefined) window.clearTimeout(entry.exitTimer);
     entry.exitTimer = undefined;
-    entry.dismissTimer = window.setTimeout(() => removeNotice(entry), credential ? 6500 : 3500);
+    entry.dismissTimer = undefined;
+    entry.remainingMs = typeof durationMs === 'number' && Number.isFinite(durationMs) && durationMs > 0
+        ? Math.min(30_000, Math.max(1000, durationMs)) : credential ? 6500 : 3500;
+    scheduleNoticeDismissal(entry);
     if (visible || entry.reveal) return;
     const reveal = () => {
         if (entry.reveal !== reveal) return;
         entry.reveal = undefined;
         entry.revealFrame = undefined;
-        if (entries.get(node) === entry && entry.dismissTimer !== undefined && node.isConnected) node.classList.add('is-visible');
+        if (entries.get(node) === entry && entry.exitTimer === undefined && node.isConnected) node.classList.add('is-visible');
     };
     entry.reveal = reveal;
     if (typeof window.requestAnimationFrame === 'function') entry.revealFrame = window.requestAnimationFrame(reveal);
@@ -304,7 +376,7 @@ export function showPageNotice(message: string, type: NoticeType, options: PageN
             : !entry.key && entry.message === message && entry.type === type && entry.language === language;
         if (!sameFeedback) continue;
         bindNoticeSignal(entry, options.signal);
-        paintNotice(entry, message, type);
+        paintNotice(entry, message, type, options.durationMs);
         return entry.node;
     }
     if (entries.size >= MAX_PAGE_NOTICES) {
@@ -325,12 +397,22 @@ export function showPageNotice(message: string, type: NoticeType, options: PageN
     copy.append(heading, body);
     const close = document.createElement('button');close.className = 'notice-close';close.type = 'button';close.textContent = '×';
     notice.append(mark, copy, close);stack.appendChild(notice);
-    const entry: NoticeEntry = {node: notice, stack, key: options.key, message, type, language, brand, title, detail, body, mark, close};
+    const entry: NoticeEntry = {node: notice, stack, key: options.key, message, type, language, brand, title, detail, body, mark, close,
+        remainingMs: 0, dismissAt: 0, hovered: false, focused: false, returnFocus: deepActiveElement(document) as HTMLElement | null, interactions: []};
     entries.set(notice, entry);
+    bindNoticeInteractions(entry);
     close.addEventListener('click', () => removeNotice(entry));
     bindNoticeSignal(entry, options.signal);
-    paintNotice(entry, message, type);
+    paintNotice(entry, message, type, options.durationMs);
     return notice;
+}
+
+/** 功能成功开始后撤销它的旧反馈，保留页面上其他功能拥有的通知。 */
+export function dismissPageNotice(key: string): void {
+    if (!key) return;
+    for (const entry of entries.values()) {
+        if (entry.key === key) removeNotice(entry);
+    }
 }
 
 function _sendErrorMessage(message: string): void {

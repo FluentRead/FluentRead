@@ -1,11 +1,11 @@
 #!/usr/bin/env node
 
-// 使用临时 Edge profile 验证划词翻译的完整触发矩阵。
+// 使用临时 Edge profile 验证划词翻译的触发矩阵；--context-menu-only 只运行右键入口专项。
 // Popup 快捷抽屉提供独立启用开关与双语/仅译文选择；触发方式、显示延迟和自定义快捷键在完整设置页修改，
 // 两个真实扩展页面同时打开，断言设置页写入、Popup 模式同步与网页中的真实划词手势结果一致。
 // 该脚本只操作本次创建的隔离 profile，不连接用户正在使用的浏览器。
 
-const {guardBrowserClose} = require('./testing/owned-browser-close.cjs');
+const {guardBrowserClose, getGuardedBrowserPid} = require('./testing/owned-browser-close.cjs');
 const fs = require('node:fs');
 const http = require('node:http');
 const os = require('node:os');
@@ -16,6 +16,7 @@ const TARGET_TEXT = 'When switching between different filaments, the printer flu
 const CONFIG_FIXTURE_CLIENT_ID = `selection-trigger-${process.pid}-${Date.now()}`;
 let configFixtureSequence = 0;
 let activateInputPage = async () => undefined;
+let assertBackgroundFocus = async () => undefined;
 let createIsolatedPage = context => context.newPage();
 const selectionUiSessions = new WeakMap();
 const selectionUiTrackers = new WeakMap();
@@ -687,6 +688,8 @@ async function readSelectionUi(page) {
   const brandIcon = findCdpNode(tooltip, node => hasCdpClass(node, 'fr-tooltip-brand-icon'));
   const original = findCdpNode(host, node => hasCdpClass(node, 'fr-original-text'));
   const translation = findCdpNode(host, node => hasCdpClass(node, 'fr-translation-result'));
+  const loading = findCdpNode(host, node => hasCdpClass(node, 'fr-loading-state'));
+  const error = findCdpNode(host, node => hasCdpClass(node, 'fr-error-state'));
   const sourceCopyButton = findCdpNode(host, node => cdpAttribute(node, 'data-copy-kind') === 'source');
   const translationCopyButton = findCdpNode(host, node => cdpAttribute(node, 'data-copy-kind') === 'translation');
   const originalPre = findCdpDescendantByName(original, 'PRE');
@@ -706,6 +709,11 @@ async function readSelectionUi(page) {
     },
     original: Boolean(original),
     translation: Boolean(translation),
+    loading: Boolean(loading),
+    loadingText: cdpText(loading).trim(),
+    error: Boolean(error),
+    errorText: cdpText(error).trim(),
+    retryButton: Boolean(findCdpNode(error, node => node.nodeName === 'BUTTON')),
     originalText: cdpText(originalPre).trim(),
     resultText: cdpText(translationPre).trim(),
     direction: {
@@ -872,6 +880,315 @@ async function closeSelectionUi(page) {
   await page.waitForTimeout(200);
 }
 
+// 仅观察可信网页右键事件；菜单项点击通过生产消息重放，不操作系统原生菜单。
+async function captureRightClickAndDropSelection(page, selector = '#target', expectedText) {
+  await activateInputPage(page);
+  const box = await page.locator(selector).boundingBox();
+  assert(box, `右键目标没有可用几何位置：${selector}`);
+  await page.evaluate(() => {
+    globalThis.__fluentReadContextMenuGesture = null;
+    document.addEventListener('contextmenu', event => {
+      const selection = window.getSelection();
+      globalThis.__fluentReadContextMenuNativeRange = selection?.rangeCount
+        ? selection.getRangeAt(0).cloneRange() : null;
+      globalThis.__fluentReadContextMenuGesture = {
+        isTrusted: event.isTrusted,
+        button: event.button,
+        selectedText: window.getSelection()?.toString().trim() || '',
+        target: event.target instanceof Element ? event.target.tagName : '',
+      };
+    }, {capture: true, once: true});
+  });
+  await page.mouse.click(box.x + Math.min(80, box.width / 2), box.y + Math.min(20, box.height / 2), {button: 'right'});
+  await page.waitForFunction(() => globalThis.__fluentReadContextMenuGesture !== null);
+  const gesture = await page.evaluate(() => globalThis.__fluentReadContextMenuGesture);
+  assert(gesture.isTrusted && gesture.button === 2, `没有收到可信右键事件：${JSON.stringify(gesture)}`);
+  if (expectedText !== undefined) assert(gesture.selectedText === expectedText,
+    `右键没有保留预期选区：${JSON.stringify({gesture, expectedText})}`);
+  // 模拟菜单弹出/失焦造成的原生 Selection 丢失；Escape 表示用户取消，不用于模拟菜单命令。
+  await page.evaluate(() => window.getSelection()?.removeAllRanges());
+  const droppedText = await page.evaluate(() => window.getSelection()?.toString().trim() || '');
+  assert(droppedText === '', '菜单专项没有清除活动 Selection');
+  return {...gesture, droppedText};
+}
+
+async function sendContextMenuMessage(extensionPage, message) {
+  return extensionPage.evaluate(message => new Promise((resolve, reject) => {
+    chrome.tabs.query({url: 'https://example.com/*'}, tabs => {
+      const queryError = chrome.runtime.lastError?.message;
+      if (queryError) {reject(new Error(queryError)); return;}
+      if (tabs.length !== 1 || !Number.isInteger(tabs[0].id)) {
+        reject(new Error(`找不到唯一的测试页面：${JSON.stringify(tabs)}`)); return;
+      }
+      chrome.tabs.sendMessage(tabs[0].id, message, {frameId: 0}, response => {
+        const messageError = chrome.runtime.lastError?.message;
+        if (messageError) reject(new Error(messageError)); else resolve(response);
+      });
+    });
+  }), message);
+}
+
+async function sendContextMenuTranslation(extensionPage, action, selectionText) {
+  return sendContextMenuMessage(extensionPage, {type: 'contextMenuTranslate', action,
+    ...(selectionText === undefined ? {} : {selectionText})});
+}
+
+async function captureContextMenuScreenshot(page, screenshot, label, screenshotOptions = {}) {
+  await assertBackgroundFocus(`before ${label}`);
+  await page.screenshot({path: screenshot, ...screenshotOptions});
+  await assertBackgroundFocus(`after ${label}`);
+}
+
+async function readContextMenuNoticeLayout(page) {
+  return page.locator('#fluent-read-page-notice-host .page-notice').evaluate(notice => {
+    const host = notice.getRootNode().host;
+    const stack = notice.parentElement;
+    const close = notice.querySelector('.notice-close');
+    const detail = notice.querySelector('.notice-detail');
+    const rect = element => {
+      const {x, y, width, height, right, bottom} = element.getBoundingClientRect();
+      return {x, y, width, height, right, bottom};
+    };
+    const style = getComputedStyle(notice);
+    const stackStyle = getComputedStyle(stack);
+    const closeStyle = getComputedStyle(close);
+    return {theme: host.getAttribute('data-fr-theme'), notice: rect(notice), stack: rect(stack), close: rect(close),
+      text: detail.textContent, background: style.backgroundColor, borderRadius: style.borderRadius,
+      boxShadow: style.boxShadow, stackBackground: stackStyle.backgroundColor,
+      stackPadding: [stackStyle.paddingTop, stackStyle.paddingRight, stackStyle.paddingBottom, stackStyle.paddingLeft].map(parseFloat),
+      closeLabel: close.getAttribute('aria-label'), closeFocused: host.shadowRoot.activeElement === close,
+      closeFocusVisible: close.matches(':focus-visible'), closeOutlineWidth: closeStyle.outlineWidth,
+      detailClientWidth: detail.clientWidth, detailScrollWidth: detail.scrollWidth,
+      documentClientWidth: document.documentElement.clientWidth, documentScrollWidth: document.documentElement.scrollWidth};
+  });
+}
+
+async function runContextMenuNoticeCases({page, popup, result, readRequestCount}) {
+  const previous = await readStoredConfig(popup);
+  const requestsBefore = readRequestCount();
+  const notice = page.locator('#fluent-read-page-notice-host .page-notice');
+  const show = async reason => {
+    await activateInputPage(page);
+    await page.mouse.move(20, 800);
+    const response = await sendContextMenuMessage(popup, {type: 'contextMenuNotice', reason});
+    assert(response?.status === 'success', `右键通知未被接受：${JSON.stringify({reason, response})}`);
+    await page.locator('#fluent-read-page-notice-host .page-notice.is-visible').waitFor({state: 'visible'});
+    await page.waitForTimeout(220);
+    return response;
+  };
+  const assertLayout = (layout, width) => {
+    assert(layout.notice.x >= 0 && layout.notice.right <= width && layout.notice.y >= 0,
+      `右键提示超出视口：${JSON.stringify(layout)}`);
+    assert(layout.close.width >= 28 && layout.close.height >= 28 && layout.closeLabel,
+      `右键提示关闭按钮没有完整28px可访问点击区域：${JSON.stringify(layout)}`);
+    const shadow = layout.boxShadow.match(/rgba?\((\d+),\s*(\d+),\s*(\d+)/);
+    assert(Number.parseFloat(layout.borderRadius) >= 10 && shadow
+      && shadow.slice(1).map(Number).every(value => value <= 100)
+      && layout.stackPadding.every(value => value >= 10),
+    `右键提示缺少圆角、中性阴影或裁切留白：${JSON.stringify(layout)}`);
+    assert(layout.detailScrollWidth <= layout.detailClientWidth + 1
+      && layout.documentScrollWidth <= layout.documentClientWidth + 1,
+    `右键长提示发生横向溢出：${JSON.stringify(layout)}`);
+  };
+  const closeFromEdge = async layout => {
+    // 在按钮左缘单击，证明不只中心的“×”文字可点击。
+    await page.mouse.click(layout.close.x + 3, layout.close.y + layout.close.height / 2);
+    await notice.waitFor({state: 'detached'});
+  };
+  await patchStoredConfig(popup, {theme: 'light'});
+  await page.waitForTimeout(500);
+  const responses = await Promise.all([
+    sendContextMenuMessage(popup, {type: 'contextMenuNotice', reason: 'selectionUnavailable'}),
+    sendContextMenuMessage(popup, {type: 'contextMenuNotice', reason: 'selectionUnavailable'}),
+  ]);
+  await notice.waitFor({state: 'visible'});
+  const noticeText = await notice.textContent();
+  assert(responses.every(response => response?.status === 'success') && await notice.count() === 1
+    && noticeText.includes('选区已失效') && noticeText.includes('重新选中文字'),
+  `右键失败提示不友好或重复堆叠：${JSON.stringify({responses, noticeText, count: await notice.count()})}`);
+  await page.setViewportSize({width: 390, height: 844});
+  await page.waitForTimeout(220);
+  const narrowLayout = await readContextMenuNoticeLayout(page);
+  assertLayout(narrowLayout, 390);
+  const narrowScreenshot = path.join(result.artifactsDir, 'context-menu-notice-narrow.png');
+  await captureContextMenuScreenshot(page, narrowScreenshot, 'narrow notice screenshot'); result.screenshots.push(narrowScreenshot);
+  await closeFromEdge(narrowLayout);
+  result.cases.push({id: 'context-menu.actionable-notice-and-dismissal', status: 'passed',
+    responses, noticeText, count: 1, layout: narrowLayout, closeGesture: 'trusted left edge of 28px button', additionalRequests: 0});
+
+  const variants = [];
+  for (const theme of ['light', 'dark']) for (const width of [1280, 390]) {
+    await page.setViewportSize({width, height: width === 390 ? 844 : 900});
+    await patchStoredConfig(popup, {theme});
+    await page.waitForTimeout(500);
+    await show('unavailable');
+    const layout = await readContextMenuNoticeLayout(page);
+    assertLayout(layout, width);
+    assert(layout.theme === theme && layout.text.includes('页面加载完成') && layout.text.includes('扩展更新'),
+      `右键提示主题或长文案未同步：${JSON.stringify(layout)}`);
+    assert(theme === 'light' ? layout.background === 'rgb(255, 255, 255)' : layout.background !== 'rgb(255, 255, 255)',
+      `右键提示没有切换${theme}主题背景：${JSON.stringify(layout)}`);
+    const screenshot = path.join(result.artifactsDir, `context-menu-notice-${theme}-${width}.png`);
+    await captureContextMenuScreenshot(page, screenshot, `${theme} ${width} notice screenshot`); result.screenshots.push(screenshot);
+    let compactScreenshot;
+    let compactClip;
+    if (theme === 'light' && width === 1280) {
+      // 直接截取浏览器像素，保留卡片四周阴影留白，方便用户评估通知外观。
+      const viewport = page.viewportSize();
+      const x = Math.max(0, Math.floor(layout.notice.x - 20));
+      const y = Math.max(0, Math.floor(layout.notice.y - 20));
+      compactClip = {x, y, width: Math.min(viewport.width, Math.ceil(layout.notice.right + 20)) - x,
+        height: Math.min(viewport.height, Math.ceil(layout.notice.bottom + 20)) - y};
+      compactScreenshot = path.join(result.artifactsDir, 'context-menu-notice-light-compact.png');
+      await captureContextMenuScreenshot(page, compactScreenshot, 'compact light notice screenshot', {clip: compactClip});
+      result.screenshots.push(compactScreenshot);
+    }
+    variants.push({theme, width, layout, screenshot, ...(compactScreenshot ? {compactScreenshot, compactClip} : {})});
+    await closeFromEdge(layout);
+  }
+  result.cases.push({id: 'context-menu.notice-theme-and-long-layout', status: 'passed', variants,
+    visualBoundary: 'Neutral shadow, rounding and clipping space checked by DOM; saved screenshots require visual inspection.'});
+
+  await page.setViewportSize({width: 1280, height: 900});
+  await patchStoredConfig(popup, {theme: 'light'});
+  await page.waitForTimeout(500);
+  const hoverStartedMessageAt = Date.now();
+  await show('unavailable');
+  await page.waitForTimeout(1200);
+  const hoverLayout = await readContextMenuNoticeLayout(page);
+  // 先核验可信鼠标确实进入通知；失败报告保留命中和离场事件，区分输入前置问题与计时回归。
+  const hoverSamples = [];
+  result.noticeHoverSamples = hoverSamples;
+  await notice.evaluate(node => {
+    const events = [];
+    const listeners = ['mouseenter', 'mouseleave', 'pointerenter', 'pointerleave'].map(type => {
+      const listener = event => {
+        if (events.length < 16) events.push({type, isTrusted: event.isTrusted, at: Date.now(),
+          relatedTarget: event.relatedTarget instanceof Element ? event.relatedTarget.tagName : null});
+      };
+      node.addEventListener(type, listener);
+      return [type, listener];
+    });
+    node.__fluentReadHoverObservation = {events, listeners};
+  });
+  const sampleHover = async () => {
+    const sample = await notice.evaluate(node => {
+      const {x, y, width, height} = node.getBoundingClientRect();
+      const point = {x: x + width / 2, y: y + height / 2};
+      const root = node.getRootNode();
+      const outer = document.elementFromPoint(point.x, point.y);
+      const inner = root.elementFromPoint(point.x, point.y);
+      return {at: Date.now(), hovered: node.matches(':hover'), connected: node.isConnected, point,
+        outer: outer?.id || outer?.tagName || null, inner: inner?.className || inner?.tagName || null,
+        events: node.__fluentReadHoverObservation.events.slice()};
+    });
+    hoverSamples.push(sample);
+    assert(sample.hovered && sample.connected,
+      `通知鼠标停留没有建立或中途离开：${JSON.stringify(sample)}`);
+  };
+  await activateInputPage(page);
+  const hoverStartedAt = Date.now();
+  await page.mouse.move(hoverLayout.notice.x + hoverLayout.notice.width / 2,
+    hoverLayout.notice.y + hoverLayout.notice.height / 2);
+  await sampleHover();
+  let hoverMoves = 1;
+  for (const heldMs of [500, 2000, 6500]) {
+    // 后台可见窗口可能收到系统离场事件；用真实小幅移动维持本用例的阅读输入，不合成 DOM 事件。
+    while (Date.now() - hoverStartedAt < heldMs) {
+      await page.waitForTimeout(Math.min(200, heldMs - (Date.now() - hoverStartedAt)));
+      await page.mouse.move(hoverLayout.notice.x + hoverLayout.notice.width / 2 + hoverMoves % 2,
+        hoverLayout.notice.y + hoverLayout.notice.height / 2);
+      hoverMoves += 1;
+    }
+    await sampleHover();
+  }
+  assert(await notice.count() === 1 && await notice.isVisible(), '右键通知在鼠标阅读超过6秒时自动消失');
+  const hoverHeldForMs = Date.now() - hoverStartedAt;
+  await notice.evaluate(node => {
+    for (const [type, listener] of node.__fluentReadHoverObservation.listeners) node.removeEventListener(type, listener);
+    delete node.__fluentReadHoverObservation;
+  });
+  await page.mouse.move(20, 800);
+  const mouseLeftAt = Date.now();
+  await notice.waitFor({state: 'detached', timeout: 6500});
+  const remainingAfterLeaveMs = Date.now() - mouseLeftAt;
+  const beforeHoverMs = hoverStartedAt - hoverStartedMessageAt;
+  const expectedRemainderMs = 6000 - beforeHoverMs;
+  assert(remainingAfterLeaveMs >= expectedRemainderMs - 500 && remainingAfterLeaveMs <= expectedRemainderMs + 850,
+    `鼠标离开后未按剩余阅读时间关闭：${JSON.stringify({beforeHoverMs, hoverHeldForMs, remainingAfterLeaveMs, expectedRemainderMs})}`);
+  result.cases.push({id: 'context-menu.notice-hover-pauses-and-resumes', status: 'passed',
+    durationMs: 6000, beforeHoverMs, hoverHeldForMs, remainingAfterLeaveMs, expectedRemainderMs,
+    inputMode: 'trusted-small-mouse-moves-inside-notice', hoverMoves, hoverSamples});
+
+  await page.evaluate(() => {
+    const button = document.createElement('button'); button.id = 'context-menu-notice-focus-origin';
+    button.textContent = 'Fixture keyboard focus origin';
+    button.style.cssText = 'position:fixed;left:40px;top:700px;width:260px;height:40px';
+    document.body.append(button);
+  });
+  await page.locator('#context-menu-notice-focus-origin').click();
+  await show('selectionUnavailable');
+  await page.keyboard.press('Escape');
+  assert(await notice.count() === 1, '通知在键盘焦点位于外部时错误拦截Escape');
+  let tabPresses = 0;
+  let focusLayout;
+  while (tabPresses < 25) {
+    await page.keyboard.press('Tab'); tabPresses += 1;
+    focusLayout = await readContextMenuNoticeLayout(page);
+    if (focusLayout.closeFocused) break;
+  }
+  assert(focusLayout?.closeFocused && focusLayout.closeFocusVisible && Number.parseFloat(focusLayout.closeOutlineWidth) >= 2,
+    `真实Tab未形成通知关闭按钮的可见焦点：${JSON.stringify({tabPresses, focusLayout})}`);
+  const focusedAt = Date.now();
+  await page.waitForTimeout(6500);
+  assert(await notice.count() === 1 && await notice.isVisible(), '右键通知在键盘阅读超过6秒时自动消失');
+  const focusedForMs = Date.now() - focusedAt;
+  const focusScreenshot = path.join(result.artifactsDir, 'context-menu-notice-keyboard-focus.png');
+  await captureContextMenuScreenshot(page, focusScreenshot, 'keyboard notice screenshot'); result.screenshots.push(focusScreenshot);
+  await page.keyboard.press('Escape');
+  await notice.waitFor({state: 'detached'});
+  const focusReturned = await page.locator('#context-menu-notice-focus-origin').evaluate(button => document.activeElement === button);
+  assert(focusReturned, '键盘关闭通知后未恢复到原网页焦点');
+  result.cases.push({id: 'context-menu.notice-keyboard-pauses-and-local-escape', status: 'passed',
+    durationMs: 6000, tabPresses, focusedForMs, focusLayout, focusReturned, additionalRequests: 0});
+
+  const revivals = [];
+  for (const interaction of ['hover', 'focus']) {
+    await page.locator('#context-menu-notice-focus-origin').click();
+    await show('unavailable');
+    await notice.evaluate(node => {globalThis.__fluentReadNoticeBeforeRevival = node;});
+    if (interaction === 'hover') {
+      const layout = await readContextMenuNoticeLayout(page);
+      await page.mouse.click(layout.close.x + layout.close.width / 2, layout.close.y + layout.close.height / 2);
+    } else {
+      let presses = 0;
+      do {await page.keyboard.press('Tab'); presses += 1;}
+      while (!(await readContextMenuNoticeLayout(page)).closeFocused && presses < 25);
+      assert((await readContextMenuNoticeLayout(page)).closeFocused, '复活用例没有建立真实关闭按钮焦点');
+      await page.keyboard.press('Escape');
+    }
+    const closingAt = Date.now();
+    await page.mouse.move(20, 800);
+    const response = await sendContextMenuMessage(popup, {type: 'contextMenuNotice', reason: 'unavailable'});
+    const updatedAfterMs = Date.now() - closingAt;
+    const sameNode = await notice.evaluate(node => node === globalThis.__fluentReadNoticeBeforeRevival);
+    assert(response?.status === 'success' && sameNode && await notice.count() === 1,
+      `离场期间同key通知没有原地复活：${JSON.stringify({interaction, response, updatedAfterMs, sameNode})}`);
+    const originFocused = await page.locator('#context-menu-notice-focus-origin').evaluate(button => document.activeElement === button);
+    assert(originFocused, '复活通知保留了已结束的按钮焦点');
+    const revivedAt = Date.now();
+    await notice.waitFor({state: 'detached', timeout: 7500});
+    const closedAfterMs = Date.now() - revivedAt;
+    assert(closedAfterMs >= 5600 && closedAfterMs <= 7000,
+      `复活通知因残留hover/focus状态未正常倒计时：${JSON.stringify({interaction, closedAfterMs})}`);
+    revivals.push({interaction, sameNode, updatedAfterMs, originFocused, closedAfterMs});
+  }
+  await page.locator('#context-menu-notice-focus-origin').evaluate(button => button.remove());
+  assert(readRequestCount() === requestsBefore, '通知外观或交互额外发起了翻译请求');
+  result.cases.push({id: 'context-menu.notice-revival-clears-ended-interaction', status: 'passed', revivals, additionalRequests: 0});
+  await patchStoredConfig(popup, {theme: previous.theme});
+}
+
 async function triggerShortcut(page, label, settleMs = 450) {
   if (label === 'Ctrl') await page.keyboard.press('Control');
   else if (label === 'Alt / Option') await page.keyboard.press('Alt');
@@ -888,11 +1205,15 @@ async function main() {
   assertDedicatedProfile(profileDir);
   let context;
   let closeBrowser;
+  let browserStartAttempted = false;
   let primaryError;
   const result = {
     ok: false,
     extensionDir: args.extensionDir,
+    artifactsDir: args.artifactsDir,
     browser: 'Microsoft Edge',
+    testScope: args.contextMenuOnly ? 'context-menu-only' : 'selection-trigger-filter-or-matrix',
+    profileMode: 'temporary-isolated',
     windowMode: args.headed ? 'headed-dedicated-profile' : 'background-visible-no-focus',
     cases: [],
     screenshots: [],
@@ -905,6 +1226,13 @@ async function main() {
   const translationRequestBatchSizes = [];
   const translationRequestEvents = [];
   let translationResponseDelayMs = 0;
+  let translationFailureResponses = 0;
+  let expectingProviderFailure = false;
+  const recordConsoleIssue = message => {
+    if (expectingProviderFailure && /Selection translation error:|翻译失败|\b400\b/.test(message)) {
+      (result.expectedConsoleErrors ||= []).push(message);
+    } else result.consoleErrors.push(message);
+  };
   const inlineCodeRequests = [];
   const translationServer = http.createServer(async (request, response) => {
     const fixtureRequestUrl = new URL(request.url, 'http://127.0.0.1');
@@ -918,6 +1246,12 @@ async function main() {
     translationRequestEvents.push(Date.now());
     if (translationResponseDelayMs > 0) {
       await new Promise(resolve => setTimeout(resolve, translationResponseDelayMs));
+    }
+    if (translationFailureResponses > 0) {
+      translationFailureResponses -= 1;
+      response.writeHead(400, {'access-control-allow-origin': '*', 'content-type': 'application/json'});
+      response.end(JSON.stringify({error: 'Controlled context-menu failure'}));
+      return;
     }
     let source = '';
     let sources = [];
@@ -935,7 +1269,7 @@ async function main() {
       'content-type': 'application/json; charset=utf-8',
     });
     const directionSuffix = args.directionOnly ? ` [to=${fixtureRequestUrl.searchParams.get('to') || ''}]` : '';
-    response.end(JSON.stringify((args.inlineCodeOnly ? sources : [source]).map(text => ({ translations: [{ text: `测试译文：${text}${directionSuffix}` }] }))));
+    response.end(JSON.stringify((args.inlineCodeOnly || args.contextMenuOnly ? sources : [source]).map(text => ({ translations: [{ text: `测试译文：${text}${directionSuffix}` }] }))));
   });
   try {
     await new Promise((resolve, reject) => {
@@ -950,6 +1284,7 @@ async function main() {
       '--no-first-run',
       '--no-default-browser-check',
     ];
+    browserStartAttempted = true;
     if (!args.headed) {
       const focusSafe = loadFocusSafeBrowser(args.focusSafeHelper);
       const browserSession = await focusSafe.launchFocusSafePersistentContext({
@@ -966,6 +1301,18 @@ async function main() {
       context = browserSession.context;
       createIsolatedPage = () => focusSafe.newPageWithoutForeground(context);
       activateInputPage = page => focusSafe.activateExtensionTabWithoutForeground(context, page);
+      if (args.contextMenuOnly) {
+        const browserPid = await getGuardedBrowserPid(browserSession);
+        result.ownedBrowserPid = browserPid;
+        assertBackgroundFocus = async label => {
+          const frontmost = await focusSafe.queryMacFrontmostApplication();
+          assert(frontmost && Number.isSafeInteger(frontmost.pid) && frontmost.pid > 0
+            && Number.isSafeInteger(browserPid) && browserPid > 0 && frontmost.pid !== browserPid,
+          `右键专项焦点检查失败：${JSON.stringify({label, frontmost, browserPid})}`);
+          (result.focusChecks ||= []).push({label, frontmost, browserFrontmost: false});
+        };
+        await assertBackgroundFocus('context-menu startup');
+      }
       result.launchMode = browserSession.launchMode;
       result.focusPolicy = browserSession.focusPolicy;
       result.windowPlacement = browserSession.windowPlacement;
@@ -984,7 +1331,7 @@ async function main() {
     const {worker, extensionId} = await waitForWorker(context);
     const attachWorkerDiagnostics = (target) => {
       target.on('console', (message) => {
-        result.consoleErrors.push(`worker ${message.type()}: ${message.text()}`);
+        recordConsoleIssue(`worker ${message.type()}: ${message.text()}`);
       });
     };
     attachWorkerDiagnostics(worker);
@@ -1035,7 +1382,7 @@ async function main() {
 
     const page = await createIsolatedPage(context);
     page.on('pageerror', (error) => result.consoleErrors.push(`pageerror: ${error.message}`));
-    page.on('console', (message) => { if (message.type() === 'error') result.consoleErrors.push(`console: ${message.text()}`); });
+    page.on('console', (message) => { if (message.type() === 'error') recordConsoleIssue(`console: ${message.text()}`); });
     await page.goto('https://example.com/', { waitUntil: 'domcontentloaded', timeout: 60000 });
     await waitForContentScript(page);
 
@@ -1277,8 +1624,9 @@ async function main() {
         selectionTranslatorTrigger: 'icon',
         selectionTranslatorDelay: 0,
         contextMenuEnabled: true,
-        contextMenuEntries: {...saved.contextMenuEntries, translateSelection: true},
+        contextMenuEntries: {...saved.contextMenuEntries, translateSelection: true, translatePage: true},
         service: 'microsoft',
+        useCache: false,
         from: 'auto',
         to: 'zh-Hans',
         hotkey: 'none',
@@ -1291,7 +1639,7 @@ async function main() {
       const triggerState = await setSelectionTrigger(selectionUi, '仅右键菜单');
       result.cases.push({id: 'context-menu.setting-and-popup-preview', status: 'passed', triggerState});
       const settingsScreenshot = path.join(args.artifactsDir, 'context-menu-setting.png');
-      await options.screenshot({path: settingsScreenshot});
+      await captureContextMenuScreenshot(options, settingsScreenshot, 'context-menu settings screenshot');
       result.screenshots.push(settingsScreenshot);
 
       // Chromium 没有 contextMenus.getAll；以 update 的回调确认 ID 是否由浏览器注册。
@@ -1317,7 +1665,9 @@ async function main() {
 
       await activateInputPage(page);
       await resetFixture(page);
-      const selected = await selectTextWithDomRange(page, '#target', 4096);
+      const selected = await tripleClickTarget(page);
+      assert(selected.mouseDown?.isTrusted && selected.text === TARGET_TEXT,
+        `右键专项原生三击选区错误：${JSON.stringify(selected)}`);
       await page.waitForTimeout(500);
       const quietUi = await readSelectionUi(page);
       assert(quietUi.selectionText === TARGET_TEXT && !quietUi.indicator && !quietUi.readingIndicator && !quietUi.tooltip,
@@ -1330,33 +1680,182 @@ async function main() {
         `仅右键菜单模式占用了 Ctrl 或发起了翻译：${JSON.stringify({afterShortcut, translationRequestCount, requestsBeforeShortcut})}`);
       result.cases.push({id: 'context-menu.selection-stays-quiet', status: 'passed', selected, requestsBeforeShortcut, ui: afterShortcut});
 
-      const actionResponse = await popup.evaluate(() => new Promise((resolve, reject) => {
-        chrome.tabs.query({url: 'https://example.com/*'}, (tabs) => {
-          const queryError = chrome.runtime.lastError?.message;
-          if (queryError) { reject(new Error(queryError)); return; }
-          if (tabs.length !== 1 || !Number.isInteger(tabs[0].id)) {
-            reject(new Error(`找不到唯一的测试页面：${JSON.stringify(tabs)}`));
-            return;
-          }
-          chrome.tabs.sendMessage(tabs[0].id, {type: 'contextMenuTranslate', action: 'selection'}, {frameId: 0}, (response) => {
-            const messageError = chrome.runtime.lastError?.message;
-            if (messageError) reject(new Error(messageError));
-            else resolve(response);
-          });
-        });
-      }));
+      translationResponseDelayMs = 2400;
+      const gesture = await captureRightClickAndDropSelection(page, '#target', TARGET_TEXT);
+      const requestsBeforeAction = translationRequestCount;
+      const actionStartedAt = Date.now();
+      const actionResponse = await sendContextMenuTranslation(popup, 'selection', gesture.selectedText);
       assert(actionResponse?.status === 'success', `右键选区翻译消息未被内容脚本接收：${JSON.stringify(actionResponse)}`);
+      await waitForSelectionUi(page, {tooltip: true, loading: true, translation: false}, '右键立即加载反馈');
+      const loadingShownAfterMs = Date.now() - actionStartedAt;
+      const loadingUi = await readSelectionUi(page);
+      assert(loadingUi.loadingText.length > 0, `右键加载反馈缺少文字：${JSON.stringify(loadingUi)}`);
+      const loadingScreenshot = path.join(args.artifactsDir, 'context-menu-selection-loading.png');
+      await captureContextMenuScreenshot(page, loadingScreenshot, 'context-menu loading screenshot');
+      result.screenshots.push(loadingScreenshot);
+      // 在途时重新打开菜单；可信右键 pointerdown 不能取消已有请求或清空卡片。
+      await page.evaluate(() => {
+        const range = globalThis.__fluentReadContextMenuNativeRange?.cloneRange();
+        if (!range) throw new Error('重复右键缺少原生选区的完整边界');
+        const selection = window.getSelection();
+        selection?.removeAllRanges(); selection?.addRange(range);
+      });
+      const repeatedGesture = await captureRightClickAndDropSelection(page, '#target', TARGET_TEXT);
+      const reopenedUi = await readSelectionUi(page);
+      assert(reopenedUi.tooltip && reopenedUi.loading && !reopenedUi.translation,
+        `在途右键使卡片消失、取消或提前完成：${JSON.stringify(reopenedUi)}`);
+      const repeatedResponses = await Promise.all([
+        sendContextMenuTranslation(popup, 'selection', repeatedGesture.selectedText),
+        sendContextMenuTranslation(popup, 'selection', repeatedGesture.selectedText),
+      ]);
+      assert(repeatedResponses.every(response => response?.status === 'success'),
+        `在途重复右键没有复用请求：${JSON.stringify(repeatedResponses)}`);
       await waitForSelectionUi(page, {tooltip: true, translation: true, resultPrefix: '测试译文：'}, '右键翻译卡片');
       const translatedUi = await readSelectionUi(page);
       assert(translatedUi.resultText.includes(TARGET_TEXT), `右键翻译卡片内容错误：${translatedUi.resultText}`);
-      result.cases.push({id: 'context-menu.selection-action', status: 'passed', actionResponse, requests: translationRequestCount, ui: translatedUi});
+      assert(translationRequestCount === requestsBeforeAction + 1,
+        `右键相同在途选区重复请求：${JSON.stringify({requestsBeforeAction, translationRequestCount})}`);
+      result.cases.push({id: 'context-menu.selection-loss-fallback-and-pending-reuse', status: 'passed', gesture,
+        repeatedGesture, actionResponse, repeatedResponses, loadingShownAfterMs, loadingUi,
+        reopenedUi, requestDispatchAfterMs: translationRequestEvents[requestsBeforeAction] - actionStartedAt,
+        fixtureResponseDelayMs: translationResponseDelayMs,
+        requests: translationRequestCount - requestsBeforeAction, ui: translatedUi});
+      translationResponseDelayMs = 0;
+      const completedResponse = await sendContextMenuTranslation(popup, 'selection', TARGET_TEXT);
+      await page.waitForTimeout(250);
+      const completedUi = await readSelectionUi(page);
+      assert(completedResponse?.status === 'success' && completedUi.resultText === translatedUi.resultText
+        && translationRequestCount === requestsBeforeAction + 1,
+      `完成后重复右键没有复用卡片：${JSON.stringify({completedResponse, completedUi, translationRequestCount})}`);
+      result.cases.push({id: 'context-menu.completed-selection-reuse', status: 'passed', completedResponse,
+        additionalRequests: 0, ui: completedUi});
       const cardScreenshot = path.join(args.artifactsDir, 'context-menu-selection-card.png');
-      await page.screenshot({path: cardScreenshot});
+      await captureContextMenuScreenshot(page, cardScreenshot, 'context-menu card screenshot');
       result.screenshots.push(cardScreenshot);
+
+      await closeSelectionUi(page);
+      await clearPageSelection(page);
+      await resetFixture(page);
+      const retryText = 'Please retry this selected sentence after the translation provider failed.';
+      await page.locator('#target').evaluate((target, text) => {target.textContent = text;}, retryText);
+      await tripleClickTarget(page);
+      const failedGesture = await captureRightClickAndDropSelection(page, '#target', retryText);
+      translationFailureResponses = 1;
+      expectingProviderFailure = true;
+      const requestsBeforeFailure = translationRequestCount;
+      const failedResponse = await sendContextMenuTranslation(popup, 'selection', failedGesture.selectedText);
+      assert(failedResponse?.status === 'success', `失败夹具没有启动：${JSON.stringify(failedResponse)}`);
+      await waitForSelectionUi(page, {tooltip: true, error: true, retryButton: true, loading: false}, '右键失败与可重试反馈');
+      const failedUi = await readSelectionUi(page);
+      assert(failedUi.errorText.includes('重试'), `失败反馈没有可执行的重试提示：${JSON.stringify(failedUi)}`);
+      const failureScreenshot = path.join(args.artifactsDir, 'context-menu-selection-retry.png');
+      await captureContextMenuScreenshot(page, failureScreenshot, 'context-menu retry screenshot');
+      result.screenshots.push(failureScreenshot);
+      const retryResponse = await sendContextMenuTranslation(popup, 'selection', retryText);
+      assert(retryResponse?.status === 'success', `失败后的右键重试没有被接收：${JSON.stringify(retryResponse)}`);
+      await waitForSelectionUi(page, {tooltip: true, translation: true, error: false, resultPrefix: '测试译文：'}, '失败后的右键重试');
+      const retryUi = await readSelectionUi(page);
+      assert(retryUi.resultText.includes(retryText) && translationRequestCount === requestsBeforeFailure + 2,
+        `失败后未恰好重试一次：${JSON.stringify({retryUi, requestsBeforeFailure, translationRequestCount})}`);
+      expectingProviderFailure = false;
+      result.cases.push({id: 'context-menu.failed-selection-retry', status: 'passed', failedResponse, retryResponse,
+        failedUi, retryUi, requests: translationRequestCount - requestsBeforeFailure});
+
+      // 仅有浏览器提供的 selectionText 不能翻译旧页面或可编辑区域中的文字。
+      await closeSelectionUi(page);
+      await clearPageSelection(page);
+      await resetFixture(page);
+      await tripleClickTarget(page);
+      const detachedGesture = await captureRightClickAndDropSelection(page, '#target', TARGET_TEXT);
+      await page.locator('#target').evaluate(target => target.remove());
+      const requestsBeforeRejection = translationRequestCount;
+      const detachedResponse = await sendContextMenuTranslation(popup, 'selection', detachedGesture.selectedText);
+      assert(detachedResponse?.status === 'failed', `断连右键目标未被拒绝：${JSON.stringify(detachedResponse)}`);
+      await resetFixture(page);
+      const editableBodySelection = await tripleClickTarget(page);
+      assert(editableBodySelection.text === TARGET_TEXT, '可编辑右键保护用例缺少相同文字的正文选区');
+      await page.evaluate(text => {
+        globalThis.__fluentReadEditableBodyRange = window.getSelection().getRangeAt(0).cloneRange();
+        const input = document.createElement('textarea');
+        input.id = 'context-menu-private-input'; input.value = text;
+        input.style.cssText = 'position:fixed;left:120px;top:120px;width:600px;height:100px';
+        // 保留正文 Selection；浏览器菜单提供的 input 原文恰好相同时也不能复用正文 Range。
+        document.body.append(input);
+      }, TARGET_TEXT);
+      const editableGesture = await captureRightClickAndDropSelection(page, '#context-menu-private-input');
+      const editableResponse = await sendContextMenuTranslation(popup, 'selection', TARGET_TEXT);
+      // 某些宿主会阻止右键 pointerdown 的焦点默认行为，正文 Selection 此时仍可能保留。
+      // 明确标注此受控宿主夹具，不能把它当作 Edge 默认聚焦行为。
+      await page.evaluate(() => {
+        const selection = window.getSelection();
+        selection.removeAllRanges(); selection.addRange(globalThis.__fluentReadEditableBodyRange.cloneRange());
+        const input = document.querySelector('#context-menu-private-input');
+        for (const name of ['pointerdown', 'mousedown']) input.addEventListener(name, event => {
+          if (event.button === 2) event.preventDefault();
+        }, {capture: true});
+      });
+      const retainedEditableGesture = await captureRightClickAndDropSelection(page, '#context-menu-private-input', TARGET_TEXT);
+      const retainedEditableResponse = await sendContextMenuTranslation(popup, 'selection', TARGET_TEXT);
+      await page.waitForTimeout(200);
+      const rejectedUi = await readSelectionUi(page);
+      assert(editableResponse?.status === 'failed' && retainedEditableResponse?.status === 'failed' && !rejectedUi.tooltip
+        && translationRequestCount === requestsBeforeRejection,
+      `可编辑右键目标被翻译：${JSON.stringify({editableResponse, rejectedUi, requestsBeforeRejection, translationRequestCount})}`);
+      await page.locator('#context-menu-private-input').evaluate(input => input.remove());
+      result.cases.push({id: 'context-menu.stale-and-editable-target-rejection', status: 'passed',
+        detachedResponse, editableResponse, editableBodySelection, editableGesture, retainedEditableGesture,
+        retainedEditableResponse, retainedSelectionHostFixture: 'right pointerdown/mousedown preventDefault', additionalRequests: 0});
+
+      await runContextMenuNoticeCases({page, popup, result, readRequestCount: () => translationRequestCount});
+
+      await clearPageSelection(page);
+      await resetFixture(page);
+      const sourceHtml = await page.locator('#selection-test-fixture').innerHTML();
+      const oldNotice = page.locator('#fluent-read-page-notice-host .page-notice');
+      const staleNoticeResponse = await sendContextMenuMessage(popup, {type: 'contextMenuNotice', reason: 'selectionUnavailable'});
+      await oldNotice.waitFor({state: 'visible'});
+      const oldNoticeBox = await oldNotice.boundingBox();
+      await page.mouse.move(oldNoticeBox.x + oldNoticeBox.width / 2, oldNoticeBox.y + oldNoticeBox.height / 2);
+      const requestsBeforeRejectedActions = translationRequestCount;
+      const rejectedSelectionResponse = await sendContextMenuTranslation(popup, 'selection', 'There is no matching live selected text.');
+      assert(rejectedSelectionResponse?.status === 'failed' && await oldNotice.count() === 1,
+        `失败的右键动作错误关闭现有提示：${JSON.stringify(rejectedSelectionResponse)}`);
+      await patchStoredConfig(popup, {on: false});
+      await page.waitForTimeout(600);
+      const disabledPageResponse = await sendContextMenuTranslation(popup, 'fullPage');
+      assert(disabledPageResponse?.status === 'disabled' && await oldNotice.count() === 1
+        && translationRequestCount === requestsBeforeRejectedActions,
+      `停用的右键动作关闭提示或发起请求：${JSON.stringify({disabledPageResponse, translationRequestCount})}`);
+      await patchStoredConfig(popup, {on: true});
+      await page.waitForTimeout(600);
+      const translateResponse = await sendContextMenuTranslation(popup, 'fullPage');
+      assert(translateResponse?.status === 'success', `右键全文动作没有启动：${JSON.stringify(translateResponse)}`);
+      await oldNotice.waitFor({state: 'detached', timeout: 1500});
+      await page.mouse.move(20, 800);
+      await page.waitForFunction(() => ['#target', '#neighbor'].every(selector => document.querySelector(selector)
+        ?.querySelectorAll('.fluent-read-bilingual-content').length === 1), undefined, {timeout: 15000});
+      const restoreResponse = await sendContextMenuTranslation(popup, 'restore');
+      await page.waitForFunction(() => document.querySelectorAll('#selection-test-fixture .fluent-read-bilingual-content').length === 0);
+      assert(restoreResponse?.status === 'success' && await page.locator('#selection-test-fixture').innerHTML() === sourceHtml,
+        `右键恢复没有还原原文：${JSON.stringify(restoreResponse)}`);
+      const retranslateResponse = await sendContextMenuTranslation(popup, 'fullPage');
+      await page.waitForFunction(() => ['#target', '#neighbor'].every(selector => document.querySelector(selector)
+        ?.querySelectorAll('.fluent-read-bilingual-content').length === 1), undefined, {timeout: 15000});
+      assert(retranslateResponse?.status === 'success', `恢复后再次右键翻译失败：${JSON.stringify(retranslateResponse)}`);
+      const finalRestoreResponse = await sendContextMenuTranslation(popup, 'restore');
+      await page.waitForFunction(() => document.querySelectorAll('#selection-test-fixture .fluent-read-bilingual-content').length === 0);
+      assert(finalRestoreResponse?.status === 'success' && await page.locator('#selection-test-fixture').innerHTML() === sourceHtml,
+        '再次右键翻译后恢复未还原原文');
+      result.cases.push({id: 'context-menu.page-translate-restore-retranslate', status: 'passed',
+        counts: [1, 0, 1, 0], staleNoticeResponse, rejectedSelectionResponse, disabledPageResponse,
+        failureNoticeRetainedForRejectedActions: true, oldFailureNoticeClearedOnSuccess: true,
+        translateResponse, restoreResponse, retranslateResponse, finalRestoreResponse});
+      result.finalConfig = await readStoredConfig(popup);
+      await assertBackgroundFocus('context-menu final state');
 
       result.ok = result.cases.every(item => item.status === 'passed') && result.consoleErrors.length === 0;
       if (!result.ok) throw new Error(`右键菜单浏览器用例出现控制台错误：${JSON.stringify(result.consoleErrors)}`);
-      result.providerEvidence = 'Local Microsoft response fixture; native menu ID registration and content message route verified without clicking the OS menu.';
+      result.providerEvidence = 'Local Microsoft HTTP response fixture; trusted CDP triple-click/right-click input, native menu ID registration, and production content-message route. Browser menu item selection and background contextMenus.onClicked dispatch are not automated; no live-provider or Firefox-runtime claim.';
       fs.writeFileSync(path.join(args.artifactsDir, 'report.json'), `${JSON.stringify(result, null, 2)}\n`);
       process.stdout.write(`${JSON.stringify(result, null, 2)}\n`);
       return;
@@ -2470,11 +2969,12 @@ async function main() {
         if (resource === 'profile') result.retainedProfile = profileDir;
       }
     };
-    let browserClosed = false;
+    let browserClosed = !browserStartAttempted;
     await cleanup('browser', async () => {
       if (closeBrowser) {await closeBrowser(); browserClosed = true;}
     });
     await cleanup('translation server', () => new Promise((resolve, reject) => {
+      if (!translationServer.listening) {resolve(); return;}
       translationServer.close(error => error ? reject(error) : resolve());
       translationServer.closeAllConnections();
     }));

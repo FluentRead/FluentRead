@@ -27,6 +27,8 @@ import {lookupWord} from '@/src/features/selection-translation/services/wordDict
 import {createInputBoxTranslationHandler} from '@/src/features/input-translation/background';
 import {UNHANDLED_RUNTIME_MESSAGE} from './browser';
 import {attachTranslationGlossaryContext, createTranslationProviderConfigSnapshot} from '@/src/services/translation/requestSnapshot';
+import {createTranslationRequestRegistry} from '@/src/app/background/handlers/translation';
+import {TRANSLATION_CANCEL_MESSAGE_TYPE} from '@/src/services/translation/types';
 
 const UNSUPPORTED_CAPABILITY_MESSAGE = '该功能依赖浏览器扩展权限，userscript 版本暂不支持';
 
@@ -36,11 +38,14 @@ const UNSUPPORTED_CAPABILITY_MESSAGE = '该功能依赖浏览器扩展权限，u
  */
 export function createPlatformMessageHandler(openSettings: () => void) {
     const visionHandlers = createVisionProbeHandlers({ready: configReady, getConfig: () => config, isSettingsUrl: () => true, resolve: modelVisionProbe.resolve});
+    const inputRequestRegistry = createTranslationRequestRegistry();
+    const inputRequestContext = {sender: {url: globalThis.location?.href}};
 
     const inputBoxTranslationHandler = createInputBoxTranslationHandler({
         ready: configReady,
         getConfig: () => config,
         translate: translateWithCache,
+        requestRegistry: inputRequestRegistry,
     });
 
     return async (message: any): Promise<any> => {
@@ -114,10 +119,15 @@ export function createPlatformMessageHandler(openSettings: () => void) {
 
         if (message.type === 'inputBoxTranslation') {
             try {
-                return await inputBoxTranslationHandler.handle(message);
+                return await inputBoxTranslationHandler.handle(message, inputRequestContext);
             } catch (error) {
                 return {success: false, error: error instanceof Error ? error.message : String(error)};
             }
+        }
+
+        if (message.type === TRANSLATION_CANCEL_MESSAGE_TYPE) {
+            try {return inputRequestRegistry.cancel(message.clientRequestId, inputRequestContext);}
+            catch (error) {return {success: false, error: error instanceof Error ? error.message : String(error)};}
         }
 
         if (message.type === 'selectionWordLookup') {

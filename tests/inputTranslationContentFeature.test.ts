@@ -16,6 +16,7 @@ import {
     inputBoxTranslationConfigKey,
     isInputBoxTranslationEnabled,
     setInputBoxText,
+    INPUT_TRANSLATION_TIMEOUT_MS,
     type InputTranslationContentConfig,
 } from '@/src/features/input-translation/content';
 
@@ -126,10 +127,9 @@ function mountHarness(overrides: {
         animations: false,
         ...overrides.config,
     };
-    const sendMessage = vi.fn(overrides.sendMessage || (async () => ({
-        success: true,
-        translatedText: '你好',
-    })));
+    const sendMessage = vi.fn((message: any) => message.type === 'fluentReadTranslationCancel'
+        ? Promise.resolve({success: true})
+        : (overrides.sendMessage || (async () => ({success: true, translatedText: '你好'})))(message));
     const logger = {error: vi.fn()};
     const feature = createInputTranslationContentFeature({
         context: {onInvalidated: vi.fn()} as any,
@@ -157,6 +157,333 @@ afterEach(() => {
 });
 
 describe('input translation content feature', () => {
+    it('慢提示挂载不阻塞请求或提交，迟到 loading 不覆盖成功状态', async () => {
+        const records: any[] = [];
+        const base = createUiFactory(records);
+        let release!: () => void;
+        let first = true;
+        const harness = mountHarness({createUi: async (context: unknown, options: unknown) => {
+            const ui = await base(context, options);
+            if (first) { first = false; await new Promise<void>(resolve => { release = resolve; }); }
+            return ui;
+        }});
+        const input = fakeElement('textarea');
+        input.value = 'Hello';
+        harness.fakeDocument.activeElement = input;
+        await harness.fakeDocument.emit('keydown', trustedKey({key: 'Enter', ctrlKey: true}));
+        expect(input.value).toBe('你好');
+        expect(records.at(-1).ui.mounted.textContent).toContain('翻译成功');
+        release();
+        await vi.waitFor(() => expect(records[0].ui.remove).toHaveBeenCalledOnce());
+        expect(records[0].ui.mount).not.toHaveBeenCalled();
+    });
+
+    it('重复触发沿用进行中请求，取消不等待后台响应且发送精确请求 ID', async () => {
+        const harness = mountHarness({sendMessage: () => new Promise(() => {})});
+        const input = fakeElement('textarea');
+        input.value = 'Hello';
+        harness.fakeDocument.activeElement = input;
+        const running = harness.fakeDocument.emit('keydown', trustedKey({key: 'Enter', ctrlKey: true}));
+        await vi.waitFor(() => expect(harness.sendMessage).toHaveBeenCalledOnce());
+        for (let count = 0; count < 5; count += 1) {
+            await harness.fakeDocument.emit('keydown', trustedKey({key: 'Enter', ctrlKey: true}));
+        }
+        expect(harness.sendMessage).toHaveBeenCalledOnce();
+        const button = harness.tooltipRecords[0].ui.mounted.children.at(-1);
+        const down = {preventDefault: vi.fn()};
+        button.listeners.get('mousedown')[0](down);
+        expect(down.preventDefault).toHaveBeenCalledOnce();
+        button.listeners.get('click')[0]({isTrusted: true, preventDefault: vi.fn(), stopPropagation: vi.fn()});
+        await running;
+        expect(input.value).toBe('Hello');
+        expect(harness.sendMessage).toHaveBeenLastCalledWith({type: 'fluentReadTranslationCancel',
+            clientRequestId: harness.sendMessage.mock.calls[0][0].clientRequestId});
+    });
+
+    it.each([true, false])('富文本失焦后不抢回焦点或写入，focusout 事件=%s', async emitFocusOut => {
+        let release!: (value: unknown) => void;
+        const harness = mountHarness({sendMessage: () => new Promise(resolve => { release = resolve; })});
+        const rich = fakeElement('div', {contenteditable: 'true'});
+        rich.innerText = 'Hello';
+        harness.fakeDocument.activeElement = rich;
+        const running = harness.fakeDocument.emit('keydown', trustedKey({key: 'Enter', ctrlKey: true}));
+        await vi.waitFor(() => expect(harness.sendMessage).toHaveBeenCalledOnce());
+        const other = fakeElement('input');
+        harness.fakeDocument.activeElement = other;
+        if (emitFocusOut) await harness.fakeDocument.emit('focusout', {target: rich, relatedTarget: other});
+        release({success: true, translatedText: '你好'});
+        await running;
+        expect(editable.replaceEditableText).not.toHaveBeenCalled();
+        expect(harness.fakeDocument.activeElement).toBe(other);
+    });
+
+    it('无关输入事件不读取完整编辑器快照，其他输入框的 Esc 不吞键', async () => {
+        const harness = mountHarness({sendMessage: () => new Promise(() => {})});
+        const input = fakeElement('textarea');
+        input.value = 'Hello';
+        harness.fakeDocument.activeElement = input;
+        const running = harness.fakeDocument.emit('keydown', trustedKey({key: 'Enter', ctrlKey: true}));
+        await vi.waitFor(() => expect(harness.sendMessage).toHaveBeenCalledOnce());
+        const other = fakeElement('div', {contenteditable: 'true'});
+        Object.defineProperty(other, 'innerText', {get: () => { throw new Error('unrelated layout read'); }});
+        harness.fakeDocument.activeElement = other;
+        await harness.fakeDocument.emit('input', {target: other});
+        const escape = trustedKey({key: 'Escape'});
+        await harness.fakeDocument.emit('keydown', escape);
+        expect(escape.preventDefault).not.toHaveBeenCalled();
+        harness.controller.abort();
+        await running;
+    });
+
+    it('消息不返回时有界超时取消后台，重试使用新的请求 ID', async () => {
+        vi.useFakeTimers();
+        let attempts = 0;
+        const harness = mountHarness({sendMessage: async () => {
+            if (++attempts === 1) return new Promise(() => {});
+            return {success: true, translatedText: '你好'};
+        }});
+        const input = fakeElement('textarea');
+        input.value = 'Hello';
+        harness.fakeDocument.activeElement = input;
+        const running = harness.fakeDocument.emit('keydown', trustedKey({key: 'Enter', ctrlKey: true}));
+        await vi.advanceTimersByTimeAsync(INPUT_TRANSLATION_TIMEOUT_MS);
+        await running;
+        expect(input.value).toBe('Hello');
+        expect(harness.sendMessage).toHaveBeenLastCalledWith(expect.objectContaining({type: 'fluentReadTranslationCancel'}));
+        const retry = harness.tooltipRecords.at(-1).ui.mounted.children.at(-1);
+        expect(retry.textContent).toBe('重试');
+        retry.listeners.get('click')[0]({isTrusted: true, preventDefault: vi.fn(), stopPropagation: vi.fn()});
+        await vi.advanceTimersByTimeAsync(0);
+        expect(input.value).toBe('你好');
+        const ids = harness.sendMessage.mock.calls.filter(([message]) => message.type === 'inputBoxTranslation').map(([message]) => message.clientRequestId);
+        expect(new Set(ids).size).toBe(2);
+        harness.controller.abort();
+        expect(vi.getTimerCount()).toBe(0);
+    });
+
+    it('提示跟随滚动和视口尺寸变化，卸载清理定位监听', async () => {
+        const harness = mountHarness();
+        const view: any = {innerWidth: 390, innerHeight: 600, addEventListener: vi.fn(), removeEventListener: vi.fn()};
+        (harness.fakeDocument as any).defaultView = view;
+        const input = fakeElement('textarea');
+        input.value = 'Hello';
+        let rect = {left: 350, width: 80, top: 560, bottom: 590};
+        input.getBoundingClientRect.mockImplementation(() => rect);
+        harness.fakeDocument.activeElement = input;
+        await harness.fakeDocument.emit('keydown', trustedKey({key: 'Enter', ctrlKey: true}));
+        const tooltip = harness.tooltipRecords.at(-1).ui.mounted;
+        expect(tooltip.style.left).toBe('298px');
+        const position = view.addEventListener.mock.calls.at(-2)[1];
+        rect = {left: 0, width: 80, top: 100, bottom: 130};
+        position();
+        expect(tooltip.style.left).toBe('12px');
+        expect(tooltip.style.top).toBe('142px');
+        harness.controller.abort();
+        expect(view.removeEventListener).toHaveBeenCalledWith('scroll', position, true);
+        expect(view.removeEventListener).toHaveBeenCalledWith('resize', position);
+    });
+
+    it.each(['keydown', 'compositionstart', 'paste', 'cut', 'ctrl_key'])('恢复原文等待期间的 %s 能立即取消写入', async type => {
+        const harness = mountHarness();
+        const rich = fakeElement('div', {contenteditable: 'true'});
+        rich.innerText = 'Hello';
+        harness.fakeDocument.activeElement = rich;
+        await harness.fakeDocument.emit('keydown', trustedKey({key: 'Enter', ctrlKey: true}));
+        let signal!: AbortSignal;
+        editable.replaceEditableText.mockImplementationOnce((_element, _text, _guard, _mode, _symbol, value) => {
+            signal = value;
+            return new Promise(resolve => value.addEventListener('abort', () => resolve('stale'), {once: true}));
+        });
+        const restore = harness.tooltipRecords.at(-1).ui.mounted.children.at(-1);
+        restore.listeners.get('click')[0]({isTrusted: true, preventDefault: vi.fn(), stopPropagation: vi.fn()});
+        await vi.waitFor(() => expect(signal).toBeInstanceOf(AbortSignal));
+        restore.listeners.get('click')[0]({isTrusted: true, preventDefault: vi.fn(), stopPropagation: vi.fn()});
+        expect(editable.replaceEditableText).toHaveBeenCalledTimes(2);
+        await harness.fakeDocument.emit(type === 'ctrl_key' ? 'keydown' : type,
+            trustedKey({key: 'x', ctrlKey: type === 'ctrl_key', target: rich}));
+        expect(signal.aborted).toBe(true);
+    });
+
+    it('完成后用户修改原文立即移除旧提示，迟到的自动移除不影响页面', async () => {
+        vi.useFakeTimers();
+        const harness = mountHarness();
+        const input = fakeElement('textarea');
+        input.value = 'Hello';
+        harness.fakeDocument.activeElement = input;
+        await harness.fakeDocument.emit('keydown', trustedKey({key: 'Enter', ctrlKey: true}));
+        const success = harness.tooltipRecords.at(-1).ui;
+        input.value = '继续写新草稿';
+        await harness.fakeDocument.emit('input', {target: input});
+        expect(success.remove).toHaveBeenCalledOnce();
+        vi.advanceTimersByTime(8000);
+        expect(success.remove).toHaveBeenCalledOnce();
+        expect(input.value).toBe('继续写新草稿');
+    });
+
+    it('提示尚无测量宽度时仍在视口内定位，滚动后使用真实尺寸', async () => {
+        const records: any[] = [];
+        const base = createUiFactory(records);
+        const harness = mountHarness({createUi: async (context: unknown, options: any) => {
+            const ui = await base(context, {...options, onMount: (container: HTMLElement) => {
+                const tooltip = options.onMount(container);
+                tooltip.getBoundingClientRect.mockReturnValue({width: 0, height: 0});
+                return tooltip;
+            }});
+            return ui;
+        }});
+        const view: any = {innerWidth: 390, innerHeight: 600, addEventListener: vi.fn(), removeEventListener: vi.fn()};
+        (harness.fakeDocument as any).defaultView = view;
+        const input = fakeElement('textarea');
+        input.value = 'Hello';
+        input.getBoundingClientRect.mockReturnValue({left: 350, width: 80, top: 560, bottom: 590});
+        harness.fakeDocument.activeElement = input;
+        await harness.fakeDocument.emit('keydown', trustedKey({key: 'Enter', ctrlKey: true}));
+        const tooltip = records.at(-1).ui.mounted;
+        expect(tooltip.style.left).toBe('258px');
+        expect(tooltip.style.top).toBe('504px');
+        tooltip.getBoundingClientRect.mockReturnValue({width: 80, height: 20});
+        view.addEventListener.mock.calls.at(-2)[1]();
+        expect(tooltip.style.left).toBe('298px');
+        harness.controller.abort();
+    });
+
+    it('原生控件失去写入所有权时不修改值或派发宿主输入事件', async () => {
+        const input = fakeElement('textarea');
+        input.value = '用户的新草稿';
+        await expect(setInputBoxText(input, '旧译文', () => false)).resolves.toBe(false);
+        expect(input.value).toBe('用户的新草稿');
+        expect(input.dispatchEvent).not.toHaveBeenCalled();
+    });
+
+    it.each(['invalidate', 'unmount', 'config', 'disabled', 'site', 'readonly', 'disconnect'])
+    ('宿主写入完成时发生 %s 不继续显示旧成功', async change => {
+        let generation = 0;
+        let siteDisabled = false;
+        const harness = mountHarness({config: {animations: true}, generation: () => generation,
+            isSiteDisabled: () => siteDisabled});
+        const rich = fakeElement('div', {contenteditable: 'true'});
+        rich.innerText = 'Hello';
+        harness.fakeDocument.activeElement = rich;
+        editable.replaceEditableText.mockImplementationOnce(() => {
+            if (change === 'invalidate') harness.feature.invalidate();
+            if (change === 'unmount') harness.controller.abort();
+            if (change === 'config') generation += 1;
+            if (change === 'disabled') harness.config.on = false;
+            if (change === 'site') siteDisabled = true;
+            if (change === 'readonly') rich.getAttribute.mockImplementation((name: string) => name === 'contenteditable' ? 'false' : null);
+            if (change === 'disconnect') rich.isConnected = false;
+            return 'replaced';
+        });
+        await harness.fakeDocument.emit('keydown', trustedKey({key: 'Enter', ctrlKey: true}));
+        expect(rich.classList.add).not.toHaveBeenCalledWith('fluent-input-success');
+        expect(harness.tooltipRecords).toHaveLength(1);
+        harness.controller.abort();
+    });
+
+    it('旧写入返回前宿主同步启动新请求，旧成功不拆新loading或样式', async () => {
+        let secondRun!: Promise<void>;
+        let request = 0;
+        const harness = mountHarness({config: {animations: true}, sendMessage: async () => {
+            if (request++ === 0) return {success: true, translatedText: '你好'};
+            return new Promise(() => {});
+        }});
+        const rich = fakeElement('div', {contenteditable: 'true'});
+        rich.innerText = 'Hello';
+        harness.fakeDocument.activeElement = rich;
+        editable.replaceEditableText.mockImplementationOnce(() => {
+            rich.innerText = '新的草稿';
+            secondRun = harness.fakeDocument.emit('keydown', trustedKey({key: 'Enter', ctrlKey: true}));
+            return 'replaced';
+        });
+        await harness.fakeDocument.emit('keydown', trustedKey({key: 'Enter', ctrlKey: true}));
+        await vi.waitFor(() => expect(harness.tooltipRecords).toHaveLength(2));
+        const current = harness.tooltipRecords.at(-1).ui;
+        expect(current.remove).not.toHaveBeenCalled();
+        expect(rich.classList.values.has('fluent-input-translating')).toBe(true);
+        expect(rich.classList.values.has('fluent-input-success')).toBe(false);
+        harness.controller.abort();
+        await secondRun;
+    });
+
+    it.each(['control', 'editable'] as const)('三连触发的 %s 清理已被取消时不重新启动翻译', async kind => {
+        for (const change of ['invalidate', 'config', 'disabled']) {
+            let generation = 0;
+            const harness = mountHarness({config: {inputBoxTranslationTrigger: 'triple_equal'}, generation: () => generation});
+            const input = kind === 'control' ? fakeElement('textarea') : fakeElement('div', {contenteditable: 'true'});
+            input.value = input.innerText = '原文';
+            input.selectionStart = input.selectionEnd = 2;
+            let caret = {text: input.innerText, caret: 2};
+            editable.readEditableCaretState.mockImplementation(() => caret);
+            harness.fakeDocument.activeElement = input;
+            const key = () => trustedKey({key: '=', code: 'Equal'});
+            for (let count = 0; count < 2; count += 1) {
+                await harness.fakeDocument.emit('keydown', key());
+                input.value += '=';
+                input.innerText += '=';
+                input.selectionStart = input.selectionEnd = input.value.length;
+                caret = {text: input.innerText, caret: input.innerText.length};
+                await harness.fakeDocument.emit('input', {target: input});
+            }
+            const cancelCleanup = () => {
+                if (change === 'invalidate') harness.feature.invalidate();
+                if (change === 'config') generation += 1;
+                if (change === 'disabled') harness.config.on = false;
+            };
+            if (kind === 'control') input.dispatchEvent.mockImplementationOnce(cancelCleanup);
+            else editable.replaceEditableText.mockImplementationOnce(() => {cancelCleanup(); return 'replaced';});
+            await harness.fakeDocument.emit('keydown', key());
+            expect(harness.sendMessage).not.toHaveBeenCalled();
+            harness.controller.abort();
+        }
+    });
+
+    it('成功提示等待挂载时取消仍完整移除所有动画与迟到UI', async () => {
+        vi.useFakeTimers();
+        const records: any[] = [];
+        const base = createUiFactory(records);
+        let release!: () => void;
+        let calls = 0;
+        const harness = mountHarness({config: {animations: true}, createUi: async (context: unknown, options: unknown) => {
+            const ui = await base(context, options);
+            if (++calls === 2) await new Promise<void>(resolve => {release = resolve;});
+            return ui;
+        }});
+        const input = fakeElement('textarea');
+        input.value = 'Hello';
+        harness.fakeDocument.activeElement = input;
+        const running = harness.fakeDocument.emit('keydown', trustedKey({key: 'Enter', ctrlKey: true}));
+        await vi.waitFor(() => expect(release).toBeTypeOf('function'));
+        expect(input.classList.values.has('fluent-input-success')).toBe(true);
+        harness.feature.invalidate();
+        expect(input.classList.values.size).toBe(0);
+        release();
+        await running;
+        expect(records[1].ui.mount).not.toHaveBeenCalled();
+        expect(records[1].ui.remove).toHaveBeenCalledOnce();
+        harness.controller.abort();
+        expect(vi.getTimerCount()).toBe(0);
+    });
+
+    it('同步抛错的取消消息与宿主恢复异常不会变成未处理拒绝', async () => {
+        const harness = mountHarness();
+        const rich = fakeElement('div', {contenteditable: 'true'});
+        rich.innerText = 'Hello';
+        harness.fakeDocument.activeElement = rich;
+        await harness.fakeDocument.emit('keydown', trustedKey({key: 'Enter', ctrlKey: true}));
+        editable.replaceEditableText.mockRejectedValueOnce(new Error('host write failed'));
+        const restore = harness.tooltipRecords.at(-1).ui.mounted.children.at(-1);
+        restore.listeners.get('click')[0]({isTrusted: true, preventDefault: vi.fn(), stopPropagation: vi.fn()});
+        await vi.waitFor(() => expect(harness.logger.error).toHaveBeenCalledWith('输入框翻译操作失败:', expect.any(Error)));
+        harness.sendMessage.mockImplementation((message: any) => {
+            if (message.type === 'fluentReadTranslationCancel') throw new Error('context gone');
+            return new Promise(() => {});
+        });
+        const running = harness.fakeDocument.emit('keydown', trustedKey({key: 'Enter', ctrlKey: true}));
+        await vi.waitFor(() => expect(harness.sendMessage).toHaveBeenCalledWith(expect.objectContaining({type: 'inputBoxTranslation'})));
+        harness.controller.abort();
+        await running;
+    });
+
     it('继承服务变更作废输入请求键，独立服务忽略网页默认变更', () => {
         const base = {on: true, service: 'google', inputBoxTranslationTrigger: 'triple_slash', inputBoxTranslationTarget: 'en', inputBoxTranslationService: ''};
         expect(inputBoxTranslationConfigKey(base)).not.toBe(inputBoxTranslationConfigKey({...base, service: 'microsoft'}));
@@ -276,6 +603,11 @@ describe('input translation content feature', () => {
         expect(first).not.toBe(inputBoxTranslationConfigKey({...base, serviceRegion: {deeplx: 'sgp', openai: 'global'}}));
         expect(first).toBe(inputBoxTranslationConfigKey({...base, serviceRegion: {deeplx: 'cn', openai: 'cn'}}));
         expect(first).not.toBe(inputBoxTranslationConfigKey({...base, token: {deeplx: 'token-b'}}));
+        expect(first).not.toBe(inputBoxTranslationConfigKey({...base, apiKeys: {deeplx: ['token-a', 'token-b']}}));
+        expect(first).toBe(inputBoxTranslationConfigKey({...base, apiKeys: {openai: ['other-key']}}));
+        expect(first).not.toBe(inputBoxTranslationConfigKey({...base, apiKeyRotationEnabled: {deeplx: true}}));
+        expect(first).not.toBe(inputBoxTranslationConfigKey({...base, secret: {deeplx: 'secret'}}));
+        expect(inputBoxTranslationConfigKey({...base, inputBoxTranslationService: 'freeTranslation'})).not.toBe(inputBoxTranslationConfigKey({...base, inputBoxTranslationService: 'freeTranslation', freeTranslationMode: 'race'}));
         expect(first).not.toBe(inputBoxTranslationConfigKey({...base, inputBoxTranslationService: 'newapi', newApiUrl: 'https://new-api'}));
         expect(first).not.toBe(inputBoxTranslationConfigKey({...base, inputBoxTranslationService: 'azureOpenai', azureOpenaiEndpoint: 'https://azure'}));
         expect(first).not.toBe(inputBoxTranslationConfigKey({...base, inputBoxTranslationService: 'youdao', youdaoAppKey: 'app', youdaoAppSecret: 'secret'}));
@@ -348,7 +680,7 @@ describe('input translation content feature', () => {
             isCurrent() ? 'replaced' : 'stale'
         ));
         await expect(setInputBoxText(rich, '译文')).resolves.toBe(true);
-        expect(editable.replaceEditableText).toHaveBeenLastCalledWith(rich, '译文', expect.any(Function), 'all');
+        expect(editable.replaceEditableText).toHaveBeenLastCalledWith(rich, '译文', expect.any(Function), 'all', '', undefined);
         expect(rich.innerText).toBe('保留富文本草稿');
         expect(rich.children).toEqual([inlineWidget]);
         expect(rich.dispatchEvent).not.toHaveBeenCalled();
@@ -370,7 +702,7 @@ describe('input translation content feature', () => {
         input.value = original;
         harness.fakeDocument.activeElement = input;
         await harness.fakeDocument.emit('keydown', trustedKey({key: 'Enter', ctrlKey: true}));
-        expect(harness.sendMessage).toHaveBeenCalledWith({type: 'inputBoxTranslation', text: original, targetLang: 'zh'});
+        expect(harness.sendMessage).toHaveBeenCalledWith({type: 'inputBoxTranslation', text: original, targetLang: 'zh', clientRequestId: expect.any(String)});
         expect(input.value).toBe(mode === 'append' ? `${original}\n你好` : `你好\n${original}`);
         await harness.fakeDocument.emit('keydown', trustedKey({key: 'Enter', ctrlKey: true}));
         expect(harness.sendMessage).toHaveBeenCalledTimes(1);
@@ -389,9 +721,9 @@ describe('input translation content feature', () => {
         rich.innerText = '原文';
         harness.fakeDocument.activeElement = rich;
         await harness.fakeDocument.emit('keydown', trustedKey({key: 'Enter', ctrlKey: true}));
-        expect(editable.replaceEditableText).toHaveBeenCalledWith(rich, '\n你好', expect.any(Function), 'end');
+        expect(editable.replaceEditableText).toHaveBeenCalledWith(rich, '\n你好', expect.any(Function), 'end', '', expect.any(AbortSignal));
         await expect(setInputBoxText(rich, '译文', () => true, 'prepend')).resolves.toBe(true);
-        expect(editable.replaceEditableText).toHaveBeenLastCalledWith(rich, '译文\n', expect.any(Function), 'start');
+        expect(editable.replaceEditableText).toHaveBeenLastCalledWith(rich, '译文\n', expect.any(Function), 'start', '', undefined);
         await expect(setInputBoxText(fakeElement('textarea'), '译文', () => true, 'prepend')).resolves.toBe(true);
         const input = fakeElement('input');
         input.value = '单行原文';
@@ -464,6 +796,7 @@ describe('input translation content feature', () => {
         expect(event.preventDefault).toHaveBeenCalledOnce();
         expect(sendMessage).toHaveBeenCalledWith({
             type: 'inputBoxTranslation',
+            clientRequestId: expect.any(String),
             text: 'Hello',
             targetLang: 'zh',
         });
@@ -475,7 +808,7 @@ describe('input translation content feature', () => {
     it.each([
         ['password', (element: any) => { element.type = 'password'; }],
         ['readonly', (element: any) => { element.readOnly = true; }],
-    ])('发送前重新校验控件资格，异步期间变为 %s 时不发送或写回', async (_label, mutate) => {
+    ])('请求启动后变为 %s 时，即使提示仍在创建也不写回', async (_label, mutate) => {
         let releaseTooltip!: () => void;
         const tooltipBarrier = new Promise<void>((resolve) => { releaseTooltip = resolve; });
         const records: any[] = [];
@@ -495,7 +828,7 @@ describe('input translation content feature', () => {
         releaseTooltip();
         await pending;
 
-        expect(sendMessage).not.toHaveBeenCalled();
+        expect(sendMessage).toHaveBeenCalledWith(expect.objectContaining({type: 'inputBoxTranslation'}));
         expect(input.value).toBe('Secret42');
     });
 
@@ -626,7 +959,7 @@ describe('input translation content feature', () => {
         await harness.fakeDocument.emit('keydown', trustedKey({key: '='}));
         if (result === 'replaced') {
             expect(harness.sendMessage).toHaveBeenCalledWith(expect.objectContaining({text: '原文='}));
-            expect(editable.replaceEditableText).toHaveBeenLastCalledWith(rich, '\n你好', expect.any(Function), 'end');
+            expect(editable.replaceEditableText).toHaveBeenLastCalledWith(rich, '\n你好', expect.any(Function), 'end', '', expect.any(AbortSignal));
         } else expect(harness.sendMessage).not.toHaveBeenCalled();
     });
 
@@ -672,16 +1005,16 @@ describe('input translation content feature', () => {
         expect(third.preventDefault).toHaveBeenCalledOnce();
         expect(third.stopPropagation).toHaveBeenCalledOnce();
         expect(harness.sendMessage).toHaveBeenCalledWith(expect.objectContaining({text: 'Hello world\n'}));
-        expect(editable.replaceEditableText).toHaveBeenCalledWith(rich, '你好', expect.any(Function), 'all');
-        const writeGuard = editable.replaceEditableText.mock.calls[0][2] as () => boolean;
+        expect(editable.replaceEditableText).toHaveBeenCalledWith(rich, '你好', expect.any(Function), 'all', '', expect.any(AbortSignal));
+        const writeGuard = editable.replaceEditableText.mock.calls.at(-1)![2] as () => boolean;
         expect(writeGuard()).toBe(true);
 
         const tooltip = harness.tooltipRecords.at(-1).ui.mounted;
         expect(tooltip.textContent).toContain('翻译成功');
         const restore = tooltip.children.at(-1).listeners.get('click')[0];
         restore({isTrusted: true, preventDefault: vi.fn(), stopPropagation: vi.fn()});
-        await vi.waitFor(() => expect(editable.replaceEditableText).toHaveBeenCalledTimes(2));
-        expect(editable.replaceEditableText).toHaveBeenLastCalledWith(rich, 'Hello world\n', expect.any(Function), 'all');
+        await vi.waitFor(() => expect(editable.replaceEditableText).toHaveBeenCalledTimes(3));
+        expect(editable.replaceEditableText).toHaveBeenLastCalledWith(rich, 'Hello world\n', expect.any(Function), 'all', '', expect.any(AbortSignal));
         await vi.waitFor(() => expect(harness.tooltipRecords.at(-1).ui.remove).toHaveBeenCalled());
     });
 
@@ -740,9 +1073,15 @@ describe('input translation content feature', () => {
         editable.replaceEditableText.mockResolvedValueOnce('unsupported');
         await unsupported.fakeDocument.emit('keydown', trustedKey({key: 'Enter', ctrlKey: true}));
         const errorTooltip = unsupported.tooltipRecords.at(-1);
-        expect(errorTooltip.options.css).toContain('pointer-events: none');
+        expect(errorTooltip.ui.mounted.children.at(-1).value).toBe('你好');
+        expect(errorTooltip.ui.mounted.children.at(-1).readOnly).toBe(true);
+        expect(errorTooltip.options.css).toContain('pointer-events: auto');
         expect(errorTooltip.ui.mounted.textContent).toContain('无法把译文写入当前编辑器');
         expect(rich.classList.values.has('fluent-input-error')).toBe(true);
+        await vi.runAllTimersAsync();
+        expect(errorTooltip.ui.remove).not.toHaveBeenCalled();
+        const close = errorTooltip.ui.mounted.children.at(-2);
+        close.listeners.get('click')[0]({isTrusted: true, preventDefault: vi.fn(), stopPropagation: vi.fn()});
         await vi.runAllTimersAsync();
         expect(errorTooltip.ui.remove).toHaveBeenCalled();
         expect(rich.classList.values.has('fluent-input-error')).toBe(false);
@@ -1096,6 +1435,7 @@ describe('input translation content feature', () => {
 
         const firstRun = harness.fakeDocument.emit('keydown', trustedKey({key: 'Enter', ctrlKey: true}));
         while (sendMessage.mock.calls.length === 0) await Promise.resolve();
+        input.value = 'Changed draft';
         await harness.fakeDocument.emit('keydown', trustedKey({key: 'Enter', ctrlKey: true}));
         resolveFirst({success: true, translatedText: '第一次'});
         await firstRun;
@@ -1127,7 +1467,7 @@ describe('input translation content feature', () => {
         await running;
 
         expect(tooltipRecords[0].ui.remove).toHaveBeenCalledOnce();
-        expect(harness.sendMessage).not.toHaveBeenCalled();
+        expect(harness.sendMessage.mock.calls.some(([message]) => message.type === 'inputBoxTranslation')).toBe(false);
     });
 
     it('翻译返回相同文本或失败时不写回，并显示错误提示', async () => {
@@ -1187,7 +1527,7 @@ describe('input translation content feature', () => {
         expect(input.classList.remove).toHaveBeenCalledWith('fluent-input-translating');
     });
 
-    it('tooltip 创建异常走外层降级提示路径', async () => {
+    it('tooltip 创建异常不影响译文提交', async () => {
         const logger = {error: vi.fn()};
         const fallbackRecords: any[] = [];
         const fallbackCreateUi = createUiFactory(fallbackRecords);
@@ -1203,7 +1543,8 @@ describe('input translation content feature', () => {
 
         await harness.fakeDocument.emit('keydown', trustedKey({key: 'Enter', ctrlKey: true}));
 
-        expect(logger.error).toHaveBeenCalledWith('输入框翻译失败:', expect.any(Error));
+        expect(logger.error).toHaveBeenCalledWith('输入框翻译提示创建失败:', expect.any(Error));
+        expect(input.value).toBe('你好');
     });
 
     it('外层异常发生后若请求已经失效，只清理视觉状态不显示降级提示', async () => {

@@ -44,6 +44,8 @@ import {createVocabularyBookChangedMessage, createVocabularyBookHandler} from '@
 import {VOCABULARY_BOOK_MESSAGE} from '@/src/features/vocabulary/protocol';
 import {vocabularyBook} from '@/src/features/vocabulary/repository';
 import {isUserscriptSettingsUrl} from './settingsPage';
+import {createTranslationRequestRegistry} from '@/src/app/background/handlers/translation';
+import {TRANSLATION_CANCEL_MESSAGE_TYPE} from '@/src/services/translation/types';
 
 const UNSUPPORTED_CAPABILITY_MESSAGE = '该功能依赖浏览器扩展权限，userscript 版本暂不支持';
 
@@ -53,6 +55,8 @@ const UNSUPPORTED_CAPABILITY_MESSAGE = '该功能依赖浏览器扩展权限，u
  */
 export function createPlatformMessageHandler(openSettings: (section?: string) => void) {
     const visionHandlers = createVisionProbeHandlers({ready: configReady, getConfig: () => config, isSettingsUrl: () => true, resolve: modelVisionProbe.resolve});
+    const inputRequestRegistry = createTranslationRequestRegistry();
+    const inputRequestContext = {sender: {url: globalThis.location?.href}};
 
     // Options 表单可能先乐观更新同一 realm 的 config；CAS 必须以已提交快照为准。
     let committedConfig = normalizeConfig(config);
@@ -82,6 +86,7 @@ export function createPlatformMessageHandler(openSettings: (section?: string) =>
         ready: configReady,
         getConfig: () => config,
         translate: translateWithCache,
+        requestRegistry: inputRequestRegistry,
     });
     const modelUsageHandler = createModelUsageHandler(modelUsageRepository, (url) => isUserscriptSettingsUrl(url));
     const vocabularyBookHandler = createVocabularyBookHandler({
@@ -169,10 +174,15 @@ export function createPlatformMessageHandler(openSettings: (section?: string) =>
 
         if (message.type === 'inputBoxTranslation') {
             try {
-                return await inputBoxTranslationHandler.handle(message);
+                return await inputBoxTranslationHandler.handle(message, inputRequestContext);
             } catch (error) {
                 return {success: false, error: error instanceof Error ? error.message : String(error)};
             }
+        }
+
+        if (message.type === TRANSLATION_CANCEL_MESSAGE_TYPE) {
+            try {return inputRequestRegistry.cancel(message.clientRequestId, inputRequestContext);}
+            catch (error) {return {success: false, error: error instanceof Error ? error.message : String(error)};}
         }
 
         if (message.type === 'selectionWordLookup') {

@@ -1,0 +1,102 @@
+{
+  "src/features/input-translation/content/index.ts": {
+    "statements": {
+      "covered": 785,
+      "total": 785,
+      "pct": 100.0
+    },
+    "functions": {
+      "covered": 52,
+      "total": 52,
+      "pct": 100.0
+    },
+    "branches": {
+      "covered": 410,
+      "total": 410,
+      "pct": 100.0
+    },
+    "lines": {
+      "covered": 785,
+      "total": 785,
+      "pct": 100.0
+    }
+  },
+  "src/features/input-translation/content/editableHost.ts": {
+    "statements": {
+      "total": 267,
+      "covered": 267,
+      "skipped": 0,
+      "pct": 100
+    },
+    "branches": {
+      "total": 195,
+      "covered": 195,
+      "skipped": 0,
+      "pct": 100
+    },
+    "functions": {
+      "total": 22,
+      "covered": 22,
+      "skipped": 0,
+      "pct": 100
+    },
+    "lines": {
+      "total": 267,
+      "covered": 267,
+      "skipped": 0,
+      "pct": 100
+    }
+  },
+  "src/features/input-translation/content/inputBox.ts": {
+    "statements": {
+      "total": 113,
+      "covered": 113,
+      "skipped": 0,
+      "pct": 100
+    },
+    "branches": {
+      "total": 79,
+      "covered": 79,
+      "skipped": 0,
+      "pct": 100
+    },
+    "functions": {
+      "total": 12,
+      "covered": 12,
+      "skipped": 0,
+      "pct": 100
+    },
+    "lines": {
+      "total": 113,
+      "covered": 113,
+      "skipped": 0,
+      "pct": 100
+    }
+  },
+  "src/features/input-translation/background/handler.ts": {
+    "statements": {
+      "total": 112,
+      "covered": 112,
+      "skipped": 0,
+      "pct": 100
+    },
+    "branches": {
+      "total": 56,
+      "covered": 56,
+      "skipped": 0,
+      "pct": 100
+    },
+    "functions": {
+      "total": 10,
+      "covered": 10,
+      "skipped": 0,
+      "pct": 100
+    },
+    "lines": {
+      "total": 112,
+      "covered": 112,
+      "skipped": 0,
+      "pct": 100
+    }
+  }
+}

@@ -1,0 +1,157 @@
+{
+  "ok": true,
+  "buildSha256": "769229ae8806138c6c059f09edfc15bcc5ee1ac4a3eaca17367c45fee5343480",
+  "harnessSha256": "28ef49c261654adfc78577b1ba722fe975c1b05ee7c23942e6be82832a81590a",
+  "checks": 87,
+  "passed": 87,
+  "caseChecks": [
+    {
+      "id": "pointer-performance",
+      "checks": 11,
+      "passed": 11,
+      "requests": 1
+    },
+    {
+      "id": "latest-point",
+      "checks": 10,
+      "passed": 10,
+      "requests": 1
+    },
+    {
+      "id": "repeat-loading",
+      "checks": 11,
+      "passed": 11,
+      "requests": 2
+    },
+    {
+      "id": "viewport-leave",
+      "checks": 11,
+      "passed": 11,
+      "requests": 1
+    },
+    {
+      "id": "hidden-tab",
+      "checks": 10,
+      "passed": 10,
+      "requests": 1
+    },
+    {
+      "id": "route-change",
+      "checks": 10,
+      "passed": 10,
+      "requests": 1
+    },
+    {
+      "id": "dom-replacement",
+      "checks": 11,
+      "passed": 11,
+      "requests": 2
+    },
+    {
+      "id": "failure-retry",
+      "checks": 13,
+      "passed": 13,
+      "requests": 2
+    }
+  ],
+  "consoleErrors": [],
+  "unexpectedNetworkRequests": [],
+  "cleanupErrors": [],
+  "retainedProfile": null,
+  "ownedBrowserCloseAndTemporaryProfileRemovalConfirmed": true,
+  "launchMode": "macos-background-cdp",
+  "focusPolicy": "launchservices-no-foreground",
+  "windowPlacement": {
+    "mode": "background-visible-no-focus",
+    "visible": true,
+    "hidden": false,
+    "centered": true,
+    "windowState": "normal",
+    "bounds": {
+      "left": 212,
+      "top": -990,
+      "width": 1280,
+      "height": 900
+    },
+    "displayTarget": "secondary",
+    "source": "macos-nsscreen",
+    "screenIndex": 1,
+    "browserFrontmost": false,
+    "frontmostBefore": {
+      "pid": 75930,
+      "name": "Grok Bot"
+    },
+    "frontmostAfter": {
+      "pid": 75930,
+      "name": "Grok Bot"
+    }
+  },
+  "phases": [
+    {
+      "name": "idle-disabled",
+      "elapsedMs": 5490.89999961853,
+      "longTasksMs": [],
+      "totalBlockingMs": 0,
+      "maxHeartbeatGapMs": 22.90000009536743,
+      "p95HeartbeatGapMs": 21.100000381469727,
+      "metrics": {
+        "ScriptDuration": 0.01172,
+        "TaskDuration": 0.164571,
+        "LayoutDuration": 0,
+        "RecalcStyleDuration": 0,
+        "LayoutCount": 0,
+        "RecalcStyleCount": 0
+      }
+    },
+    {
+      "name": "idle-enabled",
+      "elapsedMs": 5700.400000095367,
+      "longTasksMs": [],
+      "totalBlockingMs": 0,
+      "maxHeartbeatGapMs": 22.100000381469727,
+      "p95HeartbeatGapMs": 21.09999990463257,
+      "metrics": {
+        "ScriptDuration": 0.015879,
+        "TaskDuration": 0.17418599999999998,
+        "LayoutDuration": 0,
+        "RecalcStyleDuration": 0,
+        "LayoutCount": 0,
+        "RecalcStyleCount": 0
+      }
+    },
+    {
+      "name": "continuous-translated",
+      "elapsedMs": 5760.400000095367,
+      "longTasksMs": [],
+      "totalBlockingMs": 0,
+      "maxHeartbeatGapMs": 22.699999809265137,
+      "p95HeartbeatGapMs": 21,
+      "metrics": {
+        "ScriptDuration": 0.270381,
+        "TaskDuration": 0.457443,
+        "LayoutDuration": 0,
+        "RecalcStyleDuration": 0.000566,
+        "LayoutCount": 0,
+        "RecalcStyleCount": 3
+      }
+    }
+  ],
+  "scope": "Single strict 8-case PR integration regression. No repeated CPU sampling or full-site matrix. Isolated temporary background Edge with real Playwright/CDP keys and mouse.",
+  "manualArtifactInspection": {
+    "domFiles": [
+      "dom-replacement.html",
+      "viewport-leave.html"
+    ],
+    "screenshots": [
+      "dom-replacement.png",
+      "viewport-leave.png",
+      "failure-retry.png"
+    ],
+    "findings": [
+      "Replacement source receives only its new translation, old source output absent",
+      "Viewport exit leaves Alpha untranslated; fresh Beta has one bilingual translation",
+      "Explicit keyboard retry succeeds and clears failure UI",
+      "Native input and source link preserved"
+    ]
+  }
+}

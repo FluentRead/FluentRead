@@ -1,0 +1,82 @@
+{
+  "ok": true,
+  "buildSha256": "1b32f669190e351b9e1d4c8c23ee061a915b62c9d2113ee3c58276860c6e0415",
+  "harnessSha256": "28ef49c261654adfc78577b1ba722fe975c1b05ee7c23942e6be82832a81590a",
+  "checks": 45,
+  "passed": 45,
+  "caseChecks": [
+    {
+      "id": "repeat-loading",
+      "checks": 11,
+      "passed": 11,
+      "requests": 1
+    },
+    {
+      "id": "route-change",
+      "checks": 10,
+      "passed": 10,
+      "requests": 1
+    },
+    {
+      "id": "dom-replacement",
+      "checks": 11,
+      "passed": 11,
+      "requests": 2
+    },
+    {
+      "id": "failure-retry",
+      "checks": 13,
+      "passed": 13,
+      "requests": 2
+    }
+  ],
+  "consoleErrors": [],
+  "unexpectedNetworkRequests": [],
+  "cleanupErrors": [],
+  "retainedProfile": null,
+  "ownedBrowserCloseAndTemporaryProfileRemovalConfirmed": true,
+  "launchMode": "macos-background-cdp",
+  "focusPolicy": "launchservices-no-foreground",
+  "windowPlacement": {
+    "mode": "background-visible-no-focus",
+    "visible": true,
+    "hidden": false,
+    "centered": true,
+    "windowState": "normal",
+    "bounds": {
+      "left": 212,
+      "top": -990,
+      "width": 1280,
+      "height": 900
+    },
+    "displayTarget": "secondary",
+    "source": "macos-nsscreen",
+    "screenIndex": 1,
+    "browserFrontmost": false,
+    "frontmostBefore": {
+      "pid": 73685,
+      "name": "ChatGPT"
+    },
+    "frontmostAfter": {
+      "pid": 73685,
+      "name": "ChatGPT"
+    }
+  },
+  "scope": "Single strict 4-case PR #931 state-clear integration regression. No performance or full-site matrix. Isolated temporary background Edge with real Playwright/CDP keys and mouse.",
+  "manualArtifactInspection": {
+    "cases": [
+      "repeat-loading",
+      "route-change",
+      "dom-replacement",
+      "failure-retry"
+    ],
+    "domAndScreenshotsReviewed": true,
+    "findings": [
+      "Restored and retranslated source has exactly one bilingual result",
+      "Old route Alpha remains untranslated while fresh Beta receives one result",
+      "Replacement DOM receives only its own source translation",
+      "Explicit keyboard retry succeeds and clears failure UI",
+      "Native input and source href are preserved in all four DOM snapshots"
+    ]
+  }
+}

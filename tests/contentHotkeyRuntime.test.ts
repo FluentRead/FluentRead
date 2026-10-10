@@ -439,7 +439,10 @@ describe('受支持的 F9 全文快捷键使用真实 core 仲裁', () => {
 
     async function installRuntime(isSiteDisabled: () => boolean = () => false) {
         const documentTarget = Object.assign(new HotkeyTestTarget(), {getElementById: vi.fn(() => null)});
-        const windowTarget = Object.assign(new HotkeyTestTarget(), {getSelection: mocks.getSelection});
+        const windowTarget = Object.assign(new HotkeyTestTarget(), {
+            getSelection: mocks.getSelection,
+            location: {href: 'https://fixture.test/article'},
+        });
         vi.stubGlobal('document', documentTarget);
         vi.stubGlobal('window', windowTarget);
         const {createContentHotkeyRuntime} = await import('@/src/app/content/hotkeyRuntime');
@@ -549,6 +552,7 @@ describe('受支持的 F9 全文快捷键使用真实 core 仲裁', () => {
             noteBilingualHostGesture: vi.fn(),
             ...runtime.selectionShortcutPorts,
         }, controller.signal);
+        documentTarget.emit('mousemove', {isTrusted: true, clientX: 0, clientY: 0});
 
         const down = f9Event();
         // 分别驱动 window/document 的实际监听器；即使收到事件，全文自己的仲裁也必须成立。

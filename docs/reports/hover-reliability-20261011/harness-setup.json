@@ -1,0 +1,24 @@
+{
+  "beforeHarnessSha256": "f570c2c96420f2f0c3e8995a0a671310e87f7a78b2e0ce6cd7abaf14b42bf41c",
+  "afterHarnessSha256": "28ef49c261654adfc78577b1ba722fe975c1b05ee7c23942e6be82832a81590a",
+  "patchSha256": "ac6c37bc4c224ea61c83c9cedb54fcb3c8f2adc832325854783b9224e667841b",
+  "changeOnlyWorkerDiscovery": true,
+  "change": "Register exact extension-ID worker event before configStorageRead wakes worker; await both together with Promise.all. No case/fixture/phase/timeout/retry changes.",
+  "default8AndCpuHarnessSha256": "f570c2c96420f2f0c3e8995a0a671310e87f7a78b2e0ce6cd7abaf14b42bf41c",
+  "coldProfileSmokeHarnessSha256": "28ef49c261654adfc78577b1ba722fe975c1b05ee7c23942e6be82832a81590a",
+  "productBuildSha256": "046659066a31c150e36e166331ef5cdaf93f43705cbf88444afb1b9493a98a0b",
+  "excludedSetupFailure": "after-setup-worker-timeout/report.json",
+  "coldProfileSmoke": {
+    "ok": true,
+    "cases": [
+      "dom-replacement"
+    ],
+    "checks": 11,
+    "requests": 2,
+    "cleanupErrors": [],
+    "retainedProfile": null,
+    "ownedBrowserCloseAndProfileRemovalConfirmed": true,
+    "browserFrontmost": false,
+    "report": "harness-setup-fix/cold-profile-smoke/report.json"
+  }
+}

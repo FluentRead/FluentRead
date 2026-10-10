@@ -1,0 +1,14 @@
+> FluentRead-流畅阅读@0.0.37 test:audit /Users/thinkstu/Desktop/copy/FluentRead-time-changing-text-20261010
+> node scripts/testing/audit-test-suite.mjs
+
+{
+  "status": "ok",
+  "groups": {
+    "architecture": 33,
+    "unit": 366,
+    "functional": 195,
+    "regression": 37
+  },
+  "files": 631,
+  "cases": 10161
+}

@@ -1,0 +1,476 @@
+WXT 0.20.18
+ℹ Generating types...
+⚙ vite-node transformed entrypoint /private/tmp/fluentread-time-size-baseline-20261010/entrypoints/localTranslationWorker.ts
+⚙ Original:
+---
+/**
+ * @file entrypoints/localTranslationWorker.ts
+ * 文件职责：声明本地翻译 Worker 的独立 WXT 产物。
+ */
+import {startLocalTranslationWorkerApp} from '@/src/app/offscreen/localTranslationWorker';
+
+export default defineUnlistedScript(startLocalTranslationWorkerApp);
+
+---
+⚙ Transformed:
+---
+/**
+ * @file entrypoints/localTranslationWorker.ts
+ * 文件职责：声明本地翻译 Worker 的独立 WXT 产物。
+ */
+import {startLocalTranslationWorkerApp} from '@/src/app/offscreen/localTranslationWorker';
+
+export default defineUnlistedScript(startLocalTranslationWorkerApp);
+---
+⚙ vite-node transformed entrypoint /private/tmp/fluentread-time-size-baseline-20261010/entrypoints/background.ts
+⚙ Original:
+---
+/**
+ * @file entrypoints/background.ts
+ * 文件职责：声明 FluentRead 的 WXT 后台入口，并把 service worker 生命周期委托给后台应用组合根。
+ * 主要内容：配置 Safari 非持久后台行为，调用 startBackgroundApp 组装消息路由、菜单、缓存与维护任务；配置存储会根据 MV3 worker 或 MV2 background page 身份选择后台数据库端口。
+ * 模块边界：本文件只保存 WXT 元数据和唯一启动委托，不直接注册业务 handler、访问存储或调用翻译服务。
+ */
+import {startBackgroundApp} from '@/src/app/background/runtime';
+export default defineBackground({
+    persistent: {
+        safari: false,
+    },
+    main: startBackgroundApp,
+});
+
+---
+⚙ Transformed:
+---
+export default defineBackground({
+ persistent: {
+     safari: false,
+ },
+});
+---
+⚙ vite-node transformed entrypoint /private/tmp/fluentread-time-size-baseline-20261010/entrypoints/content.ts
+⚙ Original:
+---
+/**
+ * @file entrypoints/content.ts
+ * 文件职责：声明注入所有网页的 WXT 内容脚本入口，并把页面功能生命周期交给内容应用组合根。
+ * 主要内容：在 document_start 注入并等待基础 DOM 可挂载后调用 startContentApp，统一启动翻译、悬浮与交互功能。
+ * 模块边界：入口不读取配置、不操作页面 DOM，也不直接挂载 feature；激活、清理和错误隔离均由 src/app/content 管理。
+ */
+import {startContentApp} from '@/src/app/content/runtime';
+export default defineContentScript({
+    matches: ['<all_urls>'],
+    runAt: 'document_start',
+    cssInjectionMode: 'ui',
+    main: startContentApp,
+});
+
+---
+⚙ Transformed:
+---
+export default defineContentScript({
+ matches: ['<all_urls>'],
+ runAt: 'document_start',
+ cssInjectionMode: 'ui',
+});
+---
+⚙ vite-node transformed entrypoint /private/tmp/fluentread-time-size-baseline-20261010/entrypoints/supportedFrame.content.ts
+⚙ Original:
+---
+/**
+ * @file entrypoints/supportedFrame.content.ts
+ * 文件职责：在旧 QQ 邮件阅读页、Disqus 评论及 Kaggle 笔记本正文共用受限子 frame 入口。
+ * 主要内容：合并注入条件相同的内容脚本，由各运行时再次核验页面与顶层来源。
+ * 模块边界：网易邮箱需匹配 about:blank 子 frame，仍使用独立入口；通用内容入口仍只在顶层运行。
+ */
+import {startEmbeddedFrameApp} from '@/src/app/content/embeddedFrameRuntime';
+import {startQqMailFrameApp} from '@/src/app/content/qqMailFrameRuntime';
+
+export default defineContentScript({
+    matches: [
+        'https://disqus.com/embed/comments/*',
+        'https://www.kaggleusercontent.com/kf/*/__results__.html*',
+        'https://mail.qq.com/cgi-bin/readmail*',
+    ],
+    allFrames: true,
+    runAt: 'document_end',
+    cssInjectionMode: 'ui',
+    main: ctx => window.location.hostname === 'mail.qq.com'
+        ? startQqMailFrameApp(ctx) : startEmbeddedFrameApp(ctx),
+});
+
+---
+⚙ Transformed:
+---
+export default defineContentScript({
+ matches: [
+     'https://disqus.com/embed/comments/*',
+     'https://www.kaggleusercontent.com/kf/*/__results__.html*',
+     'https://mail.qq.com/cgi-bin/readmail*',
+ ],
+
+ allFrames: true,
+ runAt: 'document_end',
+ cssInjectionMode: 'ui',
+});
+---
+⚙ vite-node transformed entrypoint /private/tmp/fluentread-time-size-baseline-20261010/entrypoints/localTtsWorker.ts
+⚙ Original:
+---
+/**
+ * @file entrypoints/localTtsWorker.ts
+ * 文件职责：声明本地 TTS Worker 的独立 WXT 产物。
+ * 主要内容：同步调用应用启动函数，使 WXT 收集入口元数据时能够移除运行时导入。
+ * 模块边界：只注册 Worker 入口，模型与消息生命周期归 app 和 feature。
+ */
+import {startLocalTtsWorkerApp} from '@/src/app/offscreen/localTtsWorker';
+
+export default defineUnlistedScript(() => {
+    startLocalTtsWorkerApp();
+});
+
+---
+⚙ Transformed:
+---
+export default defineUnlistedScript();
+---
+⚙ vite-node transformed entrypoint /private/tmp/fluentread-time-size-baseline-20261010/entrypoints/neteaseMailFrame.content.ts
+⚙ Original:
+---
+/**
+ * @file entrypoints/neteaseMailFrame.content.ts
+ * 文件职责：只在网易免费邮箱页面及其 about:blank 正文子文档声明内容脚本。
+ * 主要内容：为 163、126 和 yeah 邮箱启用 frame 注入，运行时再核验阅读页与正文边界。
+ * 模块边界：不扩大通用入口的注入范围，也不在登录或写信页面直接挂载翻译功能。
+ */
+import {startNeteaseMailFrameApp} from '@/src/app/content/qqMailFrameRuntime';
+export default defineContentScript({
+    matches: ['https://*.mail.163.com/*', 'https://*.mail.126.com/*', 'https://*.mail.yeah.net/*'],
+    allFrames: true,
+    matchAboutBlank: true,
+    runAt: 'document_end',
+    cssInjectionMode: 'ui',
+    main: startNeteaseMailFrameApp,
+});
+
+---
+⚙ Transformed:
+---
+export default defineContentScript({
+ matches: ['https://*.mail.163.com/*', 'https://*.mail.126.com/*', 'https://*.mail.yeah.net/*'],
+ allFrames: true,
+ matchAboutBlank: true,
+ runAt: 'document_end',
+ cssInjectionMode: 'ui',
+});
+---
+⚙ vite-node transformed entrypoint /private/tmp/fluentread-time-size-baseline-20261010/entrypoints/mangaInferenceWorker.ts
+⚙ Original:
+---
+/**
+ * @file entrypoints/mangaInferenceWorker.ts
+ * 文件职责：声明漫画 OCR 与修补的静态模块 Worker 产物。
+ * 主要内容：绑定独立 Worker 启动函数。
+ * 模块边界：仅处理 WXT 入口声明，推理与生命周期归 app 和 feature。
+ */
+import {startMangaInferenceWorkerApp} from '@/src/app/offscreen/mangaInferenceWorker';
+export default defineUnlistedScript(startMangaInferenceWorkerApp);
+
+---
+⚙ Transformed:
+---
+/**
+ * @file entrypoints/mangaInferenceWorker.ts
+ * 文件职责：声明漫画 OCR 与修补的静态模块 Worker 产物。
+ * 主要内容：绑定独立 Worker 启动函数。
+ * 模块边界：仅处理 WXT 入口声明，推理与生命周期归 app 和 feature。
+ */
+import {startMangaInferenceWorkerApp} from '@/src/app/offscreen/mangaInferenceWorker';
+export default defineUnlistedScript(startMangaInferenceWorkerApp);
+---
+⚙ vite-node transformed entrypoint /private/tmp/fluentread-time-size-baseline-20261010/entrypoints/shadowBridge.content.ts
+⚙ Original:
+---
+/**
+ * @file entrypoints/shadowBridge.content.ts
+ * 文件职责：在网页 MAIN world 注入 Shadow DOM 路由桥，观察不会穿过隔离世界的页面导航变化。
+ * 主要内容：从 document_start 调用 startShadowBridgeApp，并限定为无全局包装的主世界内容脚本。
+ * 模块边界：只发布版本化导航信号，不暴露扩展配置或特权 API；可信校验和生命周期在 src/app/content/shadowBridge 中实现。
+ */
+import {startShadowBridgeApp} from '@/src/app/content/shadowBridge';
+
+export default defineContentScript({
+    matches: ['<all_urls>'],
+    runAt: 'document_start',
+    world: 'MAIN',
+    globalName: false,
+    main: startShadowBridgeApp,
+});
+
+---
+⚙ Transformed:
+---
+export default defineContentScript({
+ matches: ['<all_urls>'],
+ runAt: 'document_start',
+ world: 'MAIN',
+ globalName: false,
+});
+---
+⚙ vite-node transformed entrypoint /private/tmp/fluentread-time-size-baseline-20261010/entrypoints/xVideoBridge.content.ts
+⚙ Original:
+---
+/**
+ * @file entrypoints/xVideoBridge.content.ts
+ * 文件职责：在 X/Twitter MAIN world 启动字幕资源桥。
+ * 主要内容：声明站点匹配与 document_start 注入，委托应用组合根。
+ * 模块边界：入口不修改宿主 API，具体桥接与清理由视频 feature 统一负责。
+ */
+import {startXVideoBridgeApp} from '@/src/app/content/xVideoBridge';
+export default defineContentScript({
+  matches: ['*://*.x.com/*', '*://x.com/*', '*://*.twitter.com/*', '*://twitter.com/*'],
+  runAt: 'document_start', world: 'MAIN', globalName: false,
+  main: startXVideoBridgeApp,
+});
+
+---
+⚙ Transformed:
+---
+export default defineContentScript({
+ matches: ['*://*.x.com/*', '*://x.com/*', '*://*.twitter.com/*', '*://twitter.com/*'],
+ runAt: 'document_start',
+ world: 'MAIN',
+ globalName: false,
+});
+---
+⚙ vite-node transformed entrypoint /private/tmp/fluentread-time-size-baseline-20261010/entrypoints/videoTranscriptionWorker.ts
+⚙ Original:
+---
+/**
+ * @file entrypoints/videoTranscriptionWorker.ts
+ * 文件职责：声明本地字幕模型的独立 WXT Worker 产物。
+ * 主要内容：将离屏应用组合根注册为 unlisted script，供 Offscreen 按 URL 创建 Worker。
+ * 模块边界：只负责构建入口元数据，模型推理和 Worker 消息归视频 feature 管理。
+ */
+import {startVideoTranscriptionWorkerApp} from '@/src/app/offscreen/videoTranscriptionWorker';
+export default defineUnlistedScript(startVideoTranscriptionWorkerApp);
+
+---
+⚙ Transformed:
+---
+/**
+ * @file entrypoints/videoTranscriptionWorker.ts
+ * 文件职责：声明本地字幕模型的独立 WXT Worker 产物。
+ * 主要内容：将离屏应用组合根注册为 unlisted script，供 Offscreen 按 URL 创建 Worker。
+ * 模块边界：只负责构建入口元数据，模型推理和 Worker 消息归视频 feature 管理。
+ */
+import {startVideoTranscriptionWorkerApp} from '@/src/app/offscreen/videoTranscriptionWorker';
+export default defineUnlistedScript(startVideoTranscriptionWorkerApp);
+---
+⚙ vite-node transformed entrypoint /private/tmp/fluentread-time-size-baseline-20261010/entrypoints/youtubeBridge.content.ts
+⚙ Original:
+---
+/**
+ * @file entrypoints/youtubeBridge.content.ts
+ * 文件职责：在全部 YouTube 页面 MAIN world 预注入 timedtext 网络桥，确保首页/搜索页经 SPA 导航到播放页后仍能获取原生字幕响应。
+ * 主要内容：匹配 youtube.com 的裸域和子域全路径，从 document_start 调用 startYoutubeTimedTextBridgeApp，并关闭 WXT 全局包装。
+ * 模块边界：桥只覆盖顶层 YouTube SPA，不宣称支持 youtube-nocookie embed iframe；消费端仍需复验视频所有权和消息上限。
+ */
+import {startYoutubeTimedTextBridgeApp} from '@/src/app/content/youtubeTimedTextBridge';
+
+export default defineContentScript({
+  matches: ['*://*.youtube.com/*', '*://youtube.com/*'],
+  runAt: 'document_start',
+  world: 'MAIN',
+  globalName: false,
+  main: startYoutubeTimedTextBridgeApp,
+});
+
+---
+⚙ Transformed:
+---
+export default defineContentScript({
+ matches: ['*://*.youtube.com/*', '*://youtube.com/*'],
+ runAt: 'document_start',
+ world: 'MAIN',
+ globalName: false,
+});
+---
+⚙ vite-node transformed entrypoint /private/tmp/fluentread-time-size-baseline-20261010/entrypoints/informationHighlightWorker.ts
+⚙ Original:
+---
+/**
+ * @file entrypoints/informationHighlightWorker.ts
+ * 文件职责：声明信息高亮的静态模块 Worker 构建入口。
+ * 主要内容：绑定 app Worker 启动函数，运行时由扩展离屏页按包内 URL 创建。
+ * 模块边界：仅声明 WXT 入口，不下载模型、不实施评分。
+ */
+import {startInformationHighlightWorkerApp} from '@/src/app/offscreen/informationHighlightWorker';
+export default defineUnlistedScript(() => startInformationHighlightWorkerApp());
+
+---
+⚙ Transformed:
+---
+export default defineUnlistedScript();
+---
+⚙ All entrypoints: [ { type: 'background',
+    name: 'background',
+    inputPath: '/private/tmp/fluentread-time-size-baseline-20261010/entrypoints/background.ts',
+    outputDir: '/private/tmp/fluentread-time-size-baseline-20261010/.output/chrome-mv3',
+    options: { persistent: undefined },
+    skipped: false },
+  { type: 'content-script',
+    name: 'content',
+    inputPath: '/private/tmp/fluentread-time-size-baseline-20261010/entrypoints/content.ts',
+    outputDir:
+     '/private/tmp/fluentread-time-size-baseline-20261010/.output/chrome-mv3/content-scripts',
+    options: { matches: [Array], runAt: 'document_start', cssInjectionMode: 'ui' },
+    skipped: false },
+  { type: 'unlisted-page',
+    name: 'document',
+    inputPath:
+     '/private/tmp/fluentread-time-size-baseline-20261010/entrypoints/document/index.html',
+    outputDir: '/private/tmp/fluentread-time-size-baseline-20261010/.output/chrome-mv3',
+    options: { title: 'FluentRead-流畅阅读 · 文档翻译', openInTab: true },
+    skipped: false },
+  { type: 'unlisted-script',
+    name: 'informationHighlightWorker',
+    inputPath:
+     '/private/tmp/fluentread-time-size-baseline-20261010/entrypoints/informationHighlightWorker.ts',
+    outputDir: '/private/tmp/fluentread-time-size-baseline-20261010/.output/chrome-mv3',
+    options: { main: undefined },
+    skipped: false },
+  { type: 'unlisted-script',
+    name: 'localTranslationWorker',
+    inputPath:
+     '/private/tmp/fluentread-time-size-baseline-20261010/entrypoints/localTranslationWorker.ts',
+    outputDir: '/private/tmp/fluentread-time-size-baseline-20261010/.output/chrome-mv3',
+    options: { main: [Function: startLocalTranslationWorker] },
+    skipped: false },
+  { type: 'unlisted-script',
+    name: 'localTtsWorker',
+    inputPath:
+     '/private/tmp/fluentread-time-size-baseline-20261010/entrypoints/localTtsWorker.ts',
+    outputDir: '/private/tmp/fluentread-time-size-baseline-20261010/.output/chrome-mv3',
+    options: { main: undefined },
+    skipped: false },
+  { type: 'unlisted-script',
+    name: 'mangaInferenceWorker',
+    inputPath:
+     '/private/tmp/fluentread-time-size-baseline-20261010/entrypoints/mangaInferenceWorker.ts',
+    outputDir: '/private/tmp/fluentread-time-size-baseline-20261010/.output/chrome-mv3',
+    options: { main: [Function: startMangaInferenceWorker] },
+    skipped: false },
+  { type: 'content-script',
+    name: 'neteaseMailFrame',
+    inputPath:
+     '/private/tmp/fluentread-time-size-baseline-20261010/entrypoints/neteaseMailFrame.content.ts',
+    outputDir:
+     '/private/tmp/fluentread-time-size-baseline-20261010/.output/chrome-mv3/content-scripts',
+    options:
+     { matches: [Array],
+       allFrames: true,
+       matchAboutBlank: true,
+       runAt: 'document_end',
+       cssInjectionMode: 'ui' },
+    skipped: false },
+  { type: 'unlisted-page',
+    name: 'offscreen',
+    inputPath:
+     '/private/tmp/fluentread-time-size-baseline-20261010/entrypoints/offscreen/index.html',
+    outputDir: '/private/tmp/fluentread-time-size-baseline-20261010/.output/chrome-mv3',
+    options: { title: 'FluentRead Background DOM Runtime', include: [Array] },
+    skipped: false },
+  { type: 'options',
+    name: 'options',
+    options: { title: 'FluentRead-流畅阅读 · 设置', openInTab: true },
+    inputPath:
+     '/private/tmp/fluentread-time-size-baseline-20261010/entrypoints/options/index.html',
+    outputDir: '/private/tmp/fluentread-time-size-baseline-20261010/.output/chrome-mv3',
+    skipped: false },
+  { type: 'popup',
+    name: 'popup',
+    options:
+     { defaultTitle: 'FluentRead-流畅阅读', mv2Key: 'browser_action', themeIcons: undefined },
+    inputPath:
+     '/private/tmp/fluentread-time-size-baseline-20261010/entrypoints/popup/index.html',
+    outputDir: '/private/tmp/fluentread-time-size-baseline-20261010/.output/chrome-mv3',
+    skipped: false },
+  { type: 'content-script',
+    name: 'shadowBridge',
+    inputPath:
+     '/private/tmp/fluentread-time-size-baseline-20261010/entrypoints/shadowBridge.content.ts',
+    outputDir:
+     '/private/tmp/fluentread-time-size-baseline-20261010/.output/chrome-mv3/content-scripts',
+    options: { matches: [Array], runAt: 'document_start', world: 'MAIN', globalName: false },
+    skipped: false },
+  { type: 'content-script',
+    name: 'supportedFrame',
+    inputPath:
+     '/private/tmp/fluentread-time-size-baseline-20261010/entrypoints/supportedFrame.content.ts',
+    outputDir:
+     '/private/tmp/fluentread-time-size-baseline-20261010/.output/chrome-mv3/content-scripts',
+    options:
+     { matches: [Array], allFrames: true, runAt: 'document_end', cssInjectionMode: 'ui' },
+    skipped: false },
+  { type: 'unlisted-script',
+    name: 'videoTranscriptionWorker',
+    inputPath:
+     '/private/tmp/fluentread-time-size-baseline-20261010/entrypoints/videoTranscriptionWorker.ts',
+    outputDir: '/private/tmp/fluentread-time-size-baseline-20261010/.output/chrome-mv3',
+    options: { main: [Function: startVideoTranscriptionWorker] },
+    skipped: false },
+  { type: 'content-script',
+    name: 'xVideoBridge',
+    inputPath:
+     '/private/tmp/fluentread-time-size-baseline-20261010/entrypoints/xVideoBridge.content.ts',
+    outputDir:
+     '/private/tmp/fluentread-time-size-baseline-20261010/.output/chrome-mv3/content-scripts',
+    options: { matches: [Array], runAt: 'document_start', world: 'MAIN', globalName: false },
+    skipped: false },
+  { type: 'content-script',
+    name: 'youtubeBridge',
+    inputPath:
+     '/private/tmp/fluentread-time-size-baseline-20261010/entrypoints/youtubeBridge.content.ts',
+    outputDir:
+     '/private/tmp/fluentread-time-size-baseline-20261010/.output/chrome-mv3/content-scripts',
+    options: { matches: [Array], runAt: 'document_start', world: 'MAIN', globalName: false },
+    skipped: false } ]
+✔ Finished in 1.563 s
+
+> FluentRead-流畅阅读@0.0.37 generate:userscript-languages /private/tmp/fluentread-time-size-baseline-20261010
+> node scripts/generate-userscript-language-data.mjs
+
+userscript/languages/ja-JP.a4f378a7373daa43.json
+userscript/languages/ko-KR.baab61fb91516b79.json
+userscript/languages/fr-FR.110e5b67234269a4.json
+userscript/languages/ru-RU.0459cb045388b086.json
+userscript/languages/es-ES.4a621137ead34811.json
+
+> FluentRead-流畅阅读@0.0.37 build:userscript /private/tmp/fluentread-time-size-baseline-20261010
+> node scripts/testing/run-resource-safe.mjs -- vite build --config userscript/vite.config.ts
+
+[resource-safe] CPU target 60%, maxWorkers 2, concurrency 5, command: vite build --config userscript/vite.config.ts
+vite v5.4.19 building for production...
+transforming...
+✓ 653 modules transformed.
+rendering chunks...
+computing gzip size...
+.output/userscript/fluent-read.user.js  1,910.72 kB │ gzip: 777.59 kB
+✓ built in 4.41s
+Verified .output/userscript/fluent-read.user.js (1,964,913 bytes)
+
+{
+  "baselineCommit": "e754aa68012d629186a2785438535eefc115e2ba",
+  "baselineBytes": 1964913,
+  "modifiedBytes": 1967852,
+  "deltaBytes": 2939,
+  "deltaPercent": "0.1496",
+  "budgetBytes": 1965000,
+  "baselineBudgetMargin": 87,
+  "modifiedBudgetExcess": 2852
+}
+
+Removed only generated language JSON files: userscript/languages/es-ES.4a621137ead34811.json, userscript/languages/fr-FR.110e5b67234269a4.json, userscript/languages/ja-JP.a4f378a7373daa43.json, userscript/languages/ko-KR.baab61fb91516b79.json, userscript/languages/ru-RU.0459cb045388b086.json
+
+Temporary validation worktree removed: true; path=/private/tmp/fluentread-time-size-baseline-20261010

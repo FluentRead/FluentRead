@@ -1,0 +1,21 @@
+> FluentRead-流畅阅读@0.0.37 test /Users/thinkstu/Desktop/copy/FluentRead-time-changing-text-20261010
+> node scripts/testing/run-resource-safe.mjs -- vitest run "tests/architecture/moduleBoundaries.test.ts" "tests/architecture/sourceFileHeaders.test.ts" "tests/architecture/verificationOwnership.test.ts"
+
+[resource-safe] CPU target 60%, maxWorkers 2, concurrency 5, command: vitest run tests/architecture/moduleBoundaries.test.ts tests/architecture/sourceFileHeaders.test.ts tests/architecture/verificationOwnership.test.ts
+
+ RUN  v2.1.9 /Users/thinkstu/Desktop/copy/FluentRead-time-changing-text-20261010
+
+ ✓ tests/architecture/verificationOwnership.test.ts (16 tests) 6674ms
+   ✓ repository verification ownership > src 中每个可执行非组装模块都进入四维 100% 覆盖率边界 3458ms
+   ✓ repository verification ownership > 覆盖率清单不能引用不存在的源码或把组装根伪装成业务覆盖 3025ms
+ ✓ tests/architecture/moduleBoundaries.test.ts (13 tests) 3577ms
+   ✓ architecture module boundaries > src 的静态依赖图不存在跨文件循环 1354ms
+   ✓ architecture module boundaries > src 只能通过精确登记的 composition/browser/provider 迁移边界读取 entrypoints 932ms
+   ✓ architecture module boundaries > feature 不能跨目录读取另一个 feature 的内部实现 524ms
+   ✓ architecture module boundaries > 按需加载的大体积资源不得被扩展运行时代码静态引入 456ms
+ ✓ tests/architecture/sourceFileHeaders.test.ts (885 tests) 273ms
+
+ Test Files  3 passed (3)
+      Tests  914 passed (914)
+   Start at  20:58:06
+   Duration  11.58s (transform 70ms, setup 0ms, collect 566ms, tests 10.52s, environment 0ms, prepare 103ms)

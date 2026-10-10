@@ -1,0 +1,34 @@
+> FluentRead-流畅阅读@0.0.37 test /Users/thinkstu/Desktop/copy/FluentRead-time-changing-text-20261010
+> node scripts/testing/run-resource-safe.mjs -- vitest run "tests/liveTextTranslation.test.ts" "tests/liveTextRender.test.ts" "tests/translationState.test.ts" "tests/fullPageVisibilityScheduling.test.ts" "tests/fullPageHostClassPreservation.test.ts" "tests/bilingualReplay.test.ts" "tests/syntheticCandidateFreshness.test.ts"
+
+[resource-safe] 等待全局测试锁（5 个并发槽已占满，当前: wxt build; vitest /Users/thinkstu/Desktop/copy/FluentRead-document-reader-gestures-20261010/node_modules/vitest/vitest.mjs run tests/documentTranslationBinary.test.ts tests/documentTranslationBinaryEdge.test.ts tests/documentBinaryLifecycle.test.ts tests/documentPdfRasterizer.test.ts tests/documentPdfRotation.test.ts tests/documentPdfLayoutParsing.test.ts tests/pdfReadingPlan.test.ts tests/pdfLayoutAnalysis.test.ts tests/pdfPaperLayouts.test.ts tests/pdfBlockFit.test.ts tests/pdfTextLayout.test.ts tests/pdfReaderLifecycle.test.ts; wxt build -b firefox; vitest run --config vitest.coverage.config.ts tests/translationSourceStability.test.ts tests/translationSourceStabilityGate.test.ts tests/translationCore.test.ts tests/serializationPerformance.test.ts tests/pageTranslationAdvanced.test.ts tests/translationVisualProtection.test.ts tests/translationControlOwnership.test.ts tests/translationStability.test.ts --coverage.include=src/core/translation/liveData.ts --coverage.include=src/core/translation/text.ts --coverage.include=src/features/full-page-translation/content/sourceStability.ts --coverage.include=src/features/full-page-translation/content/sourceStabilityGate.ts --coverage.reportsDirectory=/private/tmp/fluentread-time-changing-coverage; wxt build -b firefox）
+[resource-safe] CPU target 60%, maxWorkers 2, concurrency 5, command: vitest run tests/liveTextTranslation.test.ts tests/liveTextRender.test.ts tests/translationState.test.ts tests/fullPageVisibilityScheduling.test.ts tests/fullPageHostClassPreservation.test.ts tests/bilingualReplay.test.ts tests/syntheticCandidateFreshness.test.ts
+
+ RUN  v2.1.9 /Users/thinkstu/Desktop/copy/FluentRead-time-changing-text-20261010
+
+ ✓ tests/fullPageVisibilityScheduling.test.ts (252 tests) 3425ms
+ ✓ tests/translationState.test.ts (92 tests) 1236ms
+   ✓ 指定节点翻译状态机 > removed subtree 查询不会读取大批无关 active owner 的状态 581ms
+ ✓ tests/bilingualReplay.test.ts (18 tests) 138ms
+ ✓ tests/liveTextTranslation.test.ts (14 tests) 34ms
+stderr | tests/liveTextRender.test.ts
+[FluentRead] 配置读取或安全迁移失败，保留已读取的公开配置 Error: 配置存储运行时不可用
+    at Object.getItem (/Users/thinkstu/Desktop/copy/FluentRead-time-changing-text-20261010/src/platform/storage/configStorageRuntime.ts:36:29)
+    at initializeConfig (/Users/thinkstu/Desktop/copy/FluentRead-time-changing-text-20261010/src/services/config/store.ts:635:41)
+    at /Users/thinkstu/Desktop/copy/FluentRead-time-changing-text-20261010/src/services/config/store.ts:807:28
+    at processTicksAndRejections (node:internal/process/task_queues:95:5)
+    at VitestExecutor.runModule (file:///Users/thinkstu/Desktop/copy/FluentRead/node_modules/.pnpm/vite-node@2.1.9_@types+node@22.10.7/node_modules/vite-node/dist/client.mjs:399:5)
+    at VitestExecutor.directRequest (file:///Users/thinkstu/Desktop/copy/FluentRead/node_modules/.pnpm/vite-node@2.1.9_@types+node@22.10.7/node_modules/vite-node/dist/client.mjs:381:5)
+    at VitestExecutor.cachedRequest (file:///Users/thinkstu/Desktop/copy/FluentRead/node_modules/.pnpm/vite-node@2.1.9_@types+node@22.10.7/node_modules/vite-node/dist/client.mjs:206:14)
+    at VitestExecutor.dependencyRequest (file:///Users/thinkstu/Desktop/copy/FluentRead/node_modules/.pnpm/vite-node@2.1.9_@types+node@22.10.7/node_modules/vite-node/dist/client.mjs:259:12)
+    at /Users/thinkstu/Desktop/copy/FluentRead-time-changing-text-20261010/src/features/full-page-translation/content/renderer.ts:2:31
+    at VitestExecutor.runModule (file:///Users/thinkstu/Desktop/copy/FluentRead/node_modules/.pnpm/vite-node@2.1.9_@types+node@22.10.7/node_modules/vite-node/dist/client.mjs:399:5)
+
+ ✓ tests/liveTextRender.test.ts (10 tests) 29ms
+ ✓ tests/syntheticCandidateFreshness.test.ts (10 tests) 76ms
+ ✓ tests/fullPageHostClassPreservation.test.ts (4 tests) 13ms
+
+ Test Files  7 passed (7)
+      Tests  400 passed (400)
+   Start at  21:00:37
+   Duration  11.53s (transform 3.02s, setup 0ms, collect 4.97s, tests 4.95s, environment 2ms, prepare 368ms)

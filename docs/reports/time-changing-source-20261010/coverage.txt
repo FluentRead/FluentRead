@@ -1,0 +1,41 @@
+> FluentRead-流畅阅读@0.0.37 test:coverage /Users/thinkstu/Desktop/copy/FluentRead-time-changing-text-20261010
+> node scripts/testing/run-resource-safe.mjs -- vitest run --config vitest.coverage.config.ts "tests/translationSourceStability.test.ts" "tests/translationSourceStabilityGate.test.ts" "tests/translationCore.test.ts" "tests/serializationPerformance.test.ts" "tests/pageTranslationAdvanced.test.ts" "tests/translationVisualProtection.test.ts" "tests/translationControlOwnership.test.ts" "tests/translationStability.test.ts" "--coverage.include=src/core/translation/liveData.ts" "--coverage.include=src/core/translation/text.ts" "--coverage.include=src/features/full-page-translation/content/sourceStability.ts" "--coverage.include=src/features/full-page-translation/content/sourceStabilityGate.ts" "--coverage.reportsDirectory=/private/tmp/fluentread-time-changing-coverage"
+
+[resource-safe] CPU target 60%, maxWorkers 2, concurrency 5, command: vitest run --config vitest.coverage.config.ts tests/translationSourceStability.test.ts tests/translationSourceStabilityGate.test.ts tests/translationCore.test.ts tests/serializationPerformance.test.ts tests/pageTranslationAdvanced.test.ts tests/translationVisualProtection.test.ts tests/translationControlOwnership.test.ts tests/translationStability.test.ts --coverage.include=src/core/translation/liveData.ts --coverage.include=src/core/translation/text.ts --coverage.include=src/features/full-page-translation/content/sourceStability.ts --coverage.include=src/features/full-page-translation/content/sourceStabilityGate.ts --coverage.reportsDirectory=/private/tmp/fluentread-time-changing-coverage
+
+ RUN  v2.1.9 /Users/thinkstu/Desktop/copy/FluentRead-time-changing-text-20261010
+      Coverage enabled with v8
+
+ ✓ tests/translationCore.test.ts (171 tests) 5742ms
+   ✓ translation candidate core > 500 个全部节点候选在同步批量解析中共享祖先守卫，下一批重新读取宿主样式 310ms
+   ✓ translation candidate core > bounds the hover-only candidate-subtree probe before conservatively splitting a run 331ms
+   ✓ translation candidate core > bounds one readability probe on an extremely wide subtree 948ms
+   ✓ translation candidate core > shares text ancestor protection across one adversarially deep discovery 590ms
+   ✓ translation candidate core > walks deeply nested DOM iteratively without overflowing the call stack 513ms
+   ✓ explicit source line breaks > does not materialize an unbounded set of child nodes 358ms
+ ✓ tests/translationStability.test.ts (95 tests) 874ms
+ ✓ tests/translationSourceStabilityGate.test.ts (60 tests) 236ms
+ ✓ tests/translationSourceStability.test.ts (172 tests) 1278ms
+ ✓ tests/serializationPerformance.test.ts (16 tests) 1563ms
+   ✓ translation snapshot mapping performance > maps a large flat candidate with linear tree-walker work and no sibling path scans 1151ms
+ ✓ tests/pageTranslationAdvanced.test.ts (19 tests) 154ms
+ ✓ tests/translationControlOwnership.test.ts (19 tests) 672ms
+ ✓ tests/translationVisualProtection.test.ts (18 tests) 291ms
+
+ Test Files  8 passed (8)
+      Tests  570 passed (570)
+   Start at  21:00:21
+   Duration  19.58s (transform 1.23s, setup 0ms, collect 4.26s, tests 10.81s, environment 2ms, prepare 912ms)
+
+ % Coverage report from v8
+-------------------|---------|----------|---------|---------|-------------------
+File               | % Stmts | % Branch | % Funcs | % Lines | Uncovered Line #s
+-------------------|---------|----------|---------|---------|-------------------
+All files          |     100 |      100 |     100 |     100 |
+ core/translation  |     100 |      100 |     100 |     100 |
+  liveData.ts      |     100 |      100 |     100 |     100 |
+  text.ts          |     100 |      100 |     100 |     100 |
+ ...lation/content |     100 |      100 |     100 |     100 |
+  ...eStability.ts |     100 |      100 |     100 |     100 |
+  ...bilityGate.ts |     100 |      100 |     100 |     100 |
+-------------------|---------|----------|---------|---------|-------------------

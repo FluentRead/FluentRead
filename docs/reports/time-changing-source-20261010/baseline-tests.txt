@@ -1,0 +1,187 @@
+RUN  v2.1.9 /Users/thinkstu/Desktop/copy/FluentRead-time-changing-text-20261010
+
+ ❯ tests/translationSourceStability.test.ts (124 tests | 28 failed) 75ms
+   × 时间、时长和动态来源过滤 > 独立展示矩阵：上午下午与时区 12:34 a.m. 4ms
+     → expected false to be true // Object.is equality
+   × 时间、时长和动态来源过滤 > 独立展示矩阵：上午下午与时区 p.m. 8:05 0ms
+     → expected false to be true // Object.is equality
+   × 时间、时长和动态来源过滤 > 独立展示矩阵：上午下午与时区 12:34 UTC 0ms
+     → expected false to be true // Object.is equality
+   × 时间、时长和动态来源过滤 > 独立展示矩阵：上午下午与时区 12:34 GMT+08:00 0ms
+     → expected false to be true // Object.is equality
+   × 时间、时长和动态来源过滤 > 独立展示矩阵：数字日期与组合日期 2026年10月3日 12:34 0ms
+     → expected false to be true // Object.is equality
+   × 时间、时长和动态来源过滤 > 独立展示矩阵：数字日期与组合日期 2026年10月3日 12:34 PM 0ms
+     → expected false to be true // Object.is equality
+   × 时间、时长和动态来源过滤 > 独立展示矩阵：数字日期与组合日期 8:05 PM · 2026/10/03 0ms
+     → expected false to be true // Object.is equality
+   × 时间、时长和动态来源过滤 > 独立展示矩阵：数字日期与组合日期 2026-10-03 · 8:05 PM 0ms
+     → expected false to be true // Object.is equality
+   × 时间、时长和动态来源过滤 > 独立展示矩阵：带点单位缩写 2 min. 0ms
+     → expected false to be true // Object.is equality
+   × 时间、时长和动态来源过滤 > 独立展示矩阵：带点单位缩写 2 secs. 0ms
+     → expected false to be true // Object.is equality
+   × 时间、时长和动态来源过滤 > 独立展示矩阵：带点单位缩写 1 hr. 2 min. 3 sec. 0ms
+     → expected false to be true // Object.is equality
+   × 时间、时长和动态来源过滤 > 独立展示矩阵：带点单位缩写 500 msec. 0ms
+     → expected false to be true // Object.is equality
+   × 时间、时长和动态来源过滤 > 独立展示矩阵：带点单位缩写 500 msecs. 0ms
+     → expected false to be true // Object.is equality
+   × 时间、时长和动态来源过滤 > 独立展示矩阵：带点单位缩写 in 2 hrs. 0ms
+     → expected false to be true // Object.is equality
+   × 时间、时长和动态来源过滤 > 独立展示矩阵：带点单位缩写 2 mins. ago 0ms
+     → expected false to be true // Object.is equality
+   × 时间、时长和动态来源过滤 > 独立展示矩阵：带点单位缩写 2 min. AGO 0ms
+     → expected false to be true // Object.is equality
+   × 时间、时长和动态来源过滤 > 独立展示矩阵：带点单位缩写 1h 2 min. 3 seconds ago 2ms
+     → expected false to be true // Object.is equality
+   × 时间、时长和动态来源过滤 > 独立展示矩阵：繁体与混合中文时长 5 分鐘前 0ms
+     → expected false to be true // Object.is equality
+   × 时间、时长和动态来源过滤 > 独立展示矩阵：繁体与混合中文时长 5 分鐘後 0ms
+     → expected false to be true // Object.is equality
+   × 时间、时长和动态来源过滤 > 独立展示矩阵：繁体与混合中文时长 1小時2分3秒 0ms
+     → expected false to be true // Object.is equality
+   × 时间、时长和动态来源过滤 > 独立展示矩阵：繁体与混合中文时长 1 小時 2 分鐘 3 秒 0ms
+     → expected false to be true // Object.is equality
+   × 时间、时长和动态来源过滤 > 独立展示矩阵：繁体与混合中文时长 5 秒鐘 0ms
+     → expected false to be true // Object.is equality
+   × 时间、时长和动态来源过滤 > 独立展示矩阵：繁体与混合中文时长 ５　分鐘後 0ms
+     → expected false to be true // Object.is equality
+   × 时间、时长和动态来源过滤 > 嵌套展示矩阵不泄漏数字或单位且保留宿主页：分隔时长节点 4ms
+     → expected 'A readable report. minutes The next s…' to be 'A readable report. The next section i…' // Object.is equality
+   × 时间、时长和动态来源过滤 > 嵌套展示矩阵不泄漏数字或单位且保留宿主页：多个单位嵌套 4ms
+     → expected 'A readable report. hour, minutes The …' to be 'A readable report. The next section i…' // Object.is equality
+   × 时间、时长和动态来源过滤 > 嵌套展示矩阵不泄漏数字或单位且保留宿主页：分隔时钟节点 4ms
+     → expected 'A readable report. : PM The next sect…' to be 'A readable report. The next section i…' // Object.is equality
+   × 时间、时长和动态来源过滤 > 嵌套展示矩阵不泄漏数字或单位且保留宿主页：全角分隔时钟 6ms
+     → expected 'A readable report. １２： PM The next se…' to be 'A readable report. The next section i…' // Object.is equality
+   × 时间、时长和动态来源过滤 > 嵌套展示矩阵不泄漏数字或单位且保留宿主页：繁体时长节点 3ms
+     → expected 'A readable report. 5 分鐘前 The next sec…' to be 'A readable report. The next section i…' // Object.is equality
+
+⎯⎯⎯⎯⎯⎯ Failed Tests 28 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  tests/translationSourceStability.test.ts > 时间、时长和动态来源过滤 > 独立展示矩阵：上午下午与时区 12:34 a.m.
+ FAIL  tests/translationSourceStability.test.ts > 时间、时长和动态来源过滤 > 独立展示矩阵：上午下午与时区 p.m. 8:05
+ FAIL  tests/translationSourceStability.test.ts > 时间、时长和动态来源过滤 > 独立展示矩阵：上午下午与时区 12:34 UTC
+ FAIL  tests/translationSourceStability.test.ts > 时间、时长和动态来源过滤 > 独立展示矩阵：上午下午与时区 12:34 GMT+08:00
+ FAIL  tests/translationSourceStability.test.ts > 时间、时长和动态来源过滤 > 独立展示矩阵：数字日期与组合日期 2026年10月3日 12:34
+ FAIL  tests/translationSourceStability.test.ts > 时间、时长和动态来源过滤 > 独立展示矩阵：数字日期与组合日期 2026年10月3日 12:34 PM
+ FAIL  tests/translationSourceStability.test.ts > 时间、时长和动态来源过滤 > 独立展示矩阵：数字日期与组合日期 8:05 PM · 2026/10/03
+ FAIL  tests/translationSourceStability.test.ts > 时间、时长和动态来源过滤 > 独立展示矩阵：数字日期与组合日期 2026-10-03 · 8:05 PM
+ FAIL  tests/translationSourceStability.test.ts > 时间、时长和动态来源过滤 > 独立展示矩阵：带点单位缩写 2 min.
+ FAIL  tests/translationSourceStability.test.ts > 时间、时长和动态来源过滤 > 独立展示矩阵：带点单位缩写 2 secs.
+ FAIL  tests/translationSourceStability.test.ts > 时间、时长和动态来源过滤 > 独立展示矩阵：带点单位缩写 1 hr. 2 min. 3 sec.
+ FAIL  tests/translationSourceStability.test.ts > 时间、时长和动态来源过滤 > 独立展示矩阵：带点单位缩写 500 msec.
+ FAIL  tests/translationSourceStability.test.ts > 时间、时长和动态来源过滤 > 独立展示矩阵：带点单位缩写 500 msecs.
+ FAIL  tests/translationSourceStability.test.ts > 时间、时长和动态来源过滤 > 独立展示矩阵：带点单位缩写 in 2 hrs.
+ FAIL  tests/translationSourceStability.test.ts > 时间、时长和动态来源过滤 > 独立展示矩阵：带点单位缩写 2 mins. ago
+ FAIL  tests/translationSourceStability.test.ts > 时间、时长和动态来源过滤 > 独立展示矩阵：带点单位缩写 2 min. AGO
+ FAIL  tests/translationSourceStability.test.ts > 时间、时长和动态来源过滤 > 独立展示矩阵：带点单位缩写 1h 2 min. 3 seconds ago
+ FAIL  tests/translationSourceStability.test.ts > 时间、时长和动态来源过滤 > 独立展示矩阵：繁体与混合中文时长 5 分鐘前
+ FAIL  tests/translationSourceStability.test.ts > 时间、时长和动态来源过滤 > 独立展示矩阵：繁体与混合中文时长 5 分鐘後
+ FAIL  tests/translationSourceStability.test.ts > 时间、时长和动态来源过滤 > 独立展示矩阵：繁体与混合中文时长 1小時2分3秒
+ FAIL  tests/translationSourceStability.test.ts > 时间、时长和动态来源过滤 > 独立展示矩阵：繁体与混合中文时长 1 小時 2 分鐘 3 秒
+ FAIL  tests/translationSourceStability.test.ts > 时间、时长和动态来源过滤 > 独立展示矩阵：繁体与混合中文时长 5 秒鐘
+ FAIL  tests/translationSourceStability.test.ts > 时间、时长和动态来源过滤 > 独立展示矩阵：繁体与混合中文时长 ５　分鐘後
+AssertionError: expected false to be true // Object.is equality
+
+- Expected
++ Received
+
+- true
++ false
+
+ ❯ tests/translationSourceStability.test.ts:44:50
+     42|
+     43|     it.each(independentDisplayCases.flatMap(([label, values]) => value…
+     44|         expect(isNonTranslatableLiveData(value)).toBe(true);
+       |                                                  ^
+     45|     });
+     46|
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/28]⎯
+
+ FAIL  tests/translationSourceStability.test.ts > 时间、时长和动态来源过滤 > 嵌套展示矩阵不泄漏数字或单位且保留宿主页：分隔时长节点
+AssertionError: expected 'A readable report. minutes The next s…' to be 'A readable report. The next section i…' // Object.is equality
+
+Expected: "A readable report. The next section is ready."
+Received: "A readable report. minutes The next section is ready."
+
+ ❯ tests/translationSourceStability.test.ts:75:47
+     73|         expect(core.discover(document.documentElement).map(candidate =…
+     74|         expect(core.resolve(prose)?.element).toBe(prose);
+     75|         expect(extractTranslationText(prose)).toBe('A readable report.…
+       |                                               ^
+     76|         expect(collectLiveTranslationTextSlots(prose).map(slot => slot…
+     77|         expect(display.outerHTML).toBe(displayBefore);
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/28]⎯
+
+ FAIL  tests/translationSourceStability.test.ts > 时间、时长和动态来源过滤 > 嵌套展示矩阵不泄漏数字或单位且保留宿主页：多个单位嵌套
+AssertionError: expected 'A readable report. hour, minutes The …' to be 'A readable report. The next section i…' // Object.is equality
+
+Expected: "A readable report. The next section is ready."
+Received: "A readable report. hour, minutes The next section is ready."
+
+ ❯ tests/translationSourceStability.test.ts:75:47
+     73|         expect(core.discover(document.documentElement).map(candidate =…
+     74|         expect(core.resolve(prose)?.element).toBe(prose);
+     75|         expect(extractTranslationText(prose)).toBe('A readable report.…
+       |                                               ^
+     76|         expect(collectLiveTranslationTextSlots(prose).map(slot => slot…
+     77|         expect(display.outerHTML).toBe(displayBefore);
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/28]⎯
+
+ FAIL  tests/translationSourceStability.test.ts > 时间、时长和动态来源过滤 > 嵌套展示矩阵不泄漏数字或单位且保留宿主页：分隔时钟节点
+AssertionError: expected 'A readable report. : PM The next sect…' to be 'A readable report. The next section i…' // Object.is equality
+
+Expected: "A readable report. The next section is ready."
+Received: "A readable report. : PM The next section is ready."
+
+ ❯ tests/translationSourceStability.test.ts:75:47
+     73|         expect(core.discover(document.documentElement).map(candidate =…
+     74|         expect(core.resolve(prose)?.element).toBe(prose);
+     75|         expect(extractTranslationText(prose)).toBe('A readable report.…
+       |                                               ^
+     76|         expect(collectLiveTranslationTextSlots(prose).map(slot => slot…
+     77|         expect(display.outerHTML).toBe(displayBefore);
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[4/28]⎯
+
+ FAIL  tests/translationSourceStability.test.ts > 时间、时长和动态来源过滤 > 嵌套展示矩阵不泄漏数字或单位且保留宿主页：全角分隔时钟
+AssertionError: expected 'A readable report. １２： PM The next se…' to be 'A readable report. The next section i…' // Object.is equality
+
+Expected: "A readable report. The next section is ready."
+Received: "A readable report. １２： PM The next section is ready."
+
+ ❯ tests/translationSourceStability.test.ts:75:47
+     73|         expect(core.discover(document.documentElement).map(candidate =…
+     74|         expect(core.resolve(prose)?.element).toBe(prose);
+     75|         expect(extractTranslationText(prose)).toBe('A readable report.…
+       |                                               ^
+     76|         expect(collectLiveTranslationTextSlots(prose).map(slot => slot…
+     77|         expect(display.outerHTML).toBe(displayBefore);
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[5/28]⎯
+
+ FAIL  tests/translationSourceStability.test.ts > 时间、时长和动态来源过滤 > 嵌套展示矩阵不泄漏数字或单位且保留宿主页：繁体时长节点
+AssertionError: expected 'A readable report. 5 分鐘前 The next sec…' to be 'A readable report. The next section i…' // Object.is equality
+
+Expected: "A readable report. The next section is ready."
+Received: "A readable report. 5 分鐘前 The next section is ready."
+
+ ❯ tests/translationSourceStability.test.ts:75:47
+     73|         expect(core.discover(document.documentElement).map(candidate =…
+     74|         expect(core.resolve(prose)?.element).toBe(prose);
+     75|         expect(extractTranslationText(prose)).toBe('A readable report.…
+       |                                               ^
+     76|         expect(collectLiveTranslationTextSlots(prose).map(slot => slot…
+     77|         expect(display.outerHTML).toBe(displayBefore);
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[6/28]⎯
+
+ Test Files  1 failed (1)
+      Tests  28 failed | 96 passed (124)
+   Start at  20:46:08
+   Duration  615ms (transform 224ms, setup 0ms, collect 348ms, tests 75ms, environment 0ms, prepare 39ms)

@@ -12,7 +12,7 @@
       "fullPagePriority",
       "architecture/moduleBoundaries",
       "fullPageRemountPreparation",
-      "syntheticSegmentFreshness"
+      "syntheticCandidateFreshness"
     ]
   },
   "interaction": {

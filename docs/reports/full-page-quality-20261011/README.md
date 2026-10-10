@@ -37,7 +37,7 @@
 | 类型检查、Chrome / Firefox / userscript 构建 | 通过 |
 | userscript verifier 与扩展 manifest verifier | 通过 |
 
-各组存在重叠，不能把计数相加当成独立测试总数。覆盖率 JSON、架构原始日志、manifest 与油猴验证日志均在本目录，汇总见 [verification.json](./verification.json)。性能回归可运行 `pnpm test tests/fullPageVisibilityScheduling.test.ts tests/translationStability.test.ts tests/fullPageAttributeBoundary.test.ts tests/fullPagePriority.test.ts tests/architecture/moduleBoundaries.test.ts tests/fullPageRemountPreparation.test.ts tests/syntheticSegmentFreshness.test.ts`。
+各组存在重叠，不能把计数相加当成独立测试总数。覆盖率 JSON、架构原始日志、manifest 与油猴验证日志均在本目录，汇总见 [verification.json](./verification.json)。性能回归可运行 `pnpm test tests/fullPageVisibilityScheduling.test.ts tests/translationStability.test.ts tests/fullPageAttributeBoundary.test.ts tests/fullPagePriority.test.ts tests/architecture/moduleBoundaries.test.ts tests/fullPageRemountPreparation.test.ts tests/syntheticCandidateFreshness.test.ts`。
 
 严格覆盖率证据仅针对被测模块及新增路径，不宣称所有悬浮球拖拽、漫画功能或整个仓库达到 100%。此前两个原生批量翻译测试夹具问题已在未修改基线复现；本次仅同步 Microsoft 第六参数断言及保留 catalog 实际导出的 partial mock，未修改供应商实现。
 

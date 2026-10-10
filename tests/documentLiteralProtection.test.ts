@@ -1,7 +1,7 @@
 /**
  * @file tests/documentLiteralProtection.test.ts
- * 文件职责：验证真实文档中 URL、邮箱、代码式专名及 GNMT+RL 的自动原样保护边界。
- * 主要内容：检验重复、数组、标点、普通词与空输入，沿用严格术语占位符恢复及缺项拒绝，不把模型术语猜成中文译名。
+ * 文件职责：验证真实文档中行内语法、根号标识、URL、邮箱、代码式专名及 GNMT+RL 的自动原样保护边界。
+ * 主要内容：检验带引号的 HTML/g 标签、嵌套与自闭合、重复、数组、标点、用户短词及空输入，沿用严格术语占位符恢复及缺项拒绝，不把模型术语猜成中文译名。
  * 模块边界：纯规则及保护链测试，实际免费服务结果由隔离浏览器测试另行验证。
  */
 import {describe, expect, it, vi} from 'vitest';
@@ -12,6 +12,7 @@ import {resolveConfiguredModel, servicesType} from '@/src/core/config/catalog';
 import {createTranslationBroker} from '@/src/services/translation/broker';
 import {prepareGlossaryRequest, getGlossaryProtectionEntries} from '@/src/services/translation/glossaryProtection';
 import {createTranslationProviderConfigSnapshot, getTranslationGlossaryTerms, getTranslationProviderConfig} from '@/src/services/translation/requestSnapshot';
+import {parseDocument, renderDocument} from '@/src/features/document-translation/core/document';
 
 vi.mock('@/src/services/config/store', () => ({config: {to: 'zh-Hans'}}));
 
@@ -19,6 +20,75 @@ const documentConfig = () => ({...createTranslationProviderConfigSnapshot(new Co
     glossaryMatchContext: {context: 'document' as const, sourceLanguage: 'en', targetLanguage: 'zh-hans'}});
 
 describe('document literal protection', () => {
+    it('keeps paired, nested and self-closing syntax exactly while leaving the words between tags translatable', () => {
+        const tag = `<details title="1 > 0" data-kind='a > b'>`;
+        const source = `${tag}Expand <g1>nested <g2>bold</g2></g1><g3/> now.</details>`;
+        const syntax = [tag, '<g1>', '<g2>', '</g2>', '</g1>', '<g3/>', '</details>'];
+        expect(findDocumentLiteralTerms(source).map(term => term.source)).toEqual(syntax);
+        expect(findDocumentLiteralTerms('a < b > c; unclosed <summary title="not closed; <!-- comment -->')).toEqual([]);
+        const current = documentConfig();
+        const packet = prepareGlossaryRequest({origin: source}, current);
+        expect(packet.message.origin).not.toMatch(/<\/?(?:g\d|details)/u);
+        expect(packet.message.origin).toContain('nested');
+        expect(packet.restore(String(packet.message.origin).replace('Expand', '展开').replace('nested', '嵌套').replace('bold', '粗体')))
+            .toBe(`${tag}展开 <g1>嵌套 <g2>粗体</g2></g1><g3/> now.</details>`);
+        expect(getTranslationGlossaryTerms(current, source)).toEqual(syntax.map(source => ({source, target: source})));
+        const page = {...current, glossaryMatchContext: {...current.glossaryMatchContext, context: 'page' as const}};
+        expect(getGlossaryProtectionEntries(page, source)).toEqual([]);
+        expect(prepareGlossaryRequest({origin: source}, page).message.origin).toBe(source);
+    });
+
+    it('does not let short glossary words change tag syntax, but still applies those words in prose', () => {
+        const current = {...documentConfig(), glossaryEnabled: true, glossaryTerms: [{source: 'g1', target: '用户编号'}, {source: 'summary', target: '摘要'}],
+            glossaryLibraries: [{id: 'user', name: 'User', enabled: true, sourceLanguage: '', targetLanguage: 'zh-hans', domains: [],
+                entries: [{id: 'g', source: 'g1', target: '用户编号', caseSensitive: false}, {id: 'summary', source: 'summary', target: '摘要', caseSensitive: false}]}]};
+        const source = '<summary><g1>g1 summary</g1></summary>';
+        const entries = getGlossaryProtectionEntries(current, source);
+        expect(entries.filter(entry => entry.source.startsWith('<')).map(entry => entry.source))
+            .toEqual(['<summary>', '<g1>', '</g1>', '</summary>']);
+        const packet = prepareGlossaryRequest({origin: source}, current);
+        expect(packet.restore(packet.message.origin)).toBe('<summary><g1>用户编号 摘要</g1></summary>');
+        expect(getTranslationGlossaryTerms(current, source)).toEqual(entries.map(({source, target}) => ({source, target})));
+    });
+
+    it('preserves only the confirmed radical identifier and lets explicit user spelling take priority', () => {
+        expect(findDocumentLiteralTerms('Multiply by √dmodel, √dk and √hidden_2; √2 + 3 stays mathematical prose.').map(term => term.source))
+            .toEqual(['√dmodel', '√dk', '√hidden_2']);
+        const source = 'Multiply by √dmodel.';
+        const packet = prepareGlossaryRequest({origin: source}, documentConfig());
+        expect(packet.message.origin).not.toContain('dmodel');
+        expect(packet.restore(String(packet.message.origin).replace('Multiply by', '乘以'))).toBe('乘以 √dmodel.');
+        expect(findDocumentLiteralTerms(source, [{source: 'dmodel', target: '用户符号', caseSensitive: true}])).toEqual([]);
+    });
+
+    it('restores Markdown emphasis/code/links and nested HTML after the same protected translation chain', () => {
+        const markdown = parseDocument('sample.md', 'Read **bold**, use `npm install`, and [link](https://example.com).', {markdownSentences: true});
+        const html = parseDocument('sample.html', '<p>Read <strong><em>bold</em></strong> now.</p>');
+        for (const [document, replacements, expected] of [
+            [markdown, [['Read', '阅读'], ['bold', '粗体'], ['use', '运行'], ['and', '并看'], ['link', '链接']], '阅读 **粗体**, 运行 `npm install`, 并看 [链接](https://example.com).'],
+            [html, [['Read', '阅读'], ['bold', '粗体'], ['now.', '。']], '<p>阅读 <strong><em>粗体</em></strong> 。</p>'],
+        ] as const) {
+            const packet = prepareGlossaryRequest({origin: document.segments[0].source}, documentConfig());
+            expect(String(packet.message.origin)).not.toMatch(/<\/?g\d/u);
+            let translated = String(packet.message.origin);
+            for (const [source, target] of replacements) translated = translated.replace(source, target);
+            expect(renderDocument(document, [packet.restore(translated) as string], 'translated')).toBe(expected);
+        }
+    });
+
+    it('gives every occurrence its own token and rejects lost, repeated and foreign paragraph syntax', () => {
+        const origins = ['<g1>bold</g1> then <g1>again</g1>', '<summary>More</summary><g2/>'];
+        const packet = prepareGlossaryRequest({origin: origins}, documentConfig());
+        const protectedOrigins = packet.message.origin as string[];
+        const tokens = getTranslationProviderConfig(packet.message, documentConfig()).glossaryProtectedTokens!;
+        expect(tokens).toHaveLength(7);
+        expect(packet.restore(protectedOrigins)).toEqual(origins);
+        for (const first of [protectedOrigins[0].replace(tokens[0], ''), protectedOrigins[0] + tokens[0], protectedOrigins[0] + tokens[4]]) {
+            expect(() => validateGlossaryProtectedTokens(protectedOrigins[0], first, tokens)).toThrow('未完整保留术语');
+            expect(() => packet.restore([first, protectedOrigins[1]])).toThrow('未完整保留术语');
+        }
+    });
+
     it('keeps URLs, emails, code-style product names and compound model names with exact spelling', () => {
         const terms = findDocumentLiteralTerms('Use FluentRead with GNMT+RL and https://github.com/tensorflow/tensor2tensor. Email ai+docs@example.org!');
         expect(terms.map(term => term.source)).toEqual(['FluentRead', 'GNMT+RL', 'https://github.com/tensorflow/tensor2tensor', 'ai+docs@example.org']);

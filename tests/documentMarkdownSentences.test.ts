@@ -22,7 +22,7 @@ describe('Markdown whole-sentence translation', () => {
 
     it('keeps one segment per line and protects link targets, code, URLs and tags with placeholders', () => {
         expect(sources(line)).toEqual(['Read the <g1>setup guide</g1> before <g2/> starts, and keep <g3>bold</g3> words.']);
-        expect(sources('- See <https://example.com> or #tag for details')).toEqual(['- See <g1/> or<g2/> for details']);
+        expect(sources('- See <https://example.com> or #tag for details')).toEqual(['See <g1/> or<g2/> for details']);
         // 图片、双链和文字为空的链接整体保护。
         expect(sources('An ![alt text](a.png) image, a [[Wiki Link]] and an [](empty) here')).toEqual(['An <g1/> image, a <g2/> and an <g3/> here']);
         // 只有受保护内容的行没有可翻译的文字；没有行内语法的行与默认方式相同。
@@ -66,13 +66,34 @@ describe('Markdown whole-sentence translation', () => {
     it('preserves guide container directives once while translating their body, including quoted and nested containers', () => {
         const guide = '::: tip Refreshing keeps your progress\nYour translation is saved.\n::: details More\nOpen the guide.\n::: \n:::\n> ::: note Extra\n> Keep reading.\n> :::';
         const parsed = parse(guide);
-        expect(parsed.segments.map(({source}) => source)).toEqual(['Your translation is saved.', 'Open the guide.', '> Keep reading.']);
-        const result = renderDocument(parsed, ['译文已保存。', '打开指南。', '> 继续阅读。'], 'bilingual');
+        expect(parsed.segments.map(({source}) => source)).toEqual(['Your translation is saved.', 'Open the guide.', 'Keep reading.']);
+        const result = renderDocument(parsed, ['译文已保存。', '打开指南。', '继续阅读。'], 'bilingual');
         const directives = (value: string) => value.split('\n').filter(line => /^\s*(?:>\s*)*:::/u.test(line));
         expect(directives(result)).toEqual(directives(guide));
         expect(result).toContain('> 译文已保存。');
         expect(result).toContain('> 打开指南。');
         expect(renderDocument(parsed, [], 'translated')).toBe(guide);
+    });
+
+    it('keeps standalone HTML and component tags out of translation without hiding their body text', () => {
+        const guide = '<GuideVisual kind="document" en />\n<details class="guide-details" title="a > b">\nRead the guide.\n<summary>More information</summary>\n</details>\n> <br/>\n<!-- keep this comment -->';
+        const parsed = parse(guide);
+        expect(parsed.segments.map(({source}) => source)).toEqual(['Read the guide.', '<summary>More information</summary>']);
+        const result = renderDocument(parsed, ['阅读指南。', '<summary>更多信息</summary>'], 'bilingual');
+        expect(result.match(/<details /gu)).toHaveLength(1);
+        expect(result.match(/<\/details>/gu)).toHaveLength(1);
+        expect(result.match(/<GuideVisual /gu)).toHaveLength(1);
+        expect(result).toContain('> 阅读指南。');
+        expect(renderDocument(parsed, [], 'translated')).toBe(guide);
+    });
+
+    it('keeps headings, list numbers, quotes and checkboxes locally while sending only the body for translation', () => {
+        const markdown = '# Heading\n  ## Subheading\n3. Item\n- [x] Done\n> - Nested item';
+        expect(sources(markdown)).toEqual(['Heading', 'Subheading', 'Item', 'Done', 'Nested item']);
+        const zh = ['标题', '子标题', '条目', '完成', '嵌套条目'];
+        expect(output(markdown, zh)).toBe('# 标题\n  ## 子标题\n3. 条目\n- [x] 完成\n> - 嵌套条目');
+        expect(output(markdown, zh, 'bilingual')).toBe('# Heading\n> # 标题\n  ## Subheading\n>   ## 子标题\n3. Item\n> 3. 条目\n- [x] Done\n> - [x] 完成\n> - Nested item\n> > - 嵌套条目');
+        expect(renderDocument(parse(markdown), [], 'translated')).toBe(markdown);
     });
 
     it('falls back to the whole sentence and re-appends protected content the service dropped', () => {

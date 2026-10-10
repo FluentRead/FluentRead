@@ -32,6 +32,8 @@ URLs, email addresses, code-style names such as `FluentRead`, and compound ident
 
 In HTML, ePub, and Markdown, a sentence that contains links, bold, italics, or inline code is translated as one sentence: links and emphasis stay on the matching words, and in Markdown the link text is translated while link targets, inline code, and URLs are kept as they are. If a service does not keep those markers, you still get the complete sentence, with code and URLs appended at its end.
 
+Markdown keeps heading levels, list numbers, container directives, and standalone HTML/component tags locally. The free service pool checks inline formatting markers and tries another route if they are changed or lost, so a successful translation retains emphasis, links, and code positions in the download.
+
 Pause a long job if needed. Completed passages remain available after a pause or request failure; continuing processes the remainder. Changing languages, services, models, or glossary settings requires a fresh translation, with a prompt first.
 
 Once translation finishes, the workspace focuses on reading, proofreading, and downloading. Open **Adjust settings** to retranslate, configure service connections, or replace files. Confirmation prompts protect results you have not downloaded.

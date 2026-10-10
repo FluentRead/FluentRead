@@ -124,7 +124,11 @@ async function validateOtherDownload(sourceBytes, outputBytes, snapshot, require
     (_match, open, id, close) => `<${open ? '/' : ''}g${id}${close ? '/' : ''}>`);
   const withoutSlots = text => text.replace(/<\/?g\d+\s*\/?>/gu, '');
   const markdownText = text => text.replace(/\[([^\]]+)\]\([^)]*\)/gu, '$1').replace(/(?:^|\n)\s*(?:#{1,6}\s+|>\s*)/gu, '\n').replace(/[*_`]/gu, '');
-  const visible = text => compact(markdownText(withoutSlots(canonicalSlots(text)).replace(/<\/?(?:i|b|u|em|strong|font|span)\b[^>]*>/gu, '')));
+  const visible = text => {
+    // 字幕导出会把服务返回的转义样式还原为真实标签；只归一允许的样式，不把普通正文实体当成 markup。
+    const styled = format === 'srt' ? text.replace(/&lt;(\/?(?:i|b|u|em|strong|font|span)\b[^&]*?)&gt;/giu, '<$1>') : text;
+    return compact(markdownText(withoutSlots(canonicalSlots(styled)).replace(/<\/?(?:i|b|u|em|strong|font|span)\b[^>]*>/gu, '')));
+  };
   const xmlText = xml => {
     let text = ''; const parser = new SaxesParser({xmlns: true});
     parser.on('text', value => {text += value;}); parser.on('cdata', value => {text += value;});
@@ -188,6 +192,16 @@ async function validateOtherDownload(sourceBytes, outputBytes, snapshot, require
       const lineCounts = value => value.split(/\r?\n/u).filter(line => line.trim()).reduce((counts, line) => counts.set(line, (counts.get(line) || 0) + 1), new Map());
       const sourceLines = lineCounts(source), outputLines = lineCounts(text);
       sourceLines.forEach((count, line) => assert((outputLines.get(line) || 0) >= count, `Markdown bilingual output changed a source line: ${line.slice(0, 80)}`));
+      let translatedBlockPrefixes = 0;
+      const lines = text.split(/\r?\n/u);
+      source.split(/\r?\n/u).forEach(line => {
+        const prefix = /^(\s*(?:#{1,6}|[-+*]|\d+[.)])\s+)/u.exec(line)?.[1];
+        if (!prefix) return;
+        const at = lines.indexOf(line), translatedLine = lines[at + 1];
+        if (!translatedLine?.startsWith('> ')) return;
+        assert(translatedLine.slice(2).startsWith(prefix), `Markdown translated heading/list prefix changed: ${line.slice(0, 80)}`);
+        translatedBlockPrefixes++;
+      });
       const code = source.match(/^\s*```[^\n]*\n[\s\S]*?^\s*```/gmu) || [];
       code.forEach(value => assert(text.includes(value), 'Markdown fenced code changed'));
       const inlineCode = [...source.matchAll(/(?<!`)(`+)(?!`)([^\n]*?)\1(?!`)/gu)].map(match => match[0]);
@@ -195,17 +209,28 @@ async function validateOtherDownload(sourceBytes, outputBytes, snapshot, require
       const refs = [...source.matchAll(/\]\(([^)]*)\)/gu)].map(match => match[1]); refs.forEach(value => assert(text.includes(`](${value})`), 'Markdown destination changed'));
       const sourceEmphasis = [...source.matchAll(/(?<![\\*])(\*\*|\*)(?![\s*])([^*\n]*?\S)\1(?!\*)|(?<![\\\p{L}\p{N}])(__|_)(?![\s_])([^_\n]*?\S)\3(?![\p{L}\p{N}_])/gu)].map(match => match[0]);
       sourceEmphasis.forEach(value => assert(text.includes(value), 'Markdown source emphasis changed'));
-      let translatedEmphasis = 0;
+      let translatedEmphasis = 0, translatedHtmlTokens = 0;
       for (const part of snapshot.markdownParts || []) {
         const segment = snapshot.segments.find(segment => segment.id === part.segmentIndex);
         assert(segment, `Markdown metadata has no source segment ${part.segmentIndex}`);
         for (const [index, token] of part.tokens.entries()) {
-          if (!['*', '**', '_', '__'].includes(token.open) || token.close !== token.open) continue;
+          const emphasis = ['*', '**', '_', '__'].includes(token.open) && token.close === token.open;
+          const html = /^<[A-Za-z][^<>]*>$/u.test(token.open) && /^<\/[A-Za-z][^<>]*>$/u.test(token.close || '');
+          if (!emphasis && !html) continue;
           const id = index + 1, translated = new RegExp(`<\\s*g\\s*${id}\\s*>([\\s\\S]*?)<\\s*\\/\\s*g\\s*${id}\\s*>`, 'iu').exec(canonicalSlots(segment.translation));
-          assert(translated, `Live service dropped Markdown emphasis in segment ${part.segmentIndex}, marker ${id}`);
-          assert(compact(text).includes(compact(`${token.open}${translated[1]}${token.close}`)), `Markdown export lost translated emphasis in segment ${part.segmentIndex}, marker ${id}`);
-          translatedEmphasis++;
+          assert(translated, `Live service dropped Markdown ${emphasis ? 'emphasis' : 'HTML'} in segment ${part.segmentIndex}, marker ${id}`);
+          assert(compact(text).includes(compact(`${token.open}${translated[1]}${token.close}`)), `Markdown export lost translated ${emphasis ? 'emphasis' : 'HTML'} in segment ${part.segmentIndex}, marker ${id}`);
+          if (emphasis) translatedEmphasis++; else translatedHtmlTokens++;
         }
+      }
+      // 原文仍在双语文件中，不能用它证明译后的 HTML 容器有效；逐段核对真实返回的标签。
+      let rawHtmlSegments = 0;
+      for (const segment of snapshot.segments) {
+        const tags = segment.source.match(/<\/?[A-Za-z][\w:-]*(?:\s[^<>]*?)?\s*\/?>/gu)?.filter(tag => !/^<\/?g\d+\s*\/?>$/iu.test(tag)) || [];
+        if (!tags.length) continue;
+        tags.forEach(tag => assert(segment.translation.includes(tag), `Live service changed Markdown HTML tag in segment ${segment.id}: ${tag}`));
+        if (tags.length === 1 && segment.source.trim() === tags[0]) assert.equal(segment.translation.trim(), tags[0], `Live service changed a standalone Markdown HTML tag in segment ${segment.id}`);
+        rawHtmlSegments++;
       }
       const components = source.match(/<GuideVisual\b[^>]*\/\s*>/gu) || [];
       components.forEach(value => assert(text.includes(value), 'Markdown guide component changed'));
@@ -215,6 +240,8 @@ async function validateOtherDownload(sourceBytes, outputBytes, snapshot, require
       structure.forEach(value => assert(text.includes(value), 'Markdown HTML container changed'));
       checks.fencedCodeBlocks = code.length; checks.inlineCodeSpans = inlineCode.length; checks.linkDestinations = refs.length;
       checks.sourceEmphasis = sourceEmphasis.length; checks.translatedEmphasis = translatedEmphasis;
+      checks.translatedHtmlTokens = translatedHtmlTokens; checks.rawHtmlSegments = rawHtmlSegments;
+      checks.translatedBlockPrefixes = translatedBlockPrefixes;
       checks.originalLinesPreserved = true; checks.guideComponents = components.length; checks.directives = directives(source); checks.htmlContainerTags = structure.length;
       text = markdownText(text);
     } else assert.equal(format, 'txt', 'Unsupported download validation format');

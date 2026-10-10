@@ -79,6 +79,27 @@ beforeEach(async () => {
 afterEach(() => { vi.restoreAllMocks(); vi.useRealTimers(); vi.unstubAllGlobals(); });
 
 describe('免费翻译服务', () => {
+    it.each(['missing', 'duplicate', 'foreign'])('文档强调标记被候选%s时在获胜前换线，恢复后仍为原始Markdown语法', async kind => {
+        mockConfig.freeTranslationOrder = ['youdaoFree', 'google'];
+        const {prepareGlossaryRequest} = await import('@/src/services/translation/glossaryProtection');
+        const {parseDocument, renderDocument} = await import('@/src/features/document-translation/core/document');
+        const document = parseDocument('sample.md', 'Translate this paragraph and keep **bold** text.', {markdownSentences: true});
+        const packet = prepareGlossaryRequest({origin: document.segments[0].source},
+            createTranslationProviderConfigSnapshot({...mockConfig, glossaryMatchContext: {context: 'document', sourceLanguage: 'en', targetLanguage: 'zh-hans'}} as unknown as TranslationConfigSource));
+        const tokens = readSnapshot(packet.message).glossaryProtectedTokens!;
+        expect(tokens).toHaveLength(2);
+        expect(packet.message.origin).not.toContain('<g1>');
+        chineseMock.mockImplementation(async (_id: string, text: string) => `译文:${kind === 'missing' ? text.replace(tokens[0], '')
+            : text + (kind === 'duplicate' ? tokens[0] : '__FRTERM_foreign_0__')}`);
+        googleMock.mockImplementation(async (source: string) => `译文:${source.replace('bold', '粗体')}`);
+        const result = await settle(freeTranslation(packet.message));
+        expect(renderDocument(document, [packet.restore(result) as string], 'translated'))
+            .toBe('译文:Translate this paragraph and keep **粗体** text.');
+        expect(chineseMock).toHaveBeenCalledOnce();
+        expect(googleMock).toHaveBeenCalledOnce();
+        expect((await getFreeTranslationWeightSnapshot()).entries.find(entry => entry.providerId === 'youdaoFree')?.status).toBe('ready');
+    });
+
     it('候选损坏术语标记时在免费池内部换线，只影响当前文字', async () => {
         mockConfig.freeTranslationOrder = ['youdaoFree', 'google'];
         const token = '__FRTERM_123456789abc_0__';

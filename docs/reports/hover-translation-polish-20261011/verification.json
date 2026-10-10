@@ -1,0 +1,480 @@
+{
+  "date": "2026-10-11",
+  "scope": "Hover translation responsiveness, interaction and lifecycle reliability; targeted verification, no full-suite or live-provider acceptance.",
+  "productionBuildSourceCommit": "6c5752f57c584f7b5f66989c4542931d4133a892",
+  "testHarnessCommit": "12ec05d7463df41802a2bd39b1ff145498c27c83",
+  "architecture": "Existing WXT/Vue/TypeScript and shared candidates, requests and rendering; synchronous resolver reuse has no cross-gesture DOM cache; mutable glossary fields are revalidated every capture. No new dependencies or reference-repository code.",
+  "strictCoverage": {
+    "src/core/translation/engine.ts": {
+      "percent": {
+        "statements": 100,
+        "branches": 100,
+        "functions": 100,
+        "lines": 100
+      },
+      "sourceSha256": "f8b6183d580fd6e5e559ec35a31c7c34088d1ac063ebe5363207e1542dce39f1",
+      "verification": "Source hash unchanged since the 969-test engine run"
+    },
+    "src/features/full-page-translation/content/hoverScheduling.ts": {
+      "percent": {
+        "statements": 100,
+        "branches": 100,
+        "functions": 100,
+        "lines": 100
+      },
+      "sourceSha256": "9fea2a6240f454b07690d51cef83ec3b6483419418b13b4fd5c12ef1ddf371db",
+      "verification": "Final integrated source: 537 tests / 7 files"
+    },
+    "src/features/hover-translation/content/index.ts": {
+      "percent": {
+        "statements": 100,
+        "branches": 100,
+        "functions": 100,
+        "lines": 100
+      },
+      "sourceSha256": "d353fb871065922aa64f24f41ac890890643279bd1ae3286ee2ea1ed892e7bbd",
+      "verification": "Final integrated source: 537 tests / 7 files"
+    },
+    "src/features/quick-translation/content/index.ts": {
+      "percent": {
+        "statements": 100,
+        "branches": 100,
+        "functions": 100,
+        "lines": 100
+      },
+      "sourceSha256": "a14481ac4d24dbcdacfc87a0fd0c9520d8d7593f3504fbec2a9da4cb696bbe58",
+      "verification": "Final integrated source: 537 tests / 7 files"
+    },
+    "src/core/glossary/revisionMemo.ts": {
+      "percent": {
+        "statements": 100,
+        "branches": 100,
+        "functions": 100,
+        "lines": 100
+      },
+      "sourceSha256": "ffc0c01f45d0f18ff8c52fdd34da9d55b8f6a2c5101adb8152508159335a0292",
+      "verification": "Final integrated source: 537 tests / 7 files"
+    },
+    "src/features/full-page-translation/content/translationRequest.ts": {
+      "percent": {
+        "statements": 100,
+        "branches": 100,
+        "functions": 100,
+        "lines": 100
+      },
+      "sourceSha256": "6b444bbe7f3bd5a56f41134b3c319eac36af98002327ab894188369b56dfa349",
+      "verification": "Final integrated source: 537 tests / 7 files"
+    }
+  },
+  "targetedRuns": [
+    {
+      "scope": "Candidate engine and direct shared-candidate boundaries; engine source hash unchanged",
+      "files": 22,
+      "passed": 969
+    },
+    {
+      "scope": "Final integrated request, snapshot, glossary memo, default/quick gestures, scheduling and visibility",
+      "files": 7,
+      "passed": 537
+    },
+    {
+      "scope": "Final integrated QQ/NetEase/embedded frame routes and shared hotkey arbitration",
+      "files": 4,
+      "passed": 134
+    },
+    {
+      "scope": "Final integrated architecture: module/provider boundaries, source headers and verification ownership",
+      "files": 4,
+      "passed": 932
+    },
+    {
+      "scope": "Hover browser CLI resource contracts; test harness unchanged after this run",
+      "files": 1,
+      "passed": 13,
+      "filteredOut": 92
+    }
+  ],
+  "testCountsAreNotAdditive": "These targeted runs overlap, especially fullPageVisibilityScheduling; audit counts are registered cases, not claims of full-suite execution.",
+  "testAudit": {
+    "status": "ok",
+    "groups": {
+      "architecture": 33,
+      "unit": 371,
+      "functional": 197,
+      "regression": 40
+    },
+    "files": 641,
+    "cases": 10443
+  },
+  "builds": {
+    "compile": "passed",
+    "chrome": "passed",
+    "firefox": "passed",
+    "userscript": "passed",
+    "userscriptVerifier": "passed",
+    "extensionManifestVerifier": "passed (built directories; no release archives)",
+    "docs": "passed"
+  },
+  "userscriptBudget": {
+    "baselineCommit": "b14baf4b267f1bdace40fff13652bf9568ba1d5f",
+    "baselineBytes": 1987953,
+    "finalBytes": 1990973,
+    "deltaBytes": 3020,
+    "deltaPercent": 0.1519,
+    "budgetBytes": 1994000,
+    "allowanceIncreaseBytes": 0,
+    "verification": "Upstream verifier and byte budget unchanged; protocol, compatibility and runtime exclusion assertions passed."
+  },
+  "browser": {
+    "evidence": "Production extension; local deterministic transport, temporary background-visible Edge",
+    "launchMode": "macos-background-cdp",
+    "focusPolicy": "launchservices-no-foreground",
+    "cdpDefaults": "noDefaults:true; native focus, tab visibility and media",
+    "windowPlacement": {
+      "mode": "background-visible-no-focus",
+      "visible": true,
+      "hidden": false,
+      "windowState": "normal",
+      "displayTarget": "secondary",
+      "browserFrontmost": false
+    },
+    "consoleErrors": [],
+    "cleanup": "Owned browser closed and temporary profile deleted; no cleanup errors.",
+    "baselineContentSha256": "db88ca33724abef7f36b5ccac745e99a880867dce205eac0ce8f405a3dcefdef",
+    "finalContentSha256": "156fe75976acf3c3b404d5c2441f6f85308c668cdf91c9806bb05ff1322bc7ac",
+    "testScriptSha256": "b796361584ac174bac9b0ca5899070d68ca83340079c89e965368c8f5c02ed99",
+    "rangeCases": [
+      {
+        "id": "giant-tail",
+        "originalCharacters": 135120,
+        "emptyNodes": 0,
+        "phases": [
+          {
+            "name": "translate",
+            "longTasksMs": [
+              52
+            ],
+            "maxHeartbeatGapMs": 69.80000019073486
+          },
+          {
+            "name": "continuous-hover",
+            "longTasksMs": [],
+            "maxHeartbeatGapMs": 21.40000009536743
+          },
+          {
+            "name": "restore",
+            "longTasksMs": [],
+            "maxHeartbeatGapMs": 38.40000009536743
+          },
+          {
+            "name": "retranslate",
+            "longTasksMs": [],
+            "maxHeartbeatGapMs": 31.300000190734863
+          }
+        ],
+        "sourceChunkCharacters": 1550,
+        "hitInSourceChunk": true,
+        "markerPreserved": true,
+        "requests": 2,
+        "hostClicks": 1,
+        "originalPreserved": true,
+        "restoreAndRetranslate": true,
+        "continuousHoverNoRepeatedRequests": true
+      },
+      {
+        "id": "empty-nodes",
+        "originalCharacters": 6240,
+        "emptyNodes": 20000,
+        "phases": [
+          {
+            "name": "translate",
+            "longTasksMs": [],
+            "maxHeartbeatGapMs": 51.89999961853027
+          },
+          {
+            "name": "continuous-hover",
+            "longTasksMs": [],
+            "maxHeartbeatGapMs": 21.800000190734863
+          },
+          {
+            "name": "restore",
+            "longTasksMs": [],
+            "maxHeartbeatGapMs": 21.09999990463257
+          },
+          {
+            "name": "retranslate",
+            "longTasksMs": [],
+            "maxHeartbeatGapMs": 21.399999618530273
+          }
+        ],
+        "sourceChunkCharacters": 1560,
+        "hitInSourceChunk": true,
+        "markerPreserved": true,
+        "requests": 2,
+        "hostClicks": 1,
+        "originalPreserved": true,
+        "restoreAndRetranslate": true,
+        "continuousHoverNoRepeatedRequests": true
+      },
+      {
+        "id": "long-token",
+        "originalCharacters": 9100,
+        "emptyNodes": 0,
+        "phases": [
+          {
+            "name": "translate",
+            "longTasksMs": [],
+            "maxHeartbeatGapMs": 47.30000019073486
+          },
+          {
+            "name": "continuous-hover",
+            "longTasksMs": [],
+            "maxHeartbeatGapMs": 21.199999809265137
+          },
+          {
+            "name": "restore",
+            "longTasksMs": [],
+            "maxHeartbeatGapMs": 21.09999990463257
+          },
+          {
+            "name": "retranslate",
+            "longTasksMs": [],
+            "maxHeartbeatGapMs": 22
+          }
+        ],
+        "sourceChunkCharacters": 1600,
+        "hitInSourceChunk": true,
+        "markerPreserved": true,
+        "requests": 2,
+        "hostClicks": 1,
+        "originalPreserved": true,
+        "restoreAndRetranslate": true,
+        "continuousHoverNoRepeatedRequests": true
+      }
+    ],
+    "longPressDisableReenable": {
+      "phases": [
+        {
+          "name": "long-press-arbitration",
+          "longTasksMs": [],
+          "maxHeartbeatGapMs": 28.09999990463257
+        },
+        {
+          "name": "delayed-hover-abort",
+          "longTasksMs": [],
+          "maxHeartbeatGapMs": 21.600000381469727
+        }
+      ],
+      "arbitrationDispatchMs": 28,
+      "wrappersAfterLongPressDeadline": 1,
+      "arbitrationRequests": 1,
+      "disableDispatchMs": 39,
+      "requestsWhileDisabled": 0,
+      "reenabledCounts": [
+        1,
+        0,
+        1
+      ],
+      "reenabledGestureWorks": true,
+      "originalPreserved": true
+    },
+    "lifecycleCancellation": [
+      {
+        "profile": "default",
+        "shortcut": "Control",
+        "boundary": "route",
+        "delayMs": 1200,
+        "phases": [
+          {
+            "name": "default-route-cancel",
+            "longTasksMs": [],
+            "maxHeartbeatGapMs": 22.699999809265137
+          }
+        ],
+        "boundaryDispatchMs": 37,
+        "requestsAfterBoundary": 0,
+        "counts": [
+          1,
+          0,
+          1
+        ],
+        "settledGestureGapMs": 300,
+        "freshGestureRequests": 2,
+        "originalPreserved": true,
+        "staleGestureCancelled": true,
+        "freshGesturePreserved": true
+      },
+      {
+        "profile": "default",
+        "shortcut": "Control",
+        "boundary": "visibility",
+        "delayMs": 1200,
+        "phases": [
+          {
+            "name": "default-visibility-cancel",
+            "longTasksMs": [],
+            "maxHeartbeatGapMs": 21.300000190734863
+          }
+        ],
+        "nativeTabVisibility": true,
+        "companionMovePreservedFocus": true,
+        "boundaryDispatchMs": 30,
+        "requestsAfterBoundary": 0,
+        "counts": [
+          1,
+          0,
+          1
+        ],
+        "settledGestureGapMs": 300,
+        "freshGestureRequests": 2,
+        "originalPreserved": true,
+        "staleGestureCancelled": true,
+        "freshGesturePreserved": true,
+        "trustedHiddenEvent": true,
+        "trustedVisibleEvent": true,
+        "sameWindowBeforeSwitch": true,
+        "targetTabInactiveDuringSwitch": true
+      },
+      {
+        "profile": "quick",
+        "shortcut": "Control+Shift+Y",
+        "boundary": "route",
+        "delayMs": 1200,
+        "phases": [
+          {
+            "name": "quick-route-cancel",
+            "longTasksMs": [],
+            "maxHeartbeatGapMs": 22.90000009536743
+          }
+        ],
+        "boundaryDispatchMs": 24,
+        "requestsAfterBoundary": 0,
+        "counts": [
+          1,
+          0,
+          1
+        ],
+        "settledGestureGapMs": 300,
+        "freshGestureRequests": 2,
+        "originalPreserved": true,
+        "staleGestureCancelled": true,
+        "freshGesturePreserved": true
+      },
+      {
+        "profile": "quick",
+        "shortcut": "Control+Shift+Y",
+        "boundary": "visibility",
+        "delayMs": 1200,
+        "phases": [
+          {
+            "name": "quick-visibility-cancel",
+            "longTasksMs": [],
+            "maxHeartbeatGapMs": 21.200000286102295
+          }
+        ],
+        "nativeTabVisibility": true,
+        "companionMovePreservedFocus": true,
+        "boundaryDispatchMs": 34,
+        "requestsAfterBoundary": 0,
+        "counts": [
+          1,
+          0,
+          1
+        ],
+        "settledGestureGapMs": 300,
+        "freshGestureRequests": 2,
+        "originalPreserved": true,
+        "staleGestureCancelled": true,
+        "freshGesturePreserved": true,
+        "trustedHiddenEvent": true,
+        "trustedVisibleEvent": true,
+        "sameWindowBeforeSwitch": true,
+        "targetTabInactiveDuringSwitch": true
+      }
+    ],
+    "sweep": {
+      "method": "Trusted CDP mouse moves; native capture-to-bubble event duration; no upstream translation",
+      "warmup": "120 trusted moves per library",
+      "repetitions": 3,
+      "movesPerRepetition": 120,
+      "delayMs": 300,
+      "baseline": {
+        "5000-terms": {
+          "entries": 5000,
+          "samples": 360,
+          "medianMs": 16.3,
+          "p95Ms": 17.1,
+          "totalHandlerMs": 5881.5,
+          "maxHeartbeatGapMs": 37.2,
+          "longTasksMs": [],
+          "upstreamRequests": 0
+        },
+        "empty": {
+          "entries": 0,
+          "samples": 360,
+          "medianMs": 0.2,
+          "p95Ms": 0.3,
+          "totalHandlerMs": 73.0,
+          "maxHeartbeatGapMs": 23,
+          "longTasksMs": [],
+          "upstreamRequests": 0
+        }
+      },
+      "final": {
+        "5000-terms": {
+          "entries": 5000,
+          "samples": 360,
+          "medianMs": 3.0,
+          "p95Ms": 4.4,
+          "totalHandlerMs": 1026.2,
+          "maxHeartbeatGapMs": 26.6,
+          "longTasksMs": [],
+          "upstreamRequests": 0
+        },
+        "empty": {
+          "entries": 0,
+          "samples": 360,
+          "medianMs": 0.1,
+          "p95Ms": 0.2,
+          "totalHandlerMs": 50.5,
+          "maxHeartbeatGapMs": 21.8,
+          "longTasksMs": [],
+          "upstreamRequests": 0
+        }
+      },
+      "5000EntryMedianReductionPercent": 81.6
+    },
+    "buildSourceCommit": "6c5752f57c584f7b5f66989c4542931d4133a892"
+  },
+  "limitations": [
+    "Deterministic local transport isolates browser behavior and input cost; live translation quality/network/provider availability unverified.",
+    "Firefox and userscript build/manifest/compatibility checks passed; no real Firefox or userscript-manager runtime acceptance.",
+    "135,120-character fixture first translation observed long tasks [52] ms; see phase-level data. Continuous hover, restore/retranslate, lifecycle and sweep phases observed none.",
+    "Selection arbitration and shared candidate protections have targeted tests; this browser script has no selection case."
+  ],
+  "reproduce": {
+    "builds": [
+      "pnpm compile",
+      "pnpm build",
+      "pnpm build:firefox",
+      "pnpm build:userscript",
+      "node scripts/verify-userscript-build.mjs",
+      "pnpm verify:extension-manifests",
+      "pnpm docs:build",
+      "pnpm test:audit"
+    ],
+    "requestCoverage": "node scripts/testing/run-resource-safe.mjs -- pnpm exec vitest run --config vitest.coverage.config.ts tests/fullPageVisibilityScheduling.test.ts tests/translationSlotEchoRegression.test.ts tests/fullPageTranslationConfigSnapshot.test.ts tests/glossaryRevisionMemo.test.ts --coverage --coverage.include=src/features/full-page-translation/content/translationRequest.ts --coverage.include=src/core/glossary/revisionMemo.ts --coverage.reportsDirectory=/private/tmp/fluentread-hover-request-coverage",
+    "architecture": "pnpm test tests/architecture/moduleBoundaries.test.ts tests/architecture/sourceFileHeaders.test.ts tests/architecture/verificationOwnership.test.ts tests/architecture/providerBoundaries.test.ts",
+    "browser": "node scripts/testing/run-resource-safe.mjs -- node scripts/testing/run-hover-visual-range-test.cjs --extension-dir .output/chrome-mv3 --focus-safe-helper scripts/testing/focus-safe-browser.cjs --background --gesture-lifecycle --hover-sweep --artifacts-dir /private/tmp/fluentread-hover-delivery",
+    "browserBaseline": "Use the same script and dependencies against a clean archive of performanceBaselineCommit, replacing extension-dir and using --background --baseline --hover-sweep --sweep-only.",
+    "cliContracts": "pnpm test tests/documentationToolContracts.test.ts -t 'hover-visual-range-test'",
+    "integrationCoverage": "node scripts/testing/run-resource-safe.mjs -- pnpm exec vitest run --config vitest.coverage.config.ts tests/fullPageVisibilityScheduling.test.ts tests/hoverTranslationContentFeature.test.ts tests/quickTranslationContentFeature.test.ts tests/translationSlotEchoRegression.test.ts tests/glossaryRevisionMemo.test.ts tests/fullPageTranslationConfigSnapshot.test.ts tests/hoverTranslationScheduling.test.ts --coverage --coverage.include=src/features/full-page-translation/content/translationRequest.ts --coverage.include=src/core/glossary/revisionMemo.ts --coverage.include=src/features/hover-translation/content/index.ts --coverage.include=src/features/quick-translation/content/index.ts --coverage.include=src/features/full-page-translation/content/hoverScheduling.ts --coverage.reportsDirectory=/private/tmp/fluentread-hover-integration-coverage",
+    "frameAndHotkey": "node scripts/testing/run-resource-safe.mjs -- pnpm exec vitest run --maxWorkers=1 tests/qqMailFrameRuntime.test.ts tests/qqMailFrameSession.test.ts tests/issue146EmbeddedFrames.test.ts tests/contentHotkeyRuntime.test.ts"
+  },
+  "performanceBaselineCommit": "86a7ab6f29e8567394a70f0c11a4b8a620295531",
+  "testedMainCommit": "b14baf4b267f1bdace40fff13652bf9568ba1d5f",
+  "resolvedBaselineAssertion": {
+    "file": "tests/architecture/providerBoundaries.test.ts",
+    "reason": "Upstream b14baf4b2 corrected the prior native-batch signature assertion; all four architecture files pass on the final integrated source."
+  }
+}

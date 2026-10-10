@@ -2,7 +2,6 @@ import fs from 'node:fs';
 import {createHash} from 'node:crypto';
 import {createRequire} from 'node:module';
 import {basename, dirname, resolve} from 'node:path';
-import {gzipSync} from 'node:zlib';
 import {runInNewContext} from 'node:vm';
 import vue from '@vitejs/plugin-vue';
 import ts from 'typescript';
@@ -69,14 +68,14 @@ function serializeUiMessages(value: unknown): string {
     return JSON.stringify(value, (_key, item) => item && typeof item === 'object' && !Array.isArray(item)
         ? Object.fromEntries(Object.entries(item).sort(([a], [b]) => a < b ? -1 : a > b ? 1 : 0)) : item);
 }
-// 构建期复用已有 pako 编码中英界面词典，减少标准 gzip 数据；解压字节与运行时端口不变。
-const gzipUiMessages = createRequire(import.meta.url)('pako').gzip as
+// 构建期统一复用已安装的 pako level 9 编码静态数据；解压字节与运行时端口不变。
+const gzipStaticData = createRequire(import.meta.url)('pako').gzip as
     (data: Uint8Array, options: {level: number}) => Uint8Array;
 const compressedUiLanguageBundles = greasyForkSource ? {} : Object.fromEntries(Object.entries(UI_LANGUAGE_BUNDLES)
     .filter(([language]) => language === 'en-US')
     .map(([language, bundle]) => [
     language,
-    Buffer.from(gzipUiMessages(Buffer.from(serializeUiMessages(bundle)), {level: 9})).toString('base64'),
+    Buffer.from(gzipStaticData(Buffer.from(serializeUiMessages(bundle)), {level: 9})).toString('base64'),
 ]));
 const remoteUiLanguageBundles = Object.fromEntries(Object.entries(UI_LANGUAGE_BUNDLES)
     .filter(([language]) => language !== 'en-US')
@@ -125,7 +124,7 @@ export function createUserscriptCatalogCompressionPlugin(): Plugin {
                 if (greasyForkSource) return 'export const zhCNMessages = globalThis.__FLUENTREAD_USERSCRIPT_DATA__.zhCNMessages;';
                 // 文档翻译页面（含 PDF 阅读器）只存在于扩展里，油猴脚本不含该页面，它的文案不占用脚本体积。
                 const contents = serializeUiMessages(Object.fromEntries(Object.entries(zhCNMessages).filter(([key]) => !key.startsWith('document.'))) as typeof zhCNMessages);
-                const compressed = Buffer.from(gzipUiMessages(Buffer.from(contents), {level: 9})).toString('base64');
+                const compressed = Buffer.from(gzipStaticData(Buffer.from(contents), {level: 9})).toString('base64');
                 return [
                     `/* Non-code Chinese UI messages; sha256 ${createHash('sha256').update(contents).digest('hex')}. */`,
                     "import {inflateWithPako} from '@/userscript/pakoRuntime';",
@@ -161,7 +160,7 @@ export function createUserscriptCatalogCompressionPlugin(): Plugin {
                 ].join('\n');
             }
             const contents = JSON.stringify(JSON.parse(fs.readFileSync(sourcePath, 'utf8')));
-            const compressed = gzipSync(Buffer.from(contents), {level: 9}).toString('base64');
+            const compressed = Buffer.from(gzipStaticData(Buffer.from(contents), {level: 9})).toString('base64');
             const digest = createHash('sha256').update(contents).digest('hex');
             return [
                 `/* Non-code site rules: ${normalizePath(sourcePath).slice(projectRoot.length)}; sha256 ${digest}. */`,
@@ -186,11 +185,11 @@ export const compatibilityPreludeEnd = '/* FluentRead userscript compatibility p
 export const executionGuardStart = '/* FluentRead userscript execution guard:start */';
 export const executionGuardEnd = '/* FluentRead userscript execution guard:end */';
 
-export function wrapUserscriptEntry(entryCode: string, bootstrapCode: string, thirdPartyNotices = ''): string {
+export function wrapUserscriptEntry(entryCode: string, bootstrapCode: string, thirdPartyNotices = '', includesServiceIcons = true): string {
     return [
         metadata,
         unicodeNotice,
-        serviceIconsNotice,
+        ...(includesServiceIcons ? [serviceIconsNotice] : []),
         ...(!bundleLibraries ? [tinycolorNotice] : []),
         ...(thirdPartyNotices ? [thirdPartyNotices] : []),
         executionGuardStart,
@@ -383,7 +382,7 @@ function bundleUserscriptCss(): Plugin {
           async handler(_options, bundle) {
             const cssEntries = Object.entries(bundle).filter(([, item]) => item.type === 'asset' && item.fileName.endsWith('.css'));
             const css = cssEntries.map(([, item]) => String(item.type === 'asset' ? item.source : '')).join('\n');
-            const compressedCss = greasyForkSource ? '' : gzipSync(Buffer.from(css, 'utf8'), {level: 9}).toString('base64');
+            const compressedCss = greasyForkSource ? '' : Buffer.from(gzipStaticData(Buffer.from(css, 'utf8'), {level: 9})).toString('base64');
             cssEntries.forEach(([fileName]) => delete bundle[fileName]);
 
             if (greasyForkSource) {
@@ -427,6 +426,8 @@ function bundleUserscriptCss(): Plugin {
                 entry.code,
                 bootstrap,
                 bundleLibraries ? bundledLibraryNotices(entry.moduleIds) : '',
+                // 许可跟随实际打包的 SVG 模块；轻量出口不含此表，完整出口仍保留原许可全文。
+                entry.moduleIds.some((id) => normalizePath(id).split('?')[0] === normalizePath(resolve(root, 'src/ui/assets/serviceBrandPaths.json'))),
             );
 
             entry.code = entry.code.replace(/[\uFFFE\uFFFF]/gu, (character) => {

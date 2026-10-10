@@ -1,0 +1,8 @@
+{
+  "preCleanupBytes": 1961680,
+  "postCleanupBytes": 1961493,
+  "measuredSavingBytes": 187,
+  "postCleanupSha256": "1fecf889d9aabd28defd79b1a013f814fbdc44669726a8389cfb74eee90d175e",
+  "cleanup": "Unused provider context lease field/argument/no-op branch removed and three isAiSdk checks reused. No scheduler/client/connectionTest lease removed.",
+  "functionalBehaviorChangesSincePreMeasurement": false
+}

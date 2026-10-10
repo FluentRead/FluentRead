@@ -1,0 +1,157 @@
+{
+  "mutants": [
+    {
+      "stage": "review-ablation-logical-capacity",
+      "startedAt": "2026-10-09T12:12:59.222537+00:00",
+      "durationSeconds": 1.166,
+      "exitCode": 1,
+      "removed": "logical-capacity",
+      "passed": 0,
+      "failed": 2,
+      "failures": [
+        "review counterexamples: physical capacity and trusted pending identity releases all 1 saturated logical leases during a 90-second quota wait",
+        "review counterexamples: physical capacity and trusted pending identity releases all 3 saturated logical leases during a 90-second quota wait"
+      ],
+      "assertionFailure": true,
+      "candidateSourceSha256": "d17c38f0e7fc929159c1f094db977bd7542ec1d4f930a8a1935697262bacff83"
+    },
+    {
+      "stage": "review-ablation-physical-capacity",
+      "startedAt": "2026-10-09T12:13:00.388940+00:00",
+      "durationSeconds": 1.166,
+      "exitCode": 1,
+      "removed": "physical-capacity",
+      "passed": 0,
+      "failed": 2,
+      "failures": [
+        "physical attempt capacity, FIFO, and cancellation keeps 1 real in-flight slots until ignored-abort transports settle",
+        "physical attempt capacity, FIFO, and cancellation keeps 3 real in-flight slots until ignored-abort transports settle"
+      ],
+      "assertionFailure": true,
+      "candidateSourceSha256": "02dfc3d58dad852458d43519d4ce5b6cd6c743de2b69a7aca6082442891e6c8c"
+    },
+    {
+      "stage": "review-ablation-typed-input",
+      "startedAt": "2026-10-09T12:13:01.555107+00:00",
+      "durationSeconds": 1.166,
+      "exitCode": 1,
+      "removed": "typed-input",
+      "passed": 0,
+      "failed": 3,
+      "failures": [
+        "review counterexamples: physical capacity and trusted pending identity binds typed input privacy from sender false and rejects payload claims",
+        "review counterexamples: physical capacity and trusted pending identity binds typed input privacy from sender true and rejects payload claims",
+        "trusted ordinary/private/unknown boundary separates an unknown typed source from an ordinary sender despite payload claims"
+      ],
+      "assertionFailure": true,
+      "candidateSourceSha256": "57b9fddbbb4ece968279037636813ae135a1f308116e26b9f8ced2fc39e2f420"
+    },
+    {
+      "stage": "review-ablation-image-privacy",
+      "startedAt": "2026-10-09T12:13:02.721250+00:00",
+      "durationSeconds": 1.165,
+      "exitCode": 1,
+      "removed": "image-privacy",
+      "passed": 0,
+      "failed": 2,
+      "failures": [
+        "review counterexamples: physical capacity and trusted pending identity restores image offscreen privacy from the active transaction false",
+        "review counterexamples: physical capacity and trusted pending identity restores image offscreen privacy from the active transaction true"
+      ],
+      "assertionFailure": true,
+      "candidateSourceSha256": "2da31075ea6111e88696db0f647a50a18fc29c9aa2f922eda9cf6e85a77a94cc"
+    },
+    {
+      "stage": "review-ablation-area-privacy",
+      "startedAt": "2026-10-09T12:13:03.887225+00:00",
+      "durationSeconds": 1.216,
+      "exitCode": 1,
+      "removed": "area-privacy",
+      "passed": 0,
+      "failed": 4,
+      "failures": [
+        "review counterexamples: area composition keeps trusted privacy isolates area text from trusted sender false",
+        "review counterexamples: area composition keeps trusted privacy isolates area text from trusted sender true",
+        "review counterexamples: area composition keeps trusted privacy isolates area vision from trusted sender false",
+        "review counterexamples: area composition keeps trusted privacy isolates area vision from trusted sender true"
+      ],
+      "assertionFailure": true,
+      "candidateSourceSha256": "9e7d2096b9c3a3c0a9f15eac4e2a71842efa695198ffd8bd6a101778a4b3fbd7"
+    },
+    {
+      "stage": "review-ablation-pending-quota",
+      "startedAt": "2026-10-09T12:13:05.103692+00:00",
+      "durationSeconds": 1.115,
+      "exitCode": 1,
+      "removed": "pending-quota",
+      "passed": 0,
+      "failed": 12,
+      "failures": [
+        "review counterexamples: physical capacity and trusted pending identity keeps concurrent same-text single pending work separate after privacy changes",
+        "review counterexamples: physical capacity and trusted pending identity keeps concurrent same-text single pending work separate after credential changes",
+        "review counterexamples: physical capacity and trusted pending identity keeps concurrent same-text single pending work separate after key-set changes",
+        "review counterexamples: physical capacity and trusted pending identity keeps concurrent same-text single pending work separate after rotation changes",
+        "review counterexamples: physical capacity and trusted pending identity keeps concurrent same-text batch pending work separate after privacy changes",
+        "review counterexamples: physical capacity and trusted pending identity keeps concurrent same-text batch pending work separate after credential changes",
+        "review counterexamples: physical capacity and trusted pending identity keeps concurrent same-text batch pending work separate after key-set changes",
+        "review counterexamples: physical capacity and trusted pending identity keeps concurrent same-text batch pending work separate after rotation changes",
+        "review counterexamples: physical capacity and trusted pending identity keeps concurrent same-text summary pending work separate after privacy changes",
+        "review counterexamples: physical capacity and trusted pending identity keeps concurrent same-text summary pending work separate after credential changes",
+        "review counterexamples: physical capacity and trusted pending identity keeps concurrent same-text summary pending work separate after key-set changes",
+        "review counterexamples: physical capacity and trusted pending identity keeps concurrent same-text summary pending work separate after rotation changes"
+      ],
+      "assertionFailure": true,
+      "candidateSourceSha256": "d17c38f0e7fc929159c1f094db977bd7542ec1d4f930a8a1935697262bacff83"
+    },
+    {
+      "stage": "review-ablation-pending-key-set",
+      "startedAt": "2026-10-09T12:13:06.219942+00:00",
+      "durationSeconds": 1.115,
+      "exitCode": 1,
+      "removed": "pending-key-set",
+      "passed": 0,
+      "failed": 6,
+      "failures": [
+        "review counterexamples: physical capacity and trusted pending identity keeps concurrent same-text single pending work separate after credential changes",
+        "review counterexamples: physical capacity and trusted pending identity keeps concurrent same-text single pending work separate after key-set changes",
+        "review counterexamples: physical capacity and trusted pending identity keeps concurrent same-text batch pending work separate after credential changes",
+        "review counterexamples: physical capacity and trusted pending identity keeps concurrent same-text batch pending work separate after key-set changes",
+        "review counterexamples: physical capacity and trusted pending identity keeps concurrent same-text summary pending work separate after credential changes",
+        "review counterexamples: physical capacity and trusted pending identity keeps concurrent same-text summary pending work separate after key-set changes"
+      ],
+      "assertionFailure": true,
+      "candidateSourceSha256": "d17c38f0e7fc929159c1f094db977bd7542ec1d4f930a8a1935697262bacff83"
+    },
+    {
+      "stage": "review-ablation-pending-rotation",
+      "startedAt": "2026-10-09T12:13:07.336180+00:00",
+      "durationSeconds": 1.115,
+      "exitCode": 1,
+      "removed": "pending-rotation",
+      "passed": 0,
+      "failed": 3,
+      "failures": [
+        "review counterexamples: physical capacity and trusted pending identity keeps concurrent same-text single pending work separate after rotation changes",
+        "review counterexamples: physical capacity and trusted pending identity keeps concurrent same-text batch pending work separate after rotation changes",
+        "review counterexamples: physical capacity and trusted pending identity keeps concurrent same-text summary pending work separate after rotation changes"
+      ],
+      "assertionFailure": true,
+      "candidateSourceSha256": "d17c38f0e7fc929159c1f094db977bd7542ec1d4f930a8a1935697262bacff83"
+    },
+    {
+      "stage": "review-ablation-svg",
+      "startedAt": "2026-10-09T12:13:08.452304+00:00",
+      "durationSeconds": 1.366,
+      "exitCode": 1,
+      "removed": "svg",
+      "passed": 0,
+      "failed": 1,
+      "failures": [
+        "review counterexample: lossless single SVG path table compression imports the authoritative SVG table through the real Vite and inflate pipeline"
+      ],
+      "assertionFailure": true,
+      "candidateSourceSha256": "3f2e0235d158b248dfedd6906acdc1276c2afd3bb4aba5640e38632ac2d9075f"
+    }
+  ],
+  "exactCandidateRestored": true
+}

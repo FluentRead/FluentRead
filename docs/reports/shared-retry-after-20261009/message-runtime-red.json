@@ -1,0 +1,26 @@
+{
+  "stage": "round2-real-runtime-red",
+  "startedAt": "2026-10-09T12:38:26.493061+00:00",
+  "durationSeconds": 0.965,
+  "exitCode": 1,
+  "passed": 4,
+  "failed": 4,
+  "failures": [
+    {
+      "name": "actual messageRuntime privacy mapping keeps a no-tab extension sender unknown when background is false through typed",
+      "reason": "AssertionError: expected false to be undefined"
+    },
+    {
+      "name": "actual messageRuntime privacy mapping keeps a no-tab extension sender unknown when background is false through fallback",
+      "reason": "AssertionError: expected false to be undefined"
+    },
+    {
+      "name": "actual messageRuntime privacy mapping keeps a no-tab extension sender unknown when background is true through typed",
+      "reason": "AssertionError: expected true to be undefined"
+    },
+    {
+      "name": "actual messageRuntime privacy mapping keeps a no-tab extension sender unknown when background is true through fallback",
+      "reason": "AssertionError: expected true to be undefined"
+    }
+  ]
+}

@@ -1,0 +1,217 @@
+{
+  "baseHead": "98e88a90489b39e9a6be8e2c71019daeaa297e23",
+  "tests": {
+    "files": 57,
+    "passed": 1690,
+    "failed": 0,
+    "rawReportSha256": "492cbfd959e4da74c083e16009529896051005db881f02ff56b0e1d84f57a879"
+  },
+  "strictCoverageModuleCount": 9,
+  "stages": [
+    {
+      "stage": "round3-valid-red",
+      "startedAt": "2026-10-09T13:22:48.423657+00:00",
+      "durationSeconds": 1.466,
+      "exitCode": 1,
+      "arguments": [
+        "exec",
+        "vitest",
+        "run",
+        "tests/translationRetryAfter.test.ts",
+        "-t",
+        "real registry Doubao route capacity|real probe raw transport outlives caller timeout",
+        "--reporter=json",
+        "--outputFile=../shared-retry-after-pr-20261009/round3-valid-red-vitest.json"
+      ]
+    },
+    {
+      "stage": "round3-focused-green",
+      "startedAt": "2026-10-09T13:23:52.845189+00:00",
+      "durationSeconds": 1.816,
+      "exitCode": 0,
+      "arguments": [
+        "exec",
+        "vitest",
+        "run",
+        "tests/translationRetryAfter.test.ts",
+        "tests/backgroundMessageRuntimePrivacy.test.ts",
+        "--reporter=json",
+        "--outputFile=../shared-retry-after-pr-20261009/round3-focused-green-vitest.json"
+      ]
+    },
+    {
+      "stage": "round3-fixes-standard",
+      "startedAt": "2026-10-09T13:27:53.019311+00:00",
+      "durationSeconds": 3.918,
+      "exitCode": 0,
+      "arguments": [
+        "build:userscript"
+      ]
+    },
+    {
+      "stage": "round3-compact-focused",
+      "startedAt": "2026-10-09T13:29:32.103741+00:00",
+      "durationSeconds": 2.968,
+      "exitCode": 0,
+      "arguments": [
+        "exec",
+        "vitest",
+        "run",
+        "tests/translationRetryAfter.test.ts",
+        "tests/translationRequestScheduler.test.ts",
+        "tests/userscriptViteConfig.test.ts",
+        "--reporter=json",
+        "--outputFile=../shared-retry-after-pr-20261009/round3-compact-focused-vitest.json"
+      ]
+    },
+    {
+      "stage": "round3-compact-standard",
+      "startedAt": "2026-10-09T13:30:11.683717+00:00",
+      "durationSeconds": 3.82,
+      "exitCode": 0,
+      "arguments": [
+        "build:userscript"
+      ]
+    },
+    {
+      "stage": "round3-compact-standard-final",
+      "startedAt": "2026-10-09T13:31:41.382400+00:00",
+      "durationSeconds": 3.871,
+      "exitCode": 0,
+      "arguments": [
+        "build:userscript"
+      ]
+    },
+    {
+      "stage": "round3-compact-wake-standard",
+      "startedAt": "2026-10-09T13:33:30.258267+00:00",
+      "durationSeconds": 3.82,
+      "exitCode": 0,
+      "arguments": [
+        "build:userscript"
+      ]
+    },
+    {
+      "stage": "round3-affected-strict-coverage",
+      "startedAt": "2026-10-09T13:35:06.141976+00:00",
+      "durationSeconds": 34.356,
+      "exitCode": 0,
+      "arguments": [
+        "exec",
+        "vitest",
+        "run",
+        "--config",
+        ".vitest-round3-coverage.config.ts",
+        "--coverage",
+        "--reporter=json",
+        "--outputFile=/home/arietids/Documents/Codex/2026-10-06/task/shared-retry-after-pr-20261009/round3-affected-vitest.json"
+      ]
+    },
+    {
+      "stage": "round3-compile",
+      "startedAt": "2026-10-09T13:35:40.562036+00:00",
+      "durationSeconds": 16.993,
+      "exitCode": 0,
+      "arguments": [
+        "compile"
+      ]
+    },
+    {
+      "stage": "round3-test-audit",
+      "startedAt": "2026-10-09T13:35:57.605202+00:00",
+      "durationSeconds": 1.216,
+      "exitCode": 0,
+      "arguments": [
+        "test:audit"
+      ]
+    },
+    {
+      "stage": "round3-chrome-build",
+      "startedAt": "2026-10-09T13:35:58.870721+00:00",
+      "durationSeconds": 20.44,
+      "exitCode": 0,
+      "arguments": [
+        "build"
+      ]
+    },
+    {
+      "stage": "round3-firefox-build",
+      "startedAt": "2026-10-09T13:36:19.371937+00:00",
+      "durationSeconds": 20.438,
+      "exitCode": 0,
+      "arguments": [
+        "build:firefox"
+      ]
+    },
+    {
+      "stage": "round3-standard-verifier",
+      "startedAt": "2026-10-09T13:36:39.872062+00:00",
+      "durationSeconds": 0.264,
+      "exitCode": 0,
+      "arguments": [
+        "exec",
+        "node",
+        "scripts/verify-userscript-build.mjs"
+      ]
+    },
+    {
+      "stage": "round3-standalone-build",
+      "startedAt": "2026-10-09T13:36:40.186221+00:00",
+      "durationSeconds": 7.225,
+      "exitCode": 0,
+      "arguments": [
+        "build:userscript:standalone"
+      ]
+    },
+    {
+      "stage": "round3-standalone-verifier",
+      "startedAt": "2026-10-09T13:36:47.463538+00:00",
+      "durationSeconds": 0.264,
+      "exitCode": 1,
+      "arguments": [
+        "exec",
+        "node",
+        "scripts/verify-userscript-standalone-build.mjs"
+      ]
+    },
+    {
+      "stage": "round3-greasyfork-build",
+      "startedAt": "2026-10-09T13:36:47.777253+00:00",
+      "durationSeconds": 2.968,
+      "exitCode": 1,
+      "arguments": [
+        "build:userscript:greasyfork"
+      ]
+    },
+    {
+      "stage": "round3-greasyfork-verifier",
+      "startedAt": "2026-10-09T13:36:50.796314+00:00",
+      "durationSeconds": 0.214,
+      "exitCode": 1,
+      "arguments": [
+        "exec",
+        "node",
+        "scripts/verify-userscript-greasyfork-build.mjs"
+      ]
+    },
+    {
+      "stage": "round3-docs-build",
+      "startedAt": "2026-10-09T13:40:37.453505+00:00",
+      "durationSeconds": 2.718,
+      "exitCode": 0,
+      "arguments": [
+        "docs:build"
+      ]
+    }
+  ],
+  "cpuTargetPercent": 60,
+  "maxWorkers": 1,
+  "concurrency": 1,
+  "realModelOrSearchCalls": 0,
+  "newDependenciesPermissionsEnvironments": 0,
+  "recoveryOperations": 0,
+  "historicalEvidenceHeads": {
+    "replayAndAblations": "10675d79f0a1f523e609ff48b7a2cca0e045b690",
+    "mixedProbeMessagePrivacyAndOccam": "98e88a90489b39e9a6be8e2c71019daeaa297e23"
+  }
+}

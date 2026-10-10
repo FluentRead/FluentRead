@@ -1,0 +1,77 @@
+{
+  "decodedMultisetEqual": true,
+  "baseline": [
+    {
+      "sha256": "609e41eb261020d108080238962e6fdd28ffe4a3f6ec879389ad44c2e0d396b6",
+      "rawBytes": 32514,
+      "encodedBytes": 10432
+    },
+    {
+      "sha256": "76599767b169bf2efc629e97e3ffba8cce7d4e74dfa143a6df3d7f777b5d9590",
+      "rawBytes": 17244,
+      "encodedBytes": 2008
+    },
+    {
+      "sha256": "8cdae65741aaa898ae77131788fb1dfca7406ad8814e77ba46a3b916c41e1f20",
+      "rawBytes": 165138,
+      "encodedBytes": 36900
+    },
+    {
+      "sha256": "9aca032ad9f66def8e0756199a66ac782131867a05b3b282eba5fc4f6f0fdd85",
+      "rawBytes": 161625,
+      "encodedBytes": 61852
+    },
+    {
+      "sha256": "a8350a4b3dd632e37a4ed668e1e6787f2016af858f27db3570f0556d451c99cf",
+      "rawBytes": 13378,
+      "encodedBytes": 4332
+    },
+    {
+      "sha256": "afef0ed242813e5b352000a5da2aa9f866e2947d2712e88a60ea7deab6f23889",
+      "rawBytes": 455855,
+      "encodedBytes": 185532
+    },
+    {
+      "sha256": "f0580b893705463eeae33a044fd28efa9f9017b127b55fe5e76393da9e4a5909",
+      "rawBytes": 68705,
+      "encodedBytes": 9624
+    }
+  ],
+  "candidate": [
+    {
+      "sha256": "609e41eb261020d108080238962e6fdd28ffe4a3f6ec879389ad44c2e0d396b6",
+      "rawBytes": 32514,
+      "encodedBytes": 10432
+    },
+    {
+      "sha256": "76599767b169bf2efc629e97e3ffba8cce7d4e74dfa143a6df3d7f777b5d9590",
+      "rawBytes": 17244,
+      "encodedBytes": 2008
+    },
+    {
+      "sha256": "8cdae65741aaa898ae77131788fb1dfca7406ad8814e77ba46a3b916c41e1f20",
+      "rawBytes": 165138,
+      "encodedBytes": 36852
+    },
+    {
+      "sha256": "9aca032ad9f66def8e0756199a66ac782131867a05b3b282eba5fc4f6f0fdd85",
+      "rawBytes": 161625,
+      "encodedBytes": 61852
+    },
+    {
+      "sha256": "a8350a4b3dd632e37a4ed668e1e6787f2016af858f27db3570f0556d451c99cf",
+      "rawBytes": 13378,
+      "encodedBytes": 4328
+    },
+    {
+      "sha256": "afef0ed242813e5b352000a5da2aa9f866e2947d2712e88a60ea7deab6f23889",
+      "rawBytes": 455855,
+      "encodedBytes": 185532
+    },
+    {
+      "sha256": "f0580b893705463eeae33a044fd28efa9f9017b127b55fe5e76393da9e4a5909",
+      "rawBytes": 68705,
+      "encodedBytes": 9628
+    }
+  ]
+}

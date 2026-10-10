@@ -1,7 +1,7 @@
 /**
  * @file src/features/area-translation/services/textTranslation.ts
  * 文件职责：在后台把圈选 OCR 或视觉转录结果作为完整文本处理，以冻结配置调用共享翻译 broker，独立返回原文、译文和可核对的 AI 校正文。
- * 主要内容：实现视觉路径的选区裁剪与模型转录、标准整块翻译、通用 AI 能力门控、专属结构化提示与严格 JSON 校验，随结果返回本次服务名称与模型，携带可信页面术语来源、同一取消信号和剩余总预算。
+ * 主要内容：实现视觉路径的选区裁剪与模型转录、标准整块翻译、通用 AI 能力门控、专属结构化提示与严格 JSON 校验，随结果返回本次服务名称与模型，文字和视觉事务均携带可信隐私及页面术语来源、同一取消信号和剩余总预算。
  * 模块边界：OCR 结果只接收本地文本；vision 分支仅向已选 provider 发送受限裁剪图，不发送完整截图，不调用浏览器或改写全局设置。
  */
 import {options as catalogOptions, resolveConfiguredModel, servicesType} from '@/src/core/config/catalog';
@@ -43,8 +43,10 @@ export function prepareAreaVisionRecognition(
     cropArea: (image: string, selection: AreaTranslationSelection, options: ImageOperationOptions) => Promise<AreaRecognitionResult>,
     translate: (request: TranslationRequestMessage) => Promise<string | string[]>,
     now: () => number = Date.now,
+    glossaryContext: TrustedTranslationGlossaryContext = {},
 ): (image: string, selection: AreaTranslationSelection, options: ImageOperationOptions) => Promise<AreaRecognitionResult> {
     const startedAt = now();
+    const trustedContext = Object.freeze({...glossaryContext});
     const frozen = createTranslationProviderConfigSnapshot(source);
     const service = source.areaTranslationService || source.service;
     const model = resolveConfiguredModel(frozen.model[service], frozen.customModel[service]);
@@ -60,10 +62,10 @@ export function prepareAreaVisionRecognition(
         checkAbort(options.signal);
         const requestTimeoutMs = Math.floor(options.timeoutMs - (now() - startedAt));
         if (requestTimeoutMs <= 0) throw new Error('圈选翻译总时间已耗尽，请重试');
-        const visionRequest = attachTranslationImageInput(attachTranslationProviderConfig(attachTranslationRequestControl(
+        const visionRequest = attachTranslationGlossaryContext(attachTranslationImageInput(attachTranslationProviderConfig(attachTranslationRequestControl(
             markTranslationRemainingBudget({origin: 'Transcribe the cropped image.', glossaryIds: [], sourceLanguage, targetLanguage: visionSnapshot.to,
                 serviceOverride: service, modelOverride: model, context: title, pageContext: '', enableAIContext: false,
-                useCache: false, requestTimeoutMs}), {signal: options.signal, ownershipKey: `area:${options.requestId}:vision`}), visionSnapshot), cropped.image);
+                useCache: false, requestTimeoutMs}), {signal: options.signal, ownershipKey: `area:${options.requestId}:vision`}), visionSnapshot), cropped.image), trustedContext);
         const value = await translate(visionRequest);
         checkAbort(options.signal);
         if (typeof value !== 'string') throw new Error('视觉圈选识别未返回有效文字');

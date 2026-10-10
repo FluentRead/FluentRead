@@ -1,0 +1,2106 @@
+{
+  "variant": "B0",
+  "seeds": 30,
+  "cases": [
+    {
+      "seed": 1,
+      "delay": 2000,
+      "outcomes": [
+        true,
+        true,
+        true,
+        true
+      ],
+      "attempts": [
+        {
+          "scope": "A",
+          "at": 0,
+          "status": 429,
+          "bodyBytes": 585
+        },
+        {
+          "scope": "A",
+          "at": 101,
+          "status": 429,
+          "bodyBytes": 581
+        },
+        {
+          "scope": "B",
+          "at": 101,
+          "status": 200,
+          "bodyBytes": 583
+        },
+        {
+          "scope": "A",
+          "at": 202,
+          "status": 429,
+          "bodyBytes": 582
+        },
+        {
+          "scope": "A",
+          "at": 2000,
+          "status": 200,
+          "bodyBytes": 585
+        },
+        {
+          "scope": "A",
+          "at": 2101,
+          "status": 200,
+          "bodyBytes": 581
+        },
+        {
+          "scope": "A",
+          "at": 2202,
+          "status": 200,
+          "bodyBytes": 582
+        }
+      ],
+      "successes": 4,
+      "healthyAttempts": 1,
+      "healthyBodyBytes": 583,
+      "leakedDispatches": 2
+    },
+    {
+      "seed": 2,
+      "delay": 60000,
+      "outcomes": [
+        false,
+        false,
+        true,
+        false
+      ],
+      "attempts": [
+        {
+          "scope": "A",
+          "at": 0,
+          "status": 429,
+          "bodyBytes": 585
+        },
+        {
+          "scope": "A",
+          "at": 102,
+          "status": 429,
+          "bodyBytes": 581
+        },
+        {
+          "scope": "B",
+          "at": 102,
+          "status": 200,
+          "bodyBytes": 583
+        },
+        {
+          "scope": "A",
+          "at": 204,
+          "status": 429,
+          "bodyBytes": 582
+        },
+        {
+          "scope": "A",
+          "at": 2000,
+          "status": 429,
+          "bodyBytes": 585
+        },
+        {
+          "scope": "A",
+          "at": 2102,
+          "status": 429,
+          "bodyBytes": 581
+        },
+        {
+          "scope": "A",
+          "at": 2204,
+          "status": 429,
+          "bodyBytes": 582
+        },
+        {
+          "scope": "A",
+          "at": 6000,
+          "status": 429,
+          "bodyBytes": 585
+        },
+        {
+          "scope": "A",
+          "at": 6102,
+          "status": 429,
+          "bodyBytes": 581
+        },
+        {
+          "scope": "A",
+          "at": 6204,
+          "status": 429,
+          "bodyBytes": 582
+        }
+      ],
+      "successes": 1,
+      "healthyAttempts": 1,
+      "healthyBodyBytes": 583,
+      "leakedDispatches": 8
+    },
+    {
+      "seed": 3,
+      "delay": 90000,
+      "outcomes": [
+        false,
+        false,
+        true,
+        false
+      ],
+      "attempts": [
+        {
+          "scope": "A",
+          "at": 0,
+          "status": 429,
+          "bodyBytes": 585
+        },
+        {
+          "scope": "A",
+          "at": 103,
+          "status": 429,
+          "bodyBytes": 581
+        },
+        {
+          "scope": "B",
+          "at": 103,
+          "status": 200,
+          "bodyBytes": 583
+        },
+        {
+          "scope": "A",
+          "at": 206,
+          "status": 429,
+          "bodyBytes": 582
+        },
+        {
+          "scope": "A",
+          "at": 2000,
+          "status": 429,
+          "bodyBytes": 585
+        },
+        {
+          "scope": "A",
+          "at": 2103,
+          "status": 429,
+          "bodyBytes": 581
+        },
+        {
+          "scope": "A",
+          "at": 2206,
+          "status": 429,
+          "bodyBytes": 582
+        },
+        {
+          "scope": "A",
+          "at": 6000,
+          "status": 429,
+          "bodyBytes": 585
+        },
+        {
+          "scope": "A",
+          "at": 6103,
+          "status": 429,
+          "bodyBytes": 581
+        },
+        {
+          "scope": "A",
+          "at": 6206,
+          "status": 429,
+          "bodyBytes": 582
+        }
+      ],
+      "successes": 1,
+      "healthyAttempts": 1,
+      "healthyBodyBytes": 583,
+      "leakedDispatches": 8
+    },
+    {
+      "seed": 4,
+      "delay": 2000,
+      "outcomes": [
+        true,
+        true,
+        true,
+        true
+      ],
+      "attempts": [
+        {
+          "scope": "A",
+          "at": 0,
+          "status": 429,
+          "bodyBytes": 585
+        },
+        {
+          "scope": "A",
+          "at": 104,
+          "status": 429,
+          "bodyBytes": 581
+        },
+        {
+          "scope": "B",
+          "at": 104,
+          "status": 200,
+          "bodyBytes": 583
+        },
+        {
+          "scope": "A",
+          "at": 208,
+          "status": 429,
+          "bodyBytes": 582
+        },
+        {
+          "scope": "A",
+          "at": 2000,
+          "status": 200,
+          "bodyBytes": 585
+        },
+        {
+          "scope": "A",
+          "at": 2104,
+          "status": 200,
+          "bodyBytes": 581
+        },
+        {
+          "scope": "A",
+          "at": 2208,
+          "status": 200,
+          "bodyBytes": 582
+        }
+      ],
+      "successes": 4,
+      "healthyAttempts": 1,
+      "healthyBodyBytes": 583,
+      "leakedDispatches": 2
+    },
+    {
+      "seed": 5,
+      "delay": 60000,
+      "outcomes": [
+        false,
+        false,
+        true,
+        false
+      ],
+      "attempts": [
+        {
+          "scope": "A",
+          "at": 0,
+          "status": 429,
+          "bodyBytes": 585
+        },
+        {
+          "scope": "A",
+          "at": 105,
+          "status": 429,
+          "bodyBytes": 581
+        },
+        {
+          "scope": "B",
+          "at": 105,
+          "status": 200,
+          "bodyBytes": 583
+        },
+        {
+          "scope": "A",
+          "at": 210,
+          "status": 429,
+          "bodyBytes": 582
+        },
+        {
+          "scope": "A",
+          "at": 2000,
+          "status": 429,
+          "bodyBytes": 585
+        },
+        {
+          "scope": "A",
+          "at": 2105,
+          "status": 429,
+          "bodyBytes": 581
+        },
+        {
+          "scope": "A",
+          "at": 2210,
+          "status": 429,
+          "bodyBytes": 582
+        },
+        {
+          "scope": "A",
+          "at": 6000,
+          "status": 429,
+          "bodyBytes": 585
+        },
+        {
+          "scope": "A",
+          "at": 6105,
+          "status": 429,
+          "bodyBytes": 581
+        },
+        {
+          "scope": "A",
+          "at": 6210,
+          "status": 429,
+          "bodyBytes": 582
+        }
+      ],
+      "successes": 1,
+      "healthyAttempts": 1,
+      "healthyBodyBytes": 583,
+      "leakedDispatches": 8
+    },
+    {
+      "seed": 6,
+      "delay": 90000,
+      "outcomes": [
+        false,
+        false,
+        true,
+        false
+      ],
+      "attempts": [
+        {
+          "scope": "A",
+          "at": 0,
+          "status": 429,
+          "bodyBytes": 585
+        },
+        {
+          "scope": "A",
+          "at": 106,
+          "status": 429,
+          "bodyBytes": 581
+        },
+        {
+          "scope": "B",
+          "at": 106,
+          "status": 200,
+          "bodyBytes": 583
+        },
+        {
+          "scope": "A",
+          "at": 212,
+          "status": 429,
+          "bodyBytes": 582
+        },
+        {
+          "scope": "A",
+          "at": 2000,
+          "status": 429,
+          "bodyBytes": 585
+        },
+        {
+          "scope": "A",
+          "at": 2106,
+          "status": 429,
+          "bodyBytes": 581
+        },
+        {
+          "scope": "A",
+          "at": 2212,
+          "status": 429,
+          "bodyBytes": 582
+        },
+        {
+          "scope": "A",
+          "at": 6000,
+          "status": 429,
+          "bodyBytes": 585
+        },
+        {
+          "scope": "A",
+          "at": 6106,
+          "status": 429,
+          "bodyBytes": 581
+        },
+        {
+          "scope": "A",
+          "at": 6212,
+          "status": 429,
+          "bodyBytes": 582
+        }
+      ],
+      "successes": 1,
+      "healthyAttempts": 1,
+      "healthyBodyBytes": 583,
+      "leakedDispatches": 8
+    },
+    {
+      "seed": 7,
+      "delay": 2000,
+      "outcomes": [
+        true,
+        true,
+        true,
+        true
+      ],
+      "attempts": [
+        {
+          "scope": "A",
+          "at": 0,
+          "status": 429,
+          "bodyBytes": 585
+        },
+        {
+          "scope": "A",
+          "at": 107,
+          "status": 429,
+          "bodyBytes": 581
+        },
+        {
+          "scope": "B",
+          "at": 107,
+          "status": 200,
+          "bodyBytes": 583
+        },
+        {
+          "scope": "A",
+          "at": 214,
+          "status": 429,
+          "bodyBytes": 582
+        },
+        {
+          "scope": "A",
+          "at": 2000,
+          "status": 200,
+          "bodyBytes": 585
+        },
+        {
+          "scope": "A",
+          "at": 2107,
+          "status": 200,
+          "bodyBytes": 581
+        },
+        {
+          "scope": "A",
+          "at": 2214,
+          "status": 200,
+          "bodyBytes": 582
+        }
+      ],
+      "successes": 4,
+      "healthyAttempts": 1,
+      "healthyBodyBytes": 583,
+      "leakedDispatches": 2
+    },
+    {
+      "seed": 8,
+      "delay": 60000,
+      "outcomes": [
+        false,
+        false,
+        true,
+        false
+      ],
+      "attempts": [
+        {
+          "scope": "A",
+          "at": 0,
+          "status": 429,
+          "bodyBytes": 585
+        },
+        {
+          "scope": "A",
+          "at": 108,
+          "status": 429,
+          "bodyBytes": 581
+        },
+        {
+          "scope": "B",
+          "at": 108,
+          "status": 200,
+          "bodyBytes": 583
+        },
+        {
+          "scope": "A",
+          "at": 216,
+          "status": 429,
+          "bodyBytes": 582
+        },
+        {
+          "scope": "A",
+          "at": 2000,
+          "status": 429,
+          "bodyBytes": 585
+        },
+        {
+          "scope": "A",
+          "at": 2108,
+          "status": 429,
+          "bodyBytes": 581
+        },
+        {
+          "scope": "A",
+          "at": 2216,
+          "status": 429,
+          "bodyBytes": 582
+        },
+        {
+          "scope": "A",
+          "at": 6000,
+          "status": 429,
+          "bodyBytes": 585
+        },
+        {
+          "scope": "A",
+          "at": 6108,
+          "status": 429,
+          "bodyBytes": 581
+        },
+        {
+          "scope": "A",
+          "at": 6216,
+          "status": 429,
+          "bodyBytes": 582
+        }
+      ],
+      "successes": 1,
+      "healthyAttempts": 1,
+      "healthyBodyBytes": 583,
+      "leakedDispatches": 8
+    },
+    {
+      "seed": 9,
+      "delay": 90000,
+      "outcomes": [
+        false,
+        false,
+        true,
+        false
+      ],
+      "attempts": [
+        {
+          "scope": "A",
+          "at": 0,
+          "status": 429,
+          "bodyBytes": 585
+        },
+        {
+          "scope": "A",
+          "at": 109,
+          "status": 429,
+          "bodyBytes": 581
+        },
+        {
+          "scope": "B",
+          "at": 109,
+          "status": 200,
+          "bodyBytes": 583
+        },
+        {
+          "scope": "A",
+          "at": 218,
+          "status": 429,
+          "bodyBytes": 582
+        },
+        {
+          "scope": "A",
+          "at": 2000,
+          "status": 429,
+          "bodyBytes": 585
+        },
+        {
+          "scope": "A",
+          "at": 2109,
+          "status": 429,
+          "bodyBytes": 581
+        },
+        {
+          "scope": "A",
+          "at": 2218,
+          "status": 429,
+          "bodyBytes": 582
+        },
+        {
+          "scope": "A",
+          "at": 6000,
+          "status": 429,
+          "bodyBytes": 585
+        },
+        {
+          "scope": "A",
+          "at": 6109,
+          "status": 429,
+          "bodyBytes": 581
+        },
+        {
+          "scope": "A",
+          "at": 6218,
+          "status": 429,
+          "bodyBytes": 582
+        }
+      ],
+      "successes": 1,
+      "healthyAttempts": 1,
+      "healthyBodyBytes": 583,
+      "leakedDispatches": 8
+    },
+    {
+      "seed": 10,
+      "delay": 2000,
+      "outcomes": [
+        true,
+        true,
+        true,
+        true
+      ],
+      "attempts": [
+        {
+          "scope": "A",
+          "at": 0,
+          "status": 429,
+          "bodyBytes": 586
+        },
+        {
+          "scope": "A",
+          "at": 110,
+          "status": 429,
+          "bodyBytes": 582
+        },
+        {
+          "scope": "B",
+          "at": 110,
+          "status": 200,
+          "bodyBytes": 584
+        },
+        {
+          "scope": "A",
+          "at": 220,
+          "status": 429,
+          "bodyBytes": 583
+        },
+        {
+          "scope": "A",
+          "at": 2000,
+          "status": 200,
+          "bodyBytes": 586
+        },
+        {
+          "scope": "A",
+          "at": 2110,
+          "status": 200,
+          "bodyBytes": 582
+        },
+        {
+          "scope": "A",
+          "at": 2220,
+          "status": 200,
+          "bodyBytes": 583
+        }
+      ],
+      "successes": 4,
+      "healthyAttempts": 1,
+      "healthyBodyBytes": 584,
+      "leakedDispatches": 2
+    },
+    {
+      "seed": 11,
+      "delay": 60000,
+      "outcomes": [
+        false,
+        false,
+        true,
+        false
+      ],
+      "attempts": [
+        {
+          "scope": "A",
+          "at": 0,
+          "status": 429,
+          "bodyBytes": 586
+        },
+        {
+          "scope": "A",
+          "at": 111,
+          "status": 429,
+          "bodyBytes": 582
+        },
+        {
+          "scope": "B",
+          "at": 111,
+          "status": 200,
+          "bodyBytes": 584
+        },
+        {
+          "scope": "A",
+          "at": 222,
+          "status": 429,
+          "bodyBytes": 583
+        },
+        {
+          "scope": "A",
+          "at": 2000,
+          "status": 429,
+          "bodyBytes": 586
+        },
+        {
+          "scope": "A",
+          "at": 2111,
+          "status": 429,
+          "bodyBytes": 582
+        },
+        {
+          "scope": "A",
+          "at": 2222,
+          "status": 429,
+          "bodyBytes": 583
+        },
+        {
+          "scope": "A",
+          "at": 6000,
+          "status": 429,
+          "bodyBytes": 586
+        },
+        {
+          "scope": "A",
+          "at": 6111,
+          "status": 429,
+          "bodyBytes": 582
+        },
+        {
+          "scope": "A",
+          "at": 6222,
+          "status": 429,
+          "bodyBytes": 583
+        }
+      ],
+      "successes": 1,
+      "healthyAttempts": 1,
+      "healthyBodyBytes": 584,
+      "leakedDispatches": 8
+    },
+    {
+      "seed": 12,
+      "delay": 90000,
+      "outcomes": [
+        false,
+        false,
+        true,
+        false
+      ],
+      "attempts": [
+        {
+          "scope": "A",
+          "at": 0,
+          "status": 429,
+          "bodyBytes": 586
+        },
+        {
+          "scope": "A",
+          "at": 112,
+          "status": 429,
+          "bodyBytes": 582
+        },
+        {
+          "scope": "B",
+          "at": 112,
+          "status": 200,
+          "bodyBytes": 584
+        },
+        {
+          "scope": "A",
+          "at": 224,
+          "status": 429,
+          "bodyBytes": 583
+        },
+        {
+          "scope": "A",
+          "at": 2000,
+          "status": 429,
+          "bodyBytes": 586
+        },
+        {
+          "scope": "A",
+          "at": 2112,
+          "status": 429,
+          "bodyBytes": 582
+        },
+        {
+          "scope": "A",
+          "at": 2224,
+          "status": 429,
+          "bodyBytes": 583
+        },
+        {
+          "scope": "A",
+          "at": 6000,
+          "status": 429,
+          "bodyBytes": 586
+        },
+        {
+          "scope": "A",
+          "at": 6112,
+          "status": 429,
+          "bodyBytes": 582
+        },
+        {
+          "scope": "A",
+          "at": 6224,
+          "status": 429,
+          "bodyBytes": 583
+        }
+      ],
+      "successes": 1,
+      "healthyAttempts": 1,
+      "healthyBodyBytes": 584,
+      "leakedDispatches": 8
+    },
+    {
+      "seed": 13,
+      "delay": 2000,
+      "outcomes": [
+        true,
+        true,
+        true,
+        true
+      ],
+      "attempts": [
+        {
+          "scope": "A",
+          "at": 0,
+          "status": 429,
+          "bodyBytes": 586
+        },
+        {
+          "scope": "A",
+          "at": 100,
+          "status": 429,
+          "bodyBytes": 582
+        },
+        {
+          "scope": "B",
+          "at": 100,
+          "status": 200,
+          "bodyBytes": 584
+        },
+        {
+          "scope": "A",
+          "at": 213,
+          "status": 429,
+          "bodyBytes": 583
+        },
+        {
+          "scope": "A",
+          "at": 2000,
+          "status": 200,
+          "bodyBytes": 586
+        },
+        {
+          "scope": "A",
+          "at": 2100,
+          "status": 200,
+          "bodyBytes": 582
+        },
+        {
+          "scope": "A",
+          "at": 2213,
+          "status": 200,
+          "bodyBytes": 583
+        }
+      ],
+      "successes": 4,
+      "healthyAttempts": 1,
+      "healthyBodyBytes": 584,
+      "leakedDispatches": 2
+    },
+    {
+      "seed": 14,
+      "delay": 60000,
+      "outcomes": [
+        false,
+        false,
+        true,
+        false
+      ],
+      "attempts": [
+        {
+          "scope": "A",
+          "at": 0,
+          "status": 429,
+          "bodyBytes": 586
+        },
+        {
+          "scope": "A",
+          "at": 101,
+          "status": 429,
+          "bodyBytes": 582
+        },
+        {
+          "scope": "B",
+          "at": 101,
+          "status": 200,
+          "bodyBytes": 584
+        },
+        {
+          "scope": "A",
+          "at": 215,
+          "status": 429,
+          "bodyBytes": 583
+        },
+        {
+          "scope": "A",
+          "at": 2000,
+          "status": 429,
+          "bodyBytes": 586
+        },
+        {
+          "scope": "A",
+          "at": 2101,
+          "status": 429,
+          "bodyBytes": 582
+        },
+        {
+          "scope": "A",
+          "at": 2215,
+          "status": 429,
+          "bodyBytes": 583
+        },
+        {
+          "scope": "A",
+          "at": 6000,
+          "status": 429,
+          "bodyBytes": 586
+        },
+        {
+          "scope": "A",
+          "at": 6101,
+          "status": 429,
+          "bodyBytes": 582
+        },
+        {
+          "scope": "A",
+          "at": 6215,
+          "status": 429,
+          "bodyBytes": 583
+        }
+      ],
+      "successes": 1,
+      "healthyAttempts": 1,
+      "healthyBodyBytes": 584,
+      "leakedDispatches": 8
+    },
+    {
+      "seed": 15,
+      "delay": 90000,
+      "outcomes": [
+        false,
+        false,
+        true,
+        false
+      ],
+      "attempts": [
+        {
+          "scope": "A",
+          "at": 0,
+          "status": 429,
+          "bodyBytes": 586
+        },
+        {
+          "scope": "A",
+          "at": 102,
+          "status": 429,
+          "bodyBytes": 582
+        },
+        {
+          "scope": "B",
+          "at": 102,
+          "status": 200,
+          "bodyBytes": 584
+        },
+        {
+          "scope": "A",
+          "at": 217,
+          "status": 429,
+          "bodyBytes": 583
+        },
+        {
+          "scope": "A",
+          "at": 2000,
+          "status": 429,
+          "bodyBytes": 586
+        },
+        {
+          "scope": "A",
+          "at": 2102,
+          "status": 429,
+          "bodyBytes": 582
+        },
+        {
+          "scope": "A",
+          "at": 2217,
+          "status": 429,
+          "bodyBytes": 583
+        },
+        {
+          "scope": "A",
+          "at": 6000,
+          "status": 429,
+          "bodyBytes": 586
+        },
+        {
+          "scope": "A",
+          "at": 6102,
+          "status": 429,
+          "bodyBytes": 582
+        },
+        {
+          "scope": "A",
+          "at": 6217,
+          "status": 429,
+          "bodyBytes": 583
+        }
+      ],
+      "successes": 1,
+      "healthyAttempts": 1,
+      "healthyBodyBytes": 584,
+      "leakedDispatches": 8
+    },
+    {
+      "seed": 16,
+      "delay": 2000,
+      "outcomes": [
+        true,
+        true,
+        true,
+        true
+      ],
+      "attempts": [
+        {
+          "scope": "A",
+          "at": 0,
+          "status": 429,
+          "bodyBytes": 586
+        },
+        {
+          "scope": "A",
+          "at": 103,
+          "status": 429,
+          "bodyBytes": 582
+        },
+        {
+          "scope": "B",
+          "at": 103,
+          "status": 200,
+          "bodyBytes": 584
+        },
+        {
+          "scope": "A",
+          "at": 219,
+          "status": 429,
+          "bodyBytes": 583
+        },
+        {
+          "scope": "A",
+          "at": 2000,
+          "status": 200,
+          "bodyBytes": 586
+        },
+        {
+          "scope": "A",
+          "at": 2103,
+          "status": 200,
+          "bodyBytes": 582
+        },
+        {
+          "scope": "A",
+          "at": 2219,
+          "status": 200,
+          "bodyBytes": 583
+        }
+      ],
+      "successes": 4,
+      "healthyAttempts": 1,
+      "healthyBodyBytes": 584,
+      "leakedDispatches": 2
+    },
+    {
+      "seed": 17,
+      "delay": 60000,
+      "outcomes": [
+        false,
+        false,
+        true,
+        false
+      ],
+      "attempts": [
+        {
+          "scope": "A",
+          "at": 0,
+          "status": 429,
+          "bodyBytes": 586
+        },
+        {
+          "scope": "A",
+          "at": 104,
+          "status": 429,
+          "bodyBytes": 582
+        },
+        {
+          "scope": "B",
+          "at": 104,
+          "status": 200,
+          "bodyBytes": 584
+        },
+        {
+          "scope": "A",
+          "at": 204,
+          "status": 429,
+          "bodyBytes": 583
+        },
+        {
+          "scope": "A",
+          "at": 2000,
+          "status": 429,
+          "bodyBytes": 586
+        },
+        {
+          "scope": "A",
+          "at": 2104,
+          "status": 429,
+          "bodyBytes": 582
+        },
+        {
+          "scope": "A",
+          "at": 2204,
+          "status": 429,
+          "bodyBytes": 583
+        },
+        {
+          "scope": "A",
+          "at": 6000,
+          "status": 429,
+          "bodyBytes": 586
+        },
+        {
+          "scope": "A",
+          "at": 6104,
+          "status": 429,
+          "bodyBytes": 582
+        },
+        {
+          "scope": "A",
+          "at": 6204,
+          "status": 429,
+          "bodyBytes": 583
+        }
+      ],
+      "successes": 1,
+      "healthyAttempts": 1,
+      "healthyBodyBytes": 584,
+      "leakedDispatches": 8
+    },
+    {
+      "seed": 18,
+      "delay": 90000,
+      "outcomes": [
+        false,
+        false,
+        true,
+        false
+      ],
+      "attempts": [
+        {
+          "scope": "A",
+          "at": 0,
+          "status": 429,
+          "bodyBytes": 586
+        },
+        {
+          "scope": "A",
+          "at": 105,
+          "status": 429,
+          "bodyBytes": 582
+        },
+        {
+          "scope": "B",
+          "at": 105,
+          "status": 200,
+          "bodyBytes": 584
+        },
+        {
+          "scope": "A",
+          "at": 206,
+          "status": 429,
+          "bodyBytes": 583
+        },
+        {
+          "scope": "A",
+          "at": 2000,
+          "status": 429,
+          "bodyBytes": 586
+        },
+        {
+          "scope": "A",
+          "at": 2105,
+          "status": 429,
+          "bodyBytes": 582
+        },
+        {
+          "scope": "A",
+          "at": 2206,
+          "status": 429,
+          "bodyBytes": 583
+        },
+        {
+          "scope": "A",
+          "at": 6000,
+          "status": 429,
+          "bodyBytes": 586
+        },
+        {
+          "scope": "A",
+          "at": 6105,
+          "status": 429,
+          "bodyBytes": 582
+        },
+        {
+          "scope": "A",
+          "at": 6206,
+          "status": 429,
+          "bodyBytes": 583
+        }
+      ],
+      "successes": 1,
+      "healthyAttempts": 1,
+      "healthyBodyBytes": 584,
+      "leakedDispatches": 8
+    },
+    {
+      "seed": 19,
+      "delay": 2000,
+      "outcomes": [
+        true,
+        true,
+        true,
+        true
+      ],
+      "attempts": [
+        {
+          "scope": "A",
+          "at": 0,
+          "status": 429,
+          "bodyBytes": 586
+        },
+        {
+          "scope": "A",
+          "at": 106,
+          "status": 429,
+          "bodyBytes": 582
+        },
+        {
+          "scope": "B",
+          "at": 106,
+          "status": 200,
+          "bodyBytes": 584
+        },
+        {
+          "scope": "A",
+          "at": 208,
+          "status": 429,
+          "bodyBytes": 583
+        },
+        {
+          "scope": "A",
+          "at": 2000,
+          "status": 200,
+          "bodyBytes": 586
+        },
+        {
+          "scope": "A",
+          "at": 2106,
+          "status": 200,
+          "bodyBytes": 582
+        },
+        {
+          "scope": "A",
+          "at": 2208,
+          "status": 200,
+          "bodyBytes": 583
+        }
+      ],
+      "successes": 4,
+      "healthyAttempts": 1,
+      "healthyBodyBytes": 584,
+      "leakedDispatches": 2
+    },
+    {
+      "seed": 20,
+      "delay": 60000,
+      "outcomes": [
+        false,
+        false,
+        true,
+        false
+      ],
+      "attempts": [
+        {
+          "scope": "A",
+          "at": 0,
+          "status": 429,
+          "bodyBytes": 586
+        },
+        {
+          "scope": "A",
+          "at": 107,
+          "status": 429,
+          "bodyBytes": 582
+        },
+        {
+          "scope": "B",
+          "at": 107,
+          "status": 200,
+          "bodyBytes": 584
+        },
+        {
+          "scope": "A",
+          "at": 210,
+          "status": 429,
+          "bodyBytes": 583
+        },
+        {
+          "scope": "A",
+          "at": 2000,
+          "status": 429,
+          "bodyBytes": 586
+        },
+        {
+          "scope": "A",
+          "at": 2107,
+          "status": 429,
+          "bodyBytes": 582
+        },
+        {
+          "scope": "A",
+          "at": 2210,
+          "status": 429,
+          "bodyBytes": 583
+        },
+        {
+          "scope": "A",
+          "at": 6000,
+          "status": 429,
+          "bodyBytes": 586
+        },
+        {
+          "scope": "A",
+          "at": 6107,
+          "status": 429,
+          "bodyBytes": 582
+        },
+        {
+          "scope": "A",
+          "at": 6210,
+          "status": 429,
+          "bodyBytes": 583
+        }
+      ],
+      "successes": 1,
+      "healthyAttempts": 1,
+      "healthyBodyBytes": 584,
+      "leakedDispatches": 8
+    },
+    {
+      "seed": 21,
+      "delay": 90000,
+      "outcomes": [
+        false,
+        false,
+        true,
+        false
+      ],
+      "attempts": [
+        {
+          "scope": "A",
+          "at": 0,
+          "status": 429,
+          "bodyBytes": 586
+        },
+        {
+          "scope": "A",
+          "at": 108,
+          "status": 429,
+          "bodyBytes": 582
+        },
+        {
+          "scope": "B",
+          "at": 108,
+          "status": 200,
+          "bodyBytes": 584
+        },
+        {
+          "scope": "A",
+          "at": 212,
+          "status": 429,
+          "bodyBytes": 583
+        },
+        {
+          "scope": "A",
+          "at": 2000,
+          "status": 429,
+          "bodyBytes": 586
+        },
+        {
+          "scope": "A",
+          "at": 2108,
+          "status": 429,
+          "bodyBytes": 582
+        },
+        {
+          "scope": "A",
+          "at": 2212,
+          "status": 429,
+          "bodyBytes": 583
+        },
+        {
+          "scope": "A",
+          "at": 6000,
+          "status": 429,
+          "bodyBytes": 586
+        },
+        {
+          "scope": "A",
+          "at": 6108,
+          "status": 429,
+          "bodyBytes": 582
+        },
+        {
+          "scope": "A",
+          "at": 6212,
+          "status": 429,
+          "bodyBytes": 583
+        }
+      ],
+      "successes": 1,
+      "healthyAttempts": 1,
+      "healthyBodyBytes": 584,
+      "leakedDispatches": 8
+    },
+    {
+      "seed": 22,
+      "delay": 2000,
+      "outcomes": [
+        true,
+        true,
+        true,
+        true
+      ],
+      "attempts": [
+        {
+          "scope": "A",
+          "at": 0,
+          "status": 429,
+          "bodyBytes": 586
+        },
+        {
+          "scope": "A",
+          "at": 109,
+          "status": 429,
+          "bodyBytes": 582
+        },
+        {
+          "scope": "B",
+          "at": 109,
+          "status": 200,
+          "bodyBytes": 584
+        },
+        {
+          "scope": "A",
+          "at": 214,
+          "status": 429,
+          "bodyBytes": 583
+        },
+        {
+          "scope": "A",
+          "at": 2000,
+          "status": 200,
+          "bodyBytes": 586
+        },
+        {
+          "scope": "A",
+          "at": 2109,
+          "status": 200,
+          "bodyBytes": 582
+        },
+        {
+          "scope": "A",
+          "at": 2214,
+          "status": 200,
+          "bodyBytes": 583
+        }
+      ],
+      "successes": 4,
+      "healthyAttempts": 1,
+      "healthyBodyBytes": 584,
+      "leakedDispatches": 2
+    },
+    {
+      "seed": 23,
+      "delay": 60000,
+      "outcomes": [
+        false,
+        false,
+        true,
+        false
+      ],
+      "attempts": [
+        {
+          "scope": "A",
+          "at": 0,
+          "status": 429,
+          "bodyBytes": 586
+        },
+        {
+          "scope": "A",
+          "at": 110,
+          "status": 429,
+          "bodyBytes": 582
+        },
+        {
+          "scope": "B",
+          "at": 110,
+          "status": 200,
+          "bodyBytes": 584
+        },
+        {
+          "scope": "A",
+          "at": 216,
+          "status": 429,
+          "bodyBytes": 583
+        },
+        {
+          "scope": "A",
+          "at": 2000,
+          "status": 429,
+          "bodyBytes": 586
+        },
+        {
+          "scope": "A",
+          "at": 2110,
+          "status": 429,
+          "bodyBytes": 582
+        },
+        {
+          "scope": "A",
+          "at": 2216,
+          "status": 429,
+          "bodyBytes": 583
+        },
+        {
+          "scope": "A",
+          "at": 6000,
+          "status": 429,
+          "bodyBytes": 586
+        },
+        {
+          "scope": "A",
+          "at": 6110,
+          "status": 429,
+          "bodyBytes": 582
+        },
+        {
+          "scope": "A",
+          "at": 6216,
+          "status": 429,
+          "bodyBytes": 583
+        }
+      ],
+      "successes": 1,
+      "healthyAttempts": 1,
+      "healthyBodyBytes": 584,
+      "leakedDispatches": 8
+    },
+    {
+      "seed": 24,
+      "delay": 90000,
+      "outcomes": [
+        false,
+        false,
+        true,
+        false
+      ],
+      "attempts": [
+        {
+          "scope": "A",
+          "at": 0,
+          "status": 429,
+          "bodyBytes": 586
+        },
+        {
+          "scope": "A",
+          "at": 111,
+          "status": 429,
+          "bodyBytes": 582
+        },
+        {
+          "scope": "B",
+          "at": 111,
+          "status": 200,
+          "bodyBytes": 584
+        },
+        {
+          "scope": "A",
+          "at": 218,
+          "status": 429,
+          "bodyBytes": 583
+        },
+        {
+          "scope": "A",
+          "at": 2000,
+          "status": 429,
+          "bodyBytes": 586
+        },
+        {
+          "scope": "A",
+          "at": 2111,
+          "status": 429,
+          "bodyBytes": 582
+        },
+        {
+          "scope": "A",
+          "at": 2218,
+          "status": 429,
+          "bodyBytes": 583
+        },
+        {
+          "scope": "A",
+          "at": 6000,
+          "status": 429,
+          "bodyBytes": 586
+        },
+        {
+          "scope": "A",
+          "at": 6111,
+          "status": 429,
+          "bodyBytes": 582
+        },
+        {
+          "scope": "A",
+          "at": 6218,
+          "status": 429,
+          "bodyBytes": 583
+        }
+      ],
+      "successes": 1,
+      "healthyAttempts": 1,
+      "healthyBodyBytes": 584,
+      "leakedDispatches": 8
+    },
+    {
+      "seed": 25,
+      "delay": 2000,
+      "outcomes": [
+        true,
+        true,
+        true,
+        true
+      ],
+      "attempts": [
+        {
+          "scope": "A",
+          "at": 0,
+          "status": 429,
+          "bodyBytes": 586
+        },
+        {
+          "scope": "A",
+          "at": 112,
+          "status": 429,
+          "bodyBytes": 582
+        },
+        {
+          "scope": "B",
+          "at": 112,
+          "status": 200,
+          "bodyBytes": 584
+        },
+        {
+          "scope": "A",
+          "at": 220,
+          "status": 429,
+          "bodyBytes": 583
+        },
+        {
+          "scope": "A",
+          "at": 2000,
+          "status": 200,
+          "bodyBytes": 586
+        },
+        {
+          "scope": "A",
+          "at": 2112,
+          "status": 200,
+          "bodyBytes": 582
+        },
+        {
+          "scope": "A",
+          "at": 2220,
+          "status": 200,
+          "bodyBytes": 583
+        }
+      ],
+      "successes": 4,
+      "healthyAttempts": 1,
+      "healthyBodyBytes": 584,
+      "leakedDispatches": 2
+    },
+    {
+      "seed": 26,
+      "delay": 60000,
+      "outcomes": [
+        false,
+        false,
+        true,
+        false
+      ],
+      "attempts": [
+        {
+          "scope": "A",
+          "at": 0,
+          "status": 429,
+          "bodyBytes": 586
+        },
+        {
+          "scope": "A",
+          "at": 100,
+          "status": 429,
+          "bodyBytes": 582
+        },
+        {
+          "scope": "B",
+          "at": 100,
+          "status": 200,
+          "bodyBytes": 584
+        },
+        {
+          "scope": "A",
+          "at": 209,
+          "status": 429,
+          "bodyBytes": 583
+        },
+        {
+          "scope": "A",
+          "at": 2000,
+          "status": 429,
+          "bodyBytes": 586
+        },
+        {
+          "scope": "A",
+          "at": 2100,
+          "status": 429,
+          "bodyBytes": 582
+        },
+        {
+          "scope": "A",
+          "at": 2209,
+          "status": 429,
+          "bodyBytes": 583
+        },
+        {
+          "scope": "A",
+          "at": 6000,
+          "status": 429,
+          "bodyBytes": 586
+        },
+        {
+          "scope": "A",
+          "at": 6100,
+          "status": 429,
+          "bodyBytes": 582
+        },
+        {
+          "scope": "A",
+          "at": 6209,
+          "status": 429,
+          "bodyBytes": 583
+        }
+      ],
+      "successes": 1,
+      "healthyAttempts": 1,
+      "healthyBodyBytes": 584,
+      "leakedDispatches": 8
+    },
+    {
+      "seed": 27,
+      "delay": 90000,
+      "outcomes": [
+        false,
+        false,
+        true,
+        false
+      ],
+      "attempts": [
+        {
+          "scope": "A",
+          "at": 0,
+          "status": 429,
+          "bodyBytes": 586
+        },
+        {
+          "scope": "A",
+          "at": 101,
+          "status": 429,
+          "bodyBytes": 582
+        },
+        {
+          "scope": "B",
+          "at": 101,
+          "status": 200,
+          "bodyBytes": 584
+        },
+        {
+          "scope": "A",
+          "at": 211,
+          "status": 429,
+          "bodyBytes": 583
+        },
+        {
+          "scope": "A",
+          "at": 2000,
+          "status": 429,
+          "bodyBytes": 586
+        },
+        {
+          "scope": "A",
+          "at": 2101,
+          "status": 429,
+          "bodyBytes": 582
+        },
+        {
+          "scope": "A",
+          "at": 2211,
+          "status": 429,
+          "bodyBytes": 583
+        },
+        {
+          "scope": "A",
+          "at": 6000,
+          "status": 429,
+          "bodyBytes": 586
+        },
+        {
+          "scope": "A",
+          "at": 6101,
+          "status": 429,
+          "bodyBytes": 582
+        },
+        {
+          "scope": "A",
+          "at": 6211,
+          "status": 429,
+          "bodyBytes": 583
+        }
+      ],
+      "successes": 1,
+      "healthyAttempts": 1,
+      "healthyBodyBytes": 584,
+      "leakedDispatches": 8
+    },
+    {
+      "seed": 28,
+      "delay": 2000,
+      "outcomes": [
+        true,
+        true,
+        true,
+        true
+      ],
+      "attempts": [
+        {
+          "scope": "A",
+          "at": 0,
+          "status": 429,
+          "bodyBytes": 586
+        },
+        {
+          "scope": "A",
+          "at": 102,
+          "status": 429,
+          "bodyBytes": 582
+        },
+        {
+          "scope": "B",
+          "at": 102,
+          "status": 200,
+          "bodyBytes": 584
+        },
+        {
+          "scope": "A",
+          "at": 213,
+          "status": 429,
+          "bodyBytes": 583
+        },
+        {
+          "scope": "A",
+          "at": 2000,
+          "status": 200,
+          "bodyBytes": 586
+        },
+        {
+          "scope": "A",
+          "at": 2102,
+          "status": 200,
+          "bodyBytes": 582
+        },
+        {
+          "scope": "A",
+          "at": 2213,
+          "status": 200,
+          "bodyBytes": 583
+        }
+      ],
+      "successes": 4,
+      "healthyAttempts": 1,
+      "healthyBodyBytes": 584,
+      "leakedDispatches": 2
+    },
+    {
+      "seed": 29,
+      "delay": 60000,
+      "outcomes": [
+        false,
+        false,
+        true,
+        false
+      ],
+      "attempts": [
+        {
+          "scope": "A",
+          "at": 0,
+          "status": 429,
+          "bodyBytes": 586
+        },
+        {
+          "scope": "A",
+          "at": 103,
+          "status": 429,
+          "bodyBytes": 582
+        },
+        {
+          "scope": "B",
+          "at": 103,
+          "status": 200,
+          "bodyBytes": 584
+        },
+        {
+          "scope": "A",
+          "at": 215,
+          "status": 429,
+          "bodyBytes": 583
+        },
+        {
+          "scope": "A",
+          "at": 2000,
+          "status": 429,
+          "bodyBytes": 586
+        },
+        {
+          "scope": "A",
+          "at": 2103,
+          "status": 429,
+          "bodyBytes": 582
+        },
+        {
+          "scope": "A",
+          "at": 2215,
+          "status": 429,
+          "bodyBytes": 583
+        },
+        {
+          "scope": "A",
+          "at": 6000,
+          "status": 429,
+          "bodyBytes": 586
+        },
+        {
+          "scope": "A",
+          "at": 6103,
+          "status": 429,
+          "bodyBytes": 582
+        },
+        {
+          "scope": "A",
+          "at": 6215,
+          "status": 429,
+          "bodyBytes": 583
+        }
+      ],
+      "successes": 1,
+      "healthyAttempts": 1,
+      "healthyBodyBytes": 584,
+      "leakedDispatches": 8
+    },
+    {
+      "seed": 30,
+      "delay": 90000,
+      "outcomes": [
+        false,
+        false,
+        true,
+        false
+      ],
+      "attempts": [
+        {
+          "scope": "A",
+          "at": 0,
+          "status": 429,
+          "bodyBytes": 586
+        },
+        {
+          "scope": "A",
+          "at": 104,
+          "status": 429,
+          "bodyBytes": 582
+        },
+        {
+          "scope": "B",
+          "at": 104,
+          "status": 200,
+          "bodyBytes": 584
+        },
+        {
+          "scope": "A",
+          "at": 217,
+          "status": 429,
+          "bodyBytes": 583
+        },
+        {
+          "scope": "A",
+          "at": 2000,
+          "status": 429,
+          "bodyBytes": 586
+        },
+        {
+          "scope": "A",
+          "at": 2104,
+          "status": 429,
+          "bodyBytes": 582
+        },
+        {
+          "scope": "A",
+          "at": 2217,
+          "status": 429,
+          "bodyBytes": 583
+        },
+        {
+          "scope": "A",
+          "at": 6000,
+          "status": 429,
+          "bodyBytes": 586
+        },
+        {
+          "scope": "A",
+          "at": 6104,
+          "status": 429,
+          "bodyBytes": 582
+        },
+        {
+          "scope": "A",
+          "at": 6217,
+          "status": 429,
+          "bodyBytes": 583
+        }
+      ],
+      "successes": 1,
+      "healthyAttempts": 1,
+      "healthyBodyBytes": 584,
+      "leakedDispatches": 8
+    }
+  ]
+}

@@ -1,0 +1,311 @@
+{
+  "base": "8467b6757affb4bc895d44fa8fbf12a65bee7479",
+  "fixedResourceCommit": "af81332fb598f78b1199d103e0943e4e521a7f96",
+  "builtSha256": "34bcb22e60894c88d3b45f4b23c3c6e1c03d1e21614a23caf896ad7333140951",
+  "pinnedSha256": "2c14c754f6486dee45b6bfd91f2a3b7c9464b26cf8d4be2b172b2692ae0e6fa4",
+  "pdfReadingKeys": {
+    "english": [
+      {
+        "key": "messages.document.pdfReading.exportBilingualHint",
+        "presentInPinned": false
+      },
+      {
+        "key": "messages.document.pdfReading.exportHint",
+        "presentInPinned": false
+      },
+      {
+        "key": "messages.document.pdfReading.layoutExportHint",
+        "presentInPinned": false
+      },
+      {
+        "key": "messages.document.pdfReading.startHint",
+        "presentInPinned": false
+      },
+      {
+        "key": "messages.document.pdfReading.layoutWithFullText",
+        "presentInPinned": false
+      },
+      {
+        "key": "messages.document.pdfReading.presentationLabel",
+        "presentInPinned": false
+      },
+      {
+        "key": "messages.document.pdfReading.readablePresentation",
+        "presentInPinned": false
+      },
+      {
+        "key": "messages.document.pdfReading.layoutPresentation",
+        "presentInPinned": false
+      },
+      {
+        "key": "messages.document.pdfReading.completeReadableText",
+        "presentInPinned": false
+      },
+      {
+        "key": "messages.document.pdfReading.preservedRegion",
+        "presentInPinned": false
+      },
+      {
+        "key": "messages.document.pdfReading.onlineLabel",
+        "presentInPinned": false
+      },
+      {
+        "key": "messages.document.pdfReading.openOnline",
+        "presentInPinned": false
+      },
+      {
+        "key": "messages.document.pdfReading.onlineHint",
+        "presentInPinned": false
+      },
+      {
+        "key": "messages.document.pdfReading.cancelImport",
+        "presentInPinned": false
+      },
+      {
+        "key": "messages.document.pdfReading.downloading",
+        "presentInPinned": false
+      },
+      {
+        "key": "messages.document.pdfReading.downloadProgress",
+        "presentInPinned": false
+      },
+      {
+        "key": "messages.document.pdfReading.downloadBytes",
+        "presentInPinned": false
+      },
+      {
+        "key": "messages.document.pdfReading.importPages",
+        "presentInPinned": false
+      },
+      {
+        "key": "messages.document.pdfReading.openReader",
+        "presentInPinned": false
+      },
+      {
+        "key": "messages.document.pdfReading.readerLabel",
+        "presentInPinned": false
+      },
+      {
+        "key": "messages.document.pdfReading.previousPage",
+        "presentInPinned": false
+      },
+      {
+        "key": "messages.document.pdfReading.nextPage",
+        "presentInPinned": false
+      },
+      {
+        "key": "messages.document.pdfReading.pageInput",
+        "presentInPinned": false
+      },
+      {
+        "key": "messages.document.pdfReading.pageLabel",
+        "presentInPinned": false
+      },
+      {
+        "key": "messages.document.pdfReading.selectionHint",
+        "presentInPinned": false
+      },
+      {
+        "key": "messages.document.pdfReading.zoom",
+        "presentInPinned": false
+      },
+      {
+        "key": "messages.document.pdfReading.zoomLabel",
+        "presentInPinned": false
+      },
+      {
+        "key": "messages.document.pdfReading.fitWidth",
+        "presentInPinned": false
+      },
+      {
+        "key": "messages.document.pdfReading.continuousPages",
+        "presentInPinned": false
+      },
+      {
+        "key": "messages.document.pdfReading.pageNumber",
+        "presentInPinned": false
+      },
+      {
+        "key": "messages.document.pdfReading.layoutPreserved",
+        "presentInPinned": false
+      },
+      {
+        "key": "messages.document.pdfReading.selectableSource",
+        "presentInPinned": false
+      },
+      {
+        "key": "messages.document.pdfReading.original",
+        "presentInPinned": false
+      },
+      {
+        "key": "messages.document.pdfReading.translated",
+        "presentInPinned": false
+      },
+      {
+        "key": "messages.document.pdfReading.loadingSource",
+        "presentInPinned": false
+      },
+      {
+        "key": "messages.document.pdfReading.loadingTranslation",
+        "presentInPinned": false
+      },
+      {
+        "key": "messages.document.pdfReading.retryPage",
+        "presentInPinned": false
+      }
+    ],
+    "zhCNMessages": [
+      {
+        "key": "document.pdfReading.exportBilingualHint",
+        "presentInPinned": false
+      },
+      {
+        "key": "document.pdfReading.exportHint",
+        "presentInPinned": false
+      },
+      {
+        "key": "document.pdfReading.layoutExportHint",
+        "presentInPinned": false
+      },
+      {
+        "key": "document.pdfReading.startHint",
+        "presentInPinned": false
+      },
+      {
+        "key": "document.pdfReading.layoutWithFullText",
+        "presentInPinned": false
+      },
+      {
+        "key": "document.pdfReading.presentationLabel",
+        "presentInPinned": false
+      },
+      {
+        "key": "document.pdfReading.readablePresentation",
+        "presentInPinned": false
+      },
+      {
+        "key": "document.pdfReading.layoutPresentation",
+        "presentInPinned": false
+      },
+      {
+        "key": "document.pdfReading.completeReadableText",
+        "presentInPinned": false
+      },
+      {
+        "key": "document.pdfReading.preservedRegion",
+        "presentInPinned": false
+      },
+      {
+        "key": "document.pdfReading.onlineLabel",
+        "presentInPinned": false
+      },
+      {
+        "key": "document.pdfReading.openOnline",
+        "presentInPinned": false
+      },
+      {
+        "key": "document.pdfReading.onlineHint",
+        "presentInPinned": false
+      },
+      {
+        "key": "document.pdfReading.cancelImport",
+        "presentInPinned": false
+      },
+      {
+        "key": "document.pdfReading.downloading",
+        "presentInPinned": false
+      },
+      {
+        "key": "document.pdfReading.downloadProgress",
+        "presentInPinned": false
+      },
+      {
+        "key": "document.pdfReading.downloadBytes",
+        "presentInPinned": false
+      },
+      {
+        "key": "document.pdfReading.importPages",
+        "presentInPinned": false
+      },
+      {
+        "key": "document.pdfReading.openReader",
+        "presentInPinned": false
+      },
+      {
+        "key": "document.pdfReading.readerLabel",
+        "presentInPinned": false
+      },
+      {
+        "key": "document.pdfReading.previousPage",
+        "presentInPinned": false
+      },
+      {
+        "key": "document.pdfReading.nextPage",
+        "presentInPinned": false
+      },
+      {
+        "key": "document.pdfReading.pageInput",
+        "presentInPinned": false
+      },
+      {
+        "key": "document.pdfReading.pageLabel",
+        "presentInPinned": false
+      },
+      {
+        "key": "document.pdfReading.selectionHint",
+        "presentInPinned": false
+      },
+      {
+        "key": "document.pdfReading.zoom",
+        "presentInPinned": false
+      },
+      {
+        "key": "document.pdfReading.zoomLabel",
+        "presentInPinned": false
+      },
+      {
+        "key": "document.pdfReading.fitWidth",
+        "presentInPinned": false
+      },
+      {
+        "key": "document.pdfReading.continuousPages",
+        "presentInPinned": false
+      },
+      {
+        "key": "document.pdfReading.pageNumber",
+        "presentInPinned": false
+      },
+      {
+        "key": "document.pdfReading.layoutPreserved",
+        "presentInPinned": false
+      },
+      {
+        "key": "document.pdfReading.selectableSource",
+        "presentInPinned": false
+      },
+      {
+        "key": "document.pdfReading.original",
+        "presentInPinned": false
+      },
+      {
+        "key": "document.pdfReading.translated",
+        "presentInPinned": false
+      },
+      {
+        "key": "document.pdfReading.loadingSource",
+        "presentInPinned": false
+      },
+      {
+        "key": "document.pdfReading.loadingTranslation",
+        "presentInPinned": false
+      },
+      {
+        "key": "document.pdfReading.retryPage",
+        "presentInPinned": false
+      }
+    ]
+  },
+  "note": "Only PDF reading key differences retained here; no resource changes performed.",
+  "candidateGeneratedDataSha256": "34bcb22e60894c88d3b45f4b23c3c6e1c03d1e21614a23caf896ad7333140951",
+  "candidateGeneratedDataEqualsBaseline": true
+}

@@ -74,6 +74,45 @@ describe('authoritative site catalogs with an external pinned data asset', () =>
     });
 });
 
+describe('actual generateBundle service SVG license routing', () => {
+    it.each(['posix', 'windows-vite', 'windows-native', 'windows-query'].flatMap(platform =>
+        [true, false].map(hasSvg => [platform, hasSvg] as const)))
+    ('uses the %s module ID and includes SVG=%s to retain the exact license', async (platform, hasSvg) => {
+        const path = await vi.importActual<typeof import('node:path')>('node:path');
+        const vite = await vi.importActual<typeof import('vite')>('vite');
+        const windows = platform.startsWith('windows');
+        const nativeFile = windows
+            ? path.win32.resolve('C:\\FluentRead', 'src/ui/assets/serviceBrandPaths.json')
+            : path.posix.resolve('/FluentRead', 'src/ui/assets/serviceBrandPaths.json');
+        // 模拟平台路径端口；Windows 分支与锁定 Vite 5.4.19 的 slash + posix.normalize 相同。
+        // 被测的是生产 generateBundle 本身，不把许可布尔值传给 wrapper。
+        vi.doMock('node:path', () => ({...path, resolve: (...segments: string[]) =>
+            segments.length === 2 && segments[1] === 'src/ui/assets/serviceBrandPaths.json'
+                ? nativeFile : path.resolve(...segments)}));
+        vi.doMock('vite', () => ({...vite, normalizePath: windows
+            ? (id: string) => path.posix.normalize(id.replace(/\\/gu, '/')) : vite.normalizePath}));
+        vi.stubEnv('FLUENTREAD_USERSCRIPT_STANDALONE', hasSvg ? '1' : '0');
+        let moduleId = platform === 'windows-native' ? nativeFile : nativeFile.replace(/\\/gu, '/');
+        if (platform === 'windows-query') moduleId += '?import';
+        try {
+            vi.resetModules();
+            const {default: config} = await import('@/userscript/vite.config');
+            const plugin = (config.plugins as Array<{name?: string; generateBundle?: {handler?: Function}}>)
+                .find(item => item.name === 'bundle-userscript-css')!;
+            const entry = {type: 'chunk', isEntry: true, fileName: 'fluent-read.user.js',
+                code: 'const ENTRY_SENTINEL = 1;', moduleIds: [hasSvg ? moduleId : moduleId.replace('.json', '-unrelated.json')]};
+            await Reflect.apply(plugin.generateBundle!.handler!, {emitFile: vi.fn()}, [{}, {'fluent-read.user.js': entry}]);
+            const notice = readFileSync(resolve(process.cwd(), 'public/third-party-notices/lobe-icons-MIT.txt'), 'utf8');
+            if (hasSvg) expect(entry.code).toContain(notice);
+            else expect(entry.code).not.toContain('Lobe Icons static SVG paths');
+            expect(entry.code).toContain('UNICODE LICENSE V3');
+            expect(entry.code).toContain('ENTRY_SENTINEL');
+        } finally {
+            vi.doUnmock('node:path'); vi.doUnmock('vite'); vi.unstubAllEnvs(); vi.resetModules();
+        }
+    });
+});
+
 describe('userscript browser shim injection', () => {
     it('excludes unreachable highlight code and copy while keeping an explicitly unavailable state', () => {
         expect(userscriptMessages(extensionChinese)).toEqual(zhCNMessages);
@@ -141,6 +180,17 @@ describe('userscript browser shim injection', () => {
             expect(moduleSource).toContain(createHash('sha256').update(JSON.stringify(original)).digest('hex'));
         }
         expect(plugin.resolveId('./catalog/other.json', importer)).toBeNull();
+    });
+
+    it('keeps the full Lobe license exactly when service SVG data is shipped', () => {
+        const withIcons = wrapUserscriptEntry('ENTRY_SENTINEL', 'BOOTSTRAP_SENTINEL', '', true);
+        const withoutIcons = wrapUserscriptEntry('ENTRY_SENTINEL', 'BOOTSTRAP_SENTINEL', '', false);
+        const notice = readFileSync(resolve(process.cwd(), 'public/third-party-notices/lobe-icons-MIT.txt'), 'utf8');
+        expect(withIcons).toContain(notice);
+        expect(withoutIcons).not.toContain('Lobe Icons static SVG paths');
+        expect(withoutIcons).toContain('UNICODE LICENSE V3');
+        expect(withoutIcons).toContain('@ctrl/tinycolor 3.6.1');
+        expect(withIcons.replace(`/*\n${notice}\n*/\n`, '')).toBe(withoutIcons);
     });
 
     it('wraps the complete single-file runtime in a duplicate-injection guard', () => {

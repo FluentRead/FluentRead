@@ -188,6 +188,8 @@
       "tests/template.test.ts",
       "tests/translateQueue.test.ts",
       "tests/translationRequestScheduler.test.ts",
+      "tests/translationRetryAfter.test.ts",
+      "tests/backgroundMessageRuntimePrivacy.test.ts",
       "tests/translationCache.test.ts",
       "tests/translationBroker.test.ts",
       "tests/microsoftTransport.test.ts",

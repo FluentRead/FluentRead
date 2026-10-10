@@ -1,0 +1,28 @@
+{
+  "mode": "standard",
+  "platform": "linux",
+  "viteVersion": "5.4.19",
+  "artifact": {
+    "path": ".output/userscript/fluent-read.user.js",
+    "bytes": 1959993,
+    "sha256": "7ee7ff35d769ed383dfe1bfbf9983af1414414748fdb1a0bcaf7f940eac36ec5"
+  },
+  "previous389Artifact": {
+    "bytes": 1959993,
+    "sha256": "7ee7ff35d769ed383dfe1bfbf9983af1414414748fdb1a0bcaf7f940eac36ec5"
+  },
+  "byteIdenticalTo389": true,
+  "graph": {
+    "moduleCount": 492,
+    "svgRelatedModuleIds": [],
+    "matchingSvgDataModuleIds": [],
+    "canonicalSvgDataPath": "/home/arietids/Documents/Codex/2026-10-06/task/FluentRead-shared-retry-after-20261009/src/ui/assets/serviceBrandPaths.json",
+    "includesSvg": false
+  },
+  "fullLobeLicensePresent": false,
+  "candidateSourceSha256": {
+    "userscript/vite.config.ts": "223084ed968b815162f6ac085cd7a6956348de38f9adbfe93b97b829cade41fd",
+    "tests/userscriptViteConfig.test.ts": "b71de2cfa298392ba4e048d5b9a6965bc1521022524dd62803b032e939256915"
+  },
+  "note": "Read-only Vite generateBundle observer records actual production entry.moduleIds; it never changes the bundle. Windows path behavior is tested through the real hook with simulated path ports, not a Windows OS build."
+}

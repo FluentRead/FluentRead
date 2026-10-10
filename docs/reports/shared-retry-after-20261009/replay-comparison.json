@@ -1,0 +1,24 @@
+{
+  "baseReused": "8467b6757affb4bc895d44fa8fbf12a65bee7479",
+  "B1EqualsB0": true,
+  "exactCandidateRestored": true,
+  "B0": {
+    "cases": 30,
+    "attempts": 270,
+    "healthyAttempts": 30,
+    "healthyBodyBytes": 17511
+  },
+  "B1-C": {
+    "cases": 30,
+    "attempts": 270,
+    "healthyAttempts": 30,
+    "healthyBodyBytes": 17511
+  },
+  "C": {
+    "cases": 30,
+    "attempts": 150,
+    "healthyAttempts": 30,
+    "healthyBodyBytes": 17511
+  },
+  "healthyCEqualsB0": true
+}

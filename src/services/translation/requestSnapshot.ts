@@ -2,7 +2,7 @@
  * @file src/services/translation/requestSnapshot.ts
  *
  * 文件职责：冻结翻译消息的可编辑字段与数组，并附加只读 provider 配置快照，消除异步缓存读取期间全局配置变化造成的请求身份错配。
- * 主要内容：在入口一次读取消息字段并复制原文/术语数组，保留内部 symbol 描述符；定义配置快照、剩余预算、内部取消、线路观察与可信术语来源，冻结术语规则并从完整文本槽协议恢复纯匹配原文；以线性首尾边界扫描确定命名空间和最终外层槽数，保留来源中的字面标记和自定义命名空间，重复、交错与缺项仍由同一严格解析器拒绝。
+ * 主要内容：在入口一次读取消息字段并复制原文/术语数组，保留内部 symbol 描述符；定义配置快照、剩余预算、内部取消、线路观察与可信术语来源，冻结术语规则并从完整文本槽协议恢复纯匹配原文；以线性首尾边界扫描确定命名空间和最终外层槽数，保留来源中的字面标记和自定义命名空间，重复、交错与缺项仍由同一严格解析器拒绝。 内部 scheduler context 交付调度器与额度身份，直接连接测试可附加持有原始传输的外层 lease，仅可信 sender.tab 区分普通和私密，无 tab 或缺少明确隐私元数据则保持未知 quota。
  * 模块边界：本文件位于翻译 application service 层，负责用例编排和端口契约；不挂载页面 UI，且不应把某家供应商的网络细节扩散到 feature，具体 HTTP 协议由 providers/platform 实现。
  */
 
@@ -20,7 +20,7 @@ import type {CustomOpenAIProvider} from '@/src/core/config/customOpenAI';
 import {normalizeDeepLApiPlan} from '@/src/core/config/deepl';
 import {resolveGlossary} from '@/src/core/glossary';
 import {parseTranslationSlots} from '@/src/core/translation/public';
-import type {TranslationRequestScheduler, TranslationRequestIdentity} from './requestScheduler';
+import type {TranslationRequestScheduler, TranslationRequestIdentity, TranslationRequestLease} from './requestScheduler';
 
 /** 在入口第一次等待前复制用户可编辑的数组与消息字段，同时保留不可枚举的内部 symbol。 */
 export function createTranslationRequestSnapshot<T extends TranslationRequestMessage>(message: T): T {
@@ -85,6 +85,18 @@ export function getTranslationImageInput(message: unknown): string | undefined {
 export interface TrustedTranslationGlossaryContext {
     readonly pageUrl?: string;
     readonly context?: TranslationGlossaryContext;
+    /** 只由后台真实 sender 绑定，用于内存 quota 隔离；不写入缓存或网络。 */
+    readonly privateContext?: boolean;
+}
+
+
+/** 只解释后台的 sender 与平台上下文，未知来源保留未知；不读取 payload 的自报隐私字段。 */
+export interface TrustedTranslationSenderContext {
+    sender?: {url?: string; tab?: unknown};
+}
+export function translationPrivacyContext(context: TrustedTranslationSenderContext | undefined): Pick<TrustedTranslationGlossaryContext, 'privateContext'> {
+    const tab = context?.sender?.tab as {incognito?: unknown} | undefined;
+    return typeof tab?.incognito === 'boolean' ? {privateContext: tab.incognito} : {};
 }
 
 /** 真实 sender 或应用组合根才能绑定网页来源；字符串 payload 无法伪造此 symbol。 */
@@ -197,6 +209,8 @@ export type TranslationProviderRequestContext = {
     readonly [TRANSLATION_REQUEST_SCHEDULER]?: {
         readonly scheduler: TranslationRequestScheduler;
         readonly identity?: TranslationRequestIdentity;
+        /** 仅外层计数的连接测试传入；SDK attempt 计数的 broker 不传。 */
+        readonly transportLease?: TranslationRequestLease;
     };
 };
 
@@ -204,9 +218,10 @@ export function attachTranslationRequestScheduler<T extends object>(
     message: T,
     scheduler: TranslationRequestScheduler,
     identity?: TranslationRequestIdentity,
+    transportLease?: TranslationRequestLease,
 ): T & TranslationProviderRequestContext {
     return Object.assign(message, {
-        [TRANSLATION_REQUEST_SCHEDULER]: Object.freeze({scheduler, identity: identity ? Object.freeze({...identity}) : undefined}),
+        [TRANSLATION_REQUEST_SCHEDULER]: Object.freeze({scheduler, identity: identity ? Object.freeze({...identity}) : undefined, transportLease}),
     });
 }
 

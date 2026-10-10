@@ -1,0 +1,137 @@
+{
+  "validatedParentHead": "389a3f19c39692a4e4af75160d5e24e4006136ed",
+  "sourceChange": "one additional normalizePath around the resolved SVG data path",
+  "tests": {
+    "actualHookCases": 8,
+    "oldFailedWindowsSvgCases": 3,
+    "oldPassedControls": 5,
+    "finalConfigFileTestsPassed": 28,
+    "finalFailed": 0,
+    "windowsExecution": "actual generateBundle hook with simulated Windows node:path and pinned Vite normalization ports; no Windows OS build claimed"
+  },
+  "stages": [
+    {
+      "stage": "round4-path-red",
+      "startedAt": "2026-10-09T13:56:42.820281+00:00",
+      "durationSeconds": 1.916,
+      "exitCode": 1,
+      "arguments": [
+        "exec",
+        "vitest",
+        "run",
+        "tests/userscriptViteConfig.test.ts",
+        "-t",
+        "actual generateBundle service SVG license routing",
+        "--reporter=json",
+        "--outputFile=../shared-retry-after-pr-20261009/round4-path-red-vitest.json"
+      ]
+    },
+    {
+      "stage": "round4-valid-path-red",
+      "startedAt": "2026-10-09T13:57:26.484313+00:00",
+      "durationSeconds": 1.866,
+      "exitCode": 1,
+      "arguments": [
+        "exec",
+        "vitest",
+        "run",
+        "tests/userscriptViteConfig.test.ts",
+        "-t",
+        "actual generateBundle service SVG license routing",
+        "--reporter=json",
+        "--outputFile=../shared-retry-after-pr-20261009/round4-valid-path-red-vitest.json"
+      ]
+    },
+    {
+      "stage": "round4-path-green",
+      "startedAt": "2026-10-09T13:58:16.254806+00:00",
+      "durationSeconds": 2.167,
+      "exitCode": 0,
+      "arguments": [
+        "exec",
+        "vitest",
+        "run",
+        "tests/userscriptViteConfig.test.ts",
+        "--reporter=json",
+        "--outputFile=../shared-retry-after-pr-20261009/round4-path-green-vitest.json"
+      ]
+    },
+    {
+      "stage": "round4-standard-module-proof",
+      "startedAt": "2026-10-09T13:59:32.811133+00:00",
+      "durationSeconds": 3.82,
+      "exitCode": 0,
+      "arguments": [
+        "exec",
+        "node",
+        "/home/arietids/Documents/Codex/2026-10-06/task/shared-retry-after-pr-20261009/round4-record-build.mjs",
+        "standard"
+      ]
+    },
+    {
+      "stage": "round4-standard-verifier",
+      "startedAt": "2026-10-09T13:59:36.679064+00:00",
+      "durationSeconds": 0.264,
+      "exitCode": 0,
+      "arguments": [
+        "exec",
+        "node",
+        "scripts/verify-userscript-build.mjs"
+      ]
+    },
+    {
+      "stage": "round4-standalone-module-proof",
+      "startedAt": "2026-10-09T13:59:36.994707+00:00",
+      "durationSeconds": 7.227,
+      "exitCode": 0,
+      "arguments": [
+        "exec",
+        "node",
+        "/home/arietids/Documents/Codex/2026-10-06/task/shared-retry-after-pr-20261009/round4-record-build.mjs",
+        "standalone"
+      ]
+    },
+    {
+      "stage": "round4-compile",
+      "startedAt": "2026-10-09T13:59:44.267168+00:00",
+      "durationSeconds": 16.995,
+      "exitCode": 0,
+      "arguments": [
+        "compile"
+      ]
+    },
+    {
+      "stage": "round4-test-audit",
+      "startedAt": "2026-10-09T14:00:01.300749+00:00",
+      "durationSeconds": 1.215,
+      "exitCode": 0,
+      "arguments": [
+        "test:audit"
+      ]
+    },
+    {
+      "stage": "round4-docs-build",
+      "startedAt": "2026-10-09T14:01:55.031226+00:00",
+      "durationSeconds": 2.717,
+      "exitCode": 0,
+      "arguments": [
+        "docs:build"
+      ]
+    }
+  ],
+  "standardArtifact": {
+    "path": ".output/userscript/fluent-read.user.js",
+    "bytes": 1959993,
+    "sha256": "7ee7ff35d769ed383dfe1bfbf9983af1414414748fdb1a0bcaf7f940eac36ec5"
+  },
+  "standaloneArtifact": {
+    "path": ".output/userscript-standalone/fluent-read.user.js",
+    "bytes": 3797330,
+    "sha256": "e174bc76a8bd80c67bcd66de323b7324f091f40b6bd504d196abb64aec584a5e"
+  },
+  "bothArtifactsByteIdenticalTo389": true,
+  "priorFunctionalAndPakoSchedulerChecks": "reuse validated 389a3f1 evidence; unchanged production translation modules",
+  "newModelSearchCalls": 0,
+  "newPermissionsDependenciesEnvironments": 0,
+  "recoveryOperations": 0
+}

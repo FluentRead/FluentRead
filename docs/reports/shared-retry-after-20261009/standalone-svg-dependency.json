@@ -1,0 +1,35 @@
+{
+  "mode": "standalone",
+  "platform": "linux",
+  "viteVersion": "5.4.19",
+  "artifact": {
+    "path": ".output/userscript-standalone/fluent-read.user.js",
+    "bytes": 3797330,
+    "sha256": "e174bc76a8bd80c67bcd66de323b7324f091f40b6bd504d196abb64aec584a5e"
+  },
+  "previous389Artifact": {
+    "bytes": 3797330,
+    "sha256": "e174bc76a8bd80c67bcd66de323b7324f091f40b6bd504d196abb64aec584a5e"
+  },
+  "byteIdenticalTo389": true,
+  "graph": {
+    "moduleCount": 1216,
+    "svgRelatedModuleIds": [
+      "/home/arietids/Documents/Codex/2026-10-06/task/FluentRead-shared-retry-after-20261009/src/ui/assets/serviceBrandPaths.json",
+      "/home/arietids/Documents/Codex/2026-10-06/task/FluentRead-shared-retry-after-20261009/src/ui/components/ServiceIcon.vue?vue&type=script&setup=true&lang.ts",
+      "/home/arietids/Documents/Codex/2026-10-06/task/FluentRead-shared-retry-after-20261009/src/ui/components/ServiceIcon.vue?vue&type=style&index=0&scoped=a6bf1c5d&lang.css",
+      "/home/arietids/Documents/Codex/2026-10-06/task/FluentRead-shared-retry-after-20261009/src/ui/components/ServiceIcon.vue"
+    ],
+    "matchingSvgDataModuleIds": [
+      "/home/arietids/Documents/Codex/2026-10-06/task/FluentRead-shared-retry-after-20261009/src/ui/assets/serviceBrandPaths.json"
+    ],
+    "canonicalSvgDataPath": "/home/arietids/Documents/Codex/2026-10-06/task/FluentRead-shared-retry-after-20261009/src/ui/assets/serviceBrandPaths.json",
+    "includesSvg": true
+  },
+  "fullLobeLicensePresent": true,
+  "candidateSourceSha256": {
+    "userscript/vite.config.ts": "223084ed968b815162f6ac085cd7a6956348de38f9adbfe93b97b829cade41fd",
+    "tests/userscriptViteConfig.test.ts": "b71de2cfa298392ba4e048d5b9a6965bc1521022524dd62803b032e939256915"
+  },
+  "note": "Read-only Vite generateBundle observer records actual production entry.moduleIds; it never changes the bundle. Windows path behavior is tested through the real hook with simulated path ports, not a Windows OS build."
+}

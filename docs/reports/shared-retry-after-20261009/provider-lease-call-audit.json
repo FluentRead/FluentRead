@@ -1,0 +1,63 @@
+{
+  "calls": [
+    {
+      "file": "src/providers/translation/connectionTest.ts",
+      "line": 122,
+      "argumentCount": 3
+    },
+    {
+      "file": "src/services/translation/broker.ts",
+      "line": 730,
+      "argumentCount": 4
+    },
+    {
+      "file": "tests/aiSdkOpenAICompatible.test.ts",
+      "line": 321,
+      "argumentCount": 3
+    },
+    {
+      "file": "tests/requestConfigSnapshot.test.ts",
+      "line": 133,
+      "argumentCount": 3
+    },
+    {
+      "file": "tests/requestConfigSnapshot.test.ts",
+      "line": 141,
+      "argumentCount": 2
+    }
+  ],
+  "readers": [
+    {
+      "file": "src/providers/translation/ai-sdk/openai-compatible.ts",
+      "line": 199
+    },
+    {
+      "file": "tests/connection-test.test.ts",
+      "line": 85
+    },
+    {
+      "file": "tests/connection-test.test.ts",
+      "line": 205
+    },
+    {
+      "file": "tests/requestConfigSnapshot.test.ts",
+      "line": 135
+    },
+    {
+      "file": "tests/requestConfigSnapshot.test.ts",
+      "line": 141
+    },
+    {
+      "file": "tests/requestConfigSnapshot.test.ts",
+      "line": 143
+    }
+  ],
+  "productionFourthArgumentCalls": [
+    {
+      "file": "src/services/translation/broker.ts",
+      "line": 730,
+      "argumentCount": 4
+    }
+  ],
+  "consumerFinding": "The only production reader is openai-compatible: its lease branch requires no quotaScope. Broker SDK provides quotaScope, all connectionTest and direct adapter tests attach only three arguments. Non-SDK adapters do not read scheduler context. Scheduler/client/connectionTest own leases are separate and retained."
+}

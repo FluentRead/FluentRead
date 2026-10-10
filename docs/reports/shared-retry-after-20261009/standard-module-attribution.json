@@ -1,0 +1,74 @@
+{
+  "artifact": {
+    "path": ".output/userscript/fluent-read.user.js",
+    "bytes": 1959993,
+    "sha256": "7ee7ff35d769ed383dfe1bfbf9983af1414414748fdb1a0bcaf7f940eac36ec5"
+  },
+  "graphCapture": "actual production entry.moduleIds and entry.modules observed without mutating bundle",
+  "sourceConfigSha256": "223084ed968b815162f6ac085cd7a6956348de38f9adbfe93b97b829cade41fd",
+  "sourceSnapshot": {
+    "src/app/background/areaRuntime.ts": "9e7d2096b9c3a3c0a9f15eac4e2a71842efa695198ffd8bd6a101778a4b3fbd7",
+    "src/app/background/handlers/translation.ts": "03f895f777964bcb8acedcc60b1545d15a844cecc90c48abe1a307e690c53a97",
+    "src/app/background/imageGlossaryContext.ts": "2da31075ea6111e88696db0f647a50a18fc29c9aa2f922eda9cf6e85a77a94cc",
+    "src/app/background/messageRuntime.ts": "a1070f83bb4ebd856734dafbc010d22ef501792724f23b16a952c266e20c9120",
+    "src/features/area-translation/background/handlers.ts": "1951653f38c266bf5f1b41386f9c220c9d7380e584b818e56341805152554190",
+    "src/features/area-translation/services/textTranslation.ts": "22ae4e5daf399116c752a607310c3dfa6c3f7355d109a414a91f43be1c9c51db",
+    "src/features/input-translation/background/handler.ts": "57b9fddbbb4ece968279037636813ae135a1f308116e26b9f8ced2fc39e2f420",
+    "src/providers/translation/ai-sdk/openai-compatible.ts": "180b3ffe02a59b1fc7f49fd97e188a50c7ddd1530a865ac3394ee71e2907c398",
+    "src/services/translation/broker.ts": "dd30a75e1595005bfb9630e834442f370008dc589f6e94704d127645e3e7301b",
+    "src/services/translation/requestScheduler.ts": "b1c0a8206c875763ef4ee0b3ae8227bf5fa37b85f4a3febe6833fbeb266ee43c",
+    "src/services/translation/requestSnapshot.ts": "a095169469ab9a51ef748307b5db628b378ec3776c21955b324625026407fa45",
+    "tests/translationRetryAfter.test.ts": "a97a2d2921c542b27953301eebbe8a4cb36fcc7505feaa47ef7a52f3e56cff40",
+    "tests/backgroundMessageRuntimePrivacy.test.ts": "cddbc6268b330dd068ca2f6530119f09904067fae4df5f3c111c681f5541ee79",
+    "tests/test-matrix.json": "cd7634ae5a2a0c76acde7ac4803569312f4d0e1cacf759a8a9941d31c4cfb2bf",
+    "tests/implementationAudit48A.test.ts": "cd726727625c74fbb910a2a17dd1d3bcc44893e607c13b874d9ca994662441ef",
+    "tests/userscriptViteConfig.test.ts": "b71de2cfa298392ba4e048d5b9a6965bc1521022524dd62803b032e939256915",
+    "userscript/vite.config.ts": "223084ed968b815162f6ac085cd7a6956348de38f9adbfe93b97b829cade41fd",
+    "src/providers/translation/connectionTest.ts": "2573c0b7e64abbed4079ba5f727467878b549d4b4f49a18e8d15364b1766048f"
+  },
+  "baselineHead": "8467b6757affb4bc895d44fa8fbf12a65bee7479",
+  "validatedParentHead": "389a3f19c39692a4e4af75160d5e24e4006136ed",
+  "newModuleIds": [],
+  "changedModuleContributions": [
+    {
+      "module": "src/services/translation/requestSnapshot.ts",
+      "baselineRenderedLength": 12388,
+      "candidateRenderedLength": 12591,
+      "deltaRenderedLength": 203
+    },
+    {
+      "module": "src/providers/translation/ai-sdk/openai-compatible.ts",
+      "baselineRenderedLength": 9875,
+      "candidateRenderedLength": 10293,
+      "deltaRenderedLength": 418
+    },
+    {
+      "module": "src/services/translation/requestScheduler.ts",
+      "baselineRenderedLength": 10054,
+      "candidateRenderedLength": 11362,
+      "deltaRenderedLength": 1308
+    },
+    {
+      "module": "src/services/translation/broker.ts",
+      "baselineRenderedLength": 59196,
+      "candidateRenderedLength": 60180,
+      "deltaRenderedLength": 984
+    },
+    {
+      "module": "src/providers/translation/connectionTest.ts",
+      "baselineRenderedLength": 6751,
+      "candidateRenderedLength": 6715,
+      "deltaRenderedLength": -36
+    },
+    {
+      "module": "src/features/input-translation/background/handler.ts",
+      "baselineRenderedLength": 2441,
+      "candidateRenderedLength": 2520,
+      "deltaRenderedLength": 79
+    }
+  ],
+  "standardSvgModules": [],
+  "note": "Current final Linux module graph bound to final artifact SHA and bytes. renderedLength is unminified tree-shaken source and is not additive final byte savings. This replaces the stale earlier lease/module attribution.",
+  "removedModuleIds": [],
+  "moduleIdComparisonCanonicalization": "Remove this checkout root prefix from raw IDs, including virtual IDs, using the same representation as the baseline capture."
+}

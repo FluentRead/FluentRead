@@ -1,7 +1,7 @@
 /**
  * @file src/app/background/messageRuntime.ts
  * 文件职责：构建并安装后台消息总运行时，把配置、翻译、OCR、TTS、生词本和标签页状态等公开 handler 连接到 browser.runtime。
- * 主要内容：向图片处理注入已保存的单图识别方式；创建图片 OCR 语言仓库和能力门控传输，绑定图片与圈选事务的真实页面及术语版本；为图片和划词释义注入独立服务选择，注入配置、翻译、本机统计、划词卡片页面缩放和词典依赖，为 TTS 状态注入离屏发送方校验与 frame 投递端口，接入离屏下载进度转存，注册类型化 router 并管理响应与错误。
+ * 主要内容：只转交真实 sender 隐私，无 tab 来源保持未知，不把后台自身的隐私状态当成发送者；向图片处理注入已保存的单图识别方式；创建图片 OCR 语言仓库和能力门控传输，绑定图片与圈选事务的真实页面及术语版本；为图片和划词释义注入独立服务选择，注入配置、翻译、本机统计、划词卡片页面缩放和词典依赖，为 TTS 状态注入离屏发送方校验与 frame 投递端口，接入离屏下载进度转存，注册类型化 router 并管理响应与错误。
  * 模块边界：本文件是 composition root，只决定依赖装配和监听生命周期，不实现各 feature 的业务算法、provider 协议或存储事务；具体实现均来自 features、services、providers 与 platform。
  */
 import {getFreeTranslationWeightSnapshot, createProviderTestRuntimeHandlers} from './providerRuntime';

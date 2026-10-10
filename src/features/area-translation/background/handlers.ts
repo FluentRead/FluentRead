@@ -1,7 +1,7 @@
 /**
  * @file src/features/area-translation/background/handlers.ts
  * 文件职责：定义圈选截图与圈选翻译在后台消息路由中的类型化处理器，并在进入浏览器截图和 Offscreen OCR 边界前校验所有不可信消息字段。
- * 主要内容：定义截图、圈选与取消协议，在 OCR 前冻结文本事务，依序执行本地裁剪识别及整块翻译并向原页面发送真实阶段；窗口、图像和选区在副作用前严格校验，截图请求全局串行并至少间隔 600ms，等待后及截图完成后均核对真实 sender 仍为活动标签页。
+ * 主要内容：在准备文字与视觉事务时传递可信隐私来源；定义截图、圈选与取消协议，在 OCR 前冻结文本事务，依序执行本地裁剪识别及整块翻译并向原页面发送真实阶段；窗口、图像和选区在副作用前严格校验，截图请求全局串行并至少间隔 600ms，等待后及截图完成后均核对真实 sender 仍为活动标签页。
  * 模块边界：本文件只负责编排和输入防线，不直接访问 tabs、配置存储或 OCR 实现；这些副作用由 background composition root 注入，几何换算归 core，Offscreen 通信归 adapter。
  */
 import type {AreaTranslationSelection} from '@/src/features/area-translation/core';
@@ -23,6 +23,7 @@ export interface AreaTranslationBackgroundContext {
         tab?: {
             id?: number;
             windowId?: number;
+            incognito?: boolean;
         };
     };
 }

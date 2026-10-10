@@ -218,7 +218,11 @@ describe('audit48 A controlled public boundaries', () => {
         vi.stubGlobal('browser', {runtime: {getURL: () => 'chrome-extension://controlled/'}, declarativeNetRequest: api});
         installRequestHeaderRuntime(); await flush(); expect(api.getDynamicRules).not.toHaveBeenCalled();
         gate.resolve(); await flush();
-        expect(api.updateDynamicRules).toHaveBeenCalledWith({removeRuleIds: [2_763_000], addRules: []});
+        expect(api.updateDynamicRules).toHaveBeenCalledWith({removeRuleIds: [2_763_000], addRules: [{
+            id: 2_763_000, priority: 2,
+            action: {type: 'modifyHeaders', requestHeaders: [{header: 'Origin', operation: 'remove'}]},
+            condition: {regexFilter: '^https?://index-translate\\.bilibili\\.com(?::[0-9]+)?/', initiatorDomains: ['controlled'], resourceTypes: ['xmlhttprequest']},
+        }]});
         expect(fetch).not.toHaveBeenCalled();
     });
 

@@ -1,0 +1,34 @@
+{
+  "stage": "round2-final-valid-mixed-probe-red",
+  "startedAt": "2026-10-09T12:42:19.573753+00:00",
+  "durationSeconds": 1.266,
+  "exitCode": 1,
+  "passed": 3,
+  "failed": 6,
+  "failures": [
+    {
+      "name": "mixed real connection probe and counted broker attempts settles a held-slot probe retry before queued broker work in global with success",
+      "reason": "AssertionError: [{\"kind\":\"probe\",\"at\":0}]: expected [ { kind: 'probe', at: +0 } ] to deeply equal [ { kind: 'probe', at: +0 }, \u2026(1) ]"
+    },
+    {
+      "name": "mixed real connection probe and counted broker attempts settles a held-slot probe retry before queued broker work in global with deadline",
+      "reason": "AssertionError: [{\"kind\":\"probe\",\"at\":0},{\"kind\":\"probe\",\"at\":4010}]: expected [ { kind: 'probe', at: +0 }, \u2026(1) ] to deeply equal [ { kind: 'probe', at: +0 }, \u2026(1) ]"
+    },
+    {
+      "name": "mixed real connection probe and counted broker attempts settles a held-slot probe retry before queued broker work in service with success",
+      "reason": "AssertionError: [{\"kind\":\"probe\",\"at\":0}]: expected [ { kind: 'probe', at: +0 } ] to deeply equal [ { kind: 'probe', at: +0 }, \u2026(1) ]"
+    },
+    {
+      "name": "mixed real connection probe and counted broker attempts settles a held-slot probe retry before queued broker work in service with deadline",
+      "reason": "AssertionError: [{\"kind\":\"probe\",\"at\":0},{\"kind\":\"probe\",\"at\":4010}]: expected [ { kind: 'probe', at: +0 }, \u2026(1) ] to deeply equal [ { kind: 'probe', at: +0 }, \u2026(1) ]"
+    },
+    {
+      "name": "mixed real connection probe and counted broker attempts settles a held-slot probe retry before queued broker work in model with success",
+      "reason": "AssertionError: [{\"kind\":\"probe\",\"at\":0}]: expected [ { kind: 'probe', at: +0 } ] to deeply equal [ { kind: 'probe', at: +0 }, \u2026(1) ]"
+    },
+    {
+      "name": "mixed real connection probe and counted broker attempts settles a held-slot probe retry before queued broker work in model with deadline",
+      "reason": "AssertionError: [{\"kind\":\"probe\",\"at\":0},{\"kind\":\"probe\",\"at\":4010}]: expected [ { kind: 'probe', at: +0 }, \u2026(1) ] to deeply equal [ { kind: 'probe', at: +0 }, \u2026(1) ]"
+    }
+  ]
+}

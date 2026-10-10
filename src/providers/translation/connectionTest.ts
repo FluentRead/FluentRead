@@ -2,7 +2,7 @@
  * @file src/providers/translation/connectionTest.ts
  *
  * 文件职责：通过真实 provider registry 执行最小翻译连接测试，覆盖服务鉴权、端点、模型配置和响应解析。
- * 主要内容：使用固定英文测试文本调用指定适配器，为 MyMemory 和免费池单服务指定测试语言对，逐服务检查使用匿名适配器与配置等待上限，验证非空结果并返回耗时；formatConnectionTestError 将失败转换为可读消息。
+ * 主要内容：连接测试外层 lease 持有 SDK 的原始传输，调用者超时后仍等原始传输结束才归还并发；使用固定英文测试文本调用指定适配器，为 MyMemory 和免费池单服务指定测试语言对，逐服务检查使用匿名适配器与配置等待上限，验证非空结果并返回耗时；formatConnectionTestError 将失败转换为可读消息。
  * 模块边界：本文件位于 provider 适配层，只把统一翻译请求转换为外部或浏览器服务协议；不管理页面 DOM、UI 生命周期或配置持久化，缓存、去重和超时总预算由 translation broker 统一协调。
  */
 
@@ -118,14 +118,11 @@ export async function runTranslationServiceConnectionTest(
             const requestWithConfig = selectedSnapshot
                 ? attachTranslationProviderConfig(observedRequest, selectedSnapshot)
                 : observedRequest;
-            const scheduledRequest = usageOptions.requestScheduler
-                ? attachTranslationRequestScheduler(requestWithConfig, usageOptions.requestScheduler, {
-                    service,
-                    model: effectiveModel,
-                })
-                : requestWithConfig;
             const transport = usageOptions.requestScheduler
                 ? usageOptions.requestScheduler.schedule(async (lease) => {
+                    const scheduledRequest = attachTranslationRequestScheduler(requestWithConfig, usageOptions.requestScheduler!, {
+                        service, model: effectiveModel,
+                    }, lease);
                     const operation = Promise.resolve().then(() => adapter(scheduledRequest));
                     lease.holdUntil(operation);
                     return operation;
@@ -135,7 +132,7 @@ export async function runTranslationServiceConnectionTest(
                     identity: {service, model: effectiveModel},
                     countRate: usageOptions.countRate !== false,
                 })
-                : Promise.resolve().then(() => adapter(scheduledRequest));
+                : Promise.resolve().then(() => adapter(requestWithConfig));
             const response = await Promise.race([transport, timeout]);
             if (!isNonEmptyText(response)) throw new Error('服务已响应，但没有返回有效译文');
             if (freeProviderId !== undefined && response.trim() === CONNECTION_TEST_ORIGIN) {

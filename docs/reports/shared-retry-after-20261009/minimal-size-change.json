@@ -1,0 +1,11 @@
+{
+  "bytes": 1959993,
+  "sha256": "7ee7ff35d769ed383dfe1bfbf9983af1414414748fdb1a0bcaf7f940eac36ec5",
+  "cap": 1960000,
+  "headroom": 7,
+  "beforeFunctionalFixes": 1961493,
+  "afterFunctionalFixesBeforeReduction": 1961638,
+  "netReduction": 1645,
+  "baselineBytes": 1959494,
+  "note": "Combined measured change, not isolated savings: actual module-graph license association; existing pako level9 static JSON/CSS encoder; common enqueue initialization and equivalent wake arithmetic. No executable-source compression."
+}

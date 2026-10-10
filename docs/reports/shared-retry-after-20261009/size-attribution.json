@@ -1,0 +1,39 @@
+{
+  "standard": {
+    "bytes": 1959993,
+    "sha256": "7ee7ff35d769ed383dfe1bfbf9983af1414414748fdb1a0bcaf7f940eac36ec5",
+    "baselineBytes": 1959494,
+    "delta": 499,
+    "cap": 1960000,
+    "overCap": 0,
+    "baselineOverCap": 0,
+    "headroom": 7,
+    "lobeLicensePresent": false
+  },
+  "standalone": {
+    "bytes": 3797330,
+    "sha256": "e174bc76a8bd80c67bcd66de323b7324f091f40b6bd504d196abb64aec584a5e",
+    "baselineBytes": 3795702,
+    "delta": 1628,
+    "cap": 3600000,
+    "overCap": 197330,
+    "baselineOverCap": 195702,
+    "headroom": -197330,
+    "lobeLicensePresent": true
+  },
+  "greasyfork": {
+    "bytes": 2322749,
+    "sha256": "71212a32ad6c707e6659c4cb5db7d1bf6ab0e2b86d95c03e02f34a0dd32026f5",
+    "baselineBytes": 2320196,
+    "delta": 2553,
+    "cap": 2000000,
+    "overCap": 322749,
+    "baselineOverCap": 320196,
+    "headroom": -322749,
+    "lobeLicensePresent": false
+  },
+  "greasyforkGeneratedData": {
+    "sha256": "34bcb22e60894c88d3b45f4b23c3c6e1c03d1e21614a23caf896ad7333140951",
+    "matchesBaseline": true
+  }
+}

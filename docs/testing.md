@@ -1,5 +1,11 @@
 # 测试与回归
 
+## 共享 Retry-After 冷却
+
+`pnpm test tests/translationRetryAfter.test.ts tests/translationRequestScheduler.test.ts tests/aiSdkOpenAICompatible.test.ts tests/translationBroker.test.ts` 通过真实客户端、broker、调度器和锁定的 AI SDK 6.0.264，使用严格拒绝未匹配网络的 `setRuntimeFetch` 夹具验证 HTTP attempts。覆盖数字、HTTP-date、毫秒头、2/60/90 秒、无效及极端值、deadline、取消、真实 transport settle 后释放 lease、健康服务隔离、可信普通/私密来源以及端点、模型和凭据切换。30 个固定 seed 重放相同到达时序；少量真实 timer 验证集成，不调用外部 API。
+
+429 的有效服务端等待作用于同 quota；缺失或无效头使用 SDK 原有的首个 2 秒退避。503 只在有效 Retry-After 下共享冷却，401/403 不引入冷却或新重试。状态只在内存保存后台冻结配置的摘要并在到期清理，不增加设置、重试次数、持久统计或跨服务 global 冷却。SDK 对大于等于 60 秒的头可能回退到 2 秒，本地共享门控仍等待服务端时点或原有 deadline。此项是确定性 mock 验证，不能视为真实服务提速。
+
 ## 扩展体积与共享推理引擎
 
 `pnpm analyze:bundle [构建目录] [基线目录]` 统计真实字节、文件类型、目录、最大文件和相同内容，详见 [2026-10-06 体积记录](./maintainers/extension-size-20261006.md)。普通开发构建不内联源码映射；需要时使用 `FLUENTREAD_DEV_SOURCEMAPS=1 pnpm dev`。手动加载可设置 `FLUENTREAD_DISABLE_BROWSER_RUNNER=1`。

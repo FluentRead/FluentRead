@@ -1,0 +1,17 @@
+{
+  "stage": "review-saturated-page-red",
+  "startedAt": "2026-10-09T11:50:49.997894+00:00",
+  "durationSeconds": 1.166,
+  "exitCode": 1,
+  "failed": 2,
+  "failures": [
+    {
+      "name": "review counterexamples: physical capacity and trusted pending identity releases all 1 saturated logical leases during a 90-second quota wait",
+      "reason": "AssertionError: [{\"service\":\"A\",\"at\":0}]: expected false to be true // Object.is equality"
+    },
+    {
+      "name": "review counterexamples: physical capacity and trusted pending identity releases all 3 saturated logical leases during a 90-second quota wait",
+      "reason": "AssertionError: [{\"service\":\"A\",\"at\":0},{\"service\":\"A\",\"at\":0},{\"service\":\"A\",\"at\":0}]: expected false to be true // Object.is equality"
+    }
+  ]
+}

@@ -1,7 +1,7 @@
 <!--
 @file src/features/settings/ui/InformationHighlightModelCard.vue
 文件职责：展示本地意外度模型的真实可用性、资源状态和显式下载操作。
-主要内容：每张卡独立读取资源状态，标题单选模型、右下角单个按钮管理资源，下载、续传与删除共用明确确认框；显示真实下载进度和错误，选择与配置切换、隐藏和卸载时拒绝迟到回复与旧确认操作。
+主要内容：每张卡独立读取资源状态，简短区分基础与进阶模型，标题单选模型、右下角单个按钮管理资源，下载、续传与删除共用明确确认框；显示真实下载进度和错误，选择与配置切换、隐藏和卸载时拒绝迟到回复与旧确认操作。
 模块边界：不直接访问网络、不分析正文、不推断模型已就绪，不自动下载或切换云端；模型校验、资源缓存和 WebGPU 检查由 feature runtime 负责。
 -->
 <template>
@@ -9,7 +9,7 @@
     <label class="highlight-model-heading" :class="{'is-selectable': selectable}">
       <input v-if="selectable" type="radio" name="information-highlight-local-model" :value="selectedModel.id" :checked="selected" :disabled="!context.active.value" :aria-label="t('informationHighlight.model.selectAction', {name: selectedModel.name})" :onChange="actions.select" data-information-highlight-model-radio :data-information-highlight-model-choice="selectedModel.id" />
       <span v-else class="highlight-model-chip" aria-hidden="true">↓</span>
-      <span class="highlight-model-copy"><span class="highlight-model-title"><strong>{{ selectedModel.name }}</strong><span v-if="selectable && selected" class="highlight-model-selected">{{ t('informationHighlight.model.selected') }}</span></span><small v-if="!compact || status && !status.supported">{{ t('informationHighlight.model.description') }}</small></span>
+      <span class="highlight-model-copy"><span class="highlight-model-title"><strong>{{ selectedModel.name }}</strong><span v-if="selectable && selected" class="highlight-model-selected">{{ t('informationHighlight.model.selected') }}</span></span><small v-if="!compact || status && !status.supported">{{ t(selectedModel.id === DEFAULT_INFORMATION_HIGHLIGHT_MODEL_ID ? 'informationHighlight.model.description.basic' : 'informationHighlight.model.description.advanced') }}</small></span>
     </label>
     <p v-if="!status || operation === 'remove'" class="highlight-model-status" role="status" aria-live="polite">{{ t(!status ? 'informationHighlight.model.reading' : 'informationHighlight.model.phase.removing') }}</p>
     <DownloadProgress v-if="showProgress" :progress="downloadProgress" :label="t(`informationHighlight.model.phase.${displayPhase}`)" data-testid="information-highlight-model-progress" />

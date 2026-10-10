@@ -34,7 +34,11 @@ const modelId=args['model-id']||'qwen2.5-0.5b';assert(Object.hasOwn(models,model
 const model=models[modelId],otherModel=Object.values(models).find(value=>value.id!==modelId);
 const modelUrlPrefix=`https://huggingface.co/${model.repository}/resolve/${model.revision}/`;
 const downloadLabel=`下载模型（${(model.bytes/1_000_000).toFixed(0)} MB）`;
-const modelDescription='离线计算意外度，需 WebGPU（shader-f16）。';
+const modelDescriptions={
+  'qwen2.5-0.5b':'基础模型，需 WebGPU（shader-f16）。',
+  'qwen3-0.6b':'进阶模型，需 WebGPU（shader-f16）。',
+};
+const modelDescription=selectedId=>modelDescriptions[selectedId];
 for(const field of ['extension-dir','playwright-root','artifacts-dir']) assert(args[field],`Missing --${field}`);
 const downloadTimeout=Number(args['download-timeout-ms']||15*60*1000);
 assert(Number.isFinite(downloadTimeout)&&downloadTimeout>=15000,'--download-timeout-ms must be at least 15000');
@@ -514,7 +518,7 @@ function popupSourceContract(){
         actions:[...element.querySelectorAll('.highlight-model-actions button')].map(button=>({text:button.textContent.trim(),disabled:button.disabled,download:button.hasAttribute('data-information-highlight-download'),remove:button.hasAttribute('data-information-highlight-remove'),pause:button.hasAttribute('data-information-highlight-pause')})),
       }));
       assert.equal(snapshot.actions.length,1);assert.equal(snapshot.actions[0].text,expectedAction);
-      assert.equal(snapshot.description,modelDescription);
+      assert.equal(snapshot.description,modelDescription(descriptor.id));
       const groupText=await control.locator('#information-highlight-settings').innerText();
       assert(!/模型文件已就绪|下载只获取模型文件|分析正文不离开此设备|已下载\s*[·•]\s*可离线使用|由\s*FluentRead\s*下载|FluentRead\s*下载\s*Qwen/u.test(groupText),'Removed model helpers and duplicate descriptions must be absent');
       return snapshot;
@@ -564,7 +568,7 @@ function popupSourceContract(){
       assert.equal(layout.cards.length,2);assert(layout.scrollWidth<=width+1);assert(layout.scrollHeight<=layout.height+1);
       assert(layout.cards.every(card=>card.rect.width>0&&card.rect.x>=0&&card.rect.right<=width+1));
       for(const card of layout.cards){
-        assert.equal(card.description,modelDescription);assert.equal(card.resourceButtonCount,1,'Every model card must have one resource action button');
+        assert.equal(card.description,modelDescription(card.modelId));assert.equal(card.resourceButtonCount,1,'Every model card must have one resource action button');
         const contentRight=card.rect.right-card.paddingRight-card.borderRightWidth;
         assert(Math.abs(card.buttonRect.right-contentRight)<=1,'Resource action must align with the card’s inner right edge');
         assert(Math.abs(card.buttonRect.bottom-card.actionsRect.bottom)<=1,'Resource action must align with the bottom of the action row');

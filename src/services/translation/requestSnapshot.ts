@@ -1,7 +1,7 @@
 /**
  * @file src/services/translation/requestSnapshot.ts
  *
- * 文件职责：冻结翻译消息的可编辑字段与数组，并附加只读 provider 配置快照，消除异步缓存读取期间全局配置变化造成的请求身份错配。
+ * 文件职责：冻结翻译消息的可编辑字段与数组，并附加只读 provider 配置快照，复制并冻结服务合批偏好，消除异步缓存读取期间全局配置变化造成的请求身份错配。
  * 主要内容：在入口一次读取消息字段并复制原文/术语数组，保留内部 symbol 描述符；定义配置快照、剩余预算、内部取消、线路观察与可信术语来源，冻结术语规则并从完整文本槽协议恢复纯匹配原文；以线性首尾边界扫描确定命名空间和最终外层槽数，保留来源中的字面标记和自定义命名空间，重复、交错与缺项仍由同一严格解析器拒绝。
  * 模块边界：本文件位于翻译 application service 层，负责用例编排和端口契约；不挂载页面 UI，且不应把某家供应商的网络细节扩散到 feature，具体 HTTP 协议由 providers/platform 实现。
  */
@@ -18,6 +18,7 @@ import {normalizeFreeTranslationOrder, normalizeFreeTranslationMode} from '@/src
 import {normalizeApiKeyRecoveryMs} from '@/src/core/config/scheduling';
 import type {CustomOpenAIProvider} from '@/src/core/config/customOpenAI';
 import {normalizeDeepLApiPlan} from '@/src/core/config/deepl';
+import {normalizeNativeBatchTranslationEnabled} from '@/src/core/config/nativeBatch';
 import {resolveGlossary} from '@/src/core/glossary';
 import {parseTranslationSlots} from '@/src/core/translation/public';
 import type {TranslationRequestScheduler, TranslationRequestIdentity} from './requestScheduler';
@@ -423,6 +424,7 @@ export function createTranslationProviderConfigSnapshot(
         token: frozenStringMap(source.token),
         apiKeys: frozenApiKeys(source.apiKeys),
         apiKeyRotationEnabled: frozenBooleanMap(source.apiKeyRotationEnabled),
+        nativeBatchTranslationEnabled: Object.freeze(normalizeNativeBatchTranslationEnabled(source.nativeBatchTranslationEnabled)),
         secret: frozenStringMap(source.secret),
         serviceRegion: frozenStringMap(source.serviceRegion),
         requireApiKey: frozenBooleanMap(source.requireApiKey),

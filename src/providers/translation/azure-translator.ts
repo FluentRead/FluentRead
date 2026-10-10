@@ -7,6 +7,7 @@
  */
 
 import {resolveCloudRegion, services} from '@/src/core/config/catalog';
+import {isNativeTranslationBatchEnabled} from '@/src/core/config/nativeBatch';
 import {AZURE_TRANSLATOR_ENDPOINT, method} from '@/src/core/config/constants';
 import {config} from '@/src/services/config/store';
 import {getTranslationLanguages} from '@/src/services/translation/languages';
@@ -23,6 +24,8 @@ type AzureTranslatorResponse =
 async function azureTranslator(message: TranslationProviderRequest<string | string[]>) {
     if (message.abortSignal?.aborted) throw abortErrorFromSignal(message.abortSignal);
     const current = getTranslationProviderConfig(message, config);
+    const enableNativeBatch = message.enableNativeBatch
+        ?? isNativeTranslationBatchEnabled(services.azureTranslator, current.nativeBatchTranslationEnabled);
     const apiKey = current.token[services.azureTranslator]?.trim();
     if (!apiKey) {
         throw new Error('Azure 翻译尚未配置密钥，请先在设置中填写');
@@ -59,7 +62,7 @@ async function azureTranslator(message: TranslationProviderRequest<string | stri
         return Array.isArray(result) ? result.map(item =>
             Array.isArray(item?.translations) && item.translations.length === 1
                 ? item.translations[0]?.text : undefined) : undefined;
-    }, message.abortSignal, 'Azure 翻译返回格式异常');
+    }, message.abortSignal, 'Azure 翻译返回格式异常', enableNativeBatch);
 }
 
 export default azureTranslator;

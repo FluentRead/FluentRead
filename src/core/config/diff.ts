@@ -1,7 +1,7 @@
 /**
  * @file src/core/config/diff.ts
  * 文件职责：把两份配置转换为可供预览的结构化差异，同时确保凭据和嵌套敏感内容只显示脱敏摘要。
- * 主要内容：维护设置字段到页面分组及中文标签的映射，格式化枚举、映射和长文本，用迭代比较检查深层对象并对预览深度作安全摘要，生成稳定的分组差异结果。
+ * 主要内容：维护设置字段到页面分组及中文标签的映射，按服务展示原生翻译合批开关，格式化枚举、映射和长文本，用迭代比较检查深层对象并对预览深度作安全摘要，生成稳定的分组差异结果。
  * 模块边界：本文件是无浏览器副作用的纯配置算法，不读取存储、不打开确认框也不执行恢复；设置页面只消费其脱敏后的 ConfigDiffResult。
  */
 import {CONFIG_CREDENTIAL_FIELDS, isSensitiveConfigKey} from './credentials';
@@ -554,6 +554,7 @@ const FIELD_DEFINITIONS: Record<string, FieldDefinition> = {
     customModel: {group: 'translationServices', label: '自定义模型', mapping: serviceMapping('自定义模型')},
     customModels: {group: 'translationServices', label: '自定义模型列表', mapping: serviceMapping('自定义模型列表')},
     modelThinking: {group: 'translationServices', label: '模型 Thinking', mapping: serviceMapping('模型 Thinking')},
+    nativeBatchTranslationEnabled: {group: 'translationServices', label: '原生翻译合批', mapping: serviceMapping('开启合并', formatBoolean)},
     requireApiKey: {group: 'translationServices', label: 'API Key 校验', mapping: apiKeyRequirementMapping()},
     minimaxBillingPlan: {group: 'translationServices', label: 'MiniMax 计费方案', format: (value) => formatEnum(value, BILLING_PLAN_LABELS)},
     minimaxRegion: {group: 'translationServices', label: 'MiniMax API 区域', format: (value) => formatEnum(value, REGION_LABELS)},

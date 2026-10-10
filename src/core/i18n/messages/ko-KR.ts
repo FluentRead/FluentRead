@@ -1367,6 +1367,8 @@ export const koKRMessages = {
     'settings.services.connection': '연결 설정',
     'settings.services.model': '모델',
     'settings.services.advanced': '고급 설정',
+    'settings.services.nativeBatch.label': '번역 요청 합치기',
+    'settings.services.nativeBatch.help': '여러 텍스트를 하나의 요청으로 합쳐 요청 횟수를 줄입니다. 끄면 각 텍스트를 따로 번역합니다.',
     'settings.services.deepl.plan': 'DeepL API 요금제',
     'settings.services.deepl.free': 'API Free (무료)',
     'settings.services.deepl.pro': 'API Pro (유료)',

@@ -1,0 +1,161 @@
+{
+  "scope": "targeted regression; not full suite",
+  "baseCommit": "e4932521fe6036a403fbd3e034dc20d5b4495fe0",
+  "sourceSha256": {
+    "docs/config/translation-engines.md": "3bef6ece571d94db56cdc5724537a54b464444bff9202426498912ce316f9b19",
+    "docs/en/config/translation-engines.md": "94d470e8f770805fc004f155efb661dfc7e2fc5deb8c2a3fdba24a8aa1afb8cd",
+    "scripts/testing/run-native-batch-live-test.cjs": "f2e1e1f003e277bb741f6822d6fef2702ce8332d70c97be01b6998892e173aa0",
+    "scripts/verify-userscript-build.mjs": "1e2988c7ea6d3edac0da4ac920e96a4e066a96fe49666709f16d9f2fe992ba71",
+    "src/app/background/handlers/translation.ts": "5fa5e5c620e0d6943036290fd2bc614d321c9b1a614d7bb03d4485c531bf1413",
+    "src/app/translation/client.ts": "d7c4b72a58e43a1c130a2e345cfa0ce1bd3b57fd1e720a3629ce64cf74459213",
+    "src/core/config/diff.ts": "930b197ec5e31b6768ee963b119c12030ca08d799f75f6d59088092bf8936fa1",
+    "src/core/config/driveSync.ts": "14ce3ae7cb60112305dfa6c6f335c49d0ea6a777af9d9006efeb70d6cdc9abaf",
+    "src/core/config/model.ts": "17eef827b71052e9f5b2704a1447cfb12db832ebee988a84f10b4135adf64210",
+    "src/core/config/nativeBatch.ts": "88289c0fb9cc6b87df5ae3a4d940d4659293976822c0eb1e3422f3f96eb8b494",
+    "src/core/i18n/messages/en-US.ts": "cbf5b9fa31f9385e563750bc05c0782bc8a3f72e78a7f052bd9bb26c95d1c77a",
+    "src/core/i18n/messages/es-ES.ts": "f2ce54452312e3cc209774133d81cf398dbc84021006c3746e4d2bd696e098d2",
+    "src/core/i18n/messages/fr-FR.ts": "d85c3fce407422e9d2b18277cd2d98630cbf249bb5a8a9cefaeffd0831c2efc8",
+    "src/core/i18n/messages/ja-JP.ts": "3e7bdb06fc816b7da52ad1ec52d015705f6d296dde36720ac1f64be137b20116",
+    "src/core/i18n/messages/ko-KR.ts": "34ad47e0e6721fe8a482c38eccfffb06266d5020ceb4dd0a82e1cc548c6c4c0b",
+    "src/core/i18n/messages/ru-RU.ts": "4ebd3959c343daa6fc76c5965e6df13d2d460c0ed4ce0b330c0f8c9bcf07bc07",
+    "src/core/i18n/messages/zh-CN.ts": "5994ad073e108ffb697e98dbd92f5cb82174147d3bee5bff5ca678459db67775",
+    "src/features/full-page-translation/content/frameSession.ts": "f506a2084037724cc69578f930d3009f3ae56879099f310da75a1ac4a3046889",
+    "src/features/full-page-translation/content/translationConfigSnapshot.ts": "77e8ab2164d231e4836ca86ffebdd2bd743469a19266afd9635532e6f84d89c5",
+    "src/features/full-page-translation/content/translationRequest.ts": "460e96f44bcc93fa7dc4aca72903860c4df0b281eb2e046796892240634a2649",
+    "src/features/settings/ui/services/FreeTranslationSettings.vue": "e62b19107aae8e302a3f4fd2c1b43f4e07b7c7fa298fcd04faa62ea639c28138",
+    "src/features/settings/ui/services/ServiceConfiguration.vue": "fd71702cd06fcd495040a649a3d414c46efdf098f2e77ea40bb22853224a0d58",
+    "src/features/settings/ui/services/ServiceNatureBadge.vue": "30e159ce015c08259b63a3a859ec3b61673d535f9a1c426ad1b18c68356b82f4",
+    "src/providers/translation/azure-translator.ts": "c4e65a28cb35f0b66287d332d183c60a14b570744ae4fad3d4be067c6a02cc14",
+    "src/providers/translation/deepl.ts": "52712f4c876dd10e9b2744860972a08b7ad57703563e019d7670c8391969986a",
+    "src/providers/translation/free-translation.ts": "742133cc923a6b9a2a4a1d330a180d86a9fa5becf26fa7563bdc7b9d8d58394c",
+    "src/providers/translation/google-cloud-translation.ts": "23b5db119ed3bcced62247158a8564c4e5f4e39f426b70cd6d61539851aa9cef",
+    "src/providers/translation/google.ts": "2fc896af068491c5898a4a493a4e851b40a67c1b4f0d25318a0b5b3d10f6f3ff",
+    "src/providers/translation/microsoft.ts": "e66d83b11f5a3a164f3a97cc8f0de9f9a87b636c3ef0c12f18e04fce858b8a0c",
+    "src/providers/translation/microsoftTransport.ts": "b8fe712f74d55c1ff98c92fb029b3f0931109f570d0df9e6814d1f6b039e245b",
+    "src/providers/translation/native-batch.ts": "18cb3ff071e08f77edee72549db157a96307534c248f985f75095aedb6a6c95b",
+    "src/services/translation/broker.ts": "31d93d0243680285620ff4287ecc2eb6420b5d90c341cecae2722ed9749f1a91",
+    "src/services/translation/capabilities.ts": "42ca7431d89972f8110a2ef6980d15bb9a1824e044754a5f3d3d17cb1c897a28",
+    "src/services/translation/requestSnapshot.ts": "b1c60ccf112cd4307a066c6f1adafad30a485c25cc9ae8eb9aed3612d5fc2e03",
+    "src/services/translation/types.ts": "c2bd1d7880fea4b24a547a2756df34bcb7ae2cb373b238dfcada9739e49a29b9",
+    "tests/backgroundTranslationHandler.test.ts": "791a120421621159a03f404ec33010ce6e01b2cabe8500ea14959a078f560b96",
+    "tests/cloudVendorProviders.test.ts": "f635bec0e622c98caea7a49e457d722f9bdfd59cc846828778651e9e16ba6575",
+    "tests/configDiff.test.ts": "5261644e2c47728022a4b730044dcc96f56a14c74a92ff267f019721cda8e28e",
+    "tests/configTransfer.test.ts": "15960439c330ebb3f258f64f5d0c46edccbcbd98c9aaa09bb1acbd88a5aec7e2",
+    "tests/deepl.test.ts": "4c84d62708935a86134bed36d4285fb0433cb903a159cffade6b06499bb9e977",
+    "tests/free-translation.test.ts": "769565c5d2f6cd2c99f2d76ffaf7a74896dcd55a210f73a10a1cf8c1e2dc3e95",
+    "tests/freeTranslationI18n.test.ts": "931ffc660959914743698c63c204391d066baf37fd54766ed3fec29753aeb8c6",
+    "tests/freeTranslationSettings.test.ts": "08bc17b86846efb7abdb7d42be4f44db48825abfd59f49123cb9fd35d3d58e2d",
+    "tests/fullPageVisibilityScheduling.test.ts": "a3a6d3cff3e09efd2f0803b0a2c819f3ec62abc4aa0c04e1dd649b7b8244a1ff",
+    "tests/google.test.ts": "88d7256e54d23b8438419bf7f4b278ed0a5f95cec1662966503a8b789ab52f11",
+    "tests/googleDriveSync.test.ts": "59e05c8a4ea74e5ea034385db1d75af5f853bba27bb9923f45049144a3672d52",
+    "tests/microsoftTransport.test.ts": "82229c544bc68ae266d3c9786196ee2723aeac2226dd817e5016adc95cbcef7b",
+    "tests/nativeBatch.test.ts": "9f807077a2763e1e279c9018669e212c139b9635140b8e6292d5b4df9ca6d69b",
+    "tests/nativeBatchConfig.test.ts": "e6519dfbd8643e86864ee5ddb8d902a77b9fc152a83c0e8c1d449c1641ef0565",
+    "tests/promptSyncLifecycle.test.ts": "3c9d4d144f77f782216323690f9d17451369ba7b094ab7fa52ba433ab518238f",
+    "tests/requestConfigSnapshot.test.ts": "92ffc6601fa9c7f16bacec3a2fd72462188e80266b90c5288a5b5a790243b98d",
+    "tests/test-matrix.json": "e21267a286ba09fd56413fe01a024d55956ef0619fbc597d09e0159fb4b0ec18",
+    "tests/translateApiPerformance.test.ts": "ffc09fc062284778b11bf42aabf46caf2e1cc8831911349a236ff0e6ab3fe98b",
+    "tests/translationBroker.test.ts": "8ed4707cf45833d659af3a00d78486dcd977c5336bd82e818f179dec6b10f686",
+    "userscript/languages/es-ES.03572bffdf7a6d25.json": "f5bedcac91283f13d83ce2ddf571307c8d7738db0342fd3b32e1a040c2b3d29b",
+    "userscript/languages/fr-FR.80a89f0f223f6025.json": "7f95cc4f7c6175044fe069dc0321793e6f463d7f173db740509c756714a22a44",
+    "userscript/languages/ja-JP.9d4bfc2086e827ca.json": "b15aab6f65d33b36e7c2b9c19b8927c1b8faffe203e88fc8daedc3385d8982f0",
+    "userscript/languages/ko-KR.f62ecd18cac2998e.json": "1addcd759f45deb5ef5db4b05457616486c0a213468a5d2c6208ec2d05ea2126",
+    "userscript/languages/ru-RU.ca36a5576d2ff240.json": "3db18a4ac77f5b845d66f1c9818226bb424092af61c1ee67be23ae50cb83991a",
+    "userscript/vite.config.ts": "b2c6907f965cd7c0869140b2784ba469112e8b77f21ba60fb0dca9b6b614476a",
+    "vitest.coverage.config.ts": "0a8b36b15e2e2285f35656d0ed9fc567c3a2e72de47d8edb4161d9b52c6503ef"
+  },
+  "tests": {
+    "runtime": {
+      "passed": 930,
+      "files": {
+        "fullPageVisibilityScheduling": 296,
+        "translationBroker": 188,
+        "free-translation": 103,
+        "google": 48,
+        "translateApiPerformance": 42,
+        "cloudVendorProviders": 62,
+        "requestConfigSnapshot": 37,
+        "backgroundTranslationHandler": 49,
+        "microsoftTransport": 17,
+        "deepl": 69,
+        "nativeBatch": 19
+      }
+    },
+    "renderedUI": {
+      "passed": 82,
+      "files": {
+        "promptSyncLifecycle": 47,
+        "freeTranslationSettings": 16,
+        "freeTranslationI18n": 19
+      }
+    },
+    "configAndTransfer": {
+      "passed": 130,
+      "files": {
+        "nativeBatchConfig": 4,
+        "configDiff": 51,
+        "configTransfer": 29,
+        "googleDriveSync": 46
+      }
+    },
+    "boundaries": {
+      "passed": 1118,
+      "files": {
+        "model": 113,
+        "configModelAuditBoundaries": 41,
+        "configDomainBoundaries": 23,
+        "qqMailFrameSession": 35,
+        "browserCapabilities": 12,
+        "architecture/sourceFileHeaders": 894
+      }
+    },
+    "userscriptBuildConfig": {
+      "passed": 23,
+      "files": [
+        "tests/userscriptViteConfig.test.ts"
+      ]
+    },
+    "uniquePassed": 2283,
+    "sourceHeaderAssertions": 894
+  },
+  "coverage": {
+    "file": "src/core/config/nativeBatch.ts",
+    "statements": 100,
+    "branches": 100,
+    "functions": 100,
+    "lines": 100
+  },
+  "checks": {
+    "compile": "passed",
+    "buildChromeMV3": "passed",
+    "buildFirefoxMV2": "passed",
+    "buildUserscript": "passed",
+    "verifyUserscript": "passed",
+    "verifyBrowserManifests": "passed",
+    "testAudit": "passed",
+    "docsBuild": "passed",
+    "diffCheck": "passed"
+  },
+  "browser": {
+    "passed": 26,
+    "production": true,
+    "engine": "Edge 131.0.2903.147",
+    "report": "./browser-report.json",
+    "allScreenshotsVisuallyReviewed": true,
+    "fiveServiceSwitchesIndependentAndDefaultOn": true,
+    "quickClose": true,
+    "latestWriteWins": true,
+    "crossPageSync": true,
+    "pageErrors": [],
+    "cleanupErrors": []
+  },
+  "notVerified": [
+    "DeepL, Azure Translator and Google Cloud real credentials/API acceptance/online translation quality",
+    "Firefox runtime",
+    "Userscript manager runtime",
+    "All sites/languages/devices",
+    "Full regression suite"
+  ],
+  "referenceProjectsUsed": false,
+  "dependenciesChanged": false
+}

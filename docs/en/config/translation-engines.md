@@ -12,6 +12,8 @@ FluentRead displays translations produced by your selected service. Use the defa
 
 Full-page translation automatically groups short passages with the same request settings when using Google translation, Microsoft translation, DeepL, Azure Translator, or Google Cloud Translation. Their native multi-text interfaces keep each source associated with its own result. **AI multi-paragraph translation** remains off by default; other machine translation services continue requesting passages individually.
 
+Each of these five services has a **Request limits → Combine translation requests** switch, enabled by default. Turn it off to request passages individually for that service. The free aggregate service follows the same preference when it calls Google or Microsoft. Changes save automatically and apply to newly started translations. **AI multi-paragraph translation** remains a separate option and is off by default.
+
 Results are displayed only after the complete array passes count, type, and nonempty checks. Interfaces with item IDs also require unique, complete IDs. Broken responses are rejected as a whole and recovered individually within the remaining timeout. Failed recovery preserves the original text and shows a failure state; invalid results are never cached. Fewer requests do not reduce character-based billing.
 
 <details class="guide-details">

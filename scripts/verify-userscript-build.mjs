@@ -22,7 +22,10 @@ const artifactBytes = Buffer.byteLength(source);
 // 实测与重现步骤见 docs/reports/google-batching-backoff-20261010/。
 // 原生数组完整校验、同预算逐段恢复、实体拒收与 AI 会话隔离另增加 6 KB 预算；
 // 同依赖独立基线 36952b0fe 与增量证据见 docs/reports/native-batch-translation-20261010/。
-const MAX_USERSCRIPT_BYTES = 1_985_000;
+// 原生合批独立开关及冻结策略增加 2,560 字节（0.1291%）：
+// 同依赖基线 e4932521f 为 1,982,807，候选为 1,985,367；预算最小增加 1 KB。
+// 增量与语言固定提交验证见 docs/reports/native-batch-setting-20261011/。
+const MAX_USERSCRIPT_BYTES = 1_986_000;
 const preludeStartMarker = '/* FluentRead userscript compatibility prelude:start */';
 const preludeEndMarker = '/* FluentRead userscript compatibility prelude:end */';
 const preludeStart = source.indexOf(preludeStartMarker);

@@ -53,6 +53,7 @@ const runtime = vi.hoisted(() => ({
         useCache: true,
         enableAIContext: false,
         enableAIMultiSegment: false,
+        nativeBatchTranslationEnabled: {} as Record<string, boolean>,
         display: 0,
         style: 0,
         longParagraphLineBreakEnabled: false,
@@ -510,6 +511,7 @@ describe("全文翻译可见性锚点", () => {
         runtime.config.useCache = true;
         runtime.config.enableAIContext = false;
         runtime.config.enableAIMultiSegment = false;
+        runtime.config.nativeBatchTranslationEnabled = {};
         runtime.config.display = 0;
         runtime.config.style = 0;
         runtime.config.longParagraphLineBreakEnabled = false;
@@ -2723,6 +2725,43 @@ describe("全文翻译可见性锚点", () => {
             expect(runtime.requestOptions[0]).not.toHaveProperty('aiMultiSegment');
         },
     );
+
+    it.each(['google', 'microsoft', 'deepL', 'azureTranslator', 'googleCloudTranslation'])(
+        '%s 原生关闭后不跨候选合批，AI 多段开启也不能绕过', async service => {
+            runtime.nativeBatchEnabled = true;
+            const session = {active: true, translationSlotCache: new Map()};
+            const snapshot = translationSnapshot({service, enableNativeBatch: false, enableAIMultiSegment: true});
+            await expect(Promise.all([
+                translateTextSlots(['First'], snapshot, undefined, undefined, session),
+                translateTextSlots(['Second'], snapshot, undefined, undefined, session),
+            ])).resolves.toEqual([['译:First'], ['译:Second']]);
+            expect(runtime.requests.mock.calls.map(([texts]) => texts)).toEqual([['First'], ['Second']]);
+            expect(runtime.requestOptions.every(options => options.enableNativeBatch === false && options.aiMultiSegment !== true)).toBe(true);
+        },
+    );
+    it('网页原生偏好按服务捕获且不改变既有会话的冻结快照', () => {
+        runtime.config.nativeBatchTranslationEnabled = {microsoft: false};
+        const first = captureFullPageTranslationConfig();
+        const alternate = captureFullPageTranslationConfig({service: 'google'});
+        runtime.config.nativeBatchTranslationEnabled.microsoft = true;
+        expect(first.enableNativeBatch).toBe(false);
+        expect(alternate.enableNativeBatch).toBe(true);
+        const next = captureFullPageTranslationConfig();
+        expect(next.enableNativeBatch).toBe(true);
+        expect(getTranslationInvocationIdentity(first)).not.toBe(getTranslationInvocationIdentity(next));
+        expect(getTranslationInvocationIdentity(translationSnapshot()))
+            .toBe(getTranslationInvocationIdentity(translationSnapshot({enableNativeBatch: true})));
+    });
+    it('同原文的已结算会话缓存按原生开关隔离，旧缺字段与 true 共用默认身份', async () => {
+        runtime.nativeBatchEnabled = true;
+        const session = {active: true, translationSlotCache: new Map(), requestSignal: new AbortController().signal};
+        await translateTextSlots(['Same'], translationSnapshot(), undefined, undefined, session);
+        await translateTextSlots(['Same'], translationSnapshot({enableNativeBatch: true}), undefined, undefined, session);
+        expect(runtime.requests).toHaveBeenCalledOnce();
+        await translateTextSlots(['Same'], translationSnapshot({enableNativeBatch: false}), undefined, undefined, session);
+        expect(runtime.requests).toHaveBeenCalledTimes(2);
+        expect(runtime.requestOptions[1]).toMatchObject({enableNativeBatch: false});
+    });
 
     it('默认原生能力经过全文 runtime drain 合并并将译文回填各自候选', async () => {
         runtime.nativeBatchEnabled = true;
@@ -7542,6 +7581,7 @@ describe("悬停重挂请求与 synthetic 提交回归", () => {
         runtime.config.useCache = true;
         runtime.config.enableAIContext = false;
         runtime.config.enableAIMultiSegment = false;
+        runtime.config.nativeBatchTranslationEnabled = {};
         runtime.config.display = 1;
         runtime.config.style = 0;
         runtime.config.fullPageTranslationMode = "viewport";

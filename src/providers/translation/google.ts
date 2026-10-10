@@ -2,7 +2,7 @@
  * @file src/providers/translation/google.ts
  *
  * 文件职责：适配无需用户密钥的 Google 浏览器批量接口与网页 RPC，在统一截止时间内合批、换线和冷却失败入口。
- * 主要内容：编码 translateHtml、translate_a/t 与带编号的 batchexecute 批次，严格校验结果数量与槽位，保护纯文本、换行及取消所有权；120 毫秒合并同语言请求，满批提前发送，通过共享 HTTP 队列暂停全部限流入口并按 Retry-After 单独探测恢复；按近期可靠性、延迟和在途负载动态排序，定期探索备用入口，保留非限流入口故障的独立冷却。为免费池提供不跨 owner 合批的数组传输入口。公开符号包括 parseGoogleBatchResponse、translateGoogleOwnerTexts、translateGoogleTexts、translateGoogleText、default:google。
+ * 主要内容：编码 translateHtml、translate_a/t 与带编号的 batchexecute 批次，严格校验结果数量与槽位，保护纯文本、换行及取消所有权；按冻结偏好选择 120 毫秒合并同语言请求或直接逐条传输，满批提前发送，通过共享 HTTP 队列暂停全部限流入口并按 Retry-After 单独探测恢复；按近期可靠性、延迟和在途负载动态排序，定期探索备用入口，保留非限流入口故障的独立冷却。为免费池提供不跨 owner 合批的数组传输入口。公开符号包括 parseGoogleBatchResponse、translateGoogleOwnerTexts、translateGoogleTexts、translateGoogleText、default:google。
  * 模块边界：本文件位于 provider 适配层，只把统一翻译请求转换为外部或浏览器服务协议；不管理页面 DOM、UI 生命周期或配置持久化，缓存、去重和超时总预算由 translation broker 统一协调。
  */
 
@@ -19,7 +19,9 @@ import {
     createRuntimeAbortContext,
     runtimeFetch,
 } from '@/src/platform/http/runtime';
-import type {TranslationProviderRequest} from '@/src/services/translation/requestSnapshot';
+import {getTranslationProviderConfig, type TranslationProviderRequest} from '@/src/services/translation/requestSnapshot';
+import {isNativeTranslationBatchEnabled} from '@/src/core/config/nativeBatch';
+import {config} from '@/src/services/config/store';
 import {createGoogleRequestGate, googleRequestDeadlineError} from './googleRequestGate';
 import {isNativeBatchResponseError, NativeBatchResponseError} from '@/src/core/translation/nativeBatch';
 import {hasTranslationContent} from '@/src/core/translation/result';
@@ -552,7 +554,8 @@ export function translateGoogleOwnerTexts(
 }
 
 export async function translateGoogleTexts(texts: readonly string[], fromLang: string, toLang: string, signal?: AbortSignal,
-    requestTimeoutMs?: number): Promise<string[]> {
+    requestTimeoutMs?: number, enableNativeBatch = true): Promise<string[]> {
+    texts = [...texts];
     const controller = new AbortController();
     const abortCallbacks = new Set<VoidFunction>();
     const cancelTasks = () => { for (const callback of [...abortCallbacks]) callback(); };
@@ -569,6 +572,16 @@ export async function translateGoogleTexts(texts: readonly string[], fromLang: s
     if (signal?.aborted) onAbort();
     else signal?.addEventListener('abort', onAbort, {once: true});
     try {
+        if (!enableNativeBatch) {
+            // 共享 HTTP 限流仍有效；关闭收集窗后每段独立发送，完整结果才交给调用方。
+            const translated: string[] = [];
+            for (const text of texts) {
+                if (controller.signal.aborted) throw abortErrorFromSignal(controller.signal);
+                translated.push(!hasTranslationContent(text) ? text
+                    : (await executeGoogleTexts([text], googleLanguage(fromLang), googleLanguage(toLang), controller.signal, deadlineAt))[0]!);
+            }
+            return translated;
+        }
         const requests = texts.map(text => enqueueGoogleText(text, googleLanguage(fromLang), googleLanguage(toLang),
             controller.signal, subscribeAbort, deadlineAt));
         // 显式大数组无需额外等收集窗；最后一个未满批次也立即进入有序 HTTP 队列。
@@ -584,14 +597,18 @@ export async function translateGoogleTexts(texts: readonly string[], fromLang: s
     }
 }
 
-export async function translateGoogleText(text: string, fromLang: string, toLang: string, signal?: AbortSignal): Promise<string> {
-    return (await translateGoogleTexts([text], fromLang, toLang, signal))[0]!;
+export async function translateGoogleText(text: string, fromLang: string, toLang: string, signal?: AbortSignal,
+    enableNativeBatch = true, requestTimeoutMs?: number): Promise<string> {
+    return (await translateGoogleTexts([text], fromLang, toLang, signal, requestTimeoutMs, enableNativeBatch))[0]!;
 }
 
 async function google(message: TranslationProviderRequest) {
     const {sourceLanguage, targetLanguage} = getTranslationLanguages(message);
+    const current = getTranslationProviderConfig(message, config);
+    const enableNativeBatch = message.enableNativeBatch
+        ?? isNativeTranslationBatchEnabled('google', current.nativeBatchTranslationEnabled);
     const texts = typeof message.origin === 'string' ? [message.origin] : message.origin;
-    const results = await translateGoogleTexts(texts, sourceLanguage, targetLanguage, message.abortSignal, message.requestTimeoutMs);
+    const results = await translateGoogleTexts(texts, sourceLanguage, targetLanguage, message.abortSignal, message.requestTimeoutMs, enableNativeBatch);
     return typeof message.origin === 'string' ? results[0]! : results;
 }
 

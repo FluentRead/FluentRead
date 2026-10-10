@@ -1,7 +1,7 @@
 <!--
  * @file src/features/settings/ui/services/FreeTranslationSettings.vue
  * 文件职责：编辑免费翻译服务的启停、选择策略、邮箱与等待时间。
- * 主要内容：优先展示并标注推荐的 B站翻译，展示全部服务的启停、连接结果、耗时与分流参考；仅活跃分流视图合并读取后台快照，切换时取消等待和旧事件，邮箱草稿只在所属配置提交。
+ * 主要内容：按配置策略展示全部服务的启停、连接结果、耗时与分流参考，B站翻译仅标注免费；仅活跃分流视图合并读取后台快照，切换时取消等待和旧事件，邮箱草稿只在所属配置提交。
  * 模块边界：只修改传入的配置，由设置页统一持久化；只读取不含凭据的后台权重快照，不请求翻译。
  -->
 <template>
@@ -25,7 +25,7 @@
               <span v-if="isSequential" class="provider-position" aria-hidden="true">{{ isEnabled(provider.id) ? order.indexOf(provider.id) + 1 : '—' }}</span>
               <ServiceIcon :service="provider.id" :label="translateLegacy(provider.label)" size="small" />
               <div class="provider-copy">
-                <div class="provider-name"><el-tooltip :content="`${translateLegacy(provider.label)} · ${translateLegacy(provider.description)}`"><strong tabindex="0">{{ translateLegacy(provider.label) }}</strong></el-tooltip><ServiceNatureBadge :service="provider.id" /><span v-if="provider.id === 'bilibiliFree'" class="provider-recommended" data-provider-recommended="bilibiliFree">{{ translateLegacy('免费') }} · {{ translateLegacy('推荐') }}</span></div>
+                <div class="provider-name"><el-tooltip :content="`${translateLegacy(provider.label)} · ${translateLegacy(provider.description)}`"><strong tabindex="0">{{ translateLegacy(provider.label) }}</strong></el-tooltip><ServiceNatureBadge :service="provider.id" /></div>
                 <div class="provider-result">
                   <span class="provider-state" :class="`is-${providerState(provider.id)}`" :data-provider-state="provider.id" :data-provider-check-status="providerState(provider.id)" :title="providerStateTitle(provider.id)" role="status">{{ providerStateLabel(provider.id) }}</span>
                   <output v-if="providerDuration(provider.id) !== undefined" class="provider-duration" :data-provider-duration="provider.id" :aria-label="t('settings.services.freeWeights.testDuration', {duration: providerDuration(provider.id)})">{{ providerDuration(provider.id) }} ms</output>
@@ -257,7 +257,6 @@ onBeforeUnmount(() => {mounted.value = false})
 .provider-row { display: flex; align-items: center; gap: 8px; }
 .provider-position { width: 14px; flex: none; color: var(--el-text-color-secondary); font-variant-numeric: tabular-nums; }
 .provider-copy { display: flex; min-width: 0; flex: 1; flex-direction: column; gap: 5px; }
-.provider-recommended { flex-shrink: 0; padding: 2px 6px; border-radius: 4px; color: var(--el-color-primary); background: var(--el-color-primary-light-9); font-size: 11px; font-weight: 600; }
 .provider-name { display: flex; align-items: center; gap: 6px; min-width: 0; }
 .provider-copy strong { min-width: 0; overflow: hidden; font-size: 12px; text-overflow: ellipsis; white-space: nowrap; }
 .provider-result { display: flex; align-items: center; gap: 4px 8px; min-height: 19px; }

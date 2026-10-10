@@ -1,7 +1,7 @@
 /**
  * @file src/providers/translation/free-translation.ts
  * 文件职责：按冻结的用户设置编排免费翻译，并接入有界请求、取消和跨段冷却。
- * 主要内容：装配免密钥服务、冻结匿名请求配置与批量预算，生成匿名连接身份；仅为全部启用微软/谷歌的高槽批次构造 owner 内有界小组，混合或非原生池保留逐槽 attempt；复用原槽协议及原生数组传输，逐槽验证质量并保留空白；在多线路请求中跳过 Apertium 已确认不支持的语言方向，为连接检查提供不换线的单服务调用，统一拒绝原文回显和错语种，把翻译线路的结果与耗时上报给调用方观察器。
+ * 主要内容：装配免密钥服务、冻结匿名请求配置与批量预算，生成匿名连接身份；仅为全部启用且开启合批的微软/谷歌高槽批次构造 owner 内有界小组，逐槽 Google 路径也尊重冻结的子服务偏好，混合或非原生池保留逐槽 attempt；复用原槽协议及原生数组传输，逐槽验证质量并保留空白；在多线路请求中跳过 Apertium 已确认不支持的语言方向，为连接检查提供不换线的单服务调用，统一拒绝原文回显和错语种，把翻译线路的结果与耗时上报给调用方观察器。
  * 模块边界：只装配已有 provider；健康状态与并发调度由 freeFallback 服务持有。
  */
 import {sha256Hex} from '@/src/shared/function/sha256';
@@ -14,6 +14,7 @@ import {translateOfficialFreeWebProvider} from './free-official-web';
 import myMemory from './mymemory';
 import {translateBilibiliFree} from './bilibili-free';
 import {services} from '@/src/core/config/catalog';
+import {isNativeTranslationBatchEnabled} from '@/src/core/config/nativeBatch';
 import {urls} from '@/src/core/config/constants';
 import {DEFAULT_DEEPLX_ENDPOINT} from '@/src/core/config/deeplx';
 import {
@@ -55,7 +56,8 @@ const providerTranslators: Record<FreeProviderId, (request: TranslationProviderR
         const results = await translateMicrosoftTexts([request.origin], request.sourceLanguage!, request.targetLanguage!, request.abortSignal);
         return results[0];
     },
-    google: request => translateGoogleText(request.origin, request.sourceLanguage!, request.targetLanguage!, request.abortSignal),
+    google: request => translateGoogleText(request.origin, request.sourceLanguage!, request.targetLanguage!, request.abortSignal,
+        isNativeTranslationBatchEnabled(services.google, getTranslationProviderConfig(request, config).nativeBatchTranslationEnabled), request.requestTimeoutMs),
     myMemory,
     bilibiliFree: translateBilibiliFree,
     transmart: request => translateFreeWebText('transmart', request.origin, request.sourceLanguage!, request.targetLanguage!, request.abortSignal),
@@ -246,10 +248,12 @@ function groupFreeSlots(texts: readonly string[]): FreeSlotGroup[] {
 
 async function translateFreeBatch(texts: string[], message: PreparedRequest): Promise<string[]> {
     if (message.abortSignal?.aborted) throw abortErrorFromSignal(message.abortSignal);
-    const enabled = normalizeFreeTranslationOrder(getTranslationProviderConfig(message, config).freeTranslationOrder);
+    const current = getTranslationProviderConfig(message, config);
+    const enabled = normalizeFreeTranslationOrder(current.freeTranslationOrder);
     // 按冻结的完整启用池决定；不能借健康/方向过滤把混合池提升为原生分组池。
     const grouped = texts.length > FREE_TRANSLATION_GROUP_MAX_SLOTS
-        && enabled.every(id => id === 'microsoft' || id === 'google');
+        && enabled.every(id => (id === 'microsoft' || id === 'google')
+            && isNativeTranslationBatchEnabled(id, current.nativeBatchTranslationEnabled));
     const translations = [...texts];
     const groups = grouped ? groupFreeSlots(texts)
         : texts.map((source, index) => ({indexes: [index], sources: [source], characters: 0}));

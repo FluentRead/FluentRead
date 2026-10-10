@@ -1,7 +1,7 @@
 /**
  * @file src/core/config/model.ts
  *
- * 文件职责：定义 FluentRead 完整配置模型、默认值及各项设置的合法范围，是配置读取、保存、迁移和 UI 绑定共同依赖的领域契约。
+ * 文件职责：定义 FluentRead 完整配置模型、默认值及各项设置的合法范围，包括默认开启并按服务独立保存的原生翻译合批偏好，是配置读取、保存、迁移和 UI 绑定共同依赖的领域契约。
  * 主要内容：支持单图选择本地识别引擎，包含正文/全部节点识别范围，保留各功能独立服务，并将所有功能服务的空值解释为继承网页默认；统一中文简繁标识及历史配置别名，并保存常用服务顺序，保存默认空的 Origin/Referer 域名移除名单，包含 Config 接口、字幕和翻译模式类型、延迟与字号范围、默认 API 地址及多项功能开关，使新增配置项在一个位置获得类型和初始语义；归一化时以迭代克隆保留深层数据和共享引用，安全迁移任意自有凭据键，升级历史默认提示词，只迁移已登记模型编号，并在线性目录遍历中保护自定义服务的当前模型和 Thinking 偏好。 可核对的公开符号包括 DeepSeekApiType、DeepSeekThinkingMode、VideoSubtitleDisplayMode、FullPageTranslationMode、DEFAULT_VIDEO_SUBTITLE_FONT_SIZE、DEFAULT_NEW_API_URL、DEFAULT_MOUSE_HOVER_TRANSLATION_DELAY。
  * 模块边界：本文件属于 core 领域层，只定义规则、类型与纯转换；不直接读写浏览器存储、不发起网络请求、不挂载 Vue/WXT 入口，持久化、协议调用和界面编排分别由 services、providers 与 features 承担。
  */
@@ -192,6 +192,7 @@ import {
     type ModelVisionOverrides,
 } from './vision';
 import {apiKeysToToken, normalizeApiKeys} from './apiKeys';
+import {DEFAULT_NATIVE_BATCH_TRANSLATION_ENABLED, normalizeNativeBatchTranslationEnabled} from './nativeBatch';
 
 export * from './scheduling';
 export * from './pageTranslation';
@@ -419,6 +420,7 @@ export class Config {
     documentGlossaryIds: string[] | null; // 文档术语选择；null 跟随全局，空数组停用
     videoGlossaryIds: string[] | null; // 字幕术语选择；null 跟随全局，空数组停用
     enableAIMultiSegment: boolean; // 是否把相邻全文段落合并为一次 AI 翻译请求
+    nativeBatchTranslationEnabled: Record<string, boolean>; // 原生多文本服务的合批开关，按服务独立保存且默认开启
     informationHighlight: InformationHighlightPreferences; // 信息高亮偏好；当前页面开启状态不持久化
     bilingualSentenceHighlightEnabled: boolean; // 是否在双语翻译中同步高亮原文与译文
     bilingualSentenceHighlightProfiles: SentenceHighlightProfile[]; // 命名的逐句高亮快照，包含 CSS
@@ -622,6 +624,7 @@ export class Config {
         this.documentGlossaryIds = null;
         this.videoGlossaryIds = null;
         this.enableAIMultiSegment = false; // 默认逐段请求，由用户按需开启 AI 多段翻译
+        this.nativeBatchTranslationEnabled = {...DEFAULT_NATIVE_BATCH_TRANSLATION_ENABLED};
         this.informationHighlight = {...DEFAULT_INFORMATION_HIGHLIGHT_PREFERENCES};
         this.bilingualSentenceHighlightEnabled = false; // 默认关闭双语逐句高亮，避免改变现有网页视觉
         this.bilingualSentenceHighlightStyle = DEFAULT_SENTENCE_HIGHLIGHT_STYLE;
@@ -1064,6 +1067,7 @@ export function normalizeConfig(value: unknown): Config {
             : false;
     }
     normalized.informationHighlight = normalizeInformationHighlightPreferences(source.informationHighlight);
+    normalized.nativeBatchTranslationEnabled = normalizeNativeBatchTranslationEnabled(source.nativeBatchTranslationEnabled);
     normalized.bilingualSentenceHighlightEnabled = source.bilingualSentenceHighlightEnabled === true;
     normalized.bilingualSentenceHighlightStyle = normalizeSentenceHighlightStyle(source.bilingualSentenceHighlightStyle);
     normalized.bilingualSentenceHighlightAppearance = normalizeSentenceHighlightAppearance(source.bilingualSentenceHighlightAppearance);

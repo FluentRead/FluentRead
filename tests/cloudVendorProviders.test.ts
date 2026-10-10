@@ -199,6 +199,18 @@ const nativeCloudProviders = [
 ] as const;
 
 describe.each(nativeCloudProviders)('$label 原生数组完整性', ({translate, bodySources, success}) => {
+    it('关闭服务合批后显式数组发送单项 HTTP，冻结覆盖不被新配置重新解释', async () => {
+        config.nativeBatchTranslationEnabled = {googleCloudTranslation: false, azureTranslator: false};
+        fetchMock.mockImplementation(async (_url, init) => json(success(bodySources(JSON.parse(String(init?.body)))
+            .map((source: string) => `译:${source}`))));
+        await expect(translate({origin: ['first', '', 'second']})).resolves.toEqual(['译:first', '', '译:second']);
+        expect(fetchMock.mock.calls.map(([, init]) => bodySources(JSON.parse(String(init?.body)))))
+            .toEqual([['first'], ['second']]);
+        fetchMock.mockClear();
+        await expect(translate({origin: ['first', 'second'], enableNativeBatch: true})).resolves.toEqual(['译:first', '译:second']);
+        expect(fetchMock).toHaveBeenCalledOnce();
+    });
+
     it('一次请求保留重复源槽、字面 HTML 与内部换行，空白槽不上传', async () => {
         const origins = ['<b>Hello & &lt;</b>\nNext', 'duplicate', '', ' \r\n', 'duplicate'];
         respond(success(['<b>你好 & &lt;</b>\n下一行', '重复一', '重复二']));

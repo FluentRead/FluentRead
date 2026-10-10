@@ -12,6 +12,20 @@ describe('shared Microsoft translation transport', () => {
         expect(transport).not.toHaveBeenCalled();
     });
 
+    it('关闭合批后逐条 HTTP，最终空译文拒绝完整请求', async () => {
+        const transport = vi.fn(async (_url, init) => response(JSON.parse(String(init?.body))
+            .map((source: string) => ({translations: [{text: `译:${source}`}]}))));
+        await expect(translateMicrosoftTextsWithTransport(transport, ['first', '', 'second'], 'en', 'zh-Hans', undefined, false))
+            .resolves.toEqual(['译:first', '', '译:second']);
+        expect(transport.mock.calls.map(([, init]) => JSON.parse(String(init?.body)))).toEqual([['first'], ['second']]);
+        transport.mockClear();
+        transport.mockResolvedValueOnce(response([{translations: [{text: '有效译文'}]}]))
+            .mockResolvedValueOnce(response([{translations: [{text: ''}]}]));
+        await expect(translateMicrosoftTextsWithTransport(transport, ['first', 'second', 'third'], 'en', 'zh-Hans', undefined, false))
+            .rejects.toMatchObject({code: 'NATIVE_BATCH_RESPONSE_INVALID'});
+        expect(transport).toHaveBeenCalledTimes(2);
+    });
+
     it('escapes plain text, forwards cancellation, and restores every HTML entity in the response', async () => {
         const signal = new AbortController().signal;
         const transport = vi.fn(async () => response([{translations: [{text: '&amp;&lt;&gt;&quot;&#39;&#x27;'}]}]));

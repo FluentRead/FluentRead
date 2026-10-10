@@ -39,7 +39,7 @@ describe('低干扰悬浮 UI', () => {
     expect(toggleTranslation).toContain('?.blur()');
     expect(toggleTranslation).not.toContain('isTranslating.value =');
     expect(floatingBall).not.toContain('showShortcutTooltip');
-    expect(floatingBall).toContain('defineExpose({ toggleTranslation, setTranslationState, setPosition })');
+    expect(floatingBall).toContain('defineExpose({ toggleTranslation, setTranslationState, setTranslationStatus, setPosition })');
     expect(handleDocumentKeydown).toContain("querySelector<HTMLElement>(':focus')?.blur()");
     expect(handleDocumentKeydown).toContain('isExpanded.value = false');
   });

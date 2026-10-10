@@ -224,6 +224,131 @@ describe('audit49B real browser-stream clients', () => {
 
 describe('audit49B actual client SFC interactions', () => {
     const panelProps = () => ({selection: {text: 'First source.', context: '', sentence: 'First source.'}, preferences: {...DEFAULT_HARNESS_PREFERENCES, enabled: true}, active: true, targetLanguage: 'zh-Hans', sourceLanguage: 'en', vocabularyEnabled: false, privateContext: false, animations: false});
+    const sentenceTable = (rows: string) => `| Text | POS | Role | Meaning |\n| --- | --- | --- | --- |\n${rows}`;
+    const sentenceRows = '| Cats | noun | subject | 猫 |\n| chase | verb | predicate | 追赶 |\n| mice | noun | object | 老鼠 |';
+    it('puts the first grounded structure and its adjacent heading before the explanation without duplicating either', async () => {
+        const text = `### 主干\n主干说明保留。\n\n| Term | Meaning |\n| --- | --- |\n| cats | 猫 |\n\n### 结构分析\n${sentenceTable(sentenceRows)}\n\n### 关键点\n关键说明保留。`;
+        const {host} = mount(ReadingAnswer, {sourceText: 'Cats chase mice.', text}); await flush();
+        const answer = host.querySelector('[data-reading-answer]')!;
+        expect([...answer.querySelectorAll('h3, h4')].map(node => node.textContent)).toEqual(['结构分析', '主干', '关键点']);
+        expect(answer.querySelectorAll('.fr-sentence-analysis')).toHaveLength(1);
+        expect(answer.querySelectorAll('table')).toHaveLength(1);
+        expect(answer.querySelector('table')?.textContent).toContain('TermMeaningcats猫');
+        const visibleText = answer.textContent!;
+        expect(visibleText.indexOf('Cats')).toBeLessThan(visibleText.indexOf('主干说明保留。'));
+        expect(visibleText.indexOf('主干说明保留。')).toBeLessThan(visibleText.indexOf('Term'));
+        expect(visibleText.indexOf('Term')).toBeLessThan(visibleText.indexOf('关键说明保留。'));
+    });
+    it('adds a structure title for a grounded table without an adjacent heading and keeps its preceding paragraph', async () => {
+        const {host} = mount(ReadingAnswer, {sourceText: 'Cats chase mice.', text: `先读主干说明。\n\n${sentenceTable(sentenceRows)}\n\n后续说明。`}); await flush();
+        const answer = host.querySelector('[data-reading-answer]')!;
+        expect([...answer.querySelectorAll('h3, h4')].map(node => node.textContent)).toEqual(['结构分析']);
+        expect(answer.querySelectorAll('.fr-sentence-analysis')).toHaveLength(1);
+        expect(answer.querySelectorAll('table')).toHaveLength(0);
+        expect(answer.textContent!.indexOf('Cats')).toBeLessThan(answer.textContent!.indexOf('先读主干说明。'));
+        expect(answer.textContent!.indexOf('先读主干说明。')).toBeLessThan(answer.textContent!.indexOf('后续说明。'));
+    });
+    it.each([
+        ['list', '- 主语对应 Cats。\n- 谓语对应 chase。', ['结构分析', '主干', '成分', '关键点'], '主语对应 Cats。'],
+        ['nested heading', '#### 主语补充\nCats 表示动作执行者。', ['结构分析', '主干', '成分', '主语补充', '关键点'], '主语补充'],
+    ])('keeps the original section heading with its remaining %s while promoting only the structure', async (_kind, continuation, headings, nextText) => {
+        const text = `### 主干\n主干原有解释。\n\n### 成分\n${sentenceTable(sentenceRows)}\n\n${continuation}\n\n### 关键点\n关键原有解释。`;
+        const {host} = mount(ReadingAnswer, {sourceText: 'Cats chase mice.', text}); await flush();
+        const answer = host.querySelector('[data-reading-answer]')!;
+        expect(answer.firstElementChild?.classList.contains('fr-reading-structure')).toBe(true);
+        expect(answer.querySelector('.fr-reading-structure h3')?.textContent).toBe('结构分析');
+        expect([...answer.querySelectorAll('h3, h4')].map(node => node.textContent)).toEqual(headings);
+        const originalHeading = [...answer.children].find(node => node.textContent === '成分')!;
+        expect(originalHeading.nextElementSibling?.textContent).toContain(nextText);
+        expect(answer.querySelectorAll('.fr-sentence-analysis')).toHaveLength(1);
+        expect(answer.querySelector('table')).toBeNull();
+        expect(answer.textContent!.indexOf('主干原有解释。')).toBeLessThan(answer.textContent!.indexOf('成分'));
+        expect(answer.textContent!.indexOf('成分')).toBeLessThan(answer.textContent!.indexOf('关键原有解释。'));
+    });
+    it.each([
+        ['ordinary', '| Term | Meaning |\n| --- | --- |\n| cats | 猫 |'],
+        ['mismatched source', sentenceTable('| birds | noun | subject | 鸟 |')],
+        ['incomplete streamed row', sentenceTable('| Cats | noun | subject | 猫 |\n| chase | verb |')],
+        ['reordered fragments', sentenceTable('| mice | noun | object | 老鼠 |\n| Cats | noun | subject | 猫 |')],
+    ])('retains the original answer order for a %s table that cannot anchor to the source', async (_kind, table) => {
+        const {host} = mount(ReadingAnswer, {sourceText: 'Cats chase mice.', text: `### 主干\n原始主干说明。\n\n### 结构分析\n${table}\n\n### 关键点\n原始关键说明。`}); await flush();
+        const answer = host.querySelector('[data-reading-answer]')!;
+        expect([...answer.querySelectorAll('h3, h4')].map(node => node.textContent)).toEqual(['主干', '结构分析', '关键点']);
+        expect(answer.querySelector('.fr-sentence-analysis')).toBeNull();
+        expect(answer.querySelectorAll('table')).toHaveLength(1);
+        expect(answer.textContent!.indexOf('原始主干说明。')).toBeLessThan(answer.textContent!.indexOf('结构分析'));
+        expect(answer.textContent!.indexOf('结构分析')).toBeLessThan(answer.textContent!.indexOf('原始关键说明。'));
+    });
+    it('keeps a selected structure fragment mounted while streamed complete rows and preceding explanation blocks grow', async () => {
+        const firstRows = '| Cats | noun | subject | 猫 |\n| chase | verb | predicate | 追赶 |';
+        const {host, props} = mount(ReadingAnswer, {sourceText: 'Cats chase mice.', text: `### 主干\n先读主干。\n\n### 结构分析\n${sentenceTable(firstRows)}`}); await flush();
+        const selected = host.querySelectorAll<HTMLButtonElement>('.fr-sentence-tokens button')[1];
+        selected.click(); await flush();
+        expect(selected.getAttribute('aria-pressed')).toBe('true');
+        props.text = `### 主干\n先读主干。\n\n### 成分\n- 正文中的新增解释。\n\n### 结构分析\n${sentenceTable(sentenceRows.replace('追赶', '主动追赶'))}\n\n### 关键点\n正在生成的新说明。`;
+        await flush();
+        expect(host.querySelectorAll<HTMLButtonElement>('.fr-sentence-tokens button')[1]).toBe(selected);
+        expect(selected.getAttribute('aria-pressed')).toBe('true');
+        expect(selected.getAttribute('tabindex')).toBe('0');
+        expect(host.querySelector('.fr-sentence-detail-heading strong')?.textContent).toBe('chase');
+        expect(host.querySelector('.fr-sentence-meaning')?.textContent).toBe('主动追赶');
+        expect([...host.querySelectorAll('h3, h4')].map(node => node.textContent)).toEqual(['结构分析', '主干', '成分', '关键点']);
+    });
+    it('shows one unknown label while keeping explicit custom word classes and concise role descriptions', async () => {
+        const rows = '| Cats | unknown | unknown | 猫 |\n| chase | custom-pos | 时间状语，修饰动作 | 追赶 |\n| mice | custom-pos | custom-pos | 老鼠 |';
+        const {host} = mount(ReadingAnswer, {sourceText: 'Cats chase mice.', text: sentenceTable(rows)}); await flush();
+        expect([...host.querySelectorAll('.fr-sentence-token-meta')].map(node => node.textContent)).toEqual(['其他', '时间状语 · custom-pos', 'custom-pos']);
+        expect(host.textContent).not.toContain('其他 · 其他');
+        host.querySelectorAll<HTMLButtonElement>('.fr-sentence-tokens button')[1].click(); await flush();
+        expect(host.querySelector('.fr-sentence-role')?.textContent).toContain('时间状语，修饰动作');
+        expect(host.querySelector('.fr-sentence-detail-heading')?.textContent).toContain('custom-pos');
+    });
+    it('filters generic unknown dimensions before localization and translates the single fallback label', async () => {
+        const i18n = await import('@/src/ui/i18n');
+        const original = i18n.useUiI18n();
+        vi.spyOn(i18n, 'useUiI18n').mockImplementation(() => ({...original, translateLegacy: value => value === '其他' ? 'Autre' : value === '主语' ? 'Sujet' : value}));
+        const rows = '| Cats | unknown | subject | 猫 |\n| chase | unknown | unknown | 追赶 |\n| mice | other | 其他 | 老鼠 |';
+        const {host} = mount(ReadingAnswer, {sourceText: 'Cats chase mice.', text: sentenceTable(rows)}); await flush();
+        expect([...host.querySelectorAll('.fr-sentence-token-meta')].map(node => node.textContent)).toEqual(['Sujet', 'Autre', 'Autre']);
+        expect(host.querySelector('.fr-sentence-detail-heading span')?.textContent).toBe('Autre');
+        expect(host.textContent).not.toContain('Sujet · Autre');
+        expect(host.textContent).not.toContain('Autre · Autre');
+    });
+    it('keeps a long unannotated source tail outside the annotation unit and reconstructs the entire source verbatim', async () => {
+        const remaining = 'chase small animals through the garden while the reader watches a sentence that is only partly annotated. '.repeat(3);
+        const source = `Cats, ${remaining}`;
+        const {host} = mount(ReadingAnswer, {sourceText: source, text: sentenceTable('| Cats | noun | subject | 猫 |')}); await flush();
+        const tokens = host.querySelector('.fr-sentence-tokens')!;
+        const unit = tokens.querySelector('.fr-sentence-unit')!;
+        expect(tokens.querySelectorAll('.fr-sentence-unit')).toHaveLength(1);
+        expect(unit.querySelector('.fr-sentence-gap')?.textContent).toBe(', ');
+        expect(unit.textContent).not.toContain('chase');
+        const prose = [...tokens.querySelectorAll('.fr-sentence-gap')].find(node => node.textContent === remaining)!;
+        expect(prose).toBeDefined();
+        expect(prose.parentElement).toBe(tokens);
+        const sourceCopy = tokens.cloneNode(true) as Element;
+        sourceCopy.querySelectorAll('.fr-sentence-token-meta').forEach(node => node.remove());
+        expect(sourceCopy.textContent).toBe(source);
+    });
+    it('keeps punctuation with the preceding structure unit and supports keyboard navigation through the wrapped buttons', async () => {
+        const source = 'When ready, Cats chase mice.';
+        const rows = '| When ready | phrase | 时间状语 | 准备好时 |\n' + sentenceRows;
+        const {host} = mount(ReadingAnswer, {sourceText: source, text: sentenceTable(rows)}); await flush();
+        const units = host.querySelectorAll('.fr-sentence-unit');
+        expect(units).toHaveLength(4);
+        expect(units[0].textContent).toContain(',');
+        expect(units[0].textContent).not.toContain('Cats');
+        expect(units[3].textContent).toContain('.');
+        const buttons = host.querySelectorAll<HTMLButtonElement>('.fr-sentence-tokens button');
+        const focus = vi.spyOn(buttons[3], 'focus');
+        const end = new Event('keydown', {bubbles: true, cancelable: true});
+        Object.defineProperty(end, 'key', {value: 'End'});
+        buttons[0].dispatchEvent(end); await flush();
+        expect(end.defaultPrevented).toBe(true);
+        expect(buttons[3].getAttribute('aria-pressed')).toBe('true');
+        expect(buttons[3].getAttribute('tabindex')).toBe('0');
+        expect(focus).toHaveBeenCalledWith({preventScroll: true});
+    });
     it('starts the same learning action for a new selection without reusing the old turn or draft question', async () => {
         const {host, props} = mount(ReadingPanel, panelProps()); await flush(); const first = external.ports[0];
         const old = first.postMessage.mock.calls[0][0]; first.onMessage.fire({type: 'result', requestId: old.requestId, response: {...result, turnId: 'old-turn', sessionId: 'old-session'}}); await flush();

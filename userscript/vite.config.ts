@@ -49,9 +49,8 @@ function installedVersion(name: string): string {
 const userscriptResourceCommit = '184a3d74f61b9d2a8d47080787f7e0180b98414d';
 // 语言文件的内容哈希来自合并后的消息目录，固定到首次包含这些文件的提交。
 const userscriptLanguageResourceCommit = 'cf1941d43f406bb5118952066da5f9399400dd37';
-const iconMetaUrl = greasyForkSource
-    ? `https://cdn.jsdelivr.net/gh/FluentRead/FluentRead@${userscriptResourceCommit}/public/icon/64.png`
-    : iconDataUrl;
+const pinnedIconUrl = `https://cdn.jsdelivr.net/gh/FluentRead/FluentRead@${userscriptResourceCommit}/public/icon/64.png`;
+const iconMetaUrl = greasyForkSource ? pinnedIconUrl : iconDataUrl;
 const uiRequires = [
     `https://cdn.jsdelivr.net/npm/vue@${installedVersion('vue')}/dist/vue.global.prod.js`,
     `https://cdn.jsdelivr.net/gh/FluentRead/FluentRead@${userscriptResourceCommit}/userscript/vueElementPlusBridge.v1.js`,
@@ -63,7 +62,10 @@ const userscriptRequires = bundleLibraries
     ? []
     : [...uiRequires, 'https://cdn.jsdelivr.net/npm/pako@2.1.0/dist/pako_inflate.min.js',
         ...(greasyForkSource ? [vendorUrl!, dataUrl!] : [])];
-const metadata = createUserscriptMetadata({version: packageJson.userscriptVersion, iconDataUrl: iconMetaUrl, requires: userscriptRequires});
+// 标准版安装时已缓存同源固定依赖，管理器列表图标复用同一提交的图片，避免重复嵌入 PNG。
+// 页面工具仍由 bootstrap 内嵌图片；无远程依赖的 standalone 连元数据图标也保持内嵌。
+const metadata = createUserscriptMetadata({version: packageJson.userscriptVersion,
+    iconDataUrl: bundleLibraries ? iconDataUrl : pinnedIconUrl, requires: userscriptRequires});
 // 界面词典只按 key 查询，稳定排序把相似 key 聚在一起，提高静态 JSON 压缩率；数组顺序保持原样。
 function serializeUiMessages(value: unknown): string {
     return JSON.stringify(value, (_key, item) => item && typeof item === 'object' && !Array.isArray(item)

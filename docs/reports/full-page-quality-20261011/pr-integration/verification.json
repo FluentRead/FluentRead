@@ -1,0 +1,58 @@
+{
+  "baseCommit": "86a7ab6f29e8567394a70f0c11a4b8a620295531",
+  "sourceCommit": "fa0cfd00e3fc7a626b0a1d6b563a56ad6afcbd34",
+  "sourceTrees": {
+    "src": "4134d5c66a7e17ab93068d858619f2ec75d0db7d",
+    "tests": "dd64cc7d6d5c5571f003de33eb8a0e476d1a540b",
+    "userscript": "2aceacdabaf1b4b11fd5d4a409bfffceb039d79b"
+  },
+  "scope": "Before PR upload: latest main integration; targeted tests and production builds; controlled Edge browser responses",
+  "targetedTests": {
+    "files": 19,
+    "tests": 749,
+    "passed": true
+  },
+  "builds": {
+    "compile": "passed",
+    "chrome": "passed",
+    "firefox": "passed",
+    "userscript": "passed",
+    "userscriptVerifier": "passed",
+    "extensionManifests": "passed",
+    "docs": "passed"
+  },
+  "testAudit": {
+    "files": 638,
+    "declaredCases": 10407,
+    "passed": true,
+    "fullSuiteExecuted": false
+  },
+  "userscript": {
+    "bytes": 1987909,
+    "budget": 1994000,
+    "budgetChangedByThisPR": false,
+    "languageResourceCommit": "cf1941d43f406bb5118952066da5f9399400dd37"
+  },
+  "artifactsSha256": {
+    ".output/chrome-mv3/manifest.json": "fd80314b160701ed5500e584e1373f5eed44a19acdc6f8b76f9a12c1565970d8",
+    ".output/firefox-mv2/manifest.json": "2f4d6388a66e23f052933d6a4f972e3f65e841806a20f6b1d274fcf14d21a3ef",
+    ".output/userscript/fluent-read.user.js": "afae41d46d30d16dcf83c6f64798c8dc37da8d1786d9a2e847bb8b3d82dd9aff"
+  },
+  "browser": {
+    "statusCases": 12,
+    "statusPassed": true,
+    "launchMode": "macos-background-cdp",
+    "focusPolicy": "launchservices-no-foreground",
+    "browserFrontmost": false,
+    "lifecyclePassed": true,
+    "fixtureRequests": 47,
+    "unexpectedNetworkRequests": 0,
+    "consoleErrors": 0,
+    "temporaryProfileRemoved": true
+  },
+  "limits": [
+    "Targeted regression is not the full suite.",
+    "Firefox build is not Firefox runtime proof.",
+    "Controlled Edge responses do not prove live provider or all-site acceptance."
+  ]
+}

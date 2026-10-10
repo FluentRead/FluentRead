@@ -1,0 +1,1776 @@
+{
+  "ok": true,
+  "windowMode": "background-visible-no-focus",
+  "launchMode": "macos-background-cdp",
+  "focusPolicy": "launchservices-no-foreground",
+  "windowPlacement": {
+    "mode": "background-visible-no-focus",
+    "visible": true,
+    "hidden": false,
+    "centered": true,
+    "windowState": "normal",
+    "bounds": {
+      "left": 212,
+      "top": -990,
+      "width": 1280,
+      "height": 900
+    },
+    "displayTarget": "secondary",
+    "source": "macos-nsscreen",
+    "screenIndex": 1,
+    "browserFrontmost": false,
+    "frontmostBefore": {
+      "pid": 73685,
+      "name": "ChatGPT"
+    },
+    "frontmostAfter": {
+      "pid": 73685,
+      "name": "ChatGPT"
+    }
+  },
+  "profileDir": "/var/folders/2v/qd62bpkx51scgbvv2nrclsxm0000gn/T/fluentread-full-page-OW0suF",
+  "url": "http://127.0.0.1:60193/unified-translation-fixture.html",
+  "extensionId": "djnlaiohfaaifbibleebjggkghlmcpcj",
+  "config": {
+    "floatingBallHotkey": "Alt+T",
+    "service": "freeTranslation",
+    "display": 1,
+    "mouseHoverTranslationDelay": 0,
+    "bilingualSentenceHighlightEnabled": true,
+    "disableFloatingBall": false,
+    "translationProgressPanelEnabled": true,
+    "fullPageTranslationMode": "viewport",
+    "animations": true,
+    "translationLoadingStyle": "ring"
+  },
+  "fixtureTranslationRequestCount": 47,
+  "fixtureTranslationItemCount": 47,
+  "unexpectedNetworkRequests": [],
+  "translated": {
+    "paragraphOne": 1,
+    "paragraphTwo": 1,
+    "paragraphTwoText": "The second paragraph changed after full-page translation.测试译文：The second paragraph changed after full-page translation.",
+    "heading": 1,
+    "dynamic": 1,
+    "staticClamp": {
+      "bilingual": 1,
+      "lineClamp": "none",
+      "inlineStyle": "-webkit-line-clamp: unset !important; max-height: unset !important; height: auto !important;",
+      "clientHeight": 374,
+      "scrollHeight": 374,
+      "wrapperVisible": true,
+      "translationText": "测试译文：This model description reproduces a card whose outer wrapper shows only two lines of source text. The bilingual translation is appended after the complete description and must remain geometrically visible instead of being clipped below the original text."
+    },
+    "dynamicClamp": {
+      "bilingual": 1,
+      "lineClamp": "none",
+      "inlineStyle": "-webkit-line-clamp: unset !important; max-height: unset !important; height: auto !important;",
+      "clientHeight": 323,
+      "scrollHeight": 323,
+      "wrapperVisible": true,
+      "translationText": "测试译文：This virtualized model description is inserted after the full page session starts. Its translated text must expand the newly mounted two-line clamp instead of remaining hidden beneath the source content."
+    },
+    "shadow": 1,
+    "header": 0,
+    "nav": 0,
+    "footer": 0,
+    "buttonBilingualCount": 0,
+    "buttonText": "★测试译文：Save changes",
+    "cancelButtonText": "测试译文：Cancel",
+    "cancelButtonBilingualCount": 0,
+    "buttonIconPresent": true,
+    "codePreserved": true,
+    "linkPreserved": "https://example.com",
+    "iconLigatures": [
+      "account_circle"
+    ],
+    "standaloneIcon": "keyboard_return",
+    "translationContainsIconLigature": false
+  },
+  "restored": {
+    "paragraphOne": 0,
+    "paragraphTwo": 0,
+    "paragraphTwoText": "The second paragraph changed after full-page translation.",
+    "heading": 0,
+    "dynamic": 0,
+    "staticClamp": {
+      "bilingual": 0,
+      "lineClamp": "2",
+      "inlineStyle": null,
+      "clientHeight": 51,
+      "scrollHeight": 179,
+      "wrapperVisible": false,
+      "translationText": ""
+    },
+    "dynamicClamp": {
+      "bilingual": 0,
+      "lineClamp": "2",
+      "inlineStyle": null,
+      "clientHeight": 51,
+      "scrollHeight": 154,
+      "wrapperVisible": false,
+      "translationText": ""
+    },
+    "shadow": 0,
+    "header": 0,
+    "nav": 0,
+    "footer": 0,
+    "buttonBilingualCount": 0,
+    "buttonText": "★Save changes",
+    "cancelButtonText": "Cancel",
+    "cancelButtonBilingualCount": 0,
+    "buttonIconPresent": true,
+    "codePreserved": false,
+    "linkPreserved": null,
+    "iconLigatures": [
+      "account_circle"
+    ],
+    "standaloneIcon": "keyboard_return",
+    "translationContainsIconLigature": false
+  },
+  "retranslated": {
+    "paragraphOne": 1,
+    "paragraphTwo": 1,
+    "paragraphTwoText": "The second paragraph changed after full-page translation.测试译文：The second paragraph changed after full-page translation.",
+    "heading": 1,
+    "dynamic": 1,
+    "staticClamp": {
+      "bilingual": 1,
+      "lineClamp": "none",
+      "inlineStyle": "-webkit-line-clamp: unset !important; max-height: unset !important; height: auto !important;",
+      "clientHeight": 374,
+      "scrollHeight": 374,
+      "wrapperVisible": true,
+      "translationText": "测试译文：This model description reproduces a card whose outer wrapper shows only two lines of source text. The bilingual translation is appended after the complete description and must remain geometrically visible instead of being clipped below the original text."
+    },
+    "dynamicClamp": {
+      "bilingual": 1,
+      "lineClamp": "none",
+      "inlineStyle": "-webkit-line-clamp: unset !important; max-height: unset !important; height: auto !important;",
+      "clientHeight": 323,
+      "scrollHeight": 323,
+      "wrapperVisible": true,
+      "translationText": "测试译文：This virtualized model description is inserted after the full page session starts. Its translated text must expand the newly mounted two-line clamp instead of remaining hidden beneath the source content."
+    },
+    "shadow": 1,
+    "header": 0,
+    "nav": 0,
+    "footer": 0,
+    "buttonBilingualCount": 0,
+    "buttonText": "★测试译文：Save changes",
+    "cancelButtonText": "测试译文：Cancel",
+    "cancelButtonBilingualCount": 0,
+    "buttonIconPresent": true,
+    "codePreserved": true,
+    "linkPreserved": "https://example.com",
+    "iconLigatures": [
+      "account_circle"
+    ],
+    "standaloneIcon": "keyboard_return",
+    "translationContainsIconLigature": false
+  },
+  "zeroDelayHover": {
+    "sameOwner": true,
+    "sameWrapper": true,
+    "wrapperConnected": true,
+    "wrapperCount": 1,
+    "htmlStable": true,
+    "mutations": 0,
+    "ownerRect": {
+      "x": 276,
+      "y": 215.015625,
+      "width": 720,
+      "height": 137.46875
+    },
+    "geometryDelta": 0,
+    "passiveHighlight": {
+      "source": {
+        "source": "This paragraph contains a preserved link",
+        "translation": "测试译文：This paragraph contains 测试译文：a preserved link",
+        "outside": 0
+      },
+      "translation": {
+        "source": "and const value = 42 that should remain inside the translated block.",
+        "translation": "测试译文：and const value = 42 测试译文：that should remain inside the translated block.",
+        "outside": 0
+      }
+    },
+    "sourceHighlight": {
+      "source": "This paragraph contains a preserved link",
+      "translation": "测试译文：This paragraph contains 测试译文：a preserved link",
+      "outside": 0
+    },
+    "translationHighlight": {
+      "source": "and const value = 42 that should remain inside the translated block.",
+      "translation": "测试译文：and const value = 42 测试译文：that should remain inside the translated block.",
+      "outside": 0
+    },
+    "screenshot": "/private/tmp/fluentread-full-page-pr-integration-lifecycle-20261011/full-page-zero-delay-hover-stable.png",
+    "translationRequests": {
+      "before": 20,
+      "after": 20
+    }
+  },
+  "passiveHoverRemount": {
+    "commits": 49,
+    "sameOwnerCommits": 12,
+    "wholeOwnerCommits": 12,
+    "wrapperCloneCommits": 12,
+    "wrapperClassCommits": 12,
+    "wrapperTamperCommits": 1,
+    "paintFrames": 89,
+    "sourceOnlyPaintFrames": 0,
+    "invalidTranslationPaintFrames": 0,
+    "maxDirectWrappers": 1,
+    "minTranslationOpacity": 1,
+    "wrapperCount": 1,
+    "translationText": "测试译文：A framework may rebuild this first source line on pointer movement.The translated result must remain visible without another provider request.",
+    "loadingCount": 0,
+    "retryCount": 0,
+    "hostClassOwned": false,
+    "hostInlineStyle": null,
+    "highFrequency": {
+      "commits": 25,
+      "sameOwnerCommits": 6,
+      "wholeOwnerCommits": 6,
+      "wrapperCloneCommits": 6,
+      "wrapperClassCommits": 6,
+      "wrapperTamperCommits": 1,
+      "paintFrames": 28,
+      "sourceOnlyPaintFrames": 0,
+      "invalidTranslationPaintFrames": 0
+    },
+    "screenshot": "/private/tmp/fluentread-full-page-pr-integration-lifecycle-20261011/full-page-passive-hover-remount-stable.png",
+    "translationRequests": {
+      "before": 20,
+      "after": 20
+    }
+  },
+  "cancelledHoverGesture": {
+    "initialRequests": 0,
+    "stages": [
+      {
+        "phase": "Control+C held",
+        "requests": 0,
+        "wrapperCount": 0,
+        "htmlStable": true
+      },
+      {
+        "phase": "C released, Control held",
+        "requests": 0,
+        "wrapperCount": 0,
+        "htmlStable": true
+      },
+      {
+        "phase": "all keys released",
+        "requests": 0,
+        "wrapperCount": 0,
+        "htmlStable": true
+      }
+    ],
+    "freshGesture": {
+      "wrapperCount": 1,
+      "neighborCount": 0
+    },
+    "restored": {
+      "phase": "restored after fresh gesture",
+      "requests": 1,
+      "wrapperCount": 0,
+      "htmlStable": true
+    },
+    "urlBefore": "http://127.0.0.1:60193/unified-translation-fixture.html",
+    "urlAfter": "http://127.0.0.1:60193/unified-translation-fixture.html"
+  },
+  "unchangedAttributeStability": {
+    "beforeRequests": 44,
+    "afterRequests": 44,
+    "requestPayloads": [],
+    "paintFrames": 24,
+    "targets": [
+      {
+        "selector": "#paragraph-two",
+        "sameOwner": true,
+        "sameSlots": true,
+        "htmlStable": true,
+        "domMutations": 0,
+        "invalidPaintFrames": 0,
+        "maxGeometryDelta": 0,
+        "singleSlotCount": 1
+      },
+      {
+        "selector": "#save-button",
+        "sameOwner": true,
+        "sameSlots": true,
+        "htmlStable": true,
+        "domMutations": 0,
+        "invalidPaintFrames": 0,
+        "maxGeometryDelta": 0,
+        "singleSlotCount": 0
+      }
+    ],
+    "screenshot": "/private/tmp/fluentread-full-page-pr-integration-lifecycle-20261011/full-page-unchanged-attributes-stable.png",
+    "sourceProtection": {
+      "beforeSlots": 2,
+      "afterSlots": 1,
+      "protectedSlots": 0,
+      "protectedSourcePreserved": true,
+      "sameProtectedSource": true,
+      "remainingTranslated": true,
+      "loadingCount": 0,
+      "retryCount": 0
+    },
+    "singleClone": {
+      "sameOwner": true,
+      "sourceTextPreserved": true,
+      "sameClonedSource": true,
+      "rebuiltSlot": true,
+      "translated": true,
+      "slotCount": 1,
+      "restoredTextPreserved": true,
+      "restoredClonedSource": true,
+      "restoredSlotCount": 0
+    }
+  },
+  "tooltipHover": {
+    "cycles": [
+      {
+        "opens": 1,
+        "closes": 0,
+        "wrappers": 1,
+        "coversTrigger": true,
+        "hit": "tooltip-hover-trigger"
+      },
+      {
+        "opens": 2,
+        "closes": 1,
+        "wrappers": 1,
+        "coversTrigger": true,
+        "hit": "tooltip-hover-trigger"
+      }
+    ],
+    "boundaries": [
+      {
+        "name": "aria tooltip",
+        "expected": "none",
+        "actual": "none",
+        "restored": "auto"
+      },
+      {
+        "name": "untranslated",
+        "expected": "auto",
+        "actual": "auto",
+        "restored": "auto"
+      },
+      {
+        "name": "link",
+        "expected": "auto",
+        "actual": "auto",
+        "restored": "auto"
+      },
+      {
+        "name": "button",
+        "expected": "auto",
+        "actual": "auto",
+        "restored": "auto"
+      },
+      {
+        "name": "focusable",
+        "expected": "auto",
+        "actual": "auto",
+        "restored": "auto"
+      },
+      {
+        "name": "dialog",
+        "expected": "auto",
+        "actual": "auto",
+        "restored": "auto"
+      },
+      {
+        "name": "ordinary content",
+        "expected": "auto",
+        "actual": "auto",
+        "restored": "auto"
+      }
+    ]
+  },
+  "tooltipControlHover": {
+    "cycles": [
+      {
+        "opens": 1,
+        "closes": 0,
+        "wrappers": 1,
+        "coversTrigger": true,
+        "hit": "tooltip-hover-trigger"
+      },
+      {
+        "opens": 2,
+        "closes": 1,
+        "wrappers": 1,
+        "coversTrigger": true,
+        "hit": "tooltip-hover-trigger"
+      }
+    ],
+    "boundaries": [
+      {
+        "name": "aria tooltip",
+        "expected": "none",
+        "actual": "none",
+        "restored": "auto"
+      },
+      {
+        "name": "untranslated",
+        "expected": "auto",
+        "actual": "auto",
+        "restored": "auto"
+      },
+      {
+        "name": "link",
+        "expected": "auto",
+        "actual": "auto",
+        "restored": "auto"
+      },
+      {
+        "name": "button",
+        "expected": "auto",
+        "actual": "auto",
+        "restored": "auto"
+      },
+      {
+        "name": "focusable",
+        "expected": "auto",
+        "actual": "auto",
+        "restored": "auto"
+      },
+      {
+        "name": "dialog",
+        "expected": "auto",
+        "actual": "auto",
+        "restored": "auto"
+      },
+      {
+        "name": "ordinary content",
+        "expected": "auto",
+        "actual": "auto",
+        "restored": "auto"
+      }
+    ]
+  },
+  "failureActions": {
+    "baseline": {
+      "url": "http://127.0.0.1:60193/unified-translation-fixture.html",
+      "href": "http://127.0.0.1:60193/unified-translation-fixture.html#translation-error-destination",
+      "hrefAttribute": "#translation-error-destination",
+      "hidden": false,
+      "linkDisplay": "block",
+      "linkGeometry": {
+        "left": 276,
+        "top": 625.3828125,
+        "right": 996,
+        "bottom": 705.3828125,
+        "width": 720,
+        "height": 80
+      },
+      "activations": 0,
+      "wrapperCount": 0,
+      "translationCount": 0,
+      "translationText": "",
+      "wrapper": null,
+      "retry": null,
+      "reason": null,
+      "retryIcon": null,
+      "reasonIcon": null,
+      "notice": {
+        "present": false,
+        "role": "",
+        "detail": ""
+      }
+    },
+    "failed": {
+      "url": "http://127.0.0.1:60193/unified-translation-fixture.html",
+      "href": "http://127.0.0.1:60193/unified-translation-fixture.html#translation-error-destination",
+      "hrefAttribute": "#translation-error-destination",
+      "hidden": false,
+      "linkDisplay": "block",
+      "linkGeometry": {
+        "left": 276,
+        "top": 625.3828125,
+        "right": 996,
+        "bottom": 708.9921875,
+        "width": 720,
+        "height": 83.609375
+      },
+      "activations": 0,
+      "wrapperCount": 1,
+      "translationCount": 0,
+      "translationText": "",
+      "wrapper": {
+        "role": "group",
+        "tabIndex": null,
+        "text": "重试 错误原因",
+        "display": "inline-flex",
+        "alignItems": "center",
+        "flexWrap": "wrap",
+        "gap": "7.6px",
+        "color": "rgb(143, 47, 94)",
+        "backgroundColor": "rgba(0, 0, 0, 0)",
+        "borderRadius": "0px",
+        "cursor": "pointer",
+        "fontSize": "20px",
+        "lineHeight": "24px",
+        "pointerEvents": "auto",
+        "textDecorationLine": "none",
+        "geometry": {
+          "left": 641.8203125,
+          "top": 666.078125,
+          "right": 835.7265625,
+          "bottom": 695.9921875,
+          "width": 193.90625,
+          "height": 29.9140625
+        }
+      },
+      "retry": {
+        "role": "",
+        "tabIndex": null,
+        "text": "重试",
+        "display": "flex",
+        "alignItems": "center",
+        "flexWrap": "nowrap",
+        "gap": "4.576px",
+        "color": "rgb(47, 120, 201)",
+        "backgroundColor": "rgba(66, 138, 223, 0.08)",
+        "borderRadius": "999px",
+        "cursor": "pointer",
+        "fontSize": "17.6px",
+        "lineHeight": "21.12px",
+        "pointerEvents": "auto",
+        "textDecorationLine": "none",
+        "geometry": {
+          "left": 641.8203125,
+          "top": 666.078125,
+          "right": 717.375,
+          "bottom": 695.9921875,
+          "width": 75.5546875,
+          "height": 29.9140625
+        }
+      },
+      "reason": {
+        "role": "",
+        "tabIndex": null,
+        "text": "错误原因",
+        "display": "flex",
+        "alignItems": "center",
+        "flexWrap": "nowrap",
+        "gap": "4.576px",
+        "color": "rgb(154, 91, 18)",
+        "backgroundColor": "rgba(245, 158, 11, 0.08)",
+        "borderRadius": "999px",
+        "cursor": "pointer",
+        "fontSize": "17.6px",
+        "lineHeight": "21.12px",
+        "pointerEvents": "auto",
+        "textDecorationLine": "none",
+        "geometry": {
+          "left": 724.96875,
+          "top": 666.078125,
+          "right": 835.7265625,
+          "bottom": 695.9921875,
+          "width": 110.7578125,
+          "height": 29.9140625
+        }
+      },
+      "retryIcon": {
+        "role": "",
+        "tabIndex": null,
+        "text": "",
+        "display": "flex",
+        "alignItems": "center",
+        "flexWrap": "nowrap",
+        "gap": "normal",
+        "color": "rgb(47, 120, 201)",
+        "backgroundColor": "rgba(0, 0, 0, 0)",
+        "borderRadius": "0px",
+        "cursor": "pointer",
+        "fontSize": "17.6px",
+        "lineHeight": "17.6px",
+        "pointerEvents": "none",
+        "textDecorationLine": "none",
+        "geometry": {
+          "left": 650.9140625,
+          "top": 672.234375,
+          "right": 668.5078125,
+          "bottom": 689.828125,
+          "width": 17.59375,
+          "height": 17.59375
+        }
+      },
+      "reasonIcon": {
+        "role": "",
+        "tabIndex": null,
+        "text": "",
+        "display": "flex",
+        "alignItems": "center",
+        "flexWrap": "nowrap",
+        "gap": "normal",
+        "color": "rgb(154, 91, 18)",
+        "backgroundColor": "rgba(0, 0, 0, 0)",
+        "borderRadius": "0px",
+        "cursor": "pointer",
+        "fontSize": "17.6px",
+        "lineHeight": "17.6px",
+        "pointerEvents": "none",
+        "textDecorationLine": "none",
+        "geometry": {
+          "left": 734.0625,
+          "top": 672.234375,
+          "right": 751.65625,
+          "bottom": 689.828125,
+          "width": 17.59375,
+          "height": 17.59375
+        }
+      },
+      "notice": {
+        "present": false,
+        "role": "",
+        "detail": ""
+      }
+    },
+    "afterReason": {
+      "url": "http://127.0.0.1:60193/unified-translation-fixture.html",
+      "href": "http://127.0.0.1:60193/unified-translation-fixture.html#translation-error-destination",
+      "hrefAttribute": "#translation-error-destination",
+      "hidden": false,
+      "linkDisplay": "block",
+      "linkGeometry": {
+        "left": 276,
+        "top": 625.3828125,
+        "right": 996,
+        "bottom": 708.9921875,
+        "width": 720,
+        "height": 83.609375
+      },
+      "activations": 0,
+      "wrapperCount": 1,
+      "translationCount": 0,
+      "translationText": "",
+      "wrapper": {
+        "role": "group",
+        "tabIndex": null,
+        "text": "重试 错误原因",
+        "display": "inline-flex",
+        "alignItems": "center",
+        "flexWrap": "wrap",
+        "gap": "7.6px",
+        "color": "rgb(143, 47, 94)",
+        "backgroundColor": "rgba(0, 0, 0, 0)",
+        "borderRadius": "0px",
+        "cursor": "pointer",
+        "fontSize": "20px",
+        "lineHeight": "24px",
+        "pointerEvents": "auto",
+        "textDecorationLine": "none",
+        "geometry": {
+          "left": 641.8203125,
+          "top": 666.078125,
+          "right": 835.7265625,
+          "bottom": 695.9921875,
+          "width": 193.90625,
+          "height": 29.9140625
+        }
+      },
+      "retry": {
+        "role": "",
+        "tabIndex": null,
+        "text": "重试",
+        "display": "flex",
+        "alignItems": "center",
+        "flexWrap": "nowrap",
+        "gap": "4.576px",
+        "color": "rgb(47, 120, 201)",
+        "backgroundColor": "rgba(66, 138, 223, 0.08)",
+        "borderRadius": "999px",
+        "cursor": "pointer",
+        "fontSize": "17.6px",
+        "lineHeight": "21.12px",
+        "pointerEvents": "auto",
+        "textDecorationLine": "none",
+        "geometry": {
+          "left": 641.8203125,
+          "top": 666.078125,
+          "right": 717.375,
+          "bottom": 695.9921875,
+          "width": 75.5546875,
+          "height": 29.9140625
+        }
+      },
+      "reason": {
+        "role": "",
+        "tabIndex": null,
+        "text": "错误原因",
+        "display": "flex",
+        "alignItems": "center",
+        "flexWrap": "nowrap",
+        "gap": "4.576px",
+        "color": "rgb(154, 91, 18)",
+        "backgroundColor": "rgba(245, 158, 11, 0.14)",
+        "borderRadius": "999px",
+        "cursor": "pointer",
+        "fontSize": "17.6px",
+        "lineHeight": "21.12px",
+        "pointerEvents": "auto",
+        "textDecorationLine": "none",
+        "geometry": {
+          "left": 724.96875,
+          "top": 666.078125,
+          "right": 835.7265625,
+          "bottom": 695.9921875,
+          "width": 110.7578125,
+          "height": 29.9140625
+        }
+      },
+      "retryIcon": {
+        "role": "",
+        "tabIndex": null,
+        "text": "",
+        "display": "flex",
+        "alignItems": "center",
+        "flexWrap": "nowrap",
+        "gap": "normal",
+        "color": "rgb(47, 120, 201)",
+        "backgroundColor": "rgba(0, 0, 0, 0)",
+        "borderRadius": "0px",
+        "cursor": "pointer",
+        "fontSize": "17.6px",
+        "lineHeight": "17.6px",
+        "pointerEvents": "none",
+        "textDecorationLine": "none",
+        "geometry": {
+          "left": 650.9140625,
+          "top": 672.234375,
+          "right": 668.5078125,
+          "bottom": 689.828125,
+          "width": 17.59375,
+          "height": 17.59375
+        }
+      },
+      "reasonIcon": {
+        "role": "",
+        "tabIndex": null,
+        "text": "",
+        "display": "flex",
+        "alignItems": "center",
+        "flexWrap": "nowrap",
+        "gap": "normal",
+        "color": "rgb(154, 91, 18)",
+        "backgroundColor": "rgba(0, 0, 0, 0)",
+        "borderRadius": "0px",
+        "cursor": "pointer",
+        "fontSize": "17.6px",
+        "lineHeight": "17.6px",
+        "pointerEvents": "none",
+        "textDecorationLine": "none",
+        "geometry": {
+          "left": 734.0625,
+          "top": 672.234375,
+          "right": 751.65625,
+          "bottom": 689.828125,
+          "width": 17.59375,
+          "height": 17.59375
+        }
+      },
+      "notice": {
+        "present": true,
+        "role": "alert",
+        "detail": "翻译失败: 400"
+      }
+    },
+    "retried": {
+      "url": "http://127.0.0.1:60193/unified-translation-fixture.html",
+      "href": "http://127.0.0.1:60193/unified-translation-fixture.html#translation-error-destination",
+      "hrefAttribute": "#translation-error-destination",
+      "hidden": false,
+      "linkDisplay": "block",
+      "linkGeometry": {
+        "left": 276,
+        "top": 625.3828125,
+        "right": 996,
+        "bottom": 775.3828125,
+        "width": 720,
+        "height": 150
+      },
+      "activations": 0,
+      "wrapperCount": 0,
+      "translationCount": 1,
+      "translationText": "测试译文：This block link fails once so its translation error actions can be verified without leaving the page.",
+      "wrapper": null,
+      "retry": null,
+      "reason": null,
+      "retryIcon": null,
+      "reasonIcon": null,
+      "notice": {
+        "present": true,
+        "role": "alert",
+        "detail": "翻译失败: 400"
+      }
+    },
+    "restored": {
+      "url": "http://127.0.0.1:60193/unified-translation-fixture.html",
+      "href": "http://127.0.0.1:60193/unified-translation-fixture.html#translation-error-destination",
+      "hrefAttribute": "#translation-error-destination",
+      "hidden": false,
+      "linkDisplay": "block",
+      "linkGeometry": {
+        "left": 276,
+        "top": 625.3828125,
+        "right": 996,
+        "bottom": 705.3828125,
+        "width": 720,
+        "height": 80
+      },
+      "activations": 0,
+      "wrapperCount": 0,
+      "translationCount": 0,
+      "translationText": "",
+      "wrapper": null,
+      "retry": null,
+      "reason": null,
+      "retryIcon": null,
+      "reasonIcon": null,
+      "notice": {
+        "present": true,
+        "role": "alert",
+        "detail": "翻译失败: 400"
+      }
+    },
+    "provider": "microsoft loopback fail-once",
+    "attempts": 2,
+    "screenshots": [
+      "/private/tmp/fluentread-full-page-pr-integration-lifecycle-20261011/full-page-link-failure.png",
+      "/private/tmp/fluentread-full-page-pr-integration-lifecycle-20261011/full-page-link-error-reason.png",
+      "/private/tmp/fluentread-full-page-pr-integration-lifecycle-20261011/full-page-link-retry-success.png"
+    ]
+  },
+  "floatingUi": {
+    "initial": {
+      "host": true,
+      "ball": true,
+      "ballClass": "fr-floating-ball",
+      "ballStyle": "--fr-ball-collapsed-opacity: 0.52; top: 408px;",
+      "position": "right",
+      "expanded": false,
+      "translated": false,
+      "translateTool": true,
+      "translateToolPressed": "false",
+      "mainCheck": false,
+      "mainOpacity": 0.52,
+      "mainTransform": "matrix(1, 0, 0, 1, 40, 0)",
+      "mainBox": {
+        "left": 1252,
+        "top": 388,
+        "right": 1292,
+        "bottom": 428
+      },
+      "translateToolBox": {
+        "left": 1216,
+        "top": 340,
+        "right": 1256,
+        "bottom": 380
+      },
+      "translateToolOpacity": 0,
+      "translateToolVisibility": "visible",
+      "translateToolDisplay": "flex",
+      "check": false,
+      "checkBox": null,
+      "checkVisible": false,
+      "shortcutTooltip": false,
+      "progressHost": true,
+      "progressPanel": false,
+      "progressPanelClass": "",
+      "progressCompact": false,
+      "progressCompactCheck": false,
+      "progress": null
+    },
+    "expandedBeforeMainClick": {
+      "host": true,
+      "ball": true,
+      "ballClass": "fr-floating-ball floating-ball-expanded",
+      "ballStyle": "--fr-ball-collapsed-opacity: 0.52; top: 408px;",
+      "position": "right",
+      "expanded": true,
+      "translated": false,
+      "translateTool": true,
+      "translateToolPressed": "false",
+      "mainCheck": false,
+      "mainOpacity": 1,
+      "mainTransform": "matrix(1, 0, 0, 1, 0, 0)",
+      "mainBox": {
+        "left": 1212,
+        "top": 388,
+        "right": 1252,
+        "bottom": 428
+      },
+      "translateToolBox": {
+        "left": 1212,
+        "top": 340,
+        "right": 1252,
+        "bottom": 380
+      },
+      "translateToolOpacity": 1,
+      "translateToolVisibility": "visible",
+      "translateToolDisplay": "flex",
+      "check": false,
+      "checkBox": null,
+      "checkVisible": false,
+      "shortcutTooltip": false,
+      "progressHost": true,
+      "progressPanel": false,
+      "progressPanelClass": "",
+      "progressCompact": false,
+      "progressCompactCheck": false,
+      "progress": null
+    },
+    "pressedDuringMainClick": {
+      "host": true,
+      "ball": true,
+      "ballClass": "fr-floating-ball floating-ball-expanded",
+      "ballStyle": "--fr-ball-collapsed-opacity: 0.52; top: 408px;",
+      "position": "right",
+      "expanded": true,
+      "translated": false,
+      "translateTool": true,
+      "translateToolPressed": "false",
+      "mainCheck": false,
+      "mainOpacity": 1,
+      "mainTransform": "matrix(1, 0, 0, 1, 0, 0)",
+      "mainBox": {
+        "left": 1212,
+        "top": 388,
+        "right": 1252,
+        "bottom": 428
+      },
+      "translateToolBox": {
+        "left": 1212,
+        "top": 340,
+        "right": 1252,
+        "bottom": 380
+      },
+      "translateToolOpacity": 1,
+      "translateToolVisibility": "visible",
+      "translateToolDisplay": "flex",
+      "check": false,
+      "checkBox": null,
+      "checkVisible": false,
+      "shortcutTooltip": false,
+      "progressHost": true,
+      "progressPanel": false,
+      "progressPanelClass": "",
+      "progressCompact": false,
+      "progressCompactCheck": false,
+      "progress": null
+    },
+    "jitteredDuringMainClick": {
+      "host": true,
+      "ball": true,
+      "ballClass": "fr-floating-ball floating-ball-expanded",
+      "ballStyle": "--fr-ball-collapsed-opacity: 0.52; top: 408px;",
+      "position": "right",
+      "expanded": true,
+      "translated": false,
+      "translateTool": true,
+      "translateToolPressed": "false",
+      "mainCheck": false,
+      "mainOpacity": 1,
+      "mainTransform": "matrix(1, 0, 0, 1, 0, 0)",
+      "mainBox": {
+        "left": 1212,
+        "top": 388,
+        "right": 1252,
+        "bottom": 428
+      },
+      "translateToolBox": {
+        "left": 1212,
+        "top": 340,
+        "right": 1252,
+        "bottom": 380
+      },
+      "translateToolOpacity": 1,
+      "translateToolVisibility": "visible",
+      "translateToolDisplay": "flex",
+      "check": false,
+      "checkBox": null,
+      "checkVisible": false,
+      "shortcutTooltip": false,
+      "progressHost": true,
+      "progressPanel": false,
+      "progressPanelClass": "",
+      "progressCompact": false,
+      "progressCompactCheck": false,
+      "progress": null
+    },
+    "afterMainClick": {
+      "host": true,
+      "ball": true,
+      "ballClass": "fr-floating-ball floating-ball-expanded",
+      "ballStyle": "--fr-ball-collapsed-opacity: 0.52; top: 408px;",
+      "position": "right",
+      "expanded": true,
+      "translated": false,
+      "translateTool": true,
+      "translateToolPressed": "false",
+      "mainCheck": false,
+      "mainOpacity": 1,
+      "mainTransform": "matrix(1, 0, 0, 1, 0, 0)",
+      "mainBox": {
+        "left": 1212,
+        "top": 388,
+        "right": 1252,
+        "bottom": 428
+      },
+      "translateToolBox": {
+        "left": 1212,
+        "top": 340,
+        "right": 1252,
+        "bottom": 380
+      },
+      "translateToolOpacity": 1,
+      "translateToolVisibility": "visible",
+      "translateToolDisplay": "flex",
+      "check": false,
+      "checkBox": null,
+      "checkVisible": false,
+      "shortcutTooltip": false,
+      "progressHost": true,
+      "progressPanel": false,
+      "progressPanelClass": "",
+      "progressCompact": false,
+      "progressCompactCheck": false,
+      "progress": null
+    },
+    "mainClickDom": {
+      "before": {
+        "url": "http://127.0.0.1:60193/unified-translation-fixture.html",
+        "bilingualCount": 0,
+        "loadingCount": 0
+      },
+      "after": {
+        "url": "http://127.0.0.1:60193/unified-translation-fixture.html",
+        "bilingualCount": 0,
+        "loadingCount": 0
+      }
+    },
+    "mainClickTranslationRequests": {
+      "before": 0,
+      "after": 0
+    },
+    "collapsedAfterMainClick": {
+      "host": true,
+      "ball": true,
+      "ballClass": "fr-floating-ball",
+      "ballStyle": "--fr-ball-collapsed-opacity: 0.52; top: 408px;",
+      "position": "right",
+      "expanded": false,
+      "translated": false,
+      "translateTool": true,
+      "translateToolPressed": "false",
+      "mainCheck": false,
+      "mainOpacity": 0.52,
+      "mainTransform": "matrix(1, 0, 0, 1, 39.9381, 0)",
+      "mainBox": {
+        "left": 1251.9381103515625,
+        "top": 388,
+        "right": 1291.9381103515625,
+        "bottom": 428
+      },
+      "translateToolBox": {
+        "left": 1215.96630859375,
+        "top": 340,
+        "right": 1255.96630859375,
+        "bottom": 380
+      },
+      "translateToolOpacity": 0,
+      "translateToolVisibility": "visible",
+      "translateToolDisplay": "flex",
+      "check": false,
+      "checkBox": null,
+      "checkVisible": false,
+      "shortcutTooltip": false,
+      "progressHost": true,
+      "progressPanel": false,
+      "progressPanelClass": "",
+      "progressCompact": false,
+      "progressCompactCheck": false,
+      "progress": null
+    },
+    "duringMainDrag": {
+      "host": true,
+      "ball": true,
+      "ballClass": "fr-floating-ball dragging",
+      "ballStyle": "--fr-ball-collapsed-opacity: 0.52; top: 388px; left: 62.4985px; right: auto; transform: none;",
+      "position": "right",
+      "expanded": false,
+      "translated": false,
+      "translateTool": true,
+      "translateToolPressed": "false",
+      "mainCheck": false,
+      "mainOpacity": 0.776217,
+      "mainTransform": "matrix(1, 0, 0, 1, 18.4725, 0)",
+      "mainBox": {
+        "left": 80.96473693847656,
+        "top": 388,
+        "right": 120.96473693847656,
+        "bottom": 428
+      },
+      "translateToolBox": null,
+      "translateToolOpacity": 0,
+      "translateToolVisibility": "hidden",
+      "translateToolDisplay": "none",
+      "check": false,
+      "checkBox": null,
+      "checkVisible": false,
+      "shortcutTooltip": false,
+      "progressHost": true,
+      "progressPanel": false,
+      "progressPanelClass": "",
+      "progressCompact": false,
+      "progressCompactCheck": false,
+      "progress": null
+    },
+    "afterMainDrag": {
+      "host": true,
+      "ball": true,
+      "ballClass": "fr-floating-ball",
+      "ballStyle": "--fr-ball-collapsed-opacity: 0.52; top: 408px;",
+      "position": "left",
+      "expanded": false,
+      "translated": false,
+      "translateTool": true,
+      "translateToolPressed": "false",
+      "mainCheck": false,
+      "mainOpacity": 0.52,
+      "mainTransform": "matrix(1, 0, 0, 1, -40, 0)",
+      "mainBox": {
+        "left": -20,
+        "top": 388,
+        "right": 20,
+        "bottom": 428
+      },
+      "translateToolBox": {
+        "left": 16,
+        "top": 340,
+        "right": 56,
+        "bottom": 380
+      },
+      "translateToolOpacity": 0,
+      "translateToolVisibility": "visible",
+      "translateToolDisplay": "flex",
+      "check": false,
+      "checkBox": null,
+      "checkVisible": false,
+      "shortcutTooltip": false,
+      "progressHost": true,
+      "progressPanel": false,
+      "progressPanelClass": "",
+      "progressCompact": false,
+      "progressCompactCheck": false,
+      "progress": null
+    },
+    "mainDragDom": {
+      "before": {
+        "url": "http://127.0.0.1:60193/unified-translation-fixture.html",
+        "bilingualCount": 0,
+        "loadingCount": 0
+      },
+      "after": {
+        "url": "http://127.0.0.1:60193/unified-translation-fixture.html",
+        "bilingualCount": 0,
+        "loadingCount": 0
+      }
+    },
+    "mainDragTranslationRequests": {
+      "before": 0,
+      "after": 0
+    },
+    "afterShortcutSamples": [
+      {
+        "expanded": false,
+        "translated": true,
+        "check": false,
+        "shortcutTooltip": false
+      },
+      {
+        "expanded": false,
+        "translated": true,
+        "check": false,
+        "shortcutTooltip": false
+      },
+      {
+        "expanded": false,
+        "translated": true,
+        "check": false,
+        "shortcutTooltip": false
+      },
+      {
+        "expanded": false,
+        "translated": true,
+        "check": false,
+        "shortcutTooltip": false
+      }
+    ],
+    "progressDuringWork": {
+      "host": true,
+      "ball": true,
+      "ballClass": "fr-floating-ball",
+      "ballStyle": "--fr-ball-collapsed-opacity: 0.52; top: 408px;",
+      "position": "left",
+      "expanded": false,
+      "translated": true,
+      "translateTool": true,
+      "translateToolPressed": "true",
+      "mainCheck": false,
+      "mainOpacity": 0.52,
+      "mainTransform": "matrix(1, 0, 0, 1, -40, 0)",
+      "mainBox": {
+        "left": -20,
+        "top": 388,
+        "right": 20,
+        "bottom": 428
+      },
+      "translateToolBox": {
+        "left": 16,
+        "top": 340,
+        "right": 56,
+        "bottom": 380
+      },
+      "translateToolOpacity": 0,
+      "translateToolVisibility": "visible",
+      "translateToolDisplay": "flex",
+      "check": false,
+      "checkBox": null,
+      "checkVisible": false,
+      "shortcutTooltip": false,
+      "progressHost": true,
+      "progressPanel": true,
+      "progressPanelClass": "fr-translation-progress fr-progress-panel-enter-active fr-progress-panel-enter-to",
+      "progressCompact": false,
+      "progressCompactCheck": false,
+      "progress": {
+        "running": 10,
+        "remaining": 58,
+        "queued": 6,
+        "offscreen": 52
+      }
+    },
+    "translatedCollapsed": {
+      "host": true,
+      "ball": true,
+      "ballClass": "fr-floating-ball",
+      "ballStyle": "--fr-ball-collapsed-opacity: 0.52; top: 408px;",
+      "position": "left",
+      "expanded": false,
+      "translated": true,
+      "translateTool": true,
+      "translateToolPressed": "true",
+      "mainCheck": false,
+      "mainOpacity": 0.52,
+      "mainTransform": "matrix(1, 0, 0, 1, -40, 0)",
+      "mainBox": {
+        "left": -20,
+        "top": 388,
+        "right": 20,
+        "bottom": 428
+      },
+      "translateToolBox": {
+        "left": 16,
+        "top": 340,
+        "right": 56,
+        "bottom": 380
+      },
+      "translateToolOpacity": 0,
+      "translateToolVisibility": "visible",
+      "translateToolDisplay": "flex",
+      "check": true,
+      "checkBox": {
+        "left": 47,
+        "top": 371,
+        "right": 56,
+        "bottom": 380
+      },
+      "checkVisible": false,
+      "shortcutTooltip": false,
+      "progressHost": true,
+      "progressPanel": false,
+      "progressPanelClass": "",
+      "progressCompact": false,
+      "progressCompactCheck": false,
+      "progress": null
+    },
+    "expandedOnHover": {
+      "host": true,
+      "ball": true,
+      "ballClass": "fr-floating-ball floating-ball-expanded",
+      "ballStyle": "--fr-ball-collapsed-opacity: 0.52; top: 408px;",
+      "position": "left",
+      "expanded": true,
+      "translated": true,
+      "translateTool": true,
+      "translateToolPressed": "true",
+      "mainCheck": false,
+      "mainOpacity": 1,
+      "mainTransform": "matrix(1, 0, 0, 1, -0.106771, 0)",
+      "mainBox": {
+        "left": 19.89322853088379,
+        "top": 388,
+        "right": 59.89323043823242,
+        "bottom": 428
+      },
+      "translateToolBox": {
+        "left": 19.95125961303711,
+        "top": 340,
+        "right": 59.95125961303711,
+        "bottom": 380
+      },
+      "translateToolOpacity": 1,
+      "translateToolVisibility": "visible",
+      "translateToolDisplay": "flex",
+      "check": true,
+      "checkBox": {
+        "left": 50.95125961303711,
+        "top": 371,
+        "right": 59.95125961303711,
+        "bottom": 380
+      },
+      "checkVisible": true,
+      "shortcutTooltip": false,
+      "progressHost": true,
+      "progressPanel": false,
+      "progressPanelClass": "",
+      "progressCompact": false,
+      "progressCompactCheck": false,
+      "progress": null
+    },
+    "pointerRestored": {
+      "host": true,
+      "ball": true,
+      "ballClass": "fr-floating-ball",
+      "ballStyle": "--fr-ball-collapsed-opacity: 0.52; top: 408px;",
+      "position": "left",
+      "expanded": false,
+      "translated": false,
+      "translateTool": true,
+      "translateToolPressed": "false",
+      "mainCheck": false,
+      "mainOpacity": 0.52,
+      "mainTransform": "matrix(1, 0, 0, 1, -39.7372, 0)",
+      "mainBox": {
+        "left": -19.737152099609375,
+        "top": 388,
+        "right": 20.262847900390625,
+        "bottom": 428
+      },
+      "translateToolBox": {
+        "left": 16.0945987701416,
+        "top": 340,
+        "right": 56.094600677490234,
+        "bottom": 380
+      },
+      "translateToolOpacity": 0,
+      "translateToolVisibility": "visible",
+      "translateToolDisplay": "flex",
+      "check": false,
+      "checkBox": null,
+      "checkVisible": false,
+      "shortcutTooltip": false,
+      "progressHost": true,
+      "progressPanel": false,
+      "progressPanelClass": "",
+      "progressCompact": false,
+      "progressCompactCheck": false,
+      "progress": null
+    },
+    "pointerRetranslateSamples": [
+      {
+        "expanded": false,
+        "translated": true,
+        "check": false,
+        "shortcutTooltip": false
+      },
+      {
+        "expanded": false,
+        "translated": true,
+        "check": false,
+        "shortcutTooltip": false
+      },
+      {
+        "expanded": false,
+        "translated": true,
+        "check": false,
+        "shortcutTooltip": false
+      },
+      {
+        "expanded": false,
+        "translated": true,
+        "check": false,
+        "shortcutTooltip": false
+      }
+    ],
+    "progressAfterScroll": {
+      "host": true,
+      "ball": true,
+      "ballClass": "fr-floating-ball",
+      "ballStyle": "--fr-ball-collapsed-opacity: 0.52; top: 408px;",
+      "position": "left",
+      "expanded": false,
+      "translated": true,
+      "translateTool": true,
+      "translateToolPressed": "true",
+      "mainCheck": false,
+      "mainOpacity": 0.52,
+      "mainTransform": "matrix(1, 0, 0, 1, -40, 0)",
+      "mainBox": {
+        "left": -20,
+        "top": 388,
+        "right": 20,
+        "bottom": 428
+      },
+      "translateToolBox": {
+        "left": 16,
+        "top": 340,
+        "right": 56,
+        "bottom": 380
+      },
+      "translateToolOpacity": 0,
+      "translateToolVisibility": "visible",
+      "translateToolDisplay": "flex",
+      "check": false,
+      "checkBox": null,
+      "checkVisible": false,
+      "shortcutTooltip": false,
+      "progressHost": true,
+      "progressPanel": true,
+      "progressPanelClass": "fr-translation-progress fr-progress-panel-enter-active fr-progress-panel-enter-to",
+      "progressCompact": false,
+      "progressCompactCheck": false,
+      "progress": {
+        "running": 3,
+        "remaining": 53,
+        "queued": 15,
+        "offscreen": 38
+      }
+    },
+    "collapsedAfterScroll": {
+      "host": true,
+      "ball": true,
+      "ballClass": "fr-floating-ball",
+      "ballStyle": "--fr-ball-collapsed-opacity: 0.52; top: 408px;",
+      "position": "left",
+      "expanded": false,
+      "translated": true,
+      "translateTool": true,
+      "translateToolPressed": "true",
+      "mainCheck": false,
+      "mainOpacity": 0.52,
+      "mainTransform": "matrix(1, 0, 0, 1, -40, 0)",
+      "mainBox": {
+        "left": -20,
+        "top": 388,
+        "right": 20,
+        "bottom": 428
+      },
+      "translateToolBox": {
+        "left": 16,
+        "top": 340,
+        "right": 56,
+        "bottom": 380
+      },
+      "translateToolOpacity": 0,
+      "translateToolVisibility": "visible",
+      "translateToolDisplay": "flex",
+      "check": true,
+      "checkBox": {
+        "left": 47,
+        "top": 371,
+        "right": 56,
+        "bottom": 380
+      },
+      "checkVisible": false,
+      "shortcutTooltip": false,
+      "progressHost": true,
+      "progressPanel": false,
+      "progressPanelClass": "",
+      "progressCompact": false,
+      "progressCompactCheck": false,
+      "progress": null
+    },
+    "offscreen": {
+      "initial": {
+        "lastTranslated": false,
+        "translatedCount": 4
+      },
+      "afterPointerCycle": {
+        "lastTranslated": false,
+        "translatedCount": 4
+      },
+      "translatedAfterScroll": true
+    },
+    "restored": {
+      "host": true,
+      "ball": true,
+      "ballClass": "fr-floating-ball",
+      "ballStyle": "--fr-ball-collapsed-opacity: 0.52; top: 408px;",
+      "position": "left",
+      "expanded": false,
+      "translated": false,
+      "translateTool": true,
+      "translateToolPressed": "false",
+      "mainCheck": false,
+      "mainOpacity": 0.52,
+      "mainTransform": "matrix(1, 0, 0, 1, -40, 0)",
+      "mainBox": {
+        "left": -20,
+        "top": 388,
+        "right": 20,
+        "bottom": 428
+      },
+      "translateToolBox": {
+        "left": 16,
+        "top": 340,
+        "right": 56,
+        "bottom": 380
+      },
+      "translateToolOpacity": 0,
+      "translateToolVisibility": "visible",
+      "translateToolDisplay": "flex",
+      "check": false,
+      "checkBox": null,
+      "checkVisible": false,
+      "shortcutTooltip": false,
+      "progressHost": true,
+      "progressPanel": false,
+      "progressPanelClass": "",
+      "progressCompact": false,
+      "progressCompactCheck": false,
+      "progress": null
+    },
+    "progressOnlyInitial": {
+      "host": false,
+      "ball": false,
+      "ballClass": "",
+      "ballStyle": "",
+      "position": "",
+      "expanded": false,
+      "translated": false,
+      "translateTool": false,
+      "translateToolPressed": "",
+      "mainCheck": false,
+      "mainOpacity": null,
+      "mainTransform": "",
+      "mainBox": null,
+      "translateToolBox": null,
+      "translateToolOpacity": null,
+      "translateToolVisibility": "",
+      "translateToolDisplay": "",
+      "check": false,
+      "checkBox": null,
+      "checkVisible": false,
+      "shortcutTooltip": false,
+      "progressHost": true,
+      "progressPanel": false,
+      "progressPanelClass": "",
+      "progressCompact": false,
+      "progressCompactCheck": false,
+      "progress": null
+    },
+    "progressOnlyDuringWork": {
+      "host": false,
+      "ball": false,
+      "ballClass": "",
+      "ballStyle": "",
+      "position": "",
+      "expanded": false,
+      "translated": false,
+      "translateTool": false,
+      "translateToolPressed": "",
+      "mainCheck": false,
+      "mainOpacity": null,
+      "mainTransform": "",
+      "mainBox": null,
+      "translateToolBox": null,
+      "translateToolOpacity": null,
+      "translateToolVisibility": "",
+      "translateToolDisplay": "",
+      "check": false,
+      "checkBox": null,
+      "checkVisible": false,
+      "shortcutTooltip": false,
+      "progressHost": true,
+      "progressPanel": true,
+      "progressPanelClass": "fr-translation-progress",
+      "progressCompact": false,
+      "progressCompactCheck": false,
+      "progress": {
+        "running": 1,
+        "remaining": 55,
+        "queued": 0,
+        "offscreen": 55
+      }
+    },
+    "progressOnlyCompact": {
+      "host": false,
+      "ball": false,
+      "ballClass": "",
+      "ballStyle": "",
+      "position": "",
+      "expanded": false,
+      "translated": false,
+      "translateTool": false,
+      "translateToolPressed": "",
+      "mainCheck": false,
+      "mainOpacity": null,
+      "mainTransform": "",
+      "mainBox": null,
+      "translateToolBox": null,
+      "translateToolOpacity": null,
+      "translateToolVisibility": "",
+      "translateToolDisplay": "",
+      "check": false,
+      "checkBox": null,
+      "checkVisible": false,
+      "shortcutTooltip": false,
+      "progressHost": true,
+      "progressPanel": true,
+      "progressPanelClass": "fr-translation-progress fr-compact fr-idle",
+      "progressCompact": true,
+      "progressCompactCheck": true,
+      "progress": {
+        "running": 0,
+        "remaining": 55,
+        "queued": 0,
+        "offscreen": 55
+      }
+    },
+    "progressOnlyRestored": {
+      "host": false,
+      "ball": false,
+      "ballClass": "",
+      "ballStyle": "",
+      "position": "",
+      "expanded": false,
+      "translated": false,
+      "translateTool": false,
+      "translateToolPressed": "",
+      "mainCheck": false,
+      "mainOpacity": null,
+      "mainTransform": "",
+      "mainBox": null,
+      "translateToolBox": null,
+      "translateToolOpacity": null,
+      "translateToolVisibility": "",
+      "translateToolDisplay": "",
+      "check": false,
+      "checkBox": null,
+      "checkVisible": false,
+      "shortcutTooltip": false,
+      "progressHost": true,
+      "progressPanel": false,
+      "progressPanelClass": "",
+      "progressCompact": false,
+      "progressCompactCheck": false,
+      "progress": null
+    },
+    "remountedBeforeRetranslate": {
+      "host": true,
+      "ball": true,
+      "ballClass": "fr-floating-ball",
+      "ballStyle": "--fr-ball-collapsed-opacity: 0.52; top: 408px;",
+      "position": "left",
+      "expanded": false,
+      "translated": false,
+      "translateTool": true,
+      "translateToolPressed": "false",
+      "mainCheck": false,
+      "mainOpacity": 0.52,
+      "mainTransform": "matrix(1, 0, 0, 1, -40, 0)",
+      "mainBox": {
+        "left": -20,
+        "top": 388,
+        "right": 20,
+        "bottom": 428
+      },
+      "translateToolBox": {
+        "left": 16,
+        "top": 340,
+        "right": 56,
+        "bottom": 380
+      },
+      "translateToolOpacity": 0,
+      "translateToolVisibility": "visible",
+      "translateToolDisplay": "flex",
+      "check": false,
+      "checkBox": null,
+      "checkVisible": false,
+      "shortcutTooltip": false,
+      "progressHost": true,
+      "progressPanel": false,
+      "progressPanelClass": "",
+      "progressCompact": false,
+      "progressCompactCheck": false,
+      "progress": null
+    },
+    "retranslated": {
+      "host": true,
+      "ball": true,
+      "ballClass": "fr-floating-ball",
+      "ballStyle": "--fr-ball-collapsed-opacity: 0.52; top: 408px;",
+      "position": "left",
+      "expanded": false,
+      "translated": true,
+      "translateTool": true,
+      "translateToolPressed": "true",
+      "mainCheck": false,
+      "mainOpacity": 0.52,
+      "mainTransform": "matrix(1, 0, 0, 1, -40, 0)",
+      "mainBox": {
+        "left": -20,
+        "top": 388,
+        "right": 20,
+        "bottom": 428
+      },
+      "translateToolBox": {
+        "left": 16,
+        "top": 340,
+        "right": 56,
+        "bottom": 380
+      },
+      "translateToolOpacity": 0,
+      "translateToolVisibility": "visible",
+      "translateToolDisplay": "flex",
+      "check": true,
+      "checkBox": {
+        "left": 47,
+        "top": 371,
+        "right": 56,
+        "bottom": 380
+      },
+      "checkVisible": false,
+      "shortcutTooltip": false,
+      "progressHost": true,
+      "progressPanel": false,
+      "progressPanelClass": "",
+      "progressCompact": false,
+      "progressCompactCheck": false,
+      "progress": null
+    }
+  },
+  "loadingStyleIsolation": null,
+  "consoleErrors": [],
+  "screenshots": [
+    "/private/tmp/fluentread-full-page-pr-integration-lifecycle-20261011/full-page-translated.png",
+    "/private/tmp/fluentread-full-page-pr-integration-lifecycle-20261011/full-page-restored.png",
+    "/private/tmp/fluentread-full-page-pr-integration-lifecycle-20261011/full-page-retranslated.png",
+    "/private/tmp/fluentread-full-page-pr-integration-lifecycle-20261011/full-page-zero-delay-hover-stable.png",
+    "/private/tmp/fluentread-full-page-pr-integration-lifecycle-20261011/full-page-passive-hover-remount-stable.png",
+    "/private/tmp/fluentread-full-page-pr-integration-lifecycle-20261011/full-page-unchanged-attributes-stable.png",
+    "/private/tmp/fluentread-full-page-pr-integration-lifecycle-20261011/full-page-link-failure.png",
+    "/private/tmp/fluentread-full-page-pr-integration-lifecycle-20261011/full-page-link-error-reason.png",
+    "/private/tmp/fluentread-full-page-pr-integration-lifecycle-20261011/full-page-link-retry-success.png"
+  ]
+}

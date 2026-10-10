@@ -1,0 +1,1037 @@
+
+> FluentRead-流畅阅读@0.0.37 build:firefox /Users/thinkstu/Desktop/copy/FluentRead-full-page-quality-20261011
+> node scripts/testing/run-resource-safe.mjs -- wxt build -b firefox
+
+[resource-safe] CPU target 60%, maxWorkers 1, concurrency 3, command: wxt build -b firefox
+
+WXT 0.20.18
+ℹ Building firefox-mv2 for production with Vite 5.4.19
+⚙ vite-node transformed entrypoint /Users/thinkstu/Desktop/copy/FluentRead-full-page-quality-20261011/entrypoints/background.ts
+⚙ Original:
+---
+/**
+ * @file entrypoints/background.ts
+ * 文件职责：声明 FluentRead 的 WXT 后台入口，并把 service worker 生命周期委托给后台应用组合根。
+ * 主要内容：配置 Safari 非持久后台行为，调用 startBackgroundApp 组装消息路由、菜单、缓存与维护任务；配置存储会根据 MV3 worker 或 MV2 background page 身份选择后台数据库端口。
+ * 模块边界：本文件只保存 WXT 元数据和唯一启动委托，不直接注册业务 handler、访问存储或调用翻译服务。
+ */
+import {startBackgroundApp} from '@/src/app/background/runtime';
+export default defineBackground({
+    persistent: {
+        safari: false,
+    },
+    main: startBackgroundApp,
+});
+
+---
+⚙ Transformed:
+---
+export default defineBackground({
+ persistent: {
+     safari: false,
+ },
+});
+---
+⚙ vite-node transformed entrypoint /Users/thinkstu/Desktop/copy/FluentRead-full-page-quality-20261011/entrypoints/informationHighlightWorker.ts
+⚙ Original:
+---
+/**
+ * @file entrypoints/informationHighlightWorker.ts
+ * 文件职责：声明信息高亮的静态模块 Worker 构建入口。
+ * 主要内容：绑定 app Worker 启动函数，运行时由扩展离屏页按包内 URL 创建。
+ * 模块边界：仅声明 WXT 入口，不下载模型、不实施评分。
+ */
+import {startInformationHighlightWorkerApp} from '@/src/app/offscreen/informationHighlightWorker';
+export default defineUnlistedScript(() => startInformationHighlightWorkerApp());
+
+---
+⚙ Transformed:
+---
+export default defineUnlistedScript();
+---
+⚙ vite-node transformed entrypoint /Users/thinkstu/Desktop/copy/FluentRead-full-page-quality-20261011/entrypoints/content.ts
+⚙ Original:
+---
+/**
+ * @file entrypoints/content.ts
+ * 文件职责：声明注入所有网页的 WXT 内容脚本入口，并把页面功能生命周期交给内容应用组合根。
+ * 主要内容：在 document_start 注入并等待基础 DOM 可挂载后调用 startContentApp，统一启动翻译、悬浮与交互功能。
+ * 模块边界：入口不读取配置、不操作页面 DOM，也不直接挂载 feature；激活、清理和错误隔离均由 src/app/content 管理。
+ */
+import {startContentApp} from '@/src/app/content/runtime';
+export default defineContentScript({
+    matches: ['<all_urls>'],
+    runAt: 'document_start',
+    cssInjectionMode: 'ui',
+    main: startContentApp,
+});
+
+---
+⚙ Transformed:
+---
+export default defineContentScript({
+ matches: ['<all_urls>'],
+ runAt: 'document_start',
+ cssInjectionMode: 'ui',
+});
+---
+⚙ vite-node transformed entrypoint /Users/thinkstu/Desktop/copy/FluentRead-full-page-quality-20261011/entrypoints/localTranslationWorker.ts
+⚙ Original:
+---
+/**
+ * @file entrypoints/localTranslationWorker.ts
+ * 文件职责：声明本地翻译 Worker 的独立 WXT 产物。
+ */
+import {startLocalTranslationWorkerApp} from '@/src/app/offscreen/localTranslationWorker';
+
+export default defineUnlistedScript(startLocalTranslationWorkerApp);
+
+---
+⚙ Transformed:
+---
+/**
+ * @file entrypoints/localTranslationWorker.ts
+ * 文件职责：声明本地翻译 Worker 的独立 WXT 产物。
+ */
+import {startLocalTranslationWorkerApp} from '@/src/app/offscreen/localTranslationWorker';
+
+export default defineUnlistedScript(startLocalTranslationWorkerApp);
+---
+⚙ vite-node transformed entrypoint /Users/thinkstu/Desktop/copy/FluentRead-full-page-quality-20261011/entrypoints/localTtsWorker.ts
+⚙ Original:
+---
+/**
+ * @file entrypoints/localTtsWorker.ts
+ * 文件职责：声明本地 TTS Worker 的独立 WXT 产物。
+ * 主要内容：同步调用应用启动函数，使 WXT 收集入口元数据时能够移除运行时导入。
+ * 模块边界：只注册 Worker 入口，模型与消息生命周期归 app 和 feature。
+ */
+import {startLocalTtsWorkerApp} from '@/src/app/offscreen/localTtsWorker';
+
+export default defineUnlistedScript(() => {
+    startLocalTtsWorkerApp();
+});
+
+---
+⚙ Transformed:
+---
+export default defineUnlistedScript();
+---
+⚙ vite-node transformed entrypoint /Users/thinkstu/Desktop/copy/FluentRead-full-page-quality-20261011/entrypoints/mangaInferenceWorker.ts
+⚙ Original:
+---
+/**
+ * @file entrypoints/mangaInferenceWorker.ts
+ * 文件职责：声明漫画 OCR 与修补的静态模块 Worker 产物。
+ * 主要内容：绑定独立 Worker 启动函数。
+ * 模块边界：仅处理 WXT 入口声明，推理与生命周期归 app 和 feature。
+ */
+import {startMangaInferenceWorkerApp} from '@/src/app/offscreen/mangaInferenceWorker';
+export default defineUnlistedScript(startMangaInferenceWorkerApp);
+
+---
+⚙ Transformed:
+---
+/**
+ * @file entrypoints/mangaInferenceWorker.ts
+ * 文件职责：声明漫画 OCR 与修补的静态模块 Worker 产物。
+ * 主要内容：绑定独立 Worker 启动函数。
+ * 模块边界：仅处理 WXT 入口声明，推理与生命周期归 app 和 feature。
+ */
+import {startMangaInferenceWorkerApp} from '@/src/app/offscreen/mangaInferenceWorker';
+export default defineUnlistedScript(startMangaInferenceWorkerApp);
+---
+⚙ vite-node transformed entrypoint /Users/thinkstu/Desktop/copy/FluentRead-full-page-quality-20261011/entrypoints/supportedFrame.content.ts
+⚙ Original:
+---
+/**
+ * @file entrypoints/supportedFrame.content.ts
+ * 文件职责：在旧 QQ 邮件阅读页、Disqus 评论及 Kaggle 笔记本正文共用受限子 frame 入口。
+ * 主要内容：合并注入条件相同的内容脚本，由各运行时再次核验页面与顶层来源。
+ * 模块边界：网易邮箱需匹配 about:blank 子 frame，仍使用独立入口；通用内容入口仍只在顶层运行。
+ */
+import {startEmbeddedFrameApp} from '@/src/app/content/embeddedFrameRuntime';
+import {startQqMailFrameApp} from '@/src/app/content/qqMailFrameRuntime';
+
+export default defineContentScript({
+    matches: [
+        'https://disqus.com/embed/comments/*',
+        'https://www.kaggleusercontent.com/kf/*/__results__.html*',
+        'https://mail.qq.com/cgi-bin/readmail*',
+    ],
+    allFrames: true,
+    runAt: 'document_end',
+    cssInjectionMode: 'ui',
+    main: ctx => window.location.hostname === 'mail.qq.com'
+        ? startQqMailFrameApp(ctx) : startEmbeddedFrameApp(ctx),
+});
+
+---
+⚙ Transformed:
+---
+export default defineContentScript({
+ matches: [
+     'https://disqus.com/embed/comments/*',
+     'https://www.kaggleusercontent.com/kf/*/__results__.html*',
+     'https://mail.qq.com/cgi-bin/readmail*',
+ ],
+
+ allFrames: true,
+ runAt: 'document_end',
+ cssInjectionMode: 'ui',
+});
+---
+⚙ vite-node transformed entrypoint /Users/thinkstu/Desktop/copy/FluentRead-full-page-quality-20261011/entrypoints/shadowBridge.content.ts
+⚙ Original:
+---
+/**
+ * @file entrypoints/shadowBridge.content.ts
+ * 文件职责：在网页 MAIN world 注入 Shadow DOM 路由桥，观察不会穿过隔离世界的页面导航变化。
+ * 主要内容：从 document_start 调用 startShadowBridgeApp，并限定为无全局包装的主世界内容脚本。
+ * 模块边界：只发布版本化导航信号，不暴露扩展配置或特权 API；可信校验和生命周期在 src/app/content/shadowBridge 中实现。
+ */
+import {startShadowBridgeApp} from '@/src/app/content/shadowBridge';
+
+export default defineContentScript({
+    matches: ['<all_urls>'],
+    runAt: 'document_start',
+    world: 'MAIN',
+    globalName: false,
+    main: startShadowBridgeApp,
+});
+
+---
+⚙ Transformed:
+---
+export default defineContentScript({
+ matches: ['<all_urls>'],
+ runAt: 'document_start',
+ world: 'MAIN',
+ globalName: false,
+});
+---
+⚙ vite-node transformed entrypoint /Users/thinkstu/Desktop/copy/FluentRead-full-page-quality-20261011/entrypoints/xVideoBridge.content.ts
+⚙ Original:
+---
+/**
+ * @file entrypoints/xVideoBridge.content.ts
+ * 文件职责：在 X/Twitter MAIN world 启动字幕资源桥。
+ * 主要内容：声明站点匹配与 document_start 注入，委托应用组合根。
+ * 模块边界：入口不修改宿主 API，具体桥接与清理由视频 feature 统一负责。
+ */
+import {startXVideoBridgeApp} from '@/src/app/content/xVideoBridge';
+export default defineContentScript({
+  matches: ['*://*.x.com/*', '*://x.com/*', '*://*.twitter.com/*', '*://twitter.com/*'],
+  runAt: 'document_start', world: 'MAIN', globalName: false,
+  main: startXVideoBridgeApp,
+});
+
+---
+⚙ Transformed:
+---
+export default defineContentScript({
+ matches: ['*://*.x.com/*', '*://x.com/*', '*://*.twitter.com/*', '*://twitter.com/*'],
+ runAt: 'document_start',
+ world: 'MAIN',
+ globalName: false,
+});
+---
+⚙ vite-node transformed entrypoint /Users/thinkstu/Desktop/copy/FluentRead-full-page-quality-20261011/entrypoints/youtubeBridge.content.ts
+⚙ Original:
+---
+/**
+ * @file entrypoints/youtubeBridge.content.ts
+ * 文件职责：在全部 YouTube 页面 MAIN world 预注入 timedtext 网络桥，确保首页/搜索页经 SPA 导航到播放页后仍能获取原生字幕响应。
+ * 主要内容：匹配 youtube.com 的裸域和子域全路径，从 document_start 调用 startYoutubeTimedTextBridgeApp，并关闭 WXT 全局包装。
+ * 模块边界：桥只覆盖顶层 YouTube SPA，不宣称支持 youtube-nocookie embed iframe；消费端仍需复验视频所有权和消息上限。
+ */
+import {startYoutubeTimedTextBridgeApp} from '@/src/app/content/youtubeTimedTextBridge';
+
+export default defineContentScript({
+  matches: ['*://*.youtube.com/*', '*://youtube.com/*'],
+  runAt: 'document_start',
+  world: 'MAIN',
+  globalName: false,
+  main: startYoutubeTimedTextBridgeApp,
+});
+
+---
+⚙ Transformed:
+---
+export default defineContentScript({
+ matches: ['*://*.youtube.com/*', '*://youtube.com/*'],
+ runAt: 'document_start',
+ world: 'MAIN',
+ globalName: false,
+});
+---
+⚙ vite-node transformed entrypoint /Users/thinkstu/Desktop/copy/FluentRead-full-page-quality-20261011/entrypoints/videoTranscriptionWorker.ts
+⚙ Original:
+---
+/**
+ * @file entrypoints/videoTranscriptionWorker.ts
+ * 文件职责：声明本地字幕模型的独立 WXT Worker 产物。
+ * 主要内容：将离屏应用组合根注册为 unlisted script，供 Offscreen 按 URL 创建 Worker。
+ * 模块边界：只负责构建入口元数据，模型推理和 Worker 消息归视频 feature 管理。
+ */
+import {startVideoTranscriptionWorkerApp} from '@/src/app/offscreen/videoTranscriptionWorker';
+export default defineUnlistedScript(startVideoTranscriptionWorkerApp);
+
+---
+⚙ Transformed:
+---
+/**
+ * @file entrypoints/videoTranscriptionWorker.ts
+ * 文件职责：声明本地字幕模型的独立 WXT Worker 产物。
+ * 主要内容：将离屏应用组合根注册为 unlisted script，供 Offscreen 按 URL 创建 Worker。
+ * 模块边界：只负责构建入口元数据，模型推理和 Worker 消息归视频 feature 管理。
+ */
+import {startVideoTranscriptionWorkerApp} from '@/src/app/offscreen/videoTranscriptionWorker';
+export default defineUnlistedScript(startVideoTranscriptionWorkerApp);
+---
+⚙ vite-node transformed entrypoint /Users/thinkstu/Desktop/copy/FluentRead-full-page-quality-20261011/entrypoints/neteaseMailFrame.content.ts
+⚙ Original:
+---
+/**
+ * @file entrypoints/neteaseMailFrame.content.ts
+ * 文件职责：只在网易免费邮箱页面及其 about:blank 正文子文档声明内容脚本。
+ * 主要内容：为 163、126 和 yeah 邮箱启用 frame 注入，运行时再核验阅读页与正文边界。
+ * 模块边界：不扩大通用入口的注入范围，也不在登录或写信页面直接挂载翻译功能。
+ */
+import {startNeteaseMailFrameApp} from '@/src/app/content/qqMailFrameRuntime';
+export default defineContentScript({
+    matches: ['https://*.mail.163.com/*', 'https://*.mail.126.com/*', 'https://*.mail.yeah.net/*'],
+    allFrames: true,
+    matchAboutBlank: true,
+    runAt: 'document_end',
+    cssInjectionMode: 'ui',
+    main: startNeteaseMailFrameApp,
+});
+
+---
+⚙ Transformed:
+---
+export default defineContentScript({
+ matches: ['https://*.mail.163.com/*', 'https://*.mail.126.com/*', 'https://*.mail.yeah.net/*'],
+ allFrames: true,
+ matchAboutBlank: true,
+ runAt: 'document_end',
+ cssInjectionMode: 'ui',
+});
+---
+⚙ All entrypoints: [ { type: 'background',
+    name: 'background',
+    inputPath:
+     '/Users/thinkstu/Desktop/copy/FluentRead-full-page-quality-20261011/entrypoints/background.ts',
+    outputDir:
+     '/Users/thinkstu/Desktop/copy/FluentRead-full-page-quality-20261011/.output/firefox-mv2',
+    options: { persistent: undefined },
+    skipped: false },
+  { type: 'content-script',
+    name: 'content',
+    inputPath:
+     '/Users/thinkstu/Desktop/copy/FluentRead-full-page-quality-20261011/entrypoints/content.ts',
+    outputDir:
+     '/Users/thinkstu/Desktop/copy/FluentRead-full-page-quality-20261011/.output/firefox-mv2/content-scripts',
+    options: { matches: [Array], runAt: 'document_start', cssInjectionMode: 'ui' },
+    skipped: false },
+  { type: 'unlisted-page',
+    name: 'document',
+    inputPath:
+     '/Users/thinkstu/Desktop/copy/FluentRead-full-page-quality-20261011/entrypoints/document/index.html',
+    outputDir:
+     '/Users/thinkstu/Desktop/copy/FluentRead-full-page-quality-20261011/.output/firefox-mv2',
+    options: { title: 'FluentRead-流畅阅读 · 文档翻译', openInTab: true },
+    skipped: false },
+  { type: 'unlisted-script',
+    name: 'informationHighlightWorker',
+    inputPath:
+     '/Users/thinkstu/Desktop/copy/FluentRead-full-page-quality-20261011/entrypoints/informationHighlightWorker.ts',
+    outputDir:
+     '/Users/thinkstu/Desktop/copy/FluentRead-full-page-quality-20261011/.output/firefox-mv2',
+    options: { main: undefined },
+    skipped: false },
+  { type: 'unlisted-script',
+    name: 'localTranslationWorker',
+    inputPath:
+     '/Users/thinkstu/Desktop/copy/FluentRead-full-page-quality-20261011/entrypoints/localTranslationWorker.ts',
+    outputDir:
+     '/Users/thinkstu/Desktop/copy/FluentRead-full-page-quality-20261011/.output/firefox-mv2',
+    options: { main: [Function: startLocalTranslationWorker] },
+    skipped: false },
+  { type: 'unlisted-script',
+    name: 'localTtsWorker',
+    inputPath:
+     '/Users/thinkstu/Desktop/copy/FluentRead-full-page-quality-20261011/entrypoints/localTtsWorker.ts',
+    outputDir:
+     '/Users/thinkstu/Desktop/copy/FluentRead-full-page-quality-20261011/.output/firefox-mv2',
+    options: { main: undefined },
+    skipped: false },
+  { type: 'unlisted-script',
+    name: 'mangaInferenceWorker',
+    inputPath:
+     '/Users/thinkstu/Desktop/copy/FluentRead-full-page-quality-20261011/entrypoints/mangaInferenceWorker.ts',
+    outputDir:
+     '/Users/thinkstu/Desktop/copy/FluentRead-full-page-quality-20261011/.output/firefox-mv2',
+    options: { main: [Function: startMangaInferenceWorker] },
+    skipped: false },
+  { type: 'content-script',
+    name: 'neteaseMailFrame',
+    inputPath:
+     '/Users/thinkstu/Desktop/copy/FluentRead-full-page-quality-20261011/entrypoints/neteaseMailFrame.content.ts',
+    outputDir:
+     '/Users/thinkstu/Desktop/copy/FluentRead-full-page-quality-20261011/.output/firefox-mv2/content-scripts',
+    options:
+     { matches: [Array],
+       allFrames: true,
+       matchAboutBlank: true,
+       runAt: 'document_end',
+       cssInjectionMode: 'ui' },
+    skipped: false },
+  { type: 'unlisted-page',
+    name: 'offscreen',
+    inputPath:
+     '/Users/thinkstu/Desktop/copy/FluentRead-full-page-quality-20261011/entrypoints/offscreen/index.html',
+    outputDir:
+     '/Users/thinkstu/Desktop/copy/FluentRead-full-page-quality-20261011/.output/firefox-mv2',
+    options: { title: 'FluentRead Background DOM Runtime', include: [Array] },
+    skipped: false },
+  { type: 'options',
+    name: 'options',
+    options: { title: 'FluentRead-流畅阅读 · 设置', openInTab: true },
+    inputPath:
+     '/Users/thinkstu/Desktop/copy/FluentRead-full-page-quality-20261011/entrypoints/options/index.html',
+    outputDir:
+     '/Users/thinkstu/Desktop/copy/FluentRead-full-page-quality-20261011/.output/firefox-mv2',
+    skipped: false },
+  { type: 'popup',
+    name: 'popup',
+    options:
+     { defaultTitle: 'FluentRead-流畅阅读', mv2Key: 'browser_action', themeIcons: undefined },
+    inputPath:
+     '/Users/thinkstu/Desktop/copy/FluentRead-full-page-quality-20261011/entrypoints/popup/index.html',
+    outputDir:
+     '/Users/thinkstu/Desktop/copy/FluentRead-full-page-quality-20261011/.output/firefox-mv2',
+    skipped: false },
+  { type: 'content-script',
+    name: 'shadowBridge',
+    inputPath:
+     '/Users/thinkstu/Desktop/copy/FluentRead-full-page-quality-20261011/entrypoints/shadowBridge.content.ts',
+    outputDir:
+     '/Users/thinkstu/Desktop/copy/FluentRead-full-page-quality-20261011/.output/firefox-mv2/content-scripts',
+    options: { matches: [Array], runAt: 'document_start', world: 'MAIN', globalName: false },
+    skipped: false },
+  { type: 'content-script',
+    name: 'supportedFrame',
+    inputPath:
+     '/Users/thinkstu/Desktop/copy/FluentRead-full-page-quality-20261011/entrypoints/supportedFrame.content.ts',
+    outputDir:
+     '/Users/thinkstu/Desktop/copy/FluentRead-full-page-quality-20261011/.output/firefox-mv2/content-scripts',
+    options:
+     { matches: [Array], allFrames: true, runAt: 'document_end', cssInjectionMode: 'ui' },
+    skipped: false },
+  { type: 'unlisted-script',
+    name: 'videoTranscriptionWorker',
+    inputPath:
+     '/Users/thinkstu/Desktop/copy/FluentRead-full-page-quality-20261011/entrypoints/videoTranscriptionWorker.ts',
+    outputDir:
+     '/Users/thinkstu/Desktop/copy/FluentRead-full-page-quality-20261011/.output/firefox-mv2',
+    options: { main: [Function: startVideoTranscriptionWorker] },
+    skipped: false },
+  { type: 'content-script',
+    name: 'xVideoBridge',
+    inputPath:
+     '/Users/thinkstu/Desktop/copy/FluentRead-full-page-quality-20261011/entrypoints/xVideoBridge.content.ts',
+    outputDir:
+     '/Users/thinkstu/Desktop/copy/FluentRead-full-page-quality-20261011/.output/firefox-mv2/content-scripts',
+    options: { matches: [Array], runAt: 'document_start', world: 'MAIN', globalName: false },
+    skipped: false },
+  { type: 'content-script',
+    name: 'youtubeBridge',
+    inputPath:
+     '/Users/thinkstu/Desktop/copy/FluentRead-full-page-quality-20261011/entrypoints/youtubeBridge.content.ts',
+    outputDir:
+     '/Users/thinkstu/Desktop/copy/FluentRead-full-page-quality-20261011/.output/firefox-mv2/content-scripts',
+    options: { matches: [Array], runAt: 'document_start', world: 'MAIN', globalName: false },
+    skipped: false } ]
+⚙ Detected entrypoints: [ { type: 'background',
+    name: 'background',
+    inputPath:
+     '/Users/thinkstu/Desktop/copy/FluentRead-full-page-quality-20261011/entrypoints/background.ts',
+    outputDir:
+     '/Users/thinkstu/Desktop/copy/FluentRead-full-page-quality-20261011/.output/firefox-mv2',
+    options: { persistent: undefined },
+    skipped: false },
+  { type: 'content-script',
+    name: 'content',
+    inputPath:
+     '/Users/thinkstu/Desktop/copy/FluentRead-full-page-quality-20261011/entrypoints/content.ts',
+    outputDir:
+     '/Users/thinkstu/Desktop/copy/FluentRead-full-page-quality-20261011/.output/firefox-mv2/content-scripts',
+    options: { matches: [Array], runAt: 'document_start', cssInjectionMode: 'ui' },
+    skipped: false },
+  { type: 'unlisted-page',
+    name: 'document',
+    inputPath:
+     '/Users/thinkstu/Desktop/copy/FluentRead-full-page-quality-20261011/entrypoints/document/index.html',
+    outputDir:
+     '/Users/thinkstu/Desktop/copy/FluentRead-full-page-quality-20261011/.output/firefox-mv2',
+    options: { title: 'FluentRead-流畅阅读 · 文档翻译', openInTab: true },
+    skipped: false },
+  { type: 'unlisted-script',
+    name: 'informationHighlightWorker',
+    inputPath:
+     '/Users/thinkstu/Desktop/copy/FluentRead-full-page-quality-20261011/entrypoints/informationHighlightWorker.ts',
+    outputDir:
+     '/Users/thinkstu/Desktop/copy/FluentRead-full-page-quality-20261011/.output/firefox-mv2',
+    options: { main: undefined },
+    skipped: false },
+  { type: 'unlisted-script',
+    name: 'localTranslationWorker',
+    inputPath:
+     '/Users/thinkstu/Desktop/copy/FluentRead-full-page-quality-20261011/entrypoints/localTranslationWorker.ts',
+    outputDir:
+     '/Users/thinkstu/Desktop/copy/FluentRead-full-page-quality-20261011/.output/firefox-mv2',
+    options: { main: [Function: startLocalTranslationWorker] },
+    skipped: false },
+  { type: 'unlisted-script',
+    name: 'localTtsWorker',
+    inputPath:
+     '/Users/thinkstu/Desktop/copy/FluentRead-full-page-quality-20261011/entrypoints/localTtsWorker.ts',
+    outputDir:
+     '/Users/thinkstu/Desktop/copy/FluentRead-full-page-quality-20261011/.output/firefox-mv2',
+    options: { main: undefined },
+    skipped: false },
+  { type: 'unlisted-script',
+    name: 'mangaInferenceWorker',
+    inputPath:
+     '/Users/thinkstu/Desktop/copy/FluentRead-full-page-quality-20261011/entrypoints/mangaInferenceWorker.ts',
+    outputDir:
+     '/Users/thinkstu/Desktop/copy/FluentRead-full-page-quality-20261011/.output/firefox-mv2',
+    options: { main: [Function: startMangaInferenceWorker] },
+    skipped: false },
+  { type: 'content-script',
+    name: 'neteaseMailFrame',
+    inputPath:
+     '/Users/thinkstu/Desktop/copy/FluentRead-full-page-quality-20261011/entrypoints/neteaseMailFrame.content.ts',
+    outputDir:
+     '/Users/thinkstu/Desktop/copy/FluentRead-full-page-quality-20261011/.output/firefox-mv2/content-scripts',
+    options:
+     { matches: [Array],
+       allFrames: true,
+       matchAboutBlank: true,
+       runAt: 'document_end',
+       cssInjectionMode: 'ui' },
+    skipped: false },
+  { type: 'unlisted-page',
+    name: 'offscreen',
+    inputPath:
+     '/Users/thinkstu/Desktop/copy/FluentRead-full-page-quality-20261011/entrypoints/offscreen/index.html',
+    outputDir:
+     '/Users/thinkstu/Desktop/copy/FluentRead-full-page-quality-20261011/.output/firefox-mv2',
+    options: { title: 'FluentRead Background DOM Runtime', include: [Array] },
+    skipped: false },
+  { type: 'options',
+    name: 'options',
+    options: { title: 'FluentRead-流畅阅读 · 设置', openInTab: true },
+    inputPath:
+     '/Users/thinkstu/Desktop/copy/FluentRead-full-page-quality-20261011/entrypoints/options/index.html',
+    outputDir:
+     '/Users/thinkstu/Desktop/copy/FluentRead-full-page-quality-20261011/.output/firefox-mv2',
+    skipped: false },
+  { type: 'popup',
+    name: 'popup',
+    options:
+     { defaultTitle: 'FluentRead-流畅阅读', mv2Key: 'browser_action', themeIcons: undefined },
+    inputPath:
+     '/Users/thinkstu/Desktop/copy/FluentRead-full-page-quality-20261011/entrypoints/popup/index.html',
+    outputDir:
+     '/Users/thinkstu/Desktop/copy/FluentRead-full-page-quality-20261011/.output/firefox-mv2',
+    skipped: false },
+  { type: 'content-script',
+    name: 'shadowBridge',
+    inputPath:
+     '/Users/thinkstu/Desktop/copy/FluentRead-full-page-quality-20261011/entrypoints/shadowBridge.content.ts',
+    outputDir:
+     '/Users/thinkstu/Desktop/copy/FluentRead-full-page-quality-20261011/.output/firefox-mv2/content-scripts',
+    options: { matches: [Array], runAt: 'document_start', world: 'MAIN', globalName: false },
+    skipped: false },
+  { type: 'content-script',
+    name: 'supportedFrame',
+    inputPath:
+     '/Users/thinkstu/Desktop/copy/FluentRead-full-page-quality-20261011/entrypoints/supportedFrame.content.ts',
+    outputDir:
+     '/Users/thinkstu/Desktop/copy/FluentRead-full-page-quality-20261011/.output/firefox-mv2/content-scripts',
+    options:
+     { matches: [Array], allFrames: true, runAt: 'document_end', cssInjectionMode: 'ui' },
+    skipped: false },
+  { type: 'unlisted-script',
+    name: 'videoTranscriptionWorker',
+    inputPath:
+     '/Users/thinkstu/Desktop/copy/FluentRead-full-page-quality-20261011/entrypoints/videoTranscriptionWorker.ts',
+    outputDir:
+     '/Users/thinkstu/Desktop/copy/FluentRead-full-page-quality-20261011/.output/firefox-mv2',
+    options: { main: [Function: startVideoTranscriptionWorker] },
+    skipped: false },
+  { type: 'content-script',
+    name: 'xVideoBridge',
+    inputPath:
+     '/Users/thinkstu/Desktop/copy/FluentRead-full-page-quality-20261011/entrypoints/xVideoBridge.content.ts',
+    outputDir:
+     '/Users/thinkstu/Desktop/copy/FluentRead-full-page-quality-20261011/.output/firefox-mv2/content-scripts',
+    options: { matches: [Array], runAt: 'document_start', world: 'MAIN', globalName: false },
+    skipped: false },
+  { type: 'content-script',
+    name: 'youtubeBridge',
+    inputPath:
+     '/Users/thinkstu/Desktop/copy/FluentRead-full-page-quality-20261011/entrypoints/youtubeBridge.content.ts',
+    outputDir:
+     '/Users/thinkstu/Desktop/copy/FluentRead-full-page-quality-20261011/.output/firefox-mv2/content-scripts',
+    options: { matches: [Array], runAt: 'document_start', world: 'MAIN', globalName: false },
+    skipped: false } ]
+(node:61058) ExperimentalWarning: Importing JSON modules is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+- Preparing...
+
+(!) Some chunks are larger than 500 kB after minification. Consider:
+- Using dynamic import() to code-split the application
+- Use build.rollupOptions.output.manualChunks to improve chunking: https://rollupjs.org/configuration-options/#output-manualchunks
+- Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.
+
+(!) Some chunks are larger than 500 kB after minification. Consider:
+- Using dynamic import() to code-split the application
+- Use build.rollupOptions.output.manualChunks to improve chunking: https://rollupjs.org/configuration-options/#output-manualchunks
+- Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.
+✔ Built extension in 33.7 s
+  ├─ .output/firefox-mv2/manifest.json                                                                     2.38 kB  
+  ├─ .output/firefox-mv2/document.html                                                                     2.2 kB   
+  ├─ .output/firefox-mv2/offscreen.html                                                                    1.55 kB  
+  ├─ .output/firefox-mv2/options.html                                                                      1.71 kB  
+  ├─ .output/firefox-mv2/popup.html                                                                        2.25 kB  
+  ├─ .output/firefox-mv2/background.js                                                                     2.24 MB  
+  ├─ .output/firefox-mv2/chunks/_commonjs-dynamic-modules-TDtrdbi3.js                                      239 B    
+  ├─ .output/firefox-mv2/chunks/_plugin-vue_export-helper-DlAUqK2U.js                                      91 B     
+  ├─ .output/firefox-mv2/chunks/_virtual_wxt-plugins-DkXLw86N.js                                           69.61 kB 
+  ├─ .output/firefox-mv2/chunks/128-rof0LK9z.js                                                            40 B     
+  ├─ .output/firefox-mv2/chunks/AreaTranslationSettings-DgHO9C7O.js                                        11.71 kB 
+  ├─ .output/firefox-mv2/chunks/capabilities-CJvkQ3lH.js                                                   682 B    
+  ├─ .output/firefox-mv2/chunks/capabilities-D1lE2mFu.js                                                   118.48 kB
+  ├─ .output/firefox-mv2/chunks/client-jkzBq4bo.js                                                         15.29 kB 
+  ├─ .output/firefox-mv2/chunks/client-snZHSsgj.js                                                         3.63 kB  
+  ├─ .output/firefox-mv2/chunks/compiler-BM9QPCsx.js                                                       102.6 kB 
+  ├─ .output/firefox-mv2/chunks/ConfigManagement-nx_Drc0D.js                                               113.14 kB
+  ├─ .output/firefox-mv2/chunks/contextMenuBridge-BHnNg0at.js                                              187 B    
+  ├─ .output/firefox-mv2/chunks/ContextMenuSettings-BXTg-UMZ.js                                            5.38 kB  
+  ├─ .output/firefox-mv2/chunks/core-DfCmf7fi.js                                                           7.66 kB  
+  ├─ .output/firefox-mv2/chunks/CustomHotkeyInput-DrHg6zKh.js                                              8.06 kB  
+  ├─ .output/firefox-mv2/chunks/CustomOpenAIProviderDialog-MDn_e_6n.js                                     5.07 kB  
+  ├─ .output/firefox-mv2/chunks/document-B2PGReZ2.js                                                       181.14 kB
+  ├─ .output/firefox-mv2/chunks/DownloadProgress-BMlbwMyH.js                                               1.05 kB  
+  ├─ .output/firefox-mv2/chunks/downloadProgress-BTPQBugl.js                                               305 B    
+  ├─ .output/firefox-mv2/chunks/featureServices-DWhQVZym.js                                                45.12 kB 
+  ├─ .output/firefox-mv2/chunks/FloatingBallSettings-Bsr6MwQ-.js                                           10.77 kB 
+  ├─ .output/firefox-mv2/chunks/fontkit.es-BGxqPRzC.js                                                     716.5 kB 
+  ├─ .output/firefox-mv2/chunks/GlossaryLibrarySelect-gw6J5beX.js                                          2.46 kB  
+  ├─ .output/firefox-mv2/chunks/i18n-CuOPzdYD.js                                                           783.71 kB
+  ├─ .output/firefox-mv2/chunks/imageEncoding-Bl3pE80W.js                                                  2.99 kB  
+  ├─ .output/firefox-mv2/chunks/index-B0CcNz6Q.js                                                          19.06 kB 
+  ├─ .output/firefox-mv2/chunks/index-B51iIltK.js                                                          45.35 kB 
+  ├─ .output/firefox-mv2/chunks/index-B52AbnLF.js                                                          390.38 kB
+  ├─ .output/firefox-mv2/chunks/index-BZ3tds0i.js                                                          4.82 kB  
+  ├─ .output/firefox-mv2/chunks/index-CEz7xnM7.js                                                          43.75 kB 
+  ├─ .output/firefox-mv2/chunks/index-D9awcXjb.js                                                          3.31 kB  
+  ├─ .output/firefox-mv2/chunks/index-DRMNthVT.js                                                          10.7 kB  
+  ├─ .output/firefox-mv2/chunks/index.full-C8QmFFM_.js                                                     728.84 kB
+  ├─ .output/firefox-mv2/chunks/InformationHighlightSettings-CJ8mndCf.js                                   28.09 kB 
+  ├─ .output/firefox-mv2/chunks/InputTranslationSettings-yqtDmA2r.js                                       14.55 kB 
+  ├─ .output/firefox-mv2/chunks/interface-skins-CKRbUvBf.js                                                11.1 kB  
+  ├─ .output/firefox-mv2/chunks/InterfaceSettings-ClJmfzgx.js                                              69.38 kB 
+  ├─ .output/firefox-mv2/chunks/jszip.min-BdIuh7e-.js                                                      96.97 kB 
+  ├─ .output/firefox-mv2/chunks/LearningCenter-DNSeXTRM.js                                                 56.59 kB 
+  ├─ .output/firefox-mv2/chunks/learningModel-B1q9bLNZ.js                                                  5.37 kB  
+  ├─ .output/firefox-mv2/chunks/localTranslationSupport-Dq55OZJm.js                                        192 B    
+  ├─ .output/firefox-mv2/chunks/LocalTtsSettings-DNC_6ao8.js                                               8.53 kB  
+  ├─ .output/firefox-mv2/chunks/mangaPatchResult-g-b3HlD7.js                                               10.68 kB 
+  ├─ .output/firefox-mv2/chunks/MangaSettings.vue_vue_type_style_index_0_scoped_e6dec263_lang-CMeeNjTq.js  105.27 kB
+  ├─ .output/firefox-mv2/chunks/modelDownloads-x4RZHIUY.js                                                 3.83 kB  
+  ├─ .output/firefox-mv2/chunks/numberFormat-BTgBvnxC.js                                                   192 B    
+  ├─ .output/firefox-mv2/chunks/ocr-QBWAwol3.js                                                            32.92 kB 
+  ├─ .output/firefox-mv2/chunks/offscreen-9egisR0L.js                                                      99.63 kB 
+  ├─ .output/firefox-mv2/chunks/options-12LYSu64.js                                                        88.79 kB 
+  ├─ .output/firefox-mv2/chunks/ParagraphCopySettings-CB5gaEru.js                                          6.68 kB  
+  ├─ .output/firefox-mv2/chunks/ParagraphHandlingSettings-Bmdx5fBh.js                                      2.8 kB   
+  ├─ .output/firefox-mv2/chunks/pdf-DTIIO-U_.js                                                            409.22 kB
+  ├─ .output/firefox-mv2/chunks/PdfReader-CazA-hO2.js                                                      60.38 kB 
+  ├─ .output/firefox-mv2/chunks/pdfReadingFont-PmD9aHzM.js                                                 1.48 kB  
+  ├─ .output/firefox-mv2/chunks/pdfSource-gjBoXda6.js                                                      648 B    
+  ├─ .output/firefox-mv2/chunks/popup-B8MZ09Bh.js                                                          2.51 kB  
+  ├─ .output/firefox-mv2/chunks/PopupApp-CBhmL6b1.js                                                       46.33 kB 
+  ├─ .output/firefox-mv2/chunks/PopupDrawer-CQYfdiG5.js                                                    3.57 kB  
+  ├─ .output/firefox-mv2/chunks/PopupOnboarding-DuRUVCpH.js                                                3.2 kB   
+  ├─ .output/firefox-mv2/chunks/popupQuickFeatureIcons-KvIetRmS.js                                         509 B    
+  ├─ .output/firefox-mv2/chunks/PopupServices-DG83I6aT.js                                                  11.53 kB 
+  ├─ .output/firefox-mv2/chunks/presentation-Ck8BgFQ4.js                                                   33 kB    
+  ├─ .output/firefox-mv2/chunks/progress-DrSrqemQ.js                                                       2.21 kB  
+  ├─ .output/firefox-mv2/chunks/PromptTemplateEditor-nOZxbFHE.js                                           5.86 kB  
+  ├─ .output/firefox-mv2/chunks/protocol-DokfpzeP.js                                                       1.49 kB  
+  ├─ .output/firefox-mv2/chunks/public-B_ZP7UDr.js                                                         22.89 kB 
+  ├─ .output/firefox-mv2/chunks/public-BLM-IEjW.js                                                         43.13 kB 
+  ├─ .output/firefox-mv2/chunks/public-Cdc0xHS3.js                                                         32.71 kB 
+  ├─ .output/firefox-mv2/chunks/public-CqG2cyb_.js                                                         38.01 kB 
+  ├─ .output/firefox-mv2/chunks/public-Hl2jQAEO.js                                                         53.24 kB 
+  ├─ .output/firefox-mv2/chunks/QuickTranslationProfiles-KQaPRSav.js                                       21.62 kB 
+  ├─ .output/firefox-mv2/chunks/ReadingAnswer-BWrpe0ma.js                                                  13.35 kB 
+  ├─ .output/firefox-mv2/chunks/registry-DVHZF1Aa.js                                                       348 B    
+  ├─ .output/firefox-mv2/chunks/result-S8stjcMA.js                                                         215 B    
+  ├─ .output/firefox-mv2/chunks/runtimeMessages-BrSTRX6n.js                                                266 B    
+  ├─ .output/firefox-mv2/chunks/SectionTranslationSettings-CYb2kGWE.js                                     7.33 kB  
+  ├─ .output/firefox-mv2/chunks/SegmentedControl-D0vm-uCZ.js                                               2.91 kB  
+  ├─ .output/firefox-mv2/chunks/SelectionSettings-Ckb_j-rF.js                                              15.5 kB  
+  ├─ .output/firefox-mv2/chunks/SelectionTranslator-CZsiSpXs.js                                            77.94 kB 
+  ├─ .output/firefox-mv2/chunks/serviceCatalog-BJXPfz8M.js                                                 7.07 kB  
+  ├─ .output/firefox-mv2/chunks/ServiceCatalog-CppZDcAi.js                                                 24.13 kB 
+  ├─ .output/firefox-mv2/chunks/ServiceConfiguration-lztlJn6G.js                                           133.49 kB
+  ├─ .output/firefox-mv2/chunks/ServiceNatureBadge-Bz9dAFso.js                                             725 B    
+  ├─ .output/firefox-mv2/chunks/SettingsPreviewLayout-C5Zi6UnZ.js                                          892 B    
+  ├─ .output/firefox-mv2/chunks/SettingsSections-BVUp1y0i.js                                               90.33 kB 
+  ├─ .output/firefox-mv2/chunks/sha2-DOVRoy0a.js                                                           215.87 kB
+  ├─ .output/firefox-mv2/chunks/siteAdaptationEditor-vt_Pt5VD.js                                           4.97 kB  
+  ├─ .output/firefox-mv2/chunks/SiteAdaptationSettings-CWtS1Wh6.js                                         26.74 kB 
+  ├─ .output/firefox-mv2/chunks/sitePreferences-xYgT4Bsv.js                                                1.34 kB  
+  ├─ .output/firefox-mv2/chunks/SitePreferencesSettings-ClOeSySQ.js                                        8.22 kB  
+  ├─ .output/firefox-mv2/chunks/SiteRulePreview-C54UC7ok.js                                                5.06 kB  
+  ├─ .output/firefox-mv2/chunks/speechProgress-C7YKgRGP.js                                                 2.33 kB  
+  ├─ .output/firefox-mv2/chunks/tensor-B9JHZz66.js                                                         13.7 kB  
+  ├─ .output/firefox-mv2/chunks/transcription-DYs8Ok0M.js                                                  2.53 kB  
+  ├─ .output/firefox-mv2/chunks/transformers.web-x8n3daXx.js                                               458.2 kB 
+  ├─ .output/firefox-mv2/chunks/TranslationCacheSettings-CJVX602P.js                                       7.39 kB  
+  ├─ .output/firefox-mv2/chunks/TranslationLoadingPreview-7o0cfxM1.js                                      16.78 kB 
+  ├─ .output/firefox-mv2/chunks/types-CN7jBpgI.js                                                          85 B     
+  ├─ .output/firefox-mv2/chunks/UiLanguageOnboarding-BlI5B-bz.js                                           6.98 kB  
+  ├─ .output/firefox-mv2/chunks/use-dialog-D9QabDFL.js                                                     6.65 kB  
+  ├─ .output/firefox-mv2/chunks/useHotkeyDraft-BdwqCHJD.js                                                 860 B    
+  ├─ .output/firefox-mv2/chunks/useSettingsActionContext-iudhVGJH.js                                       376 B    
+  ├─ .output/firefox-mv2/chunks/useVisionProbeStatus-BeZYp8nm.js                                           13.75 kB 
+  ├─ .output/firefox-mv2/chunks/VideoLocalModelSettings-Bh8Am0eM.js                                        12.19 kB 
+  ├─ .output/firefox-mv2/chunks/VideoSubtitleAppearanceSettings-D89g842Y.js                                9.43 kB  
+  ├─ .output/firefox-mv2/chunks/webgpu-C2Up5DtH.js                                                         702 B    
+  ├─ .output/firefox-mv2/chunks/WritingSettings-C5_GABgZ.js                                                14.89 kB 
+  ├─ .output/firefox-mv2/content-scripts/content.js                                                        2.75 MB  
+  ├─ .output/firefox-mv2/content-scripts/neteaseMailFrame.js                                               2.12 MB  
+  ├─ .output/firefox-mv2/content-scripts/shadowBridge.js                                                   3.35 kB  
+  ├─ .output/firefox-mv2/content-scripts/supportedFrame.js                                                 1.91 MB  
+  ├─ .output/firefox-mv2/content-scripts/xVideoBridge.js                                                   8.04 kB  
+  ├─ .output/firefox-mv2/content-scripts/youtubeBridge.js                                                  5.5 kB   
+  ├─ .output/firefox-mv2/fluent-read-ai/wllama.worker.js                                                   155.46 kB
+  ├─ .output/firefox-mv2/fluent-read-ocr/core/tesseract-core-simd-lstm.wasm.js                             129.55 kB
+  ├─ .output/firefox-mv2/fluent-read-ocr/worker/worker.min.js                                              111.58 kB
+  ├─ .output/firefox-mv2/informationHighlightWorker.js                                                     18.09 kB 
+  ├─ .output/firefox-mv2/localTranslationWorker.js                                                         389.14 kB
+  ├─ .output/firefox-mv2/localTtsWorker.js                                                                 2.04 MB  
+  ├─ .output/firefox-mv2/mangaInferenceWorker.js                                                           24.01 kB 
+  ├─ .output/firefox-mv2/popup-startup.js                                                                  1.15 kB  
+  ├─ .output/firefox-mv2/videoTranscriptionWorker.js                                                       18.1 kB  
+  ├─ .output/firefox-mv2/assets/AreaTranslationSettings-C7ms4J-n.css                                       1.43 kB  
+  ├─ .output/firefox-mv2/assets/capabilities-zxabMWFJ.css                                                  22.84 kB 
+  ├─ .output/firefox-mv2/assets/ConfigManagement-loleGv8V.css                                              44.47 kB 
+  ├─ .output/firefox-mv2/assets/ContextMenuSettings-Dvfh5iv0.css                                           2.28 kB  
+  ├─ .output/firefox-mv2/assets/CustomHotkeyInput-CB262rhW.css                                             7.05 kB  
+  ├─ .output/firefox-mv2/assets/CustomOpenAIProviderDialog-DMYstdJ7.css                                    1.47 kB  
+  ├─ .output/firefox-mv2/assets/document-Dj-Wev-n.css                                                      62.74 kB 
+  ├─ .output/firefox-mv2/assets/DownloadProgress-E5aTQrXU.css                                              1.79 kB  
+  ├─ .output/firefox-mv2/assets/el-message-box-MxYczmbt.css                                                30.95 kB 
+  ├─ .output/firefox-mv2/assets/el-overlay-CUAhHdWP.css                                                    184 B    
+  ├─ .output/firefox-mv2/assets/featureServices-CEK4A_rC.css                                               4.06 kB  
+  ├─ .output/firefox-mv2/assets/FloatingBallSettings-D_eKwpsz.css                                          5.39 kB  
+  ├─ .output/firefox-mv2/assets/GlossaryLibrarySelect-D0hlCUHC.css                                         1.45 kB  
+  ├─ .output/firefox-mv2/assets/HarnessReadingHistory-CIr3vFVh.css                                         22.38 kB 
+  ├─ .output/firefox-mv2/assets/i18n-CMRK1q-d.css                                                          8.39 kB  
+  ├─ .output/firefox-mv2/assets/InformationHighlightSettings-C-YpC7jZ.css                                  15.81 kB 
+  ├─ .output/firefox-mv2/assets/InputTranslationSettings-BX1C3rYd.css                                      4.31 kB  
+  ├─ .output/firefox-mv2/assets/interface-skins-C-micYUc.css                                               69.41 kB 
+  ├─ .output/firefox-mv2/assets/InterfaceSettings-CsmSILNa.css                                             64.95 kB 
+  ├─ .output/firefox-mv2/assets/LearningCenter-CY2r-_ad.css                                                30.97 kB 
+  ├─ .output/firefox-mv2/assets/LocalTtsSettings-BsSmeD7e.css                                              2.92 kB  
+  ├─ .output/firefox-mv2/assets/MangaSettings-OF2kXkY4.css                                                 23.54 kB 
+  ├─ .output/firefox-mv2/assets/options-BHHDbiUf.css                                                       112.13 kB
+  ├─ .output/firefox-mv2/assets/ParagraphCopySettings-C3wU--Qz.css                                         443 B    
+  ├─ .output/firefox-mv2/assets/PdfReader-BXlbcB0H.css                                                     15.05 kB 
+  ├─ .output/firefox-mv2/assets/popup-CMsO4ZOk.css                                                         44.58 kB 
+  ├─ .output/firefox-mv2/assets/PopupDrawer-CpuVa63I.css                                                   2.16 kB  
+  ├─ .output/firefox-mv2/assets/PopupOnboarding-CJGUjYze.css                                               321 B    
+  ├─ .output/firefox-mv2/assets/PopupServices-Cmu6NnR4.css                                                 6.08 kB  
+  ├─ .output/firefox-mv2/assets/PromptTemplateEditor-DT1dj0WZ.css                                          3.8 kB   
+  ├─ .output/firefox-mv2/assets/public-1smmMcHZ.css                                                        30.54 kB 
+  ├─ .output/firefox-mv2/assets/public-BdRlOPhV.css                                                        14.63 kB 
+  ├─ .output/firefox-mv2/assets/public-Cx8xmbcd.css                                                        17.31 kB 
+  ├─ .output/firefox-mv2/assets/public-wvYfDBI2.css                                                        42.57 kB 
+  ├─ .output/firefox-mv2/assets/QuickTranslationProfiles-CgLjiHyA.css                                      6.05 kB  
+  ├─ .output/firefox-mv2/assets/SectionTranslationSettings-C2xEIatw.css                                    458 B    
+  ├─ .output/firefox-mv2/assets/SegmentedControl-B-G9CCIY.css                                              3.44 kB  
+  ├─ .output/firefox-mv2/assets/SelectionSettings-C0fZ9SK5.css                                             6.42 kB  
+  ├─ .output/firefox-mv2/assets/SelectionTranslator-uoO0lhfk.css                                           32.97 kB 
+  ├─ .output/firefox-mv2/assets/ServiceCatalog-Dk83KxoJ.css                                                20.84 kB 
+  ├─ .output/firefox-mv2/assets/ServiceConfiguration-BDllE0je.css                                          56.5 kB  
+  ├─ .output/firefox-mv2/assets/ServiceNatureBadge-D8A00jJc.css                                            457 B    
+  ├─ .output/firefox-mv2/assets/SettingsPreviewLayout-e2D_WJRq.css                                         1.41 kB  
+  ├─ .output/firefox-mv2/assets/SettingsSections-DBWTjBa3.css                                              37.1 kB  
+  ├─ .output/firefox-mv2/assets/SiteAdaptationSettings-DgXU1SEe.css                                        9.69 kB  
+  ├─ .output/firefox-mv2/assets/SitePreferencesSettings-DZM8c0yL.css                                       6.08 kB  
+  ├─ .output/firefox-mv2/assets/SiteRulePreview-aKN6Wzfu.css                                               6.09 kB  
+  ├─ .output/firefox-mv2/assets/TranslationCacheSettings-DRKA4HHG.css                                      2.66 kB  
+  ├─ .output/firefox-mv2/assets/TranslationLoadingPreview-iTE9ogdz.css                                     117 B    
+  ├─ .output/firefox-mv2/assets/UiLanguageOnboarding-iw_YowsP.css                                          10.4 kB  
+  ├─ .output/firefox-mv2/assets/VideoLocalModelSettings-BToaX1mZ.css                                       6.82 kB  
+  ├─ .output/firefox-mv2/assets/VideoSubtitleAppearanceSettings-BTFUAduE.css                               6.5 kB   
+  ├─ .output/firefox-mv2/assets/WritingSettings-BdeZXuOc.css                                               20.79 kB 
+  ├─ .output/firefox-mv2/content-scripts/content.css                                                       190.39 kB
+  ├─ .output/firefox-mv2/content-scripts/neteaseMailFrame.css                                              100.64 kB
+  ├─ .output/firefox-mv2/content-scripts/supportedFrame.css                                                100.64 kB
+  ├─ .output/firefox-mv2/assets/pdf.worker.min-rsCePomN.mjs                                                1.42 MB  
+  ├─ .output/firefox-mv2/assets/wechat-contact-zY-MJ-Xi.jpg                                                100.72 kB
+  ├─ .output/firefox-mv2/ecdict-core.json                                                                  824 kB   
+  ├─ .output/firefox-mv2/ecdict-core.LICENSE.md                                                            1.72 kB  
+  ├─ .output/firefox-mv2/fluent-read-ai/ort-wasm-simd-threaded.asyncify.mjs                                50.7 kB  
+  ├─ .output/firefox-mv2/fluent-read-ai/ort-wasm-simd-threaded.asyncify.wasm                               23.57 MB 
+  ├─ .output/firefox-mv2/fluent-read-ai/wllama.wasm                                                        8.46 MB  
+  ├─ .output/firefox-mv2/fluent-read-manga/NOTICE.md                                                       1.36 kB  
+  ├─ .output/firefox-mv2/fluent-read-ocr/core/tesseract-core-simd-lstm.wasm                                2.87 MB  
+  ├─ .output/firefox-mv2/fluent-read-ocr/LICENSE.md                                                        11.36 kB 
+  ├─ .output/firefox-mv2/fluent-read-ocr/NOTICE.md                                                         970 B    
+  ├─ .output/firefox-mv2/fluent-read-ocr/worker/worker.min.js.LICENSE.txt                                  466 B    
+  ├─ .output/firefox-mv2/i18n/en-US.json                                                                   469.06 kB
+  ├─ .output/firefox-mv2/i18n/es-ES.json                                                                   511.16 kB
+  ├─ .output/firefox-mv2/i18n/fr-FR.json                                                                   525.37 kB
+  ├─ .output/firefox-mv2/i18n/ja-JP.json                                                                   556.09 kB
+  ├─ .output/firefox-mv2/i18n/ko-KR.json                                                                   525.26 kB
+  ├─ .output/firefox-mv2/i18n/ru-RU.json                                                                   686.93 kB
+  ├─ .output/firefox-mv2/icon/128.png                                                                      16.43 kB 
+  ├─ .output/firefox-mv2/icon/16.png                                                                       1.96 kB  
+  ├─ .output/firefox-mv2/icon/32.png                                                                       3.34 kB  
+  ├─ .output/firefox-mv2/icon/48.png                                                                       4.69 kB  
+  ├─ .output/firefox-mv2/icon/64.png                                                                       6.33 kB  
+  ├─ .output/firefox-mv2/icon/toolbar/error-128.png                                                        14.86 kB 
+  ├─ .output/firefox-mv2/icon/toolbar/error-16.png                                                         952 B    
+  ├─ .output/firefox-mv2/icon/toolbar/error-32.png                                                         2.3 kB   
+  ├─ .output/firefox-mv2/icon/toolbar/error-48.png                                                         3.68 kB  
+  ├─ .output/firefox-mv2/icon/toolbar/error-64.png                                                         5.26 kB  
+  ├─ .output/firefox-mv2/icon/toolbar/translated-128.png                                                   15.18 kB 
+  ├─ .output/firefox-mv2/icon/toolbar/translated-16.png                                                    892 B    
+  ├─ .output/firefox-mv2/icon/toolbar/translated-32.png                                                    2.33 kB  
+  ├─ .output/firefox-mv2/icon/toolbar/translated-48.png                                                    3.76 kB  
+  ├─ .output/firefox-mv2/icon/toolbar/translated-64.png                                                    5.38 kB  
+  ├─ .output/firefox-mv2/icon/toolbar/translating-128.png                                                  15.07 kB 
+  ├─ .output/firefox-mv2/icon/toolbar/translating-16.png                                                   951 B    
+  ├─ .output/firefox-mv2/icon/toolbar/translating-32.png                                                   2.31 kB  
+  ├─ .output/firefox-mv2/icon/toolbar/translating-48.png                                                   3.69 kB  
+  ├─ .output/firefox-mv2/icon/toolbar/translating-64.png                                                   5.27 kB  
+  ├─ .output/firefox-mv2/interface-font-licenses.txt                                                       39.82 kB 
+  ├─ .output/firefox-mv2/misc/approve.jpg                                                                  67.65 kB 
+  ├─ .output/firefox-mv2/pdf-fonts/FluentReadNotoSansSC-Regular.woff2                                      4.98 MB  
+  ├─ .output/firefox-mv2/pdf-fonts/NOTICE.md                                                               3.11 kB  
+  ├─ .output/firefox-mv2/pdf-fonts/OFL.txt                                                                 4.39 kB  
+  ├─ .output/firefox-mv2/pdfjs/cmaps/78-EUC-H.bcmap                                                        2.4 kB   
+  ├─ .output/firefox-mv2/pdfjs/cmaps/78-EUC-V.bcmap                                                        173 B    
+  ├─ .output/firefox-mv2/pdfjs/cmaps/78-H.bcmap                                                            2.38 kB  
+  ├─ .output/firefox-mv2/pdfjs/cmaps/78-RKSJ-H.bcmap                                                       2.4 kB   
+  ├─ .output/firefox-mv2/pdfjs/cmaps/78-RKSJ-V.bcmap                                                       173 B    
+  ├─ .output/firefox-mv2/pdfjs/cmaps/78-V.bcmap                                                            169 B    
+  ├─ .output/firefox-mv2/pdfjs/cmaps/78ms-RKSJ-H.bcmap                                                     2.65 kB  
+  ├─ .output/firefox-mv2/pdfjs/cmaps/78ms-RKSJ-V.bcmap                                                     290 B    
+  ├─ .output/firefox-mv2/pdfjs/cmaps/83pv-RKSJ-H.bcmap                                                     905 B    
+  ├─ .output/firefox-mv2/pdfjs/cmaps/90ms-RKSJ-H.bcmap                                                     721 B    
+  ├─ .output/firefox-mv2/pdfjs/cmaps/90ms-RKSJ-V.bcmap                                                     290 B    
+  ├─ .output/firefox-mv2/pdfjs/cmaps/90msp-RKSJ-H.bcmap                                                    715 B    
+  ├─ .output/firefox-mv2/pdfjs/cmaps/90msp-RKSJ-V.bcmap                                                    291 B    
+  ├─ .output/firefox-mv2/pdfjs/cmaps/90pv-RKSJ-H.bcmap                                                     982 B    
+  ├─ .output/firefox-mv2/pdfjs/cmaps/90pv-RKSJ-V.bcmap                                                     260 B    
+  ├─ .output/firefox-mv2/pdfjs/cmaps/Add-H.bcmap                                                           2.42 kB  
+  ├─ .output/firefox-mv2/pdfjs/cmaps/Add-RKSJ-H.bcmap                                                      2.41 kB  
+  ├─ .output/firefox-mv2/pdfjs/cmaps/Add-RKSJ-V.bcmap                                                      287 B    
+  ├─ .output/firefox-mv2/pdfjs/cmaps/Add-V.bcmap                                                           282 B    
+  ├─ .output/firefox-mv2/pdfjs/cmaps/Adobe-CNS1-0.bcmap                                                    317 B    
+  ├─ .output/firefox-mv2/pdfjs/cmaps/Adobe-CNS1-1.bcmap                                                    371 B    
+  ├─ .output/firefox-mv2/pdfjs/cmaps/Adobe-CNS1-2.bcmap                                                    376 B    
+  ├─ .output/firefox-mv2/pdfjs/cmaps/Adobe-CNS1-3.bcmap                                                    401 B    
+  ├─ .output/firefox-mv2/pdfjs/cmaps/Adobe-CNS1-4.bcmap                                                    405 B    
+  ├─ .output/firefox-mv2/pdfjs/cmaps/Adobe-CNS1-5.bcmap                                                    406 B    
+  ├─ .output/firefox-mv2/pdfjs/cmaps/Adobe-CNS1-6.bcmap                                                    406 B    
+  ├─ .output/firefox-mv2/pdfjs/cmaps/Adobe-CNS1-UCS2.bcmap                                                 41.19 kB 
+  ├─ .output/firefox-mv2/pdfjs/cmaps/Adobe-GB1-0.bcmap                                                     217 B    
+  ├─ .output/firefox-mv2/pdfjs/cmaps/Adobe-GB1-1.bcmap                                                     250 B    
+  ├─ .output/firefox-mv2/pdfjs/cmaps/Adobe-GB1-2.bcmap                                                     465 B    
+  ├─ .output/firefox-mv2/pdfjs/cmaps/Adobe-GB1-3.bcmap                                                     470 B    
+  ├─ .output/firefox-mv2/pdfjs/cmaps/Adobe-GB1-4.bcmap                                                     601 B    
+  ├─ .output/firefox-mv2/pdfjs/cmaps/Adobe-GB1-5.bcmap                                                     625 B    
+  ├─ .output/firefox-mv2/pdfjs/cmaps/Adobe-GB1-UCS2.bcmap                                                  33.97 kB 
+  ├─ .output/firefox-mv2/pdfjs/cmaps/Adobe-Japan1-0.bcmap                                                  225 B    
+  ├─ .output/firefox-mv2/pdfjs/cmaps/Adobe-Japan1-1.bcmap                                                  226 B    
+  ├─ .output/firefox-mv2/pdfjs/cmaps/Adobe-Japan1-2.bcmap                                                  233 B    
+  ├─ .output/firefox-mv2/pdfjs/cmaps/Adobe-Japan1-3.bcmap                                                  242 B    
+  ├─ .output/firefox-mv2/pdfjs/cmaps/Adobe-Japan1-4.bcmap                                                  337 B    
+  ├─ .output/firefox-mv2/pdfjs/cmaps/Adobe-Japan1-5.bcmap                                                  430 B    
+  ├─ .output/firefox-mv2/pdfjs/cmaps/Adobe-Japan1-6.bcmap                                                  485 B    
+  ├─ .output/firefox-mv2/pdfjs/cmaps/Adobe-Japan1-UCS2.bcmap                                               40.95 kB 
+  ├─ .output/firefox-mv2/pdfjs/cmaps/Adobe-Korea1-0.bcmap                                                  241 B    
+  ├─ .output/firefox-mv2/pdfjs/cmaps/Adobe-Korea1-1.bcmap                                                  386 B    
+  ├─ .output/firefox-mv2/pdfjs/cmaps/Adobe-Korea1-2.bcmap                                                  391 B    
+  ├─ .output/firefox-mv2/pdfjs/cmaps/Adobe-Korea1-UCS2.bcmap                                               23.29 kB 
+  ├─ .output/firefox-mv2/pdfjs/cmaps/B5-H.bcmap                                                            1.09 kB  
+  ├─ .output/firefox-mv2/pdfjs/cmaps/B5-V.bcmap                                                            142 B    
+  ├─ .output/firefox-mv2/pdfjs/cmaps/B5pc-H.bcmap                                                          1.1 kB   
+  ├─ .output/firefox-mv2/pdfjs/cmaps/B5pc-V.bcmap                                                          144 B    
+  ├─ .output/firefox-mv2/pdfjs/cmaps/CNS-EUC-H.bcmap                                                       1.78 kB  
+  ├─ .output/firefox-mv2/pdfjs/cmaps/CNS-EUC-V.bcmap                                                       1.92 kB  
+  ├─ .output/firefox-mv2/pdfjs/cmaps/CNS1-H.bcmap                                                          706 B    
+  ├─ .output/firefox-mv2/pdfjs/cmaps/CNS1-V.bcmap                                                          143 B    
+  ├─ .output/firefox-mv2/pdfjs/cmaps/CNS2-H.bcmap                                                          504 B    
+  ├─ .output/firefox-mv2/pdfjs/cmaps/CNS2-V.bcmap                                                          93 B     
+  ├─ .output/firefox-mv2/pdfjs/cmaps/ETen-B5-H.bcmap                                                       1.13 kB  
+  ├─ .output/firefox-mv2/pdfjs/cmaps/ETen-B5-V.bcmap                                                       158 B    
+  ├─ .output/firefox-mv2/pdfjs/cmaps/ETenms-B5-H.bcmap                                                     101 B    
+  ├─ .output/firefox-mv2/pdfjs/cmaps/ETenms-B5-V.bcmap                                                     172 B    
+  ├─ .output/firefox-mv2/pdfjs/cmaps/ETHK-B5-H.bcmap                                                       4.43 kB  
+  ├─ .output/firefox-mv2/pdfjs/cmaps/ETHK-B5-V.bcmap                                                       158 B    
+  ├─ .output/firefox-mv2/pdfjs/cmaps/EUC-H.bcmap                                                           578 B    
+  ├─ .output/firefox-mv2/pdfjs/cmaps/EUC-V.bcmap                                                           170 B    
+  ├─ .output/firefox-mv2/pdfjs/cmaps/Ext-H.bcmap                                                           2.54 kB  
+  ├─ .output/firefox-mv2/pdfjs/cmaps/Ext-RKSJ-H.bcmap                                                      2.54 kB  
+  ├─ .output/firefox-mv2/pdfjs/cmaps/Ext-RKSJ-V.bcmap                                                      218 B    
+  ├─ .output/firefox-mv2/pdfjs/cmaps/Ext-V.bcmap                                                           215 B    
+  ├─ .output/firefox-mv2/pdfjs/cmaps/GB-EUC-H.bcmap                                                        549 B    
+  ├─ .output/firefox-mv2/pdfjs/cmaps/GB-EUC-V.bcmap                                                        179 B    
+  ├─ .output/firefox-mv2/pdfjs/cmaps/GB-H.bcmap                                                            528 B    
+  ├─ .output/firefox-mv2/pdfjs/cmaps/GB-V.bcmap                                                            175 B    
+  ├─ .output/firefox-mv2/pdfjs/cmaps/GBK-EUC-H.bcmap                                                       14.69 kB 
+  ├─ .output/firefox-mv2/pdfjs/cmaps/GBK-EUC-V.bcmap                                                       180 B    
+  ├─ .output/firefox-mv2/pdfjs/cmaps/GBK2K-H.bcmap                                                         19.66 kB 
+  ├─ .output/firefox-mv2/pdfjs/cmaps/GBK2K-V.bcmap                                                         219 B    
+  ├─ .output/firefox-mv2/pdfjs/cmaps/GBKp-EUC-H.bcmap                                                      14.69 kB 
+  ├─ .output/firefox-mv2/pdfjs/cmaps/GBKp-EUC-V.bcmap                                                      181 B    
+  ├─ .output/firefox-mv2/pdfjs/cmaps/GBpc-EUC-H.bcmap                                                      557 B    
+  ├─ .output/firefox-mv2/pdfjs/cmaps/GBpc-EUC-V.bcmap                                                      181 B    
+  ├─ .output/firefox-mv2/pdfjs/cmaps/GBT-EUC-H.bcmap                                                       7.29 kB  
+  ├─ .output/firefox-mv2/pdfjs/cmaps/GBT-EUC-V.bcmap                                                       180 B    
+  ├─ .output/firefox-mv2/pdfjs/cmaps/GBT-H.bcmap                                                           7.27 kB  
+  ├─ .output/firefox-mv2/pdfjs/cmaps/GBT-V.bcmap                                                           176 B    
+  ├─ .output/firefox-mv2/pdfjs/cmaps/GBTpc-EUC-H.bcmap                                                     7.3 kB   
+  ├─ .output/firefox-mv2/pdfjs/cmaps/GBTpc-EUC-V.bcmap                                                     182 B    
+  ├─ .output/firefox-mv2/pdfjs/cmaps/H.bcmap                                                               553 B    
+  ├─ .output/firefox-mv2/pdfjs/cmaps/Hankaku.bcmap                                                         132 B    
+  ├─ .output/firefox-mv2/pdfjs/cmaps/Hiragana.bcmap                                                        124 B    
+  ├─ .output/firefox-mv2/pdfjs/cmaps/HKdla-B5-H.bcmap                                                      2.65 kB  
+  ├─ .output/firefox-mv2/pdfjs/cmaps/HKdla-B5-V.bcmap                                                      148 B    
+  ├─ .output/firefox-mv2/pdfjs/cmaps/HKdlb-B5-H.bcmap                                                      2.41 kB  
+  ├─ .output/firefox-mv2/pdfjs/cmaps/HKdlb-B5-V.bcmap                                                      148 B    
+  ├─ .output/firefox-mv2/pdfjs/cmaps/HKgccs-B5-H.bcmap                                                     2.29 kB  
+  ├─ .output/firefox-mv2/pdfjs/cmaps/HKgccs-B5-V.bcmap                                                     149 B    
+  ├─ .output/firefox-mv2/pdfjs/cmaps/HKm314-B5-H.bcmap                                                     1.77 kB  
+  ├─ .output/firefox-mv2/pdfjs/cmaps/HKm314-B5-V.bcmap                                                     149 B    
+  ├─ .output/firefox-mv2/pdfjs/cmaps/HKm471-B5-H.bcmap                                                     2.17 kB  
+  ├─ .output/firefox-mv2/pdfjs/cmaps/HKm471-B5-V.bcmap                                                     149 B    
+  ├─ .output/firefox-mv2/pdfjs/cmaps/HKscs-B5-H.bcmap                                                      4.44 kB  
+  ├─ .output/firefox-mv2/pdfjs/cmaps/HKscs-B5-V.bcmap                                                      159 B    
+  ├─ .output/firefox-mv2/pdfjs/cmaps/Katakana.bcmap                                                        100 B    
+  ├─ .output/firefox-mv2/pdfjs/cmaps/KSC-EUC-H.bcmap                                                       1.85 kB  
+  ├─ .output/firefox-mv2/pdfjs/cmaps/KSC-EUC-V.bcmap                                                       164 B    
+  ├─ .output/firefox-mv2/pdfjs/cmaps/KSC-H.bcmap                                                           1.83 kB  
+  ├─ .output/firefox-mv2/pdfjs/cmaps/KSC-Johab-H.bcmap                                                     16.79 kB 
+  ├─ .output/firefox-mv2/pdfjs/cmaps/KSC-Johab-V.bcmap                                                     166 B    
+  ├─ .output/firefox-mv2/pdfjs/cmaps/KSC-V.bcmap                                                           160 B    
+  ├─ .output/firefox-mv2/pdfjs/cmaps/KSCms-UHC-H.bcmap                                                     2.79 kB  
+  ├─ .output/firefox-mv2/pdfjs/cmaps/KSCms-UHC-HW-H.bcmap                                                  2.79 kB  
+  ├─ .output/firefox-mv2/pdfjs/cmaps/KSCms-UHC-HW-V.bcmap                                                  169 B    
+  ├─ .output/firefox-mv2/pdfjs/cmaps/KSCms-UHC-V.bcmap                                                     166 B    
+  ├─ .output/firefox-mv2/pdfjs/cmaps/KSCpc-EUC-H.bcmap                                                     2.02 kB  
+  ├─ .output/firefox-mv2/pdfjs/cmaps/KSCpc-EUC-V.bcmap                                                     166 B    
+  ├─ .output/firefox-mv2/pdfjs/cmaps/LICENSE                                                               2.08 kB  
+  ├─ .output/firefox-mv2/pdfjs/cmaps/NWP-H.bcmap                                                           2.77 kB  
+  ├─ .output/firefox-mv2/pdfjs/cmaps/NWP-V.bcmap                                                           252 B    
+  ├─ .output/firefox-mv2/pdfjs/cmaps/RKSJ-H.bcmap                                                          534 B    
+  ├─ .output/firefox-mv2/pdfjs/cmaps/RKSJ-V.bcmap                                                          170 B    
+  ├─ .output/firefox-mv2/pdfjs/cmaps/Roman.bcmap                                                           96 B     
+  ├─ .output/firefox-mv2/pdfjs/cmaps/UniCNS-UCS2-H.bcmap                                                   48.28 kB 
+  ├─ .output/firefox-mv2/pdfjs/cmaps/UniCNS-UCS2-V.bcmap                                                   156 B    
+  ├─ .output/firefox-mv2/pdfjs/cmaps/UniCNS-UTF16-H.bcmap                                                  50.42 kB 
+  ├─ .output/firefox-mv2/pdfjs/cmaps/UniCNS-UTF16-V.bcmap                                                  156 B    
+  ├─ .output/firefox-mv2/pdfjs/cmaps/UniCNS-UTF32-H.bcmap                                                  52.68 kB 
+  ├─ .output/firefox-mv2/pdfjs/cmaps/UniCNS-UTF32-V.bcmap                                                  160 B    
+  ├─ .output/firefox-mv2/pdfjs/cmaps/UniCNS-UTF8-H.bcmap                                                   53.63 kB 
+  ├─ .output/firefox-mv2/pdfjs/cmaps/UniCNS-UTF8-V.bcmap                                                   157 B    
+  ├─ .output/firefox-mv2/pdfjs/cmaps/UniGB-UCS2-H.bcmap                                                    43.37 kB 
+  ├─ .output/firefox-mv2/pdfjs/cmaps/UniGB-UCS2-V.bcmap                                                    193 B    
+  ├─ .output/firefox-mv2/pdfjs/cmaps/UniGB-UTF16-H.bcmap                                                   44.09 kB 
+  ├─ .output/firefox-mv2/pdfjs/cmaps/UniGB-UTF16-V.bcmap                                                   178 B    
+  ├─ .output/firefox-mv2/pdfjs/cmaps/UniGB-UTF32-H.bcmap                                                   45.74 kB 
+  ├─ .output/firefox-mv2/pdfjs/cmaps/UniGB-UTF32-V.bcmap                                                   182 B    
+  ├─ .output/firefox-mv2/pdfjs/cmaps/UniGB-UTF8-H.bcmap                                                    46.84 kB 
+  ├─ .output/firefox-mv2/pdfjs/cmaps/UniGB-UTF8-V.bcmap                                                    181 B    
+  ├─ .output/firefox-mv2/pdfjs/cmaps/UniJIS-UCS2-H.bcmap                                                   25.44 kB 
+  ├─ .output/firefox-mv2/pdfjs/cmaps/UniJIS-UCS2-HW-H.bcmap                                                119 B    
+  ├─ .output/firefox-mv2/pdfjs/cmaps/UniJIS-UCS2-HW-V.bcmap                                                680 B    
+  ├─ .output/firefox-mv2/pdfjs/cmaps/UniJIS-UCS2-V.bcmap                                                   664 B    
+  ├─ .output/firefox-mv2/pdfjs/cmaps/UniJIS-UTF16-H.bcmap                                                  39.44 kB 
+  ├─ .output/firefox-mv2/pdfjs/cmaps/UniJIS-UTF16-V.bcmap                                                  643 B    
+  ├─ .output/firefox-mv2/pdfjs/cmaps/UniJIS-UTF32-H.bcmap                                                  40.54 kB 
+  ├─ .output/firefox-mv2/pdfjs/cmaps/UniJIS-UTF32-V.bcmap                                                  677 B    
+  ├─ .output/firefox-mv2/pdfjs/cmaps/UniJIS-UTF8-H.bcmap                                                   41.7 kB  
+  ├─ .output/firefox-mv2/pdfjs/cmaps/UniJIS-UTF8-V.bcmap                                                   678 B    
+  ├─ .output/firefox-mv2/pdfjs/cmaps/UniJIS2004-UTF16-H.bcmap                                              39.53 kB 
+  ├─ .output/firefox-mv2/pdfjs/cmaps/UniJIS2004-UTF16-V.bcmap                                              647 B    
+  ├─ .output/firefox-mv2/pdfjs/cmaps/UniJIS2004-UTF32-H.bcmap                                              40.63 kB 
+  ├─ .output/firefox-mv2/pdfjs/cmaps/UniJIS2004-UTF32-V.bcmap                                              681 B    
+  ├─ .output/firefox-mv2/pdfjs/cmaps/UniJIS2004-UTF8-H.bcmap                                               41.78 kB 
+  ├─ .output/firefox-mv2/pdfjs/cmaps/UniJIS2004-UTF8-V.bcmap                                               682 B    
+  ├─ .output/firefox-mv2/pdfjs/cmaps/UniJISPro-UCS2-HW-V.bcmap                                             705 B    
+  ├─ .output/firefox-mv2/pdfjs/cmaps/UniJISPro-UCS2-V.bcmap                                                689 B    
+  ├─ .output/firefox-mv2/pdfjs/cmaps/UniJISPro-UTF8-V.bcmap                                                726 B    
+  ├─ .output/firefox-mv2/pdfjs/cmaps/UniJISX0213-UTF32-H.bcmap                                             40.52 kB 
+  ├─ .output/firefox-mv2/pdfjs/cmaps/UniJISX0213-UTF32-V.bcmap                                             684 B    
+  ├─ .output/firefox-mv2/pdfjs/cmaps/UniJISX02132004-UTF32-H.bcmap                                         40.61 kB 
+  ├─ .output/firefox-mv2/pdfjs/cmaps/UniJISX02132004-UTF32-V.bcmap                                         688 B    
+  ├─ .output/firefox-mv2/pdfjs/cmaps/UniKS-UCS2-H.bcmap                                                    25.78 kB 
+  ├─ .output/firefox-mv2/pdfjs/cmaps/UniKS-UCS2-V.bcmap                                                    178 B    
+  ├─ .output/firefox-mv2/pdfjs/cmaps/UniKS-UTF16-H.bcmap                                                   26.33 kB 
+  ├─ .output/firefox-mv2/pdfjs/cmaps/UniKS-UTF16-V.bcmap                                                   164 B    
+  ├─ .output/firefox-mv2/pdfjs/cmaps/UniKS-UTF32-H.bcmap                                                   26.45 kB 
+  ├─ .output/firefox-mv2/pdfjs/cmaps/UniKS-UTF32-V.bcmap                                                   168 B    
+  ├─ .output/firefox-mv2/pdfjs/cmaps/UniKS-UTF8-H.bcmap                                                    27.79 kB 
+  ├─ .output/firefox-mv2/pdfjs/cmaps/UniKS-UTF8-V.bcmap                                                    169 B    
+  ├─ .output/firefox-mv2/pdfjs/cmaps/V.bcmap                                                               166 B    
+  ├─ .output/firefox-mv2/pdfjs/cmaps/WP-Symbol.bcmap                                                       179 B    
+  ├─ .output/firefox-mv2/pdfjs/standard_fonts/FoxitDingbats.pfb                                            29.51 kB 
+  ├─ .output/firefox-mv2/pdfjs/standard_fonts/FoxitFixed.pfb                                               17.6 kB  
+  ├─ .output/firefox-mv2/pdfjs/standard_fonts/FoxitFixedBold.pfb                                           18.06 kB 
+  ├─ .output/firefox-mv2/pdfjs/standard_fonts/FoxitFixedBoldItalic.pfb                                     19.15 kB 
+  ├─ .output/firefox-mv2/pdfjs/standard_fonts/FoxitFixedItalic.pfb                                         18.75 kB 
+  ├─ .output/firefox-mv2/pdfjs/standard_fonts/FoxitSerif.pfb                                               19.47 kB 
+  ├─ .output/firefox-mv2/pdfjs/standard_fonts/FoxitSerifBold.pfb                                           19.4 kB  
+  ├─ .output/firefox-mv2/pdfjs/standard_fonts/FoxitSerifBoldItalic.pfb                                     20.73 kB 
+  ├─ .output/firefox-mv2/pdfjs/standard_fonts/FoxitSerifItalic.pfb                                         21.23 kB 
+  ├─ .output/firefox-mv2/pdfjs/standard_fonts/FoxitSymbol.pfb                                              16.73 kB 
+  ├─ .output/firefox-mv2/pdfjs/standard_fonts/LiberationSans-Bold.ttf                                      137.05 kB
+  ├─ .output/firefox-mv2/pdfjs/standard_fonts/LiberationSans-BoldItalic.ttf                                135.12 kB
+  ├─ .output/firefox-mv2/pdfjs/standard_fonts/LiberationSans-Italic.ttf                                    162.04 kB
+  ├─ .output/firefox-mv2/pdfjs/standard_fonts/LiberationSans-Regular.ttf                                   139.51 kB
+  ├─ .output/firefox-mv2/pdfjs/standard_fonts/LICENSE_FOXIT                                                1.55 kB  
+  ├─ .output/firefox-mv2/pdfjs/standard_fonts/LICENSE_LIBERATION                                           4.41 kB  
+  ├─ .output/firefox-mv2/third-party-notices/ai-sdk-adapters-Apache-2.0.txt                                703 B    
+  ├─ .output/firefox-mv2/third-party-notices/deepseek-harness-MIT.txt                                      1.64 kB  
+  ├─ .output/firefox-mv2/third-party-notices/dsh-agent-memory-MIT.txt                                      1.55 kB  
+  ├─ .output/firefox-mv2/third-party-notices/information-highlight-frequency-CC-BY-SA-4.0.txt              1.21 kB  
+  ├─ .output/firefox-mv2/third-party-notices/information-highlight-qwen-Apache-2.0.txt                     12.07 kB 
+  ├─ .output/firefox-mv2/third-party-notices/lobe-icons-MIT.txt                                            1.23 kB  
+  ├─ .output/firefox-mv2/third-party-notices/manga-models-Apache-2.0.txt                                   11.36 kB 
+  ├─ .output/firefox-mv2/third-party-notices/manga-onnxruntime-MIT.txt                                     1.07 kB  
+  ├─ .output/firefox-mv2/third-party-notices/manga-onnxruntime-ThirdPartyNotices.txt                       326.87 kB
+  ├─ .output/firefox-mv2/third-party-notices/noble-hashes-MIT.txt                                          1.11 kB  
+  ├─ .output/firefox-mv2/third-party-notices/pdf-fontkit-MIT.txt                                           1.33 kB  
+  ├─ .output/firefox-mv2/third-party-notices/ppu-ocv-MIT.txt                                               1.08 kB  
+  ├─ .output/firefox-mv2/third-party-notices/ppu-paddle-ocr-MIT.txt                                        1.08 kB  
+  ├─ .output/firefox-mv2/third-party-notices/saxes-ISC.txt                                                 3.01 kB  
+  ├─ .output/firefox-mv2/third-party-notices/tinycolor-MIT.txt                                             1.07 kB  
+  ├─ .output/firefox-mv2/third-party-notices/unicode-17.0.0.txt                                            2 kB     
+  ├─ .output/firefox-mv2/third-party-notices/wllama-MIT.txt                                                1.07 kB  
+  └─ .output/firefox-mv2/third-party-notices/xmlchars-MIT.txt                                              1.09 kB  
+Σ Total size: 67.48 MB                                                                                   
+✔ Finished in 34.1 s

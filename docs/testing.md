@@ -443,6 +443,30 @@ GitHub Issue #1029 的任务列表在 React 加载后会变成一个外层 LI �
 原生节点身份、390px 布局、动态增改、恢复重译、重挂和失败重试；供应商响应是本地夹具。
 [行为说明、测试结果与复现命令](./reports/translation-core-audit-20260915/README.md)。
 
+## 谷歌合批、请求节奏与限流恢复
+
+```bash
+pnpm test tests/google.test.ts tests/googleRequestGate.test.ts tests/googleBackoffIntegration.test.ts tests/translateApiPerformance.test.ts tests/free-translation.test.ts tests/freeBalancedRouting.test.ts
+```
+
+Google 专项覆盖 120 毫秒收集窗口、32 段与 10,000 个 HTML 转义字符边界、满批立即发送、显式大数组及时启动，以及不跨调用所有权的免费池数组传输。合批的字符预算包含 `pre` 包装开销；超长单条独立处理，不在适配层任意拆分。纯文本转义、换行、译文槽数量、RPC 乱序还原和一个调用者取消不影响其他调用者继续参与回归。
+
+`googleRequestGate` 用受控时钟验证四条 Google 入口共享实际 HTTP 请求节奏：最多 2 个在途请求、启动至少间隔 200 毫秒，取消或超时后释放排队与在途所有权。任一入口收到 429 时，全部入口共同等待 `Retry-After` 的秒数或日期；无有效等待提示时按 1、2、4 秒逐步退避，最长 60 秒。到期只允许一个恢复请求，成功才解冻队列；较早的在途成功不能抹掉较新的限流状态。合批、请求排队、退避和回退均纳入调用开始后的 8 秒总预算，等待不能装入预算时返回携带安全等待信息的 429，供免费池切换服务。403/XSRF 拒绝仍按单入口冷却，服务故障继续走有界回退；外层不重跑 Google 整条回退链。
+
+生产扩展构建后运行定向浏览器专项：
+
+```bash
+node scripts/testing/run-google-backoff-browser-test.cjs \
+  --extension-dir .output/chrome-mv3 \
+  --playwright-root <工作区 Node.js 包目录> \
+  --focus-safe-helper scripts/testing/focus-safe-browser.cjs \
+  --artifacts-dir /private/tmp/fluentread-google-backoff
+```
+
+专项使用临时 Edge profile、第二屏后台正常窗口和真实配置端口，在后台 service worker 的 `fetch` 边界记录请求时间、入口、批次大小和取消；`BrowserContext.route` 不能代替 MV3 后台请求的拦截。受控响应检查 12 个错开到达的段落合批、429 等待期间没有提前访问其他入口、恢复后的请求节奏、503 回退，以及排队调用者取消后不发 HTTP 且保留另一调用者的恢复。真实 Control 与 Alt+T 验证悬浮和全文的翻译、恢复、再次翻译、相邻段落边界、原始 DOM 恢复及无重复译文或重试占位。报告写明启动方式、焦点策略、窗口位置及证据目录。
+
+本轮借鉴了[简约翻译的批量配置](https://github.com/fishjar/kiss-translator/blob/master/src/config/api.js)中延长合并窗口、提高每包字符容量的思路，以及 [Read Frog 请求队列](https://github.com/mengxi-ream/read-frog/blob/e3cbe2b7c669c875dbf1b050254da9b628daefe1/src/utils/request/request-queue.ts#L347-L366)暂停队列与恢复时限制突发的设计。在 FluentRead 的 WXT/Vue/TypeScript 服务边界内独立实现，没有复制成段代码或添加参考仓库依赖；使用独立探测锁，保证恢复请求完成前不启动第二个探测。确定性测试和浏览器响应夹具证明请求调度与交互，不证明 Google 在线额度变大；真实服务少量成功也不代表长页面、持续滚动、多标签页、其他地区或语言均不会限流。
+
 ## 翻译核心稳定性回归
 
 OpenRouter 模型卡片曾在解除内部两行截断后仍保持外层 `height:176px`，使居中的双语内容覆盖相邻卡片。`translationHeightLayout.test.ts` 检查插入后由内向外测量、共享高度租约、宿主样式更新、窗口 resize、滚动/定位边界和移除清理；`translationTruncation.test.ts` 检查几何判断与安全边界。

@@ -8,6 +8,14 @@ FluentRead displays translations produced by your selected service. Use the defa
 
 <GuideVisual kind="provider" en />
 
+## Multi-text requests and reliability
+
+Full-page translation automatically groups short passages with the same request settings when using Google translation, Microsoft translation, DeepL, Azure Translator, or Google Cloud Translation. Their native multi-text interfaces keep each source associated with its own result. **AI multi-paragraph translation** remains off by default; other machine translation services continue requesting passages individually.
+
+Each of these five services has a **Request limits → Combine translation requests** switch, enabled by default. Turn it off to request passages individually for that service. The free aggregate service follows the same preference when it calls Google or Microsoft. Changes save automatically and apply to newly started translations. **AI multi-paragraph translation** remains a separate option and is off by default.
+
+Results are displayed only after the complete array passes count, type, and nonempty checks. Interfaces with item IDs also require unique, complete IDs. Broken responses are rejected as a whole and recovered individually within the remaining timeout. Failed recovery preserves the original text and shows a failure state; invalid results are never cached. Fewer requests do not reduce character-based billing.
+
 <details class="guide-details">
 <summary>Configure a service</summary>
 
@@ -25,11 +33,11 @@ Compact directory rows keep full service names visible and leave more room for m
 
 ## Google translation speed and fallback
 
-Google translation requires no user API key. Full-page translation briefly groups paragraphs with the same language settings. The first request favors the browser batch endpoint; later requests rank the four endpoints by recent success rate, response time, and current load. Every tenth batch uses a less-observed available endpoint to discover faster or recovered routes. No additional speed setting is needed.
+Google translation requires no user API key. Full-page translation groups paragraphs with the same language settings for about 120 milliseconds, with up to 32 paragraphs and a budget of 10,000 escaped characters per batch. A single paragraph exceeding that budget is sent separately. Full batches are sent immediately, reducing small requests on long pages and during continuous scrolling. The first request favors the browser batch endpoint; later requests rank the four endpoints by recent success rate, response time, and current load. Every tenth batch uses a less-observed available endpoint to discover faster or recovered routes. No additional speed setting is needed.
 
-Failures immediately trigger another endpoint. The unsuccessful legacy single-text endpoint has been removed. Failed or rate-limited endpoints cool down so later paragraphs can use a working endpoint directly. Only one recovery probe can run when an endpoint's cooldown expires. The fallback chain shares an 8-second budget, with at most 2 seconds per endpoint, and is not repeated by the outer retry policy.
+Network errors and service failures trigger another endpoint; endpoints that reject access cool down. All four endpoints share request pacing, so switching endpoints does not start another burst. A rate limit pauses all four, following the service's waiting period when provided and increasing the delay otherwise. Only one recovery probe runs after the wait; other paragraphs resume when it succeeds. Grouping, queueing, waiting, and fallback share an 8-second budget, with at most 2 seconds per endpoint. Cancelling translation stops that caller's wait. If the required wait exceeds the remaining budget, the request ends; the free aggregate service can then try a different provider.
 
-These are internal Google web endpoints. Availability depends on your network, region, and service limits; Chrome’s built-in page translation and Google Cloud Translation use different paths.
+These are internal Google web endpoints with no guaranteed public free quota. Availability depends on your network, region, and service limits. Grouping and backoff reduce requests and ease throttling; they do not increase Google's server-side quota. Chrome’s built-in page translation, Chrome's local translation API, and Google Cloud Translation each use separate paths.
 
 ## Which one fits?
 
@@ -225,7 +233,7 @@ If you have an OpenCode Zen API key and only need its currently free Big Pickle 
 
 If the connection check returns HTTP 404 with an HTML page, check the endpoint and model protocol; that response does not establish that the API key is invalid. JSON model errors retain the provider's specific explanation. Never include API keys in public issue reports.
 
-Extra AI context can reference the page title and parts of the article to help with meaning. It sends more text and can increase usage and waiting time. Multi-paragraph translation groups nearby passages and may reduce request counts, but failures can still require retries. Both options are off by default and can be enabled independently.
+Extra AI context can reference the page title and parts of the article to help with meaning. It sends more text and can increase usage and waiting time. Multi-paragraph translation groups directly adjacent passages under the same parent and may reduce request counts. Missing or duplicate markers and incomplete results cause the whole group to fall back to individual translation; later passages with the same settings use individual requests for the current page session. Both options are off by default and can be enabled independently.
 
 Restore existing translations before translating with changed settings. Use [glossaries](/en/guide/glossary) for consistent terminology.
 

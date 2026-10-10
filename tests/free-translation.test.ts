@@ -779,6 +779,34 @@ describe('owner-local bounded high-slot free batches', () => {
         expect(vi.getTimerCount()).toBe(0);
     });
 
+    it.each(['microsoft', 'google'] as const)('免费池尊重 %s 子服务关闭偏好，不通过组或 scalar 收集重新合批', async service => {
+        mockConfig.freeTranslationOrder = [service];
+        mockConfig.nativeBatchTranslationEnabled = {[service]: false};
+        if (service === 'microsoft') {
+            const actual = await vi.importActual<typeof import('@/src/providers/translation/microsoft')>('@/src/providers/translation/microsoft');
+            microsoftMock.mockImplementation(actual.translateMicrosoftTexts);
+        } else {
+            const actual = await vi.importActual<typeof import('@/src/providers/translation/google')>('@/src/providers/translation/google');
+            googleMock.mockImplementation(actual.translateGoogleText);
+        }
+        const bodies: string[][] = [];
+        const fetchMock = vi.fn(async (_url, init) => {
+            const body = JSON.parse(String(init.body));
+            const sources: string[] = service === 'microsoft' ? body : body[0][0];
+            bodies.push(sources);
+            return service === 'microsoft'
+                ? Response.json(sources.map(text => ({translations: [{text: `译:${text}`}]})))
+                : Response.json([sources.map(text => `译:${text.replace(/^<pre>|<\/pre>$/gu, '')}`)]);
+        });
+        vi.stubGlobal('fetch', fetchMock);
+        const origins = ownerSlots().slice(0, 9);
+        await expect(settle(freeTranslation({origin: origins, requestTimeoutMs: 20_000}))).resolves.toEqual(valid(origins));
+        expect(bodies).toHaveLength(9);
+        expect(bodies.every(body => body.length === 1)).toBe(true);
+        expect(googleOwnerMock).not.toHaveBeenCalled();
+        if (service === 'google') expect(googleMock.mock.calls.every(call => call[4] === false)).toBe(true);
+    });
+
     it('Google high-slot groups use the existing native array endpoint and retain pool pacing', async () => {
         const actual = await vi.importActual<typeof import('@/src/providers/translation/google')>('@/src/providers/translation/google');
         googleOwnerMock.mockImplementation(actual.translateGoogleOwnerTexts);

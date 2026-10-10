@@ -30,6 +30,7 @@ export function isFrameTranslationState(value: unknown): value is FrameTranslati
     if (!config || typeof config !== 'object') return false;
     return ['service', 'model', 'sourceLanguage', 'targetLanguage'].every(key => typeof config[key as keyof typeof config] === 'string')
         && ['thinking', 'useCache', 'enableAIContext', 'enableAIMultiSegment'].every(key => typeof config[key as keyof typeof config] === 'boolean')
+        && (config.enableNativeBatch === undefined || typeof config.enableNativeBatch === 'boolean')
         && (config.displayMode === 'bilingual' || config.displayMode === 'single') && Number.isFinite(config.style)
         && (config.excludedLanguages === undefined || (Array.isArray(config.excludedLanguages)
             && config.excludedLanguages.length <= translationLanguageOptions.length

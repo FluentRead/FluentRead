@@ -37,6 +37,7 @@
       "tests/extensionSizeBudget.test.ts"
     ],
     "unit": [
+      "tests/googleRequestGate.test.ts",
       "tests/implementationAudit48H.test.ts",
       "tests/translationCenterSession.test.ts",
       "tests/featureTranslationServices.test.ts",
@@ -191,6 +192,8 @@
       "tests/translationCache.test.ts",
       "tests/translationBroker.test.ts",
       "tests/microsoftTransport.test.ts",
+      "tests/nativeBatch.test.ts",
+      "tests/nativeBatchConfig.test.ts",
       "tests/translationConfigCheck.test.ts",
       "tests/translationFont.test.ts",
       "tests/translationCore.test.ts",
@@ -451,6 +454,7 @@
       "tests/featureTranslationClients.test.ts",
       "tests/gemini.test.ts",
       "tests/google.test.ts",
+      "tests/googleBackoffIntegration.test.ts",
       "tests/mimo.test.ts",
       "tests/modelUsageRepository.test.ts",
       "tests/translationStatsRepository.test.ts",

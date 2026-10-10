@@ -38,6 +38,16 @@ beforeAll(async () => {
 });
 
 async function mountComponent(advanced: boolean): Promise<void> {
+  const badgePath = 'src/features/settings/ui/services/ServiceNatureBadge.vue';
+  const badgeFilename = resolve(process.cwd(), badgePath);
+  const badgeDescriptor = parse(readFileSync(badgeFilename, 'utf8'), {filename: badgeFilename}).descriptor;
+  const badgeScript = compileScript(badgeDescriptor, {id: 'free-service-badge-test'});
+  const badgeTemplate = compileTemplate({source: badgeDescriptor.template!.content, filename: badgeFilename, id: 'free-service-badge-test',
+    compilerOptions: {mode: 'function', bindingMetadata: badgeScript.bindings, expressionPlugins: ['typescript']}});
+  expect(badgeTemplate.errors).toEqual([]);
+  const badge = (await server.ssrLoadModule(`/${badgePath}`)).default;
+  badge.ssrRender = undefined;
+  badge.render = new Function('Vue', ts.transpileModule(badgeTemplate.code, {compilerOptions: {target: ts.ScriptTarget.ES2022}}).outputText)(runtime);
   const filename = resolve(process.cwd(), componentPath);
   const {descriptor} = parse(readFileSync(filename, 'utf8'), {filename});
   const bindings = compileScript(descriptor, {id: 'free-settings-test'}).bindings;
@@ -67,13 +77,26 @@ afterAll(async () => server?.close());
 function control(ariaLabel: string): Node { const element = [...elements].reverse().find(node => node.props['aria-label'] === ariaLabel); expect(element, ariaLabel).toBeDefined(); return element!; }
 
 describe('free translation settings compiled component', () => {
-  it('微软第一、B站第二展示推荐标记，手动顺序仍可调整', async () => {
+  it('微软第一、B站第二仅展示免费标记，手动顺序仍可调整', async () => {
     expect(state.providers.slice(0, 2).map((provider: {id: string}) => provider.id)).toEqual(['microsoft', 'bilibiliFree']);
-    expect(elements.filter(node => node.props['data-provider-recommended']).map(node => node.text)).toEqual(['免费 · 推荐']);
+    expect(elements.filter(node => node.props['data-service-nature-badge'] === 'bilibiliFree').map(node => node.text)).toEqual(['免费']);
+    expect(elements.some(node => node.text?.includes('推荐'))).toBe(false);
     state.setMode('sequential');
     config.freeTranslationOrder = ['google', 'bilibiliFree'];
     await runtime.nextTick();
     expect(state.providers.map((provider: {id: string}) => provider.id).slice(0, 2)).toEqual(['google', 'bilibiliFree']);
+  });
+  it('B站独立入口与免费聚合项复用免费徽标，DeepLX仍保持免费非官方标记', async () => {
+    app.unmount();
+    const badge = (await server.ssrLoadModule('/src/features/settings/ui/services/ServiceNatureBadge.vue')).default;
+    const badgeProps = runtime.reactive({service: 'bilibili'});
+    elements = [];
+    app = renderer.createApp({setup: () => () => runtime.h(badge, badgeProps)});
+    app.provide(runtime.ssrContextKey, {modules: new Set<string>()});app.config.warnHandler = () => undefined;
+    app.mount({tag: '#root', props: {}});await runtime.nextTick();
+    expect(elements.filter(node => node.props['data-service-nature-badge'] === 'bilibili').map(node => node.text)).toEqual(['免费']);
+    badgeProps.service = 'deeplx';await runtime.nextTick();
+    expect(elements.filter(node => node.props['data-service-nature-badge'] === 'deeplx').map(node => node.text)).toEqual(['settings.services.library.freeUnofficial']);
   });
   it('已失效的检查不发布排队状态或发起请求', async () => {
     let updates = 0, requests = 0;

@@ -9,6 +9,17 @@ function group(result: ReturnType<typeof buildConfigDiff>, id: string) {
 }
 
 describe('配置差异预览', () => {
+    it('原生合批偏好按服务展示开启和关闭，不暴露配置字段名', () => {
+        expect(configDiffFieldLabel('nativeBatchTranslationEnabled')).toBe('原生翻译合批');
+        const result = buildConfigDiff(
+            {nativeBatchTranslationEnabled: {google: true, microsoft: false}},
+            {nativeBatchTranslationEnabled: {google: false, microsoft: true}},
+        );
+        expect(group(result, 'translationServices')?.changes).toEqual([
+            {key: 'nativeBatchTranslationEnabled.google', label: '谷歌翻译开启合并', before: '开启', after: '关闭'},
+            {key: 'nativeBatchTranslationEnabled.microsoft', label: '微软翻译开启合并', before: '关闭', after: '开启'},
+        ]);
+    });
     it('图片识别方式在历史中使用与设置相同的可读名称', () => {
         expect(group(buildConfigDiff({imageTranslationOcrEngine: 'tesseract'}, {imageTranslationOcrEngine: 'paddle'}), 'imageTranslation')?.changes).toEqual([
             {key: 'imageTranslationOcrEngine', label: '图片识别方式', before: 'Tesseract（轻量模型）', after: 'PaddleOCR（标准模型）'},

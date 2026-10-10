@@ -2,7 +2,7 @@
  * @file src/core/config/driveSync.ts
  * 文件职责：定义默认排除敏感信息的云同步范围、兼容完整快照和不泄露凭据的差异预览。
  * 主要内容：投影普通设置、读取 v1 完整与 v2 普通快照，兼容枚举列表去重与退役条目迁移，保留凭据明确删除语义、执行三方字段合并，并将请求体、
- * 地址、请求头、密钥和未知字段统一隐藏，普通设置展示稳定名称和值；数组整体合并。
+ * 地址、请求头、密钥和未知字段统一隐藏，普通设置包含按服务保存的原生翻译合批偏好并展示稳定名称和值；数组整体合并。
  * 模块边界：只处理纯数据；不拥有口令、加密、存储、浏览器消息或 Google API。
  */
 import {options, servicesType} from './catalog';
@@ -146,6 +146,7 @@ const VISIBLE_FIELDS: Record<string, string> = {
     enableAIContext: 'AI 智能上下文',
     glossaryEnabled: '术语库',
     enableAIMultiSegment: 'AI 多段翻译',
+    nativeBatchTranslationEnabled: '原生翻译合批',
     bilingualSentenceHighlightEnabled: '双语逐句高亮',
     bilingualSentenceHighlightStyle: '逐句高亮样式',
     bilingualSentenceHighlightAppearance: '逐句高亮自定义外观',

@@ -1368,6 +1368,8 @@ export const frFRMessages = {
     'settings.services.connection': 'Réglages de connexion',
     'settings.services.model': 'Modèle',
     'settings.services.advanced': 'Réglages avancés',
+    'settings.services.nativeBatch.label': 'Regrouper les demandes de traduction',
+    'settings.services.nativeBatch.help': 'Regroupe plusieurs textes dans une seule demande pour réduire leur nombre. Désactivez cette option pour traduire chaque texte séparément.',
     'settings.services.deepl.plan': 'Forfait API DeepL',
     'settings.services.deepl.free': 'API Free (gratuit)',
     'settings.services.deepl.pro': 'API Pro (payant)',

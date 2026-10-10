@@ -556,6 +556,23 @@ describe('云备份删除确认事务', () => {
 
 
 describe('单次敏感范围事务', () => {
+    it('普通云备份保留原生合批独立偏好，跨设备恢复不改变 AI 多段开关与本机连接', async () => {
+        const source = fixture();
+        source.local = config({...source.local, nativeBatchTranslationEnabled: {google: false, deepL: false}});
+        const upload = await source.service.prepare(password);
+        await source.service.commit(upload.id, password, 'upload', {});
+        const payload = await decryptDriveConfig(source.remote!.content, password) as {config: Record<string, unknown>};
+        expect(payload.config.nativeBatchTranslationEnabled).toEqual(source.local.nativeBatchTranslationEnabled);
+        const target = fixture();
+        const targetToken = structuredClone(target.local.token);
+        target.remote = source.remote;
+        const download = await target.service.prepare(password);
+        expect(download.changes.some(change => change.label === '原生翻译合批')).toBe(true);
+        await target.service.commit(download.id, password, 'download', {});
+        expect(target.local.nativeBatchTranslationEnabled).toEqual(source.local.nativeBatchTranslationEnabled);
+        expect(target.local.enableAIMultiSegment).toBe(false);
+        expect(target.local.token).toEqual(targetToken);
+    });
     it.each([false, true])('重装后可在 worker 重启后恢复旧免费服务列表，敏感范围 %s 不补造云端密钥', async includeSensitive => {
         const f = fixture();
         const local = structuredClone(f.local);

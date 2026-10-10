@@ -1,0 +1,1415 @@
+{
+  "ok": true,
+  "scope": "native arrays, scalar recovery, atomic cache and optional bounded live/DOM samples",
+  "extensionDir": ".output/chrome-mv3",
+  "profileMode": "automatically-created-temporary-profile",
+  "liveRequested": true,
+  "fullPageRequested": true,
+  "settingsRequested": true,
+  "cases": [
+    {
+      "name": "deepL:success-repeat-and-cache",
+      "evidence": "synthetic-official-response",
+      "ok": true,
+      "requests": [
+        {
+          "service": "deepL",
+          "path": "api-free.deepl.com/v2/translate",
+          "evidence": "synthetic-official-response",
+          "inputs": [
+            "The astronomer counted 11 bright stars before sunrise.",
+            "The chef baked 22 bread rolls for the morning market.",
+            "The cyclist travelled 33 kilometres beside the river.",
+            "The librarian shelved 44 books.\nThe gardener watered 55 plants.",
+            "Use the literal text <b>66</b> & &lt; in the manual."
+          ]
+        }
+      ]
+    },
+    {
+      "name": "deepL:missing-middle-scalar-recovery",
+      "evidence": "synthetic-official-response",
+      "ok": true,
+      "requests": [
+        {
+          "service": "deepL",
+          "path": "api-free.deepl.com/v2/translate",
+          "evidence": "synthetic-official-response",
+          "inputs": [
+            "The astronomer counted 11 bright stars before sunrise.",
+            "The chef baked 22 bread rolls for the morning market.",
+            "The cyclist travelled 33 kilometres beside the river."
+          ]
+        },
+        {
+          "service": "deepL",
+          "path": "api-free.deepl.com/v2/translate",
+          "evidence": "synthetic-official-response",
+          "inputs": [
+            "The astronomer counted 11 bright stars before sunrise."
+          ]
+        },
+        {
+          "service": "deepL",
+          "path": "api-free.deepl.com/v2/translate",
+          "evidence": "synthetic-official-response",
+          "inputs": [
+            "The chef baked 22 bread rolls for the morning market."
+          ]
+        },
+        {
+          "service": "deepL",
+          "path": "api-free.deepl.com/v2/translate",
+          "evidence": "synthetic-official-response",
+          "inputs": [
+            "The cyclist travelled 33 kilometres beside the river."
+          ]
+        }
+      ]
+    },
+    {
+      "name": "deepL:empty-middle-scalar-recovery",
+      "evidence": "synthetic-official-response",
+      "ok": true,
+      "requests": [
+        {
+          "service": "deepL",
+          "path": "api-free.deepl.com/v2/translate",
+          "evidence": "synthetic-official-response",
+          "inputs": [
+            "The astronomer counted 11 bright stars before sunrise.",
+            "The chef baked 22 bread rolls for the morning market.",
+            "The cyclist travelled 33 kilometres beside the river."
+          ]
+        },
+        {
+          "service": "deepL",
+          "path": "api-free.deepl.com/v2/translate",
+          "evidence": "synthetic-official-response",
+          "inputs": [
+            "The astronomer counted 11 bright stars before sunrise."
+          ]
+        },
+        {
+          "service": "deepL",
+          "path": "api-free.deepl.com/v2/translate",
+          "evidence": "synthetic-official-response",
+          "inputs": [
+            "The chef baked 22 bread rolls for the morning market."
+          ]
+        },
+        {
+          "service": "deepL",
+          "path": "api-free.deepl.com/v2/translate",
+          "evidence": "synthetic-official-response",
+          "inputs": [
+            "The cyclist travelled 33 kilometres beside the river."
+          ]
+        }
+      ]
+    },
+    {
+      "name": "deepL:truncated-json-scalar-recovery",
+      "evidence": "synthetic-official-response",
+      "ok": true,
+      "requests": [
+        {
+          "service": "deepL",
+          "path": "api-free.deepl.com/v2/translate",
+          "evidence": "synthetic-official-response",
+          "inputs": [
+            "The astronomer counted 11 bright stars before sunrise.",
+            "The chef baked 22 bread rolls for the morning market.",
+            "The cyclist travelled 33 kilometres beside the river."
+          ]
+        },
+        {
+          "service": "deepL",
+          "path": "api-free.deepl.com/v2/translate",
+          "evidence": "synthetic-official-response",
+          "inputs": [
+            "The astronomer counted 11 bright stars before sunrise."
+          ]
+        },
+        {
+          "service": "deepL",
+          "path": "api-free.deepl.com/v2/translate",
+          "evidence": "synthetic-official-response",
+          "inputs": [
+            "The chef baked 22 bread rolls for the morning market."
+          ]
+        },
+        {
+          "service": "deepL",
+          "path": "api-free.deepl.com/v2/translate",
+          "evidence": "synthetic-official-response",
+          "inputs": [
+            "The cyclist travelled 33 kilometres beside the river."
+          ]
+        }
+      ]
+    },
+    {
+      "name": "deepL:later-scalar-failure-is-atomic",
+      "evidence": "synthetic-official-response",
+      "ok": true,
+      "failure": {
+        "kind": "response",
+        "code": "NATIVE_BATCH_RESPONSE_INVALID"
+      },
+      "failedCalls": [
+        {
+          "service": "deepL",
+          "path": "api-free.deepl.com/v2/translate",
+          "evidence": "synthetic-official-response",
+          "inputs": [
+            "The astronomer counted 11 bright stars before sunrise.",
+            "The chef baked 22 bread rolls for the morning market.",
+            "The cyclist travelled 33 kilometres beside the river."
+          ]
+        },
+        {
+          "service": "deepL",
+          "path": "api-free.deepl.com/v2/translate",
+          "evidence": "synthetic-official-response",
+          "inputs": [
+            "The astronomer counted 11 bright stars before sunrise."
+          ]
+        },
+        {
+          "service": "deepL",
+          "path": "api-free.deepl.com/v2/translate",
+          "evidence": "synthetic-official-response",
+          "inputs": [
+            "The chef baked 22 bread rolls for the morning market."
+          ]
+        }
+      ],
+      "retryCalls": [
+        {
+          "service": "deepL",
+          "path": "api-free.deepl.com/v2/translate",
+          "evidence": "synthetic-official-response",
+          "inputs": [
+            "The astronomer counted 11 bright stars before sunrise.",
+            "The chef baked 22 bread rolls for the morning market.",
+            "The cyclist travelled 33 kilometres beside the river."
+          ]
+        }
+      ]
+    },
+    {
+      "name": "azureTranslator:success-repeat-and-cache",
+      "evidence": "synthetic-official-response",
+      "ok": true,
+      "requests": [
+        {
+          "service": "azureTranslator",
+          "path": "api.cognitive.microsofttranslator.com/translate",
+          "evidence": "synthetic-official-response",
+          "inputs": [
+            "The astronomer counted 11 bright stars before sunrise.",
+            "The chef baked 22 bread rolls for the morning market.",
+            "The cyclist travelled 33 kilometres beside the river.",
+            "The librarian shelved 44 books.\nThe gardener watered 55 plants.",
+            "Use the literal text <b>66</b> & &lt; in the manual."
+          ]
+        }
+      ]
+    },
+    {
+      "name": "azureTranslator:missing-middle-scalar-recovery",
+      "evidence": "synthetic-official-response",
+      "ok": true,
+      "requests": [
+        {
+          "service": "azureTranslator",
+          "path": "api.cognitive.microsofttranslator.com/translate",
+          "evidence": "synthetic-official-response",
+          "inputs": [
+            "The astronomer counted 11 bright stars before sunrise.",
+            "The chef baked 22 bread rolls for the morning market.",
+            "The cyclist travelled 33 kilometres beside the river."
+          ]
+        },
+        {
+          "service": "azureTranslator",
+          "path": "api.cognitive.microsofttranslator.com/translate",
+          "evidence": "synthetic-official-response",
+          "inputs": [
+            "The astronomer counted 11 bright stars before sunrise."
+          ]
+        },
+        {
+          "service": "azureTranslator",
+          "path": "api.cognitive.microsofttranslator.com/translate",
+          "evidence": "synthetic-official-response",
+          "inputs": [
+            "The chef baked 22 bread rolls for the morning market."
+          ]
+        },
+        {
+          "service": "azureTranslator",
+          "path": "api.cognitive.microsofttranslator.com/translate",
+          "evidence": "synthetic-official-response",
+          "inputs": [
+            "The cyclist travelled 33 kilometres beside the river."
+          ]
+        }
+      ]
+    },
+    {
+      "name": "azureTranslator:empty-middle-scalar-recovery",
+      "evidence": "synthetic-official-response",
+      "ok": true,
+      "requests": [
+        {
+          "service": "azureTranslator",
+          "path": "api.cognitive.microsofttranslator.com/translate",
+          "evidence": "synthetic-official-response",
+          "inputs": [
+            "The astronomer counted 11 bright stars before sunrise.",
+            "The chef baked 22 bread rolls for the morning market.",
+            "The cyclist travelled 33 kilometres beside the river."
+          ]
+        },
+        {
+          "service": "azureTranslator",
+          "path": "api.cognitive.microsofttranslator.com/translate",
+          "evidence": "synthetic-official-response",
+          "inputs": [
+            "The astronomer counted 11 bright stars before sunrise."
+          ]
+        },
+        {
+          "service": "azureTranslator",
+          "path": "api.cognitive.microsofttranslator.com/translate",
+          "evidence": "synthetic-official-response",
+          "inputs": [
+            "The chef baked 22 bread rolls for the morning market."
+          ]
+        },
+        {
+          "service": "azureTranslator",
+          "path": "api.cognitive.microsofttranslator.com/translate",
+          "evidence": "synthetic-official-response",
+          "inputs": [
+            "The cyclist travelled 33 kilometres beside the river."
+          ]
+        }
+      ]
+    },
+    {
+      "name": "azureTranslator:truncated-json-scalar-recovery",
+      "evidence": "synthetic-official-response",
+      "ok": true,
+      "requests": [
+        {
+          "service": "azureTranslator",
+          "path": "api.cognitive.microsofttranslator.com/translate",
+          "evidence": "synthetic-official-response",
+          "inputs": [
+            "The astronomer counted 11 bright stars before sunrise.",
+            "The chef baked 22 bread rolls for the morning market.",
+            "The cyclist travelled 33 kilometres beside the river."
+          ]
+        },
+        {
+          "service": "azureTranslator",
+          "path": "api.cognitive.microsofttranslator.com/translate",
+          "evidence": "synthetic-official-response",
+          "inputs": [
+            "The astronomer counted 11 bright stars before sunrise."
+          ]
+        },
+        {
+          "service": "azureTranslator",
+          "path": "api.cognitive.microsofttranslator.com/translate",
+          "evidence": "synthetic-official-response",
+          "inputs": [
+            "The chef baked 22 bread rolls for the morning market."
+          ]
+        },
+        {
+          "service": "azureTranslator",
+          "path": "api.cognitive.microsofttranslator.com/translate",
+          "evidence": "synthetic-official-response",
+          "inputs": [
+            "The cyclist travelled 33 kilometres beside the river."
+          ]
+        }
+      ]
+    },
+    {
+      "name": "azureTranslator:later-scalar-failure-is-atomic",
+      "evidence": "synthetic-official-response",
+      "ok": true,
+      "failure": {
+        "kind": "response",
+        "code": "NATIVE_BATCH_RESPONSE_INVALID"
+      },
+      "failedCalls": [
+        {
+          "service": "azureTranslator",
+          "path": "api.cognitive.microsofttranslator.com/translate",
+          "evidence": "synthetic-official-response",
+          "inputs": [
+            "The astronomer counted 11 bright stars before sunrise.",
+            "The chef baked 22 bread rolls for the morning market.",
+            "The cyclist travelled 33 kilometres beside the river."
+          ]
+        },
+        {
+          "service": "azureTranslator",
+          "path": "api.cognitive.microsofttranslator.com/translate",
+          "evidence": "synthetic-official-response",
+          "inputs": [
+            "The astronomer counted 11 bright stars before sunrise."
+          ]
+        },
+        {
+          "service": "azureTranslator",
+          "path": "api.cognitive.microsofttranslator.com/translate",
+          "evidence": "synthetic-official-response",
+          "inputs": [
+            "The chef baked 22 bread rolls for the morning market."
+          ]
+        }
+      ],
+      "retryCalls": [
+        {
+          "service": "azureTranslator",
+          "path": "api.cognitive.microsofttranslator.com/translate",
+          "evidence": "synthetic-official-response",
+          "inputs": [
+            "The astronomer counted 11 bright stars before sunrise.",
+            "The chef baked 22 bread rolls for the morning market.",
+            "The cyclist travelled 33 kilometres beside the river."
+          ]
+        }
+      ]
+    },
+    {
+      "name": "googleCloudTranslation:success-repeat-and-cache",
+      "evidence": "synthetic-official-response",
+      "ok": true,
+      "requests": [
+        {
+          "service": "googleCloudTranslation",
+          "path": "translation.googleapis.com/language/translate/v2",
+          "evidence": "synthetic-official-response",
+          "inputs": [
+            "The astronomer counted 11 bright stars before sunrise.",
+            "The chef baked 22 bread rolls for the morning market.",
+            "The cyclist travelled 33 kilometres beside the river.",
+            "The librarian shelved 44 books.\nThe gardener watered 55 plants.",
+            "Use the literal text <b>66</b> & &lt; in the manual."
+          ]
+        }
+      ]
+    },
+    {
+      "name": "googleCloudTranslation:missing-middle-scalar-recovery",
+      "evidence": "synthetic-official-response",
+      "ok": true,
+      "requests": [
+        {
+          "service": "googleCloudTranslation",
+          "path": "translation.googleapis.com/language/translate/v2",
+          "evidence": "synthetic-official-response",
+          "inputs": [
+            "The astronomer counted 11 bright stars before sunrise.",
+            "The chef baked 22 bread rolls for the morning market.",
+            "The cyclist travelled 33 kilometres beside the river."
+          ]
+        },
+        {
+          "service": "googleCloudTranslation",
+          "path": "translation.googleapis.com/language/translate/v2",
+          "evidence": "synthetic-official-response",
+          "inputs": [
+            "The astronomer counted 11 bright stars before sunrise."
+          ]
+        },
+        {
+          "service": "googleCloudTranslation",
+          "path": "translation.googleapis.com/language/translate/v2",
+          "evidence": "synthetic-official-response",
+          "inputs": [
+            "The chef baked 22 bread rolls for the morning market."
+          ]
+        },
+        {
+          "service": "googleCloudTranslation",
+          "path": "translation.googleapis.com/language/translate/v2",
+          "evidence": "synthetic-official-response",
+          "inputs": [
+            "The cyclist travelled 33 kilometres beside the river."
+          ]
+        }
+      ]
+    },
+    {
+      "name": "googleCloudTranslation:empty-middle-scalar-recovery",
+      "evidence": "synthetic-official-response",
+      "ok": true,
+      "requests": [
+        {
+          "service": "googleCloudTranslation",
+          "path": "translation.googleapis.com/language/translate/v2",
+          "evidence": "synthetic-official-response",
+          "inputs": [
+            "The astronomer counted 11 bright stars before sunrise.",
+            "The chef baked 22 bread rolls for the morning market.",
+            "The cyclist travelled 33 kilometres beside the river."
+          ]
+        },
+        {
+          "service": "googleCloudTranslation",
+          "path": "translation.googleapis.com/language/translate/v2",
+          "evidence": "synthetic-official-response",
+          "inputs": [
+            "The astronomer counted 11 bright stars before sunrise."
+          ]
+        },
+        {
+          "service": "googleCloudTranslation",
+          "path": "translation.googleapis.com/language/translate/v2",
+          "evidence": "synthetic-official-response",
+          "inputs": [
+            "The chef baked 22 bread rolls for the morning market."
+          ]
+        },
+        {
+          "service": "googleCloudTranslation",
+          "path": "translation.googleapis.com/language/translate/v2",
+          "evidence": "synthetic-official-response",
+          "inputs": [
+            "The cyclist travelled 33 kilometres beside the river."
+          ]
+        }
+      ]
+    },
+    {
+      "name": "googleCloudTranslation:truncated-json-scalar-recovery",
+      "evidence": "synthetic-official-response",
+      "ok": true,
+      "requests": [
+        {
+          "service": "googleCloudTranslation",
+          "path": "translation.googleapis.com/language/translate/v2",
+          "evidence": "synthetic-official-response",
+          "inputs": [
+            "The astronomer counted 11 bright stars before sunrise.",
+            "The chef baked 22 bread rolls for the morning market.",
+            "The cyclist travelled 33 kilometres beside the river."
+          ]
+        },
+        {
+          "service": "googleCloudTranslation",
+          "path": "translation.googleapis.com/language/translate/v2",
+          "evidence": "synthetic-official-response",
+          "inputs": [
+            "The astronomer counted 11 bright stars before sunrise."
+          ]
+        },
+        {
+          "service": "googleCloudTranslation",
+          "path": "translation.googleapis.com/language/translate/v2",
+          "evidence": "synthetic-official-response",
+          "inputs": [
+            "The chef baked 22 bread rolls for the morning market."
+          ]
+        },
+        {
+          "service": "googleCloudTranslation",
+          "path": "translation.googleapis.com/language/translate/v2",
+          "evidence": "synthetic-official-response",
+          "inputs": [
+            "The cyclist travelled 33 kilometres beside the river."
+          ]
+        }
+      ]
+    },
+    {
+      "name": "googleCloudTranslation:later-scalar-failure-is-atomic",
+      "evidence": "synthetic-official-response",
+      "ok": true,
+      "failure": {
+        "kind": "response",
+        "code": "NATIVE_BATCH_RESPONSE_INVALID"
+      },
+      "failedCalls": [
+        {
+          "service": "googleCloudTranslation",
+          "path": "translation.googleapis.com/language/translate/v2",
+          "evidence": "synthetic-official-response",
+          "inputs": [
+            "The astronomer counted 11 bright stars before sunrise.",
+            "The chef baked 22 bread rolls for the morning market.",
+            "The cyclist travelled 33 kilometres beside the river."
+          ]
+        },
+        {
+          "service": "googleCloudTranslation",
+          "path": "translation.googleapis.com/language/translate/v2",
+          "evidence": "synthetic-official-response",
+          "inputs": [
+            "The astronomer counted 11 bright stars before sunrise."
+          ]
+        },
+        {
+          "service": "googleCloudTranslation",
+          "path": "translation.googleapis.com/language/translate/v2",
+          "evidence": "synthetic-official-response",
+          "inputs": [
+            "The chef baked 22 bread rolls for the morning market."
+          ]
+        }
+      ],
+      "retryCalls": [
+        {
+          "service": "googleCloudTranslation",
+          "path": "translation.googleapis.com/language/translate/v2",
+          "evidence": "synthetic-official-response",
+          "inputs": [
+            "The astronomer counted 11 bright stars before sunrise.",
+            "The chef baked 22 bread rolls for the morning market.",
+            "The cyclist travelled 33 kilometres beside the river."
+          ]
+        }
+      ]
+    },
+    {
+      "name": "google:disabled-sends-individual-http",
+      "evidence": "live-provider",
+      "ok": true,
+      "requests": [
+        {
+          "service": "google",
+          "path": "translate-pa.googleapis.com/v1/translateHtml",
+          "evidence": "live-provider",
+          "inputs": [
+            "<pre>The astronomer counted 11 bright stars before sunrise.</pre>"
+          ]
+        },
+        {
+          "service": "google",
+          "path": "translate-pa.googleapis.com/v1/translateHtml",
+          "evidence": "live-provider",
+          "inputs": [
+            "<pre>The chef baked 22 bread rolls for the morning market.</pre>"
+          ]
+        },
+        {
+          "service": "google",
+          "path": "translate-pa.googleapis.com/v1/translateHtml",
+          "evidence": "live-provider",
+          "inputs": [
+            "<pre>The cyclist travelled 33 kilometres beside the river.</pre>"
+          ]
+        },
+        {
+          "service": "google",
+          "path": "translate-pa.googleapis.com/v1/translateHtml",
+          "evidence": "live-provider",
+          "inputs": [
+            "<pre>The librarian shelved 44 books.\nThe gardener watered 55 plants.</pre>"
+          ]
+        },
+        {
+          "service": "google",
+          "path": "translate-pa.googleapis.com/v1/translateHtml",
+          "evidence": "live-provider",
+          "inputs": [
+            "<pre>Use the literal text &lt;b&gt;66&lt;/b&gt; &amp; &amp;lt; in the manual.</pre>"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "microsoft:disabled-sends-individual-http",
+      "evidence": "live-provider",
+      "ok": true,
+      "requests": [
+        {
+          "service": "microsoft",
+          "path": "edge.microsoft.com/translate/translatetext",
+          "evidence": "live-provider",
+          "inputs": [
+            "The astronomer counted 11 bright stars before sunrise."
+          ]
+        },
+        {
+          "service": "microsoft",
+          "path": "edge.microsoft.com/translate/translatetext",
+          "evidence": "live-provider",
+          "inputs": [
+            "The chef baked 22 bread rolls for the morning market."
+          ]
+        },
+        {
+          "service": "microsoft",
+          "path": "edge.microsoft.com/translate/translatetext",
+          "evidence": "live-provider",
+          "inputs": [
+            "The cyclist travelled 33 kilometres beside the river."
+          ]
+        },
+        {
+          "service": "microsoft",
+          "path": "edge.microsoft.com/translate/translatetext",
+          "evidence": "live-provider",
+          "inputs": [
+            "The librarian shelved 44 books.\nThe gardener watered 55 plants."
+          ]
+        }
+      ]
+    },
+    {
+      "name": "deepL:disabled-sends-individual-http",
+      "evidence": "synthetic-official-response",
+      "ok": true,
+      "requests": [
+        {
+          "service": "deepL",
+          "path": "api-free.deepl.com/v2/translate",
+          "evidence": "synthetic-official-response",
+          "inputs": [
+            "The astronomer counted 11 bright stars before sunrise."
+          ]
+        },
+        {
+          "service": "deepL",
+          "path": "api-free.deepl.com/v2/translate",
+          "evidence": "synthetic-official-response",
+          "inputs": [
+            "The chef baked 22 bread rolls for the morning market."
+          ]
+        },
+        {
+          "service": "deepL",
+          "path": "api-free.deepl.com/v2/translate",
+          "evidence": "synthetic-official-response",
+          "inputs": [
+            "The cyclist travelled 33 kilometres beside the river."
+          ]
+        },
+        {
+          "service": "deepL",
+          "path": "api-free.deepl.com/v2/translate",
+          "evidence": "synthetic-official-response",
+          "inputs": [
+            "The librarian shelved 44 books.\nThe gardener watered 55 plants."
+          ]
+        },
+        {
+          "service": "deepL",
+          "path": "api-free.deepl.com/v2/translate",
+          "evidence": "synthetic-official-response",
+          "inputs": [
+            "Use the literal text <b>66</b> & &lt; in the manual."
+          ]
+        }
+      ]
+    },
+    {
+      "name": "azureTranslator:disabled-sends-individual-http",
+      "evidence": "synthetic-official-response",
+      "ok": true,
+      "requests": [
+        {
+          "service": "azureTranslator",
+          "path": "api.cognitive.microsofttranslator.com/translate",
+          "evidence": "synthetic-official-response",
+          "inputs": [
+            "The astronomer counted 11 bright stars before sunrise."
+          ]
+        },
+        {
+          "service": "azureTranslator",
+          "path": "api.cognitive.microsofttranslator.com/translate",
+          "evidence": "synthetic-official-response",
+          "inputs": [
+            "The chef baked 22 bread rolls for the morning market."
+          ]
+        },
+        {
+          "service": "azureTranslator",
+          "path": "api.cognitive.microsofttranslator.com/translate",
+          "evidence": "synthetic-official-response",
+          "inputs": [
+            "The cyclist travelled 33 kilometres beside the river."
+          ]
+        },
+        {
+          "service": "azureTranslator",
+          "path": "api.cognitive.microsofttranslator.com/translate",
+          "evidence": "synthetic-official-response",
+          "inputs": [
+            "The librarian shelved 44 books.\nThe gardener watered 55 plants."
+          ]
+        },
+        {
+          "service": "azureTranslator",
+          "path": "api.cognitive.microsofttranslator.com/translate",
+          "evidence": "synthetic-official-response",
+          "inputs": [
+            "Use the literal text <b>66</b> & &lt; in the manual."
+          ]
+        }
+      ]
+    },
+    {
+      "name": "googleCloudTranslation:disabled-sends-individual-http",
+      "evidence": "synthetic-official-response",
+      "ok": true,
+      "requests": [
+        {
+          "service": "googleCloudTranslation",
+          "path": "translation.googleapis.com/language/translate/v2",
+          "evidence": "synthetic-official-response",
+          "inputs": [
+            "The astronomer counted 11 bright stars before sunrise."
+          ]
+        },
+        {
+          "service": "googleCloudTranslation",
+          "path": "translation.googleapis.com/language/translate/v2",
+          "evidence": "synthetic-official-response",
+          "inputs": [
+            "The chef baked 22 bread rolls for the morning market."
+          ]
+        },
+        {
+          "service": "googleCloudTranslation",
+          "path": "translation.googleapis.com/language/translate/v2",
+          "evidence": "synthetic-official-response",
+          "inputs": [
+            "The cyclist travelled 33 kilometres beside the river."
+          ]
+        },
+        {
+          "service": "googleCloudTranslation",
+          "path": "translation.googleapis.com/language/translate/v2",
+          "evidence": "synthetic-official-response",
+          "inputs": [
+            "The librarian shelved 44 books.\nThe gardener watered 55 plants."
+          ]
+        },
+        {
+          "service": "googleCloudTranslation",
+          "path": "translation.googleapis.com/language/translate/v2",
+          "evidence": "synthetic-official-response",
+          "inputs": [
+            "Use the literal text <b>66</b> & &lt; in the manual."
+          ]
+        }
+      ]
+    },
+    {
+      "name": "native-settings-defaults-isolation-persistence-and-bilibili-label",
+      "evidence": "real-extension-ui",
+      "ok": true
+    },
+    {
+      "name": "six-paragraph-native-auto-with-ai-off",
+      "evidence": "synthetic-official-response-and-real-content-shortcut",
+      "ok": true,
+      "toggles": [
+        6,
+        0,
+        6
+      ],
+      "settings": {
+        "enableAIMultiSegment": false,
+        "enableNativeBatch": true,
+        "useCache": false,
+        "fullPageTranslationMode": "all",
+        "maxConcurrentTranslations": 10,
+        "display": 1
+      },
+      "requests": [
+        {
+          "service": "azureTranslator",
+          "path": "api.cognitive.microsofttranslator.com/translate",
+          "evidence": "synthetic-official-response",
+          "inputs": [
+            "The astronomer counted 11 bright stars before sunrise.",
+            "The chef baked 22 bread rolls for the morning market."
+          ]
+        },
+        {
+          "service": "azureTranslator",
+          "path": "api.cognitive.microsofttranslator.com/translate",
+          "evidence": "synthetic-official-response",
+          "inputs": [
+            "The cyclist travelled 33 kilometres beside the river.",
+            "The librarian shelved 44 books.\nThe gardener watered 55 plants.",
+            "Use the literal text <b>66</b> & &lt; in the manual."
+          ]
+        },
+        {
+          "service": "azureTranslator",
+          "path": "api.cognitive.microsofttranslator.com/translate",
+          "evidence": "synthetic-official-response",
+          "inputs": [
+            "The astronomer counted 11 bright stars before sunrise.",
+            "The chef baked 22 bread rolls for the morning market.",
+            "The cyclist travelled 33 kilometres beside the river.",
+            "The librarian shelved 44 books.\nThe gardener watered 55 plants."
+          ]
+        },
+        {
+          "service": "azureTranslator",
+          "path": "api.cognitive.microsofttranslator.com/translate",
+          "evidence": "synthetic-official-response",
+          "inputs": [
+            "Use the literal text <b>66</b> & &lt; in the manual."
+          ]
+        }
+      ]
+    },
+    {
+      "name": "six-paragraph-native-disabled-individual-requests",
+      "evidence": "synthetic-official-response-and-real-content-shortcut",
+      "ok": true,
+      "toggles": [
+        6,
+        0,
+        6
+      ],
+      "settings": {
+        "enableAIMultiSegment": false,
+        "enableNativeBatch": false,
+        "useCache": false,
+        "fullPageTranslationMode": "all",
+        "maxConcurrentTranslations": 10,
+        "display": 1
+      },
+      "requests": [
+        {
+          "service": "azureTranslator",
+          "path": "api.cognitive.microsofttranslator.com/translate",
+          "evidence": "synthetic-official-response",
+          "inputs": [
+            "The astronomer counted 11 bright stars before sunrise."
+          ]
+        },
+        {
+          "service": "azureTranslator",
+          "path": "api.cognitive.microsofttranslator.com/translate",
+          "evidence": "synthetic-official-response",
+          "inputs": [
+            "The chef baked 22 bread rolls for the morning market."
+          ]
+        },
+        {
+          "service": "azureTranslator",
+          "path": "api.cognitive.microsofttranslator.com/translate",
+          "evidence": "synthetic-official-response",
+          "inputs": [
+            "The cyclist travelled 33 kilometres beside the river."
+          ]
+        },
+        {
+          "service": "azureTranslator",
+          "path": "api.cognitive.microsofttranslator.com/translate",
+          "evidence": "synthetic-official-response",
+          "inputs": [
+            "The librarian shelved 44 books.\nThe gardener watered 55 plants."
+          ]
+        },
+        {
+          "service": "azureTranslator",
+          "path": "api.cognitive.microsofttranslator.com/translate",
+          "evidence": "synthetic-official-response",
+          "inputs": [
+            "Use the literal text <b>66</b> & &lt; in the manual."
+          ]
+        },
+        {
+          "service": "azureTranslator",
+          "path": "api.cognitive.microsofttranslator.com/translate",
+          "evidence": "synthetic-official-response",
+          "inputs": [
+            "The astronomer counted 11 bright stars before sunrise."
+          ]
+        },
+        {
+          "service": "azureTranslator",
+          "path": "api.cognitive.microsofttranslator.com/translate",
+          "evidence": "synthetic-official-response",
+          "inputs": [
+            "The chef baked 22 bread rolls for the morning market."
+          ]
+        },
+        {
+          "service": "azureTranslator",
+          "path": "api.cognitive.microsofttranslator.com/translate",
+          "evidence": "synthetic-official-response",
+          "inputs": [
+            "The cyclist travelled 33 kilometres beside the river."
+          ]
+        },
+        {
+          "service": "azureTranslator",
+          "path": "api.cognitive.microsofttranslator.com/translate",
+          "evidence": "synthetic-official-response",
+          "inputs": [
+            "The librarian shelved 44 books.\nThe gardener watered 55 plants."
+          ]
+        },
+        {
+          "service": "azureTranslator",
+          "path": "api.cognitive.microsofttranslator.com/translate",
+          "evidence": "synthetic-official-response",
+          "inputs": [
+            "Use the literal text <b>66</b> & &lt; in the manual."
+          ]
+        }
+      ]
+    },
+    {
+      "name": "google:bounded-live-batch-vs-scalar",
+      "evidence": "live-provider",
+      "ok": true,
+      "sourceCount": 6,
+      "batchRequests": [
+        {
+          "service": "google",
+          "path": "translate-pa.googleapis.com/v1/translateHtml",
+          "evidence": "live-provider",
+          "inputs": [
+            "<pre>The astronomer counted 11 bright stars before sunrise.</pre>",
+            "<pre>The chef baked 22 bread rolls for the morning market.</pre>",
+            "<pre>The cyclist travelled 33 kilometres beside the river.</pre>",
+            "<pre>The librarian shelved 44 books.\nThe gardener watered 55 plants.</pre>",
+            "<pre>Use the literal text &lt;b&gt;66&lt;/b&gt; &amp; &amp;lt; in the manual.</pre>",
+            "<pre>The astronomer counted 11 bright stars before sunrise.</pre>"
+          ]
+        }
+      ],
+      "individualRequests": [
+        {
+          "service": "google",
+          "path": "translate.googleapis.com/translate_a/t",
+          "evidence": "live-provider",
+          "inputs": [
+            "The astronomer counted 11 bright stars before sunrise."
+          ]
+        },
+        {
+          "service": "google",
+          "path": "translate-pa.googleapis.com/v1/translateHtml",
+          "evidence": "live-provider",
+          "inputs": [
+            "<pre>The chef baked 22 bread rolls for the morning market.</pre>"
+          ]
+        },
+        {
+          "service": "google",
+          "path": "translate-pa.googleapis.com/v1/translateHtml",
+          "evidence": "live-provider",
+          "inputs": [
+            "<pre>The cyclist travelled 33 kilometres beside the river.</pre>"
+          ]
+        },
+        {
+          "service": "google",
+          "path": "translate-pa.googleapis.com/v1/translateHtml",
+          "evidence": "live-provider",
+          "inputs": [
+            "<pre>The librarian shelved 44 books.\nThe gardener watered 55 plants.</pre>"
+          ]
+        },
+        {
+          "service": "google",
+          "path": "translate-pa.googleapis.com/v1/translateHtml",
+          "evidence": "live-provider",
+          "inputs": [
+            "<pre>Use the literal text &lt;b&gt;66&lt;/b&gt; &amp; &amp;lt; in the manual.</pre>"
+          ]
+        },
+        {
+          "service": "google",
+          "path": "translate-pa.googleapis.com/v1/translateHtml",
+          "evidence": "live-provider",
+          "inputs": [
+            "<pre>The astronomer counted 11 bright stars before sunrise.</pre>"
+          ]
+        }
+      ],
+      "batchMs": 518,
+      "individualMs": 2347,
+      "batchTranslations": [
+        "天文学家在日出前数出了11颗明亮的星星。",
+        "厨师为早市烤了22个面包卷。",
+        "骑自行车的人沿着河边骑行了33公里。",
+        "图书管理员将 44 本书放回了书架。\n园丁给55株植物浇了水。",
+        "请使用手册中的原文 <b>66</b> & &lt;。",
+        "天文学家在日出前数出了11颗明亮的星星。"
+      ],
+      "individualTranslations": [
+        "天文学家在日出前数出了 11 颗明亮的星星。",
+        "厨师为早市烤了22个面包卷。",
+        "骑自行车的人沿着河边骑行了33公里。",
+        "图书管理员将 44 本书放回了书架。\n园丁给55株植物浇了水。",
+        "请使用手册中的原文 <b>66</b> & &lt;。",
+        "天文学家在日出前数出了11颗明亮的星星。"
+      ]
+    },
+    {
+      "name": "microsoft:bounded-live-batch-vs-scalar",
+      "evidence": "live-provider",
+      "ok": true,
+      "sourceCount": 5,
+      "batchRequests": [
+        {
+          "service": "microsoft",
+          "path": "edge.microsoft.com/translate/translatetext",
+          "evidence": "live-provider",
+          "inputs": [
+            "The astronomer counted 11 bright stars before sunrise.",
+            "The chef baked 22 bread rolls for the morning market.",
+            "The cyclist travelled 33 kilometres beside the river.",
+            "The librarian shelved 44 books.\nThe gardener watered 55 plants.",
+            "The astronomer counted 11 bright stars before sunrise."
+          ]
+        }
+      ],
+      "individualRequests": [
+        {
+          "service": "microsoft",
+          "path": "edge.microsoft.com/translate/translatetext",
+          "evidence": "live-provider",
+          "inputs": [
+            "The astronomer counted 11 bright stars before sunrise."
+          ]
+        },
+        {
+          "service": "microsoft",
+          "path": "edge.microsoft.com/translate/translatetext",
+          "evidence": "live-provider",
+          "inputs": [
+            "The chef baked 22 bread rolls for the morning market."
+          ]
+        },
+        {
+          "service": "microsoft",
+          "path": "edge.microsoft.com/translate/translatetext",
+          "evidence": "live-provider",
+          "inputs": [
+            "The cyclist travelled 33 kilometres beside the river."
+          ]
+        },
+        {
+          "service": "microsoft",
+          "path": "edge.microsoft.com/translate/translatetext",
+          "evidence": "live-provider",
+          "inputs": [
+            "The librarian shelved 44 books.\nThe gardener watered 55 plants."
+          ]
+        },
+        {
+          "service": "microsoft",
+          "path": "edge.microsoft.com/translate/translatetext",
+          "evidence": "live-provider",
+          "inputs": [
+            "The astronomer counted 11 bright stars before sunrise."
+          ]
+        }
+      ],
+      "batchMs": 334,
+      "individualMs": 1311,
+      "batchTranslations": [
+        "天文学家在日出前数了11颗明亮的恒星。",
+        "厨师为早市烤了22个面包卷。",
+        "骑行者沿河行驶了33公里。",
+        "图书管理员整理了44本书。\n园丁浇了55株植物。",
+        "天文学家在日出前数了11颗明亮的恒星。"
+      ],
+      "individualTranslations": [
+        "天文学家在日出前数了11颗明亮的恒星。",
+        "厨师为早市烤了22个面包卷。",
+        "骑行者沿河行驶了33公里。",
+        "图书管理员整理了44本书。\n园丁浇了55株植物。",
+        "天文学家在日出前数了11颗明亮的恒星。"
+      ]
+    },
+    {
+      "name": "microsoft:literal-entity-preservation-or-safe-rejection",
+      "evidence": "live-provider",
+      "ok": true,
+      "outcomes": [
+        {
+          "mode": "batch",
+          "outcome": "invalid-literal-rejected",
+          "error": {
+            "kind": "response",
+            "code": "NATIVE_BATCH_RESPONSE_INVALID"
+          }
+        },
+        {
+          "mode": "scalar",
+          "outcome": "invalid-literal-rejected",
+          "error": {
+            "kind": "response",
+            "code": "NATIVE_BATCH_RESPONSE_INVALID"
+          }
+        }
+      ],
+      "requests": [
+        {
+          "service": "microsoft",
+          "path": "edge.microsoft.com/translate/translatetext",
+          "evidence": "live-provider",
+          "inputs": [
+            "The astronomer counted 11 bright stars before sunrise.",
+            "Use the literal text &lt;b&gt;66&lt;/b&gt; &amp; &amp;lt; in the manual."
+          ]
+        },
+        {
+          "service": "microsoft",
+          "path": "edge.microsoft.com/translate/translatetext",
+          "evidence": "live-provider",
+          "inputs": [
+            "The astronomer counted 11 bright stars before sunrise."
+          ]
+        },
+        {
+          "service": "microsoft",
+          "path": "edge.microsoft.com/translate/translatetext",
+          "evidence": "live-provider",
+          "inputs": [
+            "Use the literal text &lt;b&gt;66&lt;/b&gt; &amp; &amp;lt; in the manual."
+          ]
+        },
+        {
+          "service": "microsoft",
+          "path": "edge.microsoft.com/translate/translatetext",
+          "evidence": "live-provider",
+          "inputs": [
+            "Use the literal text &lt;b&gt;66&lt;/b&gt; &amp; &amp;lt; in the manual."
+          ]
+        }
+      ],
+      "limitation": "Safe rejection preserves the original text; it does not repair upstream semantic corruption."
+    }
+  ],
+  "screenshots": [
+    "./native-batch-azure-disabled-reopened.png",
+    "./bilibili-free-label.png",
+    "./native-full-page-1-translated.png",
+    "./native-full-page-2-restored.png",
+    "./native-full-page-3-translated.png",
+    "./native-full-page-disabled-1-translated.png",
+    "./native-full-page-disabled-2-restored.png",
+    "./native-full-page-disabled-3-translated.png",
+    "./native-batch-options-production.png"
+  ],
+  "pageErrors": [],
+  "persistenceCases": [
+    {
+      "service": "google",
+      "before": true,
+      "after": false,
+      "reopened": false,
+      "quickClose": true
+    },
+    {
+      "service": "microsoft",
+      "before": true,
+      "after": false,
+      "reopened": false,
+      "quickClose": true
+    },
+    {
+      "service": "deepL",
+      "before": true,
+      "after": false,
+      "reopened": false,
+      "quickClose": true
+    },
+    {
+      "service": "azureTranslator",
+      "before": true,
+      "after": false,
+      "reopened": false,
+      "quickClose": true
+    },
+    {
+      "service": "googleCloudTranslation",
+      "before": true,
+      "after": false,
+      "reopened": false,
+      "quickClose": true
+    }
+  ],
+  "storageEvents": [
+    {
+      "event": "request",
+      "preferences": {
+        "google": false,
+        "microsoft": true,
+        "deepL": true,
+        "azureTranslator": true,
+        "googleCloudTranslation": true
+      }
+    },
+    {
+      "event": "request",
+      "preferences": {
+        "google": false,
+        "microsoft": false,
+        "deepL": true,
+        "azureTranslator": true,
+        "googleCloudTranslation": true
+      }
+    },
+    {
+      "event": "request",
+      "preferences": {
+        "google": false,
+        "microsoft": false,
+        "deepL": false,
+        "azureTranslator": true,
+        "googleCloudTranslation": true
+      }
+    },
+    {
+      "event": "request",
+      "preferences": {
+        "google": false,
+        "microsoft": false,
+        "deepL": false,
+        "azureTranslator": false,
+        "googleCloudTranslation": true
+      }
+    },
+    {
+      "event": "request",
+      "preferences": {
+        "google": false,
+        "microsoft": false,
+        "deepL": false,
+        "azureTranslator": true,
+        "googleCloudTranslation": true
+      }
+    },
+    {
+      "event": "response",
+      "success": true
+    },
+    {
+      "event": "request",
+      "preferences": {
+        "google": false,
+        "microsoft": false,
+        "deepL": false,
+        "azureTranslator": false,
+        "googleCloudTranslation": true
+      }
+    },
+    {
+      "event": "request",
+      "preferences": {
+        "google": false,
+        "microsoft": false,
+        "deepL": false,
+        "azureTranslator": false,
+        "googleCloudTranslation": false
+      }
+    },
+    {
+      "event": "request",
+      "preferences": {
+        "google": true,
+        "microsoft": true,
+        "deepL": true,
+        "azureTranslator": true,
+        "googleCloudTranslation": true
+      }
+    },
+    {
+      "event": "response",
+      "success": true
+    },
+    {
+      "event": "request",
+      "preferences": {
+        "google": true,
+        "microsoft": true,
+        "deepL": true,
+        "azureTranslator": true,
+        "googleCloudTranslation": true
+      }
+    },
+    {
+      "event": "response",
+      "success": true
+    },
+    {
+      "event": "request",
+      "preferences": {
+        "google": true,
+        "microsoft": true,
+        "deepL": true,
+        "azureTranslator": false,
+        "googleCloudTranslation": true
+      }
+    },
+    {
+      "event": "response",
+      "success": true
+    }
+  ],
+  "quickClose": true,
+  "latestWriteWins": true,
+  "crossPageSync": true,
+  "evidenceLimits": [
+    "Synthetic cloud fixtures do not prove real cloud API acceptance.",
+    "Small live samples do not prove complete translation quality or all sites/devices."
+  ],
+  "buildFreshness": {
+    "ok": true,
+    "production": true,
+    "latestSource": {
+      "path": "src/providers/translation/google.ts",
+      "mtimeMs": 1791650106086.8418
+    },
+    "manifestMtimeMs": 1791650198880.3442
+  },
+  "launchMode": "macos-background-cdp",
+  "focusPolicy": "launchservices-no-foreground",
+  "windowPlacement": {
+    "mode": "background-visible-no-focus",
+    "visible": true,
+    "hidden": false,
+    "centered": true,
+    "windowState": "normal",
+    "bounds": {
+      "left": 212,
+      "top": -990,
+      "width": 1280,
+      "height": 900
+    },
+    "displayTarget": "secondary",
+    "source": "macos-nsscreen",
+    "screenIndex": 1,
+    "browserFrontmost": false,
+    "frontmostBefore": {
+      "pid": 73685,
+      "name": "ChatGPT"
+    },
+    "frontmostAfter": {
+      "pid": 73685,
+      "name": "ChatGPT"
+    }
+  },
+  "extensionInstall": {
+    "method": "isolated-cli-load-unpacked"
+  },
+  "browserVersion": "131.0.2903.147",
+  "cleanupErrors": []
+}

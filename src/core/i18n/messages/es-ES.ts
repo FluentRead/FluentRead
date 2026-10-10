@@ -1368,6 +1368,8 @@ export const esESMessages = {
     'settings.services.connection': 'Configuración de conexión',
     'settings.services.model': 'Modelo',
     'settings.services.advanced': 'Ajustes avanzados',
+    'settings.services.nativeBatch.label': 'Agrupar solicitudes de traducción',
+    'settings.services.nativeBatch.help': 'Agrupa varios textos en una sola solicitud para reducir su número. Desactívalo para traducir cada texto por separado.',
     'settings.services.deepl.plan': 'Plan de la API de DeepL',
     'settings.services.deepl.free': 'API Free (gratuito)',
     'settings.services.deepl.pro': 'API Pro (de pago)',

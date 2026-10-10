@@ -1,7 +1,7 @@
 /**
  * @file src/features/full-page-translation/content/requestSession.ts
  * 文件职责：持有全文翻译会话级请求复用的取消域、活动队列会话与结果缓存生命周期。
- * 主要内容：创建共享 AbortSignal，统一结束底层请求，并只在有效 AI 页面上下文变化时失效请求结果。
+ * 主要内容：创建共享 AbortSignal，统一结束底层请求，并在有效 AI 页面上下文或相邻多段来源变化时失效请求结果。
  * 模块边界：本文件不执行翻译、不管理候选或 DOM；translationRequest 负责填充缓存，runtime 只调用这里的生命周期入口。
  */
 import {servicesType} from '@/src/core/config/catalog';
@@ -47,7 +47,7 @@ export function createFullPageRequestSessionState(): FullPageRequestSessionState
 type HoverTranslationRequestSession = FullPageRequestSessionState & FullPageTranslationSessionCache;
 function createHoverTranslationRequestSession(): HoverTranslationRequestSession {
     return {active: true, translationSlotCache: new Map(), retainSettledResults: false,
-        allowAIMultiSegment: false, ...createFullPageRequestSessionState()};
+        allowAIMultiSegment: false, allowNativeBatch: false, ...createFullPageRequestSessionState()};
 }
 let hoverTranslationRequestSession = createHoverTranslationRequestSession();
 export function getHoverTranslationRequestSession(): HoverTranslationRequestSession {
@@ -79,7 +79,8 @@ export function invalidateContextSensitiveRequestCache(
     session: FullPageRequestCacheState & {translationConfig: FullPageTranslationConfigSnapshot},
 ): void {
     const snapshot = session.translationConfig;
-    if (snapshot.enableAIContext && servicesType.isUseAIContext(snapshot.service, snapshot.model)) {
+    if ((snapshot.enableAIContext || snapshot.enableAIMultiSegment)
+        && servicesType.isUseAIContext(snapshot.service, snapshot.model)) {
         session.pageContextGeneration += 1;
         clearFullPageTranslationRequestCache(session, true);
         session.translationSlotCache.clear();

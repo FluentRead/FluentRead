@@ -33,8 +33,8 @@ const qwen3Files = [
     {path: 'onnx/model_q4f16.onnx', size: 569789750, sha256: '9e33a5911974174761d0dfdcc0bec975d9c45af0eae5e9eb647b8ba9442a8f91'},
 ] as const;
 export const INFORMATION_HIGHLIGHT_MODELS: readonly InformationHighlightModel[] = [
-    {id: 'qwen2.5-0.5b', name: 'Qwen2.5 0.5B', repository: 'onnx-community/Qwen2.5-0.5B', revision: 'bae5ceaee026f0d0592858b2bd27645a06f19c42', files: qwen25Files, bytes: qwen25Files.reduce((sum, file) => sum + file.size, 0), kvCacheDtype: 'float32'},
-    {id: 'qwen3-0.6b', name: 'Qwen3 0.6B', repository: 'onnx-community/Qwen3-0.6B-ONNX', revision: '1e0a4a196ecabdf9a879664110574563d3f372d3', files: qwen3Files, bytes: qwen3Files.reduce((sum, file) => sum + file.size, 0), kvCacheDtype: 'float16'},
+    {id: 'qwen2.5-0.5b', name: 'Qwen2.5 0.5B', repository: 'onnx-community/Qwen2.5-0.5B', revision: 'bae5ceaee026f0d0592858b2bd27645a06f19c42', files: qwen25Files, bytes: /* @__PURE__ */ qwen25Files.reduce((sum, file) => sum + file.size, 0), kvCacheDtype: 'float32'},
+    {id: 'qwen3-0.6b', name: 'Qwen3 0.6B', repository: 'onnx-community/Qwen3-0.6B-ONNX', revision: '1e0a4a196ecabdf9a879664110574563d3f372d3', files: qwen3Files, bytes: /* @__PURE__ */ qwen3Files.reduce((sum, file) => sum + file.size, 0), kvCacheDtype: 'float16'},
 ];
 export function getInformationHighlightModel(value: unknown): InformationHighlightModel {
     return INFORMATION_HIGHLIGHT_MODELS.find(model => model.id === value) ?? INFORMATION_HIGHLIGHT_MODELS[0];

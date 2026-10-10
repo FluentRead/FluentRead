@@ -200,7 +200,7 @@ describe('局部翻译入口', () => {
             harness.notices.length = 0;
             harness.toggle.mockResolvedValueOnce(result);
             onPick('picked-section');
-            expect(harness.toggle).toHaveBeenLastCalledWith('picked-section', undefined);
+            expect(harness.toggle).toHaveBeenLastCalledWith('picked-section', undefined, expect.any(AbortSignal));
             await new Promise((resolve) => setTimeout(resolve, 0));
             expect(harness.notices).toEqual(notice ? [notice] : []);
         }
@@ -224,7 +224,7 @@ it('独立快捷方案先选择容器，确认后传递方案，重复触发取�
     harness.toggle.mockResolvedValue({action: 'translated', translated: 1, failed: 0});
     options.onPick('selected-container');
     await Promise.resolve();
-    expect(harness.toggle).toHaveBeenCalledWith('selected-container', invocation);
+    expect(harness.toggle).toHaveBeenCalledWith('selected-container', invocation, expect.any(AbortSignal));
     harness.pickerActive.mockReturnValue(true);
     expect(startSectionTranslationPicker(invocation)).toBe(true);
     expect(harness.stopPicker).toHaveBeenCalledOnce();
@@ -248,6 +248,59 @@ it('选择期间 Popup 保留当前方案，另一方案会重新选择容器', 
 });
 
 describe('局部入口挂载所有权和迟到提示', () => {
+    it('区域执行异常给出可重试反馈，新的选择仍可正常确认', async () => {
+        const current = mount(); startSectionTranslationPicker();
+        harness.toggle.mockRejectedValueOnce(new Error('page changed while scanning'));
+        await expect(lastPickerOptions().onPick('changed-section')).resolves.toBeUndefined();
+        expect(harness.notices).toEqual([{message: 'translationCenter.requestError', tone: 'error'}]);
+        harness.notices.length = 0; startSectionTranslationPicker();
+        harness.toggle.mockResolvedValueOnce({action: 'translated', translated: 1, failed: 0});
+        await lastPickerOptions().onPick('new-section');
+        expect(harness.notices).toEqual([]); current.abort();
+    });
+    it('退场后迟到的执行异常不再弹出反馈', async () => {
+        const current = mount(); startSectionTranslationPicker();
+        let reject!: (error: Error) => void;
+        harness.toggle.mockReturnValueOnce(new Promise((_resolve, fail) => {reject = fail;}));
+        const pending = lastPickerOptions().onPick('old-section'); current.abort();
+        reject(new Error('late page failure')); await expect(pending).resolves.toBeUndefined();
+        expect(harness.notices).toEqual([]);
+    });
+    it('替代挂载取消旧区域任务，释放旧监听器，但不取消新挂载', async () => {
+        const previous = mount(); startSectionTranslationPicker();
+        harness.toggle.mockResolvedValue({action: 'translated', translated: 1, failed: 0});
+        await lastPickerOptions().onPick('previous-section');
+        const oldSignal = harness.toggle.mock.calls.at(-1)![2] as AbortSignal;
+        const oldListeners = [...listeners];
+        const current = mount();
+        expect(oldSignal.aborted).toBe(true);
+        expect(oldListeners.every(entry => entry.signal?.aborted)).toBe(true);
+        startSectionTranslationPicker(); await lastPickerOptions().onPick('current-section');
+        const newSignal = harness.toggle.mock.calls.at(-1)![2] as AbortSignal;
+        previous.abort(); expect(newSignal.aborted).toBe(false);
+        current.abort(); expect(newSignal.aborted).toBe(true);
+    });
+    it('重新进入选择后，旧确认的迟到失败不打断新选择', async () => {
+        const current = mount(); startSectionTranslationPicker(); const oldOptions = lastPickerOptions();
+        let finish!: (value: unknown) => void;
+        harness.toggle.mockReturnValueOnce(new Promise(resolve => {finish = resolve;}));
+        const pending = oldOptions.onPick('first-section');
+        startSectionTranslationPicker();
+        finish({action: 'translated', translated: 1, failed: 2}); await pending;
+        expect(harness.notices).toEqual([]);
+        await oldOptions.onPick('stale-picker-section');
+        expect(harness.toggle).toHaveBeenCalledOnce(); current.abort();
+    });
+    it('同一选择的较早确认结果不会覆盖较新确认', async () => {
+        const current = mount(); startSectionTranslationPicker(); const options = lastPickerOptions();
+        let finish!: (value: unknown) => void;
+        harness.toggle.mockReturnValueOnce(new Promise(resolve => {finish = resolve;}));
+        const pending = options.onPick('first-section');
+        harness.toggle.mockResolvedValueOnce({action: 'translated', translated: 1, failed: 0});
+        await options.onPick('second-section');
+        finish({action: 'empty'}); await pending;
+        expect(harness.notices).toEqual([]); current.abort();
+    });
     it('预取消的挂载不登记监听器，也不覆盖仍在使用的入口', () => {
         const current = mount(), count = listeners.length, stopped = new AbortController(); stopped.abort();
         mountSectionTranslationContentFeature({isSiteDisabled: () => false}, stopped.signal);

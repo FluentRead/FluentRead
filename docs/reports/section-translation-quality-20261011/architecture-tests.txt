@@ -1,0 +1,20 @@
+
+> FluentRead-流畅阅读@0.0.37 test /Users/thinkstu/Desktop/copy/FluentRead-section-translation-quality-20261011
+> node scripts/testing/run-resource-safe.mjs -- vitest run "tests/architecture/moduleBoundaries.test.ts" "tests/architecture/sourceFileHeaders.test.ts"
+
+[resource-safe] 等待全局测试锁（3 个并发槽已占满，当前: node scripts/testing/run-test-group.mjs functional; vitest /Users/thinkstu/Desktop/copy/FluentRead-hover-reliability-20261011/node_modules/vitest/vitest.mjs run --config vitest.coverage.config.ts tests/fullPageVisibilityScheduling.test.ts --coverage.enabled --coverage.include=src/features/full-page-translation/content/requestSession.ts --coverage.reporter=text --coverage.reporter=json --coverage.reportsDirectory=/private/tmp/fluentread-hover-request-session-coverage; vitest run --config vitest.coverage.config.ts tests/translationCore.test.ts tests/translationControlOwnership.test.ts tests/allNodesTranslationCore.test.ts tests/hnFirstTargetReadiness.test.ts tests/siteAdaptationCatalog.test.ts tests/fullPageAttributeBoundary.test.ts tests/upstreamTranslationBoundaries.test.ts tests/translationSnapshotProtection.test.ts tests/bilingualRemountPerformanceBoundaries.test.ts tests/discordServerIconBoundary.test.ts tests/implementationAudit49G.test.ts tests/issue146SiteRules.test.ts tests/siteAdaptationCore.test.ts tests/xModernSiteAdaptationRegression.test.ts tests/translationOwnershipBoundaries.test.ts tests/pageTranslationAdvanced.test.ts tests/translationSourceStability.test.ts tests/translationDeclarativeAncestorMissCache.test.ts tests/translationVisualProtection.test.ts tests/translationDeclarativeAncestorMissCacheBoundaries.test.ts tests/implementationAudit49F.test.ts tests/translationGitHubTaskList.test.ts tests/sectionTranslationCore.test.ts tests/translationDocumentCorpus.test.ts --coverage.include=src/core/translation/engine.ts --coverage.reportsDirectory=coverage/hover-engine）
+[resource-safe] CPU target 60%, maxWorkers 1, concurrency 3, command: vitest run tests/architecture/moduleBoundaries.test.ts tests/architecture/sourceFileHeaders.test.ts
+
+ RUN  v2.1.9 /Users/thinkstu/Desktop/copy/FluentRead-section-translation-quality-20261011
+
+ ✓ tests/architecture/moduleBoundaries.test.ts (13 tests) 5049ms
+   ✓ architecture module boundaries > src 的静态依赖图不存在跨文件循环 1614ms
+   ✓ architecture module boundaries > src 只能通过精确登记的 composition/browser/provider 迁移边界读取 entrypoints 1788ms
+   ✓ architecture module boundaries > feature 不能跨目录读取另一个 feature 的内部实现 638ms
+   ✓ architecture module boundaries > 按需加载的大体积资源不得被扩展运行时代码静态引入 603ms
+ ✓ tests/architecture/sourceFileHeaders.test.ts (894 tests) 289ms
+
+ Test Files  2 passed (2)
+      Tests  907 passed (907)
+   Start at  01:57:51
+   Duration  6.37s (transform 154ms, setup 0ms, collect 429ms, tests 5.34s, environment 0ms, prepare 117ms)

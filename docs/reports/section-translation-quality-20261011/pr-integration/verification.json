@@ -1,0 +1,117 @@
+{
+  "baseCommit": "b14baf4b267f1bdace40fff13652bf9568ba1d5f",
+  "sourceCommit": "65ac50ebce7f53bb5202bd7187a7efd906807451",
+  "sourceTrees": {
+    "src": "59815469cb8d0068747978e72599100f00d47505",
+    "tests": "e93eae4be9d54b7e98978da8ffeb8fec0750b97d",
+    "userscript": "2aceacdabaf1b4b11fd5d4a409bfffceb039d79b"
+  },
+  "productSourceSha256": {
+    "src/features/full-page-translation/content/sectionTranslation.ts": "81ae4ae6e4682afcf8ffc7a35be8f1aa72acc43ac280962f02c6c5af0dcc41c0",
+    "src/features/full-page-translation/content/state.ts": "6154f2c035ab78edb743c2afc4487da33d5ce819cf4a2b513341a3cc2fd8e519",
+    "src/features/section-translation/core.ts": "20470b647c0e1bd9ce859676e0ed70889553c75d48a383f594fa98c6b4cd0482",
+    "src/features/section-translation/content/picker.ts": "5a177661c91a5571ff37b54fdd0449e9e502835b73ea92a817feeb393bdbda7f",
+    "src/features/section-translation/content/index.ts": "21d5973b7b7e8109493945c77eb05bdafdb3af183d804d118ee09f74bd132ac8"
+  },
+  "originalFourRegionModulesUnchanged": true,
+  "scope": "Authorized PR merge: latest main integrated; targeted regression and builds; controlled Edge browser responses",
+  "targetedTests": {
+    "primary": {
+      "files": 16,
+      "passed": 757,
+      "log": "tests.txt"
+    },
+    "remainingLifecycle": {
+      "files": 2,
+      "passed": 15,
+      "log": "lifecycle.txt"
+    },
+    "architecture": {
+      "files": 2,
+      "passed": 908,
+      "sourceHeaderAssertions": 895,
+      "log": "architecture.txt"
+    },
+    "totalFiles": 20,
+    "totalAssertions": 1680,
+    "fullRegressionRun": false
+  },
+  "builds": {
+    "compile": {
+      "passed": true,
+      "log": "compile.txt"
+    },
+    "chromeMV3": {
+      "passed": true,
+      "log": "chrome.txt"
+    },
+    "firefoxMV2": {
+      "passed": true,
+      "log": "firefox.txt"
+    },
+    "userscript": {
+      "passed": true,
+      "log": "userscript.txt"
+    },
+    "userscriptVerifier": {
+      "passed": true,
+      "log": "userscript-verifier.txt"
+    },
+    "manifests": {
+      "passed": true,
+      "log": "manifests.txt"
+    },
+    "docs": {
+      "passed": true,
+      "log": "docs.txt"
+    }
+  },
+  "audit": {
+    "passed": true,
+    "files": 638,
+    "declaredCases": 10459,
+    "log": "audit.txt"
+  },
+  "userscript": {
+    "bytes": 1993179,
+    "budget": 1994000,
+    "latestMainBudgetChanged": false
+  },
+  "artifactsSha256": {
+    ".output/chrome-mv3/manifest.json": "fd80314b160701ed5500e584e1373f5eed44a19acdc6f8b76f9a12c1565970d8",
+    ".output/firefox-mv2/manifest.json": "2f4d6388a66e23f052933d6a4f972e3f65e841806a20f6b1d274fcf14d21a3ef",
+    ".output/userscript/fluent-read.user.js": "9e3e45d5ece117e3e714c66bfb622b1ebdf0edba4a7cb79d3adf5ce8b68b8e82"
+  },
+  "browser": {
+    "corePassed": 18,
+    "qualityGroupsPassed": [
+      "boundary",
+      "shadow",
+      "retry",
+      "cancel"
+    ],
+    "uniqueCaseDescriptions": 22,
+    "reports": [
+      "browser-core.json",
+      "browser-quality.json"
+    ],
+    "freshProductionBuild": true,
+    "nativeBrowserActivationsEach": 0,
+    "uncaughtErrorsEach": 0,
+    "consoleErrorsEach": 0,
+    "profilesRemoved": true,
+    "launchMode": "macos-background-cdp",
+    "focusPolicy": "launchservices-no-foreground",
+    "placement": "normal visible window on secondary display; browserFrontmost=false",
+    "transport": "controlled Google responses; retry only disables native batching and uses per-request HTTP 400",
+    "privateFocusJsonlCommitted": false
+  },
+  "independentReview": "Latest-main attribute batching revalidates current owner state; translation, restore and request-session APIs remain compatible; no upload blocker found",
+  "limitations": [
+    "Original coverage and performance are preserved baseline/source snapshots, not rerun performance on integrated main.",
+    "Targeted integration regression is not the full suite.",
+    "Firefox and userscript have build/static evidence only; controlled Edge responses do not prove live provider acceptance.",
+    "Earlier unknown focus interruption and GitHub resource 404 remain recorded; these later clean runs do not erase them."
+  ],
+  "logNormalization": "Terminal ANSI colors, trailing spaces and blank EOF lines removed; output content retained"
+}

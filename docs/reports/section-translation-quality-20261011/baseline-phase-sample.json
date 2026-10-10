@@ -1,0 +1,102 @@
+{
+  "scope": "production extension, trusted CDP pointer/keyboard gestures, deterministic Google transport; not live provider latency or quality",
+  "sourceProjectRoot": "/private/tmp/fluentread-section-baseline-20261011",
+  "caseSet": "quality",
+  "qualityCases": [
+    "performance"
+  ],
+  "cases": [
+    "popup shows the section entry next to the page action",
+    "large selected region yields rendering frames, honors provider concurrency and preserves neighbors"
+  ],
+  "screenshots": [
+    "/private/tmp/fluentread-section-baseline-performance-phases-20261011/00-popup.png",
+    "/private/tmp/fluentread-section-baseline-performance-phases-20261011/quality-05-large-region.png"
+  ],
+  "errors": [],
+  "consoleErrors": [],
+  "errorCoverage": "errors contains uncaught page exceptions; console.error messages are recorded separately, including intentionally failed fixture requests",
+  "profileMode": "automatically-created-temporary-profile",
+  "buildFreshness": {
+    "ok": true,
+    "production": true,
+    "latestSource": {
+      "path": "/private/tmp/fluentread-section-baseline-20261011/src/app/background/areaRuntime.ts",
+      "mtimeMs": 1791652250000
+    },
+    "manifestMtimeMs": 1791654013606.0188
+  },
+  "launchMode": "macos-background-cdp",
+  "focusPolicy": "launchservices-no-foreground",
+  "windowPlacement": {
+    "mode": "background-visible-no-focus",
+    "visible": true,
+    "hidden": false,
+    "centered": true,
+    "windowState": "normal",
+    "bounds": {
+      "left": 212,
+      "top": -990,
+      "width": 1280,
+      "height": 900
+    },
+    "displayTarget": "secondary",
+    "source": "macos-nsscreen",
+    "screenIndex": 1,
+    "browserFrontmost": false,
+    "frontmostBefore": {
+      "pid": 73685,
+      "name": "ChatGPT"
+    },
+    "frontmostAfter": {
+      "pid": 73685,
+      "name": "ChatGPT"
+    }
+  },
+  "popupGeometry": {
+    "mainRight": 234,
+    "sectionLeft": 241,
+    "sameTop": true,
+    "sameHeight": true,
+    "overflow": false
+  },
+  "largePreview": {
+    "elapsedMs": 219.89999961853027,
+    "frameCount": 13,
+    "requestsBeforeConfirm": 0
+  },
+  "largeFirstRequest": {
+    "observedAfterConfirmationMs": 739.1000003814697,
+    "frameCount": 22
+  },
+  "largeFirstProgress": {
+    "elapsedAfterConfirmationMs": 899.2000002861023,
+    "frameCount": 32
+  },
+  "largeRegion": {
+    "paragraphs": 180,
+    "originalInlineNodes": 2160,
+    "requestCount": 180,
+    "maxProviderConcurrency": 1,
+    "frameCount": 1079,
+    "maxFrameGapMs": 600.0999999999999,
+    "maxTimerDelayMs": 599.7000002861023,
+    "timerCount": 1042,
+    "longTasks": [
+      {
+        "duration": 592,
+        "relativeToProbeMs": 229.5,
+        "phase": "confirmed-region"
+      }
+    ],
+    "elapsedMs": 18568.699999809265,
+    "longTaskTotalMs": 592
+  },
+  "success": true,
+  "focusEvents": {
+    "monitoring": "native macOS activation events throughout the test",
+    "browserActivations": 0,
+    "observerClosed": true
+  },
+  "profileRemoved": true
+}

@@ -1,10 +1,10 @@
 /**
  * @file src/features/section-translation/core.ts
  * 文件职责：定义局部翻译选择模式里“鼠标指着哪一块区域”的判定规则，把命中的任意节点收敛为可高亮、可翻译的块级容器，并提供向外扩大范围、元素简称与标签文案的纯计算。
- * 主要内容：导出几何判定、范围扩大、界面排除、元素简称、自然语言范围与有界原文预览及动作标签；跨开放 Shadow DOM 排除 FluentRead 界面，用 512 步预算限制祖先布局读取，跳过行内、零尺寸与媒体节点，安全映射译文工件的原文父级。
+ * 主要内容：导出几何判定、范围扩大、界面排除、元素简称、自然语言范围与有界原文预览及动作标签；复用抗表单命名控件遮蔽的标签读取，跨开放 Shadow DOM 排除 FluentRead 界面并提取原文，用 512 步预算限制祖先布局读取，跳过行内、零尺寸与媒体节点，安全映射译文工件的原文父级。
  * 模块边界：本模块只读取传入元素与注入的几何/样式端口，不注册监听、不创建界面、不发起翻译，也不读取配置；手势与高亮由 content/picker 负责，区域翻译由全文翻译 feature 的公开接口完成。
  */
-import {getComposedParent} from '@/src/core/translation/public';
+import {getComposedParent, getElementTagName} from '@/src/core/translation/public';
 
 /** 选择模式需要的最小几何端口；运行时使用真实布局，测试可注入确定数值。 */
 export interface SectionGeometry {
@@ -40,9 +40,7 @@ const NON_TEXT_TAGS = new Set(['svg', 'img', 'picture', 'video', 'audio', 'canva
 const DOCUMENT_SURFACE_TAGS = new Set(['html', 'body', 'head']);
 const MAX_ANCESTOR_STEPS = 512;
 
-function tagNameOf(element: Element): string {
-    return element.tagName.toLowerCase();
-}
+const tagNameOf = getElementTagName;
 
 function closestOf(element: Element, selector: string): Element | null {
     return typeof element.closest === 'function' ? element.closest(selector) : null;
@@ -114,6 +112,7 @@ export function expandSectionElement(current: Element, geometry: SectionGeometry
 }
 
 const SIMPLE_CLASS_TOKEN = /^[A-Za-z_-][\w-]*$/u;
+const PREVIEW_EXCLUSION_SELECTOR = `${TRANSLATION_ARTIFACT_SELECTOR},${SECTION_PICKER_UI_SELECTOR},script,style,input,textarea,select`;
 
 /** 用阅读语义介绍范围，用户无需认识 HTML 标签与网页内部类名。 */
 export function describeSectionScope(element: Element): string {
@@ -125,7 +124,7 @@ export function describeSectionScope(element: Element): string {
     return `sectionTranslation.scope.${scope}`;
 }
 
-/** 只读取前 160 个节点和 88 个原文字，避开译文、脚本与控件，超长区域不会为预览遍历整棵树。 */
+/** Light DOM 与开放影子树共用 160 节点和 88 字预算，避开译文、扩展界面、脚本与控件。 */
 export function sectionSourcePreview(element: Element): string {
     let text = '';
     let steps = 0;
@@ -137,9 +136,14 @@ export function sectionSourcePreview(element: Element): string {
         }
         if (node.nodeType === 1) {
             const child = node as Element;
-            if (child.matches(`${TRANSLATION_ARTIFACT_SELECTOR},script,style,input,textarea,select,[data-fluent-read-ui]`)) return;
+            if (child.matches(PREVIEW_EXCLUSION_SELECTOR)) return;
         }
         for (let child = node.firstChild; child && steps < 160 && text.length < 88; child = child.nextSibling) walk(child);
+        // 区域翻译会发现开放影子树内的正文；宿主与其祖先的原文预览也应覆盖同一范围。
+        if (node.nodeType === 1 && steps < 160 && text.length < 88) {
+            const root = (node as Element).shadowRoot;
+            if (root) walk(root);
+        }
     };
     walk(element);
     text = text.trim();

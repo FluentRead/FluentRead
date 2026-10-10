@@ -1056,12 +1056,58 @@ async function runContextMenuNoticeCases({page, popup, result, readRequestCount}
   await show('unavailable');
   await page.waitForTimeout(1200);
   const hoverLayout = await readContextMenuNoticeLayout(page);
+  // 先核验可信鼠标确实进入通知；失败报告保留命中和离场事件，区分输入前置问题与计时回归。
+  const hoverSamples = [];
+  result.noticeHoverSamples = hoverSamples;
+  await notice.evaluate(node => {
+    const events = [];
+    const listeners = ['mouseenter', 'mouseleave', 'pointerenter', 'pointerleave'].map(type => {
+      const listener = event => {
+        if (events.length < 16) events.push({type, isTrusted: event.isTrusted, at: Date.now(),
+          relatedTarget: event.relatedTarget instanceof Element ? event.relatedTarget.tagName : null});
+      };
+      node.addEventListener(type, listener);
+      return [type, listener];
+    });
+    node.__fluentReadHoverObservation = {events, listeners};
+  });
+  const sampleHover = async () => {
+    const sample = await notice.evaluate(node => {
+      const {x, y, width, height} = node.getBoundingClientRect();
+      const point = {x: x + width / 2, y: y + height / 2};
+      const root = node.getRootNode();
+      const outer = document.elementFromPoint(point.x, point.y);
+      const inner = root.elementFromPoint(point.x, point.y);
+      return {at: Date.now(), hovered: node.matches(':hover'), connected: node.isConnected, point,
+        outer: outer?.id || outer?.tagName || null, inner: inner?.className || inner?.tagName || null,
+        events: node.__fluentReadHoverObservation.events.slice()};
+    });
+    hoverSamples.push(sample);
+    assert(sample.hovered && sample.connected,
+      `通知鼠标停留没有建立或中途离开：${JSON.stringify(sample)}`);
+  };
+  await activateInputPage(page);
   const hoverStartedAt = Date.now();
   await page.mouse.move(hoverLayout.notice.x + hoverLayout.notice.width / 2,
     hoverLayout.notice.y + hoverLayout.notice.height / 2);
-  await page.waitForTimeout(6500);
+  await sampleHover();
+  let hoverMoves = 1;
+  for (const heldMs of [500, 2000, 6500]) {
+    // 后台可见窗口可能收到系统离场事件；用真实小幅移动维持本用例的阅读输入，不合成 DOM 事件。
+    while (Date.now() - hoverStartedAt < heldMs) {
+      await page.waitForTimeout(Math.min(200, heldMs - (Date.now() - hoverStartedAt)));
+      await page.mouse.move(hoverLayout.notice.x + hoverLayout.notice.width / 2 + hoverMoves % 2,
+        hoverLayout.notice.y + hoverLayout.notice.height / 2);
+      hoverMoves += 1;
+    }
+    await sampleHover();
+  }
   assert(await notice.count() === 1 && await notice.isVisible(), '右键通知在鼠标阅读超过6秒时自动消失');
   const hoverHeldForMs = Date.now() - hoverStartedAt;
+  await notice.evaluate(node => {
+    for (const [type, listener] of node.__fluentReadHoverObservation.listeners) node.removeEventListener(type, listener);
+    delete node.__fluentReadHoverObservation;
+  });
   await page.mouse.move(20, 800);
   const mouseLeftAt = Date.now();
   await notice.waitFor({state: 'detached', timeout: 6500});
@@ -1071,7 +1117,8 @@ async function runContextMenuNoticeCases({page, popup, result, readRequestCount}
   assert(remainingAfterLeaveMs >= expectedRemainderMs - 500 && remainingAfterLeaveMs <= expectedRemainderMs + 850,
     `鼠标离开后未按剩余阅读时间关闭：${JSON.stringify({beforeHoverMs, hoverHeldForMs, remainingAfterLeaveMs, expectedRemainderMs})}`);
   result.cases.push({id: 'context-menu.notice-hover-pauses-and-resumes', status: 'passed',
-    durationMs: 6000, beforeHoverMs, hoverHeldForMs, remainingAfterLeaveMs, expectedRemainderMs});
+    durationMs: 6000, beforeHoverMs, hoverHeldForMs, remainingAfterLeaveMs, expectedRemainderMs,
+    inputMode: 'trusted-small-mouse-moves-inside-notice', hoverMoves, hoverSamples});
 
   await page.evaluate(() => {
     const button = document.createElement('button'); button.id = 'context-menu-notice-focus-origin';

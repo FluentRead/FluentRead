@@ -1,7 +1,4 @@
-import {describe, expect, it, vi} from 'vitest';
-// Vitest 的 Node 配置不编译 Vue 组件；这里仅检验无浏览器 API 的运行时空适配器。
-vi.mock('@/src/features/image-translation/ui/ImageOcrSettings.vue', () => ({default: {}}));
-vi.mock('@/src/features/image-translation/ui/MangaSettings.vue', () => ({default: {}}));
+import {describe, expect, it} from 'vitest';
 import {
     toggleMangaTranslation,
     openMangaEntry,

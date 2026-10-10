@@ -1,7 +1,7 @@
 <!--
  * @file src/features/settings/ui/SettingsSections.vue
  * 文件职责：承载 FluentRead Options 页面各业务设置分区，连接运行时配置、服务选择、快捷键、站点规则、翻译中心、OCR、词书以及导入导出和历史恢复。
- * 主要内容：扩展设置入口可通过已校验的 service 查询参数选择服务编辑区，目录浏览不改写默认翻译服务，详情标题栏显式设为默认后复用现有配置补丁持久化并同步其他页面；图片设置优先展示语言、服务与识别选择，资源与入口按需展开；翻译设置首先展示带交互示例的阅读辅助，普通页面与网站规则连续展示任务分组并标记顶部导航的滚动定位目标，统计保留按任务切换的视图，集中分配功能服务并将模型用量合并到翻译统计，保留已访问表单实例，自定义快捷键弹窗按显示状态挂载并在离开所属分区时取消草稿；包含正文/全部节点识别范围；模板按 activeSection 展示业务分区，通用设置首先展示全局翻译开关，再按基础配置、网页辅助、基本偏好组织控件，软件语言控件随分区及缓存活跃状态启停，并保留固定英文标题与说明以便选错语言后恢复，提供当前默认服务的配置入口并保留译文样式跨页入口；图片与圈选合并在同页，共享仅在当前分区挂载的 OCR 管理组件；服务连接在主页面的服务目录内编辑，在界面风格页组织译文样式、风格与菜单栏布局，仅在高级选项激活时挂载缓存管理；脚本以独立配置副本隔离编辑与全局差分基线，协调网站入口、配置及凭据保存、历史恢复、能力过滤和离页补丁交接。
+ * 主要内容：userscript既有不可达分区的异步组件在构建期排除，保留划词本地朗读和Chrome/Firefox原组件；扩展设置入口可通过已校验的 service 查询参数选择服务编辑区，目录浏览不改写默认翻译服务，详情标题栏显式设为默认后复用现有配置补丁持久化并同步其他页面；图片设置优先展示语言、服务与识别选择，资源与入口按需展开；翻译设置首先展示带交互示例的阅读辅助，普通页面与网站规则连续展示任务分组并标记顶部导航的滚动定位目标，统计保留按任务切换的视图，集中分配功能服务并将模型用量合并到翻译统计，保留已访问表单实例，自定义快捷键弹窗按显示状态挂载并在离开所属分区时取消草稿；包含正文/全部节点识别范围；模板按 activeSection 展示业务分区，通用设置首先展示全局翻译开关，再按基础配置、网页辅助、基本偏好组织控件，软件语言控件随分区及缓存活跃状态启停，并保留固定英文标题与说明以便选错语言后恢复，提供当前默认服务的配置入口并保留译文样式跨页入口；图片与圈选合并在同页，共享仅在当前分区挂载的 OCR 管理组件；服务连接在主页面的服务目录内编辑，在界面风格页组织译文样式、风格与菜单栏布局，仅在高级选项激活时挂载缓存管理；脚本以独立配置副本隔离编辑与全局差分基线，协调网站入口、配置及凭据保存、历史恢复、能力过滤和离页补丁交接。
  * 锚点编排：翻译设置保留连续表单，双语逐句阅读辅助与智能高亮各有独立锚点；智能高亮仅在翻译设置分区激活时挂载，定位不隐藏其他分组，既有表单配置保持原归属。
  * 模块边界：该组件负责设置 UI 编排但不实现 provider 网络、配置仓库或 feature 运行时；校验与迁移来自 core/config，持久化经 services/config，复杂子界面保持在各自 feature/组件内。
  -->
@@ -597,7 +597,7 @@ const CustomOpenAIProviderDialog = defineAsyncComponent(() => import('./services
 const TranslationCenter = defineAsyncComponent(() => import('@/src/features/translation-center/public').then(module => module.TranslationCenter));
 const openInputServiceSettings = (service: string) => { setConfigurationService(service); openSettingsSection('settings-services', 'connections'); };
 const openWritingServiceSettings = () => openInputServiceSettings(config.value.writing.service || config.value.service);
-const WritingSettings = defineAsyncComponent(() => import('./WritingSettings.vue'));
+const WritingSettings = import.meta.env.BROWSER === 'userscript' ? undefined : defineAsyncComponent(() => import('./WritingSettings.vue'));
 // 单文件 userscript 没有扩展模型端口，构建期移除不可用组件与下载 UI。
 const InformationHighlightSettings = import.meta.env.BROWSER === 'userscript' ? null : defineAsyncComponent(() => import('./InformationHighlightSettings.vue'));
 const SelectionSettings = defineAsyncComponent(() => import('./SelectionSettings.vue'));
@@ -625,15 +625,15 @@ import {
   getMissingCredentialMessage,
   isApiKeyRequired,
 } from '@/src/core/config/validation';
-const ImageOcrSettings = defineAsyncComponent(() => import('@/src/features/image-translation/public').then(module => module.ImageOcrSettings));
-const MangaSettings = defineAsyncComponent(() => import('@/src/features/image-translation/public').then(module => module.MangaSettings));
-const VideoLocalModelSettings = defineAsyncComponent(() => import('./VideoLocalModelSettings.vue'));
+const ImageOcrSettings = import.meta.env.BROWSER === 'userscript' ? undefined : defineAsyncComponent(() => import('@/src/features/image-translation/public').then(module => module.ImageOcrSettings));
+const MangaSettings = import.meta.env.BROWSER === 'userscript' ? undefined : defineAsyncComponent(() => import('@/src/features/image-translation/public').then(module => module.MangaSettings));
+const VideoLocalModelSettings = import.meta.env.BROWSER === 'userscript' ? undefined : defineAsyncComponent(() => import('./VideoLocalModelSettings.vue'));
 const LocalTtsSettings = defineAsyncComponent(() => import('./LocalTtsSettings.vue'));
-const VideoSubtitleAppearanceSettings = defineAsyncComponent(() => import('./VideoSubtitleAppearanceSettings.vue'));
-const ModelUsageDashboard = defineAsyncComponent(() => import('@/src/features/model-usage/public').then(module => module.ModelUsageDashboard));
-const TranslationStatsDashboard = defineAsyncComponent(() => import('@/src/features/translation-stats/public').then(module => module.TranslationStatsDashboard));
+const VideoSubtitleAppearanceSettings = import.meta.env.BROWSER === 'userscript' ? undefined : defineAsyncComponent(() => import('./VideoSubtitleAppearanceSettings.vue'));
+const ModelUsageDashboard = import.meta.env.BROWSER === 'userscript' ? undefined : defineAsyncComponent(() => import('@/src/features/model-usage/public').then(module => module.ModelUsageDashboard));
+const TranslationStatsDashboard = import.meta.env.BROWSER === 'userscript' ? undefined : defineAsyncComponent(() => import('@/src/features/translation-stats/public').then(module => module.TranslationStatsDashboard));
 const InterfaceSettings = defineAsyncComponent(() => import('./InterfaceSettings.vue'));
-const AreaTranslationSettings = defineAsyncComponent(() => import('./AreaTranslationSettings.vue'));
+const AreaTranslationSettings = import.meta.env.BROWSER === 'userscript' ? undefined : defineAsyncComponent(() => import('./AreaTranslationSettings.vue'));
 const InputTranslationSettings = defineAsyncComponent(() => import('./InputTranslationSettings.vue'));
 import {browserCapabilities} from '@/src/platform/browser/capabilities';
 const ParagraphCopySettings = defineAsyncComponent(() => import('./ParagraphCopySettings.vue'));
@@ -651,7 +651,7 @@ import {localizeServiceOptions, useUiI18n} from '@/src/ui/i18n';
 import {applyInterfaceTheme} from '@/src/ui/interfaceAppearance';
 const ConfigManagement = defineAsyncComponent(() => import('./ConfigManagement.vue'));
 const QuickTranslationProfiles = defineAsyncComponent(() => import('./QuickTranslationProfiles.vue'));
-const ContextMenuSettings = defineAsyncComponent(() => import('./ContextMenuSettings.vue'));
+const ContextMenuSettings = import.meta.env.BROWSER === 'userscript' ? undefined : defineAsyncComponent(() => import('./ContextMenuSettings.vue'));
 import {useTranslationShortcutSettings} from './useTranslationShortcutSettings';
 import {
   config as runtimeConfig,

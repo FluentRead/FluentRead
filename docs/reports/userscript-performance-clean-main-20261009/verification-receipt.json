@@ -1,0 +1,229 @@
+{
+  "schemaVersion": 1,
+  "source": {
+    "validatedCommit": "64108a3a1078a3d42432f2dc301bd36abff0f263",
+    "baseCommit": "175c59514b9ce4242b34b9f6bed1ac6a2ceb3545",
+    "validationOccurredBeforeSourceCommit": true,
+    "sha256": {
+      "src/features/settings/ui/SettingsSections.vue": "fbfdea17d9dd69c03276135b4e2b01ae5901049fd0ce684106de87b3bd8e4fa0",
+      "tests/settingsUiArchitecture.test.ts": "25b48d912be763709be9471974e3ed29ed560972c0cc55a1e3a343eb0e20fa3e",
+      "tests/userscriptCompression.test.ts": "f6dc470fac671b22251c22b1cb4f89493c49fab0687ca8daf2cd87ab75c263c8",
+      "tests/userscriptUnsupportedCapabilities.test.ts": "40a7c521ca39ebcfd75ff615afe626812e2345b3b1b8434f0f8baa564a2eccd3",
+      "tests/userscriptViteConfig.test.ts": "175b4f73e616e7b0d767f60a5a34118644261b66030e6a57e62bdd0bfb60b261",
+      "userscript/pako.d.ts": "ddcc00abe4377728b78b31f1ff7cd3b24b4ec1a428ffe3ec0306dbd109969c06",
+      "userscript/pakoBundled.ts": "fe6111535d14b46dedfbbd9c3210864a00f29654904883bb622a1b2ac05e2510",
+      "userscript/unsupportedCapabilities.ts": "3e87f05bb5257adda8b5ac22b7414193099344ad557aacf07ac342c1253d645d",
+      "userscript/vite.config.ts": "b465fe8b4924624468562e8138ab92bfba68de06ebfc977cad32cd7ae0f6fea7"
+    }
+  },
+  "artifacts": {
+    "standard": {
+      "utf8Bytes": 1957868,
+      "sha256": "5ed2858fca0faf87eb9469bfb1073a7f5081c6aa49affdfb22f8588dec08676f",
+      "budgetBytes": 1964000,
+      "originalVerifierExecuted": true,
+      "originalVerifierExitCode": 0,
+      "originalCliMatchesReadOnlyGraphBuild": true
+    },
+    "standalone": {
+      "utf8Bytes": 3590688,
+      "sha256": "19afc0bc9260e07de9f9318a3088ef3713277bbd6f55c78b103a34747f62e3a5",
+      "budgetBytes": 3600000,
+      "originalVerifierExecuted": true,
+      "originalVerifierExitCode": 0,
+      "originalCliMatchesReadOnlyGraphBuild": true
+    }
+  },
+  "ablation": {
+    "beforeAuto": {
+      "utf8Bytes": 1964011,
+      "sha256": "e30fc1031c2feea9dd242883272009225ca251b0c5fd17e733e7c64f5f46bf61"
+    },
+    "beforeStrictTrue": {
+      "utf8Bytes": 1964355,
+      "sha256": "9d88be157cba5832995af1ade47cc27ef3a11042845ee7e44ad5b9ff007b8c80"
+    },
+    "removeReexportsOnlyAuto": {
+      "utf8Bytes": 1957524,
+      "sha256": "f5c11b12f782d377c11172edecf4f6a989347d754235ce4c8d26e88a35d5d953"
+    },
+    "removeReexportsAndStandardStrictTrue": {
+      "utf8Bytes": 1957868,
+      "sha256": "5ed2858fca0faf87eb9469bfb1073a7f5081c6aa49affdfb22f8588dec08676f"
+    },
+    "removalSavingsUnderStrictTrue": 6487,
+    "strictTrueWrappingCostAfterRemoval": 344,
+    "netSavingsFromOriginal": 6143
+  },
+  "graphs": {
+    "deadCssAndMangaOcrAssetsAbsentInLoadedAndEntryGraphs": {
+      "standard": true,
+      "standalone": true,
+      "greasyfork": true
+    },
+    "sharedOcrLanguageContractsRetained": true,
+    "standaloneFullSettingsAndLocalTtsRetained": true,
+    "extensionPublicUiExportsUnchanged": true
+  },
+  "tests": {
+    "targeted": {
+      "total": 55,
+      "passed": 54,
+      "failed": 1,
+      "failures": [
+        {
+          "file": "userscriptFreeTranslationSettings.test.ts",
+          "name": "userscript free translation settings normalizes saved mode and selected fallback order without accepting user weights",
+          "assertion": "AssertionError: expected [ 'bilibiliFree', 'sogouFree' ] to deeply equal [ 'sogouFree' ]"
+        }
+      ],
+      "resultJsonSha256": "dcbfb4ba2e835ac770c0930f54ec580c5d04d8d2317dcf15d0d7f2eb65f893b8"
+    },
+    "mainSingleCaseReplay": {
+      "commit": "175c59514b9ce4242b34b9f6bed1ac6a2ceb3545",
+      "executed": 1,
+      "failed": 1,
+      "skipped": 2,
+      "failures": [
+        {
+          "file": "userscriptFreeTranslationSettings.test.ts",
+          "name": "userscript free translation settings normalizes saved mode and selected fallback order without accepting user weights",
+          "assertion": "AssertionError: expected [ 'bilibiliFree', 'sogouFree' ] to deeply equal [ 'sogouFree' ]"
+        }
+      ],
+      "resultJsonSha256": "070cd24d22e19008e7ae03f21c7718dca5303f550357f95c92db45129750bdcf"
+    },
+    "actualRootSyntheticNavigation": {
+      "passed": true,
+      "cases": 42,
+      "resultJsonSha256": "d7b3f6fec4a2cfb8aafba35ebd5d313d7882d0a86ad5fa4bc117058657c7f929"
+    }
+  },
+  "stages": [
+    {
+      "id": "followup-dead-reexports-only",
+      "exitCode": 0,
+      "logSha256": "2bb7a22141e971378667daa119ff5db2141e47656e75cf13ac56a8ece77cc7f0"
+    },
+    {
+      "id": "followup-final-standard-proof",
+      "exitCode": 0,
+      "logSha256": "447338253770ba6fa35a705f24bc07ccd628dba95bb69e5d2c8bbd827a64bd57"
+    },
+    {
+      "id": "followup-final-standard-original-build",
+      "exitCode": 0,
+      "logSha256": "52fe084ae7c771de1a3c5cba1184440a7555532dcd212299e0c2baee2cdace45"
+    },
+    {
+      "id": "followup-final-standard-original-verifier",
+      "exitCode": 0,
+      "logSha256": "e955e147f71ed4a274c76be76b173e10c9a37694132186ab42e8c2623b2b7437"
+    },
+    {
+      "id": "followup-final-standalone-proof",
+      "exitCode": 0,
+      "logSha256": "ef591811f51254d1e714eb6e2e994ce931a9b98d1865d4c693791d08f0cbd579"
+    },
+    {
+      "id": "followup-final-standalone-original-build",
+      "exitCode": 0,
+      "logSha256": "142f240c64c851b6413f44ac1400e2c8df12fc23ca0acf2d7500d06af53da36a"
+    },
+    {
+      "id": "followup-final-standalone-original-verifier",
+      "exitCode": 0,
+      "logSha256": "e0dc660be9ea30a44feb12809fb1c91295881dd37360d6f73fcb28af95376bee"
+    },
+    {
+      "id": "followup-final-candidate-types",
+      "exitCode": 0,
+      "logSha256": "da466012bc9fa78d80a863f937702456da89779a8077ec6b0bfbe73edbee72df"
+    },
+    {
+      "id": "followup-final-candidate-contracts",
+      "exitCode": 1,
+      "logSha256": "0ebc284cec517c5e69238a119d57c11ea97afd1185bf36cdfae0eb3defdbc8e7"
+    },
+    {
+      "id": "followup-baseline-free-settings-known-failure",
+      "exitCode": 1,
+      "logSha256": "db687ce952c618130e65c8fa8eb0cc966a52b00442b62c58195a27fd434d228f"
+    },
+    {
+      "id": "followup-final-candidate-options-navigation",
+      "exitCode": 0,
+      "logSha256": "be7830fac6e5b57b0b017ee22ad28384eb5236cc0d7bb715553c74b8581b2852"
+    },
+    {
+      "id": "followup-final-candidate-test-audit",
+      "exitCode": 0,
+      "logSha256": "e89ed44bf03c2e1813d788bca3702b440dae8361c69b5f0b86318191defcc8ba"
+    },
+    {
+      "id": "followup-final-gf-original-data-block",
+      "exitCode": 1,
+      "logSha256": "88898236e9ab92e4db0023597a206fba2ae8fc97e7d18ff6d370befea58cb9b9"
+    },
+    {
+      "id": "followup-final-gf-module-proof",
+      "exitCode": 0,
+      "logSha256": "74183e3078014b1231f23c663a982cedc8e5ac42067362bc05f6678f178c7fb6"
+    },
+    {
+      "id": "followup-final-budget-note-docs-build",
+      "exitCode": 0,
+      "logSha256": "e8f26aae49536412c6d7bdcc8e2509010bdc5b0efb4922d5bbc0eccaae120046"
+    }
+  ],
+  "greasyfork": {
+    "utf8Bytes": 2335647,
+    "sourceSha256": "6cd6a5da32c6745da726418eb138ebe02c88eaed0f1f68b7b0a5b7ec1fe8dbf3",
+    "originalFormalExitCode": 1,
+    "failure": "fixed generated data mismatch at scripts/build-userscript-greasyfork.mjs:79",
+    "originalVerifierExecuted": false,
+    "originalVerifierExitCode": null,
+    "readOnlyBudgetBytes": 2000000,
+    "readOnlyOverBytes": 335647,
+    "generatedDataBytes": 868136,
+    "generatedDataSha256": "85be944ad2d1f97ae94badf3a8e8f77e282beaf1f217ed472ef2e73050ae0981",
+    "trackedDataSha256": "2c14c754f6486dee45b6bfd91f2a3b7c9464b26cf8d4be2b172b2692ae0e6fa4",
+    "resourceUrlsAndNoticesUnchanged": true
+  },
+  "browser": {
+    "status": "not-executed",
+    "creation": "rejected-before-command-execution",
+    "identicalAuthorizedRetryCount": 1,
+    "furtherRetries": 0,
+    "artifactSha256": "19afc0bc9260e07de9f9318a3088ef3713277bbd6f55c78b103a34747f62e3a5",
+    "runtimeLogSha256": null,
+    "runtimeLogAbsentReason": "Command creation was rejected by automatic approval review before execution.",
+    "approvalReason": "Reuse-only restriction still enforced by automatic approval review after authorization clarification.",
+    "firstRejectionRecordSha256": "89c9b022d7939f94fb5c3dd8ff9d50d5402d033605279f3818a859e07923688f",
+    "retryRejectionRecordSha256": "75b65fd60fcd1dbb76541ca396293cb8965c039797e5d4ba16d49ee1949b4d7c",
+    "firstReasonTextSha256": "16a532e525512170a9d4069e3814a2ec729ff50609463fccd4b0f9aeef6e6d9f",
+    "retryReasonTextSha256": "aac49bd7dec6caf35311c6e653f13d2bf2cbd63891422d1a759abfc255379e88",
+    "preparedLauncherSha256": "82d076cdc1fad70ba3b5a31b885de53034e68b3676ac635177f864c7cfd2c304",
+    "processesCreated": false,
+    "socketsConnected": false,
+    "ungzipFixtureCasesExecuted": 0,
+    "typedOffsetCasesExecuted": 0,
+    "exceptionContractsExecuted": 0,
+    "newExtensions": 0,
+    "permissionChanges": 0,
+    "RecoveryInspectedOrControlled": false,
+    "outputs": {
+      "standard": {
+        "sha256": "5ed2858fca0faf87eb9469bfb1073a7f5081c6aa49affdfb22f8588dec08676f",
+        "finalIifeRuntimeStatus": "not-executed"
+      },
+      "standalone": {
+        "sha256": "19afc0bc9260e07de9f9318a3088ef3713277bbd6f55c78b103a34747f62e3a5",
+        "finalIifeRuntimeStatus": "not-executed"
+      }
+    },
+    "actualNewSessionVersion": null,
+    "standardWholeIifeRuntimeProven": false,
+    "standaloneWholeIifeRuntimeProven": false
+  }
+}

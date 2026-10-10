@@ -29,6 +29,25 @@ const entrypointId = resolve(process.cwd(), 'entrypoints/userscript-injection-fi
 const sourceModuleId = resolve(process.cwd(), 'src/app/content/runtime.ts');
 const vueScriptModuleId = `${resolve(process.cwd(), 'src/features/selection-translation/ui/SelectionTranslator.vue')}?vue&type=script&setup=true&lang.ts`;
 
+describe('CommonJS initialization policy by userscript output', () => {
+    it.each(['standard', 'standalone', 'greasyfork'] as const)
+    ('limits deterministic wrapping to the standard output (%s)', async mode => {
+        vi.stubEnv('FLUENTREAD_USERSCRIPT_STANDALONE', mode === 'standalone' ? '1' : '0');
+        vi.stubEnv('FLUENTREAD_USERSCRIPT_GREASYFORK_SOURCE', mode === 'greasyfork' ? '1' : '0');
+        vi.stubEnv('FLUENTREAD_USERSCRIPT_VENDOR_URL', 'https://fixture.invalid/vendor.js');
+        vi.stubEnv('FLUENTREAD_USERSCRIPT_DATA_URL', 'https://fixture.invalid/data.js');
+        try {
+            vi.resetModules();
+            const {default: config} = await import('@/userscript/vite.config');
+            expect((config as {build: {commonjsOptions?: {strictRequires?: boolean}}}).build.commonjsOptions?.strictRequires)
+                .toBe(mode === 'standard' ? true : undefined);
+        } finally {
+            vi.unstubAllEnvs();
+            vi.resetModules();
+        }
+    });
+});
+
 describe('authoritative site catalogs with an external pinned data asset', () => {
     it.each(['unchanged', 'old-asset', 'reordered', 'removed-rule', 'missing-runtime-rule'] as const)
     ('reconciles %s without mutating the external asset', async variant => {

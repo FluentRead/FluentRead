@@ -29,4 +29,21 @@ describe('userscript compressed assets', () => {
 
         expect(inflateWithBundledPako(gzipSync(source))).toBe(source);
     });
+
+    it('respects the offset and length of a typed gzip input', () => {
+        const source = 'FluentRead typed view 中文 🚀';
+        const compressed = gzipSync(source);
+        const padded = new Uint8Array(compressed.length + 8).fill(0xa5);
+        padded.set(compressed, 3);
+
+        expect(inflateWithBundledPako(padded.subarray(3, 3 + compressed.length))).toBe(source);
+    });
+
+    it('rejects invalid gzip headers and damaged checksums', () => {
+        const compressed = gzipSync('FluentRead checksum');
+        compressed[compressed.length - 8] ^= 1;
+
+        expect(() => inflateWithBundledPako(new Uint8Array([0xff, 0xff, 0xff, 0xff]))).toThrow('incorrect header check');
+        expect(() => inflateWithBundledPako(compressed)).toThrow('incorrect data check');
+    });
 });

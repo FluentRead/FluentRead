@@ -191,7 +191,8 @@ describe('options UI composition architecture', () => {
       'ServiceCatalog', 'ServiceConfiguration', 'InterfaceSettings', 'VideoLocalModelSettings',
       'LocalTtsSettings', 'ModelUsageDashboard', 'TranslationStatsDashboard', 'ConfigManagement', 'TranslationCenter',
     ]) {
-      expect(sections).toContain(`const ${component} = defineAsyncComponent(`)
+      const excludedInUserscript = ['VideoLocalModelSettings', 'ModelUsageDashboard', 'TranslationStatsDashboard'].includes(component)
+      expect(sections).toContain(`const ${component} = ${excludedInUserscript ? "import.meta.env.BROWSER === 'userscript' ? undefined : " : ''}defineAsyncComponent(`)
     }
   })
 
@@ -227,7 +228,7 @@ describe('options UI composition architecture', () => {
     const dashboard = source('src/features/translation-stats/ui/TranslationStatsDashboard.vue')
     const dashboardBody = dashboard.replace(/^<!--[\s\S]*?-->\s*/u, '')
 
-    expect(settingsSections).toContain("const TranslationStatsDashboard = defineAsyncComponent(() => import('@/src/features/translation-stats/public').then(module => module.TranslationStatsDashboard))")
+    expect(settingsSections).toContain("const TranslationStatsDashboard = import.meta.env.BROWSER === 'userscript' ? undefined : defineAsyncComponent(() => import('@/src/features/translation-stats/public').then(module => module.TranslationStatsDashboard))")
     expect(settingsSections).toContain("v-if=\"hasVisitedSection('settings-translation-stats')\"")
     expect(settingsSections).toContain(":active=\"viewActive && props.activeSection === 'settings-translation-stats' && props.activePanel !== 'usage'\"")
     expect(statsPublic).toContain("from './ui/TranslationStatsDashboard.vue'")
@@ -430,7 +431,7 @@ describe('options UI composition architecture', () => {
     expect(sharedOcrSettings).toContain(':id="`${props.idPrefix}-ocr-pack-title`"')
     expect(sharedOcrSettings).toContain(':aria-labelledby="`${props.idPrefix}-ocr-pack-title`"')
     expect(sharedOcrSettings).not.toContain('id="image-ocr-pack-title"')
-    expect(settingsSections).toContain("const ModelUsageDashboard = defineAsyncComponent(() => import('@/src/features/model-usage/public').then(module => module.ModelUsageDashboard))")
+    expect(settingsSections).toContain("const ModelUsageDashboard = import.meta.env.BROWSER === 'userscript' ? undefined : defineAsyncComponent(() => import('@/src/features/model-usage/public').then(module => module.ModelUsageDashboard))")
     expect(settingsSections).toContain('<SettingsPanel name="usage" :active="props.activePanel">')
     expect(settingsSections).toContain(":active=\"viewActive && props.activeSection === 'settings-translation-stats' && props.activePanel === 'usage'\"")
     expect(modelUsagePublic).toContain("from './ui/ModelUsageDashboard.vue'")

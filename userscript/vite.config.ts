@@ -524,6 +524,8 @@ export default defineConfig({
         emptyOutDir: true,
         target: 'es2018',
         minify: greasyForkSource ? false : 'esbuild',
+        // 标准出口保留 CommonJS 的惰性初始化，避免混合 require 到达顺序改变最终包装。
+        ...(!bundleLibraries && !greasyForkSource ? {commonjsOptions: {strictRequires: true}} : {}),
         sourcemap: false,
         cssCodeSplit: false,
         assetsInlineLimit: Number.MAX_SAFE_INTEGER,

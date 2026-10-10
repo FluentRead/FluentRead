@@ -1,0 +1,405 @@
+{
+  "schemaVersion": 1,
+  "reportDate": "2026-10-10",
+  "scope": "Final standard and standalone userscript IIFE acceptance in fresh isolated profiles with a synthetic localhost memory-GM fixture.",
+  "source": {
+    "testedMergeCommit": "72ff27e10603cc14c13db8690dcc03835ca42c79",
+    "mergeParents": [
+      "dd2d2e210275e952cb3af9c07640b5878d92c8af",
+      "f1af6300b240ce65d00d36dec37ab50742197044"
+    ],
+    "testedTree": "9d007bdccf169bf670b534a39612a61c2aa4ed2e",
+    "precedingDocumentationCommit": "10af103f0429a7de33fbbf6ef48f70ea9c22edb4",
+    "documentationOnlyChangesAfterTestedSource": true,
+    "existingFinalBuildsReused": true,
+    "productionSourceChanged": false,
+    "rebuildsForBrowserAcceptance": 0
+  },
+  "browser": {
+    "release": "browserclaw/v0.51.0",
+    "reportedVersion": "Chrome/155.0.8309.26",
+    "privateAuthenticatedDisplay": true,
+    "privateDbus": true,
+    "freshTemporaryProfiles": true,
+    "desktopSessionUnchanged": true
+  },
+  "resourceSettings": {
+    "cpuTargetPercent": 60,
+    "workers": 1,
+    "concurrency": 1,
+    "heavyCommandsSerial": true
+  },
+  "artifacts": [
+    {
+      "mode": "standard",
+      "bytes": 1957253,
+      "sha256": "4bb464d4440449b68170cb9ee897bdbcc0a0da560715f0ba767b1f2cb86d66fd",
+      "diskAndBrowserScriptBeforeAndAfterEqual": true,
+      "originalBuildArtifactReceiptSha256": "49f7104d98b82c408131946bf7afe7f69354d26b50028aa135b602f31aca2230"
+    },
+    {
+      "mode": "standalone",
+      "bytes": 3591507,
+      "sha256": "500520a34202b9611ff5c77252971e2da071714fde961f8e026edc1551efae62",
+      "diskAndBrowserScriptBeforeAndAfterEqual": true,
+      "originalBuildArtifactReceiptSha256": "c34c1c5f7f05a84649c3bee2495b21ce9de2255f829193ee07f18ee9fe342dd6"
+    }
+  ],
+  "attempts": [
+    {
+      "id": "A1",
+      "mode": "standard",
+      "startedAtUTC": "2026-10-10T14:08:26Z",
+      "outcome": "Neo 进程命令行 已展平成单串；harness 的 NUL 分段 includes(profileFlag) 断言失败。未连接 CDP，未执行 IIFE。",
+      "completeAcceptancePassed": false,
+      "originalLogSha256": {
+        "launcher": "f1e70b1ba7aac66957b3954ab041140dd80fbcc3747864276dc6a9210a8def7a",
+        "neoStderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "xvfbStderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "recordedPageNetwork": {
+        "recordedPageRequests": 0,
+        "externalPageAttempts": 0,
+        "externalPageAdmitted": 0,
+        "interceptionErrors": 0
+      },
+      "pageExceptions": 0,
+      "consoleErrors": 0,
+      "cleanup": {
+        "recordedAtUTC": "2026-10-10T14:08:27.171535Z",
+        "remainingOwnedProcesses": 0,
+        "remainingOwnedListeners": 0,
+        "privateDisplaySocketExists": false,
+        "fixtureServerClosed": true,
+        "temporaryProfileRetainedLocally": true,
+        "originalReceiptSha256": "305c8d86bb9c6abef9757604992192ad38e48fa6d2be49abe6d4f182f7d16d56"
+      },
+      "phases": {},
+      "errorReceipt": {
+        "writtenAtUTC": "2026-10-10T14:08:26.444532Z",
+        "sha256": "d85ce82d5b4942c0b81301244203176bc77d458b8b6a668957b146c299ff2ae3"
+      }
+    },
+    {
+      "id": "A2",
+      "mode": "standard",
+      "startedAtUTC": "2026-10-10T14:10:59Z",
+      "outcome": "增加 readiness 等待但仍仅匹配 NUL 分段参数，15 秒后 exact owned binary/profile argument binding 超时。未连接 CDP，未执行 IIFE。",
+      "completeAcceptancePassed": false,
+      "originalLogSha256": {
+        "launcher": "fd3ee177247cd74faacd260ac70211ced8b17c59333daf79fd33000a99d5679f",
+        "neoStderr": "3aba3ffff3832264eb6442a5c3aaee14889bc58a7acc345aace39d6f0082d7b8",
+        "xvfbStderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "recordedPageNetwork": {
+        "recordedPageRequests": 0,
+        "externalPageAttempts": 0,
+        "externalPageAdmitted": 0,
+        "interceptionErrors": 0
+      },
+      "pageExceptions": 0,
+      "consoleErrors": 0,
+      "cleanup": {
+        "recordedAtUTC": "2026-10-10T14:11:15.159321Z",
+        "remainingOwnedProcesses": 0,
+        "remainingOwnedListeners": 0,
+        "privateDisplaySocketExists": false,
+        "fixtureServerClosed": true,
+        "temporaryProfileRetainedLocally": true,
+        "originalReceiptSha256": "4e1b029a875fa656650b030d9abd47ffbc02f2b0cef41f387901ece116769d0c"
+      },
+      "phases": {},
+      "errorReceipt": {
+        "writtenAtUTC": "2026-10-10T14:11:14.428318Z",
+        "sha256": "e1c4cdedbaf16b4492d0d4218a780e3cce6c323038c8f727e5f18a6c50ab512e"
+      }
+    },
+    {
+      "id": "A3",
+      "mode": "standard",
+      "startedAtUTC": "2026-10-10T14:13:12Z",
+      "outcome": "真实 IIFE 初始化与 6 项 CJS 已通过；harness 错把标准版基础 SettingsPanel 当成完整 Options，等待 settings-general 导航按钮超时。设置与 gzip 尚未完成。",
+      "completeAcceptancePassed": false,
+      "originalLogSha256": {
+        "launcher": "07a8b5077f8f248203b7d693704b79a56bfe0dd95e408a685dde64089fc7edd5",
+        "neoStderr": "3549006c56aa464e397dc1e249b74c9d5c1e0cf6c168bcd1ac72b152e1201159",
+        "xvfbStderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "recordedPageNetwork": {
+        "recordedPageRequests": 10,
+        "externalPageAttempts": 0,
+        "externalPageAdmitted": 0,
+        "interceptionErrors": 0
+      },
+      "pageExceptions": 0,
+      "consoleErrors": 0,
+      "cleanup": {
+        "recordedAtUTC": "2026-10-10T14:13:39.579997Z",
+        "remainingOwnedProcesses": 0,
+        "remainingOwnedListeners": 0,
+        "privateDisplaySocketExists": false,
+        "fixtureServerClosed": true,
+        "temporaryProfileRetainedLocally": true,
+        "originalReceiptSha256": "e7d7c25a2aea9d5c68f22cbc1ebeb1c35aa85dd150fbe798ab9058418e0a76e4"
+      },
+      "phases": {
+        "CJS-RESULT.json": {
+          "recordedAtUTC": "2026-10-10T14:13:13.712876Z",
+          "originalReceiptSha256": "fc5a0f398ca935d0019929bf819b671bccdb8caf78f85860bdc4383f18f4062a",
+          "passed": true,
+          "executedInThisSession": true
+        }
+      },
+      "errorReceipt": {
+        "writtenAtUTC": "2026-10-10T14:13:38.844993Z",
+        "sha256": "995547d37521f07623ded54b6bc672daf71e2b182de943f9904669a4ed605b50"
+      },
+      "productionFunctionCapture": {
+        "writtenAtUTC": "2026-10-10T14:13:13.654876Z",
+        "sha256": "3bbb971e40675bd9fce74c43a8651812dd297af42eb2aed49c118ef5ab087bab"
+      },
+      "iifeInitializedBeforeUiTimeout": true
+    },
+    {
+      "id": "A4",
+      "mode": "standard",
+      "startedAtUTC": "2026-10-10T14:21:24Z",
+      "outcome": "最终标准版通过；重新初始化当前 IIFE、设置保存/关闭/重开、8 gzip/24 offset/5 错误；CJS 复用 A3，未重复调用。",
+      "completeAcceptancePassed": true,
+      "originalLogSha256": {
+        "launcher": "6b09071e367e0db2bcd26a2325e0a0094f3baaf98474e38c69e40c30923e7d60",
+        "neoStderr": "7a19bbb3df44e87bc6a5038062e79e56c241dc6e0256f77fee0bb92935224748",
+        "xvfbStderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "recordedPageNetwork": {
+        "recordedPageRequests": 11,
+        "externalPageAttempts": 0,
+        "externalPageAdmitted": 0,
+        "interceptionErrors": 0
+      },
+      "pageExceptions": 0,
+      "consoleErrors": 0,
+      "cleanup": {
+        "recordedAtUTC": "2026-10-10T14:21:26.946183Z",
+        "remainingOwnedProcesses": 0,
+        "remainingOwnedListeners": 0,
+        "privateDisplaySocketExists": false,
+        "fixtureServerClosed": true,
+        "temporaryProfileRetainedLocally": true,
+        "originalReceiptSha256": "2e0130c115bdcb88c28c04850218ad87db5651cf17b9633ca1a1c306900ffd74"
+      },
+      "phases": {
+        "IIFE-INITIALIZATION.json": {
+          "recordedAtUTC": "2026-10-10T14:21:25.812727Z",
+          "originalReceiptSha256": "519476011e0b6a6080867a313742cf516b80b556ecbc7f77029066be3be96e04",
+          "passed": true,
+          "executedInThisSession": true
+        },
+        "CJS-RESULT.json": {
+          "recordedAtUTC": "2026-10-10T14:21:25.812727Z",
+          "originalReceiptSha256": "d4fc91900711a160eb28e6c255ed87a35d7ce1eb1c14cfcc69a9d35c9771638f",
+          "passed": true,
+          "executedInThisSession": false
+        },
+        "GZIP-RESULT.json": {
+          "recordedAtUTC": "2026-10-10T14:21:25.886178Z",
+          "originalReceiptSha256": "5667c772057f8733898d98b0ba8df8c6390df8dec9b4cd9c914a1da7b47a0060",
+          "passed": true,
+          "executedInThisSession": true
+        },
+        "BASIC-SETTINGS-RESULT.json": {
+          "recordedAtUTC": "2026-10-10T14:21:26.132179Z",
+          "originalReceiptSha256": "2161204cad21c4278eba0fcda13dea3ee8182db4fdf3e888b92c3f6cd388671e",
+          "passed": true,
+          "executedInThisSession": true
+        }
+      },
+      "productionFunctionCapture": {
+        "writtenAtUTC": "2026-10-10T14:21:25.757178Z",
+        "sha256": "a96fa14a7c4262171f02ee16ef48f2d5c1564a7a82d7ef180009db2a72afdda9"
+      },
+      "contracts": {
+        "gzipFixtures": 8,
+        "typedOffsetInputs": 24,
+        "offsets": [
+          0,
+          3,
+          17
+        ],
+        "errorContracts": 5,
+        "cjsFixedInputs": 6
+      },
+      "cjsExecutedInThisSession": false,
+      "settingsInteraction": {
+        "kind": "synthetic-memory-only cache checkbox/save",
+        "checkedBefore": false,
+        "checkedAfter": true,
+        "stored": {
+          "useCache": true,
+          "on": false,
+          "autoTranslate": false
+        },
+        "savedValueSurvivedRemount": true
+      },
+      "gmFixtureNetworkAttempts": 0,
+      "externalModelApiCalls": 0,
+      "finalResult": {
+        "recordedAtUTC": "2026-10-10T14:21:26.946183Z",
+        "originalReceiptSha256": "25ece3e35a84598856de9e9f2dd3ed4d40730deb2521db4c43c03a809b4c1bc1",
+        "passed": true
+      }
+    },
+    {
+      "id": "A5",
+      "mode": "standalone",
+      "startedAtUTC": "2026-10-10T14:21:42Z",
+      "outcome": "最终 standalone 首次实际验收通过；初始化、完整 Options 导航/关闭/重开、6 CJS、8 gzip/24 offset/5 错误均为本会话新运行。",
+      "completeAcceptancePassed": true,
+      "originalLogSha256": {
+        "launcher": "b89aeeb0a401181b4ecea1d9fdf281431f07f56b4495fa676c1d22c32ab3482f",
+        "neoStderr": "86df65c66f13eb9f410f6584b06f04ed12e3114da315df37451c655baef92f06",
+        "xvfbStderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "recordedPageNetwork": {
+        "recordedPageRequests": 5,
+        "externalPageAttempts": 0,
+        "externalPageAdmitted": 0,
+        "interceptionErrors": 0
+      },
+      "pageExceptions": 0,
+      "consoleErrors": 0,
+      "cleanup": {
+        "recordedAtUTC": "2026-10-10T14:21:45.290269Z",
+        "remainingOwnedProcesses": 0,
+        "remainingOwnedListeners": 0,
+        "privateDisplaySocketExists": false,
+        "fixtureServerClosed": true,
+        "temporaryProfileRetainedLocally": true,
+        "originalReceiptSha256": "0e93b32a083a063f28de368429183afac6d8eec6b05546280081c22d02290c33"
+      },
+      "phases": {
+        "IIFE-INITIALIZATION.json": {
+          "recordedAtUTC": "2026-10-10T14:21:43.684262Z",
+          "originalReceiptSha256": "d834bec20e0bd77bf3843666d96a6a3e319189f2e17bbb78c29e2f1c3390aa03",
+          "passed": true,
+          "executedInThisSession": true
+        },
+        "CJS-RESULT.json": {
+          "recordedAtUTC": "2026-10-10T14:21:43.684262Z",
+          "originalReceiptSha256": "b99c6582a0fc67db1706dad7a9698c4d9835fc12cee2ccf7a663838a33fe910a",
+          "passed": true,
+          "executedInThisSession": true
+        },
+        "GZIP-RESULT.json": {
+          "recordedAtUTC": "2026-10-10T14:21:43.795262Z",
+          "originalReceiptSha256": "349da6d6ec73d6659c1f9c4b7fb04365b9faec121cc635db85ec66fa0e290f5c",
+          "passed": true,
+          "executedInThisSession": true
+        },
+        "BASIC-SETTINGS-RESULT.json": {
+          "recordedAtUTC": "2026-10-10T14:21:44.440265Z",
+          "originalReceiptSha256": "9e3ffa0b92c23affae97aeba81c97dbba46c27f3617b0ed3d14e2a2327d05dfd",
+          "passed": true,
+          "executedInThisSession": true
+        }
+      },
+      "productionFunctionCapture": {
+        "writtenAtUTC": "2026-10-10T14:21:43.611261Z",
+        "sha256": "a95c1658da07cd0865d98ea552961cc39a0c63f6b88eec684464809ca878d438"
+      },
+      "contracts": {
+        "gzipFixtures": 8,
+        "typedOffsetInputs": 24,
+        "offsets": [
+          0,
+          3,
+          17
+        ],
+        "errorContracts": 5,
+        "cjsFixedInputs": 6
+      },
+      "cjsExecutedInThisSession": true,
+      "settingsInteraction": {
+        "kind": "full Options navigation",
+        "navigated": [
+          "settings-translation",
+          "settings-general"
+        ]
+      },
+      "gmFixtureNetworkAttempts": 0,
+      "externalModelApiCalls": 0,
+      "finalResult": {
+        "recordedAtUTC": "2026-10-10T14:21:45.290269Z",
+        "originalReceiptSha256": "94ce0e1fdbcc8ff90d0c7dd1c848c96c424be0a49e7f1b8c8c469ca83588aca3",
+        "passed": true
+      }
+    }
+  ],
+  "measurementNotes": {
+    "times": "UTC; session start from creation stamp, phase times from original receipt file write mtime.",
+    "hashes": "Hashes bind unchanged original logs and receipts, whose full contents stay local.",
+    "network": "External counters cover recorded page requests and GM fixture calls; they do not measure all browser background or machine-wide networking.",
+    "cleanup": "Remaining process count covers known owned live non-zombie processes; listener and private display socket checks are scoped to the owned process tree.",
+    "profiles": "Temporary profiles are retained locally as evidence, not deleted."
+  },
+  "notValidated": [
+    "Extension incognito route acceptance",
+    "RTX5090 WebGPU",
+    "Native Wayland/Cua deployment"
+  ],
+  "publicationChanges": {
+    "documentationOnly": true,
+    "prMetadataChanged": false,
+    "readyForReviewChanged": false,
+    "newServicesOrPermissions": false
+  },
+  "standardCommonJsProvenance": {
+    "actuallyExecutedInThisAuthorization": true,
+    "originalResultWrittenAtUTC": "2026-10-10T14:13:13.712876Z",
+    "originalResultSha256": "fc5a0f398ca935d0019929bf819b671bccdb8caf78f85860bdc4383f18f4062a",
+    "artifactSha256": "4bb464d4440449b68170cb9ee897bdbcc0a0da560715f0ba767b1f2cb86d66fd",
+    "algorithms": [
+      "MD5",
+      "SHA256"
+    ],
+    "inputs": [
+      "",
+      "abc",
+      "FluentRead 中文🙂"
+    ],
+    "passedCases": 6,
+    "stableRequireCacheIdentity": true,
+    "originalAttempt": "A3",
+    "reusedBy": "A4",
+    "sameArtifactAndOriginalEvidenceHashVerified": true,
+    "repeatedFixedInputCallsInA4": false,
+    "method": "Original CommonJS factories captured from the unmodified final IIFE lexical scope during a natural inflate call, then invoked in the real browser after initialization."
+  },
+  "gzipContracts": {
+    "productionFunctionReferences": true,
+    "finalIifeNotRewritten": true,
+    "base64PathChecked": true,
+    "utf8AndBackendRawSha256Matched": true,
+    "nativeBrowserUint8ArrayOffsets": [
+      0,
+      3,
+      17
+    ],
+    "inputAndPaddingUnchanged": true,
+    "fallbackExercisedBySyntheticPageDecompressionStreamUndefined": true,
+    "standardPinnedDependenciesServedLocally": 6,
+    "standaloneExternalDependencies": 0,
+    "errorCases": [
+      "invalid header",
+      "damaged CRC",
+      "empty input",
+      "truncated header",
+      "truncated footer"
+    ]
+  },
+  "nonBrowserHarnessFailure": {
+    "browserStarted": false,
+    "reason": "Relative harness path unresolved after the resource wrapper changed its working directory; corrected before A4.",
+    "originalLogSha256": "bc3bf640d1afc194f5c1a056c39d4627e5b29094ae1d6b1e3295334528c953c0"
+  }
+}

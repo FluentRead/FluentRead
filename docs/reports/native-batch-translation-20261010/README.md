@@ -14,7 +14,7 @@
 
 官方依据：[DeepL 请求协议](https://developers.deepl.com/api-reference/translate/request-translation)、[Azure Translate v3](https://learn.microsoft.com/en-us/azure/ai-services/translator/text-translation/reference/v3/translate)、[Google Cloud v2](https://docs.cloud.google.com/translate/docs/reference/rest/v2/translate)。免费网页端点没有与云 API 等同的稳定性承诺。
 
-常规 provider 分包最多 32 项、4000 个 UTF-16 字符；全文微任务每组最多 4 槽、2000 字符。空白来源在本地保留，重复来源回填到各自位置；超长单槽独立请求并保持完整，不截断正文。不具备可靠数组协议的机器翻译及翻译专用小模型逐槽调用，不上传 BEGIN/END 分隔符。
+三云与 Microsoft provider 常规分包最多 32 项、4000 个 UTF-16 字符；全文微任务每组最多 4 槽、2000 字符。Google 保留已合入主线的 120 毫秒收集、32 项/10,000 转义字符分包及共享限流退避。空白来源在本地保留，重复来源回填到各自位置；超长单槽独立请求并保持完整，不截断正文。不具备可靠数组协议的机器翻译及翻译专用小模型逐槽调用，不上传 BEGIN/END 分隔符。
 
 响应必须为等长稠密字符串数组，非空来源必须对应有内容的译文。所有分包通过后才返回；Google RPC 的每个译文子片段也必须具有有效结构，不能丢弃坏片段后拼成“成功”。输入按纯文本传输，不把字面 HTML 当作可执行标签；这不能保证服务总会保留所有特殊字符，真实验证发现的微软实体改写另作拒收处理。
 
@@ -32,11 +32,22 @@
 
 新原生校验模块、provider 分包模块和 Microsoft transport 的 statements/branches/functions/lines 达到 100%；范围见 [coverage.json](./coverage.json)，不代表全库覆盖率。Chrome、Firefox、油猴生产构建、类型检查和 manifest 校验分别运行；本次没有升级依赖或版本号。
 
-油猴同依赖独立基线为 `55d1219bd` 的 1,975,252 字节。原预算仅余 748 字节；本次新增协议校验、恢复与 AI 隔离逻辑超出该余量，因此预算增加 6000 字节至 1,982,000，并继续执行原有体积与运行边界检查。最终增量见 [userscript-size.json](./userscript-size.json)。
+合入最新主线 Google 排队及 429 退避改动后，最终两组定向测试分别通过 1508 和 162 项；前者含 893 个源文件头断言，不能都计作翻译场景。完整范围和未验证项见 [validation.json](./validation.json)。
+
+油猴同依赖独立基线为最新主线 `36952b0fe` 的 1,977,788 字节。原预算仅余 1,212 字节；本次新增协议校验、恢复、实体拒收与 AI 隔离逻辑超出该余量，因此预算增加 6000 字节至 1,985,000，并继续执行原有体积与运行边界检查。最终增量见 [userscript-size.json](./userscript-size.json)。
 
 ## 真实服务与浏览器证据边界
 
 专用测试凭据不可用，因此 DeepL、Azure、Google Cloud 的验证采用官方结构的合成响应，不能认定三云真实鉴权、区域、计费或线上翻译质量已验收。Google 和 Microsoft 免费端点的小规模真实对照与全文快捷键使用隔离临时浏览器；结果与合成响应分别记录。
+
+最终 [browser-report.json](./browser-report.json) 的 19 项检查通过：15 项云协议合成响应、1 项六段真实 content 快捷键切换、2 项免费服务真实对照、1 项微软实体保真或明确拒收。六段页面切换译文数为 `6 → 0 → 6`，逐段核对原文与对应译文，无重复嵌套；见 [第一次翻译](./native-full-page-1-translated.png)、[恢复原文](./native-full-page-2-restored.png)、[再次翻译](./native-full-page-3-translated.png)。页面错误与清理错误均为空，窗口一直位于第二屏后台，`browserFrontmost=false`。
+
+| 真实对照 | 源槽数 | 批量 HTTP | 顺序逐条 HTTP | 批量耗时 | 顺序逐条耗时 |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| Google（含多行、HTML 字面值和重复原文） | 6 | 1 | 6 | 826 ms | 1669 ms |
+| Microsoft（多行及重复原文；实体损坏单独验收） | 5 | 1 | 5 | 415 ms | 1448 ms |
+
+这是一次小样本观测，不能据此推算持续阅读性能、在线额度或所有语言的语义质量。浏览器交互使用 Edge 的 Chrome MV3 产物；Firefox 与油猴仅完成构建和静态边界校验，没有验证各自运行时。
 
 微软免费端点的批量和逐条结果都会把本例原文 `&lt;` 改写为 `&;`。3 次无凭据公开端点诊断确认损坏发生在服务原始响应内；命名转义、数字转义、双重转义和 `textType=plain` 探测均不能可靠保真，见 [原始响应摘要](./microsoft-entity-diagnostic.json)。因此不按猜测位置修复文本：对原文实体字面值逐 token 检查保留数量，损坏结果按协议异常拒收；同预算逐段恢复仍损坏时返回失败、保留原文，拒收结果不进入缓存。这是保守失败保护，并非对上游翻译内容的自动修复。
 

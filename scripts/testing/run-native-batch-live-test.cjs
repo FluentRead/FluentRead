@@ -140,7 +140,7 @@ async function runLive(service) {
   await fixtureMode(service);
   const individualStarted = Date.now();
   const individualTranslations = [];
-  // 顺序请求，防止 Google 的 10ms transport 窗口把“逐条对照”再次合成一批。
+  // 顺序请求，防止 Google 的收集窗口把“逐条对照”再次合成一批。
   for (const source of origins) individualTranslations.push(await translate(service, source));
   liveSample.individualTranslations = individualTranslations;
   verifyLiveCorrespondence(batchTranslations, true, origins);

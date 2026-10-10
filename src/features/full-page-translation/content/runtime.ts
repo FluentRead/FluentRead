@@ -2,7 +2,7 @@
  * @file src/features/full-page-translation/content/runtime.ts
  * 文件职责：实现全文翻译的页面级会话引擎，负责候选发现、可见性调度、批量请求、动态 DOM 重扫、失败重试、缓存复用和恢复原文。
  * 主要内容：相同译文保留原文且不重复展示；以增量计数发布完成与失败摘要，仅对本会话失败目标重试和定位；维护 FullPageSession、AbortController、Intersection/Mutation 观察器、弹窗优先调度、精确属性写入过滤、候选所有权和生命周期重试；对变化来源等待安静窗口、跳过持续变化的计数，并清理延迟重扫，只有真实宿主删除启动候选回收，同批重复属性变化只处理一次；按时间片派发并在全文结果提交前让出主线程，合并同段 DOM 写入并在重挂时复用同批布局读数与单文本来源快照；已拥有状态的发现候选直接登记复验，取消记录命中后才提取原文，避免整批重扫重复计算熔断签名；按阅读进度撤回离开预取区的待派发候选，冻结请求/展示配置与识别范围，在弹窗关闭后继续正文，按实际节点阶段发布进度及工具栏结果；悬浮调用冻结独立服务且保留快捷方案覆盖优先级；同目标预检单独读取受保护规则约束的行内代码语言上下文，发送与渲染仍只使用可翻译文本槽；向局部翻译开放单候选 translateTarget 与单个译文所有者的恢复入口。
- * 模块边界：这是 content 侧编排层，不实现 provider 协议、纯候选算法或底层状态存储；翻译调用经 app client，发现规则来自 core/translation，渲染与状态分别交给 renderer、liveTextRender 和 state；悬浮延时属于当前请求会话，路由切换、关闭和隐藏后的迟到回调不能启动新工作。
+ * 模块边界：这是 content 侧编排层，不实现 provider 协议、纯候选算法或底层状态存储；翻译调用经 app client，发现规则来自 core/translation，渲染与状态分别交给 renderer、liveTextRender 和 state；hoverScheduling 管理当前请求会话的悬浮延时，路由切换、关闭和隐藏后的迟到回调不能启动新工作。
  */
 import {resolveTranslationToolbarStatus, countFullPageTranslationWork} from '../toolbarStatus';
 import {hasDistinctTranslation} from '@/src/core/translation/result';
@@ -127,6 +127,8 @@ import {
 import {clearOrphanedTranslationArtifacts, consumeOrphanedOwnerClassMutation, isTextEquivalentHostReplacement, normalizeOrphanedSingleSlots, normalizeOrphanedTranslationArtifacts, normalizeOrphanedTranslationOwner}
     from '@/src/features/full-page-translation/content/orphanArtifacts';
 import {createFullPageRequestSessionState, disposeFullPageRequestSession, getHoverTranslationRequestSession, invalidateContextSensitiveRequestCache, invalidateFullPageRequestSessionCache, invalidateFullPageRequestSessionForRoute, invalidateHoverTranslationRequestSession, resetHoverTranslationRequestSession, type FullPageRequestSessionState} from '@/src/features/full-page-translation/content/requestSession';
+import {cancelPendingHoverTranslation, isHoverTranslationAvailable, scheduleHoverTranslation} from './hoverScheduling';
+export {cancelPendingHoverTranslation} from './hoverScheduling';
 import {getSiteAdapterAttributeFilter} from '@/src/core/site-adaptation/compiler';
 import {isElementNode, asHTMLElement, mutationTargetElement, allMutationNodesMatch, createTranslationAttributeMutationFilter, createTranslationMutationObserverOptions, isOwnSyntheticSegmentMarkerMutation, mutationRootContains as nodeContains, collapseMutationRescanRoot as broadRescanRoot} from './mutationObservation';
 import {isWithinTranslationModal, mayChangeTranslationModal} from './modalPriority';
@@ -203,7 +205,6 @@ const CANDIDATE_PRUNE_BUDGET_MS = 4;
 const STATEFUL_ATTRIBUTE_DEBOUNCE_MS = 500;
 const FULL_PAGE_LIFECYCLE_RETRY_LIMIT = 2;
 
-let hoverTimer: ReturnType<typeof setTimeout> | undefined;
 let fullPageSession: FullPageSession | null = null;
 let hoverBilingualRemountCapitulations = createBilingualRemountCapitulationRegistry();
 setBilingualLifecycleExternalManager(() => fullPageSession?.active === true);
@@ -2161,11 +2162,6 @@ export function isFullPageTranslationActive(): boolean {
 export function restoreTranslationOwner(owner: HTMLElement): boolean { const state = getTranslationState(owner), session = fullPageSession?.active ? fullPageSession : undefined; if (!state) return false;
     if (session) rememberUserCancelledCandidate(session, {element: owner, kind: state.kind, reason: 'section-restore', ...(state.syntheticSegment && state.sourceTextNodes?.length ? {nodes: state.sourceTextNodes} : {})}, owner, state);
     unregisterSessionStatefulTarget(session, owner); return withFullPageViewportAnchor(() => restoreTranslation(owner), [owner]); }
-export function cancelPendingHoverTranslation(): void {
-    if (hoverTimer === undefined) return;
-    clearTimeout(hoverTimer);
-    hoverTimer = undefined;
-}
 /**
  * 处理鼠标悬浮/快捷键翻译。坐标只负责找到内容块，真正的翻译调用与全文
  * 会话共用 translateTarget，因此按钮、富文本和恢复行为不会出现两套规则。
@@ -2177,18 +2173,13 @@ export function handleTranslation(
 ): void {
     const {delayMs = 0, continuous = false, scope = config.translationScope, ...translationOverrides} = invocation;
     cancelPendingHoverTranslation();
-    if (document.visibilityState === 'hidden' || config.on === false) return;
+    if (!isHoverTranslationAvailable()) return;
     if (continuous) beginBilingualArtifactHostWriteGesture();
     const translationConfig = captureFullPageTranslationConfig({
         ...translationOverrides,
         service: translationOverrides.service?.trim() || config.hoverTranslationService || config.service,
     }); if (!checkConfig(translationConfig)) return;
-    const requestSession = getHoverTranslationRequestSession();
-    const requestGeneration = requestSession.renderCommitGeneration;
-    hoverTimer = setTimeout(() => {
-        hoverTimer = undefined;
-        if (document.visibilityState === 'hidden' || config.on === false
-            || getHoverTranslationRequestSession() !== requestSession || requestSession.renderCommitGeneration !== requestGeneration) return;
+    scheduleHoverTranslation(() => {
         const candidate = getOwnedTranslationCandidateAtPoint(document, mouseX, mouseY) ?? resolveTranslationCandidateAtPoint(mouseX, mouseY, scope);
         if (!candidate) return;
         void translateTarget(

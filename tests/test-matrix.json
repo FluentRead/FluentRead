@@ -96,6 +96,7 @@
       "tests/fullPageHostMarkers.test.ts",
       "tests/fullPageTranslationErrorMessage.test.ts",
       "tests/hoverTranslationContentFeature.test.ts",
+      "tests/hoverTranslationScheduling.test.ts",
       "tests/paragraphCopyConfig.test.ts",
       "tests/paragraphCopyCore.test.ts",
       "tests/paragraphCopyRuntime.test.ts",

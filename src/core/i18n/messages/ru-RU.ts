@@ -1151,6 +1151,7 @@ export const ruRUMessages = {
     'settings.translationStyle.category.line': 'Линии',
     'settings.translationStyle.category.mark': 'Выделение',
     'settings.translationStyle.category.card': 'Карточки',
+    'settings.translationStyle.category.fun': 'Игривые',
     'settings.translationStyle.applyHint': 'Новый стиль применяется со следующего перевода, а настройки оформления сразу обновляют открытые страницы.',
     'settings.translationStyle.customizeTitle': 'Настройка оформления',
     'settings.translationStyle.customizeDescription': 'Выберите «По умолчанию», чтобы сохранить цвета стиля.',

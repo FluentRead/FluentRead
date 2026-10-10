@@ -1151,6 +1151,7 @@ export const frFRMessages = {
     'settings.translationStyle.category.line': 'Lignes',
     'settings.translationStyle.category.mark': 'Surlignage',
     'settings.translationStyle.category.card': 'Cartes',
+    'settings.translationStyle.category.fun': 'Ludique',
     'settings.translationStyle.applyHint': 'Un nouveau style s’applique à la prochaine traduction ; les réglages d’apparence mettent à jour immédiatement les pages ouvertes.',
     'settings.translationStyle.customizeTitle': 'Personnaliser l’apparence',
     'settings.translationStyle.customizeDescription': 'Choisissez « Par défaut » pour conserver les couleurs propres au style.',

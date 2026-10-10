@@ -1151,6 +1151,7 @@ export const jaJPMessages = {
     'settings.translationStyle.category.line': '線',
     'settings.translationStyle.category.mark': 'マーカー',
     'settings.translationStyle.category.card': 'カード',
+    'settings.translationStyle.category.fun': '遊び心',
     'settings.translationStyle.applyHint': '新しいスタイルは次の翻訳から使われます。外観の調整は開いているページにすぐ反映されます。',
     'settings.translationStyle.customizeTitle': '外観をカスタマイズ',
     'settings.translationStyle.customizeDescription': '色で「デフォルト」を選ぶと、スタイル本来の配色を使います。',

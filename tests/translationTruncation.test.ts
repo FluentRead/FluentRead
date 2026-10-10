@@ -551,11 +551,11 @@ describe('translation truncation layout', () => {
     });
 
     it('逐行标记保留内联译文骨架，恢复时不改变原文节点', async () => {
-        for (const [style, className] of [[10, 'fluent-display-learning-mode'], [11, 'fluent-display-marker']] as const) {
+        for (const [style, className] of [[10, 'fluent-display-learning-mode'], [11, 'fluent-display-marker'], [48, 'fluent-display-spoiler']] as const) {
             const {document, first} = openRouterFixture();
             const originalText = first.firstChild;
             const originalHTML = first.innerHTML;
-            options.styles.push({value: style, label: '', class: className} as never);
+            options.styles.push({value: style, label: '', class: className, inlineText: true} as never);
             try {
                 await withDocumentRealm(document, async () => {
                     beginTranslation(first, 'bilingual');

@@ -15,7 +15,7 @@ const assertScaled = (actual, base, scale, label) => assert(Math.abs(Number.pars
 const SOURCE = 'Reading should feel calm and effortless. Colors and lines should follow the page you are reading.';
 const TRANSLATION = '阅读应该轻松、自然。颜色和线条应当贴合你正在阅读的网页。';
 const DEFAULT_APPEARANCE = {textColor: '', backgroundColor: '', lineColor: '', fillColor: '', fontScale: 100, fontWeight: 'default', fontFamily: 'default', opacity: 100, customCss: ''};
-const EXPECTED_CATEGORY_COUNTS = {文字: 8, 线条: 10, 标记: 7, 卡片: 4};
+const EXPECTED_CATEGORY_COUNTS = {文字: 12, 线条: 14, 标记: 9, 卡片: 5, 趣味: 9};
 
 async function startFixture() {
   const requests = [];
@@ -171,7 +171,7 @@ async function main() {
       await shot(group, `02-category-${category}`);
     }
     report.metrics.categoryCounts = categoryCounts;
-    report.checks.push('29 preset cards across four categories update preview and persisted style');
+    report.checks.push('49 preset cards across five categories update preview and persisted style');
 
     // 3. 外观微调：色板、键盘、滑块、分段控件与自定义取色器全部写入配置，并由预览按网页规则计算。
     await options.locator('.translation-style-categories').getByRole('radio', {name: '线条', exact: true}).click();
@@ -259,7 +259,7 @@ async function main() {
     await shot(group, '03b-custom-css-and-saved-style');
     report.checks.push('direct CSS previews live, unsupported declarations are ignored, and saved style cards show their own effect');
 
-    await options.locator('.translation-style-preview-theme').getByRole('radio', {name: '深色网页', exact: true}).click();
+    await group.locator('.translation-style-preview-theme').getByRole('radio', {name: '深色网页', exact: true}).click();
     // 网页配色切换带短暂淡入，等待计算样式稳定后再断言。
     await options.waitForFunction(() => getComputedStyle(document.querySelector('.translation-style-preview-page')).backgroundColor === 'rgb(23, 25, 30)');
     assert.equal(await options.locator('.translation-style-grid .translation-style-card-sample[data-page-theme="dark"]').count(), await options.locator('.translation-style-card').count());

@@ -1,0 +1,56 @@
+{
+  "scope": "Instrumented statements, branches and functions whose start is an added or modified source line. This does not replace whole-module coverage and excludes the string-compiled ProgressPanel fixture.",
+  "files": {
+    "src/features/full-page-translation/content/stateNotification.ts": {
+      "statements": {
+        "total": 54,
+        "covered": 54,
+        "uncovered": []
+      },
+      "branches": {
+        "total": 23,
+        "covered": 23,
+        "uncovered": []
+      },
+      "functions": {
+        "total": 4,
+        "covered": 4,
+        "uncovered": []
+      }
+    },
+    "src/features/floating-ball/content/runtime.ts": {
+      "statements": {
+        "total": 10,
+        "covered": 10,
+        "uncovered": []
+      },
+      "branches": {
+        "total": 7,
+        "covered": 7,
+        "uncovered": []
+      },
+      "functions": {
+        "total": 0,
+        "covered": 0,
+        "uncovered": []
+      }
+    },
+    "src/features/floating-ball/ui/FloatingBall.vue": {
+      "statements": {
+        "total": 24,
+        "covered": 24,
+        "uncovered": []
+      },
+      "branches": {
+        "total": 19,
+        "covered": 19,
+        "uncovered": []
+      },
+      "functions": {
+        "total": 1,
+        "covered": 1,
+        "uncovered": []
+      }
+    }
+  }
+}

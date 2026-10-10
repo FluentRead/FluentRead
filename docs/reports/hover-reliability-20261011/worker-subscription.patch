@@ -1,0 +1,17 @@
+--- run-hover-reliability-test.cjs before setup fix
++++ run-hover-reliability-test.cjs after setup fix
+@@ -357,8 +357,12 @@
+     setup = await newPageWithoutForeground(context);
+     await setup.goto(`chrome-extension://${extensionId}/icon/128.png`);
+     assert.equal(await setup.evaluate(() => chrome.runtime.getManifest().name), manifest.name, 'Exact built extension owns the fixture page');
+-    await setup.evaluate(async () => {await chrome.runtime.sendMessage({type: 'configStorageRead', key: 'local:config'});});
+-    const worker = context.serviceWorkers().find(worker => new URL(worker.url()).host === extensionId) || await context.waitForEvent('serviceworker');
++    const workerReady = context.serviceWorkers().find(worker => new URL(worker.url()).host === extensionId)
++      || context.waitForEvent('serviceworker', {predicate: worker => new URL(worker.url()).host === extensionId});
++    const [worker] = await Promise.all([
++      workerReady,
++      setup.evaluate(async () => {await chrome.runtime.sendMessage({type: 'configStorageRead', key: 'local:config'});}),
++    ]);
+     assert.equal(new URL(worker.url()).host, extensionId, 'Exact built extension owns the transport worker');
+     await installTranslationFixtureOnWorker(worker, {translationUrl: provider.translationUrl, blockedUrl: provider.blockedUrl});
+     await patchConfig({on: true, service: 'microsoft', hoverTranslationService: 'microsoft', from: 'auto', to: 'zh-Hans', display: 1,

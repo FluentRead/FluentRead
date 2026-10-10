@@ -1,0 +1,16 @@
+
+> FluentRead-流畅阅读@0.0.37 test /Users/thinkstu/Desktop/copy/FluentRead-section-translation-quality-20261011
+> node scripts/testing/run-resource-safe.mjs -- vitest run "tests/quickTranslationRuntime.test.ts" "tests/contentFeatureLifecycle.test.ts"
+
+[resource-safe] 等待全局测试锁（3 个并发槽已占满，当前: vitest /Users/thinkstu/Desktop/copy/FluentRead-input-translation-quality-20261011/node_modules/vitest/vitest.mjs run tests/inputEditableHost.test.ts tests/inputBox.test.ts --config vitest.coverage.config.ts --coverage.include=src/features/input-translation/content/editableHost.ts --coverage.include=src/features/input-translation/content/inputBox.ts --coverage.reportsDirectory=/private/tmp/fluentread-input-editable-coverage-20261011; wxt build; vue-tsc --noEmit）
+[resource-safe] CPU target 60%, maxWorkers 1, concurrency 3, command: vitest run tests/quickTranslationRuntime.test.ts tests/contentFeatureLifecycle.test.ts
+
+ RUN  v2.1.9 /Users/thinkstu/Desktop/copy/FluentRead-section-translation-quality-20261011
+
+ ✓ tests/contentFeatureLifecycle.test.ts (10 tests) 163ms
+ ✓ tests/quickTranslationRuntime.test.ts (5 tests) 5ms
+
+ Test Files  2 passed (2)
+      Tests  15 passed (15)
+   Start at  02:31:13
+   Duration  808ms (transform 200ms, setup 0ms, collect 271ms, tests 168ms, environment 0ms, prepare 88ms)

@@ -930,6 +930,26 @@ describe("指定节点翻译状态机", () => {
         expect(getTranslationOwnersForRemovedNode(synthetic)).toEqual([]);
     });
 
+    it("恢复通知保留旧 synthetic 来源身份，旧订阅仍收到已清除状态", () => {
+        const {document} = parseHTML('<html><body><p id="parent"><span id="synthetic"><!--source--><b>inline</b> segment</span></p></body></html>');
+        const parent = document.querySelector('#parent') as HTMLElement;
+        const synthetic = document.querySelector('#synthetic') as HTMLElement;
+        const sources = Array.from(synthetic.childNodes);
+        const attempt = beginTranslation(synthetic, 'bilingual', 'content', true)!;
+        const notifications: Array<[HTMLElement, TranslationState | undefined, TranslationState | undefined]> = [];
+        const stop = subscribeTranslationStateChanges((owner, state, previousState) => {
+            expect(getTranslationState(owner)).toBe(state);
+            notifications.push([owner, state, previousState]);
+        });
+        try {
+            expect(restoreTranslation(synthetic)).toBe(true);
+            expect(notifications).toEqual([[synthetic, undefined, attempt.state]]);
+            expect(notifications[0][2]?.syntheticSourceNodes).toEqual(sources);
+            expect(sources.every(source => source.parentNode === parent)).toBe(true);
+            expect(synthetic.isConnected).toBe(false);
+        } finally {stop();}
+    });
+
     it("未注册节点的 artifact setter 和失败 UI detach 都安全降级", () => {
         const {document} = parseHTML('<html><body><p id="target">Readable paragraph.</p></body></html>');
         const target = document.querySelector("#target") as HTMLElement;

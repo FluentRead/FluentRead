@@ -144,11 +144,11 @@ describe('NetEase mail frame lifecycle', () => {
         expect(mocks.mountSelection).toHaveBeenCalledOnce();
         mocks.config.selectionTranslatorMode = 'disabled';
         mocks.config.disableSelectionTranslator = true;
-        mocks.subscribeConfig.mock.calls[0][0]();
+        mocks.subscribeConfig.mock.calls[0][0](mocks.config);
         await vi.waitFor(() => expect(mocks.unmountSelection).toHaveBeenCalledOnce());
         mocks.config.selectionTranslatorMode = 'bilingual';
         mocks.config.disableSelectionTranslator = false;
-        mocks.subscribeConfig.mock.calls[0][0]();
+        mocks.subscribeConfig.mock.calls[0][0](mocks.config);
         await vi.waitFor(() => expect(mocks.mountSelection).toHaveBeenCalledTimes(2));
         invalidate();
     });
@@ -172,10 +172,10 @@ describe('NetEase mail frame lifecycle', () => {
         expect(mocks.mountSelection).toHaveBeenCalledOnce();
 
         mocks.config.disableSelectionTranslator = true;
-        mocks.subscribeConfig.mock.calls[0][0]();
+        mocks.subscribeConfig.mock.calls[0][0](mocks.config);
         await vi.waitFor(() => expect(mocks.unmountSelection).toHaveBeenCalledOnce());
         mocks.config.disableSelectionTranslator = false;
-        mocks.subscribeConfig.mock.calls[0][0]();
+        mocks.subscribeConfig.mock.calls[0][0](mocks.config);
         await vi.waitFor(() => expect(mocks.mountSelection).toHaveBeenCalledTimes(2));
 
         resolveOldMount(null);
@@ -252,7 +252,7 @@ describe('QQ legacy frame startup 生命周期', () => {
         expect(mocks.sendMessage).toHaveBeenCalledWith({type: 'qqMailFrameRequest', action: 'state'});
         transition('pagehide', true);
         mocks.config.bilingualSentenceHighlightEnabled = true;
-        mocks.subscribeConfig.mock.calls[0][0]();
+        mocks.subscribeConfig.mock.calls[0][0](mocks.config);
         const listener = mocks.addRuntimeListener.mock.calls[0][0];
         listener({type: 'qqMailFrameRefresh'}, {id: 'extension-id'});
         expect(mocks.sendMessage).toHaveBeenCalledOnce();

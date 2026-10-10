@@ -4,6 +4,7 @@ import {compileScript, parse} from 'vue/compiler-sfc';
 import ts from 'typescript';
 import * as vue from 'vue';
 import * as progressApi from '@/src/features/full-page-translation/progress';
+import * as siteDomainApi from '@/src/core/site-rules/domain';
 import {createProgressPanelVisibility} from '@/src/features/full-page-translation/ui/progressPanelVisibility';
 
 import {
@@ -538,19 +539,20 @@ describe('进度面板组件实时订阅与显隐', () => {
   let state: Record<string, any>;
   let unmount: (() => void)[];
   let publishConfig: (value: typeof config) => void;
-  let config: {animations: boolean; theme: string; disableFloatingBall: boolean};
+  let config: {animations: boolean; theme: string; disableFloatingBall: boolean; floatingBallDisabledDomains: string[]};
 
   beforeEach(() => {
     vi.useFakeTimers();
-    config = {animations: true, theme: 'auto', disableFloatingBall: false};
+    config = {animations: true, theme: 'auto', disableFloatingBall: false, floatingBallDisabledDomains: []};
     const mounted: (() => void)[] = [];
     unmount = [];
-    vi.stubGlobal('window', {matchMedia: () => ({matches: false, addEventListener: vi.fn(), removeEventListener: vi.fn()})});
+    vi.stubGlobal('window', {location: {href: 'https://news.example.com/article'}, matchMedia: () => ({matches: false, addEventListener: vi.fn(), removeEventListener: vi.fn()})});
     const exports: Record<string, any> = {};
     new Function('require', 'exports', compiled)((id: string) => {
       if (id === 'vue') return {...vue, onMounted: (fn: () => void) => mounted.push(fn), onBeforeUnmount: (fn: () => void) => unmount.push(fn)};
       if (id.endsWith('/progress')) return progressApi;
       if (id === './progressPanelVisibility') return {createProgressPanelVisibility};
+      if (id.endsWith('/site-rules/domain')) return siteDomainApi;
       if (id.endsWith('/store')) return {config, subscribeConfig: (fn: typeof publishConfig) => {publishConfig = fn; return vi.fn();}};
       if (id.endsWith('/i18n')) return {useUiI18n: () => ({t: (key: string) => key})};
       throw new Error(`Unexpected import: ${id}`);
@@ -630,6 +632,21 @@ describe('进度面板组件实时订阅与显隐', () => {
     expect(vi.getTimerCount()).toBe(0);
     vi.advanceTimersByTime(1000);
     expect(state.isCompact).toBe(true);
+  });
+
+  it('浮球被站点规则隐藏时仍保留紧凑状态，移除规则后重新交给浮球反馈', () => {
+    const sessionId = startFullPageTranslationProgress();
+    updateFullPageTranslationProgress(sessionId, {running: 1, queued: 0, offscreen: 12});
+    vi.advanceTimersByTime(180);
+    publishConfig({...config, floatingBallDisabledDomains: ['example.com']});
+    updateFullPageTranslationProgress(sessionId, {running: 0, queued: 0, offscreen: 12});
+    vi.advanceTimersByTime(600);
+    expect(state.isVisible).toBe(true);
+    expect(state.isCompact).toBe(true);
+    publishConfig({...config, floatingBallDisabledDomains: ['another.test']});
+    expect(state.isVisible).toBe(false);
+    finishFullPageTranslationProgress(sessionId);
+    expect(state.isVisible).toBe(false);
   });
 
   it('其他订阅者在发布中结束任务时取消旧面板计时器，新会话仍可展开', () => {

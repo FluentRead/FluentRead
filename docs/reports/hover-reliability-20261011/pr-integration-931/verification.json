@@ -1,0 +1,64 @@
+{
+  "date": "2026-10-11",
+  "integratedMain": "0a69bfc3d2335c03cd22778af2bcebccdc8d0664",
+  "priorIntegratedHead": "e38ab9535154486d1690605bb5dbef8f30e19776",
+  "priorStage": "../pr-integration/verification.json",
+  "targetedOnly": true,
+  "additionalTests": {
+    "files": [
+      {
+        "file": "tests/fullPageVisibilityScheduling.test.ts",
+        "cases": 314
+      },
+      {
+        "file": "tests/translationState.test.ts",
+        "cases": 94
+      },
+      {
+        "file": "tests/sectionTranslationRegion.test.ts",
+        "cases": 68
+      }
+    ],
+    "passedCases": 476,
+    "scope": "state notification previous owner, precise cancellation, hover/section takeover, route generation; visibility rerun overlaps prior 673 cases, do not add counts as unique"
+  },
+  "architecture": {
+    "passedChecks": 926,
+    "moduleBoundaries": 13,
+    "verificationOwnership": 16,
+    "sourceFileHeaders": 897,
+    "ceilingsChanged": false
+  },
+  "compile": "passed",
+  "build": {
+    "chromeMV3": "passed",
+    "firefoxMV2": "passed",
+    "userscript": "passed"
+  },
+  "extensionManifests": "passed",
+  "userscriptVerifier": "passed",
+  "documentationBuild": "passed",
+  "testClassificationAudit": {
+    "result": "passed",
+    "files": 640,
+    "staticallyEnumeratedCases": 10504
+  },
+  "browser": {
+    "result": "passed",
+    "cases": [
+      "repeat-loading",
+      "route-change",
+      "dom-replacement",
+      "failure-retry"
+    ],
+    "checks": 45,
+    "contentSha256": "1b32f669190e351b9e1d4c8c23ee061a915b62c9d2113ee3c58276860c6e0415",
+    "deterministicLocalProvider": true,
+    "liveProviderValidation": false,
+    "firefoxAndUserscriptRuntimeValidation": false,
+    "performanceResampled": false,
+    "summary": "summary.json",
+    "fullReport": "browser.json"
+  },
+  "staticIntegrationReview": "new previousState clear notification is optional; generation, abort, exact state identity and source validation preserved; section only cancels its own loading state and follows hover request session route signal"
+}

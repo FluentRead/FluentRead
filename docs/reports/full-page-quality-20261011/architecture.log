@@ -1,0 +1,72 @@
+
+> FluentRead-流畅阅读@0.0.37 test:architecture /Users/thinkstu/Desktop/copy/FluentRead-full-page-quality-20261011
+> node scripts/testing/run-resource-safe.mjs -- node scripts/testing/run-test-group.mjs architecture "--" "tests/userscriptViteConfig.test.ts"
+
+[resource-safe] 等待全局测试锁（3 个并发槽已占满，当前: node scripts/testing/run-test-group.mjs functional; wxt build -b firefox; vitest /Users/thinkstu/Desktop/copy/FluentRead-target-language-quality-20261011/node_modules/vitest/vitest.mjs run --config vitest.coverage.config.ts --coverage --coverage.include=src/core/language/{identify,technicalTokens,chinese}.ts --coverage.reportsDirectory=/private/tmp/fluentread-detector-coverage tests/targetLanguageDetector.test.ts tests/languageIdentification.test.ts tests/languageIdentificationCorpus.test.ts tests/languageTechnicalTokens.test.ts tests/targetLanguageAdversarial.test.ts tests/chineseTechnicalParagraphs.test.ts tests/targetLanguageReleaseCorpus.test.ts tests/chineseLanguage.test.ts tests/languageAuditBoundaries.test.ts）
+[resource-safe] CPU target 60%, maxWorkers 1, concurrency 3, command: node scripts/testing/run-test-group.mjs architecture -- tests/userscriptViteConfig.test.ts
+
+ RUN  v2.1.9 /Users/thinkstu/Desktop/copy/FluentRead-full-page-quality-20261011
+
+ ✓ tests/browserFocusSafety.test.ts (222 tests) 2800ms
+   ✓ 视频字幕 fixture 的当前设置入口与持久配置契约 > 以生产构造和归一化验证开启/可见/双语默认，并保留用户显式关闭与原文偏好 602ms
+ ✓ tests/settingsUiArchitecture.test.ts (37 tests) 285ms
+ ✓ tests/selectionTtsBackgroundHandler.test.ts (39 tests) 402ms
+ ✓ tests/popupFeatureVisibility.test.ts (30 tests) 122ms
+ ✓ tests/backgroundConfigPersistenceHandler.test.ts (81 tests) 392ms
+ ✓ tests/architecture/verificationOwnership.test.ts (16 tests) 8746ms
+   ✓ repository verification ownership > src 中每个可执行非组装模块都进入四维 100% 覆盖率边界 4949ms
+   ✓ repository verification ownership > 覆盖率清单不能引用不存在的源码或把组装根伪装成业务覆盖 3578ms
+ ✓ tests/userscriptViteConfig.test.ts (25 tests) 2337ms
+   ✓ authoritative site catalogs with an external pinned data asset > reconciles reordered without mutating the external asset 346ms
+   ✓ userscript browser shim injection > keeps standard runtime icon inline and pins only the standard manager icon 410ms
+   ✓ userscript browser shim injection > keeps standalone runtime icon inline and pins only the standard manager icon 340ms
+ ✓ tests/backgroundTranslationHandler.test.ts (49 tests) 20ms
+ ✓ tests/settingsCenterCliContracts.test.ts (31 tests) 541ms
+ ✓ tests/architecture/moduleBoundaries.test.ts (13 tests) 6421ms
+   ✓ architecture module boundaries > src 的静态依赖图不存在跨文件循环 2782ms
+   ✓ architecture module boundaries > src 只能通过精确登记的 composition/browser/provider 迁移边界读取 entrypoints 1895ms
+   ✓ architecture module boundaries > feature 不能跨目录读取另一个 feature 的内部实现 811ms
+   ✓ architecture module boundaries > 按需加载的大体积资源不得被扩展运行时代码静态引入 535ms
+ ✓ tests/freeTranslationSettings.test.ts (16 tests) 1742ms
+   ✓ free translation settings compiled component > 微软第一、B站第二仅展示免费标记，手动顺序仍可调整 974ms
+ ✓ tests/extensionManifestContract.test.ts (20 tests) 79ms
+ ✓ tests/harnessBackground.test.ts (17 tests) 18ms
+ ✓ tests/userscriptPrivacy.test.ts (11 tests) 275ms
+ ✓ tests/backgroundVisionProbe.test.ts (9 tests) 72ms
+ ✓ tests/fullRegressionRunner.test.ts (7 tests) 408ms
+ ✓ tests/harnessAppRuntime.test.ts (3 tests) 10ms
+stderr | tests/backgroundConfigStorage.test.ts
+[FluentRead] 配置读取或安全迁移失败，保留已读取的公开配置 Error: 配置存储运行时不可用
+    at Object.getItem (/Users/thinkstu/Desktop/copy/FluentRead-full-page-quality-20261011/src/platform/storage/configStorageRuntime.ts:36:29)
+    at initializeConfig (/Users/thinkstu/Desktop/copy/FluentRead-full-page-quality-20261011/src/services/config/store.ts:635:41)
+    at /Users/thinkstu/Desktop/copy/FluentRead-full-page-quality-20261011/src/services/config/store.ts:807:28
+    at processTicksAndRejections (node:internal/process/task_queues:95:5)
+    at VitestExecutor.runModule (file:///Users/thinkstu/Desktop/copy/FluentRead-full-page-quality-20261011/node_modules/.pnpm/vite-node@2.1.9_@types+node@22.10.7/node_modules/vite-node/dist/client.mjs:399:5)
+    at VitestExecutor.directRequest (file:///Users/thinkstu/Desktop/copy/FluentRead-full-page-quality-20261011/node_modules/.pnpm/vite-node@2.1.9_@types+node@22.10.7/node_modules/vite-node/dist/client.mjs:381:5)
+    at VitestExecutor.cachedRequest (file:///Users/thinkstu/Desktop/copy/FluentRead-full-page-quality-20261011/node_modules/.pnpm/vite-node@2.1.9_@types+node@22.10.7/node_modules/vite-node/dist/client.mjs:206:14)
+    at VitestExecutor.dependencyRequest (file:///Users/thinkstu/Desktop/copy/FluentRead-full-page-quality-20261011/node_modules/.pnpm/vite-node@2.1.9_@types+node@22.10.7/node_modules/vite-node/dist/client.mjs:259:12)
+    at /Users/thinkstu/Desktop/copy/FluentRead-full-page-quality-20261011/src/app/background/configStorageBroadcast.ts:2:31
+    at VitestExecutor.runModule (file:///Users/thinkstu/Desktop/copy/FluentRead-full-page-quality-20261011/node_modules/.pnpm/vite-node@2.1.9_@types+node@22.10.7/node_modules/vite-node/dist/client.mjs:399:5)
+
+ ✓ tests/backgroundConfigStorage.test.ts (6 tests) 118ms
+ ✓ tests/architecture/providerBoundaries.test.ts (6 tests) 136ms
+ ✓ tests/requestLimitSettings.test.ts (5 tests) 1345ms
+   ✓ request limit settings interaction > inherits existing global values and retains disabled model settings across toggles 1243ms
+ ✓ tests/writingBackground.test.ts (7 tests) 36ms
+ ✓ tests/imageTranslationSecurityContract.test.ts (6 tests) 179ms
+ ✓ tests/backgroundConnectionTestHandler.test.ts (10 tests) 6ms
+ ✓ tests/backgroundCoreHandlers.test.ts (9 tests) 7ms
+ ✓ tests/architecture/sourceFileHeaders.test.ts (895 tests) 445ms
+ ✓ tests/backgroundMessageRouter.test.ts (6 tests) 6ms
+ ✓ tests/contentTrustBoundary.test.ts (5 tests) 6ms
+ ✓ tests/requestHeaderRuntime.test.ts (3 tests) 87ms
+ ✓ tests/backgroundProviderRuntime.test.ts (2 tests) 5ms
+ ✓ tests/backgroundRetiredContentScripts.test.ts (3 tests) 4ms
+ ✓ tests/freeTranslationWeightsHandler.test.ts (2 tests) 4ms
+ ✓ tests/userscriptMetadata.test.ts (1 test) 2ms
+ ✓ tests/extensionSizeBudget.test.ts (1 test) 6ms
+
+ Test Files  33 passed (33)
+      Tests  1593 passed (1593)
+   Start at  01:59:42
+   Duration  42.88s (transform 3.23s, setup 0ms, collect 9.22s, tests 27.06s, environment 4ms, prepare 1.96s)

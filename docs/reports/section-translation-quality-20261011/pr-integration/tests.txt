@@ -1,0 +1,44 @@
+
+> FluentRead-流畅阅读@0.0.37 test /Users/thinkstu/Desktop/copy/FluentRead-section-translation-quality-20261011
+> node scripts/testing/run-resource-safe.mjs -- vitest run "tests/sectionTranslationCore.test.ts" "tests/sectionTranslationPicker.test.ts" "tests/sectionTranslationRegion.test.ts" "tests/sectionTranslationRuntime.test.ts" "tests/sectionTranslationConfig.test.ts" "tests/quickTranslationActions.test.ts" "tests/contentUiRuntime.test.ts" "tests/contentRuntimeLifecycle.test.ts" "tests/translationState.test.ts" "tests/fullPageStateNotification.test.ts" "tests/fullPageFailureRecovery.test.ts" "tests/fullPageOutcomeSession.test.ts" "tests/fullPageAttributeBoundary.test.ts" "tests/fullPageVisibilityScheduling.test.ts" "tests/fullPageTranslationProgress.test.ts" "tests/userscriptViteConfig.test.ts" "tests/architecture/providerBoundaries.test.ts"
+
+[resource-safe] CPU target 60%, maxWorkers 1, concurrency 3, command: vitest run tests/sectionTranslationCore.test.ts tests/sectionTranslationPicker.test.ts tests/sectionTranslationRegion.test.ts tests/sectionTranslationRuntime.test.ts tests/sectionTranslationConfig.test.ts tests/quickTranslationActions.test.ts tests/contentUiRuntime.test.ts tests/contentRuntimeLifecycle.test.ts tests/translationState.test.ts tests/fullPageStateNotification.test.ts tests/fullPageFailureRecovery.test.ts tests/fullPageOutcomeSession.test.ts tests/fullPageAttributeBoundary.test.ts tests/fullPageVisibilityScheduling.test.ts tests/fullPageTranslationProgress.test.ts tests/userscriptViteConfig.test.ts tests/architecture/providerBoundaries.test.ts
+
+ RUN  v2.1.9 /Users/thinkstu/Desktop/copy/FluentRead-section-translation-quality-20261011
+
+ ✓ tests/fullPageVisibilityScheduling.test.ts (302 tests) 3065ms
+ ✓ tests/translationState.test.ts (94 tests) 1171ms
+   ✓ 指定节点翻译状态机 > removed subtree 查询不会读取大批无关 active owner 的状态 597ms
+ ✓ tests/sectionTranslationPicker.test.ts (64 tests) 7687ms
+   ✓ 局部翻译选择模式 > 可见的扩大、缩小和重新选择按钮调整锁定范围，重新选择清空范围链并恢复预览 479ms
+   ✓ 局部翻译选择模式 > 确认前区域出现译文时刷新为恢复文案，随后确认仍只执行一次 305ms
+   ✓ 局部翻译选择模式 > Enter 确认当前区域；Esc、右键、再次按进入快捷键和关闭按钮都会退出且不翻译 356ms
+ ✓ tests/sectionTranslationRegion.test.ts (68 tests) 94ms
+stdout | tests/fullPageAttributeBoundary.test.ts > full page site attribute boundary lifecycle > OE-C1 same-state wide-root burst reads 57 actual owners once, then starts fresh in the next callback
+OE-C1 one-record {"inspect":57,"sourceDataGets":513}
+OE-C1 burst {"serial":1,"records":3,"owners":57,"inspect":57,"sourceDataGets":513}
+OE-C1 burst {"serial":2,"records":3,"owners":57,"inspect":57,"sourceDataGets":513}
+
+ ✓ tests/fullPageAttributeBoundary.test.ts (25 tests) 2084ms
+   ✓ full page site attribute boundary lifecycle > OE-C1 same-state wide-root burst reads 57 actual owners once, then starts fresh in the next callback 1649ms
+ ✓ tests/contentRuntimeLifecycle.test.ts (43 tests) 1617ms
+   ✓ content composition root 冷启动与暂停恢复 > 空闲页面在扩展失效后主动清理，停止上下文检查且不再次挂载 407ms
+ ✓ tests/fullPageTranslationProgress.test.ts (34 tests) 27ms
+ ✓ tests/contentUiRuntime.test.ts (17 tests) 240ms
+ ✓ tests/userscriptViteConfig.test.ts (25 tests) 4679ms
+   ✓ authoritative site catalogs with an external pinned data asset > reconciles unchanged without mutating the external asset 2484ms
+   ✓ authoritative site catalogs with an external pinned data asset > reconciles old-asset without mutating the external asset 409ms
+   ✓ authoritative site catalogs with an external pinned data asset > reconciles reordered without mutating the external asset 326ms
+   ✓ userscript browser shim injection > keeps standard runtime icon inline and pins only the standard manager icon 332ms
+ ✓ tests/sectionTranslationCore.test.ts (29 tests) 56ms
+ ✓ tests/sectionTranslationRuntime.test.ts (20 tests) 24ms
+ ✓ tests/fullPageStateNotification.test.ts (18 tests) 9ms
+ ✓ tests/architecture/providerBoundaries.test.ts (6 tests) 252ms
+ ✓ tests/fullPageOutcomeSession.test.ts (3 tests) 4ms
+ ✓ tests/fullPageFailureRecovery.test.ts (4 tests) 5ms
+ ✓ tests/sectionTranslationConfig.test.ts (5 tests) 4ms
+
+ Test Files  16 passed (16)
+      Tests  757 passed (757)
+   Start at  02:30:22
+   Duration  31.73s (transform 3.02s, setup 0ms, collect 7.08s, tests 21.02s, environment 2ms, prepare 1.11s)

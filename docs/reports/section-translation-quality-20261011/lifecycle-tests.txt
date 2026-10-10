@@ -1,0 +1,19 @@
+
+> FluentRead-流畅阅读@0.0.37 test /Users/thinkstu/Desktop/copy/FluentRead-section-translation-quality-20261011
+> node scripts/testing/run-resource-safe.mjs -- vitest run "tests/sectionTranslationConfig.test.ts" "tests/quickTranslationRuntime.test.ts" "tests/contentRuntimeLifecycle.test.ts" "tests/contentFeatureLifecycle.test.ts"
+
+[resource-safe] 等待全局测试锁（3 个并发槽已占满，当前: node scripts/testing/run-test-group.mjs functional; vite build --config userscript/vite.config.ts; wxt build）
+[resource-safe] CPU target 60%, maxWorkers 1, concurrency 3, command: vitest run tests/sectionTranslationConfig.test.ts tests/quickTranslationRuntime.test.ts tests/contentRuntimeLifecycle.test.ts tests/contentFeatureLifecycle.test.ts
+
+ RUN  v2.1.9 /Users/thinkstu/Desktop/copy/FluentRead-section-translation-quality-20261011
+
+ ✓ tests/contentRuntimeLifecycle.test.ts (43 tests) 1349ms
+   ✓ content composition root 冷启动与暂停恢复 > 空闲页面在扩展失效后主动清理，停止上下文检查且不再次挂载 471ms
+ ✓ tests/contentFeatureLifecycle.test.ts (10 tests) 161ms
+ ✓ tests/quickTranslationRuntime.test.ts (5 tests) 7ms
+ ✓ tests/sectionTranslationConfig.test.ts (5 tests) 4ms
+
+ Test Files  4 passed (4)
+      Tests  63 passed (63)
+   Start at  02:04:09
+   Duration  2.52s (transform 460ms, setup 0ms, collect 250ms, tests 1.52s, environment 0ms, prepare 193ms)

@@ -10,6 +10,10 @@ Hover over a paragraph and press **Control** to translate just that paragraph.
 2. Hover over the paragraph and press **Control**.
 3. Read the translation below it. Press again to restore. Editable areas do not trigger hover translation.
 
+Hold the shortcut and move the pointer to translate several paragraphs. If you set a delay, it starts when you enter a paragraph. Moving within that paragraph keeps the deadline; entering another paragraph starts a new delay. Moving over a translated paragraph or releasing the shortcut keeps its translation.
+
+Leaving the webpage, switching tabs, or changing the page route cancels work that has not started. Scrolling also cancels the wait at the old position; move the pointer again to choose a paragraph. If translation fails, click the error indicator or focus it and press **Enter** to retry. Continuous movement does not repeatedly request a failed paragraph.
+
 <details class="guide-details">
 <summary>Paragraph copying and trigger settings</summary>
 

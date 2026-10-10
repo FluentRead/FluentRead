@@ -9,6 +9,7 @@ import {getSiteBaseDomain, normalizeDisabledExtensionDomains} from '@/src/core/s
 import {config} from '@/src/services/config/store';
 import {createPdfReaderUrl, getPdfSourceUrl} from '@/src/features/document-translation/core/pdfSource';
 import type {FullPageStateResponse} from './tabTranslationQuery';
+import type {ContextMenuFailureReason} from '@/src/core/context-menu/feedback';
 
 export interface ContextMenuClickInfo {
     readonly menuItemId?: unknown;
@@ -16,6 +17,7 @@ export interface ContextMenuClickInfo {
     readonly frameId?: number;
     readonly frameUrl?: string;
     readonly pageUrl?: string;
+    readonly selectionText?: string;
 }
 
 export interface ContextMenuClickTab {
@@ -28,6 +30,7 @@ export interface ContextMenuActionResult {
     readonly handled: boolean;
     readonly isTranslated?: boolean;
     readonly isSiteDisabled?: boolean;
+    readonly reason?: ContextMenuFailureReason;
 }
 
 function targetFrameId(info: ContextMenuClickInfo): number {
@@ -78,15 +81,21 @@ export async function runContextMenuAction(
         return {handled: true};
     }
     if (action === 'translateImage') {
-        await sendToFrame(tabId, info, {type: 'contextMenuTranslateImage', srcUrl: info.srcUrl});
-        return {handled: true};
+        const response = await sendToFrame(tabId, info, {type: 'contextMenuTranslateImage', srcUrl: info.srcUrl}) as FullPageStateResponse | undefined;
+        return response?.status === 'success' ? {handled: true}
+            : {handled: false, reason: response?.status === 'disabled' ? 'disabled' : 'imageUnavailable'};
     }
     if (action === 'translateSelection' || action === 'translateArea') {
-        await sendToFrame(tabId, info, {
+        const response = await sendToFrame(tabId, info, {
             type: 'contextMenuTranslate',
             action: action === 'translateSelection' ? 'selection' : 'area',
-        });
-        return {handled: true};
+            ...(action === 'translateSelection' && typeof info.selectionText === 'string' ? {selectionText: info.selectionText} : {}),
+        }) as FullPageStateResponse | undefined;
+        return response?.status === 'success' ? {handled: true} : {
+            handled: false,
+            reason: response?.status === 'disabled' ? 'disabled'
+                : action === 'translateSelection' ? 'selectionUnavailable' : 'areaUnavailable',
+        };
     }
     // 整页翻译始终作用于顶层文档，不能落到用户右键所在的子 frame。
     const response = await browser.tabs.sendMessage(tabId, {

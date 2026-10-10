@@ -1,0 +1,34 @@
+
+> FluentRead-流畅阅读@0.0.37 test:coverage /Users/thinkstu/Desktop/copy/FluentRead-section-translation-quality-20261011
+> node scripts/testing/run-resource-safe.mjs -- vitest run --config vitest.coverage.config.ts "tests/sectionTranslationCore.test.ts" "tests/sectionTranslationPicker.test.ts" "tests/sectionTranslationRuntime.test.ts" "tests/sectionTranslationRegion.test.ts" "--coverage.include=src/features/section-translation/core.ts" "--coverage.include=src/features/section-translation/content/picker.ts" "--coverage.include=src/features/section-translation/content/index.ts" "--coverage.include=src/features/full-page-translation/content/sectionTranslation.ts" "--coverage.reportsDirectory=/private/tmp/fluentread-section-final-coverage"
+
+[resource-safe] 等待全局测试锁（3 个并发槽已占满，当前: node scripts/testing/run-test-group.mjs functional; vitest /Users/thinkstu/Desktop/copy/FluentRead-target-language-quality-20261011/node_modules/vitest/vitest.mjs run tests/targetTranslationResult.test.ts tests/fullPageVisibilityScheduling.test.ts; wxt build）
+[resource-safe] CPU target 60%, maxWorkers 1, concurrency 3, command: vitest run --config vitest.coverage.config.ts tests/sectionTranslationCore.test.ts tests/sectionTranslationPicker.test.ts tests/sectionTranslationRuntime.test.ts tests/sectionTranslationRegion.test.ts --coverage.include=src/features/section-translation/core.ts --coverage.include=src/features/section-translation/content/picker.ts --coverage.include=src/features/section-translation/content/index.ts --coverage.include=src/features/full-page-translation/content/sectionTranslation.ts --coverage.reportsDirectory=/private/tmp/fluentread-section-final-coverage
+
+ RUN  v2.1.9 /Users/thinkstu/Desktop/copy/FluentRead-section-translation-quality-20261011
+      Coverage enabled with v8
+
+ ✓ tests/sectionTranslationPicker.test.ts (64 tests) 2372ms
+   ✓ 自有封闭操作条聚焦时不被通用输入保护挡住方向键和 Enter，网页输入仍让行 419ms
+ ✓ tests/sectionTranslationRegion.test.ts (68 tests) 84ms
+ ✓ tests/sectionTranslationCore.test.ts (29 tests) 54ms
+ ✓ tests/sectionTranslationRuntime.test.ts (20 tests) 21ms
+
+ Test Files  4 passed (4)
+      Tests  181 passed (181)
+   Start at  01:58:52
+   Duration  4.94s (transform 831ms, setup 0ms, collect 1.07s, tests 2.53s, environment 1ms, prepare 196ms)
+
+ % Coverage report from v8
+-------------------|---------|----------|---------|---------|-------------------
+File               | % Stmts | % Branch | % Funcs | % Lines | Uncovered Line #s
+-------------------|---------|----------|---------|---------|-------------------
+All files          |     100 |      100 |     100 |     100 |
+ ...lation/content |     100 |      100 |     100 |     100 |
+  ...ranslation.ts |     100 |      100 |     100 |     100 |
+ ...on-translation |     100 |      100 |     100 |     100 |
+  core.ts          |     100 |      100 |     100 |     100 |
+ ...lation/content |     100 |      100 |     100 |     100 |
+  index.ts         |     100 |      100 |     100 |     100 |
+  picker.ts        |     100 |      100 |     100 |     100 |
+-------------------|---------|----------|---------|---------|-------------------

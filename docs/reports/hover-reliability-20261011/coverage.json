@@ -1,0 +1,33 @@
+{
+  "method": "Vitest V8 targeted coverage",
+  "modules": [
+    {
+      "file": "src/app/content/hoverTranslationConfig.ts",
+      "statements": 100,
+      "branches": 100,
+      "functions": 100,
+      "lines": 100
+    },
+    {
+      "file": "src/features/full-page-translation/content/hoverScheduler.ts",
+      "statements": 100,
+      "branches": 100,
+      "functions": 100,
+      "lines": 100
+    },
+    {
+      "file": "src/features/full-page-translation/content/requestSession.ts",
+      "statements": 100,
+      "branches": 100,
+      "functions": 100,
+      "lines": 100
+    },
+    {
+      "file": "src/features/hover-translation/content/index.ts",
+      "statements": 100,
+      "branches": 100,
+      "functions": 100,
+      "lines": 100
+    }
+  ]
+}

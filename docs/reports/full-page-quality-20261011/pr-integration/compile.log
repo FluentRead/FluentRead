@@ -1,0 +1,5 @@
+
+> FluentRead-流畅阅读@0.0.37 compile /Users/thinkstu/Desktop/copy/FluentRead-full-page-quality-20261011
+> node scripts/testing/run-resource-safe.mjs -- vue-tsc --noEmit
+
+[resource-safe] CPU target 60%, maxWorkers 1, concurrency 3, command: vue-tsc --noEmit

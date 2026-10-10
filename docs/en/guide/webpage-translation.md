@@ -55,11 +55,13 @@ When you only want to read part of a page, such as a GitHub README, an article b
 - Move the pointer to preview a section. An outline marks the current range, and the label shows its type, such as paragraph, list, table, article or region, along with its translation status.
 - Clicking a section only locks the selection; it does not start translation. Once locked, the toolbar offers **Expand selection**, **Shrink selection**, **Reselect**, **Translate selected section** (or **Restore original** for a translated section), and a close button. Choose **Reselect** to return to the hover preview.
 - Press **↑** to expand the selection to its outer container and **↓** to shrink it again. You can also use the toolbar to adjust a locked selection. Arrow keys work while the toolbar or one of its buttons has focus. Use **Tab** to focus a button, then **Enter** to activate it.
-- Click **Translate selected section**, or press **Enter** to confirm, to translate the current section. **Enter** works both during the preview and after locking the selection. Paragraphs on screen are translated first and the rest follow. Display mode, service and target language are the same as for page translation.
-- Select a translated section again, then click **Restore original** or press **Enter** to confirm restoration. If some paragraphs failed, confirming translation retries them.
+- Click **Translate selected section**, or press **Enter** to confirm, to translate the current section. **Enter** works both during the preview and after locking the selection. Large sections are processed in batches, with paragraphs on screen translated first. Display mode, service and target language are the same as for page translation.
+- Select the same section again while translation is running or after it finishes, then click **Restore original** or press **Enter** to stop remaining work and restore the section. If some paragraphs failed, confirming translation retries them.
 - Press **Esc**, right-click, or click the toolbar’s close button to exit. While picking, clicks on the page don’t open links or press buttons.
 
 If you use it often, turn on its shortcut in **Settings → Translation → Section translation** (default **Alt+R**, Option+R on a Mac); press it again while picking to exit. Headers, navigation and sidebars usually stay in the original language during page translation, but if you pick one of them yourself, its text is translated too and, like other interface text, replaces the original in place so the layout stays intact. Restoring page translation also restores any translated sections.
+
+The hover preview follows changes in page content, layout and scrolling. Locking keeps your chosen section while you scroll to check it. Pausing the extension or leaving the page stops unfinished section tasks, and late results cannot reinsert translations after you restore the original.
 
 <details class="guide-details">
 <summary>Automatic translation and site rules</summary>

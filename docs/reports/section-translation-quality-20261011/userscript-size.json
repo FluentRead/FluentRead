@@ -1,0 +1,15 @@
+{
+  "baselineCommit": "fe7005dd9",
+  "baselineMethod": "git archive into an independent source directory; same locked node_modules and build commands",
+  "baselineBytes": 1985411,
+  "candidateBytes": 1990633,
+  "deltaBytes": 5222,
+  "deltaPercent": 0.26301858909817666,
+  "baselineSha256": "4162baed44553508cc9c32147a55cc95925f5996468a7592899a79a1d6108afa",
+  "candidateSha256": "bab8433d6404435bd064367132e131fb5d582ab4acf768db5e77cc0a9189bfb7",
+  "oldBudgetBytes": 1986000,
+  "newBudgetBytes": 1991000,
+  "budgetAdjustment": "minimum additional 1000-byte steps needed for this measured candidate; all other verifier assertions retained",
+  "buildLog": "build-userscript.txt",
+  "verifierLog": "userscript-verifier.txt"
+}

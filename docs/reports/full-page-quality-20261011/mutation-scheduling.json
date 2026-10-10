@@ -1,0 +1,11 @@
+{
+  "scope": "Synchronous MutationObserver callback with 120 active translated owners and 80 class/style records on distinct sibling flags under an adapter with observedAttributes: null",
+  "measurement": "Deterministic counts from the real full-page runtime in fullPageVisibilityScheduling.test.ts; layout and provider are test fixtures. This is an operation-count benchmark, not total page CPU, network latency or live-site performance evidence.",
+  "fixture": {"owners": 120, "mutationRecords": 80, "sameRoot": "document.documentElement"},
+  "baseline": {"ownerSetCopies": 80, "timersWith500msDelay": 9720, "clearedTimers": 9480},
+  "current": {"ownerSetCopies": 1, "timersWith500msDelay": 240, "clearedTimers": 0},
+  "currentTimers": {"trailingReevaluations": 120, "firstBoundaryChecks": 120},
+  "baselineConfirmed": "Regression test failed on original runtime with the recorded actual counters before the production patch",
+  "currentConfirmed": "Same regression test passed after callback-local coalescing",
+  "test": "tests/fullPageVisibilityScheduling.test.ts: 全属性关系规则的 80 个兄弟 class/style 变化只为 120 个 owner 各排一次复验"
+}

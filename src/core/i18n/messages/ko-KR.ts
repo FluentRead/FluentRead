@@ -267,7 +267,7 @@ export const koKRMessages = {
     "video.back": "표시 방식으로 돌아가기",
     "video.closeMenu": "자막 메뉴 닫기",
     "video.sourceOff": "자막 꺼짐",
-    "video.source.native": "원본 자막 · {count}개",
+    "video.source.native": "불러온 자막 · {count}개",
     "video.source.cache": "저장된 자막 · {count}개",
     "video.source.ai": "AI 자막 · {count}개",
     "video.sourcePreparing": "자막 생성 중",

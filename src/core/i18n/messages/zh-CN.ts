@@ -266,7 +266,7 @@ export const zhCNMessages = {
     "video.back": "返回显示方式",
     "video.closeMenu": "关闭字幕菜单",
     "video.sourceOff": "字幕已关闭",
-    "video.source.native": "原生字幕 · {count} 条",
+    "video.source.native": "已加载字幕 · {count} 条",
     "video.source.cache": "本地字幕 · {count} 条",
     "video.source.ai": "AI 字幕 · {count} 条",
     "video.sourcePreparing": "正在生成字幕",

@@ -267,7 +267,7 @@ export const esESMessages = {
     "video.back": "Volver a la visualización",
     "video.closeMenu": "Cerrar el menú de subtítulos",
     "video.sourceOff": "Subtítulos desactivados",
-    "video.source.native": "Subtítulos nativos · {count} segmentos",
+    "video.source.native": "Subtítulos cargados · {count} segmentos",
     "video.source.cache": "Subtítulos guardados · {count} líneas",
     "video.source.ai": "Subtítulos de IA · {count} segmentos",
     "video.sourcePreparing": "Generando subtítulos",

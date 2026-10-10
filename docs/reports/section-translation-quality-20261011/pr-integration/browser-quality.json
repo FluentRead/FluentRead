@@ -1,0 +1,146 @@
+{
+  "scope": "production extension, trusted CDP pointer/keyboard gestures, deterministic Google transport; not live provider latency or quality",
+  "sourceProjectRoot": "/Users/thinkstu/Desktop/copy/FluentRead-section-translation-quality-20261011",
+  "caseSet": "quality",
+  "qualityCases": [
+    "boundary",
+    "shadow",
+    "retry",
+    "cancel"
+  ],
+  "cases": [
+    "popup shows the section entry next to the page action",
+    "connected pending paragraphs moved outside the selected region never reach the provider in light or Shadow DOM",
+    "open Shadow DOM previews only original text and restores then translates without duplicate wrappers",
+    "partial transport failure keeps successful paragraphs and region retry only requests failed content",
+    "restoring during delayed section translation cancels undispatched work and ignores late transport results"
+  ],
+  "screenshots": [
+    "/private/tmp/fluentread-section-pr-integration-browser-20261011-quality/00-popup.png",
+    "/private/tmp/fluentread-section-pr-integration-browser-20261011-quality/quality-03-pending-boundary.png",
+    "/private/tmp/fluentread-section-pr-integration-browser-20261011-quality/quality-03-shadow-original-preview.png",
+    "/private/tmp/fluentread-section-pr-integration-browser-20261011-quality/quality-04-partial-failure-recovered.png"
+  ],
+  "errors": [],
+  "consoleErrors": [],
+  "errorCoverage": "errors contains uncaught page exceptions; console.error messages are recorded separately, including intentionally failed fixture requests",
+  "profileMode": "automatically-created-temporary-profile",
+  "focusDiagnostic": "/private/tmp/fluentread-section-pr-integration-browser-20261011-quality/focus-diagnostic.private.jsonl",
+  "buildFreshness": {
+    "ok": true,
+    "production": true,
+    "latestSource": {
+      "path": "/Users/thinkstu/Desktop/copy/FluentRead-section-translation-quality-20261011/src/ui/styles/translation-display.css",
+      "mtimeMs": 1791656976750.1802
+    },
+    "manifestMtimeMs": 1791657142295.5283
+  },
+  "launchMode": "macos-background-cdp",
+  "focusPolicy": "launchservices-no-foreground",
+  "windowPlacement": {
+    "mode": "background-visible-no-focus",
+    "visible": true,
+    "hidden": false,
+    "centered": true,
+    "windowState": "normal",
+    "bounds": {
+      "left": 212,
+      "top": -990,
+      "width": 1280,
+      "height": 900
+    },
+    "displayTarget": "secondary",
+    "source": "macos-nsscreen",
+    "screenIndex": 1,
+    "browserFrontmost": false,
+    "frontmostBefore": {
+      "pid": 44386,
+      "name": "Google Chrome"
+    },
+    "frontmostAfter": {
+      "pid": 1208,
+      "name": "WindowManager"
+    }
+  },
+  "popupGeometry": {
+    "mainRight": 234,
+    "sectionLeft": 241,
+    "sameTop": true,
+    "sameHeight": true,
+    "overflow": false
+  },
+  "pendingBoundary": [
+    {
+      "structure": "light",
+      "movedSourceStayedConnected": true,
+      "movedSourceRequested": false,
+      "selectedParagraphsTranslated": 2,
+      "dispatchedRequests": 2
+    },
+    {
+      "structure": "shadow",
+      "movedSourceStayedConnected": true,
+      "movedSourceRequested": false,
+      "selectedParagraphsTranslated": 2,
+      "dispatchedRequests": 2
+    }
+  ],
+  "qualityCaseConfigurations": [
+    {
+      "case": "connected pending paragraphs moved outside the selected region never reach the provider in light or Shadow DOM",
+      "service": "google",
+      "target": "zh-Hans",
+      "configuredConcurrency": 1,
+      "nativeGoogleBatching": true,
+      "theme": "light",
+      "transport": "deterministic Google fixture"
+    },
+    {
+      "case": "open Shadow DOM previews only original text and restores then translates without duplicate wrappers",
+      "service": "google",
+      "target": "zh-Hans",
+      "configuredConcurrency": 4,
+      "nativeGoogleBatching": true,
+      "theme": "light",
+      "transport": "deterministic Google fixture"
+    },
+    {
+      "case": "partial transport failure keeps successful paragraphs and region retry only requests failed content",
+      "service": "google",
+      "target": "zh-Hans",
+      "configuredConcurrency": 1,
+      "nativeGoogleBatching": false,
+      "theme": "light",
+      "transport": "deterministic Google fixture"
+    },
+    {
+      "case": "restoring during delayed section translation cancels undispatched work and ignores late transport results",
+      "service": "google",
+      "target": "zh-Hans",
+      "configuredConcurrency": 2,
+      "nativeGoogleBatching": true,
+      "theme": "light",
+      "transport": "deterministic Google fixture"
+    }
+  ],
+  "partialFailure": {
+    "failureMode": "controlled per-request HTTP 400",
+    "nativeGoogleBatching": false,
+    "configuredConcurrency": 1,
+    "initialRequestCount": 5,
+    "retryRequestCount": 1,
+    "successfulParagraphPreserved": true
+  },
+  "cancellation": {
+    "paragraphs": 36,
+    "dispatchedRequests": 2,
+    "lateResultsIgnored": true
+  },
+  "success": true,
+  "focusEvents": {
+    "monitoring": "native macOS activation events throughout the test",
+    "browserActivations": 0,
+    "observerClosed": true
+  },
+  "profileRemoved": true
+}

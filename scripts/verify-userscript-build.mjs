@@ -33,7 +33,12 @@ const artifactBytes = Buffer.byteLength(source);
 // 实测与截图见 docs/reports/translation-style-presets-20261010/。
 // 合并前整合 b14baf4b 的全文优化与样式预设：同依赖 main 为 1,987,953，集成后为 1,992,441。
 // 增加 4,488 字节（0.2258%），保持 main 的 1,994,000 预算；证据见悬浮报告 pr-integration/。
-const MAX_USERSCRIPT_BYTES = 1_994_000;
+// 区域分片、精确取消与动态选择协作在独立基线 fe7005dd9 上增加 5,222 字节（0.2630%）。
+// 合入最新主线后复验体积，沿用主线预算；保留全部协议与执行边界校验。
+// 原始对照与集成证据见 docs/reports/section-translation-quality-20261011/。
+// 随后整合区域翻译 0a69bfc3：同依赖 main 为 1,993,179，悬浮集成产物为 1,997,758。
+// 增加 4,579 字节（0.2297%），原预算余量 821 字节，按实测最小增加 4 KB；见悬浮报告 pr-integration-931/。
+const MAX_USERSCRIPT_BYTES = 1_998_000;
 const preludeStartMarker = '/* FluentRead userscript compatibility prelude:start */';
 const preludeEndMarker = '/* FluentRead userscript compatibility prelude:end */';
 const preludeStart = source.indexOf(preludeStartMarker);

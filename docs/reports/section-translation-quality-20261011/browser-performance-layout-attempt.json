@@ -1,0 +1,111 @@
+{
+  "scope": "production extension, trusted CDP pointer/keyboard gestures, deterministic Google transport; not live provider latency or quality",
+  "sourceProjectRoot": "/Users/thinkstu/Desktop/copy/FluentRead-section-translation-quality-20261011",
+  "caseSet": "quality",
+  "qualityCases": [
+    "performance",
+    "layout",
+    "nested-scroll",
+    "replacement",
+    "boundary",
+    "shadow",
+    "retry",
+    "cancel",
+    "narrow"
+  ],
+  "cases": [
+    "popup shows the section entry next to the page action",
+    "large selected region yields rendering frames, honors provider concurrency and preserves neighbors",
+    "stationary pointer follows layout changes while a locked selection keeps its source"
+  ],
+  "screenshots": [
+    "/private/tmp/fluentread-section-quality-final-20261011/00-popup.png",
+    "/private/tmp/fluentread-section-quality-final-20261011/quality-05-large-region.png",
+    "/private/tmp/fluentread-section-quality-final-20261011/quality-01-stationary-layout.png",
+    "/private/tmp/fluentread-section-quality-final-20261011/failure.png"
+  ],
+  "errors": [],
+  "consoleErrors": [],
+  "errorCoverage": "errors contains uncaught page exceptions; console.error messages are recorded separately, including intentionally failed fixture requests",
+  "profileMode": "automatically-created-temporary-profile",
+  "buildFreshness": {
+    "ok": true,
+    "production": true,
+    "latestSource": {
+      "path": "/Users/thinkstu/Desktop/copy/FluentRead-section-translation-quality-20261011/src/features/full-page-translation/content/sectionTranslation.ts",
+      "mtimeMs": 1791655015945.0693
+    },
+    "manifestMtimeMs": 1791655139903.7478
+  },
+  "launchMode": "macos-background-cdp",
+  "focusPolicy": "launchservices-no-foreground",
+  "windowPlacement": {
+    "mode": "background-visible-no-focus",
+    "visible": true,
+    "hidden": false,
+    "centered": true,
+    "windowState": "normal",
+    "bounds": {
+      "left": 212,
+      "top": -990,
+      "width": 1280,
+      "height": 900
+    },
+    "displayTarget": "secondary",
+    "source": "macos-nsscreen",
+    "screenIndex": 1,
+    "browserFrontmost": false,
+    "frontmostBefore": {
+      "pid": 44386,
+      "name": "Google Chrome"
+    },
+    "frontmostAfter": {
+      "pid": 1208,
+      "name": "WindowManager"
+    }
+  },
+  "popupGeometry": {
+    "mainRight": 234,
+    "sectionLeft": 241,
+    "sameTop": true,
+    "sameHeight": true,
+    "overflow": false
+  },
+  "largePreview": {
+    "elapsedMs": 293.90000009536743,
+    "frameCount": 18,
+    "requestsBeforeConfirm": 0
+  },
+  "largeFirstRequest": {
+    "observedAfterConfirmationMs": 388.90000009536743,
+    "frameCount": 41
+  },
+  "largeFirstProgress": {
+    "elapsedAfterConfirmationMs": 471.69999980926514,
+    "frameCount": 46
+  },
+  "largeRegion": {
+    "paragraphs": 180,
+    "originalInlineNodes": 2160,
+    "requestCount": 180,
+    "maxProviderConcurrency": 1,
+    "frameCount": 1098,
+    "maxFrameGapMs": 17.700000000000728,
+    "maxTimerDelayMs": 33,
+    "timerCount": 1024,
+    "longTasks": [],
+    "elapsedMs": 18289.699999809265,
+    "longTaskTotalMs": 0
+  },
+  "success": false,
+  "failure": {
+    "case": "nested scrolling re-hits an unlocked preview and keeps a locked paragraph attached",
+    "message": "Error: source preview: Quality scroll beta: 等待超时\n    at wait (/Users/thinkstu/Desktop/copy/FluentRead-section-translation-quality-20261011/scripts/testing/run-section-translation-flow-test.cjs:99:9)\n    at async Object.runSectionQualityCases (/Users/thinkstu/Desktop/copy/FluentRead-section-translation-quality-20261011/scripts/testing/section-translation-quality-cases.cjs:165:3)\n    at async /Users/thinkstu/Desktop/copy/FluentRead-section-translation-quality-20261011/scripts/testing/run-section-translation-flow-test.cjs:555:5"
+  },
+  "focusEvents": {
+    "monitoring": "native macOS activation events throughout the test",
+    "browserActivations": 0,
+    "observerClosed": true
+  },
+  "profileRemoved": true
+}

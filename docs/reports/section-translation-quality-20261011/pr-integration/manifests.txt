@@ -1,0 +1,36 @@
+
+> FluentRead-流畅阅读@0.0.37 verify:extension-manifests /Users/thinkstu/Desktop/copy/FluentRead-section-translation-quality-20261011
+> node scripts/testing/verify-extension-manifests.mjs
+
+{
+  "status": "ok",
+  "chrome": {
+    "manifestVersion": 3,
+    "offscreenPermission": true,
+    "runtimeCapabilityMarker": "__FLUENTREAD_BROWSER_CAPABILITY_BUILD__:chrome:mv3__",
+    "artifacts": [
+      "chunks/offscreen-9egisR0L.js",
+      "offscreen.html"
+    ],
+    "ocrAssets": 6
+  },
+  "firefox": {
+    "manifestVersion": 2,
+    "offscreenPermission": false,
+    "runtimeCapabilityMarker": "__FLUENTREAD_BROWSER_CAPABILITY_BUILD__:firefox:mv2__",
+    "artifacts": [
+      "chunks/offscreen-9egisR0L.js",
+      "offscreen.html"
+    ],
+    "ocrAssets": 6,
+    "geckoId": "{3096bd53-3bda-4556-b076-ebf47442a5c1}",
+    "strictMinVersion": "140.0",
+    "dataCollectionPermissions": [
+      "websiteContent",
+      "authenticationInfo",
+      "personalCommunications"
+    ],
+    "archives": [],
+    "archiveOcrAssets": 0
+  }
+}

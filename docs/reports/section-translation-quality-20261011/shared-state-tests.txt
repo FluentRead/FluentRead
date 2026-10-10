@@ -1,0 +1,17 @@
+
+> FluentRead-流畅阅读@0.0.37 test /Users/thinkstu/Desktop/copy/FluentRead-section-translation-quality-20261011
+> node scripts/testing/run-resource-safe.mjs -- vitest run "tests/translationState.test.ts" "tests/fullPageStateNotification.test.ts"
+
+[resource-safe] 等待全局测试锁（3 个并发槽已占满，当前: node scripts/testing/run-test-group.mjs functional; wxt build -b firefox; vue-tsc --noEmit）
+[resource-safe] CPU target 60%, maxWorkers 1, concurrency 3, command: vitest run tests/translationState.test.ts tests/fullPageStateNotification.test.ts
+
+ RUN  v2.1.9 /Users/thinkstu/Desktop/copy/FluentRead-section-translation-quality-20261011
+
+ ✓ tests/translationState.test.ts (94 tests) 859ms
+   ✓ 指定节点翻译状态机 > removed subtree 查询不会读取大批无关 active owner 的状态 517ms
+ ✓ tests/fullPageStateNotification.test.ts (11 tests) 7ms
+
+ Test Files  2 passed (2)
+      Tests  105 passed (105)
+   Start at  01:57:56
+   Duration  1.86s (transform 366ms, setup 0ms, collect 629ms, tests 866ms, environment 0ms, prepare 77ms)

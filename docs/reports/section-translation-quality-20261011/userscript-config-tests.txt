@@ -1,0 +1,15 @@
+
+> FluentRead-流畅阅读@0.0.37 test /Users/thinkstu/Desktop/copy/FluentRead-section-translation-quality-20261011
+> node scripts/testing/run-resource-safe.mjs -- vitest run "tests/userscriptViteConfig.test.ts"
+
+[resource-safe] 等待全局测试锁（3 个并发槽已占满，当前: node scripts/testing/run-test-group.mjs functional; vue-tsc --noEmit; vue-tsc --noEmit）
+[resource-safe] CPU target 60%, maxWorkers 1, concurrency 3, command: vitest run tests/userscriptViteConfig.test.ts
+
+ RUN  v2.1.9 /Users/thinkstu/Desktop/copy/FluentRead-section-translation-quality-20261011
+
+ ✓ tests/userscriptViteConfig.test.ts (23 tests) 1258ms
+
+ Test Files  1 passed (1)
+      Tests  23 passed (23)
+   Start at  02:05:08
+   Duration  3.30s (transform 943ms, setup 0ms, collect 1.80s, tests 1.26s, environment 0ms, prepare 50ms)

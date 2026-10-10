@@ -8,13 +8,21 @@ const assert = require('node:assert/strict');
 const crypto = require('node:crypto');
 const arg = (name, fallback) => {const i = process.argv.indexOf(`--${name}`); return i < 0 ? fallback : process.argv[i + 1];};
 const extensionDir = path.resolve(arg('extension-dir', '.output/chrome-mv3'));
+const projectRoot = path.resolve(arg('project-root', path.join(__dirname, '../..')));
 const artifacts = path.resolve(arg('artifacts-dir', '/private/tmp/fluentread-section-flow'));
 const githubUrl = arg('github-url');
 const playwrightRoot = arg('playwright-root');
 const helper = arg('focus-safe-helper');
+const caseSet = arg('case-set', 'core');
+if (!['core', 'quality', 'all'].includes(caseSet)) throw new Error('--case-set 必须是 core、quality 或 all');
+const qualityCases = arg('quality-cases', 'layout,nested-scroll,replacement,boundary,shadow,retry,cancel,performance,narrow').split(',');
+const knownQualityCases = ['layout', 'nested-scroll', 'replacement', 'boundary', 'shadow', 'retry', 'cancel', 'performance', 'narrow'];
+if (!qualityCases.length || qualityCases.some(name => !knownQualityCases.includes(name)) || new Set(qualityCases).size !== qualityCases.length) throw new Error('--quality-cases 包含未知或重复的专项名称');
 if (!playwrightRoot || !helper) throw new Error('必须提供 --playwright-root 和 --focus-safe-helper');
 const {chromium} = require(path.join(playwrightRoot, 'playwright'));
 const {launchFocusSafePersistentContext, newPageWithoutForeground, activateExtensionTabWithoutForeground} = require(helper);
+const {startFocusEventMonitor} = require('./mac-focus-event-monitor.cjs');
+const {getGuardedBrowserPid} = require('./owned-browser-close.cjs');
 const {assertFreshProductionExtension} = require('../run-site-translation-test.cjs');
 fs.mkdirSync(artifacts, {recursive: true});
 const temporaryRoot = fs.realpathSync(os.tmpdir());
@@ -22,7 +30,7 @@ const profileDir = fs.mkdtempSync(path.join(temporaryRoot, 'fluentread-section-f
 const profileIdentity = fs.lstatSync(profileDir);
 const owner = crypto.randomUUID();
 fs.writeFileSync(path.join(profileDir, '.owner'), owner, {flag: 'wx'});
-const report = {scope: 'production extension, trusted CDP pointer/keyboard gestures, deterministic Google transport', cases: [], screenshots: [], errors: [], profileMode: 'automatically-created-temporary-profile'};
+const report = {scope: 'production extension, trusted CDP pointer/keyboard gestures, deterministic Google transport; not live provider latency or quality', sourceProjectRoot: projectRoot, caseSet, qualityCases: caseSet === 'core' ? [] : qualityCases, cases: [], screenshots: [], errors: [], consoleErrors: [], errorCoverage: 'errors contains uncaught page exceptions; console.error messages are recorded separately, including intentionally failed fixture requests', profileMode: 'automatically-created-temporary-profile'};
 
 const filler = (id, text) => `<p id="${id}">${text}</p>`;
 const html = `<!doctype html><html lang="en"><head><meta charset="utf-8"><title>Section translation fixture</title><style>
@@ -53,9 +61,32 @@ ${filler('p3', 'Every provider can be switched without reloading the page.')}
 </body></html>`;
 
 const server = http.createServer((request, response) => {response.setHeader('content-type', 'text/html; charset=utf-8'); response.end(html);});
-let launched, page, popup, worker, cdp, tabId, currentCase = 'launch', launchAttempted = false, sequence = 0;
+let launched, page, popup, worker, cdp, tabId, focusMonitor, browserPid, focusError, currentCase = 'launch', currentAction = 'launch', traceCount = 0, launchAttempted = false, sequence = 0;
+const focusDiagnostic = path.join(artifacts, 'focus-diagnostic.private.jsonl');
+report.focusDiagnostic = focusDiagnostic;
+function privateFocusRecord(record) {
+  fs.appendFileSync(focusDiagnostic, `${JSON.stringify({wallTimeMs: Date.now(), case: currentCase, action: currentAction, ...record})}\n`, {mode: 0o600});
+}
+function noteAction(action) {
+  currentAction = action;
+  if (traceCount++ < 2000) privateFocusRecord({kind: 'action'});
+}
+function tracePageActions(target, label) {
+  for (const [surface, names] of [[target.keyboard, ['press', 'down', 'up']], [target.mouse, ['move', 'click']], [target, ['evaluate']]]) {
+    for (const name of names) {
+      const original = surface[name].bind(surface);
+      surface[name] = (...args) => {noteAction(`${label}.${name}: ${String(args[0]).slice(0, 160)}`); return original(...args);};
+    }
+  }
+}
+
+function assertFocusSafe() {
+  if (focusError || focusMonitor?.error) throw focusError || focusMonitor.error;
+  if (browserPid && focusMonitor?.events.some(event => event.pid === browserPid)) throw new Error('测试 Edge 在专项期间成为前台应用；测试已停止');
+}
 
 async function patch(values) {
+  noteAction(`configuration patch: ${Object.keys(values).join(',')}`);
   await popup.evaluate(async ({values, sequence}) => {
     const {value: current} = await chrome.runtime.sendMessage({type: 'configStorageRead', key: 'local:config'});
     const response = await chrome.runtime.sendMessage({type: 'persistConfig', mode: 'patch', config: values,
@@ -82,13 +113,15 @@ async function picker(code) {
   } finally {await cdp.send('Runtime.releaseObject', {objectId: object.objectId});}
 }
 async function wait(test, timeout = 20000, label = currentCase) {
+  noteAction(`wait: ${label}`);
   const until = Date.now() + timeout;
-  while (Date.now() < until) {if (await test()) return; await page.waitForTimeout(60);}
+  while (Date.now() < until) {assertFocusSafe(); if (await test()) return; await page.waitForTimeout(60);}
   throw new Error(`${label}: 等待超时`);
 }
 const pickerState = () => picker(`const box=this.querySelector('.fr-section-box'),r=box.getBoundingClientRect();return{visible:box.classList.contains('is-visible'),rect:{x:r.x,y:r.y,width:r.width,height:r.height},action:this.querySelector('.fr-section-label-action')?.textContent,meta:this.querySelector('.fr-section-label-meta')?.textContent,bar:this.querySelector('.fr-section-bar')?.textContent,selection:this.host.getAttribute('data-selection-state'),preview:this.querySelector('.fr-section-bar-preview')?.textContent,confirmDisabled:this.querySelector('.fr-section-confirm')?.disabled}`);
 const pickerActive = async () => (await page.locator('[data-fluent-read-ui="section-picker"]').count()) > 0 && Boolean(await picker('return !this.querySelector(".fr-section-bar.is-hidden")'));
 async function startFromPopupMessage() {
+  noteAction('extension message: start section picker');
   const response = await popup.evaluate(tab => chrome.tabs.sendMessage(tab, {type: 'contextMenuTranslate', action: 'section'}), tabId);
   assert.deepEqual(response, {status: 'success'});
   await wait(pickerActive);
@@ -123,15 +156,33 @@ async function shot(name) {const target = path.join(artifacts, `${name}.png`); a
 async function noticeText() {return page.evaluate(() => document.querySelector('#fluent-read-page-notice-host')?.shadowRoot?.textContent || '');}
 
 (async () => {
-  report.buildFreshness = assertFreshProductionExtension(extensionDir);
+  report.buildFreshness = assertFreshProductionExtension(extensionDir, projectRoot);
   await new Promise((resolve, reject) => {server.once('error', reject); server.listen(0, '127.0.0.1', resolve);});
+  focusMonitor = startFocusEventMonitor({onEvent: event => {
+    if (browserPid && event.pid === browserPid) {
+      privateFocusRecord({kind: 'owned-browser-activation', ownedPid: browserPid, eventTime: event.time, eventMonotonicMs: event.monotonicMs});
+      focusError = new Error('测试 Edge 在专项期间成为前台应用；测试已停止');
+    }
+  }, onError: error => {focusError = error;}});
+  await focusMonitor.ready;
   launchAttempted = true;
   launched = await launchFocusSafePersistentContext({chromium, profileDir,
-    browserPath: arg('browser-path', '/Applications/Microsoft Edge.app/Contents/MacOS/Microsoft Edge'), headless: false, background: true,
+    browserPath: arg('browser-path', '/Applications/Microsoft Edge.app/Contents/MacOS/Microsoft Edge'), headless: false, background: true, displayTarget: arg('display', 'secondary'),
     browserArgs: [`--disable-extensions-except=${extensionDir}`, `--load-extension=${extensionDir}`, '--no-first-run', '--no-default-browser-check'], viewport: {width: 1280, height: 900}, timeout: 30000});
   Object.assign(report, {launchMode: launched.launchMode, focusPolicy: launched.focusPolicy, windowPlacement: launched.windowPlacement});
   assert.equal(report.launchMode, 'macos-background-cdp'); assert.equal(report.focusPolicy, 'launchservices-no-foreground'); assert.equal(report.windowPlacement.browserFrontmost, false);
   const context = launched.context;
+  const browserSession = await context.browser().newBrowserCDPSession();
+  try {
+    const {processInfo} = await browserSession.send('SystemInfo.getProcessInfo');
+    browserPid = processInfo.find(process => process.type === 'browser')?.id;
+    assert.ok(browserPid, 'focus observer has the owned browser PID');
+    const guardedPid = await getGuardedBrowserPid(launched);
+    assert.equal(browserPid, guardedPid, 'focus observer PID matches the ownership guard and current CDP browser');
+    privateFocusRecord({kind: 'owned-browser-identity', ownedPid: browserPid, guardedPid, cdpPid: browserPid});
+    for (const event of focusMonitor.events.filter(event => event.pid === browserPid)) privateFocusRecord({kind: 'owned-browser-activation-before-identity', ownedPid: browserPid, eventTime: event.time, eventMonotonicMs: event.monotonicMs});
+  } finally {await browserSession.detach();}
+  assertFocusSafe();
   worker = context.serviceWorkers().find(w => w.url().startsWith('chrome-extension://')) || await context.waitForEvent('serviceworker');
   popup = await newPageWithoutForeground(context, 30000);
   await popup.setViewportSize({width: 400, height: 760});
@@ -139,34 +190,47 @@ async function noticeText() {return page.evaluate(() => document.querySelector('
   await patch({on: true, service: 'google', from: 'auto', to: 'zh-Hans', display: 1, disableFloatingBall: true, disableSelectionTranslator: true, uiLanguage: 'zh-CN', uiLanguageSetupCompleted: true});
   await worker.evaluate(() => {
     const original = globalThis.fetch.bind(globalThis);
-    globalThis.__sectionFixture = {origins: [], requests: []};
+    globalThis.__sectionFixture = {origins: [], requests: [], transports: [], delayMs: 60, failureMatch: '', active: 0, maxActive: 0};
+    const settleFixture = async (origins) => {
+      const fixture = globalThis.__sectionFixture;
+      const entry = {origins, startedAt: performance.now(), delayMs: fixture.delayMs, failed: Boolean(fixture.failureMatch && origins.some(text => text.includes(fixture.failureMatch)))};
+      fixture.transports.push(entry);
+      fixture.active += 1;
+      fixture.maxActive = Math.max(fixture.maxActive, fixture.active);
+      try {
+        await new Promise(resolve => setTimeout(resolve, entry.delayMs));
+        return entry.failed;
+      } finally {entry.finishedAt = performance.now(); fixture.active -= 1;}
+    };
     globalThis.fetch = async (input, options) => {
       const url = String(typeof input === 'string' ? input : input.url || input);
       const translateFixture = (origin, source, target) => {
         globalThis.__sectionFixture.origins.push(origin);
-        globalThis.__sectionFixture.requests.push({origin, source, target});
+        globalThis.__sectionFixture.requests.push({origin, source, target, requestedAt: performance.now()});
         return origin.split(/(___FLUENTREAD_[A-Za-z0-9]+_\d+_(?:BEGIN|END)___)/)
           .map(part => part.startsWith('___FLUENTREAD_') || !part.trim() ? part : `【译】${part}`).join('');
       };
       if (url.includes('/v1/translateHtml')) {
         const [texts, source, target] = JSON.parse(options.body)[0];
         const translated = texts.map(text => `<pre>${translateFixture(text.replace(/^<pre>|<\/pre>$/g, ''), source, target)}</pre>`);
-        await new Promise(resolve => setTimeout(resolve, 60));
+        if (await settleFixture(texts)) return new Response('Section fixture request intentionally rejected', {status: 400});
         return new Response(JSON.stringify([translated]), {status: 200});
       }
       if (url.includes('/translate_a/t')) {
         const parsed = new URL(url), body = new URLSearchParams(options.body);
         const translated = body.getAll('q').map(text => translateFixture(text, parsed.searchParams.get('sl'), parsed.searchParams.get('tl')));
-        await new Promise(resolve => setTimeout(resolve, 60));
+        if (await settleFixture(body.getAll('q'))) return new Response('Section fixture request intentionally rejected', {status: 400});
         return new Response(JSON.stringify(translated), {status: 200});
       }
       if (url.includes('/_/TranslateWebserverUi/data/batchexecute')) {
+        const origins = [];
         const records = JSON.parse(new URLSearchParams(options.body).get('f.req'))[0].map(rpc => {
           const [origin, source, target] = JSON.parse(rpc[1])[0];
+          origins.push(origin);
           const entry = [null, null, null, null, null, [[translateFixture(origin, source, target)]]];
           return ['wrb.fr', 'MkEWBc', JSON.stringify([null, [[entry]]]), null, null, null, rpc[3]];
         });
-        await new Promise(resolve => setTimeout(resolve, 60));
+        if (await settleFixture(origins)) return new Response('Section fixture request intentionally rejected', {status: 400});
         return new Response(JSON.stringify(records), {status: 200});
       }
       return original(input, options);
@@ -188,6 +252,8 @@ async function noticeText() {return page.evaluate(() => document.querySelector('
   report.cases.push(currentCase);
 
   page = await newPageWithoutForeground(context, 30000); page.on('pageerror', e => report.errors.push(e.message));
+  tracePageActions(page, 'fixturePage');
+  page.on('console', message => {if (message.type() === 'error') report.consoleErrors.push({case: currentCase, message: message.text(), location: message.location()});});
   await page.goto(`http://127.0.0.1:${server.address().port}/repo`); cdp = await context.newCDPSession(page);
   await activateExtensionTabWithoutForeground(context, page, 30000);
   tabId = await worker.evaluate(async url => (await chrome.tabs.query({})).find(t => t.url === url)?.id, page.url());
@@ -195,6 +261,7 @@ async function noticeText() {return page.evaluate(() => document.querySelector('
   await page.waitForSelector('#fluent-read-page-styles', {state: 'attached', timeout: 20000});
   const pageUrl = page.url();
 
+  if (caseSet !== 'quality') {
   currentCase = 'locked closed-shadow toolbar handles range keys and Escape after webpage input focus';
   await page.locator('#notes').focus();
   await startFromPopupMessage();
@@ -511,9 +578,21 @@ async function noticeText() {return page.evaluate(() => document.querySelector('
   assert.deepEqual(await popup.evaluate(tab => chrome.tabs.sendMessage(tab, {type: 'contextMenuTranslate', action: 'section'}), tabId), {status: 'disabled'});
   await patch({on: true});
   report.cases.push(currentCase);
+  }
 
-  if (githubUrl) {
+  if (caseSet !== 'core') {
+    await require('./section-translation-quality-cases.cjs').runSectionQualityCases({
+      page, worker, popup, tabId, report, patch, startFromPopupMessage, picker, pickerState, pickerActive,
+      hover, center, clickPickerButton, wait, waitLabel, hasTranslation, translationCount, shot, noticeText,
+      setCurrentCase: name => {currentCase = name;},
+      selectedCases: qualityCases,
+    });
+  }
+
+  if (githubUrl && caseSet !== 'quality') {
     currentCase = 'real GitHub README section';
+    report.githubEvidence = {url: githubUrl, webpage: 'real remote GitHub DOM', translationTransport: 'deterministic Google fixture, not live provider'};
+    const githubRequestOffset = await worker.evaluate(() => globalThis.__sectionFixture.requests.length);
     await page.goto(githubUrl, {waitUntil: 'domcontentloaded'});
     await page.waitForSelector('article.markdown-body p', {timeout: 30000});
     await page.waitForSelector('#fluent-read-page-styles', {state: 'attached', timeout: 20000});
@@ -529,7 +608,7 @@ async function noticeText() {return page.evaluate(() => document.querySelector('
     for (let attempt = 0; attempt < 8 && (await pickerState()).meta !== '文章'; attempt += 1) {
       await page.keyboard.press('ArrowUp'); await page.waitForTimeout(150);
     }
-    state = await pickerState(); report.githubLabel = state;
+    const state = await pickerState(); report.githubLabel = state;
     assert.equal(state.meta, '文章');
     await shot('10-github-picker');
     await page.keyboard.press('Enter');
@@ -540,14 +619,24 @@ async function noticeText() {return page.evaluate(() => document.querySelector('
       outside: [...document.querySelectorAll('.fluent-read-bilingual-content')].filter(n => !n.closest('article.markdown-body')).length,
     }));
     assert.equal(report.githubTranslated.outside, 0, 'only the README is translated');
+    report.githubEvidence.fixtureRequests = await worker.evaluate(offset => globalThis.__sectionFixture.requests.length - offset, githubRequestOffset);
+    assert.ok(report.githubEvidence.fixtureRequests > 0, 'real GitHub DOM still uses the controlled translation transport');
     await shot('11-github-readme-translated');
     report.cases.push(currentCase);
   }
 
+  assertFocusSafe();
   assert.deepEqual(report.errors, []); report.success = true;
 })().catch(async error => {report.success = false; report.failure = {case: currentCase, message: error.stack}; process.exitCode = 1; if (page) await shot('failure').catch(() => {});}).finally(async () => {
   let closed = !launchAttempted;
   try {if (launched) {await launched.close(); closed = true;}} catch (error) {report.cleanupError = error.message; process.exitCode = 1;}
+  if (focusMonitor) {
+    try {
+      await focusMonitor.stop();
+      report.focusEvents = {monitoring: 'native macOS activation events throughout the test', browserActivations: focusMonitor.events.filter(event => event.pid === browserPid).length, observerClosed: true};
+      assertFocusSafe();
+    } catch (error) {report.focusError = error.message; report.success = false; process.exitCode = 1;}
+  }
   await new Promise(resolve => {server.close(resolve); server.closeAllConnections();});
   if (closed) {const stat = fs.lstatSync(profileDir); assert.ok(!stat.isSymbolicLink() && stat.ino === profileIdentity.ino && stat.dev === profileIdentity.dev); assert.equal(fs.readFileSync(path.join(profileDir, '.owner'), 'utf8'), owner); fs.rmSync(profileDir, {recursive: true}); report.profileRemoved = true;}
   else report.retainedProfile = profileDir;

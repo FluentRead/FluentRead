@@ -1,0 +1,331 @@
+{
+  "objective": "优化页面区域局部翻译的性能、交互和可靠性，保留共享架构、原文和通用性",
+  "baselineCommit": "fe7005dd9597d566d83fe2ad5a276706b12ad0ca",
+  "branch": "codex/section-translation-quality-20261011",
+  "delivery": "local worktree and commit only; no push, PR or merge",
+  "productSourceSha256": {
+    "src/features/full-page-translation/content/sectionTranslation.ts": "81ae4ae6e4682afcf8ffc7a35be8f1aa72acc43ac280962f02c6c5af0dcc41c0",
+    "src/features/full-page-translation/content/state.ts": "6154f2c035ab78edb743c2afc4487da33d5ce819cf4a2b513341a3cc2fd8e519",
+    "src/features/section-translation/core.ts": "20470b647c0e1bd9ce859676e0ed70889553c75d48a383f594fa98c6b4cd0482",
+    "src/features/section-translation/content/picker.ts": "5a177661c91a5571ff37b54fdd0449e9e502835b73ea92a817feeb393bdbda7f",
+    "src/features/section-translation/content/index.ts": "21d5973b7b7e8109493945c77eb05bdafdb3af183d804d118ee09f74bd132ac8"
+  },
+  "referenceReposUsed": false,
+  "dependenciesChanged": false,
+  "versionsChanged": false,
+  "permissionsChanged": false,
+  "targetedTests": {
+    "sectionCorePickerEntryAndRegion": {
+      "passed": 181,
+      "files": 4,
+      "log": "section-coverage-tests.txt"
+    },
+    "configQuickTranslationAndContentLifecycle": {
+      "passed": 63,
+      "files": 4,
+      "log": "lifecycle-tests.txt"
+    },
+    "sharedStateAndNotification": {
+      "passed": 105,
+      "files": 2,
+      "log": "shared-state-tests.txt"
+    },
+    "userscriptConfig": {
+      "passed": 23,
+      "files": 1,
+      "log": "userscript-config-tests.txt"
+    },
+    "architecture": {
+      "passed": 907,
+      "files": 2,
+      "sourceHeaderAssertions": 894,
+      "log": "architecture-tests.txt"
+    },
+    "totalAssertions": 1279,
+    "fullRegressionRun": false
+  },
+  "coverage": {
+    "report": "coverage-summary.json",
+    "scope": [
+      "src/features/full-page-translation/content/sectionTranslation.ts",
+      "src/features/section-translation/core.ts",
+      "src/features/section-translation/content/picker.ts",
+      "src/features/section-translation/content/index.ts"
+    ],
+    "statements": 100,
+    "branches": 100,
+    "functions": 100,
+    "lines": 100,
+    "thresholdsReduced": false,
+    "coverageIgnoresAdded": false,
+    "limitation": "Shared state.ts has focused transition and real DOM tests; it is not included in the four-module 100-percent claim"
+  },
+  "builds": {
+    "chromeMV3": {
+      "passed": true,
+      "log": "build-chrome.txt"
+    },
+    "firefoxMV2": {
+      "passed": true,
+      "log": "build-firefox.txt"
+    },
+    "userscript": {
+      "passed": true,
+      "log": "build-userscript.txt",
+      "size": "userscript-size.json",
+      "verifier": "userscript-verifier.txt"
+    },
+    "typecheck": {
+      "passed": true,
+      "log": "compile.txt"
+    },
+    "manifests": {
+      "passed": true,
+      "log": "extension-manifests.txt"
+    },
+    "docs": {
+      "passed": true,
+      "log": "docs-build.txt"
+    }
+  },
+  "audit": {
+    "passed": true,
+    "files": 638,
+    "cases": 10432,
+    "log": "audit.txt"
+  },
+  "independentReview": {
+    "method": "read-only source VM with injected ports; not browser or live provider evidence",
+    "sourceSha256": "81ae4ae6e4682afcf8ffc7a35be8f1aa72acc43ac280962f02c6c5af0dcc41c0",
+    "fixedCases": [
+      "connected pending source moved outside region",
+      "synthetic direct Element or Text source key after restoration",
+      "later hover translation and restoration after pending snapshot",
+      "plain or pre-existing synthetic restoration while discovery yields"
+    ],
+    "finalScanWindowChecks": {
+      "dispatched": [
+        "first"
+      ],
+      "restoredCandidateRedispatched": false,
+      "subscriptionsRemaining": 0
+    }
+  },
+  "browser": {
+    "engine": "Microsoft Edge production Chrome MV3 extension",
+    "qualityGroupsPassed": 9,
+    "coreIncludingGithubPassed": 19,
+    "distinctPassedCaseDescriptions": 28,
+    "passedCases": [
+      {
+        "case": "popup shows the section entry next to the page action",
+        "report": "browser-performance-layout-attempt.json"
+      },
+      {
+        "case": "large selected region yields rendering frames, honors provider concurrency and preserves neighbors",
+        "report": "browser-performance-layout-attempt.json"
+      },
+      {
+        "case": "stationary pointer follows layout changes while a locked selection keeps its source",
+        "report": "browser-performance-layout-attempt.json"
+      },
+      {
+        "case": "nested scrolling re-hits an unlocked preview and keeps a locked paragraph attached",
+        "report": "browser-dynamic-boundary-attempt.json"
+      },
+      {
+        "case": "removing a locked source cannot translate detached content and permits selecting its replacement",
+        "report": "browser-dynamic-boundary-attempt.json"
+      },
+      {
+        "case": "connected pending paragraphs moved outside the selected region never reach the provider in light or Shadow DOM",
+        "report": "browser-dynamic-boundary-attempt.json"
+      },
+      {
+        "case": "open Shadow DOM previews only original text and restores then translates without duplicate wrappers",
+        "report": "browser-dynamic-boundary-attempt.json"
+      },
+      {
+        "case": "partial transport failure keeps successful paragraphs and region retry only requests failed content",
+        "report": "browser-retry-cancel-narrow.json"
+      },
+      {
+        "case": "restoring during delayed section translation cancels undispatched work and ignores late transport results",
+        "report": "browser-retry-cancel-narrow.json"
+      },
+      {
+        "case": "light and dark 390px controls stay visible through lock, range adjustments, reselect and Escape",
+        "report": "browser-retry-cancel-narrow.json"
+      },
+      {
+        "case": "locked closed-shadow toolbar handles range keys and Escape after webpage input focus",
+        "report": "browser-core-github.json"
+      },
+      {
+        "case": "toolbar buttons keep range keys and native Enter activation after Tab",
+        "report": "browser-core-github.json"
+      },
+      {
+        "case": "stable boundary preview, explicit locking, visible range buttons and reselect",
+        "report": "browser-core-github.json"
+      },
+      {
+        "case": "picker highlights the paragraph under the pointer and widens with ArrowUp",
+        "report": "browser-core-github.json"
+      },
+      {
+        "case": "click locks the section without navigation or requests; Enter confirms only that section",
+        "report": "browser-core-github.json"
+      },
+      {
+        "case": "picking the translated section again restores only that section",
+        "report": "browser-core-github.json"
+      },
+      {
+        "case": "Escape, right-click and forged events leave the page untouched",
+        "report": "browser-core-github.json"
+      },
+      {
+        "case": "picking page chrome translates it even though page translation keeps it original",
+        "report": "browser-core-github.json"
+      },
+      {
+        "case": "same-language and empty sections explain why nothing was requested",
+        "report": "browser-core-github.json"
+      },
+      {
+        "case": "optional shortcut enters and leaves picking, and yields to typing",
+        "report": "browser-core-github.json"
+      },
+      {
+        "case": "restoring page translation also restores translated sections",
+        "report": "browser-core-github.json"
+      },
+      {
+        "case": "independent section shortcut selects a container before requesting its target language",
+        "report": "browser-core-github.json"
+      },
+      {
+        "case": "another section profile switches the container language, and the same profile restores it",
+        "report": "browser-core-github.json"
+      },
+      {
+        "case": "section profile yields while editing and cancels without translation",
+        "report": "browser-core-github.json"
+      },
+      {
+        "case": "narrow layout keeps all range controls and confirmation within the viewport",
+        "report": "browser-core-github.json"
+      },
+      {
+        "case": "new nested open ShadowRoots keep locked empty-to-source summaries current",
+        "report": "browser-core-github.json"
+      },
+      {
+        "case": "turning the plugin off exits picking and rejects new requests",
+        "report": "browser-core-github.json"
+      },
+      {
+        "case": "real GitHub README section",
+        "report": "browser-core-github.json"
+      }
+    ],
+    "transport": "controlled Google responses; no live-provider quality or latency claim",
+    "remotePage": "https://github.com/FluentRead/FluentRead",
+    "github": {
+      "insideTranslations": 27,
+      "outsideTranslations": 0,
+      "fixtureRequests": 27
+    },
+    "uncaughtErrors": 0,
+    "finalCoreConsoleErrors": [
+      {
+        "case": "real GitHub README section",
+        "message": "resource HTTP 404; URL was not captured, origin cannot be precisely attributed"
+      }
+    ],
+    "launchMode": "macos-background-cdp",
+    "focusPolicy": "launchservices-no-foreground",
+    "placement": "normal visible window entirely on secondary display",
+    "historicalFocusInterruption": {
+      "report": "browser-focus-interrupted-attempt.json",
+      "userClickedTestWindow": false,
+      "cause": "unconfirmed; historical PID and native timeline not saved due to old finally assertion order",
+      "ownedProfileRemoved": true
+    },
+    "subsequentControlledRuns": {
+      "reports": [
+        "browser-retry-label-attempt.json",
+        "browser-retry-cancel-narrow.json",
+        "browser-core-github.json"
+      ],
+      "ownedBrowserNativeActivationsEach": 0,
+      "profilesRemoved": true
+    },
+    "privateFocusJsonlCommitted": false,
+    "fixtureCorrections": [
+      {
+        "report": "browser-performance-layout-attempt.json",
+        "cause": "120px scroll distance ignored 16px padding; corrected to actual offsetHeight"
+      },
+      {
+        "report": "browser-dynamic-boundary-attempt.json",
+        "cause": "whole native Google batch was rejected but test expected partial success; per-request HTTP 400 with native batching off isolates partial-failure contract"
+      },
+      {
+        "report": "browser-retry-label-attempt.json",
+        "cause": "actual partial-success label is 翻译剩余 1 段; corrected exact assertion"
+      }
+    ],
+    "finalRetryConfiguration": {
+      "nativeGoogleBatching": false,
+      "concurrency": 1,
+      "failure": "per-request HTTP 400"
+    },
+    "cancelAndNarrowConfiguration": "readyForCase resets native Google batching to true; later cases do not inherit retry preferences",
+    "runtimeLimitations": [
+      "Firefox and userscript have build/static evidence only",
+      "nine quality groups passed across filtered continuation reports, not one wholly successful original run"
+    ]
+  },
+  "performance": {
+    "baselineReport": "baseline-browser-performance.json",
+    "candidateReport": "browser-performance-layout-attempt.json",
+    "auxiliaryBaselineReport": "baseline-phase-sample.json",
+    "paragraphs": 180,
+    "originalInlineNodes": 2160,
+    "requestsEach": 180,
+    "configuredConcurrentCandidateCap": 4,
+    "actualGoogleConcurrencyEach": 1,
+    "previewMs": [
+      385.8,
+      293.9
+    ],
+    "firstRequestObservedMs": [
+      1239.3,
+      388.9
+    ],
+    "firstTranslationObservedMs": [
+      1253.9,
+      471.7
+    ],
+    "maxFrameGapMs": [
+      533.3,
+      17.7
+    ],
+    "maxTimerDelayMs": [
+      540.9,
+      33.0
+    ],
+    "recordedLongTaskTotalMs": [
+      545,
+      0
+    ],
+    "totalCompletionMs": [
+      18856.2,
+      18289.7
+    ],
+    "methodLimitations": "Single local fixture sample; 60ms request observation polling upper bound; host load affects timings; no public provider throughput or quality proof"
+  },
+  "logNormalization": "Committed text logs remove terminal color codes, trailing spaces and blank lines at EOF; command output content is retained"
+}

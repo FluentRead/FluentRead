@@ -1,0 +1,13 @@
+
+> FluentRead-流畅阅读@0.0.37 build:userscript /Users/thinkstu/Desktop/copy/FluentRead-section-translation-quality-20261011
+> node scripts/testing/run-resource-safe.mjs -- vite build --config userscript/vite.config.ts
+
+[resource-safe] 等待全局测试锁（3 个并发槽已占满，当前: node scripts/testing/run-test-group.mjs functional; vue-tsc --noEmit; vitest run tests/architecture/moduleBoundaries.test.ts tests/architecture/sourceFileHeaders.test.ts）
+[resource-safe] CPU target 60%, maxWorkers 1, concurrency 3, command: vite build --config userscript/vite.config.ts
+vite v5.4.19 building for production...
+transforming...
+✓ 660 modules transformed.
+rendering chunks...
+computing gzip size...
+.output/userscript/fluent-read.user.js  1,936.13 kB │ gzip: 785.85 kB
+✓ built in 5.94s

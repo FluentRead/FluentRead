@@ -8,7 +8,8 @@ Smart Highlighting is a separate reading aid. Bilingual sentence highlighting li
 
 1. Open **Settings → Translation settings**, then use the **Smart Highlighting** anchor at the top or scroll down to its settings group.
 2. Choose mode, density, colour and drawing style, and check the illustrative preview.
-3. Enable **Smart Highlighting** from the FluentRead PDF reader toolbar for the current document. Turn it off to clear the marks.
+3. The shortcut is off by default. Turn on **Enable shortcut** to use **Alt+H** (Option+H on macOS) on a web page or in the FluentRead PDF reader. It toggles highlighting for the current page or document. While disabled, it does not intercept this key combination.
+4. You can also enable **Smart Highlighting** from the FluentRead PDF reader toolbar for the current document. Turn it off to clear the marks.
 
 The top navigation scrolls within the continuous settings page. All groups remain displayed. Smart Highlighting and bilingual sentence highlighting have separate settings groups.
 

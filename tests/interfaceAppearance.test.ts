@@ -208,7 +208,7 @@ describe('界面皮肤与栏目配置', () => {
     expect(migrated.popupQuickFeatureOrder).toEqual(['image', 'hover', 'selection', 'appearance', 'document'])
     expect(migrated.popupQuickFeatureVisibility).not.toHaveProperty('highlight')
     expect(migrated.popupQuickFeatureVisibility.image).toBe(false)
-    expect(migrated.informationHighlight).toEqual({enabled: false, hotkey: 'Alt+H', hotkeyEnabled: true, ...informationHighlight, intensity: 'standard'})
+    expect(migrated.informationHighlight).toEqual({enabled: false, hotkey: 'Alt+H', hotkeyEnabled: false, ...informationHighlight, model: 'qwen2.5-0.5b', intensity: 'standard'})
     expect(normalizeConfig(migrated)).toEqual(migrated)
   })
 

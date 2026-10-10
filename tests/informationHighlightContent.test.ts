@@ -16,8 +16,8 @@ import {registerVisibleTranslationRoot, readVisibleTranslationRoot} from '@/src/
 import {createInformationHighlightContentRuntime, createInformationHighlightScorePort, createPageInformationHighlightRuntime, handleInformationHighlightMessage} from '@/src/app/content/informationHighlight';
 import type {InformationHighlightResult} from '@/src/features/information-highlight/protocol';
 
-// 保留背景与下划线的既有选择行为；新默认热力外观另用真实多档绘制断言覆盖。
-const defaults = {...defaultPreferences, style: 'background' as const};
+// 主动启用快捷键以验证页内会话，保留背景与下划线的既有选择行为；真实默认关闭和热力外观另行覆盖。
+const defaults = {...defaultPreferences, hotkeyEnabled: true, style: 'background' as const};
 
 const pageNotice = vi.hoisted(() => vi.fn());
 vi.mock('@/src/features/page-notice/public', () => ({showPageNotice: pageNotice}));
@@ -712,7 +712,7 @@ describe('content composition and runtime score messages', () => {
     });
     it('toggles only the current page with the configured shortcut and never writes the saved switch', async () => {
         const f = fixture(), send = vi.fn(), activation = new AbortController(); let allowed = true;
-        const runtime = createInformationHighlightContentRuntime({document: f.document, preferences: {...defaults}, send, canToggle: () => allowed});
+        const runtime = createInformationHighlightContentRuntime({document: f.document, preferences: {...defaultPreferences}, send, canToggle: () => allowed});
         const press = (init: {key: string; code: string; altKey?: boolean; shiftKey?: boolean; repeat?: boolean}, trusted = true) => {
             const event = new f.window.Event('keydown', {bubbles: true, cancelable: true}) as KeyboardEvent;
             Object.assign(event, {altKey: false, ctrlKey: false, shiftKey: false, metaKey: false, repeat: false, ...init});
@@ -721,6 +721,9 @@ describe('content composition and runtime score messages', () => {
         const altH = {key: 'h', code: 'KeyH', altKey: true};
         press(altH); expect(runtime.getState().enabled).toBe(false);
         runtime.mount(activation.signal, () => true);
+        expect(press(altH).defaultPrevented).toBe(false); await f.settle();
+        expect(runtime.getState().enabled).toBe(false); expect(f.painted()).toEqual([]); expect(send).not.toHaveBeenCalled();
+        runtime.updatePreferences({...defaults});
         const first = press(altH); expect(first.defaultPrevented).toBe(true); expect(runtime.getState().enabled).toBe(true);
         await f.settle(); expect(f.painted().length).toBeGreaterThan(0);
         for (const ignored of [press(altH, false), press({...altH, repeat: true}), press({key: 'h', code: 'KeyH'}), press({key: 'j', code: 'KeyJ', altKey: true})]) expect(ignored.defaultPrevented).toBe(false);

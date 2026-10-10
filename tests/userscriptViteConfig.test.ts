@@ -6,8 +6,9 @@ import {gunzipSync} from 'node:zlib';
 import {runInNewContext} from 'node:vm';
 import {describe, expect, it, vi} from 'vitest';
 import {ungzip} from 'pako';
-import {zhCNMessages, userscriptMessages} from '@/userscript/languageBundles';
+import {zhCNMessages, UI_LANGUAGE_BUNDLES, userscriptMessages} from '@/userscript/languageBundles';
 import {zhCNMessages as extensionChinese} from '@/src/core/i18n/messages/zh-CN';
+import {UI_LANGUAGE_BUNDLES as extensionBundles} from '@/src/core/i18n/bundles';
 import {installInformationHighlight} from '@/userscript/informationHighlight';
 import {inflateWithPako} from '@/userscript/pakoRuntime';
 import * as chineseCharacterData from '@/src/core/language/chineseVariants';
@@ -98,6 +99,23 @@ describe('userscript browser shim injection', () => {
             }
         } finally {vi.unstubAllEnvs();vi.resetModules();}
     });
+    it.each<readonly [string, Record<string, string>, Record<string, string>]>([
+        ['zh-CN', extensionChinese, zhCNMessages],
+        ...Object.entries(extensionBundles).map(([language, bundle]) => [language, bundle.messages, UI_LANGUAGE_BUNDLES[language as keyof typeof UI_LANGUAGE_BUNDLES].messages] as const),
+    ])('retains extension notices in %s while preserving all other userscript menu and settings copy', (_language, extension, projected) => {
+        const noticeKeys = Object.keys(extension).filter(key => key.startsWith('contextMenu.notice.'));
+        expect(noticeKeys).toHaveLength(6);
+        for (const key of noticeKeys) {
+            expect(extension[key]).toBeTruthy();
+            expect(Object.hasOwn(projected, key)).toBe(false);
+        }
+        const retainedKeys = Object.keys(extension).filter(key => !key.startsWith('informationHighlight.') && !noticeKeys.includes(key));
+        expect(Object.keys(projected)).toHaveLength(retainedKeys.length);
+        for (const key of retainedKeys) expect(projected[key]).toBe(extension[key]);
+        expect(projected['contextMenu.translateSelection']).toBeTruthy();
+        expect(projected['contextMenu.translatePage']).toBeTruthy();
+        expect(projected['contextMenu.restorePage']).toBeTruthy();
+    });
     it('excludes unreachable highlight code and copy while keeping an explicitly unavailable state', () => {
         expect(userscriptMessages(extensionChinese)).toEqual(zhCNMessages);
         expect(Object.keys(zhCNMessages).some(key => key.startsWith('informationHighlight.'))).toBe(false);
@@ -112,7 +130,7 @@ describe('userscript browser shim injection', () => {
         const defines = (userscriptConfig as {define: Record<string, string>}).define;
         const commit = JSON.parse(defines.__FLUENTREAD_USERSCRIPT_RESOURCE_COMMIT__);
         const bundles = JSON.parse(defines.__FLUENTREAD_USERSCRIPT_REMOTE_LANGUAGES__) as Record<string, string>;
-        expect(commit).toMatch(/^[a-f0-9]{40}$/u);
+        expect(commit).toBe('cf1941d43f406bb5118952066da5f9399400dd37');
         expect(Object.keys(bundles)).toHaveLength(5);
         for (const file of Object.values(bundles)) {
             const path = `userscript/languages/${file}`;

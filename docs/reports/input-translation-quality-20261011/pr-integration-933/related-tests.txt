@@ -1,0 +1,45 @@
+
+> FluentRead-流畅阅读@0.0.37 test /Users/thinkstu/Desktop/copy/FluentRead-input-translation-quality-20261011
+> node scripts/testing/run-resource-safe.mjs -- vitest run "tests/inputTranslationContentFeature.test.ts" "tests/inputEditableHost.test.ts" "tests/inputBox.test.ts" "tests/inputTranslationBackground.test.ts" "tests/backgroundTranslationHandler.test.ts" "tests/userscriptPlatform.test.ts" "tests/inputTranslationConfig.test.ts" "tests/optionalContentFeatures.test.ts" "tests/backgroundFeatureHandlers.test.ts" "tests/userscriptCredentialPersistence.test.ts" "tests/contentHotkeyRuntime.test.ts" "tests/contentUiRuntime.test.ts" "tests/backgroundProviderRuntime.test.ts" "tests/qqMailFrameRuntime.test.ts" "tests/hoverTranslationConfig.test.ts" "tests/architecture/moduleBoundaries.test.ts" "tests/architecture/providerBoundaries.test.ts" "tests/architecture/verificationOwnership.test.ts" "tests/architecture/sourceFileHeaders.test.ts" "tests/contentMessageRuntime.test.ts" "tests/userscriptViteConfig.test.ts"
+
+[resource-safe] 等待全局测试锁（3 个并发槽已占满，当前: pnpm exec vite build --config userscript/vite.config.ts; zsh -f -c pnpm compile > ../artifacts/hover-translation-polish-20261011/pr929-final-compile.log 2>&1 && pnpm test tests/architecture/moduleBoundaries.test.ts tests/architecture/sourceFileHeaders.test.ts tests/architecture/verificationOwnership.test.ts tests/architecture/providerBoundaries.test.ts > ../artifacts/hover-translation-polish-20261011/pr929-final-architecture.log 2>&1 && pnpm build > ../artifacts/hover-translation-polish-20261011/pr929-final-chrome.log 2>&1 && pnpm build:firefox > ../artifacts/hover-translation-polish-20261011/pr929-final-firefox.log 2>&1 && pnpm build:userscript > ../artifacts/hover-translation-polish-20261011/pr929-final-userscript.log 2>&1 && node scripts/verify-userscript-build.mjs > ../artifacts/hover-translation-polish-20261011/pr929-final-userscript-before-budget.log 2>&1; vue-tsc --noEmit）
+[resource-safe] CPU target 60%, maxWorkers 1, concurrency 3, command: vitest run tests/inputTranslationContentFeature.test.ts tests/inputEditableHost.test.ts tests/inputBox.test.ts tests/inputTranslationBackground.test.ts tests/backgroundTranslationHandler.test.ts tests/userscriptPlatform.test.ts tests/inputTranslationConfig.test.ts tests/optionalContentFeatures.test.ts tests/backgroundFeatureHandlers.test.ts tests/userscriptCredentialPersistence.test.ts tests/contentHotkeyRuntime.test.ts tests/contentUiRuntime.test.ts tests/backgroundProviderRuntime.test.ts tests/qqMailFrameRuntime.test.ts tests/hoverTranslationConfig.test.ts tests/architecture/moduleBoundaries.test.ts tests/architecture/providerBoundaries.test.ts tests/architecture/verificationOwnership.test.ts tests/architecture/sourceFileHeaders.test.ts tests/contentMessageRuntime.test.ts tests/userscriptViteConfig.test.ts
+
+ RUN  v2.1.9 /Users/thinkstu/Desktop/copy/FluentRead-input-translation-quality-20261011
+
+ ✓ tests/inputTranslationContentFeature.test.ts (96 tests) 873ms
+ ✓ tests/backgroundFeatureHandlers.test.ts (53 tests) 2149ms
+   ✓ 后台 feature handlers > 区域截图 handler 接受 windowId=0 并拒绝空截图与非法窗口 1202ms
+   ✓ 后台 feature handlers > 圈选截图必须属于sender的当前活动标签页，并在捕获完成后再次核对 602ms
+ ✓ tests/inputEditableHost.test.ts (81 tests) 220ms
+ ✓ tests/contentMessageRuntime.test.ts (93 tests) 3977ms
+   ✓ 内容脚本 runtime 消息协议 > 信息高亮状态在暂停或关闭时仍可读，关闭可抢占，开启和重试遵循当前页面门禁 459ms
+ ✓ tests/contentHotkeyRuntime.test.ts (62 tests) 1070ms
+ ✓ tests/qqMailFrameRuntime.test.ts (27 tests) 2132ms
+   ✓ QQ legacy frame startup 生命周期 > 后台授权响应晚于页面暂停时不能重新添加 frame 手势与样式 504ms
+ ✓ tests/contentUiRuntime.test.ts (17 tests) 268ms
+ ✓ tests/userscriptViteConfig.test.ts (32 tests) 1994ms
+ ✓ tests/architecture/verificationOwnership.test.ts (16 tests) 8775ms
+   ✓ repository verification ownership > src 中每个可执行非组装模块都进入四维 100% 覆盖率边界 5506ms
+   ✓ repository verification ownership > 覆盖率清单不能引用不存在的源码或把组装根伪装成业务覆盖 3063ms
+ ✓ tests/backgroundTranslationHandler.test.ts (49 tests) 16ms
+ ✓ tests/architecture/moduleBoundaries.test.ts (13 tests) 5598ms
+   ✓ architecture module boundaries > src 的静态依赖图不存在跨文件循环 1730ms
+   ✓ architecture module boundaries > src 只能通过精确登记的 composition/browser/provider 迁移边界读取 entrypoints 1634ms
+   ✓ architecture module boundaries > feature 不能跨目录读取另一个 feature 的内部实现 723ms
+   ✓ architecture module boundaries > 按需加载的大体积资源不得被扩展运行时代码静态引入 1097ms
+ ✓ tests/inputTranslationBackground.test.ts (13 tests) 18ms
+ ✓ tests/inputBox.test.ts (13 tests) 9ms
+ ✓ tests/userscriptPlatform.test.ts (8 tests) 20ms
+ ✓ tests/architecture/providerBoundaries.test.ts (6 tests) 144ms
+ ✓ tests/optionalContentFeatures.test.ts (7 tests) 7ms
+ ✓ tests/inputTranslationConfig.test.ts (10 tests) 16ms
+ ✓ tests/architecture/sourceFileHeaders.test.ts (902 tests) 291ms
+ ✓ tests/userscriptCredentialPersistence.test.ts (2 tests) 481ms
+ ✓ tests/hoverTranslationConfig.test.ts (16 tests) 12ms
+ ✓ tests/backgroundProviderRuntime.test.ts (2 tests) 3ms
+
+ Test Files  21 passed (21)
+      Tests  1518 passed (1518)
+   Start at  03:06:12
+   Duration  38.43s (transform 2.70s, setup 0ms, collect 6.24s, tests 28.07s, environment 3ms, prepare 1.20s)

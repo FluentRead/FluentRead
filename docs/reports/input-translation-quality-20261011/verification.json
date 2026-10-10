@@ -1,0 +1,138 @@
+{
+  "baseCommit": "fe7005dd9597d566d83fe2ad5a276706b12ad0ca",
+  "branch": "codex/input-translation-quality-20261011",
+  "sourceSha256": {
+    "src/features/input-translation/content/index.ts": "ebc0b0cb96c828e9b508682f1758561b54df6d19e2dc72f809ca02251cff30df",
+    "src/features/input-translation/content/editableHost.ts": "8e287109c392842c6909d7167a77a928181657e7c4bc96e117028603d24a2412",
+    "src/features/input-translation/content/inputBox.ts": "3edbabc7aaeb1b1ab1f5a0498087901f5dcd33a7f46086a160474a97408b6689",
+    "src/features/input-translation/background/handler.ts": "dfa4898e8b4fc4d5070380a63822194443665295c8b5b5e8e03b401ad131c9c5",
+    "src/app/background/messageRuntime.ts": "cfbf02e3031844b5797cdc3db4bfb40339271d3b0477f58615dece650abcb269",
+    "userscript/platform.ts": "f8baae21074a0d04a9f8c080b9991392ac40e7ea76b3d14c520033d624cf044b",
+    "userscript/platformFull.ts": "67dff42ec010ac54275875d7f213ea98f6158b608164912502c46a5090da84fb",
+    "scripts/verify-userscript-build.mjs": "9c55388a8ccfebeb5fdabc2ac5bd3ecfc54c7a547accd08b04cb334be30978e8"
+  },
+  "artifactSha256": {
+    "chrome-mv3": {
+      "manifest.json": "fd80314b160701ed5500e584e1373f5eed44a19acdc6f8b76f9a12c1565970d8",
+      "background.js": "f416c0eac108c2654dcc50b96ad1e6c954c1a2aa6f34aafa40feceee5b6ea3a8",
+      "content-scripts/content.js": "49c1c02437dd64dc45231cbda1a7c3eba5d4050fceed5698ae8018390253673f"
+    },
+    "firefox-mv2": {
+      "manifest.json": "2f4d6388a66e23f052933d6a4f972e3f65e841806a20f6b1d274fcf14d21a3ef",
+      "background.js": "11749d941d0d8d78658d02390383a199088cef952083855cd31d918642280416",
+      "content-scripts/content.js": "94fb8af9141a4b9a54998f95b20ef130d6da84342046bc288f1d0233755b2c7d"
+    }
+  },
+  "userscript": {
+    "baselineBytes": 1985367,
+    "baselineSha256": "590651db4da5f8bf864920ecdf0a81869f321ac4508864dc81e56480cebddea9",
+    "candidateBytes": 1994005,
+    "candidateSha256": "1454a19fee7d56a61ded76d3ae403195358190d197e15a3db90d93f99d132990",
+    "deltaBytes": 8638,
+    "deltaPercent": 0.435083,
+    "oldBudgetBytes": 1986000,
+    "newBudgetBytes": 1995000,
+    "candidateMarginBytes": 995
+  },
+  "lockSha256": "dca737aeb9c264e2c3078588ff01c85dd52d48636f7fa24b2451f9444a8ccc3a",
+  "coreTests": {
+    "content": 96,
+    "editableHostAndInputBox": 94,
+    "backgroundAndIntegrationSelected": 14,
+    "passed": 204
+  },
+  "relatedRegression": {
+    "passed": 997,
+    "failed": 1,
+    "total": 998,
+    "separateOptionalFeaturesPassed": 7
+  },
+  "knownBaselineFailure": {
+    "test": "tests/architecture/providerBoundaries.test.ts:188",
+    "description": "旧 Microsoft 适配器调用签名的静态字符串断言，与本次改动无关，未修改基线同样失败",
+    "unchangedFileSha256": {
+      "src/providers/translation/microsoft.ts": "e66d83b11f5a3a164f3a97cc8f0de9f9a87b636c3ef0c12f18e04fce858b8a0c",
+      "tests/architecture/providerBoundaries.test.ts": "90cbcfa680b4e7daa8eb2b96c7df7e5cae723416c201e8787b0b164210f8cb78"
+    }
+  },
+  "evidenceBoundary": {
+    "browser": "isolated Edge with Chrome MV3 production artifacts",
+    "provider": "deterministic local fixture; no live provider account certification",
+    "otherTargets": "Firefox/userscript build and artifact verification only"
+  },
+  "testAudit": {
+    "status": "ok",
+    "files": 638,
+    "cases": 10444
+  },
+  "checks": [
+    {
+      "command": "pnpm compile",
+      "exitCode": 0,
+      "evidenceLog": "/private/tmp/fluentread-input-compile-final-v5.log"
+    },
+    {
+      "command": "pnpm build",
+      "exitCode": 0,
+      "evidenceLog": "/private/tmp/fluentread-input-build-chrome-final-v5.log"
+    },
+    {
+      "command": "pnpm build:firefox",
+      "exitCode": 0,
+      "evidenceLog": "/private/tmp/fluentread-input-build-firefox-final-v5.log"
+    },
+    {
+      "command": "pnpm build:userscript",
+      "exitCode": 0,
+      "evidenceLog": "/private/tmp/fluentread-input-build-userscript-final-v5.log"
+    },
+    {
+      "command": "node scripts/verify-userscript-build.mjs",
+      "exitCode": 0,
+      "evidenceLog": "/private/tmp/fluentread-input-userscript-verifier-final-20261011.log"
+    },
+    {
+      "command": "node scripts/testing/verify-extension-manifests.mjs",
+      "exitCode": 0,
+      "evidenceLog": "/private/tmp/fluentread-input-manifests-final-v5.json"
+    },
+    {
+      "command": "pnpm test:audit",
+      "exitCode": 0,
+      "evidenceLog": "/private/tmp/fluentread-input-audit-final-v4.log"
+    },
+    {
+      "command": "pnpm docs:build",
+      "exitCode": 0,
+      "evidenceLog": "/private/tmp/fluentread-input-build-docs-final-20261011.log"
+    },
+    {
+      "command": "pnpm storybook:build",
+      "exitCode": 0,
+      "evidenceLog": "/private/tmp/fluentread-input-storybook-build-final-20261011.log"
+    },
+    {
+      "command": "pnpm storybook:check",
+      "exitCode": 0,
+      "evidenceLog": "/private/tmp/fluentread-input-storybook-check-final-20261011.log"
+    },
+    {
+      "command": "pnpm docs:check",
+      "exitCode": 0,
+      "evidenceLog": "/private/tmp/fluentread-input-check-docs-final-20261011.log"
+    }
+  ],
+  "docsCheck": {
+    "ok": true,
+    "pages": 81,
+    "links": 4328,
+    "anchors": 792,
+    "images": 158
+  },
+  "storybookCheck": {
+    "groups": 12,
+    "stories": 28,
+    "docs": 12,
+    "assets": 13
+  }
+}

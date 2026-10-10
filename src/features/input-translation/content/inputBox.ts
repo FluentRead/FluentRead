@@ -130,13 +130,17 @@ export function removeInsertedTriggerSymbols(
 }
 
 /**
- * 获取输入目标的原始值快照，保留首尾空白，
- * 用于确认异步翻译返回前用户是否编辑过输入框。
+ * 获取输入目标的提交快照。原生控件保留原始值；编辑宿主比较完整 DOM 序列化，
+ * 无需读取会触发布局的 innerText，仍能保护首尾空白、段落、链接与格式变化。
+ * 返回值只用于相等比较，不是翻译原文；最小 DOM 适配器无 innerHTML 时沿用文本快照。
  */
 export function getInputBoxValueSnapshot(element: HTMLElement): string {
     if (isFormControl(element)) return element.value;
 
-    return element.innerText || element.textContent || '';
+    const markup = element.innerHTML;
+    return typeof markup === 'string'
+        ? markup
+        : element.innerText || element.textContent || '';
 }
 
 export interface InputBoxTranslationCommitState {

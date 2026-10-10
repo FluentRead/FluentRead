@@ -2,22 +2,17 @@
  * @file src/app/content/messageRuntime.ts
  * 文件职责：创建 content 侧 runtime 消息处理函数，把 popup/background 的设置变化和功能命令映射为当前页面上的精确 mount、unmount 或状态响应。
  * 主要内容：处理悬浮球、划词模式与延迟、区域/图片能力、进度面板、站点禁用及旧缓存清理消息，并把右键菜单的划词、圈选、整页与恢复请求及 Popup 的局部翻译请求转给对应 feature；结合 BrowserCapabilities 对不支持功能确定性拒绝，并更新共享运行时状态。
- * 模块边界：本文件只做消息到 feature 生命周期的适配，全文状态与完成查询委托给 fullPageCompletionQuery，不注册全局监听器、不执行供应商翻译，也不实现组件 UI；监听安装及配置订阅由 content/runtime 负责。
+ * 模块边界：本文件只做消息到 feature 生命周期的适配，右键动作与反馈委托给 contextMenuCommands，全文状态与完成查询委托给 fullPageCompletionQuery，不注册全局监听器、不执行供应商翻译，也不实现组件 UI；监听安装及配置订阅由 content/runtime 负责。
  */
 import type {ContentScriptContext} from 'wxt/utils/content-script-context';
 import {normalizeSelectionTranslatorDelay} from '@/src/core/config/model';
 import {config} from '@/src/services/config/store';
 import {
-    autoTranslateEnglishPage,
     invalidateFullPageTranslationSessionCache,
-    isFullPageTranslationActive,
     mountAreaTranslator, mountFloatingBall,
-    startAreaTranslationFromContextMenu, startSectionTranslationPicker, translateSelectionFromContextMenu,
-    toggleContextMenuImage,
     mountImageTranslator,
     mountSelectionTranslator,
     mountTranslationProgressPanel,
-    restoreOriginalContent,
     unmountAreaTranslator,
     unmountFloatingBall,
     unmountImageTranslator,
@@ -26,7 +21,7 @@ import {
 } from './features';
 import {handleFullPageCompletionQuery} from './fullPageCompletionQuery';
 import {forwardLegacyCacheClear} from './cacheMessage';
-import {respondToAreaContextMenu} from './areaContextMenuResponse';
+import {handleContextMenuNotice, handleContextMenuTranslation} from './contextMenuCommands';
 import {browserCapabilities, type BrowserCapabilities} from '@/src/platform/browser/capabilities';
 import {rejectUnsupportedContentFeature} from './featureRegistry';
 import {handleInformationHighlightMessage, type InformationHighlightMessageState} from './informationHighlight';
@@ -41,6 +36,8 @@ export function createContentRuntimeMessageHandler(ctx: ContentScriptContext, st
         if (!message || typeof message !== 'object') return false;
         const payload = message as Record<string, unknown>;
         if (import.meta.env.BROWSER !== 'userscript') {
+            const notice = handleContextMenuNotice(payload, ctx, state, sendResponse);
+            if (notice !== undefined) return notice;
             const handled = handleInformationHighlightMessage(payload, state, ctx.isInvalid || config.on === false, sendResponse);
             if (handled !== undefined) return handled;
         }
@@ -118,10 +115,6 @@ export function createContentRuntimeMessageHandler(ctx: ContentScriptContext, st
             sendResponse();
             return true;
         }
-        if (payload.type === 'contextMenuTranslateImage') {
-            sendResponse({status: capabilities.imageTranslation && toggleContextMenuImage(payload.srcUrl) ? 'success' : 'disabled'});
-            return true;
-        }
         if (payload.type === 'toggleImageTranslator') {
             if (rejectUnsupportedContentFeature(capabilities.imageTranslation, unmountImageTranslator,
                 sendResponse, '当前浏览器暂不支持图片翻译与 OCR')) return true;
@@ -143,31 +136,8 @@ export function createContentRuntimeMessageHandler(ctx: ContentScriptContext, st
         if (payload.type === 'getFullPageTranslationState') {
             return handleFullPageCompletionQuery(payload, _sender, ctx, state, sendResponse);
         }
-        if (payload.type === 'contextMenuTranslate') {
-            if (config.on === false || state.isSiteDisabled()) {
-                sendResponse({status: 'disabled'});
-                return true;
-            }
-            if (payload.action === 'selection' || payload.action === 'section') {
-                const started = payload.action === 'section' ? startSectionTranslationPicker() : translateSelectionFromContextMenu();
-                sendResponse({status: started ? 'success' : 'failed'});
-                return true;
-            }
-            if (payload.action === 'area') {
-                respondToAreaContextMenu(capabilities.areaTranslation, startAreaTranslationFromContextMenu, sendResponse);
-                return true;
-            }
-            if (payload.action === 'fullPage' || payload.action === 'restore') {
-                const restoring = payload.action === 'restore';
-                if (restoring) restoreOriginalContent();
-                else autoTranslateEnglishPage();
-                const isTranslated = isFullPageTranslationActive();
-                const changed = isTranslated !== restoring;
-                sendResponse({status: changed ? 'success' : 'failed',
-                    action: changed ? (restoring ? 'restored' : 'translated') : 'unchanged', isTranslated});
-                return true;
-            }
-        }
+        const contextMenu = handleContextMenuTranslation(payload, state, capabilities, sendResponse);
+        if (contextMenu !== undefined) return contextMenu;
         return false;
     };
 }

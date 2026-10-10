@@ -1,0 +1,4600 @@
+{
+  "extensionDir": "/private/tmp/fluentread-input-production-pr-integration-933-20261011",
+  "profileDir": "/var/folders/2v/qd62bpkx51scgbvv2nrclsxm0000gn/T/fluentread-real-editors-cLX5ka",
+  "evidence": "Production extension; real editors from esm.sh/jsdelivr; deterministic mock provider",
+  "editors": [
+    {
+      "name": "quill",
+      "model": "Let us meet tomorrow afternoon.",
+      "dom": "Let us meet tomorrow afternoon.",
+      "requestCount": 1,
+      "sourceSent": true,
+      "restoredModel": "Quill 富文本原文。",
+      "restoredDom": "Quill 富文本原文。",
+      "passed": true
+    },
+    {
+      "name": "pm",
+      "model": "Let us meet tomorrow afternoon.",
+      "dom": "Let us meet tomorrow afternoon.",
+      "requestCount": 1,
+      "sourceSent": true,
+      "restoredModel": "ProseMirror 富文本原文。",
+      "restoredDom": "ProseMirror 富文本原文。",
+      "passed": true
+    },
+    {
+      "name": "lexical",
+      "model": "Let us meet tomorrow afternoon.",
+      "dom": "Let us meet tomorrow afternoon.",
+      "requestCount": 1,
+      "sourceSent": true,
+      "restoredModel": "Lexical 富文本原文。",
+      "restoredDom": "Lexical 富文本原文。",
+      "passed": true
+    },
+    {
+      "name": "slate",
+      "model": "Let us meet tomorrow afternoon.",
+      "dom": "Let us meet tomorrow afternoon.",
+      "requestCount": 1,
+      "sourceSent": true,
+      "restoredModel": "Slate 富文本原文。",
+      "restoredDom": "Slate 富文本原文。",
+      "passed": true
+    },
+    {
+      "name": "draft",
+      "model": "Let us meet tomorrow afternoon.",
+      "dom": "Let us meet tomorrow afternoon.",
+      "requestCount": 1,
+      "sourceSent": true,
+      "restoredModel": "Draft.js 富文本原文。",
+      "restoredDom": "Draft.js 富文本原文。",
+      "passed": true
+    }
+  ],
+  "consoleErrors": [],
+  "slateFastCache": true,
+  "slateRepetitions": [
+    {
+      "cycle": 1,
+      "cacheEnabled": false,
+      "sourceBefore": {
+        "model": "Slate 富文本原文。",
+        "selection": {
+          "anchor": {
+            "path": [
+              0,
+              0
+            ],
+            "offset": 12
+          },
+          "focus": {
+            "path": [
+              0,
+              0
+            ],
+            "offset": 12
+          }
+        },
+        "domSelection": ""
+      },
+      "model": "Let us meet tomorrow afternoon.",
+      "dom": "Let us meet tomorrow afternoon.",
+      "requestCount": 1,
+      "cacheHit": false,
+      "sourceSent": true,
+      "restoredModel": "Slate 富文本原文。",
+      "restoredDom": "Slate 富文本原文。",
+      "passed": true
+    },
+    {
+      "cycle": 2,
+      "cacheEnabled": false,
+      "sourceBefore": {
+        "model": "Slate 富文本原文。",
+        "selection": {
+          "anchor": {
+            "path": [
+              0,
+              0
+            ],
+            "offset": 12
+          },
+          "focus": {
+            "path": [
+              0,
+              0
+            ],
+            "offset": 12
+          }
+        },
+        "domSelection": ""
+      },
+      "model": "Let us meet tomorrow afternoon.",
+      "dom": "Let us meet tomorrow afternoon.",
+      "requestCount": 1,
+      "cacheHit": false,
+      "sourceSent": true,
+      "restoredModel": "Slate 富文本原文。",
+      "restoredDom": "Slate 富文本原文。",
+      "passed": true
+    },
+    {
+      "cycle": 3,
+      "cacheEnabled": false,
+      "sourceBefore": {
+        "model": "Slate 富文本原文。",
+        "selection": {
+          "anchor": {
+            "path": [
+              0,
+              0
+            ],
+            "offset": 12
+          },
+          "focus": {
+            "path": [
+              0,
+              0
+            ],
+            "offset": 12
+          }
+        },
+        "domSelection": ""
+      },
+      "model": "Let us meet tomorrow afternoon.",
+      "dom": "Let us meet tomorrow afternoon.",
+      "requestCount": 1,
+      "cacheHit": false,
+      "sourceSent": true,
+      "restoredModel": "Slate 富文本原文。",
+      "restoredDom": "Slate 富文本原文。",
+      "passed": true
+    },
+    {
+      "cycle": 4,
+      "cacheEnabled": true,
+      "sourceBefore": {
+        "model": "Slate 富文本原文。",
+        "selection": {
+          "anchor": {
+            "path": [
+              0,
+              0
+            ],
+            "offset": 12
+          },
+          "focus": {
+            "path": [
+              0,
+              0
+            ],
+            "offset": 12
+          }
+        },
+        "domSelection": ""
+      },
+      "model": "Let us meet tomorrow afternoon.",
+      "dom": "Let us meet tomorrow afternoon.",
+      "requestCount": 1,
+      "cacheHit": false,
+      "sourceSent": true,
+      "restoredModel": "Slate 富文本原文。",
+      "restoredDom": "Slate 富文本原文。",
+      "passed": true
+    },
+    {
+      "cycle": 5,
+      "cacheEnabled": true,
+      "sourceBefore": {
+        "model": "Slate 富文本原文。",
+        "selection": {
+          "anchor": {
+            "path": [
+              0,
+              0
+            ],
+            "offset": 12
+          },
+          "focus": {
+            "path": [
+              0,
+              0
+            ],
+            "offset": 12
+          }
+        },
+        "domSelection": ""
+      },
+      "model": "Let us meet tomorrow afternoon.",
+      "dom": "Let us meet tomorrow afternoon.",
+      "requestCount": 0,
+      "cacheHit": true,
+      "restoredModel": "Slate 富文本原文。",
+      "restoredDom": "Slate 富文本原文。",
+      "passed": true
+    }
+  ],
+  "launchMode": "macos-background-cdp",
+  "focusPolicy": "launchservices-no-foreground",
+  "windowPlacement": {
+    "mode": "background-visible-no-focus",
+    "visible": true,
+    "hidden": false,
+    "centered": true,
+    "windowState": "normal",
+    "bounds": {
+      "left": 212,
+      "top": -990,
+      "width": 1280,
+      "height": 900
+    },
+    "displayTarget": "secondary",
+    "source": "macos-nsscreen",
+    "screenIndex": 1,
+    "browserFrontmost": false,
+    "frontmostBefore": {
+      "pid": 73685,
+      "name": "ChatGPT"
+    },
+    "frontmostAfter": {
+      "pid": 73685,
+      "name": "ChatGPT"
+    }
+  },
+  "slateCacheConfig": {
+    "success": true,
+    "revision": 3
+  },
+  "slateInputEvents": [
+    {
+      "type": "selectionchange",
+      "capture": true,
+      "time": 11140.200000286102,
+      "defaultPrevented": false,
+      "model": "Slate 富文本原文。",
+      "modelSelection": null,
+      "domSelection": "",
+      "dom": "Slate 富文本原文。"
+    },
+    {
+      "type": "selectionchange",
+      "capture": false,
+      "time": 11140.400000095367,
+      "defaultPrevented": false,
+      "model": "Slate 富文本原文。",
+      "modelSelection": null,
+      "domSelection": "",
+      "dom": "Slate 富文本原文。"
+    },
+    {
+      "type": "beforeinput",
+      "capture": true,
+      "time": 11294.800000190735,
+      "inputType": "insertText",
+      "defaultPrevented": false,
+      "targetRanges": 1,
+      "model": "Slate 富文本原文。",
+      "modelSelection": {
+        "anchor": {
+          "path": [
+            0,
+            0
+          ],
+          "offset": 12
+        },
+        "focus": {
+          "path": [
+            0,
+            0
+          ],
+          "offset": 12
+        }
+      },
+      "domSelection": "",
+      "dom": "Slate 富文本原文。"
+    },
+    {
+      "type": "beforeinput",
+      "capture": false,
+      "time": 11299.700000286102,
+      "inputType": "insertText",
+      "defaultPrevented": true,
+      "targetRanges": 1,
+      "model": "Slate 富文本原文。=",
+      "modelSelection": {
+        "anchor": {
+          "path": [
+            0,
+            0
+          ],
+          "offset": 13
+        },
+        "focus": {
+          "path": [
+            0,
+            0
+          ],
+          "offset": 13
+        }
+      },
+      "domSelection": "",
+      "dom": "Slate 富文本原文。="
+    },
+    {
+      "type": "selectionchange",
+      "capture": true,
+      "time": 11300.300000190735,
+      "defaultPrevented": false,
+      "model": "Slate 富文本原文。=",
+      "modelSelection": {
+        "anchor": {
+          "path": [
+            0,
+            0
+          ],
+          "offset": 13
+        },
+        "focus": {
+          "path": [
+            0,
+            0
+          ],
+          "offset": 13
+        }
+      },
+      "domSelection": "",
+      "dom": "Slate 富文本原文。="
+    },
+    {
+      "type": "selectionchange",
+      "capture": false,
+      "time": 11300.400000095367,
+      "defaultPrevented": false,
+      "model": "Slate 富文本原文。=",
+      "modelSelection": {
+        "anchor": {
+          "path": [
+            0,
+            0
+          ],
+          "offset": 13
+        },
+        "focus": {
+          "path": [
+            0,
+            0
+          ],
+          "offset": 13
+        }
+      },
+      "domSelection": "",
+      "dom": "Slate 富文本原文。="
+    },
+    {
+      "type": "beforeinput",
+      "capture": true,
+      "time": 11383.400000095367,
+      "inputType": "insertText",
+      "defaultPrevented": false,
+      "targetRanges": 1,
+      "model": "Slate 富文本原文。=",
+      "modelSelection": {
+        "anchor": {
+          "path": [
+            0,
+            0
+          ],
+          "offset": 13
+        },
+        "focus": {
+          "path": [
+            0,
+            0
+          ],
+          "offset": 13
+        }
+      },
+      "domSelection": "",
+      "dom": "Slate 富文本原文。="
+    },
+    {
+      "type": "beforeinput",
+      "capture": false,
+      "time": 11388.10000038147,
+      "inputType": "insertText",
+      "defaultPrevented": true,
+      "targetRanges": 1,
+      "model": "Slate 富文本原文。==",
+      "modelSelection": {
+        "anchor": {
+          "path": [
+            0,
+            0
+          ],
+          "offset": 14
+        },
+        "focus": {
+          "path": [
+            0,
+            0
+          ],
+          "offset": 14
+        }
+      },
+      "domSelection": "",
+      "dom": "Slate 富文本原文。=="
+    },
+    {
+      "type": "selectionchange",
+      "capture": true,
+      "time": 11388.60000038147,
+      "defaultPrevented": false,
+      "model": "Slate 富文本原文。==",
+      "modelSelection": {
+        "anchor": {
+          "path": [
+            0,
+            0
+          ],
+          "offset": 14
+        },
+        "focus": {
+          "path": [
+            0,
+            0
+          ],
+          "offset": 14
+        }
+      },
+      "domSelection": "",
+      "dom": "Slate 富文本原文。=="
+    },
+    {
+      "type": "selectionchange",
+      "capture": false,
+      "time": 11388.800000190735,
+      "defaultPrevented": false,
+      "model": "Slate 富文本原文。==",
+      "modelSelection": {
+        "anchor": {
+          "path": [
+            0,
+            0
+          ],
+          "offset": 14
+        },
+        "focus": {
+          "path": [
+            0,
+            0
+          ],
+          "offset": 14
+        }
+      },
+      "domSelection": "",
+      "dom": "Slate 富文本原文。=="
+    },
+    {
+      "type": "selectionchange",
+      "capture": true,
+      "time": 11474.200000286102,
+      "defaultPrevented": false,
+      "model": "Slate 富文本原文。==",
+      "modelSelection": {
+        "anchor": {
+          "path": [
+            0,
+            0
+          ],
+          "offset": 14
+        },
+        "focus": {
+          "path": [
+            0,
+            0
+          ],
+          "offset": 14
+        }
+      },
+      "domSelection": "==",
+      "dom": "Slate 富文本原文。=="
+    },
+    {
+      "type": "selectionchange",
+      "capture": false,
+      "time": 11474.5,
+      "defaultPrevented": false,
+      "model": "Slate 富文本原文。==",
+      "modelSelection": {
+        "anchor": {
+          "path": [
+            0,
+            0
+          ],
+          "offset": 14
+        },
+        "focus": {
+          "path": [
+            0,
+            0
+          ],
+          "offset": 14
+        }
+      },
+      "domSelection": "==",
+      "dom": "Slate 富文本原文。=="
+    },
+    {
+      "type": "beforeinput",
+      "capture": true,
+      "time": 11493.300000190735,
+      "inputType": "deleteContentBackward",
+      "defaultPrevented": false,
+      "targetRanges": 1,
+      "model": "Slate 富文本原文。==",
+      "modelSelection": {
+        "anchor": {
+          "path": [
+            0,
+            0
+          ],
+          "offset": 14
+        },
+        "focus": {
+          "path": [
+            0,
+            0
+          ],
+          "offset": 14
+        }
+      },
+      "domSelection": "==",
+      "dom": "Slate 富文本原文。=="
+    },
+    {
+      "type": "beforeinput",
+      "capture": false,
+      "time": 11494.400000095367,
+      "inputType": "deleteContentBackward",
+      "defaultPrevented": true,
+      "targetRanges": 1,
+      "model": "Slate 富文本原文。",
+      "modelSelection": {
+        "anchor": {
+          "path": [
+            0,
+            0
+          ],
+          "offset": 12
+        },
+        "focus": {
+          "path": [
+            0,
+            0
+          ],
+          "offset": 12
+        }
+      },
+      "domSelection": "==",
+      "dom": "Slate 富文本原文。=="
+    },
+    {
+      "type": "selectionchange",
+      "capture": true,
+      "time": 11495.700000286102,
+      "defaultPrevented": false,
+      "model": "Slate 富文本原文。",
+      "modelSelection": {
+        "anchor": {
+          "path": [
+            0,
+            0
+          ],
+          "offset": 12
+        },
+        "focus": {
+          "path": [
+            0,
+            0
+          ],
+          "offset": 12
+        }
+      },
+      "domSelection": "",
+      "dom": "Slate 富文本原文。"
+    },
+    {
+      "type": "selectionchange",
+      "capture": false,
+      "time": 11495.800000190735,
+      "defaultPrevented": false,
+      "model": "Slate 富文本原文。",
+      "modelSelection": {
+        "anchor": {
+          "path": [
+            0,
+            0
+          ],
+          "offset": 12
+        },
+        "focus": {
+          "path": [
+            0,
+            0
+          ],
+          "offset": 12
+        }
+      },
+      "domSelection": "",
+      "dom": "Slate 富文本原文。"
+    },
+    {
+      "type": "selectionchange",
+      "capture": true,
+      "time": 11499.5,
+      "defaultPrevented": false,
+      "model": "Slate 富文本原文。",
+      "modelSelection": {
+        "anchor": {
+          "path": [
+            0,
+            0
+          ],
+          "offset": 12
+        },
+        "focus": {
+          "path": [
+            0,
+            0
+          ],
+          "offset": 12
+        }
+      },
+      "domSelection": "Slate 富文本原文。",
+      "dom": "Slate 富文本原文。"
+    },
+    {
+      "type": "selectionchange",
+      "capture": false,
+      "time": 11499.5,
+      "defaultPrevented": false,
+      "model": "Slate 富文本原文。",
+      "modelSelection": {
+        "anchor": {
+          "path": [
+            0,
+            0
+          ],
+          "offset": 12
+        },
+        "focus": {
+          "path": [
+            0,
+            0
+          ],
+          "offset": 12
+        }
+      },
+      "domSelection": "Slate 富文本原文。",
+      "dom": "Slate 富文本原文。"
+    },
+    {
+      "type": "beforeinput",
+      "capture": true,
+      "time": 11516.400000095367,
+      "inputType": "insertText",
+      "defaultPrevented": false,
+      "targetRanges": 1,
+      "model": "Slate 富文本原文。",
+      "modelSelection": {
+        "anchor": {
+          "path": [
+            0,
+            0
+          ],
+          "offset": 12
+        },
+        "focus": {
+          "path": [
+            0,
+            0
+          ],
+          "offset": 12
+        }
+      },
+      "domSelection": "Slate 富文本原文。",
+      "dom": "Slate 富文本原文。"
+    },
+    {
+      "type": "beforeinput",
+      "capture": false,
+      "time": 11517.5,
+      "inputType": "insertText",
+      "defaultPrevented": true,
+      "targetRanges": 1,
+      "model": "Let us meet tomorrow afternoon.",
+      "modelSelection": {
+        "anchor": {
+          "path": [
+            0,
+            0
+          ],
+          "offset": 31
+        },
+        "focus": {
+          "path": [
+            0,
+            0
+          ],
+          "offset": 31
+        }
+      },
+      "domSelection": "Slate 富文本原文。",
+      "dom": "Slate 富文本原文。"
+    },
+    {
+      "type": "selectionchange",
+      "capture": true,
+      "time": 11520.200000286102,
+      "defaultPrevented": false,
+      "model": "Let us meet tomorrow afternoon.",
+      "modelSelection": {
+        "anchor": {
+          "path": [
+            0,
+            0
+          ],
+          "offset": 31
+        },
+        "focus": {
+          "path": [
+            0,
+            0
+          ],
+          "offset": 31
+        }
+      },
+      "domSelection": "",
+      "dom": "Let us meet tomorrow afternoon."
+    },
+    {
+      "type": "selectionchange",
+      "capture": false,
+      "time": 11520.5,
+      "defaultPrevented": false,
+      "model": "Let us meet tomorrow afternoon.",
+      "modelSelection": {
+        "anchor": {
+          "path": [
+            0,
+            0
+          ],
+          "offset": 31
+        },
+        "focus": {
+          "path": [
+            0,
+            0
+          ],
+          "offset": 31
+        }
+      },
+      "domSelection": "",
+      "dom": "Let us meet tomorrow afternoon."
+    },
+    {
+      "type": "selectionchange",
+      "capture": true,
+      "time": 12413.400000095367,
+      "defaultPrevented": false,
+      "model": "Let us meet tomorrow afternoon.",
+      "modelSelection": {
+        "anchor": {
+          "path": [
+            0,
+            0
+          ],
+          "offset": 31
+        },
+        "focus": {
+          "path": [
+            0,
+            0
+          ],
+          "offset": 31
+        }
+      },
+      "domSelection": "Let us meet tomorrow afternoon.",
+      "dom": "Let us meet tomorrow afternoon."
+    },
+    {
+      "type": "selectionchange",
+      "capture": false,
+      "time": 12413.400000095367,
+      "defaultPrevented": false,
+      "model": "Let us meet tomorrow afternoon.",
+      "modelSelection": {
+        "anchor": {
+          "path": [
+            0,
+            0
+          ],
+          "offset": 31
+        },
+        "focus": {
+          "path": [
+            0,
+            0
+          ],
+          "offset": 31
+        }
+      },
+      "domSelection": "Let us meet tomorrow afternoon.",
+      "dom": "Let us meet tomorrow afternoon."
+    },
+    {
+      "type": "selectionchange",
+      "capture": true,
+      "time": 12414.400000095367,
+      "defaultPrevented": false,
+      "model": "Let us meet tomorrow afternoon.",
+      "modelSelection": {
+        "anchor": {
+          "path": [
+            0,
+            0
+          ],
+          "offset": 0
+        },
+        "focus": {
+          "path": [
+            0,
+            0
+          ],
+          "offset": 31
+        }
+      },
+      "domSelection": "Let us meet tomorrow afternoon.",
+      "dom": "Let us meet tomorrow afternoon."
+    },
+    {
+      "type": "selectionchange",
+      "capture": false,
+      "time": 12414.400000095367,
+      "defaultPrevented": false,
+      "model": "Let us meet tomorrow afternoon.",
+      "modelSelection": {
+        "anchor": {
+          "path": [
+            0,
+            0
+          ],
+          "offset": 0
+        },
+        "focus": {
+          "path": [
+            0,
+            0
+          ],
+          "offset": 31
+        }
+      },
+      "domSelection": "Let us meet tomorrow afternoon.",
+      "dom": "Let us meet tomorrow afternoon."
+    },
+    {
+      "type": "beforeinput",
+      "capture": true,
+      "time": 12433.700000286102,
+      "inputType": "insertText",
+      "defaultPrevented": false,
+      "targetRanges": 1,
+      "model": "Let us meet tomorrow afternoon.",
+      "modelSelection": {
+        "anchor": {
+          "path": [
+            0,
+            0
+          ],
+          "offset": 0
+        },
+        "focus": {
+          "path": [
+            0,
+            0
+          ],
+          "offset": 31
+        }
+      },
+      "domSelection": "Let us meet tomorrow afternoon.",
+      "dom": "Let us meet tomorrow afternoon."
+    },
+    {
+      "type": "beforeinput",
+      "capture": false,
+      "time": 12436.10000038147,
+      "inputType": "insertText",
+      "defaultPrevented": true,
+      "targetRanges": 1,
+      "model": "Slate 富文本原文。",
+      "modelSelection": {
+        "anchor": {
+          "path": [
+            0,
+            0
+          ],
+          "offset": 12
+        },
+        "focus": {
+          "path": [
+            0,
+            0
+          ],
+          "offset": 12
+        }
+      },
+      "domSelection": "Let us meet tomorrow afternoon.",
+      "dom": "Let us meet tomorrow afternoon."
+    },
+    {
+      "type": "selectionchange",
+      "capture": true,
+      "time": 12438,
+      "defaultPrevented": false,
+      "model": "Slate 富文本原文。",
+      "modelSelection": {
+        "anchor": {
+          "path": [
+            0,
+            0
+          ],
+          "offset": 12
+        },
+        "focus": {
+          "path": [
+            0,
+            0
+          ],
+          "offset": 12
+        }
+      },
+      "domSelection": "",
+      "dom": "Slate 富文本原文。"
+    },
+    {
+      "type": "selectionchange",
+      "capture": false,
+      "time": 12438.200000286102,
+      "defaultPrevented": false,
+      "model": "Slate 富文本原文。",
+      "modelSelection": {
+        "anchor": {
+          "path": [
+            0,
+            0
+          ],
+          "offset": 12
+        },
+        "focus": {
+          "path": [
+            0,
+            0
+          ],
+          "offset": 12
+        }
+      },
+      "domSelection": "",
+      "dom": "Slate 富文本原文。"
+    },
+    {
+      "type": "selectionchange",
+      "capture": true,
+      "time": 13857.400000095367,
+      "defaultPrevented": false,
+      "model": "Slate 富文本原文。",
+      "modelSelection": {
+        "anchor": {
+          "path": [
+            0,
+            0
+          ],
+          "offset": 12
+        },
+        "focus": {
+          "path": [
+            0,
+            0
+          ],
+          "offset": 12
+        }
+      },
+      "domSelection": "",
+      "dom": "Slate 富文本原文。"
+    },
+    {
+      "type": "selectionchange",
+      "capture": false,
+      "time": 13857.5,
+      "defaultPrevented": false,
+      "model": "Slate 富文本原文。",
+      "modelSelection": {
+        "anchor": {
+          "path": [
+            0,
+            0
+          ],
+          "offset": 12
+        },
+        "focus": {
+          "path": [
+            0,
+            0
+          ],
+          "offset": 12
+        }
+      },
+      "domSelection": "",
+      "dom": "Slate 富文本原文。"
+    },
+    {
+      "type": "beforeinput",
+      "capture": true,
+      "time": 13859.700000286102,
+      "inputType": "insertText",
+      "defaultPrevented": false,
+      "targetRanges": 1,
+      "model": "Slate 富文本原文。",
+      "modelSelection": {
+        "anchor": {
+          "path": [
+            0,
+            0
+          ],
+          "offset": 12
+        },
+        "focus": {
+          "path": [
+            0,
+            0
+          ],
+          "offset": 12
+        }
+      },
+      "domSelection": "",
+      "dom": "Slate 富文本原文。"
+    },
+    {
+      "type": "beforeinput",
+      "capture": false,
+      "time": 13860.800000190735,
+      "inputType": "insertText",
+      "defaultPrevented": true,
+      "targetRanges": 1,
+      "model": "Slate 富文本原文。=",
+      "modelSelection": {
+        "anchor": {
+          "path": [
+            0,
+            0
+          ],
+          "offset": 13
+        },
+        "focus": {
+          "path": [
+            0,
+            0
+          ],
+          "offset": 13
+        }
+      },
+      "domSelection": "",
+      "dom": "Slate 富文本原文。="
+    },
+    {
+      "type": "selectionchange",
+      "capture": true,
+      "time": 13861,
+      "defaultPrevented": false,
+      "model": "Slate 富文本原文。=",
+      "modelSelection": {
+        "anchor": {
+          "path": [
+            0,
+            0
+          ],
+          "offset": 13
+        },
+        "focus": {
+          "path": [
+            0,
+            0
+          ],
+          "offset": 13
+        }
+      },
+      "domSelection": "",
+      "dom": "Slate 富文本原文。="
+    },
+    {
+      "type": "selectionchange",
+      "capture": false,
+      "time": 13861,
+      "defaultPrevented": false,
+      "model": "Slate 富文本原文。=",
+      "modelSelection": {
+        "anchor": {
+          "path": [
+            0,
+            0
+          ],
+          "offset": 13
+        },
+        "focus": {
+          "path": [
+            0,
+            0
+          ],
+          "offset": 13
+        }
+      },
+      "domSelection": "",
+      "dom": "Slate 富文本原文。="
+    },
+    {
+      "type": "beforeinput",
+      "capture": true,
+      "time": 13862.300000190735,
+      "inputType": "insertText",
+      "defaultPrevented": false,
+      "targetRanges": 1,
+      "model": "Slate 富文本原文。=",
+      "modelSelection": {
+        "anchor": {
+          "path": [
+            0,
+            0
+          ],
+          "offset": 13
+        },
+        "focus": {
+          "path": [
+            0,
+            0
+          ],
+          "offset": 13
+        }
+      },
+      "domSelection": "",
+      "dom": "Slate 富文本原文。="
+    },
+    {
+      "type": "beforeinput",
+      "capture": false,
+      "time": 13863.10000038147,
+      "inputType": "insertText",
+      "defaultPrevented": true,
+      "targetRanges": 1,
+      "model": "Slate 富文本原文。==",
+      "modelSelection": {
+        "anchor": {
+          "path": [
+            0,
+            0
+          ],
+          "offset": 14
+        },
+        "focus": {
+          "path": [
+            0,
+            0
+          ],
+          "offset": 14
+        }
+      },
+      "domSelection": "",
+      "dom": "Slate 富文本原文。=="
+    },
+    {
+      "type": "selectionchange",
+      "capture": true,
+      "time": 13863.200000286102,
+      "defaultPrevented": false,
+      "model": "Slate 富文本原文。==",
+      "modelSelection": {
+        "anchor": {
+          "path": [
+            0,
+            0
+          ],
+          "offset": 14
+        },
+        "focus": {
+          "path": [
+            0,
+            0
+          ],
+          "offset": 14
+        }
+      },
+      "domSelection": "",
+      "dom": "Slate 富文本原文。=="
+    },
+    {
+      "type": "selectionchange",
+      "capture": false,
+      "time": 13863.200000286102,
+      "defaultPrevented": false,
+      "model": "Slate 富文本原文。==",
+      "modelSelection": {
+        "anchor": {
+          "path": [
+            0,
+            0
+          ],
+          "offset": 14
+        },
+        "focus": {
+          "path": [
+            0,
+            0
+          ],
+          "offset": 14
+        }
+      },
+      "domSelection": "",
+      "dom": "Slate 富文本原文。=="
+    },
+    {
+      "type": "selectionchange",
+      "capture": true,
+      "time": 13864.900000095367,
+      "defaultPrevented": false,
+      "model": "Slate 富文本原文。==",
+      "modelSelection": {
+        "anchor": {
+          "path": [
+            0,
+            0
+          ],
+          "offset": 14
+        },
+        "focus": {
+          "path": [
+            0,
+            0
+          ],
+          "offset": 14
+        }
+      },
+      "domSelection": "==",
+      "dom": "Slate 富文本原文。=="
+    },
+    {
+      "type": "selectionchange",
+      "capture": false,
+      "time": 13865,
+      "defaultPrevented": false,
+      "model": "Slate 富文本原文。==",
+      "modelSelection": {
+        "anchor": {
+          "path": [
+            0,
+            0
+          ],
+          "offset": 14
+        },
+        "focus": {
+          "path": [
+            0,
+            0
+          ],
+          "offset": 14
+        }
+      },
+      "domSelection": "==",
+      "dom": "Slate 富文本原文。=="
+    },
+    {
+      "type": "beforeinput",
+      "capture": true,
+      "time": 13882.400000095367,
+      "inputType": "deleteContentBackward",
+      "defaultPrevented": false,
+      "targetRanges": 1,
+      "model": "Slate 富文本原文。==",
+      "modelSelection": {
+        "anchor": {
+          "path": [
+            0,
+            0
+          ],
+          "offset": 14
+        },
+        "focus": {
+          "path": [
+            0,
+            0
+          ],
+          "offset": 14
+        }
+      },
+      "domSelection": "==",
+      "dom": "Slate 富文本原文。=="
+    },
+    {
+      "type": "beforeinput",
+      "capture": false,
+      "time": 13882.900000095367,
+      "inputType": "deleteContentBackward",
+      "defaultPrevented": true,
+      "targetRanges": 1,
+      "model": "Slate 富文本原文。",
+      "modelSelection": {
+        "anchor": {
+          "path": [
+            0,
+            0
+          ],
+          "offset": 12
+        },
+        "focus": {
+          "path": [
+            0,
+            0
+          ],
+          "offset": 12
+        }
+      },
+      "domSelection": "==",
+      "dom": "Slate 富文本原文。=="
+    },
+    {
+      "type": "selectionchange",
+      "capture": true,
+      "time": 13884.800000190735,
+      "defaultPrevented": false,
+      "model": "Slate 富文本原文。",
+      "modelSelection": {
+        "anchor": {
+          "path": [
+            0,
+            0
+          ],
+          "offset": 12
+        },
+        "focus": {
+          "path": [
+            0,
+            0
+          ],
+          "offset": 12
+        }
+      },
+      "domSelection": "",
+      "dom": "Slate 富文本原文。"
+    },
+    {
+      "type": "selectionchange",
+      "capture": false,
+      "time": 13884.900000095367,
+      "defaultPrevented": false,
+      "model": "Slate 富文本原文。",
+      "modelSelection": {
+        "anchor": {
+          "path": [
+            0,
+            0
+          ],
+          "offset": 12
+        },
+        "focus": {
+          "path": [
+            0,
+            0
+          ],
+          "offset": 12
+        }
+      },
+      "domSelection": "",
+      "dom": "Slate 富文本原文。"
+    },
+    {
+      "type": "selectionchange",
+      "capture": true,
+      "time": 13892.700000286102,
+      "defaultPrevented": false,
+      "model": "Slate 富文本原文。",
+      "modelSelection": {
+        "anchor": {
+          "path": [
+            0,
+            0
+          ],
+          "offset": 12
+        },
+        "focus": {
+          "path": [
+            0,
+            0
+          ],
+          "offset": 12
+        }
+      },
+      "domSelection": "Slate 富文本原文。",
+      "dom": "Slate 富文本原文。"
+    },
+    {
+      "type": "selectionchange",
+      "capture": false,
+      "time": 13892.800000190735,
+      "defaultPrevented": false,
+      "model": "Slate 富文本原文。",
+      "modelSelection": {
+        "anchor": {
+          "path": [
+            0,
+            0
+          ],
+          "offset": 12
+        },
+        "focus": {
+          "path": [
+            0,
+            0
+          ],
+          "offset": 12
+        }
+      },
+      "domSelection": "Slate 富文本原文。",
+      "dom": "Slate 富文本原文。"
+    },
+    {
+      "type": "beforeinput",
+      "capture": true,
+      "time": 13910.800000190735,
+      "inputType": "insertText",
+      "defaultPrevented": false,
+      "targetRanges": 1,
+      "model": "Slate 富文本原文。",
+      "modelSelection": {
+        "anchor": {
+          "path": [
+            0,
+            0
+          ],
+          "offset": 12
+        },
+        "focus": {
+          "path": [
+            0,
+            0
+          ],
+          "offset": 12
+        }
+      },
+      "domSelection": "Slate 富文本原文。",
+      "dom": "Slate 富文本原文。"
+    },
+    {
+      "type": "beforeinput",
+      "capture": false,
+      "time": 13911.700000286102,
+      "inputType": "insertText",
+      "defaultPrevented": true,
+      "targetRanges": 1,
+      "model": "Let us meet tomorrow afternoon.",
+      "modelSelection": {
+        "anchor": {
+          "path": [
+            0,
+            0
+          ],
+          "offset": 31
+        },
+        "focus": {
+          "path": [
+            0,
+            0
+          ],
+          "offset": 31
+        }
+      },
+      "domSelection": "Slate 富文本原文。",
+      "dom": "Slate 富文本原文。"
+    },
+    {
+      "type": "selectionchange",
+      "capture": true,
+      "time": 13913,
+      "defaultPrevented": false,
+      "model": "Let us meet tomorrow afternoon.",
+      "modelSelection": {
+        "anchor": {
+          "path": [
+            0,
+            0
+          ],
+          "offset": 31
+        },
+        "focus": {
+          "path": [
+            0,
+            0
+          ],
+          "offset": 31
+        }
+      },
+      "domSelection": "",
+      "dom": "Let us meet tomorrow afternoon."
+    },
+    {
+      "type": "selectionchange",
+      "capture": false,
+      "time": 13913.200000286102,
+      "defaultPrevented": false,
+      "model": "Let us meet tomorrow afternoon.",
+      "modelSelection": {
+        "anchor": {
+          "path": [
+            0,
+            0
+          ],
+          "offset": 31
+        },
+        "focus": {
+          "path": [
+            0,
+            0
+          ],
+          "offset": 31
+        }
+      },
+      "domSelection": "",
+      "dom": "Let us meet tomorrow afternoon."
+    },
+    {
+      "type": "selectionchange",
+      "capture": true,
+      "time": 13930.900000095367,
+      "defaultPrevented": false,
+      "model": "Let us meet tomorrow afternoon.",
+      "modelSelection": {
+        "anchor": {
+          "path": [
+            0,
+            0
+          ],
+          "offset": 31
+        },
+        "focus": {
+          "path": [
+            0,
+            0
+          ],
+          "offset": 31
+        }
+      },
+      "domSelection": "Let us meet tomorrow afternoon.",
+      "dom": "Let us meet tomorrow afternoon."
+    },
+    {
+      "type": "selectionchange",
+      "capture": false,
+      "time": 13930.900000095367,
+      "defaultPrevented": false,
+      "model": "Let us meet tomorrow afternoon.",
+      "modelSelection": {
+        "anchor": {
+          "path": [
+            0,
+            0
+          ],
+          "offset": 31
+        },
+        "focus": {
+          "path": [
+            0,
+            0
+          ],
+          "offset": 31
+        }
+      },
+      "domSelection": "Let us meet tomorrow afternoon.",
+      "dom": "Let us meet tomorrow afternoon."
+    },
+    {
+      "type": "beforeinput",
+      "capture": true,
+      "time": 13949.10000038147,
+      "inputType": "insertText",
+      "defaultPrevented": false,
+      "targetRanges": 1,
+      "model": "Let us meet tomorrow afternoon.",
+      "modelSelection": {
+        "anchor": {
+          "path": [
+            0,
+            0
+          ],
+          "offset": 31
+        },
+        "focus": {
+          "path": [
+            0,
+            0
+          ],
+          "offset": 31
+        }
+      },
+      "domSelection": "Let us meet tomorrow afternoon.",
+      "dom": "Let us meet tomorrow afternoon."
+    },
+    {
+      "type": "beforeinput",
+      "capture": false,
+      "time": 13949.900000095367,
+      "inputType": "insertText",
+      "defaultPrevented": true,
+      "targetRanges": 1,
+      "model": "Slate 富文本原文。",
+      "modelSelection": {
+        "anchor": {
+          "path": [
+            0,
+            0
+          ],
+          "offset": 12
+        },
+        "focus": {
+          "path": [
+            0,
+            0
+          ],
+          "offset": 12
+        }
+      },
+      "domSelection": "Let us meet tomorrow afternoon.",
+      "dom": "Let us meet tomorrow afternoon."
+    },
+    {
+      "type": "selectionchange",
+      "capture": true,
+      "time": 13951.5,
+      "defaultPrevented": false,
+      "model": "Slate 富文本原文。",
+      "modelSelection": {
+        "anchor": {
+          "path": [
+            0,
+            0
+          ],
+          "offset": 12
+        },
+        "focus": {
+          "path": [
+            0,
+            0
+          ],
+          "offset": 12
+        }
+      },
+      "domSelection": "",
+      "dom": "Slate 富文本原文。"
+    },
+    {
+      "type": "selectionchange",
+      "capture": false,
+      "time": 13951.700000286102,
+      "defaultPrevented": false,
+      "model": "Slate 富文本原文。",
+      "modelSelection": {
+        "anchor": {
+          "path": [
+            0,
+            0
+          ],
+          "offset": 12
+        },
+        "focus": {
+          "path": [
+            0,
+            0
+          ],
+          "offset": 12
+        }
+      },
+      "domSelection": "",
+      "dom": "Slate 富文本原文。"
+    },
+    {
+      "type": "selectionchange",
+      "capture": true,
+      "time": 13986.200000286102,
+      "defaultPrevented": false,
+      "model": "Slate 富文本原文。",
+      "modelSelection": {
+        "anchor": {
+          "path": [
+            0,
+            0
+          ],
+          "offset": 12
+        },
+        "focus": {
+          "path": [
+            0,
+            0
+          ],
+          "offset": 12
+        }
+      },
+      "domSelection": "",
+      "dom": "Slate 富文本原文。"
+    },
+    {
+      "type": "selectionchange",
+      "capture": false,
+      "time": 13986.300000190735,
+      "defaultPrevented": false,
+      "model": "Slate 富文本原文。",
+      "modelSelection": {
+        "anchor": {
+          "path": [
+            0,
+            0
+          ],
+          "offset": 12
+        },
+        "focus": {
+          "path": [
+            0,
+            0
+          ],
+          "offset": 12
+        }
+      },
+      "domSelection": "",
+      "dom": "Slate 富文本原文。"
+    },
+    {
+      "type": "beforeinput",
+      "capture": true,
+      "time": 13988.10000038147,
+      "inputType": "insertText",
+      "defaultPrevented": false,
+      "targetRanges": 1,
+      "model": "Slate 富文本原文。",
+      "modelSelection": {
+        "anchor": {
+          "path": [
+            0,
+            0
+          ],
+          "offset": 12
+        },
+        "focus": {
+          "path": [
+            0,
+            0
+          ],
+          "offset": 12
+        }
+      },
+      "domSelection": "",
+      "dom": "Slate 富文本原文。"
+    },
+    {
+      "type": "beforeinput",
+      "capture": false,
+      "time": 13989,
+      "inputType": "insertText",
+      "defaultPrevented": true,
+      "targetRanges": 1,
+      "model": "Slate 富文本原文。=",
+      "modelSelection": {
+        "anchor": {
+          "path": [
+            0,
+            0
+          ],
+          "offset": 13
+        },
+        "focus": {
+          "path": [
+            0,
+            0
+          ],
+          "offset": 13
+        }
+      },
+      "domSelection": "",
+      "dom": "Slate 富文本原文。="
+    },
+    {
+      "type": "selectionchange",
+      "capture": true,
+      "time": 13989,
+      "defaultPrevented": false,
+      "model": "Slate 富文本原文。=",
+      "modelSelection": {
+        "anchor": {
+          "path": [
+            0,
+            0
+          ],
+          "offset": 13
+        },
+        "focus": {
+          "path": [
+            0,
+            0
+          ],
+          "offset": 13
+        }
+      },
+      "domSelection": "",
+      "dom": "Slate 富文本原文。="
+    },
+    {
+      "type": "selectionchange",
+      "capture": false,
+      "time": 13989,
+      "defaultPrevented": false,
+      "model": "Slate 富文本原文。=",
+      "modelSelection": {
+        "anchor": {
+          "path": [
+            0,
+            0
+          ],
+          "offset": 13
+        },
+        "focus": {
+          "path": [
+            0,
+            0
+          ],
+          "offset": 13
+        }
+      },
+      "domSelection": "",
+      "dom": "Slate 富文本原文。="
+    },
+    {
+      "type": "beforeinput",
+      "capture": true,
+      "time": 13990.10000038147,
+      "inputType": "insertText",
+      "defaultPrevented": false,
+      "targetRanges": 1,
+      "model": "Slate 富文本原文。=",
+      "modelSelection": {
+        "anchor": {
+          "path": [
+            0,
+            0
+          ],
+          "offset": 13
+        },
+        "focus": {
+          "path": [
+            0,
+            0
+          ],
+          "offset": 13
+        }
+      },
+      "domSelection": "",
+      "dom": "Slate 富文本原文。="
+    },
+    {
+      "type": "beforeinput",
+      "capture": false,
+      "time": 13990.800000190735,
+      "inputType": "insertText",
+      "defaultPrevented": true,
+      "targetRanges": 1,
+      "model": "Slate 富文本原文。==",
+      "modelSelection": {
+        "anchor": {
+          "path": [
+            0,
+            0
+          ],
+          "offset": 14
+        },
+        "focus": {
+          "path": [
+            0,
+            0
+          ],
+          "offset": 14
+        }
+      },
+      "domSelection": "",
+      "dom": "Slate 富文本原文。=="
+    },
+    {
+      "type": "selectionchange",
+      "capture": true,
+      "time": 13990.800000190735,
+      "defaultPrevented": false,
+      "model": "Slate 富文本原文。==",
+      "modelSelection": {
+        "anchor": {
+          "path": [
+            0,
+            0
+          ],
+          "offset": 14
+        },
+        "focus": {
+          "path": [
+            0,
+            0
+          ],
+          "offset": 14
+        }
+      },
+      "domSelection": "",
+      "dom": "Slate 富文本原文。=="
+    },
+    {
+      "type": "selectionchange",
+      "capture": false,
+      "time": 13990.900000095367,
+      "defaultPrevented": false,
+      "model": "Slate 富文本原文。==",
+      "modelSelection": {
+        "anchor": {
+          "path": [
+            0,
+            0
+          ],
+          "offset": 14
+        },
+        "focus": {
+          "path": [
+            0,
+            0
+          ],
+          "offset": 14
+        }
+      },
+      "domSelection": "",
+      "dom": "Slate 富文本原文。=="
+    },
+    {
+      "type": "selectionchange",
+      "capture": true,
+      "time": 13992.300000190735,
+      "defaultPrevented": false,
+      "model": "Slate 富文本原文。==",
+      "modelSelection": {
+        "anchor": {
+          "path": [
+            0,
+            0
+          ],
+          "offset": 14
+        },
+        "focus": {
+          "path": [
+            0,
+            0
+          ],
+          "offset": 14
+        }
+      },
+      "domSelection": "==",
+      "dom": "Slate 富文本原文。=="
+    },
+    {
+      "type": "selectionchange",
+      "capture": false,
+      "time": 13992.300000190735,
+      "defaultPrevented": false,
+      "model": "Slate 富文本原文。==",
+      "modelSelection": {
+        "anchor": {
+          "path": [
+            0,
+            0
+          ],
+          "offset": 14
+        },
+        "focus": {
+          "path": [
+            0,
+            0
+          ],
+          "offset": 14
+        }
+      },
+      "domSelection": "==",
+      "dom": "Slate 富文本原文。=="
+    },
+    {
+      "type": "beforeinput",
+      "capture": true,
+      "time": 14010.700000286102,
+      "inputType": "deleteContentBackward",
+      "defaultPrevented": false,
+      "targetRanges": 1,
+      "model": "Slate 富文本原文。==",
+      "modelSelection": {
+        "anchor": {
+          "path": [
+            0,
+            0
+          ],
+          "offset": 14
+        },
+        "focus": {
+          "path": [
+            0,
+            0
+          ],
+          "offset": 14
+        }
+      },
+      "domSelection": "==",
+      "dom": "Slate 富文本原文。=="
+    },
+    {
+      "type": "beforeinput",
+      "capture": false,
+      "time": 14011.300000190735,
+      "inputType": "deleteContentBackward",
+      "defaultPrevented": true,
+      "targetRanges": 1,
+      "model": "Slate 富文本原文。",
+      "modelSelection": {
+        "anchor": {
+          "path": [
+            0,
+            0
+          ],
+          "offset": 12
+        },
+        "focus": {
+          "path": [
+            0,
+            0
+          ],
+          "offset": 12
+        }
+      },
+      "domSelection": "==",
+      "dom": "Slate 富文本原文。=="
+    },
+    {
+      "type": "selectionchange",
+      "capture": true,
+      "time": 14012.5,
+      "defaultPrevented": false,
+      "model": "Slate 富文本原文。",
+      "modelSelection": {
+        "anchor": {
+          "path": [
+            0,
+            0
+          ],
+          "offset": 12
+        },
+        "focus": {
+          "path": [
+            0,
+            0
+          ],
+          "offset": 12
+        }
+      },
+      "domSelection": "",
+      "dom": "Slate 富文本原文。"
+    },
+    {
+      "type": "selectionchange",
+      "capture": false,
+      "time": 14012.700000286102,
+      "defaultPrevented": false,
+      "model": "Slate 富文本原文。",
+      "modelSelection": {
+        "anchor": {
+          "path": [
+            0,
+            0
+          ],
+          "offset": 12
+        },
+        "focus": {
+          "path": [
+            0,
+            0
+          ],
+          "offset": 12
+        }
+      },
+      "domSelection": "",
+      "dom": "Slate 富文本原文。"
+    },
+    {
+      "type": "selectionchange",
+      "capture": true,
+      "time": 14020.200000286102,
+      "defaultPrevented": false,
+      "model": "Slate 富文本原文。",
+      "modelSelection": {
+        "anchor": {
+          "path": [
+            0,
+            0
+          ],
+          "offset": 12
+        },
+        "focus": {
+          "path": [
+            0,
+            0
+          ],
+          "offset": 12
+        }
+      },
+      "domSelection": "Slate 富文本原文。",
+      "dom": "Slate 富文本原文。"
+    },
+    {
+      "type": "selectionchange",
+      "capture": false,
+      "time": 14020.200000286102,
+      "defaultPrevented": false,
+      "model": "Slate 富文本原文。",
+      "modelSelection": {
+        "anchor": {
+          "path": [
+            0,
+            0
+          ],
+          "offset": 12
+        },
+        "focus": {
+          "path": [
+            0,
+            0
+          ],
+          "offset": 12
+        }
+      },
+      "domSelection": "Slate 富文本原文。",
+      "dom": "Slate 富文本原文。"
+    },
+    {
+      "type": "beforeinput",
+      "capture": true,
+      "time": 14038.400000095367,
+      "inputType": "insertText",
+      "defaultPrevented": false,
+      "targetRanges": 1,
+      "model": "Slate 富文本原文。",
+      "modelSelection": {
+        "anchor": {
+          "path": [
+            0,
+            0
+          ],
+          "offset": 12
+        },
+        "focus": {
+          "path": [
+            0,
+            0
+          ],
+          "offset": 12
+        }
+      },
+      "domSelection": "Slate 富文本原文。",
+      "dom": "Slate 富文本原文。"
+    },
+    {
+      "type": "beforeinput",
+      "capture": false,
+      "time": 14039,
+      "inputType": "insertText",
+      "defaultPrevented": true,
+      "targetRanges": 1,
+      "model": "Let us meet tomorrow afternoon.",
+      "modelSelection": {
+        "anchor": {
+          "path": [
+            0,
+            0
+          ],
+          "offset": 31
+        },
+        "focus": {
+          "path": [
+            0,
+            0
+          ],
+          "offset": 31
+        }
+      },
+      "domSelection": "Slate 富文本原文。",
+      "dom": "Slate 富文本原文。"
+    },
+    {
+      "type": "selectionchange",
+      "capture": true,
+      "time": 14040,
+      "defaultPrevented": false,
+      "model": "Let us meet tomorrow afternoon.",
+      "modelSelection": {
+        "anchor": {
+          "path": [
+            0,
+            0
+          ],
+          "offset": 31
+        },
+        "focus": {
+          "path": [
+            0,
+            0
+          ],
+          "offset": 31
+        }
+      },
+      "domSelection": "",
+      "dom": "Let us meet tomorrow afternoon."
+    },
+    {
+      "type": "selectionchange",
+      "capture": false,
+      "time": 14040.200000286102,
+      "defaultPrevented": false,
+      "model": "Let us meet tomorrow afternoon.",
+      "modelSelection": {
+        "anchor": {
+          "path": [
+            0,
+            0
+          ],
+          "offset": 31
+        },
+        "focus": {
+          "path": [
+            0,
+            0
+          ],
+          "offset": 31
+        }
+      },
+      "domSelection": "",
+      "dom": "Let us meet tomorrow afternoon."
+    },
+    {
+      "type": "selectionchange",
+      "capture": true,
+      "time": 14059.400000095367,
+      "defaultPrevented": false,
+      "model": "Let us meet tomorrow afternoon.",
+      "modelSelection": {
+        "anchor": {
+          "path": [
+            0,
+            0
+          ],
+          "offset": 31
+        },
+        "focus": {
+          "path": [
+            0,
+            0
+          ],
+          "offset": 31
+        }
+      },
+      "domSelection": "Let us meet tomorrow afternoon.",
+      "dom": "Let us meet tomorrow afternoon."
+    },
+    {
+      "type": "selectionchange",
+      "capture": false,
+      "time": 14059.400000095367,
+      "defaultPrevented": false,
+      "model": "Let us meet tomorrow afternoon.",
+      "modelSelection": {
+        "anchor": {
+          "path": [
+            0,
+            0
+          ],
+          "offset": 31
+        },
+        "focus": {
+          "path": [
+            0,
+            0
+          ],
+          "offset": 31
+        }
+      },
+      "domSelection": "Let us meet tomorrow afternoon.",
+      "dom": "Let us meet tomorrow afternoon."
+    },
+    {
+      "type": "beforeinput",
+      "capture": true,
+      "time": 14077.800000190735,
+      "inputType": "insertText",
+      "defaultPrevented": false,
+      "targetRanges": 1,
+      "model": "Let us meet tomorrow afternoon.",
+      "modelSelection": {
+        "anchor": {
+          "path": [
+            0,
+            0
+          ],
+          "offset": 31
+        },
+        "focus": {
+          "path": [
+            0,
+            0
+          ],
+          "offset": 31
+        }
+      },
+      "domSelection": "Let us meet tomorrow afternoon.",
+      "dom": "Let us meet tomorrow afternoon."
+    },
+    {
+      "type": "beforeinput",
+      "capture": false,
+      "time": 14078.400000095367,
+      "inputType": "insertText",
+      "defaultPrevented": true,
+      "targetRanges": 1,
+      "model": "Slate 富文本原文。",
+      "modelSelection": {
+        "anchor": {
+          "path": [
+            0,
+            0
+          ],
+          "offset": 12
+        },
+        "focus": {
+          "path": [
+            0,
+            0
+          ],
+          "offset": 12
+        }
+      },
+      "domSelection": "Let us meet tomorrow afternoon.",
+      "dom": "Let us meet tomorrow afternoon."
+    },
+    {
+      "type": "selectionchange",
+      "capture": true,
+      "time": 14079.200000286102,
+      "defaultPrevented": false,
+      "model": "Slate 富文本原文。",
+      "modelSelection": {
+        "anchor": {
+          "path": [
+            0,
+            0
+          ],
+          "offset": 12
+        },
+        "focus": {
+          "path": [
+            0,
+            0
+          ],
+          "offset": 12
+        }
+      },
+      "domSelection": "",
+      "dom": "Slate 富文本原文。"
+    },
+    {
+      "type": "selectionchange",
+      "capture": false,
+      "time": 14079.200000286102,
+      "defaultPrevented": false,
+      "model": "Slate 富文本原文。",
+      "modelSelection": {
+        "anchor": {
+          "path": [
+            0,
+            0
+          ],
+          "offset": 12
+        },
+        "focus": {
+          "path": [
+            0,
+            0
+          ],
+          "offset": 12
+        }
+      },
+      "domSelection": "",
+      "dom": "Slate 富文本原文。"
+    },
+    {
+      "type": "selectionchange",
+      "capture": true,
+      "time": 14119.300000190735,
+      "defaultPrevented": false,
+      "model": "Slate 富文本原文。",
+      "modelSelection": {
+        "anchor": {
+          "path": [
+            0,
+            0
+          ],
+          "offset": 12
+        },
+        "focus": {
+          "path": [
+            0,
+            0
+          ],
+          "offset": 12
+        }
+      },
+      "domSelection": "",
+      "dom": "Slate 富文本原文。"
+    },
+    {
+      "type": "selectionchange",
+      "capture": false,
+      "time": 14119.300000190735,
+      "defaultPrevented": false,
+      "model": "Slate 富文本原文。",
+      "modelSelection": {
+        "anchor": {
+          "path": [
+            0,
+            0
+          ],
+          "offset": 12
+        },
+        "focus": {
+          "path": [
+            0,
+            0
+          ],
+          "offset": 12
+        }
+      },
+      "domSelection": "",
+      "dom": "Slate 富文本原文。"
+    },
+    {
+      "type": "beforeinput",
+      "capture": true,
+      "time": 14121.300000190735,
+      "inputType": "insertText",
+      "defaultPrevented": false,
+      "targetRanges": 1,
+      "model": "Slate 富文本原文。",
+      "modelSelection": {
+        "anchor": {
+          "path": [
+            0,
+            0
+          ],
+          "offset": 12
+        },
+        "focus": {
+          "path": [
+            0,
+            0
+          ],
+          "offset": 12
+        }
+      },
+      "domSelection": "",
+      "dom": "Slate 富文本原文。"
+    },
+    {
+      "type": "beforeinput",
+      "capture": false,
+      "time": 14122.10000038147,
+      "inputType": "insertText",
+      "defaultPrevented": true,
+      "targetRanges": 1,
+      "model": "Slate 富文本原文。=",
+      "modelSelection": {
+        "anchor": {
+          "path": [
+            0,
+            0
+          ],
+          "offset": 13
+        },
+        "focus": {
+          "path": [
+            0,
+            0
+          ],
+          "offset": 13
+        }
+      },
+      "domSelection": "",
+      "dom": "Slate 富文本原文。="
+    },
+    {
+      "type": "selectionchange",
+      "capture": true,
+      "time": 14122.200000286102,
+      "defaultPrevented": false,
+      "model": "Slate 富文本原文。=",
+      "modelSelection": {
+        "anchor": {
+          "path": [
+            0,
+            0
+          ],
+          "offset": 13
+        },
+        "focus": {
+          "path": [
+            0,
+            0
+          ],
+          "offset": 13
+        }
+      },
+      "domSelection": "",
+      "dom": "Slate 富文本原文。="
+    },
+    {
+      "type": "selectionchange",
+      "capture": false,
+      "time": 14122.200000286102,
+      "defaultPrevented": false,
+      "model": "Slate 富文本原文。=",
+      "modelSelection": {
+        "anchor": {
+          "path": [
+            0,
+            0
+          ],
+          "offset": 13
+        },
+        "focus": {
+          "path": [
+            0,
+            0
+          ],
+          "offset": 13
+        }
+      },
+      "domSelection": "",
+      "dom": "Slate 富文本原文。="
+    },
+    {
+      "type": "beforeinput",
+      "capture": true,
+      "time": 14123.300000190735,
+      "inputType": "insertText",
+      "defaultPrevented": false,
+      "targetRanges": 1,
+      "model": "Slate 富文本原文。=",
+      "modelSelection": {
+        "anchor": {
+          "path": [
+            0,
+            0
+          ],
+          "offset": 13
+        },
+        "focus": {
+          "path": [
+            0,
+            0
+          ],
+          "offset": 13
+        }
+      },
+      "domSelection": "",
+      "dom": "Slate 富文本原文。="
+    },
+    {
+      "type": "beforeinput",
+      "capture": false,
+      "time": 14123.900000095367,
+      "inputType": "insertText",
+      "defaultPrevented": true,
+      "targetRanges": 1,
+      "model": "Slate 富文本原文。==",
+      "modelSelection": {
+        "anchor": {
+          "path": [
+            0,
+            0
+          ],
+          "offset": 14
+        },
+        "focus": {
+          "path": [
+            0,
+            0
+          ],
+          "offset": 14
+        }
+      },
+      "domSelection": "",
+      "dom": "Slate 富文本原文。=="
+    },
+    {
+      "type": "selectionchange",
+      "capture": true,
+      "time": 14124,
+      "defaultPrevented": false,
+      "model": "Slate 富文本原文。==",
+      "modelSelection": {
+        "anchor": {
+          "path": [
+            0,
+            0
+          ],
+          "offset": 14
+        },
+        "focus": {
+          "path": [
+            0,
+            0
+          ],
+          "offset": 14
+        }
+      },
+      "domSelection": "",
+      "dom": "Slate 富文本原文。=="
+    },
+    {
+      "type": "selectionchange",
+      "capture": false,
+      "time": 14124,
+      "defaultPrevented": false,
+      "model": "Slate 富文本原文。==",
+      "modelSelection": {
+        "anchor": {
+          "path": [
+            0,
+            0
+          ],
+          "offset": 14
+        },
+        "focus": {
+          "path": [
+            0,
+            0
+          ],
+          "offset": 14
+        }
+      },
+      "domSelection": "",
+      "dom": "Slate 富文本原文。=="
+    },
+    {
+      "type": "selectionchange",
+      "capture": true,
+      "time": 14125.400000095367,
+      "defaultPrevented": false,
+      "model": "Slate 富文本原文。==",
+      "modelSelection": {
+        "anchor": {
+          "path": [
+            0,
+            0
+          ],
+          "offset": 14
+        },
+        "focus": {
+          "path": [
+            0,
+            0
+          ],
+          "offset": 14
+        }
+      },
+      "domSelection": "==",
+      "dom": "Slate 富文本原文。=="
+    },
+    {
+      "type": "selectionchange",
+      "capture": false,
+      "time": 14125.400000095367,
+      "defaultPrevented": false,
+      "model": "Slate 富文本原文。==",
+      "modelSelection": {
+        "anchor": {
+          "path": [
+            0,
+            0
+          ],
+          "offset": 14
+        },
+        "focus": {
+          "path": [
+            0,
+            0
+          ],
+          "offset": 14
+        }
+      },
+      "domSelection": "==",
+      "dom": "Slate 富文本原文。=="
+    },
+    {
+      "type": "beforeinput",
+      "capture": true,
+      "time": 14144.5,
+      "inputType": "deleteContentBackward",
+      "defaultPrevented": false,
+      "targetRanges": 1,
+      "model": "Slate 富文本原文。==",
+      "modelSelection": {
+        "anchor": {
+          "path": [
+            0,
+            0
+          ],
+          "offset": 14
+        },
+        "focus": {
+          "path": [
+            0,
+            0
+          ],
+          "offset": 14
+        }
+      },
+      "domSelection": "==",
+      "dom": "Slate 富文本原文。=="
+    },
+    {
+      "type": "beforeinput",
+      "capture": false,
+      "time": 14146.5,
+      "inputType": "deleteContentBackward",
+      "defaultPrevented": true,
+      "targetRanges": 1,
+      "model": "Slate 富文本原文。",
+      "modelSelection": {
+        "anchor": {
+          "path": [
+            0,
+            0
+          ],
+          "offset": 12
+        },
+        "focus": {
+          "path": [
+            0,
+            0
+          ],
+          "offset": 12
+        }
+      },
+      "domSelection": "==",
+      "dom": "Slate 富文本原文。=="
+    },
+    {
+      "type": "selectionchange",
+      "capture": true,
+      "time": 14151.10000038147,
+      "defaultPrevented": false,
+      "model": "Slate 富文本原文。",
+      "modelSelection": {
+        "anchor": {
+          "path": [
+            0,
+            0
+          ],
+          "offset": 12
+        },
+        "focus": {
+          "path": [
+            0,
+            0
+          ],
+          "offset": 12
+        }
+      },
+      "domSelection": "",
+      "dom": "Slate 富文本原文。"
+    },
+    {
+      "type": "selectionchange",
+      "capture": false,
+      "time": 14151.200000286102,
+      "defaultPrevented": false,
+      "model": "Slate 富文本原文。",
+      "modelSelection": {
+        "anchor": {
+          "path": [
+            0,
+            0
+          ],
+          "offset": 12
+        },
+        "focus": {
+          "path": [
+            0,
+            0
+          ],
+          "offset": 12
+        }
+      },
+      "domSelection": "",
+      "dom": "Slate 富文本原文。"
+    },
+    {
+      "type": "selectionchange",
+      "capture": true,
+      "time": 14159.200000286102,
+      "defaultPrevented": false,
+      "model": "Slate 富文本原文。",
+      "modelSelection": {
+        "anchor": {
+          "path": [
+            0,
+            0
+          ],
+          "offset": 12
+        },
+        "focus": {
+          "path": [
+            0,
+            0
+          ],
+          "offset": 12
+        }
+      },
+      "domSelection": "Slate 富文本原文。",
+      "dom": "Slate 富文本原文。"
+    },
+    {
+      "type": "selectionchange",
+      "capture": false,
+      "time": 14159.200000286102,
+      "defaultPrevented": false,
+      "model": "Slate 富文本原文。",
+      "modelSelection": {
+        "anchor": {
+          "path": [
+            0,
+            0
+          ],
+          "offset": 12
+        },
+        "focus": {
+          "path": [
+            0,
+            0
+          ],
+          "offset": 12
+        }
+      },
+      "domSelection": "Slate 富文本原文。",
+      "dom": "Slate 富文本原文。"
+    },
+    {
+      "type": "beforeinput",
+      "capture": true,
+      "time": 14176.900000095367,
+      "inputType": "insertText",
+      "defaultPrevented": false,
+      "targetRanges": 1,
+      "model": "Slate 富文本原文。",
+      "modelSelection": {
+        "anchor": {
+          "path": [
+            0,
+            0
+          ],
+          "offset": 12
+        },
+        "focus": {
+          "path": [
+            0,
+            0
+          ],
+          "offset": 12
+        }
+      },
+      "domSelection": "Slate 富文本原文。",
+      "dom": "Slate 富文本原文。"
+    },
+    {
+      "type": "beforeinput",
+      "capture": false,
+      "time": 14177.700000286102,
+      "inputType": "insertText",
+      "defaultPrevented": true,
+      "targetRanges": 1,
+      "model": "Let us meet tomorrow afternoon.",
+      "modelSelection": {
+        "anchor": {
+          "path": [
+            0,
+            0
+          ],
+          "offset": 31
+        },
+        "focus": {
+          "path": [
+            0,
+            0
+          ],
+          "offset": 31
+        }
+      },
+      "domSelection": "Slate 富文本原文。",
+      "dom": "Slate 富文本原文。"
+    },
+    {
+      "type": "selectionchange",
+      "capture": true,
+      "time": 14178.900000095367,
+      "defaultPrevented": false,
+      "model": "Let us meet tomorrow afternoon.",
+      "modelSelection": {
+        "anchor": {
+          "path": [
+            0,
+            0
+          ],
+          "offset": 31
+        },
+        "focus": {
+          "path": [
+            0,
+            0
+          ],
+          "offset": 31
+        }
+      },
+      "domSelection": "",
+      "dom": "Let us meet tomorrow afternoon."
+    },
+    {
+      "type": "selectionchange",
+      "capture": false,
+      "time": 14179.10000038147,
+      "defaultPrevented": false,
+      "model": "Let us meet tomorrow afternoon.",
+      "modelSelection": {
+        "anchor": {
+          "path": [
+            0,
+            0
+          ],
+          "offset": 31
+        },
+        "focus": {
+          "path": [
+            0,
+            0
+          ],
+          "offset": 31
+        }
+      },
+      "domSelection": "",
+      "dom": "Let us meet tomorrow afternoon."
+    },
+    {
+      "type": "selectionchange",
+      "capture": true,
+      "time": 14202.60000038147,
+      "defaultPrevented": false,
+      "model": "Let us meet tomorrow afternoon.",
+      "modelSelection": {
+        "anchor": {
+          "path": [
+            0,
+            0
+          ],
+          "offset": 31
+        },
+        "focus": {
+          "path": [
+            0,
+            0
+          ],
+          "offset": 31
+        }
+      },
+      "domSelection": "Let us meet tomorrow afternoon.",
+      "dom": "Let us meet tomorrow afternoon."
+    },
+    {
+      "type": "selectionchange",
+      "capture": false,
+      "time": 14202.700000286102,
+      "defaultPrevented": false,
+      "model": "Let us meet tomorrow afternoon.",
+      "modelSelection": {
+        "anchor": {
+          "path": [
+            0,
+            0
+          ],
+          "offset": 31
+        },
+        "focus": {
+          "path": [
+            0,
+            0
+          ],
+          "offset": 31
+        }
+      },
+      "domSelection": "Let us meet tomorrow afternoon.",
+      "dom": "Let us meet tomorrow afternoon."
+    },
+    {
+      "type": "beforeinput",
+      "capture": true,
+      "time": 14220.700000286102,
+      "inputType": "insertText",
+      "defaultPrevented": false,
+      "targetRanges": 1,
+      "model": "Let us meet tomorrow afternoon.",
+      "modelSelection": {
+        "anchor": {
+          "path": [
+            0,
+            0
+          ],
+          "offset": 31
+        },
+        "focus": {
+          "path": [
+            0,
+            0
+          ],
+          "offset": 31
+        }
+      },
+      "domSelection": "Let us meet tomorrow afternoon.",
+      "dom": "Let us meet tomorrow afternoon."
+    },
+    {
+      "type": "beforeinput",
+      "capture": false,
+      "time": 14221.400000095367,
+      "inputType": "insertText",
+      "defaultPrevented": true,
+      "targetRanges": 1,
+      "model": "Slate 富文本原文。",
+      "modelSelection": {
+        "anchor": {
+          "path": [
+            0,
+            0
+          ],
+          "offset": 12
+        },
+        "focus": {
+          "path": [
+            0,
+            0
+          ],
+          "offset": 12
+        }
+      },
+      "domSelection": "Let us meet tomorrow afternoon.",
+      "dom": "Let us meet tomorrow afternoon."
+    },
+    {
+      "type": "selectionchange",
+      "capture": true,
+      "time": 14222.200000286102,
+      "defaultPrevented": false,
+      "model": "Slate 富文本原文。",
+      "modelSelection": {
+        "anchor": {
+          "path": [
+            0,
+            0
+          ],
+          "offset": 12
+        },
+        "focus": {
+          "path": [
+            0,
+            0
+          ],
+          "offset": 12
+        }
+      },
+      "domSelection": "",
+      "dom": "Slate 富文本原文。"
+    },
+    {
+      "type": "selectionchange",
+      "capture": false,
+      "time": 14222.400000095367,
+      "defaultPrevented": false,
+      "model": "Slate 富文本原文。",
+      "modelSelection": {
+        "anchor": {
+          "path": [
+            0,
+            0
+          ],
+          "offset": 12
+        },
+        "focus": {
+          "path": [
+            0,
+            0
+          ],
+          "offset": 12
+        }
+      },
+      "domSelection": "",
+      "dom": "Slate 富文本原文。"
+    },
+    {
+      "type": "selectionchange",
+      "capture": true,
+      "time": 14319.300000190735,
+      "defaultPrevented": false,
+      "model": "Slate 富文本原文。",
+      "modelSelection": {
+        "anchor": {
+          "path": [
+            0,
+            0
+          ],
+          "offset": 12
+        },
+        "focus": {
+          "path": [
+            0,
+            0
+          ],
+          "offset": 12
+        }
+      },
+      "domSelection": "",
+      "dom": "Slate 富文本原文。"
+    },
+    {
+      "type": "selectionchange",
+      "capture": false,
+      "time": 14319.300000190735,
+      "defaultPrevented": false,
+      "model": "Slate 富文本原文。",
+      "modelSelection": {
+        "anchor": {
+          "path": [
+            0,
+            0
+          ],
+          "offset": 12
+        },
+        "focus": {
+          "path": [
+            0,
+            0
+          ],
+          "offset": 12
+        }
+      },
+      "domSelection": "",
+      "dom": "Slate 富文本原文。"
+    },
+    {
+      "type": "beforeinput",
+      "capture": true,
+      "time": 14320.900000095367,
+      "inputType": "insertText",
+      "defaultPrevented": false,
+      "targetRanges": 1,
+      "model": "Slate 富文本原文。",
+      "modelSelection": {
+        "anchor": {
+          "path": [
+            0,
+            0
+          ],
+          "offset": 12
+        },
+        "focus": {
+          "path": [
+            0,
+            0
+          ],
+          "offset": 12
+        }
+      },
+      "domSelection": "",
+      "dom": "Slate 富文本原文。"
+    },
+    {
+      "type": "beforeinput",
+      "capture": false,
+      "time": 14321.700000286102,
+      "inputType": "insertText",
+      "defaultPrevented": true,
+      "targetRanges": 1,
+      "model": "Slate 富文本原文。=",
+      "modelSelection": {
+        "anchor": {
+          "path": [
+            0,
+            0
+          ],
+          "offset": 13
+        },
+        "focus": {
+          "path": [
+            0,
+            0
+          ],
+          "offset": 13
+        }
+      },
+      "domSelection": "",
+      "dom": "Slate 富文本原文。="
+    },
+    {
+      "type": "selectionchange",
+      "capture": true,
+      "time": 14321.700000286102,
+      "defaultPrevented": false,
+      "model": "Slate 富文本原文。=",
+      "modelSelection": {
+        "anchor": {
+          "path": [
+            0,
+            0
+          ],
+          "offset": 13
+        },
+        "focus": {
+          "path": [
+            0,
+            0
+          ],
+          "offset": 13
+        }
+      },
+      "domSelection": "",
+      "dom": "Slate 富文本原文。="
+    },
+    {
+      "type": "selectionchange",
+      "capture": false,
+      "time": 14321.800000190735,
+      "defaultPrevented": false,
+      "model": "Slate 富文本原文。=",
+      "modelSelection": {
+        "anchor": {
+          "path": [
+            0,
+            0
+          ],
+          "offset": 13
+        },
+        "focus": {
+          "path": [
+            0,
+            0
+          ],
+          "offset": 13
+        }
+      },
+      "domSelection": "",
+      "dom": "Slate 富文本原文。="
+    },
+    {
+      "type": "beforeinput",
+      "capture": true,
+      "time": 14322.800000190735,
+      "inputType": "insertText",
+      "defaultPrevented": false,
+      "targetRanges": 1,
+      "model": "Slate 富文本原文。=",
+      "modelSelection": {
+        "anchor": {
+          "path": [
+            0,
+            0
+          ],
+          "offset": 13
+        },
+        "focus": {
+          "path": [
+            0,
+            0
+          ],
+          "offset": 13
+        }
+      },
+      "domSelection": "",
+      "dom": "Slate 富文本原文。="
+    },
+    {
+      "type": "beforeinput",
+      "capture": false,
+      "time": 14323.5,
+      "inputType": "insertText",
+      "defaultPrevented": true,
+      "targetRanges": 1,
+      "model": "Slate 富文本原文。==",
+      "modelSelection": {
+        "anchor": {
+          "path": [
+            0,
+            0
+          ],
+          "offset": 14
+        },
+        "focus": {
+          "path": [
+            0,
+            0
+          ],
+          "offset": 14
+        }
+      },
+      "domSelection": "",
+      "dom": "Slate 富文本原文。=="
+    },
+    {
+      "type": "selectionchange",
+      "capture": true,
+      "time": 14323.60000038147,
+      "defaultPrevented": false,
+      "model": "Slate 富文本原文。==",
+      "modelSelection": {
+        "anchor": {
+          "path": [
+            0,
+            0
+          ],
+          "offset": 14
+        },
+        "focus": {
+          "path": [
+            0,
+            0
+          ],
+          "offset": 14
+        }
+      },
+      "domSelection": "",
+      "dom": "Slate 富文本原文。=="
+    },
+    {
+      "type": "selectionchange",
+      "capture": false,
+      "time": 14323.700000286102,
+      "defaultPrevented": false,
+      "model": "Slate 富文本原文。==",
+      "modelSelection": {
+        "anchor": {
+          "path": [
+            0,
+            0
+          ],
+          "offset": 14
+        },
+        "focus": {
+          "path": [
+            0,
+            0
+          ],
+          "offset": 14
+        }
+      },
+      "domSelection": "",
+      "dom": "Slate 富文本原文。=="
+    },
+    {
+      "type": "selectionchange",
+      "capture": true,
+      "time": 14325.200000286102,
+      "defaultPrevented": false,
+      "model": "Slate 富文本原文。==",
+      "modelSelection": {
+        "anchor": {
+          "path": [
+            0,
+            0
+          ],
+          "offset": 14
+        },
+        "focus": {
+          "path": [
+            0,
+            0
+          ],
+          "offset": 14
+        }
+      },
+      "domSelection": "==",
+      "dom": "Slate 富文本原文。=="
+    },
+    {
+      "type": "selectionchange",
+      "capture": false,
+      "time": 14325.200000286102,
+      "defaultPrevented": false,
+      "model": "Slate 富文本原文。==",
+      "modelSelection": {
+        "anchor": {
+          "path": [
+            0,
+            0
+          ],
+          "offset": 14
+        },
+        "focus": {
+          "path": [
+            0,
+            0
+          ],
+          "offset": 14
+        }
+      },
+      "domSelection": "==",
+      "dom": "Slate 富文本原文。=="
+    },
+    {
+      "type": "beforeinput",
+      "capture": true,
+      "time": 14343.60000038147,
+      "inputType": "deleteContentBackward",
+      "defaultPrevented": false,
+      "targetRanges": 1,
+      "model": "Slate 富文本原文。==",
+      "modelSelection": {
+        "anchor": {
+          "path": [
+            0,
+            0
+          ],
+          "offset": 14
+        },
+        "focus": {
+          "path": [
+            0,
+            0
+          ],
+          "offset": 14
+        }
+      },
+      "domSelection": "==",
+      "dom": "Slate 富文本原文。=="
+    },
+    {
+      "type": "beforeinput",
+      "capture": false,
+      "time": 14344.10000038147,
+      "inputType": "deleteContentBackward",
+      "defaultPrevented": true,
+      "targetRanges": 1,
+      "model": "Slate 富文本原文。",
+      "modelSelection": {
+        "anchor": {
+          "path": [
+            0,
+            0
+          ],
+          "offset": 12
+        },
+        "focus": {
+          "path": [
+            0,
+            0
+          ],
+          "offset": 12
+        }
+      },
+      "domSelection": "==",
+      "dom": "Slate 富文本原文。=="
+    },
+    {
+      "type": "selectionchange",
+      "capture": true,
+      "time": 14345.400000095367,
+      "defaultPrevented": false,
+      "model": "Slate 富文本原文。",
+      "modelSelection": {
+        "anchor": {
+          "path": [
+            0,
+            0
+          ],
+          "offset": 12
+        },
+        "focus": {
+          "path": [
+            0,
+            0
+          ],
+          "offset": 12
+        }
+      },
+      "domSelection": "",
+      "dom": "Slate 富文本原文。"
+    },
+    {
+      "type": "selectionchange",
+      "capture": false,
+      "time": 14345.5,
+      "defaultPrevented": false,
+      "model": "Slate 富文本原文。",
+      "modelSelection": {
+        "anchor": {
+          "path": [
+            0,
+            0
+          ],
+          "offset": 12
+        },
+        "focus": {
+          "path": [
+            0,
+            0
+          ],
+          "offset": 12
+        }
+      },
+      "domSelection": "",
+      "dom": "Slate 富文本原文。"
+    },
+    {
+      "type": "selectionchange",
+      "capture": true,
+      "time": 14354,
+      "defaultPrevented": false,
+      "model": "Slate 富文本原文。",
+      "modelSelection": {
+        "anchor": {
+          "path": [
+            0,
+            0
+          ],
+          "offset": 12
+        },
+        "focus": {
+          "path": [
+            0,
+            0
+          ],
+          "offset": 12
+        }
+      },
+      "domSelection": "Slate 富文本原文。",
+      "dom": "Slate 富文本原文。"
+    },
+    {
+      "type": "selectionchange",
+      "capture": false,
+      "time": 14354,
+      "defaultPrevented": false,
+      "model": "Slate 富文本原文。",
+      "modelSelection": {
+        "anchor": {
+          "path": [
+            0,
+            0
+          ],
+          "offset": 12
+        },
+        "focus": {
+          "path": [
+            0,
+            0
+          ],
+          "offset": 12
+        }
+      },
+      "domSelection": "Slate 富文本原文。",
+      "dom": "Slate 富文本原文。"
+    },
+    {
+      "type": "beforeinput",
+      "capture": true,
+      "time": 14371.800000190735,
+      "inputType": "insertText",
+      "defaultPrevented": false,
+      "targetRanges": 1,
+      "model": "Slate 富文本原文。",
+      "modelSelection": {
+        "anchor": {
+          "path": [
+            0,
+            0
+          ],
+          "offset": 12
+        },
+        "focus": {
+          "path": [
+            0,
+            0
+          ],
+          "offset": 12
+        }
+      },
+      "domSelection": "Slate 富文本原文。",
+      "dom": "Slate 富文本原文。"
+    },
+    {
+      "type": "beforeinput",
+      "capture": false,
+      "time": 14372.400000095367,
+      "inputType": "insertText",
+      "defaultPrevented": true,
+      "targetRanges": 1,
+      "model": "Let us meet tomorrow afternoon.",
+      "modelSelection": {
+        "anchor": {
+          "path": [
+            0,
+            0
+          ],
+          "offset": 31
+        },
+        "focus": {
+          "path": [
+            0,
+            0
+          ],
+          "offset": 31
+        }
+      },
+      "domSelection": "Slate 富文本原文。",
+      "dom": "Slate 富文本原文。"
+    },
+    {
+      "type": "selectionchange",
+      "capture": true,
+      "time": 14373.400000095367,
+      "defaultPrevented": false,
+      "model": "Let us meet tomorrow afternoon.",
+      "modelSelection": {
+        "anchor": {
+          "path": [
+            0,
+            0
+          ],
+          "offset": 31
+        },
+        "focus": {
+          "path": [
+            0,
+            0
+          ],
+          "offset": 31
+        }
+      },
+      "domSelection": "",
+      "dom": "Let us meet tomorrow afternoon."
+    },
+    {
+      "type": "selectionchange",
+      "capture": false,
+      "time": 14373.60000038147,
+      "defaultPrevented": false,
+      "model": "Let us meet tomorrow afternoon.",
+      "modelSelection": {
+        "anchor": {
+          "path": [
+            0,
+            0
+          ],
+          "offset": 31
+        },
+        "focus": {
+          "path": [
+            0,
+            0
+          ],
+          "offset": 31
+        }
+      },
+      "domSelection": "",
+      "dom": "Let us meet tomorrow afternoon."
+    },
+    {
+      "type": "selectionchange",
+      "capture": true,
+      "time": 14394.400000095367,
+      "defaultPrevented": false,
+      "model": "Let us meet tomorrow afternoon.",
+      "modelSelection": {
+        "anchor": {
+          "path": [
+            0,
+            0
+          ],
+          "offset": 31
+        },
+        "focus": {
+          "path": [
+            0,
+            0
+          ],
+          "offset": 31
+        }
+      },
+      "domSelection": "Let us meet tomorrow afternoon.",
+      "dom": "Let us meet tomorrow afternoon."
+    },
+    {
+      "type": "selectionchange",
+      "capture": false,
+      "time": 14394.5,
+      "defaultPrevented": false,
+      "model": "Let us meet tomorrow afternoon.",
+      "modelSelection": {
+        "anchor": {
+          "path": [
+            0,
+            0
+          ],
+          "offset": 31
+        },
+        "focus": {
+          "path": [
+            0,
+            0
+          ],
+          "offset": 31
+        }
+      },
+      "domSelection": "Let us meet tomorrow afternoon.",
+      "dom": "Let us meet tomorrow afternoon."
+    },
+    {
+      "type": "beforeinput",
+      "capture": true,
+      "time": 14411.900000095367,
+      "inputType": "insertText",
+      "defaultPrevented": false,
+      "targetRanges": 1,
+      "model": "Let us meet tomorrow afternoon.",
+      "modelSelection": {
+        "anchor": {
+          "path": [
+            0,
+            0
+          ],
+          "offset": 31
+        },
+        "focus": {
+          "path": [
+            0,
+            0
+          ],
+          "offset": 31
+        }
+      },
+      "domSelection": "Let us meet tomorrow afternoon.",
+      "dom": "Let us meet tomorrow afternoon."
+    },
+    {
+      "type": "beforeinput",
+      "capture": false,
+      "time": 14412.60000038147,
+      "inputType": "insertText",
+      "defaultPrevented": true,
+      "targetRanges": 1,
+      "model": "Slate 富文本原文。",
+      "modelSelection": {
+        "anchor": {
+          "path": [
+            0,
+            0
+          ],
+          "offset": 12
+        },
+        "focus": {
+          "path": [
+            0,
+            0
+          ],
+          "offset": 12
+        }
+      },
+      "domSelection": "Let us meet tomorrow afternoon.",
+      "dom": "Let us meet tomorrow afternoon."
+    },
+    {
+      "type": "selectionchange",
+      "capture": true,
+      "time": 14413.300000190735,
+      "defaultPrevented": false,
+      "model": "Slate 富文本原文。",
+      "modelSelection": {
+        "anchor": {
+          "path": [
+            0,
+            0
+          ],
+          "offset": 12
+        },
+        "focus": {
+          "path": [
+            0,
+            0
+          ],
+          "offset": 12
+        }
+      },
+      "domSelection": "",
+      "dom": "Slate 富文本原文。"
+    },
+    {
+      "type": "selectionchange",
+      "capture": false,
+      "time": 14413.5,
+      "defaultPrevented": false,
+      "model": "Slate 富文本原文。",
+      "modelSelection": {
+        "anchor": {
+          "path": [
+            0,
+            0
+          ],
+          "offset": 12
+        },
+        "focus": {
+          "path": [
+            0,
+            0
+          ],
+          "offset": 12
+        }
+      },
+      "domSelection": "",
+      "dom": "Slate 富文本原文。"
+    },
+    {
+      "type": "selectionchange",
+      "capture": true,
+      "time": 14451.800000190735,
+      "defaultPrevented": false,
+      "model": "Slate 富文本原文。",
+      "modelSelection": {
+        "anchor": {
+          "path": [
+            0,
+            0
+          ],
+          "offset": 12
+        },
+        "focus": {
+          "path": [
+            0,
+            0
+          ],
+          "offset": 12
+        }
+      },
+      "domSelection": "",
+      "dom": "Slate 富文本原文。"
+    },
+    {
+      "type": "selectionchange",
+      "capture": false,
+      "time": 14451.900000095367,
+      "defaultPrevented": false,
+      "model": "Slate 富文本原文。",
+      "modelSelection": {
+        "anchor": {
+          "path": [
+            0,
+            0
+          ],
+          "offset": 12
+        },
+        "focus": {
+          "path": [
+            0,
+            0
+          ],
+          "offset": 12
+        }
+      },
+      "domSelection": "",
+      "dom": "Slate 富文本原文。"
+    },
+    {
+      "type": "beforeinput",
+      "capture": true,
+      "time": 14453.800000190735,
+      "inputType": "insertText",
+      "defaultPrevented": false,
+      "targetRanges": 1,
+      "model": "Slate 富文本原文。",
+      "modelSelection": {
+        "anchor": {
+          "path": [
+            0,
+            0
+          ],
+          "offset": 12
+        },
+        "focus": {
+          "path": [
+            0,
+            0
+          ],
+          "offset": 12
+        }
+      },
+      "domSelection": "",
+      "dom": "Slate 富文本原文。"
+    },
+    {
+      "type": "beforeinput",
+      "capture": false,
+      "time": 14454.5,
+      "inputType": "insertText",
+      "defaultPrevented": true,
+      "targetRanges": 1,
+      "model": "Slate 富文本原文。=",
+      "modelSelection": {
+        "anchor": {
+          "path": [
+            0,
+            0
+          ],
+          "offset": 13
+        },
+        "focus": {
+          "path": [
+            0,
+            0
+          ],
+          "offset": 13
+        }
+      },
+      "domSelection": "",
+      "dom": "Slate 富文本原文。="
+    },
+    {
+      "type": "selectionchange",
+      "capture": true,
+      "time": 14454.60000038147,
+      "defaultPrevented": false,
+      "model": "Slate 富文本原文。=",
+      "modelSelection": {
+        "anchor": {
+          "path": [
+            0,
+            0
+          ],
+          "offset": 13
+        },
+        "focus": {
+          "path": [
+            0,
+            0
+          ],
+          "offset": 13
+        }
+      },
+      "domSelection": "",
+      "dom": "Slate 富文本原文。="
+    },
+    {
+      "type": "selectionchange",
+      "capture": false,
+      "time": 14454.60000038147,
+      "defaultPrevented": false,
+      "model": "Slate 富文本原文。=",
+      "modelSelection": {
+        "anchor": {
+          "path": [
+            0,
+            0
+          ],
+          "offset": 13
+        },
+        "focus": {
+          "path": [
+            0,
+            0
+          ],
+          "offset": 13
+        }
+      },
+      "domSelection": "",
+      "dom": "Slate 富文本原文。="
+    },
+    {
+      "type": "beforeinput",
+      "capture": true,
+      "time": 14455.60000038147,
+      "inputType": "insertText",
+      "defaultPrevented": false,
+      "targetRanges": 1,
+      "model": "Slate 富文本原文。=",
+      "modelSelection": {
+        "anchor": {
+          "path": [
+            0,
+            0
+          ],
+          "offset": 13
+        },
+        "focus": {
+          "path": [
+            0,
+            0
+          ],
+          "offset": 13
+        }
+      },
+      "domSelection": "",
+      "dom": "Slate 富文本原文。="
+    },
+    {
+      "type": "beforeinput",
+      "capture": false,
+      "time": 14456.10000038147,
+      "inputType": "insertText",
+      "defaultPrevented": true,
+      "targetRanges": 1,
+      "model": "Slate 富文本原文。==",
+      "modelSelection": {
+        "anchor": {
+          "path": [
+            0,
+            0
+          ],
+          "offset": 14
+        },
+        "focus": {
+          "path": [
+            0,
+            0
+          ],
+          "offset": 14
+        }
+      },
+      "domSelection": "",
+      "dom": "Slate 富文本原文。=="
+    },
+    {
+      "type": "selectionchange",
+      "capture": true,
+      "time": 14456.200000286102,
+      "defaultPrevented": false,
+      "model": "Slate 富文本原文。==",
+      "modelSelection": {
+        "anchor": {
+          "path": [
+            0,
+            0
+          ],
+          "offset": 14
+        },
+        "focus": {
+          "path": [
+            0,
+            0
+          ],
+          "offset": 14
+        }
+      },
+      "domSelection": "",
+      "dom": "Slate 富文本原文。=="
+    },
+    {
+      "type": "selectionchange",
+      "capture": false,
+      "time": 14456.200000286102,
+      "defaultPrevented": false,
+      "model": "Slate 富文本原文。==",
+      "modelSelection": {
+        "anchor": {
+          "path": [
+            0,
+            0
+          ],
+          "offset": 14
+        },
+        "focus": {
+          "path": [
+            0,
+            0
+          ],
+          "offset": 14
+        }
+      },
+      "domSelection": "",
+      "dom": "Slate 富文本原文。=="
+    },
+    {
+      "type": "selectionchange",
+      "capture": true,
+      "time": 14457.60000038147,
+      "defaultPrevented": false,
+      "model": "Slate 富文本原文。==",
+      "modelSelection": {
+        "anchor": {
+          "path": [
+            0,
+            0
+          ],
+          "offset": 14
+        },
+        "focus": {
+          "path": [
+            0,
+            0
+          ],
+          "offset": 14
+        }
+      },
+      "domSelection": "==",
+      "dom": "Slate 富文本原文。=="
+    },
+    {
+      "type": "selectionchange",
+      "capture": false,
+      "time": 14457.60000038147,
+      "defaultPrevented": false,
+      "model": "Slate 富文本原文。==",
+      "modelSelection": {
+        "anchor": {
+          "path": [
+            0,
+            0
+          ],
+          "offset": 14
+        },
+        "focus": {
+          "path": [
+            0,
+            0
+          ],
+          "offset": 14
+        }
+      },
+      "domSelection": "==",
+      "dom": "Slate 富文本原文。=="
+    },
+    {
+      "type": "beforeinput",
+      "capture": true,
+      "time": 14476.200000286102,
+      "inputType": "deleteContentBackward",
+      "defaultPrevented": false,
+      "targetRanges": 1,
+      "model": "Slate 富文本原文。==",
+      "modelSelection": {
+        "anchor": {
+          "path": [
+            0,
+            0
+          ],
+          "offset": 14
+        },
+        "focus": {
+          "path": [
+            0,
+            0
+          ],
+          "offset": 14
+        }
+      },
+      "domSelection": "==",
+      "dom": "Slate 富文本原文。=="
+    },
+    {
+      "type": "beforeinput",
+      "capture": false,
+      "time": 14476.5,
+      "inputType": "deleteContentBackward",
+      "defaultPrevented": true,
+      "targetRanges": 1,
+      "model": "Slate 富文本原文。",
+      "modelSelection": {
+        "anchor": {
+          "path": [
+            0,
+            0
+          ],
+          "offset": 12
+        },
+        "focus": {
+          "path": [
+            0,
+            0
+          ],
+          "offset": 12
+        }
+      },
+      "domSelection": "==",
+      "dom": "Slate 富文本原文。=="
+    },
+    {
+      "type": "selectionchange",
+      "capture": true,
+      "time": 14477.700000286102,
+      "defaultPrevented": false,
+      "model": "Slate 富文本原文。",
+      "modelSelection": {
+        "anchor": {
+          "path": [
+            0,
+            0
+          ],
+          "offset": 12
+        },
+        "focus": {
+          "path": [
+            0,
+            0
+          ],
+          "offset": 12
+        }
+      },
+      "domSelection": "",
+      "dom": "Slate 富文本原文。"
+    },
+    {
+      "type": "selectionchange",
+      "capture": false,
+      "time": 14477.800000190735,
+      "defaultPrevented": false,
+      "model": "Slate 富文本原文。",
+      "modelSelection": {
+        "anchor": {
+          "path": [
+            0,
+            0
+          ],
+          "offset": 12
+        },
+        "focus": {
+          "path": [
+            0,
+            0
+          ],
+          "offset": 12
+        }
+      },
+      "domSelection": "",
+      "dom": "Slate 富文本原文。"
+    },
+    {
+      "type": "selectionchange",
+      "capture": true,
+      "time": 14479.5,
+      "defaultPrevented": false,
+      "model": "Slate 富文本原文。",
+      "modelSelection": {
+        "anchor": {
+          "path": [
+            0,
+            0
+          ],
+          "offset": 12
+        },
+        "focus": {
+          "path": [
+            0,
+            0
+          ],
+          "offset": 12
+        }
+      },
+      "domSelection": "Slate 富文本原文。",
+      "dom": "Slate 富文本原文。"
+    },
+    {
+      "type": "selectionchange",
+      "capture": false,
+      "time": 14479.60000038147,
+      "defaultPrevented": false,
+      "model": "Slate 富文本原文。",
+      "modelSelection": {
+        "anchor": {
+          "path": [
+            0,
+            0
+          ],
+          "offset": 12
+        },
+        "focus": {
+          "path": [
+            0,
+            0
+          ],
+          "offset": 12
+        }
+      },
+      "domSelection": "Slate 富文本原文。",
+      "dom": "Slate 富文本原文。"
+    },
+    {
+      "type": "beforeinput",
+      "capture": true,
+      "time": 14498.300000190735,
+      "inputType": "insertText",
+      "defaultPrevented": false,
+      "targetRanges": 1,
+      "model": "Slate 富文本原文。",
+      "modelSelection": {
+        "anchor": {
+          "path": [
+            0,
+            0
+          ],
+          "offset": 12
+        },
+        "focus": {
+          "path": [
+            0,
+            0
+          ],
+          "offset": 12
+        }
+      },
+      "domSelection": "Slate 富文本原文。",
+      "dom": "Slate 富文本原文。"
+    },
+    {
+      "type": "beforeinput",
+      "capture": false,
+      "time": 14498.900000095367,
+      "inputType": "insertText",
+      "defaultPrevented": true,
+      "targetRanges": 1,
+      "model": "Let us meet tomorrow afternoon.",
+      "modelSelection": {
+        "anchor": {
+          "path": [
+            0,
+            0
+          ],
+          "offset": 31
+        },
+        "focus": {
+          "path": [
+            0,
+            0
+          ],
+          "offset": 31
+        }
+      },
+      "domSelection": "Slate 富文本原文。",
+      "dom": "Slate 富文本原文。"
+    },
+    {
+      "type": "selectionchange",
+      "capture": true,
+      "time": 14500.5,
+      "defaultPrevented": false,
+      "model": "Let us meet tomorrow afternoon.",
+      "modelSelection": {
+        "anchor": {
+          "path": [
+            0,
+            0
+          ],
+          "offset": 31
+        },
+        "focus": {
+          "path": [
+            0,
+            0
+          ],
+          "offset": 31
+        }
+      },
+      "domSelection": "",
+      "dom": "Let us meet tomorrow afternoon."
+    },
+    {
+      "type": "selectionchange",
+      "capture": false,
+      "time": 14500.700000286102,
+      "defaultPrevented": false,
+      "model": "Let us meet tomorrow afternoon.",
+      "modelSelection": {
+        "anchor": {
+          "path": [
+            0,
+            0
+          ],
+          "offset": 31
+        },
+        "focus": {
+          "path": [
+            0,
+            0
+          ],
+          "offset": 31
+        }
+      },
+      "domSelection": "",
+      "dom": "Let us meet tomorrow afternoon."
+    },
+    {
+      "type": "selectionchange",
+      "capture": true,
+      "time": 14515.5,
+      "defaultPrevented": false,
+      "model": "Let us meet tomorrow afternoon.",
+      "modelSelection": {
+        "anchor": {
+          "path": [
+            0,
+            0
+          ],
+          "offset": 31
+        },
+        "focus": {
+          "path": [
+            0,
+            0
+          ],
+          "offset": 31
+        }
+      },
+      "domSelection": "Let us meet tomorrow afternoon.",
+      "dom": "Let us meet tomorrow afternoon."
+    },
+    {
+      "type": "selectionchange",
+      "capture": false,
+      "time": 14515.60000038147,
+      "defaultPrevented": false,
+      "model": "Let us meet tomorrow afternoon.",
+      "modelSelection": {
+        "anchor": {
+          "path": [
+            0,
+            0
+          ],
+          "offset": 31
+        },
+        "focus": {
+          "path": [
+            0,
+            0
+          ],
+          "offset": 31
+        }
+      },
+      "domSelection": "Let us meet tomorrow afternoon.",
+      "dom": "Let us meet tomorrow afternoon."
+    },
+    {
+      "type": "beforeinput",
+      "capture": true,
+      "time": 14532.400000095367,
+      "inputType": "insertText",
+      "defaultPrevented": false,
+      "targetRanges": 1,
+      "model": "Let us meet tomorrow afternoon.",
+      "modelSelection": {
+        "anchor": {
+          "path": [
+            0,
+            0
+          ],
+          "offset": 31
+        },
+        "focus": {
+          "path": [
+            0,
+            0
+          ],
+          "offset": 31
+        }
+      },
+      "domSelection": "Let us meet tomorrow afternoon.",
+      "dom": "Let us meet tomorrow afternoon."
+    },
+    {
+      "type": "beforeinput",
+      "capture": false,
+      "time": 14533.200000286102,
+      "inputType": "insertText",
+      "defaultPrevented": true,
+      "targetRanges": 1,
+      "model": "Slate 富文本原文。",
+      "modelSelection": {
+        "anchor": {
+          "path": [
+            0,
+            0
+          ],
+          "offset": 12
+        },
+        "focus": {
+          "path": [
+            0,
+            0
+          ],
+          "offset": 12
+        }
+      },
+      "domSelection": "Let us meet tomorrow afternoon.",
+      "dom": "Let us meet tomorrow afternoon."
+    },
+    {
+      "type": "selectionchange",
+      "capture": true,
+      "time": 14534.5,
+      "defaultPrevented": false,
+      "model": "Slate 富文本原文。",
+      "modelSelection": {
+        "anchor": {
+          "path": [
+            0,
+            0
+          ],
+          "offset": 12
+        },
+        "focus": {
+          "path": [
+            0,
+            0
+          ],
+          "offset": 12
+        }
+      },
+      "domSelection": "",
+      "dom": "Slate 富文本原文。"
+    },
+    {
+      "type": "selectionchange",
+      "capture": false,
+      "time": 14534.700000286102,
+      "defaultPrevented": false,
+      "model": "Slate 富文本原文。",
+      "modelSelection": {
+        "anchor": {
+          "path": [
+            0,
+            0
+          ],
+          "offset": 12
+        },
+        "focus": {
+          "path": [
+            0,
+            0
+          ],
+          "offset": 12
+        }
+      },
+      "domSelection": "",
+      "dom": "Slate 富文本原文。"
+    }
+  ],
+  "slateSummary": {
+    "rounds": 5,
+    "passed": 5,
+    "providerRequests": 4,
+    "cacheHits": 1
+  },
+  "completed": true
+}

@@ -2,7 +2,7 @@ import {afterEach, beforeEach, describe, expect, it, vi} from 'vitest';
 import {readFileSync} from 'node:fs';
 import {parseHTML} from 'linkedom';
 
-import {sendErrorMessage, showPageNotice} from '@/src/features/page-notice/public';
+import {sendErrorMessage, showPageNotice, dismissPageNotice} from '@/src/features/page-notice/public';
 import {config} from '@/src/services/config/store';
 import {registerAllUiLanguageBundles} from '@/src/core/i18n/bundles';
 
@@ -12,8 +12,168 @@ const originalBrowser = (globalThis as typeof globalThis & {browser?: unknown}).
 
 const sendMessage = vi.fn(async () => ({success: true}));
 const noticeCss = readFileSync(new URL('../src/features/page-notice/content/notice.css', import.meta.url), 'utf8');
+const originalTheme = config.theme;
+
+function noticeEvent(node: Element, type: string, properties: Record<string, unknown> = {}): Event {
+    const event = new window.Event(type, {bubbles: true, cancelable: true});
+    Object.assign(event, properties);
+    node.dispatchEvent(event);
+    return event;
+}
 
 describe('page error notice', () => {
+    it('成功开始后按功能 key 清理旧提示，保留其他通知且空 key 或不存在的 key 无副作用', async () => {
+        const retry = showPageNotice('选区失效', 'error', {key: 'context-menu'});
+        const unrelated = showPageNotice('独立反馈', 'success', {key: 'copy'});
+        const anonymous = showPageNotice('无所属反馈', 'error');await Promise.resolve();
+        dismissPageNotice('');dismissPageNotice('missing');expect(vi.getTimerCount()).toBe(3);
+        noticeEvent(retry, 'mouseenter');expect(vi.getTimerCount()).toBe(2);
+        dismissPageNotice('context-menu');dismissPageNotice('context-menu');
+        expect(retry.classList.contains('is-leaving')).toBe(true);expect(vi.getTimerCount()).toBe(3);
+        await vi.advanceTimersByTimeAsync(180);expect(retry.isConnected).toBe(false);
+        expect(unrelated.isConnected).toBe(true);expect(anonymous.isConnected).toBe(true);expect(vi.getTimerCount()).toBe(2);
+        noticeEvent(retry, 'mouseleave');expect(vi.getTimerCount()).toBe(2);
+    });
+    it('未显示任何通知时撤销 key 不创建宿主或任务', () => {
+        dismissPageNotice('context-menu');expect(document.getElementById('fluent-read-page-notice-host')).toBeNull();expect(vi.getTimerCount()).toBe(0);
+    });
+    it('悬停暂停自动关闭，离开后按剩余时间恢复且保持一个计时器', async () => {
+        const notice = showPageNotice('正在阅读详情', 'error');await Promise.resolve();
+        await vi.advanceTimersByTimeAsync(1000);
+        noticeEvent(notice, 'mouseenter');noticeEvent(notice, 'mouseenter');
+        expect(vi.getTimerCount()).toBe(0);
+        await vi.advanceTimersByTimeAsync(30_000);expect(notice.isConnected).toBe(true);
+        noticeEvent(notice, 'mouseleave');noticeEvent(notice, 'mouseleave');
+        expect(vi.getTimerCount()).toBe(1);
+        await vi.advanceTimersByTimeAsync(2499);expect(notice.classList.contains('is-leaving')).toBe(false);
+        await vi.advanceTimersByTimeAsync(1);expect(notice.classList.contains('is-leaving')).toBe(true);
+        await vi.advanceTimersByTimeAsync(180);expect(notice.isConnected).toBe(false);expect(vi.getTimerCount()).toBe(0);
+    });
+    it('到期前悬停离开仍有最少阅读余量，关闭动画中的交互不能重新计时', async () => {
+        const notice = showPageNotice('详情', 'error');await Promise.resolve();
+        await vi.advanceTimersByTimeAsync(3400);noticeEvent(notice, 'mouseenter');noticeEvent(notice, 'mouseleave');
+        await vi.advanceTimersByTimeAsync(1499);expect(notice.classList.contains('is-leaving')).toBe(false);
+        await vi.advanceTimersByTimeAsync(1);noticeEvent(notice, 'mouseenter');noticeEvent(notice, 'mouseleave');
+        expect(vi.getTimerCount()).toBe(1);await vi.advanceTimersByTimeAsync(180);expect(notice.isConnected).toBe(false);
+    });
+    it('键盘焦点和悬停独立暂停，在通知内部移动焦点不恢复倒计时', async () => {
+        const notice = showPageNotice('DeepSeek 需要 API Key，当前尚未配置', 'error');await Promise.resolve();
+        const action = notice.querySelector('.notice-action')!, close = notice.querySelector('.notice-close')!;
+        noticeEvent(action, 'focusin', {relatedTarget: null});noticeEvent(notice, 'mouseenter');
+        noticeEvent(action, 'focusout', {relatedTarget: close});noticeEvent(close, 'focusin', {relatedTarget: action});
+        noticeEvent(notice, 'mouseleave');expect(vi.getTimerCount()).toBe(0);
+        await vi.advanceTimersByTimeAsync(20_000);expect(notice.isConnected).toBe(true);
+        noticeEvent(close, 'focusout', {relatedTarget: null});expect(vi.getTimerCount()).toBe(1);
+        await vi.advanceTimersByTimeAsync(6500 + 180);expect(notice.isConnected).toBe(false);
+    });
+    it('停留期间同 key 只更新当前通知，保持可见且从最新阅读时长恢复', async () => {
+        const notice = showPageNotice('第一条详情', 'error', {key: 'context-menu', durationMs: 6000});
+        noticeEvent(notice, 'mouseenter');await Promise.resolve();
+        expect(notice.classList.contains('is-visible')).toBe(true);expect(vi.getTimerCount()).toBe(0);
+        for (let index = 0; index < 100; index++) expect(showPageNotice(`新详情 ${index}`, 'error', {key: 'context-menu', durationMs: 6000})).toBe(notice);
+        await vi.advanceTimersByTimeAsync(20_000);expect(notice.textContent).toContain('新详情 99');expect(vi.getTimerCount()).toBe(0);
+        noticeEvent(notice, 'mouseleave');expect(vi.getTimerCount()).toBe(1);
+        await vi.advanceTimersByTimeAsync(5999);expect(notice.classList.contains('is-leaving')).toBe(false);
+        await vi.advanceTimersByTimeAsync(181);expect(notice.isConnected).toBe(false);
+    });
+    it('暂停时关闭按钮仍清理通知，abort 即时清理任务和交互监听', async () => {
+        const closed = showPageNotice('可关闭', 'success');noticeEvent(closed, 'mouseenter');
+        closed.querySelector<HTMLButtonElement>('.notice-close')!.click();expect(vi.getTimerCount()).toBe(1);
+        await vi.advanceTimersByTimeAsync(180);expect(closed.isConnected).toBe(false);
+        const controller = new AbortController();const aborted = showPageNotice('可取消', 'error', {signal: controller.signal});
+        noticeEvent(aborted, 'focusin', {relatedTarget: null});
+        const removeListener = vi.spyOn(aborted, 'removeEventListener');controller.abort();
+        expect(aborted.isConnected).toBe(false);expect(vi.getTimerCount()).toBe(0);expect(removeListener).toHaveBeenCalledTimes(5);
+        noticeEvent(aborted, 'mouseleave');noticeEvent(aborted, 'focusout', {relatedTarget: null});
+        expect(vi.getTimerCount()).toBe(0);
+    });
+    it.each(['hover', 'focus'] as const)('关闭动画期间 %s 离开后，同 key 再次反馈正常恢复倒计时', async interaction => {
+        const previous = document.createElement('button');document.body.appendChild(previous);
+        Object.defineProperty(document, 'activeElement', {value: previous, configurable: true});
+        const notice = showPageNotice('第一次反馈', 'error', {key: 'revive'});await Promise.resolve();
+        const close = notice.querySelector<HTMLButtonElement>('.notice-close')!;
+        if (interaction === 'hover') noticeEvent(notice, 'mouseenter');
+        else {
+            noticeEvent(close, 'focusin', {relatedTarget: previous});
+            Object.defineProperty(document, 'activeElement', {value: close, configurable: true});
+            vi.spyOn(previous, 'focus').mockImplementation(() => {
+                Object.defineProperty(document, 'activeElement', {value: previous, configurable: true});
+                noticeEvent(close, 'focusout', {relatedTarget: previous});
+            });
+        }
+        close.click();
+        if (interaction === 'hover') noticeEvent(notice, 'mouseleave');
+        expect(vi.getTimerCount()).toBe(1);
+        expect(showPageNotice('再次反馈', 'error', {key: 'revive'})).toBe(notice);
+        expect(vi.getTimerCount()).toBe(1);await vi.advanceTimersByTimeAsync(3500 + 180);
+        expect(notice.isConnected).toBe(false);expect(vi.getTimerCount()).toBe(0);
+    });
+    it('abort 恢复页面焦点时同步 focusout 不会给已释放通知重建计时器', async () => {
+        const previous = document.createElement('button');document.body.appendChild(previous);
+        Object.defineProperty(document, 'activeElement', {value: previous, configurable: true});
+        const controller = new AbortController();
+        const notice = showPageNotice('功能结束', 'error', {signal: controller.signal});await Promise.resolve();
+        const close = notice.querySelector('.notice-close')!;
+        noticeEvent(close, 'focusin', {relatedTarget: previous});
+        Object.defineProperty(document, 'activeElement', {value: close, configurable: true});
+        vi.spyOn(previous, 'focus').mockImplementation(() => {
+            Object.defineProperty(document, 'activeElement', {value: previous, configurable: true});
+            noticeEvent(close, 'focusout', {relatedTarget: previous});
+        });
+        controller.abort();expect(notice.isConnected).toBe(false);expect(vi.getTimerCount()).toBe(0);
+    });
+    it('已释放通知的迟到交互回调不能恢复计时器', () => {
+        const add = vi.spyOn(window.HTMLElement.prototype, 'addEventListener');
+        try {
+            const controller = new AbortController();showPageNotice('旧通知', 'error', {signal: controller.signal});
+            const leave = add.mock.calls.find(([type]) => type === 'mouseleave')![1] as EventListener;
+            controller.abort();leave(new window.Event('mouseleave'));
+            expect(vi.getTimerCount()).toBe(0);
+        } finally {add.mockRestore();}
+    });
+    it('只处理通知内部 Escape，关闭时返回进入前页面焦点且不抢焦点', async () => {
+        const original = document.createElement('button');document.body.appendChild(original);
+        const previousFocus = vi.spyOn(original, 'focus');
+        Object.defineProperty(document, 'activeElement', {value: original, configurable: true});
+        const notice = showPageNotice('键盘可关闭', 'error');await Promise.resolve();
+        expect(previousFocus).not.toHaveBeenCalled();
+        const close = notice.querySelector('.notice-close')!;
+        noticeEvent(close, 'focusin', {relatedTarget: original});
+        Object.defineProperty(document, 'activeElement', {value: close, configurable: true});
+        const ordinary = noticeEvent(close, 'keydown', {key: 'Enter'});expect(ordinary.defaultPrevented).toBe(false);
+        const pageEscape = noticeEvent(original, 'keydown', {key: 'Escape'});expect(pageEscape.defaultPrevented).toBe(false);
+        expect(notice.isConnected).toBe(true);
+        const escape = noticeEvent(close, 'keydown', {key: 'Escape'});expect(escape.defaultPrevented).toBe(true);
+        expect(previousFocus).toHaveBeenCalledWith({preventScroll: true});
+        Object.defineProperty(document, 'activeElement', {value: original, configurable: true});
+        await vi.advanceTimersByTimeAsync(180);expect(notice.isConnected).toBe(false);
+    });
+    it.each(['missing', 'disconnected', 'foreign-document', 'not-focusable'] as const)('关闭时不尝试返回无效的 %s 焦点目标', async reason => {
+        const original = document.createElement('button');document.body.appendChild(original);
+        const focus = vi.spyOn(original, 'focus');
+        Object.defineProperty(document, 'activeElement', {value: reason === 'missing' ? null : original, configurable: true});
+        const notice = showPageNotice('焦点来源失效', 'error');const close = notice.querySelector<HTMLButtonElement>('.notice-close')!;
+        Object.defineProperty(document, 'activeElement', {value: close, configurable: true});
+        if (reason === 'disconnected') original.remove();
+        if (reason === 'foreign-document') Object.defineProperty(original, 'ownerDocument', {value: parseHTML('<html/>').document});
+        if (reason === 'not-focusable') Object.defineProperty(original, 'focus', {value: undefined});
+        close.click();expect(focus).not.toHaveBeenCalled();
+        await vi.advanceTimersByTimeAsync(180);expect(notice.isConnected).toBe(false);
+    });
+    it.each([
+        [6000, 6000], [1, 1000], [60_000, 30_000], [0, 3500], [-1, 3500], [NaN, 3500], [Infinity, 3500], ['6000', 3500],
+    ])('阅读时长 %s 有界且最终会关闭', async (duration, expected) => {
+        const notice = showPageNotice('有界时长', 'error', {durationMs: duration as number});await Promise.resolve();
+        await vi.advanceTimersByTimeAsync(Number(expected) - 1);expect(notice.classList.contains('is-leaving')).toBe(false);
+        await vi.advanceTimersByTimeAsync(181);expect(notice.isConnected).toBe(false);expect(vi.getTimerCount()).toBe(0);
+    });
+    it.each(['light', 'dark', 'auto', 'invalid'])('通知仅依扩展设置更新 %s 主题，同 key 重用也更新 host', theme => {
+        config.theme = theme;const notice = showPageNotice('主题', 'error', {key: 'theme'});
+        const host = document.getElementById('fluent-read-page-notice-host')!;
+        expect(host.getAttribute('data-fr-theme')).toBe(theme === 'invalid' ? 'auto' : theme);
+        config.theme = 'dark';expect(showPageNotice('主题更新', 'error', {key: 'theme'})).toBe(notice);
+        expect(host.getAttribute('data-fr-theme')).toBe('dark');
+    });
     it('已显示且文案相同的通知不重写角色、关闭标签或内容', async () => {
         const notice = showPageNotice('DeepSeek 需要 API Key，当前尚未配置', 'error', {key: 'credential'});await Promise.resolve();
         const attribute = vi.spyOn(notice, 'setAttribute');const close = vi.spyOn(notice.querySelector('.notice-close')!, 'setAttribute');
@@ -167,6 +327,7 @@ describe('page error notice', () => {
 
     beforeEach(() => {
         vi.useFakeTimers();
+        config.theme = originalTheme;
         sendMessage.mockClear();
         const {document, window} = parseHTML(`
             <html>
@@ -193,8 +354,10 @@ describe('page error notice', () => {
     });
 
     afterEach(() => {
+        document.getElementById('fluent-read-page-notice-host')?.shadowRoot?.querySelectorAll<HTMLButtonElement>('.notice-close').forEach(close => close.click());
         vi.runAllTimers();
         vi.useRealTimers();
+        config.theme = originalTheme;
         Object.defineProperty(globalThis, 'document', {value: originalDocument, configurable: true});
         Object.defineProperty(globalThis, 'window', {value: originalWindow, configurable: true});
         Object.defineProperty(globalThis, 'browser', {value: originalBrowser, configurable: true});
@@ -303,6 +466,7 @@ describe('page error notice', () => {
             expect(details[0]).toBe(detail);
             expect(details[1]).toBe(imageFailure);
             expect(shadow.querySelector<HTMLImageElement>('img.notice-mark')?.alt).toBe('FluentRead');
+            expect(shadow.querySelector('img.notice-mark')?.getAttribute('aria-hidden')).toBe('true');
         } finally {
             config.uiLanguage = previousLanguage;
         }

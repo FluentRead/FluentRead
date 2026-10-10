@@ -37,9 +37,13 @@ Bilingual output needs an input that supports multiple lines. In a single-line i
 
 ## Cancel or restore
 
-Press **Esc** while translating to cancel writing back. If you keep editing, a late result will not overwrite the newer text.
+Press **Esc** or select **Cancel** in the status message to stop the request. Editing cancels it automatically. Leaving a rich-text editor also cancels translation so a late result cannot pull focus back. Translation in a regular input field preserves the focus and selection in other controls.
+
+Triggering translation again while the same content is still being translated keeps the current request. Triple-key triggers remove only the two characters inserted by that trigger, leaving the original text clean after a failure or cancellation. If a request stops responding, waiting ends automatically. Select **Retry** in the failure message to try again; an old retry cannot overwrite newly edited text.
 
 After translation, use **Restore original** in the success message before making another edit. Rich-text restoration restores the text; use the editor's Undo to recover formatting such as links and mentions.
+
+If an editor rejects automatic insertion, the message keeps a selectable translation that you can copy and paste manually or dismiss.
 
 Password fields and code editors are excluded. Translation does not send your reply.
 

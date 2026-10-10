@@ -1,5 +1,7 @@
 import {beforeEach, describe, expect, it, vi} from 'vitest';
 import {CONFIG_COUNT_INCREMENT_MESSAGE} from '@/src/services/config/count';
+import {Config} from '@/src/core/config/model';
+import {TRANSLATION_CANCEL_MESSAGE_TYPE} from '@/src/services/translation/types';
 
 const mocks = vi.hoisted(() => ({
     config: {count: 0},
@@ -19,6 +21,12 @@ vi.mock('@/src/services/config/store', () => ({
     configReady: Promise.resolve(),
     CONFIG_HISTORY_MESSAGE: 'configHistoryAction',
     CONFIG_PERSIST_MESSAGE: 'persistConfig',
+    CONFIG_PERSIST_BATCH_MESSAGE: 'persistConfigBatch',
+    CONFIG_STORAGE_KEY: 'local:config',
+    getConfigRevision: () => 0,
+    prepareConfigPatchRequest: vi.fn(),
+    prepareConfigSaveRequest: vi.fn(),
+    parseStoredConfig: vi.fn(),
     saveConfig: mocks.saveConfig,
     applyConfigHistoryAction: mocks.applyConfigHistoryAction,
 }));
@@ -49,8 +57,13 @@ vi.mock('@/src/features/selection-translation/services/wordDictionary', () => ({
     lookupWord: mocks.lookupWord,
 }));
 
+vi.mock('@/userscript/storage', () => ({configStorage: {watch: () => () => undefined}}));
+vi.mock('@/src/platform/storage/modelUsageRepository', () => ({modelUsageRepository: {}}));
+vi.mock('@/src/features/vocabulary/repository', () => ({vocabularyBook: {}}));
+
 import {createPlatformMessageHandler} from '@/userscript/platform';
-import {getTranslationGlossaryContext} from '@/src/services/translation/requestSnapshot';
+import {createPlatformMessageHandler as createFullPlatformMessageHandler} from '@/userscript/platformFull';
+import {getTranslationGlossaryContext, getTranslationRequestControl} from '@/src/services/translation/requestSnapshot';
 
 describe('userscript 平台消息适配', () => {
     it('免费池逐服务检查保留候选 ID，避免脚本端退回自动换线', async () => {
@@ -73,7 +86,9 @@ describe('userscript 平台消息适配', () => {
     });
     beforeEach(() => {
         vi.clearAllMocks();
+        Object.assign(mocks.config, new Config());
         mocks.config.count = 0;
+        mocks.translateWithCache.mockReset();
         mocks.saveConfig.mockResolvedValue(undefined);
         mocks.incrementUserscriptConfigCount.mockResolvedValue(14);
     });
@@ -116,5 +131,43 @@ describe('userscript 平台消息适配', () => {
         });
         expect(mocks.incrementUserscriptConfigCount).not.toHaveBeenCalled();
         expect(mocks.saveConfig).not.toHaveBeenCalled();
+    });
+
+    describe.each([
+        ['兼容', createPlatformMessageHandler],
+        ['完整', createFullPlatformMessageHandler],
+    ] as const)('%s userscript 输入框取消', (_name, createHandler) => {
+        it('共享取消消息可以终止输入框的真实后台请求', async () => {
+            let started!: () => void;
+            const providerStarted = new Promise<void>(resolve => {started = resolve;});
+            let signal!: AbortSignal;
+            mocks.translateWithCache.mockImplementation(async (request) => {
+                signal = getTranslationRequestControl(request)!.signal;
+                started();
+                return new Promise<string>((_resolve, reject) => signal.addEventListener('abort', () => {
+                    const error = new Error('provider cancelled'); error.name = 'AbortError'; reject(error);
+                }, {once: true}));
+            });
+            const handler = createHandler(vi.fn());
+            const translation = handler({type: 'inputBoxTranslation', text: 'Hello', targetLang: 'ja', clientRequestId: 'userscript-input-active'});
+            await providerStarted;
+            await expect(handler({type: TRANSLATION_CANCEL_MESSAGE_TYPE, clientRequestId: 'userscript-input-active'}))
+                .resolves.toMatchObject({success: true, cancelled: true});
+            expect(signal.aborted).toBe(true);
+            await expect(translation).resolves.toMatchObject({success: false, error: 'provider cancelled'});
+            if ('dispose' in handler && typeof handler.dispose === 'function') handler.dispose();
+        });
+
+        it('先取消后触发不调用 provider，错误取消标识返回明确失败', async () => {
+            const handler = createHandler(vi.fn());
+            await expect(handler({type: TRANSLATION_CANCEL_MESSAGE_TYPE, clientRequestId: 'userscript-input-pending'}))
+                .resolves.toMatchObject({success: true, cancelled: false});
+            await expect(handler({type: 'inputBoxTranslation', text: 'Hello', targetLang: 'ja', clientRequestId: 'userscript-input-pending'}))
+                .resolves.toMatchObject({success: false, error: '翻译请求已取消'});
+            await expect(handler({type: TRANSLATION_CANCEL_MESSAGE_TYPE, clientRequestId: 'invalid id'}))
+                .resolves.toMatchObject({success: false, error: '翻译请求 clientRequestId 格式无效'});
+            expect(mocks.translateWithCache).not.toHaveBeenCalled();
+            if ('dispose' in handler && typeof handler.dispose === 'function') handler.dispose();
+        });
     });
 });

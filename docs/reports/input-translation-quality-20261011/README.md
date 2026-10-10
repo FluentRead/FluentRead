@@ -112,6 +112,18 @@ node scripts/run-rich-text-input-editors-test.cjs \
 
 浏览器使用固定的整合生产构建副本，供应商仍为确定性本地夹具；Firefox/userscript 验证限于构建与产物。本节证据不表示外部供应商或 GitHub 托管 CI 通过。
 
+## PR 最终整合复验（bbae4100 / #933）
+
+PR 创建后的合并门禁发现 main 已合入右键菜单与通知优化 #933，导致体积预算冲突。再次将 bbae4100 整合为 e45b5c686，保留两侧的体积记录和全部守门断言。输入七个业务文件的补丁依然与原审核版本相同；独立复核确认新消息路由不截获输入翻译及取消消息，通知不共用输入提示的节点、焦点与定时器，userscript 文案裁剪保留输入协议与文案。
+
+相关回归增加 contentMessageRuntime 与 userscriptViteConfig，21 文件、1,518 个用例全部通过。类型检查、Chrome/Firefox/userscript 构建、完整 userscript verifier、manifest 检查、文档和 Storybook 构建校验均通过。测试归类审计为 640 文件、10,630 条用例。
+
+最终固定生产包的隔离 Edge 复验：输入交互 29/29、五种真实编辑器翻译及恢复 DOM/模型 5/5、Slate 连续操作及缓存 5/5。两脚本均 exit 0，无页面错误或前台抢占；连续五次快捷键仅一个请求，观察到六次实际请求取消。最终证据：[输入报告](./pr-integration-933/input-browser-report.json)、[编辑器报告](./pr-integration-933/real-editors-report.json)、[测试日志](./pr-integration-933/related-tests.txt)、[构建与审核记录](./pr-integration-933/verification.json)。
+
+同锁独立 main 为 2,001,158 字节，输入候选为 2,009,853 字节，增加 8,695 字节（0.4345%）。利用主线余量后，将 2,002,000 预算最小增加 8 KB 至 2,010,000，剩余 147 字节。所有基线、源码、产物和锁文件指纹保存在最终记录；前两节原始证据继续保留。
+
+后续提交仅添加报告，业务源码和构建产物不变。供应商响应使用确定性本地夹具，Firefox/userscript 限于构建与产物检查；无 GitHub 托管检查记录不记作 CI 通过。
+
 ## 验证边界
 
 浏览器验证使用生产 Chrome MV3 构建、临时 Edge profile、第二屏后台窗口和真实键盘/指针事件。供应商响应由本地确定性夹具提供，验证请求次数、参数、AbortSignal 和写入交互，不衡量外部服务连通性、账号认证或模型翻译质量。真实编辑器验证使用 Quill、ProseMirror、Lexical、Slate 和 Draft.js 的公开实现，不能覆盖具体网站的所有定制插件。

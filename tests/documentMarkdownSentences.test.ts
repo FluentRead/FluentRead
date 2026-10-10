@@ -21,7 +21,7 @@ describe('Markdown whole-sentence translation', () => {
     });
 
     it('keeps one segment per line and protects link targets, code, URLs and tags with placeholders', () => {
-        expect(sources(line)).toEqual(['Read the <g1>setup guide</g1> before <g2/> starts, and keep **bold** words.']);
+        expect(sources(line)).toEqual(['Read the <g1>setup guide</g1> before <g2/> starts, and keep <g3>bold</g3> words.']);
         expect(sources('- See <https://example.com> or #tag for details')).toEqual(['- See <g1/> or<g2/> for details']);
         // 图片、双链和文字为空的链接整体保护。
         expect(sources('An ![alt text](a.png) image, a [[Wiki Link]] and an [](empty) here')).toEqual(['An <g1/> image, a <g2/> and an <g3/> here']);
@@ -37,18 +37,30 @@ describe('Markdown whole-sentence translation', () => {
     });
 
     it('restores links, code and URLs inside the translated sentence', () => {
-        const zh = '在 <g2/> 开始之前请阅读<g1>安装指南</g1>，并保留**粗体**。';
+        const zh = '在 <g2/> 开始之前请阅读<g1>安装指南</g1>，并保留<g3>粗体</g3>。';
         const restored = '在 `npm install` 开始之前请阅读[安装指南](https://example.com/setup)，并保留**粗体**。';
         expect(output(line, [zh])).toBe(restored);
         expect(output(line, [zh], 'bilingual')).toBe(`${line}\n> ${restored}`);
         expect(output(`  ${line}  \nNext line.`, [zh, '下一行。'])).toBe(`  ${restored}  \n下一行。`);
         // 服务把占位符写成实体、全角或括号形式，或把单个占位符写成一对空标签。
-        for (const variant of ['在 &lt;g2/&gt; 开始之前请阅读&lt;g1&gt;安装指南&lt;/g1&gt;，并保留**粗体**。', '在 （g2/） 开始之前请阅读（g1）安装指南（/g1），并保留**粗体**。', '在 <g2></g2> 开始之前请阅读< G1 >安装指南</ g1 >，并保留**粗体**。'])
+        for (const variant of ['在 &lt;g2/&gt; 开始之前请阅读&lt;g1&gt;安装指南&lt;/g1&gt;，并保留&lt;g3&gt;粗体&lt;/g3&gt;。', '在 （g2/） 开始之前请阅读（g1）安装指南（/g1），并保留（g3）粗体（/g3）。', '在 <g2></g2> 开始之前请阅读< G1 >安装指南</ g1 >，并保留<g3>粗体</g3>。'])
             expect(output(line, [variant]), variant).toBe(restored);
         // 译文与原文相同（服务原样返回）时保留原行，不显示占位符。
         expect(output(line, [parse(line).segments[0].source])).toBe(line);
         expect(output(line, [parse(line).segments[0].source], 'bilingual')).toBe(line);
         expect(output(line, [])).toBe(line);
+    });
+
+
+    it('preserves bold and italic markers while translating their words, with code and escaped markers untouched', () => {
+        const line = 'Keep **bold** and __strong__ with *italic* and _emphasis_, `**code**` and snake_case.';
+        expect(sources(line)).toEqual(['Keep <g1>bold</g1> and <g2>strong</g2> with <g3>italic</g3> and <g4>emphasis</g4>, <g5/> and snake_case.']);
+        expect(output(line, ['保留<g1>粗体</g1>和<g2>强调</g2>、<g3>斜体</g3>、<g4>重点</g4>，<g5/>与 snake_case。']))
+            .toBe('保留**粗体**和__强调__、*斜体*、_重点_，`**code**`与 snake_case。');
+        expect(sources(String.raw`Literal \*stars\* and unclosed **marker`)).toEqual([String.raw`Literal \*stars\* and unclosed **marker`]);
+        const document = parse('Translate this paragraph and keep **bold** text.');
+        expect(documentSegmentMarkupSources(document).get(0)).toBe('Translate this paragraph and keep **bold** text.');
+        expect(output('**B**', ['<g1>粗</g1>'])).toBe('**粗**');
     });
 
     it('falls back to the whole sentence and re-appends protected content the service dropped', () => {

@@ -164,7 +164,7 @@ describe('documentbinaryAudit actual DocumentApp SFC ownership', () => {
         }
         await vi.waitFor(async () => {
             const saved = await history.load(id);
-            expect(saved?.parsedVersion).toBe(8);
+            expect(saved?.parsedVersion).toBe(9);
             expect(saved?.translations).toEqual(expectedTranslations);
             expect((saved?.parsed as any).segments.map((segment: any) => segment.source)).toEqual(expectedSources);
             expect(saved?.parsed).not.toHaveProperty('segmentOrigins');

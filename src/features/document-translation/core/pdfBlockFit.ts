@@ -47,9 +47,13 @@ export function pdfOverlayBlocks(page: PdfDocumentPage): PdfOverlayBlock[] {
             return other !== sourceBlock && protectedSource && other.y < bottom(sourceBlock) && bottom(other) > sourceBlock.y
                 && other.x > sourceBlock.x + sourceBlock.width * 0.75 && other.x < right(sourceBlock) && right(other) >= right(sourceBlock) - sourceBlock.fontSize * 2
                 ? Math.min(edge, other.x - 1.5) : edge;
-        }, right(sourceBlock));
-        const block = rightInset < right(sourceBlock) ? {...sourceBlock, width: Math.max(1, rightInset - sourceBlock.x)} : sourceBlock;
-        let limit = contentHeight, edge = Math.max(right(block), contentWidth - Math.max(0, block.x));
+        }, Math.min(right(sourceBlock), sourceBlock.cellBounds ? right(sourceBlock.cellBounds) - 0.5 : Infinity));
+        const cellBottom = sourceBlock.cellBounds ? bottom(sourceBlock.cellBounds) - 0.5 : contentHeight;
+        const clippedHeight = Math.max(1, Math.min(sourceBlock.height, cellBottom - sourceBlock.y));
+        const block = rightInset < right(sourceBlock) || clippedHeight < sourceBlock.height
+            ? {...sourceBlock, width: Math.max(1, rightInset - sourceBlock.x), height: clippedHeight} : sourceBlock;
+        let limit = Math.min(contentHeight, cellBottom), edge = Math.min(sourceBlock.cellBounds ? right(sourceBlock.cellBounds) - 0.5 : Infinity,
+            Math.max(right(block), contentWidth - Math.max(0, block.x)));
         for (const other of neighbours) {
             if (other === sourceBlock) continue;
             if (other.y >= bottom(block) - 1 && other.x < right(block) && right(other) > block.x) limit = Math.min(limit, other.y);

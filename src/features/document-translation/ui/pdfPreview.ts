@@ -384,12 +384,13 @@ function* paintPdfTranslationSteps(
             context.fillStyle = `rgb(${background[0]}, ${background[1]}, ${background[2]})`;
             const rectangles = block.lines?.flatMap(line => line.runs?.length ? line.runs : [line]);
             const erase = rectangles?.length ? rectangles.map(rect => ({x: rect.x * scaleX, y: rect.y * scaleY, width: rect.width * scaleX, height: rect.height * scaleY})) : [{x, y, width: block.width * scaleX, height: block.height * scaleY}];
+            const cell = block.cellBounds;
             erase.forEach(rect => {
-                const left = Math.max(0, rect.x - padding);
-                const top = Math.max(0, rect.y - padding);
-                const right = Math.min(virtualWidth, rect.x + rect.width + padding);
-                const bottom = Math.min(virtualHeight, rect.y + rect.height + padding);
-                context.fillRect(left, top, Math.max(1, right - left), Math.max(1, bottom - top));
+                const left = Math.max(0, rect.x - padding, cell ? (cell.x + 0.5) * scaleX : 0);
+                const top = Math.max(0, rect.y - padding, cell ? (cell.y + 0.5) * scaleY : 0);
+                const right = Math.min(virtualWidth, rect.x + rect.width + padding, cell ? (cell.x + cell.width - 0.5) * scaleX : virtualWidth);
+                const bottom = Math.min(virtualHeight, rect.y + rect.height + padding, cell ? (cell.y + cell.height - 0.5) * scaleY : virtualHeight);
+                if (right > left && bottom > top) context.fillRect(left, top, right - left, bottom - top);
             });
             if ((index + 1) % 16 === 0) yield;
         }

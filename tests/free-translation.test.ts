@@ -79,6 +79,34 @@ beforeEach(async () => {
 afterEach(() => { vi.restoreAllMocks(); vi.useRealTimers(); vi.unstubAllGlobals(); });
 
 describe('免费翻译服务', () => {
+    it('候选损坏术语标记时在免费池内部换线，只影响当前文字', async () => {
+        mockConfig.freeTranslationOrder = ['youdaoFree', 'google'];
+        const token = '__FRTERM_123456789abc_0__';
+        chineseMock.mockResolvedValue('使用 FRTERM 123456789abc 0。');
+        googleMock.mockImplementation(async (source: string) => `译文:${source}`);
+        const request = attachTranslationProviderConfig({origin: `Use ${token} here.`},
+            createTranslationProviderConfigSnapshot({...mockConfig, glossaryProtectedTokens: [token]} as unknown as TranslationConfigSource));
+        await expect(settle(freeTranslation(request))).resolves.toBe(`译文:Use ${token} here.`);
+        expect(chineseMock).toHaveBeenCalledOnce();
+        expect(googleMock).toHaveBeenCalledOnce();
+        expect((await getFreeTranslationWeightSnapshot()).entries.find(entry => entry.providerId === 'youdaoFree')?.status).toBe('ready');
+        await expect(settle(translateFreeText('Ordinary prose.'))).resolves.toBe('使用 FRTERM 123456789abc 0。');
+        expect(chineseMock).toHaveBeenCalledTimes(2);
+    });
+
+    it('原生免费批次也逐槽验证术语，拒绝串入相邻段标记并按原顺序换线', async () => {
+        mockConfig.freeTranslationOrder = ['microsoft', 'google'];
+        const tokens = Array.from({length: 9}, (_, index) => `__FRTERM_123456789abc_${index}__`);
+        const origins = tokens.map(token => `Use ${token} here.`);
+        microsoftMock.mockImplementation(async (texts: string[]) => texts.map(text => `译文:${text} ${tokens[8]}`));
+        googleOwnerMock.mockImplementation(async (texts: string[]) => texts.map(text => `译文:${text}`));
+        const request = attachTranslationProviderConfig({origin: origins},
+            createTranslationProviderConfigSnapshot({...mockConfig, glossaryProtectedTokens: tokens} as unknown as TranslationConfigSource));
+        await expect(settle(freeTranslation(request))).resolves.toEqual(origins.map(text => `译文:${text}`));
+        expect(googleOwnerMock).toHaveBeenCalled();
+        expect(googleMock).not.toHaveBeenCalled();
+    });
+
     it('已确认不支持的 Apertium 方向只在当前方向跳过，配置和连接健康身份不变', async () => {
         mockConfig.freeTranslationOrder = ['apertiumFree', 'google'];
         let unsupported = false;

@@ -80,6 +80,8 @@ describe('real PDF structural parsing', () => {
                 expect(heading).toBeDefined(); expect(paragraph).toBeDefined();
                 expect(heading.block.y + heading.block.height + heading.spaceBelow).toBeLessThan(paragraph.y);
                 expect(heading.spaceBelow).toBeLessThan(12);
+                expect(segments.some(segment => segment.source === 'ABSTRACT')).toBe(true);
+                expect(layout.blocks.filter(block => block.kind === 'figure-label').map(block => block.source)).toEqual(['Parse', 'Translate', 'Render']);
                 expect(pageData.blocks.every(block => [block.x, block.y, block.width, block.height].every(Number.isFinite))).toBe(true);
                 // v7 缺正文的旧快照在 v8 重解析后，新增正文不能抢占未变标题的人工校订。
                 const oldSegments = segments.filter(segment => segment.source === 'Document Translation Example' || /^\d+\s/u.test(segment.source))
@@ -89,9 +91,50 @@ describe('real PDF structural parsing', () => {
                     {fileName: 'sample.pdf', format: 'pdf', label: 'PDF', parts: [], segments}, 8);
                 expect(restored[heading.block.segmentIndex]).toBe('校订：4 VISUAL INVARIANTS');
                 expect(restored[paragraph.segmentIndex]).toBe('');
+                const tablePage = await pdf.getPage(2);
+                try {
+                    const tableViewport = tablePage.getViewport({scale: 1}), tableContent = await tablePage.getTextContent();
+                    const tableAtoms = pdfTextAtoms(tableContent.items.filter(item => 'str' in item), tableContent.styles as Record<string, PdfTextStyle>, tableViewport, true) as PdfLayoutAtom[];
+                    const tableGraphics = extractPdfGraphicsShapes(await tablePage.getOperatorList(), OPS, tableViewport);
+                    const tableLayout = analyzePdfPageLayout({atoms: tableAtoms, graphics: tableGraphics, width: tableViewport.width, height: tableViewport.height});
+                    const tableSegments: DocumentSegment[] = [];
+                    const tableData: PdfDocumentPage = {pageNumber: 2, width: tableViewport.width, height: tableViewport.height,
+                        ...pdfPageSegments(tableLayout.blocks, 2, tableSegments), preservedRegions: tableLayout.preservedRegions};
+                    const cells = tableData.blocks.filter(block => block.kind === 'table');
+                    expect(cells).toHaveLength(12);
+                    expect(cells.every(cell => cell.segmentIndex >= 0 && cell.cellBounds && !cell.preserveSource && cell.lineCount === 1)).toBe(true);
+                    expect(cells.map(cell => tableSegments[cell.segmentIndex].source)).toEqual(expect.arrayContaining(['Capability', 'Expected', 'Evidence',
+                        'Page dimensions', 'Two-column flow', 'Figures and charts', 'Non-text page graphics remain in place']));
+                    expect(tableSegments.filter(segment => segment.source === 'Preserved')).toHaveLength(3);
+                    const capability = pdfOverlayBlocks(tableData).find(entry => tableSegments[entry.block.segmentIndex]?.source === 'Capability')!;
+                    expect(capability.block.y + capability.block.height + capability.spaceBelow).toBeLessThan(133);
+                    expect(capability.block.x + capability.block.width + capability.spaceRight).toBeLessThan(203);
+                    expect(tableLayout.preservedRegions.filter(region => region.kind === 'figure')).toHaveLength(3);
+                } finally {tablePage.cleanup();}
                 expect(bytes).toEqual(before);
             } finally {page.cleanup();}
         } finally {await loading.destroy();}
+    });
+
+    it.runIf(Boolean(process.env.FLUENTREAD_ATTENTION_PDF))('keeps actual Attention table-four row/column identity and the raised inline radical in its sentence', async () => {
+        const bytes = new Uint8Array(readFileSync(process.env.FLUENTREAD_ATTENTION_PDF!));
+        const before = bytes.slice(), document = await parseBinaryDocument('attention.pdf', bytes);
+        if (document.binary?.kind !== 'pdf') throw new Error('Expected actual PDF model');
+        const tablePage = document.binary.pages[9], cells = tablePage.blocks.filter(block => block.kind === 'table');
+        expect(cells).toHaveLength(39);
+        expect(cells.every(cell => cell.lineCount === 1 && cell.cellBounds)).toBe(true);
+        const sources = cells.filter(cell => cell.segmentIndex >= 0).map(cell => document.segments[cell.segmentIndex].source);
+        expect(sources).not.toContain('Vinyals & Kaiser el al. (2014) [37] WSJ only, discriminative');
+        expect(sources.filter(source => source === 'WSJ only, discriminative')).toHaveLength(5);
+        expect(sources.filter(source => source === 'semi-supervised')).toHaveLength(5);
+        expect(sources).toContain('multi-task'); expect(sources).toContain('generative');
+        const values = cells.filter(cell => cell.preserveSource);
+        expect(values).toHaveLength(12); expect(values.every(cell => cell.segmentIndex === -1)).toBe(true);
+        const embedding = document.binary.pages[4].segmentIndexes.map(index => document.segments[index].source).find(source => source.startsWith('Similarly to other sequence transduction models,'))!;
+        expect(embedding).toContain('the pre-softmax linear transformation');
+        expect(embedding).toMatch(/weights by √dmodel\.$/u);
+        expect(document.binary.pages[4].blocks.filter(block => block.kind === 'formula').every(block => block.preserveSource)).toBe(true);
+        expect(bytes).toEqual(before);
     });
 
     it('retains source bytes, correct column reading order, headings and baseline superscripts', async () => {

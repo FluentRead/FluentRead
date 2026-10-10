@@ -1,7 +1,7 @@
 /**
  * @file src/features/document-translation/core/document.ts
  * 文件职责：定义文档翻译的纯领域模型，并负责把多种文本格式解析为可翻译片段，再按双语或纯译文模式无损还原原格式结构。
- * 主要内容：覆盖文本格式识别、片段切分、HTML 中被链接或强调等行内标签隔开的文字合成整句并以编号占位符保留标签（句中的行内代码整个保留、不翻译）、给出带占位符片段替换前的原文供校订显示、字幕译文丢了硬换行时按原文行数重新断行、被翻译服务转成实体的字幕样式标签还原成标签、纯文本里按固定宽度折行的段落合成一个片段、Markdown 可选地把一行作为一个片段整句翻译并以占位符保护链接地址、行内代码与网址、Markdown 容器围栏及受控缩进代码与行内位置保护、字幕标签保留、有界深度的非递归 JSON 遍历、空译文回退、MIME 信息、按格式区分的文件大小上限和下载文件命名；文本导出支持有界编码，下载摘录无需处理全文；相同译文保留原文且不重复展示。
+ * 主要内容：覆盖文本格式识别、片段切分、HTML 中被链接或强调等行内标签隔开的文字合成整句并以编号占位符保留标签（句中的行内代码整个保留、不翻译）、给出带占位符片段替换前的原文供校订显示、字幕译文丢了硬换行时按原文行数重新断行、被翻译服务转成实体的字幕样式标签还原成标签、纯文本里按固定宽度折行的段落合成一个片段、Markdown 可选地把一行作为一个片段整句翻译并以成对占位符保护强调和链接，以单占位符保护行内代码与网址、Markdown 容器围栏及受控缩进代码与行内位置保护、字幕标签保留、有界深度的非递归 JSON 遍历、空译文回退、MIME 信息、按格式区分的文件大小上限和下载文件命名；文本导出支持有界编码，下载摘录无需处理全文；相同译文保留原文且不重复展示。
  * 模块边界：该文件不读取 File、不解析 PDF/EPUB/DOCX 二进制，也不发起翻译请求；文件 I/O 与压缩包处理归 services/binary，批处理归 services/translation，展示归 preview/presentation。
  */
 import {hasDistinctTranslation} from '@/src/core/translation/result';
@@ -101,6 +101,8 @@ export interface PdfDocumentBlock {
     column?: number;
     readingOrder?: number;
     preserveSource?: boolean;
+    /** 表格单元格的原始边界，供译文拟合与文字擦除使用；原字形矩形仍保留在 lines 中。 */
+    cellBounds?: Pick<PdfDocumentRun, 'x' | 'y' | 'width' | 'height'>;
     lines?: PdfDocumentLine[];
 }
 
@@ -128,6 +130,8 @@ export interface EpubDocumentChapter {
     segmentOffset: number;
     segmentCount: number;
     title: string;
+    /** OPF content type; older saved chapters may not have this field. */
+    mediaType?: string;
 }
 
 export interface DocxDocumentPart {
@@ -388,6 +392,14 @@ function addMarkdownSentence(
     let cursor = 0;
     const tokens: Array<{open: string; close?: string}> = [];
     let source = '';
+    // 常见强调使用与链接相同的成对占位符，文字仍参与整句翻译；避免机器服务直接删掉 ** 或 _。
+    // 两种分支各自止于下一个同类标记，不对未闭合的长行做跨标记回溯；代码与 URL 已由外层保护。
+    const emphasis = (plain: string) => plain.replace(/(?<![\\*])(\*\*|\*)(?![\s*])([^*\n]*?\S)\1(?!\*)|(?<![\\\p{L}\p{N}])(__|_)(?![\s_])([^_\n]*?\S)\3(?![\p{L}\p{N}_])/gu,
+        (_match, stars: string | undefined, starText: string | undefined, underscores: string | undefined, underscoreText: string | undefined) => {
+            const marker = stars || underscores!;
+            tokens.push({open: marker, close: marker});
+            return `<g${tokens.length}>${starText ?? underscoreText}</g${tokens.length}>`;
+        });
     const links = markdownLinkRanges(value);
     let linkIndex = 0;
     let match = pattern.exec(value);
@@ -400,7 +412,7 @@ function addMarkdownSentence(
         else match = pattern.exec(value);
         // 链接中的 URL 或代码中的链接由更早开始的外层语法整体保护。
         if (start < cursor) continue;
-        source += value.slice(cursor, start);
+        source += emphasis(value.slice(cursor, start));
         const raw = value.slice(start, end);
         // 只有“[文字](地址)”形式的链接文字参与翻译；图片与 [[双链]] 整体保护。
         const text = useLink && !raw.startsWith('!') && !raw.startsWith('[[') ? raw.slice(1, raw.indexOf('](')) : '';
@@ -413,7 +425,7 @@ function addMarkdownSentence(
         }
         cursor = end;
     }
-    source += value.slice(cursor);
+    source += emphasis(value.slice(cursor));
     const options: SegmentOptions = {bilingualGroup, markdownLineStart: true};
     // 没有行内语法，或文字本身含有占位符写法（无法区分真假占位符）时，整行按普通文字处理。
     if (!tokens.length || MARKDOWN_PLACEHOLDER.test(value)) {addSegment(parts, segments, value, options); return;}
@@ -1263,13 +1275,13 @@ export function resolveDocumentTranslation(source: string, translation: string |
     return hasDistinctTranslation(source, translation) ? translation! : source;
 }
 
-function formatBilingualTranslation(document: ParsedDocument, part: SegmentPart, translation: string): string {
+function formatBilingualTranslation(document: ParsedDocument, part: SegmentPart, translation: string, xhtml: boolean): string {
     const source = originalPartSource(part);
     const formattedTranslation = ['srt', 'vtt', 'ass'].includes(document.format)
         ? preserveSubtitleMarkup(part.source, translation)
         : translation;
     if (document.format === 'html') {
-        return `${part.prefix}${source}${part.suffix}<br><span data-fluent-read-document-translation="true">${renderHtmlTranslation(part, translation)}</span>`;
+        return `${part.prefix}${source}${part.suffix}${xhtml ? '<br/>' : '<br>'}<span data-fluent-read-document-translation="true">${renderHtmlTranslation(part, translation)}</span>`;
     }
     if (document.format === 'markdown') {
         return `${part.prefix}${source}${part.suffix}\n> ${renderMarkdownTranslation(part, translation)}`;
@@ -1283,7 +1295,7 @@ function formatBilingualTranslation(document: ParsedDocument, part: SegmentPart,
     return `${part.prefix}${source}${part.suffix}\n${formattedTranslation}`;
 }
 
-function renderParts(document: ParsedDocument, translations: readonly string[], mode: DocumentRenderMode, maxLength: number): string {
+function renderParts(document: ParsedDocument, translations: readonly string[], mode: DocumentRenderMode, maxLength: number, xhtml: boolean): string {
     const output: string[] = [];
     let length = 0;
     const append = (value: string) => {
@@ -1335,7 +1347,7 @@ function renderParts(document: ParsedDocument, translations: readonly string[], 
             continue;
         }
         if (mode === 'bilingual') {
-            append(formatBilingualTranslation(document, part, translation));
+            append(formatBilingualTranslation(document, part, translation, xhtml));
             continue;
         }
         if (document.format === 'html') {
@@ -1374,10 +1386,11 @@ export function renderDocument(
     translations: readonly string[],
     mode: DocumentRenderMode = 'bilingual',
     maxLength = Infinity,
+    options: {xhtml?: boolean} = {},
 ): string {
     maxLength = Number.isNaN(maxLength) ? 0 : Math.max(0, Math.trunc(maxLength));
     if (maxLength === 0) return '';
-    if (document.format !== 'json') return renderParts(document, translations, mode, maxLength);
+    if (document.format !== 'json') return renderParts(document, translations, mode, maxLength, options.xhtml ?? false);
 
     let output = cloneJsonValue(document.jsonValue);
     document.jsonEntries?.forEach((entry) => {

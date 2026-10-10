@@ -128,6 +128,8 @@ export interface TranslationConfigSnapshot {
     glossaryProtectedTokens?: readonly string[];
     /** 与冻结词库配合，为批量 provider 的每次实际上游调用重新筛选命中词。 */
     glossaryMatchContext?: Readonly<{
+        /** broker 根据当前入口派生；文档正文的地址与代码名称使用同一严格保护链。 */
+        context?: TranslationGlossaryContext;
         sourceLanguage: string;
         targetLanguage: string;
         pageUrl?: string;

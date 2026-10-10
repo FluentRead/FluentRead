@@ -1712,7 +1712,7 @@ export function createTranslationBroker(deps: TranslationBrokerDependencies): Tr
         // Provider 只读取命中当前原文的词对；配置原文与域规则不会进入请求 JSON。
         current = Object.freeze({...current,
             glossaryTerms: Object.freeze(glossaryTerms.map(term => Object.freeze({...term}))),
-            glossaryMatchContext: Object.freeze({sourceLanguage, targetLanguage, pageUrl: glossarySource?.pageUrl,
+            glossaryMatchContext: Object.freeze({context: glossaryContext, sourceLanguage, targetLanguage, pageUrl: glossarySource?.pageUrl,
                 glossaryIds: selectedGlossaryIds ? Object.freeze([...selectedGlossaryIds]) : null}),
         });
         const execution: TranslationRequestExecution = {

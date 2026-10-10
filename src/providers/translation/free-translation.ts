@@ -1,10 +1,11 @@
 /**
  * @file src/providers/translation/free-translation.ts
  * 文件职责：按冻结的用户设置编排免费翻译，并接入有界请求、取消和跨段冷却。
- * 主要内容：装配免密钥服务、冻结匿名请求配置与批量预算，生成匿名连接身份；仅为全部启用微软/谷歌的高槽批次构造 owner 内有界小组，混合或非原生池保留逐槽 attempt；复用原槽协议及原生数组传输，逐槽验证质量并保留空白；在多线路请求中跳过 Apertium 已确认不支持的语言方向，为连接检查提供不换线的单服务调用，统一拒绝原文回显和错语种，把翻译线路的结果与耗时上报给调用方观察器。
+ * 主要内容：装配免密钥服务、冻结匿名请求配置与批量预算，生成匿名连接身份；仅为全部启用微软/谷歌的高槽批次构造 owner 内有界小组，混合或非原生池保留逐槽 attempt；复用原槽协议及原生数组传输，逐槽验证质量、在候选获胜前检查术语标记并对损坏标记局部换线、保留空白；在多线路请求中跳过 Apertium 已确认不支持的语言方向，为连接检查提供不换线的单服务调用，统一拒绝原文回显和错语种，把翻译线路的结果与耗时上报给调用方观察器。
  * 模块边界：只装配已有 provider；健康状态与并发调度由 freeFallback 服务持有。
  */
 import {sha256Hex} from '@/src/shared/function/sha256';
+import {validateGlossaryProtectedTokens} from '@/src/core/glossary';
 import {translateMicrosoftTexts} from './microsoft';
 import {translateGoogleText, translateGoogleOwnerTexts} from './google';
 import {translateFreeWebText} from './free-web';
@@ -74,6 +75,7 @@ const providerTranslators: Record<FreeProviderId, (request: TranslationProviderR
 
 async function translateProviderText(id: FreeProviderId, message: TranslationProviderRequest<string>): Promise<unknown> {
     const result = await providerTranslators[id]({...message, serviceOverride: id});
+    validateProtectedResult(message.origin, result, message);
     if (typeof result === 'string' && isLikelyUntranslatedResponse(message.origin, result, message.targetLanguage!)) {
         throw new UntranslatedFreeResultError();
     }
@@ -81,6 +83,15 @@ async function translateProviderText(id: FreeProviderId, message: TranslationPro
         throw new WrongLanguageFreeResultError();
     }
     return result;
+}
+
+/** 文本级协议不兼容只让本段换线，不暂停正常文字在同一服务上的翻译。 */
+function validateProtectedResult(origin: string, result: unknown, message: TranslationProviderRequest<string>): void {
+    try {
+        validateGlossaryProtectedTokens(origin, result, getTranslationProviderConfig(message, config).glossaryProtectedTokens);
+    } catch (error) {
+        throw Object.assign(error as Error, {freeFailure: 'request'});
+    }
 }
 
 /** 格式只属于本组，不因单槽空值、错位或类型异常暂停其他文本的正常线路。 */
@@ -101,6 +112,7 @@ async function translateNativeProviderGroup(
     const translations = sources.map((source, index) => {
         const value: unknown = result[index];
         if (typeof value !== 'string' || !value.trim()) throw new InvalidFreeGroupResultError();
+        validateProtectedResult(source, value, message);
         if (isLikelyUntranslatedResponse(source, value, message.targetLanguage!)) throw new UntranslatedFreeResultError();
         if (isClearlyWrongLanguageResponse(source, value, message.targetLanguage!)) throw new WrongLanguageFreeResultError();
         // provider 的边缘空白不能吞掉源槽缩进；纯空白槽已在 owner 本地保留。

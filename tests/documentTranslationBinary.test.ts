@@ -1,6 +1,7 @@
 import {readFileSync} from 'node:fs';
 
 import JSZip from 'jszip';
+import {SaxesParser} from 'saxes';
 import {PDFArray, PDFDict, PDFDocument, PDFHexString, PDFImage, PDFName, PDFNumber, PDFRawStream} from 'pdf-lib';
 import {describe, expect, it, vi} from 'vitest';
 
@@ -9,6 +10,7 @@ import {
     getDocumentMaxBytes,
     getDocumentFormat,
     getDocumentMimeType,
+    parseDocument,
 } from '@/src/features/document-translation/core/document';
 import {
     createDocumentDownload,
@@ -385,9 +387,57 @@ describe('binary document translation formats', () => {
         expect(chapter).toContain('译文：Fluent reading for local books');
         expect(chapter).toContain('data-fluent-read-document-translation="true"');
         const linkedChapter = await zip.file('OEBPS/chapter-2.xhtml')!.async('string');
+        for (const source of [chapter, linkedChapter]) expect(() => new SaxesParser({xmlns: true}).write(source).close()).not.toThrow();
         expect(linkedChapter).toContain('href="chapter-1.xhtml"');
         expect(linkedChapter.match(/<title>/gu)).toHaveLength(1);
         expect(linkedChapter).not.toContain('<title>译文：');
+    });
+
+    it('exports strict XHTML line breaks without rewriting namespaces, styles, resources or literal script text', async () => {
+        const zip = new JSZip();
+        zip.file('mimetype', 'application/epub+zip', {compression: 'STORE'});
+        zip.file('META-INF/container.xml', '<container><rootfiles><rootfile full-path="OEBPS/content.opf"/></rootfiles></container>');
+        zip.file('OEBPS/content.opf', '<package><manifest><item id="xml" href="chapter.xhtml" media-type="application/xhtml+xml"/><item id="html" href="legacy.html" media-type="text/html"/></manifest><spine><itemref idref="xml"/><itemref idref="html"/></spine></package>');
+        const script = '<script type="text/javascript"><![CDATA[var literal = \'<br><span data-fluent-read-document-translation="true">\';]]></script>';
+        const style = '<link rel="stylesheet" href="styles.css"/>';
+        const image = '<img src="images/sample.png" alt="original"/>';
+        zip.file('OEBPS/chapter.xhtml', `<?xml version="1.0" encoding="UTF-8"?><html xmlns="http://www.w3.org/1999/xhtml"><head><title>Chapter</title>${style}${script}</head><body><p>Original <strong>important</strong> text</p>${image}</body></html>`);
+        zip.file('OEBPS/legacy.html', '<html><body><p>Legacy HTML text</p></body></html>');
+        zip.file('OEBPS/styles.css', 'body { color: blue; }', {compression: 'STORE'});
+        zip.file('OEBPS/images/sample.png', onePixelPng, {compression: 'STORE'});
+        const parsed = await parseBinaryDocument('strict.epub', await zip.generateAsync({type: 'uint8array'}));
+        expect(parsed.binary?.kind === 'epub' && parsed.binary.chapters.map(chapter => chapter.mediaType)).toEqual(['application/xhtml+xml', 'text/html']);
+        for (const mode of ['bilingual', 'translated'] as const) {
+            const download = await createDocumentDownload(parsed, ['原文中的 <g1>重点</g1> 内容', 'HTML译文'], mode);
+            const output = await JSZip.loadAsync(download.data as Uint8Array);
+            const chapter = await output.file('OEBPS/chapter.xhtml')!.async('string');
+            expect(() => new SaxesParser({xmlns: true}).write(chapter).close()).not.toThrow();
+            expect(chapter).toContain('xmlns="http://www.w3.org/1999/xhtml"');
+            expect(chapter).toContain(script); expect(chapter).toContain(style); expect(chapter).toContain(image);
+            expect(chapter).toContain('<strong>重点</strong>');
+            expect(await output.file('OEBPS/styles.css')!.async('string')).toBe('body { color: blue; }');
+            expect(await output.file('OEBPS/images/sample.png')!.async('uint8array')).toEqual(onePixelPng);
+            if (mode === 'bilingual') {
+                expect(chapter).toContain('<br/><span data-fluent-read-document-translation="true">');
+                expect(await output.file('OEBPS/legacy.html')!.async('string')).toContain('<br><span data-fluent-read-document-translation="true">');
+            }
+        }
+        // Existing history records without media type infer XML from the source namespace.
+        if (parsed.binary?.kind === 'epub') parsed.binary.chapters[0].mediaType = undefined;
+        const legacy = await createDocumentDownload(parsed, ['已翻译', 'HTML译文'], 'bilingual');
+        const legacyChapter = await (await JSZip.loadAsync(legacy.data as Uint8Array)).file('OEBPS/chapter.xhtml')!.async('string');
+        expect(() => new SaxesParser({xmlns: true}).write(legacyChapter).close()).not.toThrow();
+    });
+
+    it.each(['sample.html', 'sample.md', 'sample.txt', 'sample.srt', 'sample.json'])('text export retains pending, unchanged and reviewed blank results in %s', async name => {
+        const parsed = parseDocument(name, readFileSync(new URL(name, exampleRoot), 'utf8'), {markdownSentences: true});
+        for (const fallback of ['', parsed.segments[0].source, undefined]) for (const mode of ['bilingual', 'translated'] as const) {
+            const translations = parsed.segments.map((segment, index) => index === 0 ? fallback : '译文：' + segment.source);
+            const download = await createDocumentDownload(parsed, translations as string[], mode);
+            const output = parseDocument(name, download.data as string, {markdownSentences: true});
+            expect(output.segments.some(entry => entry.source.includes(parsed.segments[0].source))).toBe(true);
+            expect(download.data).toContain('译文：');
+        }
     });
 
     it('ePub 章节的文本实体以可读文本翻译并保留原 XHTML 表达', async () => {

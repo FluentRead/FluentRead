@@ -1,14 +1,14 @@
 /**
  * @file src/features/document-translation/services/binary.ts
  * 文件职责：处理 PDF、EPUB 与 DOCX 二进制文档的受限解析和导出，把压缩包或页面文本转换为统一 ParsedDocument，并生成可下载的双语产物。
- * 主要内容：相同译文回退原文；Word 段落记下表格单元格供阅读视图排版；按实际字节限制导入、按需加载二进制依赖，包含归档安全上限、可取消 PDF 提取与译文回填；PDF 默认逐页原版左右对照，保留旋转裁剪、直接嵌入 JPEG 并保存溢出译文批注，显式重排端口才生成续页；ePub/DOCX 导出让出主线程并使用可取消归档流，ePub 保持首项 mimetype 无压缩。
+ * 主要内容：相同译文回退原文；Word 段落记下表格单元格供阅读视图排版；按实际字节限制导入、按需加载二进制依赖，包含归档安全上限、可取消 PDF 提取与译文回填；PDF 默认逐页原版左右对照，保留旋转裁剪、直接嵌入 JPEG 并保存溢出译文批注，显式重排端口才生成续页；ePub/DOCX 导出让出主线程并使用可取消归档流，ePub 保持首项 mimetype 无压缩及 XHTML 章节格式；未改资源保留原压缩方式，文本导出直接使用 core 的回退规则避免重复规范化。
  * 模块边界：此服务可以依赖 JSZip、pdf-lib 和二进制 I/O，但不负责调用翻译服务或渲染设置页；文本格式规则归 core/document，浏览器 Canvas 光栅实现由 ui/pdfPreview 通过接口注入。
  */
 import {hasDistinctTranslation} from '@/src/core/translation/result';
 import type JSZip from 'jszip';
 import type {PDFEmbeddedPage} from 'pdf-lib';
 import pdfWorkerUrl from 'pdfjs-dist/legacy/build/pdf.worker.min.mjs?url';
-import {generateDocumentArchive} from './archive';
+import {generateDocumentArchive, preserveStoredDocumentEntries} from './archive';
 import {analyzePdfPageLayout, extractPdfGraphicsShapes, type PdfLayoutAtom, type PdfLayoutBlock} from '../core/pdfLayoutAnalysis';
 import {buildPdfReadingPlan, type PdfReadingPlan, type PdfReadingPresentation} from '../core/pdfReadingPlan';
 
@@ -752,24 +752,24 @@ async function parseEpub(fileName: string, bytes: Uint8Array, signal?: AbortSign
         itemMatch = itemPattern.exec(opfXml);
     }
 
-    const orderedPaths: string[] = [];
+    const orderedChapters: Array<{path: string; mediaType: string}> = [];
     const itemrefPattern = /<itemref\b([^>]*)\/?\s*>/giu;
     let itemrefMatch = itemrefPattern.exec(opfXml);
     while (itemrefMatch) {
         const idref = parseXmlAttributes(itemrefMatch[1]).idref;
         const entry = idref ? manifest.get(idref) : undefined;
-        if (entry && /^(?:application\/xhtml\+xml|text\/html)$/iu.test(entry.mediaType)) orderedPaths.push(entry.path);
+        if (entry && /^(?:application\/xhtml\+xml|text\/html)$/iu.test(entry.mediaType)) orderedChapters.push(entry);
         itemrefMatch = itemrefPattern.exec(opfXml);
     }
-    if (orderedPaths.length === 0) {
+    if (orderedChapters.length === 0) {
         manifest.forEach((entry) => {
-            if (/^(?:application\/xhtml\+xml|text\/html)$/iu.test(entry.mediaType)) orderedPaths.push(entry.path);
+            if (/^(?:application\/xhtml\+xml|text\/html)$/iu.test(entry.mediaType)) orderedChapters.push(entry);
         });
     }
 
     const segments: DocumentSegment[] = [];
     const chapters: EpubDocumentChapter[] = [];
-    for (const [chapterIndex, path] of orderedPaths.entries()) {
+    for (const [chapterIndex, {path, mediaType}] of orderedChapters.entries()) {
         const entry = zip.file(path);
         if (!entry) continue;
         const source = await readArchiveText(entry, signal);
@@ -784,7 +784,7 @@ async function parseEpub(fileName: string, bytes: Uint8Array, signal?: AbortSign
                 contextLabel: segmentIndex === 0 ? title : undefined,
             });
         });
-        chapters.push({path, source, segmentOffset, segmentCount: parsed.segments.length, title});
+        chapters.push({path, source, segmentOffset, segmentCount: parsed.segments.length, title, mediaType});
     }
 
     if (segments.length === 0) throw new Error('ePub 中没有找到可翻译的章节文字');
@@ -1116,12 +1116,15 @@ async function renderEpub(document: ParsedDocument, translations: readonly strin
     const {default: JSZip} = await import('jszip');
     const zip = await JSZip.loadAsync(document.binary.bytes);
     assertArchiveSafety(zip, 'ePub');
+    preserveStoredDocumentEntries(zip, document.binary.bytes, new Set(document.binary.chapters.map(chapter => chapter.path)));
     for (const chapter of document.binary.chapters) {
         await yieldDocumentTask();
         options.signal?.throwIfAborted();
         const parsedChapter = parseDocument('chapter.html', chapter.source);
         const chapterTranslations = translations.slice(chapter.segmentOffset, chapter.segmentOffset + chapter.segmentCount);
-        zip.file(chapter.path, renderDocument(parsedChapter, chapterTranslations, mode));
+        // XHTML chapters must remain XML; do not rewrite literal source/script text while fixing generated line breaks.
+        const xhtml = chapter.mediaType === 'application/xhtml+xml' || !chapter.mediaType && /xmlns\s*=\s*["']http:\/\/www\.w3\.org\/1999\/xhtml["']/iu.test(chapter.source);
+        zip.file(chapter.path, renderDocument(parsedChapter, chapterTranslations, mode, Infinity, {xhtml}));
     }
     zip.file('mimetype', 'application/epub+zip', {compression: 'STORE'});
     // 更新文件不会改变 JSZip 的键顺序；EPUB 要求 mimetype 是第一条本地记录。
@@ -1184,6 +1187,7 @@ async function renderDocx(document: ParsedDocument, translations: readonly strin
     const {default: JSZip} = await import('jszip');
     const zip = await JSZip.loadAsync(document.binary.bytes);
     assertArchiveSafety(zip, 'DOCX');
+    preserveStoredDocumentEntries(zip, document.binary.bytes, new Set(document.binary.parts.map(part => part.path)));
     for (const part of document.binary.parts) {
         await yieldDocumentTask();
         options.signal?.throwIfAborted();
@@ -1206,7 +1210,9 @@ export async function createDocumentDownload(
     await yieldDocumentTask();
     options.signal?.throwIfAborted();
     // UI 的完成度按非空译文计算；各格式导出必须采用相同规则。
-    const resolved = document.segments.map(segment => resolveDocumentTranslation(segment.source, translations[segment.id]));
+    const resolved = isBinaryDocumentFormat(document.format)
+        ? document.segments.map(segment => resolveDocumentTranslation(segment.source, translations[segment.id]))
+        : translations;
     let data: string | Uint8Array;
     if (document.format === 'pdf') {
         if (document.binary?.kind !== 'pdf') throw new Error('PDF 文档状态无效，请重新打开文件');

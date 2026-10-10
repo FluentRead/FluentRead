@@ -71,6 +71,19 @@ describe('PDF layout overlay block selection', () => {
         expect(first.block.y + first.block.height + first.spaceBelow).toBeLessThan(65);
         expect(pdfOverlayBlocks(page([block(0, 40, 40, 100, 12, {lineCount: 1, textAlign: 'right'})]))[0].spaceRight).toBe(0);
     });
+    it('keeps table translation inside its physical cell even when the neighbouring text leaves large blank space', () => {
+        const source = block(0, 40, 100, 60, 10, {kind: 'table', lineCount: 1, cellBounds: {x: 30, y: 95, width: 100, height: 20}});
+        const original = structuredClone(source);
+        const fitted = pdfOverlayBlocks(page([source, block(-1, 200, 100, 20, 10, {kind: 'table', preserveSource: true})]))[0];
+        expect(fitted.block.y + fitted.block.height + fitted.spaceBelow).toBeLessThan(115);
+        expect(fitted.block.x + fitted.block.width + fitted.spaceRight).toBeLessThan(130);
+        expect(fitted.spaceBelow).toBeCloseTo(3);
+        expect(fitted.spaceRight).toBeCloseTo(23.5);
+        const tight = pdfOverlayBlocks(page([{...source, height: 30, width: 110}]))[0];
+        expect(tight.block).toMatchObject({width: 89.5, height: 14.5});
+        expect(tight.spaceBelow).toBe(0); expect(tight.spaceRight).toBe(0);
+        expect(source).toEqual(original);
+    });
     it('keeps a paragraph beside its preserved QED mark without changing source line erasure geometry', () => {
         const source = block(0, 70.86614, 686.88898, 455.55796, 26.87523, {lines: [{text: 'Source line', x: 70.86614, y: 686.88898, width: 455.55796, height: 11}]});
         const mark = block(-1, 515.85144, 701.88421, 8.558, 11, {kind: 'formula', preserveSource: true});

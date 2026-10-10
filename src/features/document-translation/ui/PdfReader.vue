@@ -432,7 +432,15 @@ const overlayPages = computed(() => {
       entry.overflow = fit.overflow;
       entry.boxStyle = {...entry.boxStyle, width: px(width), height: px((block.height + spaceBelow) * s), '--pdf-block-background': colors?.background ?? '#fff'};
       entry.textStyle = {fontSize: px(fit.fontSize), lineHeight: px(fit.lineHeight), fontWeight: String(block.fontWeight), textAlign: block.textAlign, color: colors?.foreground ?? '#111827', fontFamily: serif ? SERIF_FAMILY : SANS_FAMILY};
-      entry.eraseStyles = lines.map(line => ({left: px((line.x - block.x - 1) * s), top: px((line.y - block.y - 1) * s), width: px((line.width + 2) * s), height: px((line.height + 3) * s)}));
+      entry.eraseStyles = lines.flatMap(line => {
+        // 表格保留原表线；擦除字形的内边距也必须停在单元格边界内，与导出画布一致。
+        const cell = block.cellBounds;
+        const left = Math.max(line.x - 1, cell ? cell.x + 0.5 : -Infinity);
+        const top = Math.max(line.y - 1, cell ? cell.y + 0.5 : -Infinity);
+        const right = Math.min(line.x + line.width + 1, cell ? cell.x + cell.width - 0.5 : Infinity);
+        const bottom = Math.min(line.y + line.height + 2, cell ? cell.y + cell.height - 0.5 : Infinity);
+        return right > left && bottom > top ? [{left: px((left - block.x) * s), top: px((top - block.y) * s), width: px((right - left) * s), height: px((bottom - top) * s)}] : [];
+      });
       return entry;
     }));
   }

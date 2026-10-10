@@ -166,6 +166,25 @@ describe('术语库与真实翻译编排协作', () => {
         expect(isGlossaryOnlyResult(missing, 'agent', 'agent')).toBe(false);
     });
 
+    it('文档的地址、代码式产品名与组合模型名自动保护，缓存与普通网页请求隔离', async () => {
+        const h = harness();
+        h.config.glossaryEnabled = false;
+        const origin = 'FluentRead GNMT+RL https://github.com/tensorflow/tensor2tensor';
+        await expect(h.broker.translateWithCache({origin, glossaryContext: 'document'})).resolves.toBe(origin);
+        const identity = h.identities[0];
+        expect(identity).toMatchObject({glossaryTerms: [
+            {source: 'FluentRead', target: 'FluentRead'}, {source: 'GNMT+RL', target: 'GNMT+RL'},
+            {source: 'https://github.com/tensorflow/tensor2tensor', target: 'https://github.com/tensorflow/tensor2tensor'},
+        ]});
+        expect(h.calls[0].snapshot.glossaryProtectedTokens).toHaveLength(3);
+        expect(String(h.calls[0].message.origin)).not.toContain('tensorflow');
+        await expect(h.broker.translateWithCache({origin, glossaryContext: 'document'})).resolves.toBe(origin);
+        expect(h.provider).toHaveBeenCalledTimes(1);
+        await expect(h.broker.translateWithCache({origin, glossaryContext: 'page'})).resolves.toBe(`译文:${origin}`);
+        expect(h.provider).toHaveBeenCalledTimes(2);
+        expect(h.config.glossaryLibraries).toEqual([library()]);
+    });
+
     it('网站范围只采用内部真实来源，原文上下文和同名payload不能冒充网站', async () => {
         const h = harness();
         h.config.glossaryLibraries = [library('private', '内部代理', ['private.example'])];

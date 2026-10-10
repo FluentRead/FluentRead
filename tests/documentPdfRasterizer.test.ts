@@ -131,6 +131,20 @@ describe('PDF translation painter rotated geometry', () => {
         expect(context.fillText).toHaveBeenCalledWith(expect.stringMatching(/…$/u), 10, 199, expect.any(Number));
         expect(context.fillRect).toHaveBeenCalled();
     });
+    it.each([0, 90, 180, 270] as const)('clips table glyph erasure and translation within the physical cell at rotation %s', rotation => {
+        const quarterTurn = rotation === 90 || rotation === 270;
+        const canvas = document.createElement('canvas'); canvas.width = quarterTurn ? 200 : 100; canvas.height = quarterTurn ? 100 : 200;
+        const context = canvases[0].getContext();
+        const cell = {...block, height: 12, kind: 'table' as const, cellBounds: {x: 9, y: 19.5, width: 32, height: 11},
+            lines: [{x: 10, y: 20, width: 30, height: 12, text: 'Source'}]};
+        const original = structuredClone(cell);
+        paintPdfTranslation(canvas, {...input(), rotation, width: canvas.width, height: canvas.height, blocks: [cell], translations: ['译文']});
+        expect(context.fillRect).toHaveBeenCalledWith(9.5, 20, 31, 10);
+        expect(context.rect).toHaveBeenCalledWith(10, 20, 30, 10);
+        expect(context.fillText).toHaveBeenCalledOnce();
+        expect(context.restore.mock.calls.length).toBe(context.save.mock.calls.length);
+        expect(cell).toEqual(original);
+    });
     it.each([{width: 8, x: 10}, {width: 30, x: 99}])('replaces prose even at a narrow page-edge box $width/$x', geometry => {
         const canvas = document.createElement('canvas'); canvas.width = 100; canvas.height = 200;
         const context = canvases[0].getContext();

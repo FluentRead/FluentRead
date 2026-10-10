@@ -19,7 +19,7 @@ import {normalizeApiKeyRecoveryMs} from '@/src/core/config/scheduling';
 import type {CustomOpenAIProvider} from '@/src/core/config/customOpenAI';
 import {normalizeDeepLApiPlan} from '@/src/core/config/deepl';
 import {resolveGlossary} from '@/src/core/glossary';
-import {parseTranslationSlots} from '@/src/core/translation/public';
+import {findDocumentLiteralTerms, parseTranslationSlots} from '@/src/core/translation/public';
 import type {TranslationRequestScheduler, TranslationRequestIdentity} from './requestScheduler';
 
 /** 在入口第一次等待前复制用户可编辑的数组与消息字段，同时保留不可枚举的内部 symbol。 */
@@ -153,12 +153,13 @@ export function getTranslationGlossaryTerms(current: TranslationProviderConfigSn
     }
     const context = current.glossaryMatchContext;
     if (!context) return current.glossaryTerms ?? [];
-    if (!current.glossaryTerms?.length) return [];
-    return resolveGlossary(current.glossaryLibraries ?? [], {
+    const source = getTranslationGlossarySourceText(origin);
+    const terms = current.glossaryTerms?.length ? resolveGlossary(current.glossaryLibraries ?? [], {
         ...context,
         glossaryIds: context.glossaryIds ? [...context.glossaryIds] : null,
-        text: getTranslationGlossarySourceText(origin),
-    }).terms;
+        text: source,
+    }).terms : [];
+    return context.context === 'document' ? [...terms, ...findDocumentLiteralTerms(source).map(({source, target}) => ({source, target}))] : terms;
 }
 
 export type TranslationModelUsageObserver = (observation: TranslationModelUsageObservation) => void;

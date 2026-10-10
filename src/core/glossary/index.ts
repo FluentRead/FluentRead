@@ -11,4 +11,4 @@ export {resolveGlossary, resolveGlossaryEntries, getGlossaryScopeReason, glossar
 export type {GlossaryContext} from './match';
 export {decodeGlossaryText, parseGlossaryImport, exportGlossary} from './transfer';
 export type {GlossaryImportFormat} from './transfer';
-export {protectGlossaryText, GlossaryPlaceholderError} from './protection';
+export {protectGlossaryText, validateGlossaryProtectedTokens, GlossaryPlaceholderError} from './protection';

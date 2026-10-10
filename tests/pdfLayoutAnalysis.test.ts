@@ -58,6 +58,52 @@ describe('PDF baseline and structural reading analysis', () => {
         expect(result.blocks.filter(block => block.kind === 'caption').every(block => !block.preserveSource)).toBe(true);
         expect(result.blocks.find(block => block.source === 'A paragraph after the table.')?.textAlign).toBe('left');
     });
+    it('uses actual table dividers to separate tight cells and prevents lowercase records from wrapping across rows', () => {
+        const graphics = [94, 105, 149].map(y => ({kind: 'path' as const, x: 145, y, width: 322, height: 0}));
+        for (const x of [296.58, 408.5]) for (const y of [94, 105, 116, 127, 138]) graphics.push({kind: 'path', x, y, width: 0, height: 11});
+        const atoms = [atom('Parser', 206, 102, 28), atom('Training', 334, 102, 37), atom('Score', 429, 102, 20),
+            atom('A. Model et al. (2014) [37]', 151, 113, 140), atom('WSJ only, discriminative', 302.5, 113, 100), atom('good', 429, 113, 20),
+            atom('Second Model', 172, 124, 96), atom('semi-supervised', 320, 124, 65), atom('good', 429, 124, 20),
+            atom('Third Model', 177, 135, 87), atom('multi-task', 332, 135, 40), atom('good', 429, 135, 20),
+            atom('Final Model', 178, 146, 86), atom('generative', 332, 146, 41), atom('good', 429, 146, 20)];
+        const before = structuredClone(atoms);
+        const cells = analyze(atoms, graphics).blocks;
+        expect(cells).toHaveLength(15);
+        expect(cells.every(cell => cell.kind === 'table' && cell.lineCount === 1 && !cell.preserveSource)).toBe(true);
+        expect(cells.some(cell => cell.source.includes('[37] WSJ'))).toBe(false);
+        expect(cells.filter(cell => cell.x >= 296.58 && cell.x < 408.5).map(cell => cell.source)).toEqual(['Training', 'WSJ only, discriminative', 'semi-supervised', 'multi-task', 'generative']);
+        expect(cells.filter(cell => cell.x < 296.58).every(cell => cell.cellBounds && cell.cellBounds.x + cell.cellBounds.width === 296.58)).toBe(true);
+        expect(cells.filter(cell => cell.source === 'good').every(cell => cell.cellBounds!.height <= 11)).toBe(true);
+        expect(atoms).toEqual(before);
+    });
+    it('recognizes shaded table rows and a shallow abstract box without treating real diagram labels as body text', () => {
+        const graphics = [100, 125, 150, 175].map(y => ({kind: 'path' as const, x: 0, y, width: 508, height: 25}));
+        const atoms = [100, 125, 150, 175].flatMap((y, row) => [atom(row ? 'Page dimensions' : 'Capability', 8, y + 16, 70, 8),
+            atom(row ? 'Preserved' : 'Expected', 163, y + 16, 40, 8), atom(row ? 'Non-text graphics stay in place' : 'Evidence', 268, y + 16, 160, 8)]);
+        const table = analyze(atoms, graphics);
+        expect(table.preservedRegions).toMatchObject([{kind: 'table', x: 0, y: 100, width: 508, height: 100}]);
+        expect(table.blocks).toHaveLength(12); expect(table.blocks.every(cell => cell.kind === 'table' && !cell.preserveSource)).toBe(true);
+        expect(table.blocks.find(cell => cell.source === 'Capability')!.cellBounds).toEqual({x: 0, y: 100, width: 155, height: 25});
+        const summary = analyze([atom('ABSTRACT', 60, 105, 46, 8.5), atom('A document translator should preserve columns and ordinary words while retaining source graphics.', 60, 119, 480, 9),
+            atom('Parse', 340, 220, 22, 8), atom('Translate', 417, 220, 36, 8)],
+        [{kind: 'path', x: 48, y: 89, width: 516, height: 51}, {kind: 'path', x: 318, y: 201, width: 66, height: 38}, {kind: 'path', x: 402, y: 201, width: 66, height: 38}]);
+        expect(summary.blocks.find(block => block.source === 'ABSTRACT')).toMatchObject({kind: 'heading', preserveSource: false});
+        expect(summary.blocks.filter(block => block.kind === 'figure-label').map(block => block.source)).toEqual(['Parse', 'Translate']);
+    });
+    it('associates the raised radical with its adjacent radicand instead of the preceding prose line', () => {
+        const items = [atom('the two embedding layers and the pre-softmax', 108, 709.091, 396, 9.9626),
+            atom('linear transformation; we multiply those weights by', 108, 720, 361.5, 9.9626),
+            {...atom('√', 471.882, 712.292, 8.30183458, 9.9626), y: 704.82005},
+            atom('d', 480.185, 720, 5.1855, 9.9626), atom('model', 485.37, 721.494, 17.4345, 6.9738), atom('.', 503.303, 720, 2.44, 9.9626)];
+        const before = structuredClone(items), result = analyze(items);
+        expect(result.blocks).toHaveLength(1);
+        expect(result.blocks[0].source).toBe('the two embedding layers and the pre-softmax linear transformation; we multiply those weights by √dmodel.');
+        expect(result.blocks[0]).toMatchObject({kind: 'text', preserveSource: false, lineCount: 2});
+        expect(result.blocks[0].lines![1].runs!.find(run => run.text === '√')).toMatchObject({x: 471.882, y: 704.82005});
+        const equation = analyze([atom('f(x) =', 200, 120, 40), atom('√', 243, 120, 8), atom('x', 251, 120, 5)]);
+        expect(equation.blocks[0]).toMatchObject({source: 'f(x) = √x', kind: 'formula', preserveSource: true});
+        expect(items).toEqual(before);
+    });
     it('keeps author/email columns independent and reads regular column bands left to right', () => {
         const authors = [atom('Alice', 60, 100, 40), atom('Bob', 230, 100, 30), atom('Carol', 400, 100, 40), atom('alice@example.org', 50, 112, 110), atom('bob@example.org', 210, 112, 100), atom('carol@example.org', 380, 112, 110)];
         const result = analyze(authors);

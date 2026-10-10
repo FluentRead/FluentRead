@@ -82,3 +82,4 @@ export {
     resolveTranslationCandidateAtPoint,
 } from './current';
 export type * from './types';
+export {findDocumentLiteralTerms} from './documentLiterals';

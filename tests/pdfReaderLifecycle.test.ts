@@ -690,6 +690,31 @@ describe('PDF reader actual Vue component reading interaction', () => {
         expect(translation.width).toBeGreaterThan(0); expect(translation.getContext('2d')!.fillText).not.toHaveBeenCalled(); expect(root.querySelector('.pdf-page-row')!.getAttribute('data-render-state')).toBe('ready');
     });
 
+    it.each([0, 90, 180, 270])('keeps table erasure and translation inside the original cell at %i degrees and after zoom', async rotation => {
+        const doc = model();
+        if (doc.binary?.kind !== 'pdf') throw new Error('Expected PDF model');
+        const page = doc.binary.pages[0];
+        Object.assign(page, {rotation, width: rotation === 90 || rotation === 270 ? 792 : 612, height: rotation === 90 || rotation === 270 ? 612 : 792});
+        page.blocks[0] = {...page.blocks[0], x: 10, y: 20, width: 30, height: 10, lineCount: 1, fontSize: 8, lineHeight: 8, kind: 'table', cellBounds: {x: 9, y: 19, width: 32, height: 12},
+            lines: [{x: 8, y: 18, width: 36, height: 14, text: 'Source cell'}, {x: 70, y: 20, width: 10, height: 8, text: 'Clipped glyph'}]};
+        const before = JSON.stringify(page);
+        const {root, state, currentTranslations} = mountReader(doc, 'translated', ['Translated table cell']);
+        await componentFlush();
+        for (const zoom of ['1', '1.5']) {
+            state.zoom = zoom; await componentFlush();
+            const scale = Number(zoom), px = (value: number) => `${Math.round(value * scale * 100) / 100}px`;
+            const block = root.querySelector('.pdf-translation-block') as HTMLElement;
+            const erase = block.querySelector('.pdf-translation-erase') as HTMLElement;
+            expect(block.querySelectorAll('.pdf-translation-erase')).toHaveLength(1);
+            expect(erase.style.left).toBe(px(-0.5)); expect(erase.style.top).toBe(px(-0.5));
+            expect(erase.style.width).toBe(px(31)); expect(erase.style.height).toBe(px(11));
+            expect(block.style.width).toBe(px(30)); expect(block.style.height).toBe(px(10));
+        }
+        currentTranslations.value = ['校订后的表格译文']; await componentFlush();
+        expect(root.querySelector('.pdf-translation-block')!.textContent).toBe('校订后的表格译文');
+        expect(JSON.stringify(page)).toBe(before);
+    });
+
     it('lays out layout-presentation rows with 12px gutters, side by side from 900px and stacked below it', async () => {
         const {root, viewport, state, currentMode} = mountReader(model(3), 'bilingual', ['甲', '乙', '丙']); await componentFlush();
         const resize = async (clientWidth: number) => {Object.assign(viewport, {clientWidth}); resizeCallback!([], {} as ResizeObserver); await componentFlush(); flushFrames(); await componentFlush();};

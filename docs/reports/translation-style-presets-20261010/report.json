@@ -1,0 +1,130 @@
+{
+  "ok": true,
+  "extensionDir": "/Users/thinkstu/Desktop/copy/FluentRead-translation-style-presets-20261010/.output/chrome-mv3",
+  "profileDir": "/var/folders/2v/qd62bpkx51scgbvv2nrclsxm0000gn/T/fluentread-translation-style-edge-iZMPPg",
+  "artifactsDir": "/private/tmp/claude-501/-Users-thinkstu-Desktop-copy/5b4bcdf7-70ed-48de-995a-1eea66578ec7/scratchpad/ui",
+  "checks": [
+    "general links to interface; translation style is the first interface group",
+    "49 preset cards across five categories update preview and persisted style",
+    "swatches, color names, RGB, invalid input, exact percentage, sliders, segmented controls and custom picker persist appearance",
+    "direct CSS previews live, unsupported declarations are ignored, and saved style cards show their own effect",
+    "preview switches between light and dark web pages",
+    "translation-only notice switches back; sentence highlight toggle and preview work in interface page",
+    "settings reload keeps selected style and appearance",
+    "settings search jumps to the appearance panel and focuses the sentence highlight switch",
+    "dark UI, 1024/820/390 widths render without horizontal overflow",
+    "page appearance and direct CSS update live without new requests; disable and default remove the style node",
+    "card preset background renders on real pages"
+  ],
+  "consoleErrors": [],
+  "screenshots": [
+    "/private/tmp/claude-501/-Users-thinkstu-Desktop-copy/5b4bcdf7-70ed-48de-995a-1eea66578ec7/scratchpad/ui/01-desktop-light-default.png",
+    "/private/tmp/claude-501/-Users-thinkstu-Desktop-copy/5b4bcdf7-70ed-48de-995a-1eea66578ec7/scratchpad/ui/02-category-文字.png",
+    "/private/tmp/claude-501/-Users-thinkstu-Desktop-copy/5b4bcdf7-70ed-48de-995a-1eea66578ec7/scratchpad/ui/02-category-线条.png",
+    "/private/tmp/claude-501/-Users-thinkstu-Desktop-copy/5b4bcdf7-70ed-48de-995a-1eea66578ec7/scratchpad/ui/02-category-标记.png",
+    "/private/tmp/claude-501/-Users-thinkstu-Desktop-copy/5b4bcdf7-70ed-48de-995a-1eea66578ec7/scratchpad/ui/02-category-卡片.png",
+    "/private/tmp/claude-501/-Users-thinkstu-Desktop-copy/5b4bcdf7-70ed-48de-995a-1eea66578ec7/scratchpad/ui/02-category-趣味.png",
+    "/private/tmp/claude-501/-Users-thinkstu-Desktop-copy/5b4bcdf7-70ed-48de-995a-1eea66578ec7/scratchpad/ui/03-desktop-custom-appearance.png",
+    "/private/tmp/claude-501/-Users-thinkstu-Desktop-copy/5b4bcdf7-70ed-48de-995a-1eea66578ec7/scratchpad/ui/03b-custom-css-and-saved-style.png",
+    "/private/tmp/claude-501/-Users-thinkstu-Desktop-copy/5b4bcdf7-70ed-48de-995a-1eea66578ec7/scratchpad/ui/04-desktop-dark-page.png",
+    "/private/tmp/claude-501/-Users-thinkstu-Desktop-copy/5b4bcdf7-70ed-48de-995a-1eea66578ec7/scratchpad/ui/05-desktop-dark-ui.png",
+    "/private/tmp/claude-501/-Users-thinkstu-Desktop-copy/5b4bcdf7-70ed-48de-995a-1eea66578ec7/scratchpad/ui/06-width-1024-dark-ui.png",
+    "/private/tmp/claude-501/-Users-thinkstu-Desktop-copy/5b4bcdf7-70ed-48de-995a-1eea66578ec7/scratchpad/ui/06-width-820-dark-ui.png",
+    "/private/tmp/claude-501/-Users-thinkstu-Desktop-copy/5b4bcdf7-70ed-48de-995a-1eea66578ec7/scratchpad/ui/06-width-390-dark-ui.png",
+    "/private/tmp/claude-501/-Users-thinkstu-Desktop-copy/5b4bcdf7-70ed-48de-995a-1eea66578ec7/scratchpad/ui/07-page-default-wavy.png",
+    "/private/tmp/claude-501/-Users-thinkstu-Desktop-copy/5b4bcdf7-70ed-48de-995a-1eea66578ec7/scratchpad/ui/08-page-live-custom-appearance.png",
+    "/private/tmp/claude-501/-Users-thinkstu-Desktop-copy/5b4bcdf7-70ed-48de-995a-1eea66578ec7/scratchpad/ui/08b-page-live-css.png",
+    "/private/tmp/claude-501/-Users-thinkstu-Desktop-copy/5b4bcdf7-70ed-48de-995a-1eea66578ec7/scratchpad/ui/09-page-card-background.png"
+  ],
+  "metrics": {
+    "categoryCounts": {
+      "文字": 12,
+      "线条": 14,
+      "标记": 9,
+      "卡片": 5,
+      "趣味": 9
+    },
+    "previewStyle": {
+      "color": "rgb(29, 78, 216)",
+      "backgroundColor": "rgb(255, 248, 204)",
+      "decorationColor": "rgb(239, 71, 118)",
+      "fontSize": "15.21px",
+      "fontWeight": "700",
+      "opacity": "0.8",
+      "fontFamily": "\"Iowan Old Style\", \"Palatino Linotype\", Georgia, \"Times New Roman\", serif",
+      "parentFontSize": "13px"
+    },
+    "layouts": {
+      "390": {
+        "scrollWidth": 390,
+        "innerWidth": 390,
+        "groupWidth": 362
+      },
+      "820": {
+        "scrollWidth": 820,
+        "innerWidth": 820,
+        "groupWidth": 572
+      },
+      "1024": {
+        "scrollWidth": 1024,
+        "innerWidth": 1024,
+        "groupWidth": 776
+      }
+    },
+    "cssPageStyle": {
+      "color": "rgb(102, 51, 153)",
+      "background": "rgb(236, 253, 245)",
+      "fontSize": "21.06px",
+      "radius": "9px"
+    },
+    "page": {
+      "before": {
+        "className": "fluent-read-bilingual-content fluent-display-wavy",
+        "color": "rgb(38, 48, 68)",
+        "backgroundColor": "rgba(0, 0, 0, 0)",
+        "decorationColor": "rgb(64, 158, 255)",
+        "fontSize": "18px",
+        "hostFontSize": "18px"
+      },
+      "after": {
+        "className": "fluent-read-bilingual-content fluent-display-wavy",
+        "color": "rgb(29, 78, 216)",
+        "backgroundColor": "rgb(255, 248, 204)",
+        "decorationColor": "rgb(239, 71, 118)",
+        "fontSize": "21.06px",
+        "hostFontSize": "18px"
+      },
+      "requests": 1
+    }
+  },
+  "evidenceBoundary": "Local deterministic HTML/provider in an isolated Edge profile; no Firefox runtime or external provider claim.",
+  "launchMode": "macos-background-cdp",
+  "focusPolicy": "launchservices-no-foreground",
+  "windowPlacement": {
+    "mode": "background-visible-no-focus",
+    "visible": true,
+    "hidden": false,
+    "centered": true,
+    "windowState": "normal",
+    "bounds": {
+      "left": 132,
+      "top": -1020,
+      "width": 1440,
+      "height": 960
+    },
+    "displayTarget": "secondary",
+    "source": "macos-nsscreen",
+    "screenIndex": 1,
+    "browserFrontmost": false,
+    "frontmostBefore": {
+      "pid": 73685,
+      "name": "ChatGPT"
+    },
+    "frontmostAfter": {
+      "pid": 73685,
+      "name": "ChatGPT"
+    }
+  },
+  "requests": 2,
+  "cleanupErrors": []
+}

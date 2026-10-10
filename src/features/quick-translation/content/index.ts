@@ -1,7 +1,7 @@
 /**
  * @file src/features/quick-translation/content/index.ts
  * 文件职责：识别额外快捷翻译方案的可信键鼠手势，并把命中的完整方案转交给注入的悬停、全文或局部容器选择执行器。
- * 主要内容：监听 capture 阶段的 keydown/keyup，维护单次悬停手势与最后鼠标坐标，并处理划词优先、额外按键和生命周期清理。
+ * 主要内容：监听 capture 阶段的 keydown/keyup，维护单次悬停手势与可信鼠标坐标，并处理划词优先、额外按键以及路由切换、页面隐藏、失焦和指针离开时的生命周期清理。
  * 模块边界：本模块不读取配置 store、不解析服务模型、不发起翻译；配置快照、站点资格和翻译执行器都由 content composition root 注入。
  */
 import type {QuickTranslationProfile} from '@/src/core/config/quickTranslation';
@@ -138,6 +138,8 @@ export function mountQuickTranslationContentFeature(
     let selectionShortcutReserved = false;
     let mouseX = 0;
     let mouseY = 0;
+    // 键盘不会携带坐标，首次触发必须等待可信指针样本，而不能命中默认 (0,0)。
+    let pointerPositionKnown = false;
     const pressedKeys = new Set<string>();
     const pressedKeyByCode = new Map<string, string>();
 
@@ -270,7 +272,7 @@ export function mountQuickTranslationContentFeature(
                 if (gesture.conflictsWithSelectionShortcut
                     && deps.hasActiveSelectionTranslationCandidate()) {
                     deps.cancelPendingHoverTranslation();
-                } else {
+                } else if (pointerPositionKnown) {
                     void deps.runHover(gesture.profile, mouseX, mouseY);
                 }
             }
@@ -285,6 +287,7 @@ export function mountQuickTranslationContentFeature(
         if (signal.aborted || !event.isTrusted) return;
         mouseX = event.clientX;
         mouseY = event.clientY;
+        pointerPositionKnown = true;
         if (!activeHover) return;
         if (!isAvailable()) {
             clearActiveHover(true);
@@ -329,7 +332,21 @@ export function mountQuickTranslationContentFeature(
     };
     const onBlur = () => {
         if (signal.aborted) return;
+        pointerPositionKnown = false;
         cancelGestureAndPressedKeys();
+    };
+    const onRouteChange = () => {
+        if (signal.aborted) return;
+        pointerPositionKnown = false;
+        cancelGestureAndPressedKeys();
+    };
+    const onVisibilitychange = () => {if (deps.document.visibilityState === 'hidden') onRouteChange();};
+    const onMouseout = (event: MouseEvent) => {if (event.isTrusted && event.relatedTarget === null) onRouteChange();};
+    const onMouseover = (event: MouseEvent) => {
+        if (signal.aborted || !event.isTrusted) return;
+        mouseX = event.clientX;
+        mouseY = event.clientY;
+        pointerPositionKnown = true;
     };
     const onPointerdown = (event: PointerEvent) => {
         if (signal.aborted || !event.isTrusted) return;
@@ -347,5 +364,9 @@ export function mountQuickTranslationContentFeature(
     deps.document.addEventListener('mousemove', onMousemove, {signal});
     deps.document.addEventListener('selectionchange', onSelectionchange, {signal});
     deps.document.addEventListener('pointerdown', onPointerdown, {capture: true, signal});
+    deps.document.addEventListener('fluentread-route-change', onRouteChange, {signal});
+    deps.document.addEventListener('visibilitychange', onVisibilitychange, {signal});
+    deps.document.addEventListener('mouseout', onMouseout, {signal});
+    deps.document.addEventListener('mouseover', onMouseover, {signal});
     signal.addEventListener('abort', cancelGestureAndPressedKeys, {once: true});
 }

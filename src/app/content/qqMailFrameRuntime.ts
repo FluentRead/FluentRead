@@ -1,7 +1,7 @@
 /**
  * @file src/app/content/qqMailFrameRuntime.ts
  * 文件职责：为受支持邮箱的正文 frame 组装翻译，并把全文手势交给顶层会话。
- * 主要内容：QQ 旧版与网易免费邮箱各自使用受限消息协议，共享无凭据会话快照、样式和键盘生命周期。
+ * 主要内容：QQ 旧版与网易免费邮箱各自使用受限消息协议，共享无凭据会话快照、样式和键盘生命周期；真实阅读路由变化同步失效上下文与请求提交代次，同地址通知不重复清理。
  * 模块边界：只在经过后台认证的阅读 frame 激活，不挂载悬浮球等顶层 UI；翻译请求与异步状态由共享 feature 承担。
  */
 import {installContentPageLifecycle} from './pageLifecycle';
@@ -22,10 +22,11 @@ import {
 import {
     autoTranslateEnglishPage, getFullPageTranslationFrameState, cancelPendingHoverTranslation,
     handleTranslation, noteBilingualHostGesture,
-    invalidateFullPageTranslationSessionCache, restoreOriginalContent,
+    invalidateFullPageTranslationSessionCache, restoreOriginalContent, resetFullPageTranslationRouteState,
     type PageTranslationInvocation,
 } from '@/src/features/full-page-translation/public';
 import {cancelAllTranslations} from '@/src/app/translation/client';
+import {resetPageTranslationContextCache} from '@/src/services/translation/context';
 import {getCenterPoint} from '@/src/shared/geometry/touch';
 import {mountHoverTranslationContentFeature} from '@/src/features/hover-translation/public';
 import {mountSelectionTranslator, unmountSelectionTranslator} from '@/src/features/selection-translation/public';
@@ -199,8 +200,17 @@ async function startMailFrameApp(ctx: ContentScriptContext, kind: MailFrameKind)
     };
     const siteAdaptation = createContentSiteAdaptationRuntime(
         config.siteAdaptation, new URL(siteHref()), () => controller.suspend());
+    let currentRouteHref = window.location.href;
+    let currentSiteHref = siteHref();
     document.addEventListener('fluentread-route-change', () => {
-        if (siteAdaptation.routeChanged(new URL(siteHref())) && enabled()) void controller.refresh();
+        const nextRouteHref = window.location.href;
+        const nextSiteHref = siteHref();
+        if (nextRouteHref === currentRouteHref && nextSiteHref === currentSiteHref) return;
+        currentRouteHref = nextRouteHref;
+        currentSiteHref = nextSiteHref;
+        resetPageTranslationContextCache();
+        resetFullPageTranslationRouteState();
+        if (siteAdaptation.routeChanged(new URL(nextSiteHref)) && enabled()) void controller.refresh();
     }, {signal: lifetime.signal});
     const removeMessageListener = addRuntimeMessageListener(browser.runtime, listener);
     applyCoreTranslationPreferences(config);

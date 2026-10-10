@@ -1,0 +1,751 @@
+{
+  "date": "2026-10-11",
+  "scope": "Incremental hover responsiveness and lifecycle safeguards on main PR #929; targeted verification, no full-suite or live-provider acceptance.",
+  "finalDeliveryVerification": {
+    "testedMainCommit": "dc335c698c05d8a5d11dbaadacb598c0695894f8",
+    "productionBuildSourceCommit": "884a0a45089f854e3a1b104eb772c13e4978bdab",
+    "integration": "Main PR #933 context-menu/notification and #934 input-translation updates integrated; only userscript budget had a textual conflict, resolved using independent baseline measurement. All six covered hover business module hashes match the original 100% coverage evidence.",
+    "validationReuse": "The original 982 baseline performance and complete native browser matrix below remain attributed to their original source/bundle. They are not measurements of this later bundle. Final integration adds fresh type/build/architecture/shared-composition checks and five native browser reliability cases.",
+    "unchangedCoveredModuleSha256": {
+      "src/core/translation/engine.ts": "f8b6183d580fd6e5e559ec35a31c7c34088d1ac063ebe5363207e1542dce39f1",
+      "src/core/glossary/revisionMemo.ts": "ffc0c01f45d0f18ff8c52fdd34da9d55b8f6a2c5101adb8152508159335a0292",
+      "src/features/full-page-translation/content/hoverScheduler.ts": "1f8ae27c56c5312aa581f62dd3e24e9b360b3e77ca9fea011fdc01a070488bdf",
+      "src/features/full-page-translation/content/translationRequest.ts": "6b444bbe7f3bd5a56f41134b3c319eac36af98002327ab894188369b56dfa349",
+      "src/features/hover-translation/content/index.ts": "fd88a9b776fcb4f72f31f80ecd2054f9ecdc9853eb6bd7357b8dcc9d79d6fb3b",
+      "src/features/quick-translation/content/index.ts": "a14481ac4d24dbcdacfc87a0fd0c9520d8d7593f3504fbec2a9da4cb696bbe58"
+    },
+    "targetedRuns": [
+      {
+        "scope": "Final message, hotkey and selection-translator composition boundaries",
+        "files": 3,
+        "passed": 272
+      },
+      {
+        "scope": "Final architecture boundaries, source headers and ownership",
+        "files": 4,
+        "passed": 938
+      }
+    ],
+    "testAudit": {
+      "status": "ok",
+      "groups": {
+        "architecture": 33,
+        "unit": 372,
+        "functional": 197,
+        "regression": 40
+      },
+      "files": 642,
+      "cases": 10665
+    },
+    "builds": {
+      "compile": "passed",
+      "chrome": {
+        "status": "passed",
+        "seconds": 31.0
+      },
+      "firefox": {
+        "status": "passed",
+        "seconds": 34.6
+      },
+      "userscript": {
+        "status": "passed",
+        "seconds": 4.85
+      },
+      "userscriptVerifier": "passed",
+      "extensionManifestVerifier": "passed; built directories, no release archives",
+      "docs": {
+        "status": "passed",
+        "seconds": 4.71
+      }
+    },
+    "artifactSha256": {
+      "chromeContent": "eed1659d82f50c83caa603640bb7d14ac89a04b1400923889389a7ea8b2ee11c",
+      "firefoxContent": "96501eb7ddbc26eed58168703e75525960403470eb80ffca52adc92bff68248f",
+      "userscript": "a84f37e832f23990b803d0e5f71ba39c309f829609d4bfe3629a961bcdea407f",
+      "baselineUserscript": "858a55742bd4928dd5674d9c120129db27700113b1a8229224b9cb9bb37b88d3"
+    },
+    "userscriptBudget": {
+      "baselineCommit": "dc335c698c05d8a5d11dbaadacb598c0695894f8",
+      "baselineBytes": 2009853,
+      "finalBytes": 2012985,
+      "deltaBytes": 3132,
+      "deltaPercent": 0.1558,
+      "previousBudgetBytes": 2010000,
+      "budgetBytes": 2013000,
+      "allowanceIncreaseBytes": 3000,
+      "verification": "Clean main archive built with the identical locked task dependencies passes its unchanged verifier. Final artifact passes the measured minimum 3 KB allowance; all other verifier assertions retained."
+    },
+    "browserReliability": {
+      "evidence": "Production extension; trusted Playwright/CDP gestures; local deterministic Microsoft transport, no live provider claims",
+      "finalContentSha256": "eed1659d82f50c83caa603640bb7d14ac89a04b1400923889389a7ea8b2ee11c",
+      "totalAssertionsPassed": 56,
+      "cases": [
+        {
+          "id": "latest-point",
+          "requests": 1,
+          "assertionsPassed": 10
+        },
+        {
+          "id": "repeat-loading",
+          "requests": 1,
+          "assertionsPassed": 11
+        },
+        {
+          "id": "viewport-leave",
+          "requests": 1,
+          "assertionsPassed": 11
+        },
+        {
+          "id": "dom-replacement",
+          "requests": 2,
+          "assertionsPassed": 11
+        },
+        {
+          "id": "failure-retry",
+          "requests": 2,
+          "assertionsPassed": 13
+        }
+      ],
+      "consoleErrors": [],
+      "unexpectedNetworkRequests": [],
+      "failedObservations": [],
+      "windowPlacement": {
+        "mode": "background-visible-no-focus",
+        "visible": true,
+        "hidden": false,
+        "windowState": "normal",
+        "displayTarget": "secondary",
+        "browserFrontmost": false
+      },
+      "cleanup": "Owned browser closed and temporary profile deleted; no cleanup errors. Foreground application unchanged."
+    },
+    "rawEvidence": {
+      "baseline": "baseline-delivery-main-dc335c698-userscript.log; baseline-delivery-main-dc335c698-userscript-verify.log",
+      "browser": "final-delivery-reliability/report.json",
+      "sharedBoundaries": "pr934-integration-shared-boundaries.log",
+      "buildAndCheckLogs": "pr934-integration-{compile,architecture,chrome,firefox,userscript,userscript-verify,manifests,docs,audit}.log"
+    }
+  },
+  "originalMeasurementScope": "All remaining top-level build, coverage, performance and browser fields describe the original e702 acceptance on the clean 982 baseline. Final delivery integration evidence is recorded above.",
+  "testedMainCommit": "982f09df6674004cc3843384a834b67ce0f0d992",
+  "performanceBaselineCommit": "982f09df6674004cc3843384a834b67ce0f0d992",
+  "productionBuildSourceCommit": "e702ec664986cd3fe98570d4874fae9bd03386be",
+  "testHarnessSourceSha256": "dcca24e2e3b952ecb6b3d16d1e60665313a0bba47eeade5c88e2b1686d5ee60e",
+  "architecture": {
+    "stack": "Existing WXT/Vue/TypeScript; no new dependencies or copied reference-repository code.",
+    "scheduler": "One upstream hoverScheduler, with optional availability and owner/session commit guards; same-candidate dwell and request-domain semantics retained.",
+    "candidateResolver": "Reuse native hit stack and ancestor guards only within a single synchronous read-only resolution; no cross-call or cross-gesture DOM cache.",
+    "glossaryMemo": "One bounded primitive mirror; revalidate every relevant mutable field, order and descriptor on each capture; uncommon or unsafe shapes fall back to the existing revision builder. Each request keeps its own snapshot.",
+    "hostCompatibility": "Keep shared candidates, editable/formula barriers, native selection/input/link behavior, default/quick profiles, zero-delay behavior, restore/retranslate and explicit retry."
+  },
+  "strictCoverage": {
+    "src/core/translation/engine.ts": {
+      "percent": {
+        "statements": 100,
+        "branches": 100,
+        "functions": 100,
+        "lines": 100
+      },
+      "sourceSha256": "f8b6183d580fd6e5e559ec35a31c7c34088d1ac063ebe5363207e1542dce39f1",
+      "verification": "969 tests / 22 files; engine source hash unchanged"
+    },
+    "src/core/glossary/revisionMemo.ts": {
+      "percent": {
+        "statements": 100,
+        "branches": 100,
+        "functions": 100,
+        "lines": 100
+      },
+      "sourceSha256": "ffc0c01f45d0f18ff8c52fdd34da9d55b8f6a2c5101adb8152508159335a0292",
+      "verification": "711 tests / 8 files on final integrated production source"
+    },
+    "src/features/full-page-translation/content/hoverScheduler.ts": {
+      "percent": {
+        "statements": 100,
+        "branches": 100,
+        "functions": 100,
+        "lines": 100
+      },
+      "sourceSha256": "1f8ae27c56c5312aa581f62dd3e24e9b360b3e77ca9fea011fdc01a070488bdf",
+      "verification": "711 tests / 8 files on final integrated production source"
+    },
+    "src/features/full-page-translation/content/translationRequest.ts": {
+      "percent": {
+        "statements": 100,
+        "branches": 100,
+        "functions": 100,
+        "lines": 100
+      },
+      "sourceSha256": "6b444bbe7f3bd5a56f41134b3c319eac36af98002327ab894188369b56dfa349",
+      "verification": "711 tests / 8 files on final integrated production source"
+    },
+    "src/features/hover-translation/content/index.ts": {
+      "percent": {
+        "statements": 100,
+        "branches": 100,
+        "functions": 100,
+        "lines": 100
+      },
+      "sourceSha256": "fd88a9b776fcb4f72f31f80ecd2054f9ecdc9853eb6bd7357b8dcc9d79d6fb3b",
+      "verification": "711 tests / 8 files on final integrated production source"
+    },
+    "src/features/quick-translation/content/index.ts": {
+      "percent": {
+        "statements": 100,
+        "branches": 100,
+        "functions": 100,
+        "lines": 100
+      },
+      "sourceSha256": "a14481ac4d24dbcdacfc87a0fd0c9520d8d7593f3504fbec2a9da4cb696bbe58",
+      "verification": "711 tests / 8 files on final integrated production source"
+    }
+  },
+  "targetedRuns": [
+    {
+      "scope": "Candidate engine and direct shared-candidate boundaries; engine hash unchanged",
+      "files": 22,
+      "passed": 969
+    },
+    {
+      "scope": "Final integrated requests, snapshots, memo, both hover profiles, scheduler, visibility and translation state",
+      "files": 8,
+      "passed": 711,
+      "sourceCommit": "e702ec664986cd3fe98570d4874fae9bd03386be"
+    },
+    {
+      "scope": "QQ/NetEase/embedded frame lifecycle and F9/selection hotkey arbitration",
+      "files": 4,
+      "passed": 134,
+      "sourceCommit": "e702ec664986cd3fe98570d4874fae9bd03386be"
+    },
+    {
+      "scope": "Module/provider boundaries, source headers and verification ownership",
+      "files": 4,
+      "passed": 933,
+      "sourceCommit": "e702ec664986cd3fe98570d4874fae9bd03386be"
+    },
+    {
+      "scope": "Final cross-candidate browser CLI resource/cleanup contracts",
+      "files": 1,
+      "passed": 13,
+      "filteredOut": 92
+    }
+  ],
+  "testCountsAreNotAdditive": "Runs overlap. Audit counts are registered cases, not full-suite execution.",
+  "testAudit": {
+    "status": "ok",
+    "groups": {
+      "architecture": 33,
+      "unit": 372,
+      "functional": 197,
+      "regression": 40
+    },
+    "files": 642,
+    "cases": 10539
+  },
+  "builds": {
+    "compile": "passed",
+    "chrome": {
+      "status": "passed",
+      "seconds": 43.0
+    },
+    "firefox": {
+      "status": "passed",
+      "seconds": 42.8
+    },
+    "userscript": {
+      "status": "passed",
+      "seconds": 5.63
+    },
+    "userscriptVerifier": "passed; protocol, compatibility and runtime exclusion assertions retained",
+    "extensionManifestVerifier": "passed; built directories, no release archives",
+    "docs": {
+      "status": "passed",
+      "seconds": 4.47
+    }
+  },
+  "artifactSha256": {
+    "chromeContent": "8237d5b4dfcf86fb7ab41ade65b636bbd584f8e026985d340cfa6f584844e3b3",
+    "firefoxContent": "f70eb7549102f6f9148d86e18ed7c23cc5f81c8ad0e30db93b73957c39fe895c",
+    "userscript": "ec1b43a1b2456e269b8bb9de1f7127c5e1e2cd8cad94096947e132930fcc47f4"
+  },
+  "userscriptBudget": {
+    "baselineCommit": "982f09df6674004cc3843384a834b67ce0f0d992",
+    "baselineBytes": 1997758,
+    "finalBytes": 2000890,
+    "deltaBytes": 3132,
+    "deltaPercent": 0.1568,
+    "previousBudgetBytes": 1998000,
+    "budgetBytes": 2001000,
+    "allowanceIncreaseBytes": 3000,
+    "verification": "Clean main archive built with the same locked dependency tree passes its original budget; the final candidate passes the measured 3 KB allowance increase."
+  },
+  "browser": {
+    "evidence": "Production extension; local deterministic transport, temporary background-visible Edge",
+    "launchMode": "macos-background-cdp",
+    "focusPolicy": "launchservices-no-foreground",
+    "cdpDefaults": "noDefaults:true; native focus, tab visibility and media",
+    "windowPlacement": {
+      "mode": "background-visible-no-focus",
+      "visible": true,
+      "hidden": false,
+      "windowState": "normal",
+      "displayTarget": "secondary",
+      "browserFrontmost": false
+    },
+    "consoleErrors": [],
+    "cleanup": "Owned browser closed, temporary profiles deleted, no cleanup errors; foreground application unchanged.",
+    "baselineContentSha256": "1b32f669190e351b9e1d4c8c23ee061a915b62c9d2113ee3c58276860c6e0415",
+    "finalContentSha256": "8237d5b4dfcf86fb7ab41ade65b636bbd584f8e026985d340cfa6f584844e3b3",
+    "rangeCases": [
+      {
+        "id": "giant-tail",
+        "originalCharacters": 135120,
+        "emptyNodes": 0,
+        "phases": [
+          {
+            "name": "translate",
+            "longTasksMs": [
+              51
+            ],
+            "maxHeartbeatGapMs": 69.60000038146973
+          },
+          {
+            "name": "continuous-hover",
+            "longTasksMs": [],
+            "maxHeartbeatGapMs": 21.59999990463257
+          },
+          {
+            "name": "restore",
+            "longTasksMs": [],
+            "maxHeartbeatGapMs": 26
+          },
+          {
+            "name": "retranslate",
+            "longTasksMs": [],
+            "maxHeartbeatGapMs": 29.200000286102295
+          }
+        ],
+        "sourceChunkCharacters": 1550,
+        "hitInSourceChunk": true,
+        "markerPreserved": true,
+        "requests": 2,
+        "hostClicks": 1,
+        "originalPreserved": true,
+        "restoreAndRetranslate": true,
+        "continuousHoverNoRepeatedRequests": true
+      },
+      {
+        "id": "empty-nodes",
+        "originalCharacters": 6240,
+        "emptyNodes": 20000,
+        "phases": [
+          {
+            "name": "translate",
+            "longTasksMs": [],
+            "maxHeartbeatGapMs": 34.80000019073486
+          },
+          {
+            "name": "continuous-hover",
+            "longTasksMs": [],
+            "maxHeartbeatGapMs": 22.09999990463257
+          },
+          {
+            "name": "restore",
+            "longTasksMs": [],
+            "maxHeartbeatGapMs": 22.300000190734863
+          },
+          {
+            "name": "retranslate",
+            "longTasksMs": [],
+            "maxHeartbeatGapMs": 21.399999618530273
+          }
+        ],
+        "sourceChunkCharacters": 1560,
+        "hitInSourceChunk": true,
+        "markerPreserved": true,
+        "requests": 2,
+        "hostClicks": 1,
+        "originalPreserved": true,
+        "restoreAndRetranslate": true,
+        "continuousHoverNoRepeatedRequests": true
+      },
+      {
+        "id": "long-token",
+        "originalCharacters": 9100,
+        "emptyNodes": 0,
+        "phases": [
+          {
+            "name": "translate",
+            "longTasksMs": [],
+            "maxHeartbeatGapMs": 43.69999980926514
+          },
+          {
+            "name": "continuous-hover",
+            "longTasksMs": [],
+            "maxHeartbeatGapMs": 21.300000190734863
+          },
+          {
+            "name": "restore",
+            "longTasksMs": [],
+            "maxHeartbeatGapMs": 22
+          },
+          {
+            "name": "retranslate",
+            "longTasksMs": [],
+            "maxHeartbeatGapMs": 21.899999618530273
+          }
+        ],
+        "sourceChunkCharacters": 1600,
+        "hitInSourceChunk": true,
+        "markerPreserved": true,
+        "requests": 2,
+        "hostClicks": 1,
+        "originalPreserved": true,
+        "restoreAndRetranslate": true,
+        "continuousHoverNoRepeatedRequests": true
+      }
+    ],
+    "gestureChecks": {
+      "phases": [
+        {
+          "name": "long-press-arbitration",
+          "longTasksMs": [],
+          "maxHeartbeatGapMs": 22.699999809265137
+        },
+        {
+          "name": "delayed-hover-abort",
+          "longTasksMs": [],
+          "maxHeartbeatGapMs": 21.59999990463257
+        }
+      ],
+      "arbitrationDispatchMs": 23,
+      "wrappersAfterLongPressDeadline": 1,
+      "arbitrationRequests": 1,
+      "disableDispatchMs": 39,
+      "requestsWhileDisabled": 0,
+      "reenabledCounts": [
+        1,
+        0,
+        1
+      ],
+      "reenabledGestureWorks": true,
+      "originalPreserved": true
+    },
+    "lifecycleCancellation": [
+      {
+        "profile": "default",
+        "boundary": "route",
+        "delayMs": 1200,
+        "requestsAfterBoundary": 0,
+        "counts": [
+          1,
+          0,
+          1
+        ],
+        "settledGestureGapMs": 300,
+        "freshGestureRequests": 2,
+        "originalPreserved": true,
+        "staleGestureCancelled": true,
+        "freshGesturePreserved": true
+      },
+      {
+        "profile": "default",
+        "boundary": "visibility",
+        "delayMs": 1200,
+        "requestsAfterBoundary": 0,
+        "counts": [
+          1,
+          0,
+          1
+        ],
+        "settledGestureGapMs": 300,
+        "freshGestureRequests": 2,
+        "originalPreserved": true,
+        "staleGestureCancelled": true,
+        "freshGesturePreserved": true,
+        "nativeTabVisibility": true,
+        "trustedVisibilitySequence": [
+          "hidden",
+          "visible"
+        ],
+        "sameWindowSwitch": true,
+        "targetInactiveDuringCancellation": true
+      },
+      {
+        "profile": "quick",
+        "boundary": "route",
+        "delayMs": 1200,
+        "requestsAfterBoundary": 0,
+        "counts": [
+          1,
+          0,
+          1
+        ],
+        "settledGestureGapMs": 300,
+        "freshGestureRequests": 2,
+        "originalPreserved": true,
+        "staleGestureCancelled": true,
+        "freshGesturePreserved": true
+      },
+      {
+        "profile": "quick",
+        "boundary": "visibility",
+        "delayMs": 1200,
+        "requestsAfterBoundary": 0,
+        "counts": [
+          1,
+          0,
+          1
+        ],
+        "settledGestureGapMs": 300,
+        "freshGestureRequests": 2,
+        "originalPreserved": true,
+        "staleGestureCancelled": true,
+        "freshGesturePreserved": true,
+        "nativeTabVisibility": true,
+        "trustedVisibilitySequence": [
+          "hidden",
+          "visible"
+        ],
+        "sameWindowSwitch": true,
+        "targetInactiveDuringCancellation": true
+      }
+    ],
+    "totalLocalDeterministicRequests": 17
+  },
+  "crossCandidatePerformance": {
+    "workload": "cross-candidate",
+    "candidateCount": 2,
+    "delayMs": 300,
+    "repetitionsPerLibrary": 3,
+    "samplesPerLibrary": 360,
+    "totalInputsPerRun": 720,
+    "method": "Trusted CDP moves alternate two native paragraph owners; synchronous capture-to-bubble plus full-phase CDP metrics including animation-frame work; no upstream translation",
+    "snapshotPolicy": "Entering a different delivered candidate captures a new snapshot; animation-frame coalescing may deliver fewer candidate changes than input events",
+    "baseline": {
+      "empty": {
+        "samples": 360,
+        "entries": 0,
+        "medianMs": 0.8,
+        "p95Ms": 1.3,
+        "eventDurationSumMs": 308.3,
+        "scriptDurationSumMs": 329.102,
+        "taskDurationSumMs": 551.371,
+        "maxHeartbeatGapMs": 25,
+        "maxInterMoveGapMs": 81.3,
+        "requests": 0,
+        "layoutAndStyleRecalculations": 0,
+        "longTasks": 0,
+        "scriptDurationPerRepetitionMs": [
+          113.752,
+          113.149,
+          102.201
+        ]
+      },
+      "large": {
+        "samples": 360,
+        "entries": 5000,
+        "medianMs": 16.5,
+        "p95Ms": 17.3,
+        "eventDurationSumMs": 5957.5,
+        "scriptDurationSumMs": 5968.017,
+        "taskDurationSumMs": 6180.667,
+        "maxHeartbeatGapMs": 35.6,
+        "maxInterMoveGapMs": 224.5,
+        "requests": 0,
+        "layoutAndStyleRecalculations": 0,
+        "longTasks": 0,
+        "scriptDurationPerRepetitionMs": [
+          1988.905,
+          2002.983,
+          1976.129
+        ]
+      },
+      "glossaryAssociatedScriptDifferenceMs": 5638.915
+    },
+    "final": {
+      "empty": {
+        "samples": 360,
+        "entries": 0,
+        "medianMs": 0.7,
+        "p95Ms": 1.1,
+        "eventDurationSumMs": 268.9,
+        "scriptDurationSumMs": 288.879,
+        "taskDurationSumMs": 502.841,
+        "maxHeartbeatGapMs": 23.6,
+        "maxInterMoveGapMs": 32.5,
+        "requests": 0,
+        "layoutAndStyleRecalculations": 0,
+        "longTasks": 0,
+        "scriptDurationPerRepetitionMs": [
+          92.803,
+          91.274,
+          104.802
+        ]
+      },
+      "large": {
+        "samples": 360,
+        "entries": 5000,
+        "medianMs": 3.2,
+        "p95Ms": 4.4,
+        "eventDurationSumMs": 1001.0,
+        "scriptDurationSumMs": 1014.564,
+        "taskDurationSumMs": 1202.8,
+        "maxHeartbeatGapMs": 25,
+        "maxInterMoveGapMs": 18.6,
+        "requests": 0,
+        "layoutAndStyleRecalculations": 0,
+        "longTasks": 0,
+        "scriptDurationPerRepetitionMs": [
+          375.239,
+          358.832,
+          280.493
+        ]
+      },
+      "glossaryAssociatedScriptDifferenceMs": 725.685
+    },
+    "largeLibraryMedianReductionPercent": 80.61,
+    "largeLibraryFullPhaseScriptReductionPercent": 83.0,
+    "interpretation": "Synchronous capture-to-bubble event timing and full-phase CDP ScriptDuration including animation-frame work overlap and cannot be added. Large-minus-empty script duration is glossary-associated workload, not a precise snapshot-function measurement. These are input-work costs, not provider or end-to-end translation latency."
+  },
+  "upstreamReliabilityAcceptance": {
+    "evidence": "Production extension; trusted Playwright/CDP gestures; local deterministic Microsoft transport, no live provider claims",
+    "finalContentSha256": "8237d5b4dfcf86fb7ab41ade65b636bbd584f8e026985d340cfa6f584844e3b3",
+    "cases": [
+      {
+        "id": "latest-point",
+        "requests": 1,
+        "assertionsPassed": 10,
+        "assertions": [
+          "Only final settled paragraph translates",
+          "Only final settled paragraph reaches provider",
+          "No nested translation wrappers",
+          "At most one translation per owner",
+          "Original source remains exact",
+          "Hover translation preserves native input value",
+          "Native input remains editable with platform select-all",
+          "Hover shortcut inside input creates no translation work",
+          "Source link keeps its original href",
+          "Native source link click still navigates"
+        ]
+      },
+      {
+        "id": "repeat-loading",
+        "requests": 1,
+        "assertionsPassed": 11,
+        "assertions": [
+          "Rapid repeat while loading sends one upstream request",
+          "Rapid repeat creates one translation",
+          "Explicit restore and retranslate remains available without duplicate work",
+          "No nested translation wrappers",
+          "At most one translation per owner",
+          "Original source remains exact",
+          "Hover translation preserves native input value",
+          "Native input remains editable with platform select-all",
+          "Hover shortcut inside input creates no translation work",
+          "Source link keeps its original href",
+          "Native source link click still navigates"
+        ]
+      },
+      {
+        "id": "viewport-leave",
+        "requests": 1,
+        "assertionsPassed": 11,
+        "assertions": [
+          "Leaving viewport cancels delayed hover",
+          "No stale-coordinate translation after viewport leave",
+          "Fresh gesture works after pointer re-entry",
+          "No nested translation wrappers",
+          "At most one translation per owner",
+          "Original source remains exact",
+          "Hover translation preserves native input value",
+          "Native input remains editable with platform select-all",
+          "Hover shortcut inside input creates no translation work",
+          "Source link keeps its original href",
+          "Native source link click still navigates"
+        ]
+      },
+      {
+        "id": "dom-replacement",
+        "requests": 2,
+        "assertionsPassed": 11,
+        "assertions": [
+          "Removed owner response does not translate replacement DOM",
+          "Replacement DOM translates its own current source",
+          "Removed owner translation never reappears",
+          "No nested translation wrappers",
+          "At most one translation per owner",
+          "Original source remains exact",
+          "Hover translation preserves native input value",
+          "Native input remains editable with platform select-all",
+          "Hover shortcut inside input creates no translation work",
+          "Source link keeps its original href",
+          "Native source link click still navigates"
+        ]
+      },
+      {
+        "id": "failure-retry",
+        "requests": 2,
+        "assertionsPassed": 13,
+        "assertions": [
+          "Continuous movement does not retry failed request automatically",
+          "Retry remains keyboard accessible",
+          "Explicit retry sends one new request",
+          "Successful retry clears failure UI",
+          "Retry preserves source ownership",
+          "No nested translation wrappers",
+          "At most one translation per owner",
+          "Original source remains exact",
+          "Hover translation preserves native input value",
+          "Native input remains editable with platform select-all",
+          "Hover shortcut inside input creates no translation work",
+          "Source link keeps its original href",
+          "Native source link click still navigates"
+        ]
+      }
+    ],
+    "totalAssertionsPassed": 56,
+    "consoleErrors": [],
+    "unexpectedNetworkRequests": [],
+    "failedObservations": []
+  },
+  "limitations": [
+    "Browser transport is a deterministic local fixture; actual translation-provider acceptance is unverified.",
+    "Firefox and userscript build/verifier success does not establish runtime acceptance on those platforms.",
+    "The 135,120-character giant source still has one 51 ms long task during first translation; the cross-candidate performance samples have no long tasks.",
+    "Selection/profile arbitration is covered by targeted tests; the browser script does not independently accept every selection-translation path.",
+    "Results measure this controlled workload on this machine; no claim of universal end-to-end speed or complete elimination of jank."
+  ],
+  "rawEvidence": {
+    "location": "Sibling task artifacts directory hover-translation-polish-20261011; raw files remain outside the source tree.",
+    "baseline": "baseline-pr929-cross-candidate/report.json",
+    "browser": "final-pr929-browser/report.json",
+    "reliability": "final-pr929-reliability/report.json",
+    "coverage": "integration-pr929-final-coverage/coverage-summary.json",
+    "targeted": "integration-pr929-final-targeted.log",
+    "frames": "integration-pr929-frame-hotkey.log",
+    "architecture": "pr929-final-architecture.log",
+    "cli": "cross-candidate-cli-contracts.log",
+    "buildLogs": "pr929-final-{compile,chrome,firefox,userscript,userscript-verify,manifests,docs,audit}.log"
+  },
+  "reproduce": {
+    "builds": [
+      "pnpm compile",
+      "pnpm build",
+      "pnpm build:firefox",
+      "pnpm build:userscript",
+      "node scripts/verify-userscript-build.mjs",
+      "pnpm verify:extension-manifests",
+      "pnpm docs:build",
+      "pnpm test:audit"
+    ],
+    "integrationCoverage": "node scripts/testing/run-resource-safe.mjs -- pnpm exec vitest run --config vitest.coverage.config.ts tests/fullPageVisibilityScheduling.test.ts tests/translationSlotEchoRegression.test.ts tests/fullPageTranslationConfigSnapshot.test.ts tests/glossaryRevisionMemo.test.ts tests/hoverTranslationContentFeature.test.ts tests/quickTranslationContentFeature.test.ts tests/hoverTranslationScheduler.test.ts tests/translationState.test.ts --coverage --coverage.include=src/core/glossary/revisionMemo.ts --coverage.include=src/features/full-page-translation/content/hoverScheduler.ts --coverage.include=src/features/full-page-translation/content/translationRequest.ts --coverage.include=src/features/hover-translation/content/index.ts --coverage.include=src/features/quick-translation/content/index.ts --coverage.reportsDirectory=/private/tmp/fluentread-hover-integration-coverage",
+    "frameAndHotkey": "node scripts/testing/run-resource-safe.mjs -- pnpm exec vitest run --maxWorkers=1 tests/qqMailFrameRuntime.test.ts tests/qqMailFrameSession.test.ts tests/issue146EmbeddedFrames.test.ts tests/contentHotkeyRuntime.test.ts",
+    "architecture": "pnpm test tests/architecture/moduleBoundaries.test.ts tests/architecture/sourceFileHeaders.test.ts tests/architecture/verificationOwnership.test.ts tests/architecture/providerBoundaries.test.ts",
+    "cliContracts": "pnpm test tests/documentationToolContracts.test.ts -t 'hover-visual-range-test'",
+    "browser": "node scripts/testing/run-resource-safe.mjs -- node scripts/testing/run-hover-visual-range-test.cjs --extension-dir .output/chrome-mv3 --focus-safe-helper scripts/testing/focus-safe-browser.cjs --background --gesture-lifecycle --hover-sweep --artifacts-dir /private/tmp/fluentread-hover-delivery",
+    "browserBaseline": "Use this task script and the same locked dependencies against a clean archive of performanceBaselineCommit. Pass its built extension-dir, the task focus-safe-helper, --background --baseline --hover-sweep --sweep-only; execute builds with the baseline archive own resource-safe wrapper.",
+    "reliability": "node scripts/testing/run-resource-safe.mjs -- node scripts/testing/run-hover-reliability-test.cjs --extension-dir .output/chrome-mv3 --background --cases latest-point,repeat-loading,viewport-leave,dom-replacement,failure-retry --artifacts-dir /private/tmp/fluentread-hover-reliability"
+  }
+}

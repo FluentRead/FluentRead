@@ -3,7 +3,7 @@
  *
  * 文件职责：实现 DOM 节点到 TranslationCandidate 的核心解析引擎，协调安全守卫、站点适配器、布局边界和文本有效性。
  * 主要内容：按正文/全部节点范围协调候选；定义 TranslationCandidateCore、候选优选与键值函数，记录发现步骤和原因，按站点规则把显式换行拆为两种入口一致的内联候选，处理编辑器坐标命中屏障、hover 屏障、适配优先级、快照省略、缓存及坐标命中；同步只读批量解析复用全部范围及无站点适配/应用外壳例外的普通正文祖先守卫和文本保护，涉及显式外壳权限或站点重定向目标时独立解析；无元素子节点的非文档表面不重复探测不可能成立的内联分段，仍由完整候选分类复验文本和保护；悬浮命中独立后代的包裹层时禁止回退吞并整个容器，让独立 tooltip 不抢占外层控件候选，保证全文与悬浮共享决策。 可核对的公开符号包括 TranslationCoreInspection、TranslationDiscoveryStep、getTranslationCandidateKey、selectPreferredTranslationCandidate、TranslationCandidateCore。
- * 模块边界：本文件属于可独立测试的 core 候选领域；可以读取传入 DOM 以计算结果，但不访问配置存储、不调用 provider、不注册页面监听器，也不负责译文渲染或 feature 生命周期。
+ * 模块边界：本文件属于可独立测试的 core 候选领域；可以读取传入 DOM 以计算结果，坐标命中栈与祖先守卫只在单次同步解析中复用，不跨手势缓存；不访问配置存储、不调用 provider、不注册页面监听器，也不负责译文渲染或 feature 生命周期。
  */
 
 import {isTranslationTooltip} from './dom';
@@ -1046,13 +1046,25 @@ export class TranslationCandidateCore {
     }
 
     resolveAtPoint(root: Document | ShadowRoot, x: number, y: number): TranslationCandidate | null {
+        // 一次坐标解析是同步只读阶段：每个 root 的原生命中栈只读取一次，
+        // 普通正文的祖先守卫也可复用；下一次手势重新读取，避免缓存动态页面。
+        const hitStacks = new Map<Document | ShadowRoot, Element[]>();
+        const elementsAtPoint = (currentRoot: Document | ShadowRoot): Element[] => {
+            let elements = hitStacks.get(currentRoot);
+            if (!elements) {
+                elements = findElementsAtPoint(currentRoot, x, y);
+                hitStacks.set(currentRoot, elements);
+            }
+            return elements;
+        };
+        const resolve = this.createSynchronousResolver();
         // 编辑器是真实命中屏障：caret API 可能返回相邻辅助文本，命中栈也包含
         // 整个表单。必须先检查最上层元素，避免跳过输入框后翻译其父容器。
         const hitRoots = new Set<Document | ShadowRoot>();
         let hitRoot: Document | ShadowRoot | null = root;
         while (hitRoot && !hitRoots.has(hitRoot) && hitRoots.size <= maxPointResolutionDepth) {
             hitRoots.add(hitRoot);
-            const hit: Element | undefined = findElementsAtPoint(hitRoot, x, y)[0];
+            const hit: Element | undefined = elementsAtPoint(hitRoot)[0];
             if (!hit) break;
             const guard = evaluateHardGuard(hit);
             if (guard.reason === 'contenteditable' ||
@@ -1071,16 +1083,16 @@ export class TranslationCandidateCore {
 
             const pointedNode = findNodeAtPoint(currentRoot, x, y);
             if (pointedNode) {
-                const pointedCandidate = this.resolve(pointedNode);
+                const pointedCandidate = resolve(pointedNode);
                 if (pointedCandidate) return this.refineHoverCandidate(pointedCandidate, currentRoot, x, y);
             }
 
-            for (const element of findElementsAtPoint(currentRoot, x, y)) {
+            for (const element of elementsAtPoint(currentRoot)) {
                 if (element.shadowRoot) {
                     const shadowCandidate = resolveInRoot(element.shadowRoot, depth + 1);
                     if (shadowCandidate) return shadowCandidate;
                 }
-                const candidate = this.resolve(element);
+                const candidate = resolve(element);
                 if (candidate) return this.refineHoverCandidate(candidate, currentRoot, x, y);
             }
             return null;

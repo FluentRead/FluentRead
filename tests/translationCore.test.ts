@@ -3032,6 +3032,45 @@ describe('translation candidate core', () => {
         expect(core.discover(document.body).some(candidate => candidate.element === editor)).toBe(false);
     });
 
+    it('reads each hover hit stack once and observes changed content on the next call', () => {
+        const {document, core} = page('<div id="host"></div><p id="next">Updated ordinary reading text.</p>');
+        const host = document.querySelector('#host')!;
+        const shadow = host.attachShadow({mode: 'open'});
+        shadow.innerHTML = '<p id="target">Original shadow reading text.</p>';
+        const target = shadow.querySelector('#target')!;
+        const next = document.querySelector('#next')!;
+        const documentHit = vi.fn(() => [host, document.body]);
+        const shadowHit = vi.fn(() => [target]);
+        Object.defineProperty(document, 'elementsFromPoint', {configurable: true, value: documentHit});
+        Object.defineProperty(shadow, 'elementsFromPoint', {configurable: true, value: shadowHit});
+        expect(core.resolveAtPoint(document, 10, 20)?.element).toBe(target);
+        expect(documentHit).toHaveBeenCalledTimes(1);
+        expect(shadowHit).toHaveBeenCalledTimes(1);
+
+        documentHit.mockImplementation(() => [next, document.body]);
+        host.remove();
+        expect(core.resolveAtPoint(document, 10, 20)?.element).toBe(next);
+        expect(documentHit).toHaveBeenCalledTimes(2);
+        expect(shadowHit).toHaveBeenCalledTimes(1);
+
+        next.setAttribute('contenteditable', 'true');
+        expect(core.resolveAtPoint(document, 10, 20)).toBeNull();
+        expect(documentHit).toHaveBeenCalledTimes(3);
+    });
+
+    it('discovers an aliased shadow tree once without duplicating translation owners', () => {
+        const {document, core} = page('<div id="host"></div><div id="alias"></div>');
+        const shadow = document.querySelector('#host')!.attachShadow({mode: 'open'});
+        shadow.innerHTML = '<p id="target">Readable shadow content.</p>';
+        Object.defineProperty(document.querySelector('#alias')!, 'shadowRoot', {value: shadow});
+        const target = shadow.querySelector('#target')!;
+        const before = shadow.innerHTML;
+        const steps = [...core.discoverSteps(document)];
+        expect(steps.filter(step => step.element === target && step.phase === 'enter')).toHaveLength(1);
+        expect(steps.filter(step => step.candidate?.element === target)).toHaveLength(1);
+        expect(shadow.innerHTML).toBe(before);
+    });
+
     it('keeps shadow editors opaque while preserving visible button input labels', () => {
         const {document} = parseHTML('<html><body><div id="host"></div><input id="button" type="submit" value="Save comment"></body></html>');
         const core = createTranslationCore({url: new URL('https://example.test'), scope: 'all'});

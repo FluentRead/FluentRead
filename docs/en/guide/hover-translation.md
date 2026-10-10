@@ -14,6 +14,8 @@ Hold the shortcut and move the pointer to translate several paragraphs. If you s
 
 Leaving the webpage, switching tabs, or changing the page route cancels work that has not started. Scrolling also cancels the wait at the old position; move the pointer again to choose a paragraph. If translation fails, click the error indicator or focus it and press **Enter** to retry. Continuous movement does not repeatedly request a failed paragraph.
 
+Both the default shortcut and extra hover profiles follow the page-change and cancellation rules. Move the pointer and press the shortcut again after returning. A delay of 0 requires no dwell time.
+
 <details class="guide-details">
 <summary>Paragraph copying and trigger settings</summary>
 

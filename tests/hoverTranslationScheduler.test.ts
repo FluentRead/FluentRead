@@ -4,7 +4,7 @@ import type {TranslationCandidate} from '@/src/core/translation/public';
 import {HoverTranslationScheduler} from '@/src/features/full-page-translation/content/hoverScheduler';
 import type {FullPageTranslationConfigSnapshot} from '@/src/features/full-page-translation/content/translationConfigSnapshot';
 
-function fixture() {
+function fixture(guards: {isAvailable?: () => boolean; captureCommitGuard?: () => () => boolean} = {}) {
     const {document} = parseHTML('<html><body><p>First source.<strong>Second source.</strong></p><p>Another paragraph.</p></body></html>');
     const element = document.querySelector<HTMLElement>('p')!;
     const candidate: TranslationCandidate = {element, kind: 'content', reason: 'paragraph'};
@@ -13,7 +13,7 @@ function fixture() {
         sourceLanguage: 'en', targetLanguage: 'zh', useCache: true, enableAIContext: false,
         enableAIMultiSegment: false, displayMode: 'bilingual', style: 0};
     const ports = {currentScope: vi.fn(() => 'content' as const), resolveCandidate: vi.fn(() => current),
-        captureConfig: vi.fn(() => snapshot), checkConfig: vi.fn(() => true), noteGesture: vi.fn(), translate: vi.fn()};
+        captureConfig: vi.fn(() => snapshot), checkConfig: vi.fn(() => true), noteGesture: vi.fn(), translate: vi.fn(), ...guards};
     const scheduler = new HoverTranslationScheduler(ports);
     return {document, candidate, snapshot, ports, scheduler, setCurrent: (value: TranslationCandidate | null) => {current = value;}};
 }
@@ -186,6 +186,79 @@ describe('悬浮候选停留调度', () => {
         callbacks[0]!();
         expect(ports.translate).not.toHaveBeenCalled();
         callbacks[1]!();
+        expect(ports.translate).toHaveBeenCalledTimes(1);
+    });
+
+    it('不可用时撤回旧停留，不捕获配置或记录手势，恢复后新停留可正常派发', async () => {
+        let available = true;
+        const {ports, scheduler} = fixture({isAvailable: () => available});
+        scheduler.handle(1, 2, {delayMs: 100, continuous: true});
+        available = false;
+        scheduler.handle(3, 4, {delayMs: 100, continuous: true});
+        expect(vi.getTimerCount()).toBe(0);
+        expect(ports.captureConfig).toHaveBeenCalledTimes(1);
+        expect(ports.resolveCandidate).toHaveBeenCalledTimes(1);
+        expect(ports.noteGesture).toHaveBeenCalledTimes(1);
+        await vi.advanceTimersByTimeAsync(100);
+        expect(ports.translate).not.toHaveBeenCalled();
+        available = true;
+        scheduler.handle(5, 6, {delayMs: 100, continuous: true});
+        await vi.advanceTimersByTimeAsync(99);
+        expect(ports.translate).not.toHaveBeenCalled();
+        await vi.advanceTimersByTimeAsync(1);
+        expect(ports.translate).toHaveBeenCalledTimes(1);
+    });
+
+    it.each(['availability', 'commit-guard'] as const)('到期前 %s 失效时先撤回，不解析或派发迟到目标', async reason => {
+        let available = true, canCommit = true;
+        const captureCommitGuard = vi.fn(() => () => canCommit);
+        const {ports, scheduler} = fixture({isAvailable: () => available, captureCommitGuard});
+        scheduler.handle(1, 2, {delayMs: 100});
+        if (reason === 'availability') available = false;
+        else canCommit = false;
+        await vi.advanceTimersByTimeAsync(100);
+        expect(ports.resolveCandidate).toHaveBeenCalledTimes(1);
+        expect(ports.translate).not.toHaveBeenCalled();
+        expect(vi.getTimerCount()).toBe(0);
+        available = true; canCommit = true;
+        scheduler.handle(3, 4, {delayMs: 100});
+        await vi.advanceTimersByTimeAsync(100);
+        expect(ports.translate).toHaveBeenCalledTimes(1);
+        expect(captureCommitGuard).toHaveBeenCalledTimes(2);
+    });
+
+    it.each(['availability', 'commit-guard'] as const)('目标解析同步改变 %s 时复验门禁，不提交失效目标', async reason => {
+        let available = true, canCommit = true;
+        const {ports, scheduler, candidate} = fixture({isAvailable: () => available, captureCommitGuard: () => () => canCommit});
+        scheduler.handle(1, 2, {delayMs: 100});
+        ports.resolveCandidate.mockImplementationOnce(() => {
+            if (reason === 'availability') available = false;
+            else canCommit = false;
+            return candidate;
+        });
+        await vi.advanceTimersByTimeAsync(100);
+        expect(ports.resolveCandidate).toHaveBeenCalledTimes(2);
+        expect(ports.translate).not.toHaveBeenCalled();
+        expect(vi.getTimerCount()).toBe(0);
+    });
+
+    it('同段移动保留首次捕获的提交代次，失效后只有新的停留可重新获得提交权', async () => {
+        let generation = 0;
+        const captureCommitGuard = vi.fn(() => {
+            const captured = generation;
+            return () => generation === captured;
+        });
+        const {ports, scheduler} = fixture({captureCommitGuard});
+        scheduler.handle(1, 2, {delayMs: 100, continuous: true});
+        await vi.advanceTimersByTimeAsync(40);
+        generation += 1;
+        scheduler.handle(3, 4, {delayMs: 100, continuous: true});
+        expect(captureCommitGuard).toHaveBeenCalledTimes(1);
+        await vi.advanceTimersByTimeAsync(60);
+        expect(ports.translate).not.toHaveBeenCalled();
+        scheduler.handle(5, 6, {delayMs: 100, continuous: true});
+        await vi.advanceTimersByTimeAsync(100);
+        expect(captureCommitGuard).toHaveBeenCalledTimes(2);
         expect(ports.translate).toHaveBeenCalledTimes(1);
     });
 });

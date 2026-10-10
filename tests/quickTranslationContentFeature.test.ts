@@ -1,4 +1,4 @@
-import {describe, expect, it, vi} from 'vitest';
+import {afterEach, describe, expect, it, vi} from 'vitest';
 import type {QuickTranslationProfile} from '@/src/core/config/quickTranslation';
 import {
     mountQuickTranslationContentFeature,
@@ -9,6 +9,7 @@ type Listener = (event: any) => unknown;
 
 class FakeTarget {
     listeners = new Map<string, Listener[]>();
+    visibilityState = 'visible';
     options = new Map<string, Array<boolean | AddEventListenerOptions | undefined>>();
 
     addEventListener(
@@ -73,6 +74,7 @@ function pointerEvent(overrides: Record<string, unknown> = {}): any {
 function mountHarness(
     overrides: Partial<QuickTranslationContentDependencies> = {},
     controller = new AbortController(),
+    seedPointer = true,
 ) {
     const hoverT = profile('hover-t', 'hover', 'Ctrl+T');
     const hoverY = profile('hover-y', 'hover', 'Ctrl+Y');
@@ -102,10 +104,96 @@ function mountHarness(
         ...overrides,
     };
     mountQuickTranslationContentFeature(deps, controller.signal);
+    // (0,0) 是合法的已知坐标；没有任何可信样本的情况由冷启动用例单独验证。
+    if (seedPointer) documentTarget.emit('mouseover', pointerEvent());
     return {controller, deps, documentTarget, fullPage, hoverT, hoverY, windowTarget};
 }
 
+afterEach(() => vi.useRealTimers());
+
 describe('quick translation content feature', () => {
+    it('悬浮快捷方案等待可信指针样本，第一次纯键盘手势不翻译左上角', () => {
+        const {deps, documentTarget, hoverT, windowTarget} = mountHarness({}, new AbortController(), false);
+        const trigger = () => {
+            windowTarget.emit('keydown', keyboardEvent());
+            windowTarget.emit('keyup', keyboardEvent());
+            windowTarget.emit('keyup', keyboardEvent({key: 'Control', code: 'ControlLeft', ctrlKey: false}));
+        };
+        documentTarget.emit('mouseover', pointerEvent({isTrusted: false, clientX: 99, clientY: 100}));
+        trigger();
+        expect(deps.runHover).not.toHaveBeenCalled();
+        documentTarget.emit('mouseover', pointerEvent({clientX: 21, clientY: 35}));
+        trigger();
+        expect(deps.runHover).toHaveBeenCalledOnce();
+        expect(deps.runHover).toHaveBeenCalledWith(hoverT, 21, 35);
+    });
+
+    it.each(['route', 'hidden', 'pointer-exit', 'blur'])(
+        '快捷方案在 %s 后取消待执行翻译，并清空旧按键和坐标', reason => {
+            vi.useFakeTimers();
+            const upstream = vi.fn();
+            let pending: ReturnType<typeof setTimeout> | undefined;
+            const {deps, documentTarget, hoverT, windowTarget} = mountHarness({
+                runHover: vi.fn((_profile, _x, _y, invocation) => {
+                    pending = setTimeout(upstream, invocation?.delayMs ?? 0);
+                }),
+                cancelPendingHoverTranslation: vi.fn(() => clearTimeout(pending)),
+            });
+            const press = () => windowTarget.emit('keydown', keyboardEvent());
+            const release = () => {
+                windowTarget.emit('keyup', keyboardEvent());
+                windowTarget.emit('keyup', keyboardEvent({key: 'Control', code: 'ControlLeft', ctrlKey: false}));
+            };
+            press();
+            documentTarget.emit('mousemove', pointerEvent({clientX: 10, clientY: 20}));
+            if (reason === 'route') documentTarget.emit('fluentread-route-change');
+            if (reason === 'hidden') {
+                documentTarget.visibilityState = 'hidden';
+                documentTarget.emit('visibilitychange');
+                documentTarget.visibilityState = 'visible';
+                documentTarget.emit('visibilitychange');
+            }
+            if (reason === 'pointer-exit') documentTarget.emit('mouseout', pointerEvent({relatedTarget: null}));
+            if (reason === 'blur') windowTarget.emit('blur');
+            release();
+            press(); release();
+            vi.advanceTimersByTime(500);
+            expect(upstream).not.toHaveBeenCalled();
+            expect(deps.runHover).toHaveBeenCalledOnce();
+            documentTarget.emit('mousemove', pointerEvent({clientX: 31, clientY: 41}));
+            expect(deps.runHover).toHaveBeenCalledOnce();
+            press(); release();
+            vi.advanceTimersByTime(500);
+            expect(upstream).toHaveBeenCalledOnce();
+            expect(deps.runHover).toHaveBeenLastCalledWith(hoverT, 31, 41);
+        },
+    );
+
+    it('页面内切换元素、伪造离开和可见事件保留快捷方案手势', () => {
+        const {deps, documentTarget, hoverT, windowTarget} = mountHarness();
+        windowTarget.emit('keydown', keyboardEvent());
+        documentTarget.emit('mouseout', pointerEvent({relatedTarget: {}}));
+        documentTarget.emit('mouseout', pointerEvent({isTrusted: false, relatedTarget: null}));
+        documentTarget.emit('visibilitychange');
+        windowTarget.emit('keyup', keyboardEvent());
+        expect(deps.runHover).toHaveBeenCalledOnce();
+        expect(deps.runHover).toHaveBeenCalledWith(hoverT, 0, 0);
+        expect(deps.cancelPendingHoverTranslation).not.toHaveBeenCalled();
+    });
+
+    it('中止后的生命周期事件和指针进入不会恢复已卸载的快捷方案', () => {
+        const {controller, deps, documentTarget} = mountHarness();
+        controller.abort();
+        vi.mocked(deps.cancelPendingHoverTranslation).mockClear();
+        documentTarget.emit('mouseover', pointerEvent());
+        documentTarget.emit('fluentread-route-change');
+        documentTarget.visibilityState = 'hidden';
+        documentTarget.emit('visibilitychange');
+        documentTarget.emit('mouseout', pointerEvent({relatedTarget: null}));
+        expect(deps.cancelPendingHoverTranslation).not.toHaveBeenCalled();
+        expect(deps.runHover).not.toHaveBeenCalled();
+    });
+
     it('把两个悬停快捷键分别路由到各自完整 profile，并在移动后不于 keyup 重复执行', () => {
         const {deps, documentTarget, hoverT, hoverY, windowTarget} = mountHarness();
         const firstKeydown = keyboardEvent();

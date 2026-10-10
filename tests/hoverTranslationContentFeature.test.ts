@@ -185,6 +185,31 @@ describe('hover translation content feature', () => {
         expect(vi.mocked(deps.handleTranslation).mock.calls).toEqual([[31, 47]]);
     });
 
+    it.each([[31, 47], [0, 0]])('可信mouseover在未移动时提供坐标(%s,%s)，合成事件不能替换它', (x, y) => {
+        const {deps, documentTarget, windowTarget} = mountHarness({}, false);
+        documentTarget.emit('mouseover', trustedEvent({isTrusted: false, clientX: 11, clientY: 22}));
+        windowTarget.emit('keydown', trustedEvent({key: 'Control', code: 'ControlLeft', ctrlKey: true}));
+        windowTarget.emit('keyup', trustedEvent({key: 'Control', code: 'ControlLeft'}));
+        expect(deps.handleTranslation).not.toHaveBeenCalled();
+        documentTarget.emit('mouseover', trustedEvent({clientX: x, clientY: y}));
+        documentTarget.emit('mouseover', trustedEvent({isTrusted: false, clientX: 53, clientY: 71}));
+        windowTarget.emit('keydown', trustedEvent({key: 'Control', code: 'ControlLeft', ctrlKey: true}));
+        windowTarget.emit('keyup', trustedEvent({key: 'Control', code: 'ControlLeft'}));
+        expect(vi.mocked(deps.handleTranslation).mock.calls).toEqual([[x, y]]);
+    });
+
+    it('卸载后迟到的mouseover不读取位置，不启动新工作', () => {
+        const {deps, documentTarget, windowTarget, controller} = mountHarness({}, false);
+        const listener = documentTarget.listeners.get('mouseover')![0];
+        controller.abort();
+        const clientX = vi.fn(() => 31);
+        listener({...trustedEvent(), get clientX() { return clientX(); }, clientY: 47});
+        expect(clientX).not.toHaveBeenCalled();
+        windowTarget.emit('keydown', trustedEvent({key: 'Control', code: 'ControlLeft', ctrlKey: true}));
+        windowTarget.emit('keyup', trustedEvent({key: 'Control', code: 'ControlLeft'}));
+        expect(deps.handleTranslation).not.toHaveBeenCalled();
+    });
+
     it.each(['touch', 'pen', 'untrusted-mouse'])('%s 输入不会伪装成已知鼠标位置或使Control复活', pointer => {
         const {deps, documentTarget, windowTarget} = mountHarness({}, false);
         documentTarget.emit('pointerdown', trustedEvent({pointerType: pointer === 'untrusted-mouse' ? 'mouse' : pointer,
@@ -277,7 +302,7 @@ describe('hover translation content feature', () => {
         expect(deps.handleTranslation).toHaveBeenCalledOnce();
     });
 
-    it.each(['blur', 'hidden', 'pagehide', 'mouseleave', 'popstate', 'hashchange', 'route-change', 'pointercancel', 'touchcancel'])(
+    it.each(['blur', 'hidden', 'pagehide', 'mouseleave', 'mouseout', 'popstate', 'hashchange', 'route-change', 'pointercancel', 'touchcancel'])(
         '%s 取消帧和待执行翻译、废弃坐标，下一轮须取得新的可信指针', reason => {
             const {deps, documentTarget, windowTarget} = mountHarness();
             windowTarget.emit('keydown', trustedEvent({key: 'Control', code: 'ControlLeft', ctrlKey: true}));
@@ -293,6 +318,8 @@ describe('hover translation content feature', () => {
                 else windowTarget.emit(reason);
             } else if (reason === 'mouseleave' || reason === 'pointercancel' || reason === 'touchcancel') {
                 documentTarget.emit(reason, trustedEvent());
+            } else if (reason === 'mouseout') {
+                documentTarget.emit(reason, trustedEvent({relatedTarget: null}));
             } else windowTarget.emit(reason);
             expect(deps.cancelPendingHoverTranslation).toHaveBeenCalledOnce();
             expect(windowTarget.animationFrames.size).toBe(0);
@@ -316,6 +343,8 @@ describe('hover translation content feature', () => {
         documentTarget.emit('fluentread-route-change');
         windowTarget.emit('popstate');
         documentTarget.emit('mouseleave', trustedEvent({isTrusted: false}));
+        documentTarget.emit('mouseout', trustedEvent({isTrusted: false, relatedTarget: null}));
+        documentTarget.emit('mouseout', trustedEvent({relatedTarget: {}}));
         windowTarget.emit('keyup', trustedEvent({key: 'Control', code: 'ControlLeft'}));
         expect(deps.handleTranslation).toHaveBeenCalledWith(0, 0);
         expect(deps.cancelPendingHoverTranslation).not.toHaveBeenCalled();
@@ -427,7 +456,7 @@ describe('hover translation content feature', () => {
         expect([...documentTarget.listeners.values()].every(listeners => listeners.length === 0)).toBe(true);
     });
 
-    it.each(['reset', 'blur', 'selection-reserved', 'abort'])(
+    it.each(['reset', 'blur', 'selection-reserved', 'abort', 'route-change', 'hidden', 'mouseout'])(
         '长按在 %s 仲裁后不会发出迟到翻译', reason => {
             vi.useFakeTimers();
             const {deps, documentTarget, windowTarget, controller, resetKeyboardGesture} = mountHarness();
@@ -436,6 +465,15 @@ describe('hover translation content feature', () => {
             if (reason === 'reset') resetKeyboardGesture();
             if (reason === 'blur') windowTarget.emit('blur');
             if (reason === 'abort') controller.abort();
+            if (reason === 'route-change') {
+                windowTarget.location.href = 'https://fixture.test/other';
+                documentTarget.emit('fluentread-route-change');
+            }
+            if (reason === 'hidden') {
+                documentTarget.hidden = true;
+                documentTarget.emit('visibilitychange');
+            }
+            if (reason === 'mouseout') documentTarget.emit('mouseout', trustedEvent({relatedTarget: null}));
             if (reason === 'selection-reserved') {
                 vi.mocked(deps.shouldReserveSelectionShortcut).mockReturnValue(true);
                 windowTarget.emit('keydown', trustedEvent({key: 'Control', ctrlKey: true}));
@@ -446,7 +484,7 @@ describe('hover translation content feature', () => {
         },
     );
 
-    it.each(['reset', 'blur', 'selection-reserved'])(
+    it.each(['reset', 'blur', 'selection-reserved', 'route-change', 'hidden', 'mouseout'])(
         '触摸连击在 %s 后重新计数，不借用取消前的触摸', reason => {
             vi.useFakeTimers();
             const {deps, documentTarget, windowTarget, resetKeyboardGesture} = mountHarness();
@@ -455,6 +493,16 @@ describe('hover translation content feature', () => {
             tap();
             if (reason === 'reset') resetKeyboardGesture();
             if (reason === 'blur') windowTarget.emit('blur');
+            if (reason === 'route-change') {
+                windowTarget.location.href = 'https://fixture.test/other';
+                documentTarget.emit('fluentread-route-change');
+            }
+            if (reason === 'hidden') {
+                documentTarget.hidden = true;
+                documentTarget.emit('visibilitychange');
+                documentTarget.hidden = false;
+            }
+            if (reason === 'mouseout') documentTarget.emit('mouseout', trustedEvent({relatedTarget: null}));
             if (reason === 'selection-reserved') {
                 vi.mocked(deps.shouldReserveSelectionShortcut).mockReturnValue(true);
                 windowTarget.emit('keydown', trustedEvent({key: 'Control', ctrlKey: true}));

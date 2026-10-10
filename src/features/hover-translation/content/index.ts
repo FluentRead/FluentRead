@@ -1,7 +1,7 @@
 /**
  * @file src/features/hover-translation/content/index.ts
  * 文件职责：实现按住配置快捷键并移动鼠标触发的悬浮翻译手势控制器，统一管理按键集合、平台差异、节流采样和启停清理。
- * 主要内容：定义可注入的配置、常量与依赖接口，从可信鼠标移动或按下采集位置，复用快捷键解析并按绘制帧合并连续采样；区分单次切换、连续移动和触摸手势，配置变化、仲裁、离开视口、失焦、页面隐藏与卸载统一撤销待执行工作及失效坐标。
+ * 主要内容：定义可注入的配置、常量与依赖接口，从可信鼠标进入、移动或按下采集位置，复用快捷键解析并按绘制帧合并连续采样；区分单次切换、连续移动和触摸手势，配置变化、仲裁、离开视口、失焦、页面隐藏与卸载统一撤销待执行工作及失效坐标。
  * 模块边界：该模块只识别手势和调用注入的 handleTranslation/cancelPending，不读取具体翻译服务或创建译文；配置源、站点禁用判断和全文运行时由 app composition root 提供。
  */
 import {addPressedHotkeyEventKey, deletePressedHotkeyEventKey, parseHotkey} from '@/src/core/hotkey';
@@ -253,6 +253,12 @@ export function mountHoverTranslationContentFeature(
     rootDocument.addEventListener('fluentread-route-change', invalidateRouteGesture, { signal });
     rootDocument.addEventListener('visibilitychange', () => {
         if (rootDocument.hidden) invalidatePointerGesture();
+    }, { signal });
+    rootDocument.addEventListener('mouseover', event => {
+        if (!signal.aborted && event.isTrusted) rememberMousePosition(event);
+    }, { signal });
+    rootDocument.addEventListener('mouseout', event => {
+        if (event.isTrusted && event.relatedTarget === null) invalidatePointerGesture();
     }, { signal });
     rootDocument.addEventListener('mouseleave', event => {
         if (event.isTrusted) invalidatePointerGesture();

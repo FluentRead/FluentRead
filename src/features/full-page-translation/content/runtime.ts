@@ -206,6 +206,8 @@ const STATEFUL_ATTRIBUTE_DEBOUNCE_MS = 500;
 const FULL_PAGE_LIFECYCLE_RETRY_LIMIT = 2;
 
 const hoverTranslationScheduler = new HoverTranslationScheduler({
+    isAvailable: () => document.visibilityState !== 'hidden' && config.on !== false,
+    captureCommitGuard: () => { const session = getHoverTranslationRequestSession(), generation = session.renderCommitGeneration; return () => getHoverTranslationRequestSession() === session && session.renderCommitGeneration === generation; },
     currentScope: () => config.translationScope,
     resolveCandidate: (x, y, scope) => getOwnedTranslationCandidateAtPoint(document, x, y)
         ?? resolveTranslationCandidateAtPoint(x, y, scope),

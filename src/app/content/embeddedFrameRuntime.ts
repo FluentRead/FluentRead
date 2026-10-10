@@ -1,7 +1,7 @@
 /**
  * @file src/app/content/embeddedFrameRuntime.ts
  * 文件职责：让 OMG! Ubuntu 评论和 Kaggle 笔记本正文 iframe 跟随所属文章的翻译会话。
- * 主要内容：顶层提供无凭据会话快照，受限子 frame 经后台认证后挂载翻译手势、样式与会话控制。
+ * 主要内容：顶层提供无凭据会话快照，受限子 frame 经后台认证后挂载翻译手势、样式与会话控制；真实路由变化同步失效上下文与请求提交代次，同地址通知不重复清理。
  * 模块边界：不在广告或其他第三方 frame 挂载功能；URL 配对由后台验证，正文候选由共享翻译核心处理。
  */
 import type {ContentScriptContext} from 'wxt/utils/content-script-context';
@@ -19,10 +19,11 @@ import {
 import {
     autoTranslateEnglishPage, getFullPageTranslationFrameState, cancelPendingHoverTranslation,
     handleTranslation, noteBilingualHostGesture,
-    invalidateFullPageTranslationSessionCache, restoreOriginalContent,
+    invalidateFullPageTranslationSessionCache, restoreOriginalContent, resetFullPageTranslationRouteState,
     type PageTranslationInvocation,
 } from '@/src/features/full-page-translation/public';
 import {cancelAllTranslations} from '@/src/app/translation/client';
+import {resetPageTranslationContextCache} from '@/src/services/translation/context';
 import {getCenterPoint} from '@/src/shared/geometry/touch';
 import {mountHoverTranslationContentFeature} from '@/src/features/hover-translation/public';
 import {createContentHotkeyRuntime} from './hotkeyRuntime';
@@ -136,8 +137,14 @@ export async function startEmbeddedFrameApp(ctx: ContentScriptContext): Promise<
     };
     const siteAdaptation = createContentSiteAdaptationRuntime(
         config.siteAdaptation, new URL(window.location.href), () => controller.suspend());
+    let currentRouteHref = window.location.href;
     document.addEventListener('fluentread-route-change', () => {
-        if (siteAdaptation.routeChanged(new URL(window.location.href)) && enabled()) void controller.refresh();
+        const nextRouteHref = window.location.href;
+        if (nextRouteHref === currentRouteHref) return;
+        currentRouteHref = nextRouteHref;
+        resetPageTranslationContextCache();
+        resetFullPageTranslationRouteState();
+        if (siteAdaptation.routeChanged(new URL(nextRouteHref)) && enabled()) void controller.refresh();
     }, {signal: lifetime.signal});
     const removeMessageListener = addRuntimeMessageListener(browser.runtime, listener);
     applyCoreTranslationPreferences(config);

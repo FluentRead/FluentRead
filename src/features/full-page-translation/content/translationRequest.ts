@@ -16,7 +16,7 @@ import {normalizeExcludedLanguages} from '@/src/core/config/pageTranslation';
 import {isNativeTranslationBatchEnabled} from '@/src/core/config/nativeBatch';
 import {shouldSkipTranslationForTarget} from '@/src/core/language/detect';
 import {isModelThinkingEnabled} from '@/src/core/config/modelThinking';
-import {buildGlossaryRevision} from '@/src/core/glossary';
+import {createGlossaryRevisionMemoizer} from '@/src/core/glossary';
 import {translateText, translateTextBatch, type TranslateOptions} from '@/src/app/translation/client';
 import {supportsNativeTranslationBatch, supportsTranslationBatch} from '@/src/services/translation/capabilities';
 import {validateNativeBatchResults} from '@/src/core/translation/nativeBatch';
@@ -34,6 +34,8 @@ const FULL_PAGE_TRANSLATION_REQUEST_CACHE_LIMIT = 512;
 const FULL_PAGE_TRANSLATION_REMOUNT_GRACE_MS = 250;
 const CROSS_CANDIDATE_MAX_TEXT_SLOTS = 4;
 const CROSS_CANDIDATE_MAX_CHARACTERS = 2_000;
+// 悬浮手势的每次配置捕获仍同步冻结字段；只有全库摘要经原始标量复验后复用。
+const readGlossaryRevision = createGlossaryRevisionMemoizer();
 
 export type {FullPageTranslationConfigSnapshot, PageTranslationConfigOverrides} from './translationConfigSnapshot';
 
@@ -134,7 +136,7 @@ export function captureFullPageTranslationConfig(
     const profileId = overrides.profileId?.trim();
     const requestOverridesApplied = Object.keys(overrides).length > 0;
     return {
-        glossaryRevision: buildGlossaryRevision(config.glossaryLibraries, config.glossaryEnabled),
+        glossaryRevision: readGlossaryRevision(config.glossaryLibraries, config.glossaryEnabled),
         glossaryIds: overrides.glossaryIds ? Object.freeze([...overrides.glossaryIds]) : null,
         service,
         model,

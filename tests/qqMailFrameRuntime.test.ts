@@ -388,6 +388,24 @@ describe('frame bridge cleanup after extension reload', () => {
         },
     );
 
+    it('网易顶层阅读地址不变而子文档路由变化时仍失效请求，站点适配继续使用顶层身份', async () => {
+        const {listeners, window, start} = await readingFrame('netease');
+        mocks.sendMessage.mockResolvedValue({enabled: true, revision: 0, sessionId: null});
+        let invalidate!: () => void;
+        await start({isInvalid: false, onInvalidated: (callback: () => void) => { invalidate = callback; }} as never);
+        window.location.href = 'about:blank#next-frame-content';
+        const emitRoute = () => [...(listeners.get('fluentread-route-change') ?? [])]
+            .forEach(callback => callback(new Event('fluentread-route-change')));
+        emitRoute();
+        expect(mocks.resetRouteState).toHaveBeenCalledOnce();
+        expect(mocks.resetContext).toHaveBeenCalledOnce();
+        expect(mocks.routeChanged).toHaveBeenCalledWith(new URL((window.top as {location: {href: string}}).location.href));
+        emitRoute();
+        expect(mocks.resetRouteState).toHaveBeenCalledOnce();
+        expect(mocks.sendMessage).toHaveBeenCalledOnce();
+        invalidate();
+    });
+
     it.each(['qq', 'netease', 'embedded'] as const)(
         'detects passive WXT invalidation and releases an idle %s frame without another gesture', async kind => {
             vi.useFakeTimers();

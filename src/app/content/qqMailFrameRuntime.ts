@@ -198,14 +198,17 @@ async function startMailFrameApp(ctx: ContentScriptContext, kind: MailFrameKind)
     };
     const siteAdaptation = createContentSiteAdaptationRuntime(
         config.siteAdaptation, new URL(siteHref()), () => controller.suspend());
-    let currentRouteHref = siteHref();
+    let currentRouteHref = window.location.href;
+    let currentSiteHref = siteHref();
     document.addEventListener('fluentread-route-change', () => {
-        const nextRouteHref = siteHref();
-        if (nextRouteHref === currentRouteHref) return;
+        const nextRouteHref = window.location.href;
+        const nextSiteHref = siteHref();
+        if (nextRouteHref === currentRouteHref && nextSiteHref === currentSiteHref) return;
         currentRouteHref = nextRouteHref;
+        currentSiteHref = nextSiteHref;
         resetPageTranslationContextCache();
         resetFullPageTranslationRouteState();
-        if (siteAdaptation.routeChanged(new URL(nextRouteHref)) && enabled()) void controller.refresh();
+        if (siteAdaptation.routeChanged(new URL(nextSiteHref)) && enabled()) void controller.refresh();
     }, {signal: lifetime.signal});
     const removeMessageListener = addRuntimeMessageListener(browser.runtime, listener);
     applyCoreTranslationPreferences(config);

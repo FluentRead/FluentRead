@@ -1,0 +1,59 @@
+
+> FluentRead-流畅阅读@0.0.37 test /Users/thinkstu/Desktop/copy/FluentRead-full-page-quality-20261011
+> node scripts/testing/run-resource-safe.mjs -- vitest run "tests/fullPageVisibilityScheduling.test.ts" "tests/translationStability.test.ts" "tests/fullPageAttributeBoundary.test.ts" "tests/fullPagePriority.test.ts" "tests/architecture/moduleBoundaries.test.ts" "tests/fullPageRemountPreparation.test.ts" "tests/syntheticCandidateFreshness.test.ts" "tests/contentUiRuntime.test.ts" "tests/floatingUiPresentation.test.ts" "tests/fullPageStateNotification.test.ts" "tests/fullPageTranslationProgress.test.ts" "tests/implementationAudit49A.test.ts" "tests/videoUiI18n.test.ts" "tests/userscriptViteConfig.test.ts" "tests/userscriptLanguageBundles.test.ts" "tests/userscriptCompression.test.ts" "tests/translationAppearance.test.ts" "tests/translationTruncation.test.ts" "tests/settingsUiArchitecture.test.ts"
+
+[resource-safe] CPU target 60%, maxWorkers 1, concurrency 3, command: vitest run tests/fullPageVisibilityScheduling.test.ts tests/translationStability.test.ts tests/fullPageAttributeBoundary.test.ts tests/fullPagePriority.test.ts tests/architecture/moduleBoundaries.test.ts tests/fullPageRemountPreparation.test.ts tests/syntheticCandidateFreshness.test.ts tests/contentUiRuntime.test.ts tests/floatingUiPresentation.test.ts tests/fullPageStateNotification.test.ts tests/fullPageTranslationProgress.test.ts tests/implementationAudit49A.test.ts tests/videoUiI18n.test.ts tests/userscriptViteConfig.test.ts tests/userscriptLanguageBundles.test.ts tests/userscriptCompression.test.ts tests/translationAppearance.test.ts tests/translationTruncation.test.ts tests/settingsUiArchitecture.test.ts
+
+ RUN  v2.1.9 /Users/thinkstu/Desktop/copy/FluentRead-full-page-quality-20261011
+
+ ✓ tests/fullPageVisibilityScheduling.test.ts (302 tests) 1603ms
+ ✓ tests/settingsUiArchitecture.test.ts (37 tests) 130ms
+ ✓ tests/translationTruncation.test.ts (62 tests) 1027ms
+   ✓ translation truncation layout > 本地骨架净化深层 span 时不递归耗尽调用栈或改写来源 365ms
+   ✓ translation truncation layout > 本地骨架净化深层 x-inert 时不递归耗尽调用栈或改写来源 349ms
+ ✓ tests/translationStability.test.ts (95 tests) 339ms
+stderr | tests/videoUiI18n.test.ts
+[FluentRead] 配置读取或安全迁移失败，保留已读取的公开配置 Error: 配置存储运行时不可用
+    at Object.getItem (/Users/thinkstu/Desktop/copy/FluentRead-full-page-quality-20261011/src/platform/storage/configStorageRuntime.ts:36:29)
+    at initializeConfig (/Users/thinkstu/Desktop/copy/FluentRead-full-page-quality-20261011/src/services/config/store.ts:635:41)
+    at /Users/thinkstu/Desktop/copy/FluentRead-full-page-quality-20261011/src/services/config/store.ts:807:28
+    at processTicksAndRejections (node:internal/process/task_queues:95:5)
+    at VitestExecutor.runModule (file:///Users/thinkstu/Desktop/copy/FluentRead-full-page-quality-20261011/node_modules/.pnpm/vite-node@2.1.9_@types+node@22.10.7/node_modules/vite-node/dist/client.mjs:399:5)
+    at VitestExecutor.directRequest (file:///Users/thinkstu/Desktop/copy/FluentRead-full-page-quality-20261011/node_modules/.pnpm/vite-node@2.1.9_@types+node@22.10.7/node_modules/vite-node/dist/client.mjs:381:5)
+    at VitestExecutor.cachedRequest (file:///Users/thinkstu/Desktop/copy/FluentRead-full-page-quality-20261011/node_modules/.pnpm/vite-node@2.1.9_@types+node@22.10.7/node_modules/vite-node/dist/client.mjs:206:14)
+    at VitestExecutor.dependencyRequest (file:///Users/thinkstu/Desktop/copy/FluentRead-full-page-quality-20261011/node_modules/.pnpm/vite-node@2.1.9_@types+node@22.10.7/node_modules/vite-node/dist/client.mjs:259:12)
+    at /Users/thinkstu/Desktop/copy/FluentRead-full-page-quality-20261011/src/features/video-subtitle/content/ui.ts:2:31
+    at VitestExecutor.runModule (file:///Users/thinkstu/Desktop/copy/FluentRead-full-page-quality-20261011/node_modules/.pnpm/vite-node@2.1.9_@types+node@22.10.7/node_modules/vite-node/dist/client.mjs:399:5)
+
+ ✓ tests/videoUiI18n.test.ts (27 tests) 85ms
+stdout | tests/fullPageAttributeBoundary.test.ts > full page site attribute boundary lifecycle > OE-C1 same-state wide-root burst reads 57 actual owners once, then starts fresh in the next callback
+OE-C1 one-record {"inspect":57,"sourceDataGets":513}
+OE-C1 burst {"serial":1,"records":3,"owners":57,"inspect":57,"sourceDataGets":513}
+OE-C1 burst {"serial":2,"records":3,"owners":57,"inspect":57,"sourceDataGets":513}
+
+ ✓ tests/fullPageAttributeBoundary.test.ts (25 tests) 946ms
+   ✓ full page site attribute boundary lifecycle > OE-C1 same-state wide-root burst reads 57 actual owners once, then starts fresh in the next callback 773ms
+ ✓ tests/fullPageTranslationProgress.test.ts (34 tests) 22ms
+ ✓ tests/implementationAudit49A.test.ts (36 tests) 285ms
+ ✓ tests/contentUiRuntime.test.ts (17 tests) 276ms
+ ✓ tests/fullPagePriority.test.ts (19 tests) 13ms
+ ✓ tests/userscriptViteConfig.test.ts (25 tests) 1778ms
+   ✓ authoritative site catalogs with an external pinned data asset > reconciles removed-rule without mutating the external asset 311ms
+ ✓ tests/architecture/moduleBoundaries.test.ts (13 tests) 5026ms
+   ✓ architecture module boundaries > src 的静态依赖图不存在跨文件循环 2638ms
+   ✓ architecture module boundaries > src 只能通过精确登记的 composition/browser/provider 迁移边界读取 entrypoints 1032ms
+   ✓ architecture module boundaries > feature 不能跨目录读取另一个 feature 的内部实现 560ms
+   ✓ architecture module boundaries > 按需加载的大体积资源不得被扩展运行时代码静态引入 488ms
+ ✓ tests/fullPageStateNotification.test.ts (18 tests) 9ms
+ ✓ tests/translationAppearance.test.ts (13 tests) 20ms
+ ✓ tests/floatingUiPresentation.test.ts (6 tests) 5ms
+ ✓ tests/fullPageRemountPreparation.test.ts (4 tests) 30ms
+ ✓ tests/syntheticCandidateFreshness.test.ts (10 tests) 72ms
+ ✓ tests/userscriptLanguageBundles.test.ts (3 tests) 86ms
+ ✓ tests/userscriptCompression.test.ts (3 tests) 19ms
+
+ Test Files  19 passed (19)
+      Tests  749 passed (749)
+   Start at  02:20:21
+   Duration  21.79s (transform 3.13s, setup 0ms, collect 7.04s, tests 11.77s, environment 2ms, prepare 838ms)
+

@@ -1,0 +1,71 @@
+{
+  "scope": "production extension, trusted CDP pointer/keyboard gestures, deterministic Google transport; not live provider latency or quality",
+  "sourceProjectRoot": "/Users/thinkstu/Desktop/copy/FluentRead-section-translation-quality-20261011",
+  "caseSet": "quality",
+  "qualityCases": [
+    "retry",
+    "cancel",
+    "narrow"
+  ],
+  "cases": [
+    "popup shows the section entry next to the page action"
+  ],
+  "screenshots": [
+    "/private/tmp/fluentread-section-quality-recovery-final-20261011/00-popup.png",
+    "/private/tmp/fluentread-section-quality-recovery-final-20261011/failure.png"
+  ],
+  "errors": [],
+  "consoleErrors": [],
+  "errorCoverage": "errors contains uncaught page exceptions; console.error messages are recorded separately, including intentionally failed fixture requests",
+  "profileMode": "automatically-created-temporary-profile",
+  "buildFreshness": {
+    "ok": true,
+    "production": true,
+    "latestSource": {
+      "path": "/Users/thinkstu/Desktop/copy/FluentRead-section-translation-quality-20261011/src/features/full-page-translation/content/sectionTranslation.ts",
+      "mtimeMs": 1791655015945.0693
+    },
+    "manifestMtimeMs": 1791655139903.7478
+  },
+  "launchMode": "macos-background-cdp",
+  "focusPolicy": "launchservices-no-foreground",
+  "windowPlacement": {
+    "mode": "background-visible-no-focus",
+    "visible": true,
+    "hidden": false,
+    "centered": true,
+    "windowState": "normal",
+    "bounds": {
+      "left": 212,
+      "top": -990,
+      "width": 1280,
+      "height": 900
+    },
+    "displayTarget": "secondary",
+    "source": "macos-nsscreen",
+    "screenIndex": 1,
+    "browserFrontmost": false,
+    "frontmostBefore": {
+      "pid": 73685,
+      "name": "ChatGPT"
+    },
+    "frontmostAfter": {
+      "pid": 73685,
+      "name": "ChatGPT"
+    }
+  },
+  "popupGeometry": {
+    "mainRight": 234,
+    "sectionLeft": 241,
+    "sameTop": true,
+    "sameHeight": true,
+    "overflow": false
+  },
+  "success": false,
+  "failure": {
+    "case": "partial transport failure keeps successful paragraphs and region retry only requests failed content",
+    "message": "Error: 测试 Edge 在专项期间成为前台应用；测试已停止\n    at onEvent (/Users/thinkstu/Desktop/copy/FluentRead-section-translation-quality-20261011/scripts/testing/run-section-translation-flow-test.cjs:141:62)\n    at record (/Users/thinkstu/Desktop/copy/FluentRead-section-translation-quality-20261011/scripts/testing/mac-focus-event-monitor.cjs:48:12)\n    at Socket.data (/Users/thinkstu/Desktop/copy/FluentRead-section-translation-quality-20261011/scripts/testing/mac-focus-event-monitor.cjs:55:142)\n    at Socket.emit (node:events:509:28)\n    at addChunk (node:internal/streams/readable:563:12)\n    at readableAddChunkPushByteMode (node:internal/streams/readable:514:3)\n    at Readable.push (node:internal/streams/readable:394:5)\n    at Pipe.onStreamRead (node:internal/stream_base_commons:189:23)"
+  },
+  "focusError": "测试 Edge 在专项期间成为前台应用；测试已停止",
+  "profileRemoved": true
+}

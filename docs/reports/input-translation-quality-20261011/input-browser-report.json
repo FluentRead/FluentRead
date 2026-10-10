@@ -1,0 +1,1312 @@
+{
+  "extensionDir": "/private/tmp/fluentread-input-production-final-v5-20261011",
+  "profileDir": "/var/folders/2v/qd62bpkx51scgbvv2nrclsxm0000gn/T/fluentread-input-translation-GvChjX",
+  "evidence": "Production extension; real browser input; deterministic mock provider, no external provider certification",
+  "cases": [
+    {
+      "name": "output mode quick-close persistence and latest write wins; redundant service text removed",
+      "passed": true
+    },
+    {
+      "name": "interval edit and restore default",
+      "passed": true
+    },
+    {
+      "name": "default prompts can be loaded, edited, persisted and reset; whitespace uses default semantics",
+      "passed": true
+    },
+    {
+      "name": "independent AI config, responsive layout, preserved global config",
+      "passed": true
+    },
+    {
+      "name": "triple equal uses independent model and prompts, preserves original equals",
+      "passed": true
+    },
+    {
+      "name": "restore original and translate again",
+      "passed": true
+    },
+    {
+      "name": "slow triple does not translate",
+      "passed": true
+    },
+    {
+      "name": "editing while pending preserves new content",
+      "passed": true
+    },
+    {
+      "name": "blurred textarea completes without stealing the next editor focus or selection",
+      "passed": true
+    },
+    {
+      "name": "Escape aborts the provider request and preserves text without trigger symbols",
+      "passed": true
+    },
+    {
+      "name": "failure retains clean text and an inline Retry succeeds without moving editor focus",
+      "passed": true
+    },
+    {
+      "name": "native rich editor translates via undoable native editing; undo restores bold formatting",
+      "passed": true
+    },
+    {
+      "name": "model-driven editor gets standard whole-content input after selection sync, restore original",
+      "passed": true
+    },
+    {
+      "name": "plaintext-only editor supports triple trigger",
+      "passed": true
+    },
+    {
+      "name": "password and code editor excluded",
+      "passed": true
+    },
+    {
+      "name": "Space, dash and Control+Enter triggers",
+      "passed": true
+    },
+    {
+      "name": "repeated Control+Enter while pending sends one request and never submits the host editor",
+      "passed": true
+    },
+    {
+      "name": "blurred rich editor aborts the request and preserves formatting, next editor focus and selection",
+      "passed": true
+    },
+    {
+      "name": "real typing while Restore waits for model selection sync preserves the whole draft and user caret",
+      "passed": true
+    },
+    {
+      "name": "accessible pending tooltip follows narrow viewport, scroll and resize; Cancel aborts without losing input focus",
+      "passed": true
+    },
+    {
+      "name": "rejected controlled paste and uncommitted native insert retain original formatting and persistent narrow manual-copy previews with Close",
+      "passed": true
+    },
+    {
+      "name": "interval change applies without page reload",
+      "passed": true
+    },
+    {
+      "name": "bilingual textarea preserves whitespace and paragraphs, restores and translates again",
+      "passed": true
+    },
+    {
+      "name": "bilingual late edit, Escape and failure preserve the original without trigger symbols",
+      "passed": true
+    },
+    {
+      "name": "bilingual rich text preserves original DOM, paragraphs, bold and link; trigger removed at starting caret",
+      "passed": true
+    },
+    {
+      "name": "bilingual model editor removes trigger through model and appends after selection sync",
+      "passed": true
+    },
+    {
+      "name": "single-line input keeps original and avoids flattened bilingual output",
+      "passed": true
+    },
+    {
+      "name": "translation first persists and prefixes translation to textarea and rich editor while keeping original text and formatting",
+      "passed": true
+    },
+    {
+      "name": "rich triple-space handles browser non-breaking trigger spaces without altering original formatting",
+      "passed": true
+    }
+  ],
+  "consoleErrors": [],
+  "launchMode": "macos-background-cdp",
+  "focusPolicy": "launchservices-no-foreground",
+  "windowPlacement": {
+    "mode": "background-visible-no-focus",
+    "visible": true,
+    "hidden": false,
+    "centered": true,
+    "windowState": "normal",
+    "bounds": {
+      "left": 212,
+      "top": -990,
+      "width": 1280,
+      "height": 900
+    },
+    "displayTarget": "secondary",
+    "source": "macos-nsscreen",
+    "screenIndex": 1,
+    "browserFrontmost": false,
+    "frontmostBefore": {
+      "pid": 76304,
+      "name": "微信"
+    },
+    "frontmostAfter": {
+      "pid": 76304,
+      "name": "微信"
+    }
+  },
+  "quickClose": {
+    "field": "inputBoxTranslationOutputMode",
+    "reopened": "append",
+    "passed": true,
+    "interval": {
+      "value": 750,
+      "persistedAfterReload": true
+    }
+  },
+  "latestWriteWins": {
+    "field": "inputBoxTranslationOutputMode",
+    "finalValue": "append",
+    "passed": true
+  },
+  "initialConfig": {
+    "on": true,
+    "inputBoxTranslationTrigger": "triple_equal",
+    "inputBoxTranslationTarget": "en",
+    "inputBoxTranslationOutputMode": "replace",
+    "inputBoxTranslationInterval": 600,
+    "inputBoxTranslationService": "microsoft",
+    "inputBoxTranslationModel": "",
+    "inputBoxTranslationPrompt": "",
+    "inputBoxTranslationSystemPrompt": ""
+  },
+  "settingsLayout": {
+    "desktopCardHeight": 472.7421875,
+    "promptEditorInitiallyClosed": true
+  },
+  "inputEventCapabilities": {
+    "targetRangesAvailable": true,
+    "retainedCount": 1,
+    "retainedBoundary": true
+  },
+  "successTooltipVisibility": {
+    "opacity": "1",
+    "display": "block",
+    "visibility": "visible"
+  },
+  "blurTextarea": {
+    "before": {
+      "active": "other",
+      "value": "在另一个输入框里继续写作。",
+      "start": 2,
+      "end": 5
+    },
+    "after": {
+      "active": "other",
+      "value": "在另一个输入框里继续写作。",
+      "start": 2,
+      "end": 5
+    }
+  },
+  "tooltipGeometry": {
+    "failed-request-retry": {
+      "text": "! 翻译失败，请重试重试",
+      "className": "fluent-input-tooltip error show",
+      "role": "status",
+      "live": "polite",
+      "opacity": "1",
+      "display": "block",
+      "color": "rgb(255, 255, 255)",
+      "backgroundColor": "rgba(185, 28, 28, 0.96)",
+      "rect": {
+        "x": 555.828125,
+        "y": 127.0859375,
+        "width": 159.1953125,
+        "height": 32.796875
+      },
+      "viewport": {
+        "width": 1272,
+        "height": 816
+      },
+      "previews": [],
+      "buttons": [
+        {
+          "text": "重试",
+          "type": "button",
+          "color": "rgb(255, 255, 255)",
+          "backgroundColor": "rgba(0, 0, 0, 0)"
+        }
+      ]
+    },
+    "model-before-restore-race": {
+      "text": "✓ 翻译成功恢复原文",
+      "className": "fluent-input-tooltip success",
+      "role": "status",
+      "live": "polite",
+      "opacity": "1",
+      "display": "block",
+      "color": "rgb(255, 255, 255)",
+      "backgroundColor": "rgba(22, 101, 52, 0.96)",
+      "rect": {
+        "x": 565.0703125,
+        "y": 695.65625,
+        "width": 141.859375,
+        "height": 32.796875
+      },
+      "viewport": {
+        "width": 1272,
+        "height": 816
+      },
+      "previews": [],
+      "buttons": [
+        {
+          "text": "恢复原文",
+          "type": "button",
+          "color": "rgb(255, 255, 255)",
+          "backgroundColor": "rgba(0, 0, 0, 0)"
+        }
+      ]
+    },
+    "pending-390-top-edge": {
+      "text": "• 翻译中取消",
+      "className": "fluent-input-tooltip translating",
+      "role": "status",
+      "live": "polite",
+      "opacity": "1",
+      "display": "block",
+      "color": "rgb(255, 255, 255)",
+      "backgroundColor": "rgba(29, 78, 216, 0.96)",
+      "rect": {
+        "x": 144.5,
+        "y": 161.28125,
+        "width": 101,
+        "height": 32.796875
+      },
+      "viewport": {
+        "width": 390,
+        "height": 600
+      },
+      "previews": [],
+      "buttons": [
+        {
+          "text": "取消",
+          "type": "button",
+          "color": "rgb(255, 255, 255)",
+          "backgroundColor": "rgba(0, 0, 0, 0)"
+        }
+      ]
+    },
+    "pending-390-after-scroll": {
+      "text": "• 翻译中取消",
+      "className": "fluent-input-tooltip translating",
+      "role": "status",
+      "live": "polite",
+      "opacity": "1",
+      "display": "block",
+      "color": "rgb(255, 255, 255)",
+      "backgroundColor": "rgba(29, 78, 216, 0.96)",
+      "rect": {
+        "x": 144.5,
+        "y": 238.28125,
+        "width": 101,
+        "height": 32.796875
+      },
+      "viewport": {
+        "width": 390,
+        "height": 600
+      },
+      "previews": [],
+      "buttons": [
+        {
+          "text": "取消",
+          "type": "button",
+          "color": "rgb(255, 255, 255)",
+          "backgroundColor": "rgba(0, 0, 0, 0)"
+        }
+      ]
+    },
+    "pending-820-after-resize": {
+      "text": "• 翻译中取消",
+      "className": "fluent-input-tooltip translating",
+      "role": "status",
+      "live": "polite",
+      "opacity": "1",
+      "display": "block",
+      "color": "rgb(255, 255, 255)",
+      "backgroundColor": "rgba(29, 78, 216, 0.96)",
+      "rect": {
+        "x": 359.5,
+        "y": 211.0859375,
+        "width": 101,
+        "height": 32.796875
+      },
+      "viewport": {
+        "width": 820,
+        "height": 600
+      },
+      "previews": [],
+      "buttons": [
+        {
+          "text": "取消",
+          "type": "button",
+          "color": "rgb(255, 255, 255)",
+          "backgroundColor": "rgba(0, 0, 0, 0)"
+        }
+      ]
+    },
+    "manual-preview-blocked-paste-390": {
+      "text": "! 无法把译文写入当前编辑器关闭",
+      "className": "fluent-input-tooltip error",
+      "role": "status",
+      "live": "polite",
+      "opacity": "1",
+      "display": "block",
+      "color": "rgb(255, 255, 255)",
+      "backgroundColor": "rgba(185, 28, 28, 0.96)",
+      "rect": {
+        "x": 73,
+        "y": 344.50177001953125,
+        "width": 244,
+        "height": 100.796875
+      },
+      "viewport": {
+        "width": 390,
+        "height": 600
+      },
+      "previews": [
+        {
+          "value": "Let us meet tomorrow afternoon.",
+          "readonly": true,
+          "label": "译文",
+          "color": "rgb(255, 255, 255)",
+          "backgroundColor": "rgba(0, 0, 0, 0)"
+        }
+      ],
+      "buttons": [
+        {
+          "text": "关闭",
+          "type": "button",
+          "color": "rgb(255, 255, 255)",
+          "backgroundColor": "rgba(0, 0, 0, 0)"
+        }
+      ]
+    },
+    "manual-preview-blocked-native-390": {
+      "text": "! 无法把译文写入当前编辑器关闭",
+      "className": "fluent-input-tooltip error",
+      "role": "status",
+      "live": "polite",
+      "opacity": "1",
+      "display": "block",
+      "color": "rgb(255, 255, 255)",
+      "backgroundColor": "rgba(185, 28, 28, 0.96)",
+      "rect": {
+        "x": 73,
+        "y": 481.81060791015625,
+        "width": 244,
+        "height": 100.796875
+      },
+      "viewport": {
+        "width": 390,
+        "height": 600
+      },
+      "previews": [
+        {
+          "value": "Let us meet tomorrow afternoon.",
+          "readonly": true,
+          "label": "译文",
+          "color": "rgb(255, 255, 255)",
+          "backgroundColor": "rgba(0, 0, 0, 0)"
+        }
+      ],
+      "buttons": [
+        {
+          "text": "关闭",
+          "type": "button",
+          "color": "rgb(255, 255, 255)",
+          "backgroundColor": "rgba(0, 0, 0, 0)"
+        }
+      ]
+    }
+  },
+  "tooltipContrast": {
+    "failed-request-retry": {
+      "type": "error",
+      "background": "rgba(185, 28, 28, 0.96)",
+      "ratios": [
+        {
+          "text": "status",
+          "foreground": "rgb(255, 255, 255)",
+          "background": "rgba(0, 0, 0, 0)",
+          "compositedBackground": [
+            187.8,
+            37.08000000000001,
+            37.08000000000001
+          ],
+          "ratio": 6.130249819416219
+        },
+        {
+          "text": "重试",
+          "foreground": "rgb(255, 255, 255)",
+          "background": "rgba(0, 0, 0, 0)",
+          "compositedBackground": [
+            187.8,
+            37.08000000000001,
+            37.08000000000001
+          ],
+          "ratio": 6.130249819416219
+        }
+      ],
+      "minimumRatio": 6.130249819416219
+    },
+    "model-before-restore-race": {
+      "type": "success",
+      "background": "rgba(22, 101, 52, 0.96)",
+      "ratios": [
+        {
+          "text": "status",
+          "foreground": "rgb(255, 255, 255)",
+          "background": "rgba(0, 0, 0, 0)",
+          "compositedBackground": [
+            31.320000000000007,
+            107.16,
+            60.12000000000001
+          ],
+          "ratio": 6.492462457816081
+        },
+        {
+          "text": "恢复原文",
+          "foreground": "rgb(255, 255, 255)",
+          "background": "rgba(0, 0, 0, 0)",
+          "compositedBackground": [
+            31.320000000000007,
+            107.16,
+            60.12000000000001
+          ],
+          "ratio": 6.492462457816081
+        }
+      ],
+      "minimumRatio": 6.492462457816081
+    },
+    "pending-390-top-edge": {
+      "type": "translating",
+      "background": "rgba(29, 78, 216, 0.96)",
+      "ratios": [
+        {
+          "text": "status",
+          "foreground": "rgb(255, 255, 255)",
+          "background": "rgba(0, 0, 0, 0)",
+          "compositedBackground": [
+            38.040000000000006,
+            85.08000000000001,
+            217.56
+          ],
+          "ratio": 6.190533572648003
+        },
+        {
+          "text": "取消",
+          "foreground": "rgb(255, 255, 255)",
+          "background": "rgba(0, 0, 0, 0)",
+          "compositedBackground": [
+            38.040000000000006,
+            85.08000000000001,
+            217.56
+          ],
+          "ratio": 6.190533572648003
+        }
+      ],
+      "minimumRatio": 6.190533572648003
+    },
+    "pending-390-after-scroll": {
+      "type": "translating",
+      "background": "rgba(29, 78, 216, 0.96)",
+      "ratios": [
+        {
+          "text": "status",
+          "foreground": "rgb(255, 255, 255)",
+          "background": "rgba(0, 0, 0, 0)",
+          "compositedBackground": [
+            38.040000000000006,
+            85.08000000000001,
+            217.56
+          ],
+          "ratio": 6.190533572648003
+        },
+        {
+          "text": "取消",
+          "foreground": "rgb(255, 255, 255)",
+          "background": "rgba(0, 0, 0, 0)",
+          "compositedBackground": [
+            38.040000000000006,
+            85.08000000000001,
+            217.56
+          ],
+          "ratio": 6.190533572648003
+        }
+      ],
+      "minimumRatio": 6.190533572648003
+    },
+    "pending-820-after-resize": {
+      "type": "translating",
+      "background": "rgba(29, 78, 216, 0.96)",
+      "ratios": [
+        {
+          "text": "status",
+          "foreground": "rgb(255, 255, 255)",
+          "background": "rgba(0, 0, 0, 0)",
+          "compositedBackground": [
+            38.040000000000006,
+            85.08000000000001,
+            217.56
+          ],
+          "ratio": 6.190533572648003
+        },
+        {
+          "text": "取消",
+          "foreground": "rgb(255, 255, 255)",
+          "background": "rgba(0, 0, 0, 0)",
+          "compositedBackground": [
+            38.040000000000006,
+            85.08000000000001,
+            217.56
+          ],
+          "ratio": 6.190533572648003
+        }
+      ],
+      "minimumRatio": 6.190533572648003
+    },
+    "manual-preview-blocked-paste-390": {
+      "type": "error",
+      "background": "rgba(185, 28, 28, 0.96)",
+      "ratios": [
+        {
+          "text": "status",
+          "foreground": "rgb(255, 255, 255)",
+          "background": "rgba(0, 0, 0, 0)",
+          "compositedBackground": [
+            187.8,
+            37.08000000000001,
+            37.08000000000001
+          ],
+          "ratio": 6.130249819416219
+        },
+        {
+          "text": "关闭",
+          "foreground": "rgb(255, 255, 255)",
+          "background": "rgba(0, 0, 0, 0)",
+          "compositedBackground": [
+            187.8,
+            37.08000000000001,
+            37.08000000000001
+          ],
+          "ratio": 6.130249819416219
+        },
+        {
+          "text": "译文",
+          "foreground": "rgb(255, 255, 255)",
+          "background": "rgba(0, 0, 0, 0)",
+          "compositedBackground": [
+            187.8,
+            37.08000000000001,
+            37.08000000000001
+          ],
+          "ratio": 6.130249819416219
+        }
+      ],
+      "minimumRatio": 6.130249819416219
+    },
+    "manual-preview-blocked-native-390": {
+      "type": "error",
+      "background": "rgba(185, 28, 28, 0.96)",
+      "ratios": [
+        {
+          "text": "status",
+          "foreground": "rgb(255, 255, 255)",
+          "background": "rgba(0, 0, 0, 0)",
+          "compositedBackground": [
+            187.8,
+            37.08000000000001,
+            37.08000000000001
+          ],
+          "ratio": 6.130249819416219
+        },
+        {
+          "text": "关闭",
+          "foreground": "rgb(255, 255, 255)",
+          "background": "rgba(0, 0, 0, 0)",
+          "compositedBackground": [
+            187.8,
+            37.08000000000001,
+            37.08000000000001
+          ],
+          "ratio": 6.130249819416219
+        },
+        {
+          "text": "译文",
+          "foreground": "rgb(255, 255, 255)",
+          "background": "rgba(0, 0, 0, 0)",
+          "compositedBackground": [
+            187.8,
+            37.08000000000001,
+            37.08000000000001
+          ],
+          "ratio": 6.130249819416219
+        }
+      ],
+      "minimumRatio": 6.130249819416219
+    }
+  },
+  "modelRestoreCandidates": 1,
+  "modelEditorLog": [
+    {
+      "source": "beforeinput",
+      "start": 0,
+      "end": 0,
+      "length": 8,
+      "text": "="
+    },
+    {
+      "source": "beforeinput",
+      "start": 1,
+      "end": 1,
+      "length": 9,
+      "text": "="
+    },
+    {
+      "source": "paste",
+      "start": 0,
+      "end": 2,
+      "length": 10,
+      "text": ""
+    },
+    {
+      "source": "beforeinput",
+      "start": 0,
+      "end": 8,
+      "length": 8,
+      "text": "Let us meet tomorrow afternoon."
+    },
+    {
+      "source": "beforeinput",
+      "start": 0,
+      "end": 31,
+      "length": 31,
+      "text": "模型编辑器原文。"
+    }
+  ],
+  "repeatedShortcut": {
+    "triggers": 5,
+    "requests": 1,
+    "passed": true
+  },
+  "blurRich": {
+    "html": "<b>失焦取消时保留富文本原文。</b>",
+    "focus": {
+      "active": "other",
+      "value": "在另一个输入框里继续写作。",
+      "start": 1,
+      "end": 3
+    },
+    "abortedRequests": 1
+  },
+  "restoreTypingRace": {
+    "text": "Let uxs meet tomorrow afternoon.",
+    "edit": {
+      "source": "beforeinput",
+      "start": 5,
+      "end": 5,
+      "length": 31,
+      "text": "x"
+    },
+    "passed": true
+  },
+  "cancelButton": {
+    "abortedRequests": 1,
+    "active": "message",
+    "passed": true
+  },
+  "nativeRejectionFixture": {
+    "world": "FluentRead-流畅阅读",
+    "isolatedExtensionId": "djnlaiohfaaifbibleebjggkghlmcpcj"
+  },
+  "manualPreview": [
+    {
+      "editor": "blocked-paste",
+      "originalHtml": "<b>拒绝粘贴时保留格式。</b>",
+      "preview": {
+        "value": "Let us meet tomorrow afternoon.",
+        "readonly": true,
+        "label": "译文",
+        "color": "rgb(255, 255, 255)",
+        "backgroundColor": "rgba(0, 0, 0, 0)"
+      },
+      "passed": true
+    },
+    {
+      "editor": "blocked-native",
+      "originalHtml": "<b>原生写入未提交时保留格式。</b>",
+      "preview": {
+        "value": "Let us meet tomorrow afternoon.",
+        "readonly": true,
+        "label": "译文",
+        "color": "rgb(255, 255, 255)",
+        "backgroundColor": "rgba(0, 0, 0, 0)"
+      },
+      "passed": true
+    }
+  ],
+  "blockedEditorLog": [
+    {
+      "id": "blocked-paste",
+      "source": "paste",
+      "text": "Let us meet tomorrow afternoon."
+    },
+    {
+      "id": "blocked-native",
+      "source": "paste",
+      "text": "Let us meet tomorrow afternoon."
+    }
+  ],
+  "bilingualRich": {
+    "text": "中文原文。链接\n\n第二段\n\nLet us meet tomorrow afternoon.",
+    "html": "<p><b>中文原文。</b><a href=\"https://example.test/keep\">链接</a></p><p>第二段</p><p>Let us meet tomorrow afternoon.</p>",
+    "sameBold": true,
+    "sameLink": true,
+    "href": "https://example.test/keep"
+  },
+  "translationFirstRich": {
+    "text": "Let us meet tomorrow afternoon.\n原文保持格式链接",
+    "html": "<b>Let us meet tomorrow afternoon.</b><div><b>原文保持格式</b><a href=\"https://example.test/keep\">链接</a></div>",
+    "boldTexts": [
+      "Let us meet tomorrow afternoon.",
+      "原文保持格式"
+    ],
+    "links": [
+      {
+        "text": "链接",
+        "href": "https://example.test/keep"
+      }
+    ]
+  },
+  "runtimeRequests": [
+    {
+      "url": "http://127.0.0.1:11434/v1/chat/completions",
+      "body": {
+        "model": "gpt-4.1-nano",
+        "messages": [
+          {
+            "role": "system",
+            "content": "Keep the message polite. Return only translated text."
+          },
+          {
+            "role": "user",
+            "content": "Translate this input into en: 明天下午见面。="
+          }
+        ],
+        "stream": false
+      }
+    },
+    {
+      "url": "http://127.0.0.1:11434/v1/chat/completions",
+      "body": {
+        "model": "gpt-4.1-nano",
+        "messages": [
+          {
+            "role": "system",
+            "content": "Keep the message polite. Return only translated text."
+          },
+          {
+            "role": "user",
+            "content": "Translate this input into en: 明天下午见面。="
+          }
+        ],
+        "stream": false
+      }
+    },
+    {
+      "url": "http://127.0.0.1:11434/v1/chat/completions",
+      "body": {
+        "model": "gpt-4.1-nano",
+        "messages": [
+          {
+            "role": "system",
+            "content": "Keep the message polite. Return only translated text."
+          },
+          {
+            "role": "user",
+            "content": "Translate this input into en: 这是原始消息"
+          }
+        ],
+        "stream": false
+      }
+    },
+    {
+      "url": "http://127.0.0.1:11434/v1/chat/completions",
+      "body": {
+        "model": "gpt-4.1-nano",
+        "messages": [
+          {
+            "role": "system",
+            "content": "Keep the message polite. Return only translated text."
+          },
+          {
+            "role": "user",
+            "content": "Translate this input into en: 失焦后仍完成翻译"
+          }
+        ],
+        "stream": false
+      }
+    },
+    {
+      "url": "http://127.0.0.1:11434/v1/chat/completions",
+      "body": {
+        "model": "gpt-4.1-nano",
+        "messages": [
+          {
+            "role": "system",
+            "content": "Keep the message polite. Return only translated text."
+          },
+          {
+            "role": "user",
+            "content": "Translate this input into en: 取消这次翻译"
+          }
+        ],
+        "stream": false
+      }
+    },
+    {
+      "url": "http://127.0.0.1:11434/v1/chat/completions",
+      "body": {
+        "model": "gpt-4.1-nano",
+        "messages": [
+          {
+            "role": "system",
+            "content": "Keep the message polite. Return only translated text."
+          },
+          {
+            "role": "user",
+            "content": "Translate this input into en: 服务失败时保留我"
+          }
+        ],
+        "stream": false
+      }
+    },
+    {
+      "url": "http://127.0.0.1:11434/v1/chat/completions",
+      "body": {
+        "model": "gpt-4.1-nano",
+        "messages": [
+          {
+            "role": "system",
+            "content": "Keep the message polite. Return only translated text."
+          },
+          {
+            "role": "user",
+            "content": "Translate this input into en: 服务失败时保留我"
+          }
+        ],
+        "stream": false
+      }
+    },
+    {
+      "url": "http://127.0.0.1:11434/v1/chat/completions",
+      "body": {
+        "model": "gpt-4.1-nano",
+        "messages": [
+          {
+            "role": "system",
+            "content": "Keep the message polite. Return only translated text."
+          },
+          {
+            "role": "user",
+            "content": "Translate this input into en: 这段格式需要保留。"
+          }
+        ],
+        "stream": false
+      }
+    },
+    {
+      "url": "http://127.0.0.1:11434/v1/chat/completions",
+      "body": {
+        "model": "gpt-4.1-nano",
+        "messages": [
+          {
+            "role": "system",
+            "content": "Keep the message polite. Return only translated text."
+          },
+          {
+            "role": "user",
+            "content": "Translate this input into en: 模型编辑器原文。"
+          }
+        ],
+        "stream": false
+      }
+    },
+    {
+      "url": "http://127.0.0.1:11434/v1/chat/completions",
+      "body": {
+        "model": "gpt-4.1-nano",
+        "messages": [
+          {
+            "role": "system",
+            "content": "Keep the message polite. Return only translated text."
+          },
+          {
+            "role": "user",
+            "content": "Translate this input into en: 你好"
+          }
+        ],
+        "stream": false
+      }
+    },
+    {
+      "url": "http://127.0.0.1:11434/v1/chat/completions",
+      "body": {
+        "model": "gpt-4.1-nano",
+        "messages": [
+          {
+            "role": "system",
+            "content": "Keep the message polite. Return only translated text."
+          },
+          {
+            "role": "user",
+            "content": "Translate this input into en: 请保留原来的结尾-"
+          }
+        ],
+        "stream": false
+      }
+    },
+    {
+      "url": "http://127.0.0.1:11434/v1/chat/completions",
+      "body": {
+        "model": "gpt-4.1-nano",
+        "messages": [
+          {
+            "role": "system",
+            "content": "Keep the message polite. Return only translated text."
+          },
+          {
+            "role": "user",
+            "content": "Translate this input into en: 请保留原来的结尾-"
+          }
+        ],
+        "stream": false
+      }
+    },
+    {
+      "url": "http://127.0.0.1:11434/v1/chat/completions",
+      "body": {
+        "model": "gpt-4.1-nano",
+        "messages": [
+          {
+            "role": "system",
+            "content": "Keep the message polite. Return only translated text."
+          },
+          {
+            "role": "user",
+            "content": "Translate this input into en: 普通快捷键翻译"
+          }
+        ],
+        "stream": false
+      }
+    },
+    {
+      "url": "http://127.0.0.1:11434/v1/chat/completions",
+      "body": {
+        "model": "gpt-4.1-nano",
+        "messages": [
+          {
+            "role": "system",
+            "content": "Keep the message polite. Return only translated text."
+          },
+          {
+            "role": "user",
+            "content": "Translate this input into en: 重复快捷键只翻译一次"
+          }
+        ],
+        "stream": false
+      }
+    },
+    {
+      "url": "http://127.0.0.1:11434/v1/chat/completions",
+      "body": {
+        "model": "gpt-4.1-nano",
+        "messages": [
+          {
+            "role": "system",
+            "content": "Keep the message polite. Return only translated text."
+          },
+          {
+            "role": "user",
+            "content": "Translate this input into en: 失焦取消时保留富文本原文。"
+          }
+        ],
+        "stream": false
+      }
+    },
+    {
+      "url": "http://127.0.0.1:11434/v1/chat/completions",
+      "body": {
+        "model": "gpt-4.1-nano",
+        "messages": [
+          {
+            "role": "system",
+            "content": "Keep the message polite. Return only translated text."
+          },
+          {
+            "role": "user",
+            "content": "Translate this input into en: 模型编辑器原文。"
+          }
+        ],
+        "stream": false
+      }
+    },
+    {
+      "url": "http://127.0.0.1:11434/v1/chat/completions",
+      "body": {
+        "model": "gpt-4.1-nano",
+        "messages": [
+          {
+            "role": "system",
+            "content": "Keep the message polite. Return only translated text."
+          },
+          {
+            "role": "user",
+            "content": "Translate this input into en: 窄屏与滚动时可取消的翻译"
+          }
+        ],
+        "stream": false
+      }
+    },
+    {
+      "url": "http://127.0.0.1:11434/v1/chat/completions",
+      "body": {
+        "model": "gpt-4.1-nano",
+        "messages": [
+          {
+            "role": "system",
+            "content": "Keep the message polite. Return only translated text."
+          },
+          {
+            "role": "user",
+            "content": "Translate this input into en: 拒绝粘贴时保留格式。"
+          }
+        ],
+        "stream": false
+      }
+    },
+    {
+      "url": "http://127.0.0.1:11434/v1/chat/completions",
+      "body": {
+        "model": "gpt-4.1-nano",
+        "messages": [
+          {
+            "role": "system",
+            "content": "Keep the message polite. Return only translated text."
+          },
+          {
+            "role": "user",
+            "content": "Translate this input into en: 原生写入未提交时保留格式。"
+          }
+        ],
+        "stream": false
+      }
+    },
+    {
+      "url": "http://127.0.0.1:11434/v1/chat/completions",
+      "body": {
+        "model": "gpt-4.1-nano",
+        "messages": [
+          {
+            "role": "system",
+            "content": "Keep the message polite. Return only translated text."
+          },
+          {
+            "role": "user",
+            "content": "Translate this input into en: 间隔设置立即生效"
+          }
+        ],
+        "stream": false
+      }
+    },
+    {
+      "url": "http://127.0.0.1:11434/v1/chat/completions",
+      "body": {
+        "model": "gpt-4.1-nano",
+        "messages": [
+          {
+            "role": "system",
+            "content": "Keep the message polite. Return only translated text."
+          },
+          {
+            "role": "user",
+            "content": "Translate this input into en:   明天下午见面。\n请确认时间。  "
+          }
+        ],
+        "stream": false
+      }
+    },
+    {
+      "url": "http://127.0.0.1:11434/v1/chat/completions",
+      "body": {
+        "model": "gpt-4.1-nano",
+        "messages": [
+          {
+            "role": "system",
+            "content": "Keep the message polite. Return only translated text."
+          },
+          {
+            "role": "user",
+            "content": "Translate this input into en:   明天下午见面。\n请确认时间。  "
+          }
+        ],
+        "stream": false
+      }
+    },
+    {
+      "url": "http://127.0.0.1:11434/v1/chat/completions",
+      "body": {
+        "model": "gpt-4.1-nano",
+        "messages": [
+          {
+            "role": "system",
+            "content": "Keep the message polite. Return only translated text."
+          },
+          {
+            "role": "user",
+            "content": "Translate this input into en: 继续编辑时不要追加"
+          }
+        ],
+        "stream": false
+      }
+    },
+    {
+      "url": "http://127.0.0.1:11434/v1/chat/completions",
+      "body": {
+        "model": "gpt-4.1-nano",
+        "messages": [
+          {
+            "role": "system",
+            "content": "Keep the message polite. Return only translated text."
+          },
+          {
+            "role": "user",
+            "content": "Translate this input into en: 取消追加"
+          }
+        ],
+        "stream": false
+      }
+    },
+    {
+      "url": "http://127.0.0.1:11434/v1/chat/completions",
+      "body": {
+        "model": "gpt-4.1-nano",
+        "messages": [
+          {
+            "role": "system",
+            "content": "Keep the message polite. Return only translated text."
+          },
+          {
+            "role": "user",
+            "content": "Translate this input into en: 失败保留原文"
+          }
+        ],
+        "stream": false
+      }
+    },
+    {
+      "url": "http://127.0.0.1:11434/v1/chat/completions",
+      "body": {
+        "model": "gpt-4.1-nano",
+        "messages": [
+          {
+            "role": "system",
+            "content": "Keep the message polite. Return only translated text."
+          },
+          {
+            "role": "user",
+            "content": "Translate this input into en: 中文原文。链接\n\n第二段"
+          }
+        ],
+        "stream": false
+      }
+    },
+    {
+      "url": "http://127.0.0.1:11434/v1/chat/completions",
+      "body": {
+        "model": "gpt-4.1-nano",
+        "messages": [
+          {
+            "role": "system",
+            "content": "Keep the message polite. Return only translated text."
+          },
+          {
+            "role": "user",
+            "content": "Translate this input into en: 模型编辑器原文。"
+          }
+        ],
+        "stream": false
+      }
+    },
+    {
+      "url": "http://127.0.0.1:11434/v1/chat/completions",
+      "body": {
+        "model": "gpt-4.1-nano",
+        "messages": [
+          {
+            "role": "system",
+            "content": "Keep the message polite. Return only translated text."
+          },
+          {
+            "role": "user",
+            "content": "Translate this input into en:   明天下午见面。\n请确认时间。  "
+          }
+        ],
+        "stream": false
+      }
+    },
+    {
+      "url": "http://127.0.0.1:11434/v1/chat/completions",
+      "body": {
+        "model": "gpt-4.1-nano",
+        "messages": [
+          {
+            "role": "system",
+            "content": "Keep the message polite. Return only translated text."
+          },
+          {
+            "role": "user",
+            "content": "Translate this input into en: 原文保持格式链接"
+          }
+        ],
+        "stream": false
+      }
+    },
+    {
+      "url": "http://127.0.0.1:11434/v1/chat/completions",
+      "body": {
+        "model": "gpt-4.1-nano",
+        "messages": [
+          {
+            "role": "system",
+            "content": "Keep the message polite. Return only translated text."
+          },
+          {
+            "role": "user",
+            "content": "Translate this input into en: 空格回复"
+          }
+        ],
+        "stream": false
+      }
+    }
+  ],
+  "providerAbortCount": 6,
+  "persistenceCases": [
+    {
+      "name": "interval edit and restore default",
+      "passed": true
+    },
+    {
+      "name": "independent AI config, responsive layout, preserved global config",
+      "passed": true
+    },
+    {
+      "name": "interval change applies without page reload",
+      "passed": true
+    }
+  ],
+  "completed": true
+}

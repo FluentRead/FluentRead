@@ -20,7 +20,7 @@ let session;
 const pause = ms => new Promise(resolve => setTimeout(resolve, ms));
 const html = `<!doctype html><html><head><meta charset="utf-8"><title>输入框翻译 · 交互验证</title><style>
 body{margin:0;padding:48px;background:#f5f3f7;color:#292337;font:16px/1.7 system-ui}main{max-width:820px;margin:auto;background:white;border-radius:20px;padding:32px}h1{margin:0;font-size:26px}p{color:#696275}label{display:block;margin:24px 0}input,textarea,[contenteditable]{box-sizing:border-box;width:100%;padding:14px;border:1px solid #cfc8da;border-radius:10px;font:18px/1.6 system-ui}textarea{min-height:130px}small{color:#81758b}
-</style></head><body><main><h1>输入框翻译</h1><p>输入、触发、继续编辑与恢复原文</p><label>消息<textarea id="message">明天下午见面。</textarea></label><label>另一输入框<input id="other" value="请帮我确认时间。"></label><label>密码<input id="password" type="password" value="private"></label><label>富文本编辑区<div id="rich" contenteditable="true"><b>这段格式需要保留。</b></div></label><label>模型驱动编辑器<div id="model" contenteditable="true"></div></label><label>纯文本编辑区<div id="plain" contenteditable="plaintext-only">你好</div></label><label>代码编辑器<div class="cm-editor"><div id="code" class="cm-content" contenteditable="true">const a = 1;</div></div></label><small>本页使用本地测试响应，验证扩展交互。</small></main><script>
+</style></head><body><main><h1>输入框翻译</h1><p>输入、触发、继续编辑与恢复原文</p><label>消息<textarea id="message">明天下午见面。</textarea></label><label>另一输入框<input id="other" value="请帮我确认时间。"></label><label>密码<input id="password" type="password" value="private"></label><label>富文本编辑区<div id="rich" contenteditable="true"><b>这段格式需要保留。</b></div></label><label>模型驱动编辑器<div id="model" contenteditable="true"></div></label><label>拒绝粘贴的模型编辑器<div id="blocked-paste" contenteditable="true"><b>拒绝粘贴时保留格式。</b></div></label><label>原生写入未提交的编辑器<div id="blocked-native" contenteditable="true"><b>原生写入未提交时保留格式。</b></div></label><label>纯文本编辑区<div id="plain" contenteditable="plaintext-only">你好</div></label><label>代码编辑器<div class="cm-editor"><div id="code" class="cm-content" contenteditable="true">const a = 1;</div></div></label><small>本页使用本地测试响应，验证扩展交互。</small></main><script>
 // 模拟 Lexical/Draft.js：拦截 beforeinput 与 paste，只在 selectionchange 事件里同步模型选区，再由模型重新渲染 DOM。
 (() => {
   const root = document.getElementById('model');
@@ -36,13 +36,18 @@ body{margin:0;padding:48px;background:#f5f3f7;color:#292337;font:16px/1.7 system
     getSelection().addRange(range);
   };
   const offset = (node, value) => node === root ? (value === 0 ? 0 : model.text.length) : value;
-  document.addEventListener('selectionchange', () => {
+  document.addEventListener('selectionchange', event => {
     const selection = getSelection();
     if (!selection.rangeCount || !root.contains(selection.anchorNode)) return;
+    if (window.holdModelSelection && selection.toString() === model.text) {
+      window.modelSelectionHeld = true;
+      event.stopImmediatePropagation();
+      return;
+    }
     const range = selection.getRangeAt(0);
     model.start = offset(range.startContainer, range.startOffset);
     model.end = offset(range.endContainer, range.endOffset);
-  });
+  }, {capture: true});
   const replace = (text, source) => {
     log.push({source, start: model.start, end: model.end, length: model.text.length, text});
     model.text = model.text.slice(0, model.start) + text + model.text.slice(model.end);
@@ -58,6 +63,19 @@ body{margin:0;padding:48px;background:#f5f3f7;color:#292337;font:16px/1.7 system
     event.preventDefault();
     replace(event.clipboardData.getData('text/plain'), 'paste');
   });
+  window.resetModelEditor = text => {
+    model.text = text;
+    model.start = model.end = text.length;
+    render();
+  };
+  window.blockedEditorLog = [];
+  document.getElementById('blocked-paste').addEventListener('paste', event => {
+    event.preventDefault();
+    window.blockedEditorLog.push({id: 'blocked-paste', source: 'paste', text: event.clipboardData.getData('text/plain')});
+  });
+  document.getElementById('blocked-native').addEventListener('paste', event => {
+    window.blockedEditorLog.push({id: 'blocked-native', source: 'paste', text: event.clipboardData.getData('text/plain')});
+  });
   document.getElementById('message').addEventListener('keydown', event => {
     if (event.ctrlKey && event.key === 'Enter') window.pageSawCtrlEnter = true;
   });
@@ -68,6 +86,7 @@ body{margin:0;padding:48px;background:#f5f3f7;color:#292337;font:16px/1.7 system
 async function main() {
   let primaryError;
   let launchAttempted = false;
+  let captureInputFixture;
   try {
     launchAttempted = true;
     session = await helper.launchFocusSafePersistentContext({chromium, profileDir,
@@ -80,7 +99,7 @@ async function main() {
     const worker = context.serviceWorkers()[0] || await context.waitForEvent('serviceworker');
     const extensionId = new URL(worker.url()).host;
     await worker.evaluate(() => {
-      globalThis.inputTest = {mode: 'success', requests: [], pending: [], result: 'Let us meet tomorrow afternoon.'};
+      globalThis.inputTest = {mode: 'success', requests: [], pending: [], aborted: 0, result: 'Let us meet tomorrow afternoon.'};
       const originalFetch = globalThis.fetch.bind(globalThis);
       globalThis.fetch = async (input, init) => {
         const url = new URL(typeof input === 'string' || input instanceof URL ? String(input) : input.url, location.href);
@@ -88,7 +107,23 @@ async function main() {
         const state = globalThis.inputTest;
         const body = JSON.parse(init?.body || '{}');
         state.requests.push({url: url.href, body});
-        if (state.mode === 'pending') await new Promise(resolve => state.pending.push(resolve));
+        if (state.mode === 'pending') await new Promise((resolve, reject) => {
+          const signal = init?.signal || (typeof input === 'object' ? input.signal : undefined);
+          let settled = false;
+          const finish = action => {
+            if (settled) return;
+            settled = true;
+            signal?.removeEventListener('abort', onAbort);
+            action();
+          };
+          const onAbort = () => finish(() => {
+            state.aborted += 1;
+            reject(new DOMException('input fixture request aborted', 'AbortError'));
+          });
+          state.pending.push(() => finish(resolve));
+          if (signal?.aborted) onAbort();
+          else signal?.addEventListener('abort', onAbort, {once: true});
+        });
         if (state.mode === 'failure') return new Response('simulated failure', {status: 503});
         const payload = Array.isArray(body)
           ? body.map(() => ({translations: [{text: state.result}]}))
@@ -98,6 +133,11 @@ async function main() {
         return new Response(JSON.stringify(payload), {status: 200, headers: {'content-type': 'application/json'}});
       };
     });
+    captureInputFixture = async () => {
+      const state = await worker.evaluate(() => ({requests: globalThis.inputTest.requests, aborted: globalThis.inputTest.aborted}));
+      report.runtimeRequests = state.requests;
+      report.providerAbortCount = state.aborted;
+    };
     const options = await helper.newPageWithoutForeground(context);
     options.on('pageerror', error => report.consoleErrors.push(error.message));
     await options.goto(`chrome-extension://${extensionId}/options.html#settings-translation`);
@@ -123,7 +163,7 @@ async function main() {
     async function snap(name, page = options) {
       await pause(350); // Let dialog and theme transitions settle before capturing evidence.
       const file = `${name}.png`;
-      await page.screenshot({path: path.join(artifactsDir, file), animations: 'disabled'});
+      await page.screenshot({caret: 'initial', path: path.join(artifactsDir, file), animations: 'disabled'});
       for (const dialog of await page.locator('.input-translation-dialog.el-dialog').all()) {
         if (!await dialog.isVisible()) continue;
         const bounds = await dialog.boundingBox();
@@ -312,9 +352,25 @@ async function main() {
     page.on('pageerror', error => report.consoleErrors.push(error.message));
     await page.goto('https://input-translation.example/test');
     await page.waitForSelector('#fluent-read-page-styles', {state: 'attached'});
+    report.inputEventCapabilities = await page.evaluate(() => {
+      if (typeof StaticRange !== 'function' || typeof InputEvent !== 'function') return {targetRangesAvailable: false};
+      const node = document.createTextNode('range');
+      const range = new StaticRange({startContainer: node, startOffset: 1, endContainer: node, endOffset: 3});
+      const event = new InputEvent('beforeinput', {bubbles: true, cancelable: true, inputType: 'deleteContentBackward', targetRanges: [range]});
+      const targets = event.getTargetRanges();
+      return {targetRangesAvailable: true, retainedCount: targets.length,
+        retainedBoundary: targets[0]?.startContainer === node && targets[0]?.startOffset === 1
+          && targets[0]?.endContainer === node && targets[0]?.endOffset === 3};
+    });
     await helper.activateExtensionTabWithoutForeground(context, page);
     const textarea = page.locator('#message');
     const requests = () => worker.evaluate(() => globalThis.inputTest.requests);
+    const requestCount = async () => (await requests()).length;
+    const abortCount = () => worker.evaluate(() => globalThis.inputTest.aborted);
+    const waitForRequest = count => waitForAsyncCondition(async () => await requestCount() >= count,
+      {timeoutMs: 15000, message: `输入翻译供应商请求未到达 ${count} 次`});
+    const waitForAbort = count => waitForAsyncCondition(async () => await abortCount() >= count,
+      {timeoutMs: 5000, message: `输入翻译供应商请求未被取消 ${count} 次`});
     const mode = value => worker.evaluate(value => globalThis.inputTest.mode = value, value);
     const release = () => worker.evaluate(() => {
       globalThis.inputTest.mode = 'success';
@@ -342,6 +398,140 @@ async function main() {
     assert.ok(!JSON.stringify(first.body).includes('GLOBAL PROMPT'));
     report.cases.push({name: 'triple equal uses independent model and prompts, preserves original equals', passed: true});
     const domSession = await context.newCDPSession(page);
+    const executionContexts = [];
+    domSession.on('Runtime.executionContextCreated', event => executionContexts.push(event.context));
+    await domSession.send('Runtime.enable');
+    async function blockNativeCommit() {
+      // 页面主世界覆盖不了扩展的隔离世界；仅在本次 FluentRead 内容脚本世界里模拟宿主拒写。
+      for (const world of executionContexts.filter(world => world.auxData?.isDefault === false)) {
+        const identity = await domSession.send('Runtime.evaluate', {contextId: world.id,
+          expression: 'globalThis.chrome?.runtime?.id || null', returnByValue: true});
+        if (identity.result.value !== extensionId) continue;
+        await domSession.send('Runtime.evaluate', {contextId: world.id, expression: `(() => {
+          const original = document.execCommand.bind(document);
+          document.execCommand = (command, ...args) => {
+            const element = document.activeElement;
+            if (command === 'insertText' && element?.id === 'blocked-native') {
+              element.setAttribute('data-fluent-test-native-write-rejected', 'true');
+              element.setAttribute('data-fluent-test-native-write-text', args[1]);
+              return true;
+            }
+            return original(command, ...args);
+          };
+        })()`});
+        report.nativeRejectionFixture = {world: world.name, isolatedExtensionId: extensionId};
+        return;
+      }
+      throw new Error(`Cannot identify FluentRead isolated world: ${JSON.stringify(executionContexts.map(({name, origin, auxData}) => ({name, origin, auxData})))}`);
+    }
+    const attribute = (node, name) => {
+      const index = (node.attributes || []).indexOf(name);
+      return index < 0 ? null : node.attributes[index + 1];
+    };
+    const collectNodes = (node, predicate, matches = []) => {
+      if (predicate(node)) matches.push(node);
+      for (const child of [...(node.children || []), ...(node.shadowRoots || [])]) collectNodes(child, predicate, matches);
+      return matches;
+    };
+    async function readInputTooltip() {
+      const tree = await domSession.send('DOM.getDocument', {depth: -1, pierce: true});
+      const tooltip = collectNodes(tree.root, node => attribute(node, 'id') === 'fluent-input-translation-tooltip'
+        && !String(attribute(node, 'class')).split(' ').includes('hide')).at(-1);
+      if (!tooltip) return null;
+      let object;
+      try {
+        ({object} = await domSession.send('DOM.resolveNode', {backendNodeId: tooltip.backendNodeId}));
+      } catch (error) {
+        // loading → 结果提示在两次 CDP 读取之间替换旧节点，重读当前 tooltip 而非判成产品失败。
+        if (/No node with given id found|No node found for given backend id/.test(String(error.message))) return null;
+        throw error;
+      }
+      try {
+        const result = await domSession.send('Runtime.callFunctionOn', {objectId: object.objectId,
+          functionDeclaration: `function() {
+            const rect = this.getBoundingClientRect();
+            const style = getComputedStyle(this);
+            return {text: this.textContent, className: this.className, role: this.getAttribute('role'),
+              live: this.getAttribute('aria-live'), opacity: style.opacity, display: style.display,
+              color: style.color, backgroundColor: style.backgroundColor,
+              rect: {x: rect.x, y: rect.y, width: rect.width, height: rect.height},
+              viewport: {width: innerWidth, height: innerHeight},
+              previews: [...this.querySelectorAll('textarea')].map(preview => ({value: preview.value,
+                readonly: preview.readOnly, label: preview.getAttribute('aria-label'),
+                color: getComputedStyle(preview).color, backgroundColor: getComputedStyle(preview).backgroundColor})),
+              buttons: [...this.querySelectorAll('button')].map(button => ({text: button.textContent, type: button.type,
+                color: getComputedStyle(button).color, backgroundColor: getComputedStyle(button).backgroundColor}))};
+          }`, returnByValue: true});
+        return result.result.value;
+      } finally {
+        await domSession.send('Runtime.releaseObject', {objectId: object.objectId});
+      }
+    }
+    function expectInputTooltipContrast(name, state) {
+      const parseColor = value => {
+        assert.match(value, /^rgba?\([\d.,\s]+\)$/, `computed RGB color: ${value}`);
+        const channels = value.match(/[\d.]+/g).map(Number);
+        return [...channels.slice(0, 3), channels[3] ?? 1];
+      };
+      const composite = (foreground, background) => foreground.slice(0, 3)
+        .map((channel, index) => channel * foreground[3] + background[index] * (1 - foreground[3]));
+      const luminance = color => color.map(channel => {
+        const normalized = channel / 255;
+        return normalized <= 0.04045 ? normalized / 12.92 : ((normalized + 0.055) / 1.055) ** 2.4;
+      }).reduce((sum, channel, index) => sum + channel * [0.2126, 0.7152, 0.0722][index], 0);
+      // 白背底使半透明的深色提示背景最亮，给实际白色小字提供最差对比度边界。
+      const background = composite(parseColor(state.backgroundColor), [255, 255, 255]);
+      const samples = [{text: 'status', color: state.color, backgroundColor: 'rgba(0, 0, 0, 0)'},
+        ...state.buttons, ...state.previews];
+      const ratios = samples.map(sample => {
+        const foreground = parseColor(sample.color);
+        assert.deepEqual(foreground, [255, 255, 255, 1], `${name}: actual status/action/preview text is white`);
+        const surface = composite(parseColor(sample.backgroundColor), background);
+        const foregroundLuminance = luminance(composite(foreground, surface));
+        const backgroundLuminance = luminance(surface);
+        const ratio = (Math.max(foregroundLuminance, backgroundLuminance) + 0.05)
+          / (Math.min(foregroundLuminance, backgroundLuminance) + 0.05);
+        assert.ok(ratio >= 4.5, `${name}: ${sample.text || sample.label || 'preview'} white text contrast ${ratio.toFixed(3)} >= 4.5`);
+        return {text: sample.text || sample.label || 'preview', foreground: sample.color,
+          background: sample.backgroundColor, compositedBackground: surface, ratio};
+      });
+      const type = ['translating', 'success', 'error'].find(value => state.className.split(' ').includes(value));
+      assert.ok(type, `${name}: known tooltip state`);
+      report.tooltipContrast ||= {};
+      report.tooltipContrast[name] = {type, background: state.backgroundColor, ratios,
+        minimumRatio: Math.min(...ratios.map(sample => sample.ratio))};
+    }
+    async function expectInputTooltipGeometry(name, ready = () => true) {
+      let state;
+      try {
+        await waitForAsyncCondition(async () => {
+          state = await readInputTooltip();
+          if (!state || state.display === 'none' || state.opacity !== '1') return false;
+          const {rect, viewport} = state;
+          return rect.width > 0 && rect.height > 0 && rect.x >= 11 && rect.y >= 11
+            && rect.x + rect.width <= viewport.width - 11 && rect.y + rect.height <= viewport.height - 11 && ready(state);
+        }, {timeoutMs: 5000, message: `输入翻译提示未完整位于可视区域: ${name}`});
+      } catch (error) {
+        report.failedTooltip = {name, state, anchor: await textarea.boundingBox(), scrollY: await page.evaluate(() => scrollY)};
+        await snap('failed-tooltip', page);
+        throw error;
+      }
+      report.tooltipGeometry ||= {};
+      report.tooltipGeometry[name] = state;
+      expectInputTooltipContrast(name, state);
+      return state;
+    }
+    async function clickTooltipButton(label) {
+      const tree = await domSession.send('DOM.getDocument', {depth: -1, pierce: true});
+      const tooltip = collectNodes(tree.root, node => attribute(node, 'id') === 'fluent-input-translation-tooltip'
+        && !String(attribute(node, 'class')).split(' ').includes('hide')).at(-1);
+      assert.ok(tooltip, `translation tooltip exists for ${label}`);
+      const button = collectNodes(tooltip, node => node.nodeName === 'BUTTON'
+        && (node.children || []).some(child => child.nodeValue === label)).at(-1);
+      assert.ok(button, `translation tooltip offers ${label}`);
+      const quad = (await domSession.send('DOM.getBoxModel', {nodeId: button.nodeId})).model.content;
+      await page.mouse.click((quad[0] + quad[4]) / 2, (quad[1] + quad[5]) / 2);
+    }
     const tree = await domSession.send('DOM.getDocument', {depth: -1, pierce: true});
     const findRestore = node => {
       if (node.nodeName === 'BUTTON' && (node.children || []).some(child => child.nodeValue === '恢复原文')) return node;
@@ -380,8 +570,10 @@ async function main() {
     await textarea.fill('这是原始消息');
     await mode('pending');
     await triple();
-    await pause(500);
+    await waitForRequest(before + 1);
+    const editAborted = await abortCount();
     await textarea.fill('这是新编辑的消息');
+    await waitForAbort(editAborted + 1);
     await release();
     await pause(600);
     assert.equal(await textarea.inputValue(), '这是新编辑的消息');
@@ -389,33 +581,53 @@ async function main() {
 
     await mode('pending');
     await textarea.fill('失焦后仍完成翻译');
+    before = await requestCount();
     await triple();
-    await pause(400);
-    await page.locator('#other').click();
+    await waitForRequest(before + 1);
+    const other = page.locator('#other');
+    await other.fill('在另一个输入框里继续写作。');
+    const otherValue = await other.inputValue();
+    await other.evaluate(element => element.setSelectionRange(2, 5));
+    const focusBeforeWrite = await other.evaluate(element => ({active: document.activeElement?.id,
+      value: element.value, start: element.selectionStart, end: element.selectionEnd}));
     await release();
     await expectValue('Let us meet tomorrow afternoon.');
-    report.cases.push({name: 'blur without another edit still allows translation', passed: true});
+    const focusAfterWrite = await other.evaluate(element => ({active: document.activeElement?.id,
+      value: element.value, start: element.selectionStart, end: element.selectionEnd}));
+    assert.deepEqual(focusAfterWrite, focusBeforeWrite, 'textarea writeback preserves the next editor focus and selection');
+    assert.equal(focusAfterWrite.value, otherValue);
+    report.blurTextarea = {before: focusBeforeWrite, after: focusAfterWrite};
+    report.cases.push({name: 'blurred textarea completes without stealing the next editor focus or selection', passed: true});
 
     await mode('pending');
     await textarea.fill('取消这次翻译');
+    before = await requestCount();
     await triple();
-    await pause(400);
+    await waitForRequest(before + 1);
+    const escapeAborted = await abortCount();
     await page.keyboard.press('Escape');
     const cancelledValue = await textarea.inputValue();
+    await waitForAbort(escapeAborted + 1);
     await release();
     await pause(500);
+    assert.equal(await textarea.inputValue(), '取消这次翻译', 'Escape leaves no trigger symbols');
     assert.equal(await textarea.inputValue(), cancelledValue);
-    report.cases.push({name: 'Escape cancels late writeback', passed: true});
+    report.cases.push({name: 'Escape aborts the provider request and preserves text without trigger symbols', passed: true});
 
     await mode('failure');
     await textarea.fill('服务失败时保留我');
     await triple();
     await pause(1500);
-    assert.ok((await textarea.inputValue()).startsWith('服务失败时保留我'));
+    assert.equal(await textarea.inputValue(), '服务失败时保留我', 'failure leaves no trigger symbols');
+    const failureTooltip = await expectInputTooltipGeometry('failed-request-retry');
+    assert.ok(failureTooltip.buttons.some(button => button.text === '重试'));
+    await snap('06-provider-error-retry', page);
     await mode('success');
-    await triple();
+    await clickTooltipButton('重试');
     await expectValue('Let us meet tomorrow afternoon.');
-    report.cases.push({name: 'failure retains text and next trigger succeeds', passed: true});
+    assert.equal(await page.evaluate(() => document.activeElement?.id), 'message', 'Retry keeps the editor focused');
+    assert.ok(JSON.stringify((await requests()).at(-1).body).includes('服务失败时保留我'));
+    report.cases.push({name: 'failure retains clean text and an inline Retry succeeds without moving editor focus', passed: true});
 
     const editorText = selector => page.locator(selector).evaluate(element => element.textContent);
     async function expectEditor(selector, value) {
@@ -436,15 +648,15 @@ async function main() {
     await snap('06-rich-editor-translated', page);
     // macOS 撤销是 Meta+Z，其他平台是 Control+Z。
     await page.keyboard.press('ControlOrMeta+z');
-    await page.waitForFunction(() => document.querySelector('#rich').innerHTML === '<b>==这段格式需要保留。</b>');
+    await page.waitForFunction(() => document.querySelector('#rich').innerHTML === '<b>这段格式需要保留。</b>');
     report.cases.push({name: 'native rich editor translates via undoable native editing; undo restores bold formatting', passed: true});
 
     await page.locator('#model').focus(); await triple();
     await expectEditor('#model', 'Let us meet tomorrow afternoon.');
     const modelLog = await page.evaluate(() => window.modelEditorLog);
     const modelWrite = modelLog.at(-1);
-    assert.deepEqual({source: modelWrite.source, start: modelWrite.start, end: modelWrite.end}, {source: 'paste', start: 0, end: modelWrite.length},
-      `model-driven editor receives a whole-document paste after selection sync: ${JSON.stringify(modelLog)}`);
+    assert.deepEqual({source: modelWrite.source, start: modelWrite.start, end: modelWrite.end}, {source: 'beforeinput', start: 0, end: modelWrite.length},
+      `model-driven editor receives standard whole-document input after selection sync: ${JSON.stringify(modelLog)}`);
     assert.ok((await lastSourceText()).includes('模型编辑器原文。') && !(await lastSourceText()).includes('模型编辑器原文。='));
     // 上一个编辑器的提示有 300ms 淡出动画，取 DOM 中最后挂载的恢复按钮。
     await pause(400);
@@ -462,7 +674,7 @@ async function main() {
     await page.mouse.click((modelQuad[0] + modelQuad[4]) / 2, (modelQuad[1] + modelQuad[5]) / 2);
     await expectEditor('#model', '模型编辑器原文。');
     report.modelEditorLog = await page.evaluate(() => window.modelEditorLog);
-    report.cases.push({name: 'model-driven editor gets whole-content paste after selection sync, restore original', passed: true});
+    report.cases.push({name: 'model-driven editor gets standard whole-content input after selection sync, restore original', passed: true});
 
     await page.locator('#plain').focus(); await triple();
     await expectEditor('#plain', 'Let us meet tomorrow afternoon.');
@@ -490,6 +702,139 @@ async function main() {
     await expectValue('Let us meet tomorrow afternoon.');
     assert.equal(await page.evaluate(() => window.pageSawCtrlEnter === true), false, 'consumed Control+Enter does not reach page send shortcuts');
     report.cases.push({name: 'Space, dash and Control+Enter triggers', passed: true});
+    before = await requestCount();
+    const repeatedAborts = await abortCount();
+    await mode('pending');
+    await textarea.fill('重复快捷键只翻译一次');
+    await page.keyboard.press('Control+Enter');
+    await waitForRequest(before + 1);
+    for (let i = 0; i < 4; i++) await page.keyboard.press('Control+Enter');
+    await pause(400);
+    assert.equal(await requestCount(), before + 1, 'repeated pending shortcuts share exactly one provider request');
+    assert.equal(await abortCount(), repeatedAborts, 'repeated pending shortcuts retain the original active request');
+    assert.equal(await textarea.inputValue(), '重复快捷键只翻译一次');
+    assert.equal(await page.evaluate(() => window.pageSawCtrlEnter === true), false,
+      'repeated pending shortcuts do not reach the host send shortcut');
+    await release();
+    await expectValue('Let us meet tomorrow afternoon.');
+    assert.equal(await requestCount(), before + 1, 'completion also keeps the duplicate shortcuts at one provider request');
+    report.repeatedShortcut = {triggers: 5, requests: (await requestCount()) - before, passed: true};
+    report.cases.push({name: 'repeated Control+Enter while pending sends one request and never submits the host editor', passed: true});
+
+    await patch({animations: false});
+    await page.locator('#rich').evaluate(element => element.innerHTML = '<b>失焦取消时保留富文本原文。</b>');
+    const blurredRichOriginal = await page.locator('#rich').evaluate(element => element.innerHTML);
+    before = await requestCount();
+    const blurAborted = await abortCount();
+    await mode('pending');
+    await page.locator('#rich').focus();
+    await page.keyboard.press('Control+Enter');
+    await waitForRequest(before + 1);
+    await other.focus();
+    await other.evaluate(element => element.setSelectionRange(1, 3));
+    await waitForAbort(blurAborted + 1);
+    await release();
+    await pause(200);
+    assert.equal(await page.locator('#rich').evaluate(element => element.innerHTML), blurredRichOriginal);
+    const blurredRichFocus = await other.evaluate(element => ({active: document.activeElement?.id,
+      value: element.value, start: element.selectionStart, end: element.selectionEnd}));
+    assert.deepEqual(blurredRichFocus, {active: 'other', value: otherValue, start: 1, end: 3});
+    report.blurRich = {html: blurredRichOriginal, focus: blurredRichFocus, abortedRequests: (await abortCount()) - blurAborted};
+    report.cases.push({name: 'blurred rich editor aborts the request and preserves formatting, next editor focus and selection', passed: true});
+
+    await page.locator('#model').focus();
+    await page.keyboard.press('Control+Enter');
+    await expectEditor('#model', 'Let us meet tomorrow afternoon.');
+    await expectInputTooltipGeometry('model-before-restore-race', state => state.buttons.some(button => button.text === '恢复原文'));
+    await page.evaluate(() => {
+      const root = document.getElementById('model');
+      const range = document.createRange();
+      range.setStart(root.firstChild, 5); range.collapse(true);
+      getSelection().removeAllRanges(); getSelection().addRange(range);
+    });
+    await pause(40);
+    await page.evaluate(() => {window.holdModelSelection = true; window.modelSelectionHeld = false;});
+    await clickTooltipButton('恢复原文');
+    await page.waitForFunction(() => window.modelSelectionHeld === true, null, {timeout: 5000});
+    await page.keyboard.press('x');
+    const typedDuringRestore = 'Let us meet tomorrow afternoon.'.slice(0, 5) + 'x' + 'Let us meet tomorrow afternoon.'.slice(5);
+    await expectEditor('#model', typedDuringRestore);
+    const restoreRaceLog = await page.evaluate(() => window.modelEditorLog.at(-1));
+    assert.deepEqual({source: restoreRaceLog.source, start: restoreRaceLog.start, end: restoreRaceLog.end},
+      {source: 'beforeinput', start: 5, end: 5}, 'real typing during restore uses the user caret instead of the temporary whole-document selection');
+    report.restoreTypingRace = {text: typedDuringRestore, edit: restoreRaceLog, passed: true};
+    await snap('17-rich-restore-typing-preserved', page);
+    await page.evaluate(() => {window.holdModelSelection = false; window.resetModelEditor('模型编辑器原文。');});
+    report.cases.push({name: 'real typing while Restore waits for model selection sync preserves the whole draft and user caret', passed: true});
+
+    await page.setViewportSize({width: 390, height: 600});
+    await textarea.fill('窄屏与滚动时可取消的翻译');
+    await textarea.evaluate(element => window.scrollTo(0, scrollY + element.getBoundingClientRect().top - 16));
+    before = await requestCount();
+    const buttonAborted = await abortCount();
+    await mode('pending');
+    await page.keyboard.press('Control+Enter');
+    await waitForRequest(before + 1);
+    const narrowTooltip = await expectInputTooltipGeometry('pending-390-top-edge');
+    assert.equal(narrowTooltip.role, 'status');
+    assert.equal(narrowTooltip.live, 'polite');
+    assert.ok(narrowTooltip.buttons.some(button => button.text === '取消' && button.type === 'button'));
+    assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth), false);
+    await snap('14-loading-tooltip-390', page);
+    await page.evaluate(() => window.scrollBy(0, -80));
+    const scrolledTooltip = await expectInputTooltipGeometry('pending-390-after-scroll',
+      state => Math.abs(state.rect.y - narrowTooltip.rect.y) > 20);
+    assert.ok(Math.abs(scrolledTooltip.rect.y - narrowTooltip.rect.y) > 20, 'the pending tooltip follows the editor after scrolling');
+    await snap('15-loading-tooltip-scrolled', page);
+    await page.setViewportSize({width: 820, height: 600});
+    const resizedTooltip = await expectInputTooltipGeometry('pending-820-after-resize',
+      state => Math.abs(state.rect.x - scrolledTooltip.rect.x) > 20);
+    assert.ok(Math.abs(resizedTooltip.rect.x - scrolledTooltip.rect.x) > 20, 'the pending tooltip follows the editor after resizing');
+    await snap('16-loading-tooltip-resized', page);
+    await clickTooltipButton('取消');
+    await waitForAbort(buttonAborted + 1);
+    assert.equal(await page.evaluate(() => document.activeElement?.id), 'message', 'cancel button does not take focus from the editor');
+    assert.equal(await textarea.inputValue(), '窄屏与滚动时可取消的翻译');
+    await page.waitForFunction(() => !document.getElementById('fluent-input-translation-tooltip-host'));
+    await release();
+    await pause(200);
+    assert.equal(await textarea.inputValue(), '窄屏与滚动时可取消的翻译');
+    report.cancelButton = {abortedRequests: (await abortCount()) - buttonAborted, active: 'message', passed: true};
+    report.cases.push({name: 'accessible pending tooltip follows narrow viewport, scroll and resize; Cancel aborts without losing input focus', passed: true});
+
+    await page.setViewportSize({width: 390, height: 600});
+    await blockNativeCommit();
+    for (const id of ['blocked-paste', 'blocked-native']) {
+      const editor = page.locator(`#${id}`);
+      const originalHtml = await editor.evaluate(element => element.innerHTML);
+      before = await requestCount();
+      await editor.focus();
+      await page.keyboard.press('Control+Enter');
+      await waitForRequest(before + 1);
+      const preview = await expectInputTooltipGeometry(`manual-preview-${id}-390`,
+        state => state.previews.some(preview => preview.value === 'Let us meet tomorrow afternoon.'));
+      assert.equal(await editor.evaluate(element => element.innerHTML), originalHtml, 'rejected automatic writing preserves original rich formatting');
+      assert.deepEqual(preview.previews.map(({value, readonly, label}) => ({value, readonly, label})),
+        [{value: 'Let us meet tomorrow afternoon.', readonly: true, label: '译文'}]);
+      assert.ok(preview.buttons.some(button => button.text === '关闭'));
+      if (id === 'blocked-native') {
+        assert.equal(await editor.getAttribute('data-fluent-test-native-write-rejected'), 'true');
+        assert.equal(await editor.getAttribute('data-fluent-test-native-write-text'), 'Let us meet tomorrow afternoon.');
+      } else {
+        await pause(8200);
+        const retained = await readInputTooltip();
+        assert.equal(retained?.previews?.[0]?.value, 'Let us meet tomorrow afternoon.', 'manual-copy result remains beyond the normal eight-second tooltip expiry');
+      }
+      await snap(`18-manual-preview-${id}-390`, page);
+      await clickTooltipButton('关闭');
+      await page.waitForFunction(() => !document.getElementById('fluent-input-translation-tooltip-host'));
+      assert.equal(await editor.evaluate(element => element.innerHTML), originalHtml);
+      report.manualPreview ||= [];
+      report.manualPreview.push({editor: id, originalHtml, preview: preview.previews[0], passed: true});
+    }
+    report.blockedEditorLog = await page.evaluate(() => window.blockedEditorLog);
+    report.cases.push({name: 'rejected controlled paste and uncommitted native insert retain original formatting and persistent narrow manual-copy previews with Close', passed: true});
+    await page.setViewportSize({width: 1280, height: 900});
     await patch({inputBoxTranslationTrigger: 'triple_equal', inputBoxTranslationInterval: 1200});
     await textarea.fill('间隔设置立即生效'); await triple('=', 650);
     await expectValue('Let us meet tomorrow afternoon.');
@@ -510,12 +855,22 @@ async function main() {
     report.cases.push({name: 'bilingual textarea preserves whitespace and paragraphs, restores and translates again', passed: true});
 
     await mode('pending');
-    await textarea.fill('继续编辑时不要追加'); await triple(); await pause(400);
-    await textarea.fill('新的回复'); await release(); await pause(500);
+    before = await requestCount();
+    const bilingualEditAborted = await abortCount();
+    await textarea.fill('继续编辑时不要追加'); await triple();
+    await waitForRequest(before + 1);
+    await textarea.fill('新的回复');
+    await waitForAbort(bilingualEditAborted + 1);
+    await release(); await pause(500);
     assert.equal(await textarea.inputValue(), '新的回复');
     await mode('pending');
-    await textarea.fill('取消追加'); await triple(); await pause(400);
-    await page.keyboard.press('Escape'); await release(); await pause(500);
+    before = await requestCount();
+    const bilingualEscapeAborted = await abortCount();
+    await textarea.fill('取消追加'); await triple();
+    await waitForRequest(before + 1);
+    await page.keyboard.press('Escape');
+    await waitForAbort(bilingualEscapeAborted + 1);
+    await release(); await pause(500);
     assert.equal(await textarea.inputValue(), '取消追加');
     await mode('failure');
     await textarea.fill('失败保留原文'); await triple(); await pause(1000);
@@ -595,10 +950,17 @@ async function main() {
     report.cases.push({name: 'rich triple-space handles browser non-breaking trigger spaces without altering original formatting', passed: true});
     assert.deepEqual(report.consoleErrors, []);
     report.runtimeRequests = await requests();
+    report.providerAbortCount = await abortCount();
     report.persistenceCases = report.cases.filter(item => /config|interval/.test(item.name));
+    assert.deepEqual([...new Set(Object.values(report.tooltipContrast).map(sample => sample.type))].sort(),
+      ['error', 'success', 'translating'], 'contrast measured for all three rendered status backgrounds');
     report.completed = true;
   } catch (error) {
     primaryError = error;
+    if (captureInputFixture) {
+      try {await captureInputFixture();}
+      catch (diagnosticError) {report.runtimeDiagnosticError = diagnosticError.stack || String(diagnosticError);}
+    }
     throw error;
   } finally {
     const cleanupErrors = [];

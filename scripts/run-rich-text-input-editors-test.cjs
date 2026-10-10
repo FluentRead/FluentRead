@@ -1,5 +1,7 @@
 // 输入框翻译富文本专项：生产扩展、隔离 Edge、真实按键，在从 CDN 加载的 Quill、ProseMirror、Lexical、Slate、Draft.js 中验证
 // 三连触发、编辑器自身模型只含译文（无重复插入）和恢复原文。需要访问 esm.sh 与 cdn.jsdelivr.net；供应商响应为本地确定性夹具。
+// --slate-fast-cache 增加 Slate 五轮快速翻译/恢复：三轮即时响应、两轮缓存开启，并断言最后一轮零供应商请求。
+const {guardBrowserClose} = require('./testing/owned-browser-close.cjs');
 const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
@@ -9,12 +11,14 @@ const argument = (name, fallback) => {
   return i < 0 ? fallback : process.argv[i + 1];
 };
 const {chromium} = require(path.join(argument('playwright-root', path.join(os.homedir(), '.cache/codex-runtimes/codex-primary-runtime/dependencies/node/node_modules')), 'playwright'));
-const helper = require(argument('focus-safe-helper', path.join(os.homedir(), '.codex/skills/fluentread-extension-ui-test/scripts/focus-safe-browser.cjs')));
+const helper = require(argument('focus-safe-helper', path.join(__dirname, 'testing/focus-safe-browser.cjs')));
 const extensionDir = path.resolve(argument('extension-dir', '.output/chrome-mv3'));
 const artifactsDir = path.resolve(argument('artifacts-dir', '/private/tmp/fluentread-rich-text-editors'));
+// 可选压力场景：不在连续写入之间添加同步等待，同时验证真正的供应商零请求缓存命中。
+const slateFastCache = process.argv.includes('--slate-fast-cache');
 fs.mkdirSync(artifactsDir, {recursive: true});
 const profileDir = fs.mkdtempSync(path.join(os.tmpdir(), 'fluentread-real-editors-'));
-const report = {extensionDir, profileDir, evidence: 'Production extension; real editors from esm.sh/jsdelivr; deterministic mock provider', editors: [], consoleErrors: []};
+const report = {extensionDir, profileDir, evidence: 'Production extension; real editors from esm.sh/jsdelivr; deterministic mock provider', editors: [], consoleErrors: [], slateFastCache, slateRepetitions: []};
 const pause = ms => new Promise(resolve => setTimeout(resolve, ms));
 const TRANSLATION = 'Let us meet tomorrow afternoon.';
 
@@ -71,6 +75,7 @@ const slateValue = [{type: 'paragraph', children: [{text: 'Slate 富文本原文
 createRoot(document.querySelector('#slate')).render(React.createElement(Slate, {editor: slateEditor, initialValue: slateValue},
   React.createElement(Editable, {placeholder: 'Message #general'})));
 window.models.slate = () => slateEditor.children.map(node => SlateNode.string(node)).join('\\n');
+window.slateDebug = slateEditor;
 window.ready.slate = true;
 
 const Draft = await import('https://esm.sh/draft-js@0.11.7?deps=react@18.3.1,react-dom@18.3.1');
@@ -104,6 +109,7 @@ async function main() {
       browserPath: '/Applications/Microsoft Edge.app/Contents/MacOS/Microsoft Edge', background: true,
       headless: false, viewport: {width: 1280, height: 900}, displayTarget: 'secondary', timeout: 30000,
       browserArgs: [`--disable-extensions-except=${extensionDir}`, `--load-extension=${extensionDir}`, '--no-first-run', '--no-default-browser-check', '--disable-background-networking']});
+    guardBrowserClose(session, profileDir);
     Object.assign(report, {launchMode: session.launchMode, focusPolicy: session.focusPolicy, windowPlacement: session.windowPlacement});
     const context = session.context;
     const worker = context.serviceWorkers()[0] || await context.waitForEvent('serviceworker');
@@ -142,6 +148,24 @@ async function main() {
 
     await context.route('https://rich-editors.example/**', route => route.fulfill({status: 200, contentType: 'text/html', body: html}));
     const page = await helper.newPageWithoutForeground(context);
+    if (slateFastCache) {
+      await page.addInitScript(() => {
+        window.slateInputEvents = [];
+        for (const type of ['beforeinput', 'paste', 'selectionchange']) {
+          for (const capture of [true, false]) {
+            document.addEventListener(type, event => {
+              const editor = document.querySelector('#slate [data-slate-editor]');
+              if (!editor || (type === 'selectionchange' ? document.activeElement !== editor : !editor.contains(event.target))) return;
+              window.slateInputEvents.push({type, capture, time: performance.now(), inputType: event.inputType,
+                defaultPrevented: event.defaultPrevented, targetRanges: event.getTargetRanges?.().length,
+                dataTransferText: event.dataTransfer?.getData('text/plain'),
+                model: window.models?.slate(), modelSelection: structuredClone(window.slateDebug?.selection),
+                domSelection: String(document.getSelection()), dom: editor.innerText});
+            }, {capture});
+          }
+        }
+      });
+    }
     page.on('pageerror', error => report.consoleErrors.push(error.message));
     await page.goto('https://rich-editors.example/test');
     await page.waitForSelector('#fluent-read-page-styles', {state: 'attached'});
@@ -149,6 +173,18 @@ async function main() {
     await pause(800);
     await helper.activateExtensionTabWithoutForeground(context, page);
     const domSession = await context.newCDPSession(page);
+
+    async function clickRestore() {
+      const buttons = [];
+      const collect = node => {
+        if (node.nodeName === 'BUTTON' && (node.children || []).some(child => child.nodeValue === '恢复原文')) buttons.push(node);
+        for (const child of [...(node.children || []), ...(node.shadowRoots || [])]) collect(child);
+      };
+      collect((await domSession.send('DOM.getDocument', {depth: -1, pierce: true})).root);
+      assert.ok(buttons.length, 'restore action available');
+      const quad = (await domSession.send('DOM.getBoxModel', {backendNodeId: buttons.at(-1).backendNodeId})).model.content;
+      await page.mouse.click((quad[0] + quad[4]) / 2, (quad[1] + quad[5]) / 2);
+    }
 
     for (const editor of EDITORS) {
       const entry = {name: editor.name};
@@ -167,32 +203,93 @@ async function main() {
         const sent = JSON.stringify(requests.at(-1).body);
         entry.sourceSent = sent.includes(editor.original) && !sent.includes('==' + editor.original) && !sent.includes(editor.original + '==');
         assert.equal(entry.model.trim(), TRANSLATION, 'editor model holds exactly the translation (no duplication)');
+        assert.equal(entry.dom.trim(), TRANSLATION, 'rendered editor holds exactly the translation');
         assert.equal(entry.requestCount, 1);
         assert.ok(entry.sourceSent, `source sent without trigger symbols: ${sent}`);
-        await page.screenshot({path: path.join(artifactsDir, `${editor.name}-translated.png`)});
+        await page.screenshot({caret: 'initial', path: path.join(artifactsDir, `${editor.name}-translated.png`)});
 
         await pause(400);
-        const buttons = [];
-        const collect = node => {
-          if (node.nodeName === 'BUTTON' && (node.children || []).some(child => child.nodeValue === '恢复原文')) buttons.push(node);
-          for (const child of [...(node.children || []), ...(node.shadowRoots || [])]) collect(child);
-        };
-        collect((await domSession.send('DOM.getDocument', {depth: -1, pierce: true})).root);
-        const quad = (await domSession.send('DOM.getBoxModel', {nodeId: buttons.at(-1).nodeId})).model.content;
-        await page.mouse.click((quad[0] + quad[4]) / 2, (quad[1] + quad[5]) / 2);
+        await clickRestore();
         await page.waitForFunction(({name, text}) => window.models[name]().trim() === text, {name: editor.name, text: editor.original}, {timeout: 15000});
         entry.restoredModel = await page.evaluate(name => window.models[name](), editor.name);
+        entry.restoredDom = await page.locator(editor.selector).evaluate(el => el.innerText);
+        assert.equal(entry.restoredModel.trim(), editor.original, 'original editor model restored');
+        assert.equal(entry.restoredDom.trim(), editor.original, 'original rendered editor restored');
         entry.passed = true;
       } catch (error) {
         entry.passed = false;
         entry.error = String(error.message || error).slice(0, 600);
         entry.model ??= await page.evaluate(name => window.models[name](), editor.name).catch(() => null);
-        await page.screenshot({path: path.join(artifactsDir, `${editor.name}-failed.png`)}).catch(() => undefined);
+        await page.screenshot({caret: 'initial', path: path.join(artifactsDir, `${editor.name}-failed.png`)}).catch(() => undefined);
       }
     }
+    if (slateFastCache && report.editors.find(entry => entry.name === 'slate')?.passed) {
+      const editor = EDITORS.find(entry => entry.name === 'slate');
+      // 前三轮为即时供应商返回，后两轮启用真实 broker cache；最后一轮必须没有 fetch。
+      for (let cycle = 0; cycle < 5; cycle++) {
+        const entry = {cycle: cycle + 1, cacheEnabled: cycle >= 3};
+        report.slateRepetitions.push(entry);
+        try {
+          if (cycle === 3) {
+            report.slateCacheConfig = await options.evaluate(async () => {
+              const r = await chrome.runtime.sendMessage({type: 'configStorageRead', key: 'local:config'});
+              const current = typeof r.value === 'string' ? JSON.parse(r.value) : r.value;
+              return chrome.runtime.sendMessage({type: 'persistConfig', mode: 'patch', config: {useCache: true},
+                expected: {useCache: current.useCache}, clientId: 'real-editors', sequence: 2,
+                baseRevision: current.__fluentConfigRevision});
+            });
+            assert.equal(report.slateCacheConfig.success, true, JSON.stringify(report.slateCacheConfig));
+          }
+          const requestsBefore = await worker.evaluate(() => globalThis.inputTest.requests.length);
+          entry.sourceBefore = await page.evaluate(() => ({model: window.models.slate(),
+            selection: structuredClone(window.slateDebug.selection), domSelection: String(document.getSelection())}));
+          assert.equal(entry.sourceBefore.model, editor.original, 'entire original Slate model before each repetition');
+          await page.locator(editor.selector).click();
+          for (let i = 0; i < 3; i++) await page.keyboard.press('=');
+          await page.waitForFunction(text => window.models.slate() === text, TRANSLATION, {timeout: 15000});
+          entry.model = await page.evaluate(() => window.models.slate());
+          entry.dom = await page.locator(editor.selector).evaluate(el => el.innerText);
+          const requests = await worker.evaluate(() => globalThis.inputTest.requests);
+          entry.requestCount = requests.length - requestsBefore;
+          assert.equal(entry.model, TRANSLATION, 'exact whole Slate model replaces the original');
+          assert.equal(entry.dom, TRANSLATION, 'Slate model and DOM agree');
+          assert.equal(entry.requestCount, cycle === 4 ? 0 : 1,
+            cycle === 4 ? 'second cached repetition performs zero provider fetches' : 'one immediate provider fetch');
+          entry.cacheHit = cycle === 4 && entry.requestCount === 0;
+          if (entry.requestCount) {
+            const sent = JSON.stringify(requests.at(-1).body);
+            entry.sourceSent = sent.includes(editor.original) && !sent.includes(editor.original + '==');
+            assert.ok(entry.sourceSent, `source sent without trigger symbols: ${sent}`);
+          }
+          await clickRestore();
+          await page.waitForFunction(text => window.models.slate() === text, editor.original, {timeout: 15000});
+          entry.restoredModel = await page.evaluate(() => window.models.slate());
+          entry.restoredDom = await page.locator(editor.selector).evaluate(el => el.innerText);
+          assert.equal(entry.restoredModel, editor.original, 'exact original Slate model restored');
+          assert.equal(entry.restoredDom, editor.original, 'restored Slate model and DOM agree');
+          entry.passed = true;
+        } catch (error) {
+          entry.passed = false;
+          entry.error = String(error.message || error).slice(0, 800);
+          entry.model ??= await page.evaluate(() => window.models.slate()).catch(() => null);
+          entry.dom ??= await page.locator(editor.selector).evaluate(el => el.innerText).catch(() => null);
+          await page.screenshot({caret: 'initial', path: path.join(artifactsDir, `slate-repeat-${cycle + 1}-failed.png`)}).catch(() => undefined);
+          break;
+        }
+      }
+    }
+    if (slateFastCache) {
+      report.slateInputEvents = await page.evaluate(() => window.slateInputEvents);
+      report.slateSummary = {rounds: report.slateRepetitions.length,
+        passed: report.slateRepetitions.filter(entry => entry.passed).length,
+        providerRequests: report.slateRepetitions.reduce((sum, entry) => sum + (entry.requestCount || 0), 0),
+        cacheHits: report.slateRepetitions.filter(entry => entry.cacheHit).length};
+      await page.screenshot({caret: 'initial', path: path.join(artifactsDir, 'slate-repetition-final.png')});
+    }
     assert.deepEqual(report.consoleErrors, []);
-    report.completed = report.editors.every(entry => entry.passed);
-    assert.ok(report.completed, `all editors pass: ${JSON.stringify(report.editors)}`);
+    report.completed = report.editors.every(entry => entry.passed)
+      && (!slateFastCache || (report.slateRepetitions.length === 5 && report.slateRepetitions.every(entry => entry.passed)));
+    assert.ok(report.completed, `all editor scenarios pass: ${JSON.stringify({editors: report.editors, slateRepetitions: report.slateRepetitions})}`);
   } finally {
     try {
       fs.writeFileSync(path.join(artifactsDir, 'report.json'), JSON.stringify(report, null, 2));

@@ -1,3 +1,4 @@
+import {parseHTML} from 'linkedom';
 import { describe, expect, it } from 'vitest';
 import {
     canCommitInputBoxTranslation,
@@ -58,6 +59,7 @@ describe('输入框快捷键', () => {
         expect(isInputElement({ ...fakeElement('INPUT'), disabled: true } as unknown as HTMLElement)).toBe(false);
         expect(isInputElement(fakeElement('DIV', { contenteditable: 'plaintext-only' }))).toBe(true);
         expect(isInputElement(fakeElement('INPUT'))).toBe(true);
+        expect(isInputElement(fakeElement('TEXTAREA'))).toBe(true);
         expect(isInputElement({ ...fakeElement('INPUT'), type: 'password' } as unknown as HTMLElement)).toBe(false);
         expect(isInputElement({ ...fakeElement('INPUT'), type: 'PASSWORD' } as unknown as HTMLElement)).toBe(false);
         for (const value of ['true', 'TRUE', '']) {
@@ -127,6 +129,9 @@ describe('输入框快捷键', () => {
     it('选区读取只服务原生输入控件，编辑宿主交给光标文本度量', () => {
         expect(getInputBoxSelection(fakeElement('DIV', {contenteditable: 'plaintext-only'}))).toBeNull();
         expect(getInputBoxSelection(fakeElement('DIV', {contenteditable: 'true'}))).toBeNull();
+        expect(getInputBoxSelection({...fakeElement('TEXTAREA'), value: 'abc', selectionStart: 1, selectionEnd: 2} as HTMLTextAreaElement)).toEqual({start: 1, end: 2});
+        expect(getInputBoxSelection({...fakeElement('TEXTAREA'), value: 'abc', selectionStart: 1} as HTMLTextAreaElement)).toEqual({start: 1, end: 1});
+        expect(getInputBoxSelection({...fakeElement('INPUT'), selectionStart: 0, selectionEnd: null} as HTMLInputElement)).toBeNull();
     });
 
     it('覆盖无效触发区间与输入框选区缺省分支', () => {
@@ -143,6 +148,7 @@ describe('输入框快捷键', () => {
     it('用原始值快照检测翻译期间的用户编辑', () => {
         const input = { ...fakeElement('INPUT'), value: 'Hello  ' } as unknown as HTMLElement;
         expect(getInputBoxValueSnapshot(input)).toBe('Hello  ');
+        expect(getInputBoxText(input)).toBe('Hello  ');
 
         const contentEditable = {
             ...fakeElement('DIV', { contenteditable: 'true' }),
@@ -151,6 +157,28 @@ describe('输入框快捷键', () => {
         expect(getInputBoxValueSnapshot(contentEditable)).toBe(' Hello\n');
         expect(getInputBoxValueSnapshot({ ...fakeElement('DIV'), textContent: 'raw text' } as unknown as HTMLElement)).toBe('raw text');
         expect(getInputBoxValueSnapshot(fakeElement('DIV'))).toBe('');
+    });
+
+    it('富文本快照不读取 innerText，同时识别纯格式与换行变化', () => {
+        let serializationReads = 0;
+        const adapter = {
+            ...fakeElement('DIV', {contenteditable: 'true'}),
+            get innerHTML() { serializationReads += 1; return '<b>Hello</b>'; },
+        } as unknown as HTMLElement;
+        expect(getInputBoxValueSnapshot(adapter)).toBe('<b>Hello</b>');
+        expect(serializationReads).toBe(1);
+        const {document} = parseHTML('<html><body><div contenteditable="true"><b>Hello</b><p>world</p></div></body></html>');
+        const element = document.querySelector<HTMLElement>('[contenteditable]')!;
+        Object.defineProperty(element, 'innerText', {get() { throw new Error('快照不应触发布局读取'); }});
+        const initial = getInputBoxValueSnapshot(element);
+        expect(initial).toBe('<b>Hello</b><p>world</p>');
+        element.innerHTML = '<i>Hello</i><p>world</p>';
+        const reformatted = getInputBoxValueSnapshot(element);
+        expect(reformatted).not.toBe(initial);
+        element.innerHTML = '<i>Hello</i><span>world</span>';
+        expect(getInputBoxValueSnapshot(element)).not.toBe(reformatted);
+        element.innerHTML = '';
+        expect(getInputBoxValueSnapshot(element)).toBe('');
     });
 
     it('禁用后即使恢复启用，旧 feature signal 的结果仍不可落地', () => {

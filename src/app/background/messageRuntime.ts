@@ -102,6 +102,7 @@ export function installBackgroundMessageRuntime(options: BackgroundMessageRuntim
             ready: configReady,
             getConfig: () => config,
             translate: translateWithCache,
+            requestRegistry: translationRequestRegistry,
         }),
         createOpenOptionsPageHandler({
             openDefaultPage: () => browser.runtime.openOptionsPage(),

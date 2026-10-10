@@ -219,6 +219,9 @@ describe('全文翻译进度', () => {
       remaining: 11,
       queued: 4,
       offscreen: 7,
+      completed: 0,
+      failed: 0,
+      retryable: 0,
     });
     expect(getFullPageTranslationProgress()).toEqual(listener.mock.lastCall?.[0]);
     unsubscribe();
@@ -240,6 +243,9 @@ describe('全文翻译进度', () => {
       remaining: 0,
       queued: 0,
       offscreen: 0,
+      completed: 0,
+      failed: 0,
+      retryable: 0,
     });
   });
 
@@ -260,6 +266,9 @@ describe('全文翻译进度', () => {
       remaining: 0,
       queued: 0,
       offscreen: 0,
+      completed: 0,
+      failed: 0,
+      retryable: 0,
     });
     unsubscribe();
   });
@@ -336,6 +345,9 @@ describe('全文翻译进度', () => {
       remaining: 0,
       queued: 0,
       offscreen: 0,
+      completed: 0,
+      failed: 0,
+      retryable: 0,
     });
   });
 
@@ -489,7 +501,7 @@ describe('进度通知重入与订阅所有权', () => {
       updateFullPageTranslationProgress(snapshot.sessionId, {running: 4, queued: 5, offscreen: 6});
     });
     expect(calls).toBe(1);
-    expect(observer.mock.calls).toEqual([[{sessionId, active: true, modalPhase: 'none', deferred: 0, running: 4, queued: 5, offscreen: 6, remaining: 11}]]);
+    expect(observer.mock.calls).toEqual([[{sessionId, active: true, modalPhase: 'none', deferred: 0, running: 4, queued: 5, offscreen: 6, remaining: 11, completed: 0, failed: 0, retryable: 0}]]);
   });
 
   it('写入后重新订阅自己和抛出异常不会反馈循环，后续外部发布仍可使用', () => {
@@ -640,4 +652,26 @@ describe('进度面板组件实时订阅与显隐', () => {
       expect(state.isVisible).toBe(true);
     } finally {unsubscribe();}
   });
+  it('失败摘要在空队列中保留，恢复动作按当前会话交付，弹窗等待时不发出动作', () => {
+    const sessionId = startFullPageTranslationProgress();
+    const action = vi.fn(() => 1);
+    progressApi.setFullPageFailureActions(sessionId, action);
+    updateFullPageTranslationProgress(sessionId, {running: 0, queued: 0, offscreen: 0, completed: 12, failed: 2});
+    vi.advanceTimersByTime(180);
+    expect(state.isVisible).toBe(true);
+    expect(state.hasFailures).toBe(true);
+    expect(state.panelTitle).toBe('fullPage.progress.failuresTitle');
+    vi.advanceTimersByTime(2000);
+    expect(state.isVisible).toBe(true);
+    state.runFailureAction('retry'); state.runFailureAction('locate');
+    expect(action.mock.calls).toEqual([['retry'], ['locate']]);
+    updateFullPageTranslationProgress(sessionId, {running: 0, queued: 0, offscreen: 0, modalPhase: 'waiting', retryable: 0});
+    state.runFailureAction('retry');
+    expect(action).toHaveBeenCalledTimes(2);
+    finishFullPageTranslationProgress(sessionId);
+    state.runFailureAction('retry');
+    expect(action).toHaveBeenCalledTimes(2);
+    expect(state.isVisible).toBe(false);
+  });
+
 });

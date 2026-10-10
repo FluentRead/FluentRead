@@ -32,6 +32,8 @@ export interface VideoSubtitleAppearance {
     fontScale: number;
 }
 
+export const VIDEO_SUBTITLE_FONT_SCALE_RANGE = {min: 80, max: 500, step: 1} as const;
+
 export const DEFAULT_VIDEO_SUBTITLE_APPEARANCE: VideoSubtitleAppearance = {
     skin: 'classic',
     textColor: '#ffffff',
@@ -83,7 +85,7 @@ export function normalizeVideoSubtitleAppearance(value: unknown): VideoSubtitleA
         backgroundOpacity: normalizeNumber(source.backgroundOpacity, skinPreset.backgroundOpacity, 0, 95, 1),
         lineSpacing: normalizeNumber(source.lineSpacing, DEFAULT_VIDEO_SUBTITLE_APPEARANCE.lineSpacing, 1, 2, 0.01),
         maxWidth: normalizeNumber(source.maxWidth, DEFAULT_VIDEO_SUBTITLE_APPEARANCE.maxWidth, 40, 100, 1),
-        fontScale: normalizeNumber(source.fontScale, DEFAULT_VIDEO_SUBTITLE_APPEARANCE.fontScale, 80, 160, 10),
+        fontScale: normalizeNumber(source.fontScale, DEFAULT_VIDEO_SUBTITLE_APPEARANCE.fontScale, VIDEO_SUBTITLE_FONT_SCALE_RANGE.min, VIDEO_SUBTITLE_FONT_SCALE_RANGE.max, VIDEO_SUBTITLE_FONT_SCALE_RANGE.step),
     };
 }
 

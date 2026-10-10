@@ -1,4 +1,4 @@
-import {describe, expect, it} from 'vitest';
+import {describe, expect, it, vi} from 'vitest';
 import {parseHTML} from 'linkedom';
 import {
     compareFullPageCandidatePriority,
@@ -9,6 +9,7 @@ import {
     createFullPageQueueState,
     noteFullPageScroll,
     queueFullPageCandidate,
+    queueFullPageFailedCandidate,
     createFullPageDispatchPlan,
     removeFullPagePending,
     type FullPageQueueState,
@@ -143,6 +144,36 @@ function withGlobalWindow<T>(value: unknown, callback: () => T): T {
 }
 
 describe('全文翻译候选队列', () => {
+    it('显式失败重试只登记一次，保留强制刷新意图和 owner 索引，关闭会话不再入队', () => {
+        const {document} = parseHTML('<html><body><p>Retry source</p></body></html>');
+        const element = document.querySelector('p')!;
+        const first = candidate(element);
+        const queue = {...state(), active: true, scheduled: new Map<Node, TranslationCandidate>(), candidateOwnerKeys: new Map<HTMLElement, Set<Node>>()};
+        const queued = vi.fn();
+        const retryIsCurrent = () => true;
+        expect(queueFullPageFailedCandidate(queue, first, 'Retry source', queued, retryIsCurrent)).toBe(true);
+        expect(queueFullPageFailedCandidate(queue, first, 'Retry source', queued, retryIsCurrent)).toBe(false);
+        expect(queued).toHaveBeenCalledOnce();
+        expect(queue.pending.get(element)).toBe(first); expect(queue.scheduled.get(element)).toBe(first);
+        expect(queue.candidateOwnerKeys.get(element)?.has(element)).toBe(true);
+        expect(queue.pendingMetadata.get(element)?.forceFailedRequest).toBe(true);
+        expect(queue.pendingMetadata.get(element)?.retryIsCurrent).toBe(retryIsCurrent);
+        queueFullPageCandidate(queue, element, first, 'Retry source');
+        expect(queue.pendingMetadata.get(element)?.forceFailedRequest).toBe(true);
+        removeFullPagePending(queue, element, first);
+        queue.inFlightCandidates.set(element, first);
+        expect(queueFullPageFailedCandidate(queue, first, 'Retry source', queued, retryIsCurrent)).toBe(false);
+        queue.inFlightCandidates.clear();
+        expect(queueFullPageFailedCandidate(queue, first, 'Retry source', queued, retryIsCurrent)).toBe(true);
+        expect(queue.candidateOwnerKeys.get(element)?.size).toBe(1);
+        queueFullPageCandidate(queue, element, first, 'New source');
+        expect(queue.pendingMetadata.get(element)?.forceFailedRequest).toBeUndefined();
+        expect(queue.pendingMetadata.get(element)?.retryIsCurrent).toBeUndefined();
+        removeFullPagePending(queue, element);
+        queue.active = false;
+        expect(queueFullPageFailedCandidate(queue, first, 'New source', queued, retryIsCurrent)).toBe(false);
+        expect(queued).toHaveBeenCalledTimes(2);
+    });
     it('创建、更新、移除和清理 pending 元数据时保留来源代次边界', () => {
         const {document} = parseHTML('<html><body></body></html>');
         const element = document.createElement('p');
@@ -194,6 +225,11 @@ describe('全文翻译候选队列', () => {
             expect(queue.scrollDirection).toBe('backward');
             noteFullPageScroll(queue, () => false, () => { throw new Error('inactive scroll callback'); });
         });
+        withGlobalWindow({scrollY: NaN}, () => {
+            expect(createFullPageQueueState().lastScrollPosition).toBeUndefined();
+            noteFullPageScroll(queue, () => true, onScroll);
+            expect(queue.lastScrollPosition).toBe(20);
+        });
     });
 
     it('跳过不合格或已在途候选，并能处理缺失、无效和异常布局 rect', () => {
@@ -230,7 +266,7 @@ describe('全文翻译候选队列', () => {
         queue.pending.set(disconnected, disconnectedCandidate);
         expect(createFullPageDispatchPlan(queue, {
             now: 1_000,
-            viewportHeight: 600,
+            viewportHeight: NaN,
             isEligible: () => true,
             resolveSource: () => 'disconnected-source',
         }).next()).toMatchObject({candidate: disconnectedCandidate});

@@ -69,6 +69,7 @@
     "@huggingface/transformers": "3.8.1",
     "@huggingface/transformers-kokoro": "npm:@huggingface/transformers@4.2.0",
     "@noble/hashes": "1.8.0",
+    "@pdf-lib/fontkit": "1.1.1",
     "@uzen/kokoro-js": "1.2.4",
     "@wllama/wllama": "3.6.1",
     "@wxt-dev/storage": "^1.0.1",

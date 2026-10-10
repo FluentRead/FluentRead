@@ -1,0 +1,114 @@
+{
+  "success": false,
+  "scope": "production extension; offline YouTube/media + loopback Microsoft fixture; no live provider, Firefox or low-end hardware",
+  "extensionDir": "/private/tmp/fluentread-subtitle-production-20261010-2231",
+  "profileDir": "/var/folders/2v/qd62bpkx51scgbvv2nrclsxm0000gn/T/fluentread-subtitle-reliability-LuV6Ky",
+  "requests": [
+    "Readable subtitle.",
+    "This long bilingual subtitle must remain entirely inside the video viewport while the requested font scale stays at five hundred percent. This long bilingual subtitle must remain entirely inside the video viewport while the requested font scale stays at five hundred percent. This long bilingual subtitle must remain entirely inside the video viewport while the requested font scale stays at five hundred percent. This long bilingual subtitle must remain entirely inside the video viewport while the requested font scale stays at five hundred percent."
+  ],
+  "blocked": [],
+  "errors": [],
+  "cases": {
+    "numericPersistence": {
+      "custom": 437,
+      "reloaded": true,
+      "final": 500
+    },
+    "short500": {
+      "font": 105.6,
+      "panel": {
+        "x": 43.203125,
+        "y": 85.5078125,
+        "width": 921.59375,
+        "height": 424.4921875,
+        "top": 85.5078125,
+        "right": 964.796875,
+        "bottom": 510,
+        "left": 43.203125
+      },
+      "player": {
+        "x": 24,
+        "y": 24,
+        "width": 960,
+        "height": 540,
+        "top": 24,
+        "right": 984,
+        "bottom": 564,
+        "left": 24
+      },
+      "scrollHeight": 422,
+      "clientHeight": 422,
+      "inside": true
+    },
+    "long500": {
+      "font": 8,
+      "panel": {
+        "x": 43.203125,
+        "y": 439.828125,
+        "width": 921.59375,
+        "height": 70.171875,
+        "top": 439.828125,
+        "right": 964.796875,
+        "bottom": 510,
+        "left": 43.203125
+      },
+      "player": {
+        "x": 24,
+        "y": 24,
+        "width": 960,
+        "height": 540,
+        "top": 24,
+        "right": 984,
+        "bottom": 564,
+        "left": 24
+      },
+      "scrollHeight": 68,
+      "clientHeight": 68,
+      "inside": true
+    },
+    "cancel": {
+      "previewText": "导出字幕共 4 条 · 可直接导出 1 条 · 待补译 3 条最多新增 2 个文本请求；已复用 0 条人工字幕、1 条缓存译文。待补译时间跨度：00:02:00–00:02:05补译会使用当前翻译服务，可能产生用量。仅导出已有结果会保留原时间轴，并跳过未翻译条目。补译并导出完整字幕仅导出已有 1 条取消",
+      "extraRequests": 0
+    }
+  },
+  "screenshots": [
+    "/Users/thinkstu/Desktop/copy/FluentRead-reading-reliability-experience-20261010/docs/reports/reading-reliability-experience-20261010/subtitle-browser-evidence/numeric-500.png",
+    "/Users/thinkstu/Desktop/copy/FluentRead-reading-reliability-experience-20261010/docs/reports/reading-reliability-experience-20261010/subtitle-browser-evidence/short-500.png",
+    "/Users/thinkstu/Desktop/copy/FluentRead-reading-reliability-experience-20261010/docs/reports/reading-reliability-experience-20261010/subtitle-browser-evidence/long-500.png",
+    "/Users/thinkstu/Desktop/copy/FluentRead-reading-reliability-experience-20261010/docs/reports/reading-reliability-experience-20261010/subtitle-browser-evidence/export-preview.png",
+    "/Users/thinkstu/Desktop/copy/FluentRead-reading-reliability-experience-20261010/docs/reports/reading-reliability-experience-20261010/subtitle-browser-evidence/failure.png"
+  ],
+  "launchMode": "macos-background-cdp",
+  "focusPolicy": "launchservices-no-foreground",
+  "windowPlacement": {
+    "mode": "background-visible-no-focus",
+    "visible": true,
+    "hidden": false,
+    "centered": true,
+    "windowState": "normal",
+    "bounds": {
+      "left": 212,
+      "top": -990,
+      "width": 1280,
+      "height": 900
+    },
+    "displayTarget": "secondary",
+    "source": "macos-nsscreen",
+    "screenIndex": 1,
+    "browserFrontmost": false,
+    "frontmostBefore": {
+      "pid": 63844,
+      "name": "访达"
+    },
+    "frontmostAfter": {
+      "pid": 63844,
+      "name": "访达"
+    }
+  },
+  "error": "page.waitForFunction: Timeout 5000ms exceeded.\n    at preview (/Users/thinkstu/Desktop/copy/FluentRead-reading-reliability-experience-20261010/docs/reports/reading-reliability-experience-20261010/subtitle-browser-check.cjs:142:16)\n    at async main (/Users/thinkstu/Desktop/copy/FluentRead-reading-reliability-experience-20261010/docs/reports/reading-reliability-experience-20261010/subtitle-browser-check.cjs:152:3)",
+  "failureDom": {
+    "menu": "<div id=\"fluent-read-video-subtitle-menu\" class=\"fluent-read-video-subtitle-menu fluent-read-video-ui notranslate\" data-layout=\"stack\" data-view=\"main\" data-compact=\"false\" data-panel=\"watch\" role=\"menu\" aria-label=\"流畅阅读视频字幕翻译菜单\" data-fluent-read-ui=\"video-subtitle\" translate=\"no\" data-fluent-read-click-bound=\"true\"><div class=\"fluent-read-video-menu-main\"><div class=\"fluent-read-video-menu-title\"><span class=\"fluent-read-video-menu-brand\">流畅阅读</span><button type=\"button\" class=\"fluent-read-video-menu-item fluent-read-video-menu-settings\" data-action=\"open-settings\" role=\"menuitem\" data-i18n-aria-key=\"video.openSettings\" aria-label=\"打开视频翻译设置\" title=\"打开视频翻译设置\"><span class=\"fluent-read-video-menu-service\" data-service-label=\"true\">微软翻译</span><svg viewBox=\"0 0 24 24\" aria-hidden=\"true\" focusable=\"false\" class=\"fluent-read-video-menu-icon fluent-read-video-menu-icon-settings\"><path d=\"M4 7h9\"></path><path d=\"M17 7h3\"></path><path d=\"M4 17h3\"></path><path d=\"M11 17h9\"></path><path d=\"M15 5v4\"></path><path d=\"M9 15v4\"></path></svg></button><button type=\"button\" class=\"fluent-read-video-menu-close\" data-action=\"close-menu\" role=\"menuitem\" data-i18n-aria-key=\"video.closeMenu\" aria-label=\"关闭字幕菜单\" title=\"关闭字幕菜单\"><svg viewBox=\"0 0 24 24\" aria-hidden=\"true\" focusable=\"false\" class=\"fluent-read-video-menu-icon fluent-read-video-menu-icon-close\"><path d=\"M7 7l10 10\"></path><path d=\"M17 7 7 17\"></path></svg></button></div><div class=\"fluent-read-video-menu-section fluent-read-video-menu-display\"><div class=\"fluent-read-video-menu-mode-group\" role=\"group\" aria-label=\"字幕显示模式\" title=\"\"><button class=\"fluent-read-video-menu-mode\" data-i18n-key=\"video.modeBilingual\" type=\"button\" data-mode=\"bilingual\" role=\"menuitemradio\" aria-checked=\"true\">双语</button><button class=\"fluent-read-video-menu-mode\" data-i18n-key=\"video.modeTranslation\" type=\"button\" data-mode=\"translation-only\" role=\"menuitemradio\" aria-checked=\"false\">译文</button><button class=\"fluent-read-video-menu-mode\" data-i18n-key=\"video.modeOriginal\" type=\"button\" data-mode=\"original-only\" role=\"menuitemradio\" aria-checked=\"false\">原文</button><button class=\"fluent-read-video-menu-mode\" data-i18n-key=\"video.modeOff\" type=\"button\" data-mode=\"off\" role=\"menuitemradio\" aria-checked=\"false\" data-i18n-title-key=\"video.modeOffHint\" title=\"关闭流畅阅读字幕，保留网站原有字幕\">关闭</button></div><div class=\"fluent-read-video-menu-row fluent-read-video-menu-timing\" data-timing-row=\"true\" title=\"\"><span class=\"fluent-read-video-menu-row-label\" data-i18n-key=\"video.timingShort\">字幕时间</span><div class=\"fluent-read-video-menu-timing-controls\"><button type=\"button\" class=\"fluent-read-video-menu-step fluent-read-video-menu-step-reset\" data-action=\"reset-subtitle-timing\" role=\"menuitem\" disabled=\"\" aria-label=\"重置字幕时间\" title=\"重置字幕时间\"><svg viewBox=\"0 0 24 24\" aria-hidden=\"true\" focusable=\"false\" class=\"fluent-read-video-menu-icon fluent-read-video-menu-icon-reset\"><path d=\"M4 12a8 8 0 1 0 2.4-5.7\"></path><path d=\"M4 4.5V9h4.5\"></path></svg></button><button type=\"button\" class=\"fluent-read-video-menu-step\" data-action=\"subtitle-earlier\" role=\"menuitem\" aria-label=\"提前 0.5 秒\" title=\"提前 0.5 秒\"><svg viewBox=\"0 0 24 24\" aria-hidden=\"true\" focusable=\"false\" class=\"fluent-read-video-menu-icon fluent-read-video-menu-icon-minus\"><path d=\"M6 12h12\"></path></svg></button><output class=\"fluent-read-video-menu-timing-value\" data-subtitle-offset=\"true\" aria-live=\"polite\" aria-label=\"字幕时间偏移\">0.0 s</output><button type=\"button\" class=\"fluent-read-video-menu-step\" data-action=\"subtitle-later\" role=\"menuitem\" aria-label=\"延后 0.5 秒\" title=\"延后 0.5 秒\"><svg viewBox=\"0 0 24 24\" aria-hidden=\"true\" focusable=\"false\" class=\"fluent-read-video-menu-icon fluent-read-video-menu-icon-plus\"><path d=\"M12 6v12\"></path><path d=\"M6 12h12\"></path></svg></button></div></div></div><div class=\"fluent-read-video-menu-section fluent-read-video-menu-actions\"><div class=\"fluent-read-video-menu-downloads\"><button type=\"button\" class=\"fluent-read-video-menu-item fluent-read-video-menu-download\" data-action=\"download-subtitles\" role=\"menuitem\" data-i18n-aria-key=\"video.downloadOriginal\" aria-label=\"下载原文字幕\" title=\"下载原文字幕\"><svg viewBox=\"0 0 24 24\" aria-hidden=\"true\" focusable=\"false\" class=\"fluent-read-video-menu-icon fluent-read-video-menu-icon-download\"><path d=\"M12 4v10.5\"></path><path d=\"M7.5 10.5 12 15l4.5-4.5\"></path><path d=\"M5 19.5h14\"></path></svg><span class=\"fluent-read-video-menu-label\" data-i18n-key=\"video.downloadOriginalShort\">原文</span></button><button type=\"button\" class=\"fluent-read-video-menu-item fluent-read-video-menu-download\" data-action=\"download-translated-subtitles\" role=\"menuitem\" data-i18n-aria-key=\"video.downloadTranslated\" aria-label=\"下载译文字幕\" title=\"下载译文字幕\" disabled=\"\"><svg viewBox=\"0 0 24 24\" aria-hidden=\"true\" focusable=\"false\" class=\"fluent-read-video-menu-icon fluent-read-video-menu-icon-download\"><path d=\"M12 4v10.5\"></path><path d=\"M7.5 10.5 12 15l4.5-4.5\"></path><path d=\"M5 19.5h14\"></path></svg><span class=\"fluent-read-video-menu-label\" data-i18n-key=\"video.downloadTranslatedShort\">译文</span></button><button type=\"button\" class=\"fluent-read-video-menu-item fluent-read-video-menu-download\" data-action=\"download-bilingual-subtitles\" role=\"menuitem\" data-i18n-aria-key=\"video.downloadBilingual\" aria-label=\"下载双语字幕\" title=\"下载双语字幕\"><svg viewBox=\"0 0 24 24\" aria-hidden=\"true\" focusable=\"false\" class=\"fluent-read-video-menu-icon fluent-read-video-menu-icon-download\"><path d=\"M12 4v10.5\"></path><path d=\"M7.5 10.5 12 15l4.5-4.5\"></path><path d=\"M5 19.5h14\"></path></svg><span class=\"fluent-read-video-menu-label\" data-i18n-key=\"video.downloadBilingualShort\">双语</span></button></div><p class=\"fluent-read-video-menu-download-status\" data-download-status=\"true\" aria-live=\"polite\" aria-atomic=\"true\"></p></div></div></div>",
+    "video": "<video class=\"html5-main-video\" muted=\"\" style=\"position:absolute;width:1px;height:1px;opacity:0\" src=\"data:video/mp4;base64,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\"></video>"
+  }
+}

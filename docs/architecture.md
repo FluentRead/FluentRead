@@ -172,7 +172,7 @@ WXT 会把 `entrypoints/` 下零层或一层的入口作为构建输入，并在
 - 扩展自有 DOM 运行时由 background 管理，content 和 UI 只通过类型化消息协议请求能力。Chrome/Edge MV3 使用原生 Offscreen，Firefox MV2 使用后台页面中的隐藏扩展 iframe；两者加载同一个 `offscreen.html`，复用同一份消息路由、OCR、图片/区域绘制、字幕推理和 TTS 播放逻辑。
 - `extensionDomClient` 只选择文档容器，并共用 `createOffscreenClient` 的准备、握手、截止时间、取消和重建。Firefox 特有代码仅负责 iframe 创建、查询和移除，不另写 feature handler、算法或配置。
 - `offscreenDocument` 仅表示原生 API 与权限；`extensionDom` 表示共享运行时可用。Firefox 的图片、区域、本地字幕和扩展朗读可用，但 Chrome Translator 仍单独受 `chromeTranslation` 约束；Firefox MV3 尚未开放此适配。
-- content 生命周期使用 WXT `ContentScriptContext` 与 `AbortSignal`，扩展失效后不得继续回写页面。默认关闭的输入翻译和段落复制不挂载监听器，由独立子 signal 随配置启停；图片悬浮的连续 pointermove 每帧仅检测最新事件，关闭和卸载时取消待处理帧。
+- content 生命周期使用 WXT `ContentScriptContext` 与 `AbortSignal`，扩展失效后不得继续回写页面。上下文失效核查在可见页每秒运行，后台页降为每 5 秒，往返缓存暂停时停止，恢复前先核查；受支持 iframe 的状态通知合并为单个在途读取，并以失效代次拒绝迟到响应。默认关闭的输入翻译和段落复制不挂载监听器，由独立子 signal 随配置启停；图片悬浮的连续 pointermove 每帧仅检测最新事件，关闭和卸载时取消待处理帧。
 
 参考：[WXT Entrypoints](https://wxt.dev/guide/essentials/entrypoints)、[Content Scripts](https://wxt.dev/guide/essentials/content-scripts)、[Project Structure](https://wxt.dev/guide/essentials/project-structure)。
 

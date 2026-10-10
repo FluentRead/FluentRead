@@ -1,0 +1,112 @@
+{
+  "total": {
+    "lines": {
+      "total": 241,
+      "covered": 241,
+      "skipped": 0,
+      "pct": 100
+    },
+    "statements": {
+      "total": 241,
+      "covered": 241,
+      "skipped": 0,
+      "pct": 100
+    },
+    "functions": {
+      "total": 31,
+      "covered": 31,
+      "skipped": 0,
+      "pct": 100
+    },
+    "branches": {
+      "total": 145,
+      "covered": 145,
+      "skipped": 0,
+      "pct": 100
+    },
+    "branchesTrue": {
+      "total": 0,
+      "covered": 0,
+      "skipped": 0,
+      "pct": 100
+    }
+  },
+  "src/features/full-page-translation/progress.ts": {
+    "lines": {
+      "total": 160,
+      "covered": 160,
+      "skipped": 0,
+      "pct": 100
+    },
+    "functions": {
+      "total": 14,
+      "covered": 14,
+      "skipped": 0,
+      "pct": 100
+    },
+    "statements": {
+      "total": 160,
+      "covered": 160,
+      "skipped": 0,
+      "pct": 100
+    },
+    "branches": {
+      "total": 65,
+      "covered": 65,
+      "skipped": 0,
+      "pct": 100
+    }
+  },
+  "src/features/full-page-translation/content/outcomeSession.ts": {
+    "lines": {
+      "total": 41,
+      "covered": 41,
+      "skipped": 0,
+      "pct": 100
+    },
+    "functions": {
+      "total": 7,
+      "covered": 7,
+      "skipped": 0,
+      "pct": 100
+    },
+    "statements": {
+      "total": 41,
+      "covered": 41,
+      "skipped": 0,
+      "pct": 100
+    },
+    "branches": {
+      "total": 48,
+      "covered": 48,
+      "skipped": 0,
+      "pct": 100
+    }
+  },
+  "src/features/full-page-translation/core/outcomes.ts": {
+    "lines": {
+      "total": 40,
+      "covered": 40,
+      "skipped": 0,
+      "pct": 100
+    },
+    "functions": {
+      "total": 10,
+      "covered": 10,
+      "skipped": 0,
+      "pct": 100
+    },
+    "statements": {
+      "total": 40,
+      "covered": 40,
+      "skipped": 0,
+      "pct": 100
+    },
+    "branches": {
+      "total": 32,
+      "covered": 32,
+      "skipped": 0,
+      "pct": 100
+    }
+  }
+}

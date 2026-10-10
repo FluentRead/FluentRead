@@ -11,6 +11,7 @@ import pdfWorkerUrl from 'pdfjs-dist/legacy/build/pdf.worker.min.mjs?url';
 import {generateDocumentArchive} from './archive';
 import {analyzePdfPageLayout, extractPdfGraphicsShapes, type PdfLayoutAtom, type PdfLayoutBlock} from '../core/pdfLayoutAnalysis';
 import {buildPdfReadingPlan, type PdfReadingPlan, type PdfReadingPresentation} from '../core/pdfReadingPlan';
+import type {PdfReadingOutputPage, PdfTextMeasure} from '../core/pdfTextLayout';
 
 import {
     getDocumentMaxBytes,
@@ -151,10 +152,15 @@ export interface PdfRasterPageInput {
 export type PdfPageRasterizer = (input: PdfRasterPageInput) => Promise<Uint8Array>;
 export interface PdfReadingRasterPage {bytes: Uint8Array; width: number; height: number}
 export type PdfReadingRasterizer = (input: PdfRasterPageInput & {plan: PdfReadingPlan}) => AsyncIterable<PdfReadingRasterPage>;
+/** 可见文字由 PDF 字体绘制；PNG 只承载公式/图表等需要保留的原图区域。 */
+export interface PdfReadingRenderedPage extends PdfReadingOutputPage {regionImage?: Uint8Array}
+export type PdfReadingRenderer = (input: PdfRasterPageInput & {plan: PdfReadingPlan; measureText: PdfTextMeasure}) => AsyncIterable<PdfReadingRenderedPage>;
 
 export interface CreateDocumentDownloadOptions {
     pdfPageRasterizer?: PdfPageRasterizer;
     pdfReadingRasterizer?: PdfReadingRasterizer;
+    pdfReadingRenderer?: PdfReadingRenderer;
+    pdfFontLoader?: (signal?: AbortSignal) => Promise<Uint8Array>;
     pdfPresentation?: PdfReadingPresentation;
     signal?: AbortSignal;
     onPdfProgress?: (progress: {phase: 'rendering' | 'saving'; completedPages: number; totalPages: number}) => void;
@@ -921,7 +927,7 @@ async function renderPdf(
     options: CreateDocumentDownloadOptions,
 ): Promise<Uint8Array> {
     const binary = document.binary as Extract<NonNullable<ParsedDocument['binary']>, {kind: 'pdf'}>;
-    const {PDFDocument, degrees} = await import('pdf-lib');
+    const {PDFDocument, degrees, rgb} = await import('pdf-lib');
     options.signal?.throwIfAborted();
     const outputPdf = await PDFDocument.create();
     outputPdf.setTitle(`${document.fileName} - FluentRead`);
@@ -970,6 +976,19 @@ async function renderPdf(
     // 导出进行中页面可能释放已解析的片段；找不到片段时按“没有原文”处理，不能让下载中断。
     const visibleTranslations = translations.map((translation, segmentIndex) =>
         hasDistinctTranslation(document.segments[segmentIndex]?.source ?? '', translation) ? translation : '');
+    // 延迟到需要文字页时加载；没有变化的双语文档只复制原页，不准备字体。
+    let readingFont: Awaited<ReturnType<typeof import('./pdfReadingFont')['embedPdfReadingFont']>> | undefined;
+    const prepareReadingFont = async () => {
+        if (!readingFont) {
+            const {embedPdfReadingFont, loadPdfReadingFontBytes} = await import('./pdfReadingFont');
+            const bytes = await (options.pdfFontLoader ?? loadPdfReadingFontBytes)(options.signal);
+            options.signal?.throwIfAborted();
+            readingFont = await embedPdfReadingFont(outputPdf, bytes, options.signal);
+            await yieldToBrowser();
+            options.signal?.throwIfAborted();
+        }
+        return readingFont;
+    };
     for (const [index, pageData] of binary.pages.entries()) {
         options.signal?.throwIfAborted();
         const pageChanged = pageData.segmentIndexes.some(segmentIndex =>
@@ -988,7 +1007,7 @@ async function renderPdf(
             translations: visibleTranslations,
             signal: options.signal,
         };
-        if (options.pdfReadingRasterizer) {
+        if (options.pdfReadingRenderer || options.pdfReadingRasterizer) {
             // 双语下载保留原页内容流，后接固定字号的完整译文续页。
             if (mode === 'bilingual') {
                 const page = outputPdf.addPage([pageData.width, pageData.height]);
@@ -1004,7 +1023,32 @@ async function renderPdf(
                 outputPdf.addPage([pageData.width, pageData.height]).drawImage(image, {x: 0, y: 0, width: pageData.width, height: pageData.height});
             }
             const plan = buildPdfReadingPlan(document, pageData, translations);
-            for await (const rendered of options.pdfReadingRasterizer({...rasterInput, plan})) {
+            if (options.pdfReadingRenderer) {
+                const embedded = await prepareReadingFont();
+                for (const entry of plan.entries) if (entry.kind === 'text') embedded.assertSupported(entry.text);
+                for await (const rendered of options.pdfReadingRenderer({...rasterInput, plan,
+                    measureText: (text, font) => embedded.font.widthOfTextAtSize(text.replace(/\t/gu, ' '), font.size),
+                })) {
+                    options.signal?.throwIfAborted();
+                    const page = outputPdf.addPage([rendered.width, rendered.height]);
+                    if (rendered.regionImage) {
+                        const image = await outputPdf.embedPng(rendered.regionImage);
+                        await image.embed(); // 逐页释放 PNG 解码像素。
+                        page.drawImage(image, {x: 0, y: 0, width: rendered.width, height: rendered.height});
+                    }
+                    for (const item of rendered.items) if (item.kind === 'text' && item.text) {
+                        page.drawText(item.text.replace(/\t/gu, ' '), {font: embedded.font, size: item.font.size,
+                            x: item.x, y: rendered.height - item.y - embedded.font.heightAtSize(item.font.size, {descender: false}),
+                            color: rgb(0.094, 0.129, 0.184),
+                        });
+                    }
+                    await yieldToBrowser();
+                }
+                options.onPdfProgress?.({phase: 'rendering', completedPages: index + 1, totalPages});
+                await yieldToBrowser();
+                continue;
+            }
+            for await (const rendered of options.pdfReadingRasterizer!({...rasterInput, plan})) {
                 options.signal?.throwIfAborted();
                 const image = await outputPdf.embedPng(rendered.bytes);
                 await image.embed();
@@ -1147,7 +1191,7 @@ export async function createDocumentDownload(
     let data: string | Uint8Array;
     if (document.format === 'pdf') {
         if (document.binary?.kind !== 'pdf') throw new Error('PDF 文档状态无效，请重新打开文件');
-        if (!options.pdfPageRasterizer && !options.pdfReadingRasterizer) {
+        if (!options.pdfPageRasterizer && !options.pdfReadingRasterizer && !options.pdfReadingRenderer) {
             throw new Error('当前环境未提供 PDF 页面渲染器，请在浏览器扩展中下载');
         }
         data = await renderPdf(document, resolved, mode, options);

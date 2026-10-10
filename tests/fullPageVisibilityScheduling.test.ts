@@ -317,10 +317,13 @@ import {
     isFullPageTranslationActive,
     resetFullPageTranslationRouteState,
     restoreOriginalContent,
+    restoreTranslationOwner,
 } from "@/src/features/full-page-translation/content/runtime";
 import {getTranslationState} from "@/src/features/full-page-translation/content/state";
+import {getTranslationToolbarStatus} from '@/src/features/full-page-translation/content/stateNotification';
 import {
     getFullPageTranslationProgress,
+    runFullPageFailureAction,
     subscribeFullPageTranslationProgress,
     type FullPageTranslationProgress,
 } from '@/src/features/full-page-translation/progress';
@@ -928,6 +931,22 @@ describe("全文翻译可见性锚点", () => {
         return {notice, announcement, page, later, changeVisibility};
     }
 
+    it('弹窗内独立快捷方案失败不污染全文失败汇总或工具栏状态', async () => {
+        const {announcement} = announcementFixture();
+        runtime.config.fullPageTranslationMode = 'all';
+        autoTranslateEnglishPage();
+        await finishScheduledWork();
+        expect(getFullPageTranslationProgress()).toMatchObject({completed: 1, failed: 0});
+        const candidate = {element: announcement, kind: 'content' as const, reason: 'independent-hover'};
+        runtime.pointCandidate = candidate;
+        runtime.requests.mockRejectedValueOnce(new Error('independent profile fails'));
+        handleTranslation(20, 20, {profileId: 'foreign-profile', service: 'freeTranslation', model: 'foreign-model', targetLanguage: 'ja', displayMode: 'bilingual'});
+        await finishScheduledWork();
+        expect(getTranslationState(announcement)?.phase).toBe('error');
+        expect(getFullPageTranslationProgress()).toMatchObject({failed: 0, retryable: 0});
+        expect(getTranslationToolbarStatus()).toBe('idle');
+    });
+
     it.each(['all', 'viewport'] as const)('公告优先 case：%s 模式仅请求公告，用户关闭后自动续译正文且可恢复再翻译', async (mode) => {
         const {notice, announcement, page, later, changeVisibility} = announcementFixture();
         runtime.config.fullPageTranslationMode = mode;
@@ -1289,6 +1308,53 @@ describe("全文翻译可见性锚点", () => {
         restoreOriginalContent(); pendingButton.resolve(['凭据']); await finishScheduledWork();
         expect(button.textContent).toBe('Credentials'); expect(paragraph.textContent).toBe('Pending paragraph.');
         expect(isFullPageTranslationActive()).toBe(false);
+    });
+
+    it.each([0, 1])('动态控件在翻译、恢复、重译与旧响应晚到后保留节点、点击监听和宿主状态，display=%s', async display => {
+        runtime.config.display = display;
+        runtime.config.translationScope = 'all';
+        runtime.config.fullPageTranslationMode = 'all';
+        document.body.innerHTML = '<button id="execute" class="ready" aria-expanded="false"><span>Execute workflow</span></button>';
+        const button = document.querySelector<HTMLElement>('#execute')!;
+        const label = button.firstElementChild!;
+        const source = label.firstChild as Text;
+        const click = vi.fn(() => {
+            button.className = 'expanded';
+            button.setAttribute('aria-expanded', 'true');
+        });
+        button.addEventListener('click', click);
+        setLayoutBox(button, 200, 30);
+        runtime.candidates = [{element: button, kind: 'control', reason: 'dynamic-application-control', scope: 'all'}];
+
+        autoTranslateEnglishPage(); await finishScheduledWork();
+        button.dispatchEvent(new window.Event('click', {bubbles: true}));
+        TestMutationObserver.instances.at(-1)!.emit([{type: 'attributes', target: button,
+            attributeName: 'class', oldValue: 'ready', addedNodes: [], removedNodes: []} as unknown as MutationRecord]);
+        await finishScheduledWork();
+        expect(button.textContent).toBe('译:Execute workflow');
+        expect(button.firstElementChild).toBe(label); expect(label.firstChild).toBe(source);
+        restoreOriginalContent();
+        expect(button.textContent).toBe('Execute workflow');
+        expect(button.className).toBe('expanded'); expect(button.getAttribute('aria-expanded')).toBe('true');
+
+        source.nodeValue = 'Execute intermediate workflow';
+        expect(button.textContent).toBe('Execute intermediate workflow');
+        const abandoned = deferred<string[]>();
+        runtime.requests.mockReturnValueOnce(abandoned.promise);
+        autoTranslateEnglishPage(); await finishScheduledWork(); await waitForRequestCount(2);
+        restoreOriginalContent();
+        source.nodeValue = 'Execute latest workflow';
+        autoTranslateEnglishPage(); await finishScheduledWork();
+        expect(button.textContent).toBe('译:Execute latest workflow');
+        abandoned.resolve(['旧请求不能覆盖最新控件']); await finishScheduledWork();
+        expect(button.textContent).toBe('译:Execute latest workflow');
+        expect(button.firstElementChild).toBe(label); expect(label.firstChild).toBe(source);
+        button.dispatchEvent(new window.Event('click', {bubbles: true}));
+        restoreOriginalContent();
+        expect(button.textContent).toBe('Execute latest workflow');
+        button.dispatchEvent(new window.Event('click', {bubbles: true}));
+        expect(click).toHaveBeenCalledTimes(3);
+        expect(button.className).toBe('expanded'); expect(button.getAttribute('aria-expanded')).toBe('true');
     });
 
     it("Issue 422 全部节点全文接管旧悬浮正文标签时改为原位控件，保留 Text 身份", async () => {
@@ -1768,6 +1834,8 @@ describe("全文翻译可见性锚点", () => {
     it.each([
         ['light', 'translated'], ['light', 'loading'], ['shadow', 'translated'], ['shadow', 'loading'],
     ] as const)('%s 树中删除选择器所需兄弟节点会取消 %s 正文，恢复兄弟后重新发现', async (tree, phase) => {
+        // 本例验证结构资格；让发现时间片与 fake timers 同步，避免宿主 CPU 负载改变候选到达顺序。
+        replaceGlobal('performance', {now: () => Date.now()});
         runtime.config.fullPageTranslationMode = 'all';
         runtime.config.display = 1;
         document.body.innerHTML = '<div id="host"></div>';
@@ -5270,6 +5338,61 @@ describe("全文翻译可见性锚点", () => {
         expect(runtime.requests).toHaveBeenCalledWith(["Shared title across sessions"]);
     });
 
+    it('全文失败汇总只重试失败并保留成功译文，恢复拒绝旧面板命令', async () => {
+        runtime.config.fullPageTranslationMode = 'all';
+        runtime.config.display = 1;
+        document.body.innerHTML = '<p id="ok">Successful paragraph</p><p id="fail">Failed paragraph</p>';
+        const good = document.querySelector<HTMLElement>('#ok')!;
+        const bad = document.querySelector<HTMLElement>('#fail')!;
+        runtime.candidates = [good, bad].map(element => ({element, kind: 'content' as const, reason: 'paragraph'}));
+        let fail = true;
+        runtime.requests.mockImplementation(async origins => {
+            if (fail && origins.includes('Failed paragraph')) throw new Error('unavailable');
+            return origins.map(text => `译:${text}`);
+        });
+        autoTranslateEnglishPage();
+        await finishScheduledWork();
+        const progress = getFullPageTranslationProgress();
+        expect(progress).toMatchObject({running: 0, completed: 1, failed: 1});
+        const translated = good.querySelector('.fluent-read-bilingual-content');
+        expect(translated).not.toBeNull();
+        const locate = vi.fn(); Object.defineProperty(bad, 'scrollIntoView', {value: locate});
+        expect(runFullPageFailureAction(progress.sessionId, 'locate')).toBe(1);
+        expect(locate).toHaveBeenCalledOnce();
+        fail = false;
+        const previousRequests = runtime.requests.mock.calls.length;
+        expect(runFullPageFailureAction(progress.sessionId, 'retry')).toBe(1);
+        await finishScheduledWork();
+        expect(runtime.requests.mock.calls.slice(previousRequests)).toEqual([[['Failed paragraph']]]);
+        expect(good.querySelector('.fluent-read-bilingual-content')).toBe(translated);
+        expect(getFullPageTranslationProgress()).toMatchObject({completed: 2, failed: 0, running: 0});
+        expect(runFullPageFailureAction(progress.sessionId, 'retry')).toBe(0);
+        expect(runFullPageFailureAction(progress.sessionId, 'locate')).toBe(0);
+        restoreOriginalContent();
+        expect(getFullPageTranslationProgress()).toMatchObject({active: false, completed: 0, failed: 0});
+        expect(runFullPageFailureAction(progress.sessionId, 'retry')).toBe(0);
+    });
+
+    it('已移除失败段落不会由批量重试重新发请求，恢复后的旧单段回调也不启动任务', async () => {
+        runtime.config.fullPageTranslationMode = 'all';
+        document.body.innerHTML = '<p id="fail">Disconnected failure</p>';
+        const paragraph = document.querySelector<HTMLElement>('#fail')!;
+        runtime.candidates = [{element: paragraph, kind: 'content', reason: 'paragraph'}];
+        runtime.requests.mockRejectedValue(new Error('unavailable'));
+        autoTranslateEnglishPage();
+        await finishScheduledWork();
+        const progress = getFullPageTranslationProgress();
+        expect(progress.failed).toBe(1);
+        const oldCallback = runtime.retryCallbacks.at(-1)!;
+        paragraph.remove();
+        expect(runFullPageFailureAction(progress.sessionId, 'retry')).toBe(0);
+        expect(runFullPageFailureAction(progress.sessionId, 'locate')).toBe(0);
+        const count = runtime.requests.mock.calls.length;
+        restoreOriginalContent(); oldCallback();
+        await finishScheduledWork();
+        expect(runtime.requests).toHaveBeenCalledTimes(count);
+    });
+
     it("失败 UI 注入的重试回调会按点击时的当前显示模式重新解析候选", async () => {
         runtime.config.display = 1;
         document.body.innerHTML = '<p id="prose">Retry with the latest display mode.</p>';
@@ -7002,6 +7125,97 @@ describe("全文翻译可见性锚点", () => {
         observer.emit(lyrics, true);
         await finishScheduledWork();
         expect(lyrics.textContent).toContain('译:Third lyric must stay queued while offscreen.');
+    });
+    async function fiveFailedParagraphs(concurrency = 1) {
+        runtime.config.fullPageTranslationMode = 'all';
+        runtime.config.display = 1;
+        runtime.config.maxConcurrentTranslations = concurrency;
+        document.body.innerHTML = Array.from({length: 5}, (_, index) => `<p>Failure retry source ${index}.</p>`).join('');
+        const paragraphs = Array.from(document.querySelectorAll<HTMLElement>('p'));
+        runtime.candidates = paragraphs.map(element => ({element, kind: 'content', reason: 'queued-failure-retry'}));
+        runtime.requests.mockRejectedValue(new Error('temporarily unavailable'));
+        autoTranslateEnglishPage();
+        await finishScheduledWork();
+        expect(runtime.requests).toHaveBeenCalledTimes(5);
+        expect(getFullPageTranslationProgress()).toMatchObject({running: 0, failed: 5});
+        return paragraphs;
+    }
+
+    it('五个失败重试遵守单并发，不同步恢复 DOM，重复点击不追加请求', async () => {
+        const paragraphs = await fiveFailedParagraphs();
+        const states = paragraphs.map(getTranslationState);
+        const sessionId = getFullPageTranslationProgress().sessionId;
+        const requests: ReturnType<typeof deferred<string[]>>[] = [];
+        let active = 0, peak = 0;
+        runtime.requests.mockImplementation(() => {
+            const request = deferred<string[]>(); requests.push(request);
+            active += 1; peak = Math.max(peak, active);
+            return request.promise.finally(() => {active -= 1;});
+        });
+        expect(runFullPageFailureAction(sessionId, 'retry')).toBe(5);
+        expect(runFullPageFailureAction(sessionId, 'retry')).toBe(0);
+        runtime.retryCallbacks[0]!();
+        expect(paragraphs.map(getTranslationState)).toEqual(states);
+        expect(runtime.requests).toHaveBeenCalledTimes(5);
+        await finishScheduledWork();
+        expect(runtime.requests).toHaveBeenCalledTimes(6);
+        expect(getFullPageTranslationProgress()).toMatchObject({running: 1, queued: 4, failed: 4});
+        for (let index = 0; index < 5; index += 1) {
+            expect(requests).toHaveLength(index + 1);
+            requests[index]!.resolve([`Successful retry ${index}.`]);
+            await finishScheduledWork();
+        }
+        expect(peak).toBe(1); expect(runtime.requests).toHaveBeenCalledTimes(10);
+        expect(getFullPageTranslationProgress()).toMatchObject({running: 0, queued: 0, failed: 0, completed: 5});
+    });
+
+    it.each(['queued', 'in-flight'])('单段和批量失败重试在 %s 恢复时撤销尚未派发项', async phase => {
+        const paragraphs = await fiveFailedParagraphs();
+        const sessionId = getFullPageTranslationProgress().sessionId;
+        const request = deferred<string[]>();
+        runtime.requests.mockReturnValue(request.promise);
+        // 单段回调与面板共享同一队列，因此随后批量点击只接受另外四段。
+        runtime.retryCallbacks[0]!();
+        expect(runtime.requests).toHaveBeenCalledTimes(5);
+        expect(runFullPageFailureAction(sessionId, 'retry')).toBe(4);
+        if (phase === 'in-flight') await finishScheduledWork();
+        const count = phase === 'in-flight' ? 6 : 5;
+        expect(runtime.requests).toHaveBeenCalledTimes(count);
+        restoreOriginalContent();
+        request.resolve(['Late translation after restore.']);
+        await finishScheduledWork();
+        expect(runtime.requests).toHaveBeenCalledTimes(count);
+        expect(paragraphs.every(node => !getTranslationState(node) && !node.querySelector('[data-fr-translation-owned]'))).toBe(true);
+        expect(getFullPageTranslationProgress()).toMatchObject({active: false, running: 0, queued: 0, failed: 0});
+        expect(runFullPageFailureAction(sessionId, 'retry')).toBe(0);
+    });
+
+    it('批量失败重试在八毫秒派发预算后让出主线程给宿主任务', async () => {
+        let elapsed = 0;
+        replaceGlobal('performance', {now: () => {elapsed += 10; return elapsed;}});
+        await fiveFailedParagraphs(5);
+        const sessionId = getFullPageTranslationProgress().sessionId;
+        const request = deferred<string[]>(); runtime.requests.mockReturnValue(request.promise);
+        expect(runFullPageFailureAction(sessionId, 'retry')).toBe(5);
+        let observed = -1;
+        window.setTimeout(() => {observed = runtime.requests.mock.calls.length - 5;}, 0);
+        await vi.advanceTimersByTimeAsync(0);
+        expect(observed).toBe(1);
+        restoreOriginalContent(); request.resolve(['Cancelled retry.']); await finishScheduledWork();
+        expect(runtime.requests).toHaveBeenCalledTimes(6);
+    });
+    it('排队重试前局部恢复一段不被旧意图重译，其余四段仍正常完成', async () => {
+        const paragraphs = await fiveFailedParagraphs();
+        const sessionId = getFullPageTranslationProgress().sessionId;
+        runtime.requests.mockImplementation(async origins => origins.map(source => `Successful: ${source}`));
+        expect(runFullPageFailureAction(sessionId, 'retry')).toBe(5);
+        expect(restoreTranslationOwner(paragraphs[0]!)).toBe(true);
+        await finishScheduledWork();
+        expect(runtime.requests).toHaveBeenCalledTimes(9);
+        expect(getTranslationState(paragraphs[0]!)).toBeUndefined();
+        expect(paragraphs[0]!.textContent).toBe('Failure retry source 0.');
+        expect(paragraphs.slice(1).every(node => getTranslationState(node)?.phase === 'translated')).toBe(true);
+        expect(getFullPageTranslationProgress()).toMatchObject({running: 0, queued: 0, failed: 0, completed: 4});
     });
 });
 

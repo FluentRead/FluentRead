@@ -1,6 +1,6 @@
 # Privacy policy
 
-Updated: October 5, 2026.
+Updated: October 10, 2026.
 
 This policy describes how the FluentRead browser extension handles translation content, local records, service credentials, and optional Google Drive / WebDAV cloud configuration backups. FluentRead is a bilingual translation and reading-assistance tool maintained by its open-source project contributors. The website and this policy are publicly accessible without signing in. Translation does not require connecting a Google account.
 
@@ -41,7 +41,7 @@ Translation cache defaults to at most 5 MiB or 2,000 entries, with a maximum ent
 
 The optional full English dictionary is held in the browser's CacheStorage. Clearing browser data or uninstalling the extension removes it.
 
-Document translation and edits stay in the current page. Download files before leaving.
+Recent documents are stored in this browser’s local IndexedDB, including original file bytes, parsed content, translations, edits, progress, and the translation-settings fingerprint. History keeps at most 20 documents and 80 MiB of original file bytes, evicting the least recently updated entries when a limit is exceeded. There is currently no time-based expiry. Delete individual entries or clear all history on the document home page. Document history is excluded from configuration cloud backups. Download files you need to retain; clearing browser data or uninstalling the extension may remove local records.
 
 ## Google Drive configuration sync
 

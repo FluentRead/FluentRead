@@ -14,7 +14,10 @@ const artifactBytes = Buffer.byteLength(source);
 // 为保持与扩展的配置导入导出兼容，预算再放宽 1 KB。
 // 时间展示过滤与动态来源交接增加 2,939 字节：同依赖下基线 e754aa680 为 1,964,913，修复后为 1,967,852。
 // 预算仅增加 3 KB，保留体积守门；独立基线与构建记录见 docs/reports/time-changing-source-20261010/。
-const MAX_USERSCRIPT_BYTES = 1_968_000;
+// 失败摘要、受限局部重试及对应文案增加 7,324 字节（0.3722%）：
+// 同依赖独立基线 ce36085f7 为 1,967,852，候选为 1,975,176；预算增加 8 KB。
+// 实测与重现步骤见 docs/reports/reading-reliability-experience-20261010/。
+const MAX_USERSCRIPT_BYTES = 1_976_000;
 const preludeStartMarker = '/* FluentRead userscript compatibility prelude:start */';
 const preludeEndMarker = '/* FluentRead userscript compatibility prelude:end */';
 const preludeStart = source.indexOf(preludeStartMarker);

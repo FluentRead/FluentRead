@@ -1,0 +1,1400 @@
+{
+  "scope": "production-extension-domain-fixtures",
+  "provider": "microsoft-local-deterministic-response",
+  "profileMode": "new-temporary-profile",
+  "extensionDir": "/Users/thinkstu/Desktop/copy/FluentRead-reading-reliability-experience-20261010/.output/chrome-mv3",
+  "cases": [
+    {
+      "id": "button-controls",
+      "display": 1,
+      "before": {
+        "url": "https://example.com/fluentread-button-fixture",
+        "at": 1791643450472,
+        "controls": [
+          {
+            "id": "merge-button",
+            "identity": 1,
+            "html": "<span class=\"button-content\" data-display=\"flex\"><span class=\"button-label\" data-display=\"grid\">Merge pull request</span></span>",
+            "text": "Merge pull request",
+            "height": 32,
+            "ranges": [
+              {
+                "text": "Merge pull request",
+                "inside": true
+              }
+            ],
+            "wrappers": 0,
+            "segments": 0,
+            "clickCount": "0"
+          },
+          {
+            "id": "merge-menu",
+            "identity": 2,
+            "html": "<span aria-hidden=\"true\">▾</span>",
+            "text": "▾",
+            "height": 32,
+            "ranges": [
+              {
+                "text": "▾",
+                "inside": true
+              }
+            ],
+            "wrappers": 0,
+            "segments": 0,
+            "clickCount": "0"
+          },
+          {
+            "id": "save-button",
+            "identity": 3,
+            "html": "<span class=\"button-content\" data-display=\"flex\"><span aria-hidden=\"true\">✓</span><span class=\"button-label\" data-display=\"grid\">Save changes</span></span>",
+            "text": "✓Save changes",
+            "height": 32,
+            "ranges": [
+              {
+                "text": "✓",
+                "inside": true
+              },
+              {
+                "text": "Save changes",
+                "inside": true
+              }
+            ],
+            "wrappers": 0,
+            "segments": 0,
+            "clickCount": "0"
+          },
+          {
+            "id": "menu-action",
+            "identity": 4,
+            "html": "<div class=\"button-content\" data-display=\"flex\">Open settings</div>",
+            "text": "Open settings",
+            "height": 32,
+            "ranges": [
+              {
+                "text": "Open settings",
+                "inside": true
+              }
+            ],
+            "wrappers": 0,
+            "segments": 0,
+            "clickCount": "0"
+          },
+          {
+            "id": "split-button",
+            "identity": 5,
+            "html": "Review <span class=\"button-label\" data-display=\"grid\">changes</span><span class=\"badge notranslate\" translate=\"no\">23</span>",
+            "text": "Review changes23",
+            "height": 32,
+            "ranges": [
+              {
+                "text": "Review ",
+                "inside": true
+              },
+              {
+                "text": "changes",
+                "inside": true
+              },
+              {
+                "text": "23",
+                "inside": true
+              }
+            ],
+            "wrappers": 0,
+            "segments": 0,
+            "clickCount": "0"
+          }
+        ],
+        "buttonForms": [
+          {
+            "id": "submit-anonymous",
+            "tag": "input",
+            "value": "Create issue",
+            "text": "",
+            "html": "<input id=\"submit-anonymous\" type=\"submit\" value=\"Create issue\">",
+            "height": 32,
+            "wrappers": 0,
+            "segments": 0
+          },
+          {
+            "id": "button-input",
+            "tag": "input",
+            "value": "Preview changes",
+            "text": "",
+            "html": "<input id=\"button-input\" type=\"button\" value=\"Preview changes\">",
+            "height": 32,
+            "wrappers": 0,
+            "segments": 0
+          },
+          {
+            "id": "reset-input",
+            "tag": "input",
+            "value": "Reset form",
+            "text": "",
+            "html": "<input id=\"reset-input\" type=\"reset\" value=\"Reset form\">",
+            "height": 32,
+            "wrappers": 0,
+            "segments": 0
+          },
+          {
+            "id": "button-link",
+            "tag": "a",
+            "value": null,
+            "text": "Publish release",
+            "html": "<a id=\"button-link\" class=\"btn btn-primary\" href=\"#publish\" data-display=\"inline-block\">Publish release</a>",
+            "height": 32,
+            "wrappers": 0,
+            "segments": 0
+          },
+          {
+            "id": "hint-link",
+            "tag": "a",
+            "value": null,
+            "text": "Markdown is supported",
+            "html": "<a id=\"hint-link\" class=\"Link--secondary\" href=\"#markdown\" data-display=\"inline\">Markdown is supported</a>",
+            "height": 32,
+            "wrappers": 0,
+            "segments": 0
+          },
+          {
+            "id": "upload-label",
+            "tag": "label",
+            "value": null,
+            "text": "Paste, drop, or click to add files",
+            "html": "<label id=\"upload-label\" data-display=\"flex\">Paste, drop, or click to add files</label>",
+            "height": 32,
+            "wrappers": 0,
+            "segments": 0
+          },
+          {
+            "id": "custom-action",
+            "tag": "div",
+            "value": null,
+            "text": "Custom action",
+            "html": "<div id=\"custom-action\" tabindex=\"0\" data-display=\"inline-flex\">Custom action</div>",
+            "height": 32,
+            "wrappers": 0,
+            "segments": 0
+          },
+          {
+            "id": "preview-tab",
+            "tag": "span",
+            "value": null,
+            "text": "Preview tab",
+            "html": "<span id=\"preview-tab\" role=\"tab\" data-display=\"inline-block\">Preview tab</span>",
+            "height": 32,
+            "wrappers": 0,
+            "segments": 0
+          }
+        ],
+        "untouchedForms": [
+          {
+            "id": "submit-named",
+            "tag": "input",
+            "value": "Search issues",
+            "text": "",
+            "html": "<input id=\"submit-named\" type=\"submit\" name=\"commit\" value=\"Search issues\">",
+            "height": 32,
+            "wrappers": 0,
+            "segments": 0
+          },
+          {
+            "id": "text-input",
+            "tag": "input",
+            "value": "Private draft text",
+            "text": "",
+            "html": "<input id=\"text-input\" type=\"text\" name=\"q\" value=\"Private draft text\">",
+            "height": 32,
+            "wrappers": 0,
+            "segments": 0
+          }
+        ],
+        "hostFocusDecorations": 0,
+        "owned": [],
+        "nested": 0,
+        "requests": 0
+      },
+      "first": {
+        "url": "https://example.com/fluentread-button-fixture",
+        "at": 1791643454524,
+        "controls": [
+          {
+            "id": "merge-button",
+            "identity": 1,
+            "html": "<span class=\"button-content\" data-display=\"flex\"><span class=\"button-label\" data-display=\"grid\">合并拉取请求</span></span>",
+            "text": "合并拉取请求",
+            "height": 32,
+            "ranges": [
+              {
+                "text": "合并拉取请求",
+                "inside": true
+              }
+            ],
+            "wrappers": 0,
+            "segments": 0,
+            "clickCount": "0"
+          },
+          {
+            "id": "merge-menu",
+            "identity": 2,
+            "html": "<span aria-hidden=\"true\">▾</span>",
+            "text": "▾",
+            "height": 32,
+            "ranges": [
+              {
+                "text": "▾",
+                "inside": true
+              }
+            ],
+            "wrappers": 0,
+            "segments": 0,
+            "clickCount": "0"
+          },
+          {
+            "id": "save-button",
+            "identity": 3,
+            "html": "<span class=\"button-content\" data-display=\"flex\"><span aria-hidden=\"true\">✓</span><span class=\"button-label\" data-display=\"grid\">保存更改</span></span>",
+            "text": "✓保存更改",
+            "height": 32,
+            "ranges": [
+              {
+                "text": "✓",
+                "inside": true
+              },
+              {
+                "text": "保存更改",
+                "inside": true
+              }
+            ],
+            "wrappers": 0,
+            "segments": 0,
+            "clickCount": "0"
+          },
+          {
+            "id": "menu-action",
+            "identity": 4,
+            "html": "<div class=\"button-content\" data-display=\"flex\">打开设置</div>",
+            "text": "打开设置",
+            "height": 32,
+            "ranges": [
+              {
+                "text": "打开设置",
+                "inside": true
+              }
+            ],
+            "wrappers": 0,
+            "segments": 0,
+            "clickCount": "0"
+          },
+          {
+            "id": "split-button",
+            "identity": 5,
+            "html": "审查 <span class=\"button-label\" data-display=\"grid\">更改</span><span class=\"badge notranslate\" translate=\"no\">23</span>",
+            "text": "审查 更改23",
+            "height": 32,
+            "ranges": [
+              {
+                "text": "审查 ",
+                "inside": true
+              },
+              {
+                "text": "更改",
+                "inside": true
+              },
+              {
+                "text": "23",
+                "inside": true
+              }
+            ],
+            "wrappers": 0,
+            "segments": 0,
+            "clickCount": "0"
+          }
+        ],
+        "buttonForms": [
+          {
+            "id": "submit-anonymous",
+            "tag": "input",
+            "value": "测试译文：Create issue",
+            "text": "",
+            "html": "<input id=\"submit-anonymous\" type=\"submit\" value=\"测试译文：Create issue\">",
+            "height": 32,
+            "wrappers": 0,
+            "segments": 0
+          },
+          {
+            "id": "button-input",
+            "tag": "input",
+            "value": "测试译文：Preview changes",
+            "text": "",
+            "html": "<input id=\"button-input\" type=\"button\" value=\"测试译文：Preview changes\">",
+            "height": 32,
+            "wrappers": 0,
+            "segments": 0
+          },
+          {
+            "id": "reset-input",
+            "tag": "input",
+            "value": "测试译文：Reset form",
+            "text": "",
+            "html": "<input id=\"reset-input\" type=\"reset\" value=\"测试译文：Reset form\">",
+            "height": 32,
+            "wrappers": 0,
+            "segments": 0
+          },
+          {
+            "id": "button-link",
+            "tag": "a",
+            "value": null,
+            "text": "测试译文：Publish release",
+            "html": "<a id=\"button-link\" class=\"btn btn-primary\" href=\"#publish\" data-display=\"inline-block\">测试译文：Publish release</a>",
+            "height": 32,
+            "wrappers": 0,
+            "segments": 0
+          },
+          {
+            "id": "hint-link",
+            "tag": "a",
+            "value": null,
+            "text": "测试译文：Markdown is supported",
+            "html": "<a id=\"hint-link\" class=\"Link--secondary\" href=\"#markdown\" data-display=\"inline\">测试译文：Markdown is supported</a>",
+            "height": 32,
+            "wrappers": 0,
+            "segments": 0
+          },
+          {
+            "id": "upload-label",
+            "tag": "label",
+            "value": null,
+            "text": "测试译文：Paste, drop, or click to add files",
+            "html": "<label id=\"upload-label\" data-display=\"flex\">测试译文：Paste, drop, or click to add files</label>",
+            "height": 32,
+            "wrappers": 0,
+            "segments": 0
+          },
+          {
+            "id": "custom-action",
+            "tag": "div",
+            "value": null,
+            "text": "测试译文：Custom action",
+            "html": "<div id=\"custom-action\" tabindex=\"0\" data-display=\"inline-flex\">测试译文：Custom action</div>",
+            "height": 32,
+            "wrappers": 0,
+            "segments": 0
+          },
+          {
+            "id": "preview-tab",
+            "tag": "span",
+            "value": null,
+            "text": "测试译文：Preview tab",
+            "html": "<span id=\"preview-tab\" role=\"tab\" data-display=\"inline-block\">测试译文：Preview tab</span>",
+            "height": 32,
+            "wrappers": 0,
+            "segments": 0
+          }
+        ],
+        "untouchedForms": [
+          {
+            "id": "submit-named",
+            "tag": "input",
+            "value": "Search issues",
+            "text": "",
+            "html": "<input id=\"submit-named\" type=\"submit\" name=\"commit\" value=\"Search issues\">",
+            "height": 32,
+            "wrappers": 0,
+            "segments": 0
+          },
+          {
+            "id": "text-input",
+            "tag": "input",
+            "value": "Private draft text",
+            "text": "",
+            "html": "<input id=\"text-input\" type=\"text\" name=\"q\" value=\"Private draft text\">",
+            "height": 32,
+            "wrappers": 0,
+            "segments": 0
+          }
+        ],
+        "hostFocusDecorations": 0,
+        "owned": [
+          {
+            "identity": 6,
+            "tag": "fluent-read-bilingual-content fluent-display-bold",
+            "parentId": "",
+            "text": "测试译文：No conflicts with base branch",
+            "translate": "no",
+            "translationLabel": null,
+            "sourceTextIdentity": 15
+          },
+          {
+            "identity": 7,
+            "tag": "fluent-read-bilingual-content fluent-display-bold",
+            "parentId": "",
+            "text": "测试译文：Merging can be performed automatically.",
+            "translate": "no",
+            "translationLabel": null,
+            "sourceTextIdentity": 16
+          },
+          {
+            "identity": 8,
+            "tag": "fluent-read-bilingual-content fluent-display-bold",
+            "parentId": "",
+            "text": "测试译文：You can also merge this with the command line.",
+            "translate": "no",
+            "translationLabel": null,
+            "sourceTextIdentity": 17
+          },
+          {
+            "identity": 9,
+            "tag": "fluent-read-bilingual-content fluent-display-bold",
+            "parentId": "prose",
+            "text": "测试译文：Read the merge guide before continuing.",
+            "translate": "no",
+            "translationLabel": null,
+            "sourceTextIdentity": 18
+          },
+          {
+            "identity": 10,
+            "tag": "fluent-read-bilingual-content fluent-display-bold",
+            "parentId": "decorative",
+            "text": "测试译文：Decorative badge",
+            "translate": "no",
+            "translationLabel": null,
+            "sourceTextIdentity": 19
+          },
+          {
+            "identity": 11,
+            "tag": "fluent-read-bilingual-content fluent-display-bold",
+            "parentId": "broken-focus",
+            "text": "测试译文：Broken focus target",
+            "translate": "no",
+            "translationLabel": null,
+            "sourceTextIdentity": 20
+          },
+          {
+            "identity": 12,
+            "tag": "fluent-read-bilingual-content fluent-display-bold",
+            "parentId": "shell-prose",
+            "text": "测试译文：The workflow editor keeps its application controls separate from documentation.",
+            "translate": "no",
+            "translationLabel": null,
+            "sourceTextIdentity": 21
+          },
+          {
+            "identity": 13,
+            "tag": "fluent-read-bilingual-content fluent-display-bold",
+            "parentId": "faq-question",
+            "text": "测试译文：How do I cancel my subscription?",
+            "translate": "no",
+            "translationLabel": null,
+            "sourceTextIdentity": 22
+          },
+          {
+            "identity": 14,
+            "tag": "fluent-read-bilingual-content fluent-display-bold",
+            "parentId": "faq-answer",
+            "text": "测试译文：Contact support from the billing page.",
+            "translate": "no",
+            "translationLabel": null,
+            "sourceTextIdentity": 23
+          }
+        ],
+        "nested": 0,
+        "requests": 22
+      },
+      "stable": {
+        "url": "https://example.com/fluentread-button-fixture",
+        "at": 1791643456493,
+        "controls": [
+          {
+            "id": "merge-button",
+            "identity": 1,
+            "html": "<span class=\"button-content\" data-display=\"flex\"><span class=\"button-label\" data-display=\"grid\">合并拉取请求</span></span>",
+            "text": "合并拉取请求",
+            "height": 32,
+            "ranges": [
+              {
+                "text": "合并拉取请求",
+                "inside": true
+              }
+            ],
+            "wrappers": 0,
+            "segments": 0,
+            "clickCount": "0"
+          },
+          {
+            "id": "merge-menu",
+            "identity": 2,
+            "html": "<span aria-hidden=\"true\">▾</span>",
+            "text": "▾",
+            "height": 32,
+            "ranges": [
+              {
+                "text": "▾",
+                "inside": true
+              }
+            ],
+            "wrappers": 0,
+            "segments": 0,
+            "clickCount": "0"
+          },
+          {
+            "id": "save-button",
+            "identity": 3,
+            "html": "<span class=\"button-content\" data-display=\"flex\"><span aria-hidden=\"true\">✓</span><span class=\"button-label\" data-display=\"grid\">保存更改</span></span>",
+            "text": "✓保存更改",
+            "height": 32,
+            "ranges": [
+              {
+                "text": "✓",
+                "inside": true
+              },
+              {
+                "text": "保存更改",
+                "inside": true
+              }
+            ],
+            "wrappers": 0,
+            "segments": 0,
+            "clickCount": "0"
+          },
+          {
+            "id": "menu-action",
+            "identity": 4,
+            "html": "<div class=\"button-content\" data-display=\"flex\">打开设置</div>",
+            "text": "打开设置",
+            "height": 32,
+            "ranges": [
+              {
+                "text": "打开设置",
+                "inside": true
+              }
+            ],
+            "wrappers": 0,
+            "segments": 0,
+            "clickCount": "0"
+          },
+          {
+            "id": "split-button",
+            "identity": 5,
+            "html": "审查 <span class=\"button-label\" data-display=\"grid\">更改</span><span class=\"badge notranslate\" translate=\"no\">23</span>",
+            "text": "审查 更改23",
+            "height": 32,
+            "ranges": [
+              {
+                "text": "审查 ",
+                "inside": true
+              },
+              {
+                "text": "更改",
+                "inside": true
+              },
+              {
+                "text": "23",
+                "inside": true
+              }
+            ],
+            "wrappers": 0,
+            "segments": 0,
+            "clickCount": "0"
+          }
+        ],
+        "buttonForms": [
+          {
+            "id": "submit-anonymous",
+            "tag": "input",
+            "value": "测试译文：Create issue",
+            "text": "",
+            "html": "<input id=\"submit-anonymous\" type=\"submit\" value=\"测试译文：Create issue\">",
+            "height": 32,
+            "wrappers": 0,
+            "segments": 0
+          },
+          {
+            "id": "button-input",
+            "tag": "input",
+            "value": "测试译文：Preview changes",
+            "text": "",
+            "html": "<input id=\"button-input\" type=\"button\" value=\"测试译文：Preview changes\">",
+            "height": 32,
+            "wrappers": 0,
+            "segments": 0
+          },
+          {
+            "id": "reset-input",
+            "tag": "input",
+            "value": "测试译文：Reset form",
+            "text": "",
+            "html": "<input id=\"reset-input\" type=\"reset\" value=\"测试译文：Reset form\">",
+            "height": 32,
+            "wrappers": 0,
+            "segments": 0
+          },
+          {
+            "id": "button-link",
+            "tag": "a",
+            "value": null,
+            "text": "测试译文：Publish release",
+            "html": "<a id=\"button-link\" class=\"btn btn-primary\" href=\"#publish\" data-display=\"inline-block\">测试译文：Publish release</a>",
+            "height": 32,
+            "wrappers": 0,
+            "segments": 0
+          },
+          {
+            "id": "hint-link",
+            "tag": "a",
+            "value": null,
+            "text": "测试译文：Markdown is supported",
+            "html": "<a id=\"hint-link\" class=\"Link--secondary\" href=\"#markdown\" data-display=\"inline\">测试译文：Markdown is supported</a>",
+            "height": 32,
+            "wrappers": 0,
+            "segments": 0
+          },
+          {
+            "id": "upload-label",
+            "tag": "label",
+            "value": null,
+            "text": "测试译文：Paste, drop, or click to add files",
+            "html": "<label id=\"upload-label\" data-display=\"flex\">测试译文：Paste, drop, or click to add files</label>",
+            "height": 32,
+            "wrappers": 0,
+            "segments": 0
+          },
+          {
+            "id": "custom-action",
+            "tag": "div",
+            "value": null,
+            "text": "测试译文：Custom action",
+            "html": "<div id=\"custom-action\" tabindex=\"0\" data-display=\"inline-flex\">测试译文：Custom action</div>",
+            "height": 32,
+            "wrappers": 0,
+            "segments": 0
+          },
+          {
+            "id": "preview-tab",
+            "tag": "span",
+            "value": null,
+            "text": "测试译文：Preview tab",
+            "html": "<span id=\"preview-tab\" role=\"tab\" data-display=\"inline-block\">测试译文：Preview tab</span>",
+            "height": 32,
+            "wrappers": 0,
+            "segments": 0
+          }
+        ],
+        "untouchedForms": [
+          {
+            "id": "submit-named",
+            "tag": "input",
+            "value": "Search issues",
+            "text": "",
+            "html": "<input id=\"submit-named\" type=\"submit\" name=\"commit\" value=\"Search issues\">",
+            "height": 32,
+            "wrappers": 0,
+            "segments": 0
+          },
+          {
+            "id": "text-input",
+            "tag": "input",
+            "value": "Private draft text",
+            "text": "",
+            "html": "<input id=\"text-input\" type=\"text\" name=\"q\" value=\"Private draft text\">",
+            "height": 32,
+            "wrappers": 0,
+            "segments": 0
+          }
+        ],
+        "hostFocusDecorations": 0,
+        "owned": [
+          {
+            "identity": 6,
+            "tag": "fluent-read-bilingual-content fluent-display-bold",
+            "parentId": "",
+            "text": "测试译文：No conflicts with base branch",
+            "translate": "no",
+            "translationLabel": null,
+            "sourceTextIdentity": 15
+          },
+          {
+            "identity": 7,
+            "tag": "fluent-read-bilingual-content fluent-display-bold",
+            "parentId": "",
+            "text": "测试译文：Merging can be performed automatically.",
+            "translate": "no",
+            "translationLabel": null,
+            "sourceTextIdentity": 16
+          },
+          {
+            "identity": 8,
+            "tag": "fluent-read-bilingual-content fluent-display-bold",
+            "parentId": "",
+            "text": "测试译文：You can also merge this with the command line.",
+            "translate": "no",
+            "translationLabel": null,
+            "sourceTextIdentity": 17
+          },
+          {
+            "identity": 9,
+            "tag": "fluent-read-bilingual-content fluent-display-bold",
+            "parentId": "prose",
+            "text": "测试译文：Read the merge guide before continuing.",
+            "translate": "no",
+            "translationLabel": null,
+            "sourceTextIdentity": 18
+          },
+          {
+            "identity": 10,
+            "tag": "fluent-read-bilingual-content fluent-display-bold",
+            "parentId": "decorative",
+            "text": "测试译文：Decorative badge",
+            "translate": "no",
+            "translationLabel": null,
+            "sourceTextIdentity": 19
+          },
+          {
+            "identity": 11,
+            "tag": "fluent-read-bilingual-content fluent-display-bold",
+            "parentId": "broken-focus",
+            "text": "测试译文：Broken focus target",
+            "translate": "no",
+            "translationLabel": null,
+            "sourceTextIdentity": 20
+          },
+          {
+            "identity": 12,
+            "tag": "fluent-read-bilingual-content fluent-display-bold",
+            "parentId": "shell-prose",
+            "text": "测试译文：The workflow editor keeps its application controls separate from documentation.",
+            "translate": "no",
+            "translationLabel": null,
+            "sourceTextIdentity": 21
+          },
+          {
+            "identity": 13,
+            "tag": "fluent-read-bilingual-content fluent-display-bold",
+            "parentId": "faq-question",
+            "text": "测试译文：How do I cancel my subscription?",
+            "translate": "no",
+            "translationLabel": null,
+            "sourceTextIdentity": 22
+          },
+          {
+            "identity": 14,
+            "tag": "fluent-read-bilingual-content fluent-display-bold",
+            "parentId": "faq-answer",
+            "text": "测试译文：Contact support from the billing page.",
+            "translate": "no",
+            "translationLabel": null,
+            "sourceTextIdentity": 23
+          }
+        ],
+        "nested": 0,
+        "requests": 22
+      },
+      "events": [
+        {
+          "kind": "add",
+          "at": 1791643450698,
+          "id": 6,
+          "html": "<span class=\"fluent-read-bilingual-content fluent-display-bold\" data-fr-translation-owned=\"true\" translate=\"no\" lang=\"zh-Hans\" dir=\"auto\">测试译文：No conflicts with base branch</span>"
+        },
+        {
+          "kind": "add",
+          "at": 1791643450700,
+          "id": 7,
+          "html": "<span class=\"fluent-read-bilingual-content fluent-display-bold\" data-fr-translation-owned=\"true\" translate=\"no\" lang=\"zh-Hans\" dir=\"auto\">测试译文：Merging can be performed automatically.</span>"
+        },
+        {
+          "kind": "add",
+          "at": 1791643450702,
+          "id": 8,
+          "html": "<span class=\"fluent-read-bilingual-content fluent-display-bold\" data-fr-translation-owned=\"true\" translate=\"no\" lang=\"zh-Hans\" dir=\"auto\">测试译文：You can also merge this with the command line.</span>"
+        },
+        {
+          "kind": "add",
+          "at": 1791643450718,
+          "id": 9,
+          "html": "<span class=\"fluent-read-bilingual-content fluent-display-bold\" data-fr-translation-owned=\"true\" translate=\"no\" lang=\"zh-Hans\" dir=\"auto\">测试译文：Read the merge guide before continuing.</span>"
+        },
+        {
+          "kind": "add",
+          "at": 1791643451721,
+          "id": 10,
+          "html": "<span class=\"fluent-read-bilingual-content fluent-display-bold\" data-fr-translation-owned=\"true\" translate=\"no\" lang=\"zh-Hans\" dir=\"auto\">测试译文：Decorative badge</span>"
+        },
+        {
+          "kind": "add",
+          "at": 1791643451722,
+          "id": 11,
+          "html": "<span class=\"fluent-read-bilingual-content fluent-display-bold\" data-fr-translation-owned=\"true\" translate=\"no\" lang=\"zh-Hans\" dir=\"auto\">测试译文：Broken focus target</span>"
+        },
+        {
+          "kind": "add",
+          "at": 1791643451722,
+          "id": 12,
+          "html": "<span class=\"fluent-read-bilingual-content fluent-display-bold\" data-fr-translation-owned=\"true\" translate=\"no\" lang=\"zh-Hans\" dir=\"auto\">测试译文：The workflow editor keeps its application controls separate from documentation.</span>"
+        },
+        {
+          "kind": "add",
+          "at": 1791643452650,
+          "id": 13,
+          "html": "<span class=\"fluent-read-bilingual-content fluent-display-bold\" data-fr-translation-owned=\"true\" translate=\"no\" lang=\"zh-Hans\" dir=\"auto\">测试译文：How do I cancel my subscription?</span>"
+        },
+        {
+          "kind": "add",
+          "at": 1791643452709,
+          "id": 14,
+          "html": "<span class=\"fluent-read-bilingual-content fluent-display-bold\" data-fr-translation-owned=\"true\" translate=\"no\" lang=\"zh-Hans\" dir=\"auto\">测试译文：Contact support from the billing page.</span>"
+        }
+      ],
+      "restored": {
+        "url": "https://example.com/fluentread-button-fixture",
+        "at": 1791643457145,
+        "controls": [
+          {
+            "id": "merge-button",
+            "identity": 1,
+            "html": "<span class=\"button-content\" data-display=\"flex\"><span class=\"button-label\" data-display=\"grid\">Merge pull request</span></span>",
+            "text": "Merge pull request",
+            "height": 32,
+            "ranges": [
+              {
+                "text": "Merge pull request",
+                "inside": true
+              }
+            ],
+            "wrappers": 0,
+            "segments": 0,
+            "clickCount": "1"
+          },
+          {
+            "id": "merge-menu",
+            "identity": 2,
+            "html": "<span aria-hidden=\"true\">▾</span>",
+            "text": "▾",
+            "height": 32,
+            "ranges": [
+              {
+                "text": "▾",
+                "inside": true
+              }
+            ],
+            "wrappers": 0,
+            "segments": 0,
+            "clickCount": "1"
+          },
+          {
+            "id": "save-button",
+            "identity": 3,
+            "html": "<span class=\"button-content\" data-display=\"flex\"><span aria-hidden=\"true\">✓</span><span class=\"button-label\" data-display=\"grid\">Save changes</span></span>",
+            "text": "✓Save changes",
+            "height": 32,
+            "ranges": [
+              {
+                "text": "✓",
+                "inside": true
+              },
+              {
+                "text": "Save changes",
+                "inside": true
+              }
+            ],
+            "wrappers": 0,
+            "segments": 0,
+            "clickCount": "1"
+          },
+          {
+            "id": "menu-action",
+            "identity": 4,
+            "html": "<div class=\"button-content\" data-display=\"flex\">Open settings</div>",
+            "text": "Open settings",
+            "height": 32,
+            "ranges": [
+              {
+                "text": "Open settings",
+                "inside": true
+              }
+            ],
+            "wrappers": 0,
+            "segments": 0,
+            "clickCount": "1"
+          },
+          {
+            "id": "split-button",
+            "identity": 5,
+            "html": "Review <span class=\"button-label\" data-display=\"grid\">changes</span><span class=\"badge notranslate\" translate=\"no\">23</span>",
+            "text": "Review changes23",
+            "height": 32,
+            "ranges": [
+              {
+                "text": "Review ",
+                "inside": true
+              },
+              {
+                "text": "changes",
+                "inside": true
+              },
+              {
+                "text": "23",
+                "inside": true
+              }
+            ],
+            "wrappers": 0,
+            "segments": 0,
+            "clickCount": "1"
+          }
+        ],
+        "buttonForms": [
+          {
+            "id": "submit-anonymous",
+            "tag": "input",
+            "value": "Create issue",
+            "text": "",
+            "html": "<input id=\"submit-anonymous\" type=\"submit\" value=\"Create issue\">",
+            "height": 32,
+            "wrappers": 0,
+            "segments": 0
+          },
+          {
+            "id": "button-input",
+            "tag": "input",
+            "value": "Preview changes",
+            "text": "",
+            "html": "<input id=\"button-input\" type=\"button\" value=\"Preview changes\">",
+            "height": 32,
+            "wrappers": 0,
+            "segments": 0
+          },
+          {
+            "id": "reset-input",
+            "tag": "input",
+            "value": "Reset form",
+            "text": "",
+            "html": "<input id=\"reset-input\" type=\"reset\" value=\"Reset form\">",
+            "height": 32,
+            "wrappers": 0,
+            "segments": 0
+          },
+          {
+            "id": "button-link",
+            "tag": "a",
+            "value": null,
+            "text": "Publish release",
+            "html": "<a id=\"button-link\" class=\"btn btn-primary\" href=\"#publish\" data-display=\"inline-block\">Publish release</a>",
+            "height": 32,
+            "wrappers": 0,
+            "segments": 0
+          },
+          {
+            "id": "hint-link",
+            "tag": "a",
+            "value": null,
+            "text": "Markdown is supported",
+            "html": "<a id=\"hint-link\" class=\"Link--secondary\" href=\"#markdown\" data-display=\"inline\">Markdown is supported</a>",
+            "height": 32,
+            "wrappers": 0,
+            "segments": 0
+          },
+          {
+            "id": "upload-label",
+            "tag": "label",
+            "value": null,
+            "text": "Paste, drop, or click to add files",
+            "html": "<label id=\"upload-label\" data-display=\"flex\">Paste, drop, or click to add files</label>",
+            "height": 32,
+            "wrappers": 0,
+            "segments": 0
+          },
+          {
+            "id": "custom-action",
+            "tag": "div",
+            "value": null,
+            "text": "Custom action",
+            "html": "<div id=\"custom-action\" tabindex=\"0\" data-display=\"inline-flex\">Custom action</div>",
+            "height": 32,
+            "wrappers": 0,
+            "segments": 0
+          },
+          {
+            "id": "preview-tab",
+            "tag": "span",
+            "value": null,
+            "text": "Preview tab",
+            "html": "<span id=\"preview-tab\" role=\"tab\" data-display=\"inline-block\">Preview tab</span>",
+            "height": 32,
+            "wrappers": 0,
+            "segments": 0
+          }
+        ],
+        "untouchedForms": [
+          {
+            "id": "submit-named",
+            "tag": "input",
+            "value": "Search issues",
+            "text": "",
+            "html": "<input id=\"submit-named\" type=\"submit\" name=\"commit\" value=\"Search issues\">",
+            "height": 32,
+            "wrappers": 0,
+            "segments": 0
+          },
+          {
+            "id": "text-input",
+            "tag": "input",
+            "value": "Private draft text",
+            "text": "",
+            "html": "<input id=\"text-input\" type=\"text\" name=\"q\" value=\"Private draft text\">",
+            "height": 32,
+            "wrappers": 0,
+            "segments": 0
+          }
+        ],
+        "hostFocusDecorations": 0,
+        "owned": [],
+        "nested": 0,
+        "requests": 22
+      },
+      "retranslated": {
+        "url": "https://example.com/fluentread-button-fixture",
+        "at": 1791643460244,
+        "controls": [
+          {
+            "id": "merge-button",
+            "identity": 1,
+            "html": "<span class=\"button-content\" data-display=\"flex\"><span class=\"button-label\" data-display=\"grid\">合并拉取请求</span></span>",
+            "text": "合并拉取请求",
+            "height": 32,
+            "ranges": [
+              {
+                "text": "合并拉取请求",
+                "inside": true
+              }
+            ],
+            "wrappers": 0,
+            "segments": 0,
+            "clickCount": "1"
+          },
+          {
+            "id": "merge-menu",
+            "identity": 2,
+            "html": "<span aria-hidden=\"true\">▾</span>",
+            "text": "▾",
+            "height": 32,
+            "ranges": [
+              {
+                "text": "▾",
+                "inside": true
+              }
+            ],
+            "wrappers": 0,
+            "segments": 0,
+            "clickCount": "1"
+          },
+          {
+            "id": "save-button",
+            "identity": 3,
+            "html": "<span class=\"button-content\" data-display=\"flex\"><span aria-hidden=\"true\">✓</span><span class=\"button-label\" data-display=\"grid\">保存更改</span></span>",
+            "text": "✓保存更改",
+            "height": 32,
+            "ranges": [
+              {
+                "text": "✓",
+                "inside": true
+              },
+              {
+                "text": "保存更改",
+                "inside": true
+              }
+            ],
+            "wrappers": 0,
+            "segments": 0,
+            "clickCount": "1"
+          },
+          {
+            "id": "menu-action",
+            "identity": 4,
+            "html": "<div class=\"button-content\" data-display=\"flex\">打开设置</div>",
+            "text": "打开设置",
+            "height": 32,
+            "ranges": [
+              {
+                "text": "打开设置",
+                "inside": true
+              }
+            ],
+            "wrappers": 0,
+            "segments": 0,
+            "clickCount": "1"
+          },
+          {
+            "id": "split-button",
+            "identity": 5,
+            "html": "审查 <span class=\"button-label\" data-display=\"grid\">更改</span><span class=\"badge notranslate\" translate=\"no\">23</span>",
+            "text": "审查 更改23",
+            "height": 32,
+            "ranges": [
+              {
+                "text": "审查 ",
+                "inside": true
+              },
+              {
+                "text": "更改",
+                "inside": true
+              },
+              {
+                "text": "23",
+                "inside": true
+              }
+            ],
+            "wrappers": 0,
+            "segments": 0,
+            "clickCount": "1"
+          }
+        ],
+        "buttonForms": [
+          {
+            "id": "submit-anonymous",
+            "tag": "input",
+            "value": "测试译文：Create issue",
+            "text": "",
+            "html": "<input id=\"submit-anonymous\" type=\"submit\" value=\"测试译文：Create issue\">",
+            "height": 32,
+            "wrappers": 0,
+            "segments": 0
+          },
+          {
+            "id": "button-input",
+            "tag": "input",
+            "value": "测试译文：Preview changes",
+            "text": "",
+            "html": "<input id=\"button-input\" type=\"button\" value=\"测试译文：Preview changes\">",
+            "height": 32,
+            "wrappers": 0,
+            "segments": 0
+          },
+          {
+            "id": "reset-input",
+            "tag": "input",
+            "value": "测试译文：Reset form",
+            "text": "",
+            "html": "<input id=\"reset-input\" type=\"reset\" value=\"测试译文：Reset form\">",
+            "height": 32,
+            "wrappers": 0,
+            "segments": 0
+          },
+          {
+            "id": "button-link",
+            "tag": "a",
+            "value": null,
+            "text": "测试译文：Publish release",
+            "html": "<a id=\"button-link\" class=\"btn btn-primary\" href=\"#publish\" data-display=\"inline-block\">测试译文：Publish release</a>",
+            "height": 32,
+            "wrappers": 0,
+            "segments": 0
+          },
+          {
+            "id": "hint-link",
+            "tag": "a",
+            "value": null,
+            "text": "测试译文：Markdown is supported",
+            "html": "<a id=\"hint-link\" class=\"Link--secondary\" href=\"#markdown\" data-display=\"inline\">测试译文：Markdown is supported</a>",
+            "height": 32,
+            "wrappers": 0,
+            "segments": 0
+          },
+          {
+            "id": "upload-label",
+            "tag": "label",
+            "value": null,
+            "text": "测试译文：Paste, drop, or click to add files",
+            "html": "<label id=\"upload-label\" data-display=\"flex\">测试译文：Paste, drop, or click to add files</label>",
+            "height": 32,
+            "wrappers": 0,
+            "segments": 0
+          },
+          {
+            "id": "custom-action",
+            "tag": "div",
+            "value": null,
+            "text": "测试译文：Custom action",
+            "html": "<div id=\"custom-action\" tabindex=\"0\" data-display=\"inline-flex\">测试译文：Custom action</div>",
+            "height": 32,
+            "wrappers": 0,
+            "segments": 0
+          },
+          {
+            "id": "preview-tab",
+            "tag": "span",
+            "value": null,
+            "text": "测试译文：Preview tab",
+            "html": "<span id=\"preview-tab\" role=\"tab\" data-display=\"inline-block\">测试译文：Preview tab</span>",
+            "height": 32,
+            "wrappers": 0,
+            "segments": 0
+          }
+        ],
+        "untouchedForms": [
+          {
+            "id": "submit-named",
+            "tag": "input",
+            "value": "Search issues",
+            "text": "",
+            "html": "<input id=\"submit-named\" type=\"submit\" name=\"commit\" value=\"Search issues\">",
+            "height": 32,
+            "wrappers": 0,
+            "segments": 0
+          },
+          {
+            "id": "text-input",
+            "tag": "input",
+            "value": "Private draft text",
+            "text": "",
+            "html": "<input id=\"text-input\" type=\"text\" name=\"q\" value=\"Private draft text\">",
+            "height": 32,
+            "wrappers": 0,
+            "segments": 0
+          }
+        ],
+        "hostFocusDecorations": 0,
+        "owned": [
+          {
+            "identity": 24,
+            "tag": "fluent-read-bilingual-content fluent-display-bold",
+            "parentId": "",
+            "text": "测试译文：No conflicts with base branch",
+            "translate": "no",
+            "translationLabel": null,
+            "sourceTextIdentity": 33
+          },
+          {
+            "identity": 25,
+            "tag": "fluent-read-bilingual-content fluent-display-bold",
+            "parentId": "",
+            "text": "测试译文：Merging can be performed automatically.",
+            "translate": "no",
+            "translationLabel": null,
+            "sourceTextIdentity": 34
+          },
+          {
+            "identity": 26,
+            "tag": "fluent-read-bilingual-content fluent-display-bold",
+            "parentId": "",
+            "text": "测试译文：You can also merge this with the command line.",
+            "translate": "no",
+            "translationLabel": null,
+            "sourceTextIdentity": 35
+          },
+          {
+            "identity": 27,
+            "tag": "fluent-read-bilingual-content fluent-display-bold",
+            "parentId": "prose",
+            "text": "测试译文：Read the merge guide before continuing.",
+            "translate": "no",
+            "translationLabel": null,
+            "sourceTextIdentity": 36
+          },
+          {
+            "identity": 28,
+            "tag": "fluent-read-bilingual-content fluent-display-bold",
+            "parentId": "decorative",
+            "text": "测试译文：Decorative badge",
+            "translate": "no",
+            "translationLabel": null,
+            "sourceTextIdentity": 37
+          },
+          {
+            "identity": 29,
+            "tag": "fluent-read-bilingual-content fluent-display-bold",
+            "parentId": "broken-focus",
+            "text": "测试译文：Broken focus target",
+            "translate": "no",
+            "translationLabel": null,
+            "sourceTextIdentity": 38
+          },
+          {
+            "identity": 30,
+            "tag": "fluent-read-bilingual-content fluent-display-bold",
+            "parentId": "shell-prose",
+            "text": "测试译文：The workflow editor keeps its application controls separate from documentation.",
+            "translate": "no",
+            "translationLabel": null,
+            "sourceTextIdentity": 39
+          },
+          {
+            "identity": 31,
+            "tag": "fluent-read-bilingual-content fluent-display-bold",
+            "parentId": "faq-question",
+            "text": "测试译文：How do I cancel my subscription?",
+            "translate": "no",
+            "translationLabel": null,
+            "sourceTextIdentity": 40
+          },
+          {
+            "identity": 32,
+            "tag": "fluent-read-bilingual-content fluent-display-bold",
+            "parentId": "faq-answer",
+            "text": "测试译文：Contact support from the billing page.",
+            "translate": "no",
+            "translationLabel": null,
+            "sourceTextIdentity": 41
+          }
+        ],
+        "nested": 0,
+        "requests": 44
+      },
+      "passed": true
+    }
+  ],
+  "errors": [],
+  "build": {
+    "manifest.json": {
+      "mtime": "2026-10-10T14:42:17.687Z",
+      "sha256": "fd80314b160701ed5500e584e1373f5eed44a19acdc6f8b76f9a12c1565970d8"
+    },
+    "content-scripts/content.js": {
+      "mtime": "2026-10-10T14:41:45.402Z",
+      "sha256": "25be40ed94b8da5f672062674bc8ba345f1749909582e780c56615ffd5e7275f"
+    }
+  },
+  "launchMode": "macos-background-cdp",
+  "focusPolicy": "launchservices-no-foreground",
+  "windowPlacement": {
+    "mode": "background-visible-no-focus",
+    "visible": true,
+    "hidden": false,
+    "centered": true,
+    "windowState": "normal",
+    "bounds": {
+      "left": 212,
+      "top": -990,
+      "width": 1280,
+      "height": 900
+    },
+    "displayTarget": "secondary",
+    "source": "macos-nsscreen",
+    "screenIndex": 1,
+    "browserFrontmost": false,
+    "frontmostBefore": {
+      "pid": 44386,
+      "name": "Google Chrome"
+    },
+    "frontmostAfter": {
+      "pid": 44386,
+      "name": "Google Chrome"
+    }
+  },
+  "config": {
+    "service": "microsoft",
+    "from": "en",
+    "to": "zh-Hans",
+    "display": 1,
+    "autoTranslate": false,
+    "hotkey": "Control",
+    "floatingBallHotkey": "Alt+T",
+    "mouseHoverTranslationDelay": 0,
+    "fullPageTranslationMode": "all",
+    "useCache": false,
+    "enableAIContext": false,
+    "enableAIMultiSegment": false,
+    "uiLanguage": "zh-CN",
+    "uiLanguageSetupCompleted": true
+  },
+  "passed": true
+}

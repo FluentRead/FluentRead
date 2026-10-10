@@ -1,0 +1,86 @@
+{
+  "generatedAt": "2026-10-10T14:23:34.034Z",
+  "browser": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/154.0.0.0 Safari/537.36",
+  "files": [
+    {
+      "fileName": "browser-readable.pdf",
+      "bytes": 38262,
+      "pages": 4,
+      "progress": [
+        {
+          "phase": "rendering",
+          "completedPages": 0,
+          "totalPages": 1
+        },
+        {
+          "phase": "rendering",
+          "completedPages": 1,
+          "totalPages": 1
+        },
+        {
+          "phase": "saving",
+          "completedPages": 1,
+          "totalPages": 1
+        }
+      ]
+    },
+    {
+      "fileName": "browser-bilingual.pdf",
+      "bytes": 39439,
+      "pages": 5,
+      "progress": [
+        {
+          "phase": "rendering",
+          "completedPages": 0,
+          "totalPages": 1
+        },
+        {
+          "phase": "rendering",
+          "completedPages": 1,
+          "totalPages": 1
+        },
+        {
+          "phase": "saving",
+          "completedPages": 1,
+          "totalPages": 1
+        }
+      ]
+    },
+    {
+      "fileName": "browser-bilingual-layout.pdf",
+      "bytes": 67693,
+      "pages": 6,
+      "progress": [
+        {
+          "phase": "rendering",
+          "completedPages": 0,
+          "totalPages": 1
+        },
+        {
+          "phase": "rendering",
+          "completedPages": 1,
+          "totalPages": 1
+        },
+        {
+          "phase": "saving",
+          "completedPages": 1,
+          "totalPages": 1
+        }
+      ]
+    }
+  ],
+  "selectedText": "可复制的中文 PDF 译文\n公式与图表保持原貌\n中文译文可复制、可搜索，中英混合 Mixed English 123；标点：“引号”《书名》？！①②。·•\n中文译文可复制、可搜索，中英混合 Mixed English 123；标点：“引号”《书名》？！①②。·•\n中文译文可复制、可搜索，中英混合 Mixed English 123；标点：“引号”《书名》？！①②。·•\n中文译文可复制、可搜索，中英混合 Mixed English 123；标点：“引号”《书名》？！①②。·•\n中文译文可复制、可搜索，中英混合 Mixed English 123；标点：“引号”《书名》？！①②。·•\n中文译文可复制、可搜索，中英混合 Mixed English 123；标点：“引号”《书名》？！①②。·•\n中文译文可复制、可搜索，中英混合 Mixed English 123；标点：“引号”《书名》？！①②。·•\n中文译文可复制、可搜索，中英混合 Mixed English 123；标点：“引号”《书名》？！①②。·•\n中文译文可复制、可搜索，中英混合 Mixed English 123；标点：“引号”《书名》？！①②。·•\n中文译文可复制、可搜索，中英混合 Mixed English 123；标点：“引号”《书名》？！①②。·•\n中文译文可复制、可搜索，中英混合 Mixed English 123；标点：“引号”《书名》？！①②。·•\n中文译文可复制、可搜索，中英混合 Mixed English 123；标点：“引号”《书名》？！①②。·•\n中文译文可复制、可搜索，中英混合 Mixed English 123；标点：“引号”《书名》？！①②。·•\n中文译文可复制、可搜索，中英混合 Mixed English 123；标点：“引号”《书名》？！①②。·•\n中文译文可复制、可搜索，中英混合 Mixed English 123；标点：“引号”《书名》？！①②。·•\n中文译文可复制、可搜索，中英混合 Mixed English 123；标点：“引号”《书名》？！①②。·•\n中文译文可复制、可搜索，中英混合 Mixed English 123；标点：“引号”《书名》？！①②。·•\n中文译文可复制、可搜索，中英混合 Mixed English 123；标点：“引号”《书名》？！①②。·•\n中文译文可复制、可搜索，中英混合 Mixed English 123；标点：“引号”《书名》？！①②。·•\n中文译文可复制、可搜索，中英混合 Mixed English 123；标点：“引号”《书名》？！①②。·•\n中文译文可复制、可搜索，中英混合 Mixed English 123；标点：“引号”《书名》？！①②。·•\n中文译文可复制、可搜索，中英混合 Mixed English 123；标点：“引号”《书名》？！①②。·•\n中文译文可复制、可搜索，中英混合 Mixed English 123；标点：“引号”《书名》？！①②。·•",
+  "cancellation": {
+    "iteratorReleased": true,
+    "canvasesReleased": 2
+  },
+  "assertions": {
+    "unicodeAndTail": true,
+    "originalPage": true,
+    "continuation": true,
+    "chineseTextSelection": true,
+    "clipboardRoundTrip": true,
+    "cancellationCanvasRelease": true
+  },
+  "errors": []
+}

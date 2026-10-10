@@ -193,15 +193,13 @@ export async function translateVideoSubtitleCues(
   let cursor = 0;
   let completed = 0;
   let failed = false;
-  let failure: unknown;
   options.onProgress?.(completed, sources.length);
 
   const worker = async () => {
     while (!failed) {
       if (options.signal?.aborted) {
         failed = true;
-        failure = createVideoSubtitleAbortError();
-        return;
+        throw createVideoSubtitleAbortError();
       }
 
       const index = cursor;
@@ -219,17 +217,14 @@ export async function translateVideoSubtitleCues(
         completed += 1;
         options.onProgress?.(completed, sources.length);
       } catch (error) {
-        if (!failed) {
-          failed = true;
-          failure = error;
-        }
-        return;
+        failed = true;
+        // Promise.all 立即交还首错；它仍观察兄弟 worker，迟到结果只会命中 failed 返回。
+        throw error ?? new Error('字幕翻译失败');
       }
     }
   };
 
   await Promise.all(Array.from({ length: concurrency }, () => worker()));
-  if (failed) throw failure ?? new Error('字幕翻译失败');
 
   return cues.map((cue) => ({
     ...cue,
@@ -272,6 +267,22 @@ export function getVideoTranslationConfigFingerprint(value: Config): string {
     endpoint,
     azureOpenaiEndpoint: service === 'azureOpenai' ? value.azureOpenaiEndpoint : '',
     customBody: value.customBody[service] || '',
+    customHeaders: value.customHeaders[service] || '',
+    requestHeaderRules: value.requestHeaderRules,
+    apiKeys: value.apiKeys[service],
+    secret: value.secret[service] || '',
+    serviceRegion: value.serviceRegion[service] || '',
+    requireApiKey: value.requireApiKey,
+    freeTranslationOrder: service === 'free' ? value.freeTranslationOrder : undefined,
+    freeTranslationMode: service === 'free' ? value.freeTranslationMode : undefined,
+    minimaxRegion: service === 'minimax' ? value.minimaxRegion : undefined,
+    minimaxBillingPlan: service === 'minimax' ? value.minimaxBillingPlan : undefined,
+    mimoRegion: service === 'mimo' ? value.mimoRegion : undefined,
+    mimoBillingPlan: service === 'mimo' ? value.mimoBillingPlan : undefined,
+    deeplApiPlan: service === 'deepl' ? value.deeplApiPlan : undefined,
+    ak: value.ak, sk: value.sk,
+    youdaoAppKey: value.youdaoAppKey, youdaoAppSecret: value.youdaoAppSecret,
+    tencentSecretId: value.tencentSecretId, tencentSecretKey: value.tencentSecretKey,
     customOpenAIProviders: value.customOpenAIProviders,
     modelThinking: value.modelThinking,
     systemRole: value.system_role[service] || '',

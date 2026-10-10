@@ -2,7 +2,7 @@
  * @file src/features/video-subtitle/content/ui.ts
  *
  * 文件职责：封装视频字幕 content UI 的界面语言转换与可访问名称刷新，避免 YouTube 播放器运行时承载重复的文案拼装。
- * 主要内容：提供视频菜单本地化、校时与就地模型选择控件样式、节点创建、播放器定位，过滤 YouTube 滚动窗口裁掉的旧行，按 X 实际画面约束字幕几何与换行，并封装样式及字幕下载。
+ * 主要内容：提供视频菜单本地化、校时与就地模型选择控件样式、节点创建、播放器定位，过滤 YouTube 滚动窗口裁掉的旧行，按实际画面约束字幕几何、换行与大字号完整高度，并封装样式及字幕下载。
  * 模块边界：只读取界面配置并操作视频 feature 拥有的节点、样式和下载链接，不发起翻译或识别请求；任务生命周期由 runtime 管理。
  */
 
@@ -11,6 +11,7 @@ import {config} from '@/src/services/config/store';
 import {type VideoSubtitleDisplayMode} from '@/src/core/config/model';
 import {cuesToSrt, sanitizeSubtitleFilename, type VideoSubtitleCue} from './youtubeSubtitleData';
 import {getCaptionPlatform} from './platforms';
+import {fitVideoSubtitleFontSize} from './subtitleLayout';
 
 import {
     normalizeUiLanguage,
@@ -526,6 +527,10 @@ export function syncTranslationOverlayPosition(container: HTMLElement | null): v
   panel.style.setProperty('max-height', `${Math.max(0, playerHeight - (appearance.position === 'center' ? 24 : offset + 12))}px`, 'important');
   panel.style.transform = appearance.position === 'center' ? 'translateY(-50%)' : 'none';
   if (!active) return;
+  fitVideoSubtitleFontSize(baseFontSize * fontScale,
+    Math.max(0, playerHeight - (appearance.position === 'center' ? 24 : offset + 12)),
+    size => panel.style.setProperty('--fluent-read-video-subtitle-font-size', `${size}px`),
+    () => panel.scrollHeight);
 
   // 背景只包住双语文本，并以播放器中心为锚点。长字幕仍受播放器宽度限制，
   // 超出时在面板内部换行，而不是把半透明背景铺满整行。
@@ -1208,6 +1213,9 @@ export function installVideoSubtitleStyle(): HTMLStyleElement {
     #${VIDEO_TRANSLATION_MENU_ID} .fluent-read-video-menu-download-status:empty,
     #${VIDEO_TRANSLATION_MENU_ID}[data-measuring] .fluent-read-video-menu-download-status { display: none !important; }
 
+    #${VIDEO_TRANSLATION_MENU_ID}[data-view="export-prompt"] .fluent-read-video-model-prompt.fluent-read-video-export-prompt { display: flex !important; flex-direction: column !important; gap: 8px !important; }
+    #${VIDEO_TRANSLATION_MENU_ID} .fluent-read-video-export-actions { flex-wrap: wrap !important; }
+    #${VIDEO_TRANSLATION_MENU_ID} .fluent-read-video-export-actions button { white-space: normal !important; }
     #${VIDEO_TRANSLATION_MENU_ID} .fluent-read-video-model-prompt {
       display: grid !important;
       grid-template-columns: minmax(0, 1fr) !important;

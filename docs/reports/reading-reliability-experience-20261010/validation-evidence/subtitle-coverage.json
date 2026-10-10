@@ -1,0 +1,138 @@
+{
+  "total": {
+    "lines": {
+      "total": 580,
+      "covered": 580,
+      "skipped": 0,
+      "pct": 100
+    },
+    "statements": {
+      "total": 580,
+      "covered": 580,
+      "skipped": 0,
+      "pct": 100
+    },
+    "functions": {
+      "total": 40,
+      "covered": 40,
+      "skipped": 0,
+      "pct": 100
+    },
+    "branches": {
+      "total": 419,
+      "covered": 419,
+      "skipped": 0,
+      "pct": 100
+    },
+    "branchesTrue": {
+      "total": 0,
+      "covered": 0,
+      "skipped": 0,
+      "pct": "Unknown"
+    }
+  },
+  "src/features/video-subtitle/content/downloads.ts": {
+    "lines": {
+      "total": 196,
+      "covered": 196,
+      "skipped": 0,
+      "pct": 100
+    },
+    "functions": {
+      "total": 15,
+      "covered": 15,
+      "skipped": 0,
+      "pct": 100
+    },
+    "statements": {
+      "total": 196,
+      "covered": 196,
+      "skipped": 0,
+      "pct": 100
+    },
+    "branches": {
+      "total": 157,
+      "covered": 157,
+      "skipped": 0,
+      "pct": 100
+    }
+  },
+  "src/features/video-subtitle/content/exportPrompt.ts": {
+    "lines": {
+      "total": 90,
+      "covered": 90,
+      "skipped": 0,
+      "pct": 100
+    },
+    "functions": {
+      "total": 7,
+      "covered": 7,
+      "skipped": 0,
+      "pct": 100
+    },
+    "statements": {
+      "total": 90,
+      "covered": 90,
+      "skipped": 0,
+      "pct": 100
+    },
+    "branches": {
+      "total": 43,
+      "covered": 43,
+      "skipped": 0,
+      "pct": 100
+    }
+  },
+  "src/features/video-subtitle/content/subtitleLayout.ts": {
+    "lines": {
+      "total": 24,
+      "covered": 24,
+      "skipped": 0,
+      "pct": 100
+    },
+    "functions": {
+      "total": 1,
+      "covered": 1,
+      "skipped": 0,
+      "pct": 100
+    },
+    "statements": {
+      "total": 24,
+      "covered": 24,
+      "skipped": 0,
+      "pct": 100
+    },
+    "branches": {
+      "total": 20,
+      "covered": 20,
+      "skipped": 0,
+      "pct": 100
+    }
+  },
+  "src/features/video-subtitle/content/subtitleLogic.ts": {
+    "lines": {
+      "total": 270,
+      "covered": 270,
+      "skipped": 0,
+      "pct": 100
+    },
+    "functions": {
+      "total": 17,
+      "covered": 17,
+      "skipped": 0,
+      "pct": 100
+    },
+    "statements": {
+      "total": 270,
+      "covered": 270,
+      "skipped": 0,
+      "pct": 100
+    },
+    "branches": {
+      "total": 199,
+      "covered": 199,
+      "skipped": 0,
+      "pct": 100
+    }
+  }
+}

@@ -183,6 +183,128 @@ describe('内容脚本文档类型边界', () => {
 });
 
 describe('content runtime 页面生命周期', () => {
+    it('可信前后台切换调整检查预算，伪造事件和往返缓存中的可见性变化不能恢复检查', () => {
+        vi.useFakeTimers();
+        const controller = new AbortController();
+        try {
+            const target = new EventTarget();
+            const pageDocument = Object.assign(new EventTarget(), {visibilityState: 'visible'});
+            const readInvalid = vi.fn(() => false);
+            const actions = {suspend: vi.fn(), resume: vi.fn(), dispose: vi.fn()};
+            installContentPageLifecycle(target, controller.signal, actions,
+                {get isInvalid() { return readInvalid(); }}, pageDocument as unknown as Document);
+            pageDocument.visibilityState = 'hidden';
+            transition(pageDocument, 'visibilitychange', false, false);
+            vi.advanceTimersByTime(1000);
+            expect(readInvalid).toHaveBeenCalledOnce();
+            transition(pageDocument, 'visibilitychange');
+            vi.advanceTimersByTime(4999);
+            expect(readInvalid).toHaveBeenCalledOnce();
+            vi.advanceTimersByTime(1);
+            expect(readInvalid).toHaveBeenCalledTimes(2);
+            transition(target, 'pagehide', true);
+            pageDocument.visibilityState = 'visible';
+            transition(pageDocument, 'visibilitychange');
+            expect(readInvalid).toHaveBeenCalledTimes(2);
+            expect(vi.getTimerCount()).toBe(0);
+            transition(target, 'pageshow', true);
+            transition(pageDocument, 'visibilitychange');
+            expect(readInvalid).toHaveBeenCalledTimes(4);
+            expect(actions.resume).toHaveBeenCalledOnce();
+        } finally { controller.abort(); vi.useRealTimers(); }
+    });
+
+    it('WXT getter 同步触发失效回调时清理一次，不再由轮询重复销毁', () => {
+        vi.useFakeTimers();
+        try {
+            let invalidated!: () => void;
+            const unsubscribe = vi.fn();
+            const actions = {suspend: vi.fn(), resume: vi.fn(), dispose: vi.fn()};
+            installContentPageLifecycle(new EventTarget(), new AbortController().signal, actions, {
+                get isInvalid() { invalidated(); return true; },
+                onInvalidated(callback) { invalidated = callback; return unsubscribe; },
+            });
+            vi.advanceTimersByTime(1000);
+            invalidated();
+            expect(actions.dispose).toHaveBeenCalledOnce();
+            expect(unsubscribe).toHaveBeenCalledOnce();
+            expect(vi.getTimerCount()).toBe(0);
+        } finally { vi.useRealTimers(); }
+    });
+
+    it('userscript 不轮询浏览器端口，仍响应失效并释放上下文订阅', () => {
+        vi.useFakeTimers();
+        try {
+            let invalidated!: () => void;
+            const unsubscribe = vi.fn();
+            const actions = {suspend: vi.fn(), resume: vi.fn(), dispose: vi.fn()};
+            installContentPageLifecycle(new EventTarget(), new AbortController().signal, actions, {
+                isInvalid: false, onInvalidated(callback) { invalidated = callback; return unsubscribe; },
+            }, undefined, false);
+            expect(vi.getTimerCount()).toBe(0);
+            invalidated();
+            expect(actions.dispose).toHaveBeenCalledOnce();
+            expect(unsubscribe).toHaveBeenCalledOnce();
+        } finally { vi.useRealTimers(); }
+    });
+
+    it('后台空闲页减少上下文检查，回到前台立即核查失效', () => {
+        vi.useFakeTimers();
+        const controller = new AbortController();
+        try {
+            const target = new EventTarget();
+            const pageDocument = Object.assign(new EventTarget(), {visibilityState: 'hidden'});
+            const readInvalid = vi.fn(() => false);
+            const actions = {suspend: vi.fn(), resume: vi.fn(), dispose: vi.fn()};
+            installContentPageLifecycle(target, controller.signal, actions,
+                {get isInvalid() { return readInvalid(); }}, pageDocument as unknown as Document);
+            vi.advanceTimersByTime(60_000);
+            expect(readInvalid.mock.calls.length).toBeLessThanOrEqual(12);
+            expect(actions.dispose).not.toHaveBeenCalled();
+
+            readInvalid.mockReturnValue(true);
+            pageDocument.visibilityState = 'visible';
+            transition(pageDocument, 'visibilitychange');
+            expect(actions.dispose).toHaveBeenCalledOnce();
+            expect(vi.getTimerCount()).toBe(0);
+        } finally { controller.abort(); vi.useRealTimers(); }
+    });
+
+    it('往返缓存暂停所有检查，恢复前失效不重新挂载旧功能', () => {
+        vi.useFakeTimers();
+        const controller = new AbortController();
+        try {
+            const target = new EventTarget();
+            const context = {isInvalid: false};
+            const actions = {suspend: vi.fn(), resume: vi.fn(), dispose: vi.fn()};
+            installContentPageLifecycle(target, controller.signal, actions, context);
+            transition(target, 'pagehide', true);
+            expect(vi.getTimerCount()).toBe(0);
+            context.isInvalid = true;
+            transition(target, 'pageshow', true);
+            expect(actions.resume).not.toHaveBeenCalled();
+            expect(actions.dispose).toHaveBeenCalledOnce();
+            expect(vi.getTimerCount()).toBe(0);
+        } finally { controller.abort(); vi.useRealTimers(); }
+    });
+
+    it('真正离开后自行释放定时器和监听，不依赖销毁回调再次中止信号', () => {
+        vi.useFakeTimers();
+        const controller = new AbortController();
+        try {
+            const target = new EventTarget();
+            const remove = vi.spyOn(target, 'removeEventListener');
+            const actions = {suspend: vi.fn(), resume: vi.fn(), dispose: vi.fn()};
+            installContentPageLifecycle(target, controller.signal, actions, {isInvalid: false});
+            transition(target, 'pagehide');
+            expect(actions.dispose).toHaveBeenCalledOnce();
+            expect(vi.getTimerCount()).toBe(0);
+            expect(remove.mock.calls.map(([name]) => name)).toEqual(expect.arrayContaining(['pagehide', 'pageshow']));
+            vi.advanceTimersByTime(60_000);
+            expect(actions.dispose).toHaveBeenCalledOnce();
+        } finally { controller.abort(); vi.useRealTimers(); }
+    });
+
     it('上下文检查只在失效时销毁一次，并立即停止检查', () => {
         vi.useFakeTimers();
         try {

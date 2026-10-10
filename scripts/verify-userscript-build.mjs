@@ -38,7 +38,10 @@ const artifactBytes = Buffer.byteLength(source);
 // 原始对照与集成证据见 docs/reports/section-translation-quality-20261011/。
 // 随后整合区域翻译 0a69bfc3：同依赖 main 为 1,993,179，悬浮集成产物为 1,997,758。
 // 增加 4,579 字节（0.2297%），原预算余量 821 字节，按实测最小增加 4 KB；见悬浮报告 pr-integration-931/。
-const MAX_USERSCRIPT_BYTES = 1_998_000;
+// 右键来源保护及通知交互的原始对照增加 3,443 字节（0.1734%）；原生菜单专属逻辑和文案按目标剔除。
+// 整合区域与悬浮优化后：同依赖 main 为 1,997,714，候选为 2,001,158，预算最小增加 4 KB。
+// 保留全部协议/兼容性检查；证据见 docs/reports/context-menu-experience-20261011/。
+const MAX_USERSCRIPT_BYTES = 2_002_000;
 const preludeStartMarker = '/* FluentRead userscript compatibility prelude:start */';
 const preludeEndMarker = '/* FluentRead userscript compatibility prelude:end */';
 const preludeStart = source.indexOf(preludeStartMarker);

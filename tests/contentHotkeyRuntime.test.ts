@@ -550,6 +550,7 @@ describe('受支持的 F9 全文快捷键使用真实 core 仲裁', () => {
             ...runtime.selectionShortcutPorts,
         }, controller.signal);
 
+        documentTarget.emit('mouseover', {isTrusted: true, clientX: 32, clientY: 48});
         const down = f9Event();
         // 分别驱动 window/document 的实际监听器；即使收到事件，全文自己的仲裁也必须成立。
         windowTarget.emit('keydown', down);
@@ -561,7 +562,7 @@ describe('受支持的 F9 全文快捷键使用真实 core 仲裁', () => {
         windowTarget.emit('keyup', up);
         documentTarget.emit('keyup', up);
         expect(handleTranslation).toHaveBeenCalledOnce();
-        expect(handleTranslation).toHaveBeenCalledWith(0, 0);
+        expect(handleTranslation).toHaveBeenCalledWith(32, 48);
         expect(mocks.autoTranslateEnglishPage).not.toHaveBeenCalled();
         expect(mocks.restoreOriginalContent).not.toHaveBeenCalled();
 

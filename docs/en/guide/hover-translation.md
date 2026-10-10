@@ -10,6 +10,10 @@ Hover over a paragraph and press **Control** to translate just that paragraph.
 2. Hover over the paragraph and press **Control**.
 3. Read the translation below it. Press again to restore. Editable areas do not trigger hover translation.
 
+Hold the shortcut and move the mouse to translate continuously. Returning to a translated paragraph keeps its translation; release the keys and press again to show the original. The hover delay helps avoid triggers while moving. Set it to 0 to translate without a dwell period.
+
+Changing pages, chapters, or browser tabs cancels hover gestures that are still waiting. Move the mouse and press the shortcut again to continue after returning. Old key state does not start translation on a new page. Default and additional hover shortcuts follow the same rules.
+
 <details class="guide-details">
 <summary>Paragraph copying and trigger settings</summary>
 

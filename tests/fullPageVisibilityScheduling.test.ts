@@ -1834,6 +1834,8 @@ describe("全文翻译可见性锚点", () => {
     it.each([
         ['light', 'translated'], ['light', 'loading'], ['shadow', 'translated'], ['shadow', 'loading'],
     ] as const)('%s 树中删除选择器所需兄弟节点会取消 %s 正文，恢复兄弟后重新发现', async (tree, phase) => {
+        // 本例验证结构资格；让发现时间片与 fake timers 同步，避免宿主 CPU 负载改变候选到达顺序。
+        replaceGlobal('performance', {now: () => Date.now()});
         runtime.config.fullPageTranslationMode = 'all';
         runtime.config.display = 1;
         document.body.innerHTML = '<div id="host"></div>';

@@ -1,0 +1,47 @@
+{
+  "scope": "Controlled real extension: failure summary, locate, failed-only retry, retained DOM and restore/retranslate",
+  "errors": [],
+  "launchMode": "macos-background-cdp",
+  "focusPolicy": "launchservices-no-foreground",
+  "windowPlacement": {
+    "mode": "background-visible-no-focus",
+    "visible": true,
+    "hidden": false,
+    "centered": true,
+    "windowState": "normal",
+    "bounds": {
+      "left": 302,
+      "top": -940,
+      "width": 1100,
+      "height": 800
+    },
+    "displayTarget": "secondary",
+    "source": "macos-nsscreen",
+    "screenIndex": 1,
+    "browserFrontmost": false,
+    "frontmostBefore": {
+      "pid": 44386,
+      "name": "Google Chrome"
+    },
+    "frontmostAfter": {
+      "pid": 44386,
+      "name": "Google Chrome"
+    }
+  },
+  "bundledFont": {
+    "ok": true,
+    "bytes": 4977684,
+    "sha256": "ea983e51e010c28a6a03839cffea942243e49342be7307be4f2f283e73ab8127"
+  },
+  "failed": {
+    "failed": "1",
+    "completed": "2",
+    "text": "!部分段落翻译失败进行中 0剩余 0已完成 2失败 1重试失败项定位失败段落"
+  },
+  "retryRequests": [
+    [
+      "Failed paragraph should retry without touching successful content."
+    ]
+  ],
+  "passed": true
+}

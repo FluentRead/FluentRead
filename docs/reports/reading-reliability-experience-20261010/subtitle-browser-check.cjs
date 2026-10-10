@@ -125,7 +125,7 @@ async function main() {
   const geometry = () => page.evaluate(() => {
     const panel = document.querySelector('#fluent-read-video-subtitle-panel'), overlay = document.querySelector('#fluent-read-video-subtitle');
     const player = document.querySelector('#movie_player'); const p = panel.getBoundingClientRect(), r = player.getBoundingClientRect();
-    return {font: parseFloat(getComputedStyle(overlay).fontSize), panel: p.toJSON(), player: r.toJSON(), scrollHeight: panel.scrollHeight, clientHeight: panel.clientHeight,
+    return {font: parseFloat(getComputedStyle(overlay).fontSize), maximumHeight: parseFloat(getComputedStyle(panel).maxHeight), panel: p.toJSON(), player: r.toJSON(), scrollHeight: panel.scrollHeight, clientHeight: panel.clientHeight,
       inside: p.left >= r.left - 1 && p.right <= r.right + 1 && p.top >= r.top - 1 && p.bottom <= r.bottom + 1 && panel.scrollHeight <= panel.clientHeight + 1};
   });
   result.cases.short500 = await geometry(); assert(result.cases.short500.font >= 70 && result.cases.short500.inside, 'short subtitle not large/contained', result.cases.short500);
@@ -134,7 +134,8 @@ async function main() {
   await page.waitForTimeout(400);
   await page.evaluate(long => {document.querySelector('video').currentTime = 5; document.querySelector('.ytp-caption-segment').textContent = long;}, long);
   await page.waitForFunction(() => document.querySelector('#fluent-read-video-subtitle')?.textContent.includes('这是一条很长'));
-  result.cases.long500 = await geometry(); assert(result.cases.long500.inside, 'long bilingual subtitle escaped player', result.cases.long500);
+  result.cases.long500 = await geometry(); assert(result.cases.long500.inside && result.cases.long500.font > 8
+    && result.cases.long500.panel.height >= result.cases.long500.maximumHeight * .8, 'long bilingual subtitle escaped player or shrank too far', result.cases.long500);
   assert((await readConfig()).videoSubtitleAppearance.fontScale === 500, 'automatic fit mutated preference');
   await screenshot(page, 'long-500.png');
   await page.locator('#fluent-read-video-subtitle-button').press('Enter');
@@ -185,6 +186,7 @@ main().catch(async error => {
 }).finally(async () => {
   if (session) await session.close().catch(error => errors.push(error.message));
   if (server) await new Promise(resolve => server.close(resolve));
+  fs.rmSync(path.join(artifacts, 'fixture.mp4'), {force: true});
   fs.rmSync(profileDir, {recursive: true, force: true});
   fs.mkdirSync(artifacts, {recursive: true}); fs.writeFileSync(path.join(artifacts, 'result.json'), JSON.stringify(result, null, 2));
   process.stdout.write(JSON.stringify(result, null, 2) + '\n');

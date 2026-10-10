@@ -1,0 +1,145 @@
+{
+  "success": true,
+  "scope": "production extension; offline YouTube/media + loopback Microsoft fixture; no live provider, Firefox or low-end hardware",
+  "extensionDir": "/private/tmp/fluentread-subtitle-production-20261010-2242",
+  "profileDir": "/var/folders/2v/qd62bpkx51scgbvv2nrclsxm0000gn/T/fluentread-subtitle-reliability-ocSbE9",
+  "requests": [
+    "Readable subtitle.",
+    "This long bilingual subtitle must remain entirely inside the video viewport while the requested font scale stays at five hundred percent. This long bilingual subtitle must remain entirely inside the video viewport while the requested font scale stays at five hundred percent. This long bilingual subtitle must remain entirely inside the video viewport while the requested font scale stays at five hundred percent. This long bilingual subtitle must remain entirely inside the video viewport while the requested font scale stays at five hundred percent.",
+    "First missing export sentence.",
+    "Second missing export sentence."
+  ],
+  "blocked": [],
+  "errors": [],
+  "cases": {
+    "numericPersistence": {
+      "custom": 437,
+      "reloaded": true,
+      "final": 500
+    },
+    "short500": {
+      "font": 105.6,
+      "maximumHeight": 474,
+      "panel": {
+        "x": 43.203125,
+        "y": 85.5078125,
+        "width": 921.59375,
+        "height": 424.4921875,
+        "top": 85.5078125,
+        "right": 964.796875,
+        "bottom": 510,
+        "left": 43.203125
+      },
+      "player": {
+        "x": 24,
+        "y": 24,
+        "width": 960,
+        "height": 540,
+        "top": 24,
+        "right": 984,
+        "bottom": 564,
+        "left": 24
+      },
+      "scrollHeight": 422,
+      "clientHeight": 422,
+      "inside": true
+    },
+    "long500": {
+      "font": 24.39,
+      "maximumHeight": 474,
+      "panel": {
+        "x": 43.203125,
+        "y": 53.9375,
+        "width": 921.59375,
+        "height": 456.0625,
+        "top": 53.9375,
+        "right": 964.796875,
+        "bottom": 510,
+        "left": 43.203125
+      },
+      "player": {
+        "x": 24,
+        "y": 24,
+        "width": 960,
+        "height": 540,
+        "top": 24,
+        "right": 984,
+        "bottom": 564,
+        "left": 24
+      },
+      "scrollHeight": 454,
+      "clientHeight": 454,
+      "inside": true
+    },
+    "cancel": {
+      "previewText": "导出字幕共 4 条 · 可直接导出 1 条 · 待补译 3 条最多新增 2 个文本请求；已复用 0 条人工字幕、1 条缓存译文。待补译时间跨度：00:02:00–00:02:05补译会使用当前翻译服务，可能产生用量。仅导出已有结果会保留原时间轴，并跳过未翻译条目。补译并导出完整字幕仅导出已有 1 条取消",
+      "extraRequests": 0
+    },
+    "partial": {
+      "filename": "Subtitle reliability fixture-zh-Hans-translated-partial.srt",
+      "content": "1\n00:00:00,000 --> 00:00:01,500\n清晰可读。\n",
+      "extraRequests": 0,
+      "skipped": 3
+    },
+    "complete": {
+      "filename": "Subtitle reliability fixture-zh-Hans-translated.srt",
+      "content": "1\n00:00:00,000 --> 00:00:01,500\n清晰可读。\n\n2\n00:02:00,000 --> 00:02:01,500\n译文：First missing export sentence.\n\n3\n00:02:02,000 --> 00:02:03,500\n译文：Second missing export sentence.\n\n4\n00:02:04,000 --> 00:02:05,500\n译文：First missing export sentence.\n",
+      "extraRequests": 2,
+      "uniqueSources": [
+        "First missing export sentence.",
+        "Second missing export sentence."
+      ]
+    },
+    "mediaChange": {
+      "samePageUrl": true,
+      "oldPromptRemoved": true,
+      "busyCleared": true,
+      "extraRequests": 0
+    }
+  },
+  "screenshots": [
+    "/Users/thinkstu/Desktop/copy/FluentRead-reading-reliability-experience-20261010/docs/reports/reading-reliability-experience-20261010/subtitle-browser-evidence/numeric-500.png",
+    "/Users/thinkstu/Desktop/copy/FluentRead-reading-reliability-experience-20261010/docs/reports/reading-reliability-experience-20261010/subtitle-browser-evidence/short-500.png",
+    "/Users/thinkstu/Desktop/copy/FluentRead-reading-reliability-experience-20261010/docs/reports/reading-reliability-experience-20261010/subtitle-browser-evidence/long-500.png",
+    "/Users/thinkstu/Desktop/copy/FluentRead-reading-reliability-experience-20261010/docs/reports/reading-reliability-experience-20261010/subtitle-browser-evidence/export-preview.png",
+    "/Users/thinkstu/Desktop/copy/FluentRead-reading-reliability-experience-20261010/docs/reports/reading-reliability-experience-20261010/subtitle-browser-evidence/complete-feedback.png"
+  ],
+  "build": {
+    "manifestSha256": "fd80314b160701ed5500e584e1373f5eed44a19acdc6f8b76f9a12c1565970d8",
+    "contentScripts": [
+      "content-scripts/content.js",
+      "content-scripts/neteaseMailFrame.js",
+      "content-scripts/shadowBridge.js",
+      "content-scripts/supportedFrame.js",
+      "content-scripts/xVideoBridge.js",
+      "content-scripts/youtubeBridge.js"
+    ]
+  },
+  "launchMode": "macos-background-cdp",
+  "focusPolicy": "launchservices-no-foreground",
+  "windowPlacement": {
+    "mode": "background-visible-no-focus",
+    "visible": true,
+    "hidden": false,
+    "centered": true,
+    "windowState": "normal",
+    "bounds": {
+      "left": 212,
+      "top": -990,
+      "width": 1280,
+      "height": 900
+    },
+    "displayTarget": "secondary",
+    "source": "macos-nsscreen",
+    "screenIndex": 1,
+    "browserFrontmost": false,
+    "frontmostBefore": {
+      "pid": 44386,
+      "name": "Google Chrome"
+    },
+    "frontmostAfter": {
+      "pid": 44386,
+      "name": "Google Chrome"
+    }
+  }
+}

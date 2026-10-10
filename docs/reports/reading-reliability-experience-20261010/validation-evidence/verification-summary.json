@@ -1,0 +1,33 @@
+{
+  "baseCommit": "ce36085f7",
+  "integratedMain": "a95a9f9e05796e325dd1a18858dd5ee36d7a0ccc",
+  "compile": "passed",
+  "testAudit": {
+    "status": "passed",
+    "files": 634,
+    "registeredCases": 10265
+  },
+  "architecture": {
+    "files": 33,
+    "passedCases": 1584
+  },
+  "targeted": {
+    "files": 20,
+    "passedCases": 803
+  },
+  "manifests": "passed",
+  "userscriptVerifier": "passed",
+  "independentReview": "confirmed findings fixed; final subtitle layout review passed",
+  "realBrowser": [
+    "failed-only retry and restore",
+    "host button/DOM preservation",
+    "subtitle persistence, fit, cancel/partial/complete/media switch"
+  ],
+  "limits": [
+    "controlled fixture providers",
+    "Firefox real runtime not verified",
+    "low-end device not verified",
+    "50MB real document not verified",
+    "store release not performed"
+  ]
+}

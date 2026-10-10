@@ -1,0 +1,362 @@
+{
+  "baseline": {
+    "directory": "/private/tmp/fluentread-reading-size-baseline-oeb79575/.output/chrome-mv3",
+    "files": 423,
+    "totalBytes": 61637136,
+    "bytesByExtension": {
+      ".wasm": 34895939,
+      ".js": 17192975,
+      ".mjs": 1468282,
+      ".json": 4084297,
+      ".txt": 409296,
+      ".css": 1332195,
+      ".ttf": 573724,
+      ".jpg": 168372,
+      ".bcmap": 1165667,
+      ".pfb": 200615,
+      ".png": 114632,
+      ".md": 15401,
+      "(none)": 8041,
+      ".html": 7700
+    },
+    "bytesByDirectory": {
+      "fluent-read-ai": 32230718,
+      "fluent-read-ocr": 3125295,
+      "content-scripts": 7116296,
+      "(root)": 5589237,
+      "assets": 2461811,
+      "chunks": 5355963,
+      "i18n": 3257123,
+      "third-party-notices": 369007,
+      "pdfjs": 1948047,
+      "misc": 67652,
+      "icon": 114632,
+      "fluent-read-manga": 1355
+    },
+    "largestFiles": [
+      {
+        "path": "fluent-read-ai/ort-wasm-simd-threaded.asyncify.wasm",
+        "bytes": 23567050
+      },
+      {
+        "path": "fluent-read-ai/wllama.wasm",
+        "bytes": 8457512
+      },
+      {
+        "path": "fluent-read-ocr/core/tesseract-core-simd-lstm.wasm",
+        "bytes": 2871377
+      },
+      {
+        "path": "content-scripts/content.js",
+        "bytes": 2717650
+      },
+      {
+        "path": "background.js",
+        "bytes": 2219098
+      },
+      {
+        "path": "content-scripts/neteaseMailFrame.js",
+        "bytes": 2100520
+      },
+      {
+        "path": "localTtsWorker.js",
+        "bytes": 2044995
+      },
+      {
+        "path": "content-scripts/supportedFrame.js",
+        "bytes": 1892552
+      },
+      {
+        "path": "assets/pdf.worker.min-rsCePomN.mjs",
+        "bytes": 1417586
+      },
+      {
+        "path": "ecdict-core.json",
+        "bytes": 823996
+      },
+      {
+        "path": "chunks/i18n-gpQZU8v-.js",
+        "bytes": 776707
+      },
+      {
+        "path": "chunks/index.full-DbD6Jq0R.js",
+        "bytes": 728838
+      },
+      {
+        "path": "i18n/ru-RU.json",
+        "bytes": 683295
+      },
+      {
+        "path": "i18n/ja-JP.json",
+        "bytes": 553262
+      },
+      {
+        "path": "i18n/ko-KR.json",
+        "bytes": 522656
+      }
+    ],
+    "duplicates": [
+      {
+        "paths": [
+          "content-scripts/neteaseMailFrame.css",
+          "content-scripts/supportedFrame.css"
+        ],
+        "bytesEach": 99773,
+        "duplicateBytes": 99773
+      },
+      {
+        "paths": [
+          "third-party-notices/ppu-ocv-MIT.txt",
+          "third-party-notices/ppu-paddle-ocr-MIT.txt"
+        ],
+        "bytesEach": 1080,
+        "duplicateBytes": 1080
+      }
+    ]
+  },
+  "chrome": {
+    "directory": "/Users/thinkstu/Desktop/copy/FluentRead-reading-reliability-experience-20261010/.output/chrome-mv3",
+    "files": 430,
+    "totalBytes": 67410793,
+    "bytesByExtension": {
+      ".wasm": 34895939,
+      ".woff2": 4977684,
+      ".js": 17962458,
+      ".mjs": 1468282,
+      ".json": 4094354,
+      ".txt": 415209,
+      ".css": 1339608,
+      ".ttf": 573724,
+      ".jpg": 168372,
+      ".bcmap": 1165667,
+      ".pfb": 200615,
+      ".png": 114632,
+      ".md": 18508,
+      "(none)": 8041,
+      ".html": 7700
+    },
+    "bytesByDirectory": {
+      "fluent-read-ai": 32230718,
+      "pdf-fonts": 4985178,
+      "fluent-read-ocr": 3125295,
+      "content-scripts": 7150893,
+      "(root)": 5596537,
+      "assets": 2466635,
+      "chunks": 6086138,
+      "i18n": 3267180,
+      "third-party-notices": 370533,
+      "pdfjs": 1948047,
+      "misc": 67652,
+      "icon": 114632,
+      "fluent-read-manga": 1355
+    },
+    "largestFiles": [
+      {
+        "path": "fluent-read-ai/ort-wasm-simd-threaded.asyncify.wasm",
+        "bytes": 23567050
+      },
+      {
+        "path": "fluent-read-ai/wllama.wasm",
+        "bytes": 8457512
+      },
+      {
+        "path": "pdf-fonts/FluentReadNotoSansSC-Regular.woff2",
+        "bytes": 4977684
+      },
+      {
+        "path": "fluent-read-ocr/core/tesseract-core-simd-lstm.wasm",
+        "bytes": 2871377
+      },
+      {
+        "path": "content-scripts/content.js",
+        "bytes": 2733934
+      },
+      {
+        "path": "background.js",
+        "bytes": 2224627
+      },
+      {
+        "path": "content-scripts/neteaseMailFrame.js",
+        "bytes": 2108389
+      },
+      {
+        "path": "localTtsWorker.js",
+        "bytes": 2044995
+      },
+      {
+        "path": "content-scripts/supportedFrame.js",
+        "bytes": 1900407
+      },
+      {
+        "path": "assets/pdf.worker.min-rsCePomN.mjs",
+        "bytes": 1417586
+      },
+      {
+        "path": "ecdict-core.json",
+        "bytes": 823996
+      },
+      {
+        "path": "chunks/i18n-CipEI-kD.js",
+        "bytes": 780093
+      },
+      {
+        "path": "chunks/index.full-CuLV-Gcn.js",
+        "bytes": 728838
+      },
+      {
+        "path": "chunks/fontkit.es-B1aUZhvr.js",
+        "bytes": 716501
+      },
+      {
+        "path": "i18n/ru-RU.json",
+        "bytes": 685422
+      }
+    ],
+    "duplicates": [
+      {
+        "paths": [
+          "content-scripts/neteaseMailFrame.css",
+          "content-scripts/supportedFrame.css"
+        ],
+        "bytesEach": 100636,
+        "duplicateBytes": 100636
+      },
+      {
+        "paths": [
+          "third-party-notices/ppu-ocv-MIT.txt",
+          "third-party-notices/ppu-paddle-ocr-MIT.txt"
+        ],
+        "bytesEach": 1080,
+        "duplicateBytes": 1080
+      }
+    ],
+    "comparison": {
+      "baselineBytes": 61637136,
+      "savedBytes": -5773657,
+      "savedPercent": -9.367
+    }
+  },
+  "firefox": {
+    "directory": "/Users/thinkstu/Desktop/copy/FluentRead-reading-reliability-experience-20261010/.output/firefox-mv2",
+    "files": 430,
+    "totalBytes": 67409828,
+    "bytesByExtension": {
+      ".wasm": 34895939,
+      ".woff2": 4977684,
+      ".js": 17962286,
+      ".mjs": 1468282,
+      ".json": 4093561,
+      ".txt": 415209,
+      ".css": 1339608,
+      ".ttf": 573724,
+      ".jpg": 168372,
+      ".bcmap": 1165667,
+      ".pfb": 200615,
+      ".png": 114632,
+      ".md": 18508,
+      "(none)": 8041,
+      ".html": 7700
+    },
+    "bytesByDirectory": {
+      "fluent-read-ai": 32230718,
+      "pdf-fonts": 4985178,
+      "fluent-read-ocr": 3125295,
+      "content-scripts": 7150899,
+      "(root)": 5595564,
+      "assets": 2466635,
+      "chunks": 6086140,
+      "i18n": 3267180,
+      "third-party-notices": 370533,
+      "pdfjs": 1948047,
+      "misc": 67652,
+      "icon": 114632,
+      "fluent-read-manga": 1355
+    },
+    "largestFiles": [
+      {
+        "path": "fluent-read-ai/ort-wasm-simd-threaded.asyncify.wasm",
+        "bytes": 23567050
+      },
+      {
+        "path": "fluent-read-ai/wllama.wasm",
+        "bytes": 8457512
+      },
+      {
+        "path": "pdf-fonts/FluentReadNotoSansSC-Regular.woff2",
+        "bytes": 4977684
+      },
+      {
+        "path": "fluent-read-ocr/core/tesseract-core-simd-lstm.wasm",
+        "bytes": 2871377
+      },
+      {
+        "path": "content-scripts/content.js",
+        "bytes": 2733936
+      },
+      {
+        "path": "background.js",
+        "bytes": 2224447
+      },
+      {
+        "path": "content-scripts/neteaseMailFrame.js",
+        "bytes": 2108391
+      },
+      {
+        "path": "localTtsWorker.js",
+        "bytes": 2044995
+      },
+      {
+        "path": "content-scripts/supportedFrame.js",
+        "bytes": 1900409
+      },
+      {
+        "path": "assets/pdf.worker.min-rsCePomN.mjs",
+        "bytes": 1417586
+      },
+      {
+        "path": "ecdict-core.json",
+        "bytes": 823996
+      },
+      {
+        "path": "chunks/i18n-CipEI-kD.js",
+        "bytes": 780093
+      },
+      {
+        "path": "chunks/index.full-CuLV-Gcn.js",
+        "bytes": 728838
+      },
+      {
+        "path": "chunks/fontkit.es-B1aUZhvr.js",
+        "bytes": 716501
+      },
+      {
+        "path": "i18n/ru-RU.json",
+        "bytes": 685422
+      }
+    ],
+    "duplicates": [
+      {
+        "paths": [
+          "content-scripts/neteaseMailFrame.css",
+          "content-scripts/supportedFrame.css"
+        ],
+        "bytesEach": 100636,
+        "duplicateBytes": 100636
+      },
+      {
+        "paths": [
+          "third-party-notices/ppu-ocv-MIT.txt",
+          "third-party-notices/ppu-paddle-ocr-MIT.txt"
+        ],
+        "bytesEach": 1080,
+        "duplicateBytes": 1080
+      }
+    ]
+  },
+  "userscript": {
+    "baselineCe36085f7": 1967852,
+    "beforeUpstreamIntegration": 1975176,
+    "finalBytes": 1975296,
+    "budgetBytes": 1976000
+  }
+}

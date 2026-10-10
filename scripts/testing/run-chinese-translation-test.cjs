@@ -444,7 +444,7 @@ async function main() {
     scope: 'production Popup language selection, persistence, real Control hover and Alt+T full-page [1,0,1], Chinese same-language skipping, dynamic redetection, Chinese script / Spanish output discrimination and target cache isolation',
     evidenceBoundary: 'The local HTML and loopback OpenAI-compatible server are deterministic fixtures. Their success does not prove any external service translation quality or availability.',
     fixture: {ok: false, cases: []}, liveGoogle: {requested: process.argv.includes('--live-google'), cases: []},
-    screenshots: [], consoleErrors: [], ui: {}};
+    screenshots: [], consoleErrors: [], siteResourceErrors: [], ui: {}};
   let launched;
   let currentPage;
   let browserSafetyFailure = false;
@@ -458,7 +458,16 @@ async function main() {
     assert.equal(report.focusPolicy, 'launchservices-no-foreground');
     const context = launched.context;
     const capture = (surface, source) => {
-      surface.on('console', message => {if (message.type() === 'error') report.consoleErrors.push({source, message: message.text()});});
+      surface.on('console', message => {
+        if (message.type() !== 'error') return;
+        const error = {source, message: message.text(), location: message.location()};
+        // 真实站点的公共资源失败单独留证；扩展、回环服务及 JS 错误仍使专项失败。
+        const url = error.location?.url || '';
+        const publicGitHubResource = /^https:\/\/(?:github\.com|(?:[^/]+\.)?githubusercontent\.com|(?:[^/]+\.)?githubassets\.com)\//u.test(url);
+        if (source === 'live-target-language-release' && publicGitHubResource
+          && /^Failed to load resource:.*\b404\b/u.test(error.message)) report.siteResourceErrors.push(error);
+        else report.consoleErrors.push(error);
+      });
       surface.on('pageerror', error => report.consoleErrors.push({source, message: error.message}));
     };
     const worker = context.serviceWorkers()[0] || await context.waitForEvent('serviceworker', {timeout: 30000});

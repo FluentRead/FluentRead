@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-10-10T18:43:39.860Z",
+  "generatedAt": "2026-10-10T19:06:48.446Z",
   "node": "v20.11.1",
   "platform": "Darwin arm64",
   "corpora": {
@@ -12,8 +12,8 @@
   "candidates": [
     {
       "name": "unified-franc-min",
-      "importMs": 190.00308299999998,
-      "importHeapBytes": 10099000,
+      "importMs": 244.658833,
+      "importHeapBytes": 12186496,
       "corpora": {
         "calibration": {
           "pairs": 11024,
@@ -727,17 +727,17 @@
       },
       "timing": {
         "calls": 1737,
-        "medianMs": 0.12000000000000455,
-        "p95Ms": 0.8424999999999727,
-        "maxMs": 4.717624999999998
+        "medianMs": 0.11987499999997908,
+        "p95Ms": 0.5913749999999709,
+        "maxMs": 1.5909580000000005
       },
       "cachedTiming": {
         "calls": 1737,
-        "medianMs": 0.11666700000000674,
-        "p95Ms": 0.8457500000000664,
-        "maxMs": 11.137332999999899
+        "medianMs": 0.11116700000002311,
+        "p95Ms": 0.5558750000000146,
+        "maxMs": 1.9365419999999176
       },
-      "heapAfterEvaluationBytes": 35003088
+      "heapAfterEvaluationBytes": 30627088
     },
     {
       "name": "naive-franc-min-top1",
@@ -1937,15 +1937,15 @@
       },
       "timing": {
         "calls": 1737,
-        "medianMs": 0.05945799999994961,
-        "p95Ms": 0.24324999999998909,
-        "maxMs": 1.6868340000000899
+        "medianMs": 0.05683299999986957,
+        "p95Ms": 0.21683299999995143,
+        "maxMs": 0.6421250000000782
       }
     },
     {
       "name": "old-implementation",
-      "importMs": 84.71316699999988,
-      "importHeapBytes": 2927080,
+      "importMs": 43.78895800000009,
+      "importHeapBytes": 3490336,
       "corpora": {
         "calibration": {
           "pairs": 11024,
@@ -2682,17 +2682,17 @@
       },
       "timing": {
         "calls": 1737,
-        "medianMs": 0.11341700000002675,
-        "p95Ms": 0.5424170000001141,
-        "maxMs": 1.2811670000000959
+        "medianMs": 0.11599999999998545,
+        "p95Ms": 0.635332999999946,
+        "maxMs": 8.762000000000171
       },
       "cachedTiming": {
         "calls": 1737,
-        "medianMs": 0.109375,
-        "p95Ms": 0.5955829999998059,
-        "maxMs": 3.9188749999998436
+        "medianMs": 0.11662500000011278,
+        "p95Ms": 0.7742500000003929,
+        "maxMs": 11.81112499999972
       },
-      "heapAfterEvaluationBytes": 32931008,
+      "heapAfterEvaluationBytes": 45887240,
       "root": "/private/tmp/fluentread-target-language-baseline"
     }
   ],
@@ -2707,8 +2707,8 @@
       ]
     },
     "unified-language-core": {
-      "raw": 109577,
-      "gzip": 38323,
+      "raw": 110297,
+      "gzip": 38560,
       "files": [
         "src/core/language/codes.ts",
         "src/core/language/identify.ts",

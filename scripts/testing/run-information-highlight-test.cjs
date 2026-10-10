@@ -554,10 +554,24 @@ function popupSourceContract(){
       await step(`model-layout-size:${name}`,()=>control.setViewportSize({width,height:1000}));await patchConfig({theme});
       await step(`model-layout-scroll:${name}`,()=>modelCards().scrollIntoViewIfNeeded());
       const layout=await step(`model-layout:${name}`,()=>modelCards().evaluate(element=>({width:innerWidth,height:innerHeight,scrollWidth:document.documentElement.scrollWidth,scrollHeight:document.documentElement.scrollHeight,
-        cards:[...element.querySelectorAll('section[data-information-highlight-model-id]')].map(card=>({modelId:card.dataset.informationHighlightModelId,rect:card.getBoundingClientRect().toJSON(),text:card.textContent.trim(),selected:card.querySelector('input[type="radio"]')?.checked})),
+        cards:[...element.querySelectorAll('section[data-information-highlight-model-id]')].map(card=>({modelId:card.dataset.informationHighlightModelId,rect:card.getBoundingClientRect().toJSON(),actionsRect:card.querySelector('.highlight-model-actions').getBoundingClientRect().toJSON(),text:card.textContent.trim(),selected:card.querySelector('input[type="radio"]')?.checked})),
         background:getComputedStyle(element.querySelector('section')).backgroundColor,theme:document.documentElement.dataset.theme||document.documentElement.className})));
       assert.equal(layout.cards.length,2);assert(layout.scrollWidth<=width+1);assert(layout.scrollHeight<=layout.height+1);
       assert(layout.cards.every(card=>card.rect.width>0&&card.rect.x>=0&&card.rect.right<=width+1));
+      const [firstCard,secondCard]=layout.cards.map(card=>card.rect);
+      if(width===1440){
+        assert(Math.abs(firstCard.top-secondCard.top)<=1,'Wide model cards must share the same row');
+        assert(Math.abs(firstCard.width-secondCard.width)<=1,'Wide model cards must have equal widths');
+        assert(Math.abs(firstCard.height-secondCard.height)<=1,'Wide model cards must have equal heights');
+        assert(secondCard.left>=firstCard.right-1,'Wide model cards must sit side by side without overlap');
+        assert(Math.abs(layout.cards[0].actionsRect.bottom-layout.cards[1].actionsRect.bottom)<=1,'Wide model cards must align their actions along the bottom');
+        layout.arrangement='two-equal-cards-in-one-row';
+      }else if(width===390){
+        assert(secondCard.top>=firstCard.bottom-1,'Narrow model cards must stack vertically without overlap');
+        assert(Math.abs(firstCard.left-secondCard.left)<=1,'Narrow model cards must align at the left edge');
+        assert(Math.abs(firstCard.width-secondCard.width)<=1,'Narrow model cards must have equal widths');
+        layout.arrangement='two-cards-stacked-vertically';
+      }
       report.cases.push({id:`two-model-cards-layout:${name}`,layout});await shot(modelCards(),`model-cards-${name}`);await shot(control,`settings-model-cards-${name}`);
     };
     const verifyPrepareConfirmation=async(stage,{dismissals=true,screenshot=true}={})=>{

@@ -1,7 +1,7 @@
 /**
  * @file tests/inputTranslationBackground.test.ts
  * 文件职责：验证输入框翻译后台 handler 从本地配置建立冻结独立请求，拒绝网页侧伪造配置，并将可取消请求交给按发送者隔离的共享注册表。
- * 主要内容：覆盖 AI prompt 的默认与自定义变量、机器翻译忽略 prompt/model、源语言/上下文/词库隔离、缓存开关、取消字段收窄、配置水合取消、先取消后触发及 provider 迟到响应。
+ * 主要内容：覆盖 AI prompt 的默认与自定义变量、机器翻译忽略 prompt/model、源语言/上下文/词库隔离、缓存开关、取消字段收窄、同目标早退清理、配置水合取消、先取消后触发及 provider 迟到响应。
  * 模块边界：本文件使用内存 mock 翻译函数，不发起网络请求；provider 的真实协议由 translation broker 与 provider 专项测试负责。
  */
 import {describe, expect, it, vi} from 'vitest';
@@ -231,6 +231,62 @@ describe('输入框翻译后台配置绑定', () => {
         expect(request).not.toHaveProperty('clientRequestId');
         expect(request).not.toHaveProperty('signal');
         expect(request).not.toHaveProperty('ownershipKey');
+    });
+
+    it('已注册的同目标请求原文返回且不调用 broker，完成后清理 ownership 并保留已用标识', async () => {
+        const config = new Config();
+        config.to = 'en';
+        const requestRegistry = createTranslationRequestRegistry();
+        const cancel = createTranslationCancelHandler(requestRegistry);
+        const getConfig = vi.fn(() => config);
+        const translate = vi.fn(async (_request: TranslationSingleRequestMessage) => '不应调用');
+        const handler = createInputBoxTranslationHandler({ready: Promise.resolve(), getConfig, translate, requestRegistry});
+        const owner = {sender: {tab: {id: 17}, frameId: 3, documentId: 'same-target-document'}};
+        const message = {
+            type: 'inputBoxTranslation' as const,
+            text: '  修复保存记录后再次打开页面时内容丢失的问题。  ',
+            targetLang: 'zh-Hans',
+            clientRequestId: 'input-same-target-complete',
+        };
+
+        await expect(handler.handle(message, owner))
+            .resolves.toEqual({success: true, translatedText: message.text});
+        expect(getConfig).toHaveBeenCalledOnce();
+        expect(translate).not.toHaveBeenCalled();
+        expect(cancel.handle({type: TRANSLATION_CANCEL_MESSAGE_TYPE, clientRequestId: message.clientRequestId}, owner))
+            .toMatchObject({success: true, cancelled: false, clientRequestId: message.clientRequestId});
+        await expect(handler.handle(message, owner)).rejects.toThrow('clientRequestId 已在使用');
+        expect(getConfig).toHaveBeenCalledOnce();
+        expect(translate).not.toHaveBeenCalled();
+    });
+
+    it('同目标请求等待配置就绪时取消，不返回成功且不读取配置，随后就绪也不绕过取消', async () => {
+        let resolveReady!: () => void;
+        const ready = new Promise<void>(resolve => {resolveReady = resolve;});
+        const requestRegistry = createTranslationRequestRegistry();
+        const cancel = createTranslationCancelHandler(requestRegistry);
+        const getConfig = vi.fn(() => new Config());
+        const translate = vi.fn(async (_request: TranslationSingleRequestMessage) => '不应调用');
+        const handler = createInputBoxTranslationHandler({ready, getConfig, translate, requestRegistry});
+        const owner = {sender: {tab: {id: 18}, frameId: 4, documentId: 'same-target-waiting-document'}};
+        const message = {
+            type: 'inputBoxTranslation' as const,
+            text: '修复保存记录后再次打开页面时内容丢失的问题。',
+            targetLang: 'zh-Hans',
+            clientRequestId: 'input-same-target-waiting',
+        };
+
+        const pending = handler.handle(message, owner);
+        const cancelled = expect(pending).rejects.toMatchObject({name: 'AbortError'});
+        expect(cancel.handle({type: TRANSLATION_CANCEL_MESSAGE_TYPE, clientRequestId: message.clientRequestId}, owner))
+            .toMatchObject({success: true, cancelled: true});
+        await cancelled;
+        resolveReady();
+        await Promise.resolve();
+        expect(getConfig).not.toHaveBeenCalled();
+        expect(translate).not.toHaveBeenCalled();
+        expect(cancel.handle({type: TRANSLATION_CANCEL_MESSAGE_TYPE, clientRequestId: message.clientRequestId}, owner))
+            .toMatchObject({cancelled: false});
     });
 
     it('严格校验可选取消标识，缺少取消注册表时拒绝可取消请求', async () => {

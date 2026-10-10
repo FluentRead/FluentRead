@@ -129,6 +129,8 @@ type InlineCodeLanguageContext = 'name' | 'identifier' | 'neutral';
 
 /** 名称保留字形；明确短标识符成为无字母原子，自然代码只留不串词的中性边界。 */
 function inlineCodeLanguageContext(element: Element): InlineCodeLanguageContext {
+    // 后代元素可能换行、隐藏或另有保护；复杂代码只留边界，不用 textContent 折叠名称。
+    if (element.childElementCount > 0) return 'neutral';
     const value = element.textContent!.trim();
     if (value.length > 64) return 'neutral';
     const words = value.split(/[ \t/→-]+/u);
@@ -158,7 +160,7 @@ function collectReadableText(
     const emittedCodes = new WeakSet<Element>();
     let previousBlock: Element | null | undefined;
     let previousRoot: Node | undefined;
-    const append = (node: Text): void => {
+    const append = (node: Text, root: Node): void => {
         if (!languageContext) {
             const value = normalizeTranslationText(node.nodeValue ?? '');
             if (value) parts.push(value);
@@ -169,16 +171,18 @@ function collectReadableText(
         previousBlock = block;
         const code = languageContextCodeOwner(node.parentElement!, codeOwners);
         if (code) {
-            let context = codeContexts.get(code);
+            // 只以当前 root 完整覆盖的代码判定资格，不从未提供的兄弟 Text 借名称或结构。
+            const completeCode = root.contains(code);
+            let context = completeCode ? codeContexts.get(code) : 'neutral';
             if (context === undefined) {
                 context = inlineCodeLanguageContext(code);
                 codeContexts.set(code, context);
             }
             if (context !== 'name') {
-                if (!emittedCodes.has(code)) {
+                if (!completeCode || !emittedCodes.has(code)) {
                     // U+FFFC 表示明确代码原子；U+FFFD 只阻断名称串联，不提供技术锚点。
                     parts.push(context === 'identifier' ? '\uFFFC' : '\uFFFD');
-                    emittedCodes.add(code);
+                    if (completeCode) emittedCodes.add(code);
                 }
                 return;
             }
@@ -199,7 +203,7 @@ function collectReadableText(
                 protectionOptions,
                 protectionCache,
             )) {
-                append(textNode);
+                append(textNode, root);
             } else if (languageContext) {
                 parts.push('\n');
             }
@@ -207,13 +211,25 @@ function collectReadableText(
         }
         if (root.nodeType !== 1) continue;
         const element = root as Element;
+        if (languageContext) {
+            // walker 不访问根本身，根级换行和空块仍须保留真实边界。
+            if (getElementTagName(element) === 'br') {
+                parts.push('\n');
+                continue;
+            }
+            const block = languageContextBlockOwner(element, blockOwners);
+            if (previousBlock !== undefined && previousBlock !== block) parts.push('\n');
+            previousBlock = block;
+        }
         // 按钮型 input 的可见标签只存在于 value 属性里。仅当它本身就是候选根时才读取：
         // 外层容器的译文经由文本槽或双语骨架渲染，无法写回子元素属性，把属性文本混进去
         // 只会让服务端翻译一段永远显示不出来的内容。
         const controlValueAttribute = getTranslatableControlValueAttribute(element);
         if (controlValueAttribute) {
             // 属性判定已确认该标签存在且非空白，这里只做与文本节点一致的空白归一。
-            parts.push(normalizeTranslationText(element.getAttribute(controlValueAttribute)!));
+            const value = normalizeTranslationText(element.getAttribute(controlValueAttribute)!);
+            if (languageContext) parts.push('\n', value, '\n');
+            else parts.push(value);
             continue;
         }
         const document = element.ownerDocument;
@@ -234,7 +250,7 @@ function collectReadableText(
                 protectionOptions,
                 protectionCache,
             )) {
-                append(textNode);
+                append(textNode, root);
             } else if (languageContext) {
                 parts.push('\n');
             }

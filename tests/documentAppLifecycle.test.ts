@@ -131,9 +131,10 @@ describe('documentbinaryAudit actual DocumentApp SFC ownership', () => {
         const id = await documentHistoryId(bytes);
         const factory = new IDBFactory();
         const history = createDocumentHistory(factory);
+        const oldVersion = format === 'mixed-removed-duplicate' ? 7 : 6;
         await history.save({id, name: 'history.pdf', format: 'pdf', size: bytes.length, total: old.segments.length,
             completed: edits.filter((value: string) => value.trim()).length, updatedAt: 1, bytes, mimeType: 'application/pdf',
-            translations: edits, fingerprint: 'old-settings', parsed: old, parsedVersion: 6});
+            translations: edits, fingerprint: 'old-settings', parsed: old, parsedVersion: oldVersion});
         app.unmount();
         vi.stubGlobal('indexedDB', factory);
         vi.stubGlobal('File', class extends Blob {name: string; constructor(parts: BlobPart[], name: string, options?: BlobPropertyBag) {super(parts, options); this.name = name;}});
@@ -144,7 +145,7 @@ describe('documentbinaryAudit actual DocumentApp SFC ownership', () => {
         const opening = state.openHistory({id});
         await vi.waitFor(() => expect(parse).toHaveBeenCalledOnce());
         expect((await history.load(id))?.translations).toEqual(edits);
-        expect((await history.load(id))?.parsedVersion).toBe(6);
+        expect((await history.load(id))?.parsedVersion).toBe(oldVersion);
         parsing.resolve(fresh); await opening; await flush();
         const expectedSources = old.segments.filter(({id}: {id: number}) => format !== 'mixed-removed-duplicate' || id !== 2)
             .map(({source}: {source: string}) => source === 'Old native title' ? 'New native title' : source);
@@ -163,7 +164,7 @@ describe('documentbinaryAudit actual DocumentApp SFC ownership', () => {
         }
         await vi.waitFor(async () => {
             const saved = await history.load(id);
-            expect(saved?.parsedVersion).toBe(7);
+            expect(saved?.parsedVersion).toBe(8);
             expect(saved?.translations).toEqual(expectedTranslations);
             expect((saved?.parsed as any).segments.map((segment: any) => segment.source)).toEqual(expectedSources);
             expect(saved?.parsed).not.toHaveProperty('segmentOrigins');

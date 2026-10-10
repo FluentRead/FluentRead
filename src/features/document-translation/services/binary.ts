@@ -335,9 +335,10 @@ export function pdfTextAtoms(
         if (Math.abs(angle) > 0.12) return [];
         const style = styles[item.fontName] || {};
         const fontHeight = Math.max(1, Math.hypot(transform[2], transform[3]) || item.height || 1);
-        const ascent = typeof style.ascent === 'number'
+        // 标准 Type 1 字体可能给出 NaN 指标；不能让有效正文因 y=NaN 被视口过滤掉。
+        const ascent = typeof style.ascent === 'number' && Number.isFinite(style.ascent)
             ? style.ascent
-            : typeof style.descent === 'number'
+            : typeof style.descent === 'number' && Number.isFinite(style.descent)
                 ? 1 + style.descent
                 : 0.8;
         const x = transform[4];

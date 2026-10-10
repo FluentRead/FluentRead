@@ -123,6 +123,35 @@ describe('binary document low-level contracts', () => {
         expect(atoms[2].fontFamily).toBe('sans-serif');
     });
 
+    it.each([NaN, Infinity, -Infinity])('keeps prose visible when PDF.js returns a nonfinite font metric: %s', invalid => {
+        const viewport = {width: 100, height: 100, transform: [1, 0, 0, 1, 0, 0]};
+        const atoms = pdfTextAtoms([
+            pdfItem({str: 'Use finite descent', fontName: 'descent'}),
+            pdfItem({str: 'Fallback for both metrics', fontName: 'both'}),
+            pdfItem({str: 'Fallback for descent', fontName: 'missing'}),
+            pdfItem({str: 'Keep finite ascent', fontName: 'ascent'}),
+        ], {
+            descent: {ascent: invalid, descent: -0.25, fontFamily: 'serif'},
+            both: {ascent: invalid, descent: invalid},
+            missing: {descent: invalid},
+            ascent: {ascent: 0.6, descent: invalid},
+        }, viewport, true);
+        expect(atoms.map(atom => atom.text)).toEqual(['Use finite descent', 'Fallback for both metrics', 'Fallback for descent', 'Keep finite ascent']);
+        expect(atoms.map(atom => atom.y)).toEqual([12.5, 12, 12, 14]);
+        expect(atoms.every(atom => [atom.x, atom.y, atom.width, atom.height].every(Number.isFinite))).toBe(true);
+        expect(atoms[0]).toMatchObject({fontFamily: 'serif', baseline: 20, fontSize: 10});
+    });
+
+    it('preserves finite negative descenders and the normal metric precedence', () => {
+        const atoms = pdfTextAtoms([
+            pdfItem({str: 'Finite descent', fontName: 'descent'}),
+            pdfItem({str: 'Ascent takes precedence', fontName: 'ascent'}),
+            pdfItem({str: 'Missing metrics', fontName: 'missing'}),
+        ], {descent: {descent: -0.35}, ascent: {ascent: 0.7, descent: -0.35}},
+        {width: 100, height: 100, transform: [1, 0, 0, 1, 0, 0]});
+        expect(atoms.map(atom => atom.y)).toEqual([13.5, 13, 12]);
+    });
+
     it('将同一行原子按标点、连字符和栏间距组合', () => {
         expect(pdfTextLines([], 300)).toEqual([]);
         const lines = pdfTextLines([

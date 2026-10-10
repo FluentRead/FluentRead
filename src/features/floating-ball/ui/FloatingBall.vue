@@ -1,7 +1,7 @@
 <!--
  * @file src/features/floating-ball/ui/FloatingBall.vue
  * 文件职责：呈现用户开启后的页面悬浮工具，将全文翻译、品牌手柄和漫画入口按顺序组织，并保留拖动停靠与可选常驻模式。
- * 主要内容：品牌主体只显示圆形本地图标，全文状态只标记在上方翻译按钮；默认悬停展开、移出和 Escape 收回边缘，键盘聚焦与触屏轻点保持入口可操作。
+ * 主要内容：品牌主体只显示圆形本地图标，上方翻译按钮分别呈现处理中、成功与失败，活动会话仍提供恢复原文动作；默认悬停展开、移出和 Escape 收回边缘，键盘聚焦与触屏轻点保持入口可操作。
  * 模块边界：它只负责视觉与局部交互，不直接调用浏览器消息、保存配置或执行全文翻译；这些副作用由 content/runtime 通过 props、事件和 defineExpose 桥接，外观配置的归一化留在 core/config。
  -->
 <template>
@@ -17,6 +17,7 @@
     }"
     :data-position="currentDisplayPosition"
     :data-tools-display="presentation.toolsDisplay"
+    :data-translation-status="displayTranslationStatus"
     :style="rootStyle"
     @mouseenter="expandBall"
     @mouseleave="collapseBall"
@@ -29,9 +30,10 @@
       v-if="showTranslateTool"
       class="floating-ball-tool floating-ball-translate floating-ball-item"
       type="button"
-      :aria-label="isTranslating ? '恢复网页原文' : '翻译整个网页'"
+      :aria-label="translationActionLabel"
       :aria-pressed="isTranslating"
-      :title="isTranslating ? '恢复网页原文' : '翻译整个网页'"
+      :aria-busy="displayTranslationStatus === 'translating'"
+      :title="translationActionLabel"
       @pointerdown.stop
       @click.stop="toggleTranslation"
     >
@@ -40,7 +42,9 @@
         <text x="11.8" y="12.5" fill="currentColor" font-size="11.5" font-weight="700" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif">文</text>
         <path d="M4 16h16M4 16l2-2M4 16l2 2M20 16l-2-2M20 16l-2 2" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" />
       </svg>
-      <span v-if="isTranslating" class="check-mark" aria-hidden="true" />
+      <span v-if="displayTranslationStatus === 'translated'" class="check-mark" aria-hidden="true" />
+      <span v-else-if="displayTranslationStatus === 'error'" class="translation-error" aria-hidden="true">!</span>
+      <span v-else-if="displayTranslationStatus === 'translating'" class="translation-progress" aria-hidden="true">…</span>
     </button>
 
     <div
@@ -105,10 +109,11 @@ import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import type { PropType, CSSProperties } from 'vue';
 import {useUiI18n} from '@/src/ui/i18n';
 import type {MangaTranslationStatus} from '@/src/features/image-translation/public';
+import type {TranslationToolbarStatus} from '@/src/features/full-page-translation/public';
 import type { FloatingBallPresentation } from '@/src/features/floating-ball/types';
 import {resolveFloatingBallCenterY, toFloatingBallVerticalPosition} from '@/src/features/floating-ball/position';
 
-const {translateLegacy: t} = useUiI18n();
+const {translateLegacy: t, t: translateMessage} = useUiI18n();
 
 const DRAG_THRESHOLD = 6;
 const BALL_SIZE = 40;
@@ -165,6 +170,10 @@ const props = defineProps({
     type: Boolean,
     default: false,
   },
+  initialTranslationStatus: {
+    type: String as PropType<TranslationToolbarStatus>,
+    default: 'idle',
+  },
 });
 
 interface PointerDragState {
@@ -185,6 +194,7 @@ const isDragging = ref(false);
 const verticalPosition = ref<number | null>(props.verticalPosition);
 const internalPosition = ref<'left' | 'right' | null>(null);
 const isTranslating = ref(props.initialTranslating);
+const translationStatus = ref(props.initialTranslationStatus);
 const floatingBall = ref<HTMLElement | null>(null);
 const floatingBallMain = ref<HTMLElement | null>(null);
 const dragState = ref<PointerDragState | null>(null);
@@ -204,6 +214,15 @@ const showSettingsTool = computed(() => showTranslateTool.value && presentation.
 // 隐藏工具按钮不影响主体展开，键盘与触屏仍能完整访问悬浮球。
 const isMenuExpanded = computed(() => isAlwaysExpanded.value || isExpanded.value || touchExpanded.value);
 const isMainActionable = computed(() => presentation.value.clickAction !== 'none');
+const displayTranslationStatus = computed(() => isTranslating.value ? translationStatus.value : 'idle');
+const translationActionLabel = computed(() => {
+  const action = t(isTranslating.value ? '恢复网页原文' : '翻译整个网页');
+  const status = displayTranslationStatus.value;
+  const key = status === 'translating' ? 'fullPage.progress.title'
+    : status === 'error' ? 'fullPage.progress.failuresTitle'
+    : status === 'translated' ? 'fullPage.progress.completed' : null;
+  return key ? `${action} · ${translateMessage(key)}` : action;
+});
 const mangaTitle = computed(() => {
   const manga = props.manga;
   if (manga?.areaFallback) return t('画布或分片漫画 · 拖选可见区域翻译');
@@ -214,7 +233,7 @@ const mangaTitle = computed(() => {
 const mainActionLabel = computed(() => {
   if (presentation.value.clickAction === 'settings') return `FluentRead · ${t('打开 FluentRead 设置')}`;
   if (presentation.value.clickAction === 'translate') {
-    return `FluentRead · ${t(isTranslating.value ? '恢复网页原文' : '翻译整个网页')}`;
+    return `FluentRead · ${translationActionLabel.value}`;
   }
   return 'FluentRead';
 });
@@ -475,6 +494,10 @@ function setTranslationState(nextState: boolean) {
   isTranslating.value = nextState;
 }
 
+function setTranslationStatus(nextStatus: TranslationToolbarStatus) {
+  translationStatus.value = nextStatus;
+}
+
 /** 其他页面更改配置后，让已打开的页面同步位置；同值广播不打断当前拖动。 */
 function setPosition(side: 'left' | 'right', nextVerticalPosition: number | null) {
   if (side === internalPosition.value && nextVerticalPosition === verticalPosition.value) return;
@@ -483,7 +506,7 @@ function setPosition(side: 'left' | 'right', nextVerticalPosition: number | null
   nextTick(updatePositionStyle);
 }
 
-defineExpose({ toggleTranslation, setTranslationState, setPosition });
+defineExpose({ toggleTranslation, setTranslationState, setTranslationStatus, setPosition });
 
 function handleSettingsClick(event: MouseEvent) {
   props.onSettingsClick(event);
@@ -543,6 +566,8 @@ watch(() => props.verticalPosition, (nextPosition) => {
 watch(() => props.initialTranslating, (nextState) => {
   isTranslating.value = nextState;
 });
+
+watch(() => props.initialTranslationStatus, setTranslationStatus);
 
 // 尺寸切换会改变停靠高度，必须重新计算纵向居中，避免紧凑模式下出现偏移。
 watch(() => [presentation.value.compact, props.manga?.available], () => {
@@ -802,6 +827,30 @@ watch(() => presentation.value.settingsEntryVisible, () => {
 .floating-ball-settings svg {
   width: var(--fr-ball-icon-size);
   height: var(--fr-ball-icon-size);
+}
+
+.translation-error,
+.translation-progress {
+  position: absolute;
+  right: -2px;
+  bottom: -2px;
+  display: grid;
+  width: 12px;
+  height: 12px;
+  place-items: center;
+  border: 1px solid #fff;
+  border-radius: 50%;
+  background: #fff0f5;
+  color: #bd2f62;
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1;
+  pointer-events: none;
+}
+
+.translation-error {
+  background: #fff4dd;
+  color: #9a5d08;
 }
 
 .dragging {

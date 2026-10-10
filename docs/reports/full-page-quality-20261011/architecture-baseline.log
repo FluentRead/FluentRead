@@ -1,0 +1,117 @@
+
+> FluentRead-流畅阅读@0.0.37 test /Users/thinkstu/Desktop/copy/FluentRead-full-page-baseline-20261011
+> node scripts/testing/run-resource-safe.mjs -- vitest run "tests/architecture/moduleBoundaries.test.ts" "tests/architecture/providerBoundaries.test.ts" "tests/backgroundProviderRuntime.test.ts"
+
+[resource-safe] 等待全局测试锁（3 个并发槽已占满，当前: wxt build; pnpm exec vitest run tests/architecture/moduleBoundaries.test.ts tests/architecture/providerBoundaries.test.ts tests/architecture/sourceFileHeaders.test.ts tests/architecture/verificationOwnership.test.ts tests/backgroundBadgeRuntime.test.ts; vitest run --config vitest.coverage.config.ts tests/fullPageVisibilityScheduling.test.ts --coverage.include=src/features/full-page-translation/content/requestSession.ts --coverage.reportsDirectory=/private/tmp/fluentread-hover-request-coverage）
+[resource-safe] CPU target 60%, maxWorkers 1, concurrency 3, command: vitest run tests/architecture/moduleBoundaries.test.ts tests/architecture/providerBoundaries.test.ts tests/backgroundProviderRuntime.test.ts
+
+ RUN  v2.1.9 /Users/thinkstu/Desktop/copy/FluentRead-full-page-baseline-20261011
+
+ ✓ tests/architecture/moduleBoundaries.test.ts (13 tests) 5037ms
+   ✓ architecture module boundaries > src 的静态依赖图不存在跨文件循环 1727ms
+   ✓ architecture module boundaries > src 只能通过精确登记的 composition/browser/provider 迁移边界读取 entrypoints 1196ms
+   ✓ architecture module boundaries > core 与 shared 保持低层，不依赖 app、feature、service、provider、platform 或 UI 304ms
+   ✓ architecture module boundaries > feature 不能跨目录读取另一个 feature 的内部实现 1157ms
+   ✓ architecture module boundaries > 按需加载的大体积资源不得被扩展运行时代码静态引入 546ms
+ ❯ tests/architecture/providerBoundaries.test.ts (6 tests | 1 failed) 146ms
+   × translation provider architecture > 所有 legacy 网络 provider 都把 broker signal 传入 runtimeFetch 26ms
+     → expected '/**\n * @file src/providers/translati…' to contain 'translateMicrosoftTextsWithTransport(…'
+ ❯ tests/backgroundProviderRuntime.test.ts (0 test)
+
+⎯⎯⎯⎯⎯⎯ Failed Suites 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  tests/backgroundProviderRuntime.test.ts [ tests/backgroundProviderRuntime.test.ts ]
+Error: [vitest] No "services" export is defined on the "@/src/core/config/catalog" mock. Did you forget to return it from "vi.mock"?
+If you need to partially mock a module, you can use "importOriginal" helper inside:
+
+vi.mock(import("@/src/core/config/catalog"), async (importOriginal) => {
+  const actual = await importOriginal()
+  return {
+    ...actual,
+    // your mocked methods
+  }
+})
+
+ ❯ src/core/config/nativeBatch.ts:12:5
+     10|
+     11| export const NATIVE_BATCH_TRANSLATION_SERVICES = Object.freeze([
+     12|     services.google,
+       |     ^
+     13|     services.microsoft,
+     14|     services.deepL,
+ ❯ src/services/translation/requestSnapshot.ts:4:31
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/2]⎯
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  tests/architecture/providerBoundaries.test.ts > translation provider architecture > 所有 legacy 网络 provider 都把 broker signal 传入 runtimeFetch
+AssertionError: expected '/**\n * @file src/providers/translati…' to contain 'translateMicrosoftTextsWithTransport(…'
+
+- Expected
++ Received
+
+- translateMicrosoftTextsWithTransport(runtimeFetch, texts, fromLang, toLang, abortSignal)
++ /**
++  * @file src/providers/translation/microsoft.ts
++  *
++  * 文件职责：适配 Edge Microsoft 免费翻译端点，支持单条与批量文本并保留受控 HTML 片段。
++  * 主要内容：映射源/目标语言，按冻结的服务合批偏好分组并对文本进行 HTML 转义，调用 translatetext，解析 translations 数组并按原批次还原结果；导出 translateMicrosoftTexts。 可核对的公开符号包括 translateMicrosoftTexts、default:microsoft。
++  * 模块边界：本文件位于 provider 适配层，只把统一翻译请求转换为外部或浏览器服务协议；不管理页面 DOM、UI 生命周期或配置持久化，缓存、去重和超时总预算由 translation broker 统一协调。
++  */
++
++ import {getTranslationLanguages} from '@/src/services/translation/languages';
++ import type {TranslationLanguageOverride} from '@/src/services/translation/languages';
++ import {runtimeFetch} from '@/src/platform/http/runtime';
++ import {translateMicrosoftTextsWithTransport} from './microsoftTransport';
++ import {getTranslationProviderConfig, type TranslationProviderRequest} from '@/src/services/translation/requestSnapshot';
++ import {isNativeTranslationBatchEnabled} from '@/src/core/config/nativeBatch';
++ import {config} from '@/src/services/config/store';
++
++ export async function translateMicrosoftTexts(
++     texts: string[],
++     fromLang: string,
++     toLang: string,
++     abortSignal?: AbortSignal,
++     enableNativeBatch = true,
++ ): Promise<string[]> {
++     return translateMicrosoftTextsWithTransport(runtimeFetch, texts, fromLang, toLang, abortSignal, enableNativeBatch);
++ }
++
++ async function microsoft(message: TranslationProviderRequest & TranslationLanguageOverride) {
++     const origin = message.origin;
++     const isSingleText = typeof origin === 'string';
++     const texts: string[] = typeof origin === 'string' ? [origin] : origin;
++     const {sourceLanguage, targetLanguage} = getTranslationLanguages(message);
++     const current = getTranslationProviderConfig(message, config);
++     const enableNativeBatch = message.enableNativeBatch
++         ?? isNativeTranslationBatchEnabled('microsoft', current.nativeBatchTranslationEnabled);
++     const translations = await translateMicrosoftTexts(texts, sourceLanguage, targetLanguage, message.abortSignal, enableNativeBatch);
++     if (!isSingleText) return translations;
++
++     const translatedText = translations[0];
++     if (translatedText === undefined) {
++         throw new Error('微软翻译未返回译文');
++     }
++     return translatedText;
++ }
++
++ export default microsoft;
++
+
+ ❯ tests/architecture/providerBoundaries.test.ts:188:34
+    186|         expect(violations).toEqual([]);
+    187|         const microsoftAdapter = readProjectFile('src/providers/transl…
+    188|         expect(microsoftAdapter).toContain('translateMicrosoftTextsWit…
+       |                                  ^
+    189|         const microsoftTransportCalls = runtimeFetchCalls('microsoftTr…
+    190|         expect(microsoftTransportCalls).toHaveLength(1);
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/2]⎯
+
+ Test Files  2 failed | 1 passed (3)
+      Tests  1 failed | 18 passed (19)
+   Start at  01:43:38
+   Duration  6.55s (transform 255ms, setup 0ms, collect 559ms, tests 5.18s, environment 0ms, prepare 132ms)
+
+ ELIFECYCLE  Test failed. See above for more details.

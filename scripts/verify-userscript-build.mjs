@@ -25,10 +25,13 @@ const artifactBytes = Buffer.byteLength(source);
 // 原生合批独立开关及冻结策略增加 2,560 字节（0.1291%）：
 // 同依赖基线 e4932521f 为 1,982,807，候选为 1,985,367；预算最小增加 1 KB。
 // 增量与语言固定提交验证见 docs/reports/native-batch-setting-20261011/。
-// 区域分片、精确取消与动态选择协作增加 5,222 字节（0.2630%）：
-// 同依赖独立基线 fe7005dd9 为 1,985,411，候选为 1,990,633；预算最小增加 5 KB。
-// 保留全部体积、协议与执行边界校验，证据见 docs/reports/section-translation-quality-20261011/。
-const MAX_USERSCRIPT_BYTES = 1_991_000;
+// 20 个译文样式预设（规则、注册表与中文名称）增加 8,193 字节（0.4127%）：
+// 同依赖独立基线 fe7005dd9 为 1,985,255，候选为 1,993,448；预算增加 8 KB。
+// 实测与截图见 docs/reports/translation-style-presets-20261010/。
+// 区域分片、精确取消与动态选择协作在独立基线 fe7005dd9 上增加 5,222 字节（0.2630%）。
+// 合入最新主线后复验体积，沿用主线预算；保留全部协议与执行边界校验。
+// 原始对照与集成证据见 docs/reports/section-translation-quality-20261011/。
+const MAX_USERSCRIPT_BYTES = 1_994_000;
 const preludeStartMarker = '/* FluentRead userscript compatibility prelude:start */';
 const preludeEndMarker = '/* FluentRead userscript compatibility prelude:end */';
 const preludeStart = source.indexOf(preludeStartMarker);

@@ -1065,6 +1065,7 @@ export default defineConfig({
                 'src/features/video-subtitle/transcription.ts',
                 'src/app/content/siteAdaptationRuntime.ts',
                 'src/features/full-page-translation/content/mutationObservation.ts',
+                'src/features/full-page-translation/content/attributeMutationBatch.ts',
                 'src/features/full-page-translation/content/modalPriority.ts',
                 'src/features/full-page-translation/ui/modalProgressHint.ts',
                 'src/features/full-page-translation/content/modalSession.ts',

@@ -825,6 +825,147 @@ describe("全文翻译可见性锚点", () => {
         timer.mockRestore();
     });
 
+    it('全属性关系规则的 80 个兄弟 class/style 变化只为 120 个 owner 各排一次复验', async () => {
+        replaceGlobal('performance', {now: () => Date.now()});
+        runtime.config.display = 1;
+        runtime.config.fullPageTranslationMode = 'all';
+        document.body.innerHTML = '<aside>' + Array.from({length: 80}, (_, index) => `<i id="flag-${index}"></i>`).join('') +
+            '</aside><main>' + Array.from({length: 120}, (_, index) => `<p>Stable translated paragraph ${index}.</p>`).join('') + '</main>';
+        const owners = Array.from(document.querySelectorAll<HTMLElement>('p'));
+        const flags = Array.from(document.querySelectorAll<HTMLElement>('i'));
+        owners.forEach(element => setLayoutBox(element, 600, 60));
+        runtime.adapters = [{id: 'related-full-attribute-fixture', matches: () => true,
+            decide: () => ({kind: 'pass'}), observedAttributes: null}];
+        runtime.candidates = owners.map(element => ({element, kind: 'content', reason: 'wide-attribute-storm'}));
+        autoTranslateEnglishPage();
+        await finishScheduledWork();
+        const states = owners.map(getTranslationState);
+        expect(states.every(state => state?.phase === 'translated')).toBe(true);
+        expect(runtime.requests).toHaveBeenCalledTimes(owners.length);
+        const records = flags.map((target, index) => {
+            const attributeName = index % 2 ? 'class' : 'style';
+            target.setAttribute(attributeName, index % 2 ? 'host-theme' : 'opacity: 0.9;');
+            return {type: 'attributes', target, attributeName, oldValue: null,
+                addedNodes: [], removedNodes: []} as unknown as MutationRecord;
+        });
+        const timer = vi.spyOn(window, 'setTimeout');
+        const clearTimer = vi.spyOn(window, 'clearTimeout');
+        const originalFrom = Array.from;
+        let ownerSetCopies = 0;
+        const copy = vi.spyOn(Array, 'from').mockImplementation((...args: Parameters<typeof Array.from>) => {
+            const input = args[0];
+            if (input instanceof Set && input.size === owners.length && input.has(owners[0])) ownerSetCopies += 1;
+            return Reflect.apply(originalFrom, Array, args);
+        });
+        try {
+            TestMutationObserver.instances[0]!.emit(records);
+            expect({
+                ownerSetCopies,
+                trailingAndBoundaryTimers: timer.mock.calls.filter(([, delay]) => delay === 500).length,
+                clearedTimers: clearTimer.mock.calls.length,
+            }).toEqual({ownerSetCopies: 1, trailingAndBoundaryTimers: 240, clearedTimers: 0});
+            expect(owners.map(getTranslationState)).toEqual(states);
+        } finally {
+            timer.mockRestore(); clearTimer.mockRestore(); copy.mockRestore();
+        }
+        await finishScheduledWork();
+        expect(owners.map(getTranslationState)).toEqual(states);
+        expect(runtime.requests).toHaveBeenCalledTimes(owners.length);
+        expect(owners.every(owner => owner.querySelectorAll('.fluent-read-bilingual-content').length === 1)).toBe(true);
+    });
+
+    it('同批关系 class 与局部 style 合并时保留首次边界 timer', async () => {
+        replaceGlobal('performance', {now: () => Date.now()});
+        runtime.config.display = 1;
+        runtime.config.fullPageTranslationMode = 'all';
+        document.body.innerHTML = '<p>A translated owner with both site and local attribute changes.</p>';
+        const owner = document.querySelector<HTMLElement>('p')!;
+        setLayoutBox(owner, 600, 60);
+        runtime.adapters = [{id: 'class-dependent-fixture', matches: () => true,
+            decide: () => ({kind: 'pass'}), observedAttributes: ['class']}];
+        runtime.candidates = [{element: owner, kind: 'content', reason: 'mixed-boundary-flags'}];
+        autoTranslateEnglishPage();
+        await finishScheduledWork();
+        const previous = getTranslationState(owner)!;
+        document.body.className = 'host-theme';
+        owner.setAttribute('style', 'opacity: 0.9;');
+        const timer = vi.spyOn(window, 'setTimeout');
+        const clear = vi.spyOn(window, 'clearTimeout');
+        try {
+            TestMutationObserver.instances[0]!.emit([
+                {type: 'attributes', target: document.body, attributeName: 'class', oldValue: null,
+                    addedNodes: [], removedNodes: []} as unknown as MutationRecord,
+                {type: 'attributes', target: owner, attributeName: 'style', oldValue: null,
+                    addedNodes: [], removedNodes: []} as unknown as MutationRecord,
+            ]);
+            expect(timer.mock.calls.filter(([, delay]) => delay === 500)).toHaveLength(2);
+            expect(clear).not.toHaveBeenCalled();
+        } finally { timer.mockRestore(); clear.mockRestore(); }
+        await finishScheduledWork();
+        expect(getTranslationState(owner)).toBe(previous);
+        expect(runtime.requests).toHaveBeenCalledTimes(1);
+    });
+
+    it.each(['source', 'boundary', 'remove'] as const)('同批 class/style 排时遇到后续 %s 变更时不跨越旧 generation', async change => {
+        replaceGlobal('performance', {now: () => Date.now()});
+        runtime.config.display = 1;
+        runtime.config.fullPageTranslationMode = 'all';
+        document.body.innerHTML = '<aside><i id="first"></i><i id="last"></i></aside>' +
+            '<main><p id="changed">The original host paragraph.</p><p id="stable">A stable neighboring paragraph.</p></main>';
+        const changed = document.querySelector<HTMLElement>('#changed')!;
+        const stable = document.querySelector<HTMLElement>('#stable')!;
+        const first = document.querySelector<HTMLElement>('#first')!;
+        const last = document.querySelector<HTMLElement>('#last')!;
+        [changed, stable].forEach(element => setLayoutBox(element, 600, 60));
+        runtime.adapters = [{id: 'related-full-attribute-fixture', matches: () => true,
+            decide: () => ({kind: 'pass'}), observedAttributes: null}];
+        runtime.candidates = [changed, stable].map(element => ({element, kind: 'content', reason: 'mixed-mutation-order'}));
+        autoTranslateEnglishPage();
+        await finishScheduledWork();
+        const previous = getTranslationState(changed)!;
+        const stableState = getTranslationState(stable)!;
+        const firstRecord = {type: 'attributes', target: first, attributeName: 'class', oldValue: null,
+            addedNodes: [], removedNodes: []} as unknown as MutationRecord;
+        const lastRecord = {type: 'attributes', target: last, attributeName: 'style', oldValue: null,
+            addedNodes: [], removedNodes: []} as unknown as MutationRecord;
+        first.className = 'host-theme'; last.setAttribute('style', 'opacity: 0.9;');
+        let changedRecord: MutationRecord;
+        if (change === 'source') {
+            const source = changed.firstChild!;
+            source.textContent = 'The host published a different paragraph.';
+            changedRecord = {type: 'characterData', target: source, oldValue: previous.sourceText,
+                addedNodes: [], removedNodes: []} as unknown as MutationRecord;
+        } else if (change === 'boundary') {
+            changed.setAttribute('translate', 'no');
+            changedRecord = {type: 'attributes', target: changed, attributeName: 'translate', oldValue: null,
+                addedNodes: [], removedNodes: []} as unknown as MutationRecord;
+        } else {
+            changed.remove();
+            changedRecord = {type: 'childList', target: document.querySelector('main')!,
+                addedNodes: [], removedNodes: [changed]} as unknown as MutationRecord;
+        }
+        const timer = vi.spyOn(window, 'setTimeout');
+        try {
+            TestMutationObserver.instances[0]!.emit([firstRecord, changedRecord, lastRecord]);
+            expect(previous.controller.signal.aborted).toBe(true);
+            expect(getTranslationState(changed)).toBeUndefined();
+            expect(getTranslationState(stable)).toBe(stableState);
+            // 只有仍有效的邻居拥有一个 trailing timer 和一个首次边界 timer。
+            expect(timer.mock.calls.filter(([, delay]) => delay === 500)).toHaveLength(2);
+        } finally { timer.mockRestore(); }
+        await finishScheduledWork();
+        expect(getTranslationState(stable)).toBe(stableState);
+        expect(stable.querySelectorAll('.fluent-read-bilingual-content')).toHaveLength(1);
+        if (change === 'source') {
+            expect(getTranslationState(changed)).not.toBe(previous);
+            expect(changed.textContent).toContain('The host published a different paragraph.');
+            expect(runtime.requests).toHaveBeenCalledTimes(3);
+        } else {
+            expect(getTranslationState(changed)).toBeUndefined();
+            expect(runtime.requests).toHaveBeenCalledTimes(2);
+        }
+    });
+
     it.each([0, 1])('模式 %s 的连续计数更新停止重译，邻段稳定且新正文可恢复', async display => {
         runtime.config.display = display;
         runtime.config.fullPageTranslationMode = 'all';
@@ -1800,6 +1941,55 @@ describe("全文翻译可见性锚点", () => {
             expect(getTranslationState(paragraph)).toBeUndefined();
         },
     );
+
+    it('跨 light/ShadowRoot 的 class/style 合并仍立即撤销 shadow 硬边界并保留正文邻居', async () => {
+        replaceGlobal('performance', {now: () => Date.now()});
+        runtime.config.fullPageTranslationMode = 'all';
+        runtime.config.display = 1;
+        document.body.innerHTML = '<i id="light-flag"></i><p id="light-prose">A light DOM paragraph remains readable.</p><div id="shadow-host"></div>';
+        const host = document.querySelector('#shadow-host')!;
+        const shadow = host.attachShadow({mode: 'open'});
+        shadow.innerHTML = '<i id="shadow-flag"></i><p id="shadow-prose">A shadow DOM paragraph has its own boundary.</p>';
+        const light = document.querySelector<HTMLElement>('#light-prose')!;
+        const shadowProse = shadow.querySelector<HTMLElement>('#shadow-prose')!;
+        const lightFlag = document.querySelector<HTMLElement>('#light-flag')!;
+        const shadowFlag = shadow.querySelector<HTMLElement>('#shadow-flag')!;
+        [light, shadowProse].forEach(element => setLayoutBox(element, 420, 60));
+        runtime.realCore = new TranslationCandidateCore({url: new URL('https://example.com'), adapters: [
+            {id: 'tree-independent-full-attributes', matches: () => true,
+                decide: () => ({kind: 'pass'}), observedAttributes: null},
+        ]});
+        autoTranslateEnglishPage();
+        await finishScheduledWork();
+        const lightState = getTranslationState(light)!;
+        const shadowState = getTranslationState(shadowProse)!;
+        expect([lightState.phase, shadowState.phase]).toEqual(['translated', 'translated']);
+        const observer = TestMutationObserver.instances.at(-1)!;
+        expect(observer.observe).toHaveBeenCalledWith(shadow, expect.objectContaining({subtree: true, attributes: true}));
+        lightFlag.className = 'host-theme'; shadowFlag.setAttribute('style', 'opacity: 0.9;');
+        shadowProse.setAttribute('translate', 'no');
+        const timer = vi.spyOn(window, 'setTimeout');
+        try {
+            observer.emit([
+                {type: 'attributes', target: lightFlag, attributeName: 'class', oldValue: null,
+                    addedNodes: [], removedNodes: []} as unknown as MutationRecord,
+                {type: 'attributes', target: shadowFlag, attributeName: 'style', oldValue: null,
+                    addedNodes: [], removedNodes: []} as unknown as MutationRecord,
+                {type: 'attributes', target: shadowProse, attributeName: 'translate', oldValue: null,
+                    addedNodes: [], removedNodes: []} as unknown as MutationRecord,
+            ]);
+            expect(shadowState.controller.signal.aborted).toBe(true);
+            expect(getTranslationState(shadowProse)).toBeUndefined();
+            expect(getTranslationState(light)).toBe(lightState);
+            expect(timer.mock.calls.filter(([, delay]) => delay === 500)).toHaveLength(2);
+        } finally { timer.mockRestore(); }
+        await finishScheduledWork();
+        expect(getTranslationState(light)).toBe(lightState);
+        expect(getTranslationState(shadowProse)).toBeUndefined();
+        expect(light.querySelectorAll('.fluent-read-bilingual-content')).toHaveLength(1);
+        expect(shadowProse.querySelector('[data-fr-translation-owned]')).toBeNull();
+        expect(runtime.requests).toHaveBeenCalledTimes(2);
+    });
 
     it.each([[1, 'translated'], [1, 'loading'], [0, 'translated'], [0, 'loading']] as const)(
         'ShadowRoot 顶层兄弟属性变化会发现正文，并取消失去匹配的 display=%s %s 状态', async (display, phase) => {

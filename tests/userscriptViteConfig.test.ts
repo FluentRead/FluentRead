@@ -75,6 +75,29 @@ describe('authoritative site catalogs with an external pinned data asset', () =>
 });
 
 describe('userscript browser shim injection', () => {
+    it.each(['standard', 'standalone'] as const)('keeps %s runtime icon inline and pins only the standard manager icon', async mode => {
+        vi.stubEnv('FLUENTREAD_USERSCRIPT_STANDALONE', mode === 'standalone' ? '1' : '');
+        vi.stubEnv('FLUENTREAD_USERSCRIPT_GREASYFORK_SOURCE', '');
+        try {
+            vi.resetModules();
+            const {default: config} = await import('@/userscript/vite.config');
+            const plugins = (config as {plugins: Array<{name: string; generateBundle?: {handler: Function}}>}).plugins;
+            const plugin = plugins.find(item => item.name === 'bundle-userscript-css')!;
+            const entry = {type: 'chunk', isEntry: true, code: 'var fixture = 1;', moduleIds: []};
+            await Reflect.apply(plugin.generateBundle!.handler, {}, [{}, {'entry.js': entry}]);
+            const iconBytes = readFileSync(resolve(process.cwd(), 'public/icon/64.png'));
+            const runtimeIcon = JSON.parse(entry.code.match(/globalThis\.__FLUENTREAD_ICON_DATA__=("[^"]+");/u)![1]) as string;
+            expect(Buffer.from(runtimeIcon.split(',')[1], 'base64')).toEqual(iconBytes);
+            const metadataIcon = entry.code.match(/^\/\/ @icon\s+(.+)$/mu)![1];
+            if (mode === 'standalone') expect(metadataIcon).toBe(runtimeIcon);
+            else {
+                const pinned = metadataIcon.match(/^https:\/\/cdn\.jsdelivr\.net\/gh\/FluentRead\/FluentRead@([a-f0-9]{40})\/public\/icon\/64\.png$/u);
+                expect(pinned).not.toBeNull();
+                expect(execFileSync('git', ['show', `${pinned![1]}:public/icon/64.png`], {cwd: process.cwd()})).toEqual(iconBytes);
+                expect(metadataIcon).not.toBe(runtimeIcon);
+            }
+        } finally {vi.unstubAllEnvs();vi.resetModules();}
+    });
     it('excludes unreachable highlight code and copy while keeping an explicitly unavailable state', () => {
         expect(userscriptMessages(extensionChinese)).toEqual(zhCNMessages);
         expect(Object.keys(zhCNMessages).some(key => key.startsWith('informationHighlight.'))).toBe(false);

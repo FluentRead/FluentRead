@@ -1,0 +1,78 @@
+{
+  "ok": true,
+  "scope": "Same-target languages: de; multilingual paragraphs, hover/full-page zero requests, titles, links, dynamic redetection, target switch and excluded-language parity",
+  "evidenceBoundary": "The local HTML and loopback OpenAI-compatible server are deterministic fixtures. Their success does not prove any external service translation quality or availability.",
+  "consoleErrors": [],
+  "siteResourceErrors": [],
+  "launchMode": "macos-background-cdp",
+  "focusPolicy": "launchservices-no-foreground",
+  "windowPlacement": {
+    "mode": "background-visible-no-focus",
+    "visible": true,
+    "hidden": false,
+    "centered": true,
+    "windowState": "normal",
+    "bounds": {
+      "left": 132,
+      "top": -1020,
+      "width": 1440,
+      "height": 960
+    },
+    "displayTarget": "secondary",
+    "source": "macos-nsscreen",
+    "screenIndex": 1,
+    "browserFrontmost": false,
+    "frontmostBefore": {
+      "pid": 73685,
+      "name": "ChatGPT"
+    },
+    "frontmostAfter": {
+      "pid": 73685,
+      "name": "ChatGPT"
+    }
+  },
+  "multilingual": {
+    "cases": [
+      {
+        "target": "de",
+        "sameTargetElements": 2,
+        "status": "passed",
+        "hoverSameTargetRequests": 0,
+        "foreignHoverCounts": [
+          1,
+          0,
+          1,
+          0
+        ],
+        "foreignFullPageCounts": [
+          1,
+          0,
+          1
+        ],
+        "titleRequests": 0,
+        "dynamicRedetection": true,
+        "restored": true,
+        "requestSources": [
+          "This English paragraph still needs a translation for the reader of this page.",
+          "This English paragraph still needs a translation for the reader of this page.",
+          "This English paragraph still needs a translation for the reader of this page.",
+          "The dynamic paragraph was rewritten in English and it must be translated again."
+        ]
+      }
+    ],
+    "evidenceBoundary": "Pages and chat-completion responses come from the local loopback fixture; request counts prove the extension decision chain, not external provider quality.",
+    "targetSwitch": {
+      "status": "passed",
+      "from": "de",
+      "to": "en"
+    },
+    "excludedLanguage": {
+      "status": "passed",
+      "target": "zh-Hans",
+      "excludedLanguages": [
+        "de"
+      ]
+    }
+  },
+  "sourceArtifacts": "/Users/thinkstu/Desktop/copy/artifacts/target-language-quality-20261011/browser-multilingual-de-final"
+}

@@ -2,14 +2,15 @@
  * @file src/core/language/identify.ts
  *
  * 文件职责：对一段待翻译文本给出与目标语言无关的语言识别结论，是全文、悬浮、标题、划词和共享翻译客户端同目标跳过判断的唯一证据来源。
- * 主要内容：规范空白后生成技术标识符遮蔽副本并按文字切词；以非名称字母量确定主文字，把其他文字正文判为混合；结合汉字及中文技术角色语境辨别少量嵌入名称/术语和枚举，以同句代码或缩写证据及局部中文技术句架识别小写术语与操作符连接的表达式，以完整中文操作句架识别短提示中的单个服务名称，保护外语句子、功能词和引述文本；把缩写、内部大写名称、格式名和带版本名称限制为不能主导结论的少量权重。中日韩分别使用假名/谚文/汉字规则并以中文专用字形排除中日、中韩误判；单一语言文字直接给出结论；Latin、Cyrillic、Arabic、Devanagari 交给统计评估，并逐句检查是否夹带可信的其他语言句子；结果以文本为键做有界缓存，目标语言与排除列表不进入缓存。
+ * 主要内容：规范空白后生成技术标识符遮蔽副本并按文字切词；以非名称字母量确定主文字，把其他文字正文判为混合；按同句非 Latin 文字正文和相邻文字边界辨别短名称及连字符名称，让中日韩、Cyrillic、Arabic、Indic 和独立文字共用规则，不依赖品牌名单；同子句的中日韩明确外语标题、词句和提示标记优先于名称，冒号连接标签与正文而逗号及句末截断标记作用域；中文额外保留既有短操作句架与小写技术术语证据，保护外语句子、功能词和引述文本；把名称、缩写、格式名和带版本名称限制为不能主导结论的少量权重。中日韩分别使用假名/谚文/汉字规则并以中文专用字形排除中日、中韩误判；单一语言文字直接给出结论；Latin、Cyrillic、Arabic、Devanagari 交给统计评估，并逐句检查是否夹带可信的其他语言句子；名称句架只对词和词间间隔进行常数次扫描，结果以文本为键做有界缓存，目标语言与排除列表不进入缓存。
  * 模块边界：本文件属于 core 纯算法，不比较目标语言、不读取配置或页面 lang、不修改原文与 DOM；配置语言匹配和各功能入口语义由 detect.ts 负责。
+ * 判断限制：外语角色标签只在有界同子句内生效，后置标签还须直接述谓当前片段；未覆盖角色标签的文字，对普通多词 TitleCase 保守保留翻译，须有该项自身的缩写、内部大写或连字符证据才按名称计权。
  */
 
 import {classifyChineseHan, hasSimplifiedChineseEvidence, hasTraditionalChineseEvidence} from './chinese';
 import {SCRIPT_UNIQUE_LANGUAGES, hasScriptUniqueVeto, segmentScriptWords, type ScriptWord, type WritingScript} from './scripts';
 import {assessStatisticalLanguage} from './statistical';
-import {classifyEmbeddedLatinWord, createLanguageDetectionCopy, isAcronymWord, isMixedCaseName, isNameVariantWord} from './technicalTokens';
+import {classifyEmbeddedLatinWord, createLanguageDetectionCopy, isAcronymWord, isMixedCaseName, isNameVariantWord, isTechnicalAbbreviation} from './technicalTokens';
 import {FUNCTION_WORDS, type StatisticalScript} from './lexicon';
 
 export type LanguageIdentificationStatus = 'empty' | 'identified' | 'unknown' | 'mixed';
@@ -38,7 +39,14 @@ const LATIN_FUNCTION_WORDS = new Set(Object.values(FUNCTION_WORDS.Latin).flatMap
 // 这些是中文句法中的技术角色，不是浏览器、产品或供应商名称名单。未知名称也可由使用语境确认。
 const TECHNICAL_ROLE_BEFORE = /(?:降为|降為|设为|設為|设置为|設置為|切换为|切換為|级别为|級別為|提示为|提示為|生产|生產|构建|構建|运行|運行|执行|執行|安装|安裝|启用|啟用|加载|加載|导入|導入|导出|導出|兼容|适配|適配|无|無)$/u;
 const TECHNICAL_ROLE_AFTER = /^(?:只|仅|僅)?(?:构建|構建|脚本|腳本|插件|扩展|擴展|浏览器|瀏覽器|模式|级别|級別|格式|版本|组件|組件|控件|缓存|緩存|配置|参数|參數|服务|服務|接口|模型|环境|環境|内核|內核|引擎|协议|協議|文件|资源|資源|平台|项目|項目|模块|模組|检测|檢測|测试|測試|校验|校驗|日志|日誌|错误|錯誤|异常|異常|提示|验证|驗證)/u;
-const EXPLICIT_FOREIGN_WORD_BEFORE = /(?:翻译|翻譯|解释|解釋|英文|外语|外語|单词|單詞|词语|詞語)(?:一下|为|為|是|的)?$/u;
+const EXPLICIT_FOREIGN_WORD_BEFORE = /(?:翻译|翻譯|解释|解釋|(?:英文|外语|外語)(?:标题|標題|短语|短語|提示|句子)?(?:列表)?|单词|單詞|词语|詞語)(?:一下|为|為|是|的)?$/u;
+// 外语标记描述文本的角色，不列举英文短语或品牌；语言与角色之间只允许有界本族修饰。
+const EXPLICIT_FOREIGN_TEXT_CONTEXT = /(?:英文|英语|英語|外文|外语|外語)[\p{Script=Han}\s]{0,16}(?:标题|標題|题目|題目|短句|短语|短語|提示|句子|单词|單詞|词语|詞語)|(?:英語|外国語|外語)[\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}\s]{0,16}(?:タイトル|題名|見出し|単語|語句|文章|表現)|(?:영어|영문|외국어)[\p{Script=Hangul}\s]{0,16}(?:제목|문장|단어|구절|표현|안내|메시지)/u;
+const FOREIGN_CONTEXT_CLAUSE_BOUNDARY = /[,.!?。！？;；，\n\u061F\u061B\u06D4\u0964\u0965\u037E\u0589\u104B\u17D4\u1362]/u;
+// 后置标记须直接述谓当前片段；“产品提供英文标题功能”不等于“它是英文标题”。
+const CHINESE_FOREIGN_REFERENCE = /^(?:这|這|这些|這些|它|它们|它們|此|以上|上面|前述|原文|文本)?(?:都|均|全|全部|也)?(?:是|为|為|属于|屬於)$/u;
+const JAPANESE_FOREIGN_REFERENCE = /^(?:は|が)(?:含まれ)?(?:すべて|全て|いずれも|どちらも|全部)?$/u;
+const KOREAN_FOREIGN_REFERENCE = /^(?:은|는|이|가)(?:포함되어)?(?:모두|전부|각각)?$/u;
 const FOREIGN_PROSE_MARKERS = new Set(['please', 'hello', 'welcome', 'goodbye', 'thanks', 'sorry', 'translate', 'click', 'retry', 'open', 'restart', 'failed', 'crashed', 'broken', 'unavailable', 'denied', 'expired']);
 // 短操作提示只有一个服务名称和完整中文句架；不能把任意短中文旁的英文词当作名称。
 const SHORT_UI_NAME_BEFORE = /^(?:继续使用|繼續使用|通过|通過|透过|透過)$/u;
@@ -48,8 +56,183 @@ const CHINESE_TECHNICAL_CONTEXT = /(?:连接|連接|持槽|排队|排隊|阻塞|
 const CHINESE_CODE_CONTEXT = /(?:字段|欄位|参数|參數|变量|變量|元数据|元資料|调用|呼叫|缓存|緩存|并发|併發|调度|調度|处理链|處理鏈|持槽|阻塞|互锁|互鎖|安装|安裝|回归|回歸)/u;
 const CAPITALIZED_FIELD_CONTEXT = /^(?:字段|欄位|参数|參數|变量|變量|集合|状态|狀態)/u;
 const TECHNICAL_EXPRESSION_GAP = /^[ \t/、+→&|!-]+$/u;
+// DOM 识别副本的 U+FFFC 只表示结构代码原子；须由技术连接符接入表达式，不能凭原子接受正文。
+const TECHNICAL_ATOM_CONNECTION = /(?:\uFFFC[ \t]*[/、→]|[/、→][ \t]*\uFFFC)/u;
+const TECHNICAL_ATOM_PREFIX = /(?:\uFFFC[ \t]*[/、→][ \t]*)+$/u;
+const TECHNICAL_ATOM_SUFFIX = /^(?:[ \t]*[/、→][ \t]*\uFFFC)+/u;
 const TECHNICAL_CLAUSE_BOUNDARY = /[,.!?。！？;；:：，\n]/u;
 const TECHNICAL_SENTENCE_BOUNDARY = /(?<=[.!?。！？])\s*(?=\S)|\n+/u;
+const NATIVE_SENTENCE_BOUNDARY = /[.!?。！？\n\u061F\u06D4\u0964\u0965\u0589\u104B\u17D4\u1362]/u;
+const NAME_WORD_GAP = /^[ \t/、-]+$/u;
+const NATIVE_NAME_MIN_LETTERS = 8;
+// 封闭类并列连词确认名称枚举关系，适用于多种非 Latin 文字；不包含品牌或技术角色关键词。
+const NATIVE_COORDINATORS = new Set(['和', '与', '與', '或', '及', '以及', 'と', 'や', '及び', 'または',
+    '및', '과', '와', '또는', 'и', 'і', 'или', 'та', 'або', 'و', 'أو', 'یا', 'और', 'या', 'και', 'ή', 'ו', 'או']);
+
+function writingGroup(word: ScriptWord): string {
+    return CJK_SCRIPTS.has(word.script) ? 'CJK' : word.script;
+}
+
+/** 有界同子句反证；冒号仍连接外语标签与正文，不从上一子句或完整句子借用标记。 */
+function hasExplicitForeignContext(copy: string, start: number, end: number): boolean {
+    const before = copy.slice(Math.max(0, start - 128), start).split(FOREIGN_CONTEXT_CLAUSE_BOUNDARY).at(-1)!.trimEnd();
+    if (EXPLICIT_FOREIGN_WORD_BEFORE.test(before.replace(/[:：]\s*$/u, ''))
+        || EXPLICIT_FOREIGN_TEXT_CONTEXT.test(before)) return true;
+    const after = copy.slice(end, end + 128).split(FOREIGN_CONTEXT_CLAUSE_BOUNDARY)[0]!.trimStart().replace(/^\+(?=\p{L})/u, '');
+    const role = EXPLICIT_FOREIGN_TEXT_CONTEXT.exec(after);
+    if (!role) return false;
+    const reference = after.slice(0, role.index).replace(/\s+/gu, '');
+    const ending = after.slice(role.index + role[0].length);
+    return CHINESE_FOREIGN_REFERENCE.test(reference)
+        || JAPANESE_FOREIGN_REFERENCE.test(reference) && /^(?:です|であり|である|であって|なので|だ|という)/u.test(ending)
+        || KOREAN_FOREIGN_REFERENCE.test(reference) && /^(?:입니다|이다|이며|이고|인|이라는|로서)/u.test(ending);
+}
+
+/** 同句至多 256 字符的局部窗口，只寻找已有通用技术缩写证据，不借用前后完整句子的内容。 */
+function hasNearbyTechnicalAnchor(copy: string, first: ScriptWord, last: ScriptWord): boolean {
+    const before = copy.slice(Math.max(0, first.start - 128), first.start).split(NATIVE_SENTENCE_BOUNDARY).at(-1)!;
+    const after = copy.slice(last.end, last.end + 128).split(NATIVE_SENTENCE_BOUNDARY)[0]!;
+    return segmentScriptWords(before + ' ' + after).some(word => isTechnicalAbbreviation(word.text));
+}
+
+/**
+ * 名称字形与正文句架共同提供证据：每个名称最多三个 ASCII Latin 词，顿号枚举逐项检查，不能含功能词、外语动作或引号，
+ * 同句至少八个同一非 Latin 文字字符，并与该文字紧邻。普通多词标题需要后接母语正文；
+ * 单个名称、内部大写/缩写名称及连字符名称也可作母语句末宾语，不能跨完整句子借用正文证据。
+ * 一段名称最多计两个字符的预算，两侧母语句架俱全时计一点五，格式名仍为零；
+ * 顿号枚举逐项计权，不让名称数量代替正文证据。原文不会被替换，每个词和间隔仅遍历常数次。
+ */
+function findNativeNamedRuns(copy: string, words: readonly ScriptWord[]): ReadonlyMap<ScriptWord, number> {
+    const names = new Map<ScriptWord, number>();
+    let sentenceStart = 0;
+    while (sentenceStart < words.length) {
+        let sentenceEnd = sentenceStart + 1;
+        const counts = new Map<string, number>();
+        const countNative = (word: ScriptWord): void => {
+            if (word.script === 'Latin') return;
+            const group = writingGroup(word);
+            counts.set(group, (counts.get(group) ?? 0) + word.letters);
+        };
+        countNative(words[sentenceStart]!);
+        while (sentenceEnd < words.length
+            && !NATIVE_SENTENCE_BOUNDARY.test(copy.slice(words[sentenceEnd - 1]!.end, words[sentenceEnd]!.start))) {
+            countNative(words[sentenceEnd]!);
+            sentenceEnd += 1;
+        }
+        let nativeGroup: string | undefined;
+        let nativeLetters = 0;
+        for (const [group, letters] of counts) {
+            if (letters > nativeLetters) { nativeGroup = group; nativeLetters = letters; }
+        }
+        if (nativeLetters >= NATIVE_NAME_MIN_LETTERS) {
+            for (let index = sentenceStart; index < sentenceEnd; index += 1) {
+                const first = words[index]!;
+                if (first.script !== 'Latin') continue;
+                const runStart = index;
+                while (index + 1 < sentenceEnd && words[index + 1]!.script === 'Latin'
+                    && NAME_WORD_GAP.test(copy.slice(words[index]!.end, words[index + 1]!.start))) index += 1;
+                const last = words[index]!;
+                if (last.end - first.start > 64) continue;
+                const run = words.slice(runStart, index + 1);
+                const span = copy.slice(first.start, last.end);
+                const enumeration = span.includes('、');
+                const entryTexts = enumeration ? span.split('、') : [span];
+                const entries = enumeration ? entryTexts.map(part => segmentScriptWords(part)) : [run];
+                // 顿号分隔的是独立名称，不能把 Google Meet、Teams、Zoom 合成一个四词标题。
+                // 完整列表仍受 64 字符、母语句架、外语反证和逐项名称预算约束。
+                if (entries.some(entry => entry.length > 3)) continue;
+                // 未支持本族外语文本角色的文字不能仅凭普通多词标题字形确认名称。
+                // 每一项须独立有缩写、内部大写或连字符结构；旁边的单词品牌不能替它提供证据。
+                if (nativeGroup !== 'CJK'
+                    && entries.some((entry, entryIndex) => entry.length > 1
+                        && !entry.some(word => isMixedCaseName(word.text) || isAcronymWord(word.text))
+                        && !entryTexts[entryIndex]!.includes('-'))) continue;
+                const before = copy.slice(Math.max(0, first.start - 32), first.start).trimEnd();
+                const after = copy.slice(last.end, last.end + 32).trimStart();
+                if (/["'“‘「『]$/u.test(before) || /^["'”’」』]/u.test(after)
+                    || hasExplicitForeignContext(copy, first.start, last.end)) continue;
+                const previous = runStart > sentenceStart ? words[runStart - 1] : undefined;
+                const next = index + 1 < sentenceEnd ? words[index + 1] : undefined;
+                const nativeBefore = previous !== undefined && writingGroup(previous) === nativeGroup
+                    && /^[ \t]*$/u.test(copy.slice(previous.end, first.start));
+                // 单个紧贴名称的 + 可是版本后缀；分离的加号及其他运算符不能提供母语边界。
+                const nativeAfter = next !== undefined && writingGroup(next) === nativeGroup
+                    && /^\+?[ \t]*$/u.test(copy.slice(last.end, next.start));
+                if (!nativeBefore && !nativeAfter) continue;
+                const structured = run.some(word => isMixedCaseName(word.text) || isAcronymWord(word.text))
+                    || copy.slice(first.start, last.end).includes('-');
+                // 一串普通多词标题不能互相证明为名称；扩大的枚举须有单词名称或独立结构证据。
+                if (enumeration && run.length > 3 && !structured && entries.every(entry => entry.length > 1)) continue;
+                // 逗号后的普通 Title Case 片段可能是外语陈述；只有真正句首、标签/枚举边界或
+                // 两侧母语句架才有名称证据，不能凭后接母语把孤立单词或标题吞掉。
+                if (!nativeBefore && !structured && previous !== undefined
+                    && !/^[ \t]*[:：、/][ \t]*$/u.test(copy.slice(previous.end, first.start))) continue;
+                if (!nativeAfter && run.length > 1 && !structured) continue;
+                // 普通首字母大写的句末单词也可能是外语提示。需要独立技术证据确认这个
+                // 名称角色；真实名称仍可由两侧母语、内部大写、缩写或连字符确认。
+                const sibling = runStart >= sentenceStart + 2 ? words[runStart - 2] : undefined;
+                const namedSibling = previous !== undefined && NATIVE_COORDINATORS.has(previous.text)
+                    && sibling !== undefined && sibling.script === 'Latin' && names.has(sibling)
+                    && classifyEmbeddedLatinWord(sibling.text).role !== 'format';
+                if (!nativeAfter && !structured && !namedSibling && !hasNearbyTechnicalAnchor(copy, first, last)) continue;
+                if (!run.every((word, position) => {
+                    const variant = position > 0 && isNameVariantWord(word.text)
+                        && (isMixedCaseName(first.text) || isAcronymWord(first.text));
+                    return (!LATIN_FUNCTION_WORDS.has(word.text.toLowerCase()) || variant)
+                        && !FOREIGN_PROSE_MARKERS.has(word.text.toLowerCase())
+                        && (classifyEmbeddedLatinWord(word.text).role !== 'prose'
+                            || /^[A-Z][a-z]{1,23}$/u.test(word.text) || variant);
+                })) continue;
+                const weight = nativeBefore && nativeAfter ? 1.5 : 2;
+                for (const word of run) names.set(word, classifyEmbeddedLatinWord(word.text).role === 'format'
+                    ? 0 : enumeration ? weight : weight / run.length);
+            }
+        }
+        sentenceStart = sentenceEnd;
+    }
+    return names;
+}
+
+/**
+ * 外语反证优先于名称字形。Latin 连续片段中的功能词、明确外语动作、引述的未知缩写以及
+ * 没有通用技术缩写证据的两个以上全大写词仍是正文；DO NOT 不能因大写而伪装成两个名称。
+ * 按片段判断并逐词覆盖名称回退，适用于任何主文字，也保护跨完整句子的外语短提示。
+ */
+function findForeignLatinWords(copy: string, words: readonly ScriptWord[], embeddedNames: ReadonlyMap<ScriptWord, number>): ReadonlySet<ScriptWord> {
+    const foreign = new Set<ScriptWord>();
+    for (let index = 0; index < words.length; index += 1) {
+        const first = words[index]!;
+        if (first.script !== 'Latin') continue;
+        const start = index;
+        while (index + 1 < words.length && words[index + 1]!.script === 'Latin'
+            && NAME_WORD_GAP.test(copy.slice(words[index]!.end, words[index + 1]!.start))) index += 1;
+        const last = words[index]!;
+        const before = copy.slice(Math.max(0, first.start - 32), first.start).trimEnd();
+        const after = copy.slice(last.end, last.end + 32).trimStart();
+        let allUnknownAcronyms = index > start;
+        let proseEvidence = hasExplicitForeignContext(copy, first.start, last.end);
+        const quoted = /["'“‘「『]$/u.test(before) || /^["'”’」』]/u.test(after);
+        for (let cursor = start; cursor <= index; cursor += 1) {
+            const word = words[cursor]!;
+            const lower = word.text.toLowerCase();
+            const technical = isTechnicalAbbreviation(word.text) || classifyEmbeddedLatinWord(word.text).role === 'format';
+            const nameVariant = cursor > start && isNameVariantWord(word.text) && embeddedNames.has(word)
+                && (isMixedCaseName(first.text) || isAcronymWord(first.text));
+            allUnknownAcronyms &&= isAcronymWord(word.text) && !technical;
+            if ((!technical && !nameVariant && word.letters > 1 && LATIN_FUNCTION_WORDS.has(lower))
+                || (FOREIGN_PROSE_MARKERS.has(lower) && !(word.text === lower && embeddedNames.has(word)))
+                || (quoted && isAcronymWord(word.text) && !technical)) proseEvidence = true;
+        }
+        // 母语技术句子可包含尚未列出的缩写组合（如某种运行时/后端名称）；需要两侧母语
+        // 句架和同一句附近已有通用缩写的独立证据，不能凭大写、主语言比例或跨句证据放行。
+        if (allUnknownAcronyms && /\p{L}$/u.test(before) && /^\p{L}/u.test(after)) {
+            if (hasNearbyTechnicalAnchor(copy, first, last)) allUnknownAcronyms = false;
+        }
+        if (!proseEvidence && !allUnknownAcronyms) continue;
+        for (let cursor = start; cursor <= index; cursor += 1) foreign.add(words[cursor]!);
+    }
+    return foreign;
+}
 
 /**
  * 小写术语不能只凭中文占比获准：同一句至少有八个汉字、明确中文证据及代码/缩写锚点；
@@ -69,9 +252,10 @@ function findChineseTechnicalTerms(copy: string, words: readonly ScriptWord[]): 
         return {
             text, start, end: offset,
             credible: hanCount >= 8
-                && (CHINESE_CODE_CONTEXT.test(text) && sentenceWords.some((word, index) => word.script === 'Latin'
-                    && sentenceWords[index + 1]?.script === 'Latin'
-                    && /^[ \t]*[/、+→&|][ \t]*$/u.test(text.slice(word.end, sentenceWords[index + 1]!.start)))
+                && (CHINESE_CODE_CONTEXT.test(text) && (TECHNICAL_ATOM_CONNECTION.test(text)
+                    || sentenceWords.some((word, index) => word.script === 'Latin'
+                        && sentenceWords[index + 1]?.script === 'Latin'
+                        && /^[ \t]*[/、+→&|][ \t]*$/u.test(text.slice(word.end, sentenceWords[index + 1]!.start))))
                     || sentenceWords.some(word => word.script === 'Latin'
                     && (isAcronymWord(word.text) || isMixedCaseName(word.text)
                         || /^[A-Z][a-z]{1,23}$/u.test(word.text) && CAPITALIZED_FIELD_CONTEXT.test(text.slice(word.end).trimStart())))),
@@ -86,7 +270,11 @@ function findChineseTechnicalTerms(copy: string, words: readonly ScriptWord[]): 
         if (!sentence.credible) continue;
         const start = index;
         while (index + 1 < words.length && words[index + 1]!.script === 'Latin'
-            && TECHNICAL_EXPRESSION_GAP.test(copy.slice(words[index]!.end, words[index + 1]!.start))) index += 1;
+            && (() => {
+                const gap = copy.slice(words[index]!.end, words[index + 1]!.start);
+                return TECHNICAL_EXPRESSION_GAP.test(gap)
+                    || /^[ \t/、→\uFFFC]+$/u.test(gap) && TECHNICAL_ATOM_CONNECTION.test(gap);
+            })()) index += 1;
         const run = words.slice(start, index + 1);
         const last = run.at(-1)!;
         const expression = copy.slice(first.start, last.end);
@@ -94,12 +282,14 @@ function findChineseTechnicalTerms(copy: string, words: readonly ScriptWord[]): 
         const sentenceText = sentence.text;
         const localStart = first.start - sentence.start;
         const localEnd = last.end - sentence.start;
-        const before = sentenceText.slice(Math.max(0, localStart - 64), localStart).split(TECHNICAL_CLAUSE_BOUNDARY).at(-1)!.trimEnd();
-        const after = sentenceText.slice(localEnd, localEnd + 64).split(TECHNICAL_CLAUSE_BOUNDARY)[0]!.trimStart();
+        const before = sentenceText.slice(Math.max(0, localStart - 64), localStart).split(TECHNICAL_CLAUSE_BOUNDARY).at(-1)!.trimEnd()
+            .replace(TECHNICAL_ATOM_PREFIX, '').trimEnd();
+        const after = sentenceText.slice(localEnd, localEnd + 64).split(TECHNICAL_CLAUSE_BOUNDARY)[0]!.trimStart()
+            .replace(TECHNICAL_ATOM_SUFFIX, '').trimStart();
         if (!/\p{Script=Han}$/u.test(before) && !/^\p{Script=Han}/u.test(after)) continue;
         if (!CHINESE_TECHNICAL_CONTEXT.test(before + after)
             && !run.some(word => isAcronymWord(word.text) || isMixedCaseName(word.text))) continue;
-        if (EXPLICIT_FOREIGN_WORD_BEFORE.test(before) || /["'“‘「『]$/u.test(before) || /^["'”’」』]/u.test(after)) continue;
+        if (hasExplicitForeignContext(copy, first.start, last.end) || /["'“‘「『]$/u.test(before) || /^["'”’」』]/u.test(after)) continue;
         if (!run.every(word => /^[A-Za-z]{1,24}$/u.test(word.text)
             && !LATIN_FUNCTION_WORDS.has(word.text.toLowerCase())
             && (word.text === 'retry' || !FOREIGN_PROSE_MARKERS.has(word.text.toLowerCase())))) continue;
@@ -140,12 +330,13 @@ interface EmbeddedEvidence {
  * 希腊字母单字常作数学或物理符号，不视为外语。
  */
 function assessEmbeddedWords(words: readonly ScriptWord[], isMain: (word: ScriptWord) => boolean, versionedNames: number,
-    embeddedNames: ReadonlyMap<ScriptWord, number> = new Map()): EmbeddedEvidence {
+    embeddedNames: ReadonlyMap<ScriptWord, number>, foreignWords: ReadonlySet<ScriptWord>): EmbeddedEvidence {
     let foreignProse = false;
     let nameWeight = versionedNames * 2;
     for (const word of words) {
         if (isMain(word)) continue;
         if (word.script === 'Latin') {
+            if (foreignWords.has(word)) { foreignProse = true; continue; }
             if (embeddedNames.has(word)) { nameWeight += embeddedNames.get(word)!; continue; }
             const {role, weight} = classifyEmbeddedLatinWord(word.text);
             if (role === 'prose') foreignProse = true;
@@ -187,11 +378,11 @@ function findEmbeddedNames(copy: string, words: readonly ScriptWord[]): Readonly
         if (hanCount < 8 && !shortUiName) continue;
         const technicalRole = shortUiName || chineseContext && (run.length <= 2 || copy.slice(run[0]!.start, run.at(-1)!.end).includes('/'))
             && (TECHNICAL_ROLE_BEFORE.test(before.replace(/[、,，]\s*$/u, '')) || TECHNICAL_ROLE_AFTER.test(after))
-            && !EXPLICIT_FOREIGN_WORD_BEFORE.test(before);
+            && !hasExplicitForeignContext(copy, run[0]!.start, run.at(-1)!.end);
         const hanBefore = /\p{Script=Han}$/u.test(before);
         const hanAfter = /^\p{Script=Han}/u.test(after);
         if (!hanBefore && !hanAfter && !technicalRole) continue;
-        if (EXPLICIT_FOREIGN_WORD_BEFORE.test(before)) continue;
+        if (hasExplicitForeignContext(copy, run[0]!.start, run.at(-1)!.end)) continue;
         // 纯首字母大写名称需要两侧正文支撑；被标点切断的孤立词不能靠另一侧的汉字获准。
         if (!technicalRole && (!hanBefore || !hanAfter) && !run.some(word => isMixedCaseName(word.text) || isAcronymWord(word.text))) continue;
         // 引述的外语词不是名称点缀；只借助另一侧汉字也不能越过引号。
@@ -237,13 +428,13 @@ function containsForeignSentence(copy: string, script: StatisticalScript, langua
 }
 
 function identifyCjk(copy: string, words: readonly ScriptWord[], versionedNames: number,
-    embeddedNames: ReadonlyMap<ScriptWord, number>): LanguageIdentification {
+    embeddedNames: ReadonlyMap<ScriptWord, number>, foreignWords: ReadonlySet<ScriptWord>): LanguageIdentification {
     const counts = {Han: 0, Kana: 0, Hangul: 0};
     for (const word of words) {
         if (word.script === 'Han' || word.script === 'Kana' || word.script === 'Hangul') counts[word.script] += word.letters;
     }
     const native = counts.Han + counts.Kana + counts.Hangul;
-    const embedded = assessEmbeddedWords(words, word => CJK_SCRIPTS.has(word.script), versionedNames, embeddedNames);
+    const embedded = assessEmbeddedWords(words, word => CJK_SCRIPTS.has(word.script), versionedNames, embeddedNames, foreignWords);
     if (embedded.foreignProse || (counts.Kana > 0 && counts.Hangul > 0)) return MIXED;
     // 名称只能点缀正文：按词计权后超过母语字符一半时，无法证明整段属于目标语言。
     if (embedded.nameWeight * 2 > native) return UNKNOWN;
@@ -276,26 +467,31 @@ function identifyUncached(value: string): LanguageIdentification {
     const words = segmentScriptWords(detectionCopy.text);
     if (words.length === 0) return UNKNOWN;
     const embeddedNames = new Map(findEmbeddedNames(detectionCopy.text, words));
+    for (const [word, weight] of findNativeNamedRuns(detectionCopy.text, words)) {
+        if (!embeddedNames.has(word) || weight < embeddedNames.get(word)!) embeddedNames.set(word, weight);
+    }
     for (const [word, weight] of findChineseTechnicalTerms(detectionCopy.text, words)) {
         // 格式名仍保持零权重，已接纳的名称沿用原有预算；新规则只补足小写术语的正文误判。
         if (!embeddedNames.has(word) && classifyEmbeddedLatinWord(word.text).role === 'prose') embeddedNames.set(word, weight);
     }
+    const foreignWords = findForeignLatinWords(detectionCopy.text, words, embeddedNames);
 
     // 主文字按“非名称字母”决定：PDF、OpenAI 这类名称不能把中文句子变成 Latin 文本。
     const weights = new Map<string, number>();
     for (const word of words) {
-        const group = CJK_SCRIPTS.has(word.script) ? 'CJK' : word.script;
-        const contributes = word.script !== 'Latin' || (!embeddedNames.has(word) && classifyEmbeddedLatinWord(word.text).role === 'prose');
+        const group = writingGroup(word);
+        const contributes = word.script !== 'Latin' || foreignWords.has(word)
+            || (!embeddedNames.has(word) && classifyEmbeddedLatinWord(word.text).role === 'prose');
         if (contributes) weights.set(group, (weights.get(group) ?? 0) + word.letters);
     }
     const ranked = [...weights].sort((left, right) => right[1] - left[1]);
     if (ranked.length === 0 || (ranked[1] && ranked[1][1] === ranked[0]![1])) return UNKNOWN;
     const main = ranked[0]![0];
 
-    if (main === 'CJK') return identifyCjk(detectionCopy.text, words, detectionCopy.versionedNames, embeddedNames);
+    if (main === 'CJK') return identifyCjk(detectionCopy.text, words, detectionCopy.versionedNames, embeddedNames, foreignWords);
 
     const script = main as WritingScript;
-    const embedded = assessEmbeddedWords(words, word => word.script === script, script === 'Latin' ? 0 : detectionCopy.versionedNames);
+    const embedded = assessEmbeddedWords(words, word => word.script === script, script === 'Latin' ? 0 : detectionCopy.versionedNames, embeddedNames, foreignWords);
     if (embedded.foreignProse) return MIXED;
     const nativeLetters = weights.get(script)!;
     if (script !== 'Latin' && embedded.nameWeight * 2 > nativeLetters) return UNKNOWN;

@@ -1,7 +1,7 @@
 /**
  * @file src/core/language/functionWordData.ts
  * 文件职责：保存统计语言识别的原始功能词字符串，供 lexicon.ts 按原有顺序建立 Set。
- * 主要内容：逐字保留 Latin、Cyrillic、Arabic、Devanagari 四组的四十五条功能词列表；本文件仅含导出的 const 字符串。
+ * 主要内容：维护 Latin、Cyrillic、Arabic、Devanagari 四组的功能词列表，包含挪威新挪威语的目录外反证和马拉地语的代词、限定词、连词与时间副词；本文件仅含导出的 const 字符串，不收录网页或产品名。
  * 模块边界：不执行识别、切词或浏览器操作；仅 userscript 非 Greasy Fork 构建通过现有静态数据管线无损压缩，扩展直接消费明文数据。
  */
 
@@ -13,8 +13,8 @@ export const latinPtWords = "o a os as um uma uns umas e ou mas de do da dos das
 export const latinItWords = "il lo la i gli le un uno una e o ma di del della dei delle a al alla in nel nella con per su sul sulla da dal è sono essere che non si suo sua nostro nostra nostri questo questa molto più anche come quando dove ci vi noi voi può tutto";
 export const latinNlWords = "de het een en of maar van in op aan met voor door bij uit naar is zijn was wordt worden niet geen ook dit dat deze die wij we jullie ze zij hij ik je u uw ons onze er hier nog al wel om te als kan";
 export const latinPlWords = "i w na z do się nie jest są to że jak ale lub oraz dla od po przez przy o co czy ten ta te tego nasz nasza naszej naszym wasz jego jej ich my wy oni być był była może tylko już bardzo także też aby";
-export const latinCsWords = "a i v ve na s se z do je jsou byl být to že jak ale nebo pro od po při o co ten ta tento tato naše našich náš váš jeho její jejich my vy oni není také jen už velmi jako když kde abychom";
-export const latinSkWords = "a i v vo na s so sa z do je sú bol byť to že ako ale alebo pre od po pri o čo ten táto naša našej náš váš jeho jej ich my vy oni nie tiež len už veľmi keď kde aby sme ste";
+export const latinCsWords = "a i v ve na s se si k z do je jsou byl být to že jak ale nebo pro od po při o co ten ta tento tato naše našich náš váš jeho její jejich my vy oni není také jen už velmi jako když kde abychom";
+export const latinSkWords = "a i aj v vo na s so sa si k z do je sú bol byť to že ako ale alebo pre od po pri o čo ten táto naša našej náš váš jeho jej ich my vy oni nie tiež len už veľmi keď kde aby sme ste";
 export const latinRoWords = "și în de la cu pe din pentru este sunt a al ale un o unei unui care că nu se mai ce acest această nostru noastră vă ne sau dar prin după foarte fost fi";
 export const latinHuWords = "a az és egy is nem van vagy hogy de meg ez azt ezt mint már csak még sem el ki be fel le ön önök minden nagyon lesz volt lehet kell";
 export const latinTrWords = "ve bir bu için ile da de ne çok daha gibi olarak olan var yok değil mi mı ama veya her şu o ben sen biz siz onlar kadar sonra önce en";
@@ -23,9 +23,10 @@ export const latinIdWords = "dan yang di ke dari untuk dengan ini itu adalah tid
 export const latinMsWords = "dan yang di ke dari untuk dengan ini itu ialah adalah tidak akan pada dalam juga kami kita anda mereka saya atau tetapi boleh sudah belum ada oleh sebagai kerana lebih sangat bahawa telah sila";
 export const latinFilWords = "ang ng mga sa at ay na para ko mo ka siya kami kayo ito iyon hindi may nang kung pero ni si aming inyong ating iyong";
 export const latinSwWords = "na ya wa za la kwa ni katika hii huu hiyo kama lakini au sisi wewe yeye wao kuwa pia sana hapa yetu zetu wetu yako ili";
-export const latinSvWords = "och i att det som en ett på är för med av till den har inte om vi du han hon de jag var kan men eller från vår vårt våra er ert era också mycket";
-export const latinDaWords = "og i at det som en et på er for med af til den har ikke om vi du han hun de jeg var kan men eller fra vores jeres også meget hvad hvor blevet";
-export const latinNbWords = "og i å det som en et på er for med av til den har ikke om vi du han hun de jeg var kan men eller fra vår vårt våre deres også veldig hva hvor blitt";
+export const latinSvWords = "och i att det som en ett på är för med av till den har inte om vi du han hon de jag var kan men eller från vår vårt våra er ert era också mycket när kvar efter före även sedan genom utan mellan själv någon något alla varandra här där då nu så bara varje vem vad vars";
+export const latinDaWords = "og i at det som en et på er for med af til den har ikke om vi du han hun de jeg var kan men eller fra vores jeres også meget hvad hvor blevet efter før når selv igen stadig nu så kun alle hver nogle noget nogen mellem uden hvem der her siden fordi hvis";
+export const latinNbWords = "og i å at det som en et på er for med av til den har ikke om vi du han hun de jeg var kan men eller fra vår vårt våre deres også veldig hva hvor blitt etter før når selv igjen nå så bare alle hver noen noe mellom uten hvem der her siden fordi hvis fortsatt enn mye";
+export const latinNnWords = "og i å at det som ein eit på er for med av til den har ikkje om vi du han ho dei eg var kan men eller frå vår vårt våre dykk dykkar også mykje kva kvar kven når medan dersom då no så berre etter før utan mellom sjølv framleis att vert vore vera desse denne dette nokon noko alle kvarandre";
 export const latinFiWords = "ja on ei se että tämä mutta tai kun jos niin myös vain olla ovat oli me te he minä sinä hän meidän teidän kanssa mukaan jälkeen ennen hyvin joka mikä";
 export const latinEtWords = "ja on ei see et aga või kui siis ka ainult olla oli me te nad mina sina tema meie teie oma kõik väga mis kes selle nagu";
 export const latinLvWords = "un ir ar uz no par kas ka bet vai arī ļoti mēs jūs viņi es tu viņš viņa mūsu jūsu šis šī tas tā nav būt bija kā kur lai tiek";
@@ -48,5 +49,5 @@ export const arabicArWords = "في من على إلى عن مع هذا هذه ذ
 export const arabicFaWords = "و در به از که این آن با برای را است هستند بود شد می ما شما آنها من تو او یک هم نیز تا اگر یا اما خود بسیار خیلی هر چه";
 export const arabicUrWords = "اور میں کے کی کا کو سے پر یہ وہ ہے ہیں تھا تھی نہیں ہم آپ ایک بھی کہ جو اگر یا لیکن بہت ہماری ہمارا گئی گیا";
 export const devanagariHiWords = "और का की के में है हैं को से पर यह वह एक नहीं हम आप मैं तुम था थी थे भी तो कि जो लिए साथ हमारी हमारा आपका आपके बहुत गए गई";
-export const devanagariMrWords = "आणि च्या ची चा चे मध्ये आहे आहेत ला ने हे ते एक नाही आम्ही तुम्ही मी होता होती पण की जो साठी सह आमच्या आपले खूप वर तुमचे";
+export const devanagariMrWords = "आणि च्या ची चा चे मध्ये आहे आहेत ला ने हे ते एक नाही आम्ही तुम्ही मी होता होती पण की जो साठी सह आमच्या आपले खूप वर तुमचे आता नंतर पुन्हा किंवा जर तर म्हणून तसेच जेव्हा तेव्हा जरी तरी या त्या याचा त्याचा याची त्याची यांचे त्यांचे आपल्या आम्हाला तुम्हाला तिला त्याला मला त्यांनी यांनी प्रत्येक काही सर्व एखादा एखादी एखादे";
 export const devanagariNeWords = "र को का की मा छ छन् लाई बाट यो त्यो एक छैन हामी तपाईं म थियो पनि कि जो लागि साथ हाम्रो तपाईंको धेरै हो गरिए";

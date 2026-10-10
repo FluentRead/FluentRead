@@ -2,7 +2,7 @@
  * @file src/core/language/lexicon.ts
  *
  * 文件职责：保存统计识别使用的独立语言证据数据，为短文本和相近语言提供不依赖三元组分数的旁证与反证。
- * 主要内容：按书写体系列出各语言高频封闭类功能词（冠词、介词、代词、助词、连词等），以及 Latin、Cyrillic、Arabic 文字语言的合法附加字母或排他字母；数据只描述语言通用特征，不收录任何具体网页、品牌、模型名或用户样例整句。另收录与目录语言相近、但 franc-min 缺少模型的语言（加泰罗尼亚语、加利西亚语、南非荷兰语、马其顿语、白俄罗斯语、哈萨克语）作为反证。可核对的公开符号包括 FUNCTION_WORDS、LATIN_EXTRA_LETTERS、CYRILLIC_LETTERS、ARABIC_FOREIGN_LETTERS、STATISTICAL_SCRIPT_LANGUAGES。
+ * 主要内容：按书写体系列出各语言高频封闭类功能词（冠词、介词、代词、助词、连词等），以及 Latin、Cyrillic、Arabic 文字语言的合法附加字母或排他字母；数据只描述语言通用特征，不收录任何具体网页、品牌、模型名或用户样例整句。另收录与目录语言相近、但 franc-min 缺少模型的语言（加泰罗尼亚语、加利西亚语、南非荷兰语、新挪威语、马其顿语、白俄罗斯语、哈萨克语）作为反证。可核对的公开符号包括 FUNCTION_WORDS、LATIN_EXTRA_LETTERS、CYRILLIC_LETTERS、ARABIC_FOREIGN_LETTERS、STATISTICAL_SCRIPT_LANGUAGES。
  * 模块边界：本文件从 functionWordData.ts 读取逐字保留的功能词字符串并建立只读词集，其他正字法数据仍在此导出；不执行识别、不访问配置或浏览器；如何加权、何时视为可信由 statistical.ts 负责并通过语料测试校准。
  */
 
@@ -53,6 +53,7 @@ export const FUNCTION_WORDS: Readonly<Record<StatisticalScript, Readonly<Record<
         ca: words(functionWordData.latinCaWords),
         gl: words(functionWordData.latinGlWords),
         af: words(functionWordData.latinAfWords),
+        nn: words(functionWordData.latinNnWords),
     },
     Cyrillic: {
         ru: words(functionWordData.cyrillicRuWords),
@@ -90,7 +91,7 @@ export const LATIN_EXTRA_LETTERS: Readonly<Record<string, string>> = {
     hu: 'áéíóöőúüű', tr: 'çğıöşüâîû', vi: 'àáạảãâầấậẩẫăằắặẳẵèéẹẻẽêềếệểễìíịỉĩòóọỏõôồốộổỗơờớợởỡùúụủũưừứựửữỳýỵỷỹđ',
     id: 'é', ms: '', fil: 'ñ', sw: '', sv: 'åäöé', da: 'æøåé', nb: 'æøåéóòô', fi: 'äöåšž', et: 'äöüõšž',
     lv: 'āčēģīķļņšūž', lt: 'ąčęėįšųūž', sl: 'čšžćđ', hr: 'čćđšž', bs: 'čćđšž', 'sr-Latn': 'čćđšž',
-    ca: 'àçèéíïòóúü·', gl: 'áéíñóúü', af: 'áéèêëíîïóôöúûü',
+    ca: 'àçèéíïòóúü·', gl: 'áéíñóúü', af: 'áéèêëíîïóôöúûü', nn: 'æøåéóòô',
 };
 
 /** Cyrillic 文字语言的完整小写字母表；清单外字母（如乌克兰文 ї 出现在俄文候选中）构成反证。 */

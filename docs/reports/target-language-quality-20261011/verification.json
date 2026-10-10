@@ -1,0 +1,210 @@
+{
+  "baselineCommit": "dc335c698c05d8a5d11dbaadacb598c0695894f8",
+  "sourceHashes": {
+    "src/core/language/chinese.ts": "8bf08265376671df97f3f5559429caab5b148df09af8b7bb8917b477e5c6c0ea",
+    "src/core/language/functionWordData.ts": "caeb89e08bbf87f5bd4aa77a5a34a90243fb99ba5e5aead65c49d0b9f7befbf6",
+    "src/core/language/identify.ts": "54a3388bb7a65c6fccb2c2ef6da709edf9d22c07eaec61903e890069220bd9b0",
+    "src/core/language/lexicon.ts": "a7f57d1dae473560e61190abc550217b2e14bd4beec5a42527d48b590fb18c35",
+    "src/core/language/statistical.ts": "4a450f3e3646e987448142c271f64ba3630a8c2e41b6348c22f4e197e2e5f8da",
+    "src/core/language/technicalTokens.ts": "8551daf82bc503038ac8adb9991ee68d953af82b267616749a460be7a8328908",
+    "src/core/translation/targetResult.ts": "54593cc5ae2acde3646fa0b2b5863212bfcabb0d12df06a956ccf42a5aeff653",
+    "src/core/translation/text.ts": "9948e4bf74d54509627b8dab9396193c80aa758e05d4cc50620f2cac3f5a624d",
+    "src/features/area-translation/services/textTranslation.ts": "cf20e62596dd5028a8406a12b116176a167a338422a8efa98b6343c1c69cafa6",
+    "src/features/full-page-translation/content/liveTextTranslation.ts": "fee6e3a553131d0ea4f42ffd5d494255fab370d1c88d3b14c5dd91c7a6f86e8f",
+    "src/features/full-page-translation/content/runtime.ts": "b35fc904c047ba850aa94b0a1783e2b898816334dce534df92d4231e4d9c3804",
+    "src/features/full-page-translation/content/titleTranslation.ts": "ebc48fa73e55b42274c3784e2d3a8d1879e06b4e008ab43149fa2ee702fe5eb2",
+    "src/features/image-translation/background/handlers.ts": "9678f90717667660d168e13cdbb3a25ab83625e8f1460892dcbfafea28d1fbd6",
+    "src/features/input-translation/background/handler.ts": "74a794bf1a78322dc232a4971251a65171c0e637cabecbbeca74eb842acd955e"
+  },
+  "tests": {
+    "scope": "47 explicitly selected directly affected suites; not the repository-wide regression suite",
+    "files": 47,
+    "passed": 4956,
+    "failed": 0,
+    "commandLog": "/private/tmp/fluentread-target-language-integrated-final-tests.log",
+    "selectedFiles": [
+      "tests/architecture/moduleBoundaries.test.ts",
+      "tests/architecture/sourceFileHeaders.test.ts",
+      "tests/architecture/verificationOwnership.test.ts",
+      "tests/areaTextTranslation.test.ts",
+      "tests/backgroundFeatureHandlers.test.ts",
+      "tests/backgroundImageServices.test.ts",
+      "tests/chineseLanguage.test.ts",
+      "tests/chineseTechnicalParagraphs.test.ts",
+      "tests/chineseUiNamesRegression.test.ts",
+      "tests/documentTranslation.test.ts",
+      "tests/fullPageAttributeBoundary.test.ts",
+      "tests/fullPageVisibilityScheduling.test.ts",
+      "tests/hoverTranslationConfig.test.ts",
+      "tests/hoverTranslationScheduler.test.ts",
+      "tests/imageGlossaryContext.test.ts",
+      "tests/imageTargetLanguage.test.ts",
+      "tests/imageTranslationHandlerClock.test.ts",
+      "tests/inputBox.test.ts",
+      "tests/inputEditableHost.test.ts",
+      "tests/inputTranslationBackground.test.ts",
+      "tests/inputTranslationContentFeature.test.ts",
+      "tests/languageAuditBoundaries.test.ts",
+      "tests/languageCodes.test.ts",
+      "tests/languageIdentification.test.ts",
+      "tests/languageIdentificationCorpus.test.ts",
+      "tests/languageScripts.test.ts",
+      "tests/languageStatistical.test.ts",
+      "tests/languageTechnicalTokens.test.ts",
+      "tests/liveTextRender.test.ts",
+      "tests/liveTextTranslation.test.ts",
+      "tests/pageTranslationAdvanced.test.ts",
+      "tests/sameTargetLanguageClient.test.ts",
+      "tests/sameTargetLanguageRegression.test.ts",
+      "tests/sameTargetLanguageSlots.test.ts",
+      "tests/sectionTranslationRegion.test.ts",
+      "tests/sectionTranslationRuntime.test.ts",
+      "tests/targetLanguageAdversarial.test.ts",
+      "tests/targetLanguageDetector.test.ts",
+      "tests/targetLanguageReleaseCorpus.test.ts",
+      "tests/targetTranslationResult.test.ts",
+      "tests/translationCore.test.ts",
+      "tests/translationEchoValidationRegression.test.ts",
+      "tests/translationSlotEchoRegression.test.ts",
+      "tests/translationStability.test.ts",
+      "tests/translationState.test.ts",
+      "tests/userscriptViteConfig.test.ts",
+      "tests/videoSubtitleLanguage.test.ts"
+    ]
+  },
+  "coverage": {
+    "src/core/language/chinese.ts": {
+      "statements": 100,
+      "branches": 100,
+      "functions": 100,
+      "lines": 100
+    },
+    "src/core/language/identify.ts": {
+      "statements": 100,
+      "branches": 100,
+      "functions": 100,
+      "lines": 100
+    },
+    "src/core/language/technicalTokens.ts": {
+      "statements": 100,
+      "branches": 100,
+      "functions": 100,
+      "lines": 100
+    },
+    "src/core/translation/text.ts": {
+      "statements": 100,
+      "branches": 100,
+      "functions": 100,
+      "lines": 100
+    },
+    "src/core/language/functionWordData.ts": {
+      "statements": 100,
+      "branches": 100,
+      "functions": 100,
+      "lines": 100
+    },
+    "src/core/language/lexicon.ts": {
+      "statements": 100,
+      "branches": 100,
+      "functions": 100,
+      "lines": 100
+    },
+    "src/core/language/statistical.ts": {
+      "statements": 100,
+      "branches": 100,
+      "functions": 100,
+      "lines": 100
+    },
+    "src/core/translation/targetResult.ts": {
+      "statements": 100,
+      "branches": 100,
+      "functions": 100,
+      "lines": 100
+    }
+  },
+  "checks": {
+    "compile": "passed",
+    "chromeBuild": "passed",
+    "firefoxBuild": "passed",
+    "userscriptBuild": "passed",
+    "extensionManifests": "passed",
+    "userscriptVerifier": "passed",
+    "testOwnershipAudit": "passed",
+    "diffCheck": "passed",
+    "docsBuild": "passed"
+  },
+  "evidenceLimits": [
+    "Finite authored corpora are regression evidence, not universal detection accuracy.",
+    "Seven of the 52 authored native bodies remain unknown and keep translation requests.",
+    "Browser translation responses are deterministic loopback fixtures, not evidence of live-provider quality.",
+    "Firefox build and manifests were verified; Firefox runtime was not tested."
+  ],
+  "userscript": {
+    "baselineCommit": "dc335c698c05d8a5d11dbaadacb598c0695894f8",
+    "baselineBytes": 2009853,
+    "candidateBytes": 2019586,
+    "deltaBytes": 9733,
+    "deltaPercent": 0.4842642720636783,
+    "baselineBudgetBytes": 2010000,
+    "budgetBytes": 2020000,
+    "budgetIncreaseBytes": 10000,
+    "baselineSha256": "858a55742bd4928dd5674d9c120129db27700113b1a8229224b9cb9bb37b88d3",
+    "candidateSha256": "edf80176e134aff807aefa898e0ff4f235b0ee8d65765c5a5725b8905c52c8c1",
+    "sameDependencies": true,
+    "lockfileSha256": "dca737aeb9c264e2c3078588ff01c85dd52d48636f7fa24b2451f9444a8ccc3a",
+    "baselineCommand": "pnpm build:userscript && node scripts/verify-userscript-build.mjs",
+    "candidateCommand": "pnpm build:userscript && node scripts/verify-userscript-build.mjs"
+  },
+  "browsers": {
+    "release": {
+      "report": "browser-release.json",
+      "passed": true,
+      "liveParagraphs": 8,
+      "liveHoverRequests": 0,
+      "liveFullSampleRequests": 0,
+      "fixtureParagraphs": 10,
+      "fixtureMarkup": [
+        "plain",
+        "split"
+      ],
+      "noForegroundFocus": true
+    },
+    "multilingual": {
+      "status": "functional-cases-complete-with-aborted-run-and-targeted-rerun",
+      "passedTargets": [
+        "de",
+        "pt",
+        "it",
+        "fr",
+        "en",
+        "ru",
+        "ja",
+        "ko",
+        "zh-Hans"
+      ],
+      "initialRunOverallPassed": false,
+      "initialRunAbortedBefore": "excludedLanguage",
+      "initialReport": "browser-multilingual.json",
+      "targetedRerunPassed": true,
+      "targetedRerunScope": "de same-target, target switch and excluded-language parity",
+      "targetedReport": "browser-multilingual-de.json",
+      "targetedRerunNoForegroundFocus": true
+    }
+  },
+  "baselineTestFailures": {
+    "baseline": "fe7005dd9",
+    "passed": 79,
+    "failed": 9,
+    "scope": [
+      "tests/liveTextTranslation.test.ts",
+      "tests/sameTargetLanguageClient.test.ts"
+    ],
+    "cause": "Six stale native-batch snapshot expectations and three serialized-damaged-packet fixtures using a native array provider. Only fixtures were corrected; provider protocol unchanged.",
+    "evidenceLog": "/private/tmp/fluentread-target-language-baseline/baseline-tests.log"
+  },
+  "artifactHashes": {
+    ".output/chrome-mv3/manifest.json": "fd80314b160701ed5500e584e1373f5eed44a19acdc6f8b76f9a12c1565970d8",
+    ".output/firefox-mv2/manifest.json": "2f4d6388a66e23f052933d6a4f972e3f65e841806a20f6b1d274fcf14d21a3ef",
+    ".output/userscript/fluent-read.user.js": "edf80176e134aff807aefa898e0ff4f235b0ee8d65765c5a5725b8905c52c8c1"
+  }
+}

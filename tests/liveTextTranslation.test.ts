@@ -31,7 +31,7 @@ import {createTranslationRequest, translateControlValue, translateLiveText} from
 import {collectLiveTranslationTextSlots as collectRealSlots} from '@/src/core/translation/serialization';
 
 const snapshot = {service: 'microsoft', model: 'default', thinking: false, sourceLanguage: 'en', targetLanguage: 'zh',
-    useCache: true, enableAIContext: false, enableAIMultiSegment: false, displayMode: 'single' as const, style: 0};
+    useCache: true, enableAIContext: false, enableAIMultiSegment: false, enableNativeBatch: true, displayMode: 'single' as const, style: 0};
 
 describe('实时文本翻译快照', () => {
     beforeEach(() => {
@@ -265,5 +265,21 @@ describe('双语正文整块翻译', () => {
         expect(await request(() => {
             throw new Error('detached');
         })).toEqual(['one two']);
+    });
+});
+
+
+describe('目标语言排版回显保持网页原文', () => {
+    it.each(['single', 'bilingual'] as const)('%s 模式不把仅改变句尾标点的同语言结果显示为翻译', async mode => {
+        const {document} = parseHTML('<html><body><p>我们已经完成文档翻译。</p></body></html>');
+        const owner = document.querySelector('p')!;
+        const source = owner.textContent!;
+        runtime.slots = [{node: owner.firstChild as Text, prefix: '', source, suffix: ''}];
+        runtime.translations = ['我们已经完成文档翻译'];
+        runtime.translateTextSlots.mockImplementation(async () => runtime.translations);
+        const active = {...snapshot, sourceLanguage: 'auto', targetLanguage: 'zh-Hans', displayMode: mode};
+        const result = await createTranslationRequest(owner, 'content', mode, active);
+        if (result.kind === 'live-text') expect(result.changed).toBe(false);
+        expect(owner.textContent).toBe(source);
     });
 });

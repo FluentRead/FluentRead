@@ -48,7 +48,11 @@ const artifactBytes = Buffer.byteLength(source);
 // 增加 8,650 字节（0.4330%），按实测最小增加 9 KB 预算，余量 636 字节；见报告 pr-integration/。
 // 最终整合右键与通知更新 bbae4100：同依赖 main 为 2,001,158，输入候选为 2,009,853。
 // 增加 8,695 字节（0.4345%），利用主线余量后预算最小增加 8 KB，余 147 字节；见报告 pr-integration-933/。
-const MAX_USERSCRIPT_BYTES = 2_010_000;
+// 多文字名称证据、外语否决、准确 DOM 语言副本和受保护字面量的排版回显兜底；
+// 同依赖独立基线 dc335c698 为 2,009,853，最终候选为 2,019,586，增加 9,733 字节（0.4843%）。
+// 预算按实测最小增加 10 KB，余量 414 字节；见 docs/reports/target-language-quality-20261011/userscript-size.json。
+// 不引入额外检测模型。
+const MAX_USERSCRIPT_BYTES = 2_020_000;
 const preludeStartMarker = '/* FluentRead userscript compatibility prelude:start */';
 const preludeEndMarker = '/* FluentRead userscript compatibility prelude:end */';
 const preludeStart = source.indexOf(preludeStartMarker);

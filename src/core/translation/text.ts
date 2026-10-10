@@ -2,7 +2,7 @@
  * @file src/core/translation/text.ts
  *
  * 文件职责：提取和校验候选中的可读文本，拒绝标识符、独立时间与数值（含拆分行内节点的展示）、空白、扩展译文及脚本、表单或敏感区域的节点。
- * 主要内容：提供文本规范化、仅确认至少两个 Unicode 字母的 meaningful 判定与共享的 identifier 模式判定、元素与文本节点保护检查、嵌套 tooltip 来源隔离、WeakMap 状态缓存和受预算约束的深度扫描，避免在大型 DOM 上无限遍历。 可核对的公开符号包括 normalizeTranslationText、isIdentifierLikeText、isMeaningfulTranslationText、setMinimumTranslationTextLength、isTranslationTextNodeProtected、TranslationTextProtectionCache、createTranslationTextProtectionCache、isTranslationTextElementProtected、hasMeaningfulTranslationTextInNodes。
+ * 主要内容：提供文本规范化、仅确认至少两个 Unicode 字母的 meaningful 判定与共享的 identifier 模式判定、元素与文本节点保护检查、嵌套 tooltip 来源隔离、WeakMap 状态缓存和受预算约束的深度扫描；语言预检副本保留真实行内邻接，在换行、语义块和保护省略处保留边界，不改动翻译槽。 可核对的公开符号包括 normalizeTranslationText、isIdentifierLikeText、isMeaningfulTranslationText、setMinimumTranslationTextLength、isTranslationTextNodeProtected、TranslationTextProtectionCache、createTranslationTextProtectionCache、isTranslationTextElementProtected、hasMeaningfulTranslationTextInNodes。
  * 模块边界：本文件属于可独立测试的 core 候选领域；可以读取传入 DOM 以计算结果，但不访问配置存储、不调用 provider、不注册页面监听器，也不负责译文渲染或 feature 生命周期；文本语言与同目标跳过统一由 src/core/language 判断。
  */
 
@@ -16,6 +16,8 @@ import {
 } from './dom';
 import type {TranslationTextProtectionOptions} from './dom';
 import {isNonTranslatableLiveData} from './liveData';
+import {isAcronymWord, isMixedCaseName, isNameVariantWord, isTechnicalAbbreviation} from '@/src/core/language/technicalTokens';
+import {FUNCTION_WORDS} from '@/src/core/language/lexicon';
 import {
     DEFAULT_MIN_TRANSLATION_TEXT_LENGTH,
     normalizeMinTranslationTextLength,
@@ -85,6 +87,65 @@ export function isTranslationTextNodeProtected(
     );
 }
 
+const languageContextBlockTags = /^(?:address|article|aside|blockquote|dd|div|dl|dt|figcaption|figure|footer|h[1-6]|header|li|main|nav|ol|p|pre|section|table|tbody|td|tfoot|th|thead|tr|ul)$/u;
+
+/** 只供识别副本区分相邻行内文字和不同语义块；不反向依赖候选 layout 模块。 */
+function languageContextBlockOwner(element: Element, cache: WeakMap<Element, Element | null>): Element | null {
+    const chain: Element[] = [];
+    let current: Element | null = element;
+    while (current && !cache.has(current) && chain.length < maxComposedAncestorDepth) {
+        if (languageContextBlockTags.test(getElementTagName(current))) break;
+        try {
+            const display = current.ownerDocument.defaultView?.getComputedStyle(current).display;
+            if (display && display !== 'none' && display !== 'contents' && !/^(?:inline|ruby)/u.test(display)) break;
+        } catch {
+            // 无布局能力的文档仍沿语义标签寻找边界。
+        }
+        chain.push(current);
+        current = getComposedParent(current);
+    }
+    const owner = current && cache.has(current) ? cache.get(current)! : current;
+    for (const item of chain) cache.set(item, owner);
+    if (current) cache.set(current, owner);
+    return owner;
+}
+
+/** 与文本保护使用同一 composed 祖先，跨 ShadowRoot host 且只读取当前候选 roots；每个祖先只查询一次。 */
+function languageContextCodeOwner(element: Element, cache: WeakMap<Element, Element | null>): Element | null {
+    const chain: Element[] = [];
+    let current: Element | null = element;
+    while (current && !cache.has(current) && chain.length < maxComposedAncestorDepth) {
+        if (getElementTagName(current) === 'code') break;
+        chain.push(current);
+        current = getComposedParent(current);
+    }
+    const owner = current && cache.has(current) ? cache.get(current)! : current && getElementTagName(current) === 'code' ? current : null;
+    for (const item of chain) cache.set(item, owner);
+    if (current) cache.set(current, owner);
+    return owner;
+}
+
+type InlineCodeLanguageContext = 'name' | 'identifier' | 'neutral';
+
+/** 名称保留字形；明确短标识符成为无字母原子，自然代码只留不串词的中性边界。 */
+function inlineCodeLanguageContext(element: Element): InlineCodeLanguageContext {
+    // 后代元素可能换行、隐藏或另有保护；复杂代码只留边界，不用 textContent 折叠名称。
+    if (element.childElementCount > 0) return 'neutral';
+    const value = element.textContent!.trim();
+    if (value.length > 64) return 'neutral';
+    const words = value.split(/[ \t/→-]+/u);
+    const hasFunctionWord = (word: string): boolean => Object.values(FUNCTION_WORDS.Latin).some(functionWords => functionWords.has(word.toLowerCase()));
+    const named = words.length <= 3 && words.every((word, index) => {
+        const variant = index > 0 && isNameVariantWord(word) && (isAcronymWord(words[0]!) || isMixedCaseName(words[0]!));
+        return (variant || !hasFunctionWord(word))
+            && (isTechnicalAbbreviation(word) || isMixedCaseName(word) || isAcronymWord(word) || /^[A-Z][a-z]{1,23}$/u.test(word));
+    });
+    if (named) return 'name';
+    if (!words.some(hasFunctionWord) && (/^[a-z][\w$]{0,23}$/u.test(value)
+        || /^[a-z][\w$]*(?:→[a-z][\w$]*(?:[ \t][a-z][\w$]*){0,2})+$/u.test(value))) return 'identifier';
+    return 'neutral';
+}
+
 function collectReadableText(
     roots: readonly Node[],
     shouldStayOriginal?: (element: Element) => boolean,
@@ -92,9 +153,47 @@ function collectReadableText(
     protectionOptions?: TranslationTextProtectionOptions,
 ): string {
     const parts: string[] = [];
+    const languageContext = protectionOptions?.includeInlineCodeForLanguage === true;
+    const blockOwners = new WeakMap<Element, Element | null>();
+    const codeOwners = new WeakMap<Element, Element | null>();
+    const codeContexts = new WeakMap<Element, InlineCodeLanguageContext>();
+    const emittedCodes = new WeakSet<Element>();
+    let previousBlock: Element | null | undefined;
+    let previousRoot: Node | undefined;
+    const append = (node: Text, root: Node): void => {
+        if (!languageContext) {
+            const value = normalizeTranslationText(node.nodeValue ?? '');
+            if (value) parts.push(value);
+            return;
+        }
+        const block = languageContextBlockOwner(node.parentElement!, blockOwners);
+        if (previousBlock !== undefined && previousBlock !== block) parts.push('\n');
+        previousBlock = block;
+        const code = languageContextCodeOwner(node.parentElement!, codeOwners);
+        if (code) {
+            // 只以当前 root 完整覆盖的代码判定资格，不从未提供的兄弟 Text 借名称或结构。
+            const completeCode = root.contains(code);
+            let context = completeCode ? codeContexts.get(code) : 'neutral';
+            if (context === undefined) {
+                context = inlineCodeLanguageContext(code);
+                codeContexts.set(code, context);
+            }
+            if (context !== 'name') {
+                if (!completeCode || !emittedCodes.has(code)) {
+                    // U+FFFC 表示明确代码原子；U+FFFD 只阻断名称串联，不提供技术锚点。
+                    parts.push(context === 'identifier' ? '\uFFFC' : '\uFFFD');
+                    if (completeCode) emittedCodes.add(code);
+                }
+                return;
+            }
+        }
+        parts.push(node.nodeValue ?? '');
+    };
     // 每个文本节点都要复核完整祖先链；长文章中相邻文本共享祖先，逐节点重算会随正文规模二次增长。
     const protectionCache = createTranslationTextProtectionCache();
     for (const root of roots) {
+        if (languageContext && previousRoot && previousRoot.nextSibling !== root) parts.push('\n');
+        previousRoot = root;
         if (root.nodeType === 3) {
             const textNode = root as Text;
             if (!isTranslationTextNodeProtected(
@@ -104,27 +203,45 @@ function collectReadableText(
                 protectionOptions,
                 protectionCache,
             )) {
-                const value = normalizeTranslationText(textNode.nodeValue ?? '');
-                if (value) parts.push(value);
+                append(textNode, root);
+            } else if (languageContext) {
+                parts.push('\n');
             }
             continue;
         }
         if (root.nodeType !== 1) continue;
         const element = root as Element;
+        if (languageContext) {
+            // walker 不访问根本身，根级换行和空块仍须保留真实边界。
+            if (getElementTagName(element) === 'br') {
+                parts.push('\n');
+                continue;
+            }
+            const block = languageContextBlockOwner(element, blockOwners);
+            if (previousBlock !== undefined && previousBlock !== block) parts.push('\n');
+            previousBlock = block;
+        }
         // 按钮型 input 的可见标签只存在于 value 属性里。仅当它本身就是候选根时才读取：
         // 外层容器的译文经由文本槽或双语骨架渲染，无法写回子元素属性，把属性文本混进去
         // 只会让服务端翻译一段永远显示不出来的内容。
         const controlValueAttribute = getTranslatableControlValueAttribute(element);
         if (controlValueAttribute) {
             // 属性判定已确认该标签存在且非空白，这里只做与文本节点一致的空白归一。
-            parts.push(normalizeTranslationText(element.getAttribute(controlValueAttribute)!));
+            const value = normalizeTranslationText(element.getAttribute(controlValueAttribute)!);
+            if (languageContext) parts.push('\n', value, '\n');
+            else parts.push(value);
             continue;
         }
         const document = element.ownerDocument;
         if (!document?.createTreeWalker) continue;
-        const walker = document.createTreeWalker(element, 4);
+        const walker = document.createTreeWalker(element, languageContext ? 5 : 4);
         let current = walker.nextNode();
         while (current) {
+            if (current.nodeType === 1) {
+                if (getElementTagName(current as Element) === 'br') parts.push('\n');
+                current = walker.nextNode();
+                continue;
+            }
             const textNode = current as Text;
             if (!isTextInNestedTranslationTooltip(textNode, element) && !isTranslationTextNodeProtected(
                 textNode,
@@ -133,13 +250,16 @@ function collectReadableText(
                 protectionOptions,
                 protectionCache,
             )) {
-                const value = normalizeTranslationText(textNode.nodeValue ?? '');
-                if (value) parts.push(value);
+                append(textNode, root);
+            } else if (languageContext) {
+                parts.push('\n');
             }
             current = walker.nextNode();
         }
     }
-    return normalizeTranslationText(parts.join(' '));
+    // 换行分开正文句子，不把不同可见行或保护边界两侧的外语拼成一个名称。
+    return languageContext ? parts.join('').replace(/[\t \u3000]+/gu, ' ').trim()
+        : normalizeTranslationText(parts.join(' '));
 }
 
 const discoveryTextNodeBudget = 256;

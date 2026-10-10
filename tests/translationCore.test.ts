@@ -1,5 +1,5 @@
 import {parseHTML} from 'linkedom';
-import {describe, expect, it, vi} from 'vitest';
+import {afterEach, beforeEach, describe, expect, it, vi} from 'vitest';
 
 import {
     applyTranslationsToSnapshot,
@@ -22,6 +22,7 @@ import {
     resolveTranslationCandidateAtPoint,
 } from '@/src/core/translation/public';
 import {shouldSkipTranslationForTarget} from '@/src/core/language/detect';
+import productionReleaseCases from './fixtures/target-language-releases.json';
 import {
     evaluateHardGuard,
     getElementTagName,
@@ -112,6 +113,391 @@ describe('Codeforces named form controls', () => {
         expect(core.discover(document).map(candidate => candidate.element)).toContain(document.querySelector('#statement'));
         expect(core.resolve(form.querySelector('input'))).toBeNull();
         expect(getElementTagName(Object.assign(Object.create(null), {tagName: {}}) as Element)).toBe('');
+    });
+});
+
+describe('候选语言副本保留真实行内文字边界', () => {
+    const languageOptions = {includeInlineCodeForLanguage: true};
+    const withoutCodeAtoms = (copy: string) => copy.replace(/[\uFFFC\uFFFD]/gu, '').trim();
+    const styleSurface = parseHTML('<html></html>').document.defaultView!;
+    let previousStyle: PropertyDescriptor | undefined;
+    beforeEach(() => { previousStyle = Object.getOwnPropertyDescriptor(styleSurface, 'getComputedStyle'); });
+    afterEach(() => {
+        if (previousStyle) Object.defineProperty(styleSurface, 'getComputedStyle', previousStyle);
+        else Reflect.deleteProperty(styleSurface, 'getComputedStyle');
+    });
+    function inlineMarkup(source: string, mode: string): string {
+        let ordinal = 0;
+        return source.replace(/[A-Za-z][A-Za-z0-9_]*(?:[ +→][A-Za-z][A-Za-z0-9_]*)*/gu, token => {
+            const tag = mode === 'mixed' ? ordinal++ % 2 ? 'strong' : 'code' : mode;
+            return `<${tag}>${token}</${tag}>`;
+        });
+    }
+    it.each(['mixed', 'span', 'strong', 'em'].flatMap(mode => productionReleaseCases.map(source => [mode, source] as const)))
+    ('%s 发布说明仍以完整候选判断：%s', (mode, source) => {
+        const {document} = page(`<p id="release">${inlineMarkup(source, mode)}</p><p id="foreign">Please read the complete translation instructions.</p>`);
+        document.documentElement.setAttribute('lang', 'en');
+        const paragraph = document.querySelector<HTMLElement>('#release')!;
+        const providerSource = extractTranslationText(paragraph);
+        const slots = collectLiveTranslationTextSlots(paragraph).map(slot => slot.source);
+        for (const scope of ['content', 'all'] as const) {
+            const core = createTranslationCore({url: new URL('https://github.com/FluentRead/FluentRead/releases'), scope});
+            expect(core.discover(document).map(candidate => candidate.element.id)).toEqual(['release', 'foreign']);
+            const inline = paragraph.querySelector('strong, span, em, code');
+            if (mode !== 'mixed') expect(core.resolve(inline!.firstChild)?.element).toBe(paragraph);
+            const copy = extractTranslationText(paragraph, core.shouldStayOriginal, undefined, languageOptions);
+            expect(copy).toBe(source);
+            expect(extractTranslationTextFromNodes([...paragraph.childNodes], core.shouldStayOriginal, undefined, languageOptions)).toBe(source);
+            expect(shouldSkipTranslationForTarget(copy, 'zh-Hans')).toBe(true);
+            expect(shouldSkipTranslationForTarget(copy, 'en', ['zh-Hans'])).toBe(true);
+            expect(shouldSkipTranslationForTarget(copy, 'en')).toBe(false);
+            expect(shouldSkipTranslationForTarget(extractTranslationText(document.querySelector('#foreign')!, undefined, undefined, languageOptions), 'zh-Hans')).toBe(false);
+        }
+        expect(extractTranslationText(paragraph)).toBe(providerSource);
+        expect(collectLiveTranslationTextSlots(paragraph).map(slot => slot.source)).toEqual(slots);
+    });
+
+    it.each([
+        '<p>这里的并发队列配置已经完成。<br><span>Birds</span><br><strong>Fly</strong></p>',
+        '<div>这里的并发队列配置已经完成。<p>Birds</p><p>Fly</p></div>',
+        '<div>这里的并发队列配置已经完成。<p>Birds</p>Fly</div>',
+        '<p>页面的运行状态正常，所有功能可以继续使用。<span>Birds</span><span class="notranslate"> gap </span><strong>Fly</strong></p>',
+        '<p>页面的运行状态正常，所有功能可以继续使用。<span>Birds</span><span hidden> gap </span><strong>Fly</strong></p>',
+        '<p>页面的运行状态正常，所有功能可以继续使用。<span>Birds</span><span class="katex"> gap </span><strong>Fly</strong></p>',
+        '<p>页面的运行状态正常，所有功能可以继续使用。<strong>Please read the instructions.</strong></p>',
+    ])('外语正文不跨换行、语义块或保护省略处拼成名称：%s', html => {
+        const {document} = page(html);
+        const element = document.body.firstElementChild!;
+        const copy = extractTranslationText(element, undefined, undefined, languageOptions);
+        expect(copy).not.toContain('BirdsFly');
+        expect(shouldSkipTranslationForTarget(copy, 'zh-Hans')).toBe(false);
+        expect(shouldSkipTranslationForTarget(copy, 'en', ['zh-Hans'])).toBe(false);
+    });
+
+    it('不扩大部分根节点范围，也不跨数组省略节点拼接名称', () => {
+        const {document} = page('<p>页面的运行状态正常，所有功能可以继续使用。Birds<span> omitted </span>Fly</p>');
+        const paragraph = document.querySelector('p')!;
+        const copy = extractTranslationTextFromNodes([paragraph.firstChild!, paragraph.lastChild!], undefined, undefined, languageOptions);
+        expect(copy).not.toContain('omitted');
+        expect(copy).toContain('Birds\nFly');
+        expect(shouldSkipTranslationForTarget(copy, 'zh-Hans')).toBe(false);
+        expect(shouldSkipTranslationForTarget(extractTranslationTextFromNodes([paragraph.lastChild!], undefined, undefined, languageOptions), 'zh-Hans')).toBe(false);
+    });
+
+    it.each(['Hola', 'Vielen Dank', '这个软件的设置页面已经更新。'])('受保护代码自然正文不能替相邻 %s 证明英语目标', source => {
+        const {document} = page(`<p><code>This application now loads all settings and connects to the server.</code>${source}</p>`);
+        const paragraph = document.querySelector('p')!;
+        expect(extractTranslationText(paragraph)).toBe(source);
+        expect(withoutCodeAtoms(extractTranslationText(paragraph, undefined, undefined, languageOptions))).toBe(source);
+        expect(shouldSkipTranslationForTarget(extractTranslationText(paragraph, undefined, undefined, languageOptions), 'en')).toBe(false);
+    });
+
+    it.each(['This App', 'Please Restart', 'Rivers Flow', 'fetch', 'This Application Works', 'Birds Fly Across Open Fields', 'This extremely long code documentation describes every available configuration parameter on the settings page.'])
+    ('无法证明为技术名称的代码 %s 不提供正文语言证据', code => {
+        const {document} = page(`<p><code>${code}</code>Hola</p>`);
+        expect(shouldSkipTranslationForTarget(extractTranslationText(document.querySelector('p')!, undefined, undefined, languageOptions), 'en')).toBe(false);
+    });
+
+    it.each(['GPU', 'requestHandler', 'Google Meet', 'MANGA Plus', 'requestHandler Plus', 'const value = 1;', 'api_key', 'browser.runtime', ''])
+    ('有结构的代码/名称 %s 不改变可译槽', code => {
+        const {document} = page(`<p>请求状态已经更新，新增<code>${code}</code>翻译服务，可以继续翻译。</p>`);
+        const paragraph = document.querySelector('p')!;
+        const providerSource = extractTranslationText(paragraph);
+        const copy = extractTranslationText(paragraph, undefined, undefined, languageOptions);
+        if (['const value = 1;', 'api_key', 'browser.runtime'].includes(code)) expect(copy).not.toContain(code);
+        else expect(copy).toContain(code);
+        expect(shouldSkipTranslationForTarget(copy, 'zh-Hans')).toBe(true);
+        expect(extractTranslationText(paragraph)).toBe(providerSource);
+    });
+
+    it('多个受保护功能词不能组合成英语正文证据', () => {
+        const {document} = page('<p><code>The</code> <code>and</code> <code>with</code> <code>this</code> <code>for</code> <code>the</code> Hola</p>');
+        const paragraph = document.querySelector('p')!;
+        const copy = extractTranslationText(paragraph, undefined, undefined, languageOptions);
+        expect(withoutCodeAtoms(copy)).toBe('Hola');
+        expect(extractTranslationText(paragraph)).toBe('Hola');
+        expect(shouldSkipTranslationForTarget(copy, 'en')).toBe(false);
+        expect(shouldSkipTranslationForTarget(copy, 'zh-Hans', ['en'])).toBe(false);
+    });
+
+    it('部分 Text roots 不从代码中未提供的兄弟节点借名称资格', () => {
+        const {document} = page('<p></p>');
+        const paragraph = document.querySelector('p')!;
+        const roots: Node[] = [];
+        for (const word of ['The', 'and', 'with', 'this', 'for', 'the']) {
+            const code = document.createElement('code');
+            const partial = document.createTextNode(word);
+            code.append(partial, document.createTextNode('Handler'));
+            paragraph.append(code);
+            roots.push(partial);
+        }
+        const outside = document.createTextNode(' Hola');
+        paragraph.append(outside);
+        roots.push(outside);
+        const copy = extractTranslationTextFromNodes(roots, undefined, undefined, languageOptions);
+        expect(withoutCodeAtoms(copy)).toBe('Hola');
+        expect(copy).not.toContain('Handler');
+        expect(shouldSkipTranslationForTarget(copy, 'en')).toBe(false);
+        expect(shouldSkipTranslationForTarget(copy, 'zh-Hans', ['en'])).toBe(false);
+    });
+
+    it.each([
+        ['真实相邻行内根', '<p>请求状态已经更新，新增<span>Google</span> <strong>Meet</strong>翻译服务，可以继续翻译。</p>', 'children', true],
+        ['根级 br', '<p>连接字段与并发配置已经完成，<code>scheduler</code><br>/fallback</p>', 'children', false],
+        ['空语义块', '<div>页面的运行状态正常，所有功能可以继续使用。Birds<p></p>Fly</div>', 'children', false],
+        ['空 CSS 块', '<p>页面的运行状态正常，所有功能可以继续使用。Birds<span id="break"></span>Fly</p>', 'css-block', false],
+        ['未提供的中间根', '<p>页面的运行状态正常，所有功能可以继续使用。Birds<span> omitted </span>Fly</p>', 'omitted', false],
+        ['独立控件标签', '<div><p>页面的运行状态正常，所有功能可以继续使用。</p><input type="button" value="Birds"><input type="button" value="Fly"></div>', 'children', false],
+        ['部分代码先于完整根', '<p>连接字段与并发配置已经完成，<code>scheduler</code>/fallback 的连接处理通过。</p>', 'partial-first', true],
+        ['完整根先于部分代码', '<p>连接字段与并发配置已经完成，<code>scheduler</code>/fallback 的连接处理通过。</p>', 'complete-first', true],
+        ['部分代码没有原文前缀', '<p>连接字段与并发配置已经完成，<code>scheduler</code>/fallback 的连接处理通过。</p>', 'partial-only', false],
+        ['空 roots', '<p>页面的运行状态正常，所有功能可以继续使用。</p>', 'none', true],
+    ] as const)('roots 事实边界表：%s', (label, html, mode, skip) => {
+        const {document} = page(html);
+        const element = document.body.firstElementChild!;
+        if (mode === 'css-block') Object.defineProperty(document.defaultView, 'getComputedStyle', {
+            configurable: true,
+            value: (node: Element) => ({display: node.id === 'break' ? 'block' : 'inline'}),
+        });
+        const code = element.querySelector('code');
+        const roots: Node[] = mode === 'partial-first' ? [code!.firstChild!, element]
+            : mode === 'complete-first' ? [element, code!.firstChild!]
+            : mode === 'partial-only' ? [code!.firstChild!, element.lastChild!]
+            : mode === 'omitted' ? [element.firstChild!, element.lastChild!]
+            : mode === 'none' ? [] : [...element.childNodes];
+        const providerSource = extractTranslationTextFromNodes(roots);
+        const copy = extractTranslationTextFromNodes(roots, undefined, undefined, languageOptions);
+        expect(shouldSkipTranslationForTarget(copy, 'zh-Hans')).toBe(skip);
+        expect(shouldSkipTranslationForTarget(copy, 'en', ['zh-Hans'])).toBe(skip);
+        expect(extractTranslationTextFromNodes(roots)).toBe(providerSource);
+        if (mode.startsWith('partial') || mode === 'complete-first') expect(copy).not.toContain('scheduler');
+        if (mode === 'partial-first' || mode === 'complete-first') expect(copy.match(/\uFFFC/gu)).toHaveLength(1);
+        if (mode === 'partial-only') expect(copy).not.toContain('\uFFFC');
+        if (label === '根级 br') expect(copy).toContain('\uFFFC\n/fallback');
+        if (['空语义块', '空 CSS 块', '未提供的中间根', '独立控件标签'].includes(label)) {
+            expect(copy).toMatch(/Birds\n+Fly/u);
+            expect(copy).not.toContain('BirdsFly');
+        }
+        if (mode === 'omitted') expect(copy).not.toContain('omitted');
+        if (mode === 'none') expect(copy).toBe('');
+    });
+
+    it('直接文本 roots 保留隐藏片段省略处的边界', () => {
+        const {document} = page('<p>页面的运行状态正常，所有功能可以继续使用。Birds<span hidden> gap </span>Fly</p>');
+        const paragraph = document.querySelector('p')!;
+        const copy = extractTranslationTextFromNodes([paragraph.firstChild!, paragraph.querySelector('span')!.firstChild!, paragraph.lastChild!], undefined, undefined, languageOptions);
+        expect(copy).toContain('Birds\n');
+        expect(copy).not.toContain('gap');
+        expect(shouldSkipTranslationForTarget(copy, 'zh-Hans')).toBe(false);
+    });
+
+    it('宿主在读取间丢失文本值时不把空节点作为语言证据', () => {
+        const {document} = page('<p><span>Hola</span></p>');
+        const empty = document.querySelector('span')!.firstChild!;
+        Object.defineProperty(empty, 'nodeValue', {configurable: true, value: null});
+        const copy = extractTranslationText(document.querySelector('p')!, undefined, undefined, languageOptions);
+        expect(copy).toBe('');
+        expect(shouldSkipTranslationForTarget(copy, 'en')).toBe(true);
+    });
+
+    it('复杂代码名称内部的后代不提供正文语言证据', () => {
+        const {document} = page('<p>请求状态已经更新，新增<code>Google <span>Meet</span></code>翻译服务，可以继续翻译。</p>');
+        const paragraph = document.querySelector('p')!;
+        const copy = extractTranslationText(paragraph, undefined, undefined, languageOptions);
+        expect(copy).toBe('请求状态已经更新，新增\uFFFD翻译服务，可以继续翻译。');
+        expect(shouldSkipTranslationForTarget(copy, 'zh-Hans')).toBe(true);
+        expect(extractTranslationText(paragraph)).not.toContain('Google');
+    });
+
+    it.each(['inline-block', 'inline-flex', 'inline-grid', 'ruby', 'contents', ''])('CSS %s 行内布局不会制造额外空格', display => {
+        const {document} = page('<p>请求状态已经更新，新增<span>Google</span> <strong>Meet</strong>翻译服务，可以继续翻译。</p>');
+        Object.defineProperty(document.defaultView, 'getComputedStyle', {
+            configurable: true,
+            value: () => ({display}),
+        });
+        const copy = extractTranslationText(document.querySelector('p')!, undefined, undefined, languageOptions);
+        expect(copy).toBe('请求状态已经更新，新增Google Meet翻译服务，可以继续翻译。');
+        expect(shouldSkipTranslationForTarget(copy, 'zh-Hans')).toBe(true);
+    });
+
+    it.each(['block', 'flex', 'grid'])('CSS %s 独立行保留外语边界', display => {
+        const {document} = page('<p>这里的并发队列配置已经完成。<span>Birds</span><strong>Fly</strong></p>');
+        Object.defineProperty(document.defaultView, 'getComputedStyle', {
+            configurable: true,
+            value: () => ({display}),
+        });
+        const copy = extractTranslationText(document.querySelector('p')!, undefined, undefined, languageOptions);
+        expect(copy).toContain('Birds\nFly');
+        expect(shouldSkipTranslationForTarget(copy, 'zh-Hans')).toBe(false);
+    });
+
+    it('无语义块的离线片段不会因缓存空祖先制造边界', () => {
+        const {document} = page('');
+        const fragment = document.createElement('span');
+        fragment.innerHTML = '请求状态已经更新，新增<span>Google</span> <strong>Meet</strong>翻译服务，可以继续翻译。';
+        Object.defineProperty(document.defaultView, 'getComputedStyle', {
+            configurable: true,
+            value: () => ({display: 'inline'}),
+        });
+        const copy = extractTranslationText(fragment, undefined, undefined, languageOptions);
+        expect(copy).toBe('请求状态已经更新，新增Google Meet翻译服务，可以继续翻译。');
+        expect(shouldSkipTranslationForTarget(copy, 'zh-Hans')).toBe(true);
+    });
+
+    it('布局读取失败仍用语义块判断外语边界', () => {
+        const {document} = page('<div>这里的并发队列配置已经完成。<p><span>Birds</span></p><p><strong>Fly</strong></p></div>');
+        Object.defineProperty(document.defaultView, 'getComputedStyle', {
+            configurable: true,
+            value: () => { throw new Error('layout unavailable'); },
+        });
+        const copy = extractTranslationText(document.querySelector('div')!, undefined, undefined, languageOptions);
+        expect(copy).toContain('Birds\nFly');
+        expect(shouldSkipTranslationForTarget(copy, 'zh-Hans')).toBe(false);
+    });
+
+    it('shadow 内容沿现有 composed 祖先受 code 保护，不能替外部正文证明语言', () => {
+        const {document} = page('<p><code><context-source></context-source></code><span id="outside">Hola</span></p>');
+        const host = document.querySelector('context-source')!;
+        const shadow = host.attachShadow({mode: 'open'});
+        shadow.innerHTML = '<span>This application now loads all settings and connects to the server.</span>';
+        const codeText = shadow.querySelector('span')!;
+        const outside = document.querySelector('#outside')!;
+        const copy = extractTranslationTextFromNodes([codeText, outside], undefined, undefined, languageOptions);
+        expect(withoutCodeAtoms(copy)).toBe('Hola');
+        expect(shouldSkipTranslationForTarget(copy, 'en')).toBe(false);
+        expect(extractTranslationTextFromNodes([codeText, outside])).toBe('Hola');
+    });
+
+    it('不展开当前候选范围之外的 slot 投影正文', () => {
+        const {document} = page('<p><context-source><span slot="source">This application now loads all settings and connects to the server.</span></context-source><span id="outside">Hola</span></p>');
+        const host = document.querySelector('context-source')!;
+        const shadow = host.attachShadow({mode: 'open'});
+        shadow.innerHTML = '<code><slot name="source"></slot></code>';
+        const code = shadow.querySelector('code')!;
+        const copy = extractTranslationTextFromNodes([code, document.querySelector('#outside')!], undefined, undefined, languageOptions);
+        expect(copy).toBe('Hola');
+        expect(shouldSkipTranslationForTarget(copy, 'en')).toBe(false);
+    });
+
+    it.each(['scheduler', 'listener→router→typed input'])('结构 code %s 不提供外部 Hola 的正文语言证据', code => {
+        const {document} = page(`<p><code>${code}</code>Hola</p>`);
+        const paragraph = document.querySelector('p')!;
+        const copy = extractTranslationText(paragraph, undefined, undefined, languageOptions);
+        expect(copy).toBe('\uFFFCHola');
+        expect(shouldSkipTranslationForTarget(copy, 'en')).toBe(false);
+        expect(shouldSkipTranslationForTarget(copy, 'zh-Hans')).toBe(false);
+        expect(extractTranslationText(paragraph)).toBe('Hola');
+    });
+
+    it.each([
+        '<p>连接字段与并发配置已经完成。<code>scheduler</code>/Please retry</p>',
+        '<p>连接字段与并发配置已经完成，<code>scheduler</code>/Please retry</p>',
+        '<p>连接字段与并发配置已经完成，<code>scheduler</code>、Birds Fly</p>',
+        '<p>连接字段与并发配置已经完成，<code>scheduler</code>、Birds Fly 是一句英文陈述。</p>',
+        '<p>连接字段与并发配置已经完成，<code>scheduler</code>、“Birds Fly” 是原文内容。</p>',
+        '<p>连接字段与并发配置已经完成，<code>scheduler</code>/ACCESS DENIED</p>',
+        '<p>连接字段与并发配置已经完成，英文标题是 <code>scheduler</code>、Birds Fly。</p>',
+        '<p>连接字段与并发配置已经完成，英文错误提示是 <code>scheduler</code>/Memory Corrupted。</p>',
+        '<p>连接字段与并发配置已经完成，<code>scheduler</code><br>/fallback</p>',
+        '<p>连接字段与并发配置已经完成，<code>scheduler</code><span hidden> gap </span>/fallback</p>',
+        '<p>连接字段与并发配置已经完成，<code>Birds Fly Across Open Fields</code>/fallback</p>',
+        '<p>连接字段与并发配置已经完成，<code>Please retry</code>/fallback</p>',
+    ])('结构 code 锚点仍拒绝外语、引述、标题和保护边界：%s', html => {
+        const {document} = page(html);
+        const copy = extractTranslationText(document.querySelector('p')!, undefined, undefined, languageOptions);
+        expect(shouldSkipTranslationForTarget(copy, 'zh-Hans')).toBe(false);
+        expect(shouldSkipTranslationForTarget(copy, 'en', ['zh-Hans'])).toBe(false);
+    });
+
+    it('结构原子只补技术表达式，不把相邻普通正文当字段', () => {
+        const {document} = page('<p>请求状态已经更新，<code>scheduler</code> Birds Fly 可以继续显示。</p>');
+        const copy = extractTranslationText(document.querySelector('p')!, undefined, undefined, languageOptions);
+        expect(shouldSkipTranslationForTarget(copy, 'zh-Hans')).toBe(false);
+    });
+
+    it('多个结构原子与实际术语形成有界并列技术表达式', () => {
+        const {document} = page('<p>连接字段与并发配置已经完成，<code>scheduler</code>、broker、<code>probe</code>、client 的连接处理通过。</p>');
+        const copy = extractTranslationText(document.querySelector('p')!, undefined, undefined, languageOptions);
+        expect(copy).toContain('broker、\uFFFC、client');
+        expect(shouldSkipTranslationForTarget(copy, 'zh-Hans')).toBe(true);
+    });
+
+    it('结构原子没有连接符时不把两侧词串成一个技术表达式', () => {
+        const {document} = page('<p>连接字段与并发配置已经完成，<code>scheduler</code> broker<code>probe</code>client 的字段配置保持独立。</p>');
+        const copy = extractTranslationText(document.querySelector('p')!, undefined, undefined, languageOptions);
+        expect(shouldSkipTranslationForTarget(copy, 'zh-Hans')).toBe(false);
+    });
+
+    it.each([
+        ['已启用CPU后端，所有调用经XYZ ABC执行处理并保留原文。', true],
+        ['已启用后台服务，所有调用经XYZ ABC执行处理并保留原文。', false],
+    ] as const)('未知缩写组合需要同句独立技术缩写：%s', (source, skip) => {
+        const {document} = page(`<p>${source}</p>`);
+        const copy = extractTranslationText(document.querySelector('p')!, undefined, undefined, languageOptions);
+        expect(shouldSkipTranslationForTarget(copy, 'zh-Hans')).toBe(skip);
+    });
+
+    it('结构代码多文本节点只产生一个中性原子', () => {
+        const {document} = page('<p>连接字段与并发配置已经完成，<code></code>/fallback 的连接处理通过。</p>');
+        document.querySelector('code')!.append(document.createTextNode('listener→'), document.createTextNode('router'), document.createTextNode('→typed input'));
+        const paragraph = document.querySelector('p')!;
+        const copy = extractTranslationText(paragraph, undefined, undefined, languageOptions);
+        expect(copy.match(/\uFFFC/gu)).toHaveLength(1);
+        expect(copy).not.toContain('router');
+        expect(shouldSkipTranslationForTarget(copy, 'zh-Hans')).toBe(true);
+    });
+
+    it.each([
+        '<code>The<br>and<br>with<br>this<br>for<br>the</code>',
+        '<code>The<span>and</span><strong>with</strong><em>this</em><span>for</span><strong>the</strong></code>',
+        '<code>The<span hidden> x </span>and<span class="notranslate"> y </span>with this for the</code>',
+    ])('含内部换行或保护边界的 code %s 不能把功能词借给外部 Hola', markup => {
+        const {document} = page(`<p>${markup} Hola</p>`);
+        Object.defineProperty(document.defaultView, 'getComputedStyle', {
+            configurable: true,
+            value: (element: Element) => ({display: ['SPAN', 'STRONG', 'EM'].includes(element.tagName) ? 'block' : 'inline'}),
+        });
+        const copy = extractTranslationText(document.querySelector('p')!, undefined, undefined, languageOptions);
+        expect(copy).not.toContain('The');
+        expect(copy).not.toContain('and');
+        expect(copy).not.toContain('with');
+        expect(shouldSkipTranslationForTarget(copy, 'en')).toBe(false);
+        expect(shouldSkipTranslationForTarget(copy, 'zh-Hans', ['en'])).toBe(false);
+    });
+
+    it('CSS block 的结构 code 不能跨块为其他行提供技术锚点', () => {
+        const {document} = page('<p>连接字段与并发配置已经完成，<code>scheduler</code>/fallback</p>');
+        Object.defineProperty(document.defaultView, 'getComputedStyle', {
+            configurable: true,
+            value: (element: Element) => ({display: element.tagName === 'CODE' ? 'block' : 'inline'}),
+        });
+        const copy = extractTranslationText(document.querySelector('p')!, undefined, undefined, languageOptions);
+        expect(copy).toContain('\n\uFFFC\n/fallback');
+        expect(shouldSkipTranslationForTarget(copy, 'zh-Hans')).toBe(false);
+    });
+
+    it('inline-block code 保留同行结构表达式的物理邻接', () => {
+        const {document} = page('<p>连接字段与并发配置已经完成，<code>scheduler</code>/fallback 的连接处理通过。</p>');
+        Object.defineProperty(document.defaultView, 'getComputedStyle', {
+            configurable: true,
+            value: () => ({display: 'inline-block'}),
+        });
+        const copy = extractTranslationText(document.querySelector('p')!, undefined, undefined, languageOptions);
+        expect(copy).toContain('\uFFFC/fallback');
+        expect(shouldSkipTranslationForTarget(copy, 'zh-Hans')).toBe(true);
+    });
+
+    it('隐藏/代码块污染保持省略，动态外语改文重新判断', () => {
+        const {document} = page('<p>请求状态已经更新，可以继续翻译。<span hidden>Please read the instructions.</span><pre>Do not translate this source code block.</pre><code>中文代码注释</code></p>');
+        const paragraph = document.querySelector('p')!;
+        let copy = extractTranslationText(paragraph, undefined, undefined, languageOptions);
+        expect(copy).not.toContain('Please');
+        expect(copy).not.toContain('Do not');
+        expect(copy).not.toContain('中文代码');
+        expect(shouldSkipTranslationForTarget(copy, 'zh-Hans')).toBe(true);
+        paragraph.innerHTML = '请求状态已经更新，可以继续翻译。<strong>Please restart the browser.</strong>';
+        copy = extractTranslationText(paragraph, undefined, undefined, languageOptions);
+        expect(shouldSkipTranslationForTarget(copy, 'zh-Hans')).toBe(false);
     });
 });
 

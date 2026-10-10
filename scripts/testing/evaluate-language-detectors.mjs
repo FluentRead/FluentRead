@@ -8,7 +8,7 @@
 //   old-implementation  旧提交的 shouldSkipTranslationForTarget（需 --old-root 指向旧源码目录）
 //   chromium-cld3       扩展 API chrome.i18n.detectLanguage（需 --browser 及隔离浏览器参数，只在临时 profile 中运行）
 // 用法：node scripts/testing/evaluate-language-detectors.mjs --out <report.json> [--franc-full <dir>] [--old-root <dir>]
-//   [--browser --extension-dir .output/chrome-mv3 --playwright-root <dir> --focus-safe-helper <file>]
+//   [--extra-corpus <独立语料.json>] [--browser --extension-dir .output/chrome-mv3 --playwright-root <dir> --focus-safe-helper <file>]
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
@@ -30,6 +30,14 @@ const corpora = {
     holdout: JSON.parse(fs.readFileSync(path.join(ROOT, 'tests/fixtures/language-identification-holdout.json'), 'utf8')).cases,
     holdout2: JSON.parse(fs.readFileSync(path.join(ROOT, 'tests/fixtures/language-identification-holdout-2.json'), 'utf8')).cases,
 };
+
+// 新失败语料可独立加入评测，沿用同一个判定器和全部目录目标，避免只对旧校准集调参。
+const extraCorpusPath = argument('extra-corpus');
+if (extraCorpusPath) {
+    const extra = JSON.parse(fs.readFileSync(path.resolve(extraCorpusPath), 'utf8'));
+    if (!Array.isArray(extra.cases)) throw new Error('--extra-corpus 必须包含 cases 数组');
+    corpora.releaseHoldout = extra.cases;
+}
 
 async function loadModules(root, alias = {}) {
     const server = await createServer({

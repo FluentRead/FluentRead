@@ -1,0 +1,281 @@
+{
+  "ok": false,
+  "error": "Error: 测试 Edge 进程 26858 成为了前台应用；测试已停止\n    at newPageWithoutForeground (/Users/thinkstu/.codex/skills/fluentread-browser-translation-test/scripts/focus-safe-browser.cjs:514:13)\n    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)\n    at async createPage (/Users/thinkstu/Desktop/copy/FluentRead-target-language-quality-20261011/scripts/testing/run-chinese-translation-test.cjs:477:20)\n    at async runMultilingualSameTargetCases (/Users/thinkstu/Desktop/copy/FluentRead-target-language-quality-20261011/scripts/testing/multilingual-same-target-browser.cjs:228:20)\n    at async main (/Users/thinkstu/Desktop/copy/FluentRead-target-language-quality-20261011/scripts/testing/run-chinese-translation-test.cjs:544:7)",
+  "scope": "Same-target languages: de, pt, it, fr, en, ru, ja, ko, zh-Hans; multilingual paragraphs, hover/full-page zero requests, titles, links, dynamic redetection, target switch and excluded-language parity",
+  "evidenceBoundary": "The local HTML and loopback OpenAI-compatible server are deterministic fixtures. Their success does not prove any external service translation quality or availability.",
+  "consoleErrors": [],
+  "siteResourceErrors": [],
+  "launchMode": "macos-background-cdp",
+  "focusPolicy": "launchservices-no-foreground",
+  "windowPlacement": {
+    "mode": "background-visible-no-focus",
+    "visible": true,
+    "hidden": false,
+    "centered": true,
+    "windowState": "normal",
+    "bounds": {
+      "left": 132,
+      "top": -1020,
+      "width": 1440,
+      "height": 960
+    },
+    "displayTarget": "secondary",
+    "source": "macos-nsscreen",
+    "screenIndex": 1,
+    "browserFrontmost": false,
+    "frontmostBefore": {
+      "pid": 73685,
+      "name": "ChatGPT"
+    },
+    "frontmostAfter": {
+      "pid": 73685,
+      "name": "ChatGPT"
+    }
+  },
+  "multilingual": {
+    "cases": [
+      {
+        "target": "de",
+        "sameTargetElements": 2,
+        "status": "passed",
+        "hoverSameTargetRequests": 0,
+        "foreignHoverCounts": [
+          1,
+          0,
+          1,
+          0
+        ],
+        "foreignFullPageCounts": [
+          1,
+          0,
+          1
+        ],
+        "titleRequests": 0,
+        "dynamicRedetection": true,
+        "restored": true,
+        "requestSources": [
+          "This English paragraph still needs a translation for the reader of this page.",
+          "This English paragraph still needs a translation for the reader of this page.",
+          "This English paragraph still needs a translation for the reader of this page.",
+          "The dynamic paragraph was rewritten in English and it must be translated again."
+        ]
+      },
+      {
+        "target": "pt",
+        "sameTargetElements": 1,
+        "status": "passed",
+        "hoverSameTargetRequests": 0,
+        "foreignHoverCounts": [
+          1,
+          0,
+          1,
+          0
+        ],
+        "foreignFullPageCounts": [
+          1,
+          0,
+          1
+        ],
+        "titleRequests": 0,
+        "dynamicRedetection": true,
+        "restored": true,
+        "requestSources": [
+          "This English paragraph still needs a translation for the reader of this page.",
+          "This English paragraph still needs a translation for the reader of this page.",
+          "This English paragraph still needs a translation for the reader of this page.",
+          "The dynamic paragraph was rewritten in English and it must be translated again."
+        ]
+      },
+      {
+        "target": "it",
+        "sameTargetElements": 1,
+        "status": "passed",
+        "hoverSameTargetRequests": 0,
+        "foreignHoverCounts": [
+          1,
+          0,
+          1,
+          0
+        ],
+        "foreignFullPageCounts": [
+          1,
+          0,
+          1
+        ],
+        "titleRequests": 0,
+        "dynamicRedetection": true,
+        "restored": true,
+        "requestSources": [
+          "This English paragraph still needs a translation for the reader of this page.",
+          "This English paragraph still needs a translation for the reader of this page.",
+          "This English paragraph still needs a translation for the reader of this page.",
+          "The dynamic paragraph was rewritten in English and it must be translated again."
+        ]
+      },
+      {
+        "target": "fr",
+        "sameTargetElements": 2,
+        "status": "passed",
+        "hoverSameTargetRequests": 0,
+        "foreignHoverCounts": [
+          1,
+          0,
+          1,
+          0
+        ],
+        "foreignFullPageCounts": [
+          1,
+          0,
+          1
+        ],
+        "titleRequests": 0,
+        "dynamicRedetection": true,
+        "restored": true,
+        "requestSources": [
+          "This English paragraph still needs a translation for the reader of this page.",
+          "This English paragraph still needs a translation for the reader of this page.",
+          "This English paragraph still needs a translation for the reader of this page.",
+          "The dynamic paragraph was rewritten in English and it must be translated again."
+        ]
+      },
+      {
+        "target": "en",
+        "sameTargetElements": 2,
+        "status": "passed",
+        "hoverSameTargetRequests": 0,
+        "foreignHoverCounts": [
+          1,
+          0,
+          1,
+          0
+        ],
+        "foreignFullPageCounts": [
+          1,
+          0,
+          1
+        ],
+        "titleRequests": 0,
+        "dynamicRedetection": true,
+        "restored": true,
+        "requestSources": [
+          "Dieser deutsche Absatz beschreibt die verschiedenen Einstellungen der Anwendung und die automatische Übersetzung.",
+          "Dieser deutsche Absatz beschreibt die verschiedenen Einstellungen der Anwendung und die automatische Übersetzung.",
+          "Dieser deutsche Absatz beschreibt die verschiedenen Einstellungen der Anwendung und die automatische Übersetzung.",
+          "Dieser dynamische Absatz wurde ins Deutsche umgeschrieben und muss jetzt wieder übersetzt werden."
+        ]
+      },
+      {
+        "target": "ru",
+        "sameTargetElements": 2,
+        "status": "passed",
+        "hoverSameTargetRequests": 0,
+        "foreignHoverCounts": [
+          1,
+          0,
+          1,
+          0
+        ],
+        "foreignFullPageCounts": [
+          1,
+          0,
+          1
+        ],
+        "titleRequests": 0,
+        "dynamicRedetection": true,
+        "restored": true,
+        "requestSources": [
+          "This English paragraph still needs a translation for the reader of this page.",
+          "This English paragraph still needs a translation for the reader of this page.",
+          "This English paragraph still needs a translation for the reader of this page.",
+          "The dynamic paragraph was rewritten in English and it must be translated again."
+        ]
+      },
+      {
+        "target": "ja",
+        "sameTargetElements": 2,
+        "status": "passed",
+        "hoverSameTargetRequests": 0,
+        "foreignHoverCounts": [
+          1,
+          0,
+          1,
+          0
+        ],
+        "foreignFullPageCounts": [
+          1,
+          0,
+          1
+        ],
+        "titleRequests": 0,
+        "dynamicRedetection": true,
+        "restored": true,
+        "requestSources": [
+          "This English paragraph still needs a translation for the reader of this page.",
+          "This English paragraph still needs a translation for the reader of this page.",
+          "This English paragraph still needs a translation for the reader of this page.",
+          "The dynamic paragraph was rewritten in English and it must be translated again."
+        ]
+      },
+      {
+        "target": "ko",
+        "sameTargetElements": 2,
+        "status": "passed",
+        "hoverSameTargetRequests": 0,
+        "foreignHoverCounts": [
+          1,
+          0,
+          1,
+          0
+        ],
+        "foreignFullPageCounts": [
+          1,
+          0,
+          1
+        ],
+        "titleRequests": 0,
+        "dynamicRedetection": true,
+        "restored": true,
+        "requestSources": [
+          "This English paragraph still needs a translation for the reader of this page.",
+          "This English paragraph still needs a translation for the reader of this page.",
+          "This English paragraph still needs a translation for the reader of this page.",
+          "The dynamic paragraph was rewritten in English and it must be translated again."
+        ]
+      },
+      {
+        "target": "zh-Hans",
+        "sameTargetElements": 5,
+        "status": "passed",
+        "hoverSameTargetRequests": 0,
+        "foreignHoverCounts": [
+          1,
+          0,
+          1,
+          0
+        ],
+        "foreignFullPageCounts": [
+          1,
+          0,
+          1
+        ],
+        "titleRequests": 0,
+        "dynamicRedetection": true,
+        "restored": true,
+        "requestSources": [
+          "This English paragraph still needs a translation for the reader of this page.",
+          "This English paragraph still needs a translation for the reader of this page.",
+          "This English paragraph still needs a translation for the reader of this page.",
+          "The dynamic paragraph was rewritten in English and it must be translated again."
+        ]
+      }
+    ],
+    "evidenceBoundary": "Pages and chat-completion responses come from the local loopback fixture; request counts prove the extension decision chain, not external provider quality.",
+    "targetSwitch": {
+      "status": "passed",
+      "from": "de",
+      "to": "en"
+    }
+  },
+  "sourceArtifacts": "/Users/thinkstu/Desktop/copy/artifacts/target-language-quality-20261011/browser-multilingual-final",
+  "status": "aborted-by-foreground-guard-before-excluded-language-case"
+}

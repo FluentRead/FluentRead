@@ -1,0 +1,2303 @@
+{
+  "description": "独立撰写的目标语言发行说明语料：覆盖全部 52 个目录目标的自然段落与短标题、技术中英混排、未列出的品牌、共享文字、相近语种与外语句子。native-body/native-title 仅作留出测量，不据此添加产品或术语名单；regression 为发布说明结构的问题验收。所有样本均为合成测试文本，非真实发布承诺。languages 表示可信识别时唯一允许跳过的目标；空数组表示应保留翻译的混合或歧义内容。requireSkip 为必须从源头识别并跳过、具有独立名称/结构化标记证据的确定中文；没有足够结构证据的小写自由术语仅允许归属正确或保持 unknown，避免为了跳过率吞掉真实外语；empty 无需翻译。",
+  "cases": [
+    {
+      "id": "release-zh-Hans-body",
+      "text": "这次更新修复了收藏记录丢失的问题，重新打开阅读页面后，用户仍然可以找到之前保存的段落。",
+      "languages": [
+        "zh-Hans"
+      ],
+      "tags": [
+        "native-body",
+        "holdout"
+      ]
+    },
+    {
+      "id": "release-zh-Hans-title",
+      "text": "修复收藏记录丢失的问题",
+      "languages": [
+        "zh-Hans"
+      ],
+      "tags": [
+        "native-title",
+        "holdout"
+      ]
+    },
+    {
+      "id": "release-zh-Hant-body",
+      "text": "這次更新修復了收藏記錄遺失的問題，重新開啟閱讀頁面後，使用者仍然可以找到先前儲存的段落。",
+      "languages": [
+        "zh-Hant"
+      ],
+      "tags": [
+        "native-body",
+        "holdout"
+      ]
+    },
+    {
+      "id": "release-zh-Hant-title",
+      "text": "修復收藏記錄遺失的問題",
+      "languages": [
+        "zh-Hant"
+      ],
+      "tags": [
+        "native-title",
+        "holdout"
+      ]
+    },
+    {
+      "id": "release-en-body",
+      "text": "Readers can now save a paragraph for later and return to the same place after closing their browser. The saved text remains available when the page is opened again.",
+      "languages": [
+        "en"
+      ],
+      "tags": [
+        "native-body",
+        "holdout"
+      ]
+    },
+    {
+      "id": "release-en-title",
+      "text": "Keep your reading progress",
+      "languages": [
+        "en"
+      ],
+      "tags": [
+        "native-title",
+        "holdout"
+      ]
+    },
+    {
+      "id": "release-ja-body",
+      "text": "今回の更新では保存した文章が消える問題を修正しました。ブラウザーを閉じた後でも、前に読んでいた場所から読み続けることができます。",
+      "languages": [
+        "ja"
+      ],
+      "tags": [
+        "native-body",
+        "holdout"
+      ]
+    },
+    {
+      "id": "release-ja-title",
+      "text": "保存した文章をもう一度読む",
+      "languages": [
+        "ja"
+      ],
+      "tags": [
+        "native-title",
+        "holdout"
+      ]
+    },
+    {
+      "id": "release-ko-body",
+      "text": "이번 업데이트에서는 저장한 문장이 사라지는 문제를 해결했습니다. 브라우저를 닫았다가 다시 열어도 이전에 읽던 위치에서 계속 읽을 수 있습니다.",
+      "languages": [
+        "ko"
+      ],
+      "tags": [
+        "native-body",
+        "holdout"
+      ]
+    },
+    {
+      "id": "release-ko-title",
+      "text": "저장한 문장을 다시 읽기",
+      "languages": [
+        "ko"
+      ],
+      "tags": [
+        "native-title",
+        "holdout"
+      ]
+    },
+    {
+      "id": "release-fr-body",
+      "text": "Les lecteurs peuvent désormais enregistrer un passage pour le retrouver plus tard. Même après avoir fermé le navigateur, le texte conservé reste disponible sur la page.",
+      "languages": [
+        "fr"
+      ],
+      "tags": [
+        "native-body",
+        "holdout"
+      ]
+    },
+    {
+      "id": "release-fr-title",
+      "text": "Retrouver les passages enregistrés",
+      "languages": [
+        "fr"
+      ],
+      "tags": [
+        "native-title",
+        "holdout"
+      ]
+    },
+    {
+      "id": "release-ru-body",
+      "text": "Теперь читатели могут сохранить интересный отрывок и вернуться к нему позже. После закрытия браузера сохранённый текст остаётся доступным при повторном открытии страницы.",
+      "languages": [
+        "ru"
+      ],
+      "tags": [
+        "native-body",
+        "holdout"
+      ]
+    },
+    {
+      "id": "release-ru-title",
+      "text": "Сохранить место для дальнейшего чтения",
+      "languages": [
+        "ru"
+      ],
+      "tags": [
+        "native-title",
+        "holdout"
+      ]
+    },
+    {
+      "id": "release-es-body",
+      "text": "Ahora puedes guardar un párrafo y volver a leerlo más tarde. Aunque cierres el navegador, el texto guardado seguirá disponible cuando abras la página otra vez.",
+      "languages": [
+        "es"
+      ],
+      "tags": [
+        "native-body",
+        "holdout"
+      ]
+    },
+    {
+      "id": "release-es-title",
+      "text": "Volver a los párrafos guardados",
+      "languages": [
+        "es"
+      ],
+      "tags": [
+        "native-title",
+        "holdout"
+      ]
+    },
+    {
+      "id": "release-de-body",
+      "text": "Leser können einen interessanten Absatz jetzt für später speichern. Wenn sie den Browser schließen und die Seite erneut öffnen, bleibt der gespeicherte Text weiterhin verfügbar.",
+      "languages": [
+        "de"
+      ],
+      "tags": [
+        "native-body",
+        "holdout"
+      ]
+    },
+    {
+      "id": "release-de-title",
+      "text": "Gespeicherte Absätze später weiterlesen",
+      "languages": [
+        "de"
+      ],
+      "tags": [
+        "native-title",
+        "holdout"
+      ]
+    },
+    {
+      "id": "release-pt-body",
+      "text": "Os leitores agora podem guardar um parágrafo para ler mais tarde. Mesmo depois de fechar o navegador, o texto salvo continua disponível quando a página é aberta novamente.",
+      "languages": [
+        "pt"
+      ],
+      "tags": [
+        "native-body",
+        "holdout"
+      ]
+    },
+    {
+      "id": "release-pt-title",
+      "text": "Continuar a leitura dos textos salvos",
+      "languages": [
+        "pt"
+      ],
+      "tags": [
+        "native-title",
+        "holdout"
+      ]
+    },
+    {
+      "id": "release-it-body",
+      "text": "Ora i lettori possono salvare un paragrafo per leggerlo in seguito. Dopo aver chiuso il browser, il testo salvato resta disponibile quando la pagina viene aperta di nuovo.",
+      "languages": [
+        "it"
+      ],
+      "tags": [
+        "native-body",
+        "holdout"
+      ]
+    },
+    {
+      "id": "release-it-title",
+      "text": "Riprendere la lettura dei testi salvati",
+      "languages": [
+        "it"
+      ],
+      "tags": [
+        "native-title",
+        "holdout"
+      ]
+    },
+    {
+      "id": "release-ar-body",
+      "text": "يمكن للقراء الآن حفظ فقرة للعودة إليها لاحقًا. وحتى بعد إغلاق المتصفح يبقى النص المحفوظ متاحًا عند فتح الصفحة مرة أخرى، فلا تضيع الكلمات التي أرادوا قراءتها.",
+      "languages": [
+        "ar"
+      ],
+      "tags": [
+        "native-body",
+        "holdout"
+      ]
+    },
+    {
+      "id": "release-ar-title",
+      "text": "العودة إلى الفقرات المحفوظة",
+      "languages": [
+        "ar"
+      ],
+      "tags": [
+        "native-title",
+        "holdout"
+      ]
+    },
+    {
+      "id": "release-hi-body",
+      "text": "अब पाठक किसी अनुच्छेद को बाद में पढ़ने के लिए सहेज सकते हैं। ब्राउज़र बंद करने के बाद भी सहेजा गया पाठ पृष्ठ को दोबारा खोलने पर उपलब्ध रहता है।",
+      "languages": [
+        "hi"
+      ],
+      "tags": [
+        "native-body",
+        "holdout"
+      ]
+    },
+    {
+      "id": "release-hi-title",
+      "text": "सहेजे गए अनुच्छेद फिर से पढ़ें",
+      "languages": [
+        "hi"
+      ],
+      "tags": [
+        "native-title",
+        "holdout"
+      ]
+    },
+    {
+      "id": "release-bn-body",
+      "text": "পাঠকেরা এখন একটি অনুচ্ছেদ পরে পড়ার জন্য সংরক্ষণ করতে পারবেন। ব্রাউজার বন্ধ করার পরেও পৃষ্ঠাটি আবার খুললে সংরক্ষিত লেখাটি পাওয়া যাবে।",
+      "languages": [
+        "bn"
+      ],
+      "tags": [
+        "native-body",
+        "holdout"
+      ]
+    },
+    {
+      "id": "release-bn-title",
+      "text": "সংরক্ষিত অনুচ্ছেদ আবার পড়ুন",
+      "languages": [
+        "bn"
+      ],
+      "tags": [
+        "native-title",
+        "holdout"
+      ]
+    },
+    {
+      "id": "release-ur-body",
+      "text": "اب قارئین کسی پیراگراف کو بعد میں پڑھنے کے لیے محفوظ کر سکتے ہیں۔ براؤزر بند کرنے کے بعد بھی صفحہ دوبارہ کھولنے پر محفوظ کیا گیا متن دستیاب رہتا ہے۔",
+      "languages": [
+        "ur"
+      ],
+      "tags": [
+        "native-body",
+        "holdout"
+      ]
+    },
+    {
+      "id": "release-ur-title",
+      "text": "محفوظ پیراگراف دوبارہ پڑھیں",
+      "languages": [
+        "ur"
+      ],
+      "tags": [
+        "native-title",
+        "holdout"
+      ]
+    },
+    {
+      "id": "release-fa-body",
+      "text": "خوانندگان اکنون می‌توانند یک بند را برای مطالعه در زمانی دیگر ذخیره کنند. حتی پس از بستن مرورگر، متن ذخیره‌شده هنگام باز کردن دوباره صفحه در دسترس باقی می‌ماند.",
+      "languages": [
+        "fa"
+      ],
+      "tags": [
+        "native-body",
+        "holdout"
+      ]
+    },
+    {
+      "id": "release-fa-title",
+      "text": "بازگشت به متن‌های ذخیره‌شده",
+      "languages": [
+        "fa"
+      ],
+      "tags": [
+        "native-title",
+        "holdout"
+      ]
+    },
+    {
+      "id": "release-he-body",
+      "text": "הקוראים יכולים כעת לשמור פסקה כדי לקרוא אותה מאוחר יותר. גם לאחר סגירת הדפדפן, הטקסט שנשמר נשאר זמין כאשר פותחים את הדף שוב.",
+      "languages": [
+        "he"
+      ],
+      "tags": [
+        "native-body",
+        "holdout"
+      ]
+    },
+    {
+      "id": "release-he-title",
+      "text": "לחזור לפסקאות שנשמרו",
+      "languages": [
+        "he"
+      ],
+      "tags": [
+        "native-title",
+        "holdout"
+      ]
+    },
+    {
+      "id": "release-tr-body",
+      "text": "Okuyucular artık bir paragrafı daha sonra okumak üzere kaydedebilir. Tarayıcı kapatıldıktan sonra bile sayfa yeniden açıldığında kaydedilen metne ulaşılabilir.",
+      "languages": [
+        "tr"
+      ],
+      "tags": [
+        "native-body",
+        "holdout"
+      ]
+    },
+    {
+      "id": "release-tr-title",
+      "text": "Kaydedilen paragrafları yeniden okuyun",
+      "languages": [
+        "tr"
+      ],
+      "tags": [
+        "native-title",
+        "holdout"
+      ]
+    },
+    {
+      "id": "release-vi-body",
+      "text": "Người đọc có thể lưu một đoạn văn để đọc lại sau. Ngay cả khi đã đóng trình duyệt, nội dung được lưu vẫn còn khi bạn mở lại trang này.",
+      "languages": [
+        "vi"
+      ],
+      "tags": [
+        "native-body",
+        "holdout"
+      ]
+    },
+    {
+      "id": "release-vi-title",
+      "text": "Đọc lại các đoạn văn đã lưu",
+      "languages": [
+        "vi"
+      ],
+      "tags": [
+        "native-title",
+        "holdout"
+      ]
+    },
+    {
+      "id": "release-th-body",
+      "text": "ผู้อ่านสามารถบันทึกข้อความไว้เพื่อกลับมาอ่านในภายหลังได้แล้ว แม้จะปิดเบราว์เซอร์ไป ข้อความที่บันทึกไว้ก็ยังคงอยู่เมื่อเปิดหน้าเว็บอีกครั้ง",
+      "languages": [
+        "th"
+      ],
+      "tags": [
+        "native-body",
+        "holdout"
+      ]
+    },
+    {
+      "id": "release-th-title",
+      "text": "กลับมาอ่านข้อความที่บันทึกไว้",
+      "languages": [
+        "th"
+      ],
+      "tags": [
+        "native-title",
+        "holdout"
+      ]
+    },
+    {
+      "id": "release-id-body",
+      "text": "Pembaca sekarang dapat menyimpan sebuah paragraf untuk dibaca nanti. Meskipun peramban sudah ditutup, teks yang disimpan tetap tersedia ketika halaman dibuka kembali.",
+      "languages": [
+        "id"
+      ],
+      "tags": [
+        "native-body",
+        "holdout"
+      ]
+    },
+    {
+      "id": "release-id-title",
+      "text": "Baca kembali paragraf yang tersimpan",
+      "languages": [
+        "id"
+      ],
+      "tags": [
+        "native-title",
+        "holdout"
+      ]
+    },
+    {
+      "id": "release-ms-body",
+      "text": "Pembaca kini boleh menyimpan satu perenggan untuk dibaca kemudian. Walaupun pelayar telah ditutup, teks yang disimpan masih tersedia apabila halaman dibuka semula.",
+      "languages": [
+        "ms"
+      ],
+      "tags": [
+        "native-body",
+        "holdout"
+      ]
+    },
+    {
+      "id": "release-ms-title",
+      "text": "Baca semula perenggan yang disimpan",
+      "languages": [
+        "ms"
+      ],
+      "tags": [
+        "native-title",
+        "holdout"
+      ]
+    },
+    {
+      "id": "release-nl-body",
+      "text": "Lezers kunnen nu een alinea bewaren om die later opnieuw te lezen. Ook nadat de browser is gesloten, blijft de opgeslagen tekst beschikbaar wanneer de pagina weer wordt geopend.",
+      "languages": [
+        "nl"
+      ],
+      "tags": [
+        "native-body",
+        "holdout"
+      ]
+    },
+    {
+      "id": "release-nl-title",
+      "text": "Lees de opgeslagen alinea opnieuw",
+      "languages": [
+        "nl"
+      ],
+      "tags": [
+        "native-title",
+        "holdout"
+      ]
+    },
+    {
+      "id": "release-pl-body",
+      "text": "Czytelnicy mogą teraz zapisać akapit, aby wrócić do niego później. Nawet po zamknięciu przeglądarki zapisany tekst pozostaje dostępny po ponownym otwarciu strony.",
+      "languages": [
+        "pl"
+      ],
+      "tags": [
+        "native-body",
+        "holdout"
+      ]
+    },
+    {
+      "id": "release-pl-title",
+      "text": "Wróć do zapisanych fragmentów tekstu",
+      "languages": [
+        "pl"
+      ],
+      "tags": [
+        "native-title",
+        "holdout"
+      ]
+    },
+    {
+      "id": "release-uk-body",
+      "text": "Тепер читачі можуть зберегти абзац, щоб прочитати його пізніше. Навіть після закриття браузера збережений текст залишається доступним, коли сторінку відкривають знову.",
+      "languages": [
+        "uk"
+      ],
+      "tags": [
+        "native-body",
+        "holdout"
+      ]
+    },
+    {
+      "id": "release-uk-title",
+      "text": "Повернутися до збережених абзаців",
+      "languages": [
+        "uk"
+      ],
+      "tags": [
+        "native-title",
+        "holdout"
+      ]
+    },
+    {
+      "id": "release-cs-body",
+      "text": "Čtenáři si nyní mohou uložit odstavec a vrátit se k němu později. I po zavření prohlížeče zůstává uložený text dostupný při dalším otevření stránky.",
+      "languages": [
+        "cs"
+      ],
+      "tags": [
+        "native-body",
+        "holdout"
+      ]
+    },
+    {
+      "id": "release-cs-title",
+      "text": "Znovu přečíst uložené odstavce",
+      "languages": [
+        "cs"
+      ],
+      "tags": [
+        "native-title",
+        "holdout"
+      ]
+    },
+    {
+      "id": "release-sk-body",
+      "text": "Čitatelia si teraz môžu uložiť odsek a vrátiť sa k nemu neskôr. Aj po zatvorení prehliadača zostáva uložený text dostupný pri ďalšom otvorení stránky.",
+      "languages": [
+        "sk"
+      ],
+      "tags": [
+        "native-body",
+        "holdout"
+      ]
+    },
+    {
+      "id": "release-sk-title",
+      "text": "Znovu si prečítať uložené odseky",
+      "languages": [
+        "sk"
+      ],
+      "tags": [
+        "native-title",
+        "holdout"
+      ]
+    },
+    {
+      "id": "release-da-body",
+      "text": "Læsere kan nu gemme et afsnit og vende tilbage til det senere. Selv efter at browseren er lukket, er den gemte tekst stadig tilgængelig, når siden åbnes igen.",
+      "languages": [
+        "da"
+      ],
+      "tags": [
+        "native-body",
+        "holdout"
+      ]
+    },
+    {
+      "id": "release-da-title",
+      "text": "Læs de gemte afsnit igen",
+      "languages": [
+        "da"
+      ],
+      "tags": [
+        "native-title",
+        "holdout"
+      ]
+    },
+    {
+      "id": "release-sv-body",
+      "text": "Läsare kan nu spara ett stycke och återvända till det senare. Även efter att webbläsaren har stängts finns den sparade texten kvar när sidan öppnas igen.",
+      "languages": [
+        "sv"
+      ],
+      "tags": [
+        "native-body",
+        "holdout"
+      ]
+    },
+    {
+      "id": "release-sv-title",
+      "text": "Läs de sparade styckena igen",
+      "languages": [
+        "sv"
+      ],
+      "tags": [
+        "native-title",
+        "holdout"
+      ]
+    },
+    {
+      "id": "release-nb-body",
+      "text": "Lesere kan nå lagre et avsnitt og gå tilbake til det senere. Selv etter at nettleseren er lukket, er den lagrede teksten fortsatt tilgjengelig når siden åpnes igjen.",
+      "languages": [
+        "nb"
+      ],
+      "tags": [
+        "native-body",
+        "holdout"
+      ]
+    },
+    {
+      "id": "release-nb-title",
+      "text": "Les de lagrede avsnittene igjen",
+      "languages": [
+        "nb"
+      ],
+      "tags": [
+        "native-title",
+        "holdout"
+      ]
+    },
+    {
+      "id": "release-fi-body",
+      "text": "Lukijat voivat nyt tallentaa kappaleen ja palata siihen myöhemmin. Tallennettu teksti on edelleen käytettävissä, kun sivu avataan uudelleen selaimen sulkemisen jälkeen.",
+      "languages": [
+        "fi"
+      ],
+      "tags": [
+        "native-body",
+        "holdout"
+      ]
+    },
+    {
+      "id": "release-fi-title",
+      "text": "Lue tallennetut kappaleet uudelleen",
+      "languages": [
+        "fi"
+      ],
+      "tags": [
+        "native-title",
+        "holdout"
+      ]
+    },
+    {
+      "id": "release-el-body",
+      "text": "Οι αναγνώστες μπορούν πλέον να αποθηκεύσουν μια παράγραφο για να τη διαβάσουν αργότερα. Ακόμη και αφού κλείσουν το πρόγραμμα περιήγησης, το κείμενο παραμένει διαθέσιμο όταν ανοίξουν ξανά τη σελίδα.",
+      "languages": [
+        "el"
+      ],
+      "tags": [
+        "native-body",
+        "holdout"
+      ]
+    },
+    {
+      "id": "release-el-title",
+      "text": "Διαβάστε ξανά τις αποθηκευμένες παραγράφους",
+      "languages": [
+        "el"
+      ],
+      "tags": [
+        "native-title",
+        "holdout"
+      ]
+    },
+    {
+      "id": "release-ro-body",
+      "text": "Cititorii pot acum să salveze un paragraf pentru a reveni la el mai târziu. Chiar și după închiderea browserului, textul salvat rămâne disponibil când pagina este deschisă din nou.",
+      "languages": [
+        "ro"
+      ],
+      "tags": [
+        "native-body",
+        "holdout"
+      ]
+    },
+    {
+      "id": "release-ro-title",
+      "text": "Citește din nou paragrafele salvate",
+      "languages": [
+        "ro"
+      ],
+      "tags": [
+        "native-title",
+        "holdout"
+      ]
+    },
+    {
+      "id": "release-hu-body",
+      "text": "Az olvasók most elmenthetnek egy bekezdést, hogy később visszatérjenek hozzá. A böngésző bezárása után is elérhető marad a mentett szöveg, amikor az oldalt újra megnyitják.",
+      "languages": [
+        "hu"
+      ],
+      "tags": [
+        "native-body",
+        "holdout"
+      ]
+    },
+    {
+      "id": "release-hu-title",
+      "text": "Olvassa újra az elmentett bekezdéseket",
+      "languages": [
+        "hu"
+      ],
+      "tags": [
+        "native-title",
+        "holdout"
+      ]
+    },
+    {
+      "id": "release-bg-body",
+      "text": "Читателите вече могат да запазят абзац, за да се върнат към него по-късно. Дори след затваряне на браузъра запазеният текст остава достъпен при повторно отваряне на страницата.",
+      "languages": [
+        "bg"
+      ],
+      "tags": [
+        "native-body",
+        "holdout"
+      ]
+    },
+    {
+      "id": "release-bg-title",
+      "text": "Прочетете отново запазените абзаци",
+      "languages": [
+        "bg"
+      ],
+      "tags": [
+        "native-title",
+        "holdout"
+      ]
+    },
+    {
+      "id": "release-hr-body",
+      "text": "Čitatelji sada mogu spremiti odlomak kako bi ga kasnije ponovno pročitali. Čak i nakon zatvaranja preglednika, spremljeni tekst ostaje dostupan kada se stranica ponovno otvori.",
+      "languages": [
+        "hr"
+      ],
+      "tags": [
+        "native-body",
+        "holdout"
+      ]
+    },
+    {
+      "id": "release-hr-title",
+      "text": "Ponovno pročitajte spremljene odlomke",
+      "languages": [
+        "hr"
+      ],
+      "tags": [
+        "native-title",
+        "holdout"
+      ]
+    },
+    {
+      "id": "release-sr-body",
+      "text": "Читаоци сада могу да сачувају пасус како би га касније поново прочитали. Чак и након затварања прегледача, сачувани текст остаје доступан када се страница поново отвори.",
+      "languages": [
+        "sr"
+      ],
+      "tags": [
+        "native-body",
+        "holdout"
+      ]
+    },
+    {
+      "id": "release-sr-title",
+      "text": "Поново прочитајте сачуване пасусе",
+      "languages": [
+        "sr"
+      ],
+      "tags": [
+        "native-title",
+        "holdout"
+      ]
+    },
+    {
+      "id": "release-sl-body",
+      "text": "Bralci lahko zdaj shranijo odstavek, da ga pozneje znova preberejo. Tudi po zaprtju brskalnika ostane shranjeno besedilo na voljo, ko se stran ponovno odpre.",
+      "languages": [
+        "sl"
+      ],
+      "tags": [
+        "native-body",
+        "holdout"
+      ]
+    },
+    {
+      "id": "release-sl-title",
+      "text": "Znova preberite shranjene odstavke",
+      "languages": [
+        "sl"
+      ],
+      "tags": [
+        "native-title",
+        "holdout"
+      ]
+    },
+    {
+      "id": "release-et-body",
+      "text": "Lugejad saavad nüüd lõigu salvestada, et seda hiljem uuesti lugeda. Salvestatud tekst jääb kättesaadavaks ka pärast brauseri sulgemist, kui leht uuesti avatakse.",
+      "languages": [
+        "et"
+      ],
+      "tags": [
+        "native-body",
+        "holdout"
+      ]
+    },
+    {
+      "id": "release-et-title",
+      "text": "Lugege salvestatud lõike uuesti",
+      "languages": [
+        "et"
+      ],
+      "tags": [
+        "native-title",
+        "holdout"
+      ]
+    },
+    {
+      "id": "release-lv-body",
+      "text": "Lasītāji tagad var saglabāt rindkopu, lai to vēlāk izlasītu vēlreiz. Arī pēc pārlūka aizvēršanas saglabātais teksts paliek pieejams, kad lapa tiek atvērta no jauna.",
+      "languages": [
+        "lv"
+      ],
+      "tags": [
+        "native-body",
+        "holdout"
+      ]
+    },
+    {
+      "id": "release-lv-title",
+      "text": "Lasiet saglabātās rindkopas vēlreiz",
+      "languages": [
+        "lv"
+      ],
+      "tags": [
+        "native-title",
+        "holdout"
+      ]
+    },
+    {
+      "id": "release-lt-body",
+      "text": "Skaitytojai dabar gali išsaugoti pastraipą, kad vėliau ją perskaitytų dar kartą. Net ir uždarius naršyklę, išsaugotas tekstas lieka pasiekiamas vėl atidarius puslapį.",
+      "languages": [
+        "lt"
+      ],
+      "tags": [
+        "native-body",
+        "holdout"
+      ]
+    },
+    {
+      "id": "release-lt-title",
+      "text": "Dar kartą skaitykite išsaugotas pastraipas",
+      "languages": [
+        "lt"
+      ],
+      "tags": [
+        "native-title",
+        "holdout"
+      ]
+    },
+    {
+      "id": "release-ta-body",
+      "text": "வாசகர்கள் இப்போது ஒரு பத்தியை பின்னர் படிப்பதற்காகச் சேமிக்கலாம். உலாவியை மூடிய பிறகும் பக்கத்தை மீண்டும் திறக்கும்போது சேமிக்கப்பட்ட உரை கிடைக்கும்.",
+      "languages": [
+        "ta"
+      ],
+      "tags": [
+        "native-body",
+        "holdout"
+      ]
+    },
+    {
+      "id": "release-ta-title",
+      "text": "சேமித்த பத்திகளை மீண்டும் படிக்கவும்",
+      "languages": [
+        "ta"
+      ],
+      "tags": [
+        "native-title",
+        "holdout"
+      ]
+    },
+    {
+      "id": "release-te-body",
+      "text": "పాఠకులు ఇప్పుడు ఒక పేరాను తరువాత చదవడానికి భద్రపరచవచ్చు. బ్రౌజర్ మూసివేసిన తరువాత కూడా పేజీని మళ్లీ తెరిచినప్పుడు భద్రపరచిన వచనం అందుబాటులో ఉంటుంది.",
+      "languages": [
+        "te"
+      ],
+      "tags": [
+        "native-body",
+        "holdout"
+      ]
+    },
+    {
+      "id": "release-te-title",
+      "text": "భద్రపరచిన పేరాలను మళ్లీ చదవండి",
+      "languages": [
+        "te"
+      ],
+      "tags": [
+        "native-title",
+        "holdout"
+      ]
+    },
+    {
+      "id": "release-mr-body",
+      "text": "वाचक आता एखादा परिच्छेद नंतर वाचण्यासाठी जतन करू शकतात. ब्राउझर बंद केल्यानंतरही पान पुन्हा उघडल्यावर जतन केलेला मजकूर उपलब्ध राहतो.",
+      "languages": [
+        "mr"
+      ],
+      "tags": [
+        "native-body",
+        "holdout"
+      ]
+    },
+    {
+      "id": "release-mr-title",
+      "text": "जतन केलेले परिच्छेद पुन्हा वाचा",
+      "languages": [
+        "mr"
+      ],
+      "tags": [
+        "native-title",
+        "holdout"
+      ]
+    },
+    {
+      "id": "release-gu-body",
+      "text": "વાચકો હવે કોઈ ફકરો પછી વાંચવા માટે સાચવી શકે છે. બ્રાઉઝર બંધ કર્યા પછી પણ પાનું ફરી ખોલવામાં આવે ત્યારે સાચવેલું લખાણ ઉપલબ્ધ રહે છે.",
+      "languages": [
+        "gu"
+      ],
+      "tags": [
+        "native-body",
+        "holdout"
+      ]
+    },
+    {
+      "id": "release-gu-title",
+      "text": "સાચવેલા ફકરા ફરી વાંચો",
+      "languages": [
+        "gu"
+      ],
+      "tags": [
+        "native-title",
+        "holdout"
+      ]
+    },
+    {
+      "id": "release-kn-body",
+      "text": "ಓದುಗರು ಈಗ ಒಂದು ಪ್ಯಾರಾಗ್ರಾಫ್ ಅನ್ನು ನಂತರ ಓದಲು ಉಳಿಸಬಹುದು. ಬ್ರೌಸರ್ ಮುಚ್ಚಿದ ನಂತರವೂ ಪುಟವನ್ನು ಮತ್ತೆ ತೆರೆದಾಗ ಉಳಿಸಿದ ಪಠ್ಯ ಲಭ್ಯವಿರುತ್ತದೆ.",
+      "languages": [
+        "kn"
+      ],
+      "tags": [
+        "native-body",
+        "holdout"
+      ]
+    },
+    {
+      "id": "release-kn-title",
+      "text": "ಉಳಿಸಿದ ಪ್ಯಾರಾಗ್ರಾಫ್‌ಗಳನ್ನು ಮತ್ತೆ ಓದಿ",
+      "languages": [
+        "kn"
+      ],
+      "tags": [
+        "native-title",
+        "holdout"
+      ]
+    },
+    {
+      "id": "release-ml-body",
+      "text": "വായനക്കാർക്ക് ഇപ്പോൾ ഒരു ഖണ്ഡിക പിന്നീട് വായിക്കാനായി സൂക്ഷിക്കാം. ബ്രൗസർ അടച്ചശേഷവും പേജ് വീണ്ടും തുറക്കുമ്പോൾ സൂക്ഷിച്ച വാചകം ലഭ്യമായിരിക്കും.",
+      "languages": [
+        "ml"
+      ],
+      "tags": [
+        "native-body",
+        "holdout"
+      ]
+    },
+    {
+      "id": "release-ml-title",
+      "text": "സൂക്ഷിച്ച ഖണ്ഡികകൾ വീണ്ടും വായിക്കുക",
+      "languages": [
+        "ml"
+      ],
+      "tags": [
+        "native-title",
+        "holdout"
+      ]
+    },
+    {
+      "id": "release-pa-body",
+      "text": "ਪਾਠਕ ਹੁਣ ਕਿਸੇ ਪੈਰੇ ਨੂੰ ਬਾਅਦ ਵਿੱਚ ਪੜ੍ਹਨ ਲਈ ਸੰਭਾਲ ਸਕਦੇ ਹਨ। ਬ੍ਰਾਊਜ਼ਰ ਬੰਦ ਕਰਨ ਤੋਂ ਬਾਅਦ ਵੀ ਸਫ਼ਾ ਦੁਬਾਰਾ ਖੋਲ੍ਹਣ ਵੇਲੇ ਸੰਭਾਲਿਆ ਹੋਇਆ ਪਾਠ ਉਪਲਬਧ ਰਹਿੰਦਾ ਹੈ।",
+      "languages": [
+        "pa"
+      ],
+      "tags": [
+        "native-body",
+        "holdout"
+      ]
+    },
+    {
+      "id": "release-pa-title",
+      "text": "ਸੰਭਾਲੇ ਹੋਏ ਪੈਰੇ ਦੁਬਾਰਾ ਪੜ੍ਹੋ",
+      "languages": [
+        "pa"
+      ],
+      "tags": [
+        "native-title",
+        "holdout"
+      ]
+    },
+    {
+      "id": "release-ne-body",
+      "text": "पाठकहरूले अब कुनै अनुच्छेद पछि पढ्नका लागि सुरक्षित राख्न सक्छन्। ब्राउजर बन्द गरेपछि पनि पृष्ठ फेरि खोल्दा सुरक्षित गरिएको पाठ उपलब्ध रहन्छ।",
+      "languages": [
+        "ne"
+      ],
+      "tags": [
+        "native-body",
+        "holdout"
+      ]
+    },
+    {
+      "id": "release-ne-title",
+      "text": "सुरक्षित अनुच्छेद फेरि पढ्नुहोस्",
+      "languages": [
+        "ne"
+      ],
+      "tags": [
+        "native-title",
+        "holdout"
+      ]
+    },
+    {
+      "id": "release-si-body",
+      "text": "පාඨකයන්ට දැන් ඡේදයක් පසුව කියවීම සඳහා සුරැකිය හැකිය. බ්‍රවුසරය වසා දැමීමෙන් පසුවත් පිටුව නැවත විවෘත කරන විට සුරැකූ පෙළ ලබා ගත හැකිය.",
+      "languages": [
+        "si"
+      ],
+      "tags": [
+        "native-body",
+        "holdout"
+      ]
+    },
+    {
+      "id": "release-si-title",
+      "text": "සුරැකූ ඡේද නැවත කියවන්න",
+      "languages": [
+        "si"
+      ],
+      "tags": [
+        "native-title",
+        "holdout"
+      ]
+    },
+    {
+      "id": "release-sw-body",
+      "text": "Wasomaji sasa wanaweza kuhifadhi aya ili kuisoma baadaye. Hata baada ya kufunga kivinjari, maandishi yaliyohifadhiwa bado yanapatikana ukurasa unapofunguliwa tena.",
+      "languages": [
+        "sw"
+      ],
+      "tags": [
+        "native-body",
+        "holdout"
+      ]
+    },
+    {
+      "id": "release-sw-title",
+      "text": "Soma tena aya zilizohifadhiwa",
+      "languages": [
+        "sw"
+      ],
+      "tags": [
+        "native-title",
+        "holdout"
+      ]
+    },
+    {
+      "id": "release-fil-body",
+      "text": "Maaari na ngayong magtago ang mga mambabasa ng isang talata upang balikan ito sa ibang araw. Kahit isara ang browser, mababasa pa rin ang naitagong teksto kapag muling binuksan ang pahina.",
+      "languages": [
+        "fil"
+      ],
+      "tags": [
+        "native-body",
+        "holdout"
+      ]
+    },
+    {
+      "id": "release-fil-title",
+      "text": "Basahin muli ang mga naitagong talata",
+      "languages": [
+        "fil"
+      ],
+      "tags": [
+        "native-title",
+        "holdout"
+      ]
+    },
+    {
+      "id": "release-technical-chinese-01",
+      "text": "修复 Firefox 首次右键翻译没有响应的问题。",
+      "languages": [
+        "zh-Hans"
+      ],
+      "requireSkip": true,
+      "tags": [
+        "release",
+        "technical",
+        "regression"
+      ]
+    },
+    {
+      "id": "release-technical-chinese-02",
+      "text": "用户现在可以在 popup 中查看已配置的服务与模型。",
+      "languages": [
+        "zh-Hans"
+      ],
+      "requireSkip": false,
+      "tags": [
+        "release",
+        "technical",
+        "holdout",
+        "ambiguous-embedded-terms"
+      ]
+    },
+    {
+      "id": "release-technical-chinese-03",
+      "text": "加入 LibreTranslate 翻译服务，支持在设置中更换服务器地址。",
+      "languages": [
+        "zh-Hans"
+      ],
+      "requireSkip": true,
+      "tags": [
+        "release",
+        "technical",
+        "regression"
+      ]
+    },
+    {
+      "id": "release-technical-chinese-04",
+      "text": "优化 GitHub releases 页面上的目标语言识别，避免中文段落被重复翻译。",
+      "languages": [
+        "zh-Hans"
+      ],
+      "requireSkip": true,
+      "tags": [
+        "release",
+        "technical",
+        "regression"
+      ]
+    },
+    {
+      "id": "release-technical-chinese-05",
+      "text": "将 LanguageDetector 的模型下载进度显示在设置页面。",
+      "languages": [
+        "zh-Hans"
+      ],
+      "requireSkip": true,
+      "tags": [
+        "release",
+        "technical",
+        "regression"
+      ]
+    },
+    {
+      "id": "release-technical-chinese-06",
+      "text": "改进 OpenAI、Anthropic 和 DeepSeek 服务的失败提示。",
+      "languages": [
+        "zh-Hans"
+      ],
+      "requireSkip": true,
+      "tags": [
+        "release",
+        "technical",
+        "regression"
+      ]
+    },
+    {
+      "id": "release-technical-chinese-07",
+      "text": "新增 Chrome / Edge / Firefox 浏览器兼容检查。",
+      "languages": [
+        "zh-Hans"
+      ],
+      "requireSkip": true,
+      "tags": [
+        "release",
+        "technical",
+        "regression"
+      ]
+    },
+    {
+      "id": "release-technical-chinese-08",
+      "text": "修复 macOS 上使用快捷键时重复触发的问题。",
+      "languages": [
+        "zh-Hans"
+      ],
+      "requireSkip": true,
+      "tags": [
+        "release",
+        "technical",
+        "regression"
+      ]
+    },
+    {
+      "id": "release-technical-chinese-09",
+      "text": "为 PDF / ePub / Markdown 文档提供一致的双语阅读体验。",
+      "languages": [
+        "zh-Hans"
+      ],
+      "requireSkip": true,
+      "tags": [
+        "release",
+        "technical",
+        "regression"
+      ]
+    },
+    {
+      "id": "release-technical-chinese-10",
+      "text": "调整 StreamlineKit 模块的缓存策略，减少连续滚动时的卡顿。",
+      "languages": [
+        "zh-Hans"
+      ],
+      "requireSkip": true,
+      "tags": [
+        "release",
+        "technical",
+        "regression"
+      ]
+    },
+    {
+      "id": "release-technical-chinese-11",
+      "text": "为 Frost Pine 模型增加自定义请求参数入口。",
+      "languages": [
+        "zh-Hans"
+      ],
+      "requireSkip": true,
+      "tags": [
+        "release",
+        "technical",
+        "regression"
+      ]
+    },
+    {
+      "id": "release-technical-chinese-12",
+      "text": "将 Cloud Cedar / River Stone 服务的配置统一放在服务抽屉中。",
+      "languages": [
+        "zh-Hans"
+      ],
+      "requireSkip": false,
+      "tags": [
+        "release",
+        "technical",
+        "holdout",
+        "ambiguous-embedded-terms"
+      ]
+    },
+    {
+      "id": "release-technical-chinese-13",
+      "text": "修复Chrome浏览器中选中文本后工具栏位置偏移的问题。",
+      "languages": [
+        "zh-Hans"
+      ],
+      "requireSkip": true,
+      "tags": [
+        "release",
+        "technical",
+        "regression"
+      ]
+    },
+    {
+      "id": "release-technical-chinese-14",
+      "text": "新增AuroraReader阅读模式，允许调整段落间距与字体大小。",
+      "languages": [
+        "zh-Hans"
+      ],
+      "requireSkip": true,
+      "tags": [
+        "release",
+        "technical",
+        "regression"
+      ]
+    },
+    {
+      "id": "release-technical-chinese-15",
+      "text": "更新 CSP 校验，允许 blob URL 中的 Worker 正常启动。",
+      "languages": [
+        "zh-Hans"
+      ],
+      "requireSkip": false,
+      "tags": [
+        "release",
+        "technical",
+        "holdout",
+        "ambiguous-embedded-terms"
+      ]
+    },
+    {
+      "id": "release-technical-chinese-16",
+      "text": "新增 WebSocket 连接状态提示，并优化 SSE 流式响应的错误处理。",
+      "languages": [
+        "zh-Hans"
+      ],
+      "requireSkip": true,
+      "tags": [
+        "release",
+        "technical",
+        "regression"
+      ]
+    },
+    {
+      "id": "release-technical-chinese-17",
+      "text": "修复 OAuth callback 失败后无法重新登录的问题。",
+      "languages": [
+        "zh-Hans"
+      ],
+      "requireSkip": true,
+      "tags": [
+        "release",
+        "technical",
+        "regression"
+      ]
+    },
+    {
+      "id": "release-technical-chinese-18",
+      "text": "清理 stale cache，避免同一段落恢复原文后再次读取旧译文。",
+      "languages": [
+        "zh-Hans"
+      ],
+      "requireSkip": false,
+      "tags": [
+        "release",
+        "technical",
+        "holdout",
+        "ambiguous-embedded-terms"
+      ]
+    },
+    {
+      "id": "release-technical-chinese-19",
+      "text": "减少 DOM mutation 触发的重复检查，保持动态页面中的阅读位置。",
+      "languages": [
+        "zh-Hans"
+      ],
+      "requireSkip": true,
+      "tags": [
+        "release",
+        "technical",
+        "regression"
+      ]
+    },
+    {
+      "id": "release-technical-chinese-20",
+      "text": "增加 retry budget，防止并发任务耗尽后一直显示等待状态。",
+      "languages": [
+        "zh-Hans"
+      ],
+      "requireSkip": false,
+      "tags": [
+        "release",
+        "technical",
+        "holdout",
+        "ambiguous-embedded-terms"
+      ]
+    },
+    {
+      "id": "release-technical-chinese-21",
+      "text": "修复 token refresh 失败时仍显示已登录的问题。",
+      "languages": [
+        "zh-Hans"
+      ],
+      "requireSkip": false,
+      "tags": [
+        "release",
+        "technical",
+        "holdout",
+        "ambiguous-embedded-terms"
+      ]
+    },
+    {
+      "id": "release-technical-chinese-22",
+      "text": "改进 accessibility label，让屏幕阅读器能够识别当前操作。",
+      "languages": [
+        "zh-Hans"
+      ],
+      "requireSkip": false,
+      "tags": [
+        "release",
+        "technical",
+        "holdout",
+        "ambiguous-embedded-terms"
+      ]
+    },
+    {
+      "id": "release-technical-chinese-23",
+      "text": "为 options 页面中的 service drawer 增加关闭后焦点恢复。",
+      "languages": [
+        "zh-Hans"
+      ],
+      "requireSkip": false,
+      "tags": [
+        "release",
+        "technical",
+        "holdout",
+        "ambiguous-embedded-terms"
+      ]
+    },
+    {
+      "id": "release-technical-chinese-24",
+      "text": "修正 priority queue 的持槽顺序，避免低优先级任务阻塞阅读。",
+      "languages": [
+        "zh-Hans"
+      ],
+      "requireSkip": false,
+      "tags": [
+        "release",
+        "technical",
+        "holdout",
+        "ambiguous-embedded-terms"
+      ]
+    },
+    {
+      "id": "release-technical-chinese-25",
+      "text": "改进 read-aloud 的播放状态提示，避免关闭阅读卡片后继续朗读。",
+      "languages": [
+        "zh-Hans"
+      ],
+      "requireSkip": false,
+      "tags": [
+        "release",
+        "technical",
+        "holdout",
+        "ambiguous-embedded-terms"
+      ]
+    },
+    {
+      "id": "release-technical-chinese-26",
+      "text": "移除 legacy adapter，统一使用 provider registry 选择服务。",
+      "languages": [
+        "zh-Hans"
+      ],
+      "requireSkip": false,
+      "tags": [
+        "release",
+        "technical",
+        "holdout",
+        "ambiguous-embedded-terms"
+      ]
+    },
+    {
+      "id": "release-technical-chinese-27",
+      "text": "修复 inline code 导致相邻中文被误判为英语的问题。",
+      "languages": [
+        "zh-Hans"
+      ],
+      "requireSkip": false,
+      "tags": [
+        "release",
+        "technical",
+        "holdout",
+        "ambiguous-embedded-terms"
+      ]
+    },
+    {
+      "id": "release-technical-chinese-28",
+      "text": "修复 cache key 中的 source language 缺失导致译文错用的问题。",
+      "languages": [
+        "zh-Hans"
+      ],
+      "requireSkip": false,
+      "tags": [
+        "release",
+        "technical",
+        "holdout",
+        "ambiguous-embedded-terms"
+      ]
+    },
+    {
+      "id": "release-technical-chinese-29",
+      "text": "优化用户切换 target language 后的翻译会话恢复逻辑。",
+      "languages": [
+        "zh-Hans"
+      ],
+      "requireSkip": false,
+      "tags": [
+        "release",
+        "technical",
+        "holdout",
+        "ambiguous-embedded-terms"
+      ]
+    },
+    {
+      "id": "release-technical-chinese-30",
+      "text": "新增 release notes，说明本次更新的兼容性变化。",
+      "languages": [
+        "zh-Hans"
+      ],
+      "requireSkip": false,
+      "tags": [
+        "release",
+        "technical",
+        "holdout",
+        "ambiguous-embedded-terms"
+      ]
+    },
+    {
+      "id": "release-technical-chinese-31",
+      "text": "使用 async / await 简化任务取消流程，确保页面离开后不再更新内容。",
+      "languages": [
+        "zh-Hans"
+      ],
+      "requireSkip": false,
+      "tags": [
+        "release",
+        "technical",
+        "holdout",
+        "ambiguous-embedded-terms"
+      ]
+    },
+    {
+      "id": "release-technical-chinese-32",
+      "text": "优化 prefetch window，减少长文档逐页阅读时的等待。",
+      "languages": [
+        "zh-Hans"
+      ],
+      "requireSkip": false,
+      "tags": [
+        "release",
+        "technical",
+        "holdout",
+        "ambiguous-embedded-terms"
+      ]
+    },
+    {
+      "id": "release-technical-chinese-33",
+      "text": "修复 tts playback 在暂停后再次开始时丢失音色的问题。",
+      "languages": [
+        "zh-Hans"
+      ],
+      "requireSkip": false,
+      "tags": [
+        "release",
+        "technical",
+        "holdout",
+        "ambiguous-embedded-terms"
+      ]
+    },
+    {
+      "id": "release-technical-chinese-34",
+      "text": "将 worker pool 的默认并发数调整为与当前设备能力一致。",
+      "languages": [
+        "zh-Hans"
+      ],
+      "requireSkip": false,
+      "tags": [
+        "release",
+        "technical",
+        "holdout",
+        "ambiguous-embedded-terms"
+      ]
+    },
+    {
+      "id": "release-technical-chinese-35",
+      "text": "修复 fallback route 未保留 timeout budget 导致超时的问题。",
+      "languages": [
+        "zh-Hans"
+      ],
+      "requireSkip": false,
+      "tags": [
+        "release",
+        "technical",
+        "holdout",
+        "ambiguous-embedded-terms"
+      ]
+    },
+    {
+      "id": "release-technical-chinese-36",
+      "text": "修复 `src/core/language/detect.ts` 中缓存键未包含完整原文的问题。",
+      "languages": [
+        "zh-Hans"
+      ],
+      "requireSkip": true,
+      "tags": [
+        "release",
+        "technical",
+        "regression"
+      ]
+    },
+    {
+      "id": "release-technical-chinese-37",
+      "text": "发布 v0.0.37，下载地址：https://github.com/FluentRead/FluentRead/releases。",
+      "languages": [
+        "zh-Hans"
+      ],
+      "requireSkip": true,
+      "tags": [
+        "release",
+        "technical",
+        "regression"
+      ]
+    },
+    {
+      "id": "release-technical-chinese-38",
+      "text": "支持 `AbortSignal`，调用 `translateText()` 后可以取消等待中的任务。",
+      "languages": [
+        "zh-Hans"
+      ],
+      "requireSkip": true,
+      "tags": [
+        "release",
+        "technical",
+        "regression"
+      ]
+    },
+    {
+      "id": "release-technical-chinese-39",
+      "text": "更新 README.md；提交 4f92c0a 与问题 #927 的修复一并发布。",
+      "languages": [
+        "zh-Hans"
+      ],
+      "requireSkip": true,
+      "tags": [
+        "release",
+        "technical",
+        "regression"
+      ]
+    },
+    {
+      "id": "release-technical-chinese-40",
+      "text": "新增「复制原文」按钮，支持保留 `code` 中的完整内容。",
+      "languages": [
+        "zh-Hans"
+      ],
+      "requireSkip": true,
+      "tags": [
+        "release",
+        "technical",
+        "regression"
+      ]
+    },
+    {
+      "id": "release-technical-chinese-41",
+      "text": "修复「还原原文」后原本中文仍出现第二行中文的问题。",
+      "languages": [
+        "zh-Hans"
+      ],
+      "requireSkip": true,
+      "tags": [
+        "release",
+        "technical",
+        "regression"
+      ]
+    },
+    {
+      "id": "release-technical-chinese-42",
+      "text": "新版本现在支持“翻译 → 还原 → 再次翻译”的完整操作。",
+      "languages": [
+        "zh-Hans"
+      ],
+      "requireSkip": true,
+      "tags": [
+        "release",
+        "technical",
+        "regression"
+      ]
+    },
+    {
+      "id": "release-technical-chinese-43",
+      "text": "修復 Firefox 首次右鍵翻譯沒有回應的問題。",
+      "languages": [
+        "zh-Hant"
+      ],
+      "requireSkip": true,
+      "tags": [
+        "release",
+        "technical",
+        "regression"
+      ]
+    },
+    {
+      "id": "release-technical-chinese-44",
+      "text": "使用者現在可以在 popup 中查看已設定的服務與模型。",
+      "languages": [
+        "zh-Hant"
+      ],
+      "requireSkip": false,
+      "tags": [
+        "release",
+        "technical",
+        "holdout",
+        "ambiguous-embedded-terms"
+      ]
+    },
+    {
+      "id": "release-technical-chinese-45",
+      "text": "改進 GitHub releases 頁面上的目標語言識別，避免中文段落被重複翻譯。",
+      "languages": [
+        "zh-Hant"
+      ],
+      "requireSkip": true,
+      "tags": [
+        "release",
+        "technical",
+        "regression"
+      ]
+    },
+    {
+      "id": "release-technical-chinese-46",
+      "text": "修復Chrome瀏覽器中選取文字後工具列位置偏移的問題。",
+      "languages": [
+        "zh-Hant"
+      ],
+      "requireSkip": true,
+      "tags": [
+        "release",
+        "technical",
+        "regression"
+      ]
+    },
+    {
+      "id": "release-technical-chinese-47",
+      "text": "新增 StreamlineKit 模組的快取設定，減少連續捲動時的卡頓。",
+      "languages": [
+        "zh-Hant"
+      ],
+      "requireSkip": true,
+      "tags": [
+        "release",
+        "technical",
+        "regression"
+      ]
+    },
+    {
+      "id": "release-technical-chinese-48",
+      "text": "修復 OAuth callback 失敗後無法重新登入的問題。",
+      "languages": [
+        "zh-Hant"
+      ],
+      "requireSkip": true,
+      "tags": [
+        "release",
+        "technical",
+        "regression"
+      ]
+    },
+    {
+      "id": "release-technical-chinese-49",
+      "text": "發布 v0.0.37，下載位址：https://github.com/FluentRead/FluentRead/releases。",
+      "languages": [
+        "zh-Hant"
+      ],
+      "requireSkip": true,
+      "tags": [
+        "release",
+        "technical",
+        "regression"
+      ]
+    },
+    {
+      "id": "neutral-current",
+      "text": "Current",
+      "languages": [],
+      "tags": [
+        "ambiguous"
+      ]
+    },
+    {
+      "id": "neutral-menu",
+      "text": "Menu",
+      "languages": [],
+      "tags": [
+        "ambiguous"
+      ]
+    },
+    {
+      "id": "neutral-status",
+      "text": "Status",
+      "languages": [],
+      "tags": [
+        "ambiguous"
+      ]
+    },
+    {
+      "id": "neutral-chat",
+      "text": "Chat",
+      "languages": [],
+      "tags": [
+        "ambiguous"
+      ]
+    },
+    {
+      "id": "neutral-update",
+      "text": "Update",
+      "languages": [],
+      "tags": [
+        "ambiguous"
+      ]
+    },
+    {
+      "id": "neutral-play",
+      "text": "Play",
+      "languages": [],
+      "tags": [
+        "ambiguous"
+      ]
+    },
+    {
+      "id": "neutral-home",
+      "text": "Home",
+      "languages": [],
+      "tags": [
+        "ambiguous"
+      ]
+    },
+    {
+      "id": "neutral-data",
+      "text": "Data",
+      "languages": [],
+      "tags": [
+        "ambiguous"
+      ]
+    },
+    {
+      "id": "neutral-openai",
+      "text": "OpenAI",
+      "languages": [],
+      "tags": [
+        "brand"
+      ]
+    },
+    {
+      "id": "neutral-model",
+      "text": "GPT-6 Sol",
+      "languages": [],
+      "tags": [
+        "brand",
+        "identifier"
+      ]
+    },
+    {
+      "id": "neutral-files",
+      "text": "FluentRead_0.0.37_chrome.zip",
+      "languages": [],
+      "tags": [
+        "identifier"
+      ]
+    },
+    {
+      "id": "neutral-shared-han",
+      "text": "東京大学研究所",
+      "languages": [],
+      "tags": [
+        "ambiguous",
+        "shared-han"
+      ]
+    },
+    {
+      "id": "neutral-kanji-heading",
+      "text": "最新情報一覧",
+      "languages": [],
+      "tags": [
+        "ambiguous",
+        "shared-han"
+      ]
+    },
+    {
+      "id": "mixed-zh-error-short",
+      "text": "操作失败：Please retry.",
+      "languages": [],
+      "tags": [
+        "mixed",
+        "foreign-ui"
+      ]
+    },
+    {
+      "id": "mixed-zh-help-short",
+      "text": "帮助：How to use this tool",
+      "languages": [],
+      "tags": [
+        "mixed",
+        "foreign-ui"
+      ]
+    },
+    {
+      "id": "mixed-zh-en-quoted",
+      "text": "本次发布说明写道：“The new version is ready for everyone to try.”",
+      "languages": [],
+      "tags": [
+        "mixed",
+        "quotation"
+      ]
+    },
+    {
+      "id": "mixed-zh-unknown-brand-quote",
+      "text": "请翻译 Frost Pine，不要直接把英文当成已经翻译过的内容。",
+      "languages": [],
+      "tags": [
+        "mixed",
+        "quotation"
+      ]
+    },
+    {
+      "id": "mixed-zh-en-nospaces",
+      "text": "修复问题。Please restart the browser to continue.现在可以再次尝试。",
+      "languages": [],
+      "tags": [
+        "mixed",
+        "no-space"
+      ]
+    },
+    {
+      "id": "mixed-zh-http-label",
+      "text": "新增HTTP支持。Connection refused.",
+      "languages": [],
+      "tags": [
+        "mixed",
+        "technical"
+      ]
+    },
+    {
+      "id": "mixed-zh-css",
+      "text": "新增 CSS 设置：The background should be dark blue.",
+      "languages": [],
+      "tags": [
+        "mixed",
+        "technical"
+      ]
+    },
+    {
+      "id": "mixed-zh-en-upper",
+      "text": "错误提示：PLEASE CHECK YOUR INTERNET CONNECTION.",
+      "languages": [],
+      "tags": [
+        "mixed",
+        "uppercase"
+      ]
+    },
+    {
+      "id": "mixed-zh-en-bold",
+      "text": "说明：**You need to sign in before saving your changes.**",
+      "languages": [],
+      "tags": [
+        "mixed",
+        "markdown"
+      ]
+    },
+    {
+      "id": "mixed-zh-en-inline-code",
+      "text": "请按照以下英文提示操作：`Restart the browser and try again.`",
+      "languages": [],
+      "tags": [
+        "mixed",
+        "inline-code-prose"
+      ]
+    },
+    {
+      "id": "mixed-zh-fr",
+      "text": "按钮的法文说明是：Cliquez ici pour ouvrir les paramètres de votre navigateur.",
+      "languages": [],
+      "tags": [
+        "mixed",
+        "quotation"
+      ]
+    },
+    {
+      "id": "mixed-ja-zh",
+      "text": "更新のお知らせです。修复缓存损坏导致无法打开的问题。",
+      "languages": [],
+      "tags": [
+        "mixed",
+        "cjk"
+      ]
+    },
+    {
+      "id": "mixed-ko-en-short",
+      "text": "오류 메시지: Your account has expired.",
+      "languages": [],
+      "tags": [
+        "mixed",
+        "foreign-ui"
+      ]
+    },
+    {
+      "id": "mixed-ar-en-short",
+      "text": "رسالة خطأ: Your payment was declined.",
+      "languages": [],
+      "tags": [
+        "mixed",
+        "foreign-ui"
+      ]
+    },
+    {
+      "id": "mixed-th-en-short",
+      "text": "ข้อความผิดพลาด: Please sign in again.",
+      "languages": [],
+      "tags": [
+        "mixed",
+        "foreign-ui"
+      ]
+    },
+    {
+      "id": "outside-nn",
+      "text": "Lesarane kan no lagra eit avsnitt og venda tilbake til det seinare. Teksten er framleis tilgjengeleg når sida vert opna att.",
+      "languages": [],
+      "tags": [
+        "outside-catalog",
+        "similar-language"
+      ]
+    },
+    {
+      "id": "outside-ca",
+      "text": "Els lectors poden desar un paràgraf per tornar-hi més endavant. El text desat continua disponible quan es torna a obrir la pàgina.",
+      "languages": [],
+      "tags": [
+        "outside-catalog",
+        "similar-language"
+      ]
+    },
+    {
+      "id": "outside-bs",
+      "text": "Čitaoci sada mogu sačuvati pasus da ga kasnije ponovo pročitaju. Sačuvani tekst ostaje dostupan kada se stranica ponovo otvori.",
+      "languages": [],
+      "tags": [
+        "outside-catalog",
+        "similar-language"
+      ]
+    },
+    {
+      "id": "outside-be",
+      "text": "Чытачы цяпер могуць захаваць абзац, каб прачытаць яго пазней. Захаваны тэкст застаецца даступным, калі старонка адкрываецца зноў.",
+      "languages": [],
+      "tags": [
+        "outside-catalog",
+        "similar-language"
+      ]
+    },
+    {
+      "id": "hans-conversion",
+      "text": "请打开设置页面，并保存当前选中的服务。",
+      "languages": [
+        "zh-Hans"
+      ],
+      "tags": [
+        "chinese-conversion"
+      ]
+    },
+    {
+      "id": "hant-conversion",
+      "text": "請開啟設定頁面，並儲存目前選取的服務。",
+      "languages": [
+        "zh-Hant"
+      ],
+      "tags": [
+        "chinese-conversion"
+      ]
+    },
+    {
+      "id": "english-negative-not",
+      "text": "Do not close the browser until your changes have been saved.",
+      "languages": [
+        "en"
+      ],
+      "tags": [
+        "semantic-negation"
+      ]
+    },
+    {
+      "id": "english-positive",
+      "text": "You can close the browser after your changes have been saved.",
+      "languages": [
+        "en"
+      ],
+      "tags": [
+        "semantic-negation"
+      ]
+    },
+    {
+      "id": "english-version",
+      "text": "The release supports Chrome and Firefox, but your settings will remain available after an update to v0.0.37.",
+      "languages": [
+        "en"
+      ],
+      "tags": [
+        "technical"
+      ]
+    },
+    {
+      "id": "german-brand",
+      "text": "Mit FluentRead lassen sich markierte Absätze speichern, damit sie beim nächsten Öffnen des Browsers noch verfügbar sind.",
+      "languages": [
+        "de"
+      ],
+      "tags": [
+        "technical"
+      ]
+    },
+    {
+      "id": "french-brand",
+      "text": "Avec FluentRead, vous pouvez conserver les paragraphes importants pour les relire après la fermeture du navigateur.",
+      "languages": [
+        "fr"
+      ],
+      "tags": [
+        "technical"
+      ]
+    },
+    {
+      "id": "spanish-brand",
+      "text": "Con FluentRead puedes guardar los párrafos más importantes para leerlos otra vez después de cerrar el navegador.",
+      "languages": [
+        "es"
+      ],
+      "tags": [
+        "technical"
+      ]
+    },
+    {
+      "id": "japanese-name",
+      "text": "AuroraReaderでは文章を保存して後から読み直すことができます。ブラウザーを閉じても保存した内容は残ります。",
+      "languages": [
+        "ja"
+      ],
+      "tags": [
+        "technical",
+        "brand"
+      ]
+    },
+    {
+      "id": "korean-name",
+      "text": "AuroraReader에서는 문장을 저장한 뒤 나중에 다시 읽을 수 있습니다. 브라우저를 닫아도 저장한 내용은 남아 있습니다.",
+      "languages": [
+        "ko"
+      ],
+      "tags": [
+        "technical",
+        "brand"
+      ]
+    },
+    {
+      "id": "empty-score",
+      "text": "7 / 9 → 100%",
+      "languages": [],
+      "empty": true,
+      "tags": [
+        "empty"
+      ]
+    },
+    {
+      "id": "empty-emojis",
+      "text": "✅ 🎉 2026-10-11",
+      "languages": [],
+      "empty": true,
+      "tags": [
+        "empty"
+      ]
+    },
+    {
+      "id": "empty-space",
+      "text": "​‍﻿",
+      "languages": [],
+      "empty": true,
+      "tags": [
+        "empty"
+      ]
+    },
+    {
+      "id": "empty-punctuation",
+      "text": "…！？---",
+      "languages": [],
+      "empty": true,
+      "tags": [
+        "empty"
+      ]
+    },
+    {
+      "id": "outside-nn-reading",
+      "text": "Eg har ikkje lese desse sidene enno, men eg vil sjå gjennom dei før vi går vidare.",
+      "languages": [],
+      "tags": [
+        "outside-catalog",
+        "similar-language",
+        "functional-evidence"
+      ]
+    },
+    {
+      "id": "outside-nn-settings",
+      "text": "Dersom du vil endra språket, kan du opna innstillingane og velja eit nytt mål.",
+      "languages": [],
+      "tags": [
+        "outside-catalog",
+        "similar-language",
+        "functional-evidence"
+      ]
+    },
+    {
+      "id": "outside-nn-files",
+      "text": "Ingen av oss veit kvar dei gamle filene vart lagra, så vi må leita etter dei.",
+      "languages": [],
+      "tags": [
+        "outside-catalog",
+        "similar-language",
+        "functional-evidence"
+      ]
+    },
+    {
+      "id": "marathi-more-information",
+      "text": "जर तुम्हाला अधिक माहिती हवी असेल तर या पानावर पुन्हा या, किंवा आम्हाला संदेश पाठवा.",
+      "languages": [
+        "mr"
+      ],
+      "tags": [
+        "functional-evidence"
+      ]
+    },
+    {
+      "id": "hindi-more-information",
+      "text": "अगर आपको जानकारी चाहिए तो यहाँ वापस आएँ और पृष्ठ पर दिए गए निर्देश पढ़ें।",
+      "languages": [
+        "hi"
+      ],
+      "tags": [
+        "functional-evidence"
+      ]
+    },
+    {
+      "id": "nepali-more-information",
+      "text": "यदि तपाईंलाई थप जानकारी चाहिन्छ भने यो पृष्ठ फेरि खोल्नुहोस् र यहाँका निर्देशनहरू पढ्नुहोस्।",
+      "languages": [
+        "ne"
+      ],
+      "tags": [
+        "functional-evidence"
+      ]
+    },
+    {
+      "id": "mixed-hi-mr-advice",
+      "text": "अगर आपको जानकारी चाहिए तो यहाँ वापस आएँ और पृष्ठ पर दिए गए निर्देश पढ़ें। जर तुम्हाला अधिक माहिती हवी असेल तर या पानावर पुन्हा या, किंवा आम्हाला संदेश पाठवा.",
+      "languages": [],
+      "tags": [
+        "mixed",
+        "similar-language",
+        "functional-evidence"
+      ]
+    },
+    {
+      "id": "mixed-mr-ne-advice",
+      "text": "जर तुम्हाला अधिक माहिती हवी असेल तर या पानावर पुन्हा या, किंवा आम्हाला संदेश पाठवा. यदि तपाईंलाई थप जानकारी चाहिन्छ भने यो पृष्ठ फेरि खोल्नुहोस् र यहाँका निर्देशनहरू पढ्नुहोस्।",
+      "languages": [],
+      "tags": [
+        "mixed",
+        "similar-language",
+        "functional-evidence"
+      ]
+    }
+  ]
+}

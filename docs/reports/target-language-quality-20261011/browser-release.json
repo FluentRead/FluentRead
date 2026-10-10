@@ -1,0 +1,266 @@
+{
+  "ok": true,
+  "scope": "https://github.com/FluentRead/FluentRead/releases: 10 technical Chinese paragraphs, plain and code/strong inline DOM, Simplified Chinese hover/full zero requests and zero wrappers, English neighbor restore/retranslate, dynamic Chinese-to-English mutation, target switch to English",
+  "evidenceBoundary": "The local HTML and loopback OpenAI-compatible server are deterministic fixtures. Their success does not prove any external service translation quality or availability.",
+  "consoleErrors": [],
+  "siteResourceErrors": [
+    {
+      "source": "live-target-language-release",
+      "message": "Failed to load resource: the server responded with a status of 404 ()",
+      "location": {
+        "url": "https://github.com/_global-navigation/payloads.json?can_toggle_site_admin_and_employee_status=0&is_admin_mode_on=0&is_ui_opted_out=0&show_ui_opt_out=0&v=7",
+        "line": 0,
+        "column": 0,
+        "lineNumber": 0,
+        "columnNumber": 0
+      }
+    }
+  ],
+  "launchMode": "macos-background-cdp",
+  "focusPolicy": "launchservices-no-foreground",
+  "windowPlacement": {
+    "mode": "background-visible-no-focus",
+    "visible": true,
+    "hidden": false,
+    "centered": true,
+    "windowState": "normal",
+    "bounds": {
+      "left": 132,
+      "top": -1020,
+      "width": 1440,
+      "height": 960
+    },
+    "displayTarget": "secondary",
+    "source": "macos-nsscreen",
+    "screenIndex": 1,
+    "browserFrontmost": false,
+    "frontmostBefore": {
+      "pid": 73685,
+      "name": "ChatGPT"
+    },
+    "frontmostAfter": {
+      "pid": 73685,
+      "name": "ChatGPT"
+    }
+  },
+  "technicalPr906": {
+    "source": "https://github.com/FluentRead/FluentRead/releases",
+    "paragraphs": 10,
+    "cases": [
+      {
+        "markup": "plain",
+        "status": "passed",
+        "sameTargetHoverRequests": 0,
+        "sameTargetWrappers": 0,
+        "foreignHoverCounts": [
+          1,
+          0,
+          1,
+          0
+        ],
+        "foreignFullPageCounts": [
+          1,
+          0,
+          1
+        ],
+        "sameTargetFullRequests": 0,
+        "dynamicRedetection": true,
+        "sameTargetRequestSources": [
+          "This software reads the document and translates the language on this page.",
+          "This software reads the document and translates the language on this page.",
+          "This software reads the document and translates the language on this page.",
+          "The second paragraph explains the settings for the computer network."
+        ],
+        "restored": true,
+        "targetSwitch": {
+          "from": "zh-Hans",
+          "to": "en",
+          "translatedChineseParagraphs": 10,
+          "requestCount": 10
+        },
+        "targetSwitchRestored": true,
+        "urlStable": true,
+        "originalInlineDomPreserved": true
+      },
+      {
+        "markup": "split",
+        "status": "passed",
+        "sameTargetHoverRequests": 0,
+        "sameTargetWrappers": 0,
+        "foreignHoverCounts": [
+          1,
+          0,
+          1,
+          0
+        ],
+        "foreignFullPageCounts": [
+          1,
+          0,
+          1
+        ],
+        "sameTargetFullRequests": 0,
+        "dynamicRedetection": true,
+        "sameTargetRequestSources": [
+          "This software reads the document and translates the language on this page.",
+          "This software reads the document and translates the language on this page.",
+          "This software reads the document and translates the language on this page.",
+          "The second paragraph explains the settings for the computer network."
+        ],
+        "restored": true,
+        "targetSwitch": {
+          "from": "zh-Hans",
+          "to": "en",
+          "translatedChineseParagraphs": 10,
+          "requestCount": 10
+        },
+        "targetSwitchRestored": true,
+        "urlStable": true,
+        "originalInlineDomPreserved": true
+      }
+    ]
+  },
+  "liveRelease": {
+    "url": "https://github.com/FluentRead/FluentRead/releases",
+    "provider": "loopback-fixture",
+    "status": "passed",
+    "cases": [
+      {
+        "needle": "拒绝扩展包的打包兼容问题",
+        "index": 67,
+        "probe": 0,
+        "source": "FluentRead 0.0.34 修复 Microsoft Edge 开发者中心拒绝扩展包的打包兼容问题。",
+        "hoverWrappers": 0
+      },
+      {
+        "needle": "翻译语言扩展至 52 种",
+        "index": 134,
+        "probe": 1,
+        "source": "翻译语言扩展至 52 种，新增多家云翻译与 AI 服务，包括 Doubao-Seed-Translation。",
+        "hoverWrappers": 0
+      },
+      {
+        "needle": "漫画重运算移入 Worker",
+        "index": 46,
+        "probe": 2,
+        "source": "支持时将漫画重运算移入 Worker，提供 GPU 失败后的 CPU 回退并限制并发；图像处理在本地进行，识别出的文字交给所选翻译服务。",
+        "hoverWrappers": 0
+      },
+      {
+        "needle": "Thunderbird 邮件翻译",
+        "index": 56,
+        "probe": 3,
+        "source": "新增独立 Thunderbird 邮件翻译、Obsidian 桌面插件及可选的本机 ACP Agent 翻译桥接；配置方式见仓库文档。",
+        "hoverWrappers": 0
+      },
+      {
+        "needle": "另附 Firefox 构建源码",
+        "index": 60,
+        "probe": 4,
+        "source": "下载说明： Chrome 和 Edge 使用 fluent-read-0.0.35-chrome.zip，解压后在开发者模式中加载解压目录。fluent-read-0.0.35-firefox.zip 为适用于 Firefox 140 及以上版本的未签名 MV2 构建，用于临时加载或提交签名；另附 Firefox 构建源码 fluent-read-0.0.35-sources.zip。可使用 SHA256SUMS.txt 校验安装包与源码。操作步骤见离线安装指南。",
+        "hoverWrappers": 0
+      },
+      {
+        "needle": "Google Meet",
+        "index": 47,
+        "probe": 5,
+        "source": "新增 Google Meet、Teams、Zoom 网页会议双语字幕，使用平台提供的可读取字幕。",
+        "hoverWrappers": 0
+      },
+      {
+        "needle": "YouTube、Udemy、Disney+",
+        "index": 48,
+        "probe": 6,
+        "source": "YouTube、Udemy、Disney+ 可优先使用已有的目标语言人工字幕，缺失时回退到翻译服务。",
+        "hoverWrappers": 0
+      },
+      {
+        "needle": "多个 API Key",
+        "index": 136,
+        "probe": 7,
+        "source": "支持每个服务配置多个 API Key、自适应轮换、逐个检测连接，以及可配置的冷却时间。",
+        "hoverWrappers": 0
+      }
+    ],
+    "hoverRequests": 0,
+    "fullSampleRequests": 0,
+    "foreignWrappers": 20,
+    "restored": true,
+    "urlStable": true
+  },
+  "sourceArtifacts": "/Users/thinkstu/Desktop/copy/artifacts/target-language-quality-20261011/browser-release-final",
+  "fixture": {
+    "ok": true,
+    "cases": [
+      {
+        "markup": "plain",
+        "status": "passed",
+        "sameTargetHoverRequests": 0,
+        "sameTargetWrappers": 0,
+        "foreignHoverCounts": [
+          1,
+          0,
+          1,
+          0
+        ],
+        "foreignFullPageCounts": [
+          1,
+          0,
+          1
+        ],
+        "sameTargetFullRequests": 0,
+        "dynamicRedetection": true,
+        "sameTargetRequestSources": [
+          "This software reads the document and translates the language on this page.",
+          "This software reads the document and translates the language on this page.",
+          "This software reads the document and translates the language on this page.",
+          "The second paragraph explains the settings for the computer network."
+        ],
+        "restored": true,
+        "targetSwitch": {
+          "from": "zh-Hans",
+          "to": "en",
+          "translatedChineseParagraphs": 10,
+          "requestCount": 10
+        },
+        "targetSwitchRestored": true,
+        "urlStable": true,
+        "originalInlineDomPreserved": true
+      },
+      {
+        "markup": "split",
+        "status": "passed",
+        "sameTargetHoverRequests": 0,
+        "sameTargetWrappers": 0,
+        "foreignHoverCounts": [
+          1,
+          0,
+          1,
+          0
+        ],
+        "foreignFullPageCounts": [
+          1,
+          0,
+          1
+        ],
+        "sameTargetFullRequests": 0,
+        "dynamicRedetection": true,
+        "sameTargetRequestSources": [
+          "This software reads the document and translates the language on this page.",
+          "This software reads the document and translates the language on this page.",
+          "This software reads the document and translates the language on this page.",
+          "The second paragraph explains the settings for the computer network."
+        ],
+        "restored": true,
+        "targetSwitch": {
+          "from": "zh-Hans",
+          "to": "en",
+          "translatedChineseParagraphs": 10,
+          "requestCount": 10
+        },
+        "targetSwitchRestored": true,
+        "urlStable": true,
+        "originalInlineDomPreserved": true
+      }
+    ]
+  }
+}

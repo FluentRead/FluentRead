@@ -320,12 +320,12 @@ describe('userscript lossless Unicode character data', () => {
         }
     });
 
-    it('restores all 45 function-word strings byte for byte and preserves the original lexicon digest', () => {
+    it('restores all 46 function-word strings byte for byte and preserves the audited lexicon digest', () => {
         const entries = Object.entries(functionWordData).sort(([left], [right]) => left < right ? -1 : left > right ? 1 : 0);
-        expect(entries).toHaveLength(45);
+        expect(entries).toHaveLength(46);
         // 提取前四组功能词原始字符串的摘要；按导出名排序，不依赖 module namespace 的枚举实现。
         expect(createHash('sha256').update(JSON.stringify(entries)).digest('hex'))
-            .toBe('6b56ec4873ca9ec2f137f93f32987c438a5b54ba6024e64e9de33ff314b77131');
+            .toBe('998dc8f897b31a8b91eaaec8ffe4e563b513fe856a6f91d8d528209d90f15ca1');
         const transformed = createPlugin().transform(readFileSync(wordDataPath, 'utf8'), wordDataPath)!;
         vi.stubGlobal('pako', {ungzip});
         try {

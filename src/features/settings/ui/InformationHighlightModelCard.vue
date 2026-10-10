@@ -1,7 +1,7 @@
 <!--
 @file src/features/settings/ui/InformationHighlightModelCard.vue
 文件职责：展示本地意外度模型的真实可用性、资源状态和显式下载操作。
-主要内容：每张卡独立读取资源状态，标题单选模型、底部单个按钮管理资源，下载、续传与删除共用明确确认框；显示真实下载进度和错误，选择与配置切换、隐藏和卸载时拒绝迟到回复与旧确认操作。
+主要内容：每张卡独立读取资源状态，标题单选模型、右下角单个按钮管理资源，下载、续传与删除共用明确确认框；显示真实下载进度和错误，选择与配置切换、隐藏和卸载时拒绝迟到回复与旧确认操作。
 模块边界：不直接访问网络、不分析正文、不推断模型已就绪，不自动下载或切换云端；模型校验、资源缓存和 WebGPU 检查由 feature runtime 负责。
 -->
 <template>
@@ -14,12 +14,12 @@
     <p v-if="!status || operation === 'remove'" class="highlight-model-status" role="status" aria-live="polite">{{ t(!status ? 'informationHighlight.model.reading' : 'informationHighlight.model.phase.removing') }}</p>
     <DownloadProgress v-if="showProgress" :progress="downloadProgress" :label="t(`informationHighlight.model.phase.${displayPhase}`)" data-testid="information-highlight-model-progress" />
     <p v-if="status && !status.supported" class="highlight-model-notice" role="status">{{ t('informationHighlight.model.webgpuRequired') }}</p>
+    <p v-if="hasError" class="highlight-model-error" role="alert">{{ errorLabel }}</p>
     <div class="highlight-model-actions">
       <button v-if="downloading" type="button" :disabled="!context.active.value || operation === 'pause'" :onClick="actions.pause" data-testid="information-highlight-model-pause" data-information-highlight-pause>{{ t('informationHighlight.model.pause') }}</button>
       <button v-else-if="status?.downloaded" type="button" :disabled="!context.active.value || operation !== null || confirming" :onClick="actions.remove" data-testid="information-highlight-model-remove" data-information-highlight-remove>{{ t('informationHighlight.model.remove') }}</button>
       <button v-else type="button" class="highlight-model-primary" :disabled="!context.active.value || reading || operation !== null || confirming || !error && !status?.supported" :onClick="error ? actions.refresh : actions.prepare" data-testid="information-highlight-model-download" data-information-highlight-download>{{ error ? t('informationHighlight.retry') : status?.phase === 'paused' || (status?.downloadedBytes || 0) > 0 ? t('informationHighlight.model.resume') : t('informationHighlight.model.download', {size: formatDownloadBytes(selectedModel.bytes)}) }}</button>
     </div>
-    <p v-if="hasError" class="highlight-model-error" role="alert">{{ errorLabel }}</p>
   </section>
   <ElDialog v-if="confirmation" :key="confirmation.sequence" :model-value="true" class="fluentread-information-highlight-model-dialog" :title="confirmationTitle" width="min(440px, calc(100vw - 24px))" align-center append-to-body destroy-on-close :show-close="false" :close-on-click-modal="false" :close-on-press-escape="true" :before-close="confirmationActions.cancel" :onUpdate:modelValue="confirmationActions.open" :onClose="confirmationActions.cancel" :onOpenAutoFocus="focusConfirmationCancel" :onOpened="focusConfirmationCancel" data-information-highlight-model-dialog data-information-highlight-confirmation :data-information-highlight-model-id="confirmation.modelId" :data-information-highlight-action="confirmation.action">
     <template #header>
@@ -181,7 +181,7 @@ onUnmounted(() => {mounted = false; readSequence++; commandSequence++; cancelCon
 .highlight-model-chip { display: grid; place-items: center; width: 28px; height: 28px; flex: none; border-radius: 8px; color: var(--brand-strong, #2464b8); background: var(--brand-soft, #edf5ff); font-size: 18px; }
 .highlight-model-status, .highlight-model-notice, .highlight-model-error { margin: 10px 0 0; font-size: 11px; line-height: 1.65; overflow-wrap: anywhere; }
 .highlight-model-status { color: var(--muted, #637184); }.highlight-model-notice { color: var(--ink, #25354b); }.highlight-model-error { color: var(--danger, #c04b54); }
-.highlight-model-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: auto; padding-top: 12px; }.highlight-model-actions button { max-width: 100%; border: 1px solid var(--line, #dce3eb); border-radius: 7px; padding: 7px 10px; background: var(--surface, #fff); color: var(--ink, #25354b); font: inherit; font-size: 11px; overflow-wrap: anywhere; cursor: pointer; }.highlight-model-actions button.highlight-model-primary { background: var(--brand-soft, #edf5ff); color: var(--brand-strong, #2464b8); border-color: var(--brand, #3680dd); }.highlight-model-actions button:disabled { opacity: .55; cursor: default; }.highlight-model-actions button:focus-visible { outline: 2px solid var(--brand, #3680dd); outline-offset: 2px; }
+.highlight-model-actions { display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: 8px; margin-top: auto; padding-top: 12px; }.highlight-model-actions button { max-width: 100%; border: 1px solid var(--line, #dce3eb); border-radius: 7px; padding: 7px 10px; background: var(--surface, #fff); color: var(--ink, #25354b); font: inherit; font-size: 11px; overflow-wrap: anywhere; cursor: pointer; }.highlight-model-actions button.highlight-model-primary { background: var(--brand-soft, #edf5ff); color: var(--brand-strong, #2464b8); border-color: var(--brand, #3680dd); }.highlight-model-actions button:disabled { opacity: .55; cursor: default; }.highlight-model-actions button:focus-visible { outline: 2px solid var(--brand, #3680dd); outline-offset: 2px; }
 .information-highlight-model :deep(.download-progress) { margin-top: 12px; }
 .information-highlight-model.is-compact { padding: 12px; }.is-compact .highlight-model-heading { align-items: center; gap: 8px; }.is-compact .highlight-model-chip { width: 24px; height: 24px; font-size: 16px; }.is-compact .highlight-model-status { margin-top: 8px; }.is-compact .highlight-model-actions { padding-top: 8px; }
 :global(.fluentread-information-highlight-model-dialog.el-dialog) { display: flex; flex-direction: column; max-height: calc(100dvh - 24px); margin: auto; padding: 0; overflow: hidden; border: 1px solid var(--line, #e5e8ef); border-radius: 18px; color: var(--ink, #172033); background: var(--surface, #fff); box-shadow: 0 20px 60px rgba(23, 32, 51, .2); font-family: inherit; --el-dialog-bg-color: var(--surface, #fff); }

@@ -2,7 +2,7 @@
 /**
  * @file scripts/testing/run-information-highlight-test.cjs
  * 文件职责：在独立真实 Edge 中验证生产信息高亮的页面保护、启停、动态正文、可选模型与设置持久化。
- * 主要内容：通过现有后台无焦点浏览器 helper 加载本地扩展和只读正文 fixture，真实点击设置、说明、渐变与模型选项，以真实按键验证快捷键作用范围；按 --model-id 选择固定 Qwen2.5 或 Qwen3，校验两张卡的独立缓存、原生单选、下载/续传确认、离线推理标签和单按钮删除流程；--model-only 只复验模型管理、推理与 PDF，显式选择真实下载或校验后的本地导入，--verify-download-confirmation 先验证部分真实下载再导入完整模型。
+ * 主要内容：通过现有后台无焦点浏览器 helper 加载本地扩展和只读正文 fixture，真实点击设置、说明、渐变与模型选项，以真实按键验证快捷键作用范围；按 --model-id 选择固定 Qwen2.5 或 Qwen3，校验两张卡的独立缓存、简洁描述与右下单按钮、原生单选、下载/续传确认、离线推理标签和单按钮删除流程；--model-only 只复验模型管理、推理与 PDF，显式选择真实下载或校验后的本地导入，--verify-download-confirmation 先验证部分真实下载再导入完整模型。
  * 模块边界：只清理本次 profile；本地导入与产品下载证据分开记录，藕荷深色下载确认验证皮肤文字色与可读对比度，下载后的推理和 PDF 复用已有页签；不修改共享焦点策略，超时和断开均失败，网络观察不冒充全机流量或阅读效果证明。
  */
 'use strict';
@@ -34,6 +34,7 @@ const modelId=args['model-id']||'qwen2.5-0.5b';assert(Object.hasOwn(models,model
 const model=models[modelId],otherModel=Object.values(models).find(value=>value.id!==modelId);
 const modelUrlPrefix=`https://huggingface.co/${model.repository}/resolve/${model.revision}/`;
 const downloadLabel=`下载模型（${(model.bytes/1_000_000).toFixed(0)} MB）`;
+const modelDescription='离线计算意外度，需 WebGPU（shader-f16）。';
 for(const field of ['extension-dir','playwright-root','artifacts-dir']) assert(args[field],`Missing --${field}`);
 const downloadTimeout=Number(args['download-timeout-ms']||15*60*1000);
 assert(Number.isFinite(downloadTimeout)&&downloadTimeout>=15000,'--download-timeout-ms must be at least 15000');
@@ -513,7 +514,7 @@ function popupSourceContract(){
         actions:[...element.querySelectorAll('.highlight-model-actions button')].map(button=>({text:button.textContent.trim(),disabled:button.disabled,download:button.hasAttribute('data-information-highlight-download'),remove:button.hasAttribute('data-information-highlight-remove'),pause:button.hasAttribute('data-information-highlight-pause')})),
       }));
       assert.equal(snapshot.actions.length,1);assert.equal(snapshot.actions[0].text,expectedAction);
-      assert.equal(snapshot.description,'下载 Qwen，在本机离线计算词语意外度，需要支持 shader-f16 的WebGPU环境。');
+      assert.equal(snapshot.description,modelDescription);
       const groupText=await control.locator('#information-highlight-settings').innerText();
       assert(!/模型文件已就绪|下载只获取模型文件|分析正文不离开此设备|已下载\s*[·•]\s*可离线使用|由\s*FluentRead\s*下载|FluentRead\s*下载\s*Qwen/u.test(groupText),'Removed model helpers and duplicate descriptions must be absent');
       return snapshot;
@@ -554,10 +555,20 @@ function popupSourceContract(){
       await step(`model-layout-size:${name}`,()=>control.setViewportSize({width,height:1000}));await patchConfig({theme});
       await step(`model-layout-scroll:${name}`,()=>modelCards().scrollIntoViewIfNeeded());
       const layout=await step(`model-layout:${name}`,()=>modelCards().evaluate(element=>({width:innerWidth,height:innerHeight,scrollWidth:document.documentElement.scrollWidth,scrollHeight:document.documentElement.scrollHeight,
-        cards:[...element.querySelectorAll('section[data-information-highlight-model-id]')].map(card=>({modelId:card.dataset.informationHighlightModelId,rect:card.getBoundingClientRect().toJSON(),actionsRect:card.querySelector('.highlight-model-actions').getBoundingClientRect().toJSON(),text:card.textContent.trim(),selected:card.querySelector('input[type="radio"]')?.checked})),
+        cards:[...element.querySelectorAll('section[data-information-highlight-model-id]')].map(card=>{
+          const style=getComputedStyle(card),actions=card.querySelector('.highlight-model-actions'),buttons=actions.querySelectorAll('button');
+          return {modelId:card.dataset.informationHighlightModelId,rect:card.getBoundingClientRect().toJSON(),actionsRect:actions.getBoundingClientRect().toJSON(),resourceButtonCount:buttons.length,buttonRect:buttons[0]?.getBoundingClientRect().toJSON(),
+            paddingRight:parseFloat(style.paddingRight)||0,borderRightWidth:parseFloat(style.borderRightWidth)||0,description:card.querySelector('.highlight-model-heading small')?.textContent.trim(),text:card.textContent.trim(),selected:card.querySelector('input[type="radio"]')?.checked};
+        }),
         background:getComputedStyle(element.querySelector('section')).backgroundColor,theme:document.documentElement.dataset.theme||document.documentElement.className})));
       assert.equal(layout.cards.length,2);assert(layout.scrollWidth<=width+1);assert(layout.scrollHeight<=layout.height+1);
       assert(layout.cards.every(card=>card.rect.width>0&&card.rect.x>=0&&card.rect.right<=width+1));
+      for(const card of layout.cards){
+        assert.equal(card.description,modelDescription);assert.equal(card.resourceButtonCount,1,'Every model card must have one resource action button');
+        const contentRight=card.rect.right-card.paddingRight-card.borderRightWidth;
+        assert(Math.abs(card.buttonRect.right-contentRight)<=1,'Resource action must align with the card’s inner right edge');
+        assert(Math.abs(card.buttonRect.bottom-card.actionsRect.bottom)<=1,'Resource action must align with the bottom of the action row');
+      }
       const [firstCard,secondCard]=layout.cards.map(card=>card.rect);
       if(width===1440){
         assert(Math.abs(firstCard.top-secondCard.top)<=1,'Wide model cards must share the same row');
@@ -733,7 +744,8 @@ function popupSourceContract(){
       let status;for(let attempt=0;attempt<5;attempt++){status=await readModelStatus();if(status.status.downloaded)break;await delay(500);}
       report.model.status=status;assert(status.success&&status.status.downloaded);
       report.cases.push({id:'prepared-artifacts-change-single-download-to-delete',modelId,artifactAcquisition:report.model.artifactImport||report.model.artifactAcquisition,card:await inspectModelCard(model,'删除模型')});
-      await shot(cardFor(modelId),'model-card-downloaded');await layoutModelCards('downloaded');
+      await shot(cardFor(modelId),'model-card-downloaded');await layoutModelCards('downloaded');await layoutModelCards('downloaded-390',{width:390});
+      await step('restore-ready-model-layout',()=>control.setViewportSize({width:1440,height:1000}));
       if(modelManifest.length){await step('prepared-model-card-scroll',()=>cardFor(modelId).scrollIntoViewIfNeeded());await shot(control,'settings-model-downloaded');}
       assert.equal((await readModelStatus(otherModel.id)).status.downloaded,false,'The other model must not report this model files as ready');
       if(status.status.supported){

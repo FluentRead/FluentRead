@@ -1,0 +1,4 @@
+> FluentRead-流畅阅读@0.0.37 compile /Users/thinkstu/Desktop/copy/FluentRead-time-changing-text-20261010
+> node scripts/testing/run-resource-safe.mjs -- vue-tsc --noEmit
+
+[resource-safe] CPU target 60%, maxWorkers 2, concurrency 5, command: vue-tsc --noEmit

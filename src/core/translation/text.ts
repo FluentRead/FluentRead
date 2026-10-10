@@ -1,7 +1,7 @@
 /**
  * @file src/core/translation/text.ts
  *
- * 文件职责：提取和校验候选中的可读文本，拒绝标识符、独立时间与数值、空白、扩展译文及脚本、表单或敏感区域的节点。
+ * 文件职责：提取和校验候选中的可读文本，拒绝标识符、独立时间与数值（含拆分行内节点的展示）、空白、扩展译文及脚本、表单或敏感区域的节点。
  * 主要内容：提供文本规范化、仅确认至少两个 Unicode 字母的 meaningful 判定与共享的 identifier 模式判定、元素与文本节点保护检查、嵌套 tooltip 来源隔离、WeakMap 状态缓存和受预算约束的深度扫描，避免在大型 DOM 上无限遍历。 可核对的公开符号包括 normalizeTranslationText、isIdentifierLikeText、isMeaningfulTranslationText、setMinimumTranslationTextLength、isTranslationTextNodeProtected、TranslationTextProtectionCache、createTranslationTextProtectionCache、isTranslationTextElementProtected、hasMeaningfulTranslationTextInNodes。
  * 模块边界：本文件属于可独立测试的 core 候选领域；可以读取传入 DOM 以计算结果，但不访问配置存储、不调用 provider、不注册页面监听器，也不负责译文渲染或 feature 生命周期；文本语言与同目标跳过统一由 src/core/language 判断。
  */
@@ -10,6 +10,7 @@ import {
     getTranslatableControlValueAttribute,
     isTextInNestedTranslationTooltip,
     getComposedParent,
+    getElementTagName,
     isProtectedDescendantElement,
     maxComposedAncestorDepth,
 } from './dom';
@@ -151,9 +152,40 @@ interface TranslationTextProtectionState {
 }
 
 export type TranslationTextProtectionCache = WeakMap<Element, TranslationTextProtectionState>;
+// 原始 DOM 保护与祖先继承分开缓存；展示扫描提前读取的子元素不会重复强制布局。
+const rawProtectionCaches = new WeakMap<TranslationTextProtectionCache, WeakMap<Element, boolean>>();
 
 export function createTranslationTextProtectionCache(): TranslationTextProtectionCache {
     return new WeakMap<Element, TranslationTextProtectionState>();
+}
+
+const liveDataInlineTags = new Set(['a', 'abbr', 'b', 'bdi', 'bdo', 'br', 'cite', 'del', 'em', 'i', 'ins',
+    'label', 'mark', 'q', 's', 'small', 'span', 'strong', 'sub', 'sup', 'u', 'wbr']);
+
+/** 有界读取同行内展示值；跳过禁译后代，不跨段落把数值和普通单位拼成时长。 */
+function isLiveDataDisplay(element: Element, isProtected: (element: Element) => boolean): boolean {
+    const stack: Node[] = [element];
+    let text = '';
+    let visited = 0;
+    while (stack.length) {
+        const node = stack.pop()!;
+        visited += 1;
+        if (node.nodeType === 3) {
+            const value = node.nodeValue ?? '';
+            if (text.length + value.length > 128) return false;
+            text += value;
+        } else {
+            if (node !== element && node.nodeType === 1) {
+                const descendant = node as Element;
+                if (isProtected(descendant)) continue;
+                if (!liveDataInlineTags.has(getElementTagName(descendant))) return false;
+            }
+            const children = node.childNodes;
+            if (visited + stack.length + children.length > 32) return false;
+            for (let index = children.length - 1; index >= 0; index -= 1) stack.push(children[index]!);
+        }
+    }
+    return isNonTranslatableLiveData(text);
 }
 
 /**
@@ -170,6 +202,16 @@ export function isTranslationTextElementProtected(
 ): boolean {
     const cached = protectionCache.get(element);
     if (cached) return cached.protected;
+
+    const rawCache = rawProtectionCaches.get(protectionCache) ?? new WeakMap<Element, boolean>();
+    rawProtectionCaches.set(protectionCache, rawCache);
+    const isProtected = (item: Element): boolean => {
+        const cached = rawCache.get(item);
+        if (cached !== undefined) return cached;
+        const protectedSelf = isProtectedDescendantElement(item, item === ignoredExtensionElement, protectionOptions);
+        rawCache.set(item, protectedSelf);
+        return protectedSelf;
+    };
 
     const chain: Element[] = [];
     let current: Element | null = element;
@@ -193,7 +235,8 @@ export function isTranslationTextElementProtected(
         depth += 1;
         protectedByAncestor = protectedByAncestor ||
             depth > maxComposedAncestorDepth ||
-            isProtectedDescendantElement(item, item === ignoredExtensionElement, protectionOptions) ||
+            isProtected(item) ||
+            isLiveDataDisplay(item, isProtected) ||
             shouldStayOriginal?.(item) === true;
         protectionCache.set(item, {depth, protected: protectedByAncestor});
     }

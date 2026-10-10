@@ -14,6 +14,7 @@ import {
     getTranslationServiceUnavailableMessage,
     isTranslationServiceAvailable,
     supportsTranslationBatch,
+    supportsNativeTranslationBatch,
 } from '@/src/services/translation/capabilities';
 
 describe('browser capability contract', () => {
@@ -191,8 +192,22 @@ describe('translation service capability contract', () => {
         expect(supportsTranslationBatch(services.freeTranslation)).toBe(true);
         expect(supportsTranslationBatch(services.openai)).toBe(true);
         expect(supportsTranslationBatch(services.google)).toBe(true);
+        expect(supportsTranslationBatch(services.deepL)).toBe(true);
+        expect(supportsTranslationBatch(services.azureTranslator)).toBe(true);
+        expect(supportsTranslationBatch(services.googleCloudTranslation)).toBe(true);
         expect(supportsTranslationBatch(services.deeplx)).toBe(false);
         expect(supportsTranslationBatch(services.chromeTranslator)).toBe(false);
         expect(supportsTranslationBatch(services.tongyi)).toBe(false);
+    });
+
+    it('自动合批只用于真正的原生多文本接口，与逐条数组和 AI 协议区分', () => {
+        for (const service of [services.google, services.microsoft, services.deepL,
+            services.azureTranslator, services.googleCloudTranslation]) {
+            expect(supportsNativeTranslationBatch(service)).toBe(true);
+        }
+        for (const service of [services.freeTranslation, services.bilibili, services.openai,
+            services.deeplx, services.chromeTranslator, services.tongyi, 'unknown']) {
+            expect(supportsNativeTranslationBatch(service)).toBe(false);
+        }
     });
 });

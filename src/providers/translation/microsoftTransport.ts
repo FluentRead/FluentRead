@@ -5,8 +5,9 @@
  * 模块边界：只接收注入的 HTTP 端口，不读取扩展配置或持久化状态。
  */
 import {normalizeChineseLanguageCode} from '@/src/core/language/chinese';
-import {createHttpStatusError, readJsonResponse} from '@/src/platform/http/errors';
+import {createHttpStatusError} from '@/src/platform/http/errors';
 import {abortErrorFromSignal, type RuntimeFetch} from '@/src/platform/http/runtime';
+import {readNativeBatchJson, translateNativeTextBatch} from './native-batch';
 
 const MICROSOFT_TRANSLATE_URL = 'https://edge.microsoft.com/translate/translatetext';
 
@@ -47,25 +48,23 @@ export async function translateMicrosoftTextsWithTransport(
     url.searchParams.set('to', toLang === 'sr' ? 'sr-Cyrl' : toLang);
     url.searchParams.set('isEnterpriseClient', 'false');
 
-    const response = await transport(url, {
-        method: 'POST',
-        headers: {'Content-Type': 'application/json'},
-        // 端点始终运行 HTML 标签对齐器，必须先转义纯文本中的标记字符。
-        body: JSON.stringify(texts.map(escapeHtmlText)),
-        signal: abortSignal,
-    });
+    return await translateNativeTextBatch(texts, async sources => {
+        const response = await transport(url, {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            // 端点始终运行 HTML 标签对齐器，必须先转义纯文本中的标记字符。
+            body: JSON.stringify(sources.map(escapeHtmlText)),
+            signal: abortSignal,
+        });
 
-    if (!response.ok) throw createHttpStatusError(response, '翻译失败');
-    const result = await readJsonResponse<MicrosoftTranslation[]>(response, '微软翻译返回的不是有效 JSON');
-    if (abortSignal?.aborted) throw abortErrorFromSignal(abortSignal);
-    if (!Array.isArray(result) || result.length !== texts.length) {
-        throw new Error(`微软翻译返回数量异常: 期望 ${texts.length} 条，实际 ${Array.isArray(result) ? result.length : 0} 条`);
-    }
-    return result.map((item, index) => {
-        const translatedText = item?.translations?.[0]?.text;
-        if (typeof translatedText !== 'string') {
-            throw new Error(`微软翻译第 ${index + 1} 条结果缺少译文`);
-        }
-        return decodeHtmlText(translatedText);
-    });
+        if (!response.ok) throw createHttpStatusError(response, '翻译失败');
+        const result = await readNativeBatchJson<MicrosoftTranslation[]>(response, '微软翻译返回的不是有效 JSON', abortSignal);
+        if (abortSignal?.aborted) throw abortErrorFromSignal(abortSignal);
+        if (!Array.isArray(result)) return result;
+        return result.map(item => {
+            const translatedText = Array.isArray(item?.translations) && item.translations.length === 1
+                ? item.translations[0]?.text : undefined;
+            return typeof translatedText === 'string' ? decodeHtmlText(translatedText) : translatedText;
+        });
+    }, abortSignal, '微软翻译返回的批量结果不完整') as string[];
 }

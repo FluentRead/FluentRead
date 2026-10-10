@@ -43,6 +43,7 @@ const EXPECTED_PROVIDER_FILES = [
     'local-translation.ts',
     'microsoft.ts',
     'microsoftTransport.ts',
+    'native-batch.ts',
     'responses-api.ts',
     'tencent.ts',
     'tongyi.ts',

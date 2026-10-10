@@ -467,13 +467,15 @@ describe('PDF reader information highlight composition', () => {
             Object.assign(event, {key: 'h', code: 'KeyH', altKey: true, ctrlKey: false, shiftKey: false, metaKey: false, repeat: false, ...init});
             Object.defineProperty(event, 'isTrusted', {value: trusted}); document.dispatchEvent(event); return event;
         };
+        expect(press().defaultPrevented).toBe(false); await componentFlush(); expect(reader.state.informationState.enabled).toBe(false); expect(score).not.toHaveBeenCalled();
+        reader.currentInformation.value = {...reader.currentInformation.value!, preferences: {...DEFAULT_INFORMATION_HIGHLIGHT_PREFERENCES, hotkeyEnabled: true}}; await componentFlush();
         expect(press().defaultPrevented).toBe(true); await componentFlush(); expect(reader.state.informationState.enabled).toBe(true);
         for (const ignored of [press({}, false), press({repeat: true}), press({key: 'j', code: 'KeyJ'})]) expect(ignored.defaultPrevented).toBe(false);
         expect(reader.state.informationState.enabled).toBe(true);
         press(); await componentFlush(); expect(reader.state.informationState.enabled).toBe(false);
         reader.currentInformation.value = {...reader.currentInformation.value!, preferences: {...DEFAULT_INFORMATION_HIGHLIGHT_PREFERENCES, hotkeyEnabled: false}}; await componentFlush();
         expect(press().defaultPrevented).toBe(false); expect(reader.state.informationState.enabled).toBe(false);
-        reader.currentInformation.value = {...reader.currentInformation.value!, preferences: {...DEFAULT_INFORMATION_HIGHLIGHT_PREFERENCES}, available: false}; await componentFlush();
+        reader.currentInformation.value = {...reader.currentInformation.value!, preferences: {...DEFAULT_INFORMATION_HIGHLIGHT_PREFERENCES, hotkeyEnabled: true}, available: false}; await componentFlush();
         expect(press().defaultPrevented).toBe(false);
         mountedApp.unmount(); mountedApp = undefined; await componentFlush(); expect(press().defaultPrevented).toBe(false);
     });

@@ -151,6 +151,21 @@ const faqs = [
       <span class="bv-section-number">{{ t('56 秒介绍', 'A 56-SECOND TOUR') }}</span>
       <h2 id="bv-promo-title">{{ t('先看一遍，再往下读', 'Watch first, then read on') }}</h2>
       <PromoVideo :en="en" />
+      <p class="bv-promo-more">
+        {{ t('想了解更多，可以', 'For more details,') }}
+        <a
+          class="bv-text-link"
+          href="https://www.bilibili.com/video/BV1qhHJ6uEiF/"
+          target="_blank"
+          rel="noopener noreferrer"
+          >{{
+            t(
+              '观看完整官方介绍片（4 分多钟 · B 站）',
+              'watch the full official introduction (4+ minutes, in Chinese on Bilibili)'
+            )
+          }} <span aria-hidden="true">↗</span></a
+        >
+      </p>
     </section>
     <section
       v-for="feature in features"

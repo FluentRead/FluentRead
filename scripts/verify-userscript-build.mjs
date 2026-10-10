@@ -28,10 +28,7 @@ const artifactBytes = Buffer.byteLength(source);
 // 20 个译文样式预设（规则、注册表与中文名称）增加 8,193 字节（0.4127%）：
 // 同依赖独立基线 fe7005dd9 为 1,985,255，候选为 1,993,448；预算增加 8 KB。
 // 实测与截图见 docs/reports/translation-style-presets-20261010/。
-// 悬浮手势生命周期、单次同步候选复用和保真词库摘要在 fe7005dd9 上实测增加 3,029 字节（0.1526%）：
-// 同依赖独立基线为 1,985,411，候选为 1,988,440；保留最新 main 的样式预算后再最小增加 3 KB。
-// 最新 main 的独立构建对比及定向验证见 docs/reports/hover-translation-polish-20261011/verification.json。
-const MAX_USERSCRIPT_BYTES = 1_997_000;
+const MAX_USERSCRIPT_BYTES = 1_994_000;
 const preludeStartMarker = '/* FluentRead userscript compatibility prelude:start */';
 const preludeEndMarker = '/* FluentRead userscript compatibility prelude:end */';
 const preludeStart = source.indexOf(preludeStartMarker);

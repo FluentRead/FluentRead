@@ -267,7 +267,7 @@ export const jaJPMessages = {
     "video.back": "表示方法に戻る",
     "video.closeMenu": "字幕メニューを閉じる",
     "video.sourceOff": "字幕はオフです",
-    "video.source.native": "動画の字幕 · {count} 件",
+    "video.source.native": "読み込み済み字幕 · {count} 件",
     "video.source.cache": "保存済み字幕 · {count} 件",
     "video.source.ai": "AI 字幕 · {count} 件",
     "video.sourcePreparing": "字幕を生成中",

@@ -267,7 +267,7 @@ export const ruRUMessages = {
     "video.back": "Назад к отображению",
     "video.closeMenu": "Закрыть меню субтитров",
     "video.sourceOff": "Субтитры выключены",
-    "video.source.native": "Субтитры видео · {count} реплик",
+    "video.source.native": "Загруженные субтитры · {count} реплик",
     "video.source.cache": "Сохранённые субтитры · {count} реплик",
     "video.source.ai": "Субтитры ИИ · {count} реплик",
     "video.sourcePreparing": "Создание субтитров",

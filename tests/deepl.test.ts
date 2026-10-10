@@ -6,6 +6,7 @@ const {mockConfig} = vi.hoisted(() => ({
         to: 'zh-Hans',
         service: 'deepL',
         deeplApiPlan: undefined as 'free' | 'pro' | undefined,
+        nativeBatchTranslationEnabled: {} as Record<string, boolean>,
         proxy: {} as Record<string, string>,
         token: {} as Record<string, string>,
     },
@@ -33,7 +34,7 @@ beforeEach(() => {
     fetchMock.mockResolvedValue(new Response(JSON.stringify({translations: [{text: '你好'}]})));
     Object.assign(mockConfig, {
         service: 'deepL', from: 'auto', to: 'zh-Hans', deeplApiPlan: undefined,
-        proxy: {}, token: {deepL: 'test-key'},
+        proxy: {}, token: {deepL: 'test-key'}, nativeBatchTranslationEnabled: {},
     });
     vi.stubGlobal('fetch', fetchMock);
 });
@@ -163,6 +164,17 @@ describe('DeepL 扩展语言协议', () => {
 });
 
 describe('DeepL 原生数组的源槽对应', () => {
+    it('关闭合批后数组逐条 HTTP；冻结 true 覆盖仍使用原生数组', async () => {
+        mockConfig.nativeBatchTranslationEnabled.deepL = false;
+        fetchMock.mockImplementation(async (_url, init) => Response.json({translations:
+            JSON.parse(String(init?.body)).text.map((source: string) => ({text: `译:${source}`}))}));
+        await expect(deepl({origin: ['first', '', 'second']})).resolves.toEqual(['译:first', '', '译:second']);
+        expect(fetchMock.mock.calls.map(([, init]) => JSON.parse(String(init?.body)).text)).toEqual([['first'], ['second']]);
+        fetchMock.mockClear();
+        await expect(deepl({origin: ['first', 'second'], enableNativeBatch: true})).resolves.toEqual(['译:first', '译:second']);
+        expect(fetchMock).toHaveBeenCalledOnce();
+    });
+
     it('一次 HTTP 保留重复槽、字面 HTML、换行及本地空白，不拼结构标记', async () => {
         const origins = ['<b>Hello & &lt;</b>\nNext', 'same', '', ' \r\n', 'same'];
         fetchMock.mockResolvedValue(new Response(JSON.stringify({translations: [

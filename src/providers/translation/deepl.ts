@@ -7,6 +7,7 @@
  */
 
 import {normalizeChineseLanguageCode} from '@/src/core/language/chinese';
+import {isNativeTranslationBatchEnabled} from '@/src/core/config/nativeBatch';
 import {method} from "@/src/core/config/constants";
 import {getDeepLEndpoint} from '@/src/core/config/deepl';
 import {config} from "@/src/services/config/store";
@@ -42,6 +43,8 @@ async function deepl(message: TranslationProviderRequest<string | string[]>) {
     const url = getDeepLEndpoint(current.deeplApiPlan, current.proxy[service]);
     const authorization = 'DeepL-Auth-Key ' + current.token[service];
     const context = message.context;
+    const enableNativeBatch = message.enableNativeBatch
+        ?? isNativeTranslationBatchEnabled(service, current.nativeBatchTranslationEnabled);
 
     return translateNativeTextBatch(message.origin, async origins => {
         const resp = await runtimeFetch(url, {
@@ -63,7 +66,7 @@ async function deepl(message: TranslationProviderRequest<string | string[]>) {
         const result = await readNativeBatchJson<{translations?: Array<{text?: unknown}>} | null>(resp, 'DeepL 返回的不是有效 JSON', message.abortSignal);
         if (message.abortSignal?.aborted) throw abortErrorFromSignal(message.abortSignal);
         return Array.isArray(result?.translations) ? result.translations.map(item => item?.text) : undefined;
-    }, message.abortSignal, 'DeepL 返回数据格式异常：缺少译文');
+    }, message.abortSignal, 'DeepL 返回数据格式异常：缺少译文', enableNativeBatch);
 }
 
 export default deepl;

@@ -1367,6 +1367,8 @@ export const ruRUMessages = {
     'settings.services.connection': 'Настройки подключения',
     'settings.services.model': 'Модель',
     'settings.services.advanced': 'Расширенные настройки',
+    'settings.services.nativeBatch.label': 'Объединять запросы перевода',
+    'settings.services.nativeBatch.help': 'Объединяет несколько фрагментов текста в один запрос, сокращая число запросов. Отключите, чтобы переводить каждый фрагмент отдельно.',
     'settings.services.deepl.plan': 'Тариф DeepL API',
     'settings.services.deepl.free': 'API Free (бесплатный)',
     'settings.services.deepl.pro': 'API Pro (платный)',

@@ -1592,6 +1592,8 @@ export const zhCNMessages = {
     'settings.services.connection': '连接配置',
     'settings.services.model': '模型',
     'settings.services.advanced': '高级设置',
+    'settings.services.nativeBatch.label': '合并翻译请求',
+    'settings.services.nativeBatch.help': '将多段文本合并为一次请求，减少请求次数；关闭后逐段翻译。',
     'settings.services.deepl.plan': 'DeepL API 套餐',
     'settings.services.deepl.free': 'API Free（免费）',
     'settings.services.deepl.pro': 'API Pro（付费）',

@@ -96,6 +96,16 @@ describe('background translation fallback handler', () => {
         expect(parsed).toEqual({origin: 'hello'});
     });
 
+    it('原生合批只接受并透传显式布尔值，旧消息缺省仍由 broker 配置决定', () => {
+        expect(parseTranslationRequest({origin: ['a', 'b'], enableNativeBatch: false}))
+            .toEqual({origin: ['a', 'b'], enableNativeBatch: false});
+        expect(parseTranslationRequest({origin: 'a', enableNativeBatch: true}))
+            .toEqual({origin: 'a', enableNativeBatch: true});
+        for (const value of ['false', null, 0, {}]) {
+            expect(() => parseTranslationRequest({origin: 'a', enableNativeBatch: value})).toThrow('enableNativeBatch');
+        }
+    });
+
     it('保留字符串数组并忽略未提供的可选字段', () => {
         expect(parseTranslationRequest({origin: ['a', 'b']})).toEqual({origin: ['a', 'b']});
         expect(parseTranslationRequest({origin: '', context: undefined})).toEqual({origin: ''});

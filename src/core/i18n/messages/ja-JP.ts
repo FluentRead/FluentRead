@@ -1367,6 +1367,8 @@ export const jaJPMessages = {
     'settings.services.connection': '接続設定',
     'settings.services.model': 'モデル',
     'settings.services.advanced': '詳細設定',
+    'settings.services.nativeBatch.label': '翻訳リクエストをまとめる',
+    'settings.services.nativeBatch.help': '複数のテキストを1回のリクエストにまとめ、リクエスト数を減らします。オフにすると各テキストを個別に翻訳します。',
     'settings.services.deepl.plan': 'DeepL API プラン',
     'settings.services.deepl.free': 'API Free（無料）',
     'settings.services.deepl.pro': 'API Pro（有料）',

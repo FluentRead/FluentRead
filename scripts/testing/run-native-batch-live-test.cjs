@@ -1,7 +1,7 @@
 /**
  * @file scripts/testing/run-native-batch-live-test.cjs
  * 文件职责：在生产扩展和临时 Edge 中验证原生机器批量翻译的请求对应、结构恢复与完整缓存发布。
- * 主要内容：默认仅跑三家云服务的合成响应；--live 显式增加 Google/微软各一组小样本与逐条对照，--full-page 增加六段本地页面 Alt+T 翻译/恢复/再翻译。只记录已知测试文本、端点路径和数量，不读取用户凭据或 profile。
+ * 主要内容：默认仅跑三家云服务的合成响应；--settings 验证五项独立开关、快速关闭持久化与停用后的逐条请求，--live 显式增加 Google/微软小样本，--full-page 增加六段本地页面 Alt+T 翻译/恢复/再翻译。只记录已知测试文本、端点路径和开关，不读取用户凭据或 profile。
  * 模块边界：通过 options 页 runtime 消息调用真实 broker；仅本次 worker 的 fetch 接受合成云响应，焦点安全 helper 管理后台可见窗口，所有证据明确区分 synthetic 与 live。
  */
 'use strict';
@@ -19,7 +19,7 @@ function argument(name, fallback) {
 }
 
 if (process.argv.includes('--help')) {
-  console.log('Usage: node scripts/testing/run-native-batch-live-test.cjs --extension-dir PATH --playwright-root PATH --focus-safe-helper PATH --artifacts-dir PATH [--live] [--full-page] [--background]');
+  console.log('Usage: node scripts/testing/run-native-batch-live-test.cjs --extension-dir PATH --playwright-root PATH --focus-safe-helper PATH --artifacts-dir PATH [--settings] [--live] [--full-page] [--background]');
   process.exit(0);
 }
 for (const name of ['extension-dir', 'playwright-root', 'focus-safe-helper', 'artifacts-dir']) {
@@ -33,6 +33,7 @@ const helperPath = path.resolve(argument('focus-safe-helper'));
 const playwrightRoot = path.resolve(argument('playwright-root'));
 const live = process.argv.includes('--live');
 const fullPage = process.argv.includes('--full-page');
+const settings = process.argv.includes('--settings');
 const timeout = Number(argument('timeout', '45000'));
 const manifest = JSON.parse(fs.readFileSync(path.join(extensionDir, 'manifest.json'), 'utf8'));
 assert.ok(!extensionDir.endsWith('-dev') && !manifest.name.includes('DEV'), '仅接受 production 产物');
@@ -54,11 +55,143 @@ fs.mkdirSync(artifactsDir, {recursive: true});
 const report = {
   ok: false, scope: 'native arrays, scalar recovery, atomic cache and optional bounded live/DOM samples',
   extensionDir, profileMode: 'automatically-created-temporary-profile',
-  liveRequested: live, fullPageRequested: fullPage, cases: [], screenshots: [], pageErrors: [],
+  liveRequested: live, fullPageRequested: fullPage, settingsRequested: settings,
+  cases: [], screenshots: [], pageErrors: [], persistenceCases: [], storageEvents: [],
+  quickClose: false, latestWriteWins: false, crossPageSync: false,
   evidenceLimits: ['Synthetic cloud fixtures do not prove real cloud API acceptance.', 'Small live samples do not prove complete translation quality or all sites/devices.'],
 };
 let launched, optionsPage, articlePage, worker, profileDir, launchAttempted = false, server;
 let liveSample;
+const nativeServices = ['google', 'microsoft', 'deepL', 'azureTranslator', 'googleCloudTranslation'];
+
+async function runSettings(context, servicesUrl) {
+  const control = await newPageWithoutForeground(context, timeout);
+  await control.goto(servicesUrl, {waitUntil: 'domcontentloaded'});
+  const read = () => control.evaluate(async () => {
+    const response = await chrome.runtime.sendMessage({type: 'configStorageRead', key: 'local:config'});
+    if (!response?.success) throw new Error('Public configuration read failed');
+    const value = typeof response.value === 'string' ? JSON.parse(response.value) : response.value;
+    return {service: value.service, nativeBatchTranslationEnabled: value.nativeBatchTranslationEnabled, enableAIMultiSegment: value.enableAIMultiSegment};
+  });
+  const initial = await read();
+  assert.equal(initial.enableAIMultiSegment, false);
+  const open = async () => {
+    optionsPage = await newPageWithoutForeground(context, timeout);
+    optionsPage.on('pageerror', error => report.pageErrors.push(error.message));
+    await optionsPage.exposeBinding('__nativeSettingsSave', (_source, event) => report.storageEvents.push(event));
+    await optionsPage.addInitScript(() => {
+      const runtime = chrome.runtime;
+      const original = runtime.sendMessage.bind(runtime);
+      runtime.sendMessage = (...args) => {
+        const message = args.find(arg => arg && typeof arg === 'object' && arg.type);
+        const preferences = message?.type === 'persistConfig' ? message.config?.nativeBatchTranslationEnabled : undefined;
+        const record = event => {void globalThis.__nativeSettingsSave?.(event).catch(() => {});};
+        if (preferences) record({event: 'request', preferences});
+        const next = preferences ? args.map(arg => typeof arg === 'function' ? (...responses) => {
+          record({event: 'response', success: responses[0]?.success === true});
+          return arg(...responses);
+        } : arg) : args;
+        const result = original(...next);
+        if (preferences && result?.then) result.then(response => record({event: 'response', success: response?.success === true}), () => record({event: 'rejection'}));
+        return result;
+      };
+    });
+    await optionsPage.goto(servicesUrl, {waitUntil: 'domcontentloaded'});
+    await optionsPage.locator('.service-catalog').waitFor({timeout});
+  };
+  const close = async () => {
+    const id = await optionsPage.evaluate(async () => (await chrome.tabs.getCurrent()).id);
+    await activateExtensionTabWithoutForeground(context, control, timeout);
+    await control.evaluate(id => chrome.tabs.remove(id), id);
+  };
+  const select = async (service, page = optionsPage) => {
+    const target = page.locator(`.service-rail [data-service-value="${service}"]`);
+    const group = target.locator('xpath=ancestor::section[@data-service-section]').locator('.directory-section-toggle');
+    if (await group.count() && await group.getAttribute('aria-expanded') === 'false') await group.click();
+    await target.click();
+    await page.waitForFunction(service => document.querySelector('.service-catalog')?.dataset.editingService === service, service);
+  };
+  const toggle = service => optionsPage.locator(`[data-native-batch-service="${service}"]`).getByRole('switch', {name: '合并翻译请求', exact: true});
+  const clickToggle = service => optionsPage.locator(`[data-native-batch-service="${service}"] .el-switch__core`).click();
+  const saved = async (service, expected) => control.waitForFunction(async ({service, expected}) => {
+    const response = await chrome.runtime.sendMessage({type: 'configStorageRead', key: 'local:config'});
+    const value = typeof response.value === 'string' ? JSON.parse(response.value) : response.value;
+    return response.success && value?.nativeBatchTranslationEnabled?.[service] === expected;
+  }, {service, expected}, {timeout});
+  await close();
+  await open();
+  for (const service of nativeServices) {
+    await select(service);
+    assert.equal(await toggle(service).getAttribute('aria-checked'), 'true', `${service} should default on`);
+    await clickToggle(service);
+    await close(); // UI 反馈后立刻关闭，保存必须仍完成。
+    await saved(service, false);
+    await select(service, control);
+    await control.waitForFunction(service => document.querySelector(`[data-native-batch-service="${service}"] [role="switch"]`)?.getAttribute('aria-checked') === 'false', service, {timeout});
+    await open();
+    await select(service);
+    assert.equal(await toggle(service).getAttribute('aria-checked'), 'false', `${service} did not survive reopening`);
+    assert.equal((await read()).service, initial.service, 'Editing a switch changed the default provider');
+    report.persistenceCases.push({service, before: true, after: false, reopened: false, quickClose: true});
+    if (service === 'azureTranslator') {
+      await clickToggle(service);
+      await clickToggle(service);
+      await close();
+      await saved(service, false);
+      await open();
+      await select(service);
+      assert.equal(await toggle(service).getAttribute('aria-checked'), 'false');
+      report.latestWriteWins = true;
+      await shot(optionsPage, 'native-batch-azure-disabled-reopened');
+    }
+  }
+  assert.deepEqual((await read()).nativeBatchTranslationEnabled, Object.fromEntries(nativeServices.map(service => [service, false])));
+  for (const service of ['deeplx', 'bilibili', 'openai']) {
+    await select(service);
+    assert.equal(await optionsPage.locator('[data-native-batch-service]:visible').count(), 0);
+    if (service === 'bilibili') {
+      const badges = optionsPage.locator('[data-service-nature-badge="bilibili"]:visible');
+      assert.ok(await badges.count() > 0);
+      for (const text of await badges.allTextContents()) assert.equal(text.trim(), '免费');
+      await shot(optionsPage, 'bilibili-free-label');
+    }
+  }
+  for (const service of nativeServices) {
+    if (!live && ['google', 'microsoft'].includes(service)) continue;
+    await clearCache();
+    await fixtureMode(service);
+    const origins = service === 'microsoft' ? sourceTexts.filter((_, index) => index !== 4) : sourceTexts;
+    const translations = await translate(service, origins, true);
+    const requests = await calls();
+    assert.ok(requests.length >= new Set(origins).size);
+    assert.ok(requests.every(request => request.inputs.length === 1), `${service} off still sent an array`);
+    if (['google', 'microsoft'].includes(service)) {
+      verifyLiveCorrespondence(translations, true, origins);
+      await fixtureMode(service);
+      await Promise.all(origins.slice(0, 3).map(source => translate(service, source)));
+      assert.ok((await calls()).every(request => request.inputs.length === 1), `${service} concurrent scalars still grouped`);
+    } else {
+      assert.deepEqual(translations, expectedTexts);
+      await clearCache();
+      await fixtureMode(service, 'atomic-failure');
+      let failure;
+      try { await translate(service, sourceTexts.slice(0, 3), true); }
+      catch (error) { failure = error; }
+      assert.equal(failure?.code, 'NATIVE_BATCH_RESPONSE_INVALID', 'Disabled scalar failure should reject the complete result');
+      assert.equal((await cacheStats()).entries, 0, 'Disabled scalar failure wrote partial cache');
+      assert.ok((await calls()).every(request => request.inputs.length === 1));
+    }
+    report.cases.push({name: `${service}:disabled-sends-individual-http`, evidence: ['google', 'microsoft'].includes(service) ? 'live-provider' : 'synthetic-official-response', ok: true, requests});
+  }
+  assert.equal((await read()).enableAIMultiSegment, false);
+  report.quickClose = true;
+  report.crossPageSync = true;
+  assert.ok(report.storageEvents.some(event => event.event === 'request'));
+  assert.ok(report.storageEvents.some(event => event.event === 'response' && event.success));
+  await patchStoredConfig(optionsPage, {nativeBatchTranslationEnabled: Object.fromEntries(nativeServices.map(service => [service, true]))});
+  await control.close();
+  report.cases.push({name: 'native-settings-defaults-isolation-persistence-and-bilibili-label', evidence: 'real-extension-ui', ok: true});
+}
 
 async function send(message) {
   return optionsPage.evaluate(message => chrome.runtime.sendMessage(message), message);
@@ -217,14 +350,20 @@ async function runSynthetic(service) {
   report.cases.push({name: `${service}:later-scalar-failure-is-atomic`, evidence: 'synthetic-official-response', ok: true, failure, failedCalls, retryCalls});
 }
 
-async function runFullPage(context) {
+async function runFullPage(context, enableNativeBatch = true) {
+  if (articlePage) {
+    await activateExtensionTabWithoutForeground(context, optionsPage, timeout);
+    await articlePage.close();
+  }
   await patchStoredConfig(optionsPage, {service: 'azureTranslator', enableAIMultiSegment: false, enableAIContext: false,
+    nativeBatchTranslationEnabled: Object.fromEntries(nativeServices.map(service => [service, service === 'azureTranslator' ? enableNativeBatch : true])),
     autoTranslate: false, on: true, display: 1, useCache: false, fullPageTranslationMode: 'all',
     maxConcurrentTranslations: 10, pageTitleTranslationEnabled: false});
   await clearCache();
   await fixtureMode('azureTranslator');
   const escapeHtml = text => text.replace(/&/gu, '&amp;').replace(/</gu, '&lt;').replace(/>/gu, '&gt;');
   const html = `<!doctype html><html lang="en"><head><meta charset="utf-8"><title>原生批量翻译验证</title></head><body style="font:19px/1.5 system-ui;padding:24px;max-width:1100px"><main>${sourceTexts.map((source, index) => `<p id="native-slot-${index}" style="white-space:pre-wrap">${escapeHtml(source)}</p>`).join('')}</main></body></html>`;
+  if (server) await new Promise(resolve => server.close(resolve));
   server = http.createServer((_request, response) => { response.writeHead(200, {'content-type': 'text/html; charset=utf-8'}); response.end(html); });
   await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
   articlePage = await newPageWithoutForeground(context, timeout);
@@ -248,13 +387,13 @@ async function runFullPage(context) {
     } else assert.equal(await articlePage.locator('main').innerHTML(), before, '恢复没有还原源 DOM');
     assert.equal(articlePage.url(), url);
     toggles.push(expected);
-    await shot(articlePage, `native-full-page-${toggles.length}-${expected ? 'translated' : 'restored'}`);
+    await shot(articlePage, `native-full-page-${enableNativeBatch ? '' : 'disabled-'}${toggles.length}-${expected ? 'translated' : 'restored'}`);
   }
   const requests = await calls();
-  assert.ok(requests.some(call => call.inputs.length > 1), 'AI合批关闭时机器全文必须自动合批');
+  assert.ok(enableNativeBatch ? requests.some(call => call.inputs.length > 1) : requests.every(call => call.inputs.length === 1), '全文请求形态必须遵循服务合批开关');
   assert.ok(requests.every(call => call.inputs.every(text => !text.includes('___FLUENTREAD_'))), '全文机器原生数组不应上传结构占位符');
-  report.cases.push({name: 'six-paragraph-native-auto-with-ai-off', evidence: 'synthetic-official-response-and-real-content-shortcut',
-    ok: true, toggles, settings: {enableAIMultiSegment: false, useCache: false, fullPageTranslationMode: 'all', maxConcurrentTranslations: 10, display: 1}, requests});
+  report.cases.push({name: enableNativeBatch ? 'six-paragraph-native-auto-with-ai-off' : 'six-paragraph-native-disabled-individual-requests', evidence: 'synthetic-official-response-and-real-content-shortcut',
+    ok: true, toggles, settings: {enableAIMultiSegment: false, enableNativeBatch, useCache: false, fullPageTranslationMode: 'all', maxConcurrentTranslations: 10, display: 1}, requests});
 }
 
 (async () => {
@@ -331,7 +470,9 @@ async function runFullPage(context) {
       };
     }, {live, samples});
     for (const service of ['deepL', 'azureTranslator', 'googleCloudTranslation']) await runSynthetic(service);
+    if (settings) await runSettings(context, `${extensionOrigin}/${manifest.options_page || manifest.options_ui.page}#settings-services`);
     if (fullPage) await runFullPage(context);
+    if (settings && fullPage) await runFullPage(context, false);
     if (live) for (const service of ['google', 'microsoft']) {
       try { await runLive(service); }
       catch (error) {

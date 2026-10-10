@@ -1,7 +1,7 @@
 /**
  * @file tests/promptSyncLifecycle.test.ts
- * 文件职责：通过实际 ServiceConfiguration 模板按钮与确认端口验证提示词同步的操作归属。
- * 主要内容：覆盖来源编辑或删除、配置和服务切换、页签和活跃生命周期、目标列表重算、重复确认及旧按钮。
+ * 文件职责：通过实际 ServiceConfiguration 模板控件与确认端口验证服务设置的操作归属。
+ * 主要内容：覆盖原生合批开关的服务范围、默认状态、独立修改和失活事件；验证提示词同步的来源编辑或删除、配置和服务切换、页签和活跃生命周期、目标列表重算、重复确认及旧按钮。
  * 模块边界：编译真实客户端 SFC setup 与缓存模板并实际挂载，Element Plus 和浏览器为受控端口；不访问 setup 私有函数、不证明真实浏览器或存储。
  */
 import {createRequire} from 'node:module'
@@ -137,12 +137,83 @@ async function mount(raw = false) {
     ? runtime.h(component, {...props, 'onDelete:custom-provider': deleted}) : runtime.h({render: () => null}, {key: 'other'})})})
   app.component('el-button', {setup(_: unknown, {attrs, slots}: any) {return () => runtime.h('button', attrs, slots.default?.())}})
   app.component('el-input', {render: () => null})
+  app.component('el-switch', {inheritAttrs: false, props: ['modelValue'], setup(switchProps: {modelValue?: boolean}, {attrs}: any) {
+    return () => runtime.h('button', {...attrs, role: 'switch', 'aria-checked': switchProps.modelValue === true})
+  }})
   app.component('el-dialog', {props: ['modelValue', 'title'], emits: ['update:modelValue'], setup(dialogProps: {modelValue?: boolean; title?: string}, {slots}: any) {
     fixture.dialogs.push({instance: runtime.getCurrentInstance()})
     return () => dialogProps.modelValue ? runtime.h('div', {'data-confirmation-port': 'true', 'data-title': dialogProps.title}, [slots.default?.(), slots.footer?.()]) : null
   }})
   app.config.warnHandler = () => {};app.mount(document.getElementById('app')!);await settle()
 }
+
+describe('原生合批设置的实际模板与服务归属', () => {
+  async function select(service: string) {
+    props.service = service;props.customProvider = undefined
+    props.compute = runtime.reactive({showAI: false, showModel: false, showToken: false, showCustomOpenAI: false})
+    await settle()
+  }
+  function toggle() {
+    const element = document.querySelector('[data-native-batch-toggle]')
+    expect(element).not.toBeNull()
+    const handler = events.get(element!)?.['onUpdate:modelValue']
+    expect(handler).toBeTypeOf('function')
+    return {element: element!, update: handler as (enabled: boolean) => void}
+  }
+  it.each([services.google, services.microsoft, services.deepL, services.azureTranslator, services.googleCloudTranslation])('%s 默认开启，实际开关只修改当前服务偏好', async service => {
+    await mount();await select(service)
+    const defaultService = props.config.service, original = {...props.config.nativeBatchTranslationEnabled}
+    expect(document.querySelector('[data-native-batch-service]')?.getAttribute('data-native-batch-service')).toBe(service)
+    expect(toggle().element.getAttribute('aria-label')).toBe('settings.services.nativeBatch.label')
+    expect(toggle().element.getAttribute('aria-checked')).toBe('true')
+    toggle().update(false);await settle()
+    expect(props.config.nativeBatchTranslationEnabled).toEqual({...original, [service]: false})
+    expect(toggle().element.getAttribute('aria-checked')).toBe('false')
+    expect(props.config.service).toBe(defaultService);expect(props.config.enableAIMultiSegment).toBe(false)
+    toggle().update(true);await settle();expect(props.config.nativeBatchTranslationEnabled).toEqual(original)
+  })
+  it('切换配置服务后保留各自开关状态，其他服务不出现开关', async () => {
+    await mount();await select(services.google);toggle().update(false);await settle()
+    await select(services.microsoft);expect(toggle().element.getAttribute('aria-checked')).toBe('true')
+    await select(services.google);expect(toggle().element.getAttribute('aria-checked')).toBe('false')
+    for (const service of [services.bilibili, services.deeplx, services.freeTranslation, services.tencent, services.openai, sourceId]) {
+      await select(service)
+      expect(document.querySelector('[data-native-batch-service]'), service).toBeNull()
+      expect(document.querySelector('[data-native-batch-toggle]'), service).toBeNull()
+    }
+  })
+  it.each(['hidden', 'cached', 'unmount', 'config', 'service', 'tab'])('%s 后旧开关事件不修改原配置或当前配置', async reason => {
+    await mount();await select(services.google)
+    const old = toggle().update, original = props.config
+    if (reason === 'hidden') props.active = false
+    if (reason === 'cached') visible.value = false
+    if (reason === 'unmount') app!.unmount()
+    if (reason === 'config') props.config = runtime.reactive(configured())
+    if (reason === 'service') await select(services.microsoft)
+    if (reason === 'tab') fixture.tabs.at(-1).select('translation')
+    await settle();const before = snapshot(), originalBefore = JSON.stringify(original)
+    old(false);await settle()
+    expect(snapshot()).toBe(before);expect(JSON.stringify(original)).toBe(originalBefore)
+  })
+  it.each(['hidden', 'cached', 'config', 'service', 'tab'])('%s 往返后旧开关事件不能复活，当前开关仍可修改', async reason => {
+    await mount();await select(services.google)
+    const old = toggle().update, original = props.config
+    if (reason === 'hidden') props.active = false
+    if (reason === 'cached') visible.value = false
+    if (reason === 'config') props.config = runtime.reactive(configured())
+    if (reason === 'service') await select(services.microsoft)
+    if (reason === 'tab') fixture.tabs.at(-1).select('translation')
+    await settle()
+    if (reason === 'hidden') props.active = true
+    if (reason === 'cached') visible.value = true
+    if (reason === 'config') props.config = original
+    if (reason === 'service') await select(services.google)
+    if (reason === 'tab') fixture.tabs.at(-1).select('requests')
+    await settle();const before = snapshot()
+    old(false);await settle();expect(snapshot()).toBe(before)
+    toggle().update(false);await settle();expect(props.config.nativeBatchTranslationEnabled.google).toBe(false)
+  })
+})
 
 describe('提示词同步的实际按钮与确认归属', () => {
   it.each(['hidden', 'cached', 'unmount', 'config', 'service', 'tab', 'ai-off', 'system', 'user', 'provider', 'source-removed', 'source-replaced'])('%s 后旧确认不得写入原配置或当前配置', async reason => {

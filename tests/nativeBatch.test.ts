@@ -58,6 +58,18 @@ describe('原生机器批量响应契约', () => {
 });
 
 describe('原生机器分包的取消与完整发布', () => {
+    it('关闭合批后按源位置逐个调用，末槽损坏仍拒绝整个数组', async () => {
+        const translate = vi.fn(async (sources: readonly string[]) => sources.map(source => `译:${source}`));
+        await expect(translateNativeTextBatch(['first', '', 'second', 'first'], translate, undefined, undefined, false))
+            .resolves.toEqual(['译:first', '', '译:second', '译:first']);
+        expect(translate.mock.calls.map(([sources]) => sources)).toEqual([['first'], ['second'], ['first']]);
+        translate.mockClear();
+        translate.mockResolvedValueOnce(['正常译文']).mockResolvedValueOnce(['']);
+        await expect(translateNativeTextBatch(['first', 'second', 'third'], translate, undefined, undefined, false))
+            .rejects.toMatchObject({code: 'NATIVE_BATCH_RESPONSE_INVALID'});
+        expect(translate).toHaveBeenCalledTimes(2);
+    });
+
     it('保留重复 ordinal 槽、本地空白与单条/数组结果形状', async () => {
         const translate = vi.fn(async (sources: readonly string[]) => sources.map((text, index) => `${index}:${text}`));
         await expect(translateNativeTextBatch(['same', '', ' \r\n', 'same', '\u200b'], translate))

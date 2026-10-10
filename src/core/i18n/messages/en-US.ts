@@ -1595,6 +1595,8 @@ export const enUSMessages = {
     'settings.services.connection': 'Connection settings',
     'settings.services.model': 'Model',
     'settings.services.advanced': 'Advanced settings',
+    'settings.services.nativeBatch.label': 'Combine translation requests',
+    'settings.services.nativeBatch.help': 'Combine multiple text segments into one request to reduce requests. Turn off to translate each segment separately.',
     'settings.services.deepl.plan': 'DeepL API plan',
     'settings.services.deepl.free': 'API Free (free)',
     'settings.services.deepl.pro': 'API Pro (paid)',

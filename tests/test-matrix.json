@@ -193,6 +193,7 @@
       "tests/translationBroker.test.ts",
       "tests/microsoftTransport.test.ts",
       "tests/nativeBatch.test.ts",
+      "tests/nativeBatchConfig.test.ts",
       "tests/translationConfigCheck.test.ts",
       "tests/translationFont.test.ts",
       "tests/translationCore.test.ts",

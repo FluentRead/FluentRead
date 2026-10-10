@@ -1,7 +1,7 @@
 /**
  * @file src/features/full-page-translation/content/translationRequest.ts
  * 文件职责：为单次全文翻译会话冻结请求配置，并执行文本槽的批量、原生数组和显式 AI 跨候选合并、分包、回退与会话级结果复用。
- * 主要内容：冻结调用时的长段落换行与译文位置，操作身份区分展示设置而 provider 结果键仍只包含请求维度；在调用入口复制原文与服务/模型/语言/术语/排除列表快照，先过滤排除语言的文本槽再合批，在本地保留尚未排版的三美元公式源码，构造显式 client 参数，按服务选择批译策略；标记内部单条槽协议，由 broker 按冻结术语和同一截止时间逐槽校验；为本地模型只构造一次整段语言样本，为 Chrome auto 逐槽翻译保留无哨兵整段检测样本，自动原生数组合批在完整结构校验后才分发，AI 只合并同父直接相邻候选并在协议失败后停用同快照合批，严格隔离取消归属并维护有界会话缓存。
+ * 主要内容：冻结调用时的长段落换行与译文位置，操作身份区分展示设置而 provider 结果键仍只包含请求维度；在调用入口复制原文与服务/模型/语言/术语/排除列表快照，先过滤排除语言的文本槽再合批，在本地保留尚未排版的三美元公式源码，构造显式 client 参数，按服务选择批译策略；标记内部单条槽协议，由 broker 按冻结术语和同一截止时间逐槽校验；为本地模型只构造一次整段语言样本，为 Chrome auto 逐槽翻译保留无哨兵整段检测样本，按冻结服务偏好自动原生数组合批，关闭后保留逐项请求，完整结构校验后才分发，AI 只合并同父直接相邻候选并在协议失败后停用同快照合批，严格隔离取消归属并维护有界会话缓存。
  * 模块边界：本文件不发现候选、不持有 DOM 翻译状态也不渲染译文；runtime 提供会话缓存和取消作用域，client 负责后台协议与队列执行。
  */
 import {resolveConfiguredModel, services, servicesType} from '@/src/core/config/catalog';
@@ -13,6 +13,7 @@ import {
 import {config} from '@/src/services/config/store';
 import {normalizeMaxConcurrentTranslations} from '@/src/core/config/scheduling';
 import {normalizeExcludedLanguages} from '@/src/core/config/pageTranslation';
+import {isNativeTranslationBatchEnabled} from '@/src/core/config/nativeBatch';
 import {shouldSkipTranslationForTarget} from '@/src/core/language/detect';
 import {isModelThinkingEnabled} from '@/src/core/config/modelThinking';
 import {buildGlossaryRevision} from '@/src/core/glossary';
@@ -41,7 +42,7 @@ export function getTranslationInvocationIdentity(snapshot: FullPageTranslationCo
         snapshot.profileId ?? '', snapshot.service, snapshot.model, snapshot.thinking,
         snapshot.sourceLanguage, snapshot.targetLanguage, snapshot.displayMode, snapshot.style,
         snapshot.longParagraphLineBreak ?? false, snapshot.translationBeforeOriginal ?? false,
-        snapshot.enableAIContext, snapshot.enableAIMultiSegment,
+        snapshot.enableAIContext, snapshot.enableAIMultiSegment, snapshot.enableNativeBatch !== false,
         snapshot.glossaryRevision, snapshot.glossaryIds,
         snapshot.excludedLanguages,
     ]);
@@ -144,6 +145,7 @@ export function captureFullPageTranslationConfig(
         useCache: config.useCache,
         enableAIContext: config.enableAIContext,
         enableAIMultiSegment: config.enableAIMultiSegment,
+        enableNativeBatch: isNativeTranslationBatchEnabled(service, config.nativeBatchTranslationEnabled),
         displayMode: overrides.displayMode
             ?? (config.display === styles.bilingualTranslation ? 'bilingual' : 'single'),
         style: config.style,
@@ -168,6 +170,7 @@ export function createSnapshotTranslateOptions(
         sourceLanguage: snapshot.sourceLanguage,
         targetLanguage: snapshot.targetLanguage,
         enableAIContext: snapshot.enableAIContext,
+        enableNativeBatch: snapshot.enableNativeBatch !== false,
         // 非会话 batch 需要显式禁用 broker 缓存；其余调用继续使用冻结的会话值。
         useCache: options.useCache ?? snapshot.useCache,
     };
@@ -284,6 +287,7 @@ function createCacheKey(origin: string, snapshot: FullPageTranslationConfigSnaps
         to: snapshot.targetLanguage,
         excludedLanguages: snapshot.excludedLanguages,
         enableAIContext: snapshot.enableAIContext,
+        enableNativeBatch: snapshot.enableNativeBatch !== false,
         origin,
     });
 }
@@ -306,6 +310,7 @@ function createRequestCacheKey(
         useCache: snapshot.useCache,
         enableAIContext: snapshot.enableAIContext,
         enableAIMultiSegment: snapshot.enableAIMultiSegment,
+        enableNativeBatch: snapshot.enableNativeBatch !== false,
         context: document.title,
         pageUrl: document.location?.href ?? document.URL ?? '',
         pageContextGeneration,
@@ -516,6 +521,7 @@ function createTranslationBatchSnapshotKey(snapshot: FullPageTranslationConfigSn
         excludedLanguages: snapshot.excludedLanguages,
         useCache: snapshot.useCache,
         enableAIContext: snapshot.enableAIContext,
+        enableNativeBatch: snapshot.enableNativeBatch !== false,
     });
 }
 
@@ -889,6 +895,7 @@ export async function translateTextSlots(
         ? origins
         : translatedIndexes.map((index) => origins[index] ?? '');
     const isAICrossCandidateRequest = snapshot.enableAIMultiSegment
+        && !supportsNativeTranslationBatch(snapshot.service)
         && servicesType.isUseAIContext(snapshot.service, snapshot.model)
         && fullPageSession?.active && fullPageSession.allowAIMultiSegment !== false;
     const execute = (
@@ -896,6 +903,7 @@ export async function translateTextSlots(
         executionQueueSession: TranslationQueueSession | undefined,
     ) => {
         const canCombineNativeParagraphs = supportsNativeTranslationBatch(snapshot.service)
+            && snapshot.enableNativeBatch !== false
             && fullPageSession?.active && fullPageSession.allowNativeBatch !== false;
         const canCombineAIParagraphs = isAICrossCandidateRequest;
         const request = (canCombineNativeParagraphs || canCombineAIParagraphs)

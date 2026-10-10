@@ -2,11 +2,12 @@
  * @file src/services/translation/capabilities.ts
  *
  * 文件职责：把浏览器能力映射为翻译服务可用性，防止不支持的平台展示或调用 Chrome 内置翻译。
- * 主要内容：声明不可用提示，分别判断 provider 的等长数组契约和真正的原生多文本 HTTP 协议；只有原生接口才自动合并网页候选，逐项执行的数组适配器仍可用于文档等显式批次。根据 BrowserCapabilities 过滤不可用服务，不把 AI 多段开关当成机器翻译能力。
+ * 主要内容：声明不可用提示，分别判断 provider 的等长数组契约和真正的原生多文本 HTTP 协议，原生服务名单复用纯配置领域规则；只有原生接口才允许自动合并网页候选，逐项执行的数组适配器仍可用于文档等显式批次。根据 BrowserCapabilities 过滤不可用服务，不把用户合批偏好或 AI 多段开关当成机器翻译能力。
  * 模块边界：本文件位于翻译 application service 层，负责用例编排和端口契约；不挂载页面 UI，且不应把某家供应商的网络细节扩散到 feature，具体 HTTP 协议由 providers/platform 实现。
  */
 
 import {services, servicesType} from '@/src/core/config/catalog';
+import {isNativeBatchTranslationService} from '@/src/core/config/nativeBatch';
 import {
     browserCapabilities,
     type BrowserCapabilities,
@@ -17,14 +18,6 @@ export const CHROME_TRANSLATOR_UNAVAILABLE_MESSAGE =
 export const LOCAL_TRANSLATION_UNAVAILABLE_MESSAGE =
     '当前浏览器不支持扩展本地模型翻译；原配置会保留，请切换到其他翻译服务。';
 
-const NATIVE_BATCH_TRANSLATION_SERVICES = new Set<string>([
-    services.microsoft,
-    services.google,
-    services.deepL,
-    services.azureTranslator,
-    services.googleCloudTranslation,
-]);
-
 const ARRAY_TRANSLATION_SERVICES = new Set<string>([
     services.freeTranslation,
     services.bilibili,
@@ -32,7 +25,7 @@ const ARRAY_TRANSLATION_SERVICES = new Set<string>([
 
 /** 已实现供应商原生多文本请求与完整响应校验，允许自动合批；与 AI 多段开关无关。 */
 export function supportsNativeTranslationBatch(service: string): boolean {
-    return NATIVE_BATCH_TRANSLATION_SERVICES.has(service);
+    return isNativeBatchTranslationService(service);
 }
 
 /**

@@ -61,6 +61,17 @@ function configSource(overrides: Partial<TranslationConfigSource> = {}): Transla
 }
 
 describe('translation provider request config snapshot', () => {
+    it('原生合批偏好在 provider 配置快照中默认开启并隔离后续编辑', () => {
+        const preferences = {google: false, microsoft: true};
+        const snapshot = createTranslationProviderConfigSnapshot(configSource({nativeBatchTranslationEnabled: preferences}));
+        preferences.google = true;
+        preferences.microsoft = false;
+        expect(snapshot.nativeBatchTranslationEnabled).toMatchObject({google: false, microsoft: true, deepL: true});
+        expect(Object.isFrozen(snapshot.nativeBatchTranslationEnabled)).toBe(true);
+        expect(createTranslationProviderConfigSnapshot(configSource()).nativeBatchTranslationEnabled)
+            .toMatchObject({google: true, microsoft: true, deepL: true, azureTranslator: true, googleCloudTranslation: true});
+    });
+
     it('占位符约束按当前单条或批量片段筛选，不外发其他片段的标记', () => {
         const snapshot = {...createTranslationProviderConfigSnapshot(configSource()),
             glossaryProtectedTokens: ['__FRTERM_first__', '__FRTERM_second__']};

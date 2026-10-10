@@ -59,6 +59,7 @@ export async function translateMicrosoftTextsWithTransport(
     fromLang: string,
     toLang: string,
     abortSignal?: AbortSignal,
+    enableNativeBatch = true,
 ): Promise<string[]> {
     if (texts.length === 0) return [];
     if (abortSignal?.aborted) throw abortErrorFromSignal(abortSignal);
@@ -91,5 +92,5 @@ export async function translateMicrosoftTextsWithTransport(
             requireLiteralEntities(sources[index]!, decoded);
             return decoded;
         });
-    }, abortSignal, '微软翻译返回的批量结果不完整') as string[];
+    }, abortSignal, '微软翻译返回的批量结果不完整', enableNativeBatch) as string[];
 }

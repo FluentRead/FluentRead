@@ -58,6 +58,56 @@ beforeEach(async () => {
 afterEach(() => { vi.useRealTimers(); vi.restoreAllMocks(); vi.unstubAllGlobals(); });
 
 describe('Google 批量传输与换线', () => {
+    it('关闭合批时显式数组逐条 HTTP，保留空白并跳过 120ms 收集窗', async () => {
+        const starts: number[] = [];
+        fetchMock.mockImplementation(async (url, init) => {
+            starts.push(Date.now());
+            return successfulResponse(url, requestData(url, init).texts.map(text => `译文${text.match(/\d+/)![0]}`));
+        });
+        const start = Date.now();
+        await expect(flush(api.translateGoogleTexts(['Paragraph 1', ' \n', 'Paragraph 2'], 'en', 'zh', undefined, 2_000, false)))
+            .resolves.toEqual(['译文1', ' \n', '译文2']);
+        expect(fetchMock.mock.calls.map(([url, init]) => requestData(url, init).texts.length)).toEqual([1, 1]);
+        expect(starts[0]).toBe(start);
+        expect(starts[1]! - starts[0]!).toBeGreaterThanOrEqual(200);
+    });
+    it('关闭合批的异步逐条链在入口复制来源，外部修改不能改变后续槽', async () => {
+        const origins = ['Paragraph 1', 'Paragraph 2'];
+        let release!: () => void;
+        const first = new Promise<void>(resolve => {release = resolve;});
+        let calls = 0;
+        fetchMock.mockImplementation(async (url, init) => {
+            if (calls++ === 0) await first;
+            return successfulResponse(url, requestData(url, init).texts.map(text => `译文${text.match(/\d+/)![0]}`));
+        });
+        const request = api.translateGoogleTexts(origins, 'en', 'zh', undefined, 2_000, false);
+        await vi.advanceTimersByTimeAsync(0);
+        origins[1] = 'Paragraph 99';
+        origins.push('Paragraph 100');
+        release();
+        await expect(flush(request)).resolves.toEqual(['译文1', '译文2']);
+        expect(fetchMock.mock.calls.map(([url, init]) => requestData(url, init).texts[0]))
+            .toEqual(['<pre>Paragraph 1</pre>', '<pre>Paragraph 2</pre>']);
+    });
+
+    it('关闭的 scalar 请求不混入同时打开的 Google 收集批次', async () => {
+        fetchMock.mockImplementation(async (url, init) => successfulResponse(url,
+            requestData(url, init).texts.map(text => `译文${text.match(/\d+/)![0]}`)));
+        await expect(flush(Promise.all([
+            api.default({origin: 'Paragraph 1', sourceLanguage: 'en', targetLanguage: 'zh', enableNativeBatch: false}),
+            api.default({origin: 'Paragraph 2', sourceLanguage: 'en', targetLanguage: 'zh', enableNativeBatch: true}),
+            api.default({origin: 'Paragraph 3', sourceLanguage: 'en', targetLanguage: 'zh', enableNativeBatch: true}),
+        ]))).resolves.toEqual(['译文1', '译文2', '译文3']);
+        expect(fetchMock.mock.calls.map(([url, init]) => requestData(url, init).texts.length)).toEqual([1, 2]);
+    });
+    it('关闭合批后的迟到取消不会返回前面已完成的部分译文', async () => {
+        const controller = new AbortController();
+        fetchMock.mockImplementation(async (url) => {controller.abort(); return successfulResponse(url, ['迟到译文']);});
+        const request = api.translateGoogleTexts(['Paragraph 1', 'Paragraph 2'], 'en', 'zh', controller.signal, 2_000, false);
+        await expect(flush(request)).rejects.toMatchObject({name: 'AbortError'});
+        expect(fetchMock).toHaveBeenCalledOnce();
+    });
+
     it('连续错峰到达的 20 个段落只产生 5 个批次，输出顺序保留', async () => {
         const starts: number[] = [];
         fetchMock.mockImplementation(async (url, init) => {

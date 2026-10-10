@@ -30,6 +30,7 @@ const mocks = vi.hoisted(() => ({
     to: 'zh-CN',
     useCache: true,
     enableAIContext: false,
+    nativeBatchTranslationEnabled: {} as Record<string, boolean>,
     videoService: 'mock',
   },
 }));
@@ -103,6 +104,7 @@ describe('translation API request lifecycle performance', () => {
     mocks.config.translationBackoffBaseMs = 1000;
     mocks.config.translationBackoffMaxMs = 30000;
     mocks.config.enableAIContext = false;
+    mocks.config.nativeBatchTranslationEnabled = {};
     mocks.config.service = 'mock';
     mocks.config.videoService = 'mock';
     mocks.config.from = 'en';
@@ -324,6 +326,27 @@ describe('translation API request lifecycle performance', () => {
     expect(cloudAuto).not.toHaveProperty('sourceLanguageDetectionText');
     expect(chromeExplicit).toMatchObject({requestTimeoutMs: service === 'chromeTranslator' ? 299_000 : 44_000});
     expect(cloudAuto).toMatchObject({requestTimeoutMs: 44_000});
+  });
+
+  it.each(['single', 'batch', 'video'] as const)('原生合批偏好在 %s 入队前冻结，服务设置变更只影响新调用', async kind => {
+    mocks.config.maxConcurrentTranslations = 1;
+    mocks.config.service = 'google';
+    mocks.config.videoService = 'google';
+    mocks.config.nativeBatchTranslationEnabled = {google: false};
+    const blocker = deferred<string>();
+    mocks.sendMessage.mockImplementation(({origin}: {origin: string | string[]}) => origin === 'Blocking source'
+      ? blocker.promise : Promise.resolve(Array.isArray(origin) ? origin.map(() => '译文') : '译文'));
+    const first = translateText('Blocking source');
+    await vi.waitFor(() => expect(mocks.sendMessage).toHaveBeenCalledOnce());
+    const queued = kind === 'single' ? translateText('Queued source') : kind === 'batch'
+      ? translateTextBatch(['Queued source']) : translateVideoText('Queued source');
+    mocks.config.nativeBatchTranslationEnabled.google = true;
+    blocker.resolve('阻塞译文');
+    await first;
+    await queued;
+    expect(mocks.sendMessage.mock.calls[1]?.[0]).toMatchObject({serviceOverride: 'google', enableNativeBatch: false});
+    await translateText('New source');
+    expect(mocks.sendMessage.mock.calls[2]?.[0]).toMatchObject({enableNativeBatch: true});
   });
 
   it('普通单条和批量请求在排队前冻结默认服务、模型与语言', async () => {

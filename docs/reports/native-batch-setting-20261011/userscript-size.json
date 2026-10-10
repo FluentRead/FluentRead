@@ -1,0 +1,15 @@
+{
+  "baseCommit": "e4932521fe6036a403fbd3e034dc20d5b4495fe0",
+  "lockfileSha256": "dca737aeb9c264e2c3078588ff01c85dd52d48636f7fa24b2451f9444a8ccc3a",
+  "sameInstalledDependencies": true,
+  "baselineBytes": 1982807,
+  "candidateBytes": 1985367,
+  "increaseBytes": 2560,
+  "increasePercent": 0.1291098931968669,
+  "previousBudgetBytes": 1985000,
+  "budgetBytes": 1986000,
+  "baselineSha256": "7634c1ce472daf4d94b5a8bcd25d4f7e46f812dfdb8d4d78f438fa04c06c9980",
+  "candidateSha256": "590651db4da5f8bf864920ecdf0a81869f321ac4508864dc81e56480cebddea9",
+  "languageResourceCommit": "93759ec4387415a6cd12864a2f825bf5abc7353e",
+  "verifier": "passed"
+}

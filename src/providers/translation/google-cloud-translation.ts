@@ -7,6 +7,7 @@
  */
 
 import {services} from '@/src/core/config/catalog';
+import {isNativeTranslationBatchEnabled} from '@/src/core/config/nativeBatch';
 import {method, urls} from '@/src/core/config/constants';
 import {config} from '@/src/services/config/store';
 import {getTranslationLanguages} from '@/src/services/translation/languages';
@@ -26,6 +27,8 @@ type GoogleCloudResponse = {
 async function googleCloudTranslation(message: TranslationProviderRequest<string | string[]>) {
     if (message.abortSignal?.aborted) throw abortErrorFromSignal(message.abortSignal);
     const current = getTranslationProviderConfig(message, config);
+    const enableNativeBatch = message.enableNativeBatch
+        ?? isNativeTranslationBatchEnabled(services.googleCloudTranslation, current.nativeBatchTranslationEnabled);
     const apiKey = current.token[services.googleCloudTranslation]?.trim();
     if (!apiKey) {
         throw new Error('谷歌云翻译尚未配置 API Key，请先在设置中填写');
@@ -56,7 +59,7 @@ async function googleCloudTranslation(message: TranslationProviderRequest<string
         if (result?.error) throw createProviderCodeError('谷歌云翻译错误', result.error.code);
         return Array.isArray(result?.data?.translations)
             ? result.data.translations.map(item => item?.translatedText) : undefined;
-    }, message.abortSignal, '谷歌云翻译返回格式异常');
+    }, message.abortSignal, '谷歌云翻译返回格式异常', enableNativeBatch);
 }
 
 export default googleCloudTranslation;

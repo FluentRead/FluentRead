@@ -22,6 +22,16 @@ const validConfig = {
 }
 
 describe('configuration transfer helpers', () => {
+  it('原生合批按服务偏好完整往返，旧导入仍默认开启且错误类型不误关闭', () => {
+    const current = normalizeConfig({...validConfig, nativeBatchTranslationEnabled: {google: false, deepL: false}})
+    const exported = prepareConfigForExport(current)
+    expect(prepareConfigForImport(exported, new Config()).nativeBatchTranslationEnabled).toEqual(current.nativeBatchTranslationEnabled)
+    const {nativeBatchTranslationEnabled: _removed, ...legacy} = exported
+    expect(prepareConfigForImport(legacy, current).nativeBatchTranslationEnabled).toEqual(new Config().nativeBatchTranslationEnabled)
+    expect(prepareConfigForImport({...legacy, nativeBatchTranslationEnabled: {google: 'false', microsoft: false, openai: false}}, current).nativeBatchTranslationEnabled).toEqual({
+      google: true, microsoft: false, deepL: true, azureTranslator: true, googleCloudTranslation: true,
+    })
+  })
   it('导出导入保留全部节点设置，旧备份与损坏值回到正文识别', () => {
     const current = normalizeConfig({...validConfig, translationScope: 'all'})
     const exported = prepareConfigForExport(current)

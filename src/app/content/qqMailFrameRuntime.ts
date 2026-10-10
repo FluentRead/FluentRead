@@ -35,6 +35,7 @@ import {mountConfiguredQuickTranslation} from './quickTranslationRuntime';
 import {installPageStyles} from './pageStyles';
 import {syncBilingualSentenceHighlight} from './bilingualSentenceHighlight';
 import {applyCoreTranslationPreferences, createContentSiteAdaptationRuntime} from './siteAdaptationRuntime';
+import {createHoverTranslationConfigSubscription} from './hoverTranslationConfig';
 
 type MailFrameKind = 'qq' | 'netease';
 const messageTypes = {
@@ -171,6 +172,7 @@ async function startMailFrameApp(ctx: ContentScriptContext, kind: MailFrameKind)
         syncBilingualSentenceHighlight(document, config.bilingualSentenceHighlightEnabled === true, config.bilingualSentenceHighlightStyle, config.bilingualSentenceHighlightAppearance);
         const resetHover = mountHoverTranslationContentFeature({
             config, constants, document, window, navigator, getCenterPoint,
+            subscribeConfig: createHoverTranslationConfigSubscription(config, subscribeConfig, cancelPendingHoverTranslation),
             isSiteDisabled: () => !enabled() || !authorized,
             handleTranslation, noteBilingualHostGesture, cancelPendingHoverTranslation,
             ...hotkeys.selectionShortcutPorts,

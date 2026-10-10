@@ -1,10 +1,10 @@
 /**
  * @file src/features/hover-translation/content/index.ts
  * 文件职责：实现按住配置快捷键并移动鼠标触发的悬浮翻译手势控制器，统一管理按键集合、平台差异、节流采样和启停清理。
- * 主要内容：定义可注入的配置、常量与依赖接口，按配置原值复用鼠标快捷键的规范化结果，在 mountHoverTranslationContentFeature 中监听键盘、鼠标与触摸并区分单次切换和连续移动；仅使用可信鼠标采样的位置，换路由、隐藏或离页时清除位置与手势，仲裁、失焦和中止统一撤销键盘状态、长按、触摸连击及运行时延迟，触摸手势绑定开始时的快捷键配置。
+ * 主要内容：定义可注入的配置、常量与依赖接口，从可信鼠标进入、移动或按下采集位置，复用快捷键解析并按绘制帧合并连续采样；区分单次切换、连续移动和触摸手势，配置变化、仲裁、离开视口、失焦、页面隐藏与卸载统一撤销待执行工作及失效坐标。
  * 模块边界：该模块只识别手势和调用注入的 handleTranslation/cancelPending，不读取具体翻译服务或创建译文；配置源、站点禁用判断和全文运行时由 app composition root 提供。
  */
-import {addPressedHotkeyEventKey, deletePressedHotkeyEventKey} from '@/src/core/hotkey';
+import {addPressedHotkeyEventKey, deletePressedHotkeyEventKey, parseHotkey} from '@/src/core/hotkey';
 
 export interface HoverTranslationContentConfig {
     on?: boolean;
@@ -49,11 +49,13 @@ export interface HoverTranslationContentDependencies {
     getCustomSelectionHotkey: () => string | undefined;
     matchesSelectionTranslatorShortcut: (event: KeyboardEvent) => boolean;
     shouldReserveSelectionShortcut: (event: KeyboardEvent) => boolean;
+    subscribeConfig?: (listener: () => void) => () => void;
 }
 
 interface HoverTranslationScreenState {
     mouseX: number;
     mouseY: number;
+    pointerKnown: boolean;
     hotkeyPressed: boolean;
     otherKeyPressed: boolean;
     hasSlideTranslation: boolean;
@@ -63,6 +65,10 @@ interface HoverTranslationScreenState {
 
 export function normalizeHoverHotkeyParts(hotkeyString: string | undefined): string[] {
     if (!hotkeyString || hotkeyString === 'none') return [];
+
+    // 普通键使用录制器共用的解析器，保证字面量「+」等合法自定义键不会被分隔符吞掉。
+    const parsed = parseHotkey(hotkeyString);
+    if (parsed.isValid) return [...parsed.modifiers.map(key => key === 'ctrl' ? 'control' : key), parsed.key];
 
     return hotkeyString.split('+')
         .map(key => {
@@ -102,31 +108,41 @@ export function mountHoverTranslationContentFeature(
     deps: HoverTranslationContentDependencies,
     signal: AbortSignal,
 ): () => void {
+    if (signal.aborted) return () => {};
     const rootDocument = deps.document;
     const rootWindow = deps.window;
     const runtimeNavigator = deps.navigator;
     const screen: HoverTranslationScreenState = {
         mouseX: 0,
         mouseY: 0,
+        pointerKnown: false,
         hotkeyPressed: false,
         otherKeyPressed: false,
         hasSlideTranslation: false,
         gestureHotkey: '',
         gestureSharedWithSelection: false,
     };
+    const rememberMousePosition = (event: Pick<MouseEvent, 'clientX' | 'clientY'>) => {
+        screen.mouseX = event.clientX;
+        screen.mouseY = event.clientY;
+        screen.pointerKnown = true;
+    };
     const mouseHotkeysPressed = new Set<string>();
     const mouseHotkeyByCode = new Map<string, string>();
-    // (0,0) 是合法坐标；首次可信指针事件之前不能把初始值当作当前位置。
-    let pointerPositionKnown = false;
     let longPressTimer: ReturnType<typeof setTimeout> | undefined;
     let touchCount = 0;
     let touchTimer: ReturnType<typeof setTimeout> | undefined;
     let touchGestureHotkey = '';
+    let hoverFrame: number | undefined;
+    let hoverPointDirty = false;
+    let hoverFrameGeneration = 0;
+    let lastHoverX: number | undefined;
+    let lastHoverY: number | undefined;
+    let hasHoverWork = false;
     const isMac = /Mac|iPod|iPhone|iPad/.test(runtimeNavigator.platform);
     const noteExternalHostGesture = (event: Event) => {
-        if (event.isTrusted) deps.noteBilingualHostGesture();
+        if (!signal.aborted && event.isTrusted) deps.noteBilingualHostGesture();
     };
-    rootDocument.addEventListener('mousemove', noteExternalHostGesture, {signal, capture: true, passive: true});
     rootDocument.addEventListener('scroll', noteExternalHostGesture, {signal, capture: true, passive: true});
 
     let mouseShortcutRaw: string | undefined;
@@ -140,9 +156,16 @@ export function mountHoverTranslationContentFeature(
         }
         return mouseShortcut;
     };
+    let selectionShortcutRaw: string | undefined;
+    let selectionShortcutParts: string[] = [];
     const getConfiguredSelectionHotkeyParts = () => {
         const hotkey = deps.getConfiguredSelectionHotkey();
-        return normalizeHoverHotkeyParts(hotkey === 'custom' ? deps.getCustomSelectionHotkey() : hotkey);
+        const raw = hotkey === 'custom' ? deps.getCustomSelectionHotkey() : hotkey;
+        if (raw !== selectionShortcutRaw) {
+            selectionShortcutRaw = raw;
+            selectionShortcutParts = normalizeHoverHotkeyParts(raw);
+        }
+        return selectionShortcutParts;
     };
 
     const matchesPressed = (hotkeyParts: string[]) => matchesPressedHotkeyParts(hotkeyParts, mouseHotkeysPressed);
@@ -166,34 +189,46 @@ export function mountHoverTranslationContentFeature(
         if (longPressTimer !== undefined) clearTimeout(longPressTimer);
         longPressTimer = undefined;
     };
+    const cancelHoverFrame = () => {
+        if (hoverFrame !== undefined) rootWindow.cancelAnimationFrame(hoverFrame);
+        hoverFrame = undefined;
+        hoverPointDirty = false;
+        hoverFrameGeneration += 1;
+    };
+    const cancelHoverWork = () => {
+        cancelHoverFrame();
+        deps.cancelPendingHoverTranslation();
+        hasHoverWork = false;
+    };
+    const invokeTranslation: HoverTranslationContentDependencies['handleTranslation'] = (x, y, invocation) => {
+        hasHoverWork = true;
+        if (invocation) deps.handleTranslation(x, y, invocation);
+        else deps.handleTranslation(x, y);
+    };
+    const hasHoverGestureOrWork = () => screen.hotkeyPressed || screen.otherKeyPressed || mouseHotkeysPressed.size > 0
+        || longPressTimer !== undefined || touchCount > 0 || hoverFrame !== undefined || hasHoverWork;
     const cancelAndResetHoverHotkeyState = () => {
+        const active = hasHoverGestureOrWork();
         resetHoverHotkeyState();
+        lastHoverX = lastHoverY = undefined;
         cancelLongPress();
         resetTouchGesture();
-        deps.cancelPendingHoverTranslation();
+        if (active) cancelHoverWork();
     };
-    const forgetPointerAndCancelGesture = () => {
-        pointerPositionKnown = false;
+    const invalidatePointerGesture = () => {
         cancelAndResetHoverHotkeyState();
+        screen.pointerKnown = false;
     };
-    rootDocument.addEventListener('fluentread-route-change', forgetPointerAndCancelGesture, {signal});
-    rootDocument.addEventListener('visibilitychange', () => {
-        if (rootDocument.visibilityState === 'hidden') forgetPointerAndCancelGesture();
-    }, {signal});
-    rootDocument.addEventListener('mouseout', event => {
-        if (event.isTrusted && event.relatedTarget === null) forgetPointerAndCancelGesture();
-    }, {signal});
-    rootDocument.addEventListener('mouseover', event => {
-        if (!event.isTrusted) return;
-        screen.mouseX = event.clientX;
-        screen.mouseY = event.clientY;
-        pointerPositionKnown = true;
-    }, {signal});
+    let routeHref = rootWindow.location.href;
+    const invalidateRouteGesture = () => {
+        if (routeHref === rootWindow.location.href) return;
+        routeHref = rootWindow.location.href;
+        invalidatePointerGesture();
+    };
     const discardUnavailableHoverGesture = (): boolean => {
-        const unavailable = deps.isSiteDisabled()
-            || (screen.hotkeyPressed && (!deps.config.on || screen.gestureHotkey !== getConfiguredMouseShortcut().identity));
-        if (unavailable && (screen.hotkeyPressed || mouseHotkeysPressed.size > 0 ||
-            longPressTimer !== undefined || touchCount > 0)) {
+        const unavailable = signal.aborted || rootDocument.hidden || !deps.config.on || deps.isSiteDisabled()
+            || (screen.hotkeyPressed && screen.gestureHotkey !== getConfiguredMouseShortcut().identity);
+        if (unavailable && hasHoverGestureOrWork()) {
             cancelAndResetHoverHotkeyState();
         }
         return unavailable;
@@ -205,13 +240,42 @@ export function mountHoverTranslationContentFeature(
         screen.hotkeyPressed = false;
         screen.otherKeyPressed = true;
         screen.hasSlideTranslation = false;
-        deps.cancelPendingHoverTranslation();
+        cancelHoverWork();
         return true;
     };
 
     rootDocument.addEventListener('selectionchange', cancelHoverForActiveSelection, { signal });
 
-    rootWindow.addEventListener('blur', forgetPointerAndCancelGesture, { signal });
+    rootWindow.addEventListener('blur', invalidatePointerGesture, { signal });
+    rootWindow.addEventListener('pagehide', invalidatePointerGesture, { signal });
+    rootWindow.addEventListener('popstate', invalidateRouteGesture, { signal });
+    rootWindow.addEventListener('hashchange', invalidateRouteGesture, { signal });
+    rootDocument.addEventListener('fluentread-route-change', invalidateRouteGesture, { signal });
+    rootDocument.addEventListener('visibilitychange', () => {
+        if (rootDocument.hidden) invalidatePointerGesture();
+    }, { signal });
+    rootDocument.addEventListener('mouseover', event => {
+        if (!signal.aborted && event.isTrusted) rememberMousePosition(event);
+    }, { signal });
+    rootDocument.addEventListener('mouseout', event => {
+        if (event.isTrusted && event.relatedTarget === null) invalidatePointerGesture();
+    }, { signal });
+    rootDocument.addEventListener('mouseleave', event => {
+        if (event.isTrusted) invalidatePointerGesture();
+    }, { signal });
+    rootDocument.addEventListener('pointercancel', event => {
+        if (event.isTrusted) invalidatePointerGesture();
+    }, { signal });
+    rootDocument.addEventListener('touchcancel', event => {
+        if (event.isTrusted) invalidatePointerGesture();
+    }, { signal });
+    rootDocument.addEventListener('scroll', event => {
+        if (!event.isTrusted) return;
+        cancelLongPress();
+        if (hoverFrame !== undefined || hasHoverWork) cancelHoverWork();
+        // 坐标仍属于当前视口，但滚动已经换掉其下方内容；下一次移动或单次热键须重新识别目标。
+        lastHoverX = lastHoverY = undefined;
+    }, { signal, capture: true, passive: true });
 
     rootWindow.addEventListener('keydown', event => {
         if (!event.isTrusted) return;
@@ -220,7 +284,7 @@ export function mountHoverTranslationContentFeature(
         if (isMac && event.metaKey) {
             if (screen.hotkeyPressed) {
                 screen.otherKeyPressed = true;
-                deps.cancelPendingHoverTranslation();
+                cancelHoverWork();
             }
             return;
         }
@@ -246,46 +310,88 @@ export function mountHoverTranslationContentFeature(
         } else if (screen.hotkeyPressed) {
             // 步骤 2：Ctrl+C 等额外组合键会作废已排队的悬浮翻译。
             screen.otherKeyPressed = true;
-            deps.cancelPendingHoverTranslation();
+            cancelHoverWork();
         }
     }, { signal, capture: true });
 
     rootDocument.addEventListener('pointerdown', event => {
         if (!event.isTrusted) return;
-        if (deps.isSiteDisabled()) return;
+        if (discardUnavailableHoverGesture()) return;
+        // 内容脚本可能在鼠标静止时挂载。可信鼠标点击也提供位置；触摸/笔输入不能借用鼠标快捷键。
+        if (event.pointerType === 'mouse') rememberMousePosition(event);
         if (!screen.hotkeyPressed || !matchesPressed(getConfiguredSelectionHotkeyParts())) return;
         // 步骤 1：pointerdown 发生在新选区形成之前；共享划词快捷键已按下时先把拖选手势交给划词功能。
         screen.hotkeyPressed = false;
         screen.otherKeyPressed = true;
         screen.hasSlideTranslation = false;
-        deps.cancelPendingHoverTranslation();
+        cancelHoverWork();
     }, { signal, capture: true });
 
     rootWindow.addEventListener('keyup', event => {
         if (!event.isTrusted) return;
-        removeReleasedKey(event, mouseHotkeysPressed, mouseHotkeyByCode, isMac);
         if (discardUnavailableHoverGesture()) return;
+        cancelHoverForActiveSelection();
+        removeReleasedKey(event, mouseHotkeysPressed, mouseHotkeyByCode, isMac);
 
-        if (screen.hotkeyPressed && mouseHotkeysPressed.size === 0 && !screen.otherKeyPressed && !screen.hasSlideTranslation) {
-            if (deps.config.on && pointerPositionKnown) {
+        // 完整快捷键开始释放时提交本帧最新位置，保留已经停留目标的延迟；帧回调不能在松手后再启动工作。
+        if (screen.hotkeyPressed && !matchesPressed(getConfiguredMouseShortcut().parts)) {
+            if (hoverPointDirty && !screen.otherKeyPressed && screen.pointerKnown
+                && (screen.mouseX !== lastHoverX || screen.mouseY !== lastHoverY)) {
+                invokeTranslation(screen.mouseX, screen.mouseY, {
+                    delayMs: deps.config.mouseHoverTranslationDelay,
+                    continuous: true,
+                });
+                lastHoverX = screen.mouseX;
+                lastHoverY = screen.mouseY;
+            }
+            cancelHoverFrame();
+        }
+
+        if (screen.hotkeyPressed && screen.pointerKnown && mouseHotkeysPressed.size === 0 && !screen.otherKeyPressed && !screen.hasSlideTranslation) {
+            if (deps.config.on) {
                 event.preventDefault();
                 // 共享归属绑定手势开始；释放修饰键后仍须让 Document 清理划词/全文按键状态。
                 if (!screen.gestureSharedWithSelection) event.stopPropagation();
-                deps.handleTranslation(screen.mouseX, screen.mouseY);
+                invokeTranslation(screen.mouseX, screen.mouseY);
             }
         }
 
-        if (mouseHotkeysPressed.size === 0) resetHoverHotkeyState();
+        if (mouseHotkeysPressed.size === 0) {
+            resetHoverHotkeyState();
+            lastHoverX = lastHoverY = undefined;
+        }
     }, { signal, capture: true });
 
     const longPressStart = { x: 0, y: 0 };
+    const dispatchContinuousHover = () => {
+        if (cancelHoverForActiveSelection()) return;
+        hoverPointDirty = false;
+        lastHoverX = screen.mouseX;
+        lastHoverY = screen.mouseY;
+        const generation = hoverFrameGeneration;
+        invokeTranslation(screen.mouseX, screen.mouseY, {
+            delayMs: deps.config.mouseHoverTranslationDelay,
+            continuous: true,
+        });
+        if (generation !== hoverFrameGeneration || signal.aborted) return;
+        // 首点立即响应；同一绘制帧内其余移动只保留最后位置，减少候选识别和配置快照的重复开销。
+        hoverFrame = rootWindow.requestAnimationFrame(() => {
+            if (generation !== hoverFrameGeneration) return;
+            hoverFrame = undefined;
+            if (discardUnavailableHoverGesture() || !hoverPointDirty || !screen.pointerKnown
+                || !screen.hotkeyPressed || screen.otherKeyPressed || !matchesPressed(getConfiguredMouseShortcut().parts)) return;
+            dispatchContinuousHover();
+        });
+    };
 
     rootDocument.addEventListener('mousemove', event => {
         if (!event.isTrusted) return;
+        if (signal.aborted) return;
+        noteExternalHostGesture(event);
+        rememberMousePosition(event);
+        // 完全空闲时仅记录位置与宿主交互；已有手势或待工作才需要读取页面/配置状态并执行取消。
+        if (!hasHoverGestureOrWork()) return;
         if (discardUnavailableHoverGesture()) return;
-        screen.mouseX = event.clientX;
-        screen.mouseY = event.clientY;
-        pointerPositionKnown = true;
         if (longPressTimer !== undefined
             && (Math.abs(event.clientX - longPressStart.x) > 10 || Math.abs(event.clientY - longPressStart.y) > 10)) {
             cancelLongPress();
@@ -293,24 +399,18 @@ export function mountHoverTranslationContentFeature(
         // 额外按键已取消的手势保持作废，释放组合键的一部分也不能再启动新任务。
         // hasSlideTranslation 仍保留至完整释放，避免把连续移动的结尾误当成单次切换。
         if (screen.hotkeyPressed && !screen.otherKeyPressed && matchesPressed(getConfiguredMouseShortcut().parts)) {
-            if (cancelHoverForActiveSelection()) return;
             screen.hasSlideTranslation = true;
             // 连续移动与延迟是两个独立维度。0ms 只是立即响应，不能退化成
             // “再次命中已译句子就恢复原文”的单次切换手势。
-            deps.handleTranslation(
-                screen.mouseX,
-                screen.mouseY,
-                {
-                    delayMs: deps.config.mouseHoverTranslationDelay,
-                    continuous: true,
-                },
-            );
+            hoverPointDirty = screen.mouseX !== lastHoverX || screen.mouseY !== lastHoverY;
+            if (!hoverPointDirty) return;
+            if (hoverFrame === undefined) dispatchContinuousHover();
         }
-    }, { signal });
+    }, { signal, capture: true, passive: true });
 
     rootDocument.addEventListener('touchstart', event => {
         if (!event.isTrusted) return;
-        if (deps.isSiteDisabled()) return;
+        if (discardUnavailableHoverGesture()) return;
         let coordinate;
         switch (deps.config.hotkey) {
             case deps.constants.TwoFinger:
@@ -326,34 +426,33 @@ export function mountHoverTranslationContentFeature(
                 return;
         }
 
-        if (deps.config.on && coordinate) deps.handleTranslation(coordinate.x, coordinate.y);
-    }, { signal, capture: true });
+        if (coordinate) invokeTranslation(coordinate.x, coordinate.y);
+    }, { signal, capture: true, passive: true });
 
     rootDocument.addEventListener('dblclick', event => {
         if (!event.isTrusted) return;
-        if (deps.isSiteDisabled()) return;
+        if (discardUnavailableHoverGesture()) return;
         if (deps.config.hotkey === deps.constants.DoubleClick && deps.config.on) {
-            deps.handleTranslation(event.clientX, event.clientY);
+            invokeTranslation(event.clientX, event.clientY);
         }
-    }, { signal });
+    }, { signal, passive: true });
 
     rootDocument.addEventListener('mouseup', event => {
         if (!event.isTrusted) return;
-        if (deps.isSiteDisabled()) return;
         cancelLongPress();
     }, { signal });
 
     rootDocument.addEventListener('mousedown', event => {
         if (!event.isTrusted) return;
-        if (deps.isSiteDisabled()) return;
+        if (discardUnavailableHoverGesture()) return;
         if (deps.config.hotkey === deps.constants.LongPress && event.button === 0) {
             cancelLongPress();
             longPressStart.x = event.clientX;
             longPressStart.y = event.clientY;
             longPressTimer = setTimeout(() => {
                 longPressTimer = undefined;
-                if (!deps.isSiteDisabled() && deps.config.on && deps.config.hotkey === deps.constants.LongPress) {
-                    deps.handleTranslation(event.clientX, event.clientY);
+                if (!discardUnavailableHoverGesture() && deps.config.hotkey === deps.constants.LongPress) {
+                    invokeTranslation(event.clientX, event.clientY);
                 }
             }, 500);
         }
@@ -361,16 +460,16 @@ export function mountHoverTranslationContentFeature(
 
     rootDocument.addEventListener('mousedown', event => {
         if (!event.isTrusted) return;
-        if (deps.isSiteDisabled()) return;
+        if (discardUnavailableHoverGesture()) return;
         if (deps.config.hotkey === deps.constants.MiddleClick && deps.config.on && event.button === 1) {
-            deps.handleTranslation(event.clientX, event.clientY);
+            invokeTranslation(event.clientX, event.clientY);
         }
     }, { signal });
 
     rootDocument.addEventListener('touchstart', event => {
         if (!event.isTrusted) return;
         const hotkey = deps.config.hotkey || '';
-        if (!deps.config.on || deps.isSiteDisabled() ||
+        if (discardUnavailableHoverGesture() ||
             ![deps.constants.DoubleClickScreen, deps.constants.TripleClickScreen].includes(hotkey) ||
             event.touches.length !== 1) {
             resetTouchGesture();
@@ -386,10 +485,22 @@ export function mountHoverTranslationContentFeature(
             touchTimer = setTimeout(resetTouchGesture, 500);
         } else if (touchCount === requiredTouches) {
             resetTouchGesture();
-            deps.handleTranslation(event.touches[0].clientX, event.touches[0].clientY);
+            invokeTranslation(event.touches[0].clientX, event.touches[0].clientY);
         }
-    }, { signal });
+    }, { signal, passive: true });
 
-    signal.addEventListener('abort', cancelAndResetHoverHotkeyState, { once: true });
+    const getGestureConfig = () => [deps.config.on, deps.config.hotkey, deps.config.customHotkey,
+        deps.config.mouseHoverTranslationDelay, deps.isSiteDisabled()] as const;
+    let gestureConfig = getGestureConfig();
+    const unsubscribeConfig = deps.subscribeConfig?.(() => {
+        const current = getGestureConfig();
+        if (current.every((value, index) => value === gestureConfig[index])) return;
+        gestureConfig = current;
+        cancelAndResetHoverHotkeyState();
+    });
+    signal.addEventListener('abort', () => {
+        invalidatePointerGesture();
+        unsubscribeConfig?.();
+    }, { once: true });
     return cancelAndResetHoverHotkeyState;
 }

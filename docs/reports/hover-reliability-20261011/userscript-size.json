@@ -1,0 +1,12 @@
+{
+  "baselineCommit": "fe7005dd9",
+  "baselineBytes": 1985367,
+  "candidateBytes": 1989943,
+  "deltaBytes": 4576,
+  "deltaPercent": 0.2304863534046854,
+  "oldBudgetBytes": 1986000,
+  "budgetBytes": 1991000,
+  "baselineVerification": "passed",
+  "candidateVerification": "passed",
+  "sameLockedDependencies": true
+}

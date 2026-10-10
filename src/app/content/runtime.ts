@@ -54,6 +54,7 @@ import {syncBilingualSentenceHighlight} from './bilingualSentenceHighlight';
 import {applyCoreTranslationPreferences, createContentSiteAdaptationRuntime} from './siteAdaptationRuntime';
 import {createOptionalContentFeatureRuntime, type OptionalContentFeatureRuntime} from './optionalFeatures';
 import {createPageInformationHighlightRuntime} from './informationHighlight';
+import {createHoverTranslationConfigSubscription} from './hoverTranslationConfig';
 export async function startContentApp(ctx: ContentScriptContext,
     capabilities: BrowserCapabilities = browserCapabilities): Promise<void> {
     if (isRawXmlContentDocument(document) || ctx.isInvalid) return;
@@ -134,7 +135,7 @@ export async function startContentApp(ctx: ContentScriptContext,
         });
         optionalContentFeatures.sync();
         const resetHoverKeyboardGesture = mountHoverTranslationContentFeature({
-            config,
+            config, subscribeConfig: createHoverTranslationConfigSubscription(config, subscribeConfig, cancelPendingHoverTranslation),
             constants,
             document,
             window,

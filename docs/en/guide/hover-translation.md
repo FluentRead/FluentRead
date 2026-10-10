@@ -10,9 +10,11 @@ Hover over a paragraph and press **Control** to translate just that paragraph.
 2. Hover over the paragraph and press **Control**.
 3. Read the translation below it. Press again to restore. Editable areas do not trigger hover translation.
 
-Hold the shortcut and move the mouse to translate continuously. Returning to a translated paragraph keeps its translation; release the keys and press again to show the original. The hover delay helps avoid triggers while moving. Set it to 0 to translate without a dwell period.
+Hold the shortcut and move the pointer to translate several paragraphs. If you set a delay, it starts when you enter a paragraph. Moving within that paragraph keeps the deadline; entering another paragraph starts a new delay. Moving over a translated paragraph or releasing the shortcut keeps its translation.
 
-Changing pages, chapters, or browser tabs cancels hover gestures that are still waiting. Move the mouse and press the shortcut again to continue after returning. Old key state does not start translation on a new page. Default and additional hover shortcuts follow the same rules.
+Leaving the webpage, switching tabs, or changing the page route cancels work that has not started. Scrolling also cancels the wait at the old position; move the pointer again to choose a paragraph. If translation fails, click the error indicator or focus it and press **Enter** to retry. Continuous movement does not repeatedly request a failed paragraph.
+
+Both the default shortcut and extra hover profiles follow the page-change and cancellation rules. Move the pointer and press the shortcut again after returning. A delay of 0 requires no dwell time.
 
 <details class="guide-details">
 <summary>Paragraph copying and trigger settings</summary>

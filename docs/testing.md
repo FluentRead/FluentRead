@@ -550,6 +550,17 @@ pnpm exec vitest run tests/hoverTranslationContentFeature.test.ts tests/fullPage
 
 生产 Chrome 产物另由 `scripts/run-full-page-translation-test.cjs` 验证真实键鼠事件、DOM 工件身份、请求数及连续帧可见性。使用浏览器技能提供的 focus-safe helper 与临时 profile，窗口在第二块屏幕可见但不抢前台。报告必须区分本地确定性服务夹具和真实网站、真实翻译服务的结果。
 
+悬浮性能与取消生命周期由独立专项验证；它使用临时后台 Edge、真实 CDP 键鼠事件和延迟 180ms 的本地微软协议响应：
+
+```bash
+node scripts/testing/run-hover-reliability-test.cjs \
+  --extension-dir .output/chrome-mv3 --playwright-root <Node包目录> \
+  --focus-safe-helper scripts/testing/focus-safe-browser.cjs \
+  --artifacts-dir /private/tmp/fluentread-hover-reliability
+```
+
+默认执行八组场景：开关及连续移动开销、同段停留与最后位置、在途及已译段落唯一性、离开视口、真实隐藏标签页、SPA 路由切换、宿主替换段落、显式失败重试。各组也检查原文、原生输入与链接，报告保留请求数、DOM、截图、焦点策略和扩展文件哈希。追加 `--cases dom-replacement` 可缩小复现；`--baseline` 仅用于旧产物，记录行为失败后继续采样，不能作为修复验收通过。性能对比必须使用相同脚本和夹具、相同 320 次移动，冻结两份生产包；本地 CPU 采样不能推广为所有网站或供应商的加速比例。
+
 “识别全部节点”的专项由 `scripts/run-all-nodes-translation-test.cjs` 负责。它在生产扩展的“高级选项 → 页面识别”中操作真实开关，关闭并重新打开设置页确认保存，再通过原有全文翻译入口验证范围。设置从下一次翻译起生效；存量会话保持自己的范围快照，恢复后再次翻译才使用新值。
 
 本地夹具覆盖导航与页脚、工作流工具栏、项目树与标签页、展开内容与动态菜单，以及输入框、编辑器、代码和显式排除区域。断言包含默认正文范围、开启全部节点、动态新增、恢复和再次翻译，以及关闭后回到默认范围，并检查元素身份、原有点击事件和保护内容不进入翻译请求。追加 `--live-epoch --allow-network` 会在真实 Epoch 页面验证导航、图表控件和页脚；两者都使用本地确定性翻译服务，结果用于验证翻译行为，不代表真实供应商的译文质量。

@@ -1,0 +1,42 @@
+
+> FluentRead-流畅阅读@0.0.37 test /Users/thinkstu/Desktop/copy/FluentRead-input-translation-quality-20261011
+> node scripts/testing/run-resource-safe.mjs -- vitest run "tests/inputTranslationContentFeature.test.ts" "tests/inputEditableHost.test.ts" "tests/inputBox.test.ts" "tests/inputTranslationBackground.test.ts" "tests/backgroundTranslationHandler.test.ts" "tests/userscriptPlatform.test.ts" "tests/inputTranslationConfig.test.ts" "tests/optionalContentFeatures.test.ts" "tests/backgroundFeatureHandlers.test.ts" "tests/userscriptCredentialPersistence.test.ts" "tests/contentHotkeyRuntime.test.ts" "tests/contentUiRuntime.test.ts" "tests/backgroundProviderRuntime.test.ts" "tests/qqMailFrameRuntime.test.ts" "tests/hoverTranslationConfig.test.ts" "tests/architecture/moduleBoundaries.test.ts" "tests/architecture/providerBoundaries.test.ts" "tests/architecture/verificationOwnership.test.ts" "tests/architecture/sourceFileHeaders.test.ts"
+
+[resource-safe] 等待全局测试锁（3 个并发槽已占满，当前: vue-tsc --noEmit; node /private/tmp/fluentread-performance-experience-20261010/round12-model-number-format/probe.cjs; vitest run tests/contextMenu.test.ts tests/contextMenuRuntimeOwnership.test.ts tests/contentMessageRuntime.test.ts tests/selectionTranslatorLifecycle.test.ts tests/pageNotice.test.ts tests/userscriptViteConfig.test.ts tests/userscriptLanguageBundles.test.ts tests/backgroundBadgeRuntime.test.ts tests/fullPageStateNotification.test.ts tests/contentUiRuntime.test.ts tests/fullPageTranslationProgress.test.ts tests/architecture/moduleBoundaries.test.ts tests/architecture/verificationOwnership.test.ts tests/architecture/sourceHeaders.test.ts tests/architecture/providerBoundaries.test.ts tests/sectionTranslationCore.test.ts tests/sectionTranslationPicker.test.ts tests/sectionTranslationRegion.test.ts tests/sectionTranslationRuntime.test.ts tests/translationState.test.ts tests/hoverTranslationContentFeature.test.ts tests/hoverTranslationScheduler.test.ts tests/hoverTranslationConfig.test.ts tests/contentHotkeyRuntime.test.ts tests/fullPageVisibilityScheduling.test.ts tests/qqMailFrameRuntime.test.ts）
+[resource-safe] CPU target 60%, maxWorkers 1, concurrency 3, command: vitest run tests/inputTranslationContentFeature.test.ts tests/inputEditableHost.test.ts tests/inputBox.test.ts tests/inputTranslationBackground.test.ts tests/backgroundTranslationHandler.test.ts tests/userscriptPlatform.test.ts tests/inputTranslationConfig.test.ts tests/optionalContentFeatures.test.ts tests/backgroundFeatureHandlers.test.ts tests/userscriptCredentialPersistence.test.ts tests/contentHotkeyRuntime.test.ts tests/contentUiRuntime.test.ts tests/backgroundProviderRuntime.test.ts tests/qqMailFrameRuntime.test.ts tests/hoverTranslationConfig.test.ts tests/architecture/moduleBoundaries.test.ts tests/architecture/providerBoundaries.test.ts tests/architecture/verificationOwnership.test.ts tests/architecture/sourceFileHeaders.test.ts
+
+ RUN  v2.1.9 /Users/thinkstu/Desktop/copy/FluentRead-input-translation-quality-20261011
+
+ ✓ tests/inputTranslationContentFeature.test.ts (96 tests) 884ms
+ ✓ tests/backgroundFeatureHandlers.test.ts (53 tests) 2122ms
+   ✓ 后台 feature handlers > 区域截图 handler 接受 windowId=0 并拒绝空截图与非法窗口 1202ms
+   ✓ 后台 feature handlers > 圈选截图必须属于sender的当前活动标签页，并在捕获完成后再次核对 603ms
+ ✓ tests/inputEditableHost.test.ts (81 tests) 92ms
+ ✓ tests/contentHotkeyRuntime.test.ts (62 tests) 809ms
+ ✓ tests/qqMailFrameRuntime.test.ts (27 tests) 1227ms
+ ✓ tests/contentUiRuntime.test.ts (17 tests) 171ms
+ ✓ tests/architecture/verificationOwnership.test.ts (16 tests) 6637ms
+   ✓ repository verification ownership > src 中每个可执行非组装模块都进入四维 100% 覆盖率边界 3946ms
+   ✓ repository verification ownership > 覆盖率清单不能引用不存在的源码或把组装根伪装成业务覆盖 2485ms
+ ✓ tests/backgroundTranslationHandler.test.ts (49 tests) 14ms
+ ✓ tests/architecture/moduleBoundaries.test.ts (13 tests) 3553ms
+   ✓ architecture module boundaries > src 的静态依赖图不存在跨文件循环 1304ms
+   ✓ architecture module boundaries > src 只能通过精确登记的 composition/browser/provider 迁移边界读取 entrypoints 959ms
+   ✓ architecture module boundaries > feature 不能跨目录读取另一个 feature 的内部实现 535ms
+   ✓ architecture module boundaries > 按需加载的大体积资源不得被扩展运行时代码静态引入 458ms
+ ✓ tests/inputTranslationBackground.test.ts (13 tests) 16ms
+ ✓ tests/inputBox.test.ts (13 tests) 7ms
+ ✓ tests/userscriptPlatform.test.ts (8 tests) 18ms
+ ✓ tests/architecture/providerBoundaries.test.ts (6 tests) 116ms
+ ✓ tests/optionalContentFeatures.test.ts (7 tests) 6ms
+ ✓ tests/inputTranslationConfig.test.ts (10 tests) 31ms
+ ✓ tests/architecture/sourceFileHeaders.test.ts (897 tests) 273ms
+ ✓ tests/userscriptCredentialPersistence.test.ts (2 tests) 398ms
+ ✓ tests/hoverTranslationConfig.test.ts (16 tests) 12ms
+ ✓ tests/backgroundProviderRuntime.test.ts (2 tests) 3ms
+
+ Test Files  19 passed (19)
+      Tests  1388 passed (1388)
+   Start at  02:57:35
+   Duration  22.73s (transform 1.21s, setup 0ms, collect 3.25s, tests 16.39s, environment 2ms, prepare 788ms)
+

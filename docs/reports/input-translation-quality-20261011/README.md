@@ -93,6 +93,25 @@ node scripts/run-rich-text-input-editors-test.cjs \
   --slate-fast-cache
 ```
 
+## PR 主线整合复验（982f09df）
+
+合并前将最新 main 的 982f09df 整合为 2e4d34fbc。两个独立审核覆盖输入请求生命周期、后台取消、富文本标准事件提交、焦点与选区保护；整合复核未发现阻塞问题。七个业务源码文件的 SHA256 与初始验证完全一致，相对最新 main 的业务补丁也与初始补丁相同。原覆盖率证据因此对应同一业务实现；本节重新验证更新后的运行时与构建产物，后续证据提交只修改报告。
+
+19 个相关测试文件的 1,388 个用例全部通过，含输入前后台、编辑宿主、热键/UI/配置/userscript 协议与四个架构测试文件。最新主线已修正初始 providerBoundaries 静态断言，本轮该文件 6/6 通过，当前无这项测试失败。实际命令和结果见 [定向测试日志](./pr-integration/related-tests.txt)。
+
+| 检查 | 整合后结果 | 证据 |
+| --- | --- | --- |
+| 生产包输入交互 | 29/29；6 次实际取消；5 次快捷键仅 1 个请求 | [输入浏览器报告](./pr-integration/input-browser-report.json) |
+| 真实编辑器 DOM 与模型 | Quill、ProseMirror、Lexical、Slate、Draft.js 5/5，核对翻译及恢复 | [编辑器报告](./pr-integration/real-editors-report.json) |
+| Slate 连续即时返回与缓存 | 5/5；4 次供应商请求、1 次缓存命中，第五轮零请求 | [连续轮次](./pr-integration/real-editors-report.json) |
+| 浏览器错误与焦点 | 两个 runner 均 exit 0，无页面错误，browserFrontmost=false，前台前后均为 ChatGPT | [浏览器记录](./pr-integration/verification.json) |
+| 类型与产物 | compile、Chrome、Firefox、userscript 构建及完整产物守门通过 | [指纹与检查记录](./pr-integration/verification.json)、[Manifest](./pr-integration/extension-manifests.json) |
+| 文档及测试归类 | 文档/Storybook 构建和校验通过；640 文件、10,568 条用例归类审计通过 | [检查记录](./pr-integration/verification.json) |
+
+同锁独立重建最新 main 与候选 userscript：1,997,714 → 2,006,364 字节，增量 8,650 字节（0.4330%）。预算从 1,998,000 最小增加 9 KB 至 2,007,000，余量 636 字节。锁文件、基线与候选 SHA256 见 [整合指纹](./pr-integration/verification.json)，所有原有协议、执行隔离、固定依赖和功能排除断言保留。
+
+浏览器使用固定的整合生产构建副本，供应商仍为确定性本地夹具；Firefox/userscript 验证限于构建与产物。本节证据不表示外部供应商或 GitHub 托管 CI 通过。
+
 ## 验证边界
 
 浏览器验证使用生产 Chrome MV3 构建、临时 Edge profile、第二屏后台窗口和真实键盘/指针事件。供应商响应由本地确定性夹具提供，验证请求次数、参数、AbortSignal 和写入交互，不衡量外部服务连通性、账号认证或模型翻译质量。真实编辑器验证使用 Quill、ProseMirror、Lexical、Slate 和 Draft.js 的公开实现，不能覆盖具体网站的所有定制插件。

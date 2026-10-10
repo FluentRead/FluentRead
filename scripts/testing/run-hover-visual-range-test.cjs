@@ -34,6 +34,7 @@ assert.ok(Number.isInteger(nestedCycles) && nestedCycles>0 && nestedCycles<=20,'
 const nestedScale = Number(arg('nested-scale','1'));
 assert.ok(Number.isFinite(nestedScale) && nestedScale>=0.25 && nestedScale<=2,'Nested scale must be from 0.25 to 2');
 const cpuSessions = new WeakMap();
+const metricSessions = new WeakMap();
 const {chromium} = require(path.join(arg('playwright-root', path.join(os.homedir(), '.cache/codex-runtimes/codex-primary-runtime/dependencies/node/node_modules')), 'playwright'));
 // 连接临时浏览器时保留原生 tab 可见性，不启用 Playwright 默认的 focus/media 覆盖。
 const nativeContextChromium = {
@@ -57,7 +58,15 @@ const report = {baseline, profileCPU, gestureLifecycle, hoverSweep, nestedViewpo
   cases:[], consoleErrors:[]};
 fs.mkdirSync(artifactsDir,{recursive:true});
 
-async function startPhase(page) {
+async function startPhase(page, measureMetrics = false) {
+  if(measureMetrics) {
+    const session=await page.context().newCDPSession(page);
+    try {
+      await session.send('Performance.enable');
+      const before=Object.fromEntries((await session.send('Performance.getMetrics')).metrics.map(metric=>[metric.name,metric.value]));
+      metricSessions.set(page,{session,before});
+    } catch(error) {await session.detach();throw error;}
+  }
   if(profileCPU) {
     const session=await page.context().newCDPSession(page);
     await session.send('Profiler.enable');
@@ -79,6 +88,19 @@ async function finishPhase(page, name) {
     window.__hoverObserver.disconnect(); clearInterval(window.__hoverTimer);
     return {name, longTasksMs:window.__hoverTasks, maxHeartbeatGapMs:Math.max(0,...window.__hoverTicks)};
   },name);
+  const metrics=metricSessions.get(page);
+  if(metrics) {
+    try {
+      const after=Object.fromEntries((await metrics.session.send('Performance.getMetrics')).metrics.map(metric=>[metric.name,metric.value]));
+      result.metrics=Object.fromEntries(['ScriptDuration','TaskDuration','LayoutDuration','RecalcStyleDuration'].map(key=>{
+        const delta=(after[key]-metrics.before[key])*1000;
+        assert.ok(Number.isFinite(delta) && delta>=0,`${name}: finite monotonic ${key}`);
+        return [`${key}Ms`,delta];
+      }));
+      result.metrics.LayoutCount=after.LayoutCount-metrics.before.LayoutCount;
+      result.metrics.RecalcStyleCount=after.RecalcStyleCount-metrics.before.RecalcStyleCount;
+    } finally {await metrics.session.detach();metricSessions.delete(page);}
+  }
   const session=cpuSessions.get(page);
   if(session) {
     const {profile}=await session.send('Profiler.stop');
@@ -273,10 +295,14 @@ async function runHoverLifecycleCancellation(context, setup, provider, port, res
   }
 }
 
-/** 用真实鼠标事件比较长术语库与空词库的输入开销，排除翻译网络与译文布局。 */
+/** 跨两个真实候选比较词库开销；新候选重排停留与快照，排除翻译网络和译文布局。 */
 async function runHoverSweep(context, setup, provider, port) {
   const delayMs = 300, moves = 120;
-  const value = 'This ordinary paragraph keeps native pointer geometry while repeated moves replace the pending translation timer.';
+  const values = [
+    'Alpha ordinary paragraph keeps native geometry while the reader moves to a different translation candidate.',
+    'Beta ordinary paragraph starts a fresh dwell and snapshot when the reader moves back from the other candidate.',
+  ];
+  const value = values.join('');
   const libraries = Array.from({length: 10}, (_, library) => ({
     id: `sweep-${library}`, name: `Sweep fixture ${library}`, enabled: true,
     sourceLanguage: '', targetLanguage: '', domains: [],
@@ -285,8 +311,9 @@ async function runHoverSweep(context, setup, provider, port) {
       target: `夹具词条-${library}-${entry}`, caseSensitive: false,
     })),
   }));
-  report.sweep = {moves, delayMs, repetitions: 3, samples: [],
-    method: 'Trusted CDP mouse moves; native capture-to-bubble event duration; no upstream translation'};
+  report.sweep = {moves, delayMs, repetitions: 3, candidateCount: 2, workload: 'cross-candidate', samples: [],
+    method: 'Trusted CDP moves alternate two native paragraph owners; synchronous capture-to-bubble plus full-phase CDP metrics including animation-frame work; no upstream translation',
+    snapshotPolicy: 'Entering a different delivered candidate captures a new snapshot; animation-frame coalescing may deliver fewer candidate changes than input events'};
   for (const librarySet of [{id: 'empty', libraries: []}, {id: '5000-terms', libraries}]) {
     await patchFixtureConfig(setup, {on: true, hotkey: 'Control', mouseHoverTranslationDelay: delayMs,
       quickTranslationProfiles: [], glossaryEnabled: true, glossaryLibraries: librarySet.libraries});
@@ -299,30 +326,37 @@ async function runHoverSweep(context, setup, provider, port) {
     page.on('pageerror', error => report.consoleErrors.push(error.message));
     await page.goto(`http://127.0.0.1:${port}/hover-sweep-${librarySet.id}`, {waitUntil: 'domcontentloaded'});
     await page.locator('#fluent-read-page-styles').waitFor({state: 'attached'});
-    await page.evaluate(value => {
-      document.getElementById('target').textContent = value;
+    await page.evaluate(values => {
+      document.getElementById('target').replaceChildren(...values.map((value,index)=>{
+        const paragraph=document.createElement('p');paragraph.textContent=value;
+        paragraph.dataset.hoverSweepOwner=String(index);return paragraph;
+      }));
       window.__sweepEvents = [];
       let started;
       window.addEventListener('mousemove', () => {started = performance.now();}, {capture: true});
       window.addEventListener('mousemove', event => window.__sweepEvents.push({
-        durationMs: performance.now() - started, trusted: event.isTrusted, control: event.ctrlKey,
+        at: started, durationMs: performance.now() - started, trusted: event.isTrusted, control: event.ctrlKey,
+        owner: event.target.closest('[data-hover-sweep-owner]')?.dataset.hoverSweepOwner,
       }));
-    }, value);
+    }, values);
     await activateExtensionTabWithoutForeground(context, page);
     await page.waitForTimeout(500);
-    const point = await sourcePoint(page, 25);
+    const points = [await sourcePoint(page,25),await sourcePoint(page,values[0].length+25)];
+    assert.notEqual(points[0].y,points[1].y,'Sweep must cross two distinct native paragraph geometries');
     // A warm-up plus three measured repetitions share this exact page and native source geometry.
     for (let repetition = -1; repetition < 3; repetition += 1) {
       await patchFixtureConfig(setup, {on: true});
       await page.waitForTimeout(100);
-      await page.mouse.move(point.x, point.y);
+      await page.mouse.move(points[0].x, points[0].y);
       await page.evaluate(() => {window.__sweepEvents = [];});
       const before = provider.requestCount();
-      await startPhase(page);
+      await startPhase(page,true);
       await page.keyboard.down('Control');
       const started = performance.now();
       try {
-        for (let move = 0; move < moves; move += 1) await page.mouse.move(point.x + (move % 2), point.y);
+        for (let move = 0; move < moves; move += 1) {
+          const point=points[move%2];await page.mouse.move(point.x,point.y);
+        }
       } finally {
         // An extra trusted key cancels pending work immediately without rewriting a large glossary.
         await page.keyboard.down('Shift'); await page.keyboard.up('Shift'); await page.keyboard.up('Control');
@@ -333,10 +367,12 @@ async function runHoverSweep(context, setup, provider, port) {
       await page.waitForTimeout(delayMs + 50);
       assert.equal(events.length, moves, 'Every measured move must reach native document propagation');
       assert.ok(events.every(event => event.trusted && event.control), 'Every measured move must hold the trusted shortcut');
+      assert.ok(events.every((event,index)=>event.owner===String(index%2)), 'Every trusted move must alternate the actual native candidate owner');
       assert.equal(provider.requestCount(), before, 'Sweep must exercise pending scheduling without upstream work');
       assert.equal(await page.locator('#target .fluent-read-bilingual-content').count(), 0);
       assert.equal(await originalSource(page), value);
       if (repetition >= 0) report.sweep.samples.push({library: librarySet.id, entries, repetition, dispatchMs,
+        maxInterMoveGapMs:Math.max(0,...events.slice(1).map((event,index)=>event.at-events[index].at)),
         eventDurationsMs: events.map(event => event.durationMs), requests: 0, phase});
     }
     await page.close();

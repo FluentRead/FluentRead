@@ -38,7 +38,10 @@ const artifactBytes = Buffer.byteLength(source);
 // 原始对照与集成证据见 docs/reports/section-translation-quality-20261011/。
 // 随后整合区域翻译 0a69bfc3：同依赖 main 为 1,993,179，悬浮集成产物为 1,997,758。
 // 增加 4,579 字节（0.2297%），原预算余量 821 字节，按实测最小增加 4 KB；见悬浮报告 pr-integration-931/。
-const MAX_USERSCRIPT_BYTES = 1_998_000;
+// 安全词库摘要复用、同步坐标解析复用及额外手势/会话复验增加 3,132 字节（0.1568%）：
+// 同依赖独立 982f09df 为 1,997,758，候选为 2,000,890；按实测最小增加 3 KB。
+// 悬浮调度沿用主线单一实现；完整证据见 docs/reports/hover-translation-polish-20261011/verification.json。
+const MAX_USERSCRIPT_BYTES = 2_001_000;
 const preludeStartMarker = '/* FluentRead userscript compatibility prelude:start */';
 const preludeEndMarker = '/* FluentRead userscript compatibility prelude:end */';
 const preludeStart = source.indexOf(preludeStartMarker);

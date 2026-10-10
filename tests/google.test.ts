@@ -93,6 +93,34 @@ describe('Google 批量传输与换线', () => {
         expect(fetchMock.mock.calls.map(([url, init]) => requestData(url, init).texts.length)).toEqual([1, 1]);
         expect(requestData(...fetchMock.mock.calls[0]!).texts[0]).toBe(`<pre>${'C'.repeat(12_000)}</pre>`);
     });
+
+    it('rejects an RPC slot containing a malformed middle subsegment instead of dropping prose', () => {
+        const records = JSON.parse(rpcResponse(['whole']).split('\n').at(-1)!);
+        const payload = JSON.parse(records[0][2]);
+        for (const bad of [null, [7], []]) {
+            payload[1][0][0][5] = [['前半句'], bad, ['后半句']];
+            records[0][2] = JSON.stringify(payload);
+            expect(() => api.parseGoogleBatchResponse(JSON.stringify(records))).toThrow('返回格式异常');
+        }
+    });
+    it('all endpoints with broken arrays expose a structural error and permit standalone recovery', async () => {
+        fetchMock.mockImplementation(async (url, init) => {
+            const data = requestData(url, init);
+            return data.texts.length > 1 ? response('[]') : successfulResponse(url, ['恢复译文']);
+        });
+        await expect(flush(api.translateGoogleTexts(['First', 'Second'], 'en', 'zh')))
+            .rejects.toMatchObject({kind: 'response', code: 'NATIVE_BATCH_RESPONSE_INVALID', retryable: false});
+        expect(fetchMock).toHaveBeenCalledTimes(4);
+        await expect(flush(api.translateGoogleText('First', 'en', 'zh'))).resolves.toBe('恢复译文');
+        expect(fetchMock).toHaveBeenCalledTimes(5);
+    });
+
+    it('preserves invisible blank origins locally and rejects invisible empty translations', async () => {
+        fetchMock.mockResolvedValueOnce(response([['\u200b']])).mockResolvedValueOnce(response(['译文']));
+        await expect(flush(api.translateGoogleTexts(['\u200b', 'Text'], 'en', 'zh')))
+            .resolves.toEqual(['\u200b', '译文']);
+        expect(fetchMock).toHaveBeenCalledTimes(2);
+    });
     it('优先浏览器批量接口，纯文本转义、换行与实体只还原一次', async () => {
         fetchMock.mockResolvedValue(response([['<pre>第一行 &amp; &lt;b&gt;\n  第二行\n\n&amp;lt;</pre>']]));
         const request = api.default({origin: '<b>Hello & world</b>\n  Next line\n\n&lt;'});

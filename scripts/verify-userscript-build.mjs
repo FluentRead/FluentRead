@@ -20,7 +20,9 @@ const artifactBytes = Buffer.byteLength(source);
 // Google 合批、共享请求节奏与 429 退避增加 2,536 字节（0.1284%）：
 // 同依赖独立基线 f3f6016e8 为 1,975,252，候选为 1,977,788；预算增加 3 KB。
 // 实测与重现步骤见 docs/reports/google-batching-backoff-20261010/。
-const MAX_USERSCRIPT_BYTES = 1_979_000;
+// 原生数组完整校验、同预算逐段恢复、实体拒收与 AI 会话隔离另增加 6 KB 预算；
+// 同依赖独立基线 36952b0fe 与增量证据见 docs/reports/native-batch-translation-20261010/。
+const MAX_USERSCRIPT_BYTES = 1_985_000;
 const preludeStartMarker = '/* FluentRead userscript compatibility prelude:start */';
 const preludeEndMarker = '/* FluentRead userscript compatibility prelude:end */';
 const preludeStart = source.indexOf(preludeStartMarker);

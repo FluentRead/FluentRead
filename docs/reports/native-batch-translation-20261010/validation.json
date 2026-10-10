@@ -1,0 +1,61 @@
+{
+  "baseRevision": "36952b0fe4aeed716ad102849624c1e666cfeae0",
+  "validatedProductRevision": "5ebc4d233",
+  "scope": "Targeted regression only; no complete test suite or store release acceptance.",
+  "targetedTests": [
+    {
+      "files": [
+        "fullPageVisibilityScheduling",
+        "translationSlotEchoRegression",
+        "translationBroker",
+        "google",
+        "googleRequestGate",
+        "googleBackoffIntegration",
+        "userscriptViteConfig",
+        "informationHighlightConfig",
+        "architecture/sourceFileHeaders",
+        "architecture/providerBoundaries",
+        "browserCapabilities"
+      ],
+      "passed": 1508,
+      "sourceHeaderAssertions": 893
+    },
+    {
+      "files": [
+        "nativeBatch",
+        "cloudVendorProviders",
+        "deepl",
+        "microsoftTransport"
+      ],
+      "passed": 162,
+      "coverageReport": "coverage.json"
+    }
+  ],
+  "checks": {
+    "typeCheck": "passed",
+    "chromeProductionBuild": "passed",
+    "firefoxProductionBuild": "passed",
+    "userscriptProductionBuild": "passed",
+    "userscriptVerifier": "passed",
+    "extensionManifestVerifier": "passed",
+    "testMatrixAudit": {
+      "passed": true,
+      "registeredFiles": 637,
+      "registeredCases": 10347
+    },
+    "browserCases": {
+      "passed": 19,
+      "report": "browser-report.json"
+    },
+    "documentationBuild": "passed"
+  },
+  "notVerified": [
+    "DeepL live credentials/API acceptance",
+    "Azure live credentials/region/API acceptance",
+    "Google Cloud live credentials/API acceptance",
+    "Firefox browser runtime",
+    "Userscript manager runtime",
+    "Live LLM semantic quality",
+    "All sites, devices, language pairs or service quotas"
+  ]
+}

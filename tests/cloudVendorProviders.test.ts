@@ -114,7 +114,7 @@ describe('谷歌云翻译', () => {
         expect(url).toBe(GOOGLE_CLOUD_TRANSLATION_URL);
         expect(url).not.toContain('gcp-key');
         expect(headers.get('x-goog-api-key')).toBe('gcp-key');
-        expect(JSON.parse(body)).toEqual({q: 'Hello', target: 'zh-CN', format: 'text'});
+        expect(JSON.parse(body)).toEqual({q: ['Hello'], target: 'zh-CN', format: 'text'});
     });
 
     it('显式源语言与错误路径', async () => {
@@ -177,11 +177,91 @@ describe('Azure 翻译', () => {
         respond({error: {code: 401000, message: 'leak'}});
         await expect(azureTranslator({origin: 'x'})).rejects.toThrow('Azure 翻译错误（错误码 401000）');
         respond({});
-        await expect(azureTranslator({origin: 'x'})).rejects.toThrow('Azure 翻译错误');
+        await expect(azureTranslator({origin: 'x'})).rejects.toMatchObject({kind: 'response', code: 'NATIVE_BATCH_RESPONSE_INVALID'});
         respond([{translations: []}]);
         await expect(azureTranslator({origin: 'x'})).rejects.toThrow('Azure 翻译返回格式异常');
+        for (const translations of [{0: {text: '译文'}}, [{text: '译文'}, {text: '多余'}]]) {
+            respond([{translations}]);
+            await expect(azureTranslator({origin: 'x'})).rejects.toMatchObject({code: 'NATIVE_BATCH_RESPONSE_INVALID'});
+        }
         respond([]);
         await expect(azureTranslator({origin: 'x'})).rejects.toThrow('Azure 翻译返回格式异常');
+    });
+});
+
+const nativeCloudProviders = [
+    {label: 'Google Cloud', translate: googleCloudTranslation,
+        bodySources: (body: any) => body.q,
+        success: (texts: unknown[]) => ({data: {translations: texts.map(translatedText => ({translatedText}))}})},
+    {label: 'Azure', translate: azureTranslator,
+        bodySources: (body: any) => body.map((item: any) => item.Text),
+        success: (texts: unknown[]) => texts.map(text => ({translations: [{text}]}))},
+] as const;
+
+describe.each(nativeCloudProviders)('$label 原生数组完整性', ({translate, bodySources, success}) => {
+    it('一次请求保留重复源槽、字面 HTML 与内部换行，空白槽不上传', async () => {
+        const origins = ['<b>Hello & &lt;</b>\nNext', 'duplicate', '', ' \r\n', 'duplicate'];
+        respond(success(['<b>你好 & &lt;</b>\n下一行', '重复一', '重复二']));
+        await expect(translate({origin: origins})).resolves.toEqual([
+            '<b>你好 & &lt;</b>\n下一行', '重复一', '', ' \r\n', '重复二',
+        ]);
+        expect(fetchMock).toHaveBeenCalledOnce();
+        expect(bodySources(JSON.parse(lastCall().body))).toEqual([origins[0], 'duplicate', 'duplicate']);
+        const url = new URL(lastCall().url);
+        if (url.hostname === 'api.cognitive.microsofttranslator.com') expect(url.searchParams.get('textType')).toBe('plain');
+        else expect(JSON.parse(lastCall().body).format).toBe('text');
+    });
+
+    it.each([[], ['一'], ['一', '二', '额外'], ['一', undefined], ['一', 7], ['一', ' \n'], ['一', '\u200b']].map(translations => ({translations})))(
+        '异常结果 $translations 拒绝整批且不在 provider 内重试', async ({translations}) => {
+            respond(success(translations));
+            await expect(translate({origin: ['first', 'second']})).rejects.toMatchObject({
+                kind: 'response', code: 'NATIVE_BATCH_RESPONSE_INVALID', retryable: false,
+            });
+            expect(fetchMock).toHaveBeenCalledOnce();
+        },
+    );
+
+    it('按条数和字符数分包，后包缺项则整个调用失败', async () => {
+        const origins = Array.from({length: 33}, (_, index) => `source ${index}`);
+        fetchMock.mockImplementation(async (_url, init) => json(success(bodySources(JSON.parse(String(init?.body))).map((text: string) => `译:${text}`))));
+        await expect(translate({origin: origins})).resolves.toEqual(origins.map(text => `译:${text}`));
+        expect(fetchMock.mock.calls.map(([, init]) => bodySources(JSON.parse(String(init?.body))).length)).toEqual([32, 1]);
+        fetchMock.mockReset();
+        fetchMock.mockResolvedValueOnce(json(success(Array.from({length: 32}, () => '译文')))).mockResolvedValueOnce(json(success([])));
+        await expect(translate({origin: origins})).rejects.toMatchObject({code: 'NATIVE_BATCH_RESPONSE_INVALID'});
+        expect(fetchMock).toHaveBeenCalledTimes(2);
+        fetchMock.mockClear();
+        fetchMock.mockImplementation(async (_url, init) => json(success(bodySources(JSON.parse(String(init?.body))).map(() => '译文'))));
+        await expect(translate({origin: ['a'.repeat(2_001), 'b'.repeat(2_000)]})).resolves.toEqual(['译文', '译文']);
+        expect(fetchMock).toHaveBeenCalledTimes(2);
+    });
+
+    it('空白数组本地返回，取消后不启动请求或后续分包', async () => {
+        await expect(translate({origin: ['', ' \n', '\u200b']})).resolves.toEqual(['', ' \n', '\u200b']);
+        await expect(translate({origin: []})).resolves.toEqual([]);
+        expect(fetchMock).not.toHaveBeenCalled();
+        const cancelled = new AbortController();
+        cancelled.abort();
+        await expect(translate({origin: ['source'], abortSignal: cancelled.signal})).rejects.toMatchObject({name: 'AbortError'});
+        expect(fetchMock).not.toHaveBeenCalled();
+        const active = new AbortController();
+        fetchMock.mockImplementation(async () => { active.abort(); return json(success(Array.from({length: 32}, () => '译文'))); });
+        await expect(translate({origin: Array.from({length: 33}, () => 'source'), abortSignal: active.signal}))
+            .rejects.toMatchObject({name: 'AbortError'});
+        expect(fetchMock).toHaveBeenCalledOnce();
+    });
+
+    it('成功 HTTP 的损坏 JSON 属于可识别的响应结构错误', async () => {
+        fetchMock.mockResolvedValue(new Response('not json'));
+        await expect(translate({origin: ['first', 'second']})).rejects.toMatchObject({code: 'NATIVE_BATCH_RESPONSE_INVALID'});
+        expect(fetchMock).toHaveBeenCalledOnce();
+    });
+
+    it('HTTP200读取中断不会被归为可拆批的结构错误', async () => {
+        fetchMock.mockResolvedValue({ok: true, json: async () => {throw new TypeError('private response');}} as unknown as Response);
+        await expect(translate({origin: ['first', 'second']})).rejects.toMatchObject({message: '翻译响应读取失败'});
+        expect(fetchMock).toHaveBeenCalledOnce();
     });
 });
 

@@ -35,8 +35,10 @@ const runtime = vi.hoisted(() => ({
         origins.map((origin) => `译:${origin}`),
     ),
     requestOptions: [] as Array<Record<string, unknown>>,
+    requestContexts: [] as string[],
     renderOptions: [] as Array<Record<string, unknown>>,
     parsedSlots: null as string[] | null,
+    nativeBatchEnabled: false,
     cancelQueue: vi.fn(),
     retryCallbacks: [] as Array<() => void>,
     config: {
@@ -70,13 +72,17 @@ vi.mock("@/src/app/translation/check", () => ({checkConfig: () => true}));
 vi.mock('@/src/features/full-page-translation/ui/modalProgressHint', () => ({syncModalTranslationHint: vi.fn()}));
 vi.mock("@/src/core/config/catalog", () => ({
     services: {
+        google: "google",
+        bilibili: "bilibili",
         microsoft: "microsoft",
         freeTranslation: "freeTranslation",
         chromeTranslator: "chromeTranslator",
         localTranslation: "localTranslation",
     },
     servicesType: {
-        isUseAIContext: (service: string) => service === 'ai',
+        isUseAIContext: (service: string, model?: string) => service === 'ai' && model !== 'mt-only',
+        isAI: (service: string) => service === 'ai',
+        isMachine: (service: string) => ['google', 'microsoft', 'freeTranslation', 'bilibili', 'chromeTranslator', 'localTranslation', 'youdao', 'deepL', 'azureTranslator', 'googleCloudTranslation'].includes(service),
     },
     resolveConfiguredModel: (selected?: string, custom?: string) => selected === 'custom'
         ? custom || ''
@@ -97,12 +103,20 @@ vi.mock("@/src/core/language/detect", () => ({
 vi.mock("@/src/app/translation/client", () => ({
     translateText: async (origin: string, _context: string, options: Record<string, unknown>) => {
         runtime.requestOptions.push(options);
+        runtime.requestContexts.push(_context);
         return (await runtime.requests([origin]))[0];
     },
     translateTextBatch: (origins: readonly string[], _context: string, options: Record<string, unknown>) => {
         runtime.requestOptions.push(options);
+        runtime.requestContexts.push(_context);
         return runtime.requests(origins);
     },
+}));
+// 既有视口调度用例隔离逐候选请求计账；原生合批场景在本文件显式启用并经过真实 runtime drain。
+vi.mock('@/src/services/translation/capabilities', () => ({
+    supportsNativeTranslationBatch: (service: string) => runtime.nativeBatchEnabled
+        && ['google', 'microsoft', 'deepL', 'azureTranslator', 'googleCloudTranslation'].includes(service),
+    supportsTranslationBatch: (service: string) => ['google', 'microsoft', 'deepL', 'azureTranslator', 'googleCloudTranslation', 'freeTranslation', 'bilibili'].includes(service),
 }));
 vi.mock("@/src/services/translation/queue", () => ({
     createTranslationQueueSession: () => ({}),
@@ -337,6 +351,7 @@ import {
 } from '@/src/features/full-page-translation/content/translationRequest';
 import {
     createFullPageRequestSessionState,
+    disposeFullPageRequestSession,
     getHoverTranslationRequestSession,
     invalidateContextSensitiveRequestCache,
     invalidateFullPageRequestSessionCache,
@@ -479,8 +494,10 @@ describe("全文翻译可见性锚点", () => {
         runtime.requests.mockReset();
         runtime.requests.mockImplementation(async (origins) => origins.map((origin) => `译:${origin}`));
         runtime.requestOptions = [];
+        runtime.requestContexts = [];
         runtime.renderOptions = [];
         runtime.parsedSlots = null;
+        runtime.nativeBatchEnabled = false;
         runtime.cancelQueue.mockReset();
         runtime.retryCallbacks = [];
         runtime.config.service = "microsoft";
@@ -2564,6 +2581,7 @@ describe("全文翻译可见性锚点", () => {
         expect(await translateTextSlots(['One', 'Two'], snapshot)).toEqual(['结构一', '结构二']);
 
         runtime.parsedSlots = null;
+        runtime.nativeBatchEnabled = false;
         runtime.requests.mockClear();
         expect(await translateTextSlots(['One', undefined as never], snapshot)).toEqual(['译:One', '译:']);
         expect(runtime.requests).toHaveBeenCalledTimes(3);
@@ -2595,28 +2613,26 @@ describe("全文翻译可见性锚点", () => {
         }
     });
 
-    it('Chrome auto 用纯文本槽检测源语言，但仍把带标记正文交给翻译器', async () => {
+    it('Chrome auto 逐槽翻译只借用纯文本整段检测来源，不发送槽标记', async () => {
         const origins = ['Bonjour ', 'le monde.'];
         runtime.parsedSlots = ['你好，', '世界。'];
 
         await expect(translateTextSlots(origins, translationSnapshot({
             service: 'chromeTranslator',
             sourceLanguage: 'auto',
-        }))).resolves.toEqual(['你好，', '世界。']);
+        }))).resolves.toEqual(['译:Bonjour ', '译:le monde.']);
 
-        expect(runtime.requests).toHaveBeenCalledOnce();
-        const translatedPayload = runtime.requests.mock.calls[0]?.[0]?.[0] ?? '';
-        expect(translatedPayload).toContain('___FLUENTREAD_test_0_BEGIN___');
-        expect(translatedPayload).toContain('___FLUENTREAD_test_1_END___');
+        expect(runtime.requests).toHaveBeenCalledTimes(2);
+        expect(runtime.requests.mock.calls.map(([texts]) => texts)).toEqual([['Bonjour '], ['le monde.']]);
         expect(runtime.requestOptions[0]).toMatchObject({
             serviceOverride: 'chromeTranslator',
             sourceLanguage: 'auto',
-            skipLanguageDetection: true,
             sourceLanguageDetectionText: 'Bonjour \nle monde.',
         });
 
         runtime.requests.mockClear();
         runtime.requestOptions = [];
+        runtime.requestContexts = [];
         await translateTextSlots(origins, translationSnapshot({
             service: 'chromeTranslator',
             sourceLanguage: 'fr',
@@ -2625,6 +2641,7 @@ describe("全文翻译可见性锚点", () => {
 
         runtime.requests.mockClear();
         runtime.requestOptions = [];
+        runtime.requestContexts = [];
         await translateTextSlots(origins, translationSnapshot({
             service: 'custom-provider',
             sourceLanguage: 'auto',
@@ -2692,6 +2709,286 @@ describe("全文翻译可见性锚点", () => {
         )).resolves.toEqual(['', '中文']);
     });
 
+    it.each(['google', 'microsoft', 'deepL', 'azureTranslator', 'googleCloudTranslation'])(
+        '原生 %s 数组在关闭 AI 多段时仍自动跨候选合批', async (service) => {
+            runtime.nativeBatchEnabled = true;
+            const session = {active: true, translationSlotCache: new Map()};
+            const snapshot = translationSnapshot({service, enableAIMultiSegment: false});
+            await expect(Promise.all([
+                translateTextSlots(['First'], snapshot, undefined, undefined, session),
+                translateTextSlots(['Second'], snapshot, undefined, undefined, session),
+            ])).resolves.toEqual([['译:First'], ['译:Second']]);
+            expect(runtime.requests).toHaveBeenCalledOnce();
+            expect(runtime.requests).toHaveBeenCalledWith(['First', 'Second']);
+            expect(runtime.requestOptions[0]).not.toHaveProperty('aiMultiSegment');
+        },
+    );
+
+    it('默认原生能力经过全文 runtime drain 合并并将译文回填各自候选', async () => {
+        runtime.nativeBatchEnabled = true;
+        runtime.config.display = 1;
+        runtime.config.fullPageTranslationMode = 'all';
+        document.body.innerHTML = '<main><p id="first">First native paragraph.</p><p id="second">Second native paragraph.</p></main>';
+        const owners = Array.from(document.querySelectorAll<HTMLElement>('p'));
+        owners.forEach(owner => setLayoutBox(owner, 600, 60));
+        runtime.candidates = owners.map(element => ({element, kind: 'content', reason: 'native-runtime-drain'}));
+        autoTranslateEnglishPage();
+        await finishScheduledWork();
+        expect(runtime.requests).toHaveBeenCalledOnce();
+        expect(runtime.requests).toHaveBeenCalledWith(['First native paragraph.', 'Second native paragraph.']);
+        expect(owners.map(owner => owner.querySelector('.fluent-read-bilingual-content')?.textContent))
+            .toEqual(['译:First native paragraph.', '译:Second native paragraph.']);
+        expect(runtime.requestOptions[0]).not.toHaveProperty('aiMultiSegment');
+    });
+
+    it.each(['microsoft', 'ai'])('微任务单候选 %s 冻结请求上下文，页面标题在 flush 前改变不污染旧请求', async service => {
+        runtime.nativeBatchEnabled = true;
+        const session = {active: true, translationSlotCache: new Map()};
+        const snapshot = translationSnapshot({service, enableAIMultiSegment: service === 'ai'});
+        const pending = translateTextSlots(['Frozen title source'], snapshot, undefined, undefined, session);
+        document.title = 'Later route title';
+        await expect(pending).resolves.toEqual(['译:Frozen title source']);
+        expect(runtime.requestContexts).toEqual(['Fixture']);
+    });
+
+    it('原生合批冻结调用快照，并将语言、模型和页面上下文变化隔离', async () => {
+        runtime.nativeBatchEnabled = true;
+        const session = {active: true, translationSlotCache: new Map(), pageContextGeneration: 0};
+        const snapshot = translationSnapshot({glossaryIds: ['one']});
+        const origins = ['First frozen'];
+        const first = translateTextSlots(origins, snapshot, undefined, undefined, session);
+        origins[0] = 'Changed source';
+        snapshot.targetLanguage = 'ja';
+        (snapshot.glossaryIds as string[]).push('two');
+        const second = translateTextSlots(['Second'], translationSnapshot({glossaryIds: ['one']}), undefined, undefined, session);
+        const third = translateTextSlots(['Japanese'], snapshot, undefined, undefined, session);
+        session.pageContextGeneration += 1;
+        const fourth = translateTextSlots(['New context'], translationSnapshot({glossaryIds: ['one']}), undefined, undefined, session);
+        await expect(Promise.all([first, second, third, fourth])).resolves.toEqual([
+            ['译:First frozen'], ['译:Second'], ['译:Japanese'], ['译:New context'],
+        ]);
+        expect(runtime.requests.mock.calls.map(([texts]) => texts)).toEqual([
+            ['First frozen', 'Second'], ['Japanese'], ['New context'],
+        ]);
+        expect(runtime.requestOptions[0]).toMatchObject({targetLanguage: 'zh', glossaryIds: ['one']});
+    });
+
+    it.each([
+        {name: '缺中间项', invalid: ['译:A', '译:C']},
+        {name: '额外项', invalid: ['译:A', '译:B', '译:C', '额外']},
+        {name: '空译文', invalid: ['译:A', '', '译:C']},
+        {name: '非字符串', invalid: ['译:A', 42, '译:C']},
+        {name: '稀疏数组', invalid: Object.assign(new Array(3), {0: '译:A', 2: '译:C'})},
+        {name: '不可见空译文', invalid: ['译:A', '\u200b', '译:C']},
+    ])('原生最终结构异常 $name 整批拒绝且不发布局部结果或再次获得恢复预算', async ({invalid}) => {
+        runtime.nativeBatchEnabled = true;
+        const session = {active: true, translationSlotCache: new Map()};
+        runtime.requests.mockResolvedValueOnce(invalid as string[]);
+        let committed = 0;
+        const results = await Promise.allSettled([
+            translateTextSlots(['A'], translationSnapshot(), undefined, undefined, session)
+                .then(value => { committed += 1; return value; }),
+            translateTextSlots(['B', 'C'], translationSnapshot(), undefined, undefined, session)
+                .then(value => { committed += 1; return value; }),
+        ]);
+        expect(results.every(result => result.status === 'rejected'
+            && result.reason.code === 'NATIVE_BATCH_RESPONSE_INVALID')).toBe(true);
+        expect(committed).toBe(0);
+        expect(runtime.requests).toHaveBeenCalledOnce();
+    });
+
+    it.each(['NATIVE_BATCH_RESPONSE_INVALID', 'TRANSLATION_SLOT_RESPONSE_INVALID'])(
+        '原生 broker 最终恢复失败 code=%s 时全文 runtime 保留原文并呈现失败状态', async code => {
+        runtime.nativeBatchEnabled = true;
+        runtime.config.display = 1;
+        runtime.config.fullPageTranslationMode = 'all';
+        document.body.innerHTML = '<main><p>A native paragraph remains original.</p><p>Another paragraph remains original.</p></main>';
+        const owners = Array.from(document.querySelectorAll<HTMLElement>('p'));
+        owners.forEach(owner => setLayoutBox(owner, 600, 60));
+        runtime.candidates = owners.map(element => ({element, kind: 'content', reason: 'native-final-failure'}));
+        runtime.requests.mockRejectedValueOnce({kind: 'response', code, message: 'bad scalar recovery'});
+        autoTranslateEnglishPage();
+        await finishScheduledWork();
+        expect(runtime.requests).toHaveBeenCalledOnce();
+        expect(owners.map(owner => owner.textContent))
+            .toEqual(['A native paragraph remains original.', 'Another paragraph remains original.']);
+        expect(owners.map(owner => getTranslationState(owner)?.phase)).toEqual(['error', 'error']);
+        expect(document.querySelector('.fluent-read-bilingual-content')).toBeNull();
+    });
+
+    it('原生共享批次取消一个候选后保持其他候选的原始响应索引', async () => {
+        runtime.nativeBatchEnabled = true;
+        const session = {active: true, translationSlotCache: new Map()};
+        const response = deferred<string[]>();
+        runtime.requests.mockReturnValue(response.promise);
+        const cancelled = new AbortController();
+        const a = translateTextSlots(['A'], translationSnapshot(), cancelled.signal, undefined, session);
+        const b = translateTextSlots(['B'], translationSnapshot(), undefined, undefined, session);
+        await Promise.resolve();
+        await Promise.resolve();
+        const sharedSignal = runtime.requestOptions[0]?.signal as AbortSignal;
+        cancelled.abort();
+        await expect(a).rejects.toMatchObject({name: 'AbortError'});
+        expect(sharedSignal.aborted).toBe(false);
+        response.resolve(['译:A', '译:B']);
+        await expect(b).resolves.toEqual(['译:B']);
+        expect(runtime.cancelQueue).not.toHaveBeenCalled();
+    });
+
+    it('全文结束取消原生共享批次并清理所有请求取消域', async () => {
+        runtime.nativeBatchEnabled = true;
+        const session = {active: true, translationSlotCache: new Map(), ...createFullPageRequestSessionState()};
+        const response = deferred<string[]>();
+        runtime.requests.mockReturnValue(response.promise);
+        const a = translateTextSlots(['A'], translationSnapshot(), undefined, undefined, session);
+        const b = translateTextSlots(['B'], translationSnapshot(), undefined, undefined, session);
+        await Promise.resolve();
+        await Promise.resolve();
+        const sharedSignal = runtime.requestOptions[0]?.signal as AbortSignal;
+        disposeFullPageRequestSession(session, new Error('ended'));
+        await expect(a).rejects.toMatchObject({name: 'AbortError'});
+        await expect(b).rejects.toMatchObject({name: 'AbortError'});
+        expect(sharedSignal.aborted).toBe(true);
+        expect(session.requestControllers.size).toBe(0);
+        expect(session.requestQueueSessions.size).toBe(0);
+        response.resolve(['late A', 'late B']);
+        await Promise.resolve();
+    });
+
+    it('原生单候选最终结构异常直接失败，普通网络错误不在前端拆分放大', async () => {
+        runtime.nativeBatchEnabled = true;
+        runtime.requests.mockResolvedValueOnce(['误配']);
+        await expect(translateTextSlots(['A', 'B'], translationSnapshot()))
+            .rejects.toMatchObject({kind: 'response', code: 'NATIVE_BATCH_RESPONSE_INVALID'});
+        expect(runtime.requests).toHaveBeenCalledOnce();
+        runtime.requests.mockReset().mockRejectedValue(new Error('network unavailable'));
+        const session = {active: true, translationSlotCache: new Map()};
+        await expect(Promise.all([
+            translateTextSlots(['First'], translationSnapshot(), undefined, undefined, session),
+            translateTextSlots(['Second'], translationSnapshot(), undefined, undefined, session),
+        ])).rejects.toThrow('network unavailable');
+        expect(runtime.requests).toHaveBeenCalledOnce();
+    });
+
+    it('无原生批协议的机器服务逐槽发送原文且不依赖 BEGIN/END 标记', async () => {
+        await expect(translateTextSlots(['Label A', 'Label B'], translationSnapshot({service: 'youdao'})))
+            .resolves.toEqual(['译:Label A', '译:Label B']);
+        expect(runtime.requests.mock.calls.map(([texts]) => texts)).toEqual([['Label A'], ['Label B']]);
+        expect(runtime.requestOptions.every(options => !options.validateTranslationSlots)).toBe(true);
+    });
+
+    it('不接受通用提示词的翻译专用 AI 模型逐槽发送原文', async () => {
+        const snapshot = translationSnapshot({service: 'ai', model: 'mt-only', enableAIMultiSegment: true});
+        const session = {active: true, translationSlotCache: new Map()};
+        await expect(translateTextSlots(['A', 'B'], snapshot, undefined, undefined, session))
+            .resolves.toEqual(['译:A', '译:B']);
+        expect(runtime.requests.mock.calls.map(([texts]) => texts)).toEqual([['A'], ['B']]);
+        expect(runtime.requestOptions.every(options => !options.validateTranslationSlots && !options.aiMultiSegment)).toBe(true);
+    });
+
+    it.each(['AI_MULTI_SEGMENT_RESPONSE_INVALID', 'TRANSLATION_SLOT_RESPONSE_INVALID'])(
+        'AI 协议失败 %s 在正文 mutation 后仍熔断同会话同快照，其他模型仍可合批', async code => {
+        const snapshot = translationSnapshot({service: 'ai', model: 'first-model', enableAIMultiSegment: true});
+        const session = {active: true, translationSlotCache: new Map(), translationConfig: snapshot,
+            ...createFullPageRequestSessionState()};
+        runtime.requests.mockRejectedValueOnce({kind: 'response', code});
+        await Promise.all([
+            translateTextSlots(['A'], snapshot, undefined, undefined, session),
+            translateTextSlots(['B'], snapshot, undefined, undefined, session),
+        ]);
+        invalidateContextSensitiveRequestCache(session);
+        expect(session.pageContextGeneration).toBe(1);
+        runtime.requests.mockClear();
+        runtime.requestOptions = [];
+        runtime.requestContexts = [];
+        await Promise.all([
+            translateTextSlots(['C', 'D'], snapshot, undefined, undefined, session),
+            translateTextSlots(['E'], snapshot, undefined, undefined, session),
+        ]);
+        expect(runtime.requests.mock.calls.map(([texts]) => texts)).toEqual([['C'], ['D'], ['E']]);
+        expect(runtime.requestOptions.every(options => !options.aiMultiSegment)).toBe(true);
+        invalidateContextSensitiveRequestCache(session);
+        expect(session.pageContextGeneration).toBe(2);
+        runtime.requests.mockClear();
+        runtime.requestOptions = [];
+        await Promise.all([
+            translateTextSlots(['H', 'I'], snapshot, undefined, undefined, session),
+            translateTextSlots(['J'], snapshot, undefined, undefined, session),
+        ]);
+        expect(runtime.requests.mock.calls.map(([texts]) => texts)).toEqual([['H'], ['I'], ['J']]);
+        expect(runtime.requestOptions.every(options => !options.aiMultiSegment)).toBe(true);
+        runtime.requests.mockClear();
+        const other = {...snapshot, model: 'second-model'};
+        await Promise.all([
+            translateTextSlots(['F'], other, undefined, undefined, session),
+            translateTextSlots(['G'], other, undefined, undefined, session),
+        ]);
+        expect(runtime.requests).toHaveBeenCalledOnce();
+        expect(runtime.requestOptions.at(-1)).toMatchObject({aiMultiSegment: true});
+    });
+
+    it('AI 同源不同 owner 的在途工作隔离，邻段变化后不复用旧批次的已结算译文', async () => {
+        document.body.innerHTML = '<section><p>Same</p><p>First neighbor</p></section><section><p>Same</p><p>Second neighbor</p></section>';
+        const owners = Array.from(document.querySelectorAll('p'));
+        const snapshot = translationSnapshot({service: 'ai', enableAIMultiSegment: true, enableAIContext: false});
+        const session = {active: true, translationSlotCache: new Map(), translationConfig: snapshot,
+            ...createFullPageRequestSessionState()};
+        runtime.requests.mockImplementation(async texts => texts.map(text => text === 'Same'
+            ? `根据:${texts[1]}` : `译:${text}`));
+        const first = Promise.all(owners.map(owner => translateTextSlots(
+            [owner.textContent ?? ''], snapshot, undefined, undefined, session, false, owner)));
+        await expect(first).resolves.toEqual([
+            ['根据:First neighbor'], ['译:First neighbor'], ['根据:Second neighbor'], ['译:Second neighbor'],
+        ]);
+        expect(runtime.requests.mock.calls.map(([texts]) => texts)).toEqual([
+            ['Same', 'First neighbor'], ['Same', 'Second neighbor'],
+        ]);
+        expect(session.translationRequestCache.size).toBe(0);
+        owners[1]!.textContent = 'Changed neighbor';
+        await expect(Promise.all([owners[0]!, owners[1]!].map(owner => translateTextSlots(
+            [owner.textContent ?? ''], snapshot, undefined, undefined, session, false, owner))))
+            .resolves.toEqual([['根据:Changed neighbor'], ['译:Changed neighbor']]);
+        expect(runtime.requests).toHaveBeenCalledTimes(3);
+    });
+
+    it('关闭 AI 页面上下文但开启多段时，邻段 mutation 失效入口隔离新 generation 的在途请求', async () => {
+        document.body.innerHTML = '<main><p>Same paragraph</p><p>Changed neighbor</p></main>';
+        const owner = document.querySelector('p')!;
+        const snapshot = translationSnapshot({service: 'ai', enableAIMultiSegment: true, enableAIContext: false});
+        const session = {active: true, translationSlotCache: new Map(), translationConfig: snapshot,
+            ...createFullPageRequestSessionState()};
+        const oldResponse = deferred<string[]>();
+        runtime.requests.mockReturnValueOnce(oldResponse.promise);
+        const old = translateTextSlots(['Same paragraph'], snapshot, undefined, undefined, session, false, owner);
+        await Promise.resolve();
+        await Promise.resolve();
+        expect(session.translationRequestCache.size).toBe(1);
+        // runtime 的来源/相邻内容 mutation 已调用此统一失效入口。
+        invalidateContextSensitiveRequestCache(session);
+        expect(session.pageContextGeneration).toBe(1);
+        expect(session.translationRequestCache.size).toBe(0);
+        await expect(translateTextSlots(['Same paragraph'], snapshot, undefined, undefined, session, false, owner))
+            .resolves.toEqual(['译:Same paragraph']);
+        expect(runtime.requests).toHaveBeenCalledTimes(2);
+        oldResponse.resolve(['旧邻段译文']);
+        await expect(old).resolves.toEqual(['旧邻段译文']);
+        expect(session.translationRequestCache.size).toBe(0);
+    });
+
+    it('AI 从真实 DOM 只合并同父直接相邻正文，不跨未提交的中间段或章节', async () => {
+        document.body.innerHTML = '<main><p>A</p><p>B</p><p>C</p><section><p>D</p></section></main>';
+        const owners = Array.from(document.querySelectorAll('p'));
+        const session = {active: true, translationSlotCache: new Map()};
+        const snapshot = translationSnapshot({service: 'ai', enableAIMultiSegment: true});
+        await Promise.all(owners.map((owner, index) => translateTextSlots(
+            [String(index)], snapshot, undefined, undefined, session, false, owner)));
+        expect(runtime.requests.mock.calls.map(([texts]) => texts)).toEqual([['0', '1', '2'], ['3']]);
+        runtime.requests.mockClear();
+        await Promise.all([owners[0]!, owners[2]!].map((owner, index) => translateTextSlots(
+            [`Gap ${index}`], snapshot, undefined, undefined, session, false, owner)));
+        expect(runtime.requests).toHaveBeenCalledTimes(2);
+    });
+
     it('AI 多段开关只在活跃全文会话中合并相邻候选，并遵守字符上限', async () => {
         const session = {active: true, translationSlotCache: new Map()};
         const enabled = translationSnapshot({
@@ -2752,7 +3049,7 @@ describe("全文翻译可见性锚点", () => {
         expect(runtime.requestOptions[0]).toMatchObject({modelOverride: 'ai-model', targetLanguage: 'zh', glossaryIds: ['library-a']});
         await expect(translateTextSlots(['First paragraph'], originalSnapshot, undefined, undefined, session))
             .resolves.toEqual(['译:First paragraph']);
-        expect(runtime.requests).toHaveBeenCalledTimes(1);
+        expect(runtime.requests).toHaveBeenCalledTimes(2);
         clearFullPageTranslationRequestCache(session);
     });
 
@@ -2790,7 +3087,7 @@ describe("全文翻译可见性锚点", () => {
         expect(sampleBuilds).toBe(1);
     });
 
-    it('AI 多段按完整请求快照分批，并以四个文本槽为硬上限', async () => {
+    it('AI 多段按完整请求快照分批，并以四个文本槽为跨候选合批上限', async () => {
         const session = {active: true, translationSlotCache: new Map()};
         const firstModel = translationSnapshot({
             service: 'ai',
@@ -2815,6 +3112,7 @@ describe("全文翻译可见性锚点", () => {
 
         runtime.requests.mockClear();
         runtime.requestOptions = [];
+        runtime.requestContexts = [];
         const enabled = translationSnapshot({
             service: 'ai',
             model: 'ai-model',
@@ -2870,8 +3168,9 @@ describe("全文翻译可见性锚点", () => {
 
         runtime.requests.mockReset();
         runtime.requests.mockRejectedValue(new Error('provider unavailable'));
-        const first = translateTextSlots(['First'], enabled, undefined, undefined, session);
-        const second = translateTextSlots(['Second'], enabled, undefined, undefined, session);
+        const freshSession = {active: true, translationSlotCache: new Map()};
+        const first = translateTextSlots(['First'], enabled, undefined, undefined, freshSession);
+        const second = translateTextSlots(['Second'], enabled, undefined, undefined, freshSession);
         await expect(Promise.all([first, second])).rejects.toThrow('provider unavailable');
         expect(runtime.requests).toHaveBeenCalledTimes(1);
     });
@@ -7227,8 +7526,10 @@ describe("悬停重挂请求与 synthetic 提交回归", () => {
         runtime.requests.mockReset();
         runtime.requests.mockImplementation(async (origins) => origins.map((origin) => `译:${origin}`));
         runtime.requestOptions = [];
+        runtime.requestContexts = [];
         runtime.renderOptions = [];
         runtime.parsedSlots = null;
+        runtime.nativeBatchEnabled = false;
         runtime.cancelQueue.mockReset();
         runtime.retryCallbacks = [];
         runtime.config.service = "microsoft";

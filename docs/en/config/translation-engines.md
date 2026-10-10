@@ -8,6 +8,12 @@ FluentRead displays translations produced by your selected service. Use the defa
 
 <GuideVisual kind="provider" en />
 
+## Multi-text requests and reliability
+
+Full-page translation automatically groups short passages with the same request settings when using Google translation, Microsoft translation, DeepL, Azure Translator, or Google Cloud Translation. Their native multi-text interfaces keep each source associated with its own result. **AI multi-paragraph translation** remains off by default; other machine translation services continue requesting passages individually.
+
+Results are displayed only after the complete array passes count, type, and nonempty checks. Interfaces with item IDs also require unique, complete IDs. Broken responses are rejected as a whole and recovered individually within the remaining timeout. Failed recovery preserves the original text and shows a failure state; invalid results are never cached. Fewer requests do not reduce character-based billing.
+
 <details class="guide-details">
 <summary>Configure a service</summary>
 
@@ -225,7 +231,7 @@ If you have an OpenCode Zen API key and only need its currently free Big Pickle 
 
 If the connection check returns HTTP 404 with an HTML page, check the endpoint and model protocol; that response does not establish that the API key is invalid. JSON model errors retain the provider's specific explanation. Never include API keys in public issue reports.
 
-Extra AI context can reference the page title and parts of the article to help with meaning. It sends more text and can increase usage and waiting time. Multi-paragraph translation groups nearby passages and may reduce request counts, but failures can still require retries. Both options are off by default and can be enabled independently.
+Extra AI context can reference the page title and parts of the article to help with meaning. It sends more text and can increase usage and waiting time. Multi-paragraph translation groups directly adjacent passages under the same parent and may reduce request counts. Missing or duplicate markers and incomplete results cause the whole group to fall back to individual translation; later passages with the same settings use individual requests for the current page session. Both options are off by default and can be enabled independently.
 
 Restore existing translations before translating with changed settings. Use [glossaries](/en/guide/glossary) for consistent terminology.
 

@@ -21,6 +21,8 @@ import {
 } from '@/src/platform/http/runtime';
 import type {TranslationProviderRequest} from '@/src/services/translation/requestSnapshot';
 import {createGoogleRequestGate, googleRequestDeadlineError} from './googleRequestGate';
+import {isNativeBatchResponseError, NativeBatchResponseError} from '@/src/core/translation/nativeBatch';
+import {hasTranslationContent} from '@/src/core/translation/result';
 
 const GOOGLE_TRANSLATE_RPC_ID = 'MkEWBc';
 const GOOGLE_TRANSLATE_BATCH_URLS = [
@@ -125,7 +127,7 @@ function decodeGoogleText(text: string): string {
 
 function requireGoogleTexts(value: unknown, expectedLength: number): string[] {
     if (!Array.isArray(value) || value.length !== expectedLength
-        || value.some(text => typeof text !== 'string' || !text.trim())) {
+        || value.some(text => typeof text !== 'string' || !hasTranslationContent(text))) {
         throw new Error('返回格式或译文数量异常');
     }
     return value as string[];
@@ -136,13 +138,12 @@ function getArrayItem(value: unknown, index: number): unknown {
 }
 
 function joinTranslationSegments(value: unknown): string | null {
-    if (!Array.isArray(value)) {
+    if (!Array.isArray(value) || Array.from(value).some(segment =>
+        !Array.isArray(segment) || typeof segment[0] !== 'string')) {
         return null;
     }
 
-    const translatedText = value
-        .map(segment => Array.isArray(segment) && typeof segment[0] === 'string' ? segment[0] : '')
-        .join('');
+    const translatedText = value.map(segment => segment[0]).join('');
     return translatedText.length > 0 ? translatedText : null;
 }
 
@@ -212,7 +213,8 @@ function getErrorMessage(error: unknown): string {
 
 function createGoogleParseError(error: unknown, responseBody: string): Error {
     const message = getErrorMessage(error);
-    return new Error(isHtmlResponse(responseBody) ? `${message}（${GOOGLE_CAPTCHA_HINT}）` : message);
+    return isHtmlResponse(responseBody) ? new Error(`${message}（${GOOGLE_CAPTCHA_HINT}）`)
+        : new NativeBatchResponseError(message);
 }
 
 async function fetchGoogleResponse(
@@ -378,6 +380,7 @@ async function executeGoogleTexts(texts: readonly string[], fromLang: string, to
     ];
     const failures: string[] = [];
     const failureStatuses: Array<number | undefined> = [];
+    const structuralFailures: boolean[] = [];
     const ranked = prioritizeGoogleProviders(providers, ++googleSelectionSequence % GOOGLE_EXPLORATION_INTERVAL === 0);
     for (let index = 0; index < ranked.length; index++) {
         const provider = ranked[index]!;
@@ -386,6 +389,7 @@ async function executeGoogleTexts(texts: readonly string[], fromLang: string, to
         if (health.retryAt > Date.now() || health.probing) {
             failures.push(`${provider.name}: 入口暂时冷却`);
             failureStatuses.push(health.statusCode);
+            structuralFailures.push(false);
             continue;
         }
         const remainingTime = deadline - Date.now();
@@ -421,7 +425,9 @@ async function executeGoogleTexts(texts: readonly string[], fromLang: string, to
                 continue;
             }
             // 参数、语言或过大输入错误属于这次请求，不应淘汰正常接口。
-            if (xsrfRejected || ![400, 413, 415, 422].includes(statusCode ?? 0)) {
+            // 合批结构异常可能只影响多项响应，允许 broker 随后逐段恢复；单项与网络故障仍冷却。
+            if (!(texts.length > 1 && isNativeBatchResponseError(error))
+                && (xsrfRejected || ![400, 413, 415, 422].includes(statusCode ?? 0))) {
                 const failureCount = health.failures + 1;
                 const blocked = xsrfRejected || statusCode === 403;
                 const cooldown = blocked ? GOOGLE_BLOCKED_COOLDOWN_MS
@@ -435,13 +441,16 @@ async function executeGoogleTexts(texts: readonly string[], fromLang: string, to
             }
             failures.push(`${provider.name}: ${getErrorMessage(error)}`);
             failureStatuses.push(statusCode);
+            structuralFailures.push(isNativeBatchResponseError(error));
         } finally {
             health.active -= 1;
             if (recovering) health.probing = false;
         }
     }
     const summary = failures.length > 0 ? failures.join('；') : '总请求时间已耗尽';
-    const aggregate = new Error(`谷歌翻译所有匿名接口均失败：${summary}`);
+    const aggregateMessage = `谷歌翻译所有匿名接口均失败：${summary}`;
+    const aggregate = structuralFailures.length > 0 && structuralFailures.every(Boolean)
+        ? new NativeBatchResponseError(aggregateMessage) : new Error(aggregateMessage);
     const firstStatus = failureStatuses[0];
     const requestErrors = new Set([400, 404, 413, 415, 422]);
     if (firstStatus !== undefined && failureStatuses.every(status => status === firstStatus
@@ -518,7 +527,7 @@ function enqueueGoogleText(
     subscribeAbort: (callback: VoidFunction) => VoidFunction, deadlineAt: number,
 ): Promise<string> {
     if (signal?.aborted) return Promise.reject(abortErrorFromSignal(signal));
-    if (!text.trim()) return Promise.resolve(text);
+    if (!hasTranslationContent(text)) return Promise.resolve(text);
     return new Promise((resolve, reject) => {
         const task: PendingGoogleText = {text, fromLang, toLang, signal, deadlineAt,
             settled: false, resolve, reject, removeAbortListener: () => undefined};

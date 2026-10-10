@@ -15,6 +15,52 @@ import {
 } from '@/src/features/input-translation/background/handler';
 
 describe('输入框翻译后台配置绑定', () => {
+    it.each([
+        ['  修复保存记录后再次打开页面时内容丢失的问题。  ', 'zh-Hans', 'en'],
+        ['You can return to your saved paragraphs after closing the browser.', 'en', 'zh-Hans'],
+    ])('输入内容已是本次目标 %s → %s 时原文返回，切换目标 %s 后才调用服务', async (text, target, otherTarget) => {
+        const config = new Config();
+        config.to = otherTarget;
+        const translate = vi.fn(async (_request: TranslationSingleRequestMessage) => '新的译文');
+        const handler = createInputBoxTranslationHandler({ready: Promise.resolve(), getConfig: () => config, translate});
+        await expect(handler.handle({type: 'inputBoxTranslation', text, targetLang: target}))
+            .resolves.toEqual({success: true, translatedText: text});
+        expect(translate).not.toHaveBeenCalled();
+        await expect(handler.handle({type: 'inputBoxTranslation', text, targetLang: otherTarget}))
+            .resolves.toEqual({success: true, translatedText: '新的译文'});
+        expect(translate).toHaveBeenCalledOnce();
+        expect(translate.mock.calls[0][0]).toMatchObject({origin: text, targetLanguage: otherTarget});
+    });
+
+    it('输入框中的真实外语句子继续翻译，不继承网页排除语言', async () => {
+        const config = new Config();
+        config.excludedLanguages = ['en'];
+        const translate = vi.fn(async (_request: TranslationSingleRequestMessage) => '修复了保存错误。请重启浏览器后重试。');
+        const handler = createInputBoxTranslationHandler({ready: Promise.resolve(), getConfig: () => config, translate});
+        const text = '修复了保存错误。Please restart your browser and try again.';
+        await expect(handler.handle({type: 'inputBoxTranslation', text, targetLang: 'zh-Hans'}))
+            .resolves.toMatchObject({success: true});
+        expect(translate).toHaveBeenCalledOnce();
+        expect(translate.mock.calls[0][0].origin).toBe(text);
+    });
+
+    it('水合完成后才读取配置，期间网页修改消息不会更换已解析的目标', async () => {
+        const config = new Config();
+        let hydrate!: () => void;
+        const ready = new Promise<void>(resolve => { hydrate = resolve; });
+        const getConfig = vi.fn(() => config);
+        const translate = vi.fn(async (_request: TranslationSingleRequestMessage) => '不应调用');
+        const handler = createInputBoxTranslationHandler({ready, getConfig, translate});
+        const message = {type: 'inputBoxTranslation' as const, text: '修复保存记录后再次打开页面时内容丢失的问题。', targetLang: 'zh-Hans'};
+        const pending = handler.handle(message);
+        message.targetLang = 'en';
+        expect(getConfig).not.toHaveBeenCalled();
+        hydrate();
+        await expect(pending).resolves.toEqual({success: true, translatedText: message.text});
+        expect(getConfig).toHaveBeenCalledOnce();
+        expect(translate).not.toHaveBeenCalled();
+    });
+
     it('继承当前默认服务，已建立的请求保持快照，独立选择不随默认变更', () => {
         const config = new Config();
         config.service = services.google;

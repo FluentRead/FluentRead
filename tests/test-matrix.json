@@ -405,7 +405,9 @@
       "tests/informationHighlightBackend.test.ts",
       "tests/informationHighlightComposition.test.ts",
       "tests/informationHighlightScoring.test.ts",
-      "tests/informationHighlightWorker.test.ts"
+      "tests/informationHighlightWorker.test.ts",
+      "tests/targetLanguageDetector.test.ts",
+      "tests/targetTranslationResult.test.ts"
     ],
     "functional": [
       "tests/finalCoveragePublicBoundariesA.test.ts",
@@ -604,7 +606,9 @@
       "tests/xModernSiteAdaptationRegression.test.ts",
       "tests/informationHighlightContent.test.ts",
       "tests/informationHighlightUiLifecycle.test.ts",
-      "tests/informationHighlightSettingsLifecycle.test.ts"
+      "tests/informationHighlightSettingsLifecycle.test.ts",
+      "tests/imageTargetLanguage.test.ts",
+      "tests/targetLanguageReleaseCorpus.test.ts"
     ],
     "regression": [
       "tests/discordServerIconBoundary.test.ts",
@@ -645,7 +649,8 @@
       "tests/sameTargetLanguageRegression.test.ts",
       "tests/vocabularyReencounterLifecycle.test.ts",
       "tests/fullPageAttributeBoundary.test.ts",
-      "tests/hnFirstTargetReadiness.test.ts"
+      "tests/hnFirstTargetReadiness.test.ts",
+      "tests/targetLanguageAdversarial.test.ts"
     ]
   }
 }

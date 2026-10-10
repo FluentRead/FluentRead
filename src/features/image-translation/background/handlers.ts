@@ -1,12 +1,13 @@
 /**
  * @file src/features/image-translation/background/handlers.ts
  * 文件职责：定义跨域图片读取、整图翻译、文本批译、阶段进度、取消和语言包下载后台消息，并对来自页面或扩展 UI 的未知输入执行严格校验。
- * 主要内容：按设置选择单图 OCR，漫画俄语和韩语要求既有语言包，其他漫画走 PaddleOCR；包含消息解析、OCR 语言白名单、阶段通知和取消预算，待启动取消只保留尚未消费的有界 ID，避免旧历史误删重复 ID 的新取消；逐包下载排队、去重、部分成功保存和跨页状态查询；图片文本排除无需翻译的标识，去重批量和有界并发翻译同时保留原行映射、可信页面范围与术语版本。
+ * 主要内容：按设置选择单图 OCR，漫画俄语和韩语要求既有语言包，其他漫画走 PaddleOCR；包含消息解析、OCR 语言白名单、阶段通知和取消预算，待启动取消只保留尚未消费的有界 ID，避免旧历史误删重复 ID 的新取消；逐包下载排队、去重、部分成功保存和跨页状态查询；图片文本冻结目标语言，统一过滤同目标正文与无需翻译的标识，保留显式术语覆盖；去重批量和有界并发翻译同时保留原行映射、可信页面范围与术语版本。
  * 模块边界：本文件只负责协议入口与用例编排，不直接运行 Tesseract、Canvas、网络 fetch 或 Offscreen；图像读取和运算能力均由 Offscreen adapter 与 services 实现并由 app 注入。
  */
 import {normalizeRemoteImageUrl} from '../services/remoteImage';
 import {createImageTranslationFailure, imageTranslationFailureCode, imageTranslationFailureResponse} from '../failure';
 import {identifyTextLanguage} from '@/src/core/language/identify';
+import {shouldSkipTranslationForTarget} from '@/src/core/language/detect';
 import {segmentScriptWords} from '@/src/core/language/scripts';
 import {hasTranslatableText} from '@/src/core/translation/resultValidation';
 import {resolveGlossaryEntries, type GlossaryLibrary} from '@/src/core/glossary';
@@ -92,6 +93,7 @@ type ImageTextTranslationRequestBase = {
     sourceLanguageDetectionText?: string;
     glossaryRevision?: string;
     sourceLanguage?: string;
+    targetLanguage?: string;
 };
 
 type ImageTextTranslationRequest = ImageTextTranslationRequestBase & (
@@ -307,11 +309,16 @@ async function translateImageTexts(
     const glossaryContext = getTranslationGlossaryContext(message);
     const sourceLanguage = glossaryContext ? parseRequiredString(message.sourceLanguage, 'sourceLanguage') : undefined;
     const glossaryConfig = dependencies.getGlossaryConfig?.();
-    const uniqueTexts = [...new Set(texts)].filter(text => hasTranslatableText(text)
-        || (glossaryConfig?.glossaryEnabled && resolveGlossaryEntries(glossaryConfig.glossaryLibraries, {
+    const targetLanguage = glossaryConfig?.to;
+    const uniqueTexts = [...new Set(texts)].filter(text => {
+        const hasExplicitGlossary = glossaryConfig?.glossaryEnabled && resolveGlossaryEntries(glossaryConfig.glossaryLibraries, {
             text, sourceLanguage: sourceLanguage ?? glossaryConfig.from, targetLanguage: glossaryConfig.to,
             pageUrl: glossaryContext?.pageUrl,
-        }).terms.length > 0));
+        }).terms.length > 0;
+        if (hasExplicitGlossary) return true;
+        return hasTranslatableText(text)
+            && (!targetLanguage || !shouldSkipTranslationForTarget(text, targetLanguage));
+    });
     // 不删 OCR 行，阅读面板与图片坐标仍以原行对齐；纯标识整图无需外发请求。
     if (uniqueTexts.length === 0) return [...texts];
     const service = dependencies.getTranslationService();
@@ -327,6 +334,7 @@ async function translateImageTexts(
         pageContext: '' as const,
         useCache: true as const,
         serviceOverride: service,
+        ...(targetLanguage ? {targetLanguage} : {}),
         ...(glossaryContext ? {
             glossaryRevision: parseRequiredString(message.glossaryRevision, 'glossaryRevision'),
             sourceLanguage: parseRequiredString(message.sourceLanguage, 'sourceLanguage'),

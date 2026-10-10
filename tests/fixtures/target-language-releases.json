@@ -1,0 +1,12 @@
+[
+  "FluentRead 0.0.34 修复 Microsoft Edge 开发者中心拒绝扩展包的打包兼容问题。",
+  "将 ONNX 运行时以原始 .wasm 文件放入 ZIP，移除触发“包内包含压缩文件”错误的嵌套 .gz 文件。",
+  "保留本地翻译、朗读和字幕转写功能。WASM 二进制内容不变，仅调整打包与加载方式。",
+  "下载说明：Chrome 和 Edge 使用 Chrome ZIP；Firefox ZIP 为未签名构建，用于临时加载或提交签名。另附 Firefox 构建源码和 SHA-256 校验文件。",
+  "翻译语言扩展至 52 种，新增多家云翻译与 AI 服务，包括 Doubao-Seed-Translation。",
+  "支持每个服务配置多个 API Key、自适应轮换、逐个检测连接，以及可配置的冷却时间。",
+  "支持时将漫画重运算移入 Worker，提供 GPU 优先与 CPU 回退和限制并发；图像处理在本地进行，识别出的文字交给所选翻译服务。",
+  "新增可访问字幕驱动的 Google Meet、Teams、Zoom 网页会议双语字幕。",
+  "YouTube、Udemy、Disney+ 可优先使用已有的目标语言人工字幕，缺失时回退翻译。",
+  "新增独立 Thunderbird 邮件翻译、Obsidian 桌面插件及可选的本机 ACP Agent 翻译桥接；配置方式参见仓库文档。"
+]

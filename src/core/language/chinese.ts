@@ -2,7 +2,7 @@
  * @file src/core/language/chinese.ts
  *
  * 文件职责：统一中文语言别名与书写体系，并以保守字形证据区分简体、繁体、简繁同形和未知的纯汉字文本。
- * 主要内容：中文语言码经 codes.ts 的通用标签解析确定简繁；用可审核的简繁冲突对与 Unicode 简繁专属字数据判断字形，要求中文词语或专用字证据，排除简繁混排、罕见扩展字和粤语口语；导出中文专用字形证据，供日文、韩文判断排除中文文本。可核对的公开符号包括 normalizeChineseLanguageCode、getChineseScript、classifyChineseHan、hasSimplifiedChineseEvidence、hasTraditionalChineseEvidence。
+ * 主要内容：中文语言码经 codes.ts 的通用标签解析确定简繁；用可审核的简繁冲突对与 Unicode 简繁专属字数据判断字形，要求中文词语或专用字证据，包含登入、頁面、儲存与瀏覽器等中文界面词语，排除简繁混排、罕见扩展字和粤语口语；导出中文专用字形证据，供日文、韩文判断排除中文文本。可核对的公开符号包括 normalizeChineseLanguageCode、getChineseScript、classifyChineseHan、hasSimplifiedChineseEvidence、hasTraditionalChineseEvidence。
  * 模块边界：本文件属于 core 纯算法，只分析汉字字形，不处理 Latin 标识符、外语正文或其他文字（由 identify.ts 统一完成），不转换原文、不猜测地区或方言，不访问配置、浏览器、网络或翻译服务。
  */
 
@@ -83,9 +83,10 @@ const traditionalChineseEvidencePattern = /[這們譯與說從對樣發氣點實
 const cantoneseMarkerPattern = /[嘅咗哋佢冇嚟喺啲嘢唔咁乜嗰咩噉]/u;
 // 中文词语同样能确认语境，不能只在所有汉字均为中性字形时才使用：
 // 如「清单允许清空，且不再连带拒掉无关偏好的保存」没有命中上方单字短表。
-// 登录、用户、邮箱等中文词语也可确认短界面文本，仍须先通过字形冲突与混合正文检查。
+// 登录/登入、用户、邮箱、頁面、儲存及瀏覽器等中文词语也可确认短界面文本，
+// 单独的「設定」「修復」与日文共享，不能提供这种证据；仍须检查字形冲突与混合正文。
 // 「趨勢」与日文共用，只有简体「趋势」可作这里的中文证据；不能把任意纯 Han 或页面 lang 当作证据。
-const sharedChineseEvidencePattern = /新增|不再|允[许許]|[你您]好|[谢謝]{2}|登[录錄]|用[户戶]|[邮郵]箱|[关關]注|趋势|[条條]款|[隐隱]私/u;
+const sharedChineseEvidencePattern = /新增|不再|允[许許]|[你您]好|[谢謝]{2}|登[录錄入]|用[户戶]|[邮郵]箱|[关關]注|趋势|[条條]款|[隐隱]私|[浏瀏][览覽]器|[页頁]面|[储儲]存/u;
 
 export function hasSimplifiedChineseEvidence(value: string): boolean {
     return simplifiedChineseOnlyPattern.test(value);

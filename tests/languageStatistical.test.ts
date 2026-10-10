@@ -17,6 +17,12 @@ import {
 } from '@/src/core/language/lexicon';
 import {FRANC_MIN_LANGUAGES, STATISTICAL_THRESHOLDS, assessStatisticalLanguage} from '@/src/core/language/statistical';
 
+const rankOverride = vi.hoisted(() => ({value: undefined as Array<[string, number]> | undefined}));
+vi.mock('franc-min', async importOriginal => {
+    const actual = await importOriginal<typeof import('franc-min')>();
+    return {...actual, francAll: (...args: Parameters<typeof actual.francAll>) => rankOverride.value ?? actual.francAll(...args)};
+});
+
 function words(text: string): string[] {
     return text.match(/[\p{L}\p{M}'’]+/gu) ?? [];
 }
@@ -168,5 +174,35 @@ describe('保留翻译机会的拒绝分支', () => {
 
     it('文本为空时没有候选也不会抛错', () => {
         expect(assessStatisticalLanguage('Latin', [])).toMatchObject({candidates: [], reason: 'too-short', bestGuess: undefined});
+    });
+});
+
+describe('模型排序与强功能词旁证', () => {
+    const english = 'You can close the browser after your changes have been saved.';
+
+    it('真实模型把普通英语排为德语时，六种英语功能词与零种德语功能词纠正近邻排序', () => {
+        const result = assess('Latin', english);
+        expect(result.candidates.slice(0, 2).map(candidate => candidate.language)).toEqual(['de', 'en']);
+        expect(result.functionWordScores.de).toBe(0);
+        expect(result).toMatchObject({language: 'en', reason: 'lexical-correction'});
+        expect(assess('Latin', `${english} ${english}`)).toMatchObject({language: 'en'});
+    });
+
+    // 控制依赖的候选排序以验证防御边界；正文仍为完整自然语言，功能词与字母表使用真实数据。
+    // 检查模型缺项或明显不同的排序时能保留翻译，不能为了修正一个英语例子任意提升词典候选。
+    it.each([
+        ['目录候选缺失', english, [['deu', 1], ['fra', 0.96], ['nld', 0.8]]],
+        ['目录候选落在第三位', english, [['deu', 1], ['fra', 0.97], ['eng', 0.96]]],
+        ['共享词证据不足', 'Ik kan in een huis aan de rand van het dorp wonen.', [['deu', 1], ['nld', 0.96], ['fra', 0.8]]],
+        ['主模型已有本语言功能词', 'You can close the browser after your changes have been saved, sagte ich.', [['deu', 1], ['eng', 0.96], ['fra', 0.8]]],
+        ['统计候选远离第一位', english, [['deu', 1], ['eng', 0.7], ['fra', 0.6]]],
+        ['跨语言字母提供反证', `${english} Ça va très bien. À bientôt.`, [['deu', 1], ['eng', 0.96], ['fra', 0.8]]],
+    ] as const)('%s时保留翻译机会', (_label, text, candidates) => {
+        rankOverride.value = candidates.map(([code, score]) => [code, score] as [string, number]);
+        try {
+            expect(assess('Latin', text).language).toBeUndefined();
+        } finally {
+            rankOverride.value = undefined;
+        }
     });
 });

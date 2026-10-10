@@ -25,7 +25,10 @@ const artifactBytes = Buffer.byteLength(source);
 // 原生合批独立开关及冻结策略增加 2,560 字节（0.1291%）：
 // 同依赖基线 e4932521f 为 1,982,807，候选为 1,985,367；预算最小增加 1 KB。
 // 增量与语言固定提交验证见 docs/reports/native-batch-setting-20261011/。
-const MAX_USERSCRIPT_BYTES = 1_986_000;
+// 多文字名称证据、外语否决、结构代码识别和受保护字面量的排版回显兜底增加约 6 KB；
+// 同依赖独立基线 fe7005dd9 为 1,985,411 字节，最终候选与精确增量见
+// docs/reports/target-language-quality-20261011/userscript-size.json；不引入额外检测模型。
+const MAX_USERSCRIPT_BYTES = 1_992_000;
 const preludeStartMarker = '/* FluentRead userscript compatibility prelude:start */';
 const preludeEndMarker = '/* FluentRead userscript compatibility prelude:end */';
 const preludeStart = source.indexOf(preludeStartMarker);

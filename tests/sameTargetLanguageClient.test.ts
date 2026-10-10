@@ -94,7 +94,7 @@ describe('共享翻译客户端', () => {
         const outputs = ['软件读取文档并翻译页面上的语言。', '第二段说明计算机网络设置。'];
         const packet = serializeTranslationSlots([first, second]);
         const current: TranslationConfigSource = {
-            service: 'chromeTranslator', from: 'en', to: 'zh-Hans', useCache: true, enableAIContext: false,
+            service: 'openai', from: 'en', to: 'zh-Hans', useCache: true, enableAIContext: false,
             model: {}, customModel: {}, proxy: {}, custom: '', deeplx: '', newApiUrl: '',
             minimaxBillingPlan: 'payg', minimaxRegion: 'cn', mimoBillingPlan: 'payg', mimoRegion: 'cn',
             azureOpenaiEndpoint: '', customBody: {}, system_role: {}, user_role: {},
@@ -108,12 +108,12 @@ describe('共享翻译客户端', () => {
         });
         const store = new Map<string, string>();
         const broker = createTranslationBroker({
-            ready: Promise.resolve(), getConfig: () => current, providers: {chromeTranslator: provider},
+            ready: Promise.resolve(), getConfig: () => current, providers: {openai: provider},
             cache: {get: async key => store.get(key) ?? null,
                 set: async (key, value) => {store.set(key, value); return true;},
                 clear: async () => store.clear(), cleanup: async () => undefined},
-            serviceTypes: {machine: new Set(['chromeTranslator']), isAI: () => false,
-                isAiSdk: () => false, isUseAIContext: () => false},
+            serviceTypes: {machine: new Set(['chromeTranslator']), isAI: service => service === 'openai',
+                isAiSdk: () => false, isUseAIContext: service => service === 'openai'},
             endpointResolver: {resolveOpenAICompatibleEndpoint: () => ({endpoint: 'https://fixture.invalid/v1'}), aiSdkTransportProfile: 'fixture'},
             promptBuilder: {buildPageSummaryPrompt: text => text, buildPageSummarySystemPrompt: () => ''},
             getMissingCredentialMessage: () => null,
@@ -126,9 +126,9 @@ describe('共享翻译客户端', () => {
             translate: message => broker.translateWithCache(message), serializeError: serializeTranslationError,
         });
         mocks.sendMessage.mockImplementation(message => handler.handle(message, undefined));
-        const frozen: FullPageTranslationConfigSnapshot = {service: 'chromeTranslator', model: '', thinking: false,
+        const frozen: FullPageTranslationConfigSnapshot = {service: 'openai', model: '', thinking: false,
             sourceLanguage: 'en', targetLanguage: 'zh-Hans', useCache: true, enableAIContext: false,
-            enableAIMultiSegment: false, displayMode: 'bilingual', style: 0};
+            enableAIMultiSegment: false, enableNativeBatch: false, displayMode: 'bilingual', style: 0};
         await expect(translateTextSlots([first, second], frozen)).resolves.toEqual(outputs);
         expect(provider.mock.calls.map(([message]) => message.origin)).toEqual([packet.payload, first, second]);
         expect(provider.mock.calls.map(([message]) => message.validateTranslationSlots)).toEqual([true, undefined, undefined]);

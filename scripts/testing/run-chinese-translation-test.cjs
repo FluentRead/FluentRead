@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 'use strict';
 
-// 中文简繁、--spanish 西班牙语、--wrong-language 错语种恢复、--multilingual-same-target 多语言同目标及 --technical-pr-906 技术中文生产浏览器回归：临时 Edge、无前台焦点启动、真实配置选择和真实快捷键。
+// --target-release 验证 GitHub 发布说明中英技术混排；中文简繁、--spanish 西班牙语、--wrong-language 错语种恢复、--multilingual-same-target 多语言同目标及 --technical-pr-906 技术中文生产浏览器回归：临时 Edge、无前台焦点启动、真实配置选择和真实快捷键。
 // 默认同时验证截图中文零请求、相邻外语正常翻译和动态评论换语言后的重新识别。
 // loopback AI fixture 只验证请求与 UI 链路；--live-google 独立报告无需凭据的外部服务实译。
 const assert = require('node:assert/strict');
@@ -13,12 +13,16 @@ const chinesePosts = require('../../tests/fixtures/chinese-language-posts.json')
 const modelPost = require('../../tests/fixtures/chinese-language-model-post.json');
 const {multilingualFixtureTranslation, renderMultilingualPage, runMultilingualSameTargetCases} = require('./multilingual-same-target-browser.cjs');
 const multilingualMode = process.argv.includes('--multilingual-same-target');
-const technicalPr906Mode = process.argv.includes('--technical-pr-906');
-const technicalPr906Posts = technicalPr906Mode ? require('../../tests/fixtures/chinese-technical-pr-906.json') : [];
+const releaseTargetMode = process.argv.includes('--target-release');
+const technicalPr906Mode = releaseTargetMode || process.argv.includes('--technical-pr-906');
+const technicalSourceUrl = releaseTargetMode ? 'https://github.com/FluentRead/FluentRead/releases' : 'https://github.com/FluentRead/FluentRead/pull/906';
+const technicalArtifactLabel = releaseTargetMode ? 'target-language-release' : 'technical-pr-906';
+const technicalPr906Posts = technicalPr906Mode ? require(releaseTargetMode
+  ? '../../tests/fixtures/target-language-releases.json' : '../../tests/fixtures/chinese-technical-pr-906.json') : [];
 if (technicalPr906Mode) {
   assert(!process.argv.some(argument => ['--multilingual-same-target', '--wrong-language', '--spanish', '--excluded-languages', '--live-google'].includes(argument)),
     '--technical-pr-906 必须单独运行，不能隐式扩大专项范围');
-  assert.equal(technicalPr906Posts.length, 4, 'PR #906 夹具必须保留截图中的四段原文');
+  assert.equal(technicalPr906Posts.length, releaseTargetMode ? 10 : 4, '技术中文夹具必须保留受测原文');
 }
 const wrongLanguageMode = process.argv.includes('--wrong-language');
 const wrongLanguageResult = 'このファイルの最初の文字にも制限があります。簡単にするために、最初の文字として文字を使用できます。';
@@ -123,7 +127,13 @@ function renderTechnicalPr906Page(markup) {
     + '</main></body></html>';
 }
 function technicalPr906Translation(source, target) {
-  if (target === 'zh-Hans') return fixtureTranslation(source, target);
+  if (target === 'zh-Hans') {
+    if (!releaseTargetMode || paragraphs.en.some(text => source.includes(text))) return fixtureTranslation(source, target);
+    const translated = '这个页面说明软件的功能和设置。';
+    const slotted = source.replace(/(___FLUENTREAD_([a-z0-9_-]+)_(\d+)_BEGIN___)([\s\S]*?)(___FLUENTREAD_\2_\3_END___)/gu,
+      (_match, begin, _nonce, _index, _content, end) => `${begin}${translated}${end}`);
+    return slotted === source ? translated : slotted;
+  }
   assert.equal(target, 'en', 'PR #906 专项只测试简体中文与英文目标');
   const translated = 'The production test validates the translation controls for the current paragraph.';
   if (source.startsWith('___FLUENTREAD_')) {
@@ -245,11 +255,11 @@ async function startFixture() {
 }
 
 async function runTechnicalPr906Cases({context, createPage, patchConfig, activateExtensionTabWithoutForeground, shot, report, fixture, artifactsDir}) {
-  report.scope = 'PR #906 four technical Chinese paragraphs: plain and code/strong inline DOM, Simplified Chinese hover/full zero requests and zero wrappers, English neighbor restore/retranslate, dynamic Chinese-to-English mutation, target switch to English';
-  report.technicalPr906 = {source: 'https://github.com/FluentRead/FluentRead/pull/906', paragraphs: 4, cases: []};
+  report.scope = `${technicalSourceUrl}: ${technicalPr906Posts.length} technical Chinese paragraphs, plain and code/strong inline DOM, Simplified Chinese hover/full zero requests and zero wrappers, English neighbor restore/retranslate, dynamic Chinese-to-English mutation, target switch to English`;
+  report.technicalPr906 = {source: technicalSourceUrl, paragraphs: technicalPr906Posts.length, cases: []};
   for (const markup of ['plain', 'split']) {
     await patchConfig({from: 'auto', to: 'zh-Hans', useCache: false, excludedLanguages: [], pageTitleTranslationEnabled: false});
-    const page = await createPage(`${fixture.url}/article?source=technical-pr-906&markup=${markup}`, `technical-pr-906-${markup}`);
+    const page = await createPage(`${fixture.url}/article?source=technical-pr-906&markup=${markup}`, `${technicalArtifactLabel}-${markup}`);
     const caseReport = {markup, status: 'running'};
     report.technicalPr906.cases.push(caseReport);
     try {
@@ -277,7 +287,7 @@ async function runTechnicalPr906Cases({context, createPage, patchConfig, activat
       const start = fixture.requests.length;
       const assertRetained = async () => {
         assert.equal(page.url(), initialUrl);
-        assert.equal(await page.locator('[data-technical] .fluent-read-bilingual-content').count(), 0, '四段技术中文不能插入译文');
+        assert.equal(await page.locator('[data-technical] .fluent-read-bilingual-content').count(), 0, '同目标技术中文不能插入译文');
         assert.deepEqual(await page.locator('[data-technical]').allTextContents(), technicalPr906Posts);
         assert.deepEqual(await Promise.all(selectors.map(selector => page.locator(selector).innerHTML())), originalHtml, '中文原始行内 DOM 必须保留');
         assert.equal(await page.locator('.fluent-read-bilingual-content .fluent-read-bilingual-content').count(), 0);
@@ -320,8 +330,8 @@ async function runTechnicalPr906Cases({context, createPage, patchConfig, activat
       await assertRetained();
       caseReport.dynamicRedetection = true;
       caseReport.sameTargetRequestSources = fixture.requests.slice(start).map(request => request.source);
-      await shot(page, `technical-pr-906-${markup}-retained`, {fullPage: true});
-      fs.writeFileSync(path.join(artifactsDir, `technical-pr-906-${markup}-retained.html`), await page.content());
+      await shot(page, `${technicalArtifactLabel}-${markup}-retained`, {fullPage: true});
+      fs.writeFileSync(path.join(artifactsDir, `${technicalArtifactLabel}-${markup}-retained.html`), await page.content());
       await full();
       await page.waitForFunction(() => document.querySelectorAll('.fluent-read-bilingual-content').length === 0);
       assert.equal(await page.locator('#dynamic-comment').innerText(), paragraphs.en[1]);
@@ -339,9 +349,9 @@ async function runTechnicalPr906Cases({context, createPage, patchConfig, activat
       assert(!fixture.requests.slice(switchStart).some(request => paragraphs.en.some(text => request.source.includes(text))), '英文目标下不得请求英文正文');
       assert.equal(await page.locator('.fluent-read-bilingual-content .fluent-read-bilingual-content').count(), 0);
       assert.equal(page.url(), initialUrl);
-      caseReport.targetSwitch = {from: 'zh-Hans', to: 'en', translatedChineseParagraphs: 4, requestCount: fixture.requests.length - switchStart};
-      await shot(page, `technical-pr-906-${markup}-english-target`, {fullPage: true});
-      fs.writeFileSync(path.join(artifactsDir, `technical-pr-906-${markup}-english-target.html`), await page.content());
+      caseReport.targetSwitch = {from: 'zh-Hans', to: 'en', translatedChineseParagraphs: technicalPr906Posts.length, requestCount: fixture.requests.length - switchStart};
+      await shot(page, `${technicalArtifactLabel}-${markup}-english-target`, {fullPage: true});
+      fs.writeFileSync(path.join(artifactsDir, `${technicalArtifactLabel}-${markup}-english-target.html`), await page.content());
       await full();
       await page.waitForFunction(() => document.querySelectorAll('.fluent-read-bilingual-content').length === 0);
       assert.deepEqual(await Promise.all(selectors.map(selector => page.locator(selector).innerHTML())), originalHtml);
@@ -351,11 +361,69 @@ async function runTechnicalPr906Cases({context, createPage, patchConfig, activat
       caseReport.status = 'passed';
     } catch (error) {
       caseReport.status = 'failed'; caseReport.error = error.stack || String(error);
-      await shot(page, `technical-pr-906-${markup}-failure`).catch(() => {});
-      fs.writeFileSync(path.join(artifactsDir, `technical-pr-906-${markup}-failure.html`), await page.content().catch(() => ''));
+      await shot(page, `${technicalArtifactLabel}-${markup}-failure`).catch(() => {});
+      fs.writeFileSync(path.join(artifactsDir, `${technicalArtifactLabel}-${markup}-failure.html`), await page.content().catch(() => ''));
       throw error;
     } finally {await page.close();}
   }
+}
+
+async function runLiveTargetReleaseCase({context, createPage, patchConfig, activateExtensionTabWithoutForeground, shot, report, fixture, artifactsDir}) {
+  await patchConfig({from: 'auto', to: 'zh-Hans', useCache: false, excludedLanguages: [], pageTitleTranslationEnabled: false});
+  const page = await createPage(technicalSourceUrl, 'live-target-language-release');
+  const live = {url: technicalSourceUrl, provider: 'loopback-fixture', status: 'running', cases: []};
+  report.liveRelease = live;
+  try {
+    await page.locator('.markdown-body').first().waitFor({state: 'visible', timeout: 45000});
+    await page.locator('#fluent-read-page-styles').waitFor({state: 'attached'});
+    const needles = ['拒绝扩展包的打包兼容问题', '翻译语言扩展至 52 种', '漫画重运算移入 Worker', 'Thunderbird 邮件翻译', '另附 Firefox 构建源码'];
+    const matches = await page.locator('.markdown-body p, .markdown-body li').evaluateAll((elements, needles) =>
+      needles.map((needle, probe) => {
+        const index = elements.findIndex(element => (element.textContent || '').includes(needle));
+        if (index >= 0) elements[index].setAttribute('data-fr-target-language-probe', String(probe));
+        return {needle, index, probe, source: index < 0 ? '' : elements[index].textContent.trim()};
+      }), needles);
+    assert(matches.every(item => item.index >= 0), '真实发布页面必须找到截图中的所有中文段落');
+    const originalUrl = page.url();
+    const start = fixture.requests.length;
+    for (const match of matches) {
+      const element = page.locator(`[data-fr-target-language-probe="${match.probe}"]`);
+      await element.scrollIntoViewIfNeeded();
+      await activateExtensionTabWithoutForeground(context, page, 30000);
+      await element.click({position: {x: 3, y: 3}}); await element.hover({position: {x: 3, y: 3}});
+      await page.keyboard.down('Control'); await page.keyboard.up('Control');
+      await wait(450);
+      assert.equal(await element.locator('.fluent-read-bilingual-content').count(), 0, `真实中文段落不能插入译文：${match.needle}`);
+      assert.equal((await element.textContent()).trim(), match.source);
+      live.cases.push({...match, hoverWrappers: 0});
+    }
+    assert.equal(fixture.requests.length, start, '真实发布页同目标悬浮必须零请求');
+    live.hoverRequests = 0;
+    await activateExtensionTabWithoutForeground(context, page, 30000);
+    await page.keyboard.down('Alt'); await page.keyboard.press('t'); await page.keyboard.up('Alt');
+    await page.locator('.markdown-body .fluent-read-bilingual-content').first().waitFor({state: 'visible', timeout: 45000});
+    await wait(1800);
+    for (const match of matches) {
+      const element = page.locator(`[data-fr-target-language-probe="${match.probe}"]`);
+      assert.equal(await element.locator('.fluent-read-bilingual-content').count(), 0, `真实中文段落全文不能插入译文：${match.needle}`);
+      assert.equal((await element.textContent()).trim(), match.source);
+    }
+    const leaks = fixture.requests.slice(start).filter(request => needles.some(needle => request.source.includes(needle)));
+    assert.deepEqual(leaks, [], '截图中文段落及其正文槽不能发出请求');
+    live.fullSampleRequests = 0;
+    live.foreignWrappers = await page.locator('.markdown-body .fluent-read-bilingual-content').count();
+    assert(live.foreignWrappers > 0, '真实页面的英文部分必须仍能翻译');
+    await shot(page, 'live-target-language-release', {fullPage: true});
+    fs.writeFileSync(path.join(artifactsDir, 'live-target-language-release.html'), await page.content());
+    await page.keyboard.down('Alt'); await page.keyboard.press('t'); await page.keyboard.up('Alt');
+    await page.waitForFunction(() => document.querySelectorAll('.fluent-read-bilingual-content').length === 0);
+    assert.equal(page.url(), originalUrl);
+    live.restored = true; live.urlStable = true; live.status = 'passed';
+  } catch (error) {
+    live.status = 'failed'; live.error = error.stack || String(error);
+    await shot(page, 'live-target-language-release-failure').catch(() => {});
+    throw error;
+  } finally {await page.close();}
 }
 
 async function main() {
@@ -451,6 +519,7 @@ async function main() {
       report.ui.configuration = {on: true, from: 'auto', to: 'zh-Hans', display: 1, service,
         hotkey: 'Control', floatingBallHotkey: 'Alt+T', useCache: false, fullPageTranslationMode: 'all'};
       await runTechnicalPr906Cases({context, createPage, patchConfig, activateExtensionTabWithoutForeground, shot, report, fixture, artifactsDir});
+      if (releaseTargetMode) await runLiveTargetReleaseCase({context, createPage, patchConfig, activateExtensionTabWithoutForeground, shot, report, fixture, artifactsDir});
       report.fixture.cases = report.technicalPr906.cases;
       report.fixture.ok = report.fixture.cases.every(item => item.status === 'passed');
       assert.equal(report.consoleErrors.length, 0, JSON.stringify(report.consoleErrors));

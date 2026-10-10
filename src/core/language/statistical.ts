@@ -2,7 +2,7 @@
  * @file src/core/language/statistical.ts
  *
  * 文件职责：对 Latin、Cyrillic、Arabic 与 Devanagari 等多语言共用文字执行统计识别，并只在多项独立证据一致时给出可信语言。
- * 主要内容：调用 franc-min 获取候选排序，把 ISO 639-3 结果按文字规范化；以功能词逆文档频率得分、正字法字母反证和候选分差共同评估可信度，分为短文本、长文本和统计模型缺失语言的功能词专用路径三档；franc 分数只作为排序与分差信号，阈值由可复现语料校准，不当作概率。可核对的公开符号包括 assessStatisticalLanguage、StatisticalAssessment、FRANC_MIN_LANGUAGES、STATISTICAL_THRESHOLDS。
+ * 主要内容：调用 franc-min 获取候选排序，把 ISO 639-3 结果按文字规范化；以功能词逆文档频率得分、正字法字母反证和候选分差共同评估可信度，分为短文本、长文本和统计模型缺失语言的功能词专用路径三档；当首位模型没有功能词证据、次位具有至少六种功能词和高独立权重时，可在原有支持分差内纠正排序；franc 分数只作为排序与分差信号，阈值由可复现语料校准，不当作概率。可核对的公开符号包括 assessStatisticalLanguage、StatisticalAssessment、FRANC_MIN_LANGUAGES、STATISTICAL_THRESHOLDS。
  * 模块边界：本文件属于 core 纯算法，只接收已切分的同一文字词段；技术标识符遮蔽、混合文字判断、中日韩文本和目标语言比较由 identify.ts 与 detect.ts 负责，不访问配置、浏览器或网络。
  */
 
@@ -72,7 +72,7 @@ export interface StatisticalAssessment {
     letters: number;
     words: number;
     functionWordScores: Readonly<Record<string, number>>;
-    reason: 'too-short' | 'unsupported' | 'orthography' | 'function-words' | 'decisive' | 'supported' | 'neutral' | 'near-tie' | 'lexical-only';
+    reason: 'too-short' | 'unsupported' | 'orthography' | 'function-words' | 'decisive' | 'supported' | 'neutral' | 'near-tie' | 'lexical-correction' | 'lexical-only';
 }
 
 const functionWordWeights = new Map<StatisticalScript, Map<string, number>>();
@@ -138,7 +138,8 @@ function canonicalFrancCode(code: string, script: StatisticalScript): string {
  * 1. franc 首位且功能词决定性领先（至少 3 个不同功能词、得分翻倍领先）；
  * 2. franc 首位、功能词严格领先且分差达标；
  * 3. franc 首位、功能词不矛盾（与其他语言持平）但分差更大，适用于俄/保/乌等共享功能词的短句；
- * 4. franc 前两位几乎持平时，由决定性领先的功能词语言打破平局；
+ * 4. franc 前两位几乎持平时，由决定性领先的功能词语言打破平局；首位无任何功能词证据时，
+ *    次位至少六种功能词且权重达到决定性门槛三倍，才可在支持分差内纠正统计误排；
  * 5. franc-min 没有统计模型的目录语言只接受决定性功能词证据。
  * 每条路径都要求目标语言字母表内无反证；所有分数只用于同一文本内比较。
  */
@@ -212,6 +213,18 @@ export function assessStatisticalLanguage(script: StatisticalScript, words: read
         && candidates.indexOf(leaderCandidate) === 1
         && isDecisive(lexicalLeader) && consistentOrthography(lexicalLeader)) {
         return {...base, language: lexicalLeader, reason: 'near-tie'};
+    }
+
+    // 例如普通英语操作句可能被三元组误排为德语，但六种英文功能词与零个德文功能词
+    // 是独立反证。仅救援统计第二位；不能凭词典把模型中缺失、字母冲突或远落后的候选抬升。
+    if (top && leaderCandidate && leaderCandidate !== top && candidates.indexOf(leaderCandidate) === 1
+        && catalogLanguages.includes(lexicalLeader)
+        && hits[lexicalLeader]! >= thresholds.decisiveMinHits * 2
+        && scores[lexicalLeader]! >= thresholds.decisiveMinScore * 3
+        && scores[top.language] === 0
+        && top.score - leaderCandidate.score <= thresholds.supportedMinGap * gapScale
+        && consistentOrthography(lexicalLeader)) {
+        return {...base, language: lexicalLeader, reason: 'lexical-correction'};
     }
 
     // 统计模型缺失的目录语言（如斯洛伐克语、丹麦语）只能依赖功能词与正字法，要求决定性证据。

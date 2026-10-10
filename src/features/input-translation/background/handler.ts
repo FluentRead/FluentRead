@@ -1,11 +1,12 @@
 /**
  * @file src/features/input-translation/background/handler.ts
  * 文件职责：定义输入框快捷翻译的后台消息处理器，在调用共享翻译 broker 前校验原文和目标语言，并统一返回成功译文结构。
- * 主要内容：包含 inputBoxTranslation 消息常量、请求/响应与依赖接口、非空字符串解析，以及 createInputBoxTranslationHandler 工厂对本地配置快照和共享翻译 broker 的薄编排。
+ * 主要内容：包含 inputBoxTranslation 消息常量、请求/响应与依赖接口、非空字符串解析，以及 createInputBoxTranslationHandler 工厂对本地配置快照和共享翻译 broker 的薄编排；可信识别为本次目标语言时直接返回完整原文，混合或未知内容仍交给 broker。
  * 模块边界：此文件不监听键盘、不修改输入框也不绑定具体 provider；content feature 负责触发和提交，翻译实现由 background composition root 注入，统一路由负责错误响应。网页消息只能携带纯文本和目标语言，服务、模型、提示词与凭据均从后台配置读取。
  */
 import {servicesType, resolveConfiguredModel} from '@/src/core/config/catalog';
 import {Config} from '@/src/core/config/model';
+import {shouldSkipTranslationForTarget} from '@/src/core/language/detect';
 import {
     DEFAULT_INPUT_BOX_TRANSLATION_SYSTEM_PROMPT,
     completeInputBoxTranslationPrompt,
@@ -108,6 +109,9 @@ export function createInputBoxTranslationHandler(
             await dependencies.ready;
             // 步骤 2：服务、模型、提示词和凭据均从配置读取，并在任何 await 前冻结。
             const request = createInputBoxTranslationRequest(dependencies.getConfig(), text, targetLanguage);
+            if (shouldSkipTranslationForTarget(text, targetLanguage)) {
+                return {success: true, translatedText: text};
+            }
             const result = await dependencies.translate(request);
             const translatedText = Array.isArray(result) ? result[0] : result;
             if (typeof translatedText !== 'string' || !translatedText.trim()) {

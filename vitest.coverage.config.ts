@@ -84,6 +84,11 @@ export default defineConfig({
         // 按真实规则内容验证共享词书样式，与普通测试配置一致。
         css: {include: [/(?:src\/app\/content\/page|src\/ui\/styles\/(?:translation-display|bilingual-sentence-highlight|vocabulary-reencounter))\.css(?:\?|$)/]},
         include: [
+            'tests/targetLanguageDetector.test.ts',
+            'tests/targetTranslationResult.test.ts',
+            'tests/imageTargetLanguage.test.ts',
+            'tests/targetLanguageAdversarial.test.ts',
+            'tests/targetLanguageReleaseCorpus.test.ts',
             'tests/informationHighlightArtifacts.test.ts',
             'tests/informationHighlightBackend.test.ts',
             'tests/informationHighlightComposition.test.ts',
@@ -1080,6 +1085,7 @@ export default defineConfig({
                 'src/core/translation/dom.ts',
                 'src/core/translation/font.ts',
                 'src/core/translation/result.ts',
+                'src/core/translation/targetResult.ts',
                 'src/core/translation/nativeBatch.ts',
                 'src/providers/translation/native-batch.ts',
                 'src/core/translation/engine.ts',

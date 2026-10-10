@@ -1,0 +1,2033 @@
+{
+  "recognized": 45,
+  "total": 52,
+  "misses": [
+    {
+      "id": "release-id-body",
+      "text": "Pembaca sekarang dapat menyimpan sebuah paragraf untuk dibaca nanti. Meskipun peramban sudah ditutup, teks yang disimpan tetap tersedia ketika halaman dibuka kembali.",
+      "languages": [
+        "id"
+      ],
+      "tags": [
+        "native-body",
+        "holdout"
+      ],
+      "identification": {
+        "status": "unknown",
+        "languages": [],
+        "bestGuess": "id"
+      },
+      "paragraph": {
+        "candidates": [
+          {
+            "language": "id",
+            "score": 1
+          },
+          {
+            "language": "ms",
+            "score": 0.9650567142334431
+          },
+          {
+            "language": "su",
+            "score": 0.8310464690815953
+          },
+          {
+            "language": "mad",
+            "score": 0.7894255396999634
+          }
+        ],
+        "bestGuess": "id",
+        "letters": 142,
+        "words": 22,
+        "functionWordScores": {
+          "en": 0,
+          "fr": 0,
+          "de": 0,
+          "es": 0,
+          "pt": 0,
+          "it": 0,
+          "nl": 0,
+          "pl": 0,
+          "cs": 0,
+          "sk": 0,
+          "ro": 0,
+          "hu": 0,
+          "tr": 0,
+          "vi": 0,
+          "id": 1.5,
+          "ms": 1.5,
+          "fil": 0,
+          "sw": 0,
+          "sv": 0,
+          "da": 0,
+          "nb": 0,
+          "fi": 0,
+          "et": 0,
+          "lv": 0,
+          "lt": 0,
+          "sl": 0,
+          "hr": 0,
+          "bs": 0,
+          "sr-Latn": 0,
+          "ca": 0,
+          "gl": 0,
+          "af": 0,
+          "nn": 0
+        },
+        "reason": "function-words",
+        "functionWords": [
+          {
+            "language": "id",
+            "score": 1.5,
+            "hits": [
+              "untuk",
+              "sudah",
+              "yang"
+            ]
+          },
+          {
+            "language": "ms",
+            "score": 1.5,
+            "hits": [
+              "untuk",
+              "sudah",
+              "yang"
+            ]
+          },
+          {
+            "language": "en",
+            "score": 0,
+            "hits": []
+          },
+          {
+            "language": "fr",
+            "score": 0,
+            "hits": []
+          }
+        ]
+      },
+      "sentences": [
+        {
+          "text": "Pembaca sekarang dapat menyimpan sebuah paragraf untuk dibaca nanti",
+          "candidates": [
+            {
+              "language": "id",
+              "score": 1
+            },
+            {
+              "language": "ms",
+              "score": 0.8930901183860835
+            },
+            {
+              "language": "jv",
+              "score": 0.824112104373037
+            },
+            {
+              "language": "su",
+              "score": 0.8067165982121285
+            }
+          ],
+          "bestGuess": "id",
+          "letters": 59,
+          "words": 9,
+          "functionWordScores": {
+            "en": 0,
+            "fr": 0,
+            "de": 0,
+            "es": 0,
+            "pt": 0,
+            "it": 0,
+            "nl": 0,
+            "pl": 0,
+            "cs": 0,
+            "sk": 0,
+            "ro": 0,
+            "hu": 0,
+            "tr": 0,
+            "vi": 0,
+            "id": 0.5,
+            "ms": 0.5,
+            "fil": 0,
+            "sw": 0,
+            "sv": 0,
+            "da": 0,
+            "nb": 0,
+            "fi": 0,
+            "et": 0,
+            "lv": 0,
+            "lt": 0,
+            "sl": 0,
+            "hr": 0,
+            "bs": 0,
+            "sr-Latn": 0,
+            "ca": 0,
+            "gl": 0,
+            "af": 0,
+            "nn": 0
+          },
+          "reason": "function-words",
+          "functionWords": [
+            {
+              "language": "id",
+              "score": 0.5,
+              "hits": [
+                "untuk"
+              ]
+            },
+            {
+              "language": "ms",
+              "score": 0.5,
+              "hits": [
+                "untuk"
+              ]
+            },
+            {
+              "language": "en",
+              "score": 0,
+              "hits": []
+            },
+            {
+              "language": "fr",
+              "score": 0,
+              "hits": []
+            }
+          ]
+        },
+        {
+          "text": " Meskipun peramban sudah ditutup, teks yang disimpan tetap tersedia ketika halaman dibuka kembali",
+          "candidates": [
+            {
+              "language": "ms",
+              "score": 1
+            },
+            {
+              "language": "id",
+              "score": 0.9781981676280964
+            },
+            {
+              "language": "su",
+              "score": 0.8111638954869359
+            },
+            {
+              "language": "mad",
+              "score": 0.7015609093993892
+            }
+          ],
+          "bestGuess": "ms",
+          "letters": 83,
+          "words": 13,
+          "functionWordScores": {
+            "en": 0,
+            "fr": 0,
+            "de": 0,
+            "es": 0,
+            "pt": 0,
+            "it": 0,
+            "nl": 0,
+            "pl": 0,
+            "cs": 0,
+            "sk": 0,
+            "ro": 0,
+            "hu": 0,
+            "tr": 0,
+            "vi": 0,
+            "id": 1,
+            "ms": 1,
+            "fil": 0,
+            "sw": 0,
+            "sv": 0,
+            "da": 0,
+            "nb": 0,
+            "fi": 0,
+            "et": 0,
+            "lv": 0,
+            "lt": 0,
+            "sl": 0,
+            "hr": 0,
+            "bs": 0,
+            "sr-Latn": 0,
+            "ca": 0,
+            "gl": 0,
+            "af": 0,
+            "nn": 0
+          },
+          "reason": "function-words",
+          "functionWords": [
+            {
+              "language": "id",
+              "score": 1,
+              "hits": [
+                "sudah",
+                "yang"
+              ]
+            },
+            {
+              "language": "ms",
+              "score": 1,
+              "hits": [
+                "sudah",
+                "yang"
+              ]
+            },
+            {
+              "language": "en",
+              "score": 0,
+              "hits": []
+            },
+            {
+              "language": "fr",
+              "score": 0,
+              "hits": []
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "release-ms-body",
+      "text": "Pembaca kini boleh menyimpan satu perenggan untuk dibaca kemudian. Walaupun pelayar telah ditutup, teks yang disimpan masih tersedia apabila halaman dibuka semula.",
+      "languages": [
+        "ms"
+      ],
+      "tags": [
+        "native-body",
+        "holdout"
+      ],
+      "identification": {
+        "status": "unknown",
+        "languages": [],
+        "bestGuess": "id"
+      },
+      "paragraph": {
+        "candidates": [
+          {
+            "language": "id",
+            "score": 1
+          },
+          {
+            "language": "ms",
+            "score": 0.9869623785240066
+          },
+          {
+            "language": "su",
+            "score": 0.81405753872799
+          },
+          {
+            "language": "mad",
+            "score": 0.7391513518714519
+          }
+        ],
+        "bestGuess": "id",
+        "functionWordLeader": "ms",
+        "letters": 139,
+        "words": 22,
+        "functionWordScores": {
+          "en": 0,
+          "fr": 0,
+          "de": 0,
+          "es": 0,
+          "pt": 0,
+          "it": 0,
+          "nl": 0,
+          "pl": 0,
+          "cs": 0,
+          "sk": 0,
+          "ro": 0,
+          "hu": 0,
+          "tr": 0,
+          "vi": 0,
+          "id": 1.5,
+          "ms": 2.5,
+          "fil": 0,
+          "sw": 0,
+          "sv": 0,
+          "da": 0,
+          "nb": 0,
+          "fi": 0,
+          "et": 0,
+          "lv": 0,
+          "lt": 0,
+          "sl": 0,
+          "hr": 0,
+          "bs": 0,
+          "sr-Latn": 0,
+          "ca": 0,
+          "gl": 0,
+          "af": 0,
+          "nn": 0
+        },
+        "reason": "function-words",
+        "functionWords": [
+          {
+            "language": "ms",
+            "score": 2.5,
+            "hits": [
+              "boleh",
+              "untuk",
+              "telah",
+              "yang"
+            ]
+          },
+          {
+            "language": "id",
+            "score": 1.5,
+            "hits": [
+              "untuk",
+              "telah",
+              "yang"
+            ]
+          },
+          {
+            "language": "en",
+            "score": 0,
+            "hits": []
+          },
+          {
+            "language": "fr",
+            "score": 0,
+            "hits": []
+          }
+        ]
+      },
+      "sentences": [
+        {
+          "text": "Pembaca kini boleh menyimpan satu perenggan untuk dibaca kemudian",
+          "candidates": [
+            {
+              "language": "id",
+              "score": 1
+            },
+            {
+              "language": "ms",
+              "score": 0.9768691588785047
+            },
+            {
+              "language": "su",
+              "score": 0.7239485981308411
+            },
+            {
+              "language": "jv",
+              "score": 0.6483644859813085
+            }
+          ],
+          "bestGuess": "id",
+          "functionWordLeader": "ms",
+          "letters": 57,
+          "words": 9,
+          "functionWordScores": {
+            "en": 0,
+            "fr": 0,
+            "de": 0,
+            "es": 0,
+            "pt": 0,
+            "it": 0,
+            "nl": 0,
+            "pl": 0,
+            "cs": 0,
+            "sk": 0,
+            "ro": 0,
+            "hu": 0,
+            "tr": 0,
+            "vi": 0,
+            "id": 0.5,
+            "ms": 1.5,
+            "fil": 0,
+            "sw": 0,
+            "sv": 0,
+            "da": 0,
+            "nb": 0,
+            "fi": 0,
+            "et": 0,
+            "lv": 0,
+            "lt": 0,
+            "sl": 0,
+            "hr": 0,
+            "bs": 0,
+            "sr-Latn": 0,
+            "ca": 0,
+            "gl": 0,
+            "af": 0,
+            "nn": 0
+          },
+          "reason": "function-words",
+          "functionWords": [
+            {
+              "language": "ms",
+              "score": 1.5,
+              "hits": [
+                "boleh",
+                "untuk"
+              ]
+            },
+            {
+              "language": "id",
+              "score": 0.5,
+              "hits": [
+                "untuk"
+              ]
+            },
+            {
+              "language": "en",
+              "score": 0,
+              "hits": []
+            },
+            {
+              "language": "fr",
+              "score": 0,
+              "hits": []
+            }
+          ]
+        },
+        {
+          "text": " Walaupun pelayar telah ditutup, teks yang disimpan masih tersedia apabila halaman dibuka semula",
+          "candidates": [
+            {
+              "language": "ms",
+              "score": 1
+            },
+            {
+              "language": "id",
+              "score": 0.9891519667955854
+            },
+            {
+              "language": "su",
+              "score": 0.8671823412885576
+            },
+            {
+              "language": "mad",
+              "score": 0.7728516177719083
+            }
+          ],
+          "bestGuess": "ms",
+          "letters": 82,
+          "words": 13,
+          "functionWordScores": {
+            "en": 0,
+            "fr": 0,
+            "de": 0,
+            "es": 0,
+            "pt": 0,
+            "it": 0,
+            "nl": 0,
+            "pl": 0,
+            "cs": 0,
+            "sk": 0,
+            "ro": 0,
+            "hu": 0,
+            "tr": 0,
+            "vi": 0,
+            "id": 1,
+            "ms": 1,
+            "fil": 0,
+            "sw": 0,
+            "sv": 0,
+            "da": 0,
+            "nb": 0,
+            "fi": 0,
+            "et": 0,
+            "lv": 0,
+            "lt": 0,
+            "sl": 0,
+            "hr": 0,
+            "bs": 0,
+            "sr-Latn": 0,
+            "ca": 0,
+            "gl": 0,
+            "af": 0,
+            "nn": 0
+          },
+          "reason": "function-words",
+          "functionWords": [
+            {
+              "language": "id",
+              "score": 1,
+              "hits": [
+                "telah",
+                "yang"
+              ]
+            },
+            {
+              "language": "ms",
+              "score": 1,
+              "hits": [
+                "telah",
+                "yang"
+              ]
+            },
+            {
+              "language": "en",
+              "score": 0,
+              "hits": []
+            },
+            {
+              "language": "fr",
+              "score": 0,
+              "hits": []
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "release-da-body",
+      "text": "Læsere kan nu gemme et afsnit og vende tilbage til det senere. Selv efter at browseren er lukket, er den gemte tekst stadig tilgængelig, når siden åbnes igen.",
+      "languages": [
+        "da"
+      ],
+      "tags": [
+        "native-body",
+        "holdout"
+      ],
+      "identification": {
+        "status": "unknown",
+        "languages": [],
+        "bestGuess": "nl"
+      },
+      "paragraph": {
+        "candidates": [
+          {
+            "language": "nl",
+            "score": 1
+          },
+          {
+            "language": "de",
+            "score": 0.9272430865837459
+          },
+          {
+            "language": "sv",
+            "score": 0.8652336674314696
+          },
+          {
+            "language": "fr",
+            "score": 0.7860765608018355
+          }
+        ],
+        "bestGuess": "nl",
+        "functionWordLeader": "da",
+        "letters": 127,
+        "words": 28,
+        "functionWordScores": {
+          "en": 0.2,
+          "fr": 0.2,
+          "de": 0.2,
+          "es": 0,
+          "pt": 0,
+          "it": 0,
+          "nl": 0.3666666666666667,
+          "pl": 0,
+          "cs": 0,
+          "sk": 0,
+          "ro": 0.3333333333333333,
+          "hu": 0,
+          "tr": 0,
+          "vi": 0,
+          "id": 0,
+          "ms": 0,
+          "fil": 0.2,
+          "sw": 0,
+          "sv": 1.65,
+          "da": 6.05,
+          "nb": 3.216666666666667,
+          "fi": 0,
+          "et": 0.2,
+          "lv": 0,
+          "lt": 0,
+          "sl": 0,
+          "hr": 0,
+          "bs": 0,
+          "sr-Latn": 0,
+          "ca": 0.2,
+          "gl": 0,
+          "af": 0.16666666666666666,
+          "nn": 2.0166666666666666
+        },
+        "reason": "orthography",
+        "functionWords": [
+          {
+            "language": "da",
+            "score": 6.05,
+            "hits": [
+              "kan",
+              "nu",
+              "et",
+              "og",
+              "til",
+              "det",
+              "selv",
+              "efter",
+              "at",
+              "er",
+              "den",
+              "stadig",
+              "når",
+              "siden",
+              "igen"
+            ]
+          },
+          {
+            "language": "nb",
+            "score": 3.216666666666667,
+            "hits": [
+              "kan",
+              "et",
+              "og",
+              "til",
+              "det",
+              "selv",
+              "at",
+              "er",
+              "den",
+              "når",
+              "siden"
+            ]
+          },
+          {
+            "language": "nn",
+            "score": 2.0166666666666666,
+            "hits": [
+              "kan",
+              "og",
+              "til",
+              "det",
+              "at",
+              "er",
+              "den",
+              "når"
+            ]
+          },
+          {
+            "language": "sv",
+            "score": 1.65,
+            "hits": [
+              "kan",
+              "nu",
+              "det",
+              "efter",
+              "er",
+              "den"
+            ]
+          }
+        ]
+      },
+      "sentences": [
+        {
+          "text": "Læsere kan nu gemme et afsnit og vende tilbage til det senere",
+          "candidates": [
+            {
+              "language": "nl",
+              "score": 1
+            },
+            {
+              "language": "tr",
+              "score": 0.90792928408892
+            },
+            {
+              "language": "fr",
+              "score": 0.8881498337125854
+            },
+            {
+              "language": "de",
+              "score": 0.87852266760021
+            }
+          ],
+          "bestGuess": "nl",
+          "functionWordLeader": "da",
+          "letters": 50,
+          "words": 12,
+          "functionWordScores": {
+            "en": 0,
+            "fr": 0.2,
+            "de": 0,
+            "es": 0,
+            "pt": 0,
+            "it": 0,
+            "nl": 0.16666666666666666,
+            "pl": 0,
+            "cs": 0,
+            "sk": 0,
+            "ro": 0.3333333333333333,
+            "hu": 0,
+            "tr": 0,
+            "vi": 0,
+            "id": 0,
+            "ms": 0,
+            "fil": 0,
+            "sw": 0,
+            "sv": 0.75,
+            "da": 1.6166666666666665,
+            "nb": 1.2833333333333332,
+            "fi": 0,
+            "et": 0.2,
+            "lv": 0,
+            "lt": 0,
+            "sl": 0,
+            "hr": 0,
+            "bs": 0,
+            "sr-Latn": 0,
+            "ca": 0.2,
+            "gl": 0,
+            "af": 0.16666666666666666,
+            "nn": 1.0833333333333333
+          },
+          "reason": "orthography",
+          "functionWords": [
+            {
+              "language": "da",
+              "score": 1.6166666666666665,
+              "hits": [
+                "kan",
+                "nu",
+                "et",
+                "og",
+                "til",
+                "det"
+              ]
+            },
+            {
+              "language": "nb",
+              "score": 1.2833333333333332,
+              "hits": [
+                "kan",
+                "et",
+                "og",
+                "til",
+                "det"
+              ]
+            },
+            {
+              "language": "nn",
+              "score": 1.0833333333333333,
+              "hits": [
+                "kan",
+                "og",
+                "til",
+                "det"
+              ]
+            },
+            {
+              "language": "sv",
+              "score": 0.75,
+              "hits": [
+                "kan",
+                "nu",
+                "det"
+              ]
+            }
+          ]
+        },
+        {
+          "text": " Selv efter at browseren er lukket, er den gemte tekst stadig tilgængelig, når siden åbnes igen",
+          "candidates": [
+            {
+              "language": "nl",
+              "score": 1
+            },
+            {
+              "language": "de",
+              "score": 0.9568793326283633
+            },
+            {
+              "language": "sv",
+              "score": 0.8955469392550817
+            },
+            {
+              "language": "es",
+              "score": 0.7157795793678768
+            }
+          ],
+          "bestGuess": "nl",
+          "functionWordLeader": "da",
+          "letters": 77,
+          "words": 16,
+          "functionWordScores": {
+            "en": 0.2,
+            "fr": 0,
+            "de": 0.2,
+            "es": 0,
+            "pt": 0,
+            "it": 0,
+            "nl": 0.2,
+            "pl": 0,
+            "cs": 0,
+            "sk": 0,
+            "ro": 0,
+            "hu": 0,
+            "tr": 0,
+            "vi": 0,
+            "id": 0,
+            "ms": 0,
+            "fil": 0.2,
+            "sw": 0,
+            "sv": 0.8999999999999999,
+            "da": 4.433333333333334,
+            "nb": 1.9333333333333331,
+            "fi": 0,
+            "et": 0,
+            "lv": 0,
+            "lt": 0,
+            "sl": 0,
+            "hr": 0,
+            "bs": 0,
+            "sr-Latn": 0,
+            "ca": 0,
+            "gl": 0,
+            "af": 0,
+            "nn": 0.9333333333333333
+          },
+          "language": "da",
+          "reason": "lexical-only",
+          "functionWords": [
+            {
+              "language": "da",
+              "score": 4.433333333333334,
+              "hits": [
+                "selv",
+                "efter",
+                "at",
+                "er",
+                "den",
+                "stadig",
+                "når",
+                "siden",
+                "igen"
+              ]
+            },
+            {
+              "language": "nb",
+              "score": 1.9333333333333331,
+              "hits": [
+                "selv",
+                "at",
+                "er",
+                "den",
+                "når",
+                "siden"
+              ]
+            },
+            {
+              "language": "nn",
+              "score": 0.9333333333333333,
+              "hits": [
+                "at",
+                "er",
+                "den",
+                "når"
+              ]
+            },
+            {
+              "language": "sv",
+              "score": 0.8999999999999999,
+              "hits": [
+                "efter",
+                "er",
+                "den"
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "release-hr-body",
+      "text": "Čitatelji sada mogu spremiti odlomak kako bi ga kasnije ponovno pročitali. Čak i nakon zatvaranja preglednika, spremljeni tekst ostaje dostupan kada se stranica ponovno otvori.",
+      "languages": [
+        "hr"
+      ],
+      "tags": [
+        "native-body",
+        "holdout"
+      ],
+      "identification": {
+        "status": "unknown",
+        "languages": [],
+        "bestGuess": "hr"
+      },
+      "paragraph": {
+        "candidates": [
+          {
+            "language": "hr",
+            "score": 1
+          },
+          {
+            "language": "bs",
+            "score": 0.9922778023707639
+          },
+          {
+            "language": "sr-Latn",
+            "score": 0.9917367566769957
+          },
+          {
+            "language": "ilo",
+            "score": 0.7522994441985146
+          }
+        ],
+        "bestGuess": "hr",
+        "letters": 149,
+        "words": 25,
+        "functionWordScores": {
+          "en": 0,
+          "fr": 0,
+          "de": 0,
+          "es": 0.09090909090909091,
+          "pt": 0.09090909090909091,
+          "it": 0.08333333333333333,
+          "nl": 0,
+          "pl": 0.08333333333333333,
+          "cs": 0.17424242424242425,
+          "sk": 0.08333333333333333,
+          "ro": 0.09090909090909091,
+          "hu": 0,
+          "tr": 0,
+          "vi": 0,
+          "id": 0,
+          "ms": 0,
+          "fil": 0,
+          "sw": 0,
+          "sv": 0.08333333333333333,
+          "da": 0.08333333333333333,
+          "nb": 0.08333333333333333,
+          "fi": 0.09090909090909091,
+          "et": 0,
+          "lv": 0,
+          "lt": 0,
+          "sl": 0.09090909090909091,
+          "hr": 0.5075757575757576,
+          "bs": 0.5075757575757576,
+          "sr-Latn": 0.5075757575757576,
+          "ca": 0.17424242424242425,
+          "gl": 0.09090909090909091,
+          "af": 0,
+          "nn": 0.08333333333333333
+        },
+        "reason": "function-words",
+        "functionWords": [
+          {
+            "language": "hr",
+            "score": 0.5075757575757576,
+            "hits": [
+              "kako",
+              "i",
+              "se"
+            ]
+          },
+          {
+            "language": "bs",
+            "score": 0.5075757575757576,
+            "hits": [
+              "kako",
+              "i",
+              "se"
+            ]
+          },
+          {
+            "language": "sr-Latn",
+            "score": 0.5075757575757576,
+            "hits": [
+              "kako",
+              "i",
+              "se"
+            ]
+          },
+          {
+            "language": "cs",
+            "score": 0.17424242424242425,
+            "hits": [
+              "i",
+              "se"
+            ]
+          }
+        ]
+      },
+      "sentences": [
+        {
+          "text": "Čitatelji sada mogu spremiti odlomak kako bi ga kasnije ponovno pročitali",
+          "candidates": [
+            {
+              "language": "hr",
+              "score": 1
+            },
+            {
+              "language": "bs",
+              "score": 0.9753501400560224
+            },
+            {
+              "language": "sr-Latn",
+              "score": 0.9358543417366947
+            },
+            {
+              "language": "ilo",
+              "score": 0.7238095238095238
+            }
+          ],
+          "bestGuess": "hr",
+          "letters": 63,
+          "words": 11,
+          "functionWordScores": {
+            "en": 0,
+            "fr": 0,
+            "de": 0,
+            "es": 0,
+            "pt": 0,
+            "it": 0,
+            "nl": 0,
+            "pl": 0,
+            "cs": 0,
+            "sk": 0,
+            "ro": 0,
+            "hu": 0,
+            "tr": 0,
+            "vi": 0,
+            "id": 0,
+            "ms": 0,
+            "fil": 0,
+            "sw": 0,
+            "sv": 0,
+            "da": 0,
+            "nb": 0,
+            "fi": 0,
+            "et": 0,
+            "lv": 0,
+            "lt": 0,
+            "sl": 0,
+            "hr": 0.3333333333333333,
+            "bs": 0.3333333333333333,
+            "sr-Latn": 0.3333333333333333,
+            "ca": 0,
+            "gl": 0,
+            "af": 0,
+            "nn": 0
+          },
+          "reason": "function-words",
+          "functionWords": [
+            {
+              "language": "hr",
+              "score": 0.3333333333333333,
+              "hits": [
+                "kako"
+              ]
+            },
+            {
+              "language": "bs",
+              "score": 0.3333333333333333,
+              "hits": [
+                "kako"
+              ]
+            },
+            {
+              "language": "sr-Latn",
+              "score": 0.3333333333333333,
+              "hits": [
+                "kako"
+              ]
+            },
+            {
+              "language": "en",
+              "score": 0,
+              "hits": []
+            }
+          ]
+        },
+        {
+          "text": " Čak i nakon zatvaranja preglednika, spremljeni tekst ostaje dostupan kada se stranica ponovno otvori",
+          "candidates": [
+            {
+              "language": "sr-Latn",
+              "score": 1
+            },
+            {
+              "language": "bs",
+              "score": 0.9651484770361883
+            },
+            {
+              "language": "hr",
+              "score": 0.9641936407906044
+            },
+            {
+              "language": "pl",
+              "score": 0.6415544734078106
+            }
+          ],
+          "bestGuess": "sr-Latn",
+          "letters": 86,
+          "words": 14,
+          "functionWordScores": {
+            "en": 0,
+            "fr": 0,
+            "de": 0,
+            "es": 0.09090909090909091,
+            "pt": 0.09090909090909091,
+            "it": 0.08333333333333333,
+            "nl": 0,
+            "pl": 0.08333333333333333,
+            "cs": 0.17424242424242425,
+            "sk": 0.08333333333333333,
+            "ro": 0.09090909090909091,
+            "hu": 0,
+            "tr": 0,
+            "vi": 0,
+            "id": 0,
+            "ms": 0,
+            "fil": 0,
+            "sw": 0,
+            "sv": 0.08333333333333333,
+            "da": 0.08333333333333333,
+            "nb": 0.08333333333333333,
+            "fi": 0.09090909090909091,
+            "et": 0,
+            "lv": 0,
+            "lt": 0,
+            "sl": 0.09090909090909091,
+            "hr": 0.17424242424242425,
+            "bs": 0.17424242424242425,
+            "sr-Latn": 0.17424242424242425,
+            "ca": 0.17424242424242425,
+            "gl": 0.09090909090909091,
+            "af": 0,
+            "nn": 0.08333333333333333
+          },
+          "reason": "function-words",
+          "functionWords": [
+            {
+              "language": "cs",
+              "score": 0.17424242424242425,
+              "hits": [
+                "i",
+                "se"
+              ]
+            },
+            {
+              "language": "hr",
+              "score": 0.17424242424242425,
+              "hits": [
+                "i",
+                "se"
+              ]
+            },
+            {
+              "language": "bs",
+              "score": 0.17424242424242425,
+              "hits": [
+                "i",
+                "se"
+              ]
+            },
+            {
+              "language": "sr-Latn",
+              "score": 0.17424242424242425,
+              "hits": [
+                "i",
+                "se"
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "release-sr-body",
+      "text": "Читаоци сада могу да сачувају пасус како би га касније поново прочитали. Чак и након затварања прегледача, сачувани текст остаје доступан када се страница поново отвори.",
+      "languages": [
+        "sr"
+      ],
+      "tags": [
+        "native-body",
+        "holdout"
+      ],
+      "identification": {
+        "status": "unknown",
+        "languages": [],
+        "bestGuess": "bs-Cyrl"
+      },
+      "paragraph": {
+        "candidates": [
+          {
+            "language": "bs-Cyrl",
+            "score": 1
+          },
+          {
+            "language": "sr",
+            "score": 0.9916636082420175
+          },
+          {
+            "language": "bg",
+            "score": 0.915115608451738
+          },
+          {
+            "language": "ru",
+            "score": 0.8302312169034761
+          }
+        ],
+        "bestGuess": "bs-Cyrl",
+        "functionWordLeader": "bg",
+        "letters": 141,
+        "words": 26,
+        "functionWordScores": {
+          "ru": 0.41666666666666663,
+          "uk": 0,
+          "bg": 1.4166666666666667,
+          "sr": 1.4166666666666665,
+          "be": 0.16666666666666666,
+          "kk": 0.16666666666666666,
+          "mk": 1.4166666666666665
+        },
+        "reason": "unsupported",
+        "functionWords": [
+          {
+            "language": "bg",
+            "score": 1.4166666666666667,
+            "hits": [
+              "да",
+              "би",
+              "и"
+            ]
+          },
+          {
+            "language": "sr",
+            "score": 1.4166666666666665,
+            "hits": [
+              "да",
+              "како",
+              "и",
+              "се"
+            ]
+          },
+          {
+            "language": "mk",
+            "score": 1.4166666666666665,
+            "hits": [
+              "да",
+              "како",
+              "и",
+              "се"
+            ]
+          },
+          {
+            "language": "ru",
+            "score": 0.41666666666666663,
+            "hits": [
+              "да",
+              "и"
+            ]
+          }
+        ]
+      },
+      "sentences": [
+        {
+          "text": "Читаоци сада могу да сачувају пасус како би га касније поново прочитали",
+          "candidates": [
+            {
+              "language": "bs-Cyrl",
+              "score": 1
+            },
+            {
+              "language": "sr",
+              "score": 0.9855958690039408
+            },
+            {
+              "language": "bg",
+              "score": 0.7135480364179916
+            },
+            {
+              "language": "ru",
+              "score": 0.6321511074874304
+            }
+          ],
+          "bestGuess": "bs-Cyrl",
+          "functionWordLeader": "bg",
+          "letters": 60,
+          "words": 12,
+          "functionWordScores": {
+            "ru": 0.16666666666666666,
+            "uk": 0,
+            "bg": 1.1666666666666667,
+            "sr": 0.6666666666666666,
+            "be": 0.16666666666666666,
+            "kk": 0.16666666666666666,
+            "mk": 0.6666666666666666
+          },
+          "reason": "unsupported",
+          "functionWords": [
+            {
+              "language": "bg",
+              "score": 1.1666666666666667,
+              "hits": [
+                "да",
+                "би"
+              ]
+            },
+            {
+              "language": "sr",
+              "score": 0.6666666666666666,
+              "hits": [
+                "да",
+                "како"
+              ]
+            },
+            {
+              "language": "mk",
+              "score": 0.6666666666666666,
+              "hits": [
+                "да",
+                "како"
+              ]
+            },
+            {
+              "language": "ru",
+              "score": 0.16666666666666666,
+              "hits": [
+                "да"
+              ]
+            }
+          ]
+        },
+        {
+          "text": " Чак и након затварања прегледача, сачувани текст остаје доступан када се страница поново отвори",
+          "candidates": [
+            {
+              "language": "sr",
+              "score": 1
+            },
+            {
+              "language": "bs-Cyrl",
+              "score": 0.9969818913480886
+            },
+            {
+              "language": "bg",
+              "score": 0.9456740442655935
+            },
+            {
+              "language": "ru",
+              "score": 0.8421640956852224
+            }
+          ],
+          "bestGuess": "sr",
+          "letters": 81,
+          "words": 14,
+          "functionWordScores": {
+            "ru": 0.25,
+            "uk": 0,
+            "bg": 0.25,
+            "sr": 0.75,
+            "be": 0,
+            "kk": 0,
+            "mk": 0.75
+          },
+          "reason": "function-words",
+          "functionWords": [
+            {
+              "language": "sr",
+              "score": 0.75,
+              "hits": [
+                "и",
+                "се"
+              ]
+            },
+            {
+              "language": "mk",
+              "score": 0.75,
+              "hits": [
+                "и",
+                "се"
+              ]
+            },
+            {
+              "language": "ru",
+              "score": 0.25,
+              "hits": [
+                "и"
+              ]
+            },
+            {
+              "language": "bg",
+              "score": 0.25,
+              "hits": [
+                "и"
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "release-sl-body",
+      "text": "Bralci lahko zdaj shranijo odstavek, da ga pozneje znova preberejo. Tudi po zaprtju brskalnika ostane shranjeno besedilo na voljo, ko se stran ponovno odpre.",
+      "languages": [
+        "sl"
+      ],
+      "tags": [
+        "native-body",
+        "holdout"
+      ],
+      "identification": {
+        "status": "unknown",
+        "languages": [],
+        "bestGuess": "sr-Latn"
+      },
+      "paragraph": {
+        "candidates": [
+          {
+            "language": "sr-Latn",
+            "score": 1
+          },
+          {
+            "language": "bs",
+            "score": 0.9950562353231986
+          },
+          {
+            "language": "hr",
+            "score": 0.9802249412927945
+          },
+          {
+            "language": "pl",
+            "score": 0.7335928809788654
+          }
+        ],
+        "bestGuess": "sr-Latn",
+        "functionWordLeader": "sl",
+        "letters": 130,
+        "words": 24,
+        "functionWordScores": {
+          "en": 0,
+          "fr": 0,
+          "de": 0,
+          "es": 0.09090909090909091,
+          "pt": 0.2992424242424242,
+          "it": 0.125,
+          "nl": 0,
+          "pl": 0.3333333333333333,
+          "cs": 0.4242424242424242,
+          "sk": 0.3333333333333333,
+          "ro": 0.09090909090909091,
+          "hu": 0,
+          "tr": 0.125,
+          "vi": 0,
+          "id": 0,
+          "ms": 0,
+          "fil": 1.0833333333333333,
+          "sw": 0.08333333333333333,
+          "sv": 0,
+          "da": 0,
+          "nb": 0,
+          "fi": 0.09090909090909091,
+          "et": 0,
+          "lv": 0,
+          "lt": 0.25,
+          "sl": 1.299242424242424,
+          "hr": 0.2992424242424242,
+          "bs": 0.2992424242424242,
+          "sr-Latn": 0.2992424242424242,
+          "ca": 0.09090909090909091,
+          "gl": 0.2992424242424242,
+          "af": 0.08333333333333333,
+          "nn": 0
+        },
+        "reason": "function-words",
+        "functionWords": [
+          {
+            "language": "sl",
+            "score": 1.299242424242424,
+            "hits": [
+              "da",
+              "tudi",
+              "na",
+              "se"
+            ]
+          },
+          {
+            "language": "fil",
+            "score": 1.0833333333333333,
+            "hits": [
+              "na",
+              "ko"
+            ]
+          },
+          {
+            "language": "cs",
+            "score": 0.4242424242424242,
+            "hits": [
+              "po",
+              "na",
+              "se"
+            ]
+          },
+          {
+            "language": "pl",
+            "score": 0.3333333333333333,
+            "hits": [
+              "po",
+              "na"
+            ]
+          }
+        ]
+      },
+      "sentences": [
+        {
+          "text": "Bralci lahko zdaj shranijo odstavek, da ga pozneje znova preberejo",
+          "candidates": [
+            {
+              "language": "sr-Latn",
+              "score": 1
+            },
+            {
+              "language": "bs",
+              "score": 0.9661637931034482
+            },
+            {
+              "language": "hr",
+              "score": 0.9099137931034482
+            },
+            {
+              "language": "pl",
+              "score": 0.7672413793103449
+            }
+          ],
+          "bestGuess": "sr-Latn",
+          "letters": 56,
+          "words": 10,
+          "functionWordScores": {
+            "en": 0,
+            "fr": 0,
+            "de": 0,
+            "es": 0,
+            "pt": 0.125,
+            "it": 0.125,
+            "nl": 0,
+            "pl": 0,
+            "cs": 0,
+            "sk": 0,
+            "ro": 0,
+            "hu": 0,
+            "tr": 0.125,
+            "vi": 0,
+            "id": 0,
+            "ms": 0,
+            "fil": 0,
+            "sw": 0,
+            "sv": 0,
+            "da": 0,
+            "nb": 0,
+            "fi": 0,
+            "et": 0,
+            "lv": 0,
+            "lt": 0,
+            "sl": 0.125,
+            "hr": 0.125,
+            "bs": 0.125,
+            "sr-Latn": 0.125,
+            "ca": 0,
+            "gl": 0.125,
+            "af": 0,
+            "nn": 0
+          },
+          "reason": "function-words",
+          "functionWords": [
+            {
+              "language": "pt",
+              "score": 0.125,
+              "hits": [
+                "da"
+              ]
+            },
+            {
+              "language": "it",
+              "score": 0.125,
+              "hits": [
+                "da"
+              ]
+            },
+            {
+              "language": "tr",
+              "score": 0.125,
+              "hits": [
+                "da"
+              ]
+            },
+            {
+              "language": "sl",
+              "score": 0.125,
+              "hits": [
+                "da"
+              ]
+            }
+          ]
+        },
+        {
+          "text": " Tudi po zaprtju brskalnika ostane shranjeno besedilo na voljo, ko se stran ponovno odpre",
+          "candidates": [
+            {
+              "language": "hr",
+              "score": 1
+            },
+            {
+              "language": "sr-Latn",
+              "score": 0.9967368065713964
+            },
+            {
+              "language": "bs",
+              "score": 0.9834589850343198
+            },
+            {
+              "language": "cs",
+              "score": 0.5898503431979296
+            }
+          ],
+          "bestGuess": "hr",
+          "functionWordLeader": "sl",
+          "letters": 74,
+          "words": 14,
+          "functionWordScores": {
+            "en": 0,
+            "fr": 0,
+            "de": 0,
+            "es": 0.09090909090909091,
+            "pt": 0.17424242424242425,
+            "it": 0,
+            "nl": 0,
+            "pl": 0.3333333333333333,
+            "cs": 0.4242424242424242,
+            "sk": 0.3333333333333333,
+            "ro": 0.09090909090909091,
+            "hu": 0,
+            "tr": 0,
+            "vi": 0,
+            "id": 0,
+            "ms": 0,
+            "fil": 1.0833333333333333,
+            "sw": 0.08333333333333333,
+            "sv": 0,
+            "da": 0,
+            "nb": 0,
+            "fi": 0.09090909090909091,
+            "et": 0,
+            "lv": 0,
+            "lt": 0.25,
+            "sl": 1.174242424242424,
+            "hr": 0.17424242424242425,
+            "bs": 0.17424242424242425,
+            "sr-Latn": 0.17424242424242425,
+            "ca": 0.09090909090909091,
+            "gl": 0.17424242424242425,
+            "af": 0.08333333333333333,
+            "nn": 0
+          },
+          "reason": "function-words",
+          "functionWords": [
+            {
+              "language": "sl",
+              "score": 1.174242424242424,
+              "hits": [
+                "tudi",
+                "na",
+                "se"
+              ]
+            },
+            {
+              "language": "fil",
+              "score": 1.0833333333333333,
+              "hits": [
+                "na",
+                "ko"
+              ]
+            },
+            {
+              "language": "cs",
+              "score": 0.4242424242424242,
+              "hits": [
+                "po",
+                "na",
+                "se"
+              ]
+            },
+            {
+              "language": "pl",
+              "score": 0.3333333333333333,
+              "hits": [
+                "po",
+                "na"
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "release-lt-body",
+      "text": "Skaitytojai dabar gali išsaugoti pastraipą, kad vėliau ją perskaitytų dar kartą. Net ir uždarius naršyklę, išsaugotas tekstas lieka pasiekiamas vėl atidarius puslapį.",
+      "languages": [
+        "lt"
+      ],
+      "tags": [
+        "native-body",
+        "holdout"
+      ],
+      "identification": {
+        "status": "unknown",
+        "languages": [],
+        "bestGuess": "ilo"
+      },
+      "paragraph": {
+        "candidates": [
+          {
+            "language": "ilo",
+            "score": 1
+          },
+          {
+            "language": "id",
+            "score": 0.9871432818073722
+          },
+          {
+            "language": "fr",
+            "score": 0.9743608799048752
+          },
+          {
+            "language": "es",
+            "score": 0.948498810939358
+          }
+        ],
+        "bestGuess": "ilo",
+        "functionWordLeader": "lt",
+        "letters": 141,
+        "words": 22,
+        "functionWordScores": {
+          "en": 0,
+          "fr": 0,
+          "de": 0,
+          "es": 0,
+          "pt": 0,
+          "it": 0,
+          "nl": 0,
+          "pl": 0,
+          "cs": 0,
+          "sk": 0,
+          "ro": 1,
+          "hu": 0,
+          "tr": 0,
+          "vi": 0,
+          "id": 0,
+          "ms": 0,
+          "fil": 0,
+          "sw": 0,
+          "sv": 0,
+          "da": 0,
+          "nb": 0,
+          "fi": 0,
+          "et": 0,
+          "lv": 0.5,
+          "lt": 1.5,
+          "sl": 0,
+          "hr": 0,
+          "bs": 0,
+          "sr-Latn": 0,
+          "ca": 0,
+          "gl": 0,
+          "af": 0,
+          "nn": 0
+        },
+        "reason": "unsupported",
+        "functionWords": [
+          {
+            "language": "lt",
+            "score": 1.5,
+            "hits": [
+              "kad",
+              "ir"
+            ]
+          },
+          {
+            "language": "ro",
+            "score": 1,
+            "hits": [
+              "dar"
+            ]
+          },
+          {
+            "language": "lv",
+            "score": 0.5,
+            "hits": [
+              "ir"
+            ]
+          },
+          {
+            "language": "en",
+            "score": 0,
+            "hits": []
+          }
+        ]
+      },
+      "sentences": [
+        {
+          "text": "Skaitytojai dabar gali išsaugoti pastraipą, kad vėliau ją perskaitytų dar kartą",
+          "candidates": [
+            {
+              "language": "ilo",
+              "score": 1
+            },
+            {
+              "language": "it",
+              "score": 0.9324618736383442
+            },
+            {
+              "language": "ha",
+              "score": 0.8454974582425563
+            },
+            {
+              "language": "ro",
+              "score": 0.803921568627451
+            }
+          ],
+          "bestGuess": "ilo",
+          "letters": 68,
+          "words": 11,
+          "functionWordScores": {
+            "en": 0,
+            "fr": 0,
+            "de": 0,
+            "es": 0,
+            "pt": 0,
+            "it": 0,
+            "nl": 0,
+            "pl": 0,
+            "cs": 0,
+            "sk": 0,
+            "ro": 1,
+            "hu": 0,
+            "tr": 0,
+            "vi": 0,
+            "id": 0,
+            "ms": 0,
+            "fil": 0,
+            "sw": 0,
+            "sv": 0,
+            "da": 0,
+            "nb": 0,
+            "fi": 0,
+            "et": 0,
+            "lv": 0,
+            "lt": 1,
+            "sl": 0,
+            "hr": 0,
+            "bs": 0,
+            "sr-Latn": 0,
+            "ca": 0,
+            "gl": 0,
+            "af": 0,
+            "nn": 0
+          },
+          "reason": "unsupported",
+          "functionWords": [
+            {
+              "language": "ro",
+              "score": 1,
+              "hits": [
+                "dar"
+              ]
+            },
+            {
+              "language": "lt",
+              "score": 1,
+              "hits": [
+                "kad"
+              ]
+            },
+            {
+              "language": "en",
+              "score": 0,
+              "hits": []
+            },
+            {
+              "language": "fr",
+              "score": 0,
+              "hits": []
+            }
+          ]
+        },
+        {
+          "text": " Net ir uždarius naršyklę, išsaugotas tekstas lieka pasiekiamas vėl atidarius puslapį",
+          "candidates": [
+            {
+              "language": "id",
+              "score": 1
+            },
+            {
+              "language": "fr",
+              "score": 0.9517045454545454
+            },
+            {
+              "language": "pt",
+              "score": 0.9328835227272727
+            },
+            {
+              "language": "es",
+              "score": 0.9169034090909091
+            }
+          ],
+          "bestGuess": "id",
+          "letters": 73,
+          "words": 11,
+          "functionWordScores": {
+            "en": 0,
+            "fr": 0,
+            "de": 0,
+            "es": 0,
+            "pt": 0,
+            "it": 0,
+            "nl": 0,
+            "pl": 0,
+            "cs": 0,
+            "sk": 0,
+            "ro": 0,
+            "hu": 0,
+            "tr": 0,
+            "vi": 0,
+            "id": 0,
+            "ms": 0,
+            "fil": 0,
+            "sw": 0,
+            "sv": 0,
+            "da": 0,
+            "nb": 0,
+            "fi": 0,
+            "et": 0,
+            "lv": 0.5,
+            "lt": 0.5,
+            "sl": 0,
+            "hr": 0,
+            "bs": 0,
+            "sr-Latn": 0,
+            "ca": 0,
+            "gl": 0,
+            "af": 0,
+            "nn": 0
+          },
+          "reason": "orthography",
+          "functionWords": [
+            {
+              "language": "lv",
+              "score": 0.5,
+              "hits": [
+                "ir"
+              ]
+            },
+            {
+              "language": "lt",
+              "score": 0.5,
+              "hits": [
+                "ir"
+              ]
+            },
+            {
+              "language": "en",
+              "score": 0,
+              "hits": []
+            },
+            {
+              "language": "fr",
+              "score": 0,
+              "hits": []
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

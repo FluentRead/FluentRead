@@ -1,0 +1,2731 @@
+{
+  "generatedAt": "2026-10-10T18:13:36.113Z",
+  "node": "v20.11.1",
+  "platform": "Darwin arm64",
+  "corpora": {
+    "calibration": 217,
+    "holdout": 94,
+    "holdout2": 61,
+    "releaseHoldout": 207
+  },
+  "evidenceBoundary": "All candidates run on the same FluentRead-authored corpora. Numbers compare decisions on these texts only and are not general accuracy claims.",
+  "candidates": [
+    {
+      "name": "unified-franc-min",
+      "importMs": 142.32100000000003,
+      "importHeapBytes": 9647920,
+      "corpora": {
+        "calibration": {
+          "pairs": 11024,
+          "wrong": 0,
+          "expected": 176,
+          "skipped": 130,
+          "emptyCases": 5,
+          "emptyMisses": 0,
+          "wrongExamples": [],
+          "missedCases": [
+            "en-short-saved",
+            "en-short-sign-in",
+            "es-short-welcome",
+            "es-short-saved",
+            "es-short-file",
+            "pt-short-file",
+            "it-short-welcome",
+            "it-short-saved",
+            "cs-short-saved",
+            "sk-short-welcome",
+            "sk-short-saved",
+            "sk-long-extension",
+            "ro-short-welcome",
+            "hu-short-welcome",
+            "tr-short-welcome",
+            "tr-short-login",
+            "id-short-welcome",
+            "id-long-extension",
+            "id-long-privacy",
+            "ms-short-welcome",
+            "ms-long-extension",
+            "ms-long-privacy",
+            "fil-short-welcome",
+            "sw-short-welcome",
+            "da-short-welcome",
+            "da-long-extension",
+            "nb-short-welcome",
+            "nb-long-extension",
+            "fi-short-welcome",
+            "fi-long-extension",
+            "et-short-welcome",
+            "lv-short-welcome",
+            "lt-short-welcome",
+            "sl-short-welcome",
+            "sl-long-extension",
+            "hr-short-welcome",
+            "hr-long-extension",
+            "ru-short-saved",
+            "uk-short-welcome",
+            "bg-short-welcome",
+            "sr-short-welcome",
+            "sr-long-extension",
+            "ar-short-welcome",
+            "ar-short-saved",
+            "ur-short-welcome",
+            "zh-hans-saved"
+          ],
+          "sameTargetSkipRate": 0.7386363636363636,
+          "duplicateTranslationRate": 0.26136363636363635,
+          "wrongSkipRate": 0,
+          "byTag": {
+            "ambiguous": {
+              "expected": 0,
+              "skipped": 0,
+              "wrong": 0,
+              "pairs": 156,
+              "sameTargetSkipRate": null
+            },
+            "ambiguous-word": {
+              "expected": 0,
+              "skipped": 0,
+              "wrong": 0,
+              "pairs": 416,
+              "sameTargetSkipRate": null
+            },
+            "brand": {
+              "expected": 0,
+              "skipped": 0,
+              "wrong": 0,
+              "pairs": 156,
+              "sameTargetSkipRate": null
+            },
+            "cantonese": {
+              "expected": 0,
+              "skipped": 0,
+              "wrong": 0,
+              "pairs": 52,
+              "sameTargetSkipRate": null
+            },
+            "chinese": {
+              "expected": 17,
+              "skipped": 16,
+              "wrong": 0,
+              "pairs": 884,
+              "sameTargetSkipRate": 0.9411764705882353
+            },
+            "devanagari": {
+              "expected": 7,
+              "skipped": 7,
+              "wrong": 0,
+              "pairs": 364,
+              "sameTargetSkipRate": 1
+            },
+            "embedded-sentence": {
+              "expected": 0,
+              "skipped": 0,
+              "wrong": 0,
+              "pairs": 104,
+              "sameTargetSkipRate": null
+            },
+            "gibberish": {
+              "expected": 0,
+              "skipped": 0,
+              "wrong": 0,
+              "pairs": 104,
+              "sameTargetSkipRate": null
+            },
+            "identifier": {
+              "expected": 17,
+              "skipped": 17,
+              "wrong": 0,
+              "pairs": 1248,
+              "sameTargetSkipRate": 1
+            },
+            "japanese": {
+              "expected": 6,
+              "skipped": 6,
+              "wrong": 0,
+              "pairs": 312,
+              "sameTargetSkipRate": 1
+            },
+            "korean": {
+              "expected": 5,
+              "skipped": 5,
+              "wrong": 0,
+              "pairs": 260,
+              "sameTargetSkipRate": 1
+            },
+            "long": {
+              "expected": 66,
+              "skipped": 55,
+              "wrong": 0,
+              "pairs": 3432,
+              "sameTargetSkipRate": 0.8333333333333334
+            },
+            "mixed": {
+              "expected": 0,
+              "skipped": 0,
+              "wrong": 0,
+              "pairs": 728,
+              "sameTargetSkipRate": null
+            },
+            "mixed-variant": {
+              "expected": 0,
+              "skipped": 0,
+              "wrong": 0,
+              "pairs": 52,
+              "sameTargetSkipRate": null
+            },
+            "neutral": {
+              "expected": 4,
+              "skipped": 4,
+              "wrong": 0,
+              "pairs": 104,
+              "sameTargetSkipRate": 1
+            },
+            "no-franc-min-model": {
+              "expected": 21,
+              "skipped": 7,
+              "wrong": 0,
+              "pairs": 1092,
+              "sameTargetSkipRate": 0.3333333333333333
+            },
+            "outside-catalog": {
+              "expected": 0,
+              "skipped": 0,
+              "wrong": 0,
+              "pairs": 52,
+              "sameTargetSkipRate": null
+            },
+            "pure-han": {
+              "expected": 0,
+              "skipped": 0,
+              "wrong": 0,
+              "pairs": 156,
+              "sameTargetSkipRate": null
+            },
+            "rare": {
+              "expected": 0,
+              "skipped": 0,
+              "wrong": 0,
+              "pairs": 52,
+              "sameTargetSkipRate": null
+            },
+            "reported": {
+              "expected": 13,
+              "skipped": 13,
+              "wrong": 0,
+              "pairs": 676,
+              "sameTargetSkipRate": 1
+            },
+            "script-unique": {
+              "expected": 18,
+              "skipped": 18,
+              "wrong": 0,
+              "pairs": 936,
+              "sameTargetSkipRate": 1
+            },
+            "script-unique-veto": {
+              "expected": 0,
+              "skipped": 0,
+              "wrong": 0,
+              "pairs": 104,
+              "sameTargetSkipRate": null
+            },
+            "short": {
+              "expected": 89,
+              "skipped": 54,
+              "wrong": 0,
+              "pairs": 4524,
+              "sameTargetSkipRate": 0.6067415730337079
+            },
+            "similar": {
+              "expected": 36,
+              "skipped": 13,
+              "wrong": 0,
+              "pairs": 1872,
+              "sameTargetSkipRate": 0.3611111111111111
+            }
+          }
+        },
+        "holdout": {
+          "pairs": 4784,
+          "wrong": 0,
+          "expected": 67,
+          "skipped": 43,
+          "emptyCases": 2,
+          "emptyMisses": 0,
+          "wrongExamples": [],
+          "missedCases": [
+            "h-en-headline",
+            "h-en-error",
+            "h-de-headline",
+            "h-es-error",
+            "h-pt-headline",
+            "h-pt-error",
+            "h-it-headline",
+            "h-pl-forum",
+            "h-cs-forum",
+            "h-sk-forum",
+            "h-tr-forum",
+            "h-id-forum",
+            "h-ms-forum",
+            "h-da-forum",
+            "h-fi-forum",
+            "h-hr-forum",
+            "h-sl-forum",
+            "h-ru-headline",
+            "h-ru-error",
+            "h-uk-error",
+            "h-sr-forum",
+            "h-ar-forum",
+            "h-ar-error",
+            "h-zh-hant-forum"
+          ],
+          "sameTargetSkipRate": 0.6417910447761194,
+          "duplicateTranslationRate": 0.35820895522388063,
+          "wrongSkipRate": 0,
+          "byTag": {
+            "ambiguous-word": {
+              "expected": 0,
+              "skipped": 0,
+              "wrong": 0,
+              "pairs": 208,
+              "sameTargetSkipRate": null
+            },
+            "brand": {
+              "expected": 0,
+              "skipped": 0,
+              "wrong": 0,
+              "pairs": 104,
+              "sameTargetSkipRate": null
+            },
+            "chinese": {
+              "expected": 6,
+              "skipped": 5,
+              "wrong": 0,
+              "pairs": 312,
+              "sameTargetSkipRate": 0.8333333333333334
+            },
+            "identifier": {
+              "expected": 4,
+              "skipped": 4,
+              "wrong": 0,
+              "pairs": 260,
+              "sameTargetSkipRate": 1
+            },
+            "japanese": {
+              "expected": 3,
+              "skipped": 3,
+              "wrong": 0,
+              "pairs": 156,
+              "sameTargetSkipRate": 1
+            },
+            "korean": {
+              "expected": 2,
+              "skipped": 2,
+              "wrong": 0,
+              "pairs": 104,
+              "sameTargetSkipRate": 1
+            },
+            "long": {
+              "expected": 38,
+              "skipped": 26,
+              "wrong": 0,
+              "pairs": 1976,
+              "sameTargetSkipRate": 0.6842105263157895
+            },
+            "mixed": {
+              "expected": 0,
+              "skipped": 0,
+              "wrong": 0,
+              "pairs": 520,
+              "sameTargetSkipRate": null
+            },
+            "outside-catalog": {
+              "expected": 0,
+              "skipped": 0,
+              "wrong": 0,
+              "pairs": 364,
+              "sameTargetSkipRate": null
+            },
+            "pure-han": {
+              "expected": 0,
+              "skipped": 0,
+              "wrong": 0,
+              "pairs": 52,
+              "sameTargetSkipRate": null
+            },
+            "short": {
+              "expected": 21,
+              "skipped": 10,
+              "wrong": 0,
+              "pairs": 1092,
+              "sameTargetSkipRate": 0.47619047619047616
+            },
+            "similar": {
+              "expected": 15,
+              "skipped": 6,
+              "wrong": 0,
+              "pairs": 1144,
+              "sameTargetSkipRate": 0.4
+            }
+          }
+        },
+        "holdout2": {
+          "pairs": 3120,
+          "wrong": 0,
+          "expected": 43,
+          "skipped": 35,
+          "emptyCases": 1,
+          "emptyMisses": 0,
+          "wrongExamples": [],
+          "missedCases": [
+            "h2-fr-chat",
+            "h2-es-chat",
+            "h2-tr-chat",
+            "h2-id-recipe",
+            "h2-hu-weather",
+            "h2-uk-weather",
+            "h2-ar-sports",
+            "h2-zh-hant-chat"
+          ],
+          "sameTargetSkipRate": 0.813953488372093,
+          "duplicateTranslationRate": 0.18604651162790697,
+          "wrongSkipRate": 0,
+          "byTag": {
+            "ambiguous-word": {
+              "expected": 0,
+              "skipped": 0,
+              "wrong": 0,
+              "pairs": 156,
+              "sameTargetSkipRate": null
+            },
+            "brand": {
+              "expected": 0,
+              "skipped": 0,
+              "wrong": 0,
+              "pairs": 52,
+              "sameTargetSkipRate": null
+            },
+            "chinese": {
+              "expected": 4,
+              "skipped": 3,
+              "wrong": 0,
+              "pairs": 208,
+              "sameTargetSkipRate": 0.75
+            },
+            "identifier": {
+              "expected": 4,
+              "skipped": 4,
+              "wrong": 0,
+              "pairs": 312,
+              "sameTargetSkipRate": 1
+            },
+            "japanese": {
+              "expected": 2,
+              "skipped": 2,
+              "wrong": 0,
+              "pairs": 104,
+              "sameTargetSkipRate": 1
+            },
+            "korean": {
+              "expected": 2,
+              "skipped": 2,
+              "wrong": 0,
+              "pairs": 104,
+              "sameTargetSkipRate": 1
+            },
+            "long": {
+              "expected": 14,
+              "skipped": 12,
+              "wrong": 0,
+              "pairs": 728,
+              "sameTargetSkipRate": 0.8571428571428571
+            },
+            "mixed": {
+              "expected": 0,
+              "skipped": 0,
+              "wrong": 0,
+              "pairs": 416,
+              "sameTargetSkipRate": null
+            },
+            "outside-catalog": {
+              "expected": 0,
+              "skipped": 0,
+              "wrong": 0,
+              "pairs": 104,
+              "sameTargetSkipRate": null
+            },
+            "pure-han": {
+              "expected": 0,
+              "skipped": 0,
+              "wrong": 0,
+              "pairs": 104,
+              "sameTargetSkipRate": null
+            },
+            "short": {
+              "expected": 21,
+              "skipped": 15,
+              "wrong": 0,
+              "pairs": 1092,
+              "sameTargetSkipRate": 0.7142857142857143
+            },
+            "similar": {
+              "expected": 9,
+              "skipped": 7,
+              "wrong": 0,
+              "pairs": 676,
+              "sameTargetSkipRate": 0.7777777777777778
+            }
+          }
+        },
+        "releaseHoldout": {
+          "pairs": 10556,
+          "wrong": 0,
+          "expected": 166,
+          "skipped": 103,
+          "emptyCases": 4,
+          "emptyMisses": 0,
+          "wrongExamples": [],
+          "missedCases": [
+            "release-zh-Hant-title",
+            "release-en-title",
+            "release-fr-title",
+            "release-ru-title",
+            "release-es-title",
+            "release-de-title",
+            "release-it-title",
+            "release-ar-title",
+            "release-hi-title",
+            "release-ur-title",
+            "release-fa-title",
+            "release-tr-title",
+            "release-id-body",
+            "release-id-title",
+            "release-ms-body",
+            "release-ms-title",
+            "release-nl-title",
+            "release-pl-title",
+            "release-uk-title",
+            "release-cs-title",
+            "release-sk-title",
+            "release-da-body",
+            "release-da-title",
+            "release-sv-title",
+            "release-nb-title",
+            "release-fi-title",
+            "release-ro-title",
+            "release-hu-title",
+            "release-bg-title",
+            "release-hr-body",
+            "release-hr-title",
+            "release-sr-body",
+            "release-sr-title",
+            "release-sl-body",
+            "release-sl-title",
+            "release-et-title",
+            "release-lv-title",
+            "release-lt-body",
+            "release-lt-title",
+            "release-mr-title",
+            "release-ne-title",
+            "release-sw-title",
+            "release-fil-title",
+            "release-technical-chinese-02",
+            "release-technical-chinese-12",
+            "release-technical-chinese-18",
+            "release-technical-chinese-20",
+            "release-technical-chinese-21",
+            "release-technical-chinese-22",
+            "release-technical-chinese-23",
+            "release-technical-chinese-24",
+            "release-technical-chinese-25",
+            "release-technical-chinese-26",
+            "release-technical-chinese-27",
+            "release-technical-chinese-28",
+            "release-technical-chinese-29",
+            "release-technical-chinese-30",
+            "release-technical-chinese-31",
+            "release-technical-chinese-32",
+            "release-technical-chinese-33",
+            "release-technical-chinese-34",
+            "release-technical-chinese-35",
+            "release-technical-chinese-44"
+          ],
+          "sameTargetSkipRate": 0.6204819277108434,
+          "duplicateTranslationRate": 0.37951807228915657,
+          "wrongSkipRate": 0,
+          "byTag": {
+            "ambiguous": {
+              "expected": 0,
+              "skipped": 0,
+              "wrong": 0,
+              "pairs": 520,
+              "sameTargetSkipRate": null
+            },
+            "ambiguous-embedded-terms": {
+              "expected": 21,
+              "skipped": 1,
+              "wrong": 0,
+              "pairs": 1092,
+              "sameTargetSkipRate": 0.047619047619047616
+            },
+            "brand": {
+              "expected": 2,
+              "skipped": 2,
+              "wrong": 0,
+              "pairs": 208,
+              "sameTargetSkipRate": 1
+            },
+            "chinese-conversion": {
+              "expected": 2,
+              "skipped": 2,
+              "wrong": 0,
+              "pairs": 104,
+              "sameTargetSkipRate": 1
+            },
+            "cjk": {
+              "expected": 0,
+              "skipped": 0,
+              "wrong": 0,
+              "pairs": 52,
+              "sameTargetSkipRate": null
+            },
+            "foreign-ui": {
+              "expected": 0,
+              "skipped": 0,
+              "wrong": 0,
+              "pairs": 260,
+              "sameTargetSkipRate": null
+            },
+            "functional-evidence": {
+              "expected": 3,
+              "skipped": 3,
+              "wrong": 0,
+              "pairs": 416,
+              "sameTargetSkipRate": 1
+            },
+            "holdout": {
+              "expected": 125,
+              "skipped": 62,
+              "wrong": 0,
+              "pairs": 6500,
+              "sameTargetSkipRate": 0.496
+            },
+            "identifier": {
+              "expected": 0,
+              "skipped": 0,
+              "wrong": 0,
+              "pairs": 104,
+              "sameTargetSkipRate": null
+            },
+            "inline-code-prose": {
+              "expected": 0,
+              "skipped": 0,
+              "wrong": 0,
+              "pairs": 52,
+              "sameTargetSkipRate": null
+            },
+            "markdown": {
+              "expected": 0,
+              "skipped": 0,
+              "wrong": 0,
+              "pairs": 52,
+              "sameTargetSkipRate": null
+            },
+            "mixed": {
+              "expected": 0,
+              "skipped": 0,
+              "wrong": 0,
+              "pairs": 884,
+              "sameTargetSkipRate": null
+            },
+            "native-body": {
+              "expected": 52,
+              "skipped": 45,
+              "wrong": 0,
+              "pairs": 2704,
+              "sameTargetSkipRate": 0.8653846153846154
+            },
+            "native-title": {
+              "expected": 52,
+              "skipped": 16,
+              "wrong": 0,
+              "pairs": 2704,
+              "sameTargetSkipRate": 0.3076923076923077
+            },
+            "no-space": {
+              "expected": 0,
+              "skipped": 0,
+              "wrong": 0,
+              "pairs": 52,
+              "sameTargetSkipRate": null
+            },
+            "outside-catalog": {
+              "expected": 0,
+              "skipped": 0,
+              "wrong": 0,
+              "pairs": 364,
+              "sameTargetSkipRate": null
+            },
+            "quotation": {
+              "expected": 0,
+              "skipped": 0,
+              "wrong": 0,
+              "pairs": 156,
+              "sameTargetSkipRate": null
+            },
+            "regression": {
+              "expected": 28,
+              "skipped": 28,
+              "wrong": 0,
+              "pairs": 1456,
+              "sameTargetSkipRate": 1
+            },
+            "release": {
+              "expected": 49,
+              "skipped": 29,
+              "wrong": 0,
+              "pairs": 2548,
+              "sameTargetSkipRate": 0.5918367346938775
+            },
+            "semantic-negation": {
+              "expected": 2,
+              "skipped": 2,
+              "wrong": 0,
+              "pairs": 104,
+              "sameTargetSkipRate": 1
+            },
+            "shared-han": {
+              "expected": 0,
+              "skipped": 0,
+              "wrong": 0,
+              "pairs": 104,
+              "sameTargetSkipRate": null
+            },
+            "similar-language": {
+              "expected": 0,
+              "skipped": 0,
+              "wrong": 0,
+              "pairs": 468,
+              "sameTargetSkipRate": null
+            },
+            "technical": {
+              "expected": 55,
+              "skipped": 35,
+              "wrong": 0,
+              "pairs": 2964,
+              "sameTargetSkipRate": 0.6363636363636364
+            },
+            "uppercase": {
+              "expected": 0,
+              "skipped": 0,
+              "wrong": 0,
+              "pairs": 52,
+              "sameTargetSkipRate": null
+            }
+          }
+        }
+      },
+      "timing": {
+        "calls": 1737,
+        "medianMs": 0.11641700000001265,
+        "p95Ms": 0.8252919999999904,
+        "maxMs": 10.831042000000025
+      },
+      "cachedTiming": {
+        "calls": 1737,
+        "medianMs": 0.11108400000000529,
+        "p95Ms": 0.70637499999998,
+        "maxMs": 4.148665999999935
+      },
+      "heapAfterEvaluationBytes": 30724672
+    },
+    {
+      "name": "naive-franc-min-top1",
+      "corpora": {
+        "calibration": {
+          "pairs": 11024,
+          "wrong": 52,
+          "expected": 176,
+          "skipped": 132,
+          "emptyCases": 5,
+          "emptyMisses": 0,
+          "wrongExamples": [
+            {
+              "id": "en-short-saved",
+              "target": "de"
+            },
+            {
+              "id": "es-short-welcome",
+              "target": "pt"
+            },
+            {
+              "id": "pt-short-file",
+              "target": "it"
+            },
+            {
+              "id": "it-long-extension",
+              "target": "es"
+            },
+            {
+              "id": "sk-short-saved",
+              "target": "cs"
+            },
+            {
+              "id": "sk-long-extension",
+              "target": "hr"
+            },
+            {
+              "id": "sk-long-privacy",
+              "target": "cs"
+            },
+            {
+              "id": "ro-short-welcome",
+              "target": "de"
+            },
+            {
+              "id": "ms-short-welcome",
+              "target": "id"
+            },
+            {
+              "id": "ms-long-extension",
+              "target": "id"
+            },
+            {
+              "id": "ms-long-privacy",
+              "target": "id"
+            },
+            {
+              "id": "da-short-welcome",
+              "target": "es"
+            },
+            {
+              "id": "da-long-extension",
+              "target": "nl"
+            },
+            {
+              "id": "nb-short-welcome",
+              "target": "nl"
+            },
+            {
+              "id": "nb-long-extension",
+              "target": "nl"
+            },
+            {
+              "id": "fi-short-welcome",
+              "target": "nl"
+            },
+            {
+              "id": "fi-long-extension",
+              "target": "ms"
+            },
+            {
+              "id": "et-short-welcome",
+              "target": "nl"
+            },
+            {
+              "id": "et-long-extension",
+              "target": "fr"
+            },
+            {
+              "id": "lv-long-extension",
+              "target": "fr"
+            },
+            {
+              "id": "lt-short-welcome",
+              "target": "sw"
+            },
+            {
+              "id": "lt-long-extension",
+              "target": "pl"
+            },
+            {
+              "id": "sl-short-welcome",
+              "target": "hr"
+            },
+            {
+              "id": "sl-long-extension",
+              "target": "sr"
+            },
+            {
+              "id": "hr-long-extension",
+              "target": "sr"
+            },
+            {
+              "id": "ru-short-saved",
+              "target": "bg"
+            },
+            {
+              "id": "uk-short-welcome",
+              "target": "sr"
+            },
+            {
+              "id": "ur-short-welcome",
+              "target": "fa"
+            },
+            {
+              "id": "zh-hans-identifiers-formats",
+              "target": "fr"
+            },
+            {
+              "id": "zh-hans-identifiers-path",
+              "target": "fr"
+            },
+            {
+              "id": "zh-with-english-sentence",
+              "target": "en"
+            },
+            {
+              "id": "zh-with-uppercase-sentence",
+              "target": "en"
+            },
+            {
+              "id": "ja-with-english-sentence",
+              "target": "en"
+            },
+            {
+              "id": "en-with-french-sentence",
+              "target": "fr"
+            },
+            {
+              "id": "de-with-english-sentence",
+              "target": "de"
+            },
+            {
+              "id": "ru-with-english",
+              "target": "en"
+            },
+            {
+              "id": "ar-with-english",
+              "target": "en"
+            },
+            {
+              "id": "en-with-chinese",
+              "target": "en"
+            },
+            {
+              "id": "el-with-english",
+              "target": "el"
+            },
+            {
+              "id": "he-with-english",
+              "target": "de"
+            }
+          ],
+          "missedCases": [
+            "en-short-saved",
+            "es-short-welcome",
+            "pt-short-file",
+            "it-long-extension",
+            "sk-short-welcome",
+            "sk-short-saved",
+            "sk-long-extension",
+            "sk-long-privacy",
+            "ro-short-welcome",
+            "hu-short-welcome",
+            "tr-short-welcome",
+            "ms-short-welcome",
+            "ms-long-extension",
+            "ms-long-privacy",
+            "da-short-welcome",
+            "da-long-extension",
+            "nb-short-welcome",
+            "nb-long-extension",
+            "fi-short-welcome",
+            "fi-long-extension",
+            "et-short-welcome",
+            "et-long-extension",
+            "lv-short-welcome",
+            "lv-long-extension",
+            "lt-short-welcome",
+            "lt-long-extension",
+            "sl-short-welcome",
+            "sl-long-extension",
+            "hr-short-welcome",
+            "hr-long-extension",
+            "ru-short-saved",
+            "uk-short-welcome",
+            "sr-short-welcome",
+            "he-short-welcome",
+            "he-short-saved",
+            "he-long-extension",
+            "ur-short-welcome",
+            "zh-hans-saved",
+            "zh-hans-identifiers-formats",
+            "zh-hans-identifiers-path",
+            "zh-neutral-feature",
+            "zh-neutral-greeting"
+          ],
+          "sameTargetSkipRate": 0.75,
+          "duplicateTranslationRate": 0.25,
+          "wrongSkipRate": 0.0047169811320754715,
+          "byTag": {
+            "ambiguous": {
+              "expected": 0,
+              "skipped": 0,
+              "wrong": 0,
+              "pairs": 156,
+              "sameTargetSkipRate": null
+            },
+            "ambiguous-word": {
+              "expected": 0,
+              "skipped": 0,
+              "wrong": 8,
+              "pairs": 416,
+              "sameTargetSkipRate": null
+            },
+            "brand": {
+              "expected": 0,
+              "skipped": 0,
+              "wrong": 1,
+              "pairs": 156,
+              "sameTargetSkipRate": null
+            },
+            "cantonese": {
+              "expected": 0,
+              "skipped": 0,
+              "wrong": 0,
+              "pairs": 52,
+              "sameTargetSkipRate": null
+            },
+            "chinese": {
+              "expected": 17,
+              "skipped": 10,
+              "wrong": 2,
+              "pairs": 884,
+              "sameTargetSkipRate": 0.5882352941176471
+            },
+            "devanagari": {
+              "expected": 7,
+              "skipped": 7,
+              "wrong": 0,
+              "pairs": 364,
+              "sameTargetSkipRate": 1
+            },
+            "embedded-sentence": {
+              "expected": 0,
+              "skipped": 0,
+              "wrong": 2,
+              "pairs": 104,
+              "sameTargetSkipRate": null
+            },
+            "gibberish": {
+              "expected": 0,
+              "skipped": 0,
+              "wrong": 1,
+              "pairs": 104,
+              "sameTargetSkipRate": null
+            },
+            "identifier": {
+              "expected": 17,
+              "skipped": 15,
+              "wrong": 5,
+              "pairs": 1248,
+              "sameTargetSkipRate": 0.8823529411764706
+            },
+            "japanese": {
+              "expected": 6,
+              "skipped": 6,
+              "wrong": 0,
+              "pairs": 312,
+              "sameTargetSkipRate": 1
+            },
+            "korean": {
+              "expected": 5,
+              "skipped": 5,
+              "wrong": 0,
+              "pairs": 260,
+              "sameTargetSkipRate": 1
+            },
+            "long": {
+              "expected": 66,
+              "skipped": 52,
+              "wrong": 13,
+              "pairs": 3432,
+              "sameTargetSkipRate": 0.7878787878787878
+            },
+            "mixed": {
+              "expected": 0,
+              "skipped": 0,
+              "wrong": 10,
+              "pairs": 728,
+              "sameTargetSkipRate": null
+            },
+            "mixed-variant": {
+              "expected": 0,
+              "skipped": 0,
+              "wrong": 0,
+              "pairs": 52,
+              "sameTargetSkipRate": null
+            },
+            "neutral": {
+              "expected": 4,
+              "skipped": 0,
+              "wrong": 0,
+              "pairs": 104,
+              "sameTargetSkipRate": 0
+            },
+            "no-franc-min-model": {
+              "expected": 21,
+              "skipped": 0,
+              "wrong": 16,
+              "pairs": 1092,
+              "sameTargetSkipRate": 0
+            },
+            "outside-catalog": {
+              "expected": 0,
+              "skipped": 0,
+              "wrong": 1,
+              "pairs": 52,
+              "sameTargetSkipRate": null
+            },
+            "pure-han": {
+              "expected": 0,
+              "skipped": 0,
+              "wrong": 0,
+              "pairs": 156,
+              "sameTargetSkipRate": null
+            },
+            "rare": {
+              "expected": 0,
+              "skipped": 0,
+              "wrong": 0,
+              "pairs": 52,
+              "sameTargetSkipRate": null
+            },
+            "reported": {
+              "expected": 13,
+              "skipped": 13,
+              "wrong": 0,
+              "pairs": 676,
+              "sameTargetSkipRate": 1
+            },
+            "script-unique": {
+              "expected": 18,
+              "skipped": 15,
+              "wrong": 0,
+              "pairs": 936,
+              "sameTargetSkipRate": 0.8333333333333334
+            },
+            "script-unique-veto": {
+              "expected": 0,
+              "skipped": 0,
+              "wrong": 1,
+              "pairs": 104,
+              "sameTargetSkipRate": null
+            },
+            "short": {
+              "expected": 89,
+              "skipped": 61,
+              "wrong": 15,
+              "pairs": 4524,
+              "sameTargetSkipRate": 0.6853932584269663
+            },
+            "similar": {
+              "expected": 36,
+              "skipped": 17,
+              "wrong": 16,
+              "pairs": 1872,
+              "sameTargetSkipRate": 0.4722222222222222
+            }
+          }
+        },
+        "holdout": {
+          "pairs": 4784,
+          "wrong": 32,
+          "expected": 67,
+          "skipped": 51,
+          "emptyCases": 2,
+          "emptyMisses": 0,
+          "wrongExamples": [
+            {
+              "id": "h-sk-forum",
+              "target": "pt"
+            },
+            {
+              "id": "h-tr-forum",
+              "target": "nl"
+            },
+            {
+              "id": "h-id-forum",
+              "target": "ms"
+            },
+            {
+              "id": "h-da-forum",
+              "target": "nl"
+            },
+            {
+              "id": "h-nb-forum",
+              "target": "nl"
+            },
+            {
+              "id": "h-hr-forum",
+              "target": "sr"
+            },
+            {
+              "id": "h-sl-forum",
+              "target": "sr"
+            },
+            {
+              "id": "h-ru-error",
+              "target": "bg"
+            },
+            {
+              "id": "h-uk-error",
+              "target": "bg"
+            },
+            {
+              "id": "h-zh-hans-tech",
+              "target": "en"
+            },
+            {
+              "id": "h-ja-tech",
+              "target": "en"
+            },
+            {
+              "id": "h-ko-tech",
+              "target": "en"
+            },
+            {
+              "id": "h-mixed-en-es",
+              "target": "es"
+            },
+            {
+              "id": "h-mixed-fr-en",
+              "target": "en"
+            },
+            {
+              "id": "h-mixed-pt-en",
+              "target": "pt"
+            },
+            {
+              "id": "h-mixed-ru-uk",
+              "target": "uk"
+            },
+            {
+              "id": "h-mixed-zh-en-sentence",
+              "target": "en"
+            },
+            {
+              "id": "h-mixed-zh-ja",
+              "target": "ja"
+            },
+            {
+              "id": "h-mixed-ko-en",
+              "target": "en"
+            },
+            {
+              "id": "h-mixed-ar-fr",
+              "target": "fr"
+            },
+            {
+              "id": "h-mixed-hi-en",
+              "target": "en"
+            },
+            {
+              "id": "h-mixed-de-nl",
+              "target": "nl"
+            },
+            {
+              "id": "h-word-menu",
+              "target": "ms"
+            },
+            {
+              "id": "h-word-radio",
+              "target": "hr"
+            },
+            {
+              "id": "h-words-pizza-margherita",
+              "target": "sw"
+            },
+            {
+              "id": "h-name-person",
+              "target": "es"
+            },
+            {
+              "id": "h-code-line",
+              "target": "en"
+            },
+            {
+              "id": "h-latin-quote",
+              "target": "it"
+            },
+            {
+              "id": "h-catalan",
+              "target": "es"
+            },
+            {
+              "id": "h-galician",
+              "target": "es"
+            },
+            {
+              "id": "h-macedonian",
+              "target": "sr"
+            },
+            {
+              "id": "h-afrikaans",
+              "target": "nl"
+            }
+          ],
+          "missedCases": [
+            "h-sk-forum",
+            "h-tr-forum",
+            "h-id-forum",
+            "h-da-forum",
+            "h-nb-forum",
+            "h-fi-forum",
+            "h-hr-forum",
+            "h-sl-forum",
+            "h-ru-error",
+            "h-uk-error",
+            "h-sr-forum",
+            "h-he-forum",
+            "h-zh-hans-tech",
+            "h-zh-hant-forum",
+            "h-ja-tech",
+            "h-ko-tech"
+          ],
+          "sameTargetSkipRate": 0.7611940298507462,
+          "duplicateTranslationRate": 0.23880597014925375,
+          "wrongSkipRate": 0.006688963210702341,
+          "byTag": {
+            "ambiguous-word": {
+              "expected": 0,
+              "skipped": 0,
+              "wrong": 3,
+              "pairs": 208,
+              "sameTargetSkipRate": null
+            },
+            "brand": {
+              "expected": 0,
+              "skipped": 0,
+              "wrong": 1,
+              "pairs": 104,
+              "sameTargetSkipRate": null
+            },
+            "chinese": {
+              "expected": 6,
+              "skipped": 4,
+              "wrong": 1,
+              "pairs": 312,
+              "sameTargetSkipRate": 0.6666666666666666
+            },
+            "identifier": {
+              "expected": 4,
+              "skipped": 1,
+              "wrong": 4,
+              "pairs": 260,
+              "sameTargetSkipRate": 0.25
+            },
+            "japanese": {
+              "expected": 3,
+              "skipped": 2,
+              "wrong": 1,
+              "pairs": 156,
+              "sameTargetSkipRate": 0.6666666666666666
+            },
+            "korean": {
+              "expected": 2,
+              "skipped": 1,
+              "wrong": 1,
+              "pairs": 104,
+              "sameTargetSkipRate": 0.5
+            },
+            "long": {
+              "expected": 38,
+              "skipped": 28,
+              "wrong": 7,
+              "pairs": 1976,
+              "sameTargetSkipRate": 0.7368421052631579
+            },
+            "mixed": {
+              "expected": 0,
+              "skipped": 0,
+              "wrong": 10,
+              "pairs": 520,
+              "sameTargetSkipRate": null
+            },
+            "outside-catalog": {
+              "expected": 0,
+              "skipped": 0,
+              "wrong": 5,
+              "pairs": 364,
+              "sameTargetSkipRate": null
+            },
+            "pure-han": {
+              "expected": 0,
+              "skipped": 0,
+              "wrong": 0,
+              "pairs": 52,
+              "sameTargetSkipRate": null
+            },
+            "short": {
+              "expected": 21,
+              "skipped": 19,
+              "wrong": 2,
+              "pairs": 1092,
+              "sameTargetSkipRate": 0.9047619047619048
+            },
+            "similar": {
+              "expected": 15,
+              "skipped": 7,
+              "wrong": 13,
+              "pairs": 1144,
+              "sameTargetSkipRate": 0.4666666666666667
+            }
+          }
+        },
+        "holdout2": {
+          "pairs": 3120,
+          "wrong": 13,
+          "expected": 43,
+          "skipped": 40,
+          "emptyCases": 1,
+          "emptyMisses": 0,
+          "wrongExamples": [
+            {
+              "id": "h2-id-recipe",
+              "target": "ms"
+            },
+            {
+              "id": "h2-mixed-es-en",
+              "target": "es"
+            },
+            {
+              "id": "h2-mixed-it-fr",
+              "target": "fr"
+            },
+            {
+              "id": "h2-mixed-cs-sk",
+              "target": "hr"
+            },
+            {
+              "id": "h2-mixed-zh-en-quote",
+              "target": "en"
+            },
+            {
+              "id": "h2-mixed-ja-ko",
+              "target": "ja"
+            },
+            {
+              "id": "h2-mixed-ru-en-product",
+              "target": "en"
+            },
+            {
+              "id": "h2-mixed-he-ar",
+              "target": "ar"
+            },
+            {
+              "id": "h2-words-status",
+              "target": "en"
+            },
+            {
+              "id": "h2-brand-model",
+              "target": "it"
+            },
+            {
+              "id": "h2-identifier-path",
+              "target": "fr"
+            },
+            {
+              "id": "h2-occitan",
+              "target": "es"
+            },
+            {
+              "id": "h2-luxembourgish",
+              "target": "nl"
+            }
+          ],
+          "missedCases": [
+            "h2-id-recipe",
+            "h2-he-weather",
+            "h2-zh-hant-chat"
+          ],
+          "sameTargetSkipRate": 0.9302325581395349,
+          "duplicateTranslationRate": 0.06976744186046513,
+          "wrongSkipRate": 0.004166666666666667,
+          "byTag": {
+            "ambiguous-word": {
+              "expected": 0,
+              "skipped": 0,
+              "wrong": 1,
+              "pairs": 156,
+              "sameTargetSkipRate": null
+            },
+            "brand": {
+              "expected": 0,
+              "skipped": 0,
+              "wrong": 1,
+              "pairs": 52,
+              "sameTargetSkipRate": null
+            },
+            "chinese": {
+              "expected": 4,
+              "skipped": 3,
+              "wrong": 0,
+              "pairs": 208,
+              "sameTargetSkipRate": 0.75
+            },
+            "identifier": {
+              "expected": 4,
+              "skipped": 4,
+              "wrong": 2,
+              "pairs": 312,
+              "sameTargetSkipRate": 1
+            },
+            "japanese": {
+              "expected": 2,
+              "skipped": 2,
+              "wrong": 0,
+              "pairs": 104,
+              "sameTargetSkipRate": 1
+            },
+            "korean": {
+              "expected": 2,
+              "skipped": 2,
+              "wrong": 0,
+              "pairs": 104,
+              "sameTargetSkipRate": 1
+            },
+            "long": {
+              "expected": 14,
+              "skipped": 13,
+              "wrong": 1,
+              "pairs": 728,
+              "sameTargetSkipRate": 0.9285714285714286
+            },
+            "mixed": {
+              "expected": 0,
+              "skipped": 0,
+              "wrong": 7,
+              "pairs": 416,
+              "sameTargetSkipRate": null
+            },
+            "outside-catalog": {
+              "expected": 0,
+              "skipped": 0,
+              "wrong": 2,
+              "pairs": 104,
+              "sameTargetSkipRate": null
+            },
+            "pure-han": {
+              "expected": 0,
+              "skipped": 0,
+              "wrong": 0,
+              "pairs": 104,
+              "sameTargetSkipRate": null
+            },
+            "short": {
+              "expected": 21,
+              "skipped": 19,
+              "wrong": 0,
+              "pairs": 1092,
+              "sameTargetSkipRate": 0.9047619047619048
+            },
+            "similar": {
+              "expected": 9,
+              "skipped": 8,
+              "wrong": 5,
+              "pairs": 676,
+              "sameTargetSkipRate": 0.8888888888888888
+            }
+          }
+        },
+        "releaseHoldout": {
+          "pairs": 10556,
+          "wrong": 57,
+          "expected": 166,
+          "skipped": 107,
+          "emptyCases": 4,
+          "emptyMisses": 0,
+          "wrongExamples": [
+            {
+              "id": "release-it-title",
+              "target": "ro"
+            },
+            {
+              "id": "release-ms-body",
+              "target": "id"
+            },
+            {
+              "id": "release-ms-title",
+              "target": "id"
+            },
+            {
+              "id": "release-sk-body",
+              "target": "cs"
+            },
+            {
+              "id": "release-sk-title",
+              "target": "sr"
+            },
+            {
+              "id": "release-da-body",
+              "target": "nl"
+            },
+            {
+              "id": "release-da-title",
+              "target": "nl"
+            },
+            {
+              "id": "release-sv-title",
+              "target": "es"
+            },
+            {
+              "id": "release-nb-body",
+              "target": "sv"
+            },
+            {
+              "id": "release-nb-title",
+              "target": "es"
+            },
+            {
+              "id": "release-fi-title",
+              "target": "fr"
+            },
+            {
+              "id": "release-hr-title",
+              "target": "sr"
+            },
+            {
+              "id": "release-sr-title",
+              "target": "bg"
+            },
+            {
+              "id": "release-sl-body",
+              "target": "sr"
+            },
+            {
+              "id": "release-sl-title",
+              "target": "sr"
+            },
+            {
+              "id": "release-lv-title",
+              "target": "sv"
+            },
+            {
+              "id": "release-lt-title",
+              "target": "pt"
+            },
+            {
+              "id": "release-technical-chinese-07",
+              "target": "fr"
+            },
+            {
+              "id": "release-technical-chinese-09",
+              "target": "pl"
+            },
+            {
+              "id": "release-technical-chinese-12",
+              "target": "sv"
+            },
+            {
+              "id": "release-technical-chinese-15",
+              "target": "nl"
+            },
+            {
+              "id": "release-technical-chinese-22",
+              "target": "en"
+            },
+            {
+              "id": "release-technical-chinese-23",
+              "target": "fr"
+            },
+            {
+              "id": "release-technical-chinese-26",
+              "target": "es"
+            },
+            {
+              "id": "release-technical-chinese-35",
+              "target": "fr"
+            },
+            {
+              "id": "release-technical-chinese-36",
+              "target": "fr"
+            },
+            {
+              "id": "release-technical-chinese-37",
+              "target": "ro"
+            },
+            {
+              "id": "release-technical-chinese-49",
+              "target": "ro"
+            },
+            {
+              "id": "neutral-current",
+              "target": "fr"
+            },
+            {
+              "id": "neutral-menu",
+              "target": "ms"
+            },
+            {
+              "id": "neutral-status",
+              "target": "it"
+            },
+            {
+              "id": "neutral-chat",
+              "target": "de"
+            },
+            {
+              "id": "neutral-update",
+              "target": "ro"
+            },
+            {
+              "id": "neutral-openai",
+              "target": "id"
+            },
+            {
+              "id": "neutral-files",
+              "target": "ro"
+            },
+            {
+              "id": "mixed-zh-error-short",
+              "target": "en"
+            },
+            {
+              "id": "mixed-zh-help-short",
+              "target": "en"
+            },
+            {
+              "id": "mixed-zh-en-quoted",
+              "target": "en"
+            },
+            {
+              "id": "mixed-zh-en-nospaces",
+              "target": "en"
+            },
+            {
+              "id": "mixed-zh-http-label",
+              "target": "fr"
+            }
+          ],
+          "missedCases": [
+            "release-zh-Hant-title",
+            "release-it-title",
+            "release-hi-title",
+            "release-he-body",
+            "release-he-title",
+            "release-id-title",
+            "release-ms-body",
+            "release-ms-title",
+            "release-sk-body",
+            "release-sk-title",
+            "release-da-body",
+            "release-da-title",
+            "release-sv-title",
+            "release-nb-body",
+            "release-nb-title",
+            "release-fi-body",
+            "release-fi-title",
+            "release-hr-title",
+            "release-sr-body",
+            "release-sr-title",
+            "release-sl-body",
+            "release-sl-title",
+            "release-et-body",
+            "release-et-title",
+            "release-lv-body",
+            "release-lv-title",
+            "release-lt-body",
+            "release-lt-title",
+            "release-ne-title",
+            "release-technical-chinese-02",
+            "release-technical-chinese-05",
+            "release-technical-chinese-06",
+            "release-technical-chinese-07",
+            "release-technical-chinese-09",
+            "release-technical-chinese-12",
+            "release-technical-chinese-15",
+            "release-technical-chinese-18",
+            "release-technical-chinese-20",
+            "release-technical-chinese-21",
+            "release-technical-chinese-22",
+            "release-technical-chinese-23",
+            "release-technical-chinese-24",
+            "release-technical-chinese-25",
+            "release-technical-chinese-26",
+            "release-technical-chinese-27",
+            "release-technical-chinese-28",
+            "release-technical-chinese-29",
+            "release-technical-chinese-30",
+            "release-technical-chinese-31",
+            "release-technical-chinese-32",
+            "release-technical-chinese-33",
+            "release-technical-chinese-34",
+            "release-technical-chinese-35",
+            "release-technical-chinese-36",
+            "release-technical-chinese-37",
+            "release-technical-chinese-38",
+            "release-technical-chinese-44",
+            "release-technical-chinese-49",
+            "english-positive"
+          ],
+          "sameTargetSkipRate": 0.6445783132530121,
+          "duplicateTranslationRate": 0.35542168674698793,
+          "wrongSkipRate": 0.005399772641151952,
+          "byTag": {
+            "ambiguous": {
+              "expected": 0,
+              "skipped": 0,
+              "wrong": 5,
+              "pairs": 520,
+              "sameTargetSkipRate": null
+            },
+            "ambiguous-embedded-terms": {
+              "expected": 21,
+              "skipped": 0,
+              "wrong": 6,
+              "pairs": 1092,
+              "sameTargetSkipRate": 0
+            },
+            "brand": {
+              "expected": 2,
+              "skipped": 2,
+              "wrong": 1,
+              "pairs": 208,
+              "sameTargetSkipRate": 1
+            },
+            "chinese-conversion": {
+              "expected": 2,
+              "skipped": 2,
+              "wrong": 0,
+              "pairs": 104,
+              "sameTargetSkipRate": 1
+            },
+            "cjk": {
+              "expected": 0,
+              "skipped": 0,
+              "wrong": 1,
+              "pairs": 52,
+              "sameTargetSkipRate": null
+            },
+            "foreign-ui": {
+              "expected": 0,
+              "skipped": 0,
+              "wrong": 4,
+              "pairs": 260,
+              "sameTargetSkipRate": null
+            },
+            "functional-evidence": {
+              "expected": 3,
+              "skipped": 3,
+              "wrong": 5,
+              "pairs": 416,
+              "sameTargetSkipRate": 1
+            },
+            "holdout": {
+              "expected": 125,
+              "skipped": 75,
+              "wrong": 23,
+              "pairs": 6500,
+              "sameTargetSkipRate": 0.6
+            },
+            "identifier": {
+              "expected": 0,
+              "skipped": 0,
+              "wrong": 1,
+              "pairs": 104,
+              "sameTargetSkipRate": null
+            },
+            "inline-code-prose": {
+              "expected": 0,
+              "skipped": 0,
+              "wrong": 1,
+              "pairs": 52,
+              "sameTargetSkipRate": null
+            },
+            "markdown": {
+              "expected": 0,
+              "skipped": 0,
+              "wrong": 1,
+              "pairs": 52,
+              "sameTargetSkipRate": null
+            },
+            "mixed": {
+              "expected": 0,
+              "skipped": 0,
+              "wrong": 15,
+              "pairs": 884,
+              "sameTargetSkipRate": null
+            },
+            "native-body": {
+              "expected": 52,
+              "skipped": 41,
+              "wrong": 5,
+              "pairs": 2704,
+              "sameTargetSkipRate": 0.7884615384615384
+            },
+            "native-title": {
+              "expected": 52,
+              "skipped": 34,
+              "wrong": 12,
+              "pairs": 2704,
+              "sameTargetSkipRate": 0.6538461538461539
+            },
+            "no-space": {
+              "expected": 0,
+              "skipped": 0,
+              "wrong": 1,
+              "pairs": 52,
+              "sameTargetSkipRate": null
+            },
+            "outside-catalog": {
+              "expected": 0,
+              "skipped": 0,
+              "wrong": 6,
+              "pairs": 364,
+              "sameTargetSkipRate": null
+            },
+            "quotation": {
+              "expected": 0,
+              "skipped": 0,
+              "wrong": 2,
+              "pairs": 156,
+              "sameTargetSkipRate": null
+            },
+            "regression": {
+              "expected": 28,
+              "skipped": 20,
+              "wrong": 5,
+              "pairs": 1456,
+              "sameTargetSkipRate": 0.7142857142857143
+            },
+            "release": {
+              "expected": 49,
+              "skipped": 20,
+              "wrong": 11,
+              "pairs": 2548,
+              "sameTargetSkipRate": 0.40816326530612246
+            },
+            "semantic-negation": {
+              "expected": 2,
+              "skipped": 1,
+              "wrong": 1,
+              "pairs": 104,
+              "sameTargetSkipRate": 0.5
+            },
+            "shared-han": {
+              "expected": 0,
+              "skipped": 0,
+              "wrong": 0,
+              "pairs": 104,
+              "sameTargetSkipRate": null
+            },
+            "similar-language": {
+              "expected": 0,
+              "skipped": 0,
+              "wrong": 8,
+              "pairs": 468,
+              "sameTargetSkipRate": null
+            },
+            "technical": {
+              "expected": 55,
+              "skipped": 26,
+              "wrong": 13,
+              "pairs": 2964,
+              "sameTargetSkipRate": 0.4727272727272727
+            },
+            "uppercase": {
+              "expected": 0,
+              "skipped": 0,
+              "wrong": 1,
+              "pairs": 52,
+              "sameTargetSkipRate": null
+            }
+          }
+        }
+      },
+      "timing": {
+        "calls": 1737,
+        "medianMs": 0.05950000000007094,
+        "p95Ms": 0.2473339999999098,
+        "maxMs": 3.6584579999998823
+      }
+    },
+    {
+      "name": "old-implementation",
+      "importMs": 57.80004100000019,
+      "importHeapBytes": 3229168,
+      "corpora": {
+        "calibration": {
+          "pairs": 11024,
+          "wrong": 0,
+          "expected": 176,
+          "skipped": 130,
+          "emptyCases": 5,
+          "emptyMisses": 0,
+          "wrongExamples": [],
+          "missedCases": [
+            "en-short-saved",
+            "en-short-sign-in",
+            "es-short-welcome",
+            "es-short-saved",
+            "es-short-file",
+            "pt-short-file",
+            "it-short-welcome",
+            "it-short-saved",
+            "cs-short-saved",
+            "sk-short-welcome",
+            "sk-short-saved",
+            "sk-long-extension",
+            "ro-short-welcome",
+            "hu-short-welcome",
+            "tr-short-welcome",
+            "tr-short-login",
+            "id-short-welcome",
+            "id-long-extension",
+            "id-long-privacy",
+            "ms-short-welcome",
+            "ms-long-extension",
+            "ms-long-privacy",
+            "fil-short-welcome",
+            "sw-short-welcome",
+            "da-short-welcome",
+            "da-long-extension",
+            "nb-short-welcome",
+            "nb-long-extension",
+            "fi-short-welcome",
+            "fi-long-extension",
+            "et-short-welcome",
+            "lv-short-welcome",
+            "lt-short-welcome",
+            "sl-short-welcome",
+            "sl-long-extension",
+            "hr-short-welcome",
+            "hr-long-extension",
+            "ru-short-saved",
+            "uk-short-welcome",
+            "bg-short-welcome",
+            "sr-short-welcome",
+            "sr-long-extension",
+            "ar-short-welcome",
+            "ar-short-saved",
+            "ur-short-welcome",
+            "zh-hans-saved"
+          ],
+          "sameTargetSkipRate": 0.7386363636363636,
+          "duplicateTranslationRate": 0.26136363636363635,
+          "wrongSkipRate": 0,
+          "byTag": {
+            "ambiguous": {
+              "expected": 0,
+              "skipped": 0,
+              "wrong": 0,
+              "pairs": 156,
+              "sameTargetSkipRate": null
+            },
+            "ambiguous-word": {
+              "expected": 0,
+              "skipped": 0,
+              "wrong": 0,
+              "pairs": 416,
+              "sameTargetSkipRate": null
+            },
+            "brand": {
+              "expected": 0,
+              "skipped": 0,
+              "wrong": 0,
+              "pairs": 156,
+              "sameTargetSkipRate": null
+            },
+            "cantonese": {
+              "expected": 0,
+              "skipped": 0,
+              "wrong": 0,
+              "pairs": 52,
+              "sameTargetSkipRate": null
+            },
+            "chinese": {
+              "expected": 17,
+              "skipped": 16,
+              "wrong": 0,
+              "pairs": 884,
+              "sameTargetSkipRate": 0.9411764705882353
+            },
+            "devanagari": {
+              "expected": 7,
+              "skipped": 7,
+              "wrong": 0,
+              "pairs": 364,
+              "sameTargetSkipRate": 1
+            },
+            "embedded-sentence": {
+              "expected": 0,
+              "skipped": 0,
+              "wrong": 0,
+              "pairs": 104,
+              "sameTargetSkipRate": null
+            },
+            "gibberish": {
+              "expected": 0,
+              "skipped": 0,
+              "wrong": 0,
+              "pairs": 104,
+              "sameTargetSkipRate": null
+            },
+            "identifier": {
+              "expected": 17,
+              "skipped": 17,
+              "wrong": 0,
+              "pairs": 1248,
+              "sameTargetSkipRate": 1
+            },
+            "japanese": {
+              "expected": 6,
+              "skipped": 6,
+              "wrong": 0,
+              "pairs": 312,
+              "sameTargetSkipRate": 1
+            },
+            "korean": {
+              "expected": 5,
+              "skipped": 5,
+              "wrong": 0,
+              "pairs": 260,
+              "sameTargetSkipRate": 1
+            },
+            "long": {
+              "expected": 66,
+              "skipped": 55,
+              "wrong": 0,
+              "pairs": 3432,
+              "sameTargetSkipRate": 0.8333333333333334
+            },
+            "mixed": {
+              "expected": 0,
+              "skipped": 0,
+              "wrong": 0,
+              "pairs": 728,
+              "sameTargetSkipRate": null
+            },
+            "mixed-variant": {
+              "expected": 0,
+              "skipped": 0,
+              "wrong": 0,
+              "pairs": 52,
+              "sameTargetSkipRate": null
+            },
+            "neutral": {
+              "expected": 4,
+              "skipped": 4,
+              "wrong": 0,
+              "pairs": 104,
+              "sameTargetSkipRate": 1
+            },
+            "no-franc-min-model": {
+              "expected": 21,
+              "skipped": 7,
+              "wrong": 0,
+              "pairs": 1092,
+              "sameTargetSkipRate": 0.3333333333333333
+            },
+            "outside-catalog": {
+              "expected": 0,
+              "skipped": 0,
+              "wrong": 0,
+              "pairs": 52,
+              "sameTargetSkipRate": null
+            },
+            "pure-han": {
+              "expected": 0,
+              "skipped": 0,
+              "wrong": 0,
+              "pairs": 156,
+              "sameTargetSkipRate": null
+            },
+            "rare": {
+              "expected": 0,
+              "skipped": 0,
+              "wrong": 0,
+              "pairs": 52,
+              "sameTargetSkipRate": null
+            },
+            "reported": {
+              "expected": 13,
+              "skipped": 13,
+              "wrong": 0,
+              "pairs": 676,
+              "sameTargetSkipRate": 1
+            },
+            "script-unique": {
+              "expected": 18,
+              "skipped": 18,
+              "wrong": 0,
+              "pairs": 936,
+              "sameTargetSkipRate": 1
+            },
+            "script-unique-veto": {
+              "expected": 0,
+              "skipped": 0,
+              "wrong": 0,
+              "pairs": 104,
+              "sameTargetSkipRate": null
+            },
+            "short": {
+              "expected": 89,
+              "skipped": 54,
+              "wrong": 0,
+              "pairs": 4524,
+              "sameTargetSkipRate": 0.6067415730337079
+            },
+            "similar": {
+              "expected": 36,
+              "skipped": 13,
+              "wrong": 0,
+              "pairs": 1872,
+              "sameTargetSkipRate": 0.3611111111111111
+            }
+          }
+        },
+        "holdout": {
+          "pairs": 4784,
+          "wrong": 0,
+          "expected": 67,
+          "skipped": 42,
+          "emptyCases": 2,
+          "emptyMisses": 0,
+          "wrongExamples": [],
+          "missedCases": [
+            "h-en-headline",
+            "h-en-error",
+            "h-de-headline",
+            "h-es-error",
+            "h-pt-headline",
+            "h-pt-error",
+            "h-it-headline",
+            "h-pl-forum",
+            "h-cs-forum",
+            "h-sk-forum",
+            "h-tr-forum",
+            "h-id-forum",
+            "h-ms-forum",
+            "h-da-forum",
+            "h-nb-forum",
+            "h-fi-forum",
+            "h-hr-forum",
+            "h-sl-forum",
+            "h-ru-headline",
+            "h-ru-error",
+            "h-uk-error",
+            "h-sr-forum",
+            "h-ar-forum",
+            "h-ar-error",
+            "h-zh-hant-forum"
+          ],
+          "sameTargetSkipRate": 0.6268656716417911,
+          "duplicateTranslationRate": 0.3731343283582089,
+          "wrongSkipRate": 0,
+          "byTag": {
+            "ambiguous-word": {
+              "expected": 0,
+              "skipped": 0,
+              "wrong": 0,
+              "pairs": 208,
+              "sameTargetSkipRate": null
+            },
+            "brand": {
+              "expected": 0,
+              "skipped": 0,
+              "wrong": 0,
+              "pairs": 104,
+              "sameTargetSkipRate": null
+            },
+            "chinese": {
+              "expected": 6,
+              "skipped": 5,
+              "wrong": 0,
+              "pairs": 312,
+              "sameTargetSkipRate": 0.8333333333333334
+            },
+            "identifier": {
+              "expected": 4,
+              "skipped": 4,
+              "wrong": 0,
+              "pairs": 260,
+              "sameTargetSkipRate": 1
+            },
+            "japanese": {
+              "expected": 3,
+              "skipped": 3,
+              "wrong": 0,
+              "pairs": 156,
+              "sameTargetSkipRate": 1
+            },
+            "korean": {
+              "expected": 2,
+              "skipped": 2,
+              "wrong": 0,
+              "pairs": 104,
+              "sameTargetSkipRate": 1
+            },
+            "long": {
+              "expected": 38,
+              "skipped": 25,
+              "wrong": 0,
+              "pairs": 1976,
+              "sameTargetSkipRate": 0.6578947368421053
+            },
+            "mixed": {
+              "expected": 0,
+              "skipped": 0,
+              "wrong": 0,
+              "pairs": 520,
+              "sameTargetSkipRate": null
+            },
+            "outside-catalog": {
+              "expected": 0,
+              "skipped": 0,
+              "wrong": 0,
+              "pairs": 364,
+              "sameTargetSkipRate": null
+            },
+            "pure-han": {
+              "expected": 0,
+              "skipped": 0,
+              "wrong": 0,
+              "pairs": 52,
+              "sameTargetSkipRate": null
+            },
+            "short": {
+              "expected": 21,
+              "skipped": 10,
+              "wrong": 0,
+              "pairs": 1092,
+              "sameTargetSkipRate": 0.47619047619047616
+            },
+            "similar": {
+              "expected": 15,
+              "skipped": 5,
+              "wrong": 0,
+              "pairs": 1144,
+              "sameTargetSkipRate": 0.3333333333333333
+            }
+          }
+        },
+        "holdout2": {
+          "pairs": 3120,
+          "wrong": 0,
+          "expected": 43,
+          "skipped": 33,
+          "emptyCases": 1,
+          "emptyMisses": 0,
+          "wrongExamples": [],
+          "missedCases": [
+            "h2-fr-chat",
+            "h2-es-chat",
+            "h2-tr-chat",
+            "h2-id-recipe",
+            "h2-hu-weather",
+            "h2-uk-weather",
+            "h2-ar-sports",
+            "h2-zh-hant-chat",
+            "h2-ja-update",
+            "h2-ko-update"
+          ],
+          "sameTargetSkipRate": 0.7674418604651163,
+          "duplicateTranslationRate": 0.2325581395348837,
+          "wrongSkipRate": 0,
+          "byTag": {
+            "ambiguous-word": {
+              "expected": 0,
+              "skipped": 0,
+              "wrong": 0,
+              "pairs": 156,
+              "sameTargetSkipRate": null
+            },
+            "brand": {
+              "expected": 0,
+              "skipped": 0,
+              "wrong": 0,
+              "pairs": 52,
+              "sameTargetSkipRate": null
+            },
+            "chinese": {
+              "expected": 4,
+              "skipped": 3,
+              "wrong": 0,
+              "pairs": 208,
+              "sameTargetSkipRate": 0.75
+            },
+            "identifier": {
+              "expected": 4,
+              "skipped": 2,
+              "wrong": 0,
+              "pairs": 312,
+              "sameTargetSkipRate": 0.5
+            },
+            "japanese": {
+              "expected": 2,
+              "skipped": 1,
+              "wrong": 0,
+              "pairs": 104,
+              "sameTargetSkipRate": 0.5
+            },
+            "korean": {
+              "expected": 2,
+              "skipped": 1,
+              "wrong": 0,
+              "pairs": 104,
+              "sameTargetSkipRate": 0.5
+            },
+            "long": {
+              "expected": 14,
+              "skipped": 12,
+              "wrong": 0,
+              "pairs": 728,
+              "sameTargetSkipRate": 0.8571428571428571
+            },
+            "mixed": {
+              "expected": 0,
+              "skipped": 0,
+              "wrong": 0,
+              "pairs": 416,
+              "sameTargetSkipRate": null
+            },
+            "outside-catalog": {
+              "expected": 0,
+              "skipped": 0,
+              "wrong": 0,
+              "pairs": 104,
+              "sameTargetSkipRate": null
+            },
+            "pure-han": {
+              "expected": 0,
+              "skipped": 0,
+              "wrong": 0,
+              "pairs": 104,
+              "sameTargetSkipRate": null
+            },
+            "short": {
+              "expected": 21,
+              "skipped": 15,
+              "wrong": 0,
+              "pairs": 1092,
+              "sameTargetSkipRate": 0.7142857142857143
+            },
+            "similar": {
+              "expected": 9,
+              "skipped": 7,
+              "wrong": 0,
+              "pairs": 676,
+              "sameTargetSkipRate": 0.7777777777777778
+            }
+          }
+        },
+        "releaseHoldout": {
+          "pairs": 10556,
+          "wrong": 2,
+          "expected": 166,
+          "skipped": 92,
+          "emptyCases": 4,
+          "emptyMisses": 0,
+          "wrongExamples": [
+            {
+              "id": "mixed-zh-en-inline-code",
+              "target": "zh-Hans"
+            },
+            {
+              "id": "outside-nn",
+              "target": "sv"
+            }
+          ],
+          "missedCases": [
+            "release-zh-Hant-title",
+            "release-en-title",
+            "release-fr-title",
+            "release-ru-title",
+            "release-es-title",
+            "release-de-title",
+            "release-it-title",
+            "release-ar-title",
+            "release-hi-title",
+            "release-ur-title",
+            "release-fa-title",
+            "release-tr-title",
+            "release-id-body",
+            "release-id-title",
+            "release-ms-body",
+            "release-ms-title",
+            "release-nl-title",
+            "release-pl-title",
+            "release-uk-title",
+            "release-cs-body",
+            "release-cs-title",
+            "release-sk-body",
+            "release-sk-title",
+            "release-da-body",
+            "release-da-title",
+            "release-sv-title",
+            "release-nb-body",
+            "release-nb-title",
+            "release-fi-title",
+            "release-ro-title",
+            "release-hu-title",
+            "release-bg-title",
+            "release-hr-body",
+            "release-hr-title",
+            "release-sr-body",
+            "release-sr-title",
+            "release-sl-body",
+            "release-sl-title",
+            "release-et-title",
+            "release-lv-title",
+            "release-lt-body",
+            "release-lt-title",
+            "release-mr-body",
+            "release-mr-title",
+            "release-ne-title",
+            "release-sw-title",
+            "release-fil-title",
+            "release-technical-chinese-02",
+            "release-technical-chinese-06",
+            "release-technical-chinese-12",
+            "release-technical-chinese-15",
+            "release-technical-chinese-18",
+            "release-technical-chinese-20",
+            "release-technical-chinese-21",
+            "release-technical-chinese-22",
+            "release-technical-chinese-23",
+            "release-technical-chinese-24",
+            "release-technical-chinese-25",
+            "release-technical-chinese-26",
+            "release-technical-chinese-27",
+            "release-technical-chinese-28",
+            "release-technical-chinese-29",
+            "release-technical-chinese-30",
+            "release-technical-chinese-31",
+            "release-technical-chinese-32",
+            "release-technical-chinese-33",
+            "release-technical-chinese-34",
+            "release-technical-chinese-35",
+            "release-technical-chinese-44",
+            "release-technical-chinese-46",
+            "release-technical-chinese-48",
+            "hant-conversion",
+            "english-positive",
+            "marathi-more-information"
+          ],
+          "sameTargetSkipRate": 0.5542168674698795,
+          "duplicateTranslationRate": 0.4457831325301205,
+          "wrongSkipRate": 0.00018946570670708602,
+          "byTag": {
+            "ambiguous": {
+              "expected": 0,
+              "skipped": 0,
+              "wrong": 0,
+              "pairs": 520,
+              "sameTargetSkipRate": null
+            },
+            "ambiguous-embedded-terms": {
+              "expected": 21,
+              "skipped": 0,
+              "wrong": 0,
+              "pairs": 1092,
+              "sameTargetSkipRate": 0
+            },
+            "brand": {
+              "expected": 2,
+              "skipped": 2,
+              "wrong": 0,
+              "pairs": 208,
+              "sameTargetSkipRate": 1
+            },
+            "chinese-conversion": {
+              "expected": 2,
+              "skipped": 1,
+              "wrong": 0,
+              "pairs": 104,
+              "sameTargetSkipRate": 0.5
+            },
+            "cjk": {
+              "expected": 0,
+              "skipped": 0,
+              "wrong": 0,
+              "pairs": 52,
+              "sameTargetSkipRate": null
+            },
+            "foreign-ui": {
+              "expected": 0,
+              "skipped": 0,
+              "wrong": 0,
+              "pairs": 260,
+              "sameTargetSkipRate": null
+            },
+            "functional-evidence": {
+              "expected": 3,
+              "skipped": 2,
+              "wrong": 0,
+              "pairs": 416,
+              "sameTargetSkipRate": 0.6666666666666666
+            },
+            "holdout": {
+              "expected": 125,
+              "skipped": 57,
+              "wrong": 0,
+              "pairs": 6500,
+              "sameTargetSkipRate": 0.456
+            },
+            "identifier": {
+              "expected": 0,
+              "skipped": 0,
+              "wrong": 0,
+              "pairs": 104,
+              "sameTargetSkipRate": null
+            },
+            "inline-code-prose": {
+              "expected": 0,
+              "skipped": 0,
+              "wrong": 1,
+              "pairs": 52,
+              "sameTargetSkipRate": null
+            },
+            "markdown": {
+              "expected": 0,
+              "skipped": 0,
+              "wrong": 0,
+              "pairs": 52,
+              "sameTargetSkipRate": null
+            },
+            "mixed": {
+              "expected": 0,
+              "skipped": 0,
+              "wrong": 1,
+              "pairs": 884,
+              "sameTargetSkipRate": null
+            },
+            "native-body": {
+              "expected": 52,
+              "skipped": 41,
+              "wrong": 0,
+              "pairs": 2704,
+              "sameTargetSkipRate": 0.7884615384615384
+            },
+            "native-title": {
+              "expected": 52,
+              "skipped": 16,
+              "wrong": 0,
+              "pairs": 2704,
+              "sameTargetSkipRate": 0.3076923076923077
+            },
+            "no-space": {
+              "expected": 0,
+              "skipped": 0,
+              "wrong": 0,
+              "pairs": 52,
+              "sameTargetSkipRate": null
+            },
+            "outside-catalog": {
+              "expected": 0,
+              "skipped": 0,
+              "wrong": 1,
+              "pairs": 364,
+              "sameTargetSkipRate": null
+            },
+            "quotation": {
+              "expected": 0,
+              "skipped": 0,
+              "wrong": 0,
+              "pairs": 156,
+              "sameTargetSkipRate": null
+            },
+            "regression": {
+              "expected": 28,
+              "skipped": 25,
+              "wrong": 0,
+              "pairs": 1456,
+              "sameTargetSkipRate": 0.8928571428571429
+            },
+            "release": {
+              "expected": 49,
+              "skipped": 25,
+              "wrong": 0,
+              "pairs": 2548,
+              "sameTargetSkipRate": 0.5102040816326531
+            },
+            "semantic-negation": {
+              "expected": 2,
+              "skipped": 1,
+              "wrong": 0,
+              "pairs": 104,
+              "sameTargetSkipRate": 0.5
+            },
+            "shared-han": {
+              "expected": 0,
+              "skipped": 0,
+              "wrong": 0,
+              "pairs": 104,
+              "sameTargetSkipRate": null
+            },
+            "similar-language": {
+              "expected": 0,
+              "skipped": 0,
+              "wrong": 1,
+              "pairs": 468,
+              "sameTargetSkipRate": null
+            },
+            "technical": {
+              "expected": 55,
+              "skipped": 31,
+              "wrong": 0,
+              "pairs": 2964,
+              "sameTargetSkipRate": 0.5636363636363636
+            },
+            "uppercase": {
+              "expected": 0,
+              "skipped": 0,
+              "wrong": 0,
+              "pairs": 52,
+              "sameTargetSkipRate": null
+            }
+          }
+        }
+      },
+      "timing": {
+        "calls": 1737,
+        "medianMs": 0.1149159999999938,
+        "p95Ms": 0.7568330000001424,
+        "maxMs": 8.254791999999952
+      },
+      "cachedTiming": {
+        "calls": 1737,
+        "medianMs": 0.108791999999994,
+        "p95Ms": 0.5320830000000569,
+        "maxMs": 2.235209000000168
+      },
+      "heapAfterEvaluationBytes": 45249416,
+      "root": "/private/tmp/fluentread-target-language-baseline"
+    }
+  ],
+  "sizes": {
+    "franc-min": {
+      "raw": 116338,
+      "gzip": 52562,
+      "files": [
+        "../FluentRead/node_modules/.pnpm/franc-min@6.2.0/node_modules/franc-min/index.js",
+        "../FluentRead/node_modules/.pnpm/franc-min@6.2.0/node_modules/franc-min/data.js",
+        "../FluentRead/node_modules/.pnpm/franc-min@6.2.0/node_modules/franc-min/expressions.js"
+      ]
+    },
+    "unified-language-core": {
+      "raw": 105174,
+      "gzip": 36620,
+      "files": [
+        "src/core/language/codes.ts",
+        "src/core/language/identify.ts",
+        "src/core/language/lexicon.ts",
+        "src/core/language/scripts.ts",
+        "src/core/language/statistical.ts",
+        "src/core/language/technicalTokens.ts",
+        "src/core/language/detect.ts",
+        "src/core/language/chinese.ts"
+      ]
+    },
+    "chinese-variant-data": {
+      "raw": 49643,
+      "gzip": 35799,
+      "files": [
+        "src/core/language/chineseVariants.ts"
+      ]
+    }
+  }
+}

@@ -3,6 +3,7 @@ import {normalizeConfig} from '@/src/core/config/model';
 import {prepareAreaTextTranslation, supportsAreaTranslationAI} from '@/src/features/area-translation/services/textTranslation';
 import {getTranslationProviderConfig, getTranslationRequestControl, getTranslationGlossaryContext, createTranslationProviderConfigSnapshot} from '@/src/services/translation/requestSnapshot';
 import type {TranslationRequestMessage} from '@/src/services/translation/types';
+import type {GlossaryLibrary} from '@/src/core/glossary';
 
 const recognized = {image: 'data:image/png,cropped', lines: [
     {text: 'He11o world.', bbox: {x0: 0, y0: 0, x1: 100, y1: 15}},
@@ -13,8 +14,109 @@ const config = (mode: 'standard' | 'ai' = 'standard') => normalizeConfig({
     service: 'microsoft', areaTranslationMode: mode, areaTranslationService: mode === 'ai' ? 'openai' : '',
     model: {openai: 'gpt-4o'}, from: 'auto', to: 'zh-Hans', token: {openai: 'private-old-key'},
 });
+const chineseTerms = (): GlossaryLibrary => ({id: 'notes', name: '阅读用语', enabled: true,
+    sourceLanguage: 'zh-Hans', targetLanguage: 'zh-Hans', domains: ['example.org'],
+    entries: [{id: 'record', source: '记录', target: '笔记', caseSensitive: false}]});
 
 describe('圈选整块文字翻译事务', () => {
+    it.each([
+        ['修复保存记录后再次打开页面时内容丢失的问题。', 'zh-Hans', 'en'],
+        ['You can return to your saved paragraphs after closing the browser.', 'en', 'zh-Hans'],
+    ])('标准圈选原文已是目标 %s → %s 时不请求，改用目标 %s 后仍翻译', async (text, target, otherTarget) => {
+        const source = config();
+        source.to = target;
+        const translate = vi.fn(async (_request: TranslationRequestMessage) => '新的译文');
+        const original = {...recognized, lines: [{...recognized.lines[0], text}], sourceText: text,
+            recognitionMethod: 'ocr' as const, recognitionFallback: 'unknown' as const};
+        const run = prepareAreaTextTranslation(source, 'auto', 'Article', {}, translate);
+        source.to = otherTarget;
+        const unchanged = await run(original, options());
+        expect(unchanged).toMatchObject({sourceText: text, translatedText: text, mode: 'standard',
+            image: original.image, recognitionMethod: 'ocr', recognitionFallback: 'unknown', warnings: ['standard-quality']});
+        expect(unchanged.lines).toBe(original.lines);
+        expect(translate).not.toHaveBeenCalled();
+        const changed = await prepareAreaTextTranslation(source, 'auto', 'Article', {}, translate)(original, options());
+        expect(changed.translatedText).toBe('新的译文');
+        expect(translate).toHaveBeenCalledOnce();
+        expect(translate.mock.calls[0][0]).toMatchObject({origin: text, targetLanguage: otherTarget});
+    });
+
+    it('标准圈选中的真实外语句子继续请求，且不继承网页排除语言', async () => {
+        const source = config();
+        source.excludedLanguages = ['en'];
+        const text = '修复了保存错误。Please restart your browser and try again.';
+        const translate = vi.fn(async (_request: TranslationRequestMessage) => '修复了保存错误。请重启浏览器后重试。');
+        const result = await prepareAreaTextTranslation(source, 'auto', '', {}, translate)({...recognized, sourceText: text}, options());
+        expect(result.sourceText).toBe(text);
+        expect(translate).toHaveBeenCalledOnce();
+        expect(translate.mock.calls[0][0].origin).toBe(text);
+    });
+
+    it('标准圈选同目标命中用户固定译名时仍调用broker，沿用冻结词库与可信网站来源', async () => {
+        const source = config();
+        source.glossaryEnabled = true;
+        source.glossaryLibraries = [chineseTerms()];
+        const text = '修复保存记录后再次打开页面时内容丢失的问题。';
+        const context = {pageUrl: 'https://example.org/article', context: 'page' as const};
+        const translate = vi.fn(async (_request: TranslationRequestMessage) => text.replace('记录', '笔记'));
+        const run = prepareAreaTextTranslation(source, 'zh-Hans', '', context, translate);
+        source.glossaryEnabled = false;
+        source.glossaryLibraries[0].entries[0].target = '新术语';
+        context.pageUrl = 'https://other.org/article';
+        const result = await run({...recognized, sourceText: text}, options());
+        expect(result).toMatchObject({sourceText: text, translatedText: text.replace('记录', '笔记')});
+        expect(translate).toHaveBeenCalledOnce();
+        const request = translate.mock.calls[0][0];
+        expect(request).toMatchObject({origin: text, sourceLanguage: 'zh-Hans', targetLanguage: 'zh-Hans'});
+        expect(getTranslationGlossaryContext(request)?.pageUrl).toBe('https://example.org/article');
+        const frozen = getTranslationProviderConfig(request, createTranslationProviderConfigSnapshot(source));
+        expect(frozen.glossaryEnabled).toBe(true);
+        expect(frozen.glossaryLibraries?.[0]?.entries[0]?.target).toBe('笔记');
+    });
+
+    it('可选翻译配置缺少术语库时仍安全跳过标准同目标原文', async () => {
+        const source = config();
+        source.glossaryEnabled = true;
+        Reflect.deleteProperty(source, 'glossaryLibraries');
+        const text = '修复保存记录后再次打开页面时内容丢失的问题。';
+        const translate = vi.fn(async (_request: TranslationRequestMessage) => '不应请求');
+        const result = await prepareAreaTextTranslation(source, 'zh-Hans', '', {}, translate)({...recognized, sourceText: text}, options());
+        expect(result.translatedText).toBe(text);
+        expect(translate).not.toHaveBeenCalled();
+    });
+
+    it.each(['disabled', 'library-disabled', 'website', 'source', 'target', 'unmatched', 'document-disabled'] as const)(
+        '标准同目标的术语范围为%s时保留原文且不请求', async boundary => {
+            const source = config();
+            source.glossaryEnabled = true;
+            const library = chineseTerms();
+            source.glossaryLibraries = [library];
+            if (boundary === 'disabled') source.glossaryEnabled = false;
+            if (boundary === 'library-disabled') library.enabled = false;
+            if (boundary === 'source') library.sourceLanguage = 'en';
+            if (boundary === 'target') library.targetLanguage = 'en';
+            if (boundary === 'unmatched') library.entries[0].source = '书签';
+            if (boundary === 'document-disabled') source.documentGlossaryIds = [];
+            const text = '修复保存记录后再次打开页面时内容丢失的问题。';
+            const translate = vi.fn(async (_request: TranslationRequestMessage) => '不应请求');
+            const context = {pageUrl: boundary === 'website' ? 'https://other.org' : 'https://example.org',
+                context: boundary === 'document-disabled' ? 'document' as const : 'page' as const};
+            const result = await prepareAreaTextTranslation(source, 'zh-Hans', '', context, translate)({...recognized, sourceText: text}, options());
+            expect(result.translatedText).toBe(text);
+            expect(translate).not.toHaveBeenCalled();
+        },
+    );
+
+    it('AI圈选同目标仍执行OCR纠错并校验结构化结果', async () => {
+        const source = config('ai');
+        const text = '修复保存记录后再次打开页面时内容丢失的问题。';
+        const translate = vi.fn(async (_request: TranslationRequestMessage) => JSON.stringify({correctedText: text, translatedText: text}));
+        const result = await prepareAreaTextTranslation(source, 'auto', '', {}, translate)({...recognized, sourceText: text}, options());
+        expect(result).toMatchObject({sourceText: text, correctedText: text, translatedText: text, mode: 'ai'});
+        expect(translate).toHaveBeenCalledOnce();
+        expect(translate.mock.calls[0][0]).toMatchObject({origin: text, targetLanguage: 'zh-Hans', useCache: false});
+    });
+
     it('视觉识别在未指定服务和提示词时使用主服务与默认提示', async () => {
         const source = config();
         source.areaTranslationService = '';

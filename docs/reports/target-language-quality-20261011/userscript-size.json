@@ -1,0 +1,12 @@
+{
+  "baselineCommit": "fe7005dd9",
+  "baselineBytes": 1985411,
+  "candidateBytes": 1991308,
+  "deltaBytes": 5897,
+  "deltaPercent": 0.2970165874975005,
+  "budgetBytes": 1992000,
+  "baselineSha256": "4162baed44553508cc9c32147a55cc95925f5996468a7592899a79a1d6108afa",
+  "candidateSha256": "6633f6407fae0e104eb6274f0aa799760611dacfb4680101c2a32f29fd473319",
+  "sameDependencies": true,
+  "candidateCommand": "pnpm build:userscript && node scripts/verify-userscript-build.mjs"
+}

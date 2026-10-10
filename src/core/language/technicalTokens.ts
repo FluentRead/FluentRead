@@ -2,7 +2,7 @@
  * @file src/core/language/technicalTokens.ts
  *
  * 文件职责：统一识别文本中的技术标识符和名称类 Latin 词，只生成供语言识别使用的副本，避免把模型名、版本号、哈希、URL、路径和文件名当成外语正文。
- * 主要内容：按从结构最强到最弱的顺序遮蔽 URL、邮箱、@提及、行内代码、带编号的仓库引用、参数赋值、带单位数值、路径、文件名、UUID、提交哈希、版本号、带版本的产品或模型名称（可带一个首字母大写后缀及规模/变体词）、代码标识符和字母数字混合编号；URL、邮箱、域名、引用、赋值、路径和文件名按最大合法候选检查一次，名称保留超长前缀对整体匹配的拒绝语义，避免重复回溯或改变计权；把连续三个以上全大写词还原为普通词以免外语句子伪装成缩写；为非 Latin 正文中的 Latin 词给出缩写、内部大写名称、格式名、常见技术词、单字母或普通正文的角色与权重。可核对的公开符号包括 createLanguageDetectionCopy、classifyEmbeddedLatinWord、isAcronymWord、isMixedCaseName、LanguageDetectionCopy、EmbeddedLatinWordRole。
+ * 主要内容：按从结构最强到最弱的顺序遮蔽 URL、邮箱、@提及、行内代码、带编号的仓库引用、参数赋值、带单位数值、路径、文件名、UUID、提交哈希、版本号、带版本的产品或模型名称（可带一个首字母大写后缀及规模/变体词）、代码标识符和字母数字混合编号；URL、邮箱、域名、引用、赋值、路径和文件名按最大合法候选检查一次，名称保留超长前缀对整体匹配的拒绝语义，避免重复回溯或改变计权；把连续三个以上全大写词还原为普通词以免外语句子伪装成缩写；为非 Latin 正文中的 Latin 词给出缩写、内部大写名称、格式名、常见技术词、单字母或普通正文的角色与权重，提供通用技术缩写证据以区分大写名称与大写外语短句。可核对的公开符号包括 createLanguageDetectionCopy、classifyEmbeddedLatinWord、isAcronymWord、isMixedCaseName、isTechnicalAbbreviation、LanguageDetectionCopy、EmbeddedLatinWordRole。
  * 模块边界：本文件属于 core 纯算法，只读字符串并返回新的识别副本，绝不修改原文、链接、代码或宿主 DOM；不判断文本属于哪种语言，也不访问配置、浏览器或检测库。
  */
 
@@ -100,6 +100,29 @@ const TECHNICAL_WORDS = new Set([
 ]);
 const MAX_ACRONYM_LENGTH = 10;
 const MAX_MIXED_CASE_NAME_LENGTH = 24;
+// 常用 DOM 标签在行内代码中是标准标识符；不能把所有裸词都当代码遮蔽。
+const INLINE_DOM_IDENTIFIERS = new Set(['code', 'pre', 'span', 'div', 'body', 'head', 'style', 'script', 'html']);
+
+/** 已有通用技术缩写词集的证据，不按大写字形猜测任意缩写，也不维护品牌名单。 */
+export function isTechnicalAbbreviation(word: string): boolean {
+    return TECHNICAL_WORDS.has(word.toLowerCase());
+}
+
+/** 反引号不能证明代码：只接纳完整标识符、声明/赋值、字面量、调用、运算表达式和带参数的技术命令。 */
+function isStructuredInlineCode(token: string): boolean {
+    const content = token.slice(1, -1).trim();
+    if (!/\p{L}/u.test(content)) return true;
+    if (/^[A-Za-z_$][\w$]*(?:\.[A-Za-z_$][\w$]*)+$/u.test(content)
+        || /^[A-Za-z]+(?:_[A-Za-z\d]+)+$/u.test(content)
+        || isMixedCaseName(content) || isTechnicalAbbreviation(content) || INLINE_DOM_IDENTIFIERS.has(content)) return true;
+    if (/^(?:const|let|var)\s+[A-Za-z_$][\w$]*(?:\s*[:=])/u.test(content)
+        || /^[A-Za-z_$][\w$]*(?:\.[A-Za-z_$][\w$]*)*\s*(?:[+*/%-]?=)(?!=)/u.test(content)) return true;
+    if (/^(?:\{[^]*\}|\[[^]*\]|<\/?[A-Za-z][^<>]*>)$/u.test(content)) return true;
+    if (/^(?:(?:await|return|yield|new)\s+)?[A-Za-z_$][\w$]*(?:\.[A-Za-z_$][\w$]*)*\([^]*\);?$/u.test(content)) return true;
+    if (/^[\w$.]+(?:\s*[<>+*/%&|!=-]{1,3}\s*[\w$.]+)+;?$/u.test(content)) return true;
+    const firstWord = /^[A-Za-z]+/u.exec(content)?.[0];
+    return firstWord !== undefined && isTechnicalAbbreviation(firstWord) && /(?:^|\s)--?[A-Za-z]/u.test(content);
+}
 
 /** 同一最大合法前缀内，后续起点的必要后缀相同；只在候选起点匹配，失败后跳过整段而不重复回溯。 */
 function maskCandidateTokens(text: string, candidates: RegExp, pattern: RegExp, accept: (token: string) => boolean, nestedCandidate?: RegExp): {text: string; count: number} {
@@ -206,7 +229,9 @@ export function createLanguageDetectionCopy(value: string): LanguageDetectionCop
     if (EMAIL_DOMAIN_PATTERN.test(text)) text = mask(text, EMAIL_PATTERN, undefined, EMAIL_CANDIDATE_PATTERN);
     if (DOMAIN_SUFFIX_PATTERN.test(text)) text = mask(text, DOMAIN_PATTERN, undefined, DOMAIN_CANDIDATE_PATTERN);
     if (text.includes('@')) text = mask(text, MENTION_PATTERN);
-    if (text.includes('`')) text = mask(text, INLINE_CODE_PATTERN);
+    // 反引号只是网页样式，不能证明其中不是自然语言。只有明确代码结构才遮蔽整段；
+    // 英文操作提示等自然短句保留正文证据，由统一识别流程决定是否需要翻译。
+    if (text.includes('`')) text = mask(text, INLINE_CODE_PATTERN, isStructuredInlineCode);
     if (/[{<]/u.test(text)) text = mask(text, PLACEHOLDER_PATTERN);
     if (text.includes('#')) text = mask(text, REPOSITORY_REFERENCE_PATTERN, undefined, REPOSITORY_CANDIDATE_PATTERN);
     if (text.includes('=')) text = mask(text, PARAMETER_ASSIGNMENT_PATTERN, undefined, ASSIGNMENT_CANDIDATE_PATTERN);

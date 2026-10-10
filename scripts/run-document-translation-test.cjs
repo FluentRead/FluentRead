@@ -28,7 +28,7 @@ async function fixtureServer() {
       const protocol = /(___FLUENTREAD_([a-z0-9_-]+)_(\d+)_BEGIN___)([\s\S]*?)(___FLUENTREAD_\2_\3_END___)/giu;
       const translation = protocol.test(source) ? source.replace(protocol, (_match, begin, _nonce, _index, text, end) => `${begin}测试译文：${text}${end}`) : `测试译文：${source}`;
       await new Promise(resolve => setTimeout(resolve, state.delay));
-      if (state.fail && source.includes('Failure target')) { res.writeHead(400); res.end(JSON.stringify({error: {message: 'Fixture intentional failure'}})); return; }
+      if (state.fail && source.includes('Failure target')) { res.writeHead(503); res.end(JSON.stringify({error: {message: 'Fixture intentional temporary failure'}})); return; }
       res.setHeader('Content-Type', 'application/json');
       res.end(JSON.stringify({id: 'document-fixture', object: 'chat.completion', created: 1, model: 'document-fixture',
         choices: [{index: 0, message: {role: 'assistant', content: translation}, finish_reason: 'stop'}],
@@ -722,6 +722,12 @@ async function main() {
     await newFile();
     fixture.state.fail = true;
     await load('failure.txt', Buffer.from('A successful first paragraph.\n\nAnother successful paragraph.\n\nFailure target paragraph.'));
+    // 此用例单独验证已完成片段保留；通过文档设置关闭当前任务的批量请求。
+    await showSidebar();
+    await page.locator('aside.document-sidebar .document-settings-button').click();
+    const failureSettings = page.locator('.document-settings-dialog[open]');
+    await failureSettings.locator('.document-batch-translation input').uncheck();
+    await failureSettings.getByRole('button', {name: '返回文档', exact: true}).click();
     await page.getByRole('button', {name: '开始翻译', exact: true}).click();
     // 失败不再立刻中断：服务出错时自动退避重试（2 s、4 s……累计最多 120 s），工具栏下方浮出重试提示；已完成的片段保留，服务恢复后无需手动操作即可译完。
     const retryNotice = page.locator('.document-taskbar .taskbar-notices .task-notice').filter({hasText: '翻译服务暂时没有响应，将自动重试'});

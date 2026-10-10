@@ -1456,9 +1456,9 @@ async function loadFiles(files: File[], sourceUrl?: string): Promise<void> {
           // 分段规则变化时按原文恢复校订；片段数相等也不能按旧索引错位套用。
           if (saved) {
             // 原文件里的扫描页没有文字层，旧 OCR 快照不能被重解析后的空页覆盖；文字页仍使用本次解析。
-            const restored = restoreDocumentHistoryPdfOcr(saved, parsed);
+            const {document: restored, segmentOrigins} = restoreDocumentHistoryPdfOcr(saved, parsed);
             item.document = markRaw(restored);
-            Object.assign(item, {translations: restoreDocumentHistoryTranslations(saved, restored, PARSED_VERSION), fingerprint: saved.fingerprint});
+            Object.assign(item, {translations: restoreDocumentHistoryTranslations(saved, restored, PARSED_VERSION, segmentOrigins), fingerprint: saved.fingerprint});
           }
         }
       } catch (error) {

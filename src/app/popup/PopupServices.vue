@@ -4,6 +4,7 @@
  B站匿名讲解只出现在阅读分配中，并展示固定有效模型；写作继续遵循通用AI服务边界。
  主要内容：突出网页默认服务，以紧凑列表展示各功能的独立服务或继承状态，继承行在同一行标出“跟随默认”与实际跟随的服务，且仅在模型与默认服务的配置模型不同时才显示模型行，以统一状态标签呈现服务并让多语言名称完整换行，保留本地图标、配置模型和配置提醒；选择面板合并功能标题、返回与关闭操作，搜索框随列表一起滚动，常用区只放可直接使用的服务，按免费翻译、已配置或正在使用的服务、微软与谷歌、热门服务排序，待配置的服务留在更多服务中，当前选中项始终在常用区，更多服务默认展开并按机器翻译、云服务厂商与 AI 翻译分组，选项下方标出配置模型或待配置状态，支持模型搜索及键盘导航，保留不可用的旧选择，缓存默认、继承或独立行的配置模型及本地化说明，避免将设置中的模型声明为最终请求模型；只让当前活跃配置和所属面板的事件修改草稿，焦点返回复验面板与用户焦点；切换时仅重置所属抽屉的滚动，渲染后在同一归属保护内让搜索框或原分配行可见，不滚动宿主页面。
  模块边界：复用功能服务映射、模型解析及供应商能力，只修改父级配置草稿；保存由 PopupApp 负责，不请求翻译或处理连接密钥。
+ 键盘布局：极矮可见区复用同一输入和按钮排成单行，保留原有键盘顺序及控件名称；普通高度保留标题及关闭吸顶、搜索随列表滚动，不因旋转重建查询或会话。
 -->
 <template>
   <div ref="panel" class="popup-service-panel" data-i18n-ignore :onKeydown="panelActions.keydown">
@@ -28,18 +29,18 @@
         <span class="assignment-chevron" aria-hidden="true">›</span>
       </button>
     </div>
-    <section v-else class="popup-service-picker" :data-service-picker="editing.id">
+    <section v-else class="popup-service-picker" :data-service-picker="editing.id" :aria-label="t(`featureServices.${editing.id}`)">
       <header class="service-picker-heading">
         <button type="button" class="service-picker-back" :aria-label="t('featureServices.back')" :onClick="panelActions.back">←</button>
         <strong>{{ t(`featureServices.${editing.id}`) }}</strong>
         <small v-if="editing.feature?.aiOnly">{{ t('featureServices.aiOnly') }}</small>
-        <button type="button" class="service-panel-close" :aria-label="t('common.close')" :onClick="panelActions.close">×</button>
+        <button type="button" class="service-panel-close service-picker-close" :aria-label="t('common.close')" :onClick="panelActions.close">×</button>
       </header>
-      <label class="service-picker-search">
+      <div class="service-picker-search">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6.5"/><path d="m16 16 5 5"/></svg>
         <input ref="searchInput" :value="query" :onInput="panelActions.search" type="search" :aria-label="t('popup.serviceSearchPlaceholder')" :placeholder="t('popup.serviceSearchPlaceholder')" :onKeydown="panelActions.searchKeydown" />
         <button v-if="query" type="button" :aria-label="t('popup.clearSearch')" :onClick="panelActions.clear">×</button>
-      </label>
+      </div>
       <div ref="results" class="service-picker-list" role="listbox" :aria-label="t(`featureServices.${editing.id}`)" :onKeydown="panelActions.navigate">
         <button v-if="editing.feature?.inherit && !query.trim()" type="button" role="option" class="service-choice follow-choice"
           data-service-choice="" :aria-selected="!selected(editing.feature)" :onClick="panelActions.inherit">
@@ -304,7 +305,7 @@ const panelActions = computed(() => {
 .service-picker-heading > strong { min-width: 0; flex: 1; font-size: 12px; }
 .service-picker-heading > small { max-width: 100px; color: var(--muted); font-size: 9px; }
 .service-picker-back { flex: none; width: 28px; height: 28px; border: 1px solid var(--line); border-radius: 8px; background: var(--surface-soft); color: var(--ink); cursor: pointer; }
-.service-picker-search { display: flex; align-items: center; gap: 6px; min-height: 36px; padding: 0 8px; border: 1px solid var(--line); border-radius: 9px; background: var(--surface-soft); }
+.service-picker-search { min-width: 0; display: flex; align-items: center; gap: 6px; min-height: 36px; padding: 0 8px; border: 1px solid var(--line); border-radius: 9px; background: var(--surface-soft); }
 .service-picker-search:focus-within { border-color: var(--brand); box-shadow: 0 0 0 2px var(--brand-soft); }
 .service-picker-search > svg { width: 14px; height: 14px; flex: none; color: var(--muted); }
 .service-picker-search input { width: 100%; min-width: 0; border: 0; outline: 0; background: transparent; color: var(--ink); font-size: 10px; }

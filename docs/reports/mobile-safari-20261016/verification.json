@@ -1,0 +1,743 @@
+{
+  "date": "2026-10-16",
+  "baseCommit": "16f185a8338dc34c1c3abfb4a19d8c8cadf2c454",
+  "mergedPR": "https://github.com/FluentRead/FluentRead/pull/995",
+  "runtimeChangesInThisFollowup": true,
+  "qualityCI": {
+    "url": "https://github.com/FluentRead/FluentRead/actions/runs/38774714069",
+    "result": "success",
+    "filesPassed": 748,
+    "testsPassed": 25177,
+    "testsSkipped": 5,
+    "scope": "Exact f233 tested head before merge; not evidence for physical-device behavior"
+  },
+  "safari117": {
+    "webFiles": 467,
+    "webTreeSHA256": "2370a210fd9d816fcbfe569a9470406866342b0b2f7da9343a045beeab22de7c",
+    "nativeSHA256": "a4166f3c30d41fa5ed6faa24030b4727950c5a3ecc37381118d3ab11d9307c44",
+    "installedAppFilesChecked": 485,
+    "nativeBuildTargets": [
+      "macOS",
+      "iOS Simulator",
+      "iPhoneOS"
+    ],
+    "nativeBuilds": "passed; no developer signing or physical install",
+    "keyboardAndDiagnostic": {
+      "rawSummary": {
+        "executed": 4,
+        "passed": 2,
+        "failed": 2,
+        "failurePreservation": "101/102 remain Failed;103/104 independent scoped evidence, no retroactive passes"
+      },
+      "case101": "real keyboard actions completed; original final AX Switch selector Failed retained",
+      "case102": "real empty-page diagnosis observed; original AX Button selector Failed retained",
+      "case103": "independent configuration retention Passed",
+      "case104": "independent diagnostic open/close Passed",
+      "serviceTargetsPoints": 46,
+      "diagnosticTargetsPoints": 45
+    },
+    "background": {
+      "environment": "iOS26.2 (23C52) Simulator; not physical device",
+      "case": "test105Integrated117ActualHomeBackgroundSourceRecovery",
+      "rawResult": "Passed",
+      "count": 1,
+      "durationSeconds": 47.929,
+      "observedSteps": [
+        {
+          "step": "native paragraph longpress and actual FR icon opens inspect card",
+          "result": "passed",
+          "selectionClearedBeforeBackground": true
+        },
+        {
+          "step": "actual Home then existing Safari activate; original source unchanged",
+          "result": "passed",
+          "backgroundAppState": 3,
+          "backgroundStateMeaning": "runningBackground",
+          "sameDocumentLife": "17fc33f2-3f80-4964-956e-f48b3f494683",
+          "hiddenAtEpochMs": 1792087841136,
+          "visibleAtEpochMs": 1792087844356,
+          "hiddenDurationMs": 3220,
+          "pagehideCount": 0,
+          "cardPreserved": true,
+          "actualCopyTranslationFeedback": "copied checkmark and Chinese toast visible; stable screenshot02"
+        },
+        {
+          "step": "second Home; fixture changes only its source DOM within real hidden callback; Safari activate",
+          "result": "passed",
+          "hiddenAtEpochMs": 1792087849926,
+          "sourceReplacedAtEpochMs": 1792087849926,
+          "visibleAtEpochMs": 1792087853057,
+          "hiddenDurationMs": 3131,
+          "sameDocumentLife": "17fc33f2-3f80-4964-956e-f48b3f494683",
+          "pagehideCount": 0,
+          "sourceVersionAfter": 1,
+          "oldCardCleared": true,
+          "noSyntheticSelectionOrExtensionState": true
+        },
+        {
+          "step": "native selection of new source boundaries; actual FR icon opens new card; actual close",
+          "result": "passed",
+          "visibleChineseTranslation": "边界",
+          "newSelectionAtEpochMs": 1792087857145,
+          "nativeSelectionClearedAtEpochMs": 1792087860537,
+          "oldInspectCardAbsent": true
+        }
+      ],
+      "actualDOMEvents": [
+        {
+          "at": 1792087828917,
+          "event": "pageshow",
+          "persisted": false
+        },
+        {
+          "at": 1792087832864,
+          "event": "selectionchange",
+          "rangeCount": 1,
+          "text": "inspect"
+        },
+        {
+          "at": 1792087836272,
+          "event": "selectionchange",
+          "rangeCount": 0,
+          "text": ""
+        },
+        {
+          "at": 1792087841136,
+          "event": "visibilitychange",
+          "visibility": "hidden"
+        },
+        {
+          "at": 1792087844356,
+          "event": "visibilitychange",
+          "visibility": "visible"
+        },
+        {
+          "at": 1792087849926,
+          "event": "visibilitychange",
+          "visibility": "hidden"
+        },
+        {
+          "at": 1792087849926,
+          "event": "owned-source-replaced-during-real-hidden"
+        },
+        {
+          "at": 1792087853057,
+          "event": "visibilitychange",
+          "visibility": "visible"
+        },
+        {
+          "at": 1792087857145,
+          "event": "selectionchange",
+          "rangeCount": 1,
+          "text": "boundaries"
+        },
+        {
+          "at": 1792087860537,
+          "event": "selectionchange",
+          "rangeCount": 0,
+          "text": ""
+        }
+      ],
+      "limitations": [
+        "Real Home/background/foreground on dedicated Simulator only; no physical iOS device, lock/unlock, process kill/relaunch, memory reclaim or extended background suspension claim.",
+        "Both returns had pagehideCount0; pagehide-clears-card alternate branch was not exercised.",
+        "Completed card/result was observed across first return; no deliberately delayed provider request or late-response cancellation was staged.",
+        "No new permissions or providers selected. Provider request identity/cache provenance is not established by this lifecycle test.",
+        "Screenshot01 captured SpringBoard/Safari transition despite foreground state; excluded as stable pixel proof. Stable02 copy feedback proves restored card operation.",
+        "Fixture changes only host source DOM; it does not inject extension state or synthetic Selection/visibility events.",
+        "This bounded result does not replace historical633 source or228 YouTube acceptance."
+      ],
+      "focusViolations": [],
+      "cleanup": "Owned Safari/server stopped; task Simulator Shutdown; App/data retained"
+    }
+  },
+  "evidenceIndex": [
+    {
+      "relativeToResearchRoot": "safari/acceptance-integrated-main-117-final.json",
+      "sha256": "7b8c8e446b92980f9474fe6f1c78d5831460dffbde49dc9f4388dfcfd216ba40"
+    },
+    {
+      "relativeToResearchRoot": "ios-ui-harness/integrated-main117-ui-acceptance.json",
+      "sha256": "1b93cd4480fa07b3b6a5be58aea29d2bfdf516f9f92fdf1da85c89df2fbb16a3"
+    },
+    {
+      "relativeToResearchRoot": "ios-ui-harness/background-resume-117/acceptance.json",
+      "sha256": "0b3bc39eb358e8e47a574c28880c1d23d10f8ef73dd7ee9bb98a519e834fddb3"
+    },
+    {
+      "relativeToResearchRoot": "android-runtime/firefox-attempt6-native-menu-summary.json",
+      "sha256": "3b6c6ba66e592faab4df1921f2ee93c62e3e8467708267a06bf3785cbac81a25"
+    },
+    {
+      "relativeToResearchRoot": "android-runtime/firefox-attempt8-geometry-probe-summary.json",
+      "sha256": "e260c5975c64eb90b1cd25697135ac5a8e91e3dfa9c46ae41d5798dfdc2c11c1"
+    },
+    {
+      "relativeToResearchRoot": "validation/firefox-touch-caret/implementation.json",
+      "sha256": "c3eba266f641f08cb7649a9432612a1b1c2d59fd3f0447e9c282804ea1e92050"
+    },
+    {
+      "relativeToResearchRoot": "android-runtime/firefox-attempt9-production-selection-summary.json",
+      "sha256": "d26fa69dcae0847123fde209234d6a27ad27e2c96aa76ee16f50a5cb0ba185fd"
+    },
+    {
+      "relativeToResearchRoot": "validation/firefox-touch-caret/candidate2-implementation.json",
+      "sha256": "cc8a4ed89e0e48d3430e4d38b93b5dde1f313d3444a51c8e563ce58cde1250a7"
+    },
+    {
+      "relativeToResearchRoot": "validation/firefox-touch-caret/candidate2-independent-review.json",
+      "sha256": "faac025debcf41cfe7b1563ccd02d36fcb3ec7767c30203d1cf2c33da206f9d2"
+    },
+    {
+      "relativeToResearchRoot": "validation/firefox-touch-caret/candidate2-validation/build-results.json",
+      "sha256": "c7b706528bf83668046a9d1a70d9106d8e1364b2ca6c05a2b08f8adc202cc645"
+    },
+    {
+      "relativeToResearchRoot": "android-runtime/attempt10-artifact.json",
+      "sha256": "f32bbb113b2151e996cdefdae43b0f582fa9d0fd4677116a94a383c1e004bf2c"
+    },
+    {
+      "relativeToResearchRoot": "android-runtime/firefox-attempt10-production-selection-summary.json",
+      "sha256": "8e61b7a47a4840ae91020f96d7ba32abf6cdd408d3e74978c8878c553acf6697"
+    },
+    {
+      "relativeToResearchRoot": "android-runtime/edge-attempt7-channel-acceptance.json",
+      "sha256": "ea09ca5279cef7d36df33e1d6642c1149ff20e9c9b8eda58d5672d6f0af46319"
+    },
+    {
+      "relativeToResearchRoot": "android-runtime/attempt7-edge-cleanup.json",
+      "sha256": "b511f5f99f5c6cbcd218a1beb97f7e21d8f87ed79b1865f6f58f3233d5cf4239"
+    }
+  ],
+  "images": [
+    {
+      "path": "images/ios-background-retained-copy.png",
+      "sha256": "0b27ddc67193210fa21e7cc2b8b6dc4f7cec18ab3549ad6131d4a5fb000ea56c",
+      "bytes": 289890,
+      "originalScreenshotUnchanged": true
+    },
+    {
+      "path": "images/ios-background-source-cleared.png",
+      "sha256": "61905c0bc0e4311106958c8bf5aee2d4ef3a80c1acd61d8f2b57ff202651e72b",
+      "bytes": 153081,
+      "originalScreenshotUnchanged": true
+    },
+    {
+      "path": "images/ios-background-new-source.png",
+      "sha256": "2120abd540e5cbebbdddb29481d5456563b623f8dad7bd107333e5255697bf92",
+      "bytes": 200242,
+      "originalScreenshotUnchanged": true
+    },
+    {
+      "path": "images/android-native-entry-before.png",
+      "sha256": "00bf8d47ffa2847d27eb70083d13eb3a7518eeba8274e1c41065bf71296f35c4",
+      "bytes": 225283,
+      "originalScreenshotUnchanged": true
+    },
+    {
+      "path": "images/android-word-copy.png",
+      "sha256": "5b7ee06675dee22627d75cb1f3350c13644388cc37666212acba534605b771b7",
+      "bytes": 189714,
+      "originalScreenshotUnchanged": true,
+      "source": "android-runtime/attempt10-ui/c2-07-service-copy-immediate.png"
+    },
+    {
+      "path": "images/android-fullrow-entry.png",
+      "sha256": "f08fd794920a10ce3bc35c9e989600a2e92aa94ae28179a760c2bfec8bad0d4e",
+      "bytes": 228993,
+      "originalScreenshotUnchanged": true,
+      "source": "android-runtime/attempt10-ui/c2-16-fullrow-before100ms.png"
+    },
+    {
+      "path": "images/android-fullrow-card.png",
+      "sha256": "56db8f972446fdb1ff14f4ff220da48e222d43cdffa36211231a83a64115adf6",
+      "bytes": 244172,
+      "originalScreenshotUnchanged": true,
+      "source": "android-runtime/attempt10-ui/c2-17-fullrow-card-stable.png"
+    },
+    {
+      "path": "images/android-touch-cancel.png",
+      "sha256": "5bd391608bcc1a8973bc6244dced6d08b35e9b568bb3b26dc7dceea2541130c0",
+      "bytes": 227597,
+      "originalScreenshotUnchanged": true,
+      "source": "android-runtime/attempt10-ui/c2-22-cancel-stable.png"
+    },
+    {
+      "path": "images/android-edge-catalog.png",
+      "sha256": "ef96c46dbb33a9d53e49ceef525ee835485600e20f869112d076aae62fa99d44",
+      "bytes": 208056,
+      "originalScreenshotUnchanged": true,
+      "source": "android-runtime/attempt7-edge-ui/edge-12-fluentread-offer-keyboard-closed.png"
+    }
+  ],
+  "accessibility": {
+    "VoiceOver": {
+      "status": "not-run; requires physical device",
+      "source": "https://developer.apple.com/documentation/accessibility/performing-accessibility-testing-for-your-app"
+    },
+    "TalkBack": {
+      "status": "not installed in the owned API31 AVD: both known package paths absent, installedServiceCount0, accessibility_enabled0; no speech/navigation acceptance",
+      "source": "https://developer.android.com/guide/topics/ui/accessibility/testing",
+      "evidence": "android-runtime/attempt6-talkback-inventory.json"
+    }
+  },
+  "overallGoalComplete": false,
+  "edgePreparation": {
+    "version": "155.0.4283.48",
+    "package": "com.microsoft.emmx",
+    "minimumSDK": 29,
+    "targetSDK": 37,
+    "abis": [
+      "arm64-v8a"
+    ],
+    "apkSHA256": "dfe4cd6aa81eb9f9f3b630411a6a68dfa23b75a1755d8810bdb75b2f9f061272",
+    "bytes": 256510678,
+    "source": "https://explore.microsoft.com/zh-cn/edge/download?form=MA13FJ",
+    "evidence": "android-runtime/edge-official-route/20261016/apk-inspection.json",
+    "verification": "apksigner exit0 / v2 signature verified; signer recorded without independent cross-channel certificate pin",
+    "installedOrExecuted": true,
+    "FluentReadMobileCatalogAvailable": "Observed matching name and ThinkStu publisher with Get and Unverified; exact store ID/version, actual install and runtime acceptance not yet established."
+  },
+  "userscriptsManagerPreparation": {
+    "source": "https://github.com/quoid/userscripts/blob/8b743e37dd7dfc8a510aff4e5e2ab8b1cc9210df/docs/dev.md",
+    "status": "Simulator build target exists; upstream docs require Developer Team ID for App Groups; no manager build/install/account/signing performed",
+    "actualManagerAccepted": false
+  },
+  "previousMergedTestedHead": "f233726a60b0fe6e210229f373dc5a4295454ef2",
+  "firefoxTouchFix": {
+    "runtimeFile": "src/features/selection-translation/ui/SelectionTranslator.vue",
+    "runtimeFileSHA256": "dd62210aad3f12644850a01f637afca4e7d3ecdd0fca21b38263dddc0819af07",
+    "lifecycleTestsPassed": 315,
+    "relatedCoreAndOwnershipTestsPassed": 88,
+    "localRuntimeSourceFrozen": true,
+    "baselineFailure": "android-runtime/firefox-attempt6-native-menu-summary.json",
+    "probeOnly": "android-runtime/firefox-attempt8-geometry-probe-summary.json",
+    "newProductionSnapshot": {
+      "recordedAt": "2026-10-15T19:00:15.225365+00:00",
+      "directory": "/Users/thinkstu/Desktop/copy/FluentRead-mobile-acceptance-20261016/.output/firefox-mv2",
+      "recordHash": "3773f72535131ceaaa031ddc88cf100ca583d803c5cbb7fb1efbc1c831aebc4d",
+      "rawByteHash": "34f3cea0abccec699878afaa23122c8ef135a25c87799d384c6edad5a065912d",
+      "files": 478,
+      "bytes": 62270578,
+      "source": {
+        "baseCommit": "16f185a8338dc34c1c3abfb4a19d8c8cadf2c454",
+        "runtimePatch": "src/features/selection-translation/ui/SelectionTranslator.vue",
+        "runtimeFileSHA256": "dd62210aad3f12644850a01f637afca4e7d3ecdd0fca21b38263dddc0819af07",
+        "committed": false
+      },
+      "productionBuild": true,
+      "manifestVersion": 2,
+      "extensionVersion": "0.0.38",
+      "lifecycleTests": 315,
+      "researchStyleMutationAllowed": false
+    },
+    "newProductionDeviceResult": {
+      "status": "PASS_FOUR_BOUNDED_PRODUCTION_CASES",
+      "scope": "Actual Android12/API31 arm64 task emulator5580, official Firefox158.0, root-approved candidate2 unmodified production addon; not physical-device/TalkBack acceptance",
+      "counts": {
+        "passed": 4,
+        "failed": 0,
+        "normalPrimaryEntryGestures": 3,
+        "nativeHandleDrags": 1,
+        "movementCancelGestures": 1,
+        "actualCopyFeedbacks": 3,
+        "actualCloses": 3
+      },
+      "cases": [
+        {
+          "id": "native-menu-open-service",
+          "status": "PASS",
+          "observedPageDownUpMs": 56,
+          "clickObserved": true,
+          "clickPassRequirement": false,
+          "actualCardSource": "service",
+          "stableCardPixel": "c2-06-service-card-stable.png",
+          "actualCloseCardAbsent": true
+        },
+        {
+          "id": "native-menu-open-domain",
+          "status": "PASS",
+          "observedPageDownUpMs": 100,
+          "clickObserved": true,
+          "clickPassRequirement": false,
+          "actualCardSource": "domain",
+          "stableCardPixel": "c2-11-domain-card-stable.png",
+          "actualCloseCardAbsent": true
+        },
+        {
+          "id": "natural-fullrow-pointerup",
+          "status": "PASS",
+          "observedPageDownUpMs": 101,
+          "clickObserved": false,
+          "clickPassRequirement": false,
+          "actualCardSource": "service; avoid relying on it for testing and monitoring purposes.",
+          "stableCardPixel": "c2-17-fullrow-card-stable.png",
+          "actualCloseCardAbsent": true
+        },
+        {
+          "id": "entry-movement-cancel",
+          "status": "PASS",
+          "observedMaxDisplacementCss": 15.333343505859375,
+          "observedDownUpMs": 316,
+          "movementProven": true,
+          "cardAbsentAfter": true,
+          "nativeMenuStillVisible": true,
+          "stablePixel": "c2-22-cancel-stable.png",
+          "retryCount": 0
+        }
+      ],
+      "cleanup": {
+        "at": "2026-10-15T19:07:37.319293+00:00",
+        "pids": [
+          {
+            "pid": 3489,
+            "alive": false
+          },
+          {
+            "pid": 3616,
+            "alive": false
+          },
+          {
+            "pid": 3638,
+            "alive": false
+          }
+        ],
+        "ports": [
+          {
+            "port": 5048,
+            "exitCode": 1,
+            "stdout": ""
+          },
+          {
+            "port": 5580,
+            "exitCode": 1,
+            "stdout": ""
+          },
+          {
+            "port": 5581,
+            "exitCode": 1,
+            "stdout": ""
+          },
+          {
+            "port": 51865,
+            "exitCode": 1,
+            "stdout": ""
+          }
+        ],
+        "guardStatus": "stopped-by-owner",
+        "guardViolations": [],
+        "focusEvents": [],
+        "keysMetadataUnchanged": true,
+        "guardStoppedAt": "2026-10-15T19:06:36.774Z",
+        "runnerCleanup": true,
+        "forwardRemoved": true,
+        "firefoxPidofAfterRunner": {
+          "exitCode": 1,
+          "stdout": ""
+        },
+        "emulatorExit": {
+          "code": 0,
+          "signal": null
+        },
+        "taskAvdDataRetained": true
+      },
+      "providerAttribution": "Network provider attribution not captured; visible results recorded without provider claim.",
+      "clipboardBytesRead": false,
+      "artifactBeforeAfterUnchanged": true,
+      "sourceSHA256After": "dd62210aad3f12644850a01f637afca4e7d3ecdd0fca21b38263dddc0819af07",
+      "boundaries": [
+        "Only exact public example.com native-selection scenarios at360x504CSS, no fullmatrix",
+        "No physical Android or TalkBack output/navigation",
+        "No independent clipboard bytes read; success toast/icon/DOM verified",
+        "Cancellation coverage here is one proven15.33CSS in-entry movement, other cancel paths covered by root unit tests rather than thisdevice run"
+      ],
+      "report": "android-runtime/firefox-attempt10-production-selection-summary.json"
+    },
+    "limits": [
+      "Dedicated Android12/API31 emulator with actual Firefox158/native Selection and native touch input; not physical-finger or other-version acceptance.",
+      "Actual cancellation gesture produced no compatibility click; canceled-touch compatibility-click protection is covered by the SFC behavioral test.",
+      "Very narrow viewport keeps control visible but cannot guarantee native-caret clearance."
+    ],
+    "buildValidation": {
+      "sourceSHA256": "dd62210aad3f12644850a01f637afca4e7d3ecdd0fca21b38263dddc0819af07",
+      "steps": [
+        {
+          "name": "firefox-build",
+          "exitCode": 0
+        },
+        {
+          "name": "compile",
+          "exitCode": 0
+        },
+        {
+          "name": "chrome-build",
+          "exitCode": 0
+        },
+        {
+          "name": "extension-manifests",
+          "exitCode": 0
+        },
+        {
+          "name": "safari-web-build",
+          "exitCode": 0
+        },
+        {
+          "name": "safari-web-verify",
+          "exitCode": 0
+        },
+        {
+          "name": "userscript-build",
+          "exitCode": 0
+        },
+        {
+          "name": "userscript-verify",
+          "exitCode": 0
+        },
+        {
+          "name": "test-audit",
+          "exitCode": 0
+        }
+      ],
+      "sourceUnchanged": true,
+      "nativeAppleRepackagedForThisFirefoxFix": false
+    },
+    "candidate1DeviceReport": "android-runtime/firefox-attempt9-production-selection-summary.json",
+    "candidate1": {
+      "runtimeFileSHA256": "676d1c87a9f28ab302c40a47041101fa5ef0f611c986fe8e573f7d2b0cf9caaa",
+      "lifecycleTestsPassed": 290,
+      "newProductionSnapshot": {
+        "recordedAt": "2026-10-15T18:36:33.948779+00:00",
+        "directory": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/validation/firefox-touch-caret/candidate1/firefox-mv2",
+        "recordHash": "e7802c8ba3dac389547f41f3b0efe020c1b51f787f90f3b46858827d76fda897",
+        "rawByteHash": "8dbcada39b49779f4fcfa1d7fcc16ff18f657fa422b2c34c9f71256982d0f381",
+        "files": 478,
+        "bytes": 62267053,
+        "source": {
+          "baseCommit": "16f185a8338dc34c1c3abfb4a19d8c8cadf2c454",
+          "runtimePatch": "src/features/selection-translation/ui/SelectionTranslator.vue",
+          "runtimeFileSHA256": "676d1c87a9f28ab302c40a47041101fa5ef0f611c986fe8e573f7d2b0cf9caaa",
+          "committed": false
+        },
+        "productionBuild": true,
+        "manifestVersion": 2,
+        "extensionVersion": "0.0.38",
+        "lifecycleTests": 290,
+        "researchStyleMutationAllowed": false,
+        "originalWorkingOutputPath": "/Users/thinkstu/Desktop/copy/FluentRead-mobile-acceptance-20261016/.output/firefox-mv2"
+      },
+      "newProductionDeviceResult": "candidate1: two word cases passed, full-line case failed (pointerdown/up arrived but click absent); repair ongoing",
+      "buildValidation": {
+        "sourceSHA256": "676d1c87a9f28ab302c40a47041101fa5ef0f611c986fe8e573f7d2b0cf9caaa",
+        "steps": [
+          {
+            "name": "firefox-build",
+            "exitCode": 0
+          },
+          {
+            "name": "compile",
+            "exitCode": 0
+          },
+          {
+            "name": "chrome-build",
+            "exitCode": 0
+          },
+          {
+            "name": "extension-manifests",
+            "exitCode": 0
+          },
+          {
+            "name": "safari-web-build",
+            "exitCode": 0
+          },
+          {
+            "name": "safari-web-verify",
+            "exitCode": 0
+          },
+          {
+            "name": "userscript-build",
+            "exitCode": 0
+          },
+          {
+            "name": "userscript-verify",
+            "exitCode": 0
+          },
+          {
+            "name": "test-audit",
+            "exitCode": 0
+          }
+        ],
+        "sourceUnchanged": true,
+        "nativeAppleRepackagedForThisFirefoxFix": false
+      },
+      "userscript": {
+        "bytes": 2092909,
+        "sha256": "ae8bdf80efe8ed59ba47653efb5676673682133c9b9c05eb81228292394da4c2",
+        "verifier": "passed"
+      }
+    },
+    "relatedCoreAndOwnershipTestScope": "88 passed against candidate1; candidate2 changed only the already-owned SFC and its registered lifecycle consumer. No rerun or repeated count claimed.",
+    "independentCodeReview": {
+      "evidence": "validation/firefox-touch-caret/candidate2-independent-review.json",
+      "blockingFindings": [],
+      "testsRerunByReviewer": false
+    },
+    "userscript": {
+      "bytes": 2093095,
+      "sha256": "ba59f1e997f9756e96066764899f02316e3c66a4c722be21737bcd618a968383",
+      "verifier": "passed",
+      "sizeBudgetUnchanged": true
+    },
+    "candidate2DeviceReport": "android-runtime/firefox-attempt10-production-selection-summary.json",
+    "runtimeCommit": "e78ce8f1f9fb441fd5c974972d1dcaaab1ca173f",
+    "runtimeCommitMatchesTestedSource": true
+  },
+  "rootVisualReview": {
+    "originalImagesViewed": [
+      "android-runtime/attempt10-ui/c2-06-service-card-stable.png",
+      "android-runtime/attempt10-ui/c2-07-service-copy-immediate.png",
+      "android-runtime/attempt10-ui/c2-11-domain-card-stable.png",
+      "android-runtime/attempt10-ui/c2-16-fullrow-before100ms.png",
+      "android-runtime/attempt10-ui/c2-17-fullrow-card-stable.png",
+      "android-runtime/attempt10-ui/c2-18-fullrow-copy-immediate.png",
+      "android-runtime/attempt10-ui/c2-19-fullrow-closed.png",
+      "android-runtime/attempt10-ui/c2-22-cancel-stable.png",
+      "android-runtime/attempt7-edge-ui/edge-12-fluentread-offer-keyboard-closed.png"
+    ],
+    "conclusion": "Observed correct word/full-range source cards, menu/handles gone after opening, copy feedback, full-range close and movement cancellation retaining native Selection without a card. Native Android12 emulator pixels; no physical or other-layout claim."
+  },
+  "edgeChannelAcceptance": {
+    "status": "completed-bounded-channel-observation-owned-runtime-stopped",
+    "scope": "Official Edge155 Stable install, first-run, Extensions entry and FluentRead catalog search only. No extension installation, login, import, default browser change, flags, private APIs or production edit.",
+    "actualBrowser": {
+      "package": "com.microsoft.emmx",
+      "versionName": "155.0.4283.48",
+      "versionCode": 428304805,
+      "minSDK": 29,
+      "targetSDK": 37,
+      "abi": "arm64-v8a",
+      "apkSHA256BeforeAndAfter": "dfe4cd6aa81eb9f9f3b630411a6a68dfa23b75a1755d8810bdb75b2f9f061272",
+      "guardGuestSdk": "31",
+      "guardGuestAbi": "arm64-v8a"
+    },
+    "results": {
+      "officialAPKInstallation": {
+        "status": "passed",
+        "pmVersionEvidence": "attempt7-edge-ui/edge-01-pm-version.json",
+        "packageEvidence": "attempt7-edge-ui/edge-01-package.json"
+      },
+      "firstRun": {
+        "status": "completed-without-account-import-or-default-change",
+        "defaultPrompt": "Make Microsoft Edge your default browser → actual Not now",
+        "accountPrompt": "Sign in to sync → actual Not now",
+        "privacyPrompt": "Your data, your privacy → unchecked optional diagnostic data and Confirm; screenshot proves unchecked control",
+        "optionalDiagnosticsDeclinedEvidence": "attempt7-edge-ui/edge-06-optional-diagnostics-declined.png",
+        "startupCorrection": "Package-only monkey launcher failed251 and did not launch; preserved. Readonly cmd package resolve-activity returned public com.microsoft.emmx/com.microsoft.ruby.Main. Exact normal MAIN/LAUNCHER am start opened MicrosoftFirstRunActivity. No hidden intent or browser flags bypassed first-run."
+      },
+      "extensionsEntry": {
+        "status": "observed",
+        "menuLabel": "Extensions",
+        "header": "Extensions Beta",
+        "evidence": [
+          "attempt7-edge-ui/edge-08-browser-menu.png",
+          "attempt7-edge-ui/edge-10-extensions-loaded.png"
+        ]
+      },
+      "fluentReadCatalogSearch": {
+        "status": "installation-offer-observed-not-installed",
+        "query": "FluentRead",
+        "reportedResultCount": 9,
+        "visibleTitle": "FluentRead-流畅阅读",
+        "visiblePublisher": "ThinkStu",
+        "visibleAction": "Get",
+        "visibleWarning": "Unverified",
+        "screenshot": "attempt7-edge-ui/edge-12-fluentread-offer-keyboard-closed.png",
+        "accessibility": "attempt7-edge-ui/edge-12-fluentread-offer-keyboard-closed.xml",
+        "getClicked": false,
+        "extensionInstalled": false,
+        "storeIdExposedByThisUI": false,
+        "extensionVersionExposedByThisUI": false,
+        "expectedRepoEdgeStoreIdForNextPhase": "kakgmllfpjldjhcnkghpplmlbnmcoflp",
+        "identityBoundary": "Matching title/icon/publisher and Get are visible. This phase did not inspect detail/storeID/version or install; no assertion that local merged source/current build is the catalog package."
+      },
+      "defaultBrowser": {
+        "status": "unchanged",
+        "before": "com.android.chrome",
+        "after": "com.android.chrome",
+        "beforeEvidence": "attempt7-edge-ui/edge-02-role-before-first-run.json",
+        "afterEvidence": "attempt7-edge-ui/edge-12-role-after-catalog.json",
+        "unsupportedCommandRetained": "cmd role get-role-holders returned255 Unknown command; exact readonly dumpsys role used instead."
+      },
+      "scopeAdherence": {
+        "accountLogin": false,
+        "accountImport": false,
+        "madeDefault": false,
+        "browserFlags": false,
+        "developerMode": false,
+        "thirdPartyCRX": false,
+        "extensionInstallOrPermissionAcceptance": false,
+        "productOrDocsEdited": false,
+        "physicalDeviceOperation": false
+      }
+    },
+    "boundedConclusion": "The product-page-linked official Edge ARM64 Stable155 APK installs on the task Android12/API31 emulator without an account and exposes Extensions(Beta); its public catalog offers FluentRead-流畅阅读 byThinkStu withGet andUnverified. Actual extension installation, exact listingID/version, translation/runtime compatibility, update/local development package support, and physical Android remain untested.",
+    "cleanup": {
+      "checkedAtUtc": "2026-10-15T19:16:42.616854+00:00",
+      "guardStatus": "stopped-by-owner",
+      "guardStoppedAt": "2026-10-15T19:15:42.174Z",
+      "keysMetadataUnchanged": true,
+      "violations": [],
+      "checks": {
+        "controllerPid": {
+          "pid": 9241,
+          "gone": true
+        },
+        "adbServerPid": {
+          "pid": 9288,
+          "gone": true
+        },
+        "emulatorPid": {
+          "pid": 9306,
+          "gone": true
+        },
+        "5048": {
+          "exitCode": 1,
+          "listenerPids": [],
+          "empty": true
+        },
+        "5580": {
+          "exitCode": 1,
+          "listenerPids": [],
+          "empty": true
+        },
+        "5581": {
+          "exitCode": 1,
+          "listenerPids": [],
+          "empty": true
+        }
+      },
+      "default5037Touched": false,
+      "otherDevicesStopped": false
+    },
+    "runtimeDiscoveries": [
+      {
+        "issue": "Unsupported read-only role subcommand",
+        "retainedEvidence": "attempt7-edge-ui/edge-00-browser-role-before.json",
+        "resolution": "Added exact readonly dumpsys role; no default-role setter or settings write."
+      },
+      {
+        "issue": "Package-only monkey command returned251 without starting app",
+        "retainedEvidence": "attempt7-edge-ui/edge-01-launch.json",
+        "resolution": "System-resolved actual public launcher then normal MAIN/LAUNCHER startup; evidence edge-02-resolve-launcher.json/edge-03-start-resolved-launcher.json."
+      },
+      {
+        "issue": "First default-browser prompt screenshot has visible Not now but AX initially exposes WebView only; privacy checked boolean also unreliable",
+        "resolution": "Kept original screenshots/XML; only actual observed control pixel/AXbounds used. Subsequent pages used named AX controls. No screenshot alteration."
+      },
+      {
+        "issue": "Final readonly Firefox pidof saw3530 although guard readiness required empty before Edge",
+        "resolution": "Edge stopped; no Firefox action/runner/RDP performed; ownedAVD shutdown immediately requested. No attribution toEdge or claims aboutFirefox behavior. Evidence edge-13-firefox-pid-unchanged.json."
+      }
+    ],
+    "report": "android-runtime/edge-attempt7-channel-acceptance.json"
+  }
+}

@@ -2,7 +2,7 @@
  @file src/app/popup/PopupApp.vue
  文件职责：实现浏览器 Popup 的主交互界面，连接当前标签页状态、翻译配置、可插拔皮肤、功能抽屉和高频操作，让现场开关与显示操作保持简短，将长期偏好引导到对应设置页。
  主要内容：复用真实全文完成状态呈现首次翻译指引和就地自助诊断，配置修复定位当前服务，本地报告由用户预览并手动导出；在配置 hydration 后汇总翻译服务，直接展示网页默认服务与适用的配置模型；翻译与局部同排，主操作用短标题合并平台快捷键并保留加载状态，长组合在悬停提示中完整显示，站点开关保留独立按钮；赞赏码在当前弹窗内切换放大与还原，关闭后重置；悬停、划词与图片抽屉优先展示开关和操作示意，首次单屏语言选择独占内容，保存后立即显示主菜单；页面操作、抽屉和导航绑定活跃会话，等待期间独占请求，关闭和配置切换使旧回复失效；网站规则写前复验标签页，等待后台确认并呈现保存忙碌、暂停与失败反馈。
- 移动整合：Safari 免费池的新译及诊断重试在真实点击内同步申请单个 provider 完整域权限，迟到许可不延续旧页面动作，恢复原文独立可用；实际 teleport 抽屉跟随可见视口，整页遮罩隔离背景，关闭、缓存失活和卸载立即释放，根画布保持固有尺寸。
+ 移动整合：Safari 免费池的新译及诊断重试在真实点击内同步申请单个 provider 完整域权限，迟到许可不延续旧页面动作，恢复原文独立可用；实际 teleport 抽屉跟随可见视口，极矮区域由同一订阅派生紧凑布局，整页遮罩隔离背景，关闭、缓存失活和卸载立即释放，根画布保持固有尺寸。
  模块边界：组件编排 UI、浏览器导航事件与生命周期；页内面板通过授权来源固定发起网页，页面消息归属由 pageActions 管理，不实现翻译 provider、缓存存储或 content 挂载；公共配置由 services/config 管理；配置草稿复用共享编辑会话，保留 post 合并和关闭补丁交接。
 -->
 <!-- Popup 页面归 app 层所有；WXT 入口只负责调用挂载函数。 -->
@@ -890,12 +890,14 @@ watch([drawerVisible, drawerSurface, popupContext.active], ([visible, surface, a
     const viewport = getVisualViewportRect();
     for (const property of properties) overlay.style.setProperty(`--fluent-read-drawer-${property}`, `${viewport[property]}px`);
     overlay.setAttribute('data-fluent-read-popup-viewport', '');
+    overlay.toggleAttribute('data-fluent-read-popup-short', viewport.height < 224);
   };
   update();
   const stop = observeVisualViewport(update);
   releaseDrawerViewport = () => {
     stop();
     overlay.removeAttribute('data-fluent-read-popup-viewport');
+    overlay.removeAttribute('data-fluent-read-popup-short');
     for (const property of properties) overlay.style.removeProperty(`--fluent-read-drawer-${property}`);
   };
 }, {flush: 'sync'});

@@ -1,13 +1,13 @@
 <!--
  * @file src/features/selection-translation/ui/SelectionTranslator.vue
  * 文件职责：实现划词翻译的主要页面组件，覆盖选区捕获、触摸原生句柄稳定等待、避开原生菜单上下区域的行侧入口、可见视口与安全区定位、后台及宿主恢复来源校验、图标/小点/悬停/快捷键/仅右键菜单/直接弹出、原生菜单可信选区恢复与重复请求复用、翻译与词卡展示、免费 AI 讲解的显式启用、朗读、收藏选中的单词/表达/句子、双语分享卡片、鉴权服务配置入口、重试和关闭。
- * 主要内容：相同译文保留原文且不重复展示；Safari 触摸入口成功开卡后保留当前快照并清空同一原生选区，异步空选区不误关卡片；组件管理可信手势、已关闭选区与选择丢失宽限、继续阅读或复制原文时自动收起、请求 token、按既有错误种类显示有限提示并仅为当前鉴权失败提供通用设置入口、行内代码保护与纯文本安全渲染、按标签页页面缩放补偿的弹窗定位、空白拖动、边角缩放、主题及可换行的多语言标题；普通译文先于完整原文，单行可横向滚动的导航与右侧固定分享、收藏、关闭及更多操作把高度留给正文，次级菜单按可见窗口覆盖显示；指针移动按帧合并并在结束时提交最后位置，已定位卡片不重复读取选区几何；富文本 UTF-16 跟读偏移一次计算并复用；默认过滤同语言选区，按配置开放中英反向入口，翻译方向始终按现有语言配置判断；统一卡片默认显示翻译并以同一导航进入学习；首次定位后保持弹窗锚点，手动尺寸下内容与播放状态变化只影响内部布局；闲置语音栏不占空间，自动卡生成与播放期间用独立临时高度保持外框，停止恢复自然尺寸；学习短回答自然收拢、长回答受高度上限约束，完整原文和译文按需对照并允许翻译继续完成；单词先展示原文与可用词卡，再补充辅助释义，以紧凑状态提示等待、未命中与网络失败；关闭或更换选区取消等待并阻止旧响应覆盖新结果；区分语音生成和播放，按实际音频时钟或浏览器词边界显示完整词高亮，并提供真实音频时间与前后 5 秒跳转。
+ * 主要内容：相同译文保留原文且不重复展示；Firefox 触摸入口为原生手柄保留独立侧距，以绑定来源快照的可信触摸处理缺少 click 的情况并取消拖动；Safari/Firefox 触摸入口成功开卡后保留当前快照并清空同一原生选区，异步空选区不误关卡片；组件管理可信手势、已关闭选区与选择丢失宽限、继续阅读或复制原文时自动收起、请求 token、按既有错误种类显示有限提示并仅为当前鉴权失败提供通用设置入口、行内代码保护与纯文本安全渲染、按标签页页面缩放补偿的弹窗定位、空白拖动、边角缩放、主题及可换行的多语言标题；普通译文先于完整原文，单行可横向滚动的导航与右侧固定分享、收藏、关闭及更多操作把高度留给正文，次级菜单按可见窗口覆盖显示；指针移动按帧合并并在结束时提交最后位置，已定位卡片不重复读取选区几何；富文本 UTF-16 跟读偏移一次计算并复用；默认过滤同语言选区，按配置开放中英反向入口，翻译方向始终按现有语言配置判断；统一卡片默认显示翻译并以同一导航进入学习；首次定位后保持弹窗锚点，手动尺寸下内容与播放状态变化只影响内部布局；闲置语音栏不占空间，自动卡生成与播放期间用独立临时高度保持外框，停止恢复自然尺寸；学习短回答自然收拢、长回答受高度上限约束，完整原文和译文按需对照并允许翻译继续完成；单词先展示原文与可用词卡，再补充辅助释义，以紧凑状态提示等待、未命中与网络失败；关闭或更换选区取消等待并阻止旧响应覆盖新结果；区分语音生成和播放，按实际音频时钟或浏览器词边界显示完整词高亮，并提供真实音频时间与前后 5 秒跳转。
  * 材料关联：主动收藏与阅读时捕获当前选区的稳定来源和文本位置，词书真实保存后才关联材料引用，隐私窗口不采集。
  * 模块边界：组件只通过公共客户端和 runtime 消息触达后台及现有设置入口，不直接持有 provider、IndexedDB 或 Offscreen 资源；纯选区算法在 core，活动 Range 通过回调交给 content/runtime 管理 modal 挂载所有权；扩展 PDF 文档页通过可选来源适配器复用同一卡片、标题和阅读上下文，来源失效时取消当前请求，词书协议独立维护；阅读依据的 DOM 锚点只属于当前选区，关闭、换区或卸载释放临时绘制和监听。
  -->
 <template>
   <div v-ui-i18n v-show="showIndicator || showTooltip || noticeMessage || copySuccess" class="fr-selection-translator-root" :class="{'fr-touch-selection': touchInteraction}" :data-display-delay="selectionSettings.delay" @pointerdown.capture="dismissReadingToolsOutside" @pointerdown.stop @focusin="dismissReadingToolsOutside" @focusout="dismissReadingToolsOnFocusOut" @wheel.stop="handleUiWheel">
-    <button v-if="showIndicator && !showTooltip && triggerMode !== 'contextMenu'" class="fr-selection-indicator" :class="`fr-selection-indicator--${triggerMode}`" :style="indicatorStyle" type="button" aria-label="打开划词翻译" title="打开划词翻译" @pointerdown.prevent.stop @pointerenter="scheduleIndicatorHover" @pointerleave="cancelReadingHover" @click="openTooltipFromIndicator">
+    <button v-if="showIndicator && !showTooltip && triggerMode !== 'contextMenu'" class="fr-selection-indicator" :class="`fr-selection-indicator--${triggerMode}`" :style="indicatorStyle" type="button" aria-label="打开划词翻译" title="打开划词翻译" @pointerdown.prevent.stop="beginIndicatorTouch" @pointermove="trackIndicatorTouch" @pointerup="finishIndicatorTouch" @pointercancel="cancelIndicatorTouch" @contextmenu="cancelIndicatorTouch" @pointerenter="scheduleIndicatorHover" @pointerleave="leaveIndicator" @click="openTooltipFromIndicator">
       <span class="fr-selection-indicator-glyph" aria-hidden="true">译</span>
     </button>
 
@@ -375,8 +375,11 @@ const ttsContentController = createSelectionTtsContentController({
 });
 let isSelecting = false;
 let dismissedSelection: SelectionSnapshot | null = null;
-// 仅 Safari 触摸入口明确消费的快照拥有卡片；不复用会影响反向目标语言的手动翻译标志。
+// Safari/Firefox 触摸入口明确消费的快照拥有卡片；不复用会影响反向目标语言的手动翻译标志。
 let touchOpenedSelection: SelectionSnapshot | null = null;
+// Firefox 原生菜单可能只交付 pointerdown/up 而不合成 click；只记录入口本身的触摸手势。
+let indicatorTouchGesture: {pointerId: number; x: number; y: number; selection: SelectionSnapshot; element: EventTarget | null} | null = null;
+let ignoreIndicatorTouchClick = false;
 let pendingSelectionShortcutUntil = 0;
 let selectionShortcutHeld = false;
 let uiPointerInteraction = false;
@@ -932,19 +935,31 @@ function updatePosition(refreshSelection = true): void {
   if (!anchor) return;
   current.anchor = anchor;
   const viewport = viewportSize.value;
-  const entryInset = (touchInteraction.value ? 28 : 14) * popupScale.value;
-  let entryLeft = current.isForward ? anchor.right + entryInset : anchor.left - entryInset;
+  const firefoxTouch = import.meta.env.BROWSER === 'firefox' && touchInteraction.value;
+  const viewportInset = (touchInteraction.value ? 28 : 14) * popupScale.value;
+  // Gecko 的原生触摸手柄还覆盖文字端点；锚点距离独立于视口边距，不能一起放大。
+  const anchorOffset = (firefoxTouch ? 72 : touchInteraction.value ? 28 : 14) * popupScale.value;
+  const minEntryLeft = viewport.left + viewportInset, maxEntryLeft = viewport.right - viewportInset;
+  let entryLeft = current.isForward ? anchor.right + anchorOffset : anchor.left - anchorOffset;
   if (touchInteraction.value) {
     // 原生选区菜单在文字上方或下方；触摸入口放在端点所在行的侧面，不探测或猜测系统菜单尺寸。
     // 端点靠边时优先换到该行另一侧；整行都占满时仍由可见视口保留入口的完整触摸面积。
-    const oppositeLeft = current.isForward ? anchor.left - entryInset : anchor.right + entryInset;
-    if ((entryLeft < viewport.left + entryInset || entryLeft > viewport.right - entryInset)
-      && oppositeLeft >= viewport.left + entryInset && oppositeLeft <= viewport.right - entryInset) entryLeft = oppositeLeft;
+    const oppositeLeft = current.isForward ? anchor.left - anchorOffset : anchor.right + anchorOffset;
+    if (entryLeft < minEntryLeft || entryLeft > maxEntryLeft) {
+      if (oppositeLeft >= minEntryLeft && oppositeLeft <= maxEntryLeft) entryLeft = oppositeLeft;
+      else if (firefoxTouch) {
+        // 满行时选择远离两端的行内位置；普通夹边会把较大侧距重新压回原生手柄旁。
+        const safeLeft = Math.max(anchor.left + anchorOffset, minEntryLeft);
+        const safeRight = Math.min(anchor.right - anchorOffset, maxEntryLeft);
+        if (safeLeft <= safeRight) entryLeft = (safeLeft + safeRight) / 2;
+        // 极窄视口没有安全区时保留可见性退化，不声称此时仍能保证原生手柄侧距。
+      }
+    }
   }
-  const entryTop = touchInteraction.value ? (anchor.top + anchor.bottom) / 2 : anchor.bottom + entryInset;
+  const entryTop = touchInteraction.value ? (anchor.top + anchor.bottom) / 2 : anchor.bottom + anchorOffset;
   indicatorStyle.value = {
-    left: `${Math.max(viewport.left + entryInset, Math.min(viewport.right - entryInset, entryLeft))}px`,
-    top: `${Math.max(viewport.top + entryInset, Math.min(viewport.bottom - entryInset, entryTop))}px`,
+    left: `${Math.max(minEntryLeft, Math.min(maxEntryLeft, entryLeft))}px`,
+    top: `${Math.max(viewport.top + viewportInset, Math.min(viewport.bottom - viewportInset, entryTop))}px`,
   };
   if (showTooltip.value) void nextTick(() => {
     const tooltip = tooltipRef.value;
@@ -1037,11 +1052,63 @@ function openTooltip(forced = false): void {
   schedulePositionUpdate();
 }
 
-/** 仅显式触摸入口开启成功后清空同一原生选区；是否同时收起系统菜单仍由 Safari 决定。 */
-function openTooltipFromIndicator(): void {
+function cancelIndicatorTouch(): void {
+  if (import.meta.env.BROWSER !== 'firefox') return;
+  indicatorTouchGesture = null;
+}
+
+function beginIndicatorTouch(event: PointerEvent): void {
+  if (import.meta.env.BROWSER !== 'firefox' || !event.isTrusted) return;
+  cancelIndicatorTouch();
+  ignoreIndicatorTouchClick = event.pointerType === 'touch';
+  if (event.pointerType !== 'touch' || !event.isPrimary || event.button !== 0 || componentDisposed
+    || !showIndicator.value || showTooltip.value || !snapshot.value
+    || !Number.isFinite(event.clientX) || !Number.isFinite(event.clientY)) return;
+  indicatorTouchGesture = {pointerId: event.pointerId, x: event.clientX, y: event.clientY,
+    selection: snapshot.value, element: event.currentTarget};
+}
+
+function trackIndicatorTouch(event: PointerEvent): void {
+  if (import.meta.env.BROWSER !== 'firefox') return;
+  const gesture = indicatorTouchGesture;
+  if (!gesture || !event.isTrusted || event.pointerType !== 'touch') return;
+  if (event.pointerId !== gesture.pointerId || !event.isPrimary
+    || !(Math.hypot(event.clientX - gesture.x, event.clientY - gesture.y) <= 8 * popupScale.value)) cancelIndicatorTouch();
+}
+
+function finishIndicatorTouch(event: PointerEvent): void {
+  if (import.meta.env.BROWSER !== 'firefox') return;
+  const gesture = indicatorTouchGesture;
+  cancelIndicatorTouch();
+  if (!gesture || !event.isTrusted || !event.isPrimary || event.pointerType !== 'touch' || event.button !== 0
+    || event.pointerId !== gesture.pointerId || event.currentTarget !== gesture.element
+    || componentDisposed || document.visibilityState === 'hidden' || snapshot.value !== gesture.selection || !showIndicator.value || showTooltip.value
+    || !(Math.hypot(event.clientX - gesture.x, event.clientY - gesture.y) <= 8 * popupScale.value)) return;
+  // 来源 DOM 可在 down/up 之间替换而没有 selectionchange；只完成当时仍有效的同一来源。
+  restoreSelectionSource();
+  if (snapshot.value !== gesture.selection || !showIndicator.value) return;
+  try {
+    const live = readSelectionSnapshot();
+    if (!live || !isSameSelection(gesture.selection, live)) return;
+  } catch { return; }
+  event.stopPropagation();
+  openTooltipFromIndicator();
+}
+
+function leaveIndicator(): void {
+  cancelReadingHover();
+  cancelIndicatorTouch();
+}
+
+/** 仅显式触摸入口开启成功后清空同一原生选区；是否同时收起系统菜单仍由浏览器决定。 */
+function openTooltipFromIndicator(event?: MouseEvent): void {
+  // pointer 路径已处理过本轮触摸（包括取消）；键盘 detail=0 和其他平台仍保留 click 入口。
+  if (import.meta.env.BROWSER === 'firefox' && ignoreIndicatorTouchClick && event
+    && (event.detail !== 0 || (event as PointerEvent).pointerType === 'touch')) return;
+  if (showTooltip.value) return;
   const current = snapshot.value, wasVisible = showTooltip.value;
   openTooltip();
-  if (import.meta.env.BROWSER !== 'safari' || !touchInteraction.value || componentDisposed
+  if ((import.meta.env.BROWSER !== 'safari' && import.meta.env.BROWSER !== 'firefox') || !touchInteraction.value || componentDisposed
     || wasVisible || !showTooltip.value || !current || snapshot.value !== current) return;
   try {
     const selection = window.getSelection();
@@ -1948,6 +2015,7 @@ function closeTooltip(): void {
   hideAll();
 }
 function hideAll(): void {
+  cancelIndicatorTouch();
   touchOpenedSelection = null;
   invalidateFreeReadingEnable();
   if (import.meta.env.BROWSER !== 'userscript') clearContextMenuSelection();
@@ -1995,6 +2063,8 @@ function matchesSelectionModifierOnPointer(event: PointerEvent): boolean {
 }
 function handlePointerDown(event: PointerEvent): void {
   if (!event.isTrusted) return;
+  // 第二根手指可以落在入口外；document capture 先撤销尚未完成的入口触摸。
+  if (event.pointerType === 'touch') cancelIndicatorTouch();
   lastTrustedSelectionInteractionAt = Date.now();
   if (isInsideUi(event.target)) {
     touchSelectionActiveUntil = 0;
@@ -2042,6 +2112,7 @@ function handlePointerUp(event: PointerEvent): void {
 }
 function handlePointerCancel(event: PointerEvent): void {
   if (!event.isTrusted) return;
+  cancelIndicatorTouch();
   if (uiPointerInteraction || isInsideUi(event.target)) {
     uiPointerInteraction = false;
     isSelecting = false;
@@ -2061,6 +2132,7 @@ function cancelEntryDismiss(): void {
   entryDismissTimer = null;
 }
 function handlePointerMove(event: PointerEvent): void {
+  trackIndicatorTouch(event);
   if (!event.isTrusted || event.pointerType !== 'mouse' || isSelecting || showTooltip.value
     || import.meta.env.BROWSER !== 'userscript' && (contextMenuSelection || contextMenuSourceRejected)
     || !selectionSettings.value.autoDismiss || !snapshot.value
@@ -2207,6 +2279,7 @@ function handleKeyup(): void {
 }
 
 function handleWindowBlur(): void {
+  cancelIndicatorTouch();
   stopPopupGesture();
   cancelReadingHover();
   selectionShortcutHeld = false;
@@ -2217,6 +2290,7 @@ function handleWindowBlur(): void {
 
 function handlePageVisibility(): void {
   if (document.visibilityState !== 'hidden') return;
+  cancelIndicatorTouch();
   stopPopupGesture();
   cancelTouchSelectionRead();
   touchSelectionActiveUntil = 0;
@@ -2384,6 +2458,7 @@ onMounted(() => {
 
 onBeforeUnmount(() => {
   componentDisposed = true;
+  cancelIndicatorTouch();
   touchOpenedSelection = null;
   invalidateFreeReadingEnable();
   disposeReadingEvidence();

@@ -36,7 +36,7 @@ vi.mock('@/src/features/vocabulary/materialClient', () => ({materialGeneration: 
 const filename = 'src/features/selection-translation/ui/SelectionTranslator.vue';
 const {descriptor} = parse(readFileSync(filename, 'utf8'), {filename});
 const script = compileScript(descriptor, {id: 'selection-lifecycle'});
-type SelectionBuildTarget = 'chrome' | 'userscript' | 'safari';
+type SelectionBuildTarget = 'chrome' | 'userscript' | 'safari' | 'firefox';
 const setupSource = script.content;
 const compiledByTarget = new Map<SelectionBuildTarget, string>();
 function compileForTarget(target: SelectionBuildTarget): string {
@@ -1468,6 +1468,75 @@ it('keeps an existing ordinary translation running when opening the learning vie
 
 
 describe('selection card geometry across content changes', () => {
+    it.each([
+        {isForward: true, left: 100, right: 150, expected: 222},
+        {isForward: false, left: 100, right: 150, expected: 28},
+        {isForward: true, left: 350, right: 380, expected: 278},
+        {isForward: false, left: 10, right: 100, expected: 172},
+        {isForward: true, left: 134, right: 184.85, expected: 256.85},
+    ])('leaves Firefox touch caret clearance independently of viewport margin: %j', scenario => {
+        const {state, window} = mountSelection(false, undefined, 'firefox');
+        Object.assign(window, {visualViewport: {width: 390, height: 500, offsetLeft: 0, offsetTop: 0}});
+        state.handleViewportResize();state.touchInteraction = true;
+        state.snapshot = {text: 'Selected text.', anchor: {left: scenario.left, right: scenario.right, top: 150, bottom: 174}, isForward: scenario.isForward};
+        state.updatePosition(false);
+        expect(state.indicatorStyle).toEqual({left: `${scenario.expected}px`, top: '162px'});
+    });
+    it.each([true, false])('keeps full-line Firefox touch targets away from both handles for direction %s', isForward => {
+        const {state, window} = mountSelection(false, undefined, 'firefox');
+        Object.assign(window, {visualViewport: {width: 390, height: 300, offsetLeft: 80, offsetTop: 160}});
+        state.handleViewportResize();state.touchInteraction = true;
+        state.snapshot = {text: 'Full selected line.', anchor: {left: 80, right: 470, top: 160, bottom: 184}, isForward};
+        state.updatePosition(false);
+        const x = Number.parseFloat(state.indicatorStyle.left);
+        expect(x - 80).toBeGreaterThanOrEqual(72);expect(470 - x).toBeGreaterThanOrEqual(72);
+        expect(x - 22).toBeGreaterThanOrEqual(80);expect(x + 22).toBeLessThanOrEqual(470);
+        expect(state.indicatorStyle.top).toBe('188px');
+    });
+    it.each([true, false])('uses the actual Firefox touch endpoint line and scales its gap for direction %s', isForward => {
+        const {state} = mountSelection(false, undefined, 'firefox');
+        const rects = [{left: 100, right: 230, top: 100, bottom: 124, width: 130, height: 24},
+            {left: 100, right: 160, top: 124, bottom: 148, width: 60, height: 24}];
+        state.touchInteraction = true;state.pageZoom = 2;
+        state.snapshot = {text: 'Two selected lines.', range: {getClientRects: () => rects}, anchor: rects[0], isForward};
+        state.updatePosition();
+        expect(state.snapshot.anchor).toEqual(isForward ? rects[1] : rects[0]);
+        expect(state.indicatorStyle).toEqual(isForward ? {left: '196px', top: '136px'} : {left: '64px', top: '112px'});
+    });
+    it.each([true, false])('keeps the Firefox mouse entry at its existing offset for direction %s', isForward => {
+        const {state} = mountSelection(false, undefined, 'firefox');
+        state.snapshot = {text: 'Desktop selection.', anchor: {left: 100, right: 230, top: 100, bottom: 124}, isForward};
+        state.updatePosition(false);
+        expect(state.indicatorStyle).toEqual({left: isForward ? '244px' : '86px', top: '138px'});
+    });
+    it.each([true, false])('preserves visibility without claiming caret clearance in an extremely narrow Firefox viewport: %s', isForward => {
+        const {state, window} = mountSelection(false, undefined, 'firefox');
+        Object.assign(window, {visualViewport: {width: 96, height: 300, offsetLeft: 0, offsetTop: 0}});
+        state.handleViewportResize();state.touchInteraction = true;
+        state.snapshot = {text: 'Full selected line.', anchor: {left: 0, right: 96, top: 150, bottom: 174}, isForward};
+        state.updatePosition(false);
+        const x = Number.parseFloat(state.indicatorStyle.left);
+        expect(x).toBe(isForward ? 68 : 28);
+        expect(x - 22).toBeGreaterThanOrEqual(0);expect(x + 22).toBeLessThanOrEqual(96);
+        // Neither outside side nor a 72px-safe interior exists: visibility is the explicit fallback only.
+        expect(Math.min(x, 96 - x)).toBeLessThan(72);
+    });
+    it('keeps Firefox touch vertical inset independent of its gap above a panned keyboard', () => {
+        const {state, window} = mountSelection(false, undefined, 'firefox');
+        Object.assign(window, {visualViewport: {width: 390, height: 300, offsetLeft: 80, offsetTop: 160}});
+        state.handleViewportResize();state.touchInteraction = true;
+        state.snapshot = {text: 'Selected text.', anchor: {left: 210, right: 260, top: 440, bottom: 464}, isForward: true};
+        state.updatePosition(false);
+        expect(state.indicatorStyle).toEqual({left: '332px', top: '432px'});
+    });
+    it.each(['chrome', 'safari', 'userscript'] as const)('preserves the existing %s touch entry gap and viewport inset', target => {
+        const {state, window} = mountSelection(false, undefined, target);
+        Object.assign(window, {visualViewport: {width: 390, height: 300, offsetLeft: 80, offsetTop: 160}});
+        state.handleViewportResize();state.touchInteraction = true;
+        state.snapshot = {text: 'Selected text.', anchor: {left: 210, right: 260, top: 440, bottom: 464}, isForward: true};
+        state.updatePosition(false);
+        expect(state.indicatorStyle).toEqual({left: '288px', top: '432px'});
+    });
     it('keeps a card and its entry within the panned visual viewport above a software keyboard', () => {
         const {state, window} = mountSelection();
         Object.assign(window, {visualViewport: {width: 390, height: 300, offsetLeft: 80, offsetTop: 160}});
@@ -1563,7 +1632,7 @@ describe('selection card geometry across content changes', () => {
     });
 });
 
-describe('Safari explicit touch selection consumption', () => {
+describe('Safari and Firefox explicit touch selection consumption', () => {
     function prepare(target: SelectionBuildTarget = 'safari', touch = true, initialText = 'Good ideas deserve attention.') {
         const fixture = mountSelection(false, {acceptsRange: () => true, normalizeText: (text: string) => text}, target, true);
         vi.stubGlobal('Element', class {});vi.stubGlobal('Node', class {});
@@ -1590,8 +1659,105 @@ describe('Safari explicit touch selection consumption', () => {
         const indicator=fixture.renderPort!.root.querySelector('.fr-selection-indicator');
         expect(indicator).not.toBeNull();await fixture.renderPort!.click(indicator!);await Vue.nextTick();
     }
-    it('runs the actual Safari touch indicator click, retains its snapshot/language and ignores late empty selectionchange',async()=>{
-        const fixture=prepare();
+    async function pointerEntry(fixture: ReturnType<typeof prepare>, type: string, patch: Record<string, unknown> = {}, element?: Element) {
+        await Vue.nextTick();
+        const entry = element ?? fixture.renderPort!.root.querySelector('.fr-selection-indicator')!;
+        expect(entry).not.toBeNull();
+        const event = new fixture.renderPort!.domWindow.Event(type, {bubbles: true, cancelable: true});
+        Object.defineProperties(event, Object.fromEntries(Object.entries({isTrusted: true, pointerId: 17, pointerType: 'touch',
+            isPrimary: true, button: 0, clientX: 180, clientY: 248, ...patch}).map(([key, value]) => [key, {value, configurable: true}])));
+        entry.dispatchEvent(event);await Vue.nextTick();return entry;
+    }
+    describe('Firefox pointer-only explicit entry', () => {
+        it('opens on trusted entry down/up without click, consumes the same selection and ignores a following compatibility click', async () => {
+            const fixture=prepare('firefox');const snapshot=fixture.state.snapshot;
+            const entry=await pointerEntry(fixture,'pointerdown');
+            expect(fixture.removeAllRanges).not.toHaveBeenCalled();expect(fixture.state.showTooltip).toBe(false);
+            await vi.advanceTimersByTimeAsync(105);
+            await pointerEntry(fixture,'pointerup',{clientX:183,clientY:249},entry);
+            expect(fixture.state.showTooltip).toBe(true);expect(fixture.state.snapshot).toBe(snapshot);
+            expect(fixture.state.touchOpenedSelection).toBe(snapshot);expect(fixture.removeAllRanges).toHaveBeenCalledOnce();
+            expect(fixture.translateText).toHaveBeenCalledOnce();
+            await pointerEntry(fixture,'click',{detail:1},entry);
+            expect(fixture.translateText).toHaveBeenCalledOnce();expect(fixture.removeAllRanges).toHaveBeenCalledOnce();
+        });
+        it.each(['move','cancel','leave','secondary','wrong-id','untrusted','no-down','blur','hide','unmount','new-source','source-change-without-notification','hidden'] as const)
+        ('rejects %s before a Firefox touch entry can complete', async reason => {
+            const fixture=prepare('firefox');
+            const entry=await pointerEntry(fixture,reason==='no-down'?'pointerup':'pointerdown',reason==='untrusted'?{isTrusted:false}:{});
+            if(reason==='move')await pointerEntry(fixture,'pointermove',{clientX:210},entry);
+            if(reason==='cancel')await pointerEntry(fixture,'pointercancel',{},entry);
+            if(reason==='leave')await pointerEntry(fixture,'pointerleave',{},entry);
+            if(reason==='secondary')await pointerEntry(fixture,'pointerdown',{isPrimary:false,pointerId:18},entry);
+            if(reason==='blur')fixture.state.handleWindowBlur();
+            if(reason==='hide')fixture.state.hideAll();
+            if(reason==='unmount')fixture.unmount();
+            if(reason==='new-source') {fixture.replaceSelection('A new selection source.');fixture.state.applySelection(fixture.state.readSelectionSnapshot());}
+            if(reason==='source-change-without-notification')fixture.replaceSelection('The source changed without a selection event.');
+            if(reason==='hidden') {Object.assign(fixture.document,{visibilityState:'hidden'});fixture.state.handlePageVisibility();}
+            await pointerEntry(fixture,'pointerup',reason==='wrong-id'?{pointerId:18}:{},entry);
+            expect(fixture.translateText).not.toHaveBeenCalled();expect(fixture.removeAllRanges).not.toHaveBeenCalled();
+            expect(fixture.state.showTooltip).toBe(false);
+        });
+        it.each(['chrome','safari','userscript'] as const)('leaves %s pointer completion on its existing click path', async target => {
+            const fixture=prepare(target);const entry=await pointerEntry(fixture,'pointerdown');
+            const stopPropagation=vi.fn();
+            await pointerEntry(fixture,'pointerup',{stopPropagation},entry);expect(fixture.state.showTooltip).toBe(false);
+            expect(stopPropagation).not.toHaveBeenCalled();
+            await clickEntry(fixture);expect(fixture.state.showTooltip).toBe(true);
+        });
+        it('still opens Firefox through a keyboard click after an abandoned touch', async () => {
+            const fixture=prepare('firefox');const entry=await pointerEntry(fixture,'pointerdown');
+            await pointerEntry(fixture,'pointerleave',{},entry);
+            await pointerEntry(fixture,'click',{detail:0,pointerType:''},entry);
+            expect(fixture.state.showTooltip).toBe(true);expect(fixture.translateText).toHaveBeenCalledOnce();
+        });
+        it.each(['touch','mouse','keyboard'] as const)('rejects a moved touch and its compatibility click, then accepts a fresh %s entry', async next => {
+            const fixture=prepare('firefox');const entry=await pointerEntry(fixture,'pointerdown');
+            // Both points stay inside a44px button; movement must invalidate independently of pointerleave.
+            await pointerEntry(fixture,'pointermove',{clientX:195},entry);
+            await pointerEntry(fixture,'pointerup',{clientX:195},entry);
+            await pointerEntry(fixture,'click',{detail:1,clientX:195},entry);
+            expect(fixture.state.showTooltip).toBe(false);expect(fixture.translateText).not.toHaveBeenCalled();
+            if(next==='touch') {await pointerEntry(fixture,'pointerdown',{},entry);await pointerEntry(fixture,'pointerup',{},entry);}
+            if(next==='mouse') {await pointerEntry(fixture,'pointerdown',{pointerType:'mouse'},entry);await pointerEntry(fixture,'click',{pointerType:'mouse',detail:1},entry);}
+            if(next==='keyboard')await pointerEntry(fixture,'click',{pointerType:'',detail:0},entry);
+            expect(fixture.state.showTooltip).toBe(true);expect(fixture.translateText).toHaveBeenCalledOnce();
+        });
+        it('does not complete the old entry when the live native Range changes without replacing its saved source', async () => {
+            const fixture=prepare('firefox');const entry=await pointerEntry(fixture,'pointerdown');
+            const source={isConnected:true,ownerDocument:fixture.document};
+            const range={...fixture.range,startContainer:source,endContainer:source,cloneRange:()=>range};
+            Object.assign(fixture.selection,{anchorNode:source,getRangeAt:()=>range});
+            await pointerEntry(fixture,'pointerup',{},entry);
+            expect(fixture.state.showTooltip).toBe(false);expect(fixture.translateText).not.toHaveBeenCalled();
+            expect(fixture.removeAllRanges).not.toHaveBeenCalled();
+        });
+        it('keeps a pointer-opened card and its snapshot when only native selection clearing throws', async () => {
+            const fixture=prepare('firefox');fixture.removeAllRanges.mockImplementation(()=>{throw Error('native selection unavailable');});
+            const entry=await pointerEntry(fixture,'pointerdown');await pointerEntry(fixture,'pointerup',{},entry);
+            expect(fixture.state.showTooltip).toBe(true);expect(fixture.state.touchOpenedSelection).toBe(fixture.state.snapshot);
+            expect(fixture.translateText).toHaveBeenCalledOnce();expect(fixture.lifecycleErrors).not.toHaveBeenCalled();
+        });
+        it('accepts a stationary held Firefox touch when released without an actual cancellation', async () => {
+            const fixture=prepare('firefox');const entry=await pointerEntry(fixture,'pointerdown');
+            await vi.advanceTimersByTimeAsync(1500);
+            expect(fixture.state.showTooltip).toBe(false);expect(fixture.removeAllRanges).not.toHaveBeenCalled();
+            await pointerEntry(fixture,'pointerup',{},entry);
+            expect(fixture.state.showTooltip).toBe(true);expect(fixture.translateText).toHaveBeenCalledOnce();
+        });
+        it('cancels on actual entry contextmenu without preventing the native menu and permits a fresh touch', async () => {
+            const fixture=prepare('firefox');const entry=await pointerEntry(fixture,'pointerdown');
+            const menu=new fixture.renderPort!.domWindow.Event('contextmenu',{bubbles:true,cancelable:true});
+            entry.dispatchEvent(menu);expect(menu.defaultPrevented).toBe(false);
+            await pointerEntry(fixture,'pointerup',{},entry);await pointerEntry(fixture,'click',{detail:1},entry);
+            expect(fixture.state.showTooltip).toBe(false);expect(fixture.translateText).not.toHaveBeenCalled();
+            await pointerEntry(fixture,'pointerdown',{},entry);await pointerEntry(fixture,'pointerup',{},entry);
+            expect(fixture.state.showTooltip).toBe(true);expect(fixture.translateText).toHaveBeenCalledOnce();
+        });
+    });
+    it.each(['safari', 'firefox'] as const)('runs the actual %s touch indicator click, retains its snapshot/language and ignores late empty selectionchange',async target=>{
+        const fixture=prepare(target);
         const snapshot=fixture.state.snapshot;
         const direction=fixture.state.effectiveTargetLanguage;
         await clickEntry(fixture);
@@ -1605,8 +1771,8 @@ describe('Safari explicit touch selection consumption', () => {
         expect(fixture.state.showTooltip).toBe(true);expect(fixture.state.snapshot).toBe(snapshot);expect(fixture.translateText).toHaveBeenCalledOnce();
         expect(fixture.lifecycleErrors).not.toHaveBeenCalled();
     });
-    it('respects the Chinese target-language gate and preserves configured reverse direction when enabled',async()=>{
-        const fixture=prepare('safari',true,'这是一段中文。');fixture.state.openTooltipFromIndicator();
+    it.each(['safari', 'firefox'] as const)('respects the %s Chinese target-language gate and preserves configured reverse direction when enabled',async target=>{
+        const fixture=prepare(target,true,'这是一段中文。');fixture.state.openTooltipFromIndicator();
         expect(fixture.state.showTooltip).toBe(false);expect(fixture.removeAllRanges).not.toHaveBeenCalled();
         fixture.config.from='en';fixture.config.selectionTranslatorBidirectional=true;fixture.state.selectionConfigVersion+=1;
         fixture.replaceSelection('这是一段新的中文。');
@@ -1614,13 +1780,13 @@ describe('Safari explicit touch selection consumption', () => {
         expect(fixture.state.showTooltip).toBe(true);expect(fixture.state.manuallyRequestedSelection).toBe(false);
         expect(fixture.state.effectiveTargetLanguage).toBe('en');expect(fixture.removeAllRanges).toHaveBeenCalledOnce();
     });
-    it.each(['chrome','userscript','desktop','automatic'] as const)('preserves native selection for %s entry',async mode=>{
-        const fixture=prepare(mode==='chrome'||mode==='userscript'?mode:'safari',mode!=='desktop');
-        if(mode==='automatic')fixture.state.openTooltip();else await clickEntry(fixture);
+    it.each(['chrome','userscript','desktop','automatic','firefox-desktop','firefox-automatic'] as const)('preserves native selection for %s entry',async mode=>{
+        const fixture=prepare(mode.startsWith('firefox-')?'firefox':mode==='chrome'||mode==='userscript'?mode:'safari',mode!=='desktop'&&mode!=='firefox-desktop');
+        if(mode==='automatic'||mode==='firefox-automatic')fixture.state.openTooltip();else await clickEntry(fixture);
         expect(fixture.state.showTooltip).toBe(true);expect(fixture.removeAllRanges).not.toHaveBeenCalled();expect(fixture.state.touchOpenedSelection).toBeNull();
     });
-    it('releases touch ownership for new selection/hideAll and still closes when the retained source disconnects',async()=>{
-        const fixture=prepare();await clickEntry(fixture);
+    it.each(['safari', 'firefox'] as const)('releases %s touch ownership for new selection/hideAll and still closes when the retained source disconnects',async target=>{
+        const fixture=prepare(target);await clickEntry(fixture);
         fixture.replaceSelection('New ideas deserve careful attention.');
         fixture.state.applySelection(fixture.state.readSelectionSnapshot());
         expect(fixture.state.touchOpenedSelection).toBeNull();expect(fixture.state.showTooltip).toBe(false);
@@ -1630,8 +1796,14 @@ describe('Safari explicit touch selection consumption', () => {
         fixture.source.isConnected=false;fixture.state.scheduleSelectionLoss();
         expect(fixture.state.showTooltip).toBe(false);expect(fixture.state.touchOpenedSelection).toBeNull();
     });
-    it('keeps the opened card when native removeAllRanges throws and releases ownership on unmount',async()=>{
-        const fixture=prepare();fixture.removeAllRanges.mockImplementation(()=>{throw Error('native selection unavailable');});
+    it.each(['safari', 'firefox'] as const)('does not clear a newer native selection when the %s old entry is clicked', async target => {
+        const fixture=prepare(target);fixture.replaceSelection('A newer native selection.');
+        await clickEntry(fixture);
+        expect(fixture.state.showTooltip).toBe(true);expect(fixture.removeAllRanges).not.toHaveBeenCalled();
+        expect(fixture.state.touchOpenedSelection).toBeNull();
+    });
+    it.each(['safari', 'firefox'] as const)('keeps the opened %s card when native removeAllRanges throws and releases ownership on unmount',async target=>{
+        const fixture=prepare(target);fixture.removeAllRanges.mockImplementation(()=>{throw Error('native selection unavailable');});
         await clickEntry(fixture);expect(fixture.state.showTooltip).toBe(true);expect(fixture.state.touchOpenedSelection).toBe(fixture.state.snapshot);
         fixture.unmount();expect(fixture.state.touchOpenedSelection).toBeNull();expect(fixture.lifecycleErrors).not.toHaveBeenCalled();
     });

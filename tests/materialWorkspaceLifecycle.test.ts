@@ -8,7 +8,7 @@ import type {MaterialRecord} from '@/src/features/vocabulary/materialProtocol';
 const KEY = '__fluentreadMaterialUiTest';
 const dispose: Array<() => unknown> = [];
 afterEach(async () => {for (const close of dispose.splice(0).reverse()) await close(); delete (globalThis as any)[KEY];});
-const deferred = <T,>() => {let resolve!: (value: T) => void; const promise = new Promise<T>(done => {resolve=done;}); return {promise,resolve};};
+const deferred = <T,>() => {let resolve!: (value: T) => void; let reject!: (reason: Error) => void; const promise = new Promise<T>((done, fail) => {resolve=done;reject=fail;}); return {promise,resolve,reject};};
 const record = (id = 'a'): MaterialRecord => ({id,identityKey:`article:https://example.test/${id}`,kind:'article',title:`Article ${id}`,source:{kind:'article',url:`https://example.test/${id}`},locator:{kind:'text',quote:'The original sentence.'},topics:['Design'],references:[{kind:'note',id:'note-1',note:'A personal thought.'}],createdAt:1,updatedAt:2,lastReadAt:2,archivedAt:null});
 function mocks(): Plugin {return {name:'materials-client-test',enforce:'pre',resolveId(id) {
   if (id.endsWith('/materialClient') || id === '../materialClient') return '\0materials-client';
@@ -74,6 +74,56 @@ describe('material workspace action ownership',()=>{
     const ui=await mount();await ui.panel.select('a');ui.panel.note='Unfinished thought';ui.panel.startEdit();ui.panel.draft.title='Unfinished title';
     await ui.panel.select('b');ui.panel.note='Another thought';await ui.panel.select('a');expect(ui.panel.note).toBe('Unfinished thought');expect(ui.panel.draft.title).toBe('Unfinished title');expect(ui.panel.editing).toBe(true);
     expect(ui.api.materialClear).not.toHaveBeenCalled();ui.panel.confirmClear=true;await ui.panel.clearMaterials();expect(ui.api.materialClear).toHaveBeenCalledTimes(1);expect(ui.panel.materials).toEqual([]);expect(ui.panel.selected).toBeUndefined();expect(ui.panel.confirmClear).toBe(false);
+  });
+  it.each(['note','material'] as const)('does not restore a successfully saved %s draft after returning to the list while pending',async(kind)=>{
+    const ui=await mount();await ui.panel.select('a');
+    const write=deferred<MaterialRecord>();
+    if(kind==='note'){ui.panel.note='Saved thought';ui.api.materialCapture.mockReturnValueOnce(write.promise);}
+    else {ui.panel.startEdit();ui.panel.draft.title='Saved title';ui.api.materialUpdate.mockReturnValueOnce(write.promise);}
+    const saving=kind==='note'?ui.panel.saveNote():ui.panel.saveEdit();await ui.flush();expect(ui.panel.busy).toBe(true);
+    ui.panel.backToList();expect(ui.panel.selected).toBeUndefined();
+    write.resolve({...record(),title:kind==='material'?'Saved title':record().title});await saving;
+    await ui.panel.select('a');expect(ui.panel.note).toBe('');expect(ui.panel.editing).toBe(false);
+    if(kind==='note'){await ui.panel.saveNote();expect(ui.api.materialCapture).toHaveBeenCalledTimes(1);}
+  });
+  it.each(['note','material'] as const)('retains the pending %s draft on failure after returning to the list',async(kind)=>{
+    const ui=await mount();await ui.panel.select('a');const write=deferred<MaterialRecord>();
+    if(kind==='note'){ui.panel.note='Keep failed thought';ui.api.materialCapture.mockReturnValueOnce(write.promise);}
+    else {ui.panel.startEdit();ui.panel.draft.title='Keep failed title';ui.api.materialUpdate.mockReturnValueOnce(write.promise);}
+    const saving=kind==='note'?ui.panel.saveNote():ui.panel.saveEdit();await ui.flush();ui.panel.backToList();
+    write.reject(new Error('Local write unavailable'));await saving;expect(ui.panel.error).toBe('Local write unavailable');await ui.panel.select('a');
+    if(kind==='note')expect(ui.panel.note).toBe('Keep failed thought');
+    else {expect(ui.panel.editing).toBe(true);expect(ui.panel.draft.title).toBe('Keep failed title');}
+  });
+  it.each(['note','material'] as const)('preserves a newer cached %s draft when an earlier save completes',async(kind)=>{
+    const ui=await mount();await ui.panel.select('a');const write=deferred<MaterialRecord>();
+    if(kind==='note'){ui.panel.note='Submitted thought';ui.api.materialCapture.mockReturnValueOnce(write.promise);}
+    else {ui.panel.startEdit();ui.panel.draft.title='Submitted title';ui.api.materialUpdate.mockReturnValueOnce(write.promise);}
+    const saving=kind==='note'?ui.panel.saveNote():ui.panel.saveEdit();await ui.flush();
+    // Exercise the owner boundary: a later draft update must not be cleared by the captured save.
+    if(kind==='note')ui.panel.note='Newer thought';else ui.panel.draft.title='Newer title';
+    ui.panel.backToList();write.resolve(record());await saving;await ui.panel.select('a');
+    if(kind==='note')expect(ui.panel.note).toBe('Newer thought');
+    else {expect(ui.panel.editing).toBe(true);expect(ui.panel.draft.title).toBe('Newer title');}
+  });
+  it.each(['note','material'] as const)('does not clear a newer active %s draft when an earlier save completes',async(kind)=>{
+    const ui=await mount();await ui.panel.select('a');const write=deferred<MaterialRecord>();
+    if(kind==='note'){ui.panel.note='Submitted thought';ui.api.materialCapture.mockReturnValueOnce(write.promise);}
+    else {ui.panel.startEdit();ui.panel.draft.title='Submitted title';ui.api.materialUpdate.mockReturnValueOnce(write.promise);}
+    const saving=kind==='note'?ui.panel.saveNote():ui.panel.saveEdit();await ui.flush();
+    if(kind==='note')ui.panel.note='Newer active thought';else ui.panel.draft.title='Newer active title';
+    write.resolve(record());await saving;
+    if(kind==='note')expect(ui.panel.note).toBe('Newer active thought');
+    else {expect(ui.panel.editing).toBe(true);expect(ui.panel.draft.title).toBe('Newer active title');}
+  });
+  it.each(['note','material'] as const)('settles the saved %s draft when an archived response resets the selection',async(kind)=>{
+    const ui=await mount();await ui.panel.select('a');const write=deferred<MaterialRecord>();
+    if(kind==='note'){ui.panel.note='Archived saved thought';ui.api.materialCapture.mockReturnValueOnce(write.promise);}
+    else {ui.panel.startEdit();ui.panel.draft.title='Archived saved title';ui.api.materialUpdate.mockReturnValueOnce(write.promise);}
+    const saving=kind==='note'?ui.panel.saveNote():ui.panel.saveEdit();await ui.flush();
+    const archived={...record(),archivedAt:5};write.resolve(archived);await saving;expect(ui.panel.selected).toBeUndefined();
+    ui.api.materialList.mockResolvedValueOnce([archived]);ui.panel.toggleArchive();await ui.flush();await ui.panel.select('a');
+    expect(ui.panel.note).toBe('');expect(ui.panel.editing).toBe(false);
   });
   it('reports import counts and refuses late file reads or note association after unload',async()=>{
     const ui=await mount();ui.api.materialImport.mockResolvedValueOnce({inserted:0,updated:0,skipped:3});

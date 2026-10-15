@@ -1,7 +1,7 @@
 <!--
  * @file src/features/vocabulary/ui/MaterialWorkspace.vue
  * 文件职责：以阅读材料和收藏原句为主要内容，提供主题整理、回到出处、连续学习和本地笔记。
- * 主要内容：保留轻量材料列表，详情按来源聚合原句、实时收藏和问答；窄屏引用正文预留覆盖式滚动条空间，保持滚动时行尾可读；加载、重试、编辑、归档恢复均保护异步代次和卸载边界。
+ * 主要内容：保留轻量材料列表，详情按来源聚合原句、实时收藏和问答；窄屏引用正文预留覆盖式滚动条空间，保持滚动时行尾可读；加载、重试、编辑、归档恢复均保护异步代次和卸载边界，保存成功只清理所属材料中与提交快照相同的草稿。
  * 模块边界：只通过本地材料与既有学习客户端读写，不访问数据库或供应商；来源恢复由公共适配器处理，个人内容不进入配置同步。
  -->
 <template>
@@ -327,9 +327,24 @@ async function mutate(operation: () => Promise<MaterialRecord | void>, done: (it
 function startEdit() { const item = selected.value; if (!item)
     return; draft.value = { title: item.title, topics: item.topics.join(', '), url: item.source.url || '' }; editing.value = true; void nextTick(() => {if (active && selectedId.value === item.id) titleInput.value?.focus();}); }
 function cancelEdit() {if (busy.value) return; const id = selectedId.value; editing.value = false; void nextTick(() => {if (active && selectedId.value === id) organizeButton.value?.focus();});}
-async function saveEdit() { const item = selected.value; if (!item)
-    return; const patch = { title: draft.value.title, topics: draft.value.topics.split(/[,，]/u).map(value => value.trim()).filter(Boolean), ...(item.kind === 'document' ? {} : { source: { ...item.source, url: draft.value.url } }) }; await mutate(() => materialUpdate(item.id, patch), updated => { if (updated)
-    replace(updated); editing.value = false; feedback.value = '材料已整理。'; void nextTick(() => {if (active && selectedId.value === item.id) organizeButton.value?.focus();}); }); }
+async function saveEdit() {
+    const item = selected.value;
+    if (!item) return;
+    const submitted = { ...draft.value };
+    const matchesSubmitted = (value: typeof submitted | undefined) => value?.title === submitted.title
+        && value.topics === submitted.topics && value.url === submitted.url;
+    const patch = { title: submitted.title, topics: submitted.topics.split(/[,，]/u).map(value => value.trim()).filter(Boolean), ...(item.kind === 'document' ? {} : { source: { ...item.source, url: submitted.url } }) };
+    await mutate(() => materialUpdate(item.id, patch), updated => {
+        if (updated) replace(updated);
+        // 返回列表或归档响应可能刚缓存了提交中的草稿；仅清理这一份，不覆盖后续输入。
+        if (matchesSubmitted(materialDrafts.get(item.id))) materialDrafts.delete(item.id);
+        if (selectedId.value === item.id && matchesSubmitted(draft.value)) {
+            editing.value = false;
+            void nextTick(() => {if (active && selectedId.value === item.id && !editing.value) organizeButton.value?.focus();});
+        }
+        feedback.value = '材料已整理。';
+    });
+}
 async function archiveSelected() { const item = selected.value; if (!item)
     return; await mutate(() => materialArchive(item.id), () => { materials.value = materials.value.filter(value => value.id !== item.id); resetSelection(); feedback.value = '已移除材料，可在材料管理中恢复。原有收藏与问答仍保留。'; }); }
 async function restoreSelected() { const item = selected.value; if (!item)
@@ -339,11 +354,21 @@ async function saveNote() {
     const item = selected.value, content = note.value.trim(), capturedAt = Date.now();
     if (!item || !content)
         return;
-    const reference = { kind: 'note' as const, id: editingNoteId.value || crypto.randomUUID(), note: content, createdAt: capturedAt };
-    const referenceMode = editingNoteId.value ? 'update-existing' as const : undefined;
+    const submitted = { text: note.value, editingId: editingNoteId.value };
+    const matchesSubmitted = (value: typeof submitted | undefined) => value?.text === submitted.text
+        && value.editingId === submitted.editingId;
+    const reference = { kind: 'note' as const, id: submitted.editingId || crypto.randomUUID(), note: content, createdAt: capturedAt };
+    const referenceMode = submitted.editingId ? 'update-existing' as const : undefined;
     await mutate(async () => { const storageGeneration = await materialGeneration(); if (!active)
-        return; return materialCapture({ source: item.source, reference, capturedAt, generation: storageGeneration, ...(referenceMode ? {referenceMode} : {}) }); }, updated => { if (updated)
-        replace(updated); note.value = ''; editingNoteId.value = ''; feedback.value = '笔记已保存。'; });
+        return; return materialCapture({ source: item.source, reference, capturedAt, generation: storageGeneration, ...(referenceMode ? {referenceMode} : {}) }); }, updated => {
+        if (updated) replace(updated);
+        if (matchesSubmitted(noteDrafts.get(item.id))) noteDrafts.delete(item.id);
+        if (selectedId.value === item.id && matchesSubmitted({ text: note.value, editingId: editingNoteId.value })) {
+            note.value = '';
+            editingNoteId.value = '';
+        }
+        feedback.value = '笔记已保存。';
+    });
 }
 async function removeNote(reference: MaterialReference) { const item = selected.value; if (!item)
     return; await mutate(() => materialRemoveReference(item.id, reference.kind, reference.id), updated => { if (updated)

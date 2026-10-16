@@ -19,6 +19,7 @@ import youdaoMarkerFixtures from './fixtures/translation-quality/youdao-marker-s
 import {protectGlossaryText} from '@/src/core/glossary/protection';
 import {findEmojiLiteralRanges} from '@/src/core/translation/emojiLiterals';
 import * as sha256 from '@/src/shared/function/sha256';
+import observedResidue from './fixtures/translation-quality/observed-ar-fr-residue.json';
 
 const fetchMock = vi.fn<typeof fetch>();
 const responseKey = 'aahc3TfyfCEmER33';
@@ -469,5 +470,65 @@ describe('free Chinese web providers', () => {
         fetchMock.mockResolvedValueOnce(response);
         await expect(translateFreeChineseWebText('youdaoFree', 'a'.repeat(501), 'en', 'zh-Hans', controller.signal)).rejects.toMatchObject({name: 'AbortError'});
         expect(fetchMock).toHaveBeenCalledOnce();
+    });
+});
+
+
+describe.each(['youdaoFree', 'icibaFree'] as const)('%s auto 仅按实际正文决定支持范围', provider => {
+    it.each(observedResidue.pairs)('可信 $lang 在 HTTP 前退出，不把语种不支持当服务故障', async ({origin}) => {
+        await expect(translateFreeChineseWebText(provider, origin, 'auto', 'zh-Hans'))
+            .rejects.toMatchObject({freeFailure: 'request', statusCode: 400});
+        expect(fetchMock).not.toHaveBeenCalled();
+    });
+    it.each(observedResidue.pairs)('多槽先验证全部正文，英文标记或首槽不掩盖 $lang', async ({origin}) => {
+        const packet = serializeTranslationSlots(['Hello, this is an English introduction.', origin], 'english_protocol');
+        await expect(translateFreeChineseWebText(provider, packet.payload, 'auto', 'zh-Hans'))
+            .rejects.toMatchObject({freeFailure: 'request', statusCode: 400});
+        expect(fetchMock).not.toHaveBeenCalled();
+    });
+    it.each(['Mary Jane', 'OpenAI API', 'GPT-6', 'This software keeps every reader preference available after the application restarts.'])('保守保留短名称、技术词和英文 auto：%s', async origin => {
+        fetchMock.mockImplementation(async () => provider === 'youdaoFree' ? Response.json({fanyi: {tran: '中文译文'}}) : icibaResponse({err_no: 0, out: '中文译文'}));
+        await expect(translateFreeChineseWebText(provider, origin, 'auto', 'zh-Hans')).resolves.toBe('中文译文');
+        const [url, init] = fetchMock.mock.calls[0];
+        const params = provider === 'youdaoFree' ? new URL(String(url)).searchParams : new URLSearchParams(String(init?.body));
+        expect(params.get('from')).toBe('en');
+        expect(params.get('q')).toBe(origin);
+    });
+    it('不支持的 auto 文本交回既有换线，线路不被冷却且下段英文仍可用', async () => {
+        const run = createFreeFallbackRunner(1);
+        const first = {identity: provider, label: provider, translate: (signal: AbortSignal) =>
+            translateFreeChineseWebText(provider, observedResidue.pairs[0].origin, 'auto', 'zh-Hans', signal)};
+        const options = {timeoutMs: 1_000, cooldownMs: 60_000, mode: 'sequential' as const};
+        await expect(run([first, {identity: 'fallback', label: 'fallback', translate: async () => '正常的中文译文。'}], options)).resolves.toBe('正常的中文译文。');
+        expect(fetchMock).not.toHaveBeenCalled();
+        const health = (await run.getHealthSnapshot()).find(entry => entry.identity === provider);
+        expect(health?.failures ?? 0).toBe(0);
+        expect(health?.retryAt ?? 0).toBe(0);
+        fetchMock.mockImplementation(async () => provider === 'youdaoFree' ? Response.json({fanyi: {tran: '下一段译文。'}}) : icibaResponse({err_no: 0, out: '下一段译文。'}));
+        await expect(run([{...first, translate: signal => translateFreeChineseWebText(provider, 'This paragraph describes the normal application settings for every reader.', 'auto', 'zh-Hans', signal)}], options)).resolves.toBe('下一段译文。');
+        expect(fetchMock).toHaveBeenCalledOnce();
+    });
+    it('源方向显式指定时不由语言识别偷偷改写', async () => {
+        const origin = observedResidue.pairs[1].origin;
+        fetchMock.mockImplementation(async () => provider === 'youdaoFree' ? Response.json({fanyi: {tran: '显式方向结果'}}) : icibaResponse({err_no: 0, out: '显式方向结果'}));
+        await expect(translateFreeChineseWebText(provider, origin, 'en', 'zh-Hans')).resolves.toBe('显式方向结果');
+        expect(fetchMock).toHaveBeenCalledOnce();
+    });
+    it('显式不支持及同方向保持请求分类，不发 HTTP', async () => {
+        await expect(translateFreeChineseWebText(provider, observedResidue.pairs[0].origin, 'ar', 'zh-Hans')).rejects.toMatchObject({freeFailure: 'request'});
+        await expect(translateFreeChineseWebText(provider, 'English words', 'en', 'en')).rejects.toMatchObject({freeFailure: 'request'});
+        expect(fetchMock).not.toHaveBeenCalled();
+    });
+    it('解码中文槽仍自动选择中译英，返回槽协议与字词边界不变', async () => {
+        const origin = '这是一个完整的中文测试句子。';
+        const packet = serializeTranslationSlots([origin], 'english_protocol');
+        fetchMock.mockImplementation(async () => provider === 'youdaoFree' ? Response.json({fanyi: {tran: 'A complete Chinese test sentence.'}}) : icibaResponse({err_no: 0, out: 'A complete Chinese test sentence.'}));
+        const output = await translateFreeChineseWebText(provider, packet.payload, 'auto', 'en');
+        expect(parseTranslationSlots(packet, output)).toEqual(['A complete Chinese test sentence.']);
+        const [url, init] = fetchMock.mock.calls[0];
+        const params = provider === 'youdaoFree' ? new URL(String(url)).searchParams : new URLSearchParams(String(init?.body));
+        expect(params.get('from')).toBe(provider === 'youdaoFree' ? 'zh-CHS' : 'zh');
+        expect(params.get('to')).toBe('en');
+        expect(params.get('q')).toBe(origin);
     });
 });

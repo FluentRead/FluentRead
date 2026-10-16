@@ -2,6 +2,7 @@
  * @file src/core/translation/resultValidation.ts
  * 文件职责：识别翻译服务误返原文或明显错语种的响应，避免将其当成成功译文。
  * 主要内容：复用语言识别副本排除纯符号、数字和技术标识，提供保持字词内容的原样响应比较，供图片入口接受空白、标点边界或 U+200B 包装的原文；仅在既有外语证据下识别原文回显，保留字词、大小写和符号差异，补足中文目标下短标签列表、运算符标签丢词或大小写回显、整段日文及有充分外语证据的长 Latin 正文错语种判定；文档行内正文可在完整原句的既有外语证据下识别普通多词标签原样返回，专名和单词仍保持保守。
+ * 补充边界：可信外语长正文中，少量汉字替换不能掩盖大量保留的 Latin 原词，阿拉伯正文丢空格也不能冒充中文译文；成对外语引文、短名称与完整槽标记代码不作为新增拒绝证据，标记之间的正文仍参与判定。
  * 模块边界：仅做保守的纯文本判定；不读取配置或缓存、不请求服务，也不改写原文与译文。
  */
 import {getChineseScript} from '@/src/core/language/chinese';
@@ -128,10 +129,48 @@ function isClearlyForeignLatinProse(origin: string, result: string, targetLangua
         && !resultLanguage.languages.some(language => isLanguageCodeMatch(language, targetLanguage));
 }
 
-/** 拒绝明确的整段日文或 Latin 外语结果；名称、短引用和不确定混合段落照常展示。 */
+/** 引文只从新增残留正文证据中排除；不改动原文、译文或既有回显比较。 */
+function outsideQuotedText(value: string): string {
+    // Latin 字母之间的弯/直撇号属于词，不能提前结束 L’usage / s'agit 等引文。
+    // ASCII 开闭引号还须在词外；未引用正文中的撇号不构成开引号。
+    return value.replace(/“[^”]*”|「[^」]*」|『[^』]*』|«[^»]*»|"[^"\n]*"/gu, ' ')
+        .replace(/‘(?:[^’]|(?<=[\p{Script=Latin}\p{M}])’(?=[\p{Script=Latin}\p{M}]))*’(?![\p{Script=Latin}\p{M}])/gu, ' ')
+        .replace(/(?<![\p{L}\p{N}])'(?:[^'\n]|(?<=[\p{Script=Latin}\p{M}])'(?=[\p{Script=Latin}\p{M}]))*'(?![\p{L}\p{N}])/gu, ' ');
+}
+
+/** 仅新残留规则的识别副本排除完整代码标记；不解包、不吞标记之间的正文，也不赋予逐槽语义。 */
+function residueDetectionCopy(value: string): string {
+    // nonce 在三下划线处停止，避免从损坏标记跨过下一标记；仅完整标准序号及 BEGIN/END 参与遮蔽。
+    return createLanguageDetectionCopy(value.replace(/___FLUENTREAD_(?:(?!___)[a-z0-9_-])+?_(?:0|[1-9]\d*)_(?:BEGIN|END)___/giu, ' ')).text;
+}
+
+/** 原文归属必须可信，且引文之外仍有大量外语正文；比例不能独立作为错语种依据。 */
+function hasDominantForeignResidue(origin: string, result: string, targetLanguage: string): boolean {
+    const translated = residueDetectionCopy(outsideQuotedText(result));
+    const han = (translated.match(/\p{Script=Han}/gu) ?? []).length;
+    const arabic = (translated.match(/\p{Script=Arabic}/gu) ?? []).length;
+    const latin = (translated.match(/\p{Script=Latin}/gu) ?? []).length;
+    // 无汉字的 Latin 正文继续使用原有统计判定，不扩大不确定混合段落。
+    if (arabic < 60 && (han === 0 || latin < 60 || latin <= han * 6)) return false;
+    const source = residueDetectionCopy(origin);
+    const identification = identifyTextLanguage(origin);
+    if (identification.status !== 'identified'
+        || identification.languages.some(language => isLanguageCodeMatch(language, targetLanguage))) return false;
+    if (arabic >= 60 && arabic > han * 6 && (source.match(/\p{Script=Arabic}/gu) ?? []).length >= 60) return true;
+    if (!hasSubstantialLatinProse(source) || !hasSubstantialLatinProse(translated)) return false;
+    // 上面的充分正文检查已保证双方都有至少八个 Latin 词；此处匹配不可能为空。
+    const sourceWords = new Set(source.toLowerCase().match(/\p{Script=Latin}[\p{Script=Latin}\p{M}]*/gu)!);
+    const retained = translated.toLowerCase().match(/\p{Script=Latin}[\p{Script=Latin}\p{M}]*/gu)!
+        .filter(word => sourceWords.has(word));
+    return han > 0 && latin > han * 6 && retained.length >= 8
+        && retained.join('').length >= Math.max(40, latin / 2);
+}
+
+/** 拒绝明确的整段日文、Latin 外语及大量残留的阿拉伯/Latin 正文；名称和有界引文保持保守。 */
 export function isClearlyWrongLanguageResponse(origin: string, result: string, targetLanguage: string): boolean {
     if (!origin.trim() || !result.trim() || !getChineseScript(targetLanguage)) return false;
     if (isClearlyForeignLatinProse(origin, result, targetLanguage)) return true;
+    if (hasDominantForeignResidue(origin, result, targetLanguage)) return true;
     const kanaCount = (result.match(/[\p{Script=Hiragana}\p{Script=Katakana}ーｰ]/gu) ?? []).length;
     if (kanaCount < 16) return false;
     const hanCount = (result.match(/\p{Script=Han}/gu) ?? []).length;

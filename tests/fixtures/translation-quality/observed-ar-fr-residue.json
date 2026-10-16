@@ -1,0 +1,15 @@
+{
+  "scope": "Observed existing Android Firefox document, original load provenance and winning provider/cache source unknown. Text-only offline regression; not a live-provider fixture.",
+  "pairs": [
+    {
+      "lang": "ar",
+      "origin": "هذا النطاق مُخصص للاستخدام في أمثلة التوثيق دون الحاجة إلى إذن. هذه ليست خدمة، يُرجى تجنب الاعتماد عليها لأغراض الاختبار والمراقبة.",
+      "result": "هذاالنطاقمُخصصللاستخدامفيأمثلةالتوثيقدونالحاجةإلىإذن。هذهليستخدمة،يُرجىتجنبالاعتمادعليهالأغراضالاختباروالمراقبة。"
+    },
+    {
+      "lang": "fr",
+      "origin": "L’usage de ce domaine est réservé à des exemples de documentation, sans autorisation préalable.  Il ne s’agit pas d’un service ; son utilisation à des fins de test ou de surveillance est à éviter.",
+      "result": "L'use de ce domaine est réservéàdes示例de留档，无自动化priéalable。Il ne s'agit pas d'un服务；son utilationàdes fins de test ou de监视estàéviter。"
+    }
+  ]
+}

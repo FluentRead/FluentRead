@@ -11,6 +11,7 @@ import {createTranslationBroker} from '@/src/services/translation/broker';
 import type {TranslationConfigSource, TranslationProvider} from '@/src/services/translation/types';
 import {identifyTextLanguage} from '@/src/core/language/identify';
 import {resolveTranslationLanguages} from '@/src/core/translation/languages';
+import observedResidue from './fixtures/translation-quality/observed-ar-fr-residue.json';
 
 vi.mock('@/src/services/config/store', () => ({config: {}}));
 vi.mock('@/src/core/translation/public', () => import('@/src/core/translation/slotProtocol'));
@@ -127,6 +128,10 @@ function createHarness(targetLanguage = 'zh-Hans') {
 }
 
 describe('保守回显比较沿用原文已有的外语证据', () => {
+    it('图片的明确同文只规范空白，普通翻译仍拒绝可信外语原文', () => {
+        expect(isUnchangedTranslationResponse(corpusSentence, `  ${corpusSentence}  `)).toBe(true);
+        expect(isLikelyUntranslatedResponse(corpusSentence, `  ${corpusSentence}  `, 'zh-Hans')).toBe(true);
+    });
     it.each(echoVariants)('%s 的原文包装仍被图片策略接受，首次成功并缓存', async (_label, origin, result) => {
         expect(isUnchangedTranslationResponse(origin, result)).toBe(true);
         const harness = createHarness(); harness.provider.mockResolvedValue(result);
@@ -356,5 +361,73 @@ describe('中文目标下明确 Latin 错语种结果', () => {
             expect(harness.provider.mock.calls[1][0]).toMatchObject({ origin: polishSource });
             expect([...harness.store.values()]).not.toContain(corruptPolishResult);
         });
+    });
+});
+
+
+describe('已观察 AR/FR 残留正文的共享响应与缓存门禁', () => {
+    const chinese = '该域名专供文档示例使用，无需事先许可。它不是服务，请勿将其用于测试或监控。';
+    it.each(observedResidue.pairs)('拒绝 $lang 原始损坏结果，保持字节不变并接受真正中文', ({origin, result, lang}) => {
+        expect(identifyTextLanguage(origin)).toMatchObject({status: 'identified', languages: [lang]});
+        expect(isLikelyUntranslatedResponse(origin, result, 'zh-Hans')).toBe(false);
+        expect(isClearlyWrongLanguageResponse(origin, result, 'zh-Hans')).toBe(true);
+        expect(isClearlyWrongLanguageResponse(origin, result, 'zh-Hant')).toBe(true);
+        expect(isClearlyWrongLanguageResponse(origin, chinese, 'zh-Hans')).toBe(false);
+        expect(isClearlyWrongLanguageResponse(origin, result, lang)).toBe(false);
+    });
+    it.each(observedResidue.pairs)('$lang 旧坏缓存经真实 broker 读校验失效，成功后仅缓存中文', async ({origin, result}) => {
+        const harness = createHarness();
+        harness.cacheGet.mockResolvedValueOnce(result);
+        harness.provider.mockResolvedValue(chinese);
+        await expect(harness.broker.translateWithCache({origin})).resolves.toBe(chinese);
+        await expect(harness.broker.translateWithCache({origin})).resolves.toBe(chinese);
+        expect(harness.provider).toHaveBeenCalledOnce();
+        expect([...harness.store.values()]).toEqual([chinese]);
+    });
+    it.each(observedResidue.pairs)('$lang 持续坏结果按既有重试失败，不写缓存', async ({origin, result}) => {
+        const harness = createHarness(); harness.provider.mockResolvedValue(result);
+        await expect(harness.broker.translateWithCache({origin})).rejects.toMatchObject({code: 'WRONG_LANGUAGE_RESPONSE'});
+        expect(harness.provider).toHaveBeenCalledTimes(2);
+        expect(harness.cacheSet).not.toHaveBeenCalled();
+    });
+    it.each(observedResidue.pairs)('$lang 批量仅重试坏槽，不丢相邻中文和专名', async ({origin, result}) => {
+        const harness = createHarness();
+        harness.provider.mockResolvedValueOnce([result, '已经完成。', 'Mary Jane']).mockResolvedValueOnce(chinese);
+        await expect(harness.broker.translateWithCache({origin: [origin, 'The task is now complete.', 'Mary Jane']}))
+            .resolves.toEqual([chinese, '已经完成。', 'Mary Jane']);
+        expect(harness.provider).toHaveBeenCalledTimes(2);
+        expect(harness.provider.mock.calls[1][0]).toMatchObject({origin});
+    });
+    it.each(observedResidue.pairs)('$lang 中文解释中的长引文不会被比例单独误拒', ({origin, result}) => {
+        for (const [left, right] of [['“', '”'], ['‘', '’'], ['「', '」'], ['『', '』'], ['«', '»'], ['"', '"']]) {
+            expect(isClearlyWrongLanguageResponse(origin, `中文说明引用${left}${result}${right}，这是原文示例。`, 'zh-Hans')).toBe(false);
+        }
+        expect(isClearlyWrongLanguageResponse(origin, chinese.repeat(3) + ' ' + result, 'zh-Hans')).toBe(false);
+        expect(isClearlyWrongLanguageResponse('Mary Jane', result, 'zh-Hans')).toBe(false);
+        expect(isClearlyWrongLanguageResponse('CPU GPU API SQL HTTP JSON SVG PNG', result, 'zh-Hans')).toBe(false);
+        expect(isClearlyWrongLanguageResponse(chinese, result, 'zh-Hans')).toBe(false);
+    });
+    it('词外 ASCII 单引文保留，法语与英文词内撇号不截走残留正文', () => {
+        const arabic = observedResidue.pairs[0];
+        expect(isClearlyWrongLanguageResponse(arabic.origin, `中文说明引用：'${arabic.result}'，这是原文示例。`, 'zh-Hans')).toBe(false);
+        const french = observedResidue.pairs[1];
+        expect(french.origin).toContain('L’usage');
+        expect(french.origin).toContain('s’agit');
+        expect(french.origin).toContain('d’un');
+        expect(isClearlyWrongLanguageResponse(french.origin, `中文说明引用‘${french.origin}’，这是原文示例。`, 'zh-Hans')).toBe(false);
+        expect(isClearlyWrongLanguageResponse(french.origin, `中文说明引用：'${french.result}'，这是原文示例。`, 'zh-Hans')).toBe(false);
+        // observed FR 原始结果本身含 L'use / s'agit / d'un；不改字节仍须拒绝。
+        expect(french.result).toContain("s'agit");
+        expect(isClearlyWrongLanguageResponse(french.origin, french.result, 'zh-Hans')).toBe(true);
+        expect(isClearlyWrongLanguageResponse(french.origin, french.result + " it's", 'zh-Hans')).toBe(true);
+        expect(isClearlyWrongLanguageResponse(french.origin, '中文引用：\'Le logiciel traduit chaque paragraphe et conserve les paramètres de lecture pour tous les utilisateurs après un redémarrage.\'。', 'zh-Hans')).toBe(false);
+    });
+    it('少量汉字加新写的外文或不可信混合源，不被新增残留规则武断拒绝', () => {
+        const {origin} = observedResidue.pairs[1];
+        expect(isClearlyWrongLanguageResponse(origin, '示例 Automatic configuration preserves previously selected translation preferences and independently synchronizes alternate workstation profiles across distant installations.', 'zh-Hans')).toBe(false);
+        expect(isClearlyWrongLanguageResponse('???', observedResidue.pairs[1].result, 'zh-Hans')).toBe(false);
+        expect(isClearlyWrongLanguageResponse(origin, '示例 Mary Jane', 'zh-Hans')).toBe(false);
+        // 本次只证明同 Arabic 正文残留，不能用源文中不存在的文字推断保留了原文。
+        expect(isClearlyWrongLanguageResponse(origin, observedResidue.pairs[0].result, 'zh-Hans')).toBe(false);
     });
 });

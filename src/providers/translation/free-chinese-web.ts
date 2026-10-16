@@ -1,7 +1,7 @@
 /**
  * @file src/providers/translation/free-chinese-web.ts
  * 文件职责：适配有道网页普通翻译和金山词霸匿名网页翻译接口。
- * 主要内容：按码点预算且不切术语标记，生成公开网页协议所需签名，解密词霸响应，限制支持的中英方向；有道按安全长度分块，拒绝响应明确声明的反向翻译，仅按本块完整身份恢复服务删除下划线的术语标记，缺失、重复或身份变化仍失败；保留文本槽、换行、边缘空白、取消和结构化失败分类，取消或 HTTP 失败后等待未读正文结算再归还免费池容量。
+ * 主要内容：按码点预算且不切术语标记，生成公开网页协议所需签名，解密词霸响应，限制支持的中英方向；auto 使用解码正文槽的可信语言证据，明确非中英时以请求错误交回既有换线流程，不让英文协议标记决定源语言；有道按安全长度分块，拒绝响应明确声明的反向翻译，仅按本块完整身份恢复服务删除下划线的术语标记，缺失、重复或身份变化仍失败；保留文本槽、换行、边缘空白、取消和结构化失败分类，取消或 HTTP 失败后等待未读正文结算再归还免费池容量。
  * 模块边界：本文件只负责固定匿名 HTTP provider；不读取账号、Cookie、用户密钥、代理或存储，不负责免费服务编排、重试和并发。
  */
 import AES from 'crypto-js/aes';
@@ -12,6 +12,7 @@ import modeECB from 'crypto-js/mode-ecb';
 import padPkcs7 from 'crypto-js/pad-pkcs7';
 import {normalizeChineseLanguageCode} from '@/src/core/language/chinese';
 import {detectChineseScript} from '@/src/core/language/detect';
+import {identifyTextLanguage} from '@/src/core/language/identify';
 import {serializeTranslationSlots} from '@/src/core/translation/serialization';
 import {getTranslationGlossarySourceText} from '@/src/services/translation/requestSnapshot';
 import {abortErrorFromSignal, runtimeFetch} from '@/src/platform/http/runtime';
@@ -56,6 +57,13 @@ function ensureLanguage(value: string, target: boolean, text: string): string {
         const script = detectChineseScript(text);
         if (script === 'Hans') return target ? 'en' : 'zh-CHS';
         if (script === 'Hant') throw failure('免费网页翻译不支持繁体中文方向', 'request', 400);
+        if (!target) {
+            const identification = identifyTextLanguage(text);
+            if (identification.status === 'identified'
+                && identification.languages.some(language => !['en', 'zh-Hans', 'zh-Hant'].includes(language))) {
+                throw failure('免费网页翻译不支持该语言方向', 'request', 400);
+            }
+        }
         return ['en', 'zh-CHS'][Number(target)]!;
     }
     if (normalized === 'en') return 'en';
@@ -63,7 +71,10 @@ function ensureLanguage(value: string, target: boolean, text: string): string {
     throw failure('免费网页翻译不支持该语言方向', 'request', 400);
 }
 
-function direction(source: string, target: string, text: string): {from: string; to: string} {
+function direction(source: string, target: string, slots: readonly string[]): {from: string; to: string} {
+    // 所有槽在第一次请求之前检查，避免前面的英文槽掩盖后面的明确外语正文。
+    if (source === 'auto') for (const slot of slots) ensureLanguage(source, false, slot);
+    const text = slots.join('\n');
     const from = ensureLanguage(source, false, text);
     const to = ensureLanguage(target, true, text);
     if (from === to) throw failure('免费网页翻译不支持相同语言方向', 'request', 400);
@@ -184,8 +195,8 @@ export async function translateFreeChineseWebText(provider: FreeChineseWebProvid
     if (signal?.aborted) throw abortErrorFromSignal(signal);
     if (typeof text !== 'string') throw failure('免费网页翻译仅支持文本输入', 'request', 400);
     if (!text.trim()) return text;
-    const {from, to} = direction(source, target, text);
     const slots = getTranslationGlossarySourceText(text);
+    const {from, to} = direction(source, target, Array.isArray(slots) ? slots : [slots]);
     if (!Array.isArray(slots)) return translatePlain(provider, slots, from, to, signal);
     const translated: string[] = [];
     for (const slot of slots) translated.push(await translatePlain(provider, slot, from, to, signal));

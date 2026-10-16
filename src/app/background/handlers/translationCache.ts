@@ -1,7 +1,7 @@
 /**
  * @file src/app/background/handlers/translationCache.ts
  * 文件职责：把翻译缓存用量统计与清空封装为类型化后台消息处理器，为设置、popup 和旧 content 消息提供一致响应。
- * 主要内容：声明统计请求、clearTranslationCache 请求与清理完成广播，并在底层清理成功后通知所有活动 content 会话失效内存结果。
+ * 主要内容：声明统计、clearTranslationCache 请求与清理完成广播，底层清理成功后优先通过共享网页接收者端口失效内存结果，并兼容原逐标签适配器。
  * 模块边界：本文件不直接访问 IndexedDB、内存缓存或页面 localStorage，也不决定清理代次；缓存一致性和旧写入排空由 translation cache 服务负责。
  */
 import type {BackgroundMessageHandler} from '@/src/services/messaging/backgroundRouter';
@@ -40,6 +40,7 @@ export interface ClearTranslationCacheResponse {
 }
 
 export interface TranslationCacheInvalidationBroadcastAdapter {
+    broadcastTabMessage?(message: {type: typeof TRANSLATION_CACHE_CLEARED_MESSAGE}): Promise<void>;
     queryTabs(): Promise<Array<{id?: number}>>;
     sendTabMessage(tabId: number, message: {type: typeof TRANSLATION_CACHE_CLEARED_MESSAGE}): Promise<unknown>;
     warn(message: string, error: unknown): void;
@@ -51,6 +52,10 @@ export function createTranslationCacheInvalidationBroadcaster(
 ): () => Promise<void> {
     return async () => {
         try {
+            if (adapter.broadcastTabMessage) {
+                await adapter.broadcastTabMessage({type: TRANSLATION_CACHE_CLEARED_MESSAGE});
+                return;
+            }
             const tabs = await adapter.queryTabs();
             await Promise.allSettled(tabs
                 .filter((tab): tab is {id: number} => typeof tab.id === 'number')

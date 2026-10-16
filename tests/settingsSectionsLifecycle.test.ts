@@ -58,8 +58,8 @@ function createDomRenderer(document: Document, focus: ReturnType<typeof vi.fn>) 
 type NumericChange = (value: number | undefined) => void;
 type NumericPort = {disabled: boolean; change: NumericChange};
 
-async function mountSections({ready = Promise.resolve(), configSnapshot, template = false, providerGate = Promise.resolve(), activeSection = 'settings-translation', requestLimits = false, development = false, serviceSelectors = false, search = '', repairReturn = false}:
-    {ready?: Promise<void>; configSnapshot?: Record<string, unknown>; template?: boolean; providerGate?: Promise<void>; activeSection?: string; requestLimits?: boolean; development?: boolean; serviceSelectors?: boolean; search?: string; repairReturn?: boolean} = {}) {
+async function mountSections({ready = Promise.resolve(), configSnapshot, template = false, providerGate = Promise.resolve(), activeSection = 'settings-translation', requestLimits = false, development = false, serviceSelectors = false, search = '', repairReturn = false, browserName = 'chrome'}:
+    {ready?: Promise<void>; configSnapshot?: Record<string, unknown>; template?: boolean; providerGate?: Promise<void>; activeSection?: string; requestLimits?: boolean; development?: boolean; serviceSelectors?: boolean; search?: string; repairReturn?: boolean; browserName?: string} = {}) {
     const frames = new Map<number, FrameRequestCallback>();let nextFrame = 0;
     const query = vi.fn((_options: Record<string, unknown>) => Promise.resolve([] as {id?: number}[]));
     const send = vi.fn((_id: number, _message: {type: string; isEnabled?: boolean; mode?: string}) => Promise.resolve());
@@ -136,7 +136,7 @@ async function mountSections({ready = Promise.resolve(), configSnapshot, templat
         if (id === '\0sections-element') return 'export const ElMessage = Object.assign(() => {}, {warning: () => {}});';
         if (id === '\0sections-icons') return 'export const ArrowRight = {};export const InfoFilled = {};export const Edit = {};';
         if (id === '\0sections-build-mode') return `export const chatGPTPlanDevelopmentEnabled = ${development};`;
-        if (id === '\0sections-capabilities') return "export const browserCapabilities = {browser: 'chrome'};";return null;
+        if (id === '\0sections-capabilities') return `export const browserCapabilities = {browser: ${JSON.stringify(browserName)}};`;return null;
     }};
     server = await createServer({configFile: false, appType: 'custom', logLevel: 'silent', root: process.cwd(),
         plugins: [mocks, vue()], resolve: {alias: {'@': resolve(process.cwd())}},
@@ -340,6 +340,43 @@ describe('设置主表单实际组件异步归属', () => {
         query.mockResolvedValueOnce([{id: 1}]);state.floatingBallEnabled = false;await settle();expect(send).toHaveBeenCalledOnce();
         const tabs = deferred<{id?: number}[]>();query.mockReturnValueOnce(tabs.promise);state.imageTranslationEnabled = true;await settle();
         app?.unmount();app = undefined;tabs.resolve([{id: 1}]);await settle();expect(send).toHaveBeenCalledOnce();
+    });
+    it('Safari 快速功能编辑仍保存配置，模式回读不再查询或广播标签页', async () => {
+        const {state, query, send, patch, notifyConfig} = await mountSections({browserName: 'safari', configSnapshot: {
+            on: true, selectionTranslatorMode: 'bilingual', disableSelectionTranslator: false,
+        }});
+        for (let i = 0; i < 10; i++) {
+            state.floatingBallEnabled = i % 2 === 0;
+            state.imageTranslationEnabled = i % 2 === 0;
+            state.config.translationProgressPanelEnabled = i % 2 === 0;
+            state.handleTranslationProgressPanelChange(i % 2 === 0);
+        }
+        state.selectionAreaTranslationEnabled = true;
+        state.config.on = false;state.handlePluginStateChange(false);
+        state.config.selectionTranslatorMode = 'disabled';await settle();
+        state.config.selectionTranslatorMode = 'bilingual';state.config.selectionTranslatorMode = 'translation-only';await settle();
+        expect(patch).toHaveBeenLastCalledWith(expect.objectContaining({on: false, disableFloatingBall: true,
+            disableImageTranslator: true, selectionAreaEnabled: true, translationProgressPanelEnabled: false,
+            selectionTranslatorMode: 'translation-only', disableSelectionTranslator: false}), expect.any(Function));
+        expect(query).not.toHaveBeenCalled();expect(send).not.toHaveBeenCalled();
+
+        const saves = patch.mock.calls.length;
+        notifyConfig({...state.config, on: true, selectionTranslatorMode: 'bilingual', disableSelectionTranslator: false});await settle();
+        expect(state.config.on).toBe(true);expect(state.config.selectionTranslatorMode).toBe('bilingual');
+        expect(patch).toHaveBeenCalledTimes(saves);
+        expect(query).not.toHaveBeenCalled();expect(send).not.toHaveBeenCalled();
+    });
+    it('Safari 卸载后的配置通知和旧功能回调不保存或广播', async () => {
+        const {state, query, send, patch, data, notifyConfig, unsubscribe} = await mountSections({browserName: 'safari',
+            configSnapshot: {on: true, selectionTranslatorMode: 'bilingual'}});
+        app?.unmount();app = undefined;await settle();
+        const saves = patch.mock.calls.length, handoffs = data.handoffPendingConfigPatches.mock.calls.length;
+        const previous = JSON.stringify(state.config);
+        notifyConfig({...state.config, on: false, selectionTranslatorMode: 'disabled'});
+        state.handlePluginStateChange(false);state.handleTranslationProgressPanelChange(false);await settle();
+        expect(JSON.stringify(state.config)).toBe(previous);expect(unsubscribe).toHaveBeenCalledOnce();
+        expect(patch).toHaveBeenCalledTimes(saves);expect(data.handoffPendingConfigPatches).toHaveBeenCalledTimes(handoffs);
+        expect(query).not.toHaveBeenCalled();expect(send).not.toHaveBeenCalled();
     });
     it('服务列表直接复用已筛选能力结果，切换显示模式不会再分配同样的列表', async () => {
         const {state} = await mountSections();const first = state.configurationCompute.filteredServices;

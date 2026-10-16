@@ -1,7 +1,7 @@
 /**
  * @file src/app/background/personalCorrectionRuntime.ts
  * 文件职责：将个人校订接入唯一后台消息路由和现有加密存储。
- * 主要内容：验证扩展发送者与当前材料身份、阻止隐私窗口保存，显式开启后才查询复用或确认保存，关闭时保留管理数据并丢弃迟到查询，处理 CRUD/项目动作及无正文失效广播。
+ * 主要内容：验证扩展发送者与材料身份、阻止隐私窗口保存，显式开启后才复用或保存，处理 CRUD/项目动作，并通过共享网页接收者端口发送无正文失效广播。
  * 模块边界：只装配独立服务和消息端口，不重写翻译调度、不读取 DOM、不污染公共 provider 缓存。
  */
 import browser from 'webextension-polyfill';
@@ -12,6 +12,7 @@ import {PersonalCorrectionService} from '@/src/services/personal-corrections/ser
 import {PERSONAL_CORRECTIONS_CHANGED, PERSONAL_CORRECTIONS_MESSAGE, type PersonalCorrectionMessage} from '@/src/services/personal-corrections/protocol';
 import {createMaterialId, correctionMaterialId, PersonalCorrectionError, validateCorrectionInput, validateCorrectionQuery} from '@/src/core/personal-corrections/public';
 import type {BackgroundMessageHandler} from '@/src/services/messaging/backgroundRouter';
+import type {TabBroadcastRuntime} from './tabBroadcast';
 export interface PersonalCorrectionContext {sender?: {id?: string; url?: string; tab?: {id?: number; incognito?: boolean}}}
 export interface PersonalCorrectionRuntimeDependencies {
     service: PersonalCorrectionService;
@@ -76,7 +77,9 @@ export function createPersonalCorrectionHandler<TContext extends PersonalCorrect
         },
     };
 }
-export function createPersonalCorrectionRuntimeHandlers<TContext extends PersonalCorrectionContext>(): Array<BackgroundMessageHandler<TContext>> {
+export function createPersonalCorrectionRuntimeHandlers<TContext extends PersonalCorrectionContext>(
+    tabBroadcast: Pick<TabBroadcastRuntime, 'broadcastTabMessage'>,
+): Array<BackgroundMessageHandler<TContext>> {
     const service = new PersonalCorrectionService(new PersonalCorrectionRepository(configStorage));
     return [createPersonalCorrectionHandler<TContext>({service, extensionId: browser.runtime.id,
         isExtensionUrl: url => url.startsWith(browser.runtime.getURL('/')),
@@ -84,8 +87,7 @@ export function createPersonalCorrectionRuntimeHandlers<TContext extends Persona
         enabled: () => config.on && config.personalCorrectionsEnabled === true,
         changed: async () => {
             const message = {type: PERSONAL_CORRECTIONS_CHANGED};
-            const tabs = await browser.tabs.query({});
-            await Promise.allSettled(tabs.filter(tab => Number.isInteger(tab.id)).map(tab => browser.tabs.sendMessage(tab.id!, message)));
+            await tabBroadcast.broadcastTabMessage(message);
             await browser.runtime.sendMessage(message).catch(() => undefined);
         },
     })];

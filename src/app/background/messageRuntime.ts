@@ -1,7 +1,7 @@
 /**
  * @file src/app/background/messageRuntime.ts
  * 文件职责：构建并安装后台消息总运行时，把配置、翻译、OCR、TTS、生词本、扩展面板导航和标签页状态等公开 handler 连接到 browser.runtime。
- * 主要内容：向图片处理注入已保存的单图识别方式；创建图片 OCR 语言仓库和能力门控传输，绑定图片与圈选事务的真实页面及术语版本；为图片和划词释义注入独立服务选择，注入配置、翻译、本机统计、划词卡片页面缩放和词典依赖，为 TTS 状态注入离屏发送方校验与 frame 投递端口，接入离屏下载进度转存，注册类型化 router 并管理响应与错误。
+ * 主要内容：向图片与划词处理注入设置、语言仓库和能力门控，绑定事务页面及术语版本；为配置、缓存、词书、个人校订注入共享网页通知端口，Safari 从可信配置读取登记接收者；装配翻译、TTS、下载等类型化 router 与生命周期。
  * 模块边界：本文件是 composition root，只决定依赖装配和监听生命周期，不实现各 feature 的业务算法、provider 协议或存储事务；具体实现均来自 features、services、providers 与 platform。
  */
 import {getFreeTranslationWeightSnapshot, createProviderTestRuntimeHandlers} from './providerRuntime';
@@ -42,7 +42,7 @@ import {imageTranslationOffscreenAdapter, imageTranslationProgressTransport, ima
 import {selectionTtsOffscreenAdapter} from '@/src/features/selection-translation/background/offscreenAdapter';
 import {createCapabilityGatedBackgroundHandlers, createCapabilityGatedSelectionTtsTransport} from './capabilityRegistry';
 import {createConfigBackgroundHandlers} from './configMessageHandlers';
-import {createConfigImageOcrLanguageStorage, installBrowserConfigStorageBroadcast} from './configStorageRuntime';
+import {createConfigImageOcrLanguageStorage, installBrowserConfigStorageBroadcast, installBrowserTabBroadcastRuntime} from './configStorageRuntime';
 import {releaseVideoSubtitleOwnerForTab} from '@/src/features/video-subtitle/background/handlers';
 import {createVideoSubtitleBackgroundRuntime} from '@/src/features/video-subtitle/background/runtime';
 import {createLocalModelMessageHandlers} from './localModelMessageRuntime';
@@ -65,6 +65,7 @@ export interface BackgroundMessageRuntimeOptions {
 export function installBackgroundMessageRuntime(options: BackgroundMessageRuntimeOptions): void {
     const cancelWriting = installWritingBackgroundRuntime();
     const capabilities = options.capabilities ?? browserCapabilities;
+    const tabBroadcast = installBrowserTabBroadcastRuntime(capabilities.browser);
     const translationRequestRegistry = createTranslationRequestRegistry();
     const imageOcrLanguageRepository = createImageOcrLanguageRepository(createConfigImageOcrLanguageStorage());
     const selectionTtsTransport = createCapabilityGatedSelectionTtsTransport(capabilities, selectionTtsOffscreenAdapter);
@@ -83,7 +84,7 @@ export function installBackgroundMessageRuntime(options: BackgroundMessageRuntim
         getGlossaryRevision: () => buildGlossaryRevision(config.glossaryLibraries, config.glossaryEnabled),
     });
     const handlers: Array<BackgroundMessageHandler<BackgroundRuntimeContext>> = [
-        ...createPersonalCorrectionRuntimeHandlers<BackgroundRuntimeContext>(),
+        ...createPersonalCorrectionRuntimeHandlers<BackgroundRuntimeContext>(tabBroadcast),
         createChatGPTPlanHandler(),
         createTranslationCancelHandler(translationRequestRegistry),
         installHarnessBackgroundRuntime(cancelWriting),
@@ -91,8 +92,7 @@ export function installBackgroundMessageRuntime(options: BackgroundMessageRuntim
         ...createEmbeddedFrameBackgroundHandlers({sendTabMessage: (tabId, message, options) => browser.tabs.sendMessage(tabId, message, options)}),
         ...createNeteaseMailFrameBackgroundHandlers({sendTabMessage: (tabId, message, options) => browser.tabs.sendMessage(tabId, message, options)}),
         ...createTranslationCacheHandlers(clearTranslationCache, getTranslationCacheStats, createTranslationCacheInvalidationBroadcaster({
-            queryTabs: () => browser.tabs.query({}) as Promise<Array<{id?: number}>>,
-            sendTabMessage: (tabId, message) => browser.tabs.sendMessage(tabId, message),
+            ...tabBroadcast,
             warn: (message, error) => console.warn(message, error),
         })),
         ...createLocalInsightsHandlers<BackgroundRuntimeContext>((url) => url.startsWith(browser.runtime.getURL('/options.html'))),
@@ -101,7 +101,7 @@ export function installBackgroundMessageRuntime(options: BackgroundMessageRuntim
             getSnapshot: getFreeTranslationWeightSnapshot,
             isOptionsUrl: (url) => url.startsWith(browser.runtime.getURL('/options.html')),
         }),
-        ...createConfigBackgroundHandlers<BackgroundRuntimeContext>(),
+        ...createConfigBackgroundHandlers<BackgroundRuntimeContext>(tabBroadcast.registerContentReceiver),
         ...createProviderTestRuntimeHandlers(),
         createInputBoxTranslationHandler({
             ready: configReady,
@@ -154,8 +154,7 @@ export function installBackgroundMessageRuntime(options: BackgroundMessageRuntim
             vocabularyBook,
             broadcastChanged: createBrowserVocabularyBookChangedBroadcaster({
                 sendRuntimeMessage: (message) => browser.runtime.sendMessage(message),
-                queryTabs: () => browser.tabs.query({}) as Promise<Array<{id?: number}>>,
-                sendTabMessage: (tabId, message) => browser.tabs.sendMessage(tabId, message),
+                ...tabBroadcast,
             }),
             logOperationFailure: (error) => console.error('[FluentRead] vocabulary book operation failed:', error),
         }),
@@ -174,5 +173,5 @@ export function installBackgroundMessageRuntime(options: BackgroundMessageRuntim
     browser.runtime.onMessage.addListener(createBackgroundRuntimeMessageListener(router, (sender) => ({sender}) as BackgroundRuntimeContext));
     selectionPageZoom.installZoomChangeListener();
     browser.tabs.onRemoved.addListener((tabId: number) => releaseVideoSubtitleOwnerForTab(Number(tabId)));
-    installBrowserConfigStorageBroadcast();
+    installBrowserConfigStorageBroadcast(tabBroadcast);
 }

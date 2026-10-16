@@ -37,6 +37,8 @@ The current capability contract disables Chrome's built-in translator, OCR/image
 
 The native Safari free pool uses only authorized services. On the first translation from the extension panel, allow one service in Safari's permission prompt. Declining does not request another service automatically. To authorize more, use each service's Allow action in the full settings. Page access and service-domain access are separate; you can allow a day without granting all websites. Your enabled-service order and routing preferences remain intact, and restoring existing translations does not require new service access. This policy prevents automatic fallback from queuing domain prompts; it does not mean every public CORS endpoint technically requires a grant. Fixed and custom services keep their existing flow.
 
+Preference changes, cache clearing, vocabulary updates and personal corrections are synchronized with pages where FluentRead is already running. Website and service access remain separate and are granted as needed for translation; synchronizing these changes does not require access to all websites.
+
 <details class="guide-details">
 <summary>Maintainers: generate and check an unsigned Xcode wrapper</summary>
 

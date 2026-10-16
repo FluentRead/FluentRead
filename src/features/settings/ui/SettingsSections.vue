@@ -4,6 +4,7 @@
  * 主要内容：扩展设置入口可通过已校验的 service 查询参数选择服务编辑区，目录浏览不改写默认翻译服务，详情标题栏显式设为默认后复用现有配置补丁持久化并同步其他页面；图片设置优先展示语言、服务与识别选择，资源与入口按需展开；翻译设置首先展示带交互示例的阅读辅助，普通页面与网站规则连续展示任务分组并标记顶部导航的滚动定位目标，统计保留按任务切换的视图，集中分配功能服务并将模型用量合并到翻译统计，保留已访问表单实例，自定义快捷键弹窗按显示状态挂载并在离开所属分区时取消草稿；包含正文/全部节点识别范围，网站适配区域复用来源返回条并隔离配置及范围变化后的迟到操作；模板按 activeSection 展示业务分区，通用设置首先展示全局翻译开关，再按基础配置、网页辅助、基本偏好组织控件，软件语言控件随分区及缓存活跃状态启停，并保留固定英文标题与说明以便选错语言后恢复，提供当前默认服务的配置入口并保留译文样式跨页入口；图片与圈选合并在同页，共享仅在当前分区挂载的 OCR 管理组件；服务连接在主页面的服务目录内编辑，在界面风格页组织译文样式、风格与菜单栏布局，仅在高级选项激活时挂载缓存管理；脚本复用配置编辑会话隔离草稿与权威基线，批量水合时暂停完整草稿扫描，在途与失败编辑保留字段归属，继续同步保存和离页补丁交接，协调网站入口、配置及凭据保存、历史恢复和能力过滤。
  * 锚点编排：翻译设置保留连续表单，双语逐句阅读辅助与智能高亮各有独立锚点；智能高亮仅在翻译设置分区激活时挂载，定位不隐藏其他分组，既有表单配置保持原归属。新建兼容服务对话框只在首次请求打开时挂载，此后保留实例与关闭动画；加载中或失败时在添加入口旁显示可关闭提示，并停用入口说明气泡以免遮挡反馈，离开后不复活旧提示，草稿仍由原有活跃上下文和关闭流程管理。
  * AI 翻译超时：在高级全局请求限制中以秒编辑，确认后交接毫秒配置补丁；分区、缓存状态、配置同步或卸载变化会失效旧控件回调。
+ * 设置同步：Safari 仅保存权威配置，由后台通知实际 content 接收者同步功能；其他浏览器保留合并后的即时标签页广播，卸载后不继续投递。
  * 模块边界：该组件负责设置 UI 编排但不实现 provider 网络、配置仓库或 feature 运行时；校验与迁移来自 core/config，持久化经 services/config，复杂子界面保持在各自 feature/组件内；ChatGPT 登录模块在公开构建中隐藏，旧默认或深链接只回退编辑目标，不迁移或删除用户数据；脚本入口已拦截的扩展专属分区在构建期不引入其子 UI，原入口提示与数据接口保持。
  -->
 <template>
@@ -1248,7 +1249,8 @@ type SettingsBroadcastType = 'toggleFloatingBall' | 'toggleImageTranslator' | 't
 const pendingBroadcasts = new Set<SettingsBroadcastType>();
 let pendingTabsQuery: ReturnType<typeof browser.tabs.query> | undefined;
 function broadcastFeatureState(types: readonly SettingsBroadcastType[]): void {
-  if (disposed) return;
+  // Safari 由已保存配置的后台通知驱动 content reconcile，避免设置回读再次枚举所有标签页。
+  if (disposed || browserCapabilities.browser === 'safari') return;
   for (const type of types) pendingBroadcasts.add(type);
   if (pendingTabsQuery) return;
   const query = Promise.resolve().then(() => browser.tabs.query({}));

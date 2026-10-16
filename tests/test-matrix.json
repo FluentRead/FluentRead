@@ -42,6 +42,8 @@
       "tests/testConfiguration.test.ts"
     ],
     "unit": [
+      "tests/safariTabBroadcast.test.ts",
+      "tests/safariTabBroadcastIntegration.test.ts",
       "tests/materialOriginalText.test.ts",
       "tests/materialParagraphScan.test.ts",
       "tests/freeProviderPermissions.test.ts",

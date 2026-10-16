@@ -2,7 +2,7 @@
  * @file src/app/background/configStorageBroadcast.ts
  *
  * 文件职责：把后台加密配置仓库的键级变化通知给已打开的扩展页面和网页 content，使各上下文重新向后台拉取授权后的明文快照。
- * 主要内容：监听配置、凭据、历史、备份与 OCR 元数据键，向 extension runtime 广播无值通知，把公开主配置变化及阅读模型输入失效事件发送到普通标签页；凭据与模型输入比较只在后台进行，安装失败回收已有订阅，解绑逐个尝试并保留错误和失败句柄。
+ * 主要内容：监听配置、凭据、历史、备份与 OCR 元数据键，向 extension runtime 广播无值通知，通过共享网页接收者端口投递主配置与阅读模型失效事件并兼容旧适配器；凭据比较仅在后台进行，安装或解绑失败保留清理错误。
  * 模块边界：本文件不携带配置值、不判断凭据读取权限、不写 IndexedDB；读取授权由 configStorage handler 承担，运行时装配由 messageRuntime 调用。
  */
 
@@ -17,6 +17,7 @@ import {extractConfigCredentials, mergeConfigCredentials, parseStoredCredentials
 import {getHarnessModelCacheKey} from '@/src/core/config/harness';
 
 export interface ConfigStorageBroadcastRuntime {
+    broadcastTabMessage?(message: unknown, signal?: AbortSignal): Promise<void>;
     sendRuntimeMessage(message: unknown): Promise<unknown>;
     queryTabs(): Promise<Array<{id?: number}>>;
     sendTabMessage(tabId: number, message: unknown): Promise<unknown>;
@@ -28,9 +29,11 @@ export function installConfigStorageBroadcast(
     runtime: ConfigStorageBroadcastRuntime,
 ): () => void {
     let disposed = false;
+    const lifetime = new AbortController();
     const unsubscribers: Array<() => void> = [];
     const dispose = () => {
         disposed = true;
+        lifetime.abort();
         const errors: unknown[] = [];
         // 成功解绑的句柄不再执行；失败句柄留给下一次 dispose 重试。
         for (const unsubscribe of unsubscribers.splice(0)) {
@@ -61,6 +64,11 @@ export function installConfigStorageBroadcast(
                         config, parseStoredCredentials(previousValue) || extractConfigCredentials({}),
                     )))) return;
                     tabMessage = {type: 'fluentReadReadingModelInputsChanged'};
+                }
+                if (runtime.broadcastTabMessage) {
+                    void runtime.broadcastTabMessage(tabMessage, lifetime.signal)
+                        .catch(error => runtime.warn('[FluentRead] 网页配置变化广播失败', error));
+                    return;
                 }
                 void runtime.queryTabs().then(tabs => disposed ? undefined : Promise.all(tabs.map(tab => (
                     typeof tab.id === 'number'

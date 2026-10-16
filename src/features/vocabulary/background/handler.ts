@@ -1,7 +1,7 @@
 /**
  * @file src/features/vocabulary/background/handler.ts
  * 文件职责：实现本地学习收藏的后台消息处理器，对查询、收藏、解释更新、复习、撤销删除、列表、导入导出和清空进行严格输入校验与统一错误映射。
- * 主要内容：定义仓库和广播依赖，构造词书变更消息及浏览器广播适配器，创建变更 ACK、主业务 handler 和组合 handlers，并在成功写操作后通知相关标签页。
+ * 主要内容：定义仓库和广播依赖，构造词书变更协议及兼容共享网页接收者端口的广播适配器，创建变更 ACK、主业务 handler 和组合 handlers，成功写操作后通知接收者。
  * 模块边界：本文件不直接操作 Dexie 表或 Vue UI；持久化由 repository contract 注入，消息形状来自 protocol，browser.tabs 广播通过适配器隔离，失败不会泄露内部数据。
  */
 import type {BackgroundMessageHandler} from '@/src/services/messaging/backgroundRouter';
@@ -33,6 +33,7 @@ export interface VocabularyBookChangedBroadcaster {
 }
 
 export interface VocabularyBookChangeBroadcastAdapter {
+    broadcastTabMessage?(message: VocabularyBookChangedMessage): Promise<void>;
     sendRuntimeMessage(message: VocabularyBookChangedMessage): Promise<unknown>;
     queryTabs(): Promise<Array<{id?: number}>>;
     sendTabMessage(tabId: number, message: VocabularyBookChangedMessage): Promise<unknown>;
@@ -176,7 +177,11 @@ export function createBrowserVocabularyBookChangedBroadcaster(
         // 步骤 1：扩展页通过 runtime 消息接收变更通知。
         void adapter.sendRuntimeMessage(message).catch(() => undefined);
 
-        // 步骤 2：content script 需要逐 tab 发送；受限页面失败不影响原请求。
+        // 步骤 2：共享端口选择实际 content 接收者；旧适配器仍逐标签发送。
+        if (adapter.broadcastTabMessage) {
+            void adapter.broadcastTabMessage(message).catch(() => undefined);
+            return;
+        }
         void adapter.queryTabs()
             .then((tabs) => Promise.allSettled(
                 tabs

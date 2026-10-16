@@ -2,7 +2,7 @@
  * @file src/app/background/handlers/configStorage.ts
  *
  * 文件职责：在后台唯一配置数据库边界为 popup、options、document 与 content 提供受 sender 授权的只读配置记录快照。
- * 主要内容：校验 configStorageRead 消息键、等待配置仓库初始化、限制记录读取权限；为 Popup 提供只包含引导状态的启动提示，避免预唤醒重复解密主配置。
+ * 主要内容：校验 configStorageRead 消息键、等待配置仓库初始化、限制记录读取权限，在网页快照读取前登记实际通知接收者；为 Popup 提供只包含引导状态的启动提示。
  * 模块边界：本文件不直接打开 IndexedDB、不解密记录、不修改配置或广播变化；具体读取端口和扩展 URL 判断由 background composition root 注入。
  */
 
@@ -34,6 +34,7 @@ export interface ConfigStorageReadDependencies {
     ready: Promise<unknown>;
     read(key: ConfigIndexedDbKey): Promise<unknown>;
     isExtensionUrl(url: string): boolean;
+    registerContentReceiver?(sender: ConfigPersistenceContext['sender']): Promise<void>;
 }
 
 function parseKey(value: unknown): ConfigIndexedDbKey {
@@ -58,6 +59,10 @@ export function createConfigStorageReadHandler(
                     : '当前上下文无权读取该配置记录');
             }
             await dependencies.ready;
+            if (!trustedExtensionPage && key === 'local:config') {
+                try {await dependencies.registerContentReceiver?.(context.sender);}
+                catch {console.warn('[FluentRead] 网页配置通知登记失败');}
+            }
             const value = await dependencies.read(key);
             return {
                 success: true,

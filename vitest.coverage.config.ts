@@ -288,6 +288,7 @@ export default defineConfig({
                 'src/app/background/handlers/configPersistence.ts',
                 'src/app/background/handlers/configStorage.ts',
                 'src/app/background/configStorageBroadcast.ts',
+                'src/app/background/tabBroadcast.ts',
                 'src/app/background/handlers/configCount.ts',
                 'src/app/background/handlers/connectionTest.ts',
                 'src/app/background/handlers/modelUsage.ts',

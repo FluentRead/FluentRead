@@ -519,13 +519,18 @@ describe('personal correction client and scoped runtime', () => {
         expect(await call('list')).toEqual({success: false, error: '个人校订操作未完成，请稍后重试'});
     });
     it('registers one shared handler and broadcasts no user text through tabs and runtime', async () => {
-        const handlers = createPersonalCorrectionRuntimeHandlers<PersonalCorrectionContext>();
+        const sendTabMessage: (tabId: number, message: unknown) => Promise<unknown> = mocked.browser.tabs.sendMessage;
+        const broadcastTabMessage = vi.fn(async (message: unknown) => {
+            await Promise.allSettled([sendTabMessage(1, message)]);
+        });
+        const handlers = createPersonalCorrectionRuntimeHandlers<PersonalCorrectionContext>({broadcastTabMessage});
         expect(handlers).toHaveLength(1);
         mocked.browser.tabs.sendMessage.mockRejectedValueOnce(new Error('tab gone'));
         mocked.browser.runtime.sendMessage.mockRejectedValueOnce(new Error('no listener'));
         const sender = {id: 'ext', url, tab: {id: 1}};
         expect(await handlers[0].handle({type: PERSONAL_CORRECTIONS_MESSAGE, action: 'save', input: input()} as never, {sender})).toMatchObject({success: true});
-        expect(mocked.browser.tabs.sendMessage).toHaveBeenCalledWith(1, {type: PERSONAL_CORRECTIONS_CHANGED});
+        expect(broadcastTabMessage).toHaveBeenCalledWith({type: PERSONAL_CORRECTIONS_CHANGED});
+        await vi.waitFor(() => expect(mocked.browser.tabs.sendMessage).toHaveBeenCalledWith(1, {type: PERSONAL_CORRECTIONS_CHANGED}));
         await vi.waitFor(() => expect(mocked.browser.runtime.sendMessage).toHaveBeenCalledWith({type: PERSONAL_CORRECTIONS_CHANGED}));
         expect(await handlers[0].handle({type: PERSONAL_CORRECTIONS_MESSAGE, action: 'list'} as PersonalCorrectionMessage, {sender: {id: 'ext', url: 'chrome-extension://ext/options.html'}})).toMatchObject({success: true});
         for (const preference of [{on: false, personalCorrectionsEnabled: true}, {on: true, personalCorrectionsEnabled: false}]) {

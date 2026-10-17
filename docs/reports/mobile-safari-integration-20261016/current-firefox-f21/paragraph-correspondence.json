@@ -1,0 +1,666 @@
+{
+  "at": "2026-10-16T08:55:07.307423+00:00",
+  "scope": "Existing task document only; original/first/retranslation per actual p; no network/provider attribution",
+  "paragraphs": [
+    {
+      "pIndex": 0,
+      "lang": "en",
+      "originalText": "This domain is for use in documentation examples without needing permission. This is not a service; avoid relying on it for testing and monitoring purposes.",
+      "stages": {
+        "original": {
+          "originalTextRetained": true,
+          "ownedTranslationNodeCount": 0,
+          "translations": [],
+          "geometry": [],
+          "sourceOriginalVisibility": "Not captured as p rect; screenshot/nativeXML retained. Translation rect intersects viewport is geometry only, not independent visiblepixels proof."
+        },
+        "first": {
+          "originalTextRetained": true,
+          "ownedTranslationNodeCount": 1,
+          "translations": [
+            "此域名用于文档示例，无需获得许可。这不是一项服务；请勿将其用于测试和监控目的。"
+          ],
+          "geometry": [
+            {
+              "text": "此域名用于文档示例，无需获得许可。这不是一项服务；请勿将其用于测试和监控目的。",
+              "rect": {
+                "x": 32,
+                "y": 268.3999938964844,
+                "width": 296,
+                "height": 76.80000305175781,
+                "top": 268.3999938964844,
+                "right": 328,
+                "bottom": 345.1999969482422,
+                "left": 32
+              },
+              "viewportIntersection": "fully-inside-viewport",
+              "documentVisibility": "visible"
+            }
+          ],
+          "sourceOriginalVisibility": "Not captured as p rect; screenshot/nativeXML retained. Translation rect intersects viewport is geometry only, not independent visiblepixels proof."
+        },
+        "background": {
+          "originalTextRetained": true,
+          "ownedTranslationNodeCount": 1,
+          "translations": [
+            "此域名用于文档示例，无需获得许可。这不是一项服务；请勿将其用于测试和监控目的。"
+          ],
+          "geometry": [
+            {
+              "text": "此域名用于文档示例，无需获得许可。这不是一项服务；请勿将其用于测试和监控目的。",
+              "rect": {
+                "x": 32,
+                "y": 268.3999938964844,
+                "width": 296,
+                "height": 76.80000305175781,
+                "top": 268.3999938964844,
+                "right": 328,
+                "bottom": 345.1999969482422,
+                "left": 32
+              },
+              "viewportIntersection": "fully-inside-viewport",
+              "documentVisibility": "hidden"
+            }
+          ],
+          "sourceOriginalVisibility": "Not captured as p rect; screenshot/nativeXML retained. Translation rect intersects viewport is geometry only, not independent visiblepixels proof."
+        },
+        "resumed": {
+          "originalTextRetained": true,
+          "ownedTranslationNodeCount": 1,
+          "translations": [
+            "此域名用于文档示例，无需获得许可。这不是一项服务；请勿将其用于测试和监控目的。"
+          ],
+          "geometry": [
+            {
+              "text": "此域名用于文档示例，无需获得许可。这不是一项服务；请勿将其用于测试和监控目的。",
+              "rect": {
+                "x": 32,
+                "y": 268.3999938964844,
+                "width": 296,
+                "height": 76.80000305175781,
+                "top": 268.3999938964844,
+                "right": 328,
+                "bottom": 345.1999969482422,
+                "left": 32
+              },
+              "viewportIntersection": "fully-inside-viewport",
+              "documentVisibility": "visible"
+            }
+          ],
+          "sourceOriginalVisibility": "Not captured as p rect; screenshot/nativeXML retained. Translation rect intersects viewport is geometry only, not independent visiblepixels proof."
+        },
+        "restored": {
+          "originalTextRetained": true,
+          "ownedTranslationNodeCount": 0,
+          "translations": [],
+          "geometry": [],
+          "sourceOriginalVisibility": "Not captured as p rect; screenshot/nativeXML retained. Translation rect intersects viewport is geometry only, not independent visiblepixels proof."
+        },
+        "retranslated": {
+          "originalTextRetained": true,
+          "ownedTranslationNodeCount": 1,
+          "translations": [
+            "此域名用于文档示例，无需获得许可。这不是一项服务；请勿将其用于测试和监控目的。"
+          ],
+          "geometry": [
+            {
+              "text": "此域名用于文档示例，无需获得许可。这不是一项服务；请勿将其用于测试和监控目的。",
+              "rect": {
+                "x": 32,
+                "y": 268.3999938964844,
+                "width": 296,
+                "height": 76.80000305175781,
+                "top": 268.3999938964844,
+                "right": 328,
+                "bottom": 345.1999969482422,
+                "left": 32
+              },
+              "viewportIntersection": "fully-inside-viewport",
+              "documentVisibility": "visible"
+            }
+          ],
+          "sourceOriginalVisibility": "Not captured as p rect; screenshot/nativeXML retained. Translation rect intersects viewport is geometry only, not independent visiblepixels proof."
+        }
+      },
+      "qualityAssessment": "Corresponding Chinese visibly rendered; no exhaustive linguistic evaluation"
+    },
+    {
+      "pIndex": 1,
+      "lang": "ar",
+      "originalText": "هذا النطاق مُخصص للاستخدام في أمثلة التوثيق دون الحاجة إلى إذن. هذه ليست خدمة، يُرجى تجنب الاعتماد عليها لأغراض الاختبار والمراقبة.",
+      "stages": {
+        "original": {
+          "originalTextRetained": true,
+          "ownedTranslationNodeCount": 0,
+          "translations": [],
+          "geometry": [],
+          "sourceOriginalVisibility": "Not captured as p rect; screenshot/nativeXML retained. Translation rect intersects viewport is geometry only, not independent visiblepixels proof."
+        },
+        "first": {
+          "originalTextRetained": true,
+          "ownedTranslationNodeCount": 1,
+          "translations": [
+            "هذاالنطاقمُخصصللاستخدامفيأمثلةالتوثيقدونالحاجةإلىإذن。هذهليستخدمة،يُرجىتجنبالاعتمادعليهالأغراضالاختباروالمراقبة。"
+          ],
+          "geometry": [
+            {
+              "text": "هذاالنطاقمُخصصللاستخدامفيأمثلةالتوثيقدونالحاجةإلىإذن。هذهليستخدمة،يُرجىتجنبالاعتمادعليهالأغراضالاختباروالمراقبة。",
+              "rect": {
+                "x": 32,
+                "y": 436.3999938964844,
+                "width": 296,
+                "height": 89.60000610351562,
+                "top": 436.3999938964844,
+                "right": 328,
+                "bottom": 526,
+                "left": 32
+              },
+              "viewportIntersection": "partly-inside-viewport",
+              "documentVisibility": "visible"
+            }
+          ],
+          "sourceOriginalVisibility": "Not captured as p rect; screenshot/nativeXML retained. Translation rect intersects viewport is geometry only, not independent visiblepixels proof."
+        },
+        "background": {
+          "originalTextRetained": true,
+          "ownedTranslationNodeCount": 1,
+          "translations": [
+            "هذاالنطاقمُخصصللاستخدامفيأمثلةالتوثيقدونالحاجةإلىإذن。هذهليستخدمة،يُرجىتجنبالاعتمادعليهالأغراضالاختباروالمراقبة。"
+          ],
+          "geometry": [
+            {
+              "text": "هذاالنطاقمُخصصللاستخدامفيأمثلةالتوثيقدونالحاجةإلىإذن。هذهليستخدمة،يُرجىتجنبالاعتمادعليهالأغراضالاختباروالمراقبة。",
+              "rect": {
+                "x": 32,
+                "y": 436.3999938964844,
+                "width": 296,
+                "height": 89.60000610351562,
+                "top": 436.3999938964844,
+                "right": 328,
+                "bottom": 526,
+                "left": 32
+              },
+              "viewportIntersection": "partly-inside-viewport",
+              "documentVisibility": "hidden"
+            }
+          ],
+          "sourceOriginalVisibility": "Not captured as p rect; screenshot/nativeXML retained. Translation rect intersects viewport is geometry only, not independent visiblepixels proof."
+        },
+        "resumed": {
+          "originalTextRetained": true,
+          "ownedTranslationNodeCount": 1,
+          "translations": [
+            "هذاالنطاقمُخصصللاستخدامفيأمثلةالتوثيقدونالحاجةإلىإذن。هذهليستخدمة،يُرجىتجنبالاعتمادعليهالأغراضالاختباروالمراقبة。"
+          ],
+          "geometry": [
+            {
+              "text": "هذاالنطاقمُخصصللاستخدامفيأمثلةالتوثيقدونالحاجةإلىإذن。هذهليستخدمة،يُرجىتجنبالاعتمادعليهالأغراضالاختباروالمراقبة。",
+              "rect": {
+                "x": 32,
+                "y": 436.3999938964844,
+                "width": 296,
+                "height": 89.60000610351562,
+                "top": 436.3999938964844,
+                "right": 328,
+                "bottom": 526,
+                "left": 32
+              },
+              "viewportIntersection": "partly-inside-viewport",
+              "documentVisibility": "visible"
+            }
+          ],
+          "sourceOriginalVisibility": "Not captured as p rect; screenshot/nativeXML retained. Translation rect intersects viewport is geometry only, not independent visiblepixels proof."
+        },
+        "restored": {
+          "originalTextRetained": true,
+          "ownedTranslationNodeCount": 0,
+          "translations": [],
+          "geometry": [],
+          "sourceOriginalVisibility": "Not captured as p rect; screenshot/nativeXML retained. Translation rect intersects viewport is geometry only, not independent visiblepixels proof."
+        },
+        "retranslated": {
+          "originalTextRetained": true,
+          "ownedTranslationNodeCount": 1,
+          "translations": [
+            "هذاالنطاقمُخصصللاستخدامفيأمثلةالتوثيقدونالحاجةإلىإذن。هذهليستخدمة،يُرجىتجنبالاعتمادعليهالأغراضالاختباروالمراقبة。"
+          ],
+          "geometry": [
+            {
+              "text": "هذاالنطاقمُخصصللاستخدامفيأمثلةالتوثيقدونالحاجةإلىإذن。هذهليستخدمة،يُرجىتجنبالاعتمادعليهالأغراضالاختباروالمراقبة。",
+              "rect": {
+                "x": 32,
+                "y": 436.3999938964844,
+                "width": 296,
+                "height": 89.60000610351562,
+                "top": 436.3999938964844,
+                "right": 328,
+                "bottom": 526,
+                "left": 32
+              },
+              "viewportIntersection": "partly-inside-viewport",
+              "documentVisibility": "visible"
+            }
+          ],
+          "sourceOriginalVisibility": "Not captured as p rect; screenshot/nativeXML retained. Translation rect intersects viewport is geometry only, not independent visiblepixels proof."
+        }
+      },
+      "qualityAssessment": "NOT_ACCEPTED: intended zh-Hans owned output remains Arabic-like, removes spaces, changes punctuation"
+    },
+    {
+      "pIndex": 2,
+      "lang": "zh",
+      "originalText": "该域名仅用于文档示例，无需获得许可。这并非一项服务，请勿将其用于测试和监控目的。",
+      "stages": {
+        "original": {
+          "originalTextRetained": true,
+          "ownedTranslationNodeCount": 0,
+          "translations": [],
+          "geometry": [],
+          "sourceOriginalVisibility": "Not captured as p rect; screenshot/nativeXML retained. Translation rect intersects viewport is geometry only, not independent visiblepixels proof."
+        },
+        "first": {
+          "originalTextRetained": true,
+          "ownedTranslationNodeCount": 0,
+          "translations": [],
+          "geometry": [],
+          "sourceOriginalVisibility": "Not captured as p rect; screenshot/nativeXML retained. Translation rect intersects viewport is geometry only, not independent visiblepixels proof."
+        },
+        "background": {
+          "originalTextRetained": true,
+          "ownedTranslationNodeCount": 0,
+          "translations": [],
+          "geometry": [],
+          "sourceOriginalVisibility": "Not captured as p rect; screenshot/nativeXML retained. Translation rect intersects viewport is geometry only, not independent visiblepixels proof."
+        },
+        "resumed": {
+          "originalTextRetained": true,
+          "ownedTranslationNodeCount": 0,
+          "translations": [],
+          "geometry": [],
+          "sourceOriginalVisibility": "Not captured as p rect; screenshot/nativeXML retained. Translation rect intersects viewport is geometry only, not independent visiblepixels proof."
+        },
+        "restored": {
+          "originalTextRetained": true,
+          "ownedTranslationNodeCount": 0,
+          "translations": [],
+          "geometry": [],
+          "sourceOriginalVisibility": "Not captured as p rect; screenshot/nativeXML retained. Translation rect intersects viewport is geometry only, not independent visiblepixels proof."
+        },
+        "retranslated": {
+          "originalTextRetained": true,
+          "ownedTranslationNodeCount": 0,
+          "translations": [],
+          "geometry": [],
+          "sourceOriginalVisibility": "Not captured as p rect; screenshot/nativeXML retained. Translation rect intersects viewport is geometry only, not independent visiblepixels proof."
+        }
+      },
+      "qualityAssessment": "Original Chinese retained, no translation node expected; not counted as new translation"
+    },
+    {
+      "pIndex": 3,
+      "lang": "fr",
+      "originalText": "L’usage de ce domaine est réservé à des exemples de documentation, sans autorisation préalable.  Il ne s’agit pas d’un service ; son utilisation à des fins de test ou de surveillance est à éviter.",
+      "stages": {
+        "original": {
+          "originalTextRetained": true,
+          "ownedTranslationNodeCount": 0,
+          "translations": [],
+          "geometry": [],
+          "sourceOriginalVisibility": "Not captured as p rect; screenshot/nativeXML retained. Translation rect intersects viewport is geometry only, not independent visiblepixels proof."
+        },
+        "first": {
+          "originalTextRetained": true,
+          "ownedTranslationNodeCount": 1,
+          "translations": [
+            "L'use de ce domaine est réservéàdes示例de留档，无自动化priéalable。Il ne s'agit pas d'un服务；son utilationàdes fins de test ou de监视estàéviter。"
+          ],
+          "geometry": [
+            {
+              "text": "L'use de ce domaine est réservéàdes示例de留档，无自动化priéalable。Il ne s'agit pas d'un服务；son utilationàdes fins de test ou de监视estàéviter。",
+              "rect": {
+                "x": 32,
+                "y": 718.7999877929688,
+                "width": 296,
+                "height": 89.59999084472656,
+                "top": 718.7999877929688,
+                "right": 328,
+                "bottom": 808.3999786376953,
+                "left": 32
+              },
+              "viewportIntersection": "outside-viewport",
+              "documentVisibility": "visible"
+            }
+          ],
+          "sourceOriginalVisibility": "Not captured as p rect; screenshot/nativeXML retained. Translation rect intersects viewport is geometry only, not independent visiblepixels proof."
+        },
+        "background": {
+          "originalTextRetained": true,
+          "ownedTranslationNodeCount": 1,
+          "translations": [
+            "L'use de ce domaine est réservéàdes示例de留档，无自动化priéalable。Il ne s'agit pas d'un服务；son utilationàdes fins de test ou de监视estàéviter。"
+          ],
+          "geometry": [
+            {
+              "text": "L'use de ce domaine est réservéàdes示例de留档，无自动化priéalable。Il ne s'agit pas d'un服务；son utilationàdes fins de test ou de监视estàéviter。",
+              "rect": {
+                "x": 32,
+                "y": 718.7999877929688,
+                "width": 296,
+                "height": 89.59999084472656,
+                "top": 718.7999877929688,
+                "right": 328,
+                "bottom": 808.3999786376953,
+                "left": 32
+              },
+              "viewportIntersection": "outside-viewport",
+              "documentVisibility": "hidden"
+            }
+          ],
+          "sourceOriginalVisibility": "Not captured as p rect; screenshot/nativeXML retained. Translation rect intersects viewport is geometry only, not independent visiblepixels proof."
+        },
+        "resumed": {
+          "originalTextRetained": true,
+          "ownedTranslationNodeCount": 1,
+          "translations": [
+            "L'use de ce domaine est réservéàdes示例de留档，无自动化priéalable。Il ne s'agit pas d'un服务；son utilationàdes fins de test ou de监视estàéviter。"
+          ],
+          "geometry": [
+            {
+              "text": "L'use de ce domaine est réservéàdes示例de留档，无自动化priéalable。Il ne s'agit pas d'un服务；son utilationàdes fins de test ou de监视estàéviter。",
+              "rect": {
+                "x": 32,
+                "y": 718.7999877929688,
+                "width": 296,
+                "height": 89.59999084472656,
+                "top": 718.7999877929688,
+                "right": 328,
+                "bottom": 808.3999786376953,
+                "left": 32
+              },
+              "viewportIntersection": "outside-viewport",
+              "documentVisibility": "visible"
+            }
+          ],
+          "sourceOriginalVisibility": "Not captured as p rect; screenshot/nativeXML retained. Translation rect intersects viewport is geometry only, not independent visiblepixels proof."
+        },
+        "restored": {
+          "originalTextRetained": true,
+          "ownedTranslationNodeCount": 0,
+          "translations": [],
+          "geometry": [],
+          "sourceOriginalVisibility": "Not captured as p rect; screenshot/nativeXML retained. Translation rect intersects viewport is geometry only, not independent visiblepixels proof."
+        },
+        "retranslated": {
+          "originalTextRetained": true,
+          "ownedTranslationNodeCount": 1,
+          "translations": [
+            "L'use de ce domaine est réservéàdes示例de留档，无自动化priéalable。Il ne s'agit pas d'un服务；son utilationàdes fins de test ou de监视estàéviter。"
+          ],
+          "geometry": [
+            {
+              "text": "L'use de ce domaine est réservéàdes示例de留档，无自动化priéalable。Il ne s'agit pas d'un服务；son utilationàdes fins de test ou de监视estàéviter。",
+              "rect": {
+                "x": 32,
+                "y": 718.7999877929688,
+                "width": 296,
+                "height": 89.59999084472656,
+                "top": 718.7999877929688,
+                "right": 328,
+                "bottom": 808.3999786376953,
+                "left": 32
+              },
+              "viewportIntersection": "outside-viewport",
+              "documentVisibility": "visible"
+            }
+          ],
+          "sourceOriginalVisibility": "Not captured as p rect; screenshot/nativeXML retained. Translation rect intersects viewport is geometry only, not independent visiblepixels proof."
+        }
+      },
+      "qualityAssessment": "NOT_ACCEPTED: owned output visibly represented in DOM as mixed French/Chinese; offscreen in saved page screenshots"
+    },
+    {
+      "pIndex": 4,
+      "lang": "ru",
+      "originalText": "Данный домен предназначен для использования в примерах документации без необходимости получения предварительного разрешения. Это не сервис; не рекомендуется его использование для тестирования и мониторинга.",
+      "stages": {
+        "original": {
+          "originalTextRetained": true,
+          "ownedTranslationNodeCount": 0,
+          "translations": [],
+          "geometry": [],
+          "sourceOriginalVisibility": "Not captured as p rect; screenshot/nativeXML retained. Translation rect intersects viewport is geometry only, not independent visiblepixels proof."
+        },
+        "first": {
+          "originalTextRetained": true,
+          "ownedTranslationNodeCount": 1,
+          "translations": [
+            "本域名用于文档示例，无需事先获得许可。它并非一项服务，不建议用于测试和监控。"
+          ],
+          "geometry": [
+            {
+              "text": "本域名用于文档示例，无需事先获得许可。它并非一项服务，不建议用于测试和监控。",
+              "rect": {
+                "x": 32,
+                "y": 987.2000122070312,
+                "width": 296,
+                "height": 44.80000305175781,
+                "top": 987.2000122070312,
+                "right": 328,
+                "bottom": 1032.000015258789,
+                "left": 32
+              },
+              "viewportIntersection": "outside-viewport",
+              "documentVisibility": "visible"
+            }
+          ],
+          "sourceOriginalVisibility": "Not captured as p rect; screenshot/nativeXML retained. Translation rect intersects viewport is geometry only, not independent visiblepixels proof."
+        },
+        "background": {
+          "originalTextRetained": true,
+          "ownedTranslationNodeCount": 1,
+          "translations": [
+            "本域名用于文档示例，无需事先获得许可。它并非一项服务，不建议用于测试和监控。"
+          ],
+          "geometry": [
+            {
+              "text": "本域名用于文档示例，无需事先获得许可。它并非一项服务，不建议用于测试和监控。",
+              "rect": {
+                "x": 32,
+                "y": 987.2000122070312,
+                "width": 296,
+                "height": 44.80000305175781,
+                "top": 987.2000122070312,
+                "right": 328,
+                "bottom": 1032.000015258789,
+                "left": 32
+              },
+              "viewportIntersection": "outside-viewport",
+              "documentVisibility": "hidden"
+            }
+          ],
+          "sourceOriginalVisibility": "Not captured as p rect; screenshot/nativeXML retained. Translation rect intersects viewport is geometry only, not independent visiblepixels proof."
+        },
+        "resumed": {
+          "originalTextRetained": true,
+          "ownedTranslationNodeCount": 1,
+          "translations": [
+            "本域名用于文档示例，无需事先获得许可。它并非一项服务，不建议用于测试和监控。"
+          ],
+          "geometry": [
+            {
+              "text": "本域名用于文档示例，无需事先获得许可。它并非一项服务，不建议用于测试和监控。",
+              "rect": {
+                "x": 32,
+                "y": 987.2000122070312,
+                "width": 296,
+                "height": 44.80000305175781,
+                "top": 987.2000122070312,
+                "right": 328,
+                "bottom": 1032.000015258789,
+                "left": 32
+              },
+              "viewportIntersection": "outside-viewport",
+              "documentVisibility": "visible"
+            }
+          ],
+          "sourceOriginalVisibility": "Not captured as p rect; screenshot/nativeXML retained. Translation rect intersects viewport is geometry only, not independent visiblepixels proof."
+        },
+        "restored": {
+          "originalTextRetained": true,
+          "ownedTranslationNodeCount": 0,
+          "translations": [],
+          "geometry": [],
+          "sourceOriginalVisibility": "Not captured as p rect; screenshot/nativeXML retained. Translation rect intersects viewport is geometry only, not independent visiblepixels proof."
+        },
+        "retranslated": {
+          "originalTextRetained": true,
+          "ownedTranslationNodeCount": 1,
+          "translations": [
+            "本域名用于文档示例，无需事先获得许可。它并非一项服务，不建议用于测试和监控。"
+          ],
+          "geometry": [
+            {
+              "text": "本域名用于文档示例，无需事先获得许可。它并非一项服务，不建议用于测试和监控。",
+              "rect": {
+                "x": 32,
+                "y": 987.2000122070312,
+                "width": 296,
+                "height": 44.80000305175781,
+                "top": 987.2000122070312,
+                "right": 328,
+                "bottom": 1032.000015258789,
+                "left": 32
+              },
+              "viewportIntersection": "outside-viewport",
+              "documentVisibility": "visible"
+            }
+          ],
+          "sourceOriginalVisibility": "Not captured as p rect; screenshot/nativeXML retained. Translation rect intersects viewport is geometry only, not independent visiblepixels proof."
+        }
+      },
+      "qualityAssessment": "Chinese owned output observed in DOM; offscreen, linguistic quality not adjudicated"
+    },
+    {
+      "pIndex": 5,
+      "lang": "es",
+      "originalText": "Este dominio está destinado al uso en ejemplos de documentación sin necesidad de permiso. Esto no es un servicio; evitar utilizarlo para realizar pruebas o monitoreos.",
+      "stages": {
+        "original": {
+          "originalTextRetained": true,
+          "ownedTranslationNodeCount": 0,
+          "translations": [],
+          "geometry": [],
+          "sourceOriginalVisibility": "Not captured as p rect; screenshot/nativeXML retained. Translation rect intersects viewport is geometry only, not independent visiblepixels proof."
+        },
+        "first": {
+          "originalTextRetained": true,
+          "ownedTranslationNodeCount": 1,
+          "translations": [
+            "本域名仅用于提供无需许可的文档示例，不构成一项服务；请勿将其用于测试或监控目的。"
+          ],
+          "geometry": [
+            {
+              "text": "本域名仅用于提供无需许可的文档示例，不构成一项服务；请勿将其用于测试或监控目的。",
+              "rect": {
+                "x": 32,
+                "y": 1143.5999755859375,
+                "width": 296,
+                "height": 44.79998779296875,
+                "top": 1143.5999755859375,
+                "right": 328,
+                "bottom": 1188.3999633789062,
+                "left": 32
+              },
+              "viewportIntersection": "outside-viewport",
+              "documentVisibility": "visible"
+            }
+          ],
+          "sourceOriginalVisibility": "Not captured as p rect; screenshot/nativeXML retained. Translation rect intersects viewport is geometry only, not independent visiblepixels proof."
+        },
+        "background": {
+          "originalTextRetained": true,
+          "ownedTranslationNodeCount": 1,
+          "translations": [
+            "本域名仅用于提供无需许可的文档示例，不构成一项服务；请勿将其用于测试或监控目的。"
+          ],
+          "geometry": [
+            {
+              "text": "本域名仅用于提供无需许可的文档示例，不构成一项服务；请勿将其用于测试或监控目的。",
+              "rect": {
+                "x": 32,
+                "y": 1143.5999755859375,
+                "width": 296,
+                "height": 44.79998779296875,
+                "top": 1143.5999755859375,
+                "right": 328,
+                "bottom": 1188.3999633789062,
+                "left": 32
+              },
+              "viewportIntersection": "outside-viewport",
+              "documentVisibility": "hidden"
+            }
+          ],
+          "sourceOriginalVisibility": "Not captured as p rect; screenshot/nativeXML retained. Translation rect intersects viewport is geometry only, not independent visiblepixels proof."
+        },
+        "resumed": {
+          "originalTextRetained": true,
+          "ownedTranslationNodeCount": 1,
+          "translations": [
+            "本域名仅用于提供无需许可的文档示例，不构成一项服务；请勿将其用于测试或监控目的。"
+          ],
+          "geometry": [
+            {
+              "text": "本域名仅用于提供无需许可的文档示例，不构成一项服务；请勿将其用于测试或监控目的。",
+              "rect": {
+                "x": 32,
+                "y": 1143.5999755859375,
+                "width": 296,
+                "height": 44.79998779296875,
+                "top": 1143.5999755859375,
+                "right": 328,
+                "bottom": 1188.3999633789062,
+                "left": 32
+              },
+              "viewportIntersection": "outside-viewport",
+              "documentVisibility": "visible"
+            }
+          ],
+          "sourceOriginalVisibility": "Not captured as p rect; screenshot/nativeXML retained. Translation rect intersects viewport is geometry only, not independent visiblepixels proof."
+        },
+        "restored": {
+          "originalTextRetained": true,
+          "ownedTranslationNodeCount": 0,
+          "translations": [],
+          "geometry": [],
+          "sourceOriginalVisibility": "Not captured as p rect; screenshot/nativeXML retained. Translation rect intersects viewport is geometry only, not independent visiblepixels proof."
+        },
+        "retranslated": {
+          "originalTextRetained": true,
+          "ownedTranslationNodeCount": 1,
+          "translations": [
+            "本域名仅用于提供无需许可的文档示例，不构成一项服务；请勿将其用于测试或监控目的。"
+          ],
+          "geometry": [
+            {
+              "text": "本域名仅用于提供无需许可的文档示例，不构成一项服务；请勿将其用于测试或监控目的。",
+              "rect": {
+                "x": 32,
+                "y": 1143.5999755859375,
+                "width": 296,
+                "height": 44.79998779296875,
+                "top": 1143.5999755859375,
+                "right": 328,
+                "bottom": 1188.3999633789062,
+                "left": 32
+              },
+              "viewportIntersection": "outside-viewport",
+              "documentVisibility": "visible"
+            }
+          ],
+          "sourceOriginalVisibility": "Not captured as p rect; screenshot/nativeXML retained. Translation rect intersects viewport is geometry only, not independent visiblepixels proof."
+        }
+      },
+      "qualityAssessment": "Chinese owned output observed in DOM; offscreen, linguistic quality not adjudicated"
+    }
+  ]
+}

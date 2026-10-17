@@ -1,0 +1,627 @@
+{
+  "schemaVersion": 1,
+  "reviewKind": "independent-controlled-browser-outcome-review",
+  "reviewer": "/root/safari_readiness_prepare",
+  "createdAt": "2026-10-16T23:12:24.248827+00:00",
+  "status": "CONTROLLED_CHROMIUM_FIXTURE_SIX_PASS_INDEPENDENTLY_REVIEWED_NOT_SAFARI_ACCEPTANCE",
+  "reviewerActions": {
+    "wholeCandidateJsonRead": true,
+    "candidateLogRead": true,
+    "wholeSavedDomsReadAndParsed": true,
+    "allEightCandidateOriginalPngsActuallyViewed": true,
+    "oldFailureOriginalPngActuallyViewed": true,
+    "currentChromeAllFilesPhysicallyHashed": true,
+    "newReviewFilesOnly": true,
+    "productOrExistingEvidenceModified": false,
+    "runnerOrTestExecuted": false,
+    "browserDeviceSdkOrNetworkUsed": false
+  },
+  "inputs": {
+    "artifactGate": {
+      "path": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/mobile-youtube-fr-node-identity-probe-20261017/same-scope-clone-repair-20261017/artifact-gate.json",
+      "sha256": "de3a1dbf9f7b123571ba4145f6ebd9199b3a6e3b4d8718c6029d7531aceee9c8",
+      "bytes": 4116
+    },
+    "chromeFullMap": {
+      "path": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/mobile-youtube-fr-node-identity-probe-20261017/same-scope-clone-repair-20261017/chrome-file-map.json",
+      "sha256": "fe68bbd1129848b7fc8b899acb9522c14d6f67e1562df721a37cdcbc824982f4",
+      "bytes": 69369
+    },
+    "validationSummary": {
+      "path": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/mobile-youtube-fr-node-identity-probe-20261017/same-scope-clone-repair-20261017/validation/summary.json",
+      "sha256": "750c66eb4b1d6442a9a965be674d1b802dfed50216a7e2e3e9a4c9dae254b808",
+      "bytes": 6447
+    },
+    "candidateReport": {
+      "path": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/mobile-youtube-fr-node-identity-probe-20261017/same-scope-clone-repair-20261017/browser-control-clones-candidate-production/report.json",
+      "sha256": "8e7230b1fcc79a7a3deb18358a853575b29e6c20c533c5f74e48cf017957adc3",
+      "bytes": 11485
+    },
+    "candidateLog": {
+      "path": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/mobile-youtube-fr-node-identity-probe-20261017/same-scope-clone-repair-20261017/browser-control-clones-candidate-production.log",
+      "sha256": "74c95d77da91f6482180bdc6b45d817846bfccd68c36dcece7af1b70bee901f1",
+      "bytes": 1139
+    },
+    "oldReport": {
+      "path": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/mobile-youtube-fr-node-identity-probe-20261017/same-scope-clone-repair-20261017/browser-control-clones-old-production-attempt3/report.json",
+      "sha256": "9d238cee89e9dab0fb0b8484f62de73c85a2a59cacda9c4c9976b5d72ba50bd8",
+      "bytes": 6524
+    },
+    "oldLog": {
+      "path": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/mobile-youtube-fr-node-identity-probe-20261017/same-scope-clone-repair-20261017/browser-control-clones-old-production-attempt3.log",
+      "sha256": "c97b297a918540e5701f764d1b0b4363b6f3d24fa3349baaf7e3d7765fe0e245",
+      "bytes": 1988
+    },
+    "productionReview": {
+      "path": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/mobile-youtube-fr-node-identity-probe-20261017/same-scope-clone-repair-20261017/independent-production-review.json",
+      "sha256": "113b9073ad0b69214017b1fbea82829b2f7b86e572cd8867301a8308566e53b6",
+      "bytes": 9130
+    },
+    "runnerPreparationReview": {
+      "path": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/mobile-youtube-fr-node-identity-probe-20261017/same-scope-clone-repair-20261017/independent-browser-preparation-review.json",
+      "sha256": "b48416ea6b56dbd456a267bee39bb9a8f2a17c7ec8dd1b59c38a6e2a11a64a4a",
+      "bytes": 13710
+    }
+  },
+  "sourcePinsActuallyRehashed": {
+    "/Users/thinkstu/Desktop/copy/FluentRead-mobile-video-menu-accessibility-20261016/src/features/video-subtitle/content/videoPlayerBinding.ts": {
+      "path": "/Users/thinkstu/Desktop/copy/FluentRead-mobile-video-menu-accessibility-20261016/src/features/video-subtitle/content/videoPlayerBinding.ts",
+      "sha256": "0789013139caf5e43783e4d3501b9a96c5d97324213efcbdfa941e1eb34fdec4",
+      "bytes": 23201
+    },
+    "/Users/thinkstu/Desktop/copy/FluentRead-mobile-video-menu-accessibility-20261016/src/features/video-subtitle/content/ui.ts": {
+      "path": "/Users/thinkstu/Desktop/copy/FluentRead-mobile-video-menu-accessibility-20261016/src/features/video-subtitle/content/ui.ts",
+      "sha256": "eb9cd5ccd3d2931cd1e85fa8a668235374e0a865e06605981274bd20944b592c",
+      "bytes": 86837
+    },
+    "/Users/thinkstu/Desktop/copy/FluentRead-mobile-video-menu-accessibility-20261016/scripts/run-mobile-video-subtitle-test.cjs": {
+      "path": "/Users/thinkstu/Desktop/copy/FluentRead-mobile-video-menu-accessibility-20261016/scripts/run-mobile-video-subtitle-test.cjs",
+      "sha256": "7613fece1417934d34f121f5a0413658e4fc848e2cf1d8d349d866f75b116d6f",
+      "bytes": 60997
+    }
+  },
+  "candidate": {
+    "selectedSuite": "control-clones",
+    "stage": "control-clones-complete",
+    "caseCount": 6,
+    "pass": 6,
+    "fail": 0,
+    "errors": [],
+    "repairCases": [
+      {
+        "name": "desktop-whole-host",
+        "counts": [
+          2,
+          1,
+          1
+        ],
+        "microtaskMs": 0.5999999046325684,
+        "copyDisconnected": true,
+        "actualRemovalRecord": true,
+        "preservedLiveIdentityHostNativeAndIsolation": true,
+        "trustedPair": [
+          {
+            "kind": "entry",
+            "trusted": true
+          },
+          {
+            "kind": "close",
+            "trusted": true
+          }
+        ],
+        "closeFocusReturned": true,
+        "baseline": {
+          "layout": "desktop",
+          "url": "https://www.youtube.com/watch?v=fluentread-control-clones-desktop",
+          "liveInOriginalHost": true,
+          "scopeContainsHost": true,
+          "scopeIsPlayer": true,
+          "scopeVideoCount": 1,
+          "coarsePointer": false,
+          "ariaPressed": null,
+          "ariaExpanded": "false",
+          "ariaHaspopup": "menu",
+          "ariaControls": "fluent-read-video-subtitle-menu"
+        }
+      },
+      {
+        "name": "desktop-loose",
+        "counts": [
+          2,
+          1,
+          1
+        ],
+        "microtaskMs": 0.40000009536743164,
+        "copyDisconnected": true,
+        "actualRemovalRecord": true,
+        "preservedLiveIdentityHostNativeAndIsolation": true,
+        "trustedPair": [
+          {
+            "kind": "entry",
+            "trusted": true
+          },
+          {
+            "kind": "close",
+            "trusted": true
+          }
+        ],
+        "closeFocusReturned": true,
+        "baseline": {
+          "layout": "desktop",
+          "url": "https://www.youtube.com/watch?v=fluentread-control-clones-desktop",
+          "liveInOriginalHost": true,
+          "scopeContainsHost": true,
+          "scopeIsPlayer": true,
+          "scopeVideoCount": 1,
+          "coarsePointer": false,
+          "ariaPressed": null,
+          "ariaExpanded": "false",
+          "ariaHaspopup": "menu",
+          "ariaControls": "fluent-read-video-subtitle-menu"
+        }
+      },
+      {
+        "name": "mobile-whole-host",
+        "counts": [
+          2,
+          1,
+          1
+        ],
+        "microtaskMs": 0.6999998092651367,
+        "copyDisconnected": true,
+        "actualRemovalRecord": true,
+        "preservedLiveIdentityHostNativeAndIsolation": true,
+        "trustedPair": [
+          {
+            "kind": "entry",
+            "trusted": true
+          },
+          {
+            "kind": "close",
+            "trusted": true
+          }
+        ],
+        "closeFocusReturned": true,
+        "baseline": {
+          "layout": "mobile",
+          "url": "https://m.youtube.com/watch?v=fluentread-control-clones-mobile",
+          "liveInOriginalHost": true,
+          "scopeContainsHost": true,
+          "scopeIsPlayer": false,
+          "scopeVideoCount": 1,
+          "coarsePointer": true,
+          "ariaPressed": null,
+          "ariaExpanded": "false",
+          "ariaHaspopup": "menu",
+          "ariaControls": "fluent-read-video-subtitle-menu"
+        }
+      },
+      {
+        "name": "mobile-loose",
+        "counts": [
+          2,
+          1,
+          1
+        ],
+        "microtaskMs": 0.6999998092651367,
+        "copyDisconnected": true,
+        "actualRemovalRecord": true,
+        "preservedLiveIdentityHostNativeAndIsolation": true,
+        "trustedPair": [
+          {
+            "kind": "entry",
+            "trusted": true
+          },
+          {
+            "kind": "close",
+            "trusted": true
+          }
+        ],
+        "closeFocusReturned": true,
+        "baseline": {
+          "layout": "mobile",
+          "url": "https://m.youtube.com/watch?v=fluentread-control-clones-mobile",
+          "liveInOriginalHost": true,
+          "scopeContainsHost": true,
+          "scopeIsPlayer": false,
+          "scopeVideoCount": 1,
+          "coarsePointer": true,
+          "ariaPressed": null,
+          "ariaExpanded": "false",
+          "ariaHaspopup": "menu",
+          "ariaControls": "fluent-read-video-subtitle-menu"
+        }
+      }
+    ],
+    "disableCases": [
+      {
+        "name": "desktop-configuration-disable",
+        "status": "PASS",
+        "liveRemoved": true,
+        "ownCount": 0,
+        "foreignRetained": true,
+        "unrelatedRetained": true,
+        "nativeButtonsRetained": true
+      },
+      {
+        "name": "mobile-configuration-disable",
+        "status": "PASS",
+        "liveRemoved": true,
+        "ownCount": 0,
+        "foreignRetained": true,
+        "unrelatedRetained": true,
+        "nativeButtonsRetained": true
+      }
+    ],
+    "timedtextResponses": [
+      {
+        "url": "https://www.youtube.com/api/timedtext?v=fluentread-control-clones-desktop&lang=en&fmt=json3&xorb=2&xobt=3&xovt=3&c=WEB&cplayer=UNIPLAYER",
+        "status": 200
+      },
+      {
+        "url": "https://m.youtube.com/api/timedtext?v=fluentread-control-clones-mobile&lang=en&fmt=json3&xorb=2&xobt=3&xovt=3&c=WEB&cplayer=UNIPLAYER",
+        "status": 200
+      }
+    ],
+    "liveListenerEvidence": "Four trusted entry/Close pairs and actual visible menu open/close screenshots with same live identity, plus Close focusReturned=true. No private listener/factory instrumentation."
+  },
+  "oldComparison": {
+    "report": {
+      "path": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/mobile-youtube-fr-node-identity-probe-20261017/same-scope-clone-repair-20261017/browser-control-clones-old-production-attempt3/report.json",
+      "sha256": "9d238cee89e9dab0fb0b8484f62de73c85a2a59cacda9c4c9976b5d72ba50bd8",
+      "bytes": 6524
+    },
+    "executedCaseCount": 1,
+    "case": "desktop-whole-host",
+    "counts": [
+      2,
+      2,
+      2
+    ],
+    "copyConnected": true,
+    "actualRemovalRecord": false,
+    "timedtext200": true,
+    "failFastOtherOldCasesNotRun": true,
+    "oldContentScriptSHA256": "a561db0bccf57e326dfc72a2071047a78b816228c7312eb863073cc7dc65413c",
+    "candidateContentScriptSHA256": "9d2d9a12b1bb94725eeac615aa838a7d4c9df4986b9b2217258fde3ff5f527d7",
+    "originalFailureImage": {
+      "path": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/mobile-youtube-fr-node-identity-probe-20261017/same-scope-clone-repair-20261017/browser-control-clones-old-production-attempt3/failure.png",
+      "sha256": "5fc4ccdc34a2eeab09081f38ccd745a337b89a15c1320d080aa94fac0bc0ec2c",
+      "bytes": 44632,
+      "width": 1280,
+      "height": 900,
+      "viewedWith": "view_image",
+      "detail": "original",
+      "actualPixelReview": true,
+      "observation": "已实际原尺寸查看。旧桌面原图可见原控制组及追加组中的多个粉色图标；原始 JSON 和 owner DOM 同时证明当前 scope 有两个同 owner 节点、另有一个 foreign fixture。像素本身不能区分 owner。"
+    }
+  },
+  "chromeArtifactVerification": {
+    "gate": {
+      "path": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/mobile-youtube-fr-node-identity-probe-20261017/same-scope-clone-repair-20261017/artifact-gate.json",
+      "sha256": "de3a1dbf9f7b123571ba4145f6ebd9199b3a6e3b4d8718c6029d7531aceee9c8",
+      "bytes": 4116
+    },
+    "directory": "/Users/thinkstu/Desktop/copy/FluentRead-mobile-video-menu-accessibility-20261016/.output/chrome-mv3",
+    "files": 478,
+    "bytes": 62361256,
+    "allPerFileShaAndLengthExact": true,
+    "missing": [],
+    "extra": [],
+    "differences": [],
+    "symlinks": [],
+    "fullMap": {
+      "path": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/mobile-youtube-fr-node-identity-probe-20261017/same-scope-clone-repair-20261017/chrome-file-map.json",
+      "sha256": "fe68bbd1129848b7fc8b899acb9522c14d6f67e1562df721a37cdcbc824982f4",
+      "bytes": 69369
+    },
+    "fullMapShaMatch": true,
+    "rawByteHash": "3f5ef24796529a92c873a092d0050d86597d6421f7652193214a6543282e80be",
+    "rawByteHashAlgorithm": "SHA256 of concatenated sorted relative UTF8 path + NUL + decimal byte length + NUL + actual raw file bytes",
+    "recordHash": "584ffa750ec439a8f3e0dc4dec5b1a5291433a38d5c6e8c2fb10f15da1930fad",
+    "recordHashAlgorithm": "SHA256 of concatenated sorted relative UTF8 path + NUL + lowercase SHA256 hex + NUL + decimal byte length + newline",
+    "rawAndRecordHashesMatchGate": true,
+    "manifestMatchesGateAndActualReport": true,
+    "allSixManifestDeclaredScriptHashesAndSizesMatchActualReportAndDisk": true,
+    "gateSourcePinsMatch": true,
+    "validationSummaryShaMatch": true,
+    "otherArtifactFilesNotPhysicallyRehashedInThisReview": [
+      "firefox",
+      "safari",
+      "userscript"
+    ],
+    "loadedBytesLimit": "Post-run disk identity plus actual report manifest/content script identity and frozen Root build map, not process memory introspection."
+  },
+  "domReviews": [
+    {
+      "layout": "desktop",
+      "proof": {
+        "path": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/mobile-youtube-fr-node-identity-probe-20261017/same-scope-clone-repair-20261017/browser-control-clones-candidate-production/control-clones-desktop-dom.html",
+        "sha256": "997da4c72fb5ef58cf54b0ae4d48621894093ca4bbd73b882e857263b46f6501",
+        "bytes": 100060
+      },
+      "readWholeFile": true,
+      "staticParserOnly": true,
+      "elementCount": 107,
+      "scopeId": "movie_player",
+      "scopeVideoCount": 1,
+      "allVideos": 3,
+      "owner": "1792192083850-0.6111373438211365",
+      "scopedOwnCount": 1,
+      "outsideOwnCount": 2,
+      "scopedForeignCount": 2,
+      "globalPublicIdCount": 5,
+      "menuHiddenAtSnapshot": true,
+      "menuParentId": "movie_player",
+      "menuParentClass": "html5-video-player fluent-read-video-player-host",
+      "menuParentStyle": null,
+      "modeStates": [
+        {
+          "mode": "bilingual",
+          "checked": "true"
+        },
+        {
+          "mode": "translation-only",
+          "checked": "false"
+        },
+        {
+          "mode": "original-only",
+          "checked": "false"
+        },
+        {
+          "mode": "off",
+          "checked": "false"
+        }
+      ],
+      "videoSrcAttributesPresent": 0,
+      "menuCssOverflowAuto": true,
+      "menuCssMaxHeight": true
+    },
+    {
+      "layout": "mobile",
+      "proof": {
+        "path": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/mobile-youtube-fr-node-identity-probe-20261017/same-scope-clone-repair-20261017/browser-control-clones-candidate-production/control-clones-mobile-dom.html",
+        "sha256": "e335d530a801dad385b727ab4d6515ca3d5814bed3ccdf290e1ebe0ed30a2b2c",
+        "bytes": 101424
+      },
+      "readWholeFile": true,
+      "staticParserOnly": true,
+      "elementCount": 114,
+      "scopeId": "player-container-id",
+      "scopeVideoCount": 1,
+      "allVideos": 3,
+      "owner": "1792192084975-0.6899219422528411",
+      "scopedOwnCount": 1,
+      "outsideOwnCount": 2,
+      "scopedForeignCount": 2,
+      "globalPublicIdCount": 5,
+      "menuHiddenAtSnapshot": true,
+      "menuParentId": null,
+      "menuParentClass": "fluent-read-video-menu-host notranslate fluent-read-video-ui",
+      "menuParentStyle": "position: absolute !important; left: 0px !important; top: 0px !important; margin: 0px !important; padding: 0px !important; border: 0px !important; box-sizing: border-box !important; pointer-events: none !important; z-index: 2147483646 !important; transform-origin: 0px 0px !important; overflow: visible !important; width: 390px !important; height: 219px !important; transform: translate(0px, 0px) scale(1, 1.00171) !important;",
+      "modeStates": [
+        {
+          "mode": "bilingual",
+          "checked": "true"
+        },
+        {
+          "mode": "translation-only",
+          "checked": "false"
+        },
+        {
+          "mode": "original-only",
+          "checked": "false"
+        },
+        {
+          "mode": "off",
+          "checked": "false"
+        }
+      ],
+      "videoSrcAttributesPresent": 0,
+      "menuCssOverflowAuto": true,
+      "menuCssMaxHeight": true
+    },
+    {
+      "layout": "old-desktop-failure",
+      "proof": {
+        "path": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/mobile-youtube-fr-node-identity-probe-20261017/same-scope-clone-repair-20261017/browser-control-clones-old-production-attempt3/failure-dom.html",
+        "sha256": "4934d0530ddb043517d7f25d4c9a8bbd36342b9b9ff100e070a67b5848dc2e69",
+        "bytes": 99306
+      },
+      "readWholeFile": true,
+      "staticParserOnly": true,
+      "elementCount": 103,
+      "scopeId": "movie_player",
+      "scopeVideoCount": 1,
+      "allVideos": 2,
+      "owner": "1792191836751-0.7454777028064214",
+      "scopedOwnCount": 2,
+      "outsideOwnCount": 1,
+      "scopedForeignCount": 1,
+      "globalPublicIdCount": 4,
+      "menuHiddenAtSnapshot": true,
+      "menuParentId": "movie_player",
+      "menuParentClass": "html5-video-player fluent-read-video-player-host",
+      "menuParentStyle": null,
+      "modeStates": [
+        {
+          "mode": "bilingual",
+          "checked": "true"
+        },
+        {
+          "mode": "translation-only",
+          "checked": "false"
+        },
+        {
+          "mode": "original-only",
+          "checked": "false"
+        },
+        {
+          "mode": "off",
+          "checked": "false"
+        }
+      ],
+      "videoSrcAttributesPresent": 0,
+      "menuCssOverflowAuto": true,
+      "menuCssMaxHeight": true
+    }
+  ],
+  "imageReviews": [
+    {
+      "path": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/mobile-youtube-fr-node-identity-probe-20261017/same-scope-clone-repair-20261017/browser-control-clones-candidate-production/control-clones-desktop-whole-host-menu-open.png",
+      "sha256": "6f6113003508dd069f30f5e70a7b52c87ab4a96cbbc0fd873c7ef2b682b433c4",
+      "bytes": 55763,
+      "width": 1280,
+      "height": 900,
+      "viewedWith": "view_image",
+      "detail": "original",
+      "actualPixelReview": true,
+      "observation": "已实际原尺寸查看。1280px 桌面右下菜单打开；标题/Close、完整句学习、四模式、校时和下载按钮可见，菜单未越出图像边界，原控制组仍在下方。"
+    },
+    {
+      "path": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/mobile-youtube-fr-node-identity-probe-20261017/same-scope-clone-repair-20261017/browser-control-clones-candidate-production/control-clones-desktop-whole-host-menu-closed.png",
+      "sha256": "6ce03fa60f0e3008ade18981f08588ed70e4f7ff17303145e7f504de8d1cef9a",
+      "bytes": 42986,
+      "width": 1280,
+      "height": 900,
+      "viewedWith": "view_image",
+      "detail": "original",
+      "actualPixelReview": true,
+      "observation": "已实际原尺寸查看。菜单消失，字幕和两组原生控件仍见；额外粉色图标须结合 foreign-owner fixture 解释，不能按公共 id 或像素总数判成自身副本残留。"
+    },
+    {
+      "path": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/mobile-youtube-fr-node-identity-probe-20261017/same-scope-clone-repair-20261017/browser-control-clones-candidate-production/control-clones-desktop-loose-menu-open.png",
+      "sha256": "1d95fc81876aa57bd0cbdccb5f8111507e5dc850895ccc0b59798ce2d35bbc5e",
+      "bytes": 57317,
+      "width": 1280,
+      "height": 900,
+      "viewedWith": "view_image",
+      "detail": "original",
+      "actualPixelReview": true,
+      "observation": "已实际原尺寸查看。桌面菜单再次打开且主要控件清晰；左上角的粉色 loose foreign fixture 故意保留，不是被修复的自身 owner 副本。"
+    },
+    {
+      "path": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/mobile-youtube-fr-node-identity-probe-20261017/same-scope-clone-repair-20261017/browser-control-clones-candidate-production/control-clones-desktop-loose-menu-closed.png",
+      "sha256": "9de53d5a0cbe090b8a714e6d79e87ddd8145dfc6925b9db23be5de6703a391e5",
+      "bytes": 44604,
+      "width": 1280,
+      "height": 900,
+      "viewedWith": "view_image",
+      "detail": "original",
+      "actualPixelReview": true,
+      "observation": "已实际原尺寸查看。关闭后菜单不见，原控件/字幕保持，左上 foreign loose 与 copied-group foreign 图标仍在。"
+    },
+    {
+      "path": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/mobile-youtube-fr-node-identity-probe-20261017/same-scope-clone-repair-20261017/browser-control-clones-candidate-production/control-clones-mobile-whole-host-menu-open.png",
+      "sha256": "82eab9c486ac33cc7353a8d7c519bae0f83a119bde0aeb202fe502fd3a423367",
+      "bytes": 27058,
+      "width": 390,
+      "height": 844,
+      "viewedWith": "view_image",
+      "detail": "original",
+      "actualPixelReview": true,
+      "observation": "已实际原尺寸查看。390px 窄屏菜单在播放器范围内，标题/Close、学习和四模式无可见横向越界或被原生按钮覆盖；下部工具在受限滚动区边界被裁切，本图不能证明滚动后的工具可达。"
+    },
+    {
+      "path": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/mobile-youtube-fr-node-identity-probe-20261017/same-scope-clone-repair-20261017/browser-control-clones-candidate-production/control-clones-mobile-whole-host-menu-closed.png",
+      "sha256": "2cdd5d82c2cd9dbad388c32f57266b5d17dec1f1df704edfe4ac70c8716b4142",
+      "bytes": 35264,
+      "width": 390,
+      "height": 844,
+      "viewedWith": "view_image",
+      "detail": "original",
+      "actualPixelReview": true,
+      "observation": "已实际原尺寸查看。菜单消失，双行 fixture 字幕与原控件可见；copied-group foreign 图标保留，未见自身 owner 的额外入口结论由 JSON/DOM 提供。"
+    },
+    {
+      "path": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/mobile-youtube-fr-node-identity-probe-20261017/same-scope-clone-repair-20261017/browser-control-clones-candidate-production/control-clones-mobile-loose-menu-open.png",
+      "sha256": "c64d68bdc9e50effd3b4703ddca8d26f0b2d020bfa0d352d69be1077ac94865f",
+      "bytes": 28960,
+      "width": 390,
+      "height": 844,
+      "viewedWith": "view_image",
+      "detail": "original",
+      "actualPixelReview": true,
+      "observation": "已实际原尺寸查看。窄屏主要菜单控件仍可见，Close 未被原生控件遮盖；页面下方文字旁 foreign loose 图标故意保留，底部工具未在本 suite 滚动验收。"
+    },
+    {
+      "path": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/mobile-youtube-fr-node-identity-probe-20261017/same-scope-clone-repair-20261017/browser-control-clones-candidate-production/control-clones-mobile-loose-menu-closed.png",
+      "sha256": "fbf04a69d9ca24c6304f99b46d87f79c97f4f3bd6ca90a2e10f5a963f4fe79b0",
+      "bytes": 36811,
+      "width": 390,
+      "height": 844,
+      "viewedWith": "view_image",
+      "detail": "original",
+      "actualPixelReview": true,
+      "observation": "已实际原尺寸查看。菜单关闭，字幕/原控件保持；两处 foreign fixture 图标保留。焦点返回依据运行 JSON，不从截图推断。"
+    }
+  ],
+  "focusAndCleanup": {
+    "launchMode": "macos-background-cdp",
+    "focusPolicy": "launchservices-no-foreground",
+    "windowPlacement": {
+      "mode": "background-visible-no-focus",
+      "visible": true,
+      "hidden": false,
+      "centered": true,
+      "windowState": "normal",
+      "bounds": {
+        "left": 212,
+        "top": -990,
+        "width": 1280,
+        "height": 900
+      },
+      "displayTarget": "secondary",
+      "source": "macos-nsscreen",
+      "screenIndex": 1,
+      "browserFrontmost": false,
+      "frontmostBefore": {
+        "pid": 20136,
+        "name": "ChatGPT"
+      },
+      "frontmostAfter": {
+        "pid": 20136,
+        "name": "ChatGPT"
+      }
+    },
+    "focusObserver": {
+      "monitorPid": 53344,
+      "time": 1792192081621.1328,
+      "monotonicMs": 3617372823.059
+    },
+    "browserPid": 53348,
+    "focusSampleCount": 10,
+    "allSamplePidsDifferFromBrowser": true,
+    "focusEvents": [],
+    "permanentOrCleanupErrorFieldsPresent": [],
+    "browserCloseReceipt": "shared-guard-fulfilled",
+    "profileRemoved": true,
+    "stdoutOk": true,
+    "rootReportedTerminalExitCode": 0,
+    "normalRunNoErrorInjectionCoverage": true
+  },
+  "visualOutcome": {
+    "desktopVisibleMainControls": "Title/Close, learning, four modes, timing and downloads visible; menu disappears in closed screenshots.",
+    "mobile390VisibleMainControls": "Title/Close, learning and four modes visible without observed horizontal overflow or native controls covering them.",
+    "mobileLowerTools": "Only upper edges of lower tools visible at bounded 219px player/menu height; saved CSS has max-height/overflow:auto. This suite did not scroll or establish lower-tool reachability.",
+    "retainedPinkIcons": "Pixels alone do not identify ownership. Saved DOM confirms intentional foreign-owner fixtures and hidden outside same-owner nodes are preserved.",
+    "noFullMenuOrScrollAcceptanceClaim": true,
+    "pixelDomJsonNotAtomic": true
+  },
+  "unresolvedActionableFindings": [],
+  "evidenceLimits": [
+    "Controlled local desktop/mobile YouTube HTML, generated media and mock translation in actual Chromium/Edge extension; not live YouTube or live provider.",
+    "Four natural microtask copy repairs before timer/click rescue; not unique attribution to a specific observer, CPU cap or media performance proof.",
+    "Off runs after repaired copies are removed; not pending-late-copy lifecycle coverage.",
+    "No private factory-call counts; original live identity and behavior only.",
+    "No full menu scrolling/keyboard matrix, every hit region geometry, fullscreen/native track, reload/pageshow, key/player/scope revocation acceptance.",
+    "No Safari/iOS/AVKit/physical-device acceptance, playback/bilingual correctness or E2 AX root-cause attribution.",
+    "Normal suite result does not dynamically cover post-stop injected monitor error."
+  ],
+  "markdownReview": {
+    "path": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/mobile-youtube-fr-node-identity-probe-20261017/same-scope-clone-repair-20261017/independent-browser-outcome-review.md",
+    "sha256": "bbe3166449be3dc029f4f3a647e997a019757a6a83b51b4c2cdd2d2636643b99",
+    "bytes": 6700
+  },
+  "allDirectEvidenceUnchangedAtReviewWrite": true
+}

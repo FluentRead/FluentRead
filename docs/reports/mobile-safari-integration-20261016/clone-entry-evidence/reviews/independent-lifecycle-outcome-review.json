@@ -1,0 +1,3002 @@
+{
+  "schema": 1,
+  "at": "2026-10-16T23:20:51.704069+00:00",
+  "reviewer": "/root/safari_readiness_prepare",
+  "status": "PASS_CONTROLLED_CHROMIUM_LIFECYCLE_REVIEW_ONLY_NOT_SAFARI_OR_NATIVE_ACCEPTANCE",
+  "findings": [],
+  "scope": {
+    "actualBrowserRunBy": "Root, prior single lifecycle execution, reported terminal session 5666 exit0",
+    "thisReviewerActions": [
+      "Read full original report.json through all 29 top-level fields including all 18 menuScrollTargets and all 11 selectionChanges",
+      "Read full 1098-byte original log and parsed its final JSON summary",
+      "Read relevant existing lifecycle runner source and successful assertion order",
+      "Viewed exactly six original PNGs with original detail",
+      "Recomputed saved-data geometry/hit/sequence counts and input hashes; no product code executed",
+      "Wrote only these new independent audit JSON/Markdown files in D"
+    ],
+    "executedBrowserOrTestOrSDK": false,
+    "deviceOrNetworkAccess": false,
+    "productChangesByReviewer": false,
+    "allPNGsViewed": false
+  },
+  "inputs": [
+    {
+      "path": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/mobile-youtube-fr-node-identity-probe-20261017/same-scope-clone-repair-20261017/browser-candidate-lifecycle/report.json",
+      "bytes": 121979,
+      "sha256": "9f0d23527dc60aad537ec2c322e7b3ab62470bb60b5bedc55c793efb47655a13"
+    },
+    {
+      "path": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/mobile-youtube-fr-node-identity-probe-20261017/same-scope-clone-repair-20261017/browser-candidate-lifecycle.log",
+      "bytes": 1098,
+      "sha256": "6e7e8385e64a589efbcf1e87755c6d52d5b3811fdaf7b311abae984b7151f00d"
+    },
+    {
+      "path": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/mobile-youtube-fr-node-identity-probe-20261017/same-scope-clone-repair-20261017/artifact-gate.json",
+      "bytes": 4116,
+      "sha256": "de3a1dbf9f7b123571ba4145f6ebd9199b3a6e3b4d8718c6029d7531aceee9c8"
+    },
+    {
+      "path": "/Users/thinkstu/Desktop/copy/FluentRead-mobile-video-menu-accessibility-20261016/scripts/run-mobile-video-subtitle-test.cjs",
+      "bytes": 60997,
+      "sha256": "7613fece1417934d34f121f5a0413658e4fc848e2cf1d8d349d866f75b116d6f"
+    },
+    {
+      "path": "/Users/thinkstu/Desktop/copy/FluentRead-mobile-video-menu-accessibility-20261016/src/features/video-subtitle/content/videoPlayerBinding.ts",
+      "bytes": 23201,
+      "sha256": "0789013139caf5e43783e4d3501b9a96c5d97324213efcbdfa941e1eb34fdec4"
+    },
+    {
+      "path": "/Users/thinkstu/Desktop/copy/FluentRead-mobile-video-menu-accessibility-20261016/src/features/video-subtitle/content/ui.ts",
+      "bytes": 86837,
+      "sha256": "eb9cd5ccd3d2931cd1e85fa8a668235374e0a865e06605981274bd20944b592c"
+    },
+    {
+      "path": "/Users/thinkstu/Desktop/copy/FluentRead-mobile-video-menu-accessibility-20261016/.output/chrome-mv3/manifest.json",
+      "bytes": 3250,
+      "sha256": "a12a20416fc826d3dc7278b74a112b4170f8985b1ac8b1a74c91f73d5e09b642"
+    },
+    {
+      "path": "/Users/thinkstu/Desktop/copy/FluentRead-mobile-video-menu-accessibility-20261016/.output/chrome-mv3/content-scripts/content.js",
+      "bytes": 2759172,
+      "sha256": "9d2d9a12b1bb94725eeac615aa838a7d4c9df4986b9b2217258fde3ff5f527d7"
+    },
+    {
+      "path": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/mobile-youtube-fr-node-identity-probe-20261017/same-scope-clone-repair-20261017/independent-browser-outcome-review.json",
+      "bytes": 27505,
+      "sha256": "d257c4a130a1fbac5f9e35afb08dd9ffd014fee93af948cfe20aa20a279a7792"
+    },
+    {
+      "path": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/mobile-youtube-fr-node-identity-probe-20261017/same-scope-clone-repair-20261017/browser-candidate-lifecycle/portrait-menu.png",
+      "bytes": 34594,
+      "sha256": "5a920a4fe64151077928e8f5d52510afc525c8f8e53f98523ee50266c927a33f"
+    },
+    {
+      "path": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/mobile-youtube-fr-node-identity-probe-20261017/same-scope-clone-repair-20261017/browser-candidate-lifecycle/portrait-menu-normal-close.png",
+      "bytes": 37484,
+      "sha256": "738ea6f19b728fba20d001eda00966a821dd043442881d53fb9a30e1b0377f25"
+    },
+    {
+      "path": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/mobile-youtube-fr-node-identity-probe-20261017/same-scope-clone-repair-20261017/browser-candidate-lifecycle/landscape-inline.png",
+      "bytes": 23488,
+      "sha256": "7c85fbc1f838d00c9dfcf6dfd9e0d1141d0e222f095ed0018ece2465dfe38f03"
+    },
+    {
+      "path": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/mobile-youtube-fr-node-identity-probe-20261017/same-scope-clone-repair-20261017/browser-candidate-lifecycle/native-interface-enter.png",
+      "bytes": 23488,
+      "sha256": "7c85fbc1f838d00c9dfcf6dfd9e0d1141d0e222f095ed0018ece2465dfe38f03"
+    },
+    {
+      "path": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/mobile-youtube-fr-node-identity-probe-20261017/same-scope-clone-repair-20261017/browser-candidate-lifecycle/video-replaced.png",
+      "bytes": 23027,
+      "sha256": "5607893566be421212933fa4a2145852620296f1c6809f0da1f334137d3947b1"
+    },
+    {
+      "path": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/mobile-youtube-fr-node-identity-probe-20261017/same-scope-clone-repair-20261017/browser-candidate-lifecycle/refresh-recovered.png",
+      "bytes": 18770,
+      "sha256": "3b773d75706c5e3b3e4dfd550b40b437708e7dce9259eee59cabc7c0ef2a7c3f"
+    }
+  ],
+  "inputHashesPreservedAtWrite": true,
+  "executionEvidence": {
+    "rawReport": {
+      "path": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/mobile-youtube-fr-node-identity-probe-20261017/same-scope-clone-repair-20261017/browser-candidate-lifecycle/report.json",
+      "bytes": 121979,
+      "sha256": "9f0d23527dc60aad537ec2c322e7b3ab62470bb60b5bedc55c793efb47655a13"
+    },
+    "rawLog": {
+      "path": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/mobile-youtube-fr-node-identity-probe-20261017/same-scope-clone-repair-20261017/browser-candidate-lifecycle.log",
+      "bytes": 1098,
+      "sha256": "6e7e8385e64a589efbcf1e87755c6d52d5b3811fdaf7b311abae984b7151f00d"
+    },
+    "fullLogRead": true,
+    "stdoutSummary": {
+      "ok": true,
+      "selectedSuite": "lifecycle",
+      "artifacts": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/mobile-youtube-fr-node-identity-probe-20261017/same-scope-clone-repair-20261017/browser-candidate-lifecycle",
+      "cases": 12,
+      "errors": []
+    },
+    "reportedErrors": [],
+    "recordedCaptureCount": 12,
+    "recordedCaptures": [
+      {
+        "name": "portrait-inline",
+        "video": {
+          "left": 0,
+          "top": 0,
+          "right": 390,
+          "bottom": 219.375,
+          "width": 390,
+          "height": 219.375
+        },
+        "panel": {
+          "left": 27.1796875,
+          "top": 147.4453125,
+          "right": 362.8203125,
+          "bottom": 207.3984375,
+          "width": 335.640625,
+          "height": 59.953125
+        },
+        "original": "Watch bilingual captions near the bottom.",
+        "translation": "在视频底部观看双语字幕。",
+        "nativeMode": "hidden",
+        "nativeCues": [
+          {
+            "start": 0,
+            "end": 30,
+            "text": "Watch bilingual captions near the bottom.\n在视频底部观看双语字幕。"
+          }
+        ],
+        "coarsePointer": true,
+        "viewport": {
+          "width": 390,
+          "height": 844
+        }
+      },
+      {
+        "name": "portrait-visible-controls",
+        "video": {
+          "left": 0,
+          "top": 0,
+          "right": 390,
+          "bottom": 219.375,
+          "width": 390,
+          "height": 219.375
+        },
+        "panel": {
+          "left": 27.1796875,
+          "top": 111.5078125,
+          "right": 362.8203125,
+          "bottom": 171.4609375,
+          "width": 335.640625,
+          "height": 59.953125
+        },
+        "original": "Watch bilingual captions near the bottom.",
+        "translation": "在视频底部观看双语字幕。",
+        "nativeMode": "hidden",
+        "nativeCues": [
+          {
+            "start": 0,
+            "end": 30,
+            "text": "Watch bilingual captions near the bottom.\n在视频底部观看双语字幕。"
+          }
+        ],
+        "coarsePointer": true,
+        "viewport": {
+          "width": 390,
+          "height": 844
+        }
+      },
+      {
+        "name": "portrait-menu",
+        "video": {
+          "left": 0,
+          "top": 0,
+          "right": 390,
+          "bottom": 219.375,
+          "width": 390,
+          "height": 219.375
+        },
+        "panel": {
+          "left": 27.1796875,
+          "top": 111.5078125,
+          "right": 362.8203125,
+          "bottom": 171.4609375,
+          "width": 335.640625,
+          "height": 59.953125
+        },
+        "original": "Watch bilingual captions near the bottom.",
+        "translation": "在视频底部观看双语字幕。",
+        "nativeMode": "hidden",
+        "nativeCues": [
+          {
+            "start": 0,
+            "end": 30,
+            "text": "Watch bilingual captions near the bottom.\n在视频底部观看双语字幕。"
+          }
+        ],
+        "coarsePointer": true,
+        "viewport": {
+          "width": 390,
+          "height": 844
+        }
+      },
+      {
+        "name": "portrait-menu-hint",
+        "video": {
+          "left": 0,
+          "top": 0,
+          "right": 390,
+          "bottom": 219.375,
+          "width": 390,
+          "height": 219.375
+        },
+        "panel": {
+          "left": 27.1796875,
+          "top": 111.5078125,
+          "right": 362.8203125,
+          "bottom": 171.4609375,
+          "width": 335.640625,
+          "height": 59.953125
+        },
+        "original": "Watch bilingual captions near the bottom.",
+        "translation": "在视频底部观看双语字幕。",
+        "nativeMode": "hidden",
+        "nativeCues": [
+          {
+            "start": 0,
+            "end": 30,
+            "text": "Watch bilingual captions near the bottom.\n在视频底部观看双语字幕。"
+          }
+        ],
+        "coarsePointer": true,
+        "viewport": {
+          "width": 390,
+          "height": 844
+        }
+      },
+      {
+        "name": "portrait-menu-normal-close",
+        "video": {
+          "left": 0,
+          "top": 0,
+          "right": 390,
+          "bottom": 219.375,
+          "width": 390,
+          "height": 219.375
+        },
+        "panel": {
+          "left": 27.1796875,
+          "top": 111.5078125,
+          "right": 362.8203125,
+          "bottom": 171.4609375,
+          "width": 335.640625,
+          "height": 59.953125
+        },
+        "original": "Watch bilingual captions near the bottom.",
+        "translation": "在视频底部观看双语字幕。",
+        "nativeMode": "hidden",
+        "nativeCues": [
+          {
+            "start": 0,
+            "end": 30,
+            "text": "Watch bilingual captions near the bottom.\n在视频底部观看双语字幕。"
+          }
+        ],
+        "coarsePointer": true,
+        "viewport": {
+          "width": 390,
+          "height": 844
+        }
+      },
+      {
+        "name": "landscape-inline",
+        "video": {
+          "left": 0,
+          "top": 0,
+          "right": 844,
+          "bottom": 390,
+          "width": 844,
+          "height": 390
+        },
+        "panel": {
+          "left": 254.1796875,
+          "top": 282.046875,
+          "right": 589.8203125,
+          "bottom": 342,
+          "width": 335.640625,
+          "height": 59.953125
+        },
+        "original": "Watch bilingual captions near the bottom.",
+        "translation": "在视频底部观看双语字幕。",
+        "nativeMode": "hidden",
+        "nativeCues": [
+          {
+            "start": 0,
+            "end": 30,
+            "text": "Watch bilingual captions near the bottom.\n在视频底部观看双语字幕。"
+          }
+        ],
+        "coarsePointer": true,
+        "viewport": {
+          "width": 844,
+          "height": 390
+        }
+      },
+      {
+        "name": "fullscreen-geometry-safe-area",
+        "video": {
+          "left": 0,
+          "top": 0,
+          "right": 844,
+          "bottom": 390,
+          "width": 844,
+          "height": 390
+        },
+        "panel": {
+          "left": 254.1796875,
+          "top": 282.046875,
+          "right": 589.8203125,
+          "bottom": 342,
+          "width": 335.640625,
+          "height": 59.953125
+        },
+        "original": "Watch bilingual captions near the bottom.",
+        "translation": "在视频底部观看双语字幕。",
+        "nativeMode": "hidden",
+        "nativeCues": [
+          {
+            "start": 0,
+            "end": 30,
+            "text": "Watch bilingual captions near the bottom.\n在视频底部观看双语字幕。"
+          }
+        ],
+        "coarsePointer": true,
+        "viewport": {
+          "width": 844,
+          "height": 390
+        }
+      },
+      {
+        "name": "native-interface-enter",
+        "video": {
+          "left": 0,
+          "top": 0,
+          "right": 844,
+          "bottom": 390,
+          "width": 844,
+          "height": 390
+        },
+        "panel": {
+          "left": 254.1796875,
+          "top": 282.046875,
+          "right": 589.8203125,
+          "bottom": 342,
+          "width": 335.640625,
+          "height": 59.953125
+        },
+        "original": "Watch bilingual captions near the bottom.",
+        "translation": "在视频底部观看双语字幕。",
+        "nativeMode": "hidden",
+        "nativeCues": [
+          {
+            "start": 0,
+            "end": 30,
+            "text": "Watch bilingual captions near the bottom.\n在视频底部观看双语字幕。"
+          }
+        ],
+        "coarsePointer": true,
+        "viewport": {
+          "width": 844,
+          "height": 390
+        }
+      },
+      {
+        "name": "video-replaced",
+        "video": {
+          "left": 0,
+          "top": 0,
+          "right": 844,
+          "bottom": 390,
+          "width": 844,
+          "height": 390
+        },
+        "panel": {
+          "left": 254.1796875,
+          "top": 282.046875,
+          "right": 589.8203125,
+          "bottom": 342,
+          "width": 335.640625,
+          "height": 59.953125
+        },
+        "original": "Watch bilingual captions near the bottom.",
+        "translation": "在视频底部观看双语字幕。",
+        "nativeMode": "hidden",
+        "nativeCues": [
+          {
+            "start": 0,
+            "end": 30,
+            "text": "Watch bilingual captions near the bottom.\n在视频底部观看双语字幕。"
+          }
+        ],
+        "coarsePointer": true,
+        "viewport": {
+          "width": 844,
+          "height": 390
+        }
+      },
+      {
+        "name": "refresh-recovered",
+        "video": {
+          "left": 0,
+          "top": 0,
+          "right": 844,
+          "bottom": 390,
+          "width": 844,
+          "height": 390
+        },
+        "panel": {
+          "left": 254.1796875,
+          "top": 318.046875,
+          "right": 589.8203125,
+          "bottom": 378,
+          "width": 335.640625,
+          "height": 59.953125
+        },
+        "original": "Watch bilingual captions near the bottom.",
+        "translation": "在视频底部观看双语字幕。",
+        "nativeMode": "hidden",
+        "nativeCues": [
+          {
+            "start": 0,
+            "end": 30,
+            "text": "Watch bilingual captions near the bottom.\n在视频底部观看双语字幕。"
+          }
+        ],
+        "coarsePointer": true,
+        "viewport": {
+          "width": 844,
+          "height": 390
+        }
+      },
+      {
+        "name": "desktop-menu-normal-close",
+        "video": {
+          "left": 0,
+          "top": 0,
+          "right": 1280,
+          "bottom": 720,
+          "width": 1280,
+          "height": 720
+        },
+        "panel": {
+          "left": 351.46875,
+          "top": 556.921875,
+          "right": 928.5234375,
+          "bottom": 648,
+          "width": 577.0546875,
+          "height": 91.078125
+        },
+        "original": "Watch bilingual captions near the bottom.",
+        "translation": "在视频底部观看双语字幕。",
+        "nativeMode": "hidden",
+        "nativeCues": [
+          {
+            "start": 0,
+            "end": 30,
+            "text": "Watch bilingual captions near the bottom.\n在视频底部观看双语字幕。"
+          }
+        ],
+        "coarsePointer": false,
+        "viewport": {
+          "width": 1280,
+          "height": 900
+        }
+      },
+      {
+        "name": "disabled-cleanup",
+        "video": {
+          "left": 0,
+          "top": 0,
+          "right": 1280,
+          "bottom": 720,
+          "width": 1280,
+          "height": 720
+        },
+        "panel": null,
+        "nativeCues": [],
+        "coarsePointer": false,
+        "viewport": {
+          "width": 1280,
+          "height": 900
+        }
+      }
+    ],
+    "caseSemantics": "The 12 cases are named capture snapshots in one sequential runner, not 12 independently isolated test processes. A successful final log and no errors support completion of all intervening assertions.",
+    "sourceFrozenPinsNowMatchArtifactGate": true,
+    "manifestAndContentNowMatchArtifactGate": true,
+    "launchIdentityLimit": "Lifecycle log records explicit --extension-dir. Unlike control-clones suite, lifecycle report does not store per-file content-script hashes at launch; current source/manifest/content bytes and prior full-map independent review are linked, not a new cryptographic launch snapshot.",
+    "priorFullChromeReview": {
+      "path": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/mobile-youtube-fr-node-identity-probe-20261017/same-scope-clone-repair-20261017/independent-browser-outcome-review.json",
+      "bytes": 27505,
+      "sha256": "d257c4a130a1fbac5f9e35afb08dd9ffd014fee93af948cfe20aa20a279a7792"
+    },
+    "noFreshFull478FileRescanThisReview": true
+  },
+  "menuScrollReview": {
+    "observations": 18,
+    "allSavedTargetContractsSatisfied": true,
+    "allConditionalStickyHeaderContractsSatisfied": true,
+    "allFocusedBodyBelowHeader": true,
+    "targetObservationCount": 35,
+    "fivePointHitCount": 175,
+    "touchTargets": [
+      {
+        "action": "fluent-read-video-subtitle-button",
+        "label": "流畅阅读字幕翻译：已开启",
+        "height": 44,
+        "width": 44
+      },
+      {
+        "action": "open-settings",
+        "label": "打开视频翻译设置",
+        "height": 44,
+        "width": 67
+      },
+      {
+        "action": "close-menu",
+        "label": "关闭字幕菜单",
+        "height": 44,
+        "width": 44
+      },
+      {
+        "action": "open-sentence-learning",
+        "label": "开始完整句学习",
+        "height": 44,
+        "width": 360
+      },
+      {
+        "action": "bilingual",
+        "label": "双语",
+        "height": 44,
+        "width": 44
+      },
+      {
+        "action": "translation-only",
+        "label": "译文",
+        "height": 44,
+        "width": 44
+      },
+      {
+        "action": "original-only",
+        "label": "原文",
+        "height": 44,
+        "width": 44
+      },
+      {
+        "action": "off",
+        "label": "关闭",
+        "height": 44,
+        "width": 44
+      },
+      {
+        "action": "subtitle-earlier",
+        "label": "提前 0.5 秒",
+        "height": 44,
+        "width": 44
+      },
+      {
+        "action": "subtitle-later",
+        "label": "延后 0.5 秒",
+        "height": 44,
+        "width": 44
+      },
+      {
+        "action": "download-subtitles",
+        "label": "下载原文字幕",
+        "height": 44,
+        "width": 117.328125
+      },
+      {
+        "action": "download-translated-subtitles",
+        "label": "下载译文字幕",
+        "height": 44,
+        "width": 117.3359375
+      },
+      {
+        "action": "download-bilingual-subtitles",
+        "label": "下载双语字幕",
+        "height": 44,
+        "width": 117.3359375
+      }
+    ],
+    "timingGeometry": {
+      "menu": {
+        "left": 8,
+        "right": 382,
+        "top": 8,
+        "bottom": 179.375
+      },
+      "row": {
+        "left": 15,
+        "right": 375,
+        "top": 127.5,
+        "bottom": 171.5
+      },
+      "label": {
+        "left": 19,
+        "right": 235,
+        "top": 141.1015625,
+        "bottom": 157.8984375
+      },
+      "controls": {
+        "left": 243,
+        "right": 375,
+        "top": 127.5,
+        "bottom": 171.5
+      },
+      "modes": {
+        "left": 15,
+        "right": 201,
+        "top": 75.5,
+        "bottom": 123.5
+      },
+      "labelText": "字幕时间",
+      "labelWidth": 216,
+      "labelScrollWidth": 216,
+      "labelHeight": 17,
+      "labelScrollHeight": 17,
+      "overflow": "visible",
+      "textOverflow": "clip",
+      "contain": "none",
+      "offset": "0.0 s"
+    },
+    "nativeHintGeometry": {
+      "menuTop": 8,
+      "menuBottom": 179.375,
+      "hintTop": 140.5,
+      "hintBottom": 172.390625,
+      "scrollTop": 122.5
+    },
+    "normalClose": {
+      "input": "mouse.click-at-observed-checked-center",
+      "x": 353,
+      "y": 31,
+      "focusReturned": true
+    },
+    "keyboardSteps": [
+      {
+        "key": "End",
+        "expected": "download-bilingual-subtitles",
+        "observed": "download-bilingual-subtitles"
+      },
+      {
+        "key": "ArrowUp",
+        "expected": "download-translated-subtitles",
+        "observed": "download-translated-subtitles"
+      },
+      {
+        "key": "ArrowUp",
+        "expected": "download-subtitles",
+        "observed": "download-subtitles"
+      },
+      {
+        "key": "ArrowUp",
+        "expected": "subtitle-later",
+        "observed": "subtitle-later"
+      },
+      {
+        "key": "ArrowUp",
+        "expected": "subtitle-earlier",
+        "observed": "subtitle-earlier"
+      },
+      {
+        "key": "ArrowUp",
+        "expected": "off",
+        "observed": "off"
+      },
+      {
+        "key": "ArrowUp",
+        "expected": "original-only",
+        "observed": "original-only"
+      },
+      {
+        "key": "ArrowUp",
+        "expected": "translation-only",
+        "observed": "translation-only"
+      },
+      {
+        "key": "ArrowUp",
+        "expected": "bilingual",
+        "observed": "bilingual"
+      },
+      {
+        "key": "ArrowUp",
+        "expected": "open-sentence-learning",
+        "observed": "open-sentence-learning"
+      },
+      {
+        "key": "ArrowUp",
+        "expected": "close-menu",
+        "observed": "close-menu"
+      },
+      {
+        "key": "Home",
+        "expected": "open-settings",
+        "observed": "open-settings"
+      }
+    ],
+    "desktopMenu": {
+      "capabilities": {
+        "coarsePointer": false,
+        "maxTouchPoints": 0
+      },
+      "minimumTargetSize": 22,
+      "keyboardSteps": [
+        {
+          "key": "End",
+          "expected": "download-bilingual-subtitles",
+          "observed": "download-bilingual-subtitles"
+        },
+        {
+          "key": "Home",
+          "expected": "open-settings",
+          "observed": "open-settings"
+        }
+      ],
+      "normalCloseFocusReturned": true
+    },
+    "rows": [
+      {
+        "name": "portrait-menu-timing-targets",
+        "scrollTop": 35.5,
+        "scrollHeight": 292,
+        "clientHeight": 169,
+        "menu": {
+          "left": 8,
+          "top": 8,
+          "right": 382,
+          "bottom": 179.375,
+          "width": 374,
+          "height": 171.375
+        },
+        "headerTopRequired": true,
+        "headerTopHitsOwned": 3,
+        "headerTopContractSatisfied": true,
+        "focusedBodyBelowHeader": true,
+        "targets": [
+          {
+            "action": "close-menu",
+            "actualAction": "close-menu",
+            "actualMode": null,
+            "count": 1,
+            "frame": {
+              "left": 331,
+              "top": 9,
+              "right": 375,
+              "bottom": 53,
+              "width": 44,
+              "height": 44
+            },
+            "visible": {
+              "left": 331,
+              "top": 9.00219298245614,
+              "right": 375,
+              "bottom": 53,
+              "width": 44,
+              "height": 43.99780701754386
+            },
+            "fullyVisible": true,
+            "hitCount": 5,
+            "pointCount": 5,
+            "minimum": 44,
+            "savedValuesMeetContract": true
+          },
+          {
+            "action": "subtitle-earlier",
+            "actualAction": "subtitle-earlier",
+            "actualMode": null,
+            "count": 1,
+            "frame": {
+              "left": 243,
+              "top": 127.5,
+              "right": 287,
+              "bottom": 171.5,
+              "width": 44,
+              "height": 44
+            },
+            "visible": {
+              "left": 243,
+              "top": 127.5,
+              "right": 287,
+              "bottom": 171.5,
+              "width": 44,
+              "height": 44
+            },
+            "fullyVisible": true,
+            "hitCount": 5,
+            "pointCount": 5,
+            "minimum": 44,
+            "savedValuesMeetContract": true
+          },
+          {
+            "action": "subtitle-later",
+            "actualAction": "subtitle-later",
+            "actualMode": null,
+            "count": 1,
+            "frame": {
+              "left": 331,
+              "top": 127.5,
+              "right": 375,
+              "bottom": 171.5,
+              "width": 44,
+              "height": 44
+            },
+            "visible": {
+              "left": 331,
+              "top": 127.5,
+              "right": 375,
+              "bottom": 171.5,
+              "width": 44,
+              "height": 44
+            },
+            "fullyVisible": true,
+            "hitCount": 5,
+            "pointCount": 5,
+            "minimum": 44,
+            "savedValuesMeetContract": true
+          }
+        ]
+      },
+      {
+        "name": "portrait-menu-hint-targets",
+        "scrollTop": 122.5,
+        "scrollHeight": 292,
+        "clientHeight": 169,
+        "menu": {
+          "left": 8,
+          "top": 8,
+          "right": 382,
+          "bottom": 179.375,
+          "width": 374,
+          "height": 171.375
+        },
+        "headerTopRequired": true,
+        "headerTopHitsOwned": 3,
+        "headerTopContractSatisfied": true,
+        "focusedBodyBelowHeader": true,
+        "targets": [
+          {
+            "action": "close-menu",
+            "actualAction": "close-menu",
+            "actualMode": null,
+            "count": 1,
+            "frame": {
+              "left": 331,
+              "top": 9,
+              "right": 375,
+              "bottom": 53,
+              "width": 44,
+              "height": 44
+            },
+            "visible": {
+              "left": 331,
+              "top": 9.00219298245614,
+              "right": 375,
+              "bottom": 53,
+              "width": 44,
+              "height": 43.99780701754386
+            },
+            "fullyVisible": true,
+            "hitCount": 5,
+            "pointCount": 5,
+            "minimum": 44,
+            "savedValuesMeetContract": true
+          }
+        ]
+      },
+      {
+        "name": "portrait-menu-keyboard-1-End",
+        "scrollTop": 114.5,
+        "scrollHeight": 292,
+        "clientHeight": 169,
+        "menu": {
+          "left": 8,
+          "top": 8,
+          "right": 382,
+          "bottom": 179.375,
+          "width": 374,
+          "height": 171.375
+        },
+        "headerTopRequired": true,
+        "headerTopHitsOwned": 3,
+        "headerTopContractSatisfied": true,
+        "focusedBodyBelowHeader": true,
+        "targets": [
+          {
+            "action": "close-menu",
+            "actualAction": "close-menu",
+            "actualMode": null,
+            "count": 1,
+            "frame": {
+              "left": 331,
+              "top": 9,
+              "right": 375,
+              "bottom": 53,
+              "width": 44,
+              "height": 44
+            },
+            "visible": {
+              "left": 331,
+              "top": 9.00219298245614,
+              "right": 375,
+              "bottom": 53,
+              "width": 44,
+              "height": 43.99780701754386
+            },
+            "fullyVisible": true,
+            "hitCount": 5,
+            "pointCount": 5,
+            "minimum": 44,
+            "savedValuesMeetContract": true
+          },
+          {
+            "action": "focused",
+            "actualAction": "download-bilingual-subtitles",
+            "actualMode": null,
+            "count": 1,
+            "frame": {
+              "left": 257.6640625,
+              "top": 96.5,
+              "right": 375,
+              "bottom": 140.5,
+              "width": 117.3359375,
+              "height": 44
+            },
+            "visible": {
+              "left": 257.6640625,
+              "top": 96.5,
+              "right": 375,
+              "bottom": 140.5,
+              "width": 117.3359375,
+              "height": 44
+            },
+            "fullyVisible": true,
+            "hitCount": 5,
+            "pointCount": 5,
+            "minimum": 44,
+            "savedValuesMeetContract": true
+          }
+        ]
+      },
+      {
+        "name": "portrait-menu-keyboard-2-ArrowUp",
+        "scrollTop": 114.5,
+        "scrollHeight": 292,
+        "clientHeight": 169,
+        "menu": {
+          "left": 8,
+          "top": 8,
+          "right": 382,
+          "bottom": 179.375,
+          "width": 374,
+          "height": 171.375
+        },
+        "headerTopRequired": true,
+        "headerTopHitsOwned": 3,
+        "headerTopContractSatisfied": true,
+        "focusedBodyBelowHeader": true,
+        "targets": [
+          {
+            "action": "close-menu",
+            "actualAction": "close-menu",
+            "actualMode": null,
+            "count": 1,
+            "frame": {
+              "left": 331,
+              "top": 9,
+              "right": 375,
+              "bottom": 53,
+              "width": 44,
+              "height": 44
+            },
+            "visible": {
+              "left": 331,
+              "top": 9.00219298245614,
+              "right": 375,
+              "bottom": 53,
+              "width": 44,
+              "height": 43.99780701754386
+            },
+            "fullyVisible": true,
+            "hitCount": 5,
+            "pointCount": 5,
+            "minimum": 44,
+            "savedValuesMeetContract": true
+          },
+          {
+            "action": "focused",
+            "actualAction": "download-translated-subtitles",
+            "actualMode": null,
+            "count": 1,
+            "frame": {
+              "left": 136.328125,
+              "top": 96.5,
+              "right": 253.6640625,
+              "bottom": 140.5,
+              "width": 117.3359375,
+              "height": 44
+            },
+            "visible": {
+              "left": 136.328125,
+              "top": 96.5,
+              "right": 253.6640625,
+              "bottom": 140.5,
+              "width": 117.3359375,
+              "height": 44
+            },
+            "fullyVisible": true,
+            "hitCount": 5,
+            "pointCount": 5,
+            "minimum": 44,
+            "savedValuesMeetContract": true
+          }
+        ]
+      },
+      {
+        "name": "portrait-menu-keyboard-3-ArrowUp",
+        "scrollTop": 114.5,
+        "scrollHeight": 292,
+        "clientHeight": 169,
+        "menu": {
+          "left": 8,
+          "top": 8,
+          "right": 382,
+          "bottom": 179.375,
+          "width": 374,
+          "height": 171.375
+        },
+        "headerTopRequired": true,
+        "headerTopHitsOwned": 3,
+        "headerTopContractSatisfied": true,
+        "focusedBodyBelowHeader": true,
+        "targets": [
+          {
+            "action": "close-menu",
+            "actualAction": "close-menu",
+            "actualMode": null,
+            "count": 1,
+            "frame": {
+              "left": 331,
+              "top": 9,
+              "right": 375,
+              "bottom": 53,
+              "width": 44,
+              "height": 44
+            },
+            "visible": {
+              "left": 331,
+              "top": 9.00219298245614,
+              "right": 375,
+              "bottom": 53,
+              "width": 44,
+              "height": 43.99780701754386
+            },
+            "fullyVisible": true,
+            "hitCount": 5,
+            "pointCount": 5,
+            "minimum": 44,
+            "savedValuesMeetContract": true
+          },
+          {
+            "action": "focused",
+            "actualAction": "download-subtitles",
+            "actualMode": null,
+            "count": 1,
+            "frame": {
+              "left": 15,
+              "top": 96.5,
+              "right": 132.328125,
+              "bottom": 140.5,
+              "width": 117.328125,
+              "height": 44
+            },
+            "visible": {
+              "left": 15,
+              "top": 96.5,
+              "right": 132.328125,
+              "bottom": 140.5,
+              "width": 117.328125,
+              "height": 44
+            },
+            "fullyVisible": true,
+            "hitCount": 5,
+            "pointCount": 5,
+            "minimum": 44,
+            "savedValuesMeetContract": true
+          }
+        ]
+      },
+      {
+        "name": "portrait-menu-keyboard-4-ArrowUp",
+        "scrollTop": 104,
+        "scrollHeight": 292,
+        "clientHeight": 169,
+        "menu": {
+          "left": 8,
+          "top": 8,
+          "right": 382,
+          "bottom": 179.375,
+          "width": 374,
+          "height": 171.375
+        },
+        "headerTopRequired": true,
+        "headerTopHitsOwned": 3,
+        "headerTopContractSatisfied": true,
+        "focusedBodyBelowHeader": true,
+        "targets": [
+          {
+            "action": "close-menu",
+            "actualAction": "close-menu",
+            "actualMode": null,
+            "count": 1,
+            "frame": {
+              "left": 331,
+              "top": 9,
+              "right": 375,
+              "bottom": 53,
+              "width": 44,
+              "height": 44
+            },
+            "visible": {
+              "left": 331,
+              "top": 9.00219298245614,
+              "right": 375,
+              "bottom": 53,
+              "width": 44,
+              "height": 43.99780701754386
+            },
+            "fullyVisible": true,
+            "hitCount": 5,
+            "pointCount": 5,
+            "minimum": 44,
+            "savedValuesMeetContract": true
+          },
+          {
+            "action": "focused",
+            "actualAction": "subtitle-later",
+            "actualMode": null,
+            "count": 1,
+            "frame": {
+              "left": 331,
+              "top": 59,
+              "right": 375,
+              "bottom": 103,
+              "width": 44,
+              "height": 44
+            },
+            "visible": {
+              "left": 331,
+              "top": 59,
+              "right": 375,
+              "bottom": 103,
+              "width": 44,
+              "height": 44
+            },
+            "fullyVisible": true,
+            "hitCount": 5,
+            "pointCount": 5,
+            "minimum": 44,
+            "savedValuesMeetContract": true
+          }
+        ]
+      },
+      {
+        "name": "portrait-menu-keyboard-5-ArrowUp",
+        "scrollTop": 104,
+        "scrollHeight": 292,
+        "clientHeight": 169,
+        "menu": {
+          "left": 8,
+          "top": 8,
+          "right": 382,
+          "bottom": 179.375,
+          "width": 374,
+          "height": 171.375
+        },
+        "headerTopRequired": true,
+        "headerTopHitsOwned": 3,
+        "headerTopContractSatisfied": true,
+        "focusedBodyBelowHeader": true,
+        "targets": [
+          {
+            "action": "close-menu",
+            "actualAction": "close-menu",
+            "actualMode": null,
+            "count": 1,
+            "frame": {
+              "left": 331,
+              "top": 9,
+              "right": 375,
+              "bottom": 53,
+              "width": 44,
+              "height": 44
+            },
+            "visible": {
+              "left": 331,
+              "top": 9.00219298245614,
+              "right": 375,
+              "bottom": 53,
+              "width": 44,
+              "height": 43.99780701754386
+            },
+            "fullyVisible": true,
+            "hitCount": 5,
+            "pointCount": 5,
+            "minimum": 44,
+            "savedValuesMeetContract": true
+          },
+          {
+            "action": "focused",
+            "actualAction": "subtitle-earlier",
+            "actualMode": null,
+            "count": 1,
+            "frame": {
+              "left": 243,
+              "top": 59,
+              "right": 287,
+              "bottom": 103,
+              "width": 44,
+              "height": 44
+            },
+            "visible": {
+              "left": 243,
+              "top": 59,
+              "right": 287,
+              "bottom": 103,
+              "width": 44,
+              "height": 44
+            },
+            "fullyVisible": true,
+            "hitCount": 5,
+            "pointCount": 5,
+            "minimum": 44,
+            "savedValuesMeetContract": true
+          }
+        ]
+      },
+      {
+        "name": "portrait-menu-keyboard-6-ArrowUp",
+        "scrollTop": 16.5,
+        "scrollHeight": 292,
+        "clientHeight": 169,
+        "menu": {
+          "left": 8,
+          "top": 8,
+          "right": 382,
+          "bottom": 179.375,
+          "width": 374,
+          "height": 171.375
+        },
+        "headerTopRequired": true,
+        "headerTopHitsOwned": 3,
+        "headerTopContractSatisfied": true,
+        "focusedBodyBelowHeader": true,
+        "targets": [
+          {
+            "action": "close-menu",
+            "actualAction": "close-menu",
+            "actualMode": null,
+            "count": 1,
+            "frame": {
+              "left": 331,
+              "top": 9,
+              "right": 375,
+              "bottom": 53,
+              "width": 44,
+              "height": 44
+            },
+            "visible": {
+              "left": 331,
+              "top": 9.00219298245614,
+              "right": 375,
+              "bottom": 53,
+              "width": 44,
+              "height": 43.99780701754386
+            },
+            "fullyVisible": true,
+            "hitCount": 5,
+            "pointCount": 5,
+            "minimum": 44,
+            "savedValuesMeetContract": true
+          },
+          {
+            "action": "focused",
+            "actualAction": null,
+            "actualMode": "off",
+            "count": 1,
+            "frame": {
+              "left": 155,
+              "top": 96.5,
+              "right": 199,
+              "bottom": 140.5,
+              "width": 44,
+              "height": 44
+            },
+            "visible": {
+              "left": 155,
+              "top": 96.5,
+              "right": 199,
+              "bottom": 140.5,
+              "width": 44,
+              "height": 44
+            },
+            "fullyVisible": true,
+            "hitCount": 5,
+            "pointCount": 5,
+            "minimum": 44,
+            "savedValuesMeetContract": true
+          }
+        ]
+      },
+      {
+        "name": "portrait-menu-keyboard-7-ArrowUp",
+        "scrollTop": 16.5,
+        "scrollHeight": 292,
+        "clientHeight": 169,
+        "menu": {
+          "left": 8,
+          "top": 8,
+          "right": 382,
+          "bottom": 179.375,
+          "width": 374,
+          "height": 171.375
+        },
+        "headerTopRequired": true,
+        "headerTopHitsOwned": 3,
+        "headerTopContractSatisfied": true,
+        "focusedBodyBelowHeader": true,
+        "targets": [
+          {
+            "action": "close-menu",
+            "actualAction": "close-menu",
+            "actualMode": null,
+            "count": 1,
+            "frame": {
+              "left": 331,
+              "top": 9,
+              "right": 375,
+              "bottom": 53,
+              "width": 44,
+              "height": 44
+            },
+            "visible": {
+              "left": 331,
+              "top": 9.00219298245614,
+              "right": 375,
+              "bottom": 53,
+              "width": 44,
+              "height": 43.99780701754386
+            },
+            "fullyVisible": true,
+            "hitCount": 5,
+            "pointCount": 5,
+            "minimum": 44,
+            "savedValuesMeetContract": true
+          },
+          {
+            "action": "focused",
+            "actualAction": null,
+            "actualMode": "original-only",
+            "count": 1,
+            "frame": {
+              "left": 109,
+              "top": 96.5,
+              "right": 153,
+              "bottom": 140.5,
+              "width": 44,
+              "height": 44
+            },
+            "visible": {
+              "left": 109,
+              "top": 96.5,
+              "right": 153,
+              "bottom": 140.5,
+              "width": 44,
+              "height": 44
+            },
+            "fullyVisible": true,
+            "hitCount": 5,
+            "pointCount": 5,
+            "minimum": 44,
+            "savedValuesMeetContract": true
+          }
+        ]
+      },
+      {
+        "name": "portrait-menu-keyboard-8-ArrowUp",
+        "scrollTop": 16.5,
+        "scrollHeight": 292,
+        "clientHeight": 169,
+        "menu": {
+          "left": 8,
+          "top": 8,
+          "right": 382,
+          "bottom": 179.375,
+          "width": 374,
+          "height": 171.375
+        },
+        "headerTopRequired": true,
+        "headerTopHitsOwned": 3,
+        "headerTopContractSatisfied": true,
+        "focusedBodyBelowHeader": true,
+        "targets": [
+          {
+            "action": "close-menu",
+            "actualAction": "close-menu",
+            "actualMode": null,
+            "count": 1,
+            "frame": {
+              "left": 331,
+              "top": 9,
+              "right": 375,
+              "bottom": 53,
+              "width": 44,
+              "height": 44
+            },
+            "visible": {
+              "left": 331,
+              "top": 9.00219298245614,
+              "right": 375,
+              "bottom": 53,
+              "width": 44,
+              "height": 43.99780701754386
+            },
+            "fullyVisible": true,
+            "hitCount": 5,
+            "pointCount": 5,
+            "minimum": 44,
+            "savedValuesMeetContract": true
+          },
+          {
+            "action": "focused",
+            "actualAction": null,
+            "actualMode": "translation-only",
+            "count": 1,
+            "frame": {
+              "left": 63,
+              "top": 96.5,
+              "right": 107,
+              "bottom": 140.5,
+              "width": 44,
+              "height": 44
+            },
+            "visible": {
+              "left": 63,
+              "top": 96.5,
+              "right": 107,
+              "bottom": 140.5,
+              "width": 44,
+              "height": 44
+            },
+            "fullyVisible": true,
+            "hitCount": 5,
+            "pointCount": 5,
+            "minimum": 44,
+            "savedValuesMeetContract": true
+          }
+        ]
+      },
+      {
+        "name": "portrait-menu-keyboard-9-ArrowUp",
+        "scrollTop": 16.5,
+        "scrollHeight": 292,
+        "clientHeight": 169,
+        "menu": {
+          "left": 8,
+          "top": 8,
+          "right": 382,
+          "bottom": 179.375,
+          "width": 374,
+          "height": 171.375
+        },
+        "headerTopRequired": true,
+        "headerTopHitsOwned": 3,
+        "headerTopContractSatisfied": true,
+        "focusedBodyBelowHeader": true,
+        "targets": [
+          {
+            "action": "close-menu",
+            "actualAction": "close-menu",
+            "actualMode": null,
+            "count": 1,
+            "frame": {
+              "left": 331,
+              "top": 9,
+              "right": 375,
+              "bottom": 53,
+              "width": 44,
+              "height": 44
+            },
+            "visible": {
+              "left": 331,
+              "top": 9.00219298245614,
+              "right": 375,
+              "bottom": 53,
+              "width": 44,
+              "height": 43.99780701754386
+            },
+            "fullyVisible": true,
+            "hitCount": 5,
+            "pointCount": 5,
+            "minimum": 44,
+            "savedValuesMeetContract": true
+          },
+          {
+            "action": "focused",
+            "actualAction": null,
+            "actualMode": "bilingual",
+            "count": 1,
+            "frame": {
+              "left": 17,
+              "top": 96.5,
+              "right": 61,
+              "bottom": 140.5,
+              "width": 44,
+              "height": 44
+            },
+            "visible": {
+              "left": 17,
+              "top": 96.5,
+              "right": 61,
+              "bottom": 140.5,
+              "width": 44,
+              "height": 44
+            },
+            "fullyVisible": true,
+            "hitCount": 5,
+            "pointCount": 5,
+            "minimum": 44,
+            "savedValuesMeetContract": true
+          }
+        ]
+      },
+      {
+        "name": "portrait-menu-keyboard-10-ArrowUp",
+        "scrollTop": 4,
+        "scrollHeight": 292,
+        "clientHeight": 169,
+        "menu": {
+          "left": 8,
+          "top": 8,
+          "right": 382,
+          "bottom": 179.375,
+          "width": 374,
+          "height": 171.375
+        },
+        "headerTopRequired": false,
+        "headerTopHitsOwned": 0,
+        "headerTopContractSatisfied": true,
+        "focusedBodyBelowHeader": true,
+        "targets": [
+          {
+            "action": "close-menu",
+            "actualAction": "close-menu",
+            "actualMode": null,
+            "count": 1,
+            "frame": {
+              "left": 331,
+              "top": 11,
+              "right": 375,
+              "bottom": 55,
+              "width": 44,
+              "height": 44
+            },
+            "visible": {
+              "left": 331,
+              "top": 11,
+              "right": 375,
+              "bottom": 55,
+              "width": 44,
+              "height": 44
+            },
+            "fullyVisible": true,
+            "hitCount": 5,
+            "pointCount": 5,
+            "minimum": 44,
+            "savedValuesMeetContract": true
+          },
+          {
+            "action": "focused",
+            "actualAction": "open-sentence-learning",
+            "actualMode": null,
+            "count": 1,
+            "frame": {
+              "left": 15,
+              "top": 59,
+              "right": 375,
+              "bottom": 103,
+              "width": 360,
+              "height": 44
+            },
+            "visible": {
+              "left": 15,
+              "top": 59,
+              "right": 375,
+              "bottom": 103,
+              "width": 360,
+              "height": 44
+            },
+            "fullyVisible": true,
+            "hitCount": 5,
+            "pointCount": 5,
+            "minimum": 44,
+            "savedValuesMeetContract": true
+          }
+        ]
+      },
+      {
+        "name": "portrait-menu-keyboard-11-ArrowUp",
+        "scrollTop": 0,
+        "scrollHeight": 292,
+        "clientHeight": 169,
+        "menu": {
+          "left": 8,
+          "top": 8,
+          "right": 382,
+          "bottom": 179.375,
+          "width": 374,
+          "height": 171.375
+        },
+        "headerTopRequired": false,
+        "headerTopHitsOwned": 0,
+        "headerTopContractSatisfied": true,
+        "focusedBodyBelowHeader": true,
+        "targets": [
+          {
+            "action": "close-menu",
+            "actualAction": "close-menu",
+            "actualMode": null,
+            "count": 1,
+            "frame": {
+              "left": 331,
+              "top": 15,
+              "right": 375,
+              "bottom": 59,
+              "width": 44,
+              "height": 44
+            },
+            "visible": {
+              "left": 331,
+              "top": 15,
+              "right": 375,
+              "bottom": 59,
+              "width": 44,
+              "height": 44
+            },
+            "fullyVisible": true,
+            "hitCount": 5,
+            "pointCount": 5,
+            "minimum": 44,
+            "savedValuesMeetContract": true
+          },
+          {
+            "action": "focused",
+            "actualAction": "close-menu",
+            "actualMode": null,
+            "count": 1,
+            "frame": {
+              "left": 331,
+              "top": 15,
+              "right": 375,
+              "bottom": 59,
+              "width": 44,
+              "height": 44
+            },
+            "visible": {
+              "left": 331,
+              "top": 15,
+              "right": 375,
+              "bottom": 59,
+              "width": 44,
+              "height": 44
+            },
+            "fullyVisible": true,
+            "hitCount": 5,
+            "pointCount": 5,
+            "minimum": 44,
+            "savedValuesMeetContract": true
+          }
+        ]
+      },
+      {
+        "name": "portrait-menu-keyboard-12-Home",
+        "scrollTop": 0,
+        "scrollHeight": 292,
+        "clientHeight": 169,
+        "menu": {
+          "left": 8,
+          "top": 8,
+          "right": 382,
+          "bottom": 179.375,
+          "width": 374,
+          "height": 171.375
+        },
+        "headerTopRequired": false,
+        "headerTopHitsOwned": 0,
+        "headerTopContractSatisfied": true,
+        "focusedBodyBelowHeader": true,
+        "targets": [
+          {
+            "action": "close-menu",
+            "actualAction": "close-menu",
+            "actualMode": null,
+            "count": 1,
+            "frame": {
+              "left": 331,
+              "top": 15,
+              "right": 375,
+              "bottom": 59,
+              "width": 44,
+              "height": 44
+            },
+            "visible": {
+              "left": 331,
+              "top": 15,
+              "right": 375,
+              "bottom": 59,
+              "width": 44,
+              "height": 44
+            },
+            "fullyVisible": true,
+            "hitCount": 5,
+            "pointCount": 5,
+            "minimum": 44,
+            "savedValuesMeetContract": true
+          },
+          {
+            "action": "focused",
+            "actualAction": "open-settings",
+            "actualMode": null,
+            "count": 1,
+            "frame": {
+              "left": 258,
+              "top": 15,
+              "right": 325,
+              "bottom": 59,
+              "width": 67,
+              "height": 44
+            },
+            "visible": {
+              "left": 258,
+              "top": 15,
+              "right": 325,
+              "bottom": 59,
+              "width": 67,
+              "height": 44
+            },
+            "fullyVisible": true,
+            "hitCount": 5,
+            "pointCount": 5,
+            "minimum": 44,
+            "savedValuesMeetContract": true
+          }
+        ]
+      },
+      {
+        "name": "desktop-menu-open",
+        "scrollTop": 0,
+        "scrollHeight": 259,
+        "clientHeight": 259,
+        "menu": {
+          "left": 992,
+          "top": 419.3671875,
+          "right": 1272,
+          "bottom": 680,
+          "width": 280,
+          "height": 260.6328125
+        },
+        "headerTopRequired": false,
+        "headerTopHitsOwned": 0,
+        "headerTopContractSatisfied": true,
+        "focusedBodyBelowHeader": true,
+        "targets": [
+          {
+            "action": "close-menu",
+            "actualAction": "close-menu",
+            "actualMode": null,
+            "count": 1,
+            "frame": {
+              "left": 1237,
+              "top": 426.3671875,
+              "right": 1265,
+              "bottom": 454.3671875,
+              "width": 28,
+              "height": 28
+            },
+            "visible": {
+              "left": 1237,
+              "top": 426.3671875,
+              "right": 1265,
+              "bottom": 454.3671875,
+              "width": 28,
+              "height": 28
+            },
+            "fullyVisible": true,
+            "hitCount": 5,
+            "pointCount": 5,
+            "minimum": 22,
+            "savedValuesMeetContract": true
+          },
+          {
+            "action": "focused",
+            "actualAction": null,
+            "actualMode": "bilingual",
+            "count": 1,
+            "frame": {
+              "left": 1001,
+              "top": 505.1640625,
+              "right": 1065,
+              "bottom": 537.1640625,
+              "width": 64,
+              "height": 32
+            },
+            "visible": {
+              "left": 1001,
+              "top": 505.1640625,
+              "right": 1065,
+              "bottom": 537.1640625,
+              "width": 64,
+              "height": 32
+            },
+            "fullyVisible": true,
+            "hitCount": 5,
+            "pointCount": 5,
+            "minimum": 22,
+            "savedValuesMeetContract": true
+          }
+        ]
+      },
+      {
+        "name": "desktop-menu-keyboard-End",
+        "scrollTop": 0,
+        "scrollHeight": 259,
+        "clientHeight": 259,
+        "menu": {
+          "left": 992,
+          "top": 419.3671875,
+          "right": 1272,
+          "bottom": 680,
+          "width": 280,
+          "height": 260.6328125
+        },
+        "headerTopRequired": false,
+        "headerTopHitsOwned": 0,
+        "headerTopContractSatisfied": true,
+        "focusedBodyBelowHeader": true,
+        "targets": [
+          {
+            "action": "close-menu",
+            "actualAction": "close-menu",
+            "actualMode": null,
+            "count": 1,
+            "frame": {
+              "left": 1237,
+              "top": 426.3671875,
+              "right": 1265,
+              "bottom": 454.3671875,
+              "width": 28,
+              "height": 28
+            },
+            "visible": {
+              "left": 1237,
+              "top": 426.3671875,
+              "right": 1265,
+              "bottom": 454.3671875,
+              "width": 28,
+              "height": 28
+            },
+            "fullyVisible": true,
+            "hitCount": 5,
+            "pointCount": 5,
+            "minimum": 22,
+            "savedValuesMeetContract": true
+          },
+          {
+            "action": "focused",
+            "actualAction": "download-bilingual-subtitles",
+            "actualMode": null,
+            "count": 1,
+            "frame": {
+              "left": 1179,
+              "top": 577.1640625,
+              "right": 1265,
+              "bottom": 615.1640625,
+              "width": 86,
+              "height": 38
+            },
+            "visible": {
+              "left": 1179,
+              "top": 577.1640625,
+              "right": 1265,
+              "bottom": 615.1640625,
+              "width": 86,
+              "height": 38
+            },
+            "fullyVisible": true,
+            "hitCount": 5,
+            "pointCount": 5,
+            "minimum": 22,
+            "savedValuesMeetContract": true
+          }
+        ]
+      },
+      {
+        "name": "desktop-menu-keyboard-Home",
+        "scrollTop": 0,
+        "scrollHeight": 259,
+        "clientHeight": 259,
+        "menu": {
+          "left": 992,
+          "top": 419.3671875,
+          "right": 1272,
+          "bottom": 680,
+          "width": 280,
+          "height": 260.6328125
+        },
+        "headerTopRequired": false,
+        "headerTopHitsOwned": 0,
+        "headerTopContractSatisfied": true,
+        "focusedBodyBelowHeader": true,
+        "targets": [
+          {
+            "action": "close-menu",
+            "actualAction": "close-menu",
+            "actualMode": null,
+            "count": 1,
+            "frame": {
+              "left": 1237,
+              "top": 426.3671875,
+              "right": 1265,
+              "bottom": 454.3671875,
+              "width": 28,
+              "height": 28
+            },
+            "visible": {
+              "left": 1237,
+              "top": 426.3671875,
+              "right": 1265,
+              "bottom": 454.3671875,
+              "width": 28,
+              "height": 28
+            },
+            "fullyVisible": true,
+            "hitCount": 5,
+            "pointCount": 5,
+            "minimum": 22,
+            "savedValuesMeetContract": true
+          },
+          {
+            "action": "focused",
+            "actualAction": "open-settings",
+            "actualMode": null,
+            "count": 1,
+            "frame": {
+              "left": 1164,
+              "top": 429.3671875,
+              "right": 1231,
+              "bottom": 451.3671875,
+              "width": 67,
+              "height": 22
+            },
+            "visible": {
+              "left": 1164,
+              "top": 429.3671875,
+              "right": 1231,
+              "bottom": 451.3671875,
+              "width": 67,
+              "height": 22
+            },
+            "fullyVisible": true,
+            "hitCount": 5,
+            "pointCount": 5,
+            "minimum": 22,
+            "savedValuesMeetContract": true
+          }
+        ]
+      },
+      {
+        "name": "desktop-menu-before-close",
+        "scrollTop": 0,
+        "scrollHeight": 259,
+        "clientHeight": 259,
+        "menu": {
+          "left": 992,
+          "top": 419.3671875,
+          "right": 1272,
+          "bottom": 680,
+          "width": 280,
+          "height": 260.6328125
+        },
+        "headerTopRequired": false,
+        "headerTopHitsOwned": 0,
+        "headerTopContractSatisfied": true,
+        "focusedBodyBelowHeader": true,
+        "targets": [
+          {
+            "action": "close-menu",
+            "actualAction": "close-menu",
+            "actualMode": null,
+            "count": 1,
+            "frame": {
+              "left": 1237,
+              "top": 426.3671875,
+              "right": 1265,
+              "bottom": 454.3671875,
+              "width": 28,
+              "height": 28
+            },
+            "visible": {
+              "left": 1237,
+              "top": 426.3671875,
+              "right": 1265,
+              "bottom": 454.3671875,
+              "width": 28,
+              "height": 28
+            },
+            "fullyVisible": true,
+            "hitCount": 5,
+            "pointCount": 5,
+            "minimum": 22,
+            "savedValuesMeetContract": true
+          }
+        ]
+      }
+    ],
+    "numericBoundary": "Touch Close frame 44x44, clipped visible height 43.99780701754386 meets the existing 0.01px tolerance; do not round this to exact 44 visible CSS pixels. Initial touchTargets checks dimensions only; detailed scrolling probes additionally check viewport/overflow clipping and five hit points. HeaderTop false at scrollTop 4/0 and desktop 0 is expected before sticky top binds; the conditional assertion does not require header ownership there.",
+    "inputBoundary": "Timing/hint scroll is explicit page.evaluate menu.scrollTop; subsequent Home/End/ArrowUp use browser keyboard input and observed focus. Close uses mouse click at saved checked center. No physical iPhone touch or native accessibility input was run.",
+    "portraitMenuFrame": {
+      "left": 8,
+      "top": 8,
+      "right": 382,
+      "bottom": 179.375,
+      "width": 374,
+      "height": 171.375
+    }
+  },
+  "trackOwnershipAndLifecycle": {
+    "scope": "Explicit standard TextTrack.mode writes emulate system-menu selections on Chromium; not native AVKit selection or rendering",
+    "selectionCount": 11,
+    "actualBrowserChangeEventCount": 17,
+    "allChangeEventsTrusted": true,
+    "maxSelectionAckMs": 6.699999809265137,
+    "allDesiredSelectionsMatchSavedAfter": true,
+    "selectionResults": {
+      "scope": "Explicit standard TextTrack.mode writes emulate system-menu selections on Chromium; not native AVKit selection or rendering",
+      "selectionChanges": [
+        {
+          "name": "initial-site-A",
+          "before": [
+            {
+              "kind": "subtitles",
+              "label": "FluentRead",
+              "mode": "hidden"
+            },
+            {
+              "kind": "captions",
+              "label": "Site captions",
+              "mode": "hidden"
+            }
+          ],
+          "desired": {
+            "site": "showing"
+          },
+          "events": [
+            {
+              "type": "change",
+              "isTrusted": true,
+              "elapsedMs": 0.9000000953674316,
+              "tracks": [
+                {
+                  "kind": "subtitles",
+                  "label": "FluentRead",
+                  "mode": "hidden"
+                },
+                {
+                  "kind": "captions",
+                  "label": "Site captions",
+                  "mode": "showing"
+                }
+              ]
+            }
+          ],
+          "after": [
+            {
+              "kind": "subtitles",
+              "label": "FluentRead",
+              "mode": "hidden"
+            },
+            {
+              "kind": "captions",
+              "label": "Site captions",
+              "mode": "showing"
+            }
+          ],
+          "elapsedMs": 1
+        },
+        {
+          "name": "A-to-FluentRead-direct",
+          "before": [
+            {
+              "kind": "subtitles",
+              "label": "FluentRead",
+              "mode": "hidden"
+            },
+            {
+              "kind": "captions",
+              "label": "Site captions",
+              "mode": "showing"
+            }
+          ],
+          "desired": {
+            "site": "disabled",
+            "owned": "showing"
+          },
+          "events": [
+            {
+              "type": "change",
+              "isTrusted": true,
+              "elapsedMs": 1.5999999046325684,
+              "tracks": [
+                {
+                  "kind": "subtitles",
+                  "label": "FluentRead",
+                  "mode": "showing"
+                },
+                {
+                  "kind": "captions",
+                  "label": "Site captions",
+                  "mode": "disabled"
+                }
+              ]
+            },
+            {
+              "type": "change",
+              "isTrusted": true,
+              "elapsedMs": 2.6999998092651367,
+              "tracks": [
+                {
+                  "kind": "subtitles",
+                  "label": "FluentRead",
+                  "mode": "showing"
+                },
+                {
+                  "kind": "captions",
+                  "label": "Site captions",
+                  "mode": "disabled"
+                }
+              ]
+            }
+          ],
+          "after": [
+            {
+              "kind": "subtitles",
+              "label": "FluentRead",
+              "mode": "showing"
+            },
+            {
+              "kind": "captions",
+              "label": "Site captions",
+              "mode": "disabled"
+            }
+          ],
+          "elapsedMs": 3
+        },
+        {
+          "name": "A-to-FluentRead-before-Off",
+          "before": [
+            {
+              "kind": "subtitles",
+              "label": "FluentRead",
+              "mode": "hidden"
+            },
+            {
+              "kind": "captions",
+              "label": "Site captions",
+              "mode": "showing"
+            }
+          ],
+          "desired": {
+            "site": "disabled",
+            "owned": "showing"
+          },
+          "events": [
+            {
+              "type": "change",
+              "isTrusted": true,
+              "elapsedMs": 1.6000003814697266,
+              "tracks": [
+                {
+                  "kind": "subtitles",
+                  "label": "FluentRead",
+                  "mode": "showing"
+                },
+                {
+                  "kind": "captions",
+                  "label": "Site captions",
+                  "mode": "disabled"
+                }
+              ]
+            },
+            {
+              "type": "change",
+              "isTrusted": true,
+              "elapsedMs": 2.6000003814697266,
+              "tracks": [
+                {
+                  "kind": "subtitles",
+                  "label": "FluentRead",
+                  "mode": "showing"
+                },
+                {
+                  "kind": "captions",
+                  "label": "Site captions",
+                  "mode": "disabled"
+                }
+              ]
+            }
+          ],
+          "after": [
+            {
+              "kind": "subtitles",
+              "label": "FluentRead",
+              "mode": "showing"
+            },
+            {
+              "kind": "captions",
+              "label": "Site captions",
+              "mode": "disabled"
+            }
+          ],
+          "elapsedMs": 3.3000001907348633
+        },
+        {
+          "name": "system-Off",
+          "before": [
+            {
+              "kind": "subtitles",
+              "label": "FluentRead",
+              "mode": "showing"
+            },
+            {
+              "kind": "captions",
+              "label": "Site captions",
+              "mode": "disabled"
+            }
+          ],
+          "desired": {
+            "owned": "disabled"
+          },
+          "events": [
+            {
+              "type": "change",
+              "isTrusted": true,
+              "elapsedMs": 1.299999713897705,
+              "tracks": [
+                {
+                  "kind": "subtitles",
+                  "label": "FluentRead",
+                  "mode": "disabled"
+                },
+                {
+                  "kind": "captions",
+                  "label": "Site captions",
+                  "mode": "disabled"
+                }
+              ]
+            }
+          ],
+          "after": [
+            {
+              "kind": "subtitles",
+              "label": "FluentRead",
+              "mode": "disabled"
+            },
+            {
+              "kind": "captions",
+              "label": "Site captions",
+              "mode": "disabled"
+            }
+          ],
+          "elapsedMs": 1.3999996185302734
+        },
+        {
+          "name": "Off-to-FluentRead",
+          "before": [
+            {
+              "kind": "subtitles",
+              "label": "FluentRead",
+              "mode": "disabled"
+            },
+            {
+              "kind": "captions",
+              "label": "Site captions",
+              "mode": "disabled"
+            }
+          ],
+          "desired": {
+            "owned": "showing"
+          },
+          "events": [
+            {
+              "type": "change",
+              "isTrusted": true,
+              "elapsedMs": 6.099999904632568,
+              "tracks": [
+                {
+                  "kind": "subtitles",
+                  "label": "FluentRead",
+                  "mode": "showing"
+                },
+                {
+                  "kind": "captions",
+                  "label": "Site captions",
+                  "mode": "disabled"
+                }
+              ]
+            }
+          ],
+          "after": [
+            {
+              "kind": "subtitles",
+              "label": "FluentRead",
+              "mode": "showing"
+            },
+            {
+              "kind": "captions",
+              "label": "Site captions",
+              "mode": "disabled"
+            }
+          ],
+          "elapsedMs": 6.699999809265137
+        },
+        {
+          "name": "FluentRead-before-Off-reentry",
+          "before": [
+            {
+              "kind": "subtitles",
+              "label": "FluentRead",
+              "mode": "hidden"
+            },
+            {
+              "kind": "captions",
+              "label": "Site captions",
+              "mode": "disabled"
+            }
+          ],
+          "desired": {
+            "site": "disabled",
+            "owned": "showing"
+          },
+          "events": [
+            {
+              "type": "change",
+              "isTrusted": true,
+              "elapsedMs": 2.6999998092651367,
+              "tracks": [
+                {
+                  "kind": "subtitles",
+                  "label": "FluentRead",
+                  "mode": "showing"
+                },
+                {
+                  "kind": "captions",
+                  "label": "Site captions",
+                  "mode": "disabled"
+                }
+              ]
+            }
+          ],
+          "after": [
+            {
+              "kind": "subtitles",
+              "label": "FluentRead",
+              "mode": "showing"
+            },
+            {
+              "kind": "captions",
+              "label": "Site captions",
+              "mode": "disabled"
+            }
+          ],
+          "elapsedMs": 4.099999904632568
+        },
+        {
+          "name": "Off-before-leave",
+          "before": [
+            {
+              "kind": "subtitles",
+              "label": "FluentRead",
+              "mode": "showing"
+            },
+            {
+              "kind": "captions",
+              "label": "Site captions",
+              "mode": "disabled"
+            }
+          ],
+          "desired": {
+            "owned": "disabled"
+          },
+          "events": [
+            {
+              "type": "change",
+              "isTrusted": true,
+              "elapsedMs": 3.1000003814697266,
+              "tracks": [
+                {
+                  "kind": "subtitles",
+                  "label": "FluentRead",
+                  "mode": "disabled"
+                },
+                {
+                  "kind": "captions",
+                  "label": "Site captions",
+                  "mode": "disabled"
+                }
+              ]
+            }
+          ],
+          "after": [
+            {
+              "kind": "subtitles",
+              "label": "FluentRead",
+              "mode": "disabled"
+            },
+            {
+              "kind": "captions",
+              "label": "Site captions",
+              "mode": "disabled"
+            }
+          ],
+          "elapsedMs": 3.200000286102295
+        },
+        {
+          "name": "source-A-before-other-choice",
+          "before": [
+            {
+              "kind": "subtitles",
+              "label": "FluentRead",
+              "mode": "hidden"
+            },
+            {
+              "kind": "captions",
+              "label": "Site captions",
+              "mode": "disabled"
+            },
+            {
+              "kind": "captions",
+              "label": "Other site captions",
+              "mode": "hidden"
+            }
+          ],
+          "desired": {
+            "site": "showing",
+            "other": "disabled"
+          },
+          "events": [
+            {
+              "type": "change",
+              "isTrusted": true,
+              "elapsedMs": 1.299999713897705,
+              "tracks": [
+                {
+                  "kind": "subtitles",
+                  "label": "FluentRead",
+                  "mode": "hidden"
+                },
+                {
+                  "kind": "captions",
+                  "label": "Site captions",
+                  "mode": "showing"
+                },
+                {
+                  "kind": "captions",
+                  "label": "Other site captions",
+                  "mode": "disabled"
+                }
+              ]
+            },
+            {
+              "type": "change",
+              "isTrusted": true,
+              "elapsedMs": 2.5999999046325684,
+              "tracks": [
+                {
+                  "kind": "subtitles",
+                  "label": "FluentRead",
+                  "mode": "hidden"
+                },
+                {
+                  "kind": "captions",
+                  "label": "Site captions",
+                  "mode": "showing"
+                },
+                {
+                  "kind": "captions",
+                  "label": "Other site captions",
+                  "mode": "disabled"
+                }
+              ]
+            }
+          ],
+          "after": [
+            {
+              "kind": "subtitles",
+              "label": "FluentRead",
+              "mode": "hidden"
+            },
+            {
+              "kind": "captions",
+              "label": "Site captions",
+              "mode": "showing"
+            },
+            {
+              "kind": "captions",
+              "label": "Other site captions",
+              "mode": "disabled"
+            }
+          ],
+          "elapsedMs": 2.5999999046325684
+        },
+        {
+          "name": "A-to-FluentRead-before-B",
+          "before": [
+            {
+              "kind": "subtitles",
+              "label": "FluentRead",
+              "mode": "hidden"
+            },
+            {
+              "kind": "captions",
+              "label": "Site captions",
+              "mode": "showing"
+            },
+            {
+              "kind": "captions",
+              "label": "Other site captions",
+              "mode": "disabled"
+            }
+          ],
+          "desired": {
+            "site": "disabled",
+            "owned": "showing"
+          },
+          "events": [
+            {
+              "type": "change",
+              "isTrusted": true,
+              "elapsedMs": 1.5999999046325684,
+              "tracks": [
+                {
+                  "kind": "subtitles",
+                  "label": "FluentRead",
+                  "mode": "showing"
+                },
+                {
+                  "kind": "captions",
+                  "label": "Site captions",
+                  "mode": "disabled"
+                },
+                {
+                  "kind": "captions",
+                  "label": "Other site captions",
+                  "mode": "disabled"
+                }
+              ]
+            },
+            {
+              "type": "change",
+              "isTrusted": true,
+              "elapsedMs": 2.799999713897705,
+              "tracks": [
+                {
+                  "kind": "subtitles",
+                  "label": "FluentRead",
+                  "mode": "showing"
+                },
+                {
+                  "kind": "captions",
+                  "label": "Site captions",
+                  "mode": "disabled"
+                },
+                {
+                  "kind": "captions",
+                  "label": "Other site captions",
+                  "mode": "disabled"
+                }
+              ]
+            }
+          ],
+          "after": [
+            {
+              "kind": "subtitles",
+              "label": "FluentRead",
+              "mode": "showing"
+            },
+            {
+              "kind": "captions",
+              "label": "Site captions",
+              "mode": "disabled"
+            },
+            {
+              "kind": "captions",
+              "label": "Other site captions",
+              "mode": "disabled"
+            }
+          ],
+          "elapsedMs": 2.9000000953674316
+        },
+        {
+          "name": "FluentRead-to-source-B",
+          "before": [
+            {
+              "kind": "subtitles",
+              "label": "FluentRead",
+              "mode": "showing"
+            },
+            {
+              "kind": "captions",
+              "label": "Site captions",
+              "mode": "disabled"
+            },
+            {
+              "kind": "captions",
+              "label": "Other site captions",
+              "mode": "disabled"
+            }
+          ],
+          "desired": {
+            "owned": "disabled",
+            "other": "showing"
+          },
+          "events": [
+            {
+              "type": "change",
+              "isTrusted": true,
+              "elapsedMs": 1.5999999046325684,
+              "tracks": [
+                {
+                  "kind": "subtitles",
+                  "label": "FluentRead",
+                  "mode": "disabled"
+                },
+                {
+                  "kind": "captions",
+                  "label": "Site captions",
+                  "mode": "disabled"
+                },
+                {
+                  "kind": "captions",
+                  "label": "Other site captions",
+                  "mode": "showing"
+                }
+              ]
+            },
+            {
+              "type": "change",
+              "isTrusted": true,
+              "elapsedMs": 2.9000000953674316,
+              "tracks": [
+                {
+                  "kind": "subtitles",
+                  "label": "FluentRead",
+                  "mode": "disabled"
+                },
+                {
+                  "kind": "captions",
+                  "label": "Site captions",
+                  "mode": "disabled"
+                },
+                {
+                  "kind": "captions",
+                  "label": "Other site captions",
+                  "mode": "showing"
+                }
+              ]
+            }
+          ],
+          "after": [
+            {
+              "kind": "subtitles",
+              "label": "FluentRead",
+              "mode": "disabled"
+            },
+            {
+              "kind": "captions",
+              "label": "Site captions",
+              "mode": "disabled"
+            },
+            {
+              "kind": "captions",
+              "label": "Other site captions",
+              "mode": "showing"
+            }
+          ],
+          "elapsedMs": 2.9000000953674316
+        },
+        {
+          "name": "restore-site-A-before-disable",
+          "before": [
+            {
+              "kind": "subtitles",
+              "label": "FluentRead",
+              "mode": "hidden"
+            },
+            {
+              "kind": "captions",
+              "label": "Site captions",
+              "mode": "disabled"
+            },
+            {
+              "kind": "captions",
+              "label": "Other site captions",
+              "mode": "showing"
+            }
+          ],
+          "desired": {
+            "other": "disabled",
+            "site": "showing"
+          },
+          "events": [
+            {
+              "type": "change",
+              "isTrusted": true,
+              "elapsedMs": 1.4000000953674316,
+              "tracks": [
+                {
+                  "kind": "subtitles",
+                  "label": "FluentRead",
+                  "mode": "hidden"
+                },
+                {
+                  "kind": "captions",
+                  "label": "Site captions",
+                  "mode": "showing"
+                },
+                {
+                  "kind": "captions",
+                  "label": "Other site captions",
+                  "mode": "disabled"
+                }
+              ]
+            },
+            {
+              "type": "change",
+              "isTrusted": true,
+              "elapsedMs": 2.8000001907348633,
+              "tracks": [
+                {
+                  "kind": "subtitles",
+                  "label": "FluentRead",
+                  "mode": "hidden"
+                },
+                {
+                  "kind": "captions",
+                  "label": "Site captions",
+                  "mode": "showing"
+                },
+                {
+                  "kind": "captions",
+                  "label": "Other site captions",
+                  "mode": "disabled"
+                }
+              ]
+            }
+          ],
+          "after": [
+            {
+              "kind": "subtitles",
+              "label": "FluentRead",
+              "mode": "hidden"
+            },
+            {
+              "kind": "captions",
+              "label": "Site captions",
+              "mode": "showing"
+            },
+            {
+              "kind": "captions",
+              "label": "Other site captions",
+              "mode": "disabled"
+            }
+          ],
+          "elapsedMs": 2.9000000953674316
+        }
+      ],
+      "beginPreservedSiteSelection": true,
+      "directSourceRestored": true,
+      "offThenFluentReadKeptSourceDisabled": true,
+      "offPreservedAcrossReentry": true,
+      "otherSiteSelectionPreserved": true
+    },
+    "resourceErrorWitness": [
+      {
+        "type": "error",
+        "trusted": true,
+        "before": 0,
+        "at": 363.19999980926514,
+        "afterTask": 1,
+        "elapsedMs": 0.20000028610229492
+      }
+    ],
+    "resourceDiagnosticNodes": [
+      {
+        "beforeAppend": true,
+        "immediate": 1,
+        "events": [
+          {
+            "type": "error",
+            "cues": 0,
+            "readyState": 3
+          }
+        ],
+        "afterTask": 0,
+        "afterSecond": 1,
+        "afterSameLanguage": 1
+      },
+      {
+        "beforeAppend": false,
+        "immediate": 1,
+        "events": [
+          {
+            "type": "error",
+            "cues": 0,
+            "readyState": 3
+          }
+        ],
+        "afterTask": 0,
+        "afterSecond": 1,
+        "afterSameLanguage": 1
+      }
+    ],
+    "successfulAssertionsFromRunner": [
+      "Initial ready: production panel translation plus owned track cues, and trusted HTMLTrack resource-error cue recovery before following timer task",
+      "Initial site A retained entering WebKit shim",
+      "A -> FluentRead -> leave restores A",
+      "Off keeps the same owned track node and remains disabled until explicit FluentRead choice; Off -> FluentRead -> leave keeps obsolete site A disabled",
+      "Off -> leave/reenter preserves source disabled and owned hidden rather than auto-selecting either",
+      "Selection of other source B preserved on leave; source A disabled",
+      "videoSubtitleVisible false removes owned track and retains site A showing; reenable reaches ready",
+      "Actual DOM video element replaced with shallow clone and ready reached",
+      "Actual page.reload followed by fresh isolated-world shim and ready",
+      "Synthetic pageshow persisted:true followed by ready; not a real BFCache navigation",
+      "Global on:false removes subtitle layer and owned track, final captured panel null/cues empty"
+    ],
+    "offIdentityBoundary": "Same owned-node preservation is a successful runner assertion, not a separate serialized object identity measurement in report; TextTrack mode-change events are browser-generated acknowledgements of explicit standard mode writes by the fixture, not real system-menu choices.",
+    "visibilityAndCleanupBoundary": "Global disable wait explicitly checks layer and owned track absence; disabled snapshot has null panel and no cues. It does not separately serialize every menu/control count, every listener, timer, or heap allocation.",
+    "replacementBoundary": "Replacement snapshot proves ready/new visible output after DOM replacement in this fixture, not live YouTube SPA routing or all source-reset races."
+  },
+  "focusAndCleanup": {
+    "launchMode": "macos-background-cdp",
+    "focusPolicy": "launchservices-no-foreground",
+    "windowPlacement": {
+      "mode": "background-visible-no-focus",
+      "visible": true,
+      "hidden": false,
+      "centered": true,
+      "windowState": "normal",
+      "bounds": {
+        "left": 212,
+        "top": -990,
+        "width": 1280,
+        "height": 900
+      },
+      "displayTarget": "secondary",
+      "source": "macos-nsscreen",
+      "screenIndex": 1,
+      "browserFrontmost": false,
+      "frontmostBefore": {
+        "pid": 20136,
+        "name": "ChatGPT"
+      },
+      "frontmostAfter": {
+        "pid": 20136,
+        "name": "ChatGPT"
+      }
+    },
+    "focusObserver": {
+      "monitorPid": 55852,
+      "time": 1792192579375.123,
+      "monotonicMs": 3617870568.6150002
+    },
+    "browserPid": 55855,
+    "focusSampleCount": 56,
+    "sampledFrontmostPids": [
+      20136
+    ],
+    "sampledOwnedBrowserFrontmost": false,
+    "focusEvents": [],
+    "errorFieldsPresent": {},
+    "browserCloseReceipt": "shared-guard-fulfilled",
+    "profileRemoved": true,
+    "boundary": "Original stored runtime receipt reviewed; this agent did not re-query processes, profile directory, displays, or devices. Absence of observer error fields and errors[] indicate none recorded, not fault-injection coverage."
+  },
+  "viewedPNGs": [
+    {
+      "path": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/mobile-youtube-fr-node-identity-probe-20261017/same-scope-clone-repair-20261017/browser-candidate-lifecycle/portrait-menu.png",
+      "bytes": 34594,
+      "sha256": "5a920a4fe64151077928e8f5d52510afc525c8f8e53f98523ee50266c927a33f",
+      "width": 390,
+      "height": 844,
+      "viewedWith": "tools.view_image detail=original",
+      "observation": "实际看原图：390×844；菜单位于播放器内，标题、设置、Close、学习行和四个模式可见；底部时序/下载区域在初始滚动位置被裁切，需要滚动。未将初始截图解释为全菜单同时可见。"
+    },
+    {
+      "path": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/mobile-youtube-fr-node-identity-probe-20261017/same-scope-clone-repair-20261017/browser-candidate-lifecycle/portrait-menu-normal-close.png",
+      "bytes": 37484,
+      "sha256": "738ea6f19b728fba20d001eda00966a821dd043442881d53fb9a30e1b0377f25",
+      "width": 390,
+      "height": 844,
+      "viewedWith": "tools.view_image detail=original",
+      "observation": "实际看原图：390×844；菜单消失；中英字幕面板位于原生按钮组上方，设置、粉色入口、Fullscreen 可见。焦点返回依赖 JSON 的 activeElement 断言，不能仅凭像素证明。"
+    },
+    {
+      "path": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/mobile-youtube-fr-node-identity-probe-20261017/same-scope-clone-repair-20261017/browser-candidate-lifecycle/landscape-inline.png",
+      "bytes": 23488,
+      "sha256": "7c85fbc1f838d00c9dfcf6dfd9e0d1141d0e222f095ed0018ece2465dfe38f03",
+      "width": 844,
+      "height": 390,
+      "viewedWith": "tools.view_image detail=original",
+      "observation": "实际看原图：844×390；字幕面板在播放器范围内，设置、入口、Fullscreen 位于右下；字幕文字完整。"
+    },
+    {
+      "path": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/mobile-youtube-fr-node-identity-probe-20261017/same-scope-clone-repair-20261017/browser-candidate-lifecycle/native-interface-enter.png",
+      "bytes": 23488,
+      "sha256": "7c85fbc1f838d00c9dfcf6dfd9e0d1141d0e222f095ed0018ece2465dfe38f03",
+      "width": 844,
+      "height": 390,
+      "viewedWith": "tools.view_image detail=original",
+      "observation": "实际看原图：844×390；与 landscape-inline 字节相同，仍是网页播放器视图。图片不证明系统原生界面或 AVKit；状态选择由受控 WebKit 事件 shim 和 TextTrack 记录支持。"
+    },
+    {
+      "path": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/mobile-youtube-fr-node-identity-probe-20261017/same-scope-clone-repair-20261017/browser-candidate-lifecycle/video-replaced.png",
+      "bytes": 23027,
+      "sha256": "5607893566be421212933fa4a2145852620296f1c6809f0da1f334137d3947b1",
+      "width": 844,
+      "height": 390,
+      "viewedWith": "tools.view_image detail=original",
+      "observation": "实际看原图：844×390；替换后中英字幕面板和按钮入口可见，右下入口未显示此前焦点外框。换节点动作及重新 ready 由源码与成功报告支持，像素不能证明对象身份。"
+    },
+    {
+      "path": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/mobile-youtube-fr-node-identity-probe-20261017/same-scope-clone-repair-20261017/browser-candidate-lifecycle/refresh-recovered.png",
+      "bytes": 18770,
+      "sha256": "3b773d75706c5e3b3e4dfd550b40b437708e7dce9259eee59cabc7c0ef2a7c3f",
+      "width": 844,
+      "height": 390,
+      "viewedWith": "tools.view_image detail=original",
+      "observation": "实际看原图：844×390；重载后字幕位于播放器下部，页面控件处于隐藏状态；非字幕/入口永久丢失证明。ready 仅要求面板译文与 owned cues。"
+    }
+  ],
+  "limits": [
+    "local HTML and timedtext fixtures",
+    "mock translation",
+    "Chromium viewport/touch emulation",
+    "isolated-extension-world webkit capability/event shim only; no iOS/AVKit rendering",
+    "fullscreen geometry uses an explicit DOM property fixture; no system/window fullscreen",
+    "no live provider or mobile device",
+    "SafeAreaEmulation unsupported: protocol method absent; fallback fullscreen geometry side bound used, no notch/safe-area inset acceptance",
+    "WebKit begin/end fullscreen capability/events installed in verified extension isolated world; no Safari/iOS/AVKit UI",
+    "TextTrack.mode writes emulate native choices; real trusted TextTrackList.change events do not turn simulated choices into native UI interaction",
+    "FullscreenElement is an explicit DOM property fixture, no operating-system or browser-window fullscreen",
+    "pageshow persisted:true manually dispatched; no real BFCache entry/restore or suspension",
+    "Local generated video/timedtext and translation mocks; no live YouTube/provider, playback content accuracy or real phone/tablet acceptance",
+    "Exactly six original PNGs viewed; remaining PNG pixels not inspected in this review",
+    "No claim this fixture explains previous Safari E2 AX3 or SKIP root cause; E2 remains 0PASS/1SKIP independently"
+  ],
+  "productionAcceptance": false,
+  "safariAcceptance": false,
+  "iOSAVKitAcceptance": false,
+  "realBFCacheAcceptance": false,
+  "liveProviderAcceptance": false
+}

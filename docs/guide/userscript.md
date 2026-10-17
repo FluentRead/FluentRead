@@ -44,12 +44,12 @@ Greasy Fork 上的版本可能晚于 GitHub 源码。排查问题时，请先查
 
 ## Safari Userscripts 安装与排查
 
-1. 从 App Store 安装 Userscripts，并在 Safari 的扩展设置中启用。iPhone/iPad 上打开「设置 → Safari → 扩展 → Userscripts」；允许它访问所有网站，并在 Safari 中选择「始终允许」。macOS 上也要为访问的网站授予权限。
+1. 从 App Store 安装 Userscripts，并在系统的 Safari 扩展设置中启用。先在 Safari 中授权当前正在阅读的网站；若管理器或所选翻译服务提示额外访问，再核对并按需授予。需要在多个网站持续使用时，可按需选择“所有网站”或“始终允许”。macOS 上也按访问的网站管理权限。
 2. 在 Userscripts App 中确认脚本目录；新版 iPhone/iPad 客户端通常会自动设置默认目录，macOS 也可使用默认目录。安装 Greasy Fork 版本时，在 Safari 打开上方安装页，通过 Userscripts 工具栏的安装提示保存并启用。试用从源码构建的独立版时，把生成的 `.user.js` 放入该脚本目录，再打开 Userscripts 弹出窗口刷新文件列表。安装精简版时保持联网，让管理器下载 `@require` 中的界面依赖。
 3. 在 Userscripts 弹出窗口确认「Enable Injection」已开启，流畅阅读对当前网页已匹配且启用，然后刷新一个普通的 HTTP(S) 网页。设置从页面悬浮球打开；Safari Userscripts 没有脚本菜单命令。
 4. 如果脚本是直接加入脚本目录或从外部编辑器修改的，至少打开一次 Userscripts 弹出窗口，让它重新读取文件。仍未出现悬浮球时，请检查脚本版本、站点权限、当前页是否匹配，以及管理器是否成功下载依赖；反馈时附上 Safari、系统、Userscripts 版本和出问题的网页地址。
 
-这些步骤依据 [Userscripts 官方安装与元数据说明](https://github.com/quoid/userscripts/tree/release/4.x.x)；Safari 上的实际运行情况仍需设备验证。
+Userscripts 官方将全站持续访问列为[使用建议](https://github.com/quoid/userscripts/tree/release/4.x.x#usage)。网页权限控制管理器在该网页上的注入；脚本的[跨域请求](https://github.com/quoid/userscripts/tree/release/4.x.x#api)、依赖资源与翻译服务访问另受管理器约束，允许当前网页不代表所有服务域都已获准。其余步骤依据[官方安装与元数据说明](https://github.com/quoid/userscripts/tree/release/4.x.x)；Safari Userscripts 的实际运行情况仍需设备验证。
 
 </details>
 

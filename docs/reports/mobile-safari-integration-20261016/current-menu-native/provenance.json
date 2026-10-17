@@ -1,0 +1,150 @@
+{
+  "schema": 1,
+  "artifactKind": "DOCUMENTATION_EVIDENCE_COPY_ONLY",
+  "sourceDirectory": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/touch-layout-f33-followup-20261017/native-final-layout-6eecd6710e7d-b1a66b3fc4e5",
+  "sourceCommit": "6eecd6710e7daac2d2a8cca9a34d0f26dc849b44",
+  "originalsRetained": true,
+  "copiesByteIdentical": true,
+  "copyCount": 22,
+  "pathBoundary": "Copied JSON retains original absolute paths verbatim. Those fields refer to local research originals, not repository-relative bundled files. Use this mapping to locate copied selections. Unselected SDK-check/web-verify/package logs and App/DerivedData remain in original research directory.",
+  "notPerformed": [
+    "compilation",
+    "process/resource re-inventory",
+    "installation",
+    "device or browser execution"
+  ],
+  "files": [
+    {
+      "source": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/touch-layout-f33-followup-20261017/native-final-layout-6eecd6710e7d-b1a66b3fc4e5/execution-summary.json",
+      "copy": "execution-summary.json",
+      "sha256": "9b2c07ea878252c2cf3e98732fb1d5fcb9b718962c057f9437ecba16e159c497",
+      "bytes": 12198
+    },
+    {
+      "source": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/touch-layout-f33-followup-20261017/native-final-layout-6eecd6710e7d-b1a66b3fc4e5/compiled-artifact-identities.json",
+      "copy": "compiled-artifact-identities.json",
+      "sha256": "40c51fa62077d1f72e7b8aad80103f5ff01f66a5cf8628b4ad352cc89f635e15",
+      "bytes": 31336
+    },
+    {
+      "source": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/touch-layout-f33-followup-20261017/native-final-layout-6eecd6710e7d-b1a66b3fc4e5/root-independent-compiled-review.json",
+      "copy": "root-independent-compiled-review.json",
+      "sha256": "fd896bd148071088b4222c3431fca648e4a2a0cb40b4d641e335d4938b5f0552",
+      "bytes": 36930
+    },
+    {
+      "source": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/touch-layout-f33-followup-20261017/native-final-layout-6eecd6710e7d-b1a66b3fc4e5/fresh-resource-release.json",
+      "copy": "fresh-resource-release.json",
+      "sha256": "b7e298f5eacb45ff157e72746bfeb386423f373087238f7075903cafe5e60783",
+      "bytes": 2248
+    },
+    {
+      "source": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/touch-layout-f33-followup-20261017/native-final-layout-6eecd6710e7d-b1a66b3fc4e5/macOS-app-full-map.json",
+      "copy": "macOS-app-full-map.json",
+      "sha256": "08c6bacefd86bcde5c61b2217d906f6768f516220774771b1d1aedbe885b1d1d",
+      "bytes": 99566
+    },
+    {
+      "source": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/touch-layout-f33-followup-20261017/native-final-layout-6eecd6710e7d-b1a66b3fc4e5/macOS-extension-full-map.json",
+      "copy": "macOS-extension-full-map.json",
+      "sha256": "0f13109ede819163ca64358a3f0dbb37a95289a947c859322d8f86f4e7320ba5",
+      "bytes": 76945
+    },
+    {
+      "source": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/touch-layout-f33-followup-20261017/native-final-layout-6eecd6710e7d-b1a66b3fc4e5/iosSimulator-app-full-map.json",
+      "copy": "iosSimulator-app-full-map.json",
+      "sha256": "3909c0ce380b04b9fab6f1ff3ceed6d7c71e44d24e60fa216d61b76aba1c8525",
+      "bytes": 86731
+    },
+    {
+      "source": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/touch-layout-f33-followup-20261017/native-final-layout-6eecd6710e7d-b1a66b3fc4e5/iosSimulator-extension-full-map.json",
+      "copy": "iosSimulator-extension-full-map.json",
+      "sha256": "6ef03de04d1e686f435aca1af1cb8e0a82e13e0fb4ff6d724211be4ee2ebc213",
+      "bytes": 68047
+    },
+    {
+      "source": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/touch-layout-f33-followup-20261017/native-final-layout-6eecd6710e7d-b1a66b3fc4e5/iPhoneOS-app-full-map.json",
+      "copy": "iPhoneOS-app-full-map.json",
+      "sha256": "9ab9748cc6bbd289807d6c34003da6e0899332fa0a6e91ccf7fc54b871824974",
+      "bytes": 86729
+    },
+    {
+      "source": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/touch-layout-f33-followup-20261017/native-final-layout-6eecd6710e7d-b1a66b3fc4e5/iPhoneOS-extension-full-map.json",
+      "copy": "iPhoneOS-extension-full-map.json",
+      "sha256": "8de64fc7bb7fd2b427e4c164f8dd459f560555ee1395890c74fc47a39dc60bb2",
+      "bytes": 68046
+    },
+    {
+      "source": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/touch-layout-f33-followup-20261017/native-final-layout-6eecd6710e7d-b1a66b3fc4e5/root-compile-outcome.json",
+      "copy": "root-compile-outcome.json",
+      "sha256": "68bce93b20051df5d6bbe3b22e54477c1410e7a7d6a9ad235f416089632b6b82",
+      "bytes": 2916
+    },
+    {
+      "source": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/touch-layout-f33-followup-20261017/native-final-layout-6eecd6710e7d-b1a66b3fc4e5/preparation.json",
+      "copy": "preparation.json",
+      "sha256": "0f12e7f0ff78aafcc1214fb76731cbe9a83b31843db9fed2d71771b8a5c35f93",
+      "bytes": 43175
+    },
+    {
+      "source": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/touch-layout-f33-followup-20261017/native-final-layout-6eecd6710e7d-b1a66b3fc4e5/argument-replacements.diff",
+      "copy": "argument-replacements.diff",
+      "sha256": "2be6d6562e03af7681f0c07ff5dad8403998687aad29ab8a47163fd87f1369de",
+      "bytes": 6582
+    },
+    {
+      "source": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/touch-layout-f33-followup-20261017/native-final-layout-6eecd6710e7d-b1a66b3fc4e5/01-sdk-check-result.json",
+      "copy": "01-sdk-check-result.json",
+      "sha256": "6e687a1fdc2f333202acd1c39026bb74db9782eefe80480f93d2f181eef40236",
+      "bytes": 1217
+    },
+    {
+      "source": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/touch-layout-f33-followup-20261017/native-final-layout-6eecd6710e7d-b1a66b3fc4e5/02-safari-web-verify-result.json",
+      "copy": "02-safari-web-verify-result.json",
+      "sha256": "cf57463b581a07ed5cbcbd6532d721adb433383e9564ae97984c0751b77de607",
+      "bytes": 1360
+    },
+    {
+      "source": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/touch-layout-f33-followup-20261017/native-final-layout-6eecd6710e7d-b1a66b3fc4e5/03-fresh-unsigned-wrapper-result.json",
+      "copy": "03-fresh-unsigned-wrapper-result.json",
+      "sha256": "03559db459f2ddd50602a349aec2a11295ca8b7b7335abb8d79a9dfa5d15467c",
+      "bytes": 1624
+    },
+    {
+      "source": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/touch-layout-f33-followup-20261017/native-final-layout-6eecd6710e7d-b1a66b3fc4e5/04-macos-result.json",
+      "copy": "04-macos-result.json",
+      "sha256": "68d94c60c2b96f534a23bd632d638b24301a57ea597b00de81c7614f0293af4e",
+      "bytes": 1864
+    },
+    {
+      "source": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/touch-layout-f33-followup-20261017/native-final-layout-6eecd6710e7d-b1a66b3fc4e5/05-ios-simulator-result.json",
+      "copy": "05-ios-simulator-result.json",
+      "sha256": "494ef22694fd8be4b84e7d37e6bfe701e8cddbc37154745390b274852e4f6c48",
+      "bytes": 1894
+    },
+    {
+      "source": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/touch-layout-f33-followup-20261017/native-final-layout-6eecd6710e7d-b1a66b3fc4e5/06-iphoneos-arm64-result.json",
+      "copy": "06-iphoneos-arm64-result.json",
+      "sha256": "6b9bed74588d96300b84cde3792ccfbbec547ecbd6488282c35e44ae67b2927b",
+      "bytes": 2254
+    },
+    {
+      "source": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/touch-layout-f33-followup-20261017/native-final-layout-6eecd6710e7d-b1a66b3fc4e5/logs/04-macos.log",
+      "copy": "logs/04-macos.log",
+      "sha256": "53bcd9ea6aec4c26ffae98ca8259b9984fd2efd785caa761df74663739e5abae",
+      "bytes": 428982
+    },
+    {
+      "source": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/touch-layout-f33-followup-20261017/native-final-layout-6eecd6710e7d-b1a66b3fc4e5/logs/05-ios-simulator.log",
+      "copy": "logs/05-ios-simulator.log",
+      "sha256": "531d0f216924f4b1050ace7e5734052f7eea7d07354e5462621ccfc1d66d5fd1",
+      "bytes": 439290
+    },
+    {
+      "source": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/touch-layout-f33-followup-20261017/native-final-layout-6eecd6710e7d-b1a66b3fc4e5/logs/06-iphoneos.log",
+      "copy": "logs/06-iphoneos.log",
+      "sha256": "9be0565a1182e22d5c98dce174cf0af59fc2eca5bb6f506054485d43166d154e",
+      "bytes": 254571
+    }
+  ]
+}

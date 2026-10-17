@@ -1,0 +1,37 @@
+{
+  "id": "03-fresh-unsigned-wrapper",
+  "startedAt": "2026-10-16T21:25:26.514460+00:00",
+  "argv": [
+    "/opt/homebrew/opt/node@22/bin/node",
+    "/Users/thinkstu/Desktop/copy/FluentRead-mobile-video-menu-accessibility-20261016/scripts/testing/run-resource-safe.mjs",
+    "--max-workers",
+    "1",
+    "--concurrency",
+    "3",
+    "--cpu-target",
+    "40",
+    "--",
+    "/opt/homebrew/opt/node@22/bin/node",
+    "/Users/thinkstu/Desktop/copy/FluentRead-mobile-video-menu-accessibility-20261016/scripts/safari/package.mjs",
+    "--extension",
+    "/Users/thinkstu/Desktop/copy/FluentRead-mobile-video-menu-accessibility-20261016/.output/safari-mv2",
+    "--project-location",
+    "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/touch-layout-f33-followup-20261017/native-final-layout-6eecd6710e7d-b1a66b3fc4e5/output/safari-xcode",
+    "--bundle-id",
+    "org.example.FluentReadDevelopment",
+    "--platform",
+    "both"
+  ],
+  "environmentOverrides": {
+    "DEVELOPER_DIR": "/Applications/Xcode.app/Contents/Developer",
+    "PATH": "/opt/homebrew/opt/node@22/bin:/usr/bin:/bin:/usr/sbin:/sbin:/opt/homebrew/bin"
+  },
+  "cwd": "/Users/thinkstu/Desktop/copy/FluentRead-mobile-video-menu-accessibility-20261016",
+  "combinedLog": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/touch-layout-f33-followup-20261017/native-final-layout-6eecd6710e7d-b1a66b3fc4e5/logs/03-package.log",
+  "pid": 36513,
+  "pgid": 36513,
+  "returnCode": 0,
+  "elapsedSeconds": 4.246,
+  "finishedAt": "2026-10-16T21:25:30.760217+00:00",
+  "logSHA256": "337c99368cf9613506c3e8e33215b9999fa9f9998eccbd110744d0a66891e66f"
+}

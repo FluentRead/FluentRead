@@ -1,0 +1,33 @@
+{
+  "schema": 1,
+  "at": "2026-10-17T06:46:44.428703+00:00",
+  "status": "EXACT_PUBLIC_ORIGINALS_COPIED_TO_REPOSITORY_REPORT",
+  "files": [
+    {
+      "source": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/mobile-youtube-fr-node-identity-probe-20261017/same-scope-clone-repair-20261017/current-production-touch-width-rotation-keyboard-attempt1/runtime-test-summary.json",
+      "copy": "rotation-attempt1-evidence/raw/runtime-test-summary.json",
+      "bytes": 1008,
+      "sha256": "c28017762d6853a459d06746c447afa26fca320c20d407016f0377809ab47d34"
+    },
+    {
+      "source": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/mobile-youtube-fr-node-identity-probe-20261017/same-scope-clone-repair-20261017/current-production-touch-width-rotation-keyboard-attempt1/runtime-attachments/manifest.json",
+      "copy": "rotation-attempt1-evidence/raw/manifest.json",
+      "bytes": 1308,
+      "sha256": "3358ee6341c0fbc09a8b62bd3fee45356a68fd28d2fb9f6351c00c31a0e92245"
+    },
+    {
+      "source": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/mobile-youtube-fr-node-identity-probe-20261017/same-scope-clone-repair-20261017/current-production-touch-width-rotation-keyboard-attempt1/runtime-attachments/255E5947-D919-4DB5-BEB8-97322024B700.json",
+      "copy": "rotation-attempt1-evidence/raw/255E5947-D919-4DB5-BEB8-97322024B700.json",
+      "bytes": 402,
+      "sha256": "33d97fef96ee2175cab3d06479867e79d0cd9087a3cc4df80df8a686da6d7d5b"
+    },
+    {
+      "source": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/mobile-youtube-fr-node-identity-probe-20261017/same-scope-clone-repair-20261017/current-production-touch-width-rotation-keyboard-attempt1/runtime-attachments/58D0B499-A211-44EA-B844-8E4EA5C056C8.json",
+      "copy": "rotation-attempt1-evidence/raw/58D0B499-A211-44EA-B844-8E4EA5C056C8.json",
+      "bytes": 331,
+      "sha256": "f8a9ec1d012a5bfea90200d97d2da52a738524eb577a6ca28e6a7637b9718e2a"
+    }
+  ],
+  "sourceReferencesAreResearchIdentifiersOnly": true,
+  "noSDKLogsBinariesOrPrivateFullMapsCopied": true
+}

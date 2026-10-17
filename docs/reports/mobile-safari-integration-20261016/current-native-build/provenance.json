@@ -1,0 +1,35 @@
+{
+  "runtimeSourceCommit": "f5a82d11a5b6b6a5de2f2ea726065a56cdb2e6ca",
+  "files": {
+    "desktop-device-acceptance.json": {
+      "source": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/safari/controls-layout-f5a-desktop-device-1040bd47a0d9/acceptance.json",
+      "sha256": "6e487a7da291042c2c3748d5540f4196f351258659884893d884273aac29708e",
+      "bytes": 4330
+    },
+    "desktop-device-cleanup.json": {
+      "source": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/safari/controls-layout-f5a-desktop-device-1040bd47a0d9/cleanup.json",
+      "sha256": "60c400b5160db7edcc011577bad977405a6d5551b4656af5cd63907023f6a7dc",
+      "bytes": 442
+    },
+    "compiled-macos-identity.json": {
+      "source": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/safari/controls-layout-f5a-desktop-device-1040bd47a0d9/compiled-macos-identity.json",
+      "sha256": "827a522879c368232eb672c05cb2dd2d5ab0f724db5e9d7f6236da67e6d057b8",
+      "bytes": 82872
+    },
+    "compiled-iphoneos-identity.json": {
+      "source": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/safari/controls-layout-f5a-desktop-device-1040bd47a0d9/compiled-iphoneos-identity.json",
+      "sha256": "18d8f0a9aaa4e112adf43f36faf28aef2bd4fc675411013316659ec30a2599ab",
+      "bytes": 69910
+    },
+    "compiled-simulator-identity.json": {
+      "source": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/safari/controls-layout-a3-1040bd47a0d9/compiled-simulator-identity.json",
+      "sha256": "3f3df2dc7993788676427a6544e5cd17937f2a7da8d8e4a5f6c1d215417679dd",
+      "bytes": 69776
+    },
+    "simulator-acceptance.json": {
+      "source": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/safari/controls-layout-a3-1040bd47a0d9/acceptance.json",
+      "sha256": "e2b7bea373d9446159b9590eea27fbb5552772e99664b1864bfd300b4256dc12",
+      "bytes": 5714
+    }
+  }
+}

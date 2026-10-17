@@ -1,0 +1,127 @@
+{
+  "at": "2026-10-16T10:23:39.845455+00:00",
+  "caseCount": 1,
+  "result": "PASS_WITH_PROVENANCE_LIMITS",
+  "passed": 1,
+  "failed": 0,
+  "skipped": 0,
+  "sameDocumentWithinF22": true,
+  "timeOrigin": 1792145571232,
+  "translationNodeCounts": [
+    0,
+    5,
+    0,
+    5
+  ],
+  "restoredSixOriginalsExact": true,
+  "sameTargetChineseNotDuplicated": true,
+  "bothRoundsArFrChinese": true,
+  "bothRoundsArFrMalformedAbsent": true,
+  "firstEqualsRetranslatedPerParagraph": true,
+  "initialRestore": "not applicable: initial actual state already original",
+  "normalTranslateActions": 2,
+  "normalRestoreActions": 1,
+  "observedCompleteSecondsAfterTap": [
+    53.426579,
+    23.110067
+  ],
+  "waitBudgetPerRoundSeconds": 90,
+  "providerWinningRoute": "UNKNOWN",
+  "cacheReadHitInvalidation": "NOT_PROVEN",
+  "fullPageQuality": "NOT_COMPREHENSIVELY_ASSESSED",
+  "normalErrorObserved": false,
+  "documentInitialNetworkProvenance": "UNKNOWN",
+  "actions": [
+    {
+      "at": "2026-10-16T10:13:47.363128+00:00",
+      "kind": "tap-observed-AX",
+      "source": "f22-01-initial.xml",
+      "key": "text",
+      "value": "OK",
+      "bounds": [
+        768,
+        1584,
+        1032,
+        1728
+      ]
+    },
+    {
+      "at": "2026-10-16T10:14:39.706421+00:00",
+      "kind": "tap-observed-AX",
+      "source": "f22-03-service-check-popup.xml",
+      "key": "text",
+      "value": "Translate this page",
+      "bounds": [
+        87,
+        824,
+        837,
+        962
+      ]
+    },
+    {
+      "at": "2026-10-16T10:15:04.470878+00:00",
+      "kind": "tap-observed-AX",
+      "source": "f22-04-first-translate.xml",
+      "key": "content-desc",
+      "value": "Navigate up",
+      "bounds": [
+        0,
+        72,
+        168,
+        240
+      ]
+    },
+    {
+      "at": "2026-10-16T10:17:26.761462+00:00",
+      "kind": "tap-observed-AX",
+      "source": "f22-12-restore-check-popup.xml",
+      "key": "text",
+      "value": "Restore this page",
+      "bounds": [
+        87,
+        824,
+        837,
+        962
+      ]
+    },
+    {
+      "at": "2026-10-16T10:17:29.997497+00:00",
+      "kind": "tap-observed-AX",
+      "source": "f22-13-restored-popup.xml",
+      "key": "content-desc",
+      "value": "Navigate up",
+      "bounds": [
+        0,
+        72,
+        168,
+        240
+      ]
+    },
+    {
+      "at": "2026-10-16T10:18:10.342933+00:00",
+      "kind": "tap-observed-AX",
+      "source": "f22-16-retranslate-check-popup.xml",
+      "key": "text",
+      "value": "Translate this page",
+      "bounds": [
+        87,
+        824,
+        837,
+        962
+      ]
+    },
+    {
+      "at": "2026-10-16T10:18:13.363589+00:00",
+      "kind": "tap-observed-AX",
+      "source": "f22-17-retranslate-popup.xml",
+      "key": "content-desc",
+      "value": "Navigate up",
+      "bounds": [
+        0,
+        72,
+        168,
+        240
+      ]
+    }
+  ]
+}

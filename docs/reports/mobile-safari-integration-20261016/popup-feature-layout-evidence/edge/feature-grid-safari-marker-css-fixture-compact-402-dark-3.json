@@ -1,0 +1,142 @@
+{
+  "label": "feature-grid-safari-marker-css-fixture-compact-402-dark-3",
+  "skin": "compact",
+  "width": 402,
+  "theme": "dark",
+  "count": 3,
+  "mode": "safari-marker-css-fixture",
+  "documentWidth": 402,
+  "rootOverflow": false,
+  "shell": {
+    "x": 0,
+    "y": 0,
+    "width": 402,
+    "height": 394,
+    "right": 402,
+    "bottom": 394
+  },
+  "grid": {
+    "x": 12,
+    "y": 268,
+    "width": 378,
+    "height": 88,
+    "right": 390,
+    "bottom": 356
+  },
+  "display": "flex",
+  "rowGap": 4,
+  "columnGap": 4,
+  "gridRows": "none",
+  "cards": [
+    {
+      "id": "hover",
+      "x": 12,
+      "y": 268,
+      "width": 187,
+      "height": 42,
+      "right": 199,
+      "bottom": 310,
+      "display": "grid",
+      "naturalHeight": 42,
+      "copy": {
+        "x": 48,
+        "y": 276.6875,
+        "width": 133,
+        "height": 24.625,
+        "right": 181,
+        "bottom": 301.3125
+      },
+      "strong": {
+        "x": 48,
+        "y": 276.6875,
+        "width": 133,
+        "height": 13.125,
+        "right": 181,
+        "bottom": 289.8125
+      },
+      "small": {
+        "x": 48,
+        "y": 290.8125,
+        "width": 133,
+        "height": 10.5,
+        "right": 181,
+        "bottom": 301.3125
+      },
+      "copyOverflow": false
+    },
+    {
+      "id": "selection",
+      "x": 203,
+      "y": 268,
+      "width": 187,
+      "height": 42,
+      "right": 390,
+      "bottom": 310,
+      "display": "grid",
+      "naturalHeight": 42,
+      "copy": {
+        "x": 239,
+        "y": 275.6875,
+        "width": 133,
+        "height": 26.625,
+        "right": 372,
+        "bottom": 302.3125
+      },
+      "strong": {
+        "x": 239,
+        "y": 275.6875,
+        "width": 133,
+        "height": 13.125,
+        "right": 372,
+        "bottom": 288.8125
+      },
+      "small": {
+        "x": 239,
+        "y": 289.8125,
+        "width": 133,
+        "height": 12.5,
+        "right": 372,
+        "bottom": 302.3125
+      },
+      "copyOverflow": false
+    },
+    {
+      "id": "image",
+      "x": 12,
+      "y": 314,
+      "width": 187,
+      "height": 42,
+      "right": 199,
+      "bottom": 356,
+      "display": "grid",
+      "naturalHeight": 42,
+      "copy": {
+        "x": 48,
+        "y": 322.6875,
+        "width": 133,
+        "height": 24.625,
+        "right": 181,
+        "bottom": 347.3125
+      },
+      "strong": {
+        "x": 48,
+        "y": 322.6875,
+        "width": 133,
+        "height": 13.125,
+        "right": 181,
+        "bottom": 335.8125
+      },
+      "small": {
+        "x": 48,
+        "y": 336.8125,
+        "width": 133,
+        "height": 10.5,
+        "right": 181,
+        "bottom": 347.3125
+      },
+      "copyOverflow": false
+    }
+  ],
+  "issues": [],
+  "screenshot": "feature-grid-safari-marker-css-fixture-compact-402-dark-3.png"
+}

@@ -1,0 +1,29 @@
+{
+  "id": "01-sdk-check",
+  "startedAt": "2026-10-16T23:13:25.353301+00:00",
+  "finishedAt": "2026-10-16T23:13:25.774905+00:00",
+  "argv": [
+    "/opt/homebrew/opt/node@22/bin/node",
+    "/Users/thinkstu/Desktop/copy/FluentRead-mobile-video-menu-accessibility-20261016/scripts/testing/run-resource-safe.mjs",
+    "--max-workers",
+    "1",
+    "--concurrency",
+    "3",
+    "--cpu-target",
+    "40",
+    "--",
+    "/opt/homebrew/opt/node@22/bin/node",
+    "/Users/thinkstu/Desktop/copy/FluentRead-mobile-video-menu-accessibility-20261016/scripts/safari/package.mjs",
+    "--check"
+  ],
+  "environmentOverrides": {
+    "DEVELOPER_DIR": "/Applications/Xcode.app/Contents/Developer",
+    "PATH": "/opt/homebrew/opt/node@22/bin:/usr/bin:/bin:/usr/sbin:/sbin:/opt/homebrew/bin"
+  },
+  "returnCode": 0,
+  "timedOut": false,
+  "ownedProcessGroup": 54396,
+  "elapsedSeconds": 0.422,
+  "log": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/mobile-youtube-fr-node-identity-probe-20261017/same-scope-clone-repair-20261017/native-binding-scope-repair-v1/logs/01-sdk-check.log",
+  "logSHA256": "c14f577bc39fefe127522a5694d5de0ea33c16539e3573498182e06307bf7873"
+}

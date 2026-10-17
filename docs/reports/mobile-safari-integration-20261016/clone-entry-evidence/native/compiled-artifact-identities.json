@@ -1,0 +1,871 @@
+{
+  "at": "2026-10-16T23:23:03.990485+00:00",
+  "status": "COMPILE_AND_WEB_RESOURCE_MATCH_PASS_NOT_RUNTIME",
+  "scope": "Actual local package/three-platform compile/resource identities and read-only signature inspection. No install, registration, simulator boot, Safari UI, handler/root-cause or production acceptance.",
+  "preparation": {
+    "path": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/mobile-youtube-fr-node-identity-probe-20261017/same-scope-clone-repair-20261017/native-preparation.json",
+    "sha256": "ceee77a6ce5041a5d6e0dc410ddf17f99f54051b1603535e602ffdf8ed97ba75",
+    "bytes": 110516
+  },
+  "verifier": {
+    "path": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/mobile-youtube-fr-node-identity-probe-20261017/same-scope-clone-repair-20261017/verify-native-artifacts.py",
+    "sha256": "46362b52296d0cf3b2358e7e9675fa79e2f904404e434b5f8a428411328df621",
+    "bytes": 26385
+  },
+  "executionSummary": {
+    "path": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/mobile-youtube-fr-node-identity-probe-20261017/same-scope-clone-repair-20261017/native-binding-scope-repair-v1/summary.json",
+    "sha256": "6929404246551d72f80bb33026afe77103bb2212d8afac43c9e2d60659e21570",
+    "bytes": 15703
+  },
+  "buildBaseHead": "121c0217d3ce8c2067ade25328d5a9527e6019e4",
+  "uncommittedProductPatchAtBuild": true,
+  "productCommit": null,
+  "sourceInputMap": {
+    "src/features/video-subtitle/content/videoPlayerBinding.ts": {
+      "path": "/Users/thinkstu/Desktop/copy/FluentRead-mobile-video-menu-accessibility-20261016/src/features/video-subtitle/content/videoPlayerBinding.ts",
+      "sha256": "0789013139caf5e43783e4d3501b9a96c5d97324213efcbdfa941e1eb34fdec4",
+      "bytes": 23201
+    },
+    "src/features/video-subtitle/content/ui.ts": {
+      "path": "/Users/thinkstu/Desktop/copy/FluentRead-mobile-video-menu-accessibility-20261016/src/features/video-subtitle/content/ui.ts",
+      "sha256": "eb9cd5ccd3d2931cd1e85fa8a668235374e0a865e06605981274bd20944b592c",
+      "bytes": 86837
+    },
+    "tests/videoPlayerBinding.test.ts": {
+      "path": "/Users/thinkstu/Desktop/copy/FluentRead-mobile-video-menu-accessibility-20261016/tests/videoPlayerBinding.test.ts",
+      "sha256": "68fb776e05d95ec9d7d95430bfe4d3ad704703fb6f0513da05c33984074e81b0",
+      "bytes": 101967
+    },
+    "scripts/run-mobile-video-subtitle-test.cjs": {
+      "path": "/Users/thinkstu/Desktop/copy/FluentRead-mobile-video-menu-accessibility-20261016/scripts/run-mobile-video-subtitle-test.cjs",
+      "sha256": "7613fece1417934d34f121f5a0413658e4fc848e2cf1d8d349d866f75b116d6f",
+      "bytes": 60997
+    },
+    "scripts/safari/package.mjs": {
+      "path": "/Users/thinkstu/Desktop/copy/FluentRead-mobile-video-menu-accessibility-20261016/scripts/safari/package.mjs",
+      "sha256": "c8f8524584509001a46159b378e24fa378524969072ab3dd38fb06ba56618ab0",
+      "bytes": 33471
+    },
+    "scripts/testing/run-resource-safe.mjs": {
+      "path": "/Users/thinkstu/Desktop/copy/FluentRead-mobile-video-menu-accessibility-20261016/scripts/testing/run-resource-safe.mjs",
+      "sha256": "ef0d65fcbd87288afb7ad070fc20015e24265008dd6b476d87e1daf5d71b49f2",
+      "bytes": 14814
+    },
+    "src/core/config/freeProviderOrigins.json": {
+      "path": "/Users/thinkstu/Desktop/copy/FluentRead-mobile-video-menu-accessibility-20261016/src/core/config/freeProviderOrigins.json",
+      "sha256": "8b4004cade979ded8b2b76ac3398dfa108f9e423de2b6d7336dc2530cadf2418",
+      "bytes": 1021
+    },
+    "scripts/safari/container/ViewController.swift": {
+      "path": "/Users/thinkstu/Desktop/copy/FluentRead-mobile-video-menu-accessibility-20261016/scripts/safari/container/ViewController.swift",
+      "sha256": "6d9d7f1bb044d88eb17b644c8c038062f964a4486f59a90f4d3b081f09931d06",
+      "bytes": 4589
+    },
+    "scripts/safari/container/Main.html": {
+      "path": "/Users/thinkstu/Desktop/copy/FluentRead-mobile-video-menu-accessibility-20261016/scripts/safari/container/Main.html",
+      "sha256": "8359d2ff5a18fc2c655ef8798869b242b7c8495fa9a4575919213a2226d7789e",
+      "bytes": 862
+    },
+    "scripts/safari/container/Style.css": {
+      "path": "/Users/thinkstu/Desktop/copy/FluentRead-mobile-video-menu-accessibility-20261016/scripts/safari/container/Style.css",
+      "sha256": "3f4c01b933fe9622c01784d8e2eec2a228225fb07284bb5adacaf4bef4319a40",
+      "bytes": 1536
+    },
+    "scripts/safari/container/Script.js": {
+      "path": "/Users/thinkstu/Desktop/copy/FluentRead-mobile-video-menu-accessibility-20261016/scripts/safari/container/Script.js",
+      "sha256": "ff9d564bd55a9742f77043dc08ebfd4cc2415989d70576851182d9c34c0ad2f8",
+      "bytes": 2887
+    },
+    "package.json": {
+      "path": "/Users/thinkstu/Desktop/copy/FluentRead-mobile-video-menu-accessibility-20261016/package.json",
+      "sha256": "f2d0cb391c8a4049f85cacd393069f39bb62de49f2bf79558ae4e31f86991871",
+      "bytes": 8017
+    },
+    "pnpm-lock.yaml": {
+      "path": "/Users/thinkstu/Desktop/copy/FluentRead-mobile-video-menu-accessibility-20261016/pnpm-lock.yaml",
+      "sha256": "f05a7705309a18c1da81c8a155aee748bbfe8974f8dd2f2d3a7de66adbdca206",
+      "bytes": 341118
+    },
+    "wxt.config.ts": {
+      "path": "/Users/thinkstu/Desktop/copy/FluentRead-mobile-video-menu-accessibility-20261016/wxt.config.ts",
+      "sha256": "09e6aea80f44a41f7cfa24acdf486f79d73c0011a086be9d36b35c4dbbd252d6",
+      "bytes": 19585
+    }
+  },
+  "sourceGitBinaryDiffSHA256": "773b03863f85689db60cc7a452048773db410e5a90450f26f8f351945239dad2",
+  "terminalReceipts": [
+    {
+      "receipt": {
+        "path": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/mobile-youtube-fr-node-identity-probe-20261017/same-scope-clone-repair-20261017/native-binding-scope-repair-v1/01-sdk-check-result.json",
+        "sha256": "e1a61420fb0ecb8c678fba7f901f7764042d88e3b848efc452d4714dfaf03ff0",
+        "bytes": 1164
+      },
+      "log": {
+        "path": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/mobile-youtube-fr-node-identity-probe-20261017/same-scope-clone-repair-20261017/native-binding-scope-repair-v1/logs/01-sdk-check.log",
+        "sha256": "c14f577bc39fefe127522a5694d5de0ea33c16539e3573498182e06307bf7873",
+        "bytes": 1072
+      }
+    },
+    {
+      "receipt": {
+        "path": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/mobile-youtube-fr-node-identity-probe-20261017/same-scope-clone-repair-20261017/native-binding-scope-repair-v1/02-safari-web-verify-result.json",
+        "sha256": "36857193f34c1de9f95a1cb2a7e0b7281c50a366798055abfc65d1b47dd76650",
+        "bytes": 1307
+      },
+      "log": {
+        "path": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/mobile-youtube-fr-node-identity-probe-20261017/same-scope-clone-repair-20261017/native-binding-scope-repair-v1/logs/02-safari-web-verify.log",
+        "sha256": "96a5724fda5c50e93f86c99bba0ef4967091e489ad53f83e6a5a0f32fe03f3e3",
+        "bytes": 702
+      }
+    },
+    {
+      "receipt": {
+        "path": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/mobile-youtube-fr-node-identity-probe-20261017/same-scope-clone-repair-20261017/native-binding-scope-repair-v1/03-fresh-unsigned-wrapper-result.json",
+        "sha256": "1fb4f676a4f74f75d89a81265533ed6208a5f81981d711671bdfa99d8a2e088d",
+        "bytes": 1616
+      },
+      "log": {
+        "path": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/mobile-youtube-fr-node-identity-probe-20261017/same-scope-clone-repair-20261017/native-binding-scope-repair-v1/logs/03-fresh-unsigned-wrapper.log",
+        "sha256": "1b2bef0bb30aa4c6eb3a889c9255012cacee4f7c9cc05790ff7b03722a71cc0c",
+        "bytes": 6179
+      }
+    },
+    {
+      "receipt": {
+        "path": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/mobile-youtube-fr-node-identity-probe-20261017/same-scope-clone-repair-20261017/native-binding-scope-repair-v1/04-macos-result.json",
+        "sha256": "1de5b025fa588bda039a51988b62efb9079147a9445284b44cad475cc59e2ef9",
+        "bytes": 1871
+      },
+      "log": {
+        "path": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/mobile-youtube-fr-node-identity-probe-20261017/same-scope-clone-repair-20261017/native-binding-scope-repair-v1/logs/04-macos.log",
+        "sha256": "ff6b38023bcd0b59a53fd99e3c2e1d3a72614ceabee6ea8c46a31a846418b625",
+        "bytes": 472316
+      }
+    },
+    {
+      "receipt": {
+        "path": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/mobile-youtube-fr-node-identity-probe-20261017/same-scope-clone-repair-20261017/native-binding-scope-repair-v1/05-ios-simulator-result.json",
+        "sha256": "2a3233b0233d035d93717a84ba77db19da61f128449d87740206280ed4f7c549",
+        "bytes": 1900
+      },
+      "log": {
+        "path": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/mobile-youtube-fr-node-identity-probe-20261017/same-scope-clone-repair-20261017/native-binding-scope-repair-v1/logs/05-ios-simulator.log",
+        "sha256": "829668f4fddb340e66664138a891f9b7c4226510e899f8728d6dd80defef5fcc",
+        "bytes": 481026
+      }
+    },
+    {
+      "receipt": {
+        "path": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/mobile-youtube-fr-node-identity-probe-20261017/same-scope-clone-repair-20261017/native-binding-scope-repair-v1/06-iphoneos-arm64-result.json",
+        "sha256": "246beb9c2ae4e0c39f7112e34b19cfd494547894088024e410ae4c0f72274b04",
+        "bytes": 2327
+      },
+      "log": {
+        "path": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/mobile-youtube-fr-node-identity-probe-20261017/same-scope-clone-repair-20261017/native-binding-scope-repair-v1/logs/06-iphoneos-arm64.log",
+        "sha256": "a6ec95226a1bb679779859a06ae0cea99b87b7a2021bb416f37c43f8b56de06f",
+        "bytes": 280379
+      }
+    }
+  ],
+  "packageReport": {
+    "path": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/mobile-youtube-fr-node-identity-probe-20261017/same-scope-clone-repair-20261017/native-binding-scope-repair-v1/output/safari-xcode/fluentread-package-report.json",
+    "sha256": "5cb0ed0114514acc8408072d8fcd6bc373a853722561e73450ddcbacfdd58a38",
+    "bytes": 4992
+  },
+  "generatedProject": {
+    "path": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/mobile-youtube-fr-node-identity-probe-20261017/same-scope-clone-repair-20261017/native-binding-scope-repair-v1/output/safari-xcode/FluentRead/FluentRead.xcodeproj/project.pbxproj",
+    "sha256": "415738669d0b423e4ef7b8e013fc2556fce748753afff83e529f0eba14efa1d1",
+    "bytes": 56948
+  },
+  "actualProjectTargets": [
+    {
+      "id": "B59BB4293082E71900D4F598",
+      "name": "FluentRead (iOS)",
+      "productType": "com.apple.product-type.application",
+      "configurationListId": "B59BB46C3082E71900D4F598",
+      "configurations": [
+        {
+          "id": "B59BB46D3082E71900D4F598",
+          "name": "Debug",
+          "bundleId": "org.example.FluentReadDevelopment",
+          "sdk": "iphoneos",
+          "deploymentTarget": "26.0"
+        },
+        {
+          "id": "B59BB46E3082E71900D4F598",
+          "name": "Release",
+          "bundleId": "org.example.FluentReadDevelopment",
+          "sdk": "iphoneos",
+          "deploymentTarget": "26.0"
+        }
+      ]
+    },
+    {
+      "id": "B59BB43B3082E71900D4F598",
+      "name": "FluentRead (macOS)",
+      "productType": "com.apple.product-type.application",
+      "configurationListId": "B59BB4733082E71900D4F598",
+      "configurations": [
+        {
+          "id": "B59BB4743082E71900D4F598",
+          "name": "Debug",
+          "bundleId": "org.example.FluentReadDevelopment",
+          "sdk": "macosx",
+          "deploymentTarget": "14.0"
+        },
+        {
+          "id": "B59BB4753082E71900D4F598",
+          "name": "Release",
+          "bundleId": "org.example.FluentReadDevelopment",
+          "sdk": "macosx",
+          "deploymentTarget": "14.0"
+        }
+      ]
+    },
+    {
+      "id": "B59BB4473082E71900D4F598",
+      "name": "FluentRead Extension (iOS)",
+      "productType": "com.apple.product-type.app-extension",
+      "configurationListId": "B59BB4683082E71900D4F598",
+      "configurations": [
+        {
+          "id": "B59BB4693082E71900D4F598",
+          "name": "Debug",
+          "bundleId": "org.example.FluentReadDevelopment.Extension",
+          "sdk": "iphoneos",
+          "deploymentTarget": "26.0"
+        },
+        {
+          "id": "B59BB46A3082E71900D4F598",
+          "name": "Release",
+          "bundleId": "org.example.FluentReadDevelopment.Extension",
+          "sdk": "iphoneos",
+          "deploymentTarget": "26.0"
+        }
+      ]
+    },
+    {
+      "id": "B59BB4513082E71900D4F598",
+      "name": "FluentRead Extension (macOS)",
+      "productType": "com.apple.product-type.app-extension",
+      "configurationListId": "B59BB46F3082E71900D4F598",
+      "configurations": [
+        {
+          "id": "B59BB4703082E71900D4F598",
+          "name": "Debug",
+          "bundleId": "org.example.FluentReadDevelopment.Extension",
+          "sdk": "macosx",
+          "deploymentTarget": "14.0"
+        },
+        {
+          "id": "B59BB4713082E71900D4F598",
+          "name": "Release",
+          "bundleId": "org.example.FluentReadDevelopment.Extension",
+          "sdk": "macosx",
+          "deploymentTarget": "14.0"
+        }
+      ]
+    }
+  ],
+  "projectReadReceipt": {
+    "argv": [
+      "/usr/bin/plutil",
+      "-convert",
+      "json",
+      "-o",
+      "-",
+      "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/mobile-youtube-fr-node-identity-probe-20261017/same-scope-clone-repair-20261017/native-binding-scope-repair-v1/output/safari-xcode/FluentRead/FluentRead.xcodeproj/project.pbxproj"
+    ],
+    "returnCode": 0,
+    "stdout": "{\"classes\":{},\"objectVersion\":\"77\",\"archiveVersion\":\"1\",\"objects\":{\"B59BB4B83082E71A00D4F598\":{\"isa\":\"PBXBuildFile\",\"fileRef\":\"B59BB4803082E71900D4F598\"},\"B59BB4213082E71800D4F598\":{\"path\":\"Script.js\",\"isa\":\"PBXFileReference\",\"lastKnownFileType\":\"sourcecode.javascript\",\"sourceTree\":\"<group>\"},\"B59BB4B63082E71A00D4F598\":{\"isa\":\"PBXBuildFile\",\"fileRef\":\"B59BB47E3082E71900D4F598\"},\"B59BB4A93082E71A00D4F598\":{\"isa\":\"PBXBuildFile\",\"fileRef\":\"B59BB48D3082E71900D4F598\"},\"B59BB4493082E71900D4F598\":{\"isa\":\"PBXBuildFile\",\"fileRef\":\"B59BB4483082E71900D4F598\",\"settings\":{\"ATTRIBUTES\":[\"RemoveHeadersOnCopy\"]}},\"B59BB42F3082E71900D4F598\":{\"path\":\"SceneDelegate.swift\",\"isa\":\"PBXFileReference\",\"lastKnownFileType\":\"sourcecode.swift\",\"sourceTree\":\"<group>\"},\"B59BB4A73082E71A00D4F598\":{\"isa\":\"PBXBuildFile\",\"fileRef\":\"B59BB48B3082E71900D4F598\"},\"B59BB4473082E71900D4F598\":{\"buildConfigurationList\":\"B59BB4683082E71900D4F598\",\"productReference\":\"B59BB4483082E71900D4F598\",\"productType\":\"com.apple.product-type.app-extension\",\"packageProductDependencies\":[],\"productName\":\"FluentRead Extension (iOS)\",\"isa\":\"PBXNativeTarget\",\"buildPhases\":[\"B59BB4443082E71900D4F598\",\"B59BB4453082E71900D4F598\",\"B59BB4463082E71900D4F598\"],\"dependencies\":[],\"name\":\"FluentRead Extension (iOS)\",\"buildRules\":[]},\"B59BB4B43082E71A00D4F598\":{\"isa\":\"PBXBuildFile\",\"fileRef\":\"B59BB47C3082E71900D4F598\"},\"B59BB42D3082E71900D4F598\":{\"path\":\"AppDelegate.swift\",\"isa\":\"PBXFileReference\",\"lastKnownFileType\":\"sourcecode.swift\",\"sourceTree\":\"<group>\"},\"B59BB4A53082E71A00D4F598\":{\"isa\":\"PBXBuildFile\",\"fileRef\":\"B59BB4893082E71900D4F598\"},\"B59BB4453082E71900D4F598\":{\"isa\":\"PBXFrameworksBuildPhase\",\"buildActionMask\":\"2147483647\",\"files\":[],\"runOnlyForDeploymentPostprocessing\":\"0\"},\"B59BB4383082E71900D4F598\":{\"isa\":\"PBXSourcesBuildPhase\",\"buildActionMask\":\"2147483647\",\"files\":[\"B59BB4613082E71900D4F598\",\"B59BB43F3082E71900D4F598\"],\"runOnlyForDeploymentPostprocessing\":\"0\"},\"B59BB42B3082E71900D4F598\":{\"isa\":\"PBXGroup\",\"name\":\"Products\",\"children\":[\"B59BB42A3082E71900D4F598\",\"B59BB43C3082E71900D4F598\",\"B59BB4483082E71900D4F598\",\"B59BB4523082E71900D4F598\"],\"sourceTree\":\"<group>\"},\"B59BB4A33082E71A00D4F598\":{\"isa\":\"PBXBuildFile\",\"fileRef\":\"B59BB4873082E71900D4F598\"},\"B59BB4433082E71900D4F598\":{\"path\":\"Info.plist\",\"isa\":\"PBXFileReference\",\"lastKnownFileType\":\"text.plist.xml\",\"sourceTree\":\"<group>\"},\"B59BB4363082E71900D4F598\":{\"isa\":\"PBXBuildFile\",\"fileRef\":\"B59BB4343082E71900D4F598\"},\"B59BB49B3082E71900D4F598\":{\"isa\":\"PBXBuildFile\",\"fileRef\":\"B59BB47F3082E71900D4F598\"},\"B59BB48E3082E71900D4F598\":{\"path\":\"Resources\\/interface-font-licenses.txt\",\"isa\":\"PBXFileReference\",\"name\":\"interface-font-licenses.txt\",\"lastKnownFileType\":\"text\",\"sourceTree\":\"<group>\"},\"B59BB4A13082E71A00D4F598\":{\"isa\":\"PBXBuildFile\",\"fileRef\":\"B59BB4853082E71900D4F598\"},\"B59BB4413082E71900D4F598\":{\"path\":\"Base.lproj\\/Main.storyboard\",\"isa\":\"PBXFileReference\",\"name\":\"Base\",\"lastKnownFileType\":\"file.storyboard\",\"sourceTree\":\"<group>\"},\"B59BB4343082E71900D4F598\":{\"isa\":\"PBXVariantGroup\",\"name\":\"Main.storyboard\",\"children\":[\"B59BB4353082E71900D4F598\"],\"sourceTree\":\"<group>\"},\"B59BB48C3082E71900D4F598\":{\"path\":\"Resources\\/_locales\",\"isa\":\"PBXFileReference\",\"name\":\"_locales\",\"lastKnownFileType\":\"folder\",\"sourceTree\":\"<group>\"},\"B59BB4323082E71900D4F598\":{\"path\":\"Base.lproj\\/LaunchScreen.storyboard\",\"isa\":\"PBXFileReference\",\"name\":\"Base\",\"lastKnownFileType\":\"file.storyboard\",\"sourceTree\":\"<group>\"},\"B59BB48A3082E71900D4F598\":{\"path\":\"Resources\\/options.html\",\"isa\":\"PBXFileReference\",\"name\":\"options.html\",\"lastKnownFileType\":\"text.html\",\"sourceTree\":\"<group>\"},\"B59BB4303082E71900D4F598\":{\"isa\":\"PBXBuildFile\",\"fileRef\":\"B59BB42F3082E71900D4F598\"},\"B59BB4983082E71900D4F598\":{\"isa\":\"PBXBuildFile\",\"fileRef\":\"B59BB47C3082E71900D4F598\"},\"B59BB4963082E71900D4F598\":{\"isa\":\"PBXBuildFile\",\"fileRef\":\"B59BB47A3082E71900D4F598\"},\"B59BB4893082E71900D4F598\":{\"path\":\"Resources\\/chatgpt-plan-guide.html\",\"isa\":\"PBXFileReference\",\"name\":\"chatgpt-plan-guide.html\",\"lastKnownFileType\":\"text.html\",\"sourceTree\":\"<group>\"},\"B59BB46F3082E71900D4F598\":{\"isa\":\"XCConfigurationList\",\"defaultConfigurationIsVisible\":\"0\",\"defaultConfigurationName\":\"Release\",\"buildConfigurations\":[\"B59BB4703082E71900D4F598\",\"B59BB4713082E71900D4F598\"]},\"B59BB4873082E71900D4F598\":{\"path\":\"Resources\\/content-scripts\",\"isa\":\"PBXFileReference\",\"name\":\"content-scripts\",\"lastKnownFileType\":\"folder\",\"sourceTree\":\"<group>\"},\"B59BB46D3082E71900D4F598\":{\"isa\":\"XCBuildConfiguration\",\"buildSettings\":{\"INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad\":\"UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight\",\"MARKETING_VERSION\":\"1.0\",\"CURRENT_PROJECT_VERSION\":\"1\",\"PRODUCT_BUNDLE_IDENTIFIER\":\"org.example.FluentReadDevelopment\",\"SWIFT_DEFAULT_ACTOR_ISOLATION\":\"MainActor\",\"STRING_CATALOG_GENERATE_SYMBOLS\":\"YES\",\"ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME\":\"AccentColor\",\"INFOPLIST_KEY_CFBundleDisplayName\":\"FluentRead\",\"OTHER_LDFLAGS\":[\"-framework\",\"SafariServices\",\"-framework\",\"WebKit\"],\"CODE_SIGN_STYLE\":\"Automatic\",\"INFOPLIST_KEY_UILaunchStoryboardName\":\"LaunchScreen\",\"TARGETED_DEVICE_FAMILY\":\"1,2\",\"ASSETCATALOG_COMPILER_APPICON_NAME\":\"AppIcon\",\"INFOPLIST_KEY_UIMainStoryboardFile\":\"Main\",\"SDKROOT\":\"iphoneos\",\"LD_RUNPATH_SEARCH_PATHS\":[\"$(inherited)\",\"@executable_path\\/Frameworks\"],\"SWIFT_VERSION\":\"5.0\",\"PRODUCT_NAME\":\"FluentRead\",\"IPHONEOS_DEPLOYMENT_TARGET\":\"26.0\",\"INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents\":\"YES\",\"INFOPLIST_KEY_UISupportedInterfaceOrientations\":\"UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight\",\"SWIFT_APPROACHABLE_CONCURRENCY\":\"YES\",\"SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY\":\"YES\",\"SWIFT_EMIT_LOC_STRINGS\":\"YES\",\"INFOPLIST_FILE\":\"iOS (App)\\/Info.plist\",\"GENERATE_INFOPLIST_FILE\":\"YES\"},\"name\":\"Debug\"},\"B59BB4853082E71900D4F598\":{\"path\":\"Resources\\/videoTranscriptionWorker.js\",\"isa\":\"PBXFileReference\",\"name\":\"videoTranscriptionWorker.js\",\"lastKnownFileType\":\"sourcecode.javascript\",\"sourceTree\":\"<group>\"},\"B59BB46B3082E71900D4F598\":{\"buildActionMask\":\"2147483647\",\"dstSubfolderSpec\":\"13\",\"isa\":\"PBXCopyFilesBuildPhase\",\"runOnlyForDeploymentPostprocessing\":\"0\",\"dstPath\":\"\",\"files\":[\"B59BB4493082E71900D4F598\"],\"name\":\"Embed Foundation Extensions\"},\"B59BB45E3082E71900D4F598\":{\"isa\":\"PBXBuildFile\",\"fileRef\":\"B59BB4213082E71800D4F598\"},\"B59BB4833082E71900D4F598\":{\"path\":\"Resources\\/mangaInferenceWorker.js\",\"isa\":\"PBXFileReference\",\"name\":\"mangaInferenceWorker.js\",\"lastKnownFileType\":\"sourcecode.javascript\",\"sourceTree\":\"<group>\"},\"B59BB4763082E71900D4F598\":{\"path\":\"Shared (Extension)\",\"isa\":\"PBXGroup\",\"name\":\"Resources\",\"children\":[\"B59BB4773082E71900D4F598\",\"B59BB4783082E71900D4F598\",\"B59BB4793082E71900D4F598\",\"B59BB47A3082E71900D4F598\",\"B59BB47B3082E71900D4F598\",\"B59BB47C3082E71900D4F598\",\"B59BB47D3082E71900D4F598\",\"B59BB47E3082E71900D4F598\",\"B59BB47F3082E71900D4F598\",\"B59BB4803082E71900D4F598\",\"B59BB4813082E71900D4F598\",\"B59BB4823082E71900D4F598\",\"B59BB4833082E71900D4F598\",\"B59BB4843082E71900D4F598\",\"B59BB4853082E71900D4F598\",\"B59BB4863082E71900D4F598\",\"B59BB4873082E71900D4F598\",\"B59BB4883082E71900D4F598\",\"B59BB4893082E71900D4F598\",\"B59BB48A3082E71900D4F598\",\"B59BB48B3082E71900D4F598\",\"B59BB48C3082E71900D4F598\",\"B59BB48D3082E71900D4F598\",\"B59BB48E3082E71900D4F598\",\"B59BB48F3082E71900D4F598\",\"B59BB4903082E71900D4F598\",\"B59BB4913082E71900D4F598\",\"B59BB4923082E71900D4F598\"],\"sourceTree\":\"SOURCE_ROOT\"},\"B59BB4BC3082E71A00D4F598\":{\"isa\":\"PBXBuildFile\",\"fileRef\":\"B59BB4843082E71900D4F598\"},\"B59BB45C3082E71900D4F598\":{\"isa\":\"PBXBuildFile\",\"fileRef\":\"B59BB4203082E71800D4F598\"},\"B59BB4813082E71900D4F598\":{\"path\":\"Resources\\/third-party-notices\",\"isa\":\"PBXFileReference\",\"name\":\"third-party-notices\",\"lastKnownFileType\":\"folder\",\"sourceTree\":\"<group>\"},\"B59BB4743082E71900D4F598\":{\"isa\":\"XCBuildConfiguration\",\"buildSettings\":{\"INFOPLIST_KEY_NSPrincipalClass\":\"NSApplication\",\"MARKETING_VERSION\":\"1.0\",\"SWIFT_EMIT_LOC_STRINGS\":\"YES\",\"REGISTER_APP_GROUPS\":\"YES\",\"PRODUCT_BUNDLE_IDENTIFIER\":\"org.example.FluentReadDevelopment\",\"CURRENT_PROJECT_VERSION\":\"1\",\"ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME\":\"AccentColor\",\"STRING_CATALOG_GENERATE_SYMBOLS\":\"YES\",\"SWIFT_DEFAULT_ACTOR_ISOLATION\":\"MainActor\",\"INFOPLIST_KEY_CFBundleDisplayName\":\"FluentRead\",\"MACOSX_DEPLOYMENT_TARGET\":\"14.0\",\"INFOPLIST_KEY_NSMainStoryboardFile\":\"Main\",\"CODE_SIGN_STYLE\":\"Automatic\",\"OTHER_LDFLAGS\":[\"-framework\",\"SafariServices\",\"-framework\",\"WebKit\"],\"ASSETCATALOG_COMPILER_APPICON_NAME\":\"AppIcon\",\"SDKROOT\":\"macosx\",\"LD_RUNPATH_SEARCH_PATHS\":[\"$(inherited)\",\"@executable_path\\/..\\/Frameworks\"],\"SWIFT_VERSION\":\"5.0\",\"PRODUCT_NAME\":\"FluentRead\",\"SWIFT_APPROACHABLE_CONCURRENCY\":\"YES\",\"ENABLE_OUTGOING_NETWORK_CONNECTIONS\":\"YES\",\"SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY\":\"YES\",\"ENABLE_APP_SANDBOX\":\"YES\",\"ENABLE_HARDENED_RUNTIME\":\"YES\",\"ENABLE_USER_SELECTED_FILES\":\"readonly\",\"INFOPLIST_FILE\":\"macOS (App)\\/Info.plist\",\"GENERATE_INFOPLIST_FILE\":\"YES\"},\"name\":\"Debug\"},\"B59BB4BA3082E71A00D4F598\":{\"isa\":\"PBXBuildFile\",\"fileRef\":\"B59BB4823082E71900D4F598\"},\"B59BB45A3082E71900D4F598\":{\"isa\":\"PBXBuildFile\",\"fileRef\":\"B59BB41F3082E71800D4F598\"},\"B59BB41F3082E71800D4F598\":{\"path\":\"Icon.png\",\"isa\":\"PBXFileReference\",\"lastKnownFileType\":\"image.png\",\"sourceTree\":\"<group>\"},\"B59BB4723082E71900D4F598\":{\"buildActionMask\":\"2147483647\",\"dstSubfolderSpec\":\"13\",\"isa\":\"PBXCopyFilesBuildPhase\",\"runOnlyForDeploymentPostprocessing\":\"0\",\"dstPath\":\"\",\"files\":[\"B59BB4533082E71900D4F598\"],\"name\":\"Embed Foundation Extensions\"},\"B59BB41D3082E71800D4F598\":{\"isa\":\"PBXVariantGroup\",\"name\":\"Main.html\",\"children\":[\"B59BB41E3082E71800D4F598\"],\"sourceTree\":\"<group>\"},\"B59BB4703082E71900D4F598\":{\"isa\":\"XCBuildConfiguration\",\"buildSettings\":{\"ENABLE_HARDENED_RUNTIME\":\"YES\",\"MARKETING_VERSION\":\"1.0\",\"CURRENT_PROJECT_VERSION\":\"1\",\"PRODUCT_BUNDLE_IDENTIFIER\":\"org.example.FluentReadDevelopment.Extension\",\"STRING_CATALOG_GENERATE_SYMBOLS\":\"YES\",\"INFOPLIST_KEY_CFBundleDisplayName\":\"FluentRead Extension\",\"MACOSX_DEPLOYMENT_TARGET\":\"14.0\",\"OTHER_LDFLAGS\":[\"-framework\",\"SafariServices\"],\"CODE_SIGN_STYLE\":\"Automatic\",\"SDKROOT\":\"macosx\",\"LD_RUNPATH_SEARCH_PATHS\":[\"$(inherited)\",\"@executable_path\\/..\\/Frameworks\",\"@executable_path\\/..\\/..\\/..\\/..\\/Frameworks\"],\"SWIFT_VERSION\":\"5.0\",\"PRODUCT_NAME\":\"FluentRead Extension\",\"SWIFT_APPROACHABLE_CONCURRENCY\":\"YES\",\"SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY\":\"YES\",\"INFOPLIST_KEY_NSHumanReadableCopyright\":\"\",\"SKIP_INSTALL\":\"YES\",\"ENABLE_APP_SANDBOX\":\"YES\",\"SWIFT_EMIT_LOC_STRINGS\":\"YES\",\"ENABLE_USER_SELECTED_FILES\":\"readonly\",\"INFOPLIST_FILE\":\"macOS (Extension)\\/Info.plist\",\"GENERATE_INFOPLIST_FILE\":\"YES\"},\"name\":\"Debug\"},\"B59BB41B3082E71800D4F598\":{\"path\":\"Shared (App)\",\"isa\":\"PBXGroup\",\"children\":[\"B59BB4223082E71800D4F598\",\"B59BB4233082E71900D4F598\",\"B59BB41C3082E71800D4F598\"],\"sourceTree\":\"<group>\"},\"B59BB4C83082E71A00D4F598\":{\"isa\":\"PBXBuildFile\",\"fileRef\":\"B59BB4903082E71900D4F598\"},\"B59BB4683082E71900D4F598\":{\"isa\":\"XCConfigurationList\",\"defaultConfigurationIsVisible\":\"0\",\"defaultConfigurationName\":\"Release\",\"buildConfigurations\":[\"B59BB4693082E71900D4F598\",\"B59BB46A3082E71900D4F598\"]},\"B59BB4AE3082E71A00D4F598\":{\"isa\":\"PBXBuildFile\",\"fileRef\":\"B59BB4923082E71900D4F598\"},\"B59BB4C63082E71A00D4F598\":{\"isa\":\"PBXBuildFile\",\"fileRef\":\"B59BB48E3082E71900D4F598\"},\"B59BB4B93082E71A00D4F598\":{\"isa\":\"PBXBuildFile\",\"fileRef\":\"B59BB4813082E71900D4F598\"},\"B59BB4593082E71900D4F598\":{\"isa\":\"PBXBuildFile\",\"fileRef\":\"B59BB41D3082E71800D4F598\"},\"B59BB49F3082E71A00D4F598\":{\"isa\":\"PBXBuildFile\",\"fileRef\":\"B59BB4833082E71900D4F598\"},\"B59BB43F3082E71900D4F598\":{\"isa\":\"PBXBuildFile\",\"fileRef\":\"B59BB43E3082E71900D4F598\"},\"B59BB4B73082E71A00D4F598\":{\"isa\":\"PBXBuildFile\",\"fileRef\":\"B59BB47F3082E71900D4F598\"},\"B59BB4573082E71900D4F598\":{\"path\":\"Info.plist\",\"isa\":\"PBXFileReference\",\"lastKnownFileType\":\"text.plist.xml\",\"sourceTree\":\"<group>\"},\"B59BB4C43082E71A00D4F598\":{\"isa\":\"PBXBuildFile\",\"fileRef\":\"B59BB48C3082E71900D4F598\"},\"B59BB4203082E71800D4F598\":{\"path\":\"Style.css\",\"isa\":\"PBXFileReference\",\"lastKnownFileType\":\"text.css\",\"sourceTree\":\"<group>\"},\"B59BB49D3082E71A00D4F598\":{\"isa\":\"PBXBuildFile\",\"fileRef\":\"B59BB4813082E71900D4F598\"},\"B59BB43D3082E71900D4F598\":{\"path\":\"macOS (App)\",\"isa\":\"PBXGroup\",\"children\":[\"B59BB43E3082E71900D4F598\",\"B59BB4403082E71900D4F598\",\"B59BB4433082E71900D4F598\"],\"sourceTree\":\"<group>\"},\"B59BB4B53082E71A00D4F598\":{\"isa\":\"PBXBuildFile\",\"fileRef\":\"B59BB47D3082E71900D4F598\"},\"B59BB4C23082E71A00D4F598\":{\"isa\":\"PBXBuildFile\",\"fileRef\":\"B59BB48A3082E71900D4F598\"},\"B59BB4483082E71900D4F598\":{\"path\":\"FluentRead Extension.appex\",\"isa\":\"PBXFileReference\",\"includeInIndex\":\"0\",\"explicitFileType\":\"wrapper.app-extension\",\"sourceTree\":\"BUILT_PRODUCTS_DIR\"},\"B59BB4553082E71900D4F598\":{\"isa\":\"PBXTargetDependency\",\"target\":\"B59BB4513082E71900D4F598\",\"targetProxy\":\"B59BB4543082E71900D4F598\"},\"B59BB43B3082E71900D4F598\":{\"buildConfigurationList\":\"B59BB4733082E71900D4F598\",\"productReference\":\"B59BB43C3082E71900D4F598\",\"productType\":\"com.apple.product-type.application\",\"packageProductDependencies\":[],\"productName\":\"FluentRead (macOS)\",\"isa\":\"PBXNativeTarget\",\"buildPhases\":[\"B59BB4383082E71900D4F598\",\"B59BB4393082E71900D4F598\",\"B59BB43A3082E71900D4F598\",\"B59BB4723082E71900D4F598\"],\"dependencies\":[\"B59BB4553082E71900D4F598\"],\"name\":\"FluentRead (macOS)\",\"buildRules\":[]},\"B59BB42E3082E71900D4F598\":{\"isa\":\"PBXBuildFile\",\"fileRef\":\"B59BB42D3082E71900D4F598\"},\"B59BB4533082E71900D4F598\":{\"isa\":\"PBXBuildFile\",\"fileRef\":\"B59BB4523082E71900D4F598\",\"settings\":{\"ATTRIBUTES\":[\"RemoveHeadersOnCopy\"]}},\"B59BB4463082E71900D4F598\":{\"isa\":\"PBXResourcesBuildPhase\",\"buildActionMask\":\"2147483647\",\"files\":[\"B59BB4BA3082E71A00D4F598\",\"B59BB4BB3082E71A00D4F598\",\"B59BB4BD3082E71A00D4F598\",\"B59BB4C93082E71A00D4F598\",\"B59BB4B23082E71A00D4F598\",\"B59BB4C03082E71A00D4F598\",\"B59BB4B43082E71A00D4F598\",\"B59BB4BC3082E71A00D4F598\",\"B59BB4C23082E71A00D4F598\",\"B59BB4B13082E71A00D4F598\",\"B59BB4C33082E71A00D4F598\",\"B59BB4B33082E71A00D4F598\",\"B59BB4BF3082E71A00D4F598\",\"B59BB4B63082E71A00D4F598\",\"B59BB4C83082E71A00D4F598\",\"B59BB4B03082E71A00D4F598\",\"B59BB4C53082E71A00D4F598\",\"B59BB4B73082E71A00D4F598\",\"B59BB4B83082E71A00D4F598\",\"B59BB4C63082E71A00D4F598\",\"B59BB4C13082E71A00D4F598\",\"B59BB4BE3082E71A00D4F598\",\"B59BB4B53082E71A00D4F598\",\"B59BB4C73082E71A00D4F598\",\"B59BB4B93082E71A00D4F598\",\"B59BB4C43082E71A00D4F598\",\"B59BB4CA3082E71A00D4F598\",\"B59BB4AF3082E71A00D4F598\"],\"runOnlyForDeploymentPostprocessing\":\"0\"},\"B59BB4B33082E71A00D4F598\":{\"isa\":\"PBXBuildFile\",\"fileRef\":\"B59BB47B3082E71900D4F598\"},\"B59BB4B13082E71A00D4F598\":{\"isa\":\"PBXBuildFile\",\"fileRef\":\"B59BB4793082E71900D4F598\"},\"B59BB4513082E71900D4F598\":{\"buildConfigurationList\":\"B59BB46F3082E71900D4F598\",\"productReference\":\"B59BB4523082E71900D4F598\",\"productType\":\"com.apple.product-type.app-extension\",\"packageProductDependencies\":[],\"productName\":\"FluentRead Extension (macOS)\",\"isa\":\"PBXNativeTarget\",\"buildPhases\":[\"B59BB44E3082E71900D4F598\",\"B59BB44F3082E71900D4F598\",\"B59BB4503082E71900D4F598\"],\"dependencies\":[],\"name\":\"FluentRead Extension (macOS)\",\"buildRules\":[]},\"B59BB4163082E71800D4F598\":{\"isa\":\"PBXGroup\",\"sourceTree\":\"<group>\",\"children\":[\"B59BB41B3082E71800D4F598\",\"B59BB4243082E71900D4F598\",\"B59BB42C3082E71900D4F598\",\"B59BB43D3082E71900D4F598\",\"B59BB44C3082E71900D4F598\",\"B59BB4563082E71900D4F598\",\"B59BB42B3082E71900D4F598\"]},\"B59BB42C3082E71900D4F598\":{\"path\":\"iOS (App)\",\"isa\":\"PBXGroup\",\"children\":[\"B59BB42D3082E71900D4F598\",\"B59BB42F3082E71900D4F598\",\"B59BB4313082E71900D4F598\",\"B59BB4343082E71900D4F598\",\"B59BB4373082E71900D4F598\"],\"sourceTree\":\"<group>\"},\"B59BB4443082E71900D4F598\":{\"isa\":\"PBXSourcesBuildPhase\",\"buildActionMask\":\"2147483647\",\"files\":[\"B59BB4643082E71900D4F598\"],\"runOnlyForDeploymentPostprocessing\":\"0\"},\"B59BB42A3082E71900D4F598\":{\"path\":\"FluentRead.app\",\"isa\":\"PBXFileReference\",\"includeInIndex\":\"0\",\"explicitFileType\":\"wrapper.application\",\"sourceTree\":\"BUILT_PRODUCTS_DIR\"},\"B59BB4A23082E71A00D4F598\":{\"isa\":\"PBXBuildFile\",\"fileRef\":\"B59BB4863082E71900D4F598\"},\"B59BB4423082E71900D4F598\":{\"isa\":\"PBXBuildFile\",\"fileRef\":\"B59BB4403082E71900D4F598\"},\"B59BB49A3082E71900D4F598\":{\"isa\":\"PBXBuildFile\",\"fileRef\":\"B59BB47E3082E71900D4F598\"},\"B59BB4A03082E71A00D4F598\":{\"isa\":\"PBXBuildFile\",\"fileRef\":\"B59BB4843082E71900D4F598\"},\"B59BB4403082E71900D4F598\":{\"isa\":\"PBXVariantGroup\",\"name\":\"Main.storyboard\",\"children\":[\"B59BB4413082E71900D4F598\"],\"sourceTree\":\"<group>\"},\"B59BB4293082E71900D4F598\":{\"buildConfigurationList\":\"B59BB46C3082E71900D4F598\",\"productReference\":\"B59BB42A3082E71900D4F598\",\"productType\":\"com.apple.product-type.application\",\"packageProductDependencies\":[],\"productName\":\"FluentRead (iOS)\",\"isa\":\"PBXNativeTarget\",\"buildPhases\":[\"B59BB4263082E71900D4F598\",\"B59BB4273082E71900D4F598\",\"B59BB4283082E71900D4F598\",\"B59BB46B3082E71900D4F598\"],\"dependencies\":[\"B59BB44B3082E71900D4F598\"],\"name\":\"FluentRead (iOS)\",\"buildRules\":[]},\"B59BB4993082E71900D4F598\":{\"isa\":\"PBXBuildFile\",\"fileRef\":\"B59BB47D3082E71900D4F598\"},\"B59BB4273082E71900D4F598\":{\"isa\":\"PBXFrameworksBuildPhase\",\"buildActionMask\":\"2147483647\",\"files\":[],\"runOnlyForDeploymentPostprocessing\":\"0\"},\"B59BB47F3082E71900D4F598\":{\"path\":\"Resources\\/fluent-read-manga\",\"isa\":\"PBXFileReference\",\"name\":\"fluent-read-manga\",\"lastKnownFileType\":\"folder\",\"sourceTree\":\"<group>\"},\"B59BB4973082E71900D4F598\":{\"isa\":\"PBXBuildFile\",\"fileRef\":\"B59BB47B3082E71900D4F598\"},\"B59BB4253082E71900D4F598\":{\"path\":\"SafariWebExtensionHandler.swift\",\"isa\":\"PBXFileReference\",\"lastKnownFileType\":\"sourcecode.swift\",\"sourceTree\":\"<group>\"},\"B59BB47D3082E71900D4F598\":{\"path\":\"Resources\\/popup-startup.js\",\"isa\":\"PBXFileReference\",\"name\":\"popup-startup.js\",\"lastKnownFileType\":\"sourcecode.javascript\",\"sourceTree\":\"<group>\"},\"B59BB4953082E71900D4F598\":{\"isa\":\"PBXBuildFile\",\"fileRef\":\"B59BB4793082E71900D4F598\"},\"B59BB4233082E71900D4F598\":{\"path\":\"Assets.xcassets\",\"isa\":\"PBXFileReference\",\"lastKnownFileType\":\"folder.assetcatalog\",\"sourceTree\":\"<group>\"},\"B59BB47B3082E71900D4F598\":{\"path\":\"Resources\\/ecdict-core.LICENSE.md\",\"isa\":\"PBXFileReference\",\"name\":\"ecdict-core.LICENSE.md\",\"lastKnownFileType\":\"net.daringfireball.markdown\",\"sourceTree\":\"<group>\"},\"B59BB46E3082E71900D4F598\":{\"isa\":\"XCBuildConfiguration\",\"buildSettings\":{\"INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad\":\"UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight\",\"MARKETING_VERSION\":\"1.0\",\"VALIDATE_PRODUCT\":\"YES\",\"CURRENT_PROJECT_VERSION\":\"1\",\"PRODUCT_BUNDLE_IDENTIFIER\":\"org.example.FluentReadDevelopment\",\"SWIFT_DEFAULT_ACTOR_ISOLATION\":\"MainActor\",\"STRING_CATALOG_GENERATE_SYMBOLS\":\"YES\",\"ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME\":\"AccentColor\",\"INFOPLIST_KEY_CFBundleDisplayName\":\"FluentRead\",\"OTHER_LDFLAGS\":[\"-framework\",\"SafariServices\",\"-framework\",\"WebKit\"],\"CODE_SIGN_STYLE\":\"Automatic\",\"INFOPLIST_KEY_UILaunchStoryboardName\":\"LaunchScreen\",\"TARGETED_DEVICE_FAMILY\":\"1,2\",\"ASSETCATALOG_COMPILER_APPICON_NAME\":\"AppIcon\",\"INFOPLIST_KEY_UIMainStoryboardFile\":\"Main\",\"SDKROOT\":\"iphoneos\",\"LD_RUNPATH_SEARCH_PATHS\":[\"$(inherited)\",\"@executable_path\\/Frameworks\"],\"SWIFT_VERSION\":\"5.0\",\"PRODUCT_NAME\":\"FluentRead\",\"IPHONEOS_DEPLOYMENT_TARGET\":\"26.0\",\"INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents\":\"YES\",\"INFOPLIST_KEY_UISupportedInterfaceOrientations\":\"UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight\",\"SWIFT_APPROACHABLE_CONCURRENCY\":\"YES\",\"SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY\":\"YES\",\"SWIFT_EMIT_LOC_STRINGS\":\"YES\",\"INFOPLIST_FILE\":\"iOS (App)\\/Info.plist\",\"GENERATE_INFOPLIST_FILE\":\"YES\"},\"name\":\"Release\"},\"B59BB4933082E71900D4F598\":{\"isa\":\"PBXBuildFile\",\"fileRef\":\"B59BB4773082E71900D4F598\"},\"B59BB46C3082E71900D4F598\":{\"isa\":\"XCConfigurationList\",\"defaultConfigurationIsVisible\":\"0\",\"defaultConfigurationName\":\"Release\",\"buildConfigurations\":[\"B59BB46D3082E71900D4F598\",\"B59BB46E3082E71900D4F598\"]},\"B59BB4913082E71900D4F598\":{\"path\":\"Resources\\/fluent-read-ocr\",\"isa\":\"PBXFileReference\",\"name\":\"fluent-read-ocr\",\"lastKnownFileType\":\"folder\",\"sourceTree\":\"<group>\"},\"B59BB4843082E71900D4F598\":{\"path\":\"Resources\\/chunks\",\"isa\":\"PBXFileReference\",\"name\":\"chunks\",\"lastKnownFileType\":\"folder\",\"sourceTree\":\"<group>\"},\"B59BB4CA3082E71A00D4F598\":{\"isa\":\"PBXBuildFile\",\"fileRef\":\"B59BB4923082E71900D4F598\"},\"B59BB46A3082E71900D4F598\":{\"isa\":\"XCBuildConfiguration\",\"buildSettings\":{\"VALIDATE_PRODUCT\":\"YES\",\"MARKETING_VERSION\":\"1.0\",\"CURRENT_PROJECT_VERSION\":\"1\",\"PRODUCT_BUNDLE_IDENTIFIER\":\"org.example.FluentReadDevelopment.Extension\",\"STRING_CATALOG_GENERATE_SYMBOLS\":\"YES\",\"INFOPLIST_KEY_CFBundleDisplayName\":\"FluentRead Extension\",\"TARGETED_DEVICE_FAMILY\":\"1,2\",\"CODE_SIGN_STYLE\":\"Automatic\",\"OTHER_LDFLAGS\":[\"-framework\",\"SafariServices\"],\"SDKROOT\":\"iphoneos\",\"LD_RUNPATH_SEARCH_PATHS\":[\"$(inherited)\",\"@executable_path\\/Frameworks\",\"@executable_path\\/..\\/..\\/Frameworks\"],\"SWIFT_VERSION\":\"5.0\",\"PRODUCT_NAME\":\"FluentRead Extension\",\"SWIFT_APPROACHABLE_CONCURRENCY\":\"YES\",\"SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY\":\"YES\",\"INFOPLIST_KEY_NSHumanReadableCopyright\":\"\",\"SKIP_INSTALL\":\"YES\",\"IPHONEOS_DEPLOYMENT_TARGET\":\"26.0\",\"SWIFT_EMIT_LOC_STRINGS\":\"YES\",\"INFOPLIST_FILE\":\"iOS (Extension)\\/Info.plist\",\"GENERATE_INFOPLIST_FILE\":\"YES\"},\"name\":\"Release\"},\"B59BB4823082E71900D4F598\":{\"path\":\"Resources\\/pdfjs\",\"isa\":\"PBXFileReference\",\"name\":\"pdfjs\",\"lastKnownFileType\":\"folder\",\"sourceTree\":\"<group>\"},\"B59BB4803082E71900D4F598\":{\"path\":\"Resources\\/document.html\",\"isa\":\"PBXFileReference\",\"name\":\"document.html\",\"lastKnownFileType\":\"text.html\",\"sourceTree\":\"<group>\"},\"B59BB4783082E71900D4F598\":{\"path\":\"Resources\\/localTranslationWorker.js\",\"isa\":\"PBXFileReference\",\"name\":\"localTranslationWorker.js\",\"lastKnownFileType\":\"sourcecode.javascript\",\"sourceTree\":\"<group>\"},\"B59BB41C3082E71800D4F598\":{\"path\":\"Resources\",\"isa\":\"PBXGroup\",\"children\":[\"B59BB41D3082E71800D4F598\",\"B59BB41F3082E71800D4F598\",\"B59BB4203082E71800D4F598\",\"B59BB4213082E71800D4F598\"],\"sourceTree\":\"<group>\"},\"B59BB4BE3082E71A00D4F598\":{\"isa\":\"PBXBuildFile\",\"fileRef\":\"B59BB4863082E71900D4F598\"},\"B59BB4C93082E71A00D4F598\":{\"isa\":\"PBXBuildFile\",\"fileRef\":\"B59BB4913082E71900D4F598\"},\"B59BB4693082E71900D4F598\":{\"isa\":\"XCBuildConfiguration\",\"buildSettings\":{\"MARKETING_VERSION\":\"1.0\",\"CURRENT_PROJECT_VERSION\":\"1\",\"PRODUCT_BUNDLE_IDENTIFIER\":\"org.example.FluentReadDevelopment.Extension\",\"STRING_CATALOG_GENERATE_SYMBOLS\":\"YES\",\"INFOPLIST_KEY_CFBundleDisplayName\":\"FluentRead Extension\",\"TARGETED_DEVICE_FAMILY\":\"1,2\",\"CODE_SIGN_STYLE\":\"Automatic\",\"OTHER_LDFLAGS\":[\"-framework\",\"SafariServices\"],\"SDKROOT\":\"iphoneos\",\"LD_RUNPATH_SEARCH_PATHS\":[\"$(inherited)\",\"@executable_path\\/Frameworks\",\"@executable_path\\/..\\/..\\/Frameworks\"],\"SWIFT_VERSION\":\"5.0\",\"PRODUCT_NAME\":\"FluentRead Extension\",\"SWIFT_APPROACHABLE_CONCURRENCY\":\"YES\",\"SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY\":\"YES\",\"INFOPLIST_KEY_NSHumanReadableCopyright\":\"\",\"SKIP_INSTALL\":\"YES\",\"IPHONEOS_DEPLOYMENT_TARGET\":\"26.0\",\"SWIFT_EMIT_LOC_STRINGS\":\"YES\",\"INFOPLIST_FILE\":\"iOS (Extension)\\/Info.plist\",\"GENERATE_INFOPLIST_FILE\":\"YES\"},\"name\":\"Debug\"},\"B59BB41A3082E71800D4F598\":{\"isa\":\"XCConfigurationList\",\"defaultConfigurationIsVisible\":\"0\",\"defaultConfigurationName\":\"Release\",\"buildConfigurations\":[\"B59BB4663082E71900D4F598\",\"B59BB4673082E71900D4F598\"]},\"B59BB4AF3082E71A00D4F598\":{\"isa\":\"PBXBuildFile\",\"fileRef\":\"B59BB4773082E71900D4F598\"},\"B59BB44F3082E71900D4F598\":{\"isa\":\"PBXFrameworksBuildPhase\",\"buildActionMask\":\"2147483647\",\"files\":[],\"runOnlyForDeploymentPostprocessing\":\"0\"},\"B59BB4C73082E71A00D4F598\":{\"isa\":\"PBXBuildFile\",\"fileRef\":\"B59BB48F3082E71900D4F598\"},\"B59BB4673082E71900D4F598\":{\"isa\":\"XCBuildConfiguration\",\"buildSettings\":{\"CLANG_WARN_DOCUMENTATION_COMMENTS\":\"YES\",\"CLANG_WARN_UNGUARDED_AVAILABILITY\":\"YES_AGGRESSIVE\",\"CLANG_WARN_DIRECT_OBJC_ISA_USAGE\":\"YES_ERROR\",\"CLANG_ENABLE_OBJC_ARC\":\"YES\",\"CLANG_WARN_SUSPICIOUS_MOVE\":\"YES\",\"CLANG_WARN__DUPLICATE_METHOD_MATCH\":\"YES\",\"CLANG_ENABLE_OBJC_WEAK\":\"YES\",\"ENABLE_NS_ASSERTIONS\":\"NO\",\"CLANG_WARN_INFINITE_RECURSION\":\"YES\",\"GCC_WARN_UNDECLARED_SELECTOR\":\"YES\",\"SWIFT_COMPILATION_MODE\":\"wholemodule\",\"CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION\":\"YES_AGGRESSIVE\",\"CLANG_CXX_LANGUAGE_STANDARD\":\"gnu++20\",\"LOCALIZATION_PREFERS_STRING_CATALOGS\":\"YES\",\"CLANG_WARN_BOOL_CONVERSION\":\"YES\",\"CLANG_WARN_UNREACHABLE_CODE\":\"YES\",\"ENABLE_STRICT_OBJC_MSGSEND\":\"YES\",\"CLANG_ANALYZER_NONNULL\":\"YES\",\"CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING\":\"YES\",\"CLANG_WARN_STRICT_PROTOTYPES\":\"YES\",\"CLANG_WARN_ENUM_CONVERSION\":\"YES\",\"CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER\":\"YES\",\"GCC_WARN_64_TO_32_BIT_CONVERSION\":\"YES\",\"ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS\":\"YES\",\"CLANG_WARN_EMPTY_BODY\":\"YES\",\"GCC_WARN_ABOUT_RETURN_TYPE\":\"YES_ERROR\",\"GCC_WARN_UNINITIALIZED_AUTOS\":\"YES_AGGRESSIVE\",\"CLANG_WARN_COMMA\":\"YES\",\"GCC_C_LANGUAGE_STANDARD\":\"gnu17\",\"GCC_WARN_UNUSED_VARIABLE\":\"YES\",\"CLANG_WARN_RANGE_LOOP_ANALYSIS\":\"YES\",\"CLANG_ENABLE_MODULES\":\"YES\",\"CLANG_WARN_INT_CONVERSION\":\"YES\",\"ALWAYS_SEARCH_USER_PATHS\":\"NO\",\"CLANG_WARN_OBJC_ROOT_CLASS\":\"YES_ERROR\",\"CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS\":\"YES\",\"COPY_PHASE_STRIP\":\"NO\",\"CLANG_WARN_CONSTANT_CONVERSION\":\"YES\",\"ENABLE_USER_SCRIPT_SANDBOXING\":\"YES\",\"GCC_NO_COMMON_BLOCKS\":\"YES\",\"MTL_ENABLE_DEBUG_INFO\":\"NO\",\"CLANG_WARN_NON_LITERAL_NULL_CONVERSION\":\"YES\",\"MTL_FAST_MATH\":\"YES\",\"GCC_WARN_UNUSED_FUNCTION\":\"YES\",\"CLANG_WARN_OBJC_LITERAL_CONVERSION\":\"YES\",\"DEBUG_INFORMATION_FORMAT\":\"dwarf-with-dsym\",\"CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF\":\"YES\"},\"name\":\"Release\"},\"B59BB4AD3082E71A00D4F598\":{\"isa\":\"PBXBuildFile\",\"fileRef\":\"B59BB4913082E71900D4F598\"},\"B59BB44D3082E71900D4F598\":{\"path\":\"Info.plist\",\"isa\":\"PBXFileReference\",\"lastKnownFileType\":\"text.plist.xml\",\"sourceTree\":\"<group>\"},\"B59BB4C53082E71A00D4F598\":{\"isa\":\"PBXBuildFile\",\"fileRef\":\"B59BB48D3082E71900D4F598\"},\"B59BB4653082E71900D4F598\":{\"isa\":\"PBXBuildFile\",\"fileRef\":\"B59BB4253082E71900D4F598\"},\"B59BB4583082E71900D4F598\":{\"isa\":\"PBXBuildFile\",\"fileRef\":\"B59BB41D3082E71800D4F598\"},\"B59BB49E3082E71A00D4F598\":{\"isa\":\"PBXBuildFile\",\"fileRef\":\"B59BB4823082E71900D4F598\"},\"B59BB4AB3082E71A00D4F598\":{\"isa\":\"PBXBuildFile\",\"fileRef\":\"B59BB48F3082E71900D4F598\"},\"B59BB44B3082E71900D4F598\":{\"isa\":\"PBXTargetDependency\",\"target\":\"B59BB4473082E71900D4F598\",\"targetProxy\":\"B59BB44A3082E71900D4F598\"},\"B59BB43E3082E71900D4F598\":{\"path\":\"AppDelegate.swift\",\"isa\":\"PBXFileReference\",\"lastKnownFileType\":\"sourcecode.swift\",\"sourceTree\":\"<group>\"},\"B59BB4633082E71900D4F598\":{\"isa\":\"PBXBuildFile\",\"fileRef\":\"B59BB4233082E71900D4F598\"},\"B59BB4563082E71900D4F598\":{\"path\":\"macOS (Extension)\",\"isa\":\"PBXGroup\",\"children\":[\"B59BB4573082E71900D4F598\"],\"sourceTree\":\"<group>\"},\"B59BB4C33082E71A00D4F598\":{\"isa\":\"PBXBuildFile\",\"fileRef\":\"B59BB48B3082E71900D4F598\"},\"B59BB49C3082E71A00D4F598\":{\"isa\":\"PBXBuildFile\",\"fileRef\":\"B59BB4803082E71900D4F598\"},\"B59BB43C3082E71900D4F598\":{\"path\":\"FluentRead.app\",\"isa\":\"PBXFileReference\",\"includeInIndex\":\"0\",\"explicitFileType\":\"wrapper.application\",\"sourceTree\":\"BUILT_PRODUCTS_DIR\"},\"B59BB4613082E71900D4F598\":{\"isa\":\"PBXBuildFile\",\"fileRef\":\"B59BB4223082E71800D4F598\"},\"B59BB4543082E71900D4F598\":{\"isa\":\"PBXContainerItemProxy\",\"containerPortal\":\"B59BB4173082E71800D4F598\",\"remoteGlobalIDString\":\"B59BB4513082E71900D4F598\",\"remoteInfo\":\"FluentRead Extension (macOS)\",\"proxyType\":\"1\"},\"B59BB4C13082E71A00D4F598\":{\"isa\":\"PBXBuildFile\",\"fileRef\":\"B59BB4893082E71900D4F598\"},\"B59BB43A3082E71900D4F598\":{\"isa\":\"PBXResourcesBuildPhase\",\"buildActionMask\":\"2147483647\",\"files\":[\"B59BB45B3082E71900D4F598\",\"B59BB45D3082E71900D4F598\",\"B59BB4423082E71900D4F598\",\"B59BB45F3082E71900D4F598\",\"B59BB4633082E71900D4F598\",\"B59BB4593082E71900D4F598\"],\"runOnlyForDeploymentPostprocessing\":\"0\"},\"B59BB4173082E71800D4F598\":{\"buildConfigurationList\":\"B59BB41A3082E71800D4F598\",\"targets\":[\"B59BB4293082E71900D4F598\",\"B59BB43B3082E71900D4F598\",\"B59BB4473082E71900D4F598\",\"B59BB4513082E71900D4F598\"],\"minimizedProjectReferenceProxies\":\"1\",\"developmentRegion\":\"en\",\"knownRegions\":[\"en\",\"Base\"],\"isa\":\"PBXProject\",\"productRefGroup\":\"B59BB42B3082E71900D4F598\",\"projectDirPath\":\"\",\"attributes\":{\"LastSwiftUpdateCheck\":\"2620\",\"BuildIndependentTargetsInParallel\":\"1\",\"LastUpgradeCheck\":\"2620\",\"TargetAttributes\":{\"B59BB4293082E71900D4F598\":{\"CreatedOnToolsVersion\":\"26.2\"},\"B59BB43B3082E71900D4F598\":{\"CreatedOnToolsVersion\":\"26.2\"},\"B59BB4513082E71900D4F598\":{\"CreatedOnToolsVersion\":\"26.2\"},\"B59BB4473082E71900D4F598\":{\"CreatedOnToolsVersion\":\"26.2\"}}},\"hasScannedForEncodings\":\"0\",\"projectRoot\":\"\",\"preferredProjectObjectVersion\":\"77\",\"mainGroup\":\"B59BB4163082E71800D4F598\"},\"B59BB4523082E71900D4F598\":{\"path\":\"FluentRead Extension.appex\",\"isa\":\"PBXFileReference\",\"includeInIndex\":\"0\",\"explicitFileType\":\"wrapper.app-extension\",\"sourceTree\":\"BUILT_PRODUCTS_DIR\"},\"B59BB4B23082E71A00D4F598\":{\"isa\":\"PBXBuildFile\",\"fileRef\":\"B59BB47A3082E71900D4F598\"},\"B59BB4223082E71800D4F598\":{\"path\":\"ViewController.swift\",\"isa\":\"PBXFileReference\",\"lastKnownFileType\":\"sourcecode.swift\",\"sourceTree\":\"<group>\"},\"B59BB4B03082E71A00D4F598\":{\"isa\":\"PBXBuildFile\",\"fileRef\":\"B59BB4783082E71900D4F598\"},\"B59BB4503082E71900D4F598\":{\"isa\":\"PBXResourcesBuildPhase\",\"buildActionMask\":\"2147483647\",\"files\":[\"B59BB49E3082E71A00D4F598\",\"B59BB49F3082E71A00D4F598\",\"B59BB4A13082E71A00D4F598\",\"B59BB4AD3082E71A00D4F598\",\"B59BB4963082E71900D4F598\",\"B59BB4A43082E71A00D4F598\",\"B59BB4983082E71900D4F598\",\"B59BB4A03082E71A00D4F598\",\"B59BB4A63082E71A00D4F598\",\"B59BB4953082E71900D4F598\",\"B59BB4A73082E71A00D4F598\",\"B59BB4973082E71900D4F598\",\"B59BB4A33082E71A00D4F598\",\"B59BB49A3082E71900D4F598\",\"B59BB4AC3082E71A00D4F598\",\"B59BB4943082E71900D4F598\",\"B59BB4A93082E71A00D4F598\",\"B59BB49B3082E71900D4F598\",\"B59BB49C3082E71A00D4F598\",\"B59BB4AA3082E71A00D4F598\",\"B59BB4A53082E71A00D4F598\",\"B59BB4A23082E71A00D4F598\",\"B59BB4993082E71900D4F598\",\"B59BB4AB3082E71A00D4F598\",\"B59BB49D3082E71A00D4F598\",\"B59BB4A83082E71A00D4F598\",\"B59BB4AE3082E71A00D4F598\",\"B59BB4933082E71900D4F598\"],\"runOnlyForDeploymentPostprocessing\":\"0\"},\"B59BB4A83082E71A00D4F598\":{\"isa\":\"PBXBuildFile\",\"fileRef\":\"B59BB48C3082E71900D4F598\"},\"B59BB4A63082E71A00D4F598\":{\"isa\":\"PBXBuildFile\",\"fileRef\":\"B59BB48A3082E71900D4F598\"},\"B59BB4393082E71900D4F598\":{\"isa\":\"PBXFrameworksBuildPhase\",\"buildActionMask\":\"2147483647\",\"files\":[],\"runOnlyForDeploymentPostprocessing\":\"0\"},\"B59BB4A43082E71A00D4F598\":{\"isa\":\"PBXBuildFile\",\"fileRef\":\"B59BB4883082E71900D4F598\"},\"B59BB4373082E71900D4F598\":{\"path\":\"Info.plist\",\"isa\":\"PBXFileReference\",\"lastKnownFileType\":\"text.plist.xml\",\"sourceTree\":\"<group>\"},\"B59BB48F3082E71900D4F598\":{\"path\":\"Resources\\/i18n\",\"isa\":\"PBXFileReference\",\"name\":\"i18n\",\"lastKnownFileType\":\"folder\",\"sourceTree\":\"<group>\"},\"B59BB4353082E71900D4F598\":{\"path\":\"Base.lproj\\/Main.storyboard\",\"isa\":\"PBXFileReference\",\"name\":\"Base\",\"lastKnownFileType\":\"file.storyboard\",\"sourceTree\":\"<group>\"},\"B59BB4283082E71900D4F598\":{\"isa\":\"PBXResourcesBuildPhase\",\"buildActionMask\":\"2147483647\",\"files\":[\"B59BB45A3082E71900D4F598\",\"B59BB4333082E71900D4F598\",\"B59BB4583082E71900D4F598\",\"B59BB45E3082E71900D4F598\",\"B59BB4623082E71900D4F598\",\"B59BB4363082E71900D4F598\",\"B59BB45C3082E71900D4F598\"],\"runOnlyForDeploymentPostprocessing\":\"0\"},\"B59BB48D3082E71900D4F598\":{\"path\":\"Resources\\/icon\",\"isa\":\"PBXFileReference\",\"name\":\"icon\",\"lastKnownFileType\":\"folder\",\"sourceTree\":\"<group>\"},\"B59BB4333082E71900D4F598\":{\"isa\":\"PBXBuildFile\",\"fileRef\":\"B59BB4313082E71900D4F598\"},\"B59BB4263082E71900D4F598\":{\"isa\":\"PBXSourcesBuildPhase\",\"buildActionMask\":\"2147483647\",\"files\":[\"B59BB4603082E71900D4F598\",\"B59BB42E3082E71900D4F598\",\"B59BB4303082E71900D4F598\"],\"runOnlyForDeploymentPostprocessing\":\"0\"},\"B59BB48B3082E71900D4F598\":{\"path\":\"Resources\\/localTtsWorker.js\",\"isa\":\"PBXFileReference\",\"name\":\"localTtsWorker.js\",\"lastKnownFileType\":\"sourcecode.javascript\",\"sourceTree\":\"<group>\"},\"B59BB47E3082E71900D4F598\":{\"path\":\"Resources\\/fluent-read-ai\",\"isa\":\"PBXFileReference\",\"name\":\"fluent-read-ai\",\"lastKnownFileType\":\"folder\",\"sourceTree\":\"<group>\"},\"B59BB4313082E71900D4F598\":{\"isa\":\"PBXVariantGroup\",\"name\":\"LaunchScreen.storyboard\",\"children\":[\"B59BB4323082E71900D4F598\"],\"sourceTree\":\"<group>\"},\"B59BB4243082E71900D4F598\":{\"path\":\"Shared (Extension)\",\"isa\":\"PBXGroup\",\"children\":[\"B59BB4763082E71900D4F598\",\"B59BB4253082E71900D4F598\"],\"sourceTree\":\"<group>\"},\"B59BB47C3082E71900D4F598\":{\"path\":\"Resources\\/popup.html\",\"isa\":\"PBXFileReference\",\"name\":\"popup.html\",\"lastKnownFileType\":\"text.html\",\"sourceTree\":\"<group>\"},\"B59BB4943082E71900D4F598\":{\"isa\":\"PBXBuildFile\",\"fileRef\":\"B59BB4783082E71900D4F598\"},\"B59BB47A3082E71900D4F598\":{\"path\":\"Resources\\/background.js\",\"isa\":\"PBXFileReference\",\"name\":\"background.js\",\"lastKnownFileType\":\"sourcecode.javascript\",\"sourceTree\":\"<group>\"},\"B59BB4923082E71900D4F598\":{\"path\":\"Resources\\/ecdict-core.json\",\"isa\":\"PBXFileReference\",\"name\":\"ecdict-core.json\",\"lastKnownFileType\":\"text.json\",\"sourceTree\":\"<group>\"},\"B59BB4903082E71900D4F598\":{\"path\":\"Resources\\/assets\",\"isa\":\"PBXFileReference\",\"name\":\"assets\",\"lastKnownFileType\":\"folder\",\"sourceTree\":\"<group>\"},\"B59BB4883082E71900D4F598\":{\"path\":\"Resources\\/manifest.json\",\"isa\":\"PBXFileReference\",\"name\":\"manifest.json\",\"lastKnownFileType\":\"text.json\",\"sourceTree\":\"<group>\"},\"B59BB4863082E71900D4F598\":{\"path\":\"Resources\\/safari-background.html\",\"isa\":\"PBXFileReference\",\"name\":\"safari-background.html\",\"lastKnownFileType\":\"text.html\",\"sourceTree\":\"<group>\"},\"B59BB4793082E71900D4F598\":{\"path\":\"Resources\\/informationHighlightWorker.js\",\"isa\":\"PBXFileReference\",\"name\":\"informationHighlightWorker.js\",\"lastKnownFileType\":\"sourcecode.javascript\",\"sourceTree\":\"<group>\"},\"B59BB4BF3082E71A00D4F598\":{\"isa\":\"PBXBuildFile\",\"fileRef\":\"B59BB4873082E71900D4F598\"},\"B59BB45F3082E71900D4F598\":{\"isa\":\"PBXBuildFile\",\"fileRef\":\"B59BB4213082E71800D4F598\"},\"B59BB4773082E71900D4F598\":{\"path\":\"Resources\\/misc\",\"isa\":\"PBXFileReference\",\"name\":\"misc\",\"lastKnownFileType\":\"folder\",\"sourceTree\":\"<group>\"},\"B59BB4BD3082E71A00D4F598\":{\"isa\":\"PBXBuildFile\",\"fileRef\":\"B59BB4853082E71900D4F598\"},\"B59BB45D3082E71900D4F598\":{\"isa\":\"PBXBuildFile\",\"fileRef\":\"B59BB4203082E71800D4F598\"},\"B59BB4753082E71900D4F598\":{\"isa\":\"XCBuildConfiguration\",\"buildSettings\":{\"INFOPLIST_KEY_NSPrincipalClass\":\"NSApplication\",\"MARKETING_VERSION\":\"1.0\",\"SWIFT_EMIT_LOC_STRINGS\":\"YES\",\"REGISTER_APP_GROUPS\":\"YES\",\"PRODUCT_BUNDLE_IDENTIFIER\":\"org.example.FluentReadDevelopment\",\"CURRENT_PROJECT_VERSION\":\"1\",\"ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME\":\"AccentColor\",\"STRING_CATALOG_GENERATE_SYMBOLS\":\"YES\",\"SWIFT_DEFAULT_ACTOR_ISOLATION\":\"MainActor\",\"INFOPLIST_KEY_CFBundleDisplayName\":\"FluentRead\",\"MACOSX_DEPLOYMENT_TARGET\":\"14.0\",\"INFOPLIST_KEY_NSMainStoryboardFile\":\"Main\",\"CODE_SIGN_STYLE\":\"Automatic\",\"OTHER_LDFLAGS\":[\"-framework\",\"SafariServices\",\"-framework\",\"WebKit\"],\"ASSETCATALOG_COMPILER_APPICON_NAME\":\"AppIcon\",\"SDKROOT\":\"macosx\",\"LD_RUNPATH_SEARCH_PATHS\":[\"$(inherited)\",\"@executable_path\\/..\\/Frameworks\"],\"SWIFT_VERSION\":\"5.0\",\"PRODUCT_NAME\":\"FluentRead\",\"SWIFT_APPROACHABLE_CONCURRENCY\":\"YES\",\"ENABLE_OUTGOING_NETWORK_CONNECTIONS\":\"YES\",\"SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY\":\"YES\",\"ENABLE_APP_SANDBOX\":\"YES\",\"ENABLE_HARDENED_RUNTIME\":\"YES\",\"ENABLE_USER_SELECTED_FILES\":\"readonly\",\"INFOPLIST_FILE\":\"macOS (App)\\/Info.plist\",\"GENERATE_INFOPLIST_FILE\":\"YES\"},\"name\":\"Release\"},\"B59BB4BB3082E71A00D4F598\":{\"isa\":\"PBXBuildFile\",\"fileRef\":\"B59BB4833082E71900D4F598\"},\"B59BB45B3082E71900D4F598\":{\"isa\":\"PBXBuildFile\",\"fileRef\":\"B59BB41F3082E71800D4F598\"},\"B59BB44E3082E71900D4F598\":{\"isa\":\"PBXSourcesBuildPhase\",\"buildActionMask\":\"2147483647\",\"files\":[\"B59BB4653082E71900D4F598\"],\"runOnlyForDeploymentPostprocessing\":\"0\"},\"B59BB4733082E71900D4F598\":{\"isa\":\"XCConfigurationList\",\"defaultConfigurationIsVisible\":\"0\",\"defaultConfigurationName\":\"Release\",\"buildConfigurations\":[\"B59BB4743082E71900D4F598\",\"B59BB4753082E71900D4F598\"]},\"B59BB4663082E71900D4F598\":{\"isa\":\"XCBuildConfiguration\",\"buildSettings\":{\"CLANG_WARN_DOCUMENTATION_COMMENTS\":\"YES\",\"CLANG_WARN_UNGUARDED_AVAILABILITY\":\"YES_AGGRESSIVE\",\"CLANG_WARN_DIRECT_OBJC_ISA_USAGE\":\"YES_ERROR\",\"CLANG_ENABLE_OBJC_ARC\":\"YES\",\"CLANG_WARN_SUSPICIOUS_MOVE\":\"YES\",\"CLANG_WARN__DUPLICATE_METHOD_MATCH\":\"YES\",\"CLANG_ENABLE_OBJC_WEAK\":\"YES\",\"GCC_WARN_UNDECLARED_SELECTOR\":\"YES\",\"CLANG_WARN_INFINITE_RECURSION\":\"YES\",\"CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION\":\"YES_AGGRESSIVE\",\"CLANG_CXX_LANGUAGE_STANDARD\":\"gnu++20\",\"ENABLE_TESTABILITY\":\"YES\",\"CLANG_WARN_BOOL_CONVERSION\":\"YES\",\"CLANG_WARN_UNREACHABLE_CODE\":\"YES\",\"LOCALIZATION_PREFERS_STRING_CATALOGS\":\"YES\",\"ENABLE_STRICT_OBJC_MSGSEND\":\"YES\",\"CLANG_ANALYZER_NONNULL\":\"YES\",\"CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING\":\"YES\",\"CLANG_WARN_STRICT_PROTOTYPES\":\"YES\",\"CLANG_WARN_ENUM_CONVERSION\":\"YES\",\"CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER\":\"YES\",\"GCC_PREPROCESSOR_DEFINITIONS\":[\"DEBUG=1\",\"$(inherited)\"],\"GCC_WARN_64_TO_32_BIT_CONVERSION\":\"YES\",\"ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS\":\"YES\",\"CLANG_WARN_EMPTY_BODY\":\"YES\",\"GCC_WARN_ABOUT_RETURN_TYPE\":\"YES_ERROR\",\"GCC_WARN_UNINITIALIZED_AUTOS\":\"YES_AGGRESSIVE\",\"CLANG_WARN_COMMA\":\"YES\",\"GCC_DYNAMIC_NO_PIC\":\"NO\",\"GCC_C_LANGUAGE_STANDARD\":\"gnu17\",\"GCC_WARN_UNUSED_VARIABLE\":\"YES\",\"CLANG_WARN_RANGE_LOOP_ANALYSIS\":\"YES\",\"CLANG_ENABLE_MODULES\":\"YES\",\"CLANG_WARN_INT_CONVERSION\":\"YES\",\"ALWAYS_SEARCH_USER_PATHS\":\"NO\",\"CLANG_WARN_OBJC_ROOT_CLASS\":\"YES_ERROR\",\"CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS\":\"YES\",\"COPY_PHASE_STRIP\":\"NO\",\"CLANG_WARN_CONSTANT_CONVERSION\":\"YES\",\"ENABLE_USER_SCRIPT_SANDBOXING\":\"YES\",\"GCC_NO_COMMON_BLOCKS\":\"YES\",\"GCC_OPTIMIZATION_LEVEL\":\"0\",\"MTL_ENABLE_DEBUG_INFO\":\"INCLUDE_SOURCE\",\"ONLY_ACTIVE_ARCH\":\"YES\",\"SWIFT_OPTIMIZATION_LEVEL\":\"-Onone\",\"CLANG_WARN_NON_LITERAL_NULL_CONVERSION\":\"YES\",\"MTL_FAST_MATH\":\"YES\",\"GCC_WARN_UNUSED_FUNCTION\":\"YES\",\"SWIFT_ACTIVE_COMPILATION_CONDITIONS\":\"DEBUG $(inherited)\",\"CLANG_WARN_OBJC_LITERAL_CONVERSION\":\"YES\",\"DEBUG_INFORMATION_FORMAT\":\"dwarf\",\"CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF\":\"YES\"},\"name\":\"Debug\"},\"B59BB41E3082E71800D4F598\":{\"path\":\"Base.lproj\\/Main.html\",\"isa\":\"PBXFileReference\",\"name\":\"Base\",\"lastKnownFileType\":\"text.html\",\"sourceTree\":\"<group>\"},\"B59BB4AC3082E71A00D4F598\":{\"isa\":\"PBXBuildFile\",\"fileRef\":\"B59BB4903082E71900D4F598\"},\"B59BB44C3082E71900D4F598\":{\"path\":\"iOS (Extension)\",\"isa\":\"PBXGroup\",\"children\":[\"B59BB44D3082E71900D4F598\"],\"sourceTree\":\"<group>\"},\"B59BB4713082E71900D4F598\":{\"isa\":\"XCBuildConfiguration\",\"buildSettings\":{\"ENABLE_HARDENED_RUNTIME\":\"YES\",\"MARKETING_VERSION\":\"1.0\",\"CURRENT_PROJECT_VERSION\":\"1\",\"PRODUCT_BUNDLE_IDENTIFIER\":\"org.example.FluentReadDevelopment.Extension\",\"STRING_CATALOG_GENERATE_SYMBOLS\":\"YES\",\"INFOPLIST_KEY_CFBundleDisplayName\":\"FluentRead Extension\",\"MACOSX_DEPLOYMENT_TARGET\":\"14.0\",\"OTHER_LDFLAGS\":[\"-framework\",\"SafariServices\"],\"CODE_SIGN_STYLE\":\"Automatic\",\"SDKROOT\":\"macosx\",\"LD_RUNPATH_SEARCH_PATHS\":[\"$(inherited)\",\"@executable_path\\/..\\/Frameworks\",\"@executable_path\\/..\\/..\\/..\\/..\\/Frameworks\"],\"SWIFT_VERSION\":\"5.0\",\"PRODUCT_NAME\":\"FluentRead Extension\",\"SWIFT_APPROACHABLE_CONCURRENCY\":\"YES\",\"SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY\":\"YES\",\"INFOPLIST_KEY_NSHumanReadableCopyright\":\"\",\"SKIP_INSTALL\":\"YES\",\"ENABLE_APP_SANDBOX\":\"YES\",\"SWIFT_EMIT_LOC_STRINGS\":\"YES\",\"ENABLE_USER_SELECTED_FILES\":\"readonly\",\"INFOPLIST_FILE\":\"macOS (Extension)\\/Info.plist\",\"GENERATE_INFOPLIST_FILE\":\"YES\"},\"name\":\"Release\"},\"B59BB4643082E71900D4F598\":{\"isa\":\"PBXBuildFile\",\"fileRef\":\"B59BB4253082E71900D4F598\"},\"B59BB4AA3082E71A00D4F598\":{\"isa\":\"PBXBuildFile\",\"fileRef\":\"B59BB48E3082E71900D4F598\"},\"B59BB44A3082E71900D4F598\":{\"isa\":\"PBXContainerItemProxy\",\"containerPortal\":\"B59BB4173082E71800D4F598\",\"remoteGlobalIDString\":\"B59BB4473082E71900D4F598\",\"remoteInfo\":\"FluentRead Extension (iOS)\",\"proxyType\":\"1\"},\"B59BB4623082E71900D4F598\":{\"isa\":\"PBXBuildFile\",\"fileRef\":\"B59BB4233082E71900D4F598\"},\"B59BB4C03082E71A00D4F598\":{\"isa\":\"PBXBuildFile\",\"fileRef\":\"B59BB4883082E71900D4F598\"},\"B59BB4603082E71900D4F598\":{\"isa\":\"PBXBuildFile\",\"fileRef\":\"B59BB4223082E71800D4F598\"}},\"rootObject\":\"B59BB4173082E71800D4F598\"}",
+    "stderr": ""
+  },
+  "copiedWeb": {
+    "files": 467,
+    "bytes": 62232613,
+    "rawByteHash": "b9ddd701367f20934372c8a16c01b0849b05b4af57574faf1af03555eca7c897",
+    "recordHash": "4ef229d04bf1172dd401821fdb4ef0e4c6277884aa78df7653a7628c94b9472f",
+    "rawAlgorithm": "Recursive directory UTF8-name sort; SHA256(path+NUL+decimalByteLength+NUL+rawbytes)",
+    "recordAlgorithm": "Global UTF8 path sort; SHA256(path+NUL+fileSHA256+NUL+decimalByteLength+LF)"
+  },
+  "webVersion": "0.0.38",
+  "containerGuide": {
+    "sha256": "f84de75f396c8d102cb0a6a516db55d645b015aed2eaf5296e89f1ddba419f55",
+    "fullFilePins": {
+      "Shared (App)/ViewController.swift": {
+        "path": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/mobile-youtube-fr-node-identity-probe-20261017/same-scope-clone-repair-20261017/native-binding-scope-repair-v1/output/safari-xcode/FluentRead/Shared (App)/ViewController.swift",
+        "sha256": "c711a496a195363958c482d849743fcf78c528f6465d98fe434e95f613c616ab",
+        "bytes": 4598
+      },
+      "Shared (App)/Resources/Base.lproj/Main.html": {
+        "path": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/mobile-youtube-fr-node-identity-probe-20261017/same-scope-clone-repair-20261017/native-binding-scope-repair-v1/output/safari-xcode/FluentRead/Shared (App)/Resources/Base.lproj/Main.html",
+        "sha256": "8359d2ff5a18fc2c655ef8798869b242b7c8495fa9a4575919213a2226d7789e",
+        "bytes": 862
+      },
+      "Shared (App)/Resources/Style.css": {
+        "path": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/mobile-youtube-fr-node-identity-probe-20261017/same-scope-clone-repair-20261017/native-binding-scope-repair-v1/output/safari-xcode/FluentRead/Shared (App)/Resources/Style.css",
+        "sha256": "3f4c01b933fe9622c01784d8e2eec2a228225fb07284bb5adacaf4bef4319a40",
+        "bytes": 1536
+      },
+      "Shared (App)/Resources/Script.js": {
+        "path": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/mobile-youtube-fr-node-identity-probe-20261017/same-scope-clone-repair-20261017/native-binding-scope-repair-v1/output/safari-xcode/FluentRead/Shared (App)/Resources/Script.js",
+        "sha256": "ff9d564bd55a9742f77043dc08ebfd4cc2415989d70576851182d9c34c0ad2f8",
+        "bytes": 2887
+      },
+      "iOS (App)/Info.plist": {
+        "path": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/mobile-youtube-fr-node-identity-probe-20261017/same-scope-clone-repair-20261017/native-binding-scope-repair-v1/output/safari-xcode/FluentRead/iOS (App)/Info.plist",
+        "sha256": "e226eb640136bb3bbb31781a82b281882ecc1fc9695e05eab75da720ef7cb933",
+        "bytes": 852
+      }
+    },
+    "sourceReplacementMatch": true,
+    "iosSettingsMinimum": "26.2",
+    "iosSettingsPolicy": "physical device with actual DEVELOPMENT_TEAM only; Simulator and no-team builds use manual steps; physical-device API not accepted yet"
+  },
+  "products": {
+    "macOS": {
+      "web": {
+        "files": 467,
+        "bytes": 62232613,
+        "rawByteHash": "b9ddd701367f20934372c8a16c01b0849b05b4af57574faf1af03555eca7c897",
+        "recordHash": "4ef229d04bf1172dd401821fdb4ef0e4c6277884aa78df7653a7628c94b9472f",
+        "rawAlgorithm": "Recursive directory UTF8-name sort; SHA256(path+NUL+decimalByteLength+NUL+rawbytes)",
+        "recordAlgorithm": "Global UTF8 path sort; SHA256(path+NUL+fileSHA256+NUL+decimalByteLength+LF)"
+      },
+      "webFilesMatched": 467,
+      "webPrefixExtras": [],
+      "bundles": {
+        "app": {
+          "path": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/mobile-youtube-fr-node-identity-probe-20261017/same-scope-clone-repair-20261017/native-binding-scope-repair-v1/output/derived-macos/Build/Products/Release/FluentRead.app",
+          "identity": {
+            "CFBundleIdentifier": "org.example.FluentReadDevelopment",
+            "CFBundleShortVersionString": "1.0",
+            "CFBundleVersion": "1",
+            "CFBundleExecutable": "FluentRead",
+            "LSMinimumSystemVersion": "14.0",
+            "CFBundleSupportedPlatforms": [
+              "MacOSX"
+            ],
+            "DTPlatformName": "macosx",
+            "DTSDKName": "macosx26.2"
+          },
+          "inventory": {
+            "files": 482,
+            "bytes": 63252233,
+            "rawByteHash": "fdf6654c66b541d1f2a2ca5ce60198d1c1890ecb8d20337f2ae4e60f402dc766",
+            "recordHash": "645627df9b06ebe14748677406c9f2897c3967fe263cd638363975c9fe0bf7fe",
+            "rawAlgorithm": "Recursive directory UTF8-name sort; SHA256(path+NUL+decimalByteLength+NUL+rawbytes)",
+            "recordAlgorithm": "Global UTF8 path sort; SHA256(path+NUL+fileSHA256+NUL+decimalByteLength+LF)"
+          },
+          "executableRelativeKey": "Contents/MacOS/FluentRead",
+          "executableSHA256": "a66fee44a572ee6aa0b304953717ee379ccd94a88cb94df000bc38d1b414461d",
+          "executableBytes": 208344,
+          "fullFileMap": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/mobile-youtube-fr-node-identity-probe-20261017/same-scope-clone-repair-20261017/native-macOS-app-full-map.json",
+          "signingClassification": "LINKER_ADHOC_NO_TEAM",
+          "codesignDetail": {
+            "argv": [
+              "/usr/bin/codesign",
+              "-dvvv",
+              "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/mobile-youtube-fr-node-identity-probe-20261017/same-scope-clone-repair-20261017/native-binding-scope-repair-v1/output/derived-macos/Build/Products/Release/FluentRead.app"
+            ],
+            "returnCode": 0,
+            "stdout": "",
+            "stderr": "Executable=/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/mobile-youtube-fr-node-identity-probe-20261017/same-scope-clone-repair-20261017/native-binding-scope-repair-v1/output/derived-macos/Build/Products/Release/FluentRead.app/Contents/MacOS/FluentRead\nIdentifier=FluentRead\nFormat=app bundle with Mach-O universal (x86_64 arm64)\nCodeDirectory v=20400 size=963 flags=0x20002(adhoc,linker-signed) hashes=27+0 location=embedded\nHash type=sha256 size=32\nCandidateCDHash sha256=cab1721d37228f23c789efd1ed58180512e20f45\nCandidateCDHashFull sha256=cab1721d37228f23c789efd1ed58180512e20f45db25c8ee8983553b4abc7b8a\nHash choices=sha256\nCMSDigest=cab1721d37228f23c789efd1ed58180512e20f45db25c8ee8983553b4abc7b8a\nCMSDigestType=2\nCDHash=cab1721d37228f23c789efd1ed58180512e20f45\nSignature=adhoc\nInfo.plist=not bound\nTeamIdentifier=not set\nSealed Resources=none\nInternal requirements=none\n"
+          },
+          "entitlementsRead": {
+            "argv": [
+              "/usr/bin/codesign",
+              "-d",
+              "--entitlements",
+              ":-",
+              "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/mobile-youtube-fr-node-identity-probe-20261017/same-scope-clone-repair-20261017/native-binding-scope-repair-v1/output/derived-macos/Build/Products/Release/FluentRead.app"
+            ],
+            "returnCode": 0,
+            "stdout": "",
+            "stderr": "Executable=/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/mobile-youtube-fr-node-identity-probe-20261017/same-scope-clone-repair-20261017/native-binding-scope-repair-v1/output/derived-macos/Build/Products/Release/FluentRead.app/Contents/MacOS/FluentRead\nwarning: Specifying ':' in the path is deprecated and will not work in a future release\n"
+          },
+          "executableFileType": {
+            "argv": [
+              "/usr/bin/file",
+              "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/mobile-youtube-fr-node-identity-probe-20261017/same-scope-clone-repair-20261017/native-binding-scope-repair-v1/output/derived-macos/Build/Products/Release/FluentRead.app/Contents/MacOS/FluentRead"
+            ],
+            "returnCode": 0,
+            "stdout": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/mobile-youtube-fr-node-identity-probe-20261017/same-scope-clone-repair-20261017/native-binding-scope-repair-v1/output/derived-macos/Build/Products/Release/FluentRead.app/Contents/MacOS/FluentRead: Mach-O universal binary with 2 architectures: [x86_64:Mach-O 64-bit executable x86_64] [arm64:Mach-O 64-bit executable arm64]\n/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/mobile-youtube-fr-node-identity-probe-20261017/same-scope-clone-repair-20261017/native-binding-scope-repair-v1/output/derived-macos/Build/Products/Release/FluentRead.app/Contents/MacOS/FluentRead (for architecture x86_64):\tMach-O 64-bit executable x86_64\n/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/mobile-youtube-fr-node-identity-probe-20261017/same-scope-clone-repair-20261017/native-binding-scope-repair-v1/output/derived-macos/Build/Products/Release/FluentRead.app/Contents/MacOS/FluentRead (for architecture arm64):\tMach-O 64-bit executable arm64\n",
+            "stderr": ""
+          },
+          "fullFileMapSHA256": "8f23a76035297c1b5be84079dfa4ce69630704cc1e9c741b5920a4f38b8f63d7"
+        },
+        "extension": {
+          "path": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/mobile-youtube-fr-node-identity-probe-20261017/same-scope-clone-repair-20261017/native-binding-scope-repair-v1/output/derived-macos/Build/Products/Release/FluentRead.app/Contents/PlugIns/FluentRead Extension.appex",
+          "identity": {
+            "CFBundleIdentifier": "org.example.FluentReadDevelopment.Extension",
+            "CFBundleShortVersionString": "1.0",
+            "CFBundleVersion": "1",
+            "CFBundleExecutable": "FluentRead Extension",
+            "LSMinimumSystemVersion": "14.0",
+            "CFBundleSupportedPlatforms": [
+              "MacOSX"
+            ],
+            "DTPlatformName": "macosx",
+            "DTSDKName": "macosx26.2",
+            "NSExtension": {
+              "NSExtensionPointIdentifier": "com.apple.Safari.web-extension",
+              "NSExtensionPrincipalClass": "FluentRead_Extension.SafariWebExtensionHandler"
+            }
+          },
+          "inventory": {
+            "files": 469,
+            "bytes": 62356235,
+            "rawByteHash": "734e66440d1c6b6b1ff5af868ba42750d49b7ecda4cb6252850636476c991649",
+            "recordHash": "f926f7beb5bd5b0ed7d250b2f5632a0a9895393fb81e658f275bce720b82d3ba",
+            "rawAlgorithm": "Recursive directory UTF8-name sort; SHA256(path+NUL+decimalByteLength+NUL+rawbytes)",
+            "recordAlgorithm": "Global UTF8 path sort; SHA256(path+NUL+fileSHA256+NUL+decimalByteLength+LF)"
+          },
+          "executableRelativeKey": "Contents/MacOS/FluentRead Extension",
+          "executableSHA256": "4566b353483fdc4efbe3d5f676ed4b0f3655e569d809163c84eb73211411526b",
+          "executableBytes": 121992,
+          "fullFileMap": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/mobile-youtube-fr-node-identity-probe-20261017/same-scope-clone-repair-20261017/native-macOS-extension-full-map.json",
+          "signingClassification": "LINKER_ADHOC_NO_TEAM",
+          "codesignDetail": {
+            "argv": [
+              "/usr/bin/codesign",
+              "-dvvv",
+              "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/mobile-youtube-fr-node-identity-probe-20261017/same-scope-clone-repair-20261017/native-binding-scope-repair-v1/output/derived-macos/Build/Products/Release/FluentRead.app/Contents/PlugIns/FluentRead Extension.appex"
+            ],
+            "returnCode": 0,
+            "stdout": "",
+            "stderr": "Executable=/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/mobile-youtube-fr-node-identity-probe-20261017/same-scope-clone-repair-20261017/native-binding-scope-repair-v1/output/derived-macos/Build/Products/Release/FluentRead.app/Contents/PlugIns/FluentRead Extension.appex/Contents/MacOS/FluentRead Extension\nIdentifier=FluentRead Extension\nFormat=bundle with Mach-O universal (x86_64 arm64)\nCodeDirectory v=20400 size=685 flags=0x20002(adhoc,linker-signed) hashes=18+0 location=embedded\nHash type=sha256 size=32\nCandidateCDHash sha256=2e0b8f9cad07a5410b395571319cfa8d749514c6\nCandidateCDHashFull sha256=2e0b8f9cad07a5410b395571319cfa8d749514c680fe0267159f6947ede0bb8b\nHash choices=sha256\nCMSDigest=2e0b8f9cad07a5410b395571319cfa8d749514c680fe0267159f6947ede0bb8b\nCMSDigestType=2\nCDHash=2e0b8f9cad07a5410b395571319cfa8d749514c6\nSignature=adhoc\nInfo.plist=not bound\nTeamIdentifier=not set\nSealed Resources=none\nInternal requirements=none\n"
+          },
+          "entitlementsRead": {
+            "argv": [
+              "/usr/bin/codesign",
+              "-d",
+              "--entitlements",
+              ":-",
+              "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/mobile-youtube-fr-node-identity-probe-20261017/same-scope-clone-repair-20261017/native-binding-scope-repair-v1/output/derived-macos/Build/Products/Release/FluentRead.app/Contents/PlugIns/FluentRead Extension.appex"
+            ],
+            "returnCode": 0,
+            "stdout": "",
+            "stderr": "Executable=/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/mobile-youtube-fr-node-identity-probe-20261017/same-scope-clone-repair-20261017/native-binding-scope-repair-v1/output/derived-macos/Build/Products/Release/FluentRead.app/Contents/PlugIns/FluentRead Extension.appex/Contents/MacOS/FluentRead Extension\nwarning: Specifying ':' in the path is deprecated and will not work in a future release\n"
+          },
+          "executableFileType": {
+            "argv": [
+              "/usr/bin/file",
+              "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/mobile-youtube-fr-node-identity-probe-20261017/same-scope-clone-repair-20261017/native-binding-scope-repair-v1/output/derived-macos/Build/Products/Release/FluentRead.app/Contents/PlugIns/FluentRead Extension.appex/Contents/MacOS/FluentRead Extension"
+            ],
+            "returnCode": 0,
+            "stdout": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/mobile-youtube-fr-node-identity-probe-20261017/same-scope-clone-repair-20261017/native-binding-scope-repair-v1/output/derived-macos/Build/Products/Release/FluentRead.app/Contents/PlugIns/FluentRead Extension.appex/Contents/MacOS/FluentRead Extension: Mach-O universal binary with 2 architectures: [x86_64:Mach-O 64-bit executable x86_64] [arm64:Mach-O 64-bit executable arm64]\n/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/mobile-youtube-fr-node-identity-probe-20261017/same-scope-clone-repair-20261017/native-binding-scope-repair-v1/output/derived-macos/Build/Products/Release/FluentRead.app/Contents/PlugIns/FluentRead Extension.appex/Contents/MacOS/FluentRead Extension (for architecture x86_64):\tMach-O 64-bit executable x86_64\n/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/mobile-youtube-fr-node-identity-probe-20261017/same-scope-clone-repair-20261017/native-binding-scope-repair-v1/output/derived-macos/Build/Products/Release/FluentRead.app/Contents/PlugIns/FluentRead Extension.appex/Contents/MacOS/FluentRead Extension (for architecture arm64):\tMach-O 64-bit executable arm64\n",
+            "stderr": ""
+          },
+          "fullFileMapSHA256": "51a51bf64e2240a1028c1a597ff6069b6aec94fa522b6bc192b7be88836960cd"
+        }
+      },
+      "compiledContainerResources": {
+        "Base.lproj/Main.html": {
+          "path": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/mobile-youtube-fr-node-identity-probe-20261017/same-scope-clone-repair-20261017/native-binding-scope-repair-v1/output/derived-macos/Build/Products/Release/FluentRead.app/Contents/Resources/Base.lproj/Main.html",
+          "sha256": "8359d2ff5a18fc2c655ef8798869b242b7c8495fa9a4575919213a2226d7789e",
+          "bytes": 862
+        },
+        "Style.css": {
+          "path": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/mobile-youtube-fr-node-identity-probe-20261017/same-scope-clone-repair-20261017/native-binding-scope-repair-v1/output/derived-macos/Build/Products/Release/FluentRead.app/Contents/Resources/Style.css",
+          "sha256": "3f4c01b933fe9622c01784d8e2eec2a228225fb07284bb5adacaf4bef4319a40",
+          "bytes": 1536
+        },
+        "Script.js": {
+          "path": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/mobile-youtube-fr-node-identity-probe-20261017/same-scope-clone-repair-20261017/native-binding-scope-repair-v1/output/derived-macos/Build/Products/Release/FluentRead.app/Contents/Resources/Script.js",
+          "sha256": "ff9d564bd55a9742f77043dc08ebfd4cc2415989d70576851182d9c34c0ad2f8",
+          "bytes": 2887
+        }
+      }
+    },
+    "iosSimulator": {
+      "web": {
+        "files": 469,
+        "bytes": 62356479,
+        "rawByteHash": "294bdbeba3176e90cb43989d48c349c9a37ce5a94053c22ff52ad2c3d7a53bba",
+        "recordHash": "0ed8f93849d10f88bdb2a6355e1c7d54a2a106312f61257c9617a5a18741180f",
+        "rawAlgorithm": "Recursive directory UTF8-name sort; SHA256(path+NUL+decimalByteLength+NUL+rawbytes)",
+        "recordAlgorithm": "Global UTF8 path sort; SHA256(path+NUL+fileSHA256+NUL+decimalByteLength+LF)"
+      },
+      "webFilesMatched": 467,
+      "webPrefixExtras": [
+        "FluentRead Extension",
+        "Info.plist"
+      ],
+      "bundles": {
+        "app": {
+          "path": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/mobile-youtube-fr-node-identity-probe-20261017/same-scope-clone-repair-20261017/native-binding-scope-repair-v1/output/derived-ios-simulator/Build/Products/Release-iphonesimulator/FluentRead.app",
+          "identity": {
+            "CFBundleIdentifier": "org.example.FluentReadDevelopment",
+            "CFBundleShortVersionString": "1.0",
+            "CFBundleVersion": "1",
+            "CFBundleExecutable": "FluentRead",
+            "MinimumOSVersion": "26.0",
+            "CFBundleSupportedPlatforms": [
+              "iPhoneSimulator"
+            ],
+            "DTPlatformName": "iphonesimulator",
+            "DTSDKName": "iphonesimulator26.2",
+            "FluentReadDevelopmentTeam": ""
+          },
+          "inventory": {
+            "files": 485,
+            "bytes": 64227555,
+            "rawByteHash": "042dc97b7459a2c102715318b9da8fddfa30249d0b039ef9f617a66b96ae97cc",
+            "recordHash": "b6696453901cc45527f5523b7fcae867ffcb7df1dc64a2eb06e0256f09c2acf4",
+            "rawAlgorithm": "Recursive directory UTF8-name sort; SHA256(path+NUL+decimalByteLength+NUL+rawbytes)",
+            "recordAlgorithm": "Global UTF8 path sort; SHA256(path+NUL+fileSHA256+NUL+decimalByteLength+LF)"
+          },
+          "executableRelativeKey": "FluentRead",
+          "executableSHA256": "841332c3a2d3540891282d47c9bd232f439d4d6dc085a4df4a292e2f68e0c326",
+          "executableBytes": 189272,
+          "fullFileMap": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/mobile-youtube-fr-node-identity-probe-20261017/same-scope-clone-repair-20261017/native-iosSimulator-app-full-map.json",
+          "signingClassification": "LINKER_ADHOC_NO_TEAM",
+          "codesignDetail": {
+            "argv": [
+              "/usr/bin/codesign",
+              "-dvvv",
+              "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/mobile-youtube-fr-node-identity-probe-20261017/same-scope-clone-repair-20261017/native-binding-scope-repair-v1/output/derived-ios-simulator/Build/Products/Release-iphonesimulator/FluentRead.app"
+            ],
+            "returnCode": 0,
+            "stdout": "",
+            "stderr": "Executable=/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/mobile-youtube-fr-node-identity-probe-20261017/same-scope-clone-repair-20261017/native-binding-scope-repair-v1/output/derived-ios-simulator/Build/Products/Release-iphonesimulator/FluentRead.app/FluentRead\nIdentifier=FluentRead\nFormat=app bundle with Mach-O universal (x86_64 arm64)\nCodeDirectory v=20400 size=931 flags=0x20002(adhoc,linker-signed) hashes=26+0 location=embedded\nHash type=sha256 size=32\nCandidateCDHash sha256=a17e2a34fd1c3d240c3939807e9f54df1bd4cd47\nCandidateCDHashFull sha256=a17e2a34fd1c3d240c3939807e9f54df1bd4cd47e45d1ba04466a71946419859\nHash choices=sha256\nCMSDigest=a17e2a34fd1c3d240c3939807e9f54df1bd4cd47e45d1ba04466a71946419859\nCMSDigestType=2\nCDHash=a17e2a34fd1c3d240c3939807e9f54df1bd4cd47\nSignature=adhoc\nInfo.plist=not bound\nTeamIdentifier=not set\nSealed Resources=none\nInternal requirements=none\n"
+          },
+          "entitlementsRead": {
+            "argv": [
+              "/usr/bin/codesign",
+              "-d",
+              "--entitlements",
+              ":-",
+              "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/mobile-youtube-fr-node-identity-probe-20261017/same-scope-clone-repair-20261017/native-binding-scope-repair-v1/output/derived-ios-simulator/Build/Products/Release-iphonesimulator/FluentRead.app"
+            ],
+            "returnCode": 0,
+            "stdout": "",
+            "stderr": "Executable=/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/mobile-youtube-fr-node-identity-probe-20261017/same-scope-clone-repair-20261017/native-binding-scope-repair-v1/output/derived-ios-simulator/Build/Products/Release-iphonesimulator/FluentRead.app/FluentRead\nwarning: Specifying ':' in the path is deprecated and will not work in a future release\n"
+          },
+          "executableFileType": {
+            "argv": [
+              "/usr/bin/file",
+              "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/mobile-youtube-fr-node-identity-probe-20261017/same-scope-clone-repair-20261017/native-binding-scope-repair-v1/output/derived-ios-simulator/Build/Products/Release-iphonesimulator/FluentRead.app/FluentRead"
+            ],
+            "returnCode": 0,
+            "stdout": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/mobile-youtube-fr-node-identity-probe-20261017/same-scope-clone-repair-20261017/native-binding-scope-repair-v1/output/derived-ios-simulator/Build/Products/Release-iphonesimulator/FluentRead.app/FluentRead: Mach-O universal binary with 2 architectures: [x86_64:Mach-O 64-bit executable x86_64] [arm64:Mach-O 64-bit executable arm64]\n/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/mobile-youtube-fr-node-identity-probe-20261017/same-scope-clone-repair-20261017/native-binding-scope-repair-v1/output/derived-ios-simulator/Build/Products/Release-iphonesimulator/FluentRead.app/FluentRead (for architecture x86_64):\tMach-O 64-bit executable x86_64\n/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/mobile-youtube-fr-node-identity-probe-20261017/same-scope-clone-repair-20261017/native-binding-scope-repair-v1/output/derived-ios-simulator/Build/Products/Release-iphonesimulator/FluentRead.app/FluentRead (for architecture arm64):\tMach-O 64-bit executable arm64\n",
+            "stderr": ""
+          },
+          "fullFileMapSHA256": "f23f933acd0618c6185a6af3a2ee29ddf38e5c7b98a1b50281359d412a6edca0"
+        },
+        "extension": {
+          "path": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/mobile-youtube-fr-node-identity-probe-20261017/same-scope-clone-repair-20261017/native-binding-scope-repair-v1/output/derived-ios-simulator/Build/Products/Release-iphonesimulator/FluentRead.app/PlugIns/FluentRead Extension.appex",
+          "identity": {
+            "CFBundleIdentifier": "org.example.FluentReadDevelopment.Extension",
+            "CFBundleShortVersionString": "1.0",
+            "CFBundleVersion": "1",
+            "CFBundleExecutable": "FluentRead Extension",
+            "MinimumOSVersion": "26.0",
+            "CFBundleSupportedPlatforms": [
+              "iPhoneSimulator"
+            ],
+            "DTPlatformName": "iphonesimulator",
+            "DTSDKName": "iphonesimulator26.2",
+            "NSExtension": {
+              "NSExtensionPointIdentifier": "com.apple.Safari.web-extension",
+              "NSExtensionPrincipalClass": "FluentRead_Extension.SafariWebExtensionHandler"
+            }
+          },
+          "inventory": {
+            "files": 469,
+            "bytes": 62356479,
+            "rawByteHash": "294bdbeba3176e90cb43989d48c349c9a37ce5a94053c22ff52ad2c3d7a53bba",
+            "recordHash": "0ed8f93849d10f88bdb2a6355e1c7d54a2a106312f61257c9617a5a18741180f",
+            "rawAlgorithm": "Recursive directory UTF8-name sort; SHA256(path+NUL+decimalByteLength+NUL+rawbytes)",
+            "recordAlgorithm": "Global UTF8 path sort; SHA256(path+NUL+fileSHA256+NUL+decimalByteLength+LF)"
+          },
+          "executableRelativeKey": "FluentRead Extension",
+          "executableSHA256": "e8ebfe7bcda48c615684e3f8934f456908d6820ee76ed3ab6b10002e405b108e",
+          "executableBytes": 122904,
+          "fullFileMap": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/mobile-youtube-fr-node-identity-probe-20261017/same-scope-clone-repair-20261017/native-iosSimulator-extension-full-map.json",
+          "signingClassification": "LINKER_ADHOC_NO_TEAM",
+          "codesignDetail": {
+            "argv": [
+              "/usr/bin/codesign",
+              "-dvvv",
+              "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/mobile-youtube-fr-node-identity-probe-20261017/same-scope-clone-repair-20261017/native-binding-scope-repair-v1/output/derived-ios-simulator/Build/Products/Release-iphonesimulator/FluentRead.app/PlugIns/FluentRead Extension.appex"
+            ],
+            "returnCode": 0,
+            "stdout": "",
+            "stderr": "Executable=/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/mobile-youtube-fr-node-identity-probe-20261017/same-scope-clone-repair-20261017/native-binding-scope-repair-v1/output/derived-ios-simulator/Build/Products/Release-iphonesimulator/FluentRead.app/PlugIns/FluentRead Extension.appex/FluentRead Extension\nIdentifier=FluentRead Extension\nFormat=bundle with Mach-O universal (x86_64 arm64)\nCodeDirectory v=20400 size=685 flags=0x20002(adhoc,linker-signed) hashes=18+0 location=embedded\nHash type=sha256 size=32\nCandidateCDHash sha256=076bf44fce568472fdb55b5c8023f8d921f94c90\nCandidateCDHashFull sha256=076bf44fce568472fdb55b5c8023f8d921f94c90bfc633b80539d178bb3c565a\nHash choices=sha256\nCMSDigest=076bf44fce568472fdb55b5c8023f8d921f94c90bfc633b80539d178bb3c565a\nCMSDigestType=2\nCDHash=076bf44fce568472fdb55b5c8023f8d921f94c90\nSignature=adhoc\nInfo.plist=not bound\nTeamIdentifier=not set\nSealed Resources=none\nInternal requirements=none\n"
+          },
+          "entitlementsRead": {
+            "argv": [
+              "/usr/bin/codesign",
+              "-d",
+              "--entitlements",
+              ":-",
+              "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/mobile-youtube-fr-node-identity-probe-20261017/same-scope-clone-repair-20261017/native-binding-scope-repair-v1/output/derived-ios-simulator/Build/Products/Release-iphonesimulator/FluentRead.app/PlugIns/FluentRead Extension.appex"
+            ],
+            "returnCode": 0,
+            "stdout": "",
+            "stderr": "Executable=/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/mobile-youtube-fr-node-identity-probe-20261017/same-scope-clone-repair-20261017/native-binding-scope-repair-v1/output/derived-ios-simulator/Build/Products/Release-iphonesimulator/FluentRead.app/PlugIns/FluentRead Extension.appex/FluentRead Extension\nwarning: Specifying ':' in the path is deprecated and will not work in a future release\n"
+          },
+          "executableFileType": {
+            "argv": [
+              "/usr/bin/file",
+              "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/mobile-youtube-fr-node-identity-probe-20261017/same-scope-clone-repair-20261017/native-binding-scope-repair-v1/output/derived-ios-simulator/Build/Products/Release-iphonesimulator/FluentRead.app/PlugIns/FluentRead Extension.appex/FluentRead Extension"
+            ],
+            "returnCode": 0,
+            "stdout": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/mobile-youtube-fr-node-identity-probe-20261017/same-scope-clone-repair-20261017/native-binding-scope-repair-v1/output/derived-ios-simulator/Build/Products/Release-iphonesimulator/FluentRead.app/PlugIns/FluentRead Extension.appex/FluentRead Extension: Mach-O universal binary with 2 architectures: [x86_64:Mach-O 64-bit executable x86_64] [arm64:Mach-O 64-bit executable arm64]\n/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/mobile-youtube-fr-node-identity-probe-20261017/same-scope-clone-repair-20261017/native-binding-scope-repair-v1/output/derived-ios-simulator/Build/Products/Release-iphonesimulator/FluentRead.app/PlugIns/FluentRead Extension.appex/FluentRead Extension (for architecture x86_64):\tMach-O 64-bit executable x86_64\n/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/mobile-youtube-fr-node-identity-probe-20261017/same-scope-clone-repair-20261017/native-binding-scope-repair-v1/output/derived-ios-simulator/Build/Products/Release-iphonesimulator/FluentRead.app/PlugIns/FluentRead Extension.appex/FluentRead Extension (for architecture arm64):\tMach-O 64-bit executable arm64\n",
+            "stderr": ""
+          },
+          "fullFileMapSHA256": "6b70ceecfe161f3bb82b24275658425b7285ef245a75d4dda8d90811590009a4"
+        }
+      },
+      "compiledContainerResources": {
+        "Base.lproj/Main.html": {
+          "path": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/mobile-youtube-fr-node-identity-probe-20261017/same-scope-clone-repair-20261017/native-binding-scope-repair-v1/output/derived-ios-simulator/Build/Products/Release-iphonesimulator/FluentRead.app/Base.lproj/Main.html",
+          "sha256": "8359d2ff5a18fc2c655ef8798869b242b7c8495fa9a4575919213a2226d7789e",
+          "bytes": 862
+        },
+        "Style.css": {
+          "path": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/mobile-youtube-fr-node-identity-probe-20261017/same-scope-clone-repair-20261017/native-binding-scope-repair-v1/output/derived-ios-simulator/Build/Products/Release-iphonesimulator/FluentRead.app/Style.css",
+          "sha256": "3f4c01b933fe9622c01784d8e2eec2a228225fb07284bb5adacaf4bef4319a40",
+          "bytes": 1536
+        },
+        "Script.js": {
+          "path": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/mobile-youtube-fr-node-identity-probe-20261017/same-scope-clone-repair-20261017/native-binding-scope-repair-v1/output/derived-ios-simulator/Build/Products/Release-iphonesimulator/FluentRead.app/Script.js",
+          "sha256": "ff9d564bd55a9742f77043dc08ebfd4cc2415989d70576851182d9c34c0ad2f8",
+          "bytes": 2887
+        }
+      }
+    },
+    "iPhoneOS": {
+      "web": {
+        "files": 469,
+        "bytes": 62322411,
+        "rawByteHash": "729a2b52c0a829fddd35be74713dda5240c911af9d0a0acf53eb20e5df1e553e",
+        "recordHash": "195583526604720dffb0a3eab6c87419b170bd21e8328622bfd9da69c676ffc5",
+        "rawAlgorithm": "Recursive directory UTF8-name sort; SHA256(path+NUL+decimalByteLength+NUL+rawbytes)",
+        "recordAlgorithm": "Global UTF8 path sort; SHA256(path+NUL+fileSHA256+NUL+decimalByteLength+LF)"
+      },
+      "webFilesMatched": 467,
+      "webPrefixExtras": [
+        "FluentRead Extension",
+        "Info.plist"
+      ],
+      "bundles": {
+        "app": {
+          "path": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/mobile-youtube-fr-node-identity-probe-20261017/same-scope-clone-repair-20261017/native-binding-scope-repair-v1/output/target-iphoneos/build/FluentRead.app",
+          "identity": {
+            "CFBundleIdentifier": "org.example.FluentReadDevelopment",
+            "CFBundleShortVersionString": "1.0",
+            "CFBundleVersion": "1",
+            "CFBundleExecutable": "FluentRead",
+            "MinimumOSVersion": "26.0",
+            "CFBundleSupportedPlatforms": [
+              "iPhoneOS"
+            ],
+            "DTPlatformName": "iphoneos",
+            "DTSDKName": "iphoneos26.2",
+            "FluentReadDevelopmentTeam": ""
+          },
+          "inventory": {
+            "files": 485,
+            "bytes": 64124217,
+            "rawByteHash": "dd325387f4d480c9bf15f9df1ed23f600b918deea71851a366e80302065b60f7",
+            "recordHash": "53ad1bca846f9180103de55ea47efb6c808f4062d6b61430a18ac5b404fb3624",
+            "rawAlgorithm": "Recursive directory UTF8-name sort; SHA256(path+NUL+decimalByteLength+NUL+rawbytes)",
+            "recordAlgorithm": "Global UTF8 path sort; SHA256(path+NUL+fileSHA256+NUL+decimalByteLength+LF)"
+          },
+          "executableRelativeKey": "FluentRead",
+          "executableSHA256": "2beb2d194ab1bd2c2ebfc7ea996bf0acee1a0ffdf7827cefb9f55361a90ccc07",
+          "executableBytes": 125672,
+          "fullFileMap": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/mobile-youtube-fr-node-identity-probe-20261017/same-scope-clone-repair-20261017/native-iPhoneOS-app-full-map.json",
+          "signingClassification": "UNSIGNED",
+          "codesignDetail": {
+            "argv": [
+              "/usr/bin/codesign",
+              "-dvvv",
+              "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/mobile-youtube-fr-node-identity-probe-20261017/same-scope-clone-repair-20261017/native-binding-scope-repair-v1/output/target-iphoneos/build/FluentRead.app"
+            ],
+            "returnCode": 1,
+            "stdout": "",
+            "stderr": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/mobile-youtube-fr-node-identity-probe-20261017/same-scope-clone-repair-20261017/native-binding-scope-repair-v1/output/target-iphoneos/build/FluentRead.app: code object is not signed at all\n"
+          },
+          "entitlementsRead": {
+            "argv": [
+              "/usr/bin/codesign",
+              "-d",
+              "--entitlements",
+              ":-",
+              "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/mobile-youtube-fr-node-identity-probe-20261017/same-scope-clone-repair-20261017/native-binding-scope-repair-v1/output/target-iphoneos/build/FluentRead.app"
+            ],
+            "returnCode": 1,
+            "stdout": "",
+            "stderr": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/mobile-youtube-fr-node-identity-probe-20261017/same-scope-clone-repair-20261017/native-binding-scope-repair-v1/output/target-iphoneos/build/FluentRead.app: code object is not signed at all\n"
+          },
+          "executableFileType": {
+            "argv": [
+              "/usr/bin/file",
+              "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/mobile-youtube-fr-node-identity-probe-20261017/same-scope-clone-repair-20261017/native-binding-scope-repair-v1/output/target-iphoneos/build/FluentRead.app/FluentRead"
+            ],
+            "returnCode": 0,
+            "stdout": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/mobile-youtube-fr-node-identity-probe-20261017/same-scope-clone-repair-20261017/native-binding-scope-repair-v1/output/target-iphoneos/build/FluentRead.app/FluentRead: Mach-O 64-bit executable arm64\n",
+            "stderr": ""
+          },
+          "fullFileMapSHA256": "62eb2ab9779fd5fbc72e8696aa5a527748facf32fd31646e98ae605565713d8d"
+        },
+        "extension": {
+          "path": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/mobile-youtube-fr-node-identity-probe-20261017/same-scope-clone-repair-20261017/native-binding-scope-repair-v1/output/target-iphoneos/build/FluentRead.app/PlugIns/FluentRead Extension.appex",
+          "identity": {
+            "CFBundleIdentifier": "org.example.FluentReadDevelopment.Extension",
+            "CFBundleShortVersionString": "1.0",
+            "CFBundleVersion": "1",
+            "CFBundleExecutable": "FluentRead Extension",
+            "MinimumOSVersion": "26.0",
+            "CFBundleSupportedPlatforms": [
+              "iPhoneOS"
+            ],
+            "DTPlatformName": "iphoneos",
+            "DTSDKName": "iphoneos26.2",
+            "NSExtension": {
+              "NSExtensionPointIdentifier": "com.apple.Safari.web-extension",
+              "NSExtensionPrincipalClass": "FluentRead_Extension.SafariWebExtensionHandler"
+            }
+          },
+          "inventory": {
+            "files": 469,
+            "bytes": 62322411,
+            "rawByteHash": "729a2b52c0a829fddd35be74713dda5240c911af9d0a0acf53eb20e5df1e553e",
+            "recordHash": "195583526604720dffb0a3eab6c87419b170bd21e8328622bfd9da69c676ffc5",
+            "rawAlgorithm": "Recursive directory UTF8-name sort; SHA256(path+NUL+decimalByteLength+NUL+rawbytes)",
+            "recordAlgorithm": "Global UTF8 path sort; SHA256(path+NUL+fileSHA256+NUL+decimalByteLength+LF)"
+          },
+          "executableRelativeKey": "FluentRead Extension",
+          "executableSHA256": "0cb335c939e300c593b69b6a17f03d439b4cca11362b948b9b99f6e6b5fc4d32",
+          "executableBytes": 88816,
+          "fullFileMap": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/mobile-youtube-fr-node-identity-probe-20261017/same-scope-clone-repair-20261017/native-iPhoneOS-extension-full-map.json",
+          "signingClassification": "UNSIGNED",
+          "codesignDetail": {
+            "argv": [
+              "/usr/bin/codesign",
+              "-dvvv",
+              "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/mobile-youtube-fr-node-identity-probe-20261017/same-scope-clone-repair-20261017/native-binding-scope-repair-v1/output/target-iphoneos/build/FluentRead.app/PlugIns/FluentRead Extension.appex"
+            ],
+            "returnCode": 1,
+            "stdout": "",
+            "stderr": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/mobile-youtube-fr-node-identity-probe-20261017/same-scope-clone-repair-20261017/native-binding-scope-repair-v1/output/target-iphoneos/build/FluentRead.app/PlugIns/FluentRead Extension.appex: code object is not signed at all\n"
+          },
+          "entitlementsRead": {
+            "argv": [
+              "/usr/bin/codesign",
+              "-d",
+              "--entitlements",
+              ":-",
+              "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/mobile-youtube-fr-node-identity-probe-20261017/same-scope-clone-repair-20261017/native-binding-scope-repair-v1/output/target-iphoneos/build/FluentRead.app/PlugIns/FluentRead Extension.appex"
+            ],
+            "returnCode": 1,
+            "stdout": "",
+            "stderr": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/mobile-youtube-fr-node-identity-probe-20261017/same-scope-clone-repair-20261017/native-binding-scope-repair-v1/output/target-iphoneos/build/FluentRead.app/PlugIns/FluentRead Extension.appex: code object is not signed at all\n"
+          },
+          "executableFileType": {
+            "argv": [
+              "/usr/bin/file",
+              "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/mobile-youtube-fr-node-identity-probe-20261017/same-scope-clone-repair-20261017/native-binding-scope-repair-v1/output/target-iphoneos/build/FluentRead.app/PlugIns/FluentRead Extension.appex/FluentRead Extension"
+            ],
+            "returnCode": 0,
+            "stdout": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/mobile-youtube-fr-node-identity-probe-20261017/same-scope-clone-repair-20261017/native-binding-scope-repair-v1/output/target-iphoneos/build/FluentRead.app/PlugIns/FluentRead Extension.appex/FluentRead Extension: Mach-O 64-bit executable arm64\n",
+            "stderr": ""
+          },
+          "fullFileMapSHA256": "bc65f8f05beeffe8e828cb663988f6e5cc948626c7b9aef2093d20b541183995"
+        }
+      },
+      "compiledContainerResources": {
+        "Base.lproj/Main.html": {
+          "path": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/mobile-youtube-fr-node-identity-probe-20261017/same-scope-clone-repair-20261017/native-binding-scope-repair-v1/output/target-iphoneos/build/FluentRead.app/Base.lproj/Main.html",
+          "sha256": "8359d2ff5a18fc2c655ef8798869b242b7c8495fa9a4575919213a2226d7789e",
+          "bytes": 862
+        },
+        "Style.css": {
+          "path": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/mobile-youtube-fr-node-identity-probe-20261017/same-scope-clone-repair-20261017/native-binding-scope-repair-v1/output/target-iphoneos/build/FluentRead.app/Style.css",
+          "sha256": "3f4c01b933fe9622c01784d8e2eec2a228225fb07284bb5adacaf4bef4319a40",
+          "bytes": 1536
+        },
+        "Script.js": {
+          "path": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/mobile-youtube-fr-node-identity-probe-20261017/same-scope-clone-repair-20261017/native-binding-scope-repair-v1/output/target-iphoneos/build/FluentRead.app/Script.js",
+          "sha256": "ff9d564bd55a9742f77043dc08ebfd4cc2415989d70576851182d9c34c0ad2f8",
+          "bytes": 2887
+        }
+      }
+    }
+  },
+  "signaturePolicy": "No developer authority/team/provisioning; macOS and Simulator linker ad-hoc are distinguished from unsigned iPhoneOS. codesign is display-only; no --sign invocation.",
+  "runtimeGoIssued": false,
+  "sourceWebBefore": {
+    "files": 467,
+    "bytes": 62232613,
+    "rawByteHash": "b9ddd701367f20934372c8a16c01b0849b05b4af57574faf1af03555eca7c897",
+    "recordHash": "4ef229d04bf1172dd401821fdb4ef0e4c6277884aa78df7653a7628c94b9472f",
+    "rawAlgorithm": "Recursive directory UTF8-name sort; SHA256(path+NUL+decimalByteLength+NUL+rawbytes)",
+    "recordAlgorithm": "Global UTF8 path sort; SHA256(path+NUL+fileSHA256+NUL+decimalByteLength+LF)"
+  },
+  "sourceWebAfter": {
+    "files": 467,
+    "bytes": 62232613,
+    "rawByteHash": "b9ddd701367f20934372c8a16c01b0849b05b4af57574faf1af03555eca7c897",
+    "recordHash": "4ef229d04bf1172dd401821fdb4ef0e4c6277884aa78df7653a7628c94b9472f",
+    "rawAlgorithm": "Recursive directory UTF8-name sort; SHA256(path+NUL+decimalByteLength+NUL+rawbytes)",
+    "recordAlgorithm": "Global UTF8 path sort; SHA256(path+NUL+fileSHA256+NUL+decimalByteLength+LF)"
+  },
+  "boundSourcesAndProductsUnchangedDuringInspection": true,
+  "fullFileMapArtifacts": [
+    {
+      "path": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/mobile-youtube-fr-node-identity-probe-20261017/same-scope-clone-repair-20261017/native-wrapper-web-full-map.json",
+      "sha256": "fb688108455f6e6432140a6f9e4d7c9dcafa08fbba9be46a968bb821c9726db2",
+      "bytes": 67790
+    },
+    {
+      "path": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/mobile-youtube-fr-node-identity-probe-20261017/same-scope-clone-repair-20261017/native-macOS-compiled-web-full-map.json",
+      "sha256": "fb688108455f6e6432140a6f9e4d7c9dcafa08fbba9be46a968bb821c9726db2",
+      "bytes": 67790
+    },
+    {
+      "path": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/mobile-youtube-fr-node-identity-probe-20261017/same-scope-clone-repair-20261017/native-macOS-app-full-map.json",
+      "sha256": "8f23a76035297c1b5be84079dfa4ce69630704cc1e9c741b5920a4f38b8f63d7",
+      "bytes": 99566
+    },
+    {
+      "path": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/mobile-youtube-fr-node-identity-probe-20261017/same-scope-clone-repair-20261017/native-macOS-extension-full-map.json",
+      "sha256": "51a51bf64e2240a1028c1a597ff6069b6aec94fa522b6bc192b7be88836960cd",
+      "bytes": 76945
+    },
+    {
+      "path": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/mobile-youtube-fr-node-identity-probe-20261017/same-scope-clone-repair-20261017/native-iosSimulator-compiled-web-full-map.json",
+      "sha256": "6b70ceecfe161f3bb82b24275658425b7285ef245a75d4dda8d90811590009a4",
+      "bytes": 68047
+    },
+    {
+      "path": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/mobile-youtube-fr-node-identity-probe-20261017/same-scope-clone-repair-20261017/native-iosSimulator-app-full-map.json",
+      "sha256": "f23f933acd0618c6185a6af3a2ee29ddf38e5c7b98a1b50281359d412a6edca0",
+      "bytes": 86731
+    },
+    {
+      "path": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/mobile-youtube-fr-node-identity-probe-20261017/same-scope-clone-repair-20261017/native-iosSimulator-extension-full-map.json",
+      "sha256": "6b70ceecfe161f3bb82b24275658425b7285ef245a75d4dda8d90811590009a4",
+      "bytes": 68047
+    },
+    {
+      "path": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/mobile-youtube-fr-node-identity-probe-20261017/same-scope-clone-repair-20261017/native-iPhoneOS-compiled-web-full-map.json",
+      "sha256": "bc65f8f05beeffe8e828cb663988f6e5cc948626c7b9aef2093d20b541183995",
+      "bytes": 68046
+    },
+    {
+      "path": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/mobile-youtube-fr-node-identity-probe-20261017/same-scope-clone-repair-20261017/native-iPhoneOS-app-full-map.json",
+      "sha256": "62eb2ab9779fd5fbc72e8696aa5a527748facf32fd31646e98ae605565713d8d",
+      "bytes": 86729
+    },
+    {
+      "path": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/mobile-youtube-fr-node-identity-probe-20261017/same-scope-clone-repair-20261017/native-iPhoneOS-extension-full-map.json",
+      "sha256": "bc65f8f05beeffe8e828cb663988f6e5cc948626c7b9aef2093d20b541183995",
+      "bytes": 68046
+    }
+  ]
+}

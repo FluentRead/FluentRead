@@ -1,0 +1,28 @@
+{
+  "actions" : {
+    "address" : 1,
+    "clearSearch" : 1,
+    "closePopup" : 1,
+    "defaultServiceRow" : 1,
+    "extensionPopup" : 1,
+    "navigation" : 1,
+    "normalClear" : 1,
+    "overviewClose" : 1,
+    "pageMenu" : 1,
+    "pickerBack" : 1,
+    "SafariActivate" : 1,
+    "searchFocus" : 1,
+    "searchGpt" : 1,
+    "serviceSummary" : 1
+  },
+  "clipboardActions" : 0,
+  "closedTabs" : 0,
+  "configurationWrites" : 0,
+  "createdTabs" : 0,
+  "fullStoragePreservation" : "NOT_CLAIMED",
+  "keyboardAcceptance" : "PENDING_PHASE_AX_PNG_REVIEW",
+  "permissionChoices" : 0,
+  "servicePickerActions" : 7,
+  "status" : "DRAWER_KEYBOARD_ATTACHMENTS_RECORDED_REQUIRES_REVIEW",
+  "translationIntents" : 0
+}

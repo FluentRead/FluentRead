@@ -1,0 +1,13 @@
+{
+  "actions" : {
+
+  },
+  "closedTabs" : 0,
+  "configurationWrites" : 0,
+  "createdTabs" : 0,
+  "failureSnapshotRetaken" : false,
+  "keyboardAcceptance" : false,
+  "permissionChoices" : 0,
+  "reason" : "Initial dedicated simulator orientation is not portrait",
+  "status" : "UNVERIFIED_DRAWER_ROTATION_KEYBOARD_PRECONDITION_STOP"
+}

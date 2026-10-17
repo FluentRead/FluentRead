@@ -1,0 +1,212 @@
+{
+  "schema": 1,
+  "kind": "derived-public-scoped-delivery-summary",
+  "sourceCommit": "461c2fb3b310382f67fa3b21303733a590783bfd",
+  "sourceChanges": {
+    "mount": "Safari browser + current any-pointer:coarse detection; owned root marker lifecycle.",
+    "css": "Marker-scoped root/body/#app width100% and viewport-marked drawer raw width; embedded contract excluded.",
+    "tests": "255 tests/4 files before commit, exact three-file bytes subsequently bound to clean461c2fb."
+  },
+  "sourceBinding": {
+    "kind": "clean-current-commit-v1",
+    "dirtyPatchMap": null,
+    "trackedChangedFileHashes": {
+      "src/app/popup/mount.ts": {
+        "bytes": 5069,
+        "sha256": "9be03bbba9d33bd7d9fa15664fb7486abdcef272721ae4d66d21fda439122e3e"
+      },
+      "src/app/popup/popup.css": {
+        "bytes": 64106,
+        "sha256": "c6f9be4e324af4efaebbc3b24f894eb5518093be520d92794be1fac6ed4c89f7"
+      },
+      "tests/popupBootstrap.test.ts": {
+        "bytes": 27627,
+        "sha256": "148d022888e3586f5865f154bb2e578e4d528bb13e2d7838f3281a2c30f543cb"
+      }
+    }
+  },
+  "validation": {
+    "focused": {
+      "testFilesPassed": 4,
+      "testsPassed": 255,
+      "exitCode": 0,
+      "runBaseHead": "7fa8abc39fe6127ecf9a306fafed9eb6cdcb14f8",
+      "recordTimeBoundary": "Original focused receipt still says runtime pending; later runtime evidence does not rewrite it."
+    },
+    "typecheck": {
+      "sourceCommit": "461c2fb3b310382f67fa3b21303733a590783bfd",
+      "exitCode": 0
+    },
+    "webBuildExitCode": 0,
+    "sixNativeStages": [
+      {
+        "id": "01-sdk-check",
+        "exitCode": 0
+      },
+      {
+        "id": "02-safari-web-verify",
+        "exitCode": 0
+      },
+      {
+        "id": "03-fresh-unsigned-wrapper",
+        "exitCode": 0
+      },
+      {
+        "id": "04-macos",
+        "exitCode": 0
+      },
+      {
+        "id": "05-ios-simulator",
+        "exitCode": 0
+      },
+      {
+        "id": "06-iphoneos-arm64",
+        "exitCode": 0
+      }
+    ],
+    "buildBoundary": "Native compile/Web resource match only, not physical or signed/released installation."
+  },
+  "runtime": {
+    "caseDirectoryResearchIdentifier": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/mobile-youtube-fr-node-identity-probe-20261017/same-scope-clone-repair-20261017/current-production-touch-width-drawer-keyboard-attempt1",
+    "artifactKind": "clean-production-461c2fb-touch-width",
+    "productionIdentitySHA256": "62b1353c166605ab9f6e7b3a4540f2937425b5dc7164a3cfbef279fd3ed0cc03",
+    "device": "Dedicated iPhone16Pro/iOS26.2 Simulator portrait",
+    "official": {
+      "PASS": 1,
+      "SKIP": 0,
+      "FAIL": 0
+    },
+    "runtimeGuardSession": 68772,
+    "runtimeGuardExitCode": 0,
+    "RootViewedOriginalPNG": 8,
+    "RootReadPayloadJSON": 44,
+    "drawerActionsInOrder": [
+      "serviceSummary",
+      "defaultServiceRow",
+      "searchFocus",
+      "searchGpt",
+      "clearSearch",
+      "pickerBack",
+      "overviewClose"
+    ],
+    "permissionChoices": 0,
+    "query": "gpt then empty; clear leaves keyboard present; Back returns overview without keyboard.",
+    "widths": {
+      "oldMain": 308,
+      "newMain": 386,
+      "oldOverview": 308,
+      "newOverview": 386,
+      "normalWebView": 386,
+      "keyboardWebViewAndDialog": 402
+    },
+    "sameOwnedFixtureRecovery": true,
+    "fullProductAcceptance": false
+  },
+  "reviewRole": "Staging author independently checks file identity/copy SHA/length. Actual runtime by Root and PNG/44payload review by Root/diagnostic_driver_prep; no new pixel/runtime review by staging author.",
+  "currentCaseAttachmentCopyIndex": "copy-index.json",
+  "externalEvidenceReferences": {
+    "focusedValidation": {
+      "path": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/mobile-youtube-fr-node-identity-probe-20261017/same-scope-clone-repair-20261017/root-safari-touch-width-focused-validation.json",
+      "bytes": 1090,
+      "sha256": "34253a4bad8ab3d23214c1ea003d78fc85343c90d2e393d0a2bd3f2206b76da3",
+      "copy": null,
+      "availability": "research-source identifier only; no public/repository copy made by this staging"
+    },
+    "typecheck": {
+      "path": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/mobile-youtube-fr-node-identity-probe-20261017/same-scope-clone-repair-20261017/safari-touch-width-clean461c2fb-typecheck-result.json",
+      "bytes": 641,
+      "sha256": "7f0a43c05fd3386aa25e43531c4e58dbf3af24d06f97b2a1dd110bbcb3647080",
+      "copy": null,
+      "availability": "research-source identifier only; no public/repository copy made by this staging"
+    },
+    "cleanSourceBinding": {
+      "path": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/mobile-youtube-fr-node-identity-probe-20261017/same-scope-clone-repair-20261017/safari-touch-width-clean461c2fb-build-20261017/clean-source-binding.json",
+      "bytes": 3233,
+      "sha256": "9524ba029358b25849fc15024a35eee94e06386c28ee1fa5e91e47525f320544",
+      "copy": null,
+      "availability": "research-source identifier only; no public/repository copy made by this staging"
+    },
+    "webBuild": {
+      "path": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/mobile-youtube-fr-node-identity-probe-20261017/same-scope-clone-repair-20261017/safari-touch-width-clean461c2fb-build-20261017/web-build-result.json",
+      "bytes": 605,
+      "sha256": "2d59be5c37c8243ace7ea8b6d37c1fea9b38b61c424f6809139634e1834eac59",
+      "copy": null,
+      "availability": "research-source identifier only; no public/repository copy made by this staging"
+    },
+    "sixStageNativeBuild": {
+      "path": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/mobile-youtube-fr-node-identity-probe-20261017/same-scope-clone-repair-20261017/safari-touch-width-clean461c2fb-build-20261017/native-build-summary.json",
+      "bytes": 10788,
+      "sha256": "babbba7ed40dacc7ad75d18bd1cdf4371c118283be53905fa0782588de4221ce",
+      "copy": null,
+      "availability": "research-source identifier only; no public/repository copy made by this staging"
+    },
+    "compiledIdentity": {
+      "path": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/mobile-youtube-fr-node-identity-probe-20261017/same-scope-clone-repair-20261017/safari-touch-width-clean461c2fb-build-20261017/compiled-artifact-identities.json",
+      "bytes": 48261,
+      "sha256": "62b1353c166605ab9f6e7b3a4540f2937425b5dc7164a3cfbef279fd3ed0cc03",
+      "copy": null,
+      "availability": "research-source identifier only; no public/repository copy made by this staging"
+    },
+    "independentBuildFileEvidence": {
+      "path": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/mobile-youtube-fr-node-identity-probe-20261017/same-scope-clone-repair-20261017/safari-touch-width-clean461c2fb-build-20261017/independent-build-file-evidence-review.json",
+      "bytes": 3874,
+      "sha256": "a67219655dfb9e6e63460d82f140f5b34a2a5ed5ce714fad6c3d1b49aa93f2ae",
+      "copy": null,
+      "availability": "research-source identifier only; no public/repository copy made by this staging"
+    },
+    "rootRuntimeOutcome": {
+      "path": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/mobile-youtube-fr-node-identity-probe-20261017/same-scope-clone-repair-20261017/current-production-touch-width-drawer-keyboard-attempt1/root-runtime-outcome.json",
+      "bytes": 4544,
+      "sha256": "8b86b6ad13bec2888bffdf18ac781b6a332107408fadd651f98b44ee56f64bee",
+      "copy": null,
+      "availability": "research-source identifier only; no public/repository copy made by this staging"
+    },
+    "independentRuntimeReview": {
+      "path": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/mobile-youtube-fr-node-identity-probe-20261017/same-scope-clone-repair-20261017/current-production-touch-width-drawer-keyboard-attempt1/independent-runtime-review.json",
+      "bytes": 14994,
+      "sha256": "72d14557bff3f7b4a01c03394abb1ab2d0c4e3d9e6df857ce2bbde94269943fa",
+      "copy": null,
+      "availability": "research-source identifier only; no public/repository copy made by this staging"
+    },
+    "officialSummary": {
+      "path": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/mobile-youtube-fr-node-identity-probe-20261017/same-scope-clone-repair-20261017/current-production-touch-width-drawer-keyboard-attempt1/runtime-test-summary.json",
+      "bytes": 1007,
+      "sha256": "90e311d1ef6579f260dc8e6ee68c0375dd2830f116da07f54a67af2ca41a6773",
+      "copy": null,
+      "availability": "research-source identifier only; no public/repository copy made by this staging"
+    },
+    "oldMainWidthSource": {
+      "path": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/mobile-youtube-fr-node-identity-probe-20261017/same-scope-clone-repair-20261017/current-production-service-drawer-keyboard-attempt1-revision2/runtime-attachments/67E75B42-47B5-48C4-B540-9809693FDC58.json",
+      "bytes": 8314,
+      "sha256": "ba0c1546876ca4c19dc3c159a64a83bd191c48d6b1fee59832e39a8e4c9d8472",
+      "copy": null,
+      "availability": "research-source identifier only; no public/repository copy made by this staging"
+    },
+    "oldOverviewWidthSource": {
+      "path": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/mobile-youtube-fr-node-identity-probe-20261017/same-scope-clone-repair-20261017/current-production-service-drawer-keyboard-attempt1-revision2/runtime-attachments/648E47E7-C7B1-4C40-A25E-24BA7EB18EDD.json",
+      "bytes": 4341,
+      "sha256": "72d0e25d151c3d16607fbc564a00dd18fb953c2e116fabe3b32b8c1bada1cc2e",
+      "copy": null,
+      "availability": "research-source identifier only; no public/repository copy made by this staging"
+    },
+    "androidE5ToolingBoundary": {
+      "path": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/android-runtime/edge-retained-install-readonly-20261017/execution-edge-retained-readonly-18dedadf-00b6-464c-9f8b-1acf2b73ff78/root-runtime-outcome.json",
+      "bytes": 5266,
+      "sha256": "a111344e8b37856ba5f0e3ba7d13b2de494973412cc366329213ea69efaf107d",
+      "copy": null,
+      "availability": "research-source identifier only; no public/repository copy made by this staging"
+    }
+  },
+  "notAccepted": [
+    "Service list scrolling and all list rows/bottom controls reachability",
+    "Rotation, landscape, other screen sizes and skins",
+    "Complete normal Popup bottom/footer; current images show lower cards clipped, which does not prove scrolling impossible",
+    "Provider requests/translation or service/model selection and persistence",
+    "Real physical iPhone/iPad or signed/released installation",
+    "All extension storage/cache/config semantic hydration and permission persistence/expiry",
+    "Focus retention/return contract beyond the observed query/back/close flow",
+    "Android latest product acceptance: E5 stopped due tooling field mismatch before live AX/tap; zero tap",
+    "Rotation is separately under source preparation at staging time; no rotation PASS recorded here"
+  ],
+  "historicalBoundary": "Earlier cae build and SKIP records remain unchanged and retain their own identities. This portrait result does not supersede video menu/scroll/AVKit or prior skipped attempts."
+}

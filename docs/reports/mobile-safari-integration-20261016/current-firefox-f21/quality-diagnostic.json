@@ -1,0 +1,192 @@
+{
+  "at": "2026-10-16T09:02:55.223406+00:00",
+  "scope": "Offline narrowlyscoped review of attempt21 saved DOM/HTML and frozenf5a sharedsource; no providers/cache/device/tests/products modified",
+  "runtimeSourceCommit": "f5a82d11a5b6b6a5de2f2ea726065a56cdb2e6ca",
+  "facts": [
+    {
+      "pIndex": 1,
+      "sourceLangAttribute": "ar",
+      "outputLangAttribute": "zh-Hans",
+      "original": "هذا النطاق مُخصص للاستخدام في أمثلة التوثيق دون الحاجة إلى إذن. هذه ليست خدمة، يُرجى تجنب الاعتماد عليها لأغراض الاختبار والمراقبة.",
+      "first": "هذاالنطاقمُخصصللاستخدامفيأمثلةالتوثيقدونالحاجةإلىإذن。هذهليستخدمة،يُرجىتجنبالاعتمادعليهالأغراضالاختباروالمراقبة。",
+      "retranslated": "هذاالنطاقمُخصصللاستخدامفيأمثلةالتوثيقدونالحاجةإلىإذن。هذهليستخدمة،يُرجىتجنبالاعتمادعليهالأغراضالاختباروالمراقبة。",
+      "textEqualFirstRetranslate": true,
+      "ownedHTMLEqualFirstRetranslate": true,
+      "HTML": "<span class=\"fluent-read-bilingual-content fluent-display-bold\" data-fr-translation-owned=\"true\" translate=\"no\" lang=\"zh-Hans\" dir=\"auto\">هذاالنطاقمُخصصللاستخدامفيأمثلةالتوثيقدونالحاجةإلىإذن。هذهليستخدمة،يُرجىتجنبالاعتمادعليهالأغراضالاختباروالمراقبة。</span>",
+      "HTMLDecodedText": "هذاالنطاقمُخصصللاستخدامفيأمثلةالتوثيقدونالحاجةإلىإذن。هذهليستخدمة،يُرجىتجنبالاعتمادعليهالأغراضالاختباروالمراقبة。",
+      "textMatchesHTMLExactly": true,
+      "flatTextOnlyInsideOwnedSpan": true,
+      "sourceWhitespaceCount": 20,
+      "firstWhitespaceCount": 0,
+      "retranslatedWhitespaceCount": 0,
+      "ownedNodeCountFirst": 1,
+      "ownedNodeCountRetranslate": 1,
+      "pixelScope": "partly-inside-viewport",
+      "sourceRetained": true
+    },
+    {
+      "pIndex": 3,
+      "sourceLangAttribute": "fr",
+      "outputLangAttribute": "zh-Hans",
+      "original": "L’usage de ce domaine est réservé à des exemples de documentation, sans autorisation préalable.  Il ne s’agit pas d’un service ; son utilisation à des fins de test ou de surveillance est à éviter.",
+      "first": "L'use de ce domaine est réservéàdes示例de留档，无自动化priéalable。Il ne s'agit pas d'un服务；son utilationàdes fins de test ou de监视estàéviter。",
+      "retranslated": "L'use de ce domaine est réservéàdes示例de留档，无自动化priéalable。Il ne s'agit pas d'un服务；son utilationàdes fins de test ou de监视estàéviter。",
+      "textEqualFirstRetranslate": true,
+      "ownedHTMLEqualFirstRetranslate": true,
+      "HTML": "<span class=\"fluent-read-bilingual-content fluent-display-bold\" data-fr-translation-owned=\"true\" translate=\"no\" lang=\"zh-Hans\" dir=\"auto\">L'use de ce domaine est réservéàdes示例de留档，无自动化priéalable。Il ne s'agit pas d'un服务；son utilationàdes fins de test ou de监视estàéviter。</span>",
+      "HTMLDecodedText": "L'use de ce domaine est réservéàdes示例de留档，无自动化priéalable。Il ne s'agit pas d'un服务；son utilationàdes fins de test ou de监视estàéviter。",
+      "textMatchesHTMLExactly": true,
+      "flatTextOnlyInsideOwnedSpan": true,
+      "sourceWhitespaceCount": 34,
+      "firstWhitespaceCount": 15,
+      "retranslatedWhitespaceCount": 15,
+      "ownedNodeCountFirst": 1,
+      "ownedNodeCountRetranslate": 1,
+      "pixelScope": "outside-viewport",
+      "sourceRetained": true
+    }
+  ],
+  "publicSourceCrosscheck": {
+    "path": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/android-runtime/firefox-f5a-page-cycle-prepared-20261016/public-source-crosscheck/response-provenance.json",
+    "fact": "Root independentnewHTTP response has1p, differsfrommobile6p. It cannot identifyearliermobile network/cache/DOM path.",
+    "classification": "Unknown; not assertedfixture orfreshpublicsource"
+  },
+  "sourceReferences": [
+    {
+      "path": "/Users/thinkstu/Desktop/copy/FluentRead-mobile-video-menu-accessibility-20261016/src/features/full-page-translation/content/translationRequest.ts",
+      "line": 152,
+      "sha256": "4feb2a398ee1e4cf7b1dea7bc48eb2d59bde5ca0452634ee29a4c5b000cc923f",
+      "finding": "Snapshot source=config.from; target=override/config.to, thencreateSnapshotTranslateOptions forwards both. No p[lang] override in this path."
+    },
+    {
+      "path": "/Users/thinkstu/Desktop/copy/FluentRead-mobile-video-menu-accessibility-20261016/src/services/translation/client.ts",
+      "line": 365,
+      "sha256": "e038c38b5cdce0e99ff5cf5237004db23256261a2e711cb241855df470e1a4a4",
+      "finding": "Sends original origin plus selected from/to. cleanedOrigin at331 is onlyemptycheck; it does not replace origin."
+    },
+    {
+      "path": "/Users/thinkstu/Desktop/copy/FluentRead-mobile-video-menu-accessibility-20261016/src/providers/translation/free-translation.ts",
+      "line": 87,
+      "sha256": "c2d2464d534634c67d3e9f2f0873a80beda0a6dcbf81596f87a8bc594eeb6306",
+      "finding": "youdaoFree andicibaFree receive request.sourceLanguage/targetLanguage; otherpool members have ownadapters."
+    },
+    {
+      "path": "/Users/thinkstu/Desktop/copy/FluentRead-mobile-video-menu-accessibility-20261016/src/providers/translation/free-chinese-web.ts",
+      "line": 53,
+      "sha256": "4a5b79fbd20624f515b39e5ba8c255fd050921c873ebd9e698eff734ffe6922f",
+      "finding": "ensureLanguage(auto,source,text) checks onlyChinese script; all nonChinese then mapto en. Explicitfr/ar reject at63; autoFR/AR wouldstilluseen→zh-CHS."
+    },
+    {
+      "path": "/Users/thinkstu/Desktop/copy/FluentRead-mobile-video-menu-accessibility-20261016/src/core/config/freeTranslation.ts",
+      "line": 19,
+      "sha256": "dc63b34bdf1820d847d53dff9008ccc04105edd4a49ee53c4f9653c69715ae63",
+      "finding": "youdaoFree/icibaFree are included in defaultpool; actualtaskenabledorder/winningroute notcaptured."
+    },
+    {
+      "path": "/Users/thinkstu/Desktop/copy/FluentRead-mobile-video-menu-accessibility-20261016/src/core/translation/resultValidation.ts",
+      "line": 85,
+      "sha256": "07769f6fef09a74328509b097a1eac0126d339f6b11b2e1f05a889903aa25cd0",
+      "finding": "ChangedArabicwordspacing/letters andmixedFrench do not satisfyunchanged-response comparison; likelyUntranslated returnsfalse beforelanguagecheck."
+    },
+    {
+      "path": "/Users/thinkstu/Desktop/copy/FluentRead-mobile-video-menu-accessibility-20261016/src/core/translation/resultValidation.ts",
+      "line": 119,
+      "sha256": "07769f6fef09a74328509b097a1eac0126d339f6b11b2e1f05a889903aa25cd0",
+      "finding": "Any Han inoutput bypasses foreignLatinprose check; observedFRcontainsHan. Arabic result hasneitherLatin norkana so wronglanguage checkalso returnsfalse."
+    },
+    {
+      "path": "/Users/thinkstu/Desktop/copy/FluentRead-mobile-video-menu-accessibility-20261016/src/providers/translation/free-translation.ts",
+      "line": 105,
+      "sha256": "c2d2464d534634c67d3e9f2f0873a80beda0a6dcbf81596f87a8bc594eeb6306",
+      "finding": "Scalarfree responsevalidation uses likelyUntranslated+clearlyWrongLanguage; nativearraygroup also validates at145."
+    },
+    {
+      "path": "/Users/thinkstu/Desktop/copy/FluentRead-mobile-video-menu-accessibility-20261016/src/services/translation/broker.ts",
+      "line": 263,
+      "sha256": "65cb9d2a3f6165cc4fa890cadafca8995cf6e0b3f07a9d11ea139727c23384bb",
+      "finding": "isCacheableResult uses sameguards; cache read at1269–1287 mayreturn accepted persisted string. Actualhit unknown."
+    },
+    {
+      "path": "/Users/thinkstu/Desktop/copy/FluentRead-mobile-video-menu-accessibility-20261016/src/core/translation/serialization.ts",
+      "line": 386,
+      "sha256": "2a8663e6ebc1d013df2397861c4a3709cd10ffb746d1705a8e2cd2464b50d82d",
+      "finding": "Writestranslation via createTextNode aftertrim/newline splitting; internalwhitespace not globally removed. Slotwrite at407 is direct string."
+    },
+    {
+      "path": "/Users/thinkstu/Desktop/copy/FluentRead-mobile-video-menu-accessibility-20261016/src/features/full-page-translation/content/renderer.ts",
+      "line": 143,
+      "sha256": "2c74816e64c4e21a30cbdebe379f4c2133797275e06619772ac800f83a97d147",
+      "finding": "sanitizeChildren copies textnode.nodeValue verbatim; content.lang at282 is assignedfromtarget, notdetectedoutputlanguage. CSS doesnotcreateownedtranslationtext."
+    },
+    {
+      "path": "/Users/thinkstu/Desktop/copy/FluentRead-mobile-video-menu-accessibility-20261016/src/core/translation/targetResult.ts",
+      "line": 124,
+      "sha256": "a19fc1ac75ca75c5e4a8704ffdaaf05e3fcba9e92da0ca6c9eafec3c520576fe",
+      "finding": "hasDistinctTargetTranslation onlydecideswhether todraw distinctcontent; presentationnormalization doesnotmutateactualproviderresult."
+    }
+  ],
+  "confirmedCodeProperties": [
+    {
+      "id": "shared-adapter-auto-direction",
+      "status": "CONFIRMED_STATIC_CONDITION_NOT_RUNTIME_CAUSAL_PROOF",
+      "condition": "If freepool selects youdao/iciba withsourceauto andthese nonChineseFrench/Arabicoriginals",
+      "behavior": "Adapterchoosesfrom=en/towebChinese, notfr/ar ortrueautomaticdetection. ThiscanaskEnglish-onlyroute toprocessnonEnglish.",
+      "mobileSpecific": false,
+      "unknown": "Actualproviderselected/attemptpayload/whetherresulthadbeenpersistednotcaptured."
+    },
+    {
+      "id": "shared-quality-validation-blindspots",
+      "status": "CONFIRMED_STATIC_ACCEPTANCE_GAP_FOR_OBSERVED_STRINGS",
+      "behavior": "ObservedAR ischanged(nonEcho) andnoLatin/kana; observedFR ischanged andcontainsHan. ExistinglikelyUntranslated+clearlyWrongLanguage predicatesdonotrejecttheseshapes. Sameguardsallowcacheability, sohistoricalbadresultcanremainacceptable.",
+      "whatThisDoesNotProve": "It explainswhyqualitymaynotforcefallback; doesnotexplainwhogeneratedmixedtext orwhether21readcache."
+    },
+    {
+      "id": "dom-vs-css",
+      "status": "EVIDENCE_RULES_OUT_CSS_ONLY_WHITESPACE_EXPLANATION",
+      "behavior": "PuretextinsideHTMLalreadyhaslostspaces. Renderer/wholeblockwritepreserveinteriorwhitespace; no mobilespecificformatteridentifiedinreviewedchain.",
+      "uncertainty": "No rawpre-rendertranslationresultcaptured; cannoteliminateanyupstreamprovideradapter/slotprocessingwithabsoluteproof."
+    }
+  ],
+  "hypotheses": [
+    {
+      "id": "nonEnglish-fed-to-English-only-route",
+      "confidence": "plausible sharedpipeline candidate",
+      "support": "auto→en mapping anddefaultpoolincludesadapters",
+      "decisiveEvidenceNeeded": "Existingor futurepassive singleparagraph execution trace: origin/sourceLanguage/targetLanguage, selectedroute andactualHTTPfrom/to; providerrawresult."
+    },
+    {
+      "id": "accepted-cached-low-quality-result",
+      "confidence": "plausible, notestablished",
+      "support": "First/retranslated textandownedHTMLidentical; sameguardsaccepttheseshapes; persistentcachereadexists.",
+      "notProof": "Equalityalone couldalsocomefrom deterministicprovider orretainedfrontend result.",
+      "decisiveEvidenceNeeded": "Sameparagraphrequestidentity plus cachedSegments/shared/upstreamCalls andtheexistingcacheentry beforeanymutation; nocacheclear/force-refreshneeded."
+    }
+  ],
+  "minimalNextEvidence": [
+    {
+      "step": 1,
+      "kind": "Optional futuretargeted offlinecontractproof; NOT_EXECUTED",
+      "scope": "OnlyobservedAR/FR pairs into resultValidation existingunitowner, andautoAR/FR into free-chinese-web mockedtransport request capture.",
+      "expectedDistinction": "Wouldprovethesestaticcontractresults withoutliveprovider andavoidmobile/UI matrix; notproductionrootcausebyitself."
+    },
+    {
+      "step": 2,
+      "kind": "Onlyif futureRootauthorizesoneexistingconfiguredparagraph diagnostic; NOT_EXECUTED",
+      "scope": "CaptureoneAR orFR pipelineexecution passively, recording exactorigin/from/to, winningproviderorcachehit, rawstringbeforetext-skeleton andresultafterrender.",
+      "bounds": "Nofreshproviderselection/key/grant/cacheclear; donotcallanotherroute asfallbackprobe orrepeatfullpage/device matrix. Ifonlycachehitobserved, reportthatandstopratherthanforce network."
+    }
+  ],
+  "missingEvidence": [
+    "Actualattempt21translationmessage origin/sourceLanguage/targetLanguage per p",
+    "Winningfreeprovider/routeattempts andHTTPpayload/rawresponse",
+    "Cachehit/memoryreplay/persistedcacheprovenance",
+    "CurrenttaskfreeOrder/health/batchpreference snapshot",
+    "Originalmobile six-language document navigationresponse/cache/origin"
+  ],
+  "notRun": [
+    "NewHTTP/providerrequests",
+    "Browser/AVD/SDK/test/build",
+    "Cacheclear/providerorconfigurationchanges",
+    "Productedits"
+  ]
+}

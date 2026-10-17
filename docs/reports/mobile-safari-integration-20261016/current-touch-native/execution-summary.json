@@ -1,0 +1,272 @@
+{
+  "schemaVersion": 1,
+  "atUtc": "2026-10-16T19:40:12.338778+00:00",
+  "status": "LOCAL_UNSIGNED_PACKAGING_THREE_TARGET_COMPILE_AND_RESOURCE_IDENTITY_PASS_NOT_RUNTIME",
+  "executor": "/root/f25_review",
+  "runtimeSourceCommit": "a2ecda302d3a0199ffe9f0222ee2998a37bd7d5d",
+  "preparation": {
+    "path": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/touch-layout-f33-followup-20261017/native-a2-preparation/preparation.json",
+    "sha256": "35ca3e0e2ef909f186d2bb5882af7a74e0e505acefc8a3873a26c036d408b8dd"
+  },
+  "runbook": {
+    "path": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/touch-layout-f33-followup-20261017/native-a2-preparation/RUNBOOK.md",
+    "sha256": "3f31fa08fd81b2b46ea5f6481908db5ff4f0ca578f050d2435a20d81fca17324"
+  },
+  "preflight": {
+    "path": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/touch-layout-f33-followup-20261017/native-a2-preparation/preflight.json",
+    "sha256": "6e49f1ef640a0e5b247304198e2de3a67de37eae922f78ddc57e53e249c9b487"
+  },
+  "packageVerification": {
+    "path": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/touch-layout-f33-followup-20261017/native-a2-preparation/package-verification.json",
+    "sha256": "bee232b6ecd67ca131a6855ff441759e3ee19bcd68d2575d4e1e1b98d5aaa80f"
+  },
+  "compiledIdentities": {
+    "path": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/touch-layout-f33-followup-20261017/native-a2-preparation/compiled-artifact-identities.json",
+    "sha256": "b85ce5c242211b8bd3c82aa4affc31569e57eb86d0d96060e4133e1ca5283820"
+  },
+  "sourceInputPre": {
+    "path": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/touch-layout-f33-followup-20261017/native-a2-preparation/artifact-pre.json",
+    "sha256": "a714b81958f3516c1453de7238568dd7f3f0732db482015dceb7c8da89b74ad4"
+  },
+  "sourceInputPost": {
+    "path": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/touch-layout-f33-followup-20261017/native-a2-preparation/artifact-post.json",
+    "sha256": "2f74353f9d7988a8b3015f6222c9ddf33c33d5fad85ea49409ac6a46d06e16e1"
+  },
+  "freshResourceRelease": {
+    "path": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/touch-layout-f33-followup-20261017/native-a2-preparation/fresh-resource-release.json",
+    "sha256": "e4a8c4e3199d9e87a8de80f8969cd038c87892f7b0476be20cc26f80215f935c"
+  },
+  "stages": [
+    {
+      "id": "01-sdk-check",
+      "exitCode": 0,
+      "elapsedSeconds": 0.368,
+      "result": {
+        "path": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/touch-layout-f33-followup-20261017/native-a2-preparation/01-sdk-check-result.json",
+        "sha256": "abe45468b46911dd4e8ea0da676fb1a374458193257c85b89a79a53627dcc962"
+      },
+      "log": {
+        "path": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/touch-layout-f33-followup-20261017/native-a2-preparation/logs/01-sdk-check.log",
+        "sha256": "c14f577bc39fefe127522a5694d5de0ea33c16539e3573498182e06307bf7873"
+      }
+    },
+    {
+      "id": "02-safari-web-verify",
+      "exitCode": 0,
+      "elapsedSeconds": 0.23,
+      "result": {
+        "path": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/touch-layout-f33-followup-20261017/native-a2-preparation/02-safari-web-verify-result.json",
+        "sha256": "e479f6ae6caccea152896cda07a7c6327f8f130fed7b9f6e1e094ac31510121f"
+      },
+      "log": {
+        "path": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/touch-layout-f33-followup-20261017/native-a2-preparation/logs/02-safari-web-verify.log",
+        "sha256": "00ef80326f6b5db598f492cc40a5a7492906ffc88addb81696d426d7f4541c2e"
+      }
+    },
+    {
+      "id": "03-fresh-unsigned-wrapper",
+      "exitCode": 0,
+      "elapsedSeconds": 4.687,
+      "result": {
+        "path": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/touch-layout-f33-followup-20261017/native-a2-preparation/03-fresh-unsigned-wrapper-result.json",
+        "sha256": "b21abdb60dad5f67300c1e85c19e1a78d305e86dcafe69e9ce4a77a45715188b"
+      },
+      "log": {
+        "path": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/touch-layout-f33-followup-20261017/native-a2-preparation/logs/03-package.log",
+        "sha256": "964cfbbbf9264591fa4a88872ea9fe9bb2bd6e93521fdaf2433f7e059878de09"
+      }
+    },
+    {
+      "id": "04-macos",
+      "exitCode": 0,
+      "elapsedSeconds": 32.978,
+      "result": {
+        "path": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/touch-layout-f33-followup-20261017/native-a2-preparation/04-macos-result.json",
+        "sha256": "529926dd78ac3b4256a8eb23fe7e7aa9353ca2deb073b323c5ded13ac5d123c5"
+      },
+      "log": {
+        "path": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/touch-layout-f33-followup-20261017/native-a2-preparation/logs/04-macos.log",
+        "sha256": "7313bac3cb2204382fbe110343ee154986231e7803dae3f94d39ed9e363b7744"
+      }
+    },
+    {
+      "id": "05-ios-simulator",
+      "exitCode": 0,
+      "elapsedSeconds": 33.755,
+      "result": {
+        "path": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/touch-layout-f33-followup-20261017/native-a2-preparation/05-ios-simulator-result.json",
+        "sha256": "ecae3764d75903208aa4950491c103c389d73e35398f9c44bf6a313347707144"
+      },
+      "log": {
+        "path": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/touch-layout-f33-followup-20261017/native-a2-preparation/logs/05-ios-simulator.log",
+        "sha256": "3a61eff21897616eb4e5140c43cf02efd1da19b100bbc5ad43625a0f367a542f"
+      }
+    },
+    {
+      "id": "06-iphoneos-arm64",
+      "exitCode": 0,
+      "elapsedSeconds": 20.2,
+      "result": {
+        "path": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/touch-layout-f33-followup-20261017/native-a2-preparation/06-iphoneos-arm64-result.json",
+        "sha256": "e3fe751f733e8a61849b50973572ecf9516dd48828bdb99f3b2ba956bebd4614"
+      },
+      "log": {
+        "path": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/touch-layout-f33-followup-20261017/native-a2-preparation/logs/06-iphoneos.log",
+        "sha256": "06c87f33d2e688d4a8ad1636518c50f455dba6016fea416b5dc7cfb9800afe8e"
+      }
+    }
+  ],
+  "targets": {
+    "macOS": {
+      "status": "COMPILE_AND_WEB_RESOURCE_MATCH_PASS_NOT_RUNTIME",
+      "app": {
+        "directory": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/touch-layout-f33-followup-20261017/native-a2-preparation/output/derived-macos-a2ecda302-80471415c945/Build/Products/Release/FluentRead.app",
+        "files": 482,
+        "bytes": 63251441,
+        "rawByteHash": "f23950735a7b95e0546c40e9b67d0943ff580d71c461264b3fbb74e7a55db7e5",
+        "recordHash": "20488e6e258191f4796615125eb8bd8d526f36f7f897f23947d23d592c9a1a03"
+      },
+      "compiledWebRoot": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/touch-layout-f33-followup-20261017/native-a2-preparation/output/derived-macos-a2ecda302-80471415c945/Build/Products/Release/FluentRead.app/Contents/PlugIns/FluentRead Extension.appex/Contents/Resources",
+      "matchedWebFiles": 467,
+      "appBundleId": "org.example.FluentReadDevelopment",
+      "extensionBundleId": "org.example.FluentReadDevelopment.Extension",
+      "nativeSignatureStates": [
+        {
+          "bundle": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/touch-layout-f33-followup-20261017/native-a2-preparation/output/derived-macos-a2ecda302-80471415c945/Build/Products/Release/FluentRead.app",
+          "state": "ADHOC_NO_TEAM",
+          "developerAuthorityPresent": false
+        },
+        {
+          "bundle": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/touch-layout-f33-followup-20261017/native-a2-preparation/output/derived-macos-a2ecda302-80471415c945/Build/Products/Release/FluentRead.app/Contents/PlugIns/FluentRead Extension.appex",
+          "state": "ADHOC_NO_TEAM",
+          "developerAuthorityPresent": false
+        }
+      ]
+    },
+    "iosSimulator": {
+      "status": "COMPILE_AND_WEB_RESOURCE_MATCH_PASS_NOT_RUNTIME",
+      "app": {
+        "directory": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/touch-layout-f33-followup-20261017/native-a2-preparation/output/derived-ios-simulator-a2ecda302-80471415c945/Build/Products/Release-iphonesimulator/FluentRead.app",
+        "files": 485,
+        "bytes": 64226699,
+        "rawByteHash": "5d7c4bae83b67dbfcb7f0a4a9f6fa9e0a6e36ae635b0308d836dfffa5d5e677e",
+        "recordHash": "aa41370b5870ef43da58e3884974523634d3ae8ec5cd9360cbf91790cc733470"
+      },
+      "compiledWebRoot": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/touch-layout-f33-followup-20261017/native-a2-preparation/output/derived-ios-simulator-a2ecda302-80471415c945/Build/Products/Release-iphonesimulator/FluentRead.app/PlugIns/FluentRead Extension.appex",
+      "matchedWebFiles": 467,
+      "appBundleId": "org.example.FluentReadDevelopment",
+      "extensionBundleId": "org.example.FluentReadDevelopment.Extension",
+      "nativeSignatureStates": [
+        {
+          "bundle": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/touch-layout-f33-followup-20261017/native-a2-preparation/output/derived-ios-simulator-a2ecda302-80471415c945/Build/Products/Release-iphonesimulator/FluentRead.app",
+          "state": "ADHOC_NO_TEAM",
+          "developerAuthorityPresent": false
+        },
+        {
+          "bundle": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/touch-layout-f33-followup-20261017/native-a2-preparation/output/derived-ios-simulator-a2ecda302-80471415c945/Build/Products/Release-iphonesimulator/FluentRead.app/PlugIns/FluentRead Extension.appex",
+          "state": "ADHOC_NO_TEAM",
+          "developerAuthorityPresent": false
+        }
+      ]
+    },
+    "iPhoneOS": {
+      "status": "COMPILE_AND_WEB_RESOURCE_MATCH_PASS_NOT_RUNTIME",
+      "app": {
+        "directory": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/touch-layout-f33-followup-20261017/native-a2-preparation/output/target-iphoneos-a2ecda302-80471415c945/build/FluentRead.app",
+        "files": 485,
+        "bytes": 64123369,
+        "rawByteHash": "8a61c71e0e8839b5ce5da96aea3eeb14dadcbcb90312c52cf55faf8db90681da",
+        "recordHash": "0365302cdb96da31d9fbe7605e8987af14ab7ba5b71fac9c9332d4d673368e81"
+      },
+      "compiledWebRoot": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/touch-layout-f33-followup-20261017/native-a2-preparation/output/target-iphoneos-a2ecda302-80471415c945/build/FluentRead.app/PlugIns/FluentRead Extension.appex",
+      "matchedWebFiles": 467,
+      "appBundleId": "org.example.FluentReadDevelopment",
+      "extensionBundleId": "org.example.FluentReadDevelopment.Extension",
+      "nativeSignatureStates": [
+        {
+          "bundle": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/touch-layout-f33-followup-20261017/native-a2-preparation/output/target-iphoneos-a2ecda302-80471415c945/build/FluentRead.app",
+          "state": "UNSIGNED",
+          "developerAuthorityPresent": false
+        },
+        {
+          "bundle": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/touch-layout-f33-followup-20261017/native-a2-preparation/output/target-iphoneos-a2ecda302-80471415c945/build/FluentRead.app/PlugIns/FluentRead Extension.appex",
+          "state": "UNSIGNED",
+          "developerAuthorityPresent": false
+        }
+      ]
+    }
+  },
+  "resourcePolicy": {
+    "absoluteNode22": "/opt/homebrew/opt/node@22/bin/node",
+    "maxWorkers": 1,
+    "concurrency": 3,
+    "cpuTargetPercent": 40,
+    "xcodeJobs": 1,
+    "serialStages": true,
+    "hardCPUCap": false,
+    "note": "The current resource-safe script documents cooperative reservations; 40% is a target, not a kernel CPU cap."
+  },
+  "handles": [
+    {
+      "sessionId": 15667,
+      "exitCode": 0,
+      "stage": "package"
+    },
+    {
+      "sessionId": 73604,
+      "exitCode": 0,
+      "stage": "macOS"
+    },
+    {
+      "sessionId": 4950,
+      "exitCode": 0,
+      "stage": "iosSimulator"
+    },
+    {
+      "sessionId": 98048,
+      "exitCode": 0,
+      "stage": "iPhoneOS"
+    },
+    {
+      "sessionId": 28829,
+      "exitCode": 0,
+      "stage": "compiledIdentity"
+    }
+  ],
+  "unknownHandles": [],
+  "laneReleased": true,
+  "freshKnownPidsGone": 15,
+  "portsEmpty": [
+    "5048",
+    "5580",
+    "5581",
+    "52911"
+  ],
+  "appleBooted": [],
+  "taskAppleStates": [
+    "Shutdown"
+  ],
+  "keysMetadataUnchanged": true,
+  "inputPrePostDoubleHashMatches": true,
+  "productSourceBindingsUnchanged": true,
+  "currentHead": "a2ecda302d3a0199ffe9f0222ee2998a37bd7d5d",
+  "workingTreeStatusAfter": " M docs/reports/mobile-safari-integration-20261016/controls-followup.md\n?? docs/reports/mobile-safari-integration-20261016/current-touch-firefox/\n",
+  "packagerWarningsRetained": [
+    "Warning: The following keys in your manifest.json are not supported by your current version of Safari. If these are critical to your extension, you should review your code to see if you need to make changes to support Safari:\n\tworld\n\topen_in_tab\n\tmatch_about_blank"
+  ],
+  "limitations": [
+    "This accepts local packaging, compilation and exact copied/compiled Web resources and bundle identities only. No Safari native runtime acceptance.",
+    "No developer signing/team/profile, app install/launch, simulator boot, browser operation, real-device action or publication. Existing installed d9/Userscripts/old projects were not replaced.",
+    "macOS/Simulator outputs carry actual ad-hoc/linker signatures with no team; iPhoneOS outputs are actually unsigned. Do not collapse these into a claim that every Mach-O lacks a signature.",
+    "No independent focus observer was started for this compile-only task; no zero-focus-event claim is made.",
+    "Native template version/build remain local preview identity, not signed distribution/update acceptance.",
+    "Preserve packager warnings about unsupported manifest keys for later runtime assessment."
+  ],
+  "onlyNewOutputs": "This preparation directory metadata/logs and its new output projects/build products. No W source or existing project was modified.",
+  "contextPolicy": {
+    "requestedThreshold": "300K",
+    "automaticEnforcement": "UNVERIFIED_SYSTEM_CONTROLLED",
+    "allExistingDescendantsInformed": true,
+    "newDescendantsCreated": 0
+  }
+}

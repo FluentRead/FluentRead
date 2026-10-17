@@ -1,0 +1,38 @@
+{
+  "at": "2026-10-16T23:23:45.491081+00:00",
+  "status": "CONTROLLED_LIFECYCLE_PASS_NOT_SAFARI",
+  "terminalSession": 5666,
+  "terminalExitCode": 0,
+  "report": {
+    "path": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/mobile-youtube-fr-node-identity-probe-20261017/same-scope-clone-repair-20261017/browser-candidate-lifecycle/report.json",
+    "sha256": "9f0d23527dc60aad537ec2c322e7b3ab62470bb60b5bedc55c793efb47655a13",
+    "bytes": 121979
+  },
+  "log": {
+    "path": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/mobile-youtube-fr-node-identity-probe-20261017/same-scope-clone-repair-20261017/browser-candidate-lifecycle.log",
+    "sha256": "6e7e8385e64a589efbcf1e87755c6d52d5b3811fdaf7b311abae984b7151f00d",
+    "bytes": 1098
+  },
+  "caseCount": 12,
+  "caseNames": [
+    "portrait-inline",
+    "portrait-visible-controls",
+    "portrait-menu",
+    "portrait-menu-hint",
+    "portrait-menu-normal-close",
+    "landscape-inline",
+    "fullscreen-geometry-safe-area",
+    "native-interface-enter",
+    "video-replaced",
+    "refresh-recovered",
+    "desktop-menu-normal-close",
+    "disabled-cleanup"
+  ],
+  "generatedPngCount": 31,
+  "independentReview": {
+    "path": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/mobile-youtube-fr-node-identity-probe-20261017/same-scope-clone-repair-20261017/independent-lifecycle-outcome-review.json",
+    "sha256": "c928236c95575b9ab4ca728e29fb4a92c64533ea43371ff20a1f780b4388eb86",
+    "bytes": 89808
+  },
+  "scope": "12 sequential captures in controlled Chromium fixture; DOM/WebKit fullscreen shim, Safe Area API unavailable, synthetic persisted pageshow. No Safari/AVKit/physical/live-provider acceptance."
+}

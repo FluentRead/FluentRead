@@ -1,0 +1,196 @@
+{
+  "schema": 1,
+  "artifactKind": "DERIVED_PUBLIC_INDEPENDENT_PORTRAIT_RUNTIME_REVIEW",
+  "original": {
+    "researchCase": "current-production-touch-flex-portrait-drawer-keyboard-attempt1",
+    "file": "independent-runtime-review.json",
+    "bytes": 51852,
+    "sha256": "f17e697612758583cdae254e5b55d67683fcf2c485dd7f8ee7b7acfc2732de67"
+  },
+  "derivation": "Whitelist projection. Absolute paths, case nonce, session identifiers, SDK action-log excerpts, full pin inventories, private file maps and process records omitted. Original remains in research; this is not an independent rerun.",
+  "case": "current-production-touch-flex-portrait-drawer-keyboard-attempt1",
+  "status": "INDEPENDENT_PRODUCTION_TOUCH_FLEX_PORTRAIT_DRAWER_KEYBOARD_RUNTIME_PASS",
+  "findings": [],
+  "sourceCommit": "8274d0c76bead3f1f76a04f5f71e2d58475d4551",
+  "nativeIdentitySHA256": "6998df7d9b45d0422079e452ea5bdd2f53096702c7ed8a9abaeb90d4161e1828",
+  "productionAcceptance": false,
+  "scopedPortraitDrawerKeyboardAcceptance": true,
+  "officialResult": {
+    "runtimeTerminalExitCode": 0,
+    "passed": 1,
+    "skipped": 0,
+    "failed": 0,
+    "total": 1,
+    "testSeconds": 51.294,
+    "exportsExitCodes": [
+      0,
+      0
+    ]
+  },
+  "attachmentReview": {
+    "actualFilesIncludingManifest": 53,
+    "exportedAttachments": 52,
+    "allJSONRead": 44,
+    "allPNGViewed": 8,
+    "allDeviceIDsExact": true,
+    "allAttachmentsNotFailureAssociated": true,
+    "noUnlistedFiles": true,
+    "originalFileBytesUnchangedByReview": true
+  },
+  "flow": {
+    "sevenActionOrder": [
+      "serviceSummary",
+      "defaultServiceRow",
+      "searchFocus",
+      "searchGpt",
+      "clearSearch",
+      "pickerBack",
+      "overviewClose"
+    ],
+    "exactFinalActionLedger": {
+      "address": 1,
+      "clearSearch": 1,
+      "closePopup": 1,
+      "defaultServiceRow": 1,
+      "extensionPopup": 1,
+      "navigation": 1,
+      "normalClear": 1,
+      "overviewClose": 1,
+      "pageMenu": 1,
+      "pickerBack": 1,
+      "SafariActivate": 1,
+      "searchFocus": 1,
+      "searchGpt": 1,
+      "serviceSummary": 1
+    },
+    "eachConsumedOnce": true,
+    "queryClassification": [
+      {
+        "clearDoesNotPromiseKeyboardDismissal": true,
+        "expected": "gpt",
+        "keyboardCountCappedAt2": 1,
+        "knownSearchValueClassification": "gpt",
+        "phase": "picker-gpt",
+        "unexpectedRawValueExported": false
+      },
+      {
+        "clearDoesNotPromiseKeyboardDismissal": true,
+        "expected": "empty",
+        "keyboardCountCappedAt2": 1,
+        "knownSearchValueClassification": "empty",
+        "phase": "picker-cleared",
+        "unexpectedRawValueExported": false
+      }
+    ],
+    "clearDoesNotPromiseKeyboardDismissal": true,
+    "BackRestoredOverviewKeyboardAbsent": true,
+    "overviewCloseRestoredNormalPopup": true,
+    "finalNativeDoneOnce": true,
+    "finalKnownFixtureOwnerCount": 1,
+    "finalSameOwner": true,
+    "createdTabs": 0,
+    "closedTabs": 0,
+    "configurationWrites": 0,
+    "translationIntents": 0,
+    "clipboardActions": 0
+  },
+  "geometry": {
+    "uniqueNamedWebViewAndNativeHeaderCandidates": true,
+    "capturedHeaderDoneCounts": [
+      1,
+      1,
+      1,
+      1,
+      1
+    ],
+    "capturedGlobalDoneCounts": [
+      1,
+      2,
+      2,
+      1,
+      1
+    ],
+    "sourceLiveRoleIdLabelUniquenessFrameEqualityContainedEnabledHittableGatesPassed": true,
+    "liveGateEvidenceBasis": "Exact reviewed frozen Swift predicates plus selected test pass and logged once-only actions; reviewer made no independent live resnapshot.",
+    "snapshotLiveAndPNGSequentialNotAtomic": true,
+    "AXIntersectionAloneIsNotVisiblePixelProof": true,
+    "capturedTargetChecksCount": 12,
+    "allCapturedTargetsContainedInNamedWebView": true,
+    "allCapturedTargetsAboveKeyboardWhenPresent": true
+  },
+  "permissionAndPrivacy": {
+    "nativePromptObservations": 22,
+    "nativePromptNodeCountAlwaysZero": true,
+    "permissionChoices": 0,
+    "existingLocalhostPermission": "UNKNOWN",
+    "noNativePermissionAlertObservedNoDecision": true,
+    "overlayOwnerNotExposedIsNotCurrentOwnerProof": true,
+    "initialAndFinalOwnerExact": true,
+    "unrelatedPriorPageAXOrScreenshotExported": false,
+    "unexpectedRawSearchValueExported": false,
+    "fullStoragePreservationClaimed": false,
+    "interfaceLocaleAndConfigHydrationProved": false
+  },
+  "cleanup": {
+    "originalD9RestoredAndVerified": true,
+    "dedicatedSimulator": "Shutdown",
+    "resourceLaneReleased": true,
+    "cleanupErrors": [],
+    "violations": [],
+    "limitedRetainedDataRehashed": true,
+    "privateFilesCopiedBack": false,
+    "allStoragePreservationClaimed": false
+  },
+  "reviewMethod": {
+    "allRuntimeJSONRead": true,
+    "allCaseTopLevelJSONParsed": 31,
+    "allEightOriginalPNGViewedUsingLocalImageViewer": true,
+    "noSDKProcessDeviceUIBrowserNetworkQueries": true,
+    "noProjectScriptOrCheckerImportedOrExecuted": true,
+    "onlyReviewFileWritten": true,
+    "newSubagentsSpawned": false
+  },
+  "originalPNGReview": [
+    {
+      "file": "attachments/D0EBCA7F-EEA1-473D-B260-FAE1F1753CCB.png",
+      "visualConclusion": "Known public localhost fixture and address visible; no private prior-page screenshot."
+    },
+    {
+      "file": "attachments/E9989688-E26D-4C9C-8DF7-E4B118E684E9.png",
+      "visualConclusion": "Normal native sheet and product summary visible; lower cards partially clipped; no footer/DOM scroll proof."
+    },
+    {
+      "file": "attachments/DC76B08C-768E-46A5-B499-CB4B682C9961.png",
+      "visualConclusion": "Overview default-service row and close visible without keyboard; lower overview content continues beyond visible card."
+    },
+    {
+      "file": "attachments/E67A8F42-3608-4A46-9844-C0970F259A9F.png",
+      "visualConclusion": "Expanded portrait picker, empty focused search, Back and close visible above keyboard."
+    },
+    {
+      "file": "attachments/77018EE8-84A7-4A19-A0DA-C6EF02B45537.png",
+      "visualConclusion": "Exact gpt visible with filtered service names; Back, close, clear and search above keyboard; lower results continue beyond visible area."
+    },
+    {
+      "file": "attachments/63B195ED-58BF-49CC-8C25-3EC213B8E668.png",
+      "visualConclusion": "Back restored overview and removed keyboard; overview close visible."
+    },
+    {
+      "file": "attachments/E05A1B64-49C2-46E4-B650-6574E10D773A.png",
+      "visualConclusion": "Overview close restored normal Popup without drawer/keyboard; lower normal Popup cards partially clipped."
+    },
+    {
+      "file": "attachments/FB841394-D07F-4347-B54E-ECBB5A01F5FD.png",
+      "visualConclusion": "Native Done dismissed Popup; known public localhost fixture visible."
+    }
+  ],
+  "limitations": [
+    "Pass is scoped to one portrait iPhone 16 Pro simulator production drawer/search/keyboard/Back/close/Done flow.",
+    "No landscape rotation, real device, other skins/locales or general production acceptance is proved.",
+    "No permission prompt occurred; no one-day tap/fresh grant was exercised, and prior localhost permission remains unknown.",
+    "Clear-search empty state has JSON/live-source evidence, not a dedicated cleared screenshot; keyboard remained after clear and disappeared after Back.",
+    "Normal Popup lower cards are visibly partially clipped; no new DOM scroll, complete footer visibility or configuration hydration proof.",
+    "Only exact pinned native FR data13, Userscripts app47 and Demo396 bytes are rehashed; extension-wide storage/settings/cache preservation is not claimed.",
+    "Overlay tab UUID hidden; continuity uses reviewed native signature and exact action chain, with exact owner in final known fixture."
+  ]
+}

@@ -1,0 +1,48 @@
+{
+  "appFrame" : {
+    "height" : 874,
+    "width" : 402,
+    "x" : 0,
+    "y" : 0
+  },
+  "baseBoundaryEligible" : true,
+  "candidateCount" : 1,
+  "closeCount" : 0,
+  "closeFrame" : {
+    "isInfinite" : false,
+    "isNull" : true,
+    "nonFinite" : true
+  },
+  "closeType" : 0,
+  "entryCount" : 0,
+  "entryFrame" : {
+    "isInfinite" : false,
+    "isNull" : true,
+    "nonFinite" : true
+  },
+  "entryLabel" : "",
+  "entryType" : 0,
+  "knownTEDWithinPlayer" : true,
+  "metadataElapsedSeconds" : 5.2667679786682129,
+  "nativeLabels" : [
+
+  ],
+  "oneSnapshotBatch" : true,
+  "optionalBilingualCue" : null,
+  "phase" : "readiness-before-reveal-1",
+  "playback" : {
+    "pauseCount" : 0,
+    "playCount" : 0,
+    "progress" : [
+
+    ]
+  },
+  "playerCount" : 1,
+  "playerFrame" : {
+    "height" : 226,
+    "width" : 402,
+    "x" : 0,
+    "y" : 110
+  },
+  "snapshotElapsedSeconds" : 5.2654320001602173
+}

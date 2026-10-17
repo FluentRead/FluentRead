@@ -1,0 +1,155 @@
+{
+  "at": "2026-10-16T21:14:35.022301+00:00",
+  "status": "CONTROLLED_MENU_TOUCH_AND_DESKTOP_SCOPE_PASS",
+  "rawExitCode": 0,
+  "reportSHA256": "c869e7e55339059ab82a9de7ec181b2e37b38e4b7112004a345f0a4a4773cf02",
+  "inputs": {
+    "at": "2026-10-16T21:10:22.236437+00:00",
+    "selectedSuite": "menu",
+    "scriptSHA256": "b55766aef51af34b070a769e7424825ef787ec8603ac47b5a5304c2ad34a3f7c",
+    "productSourceUISHA256": "eb9cd5ccd3d2931cd1e85fa8a668235374e0a865e06605981274bd20944b592c",
+    "chromeMapSHA256": "fa6ed6c48b27fd7e9040764ca43c19a2aef9150c4ca32263c53c278a1900878e",
+    "chrome478UnchangedFromFinalGeometry": true,
+    "fullLifecyclePreviousStatus": "FAIL wrong initial-site restoration oracle after explicit Off; preserved, independently diagnosed against existing source/tests",
+    "notExecuted": [
+      "native system-selection lifecycle",
+      "video replacement",
+      "reload",
+      "pageshow recovery"
+    ],
+    "menuScopeIncludes": [
+      "touch44 and12trustedkeys",
+      "header top coverage",
+      "normalCloseandEscfocus",
+      "landscape and DOM fullscreen geometry",
+      "desktop actual coarsefalse maxTouch0",
+      "disable cleanup"
+    ]
+  },
+  "caseNames": [
+    "portrait-inline",
+    "portrait-visible-controls",
+    "portrait-menu",
+    "portrait-menu-hint",
+    "portrait-menu-normal-close",
+    "landscape-inline",
+    "fullscreen-geometry-safe-area",
+    "desktop-menu-normal-close",
+    "disabled-cleanup"
+  ],
+  "geometrySceneCount": 18,
+  "keyboardSteps": [
+    {
+      "key": "End",
+      "expected": "download-bilingual-subtitles",
+      "observed": "download-bilingual-subtitles"
+    },
+    {
+      "key": "ArrowUp",
+      "expected": "download-translated-subtitles",
+      "observed": "download-translated-subtitles"
+    },
+    {
+      "key": "ArrowUp",
+      "expected": "download-subtitles",
+      "observed": "download-subtitles"
+    },
+    {
+      "key": "ArrowUp",
+      "expected": "subtitle-later",
+      "observed": "subtitle-later"
+    },
+    {
+      "key": "ArrowUp",
+      "expected": "subtitle-earlier",
+      "observed": "subtitle-earlier"
+    },
+    {
+      "key": "ArrowUp",
+      "expected": "off",
+      "observed": "off"
+    },
+    {
+      "key": "ArrowUp",
+      "expected": "original-only",
+      "observed": "original-only"
+    },
+    {
+      "key": "ArrowUp",
+      "expected": "translation-only",
+      "observed": "translation-only"
+    },
+    {
+      "key": "ArrowUp",
+      "expected": "bilingual",
+      "observed": "bilingual"
+    },
+    {
+      "key": "ArrowUp",
+      "expected": "open-sentence-learning",
+      "observed": "open-sentence-learning"
+    },
+    {
+      "key": "ArrowUp",
+      "expected": "close-menu",
+      "observed": "close-menu"
+    },
+    {
+      "key": "Home",
+      "expected": "open-settings",
+      "observed": "open-settings"
+    }
+  ],
+  "normalClose": {
+    "input": "mouse.click-at-observed-checked-center",
+    "x": 353,
+    "y": 31,
+    "focusReturned": true
+  },
+  "desktopMenu": {
+    "capabilities": {
+      "coarsePointer": false,
+      "maxTouchPoints": 0
+    },
+    "minimumTargetSize": 22,
+    "keyboardSteps": [
+      {
+        "key": "End",
+        "expected": "download-bilingual-subtitles",
+        "observed": "download-bilingual-subtitles"
+      },
+      {
+        "key": "Home",
+        "expected": "open-settings",
+        "observed": "open-settings"
+      }
+    ],
+    "normalCloseFocusReturned": true
+  },
+  "safeAreaEmulation": {
+    "supported": false,
+    "reason": "Error: cdpSession.send: Protocol error (Emulation.setSafeAreaInsets): 'Emulation.setSafeAreaInsets' wasn't found"
+  },
+  "nativeSystemSelectionShim": {
+    "status": "NOT_RUN_EXPLICIT_MENU_SUITE",
+    "scope": "Native selection lifecycle is excluded; shared fullscreen geometry remains a controlled DOM fixture"
+  },
+  "focusEvents": [],
+  "browserCloseReceipt": "shared-guard-fulfilled",
+  "profileRemoved": true,
+  "freshRelease": "root-fresh-menu-release.json",
+  "RootActualPNGReview": [
+    "portrait-menu-hint-targets",
+    "portrait-menu-keyboard-6-ArrowUp",
+    "desktop-menu-open",
+    "desktop-menu-keyboard-End",
+    "desktop-menu-normal-close"
+  ],
+  "limits": [
+    "controlled Chromium fixture and pointer emulation; not native Safari/AVKit",
+    "desktop scenes all scrollTop zero, not desktop overflow stress",
+    "CDP safe area inset API unavailable; only fallback DOM fullscreen geometry",
+    "native selection/remount/reload/pageshow explicitly excluded",
+    "earlier lifecycle FAIL and sticky-only keyboard FAIL retained unchanged"
+  ]
+}

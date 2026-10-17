@@ -1,0 +1,57 @@
+{
+  "at": "2026-10-16T19:41:32.317825+00:00",
+  "runtimeSourceCommit": "a2ecda302d3a0199ffe9f0222ee2998a37bd7d5d",
+  "copies": {
+    "execution-summary.json": {
+      "source": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/touch-layout-f33-followup-20261017/native-a2-preparation/execution-summary.json",
+      "sha256": "9e1a175f4f36b2d570236ca1e99f266bb4818752bac356358feb839327d0dce8",
+      "bytes": 14418
+    },
+    "compiled-artifact-identities.json": {
+      "source": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/touch-layout-f33-followup-20261017/native-a2-preparation/compiled-artifact-identities.json",
+      "sha256": "b85ce5c242211b8bd3c82aa4affc31569e57eb86d0d96060e4133e1ca5283820",
+      "bytes": 432284
+    },
+    "root-independent-compiled-review.json": {
+      "source": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/touch-layout-f33-followup-20261017/native-a2-preparation/root-independent-compiled-review.json",
+      "sha256": "570dcfcf6f142c9153082edee4bc33dd1bb6da23f036cca86a214fe20dea7067",
+      "bytes": 2735
+    },
+    "package-verification.json": {
+      "source": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/touch-layout-f33-followup-20261017/native-a2-preparation/package-verification.json",
+      "sha256": "bee232b6ecd67ca131a6855ff441759e3ee19bcd68d2575d4e1e1b98d5aaa80f",
+      "bytes": 3617
+    },
+    "artifact-pre.json": {
+      "source": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/touch-layout-f33-followup-20261017/native-a2-preparation/artifact-pre.json",
+      "sha256": "a714b81958f3516c1453de7238568dd7f3f0732db482015dceb7c8da89b74ad4",
+      "bytes": 320
+    },
+    "artifact-post.json": {
+      "source": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/touch-layout-f33-followup-20261017/native-a2-preparation/artifact-post.json",
+      "sha256": "2f74353f9d7988a8b3015f6222c9ddf33c33d5fad85ea49409ac6a46d06e16e1",
+      "bytes": 318
+    },
+    "fresh-resource-release.json": {
+      "source": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/touch-layout-f33-followup-20261017/native-a2-preparation/fresh-resource-release.json",
+      "sha256": "e4a8c4e3199d9e87a8de80f8969cd038c87892f7b0476be20cc26f80215f935c",
+      "bytes": 12579
+    },
+    "04-macos-result.json": {
+      "source": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/touch-layout-f33-followup-20261017/native-a2-preparation/04-macos-result.json",
+      "sha256": "529926dd78ac3b4256a8eb23fe7e7aa9353ca2deb073b323c5ded13ac5d123c5",
+      "bytes": 1669
+    },
+    "05-ios-simulator-result.json": {
+      "source": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/touch-layout-f33-followup-20261017/native-a2-preparation/05-ios-simulator-result.json",
+      "sha256": "ecae3764d75903208aa4950491c103c389d73e35398f9c44bf6a313347707144",
+      "bytes": 1697
+    },
+    "06-iphoneos-arm64-result.json": {
+      "source": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/touch-layout-f33-followup-20261017/native-a2-preparation/06-iphoneos-arm64-result.json",
+      "sha256": "e3fe751f733e8a61849b50973572ecf9516dd48828bdb99f3b2ba956bebd4614",
+      "bytes": 2058
+    }
+  },
+  "scope": "Exact copies of local packaging/compile/resource/identity receipts. No Safari runtime or install acceptance."
+}

@@ -1,0 +1,450 @@
+{
+  "at": "2026-10-16T23:28:48.642026+00:00",
+  "status": "ORIGINAL_BYTES_EXCLUSIVELY_COPIED_AND_REHASHED",
+  "productCommit": "cae1d61221670a9d6812f803c3acefd8654ea300",
+  "stagingPlan": {
+    "path": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/mobile-youtube-fr-node-identity-probe-20261017/same-scope-clone-repair-20261017/delivery-files.json",
+    "sha256": "6340b7b064285c7cb1f879246fbb6ec50e32fa1e42daef79ac1488ab68083c84"
+  },
+  "originalPlanEntryCount": 39,
+  "copiedFiles": 66,
+  "copiedBytes": 1911054,
+  "files": [
+    {
+      "source": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/mobile-youtube-fr-node-identity-probe-20261017/same-scope-clone-repair-20261017/browser-control-clones-old-production-attempt3/report.json",
+      "copy": "docs/reports/mobile-safari-integration-20261016/clone-entry-evidence/browser-old-attempt3/report.json",
+      "sha256": "9d238cee89e9dab0fb0b8484f62de73c85a2a59cacda9c4c9976b5d72ba50bd8",
+      "bytes": 6524,
+      "plannedCopy": "docs/reports/mobile-safari-integration-20261016/clone-entry-evidence/browser-old-attempt3/report.json"
+    },
+    {
+      "source": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/mobile-youtube-fr-node-identity-probe-20261017/same-scope-clone-repair-20261017/browser-control-clones-old-production-attempt3/failure.png",
+      "copy": "docs/reports/mobile-safari-integration-20261016/clone-entry-evidence/browser-old-attempt3/failure.png",
+      "sha256": "5fc4ccdc34a2eeab09081f38ccd745a337b89a15c1320d080aa94fac0bc0ec2c",
+      "bytes": 44632,
+      "plannedCopy": "docs/reports/mobile-safari-integration-20261016/clone-entry-evidence/browser-old-attempt3/failure.png"
+    },
+    {
+      "source": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/mobile-youtube-fr-node-identity-probe-20261017/same-scope-clone-repair-20261017/browser-control-clones-candidate-production/report.json",
+      "copy": "docs/reports/mobile-safari-integration-20261016/clone-entry-evidence/browser-candidate/report.json",
+      "sha256": "8e7230b1fcc79a7a3deb18358a853575b29e6c20c533c5f74e48cf017957adc3",
+      "bytes": 11485,
+      "plannedCopy": "docs/reports/mobile-safari-integration-20261016/clone-entry-evidence/browser-candidate/report.json"
+    },
+    {
+      "source": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/mobile-youtube-fr-node-identity-probe-20261017/same-scope-clone-repair-20261017/browser-control-clones-focus-stop-fault/report.json",
+      "copy": "docs/reports/mobile-safari-integration-20261016/clone-entry-evidence/focus-stop-fault/report.json",
+      "sha256": "997b50ed6aa9809717663abbf91b19d2afd3f77ca33283439f7209606596b984",
+      "bytes": 11594,
+      "plannedCopy": "docs/reports/mobile-safari-integration-20261016/clone-entry-evidence/focus-stop-fault/report.json"
+    },
+    {
+      "source": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/mobile-youtube-fr-node-identity-probe-20261017/same-scope-clone-repair-20261017/focus-stop-fault-helper.cjs",
+      "copy": "docs/reports/mobile-safari-integration-20261016/clone-entry-evidence/focus-stop-fault/focus-stop-fault-helper.cjs.txt",
+      "sha256": "31e680775473a77e81f4bd5f2bc5b2f8aeedbe9baf89d9f095c1bfeb0cd4c56a",
+      "bytes": 956,
+      "plannedCopy": "docs/reports/mobile-safari-integration-20261016/clone-entry-evidence/focus-stop-fault/focus-stop-fault-helper.cjs"
+    },
+    {
+      "source": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/mobile-youtube-fr-node-identity-probe-20261017/same-scope-clone-repair-20261017/focus-stop-fault-preparation.json",
+      "copy": "docs/reports/mobile-safari-integration-20261016/clone-entry-evidence/focus-stop-fault/preparation.json",
+      "sha256": "f2d61e9c4b3d03aa540a1f00a81e8c305d053d03cb675499de527f1fe8e041d1",
+      "bytes": 6582,
+      "plannedCopy": "docs/reports/mobile-safari-integration-20261016/clone-entry-evidence/focus-stop-fault/preparation.json"
+    },
+    {
+      "source": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/mobile-youtube-fr-node-identity-probe-20261017/same-scope-clone-repair-20261017/baseline-vitest.json",
+      "copy": "docs/reports/mobile-safari-integration-20261016/clone-entry-evidence/tests/baseline-vitest.json",
+      "sha256": "20be73eb76eae157fe41871a939becf3fce27dece989215fa91ce19f9553636e",
+      "bytes": 49537,
+      "plannedCopy": "docs/reports/mobile-safari-integration-20261016/clone-entry-evidence/tests/baseline-vitest.json"
+    },
+    {
+      "source": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/mobile-youtube-fr-node-identity-probe-20261017/same-scope-clone-repair-20261017/baseline-execution.json",
+      "copy": "docs/reports/mobile-safari-integration-20261016/clone-entry-evidence/tests/baseline-execution.json",
+      "sha256": "441237f8c99016b2abcd4dc77d0b97ba91f5f1f80a3327efc7203be5dde19d15",
+      "bytes": 823,
+      "plannedCopy": "docs/reports/mobile-safari-integration-20261016/clone-entry-evidence/tests/baseline-execution.json"
+    },
+    {
+      "source": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/mobile-youtube-fr-node-identity-probe-20261017/same-scope-clone-repair-20261017/baseline-inputs.json",
+      "copy": "docs/reports/mobile-safari-integration-20261016/clone-entry-evidence/tests/baseline-inputs.json",
+      "sha256": "fbf0d6dc8c6ed8465e65f8eec845cc6308f26756171ecfc7b6f926b78754bcdc",
+      "bytes": 1424,
+      "plannedCopy": "docs/reports/mobile-safari-integration-20261016/clone-entry-evidence/tests/baseline-inputs.json"
+    },
+    {
+      "source": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/mobile-youtube-fr-node-identity-probe-20261017/same-scope-clone-repair-20261017/final-scoped-test-receipt.json",
+      "copy": "docs/reports/mobile-safari-integration-20261016/clone-entry-evidence/tests/final-scoped-test-receipt.json",
+      "sha256": "67d7a03e19f16ed4d0644c1bec2aedcf03b1767647d222a4a7655fcc34025300",
+      "bytes": 1406,
+      "plannedCopy": "docs/reports/mobile-safari-integration-20261016/clone-entry-evidence/tests/final-scoped-test-receipt.json"
+    },
+    {
+      "source": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/mobile-youtube-fr-node-identity-probe-20261017/same-scope-clone-repair-20261017/fixed-final-coverage-vitest.json",
+      "copy": "docs/reports/mobile-safari-integration-20261016/clone-entry-evidence/tests/final-99-vitest.json",
+      "sha256": "5e6a31476990460bc400469457f133bc7a3164194584c65a20a710fc710cdb25",
+      "bytes": 37629,
+      "plannedCopy": "docs/reports/mobile-safari-integration-20261016/clone-entry-evidence/tests/final-99-vitest.json"
+    },
+    {
+      "source": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/mobile-youtube-fr-node-identity-probe-20261017/same-scope-clone-repair-20261017/coverage/coverage-summary.json",
+      "copy": "docs/reports/mobile-safari-integration-20261016/clone-entry-evidence/tests/final-coverage/coverage-summary.json",
+      "sha256": "fdd9d2ea4510e4fe6d2e812c607153d046d35e172eb6d33d36f47b7c143cf63d",
+      "bytes": 710,
+      "plannedCopy": "docs/reports/mobile-safari-integration-20261016/clone-entry-evidence/tests/final-coverage/coverage-summary.json"
+    },
+    {
+      "source": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/mobile-youtube-fr-node-identity-probe-20261017/same-scope-clone-repair-20261017/coverage/coverage-final.json",
+      "copy": "docs/reports/mobile-safari-integration-20261016/clone-entry-evidence/tests/final-coverage/coverage-final.json",
+      "sha256": "1d6405b834f88cf3df69b426b4a87e9b7743540ab2f585116b07636c2b0b66ac",
+      "bytes": 95385,
+      "plannedCopy": "docs/reports/mobile-safari-integration-20261016/clone-entry-evidence/tests/final-coverage/coverage-final.json"
+    },
+    {
+      "source": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/mobile-youtube-fr-node-identity-probe-20261017/same-scope-clone-repair-20261017/first-strict-attempt/receipt.json",
+      "copy": "docs/reports/mobile-safari-integration-20261016/clone-entry-evidence/tests/first-strict/receipt.json",
+      "sha256": "fafaa1696ac54853101ee06735f252dfb227b35540bf7bae5c39eafe4ebe9a55",
+      "bytes": 1102,
+      "plannedCopy": "docs/reports/mobile-safari-integration-20261016/clone-entry-evidence/tests/first-strict/receipt.json"
+    },
+    {
+      "source": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/mobile-youtube-fr-node-identity-probe-20261017/same-scope-clone-repair-20261017/first-strict-attempt/fixed-coverage-vitest.json",
+      "copy": "docs/reports/mobile-safari-integration-20261016/clone-entry-evidence/tests/first-strict/vitest.json",
+      "sha256": "2a0f8a5e5fc512a79d29437cbd662b5ee989649e3fb745fbfbe7801120106f52",
+      "bytes": 37203,
+      "plannedCopy": "docs/reports/mobile-safari-integration-20261016/clone-entry-evidence/tests/first-strict/vitest.json"
+    },
+    {
+      "source": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/mobile-youtube-fr-node-identity-probe-20261017/same-scope-clone-repair-20261017/first-strict-attempt/coverage/coverage-summary.json",
+      "copy": "docs/reports/mobile-safari-integration-20261016/clone-entry-evidence/tests/first-strict/coverage-summary.json",
+      "sha256": "6d476c36303145c7ac742acd53ee873798490b30321b62fd830eed1bd532586f",
+      "bytes": 714,
+      "plannedCopy": "docs/reports/mobile-safari-integration-20261016/clone-entry-evidence/tests/first-strict/coverage-summary.json"
+    },
+    {
+      "source": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/mobile-youtube-fr-node-identity-probe-20261017/same-scope-clone-repair-20261017/first-strict-attempt/coverage/coverage-final.json",
+      "copy": "docs/reports/mobile-safari-integration-20261016/clone-entry-evidence/tests/first-strict/coverage-final.json",
+      "sha256": "6edaf6a52489e17111479dabfc8f5547d381136e4b60757cdcf1382484045979",
+      "bytes": 95381,
+      "plannedCopy": "docs/reports/mobile-safari-integration-20261016/clone-entry-evidence/tests/first-strict/coverage-final.json"
+    },
+    {
+      "source": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/mobile-youtube-fr-node-identity-probe-20261017/same-scope-clone-repair-20261017/scoped-coverage.config.mts",
+      "copy": "docs/reports/mobile-safari-integration-20261016/clone-entry-evidence/tests/scoped-coverage.config.mts.txt",
+      "sha256": "6980a1f4548b8fe0d36a64aaf8905756ebd5768c50bbdab366756a9e00b1432a",
+      "bytes": 766,
+      "plannedCopy": "docs/reports/mobile-safari-integration-20261016/clone-entry-evidence/tests/scoped-coverage.config.mts"
+    },
+    {
+      "source": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/mobile-youtube-fr-node-identity-probe-20261017/same-scope-clone-repair-20261017/root-browser-outcome.json",
+      "copy": "docs/reports/mobile-safari-integration-20261016/clone-entry-evidence/root-browser-outcome.json",
+      "sha256": "e5a916320d654c4af5d8c2d96747aa2f5e724a18fb97bdac289e34d0e02545de",
+      "bytes": 6749,
+      "plannedCopy": "docs/reports/mobile-safari-integration-20261016/clone-entry-evidence/root-browser-outcome.json"
+    },
+    {
+      "source": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/mobile-youtube-fr-node-identity-probe-20261017/same-scope-clone-repair-20261017/root-targeted-verification-summary.json",
+      "copy": "docs/reports/mobile-safari-integration-20261016/clone-entry-evidence/validation/root-targeted-verification-summary.json",
+      "sha256": "1031b8bd76dc2f9594d35f2535e19bfce5ea0ccfa0c7d83888fd98808a16243a",
+      "bytes": 5386,
+      "plannedCopy": "docs/reports/mobile-safari-integration-20261016/clone-entry-evidence/validation/root-targeted-verification-summary.json"
+    },
+    {
+      "source": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/mobile-youtube-fr-node-identity-probe-20261017/same-scope-clone-repair-20261017/validation/summary.json",
+      "copy": "docs/reports/mobile-safari-integration-20261016/clone-entry-evidence/validation/summary.json",
+      "sha256": "750c66eb4b1d6442a9a965be674d1b802dfed50216a7e2e3e9a4c9dae254b808",
+      "bytes": 6447,
+      "plannedCopy": "docs/reports/mobile-safari-integration-20261016/clone-entry-evidence/validation/summary.json"
+    },
+    {
+      "source": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/mobile-youtube-fr-node-identity-probe-20261017/same-scope-clone-repair-20261017/artifact-gate.json",
+      "copy": "docs/reports/mobile-safari-integration-20261016/clone-entry-evidence/web-artifacts/artifact-gate.json",
+      "sha256": "de3a1dbf9f7b123571ba4145f6ebd9199b3a6e3b4d8718c6029d7531aceee9c8",
+      "bytes": 4116,
+      "plannedCopy": "docs/reports/mobile-safari-integration-20261016/clone-entry-evidence/web-artifacts/artifact-gate.json"
+    },
+    {
+      "source": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/mobile-youtube-fr-node-identity-probe-20261017/same-scope-clone-repair-20261017/chrome-file-map.json",
+      "copy": "docs/reports/mobile-safari-integration-20261016/clone-entry-evidence/web-artifacts/chrome-file-map.json",
+      "sha256": "fe68bbd1129848b7fc8b899acb9522c14d6f67e1562df721a37cdcbc824982f4",
+      "bytes": 69369,
+      "plannedCopy": "docs/reports/mobile-safari-integration-20261016/clone-entry-evidence/web-artifacts/chrome-file-map.json"
+    },
+    {
+      "source": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/mobile-youtube-fr-node-identity-probe-20261017/same-scope-clone-repair-20261017/firefox-file-map.json",
+      "copy": "docs/reports/mobile-safari-integration-20261016/clone-entry-evidence/web-artifacts/firefox-file-map.json",
+      "sha256": "adc1c6046d4eeb3b8a8f49590ce96bad9491d2afd1c4e39479c96cad057bf246",
+      "bytes": 69369,
+      "plannedCopy": "docs/reports/mobile-safari-integration-20261016/clone-entry-evidence/web-artifacts/firefox-file-map.json"
+    },
+    {
+      "source": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/mobile-youtube-fr-node-identity-probe-20261017/same-scope-clone-repair-20261017/safari-file-map.json",
+      "copy": "docs/reports/mobile-safari-integration-20261016/clone-entry-evidence/web-artifacts/safari-file-map.json",
+      "sha256": "fb688108455f6e6432140a6f9e4d7c9dcafa08fbba9be46a968bb821c9726db2",
+      "bytes": 67790,
+      "plannedCopy": "docs/reports/mobile-safari-integration-20261016/clone-entry-evidence/web-artifacts/safari-file-map.json"
+    },
+    {
+      "source": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/mobile-youtube-fr-node-identity-probe-20261017/same-scope-clone-repair-20261017/userscript-file-map.json",
+      "copy": "docs/reports/mobile-safari-integration-20261016/clone-entry-evidence/web-artifacts/userscript-file-map.json",
+      "sha256": "5a106afcdb4466367a43263a02f9822063e87e4c10470b9b81fd9260aa13177d",
+      "bytes": 138,
+      "plannedCopy": "docs/reports/mobile-safari-integration-20261016/clone-entry-evidence/web-artifacts/userscript-file-map.json"
+    },
+    {
+      "source": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/mobile-youtube-fr-node-identity-probe-20261017/same-scope-clone-repair-20261017/independent-production-review.json",
+      "copy": "docs/reports/mobile-safari-integration-20261016/clone-entry-evidence/reviews/independent-production-review.json",
+      "sha256": "113b9073ad0b69214017b1fbea82829b2f7b86e572cd8867301a8308566e53b6",
+      "bytes": 9130,
+      "plannedCopy": "docs/reports/mobile-safari-integration-20261016/clone-entry-evidence/reviews/independent-production-review.json"
+    },
+    {
+      "source": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/mobile-youtube-fr-node-identity-probe-20261017/same-scope-clone-repair-20261017/independent-browser-preparation-review.json",
+      "copy": "docs/reports/mobile-safari-integration-20261016/clone-entry-evidence/reviews/independent-browser-preparation-review.json",
+      "sha256": "b48416ea6b56dbd456a267bee39bb9a8f2a17c7ec8dd1b59c38a6e2a11a64a4a",
+      "bytes": 13710,
+      "plannedCopy": "docs/reports/mobile-safari-integration-20261016/clone-entry-evidence/reviews/independent-browser-preparation-review.json"
+    },
+    {
+      "source": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/mobile-youtube-fr-node-identity-probe-20261017/same-scope-clone-repair-20261017/independent-browser-outcome-review.json",
+      "copy": "docs/reports/mobile-safari-integration-20261016/clone-entry-evidence/reviews/independent-browser-outcome-review.json",
+      "sha256": "d257c4a130a1fbac5f9e35afb08dd9ffd014fee93af948cfe20aa20a279a7792",
+      "bytes": 27505,
+      "plannedCopy": "docs/reports/mobile-safari-integration-20261016/clone-entry-evidence/reviews/independent-browser-outcome-review.json"
+    },
+    {
+      "source": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/mobile-youtube-fr-node-identity-probe-20261017/same-scope-clone-repair-20261017/independent-regression-evidence-review.json",
+      "copy": "docs/reports/mobile-safari-integration-20261016/clone-entry-evidence/reviews/independent-regression-evidence-review.json",
+      "sha256": "5de2a8439f1595fb5a5d4c9007f5b88abeef877fa5520e5c07a6b2f439384f8d",
+      "bytes": 25398,
+      "plannedCopy": "docs/reports/mobile-safari-integration-20261016/clone-entry-evidence/reviews/independent-regression-evidence-review.json"
+    },
+    {
+      "source": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/mobile-youtube-fr-node-identity-probe-20261017/same-scope-clone-repair-20261017/independent-focus-stop-fault-outcome-review.json",
+      "copy": "docs/reports/mobile-safari-integration-20261016/clone-entry-evidence/reviews/independent-focus-stop-fault-outcome-review.json",
+      "sha256": "e18be4c0bd7afad494ef19bebcf3297bb0623b4ad3b8a96e091a749058573cf3",
+      "bytes": 15105,
+      "plannedCopy": "docs/reports/mobile-safari-integration-20261016/clone-entry-evidence/reviews/independent-focus-stop-fault-outcome-review.json"
+    },
+    {
+      "source": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/mobile-youtube-fr-node-identity-probe-20261017/same-scope-clone-repair-20261017/browser-control-clones-candidate-production/control-clones-desktop-loose-menu-closed.png",
+      "copy": "docs/reports/mobile-safari-integration-20261016/clone-entry-evidence/browser-candidate/control-clones-desktop-loose-menu-closed.png",
+      "sha256": "9de53d5a0cbe090b8a714e6d79e87ddd8145dfc6925b9db23be5de6703a391e5",
+      "bytes": 44604,
+      "plannedCopy": "docs/reports/mobile-safari-integration-20261016/clone-entry-evidence/browser-candidate/control-clones-desktop-loose-menu-closed.png"
+    },
+    {
+      "source": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/mobile-youtube-fr-node-identity-probe-20261017/same-scope-clone-repair-20261017/browser-control-clones-candidate-production/control-clones-desktop-loose-menu-open.png",
+      "copy": "docs/reports/mobile-safari-integration-20261016/clone-entry-evidence/browser-candidate/control-clones-desktop-loose-menu-open.png",
+      "sha256": "1d95fc81876aa57bd0cbdccb5f8111507e5dc850895ccc0b59798ce2d35bbc5e",
+      "bytes": 57317,
+      "plannedCopy": "docs/reports/mobile-safari-integration-20261016/clone-entry-evidence/browser-candidate/control-clones-desktop-loose-menu-open.png"
+    },
+    {
+      "source": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/mobile-youtube-fr-node-identity-probe-20261017/same-scope-clone-repair-20261017/browser-control-clones-candidate-production/control-clones-desktop-whole-host-menu-closed.png",
+      "copy": "docs/reports/mobile-safari-integration-20261016/clone-entry-evidence/browser-candidate/control-clones-desktop-whole-host-menu-closed.png",
+      "sha256": "6ce03fa60f0e3008ade18981f08588ed70e4f7ff17303145e7f504de8d1cef9a",
+      "bytes": 42986,
+      "plannedCopy": "docs/reports/mobile-safari-integration-20261016/clone-entry-evidence/browser-candidate/control-clones-desktop-whole-host-menu-closed.png"
+    },
+    {
+      "source": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/mobile-youtube-fr-node-identity-probe-20261017/same-scope-clone-repair-20261017/browser-control-clones-candidate-production/control-clones-desktop-whole-host-menu-open.png",
+      "copy": "docs/reports/mobile-safari-integration-20261016/clone-entry-evidence/browser-candidate/control-clones-desktop-whole-host-menu-open.png",
+      "sha256": "6f6113003508dd069f30f5e70a7b52c87ab4a96cbbc0fd873c7ef2b682b433c4",
+      "bytes": 55763,
+      "plannedCopy": "docs/reports/mobile-safari-integration-20261016/clone-entry-evidence/browser-candidate/control-clones-desktop-whole-host-menu-open.png"
+    },
+    {
+      "source": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/mobile-youtube-fr-node-identity-probe-20261017/same-scope-clone-repair-20261017/browser-control-clones-candidate-production/control-clones-mobile-loose-menu-closed.png",
+      "copy": "docs/reports/mobile-safari-integration-20261016/clone-entry-evidence/browser-candidate/control-clones-mobile-loose-menu-closed.png",
+      "sha256": "fbf04a69d9ca24c6304f99b46d87f79c97f4f3bd6ca90a2e10f5a963f4fe79b0",
+      "bytes": 36811,
+      "plannedCopy": "docs/reports/mobile-safari-integration-20261016/clone-entry-evidence/browser-candidate/control-clones-mobile-loose-menu-closed.png"
+    },
+    {
+      "source": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/mobile-youtube-fr-node-identity-probe-20261017/same-scope-clone-repair-20261017/browser-control-clones-candidate-production/control-clones-mobile-loose-menu-open.png",
+      "copy": "docs/reports/mobile-safari-integration-20261016/clone-entry-evidence/browser-candidate/control-clones-mobile-loose-menu-open.png",
+      "sha256": "c64d68bdc9e50effd3b4703ddca8d26f0b2d020bfa0d352d69be1077ac94865f",
+      "bytes": 28960,
+      "plannedCopy": "docs/reports/mobile-safari-integration-20261016/clone-entry-evidence/browser-candidate/control-clones-mobile-loose-menu-open.png"
+    },
+    {
+      "source": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/mobile-youtube-fr-node-identity-probe-20261017/same-scope-clone-repair-20261017/browser-control-clones-candidate-production/control-clones-mobile-whole-host-menu-closed.png",
+      "copy": "docs/reports/mobile-safari-integration-20261016/clone-entry-evidence/browser-candidate/control-clones-mobile-whole-host-menu-closed.png",
+      "sha256": "2cdd5d82c2cd9dbad388c32f57266b5d17dec1f1df704edfe4ac70c8716b4142",
+      "bytes": 35264,
+      "plannedCopy": "docs/reports/mobile-safari-integration-20261016/clone-entry-evidence/browser-candidate/control-clones-mobile-whole-host-menu-closed.png"
+    },
+    {
+      "source": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/mobile-youtube-fr-node-identity-probe-20261017/same-scope-clone-repair-20261017/browser-control-clones-candidate-production/control-clones-mobile-whole-host-menu-open.png",
+      "copy": "docs/reports/mobile-safari-integration-20261016/clone-entry-evidence/browser-candidate/control-clones-mobile-whole-host-menu-open.png",
+      "sha256": "82eab9c486ac33cc7353a8d7c519bae0f83a119bde0aeb202fe502fd3a423367",
+      "bytes": 27058,
+      "plannedCopy": "docs/reports/mobile-safari-integration-20261016/clone-entry-evidence/browser-candidate/control-clones-mobile-whole-host-menu-open.png"
+    },
+    {
+      "source": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/mobile-youtube-fr-node-identity-probe-20261017/same-scope-clone-repair-20261017/browser-candidate-lifecycle/report.json",
+      "copy": "docs/reports/mobile-safari-integration-20261016/clone-entry-evidence/lifecycle/report.json",
+      "sha256": "9f0d23527dc60aad537ec2c322e7b3ab62470bb60b5bedc55c793efb47655a13",
+      "bytes": 121979
+    },
+    {
+      "source": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/mobile-youtube-fr-node-identity-probe-20261017/same-scope-clone-repair-20261017/browser-candidate-lifecycle.log",
+      "copy": "docs/reports/mobile-safari-integration-20261016/clone-entry-evidence/lifecycle/run.log",
+      "sha256": "6e7e8385e64a589efbcf1e87755c6d52d5b3811fdaf7b311abae984b7151f00d",
+      "bytes": 1098
+    },
+    {
+      "source": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/mobile-youtube-fr-node-identity-probe-20261017/same-scope-clone-repair-20261017/root-lifecycle-outcome.json",
+      "copy": "docs/reports/mobile-safari-integration-20261016/clone-entry-evidence/lifecycle/root-outcome.json",
+      "sha256": "cd591df8b167edf4b0a4038a4149c74daafb3ef8ff133eea1de5779fb7150070",
+      "bytes": 1705
+    },
+    {
+      "source": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/mobile-youtube-fr-node-identity-probe-20261017/same-scope-clone-repair-20261017/independent-lifecycle-outcome-review.json",
+      "copy": "docs/reports/mobile-safari-integration-20261016/clone-entry-evidence/reviews/independent-lifecycle-outcome-review.json",
+      "sha256": "c928236c95575b9ab4ca728e29fb4a92c64533ea43371ff20a1f780b4388eb86",
+      "bytes": 89808
+    },
+    {
+      "source": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/mobile-youtube-fr-node-identity-probe-20261017/same-scope-clone-repair-20261017/native-binding-scope-repair-v1/summary.json",
+      "copy": "docs/reports/mobile-safari-integration-20261016/clone-entry-evidence/native/execution-summary.json",
+      "sha256": "6929404246551d72f80bb33026afe77103bb2212d8afac43c9e2d60659e21570",
+      "bytes": 15703
+    },
+    {
+      "source": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/mobile-youtube-fr-node-identity-probe-20261017/same-scope-clone-repair-20261017/native-artifact-identities.json",
+      "copy": "docs/reports/mobile-safari-integration-20261016/clone-entry-evidence/native/compiled-artifact-identities.json",
+      "sha256": "25dc4fdc73e7fdb10e3fb37e6d37b5f76a1d0a20a1460af51f8126f870233469",
+      "bytes": 103729
+    },
+    {
+      "source": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/mobile-youtube-fr-node-identity-probe-20261017/same-scope-clone-repair-20261017/root-native-verification-execution.json",
+      "copy": "docs/reports/mobile-safari-integration-20261016/clone-entry-evidence/native/root-verification-execution.json",
+      "sha256": "bbaf3e9f230be8ed77959dba0020201ae79330e487093c375bcc624b0a274c14",
+      "bytes": 877
+    },
+    {
+      "source": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/mobile-youtube-fr-node-identity-probe-20261017/same-scope-clone-repair-20261017/root-native-scope-correction.json",
+      "copy": "docs/reports/mobile-safari-integration-20261016/clone-entry-evidence/native/scope-correction.json",
+      "sha256": "0d36e7d14235747c2041c3f5027b7e8733218f67a635c5588a5aa65dcba04277",
+      "bytes": 1926
+    },
+    {
+      "source": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/mobile-youtube-fr-node-identity-probe-20261017/same-scope-clone-repair-20261017/independent-native-outcome-review.json",
+      "copy": "docs/reports/mobile-safari-integration-20261016/clone-entry-evidence/native/independent-outcome-review.json",
+      "sha256": "e95d5be3c756a0d683aed61ee55265eae7fa9160af1e9d668b1d016374bd48df",
+      "bytes": 69852
+    },
+    {
+      "source": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/mobile-youtube-fr-node-identity-probe-20261017/same-scope-clone-repair-20261017/root-product-commit-correspondence.json",
+      "copy": "docs/reports/mobile-safari-integration-20261016/clone-entry-evidence/root-product-commit-correspondence.json",
+      "sha256": "c43cb2b423b8645b9a16f88d7ef6547ca6694c04a456fc4396f5b6d5fa5aa6ee",
+      "bytes": 4035
+    },
+    {
+      "source": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/mobile-youtube-fr-node-identity-probe-20261017/same-scope-clone-repair-20261017/root-final-resource-post-lifecycle-and-native-inspection.json",
+      "copy": "docs/reports/mobile-safari-integration-20261016/clone-entry-evidence/fresh-resource-release.json",
+      "sha256": "a1cdb537978156b21c2cd076a5e25d7ac732751a45ef1f749978ace732ab3fe8",
+      "bytes": 849
+    },
+    {
+      "source": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/mobile-youtube-fr-node-identity-probe-20261017/same-scope-clone-repair-20261017/safari-e2-boundary.json",
+      "copy": "docs/reports/mobile-safari-integration-20261016/clone-entry-evidence/safari-e2-boundary.json",
+      "sha256": "74fd1dac897c89256b4bf78696068d3c39b0c85946fc36075f24305b5b46b82f",
+      "bytes": 2603
+    },
+    {
+      "source": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/mobile-youtube-fr-node-identity-probe-20261017/same-scope-clone-repair-20261017/browser-candidate-lifecycle/portrait-menu.png",
+      "copy": "docs/reports/mobile-safari-integration-20261016/clone-entry-evidence/lifecycle/portrait-menu.png",
+      "sha256": "5a920a4fe64151077928e8f5d52510afc525c8f8e53f98523ee50266c927a33f",
+      "bytes": 34594
+    },
+    {
+      "source": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/mobile-youtube-fr-node-identity-probe-20261017/same-scope-clone-repair-20261017/browser-candidate-lifecycle/portrait-menu-normal-close.png",
+      "copy": "docs/reports/mobile-safari-integration-20261016/clone-entry-evidence/lifecycle/portrait-menu-normal-close.png",
+      "sha256": "738ea6f19b728fba20d001eda00966a821dd043442881d53fb9a30e1b0377f25",
+      "bytes": 37484
+    },
+    {
+      "source": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/mobile-youtube-fr-node-identity-probe-20261017/same-scope-clone-repair-20261017/browser-candidate-lifecycle/landscape-inline.png",
+      "copy": "docs/reports/mobile-safari-integration-20261016/clone-entry-evidence/lifecycle/landscape-inline.png",
+      "sha256": "7c85fbc1f838d00c9dfcf6dfd9e0d1141d0e222f095ed0018ece2465dfe38f03",
+      "bytes": 23488
+    },
+    {
+      "source": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/mobile-youtube-fr-node-identity-probe-20261017/same-scope-clone-repair-20261017/browser-candidate-lifecycle/native-interface-enter.png",
+      "copy": "docs/reports/mobile-safari-integration-20261016/clone-entry-evidence/lifecycle/native-interface-enter.png",
+      "sha256": "7c85fbc1f838d00c9dfcf6dfd9e0d1141d0e222f095ed0018ece2465dfe38f03",
+      "bytes": 23488
+    },
+    {
+      "source": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/mobile-youtube-fr-node-identity-probe-20261017/same-scope-clone-repair-20261017/browser-candidate-lifecycle/video-replaced.png",
+      "copy": "docs/reports/mobile-safari-integration-20261016/clone-entry-evidence/lifecycle/video-replaced.png",
+      "sha256": "5607893566be421212933fa4a2145852620296f1c6809f0da1f334137d3947b1",
+      "bytes": 23027
+    },
+    {
+      "source": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/mobile-youtube-fr-node-identity-probe-20261017/same-scope-clone-repair-20261017/browser-candidate-lifecycle/refresh-recovered.png",
+      "copy": "docs/reports/mobile-safari-integration-20261016/clone-entry-evidence/lifecycle/refresh-recovered.png",
+      "sha256": "3b773d75706c5e3b3e4dfd550b40b437708e7dce9259eee59cabc7c0ef2a7c3f",
+      "bytes": 18770
+    },
+    {
+      "source": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/mobile-youtube-fr-node-identity-probe-20261017/same-scope-clone-repair-20261017/native-binding-scope-repair-v1/01-sdk-check-result.json",
+      "copy": "docs/reports/mobile-safari-integration-20261016/clone-entry-evidence/native/01-sdk-check-result.json",
+      "sha256": "e1a61420fb0ecb8c678fba7f901f7764042d88e3b848efc452d4714dfaf03ff0",
+      "bytes": 1164
+    },
+    {
+      "source": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/mobile-youtube-fr-node-identity-probe-20261017/same-scope-clone-repair-20261017/native-binding-scope-repair-v1/02-safari-web-verify-result.json",
+      "copy": "docs/reports/mobile-safari-integration-20261016/clone-entry-evidence/native/02-safari-web-verify-result.json",
+      "sha256": "36857193f34c1de9f95a1cb2a7e0b7281c50a366798055abfc65d1b47dd76650",
+      "bytes": 1307
+    },
+    {
+      "source": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/mobile-youtube-fr-node-identity-probe-20261017/same-scope-clone-repair-20261017/native-binding-scope-repair-v1/03-fresh-unsigned-wrapper-result.json",
+      "copy": "docs/reports/mobile-safari-integration-20261016/clone-entry-evidence/native/03-fresh-unsigned-wrapper-result.json",
+      "sha256": "1fb4f676a4f74f75d89a81265533ed6208a5f81981d711671bdfa99d8a2e088d",
+      "bytes": 1616
+    },
+    {
+      "source": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/mobile-youtube-fr-node-identity-probe-20261017/same-scope-clone-repair-20261017/native-binding-scope-repair-v1/04-macos-result.json",
+      "copy": "docs/reports/mobile-safari-integration-20261016/clone-entry-evidence/native/04-macos-result.json",
+      "sha256": "1de5b025fa588bda039a51988b62efb9079147a9445284b44cad475cc59e2ef9",
+      "bytes": 1871
+    },
+    {
+      "source": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/mobile-youtube-fr-node-identity-probe-20261017/same-scope-clone-repair-20261017/native-binding-scope-repair-v1/05-ios-simulator-result.json",
+      "copy": "docs/reports/mobile-safari-integration-20261016/clone-entry-evidence/native/05-ios-simulator-result.json",
+      "sha256": "2a3233b0233d035d93717a84ba77db19da61f128449d87740206280ed4f7c549",
+      "bytes": 1900
+    },
+    {
+      "source": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/mobile-youtube-fr-node-identity-probe-20261017/same-scope-clone-repair-20261017/native-binding-scope-repair-v1/06-iphoneos-arm64-result.json",
+      "copy": "docs/reports/mobile-safari-integration-20261016/clone-entry-evidence/native/06-iphoneos-arm64-result.json",
+      "sha256": "246beb9c2ae4e0c39f7112e34b19cfd494547894088024e410ae4c0f72274b04",
+      "bytes": 2327
+    },
+    {
+      "source": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/mobile-youtube-fr-node-identity-probe-20261017/same-scope-clone-repair-20261017/native-macOS-app-full-map.json",
+      "copy": "docs/reports/mobile-safari-integration-20261016/clone-entry-evidence/native/macOS-app-full-map.json",
+      "sha256": "8f23a76035297c1b5be84079dfa4ce69630704cc1e9c741b5920a4f38b8f63d7",
+      "bytes": 99566
+    },
+    {
+      "source": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/mobile-youtube-fr-node-identity-probe-20261017/same-scope-clone-repair-20261017/native-iosSimulator-app-full-map.json",
+      "copy": "docs/reports/mobile-safari-integration-20261016/clone-entry-evidence/native/iosSimulator-app-full-map.json",
+      "sha256": "f23f933acd0618c6185a6af3a2ee29ddf38e5c7b98a1b50281359d412a6edca0",
+      "bytes": 86731
+    },
+    {
+      "source": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/mobile-youtube-fr-node-identity-probe-20261017/same-scope-clone-repair-20261017/native-iPhoneOS-app-full-map.json",
+      "copy": "docs/reports/mobile-safari-integration-20261016/clone-entry-evidence/native/iPhoneOS-app-full-map.json",
+      "sha256": "62eb2ab9779fd5fbc72e8696aa5a527748facf32fd31646e98ae605565713d8d",
+      "bytes": 86729
+    }
+  ],
+  "scope": "Original JSON retains absolute local evidence paths. Repository copies are found by this mapping. Two research scripts/config files retain original bytes under .txt suffix to avoid repo execution/type scanning. App/binaries/DerivedData/SDK logs/private E2 payloads are excluded."
+}

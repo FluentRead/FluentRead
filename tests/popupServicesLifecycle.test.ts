@@ -145,6 +145,29 @@ describe('Popup 服务选择实际缓存模板', () => {
     other.scrollTop=64;scrollWrites.length=0;await settle();expect(old.scrollTop).toBe(73);expect(other.scrollTop).toBe(64);expect(scrollWrites).toEqual([]);expect(document.body.scrollTop).toBe(79)
   })
 
+  it.each([{label:'部分被标题遮住',top:40,expected:24},{label:'完整滚到标题上方',top:200,expected:24},{label:'已经完整可见',top:0,expected:0}])('视口恢复时搜索框$label，只调整当前抽屉并保留查询与焦点',async({top,expected})=>{
+    await mountPopup();const scroller=attachOwnedScroller();await open('default');await search('gpt')
+    const input=document.querySelector('input[type="search"]') as HTMLInputElement,heading=document.querySelector('.service-picker-heading') as HTMLElement
+    heading.getBoundingClientRect=()=>rect(100,46);scroller.scrollTop=top;scrollWrites.length=0;focus.mockClear()
+    state.revealFocusedSearch(()=>true);await settle()
+    expect(scroller.scrollTop).toBe(expected);expect(scrollWrites).toEqual(top===expected?[]:[expected])
+    expect(document.querySelector('input[type="search"]')).toBe(input);expect(input.value).toBe('gpt');expect(focused).toBe(input)
+    expectTargetVisible(input);expect(focus).not.toHaveBeenCalled()
+  })
+  it('视口恢复任务等待渲染时用户移走焦点，不滚动也不重新聚焦搜索框',async()=>{
+    await mountPopup();const scroller=attachOwnedScroller();await open('default');await search('gpt')
+    const heading=document.querySelector('.service-picker-heading') as HTMLElement;heading.getBoundingClientRect=()=>rect(100,46)
+    scroller.scrollTop=200;scrollWrites.length=0;focus.mockClear();state.revealFocusedSearch(()=>true)
+    const outside=document.createElement('button');document.body.append(outside);focused=outside;await settle()
+    expect(scrollWrites).toEqual([]);expect(scroller.scrollTop).toBe(200);expect(focused).toBe(outside);expect(focus).not.toHaveBeenCalled();expect(document.body.scrollTop).toBe(79)
+  })
+  it('仍在短视口时不为搜索框重置用户查看服务列表的位置',async()=>{
+    await mountPopup();const scroller=attachOwnedScroller();await open('default');await search('gpt')
+    const modal=document.createElement('div');modal.className='popup-drawer-modal';modal.setAttribute('data-fluent-read-popup-short','');scroller.parentElement!.before(modal);modal.append(scroller.parentElement!)
+    scroller.scrollTop=200;scrollWrites.length=0;focus.mockClear();state.revealFocusedSearch(()=>true);await settle()
+    expect(scrollWrites).toEqual([]);expect(scroller.scrollTop).toBe(200);expect(focused).toBe(document.querySelector('input[type="search"]'));expect(focus).not.toHaveBeenCalled();expect(document.body.scrollTop).toBe(79)
+  })
+
   it('阅读选择面板允许免密钥B站并显示固定模型，写作面板不提供该服务', async () => {
     const config = runtime.reactive(new Config()); config.harness.model = 'unused-reader'; config.model.bilibili = 'unused-default'
     await mountPopup(config, {serviceOptions: [...services, {value: 'bilibili', label: 'B站翻译'}]}, false)

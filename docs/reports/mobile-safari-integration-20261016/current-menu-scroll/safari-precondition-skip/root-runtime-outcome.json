@@ -1,0 +1,98 @@
+{
+  "at": "2026-10-16T20:52:39.236835+00:00",
+  "status": "UNVERIFIED_ENTRY_PRECONDITION_0_PASS_1_SKIP",
+  "runtimeSourceCommit": "a2ecda302d3a0199ffe9f0222ee2998a37bd7d5d",
+  "caseSeconds": 8.553,
+  "rawCaseSummary": {
+    "devicesAndConfigurations": [
+      {
+        "device": {
+          "architecture": "arm64",
+          "deviceId": "A407390F-7AA8-42AE-AFEB-F93EE99E9FF8",
+          "deviceName": "FluentRead-PR995-FreshPermissions-20261015",
+          "modelName": "iPhone 16 Pro",
+          "osBuildNumber": "23C52",
+          "osVersion": "26.2",
+          "platform": "iOS Simulator"
+        },
+        "expectedFailures": 0,
+        "failedTests": 0,
+        "passedTests": 0,
+        "skippedTests": 1,
+        "testPlanConfiguration": {
+          "configurationId": "1",
+          "configurationName": "Test Scheme Action"
+        }
+      }
+    ],
+    "environmentDescription": "NativeHarness · Built with macOS 26.6.2",
+    "expectedFailures": 0,
+    "failedTests": 0,
+    "finishTime": 1792183806.904,
+    "passedTests": 0,
+    "result": "Skipped",
+    "skippedTests": 1,
+    "startTime": 1792183791.537,
+    "statistics": [],
+    "testFailures": [],
+    "title": "Test - NativeHarness",
+    "topInsights": [],
+    "totalTestCount": 1
+  },
+  "onlyObservedAction": {
+    "A9LivePlayerCenterTouch": 1
+  },
+  "menuOpenScrollClosePerformed": false,
+  "actualPNGReview": [
+    "menu-scroll-01-owned-before-open: video cannot play",
+    "A9-before-possible-live-touch: same failure/loading state",
+    "unverified-final: English embedded video intro text; not FluentRead translation/bilingual proof"
+  ],
+  "skipReason": "Unique enabled same-player44px entry unavailable",
+  "cause": "UNDETERMINED: page/AX readiness changed during run; do not assign product root cause from absent entry",
+  "freshRootFullOriginalApp485": true,
+  "freshRootUserscripts47": true,
+  "freshRootNativePrivate17": true,
+  "nativeDataContainerUUIDMigrated": true,
+  "freshRootDemoSame": true,
+  "freshRootChromeBaseline478": true,
+  "guardStatus": "UNVERIFIED_PRECONDITION_OR_AX_LIMIT",
+  "guardCleanupErrors": [],
+  "guardFocusEvents": [],
+  "guardViolations": [],
+  "installedIdentityAtEnd": "ORIGINAL_D9_FULL485_VERIFIED",
+  "resourceRelease": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/mobile-safari-a2-paused-menu-scroll-candidate-20261017/root-fresh-postruntime-release.json",
+  "resourceLaneReleased": true,
+  "evidence": [
+    {
+      "path": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/mobile-safari-a2-paused-menu-scroll-candidate-20261017/inline-attempt1/runtime-summary.json",
+      "sha256": "ff232bad9e665a44cb5f360210671143bd5b33f4fb4f73a23a901c632bdb5756"
+    },
+    {
+      "path": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/mobile-safari-a2-paused-menu-scroll-candidate-20261017/inline-attempt1/runtime-guard-report.json",
+      "sha256": "c9c1f22c0db4f2c47f24e3735767f72a4acdc8c26526a03442176c89bde04ca6"
+    },
+    {
+      "path": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/mobile-safari-a2-paused-menu-scroll-candidate-20261017/inline-attempt1/runtime-evidence/menu-scroll-result.json",
+      "sha256": "06fa95415329dcd4781bb369ffc4151cc5ae61d399d5e5a777b736e7394bcab0"
+    },
+    {
+      "path": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/mobile-safari-a2-paused-menu-scroll-candidate-20261017/inline-attempt1/identity-after-shutdown.json",
+      "sha256": "2f44864ab3effaebc69c376d2df5c3e3cca0f7e82b0500818174e6d346fcaa11"
+    },
+    {
+      "path": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/mobile-safari-a2-paused-menu-scroll-candidate-20261017/root-fresh-postruntime-release.json",
+      "sha256": "2577cd67d1fc86a5bd69d94037cf34461b28d307f4553ac566725f63bc28fc7f"
+    }
+  ],
+  "notAcceptance": [
+    "menu internal scroll",
+    "close after scroll",
+    "paused state",
+    "playback",
+    "translation",
+    "native fullscreen",
+    "physical iPhone"
+  ],
+  "nextStep": "Controlled production-browser geometry regression before any product change; no blind Safari retry"
+}

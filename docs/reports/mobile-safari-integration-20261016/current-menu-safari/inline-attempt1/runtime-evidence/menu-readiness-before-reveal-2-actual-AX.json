@@ -1,0 +1,2483 @@
+{
+  "elapsedSeconds" : 6.8801079988479614,
+  "nodes" : [
+    {
+      "frame" : {
+        "height" : 874,
+        "width" : 402,
+        "x" : 0,
+        "y" : 0
+      },
+      "identifier" : "",
+      "label" : "Safari浏览器",
+      "selected" : false,
+      "type" : 2,
+      "valueString" : null,
+      "valueType" : "nil"
+    },
+    {
+      "frame" : {
+        "height" : 874,
+        "width" : 402,
+        "x" : 0,
+        "y" : 0
+      },
+      "identifier" : "",
+      "label" : "",
+      "selected" : false,
+      "type" : 4,
+      "valueString" : null,
+      "valueType" : "nil"
+    },
+    {
+      "frame" : {
+        "height" : 874,
+        "width" : 402,
+        "x" : 0,
+        "y" : 0
+      },
+      "identifier" : "",
+      "label" : "",
+      "selected" : false,
+      "type" : 1,
+      "valueString" : null,
+      "valueType" : "nil"
+    },
+    {
+      "frame" : {
+        "height" : 874,
+        "width" : 402,
+        "x" : 0,
+        "y" : 0
+      },
+      "identifier" : "",
+      "label" : "",
+      "selected" : false,
+      "type" : 1,
+      "valueString" : null,
+      "valueType" : "nil"
+    },
+    {
+      "frame" : {
+        "height" : 874,
+        "width" : 402,
+        "x" : 0,
+        "y" : 0
+      },
+      "identifier" : "",
+      "label" : "",
+      "selected" : false,
+      "type" : 1,
+      "valueString" : null,
+      "valueType" : "nil"
+    },
+    {
+      "frame" : {
+        "height" : 874,
+        "width" : 402,
+        "x" : 0,
+        "y" : 0
+      },
+      "identifier" : "",
+      "label" : "",
+      "selected" : false,
+      "type" : 1,
+      "valueString" : null,
+      "valueType" : "nil"
+    },
+    {
+      "frame" : {
+        "height" : 874,
+        "width" : 402,
+        "x" : 0,
+        "y" : 0
+      },
+      "identifier" : "",
+      "label" : "",
+      "selected" : false,
+      "type" : 1,
+      "valueString" : null,
+      "valueType" : "nil"
+    },
+    {
+      "frame" : {
+        "height" : 874,
+        "width" : 402,
+        "x" : 0,
+        "y" : 0
+      },
+      "identifier" : "",
+      "label" : "",
+      "selected" : false,
+      "type" : 1,
+      "valueString" : null,
+      "valueType" : "nil"
+    },
+    {
+      "frame" : {
+        "height" : 874,
+        "width" : 402,
+        "x" : 0,
+        "y" : 0
+      },
+      "identifier" : "",
+      "label" : "",
+      "selected" : false,
+      "type" : 1,
+      "valueString" : null,
+      "valueType" : "nil"
+    },
+    {
+      "frame" : {
+        "height" : 874,
+        "width" : 402,
+        "x" : 0,
+        "y" : 0
+      },
+      "identifier" : "",
+      "label" : "",
+      "selected" : false,
+      "type" : 1,
+      "valueString" : null,
+      "valueType" : "nil"
+    },
+    {
+      "frame" : {
+        "height" : 874,
+        "width" : 402,
+        "x" : 0,
+        "y" : 0
+      },
+      "identifier" : "SafariWindow?View=Narrow&BarsKeptMinimized=false&UUID=9353F600-BB36-4EF0-B3F2-ABB4E11079F5&UsingLoweredBar=true&IsSecure=true&IsTabBarAvailable=false",
+      "label" : "",
+      "selected" : false,
+      "type" : 1,
+      "valueString" : null,
+      "valueType" : "nil"
+    },
+    {
+      "frame" : {
+        "height" : 874,
+        "width" : 402,
+        "x" : 0,
+        "y" : 0
+      },
+      "identifier" : "",
+      "label" : "",
+      "selected" : false,
+      "type" : 1,
+      "valueString" : null,
+      "valueType" : "nil"
+    },
+    {
+      "frame" : {
+        "height" : 874,
+        "width" : 402,
+        "x" : 0,
+        "y" : 0
+      },
+      "identifier" : "",
+      "label" : "",
+      "selected" : false,
+      "type" : 1,
+      "valueString" : null,
+      "valueType" : "nil"
+    },
+    {
+      "frame" : {
+        "height" : 49,
+        "width" : 402,
+        "x" : 0,
+        "y" : 0
+      },
+      "identifier" : "",
+      "label" : "",
+      "selected" : false,
+      "type" : 1,
+      "valueString" : null,
+      "valueType" : "nil"
+    },
+    {
+      "frame" : {
+        "height" : 49,
+        "width" : 402,
+        "x" : 0,
+        "y" : 0
+      },
+      "identifier" : "",
+      "label" : "",
+      "selected" : false,
+      "type" : 1,
+      "valueString" : null,
+      "valueType" : "nil"
+    },
+    {
+      "frame" : {
+        "height" : 49,
+        "width" : 402,
+        "x" : 0,
+        "y" : 0
+      },
+      "identifier" : "",
+      "label" : "",
+      "selected" : false,
+      "type" : 1,
+      "valueString" : null,
+      "valueType" : "nil"
+    },
+    {
+      "frame" : {
+        "height" : 62,
+        "width" : 402,
+        "x" : 0,
+        "y" : 0
+      },
+      "identifier" : "",
+      "label" : "",
+      "selected" : false,
+      "type" : 1,
+      "valueString" : null,
+      "valueType" : "nil"
+    },
+    {
+      "frame" : {
+        "height" : 874,
+        "width" : 402,
+        "x" : 0,
+        "y" : 0
+      },
+      "identifier" : "",
+      "label" : "",
+      "selected" : false,
+      "type" : 46,
+      "valueString" : null,
+      "valueType" : "nil"
+    },
+    {
+      "frame" : {
+        "height" : 874,
+        "width" : 402,
+        "x" : 0,
+        "y" : 0
+      },
+      "identifier" : "TabDocument?IsLoadedUsingDesktopUserAgent=false&InReaderMode=false&UUID=87246FAF-A680-4738-BA2A-97A9E170620D&IsPrivate=false&IsPageLoaded=true&WebViewProcessID=40882",
+      "label" : "",
+      "selected" : false,
+      "type" : 1,
+      "valueString" : null,
+      "valueType" : "nil"
+    },
+    {
+      "frame" : {
+        "height" : 874,
+        "width" : 402,
+        "x" : 0,
+        "y" : 0
+      },
+      "identifier" : "WebView",
+      "label" : "",
+      "selected" : false,
+      "type" : 58,
+      "valueString" : null,
+      "valueType" : "nil"
+    },
+    {
+      "frame" : {
+        "height" : 874,
+        "width" : 402,
+        "x" : 0,
+        "y" : 0
+      },
+      "identifier" : "",
+      "label" : "",
+      "selected" : false,
+      "type" : 58,
+      "valueString" : null,
+      "valueType" : "nil"
+    },
+    {
+      "frame" : {
+        "height" : 62,
+        "width" : 402,
+        "x" : 0,
+        "y" : 0
+      },
+      "identifier" : "",
+      "label" : "",
+      "selected" : false,
+      "type" : 1,
+      "valueString" : null,
+      "valueType" : "nil"
+    },
+    {
+      "frame" : {
+        "height" : 874,
+        "width" : 402,
+        "x" : 0,
+        "y" : 0
+      },
+      "identifier" : "",
+      "label" : "",
+      "selected" : false,
+      "type" : 1,
+      "valueString" : null,
+      "valueType" : "nil"
+    },
+    {
+      "frame" : {
+        "height" : 874,
+        "width" : 402,
+        "x" : 0,
+        "y" : 0
+      },
+      "identifier" : "",
+      "label" : "",
+      "selected" : false,
+      "type" : 58,
+      "valueString" : null,
+      "valueType" : "nil"
+    },
+    {
+      "frame" : {
+        "height" : 874,
+        "width" : 402,
+        "x" : 0,
+        "y" : 0
+      },
+      "identifier" : "",
+      "label" : "",
+      "selected" : false,
+      "type" : 1,
+      "valueString" : null,
+      "valueType" : "nil"
+    },
+    {
+      "frame" : {
+        "height" : 874,
+        "width" : 402,
+        "x" : 0,
+        "y" : 0
+      },
+      "identifier" : "",
+      "label" : "",
+      "selected" : false,
+      "type" : 1,
+      "valueString" : null,
+      "valueType" : "nil"
+    },
+    {
+      "frame" : {
+        "height" : 874,
+        "width" : 402,
+        "x" : 0,
+        "y" : 62
+      },
+      "identifier" : "",
+      "label" : "",
+      "selected" : false,
+      "type" : 1,
+      "valueString" : "",
+      "valueType" : "__NSCFConstantString"
+    },
+    {
+      "frame" : {
+        "height" : 4371,
+        "width" : 402,
+        "x" : 0,
+        "y" : 62
+      },
+      "identifier" : "",
+      "label" : "Ken Robinson认为学校扼杀创造力 - YouTube",
+      "selected" : false,
+      "type" : 1,
+      "valueString" : "",
+      "valueType" : "__NSCFConstantString"
+    },
+    {
+      "frame" : {
+        "height" : 226,
+        "width" : 402,
+        "x" : 0,
+        "y" : 110
+      },
+      "identifier" : "",
+      "label" : "",
+      "selected" : false,
+      "type" : 1,
+      "valueString" : "",
+      "valueType" : "__NSCFConstantString"
+    },
+    {
+      "frame" : {
+        "height" : 226,
+        "width" : 402,
+        "x" : 0,
+        "y" : 110
+      },
+      "identifier" : "",
+      "label" : "YouTube 视频播放器",
+      "selected" : false,
+      "type" : 1,
+      "valueString" : "",
+      "valueType" : "__NSCFConstantString"
+    },
+    {
+      "frame" : {
+        "height" : 10,
+        "width" : 402,
+        "x" : 0,
+        "y" : 110
+      },
+      "identifier" : "",
+      "label" : "",
+      "selected" : false,
+      "type" : 1,
+      "valueString" : "",
+      "valueType" : "__NSCFConstantString"
+    },
+    {
+      "frame" : {
+        "height" : 226,
+        "width" : 301,
+        "x" : 50,
+        "y" : 110
+      },
+      "identifier" : "",
+      "label" : "Ken Robinson认为学校扼杀创造力, 20分钟3秒钟",
+      "selected" : false,
+      "type" : 1,
+      "valueString" : "1秒钟",
+      "valueType" : "__NSCFString"
+    },
+    {
+      "frame" : {
+        "height" : 73,
+        "width" : 168,
+        "x" : 0,
+        "y" : 110
+      },
+      "identifier" : "",
+      "label" : "点按取消静音",
+      "selected" : false,
+      "type" : 9,
+      "valueString" : "",
+      "valueType" : "__NSCFConstantString"
+    },
+    {
+      "frame" : {
+        "height" : 214,
+        "width" : 378,
+        "x" : 12,
+        "y" : 110
+      },
+      "identifier" : "",
+      "label" : "",
+      "selected" : false,
+      "type" : 1,
+      "valueString" : "",
+      "valueType" : "__NSCFConstantString"
+    },
+    {
+      "frame" : {
+        "height" : 226,
+        "width" : 354,
+        "x" : 0,
+        "y" : 110
+      },
+      "identifier" : "",
+      "label" : "",
+      "selected" : false,
+      "type" : 1,
+      "valueString" : "",
+      "valueType" : "__NSCFConstantString"
+    },
+    {
+      "frame" : {
+        "height" : 226,
+        "width" : 402,
+        "x" : 0,
+        "y" : 110
+      },
+      "identifier" : "",
+      "label" : "",
+      "selected" : false,
+      "type" : 1,
+      "valueString" : "",
+      "valueType" : "__NSCFConstantString"
+    },
+    {
+      "frame" : {
+        "height" : 45,
+        "width" : 44,
+        "x" : 350,
+        "y" : 284
+      },
+      "identifier" : "",
+      "label" : "流畅阅读字幕翻译：已开启",
+      "selected" : false,
+      "type" : 1,
+      "valueString" : "",
+      "valueType" : "__NSCFConstantString"
+    },
+    {
+      "frame" : {
+        "height" : 10,
+        "width" : 402,
+        "x" : 0,
+        "y" : 110
+      },
+      "identifier" : "",
+      "label" : "",
+      "selected" : false,
+      "type" : 1,
+      "valueString" : "",
+      "valueType" : "__NSCFConstantString"
+    },
+    {
+      "frame" : {
+        "height" : 227,
+        "width" : 402,
+        "x" : 0,
+        "y" : 110
+      },
+      "identifier" : "",
+      "label" : "",
+      "selected" : false,
+      "type" : 1,
+      "valueString" : "",
+      "valueType" : "__NSCFConstantString"
+    },
+    {
+      "frame" : {
+        "height" : 50,
+        "width" : 402,
+        "x" : 0,
+        "y" : 61
+      },
+      "identifier" : "",
+      "label" : "横幅",
+      "selected" : false,
+      "type" : 1,
+      "valueString" : "",
+      "valueType" : "__NSCFConstantString"
+    },
+    {
+      "frame" : {
+        "height" : 48,
+        "width" : 117,
+        "x" : 0,
+        "y" : 62
+      },
+      "identifier" : "",
+      "label" : "YouTube 首页",
+      "selected" : false,
+      "type" : 42,
+      "valueString" : "",
+      "valueType" : "__NSCFConstantString"
+    },
+    {
+      "frame" : {
+        "height" : 48,
+        "width" : 48,
+        "x" : 180,
+        "y" : 62
+      },
+      "identifier" : "",
+      "label" : "在 YouTube 中搜索",
+      "selected" : false,
+      "type" : 9,
+      "valueString" : "",
+      "valueType" : "__NSCFConstantString"
+    },
+    {
+      "frame" : {
+        "height" : 48,
+        "width" : 48,
+        "x" : 228,
+        "y" : 62
+      },
+      "identifier" : "",
+      "label" : "更多选项",
+      "selected" : false,
+      "type" : 9,
+      "valueString" : "",
+      "valueType" : "__NSCFConstantString"
+    },
+    {
+      "frame" : {
+        "height" : 17,
+        "width" : 56,
+        "x" : 322,
+        "y" : 77
+      },
+      "identifier" : "",
+      "label" : "打开应用",
+      "selected" : false,
+      "type" : 42,
+      "valueString" : "",
+      "valueType" : "__NSCFConstantString"
+    },
+    {
+      "frame" : {
+        "height" : 17,
+        "width" : 56,
+        "x" : 322,
+        "y" : 77
+      },
+      "identifier" : "",
+      "label" : "打开应用",
+      "selected" : false,
+      "type" : 42,
+      "valueString" : "",
+      "valueType" : "__NSCFConstantString"
+    },
+    {
+      "frame" : {
+        "height" : 17,
+        "width" : 56,
+        "x" : 322,
+        "y" : 77
+      },
+      "identifier" : "",
+      "label" : "打开应用",
+      "selected" : false,
+      "type" : 48,
+      "valueString" : "打开应用",
+      "valueType" : "__NSCFString"
+    },
+    {
+      "frame" : {
+        "height" : 27,
+        "width" : 370,
+        "x" : 16,
+        "y" : 348
+      },
+      "identifier" : "",
+      "label" : "Ken Robinson认为学校扼杀创造力",
+      "selected" : false,
+      "type" : 1,
+      "valueString" : "2",
+      "valueType" : "NSTaggedPointerString"
+    },
+    {
+      "frame" : {
+        "height" : 27,
+        "width" : 274,
+        "x" : 16,
+        "y" : 348
+      },
+      "identifier" : "",
+      "label" : "Ken Robinson认为学校扼杀创造力",
+      "selected" : false,
+      "type" : 48,
+      "valueString" : "Ken Robinson认为学校扼杀创造力",
+      "valueType" : "__NSCFString"
+    },
+    {
+      "frame" : {
+        "height" : 16,
+        "width" : 33,
+        "x" : 16,
+        "y" : 381
+      },
+      "identifier" : "",
+      "label" : "上传者：TED。",
+      "selected" : false,
+      "type" : 48,
+      "valueString" : "@TED",
+      "valueType" : "NSTaggedPointerString"
+    },
+    {
+      "frame" : {
+        "height" : 16,
+        "width" : 66,
+        "x" : 56,
+        "y" : 381
+      },
+      "identifier" : "",
+      "label" : "30万",
+      "selected" : false,
+      "type" : 48,
+      "valueString" : "30万 次点赞",
+      "valueType" : "__NSCFString"
+    },
+    {
+      "frame" : {
+        "height" : 16,
+        "width" : 76,
+        "x" : 129,
+        "y" : 381
+      },
+      "identifier" : "",
+      "label" : "25,044,335次观看",
+      "selected" : false,
+      "type" : 48,
+      "valueString" : "2504万次观看",
+      "valueType" : "__NSCFString"
+    },
+    {
+      "frame" : {
+        "height" : 16,
+        "width" : 38,
+        "x" : 212,
+        "y" : 381
+      },
+      "identifier" : "",
+      "label" : "19年前",
+      "selected" : false,
+      "type" : 48,
+      "valueString" : "19年前",
+      "valueType" : "__NSCFString"
+    },
+    {
+      "frame" : {
+        "height" : 19,
+        "width" : 25,
+        "x" : 265,
+        "y" : 380
+      },
+      "identifier" : "",
+      "label" : "展开",
+      "selected" : false,
+      "type" : 9,
+      "valueString" : "",
+      "valueType" : "__NSCFConstantString"
+    },
+    {
+      "frame" : {
+        "height" : 49,
+        "width" : 48,
+        "x" : 8,
+        "y" : 406
+      },
+      "identifier" : "",
+      "label" : "TED，2790万位订阅者。前往频道。",
+      "selected" : false,
+      "type" : 42,
+      "valueString" : "",
+      "valueType" : "__NSCFConstantString"
+    },
+    {
+      "frame" : {
+        "height" : 33,
+        "width" : 48,
+        "x" : 56,
+        "y" : 414
+      },
+      "identifier" : "",
+      "label" : "订阅“TED”。",
+      "selected" : false,
+      "type" : 9,
+      "valueString" : "",
+      "valueType" : "__NSCFConstantString"
+    },
+    {
+      "frame" : {
+        "height" : 49,
+        "width" : 48,
+        "x" : 186,
+        "y" : 406
+      },
+      "identifier" : "",
+      "label" : "与另外 307,887 人一起顶此视频",
+      "selected" : false,
+      "type" : 40,
+      "valueString" : "0",
+      "valueType" : "NSTaggedPointerString"
+    },
+    {
+      "frame" : {
+        "height" : 49,
+        "width" : 48,
+        "x" : 227,
+        "y" : 406
+      },
+      "identifier" : "",
+      "label" : "不喜欢此视频",
+      "selected" : false,
+      "type" : 40,
+      "valueString" : "0",
+      "valueType" : "NSTaggedPointerString"
+    },
+    {
+      "frame" : {
+        "height" : 49,
+        "width" : 48,
+        "x" : 268,
+        "y" : 406
+      },
+      "identifier" : "",
+      "label" : "分享",
+      "selected" : false,
+      "type" : 9,
+      "valueString" : "",
+      "valueType" : "__NSCFConstantString"
+    },
+    {
+      "frame" : {
+        "height" : 49,
+        "width" : 48,
+        "x" : 309,
+        "y" : 406
+      },
+      "identifier" : "",
+      "label" : "保存到播放列表",
+      "selected" : false,
+      "type" : 9,
+      "valueString" : "",
+      "valueType" : "__NSCFConstantString"
+    },
+    {
+      "frame" : {
+        "height" : 49,
+        "width" : 48,
+        "x" : 350,
+        "y" : 406
+      },
+      "identifier" : "",
+      "label" : "举报",
+      "selected" : false,
+      "type" : 9,
+      "valueString" : "",
+      "valueType" : "__NSCFConstantString"
+    },
+    {
+      "frame" : {
+        "height" : 93,
+        "width" : 370,
+        "x" : 16,
+        "y" : 462
+      },
+      "identifier" : "",
+      "label" : "评论",
+      "selected" : false,
+      "type" : 9,
+      "valueString" : "",
+      "valueType" : "__NSCFConstantString"
+    },
+    {
+      "frame" : {
+        "height" : 41,
+        "width" : 40,
+        "x" : 12,
+        "y" : 818
+      },
+      "identifier" : "",
+      "label" : "前往频道：CBS Mornings",
+      "selected" : false,
+      "type" : 42,
+      "valueString" : "",
+      "valueType" : "__NSCFConstantString"
+    },
+    {
+      "frame" : {
+        "height" : 41,
+        "width" : 40,
+        "x" : 12,
+        "y" : 818
+      },
+      "identifier" : "",
+      "label" : "前往频道：CBS Mornings",
+      "selected" : false,
+      "type" : 43,
+      "valueString" : "",
+      "valueType" : "__NSCFConstantString"
+    },
+    {
+      "frame" : {
+        "height" : 35,
+        "width" : 240,
+        "x" : 64,
+        "y" : 818
+      },
+      "identifier" : "",
+      "label" : "Sir Ken Robinson on how to encourage creativity among students 来自CBS Mornings 40,417次观看 7分钟3秒钟",
+      "selected" : false,
+      "type" : 42,
+      "valueString" : "",
+      "valueType" : "__NSCFConstantString"
+    },
+    {
+      "frame" : {
+        "height" : 35,
+        "width" : 240,
+        "x" : 64,
+        "y" : 818
+      },
+      "identifier" : "",
+      "label" : "Sir Ken Robinson on how to encourage creativity among students 来自CBS Mornings 40,417次观看 7分钟3秒钟",
+      "selected" : false,
+      "type" : 42,
+      "valueString" : "3",
+      "valueType" : "NSTaggedPointerString"
+    },
+    {
+      "frame" : {
+        "height" : 35,
+        "width" : 240,
+        "x" : 64,
+        "y" : 818
+      },
+      "identifier" : "",
+      "label" : "Sir Ken Robinson on how to encourage creativity among students 来自CBS Mornings 40,417次观看 7分钟3秒钟",
+      "selected" : false,
+      "type" : 48,
+      "valueString" : "Sir Ken Robinson on how to encourage creativity among students",
+      "valueType" : "__NSCFString"
+    },
+    {
+      "frame" : {
+        "height" : 49,
+        "width" : 48,
+        "x" : 354,
+        "y" : 810
+      },
+      "identifier" : "",
+      "label" : "操作菜单",
+      "selected" : false,
+      "type" : 9,
+      "valueString" : "",
+      "valueType" : "__NSCFConstantString"
+    },
+    {
+      "frame" : {
+        "height" : 44,
+        "width" : 40,
+        "x" : 12,
+        "y" : 1136
+      },
+      "identifier" : "",
+      "label" : "前往频道：TED",
+      "selected" : false,
+      "type" : 42,
+      "valueString" : "",
+      "valueType" : "__NSCFConstantString"
+    },
+    {
+      "frame" : {
+        "height" : 35,
+        "width" : 231,
+        "x" : 64,
+        "y" : 1136
+      },
+      "identifier" : "",
+      "label" : "Bring on the learning revolution! | Ken Robinson 来自TED 787,060次观看 17分钟",
+      "selected" : false,
+      "type" : 42,
+      "valueString" : "",
+      "valueType" : "__NSCFConstantString"
+    },
+    {
+      "frame" : {
+        "height" : 35,
+        "width" : 231,
+        "x" : 64,
+        "y" : 1136
+      },
+      "identifier" : "",
+      "label" : "Bring on the learning revolution! | Ken Robinson 来自TED 787,060次观看 17分钟",
+      "selected" : false,
+      "type" : 42,
+      "valueString" : "3",
+      "valueType" : "NSTaggedPointerString"
+    },
+    {
+      "frame" : {
+        "height" : 35,
+        "width" : 231,
+        "x" : 64,
+        "y" : 1136
+      },
+      "identifier" : "",
+      "label" : "Bring on the learning revolution! | Ken Robinson 来自TED 787,060次观看 17分钟",
+      "selected" : false,
+      "type" : 48,
+      "valueString" : "Bring on the learning revolution! | Ken Robinson",
+      "valueType" : "__NSCFString"
+    },
+    {
+      "frame" : {
+        "height" : 49,
+        "width" : 48,
+        "x" : 354,
+        "y" : 1128
+      },
+      "identifier" : "",
+      "label" : "操作菜单",
+      "selected" : false,
+      "type" : 9,
+      "valueString" : "",
+      "valueType" : "__NSCFConstantString"
+    },
+    {
+      "frame" : {
+        "height" : 44,
+        "width" : 40,
+        "x" : 12,
+        "y" : 1454
+      },
+      "identifier" : "",
+      "label" : "前往频道：TEDx Talks",
+      "selected" : false,
+      "type" : 42,
+      "valueString" : "",
+      "valueType" : "__NSCFConstantString"
+    },
+    {
+      "frame" : {
+        "height" : 35,
+        "width" : 290,
+        "x" : 64,
+        "y" : 1454
+      },
+      "identifier" : "",
+      "label" : "TEDxLeadershipPittsburgh - Sir Ken Robinson - 11\/14\/09 来自TEDx Talks 73,840次观看 19分钟",
+      "selected" : false,
+      "type" : 42,
+      "valueString" : "",
+      "valueType" : "__NSCFConstantString"
+    },
+    {
+      "frame" : {
+        "height" : 35,
+        "width" : 290,
+        "x" : 64,
+        "y" : 1454
+      },
+      "identifier" : "",
+      "label" : "TEDxLeadershipPittsburgh - Sir Ken Robinson - 11\/14\/09 来自TEDx Talks 73,840次观看 19分钟",
+      "selected" : false,
+      "type" : 42,
+      "valueString" : "3",
+      "valueType" : "NSTaggedPointerString"
+    },
+    {
+      "frame" : {
+        "height" : 35,
+        "width" : 290,
+        "x" : 64,
+        "y" : 1454
+      },
+      "identifier" : "",
+      "label" : "TEDxLeadershipPittsburgh - Sir Ken Robinson - 11\/14\/09 来自TEDx Talks 73,840次观看 19分钟",
+      "selected" : false,
+      "type" : 48,
+      "valueString" : "TEDxLeadershipPittsburgh - Sir Ken Robinson - 11\/14\/09",
+      "valueType" : "__NSCFString"
+    },
+    {
+      "frame" : {
+        "height" : 49,
+        "width" : 48,
+        "x" : 354,
+        "y" : 1446
+      },
+      "identifier" : "",
+      "label" : "操作菜单",
+      "selected" : false,
+      "type" : 9,
+      "valueString" : "",
+      "valueType" : "__NSCFConstantString"
+    },
+    {
+      "frame" : {
+        "height" : 45,
+        "width" : 40,
+        "x" : 12,
+        "y" : 1771
+      },
+      "identifier" : "",
+      "label" : "前往频道：美国之音中文网",
+      "selected" : false,
+      "type" : 42,
+      "valueString" : "",
+      "valueType" : "__NSCFConstantString"
+    },
+    {
+      "frame" : {
+        "height" : 35,
+        "width" : 284,
+        "x" : 64,
+        "y" : 1772
+      },
+      "identifier" : "",
+      "label" : "原声带·夏巢川：白纸运动后，我在看守所地狱般的日子 来自美国之音中文网 4,585,956次观看 31分钟",
+      "selected" : false,
+      "type" : 42,
+      "valueString" : "",
+      "valueType" : "__NSCFConstantString"
+    },
+    {
+      "frame" : {
+        "height" : 35,
+        "width" : 284,
+        "x" : 64,
+        "y" : 1772
+      },
+      "identifier" : "",
+      "label" : "原声带·夏巢川：白纸运动后，我在看守所地狱般的日子 来自美国之音中文网 4,585,956次观看 31分钟",
+      "selected" : false,
+      "type" : 42,
+      "valueString" : "3",
+      "valueType" : "NSTaggedPointerString"
+    },
+    {
+      "frame" : {
+        "height" : 35,
+        "width" : 284,
+        "x" : 64,
+        "y" : 1772
+      },
+      "identifier" : "",
+      "label" : "原声带·夏巢川：白纸运动后，我在看守所地狱般的日子 来自美国之音中文网 4,585,956次观看 31分钟",
+      "selected" : false,
+      "type" : 48,
+      "valueString" : "原声带·夏巢川：白纸运动后，我在看守所地狱般的日子",
+      "valueType" : "__NSCFString"
+    },
+    {
+      "frame" : {
+        "height" : 49,
+        "width" : 48,
+        "x" : 354,
+        "y" : 1764
+      },
+      "identifier" : "",
+      "label" : "操作菜单",
+      "selected" : false,
+      "type" : 9,
+      "valueString" : "",
+      "valueType" : "__NSCFConstantString"
+    },
+    {
+      "frame" : {
+        "height" : 44,
+        "width" : 40,
+        "x" : 12,
+        "y" : 2090
+      },
+      "identifier" : "",
+      "label" : "前往频道：More Perfect Union",
+      "selected" : false,
+      "type" : 42,
+      "valueString" : "",
+      "valueType" : "__NSCFConstantString"
+    },
+    {
+      "frame" : {
+        "height" : 35,
+        "width" : 288,
+        "x" : 64,
+        "y" : 2090
+      },
+      "identifier" : "",
+      "label" : "Doctor Explains Why They're Terrified to Speak Out 来自More Perfect Union 896,724次观看 8分钟40秒钟",
+      "selected" : false,
+      "type" : 42,
+      "valueString" : "",
+      "valueType" : "__NSCFConstantString"
+    },
+    {
+      "frame" : {
+        "height" : 35,
+        "width" : 288,
+        "x" : 64,
+        "y" : 2090
+      },
+      "identifier" : "",
+      "label" : "Doctor Explains Why They're Terrified to Speak Out 来自More Perfect Union 896,724次观看 8分钟40秒钟",
+      "selected" : false,
+      "type" : 42,
+      "valueString" : "3",
+      "valueType" : "NSTaggedPointerString"
+    },
+    {
+      "frame" : {
+        "height" : 35,
+        "width" : 288,
+        "x" : 64,
+        "y" : 2090
+      },
+      "identifier" : "",
+      "label" : "Doctor Explains Why They're Terrified to Speak Out 来自More Perfect Union 896,724次观看 8分钟40秒钟",
+      "selected" : false,
+      "type" : 48,
+      "valueString" : "Doctor Explains Why They're Terrified to Speak Out",
+      "valueType" : "__NSCFString"
+    },
+    {
+      "frame" : {
+        "height" : 49,
+        "width" : 48,
+        "x" : 354,
+        "y" : 2082
+      },
+      "identifier" : "",
+      "label" : "操作菜单",
+      "selected" : false,
+      "type" : 9,
+      "valueString" : "",
+      "valueType" : "__NSCFConstantString"
+    },
+    {
+      "frame" : {
+        "height" : 45,
+        "width" : 40,
+        "x" : 12,
+        "y" : 2407
+      },
+      "identifier" : "",
+      "label" : "前往频道：Video Arts",
+      "selected" : false,
+      "type" : 42,
+      "valueString" : "",
+      "valueType" : "__NSCFConstantString"
+    },
+    {
+      "frame" : {
+        "height" : 35,
+        "width" : 280,
+        "x" : 64,
+        "y" : 2408
+      },
+      "identifier" : "",
+      "label" : "John Cleese's Legendary 1991 Speech About Creativity 来自Video Arts 468,967次观看 35分钟",
+      "selected" : false,
+      "type" : 42,
+      "valueString" : "",
+      "valueType" : "__NSCFConstantString"
+    },
+    {
+      "frame" : {
+        "height" : 35,
+        "width" : 280,
+        "x" : 64,
+        "y" : 2408
+      },
+      "identifier" : "",
+      "label" : "John Cleese's Legendary 1991 Speech About Creativity 来自Video Arts 468,967次观看 35分钟",
+      "selected" : false,
+      "type" : 42,
+      "valueString" : "3",
+      "valueType" : "NSTaggedPointerString"
+    },
+    {
+      "frame" : {
+        "height" : 35,
+        "width" : 280,
+        "x" : 64,
+        "y" : 2408
+      },
+      "identifier" : "",
+      "label" : "John Cleese's Legendary 1991 Speech About Creativity 来自Video Arts 468,967次观看 35分钟",
+      "selected" : false,
+      "type" : 48,
+      "valueString" : "John Cleese's Legendary 1991 Speech About Creativity",
+      "valueType" : "__NSCFString"
+    },
+    {
+      "frame" : {
+        "height" : 49,
+        "width" : 48,
+        "x" : 354,
+        "y" : 2400
+      },
+      "identifier" : "",
+      "label" : "操作菜单",
+      "selected" : false,
+      "type" : 9,
+      "valueString" : "",
+      "valueType" : "__NSCFConstantString"
+    },
+    {
+      "frame" : {
+        "height" : 43,
+        "width" : 40,
+        "x" : 12,
+        "y" : 2727
+      },
+      "identifier" : "",
+      "label" : "前往频道：全球大視野",
+      "selected" : false,
+      "type" : 42,
+      "valueString" : "",
+      "valueType" : "__NSCFConstantString"
+    },
+    {
+      "frame" : {
+        "height" : 51,
+        "width" : 283,
+        "x" : 64,
+        "y" : 2727
+      },
+      "identifier" : "",
+      "label" : "黃仁勳恭喜卡內基美隆大學畢業生 懂AI的人會取代你! 每次失敗都是學習的時刻 Jensen Huang【國際360】20260514@全球大視野 来自全球大視野 651,443次观看 19分钟",
+      "selected" : false,
+      "type" : 42,
+      "valueString" : "",
+      "valueType" : "__NSCFConstantString"
+    },
+    {
+      "frame" : {
+        "height" : 51,
+        "width" : 283,
+        "x" : 64,
+        "y" : 2727
+      },
+      "identifier" : "",
+      "label" : "黃仁勳恭喜卡內基美隆大學畢業生 懂AI的人會取代你! 每次失敗都是學習的時刻 Jensen Huang【國際360】20260514@全球大視野 来自全球大視野 651,443次观看 19分钟",
+      "selected" : false,
+      "type" : 42,
+      "valueString" : "3",
+      "valueType" : "NSTaggedPointerString"
+    },
+    {
+      "frame" : {
+        "height" : 51,
+        "width" : 283,
+        "x" : 64,
+        "y" : 2727
+      },
+      "identifier" : "",
+      "label" : "黃仁勳恭喜卡內基美隆大學畢業生 懂AI的人會取代你! 每次失敗都是學習的時刻 Jensen Huang【國際360】20260514@全球大視野 来自全球大視野 651,443次观看 19分钟",
+      "selected" : false,
+      "type" : 48,
+      "valueString" : "黃仁勳恭喜卡內基美隆大學畢業生 懂AI的人會取代你! 每次失敗都是學習的時刻 Jensen Huang【國際360】20260514@全球大視野",
+      "valueType" : "__NSCFString"
+    },
+    {
+      "frame" : {
+        "height" : 48,
+        "width" : 48,
+        "x" : 354,
+        "y" : 2719
+      },
+      "identifier" : "",
+      "label" : "操作菜单",
+      "selected" : false,
+      "type" : 9,
+      "valueString" : "",
+      "valueType" : "__NSCFConstantString"
+    },
+    {
+      "frame" : {
+        "height" : 44,
+        "width" : 40,
+        "x" : 12,
+        "y" : 3045
+      },
+      "identifier" : "",
+      "label" : "前往频道：Zeteo",
+      "selected" : false,
+      "type" : 42,
+      "valueString" : "",
+      "valueType" : "__NSCFConstantString"
+    },
+    {
+      "frame" : {
+        "height" : 35,
+        "width" : 271,
+        "x" : 64,
+        "y" : 3045
+      },
+      "identifier" : "",
+      "label" : "How’d Mehdi Do It? 7 Debate Lessons From Jubilee 来自Zeteo 1,388,307次观看 11分钟12秒钟",
+      "selected" : false,
+      "type" : 42,
+      "valueString" : "",
+      "valueType" : "__NSCFConstantString"
+    },
+    {
+      "frame" : {
+        "height" : 35,
+        "width" : 271,
+        "x" : 64,
+        "y" : 3045
+      },
+      "identifier" : "",
+      "label" : "How’d Mehdi Do It? 7 Debate Lessons From Jubilee 来自Zeteo 1,388,307次观看 11分钟12秒钟",
+      "selected" : false,
+      "type" : 42,
+      "valueString" : "3",
+      "valueType" : "NSTaggedPointerString"
+    },
+    {
+      "frame" : {
+        "height" : 35,
+        "width" : 271,
+        "x" : 64,
+        "y" : 3045
+      },
+      "identifier" : "",
+      "label" : "How’d Mehdi Do It? 7 Debate Lessons From Jubilee 来自Zeteo 1,388,307次观看 11分钟12秒钟",
+      "selected" : false,
+      "type" : 48,
+      "valueString" : "How’d Mehdi Do It? 7 Debate Lessons From Jubilee",
+      "valueType" : "__NSCFString"
+    },
+    {
+      "frame" : {
+        "height" : 49,
+        "width" : 48,
+        "x" : 354,
+        "y" : 3037
+      },
+      "identifier" : "",
+      "label" : "操作菜单",
+      "selected" : false,
+      "type" : 9,
+      "valueString" : "",
+      "valueType" : "__NSCFConstantString"
+    },
+    {
+      "frame" : {
+        "height" : 45,
+        "width" : 40,
+        "x" : 12,
+        "y" : 3362
+      },
+      "identifier" : "",
+      "label" : "前往频道：Museum of Science",
+      "selected" : false,
+      "type" : 42,
+      "valueString" : "",
+      "valueType" : "__NSCFConstantString"
+    },
+    {
+      "frame" : {
+        "height" : 35,
+        "width" : 260,
+        "x" : 64,
+        "y" : 3363
+      },
+      "identifier" : "",
+      "label" : "Can Music Transform Your Brain? With Dr. Daniel J. Levitin 来自Museum of Science 53,845次观看 10分钟27秒钟",
+      "selected" : false,
+      "type" : 42,
+      "valueString" : "",
+      "valueType" : "__NSCFConstantString"
+    },
+    {
+      "frame" : {
+        "height" : 35,
+        "width" : 260,
+        "x" : 64,
+        "y" : 3363
+      },
+      "identifier" : "",
+      "label" : "Can Music Transform Your Brain? With Dr. Daniel J. Levitin 来自Museum of Science 53,845次观看 10分钟27秒钟",
+      "selected" : false,
+      "type" : 42,
+      "valueString" : "3",
+      "valueType" : "NSTaggedPointerString"
+    },
+    {
+      "frame" : {
+        "height" : 35,
+        "width" : 260,
+        "x" : 64,
+        "y" : 3363
+      },
+      "identifier" : "",
+      "label" : "Can Music Transform Your Brain? With Dr. Daniel J. Levitin 来自Museum of Science 53,845次观看 10分钟27秒钟",
+      "selected" : false,
+      "type" : 48,
+      "valueString" : "Can Music Transform Your Brain? With Dr. Daniel J. Levitin",
+      "valueType" : "__NSCFString"
+    },
+    {
+      "frame" : {
+        "height" : 49,
+        "width" : 48,
+        "x" : 354,
+        "y" : 3355
+      },
+      "identifier" : "",
+      "label" : "操作菜单",
+      "selected" : false,
+      "type" : 9,
+      "valueString" : "",
+      "valueType" : "__NSCFConstantString"
+    },
+    {
+      "frame" : {
+        "height" : 44,
+        "width" : 40,
+        "x" : 12,
+        "y" : 3681
+      },
+      "identifier" : "",
+      "label" : "前往频道：Nate -Onion English",
+      "selected" : false,
+      "type" : 42,
+      "valueString" : "",
+      "valueType" : "__NSCFConstantString"
+    },
+    {
+      "frame" : {
+        "height" : 52,
+        "width" : 290,
+        "x" : 64,
+        "y" : 3681
+      },
+      "identifier" : "",
+      "label" : "\"每当我身处低谷，我就会听这段讲话”【乔布斯在斯坦福大学毕业典礼上的演讲】中英大字幕\/英语长句快语速 Steve Jobs' Stanford Speech 来自Nate -Onion English 2,340,447次观看 14分钟21秒钟",
+      "selected" : false,
+      "type" : 42,
+      "valueString" : "",
+      "valueType" : "__NSCFConstantString"
+    },
+    {
+      "frame" : {
+        "height" : 52,
+        "width" : 290,
+        "x" : 64,
+        "y" : 3681
+      },
+      "identifier" : "",
+      "label" : "\"每当我身处低谷，我就会听这段讲话”【乔布斯在斯坦福大学毕业典礼上的演讲】中英大字幕\/英语长句快语速 Steve Jobs' Stanford Speech 来自Nate -Onion English 2,340,447次观看 14分钟21秒钟",
+      "selected" : false,
+      "type" : 42,
+      "valueString" : "3",
+      "valueType" : "NSTaggedPointerString"
+    },
+    {
+      "frame" : {
+        "height" : 52,
+        "width" : 290,
+        "x" : 64,
+        "y" : 3681
+      },
+      "identifier" : "",
+      "label" : "\"每当我身处低谷，我就会听这段讲话”【乔布斯在斯坦福大学毕业典礼上的演讲】中英大字幕\/英语长句快语速 Steve Jobs' Stanford Speech 来自Nate -Onion English 2,340,447次观看 14分钟21秒钟",
+      "selected" : false,
+      "type" : 48,
+      "valueString" : "\"每当我身处低谷，我就会听这段讲话”【乔布斯在斯坦福大学毕业典礼上的演讲】中英大字幕\/英语长句快语速 Steve Jobs' Stanford Speech",
+      "valueType" : "__NSCFString"
+    },
+    {
+      "frame" : {
+        "height" : 49,
+        "width" : 48,
+        "x" : 354,
+        "y" : 3673
+      },
+      "identifier" : "",
+      "label" : "操作菜单",
+      "selected" : false,
+      "type" : 9,
+      "valueString" : "",
+      "valueType" : "__NSCFConstantString"
+    },
+    {
+      "frame" : {
+        "height" : 44,
+        "width" : 40,
+        "x" : 12,
+        "y" : 3999
+      },
+      "identifier" : "",
+      "label" : "前往频道：John Mearsheimer - Offensive Realism",
+      "selected" : false,
+      "type" : 42,
+      "valueString" : "",
+      "valueType" : "__NSCFConstantString"
+    },
+    {
+      "frame" : {
+        "height" : 71,
+        "width" : 290,
+        "x" : 64,
+        "y" : 3999
+      },
+      "identifier" : "",
+      "label" : "Why Can’t America Contain China? | Ask The Professor 来自John Mearsheimer - Offensive Realism 98,424次观看 10分钟15秒钟 最新",
+      "selected" : false,
+      "type" : 42,
+      "valueString" : "",
+      "valueType" : "__NSCFConstantString"
+    },
+    {
+      "frame" : {
+        "height" : 35,
+        "width" : 275,
+        "x" : 64,
+        "y" : 3999
+      },
+      "identifier" : "",
+      "label" : "Why Can’t America Contain China? | Ask The Professor 来自John Mearsheimer - Offensive Realism 98,424次观看 10分钟15秒钟",
+      "selected" : false,
+      "type" : 42,
+      "valueString" : "3",
+      "valueType" : "NSTaggedPointerString"
+    },
+    {
+      "frame" : {
+        "height" : 35,
+        "width" : 275,
+        "x" : 64,
+        "y" : 3999
+      },
+      "identifier" : "",
+      "label" : "Why Can’t America Contain China? | Ask The Professor 来自John Mearsheimer - Offensive Realism 98,424次观看 10分钟15秒钟",
+      "selected" : false,
+      "type" : 48,
+      "valueString" : "Why Can’t America Contain China? | Ask The Professor",
+      "valueType" : "__NSCFString"
+    },
+    {
+      "frame" : {
+        "height" : 19,
+        "width" : 32,
+        "x" : 64,
+        "y" : 4051
+      },
+      "identifier" : "",
+      "label" : "最新",
+      "selected" : false,
+      "type" : 43,
+      "valueString" : "",
+      "valueType" : "__NSCFConstantString"
+    },
+    {
+      "frame" : {
+        "height" : 49,
+        "width" : 48,
+        "x" : 354,
+        "y" : 3991
+      },
+      "identifier" : "",
+      "label" : "操作菜单",
+      "selected" : false,
+      "type" : 9,
+      "valueString" : "",
+      "valueType" : "__NSCFConstantString"
+    },
+    {
+      "frame" : {
+        "height" : 45,
+        "width" : 40,
+        "x" : 12,
+        "y" : 4331
+      },
+      "identifier" : "",
+      "label" : "前往频道：TED",
+      "selected" : false,
+      "type" : 42,
+      "valueString" : "",
+      "valueType" : "__NSCFConstantString"
+    },
+    {
+      "frame" : {
+        "height" : 18,
+        "width" : 233,
+        "x" : 64,
+        "y" : 4332
+      },
+      "identifier" : "",
+      "label" : "Ken Robinson: 如何逃出教育的死亡谷 来自TED 7,001,712次观看 19分钟",
+      "selected" : false,
+      "type" : 42,
+      "valueString" : "",
+      "valueType" : "__NSCFConstantString"
+    },
+    {
+      "frame" : {
+        "height" : 18,
+        "width" : 233,
+        "x" : 64,
+        "y" : 4332
+      },
+      "identifier" : "",
+      "label" : "Ken Robinson: 如何逃出教育的死亡谷 来自TED 7,001,712次观看 19分钟",
+      "selected" : false,
+      "type" : 42,
+      "valueString" : "3",
+      "valueType" : "NSTaggedPointerString"
+    },
+    {
+      "frame" : {
+        "height" : 18,
+        "width" : 233,
+        "x" : 64,
+        "y" : 4332
+      },
+      "identifier" : "",
+      "label" : "Ken Robinson: 如何逃出教育的死亡谷 来自TED 7,001,712次观看 19分钟",
+      "selected" : false,
+      "type" : 48,
+      "valueString" : "Ken Robinson: 如何逃出教育的死亡谷",
+      "valueType" : "__NSCFString"
+    },
+    {
+      "frame" : {
+        "height" : 49,
+        "width" : 48,
+        "x" : 354,
+        "y" : 4324
+      },
+      "identifier" : "",
+      "label" : "操作菜单",
+      "selected" : false,
+      "type" : 9,
+      "valueString" : "",
+      "valueType" : "__NSCFConstantString"
+    },
+    {
+      "frame" : {
+        "height" : 10,
+        "width" : 402,
+        "x" : 0,
+        "y" : 62
+      },
+      "identifier" : "",
+      "label" : "",
+      "selected" : false,
+      "type" : 1,
+      "valueString" : "",
+      "valueType" : "__NSCFConstantString"
+    },
+    {
+      "frame" : {
+        "height" : 874,
+        "width" : 402,
+        "x" : 0,
+        "y" : 0
+      },
+      "identifier" : "",
+      "label" : "",
+      "selected" : false,
+      "type" : 1,
+      "valueString" : null,
+      "valueType" : "nil"
+    },
+    {
+      "frame" : {
+        "height" : 146.79999999999995,
+        "width" : 402,
+        "x" : 0,
+        "y" : 727.20000000000005
+      },
+      "identifier" : "",
+      "label" : "",
+      "selected" : false,
+      "type" : 1,
+      "valueString" : null,
+      "valueType" : "nil"
+    },
+    {
+      "frame" : {
+        "height" : 284,
+        "width" : 642,
+        "x" : -120,
+        "y" : 732
+      },
+      "identifier" : "AdditionalDimmingOverlay",
+      "label" : "",
+      "selected" : false,
+      "type" : 43,
+      "valueString" : null,
+      "valueType" : "nil"
+    },
+    {
+      "frame" : {
+        "height" : 146.79999999999995,
+        "width" : 402,
+        "x" : 0,
+        "y" : 727.20000000000005
+      },
+      "identifier" : "",
+      "label" : "",
+      "selected" : false,
+      "type" : 1,
+      "valueString" : null,
+      "valueType" : "nil"
+    },
+    {
+      "frame" : {
+        "height" : 146.79999999999995,
+        "width" : 402,
+        "x" : 0,
+        "y" : 727.20000000000005
+      },
+      "identifier" : "",
+      "label" : "",
+      "selected" : false,
+      "type" : 1,
+      "valueString" : null,
+      "valueType" : "nil"
+    },
+    {
+      "frame" : {
+        "height" : 146.79999999999995,
+        "width" : 402,
+        "x" : 0,
+        "y" : 727.20000000000005
+      },
+      "identifier" : "",
+      "label" : "",
+      "selected" : false,
+      "type" : 1,
+      "valueString" : null,
+      "valueType" : "nil"
+    },
+    {
+      "frame" : {
+        "height" : 146.79999999999995,
+        "width" : 402,
+        "x" : 0,
+        "y" : 727.20000000000005
+      },
+      "identifier" : "",
+      "label" : "",
+      "selected" : false,
+      "type" : 1,
+      "valueString" : null,
+      "valueType" : "nil"
+    },
+    {
+      "frame" : {
+        "height" : 146.79999999999995,
+        "width" : 402,
+        "x" : 0,
+        "y" : 727.20000000000005
+      },
+      "identifier" : "",
+      "label" : "",
+      "selected" : false,
+      "type" : 1,
+      "valueString" : null,
+      "valueType" : "nil"
+    },
+    {
+      "frame" : {
+        "height" : 750,
+        "width" : 30,
+        "x" : 369,
+        "y" : 62
+      },
+      "identifier" : "",
+      "label" : "垂直滚动条, 7页",
+      "selected" : false,
+      "type" : 1,
+      "valueString" : "0%",
+      "valueType" : "NSTaggedPointerString"
+    },
+    {
+      "frame" : {
+        "height" : 30,
+        "width" : 3,
+        "x" : 396,
+        "y" : 779
+      },
+      "identifier" : "",
+      "label" : "",
+      "selected" : false,
+      "type" : 1,
+      "valueString" : null,
+      "valueType" : "nil"
+    },
+    {
+      "frame" : {
+        "height" : 30,
+        "width" : 278,
+        "x" : 62,
+        "y" : 841
+      },
+      "identifier" : "",
+      "label" : "水平滚动条, 1页",
+      "selected" : false,
+      "type" : 1,
+      "valueString" : "0%",
+      "valueType" : "NSTaggedPointerString"
+    },
+    {
+      "frame" : {
+        "height" : 3,
+        "width" : 7,
+        "x" : 330,
+        "y" : 868
+      },
+      "identifier" : "",
+      "label" : "",
+      "selected" : false,
+      "type" : 1,
+      "valueString" : null,
+      "valueType" : "nil"
+    },
+    {
+      "frame" : {
+        "height" : 750,
+        "width" : 30,
+        "x" : 369,
+        "y" : 62
+      },
+      "identifier" : "",
+      "label" : "垂直滚动条, 7页",
+      "selected" : false,
+      "type" : 1,
+      "valueString" : "0%",
+      "valueType" : "NSTaggedPointerString"
+    },
+    {
+      "frame" : {
+        "height" : 30,
+        "width" : 3,
+        "x" : 396,
+        "y" : 779
+      },
+      "identifier" : "",
+      "label" : "",
+      "selected" : false,
+      "type" : 1,
+      "valueString" : null,
+      "valueType" : "nil"
+    },
+    {
+      "frame" : {
+        "height" : 30,
+        "width" : 278,
+        "x" : 62,
+        "y" : 841
+      },
+      "identifier" : "",
+      "label" : "水平滚动条, 1页",
+      "selected" : false,
+      "type" : 1,
+      "valueString" : "0%",
+      "valueType" : "NSTaggedPointerString"
+    },
+    {
+      "frame" : {
+        "height" : 3,
+        "width" : 7,
+        "x" : 330,
+        "y" : 868
+      },
+      "identifier" : "",
+      "label" : "",
+      "selected" : false,
+      "type" : 1,
+      "valueString" : null,
+      "valueType" : "nil"
+    },
+    {
+      "frame" : {
+        "height" : 30,
+        "width" : 278,
+        "x" : 62,
+        "y" : 841
+      },
+      "identifier" : "",
+      "label" : "水平滚动条, 1页",
+      "selected" : false,
+      "type" : 1,
+      "valueString" : "0%",
+      "valueType" : "NSTaggedPointerString"
+    },
+    {
+      "frame" : {
+        "height" : 3,
+        "width" : 284,
+        "x" : 59,
+        "y" : 868
+      },
+      "identifier" : "",
+      "label" : "",
+      "selected" : false,
+      "type" : 1,
+      "valueString" : null,
+      "valueType" : "nil"
+    },
+    {
+      "frame" : {
+        "height" : 30,
+        "width" : 278,
+        "x" : 62,
+        "y" : 841
+      },
+      "identifier" : "",
+      "label" : "水平滚动条, 1页",
+      "selected" : false,
+      "type" : 1,
+      "valueString" : "0%",
+      "valueType" : "NSTaggedPointerString"
+    },
+    {
+      "frame" : {
+        "height" : 3,
+        "width" : 284,
+        "x" : 59,
+        "y" : 868
+      },
+      "identifier" : "",
+      "label" : "",
+      "selected" : false,
+      "type" : 1,
+      "valueString" : null,
+      "valueType" : "nil"
+    },
+    {
+      "frame" : {
+        "height" : 874,
+        "width" : 402,
+        "x" : 0,
+        "y" : 0
+      },
+      "identifier" : "CapsuleViewController",
+      "label" : "",
+      "selected" : false,
+      "type" : 1,
+      "valueString" : null,
+      "valueType" : "nil"
+    },
+    {
+      "frame" : {
+        "height" : 62,
+        "width" : 402,
+        "x" : 0,
+        "y" : 0
+      },
+      "identifier" : "",
+      "label" : "",
+      "selected" : false,
+      "type" : 1,
+      "valueString" : null,
+      "valueType" : "nil"
+    },
+    {
+      "frame" : {
+        "height" : 62,
+        "width" : 402,
+        "x" : 0,
+        "y" : 0
+      },
+      "identifier" : "",
+      "label" : "",
+      "selected" : false,
+      "type" : 1,
+      "valueString" : null,
+      "valueType" : "nil"
+    },
+    {
+      "frame" : {
+        "height" : 98,
+        "width" : 402,
+        "x" : 0,
+        "y" : 776
+      },
+      "identifier" : "",
+      "label" : "",
+      "selected" : false,
+      "type" : 1,
+      "valueString" : null,
+      "valueType" : "nil"
+    },
+    {
+      "frame" : {
+        "height" : 98,
+        "width" : 402,
+        "x" : 0,
+        "y" : 776
+      },
+      "identifier" : "",
+      "label" : "",
+      "selected" : false,
+      "type" : 1,
+      "valueString" : null,
+      "valueType" : "nil"
+    },
+    {
+      "frame" : {
+        "height" : 98,
+        "width" : 402,
+        "x" : 0,
+        "y" : 776
+      },
+      "identifier" : "",
+      "label" : "",
+      "selected" : false,
+      "type" : 1,
+      "valueString" : null,
+      "valueType" : "nil"
+    },
+    {
+      "frame" : {
+        "height" : 98,
+        "width" : 402,
+        "x" : 0,
+        "y" : 776
+      },
+      "identifier" : "",
+      "label" : "",
+      "selected" : false,
+      "type" : 1,
+      "valueString" : null,
+      "valueType" : "nil"
+    },
+    {
+      "frame" : {
+        "height" : 98,
+        "width" : 402,
+        "x" : 0,
+        "y" : 776
+      },
+      "identifier" : "",
+      "label" : "",
+      "selected" : false,
+      "type" : 1,
+      "valueString" : null,
+      "valueType" : "nil"
+    },
+    {
+      "frame" : {
+        "height" : 98,
+        "width" : 402,
+        "x" : 0,
+        "y" : 776
+      },
+      "identifier" : "",
+      "label" : "",
+      "selected" : false,
+      "type" : 1,
+      "valueString" : null,
+      "valueType" : "nil"
+    },
+    {
+      "frame" : {
+        "height" : 98,
+        "width" : 402,
+        "x" : 0,
+        "y" : 776
+      },
+      "identifier" : "",
+      "label" : "",
+      "selected" : false,
+      "type" : 1,
+      "valueString" : null,
+      "valueType" : "nil"
+    },
+    {
+      "frame" : {
+        "height" : 98,
+        "width" : 402,
+        "x" : 0,
+        "y" : 776
+      },
+      "identifier" : "",
+      "label" : "",
+      "selected" : false,
+      "type" : 1,
+      "valueString" : null,
+      "valueType" : "nil"
+    },
+    {
+      "frame" : {
+        "height" : 98,
+        "width" : 402,
+        "x" : 0,
+        "y" : 776
+      },
+      "identifier" : "",
+      "label" : "",
+      "selected" : false,
+      "type" : 1,
+      "valueString" : null,
+      "valueType" : "nil"
+    },
+    {
+      "frame" : {
+        "height" : 48,
+        "width" : 48,
+        "x" : 34,
+        "y" : 792
+      },
+      "identifier" : "",
+      "label" : "",
+      "selected" : false,
+      "type" : 1,
+      "valueString" : null,
+      "valueType" : "nil"
+    },
+    {
+      "frame" : {
+        "height" : 48,
+        "width" : 48,
+        "x" : 34,
+        "y" : 792
+      },
+      "identifier" : "",
+      "label" : "",
+      "selected" : false,
+      "type" : 1,
+      "valueString" : null,
+      "valueType" : "nil"
+    },
+    {
+      "frame" : {
+        "height" : 48,
+        "width" : 48,
+        "x" : 34,
+        "y" : 792
+      },
+      "identifier" : "",
+      "label" : "返回",
+      "selected" : false,
+      "type" : 9,
+      "valueString" : null,
+      "valueType" : "nil"
+    },
+    {
+      "frame" : {
+        "height" : 48,
+        "width" : 222,
+        "x" : 90,
+        "y" : 792
+      },
+      "identifier" : "",
+      "label" : "",
+      "selected" : false,
+      "type" : 1,
+      "valueString" : null,
+      "valueType" : "nil"
+    },
+    {
+      "frame" : {
+        "height" : 48,
+        "width" : 222,
+        "x" : 90,
+        "y" : 792
+      },
+      "identifier" : "",
+      "label" : "",
+      "selected" : false,
+      "type" : 1,
+      "valueString" : null,
+      "valueType" : "nil"
+    },
+    {
+      "frame" : {
+        "height" : 48,
+        "width" : 222,
+        "x" : 90,
+        "y" : 792
+      },
+      "identifier" : "",
+      "label" : "",
+      "selected" : false,
+      "type" : 1,
+      "valueString" : null,
+      "valueType" : "nil"
+    },
+    {
+      "frame" : {
+        "height" : 48,
+        "width" : 222,
+        "x" : 90,
+        "y" : 792
+      },
+      "identifier" : "CapsuleNavigationBar?isSelected=true&isDistractionControlOverlayUp=false",
+      "label" : "",
+      "selected" : true,
+      "type" : 1,
+      "valueString" : null,
+      "valueType" : "nil"
+    },
+    {
+      "frame" : {
+        "height" : 40,
+        "width" : 40,
+        "x" : 94,
+        "y" : 796
+      },
+      "identifier" : "TranslationButton",
+      "label" : "页面菜单",
+      "selected" : false,
+      "type" : 9,
+      "valueString" : null,
+      "valueType" : "nil"
+    },
+    {
+      "frame" : {
+        "height" : 0,
+        "width" : 0,
+        "x" : 94,
+        "y" : 796
+      },
+      "identifier" : "",
+      "label" : "",
+      "selected" : false,
+      "type" : 48,
+      "valueString" : null,
+      "valueType" : "nil"
+    },
+    {
+      "frame" : {
+        "height" : 20.333333333333371,
+        "width" : 67.666666666666686,
+        "x" : 167.33333333333331,
+        "y" : 806
+      },
+      "identifier" : "",
+      "label" : "翻译可用",
+      "selected" : false,
+      "type" : 48,
+      "valueString" : null,
+      "valueType" : "nil"
+    },
+    {
+      "frame" : {
+        "height" : 21,
+        "width" : 17.666666666666686,
+        "x" : 279.33333333333337,
+        "y" : 805.66666666666663
+      },
+      "identifier" : "ReloadButton",
+      "label" : "刷新",
+      "selected" : false,
+      "type" : 9,
+      "valueString" : null,
+      "valueType" : "nil"
+    },
+    {
+      "frame" : {
+        "height" : 48,
+        "width" : 48,
+        "x" : 320,
+        "y" : 792
+      },
+      "identifier" : "",
+      "label" : "",
+      "selected" : false,
+      "type" : 1,
+      "valueString" : null,
+      "valueType" : "nil"
+    },
+    {
+      "frame" : {
+        "height" : 48,
+        "width" : 48,
+        "x" : 320,
+        "y" : 792
+      },
+      "identifier" : "",
+      "label" : "",
+      "selected" : false,
+      "type" : 1,
+      "valueString" : null,
+      "valueType" : "nil"
+    },
+    {
+      "frame" : {
+        "height" : 48,
+        "width" : 48,
+        "x" : 320,
+        "y" : 792
+      },
+      "identifier" : "",
+      "label" : "更多",
+      "selected" : false,
+      "type" : 9,
+      "valueString" : null,
+      "valueType" : "nil"
+    },
+    {
+      "frame" : {
+        "height" : 874,
+        "width" : 402,
+        "x" : 0,
+        "y" : 0
+      },
+      "identifier" : "",
+      "label" : "",
+      "selected" : false,
+      "type" : 1,
+      "valueString" : null,
+      "valueType" : "nil"
+    },
+    {
+      "frame" : {
+        "height" : 874,
+        "width" : 402,
+        "x" : 0,
+        "y" : 0
+      },
+      "identifier" : "",
+      "label" : "",
+      "selected" : false,
+      "type" : 1,
+      "valueString" : null,
+      "valueType" : "nil"
+    },
+    {
+      "frame" : {
+        "height" : 874,
+        "width" : 402,
+        "x" : 0,
+        "y" : 0
+      },
+      "identifier" : "",
+      "label" : "",
+      "selected" : false,
+      "type" : 1,
+      "valueString" : null,
+      "valueType" : "nil"
+    },
+    {
+      "frame" : {
+        "height" : 874,
+        "width" : 402,
+        "x" : 0,
+        "y" : 0
+      },
+      "identifier" : "",
+      "label" : "",
+      "selected" : false,
+      "type" : 1,
+      "valueString" : null,
+      "valueType" : "nil"
+    },
+    {
+      "frame" : {
+        "height" : 874,
+        "width" : 402,
+        "x" : 0,
+        "y" : 0
+      },
+      "identifier" : "",
+      "label" : "",
+      "selected" : false,
+      "type" : 4,
+      "valueString" : null,
+      "valueType" : "nil"
+    },
+    {
+      "frame" : {
+        "height" : 874,
+        "width" : 402,
+        "x" : 0,
+        "y" : 0
+      },
+      "identifier" : "",
+      "label" : "",
+      "selected" : false,
+      "type" : 1,
+      "valueString" : null,
+      "valueType" : "nil"
+    },
+    {
+      "frame" : {
+        "height" : 874,
+        "width" : 402,
+        "x" : 0,
+        "y" : 0
+      },
+      "identifier" : "",
+      "label" : "",
+      "selected" : false,
+      "type" : 1,
+      "valueString" : null,
+      "valueType" : "nil"
+    }
+  ]
+}

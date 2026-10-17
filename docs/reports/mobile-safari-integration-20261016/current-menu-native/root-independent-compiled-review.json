@@ -1,0 +1,719 @@
+{
+  "schemaVersion": 1,
+  "reviewer": "/root/f25_review",
+  "createdAt": "2026-10-16T21:30:10.704125+00:00",
+  "status": "INDEPENDENT_COMPILE_AND_WEB_RESOURCE_MATCH_PASS_NOT_RUNTIME",
+  "reviewMode": "Pure filesystem reread/hash/plist parsing plus existing package.mjs pure project-string parser and read-only Git. Only this exclusive report written; no SDK CLI, build, browser, device, codesign/file CLI or process inventory by reviewer.",
+  "contextPreference": {
+    "handoffAtTokens": 300000,
+    "automaticEnforcementVerified": false,
+    "newDescendantsCreated": false
+  },
+  "coreBindings": [
+    {
+      "path": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/touch-layout-f33-followup-20261017/native-final-layout-6eecd6710e7d-b1a66b3fc4e5/preparation.json",
+      "sha256": "0f12e7f0ff78aafcc1214fb76731cbe9a83b31843db9fed2d71771b8a5c35f93",
+      "bytes": 43175
+    },
+    {
+      "path": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/touch-layout-f33-followup-20261017/native-final-layout-6eecd6710e7d-b1a66b3fc4e5/argument-replacements.diff",
+      "sha256": "2be6d6562e03af7681f0c07ff5dad8403998687aad29ab8a47163fd87f1369de",
+      "bytes": 6582
+    },
+    {
+      "path": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/touch-layout-f33-followup-20261017/native-final-layout-6eecd6710e7d-b1a66b3fc4e5/ROOT_COMPILE_GO.json",
+      "sha256": "358ba5daac9226c543b66147aeea7d6e047479654736cde5ca34711dfb49ec06",
+      "bytes": 784
+    },
+    {
+      "path": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/touch-layout-f33-followup-20261017/native-final-layout-6eecd6710e7d-b1a66b3fc4e5/execution-summary.json",
+      "sha256": "9b2c07ea878252c2cf3e98732fb1d5fcb9b718962c057f9437ecba16e159c497",
+      "bytes": 12198
+    },
+    {
+      "path": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/touch-layout-f33-followup-20261017/native-final-layout-6eecd6710e7d-b1a66b3fc4e5/compiled-artifact-identities.json",
+      "sha256": "40c51fa62077d1f72e7b8aad80103f5ff01f66a5cf8628b4ad352cc89f635e15",
+      "bytes": 31336
+    },
+    {
+      "path": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/touch-layout-f33-followup-20261017/native-final-layout-6eecd6710e7d-b1a66b3fc4e5/run-compile.py",
+      "sha256": "5dddd53d63142d8b17f8b11adcfd0161cb59256c04f79138c6dd36ebe89a497a",
+      "bytes": 3949
+    },
+    {
+      "path": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/touch-layout-f33-followup-20261017/native-final-layout-6eecd6710e7d-b1a66b3fc4e5/verify-compiled.py",
+      "sha256": "56da2892ca1c7a2e0f0b2cb9de5ba41c0509595249eebc81195c2afb4120e0ae",
+      "bytes": 6991
+    },
+    {
+      "path": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/touch-layout-f33-followup-20261017/native-final-layout-6eecd6710e7d-b1a66b3fc4e5/output/safari-xcode/fluentread-package-report.json",
+      "sha256": "05b51248357c9cd55b76acaf3fce1cdede9914e27772e4d2c669f6cf9d5f3f5d",
+      "bytes": 4902
+    },
+    {
+      "path": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/touch-layout-f33-followup-20261017/native-final-layout-6eecd6710e7d-b1a66b3fc4e5/output/safari-xcode/FluentRead/FluentRead.xcodeproj/project.pbxproj",
+      "sha256": "1e4df4928b8c9b872e0be81a66fcf2dafa89ca129ba725dffd990855c0d960f4",
+      "bytes": 56948
+    },
+    {
+      "path": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/menu-scroll-controlled-20261017/artifact-gate.json",
+      "sha256": "9f0fe925e8ece836e0d3687525422fe4ce2dc124a3652f25105b964f6886ed39",
+      "bytes": 3256
+    },
+    {
+      "path": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/menu-scroll-controlled-20261017/safari-final-file-map.json",
+      "sha256": "68ea70ae724e0fff09e4caf91b2cfe5aceb264e449002cce02962c5daeb98418",
+      "bytes": 67790
+    }
+  ],
+  "sourceCommit": "6eecd6710e7daac2d2a8cca9a34d0f26dc849b44",
+  "currentGitPorcelainV1": "",
+  "allNineSourceAndGeneratorBindingsIndependentlyVerified": [
+    {
+      "path": "/Users/thinkstu/Desktop/copy/FluentRead-mobile-video-menu-accessibility-20261016/src/features/video-subtitle/content/ui.ts",
+      "sha256": "eb9cd5ccd3d2931cd1e85fa8a668235374e0a865e06605981274bd20944b592c",
+      "bytes": 86837,
+      "relativePath": "src/features/video-subtitle/content/ui.ts",
+      "matchesPreparation": true,
+      "matchesCurrentCommitBytes": true
+    },
+    {
+      "path": "/Users/thinkstu/Desktop/copy/FluentRead-mobile-video-menu-accessibility-20261016/scripts/run-mobile-video-subtitle-test.cjs",
+      "sha256": "5f6aded2f3f1b47f61dc5fe89ce249c9b8ca209f1bc5a67f81150264d0d09b06",
+      "bytes": 46854,
+      "relativePath": "scripts/run-mobile-video-subtitle-test.cjs",
+      "matchesPreparation": true,
+      "matchesCurrentCommitBytes": true
+    },
+    {
+      "path": "/Users/thinkstu/Desktop/copy/FluentRead-mobile-video-menu-accessibility-20261016/scripts/safari/package.mjs",
+      "sha256": "c8f8524584509001a46159b378e24fa378524969072ab3dd38fb06ba56618ab0",
+      "bytes": 33471,
+      "relativePath": "scripts/safari/package.mjs",
+      "matchesPreparation": true,
+      "matchesCurrentCommitBytes": true
+    },
+    {
+      "path": "/Users/thinkstu/Desktop/copy/FluentRead-mobile-video-menu-accessibility-20261016/scripts/testing/run-resource-safe.mjs",
+      "sha256": "ef0d65fcbd87288afb7ad070fc20015e24265008dd6b476d87e1daf5d71b49f2",
+      "bytes": 14814,
+      "relativePath": "scripts/testing/run-resource-safe.mjs",
+      "matchesPreparation": true,
+      "matchesCurrentCommitBytes": true
+    },
+    {
+      "path": "/Users/thinkstu/Desktop/copy/FluentRead-mobile-video-menu-accessibility-20261016/src/core/config/freeProviderOrigins.json",
+      "sha256": "8b4004cade979ded8b2b76ac3398dfa108f9e423de2b6d7336dc2530cadf2418",
+      "bytes": 1021,
+      "relativePath": "src/core/config/freeProviderOrigins.json",
+      "matchesPreparation": true,
+      "matchesCurrentCommitBytes": true
+    },
+    {
+      "path": "/Users/thinkstu/Desktop/copy/FluentRead-mobile-video-menu-accessibility-20261016/scripts/safari/container/ViewController.swift",
+      "sha256": "6d9d7f1bb044d88eb17b644c8c038062f964a4486f59a90f4d3b081f09931d06",
+      "bytes": 4589,
+      "relativePath": "scripts/safari/container/ViewController.swift",
+      "matchesPreparation": true,
+      "matchesCurrentCommitBytes": true
+    },
+    {
+      "path": "/Users/thinkstu/Desktop/copy/FluentRead-mobile-video-menu-accessibility-20261016/scripts/safari/container/Main.html",
+      "sha256": "8359d2ff5a18fc2c655ef8798869b242b7c8495fa9a4575919213a2226d7789e",
+      "bytes": 862,
+      "relativePath": "scripts/safari/container/Main.html",
+      "matchesPreparation": true,
+      "matchesCurrentCommitBytes": true
+    },
+    {
+      "path": "/Users/thinkstu/Desktop/copy/FluentRead-mobile-video-menu-accessibility-20261016/scripts/safari/container/Style.css",
+      "sha256": "3f4c01b933fe9622c01784d8e2eec2a228225fb07284bb5adacaf4bef4319a40",
+      "bytes": 1536,
+      "relativePath": "scripts/safari/container/Style.css",
+      "matchesPreparation": true,
+      "matchesCurrentCommitBytes": true
+    },
+    {
+      "path": "/Users/thinkstu/Desktop/copy/FluentRead-mobile-video-menu-accessibility-20261016/scripts/safari/container/Script.js",
+      "sha256": "ff9d564bd55a9742f77043dc08ebfd4cc2415989d70576851182d9c34c0ad2f8",
+      "bytes": 2887,
+      "relativePath": "scripts/safari/container/Script.js",
+      "matchesPreparation": true,
+      "matchesCurrentCommitBytes": true
+    }
+  ],
+  "executionEvidence": {
+    "allSixReceiptFilesEqualSummaryAndPreparedArgvEnvironment": true,
+    "strictlySerialRecordedTimes": true,
+    "allSixReturnZero": true,
+    "allThreeBuildLogsHaveSuccessMarker": true,
+    "steps": [
+      {
+        "id": "01-sdk-check",
+        "receipt": {
+          "path": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/touch-layout-f33-followup-20261017/native-final-layout-6eecd6710e7d-b1a66b3fc4e5/01-sdk-check-result.json",
+          "sha256": "6e687a1fdc2f333202acd1c39026bb74db9782eefe80480f93d2f181eef40236",
+          "bytes": 1217
+        },
+        "returnCode": 0,
+        "log": {
+          "path": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/touch-layout-f33-followup-20261017/native-final-layout-6eecd6710e7d-b1a66b3fc4e5/logs/01-sdk-check.log",
+          "sha256": "c14f577bc39fefe127522a5694d5de0ea33c16539e3573498182e06307bf7873",
+          "bytes": 1072
+        },
+        "argvAndEnvironmentExactPreparationMatch": true,
+        "elapsedSeconds": 0.442,
+        "compiledBuildSuccessMarker": false
+      },
+      {
+        "id": "02-safari-web-verify",
+        "receipt": {
+          "path": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/touch-layout-f33-followup-20261017/native-final-layout-6eecd6710e7d-b1a66b3fc4e5/02-safari-web-verify-result.json",
+          "sha256": "cf57463b581a07ed5cbcbd6532d721adb433383e9564ae97984c0751b77de607",
+          "bytes": 1360
+        },
+        "returnCode": 0,
+        "log": {
+          "path": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/touch-layout-f33-followup-20261017/native-final-layout-6eecd6710e7d-b1a66b3fc4e5/logs/02-safari-web-verify.log",
+          "sha256": "f27c4c14522d969596a46f69269737e68b148d37f38847927c23d7c2e07b0b89",
+          "bytes": 702
+        },
+        "argvAndEnvironmentExactPreparationMatch": true,
+        "elapsedSeconds": 0.306,
+        "compiledBuildSuccessMarker": false
+      },
+      {
+        "id": "03-fresh-unsigned-wrapper",
+        "receipt": {
+          "path": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/touch-layout-f33-followup-20261017/native-final-layout-6eecd6710e7d-b1a66b3fc4e5/03-fresh-unsigned-wrapper-result.json",
+          "sha256": "03559db459f2ddd50602a349aec2a11295ca8b7b7335abb8d79a9dfa5d15467c",
+          "bytes": 1624
+        },
+        "returnCode": 0,
+        "log": {
+          "path": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/touch-layout-f33-followup-20261017/native-final-layout-6eecd6710e7d-b1a66b3fc4e5/logs/03-package.log",
+          "sha256": "337c99368cf9613506c3e8e33215b9999fa9f9998eccbd110744d0a66891e66f",
+          "bytes": 6029
+        },
+        "argvAndEnvironmentExactPreparationMatch": true,
+        "elapsedSeconds": 4.246,
+        "compiledBuildSuccessMarker": false
+      },
+      {
+        "id": "04-macos",
+        "receipt": {
+          "path": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/touch-layout-f33-followup-20261017/native-final-layout-6eecd6710e7d-b1a66b3fc4e5/04-macos-result.json",
+          "sha256": "68d94c60c2b96f534a23bd632d638b24301a57ea597b00de81c7614f0293af4e",
+          "bytes": 1864
+        },
+        "returnCode": 0,
+        "log": {
+          "path": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/touch-layout-f33-followup-20261017/native-final-layout-6eecd6710e7d-b1a66b3fc4e5/logs/04-macos.log",
+          "sha256": "53bcd9ea6aec4c26ffae98ca8259b9984fd2efd785caa761df74663739e5abae",
+          "bytes": 428982
+        },
+        "argvAndEnvironmentExactPreparationMatch": true,
+        "elapsedSeconds": 32.286,
+        "compiledBuildSuccessMarker": true
+      },
+      {
+        "id": "05-ios-simulator",
+        "receipt": {
+          "path": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/touch-layout-f33-followup-20261017/native-final-layout-6eecd6710e7d-b1a66b3fc4e5/05-ios-simulator-result.json",
+          "sha256": "494ef22694fd8be4b84e7d37e6bfe701e8cddbc37154745390b274852e4f6c48",
+          "bytes": 1894
+        },
+        "returnCode": 0,
+        "log": {
+          "path": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/touch-layout-f33-followup-20261017/native-final-layout-6eecd6710e7d-b1a66b3fc4e5/logs/05-ios-simulator.log",
+          "sha256": "531d0f216924f4b1050ace7e5734052f7eea7d07354e5462621ccfc1d66d5fd1",
+          "bytes": 439290
+        },
+        "argvAndEnvironmentExactPreparationMatch": true,
+        "elapsedSeconds": 34.683,
+        "compiledBuildSuccessMarker": true
+      },
+      {
+        "id": "06-iphoneos-arm64",
+        "receipt": {
+          "path": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/touch-layout-f33-followup-20261017/native-final-layout-6eecd6710e7d-b1a66b3fc4e5/06-iphoneos-arm64-result.json",
+          "sha256": "6b9bed74588d96300b84cde3792ccfbbec547ecbd6488282c35e44ae67b2927b",
+          "bytes": 2254
+        },
+        "returnCode": 0,
+        "log": {
+          "path": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/touch-layout-f33-followup-20261017/native-final-layout-6eecd6710e7d-b1a66b3fc4e5/logs/06-iphoneos.log",
+          "sha256": "9be0565a1182e22d5c98dce174cf0af59fc2eca5bb6f506054485d43166d154e",
+          "bytes": 254571
+        },
+        "argvAndEnvironmentExactPreparationMatch": true,
+        "elapsedSeconds": 19.639,
+        "compiledBuildSuccessMarker": true
+      }
+    ],
+    "parentTerminalHandles": {
+      "sixStageRun": {
+        "session": 35045,
+        "exitCode": 0
+      },
+      "compiledVerifier": {
+        "session": 66941,
+        "exitCode": 0
+      }
+    },
+    "handleEvidenceScope": "Parent-reported tool handles; reviewer did not poll processes or execute native commands."
+  },
+  "package": {
+    "report": {
+      "path": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/touch-layout-f33-followup-20261017/native-final-layout-6eecd6710e7d-b1a66b3fc4e5/output/safari-xcode/fluentread-package-report.json",
+      "sha256": "05b51248357c9cd55b76acaf3fce1cdede9914e27772e4d2c669f6cf9d5f3f5d",
+      "bytes": 4902
+    },
+    "signedFlag": false,
+    "installedFlag": false,
+    "manifestVersion": "0.0.38",
+    "nativeVersionBoundary": "Actual native App/appex 1.0/build1 remains Apple local-preview identity; not accepted as distributed update versioning.",
+    "copiedWebFreshInventory": {
+      "files": 467,
+      "bytes": 62232369,
+      "rawByteHash": "b1a66b3fc4e579216321758ebb921b7396430610119c9e5ca356de23b8cfc161",
+      "recordHash": "14320cd02100962f0f593932a754cbdb5baa3ca25f073fece8bb6ea40a1a5be2"
+    },
+    "copiedWebExactly467NoExtras": true,
+    "actualProjectPureParserVerified": {
+      "fourTargets": 4,
+      "eightTargetConfigurations": 8,
+      "targets": [
+        {
+          "name": "FluentRead (iOS)",
+          "productType": "com.apple.product-type.application",
+          "configurations": [
+            {
+              "name": "Debug",
+              "bundleId": "org.example.FluentReadDevelopment",
+              "sdk": "iphoneos"
+            },
+            {
+              "name": "Release",
+              "bundleId": "org.example.FluentReadDevelopment",
+              "sdk": "iphoneos"
+            }
+          ]
+        },
+        {
+          "name": "FluentRead (macOS)",
+          "productType": "com.apple.product-type.application",
+          "configurations": [
+            {
+              "name": "Debug",
+              "bundleId": "org.example.FluentReadDevelopment",
+              "sdk": "macosx"
+            },
+            {
+              "name": "Release",
+              "bundleId": "org.example.FluentReadDevelopment",
+              "sdk": "macosx"
+            }
+          ]
+        },
+        {
+          "name": "FluentRead Extension (iOS)",
+          "productType": "com.apple.product-type.app-extension",
+          "configurations": [
+            {
+              "name": "Debug",
+              "bundleId": "org.example.FluentReadDevelopment.Extension",
+              "sdk": "iphoneos"
+            },
+            {
+              "name": "Release",
+              "bundleId": "org.example.FluentReadDevelopment.Extension",
+              "sdk": "iphoneos"
+            }
+          ]
+        },
+        {
+          "name": "FluentRead Extension (macOS)",
+          "productType": "com.apple.product-type.app-extension",
+          "configurations": [
+            {
+              "name": "Debug",
+              "bundleId": "org.example.FluentReadDevelopment.Extension",
+              "sdk": "macosx"
+            },
+            {
+              "name": "Release",
+              "bundleId": "org.example.FluentReadDevelopment.Extension",
+              "sdk": "macosx"
+            }
+          ]
+        }
+      ],
+      "parser": "Existing verifySafariBundleIdentifiers(projectText,bundleId,both) only; CLI main was not invoked."
+    }
+  },
+  "independentDiskReads": {
+    "threeWholeAppTreesActuallyRead": true,
+    "uniqueFilesReadAcrossThreeApps": 1452,
+    "bytesReadAcrossThreeApps": 191602241,
+    "appReadBreakdown": {
+      "macOS": {
+        "allAppFilesActuallyRead": true,
+        "uniqueFileReadsInApp": 482,
+        "bytesActuallyRead": 63251685
+      },
+      "iosSimulator": {
+        "allAppFilesActuallyRead": true,
+        "uniqueFileReadsInApp": 485,
+        "bytesActuallyRead": 64226943
+      },
+      "iPhoneOS": {
+        "allAppFilesActuallyRead": true,
+        "uniqueFileReadsInApp": 485,
+        "bytesActuallyRead": 64123613
+      }
+    },
+    "allSixCompleteMapFilesReadAndComparedToFreshDiskMaps": [
+      {
+        "path": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/touch-layout-f33-followup-20261017/native-final-layout-6eecd6710e7d-b1a66b3fc4e5/macOS-app-full-map.json",
+        "sha256": "08c6bacefd86bcde5c61b2217d906f6768f516220774771b1d1aedbe885b1d1d",
+        "bytes": 99566
+      },
+      {
+        "path": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/touch-layout-f33-followup-20261017/native-final-layout-6eecd6710e7d-b1a66b3fc4e5/macOS-extension-full-map.json",
+        "sha256": "0f13109ede819163ca64358a3f0dbb37a95289a947c859322d8f86f4e7320ba5",
+        "bytes": 76945
+      },
+      {
+        "path": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/touch-layout-f33-followup-20261017/native-final-layout-6eecd6710e7d-b1a66b3fc4e5/iosSimulator-app-full-map.json",
+        "sha256": "3909c0ce380b04b9fab6f1ff3ceed6d7c71e44d24e60fa216d61b76aba1c8525",
+        "bytes": 86731
+      },
+      {
+        "path": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/touch-layout-f33-followup-20261017/native-final-layout-6eecd6710e7d-b1a66b3fc4e5/iosSimulator-extension-full-map.json",
+        "sha256": "6ef03de04d1e686f435aca1af1cb8e0a82e13e0fb4ff6d724211be4ee2ebc213",
+        "bytes": 68047
+      },
+      {
+        "path": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/touch-layout-f33-followup-20261017/native-final-layout-6eecd6710e7d-b1a66b3fc4e5/iPhoneOS-app-full-map.json",
+        "sha256": "9ab9748cc6bbd289807d6c34003da6e0899332fa0a6e91ccf7fc54b871824974",
+        "bytes": 86729
+      },
+      {
+        "path": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/touch-layout-f33-followup-20261017/native-final-layout-6eecd6710e7d-b1a66b3fc4e5/iPhoneOS-extension-full-map.json",
+        "sha256": "8de64fc7bb7fd2b427e4c164f8dd459f560555ee1395890c74fc47a39dc60bb2",
+        "bytes": 68046
+      }
+    ],
+    "sourceWebFreshlyRead": {
+      "files": 467,
+      "bytes": 62232369,
+      "rawByteHash": "b1a66b3fc4e579216321758ebb921b7396430610119c9e5ca356de23b8cfc161",
+      "recordHash": "14320cd02100962f0f593932a754cbdb5baa3ca25f073fece8bb6ea40a1a5be2"
+    },
+    "copiedWebFreshlyRead": {
+      "files": 467,
+      "bytes": 62232369,
+      "rawByteHash": "b1a66b3fc4e579216321758ebb921b7396430610119c9e5ca356de23b8cfc161",
+      "recordHash": "14320cd02100962f0f593932a754cbdb5baa3ca25f073fece8bb6ea40a1a5be2"
+    },
+    "allSymlinksSpecialFilesRejected": true
+  },
+  "products": {
+    "macOS": {
+      "wholeAppRead": {
+        "allAppFilesActuallyRead": true,
+        "uniqueFileReadsInApp": 482,
+        "bytesActuallyRead": 63251685
+      },
+      "bundles": {
+        "app": {
+          "path": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/touch-layout-f33-followup-20261017/native-final-layout-6eecd6710e7d-b1a66b3fc4e5/output/derived-macos/Build/Products/Release/FluentRead.app",
+          "identityFromActualPlist": {
+            "CFBundleIdentifier": "org.example.FluentReadDevelopment",
+            "CFBundleShortVersionString": "1.0",
+            "CFBundleVersion": "1",
+            "CFBundleExecutable": "FluentRead",
+            "LSMinimumSystemVersion": "14.0",
+            "CFBundleSupportedPlatforms": [
+              "MacOSX"
+            ],
+            "DTPlatformName": "macosx",
+            "DTSDKName": "macosx26.2"
+          },
+          "inventoryFreshlyComputed": {
+            "files": 482,
+            "bytes": 63251685,
+            "rawByteHash": "fe1e42c58fffd43b6fd8647a06e4246e52baf81ddcf8e2b333ffb37d0b49dbe2",
+            "recordHash": "4d961f6431765312664284848d4e0e4e7f5358f94283ceab65609ce6d6c2bdbd"
+          },
+          "actualFullMapMatched": {
+            "path": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/touch-layout-f33-followup-20261017/native-final-layout-6eecd6710e7d-b1a66b3fc4e5/macOS-app-full-map.json",
+            "sha256": "08c6bacefd86bcde5c61b2217d906f6768f516220774771b1d1aedbe885b1d1d",
+            "bytes": 99566
+          },
+          "executable": {
+            "path": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/touch-layout-f33-followup-20261017/native-final-layout-6eecd6710e7d-b1a66b3fc4e5/output/derived-macos/Build/Products/Release/FluentRead.app/Contents/MacOS/FluentRead",
+            "sha256": "177c802ae8670b1daa9e9ec72ead9df33b40d5ff89f6077627cec91b81badb24",
+            "bytes": 208136
+          },
+          "recordedSigningClassification": "LINKER_ADHOC_NO_TEAM",
+          "signingEvidence": "Preserved codesign/detail/entitlements receipts in pinned compiled-artifact-identities.json, tied to freshly matching executable bytes. Reviewer did not execute codesign/file."
+        },
+        "extension": {
+          "path": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/touch-layout-f33-followup-20261017/native-final-layout-6eecd6710e7d-b1a66b3fc4e5/output/derived-macos/Build/Products/Release/FluentRead.app/Contents/PlugIns/FluentRead Extension.appex",
+          "identityFromActualPlist": {
+            "CFBundleIdentifier": "org.example.FluentReadDevelopment.Extension",
+            "CFBundleShortVersionString": "1.0",
+            "CFBundleVersion": "1",
+            "CFBundleExecutable": "FluentRead Extension",
+            "LSMinimumSystemVersion": "14.0",
+            "CFBundleSupportedPlatforms": [
+              "MacOSX"
+            ],
+            "DTPlatformName": "macosx",
+            "DTSDKName": "macosx26.2"
+          },
+          "inventoryFreshlyComputed": {
+            "files": 469,
+            "bytes": 62355895,
+            "rawByteHash": "913e2fd31f43eae97419b9a3ceaa525e1d57b0bab0e0db62ca5eefcce2a68893",
+            "recordHash": "67f1fddcff4ef0d07d60266f00818adb5189e1dc003096b1caa4837e420eda60"
+          },
+          "actualFullMapMatched": {
+            "path": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/touch-layout-f33-followup-20261017/native-final-layout-6eecd6710e7d-b1a66b3fc4e5/macOS-extension-full-map.json",
+            "sha256": "0f13109ede819163ca64358a3f0dbb37a95289a947c859322d8f86f4e7320ba5",
+            "bytes": 76945
+          },
+          "executable": {
+            "path": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/touch-layout-f33-followup-20261017/native-final-layout-6eecd6710e7d-b1a66b3fc4e5/output/derived-macos/Build/Products/Release/FluentRead.app/Contents/PlugIns/FluentRead Extension.appex/Contents/MacOS/FluentRead Extension",
+            "sha256": "91c6c81bdfcdcc25fb78f877a47f9ba2e8e25fa851a320da7c78d22ab2c845a0",
+            "bytes": 121896
+          },
+          "recordedSigningClassification": "LINKER_ADHOC_NO_TEAM",
+          "signingEvidence": "Preserved codesign/detail/entitlements receipts in pinned compiled-artifact-identities.json, tied to freshly matching executable bytes. Reviewer did not execute codesign/file."
+        }
+      },
+      "matchedWebOnly": {
+        "files": 467,
+        "bytes": 62232369,
+        "rawByteHash": "b1a66b3fc4e579216321758ebb921b7396430610119c9e5ca356de23b8cfc161",
+        "recordHash": "14320cd02100962f0f593932a754cbdb5baa3ca25f073fece8bb6ea40a1a5be2"
+      },
+      "nativeExtrasAtWebPrefix": [],
+      "rootReportedWebPrefixInventory": {
+        "files": 467,
+        "bytes": 62232369,
+        "rawByteHash": "b1a66b3fc4e579216321758ebb921b7396430610119c9e5ca356de23b8cfc161",
+        "recordHash": "14320cd02100962f0f593932a754cbdb5baa3ca25f073fece8bb6ea40a1a5be2"
+      },
+      "note": "Root products.web on iOS includes native binary/Info.plist and has 469 files; pure matchedWebOnly above is 467. This schema naming does not mean two extra Web resources."
+    },
+    "iosSimulator": {
+      "wholeAppRead": {
+        "allAppFilesActuallyRead": true,
+        "uniqueFileReadsInApp": 485,
+        "bytesActuallyRead": 64226943
+      },
+      "bundles": {
+        "app": {
+          "path": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/touch-layout-f33-followup-20261017/native-final-layout-6eecd6710e7d-b1a66b3fc4e5/output/derived-ios-simulator/Build/Products/Release-iphonesimulator/FluentRead.app",
+          "identityFromActualPlist": {
+            "CFBundleIdentifier": "org.example.FluentReadDevelopment",
+            "CFBundleShortVersionString": "1.0",
+            "CFBundleVersion": "1",
+            "CFBundleExecutable": "FluentRead",
+            "MinimumOSVersion": "26.0",
+            "CFBundleSupportedPlatforms": [
+              "iPhoneSimulator"
+            ],
+            "DTPlatformName": "iphonesimulator",
+            "DTSDKName": "iphonesimulator26.2"
+          },
+          "inventoryFreshlyComputed": {
+            "files": 485,
+            "bytes": 64226943,
+            "rawByteHash": "8a43eba8254a15452e5a8cb09cb519a9fdb42bb02623e87f3c3630ff4caca3d9",
+            "recordHash": "bedc4de9c0ef08df7be31f0a1208555f8ee0b750744c81cdef8ef154418d1bad"
+          },
+          "actualFullMapMatched": {
+            "path": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/touch-layout-f33-followup-20261017/native-final-layout-6eecd6710e7d-b1a66b3fc4e5/iosSimulator-app-full-map.json",
+            "sha256": "3909c0ce380b04b9fab6f1ff3ceed6d7c71e44d24e60fa216d61b76aba1c8525",
+            "bytes": 86731
+          },
+          "executable": {
+            "path": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/touch-layout-f33-followup-20261017/native-final-layout-6eecd6710e7d-b1a66b3fc4e5/output/derived-ios-simulator/Build/Products/Release-iphonesimulator/FluentRead.app/FluentRead",
+            "sha256": "6787f23451d263c8bab9a5f4543fbe5f869ec56ed38983438119bc3f0946d15e",
+            "bytes": 189000
+          },
+          "recordedSigningClassification": "LINKER_ADHOC_NO_TEAM",
+          "signingEvidence": "Preserved codesign/detail/entitlements receipts in pinned compiled-artifact-identities.json, tied to freshly matching executable bytes. Reviewer did not execute codesign/file."
+        },
+        "extension": {
+          "path": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/touch-layout-f33-followup-20261017/native-final-layout-6eecd6710e7d-b1a66b3fc4e5/output/derived-ios-simulator/Build/Products/Release-iphonesimulator/FluentRead.app/PlugIns/FluentRead Extension.appex",
+          "identityFromActualPlist": {
+            "CFBundleIdentifier": "org.example.FluentReadDevelopment.Extension",
+            "CFBundleShortVersionString": "1.0",
+            "CFBundleVersion": "1",
+            "CFBundleExecutable": "FluentRead Extension",
+            "MinimumOSVersion": "26.0",
+            "CFBundleSupportedPlatforms": [
+              "iPhoneSimulator"
+            ],
+            "DTPlatformName": "iphonesimulator",
+            "DTSDKName": "iphonesimulator26.2"
+          },
+          "inventoryFreshlyComputed": {
+            "files": 469,
+            "bytes": 62356139,
+            "rawByteHash": "b8facd121421b232c676995866b2846a7837dda877382c89dcbda5e0271e7031",
+            "recordHash": "6e5da27938ba4a7f99f9f1911bc7a4088cd3ade862b9d6cb1ec68b75c3b5259b"
+          },
+          "actualFullMapMatched": {
+            "path": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/touch-layout-f33-followup-20261017/native-final-layout-6eecd6710e7d-b1a66b3fc4e5/iosSimulator-extension-full-map.json",
+            "sha256": "6ef03de04d1e686f435aca1af1cb8e0a82e13e0fb4ff6d724211be4ee2ebc213",
+            "bytes": 68047
+          },
+          "executable": {
+            "path": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/touch-layout-f33-followup-20261017/native-final-layout-6eecd6710e7d-b1a66b3fc4e5/output/derived-ios-simulator/Build/Products/Release-iphonesimulator/FluentRead.app/PlugIns/FluentRead Extension.appex/FluentRead Extension",
+            "sha256": "37c032216a3c4af92198199e27c584ea19db4b4e5724f23490f6281a50d13750",
+            "bytes": 122808
+          },
+          "recordedSigningClassification": "LINKER_ADHOC_NO_TEAM",
+          "signingEvidence": "Preserved codesign/detail/entitlements receipts in pinned compiled-artifact-identities.json, tied to freshly matching executable bytes. Reviewer did not execute codesign/file."
+        }
+      },
+      "matchedWebOnly": {
+        "files": 467,
+        "bytes": 62232369,
+        "rawByteHash": "b1a66b3fc4e579216321758ebb921b7396430610119c9e5ca356de23b8cfc161",
+        "recordHash": "14320cd02100962f0f593932a754cbdb5baa3ca25f073fece8bb6ea40a1a5be2"
+      },
+      "nativeExtrasAtWebPrefix": [
+        "FluentRead Extension",
+        "Info.plist"
+      ],
+      "rootReportedWebPrefixInventory": {
+        "files": 469,
+        "bytes": 62356139,
+        "rawByteHash": "b8facd121421b232c676995866b2846a7837dda877382c89dcbda5e0271e7031",
+        "recordHash": "6e5da27938ba4a7f99f9f1911bc7a4088cd3ade862b9d6cb1ec68b75c3b5259b"
+      },
+      "note": "Root products.web on iOS includes native binary/Info.plist and has 469 files; pure matchedWebOnly above is 467. This schema naming does not mean two extra Web resources."
+    },
+    "iPhoneOS": {
+      "wholeAppRead": {
+        "allAppFilesActuallyRead": true,
+        "uniqueFileReadsInApp": 485,
+        "bytesActuallyRead": 64123613
+      },
+      "bundles": {
+        "app": {
+          "path": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/touch-layout-f33-followup-20261017/native-final-layout-6eecd6710e7d-b1a66b3fc4e5/output/target-iphoneos/build/FluentRead.app",
+          "identityFromActualPlist": {
+            "CFBundleIdentifier": "org.example.FluentReadDevelopment",
+            "CFBundleShortVersionString": "1.0",
+            "CFBundleVersion": "1",
+            "CFBundleExecutable": "FluentRead",
+            "MinimumOSVersion": "26.0",
+            "CFBundleSupportedPlatforms": [
+              "iPhoneOS"
+            ],
+            "DTPlatformName": "iphoneos",
+            "DTSDKName": "iphoneos26.2"
+          },
+          "inventoryFreshlyComputed": {
+            "files": 485,
+            "bytes": 64123613,
+            "rawByteHash": "c07784b89c87fda531a08a2de21d130db328a343a27834a4a15e1ceebb04dc73",
+            "recordHash": "8d50f2e5845fcf43416138fbf72041b465f3558264d6f61813ead3e9f4d4108a"
+          },
+          "actualFullMapMatched": {
+            "path": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/touch-layout-f33-followup-20261017/native-final-layout-6eecd6710e7d-b1a66b3fc4e5/iPhoneOS-app-full-map.json",
+            "sha256": "9ab9748cc6bbd289807d6c34003da6e0899332fa0a6e91ccf7fc54b871824974",
+            "bytes": 86729
+          },
+          "executable": {
+            "path": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/touch-layout-f33-followup-20261017/native-final-layout-6eecd6710e7d-b1a66b3fc4e5/output/target-iphoneos/build/FluentRead.app/FluentRead",
+            "sha256": "0ecda40ae224c16de181330c7feef4d43370a494cd687452c8d9b12f87433fa1",
+            "bytes": 125400
+          },
+          "recordedSigningClassification": "UNSIGNED",
+          "signingEvidence": "Preserved codesign/detail/entitlements receipts in pinned compiled-artifact-identities.json, tied to freshly matching executable bytes. Reviewer did not execute codesign/file."
+        },
+        "extension": {
+          "path": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/touch-layout-f33-followup-20261017/native-final-layout-6eecd6710e7d-b1a66b3fc4e5/output/target-iphoneos/build/FluentRead.app/PlugIns/FluentRead Extension.appex",
+          "identityFromActualPlist": {
+            "CFBundleIdentifier": "org.example.FluentReadDevelopment.Extension",
+            "CFBundleShortVersionString": "1.0",
+            "CFBundleVersion": "1",
+            "CFBundleExecutable": "FluentRead Extension",
+            "MinimumOSVersion": "26.0",
+            "CFBundleSupportedPlatforms": [
+              "iPhoneOS"
+            ],
+            "DTPlatformName": "iphoneos",
+            "DTSDKName": "iphoneos26.2"
+          },
+          "inventoryFreshlyComputed": {
+            "files": 469,
+            "bytes": 62322079,
+            "rawByteHash": "10adf2bcf47ad9582a748cce3fe16d0d76a936fab7abc42ad426d6636e1622eb",
+            "recordHash": "9b42f7e6096ccc5b15bf23ef147ea0c134e56cae4cc0dc3b3b7c4302ec964b75"
+          },
+          "actualFullMapMatched": {
+            "path": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/touch-layout-f33-followup-20261017/native-final-layout-6eecd6710e7d-b1a66b3fc4e5/iPhoneOS-extension-full-map.json",
+            "sha256": "8de64fc7bb7fd2b427e4c164f8dd459f560555ee1395890c74fc47a39dc60bb2",
+            "bytes": 68046
+          },
+          "executable": {
+            "path": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/touch-layout-f33-followup-20261017/native-final-layout-6eecd6710e7d-b1a66b3fc4e5/output/target-iphoneos/build/FluentRead.app/PlugIns/FluentRead Extension.appex/FluentRead Extension",
+            "sha256": "57b1208988e5b83a8b598fa59b243983a84c8652b0f0751bf5cb076941c9b703",
+            "bytes": 88728
+          },
+          "recordedSigningClassification": "UNSIGNED",
+          "signingEvidence": "Preserved codesign/detail/entitlements receipts in pinned compiled-artifact-identities.json, tied to freshly matching executable bytes. Reviewer did not execute codesign/file."
+        }
+      },
+      "matchedWebOnly": {
+        "files": 467,
+        "bytes": 62232369,
+        "rawByteHash": "b1a66b3fc4e579216321758ebb921b7396430610119c9e5ca356de23b8cfc161",
+        "recordHash": "14320cd02100962f0f593932a754cbdb5baa3ca25f073fece8bb6ea40a1a5be2"
+      },
+      "nativeExtrasAtWebPrefix": [
+        "FluentRead Extension",
+        "Info.plist"
+      ],
+      "rootReportedWebPrefixInventory": {
+        "files": 469,
+        "bytes": 62322079,
+        "rawByteHash": "10adf2bcf47ad9582a748cce3fe16d0d76a936fab7abc42ad426d6636e1622eb",
+        "recordHash": "9b42f7e6096ccc5b15bf23ef147ea0c134e56cae4cc0dc3b3b7c4302ec964b75"
+      },
+      "note": "Root products.web on iOS includes native binary/Info.plist and has 469 files; pure matchedWebOnly above is 467. This schema naming does not mean two extra Web resources."
+    }
+  },
+  "signatureBoundary": "macOS/simulator app and appex are recorded linker ad-hoc with no team/Authority; iPhoneOS app and appex are recorded completely unsigned. Do not call all binaries completely unsigned or imply developer signing. Fresh full-file hashes bind those stored signature receipts to these unchanged binaries.",
+  "preExecutionCheckBoundary": {
+    "rootDisclosedVerifierSyntaxRepairBeforeExecution": true,
+    "rootDisclosedSyntaxOrCacheChecksAreNotBuildResults": true,
+    "reviewerReproducedThoseFailures": false,
+    "interpretation": "Preparation-stage syntax/cache-check issues, including the corrected verifier source before successful execution, are retained as provenance and must not be conflated with SDK compilation failures. Actual six commands/logs all pass and independent complete output/resource rereads above succeed. This review does not assert an entirely error-free preparation history."
+  },
+  "resourceBoundary": {
+    "newFreshReleaseReceiptPresentAtReview": true,
+    "reviewerFreshPIDPortOrForegroundChecks": false,
+    "scope": "Compilation/result identity review only. Resource lane release, focus or absence of later processes requires Root separate fresh release evidence; no process condition inferred from bundle hashes."
+  },
+  "acceptance": {
+    "allThreeLocalBuildProductsAndEmbeddedWebMatch": true,
+    "compiledIdentityPassed": true,
+    "developerSignedReleasePassed": false,
+    "installedOrUpdatedPassed": false,
+    "simulatorOrDeviceRuntimePassed": false,
+    "SafariUIOrPermissionPassed": false,
+    "realAVKitPassed": false,
+    "fullGoalComplete": false
+  }
+}

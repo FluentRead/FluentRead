@@ -1,0 +1,52 @@
+{
+  "schema": 1,
+  "copyPolicy": "Four original viewport PNGs and four original case JSONs copied byte-for-byte; summary is a public derivative. Raw report with private absolute path is excluded.",
+  "files": [
+    {
+      "file": "services-title-fr-FR-dark-320.json",
+      "bytes": 10601,
+      "sha256": "ceffc877bf40f9d4ce21f65fad370d8c4b95393659406dcc33877426277d9dad"
+    },
+    {
+      "file": "services-title-fr-FR-dark-320.png",
+      "bytes": 40910,
+      "sha256": "ec58342f9d9cc362320430fe7dbe2192dbdef5fc477087ffeaed4b4d6d75ba24"
+    },
+    {
+      "file": "services-title-fr-FR-light-320.json",
+      "bytes": 10690,
+      "sha256": "a0c79722fd70fdff129c7eda1df45b806169e107dfedee1ff95dd0838e191a36"
+    },
+    {
+      "file": "services-title-fr-FR-light-320.png",
+      "bytes": 40147,
+      "sha256": "17772b20b334a3e0ea655edc682b171d154de7d1dcbeab590f9eca44a7cee632"
+    },
+    {
+      "file": "services-title-zh-CN-dark-320.json",
+      "bytes": 10311,
+      "sha256": "f8361ab053040d7566b6423b8ca81111411334ae4f9b522f1cdbd054cbae3e52"
+    },
+    {
+      "file": "services-title-zh-CN-dark-320.png",
+      "bytes": 46140,
+      "sha256": "b82ee0f25933a9817161b0698378e3b4390289a17d72ea268cb3f5ae00a3e84b"
+    },
+    {
+      "file": "services-title-zh-CN-light-320.json",
+      "bytes": 10557,
+      "sha256": "cc0096e38063ac519ddf832467e2b642c72c59dee53a8a83e964b9289b5c0dd8"
+    },
+    {
+      "file": "services-title-zh-CN-light-320.png",
+      "bytes": 45029,
+      "sha256": "1fedfdec7cf43018172a7c50220935424555ac910cefa92c3e1684767128848f"
+    },
+    {
+      "file": "summary.json",
+      "bytes": 4569,
+      "sha256": "e27e3c532a474af97c4d329acd4c0a8fa572557e760b64d6646c62e64d9f33d9"
+    }
+  ],
+  "selfHashExcluded": true
+}

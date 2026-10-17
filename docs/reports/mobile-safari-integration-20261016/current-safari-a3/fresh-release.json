@@ -1,0 +1,29 @@
+{
+  "at": "2026-10-16T07:31:56.377250+00:00",
+  "runtimeSession": 14229,
+  "runtimeSessionExitCode": 0,
+  "exportExitCode": 0,
+  "knownPIDCount": 75,
+  "remaining": [],
+  "psCode": 0,
+  "psElapsedMs": 45.27487500000001,
+  "psTimeoutSeconds": 10,
+  "device": {
+    "udid": "A407390F-7AA8-42AE-AFEB-F93EE99E9FF8",
+    "name": "FluentRead-PR995-FreshPermissions-20261015",
+    "state": "Shutdown"
+  },
+  "foreignBootedRecordedOnly": [],
+  "oldIdentitySHA256": "b185d1c82009ea924b6b92bfdfb2045120df4d58f49c8cb345b508a28890e31d",
+  "oldInstalledFull485FreshMatch": true,
+  "DemoFreshSHA256": "6eb20314a7463f8f210cb1ced63867b1f2e3537ce66d7f12d106641d040d14b3",
+  "Userscripts47FreshMatch": true,
+  "nativePrivate17FreshMatch": true,
+  "afterShutdownReceipt": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/mobile-safari-production-inline-native-readiness-20261016/inline-attempt3/identity-after-shutdown.json",
+  "afterShutdownReceiptSHA256": "3b61b0d87f5669f64ed7a6c811d89e63d2d636779a9ea59b41ffaf66e2a1bc7f",
+  "Userscripts47AndPrivate17Boundary": "Native FR App data17 hash baseline only; not all extension settings/storage/cache. Record post-UI changes; do not copy files back.",
+  "focusEvents": [],
+  "violations": [],
+  "cleanupErrors": [],
+  "laneReleased": true
+}

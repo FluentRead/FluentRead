@@ -1,0 +1,34 @@
+{
+  "at": "2026-10-16T09:23:15.185350+00:00",
+  "runtimeSession": 90694,
+  "runtimeSessionExitCode": 0,
+  "exportCompletedExitCode": 0,
+  "laneReleased": true,
+  "knownPIDCount": 71,
+  "remainingOwnedPIDOrPGID": [],
+  "psCode": 0,
+  "freshCheckElapsedMs": 191.979,
+  "frontmostFresh": {
+    "pid": 99817,
+    "name": "ChatGPT"
+  },
+  "focusEvents": [],
+  "violations": [],
+  "cleanupErrors": [],
+  "finalDeviceState": "Shutdown",
+  "exactUDID": "A407390F-7AA8-42AE-AFEB-F93EE99E9FF8",
+  "originalD9Full485Restored": true,
+  "Userscripts47Unchanged": true,
+  "DemoSHA256": "6eb20314a7463f8f210cb1ced63867b1f2e3537ce66d7f12d106641d040d14b3",
+  "nativePrivate17Unchanged": true,
+  "privateBoundary": "Native FR App data17 hash baseline only; not all extension settings/storage/cache. Record post-UI changes; do not copy files back.",
+  "rawCounts": {
+    "pass": 0,
+    "skip": 1,
+    "fail": 0
+  },
+  "acceptanceReviewSHA256": "daf5a030d5457e5e905ed77b37224c3921127fb38b999224ee24b11435fd3c0e",
+  "guardReportSHA256": "0cc540908187dfcbe29d8ecbaf59e102a9c01dc718176f07a78f122a40acbf56",
+  "afterShutdownIdentitySHA256": "64dcb5b0f88a36ea2aacc350c037448a2cd09014a71acad037feaa126a4c55fc",
+  "noAutomaticRetry": true
+}

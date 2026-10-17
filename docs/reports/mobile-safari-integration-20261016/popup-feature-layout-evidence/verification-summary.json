@@ -1,0 +1,243 @@
+{
+  "schema": 1,
+  "artifactKind": "DERIVED_PUBLIC_POPUP_FEATURE_LAYOUT_SUMMARY",
+  "status": "ROOT_REVIEWED_SCOPE_LIMITED_EVIDENCE",
+  "sourceCommit": "8274d0c76bead3f1f76a04f5f71e2d58475d4551",
+  "version": "0.0.38",
+  "nativeIdentitySHA256": "6998df7d9b45d0422079e452ea5bdd2f53096702c7ed8a9abaeb90d4161e1828",
+  "checks": {
+    "focusedTests": {
+      "passed": 103,
+      "files": 3,
+      "names": [
+        "tests/interfaceSkinReadability.test.ts",
+        "tests/popupFeatureVisibility.test.ts",
+        "tests/popupBootstrap.test.ts"
+      ]
+    },
+    "testAudit": "PASS: registration audit only, not full test execution",
+    "typecheck": "PASS: vue-tsc --noEmit",
+    "docsBuild": "PASS",
+    "productionWebBuilds": {
+      "Chrome": "PASS",
+      "Firefox": "PASS",
+      "Safari": "PASS"
+    },
+    "nativeBuilds": {
+      "macOS": {
+        "compile": "PASS",
+        "webFilesMatched": 467,
+        "appFiles": 482,
+        "appSigning": "LINKER_ADHOC_NO_TEAM",
+        "extensionSigning": "LINKER_ADHOC_NO_TEAM"
+      },
+      "iosSimulator": {
+        "compile": "PASS",
+        "webFilesMatched": 467,
+        "appFiles": 485,
+        "appSigning": "LINKER_ADHOC_NO_TEAM",
+        "extensionSigning": "LINKER_ADHOC_NO_TEAM"
+      },
+      "iPhoneOS": {
+        "compile": "PASS",
+        "webFilesMatched": 467,
+        "appFiles": 485,
+        "appSigning": "UNSIGNED_NO_TEAM",
+        "extensionSigning": "UNSIGNED_NO_TEAM"
+      }
+    },
+    "edgeCSSFixtures": {
+      "passed": 30,
+      "safariMarkerFixtures": 24,
+      "ordinaryAndEmbeddedMarkerControls": 6,
+      "skins": [
+        "default",
+        "compact",
+        "minimal"
+      ],
+      "widths": [
+        320,
+        402
+      ],
+      "themes": [
+        "light",
+        "dark"
+      ],
+      "cardCounts": [
+        3,
+        4
+      ],
+      "originalPNGs": 11,
+      "report": "edge/report.public.json"
+    },
+    "nativeDefaultPortraitSheet": {
+      "passed": 1,
+      "skipped": 0,
+      "failed": 0,
+      "testSeconds": 33.615,
+      "payloadJSON": 35,
+      "originalPNGs": 3,
+      "platform": "Dedicated iPhone16Pro iOS26.2 Simulator",
+      "beforeAndDownWebView": {
+        "width": 386,
+        "height": 450.9734660033167,
+        "x": 8,
+        "y": 415.0265339966832
+      },
+      "afterUpWebView": {
+        "width": 402,
+        "height": 812,
+        "x": 0,
+        "y": 62
+      },
+      "fourFeatureCardsAndFooterVisibleWhenExpanded": true,
+      "expandedCache": {
+        "unique": true,
+        "width": 46,
+        "height": 46,
+        "hittable": true,
+        "fullyContainedInPopup": true
+      },
+      "sourceLinkAXCountCapped": 2,
+      "permissionChoices": 0,
+      "footerTaps": 0,
+      "configurationWrites": 0,
+      "translationIntents": 0,
+      "officialSummary": "native/official-summary.json",
+      "attachmentsManifest": "native/attachments/manifest.json"
+    },
+    "nativePortraitDrawerKeyboard": {
+      "passed": 1,
+      "skipped": 0,
+      "failed": 0,
+      "total": 1,
+      "selectedTestSeconds": 51.294,
+      "testSecondsSource": "Root and independent runtime reviews. Official summary wall-clock start/finish is a different interval.",
+      "payloadJSON": 44,
+      "originalPNGs": 8,
+      "RootReadAllPayloadJSON": true,
+      "independentReadAllPayloadJSON": true,
+      "RootViewedAllOriginalPNGs": true,
+      "independentViewedAllOriginalPNGs": true,
+      "sevenActions": [
+        "serviceSummary",
+        "defaultServiceRow",
+        "searchFocus",
+        "searchGpt",
+        "clearSearch",
+        "pickerBack",
+        "overviewClose"
+      ],
+      "eachConsumedOnce": true,
+      "searchInput": "gpt",
+      "queryThenEmptyObserved": true,
+      "keyboardRemainedAfterClear": true,
+      "BackRestoredOverviewKeyboardAbsent": true,
+      "overviewCloseRestoredNormalPopup": true,
+      "finalNativeDoneOnce": true,
+      "finalKnownFixtureOwnerCount": 1,
+      "permissionChoices": 0,
+      "existingLocalhostPermission": "UNKNOWN",
+      "configurationWrites": 0,
+      "translationIntents": 0,
+      "scopedPortraitDrawerKeyboardAcceptance": true,
+      "officialSummary": "portrait/official-summary.json",
+      "attachmentsManifest": "portrait/attachments/manifest.json",
+      "rootOutcome": "portrait/root-runtime-outcome.public.json",
+      "independentReview": "portrait/independent-runtime-review.public.json"
+    },
+    "nativeVideoFullscreenPrefix": {
+      "status": "UNVERIFIED_VIDEO_PREFIX_STOP",
+      "passed": 0,
+      "skipped": 1,
+      "failed": 0,
+      "total": 1,
+      "selectedTestSeconds": 13.076,
+      "guardSeconds": 60.88,
+      "runtimeExitCode": 0,
+      "payloadJSON": 10,
+      "originalPNGs": 0,
+      "knownPlayerCount": 1,
+      "knownTEDCount": 1,
+      "knownUniqueTarget": false,
+      "currentURLExposureReached": false,
+      "PlayFullscreenCloseCuePerformed": false,
+      "captures": 0,
+      "grantActions": 0,
+      "officialSummary": "video-prefix-stop/official-summary.json",
+      "attachmentsManifest": "video-prefix-stop/attachments/manifest.json",
+      "publicSummary": "video-prefix-stop/summary.public.json",
+      "knownNodeClosureDiagnostic": "PREPARATION_ONLY_NOT_EXECUTED"
+    }
+  },
+  "cleanupSummary": {
+    "originalD9RestoredAndVerified": true,
+    "dedicatedSimulator": "Shutdown",
+    "resourceLaneReleased": true,
+    "privateDataNotIncluded": true
+  },
+  "scopedPopupAcceptance": true,
+  "productionAcceptance": false,
+  "boundaries": [
+    "Native result is one default-skin Chinese portrait Popup sheet expansion/retraction; this is not DOM/document scroll proof.",
+    "Anchor relativeY +17.0265 accompanies native sheet resize and width386->402; no document-position/focus restoration inference.",
+    "Source-link AX count2 is not unique; no footer/feature/config/provider action was performed.",
+    "Edge fixtures manually apply Safari/embedded markers to production MV3 CSS; they do not prove native Safari skins or actual embedded bootstrap.",
+    "macOS and iPhoneOS evidence is compilation/resource matching only; no developer signing or publication.",
+    "Portrait drawer evidence adds only the exact seven-action default-Chinese iPhone16Pro Simulator flow. Clear leaves the keyboard present; Back dismisses it; close restores the normal Popup.",
+    "Normal collapsed Popup lower cards are still partly clipped; expanded native sheet is a separate scene and is not DOM scroll proof.",
+    "No landscape, focus-return, VoiceOver, other native skins/locales, physical-device, full regression, live-provider or all-extension-storage acceptance.",
+    "Native video fullscreen prefix stopped unverified with 0 PASS / 1 SKIP / 0 FAIL before Play/fullscreen/Close/cue; exact host and full target closure are not established. Known-node closure diagnostics are preparation only, not executed."
+  ],
+  "sourceReceiptPins": [
+    {
+      "sourceRelative": "safari-touch-flex-production-build-20261017/root-production-checks.json",
+      "bytes": 4298,
+      "sha256": "18be9dcc3322482a13399afcbd5418311715c259001fe2c25b84d1cf470ba73c"
+    },
+    {
+      "sourceRelative": "safari-touch-flex-production-build-20261017/compiled-artifact-identities.json",
+      "bytes": 48062,
+      "sha256": "6998df7d9b45d0422079e452ea5bdd2f53096702c7ed8a9abaeb90d4161e1828"
+    },
+    {
+      "sourceRelative": "safari-touch-flex-production-build-20261017/root-edge-css-ui-review.json",
+      "bytes": 5799,
+      "sha256": "9b2784029ebca8bb03065a65c6ebc0f505fc2f63e63842352de5cf6ae326f1a0"
+    },
+    {
+      "sourceRelative": "current-production-touch-flex-popup-scroll-attempt1/root-runtime-outcome.json",
+      "bytes": 8594,
+      "sha256": "7c2001ecf7b18fdc0bd9aededa63d21f424b2f434762762638f5d6ee340ff957"
+    },
+    {
+      "sourceRelative": "current-production-touch-flex-portrait-drawer-keyboard-attempt1/root-runtime-outcome.json",
+      "bytes": 13440,
+      "sha256": "7c0548f5386bb4f39ea5acc60de45116d71585e8e157206e49c355a0332b7489"
+    },
+    {
+      "sourceRelative": "current-production-touch-flex-portrait-drawer-keyboard-attempt1/independent-runtime-review.json",
+      "bytes": 51852,
+      "sha256": "f17e697612758583cdae254e5b55d67683fcf2c485dd7f8ee7b7acfc2732de67"
+    }
+  ],
+  "originalLogsAppsPrivateMapsAndProcessRecordsIncluded": false,
+  "sourceDraftSummary": {
+    "bytes": 8698,
+    "sha256": "d1bdf25e5fdf3013a32db8321df80afc0a3ab4c8be599b1f309b08bf8d68f127"
+  },
+  "publicationReview": {
+    "sourceDraftReview": {
+      "portraitJSONLoadedAndScanned": 44,
+      "portraitOriginalPNGsVisuallyReviewed": 8,
+      "portraitPNGMetadataReviewed": true,
+      "rawMachinePrivateReportsIncluded": false,
+      "taskOnlySimulatorMetadataInOriginalManifestRetained": true,
+      "knownPublicLocalFixtureOnly": true,
+      "worktreeWritten": false,
+      "SDKDeviceUIBrowserProcessNetworkOperations": false
+    },
+    "repositoryCopyByRoot": true,
+    "scope": "Scope-limited report evidence only; productionAcceptance remains false. No developer signing, release or deployment."
+  }
+}

@@ -613,6 +613,7 @@
       "tests/visionProbeStatusLifecycle.test.ts",
       "tests/interfaceAppearanceLifecycle.test.ts",
       "tests/interfaceSettingsLifecycle.test.ts",
+      "tests/videoSubtitleAppearanceSettingsLifecycle.test.ts",
       "tests/videoSentenceLearningAppearanceSettingsLifecycle.test.ts",
       "tests/modelVisionSettingsLifecycle.test.ts",
       "tests/serviceConfigurationLifecycle.test.ts",

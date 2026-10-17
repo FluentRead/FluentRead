@@ -1,0 +1,107 @@
+{
+  "actions" : {
+    "address" : 1,
+    "extensionPopup" : 1,
+    "navigation" : 1,
+    "normalClear" : 1,
+    "pageMenu" : 1,
+    "popupSwipeUp" : 1,
+    "SafariActivate" : 1
+  },
+  "actualExactAllowedWebViewLabel" : "流畅阅读",
+  "anchors" : [
+    {
+      "actionAllowed" : false,
+      "countCappedAt2" : 1,
+      "deltaYRelativeToWebView" : 17.026533996683213,
+      "frame" : {
+        "height" : 50,
+        "width" : 181,
+        "x" : 16,
+        "y" : 489
+      },
+      "framePositiveFinite" : true,
+      "identifier" : "",
+      "intersectsPopup" : true,
+      "label" : "鼠标悬停翻译 · Ctrl",
+      "relativeYToCurrentWebView" : 427,
+      "sameObservedIdentityAsReference" : true,
+      "type" : 9
+    },
+    {
+      "actionAllowed" : false,
+      "countCappedAt2" : 1,
+      "deltaYRelativeToWebView" : 17.026533996683213,
+      "frame" : {
+        "height" : 50,
+        "width" : 181,
+        "x" : 205,
+        "y" : 489
+      },
+      "framePositiveFinite" : true,
+      "identifier" : "",
+      "intersectsPopup" : true,
+      "label" : "划词翻译 · 显示图标",
+      "relativeYToCurrentWebView" : 427,
+      "sameObservedIdentityAsReference" : true,
+      "type" : 9
+    }
+  ],
+  "containmentAndHittabilityAreNotPixelProof" : true,
+  "downDoesNotProveRestorationOrFocus" : true,
+  "emptyOwnerIsNotCurrentOwnerProof" : true,
+  "footer" : [
+    {
+      "actionAllowed" : false,
+      "countCappedAt2" : 1,
+      "exists" : true,
+      "frameAndHittabilityReadOnlyIfExists" : true,
+      "identifier" : "",
+      "isHittable" : true,
+      "label" : "清除缓存",
+      "liveCountCappedAt2" : 1,
+      "liveFrame" : {
+        "height" : 46,
+        "width" : 46,
+        "x" : 337,
+        "y" : 614
+      },
+      "liveFramePositiveFinite" : true,
+      "liveFullyContainedInPopup" : true,
+      "snapshotFrame" : {
+        "height" : 46,
+        "width" : 46,
+        "x" : 337,
+        "y" : 614
+      },
+      "snapshotFramePositiveFinite" : true,
+      "snapshotFullyContainedInPopup" : true,
+      "snapshotIntersectsPopup" : true,
+      "snapshotMatchesLiveFrame" : true,
+      "type" : 9,
+      "valueRead" : false
+    },
+    {
+      "actionAllowed" : false,
+      "countCappedAt2" : 2,
+      "identityAndVisibilityUnverified" : true,
+      "label" : "在 GitHub 查看流畅阅读开源项目",
+      "valueRead" : false
+    }
+  ],
+  "footerMayBeHiddenOrReordered" : true,
+  "knownAnchorDisplacementObserved" : true,
+  "noDisplacementMeansOnlyThisGesturePathUnverified" : true,
+  "ownerExact" : false,
+  "ownerNotExposed" : true,
+  "phase" : "after-popupSwipeUp",
+  "scope" : "Current finite-title normalPopup; finite footer\/anchors only; no field values",
+  "snapshotLivePNGSequentialNotAtomic" : true,
+  "status" : "NORMAL_POPUP_SCROLL_OBSERVATION_REQUIRES_REVIEW",
+  "webViewFrame" : {
+    "height" : 812,
+    "width" : 402,
+    "x" : 0,
+    "y" : 62
+  }
+}

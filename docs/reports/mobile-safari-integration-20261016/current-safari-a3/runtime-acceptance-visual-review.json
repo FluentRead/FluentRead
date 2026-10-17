@@ -1,0 +1,141 @@
+{
+  "at": "2026-10-16T07:32:54.540385+00:00",
+  "status": "UNVERIFIED_SITE_CONTROL_TOUCH_PRECONDITION_CASE_SKIPPED",
+  "scope": "One production case108 attempt on the exact dedicated portrait iPhone16Pro/iOS26.2 Simulator A407. Actual menu/caption assessment was not reached. No automatic retry.",
+  "productionIdentitySHA256": "3f3df2dc7993788676427a6544e5cd17937f2a7da8d8e4a5f6c1d215417679dd",
+  "productionCommit": "f5a82d11a5b6b6a5de2f2ea726065a56cdb2e6ca",
+  "webRawSHA256": "1040bd47a0d9b907d30a91fa7d27e7aa46b7c5c1e258bb6e3223ba4082838705",
+  "productionFullAppFileCount": 485,
+  "nativeGuideAggregateSHA256": "bb04c63f19de1ad2120b1796fffbcd1dec93ab2241cb727ad4e0c179555e4ae5",
+  "rawXCTest": {
+    "total": 1,
+    "passed": 0,
+    "skipped": 1,
+    "failed": 0,
+    "durationSeconds": 13.776,
+    "summarySHA256": "f2558f19338b26a12c3748730cb782088f02bd6eb2c047f805a385aa1fa2034f",
+    "meaning": "A skipped case and zero failures do not establish acceptance."
+  },
+  "runtime": {
+    "session": 14229,
+    "exitCode": 0,
+    "installs": 1,
+    "restores": 1,
+    "testsSpawned": 1,
+    "sharedHarnessRecompiled": false,
+    "harnessSourceSHA256": "a23b56094f8699ece60b4c76391f42fb9583e003d0c2151ccb383e189a371e8c",
+    "testMethod": "test108ProductionVisibleBilingualInlineControls"
+  },
+  "actualOutcome": {
+    "actions": {
+      "address": 1,
+      "navigation": 1,
+      "normalClear": 1,
+      "siteUnmute": 1
+    },
+    "outcome": "UNVERIFIED",
+    "reason": "Current player normal touch target unavailable"
+  },
+  "controlReadinessBoundary": {
+    "scene": "Public TED watch page navigated normally; actual unmute was tapped once. Failed during initial site-control preparation before bilingual waiting/menu capture.",
+    "sourceGuard": "showControlsOnce requires the current player to exist, be hittable, have nonempty bounds and be contained in app bounds if the named reveal control is unavailable.",
+    "laterActualAX": [
+      {
+        "frame": {
+          "height": 226,
+          "width": 402,
+          "x": 0,
+          "y": 110
+        },
+        "identifier": "",
+        "label": "YouTube 视频播放器",
+        "selected": false,
+        "type": 1,
+        "valueString": "",
+        "valueType": "__NSCFConstantString"
+      },
+      {
+        "frame": {
+          "height": 12,
+          "width": 12,
+          "x": 0,
+          "y": 62
+        },
+        "identifier": "",
+        "label": "显示播放器控件",
+        "selected": false,
+        "type": 9,
+        "valueString": "",
+        "valueType": "__NSCFConstantString"
+      }
+    ],
+    "timing": "Exported screenshot and AX follow the failed readiness check. Actual player bounds were positive in later AX, but the exact false readiness term is not recorded. Do not infer a product cause or permission/provider failure."
+  },
+  "imagesReviewed": [
+    {
+      "path": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/mobile-safari-production-inline-native-readiness-20261016/inline-attempt3/runtime-evidence/unverified-final.png",
+      "sha256": "9a1ea03c96f206fadb4b13a09fba09f855b8553b8cbbe1d7445a800402fe4d7e",
+      "reviewedPersonally": true,
+      "finding": "Original screenshot shows the real TED watch page and visible playing intro frame Once a year… with native controls hidden. No FluentRead bilingual cue or menu is visible. No permission dialog is visible."
+    }
+  ],
+  "allExportedImagesReviewed": true,
+  "mandatoryMenuAcceptance": {
+    "status": "UNVERIFIED_NOT_REACHED",
+    "entryCount": "NOT_MEASURED",
+    "atLeast44px": "NOT_MEASURED",
+    "opened": "NOT_ATTEMPTED",
+    "closed": "NOT_ATTEMPTED",
+    "actionsFRMenuOpen": 0,
+    "actionsFRMenuClose": 0,
+    "artifactMissing": "A-optional-FR-menu.json was never emitted; its absence must not be reported as entryCount0."
+  },
+  "mandatoryCaptionAcceptance": {
+    "status": "UNVERIFIED_NOT_REACHED",
+    "reason": "The bilingual wait, control-relative geometry and caption/menu PNGs were not reached."
+  },
+  "notExercised": [
+    "Actual FluentRead entry/menu",
+    "Real bilingual caption/control overlay paint",
+    "Learning touch",
+    "Rare scrolling fallback",
+    "Full screen B",
+    "Rotation/background",
+    "Mode switching",
+    "Physical device or assistive speech"
+  ],
+  "restoration": {
+    "at": "2026-10-16T07:31:56.377250+00:00",
+    "runtimeSession": 14229,
+    "runtimeSessionExitCode": 0,
+    "exportExitCode": 0,
+    "knownPIDCount": 75,
+    "remaining": [],
+    "psCode": 0,
+    "psElapsedMs": 45.27487500000001,
+    "psTimeoutSeconds": 10,
+    "device": {
+      "udid": "A407390F-7AA8-42AE-AFEB-F93EE99E9FF8",
+      "name": "FluentRead-PR995-FreshPermissions-20261015",
+      "state": "Shutdown"
+    },
+    "foreignBootedRecordedOnly": [],
+    "oldIdentitySHA256": "b185d1c82009ea924b6b92bfdfb2045120df4d58f49c8cb345b508a28890e31d",
+    "oldInstalledFull485FreshMatch": true,
+    "DemoFreshSHA256": "6eb20314a7463f8f210cb1ced63867b1f2e3537ce66d7f12d106641d040d14b3",
+    "Userscripts47FreshMatch": true,
+    "nativePrivate17FreshMatch": true,
+    "afterShutdownReceipt": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/mobile-safari-production-inline-native-readiness-20261016/inline-attempt3/identity-after-shutdown.json",
+    "afterShutdownReceiptSHA256": "3b61b0d87f5669f64ed7a6c811d89e63d2d636779a9ea59b41ffaf66e2a1bc7f",
+    "Userscripts47AndPrivate17Boundary": "Native FR App data17 hash baseline only; not all extension settings/storage/cache. Record post-UI changes; do not copy files back.",
+    "focusEvents": [],
+    "violations": [],
+    "cleanupErrors": [],
+    "laneReleased": true
+  },
+  "freshReleaseReceipt": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/mobile-safari-production-inline-native-readiness-20261016/inline-attempt3/fresh-release.json",
+  "freshReleaseReceiptSHA256": "bfc8da1253f34891ae44be054bd7f75ab448ef524d1b5d968818a94914f21480",
+  "resourceLaneReleased": true,
+  "exportExitCode": 0,
+  "automaticRetry": false
+}

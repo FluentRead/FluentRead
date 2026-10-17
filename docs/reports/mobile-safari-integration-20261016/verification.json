@@ -1,0 +1,1291 @@
+{
+  "at": "2026-10-16T00:18:29.732405+00:00",
+  "runtimeCommit": "34e3170465a798f79524c56ce11024622734b862",
+  "baseMain": "5cf8f97aac1e5ea40b5d2af39f77b21f1d3c25b0",
+  "sourcePR1007Head": "fc81122e8436bb1d4635909b591321647a8e2117",
+  "sourceSHA256": {
+    "src/app/popup/PopupApp.vue": "3add5957e78f73b77278d066bf6237516f1ee8137a6e649001681776cae2c465",
+    "src/app/popup/PopupServices.vue": "65accc535c596e0d0b692f052f2c079ea5970eb3f27875dab6f10e0c9bea5906",
+    "src/app/popup/popup.css": "956a926724901fb0689e972ebb5714d75fea5881d27991a8c024d300a766bd75",
+    "src/features/video-subtitle/content/runtime.ts": "78f118d6a66437ae060479c91e14881921a9c0d056a5e7f8fbff0b3f9465239d",
+    "src/features/video-subtitle/content/nativeFullscreen.ts": "389b9e9a9c4e8d3e825cc2485d65396ae33e4e2ddc739c8717b413be0295300e",
+    "src/features/video-subtitle/content/videoPlayerBinding.ts": "e5d2b72254b04d2b72eeb6a71666b833ff55814ee5c859e40409a63c9625e686"
+  },
+  "artifacts": {
+    "chrome-mv3": {
+      "files": 478,
+      "bytes": 62340968,
+      "recordHash": "a3bf98a86e86fb0bd71284d5bdb3166890e54171e98d2f6034f68bf92b944a67",
+      "rawByteHash": "8e789d254868a58381f5f029c59f5f2e36c6b8ca9de127021b01280ec018cd00",
+      "recordAlgorithm": "global UTF8 path sort; SHA256(path + NUL + fileSHA256 + NUL + decimalByteLength + LF)",
+      "rawAlgorithm": "recursive directory UTF8 name sort; SHA256(path + NUL + decimalByteLength + NUL + rawbytes)"
+    },
+    "firefox-mv2": {
+      "files": 478,
+      "bytes": 62343823,
+      "recordHash": "e9458d2d0ec447235dc74c1a09a24df30d86c206ba2526c2cae9f81fe44cc7fa",
+      "rawByteHash": "93034120173adf4ecc925cb3d4a9b115dfbc38451dd71197658299186424c609",
+      "recordAlgorithm": "global UTF8 path sort; SHA256(path + NUL + fileSHA256 + NUL + decimalByteLength + LF)",
+      "rawAlgorithm": "recursive directory UTF8 name sort; SHA256(path + NUL + decimalByteLength + NUL + rawbytes)"
+    },
+    "safari-mv2": {
+      "files": 467,
+      "bytes": 62212322,
+      "recordHash": "746a197171b0ff03bae84f10eb7b2356d95ad304ad47f3141ab17a0633fc6d78",
+      "rawByteHash": "b1d75236d26bfa00b50648657d2284c092d7b5a2e9eea7a3db2e64eea21202af",
+      "recordAlgorithm": "global UTF8 path sort; SHA256(path + NUL + fileSHA256 + NUL + decimalByteLength + LF)",
+      "rawAlgorithm": "recursive directory UTF8 name sort; SHA256(path + NUL + decimalByteLength + NUL + rawbytes)"
+    }
+  },
+  "tests": {
+    "popupCurrent": {
+      "files": 2,
+      "passed": 141,
+      "failed": 0
+    },
+    "videoUnchangedSince7a939": {
+      "files": 4,
+      "passed": 147,
+      "failed": 0
+    },
+    "cli": {
+      "selected": 6,
+      "passed": 6,
+      "failed": 0,
+      "scriptCDPPropertyThenVerifiedInProduction": true
+    },
+    "types": "passed",
+    "audit": "passed",
+    "localFullSuite": false,
+    "fourDimensional100PercentClaim": false
+  },
+  "builds": {
+    "chrome": "passed",
+    "firefox": "passed",
+    "safariWeb": "passed",
+    "manifest": "passed",
+    "safariResourceVerifier": "passed",
+    "userscript": {
+      "build": "passed",
+      "verify": "passed",
+      "runtimeCommit": "34e3170465a798f79524c56ce11024622734b862",
+      "artifact": {
+        "bytes": 2086870,
+        "sha256": "f20ae772fe84260996b0bcc9f3243f5e9cf4a5f079616a6c2b21273b940338c7"
+      },
+      "runtimeAcceptance": false
+    },
+    "documentation": {
+      "exitCode": 0,
+      "seconds": 4.482,
+      "scope": "VitePress documentation build; verification JSON updated afterward only to record outcomes"
+    }
+  },
+  "browser": {
+    "popup": {
+      "ok": true,
+      "cases": 6,
+      "screenshots": 24,
+      "restoredSearchBorders": [
+        {
+          "label": "desktop-intrinsic-restored-vv263-same-input",
+          "search": {
+            "x": 282,
+            "y": 90.5,
+            "right": 546,
+            "bottom": 126.5,
+            "width": 264,
+            "height": 36
+          },
+          "heading": {
+            "x": 282,
+            "y": 52.5,
+            "right": 546,
+            "bottom": 90.5,
+            "width": 264,
+            "height": 38
+          },
+          "body": {
+            "x": 282,
+            "y": 32.5,
+            "right": 562,
+            "bottom": 245,
+            "width": 280,
+            "height": 212.5
+          },
+          "scrollTop": 0,
+          "edgeHits": [
+            {
+              "point": {
+                "x": 414,
+                "y": 91
+              },
+              "hit": "service-picker-search",
+              "owned": true
+            },
+            {
+              "point": {
+                "x": 414,
+                "y": 126
+              },
+              "hit": "service-picker-search",
+              "owned": true
+            },
+            {
+              "point": {
+                "x": 282.5,
+                "y": 108.5
+              },
+              "hit": "service-picker-search",
+              "owned": true
+            },
+            {
+              "point": {
+                "x": 545.5,
+                "y": 108.5
+              },
+              "hit": "service-picker-search",
+              "owned": true
+            }
+          ],
+          "focused": true
+        },
+        {
+          "label": "touch-landscape-light-restored-vv263-same-input",
+          "search": {
+            "x": 156,
+            "y": 72,
+            "right": 420,
+            "bottom": 120,
+            "width": 264,
+            "height": 48
+          },
+          "heading": {
+            "x": 156,
+            "y": 16,
+            "right": 420,
+            "bottom": 72,
+            "width": 264,
+            "height": 56
+          },
+          "body": {
+            "x": 156,
+            "y": 16,
+            "right": 436,
+            "bottom": 245,
+            "width": 280,
+            "height": 229
+          },
+          "scrollTop": 20,
+          "edgeHits": [
+            {
+              "point": {
+                "x": 288,
+                "y": 72.5
+              },
+              "hit": "service-picker-search",
+              "owned": true
+            },
+            {
+              "point": {
+                "x": 288,
+                "y": 119.5
+              },
+              "hit": "service-picker-search",
+              "owned": true
+            },
+            {
+              "point": {
+                "x": 156.5,
+                "y": 96
+              },
+              "hit": "service-picker-search",
+              "owned": true
+            },
+            {
+              "point": {
+                "x": 419.5,
+                "y": 96
+              },
+              "hit": "service-picker-search",
+              "owned": true
+            }
+          ],
+          "focused": true
+        },
+        {
+          "label": "touch-landscape-light-restored-vv263-after-vv58",
+          "search": {
+            "x": 156,
+            "y": 92,
+            "right": 420,
+            "bottom": 140,
+            "width": 264,
+            "height": 48
+          },
+          "heading": {
+            "x": 156,
+            "y": 36,
+            "right": 420,
+            "bottom": 92,
+            "width": 264,
+            "height": 56
+          },
+          "body": {
+            "x": 156,
+            "y": 16,
+            "right": 436,
+            "bottom": 245,
+            "width": 280,
+            "height": 229
+          },
+          "scrollTop": 0,
+          "edgeHits": [
+            {
+              "point": {
+                "x": 288,
+                "y": 92.5
+              },
+              "hit": "service-picker-search",
+              "owned": true
+            },
+            {
+              "point": {
+                "x": 288,
+                "y": 139.5
+              },
+              "hit": "service-picker-search",
+              "owned": true
+            },
+            {
+              "point": {
+                "x": 156.5,
+                "y": 116
+              },
+              "hit": "service-picker-search",
+              "owned": true
+            },
+            {
+              "point": {
+                "x": 419.5,
+                "y": 116
+              },
+              "hit": "service-picker-search",
+              "owned": true
+            }
+          ],
+          "focused": true
+        },
+        {
+          "label": "touch-landscape-dark-restored-vv263-same-input",
+          "search": {
+            "x": 156,
+            "y": 72,
+            "right": 420,
+            "bottom": 120,
+            "width": 264,
+            "height": 48
+          },
+          "heading": {
+            "x": 156,
+            "y": 16,
+            "right": 420,
+            "bottom": 72,
+            "width": 264,
+            "height": 56
+          },
+          "body": {
+            "x": 156,
+            "y": 16,
+            "right": 436,
+            "bottom": 245,
+            "width": 280,
+            "height": 229
+          },
+          "scrollTop": 20,
+          "edgeHits": [
+            {
+              "point": {
+                "x": 288,
+                "y": 72.5
+              },
+              "hit": "service-picker-search",
+              "owned": true
+            },
+            {
+              "point": {
+                "x": 288,
+                "y": 119.5
+              },
+              "hit": "service-picker-search",
+              "owned": true
+            },
+            {
+              "point": {
+                "x": 156.5,
+                "y": 96
+              },
+              "hit": "service-picker-search",
+              "owned": true
+            },
+            {
+              "point": {
+                "x": 419.5,
+                "y": 96
+              },
+              "hit": "service-picker-search",
+              "owned": true
+            }
+          ],
+          "focused": true
+        },
+        {
+          "label": "touch-portrait-narrow-restored-vv263-same-input",
+          "search": {
+            "x": 20,
+            "y": 72,
+            "right": 284,
+            "bottom": 120,
+            "width": 264,
+            "height": 48
+          },
+          "heading": {
+            "x": 20,
+            "y": 16,
+            "right": 284,
+            "bottom": 72,
+            "width": 264,
+            "height": 56
+          },
+          "body": {
+            "x": 20,
+            "y": 16,
+            "right": 300,
+            "bottom": 245,
+            "width": 280,
+            "height": 229
+          },
+          "scrollTop": 20,
+          "edgeHits": [
+            {
+              "point": {
+                "x": 152,
+                "y": 72.5
+              },
+              "hit": "service-picker-search",
+              "owned": true
+            },
+            {
+              "point": {
+                "x": 152,
+                "y": 119.5
+              },
+              "hit": "service-picker-search",
+              "owned": true
+            },
+            {
+              "point": {
+                "x": 20.5,
+                "y": 96
+              },
+              "hit": "service-picker-search",
+              "owned": true
+            },
+            {
+              "point": {
+                "x": 283.5,
+                "y": 96
+              },
+              "hit": "service-picker-search",
+              "owned": true
+            }
+          ],
+          "focused": true
+        }
+      ],
+      "artifactUnchanged": true,
+      "browserCloseReceipt": "shared-guard-fulfilled",
+      "profileRemoved": true,
+      "focusEvents": [],
+      "launchMode": "macos-background-cdp",
+      "focusPolicy": "launchservices-no-foreground",
+      "nativeKeyboard": false,
+      "screenshotsReviewed": 24
+    },
+    "menu": {
+      "ok": true,
+      "suite": "menu",
+      "menuButtons": {
+        "initial": {
+          "present": true,
+          "role": "button",
+          "hasPopup": "menu",
+          "controls": "fluent-read-video-subtitle-menu",
+          "expanded": "false",
+          "pressed": null,
+          "active": true,
+          "menuPresent": true,
+          "menuHidden": true,
+          "offSelected": false
+        },
+        "opened": {
+          "present": true,
+          "role": "button",
+          "hasPopup": "menu",
+          "controls": "fluent-read-video-subtitle-menu",
+          "expanded": "true",
+          "pressed": null,
+          "active": true,
+          "menuPresent": true,
+          "menuHidden": false,
+          "offSelected": false
+        },
+        "closed": {
+          "present": true,
+          "role": "button",
+          "hasPopup": "menu",
+          "controls": "fluent-read-video-subtitle-menu",
+          "expanded": "false",
+          "pressed": null,
+          "active": true,
+          "menuPresent": true,
+          "menuHidden": true,
+          "offSelected": false
+        },
+        "reopened": {
+          "present": true,
+          "role": "button",
+          "hasPopup": "menu",
+          "controls": "fluent-read-video-subtitle-menu",
+          "expanded": "true",
+          "pressed": null,
+          "active": true,
+          "menuPresent": true,
+          "menuHidden": false,
+          "offSelected": false
+        },
+        "final": {
+          "present": true,
+          "role": "button",
+          "hasPopup": "menu",
+          "controls": "fluent-read-video-subtitle-menu",
+          "expanded": "false",
+          "pressed": null,
+          "active": true,
+          "menuPresent": true,
+          "menuHidden": true,
+          "offSelected": false
+        }
+      },
+      "translationRequests": 0,
+      "aiTranslationRequests": 0,
+      "pageErrors": [],
+      "consoleErrors": [],
+      "unexpectedNetworkRequests": [],
+      "launchMode": "macos-background-cdp",
+      "focusPolicy": "launchservices-no-foreground",
+      "AX": {
+        "nodeCount": 1,
+        "role": "button",
+        "name": "流畅阅读字幕翻译：已开启",
+        "hasPopup": "menu",
+        "expanded": true,
+        "pressedPresent": false
+      },
+      "screenshotsReviewed": 4
+    }
+  },
+  "nativeFinal": {
+    "safari": {
+      "status": "PASS_TARGETED_ACTUAL_SAFARI_POPUP109_COMPLETE_CONTROLS_AND_RESTORED_BORDERS; cleanupShutdown",
+      "runtimeCommit": "34e3170465a798f79524c56ce11024622734b862",
+      "buildTargets": {
+        "iosSimulator": {
+          "build": "passed",
+          "signature": "linker ad-hoc; no developer team",
+          "nativeExecutableSHA256": "db7b28e3fe9a49b780984790ea009b85fcd24236a6b751a95b550e244b9f8829",
+          "compiledWebRawSHA256": "b1d75236d26bfa00b50648657d2284c092d7b5a2e9eea7a3db2e64eea21202af",
+          "webFiles": 467
+        },
+        "macos": {
+          "build": "passed",
+          "signature": "linker ad-hoc; no developer team",
+          "nativeExecutableSHA256": "da1bf1fb9476edcb0e6a832d28b751b30efaf4a46dd9b5b3d758ca1305148488",
+          "compiledWebRawSHA256": "b1d75236d26bfa00b50648657d2284c092d7b5a2e9eea7a3db2e64eea21202af",
+          "webFiles": 467
+        },
+        "iphoneos": {
+          "build": "passed",
+          "signature": "unsigned; no developer team",
+          "nativeExecutableSHA256": "0661a66956269cb2344d40c3792d672b3d4711fc5fcbd9406c766b6cbcd6bbd7",
+          "compiledWebRawSHA256": "b1d75236d26bfa00b50648657d2284c092d7b5a2e9eea7a3db2e64eea21202af",
+          "webFiles": 467
+        }
+      },
+      "compiledIdentitySHA256": "1236cd6d2d282c43ca4894f8b635ff152711ae77676057cc96c6fd791409032d",
+      "installed485MatchBeforeAndAfter": true,
+      "sameBundleUpdate": true,
+      "appPrivateFilesPreserved": 17,
+      "allExtensionStorageVerified": false,
+      "retainedUI": {
+        "targetLanguage": "简体中文",
+        "defaultService": "免费翻译服务",
+        "availableAndEnabled": "可用 1 / 已启用 17",
+        "selectionMode": "划词翻译 · 显示图标",
+        "alwaysTranslate127Switch": 0,
+        "languageOnboardingAbsent": true
+      },
+      "case": {
+        "name": "test109IntegratedVideoMenuActualServiceKeyboardCompleteControls",
+        "counts": {
+          "total": 1,
+          "passed": 1,
+          "failed": 0,
+          "skipped": 0
+        },
+        "seconds": 110.65
+      },
+      "actions": {
+        "portraitRealIMEMicroSearch": "passed02",
+        "portraitClear": "passed03",
+        "rotateLandscapeRealIME": "passed04",
+        "restorePortraitWithMicroAndRealIME": "passed04b",
+        "returnLandscapeSameMicroAndIME": "passed04c",
+        "landscapeClear": "passed05",
+        "landscapeBackAndKeyboardHide": "passed06",
+        "closeToMain": "passed07",
+        "portraitReopenQueryReset": "passed08",
+        "systemDoneHidesKeyboardKeepsDrawer": "passed09",
+        "finalClearCloseMain": "passed10",
+        "nativePopupDoneClose": "passed11"
+      },
+      "landscapeAX": {
+        "controls": [
+          {
+            "exists": true,
+            "frame": {
+              "height": 46,
+              "width": 86,
+              "x": 360,
+              "y": 77
+            },
+            "hittable": true,
+            "label": "搜索服务或模型，如 gpt、qwen",
+            "typeRaw": 45
+          },
+          {
+            "exists": true,
+            "frame": {
+              "height": 46,
+              "width": 46,
+              "x": 452,
+              "y": 77
+            },
+            "hittable": true,
+            "label": "清除搜索",
+            "typeRaw": 9
+          },
+          {
+            "exists": true,
+            "frame": {
+              "height": 46,
+              "width": 46,
+              "x": 297,
+              "y": 77
+            },
+            "hittable": true,
+            "label": "返回翻译服务选择",
+            "typeRaw": 9
+          },
+          {
+            "exists": true,
+            "frame": {
+              "height": 46,
+              "width": 46,
+              "x": 515,
+              "y": 77
+            },
+            "hittable": true,
+            "label": "关闭",
+            "typeRaw": 9
+          }
+        ],
+        "keyboard": {
+          "height": 162,
+          "width": 724,
+          "x": 75,
+          "y": 238
+        }
+      },
+      "landscapeDialogPoints": {
+        "height": 58,
+        "width": 320,
+        "x": 277,
+        "y": 72
+      },
+      "bodyHeight50PointsInferredFromStyles": true,
+      "visualReview": {
+        "all13OriginalsReviewed": true,
+        "observations": {
+          "04-landscape-micro": "Fullpink searchtop/bottomborder and Back/Close bottomroundcorners visible; actualdialog58pt/body50pt/controls46pt.",
+          "05-landscape-clear": "Fullsearchborder/corners remainvisible afteractualClear; no micro retained.",
+          "04b-restored-portrait-micro": "Naturalrotationfromlandscape withrealkeyboardandmicro retained; completepink outertop/bottom/sideborders visible belowstickyheader. No forcedVV/scroll/stylesheet injected.",
+          "04c-returned-landscape": "Samecompactcontrols complete aftersecondnaturalrotation.",
+          "08-reopen": "No oldquery; emptysearchfullpinktop/bottomborder andheadercontrols visible.",
+          "09-keyboard-dismissed": "Real Done hidkeyboard; querymicro remains; ordinarydrawersearchgrayoutertop/bottom androundedcorners visible belowheader.",
+          "01-10": "Target简体中文/default免费翻译服务/freepool可用1已启用17/selection显示图标 retained; no languageonboarding.",
+          "11": "Nativepopup closed; localfixture only visible."
+        },
+        "limits": [
+          "ThisactualiOSSimulatordrawerflow,not physicaldevice orTalkBack/VoiceOver.",
+          "No screenshotcropping/style/viewportmutation; originals+EXIF preserved.",
+          "Fullmaskvisuallycontinuous; no separate nativebackgroundhit.",
+          "Veryshort58pt resultlistfullreadability/reachability notexercised.",
+          "No claim of nativeDOMscrollTop,VisualViewportvalue,or outerborderCSSrect readback; AXdialog/bodypaddinginference supplementedpixelreview."
+        ]
+      },
+      "cleanup": {
+        "simulator": "Shutdown",
+        "ownedProcessesRemaining": [],
+        "focusEvents": []
+      },
+      "physicalDevice": false,
+      "voiceOverSpeech": false
+    },
+    "firefox": {
+      "status": "passed-bounded-native-Gboard-service-picker-case",
+      "uniqueCaseCount": 1,
+      "screenshotCount": 18,
+      "productionRuntimeCommit": "34e3170465a798f79524c56ce11024622734b862",
+      "postflightIdentity": {
+        "at": "2026-10-15T23:44:22.395495+00:00",
+        "files": 478,
+        "bytes": 62343823,
+        "recordHash": "e9458d2d0ec447235dc74c1a09a24df30d86c206ba2526c2cae9f81fe44cc7fa",
+        "rawByteHash": "93034120173adf4ecc925cb3d4a9b115dfbc38451dd71197658299186424c609",
+        "sixSourceHashes": {
+          "src/app/popup/PopupApp.vue": "3add5957e78f73b77278d066bf6237516f1ee8137a6e649001681776cae2c465",
+          "src/app/popup/PopupServices.vue": "65accc535c596e0d0b692f052f2c079ea5970eb3f27875dab6f10e0c9bea5906",
+          "src/app/popup/popup.css": "956a926724901fb0689e972ebb5714d75fea5881d27991a8c024d300a766bd75",
+          "src/features/video-subtitle/content/runtime.ts": "78f118d6a66437ae060479c91e14881921a9c0d056a5e7f8fbff0b3f9465239d",
+          "src/features/video-subtitle/content/nativeFullscreen.ts": "389b9e9a9c4e8d3e825cc2485d65396ae33e4e2ddc739c8717b413be0295300e",
+          "src/features/video-subtitle/content/videoPlayerBinding.ts": "e5d2b72254b04d2b72eeb6a71666b833ff55814ee5c859e40409a63c9625e686"
+        },
+        "sixSourceMatches": true,
+        "artifactMatches": true
+      },
+      "guestIdentity": {
+        "at": "2026-10-15T23:34:27.210321+00:00",
+        "firefox": [
+          "versionCode=2016189050 minSdk=26 targetSdk=37",
+          "versionName=158.0"
+        ],
+        "IME": "com.google.android.inputmethod.latin/com.android.inputmethod.latin.LatinIME",
+        "serial": "emulator-5580"
+      },
+      "executedScope": [
+        "Existing task-only Firefox158 profile with exact production temporary addon; existing example.com page, no new site grant.",
+        "Native Firefox Extensions menu opens real popup; Services > Default page service > focused search.",
+        "Guarded Android text input micro with actual Gboard; portrait 263 -> landscape 80 -> portrait 263, query/focus retained.",
+        "Same-case second landscape: actual Clear -> Back -> reopen picker -> actual Close; keyboard dismissed by workflow.",
+        "Restore initial WM lock 0; portrait services reopen and actual Close; owned modal viewport variables/short flags released."
+      ],
+      "checks": {
+        "nativeAX": {
+          "passed": true,
+          "gateFiles": [
+            "v19-06-micro-portrait-ax-gate.json",
+            "v19-07-micro-landscape-ax-gate.json",
+            "v19-08-restored-micro-portrait-ax-gate.json"
+          ],
+          "controls": [
+            "Back to translation service selection",
+            "Close",
+            "Clear search",
+            "micro EditText"
+          ],
+          "allFourHeightCSS": 46,
+          "actualNativeXML": true,
+          "spokenATTested": false
+        },
+        "searchOuterBorder": {
+          "passed": true,
+          "portraitRect": [
+            40,
+            92,
+            264,
+            48
+          ],
+          "landscapeRect": [
+            210,
+            4,
+            156,
+            48
+          ],
+          "restoredPortraitRect": [
+            40,
+            92,
+            264,
+            48
+          ],
+          "allFourDOMEdgeHitsOwned": true,
+          "completeOriginalScreenshotsReviewed": true,
+          "nativeScrollTop": 0,
+          "scopeBoundary": "This native case did not exercise the Chrome production scrolled 22->20 correction; it proves the current native zero-scroll rotation/recovery path. No separate focus-ring gap promised."
+        },
+        "samePopupDocument": {
+          "timeOrigin": 1792107316122,
+          "queryAndFocusRetainedAcrossRotation": true,
+          "inputObjectIdentityInstrumented": false
+        },
+        "configuration": {
+          "scope": "Visible main UI at initial and final screenshots: auto-detect source, Simplified Chinese target, free-service label and selection Show icon retained. No service/language selection or config toggle. Not a full storage-byte audit.",
+          "screenshots": [
+            "v19-02-open-popup.png",
+            "v19-14-portrait-restored.png",
+            "v19-16-portrait-final-close.png"
+          ]
+        },
+        "mask": {
+          "ownedOverlayFillsActualVisualViewport": true,
+          "underlyingMainButtonHitProbesBlocked": true,
+          "scope": "Read-only DOM hit probes plus full original screenshots; no destructive background-action attempt."
+        },
+        "closeCleanup": {
+          "at": "2026-10-15T23:40:06.859056+00:00",
+          "initialReadOnlyAssertion": "Incorrect additional expectation of no cached modal node failed; no product/UI action repeated. Original tool failure remains in transcript.",
+          "actualContract": "Cached modal may remain; viewport markers+short flag+all4vars must release",
+          "actual": {
+            "v19-13-landscape-close": {
+              "viewport": {
+                "width": 592,
+                "height": 280,
+                "offsetLeft": 0,
+                "offsetTop": 0,
+                "scale": 1
+              },
+              "cachedOverlayState": [
+                {
+                  "active": false,
+                  "short": false,
+                  "vars": {
+                    "left": "",
+                    "top": "",
+                    "width": "",
+                    "height": ""
+                  }
+                }
+              ],
+              "resourcesReleased": true
+            },
+            "v19-16-portrait-final-close": {
+              "viewport": {
+                "width": 360,
+                "height": 512,
+                "offsetLeft": 0,
+                "offsetTop": 0,
+                "scale": 1
+              },
+              "cachedOverlayState": [
+                {
+                  "active": false,
+                  "short": false,
+                  "vars": {
+                    "left": "",
+                    "top": "",
+                    "width": "",
+                    "height": ""
+                  }
+                }
+              ],
+              "resourcesReleased": true
+            }
+          }
+        }
+      },
+      "providerAndPermissionBoundary": {
+        "translationIntentIssued": false,
+        "providerSelected": false,
+        "newWebsiteOrProviderGrantApproved": false,
+        "providerCallsInstrumented": false,
+        "note": "No translation/provider proof is claimed. Existing runtime network was not fully instrumented. The addon-added OK was informational, not a permission approval."
+      },
+      "mediaBoundary": {
+        "actualGboard": true,
+        "mockVisualViewport": false,
+        "pointerCoarseReported": false,
+        "androidRootMarker": true,
+        "note": "Native Android root marker applies touch sizing even though this emulator reports pointer:fine; no claim that coarse media query matched."
+      },
+      "preservedToolingFailures": [
+        {
+          "file": "guard-controller-preflight-blocked.log",
+          "reason": "Initial sandbox process inventory EPERM; no resources started. Later identical ownership read used authorized escalation successfully; no automatic-review rejection."
+        },
+        {
+          "file": "guard-controller-phase-assertion-failed.log",
+          "reason": "Copied research guard asserted attempt18 against GO19 before resource start; only research assertion corrected, exact artifact/port guards retained.",
+          "correction": {
+            "at": "2026-10-15T23:33:38.294709+00:00",
+            "scope": "research guard only, numeric attempt assertion missed during preparation copying",
+            "beforeSHA256": "7de562cd4ee19408e5b418e0d9fc7d8cfb5e22215c2b0703683fb9dcfbc823f1",
+            "afterSHA256": "47bdda3bbb0221cdadebb7767a47167c7250530665e829d8dc31a984aabbfcc5",
+            "change": "runtimeGo.attempt expected18→19; exact commit/artifact/port guards unchanged",
+            "resourcesStartedBeforeFailure": false
+          }
+        },
+        {
+          "file": "postclose-validation.json",
+          "reason": "Additional read-only assertion incorrectly expected cached modal DOM absent. Actual cached inactive node is allowed; flags/vars empty and no search. No UI action repeated or product changed."
+        }
+      ],
+      "notCovered": [
+        "Physical Android device or TalkBack speech/gesture output",
+        "Native 58 CSS px viewport, themes or full long-list matrix",
+        "Chrome-specific scrolled 22->20 path in this Android run",
+        "Provider translation or all configured provider permissions",
+        "Video, source-lifecycle, long background or install/update matrices",
+        "Exact physical touch dwell time; requested 100ms stationary swipe is API input duration only"
+      ],
+      "cleanup": {
+        "laneReleased": true,
+        "guardStatus": "stopped-by-owner",
+        "guardViolations": [],
+        "focusEvents": [],
+        "rotationRestored": true,
+        "runnerNormalExit": true,
+        "forwardRemoved": true,
+        "AVDDataRetained": true,
+        "allGone": true
+      }
+    },
+    "video": {
+      "runtimeCommit": "34e3170465a798f79524c56ce11024622734b862",
+      "rawXCTest": {
+        "passed": 0,
+        "skipped": 1,
+        "failed": 0,
+        "result": "Skipped",
+        "method": "test106IntegratedObservedAXTapNativeRotationReturn",
+        "rawSummary": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/native-video-integrated-34e317-observed-entry-tap-final/runtime-summary.json",
+        "testDurationSeconds": 52.916
+      },
+      "acceptance": {
+        "singleActualEntryTap": "NOT_PASSED_MENU_DID_NOT_OPEN",
+        "nativeFullscreenKeyboardRotationReturn": "NOT_REACHED_BLOCKED_BY_MENU",
+        "overall": "NOT_ACCEPTED",
+        "rootCause": "UNRESOLVED: actual DOM input target/events, listener-bound identity and live DOM menu state not captured. Do not infer ARIA, clone, staleJS or provider failure.",
+        "rawSkipIsNotUxPass": true
+      },
+      "entry": {
+        "counts": {
+          "atEpochMs": 1792108379822.966,
+          "buttonCount": 0,
+          "locator": "Application descendants any + exact observed label",
+          "otherCount": 1,
+          "popUpButtonCount": 0,
+          "semanticBoundary": "Actual observed Other locator; not a claim of correct menu-button mapping or VoiceOver success",
+          "switchCount": 0,
+          "totalCount": 1
+        },
+        "type": {
+          "acceptedKnownTypes": "Other/Button/PopUpButton; exact name and live geometry remain required",
+          "elementTypeRaw": 1
+        },
+        "before": {
+          "actualPlayerTime": "24秒钟",
+          "actualPlayerTitle": "Ken Robinson认为学校扼杀创造力, 20分钟3秒钟",
+          "atEpochMs": 1792108381401.218,
+          "centerIsNotMeasuredFrameworkHitPoint": true,
+          "elementTypeRaw": 1,
+          "entryFrame": {
+            "height": 45,
+            "width": 44,
+            "x": 350,
+            "y": 284
+          },
+          "hittable": true,
+          "label": "流畅阅读字幕翻译：已开启",
+          "nominalFrameCenter": {
+            "x": 372,
+            "y": 306.5
+          },
+          "observedTypeIsNotSemanticAcceptance": true,
+          "playerFrame": {
+            "height": 226,
+            "width": 402,
+            "x": 0,
+            "y": 110
+          },
+          "value": "Optional()"
+        },
+        "beforeRawAX": [
+          "Other, 0x1068f4340, {{350.0, 284.0}, {44.0, 45.0}}, label: '流畅阅读字幕翻译：已开启'"
+        ],
+        "afterRawAX": [
+          "Other, 0x106ea4fa0, {{350.0, 284.0}, {44.0, 45.0}}, label: '流畅阅读字幕翻译：已开启'"
+        ],
+        "action": {
+          "api": "XCUIElement.tap()",
+          "atEpochMs": 1792108383921.849,
+          "count": 1,
+          "domClickInjected": false,
+          "fixedCoordinates": false
+        },
+        "immediate": {
+          "ariaExpandedDirectXCUIAttributeAvailable": false,
+          "atEpochMs": 1792108384553.183,
+          "entryAXValueImmediate": "Optional()",
+          "entryExistsImmediate": true,
+          "entrySelectedImmediate": false,
+          "expandedReadBoundary": "Public XCUI exposes raw value/selected, not direct DOM aria-expanded; do not infer it from subtitle enablement",
+          "menuExistsImmediate": false,
+          "tapCount": 1
+        },
+        "stableResult": {
+          "actualPlayerTime": "31秒钟",
+          "atEpochMs": 1792108388121.706,
+          "entryExistsAfter": true,
+          "entryValueAfter": "Optional()",
+          "menuExistsImmediate": false,
+          "menuOpened": false,
+          "tapCount": 1
+        },
+        "menuLabelPresentInStableRawAX": false,
+        "harnessTapCount": 1,
+        "coordinateOrDOMFallback": false,
+        "actualFrameworkHitpoint": "NOT_CAPTURED; nominal center is not actual tap location proof",
+        "directDOMAriaExpanded": "UNAVAILABLE via public XCUI; no KVC/private API used"
+      },
+      "actualFreePreflight": {
+        "effectiveVideoServiceRow": "视频字幕 · 跟随默认 · 免费翻译服务",
+        "permissionRequested": false,
+        "policy": "Safari 免费服务仅使用已授权的线路 · 可用 1 / 已启用 17",
+        "requiredOriginGrants": "Current Safari product contains()-backed available-route count >0",
+        "serviceChanged": false
+      },
+      "actualCueObservations": {
+        "automaticNaturalPlaybackContinued": true,
+        "seenInImmediateAndLaterScreenshots": true,
+        "EnglishExamples": [
+          "Good morning. How are you?",
+          "I've been blown away by the whole thing.",
+          "(Laughter)"
+        ],
+        "distinctChineseTranslationVisible": true,
+        "providerProvenance": "Not captured; no attribution",
+        "networkCount": "Not captured; existing authorized free runtime may automatically request"
+      },
+      "operationsNotTaken": [
+        "entry retry",
+        "fixed-coordinate fallback",
+        "DOM event/style/cue/cache injection",
+        "CC toggle",
+        "provider or display mode change",
+        "new grant",
+        "explicit play/pause/seek",
+        "native fullscreen"
+      ],
+      "audioBoundary": {
+        "beforeActualAX": [
+          "Button, 0x1068f3ec0, {{0.0, 110.0}, {168.0, 73.0}}, label: '点按取消静音'"
+        ],
+        "afterStableActualAXMatchingPromptCount": 0,
+        "beforePixels": "Left upper white muted/unmute affordance visible",
+        "immediateAndStablePixels": "White site muted/unmute affordance disappears after the one FR-target AX tap",
+        "stableSafariChromePixels": "Blue audio glyph appears in Safari address bar",
+        "explicitHarnessMuteOrVolumeControlAction": false,
+        "observedStateChange": true,
+        "actualDOMMutedAndVolume": "NOT_CAPTURED; blue audio glyph alone does not prove DOM muted/volume values or audible output",
+        "attribution": "Site first-gesture consumption is a candidate, not proven without DOM hit/events. Do not claim audio unaffected.",
+        "restoration": "No separate mute/volume restore gesture attempted; original DOM state was not read. Final actual DOM audio state unknown. CC not read/changed."
+      },
+      "CC": {
+        "attemptedRestoreTap": false,
+        "originalValue": "not-read",
+        "reason": "No CC-changing gesture; no restoration required",
+        "restorationClaim": false,
+        "temporarilyChangedOrGestureAttempted": false
+      },
+      "orientation": {
+        "originalRaw": 0,
+        "originalMeaning": "unknown",
+        "establishedExplicitPortrait": true,
+        "finally": {
+          "actualRaw": 1,
+          "baselineEstablishedBeforeScene": true,
+          "originalDirectionalKnown": false,
+          "originalOrientationRestorationClaim": false,
+          "originalRaw": 0,
+          "requestedRaw": 1,
+          "restorationTarget": "explicit-portrait-baseline",
+          "screenHeight": 874,
+          "screenWidth": 402,
+          "stable": true
+        },
+        "unknownOriginalRestored": false
+      },
+      "imagesReviewed": 6,
+      "cleanup": {
+        "simulator": "Shutdown",
+        "ownedProcessesRemaining": [],
+        "focusEvents": [],
+        "guardViolations": []
+      },
+      "previousCase": "Final34e317 typed-Button precondition SKIP, entry tap never attempted; observed unique Other; retained separately.",
+      "limits": [
+        "No actual DOM events, hitpoint or listener/menu mutation trace",
+        "No final-package native VIDEO fullscreen keyboard/rotation acceptance",
+        "No physical-device or VoiceOver/TalkBack acceptance"
+      ]
+    }
+  },
+  "screenshots": [
+    {
+      "path": "images/search-border-before.png",
+      "sha256": "9da93274650841fd357c69f4dbd2549e3ad7c66863a332eb2b1e22bf4b6d0ce9",
+      "edited": false
+    },
+    {
+      "path": "images/search-border-after.png",
+      "sha256": "c32d64476fb61ac9da475fb45851ba013f43f6ee7612aa786ee74b22e21b6989",
+      "edited": false
+    },
+    {
+      "path": "images/service-controls-58.png",
+      "sha256": "f6ae1406c514fd69b2e76e315460ceb5d839ea044c5d71e266fe5949cc9f3c12",
+      "edited": false
+    },
+    {
+      "path": "images/video-menu.png",
+      "sha256": "44c5ee59719daf7564d8c8782e490e747b2c2a52e76388f29f2051f5f334e3a5",
+      "edited": false
+    },
+    {
+      "path": "images/ios-landscape-keyboard.png",
+      "sha256": "73276cc4433a02451133393de2212e8190b22e3ae875c62cf0981032bb691da3",
+      "edited": false,
+      "source": "Final34e317 actual iOS Simulator Popup109"
+    },
+    {
+      "path": "images/ios-restored-search-border.png",
+      "sha256": "4e42f6167a5425b6e21e6bc1c1a6828fb92217d2c6ba0f8c383ed50e1cc8cce9",
+      "edited": false,
+      "source": "Final34e317 actual iOS Simulator Popup109"
+    },
+    {
+      "path": "images/firefox-landscape-keyboard.png",
+      "sha256": "71c309b48ba0b0e3927ce078ebfad5369e8ebec0851926836c3b132e2e39c731",
+      "edited": false,
+      "source": "Final34e317 actual Firefox Android158 Gboard attempt19"
+    },
+    {
+      "path": "images/firefox-restored-search-border.png",
+      "sha256": "f14f246f5fb77fa15384ac8e62fef3d4a19d2d1bbc190d49ae3b02b25fbe909b",
+      "edited": false,
+      "source": "Final34e317 actual Firefox Android158 Gboard attempt19"
+    },
+    {
+      "path": "images/edge-store-original.png",
+      "sha256": "f8078dc766daaf52cd6a7f14cf79ac7affbba643dbf23c633e623f2136097dbb",
+      "edited": false,
+      "source": "Published store0.0.37 on actual EdgeAndroid155; separate from final34e317"
+    },
+    {
+      "path": "images/edge-store-retranslated.png",
+      "sha256": "b75477c4ff71798153c02a810d618bbbe16da309579b19bee5e5e2b2464a883f",
+      "edited": false,
+      "source": "Published store0.0.37 on actual EdgeAndroid155; separate from final34e317"
+    }
+  ],
+  "boundaries": [
+    "Desktop viewport geometry is explicitly simulated; native device evidence is separate.",
+    "Browser menu uses a local fixture, not real-provider quality or live YouTube acceptance.",
+    "No physical-device or assistive-technology speech acceptance.",
+    "Userscripts Demo directory reselected normally but post-selection script read remains unverified.",
+    "Entire mobile/Safari goal remains active."
+  ],
+  "codeReview": {
+    "runtimeCommit": "34e3170465a798f79524c56ce11024622734b862",
+    "independentAgent": "mobile_subtitles",
+    "actionableP1P2": [],
+    "scope": "Final focused-search restoration ownership, dynamic sticky geometry and eight added consumers; video menu semantics reviewed separately",
+    "correctedGeometry": "scrollTop22 to20; no extra focus-ring margin; original8f review22to18 is historical"
+  },
+  "otherRuntimeAcceptance": {
+    "edgePublished0037": {
+      "status": "official-store-install-and-one-page-translate-restore-retranslate-passed; whole-page-quality-not-passed",
+      "uniqueFunctionalScenarioCount": 1,
+      "screenshotCount": 37,
+      "browser": {
+        "package": "com.microsoft.emmx",
+        "versionName": "155.0.4283.48",
+        "versionCode": 428304805,
+        "continuity": "Installed by official APK in Edge7; version continuity checked, no reinstall or device-base.apk byte equality claim"
+      },
+      "firstUse": {
+        "actualUIChineseSelectedAndConfirmed": true,
+        "targetSimplifiedChineseObserved": true,
+        "pageService": "Default free translation services, unchanged",
+        "accountsKeysOrPaidProviderAdded": false
+      },
+      "functionalSmoke": {
+        "status": "passed-actual-page-AX-and-visible-pixels",
+        "sourceLanguage": "Visible first paragraph English; original page also has Arabic/Chinese/French/Russian/Spanish text.",
+        "originalEnglishSHA256": "0a080719be9fbb82a86a45b80dc8c2a430fbe17dc93d23758debac092864d00f",
+        "newEnglishTranslation": "此域无需许可即可用于留档示例。这不是服务；避免依赖它进行测试和监控。",
+        "newTranslationPresent": {
+          "original17": false,
+          "translated27": true,
+          "restored32": false,
+          "retranslated37": true
+        },
+        "originalChineseWasAlreadyPresent": true,
+        "originalChinesePreservedAcrossAllStates": true,
+        "originalSixLanguageParagraphsRetainedOnRestore": true,
+        "visibleEvidence": [
+          "e20-17-original-no-native-bar.png",
+          "e20-27-first-page-result.png",
+          "e20-32-restored-page.png",
+          "e20-37-retranslated-page.png"
+        ],
+        "DOMSerializationCaptured": false,
+        "nativeAXCaptured": true,
+        "note": "XML contains offscreen nodes; only explicitly screenshot-visible first English/new Chinese paragraphs count as visible output. No DOM wrappers/pageLifecycle/network instrumentation in Edge store phase."
+      },
+      "qualityAnomaly": {
+        "status": "new-offscreen-AX-output-anomaly-observed; whole-page-quality-not-passed",
+        "textSHA256": "3dab954448abc4205daf0ec14aaff8b545e65adee67b1cec2c84fa4c66af0bbe",
+        "textLength": 51,
+        "containsGarbledText": true,
+        "containsPhoneLikeSequence": true,
+        "rawTextOmittedFromReport": true,
+        "bounds": "[111,1446][969,1446]",
+        "visiblePixelsCaptured": false,
+        "present": {
+          "original17": false,
+          "first27": true,
+          "restored32": false,
+          "retry37": true
+        },
+        "association": "New text appears after original Spanish paragraph in flattened AX order. DOM/provider source-to-output mapping uninstrumented; do not assert exact provider or cause.",
+        "rawControlledEvidence": [
+          "e20-27-first-page-result.xml",
+          "e20-37-retranslated-page.xml"
+        ],
+        "publicSummary": "An offscreen additional output contains garbled text; no full-page translation-quality pass claimed."
+      },
+      "provider": {
+        "observedServiceLabel": "免费翻译服务",
+        "actualProvider": "Unknown",
+        "networkInstrumented": false,
+        "freshOrCachedOnSecondTranslate": "Unknown; no cache clearing",
+        "uiCompletedCounters": [
+          0,
+          7,
+          14
+        ],
+        "counterBoundary": "Product UI counter only; not test count or measured provider call count."
+      },
+      "evidenceBoundary": {
+        "mechanism": "Real Android input + uiautomator fullAX + screencap; no synthetic DOM clicks or extension config injection.",
+        "guest": "Dedicated API31 arm64 AVD/Edge155; emulator, not physical Android.",
+        "page": "Actual public example.com content encountered this run; not custom fixture. Native browser translation suggestion dismissed without itsTranslate.",
+        "DOMOrNetworkCaptured": false,
+        "actualNativeTouchDwellMeasured": false,
+        "controls": "Normal semantic/observed-current-bounds taps; titleAXtext empty but full current screenshot+AXrect used; catalog hidden duplicateGet avoided using actual foregrounddetailGetrect."
+      },
+      "notRun": [
+        "Full mobile/keyboard/landscape/theme/selection matrix",
+        "Live provider identity/network-response validation or general linguistic quality",
+        "Physical device/TalkBack spoken output",
+        "Installed-extension officialID via private data or developmenttools",
+        "New browser APK install, profile reset, default-browser/account/OS permission changes",
+        "Any FluentRead product/test/build or PR-doc modifications"
+      ],
+      "extension": {
+        "observedStoreTitle": "FluentRead-流畅阅读",
+        "observedPublisher": "ThinkStu",
+        "freshVisibleStoreVersion": "0.0.37",
+        "popupInstalledVersion": "v0.0.37",
+        "actualPublicUIOfficialId": null,
+        "identityBoundary": "Actual official mobile directory search->ThinkStu card->detail->Get->namedAdd->Installed/Remove->runtimepopup v0.0.37 chain verified. No publicUI ID exposed in examined chain; independent expectedID is not presented as observedID. No private installed package/CRX bytes inspection.",
+        "installed": true,
+        "localBuildsExcluded": [
+          "local0.0.38",
+          "runtime34e317",
+          "Firefox19 production artifact"
+        ],
+        "storeMobileWarning": "This extension has not been validated for mobile by Microsoft; retained in actual images."
+      },
+      "permission": {
+        "explicitHumanAuthorization": true,
+        "scope": "Only task-owned Android Edge test profile",
+        "actualGranted": "Read and change all your data on all websites",
+        "priorApprovalBlockResolved": true
+      },
+      "cleanup": {
+        "laneReleased": true,
+        "guardStatus": "stopped-by-owner",
+        "guardViolations": [],
+        "focusEvents": [],
+        "defaultBrowserUnchanged": true,
+        "profileAndExtensionRetained": true,
+        "default5037Touched": false
+      },
+      "all37OriginalImagesReviewed": true
+    },
+    "userscriptsSimulator": {
+      "status": "Not accepted: manager popup shows first-use Open Userscripts App initialization; directory and refresh controls Disabled; Demo reread not established",
+      "manager": "Pinned official Userscripts5.0.0-beta.23 local unsigned Debug build",
+      "actualMainCaseCount": 1,
+      "latestRawXCTest": {
+        "passed": 0,
+        "skipped": 1,
+        "failed": 0,
+        "seconds": 56.51
+      },
+      "latestRevision": "attempt5/formatter-revision1",
+      "normalPageMenuReached": true,
+      "managerEntryReached": true,
+      "refreshOrFolderClicked": false,
+      "directoryReselectedThisRun": false,
+      "local127TemporaryGrant": "Same previously authorized site only, Allow1Day once",
+      "permissionRestore": "Ask selected and verified via normal system UI",
+      "identity": {
+        "userscripts47Match": true,
+        "fluentRead485Match": true,
+        "fluentRead17PrivateMatch": true,
+        "demoMatch": true
+      },
+      "cleanup": {
+        "simulator": "Shutdown",
+        "laneReleased": true,
+        "ownedProcessesRemaining": [],
+        "focusEvents": [],
+        "guardViolations": []
+      },
+      "limits": [
+        "No FluentRead userscript runtime or provider acceptance",
+        "No proven AppGroups or signing root cause"
+      ],
+      "priorResearchFailuresPreserved": [
+        "Default Ask row absence precondition",
+        "Settings detail navigation postcondition",
+        "Swift log frame formatter compile failure before runtime"
+      ],
+      "actualPopup": {
+        "firstUseInitializationPrompt": true,
+        "openSaveLocation": "Disabled in actual AX",
+        "refreshView": "Disabled in actual AX",
+        "rootViewedOriginalScreenshot": true,
+        "selectorMissingConclusion": false,
+        "normalNextStep": "Open Userscripts App through its visible first-use link; not executed in this case"
+      },
+      "imagesReviewed": 12,
+      "reportSHA256": "714dbf9d5f037cdca75e7e26a0630fb24918874166678d0acf6101ae112af676",
+      "visualReviewSHA256": "8f7b3eac5bfed5e464315c351100b560a8a39c929a1c240d7359fdc8d7b831a4"
+    }
+  },
+  "referenceProjectsBorrowed": false
+}

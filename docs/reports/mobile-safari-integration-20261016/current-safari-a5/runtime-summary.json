@@ -1,0 +1,49 @@
+{
+  "devicesAndConfigurations" : [
+    {
+      "device" : {
+        "architecture" : "arm64",
+        "deviceId" : "A407390F-7AA8-42AE-AFEB-F93EE99E9FF8",
+        "deviceName" : "FluentRead-PR995-FreshPermissions-20261015",
+        "modelName" : "iPhone 16 Pro",
+        "osBuildNumber" : "23C52",
+        "osVersion" : "26.2",
+        "platform" : "iOS Simulator"
+      },
+      "expectedFailures" : 0,
+      "failedTests" : 1,
+      "passedTests" : 0,
+      "skippedTests" : 0,
+      "testPlanConfiguration" : {
+        "configurationId" : "1",
+        "configurationName" : "Test Scheme Action"
+      }
+    }
+  ],
+  "environmentDescription" : "NativeHarness · Built with macOS 26.6.2",
+  "expectedFailures" : 0,
+  "failedTests" : 1,
+  "finishTime" : 1792139968.011,
+  "passedTests" : 0,
+  "result" : "Failed",
+  "skippedTests" : 0,
+  "startTime" : 1792139926.666,
+  "statistics" : [
+
+  ],
+  "testFailures" : [
+    {
+      "failureText" : "Failed to get matching snapshot: No matches found for first query match sequence: `Descendants matching type WebView` -> `Descendants matching type Switch` -> `Elements matching predicate 'label CONTAINS \"字幕\" AND (NOT label BEGINSWITH \"流畅阅读\")'`, given input App element pid: 60343\nPossibly caused by runtime issues:\nAutomation type mismatch: computed Other from legacy attributes vs WebView from modern attribute. Input attributes and values: {\n    \"XC_kAXXCAttributeAutomationType\" = 58;\n    \"XC_kAXXCAttributeElementBaseType\" = UIView;\n    \"XC_kAXXCAttributeElementType\" = \"_SFWebView\";\n    \"XC_kAXXCAttributeTraits\" = 146028888064;\n}\nAutomation type mismatch: computed Other from legacy attributes vs WebView from modern attribute. Input attributes and values: {\n    \"XC_kAXXCAttributeAutomationType\" = 58;\n    \"XC_kAXXCAttributeElementBaseType\" = UIView;\n    \"XC_kAXXCAttributeElementType\" = WKContentView;\n    \"XC_kAXXCAttributeTraits\" = 146028888064;\n}\nSee test report attachments for more detail.",
+      "targetName" : "SafariSmokeUITests",
+      "testIdentifier" : 1,
+      "testIdentifierString" : "SafariSmokeTests/test110ProductionLivePlayerCenterControls()",
+      "testIdentifierURL" : "test://com.apple.xcode/NativeHarness/SafariSmokeUITests/SafariSmokeTests/test110ProductionLivePlayerCenterControls",
+      "testName" : "test110ProductionLivePlayerCenterControls()"
+    }
+  ],
+  "title" : "Test - NativeHarness",
+  "topInsights" : [
+
+  ],
+  "totalTestCount" : 1
+}

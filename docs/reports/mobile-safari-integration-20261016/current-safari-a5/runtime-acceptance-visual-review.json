@@ -1,0 +1,200 @@
+{
+  "at": "2026-10-16T08:43:44.513659+00:00",
+  "status": "RAW_TEST_FAILED_AT_CC_AX_QUERY_DIAGNOSTIC_TOUCH_AND_NATIVE_CONTROL_OBSERVATION_SUCCEEDED",
+  "productionCommit": "f5a82d11a5b6b6a5de2f2ea726065a56cdb2e6ca",
+  "checkoutHead": "da0317009f53660ba8372b60fdffe70f3e8833c1",
+  "productionIdentitySHA256": "3f3df2dc7993788676427a6544e5cd17937f2a7da8d8e4a5f6c1d215417679dd",
+  "productionFullAppFileCount": 485,
+  "webRawSHA256": "1040bd47a0d9b907d30a91fa7d27e7aa46b7c5c1e258bb6e3223ba4082838705",
+  "researchSourceSHA256": "31898a64ecd8da29cea65faa72a48f99da7f6643811ffaf0cb3348c4691c57ef",
+  "researchTestBinarySHA256": "dc3d5ebfa0c7a7948e87ace641ec494338fbba41ab5412173df1680c098cb8a9",
+  "rawXCTest": {
+    "total": 1,
+    "passed": 0,
+    "skipped": 0,
+    "failed": 1,
+    "durationSeconds": 19.773,
+    "runtimeSession": 32610,
+    "runtimeSessionExitCode": 1,
+    "summarySHA256": "ca9080d20ec3c4c71cb40e8f53804039a209a530650547944cfe87e77aecadf1",
+    "failure": {
+      "failureText": "Failed to get matching snapshot: No matches found for first query match sequence: `Descendants matching type WebView` -> `Descendants matching type Switch` -> `Elements matching predicate 'label CONTAINS \"字幕\" AND (NOT label BEGINSWITH \"流畅阅读\")'`, given input App element pid: 60343\nPossibly caused by runtime issues:\nAutomation type mismatch: computed Other from legacy attributes vs WebView from modern attribute. Input attributes and values: {\n    \"XC_kAXXCAttributeAutomationType\" = 58;\n    \"XC_kAXXCAttributeElementBaseType\" = UIView;\n    \"XC_kAXXCAttributeElementType\" = \"_SFWebView\";\n    \"XC_kAXXCAttributeTraits\" = 146028888064;\n}\nAutomation type mismatch: computed Other from legacy attributes vs WebView from modern attribute. Input attributes and values: {\n    \"XC_kAXXCAttributeAutomationType\" = 58;\n    \"XC_kAXXCAttributeElementBaseType\" = UIView;\n    \"XC_kAXXCAttributeElementType\" = WKContentView;\n    \"XC_kAXXCAttributeTraits\" = 146028888064;\n}\nSee test report attachments for more detail.",
+      "targetName": "SafariSmokeUITests",
+      "testIdentifier": 1,
+      "testIdentifierString": "SafariSmokeTests/test110ProductionLivePlayerCenterControls()",
+      "testIdentifierURL": "test://com.apple.xcode/NativeHarness/SafariSmokeUITests/SafariSmokeTests/test110ProductionLivePlayerCenterControls",
+      "testName": "test110ProductionLivePlayerCenterControls()"
+    },
+    "meaning": "Overall raw failure is retained. Scoped diagnostic observations do not convert it to a test PASS."
+  },
+  "scope": "One approved case110 on portrait dedicated A407, unmodified productionf5a/App3f3d. No automatic retry, extra gesture, pause, forced display, provider or permission change.",
+  "diagnosticTouch": {
+    "status": "PASS_ONE_NORMAL_CURRENT_ELEMENT_RELATIVE_CENTER_GESTURE",
+    "decision": {
+      "containerIsHittableIsEvidenceOnly": true,
+      "decision": "oneCurrentElementRelativeCenterTouch",
+      "interactiveButtonsStillRequireIsHittable": true,
+      "normalizedX": 0.5,
+      "normalizedY": 0.5,
+      "recordedCurrentFrame": {
+        "height": 226,
+        "width": 402,
+        "x": 0,
+        "y": 110
+      }
+    },
+    "immediatelyBefore": {
+      "alerts": 0,
+      "appForeground": true,
+      "appFrame": {
+        "height": 874,
+        "width": 402,
+        "x": 0,
+        "y": 0
+      },
+      "containedInApp": true,
+      "containerIsHittableObservationOnly": false,
+      "diagnosticTouchCount": 0,
+      "elapsedSeconds": 13.069350957870483,
+      "knownTEDCandidateExists": true,
+      "phase": "immediately-before-touch",
+      "playerCount": 1,
+      "playerExists": true,
+      "playerFrame": {
+        "height": 226,
+        "width": 402,
+        "x": 0,
+        "y": 110
+      },
+      "positiveFinite": true
+    },
+    "normalTapLoggedAtCaseSeconds": 13.81,
+    "synthesizedEventLoggedAtCaseSeconds": 14.39,
+    "gestureReturnedAtCaseSeconds": 14.96,
+    "exactPlayerCenterTapLogCount": 1,
+    "sourceAndRawInputBoundary": "Normal XCTest coordinate.tap referenced the unique current known TED player with current positive finite app-contained frame; not JS/force/saved absolute point. Container isHittable remained observed=false; interactive buttons retained their own guard."
+  },
+  "nativeControls": {
+    "status": "PASS_SCOPED_SAME_PLAYER_NATIVE_FULLSCREEN_CONTROL_OBSERVED_HITTABLE",
+    "record": {
+      "diagnosticTouchCount": 1,
+      "observed": true,
+      "readElapsedSeconds": 0.9484989643096924,
+      "within3Seconds": true
+    },
+    "postTouchPlayer": {
+      "alerts": 0,
+      "appForeground": true,
+      "appFrame": {
+        "height": 874,
+        "width": 402,
+        "x": 0,
+        "y": 0
+      },
+      "containedInApp": true,
+      "containerIsHittableObservationOnly": false,
+      "diagnosticTouchCount": 1,
+      "elapsedSeconds": 15.298910975456238,
+      "knownTEDCandidateExists": true,
+      "phase": "after-touch-observation",
+      "playerCount": 1,
+      "playerExists": true,
+      "playerFrame": {
+        "height": 226,
+        "width": 402,
+        "x": 0,
+        "y": 110
+      },
+      "positiveFinite": true
+    },
+    "evidenceBoundary": "The frozen source predicate requires exactly one actual native fullscreen button with positive frame wholly within the player and isHittable=true. This observation completed0.9485s after normal gesture return. No post-touch native-controls PNG was captured before the later CC error, so general native paint/all-control hit acceptance is not established."
+  },
+  "CCPlay": {
+    "status": "UNVERIFIED_ABORTED_CC_SNAPSHOT_QUERY",
+    "facts": "CC switch query initially resolved label 已开启字幕, then XCTest could not obtain its matching snapshot during a later read and retried its internal query twice. No CC/Play tap is logged, normal-site-preparation receipt was never reached.",
+    "logTimesSeconds": {
+      "lastCCFindBeforeInternalRetries": 16.83,
+      "internalQueryRetry1": 17.91,
+      "internalQueryRetry2": 19.01,
+      "failureTriage": 19.09
+    },
+    "causeBoundary": "XCTest suggests a possible legacy/modern WebView automation-type mismatch. Native controls disappearing during reads is also plausible, but neither cause is established by this single result. No product/provider regression is concluded."
+  },
+  "menu": {
+    "status": "NOT_MEASURED",
+    "entryCount": "NOT_MEASURED",
+    "atLeast44px": "NOT_MEASURED",
+    "opened": "NOT_ATTEMPTED",
+    "closed": "NOT_ATTEMPTED",
+    "reason": "a5RequiredMenu was not reached; no A5-FR-menu-result artifact. Missing artifact is not entryCount0."
+  },
+  "realBilingual": {
+    "status": "NOT_MEASURED",
+    "reason": "The post-menu40s bilingual observation was not reached; pre-touch PNG shows only video intro text."
+  },
+  "captionPlusControls": {
+    "status": "UNVERIFIED_NOT_REACHED",
+    "reason": "No captured same-scene real bilingual cue and native controls; cannot infer combined paint from successful control appearance."
+  },
+  "imagesReviewed": [
+    {
+      "path": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/mobile-safari-live-player-touch-harness-20261016/inline-attempt1/runtime-evidence/A5-before-live-player-touch.png",
+      "sha256": "49ebd20f8c7315c2823c041017c1ab9b07e0d240b057dbf3261fd4d89169d57d",
+      "reviewedPersonally": true,
+      "finding": "Original pre-touch PNG shows the real known TED watch page, visible intro text1000 remarkable people gather in Monterey,California, and hidden native controls. No FluentRead bilingual cue/menu or permission prompt is visible."
+    }
+  ],
+  "allExportedOriginalPNGsReviewed": true,
+  "originalAttachmentCount": 21,
+  "originalAttachmentInventory": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/mobile-safari-live-player-touch-harness-20261016/inline-attempt1/original-attachment-inventory.json",
+  "allOriginalAttachmentsPreserved": true,
+  "automaticScreenRecording": {
+    "path": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/mobile-safari-live-player-touch-harness-20261016/inline-attempt1/runtime-attachments/44FAB57F-1685-4659-AFEF-09F3B5C46B43.mp4",
+    "sha256": "9a82c2c96d403bf22203c7c5539b745f074975b0e11c7c9584d72b230f3631ac",
+    "bytes": 20177810,
+    "reviewStatus": "PRESERVED_NOT_PERSONALLY_REVIEWED; no derived video-frame visual claim"
+  },
+  "restoration": {
+    "at": "2026-10-16T08:41:48.415970+00:00",
+    "runtimeSession": 32610,
+    "runtimeSessionExitCode": 1,
+    "rawTestOutcome": "0PASS/0SKIP/1FAIL; runtime test exit does not alter successful finally cleanup",
+    "exportExitCode": 0,
+    "knownPIDCount": 87,
+    "remaining": [],
+    "psCode": 0,
+    "psElapsedMs": 43.652917,
+    "psTimeoutSeconds": 10,
+    "device": {
+      "udid": "A407390F-7AA8-42AE-AFEB-F93EE99E9FF8",
+      "name": "FluentRead-PR995-FreshPermissions-20261015",
+      "state": "Shutdown"
+    },
+    "foreignBootedRecordedOnly": [],
+    "oldIdentitySHA256": "b185d1c82009ea924b6b92bfdfb2045120df4d58f49c8cb345b508a28890e31d",
+    "oldInstalledFull485FreshMatch": true,
+    "DemoFreshSHA256": "6eb20314a7463f8f210cb1ced63867b1f2e3537ce66d7f12d106641d040d14b3",
+    "Userscripts47FreshMatch": true,
+    "nativePrivate17FreshMatch": true,
+    "afterShutdownReceipt": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/mobile-safari-live-player-touch-harness-20261016/inline-attempt1/identity-after-shutdown.json",
+    "afterShutdownReceiptSHA256": "f85517e3c42cd161b7d21dfff6dbe057e76deee078aa7a6508a48c368fb79565",
+    "privateBoundary": "Native FR App data17 hash baseline only; not all extension settings/storage/cache. Record post-UI changes; do not copy files back.",
+    "focusEvents": [],
+    "violations": [],
+    "cleanupErrors": [],
+    "laneReleased": true
+  },
+  "installs": 1,
+  "restores": 1,
+  "resourceLaneReleased": true,
+  "freshReleaseReceiptSHA256": "b9574cddde0df37fae7d1c22af7c458fdb6ac38913c030c577e17ec472887ded",
+  "exportExitCode": 0,
+  "automaticRetry": false,
+  "notCovered": [
+    "Native FR menu",
+    "Real bilingual caption/control paint",
+    "Learning-touch",
+    "Rare-scroll/fullscreen/rotation/background/full-mode matrix",
+    "Physical-device or assistive speech"
+  ]
+}

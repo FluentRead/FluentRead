@@ -1,0 +1,93 @@
+{
+  "runtimeSourceCommit": "f5a82d11a5b6b6a5de2f2ea726065a56cdb2e6ca",
+  "sourceEvidenceRoot": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/mobile-learning-short-height-followup-20261016/edge-attempt1",
+  "copiedAt": "2026-10-16T07:56:25.811752+00:00",
+  "originalPNGs": 18,
+  "scope": "Controlled production Edge only; not Safari, physical touch, or live provider acceptance",
+  "files": {
+    "report.json": {
+      "sha256": "4152f312140f973f108e131721f58be2c7b22b1cd496d8df794ac9d8b406c14f",
+      "bytes": 5745
+    },
+    "visual-review.json": {
+      "sha256": "cf4aa004026ea4fed3003ea2580adbb37b5e58786eb14900a57ac92cb2e6c74e",
+      "bytes": 21373
+    },
+    "fresh-cleanup-review.json": {
+      "sha256": "6c926ff4a38fd0a92595116d3ecc536d676aad2dfc446c526ffd6e69373e67ef",
+      "bytes": 386
+    },
+    "cleanup-page-0.png": {
+      "sha256": "9c5e6ab6c8fb91a39e84967f6a84293086d97d0c3c4f68e1e47f63db7cf4f85e",
+      "bytes": 16213
+    },
+    "cleanup-page-1.png": {
+      "sha256": "4f8ad0736ee707da711e78cbeb582c0e82eae6d3b8c32dde3045848921156c6e",
+      "bytes": 47419
+    },
+    "cleanup-page-2.png": {
+      "sha256": "bb2e82aaeedcb90833a19de604d5976a7d2e35a36c56bf00895571f201df1edd",
+      "bytes": 46456
+    },
+    "learning-coarse-from-menu.png": {
+      "sha256": "bc5e5971911f5fc6fca922c04728fe23005e369e27b21bb15b9b71de0b8f2a52",
+      "bytes": 47387
+    },
+    "learning-coarse-scroll-end.png": {
+      "sha256": "a37090db88a2096b2261ee36c05eaeb0c9e5baf1e6052957f159aeca4edf3bc9",
+      "bytes": 37982
+    },
+    "learning-fine-from-menu.png": {
+      "sha256": "90517c5380026a979f8ff4c1dff3a69147eade91a3a30e838f3b95fb2ac30ff9",
+      "bytes": 50280
+    },
+    "learning-fine-scroll-end.png": {
+      "sha256": "65707d938d72af3fc397dd714e73fb82d50530701a084be0c6b28e4dfddc0047",
+      "bytes": 42224
+    },
+    "menu-with-long-cue.png": {
+      "sha256": "8872e7e059b4c041243adac13782de531d8521e4598a2cb440f6b7855c153483",
+      "bytes": 36956
+    },
+    "options-390-auto-bottom-row.png": {
+      "sha256": "8013fafabd6269ea8ba617be223e5d116a5039baa37968d4dcf88b4768de5afa",
+      "bytes": 2627
+    },
+    "options-390-auto-bottom.png": {
+      "sha256": "d342f1cc1f50b3724a608c52cd3871418f4221b532e3fce5b9c92e011ba0c779",
+      "bytes": 47572
+    },
+    "options-390-russian-auto-bottom.png": {
+      "sha256": "c704dd0edbe00f5c0f3c1be1086d0ebdf3034068763a51ff718d3831d7b1715c",
+      "bytes": 55413
+    },
+    "options-390-russian-row.png": {
+      "sha256": "60ed1fd96ce22d1f95b65b168b8130531d185bb1b937b0a8e1fba219cc0130f5",
+      "bytes": 3384
+    },
+    "video-disabled-cleanup.png": {
+      "sha256": "bb2e82aaeedcb90833a19de604d5976a7d2e35a36c56bf00895571f201df1edd",
+      "bytes": 46456
+    },
+    "video-long-controls-restored.png": {
+      "sha256": "aabba51a1ddd6991909ae94a5543c46133a7d90010f7f2d2a9400bf5e8dfdfa7",
+      "bytes": 38982
+    },
+    "video-long-scroll-end.png": {
+      "sha256": "298bc7cbd010f54f1805ea582990a2bdf06474744fe8ca49978324f62eb3a64b",
+      "bytes": 33883
+    },
+    "video-long-scroll-start.png": {
+      "sha256": "9b5077bc64b03bdb294365346dfaa734692f23b302a8581f9e60a4d640797878",
+      "bytes": 38983
+    },
+    "video-medium-controls-visible.png": {
+      "sha256": "0a346b8798abf04e81271c3169d35a34fca48f6ed0915c7781f5f88779de4b63",
+      "bytes": 29909
+    },
+    "video-short-controls-visible.png": {
+      "sha256": "e9eb1911a1971574b3a1557d6783b3ef2fcc82a152d9f2a768138ac839cd3a4a",
+      "bytes": 28418
+    }
+  }
+}

@@ -1,0 +1,40 @@
+{
+  "at": "2026-10-16T19:31:45.874653+00:00",
+  "knownPriorPids": [
+    4208,
+    4224,
+    4226,
+    4246,
+    4552,
+    2177,
+    2174
+  ],
+  "remainingOwned": [],
+  "ports": {
+    "5048": {
+      "returnCode": 1,
+      "listeners": ""
+    },
+    "5580": {
+      "returnCode": 1,
+      "listeners": ""
+    },
+    "5581": {
+      "returnCode": 1,
+      "listeners": ""
+    },
+    "52911": {
+      "returnCode": 1,
+      "listeners": ""
+    }
+  },
+  "heavyOrGUIRows": [],
+  "bootedAppleSimulators": [],
+  "taskAppleSimulatorState": "Shutdown",
+  "hostKeyMetadataUnchangedSinceF33": true,
+  "priorRawCleanupStatus": "PASS",
+  "priorUIRestored": true,
+  "UIRecoveryRequired": false,
+  "currentProductCommit": "a2ecda302d3a0199ffe9f0222ee2998a37bd7d5d",
+  "laneReleased": true
+}

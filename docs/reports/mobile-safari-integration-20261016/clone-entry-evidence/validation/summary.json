@@ -1,0 +1,157 @@
+{
+  "startedAt": "2026-10-16T23:05:05.622569+00:00",
+  "baseHead": "121c0217d3ce8c2067ade25328d5a9527e6019e4",
+  "initialGitStatus": " M scripts/run-mobile-video-subtitle-test.cjs\n M src/features/video-subtitle/content/videoPlayerBinding.ts\n M tests/videoPlayerBinding.test.ts\n",
+  "uncommittedProductPatch": true,
+  "sourceFiles": {
+    "/Users/thinkstu/Desktop/copy/FluentRead-mobile-video-menu-accessibility-20261016/src/features/video-subtitle/content/videoPlayerBinding.ts": "0789013139caf5e43783e4d3501b9a96c5d97324213efcbdfa941e1eb34fdec4",
+    "/Users/thinkstu/Desktop/copy/FluentRead-mobile-video-menu-accessibility-20261016/src/features/video-subtitle/content/ui.ts": "eb9cd5ccd3d2931cd1e85fa8a668235374e0a865e06605981274bd20944b592c",
+    "/Users/thinkstu/Desktop/copy/FluentRead-mobile-video-menu-accessibility-20261016/scripts/run-mobile-video-subtitle-test.cjs": "7613fece1417934d34f121f5a0413658e4fc848e2cf1d8d349d866f75b116d6f"
+  },
+  "resourcePolicy": "Root serial lane; resource-safe maxWorkers1/concurrency3/cpuTarget40",
+  "steps": [
+    {
+      "name": "runner-syntax",
+      "command": [
+        "node",
+        "--check",
+        "scripts/run-mobile-video-subtitle-test.cjs"
+      ],
+      "returnCode": 0,
+      "timedOut": false,
+      "elapsedSeconds": 0.085,
+      "log": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/mobile-youtube-fr-node-identity-probe-20261017/same-scope-clone-repair-20261017/validation/runner-syntax.log",
+      "logSHA256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "name": "test-audit",
+      "command": [
+        "node",
+        "scripts/testing/audit-test-suite.mjs"
+      ],
+      "returnCode": 0,
+      "timedOut": false,
+      "elapsedSeconds": 2.409,
+      "log": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/mobile-youtube-fr-node-identity-probe-20261017/same-scope-clone-repair-20261017/validation/test-audit.log",
+      "logSHA256": "77b5a1cc67625e54866ee1bcda4750518d5cb32ecb05e5078ba45c6e050a96a7"
+    },
+    {
+      "name": "typecheck",
+      "command": [
+        "pnpm",
+        "exec",
+        "vue-tsc",
+        "--noEmit"
+      ],
+      "returnCode": 0,
+      "timedOut": false,
+      "elapsedSeconds": 39.731,
+      "log": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/mobile-youtube-fr-node-identity-probe-20261017/same-scope-clone-repair-20261017/validation/typecheck.log",
+      "logSHA256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "name": "chrome-build",
+      "command": [
+        "pnpm",
+        "exec",
+        "wxt",
+        "build"
+      ],
+      "returnCode": 0,
+      "timedOut": false,
+      "elapsedSeconds": 25.063,
+      "log": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/mobile-youtube-fr-node-identity-probe-20261017/same-scope-clone-repair-20261017/validation/chrome-build.log",
+      "logSHA256": "92934f954a6e545fc69cdb2394296570e6cada2067af4186904235398d1b5903"
+    },
+    {
+      "name": "firefox-build",
+      "command": [
+        "pnpm",
+        "exec",
+        "wxt",
+        "build",
+        "-b",
+        "firefox"
+      ],
+      "returnCode": 0,
+      "timedOut": false,
+      "elapsedSeconds": 24.633,
+      "log": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/mobile-youtube-fr-node-identity-probe-20261017/same-scope-clone-repair-20261017/validation/firefox-build.log",
+      "logSHA256": "ba9e1b39b85133cc2c410ee04d682ac4e32caf139c8265e8c9b0078b676f94d5"
+    },
+    {
+      "name": "safari-web-build",
+      "command": [
+        "pnpm",
+        "exec",
+        "wxt",
+        "build",
+        "-b",
+        "safari",
+        "--mv2"
+      ],
+      "returnCode": 0,
+      "timedOut": false,
+      "elapsedSeconds": 24.584,
+      "log": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/mobile-youtube-fr-node-identity-probe-20261017/same-scope-clone-repair-20261017/validation/safari-web-build.log",
+      "logSHA256": "eb885e7ceaf3e05c2b0867c3c9b9ca6e531a010177b1925fc2df7c1e3599193d"
+    },
+    {
+      "name": "userscript-build",
+      "command": [
+        "pnpm",
+        "exec",
+        "vite",
+        "build",
+        "--config",
+        "userscript/vite.config.ts"
+      ],
+      "returnCode": 0,
+      "timedOut": false,
+      "elapsedSeconds": 5.371,
+      "log": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/mobile-youtube-fr-node-identity-probe-20261017/same-scope-clone-repair-20261017/validation/userscript-build.log",
+      "logSHA256": "7b2f7b6d44c860a245e4cde7a5f3a7be2f561e03efaaa7d41430d8a70c5d6b1e"
+    },
+    {
+      "name": "userscript-verifier",
+      "command": [
+        "node",
+        "scripts/verify-userscript-build.mjs"
+      ],
+      "returnCode": 0,
+      "timedOut": false,
+      "elapsedSeconds": 0.135,
+      "log": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/mobile-youtube-fr-node-identity-probe-20261017/same-scope-clone-repair-20261017/validation/userscript-verifier.log",
+      "logSHA256": "4a31a125c63167a317fd0579850baeaaea7e399a570981e5bfb39aff613070df"
+    },
+    {
+      "name": "extension-manifests",
+      "command": [
+        "node",
+        "scripts/testing/verify-extension-manifests.mjs"
+      ],
+      "returnCode": 0,
+      "timedOut": false,
+      "elapsedSeconds": 0.241,
+      "log": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/mobile-youtube-fr-node-identity-probe-20261017/same-scope-clone-repair-20261017/validation/extension-manifests.log",
+      "logSHA256": "e4660128a642fd99c7b039647dd73a4dc171659427d637805f88b94e6e67da1e"
+    },
+    {
+      "name": "safari-web-verifier",
+      "command": [
+        "node",
+        "scripts/safari/package.mjs",
+        "--verify"
+      ],
+      "returnCode": 0,
+      "timedOut": false,
+      "elapsedSeconds": 0.199,
+      "log": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/mobile-youtube-fr-node-identity-probe-20261017/same-scope-clone-repair-20261017/validation/safari-web-verifier.log",
+      "logSHA256": "7580397ac09cf9c3c648e32020fda9f2a9bcf88ba0af480b9e2421bd3f39bf41"
+    }
+  ],
+  "finishedAt": "2026-10-16T23:07:08.172104+00:00",
+  "status": "TARGETED_VALIDATION_ALL_PASS",
+  "sourceFilesUnchanged": true,
+  "finalGitStatus": " M scripts/run-mobile-video-subtitle-test.cjs\n M src/features/video-subtitle/content/videoPlayerBinding.ts\n M tests/videoPlayerBinding.test.ts\n"
+}

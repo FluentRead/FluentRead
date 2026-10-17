@@ -1,8 +1,8 @@
 /**
  * @file src/features/video-subtitle/content/videoPlayerBinding.ts
  * 文件职责：把字幕入口和菜单绑定到定位器选中的视频播放器，并在信息流、全屏及原生控件重挂载时保持稳定。
- * 主要内容：以画中画和全屏控件为锚点维护入口顺序，按真实控件结构变化绑定入口，在所持控制栏内清除站点深复制的本实例入口，观察器在原按钮位置不变时也识别本实例新副本，忽略字幕与 tooltip 内容更新，管理 fallback 控件、进度徽标和禁用状态下的节点清理。
- * 模块边界：只管理 FluentRead 播放器节点的挂载位置与事件；按钮行为、菜单内容和字幕业务由调用方注入。
+ * 主要内容：以画中画和全屏控件为锚点维护入口顺序，移动 YouTube 仅在已验证同视频容器中认领外部底部右控制组和交互；自有菜单宿主按媒体播放器坐标校准并隔离原生控制层，重挂仅恢复菜单原有焦点；在已认领的局部播放器范围清理自身入口副本，管理 fallback、进度徽标和禁用清理。
+ * 模块边界：只管理 FluentRead 播放器节点的挂载位置与事件；公开菜单宿主校准供既有布局帧调用，不重扫播放器或重建入口；按钮行为、菜单内容和字幕业务由调用方注入。
  */
 
 import {
@@ -15,6 +15,7 @@ import {
   VIDEO_X_SETTINGS_CONTROL_SELECTOR,
 } from './ui';
 import type {VideoPlayerLocator, VideoPlayerTarget} from './videoPlayerLocator';
+import {getYoutubeSubtitleControlsScope} from './youtubeControlsScope';
 
 export interface VideoPlayerBindingState {
   readonly enabled: boolean;
@@ -33,6 +34,7 @@ export interface VideoPlayerBindingOptions {
 
 export interface VideoPlayerBinding {
   sync(): void;
+  syncMenuHost(): void;
   getTarget(): VideoPlayerTarget | null;
   destroy(): void;
 }
@@ -60,9 +62,14 @@ function nativeControl(root: HTMLElement, selector: string): HTMLElement | null 
   return Array.from(root.querySelectorAll<HTMLElement>(selector)).find(control => !control.closest('.fluent-read-video-ui')) || null;
 }
 
-function nativeControls(player: HTMLElement): HTMLElement | null {
+function nativeControls(player: HTMLElement, scope: HTMLElement): HTMLElement | null {
   const youtube = player.querySelector<HTMLElement>(VIDEO_RIGHT_CONTROLS_SELECTOR);
   if (youtube) return youtube;
+  if (scope !== player) {
+    // mweb 的右组可能只有一个全屏按钮；不能按“至少两个按钮”向上选中包含顶部设置的整层 overlay。
+    const mobile = scope.querySelector<HTMLElement>('ytm-custom-control ytm-watch-player-controls #player-control-overlay .player-controls-bottom-right');
+    if (mobile && nativeControl(mobile, FULLSCREEN_CONTROL_SELECTOR)) return mobile;
+  }
   const anchor = nativeControl(player, FULLSCREEN_CONTROL_SELECTOR)
     || nativeControl(player, PICTURE_IN_PICTURE_CONTROL_SELECTOR) || nativeControl(player, VIDEO_X_SETTINGS_CONTROL_SELECTOR);
   if (!anchor) return null;
@@ -118,7 +125,10 @@ export function createVideoPlayerBinding(options: VideoPlayerBindingOptions): Vi
   let target: VideoPlayerTarget | null = null;
   let button: HTMLButtonElement | null = null;
   let menu: HTMLElement | null = null;
+  let menuHost: HTMLElement | null = null;
+  let menuPointer: {node: HTMLElement; value: string; priority: string} | null = null;
   let host: HTMLElement | null = null;
+  let ownedScope: HTMLElement | null = null;
   let before: Element | null = null;
   let fallback: HTMLElement | null = null;
   let destroyed = false;
@@ -127,6 +137,9 @@ export function createVideoPlayerBinding(options: VideoPlayerBindingOptions): Vi
   const buttonOwner = `${Date.now()}-${Math.random()}`;
   const buttonOwnerAttribute = 'data-fluent-read-video-binding-owner';
   const ownedButtonSelector = `button[${buttonOwnerAttribute}="${buttonOwner}"]`;
+  // 通用定位器可能回退到页面根；入口副本修复不能因此扩大为全页查询和清理。
+  const scopeForOwnedCopies = (scope: HTMLElement): HTMLElement | null =>
+    scope === document.body || scope === document.documentElement ? null : scope;
   const activePlayers = new WeakSet<HTMLElement>();
   const positionedPlayers = new WeakSet<HTMLElement>();
   const previousPositions = new WeakMap<HTMLElement, {value: string; priority: string}>();
@@ -144,21 +157,38 @@ export function createVideoPlayerBinding(options: VideoPlayerBindingOptions): Vi
     }
   };
 
+  const restoreMenuPointer = () => {
+    if (!menuPointer) return;
+    const {node, value, priority} = menuPointer;
+    if (node.style.getPropertyValue('pointer-events') === 'auto' && node.style.getPropertyPriority('pointer-events') === 'important') {
+      if (value) node.style.setProperty('pointer-events', value, priority);
+      else node.style.removeProperty('pointer-events');
+    }
+    menuPointer = null;
+  };
+
   const cleanNodes = () => {
     cleaningNodes = true;
     const buttonToRemove = button;
     const menuToRemove = menu;
+    const menuHostToRemove = menuHost;
     const fallbackToRemove = fallback;
     const hostToClean = host;
+    const scopeToClean = ownedScope;
     button = null;
     menu = null;
+    menuHost = null;
     fallback = null;
     host = null;
+    ownedScope = null;
     before = null;
     try {
+      restoreMenuPointer();
+      removeClonedButtons(scopeToClean, buttonToRemove);
       removeClonedButtons(hostToClean, buttonToRemove);
       buttonToRemove?.remove();
       menuToRemove?.remove();
+      menuHostToRemove?.remove();
       fallbackToRemove?.remove();
     } finally {
       cleaningNodes = false;
@@ -197,8 +227,67 @@ export function createVideoPlayerBinding(options: VideoPlayerBindingOptions): Vi
     positionedPlayers.add(player);
   };
 
+  const controlsScope = (next: VideoPlayerTarget): HTMLElement => {
+    try {
+      const scope = getYoutubeSubtitleControlsScope(next.player, next.video);
+      const fullscreen = document.fullscreenElement;
+      // HTML 全屏可能只带入 movie_player；兄弟控制层不在全屏子树时不得继续持有外部入口。
+      return fullscreen && !fullscreen.contains(scope) ? next.player : scope;
+    } catch {
+      // 宿主页可覆写 matches/closest；无法确认兄弟层身份时保留原播放器边界。
+      return next.player;
+    }
+  };
   const isInteractive = (next: VideoPlayerTarget): boolean =>
-    next.fullscreen || activePlayers.has(next.player) || playerIsHovered(next.player) || playerIsFocused(next.player, document);
+    next.fullscreen || activePlayers.has(next.player) || playerIsHovered(controlsScope(next)) || playerIsFocused(controlsScope(next), document);
+
+  const moveWithFocus = (node: HTMLElement, parent: HTMLElement) => {
+    if (node.parentElement === parent) return;
+    const active = document.activeElement;
+    const restoreFocus = active instanceof Element && node.contains(active);
+    parent.appendChild(node);
+    if (restoreFocus && active.isConnected && document.activeElement !== active) {
+      (active as HTMLElement).focus?.({preventScroll: true});
+    }
+  };
+
+  const menuRenderParent = (next: VideoPlayerTarget, scope: HTMLElement): HTMLElement => {
+    if (scope === next.player) return next.player;
+    const rect = next.player.getBoundingClientRect();
+    const width = next.player.clientWidth || rect.width, height = next.player.clientHeight || rect.height;
+    if (width <= 0 || height <= 0 || rect.width <= 0 || rect.height <= 0) return next.player;
+    if (!menuHost) {
+      menuHost = document.createElement('div');
+      menuHost.className = 'fluent-read-video-menu-host';
+      markVideoUi(menuHost);
+      // 只覆盖自有宿主；空白区域透传原生控件，菜单自己重新开启指针命中。
+      for (const [name, value] of Object.entries({position: 'absolute', left: '0', top: '0',
+        margin: '0', padding: '0', border: '0', 'box-sizing': 'border-box',
+        'pointer-events': 'none', 'z-index': '2147483646', 'transform-origin': '0 0', overflow: 'visible'})) menuHost.style.setProperty(name, value, 'important');
+    }
+    moveWithFocus(menuHost, scope);
+    menuHost.style.setProperty('width', `${width}px`, 'important');
+    menuHost.style.setProperty('height', `${height}px`, 'important');
+    menuHost.style.setProperty('transform', 'none', 'important');
+    const base = menuHost.getBoundingClientRect();
+    if (base.width <= 0 || base.height <= 0) return next.player;
+    const sx = base.width / width, sy = base.height / height;
+    menuHost.style.setProperty('transform', `translate(${(rect.left - base.left) / sx}px, ${(rect.top - base.top) / sy}px) scale(${rect.width / base.width}, ${rect.height / base.height})`, 'important');
+    return menuHost;
+  };
+
+  const syncOwnedMenuHost = (next: VideoPlayerTarget, scope: HTMLElement) => {
+    if (menu) {
+      const parent = menuRenderParent(next, scope);
+      moveWithFocus(menu, parent);
+      if (parent === menuHost) {
+        if (!menuPointer) menuPointer = {node: menu, value: menu.style.getPropertyValue('pointer-events'), priority: menu.style.getPropertyPriority('pointer-events')};
+        menu.style.setProperty('pointer-events', 'auto', 'important');
+      } else restoreMenuPointer();
+      markVideoUi(menu);
+      if (parent === next.player) {menuHost?.remove(); menuHost = null;}
+    } else {menuHost?.remove(); menuHost = null;}
+  };
 
   const ensureFallback = (player: HTMLElement): HTMLElement => {
     if (!fallback || fallback.parentElement !== player) {
@@ -212,7 +301,14 @@ export function createVideoPlayerBinding(options: VideoPlayerBindingOptions): Vi
   };
 
   const place = (next: VideoPlayerTarget): void => {
-    const preferred = nativeControls(next.player);
+    const scope = controlsScope(next);
+    const nextOwnedScope = scopeForOwnedCopies(scope);
+    // 站点可保留旧控制组并追加深复制组；只清 host 会漏掉同播放器内无监听的入口。
+    // 保留此前认领的局部范围，第二视频或重挂使范围收缩时仍能清除自身旧副本。
+    if (ownedScope !== nextOwnedScope) removeClonedButtons(ownedScope, button);
+    ownedScope = nextOwnedScope;
+    removeClonedButtons(ownedScope, button);
+    const preferred = nativeControls(next.player, scope);
     // X 的控制栏在悬浮后才挂载。等待真实控制栏，避免右下角 fallback 首帧闪现后跳到进度左侧。
     if (!preferred && next.player.getAttribute('data-testid') === 'videoPlayer') {
       // 原生控制栏的生命周期不代表用户结束菜单操作；保留已打开的菜单及焦点。
@@ -226,7 +322,7 @@ export function createVideoPlayerBinding(options: VideoPlayerBindingOptions): Vi
       removePlayerMark(next.player);
       return;
     }
-    const currentHostBelongs = host && host.parentElement && next.player.contains(host);
+    const currentHostBelongs = host && host.parentElement && scope.contains(host);
     if (!currentHostBelongs) {
       removeClonedButtons(host, button);
       host = null;
@@ -234,7 +330,7 @@ export function createVideoPlayerBinding(options: VideoPlayerBindingOptions): Vi
 
     if (!host) {
       if (preferred) host = preferred;
-      else if (isInteractive(next)) host = ensureFallback(next.player);
+      else if (isInteractive(next) || (menuHost && menu && !menu.hidden)) host = ensureFallback(next.player);
       else {
         cleanNodes();
         return;
@@ -260,12 +356,12 @@ export function createVideoPlayerBinding(options: VideoPlayerBindingOptions): Vi
     if (button.parentElement !== host || button.nextElementSibling !== before) host.insertBefore(button, before);
 
     if (options.createMenu) {
-      if (!menu || menu.parentElement !== next.player) {
+      if (!menu || (menu.parentElement !== next.player && menu.parentElement !== menuHost)) {
+        restoreMenuPointer();
         menu?.remove();
         menu = options.createMenu(next);
       }
-      if (menu && menu.parentElement !== next.player) next.player.appendChild(menu);
-      if (menu) markVideoUi(menu);
+      syncOwnedMenuHost(next, scope);
     }
     next.player.classList.add(VIDEO_PLAYER_HOST_CLASS);
     next.player.setAttribute(VIDEO_PLAYER_ACTIVE_ATTRIBUTE, String(isInteractive(next)));
@@ -297,7 +393,7 @@ export function createVideoPlayerBinding(options: VideoPlayerBindingOptions): Vi
     const element = event.target;
     if (!element || typeof (element as {tagName?: unknown}).tagName !== 'string') return;
     const selected = target;
-    if (!selected || (element !== selected.player && !selected.player.contains(element as Node))) return;
+    if (!selected || !controlsScope(selected).contains(element as Node)) return;
     if (activePlayers.has(selected.player) === active) return;
     if (active) activePlayers.add(selected.player);
     else activePlayers.delete(selected.player);
@@ -307,13 +403,13 @@ export function createVideoPlayerBinding(options: VideoPlayerBindingOptions): Vi
   const onPointerOver = (event: Event) => markInteraction(event, true);
   const onPointerOut = (event: Event) => {
     const related = (event as MouseEvent).relatedTarget;
-    if (related && target?.player.contains(related as Node)) return;
+    if (related && target && controlsScope(target).contains(related as Node)) return;
     markInteraction(event, false);
   };
   const onFocusIn = (event: Event) => markInteraction(event, true);
   const onFocusOut = (event: Event) => {
     const related = (event as FocusEvent).relatedTarget;
-    if (related && target?.player.contains(related as Node)) return;
+    if (related && target && controlsScope(target).contains(related as Node)) return;
     markInteraction(event, false);
   };
 
@@ -329,13 +425,17 @@ export function createVideoPlayerBinding(options: VideoPlayerBindingOptions): Vi
   });
   const controlsObserver = typeof MutationObserver !== 'undefined' ? new MutationObserver(records => {
     if (!target) return;
-    const player = target.player;
-    const playerRecords = records.filter(record => player.contains(record.target));
+    const scope = controlsScope(target);
+    // 第二视频/播放器移出会让 scope 退回 player，而变更记录仍属于旧容器；先撤回失效宿主，再按新范围过滤噪声。
+    if ((ownedScope && ownedScope !== scopeForOwnedCopies(scope))
+      || (host && !scope.contains(host)) || (menuHost && menuHost.parentElement !== scope)) {sync(); return;}
+    const playerRecords = records.filter(record => scope.contains(record.target));
     if (playerRecords.length === 0) return;
     const isOwned = (node: Node) => node instanceof Element && Boolean(node.closest('.fluent-read-video-ui'));
-    // 原按钮仍在正确锚点时也可能新插入无监听的副本；只检查本实例所持控制栏，避免字幕/tooltip 自身更新触发重新扫描。
+    // 原按钮仍在正确锚点时也可能在旁边插入无监听副本；仅检查当前局部范围，页面根仍限于持有 host。
     const addsOwnedButtonCopy = (node: Node): boolean => {
-      if (!(node instanceof Element) || !host?.contains(node)) return false;
+      const copyScope = scopeForOwnedCopies(scope) || host;
+      if (!(node instanceof Element) || !copyScope?.contains(node)) return false;
       return (node !== button && node.matches(ownedButtonSelector))
         || Array.from(node.querySelectorAll(ownedButtonSelector)).some(copy => copy !== button);
     };
@@ -365,6 +465,11 @@ export function createVideoPlayerBinding(options: VideoPlayerBindingOptions): Vi
 
   return {
     sync,
+    syncMenuHost() {
+      // 帧通知只操作仍存活的同媒体菜单；不调用 locator、按钮工厂或完整绑定同步。
+      if (destroyed || !target || !menu?.isConnected || !target.player.isConnected || !target.player.contains(target.video)) return;
+      syncOwnedMenuHost(target, controlsScope(target));
+    },
     getTarget: () => target,
     destroy() {
       if (destroyed) return;

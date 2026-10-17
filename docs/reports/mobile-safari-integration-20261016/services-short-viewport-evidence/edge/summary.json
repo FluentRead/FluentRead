@@ -1,0 +1,53 @@
+{
+  "schema": 1,
+  "productCommit": "7e504c21ad5bc6e51c29c5cf79b352c088a19146",
+  "scope": "Isolated Edge production extension, Chinese/light/default skin, CDP touch/coarse viewport. Not native Safari or IME.",
+  "result": {
+    "pass": 4,
+    "fail": 0,
+    "initialSizes": [
+      [
+        320,
+        58
+      ],
+      [
+        320,
+        80
+      ],
+      [
+        320,
+        220
+      ],
+      [
+        320,
+        224
+      ]
+    ],
+    "returnHeights": [
+      224,
+      600
+    ],
+    "originalPNGsReviewed": 27,
+    "publishedPNGs": 6,
+    "targetRowsAndInputBackCloseFivePointHit": true,
+    "actualBackClose": true,
+    "sameInputNodeQueryFocusBody": true,
+    "hostScrollUnchanged": true,
+    "fixtureConfigRestored": true,
+    "clearClickSeparatelyAccepted": false,
+    "serviceChosen": false,
+    "translationPerformed": false,
+    "providerRequestCount": "NOT_MEASURED"
+  },
+  "rawReport": {
+    "file": "report.json",
+    "bytes": 150662,
+    "sha256": "43ae3fca1aa831a2d3ffe21cd62b242c79ade911a1ed79e63c2392bca1f429e7"
+  },
+  "independentUIReview": {
+    "file": "independent-restoration-ui-review.json",
+    "bytes": 39506,
+    "sha256": "6c5b7505611ea809563b280f462fac1451e7a12c3260280426187bffbe2071e4"
+  },
+  "imageCopyPolicy": "Original bytes; no crop or re-encoding."
+}

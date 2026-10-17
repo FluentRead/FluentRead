@@ -1,0 +1,5017 @@
+{
+  "ok": true,
+  "suite": "popup-feature-grid",
+  "views": [
+    {
+      "label": "feature-grid-safari-marker-css-fixture-default-320-light-4",
+      "skin": "default",
+      "width": 320,
+      "theme": "light",
+      "count": 4,
+      "mode": "safari-marker-css-fixture",
+      "documentWidth": 320,
+      "rootOverflow": false,
+      "shell": {
+        "x": 0,
+        "y": 0,
+        "width": 320,
+        "height": 462,
+        "right": 320,
+        "bottom": 462
+      },
+      "grid": {
+        "x": 16,
+        "y": 310,
+        "width": 288,
+        "height": 108,
+        "right": 304,
+        "bottom": 418
+      },
+      "display": "flex",
+      "rowGap": 8,
+      "columnGap": 8,
+      "gridRows": "none",
+      "cards": [
+        {
+          "id": "hover",
+          "x": 16,
+          "y": 310,
+          "width": 140,
+          "height": 50,
+          "right": 156,
+          "bottom": 360,
+          "display": "grid",
+          "naturalHeight": 50,
+          "copy": {
+            "x": 59,
+            "y": 320.203125,
+            "width": 74,
+            "height": 29.59375,
+            "right": 133,
+            "bottom": 349.796875
+          },
+          "strong": {
+            "x": 59,
+            "y": 320.203125,
+            "width": 74,
+            "height": 16.09375,
+            "right": 133,
+            "bottom": 336.296875
+          },
+          "small": {
+            "x": 59,
+            "y": 338.296875,
+            "width": 74,
+            "height": 11.5,
+            "right": 133,
+            "bottom": 349.796875
+          },
+          "copyOverflow": false
+        },
+        {
+          "id": "selection",
+          "x": 164,
+          "y": 310,
+          "width": 140,
+          "height": 50,
+          "right": 304,
+          "bottom": 360,
+          "display": "grid",
+          "naturalHeight": 50,
+          "copy": {
+            "x": 207,
+            "y": 318.953125,
+            "width": 74,
+            "height": 32.09375,
+            "right": 281,
+            "bottom": 351.046875
+          },
+          "strong": {
+            "x": 207,
+            "y": 318.953125,
+            "width": 74,
+            "height": 16.09375,
+            "right": 281,
+            "bottom": 335.046875
+          },
+          "small": {
+            "x": 207,
+            "y": 337.046875,
+            "width": 74,
+            "height": 14,
+            "right": 281,
+            "bottom": 351.046875
+          },
+          "copyOverflow": false
+        },
+        {
+          "id": "image",
+          "x": 16,
+          "y": 368,
+          "width": 140,
+          "height": 50,
+          "right": 156,
+          "bottom": 418,
+          "display": "grid",
+          "naturalHeight": 50,
+          "copy": {
+            "x": 59,
+            "y": 378.203125,
+            "width": 74,
+            "height": 29.59375,
+            "right": 133,
+            "bottom": 407.796875
+          },
+          "strong": {
+            "x": 59,
+            "y": 378.203125,
+            "width": 74,
+            "height": 16.09375,
+            "right": 133,
+            "bottom": 394.296875
+          },
+          "small": {
+            "x": 59,
+            "y": 396.296875,
+            "width": 74,
+            "height": 11.5,
+            "right": 133,
+            "bottom": 407.796875
+          },
+          "copyOverflow": false
+        },
+        {
+          "id": "document",
+          "x": 164,
+          "y": 368,
+          "width": 140,
+          "height": 50,
+          "right": 304,
+          "bottom": 418,
+          "display": "grid",
+          "naturalHeight": 50,
+          "copy": {
+            "x": 207,
+            "y": 378.203125,
+            "width": 74,
+            "height": 29.59375,
+            "right": 281,
+            "bottom": 407.796875
+          },
+          "strong": {
+            "x": 207,
+            "y": 378.203125,
+            "width": 74,
+            "height": 16.09375,
+            "right": 281,
+            "bottom": 394.296875
+          },
+          "small": {
+            "x": 207,
+            "y": 396.296875,
+            "width": 74,
+            "height": 11.5,
+            "right": 281,
+            "bottom": 407.796875
+          },
+          "copyOverflow": false
+        }
+      ],
+      "issues": [],
+      "screenshot": "feature-grid-safari-marker-css-fixture-default-320-light-4.png"
+    },
+    {
+      "label": "feature-grid-safari-marker-css-fixture-default-320-light-3",
+      "skin": "default",
+      "width": 320,
+      "theme": "light",
+      "count": 3,
+      "mode": "safari-marker-css-fixture",
+      "documentWidth": 320,
+      "rootOverflow": false,
+      "shell": {
+        "x": 0,
+        "y": 0,
+        "width": 320,
+        "height": 462,
+        "right": 320,
+        "bottom": 462
+      },
+      "grid": {
+        "x": 16,
+        "y": 310,
+        "width": 288,
+        "height": 108,
+        "right": 304,
+        "bottom": 418
+      },
+      "display": "flex",
+      "rowGap": 8,
+      "columnGap": 8,
+      "gridRows": "none",
+      "cards": [
+        {
+          "id": "hover",
+          "x": 16,
+          "y": 310,
+          "width": 140,
+          "height": 50,
+          "right": 156,
+          "bottom": 360,
+          "display": "grid",
+          "naturalHeight": 50,
+          "copy": {
+            "x": 59,
+            "y": 320.203125,
+            "width": 74,
+            "height": 29.59375,
+            "right": 133,
+            "bottom": 349.796875
+          },
+          "strong": {
+            "x": 59,
+            "y": 320.203125,
+            "width": 74,
+            "height": 16.09375,
+            "right": 133,
+            "bottom": 336.296875
+          },
+          "small": {
+            "x": 59,
+            "y": 338.296875,
+            "width": 74,
+            "height": 11.5,
+            "right": 133,
+            "bottom": 349.796875
+          },
+          "copyOverflow": false
+        },
+        {
+          "id": "selection",
+          "x": 164,
+          "y": 310,
+          "width": 140,
+          "height": 50,
+          "right": 304,
+          "bottom": 360,
+          "display": "grid",
+          "naturalHeight": 50,
+          "copy": {
+            "x": 207,
+            "y": 318.953125,
+            "width": 74,
+            "height": 32.09375,
+            "right": 281,
+            "bottom": 351.046875
+          },
+          "strong": {
+            "x": 207,
+            "y": 318.953125,
+            "width": 74,
+            "height": 16.09375,
+            "right": 281,
+            "bottom": 335.046875
+          },
+          "small": {
+            "x": 207,
+            "y": 337.046875,
+            "width": 74,
+            "height": 14,
+            "right": 281,
+            "bottom": 351.046875
+          },
+          "copyOverflow": false
+        },
+        {
+          "id": "image",
+          "x": 16,
+          "y": 368,
+          "width": 140,
+          "height": 50,
+          "right": 156,
+          "bottom": 418,
+          "display": "grid",
+          "naturalHeight": 50,
+          "copy": {
+            "x": 59,
+            "y": 378.203125,
+            "width": 74,
+            "height": 29.59375,
+            "right": 133,
+            "bottom": 407.796875
+          },
+          "strong": {
+            "x": 59,
+            "y": 378.203125,
+            "width": 74,
+            "height": 16.09375,
+            "right": 133,
+            "bottom": 394.296875
+          },
+          "small": {
+            "x": 59,
+            "y": 396.296875,
+            "width": 74,
+            "height": 11.5,
+            "right": 133,
+            "bottom": 407.796875
+          },
+          "copyOverflow": false
+        }
+      ],
+      "issues": [],
+      "screenshot": null
+    },
+    {
+      "label": "feature-grid-safari-marker-css-fixture-default-320-dark-4",
+      "skin": "default",
+      "width": 320,
+      "theme": "dark",
+      "count": 4,
+      "mode": "safari-marker-css-fixture",
+      "documentWidth": 320,
+      "rootOverflow": false,
+      "shell": {
+        "x": 0,
+        "y": 0,
+        "width": 320,
+        "height": 462,
+        "right": 320,
+        "bottom": 462
+      },
+      "grid": {
+        "x": 16,
+        "y": 310,
+        "width": 288,
+        "height": 108,
+        "right": 304,
+        "bottom": 418
+      },
+      "display": "flex",
+      "rowGap": 8,
+      "columnGap": 8,
+      "gridRows": "none",
+      "cards": [
+        {
+          "id": "hover",
+          "x": 16,
+          "y": 310,
+          "width": 140,
+          "height": 50,
+          "right": 156,
+          "bottom": 360,
+          "display": "grid",
+          "naturalHeight": 50,
+          "copy": {
+            "x": 59,
+            "y": 320.203125,
+            "width": 74,
+            "height": 29.59375,
+            "right": 133,
+            "bottom": 349.796875
+          },
+          "strong": {
+            "x": 59,
+            "y": 320.203125,
+            "width": 74,
+            "height": 16.09375,
+            "right": 133,
+            "bottom": 336.296875
+          },
+          "small": {
+            "x": 59,
+            "y": 338.296875,
+            "width": 74,
+            "height": 11.5,
+            "right": 133,
+            "bottom": 349.796875
+          },
+          "copyOverflow": false
+        },
+        {
+          "id": "selection",
+          "x": 164,
+          "y": 310,
+          "width": 140,
+          "height": 50,
+          "right": 304,
+          "bottom": 360,
+          "display": "grid",
+          "naturalHeight": 50,
+          "copy": {
+            "x": 207,
+            "y": 318.953125,
+            "width": 74,
+            "height": 32.09375,
+            "right": 281,
+            "bottom": 351.046875
+          },
+          "strong": {
+            "x": 207,
+            "y": 318.953125,
+            "width": 74,
+            "height": 16.09375,
+            "right": 281,
+            "bottom": 335.046875
+          },
+          "small": {
+            "x": 207,
+            "y": 337.046875,
+            "width": 74,
+            "height": 14,
+            "right": 281,
+            "bottom": 351.046875
+          },
+          "copyOverflow": false
+        },
+        {
+          "id": "image",
+          "x": 16,
+          "y": 368,
+          "width": 140,
+          "height": 50,
+          "right": 156,
+          "bottom": 418,
+          "display": "grid",
+          "naturalHeight": 50,
+          "copy": {
+            "x": 59,
+            "y": 378.203125,
+            "width": 74,
+            "height": 29.59375,
+            "right": 133,
+            "bottom": 407.796875
+          },
+          "strong": {
+            "x": 59,
+            "y": 378.203125,
+            "width": 74,
+            "height": 16.09375,
+            "right": 133,
+            "bottom": 394.296875
+          },
+          "small": {
+            "x": 59,
+            "y": 396.296875,
+            "width": 74,
+            "height": 11.5,
+            "right": 133,
+            "bottom": 407.796875
+          },
+          "copyOverflow": false
+        },
+        {
+          "id": "document",
+          "x": 164,
+          "y": 368,
+          "width": 140,
+          "height": 50,
+          "right": 304,
+          "bottom": 418,
+          "display": "grid",
+          "naturalHeight": 50,
+          "copy": {
+            "x": 207,
+            "y": 378.203125,
+            "width": 74,
+            "height": 29.59375,
+            "right": 281,
+            "bottom": 407.796875
+          },
+          "strong": {
+            "x": 207,
+            "y": 378.203125,
+            "width": 74,
+            "height": 16.09375,
+            "right": 281,
+            "bottom": 394.296875
+          },
+          "small": {
+            "x": 207,
+            "y": 396.296875,
+            "width": 74,
+            "height": 11.5,
+            "right": 281,
+            "bottom": 407.796875
+          },
+          "copyOverflow": false
+        }
+      ],
+      "issues": [],
+      "screenshot": null
+    },
+    {
+      "label": "feature-grid-safari-marker-css-fixture-default-320-dark-3",
+      "skin": "default",
+      "width": 320,
+      "theme": "dark",
+      "count": 3,
+      "mode": "safari-marker-css-fixture",
+      "documentWidth": 320,
+      "rootOverflow": false,
+      "shell": {
+        "x": 0,
+        "y": 0,
+        "width": 320,
+        "height": 462,
+        "right": 320,
+        "bottom": 462
+      },
+      "grid": {
+        "x": 16,
+        "y": 310,
+        "width": 288,
+        "height": 108,
+        "right": 304,
+        "bottom": 418
+      },
+      "display": "flex",
+      "rowGap": 8,
+      "columnGap": 8,
+      "gridRows": "none",
+      "cards": [
+        {
+          "id": "hover",
+          "x": 16,
+          "y": 310,
+          "width": 140,
+          "height": 50,
+          "right": 156,
+          "bottom": 360,
+          "display": "grid",
+          "naturalHeight": 50,
+          "copy": {
+            "x": 59,
+            "y": 320.203125,
+            "width": 74,
+            "height": 29.59375,
+            "right": 133,
+            "bottom": 349.796875
+          },
+          "strong": {
+            "x": 59,
+            "y": 320.203125,
+            "width": 74,
+            "height": 16.09375,
+            "right": 133,
+            "bottom": 336.296875
+          },
+          "small": {
+            "x": 59,
+            "y": 338.296875,
+            "width": 74,
+            "height": 11.5,
+            "right": 133,
+            "bottom": 349.796875
+          },
+          "copyOverflow": false
+        },
+        {
+          "id": "selection",
+          "x": 164,
+          "y": 310,
+          "width": 140,
+          "height": 50,
+          "right": 304,
+          "bottom": 360,
+          "display": "grid",
+          "naturalHeight": 50,
+          "copy": {
+            "x": 207,
+            "y": 318.953125,
+            "width": 74,
+            "height": 32.09375,
+            "right": 281,
+            "bottom": 351.046875
+          },
+          "strong": {
+            "x": 207,
+            "y": 318.953125,
+            "width": 74,
+            "height": 16.09375,
+            "right": 281,
+            "bottom": 335.046875
+          },
+          "small": {
+            "x": 207,
+            "y": 337.046875,
+            "width": 74,
+            "height": 14,
+            "right": 281,
+            "bottom": 351.046875
+          },
+          "copyOverflow": false
+        },
+        {
+          "id": "image",
+          "x": 16,
+          "y": 368,
+          "width": 140,
+          "height": 50,
+          "right": 156,
+          "bottom": 418,
+          "display": "grid",
+          "naturalHeight": 50,
+          "copy": {
+            "x": 59,
+            "y": 378.203125,
+            "width": 74,
+            "height": 29.59375,
+            "right": 133,
+            "bottom": 407.796875
+          },
+          "strong": {
+            "x": 59,
+            "y": 378.203125,
+            "width": 74,
+            "height": 16.09375,
+            "right": 133,
+            "bottom": 394.296875
+          },
+          "small": {
+            "x": 59,
+            "y": 396.296875,
+            "width": 74,
+            "height": 11.5,
+            "right": 133,
+            "bottom": 407.796875
+          },
+          "copyOverflow": false
+        }
+      ],
+      "issues": [],
+      "screenshot": "feature-grid-safari-marker-css-fixture-default-320-dark-3.png"
+    },
+    {
+      "label": "feature-grid-safari-marker-css-fixture-default-402-light-4",
+      "skin": "default",
+      "width": 402,
+      "theme": "light",
+      "count": 4,
+      "mode": "safari-marker-css-fixture",
+      "documentWidth": 402,
+      "rootOverflow": false,
+      "shell": {
+        "x": 0,
+        "y": 0,
+        "width": 402,
+        "height": 447,
+        "right": 402,
+        "bottom": 447
+      },
+      "grid": {
+        "x": 16,
+        "y": 295,
+        "width": 370,
+        "height": 108,
+        "right": 386,
+        "bottom": 403
+      },
+      "display": "flex",
+      "rowGap": 8,
+      "columnGap": 8,
+      "gridRows": "none",
+      "cards": [
+        {
+          "id": "hover",
+          "x": 16,
+          "y": 295,
+          "width": 181,
+          "height": 50,
+          "right": 197,
+          "bottom": 345,
+          "display": "grid",
+          "naturalHeight": 50,
+          "copy": {
+            "x": 59,
+            "y": 305.203125,
+            "width": 115,
+            "height": 29.59375,
+            "right": 174,
+            "bottom": 334.796875
+          },
+          "strong": {
+            "x": 59,
+            "y": 305.203125,
+            "width": 115,
+            "height": 16.09375,
+            "right": 174,
+            "bottom": 321.296875
+          },
+          "small": {
+            "x": 59,
+            "y": 323.296875,
+            "width": 115,
+            "height": 11.5,
+            "right": 174,
+            "bottom": 334.796875
+          },
+          "copyOverflow": false
+        },
+        {
+          "id": "selection",
+          "x": 205,
+          "y": 295,
+          "width": 181,
+          "height": 50,
+          "right": 386,
+          "bottom": 345,
+          "display": "grid",
+          "naturalHeight": 50,
+          "copy": {
+            "x": 248,
+            "y": 303.953125,
+            "width": 115,
+            "height": 32.09375,
+            "right": 363,
+            "bottom": 336.046875
+          },
+          "strong": {
+            "x": 248,
+            "y": 303.953125,
+            "width": 115,
+            "height": 16.09375,
+            "right": 363,
+            "bottom": 320.046875
+          },
+          "small": {
+            "x": 248,
+            "y": 322.046875,
+            "width": 115,
+            "height": 14,
+            "right": 363,
+            "bottom": 336.046875
+          },
+          "copyOverflow": false
+        },
+        {
+          "id": "image",
+          "x": 16,
+          "y": 353,
+          "width": 181,
+          "height": 50,
+          "right": 197,
+          "bottom": 403,
+          "display": "grid",
+          "naturalHeight": 50,
+          "copy": {
+            "x": 59,
+            "y": 363.203125,
+            "width": 115,
+            "height": 29.59375,
+            "right": 174,
+            "bottom": 392.796875
+          },
+          "strong": {
+            "x": 59,
+            "y": 363.203125,
+            "width": 115,
+            "height": 16.09375,
+            "right": 174,
+            "bottom": 379.296875
+          },
+          "small": {
+            "x": 59,
+            "y": 381.296875,
+            "width": 115,
+            "height": 11.5,
+            "right": 174,
+            "bottom": 392.796875
+          },
+          "copyOverflow": false
+        },
+        {
+          "id": "document",
+          "x": 205,
+          "y": 353,
+          "width": 181,
+          "height": 50,
+          "right": 386,
+          "bottom": 403,
+          "display": "grid",
+          "naturalHeight": 50,
+          "copy": {
+            "x": 248,
+            "y": 363.203125,
+            "width": 115,
+            "height": 29.59375,
+            "right": 363,
+            "bottom": 392.796875
+          },
+          "strong": {
+            "x": 248,
+            "y": 363.203125,
+            "width": 115,
+            "height": 16.09375,
+            "right": 363,
+            "bottom": 379.296875
+          },
+          "small": {
+            "x": 248,
+            "y": 381.296875,
+            "width": 115,
+            "height": 11.5,
+            "right": 363,
+            "bottom": 392.796875
+          },
+          "copyOverflow": false
+        }
+      ],
+      "issues": [],
+      "screenshot": null
+    },
+    {
+      "label": "feature-grid-safari-marker-css-fixture-default-402-light-3",
+      "skin": "default",
+      "width": 402,
+      "theme": "light",
+      "count": 3,
+      "mode": "safari-marker-css-fixture",
+      "documentWidth": 402,
+      "rootOverflow": false,
+      "shell": {
+        "x": 0,
+        "y": 0,
+        "width": 402,
+        "height": 447,
+        "right": 402,
+        "bottom": 447
+      },
+      "grid": {
+        "x": 16,
+        "y": 295,
+        "width": 370,
+        "height": 108,
+        "right": 386,
+        "bottom": 403
+      },
+      "display": "flex",
+      "rowGap": 8,
+      "columnGap": 8,
+      "gridRows": "none",
+      "cards": [
+        {
+          "id": "hover",
+          "x": 16,
+          "y": 295,
+          "width": 181,
+          "height": 50,
+          "right": 197,
+          "bottom": 345,
+          "display": "grid",
+          "naturalHeight": 50,
+          "copy": {
+            "x": 59,
+            "y": 305.203125,
+            "width": 115,
+            "height": 29.59375,
+            "right": 174,
+            "bottom": 334.796875
+          },
+          "strong": {
+            "x": 59,
+            "y": 305.203125,
+            "width": 115,
+            "height": 16.09375,
+            "right": 174,
+            "bottom": 321.296875
+          },
+          "small": {
+            "x": 59,
+            "y": 323.296875,
+            "width": 115,
+            "height": 11.5,
+            "right": 174,
+            "bottom": 334.796875
+          },
+          "copyOverflow": false
+        },
+        {
+          "id": "selection",
+          "x": 205,
+          "y": 295,
+          "width": 181,
+          "height": 50,
+          "right": 386,
+          "bottom": 345,
+          "display": "grid",
+          "naturalHeight": 50,
+          "copy": {
+            "x": 248,
+            "y": 303.953125,
+            "width": 115,
+            "height": 32.09375,
+            "right": 363,
+            "bottom": 336.046875
+          },
+          "strong": {
+            "x": 248,
+            "y": 303.953125,
+            "width": 115,
+            "height": 16.09375,
+            "right": 363,
+            "bottom": 320.046875
+          },
+          "small": {
+            "x": 248,
+            "y": 322.046875,
+            "width": 115,
+            "height": 14,
+            "right": 363,
+            "bottom": 336.046875
+          },
+          "copyOverflow": false
+        },
+        {
+          "id": "image",
+          "x": 16,
+          "y": 353,
+          "width": 181,
+          "height": 50,
+          "right": 197,
+          "bottom": 403,
+          "display": "grid",
+          "naturalHeight": 50,
+          "copy": {
+            "x": 59,
+            "y": 363.203125,
+            "width": 115,
+            "height": 29.59375,
+            "right": 174,
+            "bottom": 392.796875
+          },
+          "strong": {
+            "x": 59,
+            "y": 363.203125,
+            "width": 115,
+            "height": 16.09375,
+            "right": 174,
+            "bottom": 379.296875
+          },
+          "small": {
+            "x": 59,
+            "y": 381.296875,
+            "width": 115,
+            "height": 11.5,
+            "right": 174,
+            "bottom": 392.796875
+          },
+          "copyOverflow": false
+        }
+      ],
+      "issues": [],
+      "screenshot": null
+    },
+    {
+      "label": "feature-grid-safari-marker-css-fixture-default-402-dark-4",
+      "skin": "default",
+      "width": 402,
+      "theme": "dark",
+      "count": 4,
+      "mode": "safari-marker-css-fixture",
+      "documentWidth": 402,
+      "rootOverflow": false,
+      "shell": {
+        "x": 0,
+        "y": 0,
+        "width": 402,
+        "height": 447,
+        "right": 402,
+        "bottom": 447
+      },
+      "grid": {
+        "x": 16,
+        "y": 295,
+        "width": 370,
+        "height": 108,
+        "right": 386,
+        "bottom": 403
+      },
+      "display": "flex",
+      "rowGap": 8,
+      "columnGap": 8,
+      "gridRows": "none",
+      "cards": [
+        {
+          "id": "hover",
+          "x": 16,
+          "y": 295,
+          "width": 181,
+          "height": 50,
+          "right": 197,
+          "bottom": 345,
+          "display": "grid",
+          "naturalHeight": 50,
+          "copy": {
+            "x": 59,
+            "y": 305.203125,
+            "width": 115,
+            "height": 29.59375,
+            "right": 174,
+            "bottom": 334.796875
+          },
+          "strong": {
+            "x": 59,
+            "y": 305.203125,
+            "width": 115,
+            "height": 16.09375,
+            "right": 174,
+            "bottom": 321.296875
+          },
+          "small": {
+            "x": 59,
+            "y": 323.296875,
+            "width": 115,
+            "height": 11.5,
+            "right": 174,
+            "bottom": 334.796875
+          },
+          "copyOverflow": false
+        },
+        {
+          "id": "selection",
+          "x": 205,
+          "y": 295,
+          "width": 181,
+          "height": 50,
+          "right": 386,
+          "bottom": 345,
+          "display": "grid",
+          "naturalHeight": 50,
+          "copy": {
+            "x": 248,
+            "y": 303.953125,
+            "width": 115,
+            "height": 32.09375,
+            "right": 363,
+            "bottom": 336.046875
+          },
+          "strong": {
+            "x": 248,
+            "y": 303.953125,
+            "width": 115,
+            "height": 16.09375,
+            "right": 363,
+            "bottom": 320.046875
+          },
+          "small": {
+            "x": 248,
+            "y": 322.046875,
+            "width": 115,
+            "height": 14,
+            "right": 363,
+            "bottom": 336.046875
+          },
+          "copyOverflow": false
+        },
+        {
+          "id": "image",
+          "x": 16,
+          "y": 353,
+          "width": 181,
+          "height": 50,
+          "right": 197,
+          "bottom": 403,
+          "display": "grid",
+          "naturalHeight": 50,
+          "copy": {
+            "x": 59,
+            "y": 363.203125,
+            "width": 115,
+            "height": 29.59375,
+            "right": 174,
+            "bottom": 392.796875
+          },
+          "strong": {
+            "x": 59,
+            "y": 363.203125,
+            "width": 115,
+            "height": 16.09375,
+            "right": 174,
+            "bottom": 379.296875
+          },
+          "small": {
+            "x": 59,
+            "y": 381.296875,
+            "width": 115,
+            "height": 11.5,
+            "right": 174,
+            "bottom": 392.796875
+          },
+          "copyOverflow": false
+        },
+        {
+          "id": "document",
+          "x": 205,
+          "y": 353,
+          "width": 181,
+          "height": 50,
+          "right": 386,
+          "bottom": 403,
+          "display": "grid",
+          "naturalHeight": 50,
+          "copy": {
+            "x": 248,
+            "y": 363.203125,
+            "width": 115,
+            "height": 29.59375,
+            "right": 363,
+            "bottom": 392.796875
+          },
+          "strong": {
+            "x": 248,
+            "y": 363.203125,
+            "width": 115,
+            "height": 16.09375,
+            "right": 363,
+            "bottom": 379.296875
+          },
+          "small": {
+            "x": 248,
+            "y": 381.296875,
+            "width": 115,
+            "height": 11.5,
+            "right": 363,
+            "bottom": 392.796875
+          },
+          "copyOverflow": false
+        }
+      ],
+      "issues": [],
+      "screenshot": null
+    },
+    {
+      "label": "feature-grid-safari-marker-css-fixture-default-402-dark-3",
+      "skin": "default",
+      "width": 402,
+      "theme": "dark",
+      "count": 3,
+      "mode": "safari-marker-css-fixture",
+      "documentWidth": 402,
+      "rootOverflow": false,
+      "shell": {
+        "x": 0,
+        "y": 0,
+        "width": 402,
+        "height": 447,
+        "right": 402,
+        "bottom": 447
+      },
+      "grid": {
+        "x": 16,
+        "y": 295,
+        "width": 370,
+        "height": 108,
+        "right": 386,
+        "bottom": 403
+      },
+      "display": "flex",
+      "rowGap": 8,
+      "columnGap": 8,
+      "gridRows": "none",
+      "cards": [
+        {
+          "id": "hover",
+          "x": 16,
+          "y": 295,
+          "width": 181,
+          "height": 50,
+          "right": 197,
+          "bottom": 345,
+          "display": "grid",
+          "naturalHeight": 50,
+          "copy": {
+            "x": 59,
+            "y": 305.203125,
+            "width": 115,
+            "height": 29.59375,
+            "right": 174,
+            "bottom": 334.796875
+          },
+          "strong": {
+            "x": 59,
+            "y": 305.203125,
+            "width": 115,
+            "height": 16.09375,
+            "right": 174,
+            "bottom": 321.296875
+          },
+          "small": {
+            "x": 59,
+            "y": 323.296875,
+            "width": 115,
+            "height": 11.5,
+            "right": 174,
+            "bottom": 334.796875
+          },
+          "copyOverflow": false
+        },
+        {
+          "id": "selection",
+          "x": 205,
+          "y": 295,
+          "width": 181,
+          "height": 50,
+          "right": 386,
+          "bottom": 345,
+          "display": "grid",
+          "naturalHeight": 50,
+          "copy": {
+            "x": 248,
+            "y": 303.953125,
+            "width": 115,
+            "height": 32.09375,
+            "right": 363,
+            "bottom": 336.046875
+          },
+          "strong": {
+            "x": 248,
+            "y": 303.953125,
+            "width": 115,
+            "height": 16.09375,
+            "right": 363,
+            "bottom": 320.046875
+          },
+          "small": {
+            "x": 248,
+            "y": 322.046875,
+            "width": 115,
+            "height": 14,
+            "right": 363,
+            "bottom": 336.046875
+          },
+          "copyOverflow": false
+        },
+        {
+          "id": "image",
+          "x": 16,
+          "y": 353,
+          "width": 181,
+          "height": 50,
+          "right": 197,
+          "bottom": 403,
+          "display": "grid",
+          "naturalHeight": 50,
+          "copy": {
+            "x": 59,
+            "y": 363.203125,
+            "width": 115,
+            "height": 29.59375,
+            "right": 174,
+            "bottom": 392.796875
+          },
+          "strong": {
+            "x": 59,
+            "y": 363.203125,
+            "width": 115,
+            "height": 16.09375,
+            "right": 174,
+            "bottom": 379.296875
+          },
+          "small": {
+            "x": 59,
+            "y": 381.296875,
+            "width": 115,
+            "height": 11.5,
+            "right": 174,
+            "bottom": 392.796875
+          },
+          "copyOverflow": false
+        }
+      ],
+      "issues": [],
+      "screenshot": "feature-grid-safari-marker-css-fixture-default-402-dark-3.png"
+    },
+    {
+      "label": "feature-grid-ordinary-default-320-light-3",
+      "skin": "default",
+      "width": 320,
+      "theme": "light",
+      "count": 3,
+      "mode": "ordinary",
+      "documentWidth": 320,
+      "rootOverflow": false,
+      "shell": {
+        "x": 0,
+        "y": 0,
+        "width": 320,
+        "height": 462,
+        "right": 320,
+        "bottom": 462
+      },
+      "grid": {
+        "x": 16,
+        "y": 310,
+        "width": 288,
+        "height": 108,
+        "right": 304,
+        "bottom": 418
+      },
+      "display": "grid",
+      "rowGap": 8,
+      "columnGap": 8,
+      "gridRows": "50px 50px",
+      "cards": [
+        {
+          "id": "hover",
+          "x": 16,
+          "y": 310,
+          "width": 140,
+          "height": 50,
+          "right": 156,
+          "bottom": 360,
+          "display": "grid",
+          "naturalHeight": 50,
+          "copy": {
+            "x": 59,
+            "y": 320.203125,
+            "width": 74,
+            "height": 29.59375,
+            "right": 133,
+            "bottom": 349.796875
+          },
+          "strong": {
+            "x": 59,
+            "y": 320.203125,
+            "width": 74,
+            "height": 16.09375,
+            "right": 133,
+            "bottom": 336.296875
+          },
+          "small": {
+            "x": 59,
+            "y": 338.296875,
+            "width": 74,
+            "height": 11.5,
+            "right": 133,
+            "bottom": 349.796875
+          },
+          "copyOverflow": false
+        },
+        {
+          "id": "selection",
+          "x": 164,
+          "y": 310,
+          "width": 140,
+          "height": 50,
+          "right": 304,
+          "bottom": 360,
+          "display": "grid",
+          "naturalHeight": 50,
+          "copy": {
+            "x": 207,
+            "y": 318.953125,
+            "width": 74,
+            "height": 32.09375,
+            "right": 281,
+            "bottom": 351.046875
+          },
+          "strong": {
+            "x": 207,
+            "y": 318.953125,
+            "width": 74,
+            "height": 16.09375,
+            "right": 281,
+            "bottom": 335.046875
+          },
+          "small": {
+            "x": 207,
+            "y": 337.046875,
+            "width": 74,
+            "height": 14,
+            "right": 281,
+            "bottom": 351.046875
+          },
+          "copyOverflow": false
+        },
+        {
+          "id": "image",
+          "x": 16,
+          "y": 368,
+          "width": 140,
+          "height": 50,
+          "right": 156,
+          "bottom": 418,
+          "display": "grid",
+          "naturalHeight": 50,
+          "copy": {
+            "x": 59,
+            "y": 378.203125,
+            "width": 74,
+            "height": 29.59375,
+            "right": 133,
+            "bottom": 407.796875
+          },
+          "strong": {
+            "x": 59,
+            "y": 378.203125,
+            "width": 74,
+            "height": 16.09375,
+            "right": 133,
+            "bottom": 394.296875
+          },
+          "small": {
+            "x": 59,
+            "y": 396.296875,
+            "width": 74,
+            "height": 11.5,
+            "right": 133,
+            "bottom": 407.796875
+          },
+          "copyOverflow": false
+        }
+      ],
+      "issues": [],
+      "screenshot": "feature-grid-ordinary-default-320-light-3.png"
+    },
+    {
+      "label": "feature-grid-embedded-marker-css-fixture-default-320-light-3",
+      "skin": "default",
+      "width": 320,
+      "theme": "light",
+      "count": 3,
+      "mode": "embedded-marker-css-fixture",
+      "documentWidth": 320,
+      "rootOverflow": false,
+      "shell": {
+        "x": 0,
+        "y": 0,
+        "width": 320,
+        "height": 462,
+        "right": 320,
+        "bottom": 462
+      },
+      "grid": {
+        "x": 16,
+        "y": 310,
+        "width": 288,
+        "height": 108,
+        "right": 304,
+        "bottom": 418
+      },
+      "display": "grid",
+      "rowGap": 8,
+      "columnGap": 8,
+      "gridRows": "50px 50px",
+      "cards": [
+        {
+          "id": "hover",
+          "x": 16,
+          "y": 310,
+          "width": 140,
+          "height": 50,
+          "right": 156,
+          "bottom": 360,
+          "display": "grid",
+          "naturalHeight": 50,
+          "copy": {
+            "x": 59,
+            "y": 320.203125,
+            "width": 74,
+            "height": 29.59375,
+            "right": 133,
+            "bottom": 349.796875
+          },
+          "strong": {
+            "x": 59,
+            "y": 320.203125,
+            "width": 74,
+            "height": 16.09375,
+            "right": 133,
+            "bottom": 336.296875
+          },
+          "small": {
+            "x": 59,
+            "y": 338.296875,
+            "width": 74,
+            "height": 11.5,
+            "right": 133,
+            "bottom": 349.796875
+          },
+          "copyOverflow": false
+        },
+        {
+          "id": "selection",
+          "x": 164,
+          "y": 310,
+          "width": 140,
+          "height": 50,
+          "right": 304,
+          "bottom": 360,
+          "display": "grid",
+          "naturalHeight": 50,
+          "copy": {
+            "x": 207,
+            "y": 318.953125,
+            "width": 74,
+            "height": 32.09375,
+            "right": 281,
+            "bottom": 351.046875
+          },
+          "strong": {
+            "x": 207,
+            "y": 318.953125,
+            "width": 74,
+            "height": 16.09375,
+            "right": 281,
+            "bottom": 335.046875
+          },
+          "small": {
+            "x": 207,
+            "y": 337.046875,
+            "width": 74,
+            "height": 14,
+            "right": 281,
+            "bottom": 351.046875
+          },
+          "copyOverflow": false
+        },
+        {
+          "id": "image",
+          "x": 16,
+          "y": 368,
+          "width": 140,
+          "height": 50,
+          "right": 156,
+          "bottom": 418,
+          "display": "grid",
+          "naturalHeight": 50,
+          "copy": {
+            "x": 59,
+            "y": 378.203125,
+            "width": 74,
+            "height": 29.59375,
+            "right": 133,
+            "bottom": 407.796875
+          },
+          "strong": {
+            "x": 59,
+            "y": 378.203125,
+            "width": 74,
+            "height": 16.09375,
+            "right": 133,
+            "bottom": 394.296875
+          },
+          "small": {
+            "x": 59,
+            "y": 396.296875,
+            "width": 74,
+            "height": 11.5,
+            "right": 133,
+            "bottom": 407.796875
+          },
+          "copyOverflow": false
+        }
+      ],
+      "issues": [],
+      "screenshot": "feature-grid-embedded-marker-css-fixture-default-320-light-3.png"
+    },
+    {
+      "label": "feature-grid-safari-marker-css-fixture-compact-320-light-4",
+      "skin": "compact",
+      "width": 320,
+      "theme": "light",
+      "count": 4,
+      "mode": "safari-marker-css-fixture",
+      "documentWidth": 320,
+      "rootOverflow": false,
+      "shell": {
+        "x": 0,
+        "y": 0,
+        "width": 320,
+        "height": 394,
+        "right": 320,
+        "bottom": 394
+      },
+      "grid": {
+        "x": 12,
+        "y": 268,
+        "width": 296,
+        "height": 88,
+        "right": 308,
+        "bottom": 356
+      },
+      "display": "flex",
+      "rowGap": 4,
+      "columnGap": 4,
+      "gridRows": "none",
+      "cards": [
+        {
+          "id": "hover",
+          "x": 12,
+          "y": 268,
+          "width": 146,
+          "height": 42,
+          "right": 158,
+          "bottom": 310,
+          "display": "grid",
+          "naturalHeight": 42,
+          "copy": {
+            "x": 48,
+            "y": 276.6875,
+            "width": 92,
+            "height": 24.625,
+            "right": 140,
+            "bottom": 301.3125
+          },
+          "strong": {
+            "x": 48,
+            "y": 276.6875,
+            "width": 92,
+            "height": 13.125,
+            "right": 140,
+            "bottom": 289.8125
+          },
+          "small": {
+            "x": 48,
+            "y": 290.8125,
+            "width": 92,
+            "height": 10.5,
+            "right": 140,
+            "bottom": 301.3125
+          },
+          "copyOverflow": false
+        },
+        {
+          "id": "selection",
+          "x": 162,
+          "y": 268,
+          "width": 146,
+          "height": 42,
+          "right": 308,
+          "bottom": 310,
+          "display": "grid",
+          "naturalHeight": 42,
+          "copy": {
+            "x": 198,
+            "y": 275.6875,
+            "width": 92,
+            "height": 26.625,
+            "right": 290,
+            "bottom": 302.3125
+          },
+          "strong": {
+            "x": 198,
+            "y": 275.6875,
+            "width": 92,
+            "height": 13.125,
+            "right": 290,
+            "bottom": 288.8125
+          },
+          "small": {
+            "x": 198,
+            "y": 289.8125,
+            "width": 92,
+            "height": 12.5,
+            "right": 290,
+            "bottom": 302.3125
+          },
+          "copyOverflow": false
+        },
+        {
+          "id": "image",
+          "x": 12,
+          "y": 314,
+          "width": 146,
+          "height": 42,
+          "right": 158,
+          "bottom": 356,
+          "display": "grid",
+          "naturalHeight": 42,
+          "copy": {
+            "x": 48,
+            "y": 322.6875,
+            "width": 92,
+            "height": 24.625,
+            "right": 140,
+            "bottom": 347.3125
+          },
+          "strong": {
+            "x": 48,
+            "y": 322.6875,
+            "width": 92,
+            "height": 13.125,
+            "right": 140,
+            "bottom": 335.8125
+          },
+          "small": {
+            "x": 48,
+            "y": 336.8125,
+            "width": 92,
+            "height": 10.5,
+            "right": 140,
+            "bottom": 347.3125
+          },
+          "copyOverflow": false
+        },
+        {
+          "id": "document",
+          "x": 162,
+          "y": 314,
+          "width": 146,
+          "height": 42,
+          "right": 308,
+          "bottom": 356,
+          "display": "grid",
+          "naturalHeight": 42,
+          "copy": {
+            "x": 198,
+            "y": 322.6875,
+            "width": 92,
+            "height": 24.625,
+            "right": 290,
+            "bottom": 347.3125
+          },
+          "strong": {
+            "x": 198,
+            "y": 322.6875,
+            "width": 92,
+            "height": 13.125,
+            "right": 290,
+            "bottom": 335.8125
+          },
+          "small": {
+            "x": 198,
+            "y": 336.8125,
+            "width": 92,
+            "height": 10.5,
+            "right": 290,
+            "bottom": 347.3125
+          },
+          "copyOverflow": false
+        }
+      ],
+      "issues": [],
+      "screenshot": "feature-grid-safari-marker-css-fixture-compact-320-light-4.png"
+    },
+    {
+      "label": "feature-grid-safari-marker-css-fixture-compact-320-light-3",
+      "skin": "compact",
+      "width": 320,
+      "theme": "light",
+      "count": 3,
+      "mode": "safari-marker-css-fixture",
+      "documentWidth": 320,
+      "rootOverflow": false,
+      "shell": {
+        "x": 0,
+        "y": 0,
+        "width": 320,
+        "height": 394,
+        "right": 320,
+        "bottom": 394
+      },
+      "grid": {
+        "x": 12,
+        "y": 268,
+        "width": 296,
+        "height": 88,
+        "right": 308,
+        "bottom": 356
+      },
+      "display": "flex",
+      "rowGap": 4,
+      "columnGap": 4,
+      "gridRows": "none",
+      "cards": [
+        {
+          "id": "hover",
+          "x": 12,
+          "y": 268,
+          "width": 146,
+          "height": 42,
+          "right": 158,
+          "bottom": 310,
+          "display": "grid",
+          "naturalHeight": 42,
+          "copy": {
+            "x": 48,
+            "y": 276.6875,
+            "width": 92,
+            "height": 24.625,
+            "right": 140,
+            "bottom": 301.3125
+          },
+          "strong": {
+            "x": 48,
+            "y": 276.6875,
+            "width": 92,
+            "height": 13.125,
+            "right": 140,
+            "bottom": 289.8125
+          },
+          "small": {
+            "x": 48,
+            "y": 290.8125,
+            "width": 92,
+            "height": 10.5,
+            "right": 140,
+            "bottom": 301.3125
+          },
+          "copyOverflow": false
+        },
+        {
+          "id": "selection",
+          "x": 162,
+          "y": 268,
+          "width": 146,
+          "height": 42,
+          "right": 308,
+          "bottom": 310,
+          "display": "grid",
+          "naturalHeight": 42,
+          "copy": {
+            "x": 198,
+            "y": 275.6875,
+            "width": 92,
+            "height": 26.625,
+            "right": 290,
+            "bottom": 302.3125
+          },
+          "strong": {
+            "x": 198,
+            "y": 275.6875,
+            "width": 92,
+            "height": 13.125,
+            "right": 290,
+            "bottom": 288.8125
+          },
+          "small": {
+            "x": 198,
+            "y": 289.8125,
+            "width": 92,
+            "height": 12.5,
+            "right": 290,
+            "bottom": 302.3125
+          },
+          "copyOverflow": false
+        },
+        {
+          "id": "image",
+          "x": 12,
+          "y": 314,
+          "width": 146,
+          "height": 42,
+          "right": 158,
+          "bottom": 356,
+          "display": "grid",
+          "naturalHeight": 42,
+          "copy": {
+            "x": 48,
+            "y": 322.6875,
+            "width": 92,
+            "height": 24.625,
+            "right": 140,
+            "bottom": 347.3125
+          },
+          "strong": {
+            "x": 48,
+            "y": 322.6875,
+            "width": 92,
+            "height": 13.125,
+            "right": 140,
+            "bottom": 335.8125
+          },
+          "small": {
+            "x": 48,
+            "y": 336.8125,
+            "width": 92,
+            "height": 10.5,
+            "right": 140,
+            "bottom": 347.3125
+          },
+          "copyOverflow": false
+        }
+      ],
+      "issues": [],
+      "screenshot": null
+    },
+    {
+      "label": "feature-grid-safari-marker-css-fixture-compact-320-dark-4",
+      "skin": "compact",
+      "width": 320,
+      "theme": "dark",
+      "count": 4,
+      "mode": "safari-marker-css-fixture",
+      "documentWidth": 320,
+      "rootOverflow": false,
+      "shell": {
+        "x": 0,
+        "y": 0,
+        "width": 320,
+        "height": 394,
+        "right": 320,
+        "bottom": 394
+      },
+      "grid": {
+        "x": 12,
+        "y": 268,
+        "width": 296,
+        "height": 88,
+        "right": 308,
+        "bottom": 356
+      },
+      "display": "flex",
+      "rowGap": 4,
+      "columnGap": 4,
+      "gridRows": "none",
+      "cards": [
+        {
+          "id": "hover",
+          "x": 12,
+          "y": 268,
+          "width": 146,
+          "height": 42,
+          "right": 158,
+          "bottom": 310,
+          "display": "grid",
+          "naturalHeight": 42,
+          "copy": {
+            "x": 48,
+            "y": 276.6875,
+            "width": 92,
+            "height": 24.625,
+            "right": 140,
+            "bottom": 301.3125
+          },
+          "strong": {
+            "x": 48,
+            "y": 276.6875,
+            "width": 92,
+            "height": 13.125,
+            "right": 140,
+            "bottom": 289.8125
+          },
+          "small": {
+            "x": 48,
+            "y": 290.8125,
+            "width": 92,
+            "height": 10.5,
+            "right": 140,
+            "bottom": 301.3125
+          },
+          "copyOverflow": false
+        },
+        {
+          "id": "selection",
+          "x": 162,
+          "y": 268,
+          "width": 146,
+          "height": 42,
+          "right": 308,
+          "bottom": 310,
+          "display": "grid",
+          "naturalHeight": 42,
+          "copy": {
+            "x": 198,
+            "y": 275.6875,
+            "width": 92,
+            "height": 26.625,
+            "right": 290,
+            "bottom": 302.3125
+          },
+          "strong": {
+            "x": 198,
+            "y": 275.6875,
+            "width": 92,
+            "height": 13.125,
+            "right": 290,
+            "bottom": 288.8125
+          },
+          "small": {
+            "x": 198,
+            "y": 289.8125,
+            "width": 92,
+            "height": 12.5,
+            "right": 290,
+            "bottom": 302.3125
+          },
+          "copyOverflow": false
+        },
+        {
+          "id": "image",
+          "x": 12,
+          "y": 314,
+          "width": 146,
+          "height": 42,
+          "right": 158,
+          "bottom": 356,
+          "display": "grid",
+          "naturalHeight": 42,
+          "copy": {
+            "x": 48,
+            "y": 322.6875,
+            "width": 92,
+            "height": 24.625,
+            "right": 140,
+            "bottom": 347.3125
+          },
+          "strong": {
+            "x": 48,
+            "y": 322.6875,
+            "width": 92,
+            "height": 13.125,
+            "right": 140,
+            "bottom": 335.8125
+          },
+          "small": {
+            "x": 48,
+            "y": 336.8125,
+            "width": 92,
+            "height": 10.5,
+            "right": 140,
+            "bottom": 347.3125
+          },
+          "copyOverflow": false
+        },
+        {
+          "id": "document",
+          "x": 162,
+          "y": 314,
+          "width": 146,
+          "height": 42,
+          "right": 308,
+          "bottom": 356,
+          "display": "grid",
+          "naturalHeight": 42,
+          "copy": {
+            "x": 198,
+            "y": 322.6875,
+            "width": 92,
+            "height": 24.625,
+            "right": 290,
+            "bottom": 347.3125
+          },
+          "strong": {
+            "x": 198,
+            "y": 322.6875,
+            "width": 92,
+            "height": 13.125,
+            "right": 290,
+            "bottom": 335.8125
+          },
+          "small": {
+            "x": 198,
+            "y": 336.8125,
+            "width": 92,
+            "height": 10.5,
+            "right": 290,
+            "bottom": 347.3125
+          },
+          "copyOverflow": false
+        }
+      ],
+      "issues": [],
+      "screenshot": null
+    },
+    {
+      "label": "feature-grid-safari-marker-css-fixture-compact-320-dark-3",
+      "skin": "compact",
+      "width": 320,
+      "theme": "dark",
+      "count": 3,
+      "mode": "safari-marker-css-fixture",
+      "documentWidth": 320,
+      "rootOverflow": false,
+      "shell": {
+        "x": 0,
+        "y": 0,
+        "width": 320,
+        "height": 394,
+        "right": 320,
+        "bottom": 394
+      },
+      "grid": {
+        "x": 12,
+        "y": 268,
+        "width": 296,
+        "height": 88,
+        "right": 308,
+        "bottom": 356
+      },
+      "display": "flex",
+      "rowGap": 4,
+      "columnGap": 4,
+      "gridRows": "none",
+      "cards": [
+        {
+          "id": "hover",
+          "x": 12,
+          "y": 268,
+          "width": 146,
+          "height": 42,
+          "right": 158,
+          "bottom": 310,
+          "display": "grid",
+          "naturalHeight": 42,
+          "copy": {
+            "x": 48,
+            "y": 276.6875,
+            "width": 92,
+            "height": 24.625,
+            "right": 140,
+            "bottom": 301.3125
+          },
+          "strong": {
+            "x": 48,
+            "y": 276.6875,
+            "width": 92,
+            "height": 13.125,
+            "right": 140,
+            "bottom": 289.8125
+          },
+          "small": {
+            "x": 48,
+            "y": 290.8125,
+            "width": 92,
+            "height": 10.5,
+            "right": 140,
+            "bottom": 301.3125
+          },
+          "copyOverflow": false
+        },
+        {
+          "id": "selection",
+          "x": 162,
+          "y": 268,
+          "width": 146,
+          "height": 42,
+          "right": 308,
+          "bottom": 310,
+          "display": "grid",
+          "naturalHeight": 42,
+          "copy": {
+            "x": 198,
+            "y": 275.6875,
+            "width": 92,
+            "height": 26.625,
+            "right": 290,
+            "bottom": 302.3125
+          },
+          "strong": {
+            "x": 198,
+            "y": 275.6875,
+            "width": 92,
+            "height": 13.125,
+            "right": 290,
+            "bottom": 288.8125
+          },
+          "small": {
+            "x": 198,
+            "y": 289.8125,
+            "width": 92,
+            "height": 12.5,
+            "right": 290,
+            "bottom": 302.3125
+          },
+          "copyOverflow": false
+        },
+        {
+          "id": "image",
+          "x": 12,
+          "y": 314,
+          "width": 146,
+          "height": 42,
+          "right": 158,
+          "bottom": 356,
+          "display": "grid",
+          "naturalHeight": 42,
+          "copy": {
+            "x": 48,
+            "y": 322.6875,
+            "width": 92,
+            "height": 24.625,
+            "right": 140,
+            "bottom": 347.3125
+          },
+          "strong": {
+            "x": 48,
+            "y": 322.6875,
+            "width": 92,
+            "height": 13.125,
+            "right": 140,
+            "bottom": 335.8125
+          },
+          "small": {
+            "x": 48,
+            "y": 336.8125,
+            "width": 92,
+            "height": 10.5,
+            "right": 140,
+            "bottom": 347.3125
+          },
+          "copyOverflow": false
+        }
+      ],
+      "issues": [],
+      "screenshot": "feature-grid-safari-marker-css-fixture-compact-320-dark-3.png"
+    },
+    {
+      "label": "feature-grid-safari-marker-css-fixture-compact-402-light-4",
+      "skin": "compact",
+      "width": 402,
+      "theme": "light",
+      "count": 4,
+      "mode": "safari-marker-css-fixture",
+      "documentWidth": 402,
+      "rootOverflow": false,
+      "shell": {
+        "x": 0,
+        "y": 0,
+        "width": 402,
+        "height": 394,
+        "right": 402,
+        "bottom": 394
+      },
+      "grid": {
+        "x": 12,
+        "y": 268,
+        "width": 378,
+        "height": 88,
+        "right": 390,
+        "bottom": 356
+      },
+      "display": "flex",
+      "rowGap": 4,
+      "columnGap": 4,
+      "gridRows": "none",
+      "cards": [
+        {
+          "id": "hover",
+          "x": 12,
+          "y": 268,
+          "width": 187,
+          "height": 42,
+          "right": 199,
+          "bottom": 310,
+          "display": "grid",
+          "naturalHeight": 42,
+          "copy": {
+            "x": 48,
+            "y": 276.6875,
+            "width": 133,
+            "height": 24.625,
+            "right": 181,
+            "bottom": 301.3125
+          },
+          "strong": {
+            "x": 48,
+            "y": 276.6875,
+            "width": 133,
+            "height": 13.125,
+            "right": 181,
+            "bottom": 289.8125
+          },
+          "small": {
+            "x": 48,
+            "y": 290.8125,
+            "width": 133,
+            "height": 10.5,
+            "right": 181,
+            "bottom": 301.3125
+          },
+          "copyOverflow": false
+        },
+        {
+          "id": "selection",
+          "x": 203,
+          "y": 268,
+          "width": 187,
+          "height": 42,
+          "right": 390,
+          "bottom": 310,
+          "display": "grid",
+          "naturalHeight": 42,
+          "copy": {
+            "x": 239,
+            "y": 275.6875,
+            "width": 133,
+            "height": 26.625,
+            "right": 372,
+            "bottom": 302.3125
+          },
+          "strong": {
+            "x": 239,
+            "y": 275.6875,
+            "width": 133,
+            "height": 13.125,
+            "right": 372,
+            "bottom": 288.8125
+          },
+          "small": {
+            "x": 239,
+            "y": 289.8125,
+            "width": 133,
+            "height": 12.5,
+            "right": 372,
+            "bottom": 302.3125
+          },
+          "copyOverflow": false
+        },
+        {
+          "id": "image",
+          "x": 12,
+          "y": 314,
+          "width": 187,
+          "height": 42,
+          "right": 199,
+          "bottom": 356,
+          "display": "grid",
+          "naturalHeight": 42,
+          "copy": {
+            "x": 48,
+            "y": 322.6875,
+            "width": 133,
+            "height": 24.625,
+            "right": 181,
+            "bottom": 347.3125
+          },
+          "strong": {
+            "x": 48,
+            "y": 322.6875,
+            "width": 133,
+            "height": 13.125,
+            "right": 181,
+            "bottom": 335.8125
+          },
+          "small": {
+            "x": 48,
+            "y": 336.8125,
+            "width": 133,
+            "height": 10.5,
+            "right": 181,
+            "bottom": 347.3125
+          },
+          "copyOverflow": false
+        },
+        {
+          "id": "document",
+          "x": 203,
+          "y": 314,
+          "width": 187,
+          "height": 42,
+          "right": 390,
+          "bottom": 356,
+          "display": "grid",
+          "naturalHeight": 42,
+          "copy": {
+            "x": 239,
+            "y": 322.6875,
+            "width": 133,
+            "height": 24.625,
+            "right": 372,
+            "bottom": 347.3125
+          },
+          "strong": {
+            "x": 239,
+            "y": 322.6875,
+            "width": 133,
+            "height": 13.125,
+            "right": 372,
+            "bottom": 335.8125
+          },
+          "small": {
+            "x": 239,
+            "y": 336.8125,
+            "width": 133,
+            "height": 10.5,
+            "right": 372,
+            "bottom": 347.3125
+          },
+          "copyOverflow": false
+        }
+      ],
+      "issues": [],
+      "screenshot": null
+    },
+    {
+      "label": "feature-grid-safari-marker-css-fixture-compact-402-light-3",
+      "skin": "compact",
+      "width": 402,
+      "theme": "light",
+      "count": 3,
+      "mode": "safari-marker-css-fixture",
+      "documentWidth": 402,
+      "rootOverflow": false,
+      "shell": {
+        "x": 0,
+        "y": 0,
+        "width": 402,
+        "height": 394,
+        "right": 402,
+        "bottom": 394
+      },
+      "grid": {
+        "x": 12,
+        "y": 268,
+        "width": 378,
+        "height": 88,
+        "right": 390,
+        "bottom": 356
+      },
+      "display": "flex",
+      "rowGap": 4,
+      "columnGap": 4,
+      "gridRows": "none",
+      "cards": [
+        {
+          "id": "hover",
+          "x": 12,
+          "y": 268,
+          "width": 187,
+          "height": 42,
+          "right": 199,
+          "bottom": 310,
+          "display": "grid",
+          "naturalHeight": 42,
+          "copy": {
+            "x": 48,
+            "y": 276.6875,
+            "width": 133,
+            "height": 24.625,
+            "right": 181,
+            "bottom": 301.3125
+          },
+          "strong": {
+            "x": 48,
+            "y": 276.6875,
+            "width": 133,
+            "height": 13.125,
+            "right": 181,
+            "bottom": 289.8125
+          },
+          "small": {
+            "x": 48,
+            "y": 290.8125,
+            "width": 133,
+            "height": 10.5,
+            "right": 181,
+            "bottom": 301.3125
+          },
+          "copyOverflow": false
+        },
+        {
+          "id": "selection",
+          "x": 203,
+          "y": 268,
+          "width": 187,
+          "height": 42,
+          "right": 390,
+          "bottom": 310,
+          "display": "grid",
+          "naturalHeight": 42,
+          "copy": {
+            "x": 239,
+            "y": 275.6875,
+            "width": 133,
+            "height": 26.625,
+            "right": 372,
+            "bottom": 302.3125
+          },
+          "strong": {
+            "x": 239,
+            "y": 275.6875,
+            "width": 133,
+            "height": 13.125,
+            "right": 372,
+            "bottom": 288.8125
+          },
+          "small": {
+            "x": 239,
+            "y": 289.8125,
+            "width": 133,
+            "height": 12.5,
+            "right": 372,
+            "bottom": 302.3125
+          },
+          "copyOverflow": false
+        },
+        {
+          "id": "image",
+          "x": 12,
+          "y": 314,
+          "width": 187,
+          "height": 42,
+          "right": 199,
+          "bottom": 356,
+          "display": "grid",
+          "naturalHeight": 42,
+          "copy": {
+            "x": 48,
+            "y": 322.6875,
+            "width": 133,
+            "height": 24.625,
+            "right": 181,
+            "bottom": 347.3125
+          },
+          "strong": {
+            "x": 48,
+            "y": 322.6875,
+            "width": 133,
+            "height": 13.125,
+            "right": 181,
+            "bottom": 335.8125
+          },
+          "small": {
+            "x": 48,
+            "y": 336.8125,
+            "width": 133,
+            "height": 10.5,
+            "right": 181,
+            "bottom": 347.3125
+          },
+          "copyOverflow": false
+        }
+      ],
+      "issues": [],
+      "screenshot": null
+    },
+    {
+      "label": "feature-grid-safari-marker-css-fixture-compact-402-dark-4",
+      "skin": "compact",
+      "width": 402,
+      "theme": "dark",
+      "count": 4,
+      "mode": "safari-marker-css-fixture",
+      "documentWidth": 402,
+      "rootOverflow": false,
+      "shell": {
+        "x": 0,
+        "y": 0,
+        "width": 402,
+        "height": 394,
+        "right": 402,
+        "bottom": 394
+      },
+      "grid": {
+        "x": 12,
+        "y": 268,
+        "width": 378,
+        "height": 88,
+        "right": 390,
+        "bottom": 356
+      },
+      "display": "flex",
+      "rowGap": 4,
+      "columnGap": 4,
+      "gridRows": "none",
+      "cards": [
+        {
+          "id": "hover",
+          "x": 12,
+          "y": 268,
+          "width": 187,
+          "height": 42,
+          "right": 199,
+          "bottom": 310,
+          "display": "grid",
+          "naturalHeight": 42,
+          "copy": {
+            "x": 48,
+            "y": 276.6875,
+            "width": 133,
+            "height": 24.625,
+            "right": 181,
+            "bottom": 301.3125
+          },
+          "strong": {
+            "x": 48,
+            "y": 276.6875,
+            "width": 133,
+            "height": 13.125,
+            "right": 181,
+            "bottom": 289.8125
+          },
+          "small": {
+            "x": 48,
+            "y": 290.8125,
+            "width": 133,
+            "height": 10.5,
+            "right": 181,
+            "bottom": 301.3125
+          },
+          "copyOverflow": false
+        },
+        {
+          "id": "selection",
+          "x": 203,
+          "y": 268,
+          "width": 187,
+          "height": 42,
+          "right": 390,
+          "bottom": 310,
+          "display": "grid",
+          "naturalHeight": 42,
+          "copy": {
+            "x": 239,
+            "y": 275.6875,
+            "width": 133,
+            "height": 26.625,
+            "right": 372,
+            "bottom": 302.3125
+          },
+          "strong": {
+            "x": 239,
+            "y": 275.6875,
+            "width": 133,
+            "height": 13.125,
+            "right": 372,
+            "bottom": 288.8125
+          },
+          "small": {
+            "x": 239,
+            "y": 289.8125,
+            "width": 133,
+            "height": 12.5,
+            "right": 372,
+            "bottom": 302.3125
+          },
+          "copyOverflow": false
+        },
+        {
+          "id": "image",
+          "x": 12,
+          "y": 314,
+          "width": 187,
+          "height": 42,
+          "right": 199,
+          "bottom": 356,
+          "display": "grid",
+          "naturalHeight": 42,
+          "copy": {
+            "x": 48,
+            "y": 322.6875,
+            "width": 133,
+            "height": 24.625,
+            "right": 181,
+            "bottom": 347.3125
+          },
+          "strong": {
+            "x": 48,
+            "y": 322.6875,
+            "width": 133,
+            "height": 13.125,
+            "right": 181,
+            "bottom": 335.8125
+          },
+          "small": {
+            "x": 48,
+            "y": 336.8125,
+            "width": 133,
+            "height": 10.5,
+            "right": 181,
+            "bottom": 347.3125
+          },
+          "copyOverflow": false
+        },
+        {
+          "id": "document",
+          "x": 203,
+          "y": 314,
+          "width": 187,
+          "height": 42,
+          "right": 390,
+          "bottom": 356,
+          "display": "grid",
+          "naturalHeight": 42,
+          "copy": {
+            "x": 239,
+            "y": 322.6875,
+            "width": 133,
+            "height": 24.625,
+            "right": 372,
+            "bottom": 347.3125
+          },
+          "strong": {
+            "x": 239,
+            "y": 322.6875,
+            "width": 133,
+            "height": 13.125,
+            "right": 372,
+            "bottom": 335.8125
+          },
+          "small": {
+            "x": 239,
+            "y": 336.8125,
+            "width": 133,
+            "height": 10.5,
+            "right": 372,
+            "bottom": 347.3125
+          },
+          "copyOverflow": false
+        }
+      ],
+      "issues": [],
+      "screenshot": null
+    },
+    {
+      "label": "feature-grid-safari-marker-css-fixture-compact-402-dark-3",
+      "skin": "compact",
+      "width": 402,
+      "theme": "dark",
+      "count": 3,
+      "mode": "safari-marker-css-fixture",
+      "documentWidth": 402,
+      "rootOverflow": false,
+      "shell": {
+        "x": 0,
+        "y": 0,
+        "width": 402,
+        "height": 394,
+        "right": 402,
+        "bottom": 394
+      },
+      "grid": {
+        "x": 12,
+        "y": 268,
+        "width": 378,
+        "height": 88,
+        "right": 390,
+        "bottom": 356
+      },
+      "display": "flex",
+      "rowGap": 4,
+      "columnGap": 4,
+      "gridRows": "none",
+      "cards": [
+        {
+          "id": "hover",
+          "x": 12,
+          "y": 268,
+          "width": 187,
+          "height": 42,
+          "right": 199,
+          "bottom": 310,
+          "display": "grid",
+          "naturalHeight": 42,
+          "copy": {
+            "x": 48,
+            "y": 276.6875,
+            "width": 133,
+            "height": 24.625,
+            "right": 181,
+            "bottom": 301.3125
+          },
+          "strong": {
+            "x": 48,
+            "y": 276.6875,
+            "width": 133,
+            "height": 13.125,
+            "right": 181,
+            "bottom": 289.8125
+          },
+          "small": {
+            "x": 48,
+            "y": 290.8125,
+            "width": 133,
+            "height": 10.5,
+            "right": 181,
+            "bottom": 301.3125
+          },
+          "copyOverflow": false
+        },
+        {
+          "id": "selection",
+          "x": 203,
+          "y": 268,
+          "width": 187,
+          "height": 42,
+          "right": 390,
+          "bottom": 310,
+          "display": "grid",
+          "naturalHeight": 42,
+          "copy": {
+            "x": 239,
+            "y": 275.6875,
+            "width": 133,
+            "height": 26.625,
+            "right": 372,
+            "bottom": 302.3125
+          },
+          "strong": {
+            "x": 239,
+            "y": 275.6875,
+            "width": 133,
+            "height": 13.125,
+            "right": 372,
+            "bottom": 288.8125
+          },
+          "small": {
+            "x": 239,
+            "y": 289.8125,
+            "width": 133,
+            "height": 12.5,
+            "right": 372,
+            "bottom": 302.3125
+          },
+          "copyOverflow": false
+        },
+        {
+          "id": "image",
+          "x": 12,
+          "y": 314,
+          "width": 187,
+          "height": 42,
+          "right": 199,
+          "bottom": 356,
+          "display": "grid",
+          "naturalHeight": 42,
+          "copy": {
+            "x": 48,
+            "y": 322.6875,
+            "width": 133,
+            "height": 24.625,
+            "right": 181,
+            "bottom": 347.3125
+          },
+          "strong": {
+            "x": 48,
+            "y": 322.6875,
+            "width": 133,
+            "height": 13.125,
+            "right": 181,
+            "bottom": 335.8125
+          },
+          "small": {
+            "x": 48,
+            "y": 336.8125,
+            "width": 133,
+            "height": 10.5,
+            "right": 181,
+            "bottom": 347.3125
+          },
+          "copyOverflow": false
+        }
+      ],
+      "issues": [],
+      "screenshot": "feature-grid-safari-marker-css-fixture-compact-402-dark-3.png"
+    },
+    {
+      "label": "feature-grid-ordinary-compact-320-light-3",
+      "skin": "compact",
+      "width": 320,
+      "theme": "light",
+      "count": 3,
+      "mode": "ordinary",
+      "documentWidth": 320,
+      "rootOverflow": false,
+      "shell": {
+        "x": 0,
+        "y": 0,
+        "width": 300,
+        "height": 409,
+        "right": 300,
+        "bottom": 409
+      },
+      "grid": {
+        "x": 12,
+        "y": 283,
+        "width": 276,
+        "height": 88,
+        "right": 288,
+        "bottom": 371
+      },
+      "display": "grid",
+      "rowGap": 4,
+      "columnGap": 4,
+      "gridRows": "42px 42px",
+      "cards": [
+        {
+          "id": "hover",
+          "x": 12,
+          "y": 283,
+          "width": 136,
+          "height": 42,
+          "right": 148,
+          "bottom": 325,
+          "display": "grid",
+          "naturalHeight": 42,
+          "copy": {
+            "x": 48,
+            "y": 291.6875,
+            "width": 82,
+            "height": 24.625,
+            "right": 130,
+            "bottom": 316.3125
+          },
+          "strong": {
+            "x": 48,
+            "y": 291.6875,
+            "width": 82,
+            "height": 13.125,
+            "right": 130,
+            "bottom": 304.8125
+          },
+          "small": {
+            "x": 48,
+            "y": 305.8125,
+            "width": 82,
+            "height": 10.5,
+            "right": 130,
+            "bottom": 316.3125
+          },
+          "copyOverflow": false
+        },
+        {
+          "id": "selection",
+          "x": 152,
+          "y": 283,
+          "width": 136,
+          "height": 42,
+          "right": 288,
+          "bottom": 325,
+          "display": "grid",
+          "naturalHeight": 42,
+          "copy": {
+            "x": 188,
+            "y": 290.6875,
+            "width": 82,
+            "height": 26.625,
+            "right": 270,
+            "bottom": 317.3125
+          },
+          "strong": {
+            "x": 188,
+            "y": 290.6875,
+            "width": 82,
+            "height": 13.125,
+            "right": 270,
+            "bottom": 303.8125
+          },
+          "small": {
+            "x": 188,
+            "y": 304.8125,
+            "width": 82,
+            "height": 12.5,
+            "right": 270,
+            "bottom": 317.3125
+          },
+          "copyOverflow": false
+        },
+        {
+          "id": "image",
+          "x": 12,
+          "y": 329,
+          "width": 136,
+          "height": 42,
+          "right": 148,
+          "bottom": 371,
+          "display": "grid",
+          "naturalHeight": 42,
+          "copy": {
+            "x": 48,
+            "y": 337.6875,
+            "width": 82,
+            "height": 24.625,
+            "right": 130,
+            "bottom": 362.3125
+          },
+          "strong": {
+            "x": 48,
+            "y": 337.6875,
+            "width": 82,
+            "height": 13.125,
+            "right": 130,
+            "bottom": 350.8125
+          },
+          "small": {
+            "x": 48,
+            "y": 351.8125,
+            "width": 82,
+            "height": 10.5,
+            "right": 130,
+            "bottom": 362.3125
+          },
+          "copyOverflow": false
+        }
+      ],
+      "issues": [],
+      "screenshot": null
+    },
+    {
+      "label": "feature-grid-embedded-marker-css-fixture-compact-320-light-3",
+      "skin": "compact",
+      "width": 320,
+      "theme": "light",
+      "count": 3,
+      "mode": "embedded-marker-css-fixture",
+      "documentWidth": 320,
+      "rootOverflow": false,
+      "shell": {
+        "x": 0,
+        "y": 0,
+        "width": 300,
+        "height": 409,
+        "right": 300,
+        "bottom": 409
+      },
+      "grid": {
+        "x": 12,
+        "y": 283,
+        "width": 276,
+        "height": 88,
+        "right": 288,
+        "bottom": 371
+      },
+      "display": "grid",
+      "rowGap": 4,
+      "columnGap": 4,
+      "gridRows": "42px 42px",
+      "cards": [
+        {
+          "id": "hover",
+          "x": 12,
+          "y": 283,
+          "width": 136,
+          "height": 42,
+          "right": 148,
+          "bottom": 325,
+          "display": "grid",
+          "naturalHeight": 42,
+          "copy": {
+            "x": 48,
+            "y": 291.6875,
+            "width": 82,
+            "height": 24.625,
+            "right": 130,
+            "bottom": 316.3125
+          },
+          "strong": {
+            "x": 48,
+            "y": 291.6875,
+            "width": 82,
+            "height": 13.125,
+            "right": 130,
+            "bottom": 304.8125
+          },
+          "small": {
+            "x": 48,
+            "y": 305.8125,
+            "width": 82,
+            "height": 10.5,
+            "right": 130,
+            "bottom": 316.3125
+          },
+          "copyOverflow": false
+        },
+        {
+          "id": "selection",
+          "x": 152,
+          "y": 283,
+          "width": 136,
+          "height": 42,
+          "right": 288,
+          "bottom": 325,
+          "display": "grid",
+          "naturalHeight": 42,
+          "copy": {
+            "x": 188,
+            "y": 290.6875,
+            "width": 82,
+            "height": 26.625,
+            "right": 270,
+            "bottom": 317.3125
+          },
+          "strong": {
+            "x": 188,
+            "y": 290.6875,
+            "width": 82,
+            "height": 13.125,
+            "right": 270,
+            "bottom": 303.8125
+          },
+          "small": {
+            "x": 188,
+            "y": 304.8125,
+            "width": 82,
+            "height": 12.5,
+            "right": 270,
+            "bottom": 317.3125
+          },
+          "copyOverflow": false
+        },
+        {
+          "id": "image",
+          "x": 12,
+          "y": 329,
+          "width": 136,
+          "height": 42,
+          "right": 148,
+          "bottom": 371,
+          "display": "grid",
+          "naturalHeight": 42,
+          "copy": {
+            "x": 48,
+            "y": 337.6875,
+            "width": 82,
+            "height": 24.625,
+            "right": 130,
+            "bottom": 362.3125
+          },
+          "strong": {
+            "x": 48,
+            "y": 337.6875,
+            "width": 82,
+            "height": 13.125,
+            "right": 130,
+            "bottom": 350.8125
+          },
+          "small": {
+            "x": 48,
+            "y": 351.8125,
+            "width": 82,
+            "height": 10.5,
+            "right": 130,
+            "bottom": 362.3125
+          },
+          "copyOverflow": false
+        }
+      ],
+      "issues": [],
+      "screenshot": null
+    },
+    {
+      "label": "feature-grid-safari-marker-css-fixture-minimal-320-light-4",
+      "skin": "minimal",
+      "width": 320,
+      "theme": "light",
+      "count": 4,
+      "mode": "safari-marker-css-fixture",
+      "documentWidth": 320,
+      "rootOverflow": false,
+      "shell": {
+        "x": 0,
+        "y": 0,
+        "width": 320,
+        "height": 434,
+        "right": 320,
+        "bottom": 434
+      },
+      "grid": {
+        "x": 12,
+        "y": 290,
+        "width": 296,
+        "height": 101,
+        "right": 308,
+        "bottom": 391
+      },
+      "display": "flex",
+      "rowGap": 5,
+      "columnGap": 5,
+      "gridRows": "none",
+      "cards": [
+        {
+          "id": "hover",
+          "x": 12,
+          "y": 290,
+          "width": 145.5,
+          "height": 48,
+          "right": 157.5,
+          "bottom": 338,
+          "display": "grid",
+          "naturalHeight": 48,
+          "copy": {
+            "x": 60,
+            "y": 306.8515625,
+            "width": 73.5,
+            "height": 14.296875,
+            "right": 133.5,
+            "bottom": 321.1484375
+          },
+          "strong": {
+            "x": 60,
+            "y": 306.8515625,
+            "width": 73.5,
+            "height": 14.296875,
+            "right": 133.5,
+            "bottom": 321.1484375
+          },
+          "small": {
+            "x": 0,
+            "y": 0,
+            "width": 0,
+            "height": 0,
+            "right": 0,
+            "bottom": 0
+          },
+          "copyOverflow": false
+        },
+        {
+          "id": "selection",
+          "x": 162.5,
+          "y": 290,
+          "width": 145.5,
+          "height": 48,
+          "right": 308,
+          "bottom": 338,
+          "display": "grid",
+          "naturalHeight": 48,
+          "copy": {
+            "x": 210.5,
+            "y": 306.8515625,
+            "width": 73.5,
+            "height": 14.296875,
+            "right": 284,
+            "bottom": 321.1484375
+          },
+          "strong": {
+            "x": 210.5,
+            "y": 306.8515625,
+            "width": 73.5,
+            "height": 14.296875,
+            "right": 284,
+            "bottom": 321.1484375
+          },
+          "small": {
+            "x": 0,
+            "y": 0,
+            "width": 0,
+            "height": 0,
+            "right": 0,
+            "bottom": 0
+          },
+          "copyOverflow": false
+        },
+        {
+          "id": "image",
+          "x": 12,
+          "y": 343,
+          "width": 145.5,
+          "height": 48,
+          "right": 157.5,
+          "bottom": 391,
+          "display": "grid",
+          "naturalHeight": 48,
+          "copy": {
+            "x": 60,
+            "y": 359.8515625,
+            "width": 73.5,
+            "height": 14.296875,
+            "right": 133.5,
+            "bottom": 374.1484375
+          },
+          "strong": {
+            "x": 60,
+            "y": 359.8515625,
+            "width": 73.5,
+            "height": 14.296875,
+            "right": 133.5,
+            "bottom": 374.1484375
+          },
+          "small": {
+            "x": 0,
+            "y": 0,
+            "width": 0,
+            "height": 0,
+            "right": 0,
+            "bottom": 0
+          },
+          "copyOverflow": false
+        },
+        {
+          "id": "document",
+          "x": 162.5,
+          "y": 343,
+          "width": 145.5,
+          "height": 48,
+          "right": 308,
+          "bottom": 391,
+          "display": "grid",
+          "naturalHeight": 48,
+          "copy": {
+            "x": 210.5,
+            "y": 359.8515625,
+            "width": 73.5,
+            "height": 14.296875,
+            "right": 284,
+            "bottom": 374.1484375
+          },
+          "strong": {
+            "x": 210.5,
+            "y": 359.8515625,
+            "width": 73.5,
+            "height": 14.296875,
+            "right": 284,
+            "bottom": 374.1484375
+          },
+          "small": {
+            "x": 0,
+            "y": 0,
+            "width": 0,
+            "height": 0,
+            "right": 0,
+            "bottom": 0
+          },
+          "copyOverflow": false
+        }
+      ],
+      "issues": [],
+      "screenshot": "feature-grid-safari-marker-css-fixture-minimal-320-light-4.png"
+    },
+    {
+      "label": "feature-grid-safari-marker-css-fixture-minimal-320-light-3",
+      "skin": "minimal",
+      "width": 320,
+      "theme": "light",
+      "count": 3,
+      "mode": "safari-marker-css-fixture",
+      "documentWidth": 320,
+      "rootOverflow": false,
+      "shell": {
+        "x": 0,
+        "y": 0,
+        "width": 320,
+        "height": 434,
+        "right": 320,
+        "bottom": 434
+      },
+      "grid": {
+        "x": 12,
+        "y": 290,
+        "width": 296,
+        "height": 101,
+        "right": 308,
+        "bottom": 391
+      },
+      "display": "flex",
+      "rowGap": 5,
+      "columnGap": 5,
+      "gridRows": "none",
+      "cards": [
+        {
+          "id": "hover",
+          "x": 12,
+          "y": 290,
+          "width": 145.5,
+          "height": 48,
+          "right": 157.5,
+          "bottom": 338,
+          "display": "grid",
+          "naturalHeight": 48,
+          "copy": {
+            "x": 60,
+            "y": 306.8515625,
+            "width": 73.5,
+            "height": 14.296875,
+            "right": 133.5,
+            "bottom": 321.1484375
+          },
+          "strong": {
+            "x": 60,
+            "y": 306.8515625,
+            "width": 73.5,
+            "height": 14.296875,
+            "right": 133.5,
+            "bottom": 321.1484375
+          },
+          "small": {
+            "x": 0,
+            "y": 0,
+            "width": 0,
+            "height": 0,
+            "right": 0,
+            "bottom": 0
+          },
+          "copyOverflow": false
+        },
+        {
+          "id": "selection",
+          "x": 162.5,
+          "y": 290,
+          "width": 145.5,
+          "height": 48,
+          "right": 308,
+          "bottom": 338,
+          "display": "grid",
+          "naturalHeight": 48,
+          "copy": {
+            "x": 210.5,
+            "y": 306.8515625,
+            "width": 73.5,
+            "height": 14.296875,
+            "right": 284,
+            "bottom": 321.1484375
+          },
+          "strong": {
+            "x": 210.5,
+            "y": 306.8515625,
+            "width": 73.5,
+            "height": 14.296875,
+            "right": 284,
+            "bottom": 321.1484375
+          },
+          "small": {
+            "x": 0,
+            "y": 0,
+            "width": 0,
+            "height": 0,
+            "right": 0,
+            "bottom": 0
+          },
+          "copyOverflow": false
+        },
+        {
+          "id": "image",
+          "x": 12,
+          "y": 343,
+          "width": 145.5,
+          "height": 48,
+          "right": 157.5,
+          "bottom": 391,
+          "display": "grid",
+          "naturalHeight": 48,
+          "copy": {
+            "x": 60,
+            "y": 359.8515625,
+            "width": 73.5,
+            "height": 14.296875,
+            "right": 133.5,
+            "bottom": 374.1484375
+          },
+          "strong": {
+            "x": 60,
+            "y": 359.8515625,
+            "width": 73.5,
+            "height": 14.296875,
+            "right": 133.5,
+            "bottom": 374.1484375
+          },
+          "small": {
+            "x": 0,
+            "y": 0,
+            "width": 0,
+            "height": 0,
+            "right": 0,
+            "bottom": 0
+          },
+          "copyOverflow": false
+        }
+      ],
+      "issues": [],
+      "screenshot": null
+    },
+    {
+      "label": "feature-grid-safari-marker-css-fixture-minimal-320-dark-4",
+      "skin": "minimal",
+      "width": 320,
+      "theme": "dark",
+      "count": 4,
+      "mode": "safari-marker-css-fixture",
+      "documentWidth": 320,
+      "rootOverflow": false,
+      "shell": {
+        "x": 0,
+        "y": 0,
+        "width": 320,
+        "height": 434,
+        "right": 320,
+        "bottom": 434
+      },
+      "grid": {
+        "x": 12,
+        "y": 290,
+        "width": 296,
+        "height": 101,
+        "right": 308,
+        "bottom": 391
+      },
+      "display": "flex",
+      "rowGap": 5,
+      "columnGap": 5,
+      "gridRows": "none",
+      "cards": [
+        {
+          "id": "hover",
+          "x": 12,
+          "y": 290,
+          "width": 145.5,
+          "height": 48,
+          "right": 157.5,
+          "bottom": 338,
+          "display": "grid",
+          "naturalHeight": 48,
+          "copy": {
+            "x": 60,
+            "y": 306.8515625,
+            "width": 73.5,
+            "height": 14.296875,
+            "right": 133.5,
+            "bottom": 321.1484375
+          },
+          "strong": {
+            "x": 60,
+            "y": 306.8515625,
+            "width": 73.5,
+            "height": 14.296875,
+            "right": 133.5,
+            "bottom": 321.1484375
+          },
+          "small": {
+            "x": 0,
+            "y": 0,
+            "width": 0,
+            "height": 0,
+            "right": 0,
+            "bottom": 0
+          },
+          "copyOverflow": false
+        },
+        {
+          "id": "selection",
+          "x": 162.5,
+          "y": 290,
+          "width": 145.5,
+          "height": 48,
+          "right": 308,
+          "bottom": 338,
+          "display": "grid",
+          "naturalHeight": 48,
+          "copy": {
+            "x": 210.5,
+            "y": 306.8515625,
+            "width": 73.5,
+            "height": 14.296875,
+            "right": 284,
+            "bottom": 321.1484375
+          },
+          "strong": {
+            "x": 210.5,
+            "y": 306.8515625,
+            "width": 73.5,
+            "height": 14.296875,
+            "right": 284,
+            "bottom": 321.1484375
+          },
+          "small": {
+            "x": 0,
+            "y": 0,
+            "width": 0,
+            "height": 0,
+            "right": 0,
+            "bottom": 0
+          },
+          "copyOverflow": false
+        },
+        {
+          "id": "image",
+          "x": 12,
+          "y": 343,
+          "width": 145.5,
+          "height": 48,
+          "right": 157.5,
+          "bottom": 391,
+          "display": "grid",
+          "naturalHeight": 48,
+          "copy": {
+            "x": 60,
+            "y": 359.8515625,
+            "width": 73.5,
+            "height": 14.296875,
+            "right": 133.5,
+            "bottom": 374.1484375
+          },
+          "strong": {
+            "x": 60,
+            "y": 359.8515625,
+            "width": 73.5,
+            "height": 14.296875,
+            "right": 133.5,
+            "bottom": 374.1484375
+          },
+          "small": {
+            "x": 0,
+            "y": 0,
+            "width": 0,
+            "height": 0,
+            "right": 0,
+            "bottom": 0
+          },
+          "copyOverflow": false
+        },
+        {
+          "id": "document",
+          "x": 162.5,
+          "y": 343,
+          "width": 145.5,
+          "height": 48,
+          "right": 308,
+          "bottom": 391,
+          "display": "grid",
+          "naturalHeight": 48,
+          "copy": {
+            "x": 210.5,
+            "y": 359.8515625,
+            "width": 73.5,
+            "height": 14.296875,
+            "right": 284,
+            "bottom": 374.1484375
+          },
+          "strong": {
+            "x": 210.5,
+            "y": 359.8515625,
+            "width": 73.5,
+            "height": 14.296875,
+            "right": 284,
+            "bottom": 374.1484375
+          },
+          "small": {
+            "x": 0,
+            "y": 0,
+            "width": 0,
+            "height": 0,
+            "right": 0,
+            "bottom": 0
+          },
+          "copyOverflow": false
+        }
+      ],
+      "issues": [],
+      "screenshot": null
+    },
+    {
+      "label": "feature-grid-safari-marker-css-fixture-minimal-320-dark-3",
+      "skin": "minimal",
+      "width": 320,
+      "theme": "dark",
+      "count": 3,
+      "mode": "safari-marker-css-fixture",
+      "documentWidth": 320,
+      "rootOverflow": false,
+      "shell": {
+        "x": 0,
+        "y": 0,
+        "width": 320,
+        "height": 434,
+        "right": 320,
+        "bottom": 434
+      },
+      "grid": {
+        "x": 12,
+        "y": 290,
+        "width": 296,
+        "height": 101,
+        "right": 308,
+        "bottom": 391
+      },
+      "display": "flex",
+      "rowGap": 5,
+      "columnGap": 5,
+      "gridRows": "none",
+      "cards": [
+        {
+          "id": "hover",
+          "x": 12,
+          "y": 290,
+          "width": 145.5,
+          "height": 48,
+          "right": 157.5,
+          "bottom": 338,
+          "display": "grid",
+          "naturalHeight": 48,
+          "copy": {
+            "x": 60,
+            "y": 306.8515625,
+            "width": 73.5,
+            "height": 14.296875,
+            "right": 133.5,
+            "bottom": 321.1484375
+          },
+          "strong": {
+            "x": 60,
+            "y": 306.8515625,
+            "width": 73.5,
+            "height": 14.296875,
+            "right": 133.5,
+            "bottom": 321.1484375
+          },
+          "small": {
+            "x": 0,
+            "y": 0,
+            "width": 0,
+            "height": 0,
+            "right": 0,
+            "bottom": 0
+          },
+          "copyOverflow": false
+        },
+        {
+          "id": "selection",
+          "x": 162.5,
+          "y": 290,
+          "width": 145.5,
+          "height": 48,
+          "right": 308,
+          "bottom": 338,
+          "display": "grid",
+          "naturalHeight": 48,
+          "copy": {
+            "x": 210.5,
+            "y": 306.8515625,
+            "width": 73.5,
+            "height": 14.296875,
+            "right": 284,
+            "bottom": 321.1484375
+          },
+          "strong": {
+            "x": 210.5,
+            "y": 306.8515625,
+            "width": 73.5,
+            "height": 14.296875,
+            "right": 284,
+            "bottom": 321.1484375
+          },
+          "small": {
+            "x": 0,
+            "y": 0,
+            "width": 0,
+            "height": 0,
+            "right": 0,
+            "bottom": 0
+          },
+          "copyOverflow": false
+        },
+        {
+          "id": "image",
+          "x": 12,
+          "y": 343,
+          "width": 145.5,
+          "height": 48,
+          "right": 157.5,
+          "bottom": 391,
+          "display": "grid",
+          "naturalHeight": 48,
+          "copy": {
+            "x": 60,
+            "y": 359.8515625,
+            "width": 73.5,
+            "height": 14.296875,
+            "right": 133.5,
+            "bottom": 374.1484375
+          },
+          "strong": {
+            "x": 60,
+            "y": 359.8515625,
+            "width": 73.5,
+            "height": 14.296875,
+            "right": 133.5,
+            "bottom": 374.1484375
+          },
+          "small": {
+            "x": 0,
+            "y": 0,
+            "width": 0,
+            "height": 0,
+            "right": 0,
+            "bottom": 0
+          },
+          "copyOverflow": false
+        }
+      ],
+      "issues": [],
+      "screenshot": "feature-grid-safari-marker-css-fixture-minimal-320-dark-3.png"
+    },
+    {
+      "label": "feature-grid-safari-marker-css-fixture-minimal-402-light-4",
+      "skin": "minimal",
+      "width": 402,
+      "theme": "light",
+      "count": 4,
+      "mode": "safari-marker-css-fixture",
+      "documentWidth": 402,
+      "rootOverflow": false,
+      "shell": {
+        "x": 0,
+        "y": 0,
+        "width": 402,
+        "height": 434,
+        "right": 402,
+        "bottom": 434
+      },
+      "grid": {
+        "x": 12,
+        "y": 290,
+        "width": 378,
+        "height": 101,
+        "right": 390,
+        "bottom": 391
+      },
+      "display": "flex",
+      "rowGap": 5,
+      "columnGap": 5,
+      "gridRows": "none",
+      "cards": [
+        {
+          "id": "hover",
+          "x": 12,
+          "y": 290,
+          "width": 186.5,
+          "height": 48,
+          "right": 198.5,
+          "bottom": 338,
+          "display": "grid",
+          "naturalHeight": 48,
+          "copy": {
+            "x": 60,
+            "y": 306.8515625,
+            "width": 114.5,
+            "height": 14.296875,
+            "right": 174.5,
+            "bottom": 321.1484375
+          },
+          "strong": {
+            "x": 60,
+            "y": 306.8515625,
+            "width": 114.5,
+            "height": 14.296875,
+            "right": 174.5,
+            "bottom": 321.1484375
+          },
+          "small": {
+            "x": 0,
+            "y": 0,
+            "width": 0,
+            "height": 0,
+            "right": 0,
+            "bottom": 0
+          },
+          "copyOverflow": false
+        },
+        {
+          "id": "selection",
+          "x": 203.5,
+          "y": 290,
+          "width": 186.5,
+          "height": 48,
+          "right": 390,
+          "bottom": 338,
+          "display": "grid",
+          "naturalHeight": 48,
+          "copy": {
+            "x": 251.5,
+            "y": 306.8515625,
+            "width": 114.5,
+            "height": 14.296875,
+            "right": 366,
+            "bottom": 321.1484375
+          },
+          "strong": {
+            "x": 251.5,
+            "y": 306.8515625,
+            "width": 114.5,
+            "height": 14.296875,
+            "right": 366,
+            "bottom": 321.1484375
+          },
+          "small": {
+            "x": 0,
+            "y": 0,
+            "width": 0,
+            "height": 0,
+            "right": 0,
+            "bottom": 0
+          },
+          "copyOverflow": false
+        },
+        {
+          "id": "image",
+          "x": 12,
+          "y": 343,
+          "width": 186.5,
+          "height": 48,
+          "right": 198.5,
+          "bottom": 391,
+          "display": "grid",
+          "naturalHeight": 48,
+          "copy": {
+            "x": 60,
+            "y": 359.8515625,
+            "width": 114.5,
+            "height": 14.296875,
+            "right": 174.5,
+            "bottom": 374.1484375
+          },
+          "strong": {
+            "x": 60,
+            "y": 359.8515625,
+            "width": 114.5,
+            "height": 14.296875,
+            "right": 174.5,
+            "bottom": 374.1484375
+          },
+          "small": {
+            "x": 0,
+            "y": 0,
+            "width": 0,
+            "height": 0,
+            "right": 0,
+            "bottom": 0
+          },
+          "copyOverflow": false
+        },
+        {
+          "id": "document",
+          "x": 203.5,
+          "y": 343,
+          "width": 186.5,
+          "height": 48,
+          "right": 390,
+          "bottom": 391,
+          "display": "grid",
+          "naturalHeight": 48,
+          "copy": {
+            "x": 251.5,
+            "y": 359.8515625,
+            "width": 114.5,
+            "height": 14.296875,
+            "right": 366,
+            "bottom": 374.1484375
+          },
+          "strong": {
+            "x": 251.5,
+            "y": 359.8515625,
+            "width": 114.5,
+            "height": 14.296875,
+            "right": 366,
+            "bottom": 374.1484375
+          },
+          "small": {
+            "x": 0,
+            "y": 0,
+            "width": 0,
+            "height": 0,
+            "right": 0,
+            "bottom": 0
+          },
+          "copyOverflow": false
+        }
+      ],
+      "issues": [],
+      "screenshot": null
+    },
+    {
+      "label": "feature-grid-safari-marker-css-fixture-minimal-402-light-3",
+      "skin": "minimal",
+      "width": 402,
+      "theme": "light",
+      "count": 3,
+      "mode": "safari-marker-css-fixture",
+      "documentWidth": 402,
+      "rootOverflow": false,
+      "shell": {
+        "x": 0,
+        "y": 0,
+        "width": 402,
+        "height": 434,
+        "right": 402,
+        "bottom": 434
+      },
+      "grid": {
+        "x": 12,
+        "y": 290,
+        "width": 378,
+        "height": 101,
+        "right": 390,
+        "bottom": 391
+      },
+      "display": "flex",
+      "rowGap": 5,
+      "columnGap": 5,
+      "gridRows": "none",
+      "cards": [
+        {
+          "id": "hover",
+          "x": 12,
+          "y": 290,
+          "width": 186.5,
+          "height": 48,
+          "right": 198.5,
+          "bottom": 338,
+          "display": "grid",
+          "naturalHeight": 48,
+          "copy": {
+            "x": 60,
+            "y": 306.8515625,
+            "width": 114.5,
+            "height": 14.296875,
+            "right": 174.5,
+            "bottom": 321.1484375
+          },
+          "strong": {
+            "x": 60,
+            "y": 306.8515625,
+            "width": 114.5,
+            "height": 14.296875,
+            "right": 174.5,
+            "bottom": 321.1484375
+          },
+          "small": {
+            "x": 0,
+            "y": 0,
+            "width": 0,
+            "height": 0,
+            "right": 0,
+            "bottom": 0
+          },
+          "copyOverflow": false
+        },
+        {
+          "id": "selection",
+          "x": 203.5,
+          "y": 290,
+          "width": 186.5,
+          "height": 48,
+          "right": 390,
+          "bottom": 338,
+          "display": "grid",
+          "naturalHeight": 48,
+          "copy": {
+            "x": 251.5,
+            "y": 306.8515625,
+            "width": 114.5,
+            "height": 14.296875,
+            "right": 366,
+            "bottom": 321.1484375
+          },
+          "strong": {
+            "x": 251.5,
+            "y": 306.8515625,
+            "width": 114.5,
+            "height": 14.296875,
+            "right": 366,
+            "bottom": 321.1484375
+          },
+          "small": {
+            "x": 0,
+            "y": 0,
+            "width": 0,
+            "height": 0,
+            "right": 0,
+            "bottom": 0
+          },
+          "copyOverflow": false
+        },
+        {
+          "id": "image",
+          "x": 12,
+          "y": 343,
+          "width": 186.5,
+          "height": 48,
+          "right": 198.5,
+          "bottom": 391,
+          "display": "grid",
+          "naturalHeight": 48,
+          "copy": {
+            "x": 60,
+            "y": 359.8515625,
+            "width": 114.5,
+            "height": 14.296875,
+            "right": 174.5,
+            "bottom": 374.1484375
+          },
+          "strong": {
+            "x": 60,
+            "y": 359.8515625,
+            "width": 114.5,
+            "height": 14.296875,
+            "right": 174.5,
+            "bottom": 374.1484375
+          },
+          "small": {
+            "x": 0,
+            "y": 0,
+            "width": 0,
+            "height": 0,
+            "right": 0,
+            "bottom": 0
+          },
+          "copyOverflow": false
+        }
+      ],
+      "issues": [],
+      "screenshot": null
+    },
+    {
+      "label": "feature-grid-safari-marker-css-fixture-minimal-402-dark-4",
+      "skin": "minimal",
+      "width": 402,
+      "theme": "dark",
+      "count": 4,
+      "mode": "safari-marker-css-fixture",
+      "documentWidth": 402,
+      "rootOverflow": false,
+      "shell": {
+        "x": 0,
+        "y": 0,
+        "width": 402,
+        "height": 434,
+        "right": 402,
+        "bottom": 434
+      },
+      "grid": {
+        "x": 12,
+        "y": 290,
+        "width": 378,
+        "height": 101,
+        "right": 390,
+        "bottom": 391
+      },
+      "display": "flex",
+      "rowGap": 5,
+      "columnGap": 5,
+      "gridRows": "none",
+      "cards": [
+        {
+          "id": "hover",
+          "x": 12,
+          "y": 290,
+          "width": 186.5,
+          "height": 48,
+          "right": 198.5,
+          "bottom": 338,
+          "display": "grid",
+          "naturalHeight": 48,
+          "copy": {
+            "x": 60,
+            "y": 306.8515625,
+            "width": 114.5,
+            "height": 14.296875,
+            "right": 174.5,
+            "bottom": 321.1484375
+          },
+          "strong": {
+            "x": 60,
+            "y": 306.8515625,
+            "width": 114.5,
+            "height": 14.296875,
+            "right": 174.5,
+            "bottom": 321.1484375
+          },
+          "small": {
+            "x": 0,
+            "y": 0,
+            "width": 0,
+            "height": 0,
+            "right": 0,
+            "bottom": 0
+          },
+          "copyOverflow": false
+        },
+        {
+          "id": "selection",
+          "x": 203.5,
+          "y": 290,
+          "width": 186.5,
+          "height": 48,
+          "right": 390,
+          "bottom": 338,
+          "display": "grid",
+          "naturalHeight": 48,
+          "copy": {
+            "x": 251.5,
+            "y": 306.8515625,
+            "width": 114.5,
+            "height": 14.296875,
+            "right": 366,
+            "bottom": 321.1484375
+          },
+          "strong": {
+            "x": 251.5,
+            "y": 306.8515625,
+            "width": 114.5,
+            "height": 14.296875,
+            "right": 366,
+            "bottom": 321.1484375
+          },
+          "small": {
+            "x": 0,
+            "y": 0,
+            "width": 0,
+            "height": 0,
+            "right": 0,
+            "bottom": 0
+          },
+          "copyOverflow": false
+        },
+        {
+          "id": "image",
+          "x": 12,
+          "y": 343,
+          "width": 186.5,
+          "height": 48,
+          "right": 198.5,
+          "bottom": 391,
+          "display": "grid",
+          "naturalHeight": 48,
+          "copy": {
+            "x": 60,
+            "y": 359.8515625,
+            "width": 114.5,
+            "height": 14.296875,
+            "right": 174.5,
+            "bottom": 374.1484375
+          },
+          "strong": {
+            "x": 60,
+            "y": 359.8515625,
+            "width": 114.5,
+            "height": 14.296875,
+            "right": 174.5,
+            "bottom": 374.1484375
+          },
+          "small": {
+            "x": 0,
+            "y": 0,
+            "width": 0,
+            "height": 0,
+            "right": 0,
+            "bottom": 0
+          },
+          "copyOverflow": false
+        },
+        {
+          "id": "document",
+          "x": 203.5,
+          "y": 343,
+          "width": 186.5,
+          "height": 48,
+          "right": 390,
+          "bottom": 391,
+          "display": "grid",
+          "naturalHeight": 48,
+          "copy": {
+            "x": 251.5,
+            "y": 359.8515625,
+            "width": 114.5,
+            "height": 14.296875,
+            "right": 366,
+            "bottom": 374.1484375
+          },
+          "strong": {
+            "x": 251.5,
+            "y": 359.8515625,
+            "width": 114.5,
+            "height": 14.296875,
+            "right": 366,
+            "bottom": 374.1484375
+          },
+          "small": {
+            "x": 0,
+            "y": 0,
+            "width": 0,
+            "height": 0,
+            "right": 0,
+            "bottom": 0
+          },
+          "copyOverflow": false
+        }
+      ],
+      "issues": [],
+      "screenshot": null
+    },
+    {
+      "label": "feature-grid-safari-marker-css-fixture-minimal-402-dark-3",
+      "skin": "minimal",
+      "width": 402,
+      "theme": "dark",
+      "count": 3,
+      "mode": "safari-marker-css-fixture",
+      "documentWidth": 402,
+      "rootOverflow": false,
+      "shell": {
+        "x": 0,
+        "y": 0,
+        "width": 402,
+        "height": 434,
+        "right": 402,
+        "bottom": 434
+      },
+      "grid": {
+        "x": 12,
+        "y": 290,
+        "width": 378,
+        "height": 101,
+        "right": 390,
+        "bottom": 391
+      },
+      "display": "flex",
+      "rowGap": 5,
+      "columnGap": 5,
+      "gridRows": "none",
+      "cards": [
+        {
+          "id": "hover",
+          "x": 12,
+          "y": 290,
+          "width": 186.5,
+          "height": 48,
+          "right": 198.5,
+          "bottom": 338,
+          "display": "grid",
+          "naturalHeight": 48,
+          "copy": {
+            "x": 60,
+            "y": 306.8515625,
+            "width": 114.5,
+            "height": 14.296875,
+            "right": 174.5,
+            "bottom": 321.1484375
+          },
+          "strong": {
+            "x": 60,
+            "y": 306.8515625,
+            "width": 114.5,
+            "height": 14.296875,
+            "right": 174.5,
+            "bottom": 321.1484375
+          },
+          "small": {
+            "x": 0,
+            "y": 0,
+            "width": 0,
+            "height": 0,
+            "right": 0,
+            "bottom": 0
+          },
+          "copyOverflow": false
+        },
+        {
+          "id": "selection",
+          "x": 203.5,
+          "y": 290,
+          "width": 186.5,
+          "height": 48,
+          "right": 390,
+          "bottom": 338,
+          "display": "grid",
+          "naturalHeight": 48,
+          "copy": {
+            "x": 251.5,
+            "y": 306.8515625,
+            "width": 114.5,
+            "height": 14.296875,
+            "right": 366,
+            "bottom": 321.1484375
+          },
+          "strong": {
+            "x": 251.5,
+            "y": 306.8515625,
+            "width": 114.5,
+            "height": 14.296875,
+            "right": 366,
+            "bottom": 321.1484375
+          },
+          "small": {
+            "x": 0,
+            "y": 0,
+            "width": 0,
+            "height": 0,
+            "right": 0,
+            "bottom": 0
+          },
+          "copyOverflow": false
+        },
+        {
+          "id": "image",
+          "x": 12,
+          "y": 343,
+          "width": 186.5,
+          "height": 48,
+          "right": 198.5,
+          "bottom": 391,
+          "display": "grid",
+          "naturalHeight": 48,
+          "copy": {
+            "x": 60,
+            "y": 359.8515625,
+            "width": 114.5,
+            "height": 14.296875,
+            "right": 174.5,
+            "bottom": 374.1484375
+          },
+          "strong": {
+            "x": 60,
+            "y": 359.8515625,
+            "width": 114.5,
+            "height": 14.296875,
+            "right": 174.5,
+            "bottom": 374.1484375
+          },
+          "small": {
+            "x": 0,
+            "y": 0,
+            "width": 0,
+            "height": 0,
+            "right": 0,
+            "bottom": 0
+          },
+          "copyOverflow": false
+        }
+      ],
+      "issues": [],
+      "screenshot": "feature-grid-safari-marker-css-fixture-minimal-402-dark-3.png"
+    },
+    {
+      "label": "feature-grid-ordinary-minimal-320-light-3",
+      "skin": "minimal",
+      "width": 320,
+      "theme": "light",
+      "count": 3,
+      "mode": "ordinary",
+      "documentWidth": 320,
+      "rootOverflow": false,
+      "shell": {
+        "x": 0,
+        "y": 0,
+        "width": 310,
+        "height": 434,
+        "right": 310,
+        "bottom": 434
+      },
+      "grid": {
+        "x": 12,
+        "y": 290,
+        "width": 286,
+        "height": 101,
+        "right": 298,
+        "bottom": 391
+      },
+      "display": "grid",
+      "rowGap": 5,
+      "columnGap": 5,
+      "gridRows": "48px 48px",
+      "cards": [
+        {
+          "id": "hover",
+          "x": 12,
+          "y": 290,
+          "width": 140.5,
+          "height": 48,
+          "right": 152.5,
+          "bottom": 338,
+          "display": "grid",
+          "naturalHeight": 48,
+          "copy": {
+            "x": 60,
+            "y": 306.8515625,
+            "width": 68.5,
+            "height": 14.296875,
+            "right": 128.5,
+            "bottom": 321.1484375
+          },
+          "strong": {
+            "x": 60,
+            "y": 306.8515625,
+            "width": 68.5,
+            "height": 14.296875,
+            "right": 128.5,
+            "bottom": 321.1484375
+          },
+          "small": {
+            "x": 0,
+            "y": 0,
+            "width": 0,
+            "height": 0,
+            "right": 0,
+            "bottom": 0
+          },
+          "copyOverflow": false
+        },
+        {
+          "id": "selection",
+          "x": 157.5,
+          "y": 290,
+          "width": 140.5,
+          "height": 48,
+          "right": 298,
+          "bottom": 338,
+          "display": "grid",
+          "naturalHeight": 48,
+          "copy": {
+            "x": 205.5,
+            "y": 306.8515625,
+            "width": 68.5,
+            "height": 14.296875,
+            "right": 274,
+            "bottom": 321.1484375
+          },
+          "strong": {
+            "x": 205.5,
+            "y": 306.8515625,
+            "width": 68.5,
+            "height": 14.296875,
+            "right": 274,
+            "bottom": 321.1484375
+          },
+          "small": {
+            "x": 0,
+            "y": 0,
+            "width": 0,
+            "height": 0,
+            "right": 0,
+            "bottom": 0
+          },
+          "copyOverflow": false
+        },
+        {
+          "id": "image",
+          "x": 12,
+          "y": 343,
+          "width": 140.5,
+          "height": 48,
+          "right": 152.5,
+          "bottom": 391,
+          "display": "grid",
+          "naturalHeight": 48,
+          "copy": {
+            "x": 60,
+            "y": 359.8515625,
+            "width": 68.5,
+            "height": 14.296875,
+            "right": 128.5,
+            "bottom": 374.1484375
+          },
+          "strong": {
+            "x": 60,
+            "y": 359.8515625,
+            "width": 68.5,
+            "height": 14.296875,
+            "right": 128.5,
+            "bottom": 374.1484375
+          },
+          "small": {
+            "x": 0,
+            "y": 0,
+            "width": 0,
+            "height": 0,
+            "right": 0,
+            "bottom": 0
+          },
+          "copyOverflow": false
+        }
+      ],
+      "issues": [],
+      "screenshot": null
+    },
+    {
+      "label": "feature-grid-embedded-marker-css-fixture-minimal-320-light-3",
+      "skin": "minimal",
+      "width": 320,
+      "theme": "light",
+      "count": 3,
+      "mode": "embedded-marker-css-fixture",
+      "documentWidth": 320,
+      "rootOverflow": false,
+      "shell": {
+        "x": 0,
+        "y": 0,
+        "width": 310,
+        "height": 434,
+        "right": 310,
+        "bottom": 434
+      },
+      "grid": {
+        "x": 12,
+        "y": 290,
+        "width": 286,
+        "height": 101,
+        "right": 298,
+        "bottom": 391
+      },
+      "display": "grid",
+      "rowGap": 5,
+      "columnGap": 5,
+      "gridRows": "48px 48px",
+      "cards": [
+        {
+          "id": "hover",
+          "x": 12,
+          "y": 290,
+          "width": 140.5,
+          "height": 48,
+          "right": 152.5,
+          "bottom": 338,
+          "display": "grid",
+          "naturalHeight": 48,
+          "copy": {
+            "x": 60,
+            "y": 306.8515625,
+            "width": 68.5,
+            "height": 14.296875,
+            "right": 128.5,
+            "bottom": 321.1484375
+          },
+          "strong": {
+            "x": 60,
+            "y": 306.8515625,
+            "width": 68.5,
+            "height": 14.296875,
+            "right": 128.5,
+            "bottom": 321.1484375
+          },
+          "small": {
+            "x": 0,
+            "y": 0,
+            "width": 0,
+            "height": 0,
+            "right": 0,
+            "bottom": 0
+          },
+          "copyOverflow": false
+        },
+        {
+          "id": "selection",
+          "x": 157.5,
+          "y": 290,
+          "width": 140.5,
+          "height": 48,
+          "right": 298,
+          "bottom": 338,
+          "display": "grid",
+          "naturalHeight": 48,
+          "copy": {
+            "x": 205.5,
+            "y": 306.8515625,
+            "width": 68.5,
+            "height": 14.296875,
+            "right": 274,
+            "bottom": 321.1484375
+          },
+          "strong": {
+            "x": 205.5,
+            "y": 306.8515625,
+            "width": 68.5,
+            "height": 14.296875,
+            "right": 274,
+            "bottom": 321.1484375
+          },
+          "small": {
+            "x": 0,
+            "y": 0,
+            "width": 0,
+            "height": 0,
+            "right": 0,
+            "bottom": 0
+          },
+          "copyOverflow": false
+        },
+        {
+          "id": "image",
+          "x": 12,
+          "y": 343,
+          "width": 140.5,
+          "height": 48,
+          "right": 152.5,
+          "bottom": 391,
+          "display": "grid",
+          "naturalHeight": 48,
+          "copy": {
+            "x": 60,
+            "y": 359.8515625,
+            "width": 68.5,
+            "height": 14.296875,
+            "right": 128.5,
+            "bottom": 374.1484375
+          },
+          "strong": {
+            "x": 60,
+            "y": 359.8515625,
+            "width": 68.5,
+            "height": 14.296875,
+            "right": 128.5,
+            "bottom": 374.1484375
+          },
+          "small": {
+            "x": 0,
+            "y": 0,
+            "width": 0,
+            "height": 0,
+            "right": 0,
+            "bottom": 0
+          },
+          "copyOverflow": false
+        }
+      ],
+      "issues": [],
+      "screenshot": null
+    }
+  ],
+  "errors": [],
+  "evidenceBoundary": "Production MV3 CSS in isolated Edge: 24 Safari-marker CSS compatibility fixtures plus 6 ordinary/embedded-marker controls. Three skins, 320/402px, light/dark and 4/3 cards. Not native Safari, real embedded bootstrap, translation, or full regression acceptance.",
+  "productionManifestSHA256": "a12a20416fc826d3dc7278b74a112b4170f8985b1ac8b1a74c91f73d5e09b642",
+  "caseCoverage": [
+    {
+      "label": "feature-grid-safari-marker-css-fixture-default-320-light-4",
+      "skin": "default",
+      "width": 320,
+      "theme": "light",
+      "count": 4,
+      "mode": "safari-marker-css-fixture",
+      "ok": true,
+      "screenshot": "feature-grid-safari-marker-css-fixture-default-320-light-4.png"
+    },
+    {
+      "label": "feature-grid-safari-marker-css-fixture-default-320-light-3",
+      "skin": "default",
+      "width": 320,
+      "theme": "light",
+      "count": 3,
+      "mode": "safari-marker-css-fixture",
+      "ok": true,
+      "screenshot": null
+    },
+    {
+      "label": "feature-grid-safari-marker-css-fixture-default-320-dark-4",
+      "skin": "default",
+      "width": 320,
+      "theme": "dark",
+      "count": 4,
+      "mode": "safari-marker-css-fixture",
+      "ok": true,
+      "screenshot": null
+    },
+    {
+      "label": "feature-grid-safari-marker-css-fixture-default-320-dark-3",
+      "skin": "default",
+      "width": 320,
+      "theme": "dark",
+      "count": 3,
+      "mode": "safari-marker-css-fixture",
+      "ok": true,
+      "screenshot": "feature-grid-safari-marker-css-fixture-default-320-dark-3.png"
+    },
+    {
+      "label": "feature-grid-safari-marker-css-fixture-default-402-light-4",
+      "skin": "default",
+      "width": 402,
+      "theme": "light",
+      "count": 4,
+      "mode": "safari-marker-css-fixture",
+      "ok": true,
+      "screenshot": null
+    },
+    {
+      "label": "feature-grid-safari-marker-css-fixture-default-402-light-3",
+      "skin": "default",
+      "width": 402,
+      "theme": "light",
+      "count": 3,
+      "mode": "safari-marker-css-fixture",
+      "ok": true,
+      "screenshot": null
+    },
+    {
+      "label": "feature-grid-safari-marker-css-fixture-default-402-dark-4",
+      "skin": "default",
+      "width": 402,
+      "theme": "dark",
+      "count": 4,
+      "mode": "safari-marker-css-fixture",
+      "ok": true,
+      "screenshot": null
+    },
+    {
+      "label": "feature-grid-safari-marker-css-fixture-default-402-dark-3",
+      "skin": "default",
+      "width": 402,
+      "theme": "dark",
+      "count": 3,
+      "mode": "safari-marker-css-fixture",
+      "ok": true,
+      "screenshot": "feature-grid-safari-marker-css-fixture-default-402-dark-3.png"
+    },
+    {
+      "label": "feature-grid-ordinary-default-320-light-3",
+      "skin": "default",
+      "width": 320,
+      "theme": "light",
+      "count": 3,
+      "mode": "ordinary",
+      "ok": true,
+      "screenshot": "feature-grid-ordinary-default-320-light-3.png"
+    },
+    {
+      "label": "feature-grid-embedded-marker-css-fixture-default-320-light-3",
+      "skin": "default",
+      "width": 320,
+      "theme": "light",
+      "count": 3,
+      "mode": "embedded-marker-css-fixture",
+      "ok": true,
+      "screenshot": "feature-grid-embedded-marker-css-fixture-default-320-light-3.png"
+    },
+    {
+      "label": "feature-grid-safari-marker-css-fixture-compact-320-light-4",
+      "skin": "compact",
+      "width": 320,
+      "theme": "light",
+      "count": 4,
+      "mode": "safari-marker-css-fixture",
+      "ok": true,
+      "screenshot": "feature-grid-safari-marker-css-fixture-compact-320-light-4.png"
+    },
+    {
+      "label": "feature-grid-safari-marker-css-fixture-compact-320-light-3",
+      "skin": "compact",
+      "width": 320,
+      "theme": "light",
+      "count": 3,
+      "mode": "safari-marker-css-fixture",
+      "ok": true,
+      "screenshot": null
+    },
+    {
+      "label": "feature-grid-safari-marker-css-fixture-compact-320-dark-4",
+      "skin": "compact",
+      "width": 320,
+      "theme": "dark",
+      "count": 4,
+      "mode": "safari-marker-css-fixture",
+      "ok": true,
+      "screenshot": null
+    },
+    {
+      "label": "feature-grid-safari-marker-css-fixture-compact-320-dark-3",
+      "skin": "compact",
+      "width": 320,
+      "theme": "dark",
+      "count": 3,
+      "mode": "safari-marker-css-fixture",
+      "ok": true,
+      "screenshot": "feature-grid-safari-marker-css-fixture-compact-320-dark-3.png"
+    },
+    {
+      "label": "feature-grid-safari-marker-css-fixture-compact-402-light-4",
+      "skin": "compact",
+      "width": 402,
+      "theme": "light",
+      "count": 4,
+      "mode": "safari-marker-css-fixture",
+      "ok": true,
+      "screenshot": null
+    },
+    {
+      "label": "feature-grid-safari-marker-css-fixture-compact-402-light-3",
+      "skin": "compact",
+      "width": 402,
+      "theme": "light",
+      "count": 3,
+      "mode": "safari-marker-css-fixture",
+      "ok": true,
+      "screenshot": null
+    },
+    {
+      "label": "feature-grid-safari-marker-css-fixture-compact-402-dark-4",
+      "skin": "compact",
+      "width": 402,
+      "theme": "dark",
+      "count": 4,
+      "mode": "safari-marker-css-fixture",
+      "ok": true,
+      "screenshot": null
+    },
+    {
+      "label": "feature-grid-safari-marker-css-fixture-compact-402-dark-3",
+      "skin": "compact",
+      "width": 402,
+      "theme": "dark",
+      "count": 3,
+      "mode": "safari-marker-css-fixture",
+      "ok": true,
+      "screenshot": "feature-grid-safari-marker-css-fixture-compact-402-dark-3.png"
+    },
+    {
+      "label": "feature-grid-ordinary-compact-320-light-3",
+      "skin": "compact",
+      "width": 320,
+      "theme": "light",
+      "count": 3,
+      "mode": "ordinary",
+      "ok": true,
+      "screenshot": null
+    },
+    {
+      "label": "feature-grid-embedded-marker-css-fixture-compact-320-light-3",
+      "skin": "compact",
+      "width": 320,
+      "theme": "light",
+      "count": 3,
+      "mode": "embedded-marker-css-fixture",
+      "ok": true,
+      "screenshot": null
+    },
+    {
+      "label": "feature-grid-safari-marker-css-fixture-minimal-320-light-4",
+      "skin": "minimal",
+      "width": 320,
+      "theme": "light",
+      "count": 4,
+      "mode": "safari-marker-css-fixture",
+      "ok": true,
+      "screenshot": "feature-grid-safari-marker-css-fixture-minimal-320-light-4.png"
+    },
+    {
+      "label": "feature-grid-safari-marker-css-fixture-minimal-320-light-3",
+      "skin": "minimal",
+      "width": 320,
+      "theme": "light",
+      "count": 3,
+      "mode": "safari-marker-css-fixture",
+      "ok": true,
+      "screenshot": null
+    },
+    {
+      "label": "feature-grid-safari-marker-css-fixture-minimal-320-dark-4",
+      "skin": "minimal",
+      "width": 320,
+      "theme": "dark",
+      "count": 4,
+      "mode": "safari-marker-css-fixture",
+      "ok": true,
+      "screenshot": null
+    },
+    {
+      "label": "feature-grid-safari-marker-css-fixture-minimal-320-dark-3",
+      "skin": "minimal",
+      "width": 320,
+      "theme": "dark",
+      "count": 3,
+      "mode": "safari-marker-css-fixture",
+      "ok": true,
+      "screenshot": "feature-grid-safari-marker-css-fixture-minimal-320-dark-3.png"
+    },
+    {
+      "label": "feature-grid-safari-marker-css-fixture-minimal-402-light-4",
+      "skin": "minimal",
+      "width": 402,
+      "theme": "light",
+      "count": 4,
+      "mode": "safari-marker-css-fixture",
+      "ok": true,
+      "screenshot": null
+    },
+    {
+      "label": "feature-grid-safari-marker-css-fixture-minimal-402-light-3",
+      "skin": "minimal",
+      "width": 402,
+      "theme": "light",
+      "count": 3,
+      "mode": "safari-marker-css-fixture",
+      "ok": true,
+      "screenshot": null
+    },
+    {
+      "label": "feature-grid-safari-marker-css-fixture-minimal-402-dark-4",
+      "skin": "minimal",
+      "width": 402,
+      "theme": "dark",
+      "count": 4,
+      "mode": "safari-marker-css-fixture",
+      "ok": true,
+      "screenshot": null
+    },
+    {
+      "label": "feature-grid-safari-marker-css-fixture-minimal-402-dark-3",
+      "skin": "minimal",
+      "width": 402,
+      "theme": "dark",
+      "count": 3,
+      "mode": "safari-marker-css-fixture",
+      "ok": true,
+      "screenshot": "feature-grid-safari-marker-css-fixture-minimal-402-dark-3.png"
+    },
+    {
+      "label": "feature-grid-ordinary-minimal-320-light-3",
+      "skin": "minimal",
+      "width": 320,
+      "theme": "light",
+      "count": 3,
+      "mode": "ordinary",
+      "ok": true,
+      "screenshot": null
+    },
+    {
+      "label": "feature-grid-embedded-marker-css-fixture-minimal-320-light-3",
+      "skin": "minimal",
+      "width": 320,
+      "theme": "light",
+      "count": 3,
+      "mode": "embedded-marker-css-fixture",
+      "ok": true,
+      "screenshot": null
+    }
+  ],
+  "schema": 1,
+  "artifactKind": "DERIVED_PUBLIC_EDGE_CSS_REPORT",
+  "sourceCommit": "8274d0c76bead3f1f76a04f5f71e2d58475d4551",
+  "derivedFrom": {
+    "sourceRelative": "safari-touch-flex-production-build-20261017/edge-popup-feature-grid-attempt2/report.json",
+    "bytes": 120605,
+    "sha256": "76197ff71abd923d0e5e9c258b671d09a73a46042ebc78e4705e5be6998693b4"
+  },
+  "omittedFields": [
+    "extensionDir",
+    "launchMode",
+    "focusPolicy",
+    "windowPlacement"
+  ]
+}

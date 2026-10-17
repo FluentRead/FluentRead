@@ -1,0 +1,1058 @@
+{
+  "startedAt": "2026-10-16T21:47:52.783Z",
+  "status": "UNVERIFIED_PRECONDITION_OR_AX_LIMIT",
+  "scope": "Production UI evidence; actual product runtime may perform already-authorized normal translation requests; manual screenshot review required",
+  "device": "A407390F-7AA8-42AE-AFEB-F93EE99E9FF8",
+  "commands": [
+    {
+      "command": [
+        "/usr/bin/python3",
+        "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/safari-final-menu-readiness-preparation-20261017/inline-attempt1/identity-check.py",
+        "inline-attempt1",
+        "before-boot"
+      ],
+      "log": "identity-before-boot.log",
+      "pid": 40454,
+      "pgid": 40454,
+      "cleanup": false,
+      "startedAt": "2026-10-16T21:47:57.165Z",
+      "result": {
+        "code": 0,
+        "signal": null
+      },
+      "finishedAt": "2026-10-16T21:47:57.571Z"
+    },
+    {
+      "command": [
+        "/usr/bin/xcrun",
+        "simctl",
+        "boot",
+        "A407390F-7AA8-42AE-AFEB-F93EE99E9FF8"
+      ],
+      "log": "boot.log",
+      "pid": 40459,
+      "pgid": 40459,
+      "cleanup": false,
+      "startedAt": "2026-10-16T21:47:57.694Z",
+      "result": {
+        "code": 0,
+        "signal": null
+      },
+      "finishedAt": "2026-10-16T21:47:58.642Z"
+    },
+    {
+      "command": [
+        "/usr/bin/xcrun",
+        "simctl",
+        "bootstatus",
+        "A407390F-7AA8-42AE-AFEB-F93EE99E9FF8",
+        "-b"
+      ],
+      "log": "bootstatus.log",
+      "pid": 40512,
+      "pgid": 40512,
+      "cleanup": false,
+      "startedAt": "2026-10-16T21:47:58.810Z",
+      "result": {
+        "code": 0,
+        "signal": null
+      },
+      "finishedAt": "2026-10-16T21:48:06.407Z"
+    },
+    {
+      "command": [
+        "/usr/bin/python3",
+        "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/safari-final-menu-readiness-preparation-20261017/inline-attempt1/identity-check.py",
+        "inline-attempt1",
+        "before-install"
+      ],
+      "log": "identity-before-install.log",
+      "pid": 40665,
+      "pgid": 40665,
+      "cleanup": false,
+      "startedAt": "2026-10-16T21:48:06.896Z",
+      "result": {
+        "code": 0,
+        "signal": null
+      },
+      "finishedAt": "2026-10-16T21:48:09.138Z"
+    },
+    {
+      "command": [
+        "/usr/bin/xcrun",
+        "simctl",
+        "install",
+        "A407390F-7AA8-42AE-AFEB-F93EE99E9FF8",
+        "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/touch-layout-f33-followup-20261017/native-final-layout-6eecd6710e7d-b1a66b3fc4e5/output/derived-ios-simulator/Build/Products/Release-iphonesimulator/FluentRead.app"
+      ],
+      "log": "install-production-once.log",
+      "pid": 40693,
+      "pgid": 40693,
+      "cleanup": false,
+      "startedAt": "2026-10-16T21:48:09.349Z",
+      "result": {
+        "code": 0,
+        "signal": null
+      },
+      "finishedAt": "2026-10-16T21:48:18.334Z"
+    },
+    {
+      "command": [
+        "/usr/bin/python3",
+        "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/safari-final-menu-readiness-preparation-20261017/inline-attempt1/identity-check.py",
+        "inline-attempt1",
+        "after-install"
+      ],
+      "log": "identity-after-install.log",
+      "pid": 40796,
+      "pgid": 40796,
+      "cleanup": false,
+      "startedAt": "2026-10-16T21:48:18.511Z",
+      "result": {
+        "code": 0,
+        "signal": null
+      },
+      "finishedAt": "2026-10-16T21:48:19.711Z"
+    },
+    {
+      "command": [
+        "xcodebuild",
+        "test-without-building",
+        "-xctestrun",
+        "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/safari-final-menu-readiness-preparation-20261017/DerivedData/Build/Products/production-final-layout-menu-readiness-approved-a407.xctestrun",
+        "-destination",
+        "platform=iOS Simulator,id=A407390F-7AA8-42AE-AFEB-F93EE99E9FF8",
+        "-destination-timeout",
+        "15",
+        "-jobs",
+        "1",
+        "-parallel-testing-enabled",
+        "NO",
+        "-maximum-concurrent-test-simulator-destinations",
+        "1",
+        "-only-testing:SafariSmokeUITests/SafariSmokeTests/testPausedMenuScrollAndClose",
+        "-resultBundlePath",
+        "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/safari-final-menu-readiness-preparation-20261017/inline-attempt1/runtime.xcresult",
+        "CODE_SIGNING_ALLOWED=NO",
+        "CODE_SIGNING_REQUIRED=NO",
+        "DEVELOPMENT_TEAM=",
+        "CODE_SIGN_IDENTITY="
+      ],
+      "log": "runtime-run.log",
+      "pid": 40824,
+      "pgid": 40824,
+      "cleanup": false,
+      "startedAt": "2026-10-16T21:48:19.855Z",
+      "result": {
+        "code": 0,
+        "signal": null
+      },
+      "finishedAt": "2026-10-16T21:48:39.938Z"
+    },
+    {
+      "command": [
+        "/usr/bin/xcrun",
+        "simctl",
+        "terminate",
+        "A407390F-7AA8-42AE-AFEB-F93EE99E9FF8",
+        "com.apple.mobilesafari"
+      ],
+      "log": "terminate-owned-safari.log",
+      "pid": 40926,
+      "pgid": 40926,
+      "cleanup": true,
+      "startedAt": "2026-10-16T21:48:40.148Z",
+      "result": {
+        "code": 0,
+        "signal": null
+      },
+      "finishedAt": "2026-10-16T21:48:40.371Z"
+    },
+    {
+      "command": [
+        "/usr/bin/xcrun",
+        "simctl",
+        "install",
+        "A407390F-7AA8-42AE-AFEB-F93EE99E9FF8",
+        "/Users/thinkstu/Desktop/copy/FluentRead-mobile-video-menu-accessibility-20261016/.output/safari-derived-ios-integrated-main24ccb-177b934b5dc2/Build/Products/Release-iphonesimulator/FluentRead.app"
+      ],
+      "log": "restore-original-d9-once.log",
+      "pid": 40938,
+      "pgid": 40938,
+      "cleanup": true,
+      "startedAt": "2026-10-16T21:48:40.571Z",
+      "result": {
+        "code": 0,
+        "signal": null
+      },
+      "finishedAt": "2026-10-16T21:48:41.837Z"
+    },
+    {
+      "command": [
+        "/usr/bin/python3",
+        "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/safari-final-menu-readiness-preparation-20261017/inline-attempt1/identity-check.py",
+        "inline-attempt1",
+        "after-restore"
+      ],
+      "log": "identity-after-restore.log",
+      "pid": 40951,
+      "pgid": 40951,
+      "cleanup": true,
+      "startedAt": "2026-10-16T21:48:42.057Z",
+      "result": {
+        "code": 0,
+        "signal": null
+      },
+      "finishedAt": "2026-10-16T21:48:43.228Z"
+    },
+    {
+      "command": [
+        "/usr/bin/xcrun",
+        "simctl",
+        "shutdown",
+        "A407390F-7AA8-42AE-AFEB-F93EE99E9FF8"
+      ],
+      "log": "shutdown.log",
+      "pid": 40972,
+      "pgid": 40972,
+      "cleanup": true,
+      "startedAt": "2026-10-16T21:48:43.368Z",
+      "result": {
+        "code": 0,
+        "signal": null
+      },
+      "finishedAt": "2026-10-16T21:48:46.618Z"
+    },
+    {
+      "command": [
+        "/usr/bin/python3",
+        "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/safari-final-menu-readiness-preparation-20261017/inline-attempt1/identity-check.py",
+        "inline-attempt1",
+        "after-shutdown"
+      ],
+      "log": "identity-after-shutdown.log",
+      "pid": 40997,
+      "pgid": 40997,
+      "cleanup": true,
+      "startedAt": "2026-10-16T21:48:46.904Z",
+      "result": {
+        "code": 0,
+        "signal": null
+      },
+      "finishedAt": "2026-10-16T21:48:47.170Z"
+    }
+  ],
+  "ownedPIDs": [
+    40454,
+    40459,
+    40512,
+    40665,
+    40693,
+    40796,
+    40824,
+    40926,
+    40938,
+    40951,
+    40972,
+    40997
+  ],
+  "focusEvents": [],
+  "violations": [],
+  "cleanupErrors": [],
+  "processReadSamples": [
+    {
+      "startedAt": "2026-10-16T21:47:56.995Z",
+      "timeoutMs": 10000,
+      "pid": 40450,
+      "outcome": "fulfilled",
+      "code": 0,
+      "killed": false,
+      "signal": null,
+      "stdoutBytes": 83913,
+      "stderr": "",
+      "elapsedMs": 38.67725
+    },
+    {
+      "startedAt": "2026-10-16T21:47:58.037Z",
+      "timeoutMs": 10000,
+      "pid": 40463,
+      "outcome": "fulfilled",
+      "code": 0,
+      "killed": false,
+      "signal": null,
+      "stdoutBytes": 84217,
+      "stderr": "",
+      "elapsedMs": 51.934708
+    },
+    {
+      "startedAt": "2026-10-16T21:47:59.038Z",
+      "timeoutMs": 10000,
+      "pid": 40515,
+      "outcome": "fulfilled",
+      "code": 0,
+      "killed": false,
+      "signal": null,
+      "stdoutBytes": 88435,
+      "stderr": "",
+      "elapsedMs": 50.472375
+    },
+    {
+      "startedAt": "2026-10-16T21:48:00.039Z",
+      "timeoutMs": 10000,
+      "pid": 40533,
+      "outcome": "fulfilled",
+      "code": 0,
+      "killed": false,
+      "signal": null,
+      "stdoutBytes": 91380,
+      "stderr": "",
+      "elapsedMs": 92.057917
+    },
+    {
+      "startedAt": "2026-10-16T21:48:01.042Z",
+      "timeoutMs": 10000,
+      "pid": 40560,
+      "outcome": "fulfilled",
+      "code": 0,
+      "killed": false,
+      "signal": null,
+      "stdoutBytes": 94727,
+      "stderr": "",
+      "elapsedMs": 89.538584
+    },
+    {
+      "startedAt": "2026-10-16T21:48:02.044Z",
+      "timeoutMs": 10000,
+      "pid": 40594,
+      "outcome": "fulfilled",
+      "code": 0,
+      "killed": false,
+      "signal": null,
+      "stdoutBytes": 97416,
+      "stderr": "",
+      "elapsedMs": 68.326375
+    },
+    {
+      "startedAt": "2026-10-16T21:48:03.045Z",
+      "timeoutMs": 10000,
+      "pid": 40607,
+      "outcome": "fulfilled",
+      "code": 0,
+      "killed": false,
+      "signal": null,
+      "stdoutBytes": 102097,
+      "stderr": "",
+      "elapsedMs": 80.530875
+    },
+    {
+      "startedAt": "2026-10-16T21:48:04.047Z",
+      "timeoutMs": 10000,
+      "pid": 40625,
+      "outcome": "fulfilled",
+      "code": 0,
+      "killed": false,
+      "signal": null,
+      "stdoutBytes": 103919,
+      "stderr": "",
+      "elapsedMs": 79.922583
+    },
+    {
+      "startedAt": "2026-10-16T21:48:05.049Z",
+      "timeoutMs": 10000,
+      "pid": 40648,
+      "outcome": "fulfilled",
+      "code": 0,
+      "killed": false,
+      "signal": null,
+      "stdoutBytes": 106617,
+      "stderr": "",
+      "elapsedMs": 85.124542
+    },
+    {
+      "startedAt": "2026-10-16T21:48:06.053Z",
+      "timeoutMs": 10000,
+      "pid": 40653,
+      "outcome": "fulfilled",
+      "code": 0,
+      "killed": false,
+      "signal": null,
+      "stdoutBytes": 107358,
+      "stderr": "",
+      "elapsedMs": 113.318542
+    },
+    {
+      "startedAt": "2026-10-16T21:48:07.055Z",
+      "timeoutMs": 10000,
+      "pid": 40666,
+      "outcome": "fulfilled",
+      "code": 0,
+      "killed": false,
+      "signal": null,
+      "stdoutBytes": 111647,
+      "stderr": "",
+      "elapsedMs": 173.863208
+    },
+    {
+      "startedAt": "2026-10-16T21:48:08.057Z",
+      "timeoutMs": 10000,
+      "pid": 40674,
+      "outcome": "fulfilled",
+      "code": 0,
+      "killed": false,
+      "signal": null,
+      "stdoutBytes": 112327,
+      "stderr": "",
+      "elapsedMs": 107.304667
+    },
+    {
+      "startedAt": "2026-10-16T21:48:09.059Z",
+      "timeoutMs": 10000,
+      "pid": 40686,
+      "outcome": "fulfilled",
+      "code": 0,
+      "killed": false,
+      "signal": null,
+      "stdoutBytes": 112299,
+      "stderr": "",
+      "elapsedMs": 70.006416
+    },
+    {
+      "startedAt": "2026-10-16T21:48:10.060Z",
+      "timeoutMs": 10000,
+      "pid": 40703,
+      "outcome": "fulfilled",
+      "code": 0,
+      "killed": false,
+      "signal": null,
+      "stdoutBytes": 112966,
+      "stderr": "",
+      "elapsedMs": 85.3425
+    },
+    {
+      "startedAt": "2026-10-16T21:48:11.063Z",
+      "timeoutMs": 10000,
+      "pid": 40710,
+      "outcome": "fulfilled",
+      "code": 0,
+      "killed": false,
+      "signal": null,
+      "stdoutBytes": 116411,
+      "stderr": "",
+      "elapsedMs": 82.874833
+    },
+    {
+      "startedAt": "2026-10-16T21:48:12.064Z",
+      "timeoutMs": 10000,
+      "pid": 40720,
+      "outcome": "fulfilled",
+      "code": 0,
+      "killed": false,
+      "signal": null,
+      "stdoutBytes": 118342,
+      "stderr": "",
+      "elapsedMs": 140.57125
+    },
+    {
+      "startedAt": "2026-10-16T21:48:13.067Z",
+      "timeoutMs": 10000,
+      "pid": 40732,
+      "outcome": "fulfilled",
+      "code": 0,
+      "killed": false,
+      "signal": null,
+      "stdoutBytes": 120451,
+      "stderr": "",
+      "elapsedMs": 69.973167
+    },
+    {
+      "startedAt": "2026-10-16T21:48:14.068Z",
+      "timeoutMs": 10000,
+      "pid": 40756,
+      "outcome": "fulfilled",
+      "code": 0,
+      "killed": false,
+      "signal": null,
+      "stdoutBytes": 122389,
+      "stderr": "",
+      "elapsedMs": 328.635375
+    },
+    {
+      "startedAt": "2026-10-16T21:48:15.070Z",
+      "timeoutMs": 10000,
+      "pid": 40765,
+      "outcome": "fulfilled",
+      "code": 0,
+      "killed": false,
+      "signal": null,
+      "stdoutBytes": 122994,
+      "stderr": "",
+      "elapsedMs": 79.892417
+    },
+    {
+      "startedAt": "2026-10-16T21:48:16.070Z",
+      "timeoutMs": 10000,
+      "pid": 40771,
+      "outcome": "fulfilled",
+      "code": 0,
+      "killed": false,
+      "signal": null,
+      "stdoutBytes": 123768,
+      "stderr": "",
+      "elapsedMs": 65.892917
+    },
+    {
+      "startedAt": "2026-10-16T21:48:17.073Z",
+      "timeoutMs": 10000,
+      "pid": 40777,
+      "outcome": "fulfilled",
+      "code": 0,
+      "killed": false,
+      "signal": null,
+      "stdoutBytes": 124094,
+      "stderr": "",
+      "elapsedMs": 67.099375
+    },
+    {
+      "startedAt": "2026-10-16T21:48:18.074Z",
+      "timeoutMs": 10000,
+      "pid": 40790,
+      "outcome": "fulfilled",
+      "code": 0,
+      "killed": false,
+      "signal": null,
+      "stdoutBytes": 125714,
+      "stderr": "",
+      "elapsedMs": 73.5215
+    },
+    {
+      "startedAt": "2026-10-16T21:48:19.076Z",
+      "timeoutMs": 10000,
+      "pid": 40810,
+      "outcome": "fulfilled",
+      "code": 0,
+      "killed": false,
+      "signal": null,
+      "stdoutBytes": 127470,
+      "stderr": "",
+      "elapsedMs": 63.164
+    },
+    {
+      "startedAt": "2026-10-16T21:48:20.079Z",
+      "timeoutMs": 10000,
+      "pid": 40826,
+      "outcome": "fulfilled",
+      "code": 0,
+      "killed": false,
+      "signal": null,
+      "stdoutBytes": 127892,
+      "stderr": "",
+      "elapsedMs": 64.065541
+    },
+    {
+      "startedAt": "2026-10-16T21:48:21.079Z",
+      "timeoutMs": 10000,
+      "pid": 40833,
+      "outcome": "fulfilled",
+      "code": 0,
+      "killed": false,
+      "signal": null,
+      "stdoutBytes": 128465,
+      "stderr": "",
+      "elapsedMs": 52.110041
+    },
+    {
+      "startedAt": "2026-10-16T21:48:22.082Z",
+      "timeoutMs": 10000,
+      "pid": 40835,
+      "outcome": "fulfilled",
+      "code": 0,
+      "killed": false,
+      "signal": null,
+      "stdoutBytes": 128438,
+      "stderr": "",
+      "elapsedMs": 52.18725
+    },
+    {
+      "startedAt": "2026-10-16T21:48:23.084Z",
+      "timeoutMs": 10000,
+      "pid": 40846,
+      "outcome": "fulfilled",
+      "code": 0,
+      "killed": false,
+      "signal": null,
+      "stdoutBytes": 129986,
+      "stderr": "",
+      "elapsedMs": 52.063416
+    },
+    {
+      "startedAt": "2026-10-16T21:48:24.086Z",
+      "timeoutMs": 10000,
+      "pid": 40851,
+      "outcome": "fulfilled",
+      "code": 0,
+      "killed": false,
+      "signal": null,
+      "stdoutBytes": 130352,
+      "stderr": "",
+      "elapsedMs": 51.238083
+    },
+    {
+      "startedAt": "2026-10-16T21:48:25.088Z",
+      "timeoutMs": 10000,
+      "pid": 40854,
+      "outcome": "fulfilled",
+      "code": 0,
+      "killed": false,
+      "signal": null,
+      "stdoutBytes": 130490,
+      "stderr": "",
+      "elapsedMs": 53.614292
+    },
+    {
+      "startedAt": "2026-10-16T21:48:26.090Z",
+      "timeoutMs": 10000,
+      "pid": 40857,
+      "outcome": "fulfilled",
+      "code": 0,
+      "killed": false,
+      "signal": null,
+      "stdoutBytes": 130490,
+      "stderr": "",
+      "elapsedMs": 53.369375
+    },
+    {
+      "startedAt": "2026-10-16T21:48:27.092Z",
+      "timeoutMs": 10000,
+      "pid": 40862,
+      "outcome": "fulfilled",
+      "code": 0,
+      "killed": false,
+      "signal": null,
+      "stdoutBytes": 130866,
+      "stderr": "",
+      "elapsedMs": 59.593834
+    },
+    {
+      "startedAt": "2026-10-16T21:48:28.092Z",
+      "timeoutMs": 10000,
+      "pid": 40867,
+      "outcome": "fulfilled",
+      "code": 0,
+      "killed": false,
+      "signal": null,
+      "stdoutBytes": 131096,
+      "stderr": "",
+      "elapsedMs": 65.824292
+    },
+    {
+      "startedAt": "2026-10-16T21:48:29.094Z",
+      "timeoutMs": 10000,
+      "pid": 40880,
+      "outcome": "fulfilled",
+      "code": 0,
+      "killed": false,
+      "signal": null,
+      "stdoutBytes": 131814,
+      "stderr": "",
+      "elapsedMs": 88.773792
+    },
+    {
+      "startedAt": "2026-10-16T21:48:30.094Z",
+      "timeoutMs": 10000,
+      "pid": 40890,
+      "outcome": "fulfilled",
+      "code": 0,
+      "killed": false,
+      "signal": null,
+      "stdoutBytes": 133929,
+      "stderr": "",
+      "elapsedMs": 250.379834
+    },
+    {
+      "startedAt": "2026-10-16T21:48:31.095Z",
+      "timeoutMs": 10000,
+      "pid": 40895,
+      "outcome": "fulfilled",
+      "code": 0,
+      "killed": false,
+      "signal": null,
+      "stdoutBytes": 134187,
+      "stderr": "",
+      "elapsedMs": 183.973125
+    },
+    {
+      "startedAt": "2026-10-16T21:48:32.097Z",
+      "timeoutMs": 10000,
+      "pid": 40898,
+      "outcome": "fulfilled",
+      "code": 0,
+      "killed": false,
+      "signal": null,
+      "stdoutBytes": 134468,
+      "stderr": "",
+      "elapsedMs": 64.9515
+    },
+    {
+      "startedAt": "2026-10-16T21:48:33.103Z",
+      "timeoutMs": 10000,
+      "pid": 40902,
+      "outcome": "fulfilled",
+      "code": 0,
+      "killed": false,
+      "signal": null,
+      "stdoutBytes": 134827,
+      "stderr": "",
+      "elapsedMs": 60.535917
+    },
+    {
+      "startedAt": "2026-10-16T21:48:34.103Z",
+      "timeoutMs": 10000,
+      "pid": 40905,
+      "outcome": "fulfilled",
+      "code": 0,
+      "killed": false,
+      "signal": null,
+      "stdoutBytes": 134739,
+      "stderr": "",
+      "elapsedMs": 55.918833
+    },
+    {
+      "startedAt": "2026-10-16T21:48:35.107Z",
+      "timeoutMs": 10000,
+      "pid": 40907,
+      "outcome": "fulfilled",
+      "code": 0,
+      "killed": false,
+      "signal": null,
+      "stdoutBytes": 134739,
+      "stderr": "",
+      "elapsedMs": 92.251834
+    },
+    {
+      "startedAt": "2026-10-16T21:48:36.110Z",
+      "timeoutMs": 10000,
+      "pid": 40913,
+      "outcome": "fulfilled",
+      "code": 0,
+      "killed": false,
+      "signal": null,
+      "stdoutBytes": 135452,
+      "stderr": "",
+      "elapsedMs": 58.296208
+    },
+    {
+      "startedAt": "2026-10-16T21:48:37.112Z",
+      "timeoutMs": 10000,
+      "pid": 40915,
+      "outcome": "fulfilled",
+      "code": 0,
+      "killed": false,
+      "signal": null,
+      "stdoutBytes": 135514,
+      "stderr": "",
+      "elapsedMs": 90.052041
+    },
+    {
+      "startedAt": "2026-10-16T21:48:38.114Z",
+      "timeoutMs": 10000,
+      "pid": 40917,
+      "outcome": "fulfilled",
+      "code": 0,
+      "killed": false,
+      "signal": null,
+      "stdoutBytes": 134969,
+      "stderr": "",
+      "elapsedMs": 56.887584
+    },
+    {
+      "startedAt": "2026-10-16T21:48:39.116Z",
+      "timeoutMs": 10000,
+      "pid": 40918,
+      "outcome": "fulfilled",
+      "code": 0,
+      "killed": false,
+      "signal": null,
+      "stdoutBytes": 134969,
+      "stderr": "",
+      "elapsedMs": 55.3775
+    },
+    {
+      "startedAt": "2026-10-16T21:48:40.118Z",
+      "timeoutMs": 10000,
+      "pid": 40925,
+      "outcome": "fulfilled",
+      "code": 0,
+      "killed": false,
+      "signal": null,
+      "stdoutBytes": 134319,
+      "stderr": "",
+      "elapsedMs": 49.462666
+    },
+    {
+      "startedAt": "2026-10-16T21:48:41.120Z",
+      "timeoutMs": 10000,
+      "pid": 40941,
+      "outcome": "fulfilled",
+      "code": 0,
+      "killed": false,
+      "signal": null,
+      "stdoutBytes": 132663,
+      "stderr": "",
+      "elapsedMs": 51.391334
+    },
+    {
+      "startedAt": "2026-10-16T21:48:42.122Z",
+      "timeoutMs": 10000,
+      "pid": 40952,
+      "outcome": "fulfilled",
+      "code": 0,
+      "killed": false,
+      "signal": null,
+      "stdoutBytes": 133153,
+      "stderr": "",
+      "elapsedMs": 75.27625
+    },
+    {
+      "startedAt": "2026-10-16T21:48:43.124Z",
+      "timeoutMs": 10000,
+      "pid": 40968,
+      "outcome": "fulfilled",
+      "code": 0,
+      "killed": false,
+      "signal": null,
+      "stdoutBytes": 133120,
+      "stderr": "",
+      "elapsedMs": 51.383375
+    },
+    {
+      "startedAt": "2026-10-16T21:48:44.125Z",
+      "timeoutMs": 10000,
+      "pid": 40985,
+      "outcome": "fulfilled",
+      "code": 0,
+      "killed": false,
+      "signal": null,
+      "stdoutBytes": 89331,
+      "stderr": "",
+      "elapsedMs": 50.00225
+    },
+    {
+      "startedAt": "2026-10-16T21:48:45.128Z",
+      "timeoutMs": 10000,
+      "pid": 40986,
+      "outcome": "fulfilled",
+      "code": 0,
+      "killed": false,
+      "signal": null,
+      "stdoutBytes": 87651,
+      "stderr": "",
+      "elapsedMs": 65.98725
+    },
+    {
+      "startedAt": "2026-10-16T21:48:46.129Z",
+      "timeoutMs": 10000,
+      "pid": 40989,
+      "outcome": "fulfilled",
+      "code": 0,
+      "killed": false,
+      "signal": null,
+      "stdoutBytes": 87417,
+      "stderr": "",
+      "elapsedMs": 46.651625
+    },
+    {
+      "startedAt": "2026-10-16T21:48:47.131Z",
+      "timeoutMs": 10000,
+      "pid": 40998,
+      "outcome": "fulfilled",
+      "code": 0,
+      "killed": false,
+      "signal": null,
+      "stdoutBytes": 85354,
+      "stderr": "",
+      "elapsedMs": 37.572125
+    },
+    {
+      "startedAt": "2026-10-16T21:48:47.178Z",
+      "timeoutMs": 10000,
+      "pid": 40999,
+      "outcome": "fulfilled",
+      "code": 0,
+      "killed": false,
+      "signal": null,
+      "stdoutBytes": 85103,
+      "stderr": "",
+      "elapsedMs": 36.487625
+    }
+  ],
+  "installsAttempted": 1,
+  "restoresAttempted": 1,
+  "testsSpawned": 1,
+  "hostWindowOperations": [],
+  "permissionActions": [],
+  "directoryActions": [],
+  "resourcePolicy": {
+    "jobs": 1,
+    "maxWorkers": 1,
+    "concurrency": 3,
+    "cpuTarget": 40,
+    "cpuTargetIsActualCap": false
+  },
+  "initialDevice": {
+    "lastBootedAt": "2026-10-16T20:49:26Z",
+    "dataPath": "/Users/thinkstu/Library/Developer/CoreSimulator/Devices/A407390F-7AA8-42AE-AFEB-F93EE99E9FF8/data",
+    "dataPathSize": 2938298368,
+    "logPath": "/Users/thinkstu/Library/Logs/CoreSimulator/A407390F-7AA8-42AE-AFEB-F93EE99E9FF8",
+    "udid": "A407390F-7AA8-42AE-AFEB-F93EE99E9FF8",
+    "isAvailable": true,
+    "logPathSize": 585728,
+    "deviceTypeIdentifier": "com.apple.CoreSimulator.SimDeviceType.iPhone-16-Pro",
+    "state": "Shutdown",
+    "name": "FluentRead-PR995-FreshPermissions-20261015"
+  },
+  "observer": {
+    "monitorPid": 40448,
+    "time": 1792187276903.3252,
+    "monotonicMs": 3612568289.447625
+  },
+  "frontmostBefore": {
+    "pid": 20136,
+    "name": "ChatGPT"
+  },
+  "selectedCasePassed": false,
+  "selectedCaseSkipped": true,
+  "executedOneTest": true,
+  "cleanupDeviceChecks": [
+    {
+      "at": "2026-10-16T21:48:40.147Z",
+      "owned": {
+        "lastBootedAt": "2026-10-16T21:47:58Z",
+        "dataPath": "/Users/thinkstu/Library/Developer/CoreSimulator/Devices/A407390F-7AA8-42AE-AFEB-F93EE99E9FF8/data",
+        "dataPathSize": 3001397248,
+        "logPath": "/Users/thinkstu/Library/Logs/CoreSimulator/A407390F-7AA8-42AE-AFEB-F93EE99E9FF8",
+        "udid": "A407390F-7AA8-42AE-AFEB-F93EE99E9FF8",
+        "isAvailable": true,
+        "logPathSize": 716800,
+        "deviceTypeIdentifier": "com.apple.CoreSimulator.SimDeviceType.iPhone-16-Pro",
+        "state": "Booted",
+        "name": "FluentRead-PR995-FreshPermissions-20261015"
+      },
+      "requiredState": "Booted",
+      "foreignBooted": [],
+      "foreignDevicesTouched": false
+    },
+    {
+      "at": "2026-10-16T21:48:40.570Z",
+      "owned": {
+        "lastBootedAt": "2026-10-16T21:47:58Z",
+        "dataPath": "/Users/thinkstu/Library/Developer/CoreSimulator/Devices/A407390F-7AA8-42AE-AFEB-F93EE99E9FF8/data",
+        "dataPathSize": 3001339904,
+        "logPath": "/Users/thinkstu/Library/Logs/CoreSimulator/A407390F-7AA8-42AE-AFEB-F93EE99E9FF8",
+        "udid": "A407390F-7AA8-42AE-AFEB-F93EE99E9FF8",
+        "isAvailable": true,
+        "logPathSize": 716800,
+        "deviceTypeIdentifier": "com.apple.CoreSimulator.SimDeviceType.iPhone-16-Pro",
+        "state": "Booted",
+        "name": "FluentRead-PR995-FreshPermissions-20261015"
+      },
+      "requiredState": "Booted",
+      "foreignBooted": [],
+      "foreignDevicesTouched": false
+    },
+    {
+      "at": "2026-10-16T21:48:42.054Z",
+      "owned": {
+        "lastBootedAt": "2026-10-16T21:47:58Z",
+        "dataPath": "/Users/thinkstu/Library/Developer/CoreSimulator/Devices/A407390F-7AA8-42AE-AFEB-F93EE99E9FF8/data",
+        "dataPathSize": 3069886464,
+        "logPath": "/Users/thinkstu/Library/Logs/CoreSimulator/A407390F-7AA8-42AE-AFEB-F93EE99E9FF8",
+        "udid": "A407390F-7AA8-42AE-AFEB-F93EE99E9FF8",
+        "isAvailable": true,
+        "logPathSize": 716800,
+        "deviceTypeIdentifier": "com.apple.CoreSimulator.SimDeviceType.iPhone-16-Pro",
+        "state": "Booted",
+        "name": "FluentRead-PR995-FreshPermissions-20261015"
+      },
+      "requiredState": "Booted",
+      "foreignBooted": [],
+      "foreignDevicesTouched": false
+    },
+    {
+      "at": "2026-10-16T21:48:43.367Z",
+      "owned": {
+        "lastBootedAt": "2026-10-16T21:47:58Z",
+        "dataPath": "/Users/thinkstu/Library/Developer/CoreSimulator/Devices/A407390F-7AA8-42AE-AFEB-F93EE99E9FF8/data",
+        "dataPathSize": 3069456384,
+        "logPath": "/Users/thinkstu/Library/Logs/CoreSimulator/A407390F-7AA8-42AE-AFEB-F93EE99E9FF8",
+        "udid": "A407390F-7AA8-42AE-AFEB-F93EE99E9FF8",
+        "isAvailable": true,
+        "logPathSize": 716800,
+        "deviceTypeIdentifier": "com.apple.CoreSimulator.SimDeviceType.iPhone-16-Pro",
+        "state": "Booted",
+        "name": "FluentRead-PR995-FreshPermissions-20261015"
+      },
+      "requiredState": "Booted",
+      "foreignBooted": [],
+      "foreignDevicesTouched": false
+    },
+    {
+      "at": "2026-10-16T21:48:46.775Z",
+      "owned": {
+        "lastBootedAt": "2026-10-16T21:47:58Z",
+        "dataPath": "/Users/thinkstu/Library/Developer/CoreSimulator/Devices/A407390F-7AA8-42AE-AFEB-F93EE99E9FF8/data",
+        "dataPathSize": 2799218688,
+        "logPath": "/Users/thinkstu/Library/Logs/CoreSimulator/A407390F-7AA8-42AE-AFEB-F93EE99E9FF8",
+        "udid": "A407390F-7AA8-42AE-AFEB-F93EE99E9FF8",
+        "isAvailable": true,
+        "logPathSize": 716800,
+        "deviceTypeIdentifier": "com.apple.CoreSimulator.SimDeviceType.iPhone-16-Pro",
+        "state": "Shutdown",
+        "name": "FluentRead-PR995-FreshPermissions-20261015"
+      },
+      "requiredState": "Shutdown",
+      "foreignBooted": [],
+      "foreignDevicesTouched": false
+    },
+    {
+      "at": "2026-10-16T21:48:46.903Z",
+      "owned": {
+        "lastBootedAt": "2026-10-16T21:47:58Z",
+        "dataPath": "/Users/thinkstu/Library/Developer/CoreSimulator/Devices/A407390F-7AA8-42AE-AFEB-F93EE99E9FF8/data",
+        "dataPathSize": 2799218688,
+        "logPath": "/Users/thinkstu/Library/Logs/CoreSimulator/A407390F-7AA8-42AE-AFEB-F93EE99E9FF8",
+        "udid": "A407390F-7AA8-42AE-AFEB-F93EE99E9FF8",
+        "isAvailable": true,
+        "logPathSize": 716800,
+        "deviceTypeIdentifier": "com.apple.CoreSimulator.SimDeviceType.iPhone-16-Pro",
+        "state": "Shutdown",
+        "name": "FluentRead-PR995-FreshPermissions-20261015"
+      },
+      "requiredState": "Shutdown",
+      "foreignBooted": [],
+      "foreignDevicesTouched": false
+    }
+  ],
+  "originalRestoredAndVerified": true,
+  "finalDevice": {
+    "lastBootedAt": "2026-10-16T21:47:58Z",
+    "dataPath": "/Users/thinkstu/Library/Developer/CoreSimulator/Devices/A407390F-7AA8-42AE-AFEB-F93EE99E9FF8/data",
+    "dataPathSize": 2799218688,
+    "logPath": "/Users/thinkstu/Library/Logs/CoreSimulator/A407390F-7AA8-42AE-AFEB-F93EE99E9FF8",
+    "udid": "A407390F-7AA8-42AE-AFEB-F93EE99E9FF8",
+    "isAvailable": true,
+    "logPathSize": 716800,
+    "deviceTypeIdentifier": "com.apple.CoreSimulator.SimDeviceType.iPhone-16-Pro",
+    "state": "Shutdown",
+    "name": "FluentRead-PR995-FreshPermissions-20261015"
+  },
+  "remainingOwnedProcesses": [],
+  "finalPSCompleted": true,
+  "frontmostAfter": {
+    "pid": 20136,
+    "name": "ChatGPT"
+  },
+  "finishedAt": "2026-10-16T21:48:47.293Z",
+  "elapsedMs": 54509,
+  "laneReleased": true,
+  "installedIdentityAtEnd": "ORIGINAL_D9_FULL485_VERIFIED"
+}

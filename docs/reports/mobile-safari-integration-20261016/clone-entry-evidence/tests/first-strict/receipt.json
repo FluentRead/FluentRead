@@ -1,0 +1,40 @@
+{
+  "schemaVersion": 1,
+  "phase": "candidate-first-strict-coverage",
+  "actualExitCode": 1,
+  "tests": {
+    "total": 98,
+    "passed": 98,
+    "failed": 0,
+    "pending": 0
+  },
+  "coverage": {
+    "statements": 100,
+    "branches": 99.65,
+    "functions": 100,
+    "lines": 100
+  },
+  "missingBranch": {
+    "line": 431,
+    "description": "owned menuHost externally reparented while scope remains valid"
+  },
+  "scope": "Node/linkedom public binding tests; no browser/device evidence",
+  "files": {
+    "fixed-coverage-vitest.json": {
+      "sha256": "2a0f8a5e5fc512a79d29437cbd662b5ee989649e3fb745fbfbe7801120106f52",
+      "bytes": 37203
+    },
+    "fixed-coverage-vitest.log": {
+      "sha256": "1be8b5a5004c6571cecfad652d27b6cde125c9a1c192f3b0190bdd6b3a7143ae",
+      "bytes": 1307
+    },
+    "coverage/coverage-final.json": {
+      "sha256": "6edaf6a52489e17111479dabfc8f5547d381136e4b60757cdcf1382484045979",
+      "bytes": 95381
+    },
+    "coverage/coverage-summary.json": {
+      "sha256": "6d476c36303145c7ac742acd53ee873798490b30321b62fd830eed1bd532586f",
+      "bytes": 714
+    }
+  }
+}

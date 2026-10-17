@@ -1,0 +1,77 @@
+{
+  "schema": 1,
+  "artifactKind": "DERIVED_PUBLIC_PORTRAIT_RUNTIME_OUTCOME",
+  "original": {
+    "researchCase": "current-production-touch-flex-portrait-drawer-keyboard-attempt1",
+    "file": "root-runtime-outcome.json",
+    "bytes": 13440,
+    "sha256": "7c0548f5386bb4f39ea5acc60de45116d71585e8e157206e49c355a0332b7489"
+  },
+  "derivation": "Whitelist projection. Local paths, execution/session identifiers, process records, private maps and raw evidence inventory omitted; original remains in research. This is not the original receipt.",
+  "case": "current-production-touch-flex-portrait-drawer-keyboard-attempt1",
+  "status": "PASS_CURRENT_PRODUCTION_PORTRAIT_DRAWER_KEYBOARD_SEVEN_ACTIONS",
+  "sourceCommit": "8274d0c76bead3f1f76a04f5f71e2d58475d4551",
+  "nativeIdentitySHA256": "6998df7d9b45d0422079e452ea5bdd2f53096702c7ed8a9abaeb90d4161e1828",
+  "productionAcceptance": false,
+  "scopedPopupAcceptance": true,
+  "official": {
+    "runtimeTerminalExitCode": 0,
+    "passed": 1,
+    "skipped": 0,
+    "failed": 0,
+    "total": 1,
+    "testSeconds": 51.294,
+    "exportsExitCodes": [
+      0,
+      0
+    ]
+  },
+  "observations": {
+    "RootViewedAllOriginalPNGs": 8,
+    "RootReadAllOriginalJSON": 44,
+    "sevenActions": [
+      "serviceSummary",
+      "defaultServiceRow",
+      "searchFocus",
+      "searchGpt",
+      "clearSearch",
+      "pickerBack",
+      "overviewClose"
+    ],
+    "eachConsumedOnce": true,
+    "gptThenClearedQueryObserved": true,
+    "keyboardRemainedAfterClear": true,
+    "BackRestoredOverviewKeyboardAbsent": true,
+    "overviewCloseRestoredNormalPopup": true,
+    "finalNativeDoneOnce": true,
+    "finalKnownFixtureOwnerCount": 1,
+    "permissionChoices": 0,
+    "priorLocalhostPermission": "UNKNOWN",
+    "configurationWrites": 0,
+    "translationIntents": 0
+  },
+  "cleanup": {
+    "originalD9RestoredAndVerified": true,
+    "dedicatedSimulator": "Shutdown",
+    "resourceLaneReleased": true,
+    "cleanupErrors": [],
+    "violations": [],
+    "scope": "Only the pinned D9 app, native FluentRead data13, Userscripts app47 and Demo396; not all extension storage."
+  },
+  "attachmentsManifest": "attachments/manifest.json",
+  "officialSummary": "official-summary.json",
+  "boundaries": [
+    "Pass is scoped to one portrait iPhone 16 Pro simulator production drawer/search/keyboard/Back/close/Done flow.",
+    "No landscape rotation, real device, other skins/locales or general production acceptance is proved.",
+    "No permission prompt occurred; no one-day tap/fresh grant was exercised, and prior localhost permission remains unknown.",
+    "Clear-search empty state has JSON/live-source evidence, not a dedicated cleared screenshot; keyboard remained after clear and disappeared after Back.",
+    "Normal Popup lower cards are visibly partially clipped; no new DOM scroll, complete footer visibility or configuration hydration proof.",
+    "Only exact pinned native FR data13, Userscripts app47 and Demo396 bytes are rehashed; extension-wide storage/settings/cache preservation is not claimed.",
+    "Overlay tab UUID hidden; continuity uses reviewed native signature and exact action chain, with exact owner in final known fixture.",
+    "Root and independent reviewers separately read all 44 JSON and viewed all 8 original PNGs; AX, native actions and PNG capture are sequential, not atomic.",
+    "No list reachability, keyboard focus return, orientation, VoiceOver, physical-device or live-provider acceptance is inferred.",
+    "Normal collapsed Safari sheet still clips lower cards; expanded sheet/footer evidence belongs to the separate current-production scroll case.",
+    "Two Root command-launch parameter mistakes failed before native build/runtime respectively, then were corrected with the unconsumed GO; native selected runtime itself passed once."
+  ],
+  "originalPNGCount": 8
+}

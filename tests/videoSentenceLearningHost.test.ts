@@ -66,6 +66,63 @@ describe('video learning source provenance', () => {
 });
 
 describe('learning panel mount ownership', () => {
+    it('placement明确持有外部宿主时保留逻辑player，同步不会把原Vue挂载节点搬回', () => {
+        const f = fixture('<div id="player"><video></video></div>'), player = f.document.getElementById('player')!;
+        const frame = f.document.createElement('div'); f.document.body.appendChild(frame);
+        const unmount = vi.fn(); let hostNode: HTMLElement;
+        const syncPlayer = vi.fn();
+        const host = createVideoSentenceLearningHost({markUi: vi.fn(), mount: () => unmount, place: node => {
+            hostNode = node; frame.appendChild(node);
+            return {syncPlayer, isConnected: target => target === player && node.parentElement === frame && frame.isConnected, destroy: () => frame.remove()};
+        }});
+        const current = props(f.video); host.open(player, current); expect(host.isConnected(player)).toBe(true); expect(current.player).toBe(player);
+        expect(host.syncPlayer(player, f.video)).toBe(true); expect(syncPlayer).toHaveBeenCalledWith(player); expect(hostNode!.parentElement).toBe(frame);
+        frame.remove(); expect(host.isConnected(player)).toBe(false); expect(host.syncPlayer(player, f.video)).toBe(false);
+        host.close(); expect(unmount).toHaveBeenCalledOnce(); expect(hostNode!.isConnected).toBe(false);
+    });
+
+    it('returns focused mobile learning content to its same-video sibling entry after cleanup without taking external focus', () => {
+        const f = fixture('<div id="player-container-id" class="player-container"><div id="movie_player" class="html5-video-player ytp-mweb-player"><video></video></div><ytm-custom-control><button id="fluent-read-video-subtitle-button"></button></ytm-custom-control></div><input id="outside">', 'https://m.youtube.com/watch?v=learning-focus');
+        const player = f.document.getElementById('movie_player')!, entry = f.document.getElementById('fluent-read-video-subtitle-button')!;
+        let active: Element | null = null;
+        Object.defineProperty(f.document, 'activeElement', {get: () => active});
+        const unmount = vi.fn(), entryFocus = vi.fn(() => {
+            expect(host.isOpen()).toBe(false);
+            expect(f.document.getElementById('fluent-read-video-learning-panel')).toBeNull();
+            expect(unmount).toHaveBeenCalledOnce();
+        });
+        entry.focus = entryFocus;
+        const host = createVideoSentenceLearningHost({markUi: vi.fn(), mount: element => {
+            const section = f.document.createElement('section'); section.focus = vi.fn(() => {active = section;}); element.appendChild(section);
+            return unmount;
+        }});
+        const current = props(f.video); current.platform = 'youtube';
+        host.open(player, current); host.close();
+        expect(entryFocus).toHaveBeenCalledOnce(); expect(entryFocus).toHaveBeenCalledWith({preventScroll: true});
+        host.open(player, current); active = f.document.getElementById('outside'); host.close();
+        expect(entryFocus).toHaveBeenCalledOnce(); expect(unmount).toHaveBeenCalledTimes(2);
+    });
+
+    it.each(['second-video', 'unknown-container', 'different-props-video', 'desktop', 'x'] as const)('does not return focus to an unowned sibling entry after %s changes its scope', mutation => {
+        const f = fixture('<div id="player-container-id" class="player-container"><div id="movie_player" class="html5-video-player ytp-mweb-player"><video></video></div><ytm-custom-control><button id="fluent-read-video-subtitle-button"></button></ytm-custom-control></div>', 'https://m.youtube.com/watch?v=learning-focus');
+        const player = f.document.getElementById('movie_player')!, scope = f.document.getElementById('player-container-id')!;
+        const entry = f.document.getElementById('fluent-read-video-subtitle-button')!, focus = vi.fn(); entry.focus = focus;
+        let active: Element | null = null;
+        Object.defineProperty(f.document, 'activeElement', {get: () => active});
+        const host = createVideoSentenceLearningHost({markUi: vi.fn(), mount: element => {
+            const section = f.document.createElement('section'); section.focus = vi.fn(() => {active = section;}); element.appendChild(section); return vi.fn();
+        }});
+        const current = props(f.video); current.platform = 'youtube'; host.open(player, current);
+        if (mutation === 'second-video') scope.appendChild(f.document.createElement('video'));
+        else if (mutation === 'unknown-container') scope.id = 'unrelated';
+        else if (mutation === 'different-props-video') {
+            const other = f.document.createElement('video'); f.document.body.appendChild(other); current.video = other;
+        } else if (mutation === 'desktop') player.classList.remove('ytp-mweb-player');
+        else {player.removeAttribute('id'); player.className = 'x-player'; current.platform = 'x';}
+        host.close(); expect(focus).not.toHaveBeenCalled();
+        expect(host.isOpen()).toBe(false); expect(f.document.getElementById('fluent-read-video-learning-panel')).toBeNull();
+    });
+
     it('delegates placement during mount and reparent, and disposes it even when Vue unmount fails', () => {
         const f = fixture('<div id="player"><div id="fullscreen"><video></video></div></div>');
         const player = f.document.getElementById('player')!; const fullscreen = f.document.getElementById('fullscreen')!;
@@ -99,21 +156,24 @@ describe('learning panel mount ownership', () => {
         });
         const host = createVideoSentenceLearningHost({markUi, mount});
         expect(host.syncPlayer(player, f.video)).toBe(false);
-        const current = props(f.video); host.open(player, current);
+        const current = props(f.video); host.open(player, current); expect(current.player).toBe(player);
         const panel = f.document.getElementById('fluent-read-video-learning-panel')!;
         expect(host.syncPlayer(fullscreen, f.video)).toBe(true);
+        expect(current.player).toBe(fullscreen);
         expect(panel.parentElement).toBe(fullscreen); expect(host.isConnected(fullscreen)).toBe(true);
         expect(panel.querySelector('textarea')?.textContent).toBe('Retained manual draft');
         expect(focus).toHaveBeenCalledOnce(); expect(focus).toHaveBeenCalledWith({preventScroll: true});
         expect(host.syncPlayer(fullscreen, f.video)).toBe(true); expect(focus).toHaveBeenCalledOnce();
         active = null;
         expect(host.syncPlayer(player, f.video)).toBe(true); expect(focus).toHaveBeenCalledOnce();
+        expect(current.player).toBe(player);
         fullscreen.appendChild(panel); expect(host.isConnected()).toBe(false);
         expect(host.syncPlayer(player, f.video)).toBe(true); expect(host.isConnected(player)).toBe(true);
         expect(mount).toHaveBeenCalledOnce(); expect(unmount).not.toHaveBeenCalled(); expect(markUi).toHaveBeenCalledOnce();
         const other = f.document.getElementById('other')!;
         expect(host.syncPlayer(other, f.document.getElementById('another')! as HTMLVideoElement)).toBe(false);
         expect(host.syncPlayer(other, f.video)).toBe(false);
+        expect(current.player).toBe(player);
         other.remove(); expect(host.syncPlayer(other, f.video)).toBe(false);
         f.video.remove(); expect(host.syncPlayer(player, f.video)).toBe(false);
         host.close(); expect(unmount).toHaveBeenCalledOnce();

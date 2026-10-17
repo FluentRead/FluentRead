@@ -1,0 +1,585 @@
+{
+  "schemaVersion": 1,
+  "reviewedAt": "2026-10-16T23:06:47.912209+00:00",
+  "reviewer": "diagnostic_driver_prep; second read-only cross-check by driver_source_review",
+  "status": "SAVED_REGRESSION_EVIDENCE_VERIFIED_WITH_SCOPE_LIMITS",
+  "reviewMethod": [
+    "Read raw JSON, process receipts and original logs; independently recompute SHA256 and assertion counts",
+    "Read V8 summary and every coverage counter; no test, module, browser, device, network or SDK execution",
+    "View original 1280x900 failure.png; parse saved HTML for button ancestry only",
+    "Write this report and sibling Markdown only; do not copy raw fixtures or private data into repository"
+  ],
+  "findings": [],
+  "baseline": {
+    "raw": {
+      "path": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/mobile-youtube-fr-node-identity-probe-20261017/same-scope-clone-repair-20261017/baseline-vitest.json",
+      "sha256": "20be73eb76eae157fe41871a939becf3fce27dece989215fa91ce19f9553636e",
+      "bytes": 49537
+    },
+    "jsonSuccess": false,
+    "total": 94,
+    "passed": 0,
+    "failed": 11,
+    "pending": 83,
+    "assertionStatusCounts": {
+      "skipped": 83,
+      "failed": 11
+    },
+    "testFiles": [
+      "/Users/thinkstu/Desktop/copy/FluentRead-mobile-video-menu-accessibility-20261016/tests/videoPlayerBinding.test.ts"
+    ],
+    "savedProcessExitCode": 1,
+    "exitCodeEvidence": "baseline-execution.json; not a new independent execution",
+    "selectedTests": 11,
+    "filteredUnexecutedTests": 83,
+    "allElevenFailures": "same-player owner copies outside the held control host; expected copy disconnected false but actual connected true",
+    "productSnapshot": {
+      "path": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/mobile-youtube-fr-node-identity-probe-20261017/same-scope-clone-repair-20261017/production-before.ts",
+      "sha256": "3443098758b7f2eefb4d7feab89e2a9ea530317d3db8dbe15a20af4405e94a84",
+      "bytes": 22196
+    },
+    "atRunTestSHA256FromReceipt": "1cbec79f20bb2b47b920c01f6861e62b6a863a9555869e835e8b09e91bfe7b1c",
+    "baselineTestInputSnapshotCaveat": "tests-before.ts is the original pre-addition file, not a frozen snapshot of the eleven-regression at-run test file"
+  },
+  "firstStrict": {
+    "raw": {
+      "path": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/mobile-youtube-fr-node-identity-probe-20261017/same-scope-clone-repair-20261017/first-strict-attempt/fixed-coverage-vitest.json",
+      "sha256": "2a0f8a5e5fc512a79d29437cbd662b5ee989649e3fb745fbfbe7801120106f52",
+      "bytes": 37203
+    },
+    "jsonSuccess": true,
+    "total": 98,
+    "passed": 98,
+    "failed": 0,
+    "pending": 0,
+    "assertionStatusCounts": {
+      "passed": 98
+    },
+    "testFiles": [
+      "/Users/thinkstu/Desktop/copy/FluentRead-mobile-video-menu-accessibility-20261016/tests/videoPlayerBinding.test.ts"
+    ],
+    "savedProcessExitCode": 1,
+    "coverage": {
+      "lines": {
+        "total": 403,
+        "covered": 403,
+        "skipped": 0,
+        "pct": 100
+      },
+      "statements": {
+        "total": 403,
+        "covered": 403,
+        "skipped": 0,
+        "pct": 100
+      },
+      "functions": {
+        "total": 34,
+        "covered": 34,
+        "skipped": 0,
+        "pct": 100
+      },
+      "branches": {
+        "total": 287,
+        "covered": 286,
+        "skipped": 0,
+        "pct": 99.65
+      },
+      "branchesTrue": {
+        "total": 0,
+        "covered": 0,
+        "skipped": 0,
+        "pct": "Unknown"
+      }
+    },
+    "onlyMissingBranch": [
+      {
+        "file": "/Users/thinkstu/Desktop/copy/FluentRead-mobile-video-menu-accessibility-20261016/src/features/video-subtitle/content/videoPlayerBinding.ts",
+        "id": "227",
+        "hits": [
+          0
+        ],
+        "location": {
+          "type": "branch",
+          "line": 431,
+          "loc": {
+            "start": {
+              "line": 431,
+              "column": 45
+            },
+            "end": {
+              "line": 431,
+              "column": 92
+            }
+          },
+          "locations": [
+            {
+              "start": {
+                "line": 431,
+                "column": 45
+              },
+              "end": {
+                "line": 431,
+                "column": 92
+              }
+            }
+          ]
+        }
+      }
+    ],
+    "conclusion": "98 assertion passes did not satisfy strict branch threshold; JSON success true is not process success",
+    "inputIdentityCaveat": "Saved first-strict receipt pins raw output files; it does not pin separate source/test input snapshots"
+  },
+  "finalStrict": {
+    "raw": {
+      "path": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/mobile-youtube-fr-node-identity-probe-20261017/same-scope-clone-repair-20261017/fixed-final-coverage-vitest.json",
+      "sha256": "5e6a31476990460bc400469457f133bc7a3164194584c65a20a710fc710cdb25",
+      "bytes": 37629
+    },
+    "jsonSuccess": true,
+    "total": 99,
+    "passed": 99,
+    "failed": 0,
+    "pending": 0,
+    "assertionStatusCounts": {
+      "passed": 99
+    },
+    "testFiles": [
+      "/Users/thinkstu/Desktop/copy/FluentRead-mobile-video-menu-accessibility-20261016/tests/videoPlayerBinding.test.ts"
+    ],
+    "savedProcessExitCode": 0,
+    "coverage": {
+      "lines": {
+        "total": 403,
+        "covered": 403,
+        "skipped": 0,
+        "pct": 100
+      },
+      "statements": {
+        "total": 403,
+        "covered": 403,
+        "skipped": 0,
+        "pct": 100
+      },
+      "functions": {
+        "total": 34,
+        "covered": 34,
+        "skipped": 0,
+        "pct": 100
+      },
+      "branches": {
+        "total": 287,
+        "covered": 287,
+        "skipped": 0,
+        "pct": 100
+      },
+      "branchesTrue": {
+        "total": 0,
+        "covered": 0,
+        "skipped": 0,
+        "pct": "Unknown"
+      }
+    },
+    "allStatementFunctionBranchCountersPositive": true,
+    "scope": "One Node/linkedom public-API binding test file and one V8-covered production module",
+    "thresholds": {
+      "perFile": true,
+      "statements": 100,
+      "branches": 100,
+      "functions": 100,
+      "lines": 100
+    },
+    "notCoveredByThisEvidence": [
+      "Whole repository tests or coverage",
+      "Real browser focus or MutationObserver scheduling",
+      "Safari/iOS/AVKit or live YouTube",
+      "Live translation provider or subtitle accuracy"
+    ]
+  },
+  "currentReadOnlyInputPins": [
+    {
+      "path": "/Users/thinkstu/Desktop/copy/FluentRead-mobile-video-menu-accessibility-20261016/src/features/video-subtitle/content/videoPlayerBinding.ts",
+      "sha256": "0789013139caf5e43783e4d3501b9a96c5d97324213efcbdfa941e1eb34fdec4",
+      "bytes": 23201
+    },
+    {
+      "path": "/Users/thinkstu/Desktop/copy/FluentRead-mobile-video-menu-accessibility-20261016/tests/videoPlayerBinding.test.ts",
+      "sha256": "68fb776e05d95ec9d7d95430bfe4d3ad704703fb6f0513da05c33984074e81b0",
+      "bytes": 101967
+    },
+    {
+      "path": "/Users/thinkstu/Desktop/copy/FluentRead-mobile-video-menu-accessibility-20261016/scripts/run-mobile-video-subtitle-test.cjs",
+      "sha256": "7613fece1417934d34f121f5a0413658e4fc848e2cf1d8d349d866f75b116d6f",
+      "bytes": 60997
+    }
+  ],
+  "runnerIdentityBoundary": "Final scoped receipt records runner d060eed1349c017e611b0d749b9374c457c58d1656ef64fac703634e3a66839c at that earlier point; current runner is 7613fece1417934d34f121f5a0413658e4fc848e2cf1d8d349d866f75b116d6f. Binding tests do not validate either browser runner. Preserve the historical receipt.",
+  "oldBrowserAttempt2": {
+    "rawReport": {
+      "path": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/mobile-youtube-fr-node-identity-probe-20261017/same-scope-clone-repair-20261017/browser-control-clones-old-production-attempt2/report.json",
+      "sha256": "6678fafd66d362c56030cae48c9289637f40eed88636df5c68bfa2e2addc4653",
+      "bytes": 6695
+    },
+    "rawLog": {
+      "path": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/mobile-youtube-fr-node-identity-probe-20261017/same-scope-clone-repair-20261017/browser-control-clones-old-production-attempt2.log",
+      "sha256": "deb33e7e9ff0398dd2d923dfe9164d83ccf0027c0c7065eb76702054b386f84c",
+      "bytes": 2003
+    },
+    "result": "PRODUCT_ASSERTION_RED_IN_FIRST_DESKTOP_CASE",
+    "savedConsoleOk": false,
+    "savedCaseCount": 1,
+    "case": {
+      "name": "desktop-whole-host",
+      "status": "OBSERVED_PENDING_ASSERTIONS",
+      "baseline": {
+        "layout": "desktop",
+        "url": "https://www.youtube.com/watch?v=fluentread-control-clones-desktop",
+        "liveInOriginalHost": true,
+        "scopeContainsHost": true,
+        "scopeIsPlayer": true,
+        "scopeVideoCount": 1,
+        "coarsePointer": false,
+        "ariaPressed": null,
+        "ariaExpanded": "false",
+        "ariaHaspopup": "menu",
+        "ariaControls": "fluent-read-video-subtitle-menu"
+      },
+      "repair": {
+        "kind": "whole-host",
+        "immediateOwnCount": 2,
+        "afterMicrotask": {
+          "ownCount": 2,
+          "copyConnected": true,
+          "elapsedMs": 0.6999998092651367
+        },
+        "afterTaskOwnCount": 2,
+        "removedCopyObserved": false,
+        "liveIdentity": true,
+        "liveConnected": true,
+        "liveParentUnchanged": true,
+        "nativeButtonsUnchanged": true,
+        "siblingRetained": true,
+        "siblingNativeRetained": true,
+        "foreignRetained": true,
+        "unrelatedRetained": true,
+        "url": "https://www.youtube.com/watch?v=fluentread-control-clones-desktop"
+      }
+    },
+    "assertion": "afterMicrotask ownCount 2 !== expected 1; copyConnected true; next-task count remains 2; no observed removal",
+    "originalImage": {
+      "path": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/mobile-youtube-fr-node-identity-probe-20261017/same-scope-clone-repair-20261017/browser-control-clones-old-production-attempt2/failure.png",
+      "sha256": "5fc4ccdc34a2eeab09081f38ccd745a337b89a15c1320d080aa94fac0bc0ec2c",
+      "bytes": 44632,
+      "dimensions": [
+        1280,
+        900
+      ],
+      "visuallyInspected": true,
+      "observation": "Two visible native control rows and repeated pink extension icons; fixture label explicitly says controlled production content ownership fixture. Pixels do not establish binding owner or DOM identity."
+    },
+    "savedDomCrossCheck": {
+      "sameLiveOwnerButtonsInMoviePlayer": 2,
+      "sameLiveOwnerButtonInUnrelatedPlayer": 1,
+      "foreignOwnerButtonInCopiedHost": 1,
+      "entryIDOccurrencesDocumentWide": 4,
+      "consistentWithScopeCountTwo": true,
+      "ownerTokenNotCopiedIntoReport": true
+    },
+    "focus": {
+      "launchMode": "macos-background-cdp",
+      "focusPolicy": "launchservices-no-foreground",
+      "windowPlacement": {
+        "mode": "background-visible-no-focus",
+        "visible": true,
+        "hidden": false,
+        "centered": true,
+        "windowState": "normal",
+        "bounds": {
+          "left": 212,
+          "top": -990,
+          "width": 1280,
+          "height": 900
+        },
+        "displayTarget": "secondary",
+        "source": "macos-nsscreen",
+        "screenIndex": 1,
+        "browserFrontmost": false,
+        "frontmostBefore": {
+          "pid": 20136,
+          "name": "ChatGPT"
+        },
+        "frontmostAfter": {
+          "pid": 20136,
+          "name": "ChatGPT"
+        }
+      },
+      "browserPid": 51937,
+      "samples": [
+        {
+          "at": 1792191699875,
+          "name": "ChatGPT",
+          "pid": 20136
+        },
+        {
+          "at": 1792191700447,
+          "name": "ChatGPT",
+          "pid": 20136
+        },
+        {
+          "at": 1792191700961,
+          "name": "ChatGPT",
+          "pid": 20136
+        },
+        {
+          "at": 1792191701100,
+          "name": "ChatGPT",
+          "pid": 20136
+        },
+        {
+          "at": 1792191701177,
+          "name": "ChatGPT",
+          "pid": 20136
+        }
+      ],
+      "recordedActivationEvents": [],
+      "interpretation": "Recorded samples remained ChatGPT; no owned-browser activation was recorded. This old report omits post-stop monitor.error health state, so empty events are not a proof of a continuously healthy observer through cleanup."
+    },
+    "cleanup": {
+      "browserCloseReceipt": "shared-guard-fulfilled",
+      "profileRemoved": true,
+      "interpretation": "Saved guarded-close fulfillment and profile removal are present. No independent fresh process/profile inventory was executed by this audit."
+    },
+    "extensionIdentity": {
+      "directory": "/Users/thinkstu/Desktop/copy/FluentRead-mobile-video-menu-accessibility-20261016/.output/chrome-mv3",
+      "manifestSHA256": "a12a20416fc826d3dc7278b74a112b4170f8985b1ac8b1a74c91f73d5e09b642",
+      "contentScripts": [
+        {
+          "file": "content-scripts/content.js",
+          "sha256": "a561db0bccf57e326dfc72a2071047a78b816228c7312eb863073cc7dc65413c",
+          "size": 2758980
+        },
+        {
+          "file": "content-scripts/neteaseMailFrame.js",
+          "sha256": "05f560c5193aee59bd122bdf0e8d489b6d17227b486f3204cbdb1c6cd2e703e8",
+          "size": 1961063
+        },
+        {
+          "file": "content-scripts/shadowBridge.js",
+          "sha256": "ac4cd36fa2f66d591c031c44f3d0b7bc58a39888aee263037b71be2fad686e39",
+          "size": 3351
+        },
+        {
+          "file": "content-scripts/supportedFrame.js",
+          "sha256": "51f919e9f0761e6af29c78009b00b7a2e228c77bd9d793ffaa130a1919b46bcf",
+          "size": 1734217
+        },
+        {
+          "file": "content-scripts/xVideoBridge.js",
+          "sha256": "f22318b71931cfc573c8aae63086438e4d186f4f654616a85ebd0c6178c50331",
+          "size": 8036
+        },
+        {
+          "file": "content-scripts/youtubeBridge.js",
+          "sha256": "f5304857608090e874b144266f0def19809b0ba228765f3c7d14ef22faa57af3",
+          "size": 5497
+        }
+      ]
+    },
+    "sealedOldArtifactMap": {
+      "path": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/menu-scroll-controlled-20261017/chrome-final-file-map.json",
+      "sha256": "fa6ed6c48b27fd7e9040764ca43c19a2aef9150c4ca32263c53c278a1900878e",
+      "bytes": 69369
+    },
+    "contentScriptMapChecks": [
+      {
+        "file": "content-scripts/content.js",
+        "reportSHA256": "a561db0bccf57e326dfc72a2071047a78b816228c7312eb863073cc7dc65413c",
+        "sealedMapSHA256": "a561db0bccf57e326dfc72a2071047a78b816228c7312eb863073cc7dc65413c",
+        "match": true
+      },
+      {
+        "file": "content-scripts/neteaseMailFrame.js",
+        "reportSHA256": "05f560c5193aee59bd122bdf0e8d489b6d17227b486f3204cbdb1c6cd2e703e8",
+        "sealedMapSHA256": "05f560c5193aee59bd122bdf0e8d489b6d17227b486f3204cbdb1c6cd2e703e8",
+        "match": true
+      },
+      {
+        "file": "content-scripts/shadowBridge.js",
+        "reportSHA256": "ac4cd36fa2f66d591c031c44f3d0b7bc58a39888aee263037b71be2fad686e39",
+        "sealedMapSHA256": "ac4cd36fa2f66d591c031c44f3d0b7bc58a39888aee263037b71be2fad686e39",
+        "match": true
+      },
+      {
+        "file": "content-scripts/supportedFrame.js",
+        "reportSHA256": "51f919e9f0761e6af29c78009b00b7a2e228c77bd9d793ffaa130a1919b46bcf",
+        "sealedMapSHA256": "51f919e9f0761e6af29c78009b00b7a2e228c77bd9d793ffaa130a1919b46bcf",
+        "match": true
+      },
+      {
+        "file": "content-scripts/xVideoBridge.js",
+        "reportSHA256": "f22318b71931cfc573c8aae63086438e4d186f4f654616a85ebd0c6178c50331",
+        "sealedMapSHA256": "f22318b71931cfc573c8aae63086438e4d186f4f654616a85ebd0c6178c50331",
+        "match": true
+      },
+      {
+        "file": "content-scripts/youtubeBridge.js",
+        "reportSHA256": "f5304857608090e874b144266f0def19809b0ba228765f3c7d14ef22faa57af3",
+        "sealedMapSHA256": "f5304857608090e874b144266f0def19809b0ba228765f3c7d14ef22faa57af3",
+        "match": true
+      }
+    ],
+    "oldArtifactCheck": {
+      "at": "2026-10-16T23:00:01.940Z",
+      "directory": "/Users/thinkstu/Desktop/copy/FluentRead-mobile-video-menu-accessibility-20261016/.output/chrome-mv3",
+      "expectedMap": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/menu-scroll-controlled-20261017/chrome-final-file-map.json",
+      "expectedMapSHA256": "fa6ed6c48b27fd7e9040764ca43c19a2aef9150c4ca32263c53c278a1900878e",
+      "files": 478,
+      "bytes": 62361064,
+      "rawDigest": "e63d90b408f6510484517b967daa3601bf9c4d1a63db3e9e03f58c54d2187612",
+      "differences": [],
+      "missing": [],
+      "manifest": {
+        "sha256": "a12a20416fc826d3dc7278b74a112b4170f8985b1ac8b1a74c91f73d5e09b642",
+        "bytes": 3250
+      },
+      "unchanged": true
+    },
+    "identityCaveat": "Report script hashes match preserved old artifact map; packaging/revision provenance beyond that map is not inferred. Root may now rebuild current .output; this audit does not read that mutable build tree.",
+    "unreachedAssertions": [
+      "desktop loose copy",
+      "desktop disable",
+      "all mobile cases",
+      "trusted live-entry/Close menu clicks, menu focus return and menu screenshots"
+    ],
+    "otherRawDiagnostics": "Report records one timedtext404 and console resource error. The terminating assertion is the concrete owner-copy count; no subtitle/provider acceptance is claimed.",
+    "notSafariRootCause": true
+  },
+  "firstBrowserHarnessAttempt": {
+    "result": "HARNESS_ERROR_NOT_PRODUCT_RED",
+    "cases": 0,
+    "reason": "helper.startFocusEventMonitor is not a function; old skill helper lacked required API",
+    "evidence": "browser-control-clones-old-production.log"
+  },
+  "sourceVersusRuntimeLimit": "Static sibling-copy defect, real public-API regressions, and this controlled Chromium desktop RED do not establish the cause of E2 Safari AX3; E2 document code provenance, DOM node ownership and exact URL remained unproven.",
+  "inputPins": [
+    {
+      "path": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/mobile-youtube-fr-node-identity-probe-20261017/same-scope-clone-repair-20261017/baseline-inputs.json",
+      "sha256": "fbf0d6dc8c6ed8465e65f8eec845cc6308f26756171ecfc7b6f926b78754bcdc",
+      "bytes": 1424
+    },
+    {
+      "path": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/mobile-youtube-fr-node-identity-probe-20261017/same-scope-clone-repair-20261017/baseline-execution.json",
+      "sha256": "441237f8c99016b2abcd4dc77d0b97ba91f5f1f80a3327efc7203be5dde19d15",
+      "bytes": 823
+    },
+    {
+      "path": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/mobile-youtube-fr-node-identity-probe-20261017/same-scope-clone-repair-20261017/production-before.ts",
+      "sha256": "3443098758b7f2eefb4d7feab89e2a9ea530317d3db8dbe15a20af4405e94a84",
+      "bytes": 22196
+    },
+    {
+      "path": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/mobile-youtube-fr-node-identity-probe-20261017/same-scope-clone-repair-20261017/tests-before.ts",
+      "sha256": "24dc98b3cb6c6f05a44cafeda18b5a7daea2b67494060104fcff2136278429a7",
+      "bytes": 83633
+    },
+    {
+      "path": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/mobile-youtube-fr-node-identity-probe-20261017/same-scope-clone-repair-20261017/baseline-vitest.json",
+      "sha256": "20be73eb76eae157fe41871a939becf3fce27dece989215fa91ce19f9553636e",
+      "bytes": 49537
+    },
+    {
+      "path": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/mobile-youtube-fr-node-identity-probe-20261017/same-scope-clone-repair-20261017/baseline-vitest.log",
+      "sha256": "4c50e4691a81c8d8e7b3ec3dc900e4c924702a4207faf2f0f071f3545df6bda2",
+      "bytes": 558
+    },
+    {
+      "path": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/mobile-youtube-fr-node-identity-probe-20261017/same-scope-clone-repair-20261017/first-strict-attempt/receipt.json",
+      "sha256": "fafaa1696ac54853101ee06735f252dfb227b35540bf7bae5c39eafe4ebe9a55",
+      "bytes": 1102
+    },
+    {
+      "path": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/mobile-youtube-fr-node-identity-probe-20261017/same-scope-clone-repair-20261017/first-strict-attempt/fixed-coverage-vitest.json",
+      "sha256": "2a0f8a5e5fc512a79d29437cbd662b5ee989649e3fb745fbfbe7801120106f52",
+      "bytes": 37203
+    },
+    {
+      "path": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/mobile-youtube-fr-node-identity-probe-20261017/same-scope-clone-repair-20261017/first-strict-attempt/fixed-coverage-vitest.log",
+      "sha256": "1be8b5a5004c6571cecfad652d27b6cde125c9a1c192f3b0190bdd6b3a7143ae",
+      "bytes": 1307
+    },
+    {
+      "path": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/mobile-youtube-fr-node-identity-probe-20261017/same-scope-clone-repair-20261017/first-strict-attempt/coverage/coverage-summary.json",
+      "sha256": "6d476c36303145c7ac742acd53ee873798490b30321b62fd830eed1bd532586f",
+      "bytes": 714
+    },
+    {
+      "path": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/mobile-youtube-fr-node-identity-probe-20261017/same-scope-clone-repair-20261017/first-strict-attempt/coverage/coverage-final.json",
+      "sha256": "6edaf6a52489e17111479dabfc8f5547d381136e4b60757cdcf1382484045979",
+      "bytes": 95381
+    },
+    {
+      "path": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/mobile-youtube-fr-node-identity-probe-20261017/same-scope-clone-repair-20261017/final-scoped-test-receipt.json",
+      "sha256": "67d7a03e19f16ed4d0644c1bec2aedcf03b1767647d222a4a7655fcc34025300",
+      "bytes": 1406
+    },
+    {
+      "path": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/mobile-youtube-fr-node-identity-probe-20261017/same-scope-clone-repair-20261017/fixed-final-coverage-vitest.json",
+      "sha256": "5e6a31476990460bc400469457f133bc7a3164194584c65a20a710fc710cdb25",
+      "bytes": 37629
+    },
+    {
+      "path": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/mobile-youtube-fr-node-identity-probe-20261017/same-scope-clone-repair-20261017/fixed-final-coverage-vitest.log",
+      "sha256": "d5bc6889c7012e6105c69db66faada5aca4c6db23c02bb750fcf08d9c09455cf",
+      "bytes": 1181
+    },
+    {
+      "path": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/mobile-youtube-fr-node-identity-probe-20261017/same-scope-clone-repair-20261017/coverage/coverage-summary.json",
+      "sha256": "fdd9d2ea4510e4fe6d2e812c607153d046d35e172eb6d33d36f47b7c143cf63d",
+      "bytes": 710
+    },
+    {
+      "path": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/mobile-youtube-fr-node-identity-probe-20261017/same-scope-clone-repair-20261017/coverage/coverage-final.json",
+      "sha256": "1d6405b834f88cf3df69b426b4a87e9b7743540ab2f585116b07636c2b0b66ac",
+      "bytes": 95385
+    },
+    {
+      "path": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/mobile-youtube-fr-node-identity-probe-20261017/same-scope-clone-repair-20261017/scoped-coverage.config.mts",
+      "sha256": "6980a1f4548b8fe0d36a64aaf8905756ebd5768c50bbdab366756a9e00b1432a",
+      "bytes": 766
+    },
+    {
+      "path": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/mobile-youtube-fr-node-identity-probe-20261017/same-scope-clone-repair-20261017/browser-control-clones-old-production.log",
+      "sha256": "accc0209d8160d4ac019161f69b526ed0843db4e2673963eab92a230179bf256",
+      "bytes": 1951
+    },
+    {
+      "path": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/mobile-youtube-fr-node-identity-probe-20261017/same-scope-clone-repair-20261017/browser-control-clones-old-production-attempt2.log",
+      "sha256": "deb33e7e9ff0398dd2d923dfe9164d83ccf0027c0c7065eb76702054b386f84c",
+      "bytes": 2003
+    },
+    {
+      "path": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/mobile-youtube-fr-node-identity-probe-20261017/same-scope-clone-repair-20261017/browser-control-clones-old-production-attempt2/report.json",
+      "sha256": "6678fafd66d362c56030cae48c9289637f40eed88636df5c68bfa2e2addc4653",
+      "bytes": 6695
+    },
+    {
+      "path": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/mobile-youtube-fr-node-identity-probe-20261017/same-scope-clone-repair-20261017/browser-control-clones-old-production-attempt2/failure.png",
+      "sha256": "5fc4ccdc34a2eeab09081f38ccd745a337b89a15c1320d080aa94fac0bc0ec2c",
+      "bytes": 44632
+    },
+    {
+      "path": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/mobile-youtube-fr-node-identity-probe-20261017/same-scope-clone-repair-20261017/browser-control-clones-old-production-attempt2/failure-dom.html",
+      "sha256": "d1bee8aac4e6eec048418073950e2cbd613c551d5e223427118ec73b25f83208",
+      "bytes": 99379
+    },
+    {
+      "path": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/mobile-youtube-fr-node-identity-probe-20261017/same-scope-clone-repair-20261017/pre-repair-chrome-artifact-check.json",
+      "sha256": "3a75bf52edd83fc190318ea9cb3225cf129001c922caee209ae79e6c699f8e1a",
+      "bytes": 688
+    },
+    {
+      "path": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/menu-scroll-controlled-20261017/chrome-final-file-map.json",
+      "sha256": "fa6ed6c48b27fd7e9040764ca43c19a2aef9150c4ca32263c53c278a1900878e",
+      "bytes": 69369
+    }
+  ]
+}

@@ -1,0 +1,215 @@
+{
+  "actionKey" : "preparationControlReveal",
+  "actions" : {
+    "address" : 1,
+    "navigation" : 1,
+    "normalClear" : 1,
+    "siteUnmute" : 1
+  },
+  "decision" : "boundedReadinessExpiredNoTouch",
+  "elapsedSeconds" : 8.302386999130249,
+  "samples" : [
+    {
+      "actionCount" : 0,
+      "alerts" : 0,
+      "appFrame" : {
+        "height" : 874,
+        "width" : 402,
+        "x" : 0,
+        "y" : 0
+      },
+      "appFramePositive" : true,
+      "appState" : "XCUIApplicationState(rawValue: 4)",
+      "decision" : "waitWithoutTouch",
+      "elapsedSeconds" : 19.486775994300842,
+      "knownTEDCandidateExists" : true,
+      "namedReveal" : {
+        "containedInPlayer" : false,
+        "count" : 1,
+        "exists" : true,
+        "frame" : {
+          "height" : 12,
+          "width" : 12,
+          "x" : 0,
+          "y" : 62
+        },
+        "isHittable" : false,
+        "positiveFinite" : true
+      },
+      "nativeFullscreen" : {
+        "containedInPlayer" : false,
+        "count" : 0,
+        "exists" : false,
+        "frame" : null,
+        "isHittable" : null,
+        "positiveFinite" : false
+      },
+      "player" : {
+        "containedInApp" : true,
+        "count" : 1,
+        "exists" : true,
+        "frame" : {
+          "height" : 226,
+          "width" : 402,
+          "x" : 0,
+          "y" : 110
+        },
+        "isHittable" : false,
+        "positiveFinite" : true
+      },
+      "waitElapsed" : 1.5701960325241089
+    },
+    {
+      "actionCount" : 0,
+      "alerts" : 0,
+      "appFrame" : {
+        "height" : 874,
+        "width" : 402,
+        "x" : 0,
+        "y" : 0
+      },
+      "appFramePositive" : true,
+      "appState" : "XCUIApplicationState(rawValue: 4)",
+      "decision" : "waitWithoutTouch",
+      "elapsedSeconds" : 21.382111072540283,
+      "knownTEDCandidateExists" : true,
+      "namedReveal" : {
+        "containedInPlayer" : false,
+        "count" : 1,
+        "exists" : true,
+        "frame" : {
+          "height" : 12,
+          "width" : 12,
+          "x" : 0,
+          "y" : 62
+        },
+        "isHittable" : false,
+        "positiveFinite" : true
+      },
+      "nativeFullscreen" : {
+        "containedInPlayer" : false,
+        "count" : 0,
+        "exists" : false,
+        "frame" : null,
+        "isHittable" : null,
+        "positiveFinite" : false
+      },
+      "player" : {
+        "containedInApp" : true,
+        "count" : 1,
+        "exists" : true,
+        "frame" : {
+          "height" : 226,
+          "width" : 402,
+          "x" : 0,
+          "y" : 110
+        },
+        "isHittable" : false,
+        "positiveFinite" : true
+      },
+      "waitElapsed" : 3.4655300378799438
+    },
+    {
+      "actionCount" : 0,
+      "alerts" : 0,
+      "appFrame" : {
+        "height" : 874,
+        "width" : 402,
+        "x" : 0,
+        "y" : 0
+      },
+      "appFramePositive" : true,
+      "appState" : "XCUIApplicationState(rawValue: 4)",
+      "decision" : "waitWithoutTouch",
+      "elapsedSeconds" : 23.144518971443176,
+      "knownTEDCandidateExists" : true,
+      "namedReveal" : {
+        "containedInPlayer" : false,
+        "count" : 1,
+        "exists" : true,
+        "frame" : {
+          "height" : 12,
+          "width" : 12,
+          "x" : 0,
+          "y" : 62
+        },
+        "isHittable" : false,
+        "positiveFinite" : true
+      },
+      "nativeFullscreen" : {
+        "containedInPlayer" : false,
+        "count" : 0,
+        "exists" : false,
+        "frame" : null,
+        "isHittable" : null,
+        "positiveFinite" : false
+      },
+      "player" : {
+        "containedInApp" : true,
+        "count" : 1,
+        "exists" : true,
+        "frame" : {
+          "height" : 226,
+          "width" : 402,
+          "x" : 0,
+          "y" : 110
+        },
+        "isHittable" : false,
+        "positiveFinite" : true
+      },
+      "waitElapsed" : 5.2279369831085205
+    },
+    {
+      "actionCount" : 0,
+      "alerts" : 0,
+      "appFrame" : {
+        "height" : 874,
+        "width" : 402,
+        "x" : 0,
+        "y" : 0
+      },
+      "appFramePositive" : true,
+      "appState" : "XCUIApplicationState(rawValue: 4)",
+      "decision" : "waitWithoutTouch",
+      "elapsedSeconds" : 24.941895008087158,
+      "knownTEDCandidateExists" : true,
+      "namedReveal" : {
+        "containedInPlayer" : false,
+        "count" : 1,
+        "exists" : true,
+        "frame" : {
+          "height" : 12,
+          "width" : 12,
+          "x" : 0,
+          "y" : 62
+        },
+        "isHittable" : false,
+        "positiveFinite" : true
+      },
+      "nativeFullscreen" : {
+        "containedInPlayer" : false,
+        "count" : 0,
+        "exists" : false,
+        "frame" : null,
+        "isHittable" : null,
+        "positiveFinite" : false
+      },
+      "player" : {
+        "containedInApp" : true,
+        "count" : 1,
+        "exists" : true,
+        "frame" : {
+          "height" : 226,
+          "width" : 402,
+          "x" : 0,
+          "y" : 110
+        },
+        "isHittable" : false,
+        "positiveFinite" : true
+      },
+      "waitElapsed" : 7.0253139734268188
+    }
+  ],
+  "samplingBoundary" : "Sequential live AX reads; not an atomic snapshot.",
+  "waitBudgetSeconds" : 8
+}

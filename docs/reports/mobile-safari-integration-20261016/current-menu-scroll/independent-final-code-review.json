@@ -1,0 +1,111 @@
+{
+  "schemaVersion": 1,
+  "reviewer": "/root/f25_review",
+  "createdAt": "2026-10-16T21:06:32.029758+00:00",
+  "status": "NO_STATIC_BLOCKER_SECOND_CANDIDATE_CONTROLLED_RUNTIME_PENDING",
+  "reviewMode": "Pure-disk source and prior actual-evidence review; no SDK, browser, network, device, build, tests, or process inventory by reviewer.",
+  "contextPreference": {
+    "handoffThresholdTokens": 300000,
+    "automaticEnforcementVerified": false,
+    "newDescendantsCreated": false
+  },
+  "inputs": [
+    {
+      "path": "/Users/thinkstu/Desktop/copy/FluentRead-mobile-video-menu-accessibility-20261016/src/features/video-subtitle/content/ui.ts",
+      "sha256": "eb9cd5ccd3d2931cd1e85fa8a668235374e0a865e06605981274bd20944b592c"
+    },
+    {
+      "path": "/Users/thinkstu/Desktop/copy/FluentRead-mobile-video-menu-accessibility-20261016/scripts/run-mobile-video-subtitle-test.cjs",
+      "sha256": "cdde685edee36ec99ce368f4b0e505f1f75b9c84beda28176383fe18cbcc0695"
+    },
+    {
+      "path": "/Users/thinkstu/Desktop/copy/FluentRead-mobile-video-menu-accessibility-20261016/src/features/video-subtitle/content/playerMenu.ts",
+      "sha256": "3fb6afdf1863efc18ffa91e60f3115563318954ff1fe5e1d0d41ed0cb29d3547"
+    },
+    {
+      "path": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/menu-scroll-controlled-20261017/baseline-geometry/report.json",
+      "sha256": "cd2666d74047246d082237c240eb842d752579d745e5dce7492ceb7482ee5642"
+    },
+    {
+      "path": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/menu-scroll-controlled-20261017/sticky-only/report.json",
+      "sha256": "77e637b422d996c241be7cff6b984af80052015b37ca70889557e1b81f8ef7c8"
+    },
+    {
+      "path": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/menu-scroll-controlled-20261017/independent-code-review.json",
+      "sha256": "5664a09bf8bbf5bc33736446f82bcfd33754d120cf995d352538fb9e7b28c0a6"
+    }
+  ],
+  "actualOriginalPngViews": [
+    {
+      "path": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/menu-scroll-controlled-20261017/sticky-only/portrait-menu-hint-targets.png",
+      "sha256": "565de4662c580063057bcbc0e4deb69c3932c91ea4d75694e6106b9572279384",
+      "actualView": true,
+      "note": "Previously viewed in this review chain; keyboard step 6 viewed again during final candidate review."
+    },
+    {
+      "path": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/menu-scroll-controlled-20261017/sticky-only/portrait-menu-normal-close.png",
+      "sha256": "738ea6f19b728fba20d001eda00966a821dd043442881d53fb9a30e1b0377f25",
+      "actualView": true,
+      "note": "Previously viewed in this review chain; keyboard step 6 viewed again during final candidate review."
+    },
+    {
+      "path": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/menu-scroll-controlled-20261017/sticky-only/portrait-menu-keyboard-6-ArrowUp.png",
+      "sha256": "c236c54262960d8c211ebcca24c1dae1613b42a74229fef4d13c6b4eebc43e24",
+      "actualView": true,
+      "note": "Previously viewed in this review chain; keyboard step 6 viewed again during final candidate review."
+    }
+  ],
+  "priorRuntimeEvidence": {
+    "originalBaseline": "Close nominal 44px but timing visible height 14.49780701754386px with center hit VIDEO; hint Close visible height 0. Original failure retained.",
+    "stickyOnly": {
+      "rawFailureRetained": true,
+      "normalCloseFocusReturned": true,
+      "timingAndHintCloseFull44AndFiveHits": true,
+      "keyboardStep6": {
+        "key": "ArrowUp",
+        "expectedAndActual": "off",
+        "focusedFrameTopBottom": [
+          9,
+          53
+        ],
+        "headerTopBottom": [
+          15,
+          59
+        ],
+        "allFivePointsHitOwnedTarget": false,
+        "hitTags": [
+          "DIV"
+        ]
+      },
+      "topPaddingTextLeakActualVisible": true,
+      "browserCloseReceipt": "shared-guard-fulfilled",
+      "profileRemoved": true,
+      "focusEvents": []
+    },
+    "scope": "Controlled production extension in desktop Chromium touch emulation and fixed local fixture. No Safari-native menu, finger swipe, live provider, or real-device acceptance."
+  },
+  "sourceFindings": [],
+  "sourceAssessment": [
+    "Only ui.ts product CSS changes: existing menu overflow remains; header sticky/top -6/z-index 1/opaque existing surface; default scroll-padding-top 34px and coarse-pointer override 50px. Menu DOM, events, header/control dimensions and target policies are unchanged.",
+    "Default 34px reserves current maximum desktop header 28px plus existing 6px padding; coarse 50px reserves 44px plus 6px. top -6 targets the actual observed 6px exposed top padding. Main/section grid remains the full active menu body containing block; sticky header is not bounded to a header-only wrapper.",
+    "playerMenu.ts is byte-identical. Native menu key handler still focuses the actual selected button. No new preventScroll, direct focus, locator focus or scrollIntoView test workaround was introduced.",
+    "Runner captures current focused element and overflow-clipped geometry after each trusted key, then samples actual document.elementFromPoint at five control points and three inner top-edge points before assertions. Top-edge ownership is asserted after scroll reaches the actual menu padding; body focus must lie below visible header.",
+    "Touch default target minimum remains 44px for all original and keyboard checks with five owned hits and full clipping. New 22px minimum appears only in explicit desktop calls after official CDP touch disable, actual coarse false/maxTouchPoints zero checks and 1280x900 viewport.",
+    "Desktop stage asserts actual compact header at most 28px, trusted End/Home expected focus, whole target hits, normal checked-coordinate Close and same-entry focus return. This viewport can fit the menu; it is compact desktop regression coverage, not evidence of overflowing desktop scrolling.",
+    "Normal Close clicks an observed checked center rather than locator auto-scroll, then checks hidden state and actual same-entry focus. Controlled timing/hint scrollTop setup is retained and must not be described as native finger-scroll evidence.",
+    "Focus monitor remains until exact-owner shared close guard returns, then stops and copies the complete event tail. Any activation of owned browser PID in this full interval pushes an error and exit 1 even during cleanup. Shared close helper was not changed."
+  ],
+  "boundaries": [
+    "Static review identifies no blocker to parent serial focused tests, compile/build and one controlled rerun. It does not certify those commands or authorize native runtime.",
+    "Actual browser behavior is still required to prove scroll-padding affects focus and top -6 removes exposed text without clipping Close; second candidate is not accepted from source alone.",
+    "Fixed reserve values are tied to current header dimensions; this review does not certify arbitrary fonts, zoom, locales, alternate host transforms or native Safari.",
+    "First independent-code-review.json and both prior failed runtime records remain untouched; scoped Close observations do not convert sticky-only outcome to PASS."
+  ],
+  "acceptance": {
+    "staticCompileBlockerObserved": false,
+    "secondCandidateControlledRuntimePassed": false,
+    "nativeSafariPassed": false,
+    "fullGoalComplete": false,
+    "productFixAccepted": false
+  }
+}

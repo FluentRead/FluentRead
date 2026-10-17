@@ -1,0 +1,45 @@
+{
+  "at": "2026-10-16T08:52:15.163715+00:00",
+  "laneReleased": true,
+  "guardStatus": "stopped-by-owner",
+  "knownPIDs": [
+    61103,
+    61120,
+    61122,
+    61142
+  ],
+  "remainingOwnedPIDOrPGID": [],
+  "ports": {
+    "5048": {
+      "exit": 1,
+      "output": "",
+      "empty": true
+    },
+    "5580": {
+      "exit": 1,
+      "output": "",
+      "empty": true
+    },
+    "5581": {
+      "exit": 1,
+      "output": "",
+      "empty": true
+    },
+    "52875": {
+      "exit": 1,
+      "output": "",
+      "empty": true
+    }
+  },
+  "runnerNormalExit": true,
+  "forwardRemoved": true,
+  "focusEvents": [],
+  "violations": [],
+  "keysMetadataUnchanged": true,
+  "taskDataRetained": true,
+  "EdgeActions": [],
+  "APKInstallOrUpdate": false,
+  "profileReset": false,
+  "scope": "Owned taskAVD stopped; no iOS operation, defaultADB5037 never queried/used",
+  "guardStoppedAt": "2026-10-16T08:51:58.337Z"
+}

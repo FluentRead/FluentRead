@@ -1,0 +1,47 @@
+{
+  "at": "2026-10-16T21:54:55.911926+00:00",
+  "status": "REAL_SAFARI_ENTRY_OBSERVED_MENU_NOT_ESTABLISHED_0_PASS_1_SKIP_INDEPENDENTLY_REVIEWED",
+  "sourceCommit": "6eecd6710e7daac2d2a8cca9a34d0f26dc849b44",
+  "productFullAppRawSHA256": "8a43eba8254a15452e5a8cb09cb519a9fdb42bb02623e87f3c3630ff4caca3d9",
+  "SwiftSourceSHA256": "566274799e05963b2b714966e28f9bcdfcee51805e3664cc91f85e1a3781b68e",
+  "runtimeSession": 30155,
+  "runtimeExitCode": 0,
+  "testCounts": {
+    "pass": 0,
+    "skip": 1,
+    "fail": 0
+  },
+  "selectedCaseSeconds": 12.64,
+  "guardElapsedSeconds": 54.509,
+  "normalEntryTapAttempts": 1,
+  "menuOpenAccepted": false,
+  "scrollPerformed": false,
+  "closePerformed": false,
+  "focusReturnAccepted": false,
+  "centerRevealPerformed": false,
+  "readyEntry": {
+    "sample": 2,
+    "AXSizePoints": [
+      44,
+      45
+    ],
+    "hittable": true
+  },
+  "rootCause": "UNDETERMINED_NO_EVENT_OR_DOM_IDENTITY_TIMELINE",
+  "RootActuallyViewedAllFourOriginals": true,
+  "independentReview": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/safari-final-menu-readiness-preparation-20261017/runtime-outcome-review.json",
+  "independentReviewSHA256": "6b8f37d1111dcd5e55cca7e76b271421dd07e0692dfef2463dd657ab43e84460",
+  "observation": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/safari-final-menu-readiness-preparation-20261017/root-actual-runtime-observation.json",
+  "observationSHA256": "7dd3c1892208be077aff12f1cc7a45efccd8d7588c97b0ca3577c3cc0017b14f",
+  "runtimePackageAll53StillExact": true,
+  "originalD9Full485Restored": true,
+  "US47Native17DemoScopedHashesPreserved": true,
+  "privateDataCopyBack": false,
+  "taskSimulatorShutdown": true,
+  "resourceFreshRelease": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/safari-final-menu-readiness-preparation-20261017/root-fresh-post-runtime-release.json",
+  "resourceFreshReleaseSHA256": "7c6c4deecfb52ccb02b12988cec1e53f72b9c2419176b9532f2d262f97912156",
+  "productAcceptance": false,
+  "developerSigning": false,
+  "physicalDevice": false,
+  "next": "Prepare separate bounded read-only event/node-identity research diagnosis; do not guess product fix or rerun unchanged case."
+}

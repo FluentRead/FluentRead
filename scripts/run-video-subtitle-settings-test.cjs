@@ -243,7 +243,7 @@ async function main() {
     }
     await setRange(optionsPage, '字幕字号', 130);
     await setRange(optionsPage, '字幕底部偏移', 16);
-    if (await optionsPage.getByRole('checkbox', {name: 'X 字幕自动贴底'}).isChecked()) fail('手动偏移应关闭 X 自动贴底');
+    if (await optionsPage.getByRole('checkbox', {name: '移动端 / X 自动贴底'}).isChecked()) fail('手动偏移应关闭移动端 / X 自动贴底');
     await setRange(optionsPage, '字幕背景透明度', 44);
     await setRange(optionsPage, '字幕行距', 1.45);
     await setRange(optionsPage, '字幕最大宽度', 78);
@@ -253,7 +253,7 @@ async function main() {
     if (await optionsPage.locator('[data-video-subtitle-preview-scene]').getAttribute('data-position') !== 'top') fail('字幕位置未切换到顶部');
     const reset = optionsPage.getByRole('button', {name: '恢复默认'});
     await reset.click();
-    if (!(await optionsPage.getByRole('checkbox', {name: 'X 字幕自动贴底'}).isChecked())) fail('恢复默认应启用 X 自动贴底');
+    if (!(await optionsPage.getByRole('checkbox', {name: '移动端 / X 自动贴底'}).isChecked())) fail('恢复默认应启用移动端 / X 自动贴底');
     const resetState = await optionsPage.locator('[data-video-subtitle-appearance]').evaluate(element => ({
       skin: element.querySelector('[data-skin].selected')?.getAttribute('data-skin'),
       fontScale: element.querySelector('input[aria-label="字幕字号"]')?.value,

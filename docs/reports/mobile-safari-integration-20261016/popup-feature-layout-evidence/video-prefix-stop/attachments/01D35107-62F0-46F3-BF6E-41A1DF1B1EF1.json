@@ -1,0 +1,7 @@
+{
+  "knownPlayerCountCappedAt2" : 1,
+  "knownTEDCountCappedAt2" : 1,
+  "knownUniqueTarget" : false,
+  "phase" : "after-one-navigation",
+  "unknownTextIDsValuesExported" : false
+}

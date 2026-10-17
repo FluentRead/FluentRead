@@ -1,0 +1,69 @@
+{
+  "at": "2026-10-16T09:56:56.893008+00:00",
+  "status": "A9_HARNESS_SETUP_FAILURE_WRONG_INTERNAL_UDID_NO_UI_EXECUTED",
+  "runtimeCommit": "f5a82d11a5b6b6a5de2f2ea726065a56cdb2e6ca",
+  "productionIdentitySHA256": "3f3df2dc7993788676427a6544e5cd17937f2a7da8d8e4a5f6c1d215417679dd",
+  "testMethod": "test114ProductionMenuItemClose",
+  "rawSummaryCounts": {
+    "passedTests": 0,
+    "skippedTests": 0,
+    "failedTests": 1,
+    "totalTestCount": 1
+  },
+  "rawLogCounts": "Executed1test,with1testskippedand1failure; individualcasefailed0.226s. Preserve this log/summary discrepancy; summary is0PASS/0SKIP/1FAIL.",
+  "caseDurationSeconds": 0.226,
+  "testExecuteXcodebuildExitCode": 65,
+  "runtimeGuardSessionExitCode": 1,
+  "error": "ProductionResearchSafety Code2 in setUpWithError",
+  "confirmedCause": {
+    "sourceLine7": "let udid = A407390F-7AA9-42AE-AFEB-F93EE99E9FF8",
+    "correctActualDestination": "A407390F-7AA8-42AE-AFEB-F93EE99E9FF8",
+    "actualDestinationEvidence": "runtime-summary deviceId, command -destination, runtimeguarddevice",
+    "mechanism": "Offline global A8\u2192A9 naming substitution accidentally altered the embeddedUDID segment7AA8\u21927AA9. Newsourcehash/binary binding were internallyconsistent but did notcatch this unauthorizedsafetyconstant drift. SimulatorUDID equality necessarilyfailed before navigate/appactivation.",
+    "accountability": "Harness-generation error by native_followup; not a productfailure. Original failedsource/build/runtime preserved. No automaticretry or in-placecorrection."
+  },
+  "actions": {
+    "SafariActivation": 0,
+    "navigation": 0,
+    "centerTouch": 0,
+    "FRMenuOpen": 0,
+    "FRMenuClose": 0
+  },
+  "results": {
+    "nativeControls": "NOT_MEASURED",
+    "menuOpenClose": "NOT_MEASURED",
+    "playingMenu": "NOT_MEASURED",
+    "realBilingual": "NOT_MEASURED",
+    "captionPlusNativeControls": "NOT_MEASURED",
+    "overallNativeAcceptance": "UNVERIFIED"
+  },
+  "originalAttachmentCount": 1,
+  "originalPNGCount": 0,
+  "PNGReview": "No originalPNG produced; do not substituteA8 images. OriginalMP4 retainedwithoutderivedextraction.",
+  "runtimeCleanup": {
+    "laneReleased": true,
+    "finalDevice": {
+      "lastBootedAt": "2026-10-16T09:54:33Z",
+      "dataPath": "/Users/thinkstu/Library/Developer/CoreSimulator/Devices/A407390F-7AA8-42AE-AFEB-F93EE99E9FF8/data",
+      "dataPathSize": 2613985280,
+      "logPath": "/Users/thinkstu/Library/Logs/CoreSimulator/A407390F-7AA8-42AE-AFEB-F93EE99E9FF8",
+      "udid": "A407390F-7AA8-42AE-AFEB-F93EE99E9FF8",
+      "isAvailable": true,
+      "logPathSize": 757760,
+      "deviceTypeIdentifier": "com.apple.CoreSimulator.SimDeviceType.iPhone-16-Pro",
+      "state": "Shutdown",
+      "name": "FluentRead-PR995-FreshPermissions-20261015"
+    },
+    "originalRestoredAndVerified": true,
+    "installedIdentityAtEnd": "ORIGINAL_D9_FULL485_VERIFIED",
+    "remainingOwnedProcesses": [],
+    "focusEvents": [],
+    "violations": [],
+    "cleanupErrors": [],
+    "elapsedMs": 57730,
+    "privateScope": "Native FR App data17 hash baseline only; not all extension settings/storage/cache. Record post-UI changes; do not copy files back."
+  },
+  "noAutomaticRetry": true,
+  "noProductSourceChange": true,
+  "followupBoundary": "Any corrected researchcopy needs explicitfrozenidentifier validation and rootreview/GO; preserveA1-A9 originalevidence."
+}

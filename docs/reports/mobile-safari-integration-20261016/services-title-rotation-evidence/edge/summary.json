@@ -1,0 +1,133 @@
+{
+  "schema": 1,
+  "status": "FOCUSED_DESKTOP_EDGE_COARSE_VIEWPORT_PASS",
+  "productCommit": "a41dddd9d0baef8973f666b308433ff53e7c596b",
+  "builtFrom": "c78604df4bf24dfb20033ae5a946cb6371cf8c41 plus the sole committed PopupServices.vue title patch",
+  "sourceFileSHA256": "9f11f139ab37edfcc4bd15bfcf376a6fb70a4da5ab42fc671c98e22fcda12269",
+  "productionManifestSHA256": "a12a20416fc826d3dc7278b74a112b4170f8985b1ac8b1a74c91f73d5e09b642",
+  "viewport": {
+    "width": 320,
+    "height": 480,
+    "allFourPNGsAreViewportOnly": true
+  },
+  "launch": {
+    "mode": "macos-background-cdp",
+    "focusPolicy": "launchservices-no-foreground",
+    "display": "secondary",
+    "window": "normal, visible, background",
+    "browserFrontmost": false,
+    "sameFrontmostProcessBeforeAndAfterPlacement": true
+  },
+  "caseFiles": [
+    "services-title-zh-CN-light-320.json",
+    "services-title-zh-CN-dark-320.json",
+    "services-title-fr-FR-light-320.json",
+    "services-title-fr-FR-dark-320.json"
+  ],
+  "scrollEvidence": [
+    {
+      "label": "services-title-zh-CN-light-320",
+      "before": 0,
+      "after": 94,
+      "scrollHeight": 540,
+      "clientHeight": 446,
+      "lastAssignmentInsideScroller": true
+    },
+    {
+      "label": "services-title-zh-CN-dark-320",
+      "before": 0,
+      "after": 94,
+      "scrollHeight": 540,
+      "clientHeight": 446,
+      "lastAssignmentInsideScroller": true
+    },
+    {
+      "label": "services-title-fr-FR-light-320",
+      "before": 94,
+      "after": 329,
+      "scrollHeight": 775,
+      "clientHeight": 446,
+      "lastAssignmentInsideScroller": true
+    },
+    {
+      "label": "services-title-fr-FR-dark-320",
+      "before": 329,
+      "after": 329,
+      "scrollHeight": 775,
+      "clientHeight": 446,
+      "lastAssignmentInsideScroller": true
+    }
+  ],
+  "interaction": {
+    "zh-CN-light": {
+      "defaultPickerOpened": true,
+      "knownQueryTyped": "gpt",
+      "Back": true,
+      "Close": true,
+      "reopenEscape": true,
+      "providerSelected": false
+    },
+    "otherThreeCases": "Close only; no service/model selection",
+    "allFourServiceAssignmentsAndModelsUnchanged": true
+  },
+  "cleanup": {
+    "runnerCompletedNormally": true,
+    "runnerGuardedBrowserCloseAndTemporaryProfileRemovalCompletedWithoutReportedError": true,
+    "separatePostRunProcessInventoryClaimed": false
+  },
+  "focusedChecks": {
+    "componentFiles": 2,
+    "componentCases": 55,
+    "typecheck": "PASS",
+    "testRegistryAudit": "PASS",
+    "productionWebBuilds": [
+      "Chrome",
+      "Firefox",
+      "Safari MV2"
+    ],
+    "manifestVerification": "PASS",
+    "safariWebResourceVerification": "PASS"
+  },
+  "previousAttempts": [
+    {
+      "attempt": 1,
+      "result": "STOP",
+      "reason": "Animation was sampled during slide-in; the original 600px fixture did not actually overflow."
+    },
+    {
+      "attempt": 2,
+      "result": "STOP",
+      "reason": "Normal transition cancellation rejected the harness animation.finished Promise during reopen."
+    },
+    {
+      "attempt": 3,
+      "result": "Four measured cases passed",
+      "reason": "Full-page screenshot expanded French desktop document to its intrinsic380px; not used as final320px viewport screenshots."
+    }
+  ],
+  "limits": [
+    "This is the actual desktop Edge production extension at a forced320x480 CSS viewport with CDP touch producing real coarse media; no UA, root marker or matchMedia spoof was used.",
+    "French desktop document/shell intrinsic width remains380px. Drawer, toolbar, title and46px Close fit the actual320px viewport; this does not accept the whole desktop root at320px.",
+    "Each case has internal overflow and positive scrollTop after the known-row operation. French dark retains329px from the previous case and does not demonstrate a fresh scroll displacement.",
+    "No Safari or mobile bootstrap, native keyboard, real device, provider translation, all-language wrapping matrix or full regression is accepted.",
+    "New title source has no new native-package compile or native UI result in this evidence set."
+  ],
+  "provenance": {
+    "rawReportNotCopied": {
+      "basename": "report.json",
+      "bytes": 53708,
+      "sha256": "0408b9ce3616e8276a1bf3d2549efaa3716777149378244ef7c1912018ed0a22"
+    },
+    "caseModule": {
+      "file": "services-overview-title-cases-v4.cjs",
+      "bytes": 18664,
+      "sha256": "cb2fb62176405ddf5c9c87954387bfb167b490c8983da810a9ab125140d1f8e0"
+    }
+  },
+  "runnerResult": {
+    "passed": 4,
+    "failed": 0,
+    "pageOrConsoleErrors": 0,
+    "layoutIssues": 0
+  }
+}

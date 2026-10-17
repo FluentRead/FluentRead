@@ -677,7 +677,7 @@ export function focusVideoModelPromptReturn(menu: HTMLElement, purpose?: 'select
 }
 
 /**
- * 菜单挂在播放器内，只能按播放器实际尺寸选择布局。矮而宽的播放器（手机横屏视频、
+ * 菜单渲染宿主保持媒体播放器的布局尺寸，据此选择布局。矮而宽的播放器（手机横屏视频、
  * 小窗口）改为双列，避免单列菜单遮住整个画面还需要滚动；其余情况保持单列。
  */
 export function syncVideoPlayerMenuLayout(menu: HTMLElement): void {

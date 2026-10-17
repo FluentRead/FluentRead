@@ -1,0 +1,27 @@
+{
+  "actions" : {
+    "FRMenuOpen" : 1
+  },
+  "bilingualRequired" : false,
+  "createdTabs" : 0,
+  "exactEntryObservedBeforeReveal" : true,
+  "explicitTranslationIntent" : 0,
+  "focusReturn" : "PENDING_ORIGINAL_PIXEL_REVIEW",
+  "navigation" : 0,
+  "observedPlaybackBeforeOpen" : {
+    "pauseCount" : 0,
+    "playCount" : 0,
+    "progress" : [
+
+    ]
+  },
+  "pausedStateObserved" : false,
+  "permissionChoices" : 0,
+  "playbackRequired" : false,
+  "providerChanges" : 0,
+  "readinessIsProductAcceptance" : false,
+  "readinessStatus" : "ENTRY_PRECONDITION_OBSERVED_ONLY_CONTINUING_ORIGINAL_MENU_ASSERTIONS",
+  "readinessWindowEndElapsedSeconds" : 28.990383982658386,
+  "scope" : "one menu open \/ one native internal scroll \/ timing reachability \/ normal close \/ original-pixel focus review",
+  "selectedTabs" : 0
+}

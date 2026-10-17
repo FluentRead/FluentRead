@@ -1,0 +1,42 @@
+{
+  "sourceDirectory": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/touch-layout-f33-followup-20261017/controlled-edge-attempt2",
+  "copiedOriginalBytes": true,
+  "files": {
+    "report.json": {
+      "source": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/touch-layout-f33-followup-20261017/controlled-edge-attempt2/report.json",
+      "sha256": "25fd4571773e21405ee680f0e455461635f87f78cdc225363ce5676b61b36932",
+      "bytes": 26478
+    },
+    "portrait-idle.png": {
+      "source": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/touch-layout-f33-followup-20261017/controlled-edge-attempt2/portrait-idle.png",
+      "sha256": "467e5d09e8babc81529ef2f63a1353088e68e2f6c068bdcf75741d8a2a3ec005",
+      "bytes": 87423
+    },
+    "progress-keyboard-fixture.png": {
+      "source": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/touch-layout-f33-followup-20261017/controlled-edge-attempt2/progress-keyboard-fixture.png",
+      "sha256": "a1298d15afc07a16bbfb432d5022ebba667d118334f584c7cf9b33a48925abbc",
+      "bytes": 102332
+    },
+    "portrait-translated.png": {
+      "source": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/touch-layout-f33-followup-20261017/controlled-edge-attempt2/portrait-translated.png",
+      "sha256": "6657a65094847418fcbbdc3fe8dc4c7c5bcbbe68c29211dae8c8dda76959420e",
+      "bytes": 113064
+    },
+    "landscape-dock.png": {
+      "source": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/touch-layout-f33-followup-20261017/controlled-edge-attempt2/landscape-dock.png",
+      "sha256": "149089a50e98fb07bca19d4f82194c0b2f48eae7f0e717608951ddc9e5e75326",
+      "bytes": 45881
+    },
+    "portrait-dark-settings.png": {
+      "source": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/touch-layout-f33-followup-20261017/controlled-edge-attempt2/portrait-dark-settings.png",
+      "sha256": "c7a134b6e74d681c9c248b4965a47dba192237c3813bad98ee2d128328cf58e2",
+      "bytes": 109983
+    },
+    "keyboard-geometry-fixture.png": {
+      "source": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/touch-layout-f33-followup-20261017/controlled-edge-attempt2/keyboard-geometry-fixture.png",
+      "sha256": "d75d63b9039b8b1b40213c3ac456e059b8e692251b975d25981ed3583cbaec0c",
+      "bytes": 95419
+    }
+  },
+  "priorAttemptFailurePreservedAt": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/touch-layout-f33-followup-20261017/controlled-edge-attempt1/report.json"
+}

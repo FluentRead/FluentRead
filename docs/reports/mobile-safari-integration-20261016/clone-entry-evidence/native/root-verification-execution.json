@@ -1,0 +1,17 @@
+{
+  "at": "2026-10-16T23:23:45.489723+00:00",
+  "status": "PASS_READ_ONLY_NATIVE_VERIFICATION",
+  "terminalSession": 29348,
+  "terminalExitCode": 0,
+  "verifier": {
+    "path": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/mobile-youtube-fr-node-identity-probe-20261017/same-scope-clone-repair-20261017/verify-native-artifacts.py",
+    "sha256": "46362b52296d0cf3b2358e7e9675fa79e2f904404e434b5f8a428411328df621",
+    "bytes": 26385
+  },
+  "identity": {
+    "path": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/mobile-youtube-fr-node-identity-probe-20261017/same-scope-clone-repair-20261017/native-artifact-identities.json",
+    "sha256": "25dc4fdc73e7fdb10e3fb37e6d37b5f76a1d0a20a1460af51f8126f870233469",
+    "bytes": 103729
+  },
+  "scope": "Root terminal exit 0 for read-only inspection, separate from six compile stages and any runtime."
+}

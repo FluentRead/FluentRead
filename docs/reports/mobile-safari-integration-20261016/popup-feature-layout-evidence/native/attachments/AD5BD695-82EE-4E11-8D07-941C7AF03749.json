@@ -1,0 +1,15 @@
+{
+  "after" : "portrait",
+  "before" : "unknown",
+  "initializationIsNotScrollAcceptance" : true,
+  "initialPortraitSetterAttempts" : 1,
+  "initialPortraitSetterMaximum" : 1,
+  "noAXOrPixelsOrRetry" : true,
+  "notAddedToActionLedger" : true,
+  "sceneBudgetSeconds" : 90,
+  "sceneElapsedSeconds" : 1.09853196144104,
+  "status" : "INITIAL_PORTRAIT_CONFIRMED",
+  "unknownIsNotPortraitProof" : true,
+  "waitBudgetSeconds" : 3,
+  "waitResult" : "XCTWaiterResult(rawValue: 1)"
+}

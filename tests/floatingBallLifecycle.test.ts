@@ -33,7 +33,7 @@ afterEach(() => {
 type BallApi = {setTranslationState(value: boolean): void; setTranslationStatus(value: string): void;
   setPosition(side: 'left' | 'right', vertical: number | null): void; setPopupOpen(open: boolean): void};
 
-function mountBall(initial: Record<string, unknown> = {}) {
+function mountBall(initial: Record<string, unknown> = {}, navigatorPort: {maxTouchPoints?: number} | null = {maxTouchPoints: 0}) {
   vi.useFakeTimers({toFake: ['setTimeout', 'clearTimeout', 'performance']});
   const parsed = parseHTML('<html><body></body></html>');
   const {document} = parsed;
@@ -83,6 +83,7 @@ function mountBall(initial: Record<string, unknown> = {}) {
       else element.setAttribute(key, String(value));
     },
   });
+  vi.stubGlobal('navigator', navigatorPort ?? undefined);
   vi.stubGlobal('window', window); vi.stubGlobal('document', document); vi.stubGlobal('ShadowRoot', parsed.window.ShadowRoot);
   const addDocument = vi.spyOn(document, 'addEventListener'), removeDocument = vi.spyOn(document, 'removeEventListener');
   const translate = vi.fn(), savePosition = vi.fn(), settings = vi.fn(), mangaToggle = vi.fn();
@@ -122,6 +123,31 @@ function mountBall(initial: Record<string, unknown> = {}) {
 async function flush() {await Vue.nextTick(); await Vue.nextTick();}
 
 describe('FloatingBall actual SFC lifecycle', () => {
+  it.each([
+    {name: 'navigator missing', navigatorPort: null, expected: false},
+    {name: 'maxTouchPoints missing', navigatorPort: {}, expected: false},
+    {name: 'no touch contacts', navigatorPort: {maxTouchPoints: 0}, expected: false},
+    {name: 'five touch contacts', navigatorPort: {maxTouchPoints: 5}, expected: true},
+  ])('selects the first-render hardware touch class with $name', async ({navigatorPort, expected}) => {
+    const port = mountBall({}, navigatorPort);
+    // 挂载返回时已完成首轮渲染，不需要先触摸、视口变化或异步能力探测。
+    expect(port.ball().classList.contains('is-touch-capable')).toBe(expected);
+    expect(port.ball().classList.contains('floating-ball-expanded')).toBe(false);
+    await flush();
+    expect(port.translate).not.toHaveBeenCalled(); expect(port.savePosition).not.toHaveBeenCalled();
+  });
+
+  it('keeps hardware touch capability through compact/manga and display changes without triggering translation or position callbacks', async () => {
+    const port = mountBall({}, {maxTouchPoints: 5});
+    port.props.presentation = {compact: true, toolsDisplay: 'hidden'};
+    port.props.manga = {available: true}; await flush();
+    expect(port.ball().classList.contains('is-touch-capable')).toBe(true);
+    expect(port.ball().classList.contains('is-compact')).toBe(true);
+    expect(port.ball().classList.contains('manga-reader')).toBe(true);
+    expect(port.document.querySelector('.floating-ball-translate')).toBeNull();
+    expect(port.translate).not.toHaveBeenCalled(); expect(port.savePosition).not.toHaveBeenCalled();
+  });
+
   it.each(['touch', 'mouse'])('performs %s pointerup once and ignores its compatible click', async pointerType => {
     const port = mountBall(); await flush();
     port.pointer('pointerdown', {pointerType}); await flush();

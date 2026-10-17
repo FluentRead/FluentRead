@@ -1,0 +1,90 @@
+{
+  "at": "2026-10-16T07:25:37.422336+00:00",
+  "status": "iOS Simulator unsigned build/completeidentity PASS; A3runtime pending separately",
+  "runtimeSourceCommit": "f5a82d11a5b6b6a5de2f2ea726065a56cdb2e6ca",
+  "observedCheckoutHead": "f5a82d11a5b6b6a5de2f2ea726065a56cdb2e6ca",
+  "gate": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/mobile-learning-short-height-followup-20261016/artifact-gate.json",
+  "gateSHA256": "df11a7a2db78978f0b84f9a2725d9a3a6d122bd8605ad2901279132ccff15a4b",
+  "sourceAtBuild": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/mobile-learning-short-height-followup-20261016/source-at-build.json",
+  "sourceAtBuildSHA256": "3ae1c53e9d08b36bbb7c8d71f345341e1ae38fd0d74ff5d124068576e85ccbac",
+  "web": {
+    "directory": "/Users/thinkstu/Desktop/copy/FluentRead-mobile-video-menu-accessibility-20261016/.output/safari-mv2",
+    "files": 467,
+    "bytes": 62231467,
+    "rawByteHash": "1040bd47a0d9b907d30a91fa7d27e7aa46b7c5c1e258bb6e3223ba4082838705",
+    "recordHash": "87310a5611cfb7df2672c0cf6beb4c126c8fe24dc1364793878621d9b75a32dc",
+    "fullFileMap": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/mobile-learning-short-height-followup-20261016/safari-file-map.json",
+    "recordAlgorithm": "global UTF8 path sort; SHA256(path + NUL + fileSHA256 + NUL + decimalByteLength + LF)",
+    "rawAlgorithm": "recursive directory UTF8 name sort; SHA256(path + NUL + decimalByteLength + NUL + rawbytes)"
+  },
+  "platforms": {
+    "iosSimulator": {
+      "createdAt": "2026-10-16T07:25:17.853Z",
+      "platform": "iosSimulator",
+      "app": "/Users/thinkstu/Desktop/copy/FluentRead-mobile-video-menu-accessibility-20261016/.output/safari-derived-ios-controls-layout-a3-1040bd47a0d9/Build/Products/Release-iphonesimulator/FluentRead.app",
+      "extension": "/Users/thinkstu/Desktop/copy/FluentRead-mobile-video-menu-accessibility-20261016/.output/safari-derived-ios-controls-layout-a3-1040bd47a0d9/Build/Products/Release-iphonesimulator/FluentRead.app/PlugIns/FluentRead Extension.appex",
+      "source": {
+        "extension": "/Users/thinkstu/Desktop/copy/FluentRead-mobile-video-menu-accessibility-20261016/.output/safari-mv2",
+        "version": "0.0.38",
+        "manifestSha256": "d7bcd7044f90b52d4dee774f7cef84f019b4b56fb73434de3304c9381a6cbae5",
+        "checkedReferences": 10,
+        "buildSha256": "1040bd47a0d9b907d30a91fa7d27e7aa46b7c5c1e258bb6e3223ba4082838705",
+        "artifactCount": 467
+      },
+      "actualBundleIdentifiers": {
+        "app": "org.example.FluentReadDevelopment",
+        "extension": "org.example.FluentReadDevelopment.Extension"
+      },
+      "compiledWebResourceSha256": "1040bd47a0d9b907d30a91fa7d27e7aa46b7c5c1e258bb6e3223ba4082838705",
+      "compiledWebRecordSha256": "87310a5611cfb7df2672c0cf6beb4c126c8fe24dc1364793878621d9b75a32dc",
+      "compiledWebResourceCount": 467,
+      "nativeExtras": [
+        "FluentRead Extension",
+        "Info.plist"
+      ],
+      "nativeExecutableSha256": "b416daaad08b1b66f605e00d9c61f49bc72f44f24141436d610534c3687821ef",
+      "guideResourcesByteIdentical": true,
+      "guideSourceTemplatesByteIdentical": true,
+      "generatedGuideFingerprint": "bb04c63f19de1ad2120b1796fffbcd1dec93ab2241cb727ad4e0c179555e4ae5",
+      "build": {
+        "result": "passed",
+        "exitCode": 0,
+        "log": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/safari/controls-layout-a3-1040bd47a0d9/build-ios-simulator.log",
+        "configuration": "Release",
+        "jobs": 1,
+        "CODE_SIGNING_ALLOWED": "NO",
+        "CODE_SIGNING_REQUIRED": "NO"
+      },
+      "signatureLog": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/safari/controls-layout-a3-1040bd47a0d9/signature-iosSimulator-controls-layout-a3-1040bd47a0d9.log",
+      "signatureInspectionExitCode": 0,
+      "signatureSummary": "linker ad-hoc; no developer team",
+      "installedByThisAgent": false,
+      "launchedByThisAgent": false,
+      "nativeExtensionExecutableSha256": "fc3512aec1fba4a848083fdb03c3e4064d8aec5cd4615ad334b28570bef01c23"
+    }
+  },
+  "compiledIdentity": {
+    "path": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/safari/controls-layout-a3-1040bd47a0d9/compiled-simulator-identity.json",
+    "sha256": "3f3df2dc7993788676427a6544e5cd17937f2a7da8d8e4a5f6c1d215417679dd",
+    "files": 485
+  },
+  "cleanup": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/safari/controls-layout-a3-1040bd47a0d9/cleanup.json",
+  "focusEvents": [],
+  "runtimeBoundary": {
+    "boot": false,
+    "install": false,
+    "launch": false,
+    "device": false,
+    "acceptance": "Pending separate RootGO; no priorc5UI evidence inherited"
+  },
+  "macOSiPhoneOSBoundary": "Not rebuilt for this source; prior c5three-targets are historical only.",
+  "priorPreserved": {
+    "originalD9CompiledIdentity": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/safari/integrated-main24ccb-177b934b5dc2/compiled-simulator-identity.json",
+    "historicalC5ThreeTargetAcceptance": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/safari/controls-package-c5aedabc2e94/acceptance.json",
+    "scope": "Historic evidence only; never used as new source/compiled identity",
+    "historicalA2Current841Acceptance": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/safari/controls-layout-a2-486429428a1d/acceptance.json",
+    "unexecuted65dPreparation": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/safari/controls-layout-a3-1d3f305fd65f",
+    "unexecuted061dPreparation": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/safari/controls-layout-a3-f436ccc45611"
+  },
+  "gitStatusAtFinalize": ""
+}

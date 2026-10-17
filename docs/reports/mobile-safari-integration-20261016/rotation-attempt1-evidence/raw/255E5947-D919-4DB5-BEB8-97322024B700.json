@@ -1,0 +1,12 @@
+{
+  "after" : "portrait",
+  "afterStopIsCleanupNotAcceptance" : true,
+  "before" : "unknown",
+  "noAXOrPixelsOrRetry" : true,
+  "orientationReadbackIsNotLayoutProof" : true,
+  "portraitSetterAttemptsThisCleanup" : 1,
+  "portraitSetterMaximumIncludingNormalReturn" : 1,
+  "portraitSetterSlotConsumed" : true,
+  "sceneElapsedSeconds" : 0.060896992683410645,
+  "status" : "PORTRAIT_RESTORATION_RECORDED"
+}

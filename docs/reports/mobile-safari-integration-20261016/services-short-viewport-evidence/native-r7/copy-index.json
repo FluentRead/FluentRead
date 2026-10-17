@@ -1,0 +1,65 @@
+[
+  {
+    "source": "current-production-short-viewport-visible-known-row-attempt1/runtime-attachments/45FF0CE0-A2EA-4CC9-98A5-B961291D7E8E.png",
+    "copy": {
+      "file": "portrait-gpt-keyboard.png",
+      "bytes": 368599,
+      "sha256": "107881acb1141549e57c88c95459bc065a89e22133a1f49e24f200ca0bbc2e10"
+    },
+    "byteEqual": true
+  },
+  {
+    "source": "current-production-short-viewport-visible-known-row-attempt1/runtime-attachments/C89DF07D-D783-4F85-858B-F1D58EF6A96B.png",
+    "copy": {
+      "file": "landscape-controls.png",
+      "bytes": 487591,
+      "sha256": "d6f32f6ce3afcd95335aeb8164e96f377c14cd0d6fbae1df97658765da9d2453"
+    },
+    "byteEqual": true
+  },
+  {
+    "source": "current-production-short-viewport-visible-known-row-attempt1/runtime-attachments/5351BC6F-AE6C-4CD6-9133-5BC75548B678.png",
+    "copy": {
+      "file": "landscape-complete-row.png",
+      "bytes": 507801,
+      "sha256": "f46eeee3df3811faa9bdc47a92bebbc08753502705203c354f34208ae6d6f700"
+    },
+    "byteEqual": true
+  },
+  {
+    "source": "current-production-short-viewport-visible-known-row-attempt1/runtime-attachments/B4B0BD7B-7715-4803-9275-9826D1E9D3E1.png",
+    "copy": {
+      "file": "portrait-return.png",
+      "bytes": 380937,
+      "sha256": "2e69268af8c24edc9b1d0635df9c22a30423d06cc5de7790f2b97211fcfc6a27"
+    },
+    "byteEqual": true
+  },
+  {
+    "source": "current-production-short-viewport-visible-known-row-attempt1/runtime-attachments/1C7CB385-3D88-4490-B409-884132FA7B7E.png",
+    "copy": {
+      "file": "returned-overview.png",
+      "bytes": 284463,
+      "sha256": "254758ea5d5932a3f6899a34cd11d2f493f67b1cf383f7b3e642da4a93df96c1"
+    },
+    "byteEqual": true
+  },
+  {
+    "source": "current-production-short-viewport-visible-known-row-attempt1/runtime-attachments/571B78D7-026A-4872-9F6A-3A580FDF8908.png",
+    "copy": {
+      "file": "returned-popup.png",
+      "bytes": 445094,
+      "sha256": "4933c235c5084fa93b3ec4a211f9fb912482b30b5b8a93dea96e7004390472ad"
+    },
+    "byteEqual": true
+  },
+  {
+    "source": "current-production-short-viewport-visible-known-row-attempt1/runtime-attachments/CAE9B962-A982-4116-ADA2-C04E931AA521.png",
+    "copy": {
+      "file": "closed-fixture.png",
+      "bytes": 140992,
+      "sha256": "3d1390711caefcb9045a6ad87162243673899b02a0490975ea0fca754c3ad8f6"
+    },
+    "byteEqual": true
+  }
+]

@@ -1,0 +1,678 @@
+{
+  "schemaVersion": 1,
+  "preparedAtUtc": "2026-10-16T21:24:03.674925+00:00",
+  "preparedBy": "/root/f25_review",
+  "status": "OFFLINE_BOUND_READY_FOR_ROOT_REVIEW_FRESH_SERIAL_RELEASE_AND_GO",
+  "executionAuthorized": false,
+  "runtimeGoIssued": false,
+  "scope": "Fresh local unsigned Safari wrapper then sequential macOS, iOS Simulator and iPhoneOS arm64 compilation only. No SDK/native command executed during preparation; no runtime/install/launch authorized by this manifest.",
+  "planSource": {
+    "path": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/touch-layout-f33-followup-20261017/native-final-layout-preparation-plan/plan.json",
+    "sha256": "7dd24295133bba61ebfeb19f53bbcbfc83cd008f762d047b92d085404ea17868",
+    "bytes": 12983
+  },
+  "historicalPreparation": {
+    "path": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/touch-layout-f33-followup-20261017/native-a2-preparation/preparation.json",
+    "sha256": "35ca3e0e2ef909f186d2bb5882af7a74e0e505acefc8a3873a26c036d408b8dd",
+    "bytes": 35684
+  },
+  "input": {
+    "runtimeSourceCommit": "6eecd6710e7daac2d2a8cca9a34d0f26dc849b44",
+    "checkout": {
+      "path": "/Users/thinkstu/Desktop/copy/FluentRead-mobile-video-menu-accessibility-20261016",
+      "actualHead": "6eecd6710e7daac2d2a8cca9a34d0f26dc849b44",
+      "porcelainV1": "",
+      "clean": true,
+      "verifiedAtUtc": "2026-10-16T21:24:03.674925+00:00"
+    },
+    "gate": {
+      "path": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/menu-scroll-controlled-20261017/artifact-gate.json",
+      "sha256": "9f0fe925e8ece836e0d3687525422fe4ce2dc124a3652f25105b964f6886ed39",
+      "bytes": 3256
+    },
+    "gateHistoricalBuildContext": {
+      "baseHead": "6ee7249dbaf231772f4ff0a2e16c665f56a5839b",
+      "uncommittedProductAndRunnerPatch": true,
+      "note": "Historical gate was produced before this commit; its frozen ui/runner bytes are independently equal to current committed bytes. Gate metadata is preserved, not rewritten as built at current HEAD."
+    },
+    "sourceBindings": [
+      {
+        "path": "/Users/thinkstu/Desktop/copy/FluentRead-mobile-video-menu-accessibility-20261016/src/features/video-subtitle/content/ui.ts",
+        "sha256": "eb9cd5ccd3d2931cd1e85fa8a668235374e0a865e06605981274bd20944b592c",
+        "bytes": 86837,
+        "relativePath": "src/features/video-subtitle/content/ui.ts",
+        "committedBytesMatch": true,
+        "commit": "6eecd6710e7daac2d2a8cca9a34d0f26dc849b44"
+      },
+      {
+        "path": "/Users/thinkstu/Desktop/copy/FluentRead-mobile-video-menu-accessibility-20261016/scripts/run-mobile-video-subtitle-test.cjs",
+        "sha256": "5f6aded2f3f1b47f61dc5fe89ce249c9b8ca209f1bc5a67f81150264d0d09b06",
+        "bytes": 46854,
+        "relativePath": "scripts/run-mobile-video-subtitle-test.cjs",
+        "committedBytesMatch": true,
+        "commit": "6eecd6710e7daac2d2a8cca9a34d0f26dc849b44"
+      }
+    ],
+    "safariWeb": {
+      "directory": "/Users/thinkstu/Desktop/copy/FluentRead-mobile-video-menu-accessibility-20261016/.output/safari-mv2",
+      "files": 467,
+      "bytes": 62232369,
+      "rawByteHash": "b1a66b3fc4e579216321758ebb921b7396430610119c9e5ca356de23b8cfc161",
+      "recordHash": "14320cd02100962f0f593932a754cbdb5baa3ca25f073fece8bb6ea40a1a5be2",
+      "fullFileMap": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/menu-scroll-controlled-20261017/safari-final-file-map.json",
+      "fullFileMapSHA256": "68ea70ae724e0fff09e4caf91b2cfe5aceb264e449002cce02962c5daeb98418",
+      "manifestSHA256": "d7bcd7044f90b52d4dee774f7cef84f019b4b56fb73434de3304c9381a6cbae5",
+      "recordAlgorithm": "global UTF8 path sort; SHA256(path + NUL + fileSHA256 + NUL + decimalByteLength + LF)",
+      "rawAlgorithm": "recursive directory UTF8 name sort; SHA256(path + NUL + decimalByteLength + NUL + rawbytes)"
+    },
+    "fileMapBinding": {
+      "path": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/menu-scroll-controlled-20261017/safari-final-file-map.json",
+      "sha256": "68ea70ae724e0fff09e4caf91b2cfe5aceb264e449002cce02962c5daeb98418",
+      "bytes": 67790
+    },
+    "freshOfflineWebVerification": {
+      "verifiedAtUtc": "2026-10-16T21:24:03.674925+00:00",
+      "allFilesRead": true,
+      "noSymlinksOrSpecialFiles": true,
+      "files": 467,
+      "bytes": 62232369,
+      "rawByteHash": "b1a66b3fc4e579216321758ebb921b7396430610119c9e5ca356de23b8cfc161",
+      "recordHash": "14320cd02100962f0f593932a754cbdb5baa3ca25f073fece8bb6ea40a1a5be2",
+      "exactFullMapMatch": true,
+      "manifestSHA256": "d7bcd7044f90b52d4dee774f7cef84f019b4b56fb73434de3304c9381a6cbae5"
+    }
+  },
+  "reviewedGeneratorInputs": [
+    {
+      "path": "/Users/thinkstu/Desktop/copy/FluentRead-mobile-video-menu-accessibility-20261016/scripts/safari/package.mjs",
+      "sha256": "c8f8524584509001a46159b378e24fa378524969072ab3dd38fb06ba56618ab0",
+      "bytes": 33471,
+      "relativePath": "scripts/safari/package.mjs",
+      "committedBytesMatch": true,
+      "unchangedFromA2": true,
+      "role": "Existing sole wrapper generator; reuse without edits"
+    },
+    {
+      "path": "/Users/thinkstu/Desktop/copy/FluentRead-mobile-video-menu-accessibility-20261016/scripts/testing/run-resource-safe.mjs",
+      "sha256": "ef0d65fcbd87288afb7ad070fc20015e24265008dd6b476d87e1daf5d71b49f2",
+      "bytes": 14814,
+      "relativePath": "scripts/testing/run-resource-safe.mjs",
+      "committedBytesMatch": true,
+      "unchangedFromA2": true,
+      "role": "Existing cooperative resource wrapper"
+    },
+    {
+      "path": "/Users/thinkstu/Desktop/copy/FluentRead-mobile-video-menu-accessibility-20261016/src/core/config/freeProviderOrigins.json",
+      "sha256": "8b4004cade979ded8b2b76ac3398dfa108f9e423de2b6d7336dc2530cadf2418",
+      "bytes": 1021,
+      "relativePath": "src/core/config/freeProviderOrigins.json",
+      "committedBytesMatch": true,
+      "unchangedFromA2": true,
+      "role": "Manifest verifier input"
+    },
+    {
+      "path": "/Users/thinkstu/Desktop/copy/FluentRead-mobile-video-menu-accessibility-20261016/scripts/safari/container/ViewController.swift",
+      "sha256": "6d9d7f1bb044d88eb17b644c8c038062f964a4486f59a90f4d3b081f09931d06",
+      "bytes": 4589,
+      "relativePath": "scripts/safari/container/ViewController.swift",
+      "committedBytesMatch": true,
+      "unchangedFromA2": true,
+      "role": "Container source read by existing generator"
+    },
+    {
+      "path": "/Users/thinkstu/Desktop/copy/FluentRead-mobile-video-menu-accessibility-20261016/scripts/safari/container/Main.html",
+      "sha256": "8359d2ff5a18fc2c655ef8798869b242b7c8495fa9a4575919213a2226d7789e",
+      "bytes": 862,
+      "relativePath": "scripts/safari/container/Main.html",
+      "committedBytesMatch": true,
+      "unchangedFromA2": true,
+      "role": "Container source read by existing generator"
+    },
+    {
+      "path": "/Users/thinkstu/Desktop/copy/FluentRead-mobile-video-menu-accessibility-20261016/scripts/safari/container/Style.css",
+      "sha256": "3f4c01b933fe9622c01784d8e2eec2a228225fb07284bb5adacaf4bef4319a40",
+      "bytes": 1536,
+      "relativePath": "scripts/safari/container/Style.css",
+      "committedBytesMatch": true,
+      "unchangedFromA2": true,
+      "role": "Container source read by existing generator"
+    },
+    {
+      "path": "/Users/thinkstu/Desktop/copy/FluentRead-mobile-video-menu-accessibility-20261016/scripts/safari/container/Script.js",
+      "sha256": "ff9d564bd55a9742f77043dc08ebfd4cc2415989d70576851182d9c34c0ad2f8",
+      "bytes": 2887,
+      "relativePath": "scripts/safari/container/Script.js",
+      "committedBytesMatch": true,
+      "unchangedFromA2": true,
+      "role": "Container source read by existing generator"
+    }
+  ],
+  "newRootWasEntirelyAbsentBeforeCreation": true,
+  "outputPaths": {
+    "projectLocation": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/touch-layout-f33-followup-20261017/native-final-layout-6eecd6710e7d-b1a66b3fc4e5/output/safari-xcode",
+    "project": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/touch-layout-f33-followup-20261017/native-final-layout-6eecd6710e7d-b1a66b3fc4e5/output/safari-xcode/FluentRead/FluentRead.xcodeproj",
+    "macOSDerivedData": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/touch-layout-f33-followup-20261017/native-final-layout-6eecd6710e7d-b1a66b3fc4e5/output/derived-macos",
+    "iosSimulatorDerivedData": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/touch-layout-f33-followup-20261017/native-final-layout-6eecd6710e7d-b1a66b3fc4e5/output/derived-ios-simulator",
+    "iPhoneOSTarget": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/touch-layout-f33-followup-20261017/native-final-layout-6eecd6710e7d-b1a66b3fc4e5/output/target-iphoneos",
+    "logs": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/touch-layout-f33-followup-20261017/native-final-layout-6eecd6710e7d-b1a66b3fc4e5/logs"
+  },
+  "outputsAbsentAtPreparation": true,
+  "onlyMetadataRootCreatedDuringPreparation": true,
+  "noOutputOrLogDirectoryCreated": true,
+  "expectedBundleIds": {
+    "app": "org.example.FluentReadDevelopment",
+    "extension": "org.example.FluentReadDevelopment.Extension",
+    "sameIdsDoNotAuthorizeInstallOrRegistration": true
+  },
+  "expectedProjectTargets": [
+    {
+      "name": "FluentRead (iOS)",
+      "productType": "com.apple.product-type.application",
+      "configurations": [
+        {
+          "name": "Debug",
+          "bundleId": "org.example.FluentReadDevelopment",
+          "sdk": "iphoneos"
+        },
+        {
+          "name": "Release",
+          "bundleId": "org.example.FluentReadDevelopment",
+          "sdk": "iphoneos"
+        }
+      ]
+    },
+    {
+      "name": "FluentRead (macOS)",
+      "productType": "com.apple.product-type.application",
+      "configurations": [
+        {
+          "name": "Debug",
+          "bundleId": "org.example.FluentReadDevelopment",
+          "sdk": "macosx"
+        },
+        {
+          "name": "Release",
+          "bundleId": "org.example.FluentReadDevelopment",
+          "sdk": "macosx"
+        }
+      ]
+    },
+    {
+      "name": "FluentRead Extension (iOS)",
+      "productType": "com.apple.product-type.app-extension",
+      "configurations": [
+        {
+          "name": "Debug",
+          "bundleId": "org.example.FluentReadDevelopment.Extension",
+          "sdk": "iphoneos"
+        },
+        {
+          "name": "Release",
+          "bundleId": "org.example.FluentReadDevelopment.Extension",
+          "sdk": "iphoneos"
+        }
+      ]
+    },
+    {
+      "name": "FluentRead Extension (macOS)",
+      "productType": "com.apple.product-type.app-extension",
+      "configurations": [
+        {
+          "name": "Debug",
+          "bundleId": "org.example.FluentReadDevelopment.Extension",
+          "sdk": "macosx"
+        },
+        {
+          "name": "Release",
+          "bundleId": "org.example.FluentReadDevelopment.Extension",
+          "sdk": "macosx"
+        }
+      ]
+    }
+  ],
+  "copiedWebPrefix": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/touch-layout-f33-followup-20261017/native-final-layout-6eecd6710e7d-b1a66b3fc4e5/output/safari-xcode/FluentRead/Shared (Extension)/Resources",
+  "expectedProducts": {
+    "macOS": {
+      "app": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/touch-layout-f33-followup-20261017/native-final-layout-6eecd6710e7d-b1a66b3fc4e5/output/derived-macos/Build/Products/Release/FluentRead.app",
+      "extension": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/touch-layout-f33-followup-20261017/native-final-layout-6eecd6710e7d-b1a66b3fc4e5/output/derived-macos/Build/Products/Release/FluentRead.app/Contents/PlugIns/FluentRead Extension.appex",
+      "appInfo": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/touch-layout-f33-followup-20261017/native-final-layout-6eecd6710e7d-b1a66b3fc4e5/output/derived-macos/Build/Products/Release/FluentRead.app/Contents/Info.plist",
+      "extensionInfo": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/touch-layout-f33-followup-20261017/native-final-layout-6eecd6710e7d-b1a66b3fc4e5/output/derived-macos/Build/Products/Release/FluentRead.app/Contents/PlugIns/FluentRead Extension.appex/Contents/Info.plist",
+      "compiledWebPrefix": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/touch-layout-f33-followup-20261017/native-final-layout-6eecd6710e7d-b1a66b3fc4e5/output/derived-macos/Build/Products/Release/FluentRead.app/Contents/PlugIns/FluentRead Extension.appex/Contents/Resources",
+      "allowedNonWebAtPrefix": []
+    },
+    "iosSimulator": {
+      "app": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/touch-layout-f33-followup-20261017/native-final-layout-6eecd6710e7d-b1a66b3fc4e5/output/derived-ios-simulator/Build/Products/Release-iphonesimulator/FluentRead.app",
+      "extension": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/touch-layout-f33-followup-20261017/native-final-layout-6eecd6710e7d-b1a66b3fc4e5/output/derived-ios-simulator/Build/Products/Release-iphonesimulator/FluentRead.app/PlugIns/FluentRead Extension.appex",
+      "appInfo": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/touch-layout-f33-followup-20261017/native-final-layout-6eecd6710e7d-b1a66b3fc4e5/output/derived-ios-simulator/Build/Products/Release-iphonesimulator/FluentRead.app/Info.plist",
+      "extensionInfo": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/touch-layout-f33-followup-20261017/native-final-layout-6eecd6710e7d-b1a66b3fc4e5/output/derived-ios-simulator/Build/Products/Release-iphonesimulator/FluentRead.app/PlugIns/FluentRead Extension.appex/Info.plist",
+      "compiledWebPrefix": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/touch-layout-f33-followup-20261017/native-final-layout-6eecd6710e7d-b1a66b3fc4e5/output/derived-ios-simulator/Build/Products/Release-iphonesimulator/FluentRead.app/PlugIns/FluentRead Extension.appex",
+      "allowedNonWebAtPrefix": [
+        "Info.plist",
+        "<actual CFBundleExecutable from extension Info.plist>"
+      ]
+    },
+    "iPhoneOS": {
+      "app": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/touch-layout-f33-followup-20261017/native-final-layout-6eecd6710e7d-b1a66b3fc4e5/output/target-iphoneos/build/FluentRead.app",
+      "extension": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/touch-layout-f33-followup-20261017/native-final-layout-6eecd6710e7d-b1a66b3fc4e5/output/target-iphoneos/build/FluentRead.app/PlugIns/FluentRead Extension.appex",
+      "appInfo": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/touch-layout-f33-followup-20261017/native-final-layout-6eecd6710e7d-b1a66b3fc4e5/output/target-iphoneos/build/FluentRead.app/Info.plist",
+      "extensionInfo": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/touch-layout-f33-followup-20261017/native-final-layout-6eecd6710e7d-b1a66b3fc4e5/output/target-iphoneos/build/FluentRead.app/PlugIns/FluentRead Extension.appex/Info.plist",
+      "compiledWebPrefix": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/touch-layout-f33-followup-20261017/native-final-layout-6eecd6710e7d-b1a66b3fc4e5/output/target-iphoneos/build/FluentRead.app/PlugIns/FluentRead Extension.appex",
+      "allowedNonWebAtPrefix": [
+        "Info.plist",
+        "<actual CFBundleExecutable from extension Info.plist>"
+      ]
+    }
+  },
+  "sequence": [
+    {
+      "id": "01-sdk-check",
+      "cwd": "/Users/thinkstu/Desktop/copy/FluentRead-mobile-video-menu-accessibility-20261016",
+      "verifiedCommandSource": {
+        "path": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/touch-layout-f33-followup-20261017/native-a2-preparation/01-sdk-check-result.json",
+        "sha256": "abe45468b46911dd4e8ea0da676fb1a374458193257c85b89a79a53627dcc962",
+        "bytes": 1026
+      },
+      "historicalExitCode": 0,
+      "argv": [
+        "/opt/homebrew/opt/node@22/bin/node",
+        "/Users/thinkstu/Desktop/copy/FluentRead-mobile-video-menu-accessibility-20261016/scripts/testing/run-resource-safe.mjs",
+        "--max-workers",
+        "1",
+        "--concurrency",
+        "3",
+        "--cpu-target",
+        "40",
+        "--",
+        "/opt/homebrew/opt/node@22/bin/node",
+        "/Users/thinkstu/Desktop/copy/FluentRead-mobile-video-menu-accessibility-20261016/scripts/safari/package.mjs",
+        "--check"
+      ],
+      "environmentOverrides": {
+        "DEVELOPER_DIR": "/Applications/Xcode.app/Contents/Developer",
+        "PATH": "/opt/homebrew/opt/node@22/bin:/usr/bin:/bin:/usr/sbin:/sbin:/opt/homebrew/bin"
+      },
+      "combinedLog": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/touch-layout-f33-followup-20261017/native-final-layout-6eecd6710e7d-b1a66b3fc4e5/logs/01-sdk-check.log",
+      "argumentReplacements": [],
+      "environmentReplacements": [],
+      "status": "NOT_EXECUTED",
+      "mustFinishBeforeNext": true,
+      "toolSandboxPermissionWhenExecuted": "require_escalated",
+      "shellCommandForLaterExecution": "/usr/bin/env DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer PATH=/opt/homebrew/opt/node@22/bin:/usr/bin:/bin:/usr/sbin:/sbin:/opt/homebrew/bin /opt/homebrew/opt/node@22/bin/node /Users/thinkstu/Desktop/copy/FluentRead-mobile-video-menu-accessibility-20261016/scripts/testing/run-resource-safe.mjs --max-workers 1 --concurrency 3 --cpu-target 40 -- /opt/homebrew/opt/node@22/bin/node /Users/thinkstu/Desktop/copy/FluentRead-mobile-video-menu-accessibility-20261016/scripts/safari/package.mjs --check"
+    },
+    {
+      "id": "02-safari-web-verify",
+      "cwd": "/Users/thinkstu/Desktop/copy/FluentRead-mobile-video-menu-accessibility-20261016",
+      "verifiedCommandSource": {
+        "path": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/touch-layout-f33-followup-20261017/native-a2-preparation/02-safari-web-verify-result.json",
+        "sha256": "e479f6ae6caccea152896cda07a7c6327f8f130fed7b9f6e1e094ac31510121f",
+        "bytes": 1170
+      },
+      "historicalExitCode": 0,
+      "argv": [
+        "/opt/homebrew/opt/node@22/bin/node",
+        "/Users/thinkstu/Desktop/copy/FluentRead-mobile-video-menu-accessibility-20261016/scripts/testing/run-resource-safe.mjs",
+        "--max-workers",
+        "1",
+        "--concurrency",
+        "3",
+        "--cpu-target",
+        "40",
+        "--",
+        "/opt/homebrew/opt/node@22/bin/node",
+        "/Users/thinkstu/Desktop/copy/FluentRead-mobile-video-menu-accessibility-20261016/scripts/safari/package.mjs",
+        "--verify",
+        "--extension",
+        "/Users/thinkstu/Desktop/copy/FluentRead-mobile-video-menu-accessibility-20261016/.output/safari-mv2"
+      ],
+      "environmentOverrides": {
+        "DEVELOPER_DIR": "/Applications/Xcode.app/Contents/Developer",
+        "PATH": "/opt/homebrew/opt/node@22/bin:/usr/bin:/bin:/usr/sbin:/sbin:/opt/homebrew/bin"
+      },
+      "combinedLog": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/touch-layout-f33-followup-20261017/native-final-layout-6eecd6710e7d-b1a66b3fc4e5/logs/02-safari-web-verify.log",
+      "argumentReplacements": [],
+      "environmentReplacements": [],
+      "status": "NOT_EXECUTED",
+      "mustFinishBeforeNext": true,
+      "toolSandboxPermissionWhenExecuted": "require_escalated",
+      "shellCommandForLaterExecution": "/usr/bin/env DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer PATH=/opt/homebrew/opt/node@22/bin:/usr/bin:/bin:/usr/sbin:/sbin:/opt/homebrew/bin /opt/homebrew/opt/node@22/bin/node /Users/thinkstu/Desktop/copy/FluentRead-mobile-video-menu-accessibility-20261016/scripts/testing/run-resource-safe.mjs --max-workers 1 --concurrency 3 --cpu-target 40 -- /opt/homebrew/opt/node@22/bin/node /Users/thinkstu/Desktop/copy/FluentRead-mobile-video-menu-accessibility-20261016/scripts/safari/package.mjs --verify --extension /Users/thinkstu/Desktop/copy/FluentRead-mobile-video-menu-accessibility-20261016/.output/safari-mv2"
+    },
+    {
+      "id": "03-fresh-unsigned-wrapper",
+      "cwd": "/Users/thinkstu/Desktop/copy/FluentRead-mobile-video-menu-accessibility-20261016",
+      "verifiedCommandSource": {
+        "path": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/touch-layout-f33-followup-20261017/native-a2-preparation/03-fresh-unsigned-wrapper-result.json",
+        "sha256": "b21abdb60dad5f67300c1e85c19e1a78d305e86dcafe69e9ce4a77a45715188b",
+        "bytes": 1431
+      },
+      "historicalExitCode": 0,
+      "argv": [
+        "/opt/homebrew/opt/node@22/bin/node",
+        "/Users/thinkstu/Desktop/copy/FluentRead-mobile-video-menu-accessibility-20261016/scripts/testing/run-resource-safe.mjs",
+        "--max-workers",
+        "1",
+        "--concurrency",
+        "3",
+        "--cpu-target",
+        "40",
+        "--",
+        "/opt/homebrew/opt/node@22/bin/node",
+        "/Users/thinkstu/Desktop/copy/FluentRead-mobile-video-menu-accessibility-20261016/scripts/safari/package.mjs",
+        "--extension",
+        "/Users/thinkstu/Desktop/copy/FluentRead-mobile-video-menu-accessibility-20261016/.output/safari-mv2",
+        "--project-location",
+        "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/touch-layout-f33-followup-20261017/native-final-layout-6eecd6710e7d-b1a66b3fc4e5/output/safari-xcode",
+        "--bundle-id",
+        "org.example.FluentReadDevelopment",
+        "--platform",
+        "both"
+      ],
+      "environmentOverrides": {
+        "DEVELOPER_DIR": "/Applications/Xcode.app/Contents/Developer",
+        "PATH": "/opt/homebrew/opt/node@22/bin:/usr/bin:/bin:/usr/sbin:/sbin:/opt/homebrew/bin"
+      },
+      "combinedLog": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/touch-layout-f33-followup-20261017/native-final-layout-6eecd6710e7d-b1a66b3fc4e5/logs/03-package.log",
+      "argumentReplacements": [
+        {
+          "index": 14,
+          "from": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/touch-layout-f33-followup-20261017/native-a2-preparation/output/safari-xcode-a2ecda302-80471415c945",
+          "to": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/touch-layout-f33-followup-20261017/native-final-layout-6eecd6710e7d-b1a66b3fc4e5/output/safari-xcode"
+        }
+      ],
+      "environmentReplacements": [],
+      "status": "NOT_EXECUTED",
+      "mustFinishBeforeNext": true,
+      "toolSandboxPermissionWhenExecuted": "require_escalated",
+      "shellCommandForLaterExecution": "/usr/bin/env DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer PATH=/opt/homebrew/opt/node@22/bin:/usr/bin:/bin:/usr/sbin:/sbin:/opt/homebrew/bin /opt/homebrew/opt/node@22/bin/node /Users/thinkstu/Desktop/copy/FluentRead-mobile-video-menu-accessibility-20261016/scripts/testing/run-resource-safe.mjs --max-workers 1 --concurrency 3 --cpu-target 40 -- /opt/homebrew/opt/node@22/bin/node /Users/thinkstu/Desktop/copy/FluentRead-mobile-video-menu-accessibility-20261016/scripts/safari/package.mjs --extension /Users/thinkstu/Desktop/copy/FluentRead-mobile-video-menu-accessibility-20261016/.output/safari-mv2 --project-location /Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/touch-layout-f33-followup-20261017/native-final-layout-6eecd6710e7d-b1a66b3fc4e5/output/safari-xcode --bundle-id org.example.FluentReadDevelopment --platform both"
+    },
+    {
+      "id": "04-macos",
+      "cwd": "/Users/thinkstu/Desktop/copy/FluentRead-mobile-video-menu-accessibility-20261016",
+      "verifiedCommandSource": {
+        "path": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/touch-layout-f33-followup-20261017/native-a2-preparation/04-macos-result.json",
+        "sha256": "529926dd78ac3b4256a8eb23fe7e7aa9353ca2deb073b323c5ded13ac5d123c5",
+        "bytes": 1669
+      },
+      "historicalExitCode": 0,
+      "argv": [
+        "/opt/homebrew/opt/node@22/bin/node",
+        "/Users/thinkstu/Desktop/copy/FluentRead-mobile-video-menu-accessibility-20261016/scripts/testing/run-resource-safe.mjs",
+        "--max-workers",
+        "1",
+        "--concurrency",
+        "3",
+        "--cpu-target",
+        "40",
+        "--",
+        "/Applications/Xcode.app/Contents/Developer/usr/bin/xcodebuild",
+        "-project",
+        "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/touch-layout-f33-followup-20261017/native-final-layout-6eecd6710e7d-b1a66b3fc4e5/output/safari-xcode/FluentRead/FluentRead.xcodeproj",
+        "-scheme",
+        "FluentRead (macOS)",
+        "-configuration",
+        "Release",
+        "-destination",
+        "generic/platform=macOS",
+        "-derivedDataPath",
+        "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/touch-layout-f33-followup-20261017/native-final-layout-6eecd6710e7d-b1a66b3fc4e5/output/derived-macos",
+        "-jobs",
+        "1",
+        "CODE_SIGNING_ALLOWED=NO",
+        "CODE_SIGNING_REQUIRED=NO",
+        "DEVELOPMENT_TEAM=",
+        "CODE_SIGN_IDENTITY=",
+        "PROVISIONING_PROFILE=",
+        "PROVISIONING_PROFILE_SPECIFIER=",
+        "build"
+      ],
+      "environmentOverrides": {
+        "DEVELOPER_DIR": "/Applications/Xcode.app/Contents/Developer",
+        "PATH": "/opt/homebrew/opt/node@22/bin:/usr/bin:/bin:/usr/sbin:/sbin:/opt/homebrew/bin"
+      },
+      "combinedLog": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/touch-layout-f33-followup-20261017/native-final-layout-6eecd6710e7d-b1a66b3fc4e5/logs/04-macos.log",
+      "argumentReplacements": [
+        {
+          "index": 11,
+          "from": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/touch-layout-f33-followup-20261017/native-a2-preparation/output/safari-xcode-a2ecda302-80471415c945/FluentRead/FluentRead.xcodeproj",
+          "to": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/touch-layout-f33-followup-20261017/native-final-layout-6eecd6710e7d-b1a66b3fc4e5/output/safari-xcode/FluentRead/FluentRead.xcodeproj"
+        },
+        {
+          "index": 19,
+          "from": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/touch-layout-f33-followup-20261017/native-a2-preparation/output/derived-macos-a2ecda302-80471415c945",
+          "to": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/touch-layout-f33-followup-20261017/native-final-layout-6eecd6710e7d-b1a66b3fc4e5/output/derived-macos"
+        }
+      ],
+      "environmentReplacements": [],
+      "status": "NOT_EXECUTED",
+      "mustFinishBeforeNext": true,
+      "toolSandboxPermissionWhenExecuted": "require_escalated",
+      "shellCommandForLaterExecution": "/usr/bin/env DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer PATH=/opt/homebrew/opt/node@22/bin:/usr/bin:/bin:/usr/sbin:/sbin:/opt/homebrew/bin /opt/homebrew/opt/node@22/bin/node /Users/thinkstu/Desktop/copy/FluentRead-mobile-video-menu-accessibility-20261016/scripts/testing/run-resource-safe.mjs --max-workers 1 --concurrency 3 --cpu-target 40 -- /Applications/Xcode.app/Contents/Developer/usr/bin/xcodebuild -project /Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/touch-layout-f33-followup-20261017/native-final-layout-6eecd6710e7d-b1a66b3fc4e5/output/safari-xcode/FluentRead/FluentRead.xcodeproj -scheme 'FluentRead (macOS)' -configuration Release -destination generic/platform=macOS -derivedDataPath /Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/touch-layout-f33-followup-20261017/native-final-layout-6eecd6710e7d-b1a66b3fc4e5/output/derived-macos -jobs 1 CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO DEVELOPMENT_TEAM= CODE_SIGN_IDENTITY= PROVISIONING_PROFILE= PROVISIONING_PROFILE_SPECIFIER= build"
+    },
+    {
+      "id": "05-ios-simulator",
+      "cwd": "/Users/thinkstu/Desktop/copy/FluentRead-mobile-video-menu-accessibility-20261016",
+      "verifiedCommandSource": {
+        "path": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/touch-layout-f33-followup-20261017/native-a2-preparation/05-ios-simulator-result.json",
+        "sha256": "ecae3764d75903208aa4950491c103c389d73e35398f9c44bf6a313347707144",
+        "bytes": 1697
+      },
+      "historicalExitCode": 0,
+      "argv": [
+        "/opt/homebrew/opt/node@22/bin/node",
+        "/Users/thinkstu/Desktop/copy/FluentRead-mobile-video-menu-accessibility-20261016/scripts/testing/run-resource-safe.mjs",
+        "--max-workers",
+        "1",
+        "--concurrency",
+        "3",
+        "--cpu-target",
+        "40",
+        "--",
+        "/Applications/Xcode.app/Contents/Developer/usr/bin/xcodebuild",
+        "-project",
+        "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/touch-layout-f33-followup-20261017/native-final-layout-6eecd6710e7d-b1a66b3fc4e5/output/safari-xcode/FluentRead/FluentRead.xcodeproj",
+        "-scheme",
+        "FluentRead (iOS)",
+        "-configuration",
+        "Release",
+        "-destination",
+        "generic/platform=iOS Simulator",
+        "-derivedDataPath",
+        "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/touch-layout-f33-followup-20261017/native-final-layout-6eecd6710e7d-b1a66b3fc4e5/output/derived-ios-simulator",
+        "-jobs",
+        "1",
+        "CODE_SIGNING_ALLOWED=NO",
+        "CODE_SIGNING_REQUIRED=NO",
+        "DEVELOPMENT_TEAM=",
+        "CODE_SIGN_IDENTITY=",
+        "PROVISIONING_PROFILE=",
+        "PROVISIONING_PROFILE_SPECIFIER=",
+        "build"
+      ],
+      "environmentOverrides": {
+        "DEVELOPER_DIR": "/Applications/Xcode.app/Contents/Developer",
+        "PATH": "/opt/homebrew/opt/node@22/bin:/usr/bin:/bin:/usr/sbin:/sbin:/opt/homebrew/bin"
+      },
+      "combinedLog": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/touch-layout-f33-followup-20261017/native-final-layout-6eecd6710e7d-b1a66b3fc4e5/logs/05-ios-simulator.log",
+      "argumentReplacements": [
+        {
+          "index": 11,
+          "from": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/touch-layout-f33-followup-20261017/native-a2-preparation/output/safari-xcode-a2ecda302-80471415c945/FluentRead/FluentRead.xcodeproj",
+          "to": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/touch-layout-f33-followup-20261017/native-final-layout-6eecd6710e7d-b1a66b3fc4e5/output/safari-xcode/FluentRead/FluentRead.xcodeproj"
+        },
+        {
+          "index": 19,
+          "from": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/touch-layout-f33-followup-20261017/native-a2-preparation/output/derived-ios-simulator-a2ecda302-80471415c945",
+          "to": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/touch-layout-f33-followup-20261017/native-final-layout-6eecd6710e7d-b1a66b3fc4e5/output/derived-ios-simulator"
+        }
+      ],
+      "environmentReplacements": [],
+      "status": "NOT_EXECUTED",
+      "mustFinishBeforeNext": true,
+      "toolSandboxPermissionWhenExecuted": "require_escalated",
+      "shellCommandForLaterExecution": "/usr/bin/env DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer PATH=/opt/homebrew/opt/node@22/bin:/usr/bin:/bin:/usr/sbin:/sbin:/opt/homebrew/bin /opt/homebrew/opt/node@22/bin/node /Users/thinkstu/Desktop/copy/FluentRead-mobile-video-menu-accessibility-20261016/scripts/testing/run-resource-safe.mjs --max-workers 1 --concurrency 3 --cpu-target 40 -- /Applications/Xcode.app/Contents/Developer/usr/bin/xcodebuild -project /Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/touch-layout-f33-followup-20261017/native-final-layout-6eecd6710e7d-b1a66b3fc4e5/output/safari-xcode/FluentRead/FluentRead.xcodeproj -scheme 'FluentRead (iOS)' -configuration Release -destination 'generic/platform=iOS Simulator' -derivedDataPath /Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/touch-layout-f33-followup-20261017/native-final-layout-6eecd6710e7d-b1a66b3fc4e5/output/derived-ios-simulator -jobs 1 CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO DEVELOPMENT_TEAM= CODE_SIGN_IDENTITY= PROVISIONING_PROFILE= PROVISIONING_PROFILE_SPECIFIER= build"
+    },
+    {
+      "id": "06-iphoneos-arm64",
+      "cwd": "/Users/thinkstu/Desktop/copy/FluentRead-mobile-video-menu-accessibility-20261016",
+      "verifiedCommandSource": {
+        "path": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/touch-layout-f33-followup-20261017/native-a2-preparation/06-iphoneos-arm64-result.json",
+        "sha256": "e3fe751f733e8a61849b50973572ecf9516dd48828bdb99f3b2ba956bebd4614",
+        "bytes": 2058
+      },
+      "historicalExitCode": 0,
+      "argv": [
+        "/opt/homebrew/opt/node@22/bin/node",
+        "/Users/thinkstu/Desktop/copy/FluentRead-mobile-video-menu-accessibility-20261016/scripts/testing/run-resource-safe.mjs",
+        "--max-workers",
+        "1",
+        "--concurrency",
+        "3",
+        "--cpu-target",
+        "40",
+        "--",
+        "/Applications/Xcode.app/Contents/Developer/usr/bin/xcodebuild",
+        "-project",
+        "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/touch-layout-f33-followup-20261017/native-final-layout-6eecd6710e7d-b1a66b3fc4e5/output/safari-xcode/FluentRead/FluentRead.xcodeproj",
+        "-target",
+        "FluentRead (iOS)",
+        "-configuration",
+        "Release",
+        "-sdk",
+        "iphoneos",
+        "-arch",
+        "arm64",
+        "-jobs",
+        "1",
+        "CONFIGURATION_BUILD_DIR=/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/touch-layout-f33-followup-20261017/native-final-layout-6eecd6710e7d-b1a66b3fc4e5/output/target-iphoneos/build",
+        "OBJROOT=/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/touch-layout-f33-followup-20261017/native-final-layout-6eecd6710e7d-b1a66b3fc4e5/output/target-iphoneos/obj",
+        "SYMROOT=/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/touch-layout-f33-followup-20261017/native-final-layout-6eecd6710e7d-b1a66b3fc4e5/output/target-iphoneos/sym",
+        "CODE_SIGNING_ALLOWED=NO",
+        "CODE_SIGNING_REQUIRED=NO",
+        "DEVELOPMENT_TEAM=",
+        "CODE_SIGN_IDENTITY=",
+        "PROVISIONING_PROFILE=",
+        "PROVISIONING_PROFILE_SPECIFIER=",
+        "build"
+      ],
+      "environmentOverrides": {
+        "DEVELOPER_DIR": "/Applications/Xcode.app/Contents/Developer",
+        "PATH": "/opt/homebrew/opt/node@22/bin:/usr/bin:/bin:/usr/sbin:/sbin:/opt/homebrew/bin"
+      },
+      "combinedLog": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/touch-layout-f33-followup-20261017/native-final-layout-6eecd6710e7d-b1a66b3fc4e5/logs/06-iphoneos.log",
+      "argumentReplacements": [
+        {
+          "index": 11,
+          "from": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/touch-layout-f33-followup-20261017/native-a2-preparation/output/safari-xcode-a2ecda302-80471415c945/FluentRead/FluentRead.xcodeproj",
+          "to": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/touch-layout-f33-followup-20261017/native-final-layout-6eecd6710e7d-b1a66b3fc4e5/output/safari-xcode/FluentRead/FluentRead.xcodeproj"
+        },
+        {
+          "index": 22,
+          "from": "CONFIGURATION_BUILD_DIR=/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/touch-layout-f33-followup-20261017/native-a2-preparation/output/target-iphoneos-a2ecda302-80471415c945/build",
+          "to": "CONFIGURATION_BUILD_DIR=/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/touch-layout-f33-followup-20261017/native-final-layout-6eecd6710e7d-b1a66b3fc4e5/output/target-iphoneos/build"
+        },
+        {
+          "index": 23,
+          "from": "OBJROOT=/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/touch-layout-f33-followup-20261017/native-a2-preparation/output/target-iphoneos-a2ecda302-80471415c945/obj",
+          "to": "OBJROOT=/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/touch-layout-f33-followup-20261017/native-final-layout-6eecd6710e7d-b1a66b3fc4e5/output/target-iphoneos/obj"
+        },
+        {
+          "index": 24,
+          "from": "SYMROOT=/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/touch-layout-f33-followup-20261017/native-a2-preparation/output/target-iphoneos-a2ecda302-80471415c945/sym",
+          "to": "SYMROOT=/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/touch-layout-f33-followup-20261017/native-final-layout-6eecd6710e7d-b1a66b3fc4e5/output/target-iphoneos/sym"
+        }
+      ],
+      "environmentReplacements": [],
+      "status": "NOT_EXECUTED",
+      "mustFinishBeforeNext": true,
+      "toolSandboxPermissionWhenExecuted": "require_escalated",
+      "shellCommandForLaterExecution": "/usr/bin/env DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer PATH=/opt/homebrew/opt/node@22/bin:/usr/bin:/bin:/usr/sbin:/sbin:/opt/homebrew/bin /opt/homebrew/opt/node@22/bin/node /Users/thinkstu/Desktop/copy/FluentRead-mobile-video-menu-accessibility-20261016/scripts/testing/run-resource-safe.mjs --max-workers 1 --concurrency 3 --cpu-target 40 -- /Applications/Xcode.app/Contents/Developer/usr/bin/xcodebuild -project /Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/touch-layout-f33-followup-20261017/native-final-layout-6eecd6710e7d-b1a66b3fc4e5/output/safari-xcode/FluentRead/FluentRead.xcodeproj -target 'FluentRead (iOS)' -configuration Release -sdk iphoneos -arch arm64 -jobs 1 CONFIGURATION_BUILD_DIR=/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/touch-layout-f33-followup-20261017/native-final-layout-6eecd6710e7d-b1a66b3fc4e5/output/target-iphoneos/build OBJROOT=/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/touch-layout-f33-followup-20261017/native-final-layout-6eecd6710e7d-b1a66b3fc4e5/output/target-iphoneos/obj SYMROOT=/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/touch-layout-f33-followup-20261017/native-final-layout-6eecd6710e7d-b1a66b3fc4e5/output/target-iphoneos/sym CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO DEVELOPMENT_TEAM= CODE_SIGN_IDENTITY= PROVISIONING_PROFILE= PROVISIONING_PROFILE_SPECIFIER= build"
+    }
+  ],
+  "argumentDiff": {
+    "path": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/touch-layout-f33-followup-20261017/native-final-layout-6eecd6710e7d-b1a66b3fc4e5/argument-replacements.diff",
+    "sha256": "2be6d6562e03af7681f0c07ff5dad8403998687aad29ab8a47163fd87f1369de",
+    "bytes": 6582,
+    "argumentChanges": 9,
+    "logPathChanges": 6,
+    "environmentChanges": 0,
+    "allowedChanges": "Only exact complete output/project/DerivedData path arguments, and exact path portions of CONFIGURATION_BUILD_DIR/OBJROOT/SYMROOT; no generic substring or identity replacement."
+  },
+  "resourcePolicy": {
+    "absoluteWrapper": "/Users/thinkstu/Desktop/copy/FluentRead-mobile-video-menu-accessibility-20261016/scripts/testing/run-resource-safe.mjs",
+    "absoluteNode22": "/opt/homebrew/opt/node@22/bin/node",
+    "workers": 1,
+    "concurrency": 3,
+    "cpuTargetPercent": 40,
+    "xcodeJobs": 1,
+    "serialStages": true,
+    "hardCPUCap": false,
+    "toolPermissionWhenLaterExecuted": "require_escalated on each actual exec call",
+    "lane": "Root grants unique heavy/native lane; this plan grants none"
+  },
+  "preconditions": [
+    "Root must provide fresh unique serial lane release/preflight receipt and explicit GO bound to this preparation. Current manifest grants no lane or execution.",
+    "Recheck clean HEAD/source/generator hashes and entire 467-file Web map/raw/record immediately before package and after sequence; preserve pre/post results.",
+    "Recheck every output path remains absent; never clear/reuse/overwrite existing outputs. Stop dependent stages on failure and preserve partial outputs/logs.",
+    "Each actual SDK/process exec must explicitly use require_escalated with unchanged absolute Node22 resource-safe prefix (1 worker/concurrency3/cpu target40), xcode jobs1; retain terminal handles to completion."
+  ],
+  "rootSerialReleaseReceipt": null,
+  "rootExecutionGO": null,
+  "verificationPlan": {
+    "package": "Require actual signed=false/installed=false, artifactCount467/buildSha256=b1a66b3fc4e579216321758ebb921b7396430610119c9e5ca356de23b8cfc161 and copied exact 467-file map with zero extras; independently read generated project 4 targets/8 configurations against expectedProjectTargets.",
+    "compiledWeb": "For each actual platform prefix compare all 467 relative paths/bytes/SHA256. macOS prefix has zero extras. iOS roots allow only actual Info.plist and its CFBundleExecutable native file; reject symlinks, unknown extras, provisioning profiles and resource signatures.",
+    "compiledIdentity": "Record actual App+appex complete maps/raw/record hashes, IDs, version/build/minimum OS/platform/SDK/executable. Match expected IDs and containing/extension version/build pair; do not hardcode historical total native file counts or executable hashes.",
+    "signing": "Future read-only file/codesign detail+entitlements only; never sign. Distinguish unsigned diagnostic from linker ad-hoc, require no developer Authority/Team/provisioning; package signed=false alone does not prove binary status.",
+    "postAndRelease": "Preserve exact argv/env/stdout/stderr/timestamps/exit and all handles. After sequence rehash frozen inputs and record fresh owned-resource/focus release without installed app/simulator mutation.",
+    "statusBoundary": "Only actual terminal0 plus matching resources/identities supports COMPILE_AND_WEB_RESOURCE_MATCH_PASS_NOT_RUNTIME; no install/permission/site/AVKit/device acceptance."
+  },
+  "readonlyInspectionArgvTemplates": {
+    "file": [
+      "/usr/bin/file",
+      "<actual executable derived from Info.plist>"
+    ],
+    "codesignDetail": [
+      "/usr/bin/codesign",
+      "-dvvv",
+      "<actual App or appex bundle>"
+    ],
+    "entitlements": [
+      "/usr/bin/codesign",
+      "-d",
+      "--entitlements",
+      ":-",
+      "<actual App or appex bundle>"
+    ]
+  },
+  "prohibited": [
+    "SDK/build/browser/network/install during this preparation",
+    "developer signing/provisioning/archive/export/notarize/publish",
+    "real device discovery or operation",
+    "simulator inventory/boot/install/launch/test/shutdown",
+    "daily app/foreground operations",
+    "editing product sources, existing package generator, old evidence or installed d9/Userscripts",
+    "No product/Web edits or Web rebuild during lane",
+    "No developer signing/provisioning/team/account/archive/export/notarize/publish",
+    "No installed d9/Userscripts replacement, extension registration, simulator boot/install/launch/test or physical device discovery/operation"
+  ],
+  "performedDuringPreparation": {
+    "fileReadAndHash": true,
+    "gitReadOnly": true,
+    "SDK": false,
+    "packaging": false,
+    "build": false,
+    "browser": false,
+    "network": false,
+    "deviceOrSimulator": false,
+    "processInventory": false,
+    "productEdits": false,
+    "installedOrExistingProjectMutations": false,
+    "writesOnly": [
+      "preparation.json",
+      "argument-replacements.diff"
+    ]
+  },
+  "contextPreference": {
+    "handoffAtTokens": 300000,
+    "automaticEnforcement": "SYSTEM_CONTROLLED_NOT_VERIFIED",
+    "newDescendantsCreated": false
+  }
+}

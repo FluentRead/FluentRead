@@ -1,0 +1,315 @@
+{
+  "actions" : {
+    "address" : 1,
+    "defaultServiceRow" : 1,
+    "extensionPopup" : 1,
+    "navigation" : 1,
+    "normalClear" : 1,
+    "pageMenu" : 1,
+    "SafariActivate" : 1,
+    "searchFocus" : 1,
+    "searchGpt" : 1,
+    "serviceSummary" : 1
+  },
+  "actualExactAllowedWebViewLabel" : "流畅阅读",
+  "configurationChangeIntents" : 0,
+  "emptyOwnerIsNotCurrentOwnerProof" : true,
+  "frameIntersectionIsNotVisiblePixelProof" : true,
+  "keyboardCountCappedAt2" : 1,
+  "keyboardFramesAtMost2" : [
+    {
+      "height" : 233,
+      "width" : 402,
+      "x" : 0,
+      "y" : 583
+    }
+  ],
+  "nativeGlobalExactDoneCountCappedAt2" : 2,
+  "nativeHeaderDoneCandidatesCappedAt2" : 1,
+  "nodes" : [
+    {
+      "frame" : {
+        "height" : 812,
+        "width" : 402,
+        "x" : 0,
+        "y" : 62
+      },
+      "identifier" : "",
+      "label" : "流畅阅读",
+      "type" : 58
+    },
+    {
+      "frame" : {
+        "height" : 708,
+        "width" : 402,
+        "x" : 0,
+        "y" : 132
+      },
+      "identifier" : "",
+      "label" : "流畅阅读",
+      "type" : 1
+    },
+    {
+      "frame" : {
+        "height" : 330,
+        "width" : 402,
+        "x" : 0,
+        "y" : 140
+      },
+      "identifier" : "",
+      "label" : "翻译服务, 网页对话框",
+      "type" : 1
+    },
+    {
+      "frame" : {
+        "height" : 526,
+        "width" : 346,
+        "x" : 20,
+        "y" : 168
+      },
+      "identifier" : "",
+      "label" : "网页默认服务, 区域",
+      "type" : 1
+    },
+    {
+      "frame" : {
+        "height" : 56,
+        "width" : 346,
+        "x" : 20,
+        "y" : 168
+      },
+      "identifier" : "",
+      "label" : "节标题",
+      "type" : 1
+    },
+    {
+      "frame" : {
+        "height" : 46,
+        "width" : 46,
+        "x" : 20,
+        "y" : 168
+      },
+      "identifier" : "",
+      "label" : "返回翻译服务选择",
+      "type" : 9
+    },
+    {
+      "frame" : {
+        "height" : 16,
+        "width" : 72,
+        "x" : 74,
+        "y" : 183
+      },
+      "identifier" : "",
+      "label" : "网页默认服务",
+      "type" : 48
+    },
+    {
+      "frame" : {
+        "height" : 46,
+        "width" : 46,
+        "x" : 320,
+        "y" : 168
+      },
+      "identifier" : "",
+      "label" : "关闭",
+      "type" : 9
+    },
+    {
+      "frame" : {
+        "height" : 46,
+        "width" : 256,
+        "x" : 49,
+        "y" : 225
+      },
+      "identifier" : "",
+      "label" : "搜索服务或模型，如 gpt、qwen",
+      "type" : 45
+    },
+    {
+      "frame" : {
+        "height" : 21,
+        "width" : 25,
+        "x" : 57,
+        "y" : 237
+      },
+      "identifier" : "",
+      "label" : "gpt",
+      "type" : 48
+    },
+    {
+      "frame" : {
+        "height" : 46,
+        "width" : 46,
+        "x" : 311,
+        "y" : 225
+      },
+      "identifier" : "",
+      "label" : "清除搜索",
+      "type" : 9
+    },
+    {
+      "frame" : {
+        "height" : 414,
+        "width" : 346,
+        "x" : 20,
+        "y" : 280
+      },
+      "identifier" : "",
+      "label" : "网页默认服务",
+      "type" : 1
+    },
+    {
+      "frame" : {
+        "height" : 414,
+        "width" : 346,
+        "x" : 20,
+        "y" : 280
+      },
+      "identifier" : "",
+      "label" : "翻译服务",
+      "type" : 1
+    },
+    {
+      "frame" : {
+        "height" : 13,
+        "width" : 40,
+        "x" : 24,
+        "y" : 288
+      },
+      "identifier" : "",
+      "label" : "翻译服务",
+      "type" : 48
+    },
+    {
+      "frame" : {
+        "height" : 69,
+        "width" : 346,
+        "x" : 20,
+        "y" : 306
+      },
+      "identifier" : "",
+      "label" : "OpenAI gpt-5.4-mini · gpt-5.4-nano · gpt-6-astra · gpt-5.6-luna · gpt-5.6-sol · gpt-5.6-terra · gpt-5.5 · gpt-5-mini · gpt-5-nano · gpt-4.1 · gpt-4.1-mini · gpt-4.1-nano",
+      "type" : 1
+    },
+    {
+      "frame" : {
+        "height" : 46,
+        "width" : 346,
+        "x" : 20,
+        "y" : 375
+      },
+      "identifier" : "",
+      "label" : "New API gpt-5.4-mini · gpt-5.6-luna · gpt-5.6-sol",
+      "type" : 1
+    },
+    {
+      "frame" : {
+        "height" : 56,
+        "width" : 346,
+        "x" : 20,
+        "y" : 421
+      },
+      "identifier" : "",
+      "label" : "OpenRouter openai\/gpt-5.4-mini · openai\/gpt-6-astra · openai\/gpt-5.6-luna · openai\/gpt-5.6-sol",
+      "type" : 1
+    },
+    {
+      "frame" : {
+        "height" : 46,
+        "width" : 346,
+        "x" : 20,
+        "y" : 477
+      },
+      "identifier" : "",
+      "label" : "Groq openai\/gpt-oss-20b · openai\/gpt-oss-120b",
+      "type" : 1
+    },
+    {
+      "frame" : {
+        "height" : 69,
+        "width" : 346,
+        "x" : 20,
+        "y" : 523
+      },
+      "identifier" : "",
+      "label" : "Azure gpt-5.4-mini · gpt-5.6-luna · gpt-5.6-sol · gpt-5.6-terra · gpt-5.5 · gpt-5.4-nano · gpt-5-mini · gpt-5-nano · gpt-4.1 · gpt-4.1-mini · gpt-4.1-nano",
+      "type" : 1
+    },
+    {
+      "frame" : {
+        "height" : 46,
+        "width" : 346,
+        "x" : 20,
+        "y" : 592
+      },
+      "identifier" : "",
+      "label" : "Cerebras openai\/gpt-oss-20b · openai\/gpt-oss-120b",
+      "type" : 1
+    },
+    {
+      "frame" : {
+        "height" : 56,
+        "width" : 346,
+        "x" : 20,
+        "y" : 638
+      },
+      "identifier" : "",
+      "label" : "Fireworks AI accounts\/fireworks\/models\/gpt-oss-20b · accounts\/fireworks\/models\/gpt-oss-120b",
+      "type" : 1
+    },
+    {
+      "frame" : {
+        "height" : 338,
+        "width" : 30,
+        "x" : 369,
+        "y" : 132
+      },
+      "identifier" : "",
+      "label" : "垂直滚动条, 3页",
+      "type" : 1
+    },
+    {
+      "frame" : {
+        "height" : 30,
+        "width" : 278,
+        "x" : 62,
+        "y" : 437
+      },
+      "identifier" : "",
+      "label" : "水平滚动条, 1页",
+      "type" : 1
+    },
+    {
+      "frame" : {
+        "height" : 338,
+        "width" : 30,
+        "x" : 369,
+        "y" : 132
+      },
+      "identifier" : "",
+      "label" : "垂直滚动条, 3页",
+      "type" : 1
+    },
+    {
+      "frame" : {
+        "height" : 30,
+        "width" : 278,
+        "x" : 62,
+        "y" : 437
+      },
+      "identifier" : "",
+      "label" : "水平滚动条, 1页",
+      "type" : 1
+    }
+  ],
+  "ownerExact" : false,
+  "ownerNotExposed" : true,
+  "permissionChoices" : 0,
+  "phase" : "picker-gpt",
+  "readOnlyDrawerHeaderAdmission" : true,
+  "scope" : "Current named production Popup only; no unrelated page\/field\/keyboard key values",
+  "snapshotLiveAndPNGSequentialNotAtomic" : true,
+  "status" : "DRAWER_KEYBOARD_PHASE_OBSERVATION_REQUIRES_REVIEW",
+  "translationIntents" : 0
+}

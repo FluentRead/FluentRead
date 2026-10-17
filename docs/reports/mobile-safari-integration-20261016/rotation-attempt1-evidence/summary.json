@@ -1,0 +1,64 @@
+{
+  "schema": 1,
+  "kind": "derived-scoped-rotation-initialization-stop-summary",
+  "sourceCommit": "461c2fb3b310382f67fa3b21303733a590783bfd",
+  "artifactKind": "clean-production-461c2fb-touch-width",
+  "official": {
+    "PASS": 0,
+    "SKIP": 1,
+    "FAIL": 0
+  },
+  "runtimeSession": 12855,
+  "runtimeTerminalExitCode": 1,
+  "actions": {},
+  "SafariActivate": 0,
+  "permissionChoices": 0,
+  "payloadJSON": 2,
+  "PNG": 0,
+  "rotationAcceptance": false,
+  "productAcceptance": false,
+  "initialOrientation": "unknown",
+  "finally": {
+    "before": "unknown",
+    "after": "portrait",
+    "portraitSetterAttempts": 1,
+    "notLayoutProof": true
+  },
+  "historicalGuard": {
+    "laneReleased": false,
+    "cleanupError": "Exact dedicated Safari terminate code3 found nothing to terminate; original error retained",
+    "rawCommandExitCode": 3
+  },
+  "laterResource": {
+    "laneReleased": true,
+    "separateObservationDoesNotRewriteGuard": true
+  },
+  "restoration": {
+    "D9Full485AndWeb467Verified": true,
+    "F13NativePrivateOnlyMatches": true,
+    "Userscripts47AndDemoMatch": true,
+    "taskSimulatorShutdown": true,
+    "noFullExtensionStorageClaim": true
+  },
+  "reviewAttribution": "Actual Root execution and two JSON review; independent evidence and current restoration-file review by rotation_source_review. Zero original PNG exist.",
+  "externalReferences": {
+    "root-runtime-outcome.json": {
+      "path": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/mobile-youtube-fr-node-identity-probe-20261017/same-scope-clone-repair-20261017/current-production-touch-width-rotation-keyboard-attempt1/root-runtime-outcome.json",
+      "bytes": 5425,
+      "sha256": "c7a62ad15f3dc87aafda8f93023baa4af547116c398e67c28a4a7be9cd598560",
+      "copy": null
+    },
+    "independent-runtime-review.json": {
+      "path": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/mobile-youtube-fr-node-identity-probe-20261017/same-scope-clone-repair-20261017/current-production-touch-width-rotation-keyboard-attempt1/independent-runtime-review.json",
+      "bytes": 8317,
+      "sha256": "3e7c665ddf52dad4be47994aa11cf774402b571a8f30b6de9276137a1440e037",
+      "copy": null
+    },
+    "root-resource-after-runtime.json": {
+      "path": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/mobile-youtube-fr-node-identity-probe-20261017/same-scope-clone-repair-20261017/current-production-touch-width-rotation-keyboard-attempt1/root-resource-after-runtime.json",
+      "bytes": 4440,
+      "sha256": "c101be4ec733b17b05b0a22b7f1ba762c0a25f6adf345e9f0eb2e65bb148e53b",
+      "copy": null
+    }
+  }
+}

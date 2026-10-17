@@ -1,0 +1,23 @@
+{
+  "at": "2026-10-16T21:10:22.236437+00:00",
+  "selectedSuite": "menu",
+  "scriptSHA256": "b55766aef51af34b070a769e7424825ef787ec8603ac47b5a5304c2ad34a3f7c",
+  "productSourceUISHA256": "eb9cd5ccd3d2931cd1e85fa8a668235374e0a865e06605981274bd20944b592c",
+  "chromeMapSHA256": "fa6ed6c48b27fd7e9040764ca43c19a2aef9150c4ca32263c53c278a1900878e",
+  "chrome478UnchangedFromFinalGeometry": true,
+  "fullLifecyclePreviousStatus": "FAIL wrong initial-site restoration oracle after explicit Off; preserved, independently diagnosed against existing source/tests",
+  "notExecuted": [
+    "native system-selection lifecycle",
+    "video replacement",
+    "reload",
+    "pageshow recovery"
+  ],
+  "menuScopeIncludes": [
+    "touch44 and12trustedkeys",
+    "header top coverage",
+    "normalCloseandEscfocus",
+    "landscape and DOM fullscreen geometry",
+    "desktop actual coarsefalse maxTouch0",
+    "disable cleanup"
+  ]
+}

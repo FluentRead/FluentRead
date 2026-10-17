@@ -1,0 +1,189 @@
+{
+  "at": "2026-10-16T23:10:10.801Z",
+  "status": "CANDIDATE_BROWSER_PASS_AND_SYNTHETIC_FAILURE_GATE_CONFIRMED",
+  "artifactMaps": {
+    "chrome": {
+      "filesChecked": 478,
+      "allMatched": true,
+      "mapSHA256": "fe68bbd1129848b7fc8b899acb9522c14d6f67e1562df721a37cdcbc824982f4"
+    },
+    "firefox": {
+      "filesChecked": 478,
+      "allMatched": true,
+      "mapSHA256": "adc1c6046d4eeb3b8a8f49590ce96bad9491d2afd1c4e39479c96cad057bf246"
+    },
+    "safari": {
+      "filesChecked": 467,
+      "allMatched": true,
+      "mapSHA256": "fb688108455f6e6432140a6f9e4d7c9dcafa08fbba9be46a968bb821c9726db2"
+    },
+    "userscript": {
+      "filesChecked": 1,
+      "allMatched": true,
+      "mapSHA256": "5a106afcdb4466367a43263a02f9822063e87e4c10470b9b81fd9260aa13177d"
+    }
+  },
+  "outcomes": {
+    "candidate-production": {
+      "actualExitCode": 0,
+      "cases": [
+        {
+          "name": "desktop-whole-host",
+          "status": "PASS"
+        },
+        {
+          "name": "desktop-loose",
+          "status": "PASS"
+        },
+        {
+          "name": "desktop-configuration-disable",
+          "status": "PASS"
+        },
+        {
+          "name": "mobile-whole-host",
+          "status": "PASS"
+        },
+        {
+          "name": "mobile-loose",
+          "status": "PASS"
+        },
+        {
+          "name": "mobile-configuration-disable",
+          "status": "PASS"
+        }
+      ],
+      "reportSHA256": "8e7230b1fcc79a7a3deb18358a853575b29e6c20c533c5f74e48cf017957adc3",
+      "browserCloseReceipt": "shared-guard-fulfilled",
+      "profileRemoved": true,
+      "focusEvents": [],
+      "focusObserverError": null,
+      "focusSamples": 10,
+      "timedtextResponses": [
+        {
+          "url": "https://www.youtube.com/api/timedtext?v=fluentread-control-clones-desktop&lang=en&fmt=json3&xorb=2&xobt=3&xovt=3&c=WEB&cplayer=UNIPLAYER",
+          "status": 200
+        },
+        {
+          "url": "https://m.youtube.com/api/timedtext?v=fluentread-control-clones-mobile&lang=en&fmt=json3&xorb=2&xobt=3&xovt=3&c=WEB&cplayer=UNIPLAYER",
+          "status": 200
+        }
+      ],
+      "originalPNGs": {
+        "control-clones-desktop-loose-menu-closed.png": {
+          "sha256": "9de53d5a0cbe090b8a714e6d79e87ddd8145dfc6925b9db23be5de6703a391e5",
+          "bytes": 44604
+        },
+        "control-clones-desktop-loose-menu-open.png": {
+          "sha256": "1d95fc81876aa57bd0cbdccb5f8111507e5dc850895ccc0b59798ce2d35bbc5e",
+          "bytes": 57317
+        },
+        "control-clones-desktop-whole-host-menu-closed.png": {
+          "sha256": "6ce03fa60f0e3008ade18981f08588ed70e4f7ff17303145e7f504de8d1cef9a",
+          "bytes": 42986
+        },
+        "control-clones-desktop-whole-host-menu-open.png": {
+          "sha256": "6f6113003508dd069f30f5e70a7b52c87ab4a96cbbc0fd873c7ef2b682b433c4",
+          "bytes": 55763
+        },
+        "control-clones-mobile-loose-menu-closed.png": {
+          "sha256": "fbf04a69d9ca24c6304f99b46d87f79c97f4f3bd6ca90a2e10f5a963f4fe79b0",
+          "bytes": 36811
+        },
+        "control-clones-mobile-loose-menu-open.png": {
+          "sha256": "c64d68bdc9e50effd3b4703ddca8d26f0b2d020bfa0d352d69be1077ac94865f",
+          "bytes": 28960
+        },
+        "control-clones-mobile-whole-host-menu-closed.png": {
+          "sha256": "2cdd5d82c2cd9dbad388c32f57266b5d17dec1f1df704edfe4ac70c8716b4142",
+          "bytes": 35264
+        },
+        "control-clones-mobile-whole-host-menu-open.png": {
+          "sha256": "82eab9c486ac33cc7353a8d7c519bae0f83a119bde0aeb202fe502fd3a423367",
+          "bytes": 27058
+        }
+      },
+      "scope": "Controlled production-extension Chromium desktop/mobile viewport fixture; not Safari/live provider"
+    },
+    "focus-stop-fault": {
+      "actualExitCode": 1,
+      "cases": [
+        {
+          "name": "desktop-whole-host",
+          "status": "PASS"
+        },
+        {
+          "name": "desktop-loose",
+          "status": "PASS"
+        },
+        {
+          "name": "desktop-configuration-disable",
+          "status": "PASS"
+        },
+        {
+          "name": "mobile-whole-host",
+          "status": "PASS"
+        },
+        {
+          "name": "mobile-loose",
+          "status": "PASS"
+        },
+        {
+          "name": "mobile-configuration-disable",
+          "status": "PASS"
+        }
+      ],
+      "reportSHA256": "997b50ed6aa9809717663abbf91b19d2afd3f77ca33283439f7209606596b984",
+      "browserCloseReceipt": "shared-guard-fulfilled",
+      "profileRemoved": true,
+      "focusEvents": [],
+      "focusObserverError": "Error: INJECTED_FOCUS_OBSERVER_FAILURE_DURING_STOP",
+      "focusSamples": 10,
+      "timedtextResponses": [
+        {
+          "url": "https://www.youtube.com/api/timedtext?v=fluentread-control-clones-desktop&lang=en&fmt=json3&xorb=2&xobt=3&xovt=3&c=WEB&cplayer=UNIPLAYER",
+          "status": 200
+        },
+        {
+          "url": "https://m.youtube.com/api/timedtext?v=fluentread-control-clones-mobile&lang=en&fmt=json3&xorb=2&xobt=3&xovt=3&c=WEB&cplayer=UNIPLAYER",
+          "status": 200
+        }
+      ],
+      "originalPNGs": {
+        "control-clones-desktop-loose-menu-closed.png": {
+          "sha256": "9de53d5a0cbe090b8a714e6d79e87ddd8145dfc6925b9db23be5de6703a391e5",
+          "bytes": 44604
+        },
+        "control-clones-desktop-loose-menu-open.png": {
+          "sha256": "1d95fc81876aa57bd0cbdccb5f8111507e5dc850895ccc0b59798ce2d35bbc5e",
+          "bytes": 57317
+        },
+        "control-clones-desktop-whole-host-menu-closed.png": {
+          "sha256": "6ce03fa60f0e3008ade18981f08588ed70e4f7ff17303145e7f504de8d1cef9a",
+          "bytes": 42986
+        },
+        "control-clones-desktop-whole-host-menu-open.png": {
+          "sha256": "6f6113003508dd069f30f5e70a7b52c87ab4a96cbbc0fd873c7ef2b682b433c4",
+          "bytes": 55763
+        },
+        "control-clones-mobile-loose-menu-closed.png": {
+          "sha256": "fbf04a69d9ca24c6304f99b46d87f79c97f4f3bd6ca90a2e10f5a963f4fe79b0",
+          "bytes": 36811
+        },
+        "control-clones-mobile-loose-menu-open.png": {
+          "sha256": "c64d68bdc9e50effd3b4703ddca8d26f0b2d020bfa0d352d69be1077ac94865f",
+          "bytes": 28960
+        },
+        "control-clones-mobile-whole-host-menu-closed.png": {
+          "sha256": "2cdd5d82c2cd9dbad388c32f57266b5d17dec1f1df704edfe4ac70c8716b4142",
+          "bytes": 35264
+        },
+        "control-clones-mobile-whole-host-menu-open.png": {
+          "sha256": "82eab9c486ac33cc7353a8d7c519bae0f83a119bde0aeb202fe502fd3a423367",
+          "bytes": 27058
+        }
+      },
+      "scope": "Synthetic public helper error after actual monitor.stop; not a real native error"
+    }
+  },
+  "rootViewedCandidateOriginalPNGs": 8
+}

@@ -1,7 +1,7 @@
 /**
  * @file src/features/video-subtitle/ui/videoSentenceLearning.css
  * 文件职责：为完整句学习提供层次清楚、可折叠的播放器内双语阅读卡样式。
- * 主要内容：沿用既有视频菜单的局部深灰表面与品牌粉色，突出原句与下方重播，把播放辅助做成互斥分段项；纵向留白随小播放器收缩，粗指针下主操作与顶栏图标保留至少 44px 点击区域，固定操作和滚动正文保留原播放器控制区。
+ * 主要内容：沿用既有视频菜单的局部深灰表面与品牌粉色，突出原句与重播；短高度下整卡单区滚动、顶栏固定可达，正文不再被底部操作挤空；粗指针下顶栏、导航与底部主操作保留至少44px目标，布局仍保留原播放器控制区。
  * 模块边界：仅匹配 FluentRead 自有面板后代，由字幕 runtime 显式注入和清理，不依赖宿主样式或 WXT Shadow UI 自动挂载。
  */
 #fluent-read-video-learning-panel .fr-video-learning {
@@ -124,9 +124,24 @@
 #fluent-read-video-learning-panel[data-compact=true] .fr-video-learning-footer { padding: var(--fr-learning-compact-space) 10px; }
 #fluent-read-video-learning-panel[data-compact=true] .fr-video-learning-footer-actions button { min-height: 30px; padding: 5px 6px; font-size: 11px; }
 
+/* 短播放器优先保留完整正文；导航/收藏随内容流滚动，关闭始终留在同一自有滚动区顶部。 */
+#fluent-read-video-learning-panel[data-short-height=true] .fr-video-learning {
+  display: block; overflow-x: hidden; overflow-y: auto; overscroll-behavior: contain;
+  scrollbar-width: thin; scrollbar-color: #66708366 transparent;
+}
+#fluent-read-video-learning-panel[data-short-height=true] .fr-video-learning-header {
+  position: sticky; top: 0; z-index: 2; background: var(--fr-video-menu-surface);
+}
+#fluent-read-video-learning-panel[data-short-height=true] .fr-video-learning-body { overflow: visible; }
+#fluent-read-video-learning-panel[data-short-height=true] .fr-video-learning-position { max-height: none; overflow: visible; }
+
 @media (pointer: coarse) {
   #fluent-read-video-learning-panel .fr-video-learning-footer-actions button,
   #fluent-read-video-learning-panel[data-compact=true] .fr-video-learning-footer-actions button { min-height: 44px; }
   #fluent-read-video-learning-panel .fr-video-learning-header-actions button.fr-video-learning-icon,
   #fluent-read-video-learning-panel[data-compact=true] .fr-video-learning-header-actions button.fr-video-learning-icon { min-width: 44px; min-height: 44px; }
+  #fluent-read-video-learning-panel .fr-video-learning-navigation,
+  #fluent-read-video-learning-panel[data-compact=true] .fr-video-learning-navigation { grid-template-columns: 44px 1fr 44px; }
+  #fluent-read-video-learning-panel .fr-video-learning-navigation button,
+  #fluent-read-video-learning-panel[data-compact=true] .fr-video-learning-navigation button { min-width: 44px; min-height: 44px; }
 }

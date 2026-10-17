@@ -1,7 +1,7 @@
 /**
  * @file tests/popupAppLifecycle.test.ts
  * 文件职责：执行实际 Popup 与站点按钮客户端模板，验证生命周期、页面竞态、缓存事件及焦点归属。
- * 主要内容：保持真实 Vue/KeepAlive、缓存和诊断模板，受控浏览器、持久化及展示端口覆盖延迟回复、失活、消息来源、诊断动作失败、状态切换、抽屉和弹窗；网站保存执行真实共享 store，验证同 tick 草稿捕获与在途确认的字段归属。
+ * 主要内容：保持真实 Vue/KeepAlive、缓存和诊断模板，受控浏览器、持久化及展示端口覆盖延迟回复、失活、消息来源、诊断动作失败、状态切换、抽屉和弹窗；真实服务选择子组件以布局端口验证键盘恢复时仅修正所属 scroller 的搜索外框；网站保存执行真实共享 store，验证同 tick 草稿捕获与在途确认的字段归属。
  * 模块边界：Linkedom 保留节点/事件树，动画、Element Plus、外部存储和浏览器为受控端口，普通 UI 用例控制保存端口；真实样式与浏览器流程另行验证。
  */
 import {createRequire} from 'node:module'
@@ -124,7 +124,7 @@ beforeEach(async()=>{
     if(id==='\0popup-permissions')return 'export const readFreePoolAccess=globalThis.__popupFixture.readAccess,requestFreeProviderAccess=globalThis.__popupFixture.requestAccess;export const subscribeFreeProviderAccessChanges=fn=>{globalThis.__popupFixture.permissionEvents.add(fn);return()=>globalThis.__popupFixture.permissionEvents.delete(fn)}'
     if(id==='\0popup-capabilities')return 'export const browserCapabilities=globalThis.__popupFixture.capabilities'
     if(id==='\0popup-icons')return 'export const Setting={render:()=>null}'
-    if(id==='\0popup-drawer')return "import {h,Teleport} from 'vue';export default {setup(_, {attrs,slots}){return()=>attrs.modelValue||attrs['model-value']?h(Teleport,{to:'body'},h('div',{class:'popup-drawer-modal'},h('div',{...attrs,class:['drawer-port',attrs.class]},slots.default?.()))):null}}"
+    if(id==='\0popup-drawer')return "import {h,Teleport} from 'vue';export default {setup(_, {attrs,slots}){return()=>attrs.modelValue||attrs['model-value']?h(Teleport,{to:'body'},h('div',{class:'popup-drawer-modal'},h('div',{...attrs,class:['drawer-port',attrs.class]},h('div',{class:'el-drawer__body'},slots.default?.())))):null}}"
     if(id==='\0popup-display')return "import {h} from 'vue';export default {setup(_, {attrs,slots}){return()=>h('div',attrs,slots.default?.())}}"
     return null
   }}]})
@@ -154,7 +154,67 @@ async function mount(){
   // 保留真实模板事件；Transition 的 CSS 动画为展示端口，生产截图验证真实动画。
   app=renderer.createApp({setup:()=>()=>runtime.h(runtime.KeepAlive,null,{default:()=>shown.value?runtime.h(component,{ref:(vm:any)=>{if(vm)state=vm.$.setupState}}):runtime.h({render:()=>null},{key:'other'})})});app.component('OwnedTransition',{setup:(_:unknown,{slots}:any)=>()=>slots.default?.()});app.config.warnHandler=()=>{};app.mount(document.getElementById('app')!);await drain()
 }
+async function focusedServiceSearchAtCompact(scrollTop = 22, naturalTop = 92) {
+  executeServicePicker=true;await mount();eventOf(document.querySelector('.provider-summary')!)()
+  for(let i=0;i<100&&!document.querySelector('[data-feature-service="default"]');i++){await drain();await new Promise(resolve=>setTimeout(resolve,2))}
+  const assignment=document.querySelector<HTMLElement>('[data-feature-service="default"]')!;assignment.focus();eventOf(assignment)();await drain()
+  const input=document.querySelector<HTMLInputElement>('input[type="search"]')!;input.value='micro';eventOf(input,'onInput')({target:input});await drain()
+  Object.assign(viewport,{height:80});viewport.dispatchEvent(new win.Event('resize'));flushViewport();await drain()
+  const border=input.closest<HTMLElement>('.service-picker-search')!,heading=document.querySelector<HTMLElement>('.service-picker-heading')!
+  const scroller=input.closest<HTMLElement>('.el-drawer__body')!;let offset=scrollTop
+  // 布局端口复现生产：body top16、heading bottom72、search top70、真实scrollTop22；setter保留浏览器0边界。
+  Object.defineProperties(scroller,{clientTop:{configurable:true,value:0},clientHeight:{configurable:true,value:229},
+    scrollTop:{configurable:true,get:()=>offset,set:(value:number)=>{offset=Math.max(0,value)}}})
+  const rect=(top:number,bottom:number)=>({top,bottom,left:20,right:284,x:20,y:top,width:264,height:bottom-top,toJSON(){return this}}) as DOMRect
+  scroller.getBoundingClientRect=()=>rect(16,245);heading.getBoundingClientRect=()=>{const top=Math.max(16,naturalTop-56-offset);return rect(top,top+56)}
+  // naturalTop默认92对应生产真实滚动22px后的top70，非正常flow无间距的假设。
+  border.getBoundingClientRect=()=>rect(naturalTop-offset,naturalTop+48-offset)
+  return {input,border,heading,scroller,focusCalls:noticeFocus.mock.calls.length}
+}
+function growServiceViewport(height=263){Object.assign(viewport,{height});viewport.dispatchEvent(new win.Event('resize'));flushViewport()}
 describe('实际 Popup 缓存模板与页面操作',()=>{
+  it('搜索恢复到普通高度仅回退所属抽屉2px，让完整border离开动态吸顶标题',async()=>{
+    const f=await focusedServiceSearchAtCompact();const picker=document.querySelector('[data-service-picker]')
+    const hostScroll=vi.fn();win.scrollTo=hostScroll
+    expect(f.scroller.scrollTop).toBe(22);expect(f.border.getBoundingClientRect().top).toBeLessThan(f.heading.getBoundingClientRect().bottom)
+    growServiceViewport();await drain()
+    expect(f.scroller.scrollTop).toBe(20);expect(f.border.getBoundingClientRect().top).toBe(72);expect(f.heading.getBoundingClientRect().bottom).toBe(72)
+    growServiceViewport(300);await drain();expect(f.scroller.scrollTop).toBe(20)
+    expect(document.querySelector('input[type="search"]')).toBe(f.input);expect(document.querySelector('[data-service-picker]')).toBe(picker)
+    expect(f.input.value).toBe('micro');expect(document.activeElement).toBe(f.input);expect(noticeFocus).toHaveBeenCalledTimes(f.focusCalls);expect(hostScroll).not.toHaveBeenCalled()
+  })
+  it('仅剩2px可回退时按真实容器clamp到0，至少保留完整搜索border且不滚宿主',async()=>{
+    const f=await focusedServiceSearchAtCompact(2,72);growServiceViewport();await drain()
+    expect(f.scroller.scrollTop).toBe(0);expect(f.border.getBoundingClientRect().top).toBe(f.heading.getBoundingClientRect().bottom)
+    // border与header紧邻，focus ring不作为可通过滚动分离的边界。
+    expect(f.border.getBoundingClientRect().top-2).toBeLessThan(f.heading.getBoundingClientRect().bottom)
+    expect(f.input.value).toBe('micro');expect(document.activeElement).toBe(f.input);expect(noticeFocus).toHaveBeenCalledTimes(f.focusCalls)
+  })
+  it('视口同高或缩小时不重置滚动，普通高度扩大也只在搜索确被标题遮住时修正',async()=>{
+    const f=await focusedServiceSearchAtCompact();growServiceViewport(80);await drain();expect(f.scroller.scrollTop).toBe(22)
+    growServiceViewport(58);await drain();expect(f.scroller.scrollTop).toBe(22)
+    f.border.getBoundingClientRect=()=>({top:100,bottom:148,left:20,right:284,width:264,height:48}) as DOMRect
+    growServiceViewport();await drain();expect(f.scroller.scrollTop).toBe(22)
+    f.border.getBoundingClientRect=()=>({top:92-f.scroller.scrollTop,bottom:140-f.scroller.scrollTop,left:20,right:284,width:264,height:48}) as DOMRect
+    growServiceViewport(300);await drain();expect(f.scroller.scrollTop).toBe(20);expect(noticeFocus).toHaveBeenCalledTimes(f.focusCalls)
+  })
+  it('键盘恢复后的异步修正不能抢回用户已移走的焦点或重置未聚焦长列表',async()=>{
+    const f=await focusedServiceSearchAtCompact(),outside=document.createElement('button');document.body.appendChild(outside)
+    // 非 renderer 创建的节点也接入既有焦点端口，Linkedom 的原生 focus 本身不更新 activeElement。
+    outside.focus=()=>{focused=outside}
+    growServiceViewport();outside.focus();await drain();expect(f.scroller.scrollTop).toBe(22);expect(document.activeElement).toBe(outside)
+    growServiceViewport(300);await drain();expect(f.scroller.scrollTop).toBe(22);expect(document.activeElement).toBe(outside)
+  })
+  it.each(['close','back','config','unmount'] as const)('%s使已排队的恢复修正失效，不触碰旧搜索滚动',async reason=>{
+    const f=await focusedServiceSearchAtCompact();growServiceViewport()
+    if(reason==='close')eventOf(document.querySelector('.service-panel-close')!)()
+    else if(reason==='back')eventOf(document.querySelector('.service-picker-back')!)()
+    else if(reason==='config')state.config={...state.config,service:'microsoft'}
+    else app.unmount()
+    // Back 自己的合法视图转场会重置到0；先记下转场完成的所属滚动值，再确保迟到恢复不追加位移。
+    const afterAction=f.scroller.scrollTop;await drain();expect(f.scroller.scrollTop).toBe(afterAction)
+  })
+
   it('真实服务搜索在键盘 viewport 变化时保留输入，清除、返回与关闭仍属当前抽屉',async()=>{
     executeServicePicker=true;await mount();eventOf(document.querySelector('.provider-summary')!)()
     for(let i=0;i<100&&!document.querySelector('[data-feature-service="default"]');i++){await drain();await new Promise(resolve=>setTimeout(resolve,2))}
@@ -164,10 +224,18 @@ describe('实际 Popup 缓存模板与页面操作',()=>{
     Object.assign(viewport,{height:220,offsetTop:40});viewport.dispatchEvent(new win.Event('resize'));viewport.dispatchEvent(new win.Event('scroll'));flushViewport();await drain()
     expect(document.querySelector('input[type="search"]')).toBe(input);expect(input.value).toBe('micro')
     const overlay=document.querySelector<HTMLElement>('.popup-drawer-modal')!;expect(overlay.style.getPropertyValue('--fluent-read-drawer-height')).toBe('220px')
+    const picker=document.querySelector('[data-service-picker]'),focusCalls=noticeFocus.mock.calls.length
+    Object.assign(viewport,{width:592,height:80,offsetTop:0});viewport.dispatchEvent(new win.Event('resize'));flushViewport();await drain()
+    expect(overlay.hasAttribute('data-fluent-read-popup-short')).toBe(true)
+    expect(document.querySelector('[data-service-picker]')).toBe(picker);expect(document.querySelector('input[type="search"]')).toBe(input);expect(input.value).toBe('micro')
+    expect(noticeFocus).toHaveBeenCalledTimes(focusCalls)
+    Object.assign(viewport,{width:360,height:263});viewport.dispatchEvent(new win.Event('resize'));flushViewport();await drain()
+    expect(overlay.hasAttribute('data-fluent-read-popup-short')).toBe(false);expect(input.value).toBe('micro');expect(noticeFocus).toHaveBeenCalledTimes(focusCalls)
     eventOf(document.querySelector('.service-picker-search button')!)();await drain();expect(input.value).toBe('');expect(focused).toBe(input)
     eventOf(document.querySelector('.service-picker-back')!)();await drain();expect(document.querySelector('[data-service-picker]')).toBeNull()
     const current=document.querySelector<HTMLElement>('[data-feature-service="default"]')!;current.focus();eventOf(current)();await drain()
-    eventOf(document.querySelector('.service-panel-close')!)();await drain();expect(state.drawerVisible).toBe(false);expect(overlay.hasAttribute('data-fluent-read-popup-viewport')).toBe(false)
+    Object.assign(viewport,{height:80});viewport.dispatchEvent(new win.Event('resize'));flushViewport();expect(overlay.hasAttribute('data-fluent-read-popup-short')).toBe(true)
+    eventOf(document.querySelector('.service-panel-close')!)();await drain();expect(state.drawerVisible).toBe(false);expect(overlay.hasAttribute('data-fluent-read-popup-viewport')).toBe(false);expect(overlay.hasAttribute('data-fluent-read-popup-short')).toBe(false)
   })
   it('只在打开的实际 teleport 遮罩跟随键盘可见边界，根 popup 固有尺寸不变',async()=>{
     await mount();const rootStyle=document.documentElement.getAttribute('style'),bodyStyle=document.body.getAttribute('style'),add=vi.spyOn(viewport,'addEventListener'),remove=vi.spyOn(viewport,'removeEventListener')

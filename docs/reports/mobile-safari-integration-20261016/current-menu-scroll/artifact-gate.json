@@ -1,0 +1,50 @@
+{
+  "at": "2026-10-16T21:18:50.509120+00:00",
+  "status": "FINAL_MENU_SOURCE_WEB_ARTIFACTS_SEALED",
+  "baseHead": "6ee7249dbaf231772f4ff0a2e16c665f56a5839b",
+  "uncommittedProductAndRunnerPatch": true,
+  "sourceFiles": {
+    "/Users/thinkstu/Desktop/copy/FluentRead-mobile-video-menu-accessibility-20261016/src/features/video-subtitle/content/ui.ts": "eb9cd5ccd3d2931cd1e85fa8a668235374e0a865e06605981274bd20944b592c",
+    "/Users/thinkstu/Desktop/copy/FluentRead-mobile-video-menu-accessibility-20261016/scripts/run-mobile-video-subtitle-test.cjs": "5f6aded2f3f1b47f61dc5fe89ce249c9b8ca209f1bc5a67f81150264d0d09b06"
+  },
+  "buildSummarySHA256": "4a3b74e64505505888e049bd51421a8f638b5ff91960e8acb41bd57228170221",
+  "artifacts": {
+    "chrome": {
+      "directory": "/Users/thinkstu/Desktop/copy/FluentRead-mobile-video-menu-accessibility-20261016/.output/chrome-mv3",
+      "files": 478,
+      "bytes": 62361064,
+      "rawByteHash": "e63d90b408f6510484517b967daa3601bf9c4d1a63db3e9e03f58c54d2187612",
+      "recordHash": "83209be600c8f2e9f92f1de946b9ce5ab9fe8520c254f56beab9b9fb9dd396ee",
+      "fullFileMap": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/menu-scroll-controlled-20261017/chrome-final-file-map.json",
+      "fullFileMapSHA256": "fa6ed6c48b27fd7e9040764ca43c19a2aef9150c4ca32263c53c278a1900878e"
+    },
+    "firefox": {
+      "directory": "/Users/thinkstu/Desktop/copy/FluentRead-mobile-video-menu-accessibility-20261016/.output/firefox-mv2",
+      "files": 478,
+      "bytes": 62363921,
+      "rawByteHash": "7707c6b91a5abaabb7f8dc936aa9183841121a9112a34cf02c679e7a4dd300fd",
+      "recordHash": "9553c5e3580870a1461e7792fafbbaef99187347b176f07243976b0fec006c37",
+      "fullFileMap": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/menu-scroll-controlled-20261017/firefox-final-file-map.json",
+      "fullFileMapSHA256": "ce3f7d2c46230e9dfdd2a55ae20aba2c63df4f0b93e0070bdcc8132a4c4dae65"
+    },
+    "safari": {
+      "directory": "/Users/thinkstu/Desktop/copy/FluentRead-mobile-video-menu-accessibility-20261016/.output/safari-mv2",
+      "files": 467,
+      "bytes": 62232369,
+      "rawByteHash": "b1a66b3fc4e579216321758ebb921b7396430610119c9e5ca356de23b8cfc161",
+      "recordHash": "14320cd02100962f0f593932a754cbdb5baa3ca25f073fece8bb6ea40a1a5be2",
+      "fullFileMap": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/menu-scroll-controlled-20261017/safari-final-file-map.json",
+      "fullFileMapSHA256": "68ea70ae724e0fff09e4caf91b2cfe5aceb264e449002cce02962c5daeb98418",
+      "manifestSHA256": "d7bcd7044f90b52d4dee774f7cef84f019b4b56fb73434de3304c9381a6cbae5"
+    },
+    "userscript": {
+      "directory": "/Users/thinkstu/Desktop/copy/FluentRead-mobile-video-menu-accessibility-20261016/.output/userscript",
+      "files": 1,
+      "bytes": 2087161,
+      "rawByteHash": "abd14d4b47f387f5264fc09774c19f8b4ce73cc4e8d6ae88d695113136084653",
+      "recordHash": "7e1db51608040ea96fb62c69ada0209f976add8bcd2fac97984cab2a5086952c",
+      "fullFileMap": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/menu-scroll-controlled-20261017/userscript-final-file-map.json",
+      "fullFileMapSHA256": "5a106afcdb4466367a43263a02f9822063e87e4c10470b9b81fd9260aa13177d"
+    }
+  }
+}

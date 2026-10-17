@@ -1,0 +1,9 @@
+{
+  "cleanupOrientationSetters" : 0,
+  "currentOrientation" : "portrait",
+  "initialPortraitSetterAttempts" : 1,
+  "initialPortraitSetterMaximum" : 1,
+  "landscapeSetters" : 0,
+  "noAXOrPixelsOrWaitOrRetry" : true,
+  "orientationReadbackIsNotLayoutOrScrollProof" : true
+}

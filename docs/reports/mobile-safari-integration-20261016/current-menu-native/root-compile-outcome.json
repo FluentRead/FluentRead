@@ -1,0 +1,77 @@
+{
+  "at": "2026-10-16T21:32:32.018265+00:00",
+  "status": "COMPILE_AND_WEB_RESOURCE_MATCH_INDEPENDENTLY_VERIFIED_NOT_RUNTIME",
+  "runtimeSourceCommit": "6eecd6710e7daac2d2a8cca9a34d0f26dc849b44",
+  "sixCommandExitCodes": [
+    0,
+    0,
+    0,
+    0,
+    0,
+    0
+  ],
+  "compileTerminalSession": 35045,
+  "verifyTerminalSession": 66941,
+  "compiledIdentitiesSHA256": "40c51fa62077d1f72e7b8aad80103f5ff01f66a5cf8628b4ad352cc89f635e15",
+  "independentReviewSHA256": "fd896bd148071088b4222c3431fca648e4a2a0cb40b4d641e335d4938b5f0552",
+  "freshResourceReleaseSHA256": "b7e298f5eacb45ff157e72746bfeb386423f373087238f7075903cafe5e60783",
+  "webFilesEach": 467,
+  "sourceWebRaw": "b1a66b3fc4e579216321758ebb921b7396430610119c9e5ca356de23b8cfc161",
+  "products": {
+    "macOS": {
+      "appInventory": {
+        "files": 482,
+        "bytes": 63251685,
+        "rawByteHash": "fe1e42c58fffd43b6fd8647a06e4246e52baf81ddcf8e2b333ffb37d0b49dbe2",
+        "recordHash": "4d961f6431765312664284848d4e0e4e7f5358f94283ceab65609ce6d6c2bdbd"
+      },
+      "appID": "org.example.FluentReadDevelopment",
+      "extensionID": "org.example.FluentReadDevelopment.Extension",
+      "nativeVersion": "1.0",
+      "nativeBuild": "1",
+      "signing": "LINKER_ADHOC_NO_TEAM",
+      "extraNativeFilesAtWebPrefix": []
+    },
+    "iosSimulator": {
+      "appInventory": {
+        "files": 485,
+        "bytes": 64226943,
+        "rawByteHash": "8a43eba8254a15452e5a8cb09cb519a9fdb42bb02623e87f3c3630ff4caca3d9",
+        "recordHash": "bedc4de9c0ef08df7be31f0a1208555f8ee0b750744c81cdef8ef154418d1bad"
+      },
+      "appID": "org.example.FluentReadDevelopment",
+      "extensionID": "org.example.FluentReadDevelopment.Extension",
+      "nativeVersion": "1.0",
+      "nativeBuild": "1",
+      "signing": "LINKER_ADHOC_NO_TEAM",
+      "extraNativeFilesAtWebPrefix": [
+        "FluentRead Extension",
+        "Info.plist"
+      ]
+    },
+    "iPhoneOS": {
+      "appInventory": {
+        "files": 485,
+        "bytes": 64123613,
+        "rawByteHash": "c07784b89c87fda531a08a2de21d130db328a343a27834a4a15e1ceebb04dc73",
+        "recordHash": "8d50f2e5845fcf43416138fbf72041b465f3558264d6f61813ead3e9f4d4108a"
+      },
+      "appID": "org.example.FluentReadDevelopment",
+      "extensionID": "org.example.FluentReadDevelopment.Extension",
+      "nativeVersion": "1.0",
+      "nativeBuild": "1",
+      "signing": "UNSIGNED",
+      "extraNativeFilesAtWebPrefix": [
+        "FluentRead Extension",
+        "Info.plist"
+      ]
+    }
+  },
+  "independentActualRead": "Three complete Apps, 1452 files and191602241 bytes, plus pure source/copied467 and9 bound source/generator files. Independent review does not run codesign CLI or resource inventory; those actual receipts remain separate.",
+  "installed": false,
+  "simulatorBooted": false,
+  "SafariRuntime": false,
+  "developerSigning": false,
+  "physicalDevice": false,
+  "fullGoalComplete": false
+}

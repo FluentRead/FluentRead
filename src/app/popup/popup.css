@@ -1,8 +1,9 @@
 /**
  * @file src/app/popup/popup.css
- * 文件职责：定义桌面宽度随皮肤和界面语言、Firefox Android 固定容器限制画布不超过视口，高度由内容撑开且最高 560px 的浏览器 Popup 视觉系统与交互状态，包括亮暗主题、服务选择、功能卡、设置抽屉、通知和响应式细节。
- * 主要内容：整页遮罩持续拦截背景，内部抽屉跟随可见视口并保留内部滚动，服务搜索在触屏使用 16px 字号避免自动缩放；触摸设备的主画布、快捷和服务抽屉采用 46px 命中预算，为原生 sheet 缩放留余量，开关保留紧凑胶囊视觉，桌面沿用原有布局；以白色窄版画布、浅灰控件和品牌色强调翻译、局部及站点控制；两个操作以 42px 高度紧凑同排，主按钮弹性伸展并用短标题合并快捷键，辅助按钮以上方图标和下方文字收拢；网站规则不再绘制外层框，独立按钮沿用指示点展示保存状态并尊重减少动画偏好；保留版本与赞赏码的原位放大、服务及模型摘要、两列入口、完整开源胶囊与开关优先的快捷抽屉和必要的内部滚动。
+ * 文件职责：定义桌面宽度随皮肤和界面语言、Firefox Android 固定容器限制画布不超过视口，高度由内容撑开且最高 560px 的浏览器 Popup 视觉系统与交互状态，包括亮暗主题、服务选择、功能卡、设置抽屉、通知和响应式细节；Safari 触摸独立 Popup 的快捷入口以两列换行布局适配宿主。
+ * 主要内容：Safari 触摸独立 Popup 的快捷入口使用 flex 换行，卡片宽度与皮肤局部间距共享变量，奇数末项保留半宽；整页遮罩持续拦截背景，内部抽屉跟随可见视口并保留内部滚动，服务搜索在触屏使用 16px 字号避免自动缩放；触摸设备的主画布、快捷和服务抽屉采用 46px 命中预算，为原生 sheet 缩放留余量，开关保留紧凑胶囊视觉，桌面沿用原有布局；以白色窄版画布、浅灰控件和品牌色强调翻译、局部及站点控制；两个操作以 42px 高度紧凑同排，主按钮弹性伸展并用短标题合并快捷键，辅助按钮以上方图标和下方文字收拢；网站规则不再绘制外层框，独立按钮沿用指示点展示保存状态并尊重减少动画偏好；保留版本与赞赏码的原位放大、服务及模型摘要、两列入口、完整开源胶囊与开关优先的快捷抽屉和必要的内部滚动。
  * 模块边界：样式只对应 PopupApp 的 DOM 和受控第三方组件，不决定配置值、能力可用性或消息行为；跨页面 token 在 src/ui/styles，Options/文档页各自维护页面样式。
+ * 极矮视口：服务选择的返回、搜索、清除与关闭复用原节点并排，隐藏装饰留白而不缩小操作区，输入状态与整页遮罩保持。
  */
 @import "../../ui/styles/feedback.css";
 /* Popup 页面样式跟随 app 页面边界，避免 WXT 入口目录继续承载实现。 */
@@ -414,6 +415,8 @@ footer > button { justify-self: end; }
   bottom: max(0px, calc(100% - var(--fluent-read-drawer-top) - var(--fluent-read-drawer-height))) !important;
   width: min(var(--fluent-read-drawer-width), var(--interface-popup-width, 320px)) !important;
   min-height: 0 !important; max-height: calc(var(--fluent-read-drawer-height) - 8px);
+  /* 只保留进出场位移；键盘改变视口后立即应用尺寸，焦点恢复才能读取实际可用高度。 */
+  transition-property: transform;
 }
 .popup-drawer {
   width: min(100vw, var(--interface-popup-width, 320px)) !important; min-height: 260px !important; max-height: 88vh;
@@ -434,6 +437,32 @@ footer > button { justify-self: end; }
 .provider-drawer-content { margin-top: 0; }
 /* overlay 滚动条不会为 stable gutter 扣除布局宽度；显式留出空间，避免其命中层挡住关闭按钮右缘。 */
 .popup-services-drawer .el-drawer__body { padding-right: 16px; scrollbar-gutter: stable; scrollbar-width: thin; }
+/* 横屏键盘可能只留下 58px：收回外间距，48px 操作行随同一滚动区让位，保留 46px 命中区。 */
+.popup-drawer-modal[data-fluent-read-popup-viewport][data-fluent-read-popup-short] .popup-services-drawer { max-height: var(--fluent-read-drawer-height); padding-top: 4px; padding-bottom: 4px; }
+.popup-drawer-modal[data-fluent-read-popup-short] .popup-services-drawer .drawer-handle { display: none; }
+.popup-drawer-modal[data-fluent-read-popup-short] .popup-service-picker {
+  --fluent-read-service-control-height: 46px;
+  --fluent-read-service-control-row: 48px;
+}
+.popup-drawer-modal[data-fluent-read-popup-short] .service-picker-heading {
+  position: relative; box-sizing: border-box; height: var(--fluent-read-service-control-row); min-height: var(--fluent-read-service-control-row);
+  padding-block: 0; justify-content: space-between;
+}
+.popup-drawer-modal[data-fluent-read-popup-short] .service-picker-heading > :is(strong, small) {
+  position: absolute; width: 1px; height: 1px; padding: 0; overflow: hidden; clip-path: inset(50%); white-space: nowrap;
+}
+/* 回收同一条 48px 操作行；两盒仍独立存在，避免 Firefox 原生无障碍树漏掉 display:contents 子控件。 */
+.popup-drawer-modal[data-fluent-read-popup-short] .service-picker-search {
+  position: relative; z-index: 2; box-sizing: border-box; width: auto;
+  height: var(--fluent-read-service-control-row); min-height: var(--fluent-read-service-control-row);
+  margin: calc(-1 * var(--fluent-read-service-control-row)) calc(var(--fluent-read-service-control-height) + 8px) 0;
+}
+.popup-drawer-modal[data-fluent-read-popup-short] .service-picker-search > svg { display: none; }
+.popup-drawer-modal[data-fluent-read-popup-short] .popup-service-picker :is(.service-picker-back, .service-picker-close, .service-picker-search button) { min-width: 46px; min-height: 46px; }
+.popup-drawer-modal[data-fluent-read-popup-short] .service-picker-search input { min-height: 46px; font-size: 16px; }
+.popup-drawer-modal[data-fluent-read-popup-short] .service-choice-copy > :is(strong, small) {
+  min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis;
+}
 .selection-mode-tabs {
   display: flex; gap: 4px; margin-bottom: 16px; padding: 4px; border-radius: 16px; background: var(--surface-soft);
 }
@@ -608,7 +637,7 @@ footer > button { justify-self: end; }
 .hero-card { border-radius: 14px; padding: 10px 12px; }
 .features { margin-top: 10px; }
 .features-eyebrow { font-size: 11px; font-weight: 500; letter-spacing: 0; }
-.feature-grid { gap: 8px; }
+.feature-grid { --fluentread-popup-feature-gap: 8px; gap: var(--fluentread-popup-feature-gap); }
 .feature-card { min-height: 50px; padding: 7px 8px; grid-template-columns: 26px minmax(0, 1fr) 6px; gap: 8px; border-radius: 10px; }
 .feature-icon { width: 26px; height: 28px; }
 .feature-card strong { font-size: 11.5px; font-weight: 600; }
@@ -709,7 +738,7 @@ footer button { font-weight: 500; color: var(--muted); }
 :root[data-fluentread-embedded-popup] #app { width: min(100vw, var(--fluentread-localized-popup-width, var(--interface-popup-width, 320px))); }
 :root[data-fluentread-embedded-popup] .popup-shell { max-height: min(560px, 100dvh); }
 
-/* 仅公开平台 API 确认的 Firefox Android 使用固定视口宽度；桌面工具栏与 Safari 继续保留固有尺寸。 */
+/* 仅公开平台 API 确认的 Firefox Android 使用固定视口宽度；桌面工具栏继续保留固有尺寸。 */
 :root[data-fluentread-android-popup],
 :root[data-fluentread-android-popup] body,
 :root[data-fluentread-android-popup] #app {
@@ -717,6 +746,22 @@ footer button { font-weight: 500; color: var(--muted); }
 }
 /* Android 已由浏览器给出固定页面高度，只保留画布内部滚动，避免外层再截住页脚。 */
 :root[data-fluentread-android-popup] .popup-shell { max-height: min(560px, 100dvh); }
+
+/* Safari 触摸工具栏的宿主已给定视口；页内 iframe 继续保留自己的宽度契约。 */
+:root[data-fluentread-safari-touch-popup]:not([data-fluentread-embedded-popup]),
+:root[data-fluentread-safari-touch-popup]:not([data-fluentread-embedded-popup]) body,
+:root[data-fluentread-safari-touch-popup]:not([data-fluentread-embedded-popup]) #app { width: 100%; }
+/* 只替换 Safari 触摸独立 Popup 的外层排列；各皮肤的间距与卡片内部网格仍由原规则决定。 */
+:root[data-fluentread-safari-touch-popup]:not([data-fluentread-embedded-popup]) .feature-grid {
+  display: flex;
+  flex-wrap: wrap;
+}
+:root[data-fluentread-safari-touch-popup]:not([data-fluentread-embedded-popup]) .feature-grid > .feature-card {
+  flex: 0 0 calc((100% - var(--fluentread-popup-feature-gap)) / 2);
+}
+:root[data-fluentread-safari-touch-popup]:not([data-fluentread-embedded-popup]) .popup-drawer-modal[data-fluent-read-popup-viewport] .popup-drawer {
+  width: var(--fluent-read-drawer-width) !important;
+}
 
 /* 同排操作保持紧凑高度；短标题合并快捷键，完整用途和长组合由按钮提示呈现。 */
 :root .popup-shell[data-interface-skin] .translate-action { display: flex; flex-wrap: nowrap; align-items: stretch; gap: 6px; }

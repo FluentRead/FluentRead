@@ -1,0 +1,546 @@
+{
+  "label": "services-title-fr-FR-dark-320",
+  "language": "fr-FR",
+  "theme": "dark",
+  "skin": "default",
+  "width": 320,
+  "height": 480,
+  "issues": [],
+  "screenshot": "services-title-fr-FR-dark-320.png",
+  "interaction": null,
+  "fixtureMarkers": {
+    "data-fluentread-safari-touch-popup": false,
+    "data-fluentread-embedded-popup": false,
+    "data-fluentread-android-popup": false
+  },
+  "openAnimationWait": {
+    "deadlineMs": 3000,
+    "elapsedMs": 285.19999980926514,
+    "observed": [
+      {
+        "target": "drawer",
+        "endTime": 300,
+        "iterations": 1
+      },
+      {
+        "target": "overlay",
+        "endTime": 300,
+        "iterations": 1
+      },
+      {
+        "target": "drawer",
+        "endTime": 300,
+        "iterations": 1
+      },
+      {
+        "target": "overlay",
+        "endTime": 300,
+        "iterations": 1
+      },
+      {
+        "target": "drawer",
+        "endTime": 300,
+        "iterations": 1
+      },
+      {
+        "target": "overlay",
+        "endTime": 300,
+        "iterations": 1
+      },
+      {
+        "target": "drawer",
+        "endTime": 300,
+        "iterations": 1
+      },
+      {
+        "target": "overlay",
+        "endTime": 300,
+        "iterations": 1
+      },
+      {
+        "target": "drawer",
+        "endTime": 300,
+        "iterations": 1
+      },
+      {
+        "target": "overlay",
+        "endTime": 300,
+        "iterations": 1
+      },
+      {
+        "target": "drawer",
+        "endTime": 300,
+        "iterations": 1
+      },
+      {
+        "target": "overlay",
+        "endTime": 300,
+        "iterations": 1
+      },
+      {
+        "target": "drawer",
+        "endTime": 300,
+        "iterations": 1
+      },
+      {
+        "target": "overlay",
+        "endTime": 300,
+        "iterations": 1
+      },
+      {
+        "target": "drawer",
+        "endTime": 300,
+        "iterations": 1
+      },
+      {
+        "target": "overlay",
+        "endTime": 300,
+        "iterations": 1
+      },
+      {
+        "target": "drawer",
+        "endTime": 300,
+        "iterations": 1
+      },
+      {
+        "target": "overlay",
+        "endTime": 300,
+        "iterations": 1
+      },
+      {
+        "target": "drawer",
+        "endTime": 300,
+        "iterations": 1
+      },
+      {
+        "target": "overlay",
+        "endTime": 300,
+        "iterations": 1
+      },
+      {
+        "target": "drawer",
+        "endTime": 300,
+        "iterations": 1
+      },
+      {
+        "target": "overlay",
+        "endTime": 300,
+        "iterations": 1
+      },
+      {
+        "target": "drawer",
+        "endTime": 300,
+        "iterations": 1
+      },
+      {
+        "target": "overlay",
+        "endTime": 300,
+        "iterations": 1
+      },
+      {
+        "target": "drawer",
+        "endTime": 300,
+        "iterations": 1
+      },
+      {
+        "target": "overlay",
+        "endTime": 300,
+        "iterations": 1
+      },
+      {
+        "target": "drawer",
+        "endTime": 300,
+        "iterations": 1
+      },
+      {
+        "target": "overlay",
+        "endTime": 300,
+        "iterations": 1
+      },
+      {
+        "target": "drawer",
+        "endTime": 300,
+        "iterations": 1
+      },
+      {
+        "target": "overlay",
+        "endTime": 300,
+        "iterations": 1
+      },
+      {
+        "target": "drawer",
+        "endTime": 300,
+        "iterations": 1
+      },
+      {
+        "target": "overlay",
+        "endTime": 300,
+        "iterations": 1
+      },
+      {
+        "target": "drawer",
+        "endTime": 300,
+        "iterations": 1
+      },
+      {
+        "target": "overlay",
+        "endTime": 300,
+        "iterations": 1
+      },
+      {
+        "target": "drawer",
+        "endTime": 300,
+        "iterations": 1
+      },
+      {
+        "target": "overlay",
+        "endTime": 300,
+        "iterations": 1
+      },
+      {
+        "target": "drawer",
+        "endTime": 300,
+        "iterations": 1
+      },
+      {
+        "target": "overlay",
+        "endTime": 300,
+        "iterations": 1
+      },
+      {
+        "target": "drawer",
+        "endTime": 300,
+        "iterations": 1
+      },
+      {
+        "target": "overlay",
+        "endTime": 300,
+        "iterations": 1
+      },
+      {
+        "target": "drawer",
+        "endTime": 300,
+        "iterations": 1
+      },
+      {
+        "target": "overlay",
+        "endTime": 300,
+        "iterations": 1
+      },
+      {
+        "target": "drawer",
+        "endTime": 300,
+        "iterations": 1
+      },
+      {
+        "target": "overlay",
+        "endTime": 300,
+        "iterations": 1
+      },
+      {
+        "target": "drawer",
+        "endTime": 300,
+        "iterations": 1
+      },
+      {
+        "target": "overlay",
+        "endTime": 300,
+        "iterations": 1
+      },
+      {
+        "target": "drawer",
+        "endTime": 300,
+        "iterations": 1
+      },
+      {
+        "target": "overlay",
+        "endTime": 300,
+        "iterations": 1
+      },
+      {
+        "target": "drawer",
+        "endTime": 300,
+        "iterations": 1
+      },
+      {
+        "target": "overlay",
+        "endTime": 300,
+        "iterations": 1
+      },
+      {
+        "target": "drawer",
+        "endTime": 300,
+        "iterations": 1
+      },
+      {
+        "target": "overlay",
+        "endTime": 300,
+        "iterations": 1
+      },
+      {
+        "target": "drawer",
+        "endTime": 300,
+        "iterations": 1
+      },
+      {
+        "target": "overlay",
+        "endTime": 300,
+        "iterations": 1
+      },
+      {
+        "target": "drawer",
+        "endTime": 300,
+        "iterations": 1
+      },
+      {
+        "target": "overlay",
+        "endTime": 300,
+        "iterations": 1
+      },
+      {
+        "target": "drawer",
+        "endTime": 300,
+        "iterations": 1
+      },
+      {
+        "target": "overlay",
+        "endTime": 300,
+        "iterations": 1
+      },
+      {
+        "target": "drawer",
+        "endTime": 300,
+        "iterations": 1
+      },
+      {
+        "target": "overlay",
+        "endTime": 300,
+        "iterations": 1
+      },
+      {
+        "target": "drawer",
+        "endTime": 300,
+        "iterations": 1
+      },
+      {
+        "target": "overlay",
+        "endTime": 300,
+        "iterations": 1
+      },
+      {
+        "target": "drawer",
+        "endTime": 300,
+        "iterations": 1
+      },
+      {
+        "target": "overlay",
+        "endTime": 300,
+        "iterations": 1
+      },
+      {
+        "target": "drawer",
+        "endTime": 300,
+        "iterations": 1
+      },
+      {
+        "target": "overlay",
+        "endTime": 300,
+        "iterations": 1
+      },
+      {
+        "target": "drawer",
+        "endTime": 300,
+        "iterations": 1
+      },
+      {
+        "target": "overlay",
+        "endTime": 300,
+        "iterations": 1
+      }
+    ],
+    "idleFrames": 2
+  },
+  "beforeScroll": {
+    "width": 320,
+    "documentWidth": 380,
+    "desktopDocumentAndShellWidthAreFixtureBoundary": true,
+    "shellWidth": 380,
+    "rootOverflow": false,
+    "coarsePointer": true,
+    "root": {
+      "x": 0,
+      "y": 8,
+      "width": 320,
+      "height": 472,
+      "right": 320,
+      "bottom": 480
+    },
+    "toolbar": {
+      "x": 20,
+      "y": 16,
+      "width": 264,
+      "height": 46,
+      "right": 284,
+      "bottom": 62
+    },
+    "title": {
+      "x": 20,
+      "y": 30.6015625,
+      "width": 210,
+      "height": 16.796875,
+      "right": 230,
+      "bottom": 47.3984375
+    },
+    "close": {
+      "x": 238,
+      "y": 16,
+      "width": 46,
+      "height": 46,
+      "right": 284,
+      "bottom": 62
+    },
+    "titleText": "Services de traduction",
+    "titleTextRects": [
+      {
+        "x": 20,
+        "y": 31.6015625,
+        "width": 130.765625,
+        "height": 14,
+        "right": 150.765625,
+        "bottom": 45.6015625
+      }
+    ],
+    "titleColor": "rgb(244, 245, 248)",
+    "inkToken": "#f4f5f8",
+    "scroller": {
+      "x": 20,
+      "y": 16,
+      "width": 280,
+      "height": 446,
+      "right": 300,
+      "bottom": 462
+    },
+    "scrollerClientHeight": 446,
+    "scrollerPadding": {
+      "top": 0,
+      "right": 16,
+      "bottom": 0,
+      "left": 0
+    },
+    "knownPanel": {
+      "x": 20,
+      "y": -293,
+      "width": 264,
+      "height": 755.1640625,
+      "right": 284,
+      "bottom": 462.1640625
+    },
+    "toolbarStickyTop": 0,
+    "scrollTop": 329,
+    "scrollHeight": 775,
+    "lastAssignment": {
+      "x": 20,
+      "y": 391.078125,
+      "width": 264,
+      "height": 71.0859375,
+      "right": 284,
+      "bottom": 462.1640625
+    },
+    "lastAssignmentInsideScroller": true,
+    "issues": []
+  },
+  "afterScroll": {
+    "width": 320,
+    "documentWidth": 380,
+    "desktopDocumentAndShellWidthAreFixtureBoundary": true,
+    "shellWidth": 380,
+    "rootOverflow": false,
+    "coarsePointer": true,
+    "root": {
+      "x": 0,
+      "y": 8,
+      "width": 320,
+      "height": 472,
+      "right": 320,
+      "bottom": 480
+    },
+    "toolbar": {
+      "x": 20,
+      "y": 16,
+      "width": 264,
+      "height": 46,
+      "right": 284,
+      "bottom": 62
+    },
+    "title": {
+      "x": 20,
+      "y": 30.6015625,
+      "width": 210,
+      "height": 16.796875,
+      "right": 230,
+      "bottom": 47.3984375
+    },
+    "close": {
+      "x": 238,
+      "y": 16,
+      "width": 46,
+      "height": 46,
+      "right": 284,
+      "bottom": 62
+    },
+    "titleText": "Services de traduction",
+    "titleTextRects": [
+      {
+        "x": 20,
+        "y": 31.6015625,
+        "width": 130.765625,
+        "height": 14,
+        "right": 150.765625,
+        "bottom": 45.6015625
+      }
+    ],
+    "titleColor": "rgb(244, 245, 248)",
+    "inkToken": "#f4f5f8",
+    "scroller": {
+      "x": 20,
+      "y": 16,
+      "width": 280,
+      "height": 446,
+      "right": 300,
+      "bottom": 462
+    },
+    "scrollerClientHeight": 446,
+    "scrollerPadding": {
+      "top": 0,
+      "right": 16,
+      "bottom": 0,
+      "left": 0
+    },
+    "knownPanel": {
+      "x": 20,
+      "y": -293,
+      "width": 264,
+      "height": 755.1640625,
+      "right": 284,
+      "bottom": 462.1640625
+    },
+    "toolbarStickyTop": 0,
+    "scrollTop": 329,
+    "scrollHeight": 775,
+    "lastAssignment": {
+      "x": 20,
+      "y": 391.078125,
+      "width": 264,
+      "height": 71.0859375,
+      "right": 284,
+      "bottom": 462.1640625
+    },
+    "lastAssignmentInsideScroller": true,
+    "issues": []
+  },
+  "documentWidth": 380,
+  "rootOverflow": false,
+  "coarsePointer": true,
+  "serviceAssignmentsAndModelsUnchanged": true,
+  "ok": true
+}

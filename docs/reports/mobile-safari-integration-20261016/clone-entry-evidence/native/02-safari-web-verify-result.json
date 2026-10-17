@@ -1,0 +1,31 @@
+{
+  "id": "02-safari-web-verify",
+  "startedAt": "2026-10-16T23:13:26.014112+00:00",
+  "finishedAt": "2026-10-16T23:13:26.260282+00:00",
+  "argv": [
+    "/opt/homebrew/opt/node@22/bin/node",
+    "/Users/thinkstu/Desktop/copy/FluentRead-mobile-video-menu-accessibility-20261016/scripts/testing/run-resource-safe.mjs",
+    "--max-workers",
+    "1",
+    "--concurrency",
+    "3",
+    "--cpu-target",
+    "40",
+    "--",
+    "/opt/homebrew/opt/node@22/bin/node",
+    "/Users/thinkstu/Desktop/copy/FluentRead-mobile-video-menu-accessibility-20261016/scripts/safari/package.mjs",
+    "--verify",
+    "--extension",
+    "/Users/thinkstu/Desktop/copy/FluentRead-mobile-video-menu-accessibility-20261016/.output/safari-mv2"
+  ],
+  "environmentOverrides": {
+    "DEVELOPER_DIR": "/Applications/Xcode.app/Contents/Developer",
+    "PATH": "/opt/homebrew/opt/node@22/bin:/usr/bin:/bin:/usr/sbin:/sbin:/opt/homebrew/bin"
+  },
+  "returnCode": 0,
+  "timedOut": false,
+  "ownedProcessGroup": 54415,
+  "elapsedSeconds": 0.246,
+  "log": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/mobile-youtube-fr-node-identity-probe-20261017/same-scope-clone-repair-20261017/native-binding-scope-repair-v1/logs/02-safari-web-verify.log",
+  "logSHA256": "96a5724fda5c50e93f86c99bba0ef4967091e489ad53f83e6a5a0f32fe03f3e3"
+}

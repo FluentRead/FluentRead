@@ -1,0 +1,46 @@
+{
+  "at": "2026-10-16T08:51:29.914095+00:00",
+  "functionalCaseCount": 1,
+  "scope": "Actual existing task document at example.com; fresh network provenance not established",
+  "passed": true,
+  "timeOrigin": 1792140316119,
+  "URL": "https://example.com/",
+  "translationNodeCounts": [
+    {
+      "tag": "f21-02-original",
+      "count": 0,
+      "visibility": "visible"
+    },
+    {
+      "tag": "f21-07-first-page",
+      "count": 5,
+      "visibility": "visible"
+    },
+    {
+      "tag": "f21-10-background",
+      "count": 5,
+      "visibility": "hidden"
+    },
+    {
+      "tag": "f21-12-resumed",
+      "count": 5,
+      "visibility": "visible"
+    },
+    {
+      "tag": "f21-15-restored",
+      "count": 0,
+      "visibility": "visible"
+    },
+    {
+      "tag": "f21-19-retranslated",
+      "count": 5,
+      "visibility": "visible"
+    }
+  ],
+  "originalEnglish": "This domain is for use in documentation examples without needing permission. This is not a service; avoid relying on it for testing and monitoring purposes.",
+  "newCorrespondingChinese": "此域名用于文档示例，无需获得许可。这不是一项服务；请勿将其用于测试和监控目的。",
+  "restoreAllSixParagraphsExact": true,
+  "sameDocument": true,
+  "sourceProvenance": "No navigation/reload in this run; Firefox startup retainedexistingtab; initialmultilingualdocument and/s.js cannot establish freshpublic origin response. Oldfixture/cache provenance unknown.",
+  "qualityBoundary": "Other-language mixed/unchanged-script outputs observed. Functionalstatecycle only, notwholepagequality/providerpass."
+}

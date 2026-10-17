@@ -1,0 +1,20 @@
+[
+  {
+    "source": "current-production-short-viewport-native-drawer-scroll-attempt1-revision2/runtime-attachments/A3948F52-AEE8-4BBC-B236-7C0AE1580D51.png",
+    "copy": {
+      "file": "known-localhost-fixture.png",
+      "bytes": 140669,
+      "sha256": "7b532d47ce99ec2bfcc9b18652d37ac9a515883bde20b11b8e9ac3f538d784ad"
+    },
+    "byteEqual": true
+  },
+  {
+    "source": "current-production-short-viewport-native-drawer-scroll-attempt1-revision2/runtime-attachments/E375562F-2BA8-4D5C-BD6F-3A0331AD0B2B.png",
+    "copy": {
+      "file": "mismatched-host-permission-prompt.png",
+      "bytes": 256138,
+      "sha256": "fda7fecc88426c5145e396a035351aba7508774bb9db4e13b6154739ae9e9a4c"
+    },
+    "byteEqual": true
+  }
+]

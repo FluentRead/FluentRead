@@ -1,0 +1,144 @@
+{
+  "at": "2026-10-16T09:23:12.179431+00:00",
+  "status": "A6_RAW_SKIP_NATIVE_REVEAL_OBSERVED_MENU_NOT_MEASURED",
+  "runtimeCommit": "f5a82d11a5b6b6a5de2f2ea726065a56cdb2e6ca",
+  "productionIdentitySHA256": "3f3df2dc7993788676427a6544e5cd17937f2a7da8d8e4a5f6c1d215417679dd",
+  "testMethod": "test111ProductionPlayingMenuSnapshot",
+  "rawCounts": {
+    "passedTests": 0,
+    "skippedTests": 1,
+    "failedTests": 0,
+    "totalTestCount": 1
+  },
+  "caseDurationSeconds": 15.5,
+  "testExecuteToolExitCode": 0,
+  "rawSkipReason": "A6 snapshot FR entry uniqueness/44px/same-player boundary unavailable",
+  "actions": {
+    "A6LivePlayerCenterTouch": 1,
+    "address": 1,
+    "navigation": 1,
+    "normalClear": 1,
+    "siteUnmute": 1
+  },
+  "immediateSnapshot": {
+    "appFrame": {
+      "height": 874,
+      "width": 402,
+      "x": 0,
+      "y": 0
+    },
+    "baseBoundaryEligible": true,
+    "candidateCount": 1,
+    "closeCount": 0,
+    "closeFrame": {
+      "isInfinite": false,
+      "isNull": true,
+      "nonFinite": true
+    },
+    "entryCount": 0,
+    "entryFrame": {
+      "isInfinite": false,
+      "isNull": true,
+      "nonFinite": true
+    },
+    "entryLabel": "",
+    "knownTEDWithinPlayer": true,
+    "metadataElapsedSeconds": 14.745583057403564,
+    "nativeLabels": [
+      "暂停视频",
+      "进入全屏模式"
+    ],
+    "oneSnapshotBatch": true,
+    "optionalBilingualCue": null,
+    "phase": "immediate-after-touch",
+    "playback": {
+      "pauseCount": 1,
+      "playCount": 0,
+      "progress": []
+    },
+    "playerCount": 1,
+    "playerFrame": {
+      "height": 226,
+      "width": 402,
+      "x": 0,
+      "y": 110
+    },
+    "snapshotElapsedSeconds": 14.741927027702332
+  },
+  "followingFullAXEntry": {
+    "frame": {
+      "height": 45,
+      "width": 44,
+      "x": 286,
+      "y": 262
+    },
+    "identifier": "",
+    "label": "流畅阅读字幕翻译：已开启",
+    "selected": false,
+    "type": 1,
+    "valueString": "",
+    "valueType": "__NSCFConstantString"
+  },
+  "followingFullAXElapsedSeconds": 14.99984097480774,
+  "classification": {
+    "certain": "The harness entryCount0 was a .button-only filtered count. The following full AX exposes a unique visible FR-labelled element as type1 Other, frame44x45 fully within currentplayer. The original finalPNG shows nativecontrols and FR icon together.",
+    "boundary": "The immediate metadata attachment did not preserve the excluded .other node, so later fullAX cannot be represented as the same immutable snapshot. No actual FR button/Other hit test or menu tap occurred. No product44px failure or actual entry absence established.",
+    "sourcePredicate": "a6Scene only .button with label prefix; a6ExactButton only .button. Requires separately reviewed research predicate update if a later case is authorized; no change/retry performed."
+  },
+  "results": {
+    "oneCurrentPlayerCenterTouch": "COMPLETED_MAX1",
+    "nativeControlsVisualAndSnapshot": "OBSERVED",
+    "FRVisualEntry": "OBSERVED",
+    "FRAX44x45SamePlayer": "OBSERVED_IN_FOLLOWING_FULL_AX",
+    "FRActualHittability": "NOT_MEASURED",
+    "menuOpenClose": "NOT_MEASURED",
+    "playingMenu": "NOT_MEASURED",
+    "realBilingual": "NOT_MEASURED_NOT_REACHED",
+    "captionPlusNativeControls": "UNVERIFIED",
+    "overallNativeAcceptance": "UNVERIFIED"
+  },
+  "originalAttachmentCount": 10,
+  "originalPNGCount": 2,
+  "originalPNGReviews": [
+    {
+      "name": "A6-before-possible-live-touch.png",
+      "path": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/mobile-safari-menu-first-snapshot-harness-20261016/inline-attempt1/runtime-evidence/A6-before-possible-live-touch.png",
+      "sha256": "0ebd7ddc229ce42948ba2e24722fbce7676386760444f75c3824f811005edfde",
+      "observed": "Actual TED intro at1second, Once a year English burned into video, no nativecontrols; pink FR icon near bottomright. No real bilingual cue."
+    },
+    {
+      "name": "unverified-final.png",
+      "path": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/mobile-safari-menu-first-snapshot-harness-20261016/inline-attempt1/runtime-evidence/unverified-final.png",
+      "sha256": "c418ec85cf7d2342f9fcda23a835ea735e4c49a6266e1a73aef80b8ebe3306b1",
+      "observed": "Actual intro at0:04 with nativePause/CC/Fullscreen/time/progress visible and pinkFR icon left of fullscreen. No menu opened; no trueEnglish/ChineseFR cue. No visible control hiding at this capture."
+    }
+  ],
+  "playingEvidenceBoundary": "Candidate value progresses1second to4seconds and finalimage/nativePause support playing beforemenu; menu was not opened so playing-menu remainsNOT_MEASURED.",
+  "originalVideoBoundary": "No MP4 among exported test attachments in currentmanifest; whole originalxcresult retained. No derived video frames created.",
+  "runtimeCleanup": {
+    "laneReleased": true,
+    "finalDevice": {
+      "lastBootedAt": "2026-10-16T09:20:26Z",
+      "dataPath": "/Users/thinkstu/Library/Developer/CoreSimulator/Devices/A407390F-7AA8-42AE-AFEB-F93EE99E9FF8/data",
+      "dataPathSize": 2666999808,
+      "logPath": "/Users/thinkstu/Library/Logs/CoreSimulator/A407390F-7AA8-42AE-AFEB-F93EE99E9FF8",
+      "udid": "A407390F-7AA8-42AE-AFEB-F93EE99E9FF8",
+      "isAvailable": true,
+      "logPathSize": 684032,
+      "deviceTypeIdentifier": "com.apple.CoreSimulator.SimDeviceType.iPhone-16-Pro",
+      "state": "Shutdown",
+      "name": "FluentRead-PR995-FreshPermissions-20261015"
+    },
+    "originalRestoredAndVerified": true,
+    "installedIdentityAtEnd": "ORIGINAL_D9_FULL485_VERIFIED",
+    "remainingOwnedProcesses": [],
+    "focusEvents": [],
+    "violations": [],
+    "cleanupErrors": [],
+    "elapsedMs": 61230,
+    "privateScope": "Native FR App data17 hash baseline only; not all extension settings/storage/cache. Record post-UI changes; do not copy files back."
+  },
+  "noAutomaticRetry": true,
+  "noProductSourceChange": true,
+  "allOriginalPNGPersonallyReviewed": true
+}

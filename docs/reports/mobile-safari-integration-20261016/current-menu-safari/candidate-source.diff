@@ -1,0 +1,115 @@
+--- /Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/mobile-safari-a2-paused-menu-scroll-candidate-20261017/SafariSmokeTests.candidate.swift
++++ /Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/safari-final-menu-readiness-preparation-20261017/SafariSmokeTests.candidate.swift
+@@ -205,11 +205,15 @@
+         guard let tree=try? app.snapshot() else { try limited(app,"A9 single snapshot unavailable; no retry") }
+         return try a9Scene(app,tree,phase,Date())
+     }
+-    func a9PrepareMenuScene(_ app: XCUIApplication) throws -> A9Scene {
++    func a9PrepareMenuScene(_ app: XCUIApplication, notAfter deadline: Date? = nil) throws -> A9Scene {
+         try guardUI(app)
+         guard actions["A9LivePlayerCenterTouch",default:0] == 0 else { try limited(app,"A9 whole-case coordinate touch already consumed") }
+         guard let tree=evidence(app,"A9-before-possible-live-touch") else { try limited(app,"A9 required pre-touch image/AX unavailable") }
++        if deadline != nil && menuScrollOwnedTabIDs(tree) != ["87246FAF-A680-4738-BA2A-97A9E170620D"] {
++            try limited(app,"Readiness reveal pre-touch snapshot changed retained owner; no touch")
++        }
+         let scene=try a9Scene(app,tree,"before-possible-touch",Date())
++        if deadline != nil && scene.entryCount>0 { return scene } // Readiness must not reveal over an existing exact entry.
+         if !scene.nativeLabels.isEmpty {
+             json(["decision":"nativeControlsAlreadyPresentInSnapshot","diagnosticTouchCount":0],"A9-coordinate-decision")
+             return scene
+@@ -242,6 +246,9 @@
+         try guardUI(app)
+         json(["decision":"oneCurrentElementRelativeCenterTouch","frame":rect(currentFrame),"appFrame":rect(currentAppFrame),
+               "containerIsHittableObservationOnly":containerHittable,"normalizedX":0.5,"normalizedY":0.5],"A9-coordinate-decision")
++        if let deadline=deadline {
++            guard Date()<deadline else { try limited(app,"Shared readiness deadline exhausted during native AX reads; no center touch") }
++        }
+         actions["A9LivePlayerCenterTouch",default:0] += 1
+         current.coordinate(withNormalizedOffset:CGVector(dx:0.5,dy:0.5)).tap()
+         // One immediate observation batch. No CC chain, screenshot or polling before the FR button.
+@@ -326,6 +333,55 @@
+         }
+         return (menus[0].frame,nodes(menus[0]))
+     }
++    // Additional read-only readiness evidence only. No navigation, media control or reveal action here.
++    func menuObserveEntryReadiness(_ app: XCUIApplication, _ phase: String, until deadline: Date, maximumSamples: Int, observedEntry: inout Bool) throws -> A9Scene? {
++        var observations:[[String:Any]]=[]
++        defer { json(["phase":phase,"maximumSamples":maximumSamples,"deadlineElapsedSeconds":deadline.timeIntervalSince(began),
++                      "observations":observations,"actions":actions,"productAcceptance":false],"menu-readiness-"+phase+"-summary") }
++        for index in 0..<maximumSamples {
++            try guardUI(app)
++            guard Date()<deadline else { return nil }
++            let started=Date(),name="menu-readiness-"+phase+"-"+String(index+1)
++            // evidence() saves an original screenshot then one actual AX snapshot, in that order; not an atomic image/AX pair.
++            guard let tree=evidence(app,name) else { try limited(app,"Readiness original image/AX unavailable; no fallback") }
++            guard menuScrollOwnedTabIDs(tree)==["87246FAF-A680-4738-BA2A-97A9E170620D"] else {
++                try limited(app,"Readiness exact retained tab ownership changed; no tab selection or navigation")
++            }
++            let scene=try a9Scene(app,tree,"readiness-"+phase+"-"+String(index+1),Date())
++            observedEntry = observedEntry || scene.entryCount>0
++            guard scene.entryCount<=1,scene.closeCount==0 else { try limited(app,"Readiness entry ambiguous or menu already open; no action") }
++            if scene.entryCount==1 && scene.entryLabel != "流畅阅读字幕翻译：已开启" {
++                try limited(app,"Readiness observed non-enabled exact entry; no setting change or reveal")
++            }
++            let snapshotEligible=scene.entryCount==1 && scene.entryLabel=="流畅阅读字幕翻译：已开启" &&
++                a9Positive(scene.entryFrame) && scene.entryFrame.width>=44 && scene.entryFrame.height>=44 &&
++                scene.playerFrame.contains(scene.entryFrame)
++            var actualCount=0,actualFrame=CGRect.null,hittable=false
++            if snapshotEligible {
++                let query=app.descendants(matching:scene.entryType).matching(NSPredicate(format:"label == %@",scene.entryLabel))
++                actualCount=query.count
++                guard actualCount<=1 else { try limited(app,"Readiness current exact entry ambiguous; no action") }
++                if actualCount==1 {
++                    let entry=query.element
++                    actualFrame=entry.frame;hittable=entry.exists && entry.isHittable
++                    if entry.frame != actualFrame { hittable=false }
++                }
++            }
++            try guardUI(app)
++            let withinDeadline=Date()<deadline
++            let currentEligible=snapshotEligible && actualCount==1 && actualFrame==scene.entryFrame && hittable && withinDeadline
++            observations.append(["index":index+1,"captureStartedElapsedSeconds":started.timeIntervalSince(began),
++                "completedElapsedSeconds":Date().timeIntervalSince(began),"screenshotThenSnapshot":true,
++                "entryCount":scene.entryCount,"entryLabel":scene.entryLabel,"entryFrame":a9Frame(scene.entryFrame),
++                "actualEntryCount":actualCount,"actualEntryFrame":a9Frame(actualFrame),"actualEntryHittable":hittable,
++                "snapshotEligible":snapshotEligible,"withinObservationDeadline":withinDeadline,
++                "readyEntryPreconditionOnly":currentEligible,"nativeLabels":scene.nativeLabels,"playbackObservation":scene.playback])
++            if currentEligible { return scene }
++            let remaining=deadline.timeIntervalSinceNow
++            if index+1<maximumSamples && remaining>0 { wait(min(0.75,remaining)) }
++        }
++        return nil
++    }
+     func testPausedMenuScrollAndClose() throws {
+         let app=XCUIApplication(bundleIdentifier:"com.apple.mobilesafari")
+         var result:[String:Any]=["scope":"one menu open / one native internal scroll / timing reachability / normal close / original-pixel focus review",
+@@ -339,9 +395,26 @@
+             try limited(app,"Current tab is not retained exact owner; no navigation or unknown-tab action")
+         }
+         let first=try a9Scene(app,initial,"scroll-initial",Date())
+-        // The proven normal single-center reveal is used only if no entry is already present. No Play/CC/unmute/navigation.
+-        let scene:A9Scene
+-        if first.entryCount==1 { scene=first } else { scene=try a9PrepareMenuScene(app) }
++        // One shared24s observation window inside the existing absolute180s scene deadline; sample caps4+6.
++        let readinessEnd=min(began.addingTimeInterval(180),Date().addingTimeInterval(24))
++        result["readinessWindowEndElapsedSeconds"]=readinessEnd.timeIntervalSince(began)
++        result["readinessIsProductAcceptance"]=false
++        var observedExactEntry=first.entryCount>0
++        var readyScene=try menuObserveEntryReadiness(app,"before-reveal",until:min(readinessEnd,Date().addingTimeInterval(6)),maximumSamples:4,observedEntry:&observedExactEntry)
++        result["exactEntryObservedBeforeReveal"]=observedExactEntry
++        if readyScene == nil {
++            guard !observedExactEntry else { try limited(app,"An exact entry was observed but not ready; preserve no-reveal rule for existing entry") }
++            guard Date()<readinessEnd else { try limited(app,"Shared readiness observation deadline exhausted; no reveal action") }
++            // Existing helper may consume one normal center reveal only when native controls are absent. No Play/CC/unmute.
++            let immediate=try a9PrepareMenuScene(app,notAfter:readinessEnd)
++            result["immediateAfterExistingRevealPlayback"]=immediate.playback
++            readyScene=try menuObserveEntryReadiness(app,"after-reveal",until:readinessEnd,maximumSamples:6,observedEntry:&observedExactEntry)
++        }
++        guard let scene=readyScene else {
++            result["readinessStatus"]="UNVERIFIED_ENTRY_PRECONDITION_AFTER_BOUNDED_READ_ONLY_OBSERVATIONS"
++            try limited(app,"Unique enabled same-player44px hittable entry unavailable within bounded readiness observation; no reveal retry")
++        }
++        result["readinessStatus"]="ENTRY_PRECONDITION_OBSERVED_ONLY_CONTINUING_ORIGINAL_MENU_ASSERTIONS"
+         result["observedPlaybackBeforeOpen"]=scene.playback
+         result["pausedStateObserved"]=(scene.playback["playCount"] as? Int)==1 && (scene.playback["pauseCount"] as? Int)==0
+         guard scene.entryCount==1,scene.entryLabel=="流畅阅读字幕翻译：已开启",scene.closeCount==0,

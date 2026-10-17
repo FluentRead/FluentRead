@@ -1,0 +1,93 @@
+{
+  "at": "2026-10-16T21:08:07.955869+00:00",
+  "status": "MENU_TOUCH_SCOPE_PASSED_FULL_LIFECYCLE_FAILED_NATIVE_SELECTION_RESTORE",
+  "rawExitCode": 1,
+  "reportSHA256": "537d451c333b4b8136252bde4ac32e4b492c63549acfc1eef57393e2dad92d00",
+  "normalClose": {
+    "input": "mouse.click-at-observed-checked-center",
+    "x": 353,
+    "y": 31,
+    "focusReturned": true
+  },
+  "keyboardSteps": [
+    {
+      "key": "End",
+      "expected": "download-bilingual-subtitles",
+      "observed": "download-bilingual-subtitles"
+    },
+    {
+      "key": "ArrowUp",
+      "expected": "download-translated-subtitles",
+      "observed": "download-translated-subtitles"
+    },
+    {
+      "key": "ArrowUp",
+      "expected": "download-subtitles",
+      "observed": "download-subtitles"
+    },
+    {
+      "key": "ArrowUp",
+      "expected": "subtitle-later",
+      "observed": "subtitle-later"
+    },
+    {
+      "key": "ArrowUp",
+      "expected": "subtitle-earlier",
+      "observed": "subtitle-earlier"
+    },
+    {
+      "key": "ArrowUp",
+      "expected": "off",
+      "observed": "off"
+    },
+    {
+      "key": "ArrowUp",
+      "expected": "original-only",
+      "observed": "original-only"
+    },
+    {
+      "key": "ArrowUp",
+      "expected": "translation-only",
+      "observed": "translation-only"
+    },
+    {
+      "key": "ArrowUp",
+      "expected": "bilingual",
+      "observed": "bilingual"
+    },
+    {
+      "key": "ArrowUp",
+      "expected": "open-sentence-learning",
+      "observed": "open-sentence-learning"
+    },
+    {
+      "key": "ArrowUp",
+      "expected": "close-menu",
+      "observed": "close-menu"
+    },
+    {
+      "key": "Home",
+      "expected": "open-settings",
+      "observed": "open-settings"
+    }
+  ],
+  "allTouchGeometryAndTopHitAssertionsReachedAndPassed": true,
+  "desktopExecuted": false,
+  "nativeSelectionFailure": [
+    "AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:\n+ actual - expected\n\n+ 'disabled'\n- 'showing'\n\n    at main (/Users/thinkstu/Desktop/copy/FluentRead-mobile-video-menu-accessibility-20261016/scripts/run-mobile-video-subtitle-test.cjs:392:10)"
+  ],
+  "sourceFiles": {
+    "/Users/thinkstu/Desktop/copy/FluentRead-mobile-video-menu-accessibility-20261016/src/features/video-subtitle/content/ui.ts": "eb9cd5ccd3d2931cd1e85fa8a668235374e0a865e06605981274bd20944b592c",
+    "/Users/thinkstu/Desktop/copy/FluentRead-mobile-video-menu-accessibility-20261016/scripts/run-mobile-video-subtitle-test.cjs": "cdde685edee36ec99ce368f4b0e505f1f75b9c84beda28176383fe18cbcc0695"
+  },
+  "RootActualPNGReview": [
+    "portrait-menu-hint-targets",
+    "portrait-menu-keyboard-6-ArrowUp",
+    "failure"
+  ],
+  "focusEvents": [],
+  "browserCloseReceipt": "shared-guard-fulfilled",
+  "profileRemoved": true,
+  "fullCasePass": false,
+  "nextStep": "Explicit scoped menu+desktop runner; independent native-selection diagnosis; preserve this full lifecycle failure"
+}

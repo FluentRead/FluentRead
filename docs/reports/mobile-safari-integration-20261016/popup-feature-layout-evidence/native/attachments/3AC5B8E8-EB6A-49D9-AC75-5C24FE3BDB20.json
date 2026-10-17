@@ -1,0 +1,13 @@
+{
+  "countCappedAt2" : 1,
+  "exists" : true,
+  "explicitCountReads" : 1,
+  "firstMatchActions" : 0,
+  "identifierAndLabelBothExact" : true,
+  "phase" : "localhost-one-day-attempt1-exact-native-menu-readiness",
+  "readinessWaitIsNotClickRetry" : true,
+  "readinessWaits" : 1,
+  "sceneBudgetSeconds" : 90,
+  "waitBudgetSeconds" : 5,
+  "waitElapsedSeconds" : 1.0736949443817139
+}

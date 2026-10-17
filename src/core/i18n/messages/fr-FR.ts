@@ -2793,6 +2793,7 @@ export const frFRLegacyText: Readonly<Record<string, string>> = {
     "原生翻译合批": "Regrouper les demandes de traduction",
     "开启合并": "Regroupement activé",
     "X 字幕自动贴底": "Placer automatiquement les sous-titres X en bas",
+    "移动端 / X 自动贴底": "Placement auto en bas sur mobile / X",
     "逐字高亮": "Surlignage mot à mot",
     "字幕随播放进度逐字点亮，像 KTV 歌词一样": "Les sous-titres s’illuminent mot à mot pendant la lecture, comme des paroles de karaoké.",
     "视频字幕逐字高亮": "Surlignage mot à mot des sous-titres",

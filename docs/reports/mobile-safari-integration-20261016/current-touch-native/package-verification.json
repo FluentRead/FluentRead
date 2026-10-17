@@ -1,0 +1,99 @@
+{
+  "atUtc": "2026-10-16T19:34:33.103Z",
+  "status": "COPIED467_AND_ACTUAL_PROJECT_IDENTITIES_MATCH_NOT_RUNTIME",
+  "copied": {
+    "extension": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/touch-layout-f33-followup-20261017/native-a2-preparation/output/safari-xcode-a2ecda302-80471415c945/FluentRead/Shared (Extension)/Resources",
+    "version": "0.0.38",
+    "manifestSha256": "d7bcd7044f90b52d4dee774f7cef84f019b4b56fb73434de3304c9381a6cbae5",
+    "checkedReferences": 10,
+    "buildSha256": "80471415c9451314d3976395467d12a05f4b487d5ca0bae7c535b909b72a762e",
+    "artifactCount": 467
+  },
+  "pbxproj": {
+    "path": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/touch-layout-f33-followup-20261017/native-a2-preparation/output/safari-xcode-a2ecda302-80471415c945/FluentRead/FluentRead.xcodeproj/project.pbxproj",
+    "sha256": "90800569113d37b38ea8d675a8f43107f26dd108de688c51e309320f353ba7ae"
+  },
+  "targets": [
+    {
+      "id": "B521491E3082B3AE008C6CAF",
+      "name": "FluentRead (iOS)",
+      "productType": "com.apple.product-type.application",
+      "configurationListId": "B52149613082B3AF008C6CAF",
+      "configurations": [
+        {
+          "id": "B52149623082B3AF008C6CAF",
+          "name": "Debug",
+          "bundleId": "org.example.FluentReadDevelopment",
+          "sdk": "iphoneos"
+        },
+        {
+          "id": "B52149633082B3AF008C6CAF",
+          "name": "Release",
+          "bundleId": "org.example.FluentReadDevelopment",
+          "sdk": "iphoneos"
+        }
+      ]
+    },
+    {
+      "id": "B52149303082B3AE008C6CAF",
+      "name": "FluentRead (macOS)",
+      "productType": "com.apple.product-type.application",
+      "configurationListId": "B52149683082B3AF008C6CAF",
+      "configurations": [
+        {
+          "id": "B52149693082B3AF008C6CAF",
+          "name": "Debug",
+          "bundleId": "org.example.FluentReadDevelopment",
+          "sdk": "macosx"
+        },
+        {
+          "id": "B521496A3082B3AF008C6CAF",
+          "name": "Release",
+          "bundleId": "org.example.FluentReadDevelopment",
+          "sdk": "macosx"
+        }
+      ]
+    },
+    {
+      "id": "B521493C3082B3AE008C6CAF",
+      "name": "FluentRead Extension (iOS)",
+      "productType": "com.apple.product-type.app-extension",
+      "configurationListId": "B521495D3082B3AF008C6CAF",
+      "configurations": [
+        {
+          "id": "B521495E3082B3AF008C6CAF",
+          "name": "Debug",
+          "bundleId": "org.example.FluentReadDevelopment.Extension",
+          "sdk": "iphoneos"
+        },
+        {
+          "id": "B521495F3082B3AF008C6CAF",
+          "name": "Release",
+          "bundleId": "org.example.FluentReadDevelopment.Extension",
+          "sdk": "iphoneos"
+        }
+      ]
+    },
+    {
+      "id": "B52149463082B3AE008C6CAF",
+      "name": "FluentRead Extension (macOS)",
+      "productType": "com.apple.product-type.app-extension",
+      "configurationListId": "B52149643082B3AF008C6CAF",
+      "configurations": [
+        {
+          "id": "B52149653082B3AF008C6CAF",
+          "name": "Debug",
+          "bundleId": "org.example.FluentReadDevelopment.Extension",
+          "sdk": "macosx"
+        },
+        {
+          "id": "B52149663082B3AF008C6CAF",
+          "name": "Release",
+          "bundleId": "org.example.FluentReadDevelopment.Extension",
+          "sdk": "macosx"
+        }
+      ]
+    }
+  ],
+  "packageReportPath": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/touch-layout-f33-followup-20261017/native-a2-preparation/output/safari-xcode-a2ecda302-80471415c945/fluentread-package-report.json"
+}

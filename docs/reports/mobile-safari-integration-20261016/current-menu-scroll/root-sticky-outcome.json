@@ -1,0 +1,128 @@
+{
+  "at": "2026-10-16T21:01:30.053744+00:00",
+  "status": "PARTIAL_TOUCH_CLOSE_FIXED_KEYBOARD_TARGET_OCCLUDED",
+  "rawExitCode": 1,
+  "reportSHA256": "77e637b422d996c241be7cff6b984af80052015b37ca70889557e1b81f8ef7c8",
+  "normalClose": {
+    "input": "mouse.click-at-observed-checked-center",
+    "x": 353,
+    "y": 37,
+    "focusReturned": true
+  },
+  "keyboardStepsCompleted": [
+    {
+      "key": "End",
+      "expected": "download-bilingual-subtitles",
+      "observed": "download-bilingual-subtitles"
+    },
+    {
+      "key": "ArrowUp",
+      "expected": "download-translated-subtitles",
+      "observed": "download-translated-subtitles"
+    },
+    {
+      "key": "ArrowUp",
+      "expected": "download-subtitles",
+      "observed": "download-subtitles"
+    },
+    {
+      "key": "ArrowUp",
+      "expected": "subtitle-later",
+      "observed": "subtitle-later"
+    },
+    {
+      "key": "ArrowUp",
+      "expected": "subtitle-earlier",
+      "observed": "subtitle-earlier"
+    },
+    {
+      "key": "ArrowUp",
+      "expected": "off",
+      "observed": "off"
+    }
+  ],
+  "focusedFailure": {
+    "action": "focused",
+    "count": 1,
+    "actualAction": null,
+    "actualMode": "off",
+    "inHeader": false,
+    "frame": {
+      "left": 155,
+      "top": 9,
+      "right": 199,
+      "bottom": 53,
+      "width": 44,
+      "height": 44
+    },
+    "visible": {
+      "left": 155,
+      "top": 9.00219298245614,
+      "right": 199,
+      "bottom": 53,
+      "width": 44,
+      "height": 43.99780701754386
+    },
+    "fullyVisible": true,
+    "points": [
+      {
+        "x": 177,
+        "y": 31,
+        "hitOwnedControl": false,
+        "hitTag": "DIV",
+        "hitAction": null
+      },
+      {
+        "x": 166,
+        "y": 20,
+        "hitOwnedControl": false,
+        "hitTag": "DIV",
+        "hitAction": null
+      },
+      {
+        "x": 188,
+        "y": 20,
+        "hitOwnedControl": false,
+        "hitTag": "DIV",
+        "hitAction": null
+      },
+      {
+        "x": 166,
+        "y": 42,
+        "hitOwnedControl": false,
+        "hitTag": "DIV",
+        "hitAction": null
+      },
+      {
+        "x": 188,
+        "y": 42,
+        "hitOwnedControl": false,
+        "hitTag": "DIV",
+        "hitAction": null
+      }
+    ]
+  },
+  "headerAtFailure": {
+    "left": 15,
+    "top": 15,
+    "right": 375,
+    "bottom": 59,
+    "width": 360,
+    "height": 44
+  },
+  "visualIssue": "6px scrollport padding gap above pinned header exposes a clipped preceding row/focus outline",
+  "sourceFiles": {
+    "/Users/thinkstu/Desktop/copy/FluentRead-mobile-video-menu-accessibility-20261016/src/features/video-subtitle/content/ui.ts": "a0509c3bf4185d6cb034b4d1a44604dc177bd6e93c73224c0a3dcc0c33b97cb3",
+    "/Users/thinkstu/Desktop/copy/FluentRead-mobile-video-menu-accessibility-20261016/scripts/run-mobile-video-subtitle-test.cjs": "3d44f7820850808c75d910ca866ba181326f8c446c44b3a289d95151d06cad72"
+  },
+  "RootActualPNGReview": [
+    "portrait-menu-hint-targets",
+    "portrait-menu-normal-close",
+    "portrait-menu-keyboard-6-ArrowUp"
+  ],
+  "focusEvents": [],
+  "browserCloseReceipt": "shared-guard-fulfilled",
+  "profileRemoved": true,
+  "fullCasePass": false,
+  "nextFix": "Header-aware focus scrolling; close top padding paint gap"
+}

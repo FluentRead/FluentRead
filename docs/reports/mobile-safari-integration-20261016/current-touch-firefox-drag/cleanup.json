@@ -1,0 +1,103 @@
+{
+  "startedAt": "2026-10-16T20:25:08.842416+00:00",
+  "errors": [
+    "Final Off/click-action/reader/WM verification not complete: [Errno 2] No such file or directory: '/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/android-runtime/firefox-f5a-floating-touch-attempt35/restoration-verified.json'"
+  ],
+  "transientReads": {},
+  "EdgeActions": 0,
+  "taskDataPreserved": true,
+  "runner": {
+    "controllerPid": 16222,
+    "approvedSnapshot": {
+      "directory": "/Users/thinkstu/Desktop/copy/FluentRead-mobile-video-menu-accessibility-20261016/.output/firefox-mv2",
+      "files": 478,
+      "bytes": 62363693,
+      "rawByteHash": "e026986964e0d3e065271bb460aa798bf28ab3c27512717658532abf259da6ab",
+      "recordHash": "bb6d2df04165f76bee19f6da3ce46fb702f0e54f108cae137ccc5205bc36ed3b",
+      "fullFileMap": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/touch-layout-f33-followup-20261017/firefox-file-map.json",
+      "recordAlgorithm": "global UTF8 path sort; SHA256(path + NUL + fileSHA256 + NUL + decimalByteLength + LF)",
+      "rawAlgorithm": "recursive directory UTF8 name sort; SHA256(path + NUL + decimalByteLength + NUL + rawbytes)",
+      "runtimeCommit": "a2ecda302d3a0199ffe9f0222ee2998a37bd7d5d",
+      "sourceGate": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/touch-layout-f33-followup-20261017/artifact-gate.json",
+      "sourceGateSHA256": "654199d873b4ed401ba69aa99fb3c46b92208a2133e897322a91d790cb10bec8",
+      "sourceBindings": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/touch-layout-f33-followup-20261017/source-bindings.json",
+      "sourceBindingsSHA256": "e4841610dad01d735885b7a1161e9716304b02bcb02761fa27613b1f42b1f83f",
+      "permissionReview": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/touch-layout-f33-followup-20261017/firefox-permission-review.json",
+      "permissionReviewSHA256": "f90e9acee69c7989e0889f3fd9acd355510d739210a7335d9eeb1a0a419f636f",
+      "runtimeSourceCommit": "a2ecda302d3a0199ffe9f0222ee2998a37bd7d5d",
+      "observedCheckoutHEAD": "663021d72844aaa2d5de691d538d3243a8fc990b",
+      "checkoutHEADBoundary": "Report-only descendant of runtime source commit; source12 and full478 artifact bind runtime."
+    },
+    "phase": "floating",
+    "controllerReady": "runtime-ready-attempt35.json",
+    "deadline": "2026-10-16T20:27:19.307Z",
+    "startedAt": "2026-10-16T20:06:00.984Z",
+    "target": "emulator-5580",
+    "adbHost": "127.0.0.1",
+    "adbPort": 5048,
+    "source": "/Users/thinkstu/Desktop/copy/FluentRead-mobile-video-menu-accessibility-20261016/.output/firefox-mv2",
+    "artifact": {
+      "algorithm": "SHA256 sorted UTF8 relativePath NUL fileSHA256 NUL byteLength LF",
+      "files": 478,
+      "bytes": 62363693,
+      "sha256": "bb6d2df04165f76bee19f6da3ce46fb702f0e54f108cae137ccc5205bc36ed3b"
+    },
+    "automaticServerStart": "disabled via adbBin=/usr/bin/false",
+    "scope": "official web-ext-run existing locked Android target, temporary extension on task-only Firefox profile; emulator not physical Android",
+    "status": "temporary-extension-installed",
+    "readyAt": "2026-10-16T20:06:08.540Z",
+    "rdpPort": 51231,
+    "rdpSocket": "@org.mozilla.firefox/firefox-debugger-socket",
+    "addons": [
+      [
+        "/Users/thinkstu/Desktop/copy/FluentRead-mobile-video-menu-accessibility-20261016/.output/firefox-mv2",
+        "{3096bd53-3bda-4556-b076-ebf47442a5c1}"
+      ]
+    ],
+    "listener": "COMMAND   PID     USER   FD   TYPE             DEVICE SIZE/OFF NODE NAME\nadb     15972 thinkstu   12u  IPv4 0xbb1c348fac7309a4      0t0  TCP 127.0.0.1:51231 (LISTEN)\n",
+    "runnerCleanup": true,
+    "forwardRemoved": true,
+    "finishedAt": "2026-10-16T20:25:09.551Z"
+  },
+  "guardStatus": "stopped-by-owner",
+  "focusEvents": [],
+  "violations": [],
+  "keysMetadataUnchanged": true,
+  "frontmostAfter": {
+    "pid": 20136,
+    "name": "ChatGPT"
+  },
+  "protectedTaskGUIActivations": [],
+  "nonTaskActivationCount": 0,
+  "focusPolicy": "Fail task emulator/qemu/Android Studio or known task server/emulator PID activations; preserve all events and do not attribute unrelated user app changes to automation.",
+  "knownOwnedPids": [
+    15957,
+    15970,
+    15972,
+    15989,
+    16222
+  ],
+  "remainingOwned": [],
+  "ports": {
+    "5048": {
+      "returnCode": 1,
+      "listeners": ""
+    },
+    "5580": {
+      "returnCode": 1,
+      "listeners": ""
+    },
+    "5581": {
+      "returnCode": 1,
+      "listeners": ""
+    },
+    "51231": {
+      "returnCode": 1,
+      "listeners": ""
+    }
+  },
+  "laneReleased": true,
+  "finishedAt": "2026-10-16T20:25:13.867486+00:00",
+  "elapsedSeconds": 5.02505925,
+  "status": "FAILED"
+}

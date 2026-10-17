@@ -1,0 +1,32 @@
+{
+  "id": "02-safari-web-verify",
+  "startedAt": "2026-10-16T21:25:26.207734+00:00",
+  "argv": [
+    "/opt/homebrew/opt/node@22/bin/node",
+    "/Users/thinkstu/Desktop/copy/FluentRead-mobile-video-menu-accessibility-20261016/scripts/testing/run-resource-safe.mjs",
+    "--max-workers",
+    "1",
+    "--concurrency",
+    "3",
+    "--cpu-target",
+    "40",
+    "--",
+    "/opt/homebrew/opt/node@22/bin/node",
+    "/Users/thinkstu/Desktop/copy/FluentRead-mobile-video-menu-accessibility-20261016/scripts/safari/package.mjs",
+    "--verify",
+    "--extension",
+    "/Users/thinkstu/Desktop/copy/FluentRead-mobile-video-menu-accessibility-20261016/.output/safari-mv2"
+  ],
+  "environmentOverrides": {
+    "DEVELOPER_DIR": "/Applications/Xcode.app/Contents/Developer",
+    "PATH": "/opt/homebrew/opt/node@22/bin:/usr/bin:/bin:/usr/sbin:/sbin:/opt/homebrew/bin"
+  },
+  "cwd": "/Users/thinkstu/Desktop/copy/FluentRead-mobile-video-menu-accessibility-20261016",
+  "combinedLog": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/touch-layout-f33-followup-20261017/native-final-layout-6eecd6710e7d-b1a66b3fc4e5/logs/02-safari-web-verify.log",
+  "pid": 36509,
+  "pgid": 36509,
+  "returnCode": 0,
+  "elapsedSeconds": 0.306,
+  "finishedAt": "2026-10-16T21:25:26.513398+00:00",
+  "logSHA256": "f27c4c14522d969596a46f69269737e68b148d37f38847927c23d7c2e07b0b89"
+}

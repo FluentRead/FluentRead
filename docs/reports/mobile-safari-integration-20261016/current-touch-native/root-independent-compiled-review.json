@@ -1,0 +1,65 @@
+{
+  "at": "2026-10-16T19:40:53.629998+00:00",
+  "reviewer": "root",
+  "method": "Independent pure disk tree rehash of three complete native apps plus native diagnostic receipt reads; no SDK invocation",
+  "sourceCommit": "a2ecda302d3a0199ffe9f0222ee2998a37bd7d5d",
+  "compiledIdentitySourceSHA256": "b85ce5c242211b8bd3c82aa4affc31569e57eb86d0d96060e4133e1ca5283820",
+  "firstReviewCorrection": "First local assertion incorrectly required no extras in iOS appex root. Corrected to the exact Info.plist + CFBundleExecutable allowance already specified in the preparation plan. Full maps and both hashes matched in both reads; no product change or rerun. Original failed assertion remains in tool history.",
+  "targets": {
+    "macOS": {
+      "appFiles": 482,
+      "appBytes": 63251441,
+      "rawByteHash": "f23950735a7b95e0546c40e9b67d0943ff580d71c461264b3fbb74e7a55db7e5",
+      "recordHash": "20488e6e258191f4796615125eb8bd8d526f36f7f897f23947d23d592c9a1a03",
+      "fullFileMapIndependentlyMatched": true,
+      "webFiles": 467,
+      "allowedNativeExtrasOutsideWebMap": [],
+      "unexpectedNativeExtras": [],
+      "appBundleId": "org.example.FluentReadDevelopment",
+      "extensionBundleId": "org.example.FluentReadDevelopment.Extension",
+      "signatureStatuses": [
+        "ADHOC_NO_TEAM",
+        "ADHOC_NO_TEAM"
+      ]
+    },
+    "iosSimulator": {
+      "appFiles": 485,
+      "appBytes": 64226699,
+      "rawByteHash": "5d7c4bae83b67dbfcb7f0a4a9f6fa9e0a6e36ae635b0308d836dfffa5d5e677e",
+      "recordHash": "aa41370b5870ef43da58e3884974523634d3ae8ec5cd9360cbf91790cc733470",
+      "fullFileMapIndependentlyMatched": true,
+      "webFiles": 467,
+      "allowedNativeExtrasOutsideWebMap": [
+        "FluentRead Extension",
+        "Info.plist"
+      ],
+      "unexpectedNativeExtras": [],
+      "appBundleId": "org.example.FluentReadDevelopment",
+      "extensionBundleId": "org.example.FluentReadDevelopment.Extension",
+      "signatureStatuses": [
+        "ADHOC_NO_TEAM",
+        "ADHOC_NO_TEAM"
+      ]
+    },
+    "iPhoneOS": {
+      "appFiles": 485,
+      "appBytes": 64123369,
+      "rawByteHash": "8a61c71e0e8839b5ce5da96aea3eeb14dadcbcb90312c52cf55faf8db90681da",
+      "recordHash": "0365302cdb96da31d9fbe7605e8987af14ab7ba5b71fac9c9332d4d673368e81",
+      "fullFileMapIndependentlyMatched": true,
+      "webFiles": 467,
+      "allowedNativeExtrasOutsideWebMap": [
+        "FluentRead Extension",
+        "Info.plist"
+      ],
+      "unexpectedNativeExtras": [],
+      "appBundleId": "org.example.FluentReadDevelopment",
+      "extensionBundleId": "org.example.FluentReadDevelopment.Extension",
+      "signatureStatuses": [
+        "UNSIGNED",
+        "UNSIGNED"
+      ]
+    }
+  },
+  "runtimeAcceptance": false
+}

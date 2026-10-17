@@ -1,0 +1,202 @@
+{
+  "actions" : {
+    "address" : 1,
+    "clearSearch" : 1,
+    "defaultServiceRow" : 1,
+    "extensionPopup" : 1,
+    "navigation" : 1,
+    "normalClear" : 1,
+    "pageMenu" : 1,
+    "pickerBack" : 1,
+    "SafariActivate" : 1,
+    "searchFocus" : 1,
+    "searchGpt" : 1,
+    "serviceSummary" : 1
+  },
+  "actualExactAllowedWebViewLabel" : "流畅阅读",
+  "configurationChangeIntents" : 0,
+  "emptyOwnerIsNotCurrentOwnerProof" : true,
+  "frameIntersectionIsNotVisiblePixelProof" : true,
+  "keyboardCountCappedAt2" : 0,
+  "keyboardFramesAtMost2" : [
+
+  ],
+  "nativeGlobalExactDoneCountCappedAt2" : 1,
+  "nativeHeaderDoneCandidatesCappedAt2" : 1,
+  "nodes" : [
+    {
+      "frame" : {
+        "height" : 450.97346600331667,
+        "width" : 386,
+        "x" : 8,
+        "y" : 415.02653399668321
+      },
+      "identifier" : "",
+      "label" : "流畅阅读",
+      "type" : 58
+    },
+    {
+      "frame" : {
+        "height" : 513,
+        "width" : 386,
+        "x" : 8,
+        "y" : 482
+      },
+      "identifier" : "",
+      "label" : "流畅阅读",
+      "type" : 1
+    },
+    {
+      "frame" : {
+        "height" : 379,
+        "width" : 386,
+        "x" : 8,
+        "y" : 488
+      },
+      "identifier" : "",
+      "label" : "翻译服务, 网页对话框",
+      "type" : 1
+    },
+    {
+      "frame" : {
+        "height" : 46,
+        "width" : 45,
+        "x" : 315,
+        "y" : 515
+      },
+      "identifier" : "",
+      "label" : "关闭",
+      "type" : 9
+    },
+    {
+      "frame" : {
+        "height" : 46,
+        "width" : 333,
+        "x" : 27,
+        "y" : 567
+      },
+      "identifier" : "",
+      "label" : "网页默认服务 · 免费翻译服务",
+      "type" : 9
+    },
+    {
+      "frame" : {
+        "height" : 46,
+        "width" : 333,
+        "x" : 27,
+        "y" : 617
+      },
+      "identifier" : "",
+      "label" : "鼠标悬浮 · 跟随默认 · 免费翻译服务",
+      "type" : 9
+    },
+    {
+      "frame" : {
+        "height" : 46,
+        "width" : 333,
+        "x" : 27,
+        "y" : 661
+      },
+      "identifier" : "",
+      "label" : "划词翻译 · 跟随默认 · 免费翻译服务",
+      "type" : 9
+    },
+    {
+      "frame" : {
+        "height" : 47,
+        "width" : 333,
+        "x" : 27,
+        "y" : 705
+      },
+      "identifier" : "",
+      "label" : "输入框翻译 · 跟随默认 · 免费翻译服务",
+      "type" : 9
+    },
+    {
+      "frame" : {
+        "height" : 46,
+        "width" : 333,
+        "x" : 27,
+        "y" : 750
+      },
+      "identifier" : "",
+      "label" : "视频字幕 · 跟随默认 · 免费翻译服务",
+      "type" : 9
+    },
+    {
+      "frame" : {
+        "height" : 46,
+        "width" : 333,
+        "x" : 27,
+        "y" : 794
+      },
+      "identifier" : "",
+      "label" : "文档翻译 · 跟随默认 · 免费翻译服务",
+      "type" : 9
+    },
+    {
+      "frame" : {
+        "height" : 46,
+        "width" : 333,
+        "x" : 27,
+        "y" : 838
+      },
+      "identifier" : "",
+      "label" : "图片翻译 · 跟随默认 · 免费翻译服务",
+      "type" : 9
+    },
+    {
+      "frame" : {
+        "height" : 329.79740516039914,
+        "width" : 28.80597014925371,
+        "x" : 362.31343283582089,
+        "y" : 482.24046434494193
+      },
+      "identifier" : "",
+      "label" : "垂直滚动条, 2页",
+      "type" : 1
+    },
+    {
+      "frame" : {
+        "height" : 28.805970149253653,
+        "width" : 278.07573901068236,
+        "x" : 61.962130494658801,
+        "y" : 801.66666666666663
+      },
+      "identifier" : "",
+      "label" : "水平滚动条, 1页",
+      "type" : 1
+    },
+    {
+      "frame" : {
+        "height" : 329.79740516039914,
+        "width" : 28.80597014925371,
+        "x" : 362.31343283582089,
+        "y" : 482.24046434494193
+      },
+      "identifier" : "",
+      "label" : "垂直滚动条, 2页",
+      "type" : 1
+    },
+    {
+      "frame" : {
+        "height" : 28.805970149253653,
+        "width" : 278.07573901068236,
+        "x" : 61.962130494658801,
+        "y" : 801.66666666666663
+      },
+      "identifier" : "",
+      "label" : "水平滚动条, 1页",
+      "type" : 1
+    }
+  ],
+  "ownerExact" : false,
+  "ownerNotExposed" : true,
+  "permissionChoices" : 0,
+  "phase" : "before-overviewClose",
+  "readOnlyDrawerHeaderAdmission" : true,
+  "scope" : "Current named production Popup only; no unrelated page\/field\/keyboard key values",
+  "snapshotLiveAndPNGSequentialNotAtomic" : true,
+  "status" : "DRAWER_KEYBOARD_PHASE_OBSERVATION_REQUIRES_REVIEW",
+  "translationIntents" : 0
+}

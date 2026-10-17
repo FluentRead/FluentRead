@@ -1,0 +1,46 @@
+{
+  "mode": "after-install",
+  "FR": {
+    "app": "/Users/thinkstu/Library/Developer/CoreSimulator/Devices/A407390F-7AA8-42AE-AFEB-F93EE99E9FF8/data/Containers/Bundle/Application/2495942A-2589-4A06-B622-0DB7CD3E3C39/FluentRead.app",
+    "allCompiledFilesMatch": true,
+    "fileCount": 485,
+    "nativeSHA256": "6787f23451d263c8bab9a5f4543fbe5f869ec56ed38983438119bc3f0946d15e",
+    "webRawSHA256": "b1a66b3fc4e579216321758ebb921b7396430610119c9e5ca356de23b8cfc161"
+  },
+  "Userscripts": {
+    "app": "/Users/thinkstu/Library/Developer/CoreSimulator/Devices/A407390F-7AA8-42AE-AFEB-F93EE99E9FF8/data/Containers/Bundle/Application/4EAE38A1-E4FF-4B60-8DDE-0DA00A8A623E/Userscripts-iOS-App.app",
+    "all47Match": true
+  },
+  "FRPrivate": {
+    "container": "/Users/thinkstu/Library/Developer/CoreSimulator/Devices/A407390F-7AA8-42AE-AFEB-F93EE99E9FF8/data/Containers/Data/Application/8524E3F4-E6B1-472E-BA03-06D894E49CBA",
+    "allFileSHA256": {
+      ".com.apple.mobile_container_manager.metadata.plist": "21612413875cf356358ec7f722757a390274b1cdea0866f378be27cc66cab014",
+      "Library/Caches/com.apple.WebKit.GPU/functions.data": "99817410a8d106dafb56ff8ef99e54826dfb7a9a208a646abc83182a34a2e6e2",
+      "Library/Caches/com.apple.WebKit.GPU/functions.list": "e24158cd6e3e5f98cc826ad074e8dd3a83f56329353ff2b1cd0e109e3a582704",
+      "Library/Caches/com.apple.WebKit.GPU/libraries.data": "a157169b05ff983827f0ea222b1b635c4a48d52b2574a742227761af9cc95d9a",
+      "Library/Caches/com.apple.WebKit.GPU/libraries.list": "49d1e02c64e602f1c9d081596ef2e2b8781515d3143fd59f791cff464a166626",
+      "Library/Caches/org.example.FluentReadDevelopment/WebKit/CacheStorage/salt": "5d58254bed020edcd4c036261f39c09c81d2634bcd30cd6f2bfae3f3ffd88126",
+      "Library/Caches/org.example.FluentReadDevelopment/WebKit/NetworkCache/Version 17/salt": "d628a64427b82c39957534c3b5058551ff6fe70525c61cf0baa4a6ec5d50c2fd",
+      "Library/Saved Application State/org.example.FluentReadDevelopment.savedState/KnownSceneSessions/data.data": "66d84c159c7f6423aac4fe276e76ebf25daf28bcd7752ce83550b4decfd310a4",
+      "Library/SplashBoard/Snapshots/sceneID:org.example.FluentReadDevelopment-default/21C90DD9-63C3-417D-B5D5-44D0A52585ED@3x.ktx": "94c9a98d37eb6c31689d30e422b3e2600b5aa8c203ad4232a536e6aa4c29b1ed",
+      "Library/SplashBoard/Snapshots/sceneID:org.example.FluentReadDevelopment-default/DAF3948B-189A-4FE2-A784-705D7DA3D9F2@3x.ktx": "94c9a98d37eb6c31689d30e422b3e2600b5aa8c203ad4232a536e6aa4c29b1ed",
+      "Library/SplashBoard/Snapshots/sceneID:org.example.FluentReadDevelopment-default/downscaled/03DE97BA-13D0-4E20-A508-CB9755B021C8@3x.ktx": "5434fd6328f89a076d559272175972d5973098605ea2a7eef6f847656ff8c2f4",
+      "Library/SplashBoard/Snapshots/sceneID:org.example.FluentReadDevelopment-default/downscaled/6553D705-9F42-4EB0-8E18-1F0EA1181E5E@3x.ktx": "5434fd6328f89a076d559272175972d5973098605ea2a7eef6f847656ff8c2f4",
+      "Library/WebKit/org.example.FluentReadDevelopment/WebsiteData/Default/salt": "9a20b5198db86fb720772a9f676fd9c8c56488d4859747c53a732eaec8575ca7",
+      "Library/WebKit/org.example.FluentReadDevelopment/WebsiteData/MediaKeys/v1/salt": "ba84d6a872fa812824cafeb27df4111eb2b4ba33edc0584535f8e817bbcd3b50",
+      "Library/WebKit/org.example.FluentReadDevelopment/WebsiteData/ResourceLoadStatistics/observations.db": "a209ba85773882b79b8147779c406fbb67a12dcb723ba7c4ea7ca3168e651cc8",
+      "Library/WebKit/org.example.FluentReadDevelopment/WebsiteData/ResourceLoadStatistics/observations.db-shm": "e2f3fff9a475d3372f4be3056be8c986e7b79d6b38c4935c0ec3b03d5c7b54a4",
+      "Library/WebKit/org.example.FluentReadDevelopment/WebsiteData/ResourceLoadStatistics/observations.db-wal": "99947f5de108de074d206fbc848579fedad9599e148220857395e4fd70ba39c6"
+    },
+    "fileCount": 17,
+    "scope": "Native FR App data17 hash baseline only; not all extension settings/storage/cache. Record post-UI changes; do not copy files back.",
+    "dataContainerUUIDMigrated": true,
+    "same17FileContent": true,
+    "changes": []
+  },
+  "Demo": {
+    "path": "/Users/thinkstu/Library/Developer/CoreSimulator/Devices/A407390F-7AA8-42AE-AFEB-F93EE99E9FF8/data/Containers/Data/Application/A7FDF29F-EE22-47D0-A7D1-7DB93C0E54DB/Documents/Demo_user_script.user.js",
+    "sha256": "6eb20314a7463f8f210cb1ced63867b1f2e3537ce66d7f12d106641d040d14b3"
+  },
+  "officialContainerQueries": true
+}

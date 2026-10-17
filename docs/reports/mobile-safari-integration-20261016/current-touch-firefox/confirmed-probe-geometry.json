@@ -1,0 +1,601 @@
+{
+  "mode": "probe",
+  "tag": "confirmed-probe",
+  "token": "ff72a845-5a58-46ed-be46-d6105a1aa01a",
+  "pid": 5560,
+  "restore": false,
+  "startedAt": "2026-10-16T19:21:59.435Z",
+  "startedUnixMs": 1792178519435,
+  "scope": "Fixed official selectedNodeActor/$0 reads of the owned example reader and exact options target; no native screenshot verdict",
+  "inputReady": false,
+  "requestTypes": {
+    "root": [
+      "connect",
+      "getRoot",
+      "listTabs",
+      "getTab",
+      "listAddons",
+      "listWorkers",
+      "listServiceWorkerRegistrations",
+      "listProcesses",
+      "getProcess",
+      "watchResources",
+      "unwatchResources",
+      "clearResources",
+      "requestTypes"
+    ],
+    "server0.conn4.tabDescriptor1": [
+      "getTarget",
+      "getFavicon",
+      "getWatcher",
+      "navigateTo",
+      "goBack",
+      "goForward",
+      "reloadDescriptor"
+    ],
+    "server0.conn4.child2/inspectorActor4": [
+      "getWalker",
+      "getPageStyle",
+      "getCompatibility",
+      "getHighlighterByType",
+      "getImageDataFromURL",
+      "resolveRelativeURL",
+      "pickColorFromPage",
+      "cancelPickColorFromPage",
+      "supportsHighlighters"
+    ],
+    "server0.conn4.child2/domwalker19": [
+      "release",
+      "document",
+      "documentElement",
+      "retainNode",
+      "unretainNode",
+      "releaseNode",
+      "children",
+      "nextSibling",
+      "previousSibling",
+      "findInspectingNode",
+      "querySelector",
+      "getIdrefNode",
+      "querySelectorAll",
+      "search",
+      "getSuggestionsForQuery",
+      "addPseudoClassLock",
+      "hideNode",
+      "unhideNode",
+      "removePseudoClassLock",
+      "clearPseudoClassLocks",
+      "innerHTML",
+      "setInnerHTML",
+      "outerHTML",
+      "setOuterHTML",
+      "insertAdjacentHTML",
+      "duplicateNode",
+      "removeNode",
+      "removeNodes",
+      "insertBefore",
+      "editTagName",
+      "getMutations",
+      "isInDOMTree",
+      "getNodeActorFromWindowID",
+      "getNodeActorFromContentDomReference",
+      "getStyleSheetOwnerNode",
+      "getNodeFromActor",
+      "getLayoutInspector",
+      "getParentGridNode",
+      "getOffsetParent",
+      "setMutationBreakpoints",
+      "getEmbedderElement",
+      "pick",
+      "cancelPick",
+      "clearPicker",
+      "watchRootNode",
+      "getOverflowCausingElements",
+      "getScrollableAncestorNode"
+    ],
+    "server0.conn4.child2/domnodelist20": [
+      "item",
+      "items",
+      "release"
+    ],
+    "server0.conn4.child2/consoleActor3": [
+      "startListeners",
+      "stopListeners",
+      "getCachedMessages",
+      "evaluateJSAsync",
+      "autocomplete",
+      "clearMessagesCacheAsync"
+    ],
+    "server0.conn4.child2/domnodelist24": [
+      "item",
+      "items",
+      "release"
+    ],
+    "server0.conn4.child2/domnodelist27": [
+      "item",
+      "items",
+      "release"
+    ]
+  },
+  "evaluations": [
+    {
+      "kind": "identity",
+      "nodeActor": "server0.conn4.child2/domnode21",
+      "ack": {
+        "resultID": "1792178519700.768-0",
+        "from": "server0.conn4.child2/consoleActor3"
+      },
+      "result": {
+        "type": "evaluationResult",
+        "resultID": "1792178519700.768-0",
+        "hasException": false,
+        "input": "JSON.stringify((()=>{const n=$0,d=n.ownerDocument,v=d.defaultView,vv=v.visualViewport;const viewport={width:vv?.width??v.innerWidth,height:vv?.height??v.innerHeight,offsetLeft:vv?.offsetLeft??0,offsetTop:vv?.offsetTop??0,scale:vv?.scale??1};const meta={ownerURL:d.URL,url:v.location.href,timeOrigin:v.performance.timeOrigin,visibility:d.visibilityState,viewport,scrollX:v.scrollX,scrollY:v.scrollY};const styleOf=e=>{const s=v.getComputedStyle(e);return {display:s.display,visibility:s.visibility,opacity:s.opacity,pointerEvents:s.pointerEvents,position:s.position,transform:s.transform,transformIsIdentity:s.transform==='none'||new v.DOMMatrixReadOnly(s.transform).isIdentity,clipPath:s.clipPath}};const shown=e=>{if(!e?.isConnected)return false;for(let a=e;a;a=a.parentElement??a.getRootNode()?.host){const s=v.getComputedStyle(a);if(s.display==='none'||s.visibility!=='visible'||Number(s.opacity)===0)return false;}const r=e.getBoundingClientRect();return r.width>0&&r.height>0&&r.right>viewport.offsetLeft&&r.bottom>viewport.offsetTop&&r.left<viewport.offsetLeft+viewport.width&&r.top<viewport.offsetTop+viewport.height};const geometry=e=>{const r=e.getBoundingClientRect(),x=r.x+r.width/2,y=r.y+r.height/2,hit=d.elementFromPoint(x,y);return {tag:e.localName,role:e.getAttribute('role'),connected:e.isConnected,disabled:e.matches(':disabled')||e.getAttribute('aria-disabled')==='true',rect:r.toJSON(),clientRects:[...e.getClientRects()].map(q=>q.toJSON()),point:{x,y},style:styleOf(e),viewport,visibility:d.visibilityState,visible:shown(e),documentHitOwn:hit===e||e.contains(hit)}};return {...meta,kind:'document',title:d.title,connected:n.isConnected,exactDocumentElement:n===d.documentElement};})())",
+        "result": "{\"ownerURL\":\"https://example.com/\",\"url\":\"https://example.com/\",\"timeOrigin\":1792178386849,\"visibility\":\"visible\",\"viewport\":{\"width\":360,\"height\":504,\"offsetLeft\":0,\"offsetTop\":0,\"scale\":1},\"scrollX\":0,\"scrollY\":73,\"kind\":\"document\",\"title\":\"Example Domain\",\"connected\":true,\"exactDocumentElement\":true}",
+        "startTime": 1792178519700.768,
+        "timestamp": 1792178519701.392,
+        "from": "server0.conn4.child2/consoleActor3"
+      },
+      "readAtUnixMs": 1792178519707
+    },
+    {
+      "kind": "reader",
+      "nodeActor": "server0.conn4.child2/domnode21",
+      "ack": {
+        "resultID": "1792178519703.321-1",
+        "from": "server0.conn4.child2/consoleActor3"
+      },
+      "result": {
+        "type": "evaluationResult",
+        "resultID": "1792178519703.321-1",
+        "hasException": false,
+        "input": "JSON.stringify((()=>{const n=$0,d=n.ownerDocument,v=d.defaultView,vv=v.visualViewport;const viewport={width:vv?.width??v.innerWidth,height:vv?.height??v.innerHeight,offsetLeft:vv?.offsetLeft??0,offsetTop:vv?.offsetTop??0,scale:vv?.scale??1};const meta={ownerURL:d.URL,url:v.location.href,timeOrigin:v.performance.timeOrigin,visibility:d.visibilityState,viewport,scrollX:v.scrollX,scrollY:v.scrollY};const styleOf=e=>{const s=v.getComputedStyle(e);return {display:s.display,visibility:s.visibility,opacity:s.opacity,pointerEvents:s.pointerEvents,position:s.position,transform:s.transform,transformIsIdentity:s.transform==='none'||new v.DOMMatrixReadOnly(s.transform).isIdentity,clipPath:s.clipPath}};const shown=e=>{if(!e?.isConnected)return false;for(let a=e;a;a=a.parentElement??a.getRootNode()?.host){const s=v.getComputedStyle(a);if(s.display==='none'||s.visibility!=='visible'||Number(s.opacity)===0)return false;}const r=e.getBoundingClientRect();return r.width>0&&r.height>0&&r.right>viewport.offsetLeft&&r.bottom>viewport.offsetTop&&r.left<viewport.offsetLeft+viewport.width&&r.top<viewport.offsetTop+viewport.height};const geometry=e=>{const r=e.getBoundingClientRect(),x=r.x+r.width/2,y=r.y+r.height/2,hit=d.elementFromPoint(x,y);return {tag:e.localName,role:e.getAttribute('role'),connected:e.isConnected,disabled:e.matches(':disabled')||e.getAttribute('aria-disabled')==='true',rect:r.toJSON(),clientRects:[...e.getClientRects()].map(q=>q.toJSON()),point:{x,y},style:styleOf(e),viewport,visibility:d.visibilityState,visible:shown(e),documentHitOwn:hit===e||e.contains(hit)}};const ps=[...d.querySelectorAll('p[lang]')],excluded='.fluent-read-bilingual-content,.fluent-read-translation-text';const paragraphs=ps.slice(0,6).map(p=>{const w=d.createTreeWalker(p,v.NodeFilter.SHOW_TEXT),a=[];let t;while(t=w.nextNode())if(!t.parentElement?.closest(excluded))a.push(t.data);const source=a.join('');return {lang:p.lang,source:source.slice(0,4096),sourceLength:source.length,rect:p.getBoundingClientRect().toJSON()}});const s=v.getSelection();return {...meta,kind:'reader',paragraphCount:ps.length,paragraphs,translationCount:d.querySelectorAll(excluded).length,selection:{length:s?.toString().length??0,rangeCount:s?.rangeCount??0,collapsed:s?.isCollapsed??true}};})())",
+        "result": "{\"ownerURL\":\"https://example.com/\",\"url\":\"https://example.com/\",\"timeOrigin\":1792178386849,\"visibility\":\"visible\",\"viewport\":{\"width\":360,\"height\":504,\"offsetLeft\":0,\"offsetTop\":0,\"scale\":1},\"scrollX\":0,\"scrollY\":73,\"kind\":\"reader\",\"paragraphCount\":6,\"paragraphs\":[{\"lang\":\"en\",\"source\":\"This domain is for use in documentation examples without needing permission. This is not a service; avoid relying on it for testing and monitoring purposes.\",\"sourceLength\":156,\"rect\":{\"x\":32,\"y\":85,\"width\":296,\"height\":102.39999389648438,\"top\":85,\"right\":328,\"bottom\":187.39999389648438,\"left\":32}},{\"lang\":\"ar\",\"source\":\"هذا النطاق مُخصص للاستخدام في أمثلة التوثيق دون الحاجة إلى إذن. هذه ليست خدمة، يُرجى تجنب الاعتماد عليها لأغراض الاختبار والمراقبة.\",\"sourceLength\":131,\"rect\":{\"x\":32,\"y\":203.39999389648438,\"width\":296,\"height\":67.20001220703125,\"top\":203.39999389648438,\"right\":328,\"bottom\":270.6000061035156,\"left\":32}},{\"lang\":\"zh\",\"source\":\"该域名仅用于文档示例，无需获得许可。这并非一项服务，请勿将其用于测试和监控目的。\",\"sourceLength\":40,\"rect\":{\"x\":32,\"y\":284.6000061035156,\"width\":296,\"height\":44.79998779296875,\"top\":284.6000061035156,\"right\":328,\"bottom\":329.3999938964844,\"left\":32}},{\"lang\":\"fr\",\"source\":\"L’usage de ce domaine est réservé à des exemples de documentation, sans autorisation préalable.  Il ne s’agit pas d’un service ; son utilisation à des fins de test ou de surveillance est à éviter.\",\"sourceLength\":196,\"rect\":{\"x\":32,\"y\":343.3999938964844,\"width\":296,\"height\":112,\"top\":343.3999938964844,\"right\":328,\"bottom\":455.3999938964844,\"left\":32}},{\"lang\":\"ru\",\"source\":\"Данный домен предназначен для использования в примерах документации без необходимости получения предварительного разрешения. Это не сервис; не рекомендуется его использование для тестирования и мониторинга.\",\"sourceLength\":206,\"rect\":{\"x\":32,\"y\":469.3999938964844,\"width\":296,\"height\":156.8000030517578,\"top\":469.3999938964844,\"right\":328,\"bottom\":626.1999969482422,\"left\":32}},{\"lang\":\"es\",\"source\":\"Este dominio está destinado al uso en ejemplos de documentación sin necesidad de permiso. Esto no es un servicio; evitar utilizarlo para realizar pruebas o monitoreos.\",\"sourceLength\":167,\"rect\":{\"x\":32,\"y\":640.2000122070312,\"width\":296,\"height\":89.60000610351562,\"top\":640.2000122070312,\"right\":328,\"bottom\":729.8000183105469,\"left\":32}}],\"translationCount\":0,\"selection\":{\"length\":0,\"rangeCount\":0,\"collapsed\":true}}",
+        "startTime": 1792178519703.321,
+        "timestamp": 1792178519703.932,
+        "from": "server0.conn4.child2/consoleActor3"
+      },
+      "readAtUnixMs": 1792178519722
+    },
+    {
+      "kind": "host",
+      "nodeActor": "server0.conn4.child2/domnode25",
+      "ack": {
+        "resultID": "1792178519725.745-2",
+        "from": "server0.conn4.child2/consoleActor3"
+      },
+      "result": {
+        "type": "evaluationResult",
+        "resultID": "1792178519725.745-2",
+        "hasException": false,
+        "input": "JSON.stringify((()=>{const n=$0,d=n.ownerDocument,v=d.defaultView,vv=v.visualViewport;const viewport={width:vv?.width??v.innerWidth,height:vv?.height??v.innerHeight,offsetLeft:vv?.offsetLeft??0,offsetTop:vv?.offsetTop??0,scale:vv?.scale??1};const meta={ownerURL:d.URL,url:v.location.href,timeOrigin:v.performance.timeOrigin,visibility:d.visibilityState,viewport,scrollX:v.scrollX,scrollY:v.scrollY};const styleOf=e=>{const s=v.getComputedStyle(e);return {display:s.display,visibility:s.visibility,opacity:s.opacity,pointerEvents:s.pointerEvents,position:s.position,transform:s.transform,transformIsIdentity:s.transform==='none'||new v.DOMMatrixReadOnly(s.transform).isIdentity,clipPath:s.clipPath}};const shown=e=>{if(!e?.isConnected)return false;for(let a=e;a;a=a.parentElement??a.getRootNode()?.host){const s=v.getComputedStyle(a);if(s.display==='none'||s.visibility!=='visible'||Number(s.opacity)===0)return false;}const r=e.getBoundingClientRect();return r.width>0&&r.height>0&&r.right>viewport.offsetLeft&&r.bottom>viewport.offsetTop&&r.left<viewport.offsetLeft+viewport.width&&r.top<viewport.offsetTop+viewport.height};const geometry=e=>{const r=e.getBoundingClientRect(),x=r.x+r.width/2,y=r.y+r.height/2,hit=d.elementFromPoint(x,y);return {tag:e.localName,role:e.getAttribute('role'),connected:e.isConnected,disabled:e.matches(':disabled')||e.getAttribute('aria-disabled')==='true',rect:r.toJSON(),clientRects:[...e.getClientRects()].map(q=>q.toJSON()),point:{x,y},style:styleOf(e),viewport,visibility:d.visibilityState,visible:shown(e),documentHitOwn:hit===e||e.contains(hit)}};return {...meta,kind:'host',id:n.id,tag:n.localName,connected:n.isConnected,unique:d.querySelectorAll('#fluent-read-floating-ball-container').length,exact:d.getElementById('fluent-read-floating-ball-container')===n,shadowRootExposed:n.shadowRoot!==null,rect:n.getBoundingClientRect().toJSON()};})())",
+        "result": "{\"ownerURL\":\"https://example.com/\",\"url\":\"https://example.com/\",\"timeOrigin\":1792178386849,\"visibility\":\"visible\",\"viewport\":{\"width\":360,\"height\":504,\"offsetLeft\":0,\"offsetTop\":0,\"scale\":1},\"scrollX\":0,\"scrollY\":73,\"kind\":\"host\",\"id\":\"fluent-read-floating-ball-container\",\"tag\":\"fluent-read-floating-ball-ui\",\"connected\":true,\"unique\":1,\"exact\":true,\"shadowRootExposed\":false,\"rect\":{\"x\":0,\"y\":801.4000244140625,\"width\":0,\"height\":0,\"top\":801.4000244140625,\"right\":0,\"bottom\":801.4000244140625,\"left\":0}}",
+        "startTime": 1792178519725.745,
+        "timestamp": 1792178519726.213,
+        "from": "server0.conn4.child2/consoleActor3"
+      },
+      "readAtUnixMs": 1792178519744
+    },
+    {
+      "kind": "root",
+      "nodeActor": "server0.conn4.child2/domnode26",
+      "ack": {
+        "resultID": "1792178519741.664-3",
+        "from": "server0.conn4.child2/consoleActor3"
+      },
+      "result": {
+        "type": "evaluationResult",
+        "resultID": "1792178519741.664-3",
+        "hasException": false,
+        "input": "JSON.stringify((()=>{const n=$0,d=n.ownerDocument,v=d.defaultView,vv=v.visualViewport;const viewport={width:vv?.width??v.innerWidth,height:vv?.height??v.innerHeight,offsetLeft:vv?.offsetLeft??0,offsetTop:vv?.offsetTop??0,scale:vv?.scale??1};const meta={ownerURL:d.URL,url:v.location.href,timeOrigin:v.performance.timeOrigin,visibility:d.visibilityState,viewport,scrollX:v.scrollX,scrollY:v.scrollY};const styleOf=e=>{const s=v.getComputedStyle(e);return {display:s.display,visibility:s.visibility,opacity:s.opacity,pointerEvents:s.pointerEvents,position:s.position,transform:s.transform,transformIsIdentity:s.transform==='none'||new v.DOMMatrixReadOnly(s.transform).isIdentity,clipPath:s.clipPath}};const shown=e=>{if(!e?.isConnected)return false;for(let a=e;a;a=a.parentElement??a.getRootNode()?.host){const s=v.getComputedStyle(a);if(s.display==='none'||s.visibility!=='visible'||Number(s.opacity)===0)return false;}const r=e.getBoundingClientRect();return r.width>0&&r.height>0&&r.right>viewport.offsetLeft&&r.bottom>viewport.offsetTop&&r.left<viewport.offsetLeft+viewport.width&&r.top<viewport.offsetTop+viewport.height};const geometry=e=>{const r=e.getBoundingClientRect(),x=r.x+r.width/2,y=r.y+r.height/2,hit=d.elementFromPoint(x,y);return {tag:e.localName,role:e.getAttribute('role'),connected:e.isConnected,disabled:e.matches(':disabled')||e.getAttribute('aria-disabled')==='true',rect:r.toJSON(),clientRects:[...e.getClientRects()].map(q=>q.toJSON()),point:{x,y},style:styleOf(e),viewport,visibility:d.visibilityState,visible:shown(e),documentHitOwn:hit===e||e.contains(hit)}};const h=n.host,hit=typeof n.elementFromPoint==='function'?n.elementFromPoint(0,0):null;return {...meta,kind:'shadow',nodeType:n.nodeType,mode:n.mode,connected:n.isConnected,hostId:h?.id,hostTag:h?.localName,exactHost:d.getElementById('fluent-read-floating-ball-container')===h,pointLookup:typeof n.elementFromPoint,pointReadCompleted:true,pointNodeType:hit?.nodeType??null};})())",
+        "result": "{\"ownerURL\":\"https://example.com/\",\"url\":\"https://example.com/\",\"timeOrigin\":1792178386849,\"visibility\":\"visible\",\"viewport\":{\"width\":360,\"height\":504,\"offsetLeft\":0,\"offsetTop\":0,\"scale\":1},\"scrollX\":0,\"scrollY\":73,\"kind\":\"shadow\",\"nodeType\":11,\"mode\":\"closed\",\"connected\":true,\"hostId\":\"fluent-read-floating-ball-container\",\"hostTag\":\"fluent-read-floating-ball-ui\",\"exactHost\":true,\"pointLookup\":\"function\",\"pointReadCompleted\":true,\"pointNodeType\":null}",
+        "startTime": 1792178519741.664,
+        "timestamp": 1792178519742.482,
+        "from": "server0.conn4.child2/consoleActor3"
+      },
+      "readAtUnixMs": 1792178519758
+    },
+    {
+      "kind": "main",
+      "nodeActor": "server0.conn4.child2/domnode28",
+      "ack": {
+        "resultID": "1792178519759.778-4",
+        "from": "server0.conn4.child2/consoleActor3"
+      },
+      "result": {
+        "type": "evaluationResult",
+        "resultID": "1792178519759.778-4",
+        "hasException": false,
+        "input": "JSON.stringify((()=>{const n=$0,d=n.ownerDocument,v=d.defaultView,vv=v.visualViewport;const viewport={width:vv?.width??v.innerWidth,height:vv?.height??v.innerHeight,offsetLeft:vv?.offsetLeft??0,offsetTop:vv?.offsetTop??0,scale:vv?.scale??1};const meta={ownerURL:d.URL,url:v.location.href,timeOrigin:v.performance.timeOrigin,visibility:d.visibilityState,viewport,scrollX:v.scrollX,scrollY:v.scrollY};const styleOf=e=>{const s=v.getComputedStyle(e);return {display:s.display,visibility:s.visibility,opacity:s.opacity,pointerEvents:s.pointerEvents,position:s.position,transform:s.transform,transformIsIdentity:s.transform==='none'||new v.DOMMatrixReadOnly(s.transform).isIdentity,clipPath:s.clipPath}};const shown=e=>{if(!e?.isConnected)return false;for(let a=e;a;a=a.parentElement??a.getRootNode()?.host){const s=v.getComputedStyle(a);if(s.display==='none'||s.visibility!=='visible'||Number(s.opacity)===0)return false;}const r=e.getBoundingClientRect();return r.width>0&&r.height>0&&r.right>viewport.offsetLeft&&r.bottom>viewport.offsetTop&&r.left<viewport.offsetLeft+viewport.width&&r.top<viewport.offsetTop+viewport.height};const geometry=e=>{const r=e.getBoundingClientRect(),x=r.x+r.width/2,y=r.y+r.height/2,hit=d.elementFromPoint(x,y);return {tag:e.localName,role:e.getAttribute('role'),connected:e.isConnected,disabled:e.matches(':disabled')||e.getAttribute('aria-disabled')==='true',rect:r.toJSON(),clientRects:[...e.getClientRects()].map(q=>q.toJSON()),point:{x,y},style:styleOf(e),viewport,visibility:d.visibilityState,visible:shown(e),documentHitOwn:hit===e||e.contains(hit)}};const root=n.getRootNode(),host=root.host,dock=n.closest('.fr-floating-ball'),g=geometry(n),hit=typeof root.elementFromPoint==='function'?root.elementFromPoint(g.point.x,g.point.y):null;const interiorHits=[[.5,.5],[.25,.5],[.75,.5],[.5,.25],[.5,.75]].map(([rx,ry])=>{const x=g.rect.x+g.rect.width*rx,y=g.rect.y+g.rect.height*ry,h=typeof root.elementFromPoint==='function'?root.elementFromPoint(x,y):null;return {x,y,rootHitTarget:h===n||n.contains(h),documentHitOwn:d.elementFromPoint(x,y)===host}});return {...meta,...g,kind:'main',rootType:root.nodeType,rootMode:root.mode,hostId:host?.id,hostTag:host?.localName,hostCount:d.querySelectorAll('#fluent-read-floating-ball-container').length,exactHost:d.getElementById('fluent-read-floating-ball-container')===host,hostSuspended:host?.getAttribute('data-fluent-read-ui-suspended'),mainCount:root.querySelectorAll('.floating-ball-main').length,dockCount:root.querySelectorAll('.fr-floating-ball').length,rootHitTarget:hit===n||n.contains(hit),documentHitOwn:d.elementFromPoint(g.point.x,g.point.y)===host,coarse:v.matchMedia('(pointer: coarse)').matches,anyPointerCoarse:v.matchMedia('(any-pointer: coarse)').matches,maxTouchPoints:v.navigator.maxTouchPoints,touchCapableClass:dock?.classList.contains('is-touch-capable')??false,interiorHits,dragging:dock?.classList.contains('dragging')??null,dataPosition:dock?.getAttribute('data-position'),translationStatus:dock?.getAttribute('data-translation-status'),toolsDisplay:dock?.getAttribute('data-tools-display'),dock:dock?{...geometry(dock),classes:dock.className}:null};})())",
+        "result": "{\"ownerURL\":\"https://example.com/\",\"url\":\"https://example.com/\",\"timeOrigin\":1792178386849,\"visibility\":\"visible\",\"viewport\":{\"width\":360,\"height\":504,\"offsetLeft\":0,\"offsetTop\":0,\"scale\":1},\"scrollX\":0,\"scrollY\":73,\"tag\":\"div\",\"role\":\"button\",\"connected\":true,\"disabled\":false,\"rect\":{\"x\":304,\"y\":230,\"width\":44,\"height\":44,\"top\":230,\"right\":348,\"bottom\":274,\"left\":304},\"clientRects\":[{\"x\":304,\"y\":230,\"width\":44,\"height\":44,\"top\":230,\"right\":348,\"bottom\":274,\"left\":304}],\"point\":{\"x\":326,\"y\":252},\"style\":{\"display\":\"flex\",\"visibility\":\"visible\",\"opacity\":\"0.7\",\"pointerEvents\":\"auto\",\"position\":\"relative\",\"transform\":\"none\",\"transformIsIdentity\":true,\"clipPath\":\"none\"},\"visible\":true,\"documentHitOwn\":true,\"kind\":\"main\",\"rootType\":11,\"rootMode\":\"closed\",\"hostId\":\"fluent-read-floating-ball-container\",\"hostTag\":\"fluent-read-floating-ball-ui\",\"hostCount\":1,\"exactHost\":true,\"hostSuspended\":null,\"mainCount\":1,\"dockCount\":1,\"rootHitTarget\":true,\"coarse\":false,\"anyPointerCoarse\":false,\"maxTouchPoints\":5,\"touchCapableClass\":true,\"interiorHits\":[{\"x\":326,\"y\":252,\"rootHitTarget\":true,\"documentHitOwn\":true},{\"x\":315,\"y\":252,\"rootHitTarget\":true,\"documentHitOwn\":true},{\"x\":337,\"y\":252,\"rootHitTarget\":true,\"documentHitOwn\":true},{\"x\":326,\"y\":241,\"rootHitTarget\":true,\"documentHitOwn\":true},{\"x\":326,\"y\":263,\"rootHitTarget\":true,\"documentHitOwn\":true}],\"dragging\":false,\"dataPosition\":\"right\",\"translationStatus\":\"idle\",\"toolsDisplay\":\"hover\",\"dock\":{\"tag\":\"div\",\"role\":null,\"connected\":true,\"disabled\":false,\"rect\":{\"x\":304,\"y\":178,\"width\":44,\"height\":148,\"top\":178,\"right\":348,\"bottom\":326,\"left\":304},\"clientRects\":[{\"x\":304,\"y\":178,\"width\":44,\"height\":148,\"top\":178,\"right\":348,\"bottom\":326,\"left\":304}],\"point\":{\"x\":326,\"y\":252},\"style\":{\"display\":\"flex\",\"visibility\":\"visible\",\"opacity\":\"1\",\"pointerEvents\":\"none\",\"position\":\"fixed\",\"transform\":\"matrix(1, 0, 0, 1, 0, -74)\",\"transformIsIdentity\":false,\"clipPath\":\"none\"},\"viewport\":{\"width\":360,\"height\":504,\"offsetLeft\":0,\"offsetTop\":0,\"scale\":1},\"visibility\":\"visible\",\"visible\":true,\"documentHitOwn\":false,\"classes\":\"fr-floating-ball is-touch-capable\"}}",
+        "startTime": 1792178519759.778,
+        "timestamp": 1792178519761.19,
+        "from": "server0.conn4.child2/consoleActor3"
+      },
+      "readAtUnixMs": 1792178519778
+    }
+  ],
+  "events": [],
+  "errors": [],
+  "expressionSHA256": {
+    "identity": "bb0cc4f346cc39ce68323b630f308a7e6f2c27dcc303567a92f76aed93a9f722",
+    "diagnostic": "5ecc72d13bd48d2de9338a3a10790ba24743a71eef26bf4678d1badad6229fa0",
+    "reader": "c3027e88cd8a9e009b7137e67109ee268fdb41a521efa5c6f06f33c382583f7e",
+    "host": "681025c99a88b67471415837407fc318f1d3b9e31f9cece1a1a999496cbd6e77",
+    "root": "70f4e2ad67643437fc8a68c88486cc3752992df1efaf3f93cc61122fe0bfe4c3",
+    "main": "b0ff03dfeaf39fd5696c9907a1c61c9c2c274ec8c53e67544b0833ff3da63d83",
+    "progress": "f221cdf30c4311f9c623f0b062c4446ae6e9e28bb386d452c73f1eb9b4e30329",
+    "navigation": "6f0e8f66d43ddca0b0decfb55c2d5e6d43fa78a3b7e62acdf23469c514ea58ab",
+    "switch": "ef619c81eca47c1e9e0400c4f6e878edd4d67ef3edd97be3bd00945fd8fc83bf"
+  },
+  "actionDeadline": "2026-10-16T19:40:57.483Z",
+  "inventory": {
+    "beforeTargets": [
+      {
+        "actor": "server0.conn4.tabDescriptor1",
+        "url": "https://example.com/",
+        "title": "Example Domain"
+      }
+    ],
+    "readerCount": 1,
+    "settingsCount": 0
+  },
+  "document": {
+    "url": "https://example.com/",
+    "title": "Example Domain",
+    "timeOrigin": 1792178386849,
+    "innerWindowId": 4294967297
+  },
+  "pinApproved": true,
+  "reader": {
+    "ownerURL": "https://example.com/",
+    "url": "https://example.com/",
+    "timeOrigin": 1792178386849,
+    "visibility": "visible",
+    "viewport": {
+      "width": 360,
+      "height": 504,
+      "offsetLeft": 0,
+      "offsetTop": 0,
+      "scale": 1
+    },
+    "scrollX": 0,
+    "scrollY": 73,
+    "kind": "reader",
+    "paragraphCount": 6,
+    "paragraphs": [
+      {
+        "lang": "en",
+        "source": "This domain is for use in documentation examples without needing permission. This is not a service; avoid relying on it for testing and monitoring purposes.",
+        "sourceLength": 156,
+        "rect": {
+          "x": 32,
+          "y": 85,
+          "width": 296,
+          "height": 102.39999389648438,
+          "top": 85,
+          "right": 328,
+          "bottom": 187.39999389648438,
+          "left": 32
+        }
+      },
+      {
+        "lang": "ar",
+        "source": "هذا النطاق مُخصص للاستخدام في أمثلة التوثيق دون الحاجة إلى إذن. هذه ليست خدمة، يُرجى تجنب الاعتماد عليها لأغراض الاختبار والمراقبة.",
+        "sourceLength": 131,
+        "rect": {
+          "x": 32,
+          "y": 203.39999389648438,
+          "width": 296,
+          "height": 67.20001220703125,
+          "top": 203.39999389648438,
+          "right": 328,
+          "bottom": 270.6000061035156,
+          "left": 32
+        }
+      },
+      {
+        "lang": "zh",
+        "source": "该域名仅用于文档示例，无需获得许可。这并非一项服务，请勿将其用于测试和监控目的。",
+        "sourceLength": 40,
+        "rect": {
+          "x": 32,
+          "y": 284.6000061035156,
+          "width": 296,
+          "height": 44.79998779296875,
+          "top": 284.6000061035156,
+          "right": 328,
+          "bottom": 329.3999938964844,
+          "left": 32
+        }
+      },
+      {
+        "lang": "fr",
+        "source": "L’usage de ce domaine est réservé à des exemples de documentation, sans autorisation préalable.  Il ne s’agit pas d’un service ; son utilisation à des fins de test ou de surveillance est à éviter.",
+        "sourceLength": 196,
+        "rect": {
+          "x": 32,
+          "y": 343.3999938964844,
+          "width": 296,
+          "height": 112,
+          "top": 343.3999938964844,
+          "right": 328,
+          "bottom": 455.3999938964844,
+          "left": 32
+        }
+      },
+      {
+        "lang": "ru",
+        "source": "Данный домен предназначен для использования в примерах документации без необходимости получения предварительного разрешения. Это не сервис; не рекомендуется его использование для тестирования и мониторинга.",
+        "sourceLength": 206,
+        "rect": {
+          "x": 32,
+          "y": 469.3999938964844,
+          "width": 296,
+          "height": 156.8000030517578,
+          "top": 469.3999938964844,
+          "right": 328,
+          "bottom": 626.1999969482422,
+          "left": 32
+        }
+      },
+      {
+        "lang": "es",
+        "source": "Este dominio está destinado al uso en ejemplos de documentación sin necesidad de permiso. Esto no es un servicio; evitar utilizarlo para realizar pruebas o monitoreos.",
+        "sourceLength": 167,
+        "rect": {
+          "x": 32,
+          "y": 640.2000122070312,
+          "width": 296,
+          "height": 89.60000610351562,
+          "top": 640.2000122070312,
+          "right": 328,
+          "bottom": 729.8000183105469,
+          "left": 32
+        }
+      }
+    ],
+    "translationCount": 0,
+    "selection": {
+      "length": 0,
+      "rangeCount": 0,
+      "collapsed": true
+    },
+    "nodeActor": "server0.conn4.child2/domnode21",
+    "readAtUnixMs": 1792178519722
+  },
+  "progress": {
+    "hostCount": 0,
+    "visible": false
+  },
+  "floatingHostCount": 1,
+  "host": {
+    "ownerURL": "https://example.com/",
+    "url": "https://example.com/",
+    "timeOrigin": 1792178386849,
+    "visibility": "visible",
+    "viewport": {
+      "width": 360,
+      "height": 504,
+      "offsetLeft": 0,
+      "offsetTop": 0,
+      "scale": 1
+    },
+    "scrollX": 0,
+    "scrollY": 73,
+    "kind": "host",
+    "id": "fluent-read-floating-ball-container",
+    "tag": "fluent-read-floating-ball-ui",
+    "connected": true,
+    "unique": 1,
+    "exact": true,
+    "shadowRootExposed": false,
+    "rect": {
+      "x": 0,
+      "y": 801.4000244140625,
+      "width": 0,
+      "height": 0,
+      "top": 801.4000244140625,
+      "right": 0,
+      "bottom": 801.4000244140625,
+      "left": 0
+    },
+    "nodeActor": "server0.conn4.child2/domnode25",
+    "readAtUnixMs": 1792178519744
+  },
+  "shadow": {
+    "ownerURL": "https://example.com/",
+    "url": "https://example.com/",
+    "timeOrigin": 1792178386849,
+    "visibility": "visible",
+    "viewport": {
+      "width": 360,
+      "height": 504,
+      "offsetLeft": 0,
+      "offsetTop": 0,
+      "scale": 1
+    },
+    "scrollX": 0,
+    "scrollY": 73,
+    "kind": "shadow",
+    "nodeType": 11,
+    "mode": "closed",
+    "connected": true,
+    "hostId": "fluent-read-floating-ball-container",
+    "hostTag": "fluent-read-floating-ball-ui",
+    "exactHost": true,
+    "pointLookup": "function",
+    "pointReadCompleted": true,
+    "pointNodeType": null,
+    "nodeActor": "server0.conn4.child2/domnode26",
+    "readAtUnixMs": 1792178519758
+  },
+  "controls": {
+    "main": {
+      "ownerURL": "https://example.com/",
+      "url": "https://example.com/",
+      "timeOrigin": 1792178386849,
+      "visibility": "visible",
+      "viewport": {
+        "width": 360,
+        "height": 504,
+        "offsetLeft": 0,
+        "offsetTop": 0,
+        "scale": 1
+      },
+      "scrollX": 0,
+      "scrollY": 73,
+      "tag": "div",
+      "role": "button",
+      "connected": true,
+      "disabled": false,
+      "rect": {
+        "x": 304,
+        "y": 230,
+        "width": 44,
+        "height": 44,
+        "top": 230,
+        "right": 348,
+        "bottom": 274,
+        "left": 304
+      },
+      "clientRects": [
+        {
+          "x": 304,
+          "y": 230,
+          "width": 44,
+          "height": 44,
+          "top": 230,
+          "right": 348,
+          "bottom": 274,
+          "left": 304
+        }
+      ],
+      "point": {
+        "x": 326,
+        "y": 252
+      },
+      "style": {
+        "display": "flex",
+        "visibility": "visible",
+        "opacity": "0.7",
+        "pointerEvents": "auto",
+        "position": "relative",
+        "transform": "none",
+        "transformIsIdentity": true,
+        "clipPath": "none"
+      },
+      "visible": true,
+      "documentHitOwn": true,
+      "kind": "main",
+      "rootType": 11,
+      "rootMode": "closed",
+      "hostId": "fluent-read-floating-ball-container",
+      "hostTag": "fluent-read-floating-ball-ui",
+      "hostCount": 1,
+      "exactHost": true,
+      "hostSuspended": null,
+      "mainCount": 1,
+      "dockCount": 1,
+      "rootHitTarget": true,
+      "coarse": false,
+      "anyPointerCoarse": false,
+      "maxTouchPoints": 5,
+      "touchCapableClass": true,
+      "interiorHits": [
+        {
+          "x": 326,
+          "y": 252,
+          "rootHitTarget": true,
+          "documentHitOwn": true
+        },
+        {
+          "x": 315,
+          "y": 252,
+          "rootHitTarget": true,
+          "documentHitOwn": true
+        },
+        {
+          "x": 337,
+          "y": 252,
+          "rootHitTarget": true,
+          "documentHitOwn": true
+        },
+        {
+          "x": 326,
+          "y": 241,
+          "rootHitTarget": true,
+          "documentHitOwn": true
+        },
+        {
+          "x": 326,
+          "y": 263,
+          "rootHitTarget": true,
+          "documentHitOwn": true
+        }
+      ],
+      "dragging": false,
+      "dataPosition": "right",
+      "translationStatus": "idle",
+      "toolsDisplay": "hover",
+      "dock": {
+        "tag": "div",
+        "role": null,
+        "connected": true,
+        "disabled": false,
+        "rect": {
+          "x": 304,
+          "y": 178,
+          "width": 44,
+          "height": 148,
+          "top": 178,
+          "right": 348,
+          "bottom": 326,
+          "left": 304
+        },
+        "clientRects": [
+          {
+            "x": 304,
+            "y": 178,
+            "width": 44,
+            "height": 148,
+            "top": 178,
+            "right": 348,
+            "bottom": 326,
+            "left": 304
+          }
+        ],
+        "point": {
+          "x": 326,
+          "y": 252
+        },
+        "style": {
+          "display": "flex",
+          "visibility": "visible",
+          "opacity": "1",
+          "pointerEvents": "none",
+          "position": "fixed",
+          "transform": "matrix(1, 0, 0, 1, 0, -74)",
+          "transformIsIdentity": false,
+          "clipPath": "none"
+        },
+        "viewport": {
+          "width": 360,
+          "height": 504,
+          "offsetLeft": 0,
+          "offsetTop": 0,
+          "scale": 1
+        },
+        "visibility": "visible",
+        "visible": true,
+        "documentHitOwn": false,
+        "classes": "fr-floating-ball is-touch-capable"
+      },
+      "nodeActor": "server0.conn4.child2/domnode28",
+      "readAtUnixMs": 1792178519778
+    }
+  },
+  "probePassed": true,
+  "readyUnixMs": 1792178519778,
+  "completedAt": "2026-10-16T19:21:59.778Z",
+  "completedUnixMs": 1792178519778
+}

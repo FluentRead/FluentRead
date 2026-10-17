@@ -1,0 +1,42 @@
+{
+  "devicesAndConfigurations" : [
+    {
+      "device" : {
+        "architecture" : "arm64",
+        "deviceId" : "A407390F-7AA8-42AE-AFEB-F93EE99E9FF8",
+        "deviceName" : "FluentRead-PR995-FreshPermissions-20261015",
+        "modelName" : "iPhone 16 Pro",
+        "osBuildNumber" : "23C52",
+        "osVersion" : "26.2",
+        "platform" : "iOS Simulator"
+      },
+      "expectedFailures" : 0,
+      "failedTests" : 0,
+      "passedTests" : 0,
+      "skippedTests" : 1,
+      "testPlanConfiguration" : {
+        "configurationId" : "1",
+        "configurationName" : "Test Scheme Action"
+      }
+    }
+  ],
+  "environmentDescription" : "NativeHarness · Built with macOS 26.6.2",
+  "expectedFailures" : 0,
+  "failedTests" : 0,
+  "finishTime" : 1792135800.271,
+  "passedTests" : 0,
+  "result" : "Skipped",
+  "skippedTests" : 1,
+  "startTime" : 1792135771.141,
+  "statistics" : [
+
+  ],
+  "testFailures" : [
+
+  ],
+  "title" : "Test - NativeHarness",
+  "topInsights" : [
+
+  ],
+  "totalTestCount" : 1
+}

@@ -1,0 +1,547 @@
+{
+  "schema": 1,
+  "at": "2026-10-17T06:26:18.406273+00:00",
+  "status": "REVIEWABLE_STAGING_ONLY_NOT_APPLIED_TO_W",
+  "sourceCaseDirectory": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/mobile-youtube-fr-node-identity-probe-20261017/same-scope-clone-repair-20261017/current-production-touch-width-drawer-keyboard-attempt1",
+  "copyRootRelativeToStaging": "portrait-touch-width-evidence/attachments",
+  "proposedRepositoryBase": "docs/reports/mobile-safari-integration-20261016",
+  "files": [
+    {
+      "source": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/mobile-youtube-fr-node-identity-probe-20261017/same-scope-clone-repair-20261017/current-production-touch-width-drawer-keyboard-attempt1/runtime-attachments/00261800-D45D-4A19-A5E7-8C831AD357E2.json",
+      "copy": "portrait-touch-width-evidence/attachments/00261800-D45D-4A19-A5E7-8C831AD357E2.json",
+      "bytes": 8314,
+      "sha256": "d3b87cc95c76f263ccd2f6b4d7f0bc0c57bb41bc6834f2e490435dd04a78df99",
+      "kind": "json",
+      "suggestedHumanReadableName": "baseline-current-production-popup-AX_0_90FF1270-BFDB-4BE9-91B7-33F1EB24B181.json"
+    },
+    {
+      "source": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/mobile-youtube-fr-node-identity-probe-20261017/same-scope-clone-repair-20261017/current-production-touch-width-drawer-keyboard-attempt1/runtime-attachments/0996205E-C880-49DB-BCBA-F54288CDAA80.json",
+      "copy": "portrait-touch-width-evidence/attachments/0996205E-C880-49DB-BCBA-F54288CDAA80.json",
+      "bytes": 181,
+      "sha256": "a87f200d03261407d86eb59ebcd2690fa1af8021fb313304fd0176bba2db9441",
+      "kind": "json",
+      "suggestedHumanReadableName": "baseline-prompt-observation_0_3D987BE3-DD0E-4BDB-878F-82539BEC7FC1.json"
+    },
+    {
+      "source": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/mobile-youtube-fr-node-identity-probe-20261017/same-scope-clone-repair-20261017/current-production-touch-width-drawer-keyboard-attempt1/runtime-attachments/0AEFB430-E373-46D8-BEA8-C6AD81ACF6F4.json",
+      "copy": "portrait-touch-width-evidence/attachments/0AEFB430-E373-46D8-BEA8-C6AD81ACF6F4.json",
+      "bytes": 4472,
+      "sha256": "c42cfe903a25b1dd6556194c92b6631d1143b041e9770f5dccab7c6552d635b9",
+      "kind": "json",
+      "suggestedHumanReadableName": "drawer-keyboard-before-defaultServiceRow_0_ACC8E60D-F995-443E-BA87-AE1D8B81C8A8.json"
+    },
+    {
+      "source": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/mobile-youtube-fr-node-identity-probe-20261017/same-scope-clone-repair-20261017/current-production-touch-width-drawer-keyboard-attempt1/runtime-attachments/138A6620-D92A-4B81-BE90-79F7D37D13CA.json",
+      "copy": "portrait-touch-width-evidence/attachments/138A6620-D92A-4B81-BE90-79F7D37D13CA.json",
+      "bytes": 110,
+      "sha256": "d6ad1d044f0652c8725d24df608ded7b4d5a4c9d6874a0aa7db8cd58d598b599",
+      "kind": "json",
+      "suggestedHumanReadableName": "baseline-owner-observation_0_FC9CE2FF-2319-4183-B79A-E5D7D59CA7C4.json"
+    },
+    {
+      "source": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/mobile-youtube-fr-node-identity-probe-20261017/same-scope-clone-repair-20261017/current-production-touch-width-drawer-keyboard-attempt1/runtime-attachments/1CACC654-7EB5-4C38-9E79-0F9FC1788541.json",
+      "copy": "portrait-touch-width-evidence/attachments/1CACC654-7EB5-4C38-9E79-0F9FC1788541.json",
+      "bytes": 122,
+      "sha256": "34a119dc3965b96c2e3377d4e474e98ca3eff8933bfea238574ebfc71bb638ac",
+      "kind": "json",
+      "suggestedHumanReadableName": "baseline-owner-observation_0_67FD1BFC-860B-4709-85EB-05472B84E26E.json"
+    },
+    {
+      "source": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/mobile-youtube-fr-node-identity-probe-20261017/same-scope-clone-repair-20261017/current-production-touch-width-drawer-keyboard-attempt1/runtime-attachments/1E555D93-B8BE-4972-A486-8AC8A3D9F781.png",
+      "copy": "portrait-touch-width-evidence/attachments/1E555D93-B8BE-4972-A486-8AC8A3D9F781.png",
+      "bytes": 140956,
+      "sha256": "6fc2b36ee14a951a412826294d9d150f72ded3e93b87828996cc3738c1e22648",
+      "kind": "png",
+      "suggestedHumanReadableName": "baseline-native-popup-closed-owned-fixture_0_7F7012CD-02FC-4F84-A290-BEF3FA37FDD5.png"
+    },
+    {
+      "source": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/mobile-youtube-fr-node-identity-probe-20261017/same-scope-clone-repair-20261017/current-production-touch-width-drawer-keyboard-attempt1/runtime-attachments/1F12FCBB-68FE-4F01-89AB-4E1392CC2946.json",
+      "copy": "portrait-touch-width-evidence/attachments/1F12FCBB-68FE-4F01-89AB-4E1392CC2946.json",
+      "bytes": 170,
+      "sha256": "d649aec4a1c03dc88a5396e94ad39582f34dc4fbf05565d460d25a07c3526960",
+      "kind": "json",
+      "suggestedHumanReadableName": "baseline-prompt-observation_0_A20649E7-2295-444C-ABF4-2C87AB6BD976.json"
+    },
+    {
+      "source": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/mobile-youtube-fr-node-identity-probe-20261017/same-scope-clone-repair-20261017/current-production-touch-width-drawer-keyboard-attempt1/runtime-attachments/21C8154D-B49F-479D-B92F-837DC6FE73CB.png",
+      "copy": "portrait-touch-width-evidence/attachments/21C8154D-B49F-479D-B92F-837DC6FE73CB.png",
+      "bytes": 278807,
+      "sha256": "7b196f1aee413b2a1abe65bbe61bfb214e72c54e6488846c084ae385a7fb512f",
+      "kind": "png",
+      "suggestedHumanReadableName": "drawer-keyboard-before-defaultServiceRow-original_0_B5CA8C44-ED7D-4C6E-9504-637271FAC85B.png"
+    },
+    {
+      "source": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/mobile-youtube-fr-node-identity-probe-20261017/same-scope-clone-repair-20261017/current-production-touch-width-drawer-keyboard-attempt1/runtime-attachments/24C9BE9D-109C-4233-A6CD-48A1B2362B61.json",
+      "copy": "portrait-touch-width-evidence/attachments/24C9BE9D-109C-4233-A6CD-48A1B2362B61.json",
+      "bytes": 111,
+      "sha256": "caef5b78aba305e910757b0a1706a75070de4f2261aa82e0116e6d3181cc06aa",
+      "kind": "json",
+      "suggestedHumanReadableName": "baseline-owner-observation_0_936B1D71-949F-4E3B-A88B-83F6C7C36D47.json"
+    },
+    {
+      "source": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/mobile-youtube-fr-node-identity-probe-20261017/same-scope-clone-repair-20261017/current-production-touch-width-drawer-keyboard-attempt1/runtime-attachments/2B4506F8-23CF-4DD4-96AF-FA0A5A88989B.json",
+      "copy": "portrait-touch-width-evidence/attachments/2B4506F8-23CF-4DD4-96AF-FA0A5A88989B.json",
+      "bytes": 184,
+      "sha256": "d6d3d32f7079690fca757f778a52f38ae522346064d298bd97842c8f7bc711b5",
+      "kind": "json",
+      "suggestedHumanReadableName": "baseline-prompt-observation_0_D82C23F7-82C8-4AF4-BECE-3B711FD8DD57.json"
+    },
+    {
+      "source": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/mobile-youtube-fr-node-identity-probe-20261017/same-scope-clone-repair-20261017/current-production-touch-width-drawer-keyboard-attempt1/runtime-attachments/2FA8B2C4-A417-4B5E-99ED-C0394DFBFF9A.json",
+      "copy": "portrait-touch-width-evidence/attachments/2FA8B2C4-A417-4B5E-99ED-C0394DFBFF9A.json",
+      "bytes": 171,
+      "sha256": "51e8e3f6e00dee088c9952a3833778c8e6d136a1e0cc45143464d3082bfb7758",
+      "kind": "json",
+      "suggestedHumanReadableName": "baseline-prompt-observation_0_B74E83A5-00C4-46D0-A20D-3FD824128EE2.json"
+    },
+    {
+      "source": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/mobile-youtube-fr-node-identity-probe-20261017/same-scope-clone-repair-20261017/current-production-touch-width-drawer-keyboard-attempt1/runtime-attachments/30C37A50-FD42-48D4-ABB6-6DA788EBA1C6.json",
+      "copy": "portrait-touch-width-evidence/attachments/30C37A50-FD42-48D4-ABB6-6DA788EBA1C6.json",
+      "bytes": 66,
+      "sha256": "f3af6c8ae26da467f5baba933ae9f15a33c179c088456d5bc4652ff1ee1bf669",
+      "kind": "json",
+      "suggestedHumanReadableName": "baseline-address-classification_0_40DCEB82-FB26-46AC-86DD-2A0C4DB1B2CE.json"
+    },
+    {
+      "source": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/mobile-youtube-fr-node-identity-probe-20261017/same-scope-clone-repair-20261017/current-production-touch-width-drawer-keyboard-attempt1/runtime-attachments/3DA5493A-D19E-4613-9038-0EEE24E4FAE2.json",
+      "copy": "portrait-touch-width-evidence/attachments/3DA5493A-D19E-4613-9038-0EEE24E4FAE2.json",
+      "bytes": 223,
+      "sha256": "aa0a4c8f9b0944ce875378dd44a098a13c8ebe23b2eceb4528999bcce0b6419c",
+      "kind": "json",
+      "suggestedHumanReadableName": "drawer-keyboard-query-classification_0_055CCC6E-18FC-4396-93DE-3CAFB2FD9AE8.json"
+    },
+    {
+      "source": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/mobile-youtube-fr-node-identity-probe-20261017/same-scope-clone-repair-20261017/current-production-touch-width-drawer-keyboard-attempt1/runtime-attachments/3E9D274C-86D8-45C5-B407-A3E9BA9C947D.json",
+      "copy": "portrait-touch-width-evidence/attachments/3E9D274C-86D8-45C5-B407-A3E9BA9C947D.json",
+      "bytes": 178,
+      "sha256": "f95398ce7dd0a981aa808d79028669c43112c54ba698c82b0ddf37fec6ea08fe",
+      "kind": "json",
+      "suggestedHumanReadableName": "baseline-prompt-observation_0_0DD9D9B3-7BB3-45A2-8D62-FD3563376D3E.json"
+    },
+    {
+      "source": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/mobile-youtube-fr-node-identity-probe-20261017/same-scope-clone-repair-20261017/current-production-touch-width-drawer-keyboard-attempt1/runtime-attachments/3F9A2B2C-D989-4A1A-8381-FFFDD3ED79BC.json",
+      "copy": "portrait-touch-width-evidence/attachments/3F9A2B2C-D989-4A1A-8381-FFFDD3ED79BC.json",
+      "bytes": 176,
+      "sha256": "139974197be0836b982221313e98b69887a06b5b4ca1a7399424631db01dc0e7",
+      "kind": "json",
+      "suggestedHumanReadableName": "baseline-prompt-observation_0_A7C53C97-BC78-418E-8EC1-4A4122E0A04B.json"
+    },
+    {
+      "source": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/mobile-youtube-fr-node-identity-probe-20261017/same-scope-clone-repair-20261017/current-production-touch-width-drawer-keyboard-attempt1/runtime-attachments/479905A5-BBB0-4AB1-A9E0-CA51894C6893.json",
+      "copy": "portrait-touch-width-evidence/attachments/479905A5-BBB0-4AB1-A9E0-CA51894C6893.json",
+      "bytes": 181,
+      "sha256": "2077a487fd4f9b3d701e91b08f729d09e8d170f31eebace146313415e8ca5c78",
+      "kind": "json",
+      "suggestedHumanReadableName": "baseline-prompt-observation_0_A4B3F032-4B19-4C5D-88F4-AD73DF846645.json"
+    },
+    {
+      "source": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/mobile-youtube-fr-node-identity-probe-20261017/same-scope-clone-repair-20261017/current-production-touch-width-drawer-keyboard-attempt1/runtime-attachments/497A9B37-D470-4CDF-B1C1-3BB4D493A17B.json",
+      "copy": "portrait-touch-width-evidence/attachments/497A9B37-D470-4CDF-B1C1-3BB4D493A17B.json",
+      "bytes": 6707,
+      "sha256": "ca4cf89cfd0ac4dab42db80960d6fb26a6ebecf5619a882a5c572e329cb85dbb",
+      "kind": "json",
+      "suggestedHumanReadableName": "drawer-keyboard-picker-gpt_0_94CA0E0F-CFED-4D68-8658-F780F667F341.json"
+    },
+    {
+      "source": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/mobile-youtube-fr-node-identity-probe-20261017/same-scope-clone-repair-20261017/current-production-touch-width-drawer-keyboard-attempt1/runtime-attachments/5162B436-2E1A-4346-8662-1EF5CF34A502.json",
+      "copy": "portrait-touch-width-evidence/attachments/5162B436-2E1A-4346-8662-1EF5CF34A502.json",
+      "bytes": 174,
+      "sha256": "5ea5822484f528de40c645913886ae42cb4eb8c407ffc765ea2884dadd214909",
+      "kind": "json",
+      "suggestedHumanReadableName": "baseline-prompt-observation_0_95C85914-682A-4510-B08B-5DC53CE640AC.json"
+    },
+    {
+      "source": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/mobile-youtube-fr-node-identity-probe-20261017/same-scope-clone-repair-20261017/current-production-touch-width-drawer-keyboard-attempt1/runtime-attachments/57680176-A98D-4D35-A809-F5BC6F7D5971.json",
+      "copy": "portrait-touch-width-evidence/attachments/57680176-A98D-4D35-A809-F5BC6F7D5971.json",
+      "bytes": 114,
+      "sha256": "4d484b2d036d1865a66ed2f71a8e01f0d02b3f86ad6c1c8cb99878a7659342d4",
+      "kind": "json",
+      "suggestedHumanReadableName": "baseline-owner-observation_0_B12E42DC-1AFB-4769-AB57-B7DF11B7EC8F.json"
+    },
+    {
+      "source": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/mobile-youtube-fr-node-identity-probe-20261017/same-scope-clone-repair-20261017/current-production-touch-width-drawer-keyboard-attempt1/runtime-attachments/5A207BA8-03C3-4A07-AAD9-A54932523287.json",
+      "copy": "portrait-touch-width-evidence/attachments/5A207BA8-03C3-4A07-AAD9-A54932523287.json",
+      "bytes": 177,
+      "sha256": "d25952faa877c2b95c82511bc235165cc15ad823746de454f42b785bf5f9b242",
+      "kind": "json",
+      "suggestedHumanReadableName": "baseline-prompt-observation_0_3769D8EC-3515-422C-8D70-B93813A23CF7.json"
+    },
+    {
+      "source": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/mobile-youtube-fr-node-identity-probe-20261017/same-scope-clone-repair-20261017/current-production-touch-width-drawer-keyboard-attempt1/runtime-attachments/5FCEB0B7-E48F-4EAA-B4FC-9E7BD1705707.json",
+      "copy": "portrait-touch-width-evidence/attachments/5FCEB0B7-E48F-4EAA-B4FC-9E7BD1705707.json",
+      "bytes": 179,
+      "sha256": "6f4942e73c3c7c476707b2771aa97e419ccfe502eccf0d374184a2ab9a2880da",
+      "kind": "json",
+      "suggestedHumanReadableName": "baseline-prompt-observation_0_1954C3AB-9F01-465A-9D0A-B869839D9FC3.json"
+    },
+    {
+      "source": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/mobile-youtube-fr-node-identity-probe-20261017/same-scope-clone-repair-20261017/current-production-touch-width-drawer-keyboard-attempt1/runtime-attachments/60C6175A-9B7B-454D-8BC1-594B14697458.json",
+      "copy": "portrait-touch-width-evidence/attachments/60C6175A-9B7B-454D-8BC1-594B14697458.json",
+      "bytes": 167,
+      "sha256": "69bad9006ddb97d03fa871107c16184eb0ba2ebdd542842328ff8f830047c67d",
+      "kind": "json",
+      "suggestedHumanReadableName": "baseline-prompt-observation_0_431A5B1B-2F17-40DE-8E09-15F3751162A0.json"
+    },
+    {
+      "source": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/mobile-youtube-fr-node-identity-probe-20261017/same-scope-clone-repair-20261017/current-production-touch-width-drawer-keyboard-attempt1/runtime-attachments/67075D3B-1578-42E6-B54E-0C4958002D07.json",
+      "copy": "portrait-touch-width-evidence/attachments/67075D3B-1578-42E6-B54E-0C4958002D07.json",
+      "bytes": 122,
+      "sha256": "a4b6b20b71c4ef75d92ded2476922ff7b14e7b3f5246c8926edc259884491a1a",
+      "kind": "json",
+      "suggestedHumanReadableName": "baseline-owner-observation_0_53BD9BE7-576B-4137-83A8-5CD05B0E1DA5.json"
+    },
+    {
+      "source": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/mobile-youtube-fr-node-identity-probe-20261017/same-scope-clone-repair-20261017/current-production-touch-width-drawer-keyboard-attempt1/runtime-attachments/6CADDB59-806D-4983-A014-F8C70B02868B.json",
+      "copy": "portrait-touch-width-evidence/attachments/6CADDB59-806D-4983-A014-F8C70B02868B.json",
+      "bytes": 250,
+      "sha256": "950433a4b7860b620d28e0def89d2a829e2eff6126125dbba111bdff059631a1",
+      "kind": "json",
+      "suggestedHumanReadableName": "baseline-overlay-continuity_0_D3F3428A-22A9-43B7-9853-E47C7AFBD02F.json"
+    },
+    {
+      "source": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/mobile-youtube-fr-node-identity-probe-20261017/same-scope-clone-repair-20261017/current-production-touch-width-drawer-keyboard-attempt1/runtime-attachments/6F1CFA4B-E958-40BB-9C42-79FC75C0F18D.json",
+      "copy": "portrait-touch-width-evidence/attachments/6F1CFA4B-E958-40BB-9C42-79FC75C0F18D.json",
+      "bytes": 174,
+      "sha256": "0379de8254fe002a3bb4b90390cf930f1763a077abe31cc8f7b6ca88704ee1fc",
+      "kind": "json",
+      "suggestedHumanReadableName": "baseline-prompt-observation_0_FB9F54B2-4BEB-438C-AE6D-DBBFB16261D2.json"
+    },
+    {
+      "source": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/mobile-youtube-fr-node-identity-probe-20261017/same-scope-clone-repair-20261017/current-production-touch-width-drawer-keyboard-attempt1/runtime-attachments/7F6D5FC0-C960-40CF-A764-9022EE009507.json",
+      "copy": "portrait-touch-width-evidence/attachments/7F6D5FC0-C960-40CF-A764-9022EE009507.json",
+      "bytes": 179,
+      "sha256": "b17bbe6597b7bf2373e89ba1b753159459737e27476d9e38819950acc7369fa3",
+      "kind": "json",
+      "suggestedHumanReadableName": "baseline-prompt-observation_0_94967269-1468-4F9A-92CF-B37FA0ADA1CE.json"
+    },
+    {
+      "source": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/mobile-youtube-fr-node-identity-probe-20261017/same-scope-clone-repair-20261017/current-production-touch-width-drawer-keyboard-attempt1/runtime-attachments/82B83667-8016-463F-A74E-032182E9924E.json",
+      "copy": "portrait-touch-width-evidence/attachments/82B83667-8016-463F-A74E-032182E9924E.json",
+      "bytes": 110,
+      "sha256": "054ca89a224d3c4292ddaf66adc57a7a29a234715fe58beedbc49e1e9a1d52bd",
+      "kind": "json",
+      "suggestedHumanReadableName": "baseline-owner-observation_0_3619927F-E443-4D2E-B430-E77B2A609B83.json"
+    },
+    {
+      "source": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/mobile-youtube-fr-node-identity-probe-20261017/same-scope-clone-repair-20261017/current-production-touch-width-drawer-keyboard-attempt1/runtime-attachments/83FD6008-20B5-4B82-8386-505B4D91EDF8.json",
+      "copy": "portrait-touch-width-evidence/attachments/83FD6008-20B5-4B82-8386-505B4D91EDF8.json",
+      "bytes": 700,
+      "sha256": "34534cca5fd4ea48c5516c8a8edb0ed4caa0304b3da273c5a7d455dc755dc943",
+      "kind": "json",
+      "suggestedHumanReadableName": "baseline-case-observation_0_B4E1DD15-6B1F-43FA-AB3E-60EDC3FD5D72.json"
+    },
+    {
+      "source": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/mobile-youtube-fr-node-identity-probe-20261017/same-scope-clone-repair-20261017/current-production-touch-width-drawer-keyboard-attempt1/runtime-attachments/87D5C3A0-A3F2-4E96-9F4F-EF16D62A2BC4.json",
+      "copy": "portrait-touch-width-evidence/attachments/87D5C3A0-A3F2-4E96-9F4F-EF16D62A2BC4.json",
+      "bytes": 180,
+      "sha256": "d4f86197b9e37677ccfb0ebfea4af6da5aa7861ec889954e3ba0d70bf90cc2c3",
+      "kind": "json",
+      "suggestedHumanReadableName": "baseline-prompt-observation_0_E17F4F7D-FAC1-48BB-B507-31696CB53522.json"
+    },
+    {
+      "source": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/mobile-youtube-fr-node-identity-probe-20261017/same-scope-clone-repair-20261017/current-production-touch-width-drawer-keyboard-attempt1/runtime-attachments/8D33A82A-A782-4D64-9458-1A789BF11D66.json",
+      "copy": "portrait-touch-width-evidence/attachments/8D33A82A-A782-4D64-9458-1A789BF11D66.json",
+      "bytes": 7140,
+      "sha256": "40f7f6a26cf8f57d0168251492540d4ae2f648bae4ec45406d2f2b916bcd769c",
+      "kind": "json",
+      "suggestedHumanReadableName": "drawer-keyboard-returned-normal-popup_0_10CAD1B5-7303-47C6-9A42-781B21A1CE23.json"
+    },
+    {
+      "source": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/mobile-youtube-fr-node-identity-probe-20261017/same-scope-clone-repair-20261017/current-production-touch-width-drawer-keyboard-attempt1/runtime-attachments/8D472498-D7DD-491C-A548-DFDF929B10BA.png",
+      "copy": "portrait-touch-width-evidence/attachments/8D472498-D7DD-491C-A548-DFDF929B10BA.png",
+      "bytes": 335292,
+      "sha256": "da886efd552a793f1f3206b7bb47b8332084d2b89b174136db2fbceccc46c62f",
+      "kind": "png",
+      "suggestedHumanReadableName": "drawer-keyboard-picker-gpt-original_0_797CD2B8-BBC5-4CAF-9B8D-A6ADE7B331A2.png"
+    },
+    {
+      "source": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/mobile-youtube-fr-node-identity-probe-20261017/same-scope-clone-repair-20261017/current-production-touch-width-drawer-keyboard-attempt1/runtime-attachments/8EABF3BB-0A5E-405B-85D3-2564E2108DBE.json",
+      "copy": "portrait-touch-width-evidence/attachments/8EABF3BB-0A5E-405B-85D3-2564E2108DBE.json",
+      "bytes": 255,
+      "sha256": "1a8a0a3438692576dff676d3e8829d1d53f70bcb89e42263f5dce2a79f5c36a4",
+      "kind": "json",
+      "suggestedHumanReadableName": "baseline-overlay-continuity_0_1542DFB6-075F-4CF9-8CF0-2CCCC2CB0A90.json"
+    },
+    {
+      "source": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/mobile-youtube-fr-node-identity-probe-20261017/same-scope-clone-repair-20261017/current-production-touch-width-drawer-keyboard-attempt1/runtime-attachments/8EDCB443-B5A1-4CB6-81D4-5306E2D829CC.json",
+      "copy": "portrait-touch-width-evidence/attachments/8EDCB443-B5A1-4CB6-81D4-5306E2D829CC.json",
+      "bytes": 190,
+      "sha256": "dfd05233a21cdf8c1a46a79e14122284033a04cb077b7e3f71d1ce74b78eee96",
+      "kind": "json",
+      "suggestedHumanReadableName": "localhost-one-day-no-decision_0_379BC68C-4EC1-40D0-860B-B9635D04FF3A.json"
+    },
+    {
+      "source": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/mobile-youtube-fr-node-identity-probe-20261017/same-scope-clone-repair-20261017/current-production-touch-width-drawer-keyboard-attempt1/runtime-attachments/92A0BDDE-E021-4AAC-98EE-4602F090FB48.png",
+      "copy": "portrait-touch-width-evidence/attachments/92A0BDDE-E021-4AAC-98EE-4602F090FB48.png",
+      "bytes": 140253,
+      "sha256": "25cf3b3339d8332ef6ee9481ac95c9a6679878d78709e36b1b7b8ba99d04eb59",
+      "kind": "png",
+      "suggestedHumanReadableName": "baseline-owned-known-local-fixture_0_C421E56C-697D-40AB-8DFB-A1DB5F743321.png"
+    },
+    {
+      "source": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/mobile-youtube-fr-node-identity-probe-20261017/same-scope-clone-repair-20261017/current-production-touch-width-drawer-keyboard-attempt1/runtime-attachments/9611AFCD-3362-403F-8F8C-C9742F4C9736.json",
+      "copy": "portrait-touch-width-evidence/attachments/9611AFCD-3362-403F-8F8C-C9742F4C9736.json",
+      "bytes": 376,
+      "sha256": "71007f531eb06a3f65aee71e3b14adbc6565b2dc8f941b6846d5486ff7a457e0",
+      "kind": "json",
+      "suggestedHumanReadableName": "localhost-one-day-attempt1-exact-native-menu-readiness_0_A9784D45-F7FB-4266-8CB8-5BEB03FEA911.json"
+    },
+    {
+      "source": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/mobile-youtube-fr-node-identity-probe-20261017/same-scope-clone-repair-20261017/current-production-touch-width-drawer-keyboard-attempt1/runtime-attachments/A31A72D0-B9B4-4CC8-89A8-EB98E1AFE050.json",
+      "copy": "portrait-touch-width-evidence/attachments/A31A72D0-B9B4-4CC8-89A8-EB98E1AFE050.json",
+      "bytes": 167,
+      "sha256": "f854f2fa030597fbcc771102b3f73f4e84ea014bfc4c9c271f0133a5a2098a73",
+      "kind": "json",
+      "suggestedHumanReadableName": "baseline-prompt-observation_0_923E94D5-A872-4950-A584-53CD4F0906A4.json"
+    },
+    {
+      "source": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/mobile-youtube-fr-node-identity-probe-20261017/same-scope-clone-repair-20261017/current-production-touch-width-drawer-keyboard-attempt1/runtime-attachments/B2FE913F-2239-4EAC-859C-6EAD4E9A1430.json",
+      "copy": "portrait-touch-width-evidence/attachments/B2FE913F-2239-4EAC-859C-6EAD4E9A1430.json",
+      "bytes": 118,
+      "sha256": "ac541d7a4d95bb5dcca95299f9287e3535bc7f6754747e890a7a52ad8e610998",
+      "kind": "json",
+      "suggestedHumanReadableName": "baseline-owner-observation_0_9E934B4A-9A89-412B-90DD-A639B1AD4425.json"
+    },
+    {
+      "source": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/mobile-youtube-fr-node-identity-probe-20261017/same-scope-clone-repair-20261017/current-production-touch-width-drawer-keyboard-attempt1/runtime-attachments/BBDFD48A-5E3B-490B-BF1F-8EE7257C7E52.json",
+      "copy": "portrait-touch-width-evidence/attachments/BBDFD48A-5E3B-490B-BF1F-8EE7257C7E52.json",
+      "bytes": 170,
+      "sha256": "4a004bf70fb4733a637df257335434d092209bd8a90a788f84dfac666f6e3abb",
+      "kind": "json",
+      "suggestedHumanReadableName": "baseline-prompt-observation_0_BB7E723A-EEDB-438B-9F15-195EA97BE63B.json"
+    },
+    {
+      "source": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/mobile-youtube-fr-node-identity-probe-20261017/same-scope-clone-repair-20261017/current-production-touch-width-drawer-keyboard-attempt1/runtime-attachments/BCD4E565-856A-4F16-B7E6-8DA59DC63E0A.json",
+      "copy": "portrait-touch-width-evidence/attachments/BCD4E565-856A-4F16-B7E6-8DA59DC63E0A.json",
+      "bytes": 215,
+      "sha256": "cd20c693be301e4a39ffd2e1857a616e1cadddf6d9a7e9b4d76c63113683b96d",
+      "kind": "json",
+      "suggestedHumanReadableName": "drawer-keyboard-query-classification_0_A2E50BD6-EA08-4963-AFB6-2D3C9E751DF7.json"
+    },
+    {
+      "source": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/mobile-youtube-fr-node-identity-probe-20261017/same-scope-clone-repair-20261017/current-production-touch-width-drawer-keyboard-attempt1/runtime-attachments/C4F7C67C-7FC8-43B1-A66E-92BA318995B5.json",
+      "copy": "portrait-touch-width-evidence/attachments/C4F7C67C-7FC8-43B1-A66E-92BA318995B5.json",
+      "bytes": 170,
+      "sha256": "acbfd5bc487714f0587ac2dc6d439460768e0a8eb6a85b967fddf6436be22c47",
+      "kind": "json",
+      "suggestedHumanReadableName": "baseline-prompt-observation_0_47E5558F-0FCC-48E1-ABB4-39F9BA6E1799.json"
+    },
+    {
+      "source": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/mobile-youtube-fr-node-identity-probe-20261017/same-scope-clone-repair-20261017/current-production-touch-width-drawer-keyboard-attempt1/runtime-attachments/C819B15D-1503-45F2-BF43-DE571B68FBE4.json",
+      "copy": "portrait-touch-width-evidence/attachments/C819B15D-1503-45F2-BF43-DE571B68FBE4.json",
+      "bytes": 113,
+      "sha256": "38e270377203209d3ee0423aeaa27ecb61c150b02cf07976b02c3e0e58f22c84",
+      "kind": "json",
+      "suggestedHumanReadableName": "baseline-owner-observation_0_EAEEE09E-8707-40EE-B454-42120CA90FCD.json"
+    },
+    {
+      "source": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/mobile-youtube-fr-node-identity-probe-20261017/same-scope-clone-repair-20261017/current-production-touch-width-drawer-keyboard-attempt1/runtime-attachments/C8237B35-ED56-4663-8025-A7CF733A824F.png",
+      "copy": "portrait-touch-width-evidence/attachments/C8237B35-ED56-4663-8025-A7CF733A824F.png",
+      "bytes": 421922,
+      "sha256": "8d2c7fd540226735e7ca8a7fd03c31b26962366a065633e997920b2450716aef",
+      "kind": "png",
+      "suggestedHumanReadableName": "drawer-keyboard-returned-normal-popup-original_0_4D330410-A255-4937-B681-F54B66FA78BC.png"
+    },
+    {
+      "source": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/mobile-youtube-fr-node-identity-probe-20261017/same-scope-clone-repair-20261017/current-production-touch-width-drawer-keyboard-attempt1/runtime-attachments/CF0F7CBC-56DE-4FC6-B3A1-A7C5997BA666.png",
+      "copy": "portrait-touch-width-evidence/attachments/CF0F7CBC-56DE-4FC6-B3A1-A7C5997BA666.png",
+      "bytes": 421553,
+      "sha256": "feb4634c233bf6a0ec9476e66e67953c2b84ecffbe22228ec98dbc03a67116fc",
+      "kind": "png",
+      "suggestedHumanReadableName": "baseline-current-production-popup-original_0_84306140-4FEF-4852-8675-5E079261EF81.png"
+    },
+    {
+      "source": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/mobile-youtube-fr-node-identity-probe-20261017/same-scope-clone-repair-20261017/current-production-touch-width-drawer-keyboard-attempt1/runtime-attachments/D802542E-69DE-48BA-89E1-60AE480E37B9.json",
+      "copy": "portrait-touch-width-evidence/attachments/D802542E-69DE-48BA-89E1-60AE480E37B9.json",
+      "bytes": 4586,
+      "sha256": "1051cc4552db0738110dabca1b9459a305780d782ca18f425fbbddc1bdbf19fa",
+      "kind": "json",
+      "suggestedHumanReadableName": "drawer-keyboard-before-overviewClose_0_90A7DC7E-1547-4E0A-9E9F-F7606FD90D6E.json"
+    },
+    {
+      "source": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/mobile-youtube-fr-node-identity-probe-20261017/same-scope-clone-repair-20261017/current-production-touch-width-drawer-keyboard-attempt1/runtime-attachments/DA6B9C1C-33D7-4F25-B0E8-AB2D825C0AE9.json",
+      "copy": "portrait-touch-width-evidence/attachments/DA6B9C1C-33D7-4F25-B0E8-AB2D825C0AE9.json",
+      "bytes": 178,
+      "sha256": "feda098fc1ac487d673661abe986644dde2fd89cadc72e5437a528201c18c3ef",
+      "kind": "json",
+      "suggestedHumanReadableName": "baseline-prompt-observation_0_B19D22A4-65E1-4F0C-83C8-9C41A3648D37.json"
+    },
+    {
+      "source": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/mobile-youtube-fr-node-identity-probe-20261017/same-scope-clone-repair-20261017/current-production-touch-width-drawer-keyboard-attempt1/runtime-attachments/DEAFD1CC-7C41-421C-BA5C-FC91A4430791.json",
+      "copy": "portrait-touch-width-evidence/attachments/DEAFD1CC-7C41-421C-BA5C-FC91A4430791.json",
+      "bytes": 174,
+      "sha256": "6146e50982b09a1ef7c2d21a81baafdde6fcfbebb152652135f92df010b94304",
+      "kind": "json",
+      "suggestedHumanReadableName": "baseline-prompt-observation_0_3B7E02D5-D4F9-44BC-8EA4-1B1BAEF6E986.json"
+    },
+    {
+      "source": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/mobile-youtube-fr-node-identity-probe-20261017/same-scope-clone-repair-20261017/current-production-touch-width-drawer-keyboard-attempt1/runtime-attachments/E009AF16-CC59-4CD5-B100-40CFD4323AA4.json",
+      "copy": "portrait-touch-width-evidence/attachments/E009AF16-CC59-4CD5-B100-40CFD4323AA4.json",
+      "bytes": 175,
+      "sha256": "931e578a5e25d3f660c5cf672bd5156aeff9ffaaecdc5b3fd27d6fd1845d89cf",
+      "kind": "json",
+      "suggestedHumanReadableName": "baseline-prompt-observation_0_D0B443F6-13D0-4FC8-9040-F8CFFA2A45D0.json"
+    },
+    {
+      "source": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/mobile-youtube-fr-node-identity-probe-20261017/same-scope-clone-repair-20261017/current-production-touch-width-drawer-keyboard-attempt1/runtime-attachments/E7233C52-3099-4069-ABA6-2DB318A012FB.json",
+      "copy": "portrait-touch-width-evidence/attachments/E7233C52-3099-4069-ABA6-2DB318A012FB.json",
+      "bytes": 193,
+      "sha256": "0fc95edad1758e466808893eb6f0892197d60b789c6f12aeec2161c0680bbf26",
+      "kind": "json",
+      "suggestedHumanReadableName": "baseline-prompt-observation_0_C2AE54DC-11C5-416D-8165-4A6483D96EDC.json"
+    },
+    {
+      "source": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/mobile-youtube-fr-node-identity-probe-20261017/same-scope-clone-repair-20261017/current-production-touch-width-drawer-keyboard-attempt1/runtime-attachments/EEF1DAFF-A114-4CBF-AA25-537E15F8D05A.json",
+      "copy": "portrait-touch-width-evidence/attachments/EEF1DAFF-A114-4CBF-AA25-537E15F8D05A.json",
+      "bytes": 168,
+      "sha256": "4008dfdb8c1aa55e1de78257432520983943750eba91b349b667aee8dda92798",
+      "kind": "json",
+      "suggestedHumanReadableName": "baseline-prompt-observation_0_8EE48827-41E8-4E4B-9CD4-CDB43C6EF2C8.json"
+    },
+    {
+      "source": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/mobile-youtube-fr-node-identity-probe-20261017/same-scope-clone-repair-20261017/current-production-touch-width-drawer-keyboard-attempt1/runtime-attachments/EFF566D4-AAB4-4EEA-8B3C-9FA95CBEF261.json",
+      "copy": "portrait-touch-width-evidence/attachments/EFF566D4-AAB4-4EEA-8B3C-9FA95CBEF261.json",
+      "bytes": 9646,
+      "sha256": "b6e391fe9885ca0c76d813c69c6a62d7b1d1b8afa42ff153c8493e6db7e7dd55",
+      "kind": "json",
+      "suggestedHumanReadableName": "drawer-keyboard-before-searchFocus_0_401B8273-D185-4A1A-9529-00899A0AFA10.json"
+    },
+    {
+      "source": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/mobile-youtube-fr-node-identity-probe-20261017/same-scope-clone-repair-20261017/current-production-touch-width-drawer-keyboard-attempt1/runtime-attachments/F2196560-0C7C-4AD1-B1E9-B5749019E1F3.png",
+      "copy": "portrait-touch-width-evidence/attachments/F2196560-0C7C-4AD1-B1E9-B5749019E1F3.png",
+      "bytes": 331860,
+      "sha256": "4fa39ec715ffcb533144634d0da01236791d7c1bb84b2bc3a59c33ba33e5a95b",
+      "kind": "png",
+      "suggestedHumanReadableName": "drawer-keyboard-before-searchFocus-original_0_ED67C8D3-1A88-4194-9BBA-D467F02BE6EF.png"
+    },
+    {
+      "source": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/mobile-youtube-fr-node-identity-probe-20261017/same-scope-clone-repair-20261017/current-production-touch-width-drawer-keyboard-attempt1/runtime-attachments/F6CEB35B-77D8-4333-B31D-226C7B94B0B5.png",
+      "copy": "portrait-touch-width-evidence/attachments/F6CEB35B-77D8-4333-B31D-226C7B94B0B5.png",
+      "bytes": 277293,
+      "sha256": "d276b486278d1cfbb7b70f37694bb87379dc9cdea645454dd263a1bba118c8ca",
+      "kind": "png",
+      "suggestedHumanReadableName": "drawer-keyboard-before-overviewClose-original_0_1068E258-E881-4887-8196-29B683138710.png"
+    },
+    {
+      "source": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/mobile-youtube-fr-node-identity-probe-20261017/same-scope-clone-repair-20261017/current-production-touch-width-drawer-keyboard-attempt1/runtime-attachments/manifest.json",
+      "copy": "portrait-touch-width-evidence/attachments/manifest.json",
+      "bytes": 24855,
+      "sha256": "da2fc2a7398c73f4ed87bdcc49021ad4aafabd036908d23af330059486dd1248",
+      "kind": "export-manifest"
+    }
+  ],
+  "counts": {
+    "allFiles": 53,
+    "payloadJSON": 44,
+    "originalPNG": 8,
+    "exportManifest": 1
+  },
+  "totalBytes": 2420717,
+  "payloadBytes": 2395862,
+  "payloadMeasuredRecordHash": "d605635320216bfa3787ab1b7550a2a5f3baae0d1a293679de46ecfb78f6740e",
+  "allCopiedFilesMeasuredRecordHash": "80ee1c2fb727238c677127c783f9db75ba8fe05f2e66be49fb59e832cf5b5fc8",
+  "recordAlgorithm": "Global UTF8 exported filename sort; SHA256(filename+NUL+fileSHA256+NUL+decimalByteLength+LF).",
+  "sourceVsCopy": "Every approved source file read as bytes, copied without pixel/JSON transformations, and destination SHA/length independently remeasured.",
+  "digestBoundary": "Original export manifest provides names/test/device metadata only, not expected digest/length. SHA/length here are measured source/copy identity, not comparison against missing expected hashes.",
+  "externalEvidenceReferences": {
+    "focusedValidation": {
+      "path": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/mobile-youtube-fr-node-identity-probe-20261017/same-scope-clone-repair-20261017/root-safari-touch-width-focused-validation.json",
+      "bytes": 1090,
+      "sha256": "34253a4bad8ab3d23214c1ea003d78fc85343c90d2e393d0a2bd3f2206b76da3",
+      "copy": null,
+      "availability": "research-source identifier only; no public/repository copy made by this staging"
+    },
+    "typecheck": {
+      "path": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/mobile-youtube-fr-node-identity-probe-20261017/same-scope-clone-repair-20261017/safari-touch-width-clean461c2fb-typecheck-result.json",
+      "bytes": 641,
+      "sha256": "7f0a43c05fd3386aa25e43531c4e58dbf3af24d06f97b2a1dd110bbcb3647080",
+      "copy": null,
+      "availability": "research-source identifier only; no public/repository copy made by this staging"
+    },
+    "cleanSourceBinding": {
+      "path": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/mobile-youtube-fr-node-identity-probe-20261017/same-scope-clone-repair-20261017/safari-touch-width-clean461c2fb-build-20261017/clean-source-binding.json",
+      "bytes": 3233,
+      "sha256": "9524ba029358b25849fc15024a35eee94e06386c28ee1fa5e91e47525f320544",
+      "copy": null,
+      "availability": "research-source identifier only; no public/repository copy made by this staging"
+    },
+    "webBuild": {
+      "path": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/mobile-youtube-fr-node-identity-probe-20261017/same-scope-clone-repair-20261017/safari-touch-width-clean461c2fb-build-20261017/web-build-result.json",
+      "bytes": 605,
+      "sha256": "2d59be5c37c8243ace7ea8b6d37c1fea9b38b61c424f6809139634e1834eac59",
+      "copy": null,
+      "availability": "research-source identifier only; no public/repository copy made by this staging"
+    },
+    "sixStageNativeBuild": {
+      "path": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/mobile-youtube-fr-node-identity-probe-20261017/same-scope-clone-repair-20261017/safari-touch-width-clean461c2fb-build-20261017/native-build-summary.json",
+      "bytes": 10788,
+      "sha256": "babbba7ed40dacc7ad75d18bd1cdf4371c118283be53905fa0782588de4221ce",
+      "copy": null,
+      "availability": "research-source identifier only; no public/repository copy made by this staging"
+    },
+    "compiledIdentity": {
+      "path": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/mobile-youtube-fr-node-identity-probe-20261017/same-scope-clone-repair-20261017/safari-touch-width-clean461c2fb-build-20261017/compiled-artifact-identities.json",
+      "bytes": 48261,
+      "sha256": "62b1353c166605ab9f6e7b3a4540f2937425b5dc7164a3cfbef279fd3ed0cc03",
+      "copy": null,
+      "availability": "research-source identifier only; no public/repository copy made by this staging"
+    },
+    "independentBuildFileEvidence": {
+      "path": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/mobile-youtube-fr-node-identity-probe-20261017/same-scope-clone-repair-20261017/safari-touch-width-clean461c2fb-build-20261017/independent-build-file-evidence-review.json",
+      "bytes": 3874,
+      "sha256": "a67219655dfb9e6e63460d82f140f5b34a2a5ed5ce714fad6c3d1b49aa93f2ae",
+      "copy": null,
+      "availability": "research-source identifier only; no public/repository copy made by this staging"
+    },
+    "rootRuntimeOutcome": {
+      "path": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/mobile-youtube-fr-node-identity-probe-20261017/same-scope-clone-repair-20261017/current-production-touch-width-drawer-keyboard-attempt1/root-runtime-outcome.json",
+      "bytes": 4544,
+      "sha256": "8b86b6ad13bec2888bffdf18ac781b6a332107408fadd651f98b44ee56f64bee",
+      "copy": null,
+      "availability": "research-source identifier only; no public/repository copy made by this staging"
+    },
+    "independentRuntimeReview": {
+      "path": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/mobile-youtube-fr-node-identity-probe-20261017/same-scope-clone-repair-20261017/current-production-touch-width-drawer-keyboard-attempt1/independent-runtime-review.json",
+      "bytes": 14994,
+      "sha256": "72d14557bff3f7b4a01c03394abb1ab2d0c4e3d9e6df857ce2bbde94269943fa",
+      "copy": null,
+      "availability": "research-source identifier only; no public/repository copy made by this staging"
+    },
+    "officialSummary": {
+      "path": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/mobile-youtube-fr-node-identity-probe-20261017/same-scope-clone-repair-20261017/current-production-touch-width-drawer-keyboard-attempt1/runtime-test-summary.json",
+      "bytes": 1007,
+      "sha256": "90e311d1ef6579f260dc8e6ee68c0375dd2830f116da07f54a67af2ca41a6773",
+      "copy": null,
+      "availability": "research-source identifier only; no public/repository copy made by this staging"
+    },
+    "oldMainWidthSource": {
+      "path": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/mobile-youtube-fr-node-identity-probe-20261017/same-scope-clone-repair-20261017/current-production-service-drawer-keyboard-attempt1-revision2/runtime-attachments/67E75B42-47B5-48C4-B540-9809693FDC58.json",
+      "bytes": 8314,
+      "sha256": "ba0c1546876ca4c19dc3c159a64a83bd191c48d6b1fee59832e39a8e4c9d8472",
+      "copy": null,
+      "availability": "research-source identifier only; no public/repository copy made by this staging"
+    },
+    "oldOverviewWidthSource": {
+      "path": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/mobile-youtube-fr-node-identity-probe-20261017/same-scope-clone-repair-20261017/current-production-service-drawer-keyboard-attempt1-revision2/runtime-attachments/648E47E7-C7B1-4C40-A25E-24BA7EB18EDD.json",
+      "bytes": 4341,
+      "sha256": "72d0e25d151c3d16607fbc564a00dd18fb953c2e116fabe3b32b8c1bada1cc2e",
+      "copy": null,
+      "availability": "research-source identifier only; no public/repository copy made by this staging"
+    },
+    "androidE5ToolingBoundary": {
+      "path": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/android-runtime/edge-retained-install-readonly-20261017/execution-edge-retained-readonly-18dedadf-00b6-464c-9f8b-1acf2b73ff78/root-runtime-outcome.json",
+      "bytes": 5266,
+      "sha256": "a111344e8b37856ba5f0e3ba7d13b2de494973412cc366329213ea69efaf107d",
+      "copy": null,
+      "availability": "research-source identifier only; no public/repository copy made by this staging"
+    }
+  },
+  "absolutePathBoundary": "Absolute paths inside originals, external reports or this index identify research sources. A repository-available file exists only where files[].copy explicitly names a staging copy. No claim that all external/nested pins have public copies.",
+  "excluded": [
+    "SDK/build/runtime logs",
+    "executables, App/appex bundles, DerivedData/xcresult",
+    "native private files or complete restoration identities/private full hash maps",
+    "GO/nonce/freeze/driver/harness sources",
+    "old screenshots and old case attachments"
+  ]
+}

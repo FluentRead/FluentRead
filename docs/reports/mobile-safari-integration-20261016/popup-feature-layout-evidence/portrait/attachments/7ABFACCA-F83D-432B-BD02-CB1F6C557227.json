@@ -1,0 +1,500 @@
+{
+  "actions" : {
+    "address" : 1,
+    "defaultServiceRow" : 1,
+    "extensionPopup" : 1,
+    "navigation" : 1,
+    "normalClear" : 1,
+    "pageMenu" : 1,
+    "SafariActivate" : 1,
+    "serviceSummary" : 1
+  },
+  "actualExactAllowedWebViewLabel" : "流畅阅读",
+  "configurationChangeIntents" : 0,
+  "emptyOwnerIsNotCurrentOwnerProof" : true,
+  "frameIntersectionIsNotVisiblePixelProof" : true,
+  "keyboardCountCappedAt2" : 1,
+  "keyboardFramesAtMost2" : [
+    {
+      "height" : 233,
+      "width" : 402,
+      "x" : 0,
+      "y" : 583
+    }
+  ],
+  "nativeGlobalExactDoneCountCappedAt2" : 2,
+  "nativeHeaderDoneCandidatesCappedAt2" : 1,
+  "nodes" : [
+    {
+      "frame" : {
+        "height" : 812,
+        "width" : 402,
+        "x" : 0,
+        "y" : 62
+      },
+      "identifier" : "",
+      "label" : "流畅阅读",
+      "type" : 58
+    },
+    {
+      "frame" : {
+        "height" : 708,
+        "width" : 402,
+        "x" : 0,
+        "y" : 132
+      },
+      "identifier" : "",
+      "label" : "流畅阅读",
+      "type" : 1
+    },
+    {
+      "frame" : {
+        "height" : 330,
+        "width" : 402,
+        "x" : 0,
+        "y" : 140
+      },
+      "identifier" : "",
+      "label" : "翻译服务, 网页对话框",
+      "type" : 1
+    },
+    {
+      "frame" : {
+        "height" : 1404,
+        "width" : 346,
+        "x" : 20,
+        "y" : 168
+      },
+      "identifier" : "",
+      "label" : "网页默认服务, 区域",
+      "type" : 1
+    },
+    {
+      "frame" : {
+        "height" : 56,
+        "width" : 346,
+        "x" : 20,
+        "y" : 168
+      },
+      "identifier" : "",
+      "label" : "节标题",
+      "type" : 1
+    },
+    {
+      "frame" : {
+        "height" : 46,
+        "width" : 46,
+        "x" : 20,
+        "y" : 168
+      },
+      "identifier" : "",
+      "label" : "返回翻译服务选择",
+      "type" : 9
+    },
+    {
+      "frame" : {
+        "height" : 16,
+        "width" : 72,
+        "x" : 74,
+        "y" : 183
+      },
+      "identifier" : "",
+      "label" : "网页默认服务",
+      "type" : 48
+    },
+    {
+      "frame" : {
+        "height" : 46,
+        "width" : 46,
+        "x" : 320,
+        "y" : 168
+      },
+      "identifier" : "",
+      "label" : "关闭",
+      "type" : 9
+    },
+    {
+      "frame" : {
+        "height" : 46,
+        "width" : 308,
+        "x" : 49,
+        "y" : 225
+      },
+      "identifier" : "",
+      "label" : "搜索服务或模型，如 gpt、qwen",
+      "type" : 45
+    },
+    {
+      "frame" : {
+        "height" : 21,
+        "width" : 227,
+        "x" : 57,
+        "y" : 237
+      },
+      "identifier" : "",
+      "label" : "搜索服务或模型，如 gpt、qwen",
+      "type" : 48
+    },
+    {
+      "frame" : {
+        "height" : 21,
+        "width" : 227,
+        "x" : 57,
+        "y" : 237
+      },
+      "identifier" : "",
+      "label" : "搜索服务或模型，如 gpt、qwen",
+      "type" : 48
+    },
+    {
+      "frame" : {
+        "height" : 1292,
+        "width" : 346,
+        "x" : 20,
+        "y" : 280
+      },
+      "identifier" : "",
+      "label" : "网页默认服务",
+      "type" : 1
+    },
+    {
+      "frame" : {
+        "height" : 122,
+        "width" : 346,
+        "x" : 20,
+        "y" : 280
+      },
+      "identifier" : "",
+      "label" : "常用服务",
+      "type" : 1
+    },
+    {
+      "frame" : {
+        "height" : 13,
+        "width" : 40,
+        "x" : 24,
+        "y" : 288
+      },
+      "identifier" : "",
+      "label" : "常用服务",
+      "type" : 48
+    },
+    {
+      "frame" : {
+        "height" : 46,
+        "width" : 171,
+        "x" : 20,
+        "y" : 306
+      },
+      "identifier" : "",
+      "label" : "免费翻译服务",
+      "type" : 1
+    },
+    {
+      "frame" : {
+        "height" : 46,
+        "width" : 171,
+        "x" : 195,
+        "y" : 306
+      },
+      "identifier" : "",
+      "label" : "微软翻译",
+      "type" : 1
+    },
+    {
+      "frame" : {
+        "height" : 46,
+        "width" : 171,
+        "x" : 20,
+        "y" : 356
+      },
+      "identifier" : "",
+      "label" : "谷歌翻译",
+      "type" : 1
+    },
+    {
+      "frame" : {
+        "height" : 46,
+        "width" : 171,
+        "x" : 195,
+        "y" : 356
+      },
+      "identifier" : "",
+      "label" : "B站翻译",
+      "type" : 1
+    },
+    {
+      "frame" : {
+        "height" : 46,
+        "width" : 346,
+        "x" : 20,
+        "y" : 410
+      },
+      "identifier" : "",
+      "label" : "更多服务 40",
+      "type" : 9
+    },
+    {
+      "frame" : {
+        "height" : 172,
+        "width" : 346,
+        "x" : 20,
+        "y" : 456
+      },
+      "identifier" : "",
+      "label" : "机器翻译",
+      "type" : 1
+    },
+    {
+      "frame" : {
+        "height" : 13,
+        "width" : 40,
+        "x" : 24,
+        "y" : 464
+      },
+      "identifier" : "",
+      "label" : "机器翻译",
+      "type" : 48
+    },
+    {
+      "frame" : {
+        "height" : 46,
+        "width" : 171,
+        "x" : 20,
+        "y" : 482
+      },
+      "identifier" : "",
+      "label" : "MyMemory",
+      "type" : 1
+    },
+    {
+      "frame" : {
+        "height" : 46,
+        "width" : 171,
+        "x" : 195,
+        "y" : 482
+      },
+      "identifier" : "",
+      "label" : "DeepL 待配置",
+      "type" : 1
+    },
+    {
+      "frame" : {
+        "height" : 46,
+        "width" : 171,
+        "x" : 20,
+        "y" : 532
+      },
+      "identifier" : "",
+      "label" : "DeepLX",
+      "type" : 1
+    },
+    {
+      "frame" : {
+        "height" : 46,
+        "width" : 171,
+        "x" : 195,
+        "y" : 532
+      },
+      "identifier" : "",
+      "label" : "小牛翻译 待配置",
+      "type" : 1
+    },
+    {
+      "frame" : {
+        "height" : 46,
+        "width" : 171,
+        "x" : 20,
+        "y" : 582
+      },
+      "identifier" : "",
+      "label" : "有道翻译 待配置",
+      "type" : 1
+    },
+    {
+      "frame" : {
+        "height" : 172,
+        "width" : 346,
+        "x" : 20,
+        "y" : 628
+      },
+      "identifier" : "",
+      "label" : "云服务厂商",
+      "type" : 1
+    },
+    {
+      "frame" : {
+        "height" : 13,
+        "width" : 50,
+        "x" : 24,
+        "y" : 636
+      },
+      "identifier" : "",
+      "label" : "云服务厂商",
+      "type" : 48
+    },
+    {
+      "frame" : {
+        "height" : 46,
+        "width" : 171,
+        "x" : 20,
+        "y" : 654
+      },
+      "identifier" : "",
+      "label" : "腾讯云翻译 待配置",
+      "type" : 1
+    },
+    {
+      "frame" : {
+        "height" : 46,
+        "width" : 171,
+        "x" : 195,
+        "y" : 654
+      },
+      "identifier" : "",
+      "label" : "谷歌云翻译 待配置",
+      "type" : 1
+    },
+    {
+      "frame" : {
+        "height" : 46,
+        "width" : 171,
+        "x" : 20,
+        "y" : 704
+      },
+      "identifier" : "",
+      "label" : "Azure 翻译 待配置",
+      "type" : 1
+    },
+    {
+      "frame" : {
+        "height" : 46,
+        "width" : 171,
+        "x" : 195,
+        "y" : 704
+      },
+      "identifier" : "",
+      "label" : "阿里云机器翻译 待配置",
+      "type" : 1
+    },
+    {
+      "frame" : {
+        "height" : 46,
+        "width" : 171,
+        "x" : 20,
+        "y" : 754
+      },
+      "identifier" : "",
+      "label" : "百度翻译 待配置",
+      "type" : 1
+    },
+    {
+      "frame" : {
+        "height" : 46,
+        "width" : 171,
+        "x" : 195,
+        "y" : 754
+      },
+      "identifier" : "",
+      "label" : "火山引擎翻译 待配置",
+      "type" : 1
+    },
+    {
+      "frame" : {
+        "height" : 772,
+        "width" : 346,
+        "x" : 20,
+        "y" : 800
+      },
+      "identifier" : "",
+      "label" : "AI 翻译",
+      "type" : 1
+    },
+    {
+      "frame" : {
+        "height" : 13,
+        "width" : 33,
+        "x" : 24,
+        "y" : 808
+      },
+      "identifier" : "",
+      "label" : "AI 翻译",
+      "type" : 48
+    },
+    {
+      "frame" : {
+        "height" : 46,
+        "width" : 171,
+        "x" : 20,
+        "y" : 826
+      },
+      "identifier" : "",
+      "label" : "DeepSeek 待配置",
+      "type" : 1
+    },
+    {
+      "frame" : {
+        "height" : 46,
+        "width" : 171,
+        "x" : 195,
+        "y" : 826
+      },
+      "identifier" : "",
+      "label" : "千问\/Qwen 待配置",
+      "type" : 1
+    },
+    {
+      "frame" : {
+        "height" : 320.25215889464602,
+        "width" : 30,
+        "x" : 369,
+        "y" : 132
+      },
+      "identifier" : "",
+      "label" : "垂直滚动条, 3页",
+      "type" : 1
+    },
+    {
+      "frame" : {
+        "height" : 30,
+        "width" : 278,
+        "x" : 62,
+        "y" : 419.25215889464602
+      },
+      "identifier" : "",
+      "label" : "水平滚动条, 1页",
+      "type" : 1
+    },
+    {
+      "frame" : {
+        "height" : 320.25215889464602,
+        "width" : 30,
+        "x" : 369,
+        "y" : 132
+      },
+      "identifier" : "",
+      "label" : "垂直滚动条, 3页",
+      "type" : 1
+    },
+    {
+      "frame" : {
+        "height" : 30,
+        "width" : 278,
+        "x" : 62,
+        "y" : 419.25215889464602
+      },
+      "identifier" : "",
+      "label" : "水平滚动条, 1页",
+      "type" : 1
+    }
+  ],
+  "ownerExact" : false,
+  "ownerNotExposed" : true,
+  "permissionChoices" : 0,
+  "phase" : "before-searchFocus",
+  "readOnlyDrawerHeaderAdmission" : true,
+  "scope" : "Current named production Popup only; no unrelated page\/field\/keyboard key values",
+  "snapshotLiveAndPNGSequentialNotAtomic" : true,
+  "status" : "DRAWER_KEYBOARD_PHASE_OBSERVATION_REQUIRES_REVIEW",
+  "translationIntents" : 0
+}

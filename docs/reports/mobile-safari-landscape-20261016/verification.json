@@ -1,0 +1,1594 @@
+{
+  "status": "final-style-and-update-acceptance-passed-video-native-precondition-unmet",
+  "sourceBase": "60ba5302c52880610ad843ebe3af9487380d2467",
+  "branch": "codex/mobile-landscape-keyboard-20261016",
+  "runtimeCommit": "f6380c330ca576cdeda7ad9e4cf166517853927e",
+  "sourceFiles": {
+    "src/app/popup/PopupApp.vue": "e950bce4401703c6ddc7d88545f20cda5e871324504832539e7e6cd31a7abecd",
+    "src/app/popup/PopupServices.vue": "1808abd98ac2a3c54553cd669b1707beb9d8b9807be5571d8edc406aa88b711c",
+    "src/app/popup/popup.css": "62c318a5b59f23a8702a0b0ab1bd3e1cb107d89a54d4bebba3e68d1d3e18fe90",
+    "tests/popupAppLifecycle.test.ts": "ef7f514bfa66eadd945fa4bd8f1d7c9189367dbf9422fa7db27bfdf270ccfe89"
+  },
+  "artifacts": {
+    "chrome-mv3": {
+      "directory": "/Users/thinkstu/Desktop/copy/FluentRead-mobile-acceptance-20261016/.output/chrome-mv3",
+      "files": 478,
+      "bytes": 62269495,
+      "recordHash": "499a2f99a089a26f20fb0ad1d22d5cbf7032b5659b977a207c80fb53629c3167",
+      "rawByteHash": "948a98879d608d0fff3faeb3295fe9ffbb4df1b7b41f23a5f139cb07cb3ee380",
+      "recordAlgorithm": "global UTF8 path sort; SHA256(path + NUL + fileSHA256 + NUL + decimalByteLength + LF)",
+      "rawAlgorithm": "recursive directory UTF8 name sort; SHA256(path + NUL + decimalByteLength + NUL + rawbytes)"
+    },
+    "firefox-mv2": {
+      "directory": "/Users/thinkstu/Desktop/copy/FluentRead-mobile-acceptance-20261016/.output/firefox-mv2",
+      "files": 478,
+      "bytes": 62272347,
+      "recordHash": "c6ccf02edce4df1b41fd7d66b66d26b6d09e0dcb6355aa7447ad50be6165aaf7",
+      "rawByteHash": "bb89210655799db93c987b16e5a9f4bafac5cd37f2764cdd6f91f712bdc2d3de",
+      "recordAlgorithm": "global UTF8 path sort; SHA256(path + NUL + fileSHA256 + NUL + decimalByteLength + LF)",
+      "rawAlgorithm": "recursive directory UTF8 name sort; SHA256(path + NUL + decimalByteLength + NUL + rawbytes)"
+    },
+    "safari-mv2": {
+      "directory": "/Users/thinkstu/Desktop/copy/FluentRead-mobile-acceptance-20261016/.output/safari-mv2",
+      "files": 467,
+      "bytes": 62135119,
+      "recordHash": "22092478e862f3786647366822991ab1cb0e7c10ce40d7eb11938f96e4989264",
+      "rawByteHash": "dd2300d2a3c95f0ea1a129ae48d47bee4f4909925455e6db31414ef26c18aa8c",
+      "recordAlgorithm": "global UTF8 path sort; SHA256(path + NUL + fileSHA256 + NUL + decimalByteLength + LF)",
+      "rawAlgorithm": "recursive directory UTF8 name sort; SHA256(path + NUL + decimalByteLength + NUL + rawbytes)"
+    }
+  },
+  "focusedTests": {
+    "files": 2,
+    "passed": 118,
+    "log": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/production-popup-short-viewport/candidate2/focused-tests.log"
+  },
+  "buildValidation": [
+    {
+      "name": "focused-tests",
+      "command": [
+        "pnpm",
+        "test",
+        "tests/popupAppLifecycle.test.ts",
+        "tests/popupServicesLifecycle.test.ts"
+      ],
+      "exitCode": 0,
+      "seconds": 27.538,
+      "log": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/production-popup-short-viewport/candidate2/focused-tests.log"
+    },
+    {
+      "name": "compile",
+      "command": [
+        "pnpm",
+        "compile"
+      ],
+      "exitCode": 0,
+      "seconds": 39.237,
+      "log": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/production-popup-short-viewport/candidate2/compile.log"
+    },
+    {
+      "name": "chrome",
+      "command": [
+        "pnpm",
+        "build"
+      ],
+      "exitCode": 0,
+      "seconds": 25.158,
+      "log": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/production-popup-short-viewport/candidate2/chrome.log"
+    },
+    {
+      "name": "firefox",
+      "command": [
+        "pnpm",
+        "build:firefox"
+      ],
+      "exitCode": 0,
+      "seconds": 25.342,
+      "log": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/production-popup-short-viewport/candidate2/firefox.log"
+    },
+    {
+      "name": "safari-web",
+      "command": [
+        "pnpm",
+        "build:safari"
+      ],
+      "exitCode": 0,
+      "seconds": 24.209,
+      "log": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/production-popup-short-viewport/candidate2/safari-web.log"
+    },
+    {
+      "name": "manifest",
+      "command": [
+        "pnpm",
+        "verify:extension-manifests"
+      ],
+      "exitCode": 0,
+      "seconds": 0.58,
+      "log": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/production-popup-short-viewport/candidate2/manifest.log"
+    },
+    {
+      "name": "safari-verify",
+      "command": [
+        "pnpm",
+        "safari:verify"
+      ],
+      "exitCode": 0,
+      "seconds": 0.463,
+      "log": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/production-popup-short-viewport/candidate2/safari-verify.log"
+    },
+    {
+      "name": "userscript",
+      "command": [
+        "pnpm",
+        "build:userscript"
+      ],
+      "exitCode": 0,
+      "seconds": 5.768,
+      "log": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/production-popup-short-viewport/candidate2/userscript.log"
+    },
+    {
+      "name": "userscript-verify",
+      "command": [
+        "node",
+        "scripts/verify-userscript-build.mjs"
+      ],
+      "exitCode": 0,
+      "seconds": 0.097,
+      "log": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/production-popup-short-viewport/candidate2/userscript-verify.log"
+    }
+  ],
+  "productionGeometry": {
+    "casesPassed": 6,
+    "imagesReviewed": 24,
+    "report": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/production-popup-short-viewport/candidate3/geometry-summary.json",
+    "nativeKeyboard": false,
+    "additionalVisibleHeightCSS": 58,
+    "controlsFullyWithinVisibleClipAndEdgeHitTested": true
+  },
+  "androidBefore": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/android-runtime/firefox-attempt14-lifecycle-summary.json",
+  "firstCandidateNativeAXFailure": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/android-runtime/firefox-attempt15-landscape-ime-summary.json",
+  "finalAndroidNative": {
+    "report": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/android-runtime/firefox-attempt17-landscape-ime-summary.json",
+    "visibleBorderReview": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/android-runtime/attempt17-visible-border-review.json",
+    "runtimeCommit": "f6380c330ca576cdeda7ad9e4cf166517853927e",
+    "status": "PASS_TARGETED_ACTUAL_ANDROID_FIREFOX_IME_AX_AND_COMPLETE_CONTROL_BORDERS",
+    "caseCount": 1,
+    "artifact": {
+      "directory": "/Users/thinkstu/Desktop/copy/FluentRead-mobile-acceptance-20261016/.output/firefox-mv2",
+      "files": 478,
+      "bytes": 62272347,
+      "recordHash": "c6ccf02edce4df1b41fd7d66b66d26b6d09e0dcb6355aa7447ad50be6165aaf7",
+      "rawByteHash": "bb89210655799db93c987b16e5a9f4bafac5cd37f2764cdd6f91f712bdc2d3de",
+      "recordAlgorithm": "global UTF8 path sort; SHA256(path + NUL + fileSHA256 + NUL + decimalByteLength + LF)",
+      "rawAlgorithm": "recursive directory UTF8 name sort; SHA256(path + NUL + decimalByteLength + NUL + rawbytes)",
+      "at": "2026-10-15T21:44:12.514027+00:00",
+      "matches": true,
+      "gate": "attempt17-artifact.json",
+      "parentGate": "../production-popup-short-viewport/candidate3/artifact-gate.json",
+      "beforeAfterMatch": true
+    },
+    "cleanup": {
+      "at": "2026-10-15T21:45:02.331198+00:00",
+      "processes": {
+        "74305": {
+          "exit": 1,
+          "metadata": ""
+        },
+        "74324": {
+          "exit": 1,
+          "metadata": ""
+        },
+        "74341": {
+          "exit": 1,
+          "metadata": ""
+        }
+      },
+      "listeners": {
+        "5048": {
+          "exit": 1,
+          "output": ""
+        },
+        "5580": {
+          "exit": 1,
+          "output": ""
+        },
+        "5581": {
+          "exit": 1,
+          "output": ""
+        },
+        "55428": {
+          "exit": 1,
+          "output": ""
+        }
+      },
+      "guardStoppedAt": "2026-10-15T21:44:49.723Z",
+      "guardViolations": [],
+      "keysMetadataUnchanged": true,
+      "runnerNormalExit": true,
+      "rotationRestored": true,
+      "forwardRemoved": true,
+      "firefoxPidofExit": 1,
+      "allGone": true
+    },
+    "screenReaderAcceptance": false,
+    "case": {
+      "id": "real-ime-portrait-landscape-complete-borders-and-ax",
+      "status": "PASS",
+      "portrait": {
+        "viewport": {
+          "width": 360,
+          "height": 263,
+          "offsetLeft": 0,
+          "offsetTop": 0,
+          "scale": 1
+        },
+        "AXgate": "attempt17-ui/v17-06-micro-portrait-ax-gate.json",
+        "controls": {
+          "back": {
+            "expectedActualAXNameOrValue": "Back to translation service selection",
+            "matchCount": 1,
+            "text": "Back to translation service selection",
+            "content-desc": "",
+            "class": "android.widget.Button",
+            "enabled": "true",
+            "focusable": "true",
+            "clickable": "true",
+            "bounds": "[120,348][258,486]",
+            "sizeCSS": [
+              46.0,
+              46.0
+            ],
+            "withinActualVisibleWebView": true
+          },
+          "close": {
+            "expectedActualAXNameOrValue": "Close",
+            "matchCount": 1,
+            "text": "Close",
+            "content-desc": "",
+            "class": "android.widget.Button",
+            "enabled": "true",
+            "focusable": "true",
+            "clickable": "true",
+            "bounds": "[774,348][912,486]",
+            "sizeCSS": [
+              46.0,
+              46.0
+            ],
+            "withinActualVisibleWebView": true
+          },
+          "clear": {
+            "expectedActualAXNameOrValue": "Clear search",
+            "matchCount": 1,
+            "text": "Clear search",
+            "content-desc": "",
+            "class": "android.widget.Button",
+            "enabled": "true",
+            "focusable": "true",
+            "clickable": "true",
+            "bounds": "[747,519][885,657]",
+            "sizeCSS": [
+              46.0,
+              46.0
+            ],
+            "withinActualVisibleWebView": true
+          },
+          "input": {
+            "expectedActualAXNameOrValue": "micro",
+            "matchCount": 1,
+            "text": "micro",
+            "content-desc": "",
+            "class": "android.widget.EditText",
+            "enabled": "true",
+            "focusable": "true",
+            "clickable": "true",
+            "bounds": "[207,519][729,657]",
+            "sizeCSS": [
+              174.0,
+              46.0
+            ],
+            "withinActualVisibleWebView": true
+          }
+        }
+      },
+      "landscape": {
+        "viewport": {
+          "width": 592,
+          "height": 80,
+          "offsetLeft": 0,
+          "offsetTop": 0,
+          "scale": 1
+        },
+        "AXgate": "attempt17-ui/v17-07-micro-landscape-ax-gate.json",
+        "controls": {
+          "back": {
+            "expectedActualAXNameOrValue": "Back to translation service selection",
+            "matchCount": 1,
+            "text": "Back to translation service selection",
+            "content-desc": "",
+            "class": "android.widget.Button",
+            "enabled": "true",
+            "focusable": "true",
+            "clickable": "true",
+            "bounds": "[468,255][606,393]",
+            "sizeCSS": [
+              46.0,
+              46.0
+            ],
+            "withinActualVisibleWebView": true
+          },
+          "close": {
+            "expectedActualAXNameOrValue": "Close",
+            "matchCount": 1,
+            "text": "Close",
+            "content-desc": "",
+            "class": "android.widget.Button",
+            "enabled": "true",
+            "focusable": "true",
+            "clickable": "true",
+            "bounds": "[1122,255][1260,393]",
+            "sizeCSS": [
+              46.0,
+              46.0
+            ],
+            "withinActualVisibleWebView": true
+          },
+          "clear": {
+            "expectedActualAXNameOrValue": "Clear search",
+            "matchCount": 1,
+            "text": "Clear search",
+            "content-desc": "",
+            "class": "android.widget.Button",
+            "enabled": "true",
+            "focusable": "true",
+            "clickable": "true",
+            "bounds": "[933,255][1071,393]",
+            "sizeCSS": [
+              46.0,
+              46.0
+            ],
+            "withinActualVisibleWebView": true
+          },
+          "input": {
+            "expectedActualAXNameOrValue": "micro",
+            "matchCount": 1,
+            "text": "micro",
+            "content-desc": "",
+            "class": "android.widget.EditText",
+            "enabled": "true",
+            "focusable": "true",
+            "clickable": "true",
+            "bounds": "[657,255][915,393]",
+            "sizeCSS": [
+              86.0,
+              46.0
+            ],
+            "withinActualVisibleWebView": true
+          }
+        },
+        "DOMcontrols": [
+          {
+            "label": "Back to translation service selection",
+            "className": "service-picker-back",
+            "display": "block",
+            "visibility": "visible",
+            "clipAncestors": [
+              {
+                "name": "el-drawer__body",
+                "rect": {
+                  "x": 156,
+                  "y": 4,
+                  "width": 280,
+                  "height": 72,
+                  "top": 4,
+                  "right": 436,
+                  "bottom": 76,
+                  "left": 156
+                },
+                "overflowX": "hidden",
+                "overflowY": "auto",
+                "clipPath": "none",
+                "borderRadius": "0px"
+              },
+              {
+                "name": "popup-drawer popup-services-drawer el-drawer btt open",
+                "rect": {
+                  "x": 136,
+                  "y": 0,
+                  "width": 320,
+                  "height": 80,
+                  "top": 0,
+                  "right": 456,
+                  "bottom": 80,
+                  "left": 136
+                },
+                "overflowX": "hidden",
+                "overflowY": "hidden",
+                "clipPath": "none",
+                "borderRadius": "24px 24px 0px 0px"
+              },
+              {
+                "name": "el-overlay popup-drawer-modal",
+                "rect": {
+                  "x": 0,
+                  "y": 0,
+                  "width": 592,
+                  "height": 80,
+                  "top": 0,
+                  "right": 592,
+                  "bottom": 80,
+                  "left": 0
+                },
+                "overflowX": "auto",
+                "overflowY": "auto",
+                "clipPath": "none",
+                "borderRadius": "0px"
+              },
+              {
+                "name": "popup-page el-popup-parent--hidden",
+                "rect": {
+                  "x": 0,
+                  "y": 0,
+                  "width": 380,
+                  "height": 80,
+                  "top": 0,
+                  "right": 380,
+                  "bottom": 80,
+                  "left": 0
+                },
+                "overflowX": "hidden",
+                "overflowY": "auto",
+                "clipPath": "none",
+                "borderRadius": "0px"
+              },
+              {
+                "name": "HTML",
+                "rect": {
+                  "x": 0,
+                  "y": 0,
+                  "width": 380,
+                  "height": 80,
+                  "top": 0,
+                  "right": 380,
+                  "bottom": 80,
+                  "left": 0
+                },
+                "overflowX": "hidden",
+                "overflowY": "auto",
+                "clipPath": "none",
+                "borderRadius": "0px"
+              }
+            ],
+            "hitPoints": [
+              {
+                "x": 179,
+                "y": 28,
+                "hit": true
+              },
+              {
+                "x": 158,
+                "y": 28,
+                "hit": true
+              },
+              {
+                "x": 200,
+                "y": 28,
+                "hit": true
+              },
+              {
+                "x": 179,
+                "y": 7,
+                "hit": true
+              },
+              {
+                "x": 179,
+                "y": 49,
+                "hit": true
+              }
+            ],
+            "rect": {
+              "x": 156,
+              "y": 5,
+              "width": 46,
+              "height": 46,
+              "top": 5,
+              "right": 202,
+              "bottom": 51,
+              "left": 156
+            },
+            "checked": null,
+            "pressed": null,
+            "disabled": false,
+            "testId": null,
+            "switchVisual": null
+          },
+          {
+            "label": "Close",
+            "className": "service-panel-close service-picker-close",
+            "display": "grid",
+            "visibility": "visible",
+            "clipAncestors": [
+              {
+                "name": "el-drawer__body",
+                "rect": {
+                  "x": 156,
+                  "y": 4,
+                  "width": 280,
+                  "height": 72,
+                  "top": 4,
+                  "right": 436,
+                  "bottom": 76,
+                  "left": 156
+                },
+                "overflowX": "hidden",
+                "overflowY": "auto",
+                "clipPath": "none",
+                "borderRadius": "0px"
+              },
+              {
+                "name": "popup-drawer popup-services-drawer el-drawer btt open",
+                "rect": {
+                  "x": 136,
+                  "y": 0,
+                  "width": 320,
+                  "height": 80,
+                  "top": 0,
+                  "right": 456,
+                  "bottom": 80,
+                  "left": 136
+                },
+                "overflowX": "hidden",
+                "overflowY": "hidden",
+                "clipPath": "none",
+                "borderRadius": "24px 24px 0px 0px"
+              },
+              {
+                "name": "el-overlay popup-drawer-modal",
+                "rect": {
+                  "x": 0,
+                  "y": 0,
+                  "width": 592,
+                  "height": 80,
+                  "top": 0,
+                  "right": 592,
+                  "bottom": 80,
+                  "left": 0
+                },
+                "overflowX": "auto",
+                "overflowY": "auto",
+                "clipPath": "none",
+                "borderRadius": "0px"
+              },
+              {
+                "name": "popup-page el-popup-parent--hidden",
+                "rect": {
+                  "x": 0,
+                  "y": 0,
+                  "width": 380,
+                  "height": 80,
+                  "top": 0,
+                  "right": 380,
+                  "bottom": 80,
+                  "left": 0
+                },
+                "overflowX": "hidden",
+                "overflowY": "auto",
+                "clipPath": "none",
+                "borderRadius": "0px"
+              },
+              {
+                "name": "HTML",
+                "rect": {
+                  "x": 0,
+                  "y": 0,
+                  "width": 380,
+                  "height": 80,
+                  "top": 0,
+                  "right": 380,
+                  "bottom": 80,
+                  "left": 0
+                },
+                "overflowX": "hidden",
+                "overflowY": "auto",
+                "clipPath": "none",
+                "borderRadius": "0px"
+              }
+            ],
+            "hitPoints": [
+              {
+                "x": 397,
+                "y": 28,
+                "hit": true
+              },
+              {
+                "x": 376,
+                "y": 28,
+                "hit": true
+              },
+              {
+                "x": 418,
+                "y": 28,
+                "hit": true
+              },
+              {
+                "x": 397,
+                "y": 7,
+                "hit": true
+              },
+              {
+                "x": 397,
+                "y": 49,
+                "hit": true
+              }
+            ],
+            "rect": {
+              "x": 374,
+              "y": 5,
+              "width": 46,
+              "height": 46,
+              "top": 5,
+              "right": 420,
+              "bottom": 51,
+              "left": 374
+            },
+            "checked": null,
+            "pressed": null,
+            "disabled": false,
+            "testId": null,
+            "switchVisual": null
+          },
+          {
+            "label": "Clear search",
+            "className": "",
+            "display": "block",
+            "visibility": "visible",
+            "clipAncestors": [
+              {
+                "name": "el-drawer__body",
+                "rect": {
+                  "x": 156,
+                  "y": 4,
+                  "width": 280,
+                  "height": 72,
+                  "top": 4,
+                  "right": 436,
+                  "bottom": 76,
+                  "left": 156
+                },
+                "overflowX": "hidden",
+                "overflowY": "auto",
+                "clipPath": "none",
+                "borderRadius": "0px"
+              },
+              {
+                "name": "popup-drawer popup-services-drawer el-drawer btt open",
+                "rect": {
+                  "x": 136,
+                  "y": 0,
+                  "width": 320,
+                  "height": 80,
+                  "top": 0,
+                  "right": 456,
+                  "bottom": 80,
+                  "left": 136
+                },
+                "overflowX": "hidden",
+                "overflowY": "hidden",
+                "clipPath": "none",
+                "borderRadius": "24px 24px 0px 0px"
+              },
+              {
+                "name": "el-overlay popup-drawer-modal",
+                "rect": {
+                  "x": 0,
+                  "y": 0,
+                  "width": 592,
+                  "height": 80,
+                  "top": 0,
+                  "right": 592,
+                  "bottom": 80,
+                  "left": 0
+                },
+                "overflowX": "auto",
+                "overflowY": "auto",
+                "clipPath": "none",
+                "borderRadius": "0px"
+              },
+              {
+                "name": "popup-page el-popup-parent--hidden",
+                "rect": {
+                  "x": 0,
+                  "y": 0,
+                  "width": 380,
+                  "height": 80,
+                  "top": 0,
+                  "right": 380,
+                  "bottom": 80,
+                  "left": 0
+                },
+                "overflowX": "hidden",
+                "overflowY": "auto",
+                "clipPath": "none",
+                "borderRadius": "0px"
+              },
+              {
+                "name": "HTML",
+                "rect": {
+                  "x": 0,
+                  "y": 0,
+                  "width": 380,
+                  "height": 80,
+                  "top": 0,
+                  "right": 380,
+                  "bottom": 80,
+                  "left": 0
+                },
+                "overflowX": "hidden",
+                "overflowY": "auto",
+                "clipPath": "none",
+                "borderRadius": "0px"
+              }
+            ],
+            "hitPoints": [
+              {
+                "x": 334,
+                "y": 28,
+                "hit": true
+              },
+              {
+                "x": 313,
+                "y": 28,
+                "hit": true
+              },
+              {
+                "x": 355,
+                "y": 28,
+                "hit": true
+              },
+              {
+                "x": 334,
+                "y": 7,
+                "hit": true
+              },
+              {
+                "x": 334,
+                "y": 49,
+                "hit": true
+              }
+            ],
+            "rect": {
+              "x": 311,
+              "y": 5,
+              "width": 46,
+              "height": 46,
+              "top": 5,
+              "right": 357,
+              "bottom": 51,
+              "left": 311
+            },
+            "checked": null,
+            "pressed": null,
+            "disabled": false,
+            "testId": null,
+            "switchVisual": null
+          }
+        ],
+        "nativeIME": {
+          "provider": "com.google.android.inputmethod.latin/com.android.inputmethod.latin.LatinIME",
+          "mInputShown": true,
+          "mIsInputViewShown": true,
+          "mFullscreenMode": false,
+          "evidence": "attempt17-ui/v17-07-ime-dumpsys.txt",
+          "verifiedFromRawDump": true
+        }
+      },
+      "samePopupDocumentTimeOrigin": 1792100501659,
+      "queryAndFocusRetainedAcrossRotation": true,
+      "inputIdentityBoundary": "Sameactualpopupdocument/searchpath and query/focuscontinuity. Cross-session NodeActor objectidentity not independently asserted. NoharnessDOMwrites.",
+      "realNativeActions": [
+        "ActualAXClear1002,324 atVV592×80 emptiedmicroquery andretainedfocus.",
+        "ActualAXBack537,324 returnedoverview anddismissedIME→VV592×280.",
+        "Onepickerreentry then actualAXClose1191,324 atVV592×80 closeddrawer anddismissedIME; markersfalse/varsblank.",
+        "Restoreportrait→VV360×512; actualServicesreopen shortfalse/currentvars360×512; actualAXClose843,417 clearedmarkers/vars again."
+      ],
+      "allTouches": "100msstationary nativeinput from eachfreshAXtree; newcandidate3 y324 derivedfromcurrentAX, not oldcandidate2 y348.",
+      "actionLog": "attempt17-ui/actual-touch-actions.jsonl",
+      "fullVisualBorders": {
+        "status": "PASS_FULL_ORIGINAL_SCREENSHOT_REVIEW",
+        "micro": "attempt17-ui/v17-07-micro-landscape.png",
+        "emptyQuery": "attempt17-ui/v17-08-landscape-cleared.png",
+        "reenteredEmptyQuery": "attempt17-ui/v17-10-landscape-picker-reopen.png",
+        "observed": "Complete Back/input-search border/Clear/Close top and bottom edges and rounded corners visible above real keyboard. Continuous backdrop. No style/viewport probe.",
+        "actualDrawer": {
+          "x": 136,
+          "y": 0,
+          "width": 320,
+          "height": 80,
+          "top": 0,
+          "right": 456,
+          "bottom": 80,
+          "left": 136
+        },
+        "actualBody": {
+          "x": 156,
+          "y": 4,
+          "width": 280,
+          "height": 72,
+          "top": 4,
+          "right": 436,
+          "bottom": 76,
+          "left": 156
+        },
+        "searchBorderBox": {
+          "x": 210,
+          "y": 4,
+          "width": 156,
+          "height": 48,
+          "top": 4,
+          "right": 366,
+          "bottom": 52,
+          "left": 210
+        },
+        "spaceSearchBottomToBodyBottomCSS": 24,
+        "buttonsBottomToBodyBottomCSS": 25,
+        "geometryInterpretation": "Read-only clipancestor rectangles supplement pixels. Do not mechanically intersect fixedoverlay controls with html/body380px rectangles; fixedposition escapes those overflow boxes.",
+        "notAcceptedAsFullReadableBody": "Results-section heading below controls is partly visible at80px; full resultbody readability is not counted as validated."
+      },
+      "recoveryEvidence": [
+        "attempt17-ui/v17-11-landscape-close-media.json",
+        "attempt17-ui/v17-12-portrait-restored-media.json",
+        "attempt17-ui/v17-13-portrait-reopen-media.json",
+        "attempt17-ui/v17-14-portrait-final-close-media.json"
+      ]
+    },
+    "limits": [
+      "Fullresultbody readability at80px not asserted; controls/fullborders only.",
+      "No physicalAndroid/TalkBack/VoiceOver/OSmemoryreclaim acceptance.",
+      "No selection/cardrotation/OffOn/word/fullrow/dragmatrix repeated.",
+      "NoEdgeAdd or newpermissions; no providerattribution/basepagelanguage claims.",
+      "No source/build/style/CSS/viewportmock/Range/businessstate mutation. OfficialRDPwatcher maycreate fallbackdebuggerdocument, but reads targetonlyactualpopup.html anddisconnect releaseswatcher."
+    ],
+    "sourceAndArtifactUnchangedDuringRun": true,
+    "imagesReviewed": 8
+  },
+  "finalSafariNative": {
+    "report": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/safari/landscape-keyboard-dd2300d2a3c9/runtime-drawer-attempt1/runtime-acceptance.json",
+    "runtimeCommit": "f6380c330ca576cdeda7ad9e4cf166517853927e",
+    "status": "candidate3 actual service keyboard/rotation actions and complete compact controls visual passed; cleaned up Shutdown",
+    "case": {
+      "name": "test108Candidate3ActualServiceKeyboardCompleteControls",
+      "uniqueTests": 1,
+      "rawResult": "Passed",
+      "caseDurationSeconds": 89.15,
+      "summary": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/safari/landscape-keyboard-dd2300d2a3c9/runtime-drawer-attempt1/runtime-summary.json",
+      "xcresult": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/safari/landscape-keyboard-dd2300d2a3c9/runtime-drawer-attempt1/runtime.xcresult",
+      "guardReport": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/safari/landscape-keyboard-dd2300d2a3c9/runtime-drawer-attempt1/runtime-guard-report.json"
+    },
+    "identity": {
+      "createdAt": "2026-10-15T21:32:13.796Z",
+      "app": "/Users/thinkstu/Desktop/copy/FluentRead-mobile-acceptance-20261016/.output/safari-derived-ios-landscape-keyboard-dd2300d2a3c9/Build/Products/Release-iphonesimulator/FluentRead.app",
+      "bundleId": "org.example.FluentReadDevelopment",
+      "webRawSha256": "dd2300d2a3c95f0ea1a129ae48d47bee4f4909925455e6db31414ef26c18aa8c",
+      "webRecordSha256": "22092478e862f3786647366822991ab1cb0e7c10ce40d7eb11938f96e4989264",
+      "webFiles": 467,
+      "guideSha256": "f84de75f396c8d102cb0a6a516db55d645b015aed2eaf5296e89f1ddba419f55",
+      "nativeSha256": "bdb3a81f75461bb6bd46204839d4e549136c4d97f6beb9d935fe1a8b6fe0ea88",
+      "buildPassed": true,
+      "sourceVerifier": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/safari/landscape-keyboard-dd2300d2a3c9/verify-compiled.mjs",
+      "signatureSummary": "linker ad-hoc; no developer team"
+    },
+    "retainedUI": {
+      "beforeImage": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/safari/landscape-keyboard-dd2300d2a3c9/runtime-drawer-attempt1/runtime-evidence/01-main-retained-config.png",
+      "afterImage": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/safari/landscape-keyboard-dd2300d2a3c9/runtime-drawer-attempt1/runtime-evidence/10-final-main-retained-config.png",
+      "observed": {
+        "targetLanguage": "简体中文",
+        "defaultService": "免费翻译服务",
+        "availableAndEnabled": "可用 1 / 已启用 17",
+        "selectionMode": "划词翻译 · 显示图标",
+        "alwaysTranslate127Switch": 0,
+        "languageOnboardingAbsent": true
+      },
+      "allOtherConfigurationVerified": false
+    },
+    "actions": {
+      "portraitRealIMEMicroSearch": "passed;02",
+      "portraitClear": "passed actual press -> query cleared;03",
+      "rotateToLandscapeRealIME": "passed;04",
+      "landscapeClear": "passed actual press -> query cleared;05",
+      "landscapeBack": "passed actual press -> assignment row, keyboard absent;06",
+      "Close": "passed actual press -> main;07",
+      "portraitReopenQueryReset": "passed empty query;08",
+      "systemDoneDismissKeyboardKeepsDrawer": "passed;09",
+      "clearCloseFinalConfig": "passed;10",
+      "nativePopupDoneClose": "passed;11"
+    },
+    "completeControlsVisual": {
+      "result": "passed after manual full original review",
+      "bodyClipEvidence": {
+        "bodyClipInferredFromExactShortPadding": {
+          "height": 50,
+          "width": 280,
+          "x": 297,
+          "y": 76
+        },
+        "controls": [
+          {
+            "frame": {
+              "height": 46,
+              "width": 86,
+              "x": 360,
+              "y": 77
+            },
+            "label": "搜索服务或模型，如 gpt、qwen"
+          },
+          {
+            "frame": {
+              "height": 46,
+              "width": 46,
+              "x": 452,
+              "y": 77
+            },
+            "label": "清除搜索"
+          },
+          {
+            "frame": {
+              "height": 46,
+              "width": 46,
+              "x": 297,
+              "y": 77
+            },
+            "label": "返回翻译服务选择"
+          },
+          {
+            "frame": {
+              "height": 46,
+              "width": 46,
+              "x": 515,
+              "y": 77
+            },
+            "label": "关闭"
+          }
+        ],
+        "dialog": {
+          "height": 58,
+          "width": 320,
+          "x": 277,
+          "y": 72
+        },
+        "manualFullImageBottomBorderReviewRequired": true
+      },
+      "screenshot04": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/safari/landscape-keyboard-dd2300d2a3c9/runtime-drawer-attempt1/runtime-evidence/04-landscape-micro-real-keyboard.png",
+      "screenshot05": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/safari/landscape-keyboard-dd2300d2a3c9/runtime-drawer-attempt1/runtime-evidence/05-landscape-clear-actual-result.png",
+      "observed": "Search full pink bottom border and bottom rounded corners, plus Back/Close full bottom corners remain visible above the body edge and actual keyboard toolbar. Raw AX46pt frames are supplemented by body48-row-fit assertions and original pixel review.",
+      "scope": "Top compact controls fit. Service results below the row are clipped in this very short visible space; list scrolling/reachability under this exact58pt condition not exercised.",
+      "fullBackgroundMask": "Visually continuous over underlying popup content; no separate real background hittest in this case.",
+      "pixelReadback": {
+        "originalUprightPixels": [
+          2622,
+          1206
+        ],
+        "pixelsPerPoint": 3,
+        "verticalScanXPixel": 1308,
+        "searchBottomPinkBorderRowsPixels": [
+          369,
+          370,
+          371
+        ],
+        "bodyBottomPoints": 126,
+        "scope": "Read-only existing PNG scan; no image altered, no DOM/viewport values injected."
+      }
+    },
+    "orientation": {
+      "initial": {
+        "initialRaw": 0,
+        "known": false
+      },
+      "finally": {
+        "reason": "unknown initial, no guessed restore",
+        "restored": false
+      },
+      "lastObservedRaw": 1,
+      "boundary": "Unknown initial is recorded without guessed restore. Known initial is restored by finally when available."
+    },
+    "cleanup": {
+      "report": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/safari/landscape-keyboard-dd2300d2a3c9/runtime-drawer-attempt1/phase-cleanup.json",
+      "serverPort": 53847,
+      "serverStopped": true,
+      "ownedTestOrSafariProcesses": [],
+      "deviceState": "Shutdown",
+      "laneReleased": true,
+      "dataAndAppRetained": true
+    },
+    "notExecuted": [
+      "provider translation/network provenance",
+      "new permissions or service selection",
+      "background real hittest",
+      "exact DOM CSS variable readback after close",
+      "service list scroll in58pt viewport",
+      "video scope",
+      "physical device"
+    ],
+    "imagesReviewed": 11,
+    "physicalDevice": false,
+    "screenReader": false
+  },
+  "images": [
+    {
+      "path": "images/android-landscape-ime-before.png",
+      "original": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/android-runtime/attempt14-ui/v14-16-micro-ime-landscape.png",
+      "sha256": "cd9a4a9c73c83f8de237dc1770da717b13b36f95976241196333c94cd137eb36"
+    },
+    {
+      "path": "images/geometry-dark-compact.png",
+      "original": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/production-popup-short-viewport/candidate2/ui/touch-landscape-dark-explicit-vv80-scrolled-compact.png",
+      "sha256": "8a83577f1bfd571036bc6b735c4d9fdfa5207b56cfdfdfdb4c92b908393ff839"
+    },
+    {
+      "path": "images/geometry-normal-list.png",
+      "original": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/production-popup-short-viewport/candidate2/ui/touch-portrait-narrow-normal-263-long-list-bottom.png",
+      "sha256": "d4652276af93831c907ec4f688a36209d83d78c9e8e532b4cfcbed689faa40c6"
+    },
+    {
+      "path": "images/android-landscape-ime-after.png",
+      "original": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/android-runtime/attempt16-ui/v16-07-micro-landscape.png",
+      "sha256": "0b51e4fa4832422f47bd7732e654fed415c0fb859b382f3d8be2e0ae676b6d2c"
+    },
+    {
+      "path": "images/ios-landscape-ime-clipped.png",
+      "original": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/safari/landscape-keyboard-94b7005ad2f6/runtime-drawer-attempt1/runtime-evidence/04-landscape-micro-real-keyboard.png",
+      "sha256": "f472ffa2047dd1475f4788d2e3e7f4d9c8960ef29669c4b7cf203e25f6339e8d"
+    },
+    {
+      "path": "images/geometry-58-full-border.png",
+      "original": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/production-popup-short-viewport/candidate3/ui/touch-landscape-light-explicit-vv58-micro-full-border.png",
+      "sha256": "f6ae1406c514fd69b2e76e315460ceb5d839ea044c5d71e266fe5949cc9f3c12"
+    },
+    {
+      "path": "images/ios-landscape-ime-complete.png",
+      "original": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/safari/landscape-keyboard-dd2300d2a3c9/runtime-drawer-attempt1/runtime-evidence/04-landscape-micro-real-keyboard.png",
+      "sha256": "a60b0c42c7975643451624dbd6d02dabd8e08089aae986261e336b3cd004aed5"
+    },
+    {
+      "path": "images/android-landscape-ime-final.png",
+      "original": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/android-runtime/attempt17-ui/v17-07-micro-landscape.png",
+      "sha256": "8e73bee812aca41591532973dad903feebabbfd46393d98ecf3da5190dbad3a1"
+    }
+  ],
+  "physicalDeviceAcceptance": false,
+  "screenReaderAcceptance": false,
+  "allGoalComplete": false,
+  "finalSafariBuild": {
+    "report": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/safari/landscape-keyboard-dd2300d2a3c9/acceptance.json",
+    "runtimeCommit": "f6380c330ca576cdeda7ad9e4cf166517853927e",
+    "web": {
+      "directory": "/Users/thinkstu/Desktop/copy/FluentRead-mobile-acceptance-20261016/.output/safari-mv2",
+      "files": 467,
+      "bytes": 62135119,
+      "recordHash": "22092478e862f3786647366822991ab1cb0e7c10ce40d7eb11938f96e4989264",
+      "rawByteHash": "dd2300d2a3c95f0ea1a129ae48d47bee4f4909925455e6db31414ef26c18aa8c",
+      "recordAlgorithm": "global UTF8 path sort; SHA256(path + NUL + fileSHA256 + NUL + decimalByteLength + LF)",
+      "rawAlgorithm": "recursive directory UTF8 name sort; SHA256(path + NUL + decimalByteLength + NUL + rawbytes)"
+    },
+    "guideSha256": "f84de75f396c8d102cb0a6a516db55d645b015aed2eaf5296e89f1ddba419f55",
+    "platforms": {
+      "iosSimulator": {
+        "exitCode": 0,
+        "resourceCount": 467,
+        "webRawSha256": "dd2300d2a3c95f0ea1a129ae48d47bee4f4909925455e6db31414ef26c18aa8c",
+        "webRecordSha256": "22092478e862f3786647366822991ab1cb0e7c10ce40d7eb11938f96e4989264",
+        "nativeSha256": "bdb3a81f75461bb6bd46204839d4e549136c4d97f6beb9d935fe1a8b6fe0ea88",
+        "extensionSha256": "a83172ae9fd8126e3409917999c83f3d5c0c9446bfb296ae8d4a4a976f9e7761",
+        "signature": "linker ad-hoc; no developer team",
+        "guideResourcesByteIdentical": true
+      },
+      "macos": {
+        "exitCode": 0,
+        "resourceCount": 467,
+        "webRawSha256": "dd2300d2a3c95f0ea1a129ae48d47bee4f4909925455e6db31414ef26c18aa8c",
+        "webRecordSha256": "22092478e862f3786647366822991ab1cb0e7c10ce40d7eb11938f96e4989264",
+        "nativeSha256": "284b6b1a5163957db91795910211439ed19c1de2e5490167d6511e2215caac41",
+        "extensionSha256": "745c4f66b0513ed386f6be9b648223ca3475ae9cf8b4a092e3e30e73ece69c0d",
+        "signature": "linker ad-hoc; no developer team",
+        "guideResourcesByteIdentical": true
+      },
+      "iphoneos": {
+        "exitCode": 0,
+        "resourceCount": 467,
+        "webRawSha256": "dd2300d2a3c95f0ea1a129ae48d47bee4f4909925455e6db31414ef26c18aa8c",
+        "webRecordSha256": "22092478e862f3786647366822991ab1cb0e7c10ce40d7eb11938f96e4989264",
+        "nativeSha256": "10f9918958c2ad124fb11c9cd35984802e2b499feda9ce0e3e57b0eafdcbe663",
+        "extensionSha256": "ecabaa8249e0c87cf593fc3aa45db9f32761b6982e5097ca2b74dd1defaa12b1",
+        "signature": "unsigned; no developer team",
+        "guideResourcesByteIdentical": true
+      }
+    },
+    "guardFocusEvents": 0,
+    "guardViolations": 0,
+    "physicalDevice": false,
+    "published": false
+  },
+  "finalCodeReview": {
+    "baseRuntimeReview": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/production-popup-short-viewport/candidate2/review.json",
+    "finalCSSOnlyReview": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/production-popup-short-viewport/candidate3/review-candidate3.json",
+    "actionableFindings": []
+  },
+  "candidate2Preservation": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/production-popup-short-viewport/candidate2-preserved/preservation.json",
+  "candidate2": {
+    "runtimeCommit": "88598df9567ed2765b26c9078a7f124a8d01d214",
+    "sourceFiles": {
+      "src/app/popup/PopupApp.vue": "e950bce4401703c6ddc7d88545f20cda5e871324504832539e7e6cd31a7abecd",
+      "src/app/popup/PopupServices.vue": "1808abd98ac2a3c54553cd669b1707beb9d8b9807be5571d8edc406aa88b711c",
+      "src/app/popup/popup.css": "312d1eac8febe484a9165f66767f56d568191ee23e54820dd61ffd3e78c91db7",
+      "tests/popupAppLifecycle.test.ts": "ef7f514bfa66eadd945fa4bd8f1d7c9189367dbf9422fa7db27bfdf270ccfe89"
+    },
+    "artifacts": {
+      "chrome-mv3": {
+        "directory": "/Users/thinkstu/Desktop/copy/FluentRead-mobile-acceptance-20261016/.output/chrome-mv3",
+        "files": 478,
+        "bytes": 62269418,
+        "recordHash": "a3d2d5fa264a1d1d02dddfefcc7ca4704e4c9a86aab9558c6d3743a41a50fc54",
+        "rawByteHash": "8996ad5ff237740acbde1f7b0aabe16a2396616c08d48c9f18667c5cf369b74b",
+        "recordAlgorithm": "global UTF8 path sort; SHA256(path + NUL + fileSHA256 + NUL + decimalByteLength + LF)",
+        "rawAlgorithm": "recursive directory UTF8 name sort; SHA256(path + NUL + decimalByteLength + NUL + rawbytes)"
+      },
+      "firefox-mv2": {
+        "directory": "/Users/thinkstu/Desktop/copy/FluentRead-mobile-acceptance-20261016/.output/firefox-mv2",
+        "files": 478,
+        "bytes": 62272314,
+        "recordHash": "089b87538e304d6579ff0e1d79eedf8a9187e8033f74f93e9270603cf9922c9e",
+        "rawByteHash": "bb06e10e5d507eb751a46002a6629a723d0ab9ae2aa8f87b90eb120a68979857",
+        "recordAlgorithm": "global UTF8 path sort; SHA256(path + NUL + fileSHA256 + NUL + decimalByteLength + LF)",
+        "rawAlgorithm": "recursive directory UTF8 name sort; SHA256(path + NUL + decimalByteLength + NUL + rawbytes)"
+      },
+      "safari-mv2": {
+        "directory": "/Users/thinkstu/Desktop/copy/FluentRead-mobile-acceptance-20261016/.output/safari-mv2",
+        "files": 467,
+        "bytes": 62135042,
+        "recordHash": "0fdce304ce50c2a264f5fe4398cac50cc2d97c5c472559cb1729f736a2b55460",
+        "rawByteHash": "94b7005ad2f63e0f9ed009e55669c0e5e2785cfe62819620ad2b359e4f4f3fb3",
+        "recordAlgorithm": "global UTF8 path sort; SHA256(path + NUL + fileSHA256 + NUL + decimalByteLength + LF)",
+        "rawAlgorithm": "recursive directory UTF8 name sort; SHA256(path + NUL + decimalByteLength + NUL + rawbytes)"
+      }
+    },
+    "productionGeometry": {
+      "casesPassed": 6,
+      "imagesReviewed": 21,
+      "report": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/production-popup-short-viewport/candidate2/geometry-summary.json",
+      "nativeKeyboard": false
+    },
+    "finalAndroidNative": {
+      "report": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/android-runtime/firefox-attempt16-landscape-ime-summary.json",
+      "status": "PASS_TARGETED_ACTUAL_ANDROID_FIREFOX_LANDSCAPE_IME_AND_AX",
+      "caseCount": 1,
+      "artifact": {
+        "directory": "/Users/thinkstu/Desktop/copy/FluentRead-mobile-acceptance-20261016/.output/firefox-mv2",
+        "files": 478,
+        "bytes": 62272314,
+        "recordHash": "089b87538e304d6579ff0e1d79eedf8a9187e8033f74f93e9270603cf9922c9e",
+        "rawByteHash": "bb06e10e5d507eb751a46002a6629a723d0ab9ae2aa8f87b90eb120a68979857",
+        "recordAlgorithm": "global UTF8 path sort; SHA256(path + NUL + fileSHA256 + NUL + decimalByteLength + LF)",
+        "rawAlgorithm": "recursive directory UTF8 name sort; SHA256(path + NUL + decimalByteLength + NUL + rawbytes)",
+        "at": "2026-10-15T21:05:29.019049+00:00",
+        "matches": true,
+        "gate": "attempt16-artifact.json",
+        "parentGate": "../production-popup-short-viewport/candidate2/artifact-gate.json",
+        "beforeAfterMatch": true
+      },
+      "portrait": {
+        "viewport": {
+          "width": 360,
+          "height": 263,
+          "offsetLeft": 0,
+          "offsetTop": 0,
+          "scale": 1
+        },
+        "AXgate": "attempt16-ui/v16-06-micro-portrait-ax-gate.json",
+        "controls": {
+          "back": {
+            "expectedActualAXNameOrValue": "Back to translation service selection",
+            "matchCount": 1,
+            "text": "Back to translation service selection",
+            "content-desc": "",
+            "class": "android.widget.Button",
+            "enabled": "true",
+            "focusable": "true",
+            "clickable": "true",
+            "bounds": "[120,348][258,486]",
+            "sizeCSS": [
+              46.0,
+              46.0
+            ],
+            "withinActualVisibleWebView": true
+          },
+          "close": {
+            "expectedActualAXNameOrValue": "Close",
+            "matchCount": 1,
+            "text": "Close",
+            "content-desc": "",
+            "class": "android.widget.Button",
+            "enabled": "true",
+            "focusable": "true",
+            "clickable": "true",
+            "bounds": "[774,348][912,486]",
+            "sizeCSS": [
+              46.0,
+              46.0
+            ],
+            "withinActualVisibleWebView": true
+          },
+          "clear": {
+            "expectedActualAXNameOrValue": "Clear search",
+            "matchCount": 1,
+            "text": "Clear search",
+            "content-desc": "",
+            "class": "android.widget.Button",
+            "enabled": "true",
+            "focusable": "true",
+            "clickable": "true",
+            "bounds": "[747,519][885,657]",
+            "sizeCSS": [
+              46.0,
+              46.0
+            ],
+            "withinActualVisibleWebView": true
+          },
+          "input": {
+            "expectedActualAXNameOrValue": "micro",
+            "matchCount": 1,
+            "text": "micro",
+            "content-desc": "",
+            "class": "android.widget.EditText",
+            "enabled": "true",
+            "focusable": "true",
+            "clickable": "true",
+            "bounds": "[207,519][729,657]",
+            "sizeCSS": [
+              174.0,
+              46.0
+            ],
+            "withinActualVisibleWebView": true
+          }
+        }
+      },
+      "landscape": {
+        "viewport": {
+          "width": 592,
+          "height": 80,
+          "offsetLeft": 0,
+          "offsetTop": 0,
+          "scale": 1
+        },
+        "AXgate": "attempt16-ui/v16-07-micro-landscape-ax-gate.json",
+        "controls": {
+          "back": {
+            "expectedActualAXNameOrValue": "Back to translation service selection",
+            "matchCount": 1,
+            "text": "Back to translation service selection",
+            "content-desc": "",
+            "class": "android.widget.Button",
+            "enabled": "true",
+            "focusable": "true",
+            "clickable": "true",
+            "bounds": "[468,279][606,417]",
+            "sizeCSS": [
+              46.0,
+              46.0
+            ],
+            "withinActualVisibleWebView": true
+          },
+          "close": {
+            "expectedActualAXNameOrValue": "Close",
+            "matchCount": 1,
+            "text": "Close",
+            "content-desc": "",
+            "class": "android.widget.Button",
+            "enabled": "true",
+            "focusable": "true",
+            "clickable": "true",
+            "bounds": "[1122,279][1260,417]",
+            "sizeCSS": [
+              46.0,
+              46.0
+            ],
+            "withinActualVisibleWebView": true
+          },
+          "clear": {
+            "expectedActualAXNameOrValue": "Clear search",
+            "matchCount": 1,
+            "text": "Clear search",
+            "content-desc": "",
+            "class": "android.widget.Button",
+            "enabled": "true",
+            "focusable": "true",
+            "clickable": "true",
+            "bounds": "[933,279][1071,417]",
+            "sizeCSS": [
+              46.0,
+              46.0
+            ],
+            "withinActualVisibleWebView": true
+          },
+          "input": {
+            "expectedActualAXNameOrValue": "micro",
+            "matchCount": 1,
+            "text": "micro",
+            "content-desc": "",
+            "class": "android.widget.EditText",
+            "enabled": "true",
+            "focusable": "true",
+            "clickable": "true",
+            "bounds": "[657,279][915,417]",
+            "sizeCSS": [
+              86.0,
+              46.0
+            ],
+            "withinActualVisibleWebView": true
+          }
+        },
+        "nativeIME": {
+          "provider": "com.google.android.inputmethod.latin/com.android.inputmethod.latin.LatinIME",
+          "mInputShown": true,
+          "mIsInputViewShown": true,
+          "mFullscreenMode": false,
+          "evidence": "attempt16-ui/v16-07-ime-dumpsys.txt",
+          "verifiedFromRawDump": true
+        }
+      },
+      "actions": [
+        "Clear from actualAX1002,348 atVV592×80 emptiedquery, retainedfocus; emptyinputstill inactualAX at08.",
+        "Back from actualAX537,348 returnedoverview, dismissedIME→VV592×280.",
+        "Onepickerreentry then Close from actualAX1191,348 atVV592×80 actuallyclosed drawer, dismissedIME, removedshort/viewportmarkers and blankedvars.",
+        "Restoreportrait→VV360×512; actualServicesreopen shortfalse/currentvars360×512; actualAXClose843,417 clearedmarkers/vars again."
+      ],
+      "samePopupDocumentTimeOrigin": 1792098181616,
+      "cleanup": {
+        "at": "2026-10-15T21:06:02.689697+00:00",
+        "processes": {
+          "56063": {
+            "exit": 1,
+            "metadata": ""
+          },
+          "56084": {
+            "exit": 1,
+            "metadata": ""
+          },
+          "56101": {
+            "exit": 1,
+            "metadata": ""
+          }
+        },
+        "listeners": {
+          "5048": {
+            "exit": 1,
+            "output": ""
+          },
+          "5580": {
+            "exit": 1,
+            "output": ""
+          },
+          "5581": {
+            "exit": 1,
+            "output": ""
+          },
+          "60260": {
+            "exit": 1,
+            "output": ""
+          }
+        },
+        "guardStoppedAt": "2026-10-15T21:05:50.494Z",
+        "guardViolations": [],
+        "keysMetadataUnchanged": true,
+        "runnerNormalExit": true,
+        "rotationRestored": true,
+        "forwardRemoved": true,
+        "firefoxPidofExit": 1,
+        "allGone": true
+      },
+      "screenReaderAcceptance": false
+    },
+    "finalSafariBuild": {
+      "report": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/safari/landscape-keyboard-94b7005ad2f6/acceptance.json",
+      "runtimeCommit": "88598df9567ed2765b26c9078a7f124a8d01d214",
+      "web": {
+        "directory": "/Users/thinkstu/Desktop/copy/FluentRead-mobile-acceptance-20261016/.output/safari-mv2",
+        "files": 467,
+        "bytes": 62135042,
+        "recordHash": "0fdce304ce50c2a264f5fe4398cac50cc2d97c5c472559cb1729f736a2b55460",
+        "rawByteHash": "94b7005ad2f63e0f9ed009e55669c0e5e2785cfe62819620ad2b359e4f4f3fb3",
+        "recordAlgorithm": "global UTF8 path sort; SHA256(path + NUL + fileSHA256 + NUL + decimalByteLength + LF)",
+        "rawAlgorithm": "recursive directory UTF8 name sort; SHA256(path + NUL + decimalByteLength + NUL + rawbytes)"
+      },
+      "guideSha256": "f84de75f396c8d102cb0a6a516db55d645b015aed2eaf5296e89f1ddba419f55",
+      "platforms": {
+        "iosSimulator": {
+          "exitCode": 0,
+          "resourceCount": 467,
+          "webRawSha256": "94b7005ad2f63e0f9ed009e55669c0e5e2785cfe62819620ad2b359e4f4f3fb3",
+          "webRecordSha256": "0fdce304ce50c2a264f5fe4398cac50cc2d97c5c472559cb1729f736a2b55460",
+          "nativeSha256": "02c0ac6414c68e720238d9bad71666f7f4f802aaef84631512db738b83141f16",
+          "extensionSha256": "587475efb462f868c8aba4745a24a24a3493b3d30bcc4a6cfc046463ab2e9ff1",
+          "signature": "linker ad-hoc; no developer team",
+          "guideResourcesByteIdentical": true
+        },
+        "macos": {
+          "exitCode": 0,
+          "resourceCount": 467,
+          "webRawSha256": "94b7005ad2f63e0f9ed009e55669c0e5e2785cfe62819620ad2b359e4f4f3fb3",
+          "webRecordSha256": "0fdce304ce50c2a264f5fe4398cac50cc2d97c5c472559cb1729f736a2b55460",
+          "nativeSha256": "09b137b9f999ab2d1a4669354633c2ba3502b49a7afa3c897b62344d80c3a825",
+          "extensionSha256": "7c84b798b7849daf1c12beb31fa8937f10fb8afd4240ad2895c6ed8f80eaf21d",
+          "signature": "linker ad-hoc; no developer team",
+          "guideResourcesByteIdentical": true
+        },
+        "iphoneos": {
+          "exitCode": 0,
+          "resourceCount": 467,
+          "webRawSha256": "94b7005ad2f63e0f9ed009e55669c0e5e2785cfe62819620ad2b359e4f4f3fb3",
+          "webRecordSha256": "0fdce304ce50c2a264f5fe4398cac50cc2d97c5c472559cb1729f736a2b55460",
+          "nativeSha256": "0de28636afe93ff910dbc0dbce2658f7e8c4da90f2de217742aa0b36a5819f7d",
+          "extensionSha256": "a9b018cde1717233ea1adb0ef0b983b47e6b1b411adc7fa7a42c1ef3cf2837bc",
+          "signature": "unsigned; no developer team",
+          "guideResourcesByteIdentical": true
+        }
+      },
+      "guardFocusEvents": 0,
+      "guardViolations": 0,
+      "physicalDevice": false,
+      "published": false
+    },
+    "finalSafariNative": {
+      "candidate": 2,
+      "operationScenario": "107",
+      "operationsPassed": true,
+      "visualResult": "FAIL bottom clipping approximately5pt",
+      "actualDrawerPt": {
+        "x": 277,
+        "y": 80,
+        "width": 320,
+        "height": 50
+      },
+      "bodyHeightPt": 42,
+      "controlsY": [
+        85,
+        131
+      ],
+      "bodyBottomPt": 126,
+      "sameBundleInstallExitCode": 0,
+      "installedFilesMatching": 485,
+      "appPrivateFilesUnchanged": 17,
+      "dataContainerPathChanged": true,
+      "originalInstallGuardFailed": true,
+      "physicalDevice": false,
+      "screenReader": false
+    },
+    "finalCodeReview": {
+      "report": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/production-popup-short-viewport/candidate2/review.json",
+      "runtimeCommit": "88598df9567ed2765b26c9078a7f124a8d01d214",
+      "base": "16f185a8338dc34c1c3abfb4a19d8c8cadf2c454",
+      "scope": [
+        "Firefox touch cancellation and source ownership",
+        "Popup short viewport layout and lifecycle cleanup"
+      ],
+      "actionableFindings": [],
+      "testsRunByReviewer": false
+    }
+  },
+  "candidate3BuildValidation": [
+    {
+      "name": "chrome",
+      "command": [
+        "pnpm",
+        "build"
+      ],
+      "exitCode": 0,
+      "seconds": 24.949,
+      "log": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/production-popup-short-viewport/candidate3/chrome.log"
+    },
+    {
+      "name": "firefox",
+      "command": [
+        "pnpm",
+        "build:firefox"
+      ],
+      "exitCode": 0,
+      "seconds": 24.102,
+      "log": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/production-popup-short-viewport/candidate3/firefox.log"
+    },
+    {
+      "name": "safari-web",
+      "command": [
+        "pnpm",
+        "build:safari"
+      ],
+      "exitCode": 0,
+      "seconds": 25.23,
+      "log": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/production-popup-short-viewport/candidate3/safari-web.log"
+    },
+    {
+      "name": "manifest",
+      "command": [
+        "pnpm",
+        "verify:extension-manifests"
+      ],
+      "exitCode": 0,
+      "seconds": 0.504,
+      "log": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/production-popup-short-viewport/candidate3/manifest.log"
+    },
+    {
+      "name": "safari-verify",
+      "command": [
+        "pnpm",
+        "safari:verify"
+      ],
+      "exitCode": 0,
+      "seconds": 0.453,
+      "log": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/production-popup-short-viewport/candidate3/safari-verify.log"
+    }
+  ],
+  "validationQualification": "The final follow-up changed only popup.css height budgeting. Prior118 mounted-component tests, type check, audit and userscript checks remain source-scoped evidence. Rebuilt Chrome/Firefox/SafariWeb and manifest/Safari verifiers, reran production geometry including58, native device results recorded separately.",
+  "finalSafariRootVisualReview": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/safari/landscape-keyboard-dd2300d2a3c9/runtime-drawer-attempt1/root-visual-review.json",
+  "rootFinalFirefoxImageReview": {
+    "image": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/android-runtime/attempt17-ui/v17-07-micro-landscape.png",
+    "visualResult": "Full search border and button corners visible in real80CSSpx Gboard landscape screenshot",
+    "resultListFullyReadableNotClaimed": true
+  },
+  "finalVideoFollowup": {
+    "at": "2026-10-15T21:57:49.048650+00:00",
+    "status": "PRECONDITION_LIMITED_NOT_ACCEPTED_NO_NATIVE_SCENE",
+    "runtimeCommit": "f6380c330ca576cdeda7ad9e4cf166517853927e",
+    "compiledIdentity": {
+      "compiledIdentitySHA256": "e0227bc78eba8b5534f1a00ced6171003111b30ac656c73f5bbcd8a7a530fb76",
+      "installedApp": "/Users/thinkstu/Library/Developer/CoreSimulator/Devices/A407390F-7AA8-42AE-AFEB-F93EE99E9FF8/data/Containers/Bundle/Application/2DF4528F-DC90-44CE-B42F-26EBD2B2DDE0/FluentRead.app",
+      "allCompiledFilesMatch": true,
+      "files": 485,
+      "webRawSHA256": "dd2300d2a3c95f0ea1a129ae48d47bee4f4909925455e6db31414ef26c18aa8c",
+      "webRecordSHA256": "22092478e862f3786647366822991ab1cb0e7c10ce40d7eb11938f96e4989264",
+      "nativeSHA256": "bdb3a81f75461bb6bd46204839d4e549136c4d97f6beb9d935fe1a8b6fe0ea88",
+      "runtimeCommit": "f6380c330ca576cdeda7ad9e4cf166517853927e"
+    },
+    "attempt1": {
+      "report": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/native-video-candidate3-menu-rotation-onenav-attempt1/runtime-acceptance.json",
+      "rawCounts": {
+        "failed": 1,
+        "skipped": 0,
+        "passed": 0
+      },
+      "classification": "Harness failure: initialraw0 caused limited() before Safari activation; evidence queried stoppedapp.",
+      "navigationCount": 0,
+      "nativeEntered": false,
+      "oldRawPreserved": true,
+      "cleanup": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/native-video-candidate3-menu-rotation-onenav-attempt1/cleanup.json"
+    },
+    "attempt2Report": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/native-video-candidate3-menu-rotation-onenav-attempt2/runtime-acceptance.json",
+    "attempt2Counts": {
+      "total": 1,
+      "skipped": 1,
+      "failed": 0,
+      "passed": 0
+    },
+    "navigationCount": 1,
+    "nativeSceneEntered": false,
+    "reason": "Required actual bilingual cue AX not found within bounded8sec; underlying translation cache absence/provider failure not established.",
+    "images": [
+      {
+        "path": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/native-video-candidate3-menu-rotation-onenav-attempt2/runtime-evidence/precondition-limited-final.png",
+        "sha256": "971c0de0a364ace0bab8b7500f50d6b3aebde718af6b89505efa49f1bf90a3aa",
+        "actualViewed": true,
+        "observed": "Portrait TED watch page; no visible bilingual FluentRead cue, native menu or software keyboard. Sitevideo imagery changes between frames; playback/provider/cache state not inferred.",
+        "keyboardAX": [],
+        "nativeMediaAXExists": false
+      },
+      {
+        "path": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/native-video-candidate3-menu-rotation-onenav-attempt2/runtime-evidence/finally-explicit-portrait-baseline.png",
+        "sha256": "eda8f7c6e30e18af98be5a4f4dbd2d0f563eaffdeacb3ca0e298fa5fc5d16343",
+        "actualViewed": true,
+        "observed": "Portrait TED watch page; no visible bilingual FluentRead cue, native menu or software keyboard. Sitevideo imagery changes between frames; playback/provider/cache state not inferred.",
+        "keyboardAX": [],
+        "nativeMediaAXExists": false
+      }
+    ],
+    "cleanup": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/native-video-candidate3-menu-rotation-onenav-attempt2/cleanup.json",
+    "laneReleased": true,
+    "unknownOriginalOrientationRestored": false,
+    "explicitPortraitBaselineRestored": true
+  }
+}

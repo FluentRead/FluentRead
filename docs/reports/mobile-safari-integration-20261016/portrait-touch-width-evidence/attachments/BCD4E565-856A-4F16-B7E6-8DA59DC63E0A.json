@@ -1,0 +1,8 @@
+{
+  "clearDoesNotPromiseKeyboardDismissal" : true,
+  "expected" : "gpt",
+  "keyboardCountCappedAt2" : 1,
+  "knownSearchValueClassification" : "gpt",
+  "phase" : "picker-gpt",
+  "unexpectedRawValueExported" : false
+}

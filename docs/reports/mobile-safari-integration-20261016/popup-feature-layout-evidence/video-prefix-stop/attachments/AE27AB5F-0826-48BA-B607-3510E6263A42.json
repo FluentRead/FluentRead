@@ -1,0 +1,14 @@
+{
+  "actions" : {
+    "address" : 1,
+    "navigation" : 1,
+    "normalClear" : 1,
+    "SafariActivate" : 1
+  },
+  "captures" : 0,
+  "externalAppPrivateDataRestorationRequired" : true,
+  "fullFRTrackOffReselectChainAccepted" : false,
+  "fullscreenKind" : "UNESTABLISHED",
+  "normalInlineReturn" : false,
+  "precisePriorPlaybackRestored" : "UNKNOWN"
+}

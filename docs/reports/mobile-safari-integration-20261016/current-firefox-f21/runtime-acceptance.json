@@ -1,0 +1,197 @@
+{
+  "at": "2026-10-16T08:56:25.344453+00:00",
+  "attempt": 21,
+  "status": "FUNCTIONAL_CYCLE_VERIFIED_ON_EXISTING_DOCUMENT; WHOLE_PAGE_QUALITY_NOT_ACCEPTED; FRESH_PUBLIC_SOURCE_NOT_ESTABLISHED",
+  "uniqueFunctionalCaseCount": 1,
+  "framework": "One actual Android UI flow with direct DOM/state assertions; not XCTest/unit-suite count",
+  "productionRuntimeCommit": "f5a82d11a5b6b6a5de2f2ea726065a56cdb2e6ca",
+  "checkoutHeadAtGO": "da0317009f53660ba8372b60fdffe70f3e8833c1",
+  "checkoutHeadAtReport": "da0317009f53660ba8372b60fdffe70f3e8833c1",
+  "checkoutStatusAtReport": "",
+  "artifact": {
+    "at": "2026-10-16T08:55:07.304806+00:00",
+    "directory": "/Users/thinkstu/Desktop/copy/FluentRead-mobile-video-menu-accessibility-20261016/.output/firefox-mv2",
+    "files": 478,
+    "bytes": 62363019,
+    "rawByteHash": "0cbd5c79fd1ef4fe54969553d2aa677c883f0f61af6d7fe10f74e476bf87b774",
+    "recordHash": "feb34f2d0331a6777192a993e646dddbeb6c4d8ac8055e72fbb675931b2b3c42",
+    "recordAlgorithm": "global UTF8 path sort; SHA256(path + NUL + fileSHA256 + NUL + decimalByteLength + LF)",
+    "rawAlgorithm": "recursive directory UTF8 name sort; SHA256(path + NUL + decimalByteLength + NUL + rawbytes)",
+    "beforeAfterMatch": true
+  },
+  "route": {
+    "browser": "official org.mozilla.firefox158.0/code2016189050/minSDK26",
+    "extensionVersion": "0.0.38",
+    "extensionID": "{3096bd53-3bda-4556-b076-ebf47442a5c1}",
+    "installation": "official web-ext-run0.2.4 temporaryaddon, existingtaskFirefoxApp/profile, noAPKinstall/reset",
+    "AVD": "dedicated API31 arm64 emulator5580 / owned5048",
+    "profilePrivateDataInspected": false,
+    "EdgeActions": []
+  },
+  "actualStateCycle": {
+    "at": "2026-10-16T08:51:29.914095+00:00",
+    "functionalCaseCount": 1,
+    "scope": "Actual existing task document at example.com; fresh network provenance not established",
+    "passed": true,
+    "timeOrigin": 1792140316119,
+    "URL": "https://example.com/",
+    "translationNodeCounts": [
+      {
+        "tag": "f21-02-original",
+        "count": 0,
+        "visibility": "visible"
+      },
+      {
+        "tag": "f21-07-first-page",
+        "count": 5,
+        "visibility": "visible"
+      },
+      {
+        "tag": "f21-10-background",
+        "count": 5,
+        "visibility": "hidden"
+      },
+      {
+        "tag": "f21-12-resumed",
+        "count": 5,
+        "visibility": "visible"
+      },
+      {
+        "tag": "f21-15-restored",
+        "count": 0,
+        "visibility": "visible"
+      },
+      {
+        "tag": "f21-19-retranslated",
+        "count": 5,
+        "visibility": "visible"
+      }
+    ],
+    "originalEnglish": "This domain is for use in documentation examples without needing permission. This is not a service; avoid relying on it for testing and monitoring purposes.",
+    "newCorrespondingChinese": "此域名用于文档示例，无需获得许可。这不是一项服务；请勿将其用于测试和监控目的。",
+    "restoreAllSixParagraphsExact": true,
+    "sameDocument": true,
+    "sourceProvenance": "No navigation/reload in this run; Firefox startup retainedexistingtab; initialmultilingualdocument and/s.js cannot establish freshpublic origin response. Oldfixture/cache provenance unknown.",
+    "qualityBoundary": "Other-language mixed/unchanged-script outputs observed. Functionalstatecycle only, notwholepagequality/providerpass."
+  },
+  "sourceProvenance": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/android-runtime/firefox-f5a-page-cycle-prepared-20261016/source-provenance.json",
+  "perParagraphEvidence": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/android-runtime/firefox-f5a-page-cycle-prepared-20261016/paragraph-correspondence.json",
+  "quality": {
+    "accepted": false,
+    "Arabic": "targetzh-Hans output remainsArabic-like and removes spaces; ownedpindex1",
+    "French": "mixedFrench/Chinese ownedoutput inDOM pindex3; no pixelclaim foroffscreenparagraph",
+    "RussianSpanish": "Chinese DOM outputs observed, not expert-linguisticacceptance",
+    "provider": "Unknown; no network provider/caching provenance captured",
+    "noCauseAssigned": true,
+    "notEvidenceOfNewRegression": "No before-version quality comparison executed"
+  },
+  "defaultServiceEvidence": {
+    "service": "Free translation services",
+    "source": "Auto-detect",
+    "target": "Simplified Chinese",
+    "actualPopupSnapshots": [
+      "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/android-runtime/firefox-f5a-page-cycle-prepared-20261016/attempt21-ui/f21-03-open-popup.xml",
+      "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/android-runtime/firefox-f5a-page-cycle-prepared-20261016/attempt21-ui/f21-13-restore-open-popup.xml",
+      "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/android-runtime/firefox-f5a-page-cycle-prepared-20261016/attempt21-ui/f21-14-restored-popup.xml",
+      "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/android-runtime/firefox-f5a-page-cycle-prepared-20261016/attempt21-ui/f21-17-retranslate-open-popup.xml"
+    ],
+    "noServiceLanguageOrPermissionChanges": true,
+    "storageByteAudit": false
+  },
+  "realHome": {
+    "commandAt": "2026-10-16T08:48:31.706132+00:00",
+    "normalResumeAt": "2026-10-16T08:48:57.628377+00:00",
+    "commandGapSeconds": 25.922245,
+    "exactVisibilityEventDurationCaptured": false,
+    "observedHiddenThenVisible": true,
+    "sameDocumentTimeOrigin": 1792140316119,
+    "noProcessKillOrOSReclaim": true
+  },
+  "actualInputCounts": {
+    "Translate": 2,
+    "Restore": 1,
+    "Home": 1,
+    "ResumeExistingActivity": 1,
+    "navigationReload": 0,
+    "permissionRequestsOrConsent": 0,
+    "informationalAddonAddedOK": 1
+  },
+  "researchCorrectionsRetained": [
+    "Initial sh-c argumentforwarding produced broadpackage read ratherthan intendedpackage; corrected to directargv read, noUI/statechanges.",
+    "Translate content-desc selector failed beforeinput; actualXML text used for onlyfirstTranslate action.",
+    "Initial popup read returned longStringgrip; service proof used complete nativeXML+pixels. Added publicRDPsubstring read to pagecollector forcompleteDOM; noDOMwrites.",
+    "Two intermediate blank pageimages retained/excluded from stablepixelproof."
+  ],
+  "runtimeSessions": {
+    "guard": 44774,
+    "loader": 38300,
+    "bothExitCode": 0
+  },
+  "cleanup": {
+    "at": "2026-10-16T08:52:15.163715+00:00",
+    "laneReleased": true,
+    "guardStatus": "stopped-by-owner",
+    "knownPIDs": [
+      61103,
+      61120,
+      61122,
+      61142
+    ],
+    "remainingOwnedPIDOrPGID": [],
+    "ports": {
+      "5048": {
+        "exit": 1,
+        "output": "",
+        "empty": true
+      },
+      "5580": {
+        "exit": 1,
+        "output": "",
+        "empty": true
+      },
+      "5581": {
+        "exit": 1,
+        "output": "",
+        "empty": true
+      },
+      "52875": {
+        "exit": 1,
+        "output": "",
+        "empty": true
+      }
+    },
+    "runnerNormalExit": true,
+    "forwardRemoved": true,
+    "focusEvents": [],
+    "violations": [],
+    "keysMetadataUnchanged": true,
+    "taskDataRetained": true,
+    "EdgeActions": [],
+    "APKInstallOrUpdate": false,
+    "profileReset": false,
+    "scope": "Owned taskAVD stopped; no iOS operation, defaultADB5037 never queried/used",
+    "guardStoppedAt": "2026-10-16T08:51:58.337Z"
+  },
+  "visualReview": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/android-runtime/firefox-f5a-page-cycle-prepared-20261016/visual-review.json",
+  "screenshotCount": 21,
+  "keyImages": [
+    "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/android-runtime/firefox-f5a-page-cycle-prepared-20261016/attempt21-ui/f21-03-open-page.png",
+    "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/android-runtime/firefox-f5a-page-cycle-prepared-20261016/attempt21-ui/f21-03-open-popup.png",
+    "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/android-runtime/firefox-f5a-page-cycle-prepared-20261016/attempt21-ui/f21-08-first-translated.png",
+    "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/android-runtime/firefox-f5a-page-cycle-prepared-20261016/attempt21-ui/f21-09-home.png",
+    "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/android-runtime/firefox-f5a-page-cycle-prepared-20261016/attempt21-ui/f21-11-resumed.png",
+    "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/android-runtime/firefox-f5a-page-cycle-prepared-20261016/attempt21-ui/f21-13-restore-open-popup.png",
+    "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/android-runtime/firefox-f5a-page-cycle-prepared-20261016/attempt21-ui/f21-16-restored-page.png",
+    "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/android-runtime/firefox-f5a-page-cycle-prepared-20261016/attempt21-ui/f21-20-retranslated-page.png"
+  ],
+  "notCovered": [
+    "Fresh authenticatedpublicnetwork response/source provenance",
+    "Wholepage translationquality/liveprovider attribution/cachefreshness",
+    "Physical Android/TalkBack",
+    "Selection/IME/rotation/video/systemfullscreen/OSreclaim",
+    "AMO/store update or otherbrowser"
+  ],
+  "productEdits": false,
+  "newBuild": false,
+  "automaticRuntimeRetry": false
+}

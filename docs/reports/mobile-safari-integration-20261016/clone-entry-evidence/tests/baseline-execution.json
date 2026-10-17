@@ -1,0 +1,15 @@
+{
+  "at": "2026-10-16T22:53:11.044000+00:00",
+  "status": "ACTUAL_UNCHANGED_SOURCE_ELEVEN_SAME_SCOPE_COPY_REGRESSIONS_FAIL",
+  "terminalSession": 36362,
+  "exitCode": 1,
+  "rawReportSHA256": "20be73eb76eae157fe41871a939becf3fce27dece989215fa91ce19f9553636e",
+  "rawLogSHA256": "4c50e4691a81c8d8e7b3ec3dc900e4c924702a4207faf2f0f071f3545df6bda2",
+  "productSourceSHA256": "3443098758b7f2eefb4d7feab89e2a9ea530317d3db8dbe15a20af4405e94a84",
+  "testSourceSHA256AtRun": "1cbec79f20bb2b47b920c01f6861e62b6a863a9555869e835e8b09e91bfe7b1c",
+  "failed": 11,
+  "passed": 0,
+  "filteredOut": 83,
+  "failures": "All11 expected a copied same-owner entry to become disconnected but actual remained connected. Public production API and delivered observer/lifecycle paths, not mirrored algorithm.",
+  "SafariRootCauseEstablished": false
+}

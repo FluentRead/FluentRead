@@ -1,0 +1,58 @@
+Argument-level replacement diff: actual immutable A2 result argv/environmentOverrides -> final-layout preparation
+New root: /Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/touch-layout-f33-followup-20261017/native-final-layout-6eecd6710e7d-b1a66b3fc4e5
+No SDK/native command executed. Only listed exact path values change; all other arguments and environment values remain byte-identical.
+
+01-sdk-check
+  argv length 12 unchanged; changed arguments 0
+  environmentOverrides: exact unchanged (DEVELOPER_DIR, PATH)
+  log - /Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/touch-layout-f33-followup-20261017/native-a2-preparation/logs/01-sdk-check.log
+  log + /Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/touch-layout-f33-followup-20261017/native-final-layout-6eecd6710e7d-b1a66b3fc4e5/logs/01-sdk-check.log
+
+02-safari-web-verify
+  argv length 14 unchanged; changed arguments 0
+  environmentOverrides: exact unchanged (DEVELOPER_DIR, PATH)
+  log - /Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/touch-layout-f33-followup-20261017/native-a2-preparation/logs/02-safari-web-verify.log
+  log + /Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/touch-layout-f33-followup-20261017/native-final-layout-6eecd6710e7d-b1a66b3fc4e5/logs/02-safari-web-verify.log
+
+03-fresh-unsigned-wrapper
+  argv length 19 unchanged; changed arguments 1
+  argv[14] - /Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/touch-layout-f33-followup-20261017/native-a2-preparation/output/safari-xcode-a2ecda302-80471415c945
+  argv[14] + /Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/touch-layout-f33-followup-20261017/native-final-layout-6eecd6710e7d-b1a66b3fc4e5/output/safari-xcode
+  environmentOverrides: exact unchanged (DEVELOPER_DIR, PATH)
+  log - /Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/touch-layout-f33-followup-20261017/native-a2-preparation/logs/03-package.log
+  log + /Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/touch-layout-f33-followup-20261017/native-final-layout-6eecd6710e7d-b1a66b3fc4e5/logs/03-package.log
+
+04-macos
+  argv length 29 unchanged; changed arguments 2
+  argv[11] - /Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/touch-layout-f33-followup-20261017/native-a2-preparation/output/safari-xcode-a2ecda302-80471415c945/FluentRead/FluentRead.xcodeproj
+  argv[11] + /Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/touch-layout-f33-followup-20261017/native-final-layout-6eecd6710e7d-b1a66b3fc4e5/output/safari-xcode/FluentRead/FluentRead.xcodeproj
+  argv[19] - /Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/touch-layout-f33-followup-20261017/native-a2-preparation/output/derived-macos-a2ecda302-80471415c945
+  argv[19] + /Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/touch-layout-f33-followup-20261017/native-final-layout-6eecd6710e7d-b1a66b3fc4e5/output/derived-macos
+  environmentOverrides: exact unchanged (DEVELOPER_DIR, PATH)
+  log - /Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/touch-layout-f33-followup-20261017/native-a2-preparation/logs/04-macos.log
+  log + /Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/touch-layout-f33-followup-20261017/native-final-layout-6eecd6710e7d-b1a66b3fc4e5/logs/04-macos.log
+
+05-ios-simulator
+  argv length 29 unchanged; changed arguments 2
+  argv[11] - /Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/touch-layout-f33-followup-20261017/native-a2-preparation/output/safari-xcode-a2ecda302-80471415c945/FluentRead/FluentRead.xcodeproj
+  argv[11] + /Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/touch-layout-f33-followup-20261017/native-final-layout-6eecd6710e7d-b1a66b3fc4e5/output/safari-xcode/FluentRead/FluentRead.xcodeproj
+  argv[19] - /Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/touch-layout-f33-followup-20261017/native-a2-preparation/output/derived-ios-simulator-a2ecda302-80471415c945
+  argv[19] + /Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/touch-layout-f33-followup-20261017/native-final-layout-6eecd6710e7d-b1a66b3fc4e5/output/derived-ios-simulator
+  environmentOverrides: exact unchanged (DEVELOPER_DIR, PATH)
+  log - /Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/touch-layout-f33-followup-20261017/native-a2-preparation/logs/05-ios-simulator.log
+  log + /Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/touch-layout-f33-followup-20261017/native-final-layout-6eecd6710e7d-b1a66b3fc4e5/logs/05-ios-simulator.log
+
+06-iphoneos-arm64
+  argv length 32 unchanged; changed arguments 4
+  argv[11] - /Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/touch-layout-f33-followup-20261017/native-a2-preparation/output/safari-xcode-a2ecda302-80471415c945/FluentRead/FluentRead.xcodeproj
+  argv[11] + /Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/touch-layout-f33-followup-20261017/native-final-layout-6eecd6710e7d-b1a66b3fc4e5/output/safari-xcode/FluentRead/FluentRead.xcodeproj
+  argv[22] - CONFIGURATION_BUILD_DIR=/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/touch-layout-f33-followup-20261017/native-a2-preparation/output/target-iphoneos-a2ecda302-80471415c945/build
+  argv[22] + CONFIGURATION_BUILD_DIR=/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/touch-layout-f33-followup-20261017/native-final-layout-6eecd6710e7d-b1a66b3fc4e5/output/target-iphoneos/build
+  argv[23] - OBJROOT=/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/touch-layout-f33-followup-20261017/native-a2-preparation/output/target-iphoneos-a2ecda302-80471415c945/obj
+  argv[23] + OBJROOT=/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/touch-layout-f33-followup-20261017/native-final-layout-6eecd6710e7d-b1a66b3fc4e5/output/target-iphoneos/obj
+  argv[24] - SYMROOT=/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/touch-layout-f33-followup-20261017/native-a2-preparation/output/target-iphoneos-a2ecda302-80471415c945/sym
+  argv[24] + SYMROOT=/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/touch-layout-f33-followup-20261017/native-final-layout-6eecd6710e7d-b1a66b3fc4e5/output/target-iphoneos/sym
+  environmentOverrides: exact unchanged (DEVELOPER_DIR, PATH)
+  log - /Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/touch-layout-f33-followup-20261017/native-a2-preparation/logs/06-iphoneos.log
+  log + /Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/touch-layout-f33-followup-20261017/native-final-layout-6eecd6710e7d-b1a66b3fc4e5/logs/06-iphoneos.log
+

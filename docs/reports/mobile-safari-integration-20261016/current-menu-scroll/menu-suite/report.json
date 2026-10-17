@@ -1,0 +1,4113 @@
+{
+  "selectedSuite": "menu",
+  "fixture": "mobile-youtube-production-extension",
+  "evidenceLimits": [
+    "local HTML and timedtext fixtures",
+    "mock translation",
+    "Chromium viewport/touch emulation",
+    "isolated-extension-world webkit capability/event shim only; no iOS/AVKit rendering",
+    "fullscreen geometry uses an explicit DOM property fixture; no system/window fullscreen",
+    "no live provider or mobile device",
+    "Explicit menu suite: shared caption readiness, touch/desktop menus and fullscreen geometry only; native-selection shim, video replacement, reload and persisted-pageshow lifecycle assertions are not executed; menu success is not lifecycle acceptance"
+  ],
+  "cases": [
+    {
+      "name": "portrait-inline",
+      "video": {
+        "left": 0,
+        "top": 0,
+        "right": 390,
+        "bottom": 219.375,
+        "width": 390,
+        "height": 219.375
+      },
+      "panel": {
+        "left": 27.1796875,
+        "top": 147.4453125,
+        "right": 362.8203125,
+        "bottom": 207.3984375,
+        "width": 335.640625,
+        "height": 59.953125
+      },
+      "original": "Watch bilingual captions near the bottom.",
+      "translation": "在视频底部观看双语字幕。",
+      "nativeMode": "hidden",
+      "nativeCues": [
+        {
+          "start": 0,
+          "end": 30,
+          "text": "Watch bilingual captions near the bottom.\n在视频底部观看双语字幕。"
+        }
+      ],
+      "coarsePointer": true,
+      "viewport": {
+        "width": 390,
+        "height": 844
+      }
+    },
+    {
+      "name": "portrait-visible-controls",
+      "video": {
+        "left": 0,
+        "top": 0,
+        "right": 390,
+        "bottom": 219.375,
+        "width": 390,
+        "height": 219.375
+      },
+      "panel": {
+        "left": 27.1796875,
+        "top": 111.5078125,
+        "right": 362.8203125,
+        "bottom": 171.4609375,
+        "width": 335.640625,
+        "height": 59.953125
+      },
+      "original": "Watch bilingual captions near the bottom.",
+      "translation": "在视频底部观看双语字幕。",
+      "nativeMode": "hidden",
+      "nativeCues": [
+        {
+          "start": 0,
+          "end": 30,
+          "text": "Watch bilingual captions near the bottom.\n在视频底部观看双语字幕。"
+        }
+      ],
+      "coarsePointer": true,
+      "viewport": {
+        "width": 390,
+        "height": 844
+      }
+    },
+    {
+      "name": "portrait-menu",
+      "video": {
+        "left": 0,
+        "top": 0,
+        "right": 390,
+        "bottom": 219.375,
+        "width": 390,
+        "height": 219.375
+      },
+      "panel": {
+        "left": 27.1796875,
+        "top": 111.5078125,
+        "right": 362.8203125,
+        "bottom": 171.4609375,
+        "width": 335.640625,
+        "height": 59.953125
+      },
+      "original": "Watch bilingual captions near the bottom.",
+      "translation": "在视频底部观看双语字幕。",
+      "nativeMode": "hidden",
+      "nativeCues": [
+        {
+          "start": 0,
+          "end": 30,
+          "text": "Watch bilingual captions near the bottom.\n在视频底部观看双语字幕。"
+        }
+      ],
+      "coarsePointer": true,
+      "viewport": {
+        "width": 390,
+        "height": 844
+      }
+    },
+    {
+      "name": "portrait-menu-hint",
+      "video": {
+        "left": 0,
+        "top": 0,
+        "right": 390,
+        "bottom": 219.375,
+        "width": 390,
+        "height": 219.375
+      },
+      "panel": {
+        "left": 27.1796875,
+        "top": 111.5078125,
+        "right": 362.8203125,
+        "bottom": 171.4609375,
+        "width": 335.640625,
+        "height": 59.953125
+      },
+      "original": "Watch bilingual captions near the bottom.",
+      "translation": "在视频底部观看双语字幕。",
+      "nativeMode": "hidden",
+      "nativeCues": [
+        {
+          "start": 0,
+          "end": 30,
+          "text": "Watch bilingual captions near the bottom.\n在视频底部观看双语字幕。"
+        }
+      ],
+      "coarsePointer": true,
+      "viewport": {
+        "width": 390,
+        "height": 844
+      }
+    },
+    {
+      "name": "portrait-menu-normal-close",
+      "video": {
+        "left": 0,
+        "top": 0,
+        "right": 390,
+        "bottom": 219.375,
+        "width": 390,
+        "height": 219.375
+      },
+      "panel": {
+        "left": 27.1796875,
+        "top": 111.5078125,
+        "right": 362.8203125,
+        "bottom": 171.4609375,
+        "width": 335.640625,
+        "height": 59.953125
+      },
+      "original": "Watch bilingual captions near the bottom.",
+      "translation": "在视频底部观看双语字幕。",
+      "nativeMode": "hidden",
+      "nativeCues": [
+        {
+          "start": 0,
+          "end": 30,
+          "text": "Watch bilingual captions near the bottom.\n在视频底部观看双语字幕。"
+        }
+      ],
+      "coarsePointer": true,
+      "viewport": {
+        "width": 390,
+        "height": 844
+      }
+    },
+    {
+      "name": "landscape-inline",
+      "video": {
+        "left": 0,
+        "top": 0,
+        "right": 844,
+        "bottom": 390,
+        "width": 844,
+        "height": 390
+      },
+      "panel": {
+        "left": 254.1796875,
+        "top": 282.046875,
+        "right": 589.8203125,
+        "bottom": 342,
+        "width": 335.640625,
+        "height": 59.953125
+      },
+      "original": "Watch bilingual captions near the bottom.",
+      "translation": "在视频底部观看双语字幕。",
+      "nativeMode": "hidden",
+      "nativeCues": [
+        {
+          "start": 0,
+          "end": 30,
+          "text": "Watch bilingual captions near the bottom.\n在视频底部观看双语字幕。"
+        }
+      ],
+      "coarsePointer": true,
+      "viewport": {
+        "width": 844,
+        "height": 390
+      }
+    },
+    {
+      "name": "fullscreen-geometry-safe-area",
+      "video": {
+        "left": 0,
+        "top": 0,
+        "right": 844,
+        "bottom": 390,
+        "width": 844,
+        "height": 390
+      },
+      "panel": {
+        "left": 254.1796875,
+        "top": 282.046875,
+        "right": 589.8203125,
+        "bottom": 342,
+        "width": 335.640625,
+        "height": 59.953125
+      },
+      "original": "Watch bilingual captions near the bottom.",
+      "translation": "在视频底部观看双语字幕。",
+      "nativeMode": "hidden",
+      "nativeCues": [
+        {
+          "start": 0,
+          "end": 30,
+          "text": "Watch bilingual captions near the bottom.\n在视频底部观看双语字幕。"
+        }
+      ],
+      "coarsePointer": true,
+      "viewport": {
+        "width": 844,
+        "height": 390
+      }
+    },
+    {
+      "name": "desktop-menu-normal-close",
+      "video": {
+        "left": 0,
+        "top": 0,
+        "right": 1280,
+        "bottom": 720,
+        "width": 1280,
+        "height": 720
+      },
+      "panel": {
+        "left": 351.46875,
+        "top": 556.921875,
+        "right": 928.5234375,
+        "bottom": 648,
+        "width": 577.0546875,
+        "height": 91.078125
+      },
+      "original": "Watch bilingual captions near the bottom.",
+      "translation": "在视频底部观看双语字幕。",
+      "nativeMode": "hidden",
+      "nativeCues": [
+        {
+          "start": 0,
+          "end": 30,
+          "text": "Watch bilingual captions near the bottom.\n在视频底部观看双语字幕。"
+        }
+      ],
+      "coarsePointer": false,
+      "viewport": {
+        "width": 1280,
+        "height": 900
+      }
+    },
+    {
+      "name": "disabled-cleanup",
+      "video": {
+        "left": 0,
+        "top": 0,
+        "right": 1280,
+        "bottom": 720,
+        "width": 1280,
+        "height": 720
+      },
+      "panel": null,
+      "nativeCues": [],
+      "coarsePointer": false,
+      "viewport": {
+        "width": 1280,
+        "height": 900
+      }
+    }
+  ],
+  "errors": [],
+  "focusObserver": {
+    "monitorPid": 33539,
+    "time": 1792185029464.618,
+    "monotonicMs": 3610320670.025334
+  },
+  "browserPid": 33543,
+  "focusSamples": [
+    {
+      "at": 1792185030714,
+      "name": "ChatGPT",
+      "pid": 20136
+    },
+    {
+      "at": 1792185031288,
+      "name": "ChatGPT",
+      "pid": 20136
+    },
+    {
+      "at": 1792185031798,
+      "name": "ChatGPT",
+      "pid": 20136
+    },
+    {
+      "at": 1792185031974,
+      "name": "ChatGPT",
+      "pid": 20136
+    },
+    {
+      "at": 1792185032302,
+      "name": "ChatGPT",
+      "pid": 20136
+    },
+    {
+      "at": 1792185032811,
+      "name": "ChatGPT",
+      "pid": 20136
+    },
+    {
+      "at": 1792185033322,
+      "name": "ChatGPT",
+      "pid": 20136
+    },
+    {
+      "at": 1792185033323,
+      "name": "ChatGPT",
+      "pid": 20136
+    },
+    {
+      "at": 1792185033526,
+      "name": "ChatGPT",
+      "pid": 20136
+    },
+    {
+      "at": 1792185033655,
+      "name": "ChatGPT",
+      "pid": 20136
+    },
+    {
+      "at": 1792185033801,
+      "name": "ChatGPT",
+      "pid": 20136
+    },
+    {
+      "at": 1792185033831,
+      "name": "ChatGPT",
+      "pid": 20136
+    },
+    {
+      "at": 1792185033953,
+      "name": "ChatGPT",
+      "pid": 20136
+    },
+    {
+      "at": 1792185034081,
+      "name": "ChatGPT",
+      "pid": 20136
+    },
+    {
+      "at": 1792185034229,
+      "name": "ChatGPT",
+      "pid": 20136
+    },
+    {
+      "at": 1792185034296,
+      "name": "ChatGPT",
+      "pid": 20136
+    },
+    {
+      "at": 1792185034356,
+      "name": "ChatGPT",
+      "pid": 20136
+    },
+    {
+      "at": 1792185034488,
+      "name": "ChatGPT",
+      "pid": 20136
+    },
+    {
+      "at": 1792185034629,
+      "name": "ChatGPT",
+      "pid": 20136
+    },
+    {
+      "at": 1792185034765,
+      "name": "ChatGPT",
+      "pid": 20136
+    },
+    {
+      "at": 1792185034801,
+      "name": "ChatGPT",
+      "pid": 20136
+    },
+    {
+      "at": 1792185034885,
+      "name": "ChatGPT",
+      "pid": 20136
+    },
+    {
+      "at": 1792185035011,
+      "name": "ChatGPT",
+      "pid": 20136
+    },
+    {
+      "at": 1792185035137,
+      "name": "ChatGPT",
+      "pid": 20136
+    },
+    {
+      "at": 1792185035261,
+      "name": "ChatGPT",
+      "pid": 20136
+    },
+    {
+      "at": 1792185035303,
+      "name": "ChatGPT",
+      "pid": 20136
+    },
+    {
+      "at": 1792185035385,
+      "name": "ChatGPT",
+      "pid": 20136
+    },
+    {
+      "at": 1792185035547,
+      "name": "ChatGPT",
+      "pid": 20136
+    },
+    {
+      "at": 1792185035671,
+      "name": "ChatGPT",
+      "pid": 20136
+    },
+    {
+      "at": 1792185035803,
+      "name": "ChatGPT",
+      "pid": 20136
+    },
+    {
+      "at": 1792185036326,
+      "name": "ChatGPT",
+      "pid": 20136
+    },
+    {
+      "at": 1792185036826,
+      "name": "ChatGPT",
+      "pid": 20136
+    },
+    {
+      "at": 1792185037017,
+      "name": "ChatGPT",
+      "pid": 20136
+    },
+    {
+      "at": 1792185037313,
+      "name": "ChatGPT",
+      "pid": 20136
+    },
+    {
+      "at": 1792185037813,
+      "name": "ChatGPT",
+      "pid": 20136
+    },
+    {
+      "at": 1792185038321,
+      "name": "ChatGPT",
+      "pid": 20136
+    },
+    {
+      "at": 1792185038353,
+      "name": "ChatGPT",
+      "pid": 20136
+    },
+    {
+      "at": 1792185038530,
+      "name": "ChatGPT",
+      "pid": 20136
+    },
+    {
+      "at": 1792185038683,
+      "name": "ChatGPT",
+      "pid": 20136
+    },
+    {
+      "at": 1792185038817,
+      "name": "ChatGPT",
+      "pid": 20136
+    },
+    {
+      "at": 1792185038825,
+      "name": "ChatGPT",
+      "pid": 20136
+    },
+    {
+      "at": 1792185038976,
+      "name": "ChatGPT",
+      "pid": 20136
+    },
+    {
+      "at": 1792185039129,
+      "name": "ChatGPT",
+      "pid": 20136
+    },
+    {
+      "at": 1792185039309,
+      "name": "ChatGPT",
+      "pid": 20136
+    },
+    {
+      "at": 1792185039317,
+      "name": "ChatGPT",
+      "pid": 20136
+    }
+  ],
+  "launchMode": "macos-background-cdp",
+  "focusPolicy": "launchservices-no-foreground",
+  "windowPlacement": {
+    "mode": "background-visible-no-focus",
+    "visible": true,
+    "hidden": false,
+    "centered": true,
+    "windowState": "normal",
+    "bounds": {
+      "left": 212,
+      "top": -990,
+      "width": 1280,
+      "height": 900
+    },
+    "displayTarget": "secondary",
+    "source": "macos-nsscreen",
+    "screenIndex": 1,
+    "browserFrontmost": false,
+    "frontmostBefore": {
+      "pid": 20136,
+      "name": "ChatGPT"
+    },
+    "frontmostAfter": {
+      "pid": 20136,
+      "name": "ChatGPT"
+    }
+  },
+  "timedtextResponses": [
+    {
+      "url": "https://m.youtube.com/api/timedtext?v=fluentread-mobile-992&lang=en&fmt=json3&xorb=2&xobt=3&xovt=3&c=WEB&cplayer=UNIPLAYER",
+      "status": 200
+    }
+  ],
+  "nativeShimWorlds": [
+    {
+      "extensionId": "djnlaiohfaaifbibleebjggkghlmcpcj",
+      "method": "function",
+      "contextId": 5
+    }
+  ],
+  "trackDiagnostics": [
+    {
+      "beforeAppend": true,
+      "immediate": 1,
+      "events": [
+        {
+          "type": "error",
+          "cues": 0,
+          "readyState": 3
+        }
+      ],
+      "afterTask": 0,
+      "afterSecond": 1,
+      "afterSameLanguage": 1
+    },
+    {
+      "beforeAppend": false,
+      "immediate": 1,
+      "events": [
+        {
+          "type": "error",
+          "cues": 0,
+          "readyState": 3
+        }
+      ],
+      "afterTask": 0,
+      "afterSecond": 1,
+      "afterSameLanguage": 1
+    }
+  ],
+  "stage": "initial-ready",
+  "nativeResourceEvents": [
+    {
+      "type": "error",
+      "trusted": true,
+      "before": 0,
+      "at": 376.3999996185303,
+      "afterTask": 1,
+      "elapsedMs": 1.1000003814697266
+    }
+  ],
+  "touchTargets": [
+    {
+      "action": "fluent-read-video-subtitle-button",
+      "label": "流畅阅读字幕翻译：已开启",
+      "height": 44,
+      "width": 44
+    },
+    {
+      "action": "open-settings",
+      "label": "打开视频翻译设置",
+      "height": 44,
+      "width": 67
+    },
+    {
+      "action": "close-menu",
+      "label": "关闭字幕菜单",
+      "height": 44,
+      "width": 44
+    },
+    {
+      "action": "open-sentence-learning",
+      "label": "开始完整句学习",
+      "height": 44,
+      "width": 360
+    },
+    {
+      "action": "bilingual",
+      "label": "双语",
+      "height": 44,
+      "width": 44
+    },
+    {
+      "action": "translation-only",
+      "label": "译文",
+      "height": 44,
+      "width": 44
+    },
+    {
+      "action": "original-only",
+      "label": "原文",
+      "height": 44,
+      "width": 44
+    },
+    {
+      "action": "off",
+      "label": "关闭",
+      "height": 44,
+      "width": 44
+    },
+    {
+      "action": "subtitle-earlier",
+      "label": "提前 0.5 秒",
+      "height": 44,
+      "width": 44
+    },
+    {
+      "action": "subtitle-later",
+      "label": "延后 0.5 秒",
+      "height": 44,
+      "width": 44
+    },
+    {
+      "action": "download-subtitles",
+      "label": "下载原文字幕",
+      "height": 44,
+      "width": 117.328125
+    },
+    {
+      "action": "download-translated-subtitles",
+      "label": "下载译文字幕",
+      "height": 44,
+      "width": 117.3359375
+    },
+    {
+      "action": "download-bilingual-subtitles",
+      "label": "下载双语字幕",
+      "height": 44,
+      "width": 117.3359375
+    }
+  ],
+  "timingGeometry": {
+    "menu": {
+      "left": 8,
+      "right": 382,
+      "top": 8,
+      "bottom": 179.375
+    },
+    "row": {
+      "left": 15,
+      "right": 375,
+      "top": 127.5,
+      "bottom": 171.5
+    },
+    "label": {
+      "left": 19,
+      "right": 235,
+      "top": 141.1015625,
+      "bottom": 157.8984375
+    },
+    "controls": {
+      "left": 243,
+      "right": 375,
+      "top": 127.5,
+      "bottom": 171.5
+    },
+    "modes": {
+      "left": 15,
+      "right": 201,
+      "top": 75.5,
+      "bottom": 123.5
+    },
+    "labelText": "字幕时间",
+    "labelWidth": 216,
+    "labelScrollWidth": 216,
+    "labelHeight": 17,
+    "labelScrollHeight": 17,
+    "overflow": "visible",
+    "textOverflow": "clip",
+    "contain": "none",
+    "offset": "0.0 s"
+  },
+  "menuScrollTargets": [
+    {
+      "name": "portrait-menu-timing-targets",
+      "menu": {
+        "left": 8,
+        "top": 8,
+        "right": 382,
+        "bottom": 179.375,
+        "width": 374,
+        "height": 171.375
+      },
+      "menuPaddingTop": 6,
+      "menuClipTop": 9.00219298245614,
+      "header": {
+        "left": 15,
+        "top": 9,
+        "right": 375,
+        "bottom": 53,
+        "width": 360,
+        "height": 44
+      },
+      "headerVisible": {
+        "left": 15,
+        "top": 9.00219298245614,
+        "right": 375,
+        "bottom": 53,
+        "width": 360,
+        "height": 43.99780701754386
+      },
+      "headerTopHits": [
+        {
+          "x": 105,
+          "y": 10.00219298245614,
+          "hitOwnedHeader": true,
+          "hitTag": "DIV"
+        },
+        {
+          "x": 195,
+          "y": 10.00219298245614,
+          "hitOwnedHeader": true,
+          "hitTag": "DIV"
+        },
+        {
+          "x": 285,
+          "y": 10.00219298245614,
+          "hitOwnedHeader": true,
+          "hitTag": "BUTTON"
+        }
+      ],
+      "headerBackground": "rgb(24, 24, 28)",
+      "visualViewport": {
+        "left": 0,
+        "top": 0,
+        "right": 390,
+        "bottom": 844
+      },
+      "scrollTop": 35.5,
+      "scrollHeight": 292,
+      "clientHeight": 169,
+      "timingRow": {
+        "left": 15,
+        "top": 127.5,
+        "right": 375,
+        "bottom": 171.5,
+        "width": 360,
+        "height": 44
+      },
+      "targets": [
+        {
+          "action": "close-menu",
+          "count": 1,
+          "actualAction": "close-menu",
+          "actualMode": null,
+          "inHeader": true,
+          "frame": {
+            "left": 331,
+            "top": 9,
+            "right": 375,
+            "bottom": 53,
+            "width": 44,
+            "height": 44
+          },
+          "visible": {
+            "left": 331,
+            "top": 9.00219298245614,
+            "right": 375,
+            "bottom": 53,
+            "width": 44,
+            "height": 43.99780701754386
+          },
+          "fullyVisible": true,
+          "points": [
+            {
+              "x": 353,
+              "y": 31,
+              "hitOwnedControl": true,
+              "hitTag": "path",
+              "hitAction": "close-menu"
+            },
+            {
+              "x": 342,
+              "y": 20,
+              "hitOwnedControl": true,
+              "hitTag": "BUTTON",
+              "hitAction": "close-menu"
+            },
+            {
+              "x": 364,
+              "y": 20,
+              "hitOwnedControl": true,
+              "hitTag": "BUTTON",
+              "hitAction": "close-menu"
+            },
+            {
+              "x": 342,
+              "y": 42,
+              "hitOwnedControl": true,
+              "hitTag": "BUTTON",
+              "hitAction": "close-menu"
+            },
+            {
+              "x": 364,
+              "y": 42,
+              "hitOwnedControl": true,
+              "hitTag": "BUTTON",
+              "hitAction": "close-menu"
+            }
+          ]
+        },
+        {
+          "action": "subtitle-earlier",
+          "count": 1,
+          "actualAction": "subtitle-earlier",
+          "actualMode": null,
+          "inHeader": false,
+          "frame": {
+            "left": 243,
+            "top": 127.5,
+            "right": 287,
+            "bottom": 171.5,
+            "width": 44,
+            "height": 44
+          },
+          "visible": {
+            "left": 243,
+            "top": 127.5,
+            "right": 287,
+            "bottom": 171.5,
+            "width": 44,
+            "height": 44
+          },
+          "fullyVisible": true,
+          "points": [
+            {
+              "x": 265,
+              "y": 149.5,
+              "hitOwnedControl": true,
+              "hitTag": "path",
+              "hitAction": "subtitle-earlier"
+            },
+            {
+              "x": 254,
+              "y": 138.5,
+              "hitOwnedControl": true,
+              "hitTag": "BUTTON",
+              "hitAction": "subtitle-earlier"
+            },
+            {
+              "x": 276,
+              "y": 138.5,
+              "hitOwnedControl": true,
+              "hitTag": "BUTTON",
+              "hitAction": "subtitle-earlier"
+            },
+            {
+              "x": 254,
+              "y": 160.5,
+              "hitOwnedControl": true,
+              "hitTag": "BUTTON",
+              "hitAction": "subtitle-earlier"
+            },
+            {
+              "x": 276,
+              "y": 160.5,
+              "hitOwnedControl": true,
+              "hitTag": "BUTTON",
+              "hitAction": "subtitle-earlier"
+            }
+          ]
+        },
+        {
+          "action": "subtitle-later",
+          "count": 1,
+          "actualAction": "subtitle-later",
+          "actualMode": null,
+          "inHeader": false,
+          "frame": {
+            "left": 331,
+            "top": 127.5,
+            "right": 375,
+            "bottom": 171.5,
+            "width": 44,
+            "height": 44
+          },
+          "visible": {
+            "left": 331,
+            "top": 127.5,
+            "right": 375,
+            "bottom": 171.5,
+            "width": 44,
+            "height": 44
+          },
+          "fullyVisible": true,
+          "points": [
+            {
+              "x": 353,
+              "y": 149.5,
+              "hitOwnedControl": true,
+              "hitTag": "path",
+              "hitAction": "subtitle-later"
+            },
+            {
+              "x": 342,
+              "y": 138.5,
+              "hitOwnedControl": true,
+              "hitTag": "BUTTON",
+              "hitAction": "subtitle-later"
+            },
+            {
+              "x": 364,
+              "y": 138.5,
+              "hitOwnedControl": true,
+              "hitTag": "BUTTON",
+              "hitAction": "subtitle-later"
+            },
+            {
+              "x": 342,
+              "y": 160.5,
+              "hitOwnedControl": true,
+              "hitTag": "BUTTON",
+              "hitAction": "subtitle-later"
+            },
+            {
+              "x": 364,
+              "y": 160.5,
+              "hitOwnedControl": true,
+              "hitTag": "BUTTON",
+              "hitAction": "subtitle-later"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "portrait-menu-hint-targets",
+      "menu": {
+        "left": 8,
+        "top": 8,
+        "right": 382,
+        "bottom": 179.375,
+        "width": 374,
+        "height": 171.375
+      },
+      "menuPaddingTop": 6,
+      "menuClipTop": 9.00219298245614,
+      "header": {
+        "left": 15,
+        "top": 9,
+        "right": 375,
+        "bottom": 53,
+        "width": 360,
+        "height": 44
+      },
+      "headerVisible": {
+        "left": 15,
+        "top": 9.00219298245614,
+        "right": 375,
+        "bottom": 53,
+        "width": 360,
+        "height": 43.99780701754386
+      },
+      "headerTopHits": [
+        {
+          "x": 105,
+          "y": 10.00219298245614,
+          "hitOwnedHeader": true,
+          "hitTag": "DIV"
+        },
+        {
+          "x": 195,
+          "y": 10.00219298245614,
+          "hitOwnedHeader": true,
+          "hitTag": "DIV"
+        },
+        {
+          "x": 285,
+          "y": 10.00219298245614,
+          "hitOwnedHeader": true,
+          "hitTag": "BUTTON"
+        }
+      ],
+      "headerBackground": "rgb(24, 24, 28)",
+      "visualViewport": {
+        "left": 0,
+        "top": 0,
+        "right": 390,
+        "bottom": 844
+      },
+      "scrollTop": 122.5,
+      "scrollHeight": 292,
+      "clientHeight": 169,
+      "timingRow": null,
+      "targets": [
+        {
+          "action": "close-menu",
+          "count": 1,
+          "actualAction": "close-menu",
+          "actualMode": null,
+          "inHeader": true,
+          "frame": {
+            "left": 331,
+            "top": 9,
+            "right": 375,
+            "bottom": 53,
+            "width": 44,
+            "height": 44
+          },
+          "visible": {
+            "left": 331,
+            "top": 9.00219298245614,
+            "right": 375,
+            "bottom": 53,
+            "width": 44,
+            "height": 43.99780701754386
+          },
+          "fullyVisible": true,
+          "points": [
+            {
+              "x": 353,
+              "y": 31,
+              "hitOwnedControl": true,
+              "hitTag": "path",
+              "hitAction": "close-menu"
+            },
+            {
+              "x": 342,
+              "y": 20,
+              "hitOwnedControl": true,
+              "hitTag": "BUTTON",
+              "hitAction": "close-menu"
+            },
+            {
+              "x": 364,
+              "y": 20,
+              "hitOwnedControl": true,
+              "hitTag": "BUTTON",
+              "hitAction": "close-menu"
+            },
+            {
+              "x": 342,
+              "y": 42,
+              "hitOwnedControl": true,
+              "hitTag": "BUTTON",
+              "hitAction": "close-menu"
+            },
+            {
+              "x": 364,
+              "y": 42,
+              "hitOwnedControl": true,
+              "hitTag": "BUTTON",
+              "hitAction": "close-menu"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "portrait-menu-keyboard-1-End",
+      "menu": {
+        "left": 8,
+        "top": 8,
+        "right": 382,
+        "bottom": 179.375,
+        "width": 374,
+        "height": 171.375
+      },
+      "menuPaddingTop": 6,
+      "menuClipTop": 9.00219298245614,
+      "header": {
+        "left": 15,
+        "top": 9,
+        "right": 375,
+        "bottom": 53,
+        "width": 360,
+        "height": 44
+      },
+      "headerVisible": {
+        "left": 15,
+        "top": 9.00219298245614,
+        "right": 375,
+        "bottom": 53,
+        "width": 360,
+        "height": 43.99780701754386
+      },
+      "headerTopHits": [
+        {
+          "x": 105,
+          "y": 10.00219298245614,
+          "hitOwnedHeader": true,
+          "hitTag": "DIV"
+        },
+        {
+          "x": 195,
+          "y": 10.00219298245614,
+          "hitOwnedHeader": true,
+          "hitTag": "DIV"
+        },
+        {
+          "x": 285,
+          "y": 10.00219298245614,
+          "hitOwnedHeader": true,
+          "hitTag": "BUTTON"
+        }
+      ],
+      "headerBackground": "rgb(24, 24, 28)",
+      "visualViewport": {
+        "left": 0,
+        "top": 0,
+        "right": 390,
+        "bottom": 844
+      },
+      "scrollTop": 114.5,
+      "scrollHeight": 292,
+      "clientHeight": 169,
+      "timingRow": null,
+      "targets": [
+        {
+          "action": "close-menu",
+          "count": 1,
+          "actualAction": "close-menu",
+          "actualMode": null,
+          "inHeader": true,
+          "frame": {
+            "left": 331,
+            "top": 9,
+            "right": 375,
+            "bottom": 53,
+            "width": 44,
+            "height": 44
+          },
+          "visible": {
+            "left": 331,
+            "top": 9.00219298245614,
+            "right": 375,
+            "bottom": 53,
+            "width": 44,
+            "height": 43.99780701754386
+          },
+          "fullyVisible": true,
+          "points": [
+            {
+              "x": 353,
+              "y": 31,
+              "hitOwnedControl": true,
+              "hitTag": "path",
+              "hitAction": "close-menu"
+            },
+            {
+              "x": 342,
+              "y": 20,
+              "hitOwnedControl": true,
+              "hitTag": "BUTTON",
+              "hitAction": "close-menu"
+            },
+            {
+              "x": 364,
+              "y": 20,
+              "hitOwnedControl": true,
+              "hitTag": "BUTTON",
+              "hitAction": "close-menu"
+            },
+            {
+              "x": 342,
+              "y": 42,
+              "hitOwnedControl": true,
+              "hitTag": "BUTTON",
+              "hitAction": "close-menu"
+            },
+            {
+              "x": 364,
+              "y": 42,
+              "hitOwnedControl": true,
+              "hitTag": "BUTTON",
+              "hitAction": "close-menu"
+            }
+          ]
+        },
+        {
+          "action": "focused",
+          "count": 1,
+          "actualAction": "download-bilingual-subtitles",
+          "actualMode": null,
+          "inHeader": false,
+          "frame": {
+            "left": 257.6640625,
+            "top": 96.5,
+            "right": 375,
+            "bottom": 140.5,
+            "width": 117.3359375,
+            "height": 44
+          },
+          "visible": {
+            "left": 257.6640625,
+            "top": 96.5,
+            "right": 375,
+            "bottom": 140.5,
+            "width": 117.3359375,
+            "height": 44
+          },
+          "fullyVisible": true,
+          "points": [
+            {
+              "x": 316.33203125,
+              "y": 118.5,
+              "hitOwnedControl": true,
+              "hitTag": "SPAN",
+              "hitAction": "download-bilingual-subtitles"
+            },
+            {
+              "x": 286.998046875,
+              "y": 107.5,
+              "hitOwnedControl": true,
+              "hitTag": "BUTTON",
+              "hitAction": "download-bilingual-subtitles"
+            },
+            {
+              "x": 345.666015625,
+              "y": 107.5,
+              "hitOwnedControl": true,
+              "hitTag": "BUTTON",
+              "hitAction": "download-bilingual-subtitles"
+            },
+            {
+              "x": 286.998046875,
+              "y": 129.5,
+              "hitOwnedControl": true,
+              "hitTag": "BUTTON",
+              "hitAction": "download-bilingual-subtitles"
+            },
+            {
+              "x": 345.666015625,
+              "y": 129.5,
+              "hitOwnedControl": true,
+              "hitTag": "BUTTON",
+              "hitAction": "download-bilingual-subtitles"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "portrait-menu-keyboard-2-ArrowUp",
+      "menu": {
+        "left": 8,
+        "top": 8,
+        "right": 382,
+        "bottom": 179.375,
+        "width": 374,
+        "height": 171.375
+      },
+      "menuPaddingTop": 6,
+      "menuClipTop": 9.00219298245614,
+      "header": {
+        "left": 15,
+        "top": 9,
+        "right": 375,
+        "bottom": 53,
+        "width": 360,
+        "height": 44
+      },
+      "headerVisible": {
+        "left": 15,
+        "top": 9.00219298245614,
+        "right": 375,
+        "bottom": 53,
+        "width": 360,
+        "height": 43.99780701754386
+      },
+      "headerTopHits": [
+        {
+          "x": 105,
+          "y": 10.00219298245614,
+          "hitOwnedHeader": true,
+          "hitTag": "DIV"
+        },
+        {
+          "x": 195,
+          "y": 10.00219298245614,
+          "hitOwnedHeader": true,
+          "hitTag": "DIV"
+        },
+        {
+          "x": 285,
+          "y": 10.00219298245614,
+          "hitOwnedHeader": true,
+          "hitTag": "BUTTON"
+        }
+      ],
+      "headerBackground": "rgb(24, 24, 28)",
+      "visualViewport": {
+        "left": 0,
+        "top": 0,
+        "right": 390,
+        "bottom": 844
+      },
+      "scrollTop": 114.5,
+      "scrollHeight": 292,
+      "clientHeight": 169,
+      "timingRow": null,
+      "targets": [
+        {
+          "action": "close-menu",
+          "count": 1,
+          "actualAction": "close-menu",
+          "actualMode": null,
+          "inHeader": true,
+          "frame": {
+            "left": 331,
+            "top": 9,
+            "right": 375,
+            "bottom": 53,
+            "width": 44,
+            "height": 44
+          },
+          "visible": {
+            "left": 331,
+            "top": 9.00219298245614,
+            "right": 375,
+            "bottom": 53,
+            "width": 44,
+            "height": 43.99780701754386
+          },
+          "fullyVisible": true,
+          "points": [
+            {
+              "x": 353,
+              "y": 31,
+              "hitOwnedControl": true,
+              "hitTag": "path",
+              "hitAction": "close-menu"
+            },
+            {
+              "x": 342,
+              "y": 20,
+              "hitOwnedControl": true,
+              "hitTag": "BUTTON",
+              "hitAction": "close-menu"
+            },
+            {
+              "x": 364,
+              "y": 20,
+              "hitOwnedControl": true,
+              "hitTag": "BUTTON",
+              "hitAction": "close-menu"
+            },
+            {
+              "x": 342,
+              "y": 42,
+              "hitOwnedControl": true,
+              "hitTag": "BUTTON",
+              "hitAction": "close-menu"
+            },
+            {
+              "x": 364,
+              "y": 42,
+              "hitOwnedControl": true,
+              "hitTag": "BUTTON",
+              "hitAction": "close-menu"
+            }
+          ]
+        },
+        {
+          "action": "focused",
+          "count": 1,
+          "actualAction": "download-translated-subtitles",
+          "actualMode": null,
+          "inHeader": false,
+          "frame": {
+            "left": 136.328125,
+            "top": 96.5,
+            "right": 253.6640625,
+            "bottom": 140.5,
+            "width": 117.3359375,
+            "height": 44
+          },
+          "visible": {
+            "left": 136.328125,
+            "top": 96.5,
+            "right": 253.6640625,
+            "bottom": 140.5,
+            "width": 117.3359375,
+            "height": 44
+          },
+          "fullyVisible": true,
+          "points": [
+            {
+              "x": 194.99609375,
+              "y": 118.5,
+              "hitOwnedControl": true,
+              "hitTag": "SPAN",
+              "hitAction": "download-translated-subtitles"
+            },
+            {
+              "x": 165.662109375,
+              "y": 107.5,
+              "hitOwnedControl": true,
+              "hitTag": "BUTTON",
+              "hitAction": "download-translated-subtitles"
+            },
+            {
+              "x": 224.330078125,
+              "y": 107.5,
+              "hitOwnedControl": true,
+              "hitTag": "BUTTON",
+              "hitAction": "download-translated-subtitles"
+            },
+            {
+              "x": 165.662109375,
+              "y": 129.5,
+              "hitOwnedControl": true,
+              "hitTag": "BUTTON",
+              "hitAction": "download-translated-subtitles"
+            },
+            {
+              "x": 224.330078125,
+              "y": 129.5,
+              "hitOwnedControl": true,
+              "hitTag": "BUTTON",
+              "hitAction": "download-translated-subtitles"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "portrait-menu-keyboard-3-ArrowUp",
+      "menu": {
+        "left": 8,
+        "top": 8,
+        "right": 382,
+        "bottom": 179.375,
+        "width": 374,
+        "height": 171.375
+      },
+      "menuPaddingTop": 6,
+      "menuClipTop": 9.00219298245614,
+      "header": {
+        "left": 15,
+        "top": 9,
+        "right": 375,
+        "bottom": 53,
+        "width": 360,
+        "height": 44
+      },
+      "headerVisible": {
+        "left": 15,
+        "top": 9.00219298245614,
+        "right": 375,
+        "bottom": 53,
+        "width": 360,
+        "height": 43.99780701754386
+      },
+      "headerTopHits": [
+        {
+          "x": 105,
+          "y": 10.00219298245614,
+          "hitOwnedHeader": true,
+          "hitTag": "DIV"
+        },
+        {
+          "x": 195,
+          "y": 10.00219298245614,
+          "hitOwnedHeader": true,
+          "hitTag": "DIV"
+        },
+        {
+          "x": 285,
+          "y": 10.00219298245614,
+          "hitOwnedHeader": true,
+          "hitTag": "BUTTON"
+        }
+      ],
+      "headerBackground": "rgb(24, 24, 28)",
+      "visualViewport": {
+        "left": 0,
+        "top": 0,
+        "right": 390,
+        "bottom": 844
+      },
+      "scrollTop": 114.5,
+      "scrollHeight": 292,
+      "clientHeight": 169,
+      "timingRow": null,
+      "targets": [
+        {
+          "action": "close-menu",
+          "count": 1,
+          "actualAction": "close-menu",
+          "actualMode": null,
+          "inHeader": true,
+          "frame": {
+            "left": 331,
+            "top": 9,
+            "right": 375,
+            "bottom": 53,
+            "width": 44,
+            "height": 44
+          },
+          "visible": {
+            "left": 331,
+            "top": 9.00219298245614,
+            "right": 375,
+            "bottom": 53,
+            "width": 44,
+            "height": 43.99780701754386
+          },
+          "fullyVisible": true,
+          "points": [
+            {
+              "x": 353,
+              "y": 31,
+              "hitOwnedControl": true,
+              "hitTag": "path",
+              "hitAction": "close-menu"
+            },
+            {
+              "x": 342,
+              "y": 20,
+              "hitOwnedControl": true,
+              "hitTag": "BUTTON",
+              "hitAction": "close-menu"
+            },
+            {
+              "x": 364,
+              "y": 20,
+              "hitOwnedControl": true,
+              "hitTag": "BUTTON",
+              "hitAction": "close-menu"
+            },
+            {
+              "x": 342,
+              "y": 42,
+              "hitOwnedControl": true,
+              "hitTag": "BUTTON",
+              "hitAction": "close-menu"
+            },
+            {
+              "x": 364,
+              "y": 42,
+              "hitOwnedControl": true,
+              "hitTag": "BUTTON",
+              "hitAction": "close-menu"
+            }
+          ]
+        },
+        {
+          "action": "focused",
+          "count": 1,
+          "actualAction": "download-subtitles",
+          "actualMode": null,
+          "inHeader": false,
+          "frame": {
+            "left": 15,
+            "top": 96.5,
+            "right": 132.328125,
+            "bottom": 140.5,
+            "width": 117.328125,
+            "height": 44
+          },
+          "visible": {
+            "left": 15,
+            "top": 96.5,
+            "right": 132.328125,
+            "bottom": 140.5,
+            "width": 117.328125,
+            "height": 44
+          },
+          "fullyVisible": true,
+          "points": [
+            {
+              "x": 73.6640625,
+              "y": 118.5,
+              "hitOwnedControl": true,
+              "hitTag": "SPAN",
+              "hitAction": "download-subtitles"
+            },
+            {
+              "x": 44.33203125,
+              "y": 107.5,
+              "hitOwnedControl": true,
+              "hitTag": "BUTTON",
+              "hitAction": "download-subtitles"
+            },
+            {
+              "x": 102.99609375,
+              "y": 107.5,
+              "hitOwnedControl": true,
+              "hitTag": "BUTTON",
+              "hitAction": "download-subtitles"
+            },
+            {
+              "x": 44.33203125,
+              "y": 129.5,
+              "hitOwnedControl": true,
+              "hitTag": "BUTTON",
+              "hitAction": "download-subtitles"
+            },
+            {
+              "x": 102.99609375,
+              "y": 129.5,
+              "hitOwnedControl": true,
+              "hitTag": "BUTTON",
+              "hitAction": "download-subtitles"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "portrait-menu-keyboard-4-ArrowUp",
+      "menu": {
+        "left": 8,
+        "top": 8,
+        "right": 382,
+        "bottom": 179.375,
+        "width": 374,
+        "height": 171.375
+      },
+      "menuPaddingTop": 6,
+      "menuClipTop": 9.00219298245614,
+      "header": {
+        "left": 15,
+        "top": 9,
+        "right": 375,
+        "bottom": 53,
+        "width": 360,
+        "height": 44
+      },
+      "headerVisible": {
+        "left": 15,
+        "top": 9.00219298245614,
+        "right": 375,
+        "bottom": 53,
+        "width": 360,
+        "height": 43.99780701754386
+      },
+      "headerTopHits": [
+        {
+          "x": 105,
+          "y": 10.00219298245614,
+          "hitOwnedHeader": true,
+          "hitTag": "DIV"
+        },
+        {
+          "x": 195,
+          "y": 10.00219298245614,
+          "hitOwnedHeader": true,
+          "hitTag": "DIV"
+        },
+        {
+          "x": 285,
+          "y": 10.00219298245614,
+          "hitOwnedHeader": true,
+          "hitTag": "BUTTON"
+        }
+      ],
+      "headerBackground": "rgb(24, 24, 28)",
+      "visualViewport": {
+        "left": 0,
+        "top": 0,
+        "right": 390,
+        "bottom": 844
+      },
+      "scrollTop": 104,
+      "scrollHeight": 292,
+      "clientHeight": 169,
+      "timingRow": null,
+      "targets": [
+        {
+          "action": "close-menu",
+          "count": 1,
+          "actualAction": "close-menu",
+          "actualMode": null,
+          "inHeader": true,
+          "frame": {
+            "left": 331,
+            "top": 9,
+            "right": 375,
+            "bottom": 53,
+            "width": 44,
+            "height": 44
+          },
+          "visible": {
+            "left": 331,
+            "top": 9.00219298245614,
+            "right": 375,
+            "bottom": 53,
+            "width": 44,
+            "height": 43.99780701754386
+          },
+          "fullyVisible": true,
+          "points": [
+            {
+              "x": 353,
+              "y": 31,
+              "hitOwnedControl": true,
+              "hitTag": "path",
+              "hitAction": "close-menu"
+            },
+            {
+              "x": 342,
+              "y": 20,
+              "hitOwnedControl": true,
+              "hitTag": "BUTTON",
+              "hitAction": "close-menu"
+            },
+            {
+              "x": 364,
+              "y": 20,
+              "hitOwnedControl": true,
+              "hitTag": "BUTTON",
+              "hitAction": "close-menu"
+            },
+            {
+              "x": 342,
+              "y": 42,
+              "hitOwnedControl": true,
+              "hitTag": "BUTTON",
+              "hitAction": "close-menu"
+            },
+            {
+              "x": 364,
+              "y": 42,
+              "hitOwnedControl": true,
+              "hitTag": "BUTTON",
+              "hitAction": "close-menu"
+            }
+          ]
+        },
+        {
+          "action": "focused",
+          "count": 1,
+          "actualAction": "subtitle-later",
+          "actualMode": null,
+          "inHeader": false,
+          "frame": {
+            "left": 331,
+            "top": 59,
+            "right": 375,
+            "bottom": 103,
+            "width": 44,
+            "height": 44
+          },
+          "visible": {
+            "left": 331,
+            "top": 59,
+            "right": 375,
+            "bottom": 103,
+            "width": 44,
+            "height": 44
+          },
+          "fullyVisible": true,
+          "points": [
+            {
+              "x": 353,
+              "y": 81,
+              "hitOwnedControl": true,
+              "hitTag": "path",
+              "hitAction": "subtitle-later"
+            },
+            {
+              "x": 342,
+              "y": 70,
+              "hitOwnedControl": true,
+              "hitTag": "BUTTON",
+              "hitAction": "subtitle-later"
+            },
+            {
+              "x": 364,
+              "y": 70,
+              "hitOwnedControl": true,
+              "hitTag": "BUTTON",
+              "hitAction": "subtitle-later"
+            },
+            {
+              "x": 342,
+              "y": 92,
+              "hitOwnedControl": true,
+              "hitTag": "BUTTON",
+              "hitAction": "subtitle-later"
+            },
+            {
+              "x": 364,
+              "y": 92,
+              "hitOwnedControl": true,
+              "hitTag": "BUTTON",
+              "hitAction": "subtitle-later"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "portrait-menu-keyboard-5-ArrowUp",
+      "menu": {
+        "left": 8,
+        "top": 8,
+        "right": 382,
+        "bottom": 179.375,
+        "width": 374,
+        "height": 171.375
+      },
+      "menuPaddingTop": 6,
+      "menuClipTop": 9.00219298245614,
+      "header": {
+        "left": 15,
+        "top": 9,
+        "right": 375,
+        "bottom": 53,
+        "width": 360,
+        "height": 44
+      },
+      "headerVisible": {
+        "left": 15,
+        "top": 9.00219298245614,
+        "right": 375,
+        "bottom": 53,
+        "width": 360,
+        "height": 43.99780701754386
+      },
+      "headerTopHits": [
+        {
+          "x": 105,
+          "y": 10.00219298245614,
+          "hitOwnedHeader": true,
+          "hitTag": "DIV"
+        },
+        {
+          "x": 195,
+          "y": 10.00219298245614,
+          "hitOwnedHeader": true,
+          "hitTag": "DIV"
+        },
+        {
+          "x": 285,
+          "y": 10.00219298245614,
+          "hitOwnedHeader": true,
+          "hitTag": "BUTTON"
+        }
+      ],
+      "headerBackground": "rgb(24, 24, 28)",
+      "visualViewport": {
+        "left": 0,
+        "top": 0,
+        "right": 390,
+        "bottom": 844
+      },
+      "scrollTop": 104,
+      "scrollHeight": 292,
+      "clientHeight": 169,
+      "timingRow": null,
+      "targets": [
+        {
+          "action": "close-menu",
+          "count": 1,
+          "actualAction": "close-menu",
+          "actualMode": null,
+          "inHeader": true,
+          "frame": {
+            "left": 331,
+            "top": 9,
+            "right": 375,
+            "bottom": 53,
+            "width": 44,
+            "height": 44
+          },
+          "visible": {
+            "left": 331,
+            "top": 9.00219298245614,
+            "right": 375,
+            "bottom": 53,
+            "width": 44,
+            "height": 43.99780701754386
+          },
+          "fullyVisible": true,
+          "points": [
+            {
+              "x": 353,
+              "y": 31,
+              "hitOwnedControl": true,
+              "hitTag": "path",
+              "hitAction": "close-menu"
+            },
+            {
+              "x": 342,
+              "y": 20,
+              "hitOwnedControl": true,
+              "hitTag": "BUTTON",
+              "hitAction": "close-menu"
+            },
+            {
+              "x": 364,
+              "y": 20,
+              "hitOwnedControl": true,
+              "hitTag": "BUTTON",
+              "hitAction": "close-menu"
+            },
+            {
+              "x": 342,
+              "y": 42,
+              "hitOwnedControl": true,
+              "hitTag": "BUTTON",
+              "hitAction": "close-menu"
+            },
+            {
+              "x": 364,
+              "y": 42,
+              "hitOwnedControl": true,
+              "hitTag": "BUTTON",
+              "hitAction": "close-menu"
+            }
+          ]
+        },
+        {
+          "action": "focused",
+          "count": 1,
+          "actualAction": "subtitle-earlier",
+          "actualMode": null,
+          "inHeader": false,
+          "frame": {
+            "left": 243,
+            "top": 59,
+            "right": 287,
+            "bottom": 103,
+            "width": 44,
+            "height": 44
+          },
+          "visible": {
+            "left": 243,
+            "top": 59,
+            "right": 287,
+            "bottom": 103,
+            "width": 44,
+            "height": 44
+          },
+          "fullyVisible": true,
+          "points": [
+            {
+              "x": 265,
+              "y": 81,
+              "hitOwnedControl": true,
+              "hitTag": "path",
+              "hitAction": "subtitle-earlier"
+            },
+            {
+              "x": 254,
+              "y": 70,
+              "hitOwnedControl": true,
+              "hitTag": "BUTTON",
+              "hitAction": "subtitle-earlier"
+            },
+            {
+              "x": 276,
+              "y": 70,
+              "hitOwnedControl": true,
+              "hitTag": "BUTTON",
+              "hitAction": "subtitle-earlier"
+            },
+            {
+              "x": 254,
+              "y": 92,
+              "hitOwnedControl": true,
+              "hitTag": "BUTTON",
+              "hitAction": "subtitle-earlier"
+            },
+            {
+              "x": 276,
+              "y": 92,
+              "hitOwnedControl": true,
+              "hitTag": "BUTTON",
+              "hitAction": "subtitle-earlier"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "portrait-menu-keyboard-6-ArrowUp",
+      "menu": {
+        "left": 8,
+        "top": 8,
+        "right": 382,
+        "bottom": 179.375,
+        "width": 374,
+        "height": 171.375
+      },
+      "menuPaddingTop": 6,
+      "menuClipTop": 9.00219298245614,
+      "header": {
+        "left": 15,
+        "top": 9,
+        "right": 375,
+        "bottom": 53,
+        "width": 360,
+        "height": 44
+      },
+      "headerVisible": {
+        "left": 15,
+        "top": 9.00219298245614,
+        "right": 375,
+        "bottom": 53,
+        "width": 360,
+        "height": 43.99780701754386
+      },
+      "headerTopHits": [
+        {
+          "x": 105,
+          "y": 10.00219298245614,
+          "hitOwnedHeader": true,
+          "hitTag": "DIV"
+        },
+        {
+          "x": 195,
+          "y": 10.00219298245614,
+          "hitOwnedHeader": true,
+          "hitTag": "DIV"
+        },
+        {
+          "x": 285,
+          "y": 10.00219298245614,
+          "hitOwnedHeader": true,
+          "hitTag": "BUTTON"
+        }
+      ],
+      "headerBackground": "rgb(24, 24, 28)",
+      "visualViewport": {
+        "left": 0,
+        "top": 0,
+        "right": 390,
+        "bottom": 844
+      },
+      "scrollTop": 16.5,
+      "scrollHeight": 292,
+      "clientHeight": 169,
+      "timingRow": null,
+      "targets": [
+        {
+          "action": "close-menu",
+          "count": 1,
+          "actualAction": "close-menu",
+          "actualMode": null,
+          "inHeader": true,
+          "frame": {
+            "left": 331,
+            "top": 9,
+            "right": 375,
+            "bottom": 53,
+            "width": 44,
+            "height": 44
+          },
+          "visible": {
+            "left": 331,
+            "top": 9.00219298245614,
+            "right": 375,
+            "bottom": 53,
+            "width": 44,
+            "height": 43.99780701754386
+          },
+          "fullyVisible": true,
+          "points": [
+            {
+              "x": 353,
+              "y": 31,
+              "hitOwnedControl": true,
+              "hitTag": "path",
+              "hitAction": "close-menu"
+            },
+            {
+              "x": 342,
+              "y": 20,
+              "hitOwnedControl": true,
+              "hitTag": "BUTTON",
+              "hitAction": "close-menu"
+            },
+            {
+              "x": 364,
+              "y": 20,
+              "hitOwnedControl": true,
+              "hitTag": "BUTTON",
+              "hitAction": "close-menu"
+            },
+            {
+              "x": 342,
+              "y": 42,
+              "hitOwnedControl": true,
+              "hitTag": "BUTTON",
+              "hitAction": "close-menu"
+            },
+            {
+              "x": 364,
+              "y": 42,
+              "hitOwnedControl": true,
+              "hitTag": "BUTTON",
+              "hitAction": "close-menu"
+            }
+          ]
+        },
+        {
+          "action": "focused",
+          "count": 1,
+          "actualAction": null,
+          "actualMode": "off",
+          "inHeader": false,
+          "frame": {
+            "left": 155,
+            "top": 96.5,
+            "right": 199,
+            "bottom": 140.5,
+            "width": 44,
+            "height": 44
+          },
+          "visible": {
+            "left": 155,
+            "top": 96.5,
+            "right": 199,
+            "bottom": 140.5,
+            "width": 44,
+            "height": 44
+          },
+          "fullyVisible": true,
+          "points": [
+            {
+              "x": 177,
+              "y": 118.5,
+              "hitOwnedControl": true,
+              "hitTag": "BUTTON",
+              "hitAction": null
+            },
+            {
+              "x": 166,
+              "y": 107.5,
+              "hitOwnedControl": true,
+              "hitTag": "BUTTON",
+              "hitAction": null
+            },
+            {
+              "x": 188,
+              "y": 107.5,
+              "hitOwnedControl": true,
+              "hitTag": "BUTTON",
+              "hitAction": null
+            },
+            {
+              "x": 166,
+              "y": 129.5,
+              "hitOwnedControl": true,
+              "hitTag": "BUTTON",
+              "hitAction": null
+            },
+            {
+              "x": 188,
+              "y": 129.5,
+              "hitOwnedControl": true,
+              "hitTag": "BUTTON",
+              "hitAction": null
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "portrait-menu-keyboard-7-ArrowUp",
+      "menu": {
+        "left": 8,
+        "top": 8,
+        "right": 382,
+        "bottom": 179.375,
+        "width": 374,
+        "height": 171.375
+      },
+      "menuPaddingTop": 6,
+      "menuClipTop": 9.00219298245614,
+      "header": {
+        "left": 15,
+        "top": 9,
+        "right": 375,
+        "bottom": 53,
+        "width": 360,
+        "height": 44
+      },
+      "headerVisible": {
+        "left": 15,
+        "top": 9.00219298245614,
+        "right": 375,
+        "bottom": 53,
+        "width": 360,
+        "height": 43.99780701754386
+      },
+      "headerTopHits": [
+        {
+          "x": 105,
+          "y": 10.00219298245614,
+          "hitOwnedHeader": true,
+          "hitTag": "DIV"
+        },
+        {
+          "x": 195,
+          "y": 10.00219298245614,
+          "hitOwnedHeader": true,
+          "hitTag": "DIV"
+        },
+        {
+          "x": 285,
+          "y": 10.00219298245614,
+          "hitOwnedHeader": true,
+          "hitTag": "BUTTON"
+        }
+      ],
+      "headerBackground": "rgb(24, 24, 28)",
+      "visualViewport": {
+        "left": 0,
+        "top": 0,
+        "right": 390,
+        "bottom": 844
+      },
+      "scrollTop": 16.5,
+      "scrollHeight": 292,
+      "clientHeight": 169,
+      "timingRow": null,
+      "targets": [
+        {
+          "action": "close-menu",
+          "count": 1,
+          "actualAction": "close-menu",
+          "actualMode": null,
+          "inHeader": true,
+          "frame": {
+            "left": 331,
+            "top": 9,
+            "right": 375,
+            "bottom": 53,
+            "width": 44,
+            "height": 44
+          },
+          "visible": {
+            "left": 331,
+            "top": 9.00219298245614,
+            "right": 375,
+            "bottom": 53,
+            "width": 44,
+            "height": 43.99780701754386
+          },
+          "fullyVisible": true,
+          "points": [
+            {
+              "x": 353,
+              "y": 31,
+              "hitOwnedControl": true,
+              "hitTag": "path",
+              "hitAction": "close-menu"
+            },
+            {
+              "x": 342,
+              "y": 20,
+              "hitOwnedControl": true,
+              "hitTag": "BUTTON",
+              "hitAction": "close-menu"
+            },
+            {
+              "x": 364,
+              "y": 20,
+              "hitOwnedControl": true,
+              "hitTag": "BUTTON",
+              "hitAction": "close-menu"
+            },
+            {
+              "x": 342,
+              "y": 42,
+              "hitOwnedControl": true,
+              "hitTag": "BUTTON",
+              "hitAction": "close-menu"
+            },
+            {
+              "x": 364,
+              "y": 42,
+              "hitOwnedControl": true,
+              "hitTag": "BUTTON",
+              "hitAction": "close-menu"
+            }
+          ]
+        },
+        {
+          "action": "focused",
+          "count": 1,
+          "actualAction": null,
+          "actualMode": "original-only",
+          "inHeader": false,
+          "frame": {
+            "left": 109,
+            "top": 96.5,
+            "right": 153,
+            "bottom": 140.5,
+            "width": 44,
+            "height": 44
+          },
+          "visible": {
+            "left": 109,
+            "top": 96.5,
+            "right": 153,
+            "bottom": 140.5,
+            "width": 44,
+            "height": 44
+          },
+          "fullyVisible": true,
+          "points": [
+            {
+              "x": 131,
+              "y": 118.5,
+              "hitOwnedControl": true,
+              "hitTag": "BUTTON",
+              "hitAction": null
+            },
+            {
+              "x": 120,
+              "y": 107.5,
+              "hitOwnedControl": true,
+              "hitTag": "BUTTON",
+              "hitAction": null
+            },
+            {
+              "x": 142,
+              "y": 107.5,
+              "hitOwnedControl": true,
+              "hitTag": "BUTTON",
+              "hitAction": null
+            },
+            {
+              "x": 120,
+              "y": 129.5,
+              "hitOwnedControl": true,
+              "hitTag": "BUTTON",
+              "hitAction": null
+            },
+            {
+              "x": 142,
+              "y": 129.5,
+              "hitOwnedControl": true,
+              "hitTag": "BUTTON",
+              "hitAction": null
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "portrait-menu-keyboard-8-ArrowUp",
+      "menu": {
+        "left": 8,
+        "top": 8,
+        "right": 382,
+        "bottom": 179.375,
+        "width": 374,
+        "height": 171.375
+      },
+      "menuPaddingTop": 6,
+      "menuClipTop": 9.00219298245614,
+      "header": {
+        "left": 15,
+        "top": 9,
+        "right": 375,
+        "bottom": 53,
+        "width": 360,
+        "height": 44
+      },
+      "headerVisible": {
+        "left": 15,
+        "top": 9.00219298245614,
+        "right": 375,
+        "bottom": 53,
+        "width": 360,
+        "height": 43.99780701754386
+      },
+      "headerTopHits": [
+        {
+          "x": 105,
+          "y": 10.00219298245614,
+          "hitOwnedHeader": true,
+          "hitTag": "DIV"
+        },
+        {
+          "x": 195,
+          "y": 10.00219298245614,
+          "hitOwnedHeader": true,
+          "hitTag": "DIV"
+        },
+        {
+          "x": 285,
+          "y": 10.00219298245614,
+          "hitOwnedHeader": true,
+          "hitTag": "BUTTON"
+        }
+      ],
+      "headerBackground": "rgb(24, 24, 28)",
+      "visualViewport": {
+        "left": 0,
+        "top": 0,
+        "right": 390,
+        "bottom": 844
+      },
+      "scrollTop": 16.5,
+      "scrollHeight": 292,
+      "clientHeight": 169,
+      "timingRow": null,
+      "targets": [
+        {
+          "action": "close-menu",
+          "count": 1,
+          "actualAction": "close-menu",
+          "actualMode": null,
+          "inHeader": true,
+          "frame": {
+            "left": 331,
+            "top": 9,
+            "right": 375,
+            "bottom": 53,
+            "width": 44,
+            "height": 44
+          },
+          "visible": {
+            "left": 331,
+            "top": 9.00219298245614,
+            "right": 375,
+            "bottom": 53,
+            "width": 44,
+            "height": 43.99780701754386
+          },
+          "fullyVisible": true,
+          "points": [
+            {
+              "x": 353,
+              "y": 31,
+              "hitOwnedControl": true,
+              "hitTag": "path",
+              "hitAction": "close-menu"
+            },
+            {
+              "x": 342,
+              "y": 20,
+              "hitOwnedControl": true,
+              "hitTag": "BUTTON",
+              "hitAction": "close-menu"
+            },
+            {
+              "x": 364,
+              "y": 20,
+              "hitOwnedControl": true,
+              "hitTag": "BUTTON",
+              "hitAction": "close-menu"
+            },
+            {
+              "x": 342,
+              "y": 42,
+              "hitOwnedControl": true,
+              "hitTag": "BUTTON",
+              "hitAction": "close-menu"
+            },
+            {
+              "x": 364,
+              "y": 42,
+              "hitOwnedControl": true,
+              "hitTag": "BUTTON",
+              "hitAction": "close-menu"
+            }
+          ]
+        },
+        {
+          "action": "focused",
+          "count": 1,
+          "actualAction": null,
+          "actualMode": "translation-only",
+          "inHeader": false,
+          "frame": {
+            "left": 63,
+            "top": 96.5,
+            "right": 107,
+            "bottom": 140.5,
+            "width": 44,
+            "height": 44
+          },
+          "visible": {
+            "left": 63,
+            "top": 96.5,
+            "right": 107,
+            "bottom": 140.5,
+            "width": 44,
+            "height": 44
+          },
+          "fullyVisible": true,
+          "points": [
+            {
+              "x": 85,
+              "y": 118.5,
+              "hitOwnedControl": true,
+              "hitTag": "BUTTON",
+              "hitAction": null
+            },
+            {
+              "x": 74,
+              "y": 107.5,
+              "hitOwnedControl": true,
+              "hitTag": "BUTTON",
+              "hitAction": null
+            },
+            {
+              "x": 96,
+              "y": 107.5,
+              "hitOwnedControl": true,
+              "hitTag": "BUTTON",
+              "hitAction": null
+            },
+            {
+              "x": 74,
+              "y": 129.5,
+              "hitOwnedControl": true,
+              "hitTag": "BUTTON",
+              "hitAction": null
+            },
+            {
+              "x": 96,
+              "y": 129.5,
+              "hitOwnedControl": true,
+              "hitTag": "BUTTON",
+              "hitAction": null
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "portrait-menu-keyboard-9-ArrowUp",
+      "menu": {
+        "left": 8,
+        "top": 8,
+        "right": 382,
+        "bottom": 179.375,
+        "width": 374,
+        "height": 171.375
+      },
+      "menuPaddingTop": 6,
+      "menuClipTop": 9.00219298245614,
+      "header": {
+        "left": 15,
+        "top": 9,
+        "right": 375,
+        "bottom": 53,
+        "width": 360,
+        "height": 44
+      },
+      "headerVisible": {
+        "left": 15,
+        "top": 9.00219298245614,
+        "right": 375,
+        "bottom": 53,
+        "width": 360,
+        "height": 43.99780701754386
+      },
+      "headerTopHits": [
+        {
+          "x": 105,
+          "y": 10.00219298245614,
+          "hitOwnedHeader": true,
+          "hitTag": "DIV"
+        },
+        {
+          "x": 195,
+          "y": 10.00219298245614,
+          "hitOwnedHeader": true,
+          "hitTag": "DIV"
+        },
+        {
+          "x": 285,
+          "y": 10.00219298245614,
+          "hitOwnedHeader": true,
+          "hitTag": "BUTTON"
+        }
+      ],
+      "headerBackground": "rgb(24, 24, 28)",
+      "visualViewport": {
+        "left": 0,
+        "top": 0,
+        "right": 390,
+        "bottom": 844
+      },
+      "scrollTop": 16.5,
+      "scrollHeight": 292,
+      "clientHeight": 169,
+      "timingRow": null,
+      "targets": [
+        {
+          "action": "close-menu",
+          "count": 1,
+          "actualAction": "close-menu",
+          "actualMode": null,
+          "inHeader": true,
+          "frame": {
+            "left": 331,
+            "top": 9,
+            "right": 375,
+            "bottom": 53,
+            "width": 44,
+            "height": 44
+          },
+          "visible": {
+            "left": 331,
+            "top": 9.00219298245614,
+            "right": 375,
+            "bottom": 53,
+            "width": 44,
+            "height": 43.99780701754386
+          },
+          "fullyVisible": true,
+          "points": [
+            {
+              "x": 353,
+              "y": 31,
+              "hitOwnedControl": true,
+              "hitTag": "path",
+              "hitAction": "close-menu"
+            },
+            {
+              "x": 342,
+              "y": 20,
+              "hitOwnedControl": true,
+              "hitTag": "BUTTON",
+              "hitAction": "close-menu"
+            },
+            {
+              "x": 364,
+              "y": 20,
+              "hitOwnedControl": true,
+              "hitTag": "BUTTON",
+              "hitAction": "close-menu"
+            },
+            {
+              "x": 342,
+              "y": 42,
+              "hitOwnedControl": true,
+              "hitTag": "BUTTON",
+              "hitAction": "close-menu"
+            },
+            {
+              "x": 364,
+              "y": 42,
+              "hitOwnedControl": true,
+              "hitTag": "BUTTON",
+              "hitAction": "close-menu"
+            }
+          ]
+        },
+        {
+          "action": "focused",
+          "count": 1,
+          "actualAction": null,
+          "actualMode": "bilingual",
+          "inHeader": false,
+          "frame": {
+            "left": 17,
+            "top": 96.5,
+            "right": 61,
+            "bottom": 140.5,
+            "width": 44,
+            "height": 44
+          },
+          "visible": {
+            "left": 17,
+            "top": 96.5,
+            "right": 61,
+            "bottom": 140.5,
+            "width": 44,
+            "height": 44
+          },
+          "fullyVisible": true,
+          "points": [
+            {
+              "x": 39,
+              "y": 118.5,
+              "hitOwnedControl": true,
+              "hitTag": "BUTTON",
+              "hitAction": null
+            },
+            {
+              "x": 28,
+              "y": 107.5,
+              "hitOwnedControl": true,
+              "hitTag": "BUTTON",
+              "hitAction": null
+            },
+            {
+              "x": 50,
+              "y": 107.5,
+              "hitOwnedControl": true,
+              "hitTag": "BUTTON",
+              "hitAction": null
+            },
+            {
+              "x": 28,
+              "y": 129.5,
+              "hitOwnedControl": true,
+              "hitTag": "BUTTON",
+              "hitAction": null
+            },
+            {
+              "x": 50,
+              "y": 129.5,
+              "hitOwnedControl": true,
+              "hitTag": "BUTTON",
+              "hitAction": null
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "portrait-menu-keyboard-10-ArrowUp",
+      "menu": {
+        "left": 8,
+        "top": 8,
+        "right": 382,
+        "bottom": 179.375,
+        "width": 374,
+        "height": 171.375
+      },
+      "menuPaddingTop": 6,
+      "menuClipTop": 9.00219298245614,
+      "header": {
+        "left": 15,
+        "top": 11,
+        "right": 375,
+        "bottom": 55,
+        "width": 360,
+        "height": 44
+      },
+      "headerVisible": {
+        "left": 15,
+        "top": 11,
+        "right": 375,
+        "bottom": 55,
+        "width": 360,
+        "height": 44
+      },
+      "headerTopHits": [
+        {
+          "x": 105,
+          "y": 10.00219298245614,
+          "hitOwnedHeader": false,
+          "hitTag": "DIV"
+        },
+        {
+          "x": 195,
+          "y": 10.00219298245614,
+          "hitOwnedHeader": false,
+          "hitTag": "DIV"
+        },
+        {
+          "x": 285,
+          "y": 10.00219298245614,
+          "hitOwnedHeader": false,
+          "hitTag": "DIV"
+        }
+      ],
+      "headerBackground": "rgb(24, 24, 28)",
+      "visualViewport": {
+        "left": 0,
+        "top": 0,
+        "right": 390,
+        "bottom": 844
+      },
+      "scrollTop": 4,
+      "scrollHeight": 292,
+      "clientHeight": 169,
+      "timingRow": null,
+      "targets": [
+        {
+          "action": "close-menu",
+          "count": 1,
+          "actualAction": "close-menu",
+          "actualMode": null,
+          "inHeader": true,
+          "frame": {
+            "left": 331,
+            "top": 11,
+            "right": 375,
+            "bottom": 55,
+            "width": 44,
+            "height": 44
+          },
+          "visible": {
+            "left": 331,
+            "top": 11,
+            "right": 375,
+            "bottom": 55,
+            "width": 44,
+            "height": 44
+          },
+          "fullyVisible": true,
+          "points": [
+            {
+              "x": 353,
+              "y": 33,
+              "hitOwnedControl": true,
+              "hitTag": "path",
+              "hitAction": "close-menu"
+            },
+            {
+              "x": 342,
+              "y": 22,
+              "hitOwnedControl": true,
+              "hitTag": "BUTTON",
+              "hitAction": "close-menu"
+            },
+            {
+              "x": 364,
+              "y": 22,
+              "hitOwnedControl": true,
+              "hitTag": "BUTTON",
+              "hitAction": "close-menu"
+            },
+            {
+              "x": 342,
+              "y": 44,
+              "hitOwnedControl": true,
+              "hitTag": "BUTTON",
+              "hitAction": "close-menu"
+            },
+            {
+              "x": 364,
+              "y": 44,
+              "hitOwnedControl": true,
+              "hitTag": "BUTTON",
+              "hitAction": "close-menu"
+            }
+          ]
+        },
+        {
+          "action": "focused",
+          "count": 1,
+          "actualAction": "open-sentence-learning",
+          "actualMode": null,
+          "inHeader": false,
+          "frame": {
+            "left": 15,
+            "top": 59,
+            "right": 375,
+            "bottom": 103,
+            "width": 360,
+            "height": 44
+          },
+          "visible": {
+            "left": 15,
+            "top": 59,
+            "right": 375,
+            "bottom": 103,
+            "width": 360,
+            "height": 44
+          },
+          "fullyVisible": true,
+          "points": [
+            {
+              "x": 195,
+              "y": 81,
+              "hitOwnedControl": true,
+              "hitTag": "SPAN",
+              "hitAction": "open-sentence-learning"
+            },
+            {
+              "x": 105,
+              "y": 70,
+              "hitOwnedControl": true,
+              "hitTag": "BUTTON",
+              "hitAction": "open-sentence-learning"
+            },
+            {
+              "x": 285,
+              "y": 70,
+              "hitOwnedControl": true,
+              "hitTag": "BUTTON",
+              "hitAction": "open-sentence-learning"
+            },
+            {
+              "x": 105,
+              "y": 92,
+              "hitOwnedControl": true,
+              "hitTag": "BUTTON",
+              "hitAction": "open-sentence-learning"
+            },
+            {
+              "x": 285,
+              "y": 92,
+              "hitOwnedControl": true,
+              "hitTag": "BUTTON",
+              "hitAction": "open-sentence-learning"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "portrait-menu-keyboard-11-ArrowUp",
+      "menu": {
+        "left": 8,
+        "top": 8,
+        "right": 382,
+        "bottom": 179.375,
+        "width": 374,
+        "height": 171.375
+      },
+      "menuPaddingTop": 6,
+      "menuClipTop": 9.00219298245614,
+      "header": {
+        "left": 15,
+        "top": 15,
+        "right": 375,
+        "bottom": 59,
+        "width": 360,
+        "height": 44
+      },
+      "headerVisible": {
+        "left": 15,
+        "top": 15,
+        "right": 375,
+        "bottom": 59,
+        "width": 360,
+        "height": 44
+      },
+      "headerTopHits": [
+        {
+          "x": 105,
+          "y": 10.00219298245614,
+          "hitOwnedHeader": false,
+          "hitTag": "DIV"
+        },
+        {
+          "x": 195,
+          "y": 10.00219298245614,
+          "hitOwnedHeader": false,
+          "hitTag": "DIV"
+        },
+        {
+          "x": 285,
+          "y": 10.00219298245614,
+          "hitOwnedHeader": false,
+          "hitTag": "DIV"
+        }
+      ],
+      "headerBackground": "rgb(24, 24, 28)",
+      "visualViewport": {
+        "left": 0,
+        "top": 0,
+        "right": 390,
+        "bottom": 844
+      },
+      "scrollTop": 0,
+      "scrollHeight": 292,
+      "clientHeight": 169,
+      "timingRow": null,
+      "targets": [
+        {
+          "action": "close-menu",
+          "count": 1,
+          "actualAction": "close-menu",
+          "actualMode": null,
+          "inHeader": true,
+          "frame": {
+            "left": 331,
+            "top": 15,
+            "right": 375,
+            "bottom": 59,
+            "width": 44,
+            "height": 44
+          },
+          "visible": {
+            "left": 331,
+            "top": 15,
+            "right": 375,
+            "bottom": 59,
+            "width": 44,
+            "height": 44
+          },
+          "fullyVisible": true,
+          "points": [
+            {
+              "x": 353,
+              "y": 37,
+              "hitOwnedControl": true,
+              "hitTag": "path",
+              "hitAction": "close-menu"
+            },
+            {
+              "x": 342,
+              "y": 26,
+              "hitOwnedControl": true,
+              "hitTag": "BUTTON",
+              "hitAction": "close-menu"
+            },
+            {
+              "x": 364,
+              "y": 26,
+              "hitOwnedControl": true,
+              "hitTag": "BUTTON",
+              "hitAction": "close-menu"
+            },
+            {
+              "x": 342,
+              "y": 48,
+              "hitOwnedControl": true,
+              "hitTag": "BUTTON",
+              "hitAction": "close-menu"
+            },
+            {
+              "x": 364,
+              "y": 48,
+              "hitOwnedControl": true,
+              "hitTag": "BUTTON",
+              "hitAction": "close-menu"
+            }
+          ]
+        },
+        {
+          "action": "focused",
+          "count": 1,
+          "actualAction": "close-menu",
+          "actualMode": null,
+          "inHeader": true,
+          "frame": {
+            "left": 331,
+            "top": 15,
+            "right": 375,
+            "bottom": 59,
+            "width": 44,
+            "height": 44
+          },
+          "visible": {
+            "left": 331,
+            "top": 15,
+            "right": 375,
+            "bottom": 59,
+            "width": 44,
+            "height": 44
+          },
+          "fullyVisible": true,
+          "points": [
+            {
+              "x": 353,
+              "y": 37,
+              "hitOwnedControl": true,
+              "hitTag": "path",
+              "hitAction": "close-menu"
+            },
+            {
+              "x": 342,
+              "y": 26,
+              "hitOwnedControl": true,
+              "hitTag": "BUTTON",
+              "hitAction": "close-menu"
+            },
+            {
+              "x": 364,
+              "y": 26,
+              "hitOwnedControl": true,
+              "hitTag": "BUTTON",
+              "hitAction": "close-menu"
+            },
+            {
+              "x": 342,
+              "y": 48,
+              "hitOwnedControl": true,
+              "hitTag": "BUTTON",
+              "hitAction": "close-menu"
+            },
+            {
+              "x": 364,
+              "y": 48,
+              "hitOwnedControl": true,
+              "hitTag": "BUTTON",
+              "hitAction": "close-menu"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "portrait-menu-keyboard-12-Home",
+      "menu": {
+        "left": 8,
+        "top": 8,
+        "right": 382,
+        "bottom": 179.375,
+        "width": 374,
+        "height": 171.375
+      },
+      "menuPaddingTop": 6,
+      "menuClipTop": 9.00219298245614,
+      "header": {
+        "left": 15,
+        "top": 15,
+        "right": 375,
+        "bottom": 59,
+        "width": 360,
+        "height": 44
+      },
+      "headerVisible": {
+        "left": 15,
+        "top": 15,
+        "right": 375,
+        "bottom": 59,
+        "width": 360,
+        "height": 44
+      },
+      "headerTopHits": [
+        {
+          "x": 105,
+          "y": 10.00219298245614,
+          "hitOwnedHeader": false,
+          "hitTag": "DIV"
+        },
+        {
+          "x": 195,
+          "y": 10.00219298245614,
+          "hitOwnedHeader": false,
+          "hitTag": "DIV"
+        },
+        {
+          "x": 285,
+          "y": 10.00219298245614,
+          "hitOwnedHeader": false,
+          "hitTag": "DIV"
+        }
+      ],
+      "headerBackground": "rgb(24, 24, 28)",
+      "visualViewport": {
+        "left": 0,
+        "top": 0,
+        "right": 390,
+        "bottom": 844
+      },
+      "scrollTop": 0,
+      "scrollHeight": 292,
+      "clientHeight": 169,
+      "timingRow": null,
+      "targets": [
+        {
+          "action": "close-menu",
+          "count": 1,
+          "actualAction": "close-menu",
+          "actualMode": null,
+          "inHeader": true,
+          "frame": {
+            "left": 331,
+            "top": 15,
+            "right": 375,
+            "bottom": 59,
+            "width": 44,
+            "height": 44
+          },
+          "visible": {
+            "left": 331,
+            "top": 15,
+            "right": 375,
+            "bottom": 59,
+            "width": 44,
+            "height": 44
+          },
+          "fullyVisible": true,
+          "points": [
+            {
+              "x": 353,
+              "y": 37,
+              "hitOwnedControl": true,
+              "hitTag": "path",
+              "hitAction": "close-menu"
+            },
+            {
+              "x": 342,
+              "y": 26,
+              "hitOwnedControl": true,
+              "hitTag": "BUTTON",
+              "hitAction": "close-menu"
+            },
+            {
+              "x": 364,
+              "y": 26,
+              "hitOwnedControl": true,
+              "hitTag": "BUTTON",
+              "hitAction": "close-menu"
+            },
+            {
+              "x": 342,
+              "y": 48,
+              "hitOwnedControl": true,
+              "hitTag": "BUTTON",
+              "hitAction": "close-menu"
+            },
+            {
+              "x": 364,
+              "y": 48,
+              "hitOwnedControl": true,
+              "hitTag": "BUTTON",
+              "hitAction": "close-menu"
+            }
+          ]
+        },
+        {
+          "action": "focused",
+          "count": 1,
+          "actualAction": "open-settings",
+          "actualMode": null,
+          "inHeader": true,
+          "frame": {
+            "left": 258,
+            "top": 15,
+            "right": 325,
+            "bottom": 59,
+            "width": 67,
+            "height": 44
+          },
+          "visible": {
+            "left": 258,
+            "top": 15,
+            "right": 325,
+            "bottom": 59,
+            "width": 67,
+            "height": 44
+          },
+          "fullyVisible": true,
+          "points": [
+            {
+              "x": 291.5,
+              "y": 37,
+              "hitOwnedControl": true,
+              "hitTag": "SPAN",
+              "hitAction": "open-settings"
+            },
+            {
+              "x": 274.75,
+              "y": 26,
+              "hitOwnedControl": true,
+              "hitTag": "BUTTON",
+              "hitAction": "open-settings"
+            },
+            {
+              "x": 308.25,
+              "y": 26,
+              "hitOwnedControl": true,
+              "hitTag": "BUTTON",
+              "hitAction": "open-settings"
+            },
+            {
+              "x": 274.75,
+              "y": 48,
+              "hitOwnedControl": true,
+              "hitTag": "BUTTON",
+              "hitAction": "open-settings"
+            },
+            {
+              "x": 308.25,
+              "y": 48,
+              "hitOwnedControl": true,
+              "hitTag": "BUTTON",
+              "hitAction": "open-settings"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "desktop-menu-open",
+      "menu": {
+        "left": 992,
+        "top": 419.3671875,
+        "right": 1272,
+        "bottom": 680,
+        "width": 280,
+        "height": 260.6328125
+      },
+      "menuPaddingTop": 6,
+      "menuClipTop": 420.36578065134097,
+      "header": {
+        "left": 999,
+        "top": 426.3671875,
+        "right": 1265,
+        "bottom": 454.3671875,
+        "width": 266,
+        "height": 28
+      },
+      "headerVisible": {
+        "left": 999,
+        "top": 426.3671875,
+        "right": 1265,
+        "bottom": 454.3671875,
+        "width": 266,
+        "height": 28
+      },
+      "headerTopHits": [
+        {
+          "x": 1065.5,
+          "y": 421.36578065134097,
+          "hitOwnedHeader": false,
+          "hitTag": "DIV"
+        },
+        {
+          "x": 1132,
+          "y": 421.36578065134097,
+          "hitOwnedHeader": false,
+          "hitTag": "DIV"
+        },
+        {
+          "x": 1198.5,
+          "y": 421.36578065134097,
+          "hitOwnedHeader": false,
+          "hitTag": "DIV"
+        }
+      ],
+      "headerBackground": "rgb(24, 24, 28)",
+      "visualViewport": {
+        "left": 0,
+        "top": 0,
+        "right": 1280,
+        "bottom": 900
+      },
+      "scrollTop": 0,
+      "scrollHeight": 259,
+      "clientHeight": 259,
+      "timingRow": null,
+      "targets": [
+        {
+          "action": "close-menu",
+          "count": 1,
+          "actualAction": "close-menu",
+          "actualMode": null,
+          "inHeader": true,
+          "frame": {
+            "left": 1237,
+            "top": 426.3671875,
+            "right": 1265,
+            "bottom": 454.3671875,
+            "width": 28,
+            "height": 28
+          },
+          "visible": {
+            "left": 1237,
+            "top": 426.3671875,
+            "right": 1265,
+            "bottom": 454.3671875,
+            "width": 28,
+            "height": 28
+          },
+          "fullyVisible": true,
+          "points": [
+            {
+              "x": 1251,
+              "y": 440.3671875,
+              "hitOwnedControl": true,
+              "hitTag": "path",
+              "hitAction": "close-menu"
+            },
+            {
+              "x": 1244,
+              "y": 433.3671875,
+              "hitOwnedControl": true,
+              "hitTag": "svg",
+              "hitAction": "close-menu"
+            },
+            {
+              "x": 1258,
+              "y": 433.3671875,
+              "hitOwnedControl": true,
+              "hitTag": "BUTTON",
+              "hitAction": "close-menu"
+            },
+            {
+              "x": 1244,
+              "y": 447.3671875,
+              "hitOwnedControl": true,
+              "hitTag": "BUTTON",
+              "hitAction": "close-menu"
+            },
+            {
+              "x": 1258,
+              "y": 447.3671875,
+              "hitOwnedControl": true,
+              "hitTag": "BUTTON",
+              "hitAction": "close-menu"
+            }
+          ]
+        },
+        {
+          "action": "focused",
+          "count": 1,
+          "actualAction": null,
+          "actualMode": "bilingual",
+          "inHeader": false,
+          "frame": {
+            "left": 1001,
+            "top": 505.1640625,
+            "right": 1065,
+            "bottom": 537.1640625,
+            "width": 64,
+            "height": 32
+          },
+          "visible": {
+            "left": 1001,
+            "top": 505.1640625,
+            "right": 1065,
+            "bottom": 537.1640625,
+            "width": 64,
+            "height": 32
+          },
+          "fullyVisible": true,
+          "points": [
+            {
+              "x": 1033,
+              "y": 521.1640625,
+              "hitOwnedControl": true,
+              "hitTag": "BUTTON",
+              "hitAction": null
+            },
+            {
+              "x": 1017,
+              "y": 513.1640625,
+              "hitOwnedControl": true,
+              "hitTag": "BUTTON",
+              "hitAction": null
+            },
+            {
+              "x": 1049,
+              "y": 513.1640625,
+              "hitOwnedControl": true,
+              "hitTag": "BUTTON",
+              "hitAction": null
+            },
+            {
+              "x": 1017,
+              "y": 529.1640625,
+              "hitOwnedControl": true,
+              "hitTag": "BUTTON",
+              "hitAction": null
+            },
+            {
+              "x": 1049,
+              "y": 529.1640625,
+              "hitOwnedControl": true,
+              "hitTag": "BUTTON",
+              "hitAction": null
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "desktop-menu-keyboard-End",
+      "menu": {
+        "left": 992,
+        "top": 419.3671875,
+        "right": 1272,
+        "bottom": 680,
+        "width": 280,
+        "height": 260.6328125
+      },
+      "menuPaddingTop": 6,
+      "menuClipTop": 420.36578065134097,
+      "header": {
+        "left": 999,
+        "top": 426.3671875,
+        "right": 1265,
+        "bottom": 454.3671875,
+        "width": 266,
+        "height": 28
+      },
+      "headerVisible": {
+        "left": 999,
+        "top": 426.3671875,
+        "right": 1265,
+        "bottom": 454.3671875,
+        "width": 266,
+        "height": 28
+      },
+      "headerTopHits": [
+        {
+          "x": 1065.5,
+          "y": 421.36578065134097,
+          "hitOwnedHeader": false,
+          "hitTag": "DIV"
+        },
+        {
+          "x": 1132,
+          "y": 421.36578065134097,
+          "hitOwnedHeader": false,
+          "hitTag": "DIV"
+        },
+        {
+          "x": 1198.5,
+          "y": 421.36578065134097,
+          "hitOwnedHeader": false,
+          "hitTag": "DIV"
+        }
+      ],
+      "headerBackground": "rgb(24, 24, 28)",
+      "visualViewport": {
+        "left": 0,
+        "top": 0,
+        "right": 1280,
+        "bottom": 900
+      },
+      "scrollTop": 0,
+      "scrollHeight": 259,
+      "clientHeight": 259,
+      "timingRow": null,
+      "targets": [
+        {
+          "action": "close-menu",
+          "count": 1,
+          "actualAction": "close-menu",
+          "actualMode": null,
+          "inHeader": true,
+          "frame": {
+            "left": 1237,
+            "top": 426.3671875,
+            "right": 1265,
+            "bottom": 454.3671875,
+            "width": 28,
+            "height": 28
+          },
+          "visible": {
+            "left": 1237,
+            "top": 426.3671875,
+            "right": 1265,
+            "bottom": 454.3671875,
+            "width": 28,
+            "height": 28
+          },
+          "fullyVisible": true,
+          "points": [
+            {
+              "x": 1251,
+              "y": 440.3671875,
+              "hitOwnedControl": true,
+              "hitTag": "path",
+              "hitAction": "close-menu"
+            },
+            {
+              "x": 1244,
+              "y": 433.3671875,
+              "hitOwnedControl": true,
+              "hitTag": "svg",
+              "hitAction": "close-menu"
+            },
+            {
+              "x": 1258,
+              "y": 433.3671875,
+              "hitOwnedControl": true,
+              "hitTag": "BUTTON",
+              "hitAction": "close-menu"
+            },
+            {
+              "x": 1244,
+              "y": 447.3671875,
+              "hitOwnedControl": true,
+              "hitTag": "BUTTON",
+              "hitAction": "close-menu"
+            },
+            {
+              "x": 1258,
+              "y": 447.3671875,
+              "hitOwnedControl": true,
+              "hitTag": "BUTTON",
+              "hitAction": "close-menu"
+            }
+          ]
+        },
+        {
+          "action": "focused",
+          "count": 1,
+          "actualAction": "download-bilingual-subtitles",
+          "actualMode": null,
+          "inHeader": false,
+          "frame": {
+            "left": 1179,
+            "top": 577.1640625,
+            "right": 1265,
+            "bottom": 615.1640625,
+            "width": 86,
+            "height": 38
+          },
+          "visible": {
+            "left": 1179,
+            "top": 577.1640625,
+            "right": 1265,
+            "bottom": 615.1640625,
+            "width": 86,
+            "height": 38
+          },
+          "fullyVisible": true,
+          "points": [
+            {
+              "x": 1222,
+              "y": 596.1640625,
+              "hitOwnedControl": true,
+              "hitTag": "SPAN",
+              "hitAction": "download-bilingual-subtitles"
+            },
+            {
+              "x": 1200.5,
+              "y": 586.6640625,
+              "hitOwnedControl": true,
+              "hitTag": "BUTTON",
+              "hitAction": "download-bilingual-subtitles"
+            },
+            {
+              "x": 1243.5,
+              "y": 586.6640625,
+              "hitOwnedControl": true,
+              "hitTag": "BUTTON",
+              "hitAction": "download-bilingual-subtitles"
+            },
+            {
+              "x": 1200.5,
+              "y": 605.6640625,
+              "hitOwnedControl": true,
+              "hitTag": "BUTTON",
+              "hitAction": "download-bilingual-subtitles"
+            },
+            {
+              "x": 1243.5,
+              "y": 605.6640625,
+              "hitOwnedControl": true,
+              "hitTag": "BUTTON",
+              "hitAction": "download-bilingual-subtitles"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "desktop-menu-keyboard-Home",
+      "menu": {
+        "left": 992,
+        "top": 419.3671875,
+        "right": 1272,
+        "bottom": 680,
+        "width": 280,
+        "height": 260.6328125
+      },
+      "menuPaddingTop": 6,
+      "menuClipTop": 420.36578065134097,
+      "header": {
+        "left": 999,
+        "top": 426.3671875,
+        "right": 1265,
+        "bottom": 454.3671875,
+        "width": 266,
+        "height": 28
+      },
+      "headerVisible": {
+        "left": 999,
+        "top": 426.3671875,
+        "right": 1265,
+        "bottom": 454.3671875,
+        "width": 266,
+        "height": 28
+      },
+      "headerTopHits": [
+        {
+          "x": 1065.5,
+          "y": 421.36578065134097,
+          "hitOwnedHeader": false,
+          "hitTag": "DIV"
+        },
+        {
+          "x": 1132,
+          "y": 421.36578065134097,
+          "hitOwnedHeader": false,
+          "hitTag": "DIV"
+        },
+        {
+          "x": 1198.5,
+          "y": 421.36578065134097,
+          "hitOwnedHeader": false,
+          "hitTag": "DIV"
+        }
+      ],
+      "headerBackground": "rgb(24, 24, 28)",
+      "visualViewport": {
+        "left": 0,
+        "top": 0,
+        "right": 1280,
+        "bottom": 900
+      },
+      "scrollTop": 0,
+      "scrollHeight": 259,
+      "clientHeight": 259,
+      "timingRow": null,
+      "targets": [
+        {
+          "action": "close-menu",
+          "count": 1,
+          "actualAction": "close-menu",
+          "actualMode": null,
+          "inHeader": true,
+          "frame": {
+            "left": 1237,
+            "top": 426.3671875,
+            "right": 1265,
+            "bottom": 454.3671875,
+            "width": 28,
+            "height": 28
+          },
+          "visible": {
+            "left": 1237,
+            "top": 426.3671875,
+            "right": 1265,
+            "bottom": 454.3671875,
+            "width": 28,
+            "height": 28
+          },
+          "fullyVisible": true,
+          "points": [
+            {
+              "x": 1251,
+              "y": 440.3671875,
+              "hitOwnedControl": true,
+              "hitTag": "path",
+              "hitAction": "close-menu"
+            },
+            {
+              "x": 1244,
+              "y": 433.3671875,
+              "hitOwnedControl": true,
+              "hitTag": "svg",
+              "hitAction": "close-menu"
+            },
+            {
+              "x": 1258,
+              "y": 433.3671875,
+              "hitOwnedControl": true,
+              "hitTag": "BUTTON",
+              "hitAction": "close-menu"
+            },
+            {
+              "x": 1244,
+              "y": 447.3671875,
+              "hitOwnedControl": true,
+              "hitTag": "BUTTON",
+              "hitAction": "close-menu"
+            },
+            {
+              "x": 1258,
+              "y": 447.3671875,
+              "hitOwnedControl": true,
+              "hitTag": "BUTTON",
+              "hitAction": "close-menu"
+            }
+          ]
+        },
+        {
+          "action": "focused",
+          "count": 1,
+          "actualAction": "open-settings",
+          "actualMode": null,
+          "inHeader": true,
+          "frame": {
+            "left": 1164,
+            "top": 429.3671875,
+            "right": 1231,
+            "bottom": 451.3671875,
+            "width": 67,
+            "height": 22
+          },
+          "visible": {
+            "left": 1164,
+            "top": 429.3671875,
+            "right": 1231,
+            "bottom": 451.3671875,
+            "width": 67,
+            "height": 22
+          },
+          "fullyVisible": true,
+          "points": [
+            {
+              "x": 1197.5,
+              "y": 440.3671875,
+              "hitOwnedControl": true,
+              "hitTag": "SPAN",
+              "hitAction": "open-settings"
+            },
+            {
+              "x": 1180.75,
+              "y": 434.8671875,
+              "hitOwnedControl": true,
+              "hitTag": "SPAN",
+              "hitAction": "open-settings"
+            },
+            {
+              "x": 1214.25,
+              "y": 434.8671875,
+              "hitOwnedControl": true,
+              "hitTag": "svg",
+              "hitAction": "open-settings"
+            },
+            {
+              "x": 1180.75,
+              "y": 445.8671875,
+              "hitOwnedControl": true,
+              "hitTag": "SPAN",
+              "hitAction": "open-settings"
+            },
+            {
+              "x": 1214.25,
+              "y": 445.8671875,
+              "hitOwnedControl": true,
+              "hitTag": "svg",
+              "hitAction": "open-settings"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "desktop-menu-before-close",
+      "menu": {
+        "left": 992,
+        "top": 419.3671875,
+        "right": 1272,
+        "bottom": 680,
+        "width": 280,
+        "height": 260.6328125
+      },
+      "menuPaddingTop": 6,
+      "menuClipTop": 420.36578065134097,
+      "header": {
+        "left": 999,
+        "top": 426.3671875,
+        "right": 1265,
+        "bottom": 454.3671875,
+        "width": 266,
+        "height": 28
+      },
+      "headerVisible": {
+        "left": 999,
+        "top": 426.3671875,
+        "right": 1265,
+        "bottom": 454.3671875,
+        "width": 266,
+        "height": 28
+      },
+      "headerTopHits": [
+        {
+          "x": 1065.5,
+          "y": 421.36578065134097,
+          "hitOwnedHeader": false,
+          "hitTag": "DIV"
+        },
+        {
+          "x": 1132,
+          "y": 421.36578065134097,
+          "hitOwnedHeader": false,
+          "hitTag": "DIV"
+        },
+        {
+          "x": 1198.5,
+          "y": 421.36578065134097,
+          "hitOwnedHeader": false,
+          "hitTag": "DIV"
+        }
+      ],
+      "headerBackground": "rgb(24, 24, 28)",
+      "visualViewport": {
+        "left": 0,
+        "top": 0,
+        "right": 1280,
+        "bottom": 900
+      },
+      "scrollTop": 0,
+      "scrollHeight": 259,
+      "clientHeight": 259,
+      "timingRow": null,
+      "targets": [
+        {
+          "action": "close-menu",
+          "count": 1,
+          "actualAction": "close-menu",
+          "actualMode": null,
+          "inHeader": true,
+          "frame": {
+            "left": 1237,
+            "top": 426.3671875,
+            "right": 1265,
+            "bottom": 454.3671875,
+            "width": 28,
+            "height": 28
+          },
+          "visible": {
+            "left": 1237,
+            "top": 426.3671875,
+            "right": 1265,
+            "bottom": 454.3671875,
+            "width": 28,
+            "height": 28
+          },
+          "fullyVisible": true,
+          "points": [
+            {
+              "x": 1251,
+              "y": 440.3671875,
+              "hitOwnedControl": true,
+              "hitTag": "path",
+              "hitAction": "close-menu"
+            },
+            {
+              "x": 1244,
+              "y": 433.3671875,
+              "hitOwnedControl": true,
+              "hitTag": "svg",
+              "hitAction": "close-menu"
+            },
+            {
+              "x": 1258,
+              "y": 433.3671875,
+              "hitOwnedControl": true,
+              "hitTag": "BUTTON",
+              "hitAction": "close-menu"
+            },
+            {
+              "x": 1244,
+              "y": 447.3671875,
+              "hitOwnedControl": true,
+              "hitTag": "BUTTON",
+              "hitAction": "close-menu"
+            },
+            {
+              "x": 1258,
+              "y": 447.3671875,
+              "hitOwnedControl": true,
+              "hitTag": "BUTTON",
+              "hitAction": "close-menu"
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "nativeHintGeometry": {
+    "menuTop": 8,
+    "menuBottom": 179.375,
+    "hintTop": 140.5,
+    "hintBottom": 172.390625,
+    "scrollTop": 122.5
+  },
+  "normalMenuClose": {
+    "input": "mouse.click-at-observed-checked-center",
+    "x": 353,
+    "y": 31,
+    "focusReturned": true
+  },
+  "menuKeyboardSteps": [
+    {
+      "key": "End",
+      "expected": "download-bilingual-subtitles",
+      "observed": "download-bilingual-subtitles"
+    },
+    {
+      "key": "ArrowUp",
+      "expected": "download-translated-subtitles",
+      "observed": "download-translated-subtitles"
+    },
+    {
+      "key": "ArrowUp",
+      "expected": "download-subtitles",
+      "observed": "download-subtitles"
+    },
+    {
+      "key": "ArrowUp",
+      "expected": "subtitle-later",
+      "observed": "subtitle-later"
+    },
+    {
+      "key": "ArrowUp",
+      "expected": "subtitle-earlier",
+      "observed": "subtitle-earlier"
+    },
+    {
+      "key": "ArrowUp",
+      "expected": "off",
+      "observed": "off"
+    },
+    {
+      "key": "ArrowUp",
+      "expected": "original-only",
+      "observed": "original-only"
+    },
+    {
+      "key": "ArrowUp",
+      "expected": "translation-only",
+      "observed": "translation-only"
+    },
+    {
+      "key": "ArrowUp",
+      "expected": "bilingual",
+      "observed": "bilingual"
+    },
+    {
+      "key": "ArrowUp",
+      "expected": "open-sentence-learning",
+      "observed": "open-sentence-learning"
+    },
+    {
+      "key": "ArrowUp",
+      "expected": "close-menu",
+      "observed": "close-menu"
+    },
+    {
+      "key": "Home",
+      "expected": "open-settings",
+      "observed": "open-settings"
+    }
+  ],
+  "safeAreaEmulation": {
+    "supported": false,
+    "reason": "Error: cdpSession.send: Protocol error (Emulation.setSafeAreaInsets): 'Emulation.setSafeAreaInsets' wasn't found"
+  },
+  "nativeSystemSelectionShim": {
+    "status": "NOT_RUN_EXPLICIT_MENU_SUITE",
+    "scope": "Native selection lifecycle is excluded; shared fullscreen geometry remains a controlled DOM fixture"
+  },
+  "desktopMenu": {
+    "capabilities": {
+      "coarsePointer": false,
+      "maxTouchPoints": 0
+    },
+    "minimumTargetSize": 22,
+    "keyboardSteps": [
+      {
+        "key": "End",
+        "expected": "download-bilingual-subtitles",
+        "observed": "download-bilingual-subtitles"
+      },
+      {
+        "key": "Home",
+        "expected": "open-settings",
+        "observed": "open-settings"
+      }
+    ],
+    "normalCloseFocusReturned": true
+  },
+  "mockRequests": [
+    {
+      "url": "https://edge.microsoft.com/translate/translatetext?from=en&to=zh-Hans&isEnterpriseClient=false",
+      "source": "[\"Watch bilingual captions near the bottom.\"]"
+    }
+  ],
+  "browserCloseReceipt": "shared-guard-fulfilled",
+  "focusEvents": [],
+  "profileRemoved": true
+}

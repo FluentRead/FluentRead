@@ -1,0 +1,12 @@
+{
+  "at": "2026-10-16T21:15:54.608304+00:00",
+  "selectedSuite": "lifecycle",
+  "baseHead": "6ee7249dbaf231772f4ff0a2e16c665f56a5839b",
+  "scriptSHA256": "5f6aded2f3f1b47f61dc5fe89ce249c9b8ca209f1bc5a67f81150264d0d09b06",
+  "productSourceUISHA256": "eb9cd5ccd3d2931cd1e85fa8a668235374e0a865e06605981274bd20944b592c",
+  "chromeMapSHA256": "fa6ed6c48b27fd7e9040764ca43c19a2aef9150c4ca32263c53c278a1900878e",
+  "chrome478UnchangedFromFinalGeometry": true,
+  "oracleChange": "Separately require direct A to FluentRead leave restore and Off then FluentRead leave preserve A disabled, matching existing nativeFullscreen.ts/tests; actual trusted TextTrackList.change required before each next step",
+  "priorFailuresRetained": true,
+  "scope": "Controlled Chromium standard TextTrack API and webkit capability/event shim, never native Safari/AVKit rendering"
+}

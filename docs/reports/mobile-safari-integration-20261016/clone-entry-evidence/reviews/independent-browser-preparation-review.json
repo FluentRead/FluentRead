@@ -1,0 +1,260 @@
+{
+  "schemaVersion": 1,
+  "reviewKind": "independent-browser-suite-preparation-source-review",
+  "reviewer": "/root/safari_readiness_prepare",
+  "createdAt": "2026-10-16T23:05:16.585287+00:00",
+  "status": "SOURCE_PREPARATION_REVIEW_PASS_RESOLVED_FOCUS_FINDING_NOT_RUNTIME_ACCEPTANCE",
+  "independence": {
+    "runnerAuthor": false,
+    "productAuthor": false,
+    "testAuthor": false,
+    "reviewActivities": [
+      "Read actual runner additions/shared launch/catch/finally paths and actual HEAD diff",
+      "Read production binding/locator/runtime/config lifecycle and timedtext builder paths",
+      "Read helper background-tab/activation APIs, native monitor and guarded close sources",
+      "Hash current runner, production and manifest-declared original built scripts",
+      "Write new independent review files only"
+    ],
+    "notPerformed": [
+      "No runner/test/module execution",
+      "No test or SDK commands",
+      "No browser launch or interaction",
+      "No device or process control/inventory",
+      "No network",
+      "No product/runner/test edits"
+    ],
+    "testAuthorHandoff": "Root authorization forwarded to existing diagnostic_driver_prep author to assess only existing verificationCliCleanup/browserFocusSafety public CLI harness; no mirrored cleanup model or regex-only test, no test execution by this reviewer."
+  },
+  "sourceVersionsObserved": [
+    {
+      "sha256": "d060eed1349c017e611b0d749b9374c457c58d1656ef64fac703634e3a66839c",
+      "bytes": 60558,
+      "stage": "Initial suite with exact timedtext route and inherited late-monitor-error gap"
+    },
+    {
+      "sha256": "20cfe441f625890ca30b3e04685e725230aa5d5c87d4d765017bd3431e61ad18",
+      "bytes": 60816,
+      "stage": "Origin/path/single-v route repair"
+    },
+    {
+      "sha256": "7613fece1417934d34f121f5a0413658e4fc848e2cf1d8d349d866f75b116d6f",
+      "bytes": 60997,
+      "stage": "Final route plus post-stop monitor permanent error check"
+    }
+  ],
+  "inputs": {
+    "runner": {
+      "path": "/Users/thinkstu/Desktop/copy/FluentRead-mobile-video-menu-accessibility-20261016/scripts/run-mobile-video-subtitle-test.cjs",
+      "sha256": "7613fece1417934d34f121f5a0413658e4fc848e2cf1d8d349d866f75b116d6f",
+      "bytes": 60997
+    },
+    "productionBinding": {
+      "path": "/Users/thinkstu/Desktop/copy/FluentRead-mobile-video-menu-accessibility-20261016/src/features/video-subtitle/content/videoPlayerBinding.ts",
+      "sha256": "0789013139caf5e43783e4d3501b9a96c5d97324213efcbdfa941e1eb34fdec4",
+      "bytes": 23201
+    },
+    "productionLocator": {
+      "path": "/Users/thinkstu/Desktop/copy/FluentRead-mobile-video-menu-accessibility-20261016/src/features/video-subtitle/content/videoPlayerLocator.ts",
+      "sha256": "67ff409285b5116088605c13174ea0b9a7881f2ac08f1aed73e68e73f8ddba97",
+      "bytes": 19571
+    },
+    "productionRuntime": {
+      "path": "/Users/thinkstu/Desktop/copy/FluentRead-mobile-video-menu-accessibility-20261016/src/features/video-subtitle/content/runtime.ts",
+      "sha256": "8c73835f8f0950c06e076c3a54114f1fedc8709d588004c3fa7781f37f094285",
+      "bytes": 92277
+    },
+    "contentRuntime": {
+      "path": "/Users/thinkstu/Desktop/copy/FluentRead-mobile-video-menu-accessibility-20261016/src/app/content/runtime.ts",
+      "sha256": "69d96a36629826067eb5d5b4cc7c1c8eb65245254c892cb1d34470f3ff51e63b",
+      "bytes": 18288
+    },
+    "pageAvailability": {
+      "path": "/Users/thinkstu/Desktop/copy/FluentRead-mobile-video-menu-accessibility-20261016/src/app/content/pageAvailability.ts",
+      "sha256": "211ec63518b85278846b155417e3789b2ef0d3ef6de8b754c1c7465865a747e6",
+      "bytes": 8884
+    },
+    "timedtextUrlBuilder": {
+      "path": "/Users/thinkstu/Desktop/copy/FluentRead-mobile-video-menu-accessibility-20261016/src/features/video-subtitle/content/youtubeSubtitleData.ts",
+      "sha256": "c3432c66fe568608f53724b7089545355117e3657336c14759a3eef75516d759",
+      "bytes": 22340
+    },
+    "focusHelper": {
+      "path": "/Users/thinkstu/Desktop/copy/FluentRead-mobile-video-menu-accessibility-20261016/scripts/testing/focus-safe-browser.cjs",
+      "sha256": "a181f9d68ba4d6942afeb78bf43aa89139ab3f7743396edceda139bd92cf05af",
+      "bytes": 25787
+    },
+    "focusMonitor": {
+      "path": "/Users/thinkstu/Desktop/copy/FluentRead-mobile-video-menu-accessibility-20261016/scripts/testing/mac-focus-event-monitor.cjs",
+      "sha256": "4de9f4315351015417cbfd620afecfad92a5c1e84a8d12acda02e4c63ea820a6",
+      "bytes": 6894
+    },
+    "focusObserverSwift": {
+      "path": "/Users/thinkstu/Desktop/copy/FluentRead-mobile-video-menu-accessibility-20261016/scripts/testing/mac-focus-event-observer.swift",
+      "sha256": "71768a82a8cdaeae30e6f1911aae8bfc94e19867aa454f0b3baf62290c982145",
+      "bytes": 1972
+    },
+    "guardedClose": {
+      "path": "/Users/thinkstu/Desktop/copy/FluentRead-mobile-video-menu-accessibility-20261016/scripts/testing/owned-browser-close.cjs",
+      "sha256": "7afb92009af0fbbba8ecb8bfbb8f0486a56f96cfab72edb60d6bc8f36dc4ee9d",
+      "bytes": 13724
+    },
+    "originalBuiltManifest": {
+      "path": "/Users/thinkstu/Desktop/copy/FluentRead-mobile-video-menu-accessibility-20261016/.output/chrome-mv3/manifest.json",
+      "sha256": "a12a20416fc826d3dc7278b74a112b4170f8985b1ac8b1a74c91f73d5e09b642",
+      "bytes": 3250
+    },
+    "originalBuiltContent": {
+      "path": "/Users/thinkstu/Desktop/copy/FluentRead-mobile-video-menu-accessibility-20261016/.output/chrome-mv3/content-scripts/content.js",
+      "sha256": "a561db0bccf57e326dfc72a2071047a78b816228c7312eb863073cc7dc65413c",
+      "bytes": 2758980
+    }
+  },
+  "actualHeadDiff": {
+    "sha256": "45be6e35944072cc725062b9ff5bd689502c1ddf923f4f8b85b6b1dddf205fb5",
+    "bytes": 19880
+  },
+  "lineLocations": {
+    "manifestProductionEntry": 79,
+    "timedtextPredicate": 98,
+    "baselineLiveAndOwner": 108,
+    "cloneInjection": 127,
+    "microtaskCheckpoint": 140,
+    "trustedClickAndMenu": 157,
+    "configurationDisable": 176,
+    "suiteEarlyReturn": 263,
+    "cleanupStart": 665,
+    "finalMonitorError": 669,
+    "profileRemoval": 676
+  },
+  "originalBuiltManifestDeclaredScripts": [
+    {
+      "relative": "content-scripts/content.js",
+      "path": "/Users/thinkstu/Desktop/copy/FluentRead-mobile-video-menu-accessibility-20261016/.output/chrome-mv3/content-scripts/content.js",
+      "sha256": "a561db0bccf57e326dfc72a2071047a78b816228c7312eb863073cc7dc65413c",
+      "bytes": 2758980
+    },
+    {
+      "relative": "content-scripts/neteaseMailFrame.js",
+      "path": "/Users/thinkstu/Desktop/copy/FluentRead-mobile-video-menu-accessibility-20261016/.output/chrome-mv3/content-scripts/neteaseMailFrame.js",
+      "sha256": "05f560c5193aee59bd122bdf0e8d489b6d17227b486f3204cbdb1c6cd2e703e8",
+      "bytes": 1961063
+    },
+    {
+      "relative": "content-scripts/shadowBridge.js",
+      "path": "/Users/thinkstu/Desktop/copy/FluentRead-mobile-video-menu-accessibility-20261016/.output/chrome-mv3/content-scripts/shadowBridge.js",
+      "sha256": "ac4cd36fa2f66d591c031c44f3d0b7bc58a39888aee263037b71be2fad686e39",
+      "bytes": 3351
+    },
+    {
+      "relative": "content-scripts/supportedFrame.js",
+      "path": "/Users/thinkstu/Desktop/copy/FluentRead-mobile-video-menu-accessibility-20261016/.output/chrome-mv3/content-scripts/supportedFrame.js",
+      "sha256": "51f919e9f0761e6af29c78009b00b7a2e228c77bd9d793ffaa130a1919b46bcf",
+      "bytes": 1734217
+    },
+    {
+      "relative": "content-scripts/xVideoBridge.js",
+      "path": "/Users/thinkstu/Desktop/copy/FluentRead-mobile-video-menu-accessibility-20261016/.output/chrome-mv3/content-scripts/xVideoBridge.js",
+      "sha256": "f22318b71931cfc573c8aae63086438e4d186f4f654616a85ebd0c6178c50331",
+      "bytes": 8036
+    },
+    {
+      "relative": "content-scripts/youtubeBridge.js",
+      "path": "/Users/thinkstu/Desktop/copy/FluentRead-mobile-video-menu-accessibility-20261016/.output/chrome-mv3/content-scripts/youtubeBridge.js",
+      "sha256": "f5304857608090e874b144266f0def19809b0ba228765f3c7d14ef22faa57af3",
+      "bytes": 5497
+    }
+  ],
+  "inspections": [
+    {
+      "id": "REAL_DECLARED_CONTENT",
+      "result": "SUPPORTED_STATICALLY",
+      "line": 79,
+      "scope": "Dedicated fresh profile loads actual extensionDir; records manifest and declared JS hashes, requires content-scripts/content.js; no import/sync/cleanup model inserted."
+    },
+    {
+      "id": "SCOPED_FIXTURE_AND_OWNER",
+      "result": "SUPPORTED_STATICALLY",
+      "line": 108,
+      "scope": "Desktop player/mobile known outer container share exactly one scoped video; same-owner outside hidden player and foreign owner preserved."
+    },
+    {
+      "id": "MICROTASK_BEFORE_PERIODIC_TASK",
+      "result": "SUPPORTED_STATICALLY",
+      "line": 140,
+      "scope": "Immediate count2 -> microtask count1/copy detached before timer0 and clicks; rules out timer/1s polling repair but not every other microtask/observer."
+    },
+    {
+      "id": "LIVE_IDENTITY_NATIVE_HOST",
+      "result": "SUPPORTED_STATICALLY",
+      "line": 127,
+      "scope": "Original live object/parent and original native buttons retained; copied native group remains; private factory call counts not exposed."
+    },
+    {
+      "id": "TRUSTED_ENTRY_CLOSE_AND_FOCUS",
+      "result": "SUPPORTED_STATICALLY",
+      "line": 157,
+      "scope": "Real Playwright inputs; capture trusted flags; real menu hidden/expanded transitions and focusReturned; no synthetic acceptance."
+    },
+    {
+      "id": "OFF_IS_BINDING_DISABLE",
+      "result": "SUPPORTED_STATICALLY_WITH_NARROW_COVERAGE",
+      "line": 176,
+      "scope": "Feature flag false with total on true avoids global disposal; verifies live/menu removal, ownCount0 and unrelated/foreign/native preservation, not pending-late-copy cleanup."
+    },
+    {
+      "id": "TIMEDTEXT_ROUTE_REPAIR",
+      "result": "RESOLVED_STATICALLY",
+      "line": 98,
+      "scope": "Exact origin/path and exactly one exact v; extra fmt/xorb/xobt/xovt/c/cplayer allowed; other video/host remain outside fixture route."
+    },
+    {
+      "id": "LATE_MONITOR_ERROR_FIX",
+      "result": "RESOLVED_STATICALLY_DYNAMIC_REGRESSION_NOT_RUN_BY_REVIEWER",
+      "line": 669,
+      "scope": "After stop reads permanent error, records errors and exit1, retains activation check and continues guarded cleanup/profile decision."
+    },
+    {
+      "id": "BACKGROUND_FOCUS_POLICY",
+      "result": "CONDITIONAL_ON_ACTUAL_RUN_RECEIPT_AND_PINNED_HELPER",
+      "scope": "W helper a181f API present; native monitor ready before launch, no-foreground launch/tab APIs, exact verified browser PID, 500ms samples plus activation events and post-stop error check."
+    },
+    {
+      "id": "OWNED_CLOSE_PROFILE_POLICY",
+      "result": "SUPPORTED_STATICALLY_RUNTIME_RECEIPT_REQUIRED",
+      "line": 676,
+      "scope": "Exact shared guarded close before profile deletion; failures retain profile unless browser launch never attempted; errors mark final process failure."
+    }
+  ],
+  "resolvedFindings": [
+    {
+      "id": "P2_CLEANUP_FOCUS_MONITOR_ERROR_OMITTED",
+      "category": "shared existing runner path inherited by new suite",
+      "oldReachablePath": "cleanupStarted=true; monitor protocol/stderr/child error sets permanentError and onError; failFocus immediately returns because cleanupStarted; monitor.stop does not automatically reject stored permanentError; old finally checked only activation events, permitting ok=true with no activation.",
+      "fixedAtLine": 669,
+      "actualFinalCode": "const observerError=focusMonitor.error; if(observerError){report.focusObserverError=String(observerError);report.errors.push(report.focusObserverError);process.exitCode=1;}",
+      "verification": "Actual final source order and content read; no late-error injection or CLI VM run performed by this reviewer."
+    }
+  ],
+  "unresolvedActionableFindings": [],
+  "operationalRequirements": [
+    "Use W/scripts/testing/focus-safe-browser.cjs a181f, not old skill helper 284c without startFocusEventMonitor/queryMacFrontmostApplication exports.",
+    "Pin each actual old/new built artifact independently, using immutable full map and before/after checks; runner content hashes alone do not prove immutable loaded bytes.",
+    "Accept only complete stage, expected cases, process success, no permanent observer error/activation, guarded-close receipt and profile cleanup status from actual run.",
+    "A fail-fast RED only proves the executed failing scenario; preserve helper bootstrap failures separately from product RED."
+  ],
+  "limits": [
+    "Off runs after observer copies have already been removed; no pending late-copy lifecycle proof from this suite.",
+    "Microtask checkpoint excludes timer-based rescue, not unique attribution to one extension observer.",
+    "No private factory call-count instrumentation; live object and owner uniqueness only.",
+    "No whole artifact seal generated by runner; manifest/declared JS disk snapshot only.",
+    "No old/new browser outcomes independently reviewed in this preparation report.",
+    "No page-root scope, scope revocation, player/key replacement, reload/pageshow, fullscreen/native-track or complete lifecycle matrix acceptance.",
+    "No live YouTube/Safari/iOS/AVKit/real-device/provider/subtitle-accuracy/playback proof and no E2 AX root-cause attribution."
+  ],
+  "markdownReview": {
+    "path": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/mobile-youtube-fr-node-identity-probe-20261017/same-scope-clone-repair-20261017/independent-browser-preparation-review.md",
+    "sha256": "9be29d2e252a3b42949eed5f91c9e3bd001352a55720dddcd3b6577f5ae80a20",
+    "bytes": 5345
+  },
+  "runnerUnchangedAtReviewWrite": true
+}

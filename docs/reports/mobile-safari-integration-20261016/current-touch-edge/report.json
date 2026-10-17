@@ -1,0 +1,1189 @@
+{
+  "ok": true,
+  "suite": "mobile-floating",
+  "extensionDir": "/Users/thinkstu/Desktop/copy/FluentRead-mobile-video-menu-accessibility-20261016/.output/chrome-mv3",
+  "profileDir": "/var/folders/2v/qd62bpkx51scgbvv2nrclsxm0000gn/T/fluentread-mobile-floating-VPwmfL",
+  "build": "production",
+  "cases": [
+    {
+      "id": "touch-handle-full-44px",
+      "status": "passed",
+      "metrics": {
+        "dock": {
+          "x": 334,
+          "y": 348,
+          "width": 44,
+          "height": 148,
+          "right": 378,
+          "bottom": 496
+        },
+        "main": {
+          "x": 334,
+          "y": 400,
+          "width": 44,
+          "height": 44,
+          "right": 378,
+          "bottom": 444
+        },
+        "position": "right",
+        "status": "idle",
+        "style": null,
+        "expanded": false,
+        "viewport": {
+          "width": 390,
+          "height": 844
+        },
+        "visualViewport": {
+          "left": 0,
+          "top": 0,
+          "width": 390,
+          "height": 844,
+          "right": 390,
+          "bottom": 844,
+          "scale": 1
+        },
+        "coarse": true,
+        "anyPointerCoarse": true,
+        "maxTouchPoints": 5,
+        "hardwareTouchClass": true,
+        "computedStyle": {
+          "display": "flex",
+          "visibility": "visible",
+          "opacity": "0.7",
+          "pointerEvents": "auto",
+          "transform": "none",
+          "transformIsIdentity": true,
+          "clipPath": "none"
+        },
+        "hitSamples": [
+          {
+            "name": "center",
+            "x": 356,
+            "y": 422,
+            "rootHitTarget": true,
+            "documentHitOwn": true
+          },
+          {
+            "name": "upper-left",
+            "x": 345,
+            "y": 411,
+            "rootHitTarget": true,
+            "documentHitOwn": true
+          },
+          {
+            "name": "upper-right",
+            "x": 367,
+            "y": 411,
+            "rootHitTarget": true,
+            "documentHitOwn": true
+          },
+          {
+            "name": "lower-left",
+            "x": 345,
+            "y": 433,
+            "rootHitTarget": true,
+            "documentHitOwn": true
+          },
+          {
+            "name": "lower-right",
+            "x": 367,
+            "y": 433,
+            "rootHitTarget": true,
+            "documentHitOwn": true
+          }
+        ]
+      }
+    },
+    {
+      "id": "progress-loading-visible-above-keyboard-fixture",
+      "status": "passed",
+      "evidence": "production loading state, isolated-world keyboard geometry fixture",
+      "bounds": {
+        "x": 95,
+        "y": 382,
+        "right": 365,
+        "bottom": 450,
+        "closeWidth": 44,
+        "closeHeight": 44
+      }
+    },
+    {
+      "id": "cancel-loading-rejects-late-provider-response",
+      "status": "passed"
+    },
+    {
+      "id": "touch-full-page-translation",
+      "status": "passed",
+      "count": 4
+    },
+    {
+      "id": "touch-restore-original",
+      "status": "passed"
+    },
+    {
+      "id": "touch-translate-again",
+      "status": "passed"
+    },
+    {
+      "id": "drag-persists-without-translation-toggle",
+      "status": "passed",
+      "metrics": {
+        "dock": {
+          "x": 12,
+          "y": 546,
+          "width": 44,
+          "height": 148,
+          "right": 56,
+          "bottom": 694
+        },
+        "main": {
+          "x": 12,
+          "y": 598,
+          "width": 44,
+          "height": 44,
+          "right": 56,
+          "bottom": 642
+        },
+        "position": "left",
+        "status": "translated",
+        "style": null,
+        "expanded": false,
+        "viewport": {
+          "width": 390,
+          "height": 844
+        },
+        "visualViewport": {
+          "left": 0,
+          "top": 0,
+          "width": 390,
+          "height": 844,
+          "right": 390,
+          "bottom": 844,
+          "scale": 1
+        },
+        "coarse": true,
+        "anyPointerCoarse": true,
+        "maxTouchPoints": 5,
+        "hardwareTouchClass": true,
+        "computedStyle": {
+          "display": "flex",
+          "visibility": "visible",
+          "opacity": "0.7",
+          "pointerEvents": "auto",
+          "transform": "none",
+          "transformIsIdentity": true,
+          "clipPath": "none"
+        },
+        "hitSamples": [
+          {
+            "name": "center",
+            "x": 34,
+            "y": 620,
+            "rootHitTarget": true,
+            "documentHitOwn": true
+          },
+          {
+            "name": "upper-left",
+            "x": 23,
+            "y": 609,
+            "rootHitTarget": true,
+            "documentHitOwn": true
+          },
+          {
+            "name": "upper-right",
+            "x": 45,
+            "y": 609,
+            "rootHitTarget": true,
+            "documentHitOwn": true
+          },
+          {
+            "name": "lower-left",
+            "x": 23,
+            "y": 631,
+            "rootHitTarget": true,
+            "documentHitOwn": true
+          },
+          {
+            "name": "lower-right",
+            "x": 45,
+            "y": 631,
+            "rootHitTarget": true,
+            "documentHitOwn": true
+          }
+        ]
+      }
+    },
+    {
+      "id": "refresh-restores-dock",
+      "status": "passed",
+      "metrics": {
+        "dock": {
+          "x": 12,
+          "y": 546,
+          "width": 44,
+          "height": 148,
+          "right": 56,
+          "bottom": 694
+        },
+        "main": {
+          "x": 12,
+          "y": 598,
+          "width": 44,
+          "height": 44,
+          "right": 56,
+          "bottom": 642
+        },
+        "position": "left",
+        "status": "idle",
+        "style": null,
+        "expanded": false,
+        "viewport": {
+          "width": 390,
+          "height": 844
+        },
+        "visualViewport": {
+          "left": 0,
+          "top": 0,
+          "width": 390,
+          "height": 844,
+          "right": 390,
+          "bottom": 844,
+          "scale": 1
+        },
+        "coarse": true,
+        "anyPointerCoarse": true,
+        "maxTouchPoints": 5,
+        "hardwareTouchClass": true,
+        "computedStyle": {
+          "display": "flex",
+          "visibility": "visible",
+          "opacity": "0.7",
+          "pointerEvents": "auto",
+          "transform": "none",
+          "transformIsIdentity": true,
+          "clipPath": "none"
+        },
+        "hitSamples": [
+          {
+            "name": "center",
+            "x": 34,
+            "y": 620,
+            "rootHitTarget": true,
+            "documentHitOwn": true
+          },
+          {
+            "name": "upper-left",
+            "x": 23,
+            "y": 609,
+            "rootHitTarget": true,
+            "documentHitOwn": true
+          },
+          {
+            "name": "upper-right",
+            "x": 45,
+            "y": 609,
+            "rootHitTarget": true,
+            "documentHitOwn": true
+          },
+          {
+            "name": "lower-left",
+            "x": 23,
+            "y": 631,
+            "rootHitTarget": true,
+            "documentHitOwn": true
+          },
+          {
+            "name": "lower-right",
+            "x": 45,
+            "y": 631,
+            "rootHitTarget": true,
+            "documentHitOwn": true
+          }
+        ]
+      }
+    },
+    {
+      "id": "landscape-dock-visible",
+      "status": "passed",
+      "metrics": {
+        "dock": {
+          "x": 12,
+          "y": 212.4921875,
+          "width": 44,
+          "height": 148,
+          "right": 56,
+          "bottom": 360.4921875
+        },
+        "main": {
+          "x": 12,
+          "y": 264.4921875,
+          "width": 44,
+          "height": 44,
+          "right": 56,
+          "bottom": 308.4921875
+        },
+        "position": "left",
+        "status": "idle",
+        "style": null,
+        "expanded": false,
+        "viewport": {
+          "width": 844,
+          "height": 390
+        },
+        "visualViewport": {
+          "left": 0,
+          "top": 0,
+          "width": 844,
+          "height": 390,
+          "right": 844,
+          "bottom": 390,
+          "scale": 1
+        },
+        "coarse": true,
+        "anyPointerCoarse": true,
+        "maxTouchPoints": 5,
+        "hardwareTouchClass": true,
+        "computedStyle": {
+          "display": "flex",
+          "visibility": "visible",
+          "opacity": "0.7",
+          "pointerEvents": "auto",
+          "transform": "none",
+          "transformIsIdentity": true,
+          "clipPath": "none"
+        },
+        "hitSamples": [
+          {
+            "name": "center",
+            "x": 34,
+            "y": 286.4921875,
+            "rootHitTarget": true,
+            "documentHitOwn": true
+          },
+          {
+            "name": "upper-left",
+            "x": 23,
+            "y": 275.4921875,
+            "rootHitTarget": true,
+            "documentHitOwn": true
+          },
+          {
+            "name": "upper-right",
+            "x": 45,
+            "y": 275.4921875,
+            "rootHitTarget": true,
+            "documentHitOwn": true
+          },
+          {
+            "name": "lower-left",
+            "x": 23,
+            "y": 297.4921875,
+            "rootHitTarget": true,
+            "documentHitOwn": true
+          },
+          {
+            "name": "lower-right",
+            "x": 45,
+            "y": 297.4921875,
+            "rootHitTarget": true,
+            "documentHitOwn": true
+          }
+        ]
+      }
+    },
+    {
+      "id": "touch-settings-popup-dark",
+      "status": "passed",
+      "popup": {
+        "x": 62,
+        "y": 213,
+        "right": 382,
+        "bottom": 638,
+        "width": 320,
+        "height": 425,
+        "opacity": "1"
+      }
+    },
+    {
+      "id": "visual-viewport-keyboard-offset-fixture",
+      "status": "passed",
+      "evidence": "isolated-world viewport fixture; not actual keyboard",
+      "metrics": {
+        "dock": {
+          "x": 37,
+          "y": 326.375,
+          "width": 44,
+          "height": 148,
+          "right": 81,
+          "bottom": 474.375
+        },
+        "main": {
+          "x": 37,
+          "y": 378.375,
+          "width": 44,
+          "height": 44,
+          "right": 81,
+          "bottom": 422.375
+        },
+        "position": "left",
+        "status": "idle",
+        "style": null,
+        "expanded": true,
+        "viewport": {
+          "width": 390,
+          "height": 844
+        },
+        "visualViewport": {
+          "left": 0,
+          "top": 0,
+          "width": 390,
+          "height": 844,
+          "right": 390,
+          "bottom": 844,
+          "scale": 1
+        },
+        "coarse": true,
+        "anyPointerCoarse": true,
+        "maxTouchPoints": 5,
+        "hardwareTouchClass": true,
+        "computedStyle": {
+          "display": "flex",
+          "visibility": "visible",
+          "opacity": "1",
+          "pointerEvents": "auto",
+          "transform": "matrix(1, 0, 0, 1, 0, 0)",
+          "transformIsIdentity": true,
+          "clipPath": "none"
+        },
+        "hitSamples": [
+          {
+            "name": "center",
+            "x": 59,
+            "y": 400.375,
+            "rootHitTarget": true,
+            "documentHitOwn": true
+          },
+          {
+            "name": "upper-left",
+            "x": 48,
+            "y": 389.375,
+            "rootHitTarget": true,
+            "documentHitOwn": true
+          },
+          {
+            "name": "upper-right",
+            "x": 70,
+            "y": 389.375,
+            "rootHitTarget": true,
+            "documentHitOwn": true
+          },
+          {
+            "name": "lower-left",
+            "x": 48,
+            "y": 411.375,
+            "rootHitTarget": true,
+            "documentHitOwn": true
+          },
+          {
+            "name": "lower-right",
+            "x": 70,
+            "y": 411.375,
+            "rootHitTarget": true,
+            "documentHitOwn": true
+          }
+        ]
+      }
+    },
+    {
+      "id": "disable-unmounts-floating-controls",
+      "status": "passed"
+    },
+    {
+      "id": "reenable-remounts-once",
+      "status": "passed",
+      "count": 1,
+      "metrics": {
+        "dock": {
+          "x": 37,
+          "y": 326.375,
+          "width": 44,
+          "height": 148,
+          "right": 81,
+          "bottom": 474.375
+        },
+        "main": {
+          "x": 37,
+          "y": 378.375,
+          "width": 44,
+          "height": 44,
+          "right": 81,
+          "bottom": 422.375
+        },
+        "position": "left",
+        "status": "idle",
+        "style": null,
+        "expanded": true,
+        "viewport": {
+          "width": 390,
+          "height": 844
+        },
+        "visualViewport": {
+          "left": 0,
+          "top": 0,
+          "width": 390,
+          "height": 844,
+          "right": 390,
+          "bottom": 844,
+          "scale": 1
+        },
+        "coarse": true,
+        "anyPointerCoarse": true,
+        "maxTouchPoints": 5,
+        "hardwareTouchClass": true,
+        "computedStyle": {
+          "display": "flex",
+          "visibility": "visible",
+          "opacity": "1",
+          "pointerEvents": "auto",
+          "transform": "matrix(1, 0, 0, 1, 0, 0)",
+          "transformIsIdentity": true,
+          "clipPath": "none"
+        },
+        "hitSamples": [
+          {
+            "name": "center",
+            "x": 59,
+            "y": 400.375,
+            "rootHitTarget": true,
+            "documentHitOwn": true
+          },
+          {
+            "name": "upper-left",
+            "x": 48,
+            "y": 389.375,
+            "rootHitTarget": true,
+            "documentHitOwn": true
+          },
+          {
+            "name": "upper-right",
+            "x": 70,
+            "y": 389.375,
+            "rootHitTarget": true,
+            "documentHitOwn": true
+          },
+          {
+            "name": "lower-left",
+            "x": 48,
+            "y": 411.375,
+            "rootHitTarget": true,
+            "documentHitOwn": true
+          },
+          {
+            "name": "lower-right",
+            "x": 70,
+            "y": 411.375,
+            "rootHitTarget": true,
+            "documentHitOwn": true
+          }
+        ]
+      }
+    },
+    {
+      "id": "click-only-activation-fixture",
+      "status": "passed",
+      "evidence": "DOM click without pointer events; does not establish VoiceOver acceptance"
+    }
+  ],
+  "screenshots": [
+    "portrait-idle.png",
+    "progress-keyboard-fixture.png",
+    "portrait-translated.png",
+    "landscape-dock.png",
+    "portrait-dark-settings.png",
+    "keyboard-geometry-fixture.png"
+  ],
+  "consoleErrors": [],
+  "stages": [
+    {
+      "name": "fixture-listen",
+      "state": "before",
+      "at": 1792177583079
+    },
+    {
+      "name": "fixture-listen",
+      "state": "after",
+      "at": 1792177583083
+    },
+    {
+      "name": "native-focus-observer",
+      "state": "before",
+      "at": 1792177583084
+    },
+    {
+      "name": "native-focus-observer",
+      "state": "after",
+      "at": 1792177587418
+    },
+    {
+      "name": "browser-launch",
+      "state": "before",
+      "at": 1792177587420
+    },
+    {
+      "name": "browser-launch",
+      "state": "after",
+      "at": 1792177588586
+    },
+    {
+      "name": "ownership-capture",
+      "state": "before",
+      "at": 1792177588586
+    },
+    {
+      "name": "ownership-capture",
+      "state": "after",
+      "at": 1792177588586
+    },
+    {
+      "name": "initial-focus-check",
+      "state": "before",
+      "at": 1792177588586
+    },
+    {
+      "name": "initial-focus-check",
+      "state": "after",
+      "at": 1792177588661
+    },
+    {
+      "name": "extension-worker",
+      "state": "before",
+      "at": 1792177588662
+    },
+    {
+      "name": "extension-worker",
+      "state": "after",
+      "at": 1792177588662
+    },
+    {
+      "name": "worker-error-monitor",
+      "state": "before",
+      "at": 1792177588753
+    },
+    {
+      "name": "worker-error-monitor",
+      "state": "after",
+      "at": 1792177588758
+    },
+    {
+      "name": "open-owned-options-control",
+      "state": "before",
+      "at": 1792177588762
+    },
+    {
+      "name": "open-owned-options-control",
+      "state": "after",
+      "at": 1792177588979
+    },
+    {
+      "name": "options-control-tab-identity",
+      "state": "before",
+      "at": 1792177588979
+    },
+    {
+      "name": "options-control-tab-identity",
+      "state": "after",
+      "at": 1792177589173
+    },
+    {
+      "name": "configure-temporary-profile",
+      "state": "before",
+      "at": 1792177589173
+    },
+    {
+      "name": "configure-temporary-profile",
+      "state": "after",
+      "at": 1792177589254
+    },
+    {
+      "name": "open-owned-reading-page",
+      "state": "before",
+      "at": 1792177589254
+    },
+    {
+      "name": "open-owned-reading-page",
+      "state": "after",
+      "at": 1792177589843
+    },
+    {
+      "name": "activate-owned-reading-tab",
+      "state": "before",
+      "at": 1792177589844
+    },
+    {
+      "name": "activate-owned-reading-tab",
+      "state": "after",
+      "at": 1792177589860
+    },
+    {
+      "name": "owned-tab-id",
+      "state": "before",
+      "at": 1792177589860
+    },
+    {
+      "name": "owned-tab-id",
+      "state": "after",
+      "at": 1792177589862
+    },
+    {
+      "name": "production-content-ready",
+      "state": "before",
+      "at": 1792177589863
+    },
+    {
+      "name": "production-content-ready",
+      "state": "after",
+      "at": 1792177589865
+    },
+    {
+      "name": "reload-with-touch-capability-before-mount",
+      "state": "before",
+      "at": 1792177589869
+    },
+    {
+      "name": "reload-with-touch-capability-before-mount",
+      "state": "after",
+      "at": 1792177589926
+    },
+    {
+      "name": "touch-capable-content-ready",
+      "state": "before",
+      "at": 1792177589927
+    },
+    {
+      "name": "touch-capable-content-ready",
+      "state": "after",
+      "at": 1792177589936
+    },
+    {
+      "name": "full-page-translation-settles",
+      "state": "before",
+      "at": 1792177594749
+    },
+    {
+      "name": "full-page-translation-settles",
+      "state": "after",
+      "at": 1792177594757
+    },
+    {
+      "name": "retranslation-settles",
+      "state": "before",
+      "at": 1792177595426
+    },
+    {
+      "name": "retranslation-settles",
+      "state": "after",
+      "at": 1792177595434
+    },
+    {
+      "name": "content-ready-after-refresh",
+      "state": "before",
+      "at": 1792177596393
+    },
+    {
+      "name": "content-ready-after-refresh",
+      "state": "after",
+      "at": 1792177596396
+    },
+    {
+      "name": "close-owned-browser",
+      "state": "before",
+      "at": 1792177600783
+    },
+    {
+      "name": "close-owned-browser",
+      "state": "after",
+      "at": 1792177600981
+    },
+    {
+      "name": "stop-focus-observer",
+      "state": "before",
+      "at": 1792177600981
+    },
+    {
+      "name": "stop-focus-observer",
+      "state": "after",
+      "at": 1792177600988
+    },
+    {
+      "name": "close-fixture-server",
+      "state": "before",
+      "at": 1792177600989
+    },
+    {
+      "name": "close-fixture-server",
+      "state": "after",
+      "at": 1792177600989
+    }
+  ],
+  "focusSamples": [
+    {
+      "at": 1792177588661,
+      "name": "ChatGPT",
+      "pid": 20136
+    },
+    {
+      "at": 1792177588836,
+      "name": "ChatGPT",
+      "pid": 20136
+    },
+    {
+      "at": 1792177588979,
+      "name": "ChatGPT",
+      "pid": 20136
+    },
+    {
+      "at": 1792177589245,
+      "name": "ChatGPT",
+      "pid": 20136
+    },
+    {
+      "at": 1792177589327,
+      "name": "ChatGPT",
+      "pid": 20136
+    },
+    {
+      "at": 1792177589739,
+      "name": "ChatGPT",
+      "pid": 20136
+    },
+    {
+      "at": 1792177589843,
+      "name": "ChatGPT",
+      "pid": 20136
+    },
+    {
+      "at": 1792177590234,
+      "name": "ChatGPT",
+      "pid": 20136
+    },
+    {
+      "at": 1792177590620,
+      "name": "ChatGPT",
+      "pid": 20136
+    },
+    {
+      "at": 1792177590743,
+      "name": "ChatGPT",
+      "pid": 20136
+    },
+    {
+      "at": 1792177591246,
+      "name": "ChatGPT",
+      "pid": 20136
+    },
+    {
+      "at": 1792177591503,
+      "name": "ChatGPT",
+      "pid": 20136
+    },
+    {
+      "at": 1792177591742,
+      "name": "ChatGPT",
+      "pid": 20136
+    },
+    {
+      "at": 1792177592274,
+      "name": "ChatGPT",
+      "pid": 20136
+    },
+    {
+      "at": 1792177592759,
+      "name": "ChatGPT",
+      "pid": 20136
+    },
+    {
+      "at": 1792177593277,
+      "name": "ChatGPT",
+      "pid": 20136
+    },
+    {
+      "at": 1792177593775,
+      "name": "ChatGPT",
+      "pid": 20136
+    },
+    {
+      "at": 1792177594272,
+      "name": "ChatGPT",
+      "pid": 20136
+    },
+    {
+      "at": 1792177594758,
+      "name": "ChatGPT",
+      "pid": 20136
+    },
+    {
+      "at": 1792177594827,
+      "name": "ChatGPT",
+      "pid": 20136
+    },
+    {
+      "at": 1792177595413,
+      "name": "ChatGPT",
+      "pid": 20136
+    },
+    {
+      "at": 1792177595768,
+      "name": "ChatGPT",
+      "pid": 20136
+    },
+    {
+      "at": 1792177596266,
+      "name": "ChatGPT",
+      "pid": 20136
+    },
+    {
+      "at": 1792177596762,
+      "name": "ChatGPT",
+      "pid": 20136
+    },
+    {
+      "at": 1792177597289,
+      "name": "ChatGPT",
+      "pid": 20136
+    },
+    {
+      "at": 1792177597505,
+      "name": "ChatGPT",
+      "pid": 20136
+    },
+    {
+      "at": 1792177597764,
+      "name": "ChatGPT",
+      "pid": 20136
+    },
+    {
+      "at": 1792177598273,
+      "name": "ChatGPT",
+      "pid": 20136
+    },
+    {
+      "at": 1792177598767,
+      "name": "ChatGPT",
+      "pid": 20136
+    },
+    {
+      "at": 1792177598954,
+      "name": "ChatGPT",
+      "pid": 20136
+    },
+    {
+      "at": 1792177599294,
+      "name": "ChatGPT",
+      "pid": 20136
+    },
+    {
+      "at": 1792177599603,
+      "name": "ChatGPT",
+      "pid": 20136
+    },
+    {
+      "at": 1792177599786,
+      "name": "ChatGPT",
+      "pid": 20136
+    },
+    {
+      "at": 1792177600283,
+      "name": "ChatGPT",
+      "pid": 20136
+    },
+    {
+      "at": 1792177600773,
+      "name": "ChatGPT",
+      "pid": 20136
+    },
+    {
+      "at": 1792177600782,
+      "name": "ChatGPT",
+      "pid": 20136
+    }
+  ],
+  "unverified": [
+    "physical Android/iOS devices",
+    "Safari and Firefox runtime",
+    "actual native keyboard",
+    "live translation providers"
+  ],
+  "fixturePolicy": "Production extension with local Microsoft response transport; trusted CDP touch input; isolated-world VisualViewport fixture explicitly does not represent native mobile keyboard.",
+  "stage": "close-fixture-server",
+  "focusObserver": {
+    "monitorPid": 2174,
+    "time": 1792177587415.185,
+    "monotonicMs": 3602878659.0112085
+  },
+  "launchMode": "macos-background-cdp",
+  "focusPolicy": "launchservices-no-foreground",
+  "windowPlacement": {
+    "mode": "background-visible-no-focus",
+    "visible": true,
+    "hidden": false,
+    "centered": true,
+    "windowState": "normal",
+    "bounds": {
+      "left": 132,
+      "top": -1040,
+      "width": 1440,
+      "height": 1000
+    },
+    "displayTarget": "secondary",
+    "source": "macos-nsscreen",
+    "screenIndex": 1,
+    "browserFrontmost": false,
+    "frontmostBefore": {
+      "pid": 20136,
+      "name": "ChatGPT"
+    },
+    "frontmostAfter": {
+      "pid": 20136,
+      "name": "ChatGPT"
+    }
+  },
+  "browserPid": 2177,
+  "workerErrorMonitor": true,
+  "optionsControlTab": {
+    "id": 1733001429,
+    "windowId": 1733001427,
+    "url": "chrome-extension://djnlaiohfaaifbibleebjggkghlmcpcj/options.html#settings-general"
+  },
+  "touchCapabilitySetup": {
+    "maxTouchPoints": 5,
+    "beforeFreshDocumentMount": true,
+    "nativeMobileEvidence": false
+  },
+  "firstTouch": {
+    "metrics": {
+      "dock": {
+        "x": 334,
+        "y": 348,
+        "width": 44,
+        "height": 148,
+        "right": 378,
+        "bottom": 496
+      },
+      "main": {
+        "x": 334,
+        "y": 400,
+        "width": 44,
+        "height": 44,
+        "right": 378,
+        "bottom": 444
+      },
+      "position": "right",
+      "status": "translating",
+      "style": null,
+      "expanded": true,
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "visualViewport": {
+        "left": 0,
+        "top": 0,
+        "width": 390,
+        "height": 844,
+        "right": 390,
+        "bottom": 844,
+        "scale": 1
+      },
+      "coarse": true,
+      "anyPointerCoarse": true,
+      "maxTouchPoints": 5,
+      "hardwareTouchClass": true,
+      "computedStyle": {
+        "display": "flex",
+        "visibility": "visible",
+        "opacity": "1",
+        "pointerEvents": "auto",
+        "transform": "matrix(1, 0, 0, 1, 0, 0)",
+        "transformIsIdentity": true,
+        "clipPath": "none"
+      },
+      "hitSamples": [
+        {
+          "name": "center",
+          "x": 356,
+          "y": 422,
+          "rootHitTarget": true,
+          "documentHitOwn": true
+        },
+        {
+          "name": "upper-left",
+          "x": 345,
+          "y": 411,
+          "rootHitTarget": true,
+          "documentHitOwn": true
+        },
+        {
+          "name": "upper-right",
+          "x": 367,
+          "y": 411,
+          "rootHitTarget": true,
+          "documentHitOwn": true
+        },
+        {
+          "name": "lower-left",
+          "x": 345,
+          "y": 433,
+          "rootHitTarget": true,
+          "documentHitOwn": true
+        },
+        {
+          "name": "lower-right",
+          "x": 367,
+          "y": 433,
+          "rootHitTarget": true,
+          "documentHitOwn": true
+        }
+      ]
+    },
+    "events": [
+      {
+        "type": "pointerdown",
+        "pointerId": 2,
+        "button": 0,
+        "detail": 0,
+        "trusted": true
+      },
+      {
+        "type": "pointerup",
+        "pointerId": 2,
+        "button": 0,
+        "detail": 0,
+        "trusted": true
+      },
+      {
+        "type": "click",
+        "pointerId": 2,
+        "button": 0,
+        "detail": 0,
+        "trusted": true
+      }
+    ]
+  },
+  "progressBounds": {
+    "x": 95,
+    "y": 382,
+    "right": 365,
+    "bottom": 450,
+    "closeWidth": 44,
+    "closeHeight": 44
+  },
+  "workerUnhandledErrors": [],
+  "gracefulBrowserClose": {
+    "requestedAt": 1792177600783,
+    "method": "Browser.close",
+    "returnedAt": 1792177600785
+  },
+  "browserCloseReceipt": "shared-guard-fulfilled",
+  "focusEvents": [],
+  "profileRemoved": true
+}

@@ -1,0 +1,56 @@
+[
+  {
+    "source": "edge-restoration-v4/services-short-zh-CN-gpt-58-top.png",
+    "copy": {
+      "file": "services-short-zh-CN-gpt-58-top.png",
+      "bytes": 3699,
+      "sha256": "cbdcae493c9ce88eeceb2158c0e243ec1ec9171e2be709c9f8f6717e2eeb6478"
+    },
+    "byteEqual": true
+  },
+  {
+    "source": "edge-restoration-v4/services-short-zh-CN-gpt-58-first-row.png",
+    "copy": {
+      "file": "services-short-zh-CN-gpt-58-first-row.png",
+      "bytes": 5248,
+      "sha256": "9b5970471e0452ba48e9f6320f2affcd82ed3f1da13bbb8ce520fc7f2807518f"
+    },
+    "byteEqual": true
+  },
+  {
+    "source": "edge-restoration-v4/services-short-zh-CN-gpt-58-last-row.png",
+    "copy": {
+      "file": "services-short-zh-CN-gpt-58-last-row.png",
+      "bytes": 5483,
+      "sha256": "5e5b76f3dddfaccdb3e1169b4fb498c3feacd084c92a0597c4afd26b50b2a013"
+    },
+    "byteEqual": true
+  },
+  {
+    "source": "edge-restoration-v4/services-short-zh-CN-gpt-58-last-return-600.png",
+    "copy": {
+      "file": "services-short-zh-CN-gpt-58-last-return-600.png",
+      "bytes": 42509,
+      "sha256": "62f47e2f12a5dd4814412a6f3b16fe859fbdd6afb00d85d4c8f19c288917b9ba"
+    },
+    "byteEqual": true
+  },
+  {
+    "source": "edge-restoration-v4/services-short-zh-CN-gpt-224-224-scrolled.png",
+    "copy": {
+      "file": "services-short-zh-CN-gpt-224-224-scrolled.png",
+      "bytes": 16041,
+      "sha256": "b95a2b3eb1b0987b24296ab5e4c113189de78f0734ffe7e335f821a185b6b916"
+    },
+    "byteEqual": true
+  },
+  {
+    "source": "edge-restoration-v4/services-short-zh-CN-gpt-224-normal-return.png",
+    "copy": {
+      "file": "services-short-zh-CN-gpt-224-normal-return.png",
+      "bytes": 42509,
+      "sha256": "62f47e2f12a5dd4814412a6f3b16fe859fbdd6afb00d85d4c8f19c288917b9ba"
+    },
+    "byteEqual": true
+  }
+]

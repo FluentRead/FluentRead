@@ -15,6 +15,7 @@ import {Config} from '@/src/core/config/model';
 import * as learningAppearance from '@/src/core/config/videoSentenceLearningAppearance';
 import * as timeline from '@/src/features/video-subtitle/content/sentenceTimeline';
 import * as playback from '@/src/features/video-subtitle/content/sentencePlayback';
+import * as youtubeControlsScope from '@/src/features/video-subtitle/content/youtubeControlsScope';
 import {getVideoTranslationConfigFingerprint} from '@/src/features/video-subtitle/content/subtitleLogic';
 import * as vocabulary from '@/src/features/vocabulary/public';
 import {beginMaterialCapture, completeMaterialCapture} from '@/src/features/vocabulary/material/public';
@@ -65,6 +66,7 @@ async function mount(): Promise<void> {
     if (id === '@/src/features/vocabulary/material/public') return {beginMaterialCapture, completeMaterialCapture};
     if (id === '../content/sentenceTimeline') return timeline;
     if (id === '../content/sentencePlayback') return playback;
+    if (id === '../content/youtubeControlsScope') return youtubeControlsScope;
     if (id === '../content/subtitleLogic') return {getVideoTranslationConfigFingerprint};
     return require(id);
   }, exports);
@@ -79,6 +81,26 @@ function changeTranslationConfig(kind: 'service' | 'model' | 'glossary'): void {
   else if (kind === 'model') config.model.google = 'updated-fixture-model';
   else config.glossaryLibraries[0].entries[0].target = '新的译名';
   subscription();
+}
+
+/** 实际 SFC setup 注册在窗口上的监听消费 DOM target；显式媒体端口不把 portal 父链伪装为 player。 */
+function portalKeyboardFixture() {
+  const {document} = parseHTML('<html><body><div id="player-container-id" class="player-container">'
+    + '<div id="movie_player" class="html5-video-player ytp-mweb-player"><video></video><button id="native"></button></div>'
+    + '<ytm-custom-control><button id="external-native"></button></ytm-custom-control>'
+    + '<div class="fluent-read-video-learning-frame"><div id="learning-host"><section><button id="panel-button"></button><textarea></textarea></section></div></div>'
+    + '</div><button id="outside"></button><div id="other-player"></div></body></html>');
+  const keyboardWindow = new EventTarget(); Object.defineProperty(document, 'defaultView', {value: keyboardWindow});
+  video = Object.assign(document.querySelector('video')!, {currentTime: 0, paused: true, seeking: false, ended: false,
+    play: vi.fn().mockResolvedValue(undefined), pause: vi.fn()});
+  const player = document.getElementById('movie_player')!, panel = document.querySelector('section')!;
+  props.video = video; props.player = player;
+  const key = (name: string, target: Element) => {
+    const event = new Event('keydown', {cancelable: true});
+    Object.defineProperties(event, {key: {value: name}, target: {value: target}});
+    keyboardWindow.dispatchEvent(event); return event;
+  };
+  return {document, keyboardWindow, player, panel, scope: document.getElementById('player-container-id')!, key};
 }
 
 beforeEach(() => {
@@ -106,11 +128,69 @@ beforeEach(() => {
 afterEach(() => {close(); vi.unstubAllGlobals(); vi.useRealTimers();});
 
 describe('完整句学习组件的调度与异步归属回归', () => {
+  it.each([false, true])('换句只归顶当前owned滚动区，短高整卡=%s，页面与外层portal滚动不变', async short => {
+    const f = portalKeyboardFixture(), host = f.panel.parentElement!;
+    host.id = 'fluent-read-video-learning-panel'; host.dataset.shortHeight = String(short);
+    await mount(); state.panel = vue.markRaw(f.panel);
+    const body = f.document.createElement('div'); f.panel.appendChild(body); state.body = vue.markRaw(body);
+    body.scrollTop = 42; f.panel.scrollTop = 180; host.scrollTop = 200; f.document.documentElement.scrollTop = 2720;
+    f.key('ArrowRight', video); await flush();
+    expect(state.index).toBe(1); expect(body.scrollTop).toBe(0); expect(f.panel.scrollTop).toBe(short ? 0 : 180);
+    expect(host.scrollTop).toBe(200); expect(f.document.documentElement.scrollTop).toBe(2720);
+  });
+
+  it('portal面板以显式媒体player消费真实窗口学习键，并让位同视频兄弟菜单', async () => {
+    const f = portalKeyboardFixture(); await mount(); state.panel = vue.markRaw(f.panel);
+    expect(f.panel.parentElement!.parentElement).not.toBe(f.player);
+    const next = f.key('ArrowRight', video); await flush();
+    expect(next.defaultPrevented).toBe(true); expect(state.index).toBe(1); expect(video.currentTime).toBe(2);
+    expect(f.key('r', video).defaultPrevented).toBe(true); expect(state.mode).toBe('loop');
+    expect(f.key('q', video).defaultPrevented).toBe(true); expect(state.mode).toBe('pause');
+    expect(f.key('ArrowLeft', f.document.getElementById('panel-button')!).defaultPrevented).toBe(true); await flush();
+    expect(state.index).toBe(0);
+    for (const target of [f.document.getElementById('outside')!, f.document.getElementById('external-native')!, f.panel.querySelector('textarea')!]) {
+      expect(f.key('r', target).defaultPrevented).toBe(false); expect(state.mode).toBe('pause');
+    }
+    const menuHost = f.document.createElement('div'), menu = f.document.createElement('div'), item = f.document.createElement('button');
+    menu.id = 'fluent-read-video-subtitle-menu'; menu.hidden = false; menu.appendChild(item); menuHost.appendChild(menu); f.scope.appendChild(menuHost);
+    const before = [state.index, state.mode, video.currentTime];
+    for (const name of ['ArrowLeft', 'ArrowRight', 'r', 'q', 'Escape']) {
+      expect(f.key(name, item).defaultPrevented).toBe(false); expect([state.index, state.mode, video.currentTime]).toEqual(before);
+    }
+    expect(f.key('Escape', video).defaultPrevented).toBe(false); expect(emit).not.toHaveBeenCalled();
+    // 同名菜单移出已验证同视频范围后，不再阻止当前学习面板关闭。
+    f.document.getElementById('other-player')!.appendChild(menuHost);
+    expect(f.key('Escape', video).defaultPrevented).toBe(true); expect(emit).toHaveBeenCalledWith('close');
+    close(); expect(f.key('ArrowRight', video).defaultPrevented).toBe(false);
+  });
+
+  it.each(['missing', 'mismatched'] as const)('没有可靠logical player（%s）时不猜portal父链，但保留面板内部学习键', async condition => {
+    const f = portalKeyboardFixture();
+    props.player = condition === 'missing' ? undefined : f.document.getElementById('other-player');
+    await mount(); state.panel = vue.markRaw(f.panel);
+    expect(f.key('ArrowRight', video).defaultPrevented).toBe(false); expect(state.index).toBe(0);
+    expect(f.key('r', f.document.getElementById('panel-button')!).defaultPrevented).toBe(true); expect(state.mode).toBe('loop');
+    expect(f.key('Escape', f.document.getElementById('panel-button')!).defaultPrevented).toBe(true); expect(emit).toHaveBeenCalledWith('close');
+  });
+
+  it('同媒体重挂后拒绝旧player并立即消费更新后的显式player，不依赖portal位置', async () => {
+    const f = portalKeyboardFixture(); await mount(); state.panel = vue.markRaw(f.panel);
+    const next = f.document.getElementById('other-player')!; next.appendChild(video);
+    expect(f.key('ArrowRight', video).defaultPrevented).toBe(false); expect(state.index).toBe(0);
+    props.player = next; await flush();
+    expect(f.key('ArrowRight', video).defaultPrevented).toBe(true); await flush(); expect(state.index).toBe(1);
+    expect(f.key('r', f.document.getElementById('native')!).defaultPrevented).toBe(false);
+    expect(f.panel.parentElement!.parentElement!.contains(video)).toBe(false);
+    expect(f.key('q', f.document.getElementById('panel-button')!).defaultPrevented).toBe(true); expect(state.mode).toBe('pause');
+  });
+
   it('播放器焦点下在捕获阶段接管学习键，编辑、修饰、组合输入与页面外区域保留原操作', async () => {
-    const {document} = parseHTML('<html><body><div id="player"><button id="native"></button><div id="host"><section><input/><textarea/><div contenteditable><span id="editable"></span></div></section></div></div><button id="outside"></button></body></html>');
+    const {document} = parseHTML('<html><body><div id="player"><video></video><button id="native"></button><div id="host"><section><input/><textarea/><div contenteditable><span id="editable"></span></div></section></div></div><button id="outside"></button></body></html>');
     const keyboardWindow = new EventTarget();
     Object.defineProperty(document, 'defaultView', {value: keyboardWindow});
-    Object.assign(video, {ownerDocument: document, playbackRate: 1.25});
+    video = Object.assign(document.querySelector('video')!, {currentTime: 0, paused: true, seeking: false, ended: false,
+      play: vi.fn().mockResolvedValue(undefined), pause: vi.fn(), playbackRate: 1.25});
+    props.video = video; props.player = document.getElementById('player')!;
     const add = vi.spyOn(keyboardWindow, 'addEventListener'); const remove = vi.spyOn(keyboardWindow, 'removeEventListener');
     await mount(); state.panel = vue.markRaw(document.querySelector('section')!);
     expect(add).toHaveBeenCalledWith('keydown', state.onPlayerKeydown, true);
@@ -146,8 +226,7 @@ describe('完整句学习组件的调度与异步归属回归', () => {
     }
     menu.remove();
     Object.defineProperty(document, 'fullscreenElement', {value: document.getElementById('player'), configurable: true});
-    document.getElementById('player')!.appendChild(document.createElement('video'));
-    const realMedia = document.querySelector('video')!;
+    const realMedia = document.createElement('video'); document.getElementById('player')!.appendChild(realMedia);
     Object.assign(realMedia, {currentTime: video.currentTime, paused: true, seeking: false, ended: false, play: vi.fn(), pause: vi.fn()});
     props.video = realMedia;
     await flush();

@@ -1,0 +1,94 @@
+{
+  "at": "2026-10-16T23:24:52.760554+00:00",
+  "productCommit": "cae1d61221670a9d6812f803c3acefd8654ea300",
+  "buildBaseHead": "121c0217d3ce8c2067ade25328d5a9527e6019e4",
+  "buildHadUncommittedProductPatch": true,
+  "scope": "The build was run before the product commit, on 121c plus the exact frozen dirty patch. This post-build correspondence verifies 14 frozen inputs against committed blobs and working bytes; it does not redate or rerun the build.",
+  "nativeIdentitySHA256": "25dc4fdc73e7fdb10e3fb37e6d37b5f76a1d0a20a1460af51f8126f870233469",
+  "inputs": {
+    "src/features/video-subtitle/content/videoPlayerBinding.ts": {
+      "sha256": "0789013139caf5e43783e4d3501b9a96c5d97324213efcbdfa941e1eb34fdec4",
+      "bytes": 23201,
+      "commitBlobMatchesFrozenBuildInput": true,
+      "workingFileMatchesCommitBlob": true
+    },
+    "src/features/video-subtitle/content/ui.ts": {
+      "sha256": "eb9cd5ccd3d2931cd1e85fa8a668235374e0a865e06605981274bd20944b592c",
+      "bytes": 86837,
+      "commitBlobMatchesFrozenBuildInput": true,
+      "workingFileMatchesCommitBlob": true
+    },
+    "tests/videoPlayerBinding.test.ts": {
+      "sha256": "68fb776e05d95ec9d7d95430bfe4d3ad704703fb6f0513da05c33984074e81b0",
+      "bytes": 101967,
+      "commitBlobMatchesFrozenBuildInput": true,
+      "workingFileMatchesCommitBlob": true
+    },
+    "scripts/run-mobile-video-subtitle-test.cjs": {
+      "sha256": "7613fece1417934d34f121f5a0413658e4fc848e2cf1d8d349d866f75b116d6f",
+      "bytes": 60997,
+      "commitBlobMatchesFrozenBuildInput": true,
+      "workingFileMatchesCommitBlob": true
+    },
+    "scripts/safari/package.mjs": {
+      "sha256": "c8f8524584509001a46159b378e24fa378524969072ab3dd38fb06ba56618ab0",
+      "bytes": 33471,
+      "commitBlobMatchesFrozenBuildInput": true,
+      "workingFileMatchesCommitBlob": true
+    },
+    "scripts/testing/run-resource-safe.mjs": {
+      "sha256": "ef0d65fcbd87288afb7ad070fc20015e24265008dd6b476d87e1daf5d71b49f2",
+      "bytes": 14814,
+      "commitBlobMatchesFrozenBuildInput": true,
+      "workingFileMatchesCommitBlob": true
+    },
+    "src/core/config/freeProviderOrigins.json": {
+      "sha256": "8b4004cade979ded8b2b76ac3398dfa108f9e423de2b6d7336dc2530cadf2418",
+      "bytes": 1021,
+      "commitBlobMatchesFrozenBuildInput": true,
+      "workingFileMatchesCommitBlob": true
+    },
+    "scripts/safari/container/ViewController.swift": {
+      "sha256": "6d9d7f1bb044d88eb17b644c8c038062f964a4486f59a90f4d3b081f09931d06",
+      "bytes": 4589,
+      "commitBlobMatchesFrozenBuildInput": true,
+      "workingFileMatchesCommitBlob": true
+    },
+    "scripts/safari/container/Main.html": {
+      "sha256": "8359d2ff5a18fc2c655ef8798869b242b7c8495fa9a4575919213a2226d7789e",
+      "bytes": 862,
+      "commitBlobMatchesFrozenBuildInput": true,
+      "workingFileMatchesCommitBlob": true
+    },
+    "scripts/safari/container/Style.css": {
+      "sha256": "3f4c01b933fe9622c01784d8e2eec2a228225fb07284bb5adacaf4bef4319a40",
+      "bytes": 1536,
+      "commitBlobMatchesFrozenBuildInput": true,
+      "workingFileMatchesCommitBlob": true
+    },
+    "scripts/safari/container/Script.js": {
+      "sha256": "ff9d564bd55a9742f77043dc08ebfd4cc2415989d70576851182d9c34c0ad2f8",
+      "bytes": 2887,
+      "commitBlobMatchesFrozenBuildInput": true,
+      "workingFileMatchesCommitBlob": true
+    },
+    "package.json": {
+      "sha256": "f2d0cb391c8a4049f85cacd393069f39bb62de49f2bf79558ae4e31f86991871",
+      "bytes": 8017,
+      "commitBlobMatchesFrozenBuildInput": true,
+      "workingFileMatchesCommitBlob": true
+    },
+    "pnpm-lock.yaml": {
+      "sha256": "f05a7705309a18c1da81c8a155aee748bbfe8974f8dd2f2d3a7de66adbdca206",
+      "bytes": 341118,
+      "commitBlobMatchesFrozenBuildInput": true,
+      "workingFileMatchesCommitBlob": true
+    },
+    "wxt.config.ts": {
+      "sha256": "09e6aea80f44a41f7cfa24acdf486f79d73c0011a086be9d36b35c4dbbd252d6",
+      "bytes": 19585,
+      "commitBlobMatchesFrozenBuildInput": true,
+      "workingFileMatchesCommitBlob": true
+    }
+  }
+}

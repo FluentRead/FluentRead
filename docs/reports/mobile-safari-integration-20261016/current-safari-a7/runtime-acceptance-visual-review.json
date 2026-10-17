@@ -1,0 +1,190 @@
+{
+  "at": "2026-10-16T09:36:34.179910+00:00",
+  "status": "A7_RAW_SKIP_PRETOUCH_CANDIDATE_OR_FRAME_GUARD_MENU_NOT_MEASURED",
+  "runtimeCommit": "f5a82d11a5b6b6a5de2f2ea726065a56cdb2e6ca",
+  "productionIdentitySHA256": "3f3df2dc7993788676427a6544e5cd17937f2a7da8d8e4a5f6c1d215417679dd",
+  "testMethod": "test112ProductionSemanticMenuSnapshot",
+  "rawCounts": {
+    "passedTests": 0,
+    "skippedTests": 1,
+    "failedTests": 0,
+    "totalTestCount": 1
+  },
+  "caseDurationSeconds": 11.979,
+  "testExecuteToolExitCode": 0,
+  "rawSkipReason": "A7 player/candidate moved after evidence; no gesture",
+  "actions": {
+    "address": 1,
+    "navigation": 1,
+    "normalClear": 1,
+    "siteUnmute": 1
+  },
+  "beforeSnapshot": {
+    "appFrame": {
+      "height": 874,
+      "width": 402,
+      "x": 0,
+      "y": 0
+    },
+    "baseBoundaryEligible": true,
+    "candidateCount": 1,
+    "closeCount": 0,
+    "closeFrame": {
+      "isInfinite": false,
+      "isNull": true,
+      "nonFinite": true
+    },
+    "closeType": 0,
+    "entryCount": 1,
+    "entryFrame": {
+      "height": 45,
+      "width": 44,
+      "x": 350,
+      "y": 284
+    },
+    "entryLabel": "流畅阅读字幕翻译：已开启",
+    "entryType": 1,
+    "knownTEDWithinPlayer": true,
+    "metadataElapsedSeconds": 10.57870602607727,
+    "nativeLabels": [],
+    "oneSnapshotBatch": true,
+    "optionalBilingualCue": null,
+    "phase": "before-possible-touch",
+    "playback": {
+      "pauseCount": 0,
+      "playCount": 0,
+      "progress": []
+    },
+    "playerCount": 1,
+    "playerFrame": {
+      "height": 226,
+      "width": 402,
+      "x": 0,
+      "y": 110
+    },
+    "snapshotElapsedSeconds": 10.576867938041687
+  },
+  "beforeAX": {
+    "elapsedSeconds": 10.566246032714844,
+    "relevantNodes": [
+      {
+        "label": "YouTube 视频播放器",
+        "type": 1,
+        "frame": {
+          "height": 226,
+          "width": 402,
+          "x": 0,
+          "y": 110
+        },
+        "valueString": ""
+      },
+      {
+        "label": "Do schools kill creativity? | Sir Ken Robinson | TED, 20分钟3秒钟",
+        "type": 1,
+        "frame": {
+          "height": 226,
+          "width": 301,
+          "x": 50,
+          "y": 110
+        },
+        "valueString": "0秒钟"
+      },
+      {
+        "label": "流畅阅读字幕翻译：已开启",
+        "type": 1,
+        "frame": {
+          "height": 45,
+          "width": 44,
+          "x": 350,
+          "y": 284
+        },
+        "valueString": ""
+      }
+    ]
+  },
+  "finalAX": {
+    "elapsedSeconds": 11.411293029785156,
+    "relevantNodes": [
+      {
+        "label": "YouTube 视频播放器",
+        "type": 1,
+        "frame": {
+          "height": 226,
+          "width": 402,
+          "x": 0,
+          "y": 110
+        },
+        "valueString": ""
+      },
+      {
+        "label": "Ken Robinson认为学校扼杀创造力, 20分钟3秒钟",
+        "type": 1,
+        "frame": {
+          "height": 226,
+          "width": 301,
+          "x": 50,
+          "y": 110
+        },
+        "valueString": "1秒钟"
+      }
+    ]
+  },
+  "classification": {
+    "certain": "Before snapshot correctly counts one FR entry with actual Other type1, full expectedlabel, frame44x45 withinplayer. Guard then stops before anycenter/FRtap. KnownTED candidate label changes from fullEnglish to fullChinese between retained snapshots; playergeometry in both retainedAX is(0,110,402,226).",
+    "uncertain": "Current recheck stored stillKnown/currentFrame/currentAppFrame locally but did not attach per-condition results. The exact failed term of compositeguard is unproven. Title-localization race is supported by retained before/final labels, but do not label actual geometrymovement as established."
+  },
+  "results": {
+    "FRSemanticSnapshot": "OBSERVED_UNIQUE_OTHER_44x45_SAMEPLAYER",
+    "oneCurrentPlayerCenterTouch": "NOT_PERFORMED",
+    "nativeControls": "NOT_MEASURED_NO_REVEAL",
+    "FRActualHittability": "NOT_MEASURED",
+    "menuOpenClose": "NOT_MEASURED",
+    "playingMenu": "NOT_MEASURED",
+    "realBilingual": "NOT_MEASURED_NOT_REACHED",
+    "captionPlusNativeControls": "UNVERIFIED",
+    "overallNativeAcceptance": "UNVERIFIED"
+  },
+  "originalAttachmentCount": 7,
+  "originalPNGCount": 2,
+  "originalPNGReviews": [
+    {
+      "name": "A7-before-possible-live-touch.png",
+      "path": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/mobile-safari-semantic-entry-harness-20261016/inline-attempt1/runtime-evidence/A7-before-possible-live-touch.png",
+      "sha256": "c42c72155f7ee38d4dfe94d672f672215bcc2abfa40cd526832fae83a4276dac",
+      "observed": "Actual TED intro Once a year with pink FR icon visible lower-right; surrounding page still loading with white blank regions; no nativecontrols/menu/bilingual cue."
+    },
+    {
+      "name": "unverified-final.png",
+      "path": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/mobile-safari-semantic-entry-harness-20261016/inline-attempt1/runtime-evidence/unverified-final.png",
+      "sha256": "ad62cdb7b8b55aefdadcb99a35d75612cc3933d067ce4f59da05efe6005cf6ff",
+      "observed": "Actual sameTED intro with YouTube page and localizedChinese title now populated; pinkFR iconvisible, nativecontrols hidden; no menu or FR bilingualcue."
+    }
+  ],
+  "originalVideoBoundary": "No MP4 in exported attachmentmanifest; originalxcresult preserved, no additionalderivedframe extraction.",
+  "runtimeCleanup": {
+    "laneReleased": true,
+    "finalDevice": {
+      "lastBootedAt": "2026-10-16T09:34:05Z",
+      "dataPath": "/Users/thinkstu/Library/Developer/CoreSimulator/Devices/A407390F-7AA8-42AE-AFEB-F93EE99E9FF8/data",
+      "dataPathSize": 2664058880,
+      "logPath": "/Users/thinkstu/Library/Logs/CoreSimulator/A407390F-7AA8-42AE-AFEB-F93EE99E9FF8",
+      "udid": "A407390F-7AA8-42AE-AFEB-F93EE99E9FF8",
+      "isAvailable": true,
+      "logPathSize": 548864,
+      "deviceTypeIdentifier": "com.apple.CoreSimulator.SimDeviceType.iPhone-16-Pro",
+      "state": "Shutdown",
+      "name": "FluentRead-PR995-FreshPermissions-20261015"
+    },
+    "originalRestoredAndVerified": true,
+    "installedIdentityAtEnd": "ORIGINAL_D9_FULL485_VERIFIED",
+    "remainingOwnedProcesses": [],
+    "focusEvents": [],
+    "violations": [],
+    "cleanupErrors": [],
+    "elapsedMs": 57508,
+    "privateScope": "Native FR App data17 hash baseline only; not all extension settings/storage/cache. Record post-UI changes; do not copy files back."
+  },
+  "noAutomaticRetry": true,
+  "noProductSourceChange": true,
+  "allOriginalPNGPersonallyReviewed": true
+}

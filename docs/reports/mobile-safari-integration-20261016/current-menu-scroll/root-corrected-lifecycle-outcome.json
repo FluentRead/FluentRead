@@ -1,0 +1,62 @@
+{
+  "at": "2026-10-16T21:17:55.463517+00:00",
+  "status": "CONTROLLED_LIFECYCLE_ASSERTIONS_PASS",
+  "rawExitCode": 0,
+  "reportSHA256": "37d006ff24c3aface33fa0cbadb201fba68f8baf38c2c57cab6f74ebc2bd123e",
+  "inputs": {
+    "at": "2026-10-16T21:15:54.608304+00:00",
+    "selectedSuite": "lifecycle",
+    "baseHead": "6ee7249dbaf231772f4ff0a2e16c665f56a5839b",
+    "scriptSHA256": "5f6aded2f3f1b47f61dc5fe89ce249c9b8ca209f1bc5a67f81150264d0d09b06",
+    "productSourceUISHA256": "eb9cd5ccd3d2931cd1e85fa8a668235374e0a865e06605981274bd20944b592c",
+    "chromeMapSHA256": "fa6ed6c48b27fd7e9040764ca43c19a2aef9150c4ca32263c53c278a1900878e",
+    "chrome478UnchangedFromFinalGeometry": true,
+    "oracleChange": "Separately require direct A to FluentRead leave restore and Off then FluentRead leave preserve A disabled, matching existing nativeFullscreen.ts/tests; actual trusted TextTrackList.change required before each next step",
+    "priorFailuresRetained": true,
+    "scope": "Controlled Chromium standard TextTrack API and webkit capability/event shim, never native Safari/AVKit rendering"
+  },
+  "caseNames": [
+    "portrait-inline",
+    "portrait-visible-controls",
+    "portrait-menu",
+    "portrait-menu-hint",
+    "portrait-menu-normal-close",
+    "landscape-inline",
+    "fullscreen-geometry-safe-area",
+    "native-interface-enter",
+    "video-replaced",
+    "refresh-recovered",
+    "desktop-menu-normal-close",
+    "disabled-cleanup"
+  ],
+  "geometrySceneCount": 18,
+  "selectionReceiptCount": 11,
+  "trustedChangeEventCount": 17,
+  "maximumACKMilliseconds": 6.300000190734863,
+  "nativeSelectionContractFlags": {
+    "beginPreservedSiteSelection": true,
+    "directSourceRestored": true,
+    "offThenFluentReadKeptSourceDisabled": true,
+    "offPreservedAcrossReentry": true,
+    "otherSiteSelectionPreserved": true
+  },
+  "focusEvents": [],
+  "browserCloseReceipt": "shared-guard-fulfilled",
+  "profileRemoved": true,
+  "freshRelease": "root-fresh-corrected-lifecycle-release.json",
+  "RootActualPNGReview": [
+    "native-interface-enter",
+    "video-replaced",
+    "refresh-recovered",
+    "disabled-cleanup"
+  ],
+  "limits": [
+    "Chromium fixture standard TextTrack.mode writes and isolated-world webkit shim; no Safari/AVKit selection/rendering",
+    "no real iOS/physical device/live provider acceptance",
+    "synthetic persisted pageshow event plus ready check; no independent pageshow PNG or actual BFCache transition",
+    "refresh screenshot proves DOM bilingual recovery; native cue was original-only at that capture, not instant translated native cue readiness",
+    "safe-area CDP API unavailable; desktop scrollTop zero",
+    "prior raw lifecycle assertion FAIL retained unchanged and separately diagnosed; product native state machine unchanged"
+  ],
+  "fullGoalComplete": false
+}

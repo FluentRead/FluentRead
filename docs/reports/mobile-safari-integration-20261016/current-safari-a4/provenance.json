@@ -1,0 +1,30 @@
+{
+  "runtimeSourceCommit": "f5a82d11a5b6b6a5de2f2ea726065a56cdb2e6ca",
+  "files": {
+    "runtime-summary.json": {
+      "source": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/mobile-safari-control-readiness-harness-20261016/inline-attempt1/runtime-summary.json",
+      "sha256": "71238c3124e27c3b5782bb2d0aff04e9f5c6e508fb8368145627bee9ee3b6f1b",
+      "bytes": 1008
+    },
+    "runtime-acceptance-visual-review.json": {
+      "source": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/mobile-safari-control-readiness-harness-20261016/inline-attempt1/runtime-acceptance-visual-review.json",
+      "sha256": "64639d9929f1a84e18dc0898216248375a02617be986a31f6b895308e225f7ef",
+      "bytes": 6895
+    },
+    "fresh-release.json": {
+      "source": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/mobile-safari-control-readiness-harness-20261016/inline-attempt1/fresh-release.json",
+      "sha256": "c4b7c991c37278cface10acefd3891efd76dd97dee374305e2934f0ca4629ffe",
+      "bytes": 1272
+    },
+    "preparationControlReveal-readiness.json": {
+      "source": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/mobile-safari-control-readiness-harness-20261016/inline-attempt1/runtime-evidence/preparationControlReveal-readiness.json",
+      "sha256": "16b02d3d9bc0ca04424892b1bda698bdbb59a3854ef04ad8f01c17b65d2c35d9",
+      "bytes": 5228
+    },
+    "unverified-final.png": {
+      "source": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/mobile-safari-control-readiness-harness-20261016/inline-attempt1/runtime-evidence/unverified-final.png",
+      "sha256": "d11b71a123d5660c9a1905622d396daae833c919cf9b5ec3679359ec5f59e648",
+      "bytes": 698064
+    }
+  }
+}

@@ -1,0 +1,101 @@
+{
+  "at": "2026-10-16T21:52:53.840307+00:00",
+  "status": "ROOT_ACTUAL_OBSERVATION_ENTRY_APPEARED_MENU_NOT_ESTABLISHED_SKIP",
+  "terminalSession": 30155,
+  "terminalExitCode": 0,
+  "sourceCommit": "6eecd6710e7daac2d2a8cca9a34d0f26dc849b44",
+  "caseDurationSeconds": 12.64,
+  "runtimeGuardElapsedMs": 54509,
+  "counts": {
+    "pass": 0,
+    "skip": 1,
+    "fail": 0
+  },
+  "menuInputAttempts": {
+    "FRMenuOpen": 1
+  },
+  "acceptedMenuOpen": false,
+  "nativeMenuScrollPerformed": false,
+  "menuClosePerformed": false,
+  "entryWasVisibleAndHittableBeforeTap": true,
+  "playerCenterRevealPerformed": false,
+  "exactAX": [
+    {
+      "name": "menu-scroll-01-owned-before-open",
+      "atElapsedSeconds": 4.967448949813843,
+      "entryNodes": [],
+      "closeNodes": []
+    },
+    {
+      "name": "menu-readiness-before-reveal-1",
+      "atElapsedSeconds": 5.263427972793579,
+      "entryNodes": [],
+      "closeNodes": []
+    },
+    {
+      "name": "menu-readiness-before-reveal-2",
+      "atElapsedSeconds": 6.880107998847961,
+      "entryNodes": [
+        {
+          "frame": {
+            "height": 45,
+            "width": 44,
+            "x": 350,
+            "y": 284
+          },
+          "identifier": "",
+          "label": "流畅阅读字幕翻译：已开启",
+          "selected": false,
+          "type": 1,
+          "valueString": "",
+          "valueType": "__NSCFConstantString"
+        }
+      ],
+      "closeNodes": []
+    },
+    {
+      "name": "unverified-final",
+      "atElapsedSeconds": 12.18168294429779,
+      "entryNodes": [],
+      "closeNodes": []
+    }
+  ],
+  "RootActuallyViewedOriginalPNGs": [
+    {
+      "file": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/safari-final-menu-readiness-preparation-20261017/inline-attempt1/runtime-evidence/menu-scroll-01-owned-before-open.png",
+      "sha256": "23c6eec5206aa9b96fc988255e02a1d6392b9915e7da13df671da0811be3b225"
+    },
+    {
+      "file": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/safari-final-menu-readiness-preparation-20261017/inline-attempt1/runtime-evidence/menu-readiness-before-reveal-1.png",
+      "sha256": "3f72d4462018407b900eb5086377c4393fa8342c2ed6c782650d5f7d5e40eae8"
+    },
+    {
+      "file": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/safari-final-menu-readiness-preparation-20261017/inline-attempt1/runtime-evidence/menu-readiness-before-reveal-2.png",
+      "sha256": "8375c0ec75fb9e4afc7e088f1515367b3849bfc6723c8ed120afc37c3c8090f8"
+    },
+    {
+      "file": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/safari-final-menu-readiness-preparation-20261017/inline-attempt1/runtime-evidence/unverified-final.png",
+      "sha256": "fdc044fee078aae5f79c49b970c3153cb459f6a7739f12a3cf20e57b1a12a55a"
+    }
+  ],
+  "pixelObservation": "Initial blank page, black player, then English intro with pink FR entry, final video frame and full YouTube content with no visible FR menu. Screenshot and AX are sequential, not atomic.",
+  "limitations": [
+    "Native AX entry readiness and one XCTest tap do not prove the product click handler received the event.",
+    "No unique cause established: transient DOM/media rebinding, visibility, event delivery or AX changes remain unseparated.",
+    "No accepted stable playback, bilingual output, menu scrolling, close/focus, AVKit or physical-device result."
+  ],
+  "recovery": {
+    "oldD9Full485AllRestored": true,
+    "Userscripts47AllPhasesMatch": true,
+    "nativeAppPrivate17HashesAllPhasesMatch": true,
+    "DemoSHAAllPhasesMatch": true,
+    "dataContainerUUIDMigrated": true,
+    "noPrivateDataCopiedBack": true,
+    "scope": "native App17 file map only, not all extension settings/storage/cache",
+    "taskSimulatorShutdown": true,
+    "focusEvents": [],
+    "cleanupErrors": [],
+    "freshReleaseSHA256": "7c6c4deecfb52ccb02b12988cec1e53f72b9c2419176b9532f2d262f97912156"
+  },
+  "independentOutcomeReviewPending": true
+}

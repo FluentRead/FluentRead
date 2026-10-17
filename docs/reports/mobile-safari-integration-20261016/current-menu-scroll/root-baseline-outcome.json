@@ -1,0 +1,149 @@
+{
+  "at": "2026-10-16T20:58:51.298577+00:00",
+  "status": "REPRODUCED_POST_SCROLL_CLOSE_CLIPPED",
+  "baselineProductSourceCommit": "a2ecda302d3a0199ffe9f0222ee2998a37bd7d5d",
+  "baselineExitCode": 1,
+  "timing": {
+    "scrollTop": 35.5,
+    "close": {
+      "action": "close-menu",
+      "count": 1,
+      "frame": {
+        "left": 331,
+        "top": -20.5,
+        "right": 375,
+        "bottom": 23.5,
+        "width": 44,
+        "height": 44
+      },
+      "visible": {
+        "left": 331,
+        "top": 9.00219298245614,
+        "right": 375,
+        "bottom": 23.5,
+        "width": 44,
+        "height": 14.49780701754386
+      },
+      "fullyVisible": false,
+      "points": [
+        {
+          "x": 353,
+          "y": 1.5,
+          "hitOwnedControl": false,
+          "hitTag": "VIDEO",
+          "hitAction": null
+        },
+        {
+          "x": 342,
+          "y": -9.5,
+          "hitOwnedControl": false,
+          "hitTag": null,
+          "hitAction": null
+        },
+        {
+          "x": 364,
+          "y": -9.5,
+          "hitOwnedControl": false,
+          "hitTag": null,
+          "hitAction": null
+        },
+        {
+          "x": 342,
+          "y": 12.5,
+          "hitOwnedControl": true,
+          "hitTag": "BUTTON",
+          "hitAction": "close-menu"
+        },
+        {
+          "x": 364,
+          "y": 12.5,
+          "hitOwnedControl": true,
+          "hitTag": "BUTTON",
+          "hitAction": "close-menu"
+        }
+      ]
+    }
+  },
+  "hint": {
+    "scrollTop": 122.5,
+    "close": {
+      "action": "close-menu",
+      "count": 1,
+      "frame": {
+        "left": 331,
+        "top": -107.5,
+        "right": 375,
+        "bottom": -63.5,
+        "width": 44,
+        "height": 44
+      },
+      "visible": {
+        "left": 331,
+        "top": 9.00219298245614,
+        "right": 375,
+        "bottom": -63.5,
+        "width": 44,
+        "height": 0
+      },
+      "fullyVisible": false,
+      "points": [
+        {
+          "x": 353,
+          "y": -85.5,
+          "hitOwnedControl": false,
+          "hitTag": null,
+          "hitAction": null
+        },
+        {
+          "x": 342,
+          "y": -96.5,
+          "hitOwnedControl": false,
+          "hitTag": null,
+          "hitAction": null
+        },
+        {
+          "x": 364,
+          "y": -96.5,
+          "hitOwnedControl": false,
+          "hitTag": null,
+          "hitAction": null
+        },
+        {
+          "x": 342,
+          "y": -74.5,
+          "hitOwnedControl": false,
+          "hitTag": null,
+          "hitAction": null
+        },
+        {
+          "x": 364,
+          "y": -74.5,
+          "hitOwnedControl": false,
+          "hitTag": null,
+          "hitAction": null
+        }
+      ]
+    }
+  },
+  "actualRootPNGReview": [
+    "portrait-menu-timing-targets.png: header close mostly above menu and viewport",
+    "portrait-menu-hint-targets.png: header close absent above scroll container"
+  ],
+  "normalClosePerformed": false,
+  "keyboardAfterReopenPerformed": false,
+  "bootstrapFailureSeparate": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/menu-scroll-controlled-20261017/baseline/report.json",
+  "focusEvents": [],
+  "browserCloseReceipt": "shared-guard-fulfilled",
+  "profileRemoved": true,
+  "freshRelease": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/menu-scroll-controlled-20261017/root-fresh-baseline-release.json",
+  "reportSHA256": "cd2666d74047246d082237c240eb842d752579d745e5dce7492ceb7482ee5642",
+  "evidenceLimits": [
+    "local HTML and timedtext fixtures",
+    "mock translation",
+    "Chromium viewport/touch emulation",
+    "isolated-extension-world webkit capability/event shim only; no iOS/AVKit rendering",
+    "fullscreen geometry uses an explicit DOM property fixture; no system/window fullscreen",
+    "no live provider or mobile device"
+  ],
+  "fixPending": true
+}

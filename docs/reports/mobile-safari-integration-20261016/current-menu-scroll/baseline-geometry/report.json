@@ -1,0 +1,774 @@
+{
+  "fixture": "mobile-youtube-production-extension",
+  "evidenceLimits": [
+    "local HTML and timedtext fixtures",
+    "mock translation",
+    "Chromium viewport/touch emulation",
+    "isolated-extension-world webkit capability/event shim only; no iOS/AVKit rendering",
+    "fullscreen geometry uses an explicit DOM property fixture; no system/window fullscreen",
+    "no live provider or mobile device"
+  ],
+  "cases": [
+    {
+      "name": "portrait-inline",
+      "video": {
+        "left": 0,
+        "top": 0,
+        "right": 390,
+        "bottom": 219.375,
+        "width": 390,
+        "height": 219.375
+      },
+      "panel": {
+        "left": 27.1796875,
+        "top": 147.4453125,
+        "right": 362.8203125,
+        "bottom": 207.3984375,
+        "width": 335.640625,
+        "height": 59.953125
+      },
+      "original": "Watch bilingual captions near the bottom.",
+      "translation": "在视频底部观看双语字幕。",
+      "nativeMode": "hidden",
+      "nativeCues": [
+        {
+          "start": 0,
+          "end": 30,
+          "text": "Watch bilingual captions near the bottom.\n在视频底部观看双语字幕。"
+        }
+      ],
+      "coarsePointer": true,
+      "viewport": {
+        "width": 390,
+        "height": 844
+      }
+    },
+    {
+      "name": "portrait-visible-controls",
+      "video": {
+        "left": 0,
+        "top": 0,
+        "right": 390,
+        "bottom": 219.375,
+        "width": 390,
+        "height": 219.375
+      },
+      "panel": {
+        "left": 27.1796875,
+        "top": 111.5078125,
+        "right": 362.8203125,
+        "bottom": 171.4609375,
+        "width": 335.640625,
+        "height": 59.953125
+      },
+      "original": "Watch bilingual captions near the bottom.",
+      "translation": "在视频底部观看双语字幕。",
+      "nativeMode": "hidden",
+      "nativeCues": [
+        {
+          "start": 0,
+          "end": 30,
+          "text": "Watch bilingual captions near the bottom.\n在视频底部观看双语字幕。"
+        }
+      ],
+      "coarsePointer": true,
+      "viewport": {
+        "width": 390,
+        "height": 844
+      }
+    },
+    {
+      "name": "portrait-menu",
+      "video": {
+        "left": 0,
+        "top": 0,
+        "right": 390,
+        "bottom": 219.375,
+        "width": 390,
+        "height": 219.375
+      },
+      "panel": {
+        "left": 27.1796875,
+        "top": 111.5078125,
+        "right": 362.8203125,
+        "bottom": 171.4609375,
+        "width": 335.640625,
+        "height": 59.953125
+      },
+      "original": "Watch bilingual captions near the bottom.",
+      "translation": "在视频底部观看双语字幕。",
+      "nativeMode": "hidden",
+      "nativeCues": [
+        {
+          "start": 0,
+          "end": 30,
+          "text": "Watch bilingual captions near the bottom.\n在视频底部观看双语字幕。"
+        }
+      ],
+      "coarsePointer": true,
+      "viewport": {
+        "width": 390,
+        "height": 844
+      }
+    }
+  ],
+  "errors": [
+    "AssertionError [ERR_ASSERTION]: timing: full44px target clipped by menu/player/viewport {\"action\":\"close-menu\",\"count\":1,\"frame\":{\"left\":331,\"top\":-20.5,\"right\":375,\"bottom\":23.5,\"width\":44,\"height\":44},\"visible\":{\"left\":331,\"top\":9.00219298245614,\"right\":375,\"bottom\":23.5,\"width\":44,\"height\":14.49780701754386},\"fullyVisible\":false,\"points\":[{\"x\":353,\"y\":1.5,\"hitOwnedControl\":false,\"hitTag\":\"VIDEO\",\"hitAction\":null},{\"x\":342,\"y\":-9.5,\"hitOwnedControl\":false,\"hitTag\":null,\"hitAction\":null},{\"x\":364,\"y\":-9.5,\"hitOwnedControl\":false,\"hitTag\":null,\"hitAction\":null},{\"x\":342,\"y\":12.5,\"hitOwnedControl\":true,\"hitTag\":\"BUTTON\",\"hitAction\":\"close-menu\"},{\"x\":364,\"y\":12.5,\"hitOwnedControl\":true,\"hitTag\":\"BUTTON\",\"hitAction\":\"close-menu\"}]}\n    at main (/Users/thinkstu/Desktop/copy/FluentRead-mobile-video-menu-accessibility-20261016/scripts/run-mobile-video-subtitle-test.cjs:288:14)"
+  ],
+  "focusObserver": {
+    "monitorPid": 30760,
+    "time": 1792184109103.965,
+    "monotonicMs": 3609400340.8361254
+  },
+  "browserPid": 30763,
+  "focusSamples": [
+    {
+      "at": 1792184115242,
+      "name": "ChatGPT",
+      "pid": 20136
+    },
+    {
+      "at": 1792184115818,
+      "name": "ChatGPT",
+      "pid": 20136
+    },
+    {
+      "at": 1792184116322,
+      "name": "ChatGPT",
+      "pid": 20136
+    },
+    {
+      "at": 1792184116624,
+      "name": "ChatGPT",
+      "pid": 20136
+    },
+    {
+      "at": 1792184116818,
+      "name": "ChatGPT",
+      "pid": 20136
+    },
+    {
+      "at": 1792184117335,
+      "name": "ChatGPT",
+      "pid": 20136
+    },
+    {
+      "at": 1792184117824,
+      "name": "ChatGPT",
+      "pid": 20136
+    },
+    {
+      "at": 1792184118004,
+      "name": "ChatGPT",
+      "pid": 20136
+    },
+    {
+      "at": 1792184118221,
+      "name": "ChatGPT",
+      "pid": 20136
+    },
+    {
+      "at": 1792184118322,
+      "name": "ChatGPT",
+      "pid": 20136
+    },
+    {
+      "at": 1792184118344,
+      "name": "ChatGPT",
+      "pid": 20136
+    },
+    {
+      "at": 1792184118525,
+      "name": "ChatGPT",
+      "pid": 20136
+    },
+    {
+      "at": 1792184118661,
+      "name": "ChatGPT",
+      "pid": 20136
+    }
+  ],
+  "launchMode": "macos-background-cdp",
+  "focusPolicy": "launchservices-no-foreground",
+  "windowPlacement": {
+    "mode": "background-visible-no-focus",
+    "visible": true,
+    "hidden": false,
+    "centered": true,
+    "windowState": "normal",
+    "bounds": {
+      "left": 212,
+      "top": -990,
+      "width": 1280,
+      "height": 900
+    },
+    "displayTarget": "secondary",
+    "source": "macos-nsscreen",
+    "screenIndex": 1,
+    "browserFrontmost": false,
+    "frontmostBefore": {
+      "pid": 20136,
+      "name": "ChatGPT"
+    },
+    "frontmostAfter": {
+      "pid": 20136,
+      "name": "ChatGPT"
+    }
+  },
+  "timedtextResponses": [
+    {
+      "url": "https://m.youtube.com/api/timedtext?v=fluentread-mobile-992&lang=en&fmt=json3&xorb=2&xobt=3&xovt=3&c=WEB&cplayer=UNIPLAYER",
+      "status": 200
+    }
+  ],
+  "nativeShimWorlds": [
+    {
+      "extensionId": "djnlaiohfaaifbibleebjggkghlmcpcj",
+      "method": "function",
+      "contextId": 5
+    }
+  ],
+  "trackDiagnostics": [
+    {
+      "beforeAppend": true,
+      "immediate": 1,
+      "events": [
+        {
+          "type": "error",
+          "cues": 0,
+          "readyState": 3
+        }
+      ],
+      "afterTask": 0,
+      "afterSecond": 1,
+      "afterSameLanguage": 1
+    },
+    {
+      "beforeAppend": false,
+      "immediate": 1,
+      "events": [
+        {
+          "type": "error",
+          "cues": 0,
+          "readyState": 3
+        }
+      ],
+      "afterTask": 0,
+      "afterSecond": 1,
+      "afterSameLanguage": 1
+    }
+  ],
+  "stage": "initial-ready",
+  "nativeResourceEvents": [
+    {
+      "type": "error",
+      "trusted": true,
+      "before": 0,
+      "at": 425.7999997138977,
+      "afterTask": 1,
+      "elapsedMs": 0.09999990463256836
+    }
+  ],
+  "touchTargets": [
+    {
+      "action": "fluent-read-video-subtitle-button",
+      "label": "流畅阅读字幕翻译：已开启",
+      "height": 44,
+      "width": 44
+    },
+    {
+      "action": "open-settings",
+      "label": "打开视频翻译设置",
+      "height": 44,
+      "width": 67
+    },
+    {
+      "action": "close-menu",
+      "label": "关闭字幕菜单",
+      "height": 44,
+      "width": 44
+    },
+    {
+      "action": "open-sentence-learning",
+      "label": "开始完整句学习",
+      "height": 44,
+      "width": 360
+    },
+    {
+      "action": "bilingual",
+      "label": "双语",
+      "height": 44,
+      "width": 44
+    },
+    {
+      "action": "translation-only",
+      "label": "译文",
+      "height": 44,
+      "width": 44
+    },
+    {
+      "action": "original-only",
+      "label": "原文",
+      "height": 44,
+      "width": 44
+    },
+    {
+      "action": "off",
+      "label": "关闭",
+      "height": 44,
+      "width": 44
+    },
+    {
+      "action": "subtitle-earlier",
+      "label": "提前 0.5 秒",
+      "height": 44,
+      "width": 44
+    },
+    {
+      "action": "subtitle-later",
+      "label": "延后 0.5 秒",
+      "height": 44,
+      "width": 44
+    },
+    {
+      "action": "download-subtitles",
+      "label": "下载原文字幕",
+      "height": 44,
+      "width": 117.328125
+    },
+    {
+      "action": "download-translated-subtitles",
+      "label": "下载译文字幕",
+      "height": 44,
+      "width": 117.3359375
+    },
+    {
+      "action": "download-bilingual-subtitles",
+      "label": "下载双语字幕",
+      "height": 44,
+      "width": 117.3359375
+    }
+  ],
+  "timingGeometry": {
+    "menu": {
+      "left": 8,
+      "right": 382,
+      "top": 8,
+      "bottom": 179.375
+    },
+    "row": {
+      "left": 15,
+      "right": 375,
+      "top": 127.5,
+      "bottom": 171.5
+    },
+    "label": {
+      "left": 19,
+      "right": 235,
+      "top": 141.1015625,
+      "bottom": 157.8984375
+    },
+    "controls": {
+      "left": 243,
+      "right": 375,
+      "top": 127.5,
+      "bottom": 171.5
+    },
+    "modes": {
+      "left": 15,
+      "right": 201,
+      "top": 75.5,
+      "bottom": 123.5
+    },
+    "labelText": "字幕时间",
+    "labelWidth": 216,
+    "labelScrollWidth": 216,
+    "labelHeight": 17,
+    "labelScrollHeight": 17,
+    "overflow": "visible",
+    "textOverflow": "clip",
+    "contain": "none",
+    "offset": "0.0 s"
+  },
+  "menuScrollTargets": [
+    {
+      "name": "portrait-menu-timing-targets",
+      "menu": {
+        "left": 8,
+        "top": 8,
+        "right": 382,
+        "bottom": 179.375,
+        "width": 374,
+        "height": 171.375
+      },
+      "header": {
+        "left": 15,
+        "top": -20.5,
+        "right": 375,
+        "bottom": 23.5,
+        "width": 360,
+        "height": 44
+      },
+      "headerVisible": {
+        "left": 15,
+        "top": 9.00219298245614,
+        "right": 375,
+        "bottom": 23.5,
+        "width": 360,
+        "height": 14.49780701754386
+      },
+      "visualViewport": {
+        "left": 0,
+        "top": 0,
+        "right": 390,
+        "bottom": 844
+      },
+      "scrollTop": 35.5,
+      "scrollHeight": 292,
+      "clientHeight": 169,
+      "timingRow": {
+        "left": 15,
+        "top": 127.5,
+        "right": 375,
+        "bottom": 171.5,
+        "width": 360,
+        "height": 44
+      },
+      "targets": [
+        {
+          "action": "close-menu",
+          "count": 1,
+          "frame": {
+            "left": 331,
+            "top": -20.5,
+            "right": 375,
+            "bottom": 23.5,
+            "width": 44,
+            "height": 44
+          },
+          "visible": {
+            "left": 331,
+            "top": 9.00219298245614,
+            "right": 375,
+            "bottom": 23.5,
+            "width": 44,
+            "height": 14.49780701754386
+          },
+          "fullyVisible": false,
+          "points": [
+            {
+              "x": 353,
+              "y": 1.5,
+              "hitOwnedControl": false,
+              "hitTag": "VIDEO",
+              "hitAction": null
+            },
+            {
+              "x": 342,
+              "y": -9.5,
+              "hitOwnedControl": false,
+              "hitTag": null,
+              "hitAction": null
+            },
+            {
+              "x": 364,
+              "y": -9.5,
+              "hitOwnedControl": false,
+              "hitTag": null,
+              "hitAction": null
+            },
+            {
+              "x": 342,
+              "y": 12.5,
+              "hitOwnedControl": true,
+              "hitTag": "BUTTON",
+              "hitAction": "close-menu"
+            },
+            {
+              "x": 364,
+              "y": 12.5,
+              "hitOwnedControl": true,
+              "hitTag": "BUTTON",
+              "hitAction": "close-menu"
+            }
+          ]
+        },
+        {
+          "action": "subtitle-earlier",
+          "count": 1,
+          "frame": {
+            "left": 243,
+            "top": 127.5,
+            "right": 287,
+            "bottom": 171.5,
+            "width": 44,
+            "height": 44
+          },
+          "visible": {
+            "left": 243,
+            "top": 127.5,
+            "right": 287,
+            "bottom": 171.5,
+            "width": 44,
+            "height": 44
+          },
+          "fullyVisible": true,
+          "points": [
+            {
+              "x": 265,
+              "y": 149.5,
+              "hitOwnedControl": true,
+              "hitTag": "path",
+              "hitAction": "subtitle-earlier"
+            },
+            {
+              "x": 254,
+              "y": 138.5,
+              "hitOwnedControl": true,
+              "hitTag": "BUTTON",
+              "hitAction": "subtitle-earlier"
+            },
+            {
+              "x": 276,
+              "y": 138.5,
+              "hitOwnedControl": true,
+              "hitTag": "BUTTON",
+              "hitAction": "subtitle-earlier"
+            },
+            {
+              "x": 254,
+              "y": 160.5,
+              "hitOwnedControl": true,
+              "hitTag": "BUTTON",
+              "hitAction": "subtitle-earlier"
+            },
+            {
+              "x": 276,
+              "y": 160.5,
+              "hitOwnedControl": true,
+              "hitTag": "BUTTON",
+              "hitAction": "subtitle-earlier"
+            }
+          ]
+        },
+        {
+          "action": "subtitle-later",
+          "count": 1,
+          "frame": {
+            "left": 331,
+            "top": 127.5,
+            "right": 375,
+            "bottom": 171.5,
+            "width": 44,
+            "height": 44
+          },
+          "visible": {
+            "left": 331,
+            "top": 127.5,
+            "right": 375,
+            "bottom": 171.5,
+            "width": 44,
+            "height": 44
+          },
+          "fullyVisible": true,
+          "points": [
+            {
+              "x": 353,
+              "y": 149.5,
+              "hitOwnedControl": true,
+              "hitTag": "path",
+              "hitAction": "subtitle-later"
+            },
+            {
+              "x": 342,
+              "y": 138.5,
+              "hitOwnedControl": true,
+              "hitTag": "BUTTON",
+              "hitAction": "subtitle-later"
+            },
+            {
+              "x": 364,
+              "y": 138.5,
+              "hitOwnedControl": true,
+              "hitTag": "BUTTON",
+              "hitAction": "subtitle-later"
+            },
+            {
+              "x": 342,
+              "y": 160.5,
+              "hitOwnedControl": true,
+              "hitTag": "BUTTON",
+              "hitAction": "subtitle-later"
+            },
+            {
+              "x": 364,
+              "y": 160.5,
+              "hitOwnedControl": true,
+              "hitTag": "BUTTON",
+              "hitAction": "subtitle-later"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "portrait-menu-hint-targets",
+      "menu": {
+        "left": 8,
+        "top": 8,
+        "right": 382,
+        "bottom": 179.375,
+        "width": 374,
+        "height": 171.375
+      },
+      "header": {
+        "left": 15,
+        "top": -107.5,
+        "right": 375,
+        "bottom": -63.5,
+        "width": 360,
+        "height": 44
+      },
+      "headerVisible": {
+        "left": 15,
+        "top": 9.00219298245614,
+        "right": 375,
+        "bottom": -63.5,
+        "width": 360,
+        "height": 0
+      },
+      "visualViewport": {
+        "left": 0,
+        "top": 0,
+        "right": 390,
+        "bottom": 844
+      },
+      "scrollTop": 122.5,
+      "scrollHeight": 292,
+      "clientHeight": 169,
+      "timingRow": null,
+      "targets": [
+        {
+          "action": "close-menu",
+          "count": 1,
+          "frame": {
+            "left": 331,
+            "top": -107.5,
+            "right": 375,
+            "bottom": -63.5,
+            "width": 44,
+            "height": 44
+          },
+          "visible": {
+            "left": 331,
+            "top": 9.00219298245614,
+            "right": 375,
+            "bottom": -63.5,
+            "width": 44,
+            "height": 0
+          },
+          "fullyVisible": false,
+          "points": [
+            {
+              "x": 353,
+              "y": -85.5,
+              "hitOwnedControl": false,
+              "hitTag": null,
+              "hitAction": null
+            },
+            {
+              "x": 342,
+              "y": -96.5,
+              "hitOwnedControl": false,
+              "hitTag": null,
+              "hitAction": null
+            },
+            {
+              "x": 364,
+              "y": -96.5,
+              "hitOwnedControl": false,
+              "hitTag": null,
+              "hitAction": null
+            },
+            {
+              "x": 342,
+              "y": -74.5,
+              "hitOwnedControl": false,
+              "hitTag": null,
+              "hitAction": null
+            },
+            {
+              "x": 364,
+              "y": -74.5,
+              "hitOwnedControl": false,
+              "hitTag": null,
+              "hitAction": null
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "nativeHintGeometry": {
+    "menuTop": 8,
+    "menuBottom": 179.375,
+    "hintTop": 140.5,
+    "hintBottom": 172.390625,
+    "scrollTop": 122.5
+  },
+  "failureDom": {
+    "url": "https://m.youtube.com/watch?v=fluentread-mobile-992",
+    "visibility": "visible",
+    "video": {
+      "readyState": 4,
+      "currentTime": 0,
+      "paused": true,
+      "seeking": false,
+      "width": 640,
+      "height": 360,
+      "tracks": [
+        {
+          "kind": "subtitles",
+          "label": "FluentRead",
+          "mode": "hidden",
+          "cues": 1
+        }
+      ],
+      "nodes": [
+        {
+          "readyState": 3,
+          "kind": "subtitles",
+          "language": "zh-Hans",
+          "mode": "hidden",
+          "cues": 1
+        }
+      ]
+    }
+  },
+  "failureBusinessTracks": [
+    {
+      "kind": "subtitles",
+      "label": "FluentRead",
+      "mode": "hidden",
+      "cues": 1
+    }
+  ],
+  "failureConfig": {
+    "on": true,
+    "from": "en",
+    "to": "zh-Hans",
+    "videoTranslationEnabled": true,
+    "videoSubtitleVisible": true,
+    "videoSubtitleDisplayMode": "bilingual",
+    "videoService": "microsoft"
+  },
+  "mockRequests": [
+    {
+      "url": "https://edge.microsoft.com/translate/translatetext?from=en&to=zh-Hans&isEnterpriseClient=false",
+      "source": "[\"Watch bilingual captions near the bottom.\"]"
+    }
+  ],
+  "browserCloseReceipt": "shared-guard-fulfilled",
+  "focusEvents": [],
+  "profileRemoved": true
+}

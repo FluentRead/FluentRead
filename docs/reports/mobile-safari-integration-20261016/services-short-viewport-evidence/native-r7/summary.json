@@ -1,0 +1,144 @@
+{
+  "schema": 1,
+  "runId": "current-production-short-viewport-visible-known-row-attempt1",
+  "productCommit": "7e504c21ad5bc6e51c29c5cf79b352c088a19146",
+  "sourceCommit": "7e504c21ad5bc6e51c29c5cf79b352c088a19146",
+  "device": "Dedicated iPhone16Pro iOS26.2 Simulator",
+  "official": {
+    "passed": 1,
+    "skipped": 0,
+    "failed": 0,
+    "total": 1,
+    "selectedMethodSeconds": 73.008,
+    "wholeOfficialSeconds": 79.12400007247925
+  },
+  "status": "PASSED_SELECTED_NATIVE_SHORT_VIEWPORT_FLOW_AFTER_ORIGINAL_IMAGE_REVIEW",
+  "acceptedScope": "Only selected native Popup short viewport flow on the pinned simulator product and task local fixture.",
+  "actions": {
+    "address": 1,
+    "clearSearch": 1,
+    "closePopup": 1,
+    "defaultServiceRow": 1,
+    "drawerScrollSlot": 1,
+    "extensionPopup": 1,
+    "navigation": 1,
+    "normalClear": 1,
+    "overviewClose": 1,
+    "pageMenu": 1,
+    "pickerBack": 1,
+    "rotateLandscape": 1,
+    "rotatePortrait": 1,
+    "SafariActivate": 1,
+    "searchFocus": 1,
+    "searchGpt": 1,
+    "serviceSummary": 1
+  },
+  "permissionChoices": 0,
+  "permissionPersistenceAfterRestore": "UNKNOWN",
+  "fixtureHost": "127.0.0.1",
+  "nativeScrollGestures": 1,
+  "serviceRow": {
+    "label": "Fireworks AI accounts/fireworks/models/gpt-oss-20b · accounts/fireworks/models/gpt-oss-120b",
+    "frame": {
+      "height": 46,
+      "width": 358,
+      "x": 250,
+      "y": 80
+    },
+    "completeInConservativeShortPort": true,
+    "liveMatchesSnapshot": true,
+    "nativeIsHittable": true,
+    "clicked": false
+  },
+  "landscapeDialogFrame": {
+    "height": 58,
+    "width": 414,
+    "x": 230,
+    "y": 72
+  },
+  "conservativeContentPort": {
+    "height": 50,
+    "width": 358,
+    "x": 250,
+    "y": 76
+  },
+  "queryKeyboardBothRotationsAndNormalReturnClearBackCloseDoneAccepted": true,
+  "cleanupPortraitSetterAttempts": 0,
+  "originalPNGs": 12,
+  "publicOriginalPNGs": 7,
+  "JSONPayloads": 69,
+  "AXPayloads": 10,
+  "manifestRows": 81,
+  "allOriginalPNGsViewedByRootAndIndependentReviewer": true,
+  "allJSONAndManifestReadByIndependentReviewer": true,
+  "snapshotAndPNGAtomic": false,
+  "physicalDOMAndFocusIdentityEstablished": false,
+  "allPopupControls46pxClaimed": false,
+  "translationIntentsRecorded": 0,
+  "configurationWritesRecorded": 0,
+  "providerRequests": "NOT_MEASURED",
+  "liveProviderAcceptance": false,
+  "YouTubeSubtitleAVKitAcceptance": false,
+  "physicalDeviceAcceptance": false,
+  "limitedRestorationVerifiedByRootAndIndependentReviewer": true,
+  "taskSimulatorShutdown": true,
+  "nativeAppFiles": 485,
+  "pureWebFiles": 467,
+  "FRPrivateNativeFiles": 13,
+  "userscriptsAppFiles": 47,
+  "DemoBytes": 396,
+  "privateFilesCopiedBack": false,
+  "fullExtensionStoragePreservationClaimed": false,
+  "harnessRevision": {
+    "productChangedBetweenR2AndR7": false,
+    "freshPreGestureSnapshot": true,
+    "knownServiceLabels": 6,
+    "newKnownLabel": "Fireworks AI accounts/fireworks/models/gpt-oss-20b · accounts/fireworks/models/gpt-oss-120b",
+    "unchangedFreshnessSeconds": 3,
+    "unchangedSingleGestureMaximum": 1,
+    "unchangedCompleteRowAndLiveHitGate": true,
+    "historicalR2ThroughR6SkipsPreserved": true
+  },
+  "rootObservation": {
+    "file": "root-runtime-observations.json",
+    "bytes": 11825,
+    "sha256": "b12e76c4374dab1ce1fe735ae32a6d671e56bde83ee0b453927bacce48d8d853"
+  },
+  "rootOutcome": {
+    "file": "root-runtime-outcome.json",
+    "bytes": 12646,
+    "sha256": "a1080e2d1d173ecc31be069bb0e456d09297f12b4dac8d1a13ab3207a981d59a"
+  },
+  "independentRuntimeReview": {
+    "file": "independent-runtime-review.json",
+    "bytes": 25852,
+    "sha256": "d799fcbafe2837c6ee0e7a1b3361ce2038510986c87feaf76d798f4596f35b28",
+    "status": "PASS_SELECTED_NATIVE_SHORT_VIEWPORT_FLOW_AND_BOUNDED_RESTORATION"
+  },
+  "restorationWitness": {
+    "file": "restoration-witness.json",
+    "bytes": 2110,
+    "sha256": "aee42725b753ec278e943810d9222a3919ef03e085fd9a09aedadd6022fcb75c"
+  },
+  "officialSummary": {
+    "file": "official-summary.json",
+    "bytes": 1006,
+    "sha256": "89e9f985cfad899d95a732c16a5795814343e5c92bc5ca4d7ff08c44b9c3b7cf"
+  },
+  "attachmentsInventory": {
+    "file": "runtime-attachments-inventory.json",
+    "bytes": 32654,
+    "sha256": "323c6a36525e71edb563717d26e022d57fd946eaea5c61048644aa663f38e47d"
+  },
+  "runtimeGuard": {
+    "file": "runtime-guard-report.json",
+    "bytes": 30336,
+    "sha256": "4f01673796600cd2f9433593f8f4fdd83f2b1b8c6d29921eb23dd7d9a54d2e3b"
+  },
+  "runtimeLog": {
+    "file": "runtime-run.log",
+    "bytes": 62365,
+    "sha256": "3aae954aff2fbc3e33c4e1f6b147bd8b017e394e84f3d3e24e1e30c92ae88e26"
+  },
+  "imageCopyPolicy": "Original bytes; no crop/re-encoding."
+}

@@ -1,0 +1,461 @@
+{
+  "at": "2026-10-16T21:27:36.583745+00:00",
+  "sourceCommit": "6eecd6710e7daac2d2a8cca9a34d0f26dc849b44",
+  "status": "COMPILE_AND_WEB_RESOURCE_MATCH_PASS_NOT_RUNTIME",
+  "packageReportSHA256": "05b51248357c9cd55b76acaf3fce1cdede9914e27772e4d2c669f6cf9d5f3f5d",
+  "generatedProjectSHA256": "1e4df4928b8c9b872e0be81a66fcf2dafa89ca129ba725dffd990855c0d960f4",
+  "actualProjectTargets": [
+    {
+      "name": "FluentRead (macOS)",
+      "productType": "com.apple.product-type.application",
+      "configurations": [
+        {
+          "name": "Debug",
+          "bundleId": "org.example.FluentReadDevelopment",
+          "sdk": "macosx"
+        },
+        {
+          "name": "Release",
+          "bundleId": "org.example.FluentReadDevelopment",
+          "sdk": "macosx"
+        }
+      ]
+    },
+    {
+      "name": "FluentRead Extension (macOS)",
+      "productType": "com.apple.product-type.app-extension",
+      "configurations": [
+        {
+          "name": "Debug",
+          "bundleId": "org.example.FluentReadDevelopment.Extension",
+          "sdk": "macosx"
+        },
+        {
+          "name": "Release",
+          "bundleId": "org.example.FluentReadDevelopment.Extension",
+          "sdk": "macosx"
+        }
+      ]
+    },
+    {
+      "name": "FluentRead (iOS)",
+      "productType": "com.apple.product-type.application",
+      "configurations": [
+        {
+          "name": "Debug",
+          "bundleId": "org.example.FluentReadDevelopment",
+          "sdk": "iphoneos"
+        },
+        {
+          "name": "Release",
+          "bundleId": "org.example.FluentReadDevelopment",
+          "sdk": "iphoneos"
+        }
+      ]
+    },
+    {
+      "name": "FluentRead Extension (iOS)",
+      "productType": "com.apple.product-type.app-extension",
+      "configurations": [
+        {
+          "name": "Debug",
+          "bundleId": "org.example.FluentReadDevelopment.Extension",
+          "sdk": "iphoneos"
+        },
+        {
+          "name": "Release",
+          "bundleId": "org.example.FluentReadDevelopment.Extension",
+          "sdk": "iphoneos"
+        }
+      ]
+    }
+  ],
+  "copiedWeb": {
+    "files": 467,
+    "bytes": 62232369,
+    "rawByteHash": "b1a66b3fc4e579216321758ebb921b7396430610119c9e5ca356de23b8cfc161",
+    "recordHash": "14320cd02100962f0f593932a754cbdb5baa3ca25f073fece8bb6ea40a1a5be2"
+  },
+  "products": {
+    "macOS": {
+      "web": {
+        "files": 467,
+        "bytes": 62232369,
+        "rawByteHash": "b1a66b3fc4e579216321758ebb921b7396430610119c9e5ca356de23b8cfc161",
+        "recordHash": "14320cd02100962f0f593932a754cbdb5baa3ca25f073fece8bb6ea40a1a5be2"
+      },
+      "webFilesMatched": 467,
+      "webPrefixExtras": [],
+      "bundles": {
+        "app": {
+          "path": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/touch-layout-f33-followup-20261017/native-final-layout-6eecd6710e7d-b1a66b3fc4e5/output/derived-macos/Build/Products/Release/FluentRead.app",
+          "identity": {
+            "CFBundleIdentifier": "org.example.FluentReadDevelopment",
+            "CFBundleShortVersionString": "1.0",
+            "CFBundleVersion": "1",
+            "CFBundleExecutable": "FluentRead",
+            "LSMinimumSystemVersion": "14.0",
+            "CFBundleSupportedPlatforms": [
+              "MacOSX"
+            ],
+            "DTPlatformName": "macosx",
+            "DTSDKName": "macosx26.2"
+          },
+          "inventory": {
+            "files": 482,
+            "bytes": 63251685,
+            "rawByteHash": "fe1e42c58fffd43b6fd8647a06e4246e52baf81ddcf8e2b333ffb37d0b49dbe2",
+            "recordHash": "4d961f6431765312664284848d4e0e4e7f5358f94283ceab65609ce6d6c2bdbd"
+          },
+          "fullFileMap": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/touch-layout-f33-followup-20261017/native-final-layout-6eecd6710e7d-b1a66b3fc4e5/macOS-app-full-map.json",
+          "fullFileMapSHA256": "08c6bacefd86bcde5c61b2217d906f6768f516220774771b1d1aedbe885b1d1d",
+          "signingClassification": "LINKER_ADHOC_NO_TEAM",
+          "codesignDetail": {
+            "argv": [
+              "/usr/bin/codesign",
+              "-dvvv",
+              "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/touch-layout-f33-followup-20261017/native-final-layout-6eecd6710e7d-b1a66b3fc4e5/output/derived-macos/Build/Products/Release/FluentRead.app"
+            ],
+            "returnCode": 0,
+            "stdout": "",
+            "stderr": "Executable=/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/touch-layout-f33-followup-20261017/native-final-layout-6eecd6710e7d-b1a66b3fc4e5/output/derived-macos/Build/Products/Release/FluentRead.app/Contents/MacOS/FluentRead\nIdentifier=FluentRead\nFormat=app bundle with Mach-O universal (x86_64 arm64)\nCodeDirectory v=20400 size=963 flags=0x20002(adhoc,linker-signed) hashes=27+0 location=embedded\nHash type=sha256 size=32\nCandidateCDHash sha256=9fe42d328706b3612ef53b230e5ccee01e94871c\nCandidateCDHashFull sha256=9fe42d328706b3612ef53b230e5ccee01e94871c2d302b53305b78ad8f68731c\nHash choices=sha256\nCMSDigest=9fe42d328706b3612ef53b230e5ccee01e94871c2d302b53305b78ad8f68731c\nCMSDigestType=2\nCDHash=9fe42d328706b3612ef53b230e5ccee01e94871c\nSignature=adhoc\nInfo.plist=not bound\nTeamIdentifier=not set\nSealed Resources=none\nInternal requirements=none\n"
+          },
+          "entitlementsRead": {
+            "argv": [
+              "/usr/bin/codesign",
+              "-d",
+              "--entitlements",
+              ":-",
+              "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/touch-layout-f33-followup-20261017/native-final-layout-6eecd6710e7d-b1a66b3fc4e5/output/derived-macos/Build/Products/Release/FluentRead.app"
+            ],
+            "returnCode": 0,
+            "stdout": "",
+            "stderr": "Executable=/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/touch-layout-f33-followup-20261017/native-final-layout-6eecd6710e7d-b1a66b3fc4e5/output/derived-macos/Build/Products/Release/FluentRead.app/Contents/MacOS/FluentRead\nwarning: Specifying ':' in the path is deprecated and will not work in a future release\n"
+          },
+          "executableFileType": {
+            "argv": [
+              "/usr/bin/file",
+              "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/touch-layout-f33-followup-20261017/native-final-layout-6eecd6710e7d-b1a66b3fc4e5/output/derived-macos/Build/Products/Release/FluentRead.app/Contents/MacOS/FluentRead"
+            ],
+            "returnCode": 0,
+            "stdout": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/touch-layout-f33-followup-20261017/native-final-layout-6eecd6710e7d-b1a66b3fc4e5/output/derived-macos/Build/Products/Release/FluentRead.app/Contents/MacOS/FluentRead: Mach-O universal binary with 2 architectures: [x86_64:Mach-O 64-bit executable x86_64] [arm64:Mach-O 64-bit executable arm64]\n/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/touch-layout-f33-followup-20261017/native-final-layout-6eecd6710e7d-b1a66b3fc4e5/output/derived-macos/Build/Products/Release/FluentRead.app/Contents/MacOS/FluentRead (for architecture x86_64):\tMach-O 64-bit executable x86_64\n/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/touch-layout-f33-followup-20261017/native-final-layout-6eecd6710e7d-b1a66b3fc4e5/output/derived-macos/Build/Products/Release/FluentRead.app/Contents/MacOS/FluentRead (for architecture arm64):\tMach-O 64-bit executable arm64\n",
+            "stderr": ""
+          }
+        },
+        "extension": {
+          "path": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/touch-layout-f33-followup-20261017/native-final-layout-6eecd6710e7d-b1a66b3fc4e5/output/derived-macos/Build/Products/Release/FluentRead.app/Contents/PlugIns/FluentRead Extension.appex",
+          "identity": {
+            "CFBundleIdentifier": "org.example.FluentReadDevelopment.Extension",
+            "CFBundleShortVersionString": "1.0",
+            "CFBundleVersion": "1",
+            "CFBundleExecutable": "FluentRead Extension",
+            "LSMinimumSystemVersion": "14.0",
+            "CFBundleSupportedPlatforms": [
+              "MacOSX"
+            ],
+            "DTPlatformName": "macosx",
+            "DTSDKName": "macosx26.2"
+          },
+          "inventory": {
+            "files": 469,
+            "bytes": 62355895,
+            "rawByteHash": "913e2fd31f43eae97419b9a3ceaa525e1d57b0bab0e0db62ca5eefcce2a68893",
+            "recordHash": "67f1fddcff4ef0d07d60266f00818adb5189e1dc003096b1caa4837e420eda60"
+          },
+          "fullFileMap": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/touch-layout-f33-followup-20261017/native-final-layout-6eecd6710e7d-b1a66b3fc4e5/macOS-extension-full-map.json",
+          "fullFileMapSHA256": "0f13109ede819163ca64358a3f0dbb37a95289a947c859322d8f86f4e7320ba5",
+          "signingClassification": "LINKER_ADHOC_NO_TEAM",
+          "codesignDetail": {
+            "argv": [
+              "/usr/bin/codesign",
+              "-dvvv",
+              "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/touch-layout-f33-followup-20261017/native-final-layout-6eecd6710e7d-b1a66b3fc4e5/output/derived-macos/Build/Products/Release/FluentRead.app/Contents/PlugIns/FluentRead Extension.appex"
+            ],
+            "returnCode": 0,
+            "stdout": "",
+            "stderr": "Executable=/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/touch-layout-f33-followup-20261017/native-final-layout-6eecd6710e7d-b1a66b3fc4e5/output/derived-macos/Build/Products/Release/FluentRead.app/Contents/PlugIns/FluentRead Extension.appex/Contents/MacOS/FluentRead Extension\nIdentifier=FluentRead Extension\nFormat=bundle with Mach-O universal (x86_64 arm64)\nCodeDirectory v=20400 size=685 flags=0x20002(adhoc,linker-signed) hashes=18+0 location=embedded\nHash type=sha256 size=32\nCandidateCDHash sha256=f9aa717a4918685d110662f8a3d46194339a9b84\nCandidateCDHashFull sha256=f9aa717a4918685d110662f8a3d46194339a9b845fcd3f43d2f9f2c28a9e50e7\nHash choices=sha256\nCMSDigest=f9aa717a4918685d110662f8a3d46194339a9b845fcd3f43d2f9f2c28a9e50e7\nCMSDigestType=2\nCDHash=f9aa717a4918685d110662f8a3d46194339a9b84\nSignature=adhoc\nInfo.plist=not bound\nTeamIdentifier=not set\nSealed Resources=none\nInternal requirements=none\n"
+          },
+          "entitlementsRead": {
+            "argv": [
+              "/usr/bin/codesign",
+              "-d",
+              "--entitlements",
+              ":-",
+              "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/touch-layout-f33-followup-20261017/native-final-layout-6eecd6710e7d-b1a66b3fc4e5/output/derived-macos/Build/Products/Release/FluentRead.app/Contents/PlugIns/FluentRead Extension.appex"
+            ],
+            "returnCode": 0,
+            "stdout": "",
+            "stderr": "Executable=/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/touch-layout-f33-followup-20261017/native-final-layout-6eecd6710e7d-b1a66b3fc4e5/output/derived-macos/Build/Products/Release/FluentRead.app/Contents/PlugIns/FluentRead Extension.appex/Contents/MacOS/FluentRead Extension\nwarning: Specifying ':' in the path is deprecated and will not work in a future release\n"
+          },
+          "executableFileType": {
+            "argv": [
+              "/usr/bin/file",
+              "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/touch-layout-f33-followup-20261017/native-final-layout-6eecd6710e7d-b1a66b3fc4e5/output/derived-macos/Build/Products/Release/FluentRead.app/Contents/PlugIns/FluentRead Extension.appex/Contents/MacOS/FluentRead Extension"
+            ],
+            "returnCode": 0,
+            "stdout": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/touch-layout-f33-followup-20261017/native-final-layout-6eecd6710e7d-b1a66b3fc4e5/output/derived-macos/Build/Products/Release/FluentRead.app/Contents/PlugIns/FluentRead Extension.appex/Contents/MacOS/FluentRead Extension: Mach-O universal binary with 2 architectures: [x86_64:Mach-O 64-bit executable x86_64] [arm64:Mach-O 64-bit executable arm64]\n/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/touch-layout-f33-followup-20261017/native-final-layout-6eecd6710e7d-b1a66b3fc4e5/output/derived-macos/Build/Products/Release/FluentRead.app/Contents/PlugIns/FluentRead Extension.appex/Contents/MacOS/FluentRead Extension (for architecture x86_64):\tMach-O 64-bit executable x86_64\n/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/touch-layout-f33-followup-20261017/native-final-layout-6eecd6710e7d-b1a66b3fc4e5/output/derived-macos/Build/Products/Release/FluentRead.app/Contents/PlugIns/FluentRead Extension.appex/Contents/MacOS/FluentRead Extension (for architecture arm64):\tMach-O 64-bit executable arm64\n",
+            "stderr": ""
+          }
+        }
+      }
+    },
+    "iosSimulator": {
+      "web": {
+        "files": 469,
+        "bytes": 62356139,
+        "rawByteHash": "b8facd121421b232c676995866b2846a7837dda877382c89dcbda5e0271e7031",
+        "recordHash": "6e5da27938ba4a7f99f9f1911bc7a4088cd3ade862b9d6cb1ec68b75c3b5259b"
+      },
+      "webFilesMatched": 467,
+      "webPrefixExtras": [
+        "FluentRead Extension",
+        "Info.plist"
+      ],
+      "bundles": {
+        "app": {
+          "path": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/touch-layout-f33-followup-20261017/native-final-layout-6eecd6710e7d-b1a66b3fc4e5/output/derived-ios-simulator/Build/Products/Release-iphonesimulator/FluentRead.app",
+          "identity": {
+            "CFBundleIdentifier": "org.example.FluentReadDevelopment",
+            "CFBundleShortVersionString": "1.0",
+            "CFBundleVersion": "1",
+            "CFBundleExecutable": "FluentRead",
+            "MinimumOSVersion": "26.0",
+            "CFBundleSupportedPlatforms": [
+              "iPhoneSimulator"
+            ],
+            "DTPlatformName": "iphonesimulator",
+            "DTSDKName": "iphonesimulator26.2"
+          },
+          "inventory": {
+            "files": 485,
+            "bytes": 64226943,
+            "rawByteHash": "8a43eba8254a15452e5a8cb09cb519a9fdb42bb02623e87f3c3630ff4caca3d9",
+            "recordHash": "bedc4de9c0ef08df7be31f0a1208555f8ee0b750744c81cdef8ef154418d1bad"
+          },
+          "fullFileMap": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/touch-layout-f33-followup-20261017/native-final-layout-6eecd6710e7d-b1a66b3fc4e5/iosSimulator-app-full-map.json",
+          "fullFileMapSHA256": "3909c0ce380b04b9fab6f1ff3ceed6d7c71e44d24e60fa216d61b76aba1c8525",
+          "signingClassification": "LINKER_ADHOC_NO_TEAM",
+          "codesignDetail": {
+            "argv": [
+              "/usr/bin/codesign",
+              "-dvvv",
+              "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/touch-layout-f33-followup-20261017/native-final-layout-6eecd6710e7d-b1a66b3fc4e5/output/derived-ios-simulator/Build/Products/Release-iphonesimulator/FluentRead.app"
+            ],
+            "returnCode": 0,
+            "stdout": "",
+            "stderr": "Executable=/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/touch-layout-f33-followup-20261017/native-final-layout-6eecd6710e7d-b1a66b3fc4e5/output/derived-ios-simulator/Build/Products/Release-iphonesimulator/FluentRead.app/FluentRead\nIdentifier=FluentRead\nFormat=app bundle with Mach-O universal (x86_64 arm64)\nCodeDirectory v=20400 size=931 flags=0x20002(adhoc,linker-signed) hashes=26+0 location=embedded\nHash type=sha256 size=32\nCandidateCDHash sha256=eb27581d7af5e22b1a9141ef671447fc6d60b993\nCandidateCDHashFull sha256=eb27581d7af5e22b1a9141ef671447fc6d60b993c417f69608031dbd8a1d6671\nHash choices=sha256\nCMSDigest=eb27581d7af5e22b1a9141ef671447fc6d60b993c417f69608031dbd8a1d6671\nCMSDigestType=2\nCDHash=eb27581d7af5e22b1a9141ef671447fc6d60b993\nSignature=adhoc\nInfo.plist=not bound\nTeamIdentifier=not set\nSealed Resources=none\nInternal requirements=none\n"
+          },
+          "entitlementsRead": {
+            "argv": [
+              "/usr/bin/codesign",
+              "-d",
+              "--entitlements",
+              ":-",
+              "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/touch-layout-f33-followup-20261017/native-final-layout-6eecd6710e7d-b1a66b3fc4e5/output/derived-ios-simulator/Build/Products/Release-iphonesimulator/FluentRead.app"
+            ],
+            "returnCode": 0,
+            "stdout": "",
+            "stderr": "Executable=/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/touch-layout-f33-followup-20261017/native-final-layout-6eecd6710e7d-b1a66b3fc4e5/output/derived-ios-simulator/Build/Products/Release-iphonesimulator/FluentRead.app/FluentRead\nwarning: Specifying ':' in the path is deprecated and will not work in a future release\n"
+          },
+          "executableFileType": {
+            "argv": [
+              "/usr/bin/file",
+              "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/touch-layout-f33-followup-20261017/native-final-layout-6eecd6710e7d-b1a66b3fc4e5/output/derived-ios-simulator/Build/Products/Release-iphonesimulator/FluentRead.app/FluentRead"
+            ],
+            "returnCode": 0,
+            "stdout": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/touch-layout-f33-followup-20261017/native-final-layout-6eecd6710e7d-b1a66b3fc4e5/output/derived-ios-simulator/Build/Products/Release-iphonesimulator/FluentRead.app/FluentRead: Mach-O universal binary with 2 architectures: [x86_64:Mach-O 64-bit executable x86_64] [arm64:Mach-O 64-bit executable arm64]\n/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/touch-layout-f33-followup-20261017/native-final-layout-6eecd6710e7d-b1a66b3fc4e5/output/derived-ios-simulator/Build/Products/Release-iphonesimulator/FluentRead.app/FluentRead (for architecture x86_64):\tMach-O 64-bit executable x86_64\n/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/touch-layout-f33-followup-20261017/native-final-layout-6eecd6710e7d-b1a66b3fc4e5/output/derived-ios-simulator/Build/Products/Release-iphonesimulator/FluentRead.app/FluentRead (for architecture arm64):\tMach-O 64-bit executable arm64\n",
+            "stderr": ""
+          }
+        },
+        "extension": {
+          "path": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/touch-layout-f33-followup-20261017/native-final-layout-6eecd6710e7d-b1a66b3fc4e5/output/derived-ios-simulator/Build/Products/Release-iphonesimulator/FluentRead.app/PlugIns/FluentRead Extension.appex",
+          "identity": {
+            "CFBundleIdentifier": "org.example.FluentReadDevelopment.Extension",
+            "CFBundleShortVersionString": "1.0",
+            "CFBundleVersion": "1",
+            "CFBundleExecutable": "FluentRead Extension",
+            "MinimumOSVersion": "26.0",
+            "CFBundleSupportedPlatforms": [
+              "iPhoneSimulator"
+            ],
+            "DTPlatformName": "iphonesimulator",
+            "DTSDKName": "iphonesimulator26.2"
+          },
+          "inventory": {
+            "files": 469,
+            "bytes": 62356139,
+            "rawByteHash": "b8facd121421b232c676995866b2846a7837dda877382c89dcbda5e0271e7031",
+            "recordHash": "6e5da27938ba4a7f99f9f1911bc7a4088cd3ade862b9d6cb1ec68b75c3b5259b"
+          },
+          "fullFileMap": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/touch-layout-f33-followup-20261017/native-final-layout-6eecd6710e7d-b1a66b3fc4e5/iosSimulator-extension-full-map.json",
+          "fullFileMapSHA256": "6ef03de04d1e686f435aca1af1cb8e0a82e13e0fb4ff6d724211be4ee2ebc213",
+          "signingClassification": "LINKER_ADHOC_NO_TEAM",
+          "codesignDetail": {
+            "argv": [
+              "/usr/bin/codesign",
+              "-dvvv",
+              "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/touch-layout-f33-followup-20261017/native-final-layout-6eecd6710e7d-b1a66b3fc4e5/output/derived-ios-simulator/Build/Products/Release-iphonesimulator/FluentRead.app/PlugIns/FluentRead Extension.appex"
+            ],
+            "returnCode": 0,
+            "stdout": "",
+            "stderr": "Executable=/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/touch-layout-f33-followup-20261017/native-final-layout-6eecd6710e7d-b1a66b3fc4e5/output/derived-ios-simulator/Build/Products/Release-iphonesimulator/FluentRead.app/PlugIns/FluentRead Extension.appex/FluentRead Extension\nIdentifier=FluentRead Extension\nFormat=bundle with Mach-O universal (x86_64 arm64)\nCodeDirectory v=20400 size=685 flags=0x20002(adhoc,linker-signed) hashes=18+0 location=embedded\nHash type=sha256 size=32\nCandidateCDHash sha256=6eafaf3f81def11e42becb23f08cbe4516e16b01\nCandidateCDHashFull sha256=6eafaf3f81def11e42becb23f08cbe4516e16b01687db8656912bb5c52e306b5\nHash choices=sha256\nCMSDigest=6eafaf3f81def11e42becb23f08cbe4516e16b01687db8656912bb5c52e306b5\nCMSDigestType=2\nCDHash=6eafaf3f81def11e42becb23f08cbe4516e16b01\nSignature=adhoc\nInfo.plist=not bound\nTeamIdentifier=not set\nSealed Resources=none\nInternal requirements=none\n"
+          },
+          "entitlementsRead": {
+            "argv": [
+              "/usr/bin/codesign",
+              "-d",
+              "--entitlements",
+              ":-",
+              "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/touch-layout-f33-followup-20261017/native-final-layout-6eecd6710e7d-b1a66b3fc4e5/output/derived-ios-simulator/Build/Products/Release-iphonesimulator/FluentRead.app/PlugIns/FluentRead Extension.appex"
+            ],
+            "returnCode": 0,
+            "stdout": "",
+            "stderr": "Executable=/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/touch-layout-f33-followup-20261017/native-final-layout-6eecd6710e7d-b1a66b3fc4e5/output/derived-ios-simulator/Build/Products/Release-iphonesimulator/FluentRead.app/PlugIns/FluentRead Extension.appex/FluentRead Extension\nwarning: Specifying ':' in the path is deprecated and will not work in a future release\n"
+          },
+          "executableFileType": {
+            "argv": [
+              "/usr/bin/file",
+              "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/touch-layout-f33-followup-20261017/native-final-layout-6eecd6710e7d-b1a66b3fc4e5/output/derived-ios-simulator/Build/Products/Release-iphonesimulator/FluentRead.app/PlugIns/FluentRead Extension.appex/FluentRead Extension"
+            ],
+            "returnCode": 0,
+            "stdout": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/touch-layout-f33-followup-20261017/native-final-layout-6eecd6710e7d-b1a66b3fc4e5/output/derived-ios-simulator/Build/Products/Release-iphonesimulator/FluentRead.app/PlugIns/FluentRead Extension.appex/FluentRead Extension: Mach-O universal binary with 2 architectures: [x86_64:Mach-O 64-bit executable x86_64] [arm64:Mach-O 64-bit executable arm64]\n/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/touch-layout-f33-followup-20261017/native-final-layout-6eecd6710e7d-b1a66b3fc4e5/output/derived-ios-simulator/Build/Products/Release-iphonesimulator/FluentRead.app/PlugIns/FluentRead Extension.appex/FluentRead Extension (for architecture x86_64):\tMach-O 64-bit executable x86_64\n/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/touch-layout-f33-followup-20261017/native-final-layout-6eecd6710e7d-b1a66b3fc4e5/output/derived-ios-simulator/Build/Products/Release-iphonesimulator/FluentRead.app/PlugIns/FluentRead Extension.appex/FluentRead Extension (for architecture arm64):\tMach-O 64-bit executable arm64\n",
+            "stderr": ""
+          }
+        }
+      }
+    },
+    "iPhoneOS": {
+      "web": {
+        "files": 469,
+        "bytes": 62322079,
+        "rawByteHash": "10adf2bcf47ad9582a748cce3fe16d0d76a936fab7abc42ad426d6636e1622eb",
+        "recordHash": "9b42f7e6096ccc5b15bf23ef147ea0c134e56cae4cc0dc3b3b7c4302ec964b75"
+      },
+      "webFilesMatched": 467,
+      "webPrefixExtras": [
+        "FluentRead Extension",
+        "Info.plist"
+      ],
+      "bundles": {
+        "app": {
+          "path": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/touch-layout-f33-followup-20261017/native-final-layout-6eecd6710e7d-b1a66b3fc4e5/output/target-iphoneos/build/FluentRead.app",
+          "identity": {
+            "CFBundleIdentifier": "org.example.FluentReadDevelopment",
+            "CFBundleShortVersionString": "1.0",
+            "CFBundleVersion": "1",
+            "CFBundleExecutable": "FluentRead",
+            "MinimumOSVersion": "26.0",
+            "CFBundleSupportedPlatforms": [
+              "iPhoneOS"
+            ],
+            "DTPlatformName": "iphoneos",
+            "DTSDKName": "iphoneos26.2"
+          },
+          "inventory": {
+            "files": 485,
+            "bytes": 64123613,
+            "rawByteHash": "c07784b89c87fda531a08a2de21d130db328a343a27834a4a15e1ceebb04dc73",
+            "recordHash": "8d50f2e5845fcf43416138fbf72041b465f3558264d6f61813ead3e9f4d4108a"
+          },
+          "fullFileMap": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/touch-layout-f33-followup-20261017/native-final-layout-6eecd6710e7d-b1a66b3fc4e5/iPhoneOS-app-full-map.json",
+          "fullFileMapSHA256": "9ab9748cc6bbd289807d6c34003da6e0899332fa0a6e91ccf7fc54b871824974",
+          "signingClassification": "UNSIGNED",
+          "codesignDetail": {
+            "argv": [
+              "/usr/bin/codesign",
+              "-dvvv",
+              "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/touch-layout-f33-followup-20261017/native-final-layout-6eecd6710e7d-b1a66b3fc4e5/output/target-iphoneos/build/FluentRead.app"
+            ],
+            "returnCode": 1,
+            "stdout": "",
+            "stderr": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/touch-layout-f33-followup-20261017/native-final-layout-6eecd6710e7d-b1a66b3fc4e5/output/target-iphoneos/build/FluentRead.app: code object is not signed at all\n"
+          },
+          "entitlementsRead": {
+            "argv": [
+              "/usr/bin/codesign",
+              "-d",
+              "--entitlements",
+              ":-",
+              "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/touch-layout-f33-followup-20261017/native-final-layout-6eecd6710e7d-b1a66b3fc4e5/output/target-iphoneos/build/FluentRead.app"
+            ],
+            "returnCode": 1,
+            "stdout": "",
+            "stderr": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/touch-layout-f33-followup-20261017/native-final-layout-6eecd6710e7d-b1a66b3fc4e5/output/target-iphoneos/build/FluentRead.app: code object is not signed at all\n"
+          },
+          "executableFileType": {
+            "argv": [
+              "/usr/bin/file",
+              "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/touch-layout-f33-followup-20261017/native-final-layout-6eecd6710e7d-b1a66b3fc4e5/output/target-iphoneos/build/FluentRead.app/FluentRead"
+            ],
+            "returnCode": 0,
+            "stdout": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/touch-layout-f33-followup-20261017/native-final-layout-6eecd6710e7d-b1a66b3fc4e5/output/target-iphoneos/build/FluentRead.app/FluentRead: Mach-O 64-bit executable arm64\n",
+            "stderr": ""
+          }
+        },
+        "extension": {
+          "path": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/touch-layout-f33-followup-20261017/native-final-layout-6eecd6710e7d-b1a66b3fc4e5/output/target-iphoneos/build/FluentRead.app/PlugIns/FluentRead Extension.appex",
+          "identity": {
+            "CFBundleIdentifier": "org.example.FluentReadDevelopment.Extension",
+            "CFBundleShortVersionString": "1.0",
+            "CFBundleVersion": "1",
+            "CFBundleExecutable": "FluentRead Extension",
+            "MinimumOSVersion": "26.0",
+            "CFBundleSupportedPlatforms": [
+              "iPhoneOS"
+            ],
+            "DTPlatformName": "iphoneos",
+            "DTSDKName": "iphoneos26.2"
+          },
+          "inventory": {
+            "files": 469,
+            "bytes": 62322079,
+            "rawByteHash": "10adf2bcf47ad9582a748cce3fe16d0d76a936fab7abc42ad426d6636e1622eb",
+            "recordHash": "9b42f7e6096ccc5b15bf23ef147ea0c134e56cae4cc0dc3b3b7c4302ec964b75"
+          },
+          "fullFileMap": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/touch-layout-f33-followup-20261017/native-final-layout-6eecd6710e7d-b1a66b3fc4e5/iPhoneOS-extension-full-map.json",
+          "fullFileMapSHA256": "8de64fc7bb7fd2b427e4c164f8dd459f560555ee1395890c74fc47a39dc60bb2",
+          "signingClassification": "UNSIGNED",
+          "codesignDetail": {
+            "argv": [
+              "/usr/bin/codesign",
+              "-dvvv",
+              "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/touch-layout-f33-followup-20261017/native-final-layout-6eecd6710e7d-b1a66b3fc4e5/output/target-iphoneos/build/FluentRead.app/PlugIns/FluentRead Extension.appex"
+            ],
+            "returnCode": 1,
+            "stdout": "",
+            "stderr": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/touch-layout-f33-followup-20261017/native-final-layout-6eecd6710e7d-b1a66b3fc4e5/output/target-iphoneos/build/FluentRead.app/PlugIns/FluentRead Extension.appex: code object is not signed at all\n"
+          },
+          "entitlementsRead": {
+            "argv": [
+              "/usr/bin/codesign",
+              "-d",
+              "--entitlements",
+              ":-",
+              "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/touch-layout-f33-followup-20261017/native-final-layout-6eecd6710e7d-b1a66b3fc4e5/output/target-iphoneos/build/FluentRead.app/PlugIns/FluentRead Extension.appex"
+            ],
+            "returnCode": 1,
+            "stdout": "",
+            "stderr": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/touch-layout-f33-followup-20261017/native-final-layout-6eecd6710e7d-b1a66b3fc4e5/output/target-iphoneos/build/FluentRead.app/PlugIns/FluentRead Extension.appex: code object is not signed at all\n"
+          },
+          "executableFileType": {
+            "argv": [
+              "/usr/bin/file",
+              "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/touch-layout-f33-followup-20261017/native-final-layout-6eecd6710e7d-b1a66b3fc4e5/output/target-iphoneos/build/FluentRead.app/PlugIns/FluentRead Extension.appex/FluentRead Extension"
+            ],
+            "returnCode": 0,
+            "stdout": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/touch-layout-f33-followup-20261017/native-final-layout-6eecd6710e7d-b1a66b3fc4e5/output/target-iphoneos/build/FluentRead.app/PlugIns/FluentRead Extension.appex/FluentRead Extension: Mach-O 64-bit executable arm64\n",
+            "stderr": ""
+          }
+        }
+      }
+    }
+  },
+  "scope": "Local unsigned packaging/compilation and exact copied resources only; no install, simulator boot, Safari UI or device runtime.",
+  "sourceWebAfter": {
+    "files": 467,
+    "bytes": 62232369,
+    "rawByteHash": "b1a66b3fc4e579216321758ebb921b7396430610119c9e5ca356de23b8cfc161",
+    "recordHash": "14320cd02100962f0f593932a754cbdb5baa3ca25f073fece8bb6ea40a1a5be2"
+  },
+  "boundSourcesUnchanged": true
+}

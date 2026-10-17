@@ -1,0 +1,78 @@
+{
+  "at": "2026-10-16T19:33:32.193489+00:00",
+  "case": "F34",
+  "status": "SCOPED_TOUCH_FALLBACK_AND_ORIGINAL_OFF_RECOVERY_PASS",
+  "runtimeCommit": "a2ecda302d3a0199ffe9f0222ee2998a37bd7d5d",
+  "recoveryOnly": true,
+  "nativeInputs": 13,
+  "actionCounts": {
+    "notice": 1,
+    "more": 1,
+    "extensions": 1,
+    "addon": 1,
+    "open-settings": 1,
+    "web-assistance": 1,
+    "scroll-settings": 1,
+    "switch-off": 1,
+    "open-tabs": 2,
+    "reader-tab": 2,
+    "close-settings": 1
+  },
+  "generalTouchGeometryProbePassed": true,
+  "exactFallbackCapabilityObserved": true,
+  "exactFallbackAccepted": true,
+  "touchProbe": {
+    "geometry": "confirmed-probe",
+    "proof": "03-ball-proof",
+    "PNG": "03-reader.png",
+    "coarse": false,
+    "anyPointerCoarse": false,
+    "maxTouchPoints": 5,
+    "touchCapableClass": true,
+    "generalGeometryProbePassed": true,
+    "exactFallbackCapabilityObserved": true,
+    "exactFallbackAccepted": true,
+    "atUnixMs": 1792178519834.2102
+  },
+  "historicalOriginalOffRestored": true,
+  "freshOriginalBaselineClaimed": false,
+  "createdF34SettingsClosed": true,
+  "nativeTabCountRestored": 2,
+  "priorF32SettingsClosure": "NOT_OBSERVED",
+  "unknownCardInputs": 0,
+  "rotationWrites": 0,
+  "functionalChainComplete": false,
+  "scopedDragOrientationChainComplete": false,
+  "fullFloatingGoalAccepted": false,
+  "restoration": {
+    "path": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/android-runtime/firefox-f5a-floating-touch-attempt34/restoration-verified.json",
+    "sha256": "dba2b2708258162c21053b2b558478fc27e7a77bee83fa00eb7b0d519d73c0fa"
+  },
+  "cleanup": {
+    "path": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/android-runtime/firefox-f5a-floating-touch-attempt34/cleanup.json",
+    "sha256": "e408fda5b767567f7e68b2937f5cbc9915438ad46324fbd27a1455443c0def2c"
+  },
+  "rawCleanupStatus": "PASS",
+  "focusEvents": 0,
+  "violations": 0,
+  "caseLaneReleased": true,
+  "rootRelease": {
+    "path": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/android-runtime/firefox-f5a-floating-touch-attempt34/root-fresh-post-release.json",
+    "sha256": "3e08d12cf735344150ce823616e571c84fe864e485d071bcfd11de83afe1630d"
+  },
+  "releaseAt": "2026-10-16T19:31:45.874653+00:00",
+  "artifactPre": {
+    "path": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/android-runtime/firefox-f5a-floating-touch-attempt34/artifact-pre.json",
+    "sha256": "c96eaa04456994f65caa728ef81a3da564676e1c668044f366b505966964affa"
+  },
+  "artifactPost": {
+    "path": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/android-runtime/firefox-f5a-floating-touch-attempt34/artifact-post.json",
+    "sha256": "01e6eda574b6b9f1a2cee426ca0e452502c8859c1a496633d57056be4eafe9c0"
+  },
+  "terminalHandles": {
+    "guard49213": 0,
+    "loader86205": 0,
+    "finish22409": 0
+  },
+  "boundary": "Native hardware-capability fallback probe and normal settings Off recovery only; no floating-button touch, native drag/orientation/remount/IME, live-provider, physical-device or Safari runtime acceptance. F34 new settings closure does not prove prior F32 page closure."
+}

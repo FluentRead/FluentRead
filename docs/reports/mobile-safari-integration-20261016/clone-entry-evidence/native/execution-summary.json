@@ -1,0 +1,322 @@
+{
+  "startedAt": "2026-10-16T23:13:25.227355+00:00",
+  "preparationSHA256": "ceee77a6ce5041a5d6e0dc410ddf17f99f54051b1603535e602ffdf8ed97ba75",
+  "buildBaseHead": "121c0217d3ce8c2067ade25328d5a9527e6019e4",
+  "uncommittedProductPatchAtBuild": true,
+  "sourceInputMap": {
+    "src/features/video-subtitle/content/videoPlayerBinding.ts": {
+      "path": "/Users/thinkstu/Desktop/copy/FluentRead-mobile-video-menu-accessibility-20261016/src/features/video-subtitle/content/videoPlayerBinding.ts",
+      "sha256": "0789013139caf5e43783e4d3501b9a96c5d97324213efcbdfa941e1eb34fdec4",
+      "bytes": 23201
+    },
+    "src/features/video-subtitle/content/ui.ts": {
+      "path": "/Users/thinkstu/Desktop/copy/FluentRead-mobile-video-menu-accessibility-20261016/src/features/video-subtitle/content/ui.ts",
+      "sha256": "eb9cd5ccd3d2931cd1e85fa8a668235374e0a865e06605981274bd20944b592c",
+      "bytes": 86837
+    },
+    "tests/videoPlayerBinding.test.ts": {
+      "path": "/Users/thinkstu/Desktop/copy/FluentRead-mobile-video-menu-accessibility-20261016/tests/videoPlayerBinding.test.ts",
+      "sha256": "68fb776e05d95ec9d7d95430bfe4d3ad704703fb6f0513da05c33984074e81b0",
+      "bytes": 101967
+    },
+    "scripts/run-mobile-video-subtitle-test.cjs": {
+      "path": "/Users/thinkstu/Desktop/copy/FluentRead-mobile-video-menu-accessibility-20261016/scripts/run-mobile-video-subtitle-test.cjs",
+      "sha256": "7613fece1417934d34f121f5a0413658e4fc848e2cf1d8d349d866f75b116d6f",
+      "bytes": 60997
+    },
+    "scripts/safari/package.mjs": {
+      "path": "/Users/thinkstu/Desktop/copy/FluentRead-mobile-video-menu-accessibility-20261016/scripts/safari/package.mjs",
+      "sha256": "c8f8524584509001a46159b378e24fa378524969072ab3dd38fb06ba56618ab0",
+      "bytes": 33471
+    },
+    "scripts/testing/run-resource-safe.mjs": {
+      "path": "/Users/thinkstu/Desktop/copy/FluentRead-mobile-video-menu-accessibility-20261016/scripts/testing/run-resource-safe.mjs",
+      "sha256": "ef0d65fcbd87288afb7ad070fc20015e24265008dd6b476d87e1daf5d71b49f2",
+      "bytes": 14814
+    },
+    "src/core/config/freeProviderOrigins.json": {
+      "path": "/Users/thinkstu/Desktop/copy/FluentRead-mobile-video-menu-accessibility-20261016/src/core/config/freeProviderOrigins.json",
+      "sha256": "8b4004cade979ded8b2b76ac3398dfa108f9e423de2b6d7336dc2530cadf2418",
+      "bytes": 1021
+    },
+    "scripts/safari/container/ViewController.swift": {
+      "path": "/Users/thinkstu/Desktop/copy/FluentRead-mobile-video-menu-accessibility-20261016/scripts/safari/container/ViewController.swift",
+      "sha256": "6d9d7f1bb044d88eb17b644c8c038062f964a4486f59a90f4d3b081f09931d06",
+      "bytes": 4589
+    },
+    "scripts/safari/container/Main.html": {
+      "path": "/Users/thinkstu/Desktop/copy/FluentRead-mobile-video-menu-accessibility-20261016/scripts/safari/container/Main.html",
+      "sha256": "8359d2ff5a18fc2c655ef8798869b242b7c8495fa9a4575919213a2226d7789e",
+      "bytes": 862
+    },
+    "scripts/safari/container/Style.css": {
+      "path": "/Users/thinkstu/Desktop/copy/FluentRead-mobile-video-menu-accessibility-20261016/scripts/safari/container/Style.css",
+      "sha256": "3f4c01b933fe9622c01784d8e2eec2a228225fb07284bb5adacaf4bef4319a40",
+      "bytes": 1536
+    },
+    "scripts/safari/container/Script.js": {
+      "path": "/Users/thinkstu/Desktop/copy/FluentRead-mobile-video-menu-accessibility-20261016/scripts/safari/container/Script.js",
+      "sha256": "ff9d564bd55a9742f77043dc08ebfd4cc2415989d70576851182d9c34c0ad2f8",
+      "bytes": 2887
+    },
+    "package.json": {
+      "path": "/Users/thinkstu/Desktop/copy/FluentRead-mobile-video-menu-accessibility-20261016/package.json",
+      "sha256": "f2d0cb391c8a4049f85cacd393069f39bb62de49f2bf79558ae4e31f86991871",
+      "bytes": 8017
+    },
+    "pnpm-lock.yaml": {
+      "path": "/Users/thinkstu/Desktop/copy/FluentRead-mobile-video-menu-accessibility-20261016/pnpm-lock.yaml",
+      "sha256": "f05a7705309a18c1da81c8a155aee748bbfe8974f8dd2f2d3a7de66adbdca206",
+      "bytes": 341118
+    },
+    "wxt.config.ts": {
+      "path": "/Users/thinkstu/Desktop/copy/FluentRead-mobile-video-menu-accessibility-20261016/wxt.config.ts",
+      "sha256": "09e6aea80f44a41f7cfa24acdf486f79d73c0011a086be9d36b35c4dbbd252d6",
+      "bytes": 19585
+    }
+  },
+  "safariWebRawByteHash": "b9ddd701367f20934372c8a16c01b0849b05b4af57574faf1af03555eca7c897",
+  "steps": [
+    {
+      "id": "01-sdk-check",
+      "startedAt": "2026-10-16T23:13:25.353301+00:00",
+      "finishedAt": "2026-10-16T23:13:25.774905+00:00",
+      "argv": [
+        "/opt/homebrew/opt/node@22/bin/node",
+        "/Users/thinkstu/Desktop/copy/FluentRead-mobile-video-menu-accessibility-20261016/scripts/testing/run-resource-safe.mjs",
+        "--max-workers",
+        "1",
+        "--concurrency",
+        "3",
+        "--cpu-target",
+        "40",
+        "--",
+        "/opt/homebrew/opt/node@22/bin/node",
+        "/Users/thinkstu/Desktop/copy/FluentRead-mobile-video-menu-accessibility-20261016/scripts/safari/package.mjs",
+        "--check"
+      ],
+      "environmentOverrides": {
+        "DEVELOPER_DIR": "/Applications/Xcode.app/Contents/Developer",
+        "PATH": "/opt/homebrew/opt/node@22/bin:/usr/bin:/bin:/usr/sbin:/sbin:/opt/homebrew/bin"
+      },
+      "returnCode": 0,
+      "timedOut": false,
+      "ownedProcessGroup": 54396,
+      "elapsedSeconds": 0.422,
+      "log": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/mobile-youtube-fr-node-identity-probe-20261017/same-scope-clone-repair-20261017/native-binding-scope-repair-v1/logs/01-sdk-check.log",
+      "logSHA256": "c14f577bc39fefe127522a5694d5de0ea33c16539e3573498182e06307bf7873"
+    },
+    {
+      "id": "02-safari-web-verify",
+      "startedAt": "2026-10-16T23:13:26.014112+00:00",
+      "finishedAt": "2026-10-16T23:13:26.260282+00:00",
+      "argv": [
+        "/opt/homebrew/opt/node@22/bin/node",
+        "/Users/thinkstu/Desktop/copy/FluentRead-mobile-video-menu-accessibility-20261016/scripts/testing/run-resource-safe.mjs",
+        "--max-workers",
+        "1",
+        "--concurrency",
+        "3",
+        "--cpu-target",
+        "40",
+        "--",
+        "/opt/homebrew/opt/node@22/bin/node",
+        "/Users/thinkstu/Desktop/copy/FluentRead-mobile-video-menu-accessibility-20261016/scripts/safari/package.mjs",
+        "--verify",
+        "--extension",
+        "/Users/thinkstu/Desktop/copy/FluentRead-mobile-video-menu-accessibility-20261016/.output/safari-mv2"
+      ],
+      "environmentOverrides": {
+        "DEVELOPER_DIR": "/Applications/Xcode.app/Contents/Developer",
+        "PATH": "/opt/homebrew/opt/node@22/bin:/usr/bin:/bin:/usr/sbin:/sbin:/opt/homebrew/bin"
+      },
+      "returnCode": 0,
+      "timedOut": false,
+      "ownedProcessGroup": 54415,
+      "elapsedSeconds": 0.246,
+      "log": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/mobile-youtube-fr-node-identity-probe-20261017/same-scope-clone-repair-20261017/native-binding-scope-repair-v1/logs/02-safari-web-verify.log",
+      "logSHA256": "96a5724fda5c50e93f86c99bba0ef4967091e489ad53f83e6a5a0f32fe03f3e3"
+    },
+    {
+      "id": "03-fresh-unsigned-wrapper",
+      "startedAt": "2026-10-16T23:13:26.502820+00:00",
+      "finishedAt": "2026-10-16T23:13:30.410315+00:00",
+      "argv": [
+        "/opt/homebrew/opt/node@22/bin/node",
+        "/Users/thinkstu/Desktop/copy/FluentRead-mobile-video-menu-accessibility-20261016/scripts/testing/run-resource-safe.mjs",
+        "--max-workers",
+        "1",
+        "--concurrency",
+        "3",
+        "--cpu-target",
+        "40",
+        "--",
+        "/opt/homebrew/opt/node@22/bin/node",
+        "/Users/thinkstu/Desktop/copy/FluentRead-mobile-video-menu-accessibility-20261016/scripts/safari/package.mjs",
+        "--extension",
+        "/Users/thinkstu/Desktop/copy/FluentRead-mobile-video-menu-accessibility-20261016/.output/safari-mv2",
+        "--project-location",
+        "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/mobile-youtube-fr-node-identity-probe-20261017/same-scope-clone-repair-20261017/native-binding-scope-repair-v1/output/safari-xcode",
+        "--bundle-id",
+        "org.example.FluentReadDevelopment",
+        "--platform",
+        "both"
+      ],
+      "environmentOverrides": {
+        "DEVELOPER_DIR": "/Applications/Xcode.app/Contents/Developer",
+        "PATH": "/opt/homebrew/opt/node@22/bin:/usr/bin:/bin:/usr/sbin:/sbin:/opt/homebrew/bin"
+      },
+      "returnCode": 0,
+      "timedOut": false,
+      "ownedProcessGroup": 54423,
+      "elapsedSeconds": 3.907,
+      "log": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/mobile-youtube-fr-node-identity-probe-20261017/same-scope-clone-repair-20261017/native-binding-scope-repair-v1/logs/03-fresh-unsigned-wrapper.log",
+      "logSHA256": "1b2bef0bb30aa4c6eb3a889c9255012cacee4f7c9cc05790ff7b03722a71cc0c"
+    },
+    {
+      "id": "04-macos",
+      "startedAt": "2026-10-16T23:13:30.657785+00:00",
+      "finishedAt": "2026-10-16T23:14:03.110817+00:00",
+      "argv": [
+        "/opt/homebrew/opt/node@22/bin/node",
+        "/Users/thinkstu/Desktop/copy/FluentRead-mobile-video-menu-accessibility-20261016/scripts/testing/run-resource-safe.mjs",
+        "--max-workers",
+        "1",
+        "--concurrency",
+        "3",
+        "--cpu-target",
+        "40",
+        "--",
+        "/Applications/Xcode.app/Contents/Developer/usr/bin/xcodebuild",
+        "-project",
+        "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/mobile-youtube-fr-node-identity-probe-20261017/same-scope-clone-repair-20261017/native-binding-scope-repair-v1/output/safari-xcode/FluentRead/FluentRead.xcodeproj",
+        "-scheme",
+        "FluentRead (macOS)",
+        "-configuration",
+        "Release",
+        "-destination",
+        "generic/platform=macOS",
+        "-derivedDataPath",
+        "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/mobile-youtube-fr-node-identity-probe-20261017/same-scope-clone-repair-20261017/native-binding-scope-repair-v1/output/derived-macos",
+        "-jobs",
+        "1",
+        "CODE_SIGNING_ALLOWED=NO",
+        "CODE_SIGNING_REQUIRED=NO",
+        "DEVELOPMENT_TEAM=",
+        "CODE_SIGN_IDENTITY=",
+        "PROVISIONING_PROFILE=",
+        "PROVISIONING_PROFILE_SPECIFIER=",
+        "build"
+      ],
+      "environmentOverrides": {
+        "DEVELOPER_DIR": "/Applications/Xcode.app/Contents/Developer",
+        "PATH": "/opt/homebrew/opt/node@22/bin:/usr/bin:/bin:/usr/sbin:/sbin:/opt/homebrew/bin"
+      },
+      "returnCode": 0,
+      "timedOut": false,
+      "ownedProcessGroup": 54459,
+      "elapsedSeconds": 32.453,
+      "log": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/mobile-youtube-fr-node-identity-probe-20261017/same-scope-clone-repair-20261017/native-binding-scope-repair-v1/logs/04-macos.log",
+      "logSHA256": "ff6b38023bcd0b59a53fd99e3c2e1d3a72614ceabee6ea8c46a31a846418b625"
+    },
+    {
+      "id": "05-ios-simulator",
+      "startedAt": "2026-10-16T23:14:03.377855+00:00",
+      "finishedAt": "2026-10-16T23:14:37.138125+00:00",
+      "argv": [
+        "/opt/homebrew/opt/node@22/bin/node",
+        "/Users/thinkstu/Desktop/copy/FluentRead-mobile-video-menu-accessibility-20261016/scripts/testing/run-resource-safe.mjs",
+        "--max-workers",
+        "1",
+        "--concurrency",
+        "3",
+        "--cpu-target",
+        "40",
+        "--",
+        "/Applications/Xcode.app/Contents/Developer/usr/bin/xcodebuild",
+        "-project",
+        "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/mobile-youtube-fr-node-identity-probe-20261017/same-scope-clone-repair-20261017/native-binding-scope-repair-v1/output/safari-xcode/FluentRead/FluentRead.xcodeproj",
+        "-scheme",
+        "FluentRead (iOS)",
+        "-configuration",
+        "Release",
+        "-destination",
+        "generic/platform=iOS Simulator",
+        "-derivedDataPath",
+        "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/mobile-youtube-fr-node-identity-probe-20261017/same-scope-clone-repair-20261017/native-binding-scope-repair-v1/output/derived-ios-simulator",
+        "-jobs",
+        "1",
+        "CODE_SIGNING_ALLOWED=NO",
+        "CODE_SIGNING_REQUIRED=NO",
+        "DEVELOPMENT_TEAM=",
+        "CODE_SIGN_IDENTITY=",
+        "PROVISIONING_PROFILE=",
+        "PROVISIONING_PROFILE_SPECIFIER=",
+        "build"
+      ],
+      "environmentOverrides": {
+        "DEVELOPER_DIR": "/Applications/Xcode.app/Contents/Developer",
+        "PATH": "/opt/homebrew/opt/node@22/bin:/usr/bin:/bin:/usr/sbin:/sbin:/opt/homebrew/bin"
+      },
+      "returnCode": 0,
+      "timedOut": false,
+      "ownedProcessGroup": 54899,
+      "elapsedSeconds": 33.76,
+      "log": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/mobile-youtube-fr-node-identity-probe-20261017/same-scope-clone-repair-20261017/native-binding-scope-repair-v1/logs/05-ios-simulator.log",
+      "logSHA256": "829668f4fddb340e66664138a891f9b7c4226510e899f8728d6dd80defef5fcc"
+    },
+    {
+      "id": "06-iphoneos-arm64",
+      "startedAt": "2026-10-16T23:14:37.391324+00:00",
+      "finishedAt": "2026-10-16T23:14:56.844991+00:00",
+      "argv": [
+        "/opt/homebrew/opt/node@22/bin/node",
+        "/Users/thinkstu/Desktop/copy/FluentRead-mobile-video-menu-accessibility-20261016/scripts/testing/run-resource-safe.mjs",
+        "--max-workers",
+        "1",
+        "--concurrency",
+        "3",
+        "--cpu-target",
+        "40",
+        "--",
+        "/Applications/Xcode.app/Contents/Developer/usr/bin/xcodebuild",
+        "-project",
+        "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/mobile-youtube-fr-node-identity-probe-20261017/same-scope-clone-repair-20261017/native-binding-scope-repair-v1/output/safari-xcode/FluentRead/FluentRead.xcodeproj",
+        "-target",
+        "FluentRead (iOS)",
+        "-configuration",
+        "Release",
+        "-sdk",
+        "iphoneos",
+        "-arch",
+        "arm64",
+        "-jobs",
+        "1",
+        "CONFIGURATION_BUILD_DIR=/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/mobile-youtube-fr-node-identity-probe-20261017/same-scope-clone-repair-20261017/native-binding-scope-repair-v1/output/target-iphoneos/build",
+        "OBJROOT=/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/mobile-youtube-fr-node-identity-probe-20261017/same-scope-clone-repair-20261017/native-binding-scope-repair-v1/output/target-iphoneos/obj",
+        "SYMROOT=/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/mobile-youtube-fr-node-identity-probe-20261017/same-scope-clone-repair-20261017/native-binding-scope-repair-v1/output/target-iphoneos/sym",
+        "CODE_SIGNING_ALLOWED=NO",
+        "CODE_SIGNING_REQUIRED=NO",
+        "DEVELOPMENT_TEAM=",
+        "CODE_SIGN_IDENTITY=",
+        "PROVISIONING_PROFILE=",
+        "PROVISIONING_PROFILE_SPECIFIER=",
+        "build"
+      ],
+      "environmentOverrides": {
+        "DEVELOPER_DIR": "/Applications/Xcode.app/Contents/Developer",
+        "PATH": "/opt/homebrew/opt/node@22/bin:/usr/bin:/bin:/usr/sbin:/sbin:/opt/homebrew/bin"
+      },
+      "returnCode": 0,
+      "timedOut": false,
+      "ownedProcessGroup": 55268,
+      "elapsedSeconds": 19.453,
+      "log": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/mobile-youtube-fr-node-identity-probe-20261017/same-scope-clone-repair-20261017/native-binding-scope-repair-v1/logs/06-iphoneos-arm64.log",
+      "logSHA256": "a6ec95226a1bb679779859a06ae0cea99b87b7a2021bb416f37c43f8b56de06f"
+    }
+  ],
+  "finishedAt": "2026-10-16T23:14:57.425855+00:00",
+  "status": "SIX_NATIVE_STAGES_PASS_NO_RUNTIME",
+  "sourceInputsUnchanged": true,
+  "resourceLaneReleased": true
+}

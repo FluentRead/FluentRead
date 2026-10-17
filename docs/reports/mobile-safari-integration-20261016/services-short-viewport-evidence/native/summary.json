@@ -1,0 +1,61 @@
+{
+  "schema": 1,
+  "productCommit": "7e504c21ad5bc6e51c29c5cf79b352c088a19146",
+  "sourceCommit": "7e504c21ad5bc6e51c29c5cf79b352c088a19146",
+  "device": "Dedicated iPhone16Pro iOS26.2 Simulator",
+  "official": {
+    "passed": 0,
+    "skipped": 1,
+    "failed": 0,
+    "total": 1,
+    "selectedMethodSeconds": 21.985,
+    "wholeOfficialSeconds": 28.313000202178955
+  },
+  "status": "SKIPPED_NATIVE_PERMISSION_HOST_MISMATCH",
+  "actions": {
+    "address": 1,
+    "extensionPopup": 1,
+    "navigation": 1,
+    "normalClear": 1,
+    "pageMenu": 1,
+    "SafariActivate": 1
+  },
+  "permissionChoices": 0,
+  "actualPromptHost": "m.youtube.com",
+  "knownFixtureHost": "127.0.0.1",
+  "requestSourceEstablished": false,
+  "PopupKeyboardRotationListAcceptance": false,
+  "originalPNGs": 2,
+  "JSONPayloads": 23,
+  "limitedRestorationVerifiedByRoot": true,
+  "taskSimulatorShutdown": true,
+  "nativeAppFiles": 485,
+  "pureWebFiles": 467,
+  "FRPrivateNativeFiles": 13,
+  "userscriptsAppFiles": 47,
+  "DemoBytes": 396,
+  "fullExtensionStoragePreservationClaimed": false,
+  "rootObservation": {
+    "file": "root-runtime-observations.json",
+    "bytes": 9424,
+    "sha256": "8ecf7ee70227f73fecd34d72e35d59e7aabe1e7c7ca6458127889253b463246c"
+  },
+  "independentRuntimeReview": {
+    "bytes": 50948,
+    "sha256": "bcc8488ee8f5ca448dd5ef11bea9a59a1f809c3314c8965f59b17624c256fec0",
+    "file": "independent-runtime-review.json",
+    "status": "PASS_EVIDENCE_AND_BOUNDED_RESTORATION_UI_SKIP_PRESERVED"
+  },
+  "imageCopyPolicy": "Original bytes; no crop/re-encoding.",
+  "restorationWitness": {
+    "bytes": 2185,
+    "sha256": "cd9ed7f9cb8c7ab9eb30535d2054413562c812f276b1d71df065d6f5781ca762",
+    "file": "restoration-witness.json"
+  },
+  "permissionSourceAnalysis": {
+    "bytes": 11474,
+    "sha256": "a2144eaa82b4299e4f23a61eaed20b3822a9d1bffcf9a69b160f6786c3cc3d6c",
+    "file": "native-permission-host-source-findings.json",
+    "status": "SOURCE_ONLY_CAUSE_UNDETERMINED"
+  }
+}

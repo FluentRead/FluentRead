@@ -1,0 +1,7 @@
+{
+  "actions" : {
+    "FRMenuOpen" : 1
+  },
+  "outcome" : "UNVERIFIED",
+  "reason" : "Normal menu open\/required original image unavailable; no retry"
+}

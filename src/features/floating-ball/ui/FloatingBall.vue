@@ -1,7 +1,7 @@
 <!--
  * @file src/features/floating-ball/ui/FloatingBall.vue
  * 文件职责：呈现用户开启后的页面悬浮工具，将全文翻译、品牌手柄和漫画入口按顺序组织，并保留拖动停靠与可选常驻模式。
- * 主要内容：品牌主体只显示圆形本地图标，上方翻译按钮分别呈现处理中、成功与失败，活动会话仍提供恢复原文动作，用户可见名称复用当前界面语言的品牌文案；默认悬停展开、移出和 Escape 收回边缘，键盘聚焦与触屏轻点保持入口可操作；软键盘、缩放与屏幕旋转时按可见视口停靠，触屏入口保留完整命中区域。
+ * 主要内容：品牌主体只显示圆形本地图标，上方翻译按钮分别呈现处理中、成功与失败，活动会话仍提供恢复原文动作，用户可见名称复用当前界面语言的品牌文案；默认悬停展开、移出和 Escape 收回边缘，键盘聚焦与触屏轻点保持入口可操作；软键盘、缩放与屏幕旋转时按可见视口停靠，首次渲染即按硬件触摸能力保留完整入口，同时兼容任一粗指针的 CSS 呈现。
  * 模块边界：它只负责视觉与局部交互，不直接调用浏览器消息、保存配置或执行全文翻译；这些副作用由 content/runtime 通过 props、事件和 defineExpose 桥接，外观配置的归一化留在 core/config。
  -->
 <template>
@@ -13,6 +13,7 @@
       'floating-ball-expanded': isMenuExpanded,
       dragging: isDragging,
       'is-compact': presentation.compact,
+      'is-touch-capable': isTouchCapable,
       'manga-reader': !!manga?.available,
     }"
     :data-position="currentDisplayPosition"
@@ -120,6 +121,9 @@ const {translateLegacy: t, t: translateMessage} = useUiI18n();
 const DRAG_THRESHOLD = 6;
 const BALL_SIZE = 40;
 const COMPACT_BALL_SIZE = 32;
+const TOUCH_BALL_SIZE = 44;
+/** 主指针可由鼠标占据；首次渲染前按硬件触摸能力保留完整手柄，无需等待用户先触摸半截入口。 */
+const isTouchCapable = typeof navigator !== 'undefined' && navigator.maxTouchPoints > 0;
 
 /** 与配置默认值一致；独立挂载时同样按悬停展开。 */
 const DEFAULT_PRESENTATION: FloatingBallPresentation = {
@@ -352,6 +356,7 @@ function updatePositionStyle() {
 }
 
 function fallbackBallSize() {
+  if (isTouchCapable) return TOUCH_BALL_SIZE;
   return presentation.value.compact || props.manga?.available ? COMPACT_BALL_SIZE : BALL_SIZE;
 }
 
@@ -914,8 +919,20 @@ watch(() => presentation.value.settingsEntryVisible, () => {
     transition: none;
   }
 }
-/* 触屏没有 hover，完整的 44px 手柄可直接点击和拖动，避免半圆只剩十几像素。 */
-@media (pointer: coarse) {
+/* 浏览器可能没有把触屏报告为粗指针；硬件能力在首次渲染时保留完整入口，紧凑和漫画模式同样可触摸。 */
+.fr-floating-ball.is-touch-capable {
+  --fr-ball-size: 44px;
+  --fr-ball-tool-size: 44px;
+  --fr-ball-edge-gap: 12px;
+}
+.fr-floating-ball.is-touch-capable:not(.floating-ball-expanded):not(.dragging)[data-position] :is(.floating-ball-main, .floating-ball-manga),
+.fr-floating-ball.is-touch-capable.manga-reader:not(.floating-ball-expanded):not(.dragging)[data-position] :is(.floating-ball-main, .floating-ball-manga) {
+  transform: none;
+  clip-path: none;
+  opacity: max(.7, var(--fr-ball-collapsed-opacity, .52));
+}
+/* 同时支持浏览器报告的任一粗指针，保留运行期间媒体能力变化的 CSS 响应。 */
+@media (any-pointer: coarse) {
   .fr-floating-ball,
   .fr-floating-ball.is-compact,
   .fr-floating-ball.manga-reader {

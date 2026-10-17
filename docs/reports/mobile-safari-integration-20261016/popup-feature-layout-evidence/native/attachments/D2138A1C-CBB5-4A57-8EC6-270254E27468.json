@@ -1,0 +1,28 @@
+{
+  "actions" : {
+    "address" : 1,
+    "closePopup" : 1,
+    "extensionPopup" : 1,
+    "navigation" : 1,
+    "normalClear" : 1,
+    "pageMenu" : 1,
+    "popupSwipeDown" : 1,
+    "popupSwipeUp" : 1,
+    "SafariActivate" : 1
+  },
+  "clipboardActions" : 0,
+  "closedTabs" : 0,
+  "configurationWrites" : 0,
+  "createdTabs" : 0,
+  "drawerActions" : 0,
+  "footerTaps" : 0,
+  "fullStoragePreservation" : "NOT_CLAIMED",
+  "landscapeSetters" : 0,
+  "originalPopupPNGs" : 3,
+  "permissionChoices" : 0,
+  "returnPositionOrFocusRestoration" : "NOT_PROVED",
+  "scrollAcceptance" : "PENDING_ORIGINAL_AX_PNG_REVIEW",
+  "scrollActions" : 2,
+  "status" : "NORMAL_POPUP_SCROLL_ATTACHMENTS_RECORDED_REQUIRES_REVIEW",
+  "translationIntents" : 0
+}

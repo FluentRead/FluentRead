@@ -1,0 +1,149 @@
+{
+  "schemaVersion": 1,
+  "patch": {
+    "repository": "/Users/thinkstu/Desktop/copy/FluentRead-mobile-video-menu-accessibility-20261016",
+    "sourceType": "patch_file",
+    "base": "runner SHA256 b55766aef51af34b070a769e7424825ef787ec8603ac47b5a5304c2ad34a3f7c",
+    "head": "candidate SHA256 5f6aded2f3f1b47f61dc5fe89ce249c9b8ca209f1bc5a67f81150264d0d09b06",
+    "changedFiles": [
+      "scripts/run-mobile-video-subtitle-test.cjs"
+    ],
+    "sha256": "03f5fa00fe4af8b0f503d888ddbba6d210f4bcfd33d00df23efc1f7b84b6ec9c"
+  },
+  "recommendation": "merge",
+  "workflowLabel": "human_review_required",
+  "impact": {
+    "rating": "moderate",
+    "rationale": "Only the controlled lifecycle acceptance runner changes. An incorrect oracle can misclassify native track ownership; shipped extension behavior, menu CSS and resource guards are unchanged."
+  },
+  "regressionLikelihood": {
+    "rating": "low",
+    "rationale": "The exact 5f6aded2 candidate completed its controlled Chromium lifecycle with eleven real trusted change ACK receipts, preserved ownership assertions and cleanup; source guards and common/menu scope remain unchanged."
+  },
+  "regressionProtection": {
+    "rating": "strong",
+    "rationale": "Changed-path controlled production-browser execution at exact script 5f6aded2 passed. Independent raw checks verified report37d006ff, all eleven transition receipts, seventeen trusted change events, desired/after modes and deadlines, five ownership flags, errors/focus absence and owned cleanup. This applies only to the Chromium fixture/shim contract.",
+    "exactHeadChecksPassed": true
+  },
+  "recoverability": {
+    "rating": "easy",
+    "rationale": "Revert this one runner patch; no product, migration or persistent configuration changes."
+  },
+  "confidence": {
+    "rating": "high",
+    "rationale": "The prior source review is preserved and its sole decision-critical ACK unknown is now resolved by exact-head raw runtime receipts, startup input pins, runner log, outcome and captured release record."
+  },
+  "applicability": {
+    "status": "confirmed",
+    "rationale": "Exact patch remains03f5fa00 and candidate/current W remain5f6aded2. lifecycle-corrected-oracle/inputs.json binds that script and UIeb9cd5; runner.log records the lifecycle invocation. This reviewer only read disk and wrote independent managed artifacts."
+  },
+  "statusQuoRisk": {
+    "rating": "moderate",
+    "rationale": "The old lifecycle scenario expects obsolete A to return after genuine Off, contradicting nativeFullscreen.ts and existing ownership tests, and can report a false product failure."
+  },
+  "autoMergeExclusions": [
+    "other"
+  ],
+  "affectedRuntimeRoots": [
+    "scripts/run-mobile-video-subtitle-test.cjs main(), default lifecycle suite only; explicit menu suite returns before this block"
+  ],
+  "importantCallers": [
+    "selectNativeTracks: eleven explicit system-selection shim calls",
+    "src/features/video-subtitle/content/nativeFullscreen.ts onTrackChange(), enter(), leave(), sync()",
+    "tests/videoNativeFullscreen.test.ts:81-110,267-299 independent ownership contract"
+  ],
+  "riskDrivers": [
+    "Moderate consequence of a wrong acceptance oracle still requires human review.",
+    "Chromium standard TextTrack writes and isolated-world webkit shim do not establish native Safari/AVKit selection/rendering."
+  ],
+  "protectiveFactors": [
+    "No product code changed.",
+    "No synthetic change dispatch or new production mode writes.",
+    "Menu/common prefix and disable/replacement/reload/pageshow/desktop/cleanup suffix unchanged.",
+    "Direct source-restoration positive control is retained separately from Off invalidation.",
+    "Root executed one lifecycle run; independent raw receipt validation passed without another browser/SDK/build run."
+  ],
+  "materialBoundaries": [
+    {
+      "id": "ack-order",
+      "invariant": "Selection ACK must follow subscription, a real trusted browser change event and post-dispatch mode agreement within one absolute 2000ms deadline.",
+      "runtimeRoot": "candidate lines419-449 selectNativeTracks",
+      "counterexample": "Untrusted/synthetic change, no event despite cue readiness, no actual mode transition, late ACK, or a later production listener changing the desired modes must not pass.",
+      "legitimateControl": "Listener is installed before the only desired-mode write loop; no-op setup and absent references fail; isTrusted is required; deadline timer plus post-dispatch deadline/matches checks reject these cases; success and failure clear listeners and both timers. Production onTrackChange calls sync synchronously.",
+      "result": "supported"
+    },
+    {
+      "id": "source-ownership",
+      "invariant": "Direct A->FluentRead->leave restores A; a newer Off choice invalidates old A and must not be undone by later FluentRead selection.",
+      "runtimeRoot": "candidate lines456-507; nativeFullscreen.ts:57-122",
+      "counterexample": "Changing the old expectation to disabled without retaining a direct positive restoration case could hide a broken restore path.",
+      "legitimateControl": "Candidate adds directSourceRestored showing assertion before the Off scenario, preserves Off/reentry, other-site-B and disable assertions. Independent existing tests:81-110 and267-299 establish both contracts. No extra selection occurs between the final ACK and leave assertion.",
+      "result": "supported"
+    },
+    {
+      "id": "scope-ownership",
+      "invariant": "Native oracle correction must not weaken menu checks, focus/resource cleanup, or overwrite modes outside explicit fixture selection steps.",
+      "runtimeRoot": "supplied exact patch and candidate main()",
+      "counterexample": "A helper could force passing modes after leave or alter common/menu cleanup behavior.",
+      "legitimateControl": "The only changed writes are the declared desired-mode loop at selection calls. Direct/Off/B/disable outcomes are read assertions. Exact diff reconstruction and byte comparisons prove the menu/common prefix and disable/replacement/reload/pageshow/desktop/finally suffix unchanged.",
+      "result": "supported"
+    },
+    {
+      "id": "browser-integration",
+      "invariant": "The actual controlled production-browser run must deliver trusted ACK receipts and preserve every ownership assertion.",
+      "runtimeRoot": "default lifecycle main() under production artifact",
+      "counterexample": "Chromium delivers no qualifying event, or production bridge queued change processing produces different modes and the new helper times out/fails.",
+      "legitimateControl": "Exact candidate run report SHA25637d006ff24c3aface33fa0cbadb201fba68f8baf38c2c57cab6f74ebc2bd123e contains all eleven expected transition names and seventeen change events, each isTrusted=true, nonempty receipts and matching desired/after modes. Maximum post-dispatch ACK is6.300000190734863ms<2000ms. Direct/Off/reentry/B flags pass, errors/focus are empty, owned close is fulfilled and profile removed.",
+      "result": "supported"
+    }
+  ],
+  "validation": [
+    {
+      "name": "SHA256 patch/base/candidate and initial/final W binding",
+      "status": "passed",
+      "protects": "Exact immutable patch identity and applicability; initial W was base, final W was candidate after an external change."
+    },
+    {
+      "name": "Read-only difflib exact carrier reconstruction and unchanged prefix/suffix comparison",
+      "status": "passed",
+      "protects": "Only declared lifecycle native block differs; menu and resource/focus logic remain intact."
+    },
+    {
+      "name": "node --check supplied candidate",
+      "status": "passed",
+      "protects": "JavaScript parse validity without executing the runner or loading helpers."
+    },
+    {
+      "name": "Independent nativeFullscreen.ts and existing ownership test source trace",
+      "status": "passed",
+      "protects": "Correct direct-restoration positive control and obsolete-source invalidation contract; tests were inspected, not run."
+    },
+    {
+      "name": "Prior independent source review retained unchanged",
+      "status": "passed",
+      "protects": "Original artifact native-oracle-independent-review.json SHA256a42ea7f48c069e55527733e123ef70ff99bc62e8b25932c498a7d87c221518b3 is preserved; this is a separate later assessment."
+    },
+    {
+      "name": "Exact candidate controlled lifecycle raw evidence",
+      "status": "passed",
+      "protects": "report37d006ff; eleven expected selection names, seventeen type=change/isTrusted=true events, every receipt has an actual mode transition, desired after-state match, 0<=event elapsed<=post-dispatch ACK<2000ms; maxACK6.300000190734863ms."
+    },
+    {
+      "name": "Ownership and completion raw checks",
+      "status": "passed",
+      "protects": "Five ownership flags true, twelve completed cases including disabled-cleanup, runner.log ok=true/errors=[], Root outcome rawExitCode0, report errors[]/focusEvents[]/shared-guard-fulfilled/profileRemoved=true."
+    },
+    {
+      "name": "Captured fresh release evidence",
+      "status": "passed",
+      "protects": "Release SHA256e185c74e3a54a391cf640e5bbb1d0bb4f6e177ff616a035e8edfe6e7688a3a94 at2026-10-16T21:16:45.300836Z records no remaining owned PIDs, five empty ports, no heavy/GUI or booted Apple rows, task simulator Shutdown and unchanged host key metadata. This is a captured release, not a claim about current global resource availability."
+    }
+  ],
+  "unknowns": [
+    {
+      "summary": "Native AVKit system-menu selection/rendering, physical devices, live providers, actual BFCache transition and nonzero desktop scroll pressure remain outside this controlled Chromium oracle patch acceptance.",
+      "decisionCritical": false
+    }
+  ],
+  "evidencePlan": []
+}

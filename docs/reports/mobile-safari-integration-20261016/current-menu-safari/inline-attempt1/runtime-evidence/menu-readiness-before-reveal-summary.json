@@ -1,0 +1,79 @@
+{
+  "actions" : {
+
+  },
+  "deadlineElapsedSeconds" : 10.990429997444153,
+  "maximumSamples" : 4,
+  "observations" : [
+    {
+      "actualEntryCount" : 0,
+      "actualEntryFrame" : {
+        "isInfinite" : false,
+        "isNull" : true,
+        "nonFinite" : true
+      },
+      "actualEntryHittable" : false,
+      "captureStartedElapsedSeconds" : 5.0548579692840576,
+      "completedElapsedSeconds" : 5.2962679862976074,
+      "entryCount" : 0,
+      "entryFrame" : {
+        "isInfinite" : false,
+        "isNull" : true,
+        "nonFinite" : true
+      },
+      "entryLabel" : "",
+      "index" : 1,
+      "nativeLabels" : [
+
+      ],
+      "playbackObservation" : {
+        "pauseCount" : 0,
+        "playCount" : 0,
+        "progress" : [
+
+        ]
+      },
+      "readyEntryPreconditionOnly" : false,
+      "screenshotThenSnapshot" : true,
+      "snapshotEligible" : false,
+      "withinObservationDeadline" : true
+    },
+    {
+      "actualEntryCount" : 1,
+      "actualEntryFrame" : {
+        "height" : 45,
+        "width" : 44,
+        "x" : 350,
+        "y" : 284
+      },
+      "actualEntryHittable" : true,
+      "captureStartedElapsedSeconds" : 6.5904489755630493,
+      "completedElapsedSeconds" : 7.2185649871826172,
+      "entryCount" : 1,
+      "entryFrame" : {
+        "height" : 45,
+        "width" : 44,
+        "x" : 350,
+        "y" : 284
+      },
+      "entryLabel" : "流畅阅读字幕翻译：已开启",
+      "index" : 2,
+      "nativeLabels" : [
+
+      ],
+      "playbackObservation" : {
+        "pauseCount" : 0,
+        "playCount" : 0,
+        "progress" : [
+
+        ]
+      },
+      "readyEntryPreconditionOnly" : true,
+      "screenshotThenSnapshot" : true,
+      "snapshotEligible" : true,
+      "withinObservationDeadline" : true
+    }
+  ],
+  "phase" : "before-reveal",
+  "productAcceptance" : false
+}

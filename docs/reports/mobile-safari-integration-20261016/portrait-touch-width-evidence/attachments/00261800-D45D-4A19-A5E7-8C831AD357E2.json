@@ -1,0 +1,365 @@
+{
+  "actions" : {
+    "address" : 1,
+    "extensionPopup" : 1,
+    "navigation" : 1,
+    "normalClear" : 1,
+    "pageMenu" : 1,
+    "SafariActivate" : 1
+  },
+  "actualExactAllowedWebViewLabel" : "流畅阅读",
+  "allowedTitleDoesNotIdentifyLocale" : true,
+  "artifactKind" : "clean-production-461c2fb-touch-width",
+  "configHydration" : "NOT_PROVED",
+  "currentDefaultServiceOrModel" : null,
+  "currentInterfaceLanguage" : null,
+  "currentSelectionMode" : null,
+  "currentSiteSwitch" : null,
+  "emptyOwnerIsNotCurrentOwnerProof" : true,
+  "frameIntersectionIsNotVisualProof" : true,
+  "interpretation" : "PENDING_LOCAL_AX_AND_ORIGINAL_IMAGE_REVIEW",
+  "nodes" : [
+    {
+      "binaryValueOnlyNotInterpreted" : null,
+      "frame" : {
+        "height" : 450.97346600331667,
+        "width" : 386,
+        "x" : 8,
+        "y" : 415.02653399668321
+      },
+      "identifier" : "",
+      "label" : "流畅阅读",
+      "type" : 58
+    },
+    {
+      "binaryValueOnlyNotInterpreted" : null,
+      "frame" : {
+        "height" : 538,
+        "width" : 386,
+        "x" : 8,
+        "y" : 482
+      },
+      "identifier" : "",
+      "label" : "流畅阅读",
+      "type" : 1
+    },
+    {
+      "binaryValueOnlyNotInterpreted" : null,
+      "frame" : {
+        "height" : 538,
+        "width" : 386,
+        "x" : 8,
+        "y" : 482
+      },
+      "identifier" : "",
+      "label" : "主要",
+      "type" : 1
+    },
+    {
+      "binaryValueOnlyNotInterpreted" : null,
+      "frame" : {
+        "height" : 46,
+        "width" : 356,
+        "x" : 23,
+        "y" : 491
+      },
+      "identifier" : "",
+      "label" : "节标题",
+      "type" : 1
+    },
+    {
+      "binaryValueOnlyNotInterpreted" : null,
+      "frame" : {
+        "height" : 18,
+        "width" : 55,
+        "x" : 62,
+        "y" : 497
+      },
+      "identifier" : "",
+      "label" : "流畅阅读",
+      "type" : 48
+    },
+    {
+      "binaryValueOnlyNotInterpreted" : null,
+      "frame" : {
+        "height" : 14,
+        "width" : 36,
+        "x" : 62,
+        "y" : 516
+      },
+      "identifier" : "",
+      "label" : "v0.0.38",
+      "type" : 48
+    },
+    {
+      "binaryValueOnlyNotInterpreted" : null,
+      "frame" : {
+        "height" : 46,
+        "width" : 61,
+        "x" : 254,
+        "y" : 491
+      },
+      "identifier" : "",
+      "label" : "支持流畅阅读",
+      "type" : 9
+    },
+    {
+      "binaryValueOnlyNotInterpreted" : null,
+      "frame" : {
+        "height" : 46,
+        "width" : 60,
+        "x" : 320,
+        "y" : 491
+      },
+      "identifier" : "",
+      "label" : "打开完整设置",
+      "type" : 9
+    },
+    {
+      "binaryValueOnlyNotInterpreted" : null,
+      "frame" : {
+        "height" : 13,
+        "width" : 30,
+        "x" : 38,
+        "y" : 556
+      },
+      "identifier" : "",
+      "label" : "源语言",
+      "type" : 48
+    },
+    {
+      "binaryValueOnlyNotInterpreted" : null,
+      "frame" : {
+        "height" : 24,
+        "width" : 114,
+        "x" : 45,
+        "y" : 583
+      },
+      "identifier" : "",
+      "label" : "源语言",
+      "type" : 49
+    },
+    {
+      "binaryValueOnlyNotInterpreted" : null,
+      "frame" : {
+        "height" : 14,
+        "width" : 43,
+        "x" : 45,
+        "y" : 583
+      },
+      "identifier" : "",
+      "label" : "自动检测",
+      "type" : 48
+    },
+    {
+      "binaryValueOnlyNotInterpreted" : null,
+      "frame" : {
+        "height" : 21,
+        "width" : 16,
+        "x" : 193,
+        "y" : 580
+      },
+      "identifier" : "",
+      "label" : "→",
+      "type" : 48
+    },
+    {
+      "binaryValueOnlyNotInterpreted" : null,
+      "frame" : {
+        "height" : 13,
+        "width" : 39,
+        "x" : 217,
+        "y" : 556
+      },
+      "identifier" : "",
+      "label" : "目标语言",
+      "type" : 48
+    },
+    {
+      "binaryValueOnlyNotInterpreted" : null,
+      "frame" : {
+        "height" : 24,
+        "width" : 114,
+        "x" : 224,
+        "y" : 583
+      },
+      "identifier" : "",
+      "label" : "目标语言",
+      "type" : 49
+    },
+    {
+      "binaryValueOnlyNotInterpreted" : null,
+      "frame" : {
+        "height" : 14,
+        "width" : 43,
+        "x" : 224,
+        "y" : 583
+      },
+      "identifier" : "",
+      "label" : "简体中文",
+      "type" : 48
+    },
+    {
+      "binaryValueOnlyNotInterpreted" : null,
+      "frame" : {
+        "height" : 45,
+        "width" : 332,
+        "x" : 35,
+        "y" : 614
+      },
+      "identifier" : "",
+      "label" : "按功能选择服务 · 网页默认服务 · 免费翻译服务",
+      "type" : 1
+    },
+    {
+      "binaryValueOnlyNotInterpreted" : null,
+      "frame" : {
+        "height" : 36,
+        "width" : 332,
+        "x" : 35,
+        "y" : 666
+      },
+      "identifier" : "",
+      "label" : "应用程序状态",
+      "type" : 1
+    },
+    {
+      "binaryValueOnlyNotInterpreted" : null,
+      "frame" : {
+        "height" : 33,
+        "width" : 326,
+        "x" : 35,
+        "y" : 667
+      },
+      "identifier" : "",
+      "label" : "Safari 免费服务仅使用已授权的线路 · 先允许访问 微软翻译，再开始翻译。",
+      "type" : 48
+    },
+    {
+      "binaryValueOnlyNotInterpreted" : "0",
+      "frame" : {
+        "height" : 46,
+        "width" : 282,
+        "x" : 35,
+        "y" : 708
+      },
+      "identifier" : "",
+      "label" : "翻译当前网页",
+      "type" : 40
+    },
+    {
+      "binaryValueOnlyNotInterpreted" : null,
+      "frame" : {
+        "height" : 46,
+        "width" : 46,
+        "x" : 321,
+        "y" : 708
+      },
+      "identifier" : "",
+      "label" : "局部翻译：点击或按住左键划选，再确认翻译",
+      "type" : 9
+    },
+    {
+      "binaryValueOnlyNotInterpreted" : "0",
+      "frame" : {
+        "height" : 45,
+        "width" : 91,
+        "x" : 35,
+        "y" : 760
+      },
+      "identifier" : "",
+      "label" : "始终翻译 127.0.0.1",
+      "type" : 40
+    },
+    {
+      "binaryValueOnlyNotInterpreted" : "0",
+      "frame" : {
+        "height" : 45,
+        "width" : 100,
+        "x" : 128,
+        "y" : 760
+      },
+      "identifier" : "",
+      "label" : "在 127.0.0.1 禁用扩展",
+      "type" : 40
+    },
+    {
+      "binaryValueOnlyNotInterpreted" : null,
+      "frame" : {
+        "height" : 122,
+        "width" : 175,
+        "x" : 23,
+        "y" : 825
+      },
+      "identifier" : "",
+      "label" : "鼠标悬停翻译 · Ctrl",
+      "type" : 9
+    },
+    {
+      "binaryValueOnlyNotInterpreted" : null,
+      "frame" : {
+        "height" : 122,
+        "width" : 175,
+        "x" : 204,
+        "y" : 825
+      },
+      "identifier" : "",
+      "label" : "划词翻译 · 显示图标",
+      "type" : 9
+    },
+    {
+      "binaryValueOnlyNotInterpreted" : null,
+      "frame" : {
+        "height" : 329.79740516039914,
+        "width" : 28.80597014925371,
+        "x" : 362.31343283582089,
+        "y" : 482.24046434494193
+      },
+      "identifier" : "",
+      "label" : "垂直滚动条, 2页",
+      "type" : 1
+    },
+    {
+      "binaryValueOnlyNotInterpreted" : null,
+      "frame" : {
+        "height" : 28.805970149253653,
+        "width" : 278.07573901068236,
+        "x" : 61.962130494658801,
+        "y" : 810.62852404643445
+      },
+      "identifier" : "",
+      "label" : "水平滚动条, 1页",
+      "type" : 1
+    },
+    {
+      "binaryValueOnlyNotInterpreted" : null,
+      "frame" : {
+        "height" : 329.79740516039914,
+        "width" : 28.80597014925371,
+        "x" : 362.31343283582089,
+        "y" : 482.24046434494193
+      },
+      "identifier" : "",
+      "label" : "垂直滚动条, 2页",
+      "type" : 1
+    },
+    {
+      "binaryValueOnlyNotInterpreted" : null,
+      "frame" : {
+        "height" : 28.805970149253653,
+        "width" : 278.07573901068236,
+        "x" : 61.962130494658801,
+        "y" : 810.62852404643445
+      },
+      "identifier" : "",
+      "label" : "水平滚动条, 1页",
+      "type" : 1
+    }
+  ],
+  "ownerExact" : false,
+  "ownerNotExposed" : true,
+  "pixelAndAXCaptureSequentialNotAtomic" : true,
+  "productCommit" : "461c2fb3b310382f67fa3b21303733a590783bfd",
+  "scope" : "named normal Popup subtree only; no prior host page AX text",
+  "status" : "READ_ONLY_POPUP_BASELINE_OBSERVATION_REQUIRES_REVIEW"
+}

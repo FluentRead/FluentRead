@@ -1,0 +1,56 @@
+{
+  "at": "2026-10-16T23:07:49.417444+00:00",
+  "status": "CLONE_REPAIR_WEB_ARTIFACTS_SEALED",
+  "buildBaseHead": "121c0217d3ce8c2067ade25328d5a9527e6019e4",
+  "uncommittedProductPatchAtBuild": true,
+  "sourceFiles": {
+    "/Users/thinkstu/Desktop/copy/FluentRead-mobile-video-menu-accessibility-20261016/src/features/video-subtitle/content/videoPlayerBinding.ts": "0789013139caf5e43783e4d3501b9a96c5d97324213efcbdfa941e1eb34fdec4",
+    "/Users/thinkstu/Desktop/copy/FluentRead-mobile-video-menu-accessibility-20261016/src/features/video-subtitle/content/ui.ts": "eb9cd5ccd3d2931cd1e85fa8a668235374e0a865e06605981274bd20944b592c",
+    "/Users/thinkstu/Desktop/copy/FluentRead-mobile-video-menu-accessibility-20261016/scripts/run-mobile-video-subtitle-test.cjs": "7613fece1417934d34f121f5a0413658e4fc848e2cf1d8d349d866f75b116d6f"
+  },
+  "validationSummarySHA256": "750c66eb4b1d6442a9a965be674d1b802dfed50216a7e2e3e9a4c9dae254b808",
+  "artifacts": {
+    "chrome": {
+      "directory": "/Users/thinkstu/Desktop/copy/FluentRead-mobile-video-menu-accessibility-20261016/.output/chrome-mv3",
+      "files": 478,
+      "bytes": 62361256,
+      "rawByteHash": "3f5ef24796529a92c873a092d0050d86597d6421f7652193214a6543282e80be",
+      "recordHash": "584ffa750ec439a8f3e0dc4dec5b1a5291433a38d5c6e8c2fb10f15da1930fad",
+      "fullFileMap": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/mobile-youtube-fr-node-identity-probe-20261017/same-scope-clone-repair-20261017/chrome-file-map.json",
+      "fullFileMapSHA256": "fe68bbd1129848b7fc8b899acb9522c14d6f67e1562df721a37cdcbc824982f4",
+      "manifestSHA256": "a12a20416fc826d3dc7278b74a112b4170f8985b1ac8b1a74c91f73d5e09b642",
+      "contentScriptSHA256": "9d2d9a12b1bb94725eeac615aa838a7d4c9df4986b9b2217258fde3ff5f527d7"
+    },
+    "firefox": {
+      "directory": "/Users/thinkstu/Desktop/copy/FluentRead-mobile-video-menu-accessibility-20261016/.output/firefox-mv2",
+      "files": 478,
+      "bytes": 62364165,
+      "rawByteHash": "f1fa8efa0cb9e438c8640cc36ef18b73a003aaa99fa351a73c517ee7f6448015",
+      "recordHash": "606553f4b8d98d41b4b2767b4ca226dfc8d236bfe60044ac081888e6a7dfc3de",
+      "fullFileMap": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/mobile-youtube-fr-node-identity-probe-20261017/same-scope-clone-repair-20261017/firefox-file-map.json",
+      "fullFileMapSHA256": "adc1c6046d4eeb3b8a8f49590ce96bad9491d2afd1c4e39479c96cad057bf246",
+      "manifestSHA256": "9802dab15f2073f80469306f3bcdfb957f8204d6a2904fe65cc1ae26ee3965f1",
+      "contentScriptSHA256": "3ae5180e481d6e7408c8d3209fca606e139ad182efa80c9d79835f2e82182c9b"
+    },
+    "safari": {
+      "directory": "/Users/thinkstu/Desktop/copy/FluentRead-mobile-video-menu-accessibility-20261016/.output/safari-mv2",
+      "files": 467,
+      "bytes": 62232613,
+      "rawByteHash": "b9ddd701367f20934372c8a16c01b0849b05b4af57574faf1af03555eca7c897",
+      "recordHash": "4ef229d04bf1172dd401821fdb4ef0e4c6277884aa78df7653a7628c94b9472f",
+      "fullFileMap": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/mobile-youtube-fr-node-identity-probe-20261017/same-scope-clone-repair-20261017/safari-file-map.json",
+      "fullFileMapSHA256": "fb688108455f6e6432140a6f9e4d7c9dcafa08fbba9be46a968bb821c9726db2",
+      "manifestSHA256": "d7bcd7044f90b52d4dee774f7cef84f019b4b56fb73434de3304c9381a6cbae5",
+      "contentScriptSHA256": "8a184492ba7bb60473537fc1e4baac894ee8246a4a86c9af0d816973bad9b301"
+    },
+    "userscript": {
+      "directory": "/Users/thinkstu/Desktop/copy/FluentRead-mobile-video-menu-accessibility-20261016/.output/userscript",
+      "files": 1,
+      "bytes": 2087161,
+      "rawByteHash": "abd14d4b47f387f5264fc09774c19f8b4ce73cc4e8d6ae88d695113136084653",
+      "recordHash": "7e1db51608040ea96fb62c69ada0209f976add8bcd2fac97984cab2a5086952c",
+      "fullFileMap": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/mobile-youtube-fr-node-identity-probe-20261017/same-scope-clone-repair-20261017/userscript-file-map.json",
+      "fullFileMapSHA256": "5a106afcdb4466367a43263a02f9822063e87e4c10470b9b81fd9260aa13177d"
+    }
+  }
+}

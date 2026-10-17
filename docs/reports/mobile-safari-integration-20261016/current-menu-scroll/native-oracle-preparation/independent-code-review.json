@@ -1,0 +1,146 @@
+{
+  "schemaVersion": 1,
+  "patch": {
+    "repository": "/Users/thinkstu/Desktop/copy/FluentRead-mobile-video-menu-accessibility-20261016",
+    "sourceType": "patch_file",
+    "base": "runner SHA256 b55766aef51af34b070a769e7424825ef787ec8603ac47b5a5304c2ad34a3f7c",
+    "head": "candidate SHA256 5f6aded2f3f1b47f61dc5fe89ce249c9b8ca209f1bc5a67f81150264d0d09b06",
+    "changedFiles": [
+      "scripts/run-mobile-video-subtitle-test.cjs"
+    ],
+    "sha256": "03f5fa00fe4af8b0f503d888ddbba6d210f4bcfd33d00df23efc1f7b84b6ec9c"
+  },
+  "recommendation": "hold_for_evidence",
+  "workflowLabel": "hold_for_evidence",
+  "impact": {
+    "rating": "moderate",
+    "rationale": "Only the controlled lifecycle acceptance runner changes. An incorrect oracle can misclassify native track ownership; shipped extension behavior, menu CSS and resource guards are unchanged."
+  },
+  "regressionLikelihood": {
+    "rating": "moderate",
+    "rationale": "No source-visible defect found. Browser-generated trusted TextTrackList.change delivery and post-dispatch mode stability have not yet run at this candidate."
+  },
+  "regressionProtection": {
+    "rating": "partial",
+    "rationale": "Exact patch/base/candidate identity, prefix/suffix scope equivalence, source contracts and node --check passed. No browser execution occurred.",
+    "exactHeadChecksPassed": false
+  },
+  "recoverability": {
+    "rating": "easy",
+    "rationale": "Revert this one runner patch; no product, migration or persistent configuration changes."
+  },
+  "confidence": {
+    "rating": "moderate",
+    "rationale": "All changed transitions and their product ownership contract were traced; actual trusted browser ACK behavior remains unobserved."
+  },
+  "applicability": {
+    "status": "confirmed",
+    "rationale": "Initial W runner matched supplied base b55766. The patch exactly reconstructs base to candidate. Final read-only hash observed W now equals candidate 5f6aded2; this reviewer did not apply or edit W."
+  },
+  "statusQuoRisk": {
+    "rating": "moderate",
+    "rationale": "The old lifecycle scenario expects obsolete A to return after genuine Off, contradicting nativeFullscreen.ts and existing ownership tests, and can report a false product failure."
+  },
+  "autoMergeExclusions": [
+    "other"
+  ],
+  "affectedRuntimeRoots": [
+    "scripts/run-mobile-video-subtitle-test.cjs main(), default lifecycle suite only; explicit menu suite returns before this block"
+  ],
+  "importantCallers": [
+    "selectNativeTracks: eleven explicit system-selection shim calls",
+    "src/features/video-subtitle/content/nativeFullscreen.ts onTrackChange(), enter(), leave(), sync()",
+    "tests/videoNativeFullscreen.test.ts:81-110,267-299 independent ownership contract"
+  ],
+  "riskDrivers": [
+    "New ACK oracle depends on real browser TextTrackList.change task delivery.",
+    "Chromium system-selection shim is not native Safari/AVKit selection or rendering proof."
+  ],
+  "protectiveFactors": [
+    "No product code changed.",
+    "No synthetic change dispatch or new production mode writes.",
+    "Menu/common prefix and disable/replacement/reload/pageshow/desktop/cleanup suffix unchanged.",
+    "Direct source-restoration positive control is retained separately from Off invalidation."
+  ],
+  "materialBoundaries": [
+    {
+      "id": "ack-order",
+      "invariant": "Selection ACK must follow subscription, a real trusted browser change event and post-dispatch mode agreement within one absolute 2000ms deadline.",
+      "runtimeRoot": "candidate lines419-449 selectNativeTracks",
+      "counterexample": "Untrusted/synthetic change, no event despite cue readiness, no actual mode transition, late ACK, or a later production listener changing the desired modes must not pass.",
+      "legitimateControl": "Listener is installed before the only desired-mode write loop; no-op setup and absent references fail; isTrusted is required; deadline timer plus post-dispatch deadline/matches checks reject these cases; success and failure clear listeners and both timers. Production onTrackChange calls sync synchronously.",
+      "result": "supported"
+    },
+    {
+      "id": "source-ownership",
+      "invariant": "Direct A->FluentRead->leave restores A; a newer Off choice invalidates old A and must not be undone by later FluentRead selection.",
+      "runtimeRoot": "candidate lines456-507; nativeFullscreen.ts:57-122",
+      "counterexample": "Changing the old expectation to disabled without retaining a direct positive restoration case could hide a broken restore path.",
+      "legitimateControl": "Candidate adds directSourceRestored showing assertion before the Off scenario, preserves Off/reentry, other-site-B and disable assertions. Independent existing tests:81-110 and267-299 establish both contracts. No extra selection occurs between the final ACK and leave assertion.",
+      "result": "supported"
+    },
+    {
+      "id": "scope-ownership",
+      "invariant": "Native oracle correction must not weaken menu checks, focus/resource cleanup, or overwrite modes outside explicit fixture selection steps.",
+      "runtimeRoot": "supplied exact patch and candidate main()",
+      "counterexample": "A helper could force passing modes after leave or alter common/menu cleanup behavior.",
+      "legitimateControl": "The only changed writes are the declared desired-mode loop at selection calls. Direct/Off/B/disable outcomes are read assertions. Exact diff reconstruction and byte comparisons prove the menu/common prefix and disable/replacement/reload/pageshow/desktop/finally suffix unchanged.",
+      "result": "supported"
+    },
+    {
+      "id": "browser-integration",
+      "invariant": "The actual controlled production-browser run must deliver trusted ACK receipts and preserve every ownership assertion.",
+      "runtimeRoot": "default lifecycle main() under production artifact",
+      "counterexample": "Chromium delivers no qualifying event, or production bridge queued change processing produces different modes and the new helper times out/fails.",
+      "legitimateControl": "The proposed runner fails closed on no event, untrusted event, late event and mode drift, and records events/modes in success receipts or rejection details. Actual candidate runtime has not been run.",
+      "result": "unresolved"
+    }
+  ],
+  "validation": [
+    {
+      "name": "SHA256 patch/base/candidate and initial/final W binding",
+      "status": "passed",
+      "protects": "Exact immutable patch identity and applicability; initial W was base, final W was candidate after an external change."
+    },
+    {
+      "name": "Read-only difflib exact carrier reconstruction and unchanged prefix/suffix comparison",
+      "status": "passed",
+      "protects": "Only declared lifecycle native block differs; menu and resource/focus logic remain intact."
+    },
+    {
+      "name": "node --check supplied candidate",
+      "status": "passed",
+      "protects": "JavaScript parse validity without executing the runner or loading helpers."
+    },
+    {
+      "name": "Independent nativeFullscreen.ts and existing ownership test source trace",
+      "status": "passed",
+      "protects": "Correct direct-restoration positive control and obsolete-source invalidation contract; tests were inspected, not run."
+    },
+    {
+      "name": "Candidate controlled production-browser lifecycle",
+      "status": "skipped",
+      "protects": "Trusted event receipts, actual post-dispatch stability, full default lifecycle and cleanup; prohibited during this read-only review."
+    }
+  ],
+  "unknowns": [
+    {
+      "summary": "Actual Chromium trusted TextTrackList.change ACK and all lifecycle assertions at candidate 5f6aded2 remain unobserved.",
+      "decisionCritical": true
+    },
+    {
+      "summary": "Native AVKit system-menu selection/rendering remains outside this Chromium shim and is not implied by a later PASS.",
+      "decisionCritical": false
+    }
+  ],
+  "evidencePlan": [
+    {
+      "question": "Does this exact candidate pass real trusted change ACKs and the independent ownership scenarios?",
+      "action": "After Root review/authorization, apply the exact patch and run one serialized default lifecycle production-browser check with current artifact pins; retain all eleven ACK receipts, assertions, screenshots and resource/focus cleanup. Do not rewrite the historical failure.",
+      "outcomes": {
+        "All trusted ACKs and ownership/cleanup assertions pass": "merge",
+        "No ACK or a changed assertion fails": "revise"
+      }
+    }
+  ]
+}

@@ -38,12 +38,12 @@ In an isolated Android 13 emulator running Via 7.3.3, the imported standalone bu
 
 ## Safari Userscripts setup and troubleshooting
 
-1. Install Userscripts from the App Store and enable its Safari extension. On iPhone/iPad, go to Settings → Safari → Extensions → Userscripts, allow access to all websites, and choose Always Allow in Safari. On macOS, grant the extension access to the sites you visit.
+1. Install Userscripts from the App Store and enable it in the system's Safari extension settings. Start by granting access to the site you are reading in Safari. If the manager or your selected translation service asks for additional access, review and grant it as needed. For ongoing use across multiple sites, you can choose All Websites or Always Allow as needed. On macOS, manage access for the sites you visit too.
 2. Confirm the scripts directory in the Userscripts app. Recent iPhone/iPad versions normally create a default directory, and macOS can use its default directory too. For the Greasy Fork release, open the installation page above in Safari and use the Userscripts toolbar prompt to save and enable it. To try the standalone build from source, put its `.user.js` file in that scripts directory, then open the Userscripts popup to refresh the file list. Stay online during installation of the slim build while the manager downloads its `@require` UI libraries.
 3. In the Userscripts popup, confirm Enable Injection is on and FluentRead is matched and enabled for the current site. Reload a regular HTTP(S) page. Open FluentRead settings from its page floating button; Safari Userscripts does not provide script menu commands.
 4. If you added or edited the script directly in its directory, open the Userscripts popup at least once to refresh its file list. If the floating button is still missing, check the script version, site permission, URL match, and whether the required libraries downloaded. Include Safari, system, and Userscripts versions and the affected URL in a report.
 
-These steps follow the [official Userscripts installation and metadata documentation](https://github.com/quoid/userscripts/tree/release/4.x.x). Runtime behavior on Safari still needs device verification.
+Userscripts lists persistent access to all websites as a [usage recommendation](https://github.com/quoid/userscripts/tree/release/4.x.x#usage). Site permission controls the manager's injection into that page. The script's [cross-origin requests](https://github.com/quoid/userscripts/tree/release/4.x.x#api), dependency resources, and translation-service access remain subject to the manager's rules; allowing the current page does not establish access to every service domain. The other steps follow the [official installation and metadata documentation](https://github.com/quoid/userscripts/tree/release/4.x.x). Actual Safari Userscripts behavior still needs device verification.
 
 </details>
 

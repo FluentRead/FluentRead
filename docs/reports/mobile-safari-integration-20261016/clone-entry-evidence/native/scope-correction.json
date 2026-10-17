@@ -1,0 +1,27 @@
+{
+  "at": "2026-10-16T23:24:52.762324+00:00",
+  "status": "SCOPE_WORDING_CORRECTION_NO_ARTIFACT_CHANGE",
+  "correctedRecord": {
+    "path": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/mobile-youtube-fr-node-identity-probe-20261017/same-scope-clone-repair-20261017/native-artifact-identities.json",
+    "sha256": "25dc4fdc73e7fdb10e3fb37e6d37b5f76a1d0a20a1460af51f8126f870233469",
+    "field": "scope",
+    "overbroadPhrase": "No install, registration"
+  },
+  "correction": "The macOS Xcode build includes automatic LaunchServices registration. No manual install, App launch, or registration acceptance was performed in this build/inspection stage. This is compile/resource evidence, not runtime acceptance.",
+  "macosBuildLog": {
+    "path": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/mobile-youtube-fr-node-identity-probe-20261017/same-scope-clone-repair-20261017/native-binding-scope-repair-v1/logs/04-macos.log",
+    "sha256": "ff6b38023bcd0b59a53fd99e3c2e1d3a72614ceabee6ea8c46a31a846418b625",
+    "bytes": 472316
+  },
+  "actualLogLines": [
+    {
+      "line": 1184,
+      "text": "RegisterWithLaunchServices /Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/mobile-youtube-fr-node-identity-probe-20261017/same-scope-clone-repair-20261017/native-binding-scope-repair-v1/output/derived-macos/Build/Products/Release/FluentRead.app (in target 'FluentRead (macOS)' from project 'FluentRead')"
+    },
+    {
+      "line": 1186,
+      "text": "    /System/Library/Frameworks/CoreServices.framework/Versions/Current/Frameworks/LaunchServices.framework/Versions/Current/Support/lsregister -f -R -trusted /Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/mobile-youtube-fr-node-identity-probe-20261017/same-scope-clone-repair-20261017/native-binding-scope-repair-v1/output/derived-macos/Build/Products/Release/FluentRead.app"
+    }
+  ],
+  "frozenOriginalPreserved": true
+}

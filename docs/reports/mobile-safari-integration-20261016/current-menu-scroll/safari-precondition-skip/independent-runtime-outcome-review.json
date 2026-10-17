@@ -1,0 +1,242 @@
+{
+  "schema": 1,
+  "reviewedAt": "2026-10-16T20:53:08.925549+00:00",
+  "reviewer": "/root/f25_review",
+  "status": "UNVERIFIED_ENTRY_PRECONDITION_MENU_SCROLL_AND_CLOSE_NOT_EXERCISED",
+  "fullGoalAccepted": false,
+  "menuScrollAccepted": false,
+  "scope": "Independent actual original PNG viewing and completed disk evidence review. No SDK/browser/network/process/device/build or product edit; raw evidence preserved and only this exclusive new review written.",
+  "counts": {
+    "testCases": 1,
+    "passed": 0,
+    "skipped": 1,
+    "failed": 0,
+    "methodDurationSecondsFromRawLog": 8.553,
+    "summarySessionDurationSeconds": 15.367,
+    "outerGuardElapsedMs": 53775,
+    "physicalProductTouches": 1,
+    "normalPlayerCenter": 1,
+    "menuOpen": 0,
+    "menuInternalScroll": 0,
+    "menuClose": 0,
+    "navigation": 0,
+    "createdTabs": 0,
+    "selectedTabs": 0,
+    "permissionChoices": 0,
+    "explicitTranslationIntent": 0,
+    "PlayButtonActions": 0,
+    "CCActions": 0,
+    "unmuteActions": 0
+  },
+  "rawTestBoundary": {
+    "summaryResult": "Skipped",
+    "guardStatus": "UNVERIFIED_PRECONDITION_OR_AX_LIMIT",
+    "reason": "Unique enabled same-player44px entry unavailable",
+    "xcodebuildProcessExitCode": 0,
+    "executeSucceededIsNotProductPass": true,
+    "actions": {
+      "A9LivePlayerCenterTouch": 1
+    }
+  },
+  "actualOriginalPNGReview": [
+    {
+      "path": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/mobile-safari-a2-paused-menu-scroll-candidate-20261017/inline-attempt1/runtime-evidence/menu-scroll-01-owned-before-open.png",
+      "sha256": "732fbbfa02bd945e0bdde213cfa7c8bb82bdbfc0832aab205690d99f4d5398f3",
+      "actualViewedVia": "view_image of original PNG path; tool presentation resized for context, no edited/cropped surrogate",
+      "observation": "Player region visibly reports 视频无法播放; site unmute prompt and a small pink floating icon are visible. No subtitle-menu entry or menu is established. The pink icon is not substituted for the exact video-menu semantic entry."
+    },
+    {
+      "path": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/mobile-safari-a2-paused-menu-scroll-candidate-20261017/inline-attempt1/runtime-evidence/A9-before-possible-live-touch.png",
+      "sha256": "732fbbfa02bd945e0bdde213cfa7c8bb82bdbfc0832aab205690d99f4d5398f3",
+      "actualViewedVia": "view_image of original PNG path; tool presentation resized for context, no edited/cropped surrogate",
+      "observation": "Same original image bytes as the initial screenshot; still 视频无法播放 before the only normal center touch."
+    },
+    {
+      "path": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/mobile-safari-a2-paused-menu-scroll-candidate-20261017/inline-attempt1/runtime-evidence/unverified-final.png",
+      "sha256": "33ffc4b7ab151e9db0de89ea2bbcc7404465a542d98ccedf6758b12047e425d9",
+      "actualViewedVia": "view_image of original PNG path; tool presentation resized for context, no edited/cropped surrogate",
+      "observation": "Player region now shows black-background English introductory video text, with the same TED page below; this is video picture text, not proven FluentRead translation/bilingual cues. No open menu or visible FR subtitle entry is established."
+    }
+  ],
+  "actualGeometryAndOwner": {
+    "currentUUIDObservedInAllThreeExportedAX": "87246FAF-A680-4738-BA2A-97A9E170620D",
+    "knownTEDAndUniquePlayerObserved": true,
+    "playerFrame": {
+      "height": 226,
+      "width": 402,
+      "x": 0,
+      "y": 110
+    },
+    "allThreeSceneEntryCount": 0,
+    "allThreeSceneCloseCount": 0,
+    "nativeLabels": [],
+    "optionalBilingualCue": null,
+    "initialAXNodeCount": 83,
+    "finalAXNodeCount": 181,
+    "postTouchAXPlayerValue": "2秒钟",
+    "postTouchAXValueIsPlaybackAcceptance": false
+  },
+  "diagnosis": {
+    "entryAbsenceObserved": true,
+    "readinessOnlyRootCauseProven": false,
+    "boundedInference": "The page/player visibly changed from an unavailable-video state to an introductory video picture; final AX has more nodes and player value2sec. The helper sampled immediate post-touch eligibility at about7.748sec and exited early when the exact entry remained absent. This is compatible with a transient page/media/extension-readiness transition, but does not distinguish readiness from entry integration, visibility/AX exposure, media eligibility or a product issue.",
+    "notEstablished": [
+      "sustained actual playback",
+      "paused-state prerequisite",
+      "FluentRead source+translation bilingual rendering",
+      "current menu reachability",
+      "internal menu scroll",
+      "timing controls complete44/hittability",
+      "normal Close or focus return"
+    ],
+    "minimumFuturePreparationOnly": "If Root later chooses a new candidate, consider one bounded read-only stabilization/readiness observation of the same owned tab/player and exact entry before declaring it absent, while keeping the existing gesture/navigation/provider/permission limits. No repeat run or additional input is authorized/performed by this review."
+  },
+  "restorationAndResources": {
+    "evidenceBasis": "Completed bound identity-checker records and Root fresh postruntime disk receipt; reviewer did not issue new simulator/container/process queries.",
+    "a2InstallAttempts": 1,
+    "d9RestoreAttempts": 1,
+    "testsSpawned": 1,
+    "afterInstallA2Full485Verified": true,
+    "afterRestoreAndAfterShutdownOriginalD9Full485Verified": true,
+    "Userscripts47AndDemoConsistent": true,
+    "nativePrivate17SameContentAllFivePhases": true,
+    "privateBoundary": "Native FR App data17 hash baseline only; not all extension settings/storage/cache. Record post-UI changes; do not copy files back.",
+    "containerUUIDMigrationRecorded": true,
+    "privateContentRestoredByCopy": false,
+    "cleanupErrors": [],
+    "focusEvents": [],
+    "violations": [],
+    "remainingOwnedProcesses": [],
+    "finalDeviceState": "Shutdown",
+    "installedIdentityAtEnd": "ORIGINAL_D9_FULL485_VERIFIED",
+    "laneReleased": true,
+    "freshRelease": {
+      "path": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/mobile-safari-a2-paused-menu-scroll-candidate-20261017/root-fresh-postruntime-release.json",
+      "sha256": "2577cd67d1fc86a5bd69d94037cf34461b28d307f4553ac566725f63bc28fc7f",
+      "at": "2026-10-16T20:51:32.454670+00:00",
+      "remainingOwned": [],
+      "portsEmpty": [
+        "5048",
+        "5580",
+        "5581",
+        "52911",
+        "51231"
+      ],
+      "heavyOrGUIRows": [],
+      "bootedAppleSimulators": [],
+      "taskAppleSimulatorState": "Shutdown",
+      "hostKeyMetadataUnchangedSinceF34": true,
+      "laneReleased": true,
+      "priorRawCleanupStatusIsHistoricalF35NotThisSafariCleanup": true
+    },
+    "uiGoalPassDoesNotFollowFromSuccessfulCleanup": true
+  },
+  "frozenRuntimePackage": {
+    "path": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/mobile-safari-a2-paused-menu-scroll-candidate-20261017/root-runtime-package-seal.json",
+    "fileCount": 33,
+    "all33InputHashesStillMatch": true
+  },
+  "inputs": [
+    {
+      "path": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/mobile-safari-a2-paused-menu-scroll-candidate-20261017/inline-attempt1/runtime-summary.json",
+      "sha256": "ff232bad9e665a44cb5f360210671143bd5b33f4fb4f73a23a901c632bdb5756"
+    },
+    {
+      "path": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/mobile-safari-a2-paused-menu-scroll-candidate-20261017/inline-attempt1/runtime-guard-report.json",
+      "sha256": "c9c1f22c0db4f2c47f24e3735767f72a4acdc8c26526a03442176c89bde04ca6"
+    },
+    {
+      "path": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/mobile-safari-a2-paused-menu-scroll-candidate-20261017/inline-attempt1/cleanup.json",
+      "sha256": "964c1cd51da212e45581d807e89298075f79397459dbbc164ef0ad935c2c26fa"
+    },
+    {
+      "path": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/mobile-safari-a2-paused-menu-scroll-candidate-20261017/inline-attempt1/runtime-run.log",
+      "sha256": "6343c5bb5d2227d19e17c7aa00919024dea49ff4745b4369f6184558839ce7dc"
+    },
+    {
+      "path": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/mobile-safari-a2-paused-menu-scroll-candidate-20261017/inline-attempt1/runtime-files.json",
+      "sha256": "ffad917ab50b29fec061479ffb86d55389e477157984b0b7c8d617fb57594d88"
+    },
+    {
+      "path": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/mobile-safari-a2-paused-menu-scroll-candidate-20261017/root-fresh-postruntime-release.json",
+      "sha256": "2577cd67d1fc86a5bd69d94037cf34461b28d307f4553ac566725f63bc28fc7f"
+    },
+    {
+      "path": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/mobile-safari-a2-paused-menu-scroll-candidate-20261017/root-runtime-package-seal.json",
+      "sha256": "054baac4147c65b5c6e70a1e9e940ea9d78d17a0ba024512e07d7577677f3678"
+    },
+    {
+      "path": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/mobile-safari-a2-paused-menu-scroll-candidate-20261017/inline-attempt1/runtime-evidence/menu-scroll-result.json",
+      "sha256": "06fa95415329dcd4781bb369ffc4151cc5ae61d399d5e5a777b736e7394bcab0"
+    },
+    {
+      "path": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/mobile-safari-a2-paused-menu-scroll-candidate-20261017/inline-attempt1/runtime-evidence/outcome.json",
+      "sha256": "4290363f915cc0925531a602125ada31d7ab8dc07654a78ce4e79235b2734db1"
+    },
+    {
+      "path": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/mobile-safari-a2-paused-menu-scroll-candidate-20261017/inline-attempt1/runtime-evidence/A9-scene-scroll-initial.json",
+      "sha256": "e32c17c6b57b047685412e9f2faac95c2b9b6c15d4af9ae910de47ca5687c96e"
+    },
+    {
+      "path": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/mobile-safari-a2-paused-menu-scroll-candidate-20261017/inline-attempt1/runtime-evidence/A9-scene-before-possible-touch.json",
+      "sha256": "7ecb3f3a223a97aaf781e563219c31d55ea874ff2fb2a923877c64a15b10e98c"
+    },
+    {
+      "path": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/mobile-safari-a2-paused-menu-scroll-candidate-20261017/inline-attempt1/runtime-evidence/A9-scene-immediate-after-touch.json",
+      "sha256": "839608622c5e943238dd519f755e9f8f584828fa7d09b3b2ebec4ba28a7bd4f8"
+    },
+    {
+      "path": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/mobile-safari-a2-paused-menu-scroll-candidate-20261017/inline-attempt1/runtime-evidence/A9-pre-touch-premises.json",
+      "sha256": "db82e5d019c16c432f2c5a6431f3d67b45982b10845455ae6890f8fe75cfd5f6"
+    },
+    {
+      "path": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/mobile-safari-a2-paused-menu-scroll-candidate-20261017/inline-attempt1/runtime-evidence/A9-coordinate-decision.json",
+      "sha256": "abc49ecc719453d28bfc24562c0c67e4a009688b071785b11733166daa7c6d61"
+    },
+    {
+      "path": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/mobile-safari-a2-paused-menu-scroll-candidate-20261017/inline-attempt1/runtime-evidence/menu-scroll-01-owned-before-open-actual-AX.json",
+      "sha256": "9edbe085a84e88a2bbecf941b6a4acfb4037e023dd46fb09cf18fdc4b81df797"
+    },
+    {
+      "path": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/mobile-safari-a2-paused-menu-scroll-candidate-20261017/inline-attempt1/runtime-evidence/A9-before-possible-live-touch-actual-AX.json",
+      "sha256": "d4bfde428ec71ffb870f40056d575dc58dd176baaae8171976cafbcb328dd3b0"
+    },
+    {
+      "path": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/mobile-safari-a2-paused-menu-scroll-candidate-20261017/inline-attempt1/runtime-evidence/unverified-final-actual-AX.json",
+      "sha256": "ad5c8f8a9e30b74b12b3b0e452ff7cbc75157de2deea9aced97109166b79c35b"
+    },
+    {
+      "path": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/mobile-safari-a2-paused-menu-scroll-candidate-20261017/inline-attempt1/identity-before-boot.json",
+      "sha256": "0c583c6c4f3ff09d12fb0e53a5253038a12a4a6f3bbe3f700b655c405d5b6320"
+    },
+    {
+      "path": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/mobile-safari-a2-paused-menu-scroll-candidate-20261017/inline-attempt1/identity-before-install.json",
+      "sha256": "ff803887cc2ad8d07ccb8c6fe6ff0ed1084f3fbf9096bef2c49d0de05f4f836f"
+    },
+    {
+      "path": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/mobile-safari-a2-paused-menu-scroll-candidate-20261017/inline-attempt1/identity-after-install.json",
+      "sha256": "8f45fda7671de6d7cb0077425126ef3d0685e0a05a186fff4034e06fa90f7a41"
+    },
+    {
+      "path": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/mobile-safari-a2-paused-menu-scroll-candidate-20261017/inline-attempt1/identity-after-restore.json",
+      "sha256": "647adba8c726b30b9578d448c19502b9e4250a0ca3ea84528daef4a64564f0bf"
+    },
+    {
+      "path": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/mobile-safari-a2-paused-menu-scroll-candidate-20261017/inline-attempt1/identity-after-shutdown.json",
+      "sha256": "2f44864ab3effaebc69c376d2df5c3e3cca0f7e82b0500818174e6d346fcaa11"
+    }
+  ],
+  "performed": {
+    "readOriginalDiskEvidence": true,
+    "viewedAllThreeOriginalPNGPaths": true,
+    "static33PackageHashVerification": true,
+    "SDK": false,
+    "build": false,
+    "processInventory": false,
+    "browser": false,
+    "device": false,
+    "network": false,
+    "productOrRawEvidenceEdits": false
+  },
+  "contextPolicy": "300K preference maintained; no child created for this bounded review; automatic system threshold unverified."
+}

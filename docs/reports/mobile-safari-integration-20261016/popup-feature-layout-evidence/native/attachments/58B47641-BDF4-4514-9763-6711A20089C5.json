@@ -1,0 +1,10 @@
+{
+  "emptyOwnerIsNotCurrentOwnerProof" : true,
+  "exactLedger" : true,
+  "fixedChainSeconds" : 5,
+  "knownNativeUISignature" : true,
+  "ownerExact" : false,
+  "ownerNotExposed" : true,
+  "phase" : "closePopup",
+  "queriesSequentialNotAtomic" : true
+}

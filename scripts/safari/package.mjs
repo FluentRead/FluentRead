@@ -16,6 +16,7 @@ const toolNames = ['safari-web-extension-packager', 'safari-web-extension-conver
 // Node20 原生脚本与 WXT/平台共用 JSON 单一源，不解析 TypeScript 或维护第二份域表。
 const freeProviderOrigins = JSON.parse(readFileSync(new URL('../../src/core/config/freeProviderOrigins.json', import.meta.url), 'utf8'));
 const optionalProviderOrigins = Object.values(freeProviderOrigins).flat();
+const bundleIdentifierPattern = /^[A-Za-z][A-Za-z0-9-]*(?:\.[A-Za-z][A-Za-z0-9-]*){2,}$/u;
 
 function assert(condition, message) {
     if (!condition) throw new Error(message);
@@ -128,7 +129,7 @@ export function findPackager(run = spawnSync, env = process.env) {
 }
 
 export function packagingArguments({extension, projectLocation, bundleId, platform}) {
-    assert(typeof bundleId === 'string' && /^[A-Za-z][A-Za-z0-9-]*(?:\.[A-Za-z][A-Za-z0-9-]*){2,}$/u.test(bundleId), '请用 --bundle-id 指定维护者自己的反向域名标识，例如 org.example.FluentRead');
+    assert(typeof bundleId === 'string' && bundleIdentifierPattern.test(bundleId), '请用 --bundle-id 指定维护者自己的反向域名标识，例如 org.example.FluentRead');
     assert(['both', 'ios', 'macos'].includes(platform), '--platform 只能为 both、ios 或 macos');
     return [extension, '--project-location', projectLocation, '--app-name', 'FluentRead',
         '--bundle-identifier', bundleId, '--swift', '--copy-resources', '--no-open', '--no-prompt',
@@ -189,6 +190,138 @@ export function applyDeploymentTargets(project, platform) {
     if (platform !== 'macos') assert(seen.has('IPHONEOS_DEPLOYMENT_TARGET'), 'Apple 工程缺少 iOS deployment target，请检查模板变化');
     if (platform !== 'ios') assert(seen.has('MACOSX_DEPLOYMENT_TARGET'), 'Apple 工程缺少 macOS deployment target，请检查模板变化');
     return updated;
+}
+
+/** 只识别 Apple 生成的多行对象格式；未知布局停止，不把注释或名称当作 target 关联。 */
+function projectObjects(project, section) {
+    const begin = `/* Begin ${section} section */`, end = `/* End ${section} section */`;
+    assert(project.split(begin).length === 2 && project.split(end).length === 2, `Apple 工程 ${section} section 缺失或重复`);
+    const start = project.indexOf(begin) + begin.length, stop = project.indexOf(end);
+    assert(stop > start, `Apple 工程 ${section} section 顺序错误`);
+    const contents = project.slice(start, stop), objects = new Map();
+    const pattern = /^\t\t([A-F0-9]{24}) \/\* [^\n]* \*\/ = \{\n([\s\S]*?)^\t\t\};$/gmu;
+    let cursor = 0;
+    for (const match of contents.matchAll(pattern)) {
+        assert(!contents.slice(cursor, match.index).trim() && !objects.has(match[1]), `Apple 工程 ${section} 对象布局或 ID 重复`);
+        const bodyStart = start + match.index + match[0].indexOf('\n') + 1;
+        const object = {id: match[1], body: match[2], bodyStart};
+        assert(projectProperty(object, 'isa') === section, `Apple 工程 ${section} 对象类型不符`);
+        assert([...project.matchAll(new RegExp(`^\\t\\t${object.id} /\\* [^\\n]* \\*/ = \\{`, 'gmu'))].length === 1,
+            'Apple 工程对象 ID 重复');
+        objects.set(object.id, object);
+        cursor = match.index + match[0].length;
+    }
+    assert(objects.size > 0 && !contents.slice(cursor).trim(), `Apple 工程 ${section} 对象布局已变化`);
+    return objects;
+}
+
+function projectProperty(object, key) {
+    const matches = [...object.body.matchAll(new RegExp(`^\\t\\t\\t${key} = ([^;\\n]+);$`, 'gmu'))];
+    assert(matches.length === 1, `Apple 工程 ${object.id} 的 ${key} 缺失或重复`);
+    const raw = matches[0][1];
+    return /^"[^"\\]*"$/u.test(raw) ? raw.slice(1, -1) : raw;
+}
+
+function projectReference(object, key) {
+    const value = projectProperty(object, key);
+    assert(/^[A-F0-9]{24}(?: \/\* [^\n]* \*\/)?$/u.test(value), `Apple 工程 ${key} 引用格式已变化`);
+    return value.slice(0, 24);
+}
+
+function projectReferences(object, key) {
+    const matches = [...object.body.matchAll(new RegExp(`^\\t\\t\\t${key} = \\(\\n([\\s\\S]*?)^\\t\\t\\t\\);$`, 'gmu'))];
+    assert(matches.length === 1, `Apple 工程 ${key} 列表缺失或重复`);
+    const references = matches[0][1].trimEnd().split('\n').map(line => {
+        assert(/^\t{4}[A-F0-9]{24} \/\* [^\n]* \*\/,$/u.test(line), `Apple 工程 ${key} 列表布局已变化`);
+        return line.slice(4, 28);
+    });
+    assert(new Set(references).size === references.length, `Apple 工程 ${key} 引用重复`);
+    return references;
+}
+
+/** 按 productType → 配置列表 → 配置读取身份；同时拒绝共享配置、额外 target 和身份覆盖。 */
+function safariTargetConfigurations(project, platform) {
+    assert(['both', 'ios', 'macos'].includes(platform), '未知 Apple 模板平台');
+    const targets = projectObjects(project, 'PBXNativeTarget'), projects = projectObjects(project, 'PBXProject');
+    const lists = projectObjects(project, 'XCConfigurationList'), configs = projectObjects(project, 'XCBuildConfiguration');
+    assert(projects.size === 1, 'Apple 工程必须只有一个 PBXProject');
+    const owner = [...projects.values()][0], linkedTargets = projectReferences(owner, 'targets');
+    assert(linkedTargets.length === targets.size && linkedTargets.every(id => targets.has(id)), 'Apple 工程 target 关联不完整');
+    const usedLists = new Set(), usedConfigs = new Set();
+    const readConfigurations = object => {
+        const listId = projectReference(object, 'buildConfigurationList'), list = lists.get(listId);
+        assert(list && !usedLists.has(listId), 'Apple 工程配置列表缺失或被多个对象共享');
+        usedLists.add(listId);
+        const ids = projectReferences(list, 'buildConfigurations');
+        const result = ids.map(id => {
+            const config = configs.get(id);
+            assert(config && !usedConfigs.has(id), 'Apple 工程构建配置缺失或被多个对象共享');
+            usedConfigs.add(id);
+            assert(!/\bbaseConfigurationReference\s*=/u.test(config.body), 'Apple 模板不能通过外部配置覆盖身份');
+            const settings = [...config.body.matchAll(/^\t{3}buildSettings = \{\n([\s\S]*?)^\t{3}\};$/gmu)];
+            assert(settings.length === 1, 'Apple 工程 buildSettings 布局已变化');
+            return {...config, name: projectProperty(config, 'name'), settings: settings[0][1],
+                settingsStart: config.bodyStart + settings[0].index + settings[0][0].indexOf('\n') + 1};
+        });
+        assert(result.length === 2 && new Set(result.map(config => config.name)).size === 2
+            && result.every(config => ['Debug', 'Release'].includes(config.name)), 'Apple 模板必须包含唯一 Debug/Release 配置');
+        return {listId, configurations: result};
+    };
+    const projectConfigs = readConfigurations(owner).configurations;
+    const setting = (config, key, required = true) => {
+        const matches = [...config.settings.matchAll(new RegExp(`^\\t{4}${key} = ([^;\\n]+);$`, 'gmu'))];
+        assert(matches.length === 1 || (!required && matches.length === 0), `Apple 配置 ${config.id} 的 ${key} 缺失或重复`);
+        return matches[0];
+    };
+    const expectedSDKs = platform === 'both' ? ['iphoneos', 'macosx'] : [platform === 'ios' ? 'iphoneos' : 'macosx'];
+    const targetKinds = new Set();
+    const result = [...targets.values()].map(target => {
+        const productType = projectProperty(target, 'productType');
+        assert(['com.apple.product-type.application', 'com.apple.product-type.app-extension'].includes(productType), 'Apple 模板包含不认识的 target 类型');
+        const {listId, configurations} = readConfigurations(target);
+        const values = configurations.map(config => {
+            assert(!/\bPRODUCT_BUNDLE_IDENTIFIER\s*\[|\bINFOPLIST_KEY_CFBundleIdentifier\b/u.test(config.settings), 'Apple 模板包含条件或 Info.plist 身份覆盖');
+            const match = setting(config, 'PRODUCT_BUNDLE_IDENTIFIER');
+            const bundleId = match[1].replace(/^"([^"\\]*)"$/u, '$1');
+            assert(bundleIdentifierPattern.test(bundleId), 'Apple 模板 bundle identifier 不是确定的字面值');
+            const inherited = projectConfigs.find(item => item.name === config.name);
+            const sdk = (setting(config, 'SDKROOT', false) ?? setting(inherited, 'SDKROOT'))[1];
+            assert(expectedSDKs.includes(sdk), 'Apple target SDK 与请求的平台不符');
+            return {id: config.id, name: config.name, bundleId, sdk,
+                start: config.settingsStart + match.index + match[0].indexOf(' = ') + 3, length: match[1].length};
+        });
+        assert(values[0].sdk === values[1].sdk, 'Apple target 的 Debug/Release 平台混淆');
+        const kind = `${productType}:${values[0].sdk}`;
+        assert(!targetKinds.has(kind), 'Apple 模板包含重复的 App/Extension 平台 target');
+        targetKinds.add(kind);
+        return {id: target.id, name: projectProperty(target, 'name'), productType, configurationListId: listId, configurations: values};
+    });
+    assert(result.length === expectedSDKs.length * 2 && usedLists.size === lists.size && usedConfigs.size === configs.size,
+        'Apple 模板 App/Extension 或配置关联不完整');
+    return result;
+}
+
+/** Apple 单平台工具可能保留默认 App ID；仅修改实际 native target 所属配置的值。 */
+export function applySafariBundleIdentifiers(project, bundleId, platform) {
+    assert(typeof bundleId === 'string' && bundleIdentifierPattern.test(bundleId), '无效的 Safari bundle-id');
+    const edits = safariTargetConfigurations(project, platform).flatMap(target => target.configurations.map(config =>
+        ({...config, value: `${bundleId}${target.productType === 'com.apple.product-type.app-extension' ? '.Extension' : ''}`})));
+    for (const edit of edits.sort((left, right) => right.start - left.start)) {
+        project = project.slice(0, edit.start) + edit.value + project.slice(edit.start + edit.length);
+    }
+    verifySafariBundleIdentifiers(project, bundleId, platform);
+    return project;
+}
+
+/** 在所有工程写入完成后重新读取实际配置，报告中不能以命令参数代替真实身份。 */
+export function verifySafariBundleIdentifiers(project, bundleId, platform) {
+    assert(typeof bundleId === 'string' && bundleIdentifierPattern.test(bundleId), '无效的 Safari bundle-id');
+    return safariTargetConfigurations(project, platform).map(target => ({...target, configurations: target.configurations.map(config => {
+        const expected = `${bundleId}${target.productType === 'com.apple.product-type.app-extension' ? '.Extension' : ''}`;
+        assert(config.bundleId === expected, `Apple target ${target.name}/${config.name} 实际 bundle identifier 与请求不符`);
+        const {start, length, ...identity} = config;
+        return identity;
+    })}));
 }
 
 async function templatePath(directory, relative, kind = 'file') {
@@ -357,16 +490,19 @@ async function main() {
     assert(projects.length > 0, 'Apple 工具未生成 Xcode 工程，请检查上方输出');
     const copiedExtensions = [];
     const containerGuides = [];
+    const targetBundleIdentifiers = [];
     for (const project of projects) {
         const template = await locateSafariTemplate(project, config.platform);
         const copied = await verifySafariBuild(template.extensionResources);
         assert(copied.buildSha256 === build.buildSha256, 'Apple 包装内的资源与已校验的 Safari 构建不一致');
         copiedExtensions.push(copied.extension);
         const file = path.join(project, 'project.pbxproj');
-        await writeFile(file, applyDeploymentTargets(await readFile(file, 'utf8'), config.platform));
+        const deploymentProject = applyDeploymentTargets(await readFile(file, 'utf8'), config.platform);
+        await writeFile(file, applySafariBundleIdentifiers(deploymentProject, config.bundleId, config.platform));
         containerGuides.push(await applyContainerGuide(project, config.bundleId, config.platform));
+        targetBundleIdentifiers.push({project, targets: verifySafariBundleIdentifiers(await readFile(file, 'utf8'), config.bundleId, config.platform)});
     }
-    const report = {...build, packager, projects, copiedExtensions, containerGuides, bundleId: config.bundleId, platform: config.platform,
+    const report = {...build, packager, projects, copiedExtensions, containerGuides, targetBundleIdentifiers, bundleId: config.bundleId, platform: config.platform,
         minimumOS: {ios: '26.0', macos: '14.0'}, minimumSafari: '26.0', signed: false, installed: false};
     await writeFile(path.join(config.projectLocation, 'fluentread-package-report.json'), `${JSON.stringify(report, null, 2)}\n`);
     console.log(JSON.stringify(report, null, 2));

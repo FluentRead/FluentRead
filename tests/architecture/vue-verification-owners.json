@@ -444,10 +444,11 @@
       "scenario": "实际字幕模型加载、清理和能力变化"
     },
     "src/features/settings/ui/VideoSubtitleAppearanceSettings.vue": {
-      "kind": "frozen-debt",
-      "sourceSha256": "7bea99275ca33c5690ccbdc840bc35b8a0817c6c529b23e1c8a21ad0729d3152",
-      "reason": "提供视频字幕外观设置，并用同一套 CSS 变量展示隔离的实时预览。 当前尚未登记可确认的自动组件行为消费者；不把父组件mock或源码契约算作该组件行为证明。",
-      "exitCriteria": "修改此文件前，以真实SFC执行对应事件/异步/取消场景并登记消费者，或纳入正式逐文件严格覆盖；不得刷新冻结hash延续豁免。"
+      "kind": "behavior",
+      "tests": [
+        "tests/videoSubtitleAppearanceSettingsLifecycle.test.ts"
+      ],
+      "scenario": "真实模板自动贴底、手动偏移联动、位置显隐、七语标签/ARIA、字号与皮肤预览、重置及草稿替换"
     },
     "src/features/settings/ui/WebDavBackup.vue": {
       "kind": "frozen-debt",

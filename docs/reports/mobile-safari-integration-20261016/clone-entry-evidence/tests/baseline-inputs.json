@@ -1,0 +1,22 @@
+{
+  "at": "2026-10-16T22:49:49.543159+00:00",
+  "baseHead": "121c0217d3ce8c2067ade25328d5a9527e6019e4",
+  "productUnchangedAtBaselinePreparation": true,
+  "staticCounterexample": "One verified player/scope, original native controls retained, same-owner controls or entry deep-cloned elsewhere within same scope. Existing host-only cleanup can leave inert copies after sync and dispose.",
+  "SafariRootCauseEstablished": false,
+  "sourceSnapshots": [
+    {
+      "source": "src/features/video-subtitle/content/videoPlayerBinding.ts",
+      "snapshot": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/mobile-youtube-fr-node-identity-probe-20261017/same-scope-clone-repair-20261017/production-before.ts",
+      "sha256": "3443098758b7f2eefb4d7feab89e2a9ea530317d3db8dbe15a20af4405e94a84",
+      "bytes": 22196
+    },
+    {
+      "source": "tests/videoPlayerBinding.test.ts",
+      "snapshot": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/mobile-youtube-fr-node-identity-probe-20261017/same-scope-clone-repair-20261017/tests-before.ts",
+      "sha256": "24dc98b3cb6c6f05a44cafeda18b5a7daea2b67494060104fcff2136278429a7",
+      "bytes": 83633
+    }
+  ],
+  "plannedValidation": "Actual public createVideoPlayerBinding observer/cleanup regressions first against unchanged source, then minimal owned-scope repair and appropriate focused coverage/UI checks. Root serial resource lane owns all runs."
+}

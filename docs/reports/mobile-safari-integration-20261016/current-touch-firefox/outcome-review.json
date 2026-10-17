@@ -1,0 +1,438 @@
+{
+  "schema": 1,
+  "attempt": 34,
+  "reviewer": "/root/touch_layout_review",
+  "reviewedAt": "2026-10-16T19:35:23.388971+00:00",
+  "status": "LIMITED_EXACT_TOUCH_FALLBACK_AND_OFF_RECOVERY_ACCEPTED",
+  "conclusion": "Actual raw records and directly viewed screenshots support the exact false/false/5 touch-layout fallback geometry and the bounded historical-F32-target Off recovery. They do not establish the complete floating functional/drag/orientation goal.",
+  "runtime": {
+    "commit": "a2ecda302d3a0199ffe9f0222ee2998a37bd7d5d",
+    "environment": "Dedicated Android API31 emulator / task-only Firefox / official temporary extension, not physical Android",
+    "artifactFiles": 478,
+    "artifactBytes": 62363693,
+    "rawByteHash": "e026986964e0d3e065271bb460aa798bf28ab3c27512717658532abf259da6ab",
+    "recordHash": "bb6d2df04165f76bee19f6da3ce46fb702f0e54f108cae137ccc5205bc36ed3b",
+    "independentPostDiskDoubleHashMatches": true,
+    "sealSHA256": "07d2fab780549c16c472e794198fdd00e9544fbd30885a0f5fd43220a6db9f5b",
+    "sealed19SourceHashesStillUnchanged": true
+  },
+  "independentReviewPerformed": {
+    "allGeometryFiles": 29,
+    "rawEvaluationResultIDsAndNoExceptionChecked": true,
+    "rawReaderSettingsMainHostShadowValuesMatchPublishedGeometry": true,
+    "allCapturePNGAXPairsHashChecked": 29,
+    "allProofImageTimeAndExactClientProjectionChecked": 17,
+    "nativeActionsProofsAXAndGeometryFreshnessChecked": 13,
+    "allRawClientRowsRead": 317,
+    "actualOriginalPNGsViewed": 8,
+    "independentActualPostArtifactDiskRehashFiles": 478,
+    "noSDKDeviceBrowserBuildOrProcessInspection": true
+  },
+  "actualPNGObservations": [
+    {
+      "file": "attempt34-ui/03-reader.png",
+      "sha256": "27e21675ed035c8d1e53edb81b8ae0f2b81cdaf6672369c63790dc6ba59ea990",
+      "observer": "/root/touch_layout_review",
+      "tool": "view_image",
+      "actualViewed": true,
+      "observation": "Actual reader, native tab count2; complete circular FluentRead ball inside the right page edge, with full logo and no half-hidden cut."
+    },
+    {
+      "file": "attempt34-ui/17-off-settings.png",
+      "sha256": "d3b3dd86b3bf42db701b0535b82cee4df8ba8867c24dd11cd943a8ef90cf0cb3",
+      "observer": "/root/touch_layout_review",
+      "tool": "view_image",
+      "actualViewed": true,
+      "observation": "Owned FluentRead settings at native tab count3; full-page floating-ball switch visibly grey with thumb left after Off."
+    },
+    {
+      "file": "attempt34-ui/22-off-reader-fresh.png",
+      "sha256": "f3899633f30d9df523f91ebb330f66d90879b2042e586137ef388140ccd6ca46",
+      "observer": "/root/touch_layout_review",
+      "tool": "view_image",
+      "actualViewed": true,
+      "observation": "Original reader at native count3; ball absent while original multilingual text and reading position visibly retained."
+    },
+    {
+      "file": "attempt34-ui/24-close-grid.png",
+      "sha256": "5689a541cba07e2ed67f617d22dbf7b75b50a8f8803a75cc6269b6f23474b667",
+      "observer": "/root/touch_layout_review",
+      "tool": "view_image",
+      "actualViewed": true,
+      "observation": "Three cards: old Unable to connect upper-left, Example Domain upper-right, F34 FluentRead settings lower-left; intended close x belongs only to new settings card."
+    },
+    {
+      "file": "attempt34-ui/26-after-close.png",
+      "sha256": "1e9458811778eec5f4337effba2216afcb0555a204616cac9dd6c68e2c75d436",
+      "observer": "/root/touch_layout_review",
+      "tool": "view_image",
+      "actualViewed": true,
+      "observation": "Native grid count2, Tab closed notification; old Unable to connect and Example Domain remain, FluentRead settings card gone."
+    },
+    {
+      "file": "attempt34-ui/28-final-reader.png",
+      "sha256": "9571190753a91418ea8506e68bc465d28d4b55d231e59dc3119f86cc3c0dea67",
+      "observer": "/root/touch_layout_review",
+      "tool": "view_image",
+      "actualViewed": true,
+      "observation": "Original reader restored with native count2, no ball, original text and position retained."
+    },
+    {
+      "file": "attempt34-ui/11-full-settings.png",
+      "sha256": "1fe74fa6d3eba8e4c7bd1f815cc22fde293d1a512d60278eae45ec7d482e6a75",
+      "observer": "/root/touch_layout_review",
+      "tool": "view_image",
+      "actualViewed": true,
+      "observation": "Additional observed creation evidence: owned FluentRead settings visible with native tab count3."
+    },
+    {
+      "file": "attempt34-ui/15-toggle-view.png",
+      "sha256": "695a876294dba7ead0b1af5c0127783fcc98cd7cc97604e189037df599141a5f",
+      "observer": "/root/touch_layout_review",
+      "tool": "view_image",
+      "actualViewed": true,
+      "observation": "Additional pre-Off evidence: full-page floating-ball switch visibly pink with thumb right before the single Off input."
+    }
+  ],
+  "touchFallback": {
+    "accepted": true,
+    "evidence": [
+      "attempt34-ui/confirmed-probe-geometry.json",
+      "attempt34-ui/initial-probe-geometry.json",
+      "attempt34-ui/03-ball-proof.json",
+      "attempt34-ui/03-reader.png"
+    ],
+    "primaryPointerCoarse": false,
+    "anyPointerCoarse": false,
+    "maxTouchPoints": 5,
+    "hardwareTouchClass": true,
+    "actualRectCSSpx": {
+      "x": 304,
+      "y": 230,
+      "width": 44,
+      "height": 44,
+      "top": 230,
+      "right": 348,
+      "bottom": 274,
+      "left": 304
+    },
+    "actualVisualViewport": {
+      "width": 360,
+      "height": 504,
+      "offsetLeft": 0,
+      "offsetTop": 0,
+      "scale": 1
+    },
+    "actualComputedStyle": {
+      "display": "flex",
+      "visibility": "visible",
+      "opacity": "0.7",
+      "pointerEvents": "auto",
+      "position": "relative",
+      "transform": "none",
+      "transformIsIdentity": true,
+      "clipPath": "none"
+    },
+    "actualInteriorHits": [
+      {
+        "x": 326,
+        "y": 252,
+        "rootHitTarget": true,
+        "documentHitOwn": true
+      },
+      {
+        "x": 315,
+        "y": 252,
+        "rootHitTarget": true,
+        "documentHitOwn": true
+      },
+      {
+        "x": 337,
+        "y": 252,
+        "rootHitTarget": true,
+        "documentHitOwn": true
+      },
+      {
+        "x": 326,
+        "y": 241,
+        "rootHitTarget": true,
+        "documentHitOwn": true
+      },
+      {
+        "x": 326,
+        "y": 263,
+        "rootHitTarget": true,
+        "documentHitOwn": true
+      }
+    ],
+    "allFiveRootAndDocumentHits": true,
+    "generalGeometryAccepted": true,
+    "exactFalseFalse5CapabilityAccepted": true,
+    "readOnlyOnly": true,
+    "floatingNativeInputs": 0,
+    "acceptanceBoundary": "This actual Firefox emulator capability combination and current visible 44px geometry/style/hits only; no tap/drag/remount/orientation/translation/provider functional chain."
+  },
+  "historicalOffRecovery": {
+    "accepted": true,
+    "target": false,
+    "targetIsHistoricalF32Observation": true,
+    "targetSourceSHA256": "ec9984718c899c4c83aea50171e40af85d2d7e1224077eb9f9206a41d6dd7dd3",
+    "freshF34BaselineClaimed": false,
+    "normalNavigationActionsEachExactlyOne": {
+      "more": 1,
+      "extensions": 1,
+      "addon": 1,
+      "open-settings": 1
+    },
+    "currentCheckedBeforeOff": true,
+    "conditionalOffNativeInputs": 1,
+    "currentCheckedAfterOff": false,
+    "offInputUncertain": false,
+    "freshOffGeometry": "attempt34-ui/fresh-off-before-close-geometry.json",
+    "freshOffGeometrySHA256": "c5083af876cf46303d4ea3f1b1d39e68c27e3d621db92ee63cc37c269ea21711",
+    "OffObservationToFinalVerifyMs": 46409.413818359375,
+    "readerCurrentPin": {
+      "url": "https://example.com/",
+      "timeOrigin": 1792178386849,
+      "innerWindowId": 4294967297,
+      "title": "Example Domain",
+      "freshForF34": true,
+      "historicalSourceSHA256": "d5118e54d495017aa21d1ba7d44fd15dd48a77b22aab4f3f69e8912fad46f986"
+    },
+    "readerRawSamplesExact": 8,
+    "originalParagraphCount": 6,
+    "allOriginalParagraphLangAndSourceMatchHistoricalAndExpected": true,
+    "translationCount": 0,
+    "selectionLength": 0,
+    "selectionRangeCount": 0,
+    "selectionCollapsed": true,
+    "progressVisible": false,
+    "scrollX": 0,
+    "scrollY": 73,
+    "finalFloatingHostCount": 0
+  },
+  "newSettingsOwnershipAndClosure": {
+    "accepted": true,
+    "freshPin": {
+      "url": "moz-extension://5742e8dc-cff0-43e1-8997-d64aa023ec64/options.html#settings-general",
+      "timeOrigin": 1792178600815,
+      "innerWindowId": 6442450950,
+      "title": "FluentRead settings",
+      "createdByCase": true,
+      "createdInCase": 34,
+      "freshForF34": true,
+      "normalOpenSettingsReceiptUnixMs": 1792178600752.5881,
+      "beforeInventoryGeometry": "initial-inventory",
+      "afterInventoryGeometry": "after-open-settings",
+      "priorF32SettingsClosure": "NOT_OBSERVED",
+      "nativeTabCountBefore": 2,
+      "nativeTabCountAfter": 3,
+      "nativeCreationProof": "11-anchor-proof",
+      "nativeCreationAXSHA256": "e52ad6645e2423af28a12c9a6230bea0e672c5b16a03e81fa54f6a945bffb08f"
+    },
+    "normalOpenSettingsReceiptBeforeNewTargetReads": true,
+    "RDPSettingsCountBefore": 0,
+    "RDPSettingsCountAfterOpen": 1,
+    "nativeTabCountBefore": 2,
+    "nativeTabCountAfterOpen": 3,
+    "nativeTabCountAfterClose": 2,
+    "finalRDPSettingsCount": 0,
+    "closeInputs": 1,
+    "uniqueCloseTarget": "Close tab FluentRead settings",
+    "actualNativeCloseXY": [
+      456,
+      981
+    ],
+    "unknownOldCardStillVisibleAfterClose": true,
+    "unknownCardInputCount": 0,
+    "priorF32SettingsClosure": "NOT_OBSERVED"
+  },
+  "actualInputBoundary": {
+    "nativeActions": {
+      "notice": 1,
+      "more": 1,
+      "extensions": 1,
+      "addon": 1,
+      "open-settings": 1,
+      "web-assistance": 1,
+      "scroll-settings": 1,
+      "switch-off": 1,
+      "open-tabs": 2,
+      "reader-tab": 2,
+      "close-settings": 1
+    },
+    "nativeActionCount": 13,
+    "clientNativeInputCount": 13,
+    "clientNativeArgumentsAndOrderEqualNativeLedger": true,
+    "inputProjectionPrefixHashesMatchAll29CapturesAnd17Proofs": true,
+    "conditionalOff": 1,
+    "floatingBallInputs": 0,
+    "dragInputs": 0,
+    "unknownCardInputs": 0,
+    "WMReadQueries": 2,
+    "WMWriteCommands": 0,
+    "WMOriginalRaw": "lock 0",
+    "WMUnchanged": "Fixed final verifier reread equality passed and certificate recorded unchanged; second raw stdout is not separately stored in client ledger.",
+    "permissionOrDefaultChanges": 0,
+    "EdgeActions": 0
+  },
+  "release": {
+    "rawCleanupStatus": "PASS",
+    "rawCleanupFinishedAt": "2026-10-16T19:31:28.703113+00:00",
+    "rawCleanupSHA256": "e408fda5b767567f7e68b2937f5cbc9915438ad46324fbd27a1455443c0def2c",
+    "guardStatus": "stopped-by-owner",
+    "loaderFinishedAt": "2026-10-16T19:31:23.815Z",
+    "loaderForwardRemoved": true,
+    "freshRootReleaseAt": "2026-10-16T19:31:45.874653+00:00",
+    "freshRootReleaseSHA256": "3e08d12cf735344150ce823616e571c84fe864e485d071bcfd11de83afe1630d",
+    "rawCleanupKnownOwnedPids": [
+      4208,
+      4224,
+      4226,
+      4246,
+      4552
+    ],
+    "freshRootKnownPids": [
+      4208,
+      4224,
+      4226,
+      4246,
+      4552,
+      2177,
+      2174
+    ],
+    "rawCleanupRemainingOwned": [],
+    "freshRootRemainingOwned": [],
+    "freshRootPorts": {
+      "5048": {
+        "returnCode": 1,
+        "listeners": ""
+      },
+      "5580": {
+        "returnCode": 1,
+        "listeners": ""
+      },
+      "5581": {
+        "returnCode": 1,
+        "listeners": ""
+      },
+      "52911": {
+        "returnCode": 1,
+        "listeners": ""
+      }
+    },
+    "freshRootHeavyOrGUIRows": [],
+    "freshRootBootedAppleSimulators": [],
+    "taskAppleSimulatorState": "Shutdown",
+    "guardHostKeyMetadataBeforeAfterExactlyEqual": true,
+    "focusEvents": [],
+    "violations": [],
+    "rootReportedGuardTerminalSession": 49213,
+    "rootReportedLoaderTerminalSession": 86205,
+    "rootReportedBothTerminalExitCode": 0,
+    "terminalHandleBoundary": "Root reported terminal handle exit0; this reviewer independently checked persisted finished guard/loader and cleanup records, did not poll live handles.",
+    "resourceAvailabilityBoundary": "Only the recorded 19:31:45Z post-release snapshot; not a claim of indefinite global availability."
+  },
+  "artifactPost": {
+    "receipt": {
+      "at": "2026-10-16T19:31:46.103590+00:00",
+      "phase": "post",
+      "files": 478,
+      "recordHash": "bb6d2df04165f76bee19f6da3ce46fb702f0e54f108cae137ccc5205bc36ed3b",
+      "rawByteHash": "e026986964e0d3e065271bb460aa798bf28ab3c27512717658532abf259da6ab",
+      "runtimeCommit": "a2ecda302d3a0199ffe9f0222ee2998a37bd7d5d",
+      "pureDiskOnly": true
+    },
+    "sha256": "01e6eda574b6b9f1a2cee426ca0e452502c8859c1a496633d57056be4eafe9c0",
+    "matchesPreCommitCountRawAndRecord": true,
+    "independentDiskRehashMatchesReceipt": true
+  },
+  "preservedBoundaries": {
+    "functionalChainComplete": false,
+    "scopedDragOrientationChainComplete": false,
+    "fullFloatingGoalAccepted": false,
+    "priorF32SettingsClosure": "NOT_OBSERVED",
+    "unknownOldCardClosure": "NOT_OBSERVED / not authorized",
+    "F33RawCleanup": "FAILED historical result unchanged",
+    "F33OffAtItsOwnEnd": "PENDING historical result unchanged; target subsequently recovered by F34",
+    "realPhysicalAndroidDeviceAccepted": false,
+    "liveProviderTranslationAccepted": false,
+    "permissionUIAcceptanceInferred": false
+  },
+  "remainingConfirmedProblems": [],
+  "evidenceSHA256": {
+    "preparation-seal.json": "07d2fab780549c16c472e794198fdd00e9544fbd30885a0f5fd43220a6db9f5b",
+    "full-source-review.json": "7ce268bce57efa1526b55e3a6d6044af1149c036c155302c81ba833c6a82cf39",
+    "runtime-go.json": "f339eb90e9937f14f8a06303e88fbb3941e17c49a7133213004d3c0723c5abf4",
+    "runtime-ready-attempt34.json": "af2638ca7d6c6b87f3504c410af793dd579e3acb9acc31ebbc17d3053ef1b92d",
+    "case-state.json": "3ec77f5474c86624e9d778d825c22464606c38c0e9e4a0ddbaa9ca0758379198",
+    "document-pin.json": "05dae3c741c397128e619a7c5edf983a38d2db4eed693293092600e0da155f27",
+    "settings-pin.json": "c1ce2b05f667d5b92270761755aa0bf64f7cf95ca39a1c4f3599549b36044d11",
+    "rotation-original.json": "fb7813c4cd68d072f3d6374a5cd3f97f1ecc206ade4ab6cca3a776e313c821ca",
+    "restoration-verified.json": "dba2b2708258162c21053b2b558478fc27e7a77bee83fa00eb7b0d519d73c0fa",
+    "cleanup.json": "e408fda5b767567f7e68b2937f5cbc9915438ad46324fbd27a1455443c0def2c",
+    "root-fresh-post-release.json": "3e08d12cf735344150ce823616e571c84fe864e485d071bcfd11de83afe1630d",
+    "artifact-pre.json": "c96eaa04456994f65caa728ef81a3da564676e1c668044f366b505966964affa",
+    "artifact-post.json": "01e6eda574b6b9f1a2cee426ca0e452502c8859c1a496633d57056be4eafe9c0",
+    "boot-owned-avd-attempt34-report.json": "677c1c36ce3a3ade0343b7870722d578e2ed4c97a684a458df68fe71f6bb9c5b",
+    "firefox-production-attempt34-floating-run.json": "8cd8bfd86f6e9b1fdfcb9e805b8c7184d7f8a3a3b5d3994d4c5c04a76b898b7f",
+    "client-commands-attempt34.jsonl": "3a1f589c46fb6eebbda33ca2209411b32336f9bb65944621ee53d59635a78eed",
+    "attempt34-ui/native-actions.jsonl": "ebab4d621880457afe88ae2e87934678f08bdcb89964d3f2aa5935595570f85c"
+  },
+  "geometryEvidenceSHA256": {
+    "after-assistance-geometry.json": "db675d3fc894fc41c1e21e4b973a9752d352d4c8beb30b4302ed45dc082faeb3",
+    "after-close-geometry.json": "71d707d8f6a0ec743d1b760ff8b33cbb27d4a397bd133f784219f514ee4dab0b",
+    "after-off-geometry.json": "d3770781f4b9c1e3e2f1236d82b305d5110d485f62d1215044c1dd47e7b19483",
+    "after-open-settings-geometry.json": "9200e460f554dff4301153c51f5e68ab4ff0886e90d0437f094b409673433acf",
+    "before-addon-geometry.json": "ab8272a33ecd8a84ebe158fb8ef1d39b85b5c94dc315da827c67a85a0481323e",
+    "before-assistance-geometry.json": "da66e4e572869a94fbbe7805e8546488ffb81f1af8257147717285495234bc84",
+    "before-close-fresh-geometry.json": "6bae8c2a8d03b176741467f037c238603634870f2991e7f2e805c57e4b05e62b",
+    "before-extensions-geometry.json": "41d395cf0a3f847e875823f3b854d8c4d9bc38089751cb77164188aebabb09b4",
+    "before-final-reader-geometry.json": "b83b8ac5276727e0ff441a785f98920e631987497d98c179592693d3b53d2ed6",
+    "before-more-geometry.json": "adc8e444d68530e181aadb1b05cc71015a8029c377aaecb7cd5ff490d22bce7f",
+    "before-off-geometry.json": "d5672f4a249ba570b6a2a131835ecee6cabadb7a85805026f023a6aac3af7f34",
+    "before-open-settings-geometry.json": "92bf51b68a7f64682fbbf0716b30ecb3f526e33d541a74362e9167cd2e815133",
+    "before-reader-return-geometry.json": "793a928279a1b78bd449a6a254478890286de291f7d1cbe8652a2934f24066c3",
+    "before-scroll-1-geometry.json": "ab93df205adeb0af0acc2f1c8f858e6aa7f76d09c722920a498c712e01b37fd3",
+    "close-grid-geometry.json": "3974d966f8157620d2f60d8caa49ff00bd354d30f8f9260dea0e81252496834a",
+    "confirmed-probe-geometry.json": "74f786fb23baa33f922d5218e19fd748afef60f04cacbc25936e24b025a45004",
+    "final-reader-observation-geometry.json": "de348aa8b4be13aa34721bb04932814df3d89cb00999006ad31edb74af888061",
+    "final-verify-fresh-geometry.json": "cb28235a7dab6ac425ef79f217c6bc341dcba74eb11fd11517052e584539df4a",
+    "fresh-off-before-close-geometry.json": "c5083af876cf46303d4ea3f1b1d39e68c27e3d621db92ee63cc37c269ea21711",
+    "initial-inventory-geometry.json": "f9366792b9cd11f20be433cc0bfd348751e359675bd28f755d96635bbd722130",
+    "initial-probe-geometry.json": "a8c0b3cf991c3fbc6728b13a21b4cd01a79bc5ccb95b4eab7881295d02ace53b",
+    "initial-reader-geometry.json": "25e3ec6c0b85b8d70959e7b143ea6c6a9da5c7bc3a22385e991c90da8a5fe52e",
+    "new-settings-geometry.json": "381d96ed64593af846d7ab0dca9b411f554f4c42471493b8a53ab5b86567767b",
+    "off-before-leave-geometry.json": "00b65811ebd140459ad56d9f838f0b8b19b6f1c57beddb72ade915349e3056c9",
+    "off-reader-geometry.json": "9f34f61d3bc525fff268b5e1a09749cda3601a35bed021b9bb02b3cdbb7a6b17",
+    "reader-after-settings-geometry.json": "a94f7391fe7cb1644ccb9071e5a45733852aca8ff1f74421055f47594b7293e0",
+    "reader-grid-inventory-geometry.json": "b1d5961bdea1b1da95c426f3590f86443b58d5855ccfbeb3c9b152bbca401024",
+    "reader-off-observation-geometry.json": "5843389dc882fa6557593e478e27f844744fba935e5fce2fb9dee69c87e7890e",
+    "toggle-view-geometry.json": "d66800f7c413ba3b4d2990d9183e46eb13d0392c004046bcf8f342f0ff4b1d0e"
+  },
+  "proofEvidenceSHA256": {
+    "01-notice-proof.json": "e61a16bc9d546b21e0780bb2c097fdf7e729b240ee41cbf9ce35ecc94cb8ab9b",
+    "03-ball-proof.json": "dbe527efa203af718f3fc5751580452576d37c8e805302e25aae3e48d8f8bb76",
+    "03-more-proof.json": "aa15d8fa6a61cb303690506acbe1b47f21544a116d7a4133733d76cb508fe9ee",
+    "05-extensions-proof.json": "aff9aafc2b6097cf5f80f11ef7cba55bebea8d265ba59c70b66fb7e83d976032",
+    "07-addon-proof.json": "351cfa0f014e7113e7564ec363e0a044fdd41974f303cec6ee99fffa7bbcc5e6",
+    "09-open-settings-proof.json": "ef1fc6399189eb05e334dcde05b3a818636652aa9f869dcfb893e711e6d4bf25",
+    "11-anchor-proof.json": "e4ceff0bee4aab44c66c586cb5fe3dd25ec7b7f17fc5087a0ccbb04c24e22d34",
+    "11-assistance-proof.json": "a7e7500c4171cbe5f34b2ff0850bfba6b40664d3ad02ed5e8e95b308e7425b00",
+    "13-scroll-proof.json": "d04d5abbd284e514fb396d78dcd85d6a8d5f67a55b5c300934cf70796602d800",
+    "15-off-proof.json": "28946c6d98438aa0b98b4ef9300f7e018e10413bbc9487b61fba668a1b6502bc",
+    "17-tabs-proof.json": "ff26df036b8ae5dea60aec60d6b533f63b23abb6e2f15a7434a480eaa3f42fd1",
+    "19-reader-proof.json": "b7eda0d92e72049499251d9b64b22e2f6090ef91900c384267f23bb10cc31fbb",
+    "22-off-proof.json": "79578e129031c3833b7ec1d8d0f18d796aa6427cc0f55ebe9aebdb4dd35a9c74",
+    "22-open-tabs-proof.json": "da3df3c56ad4f14617b5c033dfc72f55fb630707d128e70b5c1ac85704f9ef90",
+    "24-close-proof.json": "6ad23ec036cef42c12551cd636815012463b9669f2d05593485b969da2858448",
+    "26-reader-proof.json": "0a844d075c1f71413e15c472aa0554b229b5d454ef7f2b5a179379763d40a0bd",
+    "28-final-proof.json": "35f3fb0faea06983e3f9593aa1a8d6a07047a2f37a47c82096dc49ba7286b206"
+  },
+  "parallelReadOnlySubreview": {
+    "agent": "/root/touch_layout_review/f34_release_evidence",
+    "status": "PASS_NO_CONFIRMED_BLOCKER",
+    "scope": "Raw resource release/guard/loader/ledger/input/WM/artifact pre-post; no files written, no SDK or process inspection."
+  },
+  "contextPolicy": "300K user compression/handoff preference inherited by child; automatic threshold enforcement unverified."
+}

@@ -1,0 +1,1153 @@
+{
+  "elapsedSeconds" : 5.2634279727935791,
+  "nodes" : [
+    {
+      "frame" : {
+        "height" : 874,
+        "width" : 402,
+        "x" : 0,
+        "y" : 0
+      },
+      "identifier" : "",
+      "label" : "Safari浏览器",
+      "selected" : false,
+      "type" : 2,
+      "valueString" : null,
+      "valueType" : "nil"
+    },
+    {
+      "frame" : {
+        "height" : 874,
+        "width" : 402,
+        "x" : 0,
+        "y" : 0
+      },
+      "identifier" : "",
+      "label" : "",
+      "selected" : false,
+      "type" : 4,
+      "valueString" : null,
+      "valueType" : "nil"
+    },
+    {
+      "frame" : {
+        "height" : 874,
+        "width" : 402,
+        "x" : 0,
+        "y" : 0
+      },
+      "identifier" : "",
+      "label" : "",
+      "selected" : false,
+      "type" : 1,
+      "valueString" : null,
+      "valueType" : "nil"
+    },
+    {
+      "frame" : {
+        "height" : 874,
+        "width" : 402,
+        "x" : 0,
+        "y" : 0
+      },
+      "identifier" : "",
+      "label" : "",
+      "selected" : false,
+      "type" : 1,
+      "valueString" : null,
+      "valueType" : "nil"
+    },
+    {
+      "frame" : {
+        "height" : 874,
+        "width" : 402,
+        "x" : 0,
+        "y" : 0
+      },
+      "identifier" : "",
+      "label" : "",
+      "selected" : false,
+      "type" : 1,
+      "valueString" : null,
+      "valueType" : "nil"
+    },
+    {
+      "frame" : {
+        "height" : 874,
+        "width" : 402,
+        "x" : 0,
+        "y" : 0
+      },
+      "identifier" : "",
+      "label" : "",
+      "selected" : false,
+      "type" : 1,
+      "valueString" : null,
+      "valueType" : "nil"
+    },
+    {
+      "frame" : {
+        "height" : 874,
+        "width" : 402,
+        "x" : 0,
+        "y" : 0
+      },
+      "identifier" : "",
+      "label" : "",
+      "selected" : false,
+      "type" : 1,
+      "valueString" : null,
+      "valueType" : "nil"
+    },
+    {
+      "frame" : {
+        "height" : 874,
+        "width" : 402,
+        "x" : 0,
+        "y" : 0
+      },
+      "identifier" : "",
+      "label" : "",
+      "selected" : false,
+      "type" : 1,
+      "valueString" : null,
+      "valueType" : "nil"
+    },
+    {
+      "frame" : {
+        "height" : 874,
+        "width" : 402,
+        "x" : 0,
+        "y" : 0
+      },
+      "identifier" : "",
+      "label" : "",
+      "selected" : false,
+      "type" : 1,
+      "valueString" : null,
+      "valueType" : "nil"
+    },
+    {
+      "frame" : {
+        "height" : 874,
+        "width" : 402,
+        "x" : 0,
+        "y" : 0
+      },
+      "identifier" : "",
+      "label" : "",
+      "selected" : false,
+      "type" : 1,
+      "valueString" : null,
+      "valueType" : "nil"
+    },
+    {
+      "frame" : {
+        "height" : 874,
+        "width" : 402,
+        "x" : 0,
+        "y" : 0
+      },
+      "identifier" : "SafariWindow?View=Narrow&BarsKeptMinimized=false&UUID=9353F600-BB36-4EF0-B3F2-ABB4E11079F5&UsingLoweredBar=true&IsSecure=true&IsTabBarAvailable=false",
+      "label" : "",
+      "selected" : false,
+      "type" : 1,
+      "valueString" : null,
+      "valueType" : "nil"
+    },
+    {
+      "frame" : {
+        "height" : 874,
+        "width" : 402,
+        "x" : 0,
+        "y" : 0
+      },
+      "identifier" : "",
+      "label" : "",
+      "selected" : false,
+      "type" : 1,
+      "valueString" : null,
+      "valueType" : "nil"
+    },
+    {
+      "frame" : {
+        "height" : 874,
+        "width" : 402,
+        "x" : 0,
+        "y" : 0
+      },
+      "identifier" : "",
+      "label" : "",
+      "selected" : false,
+      "type" : 1,
+      "valueString" : null,
+      "valueType" : "nil"
+    },
+    {
+      "frame" : {
+        "height" : 49,
+        "width" : 402,
+        "x" : 0,
+        "y" : 0
+      },
+      "identifier" : "",
+      "label" : "",
+      "selected" : false,
+      "type" : 1,
+      "valueString" : null,
+      "valueType" : "nil"
+    },
+    {
+      "frame" : {
+        "height" : 49,
+        "width" : 402,
+        "x" : 0,
+        "y" : 0
+      },
+      "identifier" : "",
+      "label" : "",
+      "selected" : false,
+      "type" : 1,
+      "valueString" : null,
+      "valueType" : "nil"
+    },
+    {
+      "frame" : {
+        "height" : 49,
+        "width" : 402,
+        "x" : 0,
+        "y" : 0
+      },
+      "identifier" : "",
+      "label" : "",
+      "selected" : false,
+      "type" : 1,
+      "valueString" : null,
+      "valueType" : "nil"
+    },
+    {
+      "frame" : {
+        "height" : 62,
+        "width" : 402,
+        "x" : 0,
+        "y" : 0
+      },
+      "identifier" : "",
+      "label" : "",
+      "selected" : false,
+      "type" : 1,
+      "valueString" : null,
+      "valueType" : "nil"
+    },
+    {
+      "frame" : {
+        "height" : 874,
+        "width" : 402,
+        "x" : 0,
+        "y" : 0
+      },
+      "identifier" : "",
+      "label" : "",
+      "selected" : false,
+      "type" : 46,
+      "valueString" : null,
+      "valueType" : "nil"
+    },
+    {
+      "frame" : {
+        "height" : 874,
+        "width" : 402,
+        "x" : 0,
+        "y" : 0
+      },
+      "identifier" : "TabDocument?IsLoadedUsingDesktopUserAgent=false&InReaderMode=false&UUID=87246FAF-A680-4738-BA2A-97A9E170620D&IsPrivate=false&IsPageLoaded=true&WebViewProcessID=40882",
+      "label" : "",
+      "selected" : false,
+      "type" : 1,
+      "valueString" : null,
+      "valueType" : "nil"
+    },
+    {
+      "frame" : {
+        "height" : 874,
+        "width" : 402,
+        "x" : 0,
+        "y" : 0
+      },
+      "identifier" : "WebView",
+      "label" : "",
+      "selected" : false,
+      "type" : 58,
+      "valueString" : null,
+      "valueType" : "nil"
+    },
+    {
+      "frame" : {
+        "height" : 874,
+        "width" : 402,
+        "x" : 0,
+        "y" : 0
+      },
+      "identifier" : "",
+      "label" : "",
+      "selected" : false,
+      "type" : 58,
+      "valueString" : null,
+      "valueType" : "nil"
+    },
+    {
+      "frame" : {
+        "height" : 62,
+        "width" : 402,
+        "x" : 0,
+        "y" : 0
+      },
+      "identifier" : "",
+      "label" : "",
+      "selected" : false,
+      "type" : 1,
+      "valueString" : null,
+      "valueType" : "nil"
+    },
+    {
+      "frame" : {
+        "height" : 874,
+        "width" : 402,
+        "x" : 0,
+        "y" : 0
+      },
+      "identifier" : "",
+      "label" : "",
+      "selected" : false,
+      "type" : 1,
+      "valueString" : null,
+      "valueType" : "nil"
+    },
+    {
+      "frame" : {
+        "height" : 874,
+        "width" : 402,
+        "x" : 0,
+        "y" : 0
+      },
+      "identifier" : "",
+      "label" : "",
+      "selected" : false,
+      "type" : 58,
+      "valueString" : null,
+      "valueType" : "nil"
+    },
+    {
+      "frame" : {
+        "height" : 874,
+        "width" : 402,
+        "x" : 0,
+        "y" : 0
+      },
+      "identifier" : "",
+      "label" : "",
+      "selected" : false,
+      "type" : 1,
+      "valueString" : null,
+      "valueType" : "nil"
+    },
+    {
+      "frame" : {
+        "height" : 874,
+        "width" : 402,
+        "x" : 0,
+        "y" : 0
+      },
+      "identifier" : "",
+      "label" : "",
+      "selected" : false,
+      "type" : 1,
+      "valueString" : null,
+      "valueType" : "nil"
+    },
+    {
+      "frame" : {
+        "height" : 874,
+        "width" : 402,
+        "x" : 0,
+        "y" : 62
+      },
+      "identifier" : "",
+      "label" : "",
+      "selected" : false,
+      "type" : 1,
+      "valueString" : "",
+      "valueType" : "__NSCFConstantString"
+    },
+    {
+      "frame" : {
+        "height" : 714,
+        "width" : 402,
+        "x" : 0,
+        "y" : 62
+      },
+      "identifier" : "",
+      "label" : "YouTube",
+      "selected" : false,
+      "type" : 1,
+      "valueString" : "",
+      "valueType" : "__NSCFConstantString"
+    },
+    {
+      "frame" : {
+        "height" : 226,
+        "width" : 402,
+        "x" : 0,
+        "y" : 110
+      },
+      "identifier" : "",
+      "label" : "YouTube 视频播放器",
+      "selected" : false,
+      "type" : 1,
+      "valueString" : "",
+      "valueType" : "__NSCFConstantString"
+    },
+    {
+      "frame" : {
+        "height" : 10,
+        "width" : 402,
+        "x" : 0,
+        "y" : 110
+      },
+      "identifier" : "",
+      "label" : "",
+      "selected" : false,
+      "type" : 1,
+      "valueString" : "",
+      "valueType" : "__NSCFConstantString"
+    },
+    {
+      "frame" : {
+        "height" : 226,
+        "width" : 301,
+        "x" : 50,
+        "y" : 110
+      },
+      "identifier" : "",
+      "label" : "Do schools kill creativity? | Sir Ken Robinson | TED, 20分钟3秒钟",
+      "selected" : false,
+      "type" : 1,
+      "valueString" : "0秒钟",
+      "valueType" : "__NSCFString"
+    },
+    {
+      "frame" : {
+        "height" : 73,
+        "width" : 168,
+        "x" : 0,
+        "y" : 110
+      },
+      "identifier" : "",
+      "label" : "点按取消静音",
+      "selected" : false,
+      "type" : 9,
+      "valueString" : "",
+      "valueType" : "__NSCFConstantString"
+    },
+    {
+      "frame" : {
+        "height" : 214,
+        "width" : 378,
+        "x" : 12,
+        "y" : 110
+      },
+      "identifier" : "",
+      "label" : "",
+      "selected" : false,
+      "type" : 1,
+      "valueString" : "",
+      "valueType" : "__NSCFConstantString"
+    },
+    {
+      "frame" : {
+        "height" : 226,
+        "width" : 354,
+        "x" : 0,
+        "y" : 110
+      },
+      "identifier" : "",
+      "label" : "",
+      "selected" : false,
+      "type" : 1,
+      "valueString" : "",
+      "valueType" : "__NSCFConstantString"
+    },
+    {
+      "frame" : {
+        "height" : 226,
+        "width" : 402,
+        "x" : 0,
+        "y" : 110
+      },
+      "identifier" : "",
+      "label" : "",
+      "selected" : false,
+      "type" : 1,
+      "valueString" : "",
+      "valueType" : "__NSCFConstantString"
+    },
+    {
+      "frame" : {
+        "height" : 48,
+        "width" : 402,
+        "x" : 0,
+        "y" : 62
+      },
+      "identifier" : "",
+      "label" : "横幅",
+      "selected" : false,
+      "type" : 1,
+      "valueString" : "",
+      "valueType" : "__NSCFConstantString"
+    },
+    {
+      "frame" : {
+        "height" : 874,
+        "width" : 402,
+        "x" : 0,
+        "y" : 0
+      },
+      "identifier" : "",
+      "label" : "",
+      "selected" : false,
+      "type" : 1,
+      "valueString" : null,
+      "valueType" : "nil"
+    },
+    {
+      "frame" : {
+        "height" : 750,
+        "width" : 30,
+        "x" : 369,
+        "y" : 62
+      },
+      "identifier" : "",
+      "label" : "垂直滚动条, 1页",
+      "selected" : false,
+      "type" : 1,
+      "valueString" : "0%",
+      "valueType" : "NSTaggedPointerString"
+    },
+    {
+      "frame" : {
+        "height" : 30,
+        "width" : 3,
+        "x" : 396,
+        "y" : 779
+      },
+      "identifier" : "",
+      "label" : "",
+      "selected" : false,
+      "type" : 1,
+      "valueString" : null,
+      "valueType" : "nil"
+    },
+    {
+      "frame" : {
+        "height" : 30,
+        "width" : 278,
+        "x" : 62,
+        "y" : 841
+      },
+      "identifier" : "",
+      "label" : "水平滚动条, 1页",
+      "selected" : false,
+      "type" : 1,
+      "valueString" : "0%",
+      "valueType" : "NSTaggedPointerString"
+    },
+    {
+      "frame" : {
+        "height" : 3,
+        "width" : 7,
+        "x" : 330,
+        "y" : 868
+      },
+      "identifier" : "",
+      "label" : "",
+      "selected" : false,
+      "type" : 1,
+      "valueString" : null,
+      "valueType" : "nil"
+    },
+    {
+      "frame" : {
+        "height" : 750,
+        "width" : 30,
+        "x" : 369,
+        "y" : 62
+      },
+      "identifier" : "",
+      "label" : "垂直滚动条, 1页",
+      "selected" : false,
+      "type" : 1,
+      "valueString" : "0%",
+      "valueType" : "NSTaggedPointerString"
+    },
+    {
+      "frame" : {
+        "height" : 30,
+        "width" : 3,
+        "x" : 396,
+        "y" : 779
+      },
+      "identifier" : "",
+      "label" : "",
+      "selected" : false,
+      "type" : 1,
+      "valueString" : null,
+      "valueType" : "nil"
+    },
+    {
+      "frame" : {
+        "height" : 30,
+        "width" : 278,
+        "x" : 62,
+        "y" : 841
+      },
+      "identifier" : "",
+      "label" : "水平滚动条, 1页",
+      "selected" : false,
+      "type" : 1,
+      "valueString" : "0%",
+      "valueType" : "NSTaggedPointerString"
+    },
+    {
+      "frame" : {
+        "height" : 3,
+        "width" : 7,
+        "x" : 330,
+        "y" : 868
+      },
+      "identifier" : "",
+      "label" : "",
+      "selected" : false,
+      "type" : 1,
+      "valueString" : null,
+      "valueType" : "nil"
+    },
+    {
+      "frame" : {
+        "height" : 30,
+        "width" : 278,
+        "x" : 62,
+        "y" : 841
+      },
+      "identifier" : "",
+      "label" : "水平滚动条, 1页",
+      "selected" : false,
+      "type" : 1,
+      "valueString" : "0%",
+      "valueType" : "NSTaggedPointerString"
+    },
+    {
+      "frame" : {
+        "height" : 3,
+        "width" : 284,
+        "x" : 59,
+        "y" : 868
+      },
+      "identifier" : "",
+      "label" : "",
+      "selected" : false,
+      "type" : 1,
+      "valueString" : null,
+      "valueType" : "nil"
+    },
+    {
+      "frame" : {
+        "height" : 30,
+        "width" : 278,
+        "x" : 62,
+        "y" : 841
+      },
+      "identifier" : "",
+      "label" : "水平滚动条, 1页",
+      "selected" : false,
+      "type" : 1,
+      "valueString" : "0%",
+      "valueType" : "NSTaggedPointerString"
+    },
+    {
+      "frame" : {
+        "height" : 3,
+        "width" : 284,
+        "x" : 59,
+        "y" : 868
+      },
+      "identifier" : "",
+      "label" : "",
+      "selected" : false,
+      "type" : 1,
+      "valueString" : null,
+      "valueType" : "nil"
+    },
+    {
+      "frame" : {
+        "height" : 874,
+        "width" : 402,
+        "x" : 0,
+        "y" : 0
+      },
+      "identifier" : "CapsuleViewController",
+      "label" : "",
+      "selected" : false,
+      "type" : 1,
+      "valueString" : null,
+      "valueType" : "nil"
+    },
+    {
+      "frame" : {
+        "height" : 62,
+        "width" : 402,
+        "x" : 0,
+        "y" : 0
+      },
+      "identifier" : "",
+      "label" : "",
+      "selected" : false,
+      "type" : 1,
+      "valueString" : null,
+      "valueType" : "nil"
+    },
+    {
+      "frame" : {
+        "height" : 62,
+        "width" : 402,
+        "x" : 0,
+        "y" : 0
+      },
+      "identifier" : "",
+      "label" : "",
+      "selected" : false,
+      "type" : 1,
+      "valueString" : null,
+      "valueType" : "nil"
+    },
+    {
+      "frame" : {
+        "height" : 98,
+        "width" : 402,
+        "x" : 0,
+        "y" : 776
+      },
+      "identifier" : "",
+      "label" : "",
+      "selected" : false,
+      "type" : 1,
+      "valueString" : null,
+      "valueType" : "nil"
+    },
+    {
+      "frame" : {
+        "height" : 98,
+        "width" : 402,
+        "x" : 0,
+        "y" : 776
+      },
+      "identifier" : "",
+      "label" : "",
+      "selected" : false,
+      "type" : 1,
+      "valueString" : null,
+      "valueType" : "nil"
+    },
+    {
+      "frame" : {
+        "height" : 98,
+        "width" : 402,
+        "x" : 0,
+        "y" : 776
+      },
+      "identifier" : "",
+      "label" : "",
+      "selected" : false,
+      "type" : 1,
+      "valueString" : null,
+      "valueType" : "nil"
+    },
+    {
+      "frame" : {
+        "height" : 98,
+        "width" : 402,
+        "x" : 0,
+        "y" : 776
+      },
+      "identifier" : "",
+      "label" : "",
+      "selected" : false,
+      "type" : 1,
+      "valueString" : null,
+      "valueType" : "nil"
+    },
+    {
+      "frame" : {
+        "height" : 98,
+        "width" : 402,
+        "x" : 0,
+        "y" : 776
+      },
+      "identifier" : "",
+      "label" : "",
+      "selected" : false,
+      "type" : 1,
+      "valueString" : null,
+      "valueType" : "nil"
+    },
+    {
+      "frame" : {
+        "height" : 98,
+        "width" : 402,
+        "x" : 0,
+        "y" : 776
+      },
+      "identifier" : "",
+      "label" : "",
+      "selected" : false,
+      "type" : 1,
+      "valueString" : null,
+      "valueType" : "nil"
+    },
+    {
+      "frame" : {
+        "height" : 98,
+        "width" : 402,
+        "x" : 0,
+        "y" : 776
+      },
+      "identifier" : "",
+      "label" : "",
+      "selected" : false,
+      "type" : 1,
+      "valueString" : null,
+      "valueType" : "nil"
+    },
+    {
+      "frame" : {
+        "height" : 98,
+        "width" : 402,
+        "x" : 0,
+        "y" : 776
+      },
+      "identifier" : "",
+      "label" : "",
+      "selected" : false,
+      "type" : 1,
+      "valueString" : null,
+      "valueType" : "nil"
+    },
+    {
+      "frame" : {
+        "height" : 98,
+        "width" : 402,
+        "x" : 0,
+        "y" : 776
+      },
+      "identifier" : "",
+      "label" : "",
+      "selected" : false,
+      "type" : 1,
+      "valueString" : null,
+      "valueType" : "nil"
+    },
+    {
+      "frame" : {
+        "height" : 48,
+        "width" : 48,
+        "x" : 34,
+        "y" : 792
+      },
+      "identifier" : "",
+      "label" : "",
+      "selected" : false,
+      "type" : 1,
+      "valueString" : null,
+      "valueType" : "nil"
+    },
+    {
+      "frame" : {
+        "height" : 48,
+        "width" : 48,
+        "x" : 34,
+        "y" : 792
+      },
+      "identifier" : "",
+      "label" : "",
+      "selected" : false,
+      "type" : 1,
+      "valueString" : null,
+      "valueType" : "nil"
+    },
+    {
+      "frame" : {
+        "height" : 48,
+        "width" : 48,
+        "x" : 34,
+        "y" : 792
+      },
+      "identifier" : "",
+      "label" : "返回",
+      "selected" : false,
+      "type" : 9,
+      "valueString" : null,
+      "valueType" : "nil"
+    },
+    {
+      "frame" : {
+        "height" : 48,
+        "width" : 222,
+        "x" : 90,
+        "y" : 792
+      },
+      "identifier" : "",
+      "label" : "",
+      "selected" : false,
+      "type" : 1,
+      "valueString" : null,
+      "valueType" : "nil"
+    },
+    {
+      "frame" : {
+        "height" : 48,
+        "width" : 222,
+        "x" : 90,
+        "y" : 792
+      },
+      "identifier" : "",
+      "label" : "",
+      "selected" : false,
+      "type" : 1,
+      "valueString" : null,
+      "valueType" : "nil"
+    },
+    {
+      "frame" : {
+        "height" : 48,
+        "width" : 222,
+        "x" : 90,
+        "y" : 792
+      },
+      "identifier" : "",
+      "label" : "",
+      "selected" : false,
+      "type" : 1,
+      "valueString" : null,
+      "valueType" : "nil"
+    },
+    {
+      "frame" : {
+        "height" : 48,
+        "width" : 222,
+        "x" : 90,
+        "y" : 792
+      },
+      "identifier" : "CapsuleNavigationBar?isSelected=true&isDistractionControlOverlayUp=false",
+      "label" : "",
+      "selected" : true,
+      "type" : 1,
+      "valueString" : null,
+      "valueType" : "nil"
+    },
+    {
+      "frame" : {
+        "height" : 40,
+        "width" : 40,
+        "x" : 94,
+        "y" : 796
+      },
+      "identifier" : "PageFormatMenuButton",
+      "label" : "页面菜单",
+      "selected" : false,
+      "type" : 9,
+      "valueString" : null,
+      "valueType" : "nil"
+    },
+    {
+      "frame" : {
+        "height" : 0,
+        "width" : 0,
+        "x" : 94,
+        "y" : 796
+      },
+      "identifier" : "",
+      "label" : "",
+      "selected" : false,
+      "type" : 48,
+      "valueString" : null,
+      "valueType" : "nil"
+    },
+    {
+      "frame" : {
+        "height" : 20.333333333333371,
+        "width" : 102.33333333333331,
+        "x" : 150,
+        "y" : 806
+      },
+      "identifier" : "TabBarItemTitle",
+      "label" : "地址",
+      "selected" : false,
+      "type" : 49,
+      "valueString" : "‎youtube.com",
+      "valueType" : "__NSCFString"
+    },
+    {
+      "frame" : {
+        "height" : 21,
+        "width" : 17.666666666666686,
+        "x" : 279.33333333333337,
+        "y" : 805.66666666666663
+      },
+      "identifier" : "ReloadButton",
+      "label" : "刷新",
+      "selected" : false,
+      "type" : 9,
+      "valueString" : null,
+      "valueType" : "nil"
+    },
+    {
+      "frame" : {
+        "height" : 48,
+        "width" : 48,
+        "x" : 320,
+        "y" : 792
+      },
+      "identifier" : "",
+      "label" : "",
+      "selected" : false,
+      "type" : 1,
+      "valueString" : null,
+      "valueType" : "nil"
+    },
+    {
+      "frame" : {
+        "height" : 48,
+        "width" : 48,
+        "x" : 320,
+        "y" : 792
+      },
+      "identifier" : "",
+      "label" : "",
+      "selected" : false,
+      "type" : 1,
+      "valueString" : null,
+      "valueType" : "nil"
+    },
+    {
+      "frame" : {
+        "height" : 48,
+        "width" : 48,
+        "x" : 320,
+        "y" : 792
+      },
+      "identifier" : "",
+      "label" : "更多",
+      "selected" : false,
+      "type" : 9,
+      "valueString" : null,
+      "valueType" : "nil"
+    },
+    {
+      "frame" : {
+        "height" : 874,
+        "width" : 402,
+        "x" : 0,
+        "y" : 0
+      },
+      "identifier" : "",
+      "label" : "",
+      "selected" : false,
+      "type" : 1,
+      "valueString" : null,
+      "valueType" : "nil"
+    },
+    {
+      "frame" : {
+        "height" : 874,
+        "width" : 402,
+        "x" : 0,
+        "y" : 0
+      },
+      "identifier" : "",
+      "label" : "",
+      "selected" : false,
+      "type" : 1,
+      "valueString" : null,
+      "valueType" : "nil"
+    },
+    {
+      "frame" : {
+        "height" : 874,
+        "width" : 402,
+        "x" : 0,
+        "y" : 0
+      },
+      "identifier" : "",
+      "label" : "",
+      "selected" : false,
+      "type" : 1,
+      "valueString" : null,
+      "valueType" : "nil"
+    },
+    {
+      "frame" : {
+        "height" : 874,
+        "width" : 402,
+        "x" : 0,
+        "y" : 0
+      },
+      "identifier" : "",
+      "label" : "",
+      "selected" : false,
+      "type" : 1,
+      "valueString" : null,
+      "valueType" : "nil"
+    },
+    {
+      "frame" : {
+        "height" : 874,
+        "width" : 402,
+        "x" : 0,
+        "y" : 0
+      },
+      "identifier" : "",
+      "label" : "",
+      "selected" : false,
+      "type" : 4,
+      "valueString" : null,
+      "valueType" : "nil"
+    },
+    {
+      "frame" : {
+        "height" : 874,
+        "width" : 402,
+        "x" : 0,
+        "y" : 0
+      },
+      "identifier" : "",
+      "label" : "",
+      "selected" : false,
+      "type" : 1,
+      "valueString" : null,
+      "valueType" : "nil"
+    },
+    {
+      "frame" : {
+        "height" : 874,
+        "width" : 402,
+        "x" : 0,
+        "y" : 0
+      },
+      "identifier" : "",
+      "label" : "",
+      "selected" : false,
+      "type" : 1,
+      "valueString" : null,
+      "valueType" : "nil"
+    }
+  ]
+}

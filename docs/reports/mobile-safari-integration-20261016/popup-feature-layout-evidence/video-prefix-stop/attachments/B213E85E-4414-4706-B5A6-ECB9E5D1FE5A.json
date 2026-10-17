@@ -1,0 +1,16 @@
+{
+  "actions" : {
+    "address" : 1,
+    "navigation" : 1,
+    "normalClear" : 1,
+    "SafariActivate" : 1
+  },
+  "captures" : 0,
+  "failureAXRetaken" : false,
+  "failurePNG" : false,
+  "fullFRTrackOffReselectChainAccepted" : false,
+  "fullscreenKind" : "UNESTABLISHED",
+  "normalInlineReturn" : false,
+  "reason" : "Current unique owned TED\/player not established",
+  "status" : "UNVERIFIED_VIDEO_PREFIX_STOP"
+}

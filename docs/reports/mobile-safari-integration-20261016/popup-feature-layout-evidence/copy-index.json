@@ -1,0 +1,961 @@
+{
+  "schema": 1,
+  "artifactKind": "PUBLIC_REPOSITORY_EVIDENCE_COPY_INDEX",
+  "status": "ROOT_REVIEWED_SCOPE_LIMITED_EVIDENCE",
+  "sourceCommit": "8274d0c76bead3f1f76a04f5f71e2d58475d4551",
+  "indexRoot": "docs/reports/mobile-safari-integration-20261016 (repository-relative); keys below are relative to this report directory",
+  "selfExcluded": true,
+  "reviewedSourceDraftIndex": {
+    "bytes": 72371,
+    "sha256": "78887fea02484a0d1527daea38fc3eaf93355bf1c0fc69927bd56a1261a6ebaf"
+  },
+  "originalByteCopies": 147,
+  "derivedPublicFiles": 7,
+  "files": {
+    "popup-feature-layout-evidence/edge/feature-grid-embedded-marker-css-fixture-compact-320-light-3.json": {
+      "kind": "original-byte-copy",
+      "bytes": 2743,
+      "sha256": "53a77b6c64c2438e19701b9469d0f0c8c258cb36a32f43408be93bbe03ee0352",
+      "sourceRelative": "research/safari-touch-flex-production-build-20261017/edge-popup-feature-grid-attempt2/feature-grid-embedded-marker-css-fixture-compact-320-light-3.json"
+    },
+    "popup-feature-layout-evidence/edge/feature-grid-embedded-marker-css-fixture-default-320-light-3.json": {
+      "kind": "original-byte-copy",
+      "bytes": 2852,
+      "sha256": "6a64c428e0948e787f80789bf19e4e1298dba03c48e359839ff4ad0b7ce782d7",
+      "sourceRelative": "research/safari-touch-flex-production-build-20261017/edge-popup-feature-grid-attempt2/feature-grid-embedded-marker-css-fixture-default-320-light-3.json"
+    },
+    "popup-feature-layout-evidence/edge/feature-grid-embedded-marker-css-fixture-default-320-light-3.png": {
+      "kind": "original-byte-copy",
+      "bytes": 47662,
+      "sha256": "8a7f2797a32673c691255451da36f8597406166f417ec6fdff9c2535f5fdd987",
+      "sourceRelative": "research/safari-touch-flex-production-build-20261017/edge-popup-feature-grid-attempt2/feature-grid-embedded-marker-css-fixture-default-320-light-3.png"
+    },
+    "popup-feature-layout-evidence/edge/feature-grid-embedded-marker-css-fixture-minimal-320-light-3.json": {
+      "kind": "original-byte-copy",
+      "bytes": 2770,
+      "sha256": "1ef28be57e777c5038b2ac9f8b9937513fbf5fd8339dd21cb23a200ba3c18e6b",
+      "sourceRelative": "research/safari-touch-flex-production-build-20261017/edge-popup-feature-grid-attempt2/feature-grid-embedded-marker-css-fixture-minimal-320-light-3.json"
+    },
+    "popup-feature-layout-evidence/edge/feature-grid-ordinary-compact-320-light-3.json": {
+      "kind": "original-byte-copy",
+      "bytes": 2705,
+      "sha256": "2881b20ca14ef3a24a8b54aee282247f426b11e4c4a3c69555c33f33c9f1ec98",
+      "sourceRelative": "research/safari-touch-flex-production-build-20261017/edge-popup-feature-grid-attempt2/feature-grid-ordinary-compact-320-light-3.json"
+    },
+    "popup-feature-layout-evidence/edge/feature-grid-ordinary-default-320-light-3.json": {
+      "kind": "original-byte-copy",
+      "bytes": 2795,
+      "sha256": "5dbc82101e9290120c527348a79dbf7ce284d702f6e899fc5b218753d65ed00c",
+      "sourceRelative": "research/safari-touch-flex-production-build-20261017/edge-popup-feature-grid-attempt2/feature-grid-ordinary-default-320-light-3.json"
+    },
+    "popup-feature-layout-evidence/edge/feature-grid-ordinary-default-320-light-3.png": {
+      "kind": "original-byte-copy",
+      "bytes": 47662,
+      "sha256": "8a7f2797a32673c691255451da36f8597406166f417ec6fdff9c2535f5fdd987",
+      "sourceRelative": "research/safari-touch-flex-production-build-20261017/edge-popup-feature-grid-attempt2/feature-grid-ordinary-default-320-light-3.png"
+    },
+    "popup-feature-layout-evidence/edge/feature-grid-ordinary-minimal-320-light-3.json": {
+      "kind": "original-byte-copy",
+      "bytes": 2732,
+      "sha256": "de68b3282b977d6981eb403788a61a20c9c223240844bba50883cde42aeb6944",
+      "sourceRelative": "research/safari-touch-flex-production-build-20261017/edge-popup-feature-grid-attempt2/feature-grid-ordinary-minimal-320-light-3.json"
+    },
+    "popup-feature-layout-evidence/edge/feature-grid-safari-marker-css-fixture-compact-320-dark-3.json": {
+      "kind": "original-byte-copy",
+      "bytes": 2791,
+      "sha256": "82918abfb90a1fc1d6b981c59770beb3cc3a1b3a5d2142c1d6418c4e01e42bd3",
+      "sourceRelative": "research/safari-touch-flex-production-build-20261017/edge-popup-feature-grid-attempt2/feature-grid-safari-marker-css-fixture-compact-320-dark-3.json"
+    },
+    "popup-feature-layout-evidence/edge/feature-grid-safari-marker-css-fixture-compact-320-dark-3.png": {
+      "kind": "original-byte-copy",
+      "bytes": 52594,
+      "sha256": "da84970afddc567cb09fce9d8b2958455dc4c3f1d44459867ec8faffdcb15a4d",
+      "sourceRelative": "research/safari-touch-flex-production-build-20261017/edge-popup-feature-grid-attempt2/feature-grid-safari-marker-css-fixture-compact-320-dark-3.png"
+    },
+    "popup-feature-layout-evidence/edge/feature-grid-safari-marker-css-fixture-compact-320-dark-4.json": {
+      "kind": "original-byte-copy",
+      "bytes": 3449,
+      "sha256": "545622f9c22d7f3a56e792c95258538182d083e9e2a9f8f13218b49ddffb35e8",
+      "sourceRelative": "research/safari-touch-flex-production-build-20261017/edge-popup-feature-grid-attempt2/feature-grid-safari-marker-css-fixture-compact-320-dark-4.json"
+    },
+    "popup-feature-layout-evidence/edge/feature-grid-safari-marker-css-fixture-compact-320-light-3.json": {
+      "kind": "original-byte-copy",
+      "bytes": 2734,
+      "sha256": "8a389334bb0411c87f8ef8108e64913b2e2fce0d9352d55e2e1d40e247acd8a1",
+      "sourceRelative": "research/safari-touch-flex-production-build-20261017/edge-popup-feature-grid-attempt2/feature-grid-safari-marker-css-fixture-compact-320-light-3.json"
+    },
+    "popup-feature-layout-evidence/edge/feature-grid-safari-marker-css-fixture-compact-320-light-4.json": {
+      "kind": "original-byte-copy",
+      "bytes": 3511,
+      "sha256": "bac491552a769adde1fa6580a0064a73a2d431f1fa357b03fbd5c94aa0c0497f",
+      "sourceRelative": "research/safari-touch-flex-production-build-20261017/edge-popup-feature-grid-attempt2/feature-grid-safari-marker-css-fixture-compact-320-light-4.json"
+    },
+    "popup-feature-layout-evidence/edge/feature-grid-safari-marker-css-fixture-compact-320-light-4.png": {
+      "kind": "original-byte-copy",
+      "bytes": 53851,
+      "sha256": "b86d2f4bbbf15f42a3a6a0824dac2698aa4757a8332bfaf430900c239c80e4ef",
+      "sourceRelative": "research/safari-touch-flex-production-build-20261017/edge-popup-feature-grid-attempt2/feature-grid-safari-marker-css-fixture-compact-320-light-4.png"
+    },
+    "popup-feature-layout-evidence/edge/feature-grid-safari-marker-css-fixture-compact-402-dark-3.json": {
+      "kind": "original-byte-copy",
+      "bytes": 2800,
+      "sha256": "143a09d9e984b01ba728c59add87284d8c9759cb4be0b7a7fa38035fd2d14354",
+      "sourceRelative": "research/safari-touch-flex-production-build-20261017/edge-popup-feature-grid-attempt2/feature-grid-safari-marker-css-fixture-compact-402-dark-3.json"
+    },
+    "popup-feature-layout-evidence/edge/feature-grid-safari-marker-css-fixture-compact-402-dark-3.png": {
+      "kind": "original-byte-copy",
+      "bytes": 55457,
+      "sha256": "db73f5473ed80815442ecb7d93175f61790ac23ac82088a42bc5db280c41a74a",
+      "sourceRelative": "research/safari-touch-flex-production-build-20261017/edge-popup-feature-grid-attempt2/feature-grid-safari-marker-css-fixture-compact-402-dark-3.png"
+    },
+    "popup-feature-layout-evidence/edge/feature-grid-safari-marker-css-fixture-compact-402-dark-4.json": {
+      "kind": "original-byte-copy",
+      "bytes": 3461,
+      "sha256": "d187e0a3e0feb4eb528fd26548917702424e0e0e810a8c5ee303fc15b22c639c",
+      "sourceRelative": "research/safari-touch-flex-production-build-20261017/edge-popup-feature-grid-attempt2/feature-grid-safari-marker-css-fixture-compact-402-dark-4.json"
+    },
+    "popup-feature-layout-evidence/edge/feature-grid-safari-marker-css-fixture-compact-402-light-3.json": {
+      "kind": "original-byte-copy",
+      "bytes": 2743,
+      "sha256": "60868954e5542d3a0d7d9000570b57748ddfabb0be5615a34622aab82fd8783f",
+      "sourceRelative": "research/safari-touch-flex-production-build-20261017/edge-popup-feature-grid-attempt2/feature-grid-safari-marker-css-fixture-compact-402-light-3.json"
+    },
+    "popup-feature-layout-evidence/edge/feature-grid-safari-marker-css-fixture-compact-402-light-4.json": {
+      "kind": "original-byte-copy",
+      "bytes": 3463,
+      "sha256": "c7b9a99f7eb650cbcde9de7ceadd5dd99194f68b79ed1c942b174ab1d48efd05",
+      "sourceRelative": "research/safari-touch-flex-production-build-20261017/edge-popup-feature-grid-attempt2/feature-grid-safari-marker-css-fixture-compact-402-light-4.json"
+    },
+    "popup-feature-layout-evidence/edge/feature-grid-safari-marker-css-fixture-default-320-dark-3.json": {
+      "kind": "original-byte-copy",
+      "bytes": 2838,
+      "sha256": "cdcf2bbb9e5615ac5b335a7ceb1d45adcf758288c2985f538a32ed9b8f0a142d",
+      "sourceRelative": "research/safari-touch-flex-production-build-20261017/edge-popup-feature-grid-attempt2/feature-grid-safari-marker-css-fixture-default-320-dark-3.json"
+    },
+    "popup-feature-layout-evidence/edge/feature-grid-safari-marker-css-fixture-default-320-dark-3.png": {
+      "kind": "original-byte-copy",
+      "bytes": 58670,
+      "sha256": "cca2d21198267b3ce6ab8c21fc65c1c173e41bb37cf56e3470e48037e6a02fe5",
+      "sourceRelative": "research/safari-touch-flex-production-build-20261017/edge-popup-feature-grid-attempt2/feature-grid-safari-marker-css-fixture-default-320-dark-3.png"
+    },
+    "popup-feature-layout-evidence/edge/feature-grid-safari-marker-css-fixture-default-320-dark-4.json": {
+      "kind": "original-byte-copy",
+      "bytes": 3512,
+      "sha256": "18e3737653539b615fe6f7a7397e34182bea8f2360e16a3a59824b5fee26cbe9",
+      "sourceRelative": "research/safari-touch-flex-production-build-20261017/edge-popup-feature-grid-attempt2/feature-grid-safari-marker-css-fixture-default-320-dark-4.json"
+    },
+    "popup-feature-layout-evidence/edge/feature-grid-safari-marker-css-fixture-default-320-light-3.json": {
+      "kind": "original-byte-copy",
+      "bytes": 2781,
+      "sha256": "b69538fb32ae67e5dadb256d38827a74ce741bfcbee703d8c0a338f8a25db6fc",
+      "sourceRelative": "research/safari-touch-flex-production-build-20261017/edge-popup-feature-grid-attempt2/feature-grid-safari-marker-css-fixture-default-320-light-3.json"
+    },
+    "popup-feature-layout-evidence/edge/feature-grid-safari-marker-css-fixture-default-320-light-4.json": {
+      "kind": "original-byte-copy",
+      "bytes": 3574,
+      "sha256": "7db84e2883c235e1174f7c5811cd1752d46576ffe446251e5825d6c810b047e8",
+      "sourceRelative": "research/safari-touch-flex-production-build-20261017/edge-popup-feature-grid-attempt2/feature-grid-safari-marker-css-fixture-default-320-light-4.json"
+    },
+    "popup-feature-layout-evidence/edge/feature-grid-safari-marker-css-fixture-default-320-light-4.png": {
+      "kind": "original-byte-copy",
+      "bytes": 49899,
+      "sha256": "62af64962ece64d134d35b7a9f0a59eca403fa1fc62f123c7660cc32cd7b2125",
+      "sourceRelative": "research/safari-touch-flex-production-build-20261017/edge-popup-feature-grid-attempt2/feature-grid-safari-marker-css-fixture-default-320-light-4.png"
+    },
+    "popup-feature-layout-evidence/edge/feature-grid-safari-marker-css-fixture-default-402-dark-3.json": {
+      "kind": "original-byte-copy",
+      "bytes": 2847,
+      "sha256": "2b85ffd66b922d36e2f70013bc6837cf919ed308e5051df7337e33968a61b05c",
+      "sourceRelative": "research/safari-touch-flex-production-build-20261017/edge-popup-feature-grid-attempt2/feature-grid-safari-marker-css-fixture-default-402-dark-3.json"
+    },
+    "popup-feature-layout-evidence/edge/feature-grid-safari-marker-css-fixture-default-402-dark-3.png": {
+      "kind": "original-byte-copy",
+      "bytes": 61627,
+      "sha256": "528da603beb483c862bb1f5ba0114f61b21a9b080a53a98fce97ae8b7a9a416f",
+      "sourceRelative": "research/safari-touch-flex-production-build-20261017/edge-popup-feature-grid-attempt2/feature-grid-safari-marker-css-fixture-default-402-dark-3.png"
+    },
+    "popup-feature-layout-evidence/edge/feature-grid-safari-marker-css-fixture-default-402-dark-4.json": {
+      "kind": "original-byte-copy",
+      "bytes": 3524,
+      "sha256": "3bc107c278ff00ce7255db3d074ded38ea24c2c0c61ee78657d632cc693664af",
+      "sourceRelative": "research/safari-touch-flex-production-build-20261017/edge-popup-feature-grid-attempt2/feature-grid-safari-marker-css-fixture-default-402-dark-4.json"
+    },
+    "popup-feature-layout-evidence/edge/feature-grid-safari-marker-css-fixture-default-402-light-3.json": {
+      "kind": "original-byte-copy",
+      "bytes": 2790,
+      "sha256": "2955fc71961e6e796c80727066f1cfa3d148e4d70422bbc9a4882947f7c16642",
+      "sourceRelative": "research/safari-touch-flex-production-build-20261017/edge-popup-feature-grid-attempt2/feature-grid-safari-marker-css-fixture-default-402-light-3.json"
+    },
+    "popup-feature-layout-evidence/edge/feature-grid-safari-marker-css-fixture-default-402-light-4.json": {
+      "kind": "original-byte-copy",
+      "bytes": 3526,
+      "sha256": "669e531516b095324750d2ec6ffd548739bd23698cb9bb3d2f137480124840c0",
+      "sourceRelative": "research/safari-touch-flex-production-build-20261017/edge-popup-feature-grid-attempt2/feature-grid-safari-marker-css-fixture-default-402-light-4.json"
+    },
+    "popup-feature-layout-evidence/edge/feature-grid-safari-marker-css-fixture-minimal-320-dark-3.json": {
+      "kind": "original-byte-copy",
+      "bytes": 2818,
+      "sha256": "2bed7dde79c18a0d19663c7d9d89002ada62840459899e6fdc4393259fb8ed8f",
+      "sourceRelative": "research/safari-touch-flex-production-build-20261017/edge-popup-feature-grid-attempt2/feature-grid-safari-marker-css-fixture-minimal-320-dark-3.json"
+    },
+    "popup-feature-layout-evidence/edge/feature-grid-safari-marker-css-fixture-minimal-320-dark-3.png": {
+      "kind": "original-byte-copy",
+      "bytes": 41185,
+      "sha256": "23b37c982fdcaccc95b7b55ad837289a63a8d85f042f128ed6c25c29e79e7025",
+      "sourceRelative": "research/safari-touch-flex-production-build-20261017/edge-popup-feature-grid-attempt2/feature-grid-safari-marker-css-fixture-minimal-320-dark-3.png"
+    },
+    "popup-feature-layout-evidence/edge/feature-grid-safari-marker-css-fixture-minimal-320-dark-4.json": {
+      "kind": "original-byte-copy",
+      "bytes": 3484,
+      "sha256": "bb6cbf6ae7ca6afbd6b729099853e392aa4fc89e264c7b65c9e93aa0bf3d8f11",
+      "sourceRelative": "research/safari-touch-flex-production-build-20261017/edge-popup-feature-grid-attempt2/feature-grid-safari-marker-css-fixture-minimal-320-dark-4.json"
+    },
+    "popup-feature-layout-evidence/edge/feature-grid-safari-marker-css-fixture-minimal-320-light-3.json": {
+      "kind": "original-byte-copy",
+      "bytes": 2761,
+      "sha256": "f5fcce318d0a755549f3e7f854c9dcb9fddd6a24a6f301965938ad70c25ef38b",
+      "sourceRelative": "research/safari-touch-flex-production-build-20261017/edge-popup-feature-grid-attempt2/feature-grid-safari-marker-css-fixture-minimal-320-light-3.json"
+    },
+    "popup-feature-layout-evidence/edge/feature-grid-safari-marker-css-fixture-minimal-320-light-4.json": {
+      "kind": "original-byte-copy",
+      "bytes": 3546,
+      "sha256": "2572460cf7f194374e4a64cd68e25e7674cb50156055df99e66c7e30fae9cd48",
+      "sourceRelative": "research/safari-touch-flex-production-build-20261017/edge-popup-feature-grid-attempt2/feature-grid-safari-marker-css-fixture-minimal-320-light-4.json"
+    },
+    "popup-feature-layout-evidence/edge/feature-grid-safari-marker-css-fixture-minimal-320-light-4.png": {
+      "kind": "original-byte-copy",
+      "bytes": 43055,
+      "sha256": "074c17ff03446ccaefd3339044c40a6bbc47c077e06d9770f0ab2e6b6179efe7",
+      "sourceRelative": "research/safari-touch-flex-production-build-20261017/edge-popup-feature-grid-attempt2/feature-grid-safari-marker-css-fixture-minimal-320-light-4.png"
+    },
+    "popup-feature-layout-evidence/edge/feature-grid-safari-marker-css-fixture-minimal-402-dark-3.json": {
+      "kind": "original-byte-copy",
+      "bytes": 2824,
+      "sha256": "cf6923a8824a2c76909e1522e197d96072123d27465bf393cf45cfbd6ad2ea8b",
+      "sourceRelative": "research/safari-touch-flex-production-build-20261017/edge-popup-feature-grid-attempt2/feature-grid-safari-marker-css-fixture-minimal-402-dark-3.json"
+    },
+    "popup-feature-layout-evidence/edge/feature-grid-safari-marker-css-fixture-minimal-402-dark-3.png": {
+      "kind": "original-byte-copy",
+      "bytes": 42036,
+      "sha256": "ddfda8f8e295bfbbacd907803eb37ee3a66cec9281994e2b62e34c1b428686d9",
+      "sourceRelative": "research/safari-touch-flex-production-build-20261017/edge-popup-feature-grid-attempt2/feature-grid-safari-marker-css-fixture-minimal-402-dark-3.png"
+    },
+    "popup-feature-layout-evidence/edge/feature-grid-safari-marker-css-fixture-minimal-402-dark-4.json": {
+      "kind": "original-byte-copy",
+      "bytes": 3492,
+      "sha256": "9e9cfa0dc87aa48c7a78522cc92da8ea4373a3ffb1ff26627f462e5b19f6cbb7",
+      "sourceRelative": "research/safari-touch-flex-production-build-20261017/edge-popup-feature-grid-attempt2/feature-grid-safari-marker-css-fixture-minimal-402-dark-4.json"
+    },
+    "popup-feature-layout-evidence/edge/feature-grid-safari-marker-css-fixture-minimal-402-light-3.json": {
+      "kind": "original-byte-copy",
+      "bytes": 2767,
+      "sha256": "182045b67ea9bd6bd15fa9c8e57ffcd3987e50ddfb52e015b090a825981eaefa",
+      "sourceRelative": "research/safari-touch-flex-production-build-20261017/edge-popup-feature-grid-attempt2/feature-grid-safari-marker-css-fixture-minimal-402-light-3.json"
+    },
+    "popup-feature-layout-evidence/edge/feature-grid-safari-marker-css-fixture-minimal-402-light-4.json": {
+      "kind": "original-byte-copy",
+      "bytes": 3494,
+      "sha256": "5d51bc4113c8e490b55aca7f6c8a7dcd5e14b812831a918e3e4ac54e58452817",
+      "sourceRelative": "research/safari-touch-flex-production-build-20261017/edge-popup-feature-grid-attempt2/feature-grid-safari-marker-css-fixture-minimal-402-light-4.json"
+    },
+    "popup-feature-layout-evidence/edge/report.public.json": {
+      "kind": "derived-public-draft",
+      "bytes": 120335,
+      "sha256": "eff3b2c2d3fe4b21a28b19a6d736952f564f1bd069960486b4b70c9763561c2b",
+      "sourceRelative": "public-draft/evidence/edge/report.public.json"
+    },
+    "popup-feature-layout-evidence/native/attachments/0CDFCDE9-ECDD-41FC-89AE-967021EAE90B.json": {
+      "kind": "original-byte-copy",
+      "bytes": 2741,
+      "sha256": "06cf3063ca909454d20917762dd199abefc04fc937b374369c2b5792c1562028",
+      "sourceRelative": "research/current-production-touch-flex-popup-scroll-attempt1/runtime-attachments/0CDFCDE9-ECDD-41FC-89AE-967021EAE90B.json"
+    },
+    "popup-feature-layout-evidence/native/attachments/1E615A14-6D93-4F64-AB7C-22C0F7C4DE8B.png": {
+      "kind": "original-byte-copy",
+      "bytes": 444869,
+      "sha256": "2beebe045cd0b00f23020b276ecd28a2ed3174bd8f9026157df5eb40b4a6c621",
+      "sourceRelative": "research/current-production-touch-flex-popup-scroll-attempt1/runtime-attachments/1E615A14-6D93-4F64-AB7C-22C0F7C4DE8B.png"
+    },
+    "popup-feature-layout-evidence/native/attachments/23E5ED5B-39A1-48CA-A161-1FCF6BEB2753.json": {
+      "kind": "original-byte-copy",
+      "bytes": 2968,
+      "sha256": "9b3d2e3bc0f45e33559ca75099e51981be7c036978436bfdb1e73c65d0db5f7b",
+      "sourceRelative": "research/current-production-touch-flex-popup-scroll-attempt1/runtime-attachments/23E5ED5B-39A1-48CA-A161-1FCF6BEB2753.json"
+    },
+    "popup-feature-layout-evidence/native/attachments/2DAB4646-AD49-4ECB-B2EC-7C1C8D6DE95A.json": {
+      "kind": "original-byte-copy",
+      "bytes": 181,
+      "sha256": "a1420c96d1f49a29ebcb90af7e108de48198902ba88c9a03e15d4d420e51bcc4",
+      "sourceRelative": "research/current-production-touch-flex-popup-scroll-attempt1/runtime-attachments/2DAB4646-AD49-4ECB-B2EC-7C1C8D6DE95A.json"
+    },
+    "popup-feature-layout-evidence/native/attachments/312EDDE2-324D-4860-A7EE-8670C4CA943E.json": {
+      "kind": "original-byte-copy",
+      "bytes": 190,
+      "sha256": "dfd05233a21cdf8c1a46a79e14122284033a04cb077b7e3f71d1ce74b78eee96",
+      "sourceRelative": "research/current-production-touch-flex-popup-scroll-attempt1/runtime-attachments/312EDDE2-324D-4860-A7EE-8670C4CA943E.json"
+    },
+    "popup-feature-layout-evidence/native/attachments/321282EC-1DD0-4C98-B7A4-61A672724931.json": {
+      "kind": "original-byte-copy",
+      "bytes": 193,
+      "sha256": "0fc95edad1758e466808893eb6f0892197d60b789c6f12aeec2161c0680bbf26",
+      "sourceRelative": "research/current-production-touch-flex-popup-scroll-attempt1/runtime-attachments/321282EC-1DD0-4C98-B7A4-61A672724931.json"
+    },
+    "popup-feature-layout-evidence/native/attachments/3438D134-FA92-4EAC-8104-B8D5940FE2D0.png": {
+      "kind": "original-byte-copy",
+      "bytes": 444857,
+      "sha256": "324af965e20af0ee35ec189520f2f1bd96159dab882222391fbfd37272daa34b",
+      "sourceRelative": "research/current-production-touch-flex-popup-scroll-attempt1/runtime-attachments/3438D134-FA92-4EAC-8104-B8D5940FE2D0.png"
+    },
+    "popup-feature-layout-evidence/native/attachments/39728C8F-4153-43C9-AD47-8A3BE1745B68.json": {
+      "kind": "original-byte-copy",
+      "bytes": 168,
+      "sha256": "4008dfdb8c1aa55e1de78257432520983943750eba91b349b667aee8dda92798",
+      "sourceRelative": "research/current-production-touch-flex-popup-scroll-attempt1/runtime-attachments/39728C8F-4153-43C9-AD47-8A3BE1745B68.json"
+    },
+    "popup-feature-layout-evidence/native/attachments/3AC5B8E8-EB6A-49D9-AC75-5C24FE3BDB20.json": {
+      "kind": "original-byte-copy",
+      "bytes": 376,
+      "sha256": "56141940a03c70e6c629852b8bf4c3eb7b4f537c2068522d113043f7b25cc84b",
+      "sourceRelative": "research/current-production-touch-flex-popup-scroll-attempt1/runtime-attachments/3AC5B8E8-EB6A-49D9-AC75-5C24FE3BDB20.json"
+    },
+    "popup-feature-layout-evidence/native/attachments/456082F7-400B-4EEA-BFE1-B0F8CD589AF6.json": {
+      "kind": "original-byte-copy",
+      "bytes": 179,
+      "sha256": "c75a0f28d5d32e0389461f96c591a0013a38cd03ef14279cce0ad0e91644a378",
+      "sourceRelative": "research/current-production-touch-flex-popup-scroll-attempt1/runtime-attachments/456082F7-400B-4EEA-BFE1-B0F8CD589AF6.json"
+    },
+    "popup-feature-layout-evidence/native/attachments/48A43835-1F4E-4FEC-98EF-95246F2A285B.json": {
+      "kind": "original-byte-copy",
+      "bytes": 255,
+      "sha256": "1a8a0a3438692576dff676d3e8829d1d53f70bcb89e42263f5dce2a79f5c36a4",
+      "sourceRelative": "research/current-production-touch-flex-popup-scroll-attempt1/runtime-attachments/48A43835-1F4E-4FEC-98EF-95246F2A285B.json"
+    },
+    "popup-feature-layout-evidence/native/attachments/5035BBF4-450B-459F-8346-F3850F7DBD74.json": {
+      "kind": "original-byte-copy",
+      "bytes": 173,
+      "sha256": "2e90cfb54c44ed72a8496d33db7059f27bf957d138c0bada703c72e932a777d2",
+      "sourceRelative": "research/current-production-touch-flex-popup-scroll-attempt1/runtime-attachments/5035BBF4-450B-459F-8346-F3850F7DBD74.json"
+    },
+    "popup-feature-layout-evidence/native/attachments/54015268-D71C-4B85-BD14-AA7FDB451F17.json": {
+      "kind": "original-byte-copy",
+      "bytes": 175,
+      "sha256": "931e578a5e25d3f660c5cf672bd5156aeff9ffaaecdc5b3fd27d6fd1845d89cf",
+      "sourceRelative": "research/current-production-touch-flex-popup-scroll-attempt1/runtime-attachments/54015268-D71C-4B85-BD14-AA7FDB451F17.json"
+    },
+    "popup-feature-layout-evidence/native/attachments/58B47641-BDF4-4514-9763-6711A20089C5.json": {
+      "kind": "original-byte-copy",
+      "bytes": 250,
+      "sha256": "950433a4b7860b620d28e0def89d2a829e2eff6126125dbba111bdff059631a1",
+      "sourceRelative": "research/current-production-touch-flex-popup-scroll-attempt1/runtime-attachments/58B47641-BDF4-4514-9763-6711A20089C5.json"
+    },
+    "popup-feature-layout-evidence/native/attachments/5D88B062-E69F-4105-8BAF-EAE68E790FC0.json": {
+      "kind": "original-byte-copy",
+      "bytes": 178,
+      "sha256": "5cfd0bdcc5b8908b2be956ea7f616e8178fb4664b548b533ed5be1f38e0d4571",
+      "sourceRelative": "research/current-production-touch-flex-popup-scroll-attempt1/runtime-attachments/5D88B062-E69F-4105-8BAF-EAE68E790FC0.json"
+    },
+    "popup-feature-layout-evidence/native/attachments/60D9A35B-B35A-485A-81BA-AF2EDB4500FF.json": {
+      "kind": "original-byte-copy",
+      "bytes": 180,
+      "sha256": "ee074e2abcd10eb0d332b72849ee8b39fe70e4a29519ba5d2556eccee9a4b3e2",
+      "sourceRelative": "research/current-production-touch-flex-popup-scroll-attempt1/runtime-attachments/60D9A35B-B35A-485A-81BA-AF2EDB4500FF.json"
+    },
+    "popup-feature-layout-evidence/native/attachments/6D3DC9C9-5B5F-4260-8234-260D1C2BC26F.json": {
+      "kind": "original-byte-copy",
+      "bytes": 174,
+      "sha256": "0379de8254fe002a3bb4b90390cf930f1763a077abe31cc8f7b6ca88704ee1fc",
+      "sourceRelative": "research/current-production-touch-flex-popup-scroll-attempt1/runtime-attachments/6D3DC9C9-5B5F-4260-8234-260D1C2BC26F.json"
+    },
+    "popup-feature-layout-evidence/native/attachments/7BDA7CAD-183A-4668-8C11-0F5C7B472413.json": {
+      "kind": "original-byte-copy",
+      "bytes": 2908,
+      "sha256": "005248a05eb3c43270b48bd87550f1eaf9db1a5fe9444a65d59d9e7ce5866a49",
+      "sourceRelative": "research/current-production-touch-flex-popup-scroll-attempt1/runtime-attachments/7BDA7CAD-183A-4668-8C11-0F5C7B472413.json"
+    },
+    "popup-feature-layout-evidence/native/attachments/83B90A0F-9AA4-447E-B6E6-28EB0DD9CE48.json": {
+      "kind": "original-byte-copy",
+      "bytes": 179,
+      "sha256": "b17bbe6597b7bf2373e89ba1b753159459737e27476d9e38819950acc7369fa3",
+      "sourceRelative": "research/current-production-touch-flex-popup-scroll-attempt1/runtime-attachments/83B90A0F-9AA4-447E-B6E6-28EB0DD9CE48.json"
+    },
+    "popup-feature-layout-evidence/native/attachments/8DD4EFEB-ECB3-4164-943D-49C71BB93492.json": {
+      "kind": "original-byte-copy",
+      "bytes": 118,
+      "sha256": "ac541d7a4d95bb5dcca95299f9287e3535bc7f6754747e890a7a52ad8e610998",
+      "sourceRelative": "research/current-production-touch-flex-popup-scroll-attempt1/runtime-attachments/8DD4EFEB-ECB3-4164-943D-49C71BB93492.json"
+    },
+    "popup-feature-layout-evidence/native/attachments/9384DA18-AD6F-4B09-A0E7-F1A38CFBF93F.json": {
+      "kind": "original-byte-copy",
+      "bytes": 114,
+      "sha256": "4d484b2d036d1865a66ed2f71a8e01f0d02b3f86ad6c1c8cb99878a7659342d4",
+      "sourceRelative": "research/current-production-touch-flex-popup-scroll-attempt1/runtime-attachments/9384DA18-AD6F-4B09-A0E7-F1A38CFBF93F.json"
+    },
+    "popup-feature-layout-evidence/native/attachments/96F3E92E-2BD1-46B5-BFF8-7C89DD0F97EB.json": {
+      "kind": "original-byte-copy",
+      "bytes": 122,
+      "sha256": "a4b6b20b71c4ef75d92ded2476922ff7b14e7b3f5246c8926edc259884491a1a",
+      "sourceRelative": "research/current-production-touch-flex-popup-scroll-attempt1/runtime-attachments/96F3E92E-2BD1-46B5-BFF8-7C89DD0F97EB.json"
+    },
+    "popup-feature-layout-evidence/native/attachments/A369842E-9E46-4A61-B0FC-C9FB4AF55DD5.json": {
+      "kind": "original-byte-copy",
+      "bytes": 110,
+      "sha256": "d6ad1d044f0652c8725d24df608ded7b4d5a4c9d6874a0aa7db8cd58d598b599",
+      "sourceRelative": "research/current-production-touch-flex-popup-scroll-attempt1/runtime-attachments/A369842E-9E46-4A61-B0FC-C9FB4AF55DD5.json"
+    },
+    "popup-feature-layout-evidence/native/attachments/ACD041FE-A608-4DAB-B711-66F311CA3D0C.json": {
+      "kind": "original-byte-copy",
+      "bytes": 170,
+      "sha256": "acbfd5bc487714f0587ac2dc6d439460768e0a8eb6a85b967fddf6436be22c47",
+      "sourceRelative": "research/current-production-touch-flex-popup-scroll-attempt1/runtime-attachments/ACD041FE-A608-4DAB-B711-66F311CA3D0C.json"
+    },
+    "popup-feature-layout-evidence/native/attachments/AD594B46-CAB8-48E1-B5C7-1207DC82092A.json": {
+      "kind": "original-byte-copy",
+      "bytes": 179,
+      "sha256": "6f4942e73c3c7c476707b2771aa97e419ccfe502eccf0d374184a2ab9a2880da",
+      "sourceRelative": "research/current-production-touch-flex-popup-scroll-attempt1/runtime-attachments/AD594B46-CAB8-48E1-B5C7-1207DC82092A.json"
+    },
+    "popup-feature-layout-evidence/native/attachments/AD5BD695-82EE-4E11-8D07-941C7AF03749.json": {
+      "kind": "original-byte-copy",
+      "bytes": 472,
+      "sha256": "cf8032d754f792e937744512aecfd23e0a0e09ee26c95c369b262a88718a6c68",
+      "sourceRelative": "research/current-production-touch-flex-popup-scroll-attempt1/runtime-attachments/AD5BD695-82EE-4E11-8D07-941C7AF03749.json"
+    },
+    "popup-feature-layout-evidence/native/attachments/AD8590FC-2BB9-4B28-8CCE-351A2903466B.json": {
+      "kind": "original-byte-copy",
+      "bytes": 271,
+      "sha256": "a313334b730d01253a497f1bcae4e1e2b3a498d50674f5cc3f2257b55d790ca8",
+      "sourceRelative": "research/current-production-touch-flex-popup-scroll-attempt1/runtime-attachments/AD8590FC-2BB9-4B28-8CCE-351A2903466B.json"
+    },
+    "popup-feature-layout-evidence/native/attachments/AEE0CBAC-459E-41F0-BFCC-7DA4B92E78B3.json": {
+      "kind": "original-byte-copy",
+      "bytes": 167,
+      "sha256": "f854f2fa030597fbcc771102b3f73f4e84ea014bfc4c9c271f0133a5a2098a73",
+      "sourceRelative": "research/current-production-touch-flex-popup-scroll-attempt1/runtime-attachments/AEE0CBAC-459E-41F0-BFCC-7DA4B92E78B3.json"
+    },
+    "popup-feature-layout-evidence/native/attachments/C198A407-917B-4AD8-883B-5B03ABB35530.json": {
+      "kind": "original-byte-copy",
+      "bytes": 110,
+      "sha256": "054ca89a224d3c4292ddaf66adc57a7a29a234715fe58beedbc49e1e9a1d52bd",
+      "sourceRelative": "research/current-production-touch-flex-popup-scroll-attempt1/runtime-attachments/C198A407-917B-4AD8-883B-5B03ABB35530.json"
+    },
+    "popup-feature-layout-evidence/native/attachments/C3E37D67-5945-4BFC-A6E8-5C2743E3F686.json": {
+      "kind": "original-byte-copy",
+      "bytes": 167,
+      "sha256": "69bad9006ddb97d03fa871107c16184eb0ba2ebdd542842328ff8f830047c67d",
+      "sourceRelative": "research/current-production-touch-flex-popup-scroll-attempt1/runtime-attachments/C3E37D67-5945-4BFC-A6E8-5C2743E3F686.json"
+    },
+    "popup-feature-layout-evidence/native/attachments/C771A2BC-FB2D-4FE8-AB43-E5CF628F0195.json": {
+      "kind": "original-byte-copy",
+      "bytes": 66,
+      "sha256": "f3af6c8ae26da467f5baba933ae9f15a33c179c088456d5bc4652ff1ee1bf669",
+      "sourceRelative": "research/current-production-touch-flex-popup-scroll-attempt1/runtime-attachments/C771A2BC-FB2D-4FE8-AB43-E5CF628F0195.json"
+    },
+    "popup-feature-layout-evidence/native/attachments/C9E3AE1F-A804-466B-B1A9-6970C4B69A5D.png": {
+      "kind": "original-byte-copy",
+      "bytes": 391836,
+      "sha256": "47b702de8354c475a42636eda873f169b26c9bd47d8ea21a84c889e47810c824",
+      "sourceRelative": "research/current-production-touch-flex-popup-scroll-attempt1/runtime-attachments/C9E3AE1F-A804-466B-B1A9-6970C4B69A5D.png"
+    },
+    "popup-feature-layout-evidence/native/attachments/D2138A1C-CBB5-4A57-8EC6-270254E27468.json": {
+      "kind": "original-byte-copy",
+      "bytes": 728,
+      "sha256": "87fb27336ae58a2ca35117836c78f6d7e68f1941605099c6ab2413eebd79774e",
+      "sourceRelative": "research/current-production-touch-flex-popup-scroll-attempt1/runtime-attachments/D2138A1C-CBB5-4A57-8EC6-270254E27468.json"
+    },
+    "popup-feature-layout-evidence/native/attachments/D6BEBF84-738C-46D5-816D-8C8627788808.json": {
+      "kind": "original-byte-copy",
+      "bytes": 113,
+      "sha256": "38e270377203209d3ee0423aeaa27ecb61c150b02cf07976b02c3e0e58f22c84",
+      "sourceRelative": "research/current-production-touch-flex-popup-scroll-attempt1/runtime-attachments/D6BEBF84-738C-46D5-816D-8C8627788808.json"
+    },
+    "popup-feature-layout-evidence/native/attachments/D938FAC9-7206-48EB-8119-7CBEA6185012.json": {
+      "kind": "original-byte-copy",
+      "bytes": 122,
+      "sha256": "34a119dc3965b96c2e3377d4e474e98ca3eff8933bfea238574ebfc71bb638ac",
+      "sourceRelative": "research/current-production-touch-flex-popup-scroll-attempt1/runtime-attachments/D938FAC9-7206-48EB-8119-7CBEA6185012.json"
+    },
+    "popup-feature-layout-evidence/native/attachments/E983D422-21E0-479F-A9F5-5F02AFEB4A1C.json": {
+      "kind": "original-byte-copy",
+      "bytes": 170,
+      "sha256": "4a004bf70fb4733a637df257335434d092209bd8a90a788f84dfac666f6e3abb",
+      "sourceRelative": "research/current-production-touch-flex-popup-scroll-attempt1/runtime-attachments/E983D422-21E0-479F-A9F5-5F02AFEB4A1C.json"
+    },
+    "popup-feature-layout-evidence/native/attachments/F03F2601-2F9F-4BD6-A478-66F8AEC24D3A.json": {
+      "kind": "original-byte-copy",
+      "bytes": 171,
+      "sha256": "51e8e3f6e00dee088c9952a3833778c8e6d136a1e0cc45143464d3082bfb7758",
+      "sourceRelative": "research/current-production-touch-flex-popup-scroll-attempt1/runtime-attachments/F03F2601-2F9F-4BD6-A478-66F8AEC24D3A.json"
+    },
+    "popup-feature-layout-evidence/native/attachments/F750E663-B7F6-46A5-8A7E-77661F189DB3.json": {
+      "kind": "original-byte-copy",
+      "bytes": 111,
+      "sha256": "caef5b78aba305e910757b0a1706a75070de4f2261aa82e0116e6d3181cc06aa",
+      "sourceRelative": "research/current-production-touch-flex-popup-scroll-attempt1/runtime-attachments/F750E663-B7F6-46A5-8A7E-77661F189DB3.json"
+    },
+    "popup-feature-layout-evidence/native/attachments/manifest.json": {
+      "kind": "original-byte-copy",
+      "bytes": 18201,
+      "sha256": "a0831be73dd1485c1501a90d53de51f5ddb410691aa13efb46da743796f01589",
+      "sourceRelative": "research/current-production-touch-flex-popup-scroll-attempt1/runtime-attachments/manifest.json"
+    },
+    "popup-feature-layout-evidence/native/official-summary.json": {
+      "kind": "original-byte-copy",
+      "bytes": 1006,
+      "sha256": "96abf6f534331a6acbfc243107e134a642c37227ee9d3aa49b5a31396f0d446b",
+      "sourceRelative": "research/current-production-touch-flex-popup-scroll-attempt1/runtime-test-summary.json"
+    },
+    "popup-feature-layout-evidence/portrait/attachments/11BF2AAB-F4FC-4292-B98E-0A967307C91B.json": {
+      "kind": "original-byte-copy",
+      "bytes": 177,
+      "sha256": "d25952faa877c2b95c82511bc235165cc15ad823746de454f42b785bf5f9b242",
+      "sourceRelative": "research/current-production-touch-flex-portrait-drawer-keyboard-attempt1/runtime-attachments/11BF2AAB-F4FC-4292-B98E-0A967307C91B.json"
+    },
+    "popup-feature-layout-evidence/portrait/attachments/12F91AC8-1081-411A-B557-D48135CA2A4E.json": {
+      "kind": "original-byte-copy",
+      "bytes": 111,
+      "sha256": "caef5b78aba305e910757b0a1706a75070de4f2261aa82e0116e6d3181cc06aa",
+      "sourceRelative": "research/current-production-touch-flex-portrait-drawer-keyboard-attempt1/runtime-attachments/12F91AC8-1081-411A-B557-D48135CA2A4E.json"
+    },
+    "popup-feature-layout-evidence/portrait/attachments/15BF550D-E780-42FB-BB7E-A62FDFC3D454.json": {
+      "kind": "original-byte-copy",
+      "bytes": 190,
+      "sha256": "dfd05233a21cdf8c1a46a79e14122284033a04cb077b7e3f71d1ce74b78eee96",
+      "sourceRelative": "research/current-production-touch-flex-portrait-drawer-keyboard-attempt1/runtime-attachments/15BF550D-E780-42FB-BB7E-A62FDFC3D454.json"
+    },
+    "popup-feature-layout-evidence/portrait/attachments/16C9F96A-36F4-4D15-ABF1-D61E2173EF7A.json": {
+      "kind": "original-byte-copy",
+      "bytes": 110,
+      "sha256": "d6ad1d044f0652c8725d24df608ded7b4d5a4c9d6874a0aa7db8cd58d598b599",
+      "sourceRelative": "research/current-production-touch-flex-portrait-drawer-keyboard-attempt1/runtime-attachments/16C9F96A-36F4-4D15-ABF1-D61E2173EF7A.json"
+    },
+    "popup-feature-layout-evidence/portrait/attachments/18A98366-689C-48AF-90A0-77EF854F1EC6.json": {
+      "kind": "original-byte-copy",
+      "bytes": 167,
+      "sha256": "69bad9006ddb97d03fa871107c16184eb0ba2ebdd542842328ff8f830047c67d",
+      "sourceRelative": "research/current-production-touch-flex-portrait-drawer-keyboard-attempt1/runtime-attachments/18A98366-689C-48AF-90A0-77EF854F1EC6.json"
+    },
+    "popup-feature-layout-evidence/portrait/attachments/20B533EB-EB28-4122-B3BB-71AE2A1E440D.json": {
+      "kind": "original-byte-copy",
+      "bytes": 174,
+      "sha256": "0379de8254fe002a3bb4b90390cf930f1763a077abe31cc8f7b6ca88704ee1fc",
+      "sourceRelative": "research/current-production-touch-flex-portrait-drawer-keyboard-attempt1/runtime-attachments/20B533EB-EB28-4122-B3BB-71AE2A1E440D.json"
+    },
+    "popup-feature-layout-evidence/portrait/attachments/2BF63BCB-8050-419C-9603-D4676D4304E7.json": {
+      "kind": "original-byte-copy",
+      "bytes": 170,
+      "sha256": "d649aec4a1c03dc88a5396e94ad39582f34dc4fbf05565d460d25a07c3526960",
+      "sourceRelative": "research/current-production-touch-flex-portrait-drawer-keyboard-attempt1/runtime-attachments/2BF63BCB-8050-419C-9603-D4676D4304E7.json"
+    },
+    "popup-feature-layout-evidence/portrait/attachments/2C8792E3-3727-4318-B014-C0E2FF6427B9.json": {
+      "kind": "original-byte-copy",
+      "bytes": 179,
+      "sha256": "b17bbe6597b7bf2373e89ba1b753159459737e27476d9e38819950acc7369fa3",
+      "sourceRelative": "research/current-production-touch-flex-portrait-drawer-keyboard-attempt1/runtime-attachments/2C8792E3-3727-4318-B014-C0E2FF6427B9.json"
+    },
+    "popup-feature-layout-evidence/portrait/attachments/359D7C34-86A0-43EA-B1CA-3E1D6AD74B6A.json": {
+      "kind": "original-byte-copy",
+      "bytes": 180,
+      "sha256": "d4f86197b9e37677ccfb0ebfea4af6da5aa7861ec889954e3ba0d70bf90cc2c3",
+      "sourceRelative": "research/current-production-touch-flex-portrait-drawer-keyboard-attempt1/runtime-attachments/359D7C34-86A0-43EA-B1CA-3E1D6AD74B6A.json"
+    },
+    "popup-feature-layout-evidence/portrait/attachments/3CCA6CCA-3ABF-4321-847D-1EB15EED6FB0.json": {
+      "kind": "original-byte-copy",
+      "bytes": 118,
+      "sha256": "ac541d7a4d95bb5dcca95299f9287e3535bc7f6754747e890a7a52ad8e610998",
+      "sourceRelative": "research/current-production-touch-flex-portrait-drawer-keyboard-attempt1/runtime-attachments/3CCA6CCA-3ABF-4321-847D-1EB15EED6FB0.json"
+    },
+    "popup-feature-layout-evidence/portrait/attachments/3E7BF965-1A63-4D61-A8EB-D926E08EBEDD.json": {
+      "kind": "original-byte-copy",
+      "bytes": 193,
+      "sha256": "0fc95edad1758e466808893eb6f0892197d60b789c6f12aeec2161c0680bbf26",
+      "sourceRelative": "research/current-production-touch-flex-portrait-drawer-keyboard-attempt1/runtime-attachments/3E7BF965-1A63-4D61-A8EB-D926E08EBEDD.json"
+    },
+    "popup-feature-layout-evidence/portrait/attachments/4137C655-E470-4100-A693-A59B591B362D.json": {
+      "kind": "original-byte-copy",
+      "bytes": 175,
+      "sha256": "931e578a5e25d3f660c5cf672bd5156aeff9ffaaecdc5b3fd27d6fd1845d89cf",
+      "sourceRelative": "research/current-production-touch-flex-portrait-drawer-keyboard-attempt1/runtime-attachments/4137C655-E470-4100-A693-A59B591B362D.json"
+    },
+    "popup-feature-layout-evidence/portrait/attachments/4FD5AD5B-20DC-476C-AE1A-DB7FEE501059.json": {
+      "kind": "original-byte-copy",
+      "bytes": 171,
+      "sha256": "51e8e3f6e00dee088c9952a3833778c8e6d136a1e0cc45143464d3082bfb7758",
+      "sourceRelative": "research/current-production-touch-flex-portrait-drawer-keyboard-attempt1/runtime-attachments/4FD5AD5B-20DC-476C-AE1A-DB7FEE501059.json"
+    },
+    "popup-feature-layout-evidence/portrait/attachments/58A8A94C-BE3F-4D23-8EF3-8CD35374A7D5.json": {
+      "kind": "original-byte-copy",
+      "bytes": 179,
+      "sha256": "6f4942e73c3c7c476707b2771aa97e419ccfe502eccf0d374184a2ab9a2880da",
+      "sourceRelative": "research/current-production-touch-flex-portrait-drawer-keyboard-attempt1/runtime-attachments/58A8A94C-BE3F-4D23-8EF3-8CD35374A7D5.json"
+    },
+    "popup-feature-layout-evidence/portrait/attachments/63B195ED-58BF-49CC-8C25-3EC213B8E668.png": {
+      "kind": "original-byte-copy",
+      "bytes": 277395,
+      "sha256": "3aaf44caa390e9b516d786895a09cb1506582f8696f1909ba84d041fa9d26b1a",
+      "sourceRelative": "research/current-production-touch-flex-portrait-drawer-keyboard-attempt1/runtime-attachments/63B195ED-58BF-49CC-8C25-3EC213B8E668.png"
+    },
+    "popup-feature-layout-evidence/portrait/attachments/68072A75-B695-4287-91F8-B2C522CE70AE.json": {
+      "kind": "original-byte-copy",
+      "bytes": 6707,
+      "sha256": "ca4cf89cfd0ac4dab42db80960d6fb26a6ebecf5619a882a5c572e329cb85dbb",
+      "sourceRelative": "research/current-production-touch-flex-portrait-drawer-keyboard-attempt1/runtime-attachments/68072A75-B695-4287-91F8-B2C522CE70AE.json"
+    },
+    "popup-feature-layout-evidence/portrait/attachments/6CCD3A0D-09F7-4EF5-A779-729D90502CC2.json": {
+      "kind": "original-byte-copy",
+      "bytes": 174,
+      "sha256": "6146e50982b09a1ef7c2d21a81baafdde6fcfbebb152652135f92df010b94304",
+      "sourceRelative": "research/current-production-touch-flex-portrait-drawer-keyboard-attempt1/runtime-attachments/6CCD3A0D-09F7-4EF5-A779-729D90502CC2.json"
+    },
+    "popup-feature-layout-evidence/portrait/attachments/707FF92A-6CCE-4CE5-AAB5-C99B8DEA23F0.json": {
+      "kind": "original-byte-copy",
+      "bytes": 110,
+      "sha256": "054ca89a224d3c4292ddaf66adc57a7a29a234715fe58beedbc49e1e9a1d52bd",
+      "sourceRelative": "research/current-production-touch-flex-portrait-drawer-keyboard-attempt1/runtime-attachments/707FF92A-6CCE-4CE5-AAB5-C99B8DEA23F0.json"
+    },
+    "popup-feature-layout-evidence/portrait/attachments/77018EE8-84A7-4A19-A0DA-C6EF02B45537.png": {
+      "kind": "original-byte-copy",
+      "bytes": 369086,
+      "sha256": "d64814bd91a00812da6d7a739b8a75d624ab3713a163e89d17a1e3dfb037a3d4",
+      "sourceRelative": "research/current-production-touch-flex-portrait-drawer-keyboard-attempt1/runtime-attachments/77018EE8-84A7-4A19-A0DA-C6EF02B45537.png"
+    },
+    "popup-feature-layout-evidence/portrait/attachments/7ABFACCA-F83D-432B-BD02-CB1F6C557227.json": {
+      "kind": "original-byte-copy",
+      "bytes": 9646,
+      "sha256": "b6e391fe9885ca0c76d813c69c6a62d7b1d1b8afa42ff153c8493e6db7e7dd55",
+      "sourceRelative": "research/current-production-touch-flex-portrait-drawer-keyboard-attempt1/runtime-attachments/7ABFACCA-F83D-432B-BD02-CB1F6C557227.json"
+    },
+    "popup-feature-layout-evidence/portrait/attachments/7D13B1BA-81DA-45E6-A089-21B6DD1DD96D.json": {
+      "kind": "original-byte-copy",
+      "bytes": 181,
+      "sha256": "a87f200d03261407d86eb59ebcd2690fa1af8021fb313304fd0176bba2db9441",
+      "sourceRelative": "research/current-production-touch-flex-portrait-drawer-keyboard-attempt1/runtime-attachments/7D13B1BA-81DA-45E6-A089-21B6DD1DD96D.json"
+    },
+    "popup-feature-layout-evidence/portrait/attachments/8202B96B-1DA6-4916-AC28-7C72759B2F7F.json": {
+      "kind": "original-byte-copy",
+      "bytes": 178,
+      "sha256": "f95398ce7dd0a981aa808d79028669c43112c54ba698c82b0ddf37fec6ea08fe",
+      "sourceRelative": "research/current-production-touch-flex-portrait-drawer-keyboard-attempt1/runtime-attachments/8202B96B-1DA6-4916-AC28-7C72759B2F7F.json"
+    },
+    "popup-feature-layout-evidence/portrait/attachments/881C3EA6-173A-43AF-88EA-F57321D355CB.json": {
+      "kind": "original-byte-copy",
+      "bytes": 114,
+      "sha256": "4d484b2d036d1865a66ed2f71a8e01f0d02b3f86ad6c1c8cb99878a7659342d4",
+      "sourceRelative": "research/current-production-touch-flex-portrait-drawer-keyboard-attempt1/runtime-attachments/881C3EA6-173A-43AF-88EA-F57321D355CB.json"
+    },
+    "popup-feature-layout-evidence/portrait/attachments/8D99E983-2A40-4C29-9AF3-DAAD2691F711.json": {
+      "kind": "original-byte-copy",
+      "bytes": 122,
+      "sha256": "34a119dc3965b96c2e3377d4e474e98ca3eff8933bfea238574ebfc71bb638ac",
+      "sourceRelative": "research/current-production-touch-flex-portrait-drawer-keyboard-attempt1/runtime-attachments/8D99E983-2A40-4C29-9AF3-DAAD2691F711.json"
+    },
+    "popup-feature-layout-evidence/portrait/attachments/946E260D-E94E-4B0C-A992-B88DA38AD47B.json": {
+      "kind": "original-byte-copy",
+      "bytes": 8311,
+      "sha256": "361c7a8472fe84cd9a1a034720f2af390f0a4f3caee46d2b8c32fc1713edb738",
+      "sourceRelative": "research/current-production-touch-flex-portrait-drawer-keyboard-attempt1/runtime-attachments/946E260D-E94E-4B0C-A992-B88DA38AD47B.json"
+    },
+    "popup-feature-layout-evidence/portrait/attachments/A0A72EDF-B432-4A77-BF20-2A991706391F.json": {
+      "kind": "original-byte-copy",
+      "bytes": 376,
+      "sha256": "01a4b3fc2034c77f0520397dcd41531a905607760377c8854b4b9504877cc613",
+      "sourceRelative": "research/current-production-touch-flex-portrait-drawer-keyboard-attempt1/runtime-attachments/A0A72EDF-B432-4A77-BF20-2A991706391F.json"
+    },
+    "popup-feature-layout-evidence/portrait/attachments/A64D2B4F-9E37-4F78-813F-448EA84A848C.json": {
+      "kind": "original-byte-copy",
+      "bytes": 176,
+      "sha256": "139974197be0836b982221313e98b69887a06b5b4ca1a7399424631db01dc0e7",
+      "sourceRelative": "research/current-production-touch-flex-portrait-drawer-keyboard-attempt1/runtime-attachments/A64D2B4F-9E37-4F78-813F-448EA84A848C.json"
+    },
+    "popup-feature-layout-evidence/portrait/attachments/ADFB233F-23C4-4ABD-BF05-AB7354145462.json": {
+      "kind": "original-byte-copy",
+      "bytes": 167,
+      "sha256": "f854f2fa030597fbcc771102b3f73f4e84ea014bfc4c9c271f0133a5a2098a73",
+      "sourceRelative": "research/current-production-touch-flex-portrait-drawer-keyboard-attempt1/runtime-attachments/ADFB233F-23C4-4ABD-BF05-AB7354145462.json"
+    },
+    "popup-feature-layout-evidence/portrait/attachments/B0022F7C-40E9-40F2-B8F1-BBD4B1281423.json": {
+      "kind": "original-byte-copy",
+      "bytes": 250,
+      "sha256": "950433a4b7860b620d28e0def89d2a829e2eff6126125dbba111bdff059631a1",
+      "sourceRelative": "research/current-production-touch-flex-portrait-drawer-keyboard-attempt1/runtime-attachments/B0022F7C-40E9-40F2-B8F1-BBD4B1281423.json"
+    },
+    "popup-feature-layout-evidence/portrait/attachments/B52201CD-3B2B-4970-9992-E0A734957CD9.json": {
+      "kind": "original-byte-copy",
+      "bytes": 170,
+      "sha256": "4a004bf70fb4733a637df257335434d092209bd8a90a788f84dfac666f6e3abb",
+      "sourceRelative": "research/current-production-touch-flex-portrait-drawer-keyboard-attempt1/runtime-attachments/B52201CD-3B2B-4970-9992-E0A734957CD9.json"
+    },
+    "popup-feature-layout-evidence/portrait/attachments/B7F17C85-A66F-42DE-A5D2-6B01FD96A9C2.json": {
+      "kind": "original-byte-copy",
+      "bytes": 223,
+      "sha256": "aa0a4c8f9b0944ce875378dd44a098a13c8ebe23b2eceb4528999bcce0b6419c",
+      "sourceRelative": "research/current-production-touch-flex-portrait-drawer-keyboard-attempt1/runtime-attachments/B7F17C85-A66F-42DE-A5D2-6B01FD96A9C2.json"
+    },
+    "popup-feature-layout-evidence/portrait/attachments/B9493CEA-56D7-467F-97C3-375B8AE943FB.json": {
+      "kind": "original-byte-copy",
+      "bytes": 7138,
+      "sha256": "4647b930f4e28e008f45231f2cbdbfed2fa10fa93527acda0109da578453c514",
+      "sourceRelative": "research/current-production-touch-flex-portrait-drawer-keyboard-attempt1/runtime-attachments/B9493CEA-56D7-467F-97C3-375B8AE943FB.json"
+    },
+    "popup-feature-layout-evidence/portrait/attachments/BC7CE1C0-C9D2-40DD-8966-41AC218979EF.json": {
+      "kind": "original-byte-copy",
+      "bytes": 66,
+      "sha256": "f3af6c8ae26da467f5baba933ae9f15a33c179c088456d5bc4652ff1ee1bf669",
+      "sourceRelative": "research/current-production-touch-flex-portrait-drawer-keyboard-attempt1/runtime-attachments/BC7CE1C0-C9D2-40DD-8966-41AC218979EF.json"
+    },
+    "popup-feature-layout-evidence/portrait/attachments/C2287666-5D18-4FDA-8B9C-600B7736C60A.json": {
+      "kind": "original-byte-copy",
+      "bytes": 255,
+      "sha256": "1a8a0a3438692576dff676d3e8829d1d53f70bcb89e42263f5dce2a79f5c36a4",
+      "sourceRelative": "research/current-production-touch-flex-portrait-drawer-keyboard-attempt1/runtime-attachments/C2287666-5D18-4FDA-8B9C-600B7736C60A.json"
+    },
+    "popup-feature-layout-evidence/portrait/attachments/C3C2B92F-452D-456C-941A-7D6EEED8C924.json": {
+      "kind": "original-byte-copy",
+      "bytes": 215,
+      "sha256": "cd20c693be301e4a39ffd2e1857a616e1cadddf6d9a7e9b4d76c63113683b96d",
+      "sourceRelative": "research/current-production-touch-flex-portrait-drawer-keyboard-attempt1/runtime-attachments/C3C2B92F-452D-456C-941A-7D6EEED8C924.json"
+    },
+    "popup-feature-layout-evidence/portrait/attachments/C6D12F54-7AD5-4553-9B2B-15383149AFE8.json": {
+      "kind": "original-byte-copy",
+      "bytes": 181,
+      "sha256": "2077a487fd4f9b3d701e91b08f729d09e8d170f31eebace146313415e8ca5c78",
+      "sourceRelative": "research/current-production-touch-flex-portrait-drawer-keyboard-attempt1/runtime-attachments/C6D12F54-7AD5-4553-9B2B-15383149AFE8.json"
+    },
+    "popup-feature-layout-evidence/portrait/attachments/D0EBCA7F-EEA1-473D-B260-FAE1F1753CCB.png": {
+      "kind": "original-byte-copy",
+      "bytes": 142673,
+      "sha256": "9d6305949a2a08a18262414203eaf351a0e1240e08c1b2f14e81d45533081fa3",
+      "sourceRelative": "research/current-production-touch-flex-portrait-drawer-keyboard-attempt1/runtime-attachments/D0EBCA7F-EEA1-473D-B260-FAE1F1753CCB.png"
+    },
+    "popup-feature-layout-evidence/portrait/attachments/D6DF31E1-C4E0-4960-880A-254CB9ABA8DB.json": {
+      "kind": "original-byte-copy",
+      "bytes": 113,
+      "sha256": "38e270377203209d3ee0423aeaa27ecb61c150b02cf07976b02c3e0e58f22c84",
+      "sourceRelative": "research/current-production-touch-flex-portrait-drawer-keyboard-attempt1/runtime-attachments/D6DF31E1-C4E0-4960-880A-254CB9ABA8DB.json"
+    },
+    "popup-feature-layout-evidence/portrait/attachments/DA253896-4BFF-4D52-86A3-0594C0255560.json": {
+      "kind": "original-byte-copy",
+      "bytes": 174,
+      "sha256": "5ea5822484f528de40c645913886ae42cb4eb8c407ffc765ea2884dadd214909",
+      "sourceRelative": "research/current-production-touch-flex-portrait-drawer-keyboard-attempt1/runtime-attachments/DA253896-4BFF-4D52-86A3-0594C0255560.json"
+    },
+    "popup-feature-layout-evidence/portrait/attachments/DC76B08C-768E-46A5-B499-CB4B682C9961.png": {
+      "kind": "original-byte-copy",
+      "bytes": 278868,
+      "sha256": "429d42ad3ca0af7b3f4ca3b48937492356f444c37797c17aec0be45de00d4fd2",
+      "sourceRelative": "research/current-production-touch-flex-portrait-drawer-keyboard-attempt1/runtime-attachments/DC76B08C-768E-46A5-B499-CB4B682C9961.png"
+    },
+    "popup-feature-layout-evidence/portrait/attachments/DC87A6BA-6F49-4007-A960-6450B2DA3C2F.json": {
+      "kind": "original-byte-copy",
+      "bytes": 122,
+      "sha256": "a4b6b20b71c4ef75d92ded2476922ff7b14e7b3f5246c8926edc259884491a1a",
+      "sourceRelative": "research/current-production-touch-flex-portrait-drawer-keyboard-attempt1/runtime-attachments/DC87A6BA-6F49-4007-A960-6450B2DA3C2F.json"
+    },
+    "popup-feature-layout-evidence/portrait/attachments/DF5BBA69-9EE8-4390-9E89-345BDD6F50EB.json": {
+      "kind": "original-byte-copy",
+      "bytes": 168,
+      "sha256": "4008dfdb8c1aa55e1de78257432520983943750eba91b349b667aee8dda92798",
+      "sourceRelative": "research/current-production-touch-flex-portrait-drawer-keyboard-attempt1/runtime-attachments/DF5BBA69-9EE8-4390-9E89-345BDD6F50EB.json"
+    },
+    "popup-feature-layout-evidence/portrait/attachments/E05A1B64-49C2-46E4-B650-6574E10D773A.png": {
+      "kind": "original-byte-copy",
+      "bytes": 445102,
+      "sha256": "bec44159b6167501677c1d662a45b04fff2d8b815884fd4208e04a3bb6495d3e",
+      "sourceRelative": "research/current-production-touch-flex-portrait-drawer-keyboard-attempt1/runtime-attachments/E05A1B64-49C2-46E4-B650-6574E10D773A.png"
+    },
+    "popup-feature-layout-evidence/portrait/attachments/E0D91593-EC72-4374-9722-0468E6E6B3E4.json": {
+      "kind": "original-byte-copy",
+      "bytes": 178,
+      "sha256": "feda098fc1ac487d673661abe986644dde2fd89cadc72e5437a528201c18c3ef",
+      "sourceRelative": "research/current-production-touch-flex-portrait-drawer-keyboard-attempt1/runtime-attachments/E0D91593-EC72-4374-9722-0468E6E6B3E4.json"
+    },
+    "popup-feature-layout-evidence/portrait/attachments/E0FF20D4-94F2-4989-8D46-CF64A0075FD2.json": {
+      "kind": "original-byte-copy",
+      "bytes": 184,
+      "sha256": "d6d3d32f7079690fca757f778a52f38ae522346064d298bd97842c8f7bc711b5",
+      "sourceRelative": "research/current-production-touch-flex-portrait-drawer-keyboard-attempt1/runtime-attachments/E0FF20D4-94F2-4989-8D46-CF64A0075FD2.json"
+    },
+    "popup-feature-layout-evidence/portrait/attachments/E67A8F42-3608-4A46-9844-C0970F259A9F.png": {
+      "kind": "original-byte-copy",
+      "bytes": 365558,
+      "sha256": "41b1dd182021ebe1151c3e8d75a6ea2d9f5e879da7b6b23724102ce258e34160",
+      "sourceRelative": "research/current-production-touch-flex-portrait-drawer-keyboard-attempt1/runtime-attachments/E67A8F42-3608-4A46-9844-C0970F259A9F.png"
+    },
+    "popup-feature-layout-evidence/portrait/attachments/E9989688-E26D-4C9C-8DF7-E4B118E684E9.png": {
+      "kind": "original-byte-copy",
+      "bytes": 445168,
+      "sha256": "8e941d0ae747b88097ecad489173ea2c90f0b6a25fe228bace8c47b67b8265ea",
+      "sourceRelative": "research/current-production-touch-flex-portrait-drawer-keyboard-attempt1/runtime-attachments/E9989688-E26D-4C9C-8DF7-E4B118E684E9.png"
+    },
+    "popup-feature-layout-evidence/portrait/attachments/EB8681F9-5D3D-4740-BF6A-1A8F9F96C350.json": {
+      "kind": "original-byte-copy",
+      "bytes": 4472,
+      "sha256": "fd4e0ef073bfa3dafa395208794f1c5e28912dfb65d56a0dc4f33c252cc22eef",
+      "sourceRelative": "research/current-production-touch-flex-portrait-drawer-keyboard-attempt1/runtime-attachments/EB8681F9-5D3D-4740-BF6A-1A8F9F96C350.json"
+    },
+    "popup-feature-layout-evidence/portrait/attachments/F2400075-86CA-4D69-8400-A0AD72BCE905.json": {
+      "kind": "original-byte-copy",
+      "bytes": 700,
+      "sha256": "34534cca5fd4ea48c5516c8a8edb0ed4caa0304b3da273c5a7d455dc755dc943",
+      "sourceRelative": "research/current-production-touch-flex-portrait-drawer-keyboard-attempt1/runtime-attachments/F2400075-86CA-4D69-8400-A0AD72BCE905.json"
+    },
+    "popup-feature-layout-evidence/portrait/attachments/F72F39A7-CBA4-4A87-880F-5F136B3DE34E.json": {
+      "kind": "original-byte-copy",
+      "bytes": 170,
+      "sha256": "acbfd5bc487714f0587ac2dc6d439460768e0a8eb6a85b967fddf6436be22c47",
+      "sourceRelative": "research/current-production-touch-flex-portrait-drawer-keyboard-attempt1/runtime-attachments/F72F39A7-CBA4-4A87-880F-5F136B3DE34E.json"
+    },
+    "popup-feature-layout-evidence/portrait/attachments/F96CC53D-7400-4C68-AA21-ED8FA7002F37.json": {
+      "kind": "original-byte-copy",
+      "bytes": 4586,
+      "sha256": "4e4aac7bd4a5f895ae04b9615cbf20d160b38cbad86695461b89cb13e7db35b9",
+      "sourceRelative": "research/current-production-touch-flex-portrait-drawer-keyboard-attempt1/runtime-attachments/F96CC53D-7400-4C68-AA21-ED8FA7002F37.json"
+    },
+    "popup-feature-layout-evidence/portrait/attachments/FB841394-D07F-4347-B54E-ECBB5A01F5FD.png": {
+      "kind": "original-byte-copy",
+      "bytes": 141022,
+      "sha256": "aa2360e3e3a2d8e942ea508ea9474e9bbab6eb1c7b590d3fae879db9ec054167",
+      "sourceRelative": "research/current-production-touch-flex-portrait-drawer-keyboard-attempt1/runtime-attachments/FB841394-D07F-4347-B54E-ECBB5A01F5FD.png"
+    },
+    "popup-feature-layout-evidence/portrait/attachments/manifest.json": {
+      "kind": "original-byte-copy",
+      "bytes": 24853,
+      "sha256": "2bcbd986686d8e055a19c2e306be524bfa8d2cbd8574e031d1c0602b0f4d63c0",
+      "sourceRelative": "research/current-production-touch-flex-portrait-drawer-keyboard-attempt1/runtime-attachments/manifest.json"
+    },
+    "popup-feature-layout-evidence/portrait/independent-runtime-review.public.json": {
+      "kind": "derived-public-file",
+      "bytes": 7680,
+      "sha256": "2aa4f2a74154250b4f1817724c0a72746c9865107574f93c38f46076d2fd5155",
+      "sourceRelative": "research/current-production-touch-flex-portrait-drawer-keyboard-attempt1/independent-runtime-review.json",
+      "derivation": "Whitelist; original pin is embedded, raw machine paths omitted."
+    },
+    "popup-feature-layout-evidence/portrait/official-summary.json": {
+      "kind": "original-byte-copy",
+      "bytes": 1007,
+      "sha256": "1c8caa9838658b1366b8339b5f3f3a9aca9664022d608cee32b56ebe1158b8e7",
+      "sourceRelative": "research/current-production-touch-flex-portrait-drawer-keyboard-attempt1/runtime-test-summary.json"
+    },
+    "popup-feature-layout-evidence/portrait/root-runtime-outcome.public.json": {
+      "kind": "derived-public-file",
+      "bytes": 3838,
+      "sha256": "8ca359caa0dd7dff3e7279d66332eb0fc436c5aab04128ebd0aa7db3ac7042cf",
+      "sourceRelative": "research/current-production-touch-flex-portrait-drawer-keyboard-attempt1/root-runtime-outcome.json",
+      "derivation": "Whitelist; original pin is embedded, raw machine paths omitted."
+    },
+    "popup-feature-layout-evidence/verification-summary.json": {
+      "kind": "derived-public-file",
+      "bytes": 9034,
+      "sha256": "85cdb2c2b9d48e19ad045116ca0256cc04494dfd2aafcf3835085913ee043865",
+      "derivation": "Root copied reviewed fields and retained source draft review; replaced draft-only publication status. No runtime conclusion changed.",
+      "sourceDraftFile": {
+        "bytes": 8698,
+        "sha256": "d1bdf25e5fdf3013a32db8321df80afc0a3ab4c8be599b1f309b08bf8d68f127"
+      }
+    },
+    "popup-feature-layout-evidence/video-prefix-stop/attachments/00AC5186-6C91-4497-AE3E-B7218F8F2085.json": {
+      "kind": "original-byte-copy",
+      "bytes": 88,
+      "sha256": "76e35e34cf7e17ebd0ca4042d2549ec10301d2308380c5f46c40bf9fd298ca6f",
+      "sourceRelative": "research/current-production-touch-flex-native-fullscreen-prefix-attempt1/runtime-attachments/00AC5186-6C91-4497-AE3E-B7218F8F2085.json"
+    },
+    "popup-feature-layout-evidence/video-prefix-stop/attachments/01D35107-62F0-46F3-BF6E-41A1DF1B1EF1.json": {
+      "kind": "original-byte-copy",
+      "bytes": 178,
+      "sha256": "2da573a2e486925d3b9ebf405673f72304a2cdb854d5344bccffbefaba13f8ef",
+      "sourceRelative": "research/current-production-touch-flex-native-fullscreen-prefix-attempt1/runtime-attachments/01D35107-62F0-46F3-BF6E-41A1DF1B1EF1.json"
+    },
+    "popup-feature-layout-evidence/video-prefix-stop/attachments/07CAECD8-86CA-4CC7-A4C8-90DB22A888E0.json": {
+      "kind": "original-byte-copy",
+      "bytes": 88,
+      "sha256": "76e35e34cf7e17ebd0ca4042d2549ec10301d2308380c5f46c40bf9fd298ca6f",
+      "sourceRelative": "research/current-production-touch-flex-native-fullscreen-prefix-attempt1/runtime-attachments/07CAECD8-86CA-4CC7-A4C8-90DB22A888E0.json"
+    },
+    "popup-feature-layout-evidence/video-prefix-stop/attachments/117AC38E-CC6F-4C06-B55C-0768C14D2B3C.json": {
+      "kind": "original-byte-copy",
+      "bytes": 88,
+      "sha256": "76e35e34cf7e17ebd0ca4042d2549ec10301d2308380c5f46c40bf9fd298ca6f",
+      "sourceRelative": "research/current-production-touch-flex-native-fullscreen-prefix-attempt1/runtime-attachments/117AC38E-CC6F-4C06-B55C-0768C14D2B3C.json"
+    },
+    "popup-feature-layout-evidence/video-prefix-stop/attachments/2C36A32B-89D2-437A-A95A-4A0DEF07C24A.json": {
+      "kind": "original-byte-copy",
+      "bytes": 88,
+      "sha256": "76e35e34cf7e17ebd0ca4042d2549ec10301d2308380c5f46c40bf9fd298ca6f",
+      "sourceRelative": "research/current-production-touch-flex-native-fullscreen-prefix-attempt1/runtime-attachments/2C36A32B-89D2-437A-A95A-4A0DEF07C24A.json"
+    },
+    "popup-feature-layout-evidence/video-prefix-stop/attachments/2FFC6F37-00D9-4707-B776-137179B050A6.json": {
+      "kind": "original-byte-copy",
+      "bytes": 68,
+      "sha256": "d6841db711e2cc8a8b4e31c4daa81ff6934b4c3f398113b8eba4af93380684e4",
+      "sourceRelative": "research/current-production-touch-flex-native-fullscreen-prefix-attempt1/runtime-attachments/2FFC6F37-00D9-4707-B776-137179B050A6.json"
+    },
+    "popup-feature-layout-evidence/video-prefix-stop/attachments/8971D375-2857-4EAE-996F-92993C0D8C20.json": {
+      "kind": "original-byte-copy",
+      "bytes": 88,
+      "sha256": "76e35e34cf7e17ebd0ca4042d2549ec10301d2308380c5f46c40bf9fd298ca6f",
+      "sourceRelative": "research/current-production-touch-flex-native-fullscreen-prefix-attempt1/runtime-attachments/8971D375-2857-4EAE-996F-92993C0D8C20.json"
+    },
+    "popup-feature-layout-evidence/video-prefix-stop/attachments/AE27AB5F-0826-48BA-B607-3510E6263A42.json": {
+      "kind": "original-byte-copy",
+      "bytes": 349,
+      "sha256": "b00a7ce8796d55bc56a993b9b8cb4ea800fc9100a452b20e6a6b1fc459cff74d",
+      "sourceRelative": "research/current-production-touch-flex-native-fullscreen-prefix-attempt1/runtime-attachments/AE27AB5F-0826-48BA-B607-3510E6263A42.json"
+    },
+    "popup-feature-layout-evidence/video-prefix-stop/attachments/B213E85E-4414-4706-B5A6-ECB9E5D1FE5A.json": {
+      "kind": "original-byte-copy",
+      "bytes": 413,
+      "sha256": "01f3a6fa78f39db2b56f6021d09439c306e2cd072c2a7be984148b1552a62b04",
+      "sourceRelative": "research/current-production-touch-flex-native-fullscreen-prefix-attempt1/runtime-attachments/B213E85E-4414-4706-B5A6-ECB9E5D1FE5A.json"
+    },
+    "popup-feature-layout-evidence/video-prefix-stop/attachments/B8DAB340-5B55-43D8-BCBA-6DF07E59394E.json": {
+      "kind": "original-byte-copy",
+      "bytes": 88,
+      "sha256": "76e35e34cf7e17ebd0ca4042d2549ec10301d2308380c5f46c40bf9fd298ca6f",
+      "sourceRelative": "research/current-production-touch-flex-native-fullscreen-prefix-attempt1/runtime-attachments/B8DAB340-5B55-43D8-BCBA-6DF07E59394E.json"
+    },
+    "popup-feature-layout-evidence/video-prefix-stop/attachments/manifest.json": {
+      "kind": "original-byte-copy",
+      "bytes": 4920,
+      "sha256": "a568e1dc12a1b3009ca59fc1e50a4ae7a45fc0aaf7e02cbf5b59c1ff879f3930",
+      "sourceRelative": "research/current-production-touch-flex-native-fullscreen-prefix-attempt1/runtime-attachments/manifest.json"
+    },
+    "popup-feature-layout-evidence/video-prefix-stop/official-summary.json": {
+      "kind": "original-byte-copy",
+      "bytes": 1008,
+      "sha256": "ae24cbcdbb90d956ba72b1f6455baa6f5725adb3e8b34b77d285e7eaa32b0c3f",
+      "sourceRelative": "research/current-production-touch-flex-native-fullscreen-prefix-attempt1/runtime-test-summary.json"
+    },
+    "popup-feature-layout-evidence/video-prefix-stop/summary.public.json": {
+      "kind": "derived-public-file",
+      "bytes": 4331,
+      "sha256": "118cc724baf664eb3c110d464685440ee24004a72088e8aa26b34325cd8d33c4",
+      "derivation": "Whitelist stop result and guard aggregates; research source pins embedded. Original guard/log/private report not copied."
+    },
+    "popup-feature-layout.md": {
+      "kind": "derived-public-file",
+      "bytes": 8066,
+      "sha256": "8f9242c14331c3cc2abc60095756af56959df3768214b0e969f274329ab20e01",
+      "derivation": "Updated scoped layout and portrait evidence; original research comparison table preserved."
+    },
+    "acceptance.md": {
+      "kind": "derived-merged-document",
+      "bytes": 15716,
+      "sha256": "1ab4c4884e42a2818b8cf211661233401b62d294a194bd0a87d8df164920f018",
+      "before": {
+        "bytes": 14871,
+        "sha256": "9248ca7e112ae7afd9769c84806fc9f00b408a8aac326743c2b186be79fe0189"
+      },
+      "insertedFragment": {
+        "bytes": 844,
+        "sha256": "115b9612f40bf97cd622613fa3a650b9912106313b550bb0d6768d3082759b80"
+      },
+      "derivation": "Inserted latest8274 scope paragraph before historical461 paragraph; all previous acceptance content preserved."
+    }
+  },
+  "stagingFilesNotCopied": [
+    "README.md",
+    "PR1009-latest-validation-fragment.md",
+    "docs/reports/mobile-safari-integration-20261016/acceptance-link-fragment.md"
+  ],
+  "scope": "Original payloads and official exports plus explicit public derivations. No SDK logs, Apps, full private hash maps, process records, developer signing or publication. Native video prefix stopped UNVERIFIED (0 pass/1 skip/0 fail); no video-goal acceptance.",
+  "publicationMeaning": "Repository documentation and PR evidence; no extension release or deployment."
+}

@@ -1,0 +1,344 @@
+{
+  "at": "2026-10-16T10:23:39.845455+00:00",
+  "rows": [
+    {
+      "index": 0,
+      "lang": "en",
+      "original": "This domain is for use in documentation examples without needing permission. This is not a service; avoid relying on it for testing and monitoring purposes.",
+      "first": {
+        "lang": "en",
+        "source": "This domain is for use in documentation examples without needing permission. This is not a service; avoid relying on it for testing and monitoring purposes.",
+        "targets": [
+          "此域名用于文档示例，无需获得许可。这不是一项服务；请勿将其用于测试和监控目的。"
+        ],
+        "rawHTML": "<p lang=\"en\">This domain is for use in documentation examples without needing permission. This is not a service; avoid relying on it for testing and monitoring purposes.<span class=\"fluent-read-bilingual-content fluent-display-bold\" data-fr-translation-owned=\"true\" translate=\"no\" lang=\"zh-Hans\" dir=\"auto\">此域名用于文档示例，无需获得许可。这不是一项服务；请勿将其用于测试和监控目的。</span></p>",
+        "rectAtRead": {
+          "x": 32,
+          "y": 268.3999938964844,
+          "width": 296,
+          "height": 76.80000305175781,
+          "top": 268.3999938964844,
+          "right": 328,
+          "bottom": 345.1999969482422,
+          "left": 32
+        },
+        "viewportIntersectionAtRead": true
+      },
+      "restored": {
+        "lang": "en",
+        "source": "This domain is for use in documentation examples without needing permission. This is not a service; avoid relying on it for testing and monitoring purposes.",
+        "targets": [],
+        "rawHTML": "<p lang=\"en\">This domain is for use in documentation examples without needing permission. This is not a service; avoid relying on it for testing and monitoring purposes.</p>"
+      },
+      "retranslated": {
+        "lang": "en",
+        "source": "This domain is for use in documentation examples without needing permission. This is not a service; avoid relying on it for testing and monitoring purposes.",
+        "targets": [
+          "此域名用于文档示例，无需获得许可。这不是一项服务；请勿将其用于测试和监控目的。"
+        ],
+        "rawHTML": "<p lang=\"en\">This domain is for use in documentation examples without needing permission. This is not a service; avoid relying on it for testing and monitoring purposes.<span class=\"fluent-read-bilingual-content fluent-display-bold\" data-fr-translation-owned=\"true\" translate=\"no\" lang=\"zh-Hans\" dir=\"auto\">此域名用于文档示例，无需获得许可。这不是一项服务；请勿将其用于测试和监控目的。</span></p>",
+        "rectAtRead": {
+          "x": 32,
+          "y": -239.60000610351562,
+          "width": 296,
+          "height": 76.80000305175781,
+          "top": -239.60000610351562,
+          "right": 328,
+          "bottom": -162.8000030517578,
+          "left": 32
+        },
+        "viewportIntersectionAtRead": false
+      },
+      "originalExactAfterRestore": true,
+      "firstEqualsRetranslated": true,
+      "targetNodeCounts": {
+        "initial": 0,
+        "first": 1,
+        "restored": 0,
+        "retranslated": 1,
+        "final": 1
+      },
+      "observedMalformedF21Result": null,
+      "qualityConclusion": "Chinese display observed; comprehensive translation fidelity not assessed"
+    },
+    {
+      "index": 1,
+      "lang": "ar",
+      "original": "هذا النطاق مُخصص للاستخدام في أمثلة التوثيق دون الحاجة إلى إذن. هذه ليست خدمة، يُرجى تجنب الاعتماد عليها لأغراض الاختبار والمراقبة.",
+      "first": {
+        "lang": "ar",
+        "source": "هذا النطاق مُخصص للاستخدام في أمثلة التوثيق دون الحاجة إلى إذن. هذه ليست خدمة، يُرجى تجنب الاعتماد عليها لأغراض الاختبار والمراقبة.",
+        "targets": [
+          "此域名专用于文档示例，无需获得许可。 这不是一项服务，请勿将其用于测试和监控目的。"
+        ],
+        "rawHTML": "<p lang=\"ar\" dir=\"rtl\">هذا النطاق مُخصص للاستخدام في أمثلة التوثيق دون الحاجة إلى إذن. هذه ليست خدمة، يُرجى تجنب الاعتماد عليها لأغراض الاختبار والمراقبة.<span class=\"fluent-read-bilingual-content fluent-display-bold\" data-fr-translation-owned=\"true\" translate=\"no\" lang=\"zh-Hans\" dir=\"auto\">此域名专用于文档示例，无需获得许可。 这不是一项服务，请勿将其用于测试和监控目的。</span></p>",
+        "rectAtRead": {
+          "x": 32,
+          "y": 436.3999938964844,
+          "width": 296,
+          "height": 44.80000305175781,
+          "top": 436.3999938964844,
+          "right": 328,
+          "bottom": 481.1999969482422,
+          "left": 32
+        },
+        "viewportIntersectionAtRead": true
+      },
+      "restored": {
+        "lang": "ar",
+        "source": "هذا النطاق مُخصص للاستخدام في أمثلة التوثيق دون الحاجة إلى إذن. هذه ليست خدمة، يُرجى تجنب الاعتماد عليها لأغراض الاختبار والمراقبة.",
+        "targets": [],
+        "rawHTML": "<p lang=\"ar\" dir=\"rtl\">هذا النطاق مُخصص للاستخدام في أمثلة التوثيق دون الحاجة إلى إذن. هذه ليست خدمة، يُرجى تجنب الاعتماد عليها لأغراض الاختبار والمراقبة.</p>"
+      },
+      "retranslated": {
+        "lang": "ar",
+        "source": "هذا النطاق مُخصص للاستخدام في أمثلة التوثيق دون الحاجة إلى إذن. هذه ليست خدمة، يُرجى تجنب الاعتماد عليها لأغراض الاختبار والمراقبة.",
+        "targets": [
+          "此域名专用于文档示例，无需获得许可。 这不是一项服务，请勿将其用于测试和监控目的。"
+        ],
+        "rawHTML": "<p lang=\"ar\" dir=\"rtl\">هذا النطاق مُخصص للاستخدام في أمثلة التوثيق دون الحاجة إلى إذن. هذه ليست خدمة، يُرجى تجنب الاعتماد عليها لأغراض الاختبار والمراقبة.<span class=\"fluent-read-bilingual-content fluent-display-bold\" data-fr-translation-owned=\"true\" translate=\"no\" lang=\"zh-Hans\" dir=\"auto\">此域名专用于文档示例，无需获得许可。 这不是一项服务，请勿将其用于测试和监控目的。</span></p>",
+        "rectAtRead": {
+          "x": 32,
+          "y": -71.60000610351562,
+          "width": 296,
+          "height": 44.80000305175781,
+          "top": -71.60000610351562,
+          "right": 328,
+          "bottom": -26.800003051757812,
+          "left": 32
+        },
+        "viewportIntersectionAtRead": false
+      },
+      "originalExactAfterRestore": true,
+      "firstEqualsRetranslated": true,
+      "targetNodeCounts": {
+        "initial": 0,
+        "first": 1,
+        "restored": 0,
+        "retranslated": 1,
+        "final": 1
+      },
+      "observedMalformedF21Result": "هذاالنطاقمُخصصللاستخدامفيأمثلةالتوثيقدونالحاجةإلىإذن。هذهليستخدمة،يُرجىتجنبالاعتمادعليهالأغراضالاختباروالمراقبة。",
+      "qualityConclusion": "Corresponding Chinese observed twice; malformed F21 output absent"
+    },
+    {
+      "index": 2,
+      "lang": "zh",
+      "original": "该域名仅用于文档示例，无需获得许可。这并非一项服务，请勿将其用于测试和监控目的。",
+      "first": {
+        "lang": "zh",
+        "source": "该域名仅用于文档示例，无需获得许可。这并非一项服务，请勿将其用于测试和监控目的。",
+        "targets": [],
+        "rawHTML": "<p lang=\"zh\">该域名仅用于文档示例，无需获得许可。这并非一项服务，请勿将其用于测试和监控目的。</p>",
+        "rectAtRead": null,
+        "viewportIntersectionAtRead": false
+      },
+      "restored": {
+        "lang": "zh",
+        "source": "该域名仅用于文档示例，无需获得许可。这并非一项服务，请勿将其用于测试和监控目的。",
+        "targets": [],
+        "rawHTML": "<p lang=\"zh\">该域名仅用于文档示例，无需获得许可。这并非一项服务，请勿将其用于测试和监控目的。</p>"
+      },
+      "retranslated": {
+        "lang": "zh",
+        "source": "该域名仅用于文档示例，无需获得许可。这并非一项服务，请勿将其用于测试和监控目的。",
+        "targets": [],
+        "rawHTML": "<p lang=\"zh\">该域名仅用于文档示例，无需获得许可。这并非一项服务，请勿将其用于测试和监控目的。</p>",
+        "rectAtRead": null,
+        "viewportIntersectionAtRead": false
+      },
+      "originalExactAfterRestore": true,
+      "firstEqualsRetranslated": true,
+      "targetNodeCounts": {
+        "initial": 0,
+        "first": 0,
+        "restored": 0,
+        "retranslated": 0,
+        "final": 0
+      },
+      "observedMalformedF21Result": null,
+      "qualityConclusion": "Same-target original retained; no duplicate translation"
+    },
+    {
+      "index": 3,
+      "lang": "fr",
+      "original": "L’usage de ce domaine est réservé à des exemples de documentation, sans autorisation préalable.  Il ne s’agit pas d’un service ; son utilisation à des fins de test ou de surveillance est à éviter.",
+      "first": {
+        "lang": "fr",
+        "source": "L’usage de ce domaine est réservé à des exemples de documentation, sans autorisation préalable.  Il ne s’agit pas d’un service ; son utilisation à des fins de test ou de surveillance est à éviter.",
+        "targets": [
+          "该域名仅限于文档示例，无需事先授权。 这不是一项服务;应避免将其用于测试或监测目的。"
+        ],
+        "rawHTML": "<p lang=\"fr\">L’usage de ce domaine est réservé à des exemples de documentation, sans autorisation préalable.  Il ne s’agit pas d’un service ; son utilisation à des fins de test ou de surveillance est à éviter.<span class=\"fluent-read-bilingual-content fluent-display-bold\" data-fr-translation-owned=\"true\" translate=\"no\" lang=\"zh-Hans\" dir=\"auto\">该域名仅限于文档示例，无需事先授权。 这不是一项服务;应避免将其用于测试或监测目的。</span></p>",
+        "rectAtRead": {
+          "x": 32,
+          "y": 674,
+          "width": 296,
+          "height": 44.80000305175781,
+          "top": 674,
+          "right": 328,
+          "bottom": 718.8000030517578,
+          "left": 32
+        },
+        "viewportIntersectionAtRead": false
+      },
+      "restored": {
+        "lang": "fr",
+        "source": "L’usage de ce domaine est réservé à des exemples de documentation, sans autorisation préalable.  Il ne s’agit pas d’un service ; son utilisation à des fins de test ou de surveillance est à éviter.",
+        "targets": [],
+        "rawHTML": "<p lang=\"fr\">L’usage de ce domaine est réservé à des exemples de documentation, sans autorisation préalable.  Il ne s’agit pas d’un service ; son utilisation à des fins de test ou de surveillance est à éviter.</p>"
+      },
+      "retranslated": {
+        "lang": "fr",
+        "source": "L’usage de ce domaine est réservé à des exemples de documentation, sans autorisation préalable.  Il ne s’agit pas d’un service ; son utilisation à des fins de test ou de surveillance est à éviter.",
+        "targets": [
+          "该域名仅限于文档示例，无需事先授权。 这不是一项服务;应避免将其用于测试或监测目的。"
+        ],
+        "rawHTML": "<p lang=\"fr\">L’usage de ce domaine est réservé à des exemples de documentation, sans autorisation préalable.  Il ne s’agit pas d’un service ; son utilisation à des fins de test ou de surveillance est à éviter.<span class=\"fluent-read-bilingual-content fluent-display-bold\" data-fr-translation-owned=\"true\" translate=\"no\" lang=\"zh-Hans\" dir=\"auto\">该域名仅限于文档示例，无需事先授权。 这不是一项服务;应避免将其用于测试或监测目的。</span></p>",
+        "rectAtRead": {
+          "x": 32,
+          "y": 166,
+          "width": 296,
+          "height": 44.80000305175781,
+          "top": 166,
+          "right": 328,
+          "bottom": 210.8000030517578,
+          "left": 32
+        },
+        "viewportIntersectionAtRead": true
+      },
+      "originalExactAfterRestore": true,
+      "firstEqualsRetranslated": true,
+      "targetNodeCounts": {
+        "initial": 0,
+        "first": 1,
+        "restored": 0,
+        "retranslated": 1,
+        "final": 1
+      },
+      "observedMalformedF21Result": "L'use de ce domaine est réservéàdes示例de留档，无自动化priéalable。Il ne s'agit pas d'un服务；son utilationàdes fins de test ou de监视estàéviter。",
+      "qualityConclusion": "Corresponding Chinese observed twice; malformed F21 output absent"
+    },
+    {
+      "index": 4,
+      "lang": "ru",
+      "original": "Данный домен предназначен для использования в примерах документации без необходимости получения предварительного разрешения. Это не сервис; не рекомендуется его использование для тестирования и мониторинга.",
+      "first": {
+        "lang": "ru",
+        "source": "Данный домен предназначен для использования в примерах документации без необходимости получения предварительного разрешения. Это не сервис; не рекомендуется его использование для тестирования и мониторинга.",
+        "targets": [
+          "本域名用于文档示例，无需事先获得许可。它并非一项服务，不建议用于测试和监控。"
+        ],
+        "rawHTML": "<p lang=\"ru\">Данный домен предназначен для использования в примерах документации без необходимости получения предварительного разрешения. Это не сервис; не рекомендуется его использование для тестирования и мониторинга.<span class=\"fluent-read-bilingual-content fluent-display-bold\" data-fr-translation-owned=\"true\" translate=\"no\" lang=\"zh-Hans\" dir=\"auto\">本域名用于文档示例，无需事先获得许可。它并非一项服务，不建议用于测试和监控。</span></p>",
+        "rectAtRead": {
+          "x": 32,
+          "y": 897.5999755859375,
+          "width": 296,
+          "height": 44.79998779296875,
+          "top": 897.5999755859375,
+          "right": 328,
+          "bottom": 942.3999633789062,
+          "left": 32
+        },
+        "viewportIntersectionAtRead": false
+      },
+      "restored": {
+        "lang": "ru",
+        "source": "Данный домен предназначен для использования в примерах документации без необходимости получения предварительного разрешения. Это не сервис; не рекомендуется его использование для тестирования и мониторинга.",
+        "targets": [],
+        "rawHTML": "<p lang=\"ru\">Данный домен предназначен для использования в примерах документации без необходимости получения предварительного разрешения. Это не сервис; не рекомендуется его использование для тестирования и мониторинга.</p>"
+      },
+      "retranslated": {
+        "lang": "ru",
+        "source": "Данный домен предназначен для использования в примерах документации без необходимости получения предварительного разрешения. Это не сервис; не рекомендуется его использование для тестирования и мониторинга.",
+        "targets": [
+          "本域名用于文档示例，无需事先获得许可。它并非一项服务，不建议用于测试和监控。"
+        ],
+        "rawHTML": "<p lang=\"ru\">Данный домен предназначен для использования в примерах документации без необходимости получения предварительного разрешения. Это не сервис; не рекомендуется его использование для тестирования и мониторинга.<span class=\"fluent-read-bilingual-content fluent-display-bold\" data-fr-translation-owned=\"true\" translate=\"no\" lang=\"zh-Hans\" dir=\"auto\">本域名用于文档示例，无需事先获得许可。它并非一项服务，不建议用于测试和监控。</span></p>",
+        "rectAtRead": {
+          "x": 32,
+          "y": 389.6000061035156,
+          "width": 296,
+          "height": 44.79998779296875,
+          "top": 389.6000061035156,
+          "right": 328,
+          "bottom": 434.3999938964844,
+          "left": 32
+        },
+        "viewportIntersectionAtRead": true
+      },
+      "originalExactAfterRestore": true,
+      "firstEqualsRetranslated": true,
+      "targetNodeCounts": {
+        "initial": 0,
+        "first": 1,
+        "restored": 0,
+        "retranslated": 1,
+        "final": 1
+      },
+      "observedMalformedF21Result": null,
+      "qualityConclusion": "Chinese display observed; comprehensive translation fidelity not assessed"
+    },
+    {
+      "index": 5,
+      "lang": "es",
+      "original": "Este dominio está destinado al uso en ejemplos de documentación sin necesidad de permiso. Esto no es un servicio; evitar utilizarlo para realizar pruebas o monitoreos.",
+      "first": {
+        "lang": "es",
+        "source": "Este dominio está destinado al uso en ejemplos de documentación sin necesidad de permiso. Esto no es un servicio; evitar utilizarlo para realizar pruebas o monitoreos.",
+        "targets": [
+          "本域名仅用于提供无需许可的文档示例，不构成一项服务；请勿将其用于测试或监控目的。"
+        ],
+        "rawHTML": "<p lang=\"es\">Este dominio está destinado al uso en ejemplos de documentación sin necesidad de permiso. Esto no es un servicio; evitar utilizarlo para realizar pruebas o monitoreos.<span class=\"fluent-read-bilingual-content fluent-display-bold\" data-fr-translation-owned=\"true\" translate=\"no\" lang=\"zh-Hans\" dir=\"auto\">本域名仅用于提供无需许可的文档示例，不构成一项服务；请勿将其用于测试或监控目的。</span></p>",
+        "rectAtRead": {
+          "x": 32,
+          "y": 1054,
+          "width": 296,
+          "height": 44.80000305175781,
+          "top": 1054,
+          "right": 328,
+          "bottom": 1098.8000030517578,
+          "left": 32
+        },
+        "viewportIntersectionAtRead": false
+      },
+      "restored": {
+        "lang": "es",
+        "source": "Este dominio está destinado al uso en ejemplos de documentación sin necesidad de permiso. Esto no es un servicio; evitar utilizarlo para realizar pruebas o monitoreos.",
+        "targets": [],
+        "rawHTML": "<p lang=\"es\">Este dominio está destinado al uso en ejemplos de documentación sin necesidad de permiso. Esto no es un servicio; evitar utilizarlo para realizar pruebas o monitoreos.</p>"
+      },
+      "retranslated": {
+        "lang": "es",
+        "source": "Este dominio está destinado al uso en ejemplos de documentación sin necesidad de permiso. Esto no es un servicio; evitar utilizarlo para realizar pruebas o monitoreos.",
+        "targets": [
+          "本域名仅用于提供无需许可的文档示例，不构成一项服务；请勿将其用于测试或监控目的。"
+        ],
+        "rawHTML": "<p lang=\"es\">Este dominio está destinado al uso en ejemplos de documentación sin necesidad de permiso. Esto no es un servicio; evitar utilizarlo para realizar pruebas o monitoreos.<span class=\"fluent-read-bilingual-content fluent-display-bold\" data-fr-translation-owned=\"true\" translate=\"no\" lang=\"zh-Hans\" dir=\"auto\">本域名仅用于提供无需许可的文档示例，不构成一项服务；请勿将其用于测试或监控目的。</span></p>",
+        "rectAtRead": {
+          "x": 32,
+          "y": 546,
+          "width": 296,
+          "height": 44.80000305175781,
+          "top": 546,
+          "right": 328,
+          "bottom": 590.8000030517578,
+          "left": 32
+        },
+        "viewportIntersectionAtRead": false
+      },
+      "originalExactAfterRestore": true,
+      "firstEqualsRetranslated": true,
+      "targetNodeCounts": {
+        "initial": 0,
+        "first": 1,
+        "restored": 0,
+        "retranslated": 1,
+        "final": 1
+      },
+      "observedMalformedF21Result": null,
+      "qualityConclusion": "Chinese display observed; comprehensive translation fidelity not assessed"
+    }
+  ],
+  "scope": "Existing document, original load provenance Unknown. Exact raw strings and HTML retained; this is not provider/network/cache provenance."
+}

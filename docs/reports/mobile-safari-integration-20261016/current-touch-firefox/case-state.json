@@ -1,0 +1,104 @@
+{
+  "actions": {
+    "notice": 1,
+    "more": 1,
+    "extensions": 1,
+    "addon": 1,
+    "open-settings": 1,
+    "web-assistance": 1,
+    "scroll-settings": 1,
+    "switch-off": 1,
+    "open-tabs": 2,
+    "reader-tab": 2,
+    "close-settings": 1
+  },
+  "recoveryOnly": true,
+  "priorCase": 32,
+  "targetSwitch": false,
+  "targetSourceSHA256": "ec9984718c899c4c83aea50171e40af85d2d7e1224077eb9f9206a41d6dd7dd3",
+  "freshBaselineClaimed": false,
+  "normalRoute": {
+    "preflightPassed": true,
+    "beforeInventoryGeometry": "initial-inventory",
+    "beforeInventorySHA256": "f9366792b9cd11f20be433cc0bfd348751e359675bd28f755d96635bbd722130",
+    "beforeSettingsCount": 0,
+    "readerGeometry": "initial-reader",
+    "atUnixMs": 1792178475648.4502,
+    "beforeNativeTabCount": 2,
+    "beforeNativeCountAXSHA256": "7807f91b69f2b9a83e5d080964fe2ec30d48dc753d40b3b078e351ec3aed0859",
+    "beforeNativeCountProof": "03-more-proof",
+    "openSettingsCompletedUnixMs": 1792178600752.5881,
+    "openSettingsProof": {
+      "attempt": 34,
+      "captureTag": "09-addon-popup",
+      "receiptTag": "open-settings-once",
+      "observer": {
+        "name": "root",
+        "tool": "view_image",
+        "toolReference": "functions.exec original 09-addon-popup.png viewed Settings button",
+        "viewedAtUnixMs": 1792178594857.1401
+      },
+      "targetActuallyVisible": true,
+      "noOtherOccluderAtTarget": true,
+      "inputContinuity": {
+        "commands": 4,
+        "sha256": "85a783cb9d40ccc0b3c1236379db52ce525755875d20528da92ca1438d110813"
+      },
+      "nativeTargetKey": "text",
+      "nativeTargetValue": "Open full settings",
+      "visibleTargetBoundsPx": [
+        792,
+        270,
+        1032,
+        408
+      ],
+      "nativeOverlayBoundsPx": [],
+      "normalRecoveryMenuActuallyObserved": true
+    },
+    "createdByCase": 34
+  },
+  "priorF32SettingsClosure": "NOT_OBSERVED",
+  "touchProbe": {
+    "geometry": "confirmed-probe",
+    "proof": "03-ball-proof",
+    "PNG": "03-reader.png",
+    "coarse": false,
+    "anyPointerCoarse": false,
+    "maxTouchPoints": 5,
+    "touchCapableClass": true,
+    "generalGeometryProbePassed": true,
+    "exactFallbackCapabilityObserved": true,
+    "exactFallbackAccepted": true,
+    "atUnixMs": 1792178519834.2102
+  },
+  "anchored": true,
+  "readerDiagnosticGeometry": "initial-reader",
+  "newSettingsCreatedInCase": 34,
+  "latestFreshChecked": {
+    "checked": false,
+    "geometry": "fresh-off-before-close",
+    "geometrySHA256": "c5083af876cf46303d4ea3f1b1d39e68c27e3d621db92ee63cc37c269ea21711",
+    "atUnixMs": 1792179034167.437,
+    "originalTargetSourceSHA256": "ec9984718c899c4c83aea50171e40af85d2d7e1224077eb9f9206a41d6dd7dd3",
+    "freshBaselineClaimed": false
+  },
+  "offInputAttempted": true,
+  "offInputUncertain": false,
+  "offSettingsObservation": {
+    "checked": false,
+    "geometry": "fresh-off-before-close",
+    "geometrySHA256": "c5083af876cf46303d4ea3f1b1d39e68c27e3d621db92ee63cc37c269ea21711",
+    "atUnixMs": 1792179034167.437,
+    "originalTargetSourceSHA256": "ec9984718c899c4c83aea50171e40af85d2d7e1224077eb9f9206a41d6dd7dd3",
+    "freshBaselineClaimed": false,
+    "switchOffAttempts": 1,
+    "noTouchThisObservation": true
+  },
+  "offReaderObservation": {
+    "geometry": "reader-off-observation",
+    "proof": "22-off-proof",
+    "PNG": "22-off-reader-fresh.png",
+    "atUnixMs": 1792179006376.29
+  },
+  "createdF34SettingsClosed": true
+}

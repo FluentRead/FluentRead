@@ -1,0 +1,209 @@
+{
+  "success": true,
+  "scope": "Options 390px label/checkbox; controlled same-stack top/middle/bottom/progress obstacles; short and long captions, scrolling/hit-test and cleanup",
+  "extensionDir": "/Users/thinkstu/Desktop/copy/FluentRead-mobile-video-menu-accessibility-20261016/.output/chrome-mv3",
+  "manifestVersion": "0.0.38",
+  "manifestSha256": "a12a20416fc826d3dc7278b74a112b4170f8985b1ac8b1a74c91f73d5e09b642",
+  "manifestMtime": "2026-10-16T07:20:10.349Z",
+  "checks": [
+    "390px label readable/unclipped; checkbox located and public persistence toggled false → true",
+    "Same-stack top/middle/bottom/progress controls clear for medium/short/long captions; requested font preserved; long panel hit-test, actual keyboard scrolling, same-cue preservation, hide/show recovery and Off cleanup"
+  ],
+  "consoleErrors": [],
+  "pageErrors": [],
+  "screenshots": [
+    "options-390-auto-bottom.png",
+    "options-390-auto-bottom-row.png",
+    "options-390-russian-auto-bottom.png",
+    "options-390-russian-row.png",
+    "video-medium-controls-visible.png",
+    "video-short-controls-visible.png",
+    "video-long-scroll-start.png",
+    "video-long-scroll-end.png",
+    "video-long-controls-restored.png",
+    "menu-with-long-cue.png",
+    "learning-fine-from-menu.png",
+    "learning-fine-scroll-end.png",
+    "learning-coarse-from-menu.png",
+    "learning-coarse-scroll-end.png",
+    "video-disabled-cleanup.png"
+  ],
+  "limitations": [
+    "Chromium CSS viewport emulation, not a mobile device or Safari.",
+    "Controlled HTML/media/timedtext and deterministic translation; no live site/provider result.",
+    "No extension build, model download, ASR or broad settings/site matrix."
+  ],
+  "profileDir": "/var/folders/2v/qd62bpkx51scgbvv2nrclsxm0000gn/T/fluentread-mobile-mini-97bzHO",
+  "browserPid": 46557,
+  "launchMode": "macos-background-cdp",
+  "focusPolicy": "launchservices-no-foreground",
+  "windowPlacement": {
+    "mode": "background-visible-no-focus",
+    "visible": true,
+    "hidden": false,
+    "centered": true,
+    "windowState": "normal",
+    "bounds": {
+      "left": 212,
+      "top": -990,
+      "width": 1280,
+      "height": 900
+    },
+    "displayTarget": "secondary",
+    "source": "macos-nsscreen",
+    "screenIndex": 1,
+    "browserFrontmost": false,
+    "frontmostBefore": {
+      "pid": 99817,
+      "name": "ChatGPT"
+    },
+    "frontmostAfter": {
+      "pid": 99817,
+      "name": "ChatGPT"
+    }
+  },
+  "extensionInstall": {
+    "mode": "command-line",
+    "extensionId": "djnlaiohfaaifbibleebjggkghlmcpcj",
+    "workerUrl": "chrome-extension://djnlaiohfaaifbibleebjggkghlmcpcj/background.js"
+  },
+  "configWrite": {
+    "success": true,
+    "message": "persistConfig"
+  },
+  "focusSamples": [
+    {
+      "stage": "options-390-auto-bottom.png",
+      "browserFrontmost": false,
+      "frontmost": {
+        "pid": 99817,
+        "name": "ChatGPT"
+      }
+    },
+    {
+      "stage": "options-390-russian-auto-bottom.png",
+      "browserFrontmost": false,
+      "frontmost": {
+        "pid": 99817,
+        "name": "ChatGPT"
+      }
+    },
+    {
+      "stage": "video-medium-controls-visible.png",
+      "browserFrontmost": false,
+      "frontmost": {
+        "pid": 99817,
+        "name": "ChatGPT"
+      }
+    },
+    {
+      "stage": "video-short-controls-visible.png",
+      "browserFrontmost": false,
+      "frontmost": {
+        "pid": 99817,
+        "name": "ChatGPT"
+      }
+    },
+    {
+      "stage": "video-long-scroll-start.png",
+      "browserFrontmost": false,
+      "frontmost": {
+        "pid": 99817,
+        "name": "ChatGPT"
+      }
+    },
+    {
+      "stage": "video-long-scroll-end.png",
+      "browserFrontmost": false,
+      "frontmost": {
+        "pid": 99817,
+        "name": "ChatGPT"
+      }
+    },
+    {
+      "stage": "video-long-controls-restored.png",
+      "browserFrontmost": false,
+      "frontmost": {
+        "pid": 99817,
+        "name": "ChatGPT"
+      }
+    },
+    {
+      "stage": "menu-with-long-cue.png",
+      "browserFrontmost": false,
+      "frontmost": {
+        "pid": 99817,
+        "name": "ChatGPT"
+      }
+    },
+    {
+      "stage": "learning-fine-from-menu.png",
+      "browserFrontmost": false,
+      "frontmost": {
+        "pid": 99817,
+        "name": "ChatGPT"
+      }
+    },
+    {
+      "stage": "learning-fine-scroll-end.png",
+      "browserFrontmost": false,
+      "frontmost": {
+        "pid": 99817,
+        "name": "ChatGPT"
+      }
+    },
+    {
+      "stage": "learning-coarse-from-menu.png",
+      "browserFrontmost": false,
+      "frontmost": {
+        "pid": 99817,
+        "name": "ChatGPT"
+      }
+    },
+    {
+      "stage": "learning-coarse-scroll-end.png",
+      "browserFrontmost": false,
+      "frontmost": {
+        "pid": 99817,
+        "name": "ChatGPT"
+      }
+    },
+    {
+      "stage": "video-disabled-cleanup.png",
+      "browserFrontmost": false,
+      "frontmost": {
+        "pid": 99817,
+        "name": "ChatGPT"
+      }
+    },
+    {
+      "stage": "complete",
+      "browserFrontmost": false,
+      "frontmost": {
+        "pid": 99817,
+        "name": "ChatGPT"
+      }
+    }
+  ],
+  "transitions": [
+    {
+      "hidden": true,
+      "scrolling": false,
+      "host": false,
+      "elapsedMs": 10.399999618530273
+    },
+    {
+      "hidden": false,
+      "scrolling": true,
+      "host": true,
+      "elapsedMs": 32.90000009536743
+    }
+  ],
+  "menuEntryCount": 1,
+  "menuPointer": "actual no-force entry and close clicks passed",
+  "learningPointer": "fine/coarse CSS: readable first line, native End to actions, sticky close hit, normal close, focus and same-cue restoration passed; no saved-item write",
+  "providerRequests": 6,
+  "layoutChecksPassed": true,
+  "browserClosed": true,
+  "profileRemoved": true
+}

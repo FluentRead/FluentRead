@@ -1,0 +1,265 @@
+{
+  "at": "2026-10-16T10:23:39.845455+00:00",
+  "status": "PASS_WITH_PROVENANCE_LIMITS",
+  "runtimeCommit": "d6b135e1e8383b3b4fd323ce36da4e639377f178",
+  "artifact": {
+    "directory": "/Users/thinkstu/Desktop/copy/FluentRead-mobile-observed-language-guard-20261016/.output/firefox-mv2",
+    "files": 478,
+    "bytes": 62344476,
+    "recordHash": "8ce57b1a076767cd6ddadc4acc5d9b61461cb637b39a28a4a317e9fccd9c05ff",
+    "rawByteHash": "9d2ed18771f174ddc5ceee4d9c39fc28f28fc83926c98e49e2b404160dd398f6",
+    "runtimeCommit": "d6b135e1e8383b3b4fd323ce36da4e639377f178",
+    "fullFileMap": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/observed-language-guard-20261016/production-builds/artifact-identities.json",
+    "permissionReviewSHA256": "2f14bf39790bf5f933a0a28a30d4149ed23dd390d4e4a0759b75c06c97d5052e",
+    "recordAlgorithm": "SHA256 of globally sorted records: relative POSIX path + NUL + file SHA256 hex + NUL + decimal byte length + newline.",
+    "rawAlgorithm": "Visit entries recursively in name-sorted directory order; each file updates SHA256(relative POSIX path + NUL + decimal byte length + NUL + raw bytes).",
+    "buildSourceSnapshot": {
+      "src/core/translation/resultValidation.ts": "3ba2f63073ab33517d5d2c32caf01e54a85dcaec0fde3a66a3d24650dac5ce80",
+      "src/providers/translation/free-chinese-web.ts": "83ab70dfbe1a6efbf5732bccf094efc07895b11153b9aa254dce45621f0399aa",
+      "tests/freeChineseWebProviders.test.ts": "2c908dddf591da4b9c1bc9023f27abd97df48dd1a79355d62c136256c6df9389",
+      "tests/translationEchoValidationRegression.test.ts": "9f8d50f7cc6148feccd3bea1cf936eea7a325380646e0f00ec285ad85870f13b",
+      "tests/fixtures/translation-quality/observed-ar-fr-residue.json": "8f2495b74245791daca327d75359daaa3535e2ec78a65e9c12a620a71d495739",
+      "docs/reports/observed-language-guard-20261016.md": "8dec59b86658ddcc152f5a754a46a81d5b68d79f8d261fae25b9950e5d0a83cf"
+    },
+    "committedProductionSourceSHA256": {
+      "src/core/translation/resultValidation.ts": "3ba2f63073ab33517d5d2c32caf01e54a85dcaec0fde3a66a3d24650dac5ce80",
+      "src/providers/translation/free-chinese-web.ts": "83ab70dfbe1a6efbf5732bccf094efc07895b11153b9aa254dce45621f0399aa"
+    },
+    "buildSnapshotNote": "Build snapshot retains original pre-commit metadata/doc hashes; committed d6 production module bytes match exactly. Final docs later revalidated separately by Root."
+  },
+  "environment": {
+    "FirefoxVersion": "158.0",
+    "FirefoxVersionCode": 2016189050,
+    "APKChanged": false,
+    "device": "task API31 arm64 Android emulator-5580",
+    "browserProfile": "existing task profile/data retained",
+    "ADB": "127.0.0.1:5048",
+    "extensionID": "{3096bd53-3bda-4556-b076-ebf47442a5c1}",
+    "hostEmulatorWindow": "-no-window",
+    "focusMonitor": "continuous owned native monitor; zero events/violations"
+  },
+  "actualCase": {
+    "at": "2026-10-16T10:23:39.845455+00:00",
+    "caseCount": 1,
+    "result": "PASS_WITH_PROVENANCE_LIMITS",
+    "passed": 1,
+    "failed": 0,
+    "skipped": 0,
+    "sameDocumentWithinF22": true,
+    "timeOrigin": 1792145571232,
+    "translationNodeCounts": [
+      0,
+      5,
+      0,
+      5
+    ],
+    "restoredSixOriginalsExact": true,
+    "sameTargetChineseNotDuplicated": true,
+    "bothRoundsArFrChinese": true,
+    "bothRoundsArFrMalformedAbsent": true,
+    "firstEqualsRetranslatedPerParagraph": true,
+    "initialRestore": "not applicable: initial actual state already original",
+    "normalTranslateActions": 2,
+    "normalRestoreActions": 1,
+    "observedCompleteSecondsAfterTap": [
+      53.426579,
+      23.110067
+    ],
+    "waitBudgetPerRoundSeconds": 90,
+    "providerWinningRoute": "UNKNOWN",
+    "cacheReadHitInvalidation": "NOT_PROVEN",
+    "fullPageQuality": "NOT_COMPREHENSIVELY_ASSESSED",
+    "normalErrorObserved": false,
+    "documentInitialNetworkProvenance": "UNKNOWN",
+    "actions": [
+      {
+        "at": "2026-10-16T10:13:47.363128+00:00",
+        "kind": "tap-observed-AX",
+        "source": "f22-01-initial.xml",
+        "key": "text",
+        "value": "OK",
+        "bounds": [
+          768,
+          1584,
+          1032,
+          1728
+        ]
+      },
+      {
+        "at": "2026-10-16T10:14:39.706421+00:00",
+        "kind": "tap-observed-AX",
+        "source": "f22-03-service-check-popup.xml",
+        "key": "text",
+        "value": "Translate this page",
+        "bounds": [
+          87,
+          824,
+          837,
+          962
+        ]
+      },
+      {
+        "at": "2026-10-16T10:15:04.470878+00:00",
+        "kind": "tap-observed-AX",
+        "source": "f22-04-first-translate.xml",
+        "key": "content-desc",
+        "value": "Navigate up",
+        "bounds": [
+          0,
+          72,
+          168,
+          240
+        ]
+      },
+      {
+        "at": "2026-10-16T10:17:26.761462+00:00",
+        "kind": "tap-observed-AX",
+        "source": "f22-12-restore-check-popup.xml",
+        "key": "text",
+        "value": "Restore this page",
+        "bounds": [
+          87,
+          824,
+          837,
+          962
+        ]
+      },
+      {
+        "at": "2026-10-16T10:17:29.997497+00:00",
+        "kind": "tap-observed-AX",
+        "source": "f22-13-restored-popup.xml",
+        "key": "content-desc",
+        "value": "Navigate up",
+        "bounds": [
+          0,
+          72,
+          168,
+          240
+        ]
+      },
+      {
+        "at": "2026-10-16T10:18:10.342933+00:00",
+        "kind": "tap-observed-AX",
+        "source": "f22-16-retranslate-check-popup.xml",
+        "key": "text",
+        "value": "Translate this page",
+        "bounds": [
+          87,
+          824,
+          837,
+          962
+        ]
+      },
+      {
+        "at": "2026-10-16T10:18:13.363589+00:00",
+        "kind": "tap-observed-AX",
+        "source": "f22-17-retranslate-popup.xml",
+        "key": "content-desc",
+        "value": "Navigate up",
+        "bounds": [
+          0,
+          72,
+          168,
+          240
+        ]
+      }
+    ]
+  },
+  "sourceProvenance": {
+    "url": "https://example.com/",
+    "state": "UNKNOWN_ORIGINAL_LOAD_PATH",
+    "sameDocumentDuringThisRun": true,
+    "noTestNavigationReload": true,
+    "differsFromF21DocumentInstance": true,
+    "note": "F21 and F22 timeOrigin differ after normal official loader browser restart. Source originals match; this does not prove a fresh public HTTP response or fixture origin."
+  },
+  "providerCacheProvenance": {
+    "defaultServiceUi": "Free translation services",
+    "languageUi": "Auto-detect → Simplified Chinese",
+    "actualWinningProvider": "UNKNOWN",
+    "requestOrCachePayloadCaptured": false,
+    "oldBadCacheReadRejected": "NOT_PROVEN",
+    "normalRuntimeMayFetch": true,
+    "routeConfigChanged": false,
+    "cacheClearedOrInjected": false
+  },
+  "changes": {
+    "productSource": false,
+    "permissions": false,
+    "providerConfig": false,
+    "APK": false,
+    "EdgeActions": 0,
+    "onlyInitialAddonNoticeOK": true
+  },
+  "rawEvidence": {
+    "functional": "functional-checks.json",
+    "paragraphs": "paragraph-correspondence.json",
+    "visual": "visual-review.json",
+    "cleanup": "cleanup.json",
+    "identity": "postflight-identity.json",
+    "nativeAXAndPNGs": "attempt22-ui/",
+    "loader": "firefox-production-attempt22-quality-cycle-run.json",
+    "guard": "boot-owned-avd-attempt22-report.json"
+  },
+  "cleanup": {
+    "at": "2026-10-16T10:20:58.645757+00:00",
+    "laneReleased": true,
+    "guardSession": 86625,
+    "guardExitCode": 0,
+    "loaderSession": 48972,
+    "loaderExitCode": 0,
+    "guardStatus": "stopped-by-owner",
+    "knownPIDs": [
+      82097,
+      82123,
+      82129,
+      82148,
+      82391,
+      82414
+    ],
+    "freshRemainingOwnedProcesses": [],
+    "freshPorts": [
+      {
+        "port": 5048,
+        "exitCode": 1,
+        "listeners": ""
+      },
+      {
+        "port": 5580,
+        "exitCode": 1,
+        "listeners": ""
+      },
+      {
+        "port": 5581,
+        "exitCode": 1,
+        "listeners": ""
+      },
+      {
+        "port": 60540,
+        "exitCode": 1,
+        "listeners": ""
+      }
+    ],
+    "runnerExit": true,
+    "ownedForwardRemoved": true,
+    "FirefoxTaskStopped": true,
+    "guardEmulatorServerStopped": true,
+    "hostAuthenticationMetadataUnchanged": true,
+    "focusEventCount": 0,
+    "violations": [],
+    "cleanupErrors": [],
+    "preserved": [
+      "task AVD/profile/data",
+      "Edge app/data/extension",
+      "default ADB server"
+    ],
+    "deviceScope": "Only emulator-5580; no iOS/Safari/physical device operation."
+  },
+  "unverified": [
+    "Actual winning provider/cache hit/persistent old-cache invalidation",
+    "Fresh public network document provenance",
+    "Physical Android/iOS or TalkBack",
+    "Broader sites/languages/translation fidelity/long-term stability",
+    "Selection/video/IME/rotation/background recovery not repeated in F22"
+  ]
+}

@@ -1,0 +1,113 @@
+{
+  "startedAt": "2026-10-16T21:17:00.944304+00:00",
+  "sourceFiles": {
+    "/Users/thinkstu/Desktop/copy/FluentRead-mobile-video-menu-accessibility-20261016/src/features/video-subtitle/content/ui.ts": "eb9cd5ccd3d2931cd1e85fa8a668235374e0a865e06605981274bd20944b592c",
+    "/Users/thinkstu/Desktop/copy/FluentRead-mobile-video-menu-accessibility-20261016/scripts/run-mobile-video-subtitle-test.cjs": "5f6aded2f3f1b47f61dc5fe89ce249c9b8ca209f1bc5a67f81150264d0d09b06"
+  },
+  "baseHead": "6ee7249dbaf231772f4ff0a2e16c665f56a5839b",
+  "uncommittedProductPatch": true,
+  "resourcePolicy": "maxWorkers1/concurrency3/cpuTarget40; sequential",
+  "steps": [
+    {
+      "name": "native-tests",
+      "command": [
+        "pnpm",
+        "exec",
+        "vitest",
+        "run",
+        "tests/videoNativeFullscreen.test.ts",
+        "--maxWorkers=1"
+      ],
+      "returnCode": 0,
+      "elapsedSeconds": 1.062,
+      "log": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/menu-scroll-controlled-20261017/cross-platform-build/native-tests.log"
+    },
+    {
+      "name": "firefox-build",
+      "command": [
+        "pnpm",
+        "exec",
+        "wxt",
+        "build",
+        "-b",
+        "firefox"
+      ],
+      "returnCode": 0,
+      "elapsedSeconds": 24.718,
+      "log": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/menu-scroll-controlled-20261017/cross-platform-build/firefox-build.log"
+    },
+    {
+      "name": "safari-web-build",
+      "command": [
+        "pnpm",
+        "exec",
+        "wxt",
+        "build",
+        "-b",
+        "safari",
+        "--mv2"
+      ],
+      "returnCode": 0,
+      "elapsedSeconds": 24.143,
+      "log": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/menu-scroll-controlled-20261017/cross-platform-build/safari-web-build.log"
+    },
+    {
+      "name": "userscript-build",
+      "command": [
+        "pnpm",
+        "exec",
+        "vite",
+        "build",
+        "--config",
+        "userscript/vite.config.ts"
+      ],
+      "returnCode": 0,
+      "elapsedSeconds": 5.442,
+      "log": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/menu-scroll-controlled-20261017/cross-platform-build/userscript-build.log"
+    },
+    {
+      "name": "verify-userscript",
+      "command": [
+        "node",
+        "scripts/verify-userscript-build.mjs"
+      ],
+      "returnCode": 0,
+      "elapsedSeconds": 0.137,
+      "log": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/menu-scroll-controlled-20261017/cross-platform-build/verify-userscript.log"
+    },
+    {
+      "name": "verify-manifests",
+      "command": [
+        "node",
+        "scripts/testing/verify-extension-manifests.mjs"
+      ],
+      "returnCode": 0,
+      "elapsedSeconds": 0.249,
+      "log": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/menu-scroll-controlled-20261017/cross-platform-build/verify-manifests.log"
+    },
+    {
+      "name": "verify-safari",
+      "command": [
+        "node",
+        "scripts/safari/package.mjs",
+        "--verify"
+      ],
+      "returnCode": 0,
+      "elapsedSeconds": 0.194,
+      "log": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/menu-scroll-controlled-20261017/cross-platform-build/verify-safari.log"
+    },
+    {
+      "name": "audit",
+      "command": [
+        "node",
+        "scripts/testing/audit-test-suite.mjs"
+      ],
+      "returnCode": 0,
+      "elapsedSeconds": 2.473,
+      "log": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/menu-scroll-controlled-20261017/cross-platform-build/audit.log"
+    }
+  ],
+  "finishedAt": "2026-10-16T21:17:59.367349+00:00",
+  "status": "NATIVE_TESTS_CROSS_PLATFORM_BUILDS_AND_VERIFIERS_PASS",
+  "sourceFilesUnchanged": true
+}

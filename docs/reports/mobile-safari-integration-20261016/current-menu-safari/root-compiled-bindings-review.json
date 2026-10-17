@@ -1,0 +1,26 @@
+{
+  "at": "2026-10-16T21:43:43.081571+00:00",
+  "status": "ROOT_COMPILED_BINDINGS_REVIEW_PASS_PENDING_INDEPENDENT_AND_RUNTIME_RELEASE",
+  "source566CompileLogPresent": true,
+  "terminalSession": 9650,
+  "terminalExitCode": 0,
+  "selectedTest": "testPausedMenuScrollAndClose",
+  "newPlanSHA256": "4dde9419d044a2febb26e1e8871ab5169649bdb90fe6dbd9abdacf5333d9c95d",
+  "preparedXctestrunSHA256": "6c4de77b7c0970cb81b20ef94cf912c1ecbf6970009c3b28029332010be48932",
+  "actualEnvironment": {
+    "FLUENTREAD_UI_APPROVED": "1",
+    "FLUENTREAD_EXPECTED_UDID": "A407390F-7AA8-42AE-AFEB-F93EE99E9FF8",
+    "FLUENTREAD_ARTIFACT_KIND": "production",
+    "FLUENTREAD_PRODUCTION_IDENTITY_SHA256": "3f74f268976e82aa7a84c5375938c89253ab461aa6585f5d18efec8164b04051",
+    "FLUENTREAD_EXPECTED_WEB_RAW": "b1a66b3fc4e579216321758ebb921b7396430610119c9e5ca356de23b8cfc161",
+    "FLUENTREAD_RUNTIME_COMMIT": "6eecd6710e7daac2d2a8cca9a34d0f26dc849b44"
+  },
+  "actualBinarySHA256": {
+    "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/safari-final-menu-readiness-preparation-20261017/DerivedData/Build/Products/Debug-iphonesimulator/SafariSmokeUITests-Runner.app/SafariSmokeUITests-Runner": "46603cf963c565b58a7fd252ebd3fa74e85143e4a358f22328e75b94c5dd9a5e",
+    "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/safari-final-menu-readiness-preparation-20261017/DerivedData/Build/Products/Debug-iphonesimulator/SafariSmokeUITests-Runner.app/PlugIns/SafariSmokeUITests.xctest/SafariSmokeUITests": "681c96eafd85022605850d90cc90ce2835a129b8ad5e92d3559f3a81ac5b90bb",
+    "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/safari-final-menu-readiness-preparation-20261017/DerivedData/Build/Products/Debug-iphonesimulator/NativeHarness.app/NativeHarness": "12551b14311235dea669ef7d85d9d20cd8d1f090f64d65f55091233f707b4199"
+  },
+  "signatureReviewSHA256": "95e7d736d396eba017ccecc1b4ba93fede6abc0a5c3c7f5ce7d91507c32d9414",
+  "runtimeStarted": false,
+  "runtimeGO": false
+}

@@ -1,0 +1,49 @@
+{
+  "appFrame" : {
+    "height" : 874,
+    "width" : 402,
+    "x" : 0,
+    "y" : 0
+  },
+  "baseBoundaryEligible" : true,
+  "candidateCount" : 1,
+  "closeCount" : 0,
+  "closeFrame" : {
+    "isInfinite" : false,
+    "isNull" : true,
+    "nonFinite" : true
+  },
+  "closeType" : 0,
+  "entryCount" : 1,
+  "entryFrame" : {
+    "height" : 45,
+    "width" : 44,
+    "x" : 350,
+    "y" : 284
+  },
+  "entryLabel" : "流畅阅读字幕翻译：已开启",
+  "entryType" : 1,
+  "knownTEDWithinPlayer" : true,
+  "metadataElapsedSeconds" : 6.8862990140914917,
+  "nativeLabels" : [
+
+  ],
+  "oneSnapshotBatch" : true,
+  "optionalBilingualCue" : null,
+  "phase" : "readiness-before-reveal-2",
+  "playback" : {
+    "pauseCount" : 0,
+    "playCount" : 0,
+    "progress" : [
+
+    ]
+  },
+  "playerCount" : 1,
+  "playerFrame" : {
+    "height" : 226,
+    "width" : 402,
+    "x" : 0,
+    "y" : 110
+  },
+  "snapshotElapsedSeconds" : 6.883836030960083
+}

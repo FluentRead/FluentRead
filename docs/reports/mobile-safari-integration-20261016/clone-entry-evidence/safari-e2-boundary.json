@@ -1,0 +1,73 @@
+{
+  "at": "2026-10-16T23:25:32.343896+00:00",
+  "kind": "MINIMAL_BOUNDARY_SUMMARY_NOT_RAW_RUNTIME_PAYLOAD",
+  "source": {
+    "path": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/mobile-youtube-fr-node-identity-probe-20261017/runtime-owned-tab-attempt1-revision2/root-runtime-outcome.json",
+    "sha256": "4c296e8dc331ba5e2b4940f539a96da27091d13ad7ce85eeeb0e6d9359810c4d",
+    "bytes": 9726
+  },
+  "independentReview": {
+    "path": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/mobile-youtube-fr-node-identity-probe-20261017/runtime-owned-tab-attempt1-revision2/independent-runtime-outcome-review.json",
+    "sha256": "9643dc0224471ef08039db8829978cedb5cee6dad53cd64bf2fbc1730d4026a0",
+    "bytes": 50102
+  },
+  "independentReviewExists": true,
+  "historicalRootPendingReviewFieldPredatesFinalReview": true,
+  "artifactKind": "research-only-r5-node-event-timeline-NOT-production",
+  "sourceCommit": "6eecd6710e7daac2d2a8cca9a34d0f26dc849b44",
+  "case": {
+    "passed": 0,
+    "skipped": 1,
+    "failed": 0,
+    "durationSeconds": 7.76,
+    "guardElapsedMs": 51949,
+    "xcodebuildExitCode": 0,
+    "meaning": "Exit0/TEST EXECUTE SUCCEEDED with SKIP is not product acceptance."
+  },
+  "actions": {
+    "address": 1,
+    "normalClear": 0,
+    "navigation": 0,
+    "entryTap": 0,
+    "pageMenu": 0,
+    "extensionPopup": 0,
+    "readNodes": 0,
+    "closePopup": 0,
+    "permission": 0,
+    "play": 0,
+    "CC": 0,
+    "translationIntent": 0,
+    "retry": 0
+  },
+  "exactAddressValuePreconditionSatisfied": false,
+  "fullAddressNotCollected": true,
+  "AXSameLabelNodeCount": 3,
+  "AXNodesAreNotDomCopyOrRootCauseProof": true,
+  "actualTrustedCapture": "NOT_OBTAINED",
+  "productionAcceptance": false,
+  "rootCauseEstablished": false,
+  "restoration": {
+    "fullOriginalAppFiles": 485,
+    "fivePhaseCounts": [
+      485,
+      485,
+      488,
+      485,
+      485
+    ],
+    "Userscripts47ActuallyRehashedByRoot": true,
+    "DemoActuallyRehashedByRoot": true,
+    "selectedNativePrivate17ActuallyRehashedByRoot": true,
+    "scope": "Selected native App private files only; not all extension storage/settings/cache; no business-data copyback."
+  },
+  "cleanup": {
+    "laneReleased": true,
+    "Shutdown": true,
+    "remainingOwned": [],
+    "violations": [],
+    "cleanupErrors": [],
+    "focusEvents": []
+  },
+  "noFrozenCaseRetry": true,
+  "scope": "This separate r5 observation predates the clone repair. It neither tests the latest production repair nor establishes the AX3 cause. Private attachments, URL values, tab identity and restoration paths are not copied."
+}

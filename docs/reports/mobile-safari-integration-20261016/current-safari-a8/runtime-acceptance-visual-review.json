@@ -1,0 +1,237 @@
+{
+  "at": "2026-10-16T09:47:33.655097+00:00",
+  "status": "A8_RAW_SKIP_MENU_NORMAL_OPEN_VISUALLY_OBSERVED_CLOSE_NOT_MEASURED",
+  "runtimeCommit": "f5a82d11a5b6b6a5de2f2ea726065a56cdb2e6ca",
+  "productionIdentitySHA256": "3f3df2dc7993788676427a6544e5cd17937f2a7da8d8e4a5f6c1d215417679dd",
+  "testMethod": "test113ProductionLocalizedCandidateMenu",
+  "rawCounts": {
+    "passedTests": 0,
+    "skippedTests": 1,
+    "failedTests": 0,
+    "totalTestCount": 1
+  },
+  "caseDurationSeconds": 18.305,
+  "testExecuteToolExitCode": 0,
+  "rawSkipReason": "A8 exact semantic close did not appear within3s",
+  "actions": {
+    "A8LivePlayerCenterTouch": 1,
+    "address": 1,
+    "FRMenuOpen": 1,
+    "navigation": 1,
+    "normalClear": 1,
+    "siteUnmute": 1
+  },
+  "preTouchPremises": {
+    "appFrame": {
+      "height": 874,
+      "width": 402,
+      "x": 0,
+      "y": 0
+    },
+    "appFramePositive": true,
+    "candidateCount": 1,
+    "candidateFrame": {
+      "height": 226,
+      "width": 301,
+      "x": 50,
+      "y": 110
+    },
+    "candidateFramePositive": true,
+    "candidateWithinPlayer": true,
+    "containerIsHittableObservationOnly": false,
+    "currentCandidateLabel": "Ken Robinson认为学校扼杀创造力, 20分钟3秒钟",
+    "currentFrame": {
+      "height": 226,
+      "width": 402,
+      "x": 0,
+      "y": 110
+    },
+    "currentFramePositive": true,
+    "elapsedSeconds": 11.193722009658813,
+    "evidencePlayerFrame": {
+      "height": 226,
+      "width": 402,
+      "x": 0,
+      "y": 110
+    },
+    "playerCount": 1,
+    "playerWithinApp": true,
+    "samePlayerFrame": true,
+    "stillKnown": true
+  },
+  "immediateSnapshot": {
+    "appFrame": {
+      "height": 874,
+      "width": 402,
+      "x": 0,
+      "y": 0
+    },
+    "baseBoundaryEligible": true,
+    "candidateCount": 1,
+    "closeCount": 0,
+    "closeFrame": {
+      "isInfinite": false,
+      "isNull": true,
+      "nonFinite": true
+    },
+    "closeType": 0,
+    "entryCount": 1,
+    "entryFrame": {
+      "height": 45,
+      "width": 44,
+      "x": 286,
+      "y": 262
+    },
+    "entryLabel": "流畅阅读字幕翻译：已开启",
+    "entryType": 1,
+    "knownTEDWithinPlayer": true,
+    "metadataElapsedSeconds": 13.644582986831665,
+    "nativeLabels": [
+      "暂停视频",
+      "进入全屏模式"
+    ],
+    "oneSnapshotBatch": true,
+    "optionalBilingualCue": null,
+    "phase": "immediate-after-touch",
+    "playback": {
+      "pauseCount": 1,
+      "playCount": 0,
+      "progress": []
+    },
+    "playerCount": 1,
+    "playerFrame": {
+      "height": 226,
+      "width": 402,
+      "x": 0,
+      "y": 110
+    },
+    "snapshotElapsedSeconds": 13.6405029296875
+  },
+  "rawMenuResult": {
+    "actions": {
+      "A8LivePlayerCenterTouch": 1,
+      "address": 1,
+      "FRMenuOpen": 1,
+      "navigation": 1,
+      "normalClear": 1,
+      "siteUnmute": 1
+    },
+    "actualEntryFrame": {
+      "height": 45,
+      "width": 44,
+      "x": 286,
+      "y": 262
+    },
+    "atLeast44px": true,
+    "beforeOpenPlayback": {
+      "pauseCount": 1,
+      "playCount": 0,
+      "progress": []
+    },
+    "closeObserved": false,
+    "entryContainedInPlayer": true,
+    "entryCount": 1,
+    "entryIsHittable": true,
+    "entryLabel": "流畅阅读字幕翻译：已开启",
+    "entryType": 1,
+    "opened": false,
+    "snapshotEntryFrame": {
+      "height": 45,
+      "width": 44,
+      "x": 286,
+      "y": 262
+    },
+    "snapshotToEntryCheckSeconds": 0.15289807319641113
+  },
+  "actualFinalMenuNode": {
+    "frame": {
+      "height": 179,
+      "width": 386,
+      "x": 8,
+      "y": 118
+    },
+    "identifier": "",
+    "label": "流畅阅读视频字幕翻译菜单",
+    "selected": false,
+    "type": 1,
+    "valueString": "",
+    "valueType": "__NSCFConstantString"
+  },
+  "actualFinalCloseNode": {
+    "frame": {
+      "height": 45,
+      "width": 44,
+      "x": 343,
+      "y": 125
+    },
+    "identifier": "",
+    "label": "关闭字幕菜单",
+    "selected": false,
+    "type": 54,
+    "valueString": "",
+    "valueType": "__NSCFConstantString"
+  },
+  "finalAXElapsedSeconds": 17.791497945785522,
+  "classification": {
+    "certain": "One unique sameplayer entry Other44x45, actualhittabletrue, finalguard followed by one normaltap. Original finalPNG and fullAX independently show actual menu opened. Close is exactlabel MenuItem(type54), excluded by harness Button9/Other1 presencepredicate. No close action occurred.",
+    "rawFieldBoundary": "Raw menu-result opened=false retained exactly; that field was assigned only after accepted closepresence and cannot override original visual/AX menu-open evidence. Rawskip/counts unchanged.",
+    "sdkTypeSource": "Independent patch_review read local XCUIElementTypes.h: XCUIElementTypeMenuItem=54, Swift.menuItem. No SDK execution for this mapping.",
+    "visualBoundary": "Title/free-service/header close/learning action/display-mode row are legible within menuviewport. Subtitle-time row is clipped at lower viewport edge, unseen content beyond requires separate scrolling/reachability check. Do not call entire UI accepted."
+  },
+  "results": {
+    "oneCurrentPlayerCenterTouch": "COMPLETED_MAX1",
+    "nativeControlsSnapshot": "OBSERVED_SAMEPLAYER_PAUSE_AND_FULLSCREEN",
+    "FRUnique44x45SamePlayerActualHittableNormalTap": "PASS_SCOPED",
+    "menuNormalOpen": "PASS_SCOPED_ORIGINAL_PNG_AND_AX",
+    "menuClose": "NOT_MEASURED_NO_ACTION",
+    "completeMenuOpenClose": "UNVERIFIED",
+    "playingMenu": "PARTIAL_EVIDENCE_NOT_FULL_ACCEPTANCE",
+    "realBilingual": "NOT_MEASURED_NOT_REACHED",
+    "captionPlusNativeControls": "UNVERIFIED",
+    "overallNativeAcceptance": "UNVERIFIED"
+  },
+  "playingBoundary": "Immediate snapshot before normalentrytap containsPause1/Play0. Candidate value progresses1second beforetouch to8seconds in finalmenuAX and imagebackground changes. This supports playback across captureinterval; no two recorded states with menualreadyopen establish continuousprogress during menu and no close was tested.",
+  "originalAttachmentCount": 11,
+  "originalPNGCount": 2,
+  "originalPNGReviews": [
+    {
+      "name": "A8-before-possible-live-touch.png",
+      "path": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/mobile-safari-localized-candidate-harness-20261016/inline-attempt1/runtime-evidence/A8-before-possible-live-touch.png",
+      "sha256": "0c06879535313c09ad1b2a981ac8682f0b44a5bf25f8f6ffa2e898d17c6f5169",
+      "observed": "Actual TED intro Once a year and pinkFR icon lower-right, page stillloading/white; no nativecontrols or bilingualcue."
+    },
+    {
+      "name": "unverified-final.png",
+      "path": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/mobile-safari-localized-candidate-harness-20261016/inline-attempt1/runtime-evidence/unverified-final.png",
+      "sha256": "a55118367bdb712522716de1db9da3f56c7346e13924a492dbc3920f509ad581",
+      "observed": "Actual FR menu visibly open over player. Header/closeX/free-service/learning/display modes readable. Lower subtitle-time controls clipped by scrollviewport; no scrollingwasperformed. No truebilingual cue; nativecontrols no longer visible."
+    }
+  ],
+  "originalVideoBoundary": "No MP4 in exported attachmentmanifest; full originalxcresult preserved. No derivedframes.",
+  "runtimeCleanup": {
+    "laneReleased": true,
+    "finalDevice": {
+      "lastBootedAt": "2026-10-16T09:44:12Z",
+      "dataPath": "/Users/thinkstu/Library/Developer/CoreSimulator/Devices/A407390F-7AA8-42AE-AFEB-F93EE99E9FF8/data",
+      "dataPathSize": 2607767552,
+      "logPath": "/Users/thinkstu/Library/Logs/CoreSimulator/A407390F-7AA8-42AE-AFEB-F93EE99E9FF8",
+      "udid": "A407390F-7AA8-42AE-AFEB-F93EE99E9FF8",
+      "isAvailable": true,
+      "logPathSize": 684032,
+      "deviceTypeIdentifier": "com.apple.CoreSimulator.SimDeviceType.iPhone-16-Pro",
+      "state": "Shutdown",
+      "name": "FluentRead-PR995-FreshPermissions-20261015"
+    },
+    "originalRestoredAndVerified": true,
+    "installedIdentityAtEnd": "ORIGINAL_D9_FULL485_VERIFIED",
+    "remainingOwnedProcesses": [],
+    "focusEvents": [],
+    "violations": [],
+    "cleanupErrors": [],
+    "elapsedMs": 61978,
+    "privateScope": "Native FR App data17 hash baseline only; not all extension settings/storage/cache. Record post-UI changes; do not copy files back."
+  },
+  "noAutomaticRetry": true,
+  "noProductSourceChange": true,
+  "allOriginalPNGPersonallyReviewed": true
+}

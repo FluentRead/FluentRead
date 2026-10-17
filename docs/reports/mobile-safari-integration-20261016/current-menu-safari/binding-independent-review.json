@@ -1,0 +1,281 @@
+{
+  "schema": 1,
+  "at": "2026-10-16T21:41:39.096Z",
+  "reviewer": "Independent offline audit agent /root/safari_readiness_prepare/readiness_source_audit",
+  "status": "OFFLINE_BINDING_SOURCE_AND_DISK_IDENTITY_REVIEW_ACCEPTED_NO_BUILD_OR_RUNTIME_GO",
+  "scope": {
+    "root": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/safari-final-menu-readiness-preparation-20261017",
+    "frozenSealFileCount": 26,
+    "frozenRootManifestFileCount": 25,
+    "reviewedBoundary": "The exact26 files in binding-source-seal.json, that seal itself, the specified21 unique source-proof files, oldB33 sealed inputs, historical source9, and local artifact bytes needed to reproduce new/old identity maps. Files added later by Root are outside this review.",
+    "noWholeDirectoryPermanentFreezeClaim": true,
+    "descendantsCreated": 0
+  },
+  "frozenHashes": {
+    "bindingSourceSealSHA256": "5471ed60f7ccba2b665d107d4d1e763797a397d185313d052f04b4ee567c5e7b",
+    "rootFinalInputsSHA256": "49243d1871171ea31db8448dccebfce7b240b26f8695f0af736e675b6fc77981",
+    "newFlatIdentitySHA256": "3f74f268976e82aa7a84c5375938c89253ab461aa6585f5d18efec8164b04051",
+    "candidateSourceSHA256": "566274799e05963b2b714966e28f9bcdfcee51805e3664cc91f85e1a3781b68e"
+  },
+  "blockingFindings": [],
+  "checklist": {
+    "guardAndBinderLogic": {
+      "result": "MATCH",
+      "namedReplacementCount": 18,
+      "perFile": [
+        {
+          "file": "build-harness-guard.cjs",
+          "replacements": 1,
+          "reverseToOldByteExact": true,
+          "oldSHA256": "b040dac437627a0563173b7a27ae6fa7bef9e119c11d687e83cf9a1a78c43791",
+          "newSHA256": "1d5f8bb7ad7c1e42582227b036eea2926734c19fa03dd8ec492d10d43084a94f"
+        },
+        {
+          "file": "inline-attempt1/runtime-guard.cjs",
+          "replacements": 6,
+          "reverseToOldByteExact": true,
+          "oldSHA256": "033d245ef070d24b1d383097cf0e83a850dec918cfec5012e94f1d697af4bd42",
+          "newSHA256": "8e5cc68ff7cf8f3ab3b25e241ba7853f6f89c2d63bcc9f6b5d4bcfe0f74e788e"
+        },
+        {
+          "file": "bind-compiled-runtime.py",
+          "replacements": 11,
+          "reverseToOldByteExact": true,
+          "oldSHA256": "4889b12fb7ea4add8cc26bc4b10d7fd9e0c3965abc34505d25f78ce52b5cc1ad",
+          "newSHA256": "293a133427cfe49da8fe856c68ea999d3de062e69b7eec5a5b78eb7ef26582c5"
+        }
+      ],
+      "method": "Each named old literal occurs exactly once in its old file and each named new literal exactly once in the frozen replacement context. Reverse only the18 declared replacements. Result is byte-identical to oldB.",
+      "semanticAssessment": "Replacement contents bind source hash, product commit, identity path/hash, raw/record Web hashes, inherited protocol plan path and future output/report labels. No command, condition, timeout, action loop, cleanup flow, process/focus observer or signing flag logic changes.",
+      "threeGeneratedDiffArtifactsRecomputedByteExact": true,
+      "PythonBinderAndIdentityCheckerASTParseOnly": true,
+      "binderOrGuardExecuted": false
+    },
+    "projectHostAndIdentityChecker": {
+      "result": "BYTE_EXACT",
+      "files": [
+        "harness/NativeHarness.xcodeproj/project.pbxproj",
+        "harness/NativeHarness.xcodeproj/xcshareddata/xcschemes/NativeHarness.xcscheme",
+        "harness/Host/AppDelegate.swift",
+        "inline-attempt1/identity-check.py"
+      ],
+      "projectSourceReference": "../SafariSmokeTests.candidate.swift",
+      "referenceResolvesWithinNewRoot": true,
+      "currentSourceMatchesPriorIndependentCandidateReview": true,
+      "priorCandidateReviewSHA256": "772c99b9d45eaa2199adf782f431b3909ab55b1d505eb513072f158640c6ba73",
+      "originalMenuAssertionSuffixSHA256": "fd5b011c488bc62832f1995115c8269b7470a7fbf628920907d5fed69bfffce7"
+    },
+    "fixedOwnershipRestoreAndExclusions": {
+      "result": "MATCH",
+      "UDID": "A407390F-7AA8-42AE-AFEB-F93EE99E9FF8",
+      "retainedOwnerTabUUID": "87246FAF-A680-4738-BA2A-97A9E170620D",
+      "bundle": "org.example.FluentReadDevelopment",
+      "oldD9IdentitySHA256": "b185d1c82009ea924b6b92bfdfb2045120df4d58f49c8cb345b508a28890e31d",
+      "oldD9All485ArtifactFilesFreshlyReadAndMatched": true,
+      "UserscriptsSourceSHA256": "0fac51f0b43d7ab473cf05145cc2be26a2c2281ef9d87ad4fc19a052181c9cb5",
+      "UserscriptsAll47ArtifactFilesFreshlyReadAndMatched": true,
+      "DemoExpectedSHA256": "6eb20314a7463f8f210cb1ced63867b1f2e3537ce66d7f12d106641d040d14b3",
+      "nativePrivate17Protocol": "Exact old source retained:17-file baseline before boot; equality required before install and after install; post-UI differences recorded without copy-back. No private container read by this reviewer.",
+      "excludedDiagnosticIdentitySHA256": "a13a50f6d97c6516501190ccd33a7d0241e5e06cb68eb2d9bd455ab06e97d089",
+      "excludedDiagnosticWebRawSHA256": "50c33842c9595bff21eff0b9eaeb0c1bb79d08c3ef371ab3476fe304cf8b8ea2",
+      "originalAndSelectedInheritedProtocolPlanFieldsDeepEqual": [
+        "UDID",
+        "name",
+        "bundle",
+        "oldIdentity",
+        "oldIdentitySHA256",
+        "Userscripts",
+        "budgetSeconds",
+        "sceneBudgetSeconds",
+        "runtimeProcessCeilingSeconds",
+        "cleanupReserveSeconds",
+        "privateBoundary",
+        "resourcePolicy"
+      ],
+      "officialPathAndAfterShutdownRulesByteExact": true,
+      "currentInstalledDeviceOrPrivateMetadataVerified": false
+    },
+    "finalProductProjection": {
+      "result": "FRESH_LOCAL_ARTIFACT_BYTES_MATCH",
+      "sourceCommit": "6eecd6710e7daac2d2a8cca9a34d0f26dc849b44",
+      "flatKeySetExactToOldB": [
+        "allFileSHA256",
+        "app",
+        "bundleId",
+        "extensionBundleId",
+        "guideSha256",
+        "nativeSha256",
+        "projectionBoundary",
+        "runtimeCommit",
+        "sourceNestedIdentity",
+        "sourcePackageReport",
+        "webFiles",
+        "webRawSha256",
+        "webRecordSha256"
+      ],
+      "newAppFull485MapMatchesNestedMapKeysHashesAndLengths": true,
+      "newAppSummary": {
+        "files": 485,
+        "bytes": 64226943,
+        "rawByteHash": "8a43eba8254a15452e5a8cb09cb519a9fdb42bb02623e87f3c3630ff4caca3d9",
+        "recordHash": "bedc4de9c0ef08df7be31f0a1208555f8ee0b750744c81cdef8ef154418d1bad"
+      },
+      "compiledExtensionFiles": 469,
+      "compiledExtensionExtrasBeyondExact467WebKeys": [
+        "FluentRead Extension",
+        "Info.plist"
+      ],
+      "newWeb467MatchesExpectedInputMapCopiedResourcesAndCompiledExtension": true,
+      "newWebSummary": {
+        "files": 467,
+        "bytes": 62232369,
+        "rawByteHash": "b1a66b3fc4e579216321758ebb921b7396430610119c9e5ca356de23b8cfc161",
+        "recordHash": "14320cd02100962f0f593932a754cbdb5baa3ca25f073fece8bb6ea40a1a5be2"
+      },
+      "nativeExecutableReadFromActualInfoPlist": {
+        "path": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/touch-layout-f33-followup-20261017/native-final-layout-6eecd6710e7d-b1a66b3fc4e5/output/derived-ios-simulator/Build/Products/Release-iphonesimulator/FluentRead.app/FluentRead",
+        "sha256": "6787f23451d263c8bab9a5f4543fbe5f869ec56ed38983438119bc3f0946d15e",
+        "executableNameFromActualInfo": "FluentRead"
+      },
+      "orderedGuide5": {
+        "sha256": "f84de75f396c8d102cb0a6a516db55d645b015aed2eaf5296e89f1ddba419f55",
+        "files": [
+          {
+            "relativePath": "Shared (App)/ViewController.swift",
+            "path": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/touch-layout-f33-followup-20261017/native-final-layout-6eecd6710e7d-b1a66b3fc4e5/output/safari-xcode/FluentRead/Shared (App)/ViewController.swift",
+            "bytes": 4598,
+            "sha256": "c711a496a195363958c482d849743fcf78c528f6465d98fe434e95f613c616ab"
+          },
+          {
+            "relativePath": "Shared (App)/Resources/Base.lproj/Main.html",
+            "path": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/touch-layout-f33-followup-20261017/native-final-layout-6eecd6710e7d-b1a66b3fc4e5/output/safari-xcode/FluentRead/Shared (App)/Resources/Base.lproj/Main.html",
+            "bytes": 862,
+            "sha256": "8359d2ff5a18fc2c655ef8798869b242b7c8495fa9a4575919213a2226d7789e"
+          },
+          {
+            "relativePath": "Shared (App)/Resources/Style.css",
+            "path": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/touch-layout-f33-followup-20261017/native-final-layout-6eecd6710e7d-b1a66b3fc4e5/output/safari-xcode/FluentRead/Shared (App)/Resources/Style.css",
+            "bytes": 1536,
+            "sha256": "3f4c01b933fe9622c01784d8e2eec2a228225fb07284bb5adacaf4bef4319a40"
+          },
+          {
+            "relativePath": "Shared (App)/Resources/Script.js",
+            "path": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/touch-layout-f33-followup-20261017/native-final-layout-6eecd6710e7d-b1a66b3fc4e5/output/safari-xcode/FluentRead/Shared (App)/Resources/Script.js",
+            "bytes": 2887,
+            "sha256": "ff9d564bd55a9742f77043dc08ebfd4cc2415989d70576851182d9c34c0ad2f8"
+          },
+          {
+            "relativePath": "iOS (App)/Info.plist",
+            "path": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/touch-layout-f33-followup-20261017/native-final-layout-6eecd6710e7d-b1a66b3fc4e5/output/safari-xcode/FluentRead/iOS (App)/Info.plist",
+            "bytes": 852,
+            "sha256": "e226eb640136bb3bbb31781a82b281882ecc1fc9695e05eab75da720ef7cb933"
+          }
+        ]
+      },
+      "guideHashAlgorithm": "In package.containerGuides[0].files order, SHA256(relativeUTF8 + NUL + decimalByteLength + NUL + rawGeneratedBytes)",
+      "inventoryAlgorithms": "rawByteHash uses UTF8-name-sorted recursive traversal and relativeUTF8 + NUL + decimalByteLength + NUL + rawBytes. recordHash uses UTF8-relative-path sorted records relativeUTF8 + NUL + hexSHA256 + NUL + decimalByteLength + newline.",
+      "AppAndExtensionBundleIDsMatchActualInfoPlistsAndPackage": true,
+      "oldA2IdentityNotReused": true,
+      "sourceNestedIdentityAndPackageReportPathsAndHashesExact": true,
+      "packageSignedAndInstalledFlagsBothFalse": true,
+      "noSymlinkSpecialProvisionOrResearchDiagnosticFilesInNewApp": true,
+      "opaqueExclusionsNotRelaxed": true,
+      "freshSigningOrArchitectureValidationPerformed": false
+    },
+    "seals": {
+      "result": "MATCH",
+      "bindingSealAll26HashesAndLengthsMatched": true,
+      "rootFinalInputsAll25HashesMatched": true,
+      "rootManifestKeysEqualBindingSealMinusRootManifestItself": true,
+      "sealDoesNotIncludeItself": true,
+      "rootManifestDoesNotIncludeItself": true,
+      "specifiedUniqueSourceProofFilesAllHashAndLengthMatched": 21,
+      "oldBSealedFilesHashAndLengthMatched": 33,
+      "historicalSourcePreparationFilesHashAndLengthMatched": 9,
+      "duplicateJSONKeysRejectedDuringParsing": true
+    },
+    "resourceAndActionBoundaries": {
+      "result": "UNCHANGED",
+      "harnessBuildCeilingSeconds": 300,
+      "sceneSeconds": 180,
+      "runtimeProcessCeilingSeconds": 240,
+      "runtimeTotalSeconds": 540,
+      "cleanupReserveSeconds": 180,
+      "jobs": 1,
+      "maxWorkers": 1,
+      "concurrency": 3,
+      "cpuTarget": 40,
+      "cpuTargetIsKernelCap": false,
+      "futureInstallMaximum": 1,
+      "futureSelectedTestMaximum": 1,
+      "futureOriginalD9RestoreMaximum": 1,
+      "selectedMethod": "SafariSmokeUITests/SafariSmokeTests/testPausedMenuScrollAndClose",
+      "actionAndCleanupControlFlowByteExactAfterNamedBindings": true,
+      "serialLockFocusObserverOwnedPIDPGIDAndTerminalReceiptAccountingPreserved": true,
+      "activationMarkerRequiredForOwnedSafariTerminationPreserved": true,
+      "noHostSimulatorGUIForeignDeviceResetUninstallPermissionSettingOrCopyBackExpansion": true,
+      "rawSkipsFailuresAndViolationsRetained": true,
+      "executorExitZeroDoesNotEstablishProductAcceptance": true
+    },
+    "futureOutputsAndAuthority": {
+      "result": "PREPARED_SOURCE_ONLY",
+      "noDerivedDataBuildReceiptCompiledHarnessXctestrunRuntimePlansOrRuntimeEvidenceAtAuditSnapshot": true,
+      "binderNotExecuted": true,
+      "futurePathsStayWithinNewRoot": true,
+      "binderRequiresRealNewBuildReceiptCodeZeroAndActualNewBinaries": true,
+      "oldA2CompiledHarnessNotReused": true,
+      "sourceOnlyHistoricalRecordsPreserved": true,
+      "separateRootBuildAndRuntimeAuthorityStillRequired": true,
+      "RootBuildGOGrantedByThisReview": false,
+      "RootRuntimeGOGrantedByThisReview": false,
+      "RootLaterStageFilesObservedByNameButNotReadExecutedOrApproved": [
+        "root-fresh-lane.py",
+        "root-fresh-pre-build-release.json",
+        "root-source-review.json"
+      ]
+    }
+  },
+  "freshArtifactRecoverySummaries": {
+    "oldD9": {
+      "files": 485,
+      "bytes": 64206587,
+      "rawByteHash": "c1e3e2fa9e8f32e6dde036b8f5f621f9bba3d8e125b952b69448506cf8277643",
+      "recordHash": "9557d296bf98f3d615a05e615b8810a06936d196d13cda653819a573866beee6"
+    },
+    "Userscripts": {
+      "files": 47,
+      "bytes": 7388462,
+      "rawByteHash": "bd33bf8d5152be34d1b175178c6f0f769b81ebf4b17c5153fc43e0096c80144f",
+      "recordHash": "a255a588c0b5dd74fc1d115752fd18312882634183dd1cd0e9a2e6b988c3b85a"
+    }
+  },
+  "limitations": [
+    "This report verifies frozen source and local disk artifact identity only. It does not establish a successful build or usable compiled harness.",
+    "No binder, guard, SDK command, browser, device, simulator, process inventory, signature tool, network action or root-release script was executed.",
+    "No current installed container, private17 baseline, Demo content, device state, serial lane or checkout head was queried. The unchanged runtime protocol and a later Root-owned preflight must verify those live facts.",
+    "The pre-existing package receipts were read as frozen evidence; this audit did not repeat their compilation or signing inspection.",
+    "6s/24s readiness and180s native source deadlines remain cooperative. This binding stage preserves the reviewed code and original outer guards; no hard interruption of synchronous native APIs is claimed.",
+    "Readiness, source acceptance, runtime exit0 and successful cleanup cannot replace menu assertions and independent original-pixel/focus review.",
+    "Later Root stage files are outside the26-file preparation seal. Their presence does not make this seal a whole-directory freeze or confer GO from this reviewer."
+  ],
+  "performed": {
+    "pureFileReadsHashMapComparison": true,
+    "PythonASTParseWithoutExecution": true,
+    "newReviewFileOnly": true,
+    "SDK": false,
+    "build": false,
+    "binder": false,
+    "guard": false,
+    "browser": false,
+    "device": false,
+    "simulator": false,
+    "ADB": false,
+    "processInventory": false,
+    "network": false,
+    "signatureOperation": false,
+    "WEdit": false,
+    "oldBEdit": false,
+    "sealedFileEdit": false
+  },
+  "contextPolicy": "300K context-compaction preference retained; no descendants spawned and no enforced-system-threshold claim."
+}

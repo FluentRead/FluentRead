@@ -1,0 +1,26 @@
+[
+  {
+    "attachments" : [
+      {
+        "configurationName" : "Test Scheme Action",
+        "deviceId" : "A407390F-7AA8-42AE-AFEB-F93EE99E9FF8",
+        "deviceName" : "FluentRead-PR995-FreshPermissions-20261015",
+        "exportedFileName" : "255E5947-D919-4DB5-BEB8-97322024B700.json",
+        "isAssociatedWithFailure" : false,
+        "suggestedHumanReadableName" : "drawer-rotation-finally-portrait_0_1218A2C0-5D65-43CA-AD46-E851F565C429.json",
+        "timestamp" : 1792219320.727
+      },
+      {
+        "configurationName" : "Test Scheme Action",
+        "deviceId" : "A407390F-7AA8-42AE-AFEB-F93EE99E9FF8",
+        "deviceName" : "FluentRead-PR995-FreshPermissions-20261015",
+        "exportedFileName" : "58D0B499-A211-44EA-B844-8E4EA5C056C8.json",
+        "isAssociatedWithFailure" : false,
+        "suggestedHumanReadableName" : "baseline-stop_0_60D6CFE4-9D97-4777-B869-CA6B7149F102.json",
+        "timestamp" : 1792219320.668
+      }
+    ],
+    "testIdentifier" : "CurrentProductionServiceDrawerKeyboardAttempt1Tests/testCurrentProductionOwnedTabServicesDrawerKeyboardAttempt1Once()",
+    "testIdentifierURL" : "test://com.apple.xcode/NativeHarness/SafariSmokeUITests/CurrentProductionServiceDrawerKeyboardAttempt1Tests/testCurrentProductionOwnedTabServicesDrawerKeyboardAttempt1Once"
+  }
+]

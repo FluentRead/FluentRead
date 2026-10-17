@@ -1,0 +1,96 @@
+{
+  "at": "2026-10-16T21:43:08.217120+00:00",
+  "status": "SIGNATURE_METADATA_MACH_O_AND_SDK_RUNNER_IDENTITY_PASS",
+  "items": [
+    {
+      "kind": "runner",
+      "binary": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/safari-final-menu-readiness-preparation-20261017/DerivedData/Build/Products/Debug-iphonesimulator/SafariSmokeUITests-Runner.app/SafariSmokeUITests-Runner",
+      "sha256": "46603cf963c565b58a7fd252ebd3fa74e85143e4a358f22328e75b94c5dd9a5e",
+      "signature": "UNCHANGED_APPLE_SDK_VENDOR_RUNNER_NO_SIGNING_APPLIED",
+      "provisioningAbsent": true,
+      "fileReceipt": {
+        "command": [
+          "/usr/bin/file",
+          "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/safari-final-menu-readiness-preparation-20261017/DerivedData/Build/Products/Debug-iphonesimulator/SafariSmokeUITests-Runner.app/SafariSmokeUITests-Runner"
+        ],
+        "returnCode": 0,
+        "stdout": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/safari-final-menu-readiness-preparation-20261017/DerivedData/Build/Products/Debug-iphonesimulator/SafariSmokeUITests-Runner.app/SafariSmokeUITests-Runner: Mach-O universal binary with 2 architectures: [x86_64:Mach-O 64-bit executable x86_64] [arm64:Mach-O 64-bit executable arm64]\n/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/safari-final-menu-readiness-preparation-20261017/DerivedData/Build/Products/Debug-iphonesimulator/SafariSmokeUITests-Runner.app/SafariSmokeUITests-Runner (for architecture x86_64):\tMach-O 64-bit executable x86_64\n/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/safari-final-menu-readiness-preparation-20261017/DerivedData/Build/Products/Debug-iphonesimulator/SafariSmokeUITests-Runner.app/SafariSmokeUITests-Runner (for architecture arm64):\tMach-O 64-bit executable arm64\n",
+        "stderr": ""
+      },
+      "signatureReceipt": {
+        "command": [
+          "/usr/bin/codesign",
+          "-dv",
+          "--verbose=4",
+          "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/safari-final-menu-readiness-preparation-20261017/DerivedData/Build/Products/Debug-iphonesimulator/SafariSmokeUITests-Runner.app"
+        ],
+        "returnCode": 0,
+        "stdout": "",
+        "stderr": "Executable=/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/safari-final-menu-readiness-preparation-20261017/DerivedData/Build/Products/Debug-iphonesimulator/SafariSmokeUITests-Runner.app/SafariSmokeUITests-Runner\nIdentifier=com.apple.XCTRunner\nFormat=app bundle with Mach-O universal (x86_64 arm64)\nCodeDirectory v=20400 size=823 flags=0x0(none) hashes=20+2 location=embedded\nVersionPlatform=7\nVersionMin=917504\nVersionSDK=1704448\nHash type=sha256 size=32\nCandidateCDHash sha256=705cdfa23655498b28210913e27380b47836350e\nCandidateCDHashFull sha256=705cdfa23655498b28210913e27380b47836350e936820e5a77d88ffd49c74ac\nHash choices=sha256\nCMSDigest=705cdfa23655498b28210913e27380b47836350e936820e5a77d88ffd49c74ac\nCMSDigestType=2\nExecutable Segment base=0\nExecutable Segment limit=32768\nExecutable Segment flags=0x1\nPage size=4096\nCDHash=705cdfa23655498b28210913e27380b47836350e\nSignature size=4412\nAuthority=Software Signing\nAuthority=Apple Code Signing Certification Authority\nAuthority=Apple Root CA\nInfo.plist=not bound\nTeamIdentifier=59GAB85EFG\nSealed Resources=none\nInternal requirements count=1 size=68\n"
+      },
+      "sdkVendorSource": {
+        "path": "/Applications/Xcode.app/Contents/Developer/Platforms/iPhoneSimulator.platform/Developer/Library/Xcode/Agents/XCTRunner.app/XCTRunner",
+        "sha256": "46603cf963c565b58a7fd252ebd3fa74e85143e4a358f22328e75b94c5dd9a5e"
+      }
+    },
+    {
+      "kind": "test",
+      "binary": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/safari-final-menu-readiness-preparation-20261017/DerivedData/Build/Products/Debug-iphonesimulator/SafariSmokeUITests-Runner.app/PlugIns/SafariSmokeUITests.xctest/SafariSmokeUITests",
+      "sha256": "681c96eafd85022605850d90cc90ce2835a129b8ad5e92d3559f3a81ac5b90bb",
+      "signature": "LINKER_ADHOC_NO_TEAM",
+      "provisioningAbsent": true,
+      "fileReceipt": {
+        "command": [
+          "/usr/bin/file",
+          "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/safari-final-menu-readiness-preparation-20261017/DerivedData/Build/Products/Debug-iphonesimulator/SafariSmokeUITests-Runner.app/PlugIns/SafariSmokeUITests.xctest/SafariSmokeUITests"
+        ],
+        "returnCode": 0,
+        "stdout": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/safari-final-menu-readiness-preparation-20261017/DerivedData/Build/Products/Debug-iphonesimulator/SafariSmokeUITests-Runner.app/PlugIns/SafariSmokeUITests.xctest/SafariSmokeUITests: Mach-O universal binary with 2 architectures: [x86_64:Mach-O 64-bit bundle x86_64] [arm64:Mach-O 64-bit bundle arm64]\n/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/safari-final-menu-readiness-preparation-20261017/DerivedData/Build/Products/Debug-iphonesimulator/SafariSmokeUITests-Runner.app/PlugIns/SafariSmokeUITests.xctest/SafariSmokeUITests (for architecture x86_64):\tMach-O 64-bit bundle x86_64\n/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/safari-final-menu-readiness-preparation-20261017/DerivedData/Build/Products/Debug-iphonesimulator/SafariSmokeUITests-Runner.app/PlugIns/SafariSmokeUITests.xctest/SafariSmokeUITests (for architecture arm64):\tMach-O 64-bit bundle arm64\n",
+        "stderr": ""
+      },
+      "signatureReceipt": {
+        "command": [
+          "/usr/bin/codesign",
+          "-dv",
+          "--verbose=4",
+          "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/safari-final-menu-readiness-preparation-20261017/DerivedData/Build/Products/Debug-iphonesimulator/SafariSmokeUITests-Runner.app/PlugIns/SafariSmokeUITests.xctest"
+        ],
+        "returnCode": 0,
+        "stdout": "",
+        "stderr": "Executable=/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/safari-final-menu-readiness-preparation-20261017/DerivedData/Build/Products/Debug-iphonesimulator/SafariSmokeUITests-Runner.app/PlugIns/SafariSmokeUITests.xctest/SafariSmokeUITests\nIdentifier=SafariSmokeUITests\nFormat=bundle with Mach-O universal (x86_64 arm64)\nCodeDirectory v=20400 size=2923 flags=0x20002(adhoc,linker-signed) hashes=88+0 location=embedded\nVersionPlatform=7\nVersionMin=1703936\nVersionSDK=1704448\nHash type=sha256 size=32\nCandidateCDHash sha256=3af055d0767dcbe18d27b00b75c104ae0ed9aa69\nCandidateCDHashFull sha256=3af055d0767dcbe18d27b00b75c104ae0ed9aa691806fd50bfd59d4e37a953f8\nHash choices=sha256\nCMSDigest=3af055d0767dcbe18d27b00b75c104ae0ed9aa691806fd50bfd59d4e37a953f8\nCMSDigestType=2\nExecutable Segment base=0\nExecutable Segment limit=179184\nExecutable Segment flags=0x0\nPage size=4096\nCDHash=3af055d0767dcbe18d27b00b75c104ae0ed9aa69\nSignature=adhoc\nInfo.plist=not bound\nTeamIdentifier=not set\nSealed Resources=none\nInternal requirements=none\n"
+      },
+      "sdkVendorSource": null
+    },
+    {
+      "kind": "host",
+      "binary": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/safari-final-menu-readiness-preparation-20261017/DerivedData/Build/Products/Debug-iphonesimulator/NativeHarness.app/NativeHarness",
+      "sha256": "12551b14311235dea669ef7d85d9d20cd8d1f090f64d65f55091233f707b4199",
+      "signature": "LINKER_ADHOC_NO_TEAM",
+      "provisioningAbsent": true,
+      "fileReceipt": {
+        "command": [
+          "/usr/bin/file",
+          "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/safari-final-menu-readiness-preparation-20261017/DerivedData/Build/Products/Debug-iphonesimulator/NativeHarness.app/NativeHarness"
+        ],
+        "returnCode": 0,
+        "stdout": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/safari-final-menu-readiness-preparation-20261017/DerivedData/Build/Products/Debug-iphonesimulator/NativeHarness.app/NativeHarness: Mach-O universal binary with 2 architectures: [x86_64:Mach-O 64-bit executable x86_64] [arm64:Mach-O 64-bit executable arm64]\n/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/safari-final-menu-readiness-preparation-20261017/DerivedData/Build/Products/Debug-iphonesimulator/NativeHarness.app/NativeHarness (for architecture x86_64):\tMach-O 64-bit executable x86_64\n/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/safari-final-menu-readiness-preparation-20261017/DerivedData/Build/Products/Debug-iphonesimulator/NativeHarness.app/NativeHarness (for architecture arm64):\tMach-O 64-bit executable arm64\n",
+        "stderr": ""
+      },
+      "signatureReceipt": {
+        "command": [
+          "/usr/bin/codesign",
+          "-dv",
+          "--verbose=4",
+          "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/safari-final-menu-readiness-preparation-20261017/DerivedData/Build/Products/Debug-iphonesimulator/NativeHarness.app"
+        ],
+        "returnCode": 0,
+        "stdout": "",
+        "stderr": "Executable=/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/safari-final-menu-readiness-preparation-20261017/DerivedData/Build/Products/Debug-iphonesimulator/NativeHarness.app/NativeHarness\nIdentifier=NativeHarness\nFormat=app bundle with Mach-O universal (x86_64 arm64)\nCodeDirectory v=20400 size=422 flags=0x20002(adhoc,linker-signed) hashes=10+0 location=embedded\nVersionPlatform=7\nVersionMin=1703936\nVersionSDK=1704448\nHash type=sha256 size=32\nCandidateCDHash sha256=840adc20bf8536f5e2dc069e7d9824fb4fc8ba9c\nCandidateCDHashFull sha256=840adc20bf8536f5e2dc069e7d9824fb4fc8ba9cbff0c3602dd82a509a93e22a\nHash choices=sha256\nCMSDigest=840adc20bf8536f5e2dc069e7d9824fb4fc8ba9cbff0c3602dd82a509a93e22a\nCMSDigestType=2\nExecutable Segment base=0\nExecutable Segment limit=7932\nExecutable Segment flags=0x1\nPage size=4096\nCDHash=840adc20bf8536f5e2dc069e7d9824fb4fc8ba9c\nSignature=adhoc\nInfo.plist=not bound\nTeamIdentifier=not set\nSealed Resources=none\nInternal requirements=none\n"
+      },
+      "sdkVendorSource": null
+    }
+  ],
+  "newSigningApplied": false,
+  "runtimeStarted": false,
+  "harnessIdentitySHA256": "b4c813d79e3210cb138bbe0506531d64572a024e5b364cbd6de55015776d27b2"
+}

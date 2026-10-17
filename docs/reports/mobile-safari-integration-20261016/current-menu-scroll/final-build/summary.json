@@ -1,0 +1,55 @@
+{
+  "startedAt": "2026-10-16T21:04:37.778674+00:00",
+  "sourceFiles": {
+    "/Users/thinkstu/Desktop/copy/FluentRead-mobile-video-menu-accessibility-20261016/src/features/video-subtitle/content/ui.ts": "eb9cd5ccd3d2931cd1e85fa8a668235374e0a865e06605981274bd20944b592c",
+    "/Users/thinkstu/Desktop/copy/FluentRead-mobile-video-menu-accessibility-20261016/scripts/run-mobile-video-subtitle-test.cjs": "cdde685edee36ec99ce368f4b0e505f1f75b9c84beda28176383fe18cbcc0695"
+  },
+  "baseHead": "6ee7249dbaf231772f4ff0a2e16c665f56a5839b",
+  "uncommittedProductPatch": true,
+  "resourcePolicy": "maxWorkers1/concurrency3/cpuTarget40; sequential",
+  "steps": [
+    {
+      "name": "focused-tests",
+      "command": [
+        "pnpm",
+        "exec",
+        "vitest",
+        "run",
+        "tests/videoUiI18n.test.ts",
+        "tests/videoPlayerBinding.test.ts",
+        "tests/videoSubtitleViewport.test.ts",
+        "--maxWorkers=1"
+      ],
+      "returnCode": 0,
+      "elapsedSeconds": 3.588,
+      "log": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/menu-scroll-controlled-20261017/final-build/focused-tests.log"
+    },
+    {
+      "name": "compile",
+      "command": [
+        "pnpm",
+        "exec",
+        "vue-tsc",
+        "--noEmit"
+      ],
+      "returnCode": 0,
+      "elapsedSeconds": 38.559,
+      "log": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/menu-scroll-controlled-20261017/final-build/compile.log"
+    },
+    {
+      "name": "chrome-build",
+      "command": [
+        "pnpm",
+        "exec",
+        "wxt",
+        "build"
+      ],
+      "returnCode": 0,
+      "elapsedSeconds": 24.583,
+      "log": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/menu-scroll-controlled-20261017/final-build/chrome-build.log"
+    }
+  ],
+  "finishedAt": "2026-10-16T21:05:44.511091+00:00",
+  "status": "FOCUSED_TESTS_COMPILE_CHROME_BUILD_PASS",
+  "sourceFilesUnchanged": true
+}

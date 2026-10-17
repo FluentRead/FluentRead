@@ -1,0 +1,300 @@
+{
+  "at": "2026-10-16T10:09:45.341879+00:00",
+  "status": "CORRECTED_A9_MENU_NORMAL_OPEN_CLOSE_SCOPED_PASS_PLAYING_AND_CAPTIONS_UNVERIFIED",
+  "runtimeCommit": "f5a82d11a5b6b6a5de2f2ea726065a56cdb2e6ca",
+  "productionIdentitySHA256": "3f3df2dc7993788676427a6544e5cd17937f2a7da8d8e4a5f6c1d215417679dd",
+  "researchSourceSHA256": "951ac219d0e2f20e802e3d1fedba05fc70d4c791529827b525a48b32f53fa53c",
+  "testMethod": "test114ProductionMenuItemClose",
+  "evidenceNameBoundary": "Correctedindependentroot intentionallyretains A9 helper/attachment/case114 names; failedA9 evidenceuntouched.",
+  "rawCounts": {
+    "passedTests": 0,
+    "skippedTests": 1,
+    "failedTests": 0,
+    "totalTestCount": 1
+  },
+  "caseDurationSeconds": 62.307,
+  "testExecuteToolExitCode": 0,
+  "rawSkipReason": "No actual nonempty English/Chinese source+translation with positive panel/source/translation frames within40s; intro or provider/source unavailable",
+  "actions": {
+    "A9LivePlayerCenterTouch": 1,
+    "address": 1,
+    "FRMenuClose": 1,
+    "FRMenuOpen": 1,
+    "navigation": 1,
+    "normalClear": 1,
+    "siteUnmute": 1
+  },
+  "mandatoryMenuChecks": {
+    "entryCount": {
+      "actual": 1,
+      "expected": 1,
+      "match": true
+    },
+    "atLeast44px": {
+      "actual": true,
+      "expected": true,
+      "match": true
+    },
+    "entryIsHittable": {
+      "actual": true,
+      "expected": true,
+      "match": true
+    },
+    "entryContainedInPlayer": {
+      "actual": true,
+      "expected": true,
+      "match": true
+    },
+    "opened": {
+      "actual": true,
+      "expected": true,
+      "match": true
+    },
+    "menuAXCaptured": {
+      "actual": true,
+      "expected": true,
+      "match": true
+    },
+    "menuStillOpenInLaterSnapshot": {
+      "actual": true,
+      "expected": true,
+      "match": true
+    },
+    "closeContainedInPlayer": {
+      "actual": true,
+      "expected": true,
+      "match": true
+    },
+    "closeIsHittable": {
+      "actual": true,
+      "expected": true,
+      "match": true
+    },
+    "closeObserved": {
+      "actual": true,
+      "expected": true,
+      "match": true
+    },
+    "actions.FRMenuOpen": {
+      "actual": 1,
+      "expected": 1,
+      "match": true
+    },
+    "actions.FRMenuClose": {
+      "actual": 1,
+      "expected": 1,
+      "match": true
+    }
+  },
+  "menuResult": {
+    "actions": {
+      "A9LivePlayerCenterTouch": 1,
+      "address": 1,
+      "FRMenuClose": 1,
+      "FRMenuOpen": 1,
+      "navigation": 1,
+      "normalClear": 1,
+      "siteUnmute": 1
+    },
+    "actualEntryFrame": {
+      "height": 45,
+      "width": 44,
+      "x": 286,
+      "y": 262
+    },
+    "atLeast44px": true,
+    "beforeOpenPlayback": {
+      "pauseCount": 0,
+      "playCount": 1,
+      "progress": []
+    },
+    "closeContainedInPlayer": true,
+    "closeFrame": {
+      "height": 45,
+      "width": 44,
+      "x": 343,
+      "y": 125
+    },
+    "closeIsHittable": true,
+    "closeObserved": true,
+    "closeType": 54,
+    "entryContainedInPlayer": true,
+    "entryCount": 1,
+    "entryIsHittable": true,
+    "entryLabel": "流畅阅读字幕翻译：已开启",
+    "entryType": 1,
+    "finalCloseType": 54,
+    "laterMenuReadElapsedSeconds": 1.221572995185852,
+    "menuAXCaptured": true,
+    "menuLaterPlayback": {
+      "pauseCount": 0,
+      "playCount": 1,
+      "progress": []
+    },
+    "menuOpenPlayback": {
+      "pauseCount": 0,
+      "playCount": 1,
+      "progress": []
+    },
+    "menuStillOpenInLaterSnapshot": true,
+    "opened": true,
+    "snapshotEntryFrame": {
+      "height": 45,
+      "width": 44,
+      "x": 286,
+      "y": 262
+    },
+    "snapshotToEntryCheckSeconds": 0.16652405261993408
+  },
+  "preTouchPremises": {
+    "appFrame": {
+      "height": 874,
+      "width": 402,
+      "x": 0,
+      "y": 0
+    },
+    "appFramePositive": true,
+    "candidateCount": 1,
+    "candidateFrame": {
+      "height": 226,
+      "width": 301,
+      "x": 50,
+      "y": 110
+    },
+    "candidateFramePositive": true,
+    "candidateWithinPlayer": true,
+    "containerIsHittableObservationOnly": false,
+    "currentCandidateLabel": "Ken Robinson认为学校扼杀创造力, 20分钟3秒钟",
+    "currentFrame": {
+      "height": 226,
+      "width": 402,
+      "x": 0,
+      "y": 110
+    },
+    "currentFramePositive": true,
+    "elapsedSeconds": 14.06749701499939,
+    "evidencePlayerFrame": {
+      "height": 226,
+      "width": 402,
+      "x": 0,
+      "y": 110
+    },
+    "playerCount": 1,
+    "playerWithinApp": true,
+    "samePlayerFrame": true,
+    "stillKnown": true
+  },
+  "results": {
+    "oneCurrentPlayerCenterTouch": "COMPLETED_MAX1",
+    "nativeControls": "OBSERVED",
+    "FRUnique44x45SamePlayerHittableNormalTap": "PASS_SCOPED",
+    "menuOpenClose": "PASS_SCOPED_IN_PAUSED_STATE",
+    "focusReturn": "OBSERVED_ORIGINAL_FINAL_BLUE_OUTLINE_ON_FR",
+    "playingMenu": "NOT_ACCEPTED_ACTUAL_PAUSED_STATE",
+    "realBilingual": "UNVERIFIED_40S_WAIT_NO_CUE",
+    "captionPlusNativeControls": "UNVERIFIED_NO_REAL_BILINGUAL_CUE",
+    "menuScrollabilityReachability": "NOT_MEASURED",
+    "overallNativeAcceptance": "UNVERIFIED"
+  },
+  "playbackEvidence": {
+    "immediateAfterCenter": {
+      "pauseCount": 0,
+      "playCount": 1,
+      "progress": []
+    },
+    "menuOpen": {
+      "pauseCount": 0,
+      "playCount": 1,
+      "progress": []
+    },
+    "menuLater": {
+      "pauseCount": 0,
+      "playCount": 1,
+      "progress": []
+    },
+    "menuAXCandidate": [
+      {
+        "frame": {
+          "height": 226,
+          "width": 301,
+          "x": 50,
+          "y": 110
+        },
+        "identifier": "",
+        "label": "Ken Robinson认为学校扼杀创造力, 20分钟3秒钟",
+        "selected": false,
+        "type": 1,
+        "valueString": "4秒钟",
+        "valueType": "__NSCFString"
+      }
+    ],
+    "finalAXCandidate": [
+      {
+        "frame": {
+          "height": 226,
+          "width": 301,
+          "x": 50,
+          "y": 110
+        },
+        "identifier": "",
+        "label": "Ken Robinson认为学校扼杀创造力, 20分钟3秒钟",
+        "selected": false,
+        "type": 1,
+        "valueString": "4秒钟",
+        "valueType": "__NSCFString"
+      }
+    ],
+    "observed": "NativePlay1/Pause0 immediatelyafter solecenter and throughmenu; candidate4seconds atmenu and40s-laterfinal; finalPNGbigPlay+0:04. Actual pausedstateestablished.",
+    "causalityBoundary": "No explicit pause/Play action wasissued; pausedstate follows theallowedcentertap, but no claim of productpausebug orpreciseeventcause. Thiscasecannotvalidateplayingmenu.",
+    "captionBoundary": "Thevideo remainsat4secondintro duringbilingualwait, so absencecannot be attributed specificallytoprovider/sourceavailability. No additionalresumeactionwasauthorizedinthiscase."
+  },
+  "originalAttachmentCount": 16,
+  "originalPNGCount": 3,
+  "originalPNGReviews": [
+    {
+      "name": "A9-before-possible-live-touch.png",
+      "path": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/mobile-safari-menuitem-close-corrected-harness-20261016/inline-attempt1/runtime-evidence/A9-before-possible-live-touch.png",
+      "sha256": "8809ef0ebe6c5c1546837f94d20fb1844608f2e44bcbd6f3d191ab3559106ca1",
+      "observed": "TED introductory burned-inEnglish text, nativecontrols hidden; no truebilingualcue."
+    },
+    {
+      "name": "A9-menu-after-one-normal-tap.png",
+      "path": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/mobile-safari-menuitem-close-corrected-harness-20261016/inline-attempt1/runtime-evidence/A9-menu-after-one-normal-tap.png",
+      "sha256": "1981f226ce8b94d2606511fe5ed41bccee66884ca1bdb66bec10f9cb3c2c4366",
+      "observed": "Menu visiblyopen. Title/free-service/closeX/learningaction/modechoices readable, no overlapamongthosevisiblecontrols. Lower subtitle-time row clipped by menuviewport; scrolling/reachability nottested. Underlying nativeprogress bar remainsvisible."
+    },
+    {
+      "name": "unverified-final.png",
+      "path": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/mobile-safari-menuitem-close-corrected-harness-20261016/inline-attempt1/runtime-evidence/unverified-final.png",
+      "sha256": "f1fd1386844c9c4090e079ddfa71567aea915eff3e27d53c00392b4944834feb",
+      "observed": "Menu visiblyclosed, bluefocusoutline returned toFRentry. NativebigPlay icon and0:04/20:03 visible, confirmingpausedintro; noEnglish/ChineseFRpanel ortranslation."
+    }
+  ],
+  "allOriginalPNGPersonallyReviewed": true,
+  "originalVideoBoundary": "No MP4 in currentexportedmanifest; originalxcresultretained. No derivedframes.",
+  "runtimeCleanup": {
+    "laneReleased": true,
+    "finalDevice": {
+      "lastBootedAt": "2026-10-16T10:05:56Z",
+      "dataPath": "/Users/thinkstu/Library/Developer/CoreSimulator/Devices/A407390F-7AA8-42AE-AFEB-F93EE99E9FF8/data",
+      "dataPathSize": 2692333568,
+      "logPath": "/Users/thinkstu/Library/Logs/CoreSimulator/A407390F-7AA8-42AE-AFEB-F93EE99E9FF8",
+      "udid": "A407390F-7AA8-42AE-AFEB-F93EE99E9FF8",
+      "isAvailable": true,
+      "logPathSize": 630784,
+      "deviceTypeIdentifier": "com.apple.CoreSimulator.SimDeviceType.iPhone-16-Pro",
+      "state": "Shutdown",
+      "name": "FluentRead-PR995-FreshPermissions-20261015"
+    },
+    "originalRestoredAndVerified": true,
+    "installedIdentityAtEnd": "ORIGINAL_D9_FULL485_VERIFIED",
+    "remainingOwnedProcesses": [],
+    "focusEvents": [],
+    "violations": [],
+    "cleanupErrors": [],
+    "elapsedMs": 107017,
+    "privateScope": "Native FR App data17 hash baseline only; not all extension settings/storage/cache. Record post-UI changes; do not copy files back."
+  },
+  "noAutomaticRetry": true,
+  "noProductSourceChange": true
+}

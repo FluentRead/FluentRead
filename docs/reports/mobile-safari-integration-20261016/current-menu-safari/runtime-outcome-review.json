@@ -1,0 +1,539 @@
+{
+  "schema": 1,
+  "at": "2026-10-16T21:53:21.134Z",
+  "reviewer": "Independent offline runtime evidence reviewer /root/safari_readiness_prepare/readiness_source_audit",
+  "status": "UNVERIFIED_MENU_OPEN_AFTER_ONE_NORMAL_ENTRY_TAP_0_PASS_1_SKIP_RESTORATION_VERIFIED",
+  "blockingReviewFindings": [],
+  "recordConflicts": [],
+  "outcome": {
+    "passedTests": 0,
+    "failedTests": 0,
+    "skippedTests": 1,
+    "totalTestCount": 1,
+    "selectedTest": "SafariSmokeUITests/SafariSmokeTests/testPausedMenuScrollAndClose",
+    "selectedCaseSeconds": 12.64,
+    "guardEndToEndSeconds": 54.509,
+    "guardStatus": "UNVERIFIED_PRECONDITION_OR_AX_LIMIT",
+    "rootReportedTerminalSession": {
+      "id": 30155,
+      "exitCode": 0,
+      "reviewerDidNotPollSession": true
+    },
+    "storedRuntimeCommandTerminalResult": {
+      "code": 0,
+      "signal": null
+    },
+    "executorSuccessIsNotProductPass": true,
+    "readinessPreconditionObserved": true,
+    "menuOpenEstablished": false,
+    "scrollExercised": false,
+    "CloseActionExercised": false,
+    "rootCause": "UNDETERMINED",
+    "finalConclusion": "During the second read-only before-reveal sample, the enabled entry met the owned-frame/44-size/hittability precondition with no center reveal. One normal semantic entry tap followed. The exact Close did not establish existence during the3s wait, so the case skipped before menu capture, internal scrolling or Close assertions."
+  },
+  "scope": {
+    "root": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/safari-final-menu-readiness-preparation-20261017",
+    "operation": "Offline reading of exported original PNG/AX/JSON/log artifacts, current sealed-file hashing, and pure-disk rehash of only the final official A407 paths already recorded by after-restore/after-shutdown plus their necessary owner metadata.",
+    "noNewInputOrRuntime": true,
+    "noNewGOGranted": true,
+    "noOtherDeviceOrContainerScanned": true,
+    "privateScope": "Native FR App17-file snapshot only. This does not cover all extension settings, extension storage or caches."
+  },
+  "integrity": {
+    "runtimePackageSealSHA256": "84b493e9f3d72747b7fcbb7c23bf509f7383e1fad9509ca655335850f322c50a",
+    "runtimePackageSealCurrent53HashesAndLengthsAllMatched": true,
+    "sourcePreparation26FilesUnchanged": true,
+    "frozenSwiftSourceSHA256": "566274799e05963b2b714966e28f9bcdfcee51805e3664cc91f85e1a3781b68e",
+    "runtimeEvidenceManifestSHA256": "748b2aa46a65e22e51aebddfb97f68f6682d0095cb9e65517982e51ceddcdc2c",
+    "attachmentCount": 14,
+    "originalPNGCount": 4,
+    "manifestPathsExactlyMatchEvidenceDirectoryFiles": true,
+    "duplicateJSONKeysRejectedDuringParsing": true,
+    "inputSHA256": {
+      "inline-attempt1/runtime-files.json": "748b2aa46a65e22e51aebddfb97f68f6682d0095cb9e65517982e51ceddcdc2c",
+      "inline-attempt1/runtime-summary.json": "c70928fd9359d2de0c5b667b1c3e110a6f6f02c9c7226f069fb6bef1ecfaa4ca",
+      "inline-attempt1/runtime-guard-report.json": "b9fde877f817109eb25722a566b534524f9712ab9970676ca906c1152ccd061a",
+      "inline-attempt1/runtime-run.log": "887b067436c8d9c4c89cdfad46fc43c5c59265c885559a944d8bb72aef24f23b",
+      "inline-attempt1/cleanup.json": "ad0d9d33a1d2e0e3f207eccec8c2e2d4828800f2c830d0f41028cc3c937ccf68",
+      "inline-attempt1/runtime-execution-once.json": "07ee8918fc5068ad15ab497fbebf2432c83eabd5a48b5b08c49e8e7dd666aabb",
+      "root-fresh-post-runtime-release.json": "7c6c4deecfb52ccb02b12988cec1e53f72b9c2419176b9532f2d262f97912156",
+      "root-runtime-package-seal.json": "84b493e9f3d72747b7fcbb7c23bf509f7383e1fad9509ca655335850f322c50a",
+      "inline-attempt1/runtime-evidence/menu-scroll-result.json": "f9684d9b06cc162eb9a2c7be6767c7d71c9843f42f7e856122a8c1f990dff927",
+      "inline-attempt1/runtime-evidence/unverified-final-actual-AX.json": "d1e1cc417cae4e1672a95cebca0f05b4751796f06cb05f6f83dbe27359e0d80b",
+      "inline-attempt1/runtime-evidence/unverified-final.png": "fdc044fee078aae5f79c49b970c3153cb459f6a7739f12a3cf20e57b1a12a55a",
+      "inline-attempt1/runtime-evidence/outcome.json": "ca4d81304dc5e9008d64c34431932e1af0cf3a0e57345b27ccfc4b16650a5cea",
+      "inline-attempt1/runtime-evidence/menu-readiness-before-reveal-summary.json": "3e212d8c3d18bf2a6e443bb72aecb2e0957776b4e2d8772306d11dde9059d3d4",
+      "inline-attempt1/runtime-evidence/A9-scene-readiness-before-reveal-2.json": "98bbb523d7b6bc71ba206430f6938569c04c0db02a48ff822b02df227e655ce1",
+      "inline-attempt1/runtime-evidence/menu-readiness-before-reveal-2-actual-AX.json": "f0abcdaea5a3b2dfc5ded3e6dfd11c9ada80adde51797411f1b8bceca8b51378",
+      "inline-attempt1/runtime-evidence/menu-readiness-before-reveal-2.png": "8375c0ec75fb9e4afc7e088f1515367b3849bfc6723c8ed120afc37c3c8090f8",
+      "inline-attempt1/runtime-evidence/A9-scene-readiness-before-reveal-1.json": "93eaad154cc5eb56750ca93bfef561c37399d680c2a2389cafd84f5654ad8fc0",
+      "inline-attempt1/runtime-evidence/menu-readiness-before-reveal-1-actual-AX.json": "b1378a73c6e2b418f7c3071aecac91922dcebd667f451bddd3093d0dd768a343",
+      "inline-attempt1/runtime-evidence/menu-readiness-before-reveal-1.png": "3f72d4462018407b900eb5086377c4393fa8342c2ed6c782650d5f7d5e40eae8",
+      "inline-attempt1/runtime-evidence/A9-scene-scroll-initial.json": "f5b3d180ff565ee512b545ef5d2bf39a61819ee67be2dc96d6656233410b95a6",
+      "inline-attempt1/runtime-evidence/menu-scroll-01-owned-before-open-actual-AX.json": "dd30f52d9af6f676388490282f8e397f157f863e746f52fe7565d5afc173eee8",
+      "inline-attempt1/runtime-evidence/menu-scroll-01-owned-before-open.png": "23c6eec5206aa9b96fc988255e02a1d6392b9915e7da13df671da0811be3b225",
+      "inline-attempt1/identity-before-boot.json": "bcd20ae3a4a69396754d2a8c29a36ae0092771eeff56e3c77effbc6b52619a1c",
+      "inline-attempt1/identity-before-install.json": "d6118ceecd0a6a242023a72fcb72d875bdf62cefa5263267bae8c30f40a8b2c6",
+      "inline-attempt1/identity-after-install.json": "ee9d294e33e874fbed458eb203783fe949dd3beb7a5ce7e839d86209a2b05891",
+      "inline-attempt1/identity-after-restore.json": "64a0cd6c95e3af9920fd232aaa60e187febf40197eb7c1136c2aed3de7eb20a0",
+      "inline-attempt1/identity-after-shutdown.json": "f3dbc138f4ade25d0a0656fd3489465216ccdd57fd082f2eb178f63dd1217b71"
+    }
+  },
+  "originalPixelReview": {
+    "actualViewImageCallsCompleted": 4,
+    "viewMethod": "view_image with detail original for each of all four exported PNG files",
+    "hashesOrTextWereNotSubstitutedForViewing": true,
+    "viewedInOrder": [
+      "menu-scroll-01-owned-before-open.png",
+      "menu-readiness-before-reveal-1.png",
+      "menu-readiness-before-reveal-2.png",
+      "unverified-final.png"
+    ],
+    "images": [
+      {
+        "name": "menu-scroll-01-owned-before-open.png",
+        "path": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/safari-final-menu-readiness-preparation-20261017/inline-attempt1/runtime-evidence/menu-scroll-01-owned-before-open.png",
+        "sha256": "23c6eec5206aa9b96fc988255e02a1d6392b9915e7da13df671da0811be3b225",
+        "bytes": 87485,
+        "width": 1206,
+        "height": 2622,
+        "actualOriginalViewed": true,
+        "observation": "White loading page with Safari youtube.com address bar and a small progress segment. No player or FR menu is visibly established in this screenshot. The following AX batch already contains a known TED/player; the capture pair is sequential."
+      },
+      {
+        "name": "menu-readiness-before-reveal-1.png",
+        "path": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/safari-final-menu-readiness-preparation-20261017/inline-attempt1/runtime-evidence/menu-readiness-before-reveal-1.png",
+        "sha256": "3f72d4462018407b900eb5086377c4393fa8342c2ed6c782650d5f7d5e40eae8",
+        "bytes": 81944,
+        "width": 1206,
+        "height": 2622,
+        "actualOriginalViewed": true,
+        "observation": "Mostly black loading/player area with the Safari address bar and loading indication. No FR menu or Close is visible."
+      },
+      {
+        "name": "menu-readiness-before-reveal-2.png",
+        "path": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/safari-final-menu-readiness-preparation-20261017/inline-attempt1/runtime-evidence/menu-readiness-before-reveal-2.png",
+        "sha256": "8375c0ec75fb9e4afc7e088f1515367b3849bfc6723c8ed120afc37c3c8090f8",
+        "bytes": 126397,
+        "width": 1206,
+        "height": 2622,
+        "actualOriginalViewed": true,
+        "observation": "The video area shows its English intro text, a site unmute overlay and the compact pink FR entry near the player's lower-right area. No FR menu or Close is visible. The icon's painted size is not substituted for the44x45 native hit-frame observation."
+      },
+      {
+        "name": "unverified-final.png",
+        "path": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/safari-final-menu-readiness-preparation-20261017/inline-attempt1/runtime-evidence/unverified-final.png",
+        "sha256": "fdc044fee078aae5f79c49b970c3153cb459f6a7739f12a3cf20e57b1a12a55a",
+        "bytes": 1368906,
+        "width": 1206,
+        "height": 2622,
+        "actualOriginalViewed": true,
+        "observation": "A changed video frame, loaded YouTube title and page content are visible. No FR menu or Close is visible, and the pink entry is not visible at this capture. This cannot establish that a menu never appeared between captures, a successful close, focus return, paused state, or accepted playback."
+      }
+    ],
+    "pairBoundary": "Each original screenshot precedes its native AX snapshot. They are sequential observations, not atomic or pixel-identical scene evidence. Startup loading differences between the first screenshot and its later AX batch are retained in this interpretation.",
+    "observedFinalMenuOrClose": false,
+    "focusReturnAcceptance": "UNVERIFIED_NO_MENU_CLOSE_EXERCISED",
+    "noSuccessfulPlaybackBilingualOrMenuAcceptanceInferred": true
+  },
+  "AXAndReadiness": {
+    "rawFourAXBatches": [
+      {
+        "name": "menu-scroll-01-owned-before-open-actual-AX.json",
+        "sha256": "dd30f52d9af6f676388490282f8e397f157f863e746f52fe7565d5afc173eee8",
+        "elapsedSeconds": 4.967448949813843,
+        "nodeCount": 86,
+        "exactOwnerUUIDs": [
+          "87246FAF-A680-4738-BA2A-97A9E170620D"
+        ],
+        "entryCount": 0,
+        "entry": null,
+        "closeCount": 0,
+        "menuCount": 0,
+        "nativePlaybackControlCount": 0,
+        "playerFrame": {
+          "height": 274,
+          "width": 402,
+          "x": 0,
+          "y": 110
+        }
+      },
+      {
+        "name": "menu-readiness-before-reveal-1-actual-AX.json",
+        "sha256": "b1378a73c6e2b418f7c3071aecac91922dcebd667f451bddd3093d0dd768a343",
+        "elapsedSeconds": 5.263427972793579,
+        "nodeCount": 82,
+        "exactOwnerUUIDs": [
+          "87246FAF-A680-4738-BA2A-97A9E170620D"
+        ],
+        "entryCount": 0,
+        "entry": null,
+        "closeCount": 0,
+        "menuCount": 0,
+        "nativePlaybackControlCount": 0,
+        "playerFrame": {
+          "height": 226,
+          "width": 402,
+          "x": 0,
+          "y": 110
+        }
+      },
+      {
+        "name": "menu-readiness-before-reveal-2-actual-AX.json",
+        "sha256": "f0abcdaea5a3b2dfc5ded3e6dfd11c9ada80adde51797411f1b8bceca8b51378",
+        "elapsedSeconds": 6.880107998847961,
+        "nodeCount": 177,
+        "exactOwnerUUIDs": [
+          "87246FAF-A680-4738-BA2A-97A9E170620D"
+        ],
+        "entryCount": 1,
+        "entry": {
+          "frame": {
+            "height": 45,
+            "width": 44,
+            "x": 350,
+            "y": 284
+          },
+          "identifier": "",
+          "label": "流畅阅读字幕翻译：已开启",
+          "selected": false,
+          "type": 1,
+          "valueString": "",
+          "valueType": "__NSCFConstantString"
+        },
+        "closeCount": 0,
+        "menuCount": 0,
+        "nativePlaybackControlCount": 0,
+        "playerFrame": {
+          "height": 226,
+          "width": 402,
+          "x": 0,
+          "y": 110
+        }
+      },
+      {
+        "name": "unverified-final-actual-AX.json",
+        "sha256": "d1e1cc417cae4e1672a95cebca0f05b4751796f06cb05f6f83dbe27359e0d80b",
+        "elapsedSeconds": 12.18168294429779,
+        "nodeCount": 179,
+        "exactOwnerUUIDs": [
+          "87246FAF-A680-4738-BA2A-97A9E170620D"
+        ],
+        "entryCount": 0,
+        "entry": null,
+        "closeCount": 0,
+        "menuCount": 0,
+        "nativePlaybackControlCount": 0,
+        "playerFrame": {
+          "height": 226,
+          "width": 402,
+          "x": 0,
+          "y": 110
+        }
+      }
+    ],
+    "exactOwnerAcrossAllFourBatches": "87246FAF-A680-4738-BA2A-97A9E170620D",
+    "rawEntryCountsInCaptureOrder": [
+      0,
+      0,
+      1,
+      0
+    ],
+    "rawMenuCountsInCaptureOrder": [
+      0,
+      0,
+      0,
+      0
+    ],
+    "rawCloseCountsInCaptureOrder": [
+      0,
+      0,
+      0,
+      0
+    ],
+    "uniqueKnownTEDAndPlayerBoundaryInAllThreeSceneReports": true,
+    "beforeRevealSamplesUsed": 2,
+    "maximumBeforeRevealSamples": 4,
+    "beforeRevealPhaseDeadlineElapsedSeconds": 10.990429997444153,
+    "sharedReadinessDeadlineElapsedSeconds": 28.990383982658386,
+    "readySample": {
+      "index": 2,
+      "captureStartedElapsedSeconds": 6.590448975563049,
+      "actualAXElapsedSeconds": 6.880107998847961,
+      "completedElapsedSeconds": 7.218564987182617,
+      "exactLabel": "流畅阅读字幕翻译：已开启",
+      "exactNativeType": 1,
+      "nativeTypeName": "Other",
+      "snapshotEntryCount": 1,
+      "actualEntryCount": 1,
+      "frame": {
+        "x": 350,
+        "y": 284,
+        "width": 44,
+        "height": 45
+      },
+      "actualFrameMatchesSnapshot": true,
+      "actualEntryHittable": true,
+      "containedWithinOwnedPlayer": true,
+      "withinObservationDeadline": true
+    },
+    "readinessActions": {},
+    "readinessProductAcceptance": false,
+    "noCenterRevealNeededOrPerformed": true,
+    "afterRevealHelperOrObservationPhaseNotEntered": true,
+    "nativePlayPauseCountsBothZeroAndProgressEmpty": true,
+    "pausedStateObserved": false,
+    "optionalBilingualCueInSceneReports": null,
+    "sourceValueOrChangingPixelsNotPromotedToPlaybackAcceptance": true
+  },
+  "actualActionAndStopBoundary": {
+    "recordedCounts": {
+      "install": 1,
+      "test": 1,
+      "restore": 1,
+      "FRMenuOpen": 1,
+      "centerReveal": 0,
+      "internalScroll": 0,
+      "FRMenuClose": 0
+    },
+    "semanticTapAtLogElapsedSeconds": 7.75,
+    "synthesizedEventAtLogElapsedSeconds": 8.08,
+    "CloseWaitStartedAtLogElapsedSeconds": 8.83,
+    "CloseExistenceWaitRequestedSeconds": 3,
+    "ClosePollsLoggedNearSeconds": [
+      9.85,
+      10.92,
+      11.84
+    ],
+    "actionKeyMeaning": "FRMenuOpen:1 counts the single attempted entry tap. It does not mean that the menu opened.",
+    "finalSourceResultActions": {
+      "FRMenuOpen": 1
+    },
+    "rawOutcome": {
+      "actions": {
+        "FRMenuOpen": 1
+      },
+      "outcome": "UNVERIFIED",
+      "reason": "Normal menu open/required original image unavailable; no retry"
+    },
+    "branchInterpretation": "Close existence wait3s did not establish close; short-circuit prevented menu-scroll02 evidence call. No screenshot-tool failure is evidenced.",
+    "screenshotToolFailureProven": false,
+    "noMenuScroll02CaptureOrAXErrorAttachment": true,
+    "noInternalScrollOrCloseActionOrMenuAssertionEvaluation": true,
+    "noRetryAfterSkip": true,
+    "navigation": 0,
+    "createdTabs": 0,
+    "selectedTabs": 0,
+    "Play": 0,
+    "CC": 0,
+    "unmute": 0,
+    "permissionChoice": 0,
+    "providerOrSettingsChange": 0,
+    "recordedInputLimitAssessment": "The readiness helper emitted only observations. The selected code path skipped the center-reveal helper and recorded exactly one normal semantic entry tap; no further menu action was exercised."
+  },
+  "restorationAndPrivateData": {
+    "fivePhaseStoredIdentityAndLogCrossChecks": [
+      {
+        "phase": "before-boot",
+        "sha256": "bcd20ae3a4a69396754d2a8c29a36ae0092771eeff56e3c77effbc6b52619a1c",
+        "installedIdentity": "ORIGINAL_D9",
+        "fullAppFileCount": 485,
+        "US47": true,
+        "nativePrivateCount": 17,
+        "sameNative17MapAsBeforeBoot": true,
+        "privateContainer": "/Users/thinkstu/Library/Developer/CoreSimulator/Devices/A407390F-7AA8-42AE-AFEB-F93EE99E9FF8/data/Containers/Data/Application/FBD0D2B0-1BDB-4C35-8595-7958479D1E39",
+        "privateContainerMigrated": null,
+        "DemoSHA256": "6eb20314a7463f8f210cb1ced63867b1f2e3537ce66d7f12d106641d040d14b3",
+        "officialQueriesInStoredReceipt": false
+      },
+      {
+        "phase": "before-install",
+        "sha256": "d6118ceecd0a6a242023a72fcb72d875bdf62cefa5263267bae8c30f40a8b2c6",
+        "installedIdentity": "ORIGINAL_D9",
+        "fullAppFileCount": 485,
+        "US47": true,
+        "nativePrivateCount": 17,
+        "sameNative17MapAsBeforeBoot": true,
+        "privateContainer": "/Users/thinkstu/Library/Developer/CoreSimulator/Devices/A407390F-7AA8-42AE-AFEB-F93EE99E9FF8/data/Containers/Data/Application/FBD0D2B0-1BDB-4C35-8595-7958479D1E39",
+        "privateContainerMigrated": false,
+        "DemoSHA256": "6eb20314a7463f8f210cb1ced63867b1f2e3537ce66d7f12d106641d040d14b3",
+        "officialQueriesInStoredReceipt": true
+      },
+      {
+        "phase": "after-install",
+        "sha256": "ee9d294e33e874fbed458eb203783fe949dd3beb7a5ce7e839d86209a2b05891",
+        "installedIdentity": "FINAL_LAYOUT",
+        "fullAppFileCount": 485,
+        "US47": true,
+        "nativePrivateCount": 17,
+        "sameNative17MapAsBeforeBoot": true,
+        "privateContainer": "/Users/thinkstu/Library/Developer/CoreSimulator/Devices/A407390F-7AA8-42AE-AFEB-F93EE99E9FF8/data/Containers/Data/Application/8524E3F4-E6B1-472E-BA03-06D894E49CBA",
+        "privateContainerMigrated": true,
+        "DemoSHA256": "6eb20314a7463f8f210cb1ced63867b1f2e3537ce66d7f12d106641d040d14b3",
+        "officialQueriesInStoredReceipt": true
+      },
+      {
+        "phase": "after-restore",
+        "sha256": "64a0cd6c95e3af9920fd232aaa60e187febf40197eb7c1136c2aed3de7eb20a0",
+        "installedIdentity": "ORIGINAL_D9",
+        "fullAppFileCount": 485,
+        "US47": true,
+        "nativePrivateCount": 17,
+        "sameNative17MapAsBeforeBoot": true,
+        "privateContainer": "/Users/thinkstu/Library/Developer/CoreSimulator/Devices/A407390F-7AA8-42AE-AFEB-F93EE99E9FF8/data/Containers/Data/Application/6DDC30DD-B971-42A2-A1A2-81AB9C29A5DF",
+        "privateContainerMigrated": true,
+        "DemoSHA256": "6eb20314a7463f8f210cb1ced63867b1f2e3537ce66d7f12d106641d040d14b3",
+        "officialQueriesInStoredReceipt": true
+      },
+      {
+        "phase": "after-shutdown",
+        "sha256": "f3dbc138f4ade25d0a0656fd3489465216ccdd57fd082f2eb178f63dd1217b71",
+        "installedIdentity": "ORIGINAL_D9",
+        "fullAppFileCount": 485,
+        "US47": true,
+        "nativePrivateCount": 17,
+        "sameNative17MapAsBeforeBoot": true,
+        "privateContainer": "/Users/thinkstu/Library/Developer/CoreSimulator/Devices/A407390F-7AA8-42AE-AFEB-F93EE99E9FF8/data/Containers/Data/Application/6DDC30DD-B971-42A2-A1A2-81AB9C29A5DF",
+        "privateContainerMigrated": true,
+        "DemoSHA256": "6eb20314a7463f8f210cb1ced63867b1f2e3537ce66d7f12d106641d040d14b3",
+        "officialQueriesInStoredReceipt": false
+      }
+    ],
+    "expectedIdentitySequence": [
+      "ORIGINAL_D9",
+      "ORIGINAL_D9",
+      "FINAL_LAYOUT",
+      "ORIGINAL_D9",
+      "ORIGINAL_D9"
+    ],
+    "currentFinalOfficialPathDiskRehash": {
+      "d9Full485": true,
+      "Userscripts47": true,
+      "nativePrivate17EqualsBeforeBoot": true,
+      "DemoHashEqualsBeforeBoot": true,
+      "ownerMetadata": [
+        {
+          "kind": "FRApp",
+          "path": "/Users/thinkstu/Library/Developer/CoreSimulator/Devices/A407390F-7AA8-42AE-AFEB-F93EE99E9FF8/data/Containers/Bundle/Application/D7D1138A-A223-45F2-8C57-94BB17F7BCEC/.com.apple.mobile_container_manager.metadata.plist",
+          "sha256": "781552e21cc7b4cdf6efbea6e1d40c675c572c2d2daa2f2d607074c2fe1ee723",
+          "MCMMetadataIdentifier": "org.example.FluentReadDevelopment"
+        },
+        {
+          "kind": "UserscriptsApp",
+          "path": "/Users/thinkstu/Library/Developer/CoreSimulator/Devices/A407390F-7AA8-42AE-AFEB-F93EE99E9FF8/data/Containers/Bundle/Application/4EAE38A1-E4FF-4B60-8DDE-0DA00A8A623E/.com.apple.mobile_container_manager.metadata.plist",
+          "sha256": "88a653d138434e75d9d5f8c8cec693adf9c7525d7c11aafb8e2d03cc0e2e19cb",
+          "MCMMetadataIdentifier": "dev.debug.userscripts"
+        },
+        {
+          "kind": "FRNativePrivate",
+          "path": "/Users/thinkstu/Library/Developer/CoreSimulator/Devices/A407390F-7AA8-42AE-AFEB-F93EE99E9FF8/data/Containers/Data/Application/6DDC30DD-B971-42A2-A1A2-81AB9C29A5DF/.com.apple.mobile_container_manager.metadata.plist",
+          "sha256": "21612413875cf356358ec7f722757a390274b1cdea0866f378be27cc66cab014",
+          "MCMMetadataIdentifier": "org.example.FluentReadDevelopment"
+        },
+        {
+          "kind": "UserscriptsDemoData",
+          "path": "/Users/thinkstu/Library/Developer/CoreSimulator/Devices/A407390F-7AA8-42AE-AFEB-F93EE99E9FF8/data/Containers/Data/Application/A7FDF29F-EE22-47D0-A7D1-7DB93C0E54DB/.com.apple.mobile_container_manager.metadata.plist",
+          "sha256": "e0f66997f2b542dd9a65b9e9a680e76848391cc8d8118d1adedf53d4a83876c9",
+          "MCMMetadataIdentifier": "dev.debug.userscripts"
+        }
+      ]
+    },
+    "originalD9Full485MapCurrentMatchesOldIdentity": true,
+    "Userscripts47MapCurrentMatchesPinnedSource": true,
+    "nativePrivate17AllFiveMapsAndCurrentFinalMapEqualBeforeBoot": true,
+    "DemoAllFiveHashesAndCurrentFinalHashEqual": true,
+    "DemoSHA256": "6eb20314a7463f8f210cb1ced63867b1f2e3537ce66d7f12d106641d040d14b3",
+    "installedBundleAndDataUUIDMigrationRecorded": true,
+    "migrationIsNotContentLoss": true,
+    "afterRestoreAndAfterShutdownOfficialPathsEqual": true,
+    "ownerMetadataIdentifiersMatchPinnedBundleIDs": true,
+    "appInfoBundleIdentifiersMatchPinnedBundleIDs": true,
+    "beforeBootAndAfterShutdownStoredOfficialContainerQueryFlagFalse": true,
+    "noNewContainerQueryOrDataCopyBackByReviewer": true
+  },
+  "cleanupAndResources": {
+    "storedGuardAndCleanupCrossMatch": {
+      "laneReleased": true,
+      "originalD9RestoredAndVerified": true,
+      "remainingOwnedProcesses": [],
+      "focusEvents": [],
+      "violations": [],
+      "cleanupErrors": [],
+      "guardElapsedMs": 54509,
+      "finalDeviceState": "Shutdown",
+      "storedProcessReadSamples": 52,
+      "finalPSCompleted": true
+    },
+    "storedCommandCount": 12,
+    "allStoredCommandsHaveTerminalCode0AndOwnedPIDEqualsPGID": true,
+    "oneSameBundleInstallOneSelectedCaseOneOriginalRestore": true,
+    "activationMarkerPrecededOwnedSafariTermination": true,
+    "noForeignBootedDeviceInCleanupChecks": true,
+    "storedPostRuntimeFreshLane": {
+      "sha256": "7c6c4deecfb52ccb02b12988cec1e53f72b9c2419176b9532f2d262f97912156",
+      "freshLaneRecordedReleased": true,
+      "knownPriorPidCount": 207,
+      "hostKeyMetadataUnchangedSinceF34": true,
+      "headCommit": "6eecd6710e7daac2d2a8cca9a34d0f26dc849b44",
+      "checkoutClean": true,
+      "historicalF35FailureRetained": true
+    },
+    "postRuntimeFreePortRecordsHaveNoListeners": true,
+    "postRuntimeNoHeavyGUIOrBootedAppleSimulatorRowsRecorded": true,
+    "noFreshProcessDeviceOrPortQueryByReviewer": true,
+    "historicalF35FailureNotErasedByThisRun": true,
+    "budgetsSeconds": {
+      "scene": 180,
+      "runtimeProcess": 240,
+      "total": 540,
+      "cleanupReserve": 180
+    },
+    "resourcePolicy": {
+      "jobs": 1,
+      "maxWorkers": 1,
+      "concurrency": 3,
+      "cpuTarget": 40,
+      "cpuTargetIsKernelCap": false
+    }
+  },
+  "noAcceptanceClaims": [
+    "A successful product/menu test",
+    "A pause or successful sustained playback result",
+    "Bilingual captions or translation output",
+    "Menu internal scrolling, timing-row reachability, or44-size Close acceptance",
+    "A successful normal menu Close or focus return",
+    "Native fullscreen, physical device behavior, all menu rows or the wider stress matrix",
+    "A unique cause for the missing Close or the original entry absence",
+    "That the generic compound skip reason establishes screenshot capture failure",
+    "That executor exit0 or suite passed wording converts the skipped case into a pass"
+  ],
+  "limitations": [
+    "The four original PNGs were actually viewed and cross-checked against subsequent AX batches; snapshots and screenshots remain sequential, and observations cannot exclude a transient UI state between captures.",
+    "The exact Close wait failed to establish a current Close. This result does not identify whether the action handling, readiness/lifecycle state, hit delivery or some other cause produced that outcome.",
+    "Final current disk reads were restricted to recorded official A407 restoration paths and their owner metadata. No SDK, simctl/get_app_container, browser, process inventory or device operation was performed.",
+    "Post-runtime lane/process/focus/port/checkout facts are supported by saved Root/guard receipts. The reviewer did not take a new live state snapshot.",
+    "Native private17 equality is not a claim about all extension storage, settings or caches."
+  ],
+  "performed": {
+    "originalPNGViewImage": true,
+    "allFourOriginalPNGsViewed": true,
+    "rawAXSceneSummaryActionsRuntimeLogRead": true,
+    "fiveIdentityPhaseCrossCheck": true,
+    "current53SealHashAndLengthCheck": true,
+    "recordedFinalOfficialDiskPathRehash": true,
+    "necessaryOwnerMetadataRead": true,
+    "newReviewFileOnly": true,
+    "inputEdit": false,
+    "SDK": false,
+    "processInventory": false,
+    "browser": false,
+    "deviceOperation": false,
+    "simulatorOperation": false,
+    "ADB": false,
+    "network": false,
+    "runtimeRerun": false,
+    "containerWrite": false,
+    "dataCopyBack": false
+  },
+  "contextPolicy": "300K context-compaction preference retained. No descendants created and no enforced system-threshold claim."
+}

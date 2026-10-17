@@ -1,0 +1,20 @@
+{
+  "runtimeSourceCommit": "f5a82d11a5b6b6a5de2f2ea726065a56cdb2e6ca",
+  "files": {
+    "runtime-summary.json": {
+      "source": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/mobile-safari-production-inline-native-readiness-20261016/inline-attempt3/runtime-summary.json",
+      "sha256": "f2558f19338b26a12c3748730cb782088f02bd6eb2c047f805a385aa1fa2034f",
+      "bytes": 1008
+    },
+    "runtime-acceptance-visual-review.json": {
+      "source": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/mobile-safari-production-inline-native-readiness-20261016/inline-attempt3/runtime-acceptance-visual-review.json",
+      "sha256": "79c4171d37f3af8dfc22fadf986a0c35ddf5e673c64d220c3031300e6b4e8c57",
+      "bytes": 5999
+    },
+    "fresh-release.json": {
+      "source": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/mobile-safari-production-inline-native-readiness-20261016/inline-attempt3/fresh-release.json",
+      "sha256": "bfc8da1253f34891ae44be054bd7f75ab448ef524d1b5d968818a94914f21480",
+      "bytes": 1282
+    }
+  }
+}

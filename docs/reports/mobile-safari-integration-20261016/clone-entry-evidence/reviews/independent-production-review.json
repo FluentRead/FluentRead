@@ -1,0 +1,217 @@
+{
+  "schemaVersion": 1,
+  "reviewKind": "independent-production-source-review",
+  "createdAt": "2026-10-16T22:58:09.563880+00:00",
+  "status": "SOURCE_REVIEW_PASS_NO_NEW_ACTIONABLE_FINDING_NOT_TEST_OR_SAFARI_ACCEPTANCE",
+  "reviewer": "/root/safari_readiness_prepare",
+  "workspace": "/Users/thinkstu/Desktop/copy/FluentRead-mobile-video-menu-accessibility-20261016",
+  "headAtReview": "121c0217d3ce8c2067ade25328d5a9527e6019e4",
+  "scope": {
+    "productionPath": "/Users/thinkstu/Desktop/copy/FluentRead-mobile-video-menu-accessibility-20261016/src/features/video-subtitle/content/videoPlayerBinding.ts",
+    "readProductionLines": [
+      1,
+      489
+    ],
+    "actualDiff": {
+      "sha256": "30f920537c4ecb24f4a1fbd5421cbf2e4cc980c5cc08b714026751b83c2c2697",
+      "bytes": 5900
+    },
+    "baselineAtHead": {
+      "sha256": "3443098758b7f2eefb4d7feab89e2a9ea530317d3db8dbe15a20af4405e94a84",
+      "bytes": 22196
+    },
+    "testReading": "All newly added lines in actual tests diff plus related existing lifecycle/X/noise/scope cases; no test execution",
+    "noProductOrTestEdits": true,
+    "noTestExecution": true,
+    "noModuleExecution": true,
+    "noSdk": true,
+    "noBrowser": true,
+    "noDevice": true,
+    "noNetwork": true
+  },
+  "inputs": {
+    "production": {
+      "path": "/Users/thinkstu/Desktop/copy/FluentRead-mobile-video-menu-accessibility-20261016/src/features/video-subtitle/content/videoPlayerBinding.ts",
+      "sha256": "0789013139caf5e43783e4d3501b9a96c5d97324213efcbdfa941e1eb34fdec4",
+      "bytes": 23201
+    },
+    "youtubeControlsScope": {
+      "path": "/Users/thinkstu/Desktop/copy/FluentRead-mobile-video-menu-accessibility-20261016/src/features/video-subtitle/content/youtubeControlsScope.ts",
+      "sha256": "554a870f1d58f83399ecb307f85b992c1b528c194885ba08196f9177fe51e66e",
+      "bytes": 1459
+    },
+    "locator": {
+      "path": "/Users/thinkstu/Desktop/copy/FluentRead-mobile-video-menu-accessibility-20261016/src/features/video-subtitle/content/videoPlayerLocator.ts",
+      "sha256": "67ff409285b5116088605c13174ea0b9a7881f2ac08f1aed73e68e73f8ddba97",
+      "bytes": 19571
+    },
+    "uiSelectorsPartialRead": {
+      "path": "/Users/thinkstu/Desktop/copy/FluentRead-mobile-video-menu-accessibility-20261016/src/features/video-subtitle/content/ui.ts",
+      "sha256": "eb9cd5ccd3d2931cd1e85fa8a668235374e0a865e06605981274bd20944b592c",
+      "bytes": 86837
+    },
+    "testsSnapshotNotExecuted": {
+      "path": "/Users/thinkstu/Desktop/copy/FluentRead-mobile-video-menu-accessibility-20261016/tests/videoPlayerBinding.test.ts",
+      "sha256": "e89a8b9e56c5ff2db0846001e5544105eb47a8fe8b843d035b5090a1fb7a89da",
+      "bytes": 99102
+    },
+    "priorPlanReview": {
+      "path": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/mobile-youtube-fr-node-identity-probe-20261017/source-duplicate-entry-analysis-20261017-driver/independent-scope-plan-review.json",
+      "sha256": "4c6bd068f45f19221c6509754a9211c8480cdf283ae0f8fec3335b43d9fd8d1c",
+      "bytes": 12618
+    },
+    "driverAnalysisMd": {
+      "path": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/mobile-youtube-fr-node-identity-probe-20261017/source-duplicate-entry-analysis-20261017-driver/source-duplicate-entry-analysis.md",
+      "sha256": "5c970bdb857fdb4368960b61eabc0e192d64a6ef890bb430024646813f2e7cb2",
+      "bytes": 5633
+    },
+    "driverAnalysisJson": {
+      "path": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/mobile-youtube-fr-node-identity-probe-20261017/source-duplicate-entry-analysis-20261017-driver/source-duplicate-entry-analysis.json",
+      "sha256": "f3be9ec75d2225cf22eda37e29caae713302c3c4794035bb4b47229f9b8b2c45",
+      "bytes": 15731
+    }
+  },
+  "sourceChecks": [
+    {
+      "id": "EXACT_INSTANCE_OWNER_ONLY",
+      "lines": [
+        136,
+        157
+      ],
+      "conclusion": "Retains existing per-binding exact owner selector; excludes held live object; no public-id cleanup added."
+    },
+    {
+      "id": "FINITE_OWNED_SCOPE",
+      "lines": [
+        140,
+        142
+      ],
+      "conclusion": "New ownedScope excludes body and documentElement; generic-root fallback retains only historical host behavior."
+    },
+    {
+      "id": "CAPTURE_CLEANUP_BEFORE_CLEAR",
+      "lines": [
+        170,
+        195
+      ],
+      "conclusion": "Snapshots old scope/host/live before clearing all refs; cleanup is guarded against synchronous focusout reentry."
+    },
+    {
+      "id": "OLD_AND_CURRENT_SCOPE_BEFORE_EARLY_RETURN",
+      "lines": [
+        303,
+        323
+      ],
+      "conclusion": "Releases retained scope and cleans current bounded scope before X menu-preserving early return; live button excluded."
+    },
+    {
+      "id": "HELD_HOST_FALLBACK_PRESERVED",
+      "lines": [
+        325,
+        344
+      ],
+      "conclusion": "Retains host-only cleanup for disconnected/reparented old native host outside retained/current scope."
+    },
+    {
+      "id": "LIFECYCLE_RELEASE",
+      "lines": [
+        371,
+        389
+      ],
+      "conclusion": "Key/player switch, disable and disconnect use cleanNodes; destroyed path also cleans after unsubscribe/observer disconnect."
+    },
+    {
+      "id": "PRE_FILTER_SCOPE_IDENTITY",
+      "lines": [
+        426,
+        433
+      ],
+      "conclusion": "A non-null retained scope change invokes sync before current-scope record filtering, including internal surviving host with no menuHost."
+    },
+    {
+      "id": "CURRENT_SCOPE_OWNED_COPY_FAST_PATH",
+      "lines": [
+        434,
+        461
+      ],
+      "conclusion": "Uses current finite scope or historical held host; checks added exact-owner copies before owned-UI fast-ignore; retains noise filtering."
+    },
+    {
+      "id": "LIVE_MENU_AND_LISTENER_PRESERVATION",
+      "lines": [
+        313,
+        368
+      ],
+      "conclusion": "No createButton/createMenu/focus restoration algorithm changes; removes only matching copies and keeps live object on valid same-target moves."
+    },
+    {
+      "id": "NO_SCOPE_SELECTOR_OR_MEDIA_SELECTION_EXPANSION",
+      "lines": [
+        230,
+        239
+      ],
+      "conclusion": "YouTube unique-video/known-container/fullscreen boundaries and locator source are unchanged."
+    }
+  ],
+  "testSourceScenariosNotExecuted": {
+    "expandedNewCases": 15,
+    "breakdown": {
+      "siblingHostDesktopMobile": 2,
+      "bodyHtmlRootsWithFiniteHost": 2,
+      "internalHostOldScopeInvalidation": 1,
+      "playerSwitch": 1,
+      "looseCopyDesktopMobile": 2,
+      "disableMediaKeyDestroyDesktopMobile": 6,
+      "secondVideoRevocation": 1
+    },
+    "notRuntimeEvidence": true
+  },
+  "actionableFindings": [],
+  "knownPreExistingBoundaries": [
+    {
+      "id": "HISTORICAL_HELD_HOST_CAN_BE_ROOT",
+      "introducedByPatch": false,
+      "blockingCurrentMinimalPatch": false,
+      "sourceLines": {
+        "nativeControls": [
+          65,
+          83
+        ],
+        "hostFallback": [
+          436,
+          438
+        ],
+        "hostCleanup": [
+          344,
+          344
+        ]
+      },
+      "reachableCondition": "A generic/fullscreen player is body or html and its native control anchor is a direct child of that root. Existing nativeControls() can return anchor.parentElement as held host.",
+      "effect": "Historical removeClonedButtons(host,...) and observer copyScope fallback may still query body/html and clean matching owner copies there.",
+      "requiredClaimBoundary": "This patch prevents newly expanded ownedScope sweeps from adopting page roots. It does not establish a universal ban on every existing root-valued held-host query.",
+      "testBoundary": "The two new root tests retain a finite .ytp-right-controls host; they do not exercise a root-valued native host."
+    },
+    {
+      "id": "NO_GLOBAL_RECOVERY_AFTER_SCOPE_RELEASE",
+      "introducedByPatch": false,
+      "blockingCurrentMinimalPatch": false,
+      "effect": "Same-owner copies later moved to unclaimed unrelated roots are deliberately not found through document/body scans."
+    }
+  ],
+  "evidenceBoundaries": [
+    "Source inspection only; Root owns actual focused tests, strict coverage and build validation.",
+    "Fixture observer calls may validate the source path when executed; they are not browser or Safari evidence.",
+    "The conditional DOM clone gap does not establish the cause of E2 AX same-label rows.",
+    "No E2 rerun, no Safari menu/playback/bilingual/scroll acceptance, and no change to frozen historical reports."
+  ],
+  "memoryUse": {
+    "source": "MEMORY.md:4590-4598",
+    "purpose": "Historical X open-menu cleanup reminder only; rechecked against current source 313-323 and existing X test source. No unverified historical result used as a current result."
+  },
+  "markdownReview": {
+    "path": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/mobile-youtube-fr-node-identity-probe-20261017/same-scope-clone-repair-20261017/independent-production-review.md",
+    "sha256": "31317bb6a8e0e35f7c50f8bb2934335537f42ffdd3d641caa36d683bc5e4a499",
+    "bytes": 4355
+  },
+  "sourceUnchangedAtReviewWrite": true
+}

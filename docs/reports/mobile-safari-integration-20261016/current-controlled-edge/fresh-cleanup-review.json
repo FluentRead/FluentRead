@@ -1,0 +1,24 @@
+{
+  "at": "2026-10-16T07:22:30.021492+00:00",
+  "pids": {
+    "46533": {
+      "gone": true,
+      "returnCode": 1
+    },
+    "46534": {
+      "gone": true,
+      "returnCode": 1
+    },
+    "46557": {
+      "gone": true,
+      "returnCode": 1
+    },
+    "46550": {
+      "gone": true,
+      "returnCode": 1
+    }
+  },
+  "profileRemoved": true,
+  "focusEvents": [],
+  "violations": []
+}

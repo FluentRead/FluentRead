@@ -1,0 +1,15 @@
+{
+  "at": "2026-10-16T08:11:12.881541+00:00",
+  "laneReleased": true,
+  "buildOnly": true,
+  "knownOwnedPIDCount": 91,
+  "remainingOwnedPIDOrPGIDProcesses": [],
+  "focusEvents": [],
+  "violations": [],
+  "cleanupErrors": [],
+  "allGuardCommandsTerminal": true,
+  "deviceActions": [],
+  "bootInstallLaunchOrTest": false,
+  "noDeviceStateClaim": "No simctl/device operation is performed; parent release proof is separate.",
+  "gitStatus": ""
+}

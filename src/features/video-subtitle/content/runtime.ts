@@ -1,8 +1,8 @@
 /**
  * @file src/features/video-subtitle/content/runtime.ts
  * 文件职责：装配视频及会议字幕运行时，并协调 YouTube/X 原生字幕、目标语言人工轨、逐条翻译、校时、菜单、完整句学习与下载。
- * 主要内容：挂载可关闭的原句学习面板与带时间点来源恢复，媒体切换和配置变化清理控制；相同译文保留原文且不重复展示；YouTube 同轮相同输入复用字幕选择并保留第二次时钟读取；协调字幕校时、预翻译与补译导出确认，并为可选的逐字高亮提供当前句时间；X 分片加载尊重原生轨道优先级，播放器内换模型必须确认且保留取消焦点，完整 AI 识别提前展示稳定句，完成后才缓存和导出。
- * 模块边界：本文件只在 content 页面编排，完整 AI 字幕缓存请求与提交身份由 subtitleSession 拥有，requestSession 将两类采集映射为后台单流的唯一请求代际；采集资源仍归 capture/fullCapture，不拦截 fetch/XHR 也不实现翻译 provider，翻译经统一 service client。
+ * 主要内容：挂载可关闭的原句学习面板与带时间点来源恢复，媒体切换和配置变化清理控制；播放器入口以菜单按钮的展开状态表达打开与关闭，字幕启用状态保留在文案、样式和菜单选项中；相同译文保留原文且不重复展示；YouTube 同轮相同输入复用字幕选择并保留第二次时钟读取；协调字幕校时、预翻译与补译导出确认，并为可选的逐字高亮提供当前句时间；X 分片加载尊重原生轨道优先级，播放器内换模型必须确认且保留取消焦点，完整 AI 识别提前展示稳定句，完成后才缓存和导出。
+ * 模块边界：本文件只在 content 页面编排，同视频底控的局部显隐订阅与字幕布局共用帧调度，帧内先校准自有菜单宿主再测菜单，并随关闭、重绑和销毁清理；完整 AI 字幕缓存请求与提交身份由 subtitleSession 拥有，requestSession 将两类采集映射为后台单流的唯一请求代际；采集资源仍归 capture/fullCapture，不拦截 fetch/XHR 也不实现翻译 provider，翻译经统一 service client。
  */
 import {createApp, h, shallowReactive} from 'vue';
 import {createNativeFullscreenSubtitles, supportsNativeVideoFullscreen} from './nativeFullscreen';
@@ -123,6 +123,7 @@ import {mountPlatformCaptions} from './platformRuntime';
 import {YoutubeHumanCaptions} from './youtubeHumanCaptions';
 import {createVideoSubtitleDownloads} from './downloads';
 import {confirmVideoSubtitleExport} from './exportPrompt';
+import {createSubtitleLayoutObserver} from './subtitleLayoutObserver';
 
 // 兼容既有测试与外部调用方；AI 时间轴的实现位于 video-ai 目录。
 export {
@@ -207,30 +208,15 @@ export function mountVideoSubtitleTranslation(): () => void {
   });
   const closeSentenceLearning = learning.close;
   const openSentenceLearning = learning.open;
-  let layoutPlayer: HTMLElement | null = null;
-  let layoutVideo: HTMLVideoElement | null = null;
-  let layoutFrame: number | undefined;
-  const scheduleSubtitleLayout = () => {
-    if (destroyed || layoutFrame !== undefined) return;
-    layoutFrame = window.requestAnimationFrame(() => {
-      layoutFrame = undefined;
-      if (destroyed) return;
-      const target = playerLocator.getTarget();
-      if (learning.isOpen() && target?.video === observedVideo) learning.syncPlayer(target.player, target.video);
-      if (menuElement?.isConnected) syncVideoPlayerMenuLayout(menuElement);
-      syncTranslationOverlayPosition(observedContainer);
-    });
-  };
-  const layoutObserver = typeof ResizeObserver !== 'undefined' ? new ResizeObserver(scheduleSubtitleLayout) : null;
-  const observeSubtitleLayout = (player: HTMLElement | null, video: HTMLVideoElement | null) => {
-    if (layoutPlayer === player && layoutVideo === video) return;
-    layoutObserver?.disconnect();
-    layoutPlayer = player;
-    layoutVideo = video;
-    if (player) layoutObserver?.observe(player);
-    if (video) layoutObserver?.observe(video);
-    scheduleSubtitleLayout();
-  };
+  const subtitleLayout = createSubtitleLayoutObserver(() => {
+    const target = playerLocator.getTarget();
+    if (learning.isOpen() && target?.video === observedVideo) learning.syncPlayer(target.player, target.video);
+    playerBinding?.syncMenuHost();
+    if (menuElement?.isConnected) syncVideoPlayerMenuLayout(menuElement);
+    syncTranslationOverlayPosition(observedContainer);
+  }, isYouTubeVideoPage);
+  const scheduleSubtitleLayout = subtitleLayout.schedule;
+  const observeSubtitleLayout = subtitleLayout.observe;
   let pretranslationTrackRequest: Promise<void> | undefined;
   let pretranslationTrackRequestKey = '';
   let pretranslationTrackRetryAt = 0;
@@ -994,7 +980,8 @@ export function mountVideoSubtitleTranslation(): () => void {
       ? (config.videoTranslationEnabled ? videoUi('video.enabled') : videoUi('video.disabled'))
       : videoUi('video.globalDisabled');
     button?.classList.toggle(VIDEO_TRANSLATION_ACTIVE_CLASS, enabled);
-    button?.setAttribute('aria-pressed', String(enabled));
+    // 入口只开关菜单；清理复用节点上的旧 toggle 语义，不把字幕状态冒充点击动作。
+    button?.removeAttribute('aria-pressed');
     button?.setAttribute('aria-expanded', String(!menu.hidden));
 
     const language = getVideoUiLanguage(config.uiLanguage);
@@ -1290,7 +1277,6 @@ export function mountVideoSubtitleTranslation(): () => void {
     button.className = 'ytp-button fluent-read-video-subtitle-button fluent-read-video-ui notranslate';
     button.type = 'button';
     button.setAttribute('role', 'button');
-    button.setAttribute('aria-pressed', 'false');
     button.setAttribute('aria-expanded', 'false');
     button.setAttribute('aria-haspopup', 'menu');
     button.setAttribute('aria-controls', VIDEO_TRANSLATION_MENU_ID);
@@ -1858,10 +1844,7 @@ export function mountVideoSubtitleTranslation(): () => void {
     observedVideo = null;
     if (uiSyncTimer !== undefined) window.clearInterval(uiSyncTimer);
     captionObserver?.disconnect();
-    layoutObserver?.disconnect();
-    if (layoutFrame !== undefined) window.cancelAnimationFrame(layoutFrame);
-    layoutPlayer = null;
-    layoutVideo = null;
+    subtitleLayout.destroy();
     unsubscribeConfig();
     document.removeEventListener('click', handleDocumentClick, true);
     document.removeEventListener('keydown', handleDocumentKeydown, true);

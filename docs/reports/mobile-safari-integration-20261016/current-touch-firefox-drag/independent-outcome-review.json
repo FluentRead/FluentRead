@@ -1,0 +1,501 @@
+{
+  "schema": 1,
+  "attempt": 35,
+  "reviewer": "/root/f25_review",
+  "at": "2026-10-16T20:29:24.980275+00:00",
+  "status": "LOCAL_NATIVE_DRAG_AND_UI_RECOVERY_OBSERVED_TIMELY_FINAL_CERTIFICATE_NOT_ACHIEVED",
+  "overallFrozenCaseAccepted": false,
+  "originalUnchangedFrozenHelperFullChainPass": false,
+  "scopedSingleNativeDragChainAccepted": false,
+  "functionalChainComplete": false,
+  "fullFloatingGoalAccepted": false,
+  "protocolAdapted": true,
+  "evidenceReferences": [
+    {
+      "file": "case-state.json",
+      "sha256": "25966e1832bf63f811bd661139803769cf5b949910cea1d57bf7ae6cf6f2d423"
+    },
+    {
+      "file": "document-pin.json",
+      "sha256": "557c2fe4f216e924fff83d2b86b5e3c45916d48f2d5706e42eb63ec3bc6a982e"
+    },
+    {
+      "file": "settings-pin.json",
+      "sha256": "92f09e95faf2620cee8c6927fe43cf8597e3023da0e1d58474f85ff414f178f8"
+    },
+    {
+      "file": "runtime-ready-attempt35.json",
+      "sha256": "d4e4f76880b2c2fc38ae418fcdc115299d691577b2bfd6373b067f5a90f9a208"
+    },
+    {
+      "file": "runtime-go.json",
+      "sha256": "6d2b6d2202c084c1c8bd0bef4192f3572f9189e793a509878403dce8f2010ae1"
+    },
+    {
+      "file": "general-option-recovery-go.json",
+      "sha256": "0bc25d6f22ec387a6debf1af19719b660970b9de3068847db2fe52e474e93861"
+    },
+    {
+      "file": "floating-native-attempt35-general-recovery.py",
+      "sha256": "d00377efbc2a8795b0888447b9dc6eae2f6fa3b99f87f3e7962597188c91a44e"
+    },
+    {
+      "file": "cleanup.json",
+      "sha256": "00344eba880ebc74266560843b80ea203afb9e3a90cf6817a0699c460ff71422"
+    },
+    {
+      "file": "root-fresh-post-release.json",
+      "sha256": "f955a28c7bba573518f95ef22262dd1f0069a77c78536a17b0ca68b5867db9b5"
+    },
+    {
+      "file": "artifact-pre.json",
+      "sha256": "70c4787e2db296059808174e97aa93e64120f6627ae41af5c182d33806d57039"
+    },
+    {
+      "file": "artifact-post.json",
+      "sha256": "3d7e7ef434097f0a1c828c49da2bd1c2258b9a9bc2e7750197a791184be16a7e"
+    },
+    {
+      "file": "client-commands-attempt35.jsonl",
+      "sha256": "74e9af8f96f76a28a52dab437b2f37a31483a796c35397ca5c989d606aa02d05"
+    },
+    {
+      "file": "attempt35-ui/native-actions.jsonl",
+      "sha256": "d8a1da5582a548f867c19d9018f85377879eaf3b6d797214e79e675d5892a6eb"
+    },
+    {
+      "file": "attempt35-ui/16-drag-current-geometry.json",
+      "sha256": "9cce923f202e443b3a3b86c3098ee3157ee0bc46e706e37bd4e40c2c8dd94691"
+    },
+    {
+      "file": "attempt35-ui/17-after-current-geometry.json",
+      "sha256": "0a857313d3096916f2cfb49c78ac689b7f386954aafe14ef00f87fba68dfeb34"
+    },
+    {
+      "file": "attempt35-ui/20-confirm-current-geometry.json",
+      "sha256": "c109a60b9efafcc11475565d13b0c1451571b4e875fa6f4526f8e32455cd7f83"
+    },
+    {
+      "file": "attempt35-ui/26-off-current-geometry.json",
+      "sha256": "3472b820b1a85e4a8a2f09b701dc1e92fb4d7b34d408fdf2635612b570e554e1"
+    },
+    {
+      "file": "attempt35-ui/31-final-current-geometry.json",
+      "sha256": "4478a10ffbad476d39e37917d5ca48cd993aa36d18e5cc3113d776d037be20bf"
+    },
+    {
+      "file": "attempt35-ui/31-final-ax.xml",
+      "sha256": "7807f91b69f2b9a83e5d080964fe2ec30d48dc753d40b3b078e351ec3aed0859"
+    },
+    {
+      "file": "attempt35-ui/31-final-observation.json",
+      "sha256": "105ef0b5c3f09522f22abc775edc8d2b7a5f1b17d0cf02ab79969ef85296f9df"
+    }
+  ],
+  "originalSeal": {
+    "sha256": "9ae6d1fd21e6e5d5f7401a18fa695962ba4663c4c2f5d1509a8f455bd1382a54",
+    "files": 28,
+    "allHashesIndependentlyMatchAfterRuntime": true,
+    "modifiedByReviewer": false
+  },
+  "actualOriginalPNGReview": {
+    "tool": "view_image",
+    "detail": "original",
+    "imagesViewed": 11,
+    "allRuntimePNGsClaimedViewed": false,
+    "images": [
+      {
+        "file": "attempt35-ui/10-floating-on.png",
+        "sha256": "89a28d53c12310644b957fd0b174535be87d1c7b802e4826c66fd43ae06efd56",
+        "actuallyViewedByReviewer": true,
+        "observation": "Actual General floating toggle pink/right (On); inline advanced link visible."
+      },
+      {
+        "file": "attempt35-ui/13-click-original.png",
+        "sha256": "4847227bc899855bd484d0b0a8c695e03635369dab4b2c3a48c89aa966e46c96",
+        "actuallyViewedByReviewer": true,
+        "observation": "Actual Translate/show original radio selected; other choices including Drag only visible."
+      },
+      {
+        "file": "attempt35-ui/14-drag-only.png",
+        "sha256": "b3fcb3c066f16530ae3f86b15d642aa5636a83b0fed44f2075cf81b3e6e0d2f6",
+        "actuallyViewedByReviewer": true,
+        "observation": "Actual Drag only radio selected."
+      },
+      {
+        "file": "attempt35-ui/16-ball-before.png",
+        "sha256": "4f2bcaf4a12d649f68f6fa4eb51f8d2add168744061d380342c8eca54fad4ed4",
+        "actuallyViewedByReviewer": true,
+        "observation": "Whole circular floating main visible at right edge of unchanged multilingual reader."
+      },
+      {
+        "file": "attempt35-ui/17-ball-after.png",
+        "sha256": "7039cbd159abf43512513c29c72b7857b7f345c52ffc7f6251f10b56bc31253a",
+        "actuallyViewedByReviewer": true,
+        "observation": "Whole circular main now at left edge lower on the same reader; no visible translation/progress/selection."
+      },
+      {
+        "file": "attempt35-ui/20-click-restored.png",
+        "sha256": "4a8c40d7d33f53be81e2a33b0dbfe2f56e1d6a891e4a8eb560dd8919e6f2c5ec",
+        "actuallyViewedByReviewer": true,
+        "observation": "Actual Translate/show original radio selected again while enabled."
+      },
+      {
+        "file": "attempt35-ui/22-general-fresh.png",
+        "sha256": "ae84144eb684cc063bc62fd57e11d881de92dad67c9a1d520e7d0228fe85cd09",
+        "actuallyViewedByReviewer": true,
+        "observation": "Actual native General/Translation menu still open; General row visible, Translation selected before recovery choice."
+      },
+      {
+        "file": "attempt35-ui/26-floating-off.png",
+        "sha256": "ccea353fd727210b8ccca653b06186fd2f153027c17bf11cecd6d54d32b782b3",
+        "actuallyViewedByReviewer": true,
+        "observation": "Actual floating toggle gray/left (Off) in General/Web assistance."
+      },
+      {
+        "file": "attempt35-ui/29-tabs.png",
+        "sha256": "a71809e1b66517178fc5ef1ac76082b2b9ad8b9edd58760520851578f9212e14",
+        "actuallyViewedByReviewer": true,
+        "observation": "Native three-tab grid includes owned settings, reader and untouched unknown card; close target is settings."
+      },
+      {
+        "file": "attempt35-ui/30-tabs.png",
+        "sha256": "5ccf3126a4d40d69aac4cddf01d05a195a9675544e0301b1f1df908612691761",
+        "actuallyViewedByReviewer": true,
+        "observation": "Only two native cards remain; settings card gone, unknown and reader remain; Tab closed feedback."
+      },
+      {
+        "file": "attempt35-ui/31-final-reader.png",
+        "sha256": "e45692683b8ac4f225c2c169e44f65c37d26a1014d5c344bc63fa31941a0e141",
+        "actuallyViewedByReviewer": true,
+        "observation": "Final Example Domain reader, native tab counter2, floating main absent and original page visibly preserved."
+      }
+    ]
+  },
+  "rawInputAccounting": {
+    "unit": "Recorded real Android shell input commands; not XCTest or a fixture test count.",
+    "physicalInputCount": 29,
+    "nativeLedgerCount": 29,
+    "clientInputCount": 29,
+    "stateCounterTotal": 29,
+    "allPhysicalArgumentsMatchInOrder": true,
+    "allNativeAndClientReturnCodes": 0,
+    "allLedgerProofPNGHashesMatched": true,
+    "counts": {
+      "notice": 1,
+      "more": 1,
+      "extensions": 1,
+      "addon": 1,
+      "open-settings": 1,
+      "web-assistance": 2,
+      "scroll-settings": 5,
+      "switch-on": 1,
+      "open-floating-settings": 1,
+      "click-none": 1,
+      "open-tabs": 4,
+      "reader-tab": 3,
+      "drag": 1,
+      "settings-tab": 1,
+      "restore-click-action": 1,
+      "open-general-navigation": 1,
+      "choose-general": 1,
+      "switch-off": 1,
+      "close-settings": 1
+    },
+    "unknownCardInputsObserved": 0,
+    "WMWriteRows": 0,
+    "WMReadRows": 1,
+    "dragRetries": 0,
+    "rotationInputs": 0,
+    "ballTapInputs": 0,
+    "uncertainIssueFailureRecorded": false,
+    "totalClientCommandsIncludingReadOnly": 585
+  },
+  "localNativeDragObservation": {
+    "observed": true,
+    "scope": "One true native600ms main-ball drag on task-only Firefox emulator. Local before/after evidence only; separate from the unachieved final certificate.",
+    "nativeArguments": [
+      978,
+      1020,
+      270,
+      1247,
+      600
+    ],
+    "before": {
+      "role": "img",
+      "rect": {
+        "x": 304,
+        "y": 230,
+        "width": 44,
+        "height": 44,
+        "top": 230,
+        "right": 348,
+        "bottom": 274,
+        "left": 304
+      },
+      "dataPosition": "right",
+      "dockCenter": {
+        "x": 326,
+        "y": 252
+      },
+      "derivedRenderedVerticalRatio": 0.5,
+      "dragging": false,
+      "translationStatus": "idle",
+      "coarse": false,
+      "anyPointerCoarse": false,
+      "maxTouchPoints": 5,
+      "touchCapableClass": true,
+      "viewport": {
+        "width": 360,
+        "height": 504,
+        "offsetLeft": 0,
+        "offsetTop": 0,
+        "scale": 1
+      }
+    },
+    "after": {
+      "role": "img",
+      "rect": {
+        "x": 12,
+        "y": 306,
+        "width": 44,
+        "height": 44,
+        "top": 306,
+        "right": 56,
+        "bottom": 350,
+        "left": 12
+      },
+      "dataPosition": "left",
+      "dockCenter": {
+        "x": 34,
+        "y": 328
+      },
+      "derivedRenderedVerticalRatio": 0.6507936507936508,
+      "dragging": false,
+      "translationStatus": "idle",
+      "coarse": false,
+      "anyPointerCoarse": false,
+      "maxTouchPoints": 5,
+      "touchCapableClass": true,
+      "viewport": {
+        "width": 360,
+        "height": 504,
+        "offsetLeft": 0,
+        "offsetTop": 0,
+        "scale": 1
+      }
+    },
+    "fiveInteriorOwnedHitsBeforeAndAfter": true,
+    "mainFull44pxBeforeAndAfter": true,
+    "sideChangedRightToLeft": true,
+    "positionEvidence": "DERIVED_RENDERED_DOCK_CENTER_NOT_STORED_CONFIG",
+    "positionRetention": "No second drag/reset; new rendered left dock and numeric ratio intentionally retained per dedicated-profile policy. A storage ACK was not observed.",
+    "storedVerticalPositionReadback": null,
+    "storedVerticalPositionReadbackStatus": "NOT_OBSERVED",
+    "crossRestartDurability": "NOT_OBSERVED",
+    "originalNullConfigRestorationClaim": false
+  },
+  "UIRecoveryObservations": {
+    "freshInitialSwitchOffObserved": true,
+    "OnObserved": true,
+    "originalClickAction": "translate",
+    "temporaryClickAction": "none",
+    "restoredClickAction": "translate",
+    "originalAndRestoreVisibleEnabledRadioProofs": true,
+    "clickRestoredBeforeOff": true,
+    "OffObserved": true,
+    "finalReaderHostCount": 0,
+    "finalAbsencePassed": true,
+    "sameReaderDocument": {
+      "url": "https://example.com/",
+      "timeOrigin": 1792181162622,
+      "innerWindowId": 4294967297
+    },
+    "sameSixSourcesAndOriginalScrollAtAll10ReaderGeometryCheckpoints": true,
+    "readerGeometryCheckpoints": [
+      "01-reader-geometry.json",
+      "06-reader-geometry.json",
+      "16-ball-before-geometry.json",
+      "16-drag-current-geometry.json",
+      "17-after-current-geometry.json",
+      "17-ball-after-geometry.json",
+      "28-reader-current-geometry.json",
+      "28-reader-off-geometry.json",
+      "31-final-current-geometry.json",
+      "31-final-reader-geometry.json"
+    ],
+    "scroll": [
+      0,
+      73
+    ],
+    "translationCount": 0,
+    "selectionLength": 0,
+    "selectionRangeCount": 0,
+    "visibleProgress": false,
+    "onlyCreatedF35SettingsClosed": true,
+    "officialSettingsTargetsBeforeCreatedAfter": [
+      0,
+      1,
+      0
+    ],
+    "nativeTabCounts": [
+      2,
+      3,
+      2
+    ],
+    "unknownCardRemainsUntouched": true,
+    "priorF32SettingsClosure": "NOT_OBSERVED",
+    "allConfigurationRestored": false,
+    "formalTimelyRestorationVerified": false,
+    "finalWMReadbackComparison": "NOT_PERFORMED; one baseline WM read and zero recorded writes, but final verify was not run."
+  },
+  "generalRecoveryAdaptation": {
+    "sourceSHA256": "d00377efbc2a8795b0888447b9dc6eae2f6fa3b99f87f3e7962597188c91a44e",
+    "independentReviewSHA256": "bc7834cea32a363388964e37e40583adbd6e8dbab7badd7a3b51e0d85c871a10",
+    "observedRawAXText": "\tGeneral settings",
+    "observedDOMOptionText": "General settings",
+    "actualNativeClass": "android.widget.CheckedTextView",
+    "actualEnabled": true,
+    "choiceInputCount": 1,
+    "newShortGOIssuedAt": "2026-10-16T20:18:51.854222+00:00",
+    "newShortGOStartBefore": "2026-10-16T20:19:51.854320+00:00",
+    "nativeChoiceCompletedUnixMs": 1792181947024.072,
+    "deltas": "Only choose-general entry bound to separate source/review GO; menu-open historical age120→600s; exact DOM label or one leading TAB. Current PNG/AX/geometry/input projection, existing action counts/state and original global deadlines preserved.",
+    "resultLabel": "RECOVERY_PROTOCOL_ADAPTED; not unchanged original frozen-helper PASS."
+  },
+  "certificateDeadlineFacts": {
+    "frozenFinalOffToClosureLimitMs": 120000,
+    "actualOffObservationUnixMs": 1792182061464.928,
+    "actualOffObservationISO": "2026-10-16T20:21:01.464928+00:00",
+    "ownedSettingsCloseCompletedUnixMs": 1792182263034.361,
+    "OffToSettingsCloseMs": 201569.43310546875,
+    "finalGeometryCompletedUnixMs": 1792182308690,
+    "OffToFinalGeometryMs": 247225.07202148438,
+    "finalObserveOffRecordedUnixMs": 1792182308751.008,
+    "OffToFinalObserveMs": 247286.080078125,
+    "timelyWindowSatisfied": false,
+    "restorationVerifiedFileExists": false,
+    "verifyInvocation": "Root explicitly reports verify was not invoked; independent timestamp calculation shows frozen verification predicate would reject. Do not create a replacement certificate or retroactively relax this gate.",
+    "globalActionDeadline": "2026-10-16T20:27:19.307Z",
+    "globalCleanupDeadline": "2026-10-16T20:29:19.307Z",
+    "globalDeadlineExpiredCauseClaimed": false,
+    "interpretation": "The final research evidence deadline was missed despite observed UI recovery. This does not establish a floating-ball product restoration defect."
+  },
+  "cleanupAndResourceRelease": {
+    "rawCleanupStatus": "FAILED",
+    "rawCleanupErrors": [
+      "Final Off/click-action/reader/WM verification not complete: [Errno 2] No such file or directory: '/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/android-runtime/firefox-f5a-floating-touch-attempt35/restoration-verified.json'"
+    ],
+    "cleanupStartedAt": "2026-10-16T20:25:08.842416+00:00",
+    "cleanupFinishedAt": "2026-10-16T20:25:13.867486+00:00",
+    "rawLaneReleased": true,
+    "knownFiveOwnedPIDs": [
+      15957,
+      15970,
+      15972,
+      15989,
+      16222
+    ],
+    "remainingOwned": [],
+    "ports": {
+      "5048": {
+        "returnCode": 1,
+        "listeners": ""
+      },
+      "5580": {
+        "returnCode": 1,
+        "listeners": ""
+      },
+      "5581": {
+        "returnCode": 1,
+        "listeners": ""
+      },
+      "51231": {
+        "returnCode": 1,
+        "listeners": ""
+      }
+    },
+    "focusEvents": [],
+    "protectedTaskGUIActivations": [],
+    "nonTaskActivationCount": 0,
+    "violations": [],
+    "keysMetadataUnchanged": true,
+    "freshRootResourceReleaseAt": "2026-10-16T20:25:59.472291+00:00",
+    "freshRootLaneReleased": true,
+    "freshRootRemainingOwned": [],
+    "freshRootPorts": {
+      "5048": {
+        "returnCode": 1,
+        "listeners": ""
+      },
+      "5580": {
+        "returnCode": 1,
+        "listeners": ""
+      },
+      "5581": {
+        "returnCode": 1,
+        "listeners": ""
+      },
+      "52911": {
+        "returnCode": 1,
+        "listeners": ""
+      },
+      "51231": {
+        "returnCode": 1,
+        "listeners": ""
+      }
+    },
+    "freshRootHeavyOrGUIRows": [],
+    "freshRootBootedAppleSimulators": [],
+    "freshRootTaskAppleSimulatorState": "Shutdown",
+    "terminalHandlesReportedByRoot": {
+      "finishWrapper10663": {
+        "terminalExit": 0,
+        "printedFinishReturnCode": 1,
+        "nativeAndCleanupReturnCode": 1
+      },
+      "loader59009": {
+        "terminalExit": 0
+      },
+      "guard21493": {
+        "terminalExit": 0
+      }
+    },
+    "terminalBoundary": "Handle exit details are explicit Root tool-result reports; raw cleanup/runner/guard completion and resource receipts independently read from disk. Wrapper exit0 does not turn cleanup FAILED into PASS."
+  },
+  "artifactBoundary": {
+    "files": 478,
+    "prePostRecordedDoubleHashesMatch": true,
+    "recordHash": "bb6d2df04165f76bee19f6da3ce46fb702f0e54f108cae137ccc5205bc36ed3b",
+    "rawByteHash": "e026986964e0d3e065271bb460aa798bf28ab3c27512717658532abf259da6ab",
+    "full478ArtifactRehashedByReviewer": false,
+    "runtimeSourceCommit": "a2ecda302d3a0199ffe9f0222ee2998a37bd7d5d",
+    "original28StaticFilesStillByteExact": true
+  },
+  "unacceptedOrUnobserved": [
+    "Timely formal final restoration certificate",
+    "Original frozen helper full-chain PASS",
+    "Full floating feature goal or translation functional chain",
+    "Stored vertical ratio readback or persistence ACK",
+    "Cross restart/remount behavior",
+    "Rotation, IME, provider or physical Android acceptance",
+    "Final WM measured comparison",
+    "Historical F32 settings closure",
+    "Zero provider network requests; only zero visible translation/progress at reader checkpoints was observed"
+  ],
+  "performedByReviewer": {
+    "pureFileReadAndHash": true,
+    "actualViewOriginalPNGFiles": true,
+    "exclusiveIndependentOutcomeJSONWrite": true,
+    "SDK": false,
+    "ADB": false,
+    "browser": false,
+    "build": false,
+    "network": false,
+    "processInspection": false,
+    "nativeInput": false,
+    "rawEvidenceOrProductModified": false,
+    "newGO": false
+  },
+  "contextPolicy": "300K user handoff preference retained; actual automatic threshold enforcement unverified. No new descendant created."
+}

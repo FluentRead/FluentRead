@@ -1,0 +1,23 @@
+{
+  "at": "2026-10-16T21:43:05.619403+00:00",
+  "status": "COMPILED_BOUND_PENDING_ROOT_RUNTIME_GO",
+  "files": {
+    "SafariSmokeTests.candidate.swift": "566274799e05963b2b714966e28f9bcdfcee51805e3664cc91f85e1a3781b68e",
+    "build-guard-report.json": "5c945e31b140a43437f36c9b28ff1c3920734cc58630cf08d91cf4b59e47e8b7",
+    "identity-final-layout-flat.candidate.json": "3f74f268976e82aa7a84c5375938c89253ab461aa6585f5d18efec8164b04051",
+    "inline-attempt1/plan.json": "4dde9419d044a2febb26e1e8871ab5169649bdb90fe6dbd9abdacf5333d9c95d",
+    "inline-attempt1/runtime-run-plan.json": "77f115092ff83eea34a129e9ed6490f6f59a44ecaefd17651f363d2d6982f921",
+    "inline-attempt1/runtime-guard.cjs": "8e5cc68ff7cf8f3ab3b25e241ba7853f6f89c2d63bcc9f6b5d4bcfe0f74e788e",
+    "inline-attempt1/identity-check.py": "08f2a6a8cc7c8faba721bdf58082e83adcfcebdbbd847ee71c6ad1c27342fa13",
+    "compiled-harness-identity.json": "b4c813d79e3210cb138bbe0506531d64572a024e5b364cbd6de55015776d27b2",
+    "DerivedData/Build/Products/production-final-layout-menu-readiness-approved-a407.xctestrun": "6c4de77b7c0970cb81b20ef94cf912c1ecbf6970009c3b28029332010be48932"
+  },
+  "binarySHA256": {
+    "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/safari-final-menu-readiness-preparation-20261017/DerivedData/Build/Products/Debug-iphonesimulator/SafariSmokeUITests-Runner.app/SafariSmokeUITests-Runner": "46603cf963c565b58a7fd252ebd3fa74e85143e4a358f22328e75b94c5dd9a5e",
+    "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/safari-final-menu-readiness-preparation-20261017/DerivedData/Build/Products/Debug-iphonesimulator/SafariSmokeUITests-Runner.app/PlugIns/SafariSmokeUITests.xctest/SafariSmokeUITests": "681c96eafd85022605850d90cc90ce2835a129b8ad5e92d3559f3a81ac5b90bb",
+    "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/safari-final-menu-readiness-preparation-20261017/DerivedData/Build/Products/Debug-iphonesimulator/NativeHarness.app/NativeHarness": "12551b14311235dea669ef7d85d9d20cd8d1f090f64d65f55091233f707b4199"
+  },
+  "deviceActions": [],
+  "productRebuilt": false,
+  "SDKCommandsInBinder": false
+}

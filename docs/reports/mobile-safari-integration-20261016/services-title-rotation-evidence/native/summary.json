@@ -1,0 +1,116 @@
+{
+  "schema": 1,
+  "status": "FOCUSED_IOS_SIMULATOR_FLOW_PASS",
+  "scope": "One known-localhost native Safari production Popup service-picker flow on iOS Simulator.",
+  "productCommit": "8274d0c76bead3f1f76a04f5f71e2d58475d4551",
+  "checkoutCommitAtRun": "c78604df4bf24dfb20033ae5a946cb6371cf8c41",
+  "officialResult": {
+    "passed": 1,
+    "skipped": 0,
+    "failed": 0,
+    "selectedTestMethodSeconds": 65.105,
+    "wholeTestRunSeconds": 82.529
+  },
+  "actions": {
+    "admittedActionCount": 16,
+    "allSixteenPerformedExactlyOnce": true,
+    "counts": {
+      "address": 1,
+      "clearSearch": 1,
+      "closePopup": 1,
+      "defaultServiceRow": 1,
+      "extensionPopup": 1,
+      "navigation": 1,
+      "normalClear": 1,
+      "overviewClose": 1,
+      "pageMenu": 1,
+      "pickerBack": 1,
+      "rotateLandscape": 1,
+      "rotatePortrait": 1,
+      "SafariActivate": 1,
+      "searchFocus": 1,
+      "searchGpt": 1,
+      "serviceSummary": 1
+    }
+  },
+  "observed": {
+    "gptRetainedAcrossLandscapeAndPortrait": true,
+    "nativeKeyboardObservedDuringBothRotations": true,
+    "clearThenBackThenOverviewCloseThenNativeDoneCompleted": true,
+    "finalKnownLocalPageContinuityVerified": true,
+    "landscapeProviderListObscuredByKeyboard": true,
+    "providerSelectionPerformed": false,
+    "permissionChoices": 0,
+    "configurationWrites": 0,
+    "translationIntents": 0,
+    "clipboardActions": 0,
+    "createdTabs": 0,
+    "closedTabs": 0
+  },
+  "cleanup": {
+    "originalBaselineRestorationReviewed": true,
+    "pinnedDataSubsetRestored": true,
+    "allStoragePreservationClaimed": false,
+    "simulatorShutdown": true,
+    "ownedRuntimeResourcesReleased": true
+  },
+  "limits": [
+    "This accepts only the recorded known-localhost iOS Simulator flow for production commit 8274d0c76bead3f1f76a04f5f71e2d58475d4551.",
+    "The landscape provider list remained obscured by the keyboard. No provider was selected; full-list visibility is not accepted.",
+    "No real-device, real-provider translation, all-product layout, physical DOM identity, or true input-focus acceptance.",
+    "The coordinate normalization was a test-harness change; it is not a product bug fix or a general OS coordinate rule.",
+    "The services-overview visible-title patch was applied after this run and is absent from these screenshots. It requires separate validation."
+  ],
+  "images": [
+    {
+      "file": "portrait-gpt-before-rotation.png",
+      "sourceBasename": "1344C845-DAE7-4408-B49F-92D22AC3E9E1.png",
+      "bytes": 369189,
+      "sha256": "6f576d63c2f88ee6bfe84cab82c7f900a470e3eb8cccaa65ef00f4f9c5fe2778",
+      "caption": "竖屏输入 gpt，旋转前",
+      "originalBytesPreserved": true,
+      "croppedOrReencoded": false,
+      "width": 1206,
+      "height": 2622,
+      "EXIFOrientation": 1
+    },
+    {
+      "file": "portrait-gpt-after-rotation.png",
+      "sourceBasename": "B1FFD1A6-D5C4-491B-A1E2-2FECCCD74FFE.png",
+      "bytes": 381206,
+      "sha256": "c6a1dbc2aa6729e49a7556278c7a160efd66cd7bf3a2cc56653b98cd4b016644",
+      "caption": "横屏后返回竖屏，gpt 保留",
+      "originalBytesPreserved": true,
+      "croppedOrReencoded": false,
+      "width": 1206,
+      "height": 2622,
+      "EXIFOrientation": 1
+    }
+  ],
+  "provenance": {
+    "caseBasename": "current-production-touch-flex-active-ime-native-keyboard-coordinate-attempt1",
+    "authorityReportsNotIncluded": [
+      {
+        "basename": "root-runtime-outcome.json",
+        "bytes": 34985,
+        "sha256": "c27c0435f1fa2a266b412776570215427225b57c7ce85cba9cf9aef59257a5e8"
+      },
+      {
+        "basename": "independent-runtime-review.json",
+        "bytes": 47426,
+        "sha256": "07f46ce370f14e32a9a490a48ed6b27acdfb7367c6735755b80283810d61d60c"
+      },
+      {
+        "basename": "restoration-witness.json",
+        "bytes": 2190,
+        "sha256": "0c4c2aae85ea528b5e5559bdca12708fb7fa1123fcf0f955ae96c34c990c493d"
+      }
+    ]
+  },
+  "publicPackaging": {
+    "onlyTwoOriginalPortraitPNGsIncluded": true,
+    "landscapePNGNotCopied": true,
+    "absolutePathsDeviceIdentifiersTabIdentifiersNonceAndRawAXExcluded": true,
+    "includedInPullRequestEvidence": true
+  }
+}

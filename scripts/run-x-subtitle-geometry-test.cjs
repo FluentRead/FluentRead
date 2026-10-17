@@ -53,6 +53,8 @@ function geometrySnapshot(page, phase) {
       const value = element?.getBoundingClientRect();
       return value ? {left:value.left, top:value.top, right:value.right, bottom:value.bottom, width:value.width, height:value.height} : null;
     };
+    const button = document.querySelector('#fluent-read-video-subtitle-button');
+    const menu = document.querySelector('#fluent-read-video-subtitle-menu');
     const player = document.querySelector('[data-testid="videoPlayer"]');
     const video = document.querySelector('video');
     const layer = document.querySelector('#fluent-read-video-subtitle-layer');
@@ -77,7 +79,10 @@ function geometrySnapshot(page, phase) {
       originalWrap: originalStyle?.overflowWrap || '', translationWrap: translationStyle?.overflowWrap || '',
       originalFits: Boolean(original && original.scrollWidth <= original.clientWidth + 1),
       translationFits: Boolean(translation && translation.scrollWidth <= translation.clientWidth + 1),
-      button: document.querySelector('#fluent-read-video-subtitle-button')?.getAttribute('aria-pressed') || '',
+      button: String(Boolean(button?.classList.contains('fluent-read-video-subtitle-active'))),
+      menuButton: button ? {role: button.getAttribute('role'), hasPopup: button.getAttribute('aria-haspopup'),
+        controls: button.getAttribute('aria-controls'), expanded: button.getAttribute('aria-expanded'),
+        pressed: button.getAttribute('aria-pressed'), menuHidden: menu ? menu.hidden : null} : null,
       fullscreen: Boolean(document.fullscreenElement),
     };
   }, phase);
@@ -181,12 +186,19 @@ async function main() {
 
     const capture = async (name, checks = () => {}) => {
       const snapshot = await geometrySnapshot(page, name);
+      if (snapshot.menuButton) {
+        assert.equal(snapshot.menuButton.role, 'button'); assert.equal(snapshot.menuButton.hasPopup, 'menu');
+        assert.equal(snapshot.menuButton.controls, 'fluent-read-video-subtitle-menu'); assert.equal(snapshot.menuButton.pressed, null);
+        assert.equal(typeof snapshot.menuButton.menuHidden, 'boolean');
+        assert.equal(snapshot.menuButton.expanded, String(!snapshot.menuButton.menuHidden));
+      }
       await checks(snapshot);
       report.cases.push(snapshot);
       await page.screenshot({path:path.join(artifacts, `${name}.png`)});
       return snapshot;
     };
     await capture('bilingual-contain', snapshot => {
+      assert.ok(snapshot.menuButton); assert.equal(snapshot.button, 'true');
       assert.equal(snapshot.player.width, 720);
       assert.equal(snapshot.player.height, 640);
       assert.equal(snapshot.video.width, 360);

@@ -1,5 +1,5 @@
 import {describe, expect, it, vi} from 'vitest';
-import {fitVideoSubtitleFontSize} from '@/src/features/video-subtitle/content/subtitleLayout';
+import {fitVideoSubtitleFontSize, getVideoSubtitleFreeRegions, videoSubtitleRectsOverlap} from '@/src/features/video-subtitle/content/subtitleLayout';
 
 import {
   DEFAULT_VIDEO_SUBTITLE_APPEARANCE,
@@ -15,6 +15,29 @@ import {
 } from '@/src/core/config/model';
 
 describe('video subtitle appearance contract', () => {
+  it('移动视频的空区同时避开顶部、中部和底部控件，保留足以阅读的左上区域', () => {
+    const viewport = {left: 50, top: 48, width: 301, height: 226};
+    const obstacles = [{left: 234, top: 48, width: 144, height: 48}, {left: 91, top: 133, width: 220, height: 56},
+      {left: 12, top: 200, width: 312, height: 44}, {left: 330, top: 200, width: 48, height: 44}, {left: 30, top: 230, width: 342, height: 44}];
+    const regions = getVideoSubtitleFreeRegions(viewport, obstacles);
+    expect(regions).toContainEqual({left: 56, top: 54, width: 174, height: 75});
+    for (const area of regions) {
+      expect(area.left).toBeGreaterThanOrEqual(viewport.left); expect(area.top).toBeGreaterThanOrEqual(viewport.top);
+      expect(area.left + area.width).toBeLessThanOrEqual(viewport.left + viewport.width);
+      expect(area.top + area.height).toBeLessThanOrEqual(viewport.top + viewport.height);
+      expect(obstacles.some(obstacle => videoSubtitleRectsOverlap(area, obstacle))).toBe(false);
+    }
+    expect(getVideoSubtitleFreeRegions(viewport, [...obstacles, ...obstacles])).toEqual(regions);
+    expect(getVideoSubtitleFreeRegions(viewport, [{left: 500, top: 500, width: 5, height: 5}])).toEqual([{left: 56, top: 54, width: 289, height: 214}]);
+  });
+
+  it('空区搜索限制障碍与候选数量，不伪造被全部覆盖的可用位置', () => {
+    expect(getVideoSubtitleFreeRegions({left: 0, top: 0, width: 100, height: 100}, [{left: 0, top: 0, width: 100, height: 100}])).toEqual([]);
+    const obstacles = Array.from({length: 100}, (_, index) => ({left: index * 7, top: index * 3, width: 8, height: 12}));
+    const viewport = {left: 0, top: 0, width: 320, height: 180};
+    expect(getVideoSubtitleFreeRegions(viewport, obstacles)).toEqual(getVideoSubtitleFreeRegions(viewport, obstacles.slice(0, 16)));
+    expect(getVideoSubtitleFreeRegions(viewport, obstacles).length).toBeLessThanOrEqual(8);
+  });
   it('字幕时间偏移保存为半秒步进，迁移旧配置时默认同步且不改已有字幕外观', () => {
     expect(new Config().videoSubtitleOffsetMs).toBe(0);
     expect(normalizeConfig({}).videoSubtitleOffsetMs).toBe(0);

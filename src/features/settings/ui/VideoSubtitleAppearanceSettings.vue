@@ -59,8 +59,8 @@
             <strong>字号与位置</strong>
             <label><span>字号 <b>{{ config.videoSubtitleAppearance.fontScale }}%</b></span><input v-model.number="config.videoSubtitleAppearance.fontScale" type="range" :min="VIDEO_SUBTITLE_FONT_SCALE_RANGE.min" :max="VIDEO_SUBTITLE_FONT_SCALE_RANGE.max" step="10" aria-label="字幕字号" /><input :value="config.videoSubtitleAppearance.fontScale" type="number" :min="VIDEO_SUBTITLE_FONT_SCALE_RANGE.min" :max="VIDEO_SUBTITLE_FONT_SCALE_RANGE.max" step="1" :aria-label="translateControlLabel('字幕字号')" @change="updateFontScale" /></label>
             <label><span>位置</span><UiSelect v-model="config.videoSubtitleAppearance.position" aria-label="字幕位置"><ElOption value="bottom" :label="translateControlLabel('底部')" /><ElOption value="center" :label="translateControlLabel('中部')" /><ElOption value="top" :label="translateControlLabel('顶部')" /></UiSelect></label>
-            <label><span>底部偏移 <b>{{ config.videoSubtitleAppearance.position === 'bottom' && config.videoSubtitleAppearance.autoBottom ? 'X 自动' : `${config.videoSubtitleAppearance.bottomOffset}%` }}</b></span><input v-model.number="config.videoSubtitleAppearance.bottomOffset" type="range" min="0" max="25" step="1" aria-label="字幕底部偏移" @input="config.videoSubtitleAppearance.autoBottom = false" /></label>
-            <label v-if="config.videoSubtitleAppearance.position === 'bottom'"><span>X 字幕自动贴底</span><input v-model="config.videoSubtitleAppearance.autoBottom" type="checkbox" aria-label="X 字幕自动贴底" /></label>
+            <label><span>底部偏移 <b>{{ config.videoSubtitleAppearance.position === 'bottom' && config.videoSubtitleAppearance.autoBottom ? translateControlLabel('自动') : `${config.videoSubtitleAppearance.bottomOffset}%` }}</b></span><input v-model.number="config.videoSubtitleAppearance.bottomOffset" type="range" min="0" max="25" step="1" aria-label="字幕底部偏移" @input="config.videoSubtitleAppearance.autoBottom = false" /></label>
+            <label v-if="config.videoSubtitleAppearance.position === 'bottom'" class="subtitle-auto-bottom-toggle"><span>{{ translateControlLabel('移动端 / X 自动贴底') }}</span><input v-model="config.videoSubtitleAppearance.autoBottom" type="checkbox" :aria-label="translateControlLabel('移动端 / X 自动贴底')" /></label>
           </div>
           <div class="subtitle-appearance-control-group">
             <strong>颜色与布局</strong>
@@ -174,6 +174,9 @@ function skinSwatchStyle(skin: typeof VIDEO_SUBTITLE_SKINS[number]): Record<stri
 .subtitle-appearance-control-group > strong { color: var(--ink); font-size: 11px; }
 .subtitle-appearance-controls label { display: grid; gap: 5px; color: var(--muted); font-size: 11px; }
 .subtitle-appearance-controls label span { display: flex; justify-content: space-between; gap: 8px; }
+.subtitle-appearance-controls .subtitle-auto-bottom-toggle { grid-template-columns: minmax(0, 1fr) auto; align-items: center; min-height: 40px; column-gap: 12px; cursor: pointer; }
+.subtitle-appearance-controls .subtitle-auto-bottom-toggle span { display: block; min-width: 0; line-height: 1.5; overflow-wrap: anywhere; }
+.subtitle-appearance-controls .subtitle-auto-bottom-toggle input { width: 18px; height: 18px; margin: 0; accent-color: var(--brand); cursor: inherit; }
 .subtitle-appearance-controls b { color: var(--ink); font-weight: 650; }
 .subtitle-appearance-controls input[type="range"] { width: 100%; accent-color: var(--brand); }
 .subtitle-appearance-controls input[type="number"] { width: 100%; min-height: 30px; box-sizing: border-box; border: 1px solid var(--line); border-radius: 6px; color: var(--ink); background: var(--surface); }

@@ -1,0 +1,154 @@
+{
+  "at": "2026-10-16T10:23:39.845455+00:00",
+  "reviewed": true,
+  "images": [
+    {
+      "path": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/android-runtime/firefox-quality-d6b135e1-page-cycle-attempt22/attempt22-ui/f22-01-initial.png",
+      "sha256": "a051cacb1a74935f52c602b239d59159f5320d85b080d823b48571fbd0e24b6a",
+      "viewedOriginalViaViewImage": true,
+      "note": "Normal temporary-addon added notification; only OK dismissed, no permission consent"
+    },
+    {
+      "path": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/android-runtime/firefox-quality-d6b135e1-page-cycle-attempt22/attempt22-ui/f22-03-service-check-extensions.png",
+      "sha256": "e967b4b980b9a60c0ae2a0e8acf3b99a6591f7deb0a41f94af3ff9c77ca03047",
+      "viewedOriginalViaViewImage": true,
+      "note": "Actual native browser/extension navigation state; no permission change"
+    },
+    {
+      "path": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/android-runtime/firefox-quality-d6b135e1-page-cycle-attempt22/attempt22-ui/f22-03-service-check-menu.png",
+      "sha256": "c2f898a7004855f7e6cbcb551c2d2623006a23e0c75e2cec6abed0167bfcdcc4",
+      "viewedOriginalViaViewImage": true,
+      "note": "Actual native browser/extension navigation state; no permission change"
+    },
+    {
+      "path": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/android-runtime/firefox-quality-d6b135e1-page-cycle-attempt22/attempt22-ui/f22-03-service-check-page.png",
+      "sha256": "927566c80c7167db2a17b1966c8e88213c7dfc08afab311c5aa50482e53ac89e",
+      "viewedOriginalViaViewImage": true,
+      "note": "Actual native browser/extension navigation state; no permission change"
+    },
+    {
+      "path": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/android-runtime/firefox-quality-d6b135e1-page-cycle-attempt22/attempt22-ui/f22-03-service-check-popup.png",
+      "sha256": "7615e4c1a6db6d548379e8903aaf44f88333b17480daad1beadc3d1313c78435",
+      "viewedOriginalViaViewImage": true,
+      "note": "Actual native browser/extension navigation state; no permission change"
+    },
+    {
+      "path": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/android-runtime/firefox-quality-d6b135e1-page-cycle-attempt22/attempt22-ui/f22-04-first-translate.png",
+      "sha256": "44211995e5abef7c2ea0ad59a44d63267b9ec1a2176cf1629819f3c1e4858d89",
+      "viewedOriginalViaViewImage": true,
+      "note": "Actual native browser/extension navigation state; no permission change"
+    },
+    {
+      "path": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/android-runtime/firefox-quality-d6b135e1-page-cycle-attempt22/attempt22-ui/f22-07-first-visible.png",
+      "sha256": "72b94f260b150697f9eb8228bf57dc087c79fe5a0be3b05c2c5eb3db0962f910",
+      "viewedOriginalViaViewImage": true,
+      "note": "Intermediate first round: English translated while Arabic still has a loading spinner; not the settled readiness frame"
+    },
+    {
+      "path": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/android-runtime/firefox-quality-d6b135e1-page-cycle-attempt22/attempt22-ui/f22-09-first-settled-top.png",
+      "sha256": "c4121e15c5a47f803ae38599618b4a95447debc20118c1ade7581dc9e89147a3",
+      "viewedOriginalViaViewImage": true,
+      "note": "Actual native browser/extension navigation state; no permission change"
+    },
+    {
+      "path": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/android-runtime/firefox-quality-d6b135e1-page-cycle-attempt22/attempt22-ui/f22-10-first-ar-visible.png",
+      "sha256": "6056ada8e0e91ea012895100dcf1f6d48e37c10eb95bf6459bd5a59c30bedc09",
+      "viewedOriginalViaViewImage": true,
+      "note": "First corresponding Chinese translation visible with source paragraph; ordinary scroll clipping at viewport edges only"
+    },
+    {
+      "path": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/android-runtime/firefox-quality-d6b135e1-page-cycle-attempt22/attempt22-ui/f22-11-first-fr-visible.png",
+      "sha256": "5b60947a369155350e02e2c9be4b8fb421c773c6fbb168daaffe9dfd8eb7b50f",
+      "viewedOriginalViaViewImage": true,
+      "note": "First corresponding Chinese translation visible with source paragraph; ordinary scroll clipping at viewport edges only"
+    },
+    {
+      "path": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/android-runtime/firefox-quality-d6b135e1-page-cycle-attempt22/attempt22-ui/f22-12-restore-check-extensions.png",
+      "sha256": "3eb26870abae9f8fe92b3b778fa954e2a86c881c6f313c2bc79aef134acdf81a",
+      "viewedOriginalViaViewImage": true,
+      "note": "Actual native browser/extension navigation state; no permission change"
+    },
+    {
+      "path": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/android-runtime/firefox-quality-d6b135e1-page-cycle-attempt22/attempt22-ui/f22-12-restore-check-menu.png",
+      "sha256": "c40dd3871a6569ed711f5161797d095bd3ab89dfdc999e9c0642ea3440fc450e",
+      "viewedOriginalViaViewImage": true,
+      "note": "Actual native browser/extension navigation state; no permission change"
+    },
+    {
+      "path": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/android-runtime/firefox-quality-d6b135e1-page-cycle-attempt22/attempt22-ui/f22-12-restore-check-page.png",
+      "sha256": "5b60947a369155350e02e2c9be4b8fb421c773c6fbb168daaffe9dfd8eb7b50f",
+      "viewedOriginalViaViewImage": true,
+      "note": "Actual native browser/extension navigation state; no permission change"
+    },
+    {
+      "path": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/android-runtime/firefox-quality-d6b135e1-page-cycle-attempt22/attempt22-ui/f22-12-restore-check-popup.png",
+      "sha256": "4a64423fe458b1dfa06fda339bcd39ee0cae2a9e4c11303883df654ecf0eef5f",
+      "viewedOriginalViaViewImage": true,
+      "note": "Actual native browser/extension navigation state; no permission change"
+    },
+    {
+      "path": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/android-runtime/firefox-quality-d6b135e1-page-cycle-attempt22/attempt22-ui/f22-13-restored-popup.png",
+      "sha256": "81a00b65f2b5192b8d1b301f326c61f571627fdb344b538d8393db590e1e69ed",
+      "viewedOriginalViaViewImage": true,
+      "note": "Actual native browser/extension navigation state; no permission change"
+    },
+    {
+      "path": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/android-runtime/firefox-quality-d6b135e1-page-cycle-attempt22/attempt22-ui/f22-15-restored-visible.png",
+      "sha256": "adc77b1a82be30eb466f29cfaab4f671378d3104cc646b04c7723944a6bd3bc5",
+      "viewedOriginalViaViewImage": true,
+      "note": "Original French/Russian/Spanish paragraphs visible, Chinese translation blocks removed"
+    },
+    {
+      "path": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/android-runtime/firefox-quality-d6b135e1-page-cycle-attempt22/attempt22-ui/f22-16-retranslate-check-extensions.png",
+      "sha256": "4cb7da1117cf82463a6e2a052168e7608a372484db7e61573158f62c4fa807c6",
+      "viewedOriginalViaViewImage": true,
+      "note": "Actual native browser/extension navigation state; no permission change"
+    },
+    {
+      "path": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/android-runtime/firefox-quality-d6b135e1-page-cycle-attempt22/attempt22-ui/f22-16-retranslate-check-menu.png",
+      "sha256": "b9d8ddb3bc8ba2a4ca195b374fe212343d1562b0cdf50922c6460cdc2856efa5",
+      "viewedOriginalViaViewImage": true,
+      "note": "Actual native browser/extension navigation state; no permission change"
+    },
+    {
+      "path": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/android-runtime/firefox-quality-d6b135e1-page-cycle-attempt22/attempt22-ui/f22-16-retranslate-check-page.png",
+      "sha256": "b364b158da38d68e0b9d51f9274d75e5cd8803c219f498f3b3933562c059b4aa",
+      "viewedOriginalViaViewImage": true,
+      "note": "Original French/Russian/Spanish paragraphs visible, Chinese translation blocks removed"
+    },
+    {
+      "path": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/android-runtime/firefox-quality-d6b135e1-page-cycle-attempt22/attempt22-ui/f22-16-retranslate-check-popup.png",
+      "sha256": "896473cd81131238206b96458efca3a73bc1c219cce27880cfbff209a66314e9",
+      "viewedOriginalViaViewImage": true,
+      "note": "Actual native browser/extension navigation state; no permission change"
+    },
+    {
+      "path": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/android-runtime/firefox-quality-d6b135e1-page-cycle-attempt22/attempt22-ui/f22-17-retranslate-popup.png",
+      "sha256": "2b6ab5f1d628dbcb0646ffe71149fc09d8f6d3ec73eec3c5a36be0861499db26",
+      "viewedOriginalViaViewImage": true,
+      "note": "Actual native browser/extension navigation state; no permission change"
+    },
+    {
+      "path": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/android-runtime/firefox-quality-d6b135e1-page-cycle-attempt22/attempt22-ui/f22-19-retranslated-visible.png",
+      "sha256": "88de97bc5f99ba540701f153e0e01758d37fb7eec12f27e44ca0d33ef2649aa4",
+      "viewedOriginalViaViewImage": true,
+      "note": "Retranslated French original and complete Chinese block visible; Russian Chinese block visible"
+    },
+    {
+      "path": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/android-runtime/firefox-quality-d6b135e1-page-cycle-attempt22/attempt22-ui/f22-21-retranslated-ar-visible.png",
+      "sha256": "39070b443580f8661ec4ccad33e1f12285fd9253e0dd8352534e3e9a5dbb0845",
+      "viewedOriginalViaViewImage": true,
+      "note": "Retranslated Arabic original and complete Chinese block visible; English bilingual block visible"
+    }
+  ],
+  "count": 23,
+  "reviewMethod": "Every original PNG displayed with view_image; no composite/CSS injection.",
+  "keyImages": [
+    "f22-10-first-ar-visible.png",
+    "f22-15-restored-visible.png",
+    "f22-19-retranslated-visible.png",
+    "f22-21-retranslated-ar-visible.png"
+  ],
+  "conclusion": "AR/FR Chinese is readable and corresponding in this narrow flow. This is not a popup layout/rotation/keyboard/touch-target or physical-device accessibility matrix. Ordinary source lines above/below viewport remain clipped by normal scrolling; offscreen DOM alone is not claimed pixel-visible.",
+  "secondRoundSpanish": "DOM result recorded, not separately scrolled into a second-round screenshot."
+}

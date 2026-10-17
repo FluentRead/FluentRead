@@ -1,0 +1,133 @@
+{
+  "at": "2026-10-16T23:14:48.100Z",
+  "scope": "Focused local tests; Node/controlled ports, not live browser or native acceptance",
+  "reports": [
+    {
+      "file": "fixed-final-coverage-vitest.json",
+      "sha256": "5e6a31476990460bc400469457f133bc7a3164194584c65a20a710fc710cdb25",
+      "bytes": 37629,
+      "tests": 99,
+      "passed": 99,
+      "failed": 0,
+      "pending": 0,
+      "suites": [
+        {
+          "file": "/Users/thinkstu/Desktop/copy/FluentRead-mobile-video-menu-accessibility-20261016/tests/videoPlayerBinding.test.ts",
+          "status": "passed",
+          "tests": 99,
+          "failed": []
+        }
+      ]
+    },
+    {
+      "file": "neighbors-vitest.json",
+      "sha256": "b51b0997be8938a368308eab3b777ecea9c868e90c331bb032773146fe198e15",
+      "bytes": 472657,
+      "tests": 1254,
+      "passed": 1254,
+      "failed": 0,
+      "pending": 0,
+      "suites": [
+        {
+          "file": "/Users/thinkstu/Desktop/copy/FluentRead-mobile-video-menu-accessibility-20261016/tests/implementationAudit49D.test.ts",
+          "status": "passed",
+          "tests": 47,
+          "failed": []
+        },
+        {
+          "file": "/Users/thinkstu/Desktop/copy/FluentRead-mobile-video-menu-accessibility-20261016/tests/videoNativeFullscreen.test.ts",
+          "status": "passed",
+          "tests": 27,
+          "failed": []
+        },
+        {
+          "file": "/Users/thinkstu/Desktop/copy/FluentRead-mobile-video-menu-accessibility-20261016/tests/videoPlayerLocator.test.ts",
+          "status": "passed",
+          "tests": 37,
+          "failed": []
+        },
+        {
+          "file": "/Users/thinkstu/Desktop/copy/FluentRead-mobile-video-menu-accessibility-20261016/tests/videoSubtitleLogic.test.ts",
+          "status": "passed",
+          "tests": 27,
+          "failed": []
+        },
+        {
+          "file": "/Users/thinkstu/Desktop/copy/FluentRead-mobile-video-menu-accessibility-20261016/tests/videoSubtitleViewport.test.ts",
+          "status": "passed",
+          "tests": 35,
+          "failed": []
+        },
+        {
+          "file": "/Users/thinkstu/Desktop/copy/FluentRead-mobile-video-menu-accessibility-20261016/tests/architecture/moduleBoundaries.test.ts",
+          "status": "passed",
+          "tests": 15,
+          "failed": []
+        },
+        {
+          "file": "/Users/thinkstu/Desktop/copy/FluentRead-mobile-video-menu-accessibility-20261016/tests/architecture/sourceFileHeaders.test.ts",
+          "status": "passed",
+          "tests": 1066,
+          "failed": []
+        }
+      ]
+    },
+    {
+      "file": "verification-ports-vitest.json",
+      "sha256": "199b9991b103661b9e2374d3d1055531d93b45bedcd0d04db1e4b1a5b2050135",
+      "bytes": 127282,
+      "tests": 295,
+      "passed": 290,
+      "failed": 5,
+      "pending": 0,
+      "suites": [
+        {
+          "file": "/Users/thinkstu/Desktop/copy/FluentRead-mobile-video-menu-accessibility-20261016/tests/browserFocusSafety.test.ts",
+          "status": "passed",
+          "tests": 251,
+          "failed": []
+        },
+        {
+          "file": "/Users/thinkstu/Desktop/copy/FluentRead-mobile-video-menu-accessibility-20261016/tests/verificationCliCleanup.test.ts",
+          "status": "failed",
+          "tests": 23,
+          "failed": [
+            "public verification CLI cleanup with owned process receipts scripts/capture-product-assets.cjs: report EISDIR cannot block session close or mask primary failure",
+            "public verification CLI cleanup with owned process receipts scripts/capture-product-assets.cjs: rejected close preserves primary and exact live owner profile",
+            "public verification CLI cleanup with owned process receipts scripts/capture-product-assets.cjs: partial launcher with a real live child retains even an empty profile",
+            "public verification CLI cleanup with owned process receipts capture connection cleanup rejection still closes its real loopback server and profile",
+            "public verification CLI cleanup with owned process receipts capture owns a partial CDP acquisition and continues cleanup after detach rejection"
+          ]
+        },
+        {
+          "file": "/Users/thinkstu/Desktop/copy/FluentRead-mobile-video-menu-accessibility-20261016/tests/architecture/verificationOwnership.test.ts",
+          "status": "passed",
+          "tests": 21,
+          "failed": []
+        }
+      ]
+    },
+    {
+      "file": "verification-cli-cleanup-loopback-vitest.json",
+      "sha256": "da3ef152ab7b4436d5b6a867f3d294a94bb739a4aa398cd8419be86a70f93474",
+      "bytes": 11229,
+      "tests": 23,
+      "passed": 23,
+      "failed": 0,
+      "pending": 0,
+      "suites": [
+        {
+          "file": "/Users/thinkstu/Desktop/copy/FluentRead-mobile-video-menu-accessibility-20261016/tests/verificationCliCleanup.test.ts",
+          "status": "passed",
+          "tests": 23,
+          "failed": []
+        }
+      ]
+    }
+  ],
+  "notes": [
+    "verification-ports initial run: 5 verificationCliCleanup cases hit sandbox listen EPERM before intended public CLI boundary; preserve failed original, not green",
+    "Only verificationCliCleanup was rerun with loopback permitted; successful browserFocusSafety and verificationOwnership were not repeated",
+    "Strict coverage final 403/403 statements and lines, 34/34 functions, 287/287 branches, no skip"
+  ]
+}

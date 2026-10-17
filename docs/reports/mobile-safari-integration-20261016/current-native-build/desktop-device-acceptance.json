@@ -1,0 +1,66 @@
+{
+  "at": "2026-10-16T08:11:13.416270+00:00",
+  "status": "Unsigned macOS/iPhoneOS compile and exact resources passed; no runtime acceptance",
+  "runtimeSourceCommit": "f5a82d11a5b6b6a5de2f2ea726065a56cdb2e6ca",
+  "observedCheckoutHead": "f5a82d11a5b6b6a5de2f2ea726065a56cdb2e6ca",
+  "gate": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/mobile-learning-short-height-followup-20261016/artifact-gate.json",
+  "gateSHA256": "df11a7a2db78978f0b84f9a2725d9a3a6d122bd8605ad2901279132ccff15a4b",
+  "web": {
+    "directory": "/Users/thinkstu/Desktop/copy/FluentRead-mobile-video-menu-accessibility-20261016/.output/safari-mv2",
+    "files": 467,
+    "bytes": 62231467,
+    "rawByteHash": "1040bd47a0d9b907d30a91fa7d27e7aa46b7c5c1e258bb6e3223ba4082838705",
+    "recordHash": "87310a5611cfb7df2672c0cf6beb4c126c8fe24dc1364793878621d9b75a32dc",
+    "fullFileMap": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/mobile-learning-short-height-followup-20261016/safari-file-map.json",
+    "recordAlgorithm": "global UTF8 path sort; SHA256(path + NUL + fileSHA256 + NUL + decimalByteLength + LF)",
+    "rawAlgorithm": "recursive directory UTF8 name sort; SHA256(path + NUL + decimalByteLength + NUL + rawbytes)"
+  },
+  "platforms": {
+    "macos": {
+      "resources": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/safari/controls-layout-f5a-desktop-device-1040bd47a0d9/resources-macos-controls-layout-f5a-desktop-device-1040bd47a0d9.json",
+      "compiledIdentity": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/safari/controls-layout-f5a-desktop-device-1040bd47a0d9/compiled-macos-identity.json",
+      "identitySHA256": "827a522879c368232eb672c05cb2dd2d5ab0f724db5e9d7f6236da67e6d057b8",
+      "allFileCount": 482,
+      "app": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/safari/controls-layout-f5a-desktop-device-1040bd47a0d9/derived-macos/Build/Products/Release/FluentRead.app",
+      "signatureSummary": "linker ad-hoc; no developer team",
+      "nativeSHA256": "d55ea3cee63bc975d261d6e577e76516e325335032a806e6f6da09da28018839"
+    },
+    "iphoneos": {
+      "resources": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/safari/controls-layout-f5a-desktop-device-1040bd47a0d9/resources-iphoneos-controls-layout-f5a-desktop-device-1040bd47a0d9.json",
+      "compiledIdentity": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/safari/controls-layout-f5a-desktop-device-1040bd47a0d9/compiled-iphoneos-identity.json",
+      "identitySHA256": "18d8f0a9aaa4e112adf43f36faf28aef2bd4fc675411013316659ec30a2599ab",
+      "allFileCount": 485,
+      "app": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/safari/controls-layout-f5a-desktop-device-1040bd47a0d9/target-iphoneos/build/FluentRead.app",
+      "signatureSummary": "unsigned; no developer team",
+      "nativeSHA256": "64f7a5cdaa77c7db7875421d8a612452eeb14c722e668c59e3ec76e1ed755561"
+    }
+  },
+  "existingSimulatorIdentity": {
+    "path": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/safari/controls-layout-a3-1040bd47a0d9/compiled-simulator-identity.json",
+    "sha256": "3f3df2dc7993788676427a6544e5cd17937f2a7da8d8e4a5f6c1d215417679dd",
+    "scope": "Existing f5a Simulator identity is read-only association; no Simulator build, copy, install, boot or runtime in this phase"
+  },
+  "historicalThreeTargetAcceptance": {
+    "path": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/safari/controls-package-c5aedabc2e94/acceptance.json",
+    "sha256": "bc40871ee09f759711b19a3c1f65e2748cb830c120ed55888df15a65e6d365b7",
+    "scope": "Historical c5 only, not evidence of f5a macOS/iPhoneOS acceptance"
+  },
+  "cleanup": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/safari/controls-layout-f5a-desktop-device-1040bd47a0d9/cleanup.json",
+  "resourcePolicy": {
+    "globalConcurrency": 3,
+    "maxWorkers": 1,
+    "cpuTarget": 40,
+    "xcodeJobs": 1,
+    "sequential": true
+  },
+  "runtimeBoundary": {
+    "WebBuilt": false,
+    "SimulatorBuilt": false,
+    "boot": false,
+    "install": false,
+    "launch": false,
+    "test": false,
+    "physicalDevice": false
+  },
+  "signingBoundary": "CODE_SIGNING_ALLOWED=NO/CODE_SIGNING_REQUIRED=NO; no account/team/provisioning/signing identity; App and appex inspected separately"
+}

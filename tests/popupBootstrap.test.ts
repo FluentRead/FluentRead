@@ -37,6 +37,66 @@ beforeEach(async () => {
 afterEach(() => {ports.unmountCallbacks.forEach(fn=>fn());vi.unstubAllGlobals();});
 
 describe('Popup fresh configuration bootstrap', () => {
+    it.each([false,true])('Safari coarse 对首次完成=%s 的根启用自有填宽且卸载释放',async completed=>{
+        ports.browser='safari';ports.config.uiLanguageSetupCompleted=completed;
+        const matchMedia=vi.fn(()=>({matches:true}));vi.stubGlobal('window',Object.assign(new EventTarget(),{matchMedia}));
+        await bootstrap.mountPreparedPopupApp('#owned');
+        expect(matchMedia).toHaveBeenCalledOnce();expect(matchMedia).toHaveBeenCalledWith('(any-pointer: coarse)');expect(ports.platform).not.toHaveBeenCalled();
+        expect(document.documentElement.getAttribute('data-fluentread-safari-touch-popup')).toBe('');
+        expect(ports.createApp).toHaveBeenCalledWith({kind:completed?'main':'onboarding'});
+        ports.unmountCallbacks.forEach(fn=>fn());expect(document.documentElement.hasAttribute('data-fluentread-safari-touch-popup')).toBe(false);
+    });
+    it.each(['chrome','firefox','thunderbird'])('%s coarse 不探测或取得 Safari 填宽标记',async browser=>{
+        ports.browser=browser;const matchMedia=vi.fn(()=>({matches:true}));vi.stubGlobal('window',Object.assign(new EventTarget(),{matchMedia}));
+        await bootstrap.mountPreparedPopupApp('#owned');
+        expect(matchMedia).not.toHaveBeenCalled();expect(document.documentElement.hasAttribute('data-fluentread-safari-touch-popup')).toBe(false);
+    });
+    it.each(['fine','missing','throws','no-window'])('Safari %s 输入能力保留固有宽度且不阻塞配置挂载',async mode=>{
+        ports.browser='safari';const matchMedia=vi.fn(()=>{if(mode==='throws')throw Error('media unavailable');return {matches:false};});
+        vi.stubGlobal('window',mode==='no-window'?undefined:mode==='missing'?new EventTarget():Object.assign(new EventTarget(),{matchMedia}));
+        await bootstrap.mountPreparedPopupApp('#owned');
+        expect(ports.mount).toHaveBeenCalledOnce();expect(ports.platform).not.toHaveBeenCalled();
+        expect(document.documentElement.hasAttribute('data-fluentread-safari-touch-popup')).toBe(false);
+    });
+    it('Safari 标记不等待配置；pending 配置退出后不重新写回或挂载',async()=>{
+        ports.browser='safari';const gate=deferred();ports.ready=gate.promise;
+        const matchMedia=vi.fn(()=>({matches:true}));const target=Object.assign(new EventTarget(),{matchMedia});vi.stubGlobal('window',target);
+        vi.resetModules();bootstrap=await import('../src/app/popup/mount');
+        const pending=bootstrap.mountPreparedPopupApp('#owned');
+        expect(document.documentElement.hasAttribute('data-fluentread-safari-touch-popup')).toBe(true);expect(ports.createApp).not.toHaveBeenCalled();
+        target.dispatchEvent(new Event('pagehide'));gate.resolve();await pending;
+        expect(document.documentElement.hasAttribute('data-fluentread-safari-touch-popup')).toBe(false);expect(ports.createApp).not.toHaveBeenCalled();expect(matchMedia).toHaveBeenCalledOnce();
+    });
+    it('Safari 输入能力返回前已退出时不取得过期标记',async()=>{
+        ports.browser='safari';const target=new EventTarget();
+        vi.stubGlobal('window',Object.assign(target,{matchMedia:vi.fn(()=>{target.dispatchEvent(new Event('pagehide'));return {matches:true};})}));
+        await bootstrap.mountPreparedPopupApp('#owned');
+        expect(document.documentElement.hasAttribute('data-fluentread-safari-touch-popup')).toBe(false);expect(ports.createApp).not.toHaveBeenCalled();
+    });
+    it.each(['mount-failure','config-failure','hydration-blocked'] as const)('Safari %s 清理已取得的填宽标记',async reason=>{
+        ports.browser='safari';vi.stubGlobal('window',Object.assign(new EventTarget(),{matchMedia:vi.fn(()=>({matches:true}))}));
+        if(reason==='mount-failure')ports.mount.mockImplementation(()=>{throw Error('mount failed');});
+        if(reason==='config-failure'){ports.ready=Promise.reject(Error('config failed'));ports.ready.catch(()=>{});vi.resetModules();bootstrap=await import('../src/app/popup/mount');}
+        if(reason==='hydration-blocked')ports.hydration='blocked';
+        await expect(bootstrap.mountPreparedPopupApp('#owned')).rejects.toThrow();
+        expect(document.documentElement.hasAttribute('data-fluentread-safari-touch-popup')).toBe(false);
+    });
+    it('Safari pagehide 清理自有标记与监听，随后卸载重复释放安全',async()=>{
+        ports.browser='safari';const target=Object.assign(new EventTarget(),{matchMedia:vi.fn(()=>({matches:true}))});vi.stubGlobal('window',target);
+        const remove=vi.spyOn(target,'removeEventListener');await bootstrap.mountPreparedPopupApp('#owned');target.dispatchEvent(new Event('pagehide'));
+        expect(document.documentElement.hasAttribute('data-fluentread-safari-touch-popup')).toBe(false);expect(remove).toHaveBeenCalledWith('pagehide',expect.any(Function));
+        ports.unmountCallbacks.forEach(fn=>fn());expect(document.documentElement.hasAttribute('data-fluentread-safari-touch-popup')).toBe(false);
+    });
+    it.each(['pagehide','unmount','mount-failure'])('Safari %s 不改写或移除预存宿主标记',async reason=>{
+        ports.browser='safari';const target=Object.assign(new EventTarget(),{matchMedia:vi.fn(()=>({matches:true}))});vi.stubGlobal('window',target);
+        document.documentElement.setAttribute('data-fluentread-safari-touch-popup','external-owner');
+        if(reason==='mount-failure')ports.mount.mockImplementation(()=>{throw Error('mount failed');});
+        const pending=bootstrap.mountPreparedPopupApp('#owned');
+        if(reason==='mount-failure')await expect(pending).rejects.toThrow('mount failed');else await pending;
+        if(reason==='pagehide')target.dispatchEvent(new Event('pagehide'));if(reason==='unmount')ports.unmountCallbacks.forEach(fn=>fn());
+        expect(document.documentElement.getAttribute('data-fluentread-safari-touch-popup')).toBe('external-owner');
+    });
+
     it.each([false,true])('Android 固定容器对首次完成=%s 的独立根共享一次公开平台判别',async completed=>{
         ports.browser='firefox';ports.platform.mockResolvedValue({os:'android'});ports.config.uiLanguageSetupCompleted=completed;
         await bootstrap.mountPreparedPopupApp('#owned');

@@ -1,0 +1,436 @@
+{
+  "schemaVersion": 1,
+  "reviewer": "/root/f25_review",
+  "createdAt": "2026-10-16T21:14:47.749633+00:00",
+  "status": "SCOPED_CONTROLLED_MENU_SUITE_PASS_NATIVE_LIFECYCLE_AND_SAFARI_NOT_ACCEPTED",
+  "reviewMode": "Read-only source/raw evidence review and actual original PNG viewing; only this new independent report written. No SDK, browser, device, build, network or process inventory executed by reviewer.",
+  "contextPreference": {
+    "handoffAtTokens": 300000,
+    "automaticEnforcementVerified": false,
+    "newDescendantsCreated": false
+  },
+  "inputs": [
+    {
+      "path": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/menu-scroll-controlled-20261017/menu-suite/report.json",
+      "sha256": "c869e7e55339059ab82a9de7ec181b2e37b38e4b7112004a345f0a4a4773cf02"
+    },
+    {
+      "path": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/menu-scroll-controlled-20261017/menu-suite/inputs.json",
+      "sha256": "4a937b6d40815651086402026ba035fac35eaf377910c2292ec635434d2a8286"
+    },
+    {
+      "path": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/menu-scroll-controlled-20261017/menu-suite/runner.log",
+      "sha256": "a1854abbac888b81a3e1de957378bc6c833d065ad6bf271ff49c467cda2547c1"
+    },
+    {
+      "path": "/Users/thinkstu/Desktop/copy/FluentRead-mobile-video-menu-accessibility-20261016/scripts/run-mobile-video-subtitle-test.cjs",
+      "sha256": "b55766aef51af34b070a769e7424825ef787ec8603ac47b5a5304c2ad34a3f7c"
+    },
+    {
+      "path": "/Users/thinkstu/Desktop/copy/FluentRead-mobile-video-menu-accessibility-20261016/src/features/video-subtitle/content/ui.ts",
+      "sha256": "eb9cd5ccd3d2931cd1e85fa8a668235374e0a865e06605981274bd20944b592c"
+    }
+  ],
+  "artifactBinding": {
+    "recordedChromeMapSHA256": "fa6ed6c48b27fd7e9040764ca43c19a2aef9150c4ca32263c53c278a1900878e",
+    "sameAsFinalGeometryMapActualHash": true,
+    "parentRecordedFull478RehashUnchanged": true,
+    "all478FilesRehashedByReviewer": false
+  },
+  "actualOriginalPngViews": [
+    {
+      "path": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/menu-scroll-controlled-20261017/menu-suite/portrait-menu-timing-targets.png",
+      "sha256": "08997d5e42756dc19ed356d3b06939ba5ca90f7a6d6ea82270ffb7be6c19e2c9",
+      "actualView": true
+    },
+    {
+      "path": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/menu-scroll-controlled-20261017/menu-suite/portrait-menu-hint-targets.png",
+      "sha256": "674770c80332eef88132b64ce099dc1ab22031e5b4149ce5cd168898892a206e",
+      "actualView": true
+    },
+    {
+      "path": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/menu-scroll-controlled-20261017/menu-suite/portrait-menu-keyboard-1-End.png",
+      "sha256": "4b9a4c81e4fe4bb100d23a5df036509314aa28f7cedc6b6d90331f745c29accb",
+      "actualView": true
+    },
+    {
+      "path": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/menu-scroll-controlled-20261017/menu-suite/portrait-menu-keyboard-2-ArrowUp.png",
+      "sha256": "fcef69f661344d6405f729a17461528f98a78ce02b824d04d9bdb4e8c186fc77",
+      "actualView": true
+    },
+    {
+      "path": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/menu-scroll-controlled-20261017/menu-suite/portrait-menu-keyboard-3-ArrowUp.png",
+      "sha256": "757d9564cb54f2a7695397fceb3b1997fc956a9074921b3dba69205b2bff5329",
+      "actualView": true
+    },
+    {
+      "path": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/menu-scroll-controlled-20261017/menu-suite/portrait-menu-keyboard-4-ArrowUp.png",
+      "sha256": "36d6dfe14360729a2e3a15320fd001bf2095f4f7d3a5ae8c7079a9cef9173c87",
+      "actualView": true
+    },
+    {
+      "path": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/menu-scroll-controlled-20261017/menu-suite/portrait-menu-keyboard-5-ArrowUp.png",
+      "sha256": "5ea0d9653cd3bd88dd79d32b05c1488d90c2df2707fa960848bf7626b6cfd89c",
+      "actualView": true
+    },
+    {
+      "path": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/menu-scroll-controlled-20261017/menu-suite/portrait-menu-keyboard-6-ArrowUp.png",
+      "sha256": "65bbd889ab90f6b7b5f966bccf4ad3c04b6f87931391ee1f64d0311a806a29b5",
+      "actualView": true
+    },
+    {
+      "path": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/menu-scroll-controlled-20261017/menu-suite/portrait-menu-keyboard-7-ArrowUp.png",
+      "sha256": "1b653e2d32959ed854dc850be7952cf3483b47aa51ea506cc9dd8eae127b72e0",
+      "actualView": true
+    },
+    {
+      "path": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/menu-scroll-controlled-20261017/menu-suite/portrait-menu-keyboard-8-ArrowUp.png",
+      "sha256": "e387663adfbdd910bf9ffd85b5ce6d7d74b3835af415a1d9e947f60c4c3ec8b9",
+      "actualView": true
+    },
+    {
+      "path": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/menu-scroll-controlled-20261017/menu-suite/portrait-menu-keyboard-9-ArrowUp.png",
+      "sha256": "395a62595cfdc98fa4c4cfaca3c2109d0ed624b368bb8d2165bfb548396528d3",
+      "actualView": true
+    },
+    {
+      "path": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/menu-scroll-controlled-20261017/menu-suite/portrait-menu-keyboard-10-ArrowUp.png",
+      "sha256": "2a9068447f75ecb755a9b56c910916714820e110d8ae4f9ef3e1e0f4baace10b",
+      "actualView": true
+    },
+    {
+      "path": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/menu-scroll-controlled-20261017/menu-suite/portrait-menu-keyboard-11-ArrowUp.png",
+      "sha256": "20957fb90fd0a1b277f2afbc1f829eb612239eeb8ac1b0e302d1bf8c0b52ada6",
+      "actualView": true
+    },
+    {
+      "path": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/menu-scroll-controlled-20261017/menu-suite/portrait-menu-keyboard-12-Home.png",
+      "sha256": "9d28a24250993193f6643c611a9c7ef67d59867a2758113340135254dadee31b",
+      "actualView": true
+    },
+    {
+      "path": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/menu-scroll-controlled-20261017/menu-suite/desktop-menu-open.png",
+      "sha256": "d50b833a9ab36a8d92ddd1ad1798054cf247a064771f2c81aca2fa65e696d547",
+      "actualView": true
+    },
+    {
+      "path": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/menu-scroll-controlled-20261017/menu-suite/desktop-menu-keyboard-End.png",
+      "sha256": "af2b213b4b44a56fb9dc43da0c69d922f39fe7676d26fc929fc18371a3ab9325",
+      "actualView": true
+    },
+    {
+      "path": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/menu-scroll-controlled-20261017/menu-suite/desktop-menu-keyboard-Home.png",
+      "sha256": "a03b7bd9e91805a1fb324af42b65c40a324ff256ece7b1be530f0c85814e8de4",
+      "actualView": true
+    },
+    {
+      "path": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/menu-scroll-controlled-20261017/menu-suite/desktop-menu-before-close.png",
+      "sha256": "a03b7bd9e91805a1fb324af42b65c40a324ff256ece7b1be530f0c85814e8de4",
+      "actualView": true
+    },
+    {
+      "path": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/menu-scroll-controlled-20261017/menu-suite/portrait-menu-normal-close.png",
+      "sha256": "738ea6f19b728fba20d001eda00966a821dd043442881d53fb9a30e1b0377f25",
+      "actualView": true
+    },
+    {
+      "path": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/menu-scroll-controlled-20261017/menu-suite/desktop-menu-normal-close.png",
+      "sha256": "8476ca00a873b27c1682fa76a8af668c33f5b6ff7b5101271f4c85a9b5bfc000",
+      "actualView": true
+    },
+    {
+      "path": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/menu-scroll-controlled-20261017/menu-suite/disabled-cleanup.png",
+      "sha256": "605cc9ebd2c5e89b78073b4cf6ac96c797cd9a673dd33a90d9abb4845e9e0ca8",
+      "actualView": true
+    },
+    {
+      "path": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/menu-scroll-controlled-20261017/menu-suite/landscape-inline.png",
+      "sha256": "7c85fbc1f838d00c9dfcf6dfd9e0d1141d0e222f095ed0018ece2465dfe38f03",
+      "actualView": true
+    },
+    {
+      "path": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/menu-scroll-controlled-20261017/menu-suite/fullscreen-geometry-safe-area.png",
+      "sha256": "7c85fbc1f838d00c9dfcf6dfd9e0d1141d0e222f095ed0018ece2465dfe38f03",
+      "actualView": true
+    }
+  ],
+  "recordedRuntimeResult": {
+    "selectedSuite": "menu",
+    "terminalSession": 51155,
+    "parentObservedExitCode": 0,
+    "runnerLogOk": true,
+    "cases": 9,
+    "geometryScenes": 18,
+    "errors": []
+  },
+  "touchMenu": {
+    "geometryScenes": 14,
+    "targetMeasurements": 28,
+    "minimumNominalSizePx": 44,
+    "visibleSizeTolerancePx": 0.01,
+    "minimumRecordedVisibleHeightPx": 43.99780701754386,
+    "allTargetsUniqueFullClipAndFiveOwnedHits": true,
+    "allTwelveTrustedKeyExpectedFocusObserved": true,
+    "keyboardSteps": [
+      {
+        "key": "End",
+        "expected": "download-bilingual-subtitles",
+        "observed": "download-bilingual-subtitles"
+      },
+      {
+        "key": "ArrowUp",
+        "expected": "download-translated-subtitles",
+        "observed": "download-translated-subtitles"
+      },
+      {
+        "key": "ArrowUp",
+        "expected": "download-subtitles",
+        "observed": "download-subtitles"
+      },
+      {
+        "key": "ArrowUp",
+        "expected": "subtitle-later",
+        "observed": "subtitle-later"
+      },
+      {
+        "key": "ArrowUp",
+        "expected": "subtitle-earlier",
+        "observed": "subtitle-earlier"
+      },
+      {
+        "key": "ArrowUp",
+        "expected": "off",
+        "observed": "off"
+      },
+      {
+        "key": "ArrowUp",
+        "expected": "original-only",
+        "observed": "original-only"
+      },
+      {
+        "key": "ArrowUp",
+        "expected": "translation-only",
+        "observed": "translation-only"
+      },
+      {
+        "key": "ArrowUp",
+        "expected": "bilingual",
+        "observed": "bilingual"
+      },
+      {
+        "key": "ArrowUp",
+        "expected": "open-sentence-learning",
+        "observed": "open-sentence-learning"
+      },
+      {
+        "key": "ArrowUp",
+        "expected": "close-menu",
+        "observed": "close-menu"
+      },
+      {
+        "key": "Home",
+        "expected": "open-settings",
+        "observed": "open-settings"
+      }
+    ],
+    "focusedBodyBelowVisibleHeader": true,
+    "normalClose": {
+      "input": "mouse.click-at-observed-checked-center",
+      "x": 353,
+      "y": 31,
+      "focusReturned": true
+    },
+    "escapeFocusReturnPassed": true,
+    "visualFinding": "Opaque sticky header and Close remain visible at timing/hint scroll positions; prior strip above the scrolled header is absent. Focus rings move through the twelve expected controls; former step6 off is visible below header. Nonfocused body content may normally be partly scrolled under the opaque title."
+  },
+  "topEdgeProof": {
+    "gate": "scrollTop >= menuPaddingTop (actual 6px)",
+    "gatedSceneCount": 11,
+    "ownedSamplesPerGatedScene": 3,
+    "allGatedSamplesOwnedByHeader": true,
+    "exceptions": [
+      {
+        "name": "portrait-menu-keyboard-10-ArrowUp",
+        "scrollTop": 4,
+        "rawOwnedHeaderSamples": [
+          false,
+          false,
+          false
+        ]
+      },
+      {
+        "name": "portrait-menu-keyboard-11-ArrowUp",
+        "scrollTop": 0,
+        "rawOwnedHeaderSamples": [
+          false,
+          false,
+          false
+        ]
+      },
+      {
+        "name": "portrait-menu-keyboard-12-Home",
+        "scrollTop": 0,
+        "rawOwnedHeaderSamples": [
+          false,
+          false,
+          false
+        ]
+      },
+      {
+        "name": "desktop-menu-open",
+        "scrollTop": 0,
+        "rawOwnedHeaderSamples": [
+          false,
+          false,
+          false
+        ]
+      },
+      {
+        "name": "desktop-menu-keyboard-End",
+        "scrollTop": 0,
+        "rawOwnedHeaderSamples": [
+          false,
+          false,
+          false
+        ]
+      },
+      {
+        "name": "desktop-menu-keyboard-Home",
+        "scrollTop": 0,
+        "rawOwnedHeaderSamples": [
+          false,
+          false,
+          false
+        ]
+      },
+      {
+        "name": "desktop-menu-before-close",
+        "scrollTop": 0,
+        "rawOwnedHeaderSamples": [
+          false,
+          false,
+          false
+        ]
+      }
+    ],
+    "interpretation": "Keys10–12 and all four desktop scenes are below the 6px threshold; raw false samples there are retained rather than counted as positive coverage."
+  },
+  "desktopMenu": {
+    "capabilities": {
+      "coarsePointer": false,
+      "maxTouchPoints": 0
+    },
+    "viewport": [
+      1280,
+      900
+    ],
+    "headerHeightPx": 28,
+    "actualCloseSizePx": [
+      28,
+      28
+    ],
+    "actualSettingsHeightPx": 22,
+    "minimumTestTargetSizePx": 22,
+    "geometryScenes": 4,
+    "targetMeasurements": 7,
+    "allTargetsUniqueFullClipAndFiveOwnedHits": true,
+    "keyboardSteps": [
+      {
+        "key": "End",
+        "expected": "download-bilingual-subtitles",
+        "observed": "download-bilingual-subtitles"
+      },
+      {
+        "key": "Home",
+        "expected": "open-settings",
+        "observed": "open-settings"
+      }
+    ],
+    "normalCloseFocusReturned": true,
+    "allScrollTopValues": [
+      0,
+      0,
+      0,
+      0
+    ],
+    "scrolledDesktopTest": false,
+    "scope": "Compact desktop presentation, trusted End/Home focus and checked-coordinate normal Close. Menu fits; this is not desktop scroll stress coverage."
+  },
+  "otherObservedScope": {
+    "landscapeGeometry": true,
+    "fullscreenGeometry": "Explicit controlled DOM property fixture only; no OS/browser native fullscreen",
+    "safeAreaEmulation": {
+      "supported": false,
+      "reason": "Error: cdpSession.send: Protocol error (Emulation.setSafeAreaInsets): 'Emulation.setSafeAreaInsets' wasn't found"
+    },
+    "safeAreaInset4424ActuallyValidated": false,
+    "disableCleanup": "Actual screenshot removes FluentRead UI; source awaits absent custom layer/native bridge track. Original site captions may remain. Native selection lifecycle was not run."
+  },
+  "nativeLifecycleBoundary": {
+    "reportedState": {
+      "status": "NOT_RUN_EXPLICIT_MENU_SUITE",
+      "scope": "Native selection lifecycle is excluded; shared fullscreen geometry remains a controlled DOM fixture"
+    },
+    "selectionReplacementReloadPageshowExecuted": false,
+    "defaultLifecycleBlockSHA256": "923f4e214634cfe1f19f0306d0fffdad7d3be1ea6227cd9080a3b65f96e07ccd",
+    "defaultLifecycleBlockByteUnchanged": true,
+    "menuBranch": "After shared fullscreen-geometry cleanup and before first site-track construction; runs desktop/disable cleanup then returns through common finally.",
+    "overallLifecycleAccepted": false
+  },
+  "cleanupObserved": {
+    "browserPid": 33543,
+    "focusMonitorPid": 33539,
+    "focusSamples": 45,
+    "browserCloseReceipt": "shared-guard-fulfilled",
+    "profileRemoved": true,
+    "focusEvents": [],
+    "focusMonitorKeptThroughSharedCloseInSource": true,
+    "scope": "No activation observed for this owned browser in this run; guard receipt fulfilled and profile removed. Reviewer did not perform fresh PID/port inventory."
+  },
+  "preservedHistory": [
+    {
+      "path": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/menu-scroll-controlled-20261017/baseline-geometry/report.json",
+      "sha256": "cd2666d74047246d082237c240eb842d752579d745e5dce7492ceb7482ee5642"
+    },
+    {
+      "path": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/menu-scroll-controlled-20261017/sticky-only/report.json",
+      "sha256": "77e637b422d996c241be7cff6b984af80052015b37ca70889557e1b81f8ef7c8"
+    },
+    {
+      "path": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/menu-scroll-controlled-20261017/final-geometry/report.json",
+      "sha256": "537d451c333b4b8136252bde4ac32e4b492c63549acfc1eef57393e2dad92d00"
+    },
+    {
+      "path": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/menu-scroll-controlled-20261017/independent-code-review.json",
+      "sha256": "5664a09bf8bbf5bc33736446f82bcfd33754d120cf995d352538fb9e7b28c0a6"
+    },
+    {
+      "path": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/menu-scroll-controlled-20261017/independent-final-code-review.json",
+      "sha256": "9777f44821020ad0e9e5d6312d08c33e9b290ccd97ebb885453c132d8363010d"
+    },
+    {
+      "path": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/menu-scroll-controlled-20261017/independent-final-runtime-review.json",
+      "sha256": "f7c6e4628c95e7ef6b4ea14ea3fc2b012e634cac2be68c4c50600e8024a1b5c3"
+    }
+  ],
+  "evidenceLimits": [
+    "local HTML and timedtext fixtures",
+    "mock translation",
+    "Chromium viewport/touch emulation",
+    "isolated-extension-world webkit capability/event shim only; no iOS/AVKit rendering",
+    "fullscreen geometry uses an explicit DOM property fixture; no system/window fullscreen",
+    "no live provider or mobile device",
+    "Explicit menu suite: shared caption readiness, touch/desktop menus and fullscreen geometry only; native-selection shim, video replacement, reload and persisted-pageshow lifecycle assertions are not executed; menu success is not lifecycle acceptance",
+    "Timing/hint menu scroll positions are controlled DOM setup; keyboard inputs are trusted CDP events and normal Close uses checked mouse coordinates. No native finger-scroll evidence.",
+    "A separate menu-suite success does not relabel the prior final-geometry native track failure or establish real Safari/AVKit behavior."
+  ],
+  "acceptance": {
+    "explicitControlledMenuSuitePassed": true,
+    "touchMenuGeometryKeyboardAndFocusPassed": true,
+    "desktopCompactKeyboardAndFocusPassed": true,
+    "desktopScrollingPassed": false,
+    "nativeLifecyclePassed": false,
+    "nativeSafariPassed": false,
+    "fullGoalComplete": false
+  }
+}

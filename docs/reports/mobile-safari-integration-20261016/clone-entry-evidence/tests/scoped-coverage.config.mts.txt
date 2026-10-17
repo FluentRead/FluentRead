@@ -1,0 +1,17 @@
+import baseConfig from "/Users/thinkstu/Desktop/copy/FluentRead-mobile-video-menu-accessibility-20261016/vitest.config.ts";
+
+export default {
+  ...baseConfig,
+  test: {
+    ...baseConfig.test,
+    include: ["tests/videoPlayerBinding.test.ts"],
+    coverage: {
+      provider: "v8", enabled: true, all: true, clean: true,
+      include: ["src/features/video-subtitle/content/videoPlayerBinding.ts"],
+      exclude: ["**/*.d.ts"],
+      reportsDirectory: "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/mobile-youtube-fr-node-identity-probe-20261017/same-scope-clone-repair-20261017/coverage",
+      reporter: ["text", "json-summary", "json"],
+      thresholds: {perFile: true, statements: 100, branches: 100, functions: 100, lines: 100},
+    },
+  },
+};

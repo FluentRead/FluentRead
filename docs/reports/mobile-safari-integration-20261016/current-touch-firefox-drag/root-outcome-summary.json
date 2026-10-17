@@ -1,0 +1,223 @@
+{
+  "schema": 1,
+  "attempt": 35,
+  "at": "2026-10-16T20:27:51.952115+00:00",
+  "status": "INCOMPLETE_TIMELY_FINAL_GATE_RECOVERY_PROTOCOL_ADAPTED",
+  "runtimeSourceCommit": "a2ecda302d3a0199ffe9f0222ee2998a37bd7d5d",
+  "observedCheckoutHEAD": "663021d72844aaa2d5de691d538d3243a8fc990b",
+  "protocolBoundary": {
+    "original28StaticFilesUnchanged": true,
+    "generalOptionRecoveryAdapted": true,
+    "originalUnchangedFrozenFullChainAccepted": false,
+    "adaptation": "Reviewed separate helper accepts exactly one TAB before the observed native General settings label; menu age allowance600s; all fresh proof, overall deadlines and action limits retained.",
+    "adaptationReview": {
+      "path": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/android-runtime/firefox-f5a-floating-touch-attempt35/independent-general-recovery-source-review.json",
+      "sha256": "bc7834cea32a363388964e37e40583adbd6e8dbab7badd7a3b51e0d85c871a10"
+    },
+    "adaptationGO": {
+      "path": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/android-runtime/firefox-f5a-floating-touch-attempt35/general-option-recovery-go.json",
+      "sha256": "0bc25d6f22ec387a6debf1af19719b660970b9de3068847db2fe52e474e93861"
+    }
+  },
+  "observed": {
+    "initialFloatingOff": {
+      "geometry": "06-settings",
+      "checked": false,
+      "atUnixMs": 1792181334333.431
+    },
+    "on": {
+      "checked": true,
+      "geometry": "10-floating-on",
+      "geometrySHA256": "4df1a41e2cf2f26b0ac804b16ea5d8e38c7f53c12acf6a0985e81ea80294e63c",
+      "atUnixMs": 1792181437665.045
+    },
+    "oneNativeDrag": {
+      "accepted": true,
+      "geometry": "17-after-current",
+      "geometrySHA256": "0a857313d3096916f2cfb49c78ac689b7f386954aafe14ef00f87fba68dfeb34",
+      "proof": "17-drag-observed",
+      "PNG": "17-ball-after.png",
+      "side": "left",
+      "derivedRenderedVerticalRatio": 0.6507936507936508,
+      "actualDockCenter": {
+        "x": 34,
+        "y": 328
+      },
+      "storedVerticalPositionReadback": null,
+      "storedVerticalPositionReadbackStatus": "NOT_OBSERVED",
+      "durablePersistenceAccepted": false,
+      "retainedInDedicatedTestProfile": true,
+      "atUnixMs": 1792181674850.6272
+    },
+    "dragBefore": {
+      "geometry": "16-drag-current",
+      "geometrySHA256": "9cce923f202e443b3a3b86c3098ee3157ee0bc46e706e37bd4e40c2c8dd94691",
+      "document": {
+        "url": "https://example.com/",
+        "timeOrigin": 1792181162622,
+        "innerWindowId": 4294967297
+      },
+      "mainRect": {
+        "x": 304,
+        "y": 230,
+        "width": 44,
+        "height": 44,
+        "top": 230,
+        "right": 348,
+        "bottom": 274,
+        "left": 304
+      },
+      "dockSide": "right",
+      "targetSide": "left",
+      "targetCSS": [
+        90.0,
+        327.6
+      ],
+      "actualNativeStart": [
+        978,
+        1020
+      ],
+      "actualNativeEnd": [
+        270,
+        1247
+      ],
+      "durationMilliseconds": 600
+    },
+    "clickActionRestored": {
+      "value": "translate",
+      "index": 0,
+      "geometry": "20-confirm-current",
+      "geometrySHA256": "c109a60b9efafcc11475565d13b0c1451571b4e875fa6f4526f8e32455cd7f83",
+      "proof": "20-confirm-click",
+      "PNG": "20-click-restored.png",
+      "AXSHA256": "6a95863e5cfe9f377fc54e9a3b94e55c7050e917024998da73479d5c7662937a",
+      "document": {
+        "url": "moz-extension://5742e8dc-cff0-43e1-8997-d64aa023ec64/options.html#settings-translation",
+        "timeOrigin": 1792181306810,
+        "innerWindowId": 6442450950
+      },
+      "inputContinuity": {
+        "commands": 19,
+        "sha256": "1de78f02890dc4239e7e0f4209ce0610191ecef1995a3ffb75e98d625937060c"
+      },
+      "nativeLedgerCount": 19,
+      "atUnixMs": 1792181753181.7332
+    },
+    "off": {
+      "checked": false,
+      "geometry": "26-off-current",
+      "geometrySHA256": "3472b820b1a85e4a8a2f09b701dc1e92fb4d7b34d408fdf2635612b570e554e1",
+      "atUnixMs": 1792182061464.928,
+      "switchOffAttempts": 1,
+      "noTouchThisObservation": true
+    },
+    "finalReader": {
+      "geometry": {
+        "path": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/android-runtime/firefox-f5a-floating-touch-attempt35/attempt35-ui/31-final-current-geometry.json",
+        "sha256": "4478a10ffbad476d39e37917d5ca48cd993aa36d18e5cc3113d776d037be20bf"
+      },
+      "PNG": {
+        "path": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/android-runtime/firefox-f5a-floating-touch-attempt35/attempt35-ui/31-final-reader.png",
+        "sha256": "e45692683b8ac4f225c2c169e44f65c37d26a1014d5c344bc63fa31941a0e141"
+      },
+      "AX": {
+        "path": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/android-runtime/firefox-f5a-floating-touch-attempt35/attempt35-ui/31-final-ax.xml",
+        "sha256": "7807f91b69f2b9a83e5d080964fe2ec30d48dc753d40b3b078e351ec3aed0859"
+      },
+      "sameDocument": {
+        "url": "https://example.com/",
+        "title": "Example Domain",
+        "timeOrigin": 1792181162622,
+        "innerWindowId": 4294967297
+      },
+      "sixOriginalsExact": true,
+      "scroll": [
+        0,
+        73
+      ],
+      "translationCount": 0,
+      "floatingHostCount": 0,
+      "selection": {
+        "length": 0,
+        "rangeCount": 0,
+        "collapsed": true
+      },
+      "progress": {
+        "hostCount": 0,
+        "visible": false
+      },
+      "nativeTabCount": 2,
+      "officialSettingsCount": 0
+    },
+    "onlyCreatedF35SettingsClosed": true,
+    "unknownCardInputs": 0,
+    "priorF32SettingsClosure": "NOT_OBSERVED"
+  },
+  "timelyFinalGate": {
+    "limitMs": 120000,
+    "offReadToFinalObservationMs": 247286.080078125,
+    "passed": false,
+    "verifyInvoked": false,
+    "certificateCreated": false,
+    "reason": "Final reader observation occurred after the predefined Off-read120s window; preserve absence of final certificate and raw cleanup failure."
+  },
+  "actions": {
+    "notice": 1,
+    "more": 1,
+    "extensions": 1,
+    "addon": 1,
+    "open-settings": 1,
+    "web-assistance": 2,
+    "scroll-settings": 5,
+    "switch-on": 1,
+    "open-floating-settings": 1,
+    "click-none": 1,
+    "open-tabs": 4,
+    "reader-tab": 3,
+    "drag": 1,
+    "settings-tab": 1,
+    "restore-click-action": 1,
+    "open-general-navigation": 1,
+    "choose-general": 1,
+    "switch-off": 1,
+    "close-settings": 1
+  },
+  "allConfigurationRestored": false,
+  "retainedDock": "left; rendered ratio0.6507936507936508, dedicated test profile only",
+  "durablePositionPersistenceAccepted": false,
+  "finalWMUnchangedReadback": "NOT_OBSERVED",
+  "WMwrites": 0,
+  "providerRequests": "NOT_MEASURED",
+  "translationProgressObserved": false,
+  "resourceRelease": {
+    "rawCleanup": {
+      "path": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/android-runtime/firefox-f5a-floating-touch-attempt35/cleanup.json",
+      "sha256": "00344eba880ebc74266560843b80ea203afb9e3a90cf6817a0699c460ff71422"
+    },
+    "rawStatus": "FAILED",
+    "rawErrors": [
+      "Final Off/click-action/reader/WM verification not complete: [Errno 2] No such file or directory: '/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/android-runtime/firefox-f5a-floating-touch-attempt35/restoration-verified.json'"
+    ],
+    "laneReleased": true,
+    "freshRootRelease": {
+      "path": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/android-runtime/firefox-f5a-floating-touch-attempt35/root-fresh-post-release.json",
+      "sha256": "f955a28c7bba573518f95ef22262dd1f0069a77c78536a17b0ca68b5867db9b5"
+    },
+    "guardAndLoaderTerminalExitCode": 0,
+    "focusEvents": [],
+    "violations": [],
+    "hostKeyMetadataUnchanged": true
+  },
+  "productArtifactPost": {
+    "path": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/android-runtime/firefox-f5a-floating-touch-attempt35/artifact-post.json",
+    "sha256": "3d7e7ef434097f0a1c828c49da2bd1c2258b9a9bc2e7750197a791184be16a7e"
+  },
+  "artifactFull478DualHashUnchanged": true,
+  "nativeDragLocalObservationAccepted": true,
+  "sequenceOnDragOffObserved": true,
+  "timelyFinalRestorationCertified": false,
+  "scopedUnchangedFullChainAccepted": false,
+  "functionalChainComplete": false,
+  "fullFloatingGoalAccepted": false,
+  "overallGoalComplete": false
+}

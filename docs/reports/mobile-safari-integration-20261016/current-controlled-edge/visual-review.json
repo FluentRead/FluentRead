@@ -1,0 +1,715 @@
+{
+  "reviewedAt": "2026-10-16T07:25:13.486894+00:00",
+  "reviewer": "independent_patch_review_agent",
+  "method": "All 18 original PNGs individually opened via view_image(detail=original), including all 15 report images and 3 cleanup images. No resizing, montage or editing. Reviewer did not run any browser, test, build or SDK command.",
+  "imageCount": 18,
+  "allPngFilesReviewed": true,
+  "declaredScope": "390px Chinese/Russian settings label; controlled 402x226.125 YouTube-like fixture; caption/control separation; menu and learning card visual layout at fine/coarse CSS pointer settings; owned UI removal on Off.",
+  "scopedVisualAccepted": true,
+  "runnerActionsPassed": true,
+  "learningBodyReadabilityAccepted": true,
+  "ownedOffCleanupAccepted": true,
+  "wholeNativeFixtureAfterOffAccepted": false,
+  "safariOrPhysicalDeviceAccepted": false,
+  "images": [
+    {
+      "file": "cleanup-page-0.png",
+      "actuallyViewedOriginal": true,
+      "status": "neutral_blank_cleanup_snapshot",
+      "conclusion": "空白后台页原图，只作清理快照，不作产品视觉证据。"
+    },
+    {
+      "file": "cleanup-page-1.png",
+      "actuallyViewedOriginal": true,
+      "status": "pass_scoped_label_at_cleanup",
+      "conclusion": "设置清理快照保持中文标签及复选框完整同排。"
+    },
+    {
+      "file": "cleanup-page-2.png",
+      "actuallyViewedOriginal": true,
+      "status": "pass_owned_cleanup_with_fixture_limit",
+      "conclusion": "与Off图一致：自有字幕卡片和入口消失，原生夹具长字幕溢出仍在；此限制不改写为FluentRead清理失败或整页视觉通过。"
+    },
+    {
+      "file": "learning-coarse-from-menu.png",
+      "actuallyViewedOriginal": true,
+      "status": "pass_learning_coarse_start",
+      "conclusion": "粗指针顶栏按钮加大后，正文仍有完整首行及第二行可读；后续行由整卡滚动呈现，未退化为窄缝。"
+    },
+    {
+      "file": "learning-coarse-scroll-end.png",
+      "actuallyViewedOriginal": true,
+      "status": "pass_learning_coarse_end",
+      "conclusion": "粗指针滚动到底后sticky顶栏完整，导航和底部操作完整可见，右侧可见滚动末端指示；无操作区被顶栏覆盖。"
+    },
+    {
+      "file": "learning-fine-from-menu.png",
+      "actuallyViewedOriginal": true,
+      "status": "pass_learning_fine_start",
+      "conclusion": "细指针学习面板首行完整且连续多行正文可读，正文不再被固定操作区挤成窄缝；顶栏和关闭按钮保留。底边下一行部分裁切属于整卡滚动窗口。"
+    },
+    {
+      "file": "learning-fine-scroll-end.png",
+      "actuallyViewedOriginal": true,
+      "status": "pass_learning_fine_end",
+      "conclusion": "滚到底部后sticky顶栏仍在原位，关闭、上句、重播、下句、解释与收藏区域完整可见；下句灰显符合当前末句状态。"
+    },
+    {
+      "file": "menu-with-long-cue.png",
+      "actuallyViewedOriginal": true,
+      "status": "pass_menu_visual",
+      "conclusion": "菜单文字、模式项、时间和下载行完整可读，关闭按钮可见；菜单在原生暗罩上方，字幕退到背景未遮挡菜单。"
+    },
+    {
+      "file": "options-390-auto-bottom-row.png",
+      "actuallyViewedOriginal": true,
+      "status": "pass_scoped_label",
+      "conclusion": "局部原图中中文标签及勾选框完整同排。"
+    },
+    {
+      "file": "options-390-auto-bottom.png",
+      "actuallyViewedOriginal": true,
+      "status": "pass_scoped_label",
+      "conclusion": "中文自动贴底标签完整，与右侧复选框同排，无文字遮挡或横向挤出。"
+    },
+    {
+      "file": "options-390-russian-auto-bottom.png",
+      "actuallyViewedOriginal": true,
+      "status": "pass_scoped_label",
+      "conclusion": "俄文自动贴底标签单行完整，复选框同排；说明换行自然，无新挤压。"
+    },
+    {
+      "file": "options-390-russian-row.png",
+      "actuallyViewedOriginal": true,
+      "status": "pass_scoped_label",
+      "conclusion": "俄文末尾 / X 与勾选框均完整，未截字。"
+    },
+    {
+      "file": "video-disabled-cleanup.png",
+      "actuallyViewedOriginal": true,
+      "status": "pass_owned_cleanup_with_fixture_limit",
+      "conclusion": "FluentRead字幕卡片与入口已撤回；恢复的原生夹具超长英文字幕仍越出视频顶部并压在原生控件区域。只接受自有UI清理，不宣称整页原生字幕无遮挡。"
+    },
+    {
+      "file": "video-long-controls-restored.png",
+      "actuallyViewedOriginal": true,
+      "status": "pass_layout_restore_only",
+      "conclusion": "控件恢复后卡片保持左上空区、正文回到中文开头，仅用于显隐布局恢复结论。"
+    },
+    {
+      "file": "video-long-scroll-end.png",
+      "actuallyViewedOriginal": true,
+      "status": "pass_scroll_end_window",
+      "conclusion": "英文末句完整可读，顶边上文部分裁切属于滚动窗口；原生控件仍可见。"
+    },
+    {
+      "file": "video-long-scroll-start.png",
+      "actuallyViewedOriginal": true,
+      "status": "pass_scroll_start_window",
+      "conclusion": "长字幕首段清晰，底边下一行的部分裁切属于滚动窗口边缘，卡片没有越出控件空区。"
+    },
+    {
+      "file": "video-medium-controls-visible.png",
+      "actuallyViewedOriginal": true,
+      "status": "pass_scoped_caption_layout",
+      "conclusion": "中句中文一行、英文两行完整，卡片清晰位于暗罩上方，避开顶部、中部、底部及进度区域。"
+    },
+    {
+      "file": "video-short-controls-visible.png",
+      "actuallyViewedOriginal": true,
+      "status": "pass_scoped_caption_layout",
+      "conclusion": "短句双语完整、背景按内容收窄，未覆盖原生控件。"
+    }
+  ],
+  "evidence": {
+    "entry-hit.json": {
+      "rect": {
+        "x": 298,
+        "y": 206.125,
+        "width": 32,
+        "height": 32,
+        "top": 206.125,
+        "right": 330,
+        "bottom": 238.125,
+        "left": 298
+      },
+      "hitOwned": true,
+      "parentClass": "player-controls-bottom player-controls-bottom-right"
+    },
+    "menu-hit.json": {
+      "menuVisible": true,
+      "scrollHost": false,
+      "hitOwned": true,
+      "hitId": "",
+      "hitClass": "fluent-read-video-menu-mode",
+      "blockedBySubtitle": false,
+      "button": {
+        "x": 17,
+        "y": 167.06582641601562,
+        "width": 30,
+        "height": 28.015487670898438,
+        "top": 167.06582641601562,
+        "right": 47,
+        "bottom": 195.08131408691406,
+        "left": 17
+      }
+    },
+    "menu-resize.json": {
+      "before": {
+        "player": {
+          "x": 0,
+          "y": 48,
+          "width": 402,
+          "height": 226.125,
+          "top": 48,
+          "right": 402,
+          "bottom": 274.125,
+          "left": 0
+        },
+        "host": {
+          "x": 0,
+          "y": 48,
+          "width": 402,
+          "height": 226.125,
+          "top": 48,
+          "right": 402,
+          "bottom": 274.125,
+          "left": 0
+        },
+        "menu": {
+          "x": 8,
+          "y": 89.22591400146484,
+          "width": 386,
+          "height": 144.876953125,
+          "top": 89.22591400146484,
+          "right": 394,
+          "bottom": 234.10286712646484,
+          "left": 8
+        }
+      },
+      "narrow": {
+        "player": {
+          "x": 0,
+          "y": 48,
+          "width": 320,
+          "height": 180,
+          "top": 48,
+          "right": 320,
+          "bottom": 228,
+          "left": 0
+        },
+        "host": {
+          "x": 0,
+          "y": 48,
+          "width": 320,
+          "height": 180,
+          "top": 48,
+          "right": 320,
+          "bottom": 228,
+          "left": 0
+        },
+        "menu": {
+          "x": 8,
+          "y": 56,
+          "width": 304,
+          "height": 132,
+          "top": 56,
+          "right": 312,
+          "bottom": 188,
+          "left": 8
+        }
+      },
+      "restored": {
+        "player": {
+          "x": 0,
+          "y": 48,
+          "width": 402,
+          "height": 226.125,
+          "top": 48,
+          "right": 402,
+          "bottom": 274.125,
+          "left": 0
+        },
+        "host": {
+          "x": 0,
+          "y": 48,
+          "width": 402,
+          "height": 226.125,
+          "top": 48,
+          "right": 402,
+          "bottom": 274.125,
+          "left": 0
+        },
+        "menu": {
+          "x": 8,
+          "y": 89.22591400146484,
+          "width": 386,
+          "height": 144.876953125,
+          "top": 89.22591400146484,
+          "right": 394,
+          "bottom": 234.10286712646484,
+          "left": 8
+        }
+      },
+      "elapsedMs": 17.100000381469727
+    },
+    "learning-fine-layout.json": {
+      "shortHeight": "true",
+      "section": {
+        "x": 34,
+        "y": 56.004425048828125,
+        "width": 360,
+        "height": 162.089599609375,
+        "top": 56.004425048828125,
+        "right": 394,
+        "bottom": 218.09402465820312,
+        "left": 34
+      },
+      "header": {
+        "x": 35,
+        "y": 57.00497817993164,
+        "width": 358,
+        "height": 36.105892181396484,
+        "top": 57.00497817993164,
+        "right": 393,
+        "bottom": 93.11087036132812,
+        "left": 35
+      },
+      "firstLine": {
+        "x": 59,
+        "y": 135.25135803222656,
+        "width": 277.9921875,
+        "height": 20.011062622070312,
+        "top": 135.25135803222656,
+        "right": 336.9921875,
+        "bottom": 155.26242065429688,
+        "left": 59
+      },
+      "sectionOverflow": "auto",
+      "bodyOverflow": "visible",
+      "scrollTop": 0,
+      "scrollHeight": 1691,
+      "clientHeight": 160
+    },
+    "learning-fine-end.json": {
+      "scrollTop": 1530.5,
+      "scrollHeight": 1691,
+      "clientHeight": 160,
+      "section": {
+        "x": 34,
+        "y": 56.004425048828125,
+        "width": 360,
+        "height": 162.089599609375,
+        "top": 56.004425048828125,
+        "right": 394,
+        "bottom": 218.09402465820312,
+        "left": 34
+      },
+      "controls": [
+        {
+          "action": "close",
+          "rect": {
+            "x": 359,
+            "y": 61.54655075073242,
+            "width": 24,
+            "height": 26.01437759399414,
+            "top": 61.54655075073242,
+            "right": 383,
+            "bottom": 87.56092834472656,
+            "left": 359
+          },
+          "hitOwned": true,
+          "disabled": false
+        },
+        {
+          "action": "previous",
+          "rect": {
+            "x": 45,
+            "y": 146.19491577148438,
+            "width": 32,
+            "height": 32.0177001953125,
+            "top": 146.19491577148438,
+            "right": 77,
+            "bottom": 178.21261596679688,
+            "left": 45
+          },
+          "hitOwned": true,
+          "disabled": false
+        },
+        {
+          "action": "play",
+          "rect": {
+            "x": 83,
+            "y": 146.19491577148438,
+            "width": 262,
+            "height": 32.0177001953125,
+            "top": 146.19491577148438,
+            "right": 345,
+            "bottom": 178.21261596679688,
+            "left": 83
+          },
+          "hitOwned": true,
+          "disabled": false
+        },
+        {
+          "action": "next",
+          "rect": {
+            "x": 351,
+            "y": 146.19491577148438,
+            "width": 32,
+            "height": 32.0177001953125,
+            "top": 146.19491577148438,
+            "right": 383,
+            "bottom": 178.21261596679688,
+            "left": 351
+          },
+          "hitOwned": true,
+          "disabled": true
+        },
+        {
+          "action": "explain",
+          "rect": {
+            "x": 45,
+            "y": 182.66038513183594,
+            "width": 166,
+            "height": 30.016586303710938,
+            "top": 182.66038513183594,
+            "right": 211,
+            "bottom": 212.67697143554688,
+            "left": 45
+          },
+          "hitOwned": true,
+          "disabled": false
+        },
+        {
+          "action": "save",
+          "rect": {
+            "x": 217,
+            "y": 182.66038513183594,
+            "width": 166,
+            "height": 30.016586303710938,
+            "top": 182.66038513183594,
+            "right": 383,
+            "bottom": 212.67697143554688,
+            "left": 217
+          },
+          "hitOwned": true,
+          "disabled": false
+        }
+      ]
+    },
+    "learning-fine-height-switch.json": {
+      "tallLearning": {
+        "sectionScrollTop": 0,
+        "bodyScrollTop": 0,
+        "sectionOverflow": "hidden",
+        "bodyOverflow": "auto"
+      },
+      "shortAgain": {
+        "scrollTop": 0,
+        "overflow": "auto"
+      }
+    },
+    "learning-coarse-layout.json": {
+      "shortHeight": "true",
+      "section": {
+        "x": 34,
+        "y": 56.004425048828125,
+        "width": 360,
+        "height": 162.089599609375,
+        "top": 56.004425048828125,
+        "right": 394,
+        "bottom": 218.09402465820312,
+        "left": 34
+      },
+      "header": {
+        "x": 35,
+        "y": 57.00497817993164,
+        "width": 358,
+        "height": 53.92043685913086,
+        "top": 57.00497817993164,
+        "right": 393,
+        "bottom": 110.9254150390625,
+        "left": 35
+      },
+      "firstLine": {
+        "x": 59,
+        "y": 153.06588745117188,
+        "width": 277.9921875,
+        "height": 20.011077880859375,
+        "top": 153.06588745117188,
+        "right": 336.9921875,
+        "bottom": 173.07696533203125,
+        "left": 59
+      },
+      "sectionOverflow": "auto",
+      "bodyOverflow": "visible",
+      "scrollTop": 0,
+      "scrollHeight": 1734,
+      "clientHeight": 160
+    },
+    "learning-coarse-end.json": {
+      "scrollTop": 1574.5,
+      "scrollHeight": 1734,
+      "clientHeight": 160,
+      "section": {
+        "x": 34,
+        "y": 56.004425048828125,
+        "width": 360,
+        "height": 162.089599609375,
+        "top": 56.004425048828125,
+        "right": 394,
+        "bottom": 218.09402465820312,
+        "left": 34
+      },
+      "controls": [
+        {
+          "action": "close",
+          "rect": {
+            "x": 339,
+            "y": 61.45275115966797,
+            "width": 44,
+            "height": 44.02433776855469,
+            "top": 61.45275115966797,
+            "right": 383,
+            "bottom": 105.47708892822266,
+            "left": 339
+          },
+          "hitOwned": true,
+          "disabled": false
+        },
+        {
+          "action": "previous",
+          "rect": {
+            "x": 45,
+            "y": 119.985107421875,
+            "width": 44,
+            "height": 44.02433776855469,
+            "top": 119.985107421875,
+            "right": 89,
+            "bottom": 164.0094451904297,
+            "left": 45
+          },
+          "hitOwned": true,
+          "disabled": false
+        },
+        {
+          "action": "play",
+          "rect": {
+            "x": 95,
+            "y": 119.985107421875,
+            "width": 238,
+            "height": 44.02433776855469,
+            "top": 119.985107421875,
+            "right": 333,
+            "bottom": 164.0094451904297,
+            "left": 95
+          },
+          "hitOwned": true,
+          "disabled": false
+        },
+        {
+          "action": "next",
+          "rect": {
+            "x": 339,
+            "y": 119.985107421875,
+            "width": 44,
+            "height": 44.02433776855469,
+            "top": 119.985107421875,
+            "right": 383,
+            "bottom": 164.0094451904297,
+            "left": 339
+          },
+          "hitOwned": true,
+          "disabled": true
+        },
+        {
+          "action": "explain",
+          "rect": {
+            "x": 45,
+            "y": 168.45721435546875,
+            "width": 166,
+            "height": 44.02433776855469,
+            "top": 168.45721435546875,
+            "right": 211,
+            "bottom": 212.48155212402344,
+            "left": 45
+          },
+          "hitOwned": true,
+          "disabled": false
+        },
+        {
+          "action": "save",
+          "rect": {
+            "x": 217,
+            "y": 168.45721435546875,
+            "width": 166,
+            "height": 44.02433776855469,
+            "top": 168.45721435546875,
+            "right": 383,
+            "bottom": 212.48155212402344,
+            "left": 217
+          },
+          "hitOwned": true,
+          "disabled": false
+        }
+      ]
+    },
+    "learning-coarse-height-switch.json": {
+      "tallLearning": {
+        "sectionScrollTop": 0,
+        "bodyScrollTop": 0,
+        "sectionOverflow": "hidden",
+        "bodyOverflow": "auto"
+      },
+      "shortAgain": {
+        "scrollTop": 0,
+        "overflow": "auto"
+      }
+    },
+    "learning-fine-hit.json": {
+      "button": {
+        "x": 359,
+        "y": 61.54655075073242,
+        "width": 24,
+        "height": 26.01437759399414,
+        "top": 61.54655075073242,
+        "right": 383,
+        "bottom": 87.56092834472656,
+        "left": 359
+      },
+      "hitOwned": true,
+      "hitId": "",
+      "hitClass": "[object SVGAnimatedString]",
+      "parentClass": "fluent-read-video-learning-frame fluent-read-video-ui notranslate",
+      "scrollHost": false,
+      "focusedWithinLearning": true
+    },
+    "learning-coarse-hit.json": {
+      "button": {
+        "x": 339,
+        "y": 61.45275115966797,
+        "width": 44,
+        "height": 44.02433776855469,
+        "top": 61.45275115966797,
+        "right": 383,
+        "bottom": 105.47708892822266,
+        "left": 339
+      },
+      "hitOwned": true,
+      "hitId": "",
+      "hitClass": "[object SVGAnimatedString]",
+      "parentClass": "fluent-read-video-learning-frame fluent-read-video-ui notranslate",
+      "scrollHost": false,
+      "focusedWithinLearning": true
+    },
+    "native-controls-hit.json": [
+      {
+        "label": "Pause",
+        "owned": true,
+        "hitId": "",
+        "hitTag": "BUTTON",
+        "rect": {
+          "x": 173,
+          "y": 133.0625,
+          "width": 56,
+          "height": 56,
+          "top": 133.0625,
+          "right": 229,
+          "bottom": 189.0625,
+          "left": 173
+        }
+      },
+      {
+        "label": "Settings",
+        "owned": true,
+        "hitId": "",
+        "hitTag": "BUTTON",
+        "rect": {
+          "x": 330,
+          "y": 48,
+          "width": 48,
+          "height": 48,
+          "top": 48,
+          "right": 378,
+          "bottom": 96,
+          "left": 330
+        }
+      },
+      {
+        "label": "Fullscreen",
+        "owned": true,
+        "hitId": "",
+        "hitTag": "BUTTON",
+        "rect": {
+          "x": 330,
+          "y": 198.125,
+          "width": 48,
+          "height": 48,
+          "top": 198.125,
+          "right": 378,
+          "bottom": 246.125,
+          "left": 330
+        }
+      }
+    ],
+    "native-controls-clicks.json": {
+      "Settings": 1,
+      "Fullscreen": 1,
+      "Pause": 2
+    },
+    "video-disabled.json": {
+      "host": false,
+      "panelVisible": false,
+      "paused": true,
+      "events": {
+        "click": 0,
+        "keyup": 0
+      }
+    },
+    "fresh-cleanup-review.json": {
+      "at": "2026-10-16T07:22:30.021492+00:00",
+      "pids": {
+        "46533": {
+          "gone": true,
+          "returnCode": 1
+        },
+        "46534": {
+          "gone": true,
+          "returnCode": 1
+        },
+        "46557": {
+          "gone": true,
+          "returnCode": 1
+        },
+        "46550": {
+          "gone": true,
+          "returnCode": 1
+        }
+      },
+      "profileRemoved": true,
+      "focusEvents": [],
+      "violations": []
+    },
+    "captionScrollTop": {
+      "video-before-menu.json": 2720,
+      "video-after-menu.json": 2720,
+      "video-after-learning-fine.json": 2720,
+      "video-after-learning-coarse.json": 2720
+    }
+  },
+  "conclusions": [
+    "Previous short-height learning-body collapse is visually resolved in both fine and coarse CSS screenshots: the first line and additional lines are readable.",
+    "At End, sticky close and navigation/footer controls remain visible. Existing JSON records all six coarse targets at least 44px wide/high with successful center ownership hit tests; the final next action is disabled as expected.",
+    "Existing height-switch JSON records short section overflow:auto/body visible, tall section hidden/body auto, and short section auto again with zero section offset.",
+    "Saved JSON records caption scrollTop 2720 before menu and after menu, fine learning and coarse learning close.",
+    "Off passes owned UI cleanup only; deliberately oversized native fixture captions remain visually overflowing."
+  ],
+  "limitations": [
+    "Edge/Chromium controlled CSS viewport and pointer-media emulation only; not Safari, live YouTube or a physical mobile device.",
+    "No actual mobile touch/inertial scrolling or screen-reader acceptance.",
+    "Hit/click, focus return and size values come from existing runner evidence; static images alone cannot prove those actions.",
+    "No saved-item write was performed; action accessibility does not establish successful explain/save backend behavior.",
+    "All-platform/product release acceptance is outside this scoped visual review."
+  ]
+}

@@ -1,0 +1,103 @@
+{
+  "schema": 1,
+  "artifactKind": "DERIVED_PUBLIC_VIDEO_PREFIX_STOP_SUMMARY",
+  "status": "UNVERIFIED_VIDEO_PREFIX_STOP",
+  "sourceCommit": "8274d0c76bead3f1f76a04f5f71e2d58475d4551",
+  "nativeIdentitySHA256": "6998df7d9b45d0422079e452ea5bdd2f53096702c7ed8a9abaeb90d4161e1828",
+  "productionAcceptance": false,
+  "videoPrefixAcceptance": false,
+  "derivation": "Whitelist of original attachment results and runtime guard aggregates. No raw guard, SDK log, session identifier, machine path, PID, full process record or private map is published. Original source pins below refer to research files.",
+  "official": {
+    "passed": 0,
+    "skipped": 1,
+    "failed": 0,
+    "total": 1,
+    "selectedTestSeconds": 13.076,
+    "runtimeExitCode": 0,
+    "guardSeconds": 60.88,
+    "timingNote": "Selected test duration is from the runtime log; official summary start/finish and the guard cover different intervals."
+  },
+  "attachments": {
+    "payloadJSON": 10,
+    "originalPNG": 0,
+    "manifest": "attachments/manifest.json",
+    "officialSummary": "official-summary.json"
+  },
+  "observations": {
+    "afterOneNavigationOwnerExact": true,
+    "ownerCountCappedAt2": 1,
+    "knownPlayerCountCappedAt2": 1,
+    "knownTEDCountCappedAt2": 1,
+    "knownUniqueTarget": false,
+    "phase": "after-one-navigation",
+    "unknownTextIDsValuesExported": false,
+    "actions": {
+      "address": 1,
+      "navigation": 1,
+      "normalClear": 1,
+      "SafariActivate": 1
+    },
+    "captures": 0,
+    "grantActionsInFinalLedger": 0,
+    "guardPermissionChoices": null,
+    "currentURLExposureReached": false,
+    "exactHostAndFullyLoadedPageEstablished": false,
+    "playActions": 0,
+    "fullscreenActions": 0,
+    "AVKitCloseActions": 0,
+    "cueObservations": 0,
+    "fullscreenKind": "UNESTABLISHED",
+    "normalInlineReturn": false,
+    "precisePriorPlaybackRestored": "UNKNOWN",
+    "fullFRTrackOffReselectChainAccepted": false
+  },
+  "cleanup": {
+    "originalD9RestoredAndVerified": true,
+    "dedicatedSimulator": "Shutdown",
+    "resourceLaneReleased": true,
+    "commands": 12,
+    "commandsAllCode0AndNullSignal": true,
+    "processSampleCount": 57,
+    "processSampleReadCodesAll0": true,
+    "focusEvents": [],
+    "cleanupErrors": [],
+    "violations": [],
+    "ownedProcessesRemaining": 0,
+    "RootCurrentFSRehashMatchesPinnedBaseline": true,
+    "retainedScope": "D9 app485, native FluentRead data13, Userscripts app47 and Demo396 only; not all extension storage.",
+    "independentCurrentFSRehashStatus": "Not incorporated into this draft; separate review was pending at preparation."
+  },
+  "boundaries": [
+    "The targetParts closure did not pass. Individual WebView-count, ancestry, positive/contained-frame and label-length predicates are not separately reported; no root cause is inferred.",
+    "One known player and one known TED node do not establish the full unique target, exact current host or a fully loaded page.",
+    "Stopped before currentURLExposure, Play, fullscreen, AVKit Close or cue observation; this is a skipped/unverified prefix, not a video pass.",
+    "No permission grant action or screenshot was performed. No CC, Off, reselect, live-provider or full video-goal acceptance.",
+    "A read-only known-node closure diagnostic is being prepared; it has not been executed."
+  ],
+  "sourcePins": [
+    {
+      "researchCase": "current-production-touch-flex-native-fullscreen-prefix-attempt1",
+      "file": "runtime-guard-report.json",
+      "bytes": 22940,
+      "sha256": "1c50186cb0897cd970e860f35c6d8d17badac987439b676ee01cdb0c5872b80a"
+    },
+    {
+      "researchCase": "current-production-touch-flex-native-fullscreen-prefix-attempt1",
+      "file": "cleanup.json",
+      "bytes": 1073,
+      "sha256": "d62e56b44c647facabddcf8c622abb5eb2ebd918059746bcaf343ec06546090f"
+    },
+    {
+      "researchCase": "current-production-touch-flex-native-fullscreen-prefix-attempt1",
+      "file": "runtime-run.log",
+      "bytes": 9538,
+      "sha256": "474bd5740ce6c2d7d5acaa680283c8b977e856980f9fb138e75e5ae23058b9e6"
+    },
+    {
+      "researchCase": "current-production-touch-flex-native-fullscreen-prefix-attempt1",
+      "file": "root-actual-current-restoration-hash-review.json",
+      "bytes": 1608,
+      "sha256": "24e76846bb41e2652b1b9bd1913266004a169f51587acf4c50e53bd4b6fe57a6"
+    }
+  ]
+}

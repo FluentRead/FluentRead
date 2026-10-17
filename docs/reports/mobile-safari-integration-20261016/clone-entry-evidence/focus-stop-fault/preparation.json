@@ -1,0 +1,106 @@
+{
+  "schemaVersion": 1,
+  "preparedAt": "2026-10-16T23:08:36.373047+00:00",
+  "status": "SOURCE_ONLY_NOT_EXECUTED",
+  "wrapper": {
+    "path": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/mobile-youtube-fr-node-identity-probe-20261017/same-scope-clone-repair-20261017/focus-stop-fault-helper.cjs",
+    "sha256": "31e680775473a77e81f4bd5f2bc5b2f8aeedbe9baf89d9f095c1bfeb0cd4c56a",
+    "bytes": 956
+  },
+  "actualInputPins": [
+    {
+      "path": "/Users/thinkstu/Desktop/copy/FluentRead-mobile-video-menu-accessibility-20261016/scripts/testing/focus-safe-browser.cjs",
+      "sha256": "a181f9d68ba4d6942afeb78bf43aa89139ab3f7743396edceda139bd92cf05af",
+      "bytes": 25787
+    },
+    {
+      "path": "/Users/thinkstu/Desktop/copy/FluentRead-mobile-video-menu-accessibility-20261016/scripts/testing/mac-focus-event-monitor.cjs",
+      "sha256": "4de9f4315351015417cbfd620afecfad92a5c1e84a8d12acda02e4c63ea820a6",
+      "bytes": 6894
+    },
+    {
+      "path": "/Users/thinkstu/Desktop/copy/FluentRead-mobile-video-menu-accessibility-20261016/scripts/testing/mac-focus-event-observer.swift",
+      "sha256": "71768a82a8cdaeae30e6f1911aae8bfc94e19867aa454f0b3baf62290c982145",
+      "bytes": 1972
+    },
+    {
+      "path": "/Users/thinkstu/Desktop/copy/FluentRead-mobile-video-menu-accessibility-20261016/scripts/run-mobile-video-subtitle-test.cjs",
+      "sha256": "7613fece1417934d34f121f5a0413658e4fc848e2cf1d8d349d866f75b116d6f",
+      "bytes": 60997
+    },
+    {
+      "path": "/Users/thinkstu/Desktop/copy/FluentRead-mobile-video-menu-accessibility-20261016/scripts/testing/owned-browser-close.cjs",
+      "sha256": "7afb92009af0fbbba8ecb8bfbb8f0486a56f96cfab72edb60d6bc8f36dc4ee9d",
+      "bytes": 13724
+    }
+  ],
+  "purpose": "Exercise the public monitor.error contract after successful real monitor.stop, through the actual browser CLI finally; do not fabricate an activation or native observer failure.",
+  "actualExportReview": {
+    "helperExports": [
+      "startFocusEventMonitor",
+      "queryMacFrontmostApplication",
+      "activateExtensionTabWithoutForeground",
+      "launchFocusSafePersistentContext",
+      "newPageWithoutForeground"
+    ],
+    "helperExportShape": "Plain module.exports object; spread retains all current real API function identities except the deliberate startFocusEventMonitor wrapper.",
+    "monitorReturnShape": "Plain object: ready promise, stop function, events array, configurable error getter and monitorPid getter. Real stop is closure-based and returns one memoized promise.",
+    "proxyBehavior": "ready/events/monitorPid and unknown properties use Reflect.get on actual monitor; stop getter returns one stable wrapper function; real error getter always takes precedence.",
+    "stopBehavior": "Call actual monitor.stop immediately once; await its actual returned promise via then; only fulfillment installs the one fixed Error. Preserve real fulfillment value. Memoize the wrapper promise for repeat stop.",
+    "noFakeNativeCallback": "Do not call onError, add events, replace ready, change monitorPid or suppress actual failure. If real stop rejects, injection is not installed and rejection reaches actual runner."
+  },
+  "fixedMarker": "INJECTED_FOCUS_OBSERVER_FAILURE_DURING_STOP",
+  "preconditionsForRootExecution": [
+    "Root first completes normal candidate actual control-clones run with all six cases PASS and valid focus/cleanup receipts.",
+    "Root separately verifies fresh resource lane and candidate artifact identity; this preparation is not GO and does not freeze a candidate build.",
+    "Use the actual same runner and one new temporary profile supplied by its real launch path; one injection run, no automatic retry.",
+    "Recheck wrapper/helper/monitor/runner input pins before execution; any source drift requires review."
+  ],
+  "suggestedRootCommandArgv": [
+    "/opt/homebrew/opt/node@22/bin/node",
+    "/Users/thinkstu/Desktop/copy/FluentRead-mobile-video-menu-accessibility-20261016/scripts/run-mobile-video-subtitle-test.cjs",
+    "--suite",
+    "control-clones",
+    "--extension-dir",
+    "/Users/thinkstu/Desktop/copy/FluentRead-mobile-video-menu-accessibility-20261016/.output/chrome-mv3",
+    "--playwright-root",
+    "/Users/thinkstu/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/node_modules",
+    "--focus-safe-helper",
+    "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/mobile-youtube-fr-node-identity-probe-20261017/same-scope-clone-repair-20261017/focus-stop-fault-helper.cjs",
+    "--artifacts-dir",
+    "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/mobile-youtube-fr-node-identity-probe-20261017/same-scope-clone-repair-20261017/browser-control-clones-candidate-stop-fault-attempt1",
+    "--ffmpeg",
+    "/opt/homebrew/bin/ffmpeg"
+  ],
+  "expectedInjectedRun": {
+    "caseCount": 6,
+    "caseStatuses": "All six actual control-clones cases PASS before finally",
+    "processExitCode": 1,
+    "stdoutOk": false,
+    "reportFocusObserverError": "Error: INJECTED_FOCUS_OBSERVER_FAILURE_DURING_STOP",
+    "reportErrorsMustContainFixedMarker": true,
+    "browserCloseReceipt": "shared-guard-fulfilled",
+    "profileRemoved": true,
+    "focusEvents": "Real monitor events only; no owned-browser activation allowed",
+    "realMonitorStop": "Must actually fulfill and clean its owned observer before injection exists"
+  },
+  "negativeInterpretations": [
+    "This is a deliberate synthetic public helper error after stop, not an observed native Swift/NSWorkspace error.",
+    "Six case PASS with exit1 is an intentional failure-path result, not successful suite acceptance.",
+    "Without marker in focusObserverError/errors and exit1 the runner contract is not verified.",
+    "If any earlier assertion or real focus/cleanup error occurs, retain raw artifacts and report that primary result; do not claim the intended isolated fault scenario completed.",
+    "A successful native stop plus late synthetic getter failure does not dynamically cover every possible real native error timing.",
+    "No Safari/iOS/AVKit, live YouTube/provider or Safari E2 AX-root-cause acceptance."
+  ],
+  "preparationChecks": {
+    "filesOnly": true,
+    "wrapperLoaded": false,
+    "nodeSyntaxCheckExecuted": false,
+    "testsExecuted": false,
+    "browserExecuted": false,
+    "sdkExecuted": false,
+    "productFilesModified": false,
+    "noNewDirectoriesOrProfilesFromWrapperPreparation": true
+  },
+  "contextPreference": "User preference: compact around 300K context; propagate to any descendants. No descendants spawned for this preparation."
+}

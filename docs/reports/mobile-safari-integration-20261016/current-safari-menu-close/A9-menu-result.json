@@ -1,0 +1,66 @@
+{
+  "actions" : {
+    "A9LivePlayerCenterTouch" : 1,
+    "address" : 1,
+    "FRMenuClose" : 1,
+    "FRMenuOpen" : 1,
+    "navigation" : 1,
+    "normalClear" : 1,
+    "siteUnmute" : 1
+  },
+  "actualEntryFrame" : {
+    "height" : 45,
+    "width" : 44,
+    "x" : 286,
+    "y" : 262
+  },
+  "atLeast44px" : true,
+  "beforeOpenPlayback" : {
+    "pauseCount" : 0,
+    "playCount" : 1,
+    "progress" : [
+
+    ]
+  },
+  "closeContainedInPlayer" : true,
+  "closeFrame" : {
+    "height" : 45,
+    "width" : 44,
+    "x" : 343,
+    "y" : 125
+  },
+  "closeIsHittable" : true,
+  "closeObserved" : true,
+  "closeType" : 54,
+  "entryContainedInPlayer" : true,
+  "entryCount" : 1,
+  "entryIsHittable" : true,
+  "entryLabel" : "流畅阅读字幕翻译：已开启",
+  "entryType" : 1,
+  "finalCloseType" : 54,
+  "laterMenuReadElapsedSeconds" : 1.2215729951858521,
+  "menuAXCaptured" : true,
+  "menuLaterPlayback" : {
+    "pauseCount" : 0,
+    "playCount" : 1,
+    "progress" : [
+
+    ]
+  },
+  "menuOpenPlayback" : {
+    "pauseCount" : 0,
+    "playCount" : 1,
+    "progress" : [
+
+    ]
+  },
+  "menuStillOpenInLaterSnapshot" : true,
+  "opened" : true,
+  "snapshotEntryFrame" : {
+    "height" : 45,
+    "width" : 44,
+    "x" : 286,
+    "y" : 262
+  },
+  "snapshotToEntryCheckSeconds" : 0.16652405261993408
+}

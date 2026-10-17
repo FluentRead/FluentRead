@@ -1,0 +1,160 @@
+{
+  "atUtc": "2026-10-16T19:39:24.152812+00:00",
+  "knownPriorAndBuildPids": [
+    2174,
+    2177,
+    4208,
+    4224,
+    4226,
+    4246,
+    4552,
+    10471,
+    10483,
+    10525,
+    10683,
+    10684,
+    11267,
+    11268,
+    11767
+  ],
+  "remainingOwned": [],
+  "heavyOrGUIRows": [],
+  "ports": {
+    "5048": {
+      "argv": [
+        "/usr/sbin/lsof",
+        "-nP",
+        "-iTCP:5048",
+        "-sTCP:LISTEN"
+      ],
+      "exitCode": 1,
+      "stdout": "",
+      "stderr": ""
+    },
+    "5580": {
+      "argv": [
+        "/usr/sbin/lsof",
+        "-nP",
+        "-iTCP:5580",
+        "-sTCP:LISTEN"
+      ],
+      "exitCode": 1,
+      "stdout": "",
+      "stderr": ""
+    },
+    "5581": {
+      "argv": [
+        "/usr/sbin/lsof",
+        "-nP",
+        "-iTCP:5581",
+        "-sTCP:LISTEN"
+      ],
+      "exitCode": 1,
+      "stdout": "",
+      "stderr": ""
+    },
+    "52911": {
+      "argv": [
+        "/usr/sbin/lsof",
+        "-nP",
+        "-iTCP:52911",
+        "-sTCP:LISTEN"
+      ],
+      "exitCode": 1,
+      "stdout": "",
+      "stderr": ""
+    }
+  },
+  "appleSimctlRead": {
+    "argv": [
+      "/usr/bin/xcrun",
+      "simctl",
+      "list",
+      "devices",
+      "--json"
+    ],
+    "exitCode": 0,
+    "stdout": "{\n  \"devices\" : {\n    \"com.apple.CoreSimulator.SimRuntime.iOS-26-2\" : [\n      {\n        \"dataPath\" : \"\\/Users\\/thinkstu\\/Library\\/Developer\\/CoreSimulator\\/Devices\\/750C205D-635A-4241-8F11-8BF25FB50B74\\/data\",\n        \"dataPathSize\" : 18337792,\n        \"logPath\" : \"\\/Users\\/thinkstu\\/Library\\/Logs\\/CoreSimulator\\/750C205D-635A-4241-8F11-8BF25FB50B74\",\n        \"udid\" : \"750C205D-635A-4241-8F11-8BF25FB50B74\",\n        \"isAvailable\" : true,\n        \"deviceTypeIdentifier\" : \"com.apple.CoreSimulator.SimDeviceType.iPhone-17-Pro\",\n        \"state\" : \"Shutdown\",\n        \"name\" : \"iPhone 17 Pro\"\n      },\n      {\n        \"dataPath\" : \"\\/Users\\/thinkstu\\/Library\\/Developer\\/CoreSimulator\\/Devices\\/1D111325-66D0-450B-A54B-E3022B4C66D5\\/data\",\n        \"dataPathSize\" : 18337792,\n        \"logPath\" : \"\\/Users\\/thinkstu\\/Library\\/Logs\\/CoreSimulator\\/1D111325-66D0-450B-A54B-E3022B4C66D5\",\n        \"udid\" : \"1D111325-66D0-450B-A54B-E3022B4C66D5\",\n        \"isAvailable\" : true,\n        \"deviceTypeIdentifier\" : \"com.apple.CoreSimulator.SimDeviceType.iPhone-17-Pro-Max\",\n        \"state\" : \"Shutdown\",\n        \"name\" : \"iPhone 17 Pro Max\"\n      },\n      {\n        \"dataPath\" : \"\\/Users\\/thinkstu\\/Library\\/Developer\\/CoreSimulator\\/Devices\\/7A272612-83E2-4D56-BCB3-91B940E3D7B3\\/data\",\n        \"dataPathSize\" : 18337792,\n        \"logPath\" : \"\\/Users\\/thinkstu\\/Library\\/Logs\\/CoreSimulator\\/7A272612-83E2-4D56-BCB3-91B940E3D7B3\",\n        \"udid\" : \"7A272612-83E2-4D56-BCB3-91B940E3D7B3\",\n        \"isAvailable\" : true,\n        \"deviceTypeIdentifier\" : \"com.apple.CoreSimulator.SimDeviceType.iPhone-Air\",\n        \"state\" : \"Shutdown\",\n        \"name\" : \"iPhone Air\"\n      },\n      {\n        \"dataPath\" : \"\\/Users\\/thinkstu\\/Library\\/Developer\\/CoreSimulator\\/Devices\\/AA798B14-7575-412B-99A5-98EFFD603C4C\\/data\",\n        \"dataPathSize\" : 18337792,\n        \"logPath\" : \"\\/Users\\/thinkstu\\/Library\\/Logs\\/CoreSimulator\\/AA798B14-7575-412B-99A5-98EFFD603C4C\",\n        \"udid\" : \"AA798B14-7575-412B-99A5-98EFFD603C4C\",\n        \"isAvailable\" : true,\n        \"deviceTypeIdentifier\" : \"com.apple.CoreSimulator.SimDeviceType.iPhone-17\",\n        \"state\" : \"Shutdown\",\n        \"name\" : \"iPhone 17\"\n      },\n      {\n        \"lastBootedAt\" : \"2026-10-16T15:04:59Z\",\n        \"dataPath\" : \"\\/Users\\/thinkstu\\/Library\\/Developer\\/CoreSimulator\\/Devices\\/A407390F-7AA8-42AE-AFEB-F93EE99E9FF8\\/data\",\n        \"dataPathSize\" : 2775810048,\n        \"logPath\" : \"\\/Users\\/thinkstu\\/Library\\/Logs\\/CoreSimulator\\/A407390F-7AA8-42AE-AFEB-F93EE99E9FF8\",\n        \"udid\" : \"A407390F-7AA8-42AE-AFEB-F93EE99E9FF8\",\n        \"isAvailable\" : true,\n        \"logPathSize\" : 479232,\n        \"deviceTypeIdentifier\" : \"com.apple.CoreSimulator.SimDeviceType.iPhone-16-Pro\",\n        \"state\" : \"Shutdown\",\n        \"name\" : \"FluentRead-PR995-FreshPermissions-20261015\"\n      },\n      {\n        \"lastBootedAt\" : \"2026-10-15T07:12:13Z\",\n        \"dataPath\" : \"\\/Users\\/thinkstu\\/Library\\/Developer\\/CoreSimulator\\/Devices\\/3D298EC7-49B4-4FDB-BD68-4AF09792BCBE\\/data\",\n        \"dataPathSize\" : 1878519808,\n        \"logPath\" : \"\\/Users\\/thinkstu\\/Library\\/Logs\\/CoreSimulator\\/3D298EC7-49B4-4FDB-BD68-4AF09792BCBE\",\n        \"udid\" : \"3D298EC7-49B4-4FDB-BD68-4AF09792BCBE\",\n        \"isAvailable\" : true,\n        \"logPathSize\" : 503808,\n        \"deviceTypeIdentifier\" : \"com.apple.CoreSimulator.SimDeviceType.iPhone-16-Pro\",\n        \"state\" : \"Shutdown\",\n        \"name\" : \"FluentRead-PR995-iPhone-26.2\"\n      },\n      {\n        \"lastBootedAt\" : \"2026-10-15T22:13:15Z\",\n        \"dataPath\" : \"\\/Users\\/thinkstu\\/Library\\/Developer\\/CoreSimulator\\/Devices\\/BF9B8551-9EB0-4DF4-B24B-CEB1165A3BC0\\/data\",\n        \"dataPathSize\" : 1952550912,\n        \"logPath\" : \"\\/Users\\/thinkstu\\/Library\\/Logs\\/CoreSimulator\\/BF9B8551-9EB0-4DF4-B24B-CEB1165A3BC0\",\n        \"udid\" : \"BF9B8551-9EB0-4DF4-B24B-CEB1165A3BC0\",\n        \"isAvailable\" : true,\n        \"logPathSize\" : 565248,\n        \"deviceTypeIdentifier\" : \"com.apple.CoreSimulator.SimDeviceType.iPhone-16-Pro\",\n        \"state\" : \"Shutdown\",\n        \"name\" : \"FluentRead-Safari-Material-c08dc6acc-20261015\"\n      },\n      {\n        \"dataPath\" : \"\\/Users\\/thinkstu\\/Library\\/Developer\\/CoreSimulator\\/Devices\\/636DA6A0-5A37-463D-A307-ECF8AD7CD553\\/data\",\n        \"dataPathSize\" : 18337792,\n        \"logPath\" : \"\\/Users\\/thinkstu\\/Library\\/Logs\\/CoreSimulator\\/636DA6A0-5A37-463D-A307-ECF8AD7CD553\",\n        \"udid\" : \"636DA6A0-5A37-463D-A307-ECF8AD7CD553\",\n        \"isAvailable\" : true,\n        \"deviceTypeIdentifier\" : \"com.apple.CoreSimulator.SimDeviceType.iPhone-16e\",\n        \"state\" : \"Shutdown\",\n        \"name\" : \"iPhone 16e\"\n      },\n      {\n        \"dataPath\" : \"\\/Users\\/thinkstu\\/Library\\/Developer\\/CoreSimulator\\/Devices\\/BB7579FA-B8E9-4D6E-AA16-9B7E13096908\\/data\",\n        \"dataPathSize\" : 18337792,\n        \"logPath\" : \"\\/Users\\/thinkstu\\/Library\\/Logs\\/CoreSimulator\\/BB7579FA-B8E9-4D6E-AA16-9B7E13096908\",\n        \"udid\" : \"BB7579FA-B8E9-4D6E-AA16-9B7E13096908\",\n        \"isAvailable\" : true,\n        \"deviceTypeIdentifier\" : \"com.apple.CoreSimulator.SimDeviceType.iPad-Pro-13-inch-M5-12GB\",\n        \"state\" : \"Shutdown\",\n        \"name\" : \"iPad Pro 13-inch (M5)\"\n      },\n      {\n        \"dataPath\" : \"\\/Users\\/thinkstu\\/Library\\/Developer\\/CoreSimulator\\/Devices\\/7990B281-DEBB-402D-A6B2-DF07B4E0ACE7\\/data\",\n        \"dataPathSize\" : 18337792,\n        \"logPath\" : \"\\/Users\\/thinkstu\\/Library\\/Logs\\/CoreSimulator\\/7990B281-DEBB-402D-A6B2-DF07B4E0ACE7\",\n        \"udid\" : \"7990B281-DEBB-402D-A6B2-DF07B4E0ACE7\",\n        \"isAvailable\" : true,\n        \"deviceTypeIdentifier\" : \"com.apple.CoreSimulator.SimDeviceType.iPad-Pro-11-inch-M5-12GB\",\n        \"state\" : \"Shutdown\",\n        \"name\" : \"iPad Pro 11-inch (M5)\"\n      },\n      {\n        \"dataPath\" : \"\\/Users\\/thinkstu\\/Library\\/Developer\\/CoreSimulator\\/Devices\\/51EFD9E5-183C-4FDD-9D93-6C60CB3CFDFD\\/data\",\n        \"dataPathSize\" : 18337792,\n        \"logPath\" : \"\\/Users\\/thinkstu\\/Library\\/Logs\\/CoreSimulator\\/51EFD9E5-183C-4FDD-9D93-6C60CB3CFDFD\",\n        \"udid\" : \"51EFD9E5-183C-4FDD-9D93-6C60CB3CFDFD\",\n        \"isAvailable\" : true,\n        \"deviceTypeIdentifier\" : \"com.apple.CoreSimulator.SimDeviceType.iPad-mini-A17-Pro\",\n        \"state\" : \"Shutdown\",\n        \"name\" : \"iPad mini (A17 Pro)\"\n      },\n      {\n        \"dataPath\" : \"\\/Users\\/thinkstu\\/Library\\/Developer\\/CoreSimulator\\/Devices\\/949C44F1-A76C-408A-8B7B-202D7F84B039\\/data\",\n        \"dataPathSize\" : 18337792,\n        \"logPath\" : \"\\/Users\\/thinkstu\\/Library\\/Logs\\/CoreSimulator\\/949C44F1-A76C-408A-8B7B-202D7F84B039\",\n        \"udid\" : \"949C44F1-A76C-408A-8B7B-202D7F84B039\",\n        \"isAvailable\" : true,\n        \"deviceTypeIdentifier\" : \"com.apple.CoreSimulator.SimDeviceType.iPad-A16\",\n        \"state\" : \"Shutdown\",\n        \"name\" : \"iPad (A16)\"\n      },\n      {\n        \"dataPath\" : \"\\/Users\\/thinkstu\\/Library\\/Developer\\/CoreSimulator\\/Devices\\/3A329717-1DA9-46DC-92AD-60BCB686268E\\/data\",\n        \"dataPathSize\" : 18337792,\n        \"logPath\" : \"\\/Users\\/thinkstu\\/Library\\/Logs\\/CoreSimulator\\/3A329717-1DA9-46DC-92AD-60BCB686268E\",\n        \"udid\" : \"3A329717-1DA9-46DC-92AD-60BCB686268E\",\n        \"isAvailable\" : true,\n        \"deviceTypeIdentifier\" : \"com.apple.CoreSimulator.SimDeviceType.iPad-Air-13-inch-M3\",\n        \"state\" : \"Shutdown\",\n        \"name\" : \"iPad Air 13-inch (M3)\"\n      },\n      {\n        \"dataPath\" : \"\\/Users\\/thinkstu\\/Library\\/Developer\\/CoreSimulator\\/Devices\\/CDFAD953-7293-4C45-8472-88B93E9062CB\\/data\",\n        \"dataPathSize\" : 18337792,\n        \"logPath\" : \"\\/Users\\/thinkstu\\/Library\\/Logs\\/CoreSimulator\\/CDFAD953-7293-4C45-8472-88B93E9062CB\",\n        \"udid\" : \"CDFAD953-7293-4C45-8472-88B93E9062CB\",\n        \"isAvailable\" : true,\n        \"deviceTypeIdentifier\" : \"com.apple.CoreSimulator.SimDeviceType.iPad-Air-11-inch-M3\",\n        \"state\" : \"Shutdown\",\n        \"name\" : \"iPad Air 11-inch (M3)\"\n      }\n    ]\n  }\n}\n",
+    "stderr": ""
+  },
+  "bootedAppleSimulators": [],
+  "taskAppleSimulator": [
+    {
+      "lastBootedAt": "2026-10-16T15:04:59Z",
+      "dataPath": "/Users/thinkstu/Library/Developer/CoreSimulator/Devices/A407390F-7AA8-42AE-AFEB-F93EE99E9FF8/data",
+      "dataPathSize": 2775810048,
+      "logPath": "/Users/thinkstu/Library/Logs/CoreSimulator/A407390F-7AA8-42AE-AFEB-F93EE99E9FF8",
+      "udid": "A407390F-7AA8-42AE-AFEB-F93EE99E9FF8",
+      "isAvailable": true,
+      "logPathSize": 479232,
+      "deviceTypeIdentifier": "com.apple.CoreSimulator.SimDeviceType.iPhone-16-Pro",
+      "state": "Shutdown",
+      "name": "FluentRead-PR995-FreshPermissions-20261015"
+    }
+  ],
+  "hostKeyMetadataAfter": {
+    "/Users/thinkstu/.android": {
+      "inode": "2409212",
+      "size": "640",
+      "mode": 16877,
+      "uid": 501,
+      "mtimeNs": "1790613460765486531",
+      "ctimeNs": "1790613460765486531"
+    },
+    "/Users/thinkstu/.android/adbkey": {
+      "inode": "2409494",
+      "size": "1704",
+      "mode": 33152,
+      "uid": 501,
+      "mtimeNs": "1635316656852991343",
+      "ctimeNs": "1755877057735801014"
+    },
+    "/Users/thinkstu/.android/adbkey.pub": {
+      "inode": "2409320",
+      "size": "737",
+      "mode": 33188,
+      "uid": 501,
+      "mtimeNs": "1635316656852962732",
+      "ctimeNs": "1755877048171967138"
+    }
+  },
+  "keysMetadataUnchanged": true,
+  "productSourceBindingsUnchanged": true,
+  "currentHead": "a2ecda302d3a0199ffe9f0222ee2998a37bd7d5d",
+  "workingTreeStatus": " M docs/reports/mobile-safari-integration-20261016/controls-followup.md\n?? docs/reports/mobile-safari-integration-20261016/current-touch-firefox/\n",
+  "artifactPostPath": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/touch-layout-f33-followup-20261017/native-a2-preparation/artifact-post.json",
+  "artifactPostSHA256": "2f74353f9d7988a8b3015f6222c9ddf33c33d5fad85ea49409ac6a46d06e16e1",
+  "inputPrePostDoubleHashMatches": true,
+  "handles": [
+    {
+      "sessionId": 15667,
+      "exitCode": 0,
+      "stage": "package"
+    },
+    {
+      "sessionId": 73604,
+      "exitCode": 0,
+      "stage": "macOS"
+    },
+    {
+      "sessionId": 4950,
+      "exitCode": 0,
+      "stage": "iosSimulator"
+    },
+    {
+      "sessionId": 98048,
+      "exitCode": 0,
+      "stage": "iPhoneOS"
+    },
+    {
+      "sessionId": 28829,
+      "exitCode": 0,
+      "stage": "compiledIdentity"
+    }
+  ],
+  "unknownHandles": [],
+  "SDKLaneReleasedAfterThisReadOnlyCommandTerminates": true,
+  "installedLaunchedBooted": false,
+  "focusMonitoring": "No independent focus observer was started by this compile-only task; do not claim zero focus events from absence of a monitor.",
+  "laneReleased": true
+}

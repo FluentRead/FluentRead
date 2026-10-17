@@ -1,0 +1,7 @@
+{
+  "emptyOwnerIsNotCurrentOwnerProof" : true,
+  "ownerExact" : false,
+  "ownerNotExposed" : true,
+  "permissionChoices" : 0,
+  "status" : "NO_NATIVE_PERMISSION_ALERT_OBSERVED_NO_DECISION"
+}

@@ -1,0 +1,306 @@
+{
+  "harnessSourceSHA256": "566274799e05963b2b714966e28f9bcdfcee51805e3664cc91f85e1a3781b68e",
+  "startedAt": "2026-10-16T21:42:30.823Z",
+  "scope": "Owned research testharness build only; no Webbuild/boot/install/test/navigation",
+  "command": [
+    "node",
+    "/Users/thinkstu/Desktop/copy/FluentRead-mobile-video-menu-accessibility-20261016/scripts/testing/run-resource-safe.mjs",
+    "--max-workers",
+    "1",
+    "--concurrency",
+    "3",
+    "--cpu-target",
+    "40",
+    "--",
+    "xcodebuild",
+    "-project",
+    "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/safari-final-menu-readiness-preparation-20261017/harness/NativeHarness.xcodeproj",
+    "-scheme",
+    "NativeHarness",
+    "-configuration",
+    "Debug",
+    "-sdk",
+    "iphonesimulator",
+    "-destination",
+    "generic/platform=iOS Simulator",
+    "-derivedDataPath",
+    "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/safari-final-menu-readiness-preparation-20261017/DerivedData",
+    "-jobs",
+    "1",
+    "CODE_SIGNING_ALLOWED=NO",
+    "CODE_SIGNING_REQUIRED=NO",
+    "DEVELOPMENT_TEAM=",
+    "CODE_SIGN_IDENTITY=",
+    "build-for-testing"
+  ],
+  "focusEvents": [],
+  "violations": [],
+  "samples": [
+    {
+      "at": "2026-10-16T21:42:35.222Z",
+      "host": []
+    },
+    {
+      "at": "2026-10-16T21:42:36.264Z",
+      "host": []
+    },
+    {
+      "at": "2026-10-16T21:42:37.274Z",
+      "host": []
+    },
+    {
+      "at": "2026-10-16T21:42:38.267Z",
+      "host": []
+    },
+    {
+      "at": "2026-10-16T21:42:39.269Z",
+      "host": []
+    },
+    {
+      "at": "2026-10-16T21:42:40.272Z",
+      "host": []
+    },
+    {
+      "at": "2026-10-16T21:42:41.274Z",
+      "host": []
+    },
+    {
+      "at": "2026-10-16T21:42:42.275Z",
+      "host": []
+    },
+    {
+      "at": "2026-10-16T21:42:43.278Z",
+      "host": []
+    },
+    {
+      "at": "2026-10-16T21:42:44.279Z",
+      "host": []
+    },
+    {
+      "at": "2026-10-16T21:42:45.283Z",
+      "host": []
+    },
+    {
+      "at": "2026-10-16T21:42:46.284Z",
+      "host": []
+    },
+    {
+      "at": "2026-10-16T21:42:47.287Z",
+      "host": []
+    },
+    {
+      "at": "2026-10-16T21:42:48.286Z",
+      "host": []
+    },
+    {
+      "at": "2026-10-16T21:42:49.288Z",
+      "host": []
+    },
+    {
+      "at": "2026-10-16T21:42:50.290Z",
+      "host": []
+    },
+    {
+      "at": "2026-10-16T21:42:51.291Z",
+      "host": []
+    },
+    {
+      "at": "2026-10-16T21:42:52.293Z",
+      "host": []
+    },
+    {
+      "at": "2026-10-16T21:42:52.934Z",
+      "host": []
+    }
+  ],
+  "status": "build-passed-no-runtime",
+  "observer": {
+    "monitorPid": 39650,
+    "time": 1792186955093.2798,
+    "monotonicMs": 3612246479.5749583
+  },
+  "frontmostBefore": {
+    "pid": 20136,
+    "name": "ChatGPT"
+  },
+  "processReadSamples": [
+    {
+      "at": "2026-10-16T21:42:35.183Z",
+      "timeoutMs": 10000,
+      "pid": 39655,
+      "code": 0,
+      "killed": false,
+      "signal": null,
+      "elapsedMs": 38.258042
+    },
+    {
+      "at": "2026-10-16T21:42:36.225Z",
+      "timeoutMs": 10000,
+      "pid": 39662,
+      "code": 0,
+      "killed": false,
+      "signal": null,
+      "elapsedMs": 38.661
+    },
+    {
+      "at": "2026-10-16T21:42:37.226Z",
+      "timeoutMs": 10000,
+      "pid": 39674,
+      "code": 0,
+      "killed": false,
+      "signal": null,
+      "elapsedMs": 46.937042
+    },
+    {
+      "at": "2026-10-16T21:42:38.229Z",
+      "timeoutMs": 10000,
+      "pid": 39692,
+      "code": 0,
+      "killed": false,
+      "signal": null,
+      "elapsedMs": 38.09475
+    },
+    {
+      "at": "2026-10-16T21:42:39.231Z",
+      "timeoutMs": 10000,
+      "pid": 39718,
+      "code": 0,
+      "killed": false,
+      "signal": null,
+      "elapsedMs": 38.0385
+    },
+    {
+      "at": "2026-10-16T21:42:40.233Z",
+      "timeoutMs": 10000,
+      "pid": 39736,
+      "code": 0,
+      "killed": false,
+      "signal": null,
+      "elapsedMs": 39.364375
+    },
+    {
+      "at": "2026-10-16T21:42:41.234Z",
+      "timeoutMs": 10000,
+      "pid": 39753,
+      "code": 0,
+      "killed": false,
+      "signal": null,
+      "elapsedMs": 39.780167
+    },
+    {
+      "at": "2026-10-16T21:42:42.237Z",
+      "timeoutMs": 10000,
+      "pid": 39768,
+      "code": 0,
+      "killed": false,
+      "signal": null,
+      "elapsedMs": 38.419042
+    },
+    {
+      "at": "2026-10-16T21:42:43.238Z",
+      "timeoutMs": 10000,
+      "pid": 39780,
+      "code": 0,
+      "killed": false,
+      "signal": null,
+      "elapsedMs": 38.7555
+    },
+    {
+      "at": "2026-10-16T21:42:44.240Z",
+      "timeoutMs": 10000,
+      "pid": 39793,
+      "code": 0,
+      "killed": false,
+      "signal": null,
+      "elapsedMs": 38.253125
+    },
+    {
+      "at": "2026-10-16T21:42:45.242Z",
+      "timeoutMs": 10000,
+      "pid": 39797,
+      "code": 0,
+      "killed": false,
+      "signal": null,
+      "elapsedMs": 40.035792
+    },
+    {
+      "at": "2026-10-16T21:42:46.245Z",
+      "timeoutMs": 10000,
+      "pid": 39808,
+      "code": 0,
+      "killed": false,
+      "signal": null,
+      "elapsedMs": 39.322916
+    },
+    {
+      "at": "2026-10-16T21:42:47.247Z",
+      "timeoutMs": 10000,
+      "pid": 39814,
+      "code": 0,
+      "killed": false,
+      "signal": null,
+      "elapsedMs": 39.864041
+    },
+    {
+      "at": "2026-10-16T21:42:48.246Z",
+      "timeoutMs": 10000,
+      "pid": 39830,
+      "code": 0,
+      "killed": false,
+      "signal": null,
+      "elapsedMs": 39.655625
+    },
+    {
+      "at": "2026-10-16T21:42:49.248Z",
+      "timeoutMs": 10000,
+      "pid": 39839,
+      "code": 0,
+      "killed": false,
+      "signal": null,
+      "elapsedMs": 39.682334
+    },
+    {
+      "at": "2026-10-16T21:42:50.251Z",
+      "timeoutMs": 10000,
+      "pid": 39847,
+      "code": 0,
+      "killed": false,
+      "signal": null,
+      "elapsedMs": 39.566708
+    },
+    {
+      "at": "2026-10-16T21:42:51.251Z",
+      "timeoutMs": 10000,
+      "pid": 39851,
+      "code": 0,
+      "killed": false,
+      "signal": null,
+      "elapsedMs": 39.603792
+    },
+    {
+      "at": "2026-10-16T21:42:52.253Z",
+      "timeoutMs": 10000,
+      "pid": 39852,
+      "code": 0,
+      "killed": false,
+      "signal": null,
+      "elapsedMs": 39.54625
+    },
+    {
+      "at": "2026-10-16T21:42:52.894Z",
+      "timeoutMs": 10000,
+      "pid": 39862,
+      "code": 0,
+      "killed": false,
+      "signal": null,
+      "elapsedMs": 38.723041
+    }
+  ],
+  "pid": 39656,
+  "pgid": 39656,
+  "result": {
+    "code": 0,
+    "signal": null
+  },
+  "finishedAt": "2026-10-16T21:42:52.941Z"
+}

@@ -1,0 +1,601 @@
+{
+  "schemaVersion": 1,
+  "reviewer": "/root/f25_review",
+  "createdAt": "2026-10-16T21:18:14.553810+00:00",
+  "status": "CONTROLLED_CHROMIUM_LIFECYCLE_CORRECTED_ORACLE_PASS_REAL_AVKIT_NOT_VERIFIED",
+  "mode": "Independent pure-disk review and actual original PNG views; only this new report written. No SDK, browser, network, build, device, process inventory or tests executed by reviewer.",
+  "contextPreference": {
+    "handoffAtTokens": 300000,
+    "automaticEnforcementVerified": false,
+    "newDescendantsCreated": false
+  },
+  "inputs": [
+    {
+      "path": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/menu-scroll-controlled-20261017/lifecycle-corrected-oracle/inputs.json",
+      "sha256": "536b39d4998d666672527a32fd5309f02394a6b4047770faf4c070cff0eb518a"
+    },
+    {
+      "path": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/menu-scroll-controlled-20261017/lifecycle-corrected-oracle/report.json",
+      "sha256": "37d006ff24c3aface33fa0cbadb201fba68f8baf38c2c57cab6f74ebc2bd123e"
+    },
+    {
+      "path": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/menu-scroll-controlled-20261017/lifecycle-corrected-oracle/runner.log",
+      "sha256": "2e99b0c93f4503bbff03beef5b278c25806c5049fde0d168fdc87aa3ce918854"
+    },
+    {
+      "path": "/Users/thinkstu/Desktop/copy/FluentRead-mobile-video-menu-accessibility-20261016/scripts/run-mobile-video-subtitle-test.cjs",
+      "sha256": "5f6aded2f3f1b47f61dc5fe89ce249c9b8ca209f1bc5a67f81150264d0d09b06"
+    },
+    {
+      "path": "/Users/thinkstu/Desktop/copy/FluentRead-mobile-video-menu-accessibility-20261016/src/features/video-subtitle/content/ui.ts",
+      "sha256": "eb9cd5ccd3d2931cd1e85fa8a668235374e0a865e06605981274bd20944b592c"
+    },
+    {
+      "path": "/Users/thinkstu/Desktop/copy/FluentRead-mobile-video-menu-accessibility-20261016/src/features/video-subtitle/content/nativeFullscreen.ts",
+      "sha256": "389b9e9a9c4e8d3e825cc2485d65396ae33e4e2ddc739c8717b413be0295300e"
+    },
+    {
+      "path": "/Users/thinkstu/Desktop/copy/FluentRead-mobile-video-menu-accessibility-20261016/tests/videoNativeFullscreen.test.ts",
+      "sha256": "68f6497f91687e94dfee50d8c258bb811d704e027f4c923a21b984fde74876b0"
+    }
+  ],
+  "recordedRuntime": {
+    "terminalSession": 7855,
+    "parentObservedExitCode": 0,
+    "runnerLogOk": true,
+    "selectedSuite": "lifecycle",
+    "selectionIsAlsoDefaultInSource": true,
+    "commandExplicitlyPassedLifecycle": true,
+    "capturedCases": 12,
+    "errors": []
+  },
+  "artifactBinding": {
+    "recordedChromeMapSHA256": "fa6ed6c48b27fd7e9040764ca43c19a2aef9150c4ca32263c53c278a1900878e",
+    "sameAsFinalGeometryMapHash": true,
+    "parentRecordedFull478Unchanged": true,
+    "all478BuiltFilesRehashedByReviewer": false,
+    "productUiUnchangedFromMenuSuite": true
+  },
+  "actualOriginalPngViews": [
+    {
+      "path": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/menu-scroll-controlled-20261017/lifecycle-corrected-oracle/native-interface-enter.png",
+      "sha256": "7c85fbc1f838d00c9dfcf6dfd9e0d1141d0e222f095ed0018ece2465dfe38f03",
+      "actualView": true
+    },
+    {
+      "path": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/menu-scroll-controlled-20261017/lifecycle-corrected-oracle/video-replaced.png",
+      "sha256": "5607893566be421212933fa4a2145852620296f1c6809f0da1f334137d3947b1",
+      "actualView": true
+    },
+    {
+      "path": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/menu-scroll-controlled-20261017/lifecycle-corrected-oracle/refresh-recovered.png",
+      "sha256": "3b773d75706c5e3b3e4dfd550b40b437708e7dce9259eee59cabc7c0ef2a7c3f",
+      "actualView": true
+    },
+    {
+      "path": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/menu-scroll-controlled-20261017/lifecycle-corrected-oracle/portrait-menu-keyboard-6-ArrowUp.png",
+      "sha256": "65bbd889ab90f6b7b5f966bccf4ad3c04b6f87931391ee1f64d0311a806a29b5",
+      "actualView": true
+    },
+    {
+      "path": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/menu-scroll-controlled-20261017/lifecycle-corrected-oracle/desktop-menu-open.png",
+      "sha256": "6984b132cdcd8c44ca61a2ca686a86eb9c7d37418cc3607c260bba8c9f7e4204",
+      "actualView": true
+    },
+    {
+      "path": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/menu-scroll-controlled-20261017/lifecycle-corrected-oracle/desktop-menu-keyboard-End.png",
+      "sha256": "af2b213b4b44a56fb9dc43da0c69d922f39fe7676d26fc929fc18371a3ab9325",
+      "actualView": true
+    },
+    {
+      "path": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/menu-scroll-controlled-20261017/lifecycle-corrected-oracle/desktop-menu-keyboard-Home.png",
+      "sha256": "a03b7bd9e91805a1fb324af42b65c40a324ff256ece7b1be530f0c85814e8de4",
+      "actualView": true
+    },
+    {
+      "path": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/menu-scroll-controlled-20261017/lifecycle-corrected-oracle/desktop-menu-before-close.png",
+      "sha256": "a03b7bd9e91805a1fb324af42b65c40a324ff256ece7b1be530f0c85814e8de4",
+      "actualView": true
+    },
+    {
+      "path": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/menu-scroll-controlled-20261017/lifecycle-corrected-oracle/desktop-menu-normal-close.png",
+      "sha256": "8476ca00a873b27c1682fa76a8af668c33f5b6ff7b5101271f4c85a9b5bfc000",
+      "actualView": true
+    },
+    {
+      "path": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/menu-scroll-controlled-20261017/lifecycle-corrected-oracle/disabled-cleanup.png",
+      "sha256": "605cc9ebd2c5e89b78073b4cf6ac96c797cd9a673dd33a90d9abb4845e9e0ca8",
+      "actualView": true
+    },
+    {
+      "path": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/menu-scroll-controlled-20261017/lifecycle-corrected-oracle/fullscreen-geometry-safe-area.png",
+      "sha256": "7c85fbc1f838d00c9dfcf6dfd9e0d1141d0e222f095ed0018ece2465dfe38f03",
+      "actualView": true
+    }
+  ],
+  "nativeSelectionFixture": {
+    "scope": "Explicit standard TextTrack.mode writes emulate system-menu selections on Chromium; not native AVKit selection or rendering",
+    "acknowledgedSelectionOperations": 11,
+    "recordedBrowserChangeEvents": 17,
+    "allEventsTrusted": true,
+    "absoluteAckDeadlineMs": 2000,
+    "maximumObservedAckMs": 6.300000190734863,
+    "ackReceipts": [
+      {
+        "name": "initial-site-A",
+        "desired": {
+          "site": "showing"
+        },
+        "eventCount": 1,
+        "allEventsTrusted": true,
+        "elapsedMs": 1.0999999046325684,
+        "after": [
+          {
+            "kind": "subtitles",
+            "label": "FluentRead",
+            "mode": "hidden"
+          },
+          {
+            "kind": "captions",
+            "label": "Site captions",
+            "mode": "showing"
+          }
+        ]
+      },
+      {
+        "name": "A-to-FluentRead-direct",
+        "desired": {
+          "site": "disabled",
+          "owned": "showing"
+        },
+        "eventCount": 2,
+        "allEventsTrusted": true,
+        "elapsedMs": 2.9000000953674316,
+        "after": [
+          {
+            "kind": "subtitles",
+            "label": "FluentRead",
+            "mode": "showing"
+          },
+          {
+            "kind": "captions",
+            "label": "Site captions",
+            "mode": "disabled"
+          }
+        ]
+      },
+      {
+        "name": "A-to-FluentRead-before-Off",
+        "desired": {
+          "site": "disabled",
+          "owned": "showing"
+        },
+        "eventCount": 2,
+        "allEventsTrusted": true,
+        "elapsedMs": 2.1000003814697266,
+        "after": [
+          {
+            "kind": "subtitles",
+            "label": "FluentRead",
+            "mode": "showing"
+          },
+          {
+            "kind": "captions",
+            "label": "Site captions",
+            "mode": "disabled"
+          }
+        ]
+      },
+      {
+        "name": "system-Off",
+        "desired": {
+          "owned": "disabled"
+        },
+        "eventCount": 1,
+        "allEventsTrusted": true,
+        "elapsedMs": 1.299999713897705,
+        "after": [
+          {
+            "kind": "subtitles",
+            "label": "FluentRead",
+            "mode": "disabled"
+          },
+          {
+            "kind": "captions",
+            "label": "Site captions",
+            "mode": "disabled"
+          }
+        ]
+      },
+      {
+        "name": "Off-to-FluentRead",
+        "desired": {
+          "owned": "showing"
+        },
+        "eventCount": 1,
+        "allEventsTrusted": true,
+        "elapsedMs": 6.300000190734863,
+        "after": [
+          {
+            "kind": "subtitles",
+            "label": "FluentRead",
+            "mode": "showing"
+          },
+          {
+            "kind": "captions",
+            "label": "Site captions",
+            "mode": "disabled"
+          }
+        ]
+      },
+      {
+        "name": "FluentRead-before-Off-reentry",
+        "desired": {
+          "site": "disabled",
+          "owned": "showing"
+        },
+        "eventCount": 1,
+        "allEventsTrusted": true,
+        "elapsedMs": 2.3000001907348633,
+        "after": [
+          {
+            "kind": "subtitles",
+            "label": "FluentRead",
+            "mode": "showing"
+          },
+          {
+            "kind": "captions",
+            "label": "Site captions",
+            "mode": "disabled"
+          }
+        ]
+      },
+      {
+        "name": "Off-before-leave",
+        "desired": {
+          "owned": "disabled"
+        },
+        "eventCount": 1,
+        "allEventsTrusted": true,
+        "elapsedMs": 2.799999713897705,
+        "after": [
+          {
+            "kind": "subtitles",
+            "label": "FluentRead",
+            "mode": "disabled"
+          },
+          {
+            "kind": "captions",
+            "label": "Site captions",
+            "mode": "disabled"
+          }
+        ]
+      },
+      {
+        "name": "source-A-before-other-choice",
+        "desired": {
+          "site": "showing",
+          "other": "disabled"
+        },
+        "eventCount": 2,
+        "allEventsTrusted": true,
+        "elapsedMs": 3,
+        "after": [
+          {
+            "kind": "subtitles",
+            "label": "FluentRead",
+            "mode": "hidden"
+          },
+          {
+            "kind": "captions",
+            "label": "Site captions",
+            "mode": "showing"
+          },
+          {
+            "kind": "captions",
+            "label": "Other site captions",
+            "mode": "disabled"
+          }
+        ]
+      },
+      {
+        "name": "A-to-FluentRead-before-B",
+        "desired": {
+          "site": "disabled",
+          "owned": "showing"
+        },
+        "eventCount": 2,
+        "allEventsTrusted": true,
+        "elapsedMs": 3,
+        "after": [
+          {
+            "kind": "subtitles",
+            "label": "FluentRead",
+            "mode": "showing"
+          },
+          {
+            "kind": "captions",
+            "label": "Site captions",
+            "mode": "disabled"
+          },
+          {
+            "kind": "captions",
+            "label": "Other site captions",
+            "mode": "disabled"
+          }
+        ]
+      },
+      {
+        "name": "FluentRead-to-source-B",
+        "desired": {
+          "owned": "disabled",
+          "other": "showing"
+        },
+        "eventCount": 2,
+        "allEventsTrusted": true,
+        "elapsedMs": 3,
+        "after": [
+          {
+            "kind": "subtitles",
+            "label": "FluentRead",
+            "mode": "disabled"
+          },
+          {
+            "kind": "captions",
+            "label": "Site captions",
+            "mode": "disabled"
+          },
+          {
+            "kind": "captions",
+            "label": "Other site captions",
+            "mode": "showing"
+          }
+        ]
+      },
+      {
+        "name": "restore-site-A-before-disable",
+        "desired": {
+          "other": "disabled",
+          "site": "showing"
+        },
+        "eventCount": 2,
+        "allEventsTrusted": true,
+        "elapsedMs": 2.9000000953674316,
+        "after": [
+          {
+            "kind": "subtitles",
+            "label": "FluentRead",
+            "mode": "hidden"
+          },
+          {
+            "kind": "captions",
+            "label": "Site captions",
+            "mode": "showing"
+          },
+          {
+            "kind": "captions",
+            "label": "Other site captions",
+            "mode": "disabled"
+          }
+        ]
+      }
+    ],
+    "sourceAckReview": [
+      "Subscribes to actual current TextTrackList change before standard mode writes; required refs must exist and at least one desired mode must transition.",
+      "Rejects untrusted events and missing change within 2000ms; post-dispatch zero-delay task checks the same desired modes again and the same absolute performance.now deadline.",
+      "Removes current listener and both timers on resolve/reject; actual cue readiness is checked separately after Off-to-FluentRead selection ACK.",
+      "No synthetic change dispatch is used for these ACKs. Events are browser-generated by scripted standard TextTrack.mode writes; they are not user-native system-menu inputs."
+    ],
+    "observedAssertions": {
+      "beginPreservedSiteSelection": true,
+      "directSourceRestored": true,
+      "offThenFluentReadKeptSourceDisabled": true,
+      "offPreservedAcrossReentry": true,
+      "otherSiteSelectionPreserved": true
+    },
+    "oracleAssessment": "Direct A→FluentRead→leave restores A. An intervening Off choice clears previousShowing in existing production onTrackChange, so Off→FluentRead→leave must retain A disabled. New oracle separates these distinct histories and agrees with existing source-choice ownership tests; product nativeFullscreen.ts was not changed for this correction.",
+    "otherChecksReached": "Owned track identity survives Off; cue count recovers after reselect; source A remains showing when bridge visibility is disabled; replacement/reload/desktop/final disable all execute after these assertions."
+  },
+  "lifecycleEvidence": {
+    "replacement": {
+      "source": "Old video clone replacement, next.load(), shared ready predicate and actual video-replaced capture.",
+      "observed": {
+        "name": "video-replaced",
+        "video": {
+          "left": 0,
+          "top": 0,
+          "right": 844,
+          "bottom": 390,
+          "width": 844,
+          "height": 390
+        },
+        "panel": {
+          "left": 254.1796875,
+          "top": 282.046875,
+          "right": 589.8203125,
+          "bottom": 342,
+          "width": 335.640625,
+          "height": 59.953125
+        },
+        "original": "Watch bilingual captions near the bottom.",
+        "translation": "在视频底部观看双语字幕。",
+        "nativeMode": "hidden",
+        "nativeCues": [
+          {
+            "start": 0,
+            "end": 30,
+            "text": "Watch bilingual captions near the bottom.\n在视频底部观看双语字幕。"
+          }
+        ],
+        "coarsePointer": true,
+        "viewport": {
+          "width": 844,
+          "height": 390
+        }
+      },
+      "scope": "Demonstrates controlled replacement recovery. No real navigation/media-provider switch or repeated stress matrix."
+    },
+    "reload": {
+      "source": "Real page.reload(domcontentloaded), activation, reinstall isolated-world webkit shim, ready, refresh-recovered capture.",
+      "observed": {
+        "name": "refresh-recovered",
+        "video": {
+          "left": 0,
+          "top": 0,
+          "right": 844,
+          "bottom": 390,
+          "width": 844,
+          "height": 390
+        },
+        "panel": {
+          "left": 254.1796875,
+          "top": 318.046875,
+          "right": 589.8203125,
+          "bottom": 378,
+          "width": 335.640625,
+          "height": 59.953125
+        },
+        "original": "Watch bilingual captions near the bottom.",
+        "translation": "在视频底部观看双语字幕。",
+        "nativeMode": "hidden",
+        "nativeCues": [
+          {
+            "start": 0,
+            "end": 30,
+            "text": "Watch bilingual captions near the bottom."
+          }
+        ],
+        "coarsePointer": true,
+        "viewport": {
+          "width": 844,
+          "height": 390
+        }
+      },
+      "note": "At this capture DOM is bilingual while recorded native cue text is English only. Shared ready checks nonempty native cues, not bilingual cue content at this instant; later desktop-normal-close records a bilingual cue. Do not claim instantaneous bilingual native-cue restoration at refresh."
+    },
+    "persistedPageshow": {
+      "executed": true,
+      "source": "Synthetic PageTransitionEvent(pageshow,{persisted:true}) followed by ready before desktop.",
+      "separateRawPngExists": false,
+      "actualViewClaimedForMissingPng": false,
+      "downstreamEvidence": "Desktop open/key/Close and final disable execute and have actual viewed original PNGs.",
+      "realBFCacheRoundTripVerified": false
+    },
+    "finalDisable": {
+      "panelAbsent": true,
+      "recordedNativeCues": [],
+      "sourceAwaitedNativeTrackNodeAbsent": true,
+      "visualFinding": "FluentRead entry/menu/translation UI removed; original site caption may remain, as actually pictured."
+    }
+  },
+  "menuEvidence": {
+    "geometryScenes": 18,
+    "targetMeasurements": 35,
+    "allTargetsUniqueFullClipAndFiveOwnedHitsWithinExisting001Tolerance": true,
+    "touchMinimumPx": 44,
+    "desktopMinimumPx": 22,
+    "touchKeyboardSteps": 12,
+    "allExpectedTouchKeysObserved": true,
+    "normalTouchClose": {
+      "input": "mouse.click-at-observed-checked-center",
+      "x": 353,
+      "y": 31,
+      "focusReturned": true
+    },
+    "key6ActualOriginalViewed": true,
+    "desktop": {
+      "capabilities": {
+        "coarsePointer": false,
+        "maxTouchPoints": 0
+      },
+      "minimumTargetSize": 22,
+      "keyboardSteps": [
+        {
+          "key": "End",
+          "expected": "download-bilingual-subtitles",
+          "observed": "download-bilingual-subtitles"
+        },
+        {
+          "key": "Home",
+          "expected": "open-settings",
+          "observed": "open-settings"
+        }
+      ],
+      "normalCloseFocusReturned": true
+    },
+    "desktopAllScrollTop": [
+      0,
+      0,
+      0,
+      0
+    ],
+    "desktopScrollingVerified": false,
+    "topCoverage": "Only scrollTop >= actual 6px padding scenes require three owned header points; keys10–12 and desktop scroll0 are exceptions with raw false values retained."
+  },
+  "fullscreenAndSafeArea": {
+    "geometryMode": "Explicit DOM fullscreen-property fixture and synthetic events; no OS/browser native fullscreen rendering.",
+    "safeAreaEmulation": {
+      "supported": false,
+      "reason": "Error: cdpSession.send: Protocol error (Emulation.setSafeAreaInsets): 'Emulation.setSafeAreaInsets' wasn't found"
+    },
+    "actualNotchInset4424Verified": false
+  },
+  "cleanupObserved": {
+    "browserPid": 34487,
+    "monitorPid": 34484,
+    "focusSamples": 54,
+    "browserCloseReceipt": "shared-guard-fulfilled",
+    "profileRemoved": true,
+    "focusEvents": [],
+    "sourceMonitorSpansSharedClose": true,
+    "scope": "Recorded guard fulfilled/profile removed/no focus events this run. Reviewer did not execute fresh PID or port checks."
+  },
+  "preservedHistory": [
+    {
+      "path": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/menu-scroll-controlled-20261017/baseline-geometry/report.json",
+      "sha256": "cd2666d74047246d082237c240eb842d752579d745e5dce7492ceb7482ee5642"
+    },
+    {
+      "path": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/menu-scroll-controlled-20261017/sticky-only/report.json",
+      "sha256": "77e637b422d996c241be7cff6b984af80052015b37ca70889557e1b81f8ef7c8"
+    },
+    {
+      "path": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/menu-scroll-controlled-20261017/final-geometry/report.json",
+      "sha256": "537d451c333b4b8136252bde4ac32e4b492c63549acfc1eef57393e2dad92d00"
+    },
+    {
+      "path": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/menu-scroll-controlled-20261017/menu-suite/report.json",
+      "sha256": "c869e7e55339059ab82a9de7ec181b2e37b38e4b7112004a345f0a4a4773cf02"
+    },
+    {
+      "path": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/menu-scroll-controlled-20261017/independent-final-runtime-review.json",
+      "sha256": "f7c6e4628c95e7ef6b4ea14ea3fc2b012e634cac2be68c4c50600e8024a1b5c3"
+    },
+    {
+      "path": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/menu-scroll-controlled-20261017/independent-menu-suite-runtime-review.json",
+      "sha256": "65e9eff1ff3321f1fe2614f646fa49e3db826a953b006a371367168ea761e8df"
+    }
+  ],
+  "evidenceLimits": [
+    "local HTML and timedtext fixtures",
+    "mock translation",
+    "Chromium viewport/touch emulation",
+    "isolated-extension-world webkit capability/event shim only; no iOS/AVKit rendering",
+    "fullscreen geometry uses an explicit DOM property fixture; no system/window fullscreen",
+    "no live provider or mobile device",
+    "Standard TextTrack.mode writes and trusted browser change events validate the controlled ownership contract, not actual AVKit selection or rendering.",
+    "Persisted pageshow is explicitly synthetic, not a browser BFCache navigation; no standalone pageshow PNG was created.",
+    "Original final-geometry failure remains unchanged; the new test oracle is explicitly revised and does not retroactively turn the old run green."
+  ],
+  "acceptance": {
+    "correctedControlledLifecycleRunPassed": true,
+    "controlledSelectionContractPassed": true,
+    "controlledReplacementReloadAndSyntheticPageshowReadyPassed": true,
+    "controlledTouchAndCompactDesktopPassed": true,
+    "desktopScrollStressPassed": false,
+    "realSafariAVKitPassed": false,
+    "realBFCachePassed": false,
+    "safeAreaInsetsActuallyPassed": false,
+    "fullNativeGoalComplete": false
+  }
+}

@@ -2795,6 +2795,7 @@ export const esESLegacyText: Readonly<Record<string, string>> = {
     "原生翻译合批": "Agrupar solicitudes de traducción",
     "开启合并": "Combinación activada",
     "X 字幕自动贴底": "Colocar automáticamente los subtítulos de X abajo",
+    "移动端 / X 自动贴底": "Ajuste inferior automático en móvil / X",
     "逐字高亮": "Resaltado palabra por palabra",
     "字幕随播放进度逐字点亮，像 KTV 歌词一样": "Los subtítulos se iluminan palabra por palabra al reproducir, como la letra de un karaoke.",
     "视频字幕逐字高亮": "Resaltado palabra por palabra de los subtítulos",

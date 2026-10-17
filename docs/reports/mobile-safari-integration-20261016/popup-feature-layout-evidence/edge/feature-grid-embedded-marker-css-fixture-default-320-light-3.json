@@ -1,0 +1,142 @@
+{
+  "label": "feature-grid-embedded-marker-css-fixture-default-320-light-3",
+  "skin": "default",
+  "width": 320,
+  "theme": "light",
+  "count": 3,
+  "mode": "embedded-marker-css-fixture",
+  "documentWidth": 320,
+  "rootOverflow": false,
+  "shell": {
+    "x": 0,
+    "y": 0,
+    "width": 320,
+    "height": 462,
+    "right": 320,
+    "bottom": 462
+  },
+  "grid": {
+    "x": 16,
+    "y": 310,
+    "width": 288,
+    "height": 108,
+    "right": 304,
+    "bottom": 418
+  },
+  "display": "grid",
+  "rowGap": 8,
+  "columnGap": 8,
+  "gridRows": "50px 50px",
+  "cards": [
+    {
+      "id": "hover",
+      "x": 16,
+      "y": 310,
+      "width": 140,
+      "height": 50,
+      "right": 156,
+      "bottom": 360,
+      "display": "grid",
+      "naturalHeight": 50,
+      "copy": {
+        "x": 59,
+        "y": 320.203125,
+        "width": 74,
+        "height": 29.59375,
+        "right": 133,
+        "bottom": 349.796875
+      },
+      "strong": {
+        "x": 59,
+        "y": 320.203125,
+        "width": 74,
+        "height": 16.09375,
+        "right": 133,
+        "bottom": 336.296875
+      },
+      "small": {
+        "x": 59,
+        "y": 338.296875,
+        "width": 74,
+        "height": 11.5,
+        "right": 133,
+        "bottom": 349.796875
+      },
+      "copyOverflow": false
+    },
+    {
+      "id": "selection",
+      "x": 164,
+      "y": 310,
+      "width": 140,
+      "height": 50,
+      "right": 304,
+      "bottom": 360,
+      "display": "grid",
+      "naturalHeight": 50,
+      "copy": {
+        "x": 207,
+        "y": 318.953125,
+        "width": 74,
+        "height": 32.09375,
+        "right": 281,
+        "bottom": 351.046875
+      },
+      "strong": {
+        "x": 207,
+        "y": 318.953125,
+        "width": 74,
+        "height": 16.09375,
+        "right": 281,
+        "bottom": 335.046875
+      },
+      "small": {
+        "x": 207,
+        "y": 337.046875,
+        "width": 74,
+        "height": 14,
+        "right": 281,
+        "bottom": 351.046875
+      },
+      "copyOverflow": false
+    },
+    {
+      "id": "image",
+      "x": 16,
+      "y": 368,
+      "width": 140,
+      "height": 50,
+      "right": 156,
+      "bottom": 418,
+      "display": "grid",
+      "naturalHeight": 50,
+      "copy": {
+        "x": 59,
+        "y": 378.203125,
+        "width": 74,
+        "height": 29.59375,
+        "right": 133,
+        "bottom": 407.796875
+      },
+      "strong": {
+        "x": 59,
+        "y": 378.203125,
+        "width": 74,
+        "height": 16.09375,
+        "right": 133,
+        "bottom": 394.296875
+      },
+      "small": {
+        "x": 59,
+        "y": 396.296875,
+        "width": 74,
+        "height": 11.5,
+        "right": 133,
+        "bottom": 407.796875
+      },
+      "copyOverflow": false
+    }
+  ],
+  "issues": [],
+  "screenshot": "feature-grid-embedded-marker-css-fixture-default-320-light-3.png"
+}

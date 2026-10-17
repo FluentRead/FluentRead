@@ -1,0 +1,393 @@
+{
+  "selectedSuite": "control-clones",
+  "fixture": "same-scope-control-clones-production-extension",
+  "evidenceLimits": [
+    "Local desktop/mobile YouTube HTML, generated media and timedtext fixtures; mock translation",
+    "Actual built extension content and native Chromium MutationObserver; no binding import, sync call or cleanup model",
+    "Trusted CDP entry/Close clicks on the original live entry; no synthetic click acceptance",
+    "Chromium viewport/touch emulation only; no live YouTube, Safari, iOS/AVKit or Safari E2/AX attribution",
+    "Private factory call counts are not instrumented; observed live identity and owner uniqueness are checked",
+    "No fullscreen/native-track shim, subtitle accuracy or reload/pageshow lifecycle acceptance in this suite"
+  ],
+  "cases": [
+    {
+      "name": "desktop-whole-host",
+      "status": "PASS",
+      "baseline": {
+        "layout": "desktop",
+        "url": "https://www.youtube.com/watch?v=fluentread-control-clones-desktop",
+        "liveInOriginalHost": true,
+        "scopeContainsHost": true,
+        "scopeIsPlayer": true,
+        "scopeVideoCount": 1,
+        "coarsePointer": false,
+        "ariaPressed": null,
+        "ariaExpanded": "false",
+        "ariaHaspopup": "menu",
+        "ariaControls": "fluent-read-video-subtitle-menu"
+      },
+      "repair": {
+        "kind": "whole-host",
+        "immediateOwnCount": 2,
+        "afterMicrotask": {
+          "ownCount": 1,
+          "copyConnected": false,
+          "elapsedMs": 0.5
+        },
+        "afterTaskOwnCount": 1,
+        "removedCopyObserved": true,
+        "liveIdentity": true,
+        "liveConnected": true,
+        "liveParentUnchanged": true,
+        "nativeButtonsUnchanged": true,
+        "siblingRetained": true,
+        "siblingNativeRetained": true,
+        "foreignRetained": true,
+        "unrelatedRetained": true,
+        "url": "https://www.youtube.com/watch?v=fluentread-control-clones-desktop"
+      },
+      "menu": {
+        "focusReturned": true,
+        "ariaPressed": null,
+        "selectedMode": "bilingual",
+        "clicks": [
+          {
+            "kind": "entry",
+            "trusted": true
+          },
+          {
+            "kind": "close",
+            "trusted": true
+          }
+        ],
+        "url": "https://www.youtube.com/watch?v=fluentread-control-clones-desktop"
+      }
+    },
+    {
+      "name": "desktop-loose",
+      "status": "PASS",
+      "baseline": {
+        "layout": "desktop",
+        "url": "https://www.youtube.com/watch?v=fluentread-control-clones-desktop",
+        "liveInOriginalHost": true,
+        "scopeContainsHost": true,
+        "scopeIsPlayer": true,
+        "scopeVideoCount": 1,
+        "coarsePointer": false,
+        "ariaPressed": null,
+        "ariaExpanded": "false",
+        "ariaHaspopup": "menu",
+        "ariaControls": "fluent-read-video-subtitle-menu"
+      },
+      "repair": {
+        "kind": "loose",
+        "immediateOwnCount": 2,
+        "afterMicrotask": {
+          "ownCount": 1,
+          "copyConnected": false,
+          "elapsedMs": 0.5
+        },
+        "afterTaskOwnCount": 1,
+        "removedCopyObserved": true,
+        "liveIdentity": true,
+        "liveConnected": true,
+        "liveParentUnchanged": true,
+        "nativeButtonsUnchanged": true,
+        "siblingRetained": true,
+        "siblingNativeRetained": true,
+        "foreignRetained": true,
+        "unrelatedRetained": true,
+        "url": "https://www.youtube.com/watch?v=fluentread-control-clones-desktop"
+      },
+      "menu": {
+        "focusReturned": true,
+        "ariaPressed": null,
+        "selectedMode": "bilingual",
+        "clicks": [
+          {
+            "kind": "entry",
+            "trusted": true
+          },
+          {
+            "kind": "close",
+            "trusted": true
+          }
+        ],
+        "url": "https://www.youtube.com/watch?v=fluentread-control-clones-desktop"
+      }
+    },
+    {
+      "name": "desktop-configuration-disable",
+      "status": "PASS",
+      "liveRemoved": true,
+      "ownCount": 0,
+      "foreignRetained": true,
+      "unrelatedRetained": true,
+      "nativeButtonsRetained": true
+    },
+    {
+      "name": "mobile-whole-host",
+      "status": "PASS",
+      "baseline": {
+        "layout": "mobile",
+        "url": "https://m.youtube.com/watch?v=fluentread-control-clones-mobile",
+        "liveInOriginalHost": true,
+        "scopeContainsHost": true,
+        "scopeIsPlayer": false,
+        "scopeVideoCount": 1,
+        "coarsePointer": true,
+        "ariaPressed": null,
+        "ariaExpanded": "false",
+        "ariaHaspopup": "menu",
+        "ariaControls": "fluent-read-video-subtitle-menu"
+      },
+      "repair": {
+        "kind": "whole-host",
+        "immediateOwnCount": 2,
+        "afterMicrotask": {
+          "ownCount": 1,
+          "copyConnected": false,
+          "elapsedMs": 0.7000002861022949
+        },
+        "afterTaskOwnCount": 1,
+        "removedCopyObserved": true,
+        "liveIdentity": true,
+        "liveConnected": true,
+        "liveParentUnchanged": true,
+        "nativeButtonsUnchanged": true,
+        "siblingRetained": true,
+        "siblingNativeRetained": true,
+        "foreignRetained": true,
+        "unrelatedRetained": true,
+        "url": "https://m.youtube.com/watch?v=fluentread-control-clones-mobile"
+      },
+      "menu": {
+        "focusReturned": true,
+        "ariaPressed": null,
+        "selectedMode": "bilingual",
+        "clicks": [
+          {
+            "kind": "entry",
+            "trusted": true
+          },
+          {
+            "kind": "close",
+            "trusted": true
+          }
+        ],
+        "url": "https://m.youtube.com/watch?v=fluentread-control-clones-mobile"
+      }
+    },
+    {
+      "name": "mobile-loose",
+      "status": "PASS",
+      "baseline": {
+        "layout": "mobile",
+        "url": "https://m.youtube.com/watch?v=fluentread-control-clones-mobile",
+        "liveInOriginalHost": true,
+        "scopeContainsHost": true,
+        "scopeIsPlayer": false,
+        "scopeVideoCount": 1,
+        "coarsePointer": true,
+        "ariaPressed": null,
+        "ariaExpanded": "false",
+        "ariaHaspopup": "menu",
+        "ariaControls": "fluent-read-video-subtitle-menu"
+      },
+      "repair": {
+        "kind": "loose",
+        "immediateOwnCount": 2,
+        "afterMicrotask": {
+          "ownCount": 1,
+          "copyConnected": false,
+          "elapsedMs": 0.5999999046325684
+        },
+        "afterTaskOwnCount": 1,
+        "removedCopyObserved": true,
+        "liveIdentity": true,
+        "liveConnected": true,
+        "liveParentUnchanged": true,
+        "nativeButtonsUnchanged": true,
+        "siblingRetained": true,
+        "siblingNativeRetained": true,
+        "foreignRetained": true,
+        "unrelatedRetained": true,
+        "url": "https://m.youtube.com/watch?v=fluentread-control-clones-mobile"
+      },
+      "menu": {
+        "focusReturned": true,
+        "ariaPressed": null,
+        "selectedMode": "bilingual",
+        "clicks": [
+          {
+            "kind": "entry",
+            "trusted": true
+          },
+          {
+            "kind": "close",
+            "trusted": true
+          }
+        ],
+        "url": "https://m.youtube.com/watch?v=fluentread-control-clones-mobile"
+      }
+    },
+    {
+      "name": "mobile-configuration-disable",
+      "status": "PASS",
+      "liveRemoved": true,
+      "ownCount": 0,
+      "foreignRetained": true,
+      "unrelatedRetained": true,
+      "nativeButtonsRetained": true
+    }
+  ],
+  "errors": [
+    "Error: INJECTED_FOCUS_OBSERVER_FAILURE_DURING_STOP"
+  ],
+  "focusObserver": {
+    "monitorPid": 53597,
+    "time": 1792192152793.093,
+    "monotonicMs": 3617443993.801584
+  },
+  "browserPid": 53601,
+  "focusSamples": [
+    {
+      "at": 1792192154044,
+      "name": "ChatGPT",
+      "pid": 20136
+    },
+    {
+      "at": 1792192154616,
+      "name": "ChatGPT",
+      "pid": 20136
+    },
+    {
+      "at": 1792192155125,
+      "name": "ChatGPT",
+      "pid": 20136
+    },
+    {
+      "at": 1792192155146,
+      "name": "ChatGPT",
+      "pid": 20136
+    },
+    {
+      "at": 1792192155445,
+      "name": "ChatGPT",
+      "pid": 20136
+    },
+    {
+      "at": 1792192155622,
+      "name": "ChatGPT",
+      "pid": 20136
+    },
+    {
+      "at": 1792192156128,
+      "name": "ChatGPT",
+      "pid": 20136
+    },
+    {
+      "at": 1792192156128,
+      "name": "ChatGPT",
+      "pid": 20136
+    },
+    {
+      "at": 1792192156410,
+      "name": "ChatGPT",
+      "pid": 20136
+    },
+    {
+      "at": 1792192156792,
+      "name": "ChatGPT",
+      "pid": 20136
+    }
+  ],
+  "launchMode": "macos-background-cdp",
+  "focusPolicy": "launchservices-no-foreground",
+  "windowPlacement": {
+    "mode": "background-visible-no-focus",
+    "visible": true,
+    "hidden": false,
+    "centered": true,
+    "windowState": "normal",
+    "bounds": {
+      "left": 212,
+      "top": -990,
+      "width": 1280,
+      "height": 900
+    },
+    "displayTarget": "secondary",
+    "source": "macos-nsscreen",
+    "screenIndex": 1,
+    "browserFrontmost": false,
+    "frontmostBefore": {
+      "pid": 20136,
+      "name": "ChatGPT"
+    },
+    "frontmostAfter": {
+      "pid": 20136,
+      "name": "ChatGPT"
+    }
+  },
+  "extensionIdentity": {
+    "directory": "/Users/thinkstu/Desktop/copy/FluentRead-mobile-video-menu-accessibility-20261016/.output/chrome-mv3",
+    "manifestSHA256": "a12a20416fc826d3dc7278b74a112b4170f8985b1ac8b1a74c91f73d5e09b642",
+    "contentScripts": [
+      {
+        "file": "content-scripts/content.js",
+        "sha256": "9d2d9a12b1bb94725eeac615aa838a7d4c9df4986b9b2217258fde3ff5f527d7",
+        "size": 2759172
+      },
+      {
+        "file": "content-scripts/neteaseMailFrame.js",
+        "sha256": "05f560c5193aee59bd122bdf0e8d489b6d17227b486f3204cbdb1c6cd2e703e8",
+        "size": 1961063
+      },
+      {
+        "file": "content-scripts/shadowBridge.js",
+        "sha256": "ac4cd36fa2f66d591c031c44f3d0b7bc58a39888aee263037b71be2fad686e39",
+        "size": 3351
+      },
+      {
+        "file": "content-scripts/supportedFrame.js",
+        "sha256": "51f919e9f0761e6af29c78009b00b7a2e228c77bd9d793ffaa130a1919b46bcf",
+        "size": 1734217
+      },
+      {
+        "file": "content-scripts/xVideoBridge.js",
+        "sha256": "f22318b71931cfc573c8aae63086438e4d186f4f654616a85ebd0c6178c50331",
+        "size": 8036
+      },
+      {
+        "file": "content-scripts/youtubeBridge.js",
+        "sha256": "f5304857608090e874b144266f0def19809b0ba228765f3c7d14ef22faa57af3",
+        "size": 5497
+      }
+    ]
+  },
+  "stage": "control-clones-complete",
+  "timedtextResponses": [
+    {
+      "url": "https://www.youtube.com/api/timedtext?v=fluentread-control-clones-desktop&lang=en&fmt=json3&xorb=2&xobt=3&xovt=3&c=WEB&cplayer=UNIPLAYER",
+      "status": 200
+    },
+    {
+      "url": "https://m.youtube.com/api/timedtext?v=fluentread-control-clones-mobile&lang=en&fmt=json3&xorb=2&xobt=3&xovt=3&c=WEB&cplayer=UNIPLAYER",
+      "status": 200
+    }
+  ],
+  "mockRequests": [
+    {
+      "url": "https://edge.microsoft.com/translate/translatetext?from=en&to=zh-Hans&isEnterpriseClient=false",
+      "source": "[\"Watch bilingual captions near the bottom.\"]"
+    },
+    {
+      "url": "https://edge.microsoft.com/translate/translatetext?from=en&to=zh-Hans&isEnterpriseClient=false",
+      "source": "[\"Watch bilingual captions near the bottom.\"]"
+    }
+  ],
+  "browserCloseReceipt": "shared-guard-fulfilled",
+  "focusObserverError": "Error: INJECTED_FOCUS_OBSERVER_FAILURE_DURING_STOP",
+  "focusEvents": [],
+  "profileRemoved": true
+}

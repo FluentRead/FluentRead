@@ -1,0 +1,90 @@
+{
+  "at": "2026-10-16T19:33:32.193489+00:00",
+  "sourceCase": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/android-runtime/firefox-f5a-floating-touch-attempt34",
+  "runtimeCommit": "a2ecda302d3a0199ffe9f0222ee2998a37bd7d5d",
+  "copies": {
+    "root-outcome-summary.json": {
+      "source": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/android-runtime/firefox-f5a-floating-touch-attempt34/root-outcome-summary.json",
+      "sha256": "3357e10d773e0160ab1ffc009365ecf43fb396a1cc45e2dc2f32f1c9fd43819c",
+      "bytes": 3155
+    },
+    "restoration-verified.json": {
+      "source": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/android-runtime/firefox-f5a-floating-touch-attempt34/restoration-verified.json",
+      "sha256": "dba2b2708258162c21053b2b558478fc27e7a77bee83fa00eb7b0d519d73c0fa",
+      "bytes": 1637
+    },
+    "artifact-pre.json": {
+      "source": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/android-runtime/firefox-f5a-floating-touch-attempt34/artifact-pre.json",
+      "sha256": "c96eaa04456994f65caa728ef81a3da564676e1c668044f366b505966964affa",
+      "bytes": 336
+    },
+    "artifact-post.json": {
+      "source": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/android-runtime/firefox-f5a-floating-touch-attempt34/artifact-post.json",
+      "sha256": "01e6eda574b6b9f1a2cee426ca0e452502c8859c1a496633d57056be4eafe9c0",
+      "bytes": 337
+    },
+    "root-fresh-post-release.json": {
+      "source": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/android-runtime/firefox-f5a-floating-touch-attempt34/root-fresh-post-release.json",
+      "sha256": "3e08d12cf735344150ce823616e571c84fe864e485d071bcfd11de83afe1630d",
+      "bytes": 776
+    },
+    "03-reader.png": {
+      "source": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/android-runtime/firefox-f5a-floating-touch-attempt34/attempt34-ui/03-reader.png",
+      "sha256": "27e21675ed035c8d1e53edb81b8ae0f2b81cdaf6672369c63790dc6ba59ea990",
+      "bytes": 261882
+    },
+    "17-off-settings.png": {
+      "source": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/android-runtime/firefox-f5a-floating-touch-attempt34/attempt34-ui/17-off-settings.png",
+      "sha256": "d3b3dd86b3bf42db701b0535b82cee4df8ba8867c24dd11cd943a8ef90cf0cb3",
+      "bytes": 221183
+    },
+    "22-off-reader-fresh.png": {
+      "source": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/android-runtime/firefox-f5a-floating-touch-attempt34/attempt34-ui/22-off-reader-fresh.png",
+      "sha256": "f3899633f30d9df523f91ebb330f66d90879b2042e586137ef388140ccd6ca46",
+      "bytes": 251415
+    },
+    "24-close-grid.png": {
+      "source": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/android-runtime/firefox-f5a-floating-touch-attempt34/attempt34-ui/24-close-grid.png",
+      "sha256": "5689a541cba07e2ed67f617d22dbf7b75b50a8f8803a75cc6269b6f23474b667",
+      "bytes": 281399
+    },
+    "26-after-close.png": {
+      "source": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/android-runtime/firefox-f5a-floating-touch-attempt34/attempt34-ui/26-after-close.png",
+      "sha256": "1e9458811778eec5f4337effba2216afcb0555a204616cac9dd6c68e2c75d436",
+      "bytes": 190917
+    },
+    "28-final-reader.png": {
+      "source": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/android-runtime/firefox-f5a-floating-touch-attempt34/attempt34-ui/28-final-reader.png",
+      "sha256": "9571190753a91418ea8506e68bc465d28d4b55d231e59dc3119f86cc3c0dea67",
+      "bytes": 249921
+    },
+    "outcome-review.json": {
+      "source": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/android-runtime/firefox-f5a-floating-touch-attempt34/outcome-review.json",
+      "sha256": "12bea6da32ec08c8b6adfbb15027fdca8e7a05f70192ad1e64cd1a482c35c88c",
+      "bytes": 20294
+    },
+    "cleanup.json": {
+      "source": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/android-runtime/firefox-f5a-floating-touch-attempt34/cleanup.json",
+      "sha256": "e408fda5b767567f7e68b2937f5cbc9915438ad46324fbd27a1455443c0def2c",
+      "bytes": 5914
+    },
+    "case-state.json": {
+      "source": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/android-runtime/firefox-f5a-floating-touch-attempt34/case-state.json",
+      "sha256": "3ec77f5474c86624e9d778d825c22464606c38c0e9e4a0ddbaa9ca0758379198",
+      "bytes": 3425
+    },
+    "confirmed-probe-geometry.json": {
+      "source": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/android-runtime/firefox-f5a-floating-touch-attempt34/attempt34-ui/confirmed-probe-geometry.json",
+      "sha256": "74f786fb23baa33f922d5218e19fd748afef60f04cacbc25936e24b025a45004",
+      "bytes": 34338
+    },
+    "final-verify-fresh-geometry.json": {
+      "source": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/android-runtime/firefox-f5a-floating-touch-attempt34/attempt34-ui/final-verify-fresh-geometry.json",
+      "sha256": "cb28235a7dab6ac425ef79f217c6bc341dcba74eb11fd11517052e584539df4a",
+      "bytes": 16586
+    }
+  },
+  "pixelTransformations": 0,
+  "PNGOriginalsOnly": true,
+  "scope": "Six selected original PNGs, not every capture from F34; raw research originals retained."
+}

@@ -2,7 +2,7 @@
  * @file src/features/video-subtitle/content/ui.ts
  *
  * 文件职责：封装视频字幕 content UI 的界面语言转换与可访问名称刷新，避免 YouTube 播放器运行时承载重复的文案拼装。
- * 主要内容：提供视频菜单本地化、菜单与完整句学习共享的局部外观变量、按逐字高亮开关写入字幕行、校时与就地模型选择控件样式、节点创建、播放器定位；每次原生字幕读取按候选集合与局部父链排除嵌套内层，保留外层全文和顺序，避免片段两两包含扫描，不跨调用缓存节点；过滤 YouTube 滚动窗口裁掉的旧行，按实际画面约束字幕几何、换行与大字号完整高度，并封装字幕清理、媒体时钟读取、样式及字幕下载。
+ * 主要内容：提供视频菜单本地化、菜单与完整句学习共享的局部外观变量、按逐字高亮开关写入字幕行、校时与就地模型选择控件样式、节点创建、播放器定位；每次原生字幕读取按候选集合与局部父链排除嵌套内层，保留外层全文和顺序，避免片段两两包含扫描，不跨调用缓存节点；过滤 YouTube 滚动窗口裁掉的旧行，按实际画面及同视频可见底控约束字幕几何、换行与大字号完整高度，并封装字幕清理、媒体时钟读取、样式及字幕下载。
  * 模块边界：只读取界面配置并操作视频 feature 拥有的节点、样式和下载链接，不发起翻译或识别请求；任务生命周期由 runtime 管理。
  */
 
@@ -12,6 +12,9 @@ import {type VideoSubtitleDisplayMode} from '@/src/core/config/model';
 import {cuesToSrt, sanitizeSubtitleFilename, type VideoSubtitleCue} from './youtubeSubtitleData';
 import {getCaptionPlatform} from './platforms';
 import {fitVideoSubtitleFontSize} from './subtitleLayout';
+import {getYoutubeSubtitleControlsScope} from './youtubeControlsScope';
+import {getVisibleYoutubeSubtitleControls, positionMobileYoutubeSubtitle, resetSubtitlePanelLayout, finishSubtitlePanelLayout,
+  prepareSubtitlePanelLayout, findOwnedSubtitlePanel, syncSubtitleScrollHostState, VIDEO_SUBTITLE_SCROLL_HOST_ID} from './subtitleControlLayout';
 import {createVideoKaraokeController, setVideoCaptionText, type VideoKaraokeController, VIDEO_KARAOKE_FILL_PROPERTY, VIDEO_KARAOKE_STATE_ATTRIBUTE, VIDEO_KARAOKE_TEXT_ATTRIBUTE, VIDEO_KARAOKE_UNIT_CLASS} from './karaoke';
 
 import {
@@ -171,7 +174,9 @@ export function createVideoSubtitleKaraoke(
 /** 人工轨到达时原文与译文一起更新；网站字幕节点及原始时间轴保持不变。 */
 export function renderHumanVideoCaption(player: HTMLElement, container: HTMLElement, source: string, translation: string): void {
   writeVideoCaptionText(getOrCreateNormalizedCaptionOverlay(player), source);
-  player.querySelector(`#${VIDEO_TRANSLATION_LAYER_ID}`)?.classList.add(VIDEO_NORMALIZED_CAPTION_ACTIVE_CLASS);
+  const layer = player.querySelector<HTMLElement>(`#${VIDEO_TRANSLATION_LAYER_ID}`);
+  layer?.classList.add(VIDEO_NORMALIZED_CAPTION_ACTIVE_CLASS);
+  if (layer) syncSubtitleScrollHostState(layer);
   container.classList.add(VIDEO_NORMALIZED_CAPTION_CLASS);
   writeVideoCaptionText(getOrCreateTranslationOverlay(player), translation);
   syncTranslationOverlayPosition(container);
@@ -381,13 +386,17 @@ export function getOrCreateVideoSubtitleLayer(player: HTMLElement): HTMLElement 
     layer.setAttribute('data-fluent-read-ui', 'video-subtitle');
     layer.setAttribute('translate', 'no');
   }
-  if (layer.parentElement !== player) player.appendChild(layer);
+  if (layer.parentElement !== player) {
+    const panel = findOwnedSubtitlePanel(layer, VIDEO_SUBTITLE_PANEL_ID);
+    if (panel) resetSubtitlePanelLayout(panel, true);
+    player.appendChild(layer);
+  }
   return layer;
 }
 
 export function getOrCreateVideoSubtitlePanel(player: HTMLElement): HTMLElement {
   const layer = getOrCreateVideoSubtitleLayer(player);
-  const existing = layer.querySelector<HTMLElement>(`#${VIDEO_SUBTITLE_PANEL_ID}`);
+  const existing = findOwnedSubtitlePanel(layer, VIDEO_SUBTITLE_PANEL_ID);
   if (existing) return existing;
 
   const panel = document.createElement('div');
@@ -441,12 +450,13 @@ export function getOrCreateNormalizedCaptionOverlay(player: HTMLElement): HTMLEl
 
 /** 字幕运行时只保留状态所有权，自有 DOM 的清空交由 UI 层完成。 */
 export function clearRenderedVideoTranslation(owner: Document): void {
+  owner.querySelectorAll<HTMLElement>(`#${VIDEO_SUBTITLE_PANEL_ID}`).forEach(panel => resetSubtitlePanelLayout(panel));
   owner.querySelectorAll(`#${VIDEO_TRANSLATION_OVERLAY_ID}`).forEach(node => writeVideoCaptionText(node, ''));
 }
 
 export function deactivateNormalizedVideoCaption(owner: Document): void {
   owner.querySelectorAll(VIDEO_CAPTION_CONTAINER_SELECTOR).forEach(node => node.classList.remove(VIDEO_NORMALIZED_CAPTION_CLASS));
-  owner.querySelectorAll(`#${VIDEO_TRANSLATION_LAYER_ID}`).forEach(node => node.classList.remove(VIDEO_NORMALIZED_CAPTION_ACTIVE_CLASS));
+  owner.querySelectorAll<HTMLElement>(`#${VIDEO_TRANSLATION_LAYER_ID}`).forEach(node => {node.classList.remove(VIDEO_NORMALIZED_CAPTION_ACTIVE_CLASS); syncSubtitleScrollHostState(node);});
   owner.querySelectorAll(`#${VIDEO_NORMALIZED_CAPTION_OVERLAY_ID}`).forEach(node => writeVideoCaptionText(node, ''));
 }
 
@@ -458,6 +468,7 @@ export function readVideoPlaybackTimeMs(player: HTMLElement | null, fallback: HT
 }
 
 export function removeTranslationOverlay(): void {
+  document.querySelectorAll<HTMLElement>(`#${VIDEO_SUBTITLE_PANEL_ID}`).forEach(panel => resetSubtitlePanelLayout(panel, true));
   document.querySelectorAll(`#${VIDEO_TRANSLATION_LAYER_ID}`).forEach((node) => node.remove());
   document.querySelectorAll(`#${VIDEO_TRANSLATION_OVERLAY_ID}`).forEach((node) => node.remove());
   document.querySelectorAll(`#${VIDEO_NORMALIZED_CAPTION_OVERLAY_ID}`).forEach((node) => node.remove());
@@ -542,17 +553,9 @@ export const getXVideoSubtitleViewport = getVideoSubtitleViewport;
 /** 只避开真实可见的底部控件；移动视频高度不足时不能保留桌面的 52px 起步底距。 */
 function getYoutubeSubtitleBottomInset(player: HTMLElement, viewport: Pick<DOMRect, 'left' | 'right' | 'top' | 'bottom' | 'height'>): number {
   let inset = 12;
-  for (const controls of player.querySelectorAll<HTMLElement>('.ytp-chrome-bottom, .player-controls-bottom, .ytm-player-controls, .ytp-right-controls')) {
-    const rect = controls.getBoundingClientRect();
-    if (rect.width <= 0 || rect.height <= 0 || rect.right <= viewport.left || rect.left >= viewport.right
-      || rect.top < viewport.top + viewport.height * .65 || rect.top >= viewport.bottom) continue;
-    let visible = true;
-    for (let current: HTMLElement | null = controls; current && visible; current = current.parentElement) {
-      const style = getComputedStyle(current);
-      visible = style.display !== 'none' && style.visibility !== 'hidden' && style.opacity !== '0';
-      if (current === player) break;
-    }
-    if (visible) inset = Math.max(inset, viewport.bottom - rect.top + 8);
+  for (const rect of getVisibleYoutubeSubtitleControls(player)) {
+    if (rect.right <= viewport.left || rect.left >= viewport.right || rect.top < viewport.top + viewport.height * .65 || rect.top >= viewport.bottom) continue;
+    inset = Math.max(inset, viewport.bottom - rect.top + 8);
   }
   return inset;
 }
@@ -574,6 +577,8 @@ export function syncTranslationOverlayPosition(container: HTMLElement | null): v
     if (isXVideoPage()) layer.style.setProperty('clip-path', 'inset(50%)', 'important');
     else layer.style.removeProperty('clip-path');
   }
+  // 测量阶段不解除同句滚动交互；临时宿主与原 layer 始终使用相同坐标与显示状态。
+  prepareSubtitlePanelLayout(panel, layer, player);
   const visibleCaptionSegments = getVisibleCaptionSegments(container)
     .map((element) => element.getBoundingClientRect())
     .filter((rect) => rect.width > 0 && rect.height > 0);
@@ -582,7 +587,9 @@ export function syncTranslationOverlayPosition(container: HTMLElement | null): v
 
   const playerWidth = viewport ? viewport.width : playerRect.width || 960;
   const menu = document.getElementById(VIDEO_TRANSLATION_MENU_ID);
-  const menuReserve = menu instanceof HTMLElement && !menu.hidden && playerWidth >= 640
+  const menuOpen = menu instanceof HTMLElement && !menu.hidden;
+  const learningOpen = Boolean(getYoutubeSubtitleControlsScope(player).querySelector('#fluent-read-video-learning-panel.fluent-read-video-ui[data-fluent-read-ui="video-subtitle"]'));
+  const menuReserve = menuOpen && playerWidth >= 640
     ? Math.min(menu.getBoundingClientRect().width + 20, playerWidth * .34)
     : 0;
   const appearance = normalizeVideoSubtitleAppearance(config.videoSubtitleAppearance);
@@ -615,24 +622,33 @@ export function syncTranslationOverlayPosition(container: HTMLElement | null): v
   const maximumHeight = Math.max(0, playerHeight - (appearance.position === 'center' ? 24 : offset + 12));
   panel.style.setProperty('max-height', fullscreen ? `min(${maximumHeight}px, calc(100% - max(env(safe-area-inset-top, 0px), env(safe-area-inset-bottom, 0px)) - max(env(safe-area-inset-top, 0px), env(safe-area-inset-bottom, 0px)) - 24px))` : `${maximumHeight}px`, 'important');
   panel.style.transform = appearance.position === 'center' ? 'translateY(-50%)' : 'none';
-  if (!active) return;
+  if (!active) {resetSubtitlePanelLayout(panel); return;}
+
+  // 背景只包住双语文本，并以播放器中心为锚点。长字幕仍受播放器宽度限制，
+  // 超出时在面板内部换行，而不是把半透明背景铺满整行。
+  const centerPanel = () => {
+    panel.style.left = `${(viewport?.left || 0) + 12}px`;
+    const layerRect = layer.getBoundingClientRect();
+    const measuredWidth = panel.getBoundingClientRect().width / (layer.clientWidth > 0 && layerRect.width > 0 ? layerRect.width / layer.clientWidth : 1);
+    const width = Math.min(Math.max(measuredWidth, 0), availableWidth);
+    const usableRight = playerWidth - menuReserve - 12;
+    const left = Math.max(12, Math.min((usableRight - width + 12) / 2, usableRight - width));
+    const panelLeft = `${(viewport?.left || 0) + left}px`;
+    panel.style.left = fullscreen
+      ? `max(${(viewport?.left || 0) + 12}px, env(safe-area-inset-left, 0px), min(${panelLeft}, calc(100% - max(12px, env(safe-area-inset-right, 0px)) - ${width}px)))`
+      : panelLeft;
+  };
+  centerPanel();
+  // 菜单或学习面板开启时撤回兄弟宿主；字幕回原层且不接收指针，避免遮挡当前交互面板。
+  const adaptive = !menuOpen && !learningOpen && isYouTubeVideoPage() && compactPlayer && autoBottom && config.on !== false && config.videoTranslationEnabled !== false && config.videoSubtitleVisible !== false && viewport
+    && positionMobileYoutubeSubtitle(panel, player, layer, viewport, availableWidth);
+  if (adaptive) return;
+  finishSubtitlePanelLayout(panel, menuOpen || learningOpen);
   fitVideoSubtitleFontSize(baseFontSize * fontScale,
     fullscreen ? Math.min(maximumHeight, panel.clientHeight || maximumHeight) : maximumHeight,
     size => panel.style.setProperty('--fluent-read-video-subtitle-font-size', `${size}px`),
     () => panel.scrollHeight);
-
-  // 背景只包住双语文本，并以播放器中心为锚点。长字幕仍受播放器宽度限制，
-  // 超出时在面板内部换行，而不是把半透明背景铺满整行。
-  panel.style.left = `${(viewport?.left || 0) + 12}px`;
-  const layerRect = layer.getBoundingClientRect();
-  const measuredWidth = panel.getBoundingClientRect().width / (layer.clientWidth > 0 && layerRect.width > 0 ? layerRect.width / layer.clientWidth : 1);
-  const width = Math.min(Math.max(measuredWidth, 0), availableWidth);
-  const usableRight = playerWidth - menuReserve - 12;
-  const left = Math.max(12, Math.min((usableRight - width + 12) / 2, usableRight - width));
-  const panelLeft = `${(viewport?.left || 0) + left}px`;
-  panel.style.left = fullscreen
-    ? `max(${(viewport?.left || 0) + 12}px, env(safe-area-inset-left, 0px), min(${panelLeft}, calc(100% - max(12px, env(safe-area-inset-right, 0px)) - ${width}px)))`
-    : panelLeft;
+  centerPanel();
 
   // 双语模式下原生字幕仍然可见时，译文面板要放在原生字幕上方，不能用固定底部
   // 位置压住 YouTube 的分段字幕。逐词合并已经显示整段原文时，原文在同一个面板内，
@@ -652,6 +668,9 @@ export function syncTranslationOverlayPosition(container: HTMLElement | null): v
 }
 
 export function applyVideoDisplayState(container: HTMLElement): void {
+  if (config.on === false || config.videoTranslationEnabled === false || config.videoSubtitleVisible === false) {
+    document.querySelectorAll<HTMLElement>(`#${VIDEO_SUBTITLE_PANEL_ID}`).forEach(panel => resetSubtitlePanelLayout(panel));
+  }
   const mode = normalizeVideoSubtitleDisplayMode(config.videoSubtitleDisplayMode);
   container.classList.toggle(VIDEO_DISPLAY_TRANSLATION_ONLY_CLASS, mode === 'translation-only');
   container.classList.toggle(VIDEO_DISPLAY_ORIGINAL_ONLY_CLASS, mode === 'original-only');
@@ -662,6 +681,7 @@ export function applyVideoDisplayState(container: HTMLElement): void {
   layer?.classList.toggle(VIDEO_DISPLAY_ORIGINAL_ONLY_CLASS, mode === 'original-only');
   layer?.classList.toggle(VIDEO_DISPLAY_HIDDEN_CLASS, config.videoSubtitleVisible === false);
   layer?.setAttribute('data-fluent-read-video-display-mode', mode);
+  if (layer) syncSubtitleScrollHostState(layer);
 }
 
 export function installVideoSubtitleStyle(): HTMLStyleElement {
@@ -685,13 +705,23 @@ export function installVideoSubtitleStyle(): HTMLStyleElement {
     #${VIDEO_AI_CAPTION_CONTAINER_ID} .${VIDEO_CAPTION_SEGMENT_SELECTOR.slice(1)} {
       display: block !important;
     }
-    #${VIDEO_TRANSLATION_LAYER_ID} {
+    :is(#${VIDEO_TRANSLATION_LAYER_ID}, #${VIDEO_SUBTITLE_SCROLL_HOST_ID}) {
       position: absolute !important;
       inset: 0 !important;
       z-index: 2147483645 !important;
       overflow: hidden !important;
       pointer-events: none !important;
       visibility: visible !important;
+    }
+    #${VIDEO_SUBTITLE_SCROLL_HOST_ID} {
+      inset: auto !important;
+      left: 0 !important;
+      top: 0 !important;
+      margin: 0 !important;
+      padding: 0 !important;
+      border: 0 !important;
+      transform-origin: 0 0 !important;
+      z-index: 2147483646 !important;
     }
     #${VIDEO_SUBTITLE_PANEL_ID} {
       display: none !important;
@@ -702,7 +732,7 @@ export function installVideoSubtitleStyle(): HTMLStyleElement {
       min-width: 0 !important;
       bottom: var(--fluent-read-video-subtitle-bottom, clamp(52px, 10%, 96px)) !important;
       margin: 0 !important;
-      padding: 5px 8px 6px !important;
+      padding: var(--fluent-read-video-subtitle-padding, 5px 8px 6px) !important;
       border: 1px solid var(--fluent-read-video-subtitle-border, rgba(255, 255, 255, .1)) !important;
       border-radius: 6px !important;
       background: var(--fluent-read-video-subtitle-background, rgba(12, 15, 22, .56)) !important;
@@ -710,7 +740,7 @@ export function installVideoSubtitleStyle(): HTMLStyleElement {
       backdrop-filter: var(--fluent-read-video-subtitle-backdrop-filter, blur(2px)) !important;
       flex-direction: column !important;
       align-items: center !important;
-      gap: 6px !important;
+      gap: var(--fluent-read-video-subtitle-gap, 6px) !important;
       overflow: hidden !important;
       pointer-events: none !important;
       user-select: none !important;
@@ -719,6 +749,15 @@ export function installVideoSubtitleStyle(): HTMLStyleElement {
     #${VIDEO_SUBTITLE_PANEL_ID}.${VIDEO_SUBTITLE_PANEL_ACTIVE_CLASS} {
       display: flex !important;
     }
+    #${VIDEO_SUBTITLE_PANEL_ID}[data-fluent-read-subtitle-scrollable="true"] {
+      overflow-y: auto !important;
+      overflow-x: hidden !important;
+      pointer-events: auto !important;
+      touch-action: pan-y pinch-zoom !important;
+      overscroll-behavior: contain !important;
+    }
+    #${VIDEO_SUBTITLE_PANEL_ID}[data-fluent-read-subtitle-scrollable="true"] > div { flex-shrink: 0 !important; }
+    #${VIDEO_SUBTITLE_PANEL_ID}[data-fluent-read-subtitle-scrollable="true"]:focus-visible { outline: 2px solid currentColor !important; outline-offset: -2px !important; }
     #${VIDEO_TRANSLATION_OVERLAY_ID} {
       display: block !important;
       position: relative !important;
@@ -793,15 +832,15 @@ export function installVideoSubtitleStyle(): HTMLStyleElement {
     .${VIDEO_KARAOKE_UNIT_CLASS}[${VIDEO_KARAOKE_STATE_ATTRIBUTE}="active"]:dir(rtl)::after {
       clip-path: inset(-.3em -.3em -.3em calc(100% - var(${VIDEO_KARAOKE_FILL_PROPERTY}, 0%))) !important;
     }
-    #${VIDEO_TRANSLATION_LAYER_ID}.${VIDEO_NORMALIZED_CAPTION_ACTIVE_CLASS} #${VIDEO_NORMALIZED_CAPTION_OVERLAY_ID} {
+    :is(#${VIDEO_TRANSLATION_LAYER_ID}, #${VIDEO_SUBTITLE_SCROLL_HOST_ID}).${VIDEO_NORMALIZED_CAPTION_ACTIVE_CLASS} #${VIDEO_NORMALIZED_CAPTION_OVERLAY_ID} {
       display: block !important;
     }
-    #${VIDEO_TRANSLATION_LAYER_ID}.${VIDEO_DISPLAY_TRANSLATION_ONLY_CLASS} #${VIDEO_NORMALIZED_CAPTION_OVERLAY_ID},
-    #${VIDEO_TRANSLATION_LAYER_ID}.${VIDEO_DISPLAY_ORIGINAL_ONLY_CLASS} #${VIDEO_TRANSLATION_OVERLAY_ID},
-    #${VIDEO_TRANSLATION_LAYER_ID}.${VIDEO_DISPLAY_HIDDEN_CLASS} {
+    :is(#${VIDEO_TRANSLATION_LAYER_ID}, #${VIDEO_SUBTITLE_SCROLL_HOST_ID}).${VIDEO_DISPLAY_TRANSLATION_ONLY_CLASS} #${VIDEO_NORMALIZED_CAPTION_OVERLAY_ID},
+    :is(#${VIDEO_TRANSLATION_LAYER_ID}, #${VIDEO_SUBTITLE_SCROLL_HOST_ID}).${VIDEO_DISPLAY_ORIGINAL_ONLY_CLASS} #${VIDEO_TRANSLATION_OVERLAY_ID},
+    :is(#${VIDEO_TRANSLATION_LAYER_ID}, #${VIDEO_SUBTITLE_SCROLL_HOST_ID}).${VIDEO_DISPLAY_HIDDEN_CLASS} {
       visibility: hidden !important;
     }
-    #${VIDEO_TRANSLATION_LAYER_ID}.${VIDEO_DISPLAY_TRANSLATION_ONLY_CLASS} #${VIDEO_NORMALIZED_CAPTION_OVERLAY_ID} {
+    :is(#${VIDEO_TRANSLATION_LAYER_ID}, #${VIDEO_SUBTITLE_SCROLL_HOST_ID}).${VIDEO_DISPLAY_TRANSLATION_ONLY_CLASS} #${VIDEO_NORMALIZED_CAPTION_OVERLAY_ID} {
       display: none !important;
     }
     #ytp-caption-window-container.${VIDEO_NORMALIZED_CAPTION_CLASS} .ytp-caption-segment,
@@ -810,7 +849,7 @@ export function installVideoSubtitleStyle(): HTMLStyleElement {
     .ytp-caption-window-container.${VIDEO_NORMALIZED_CAPTION_CLASS} .captions-text {
       visibility: hidden !important;
     }
-    #${VIDEO_TRANSLATION_LAYER_ID}.${VIDEO_DISPLAY_HIDDEN_CLASS} {
+    :is(#${VIDEO_TRANSLATION_LAYER_ID}, #${VIDEO_SUBTITLE_SCROLL_HOST_ID}).${VIDEO_DISPLAY_HIDDEN_CLASS} {
       visibility: hidden !important;
     }
     #${VIDEO_TRANSLATION_BUTTON_ID} {
@@ -931,6 +970,7 @@ export function installVideoSubtitleStyle(): HTMLStyleElement {
       word-break: normal !important;
       white-space: normal !important;
       overflow: auto !important;
+      scroll-padding-top: calc(28px + 6px) !important;
       overscroll-behavior: contain !important;
       scrollbar-width: thin !important;
       cursor: default !important;
@@ -1029,6 +1069,10 @@ export function installVideoSubtitleStyle(): HTMLStyleElement {
     #${VIDEO_TRANSLATION_MENU_ID}[data-layout="wide"] .fluent-read-video-menu-download-status { flex: 1 0 100% !important; }
 
     #${VIDEO_TRANSLATION_MENU_ID} .fluent-read-video-menu-title {
+      position: sticky !important;
+      top: -6px !important;
+      z-index: 1 !important;
+      background: var(--fr-video-menu-surface) !important;
       display: flex !important;
       align-items: center !important;
       justify-content: space-between !important;
@@ -1486,6 +1530,7 @@ export function installVideoSubtitleStyle(): HTMLStyleElement {
     /* 触屏目标至少 44px；菜单沿既有最大高度滚动，不压缩触控区域。 */
     @media (pointer: coarse) {
       #${VIDEO_TRANSLATION_BUTTON_ID} { min-width: 44px !important; min-height: 44px !important; }
+      #${VIDEO_TRANSLATION_MENU_ID} { scroll-padding-top: calc(44px + 6px) !important; }
       /* 双 ID 优先于 compact/wide 的次级按钮规则，关闭、模式、返回与操作均保留完整触控面积。 */
       #${VIDEO_TRANSLATION_MENU_ID}#${VIDEO_TRANSLATION_MENU_ID} button {
         min-width: 44px !important;

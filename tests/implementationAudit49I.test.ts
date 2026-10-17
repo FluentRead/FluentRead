@@ -494,11 +494,33 @@ global.chrome={runtime:{sendMessage:async message=>{if(message.type==='persistCo
 let serial=0;
 const locator={first(){return this;},waitFor:async()=>{},click:async()=>{},count:async()=>0,getAttribute:async()=> 'true'};
 const makePage=()=>{
- let ownWindow,currentUrl='about:blank';
- const use=()=>{global.window=ownWindow;global.document=ownWindow.document;global.HTMLElement=ownWindow.HTMLElement;};
- return {on(){},locator:()=>locator,getByRole:()=>locator,getByText:()=>locator,screenshot:async()=>{},close:async()=>{},waitForTimeout:async()=>{},waitForLoadState:async()=>{},url:()=>currentUrl,
-  goto:async url=>{currentUrl=url;const html=url.includes('/popup.html')?'<div data-feature="video-subtitle" class="feature-card"></div><div class="feature-card">图片翻译</div>'+ '<div class="feature-card"></div>'.repeat(4):url.includes('/options.html')?'<div class="sidebar"><button class="active">视频字幕翻译</button></div><section id="settings-video"><select aria-label="视频字幕翻译服务"></select></section>':'<div class="ytp-right-controls"><button id="fluent-read-video-subtitle-button" aria-pressed="true"></button></div>'+fs.readFileSync(process.env.AUDIT_VIDEO_MENU,'utf8');ownWindow=parseHTML('<html><body>'+html+'</body></html>').window;ownWindow.location={origin:'https://controlled.invalid'};ownWindow.postMessage=()=>{};use();},
-  reload:async()=>{},evaluate:async(callback,value)=>{use();const result=await callback(value);if(result?.modeCount!==undefined)log('actual-client-menu-consumed',result);return result;},
+ let ownWindow,currentUrl='about:blank',closed=false;
+ const use=()=>{if(closed)throw Error('CONTROLLED_CLOSED_PAGE');global.window=ownWindow;global.document=ownWindow.document;global.HTMLElement=ownWindow.HTMLElement;};
+ const resolveLocator=selector=>{
+   if(selector==='.popup-shell[data-config-ready="true"]')return {...locator,waitFor:async()=>{
+     use();if(!document.querySelector(selector))throw Error('CONTROLLED_POPUP_NOT_READY');log('public-popup-ready');
+   }};
+   if(selector==='[data-testid="popup-feature-services"]')return {...locator,click:async()=>{
+     // 仅模拟公开 locator 输入端口，不在 runner 中合成 DOM click 或实现业务保存。
+     use();if(!document.querySelector(selector))throw Error('CONTROLLED_SERVICES_ENTRY_MISSING');
+     const panel=document.querySelector('.popup-service-panel');if(!panel)throw Error('CONTROLLED_SERVICE_PANEL_MISSING');
+     panel.hidden=false;log('public-services-entry-click');
+   }};
+   if(selector==='.popup-service-panel')return {...locator,locator:child=>({...locator,waitFor:async()=>{
+     use();const panel=document.querySelector(selector),row=panel?.querySelector(child);
+     if(!panel||panel.hidden||!row)throw Error('CONTROLLED_VIDEO_ASSIGNMENT_UNAVAILABLE');
+     log('public-video-assignment-wait',{selector:child,summary:row.querySelector('.assignment-value')?.textContent});
+   }})};
+   if(selector==='#fluent-read-video-subtitle-button')return {...locator,click:async()=>{
+     // 受控浏览器端口模拟公开 locator.click 激活；这不代替真实浏览器事件验收。
+     use();const button=document.getElementById('fluent-read-video-subtitle-button'),menu=document.getElementById('fluent-read-video-subtitle-menu');
+     menu.hidden=!menu.hidden;button.setAttribute('aria-expanded',String(!menu.hidden));log('public-menu-entry-click');
+   }};
+   return locator;
+ };
+ return {on(){},locator:resolveLocator,getByRole:()=>locator,getByText:()=>locator,screenshot:async()=>{},close:async()=>{closed=true;},waitForTimeout:async()=>{},waitForLoadState:async()=>{},url:()=>currentUrl,
+  goto:async url=>{currentUrl=url;const html=url.includes('/popup.html')?'<section class="popup-shell" data-config-ready="true"><button data-testid="popup-feature-services">翻译服务</button><section class="popup-service-panel" hidden><button data-feature-service="video"><span class="assignment-value">微软翻译</span></button></section></section>':url.includes('/options.html')?'<h1>视频字幕翻译</h1><div class="sidebar"><button class="active">视频字幕翻译</button></div><section id="settings-video"><div class="feature-enable-card"><button role="switch" aria-label="视频字幕翻译" aria-checked="true">视频字幕翻译</button></div><select aria-label="视频字幕翻译服务"></select></section>':'<div class="ytp-right-controls"><button id="fluent-read-video-subtitle-button" class="fluent-read-video-subtitle-active" role="button" aria-haspopup="menu" aria-expanded="false" aria-controls="fluent-read-video-subtitle-menu"></button></div>'+fs.readFileSync(process.env.AUDIT_VIDEO_MENU,'utf8');ownWindow=parseHTML('<html><body>'+html+'</body></html>').window;ownWindow.location={origin:'https://controlled.invalid'};ownWindow.postMessage=()=>{};use();},
+  reload:async()=>{use();},evaluate:async(callback,value)=>{use();const result=await callback(value);if(result?.modeCount!==undefined)log('actual-client-menu-consumed',result);if(result?.videoServiceAssignmentPresent!==undefined)log('actual-popup-assignment-consumed',{present:result.videoServiceAssignmentPresent,summary:result.videoServiceAssignmentSummary,betaMarkers:result.betaMarkers,obsoleteVideoCard:Boolean(document.querySelector('[data-feature="video-subtitle"]'))});return result;},
   waitForSelector:async()=>{},waitForFunction:async(callback,value,options)=>{use();const result=await callback(value);log('public-wait-function-port',{value,options,result});if(!result)throw Error('CONTROLLED_OVERLAY_TIMEOUT');},
   waitForEvent:async()=>{const file=path.join(process.env.TMPDIR,'controlled.srt');fs.writeFileSync(file,'1\n00:00:00,000 --> 00:00:01,200\nDownload test subtitle.\n');return {path:async()=>file,suggestedFilename:()=> 'fixture.srt'};}
  };
@@ -1228,9 +1250,19 @@ it('selection public CLI clears its actual 25ms tracker after the next external 
     expect(result.directories.every(directory=>!directory.exists)).toBe(true);
 },12000);
 
+it('video fixture rejects an unknown suite before native or browser allocation',async()=>{
+    const result=await invoke(videoFixture,'launch',['--suite','unknown-suite']);
+    expect(result.code).toBe(1);expect(result.stderr).toContain('未知视频 fixture suite');
+    expect(count(result,'native-command-port')).toBe(0);expect(count(result,'launch')).toBe(0);
+},12000);
+
 it('video subtitle public CLI accepts all four actual client menu modes and passes the overlay timeout in the options position',async()=>{
     const result=await invoke(videoContract,'client-contract');
     expect(result.code).toBe(1);expect(result.stderr).toContain('CONTROLLED_OVERLAY_TIMEOUT');
+    expect(count(result,'public-popup-ready')).toBe(2);
+    expect(count(result,'public-services-entry-click')).toBe(1);
+    expect(result.events.find(event=>event.kind==='public-video-assignment-wait')).toMatchObject({selector:'[data-feature-service="video"]',summary:'微软翻译'});
+    expect(result.events.find(event=>event.kind==='actual-popup-assignment-consumed')).toMatchObject({present:true,summary:'微软翻译',betaMarkers:0,obsoleteVideoCard:false});
     const menu=result.events.find(event=>event.kind==='actual-client-menu-consumed')!;
     expect(menu.modeCount).toBe(4);expect(menu.bilingualSelected).toBe(true);expect(menu.downloadPresent).toBe(true);
     const wait=result.events.filter(event=>event.kind==='public-wait-function-port').at(-1)!;

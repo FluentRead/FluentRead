@@ -1,0 +1,392 @@
+{
+  "schema": 1,
+  "at": "2026-10-16T21:46:14.925Z",
+  "reviewer": "Independent pure-disk reviewer /root/safari_readiness_prepare/readiness_source_audit",
+  "status": "COMPILED_HARNESS_BINDING_AND_STORED_SIGNATURE_RECEIPTS_ACCEPTED_NO_RUNTIME_GO",
+  "blockingFindings": [],
+  "scope": {
+    "root": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/safari-final-menu-readiness-preparation-20261017",
+    "reviewed": "The new build report/log, actual three harness binaries, default/prepared xctestrun plists, compiled identity, runtime plan/runPlan/binding receipt, the stored Root signature receipts, unchanged26-file source seal, and the new/old artifact recovery maps.",
+    "authority": "Read-only local artifact inspection and one new review file only. No executable guard/binder, SDK, signing command, browser, process inventory, device, simulator or runtime operation.",
+    "rootLaterStageFiles": "Root supplemental files remain separate by timestamp and scope; their presence does not mutate the26 listed sealed inputs.",
+    "RootRuntimeGOGranted": false
+  },
+  "inputSHA256": {
+    "build-guard-report.json": "5c945e31b140a43437f36c9b28ff1c3920734cc58630cf08d91cf4b59e47e8b7",
+    "build-for-testing.log": "124b92415fc31086f7a70b92c52f748742beae50048e548a61a22f870c7b6fbd",
+    "compiled-harness-identity.json": "b4c813d79e3210cb138bbe0506531d64572a024e5b364cbd6de55015776d27b2",
+    "inline-attempt1/plan.json": "4dde9419d044a2febb26e1e8871ab5169649bdb90fe6dbd9abdacf5333d9c95d",
+    "inline-attempt1/runtime-run-plan.json": "77f115092ff83eea34a129e9ed6490f6f59a44ecaefd17651f363d2d6982f921",
+    "inline-attempt1/production-binding-receipt.json": "e71e5e2261dee13266bbd25b0499030658e436a8d2839fa44f9e670e90b2e423",
+    "root-compiled-signature-review.json": "95e7d736d396eba017ccecc1b4ba93fede6abc0a5c3c7f5ce7d91507c32d9414",
+    "binding-source-seal.json": "5471ed60f7ccba2b665d107d4d1e763797a397d185313d052f04b4ee567c5e7b",
+    "root-final-inputs.json": "49243d1871171ea31db8448dccebfce7b240b26f8695f0af736e675b6fc77981",
+    "binding-independent-review.json": "7cf66faf694d34e50b617bc4e2070932807a64b2b57b1a788f3c61315f3237db"
+  },
+  "sourceAndBuild": {
+    "sourceSHA256": "566274799e05963b2b714966e28f9bcdfcee51805e3664cc91f85e1a3781b68e",
+    "sourceSeal26Unchanged": true,
+    "rootSourceManifest25Unchanged": true,
+    "priorBindingIndependentReviewSHA256": "7cf66faf694d34e50b617bc4e2070932807a64b2b57b1a788f3c61315f3237db",
+    "oldB33Unchanged": true,
+    "rootReportedTerminalSession": {
+      "id": 9650,
+      "exitCode": 0,
+      "reviewerDidNotPollSession": true
+    },
+    "independentlyReadDiskBuildEvidence": {
+      "status": "build-passed-no-runtime",
+      "result": {
+        "code": 0,
+        "signal": null
+      },
+      "elapsedSeconds": 22.118,
+      "commandExact": true,
+      "arm64AndX86_64CompileLines": [
+        {
+          "line": 666,
+          "text": "SwiftCompile normal x86_64 /Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/safari-final-menu-readiness-preparation-20261017/SafariSmokeTests.candidate.swift (in target 'SafariSmokeUITests' from project 'NativeHarness')"
+        },
+        {
+          "line": 672,
+          "text": "SwiftCompile normal arm64 /Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/safari-final-menu-readiness-preparation-20261017/SafariSmokeTests.candidate.swift (in target 'SafariSmokeUITests' from project 'NativeHarness')"
+        },
+        {
+          "line": 728,
+          "text": "SwiftCompile normal arm64 Compiling\\ SafariSmokeTests.candidate.swift /Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/safari-final-menu-readiness-preparation-20261017/SafariSmokeTests.candidate.swift (in target 'SafariSmokeUITests' from project 'NativeHarness')"
+        },
+        {
+          "line": 730,
+          "text": "SwiftCompile normal arm64 /Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/safari-final-menu-readiness-preparation-20261017/SafariSmokeTests.candidate.swift (in target 'SafariSmokeUITests' from project 'NativeHarness')"
+        },
+        {
+          "line": 734,
+          "text": "SwiftCompile normal x86_64 Compiling\\ SafariSmokeTests.candidate.swift /Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/safari-final-menu-readiness-preparation-20261017/SafariSmokeTests.candidate.swift (in target 'SafariSmokeUITests' from project 'NativeHarness')"
+        },
+        {
+          "line": 736,
+          "text": "SwiftCompile normal x86_64 /Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/safari-final-menu-readiness-preparation-20261017/SafariSmokeTests.candidate.swift (in target 'SafariSmokeUITests' from project 'NativeHarness')"
+        }
+      ],
+      "logBytes": 253323,
+      "logLines": 846,
+      "logWarningCount": 15,
+      "storedObserverAndProcessReadCount": 19,
+      "CodeSignCommandLinesFound": false,
+      "testExecutionLinesFound": false
+    },
+    "testBuildSucceededMarker": {
+      "line": 845,
+      "text": "** TEST BUILD SUCCEEDED **"
+    },
+    "commandAssessment": "Stored argv exactly matches the reviewed run-resource-safe wrapper:workers1/concurrency3/CPU target40, xcodebuild build-for-testing only, new harness project/source/DerivedData paths, jobs1, CODE_SIGNING_ALLOWED=NO, CODE_SIGNING_REQUIRED=NO and empty development team/sign identity.",
+    "sourceCompileAssessment": "The log names the current root SafariSmokeTests.candidate.swift in actual SwiftCompile records for arm64 and x86_64. Its current bytes match the pre/post guard source hash, and the newly hashed UITest slices contain the new helper, selector and specific added guard literals.",
+    "warningAssessment": "15 warning lines were retained: manual target order, inherited Host iOS26 deprecations, AppIntents metadata extraction with no dependency, and unstripped signed Apple SDK support binaries. No compiler error line or test execution line was found.",
+    "productWebRebuildInHarnessCommand": false
+  },
+  "compiledBinaries": {
+    "actualBinaryCount": 3,
+    "evidence": [
+      {
+        "path": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/safari-final-menu-readiness-preparation-20261017/DerivedData/Build/Products/Debug-iphonesimulator/SafariSmokeUITests-Runner.app/SafariSmokeUITests-Runner",
+        "bytes": 178976,
+        "sha256": "46603cf963c565b58a7fd252ebd3fa74e85143e4a358f22328e75b94c5dd9a5e",
+        "fatSlices": [
+          {
+            "architecture": "x86_64",
+            "offset": 16384,
+            "bytes": 62512,
+            "MachOFiletype": 2
+          },
+          {
+            "architecture": "arm64",
+            "offset": 81920,
+            "bytes": 97056,
+            "MachOFiletype": 2
+          }
+        ]
+      },
+      {
+        "path": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/safari-final-menu-readiness-preparation-20261017/DerivedData/Build/Products/Debug-iphonesimulator/SafariSmokeUITests-Runner.app/PlugIns/SafariSmokeUITests.xctest/SafariSmokeUITests",
+        "bytes": 722176,
+        "sha256": "681c96eafd85022605850d90cc90ce2835a129b8ad5e92d3559f3a81ac5b90bb",
+        "fatSlices": [
+          {
+            "architecture": "x86_64",
+            "offset": 4096,
+            "bytes": 355344,
+            "MachOFiletype": 8,
+            "newSourceMarkers": [
+              {
+                "text": "menuObserveEntryReadiness",
+                "present": true,
+                "sliceOffset": 252693
+              },
+              {
+                "text": "testPausedMenuScrollAndClose",
+                "present": true,
+                "sliceOffset": 229198
+              },
+              {
+                "text": "An exact entry was observed but not ready; preserve no-reveal rule for existing entry",
+                "present": true,
+                "sliceOffset": 223360
+              },
+              {
+                "text": "Readiness reveal pre-touch snapshot changed retained owner; no touch",
+                "present": true,
+                "sliceOffset": 218080
+              }
+            ]
+          },
+          {
+            "architecture": "arm64",
+            "offset": 360448,
+            "bytes": 361728,
+            "MachOFiletype": 8,
+            "newSourceMarkers": [
+              {
+                "text": "menuObserveEntryReadiness",
+                "present": true,
+                "sliceOffset": 256797
+              },
+              {
+                "text": "testPausedMenuScrollAndClose",
+                "present": true,
+                "sliceOffset": 203262
+              },
+              {
+                "text": "An exact entry was observed but not ready; preserve no-reveal rule for existing entry",
+                "present": true,
+                "sliceOffset": 197424
+              },
+              {
+                "text": "Readiness reveal pre-touch snapshot changed retained owner; no touch",
+                "present": true,
+                "sliceOffset": 192144
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "path": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/safari-final-menu-readiness-preparation-20261017/DerivedData/Build/Products/Debug-iphonesimulator/NativeHarness.app/NativeHarness",
+        "bytes": 72416,
+        "sha256": "12551b14311235dea669ef7d85d9d20cd8d1f090f64d65f55091233f707b4199",
+        "fatSlices": [
+          {
+            "architecture": "x86_64",
+            "offset": 4096,
+            "bytes": 25496,
+            "MachOFiletype": 2
+          },
+          {
+            "architecture": "arm64",
+            "offset": 32768,
+            "bytes": 39648,
+            "MachOFiletype": 2
+          }
+        ]
+      }
+    ],
+    "helperAndLiteralPresenceIsCompileIdentityCorroborationOnly": true,
+    "binaryPresenceDoesNotProveCodeExecuted": true,
+    "oldA2UITestBinaryReused": false,
+    "hostAndRunnerMayMatchPreviousBuildsBecauseTheirSourceOrVendorBytesAreUnchanged": true
+  },
+  "xctestrunAndExecutionBinding": {
+    "originalDefaultSHA256": "302709e6fa76b9b2c6566574d7eb77a9975703ebfca14a1d162deb7f572c1911",
+    "preparedSHA256": "6c4de77b7c0970cb81b20ef94cf912c1ecbf6970009c3b28029332010be48932",
+    "originalDefaultCount": 1,
+    "targetCount": 1,
+    "target": "SafariSmokeUITests",
+    "defaultHasNoFluentReadEnvironmentBindings": true,
+    "onlyPreparedMutation": {
+      "EnvironmentVariablesAdded": {
+        "FLUENTREAD_UI_APPROVED": "1",
+        "FLUENTREAD_EXPECTED_UDID": "A407390F-7AA8-42AE-AFEB-F93EE99E9FF8",
+        "FLUENTREAD_ARTIFACT_KIND": "production",
+        "FLUENTREAD_PRODUCTION_IDENTITY_SHA256": "3f74f268976e82aa7a84c5375938c89253ab461aa6585f5d18efec8164b04051",
+        "FLUENTREAD_EXPECTED_WEB_RAW": "b1a66b3fc4e579216321758ebb921b7396430610119c9e5ca356de23b8cfc161",
+        "FLUENTREAD_RUNTIME_COMMIT": "6eecd6710e7daac2d2a8cca9a34d0f26dc849b44"
+      }
+    },
+    "entirePreparedPlistEqualsDefaultPlusOnlyThoseSixEnvironmentBindings": true,
+    "originalDefaultTimeAllowanceSeconds": 600,
+    "originalTestTimeoutsEnabled": false,
+    "timeoutInterpretation": "The unchanged generated default600s field and disabled XCTest timeouts are not the180s scene or240s outer process budget. Those limits remain in the frozen Swift/runtime guard.",
+    "actualInfoPlistExecutablePathsResolveToExactThreeBinariesWithinNewProductsRoot": true,
+    "runtimePlanSHA256": "4dde9419d044a2febb26e1e8871ab5169649bdb90fe6dbd9abdacf5333d9c95d",
+    "runPlanSHA256": "77f115092ff83eea34a129e9ed6490f6f59a44ecaefd17651f363d2d6982f921",
+    "productionBindingReceiptSHA256": "e71e5e2261dee13266bbd25b0499030658e436a8d2839fa44f9e670e90b2e423",
+    "productionBindingAll9ReferencedFileHashesMatch": true,
+    "compiledIdentityRunPlanAndReceiptAllThreeBinaryMapsEqual": true,
+    "sourceBuildReceiptIdentityPlanAndPreparedHashesCrossMatch": true,
+    "commandExact": [
+      "xcodebuild",
+      "test-without-building",
+      "-xctestrun",
+      "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/safari-final-menu-readiness-preparation-20261017/DerivedData/Build/Products/production-final-layout-menu-readiness-approved-a407.xctestrun",
+      "-destination",
+      "platform=iOS Simulator,id=A407390F-7AA8-42AE-AFEB-F93EE99E9FF8",
+      "-destination-timeout",
+      "15",
+      "-jobs",
+      "1",
+      "-parallel-testing-enabled",
+      "NO",
+      "-maximum-concurrent-test-simulator-destinations",
+      "1",
+      "-only-testing:SafariSmokeUITests/SafariSmokeTests/testPausedMenuScrollAndClose",
+      "-resultBundlePath",
+      "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/safari-final-menu-readiness-preparation-20261017/inline-attempt1/runtime.xcresult",
+      "CODE_SIGNING_ALLOWED=NO",
+      "CODE_SIGNING_REQUIRED=NO",
+      "DEVELOPMENT_TEAM=",
+      "CODE_SIGN_IDENTITY="
+    ],
+    "exactlyOneOnlyTestingSelector": "SafariSmokeUITests/SafariSmokeTests/testPausedMenuScrollAndClose",
+    "rootGOEnvironmentStillRequired": "FLUENTREAD_PRODUCTION_RUNTIME_GO=1",
+    "commandExecutedByReviewer": false
+  },
+  "savedSignatureReceiptReview": {
+    "sourceSHA256": "95e7d736d396eba017ccecc1b4ba93fede6abc0a5c3c7f5ce7d91507c32d9414",
+    "items": [
+      {
+        "kind": "runner",
+        "actualBinarySHA256": "46603cf963c565b58a7fd252ebd3fa74e85143e4a358f22328e75b94c5dd9a5e",
+        "storedClassification": "UNCHANGED_APPLE_SDK_VENDOR_RUNNER_NO_SIGNING_APPLIED",
+        "fileAndSignatureRawReceiptsConsistent": true,
+        "receiptCommandsNotReexecuted": true
+      },
+      {
+        "kind": "test",
+        "actualBinarySHA256": "681c96eafd85022605850d90cc90ce2835a129b8ad5e92d3559f3a81ac5b90bb",
+        "storedClassification": "LINKER_ADHOC_NO_TEAM",
+        "fileAndSignatureRawReceiptsConsistent": true,
+        "receiptCommandsNotReexecuted": true
+      },
+      {
+        "kind": "host",
+        "actualBinarySHA256": "12551b14311235dea669ef7d85d9d20cd8d1f090f64d65f55091233f707b4199",
+        "storedClassification": "LINKER_ADHOC_NO_TEAM",
+        "fileAndSignatureRawReceiptsConsistent": true,
+        "receiptCommandsNotReexecuted": true
+      }
+    ],
+    "allReceiptBinaryHashesMatchFreshlyReadActualBinaries": true,
+    "receiptCommandArgumentsAreReadOnlyFileAndCodesignDisplay": true,
+    "reportedFileArchitectureMatchesPureByteMachOHeaderParsing": true,
+    "noEmbeddedProvisioningFoundUnderActualHarnessBundles": true,
+    "hostAndTestClassification": "Stored raw codesign output reports linker ad-hoc flags0x20002, Signature=adhoc, TeamIdentifier=not set.",
+    "runnerClassification": "Stored raw codesign output reports the Apple SDK vendor Runner, Authority Apple Root CA and TeamIdentifier59GAB85EFG. It is not classified as a project no-team binary.",
+    "liveSDKVendorBinaryRehashedByThisReviewer": false,
+    "vendorIdentityBoundary": "The copied Runner's actual hash matches the Root receipt's sdkVendorSource hash and the known unchanged prior Runner bytes. This reviewer did not read the live SDK path or re-run signature verification.",
+    "RootReceiptReportsNewSigningApplied": false,
+    "RootReceiptReportsRuntimeStarted": false,
+    "freshFileCodesignOrSigningCommandExecutedByReviewer": false,
+    "cryptographicSignatureTrustRevalidatedByReviewer": false
+  },
+  "productAndRecoveryIdentity": {
+    "newFlatIdentitySHA256": "3f74f268976e82aa7a84c5375938c89253ab461aa6585f5d18efec8164b04051",
+    "sourceCommit": "6eecd6710e7daac2d2a8cca9a34d0f26dc849b44",
+    "newAppAll485FreshlyReadAndExactFlatMapHashesMatched": true,
+    "newAppSummary": {
+      "files": 485,
+      "bytes": 64226943,
+      "rawByteHash": "8a43eba8254a15452e5a8cb09cb519a9fdb42bb02623e87f3c3630ff4caca3d9",
+      "recordHash": "bedc4de9c0ef08df7be31f0a1208555f8ee0b750744c81cdef8ef154418d1bad"
+    },
+    "oldD9IdentitySHA256": "b185d1c82009ea924b6b92bfdfb2045120df4d58f49c8cb345b508a28890e31d",
+    "oldD9All485FreshlyReadAndExactRestoreMapHashesMatched": true,
+    "oldD9Summary": {
+      "files": 485,
+      "bytes": 64206587,
+      "rawByteHash": "c1e3e2fa9e8f32e6dde036b8f5f621f9bba3d8e125b952b69448506cf8277643",
+      "recordHash": "9557d296bf98f3d615a05e615b8810a06936d196d13cda653819a573866beee6"
+    },
+    "UserscriptsSourceSHA256": "0fac51f0b43d7ab473cf05145cc2be26a2c2281ef9d87ad4fc19a052181c9cb5",
+    "UserscriptsAll47FreshlyReadAndExactMapHashesMatched": true,
+    "UserscriptsSummary": {
+      "files": 47,
+      "bytes": 7388462,
+      "rawByteHash": "bd33bf8d5152be34d1b175178c6f0f769b81ebf4b17c5153fc43e0096c80144f",
+      "recordHash": "a255a588c0b5dd74fc1d115752fd18312882634183dd1cd0e9a2e6b988c3b85a"
+    },
+    "planWebGuideNativeFieldsExactlyMatchSealedFlatIdentity": true,
+    "priorSealedProjectionContainsIndependentlyVerifiedWeb467Guide5AndNativeAlgorithms": true,
+    "freshFullAppHashMatchesThatPreviouslyVerifiedProjection": true,
+    "newProductNoProvisionDiagnosticSymlinkOrSpecialFileFound": true,
+    "currentInstalledAppOrPrivateContainersRead": false
+  },
+  "preservedProtocol": {
+    "fieldsDeepEqualToOldB": [
+      "UDID",
+      "name",
+      "bundle",
+      "oldIdentity",
+      "oldIdentitySHA256",
+      "Userscripts",
+      "budgetSeconds",
+      "sceneBudgetSeconds",
+      "runtimeProcessCeilingSeconds",
+      "cleanupReserveSeconds",
+      "privateBoundary",
+      "resourcePolicy"
+    ],
+    "UDID": "A407390F-7AA8-42AE-AFEB-F93EE99E9FF8",
+    "retainedOwnerTabUUID": "87246FAF-A680-4738-BA2A-97A9E170620D",
+    "budgetsSeconds": {
+      "harnessBuild": 300,
+      "scene": 180,
+      "runtimeProcess": 240,
+      "runtimeTotal": 540,
+      "cleanupReserve": 180
+    },
+    "resources": {
+      "jobs": 1,
+      "maxWorkers": 1,
+      "concurrency": 3,
+      "cpuTarget": 40,
+      "cpuTargetIsKernelCap": false
+    },
+    "actionLimits": {
+      "newSameBundleInstall": 1,
+      "selectedCase": 1,
+      "originalD9Restore": 1
+    },
+    "DemoAndNativePrivate17": "Unchanged byte-exact identity-checker protocol; do not treat this artifact review as current Demo or17-file installed baseline verification.",
+    "focusOwnedPIDPGIDOfficialPathsAndAfterShutdownChecks": "Unchanged frozen guard/checker logic. Saved build observer samples were read; this reviewer did not query current process/device/focus state.",
+    "noRuntimeOutputFilesAtAuditSnapshot": true
+  },
+  "conclusion": "No blocking discrepancy found in the frozen new harness compile, actual compiled identity, plist/environment/selector binding, or stored signature receipts. Acceptance is limited to those local artifacts. A fresh Root-owned preflight, separate runtime GO and actual evidence review remain outside this report.",
+  "limitations": [
+    "Stored terminal-zero/build and signature receipts were reviewed from disk; this reviewer did not launch or poll the build session, binder, file, codesign or SDK.",
+    "Mach-O parsing and helper/string presence corroborate binary architecture and compiled identity. They do not prove runtime control flow or UI behavior.",
+    "No current device, installed App, private17, Demo, serial lane, process inventory, focus or checkout state was read. Later Root preflight must verify those facts.",
+    "No test has been accepted as passed by this review. Readiness, binary binding, exit0 and cleanup cannot replace the original menu assertions and original-pixel/focus review.",
+    "No runtime GO, simulator operation, physical-device compatibility, playback, bilingual output or product UI acceptance is granted or inferred."
+  ],
+  "performed": {
+    "pureDiskReadHashPlistAndRawMachOParsing": true,
+    "newReviewFileOnly": true,
+    "SDK": false,
+    "build": false,
+    "binder": false,
+    "guard": false,
+    "fileCommand": false,
+    "codesignCommand": false,
+    "signing": false,
+    "runtime": false,
+    "browser": false,
+    "device": false,
+    "simulator": false,
+    "ADB": false,
+    "processInventory": false,
+    "network": false,
+    "inputEdit": false,
+    "WEdit": false,
+    "oldBEdit": false
+  },
+  "contextPolicy": "300K context-compaction preference retained; no descendants created and no enforced-threshold claim."
+}

@@ -1,0 +1,27 @@
+'use strict';
+
+// Research-only fault: actual native monitor and cleanup run before this marker.
+const realHelper = require('/Users/thinkstu/Desktop/copy/FluentRead-mobile-video-menu-accessibility-20261016/scripts/testing/focus-safe-browser.cjs');
+const marker = 'INJECTED_FOCUS_OBSERVER_FAILURE_DURING_STOP';
+
+module.exports = {
+  ...realHelper,
+  startFocusEventMonitor(options) {
+    const monitor = realHelper.startFocusEventMonitor(options);
+    let stopPromise, injectedError;
+    const stop = () => {
+      if (!stopPromise) stopPromise = monitor.stop().then(value => {
+        injectedError = new Error(marker);
+        return value;
+      });
+      return stopPromise;
+    };
+    return new Proxy(monitor, {
+      get(target, property, receiver) {
+        if (property === 'stop') return stop;
+        if (property === 'error') return target.error || injectedError;
+        return Reflect.get(target, property, receiver);
+      },
+    });
+  },
+};

@@ -1,0 +1,54 @@
+{
+  "at": "2026-10-16T10:20:58.645757+00:00",
+  "laneReleased": true,
+  "guardSession": 86625,
+  "guardExitCode": 0,
+  "loaderSession": 48972,
+  "loaderExitCode": 0,
+  "guardStatus": "stopped-by-owner",
+  "knownPIDs": [
+    82097,
+    82123,
+    82129,
+    82148,
+    82391,
+    82414
+  ],
+  "freshRemainingOwnedProcesses": [],
+  "freshPorts": [
+    {
+      "port": 5048,
+      "exitCode": 1,
+      "listeners": ""
+    },
+    {
+      "port": 5580,
+      "exitCode": 1,
+      "listeners": ""
+    },
+    {
+      "port": 5581,
+      "exitCode": 1,
+      "listeners": ""
+    },
+    {
+      "port": 60540,
+      "exitCode": 1,
+      "listeners": ""
+    }
+  ],
+  "runnerExit": true,
+  "ownedForwardRemoved": true,
+  "FirefoxTaskStopped": true,
+  "guardEmulatorServerStopped": true,
+  "hostAuthenticationMetadataUnchanged": true,
+  "focusEventCount": 0,
+  "violations": [],
+  "cleanupErrors": [],
+  "preserved": [
+    "task AVD/profile/data",
+    "Edge app/data/extension",
+    "default ADB server"
+  ],
+  "deviceScope": "Only emulator-5580; no iOS/Safari/physical device operation."
+}

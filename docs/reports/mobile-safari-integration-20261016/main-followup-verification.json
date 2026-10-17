@@ -1,0 +1,256 @@
+{
+  "at": "2026-10-16T02:30:07.044969+00:00",
+  "sourceCommit": "47f105aed2456b644b83da79692d4b9d815a97bb",
+  "integratedMain": "877ee77b5e3c905f6cc016db63633342dceb2419",
+  "nativeRuntimeCommit": "d9d4c9189f8d7777ec89aeada94885c4c2e9432f",
+  "nativeWebSHA256": "177b934b5dc2e86f39bc03d5b790320300759171fcb5a40bba05ad822dbe1497",
+  "validation47f": {
+    "at": "2026-10-16T01:55:29.406690+00:00",
+    "commit": "47f105aed2456b644b83da79692d4b9d815a97bb",
+    "parents": [
+      "d9d4c9189f8d7777ec89aeada94885c4c2e9432f",
+      "877ee77b5e3c905f6cc016db63633342dceb2419"
+    ],
+    "consumerTests": {
+      "files": 3,
+      "passed": 103,
+      "breakdown": {
+        "videoSubtitleTrackPriorityRuntime": 43,
+        "videoPlayerBinding": 52,
+        "shadowUi": 8
+      }
+    },
+    "cliContractTests": {
+      "file": "tests/implementationAudit49I.test.ts",
+      "passed": 145,
+      "intendedNameFilterApplied": false,
+      "note": "pnpm consumed -t; actual log shows entire selected file ran once. No rerun. Controlled subprocess/browser ports; not real website/provider acceptance."
+    },
+    "audit": "PASS",
+    "types": "PASS",
+    "logs": {
+      "direct-consumers.log": "c24e367ffca96bc13128487efa005e0409922d5129fb0c22f5c2ff61bc98f295",
+      "selected-cli.log": "933948d2cf1ee01d08cd96d9b157e2202c079cc1748fa6c5c661b88526028a26",
+      "audit.log": "76b80b01f4c772289d6df4611da64a42033fab4b7ecc9df6bedafba5bb04f2de",
+      "types.log": "26e1aa567737f0d9faef6acfd577d20011f9c10f8ccfa1b2a2d5700f7bf90393"
+    },
+    "resourcePolicy": {
+      "maxWorkers": 1,
+      "concurrency": 3,
+      "cpuTarget": 40,
+      "actualCPUCapClaim": false
+    },
+    "fullRepositorySuite": false,
+    "installedNativeRuntime": "d9d4c9189f8d7777ec89aeada94885c4c2e9432f",
+    "newWebBuilds": "PASS Chrome/Firefox/Safari Web/userscript plusmanifest/Safari/userscript verifiers",
+    "productionUI": {
+      "menu": "PASS",
+      "initialEntryBehavior": "PASS",
+      "initialEntrySteadyVisual": "NOT_PASSED capturedentryanimation",
+      "entryOnlyFollowup": "PASS actualstableviewportgeometry/centerhit/AX andSettingsroute",
+      "firstReport": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/main877-production-ui-20261016/runtime-attempt1/runtime-acceptance.json",
+      "followupReport": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/main877-production-ui-20261016/runtime-attempt2-entry-only/runtime-acceptance.json"
+    }
+  },
+  "d9ArtifactGate": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/integration-main24ccb-builds-20261016/artifact-gate.json",
+  "d9ProductionUI": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/integration-main24ccb-production-menu-20261016/runtime-acceptance.json",
+  "d9ProductionRootReview": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/integration-main24ccb-production-menu-20261016/root-visual-review.json",
+  "d9NativeBuild": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/safari/integrated-main24ccb-177b934b5dc2/acceptance.json",
+  "d9NativeUpdate": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/safari/integrated-main24ccb-177b934b5dc2/update-only-attempt1/acceptance.json",
+  "videoMenuActualFailure": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/native-video-integrated-d9d4c9189-site-prompt-preflight-attempt2/runtime-acceptance.json",
+  "videoIndependentNative1": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/native-video-integrated-d9d4c9189-independent-fullscreen-attempt1/runtime-acceptance.json",
+  "videoIndependentNative2": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/native-video-integrated-d9d4c9189-independent-fullscreen-attempt2/runtime-acceptance.json",
+  "userscripts7": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/userscripts-simulator-feasibility/runtime-attempt7/runtime-acceptance.json",
+  "userscripts8": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/userscripts-simulator-feasibility/runtime-attempt8/runtime-acceptance.json",
+  "images": [
+    {
+      "path": "images/d9-video-disabled.png",
+      "original": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/integration-main24ccb-production-menu-20261016/video-subtitle-fixture-disabled.png",
+      "sha256": "1914b9ccb1151f5c67e7d39fc589b3b29ffc409274a7e480af9173b087129921",
+      "runtimeCommit": "d9d4c9189f8d7777ec89aeada94885c4c2e9432f"
+    },
+    {
+      "path": "images/d9-video-settings-reenabled.png",
+      "original": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/integration-main24ccb-production-menu-20261016/video-subtitle-fixture-settings-reenabled.png",
+      "sha256": "2166f5ecff6d63ba11872b3591f373693da159b9a2818be91d10a1e96b8c588c",
+      "runtimeCommit": "d9d4c9189f8d7777ec89aeada94885c4c2e9432f"
+    },
+    {
+      "path": "images/47f-video-service-assignment.png",
+      "original": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/main877-production-ui-20261016/runtime-attempt2-entry-only/entry-02-video-assignment.png",
+      "sha256": "e17c51ed8ac506c1ff40ee5bc200aad563ff1f421f839038934d8e0b1ee7d0f5",
+      "runtimeCommit": "47f105aed2456b644b83da79692d4b9d815a97bb"
+    }
+  ],
+  "new47fWebBuilds": {
+    "at": "2026-10-16T02:04:05.403337+00:00",
+    "sourceCommit": "47f105aed2456b644b83da79692d4b9d815a97bb",
+    "serial": true,
+    "nativeAppOrDeviceOperation": false,
+    "results": [
+      {
+        "name": "chrome",
+        "args": [
+          "pnpm",
+          "build"
+        ],
+        "exitCode": 0,
+        "seconds": 26.87,
+        "log": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/main877-integration-20261016/chrome.log"
+      },
+      {
+        "name": "firefox",
+        "args": [
+          "pnpm",
+          "build:firefox"
+        ],
+        "exitCode": 0,
+        "seconds": 24.135,
+        "log": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/main877-integration-20261016/firefox.log"
+      },
+      {
+        "name": "safari-web",
+        "args": [
+          "pnpm",
+          "build:safari"
+        ],
+        "exitCode": 0,
+        "seconds": 24.588,
+        "log": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/main877-integration-20261016/safari-web.log"
+      },
+      {
+        "name": "manifests",
+        "args": [
+          "pnpm",
+          "verify:extension-manifests"
+        ],
+        "exitCode": 0,
+        "seconds": 0.543,
+        "log": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/main877-integration-20261016/manifests.log"
+      },
+      {
+        "name": "safari-verify",
+        "args": [
+          "pnpm",
+          "safari:verify"
+        ],
+        "exitCode": 0,
+        "seconds": 0.488,
+        "log": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/main877-integration-20261016/safari-verify.log"
+      },
+      {
+        "name": "userscript",
+        "args": [
+          "pnpm",
+          "build:userscript"
+        ],
+        "exitCode": 0,
+        "seconds": 5.404,
+        "log": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/main877-integration-20261016/userscript.log"
+      },
+      {
+        "name": "userscript-verify",
+        "args": [
+          "node",
+          "scripts/verify-userscript-build.mjs"
+        ],
+        "exitCode": 0,
+        "seconds": 0.135,
+        "log": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/main877-integration-20261016/userscript-verify.log"
+      }
+    ]
+  },
+  "new47fProductionUI": {
+    "menu": "PASS",
+    "initialEntryBehavior": "PASS",
+    "initialEntrySteadyVisual": "NOT_PASSED capturedentryanimation",
+    "entryOnlyFollowup": "PASS actualstableviewportgeometry/centerhit/AX andSettingsroute",
+    "firstReport": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/main877-production-ui-20261016/runtime-attempt1/runtime-acceptance.json",
+    "followupReport": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/main877-production-ui-20261016/runtime-attempt2-entry-only/runtime-acceptance.json",
+    "menuDisabledStableSamples": 22,
+    "menuEnabledStableSamples": 22,
+    "entryOnlyStableGeometry": {
+      "rect": [
+        496,
+        582,
+        264,
+        36
+      ],
+      "visualViewport": [
+        1272,
+        816
+      ],
+      "stableFrames": 3,
+      "fullRectInside": true,
+      "centerHitsRow": true
+    },
+    "allOriginalPNGsReviewed": {
+      "firstInvocation": 11,
+      "entryOnlyFollowup": 5
+    },
+    "nativeOrProviderOrSpeechAcceptance": false
+  },
+  "fullRepositorySuite": false,
+  "physicalDevices": false,
+  "developerSigningOrRelease": false,
+  "referenceProjectsBorrowed": false,
+  "goalComplete": false,
+  "new47fArtifactGate": {
+    "at": "2026-10-16T02:05:46.217831+00:00",
+    "runtimeCommit": "47f105aed2456b644b83da79692d4b9d815a97bb",
+    "worktree": "/Users/thinkstu/Desktop/copy/FluentRead-mobile-video-menu-accessibility-20261016",
+    "branch": "codex/mobile-video-menu-accessibility-20261016",
+    "sourceSHA256": {
+      "src/app/popup/PopupApp.vue": "3add5957e78f73b77278d066bf6237516f1ee8137a6e649001681776cae2c465",
+      "src/app/popup/PopupServices.vue": "65accc535c596e0d0b692f052f2c079ea5970eb3f27875dab6f10e0c9bea5906",
+      "src/app/popup/popup.css": "956a926724901fb0689e972ebb5714d75fea5881d27991a8c024d300a766bd75",
+      "src/features/video-subtitle/content/runtime.ts": "5dcd344023282a0a2dd0bd0194888594fd67803a255b55e77e4a231fede68092",
+      "src/features/video-subtitle/content/nativeFullscreen.ts": "389b9e9a9c4e8d3e825cc2485d65396ae33e4e2ddc739c8717b413be0295300e",
+      "src/features/video-subtitle/content/videoPlayerBinding.ts": "e5d2b72254b04d2b72eeb6a71666b833ff55814ee5c859e40409a63c9625e686"
+    },
+    "artifacts": {
+      "chrome": {
+        "directory": "/Users/thinkstu/Desktop/copy/FluentRead-mobile-video-menu-accessibility-20261016/.output/chrome-mv3",
+        "files": 478,
+        "bytes": 62342867,
+        "recordHash": "d4f987e13f48cfe76923e0444753fc9a6284496ca44de8481e8c553cccc38fb2",
+        "rawByteHash": "ced47af3bc1167a288b3eefcc053493e2218fe24bd45ccd311bac37d4ccd64c9",
+        "recordAlgorithm": "global UTF8 path sort; SHA256(path + NUL + fileSHA256 + NUL + decimalByteLength + LF)",
+        "rawAlgorithm": "recursive directory UTF8 name sort; SHA256(path + NUL + decimalByteLength + NUL + rawbytes)"
+      },
+      "firefox": {
+        "directory": "/Users/thinkstu/Desktop/copy/FluentRead-mobile-video-menu-accessibility-20261016/.output/firefox-mv2",
+        "files": 478,
+        "bytes": 62345812,
+        "recordHash": "8890e882da13022623cf45c877ad9724e83ebad20f2af7c123c1d711b4635dba",
+        "rawByteHash": "7ca8676eb7072b376b4f9f9a4c612b56b8561dc776db6e7327b921cafbf7809b",
+        "recordAlgorithm": "global UTF8 path sort; SHA256(path + NUL + fileSHA256 + NUL + decimalByteLength + LF)",
+        "rawAlgorithm": "recursive directory UTF8 name sort; SHA256(path + NUL + decimalByteLength + NUL + rawbytes)"
+      },
+      "safari": {
+        "directory": "/Users/thinkstu/Desktop/copy/FluentRead-mobile-video-menu-accessibility-20261016/.output/safari-mv2",
+        "files": 467,
+        "bytes": 62214265,
+        "recordHash": "b01359604359599eb89799fb0e8c2ab3eecf7fa0f13b21d94a3e51fad816d3e1",
+        "rawByteHash": "99c5718deea088debccbd7b562b9f9190a45a5e5f46442fc181468782525a5b7",
+        "recordAlgorithm": "global UTF8 path sort; SHA256(path + NUL + fileSHA256 + NUL + decimalByteLength + LF)",
+        "rawAlgorithm": "recursive directory UTF8 name sort; SHA256(path + NUL + decimalByteLength + NUL + rawbytes)"
+      }
+    },
+    "buildResults": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/main877-integration-20261016/builds.json",
+    "workingTreeClean": false,
+    "workingTreeChanges": "documentation only; runtime source committed47f",
+    "runtimeAcceptance": "Artifact gate captured before UI execution; final UI results are in new47fProductionUI. Installed native runtime remainsd9.",
+    "userscript": {
+      "path": "/Users/thinkstu/Desktop/copy/FluentRead-mobile-video-menu-accessibility-20261016/.output/userscript/fluent-read.user.js",
+      "bytes": 2087043,
+      "sha256": "315517cdf1ee2b0a319f110eba2297c9db84678e82a4700d9ee146c6df5d465e"
+    }
+  },
+  "rootSteadyEntryReview": {
+    "originalViewed": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/main877-production-ui-20261016/runtime-attempt2-entry-only/entry-02-video-assignment.png",
+    "wholeImageReviewed": true,
+    "observation": "Video assignment row and close button fully visible. Long list belowviewport remains scrollable-scopeunverified, not all-list acceptance."
+  },
+  "new47fArtifactGateOriginal": "research/mobile-safari-20261015/main877-integration-20261016/artifact-gate.json (original unchanged)"
+}

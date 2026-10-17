@@ -1,0 +1,151 @@
+{
+  "at": "2026-10-16T08:01:12.579087+00:00",
+  "status": "UNVERIFIED_SAME_PLAYER_HITTABLE_FALSE_ACROSS_BOUNDED_READINESS_SAMPLES",
+  "scope": "A4: one isolated readiness-harness case108 attempt against unchanged f5a production App3f3d on dedicated portrait iPhone16Pro/iOS26.2 A407. Real FluentRead caption/menu assessment was not reached.",
+  "productionIdentitySHA256": "3f3df2dc7993788676427a6544e5cd17937f2a7da8d8e4a5f6c1d215417679dd",
+  "productionCommit": "f5a82d11a5b6b6a5de2f2ea726065a56cdb2e6ca",
+  "webRawSHA256": "1040bd47a0d9b907d30a91fa7d27e7aa46b7c5c1e258bb6e3223ba4082838705",
+  "productionFullAppFileCount": 485,
+  "nativeGuideAggregateSHA256": "bb04c63f19de1ad2120b1796fffbcd1dec93ab2241cb727ad4e0c179555e4ae5",
+  "rawXCTest": {
+    "total": 1,
+    "passed": 0,
+    "skipped": 1,
+    "failed": 0,
+    "durationSeconds": 26.734,
+    "summarySHA256": "71238c3124e27c3b5782bb2d0aff04e9f5c6e508fb8368145627bee9ee3b6f1b",
+    "meaning": "A skipped case and zero failures do not establish acceptance."
+  },
+  "runtime": {
+    "session": 5351,
+    "exitCode": 0,
+    "installs": 1,
+    "restores": 1,
+    "testsSpawned": 1,
+    "isolatedResearchHarnessSourceSHA256": "d5e0f09cef2e94f999b9831b3b3ed0d7d89f70ee315329779cd10879e746de4a",
+    "newTestBinarySHA256": "48d2abdecc5849cf5033d86e8153d00cdda845658670616d63ad305c218569b3",
+    "testMethod": "test108ProductionVisibleBilingualInlineControls",
+    "productRecompiledForA4": false
+  },
+  "actualOutcome": {
+    "actions": {
+      "address": 1,
+      "navigation": 1,
+      "normalClear": 1,
+      "siteUnmute": 1
+    },
+    "outcome": "UNVERIFIED",
+    "reason": "No unique same-player hittable control/player within bounded8s; readiness attached; no touch"
+  },
+  "readinessEvidence": {
+    "path": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/mobile-safari-control-readiness-harness-20261016/inline-attempt1/runtime-evidence/preparationControlReveal-readiness.json",
+    "sha256": "16b02d3d9bc0ca04424892b1bda698bdbb59a3854ef04ad8f01c17b65d2c35d9",
+    "waitBudgetSeconds": 8,
+    "attachmentElapsedSeconds": 8.302386999130249,
+    "sampleCount": 4,
+    "waitSampleSeconds": [
+      1.5701960325241089,
+      3.465530037879944,
+      5.2279369831085205,
+      7.025313973426819
+    ],
+    "consistentFacts": {
+      "knownTEDCandidateExists": true,
+      "SafariForeground": true,
+      "alerts": 0,
+      "uniquePlayer": true,
+      "playerExists": true,
+      "playerPositiveFinite": true,
+      "playerContainedInApp": true,
+      "playerFrame": {
+        "height": 226,
+        "width": 402,
+        "x": 0,
+        "y": 110
+      },
+      "playerIsHittable": false,
+      "namedRevealUniqueExists": true,
+      "namedRevealFrame": {
+        "height": 12,
+        "width": 12,
+        "x": 0,
+        "y": 62
+      },
+      "namedRevealIsHittable": false,
+      "namedRevealContainedInPlayer": false,
+      "nativeFullscreenCount": 0,
+      "revealTouches": 0
+    },
+    "decision": "boundedReadinessExpiredNoTouch",
+    "timingBoundary": "The 8-second no-action wait ended without touch. Attached elapsed8.302s includes final limited outcome/screenshot/AX/defer work. AX samples are sequential and not atomic.",
+    "correctedEarlierProgressInference": "The actual exported readiness evidence establishes candidate=true in all four samples. An earlier progress note based only on a log tail speculated about candidate waiting; that was not the failure cause and is superseded by this evidence.",
+    "causeBoundary": "This run proves the actual .isHittable false predicate. It does not establish whether site AX semantics, native automation behavior or product DOM/layering caused it, and does not retroactively record the A3 missing boolean. No further wait/retry or predicate weakening was performed."
+  },
+  "imagesReviewed": [
+    {
+      "path": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/mobile-safari-control-readiness-harness-20261016/inline-attempt1/runtime-evidence/unverified-final.png",
+      "sha256": "d11b71a123d5660c9a1905622d396daae833c919cf9b5ec3679359ec5f59e648",
+      "reviewedPersonally": true,
+      "finding": "Original PNG shows the real TED watch page with the intro image Their ideas. Native video controls are hidden. No FluentRead bilingual cue/menu or permission dialog is visible."
+    }
+  ],
+  "allExportedImagesReviewed": true,
+  "mandatoryMenuAcceptance": {
+    "status": "UNVERIFIED_NOT_REACHED",
+    "entryCount": "NOT_MEASURED",
+    "atLeast44px": "NOT_MEASURED",
+    "opened": "NOT_ATTEMPTED",
+    "closed": "NOT_ATTEMPTED",
+    "actionsFRMenuOpen": 0,
+    "actionsFRMenuClose": 0,
+    "artifactMissing": "A-optional-FR-menu.json not emitted; never equate absence with entryCount0."
+  },
+  "mandatoryCaptionAcceptance": {
+    "status": "UNVERIFIED_NOT_REACHED",
+    "reason": "Bilingual readiness wait and caption/control pixel capture were not reached."
+  },
+  "notExercised": [
+    "Actual FluentRead entry/menu",
+    "Real bilingual caption/control overlay paint",
+    "Learning touch",
+    "Rare scrolling fallback",
+    "Fullscreen B",
+    "Rotation/background",
+    "Mode switching",
+    "Physical-device or assistive-speech acceptance"
+  ],
+  "restoration": {
+    "at": "2026-10-16T08:00:04.110208+00:00",
+    "runtimeSession": 5351,
+    "runtimeSessionExitCode": 0,
+    "exportExitCode": 0,
+    "knownPIDCount": 76,
+    "remaining": [],
+    "psCode": 0,
+    "psElapsedMs": 45.82183299999999,
+    "psTimeoutSeconds": 10,
+    "device": {
+      "udid": "A407390F-7AA8-42AE-AFEB-F93EE99E9FF8",
+      "name": "FluentRead-PR995-FreshPermissions-20261015",
+      "state": "Shutdown"
+    },
+    "foreignBootedRecordedOnly": [],
+    "oldIdentitySHA256": "b185d1c82009ea924b6b92bfdfb2045120df4d58f49c8cb345b508a28890e31d",
+    "oldInstalledFull485FreshMatch": true,
+    "DemoFreshSHA256": "6eb20314a7463f8f210cb1ced63867b1f2e3537ce66d7f12d106641d040d14b3",
+    "Userscripts47FreshMatch": true,
+    "nativePrivate17FreshMatch": true,
+    "afterShutdownReceipt": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/mobile-safari-control-readiness-harness-20261016/inline-attempt1/identity-after-shutdown.json",
+    "afterShutdownReceiptSHA256": "7c82c78b8cd39402fba7008507d1447b1f2df821956c122878537a99dd608286",
+    "Userscripts47AndPrivate17Boundary": "Native FR App data17 hash baseline only; not all extension settings/storage/cache. Record post-UI changes; do not copy files back.",
+    "focusEvents": [],
+    "violations": [],
+    "cleanupErrors": [],
+    "laneReleased": true
+  },
+  "freshReleaseReceipt": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/mobile-safari-control-readiness-harness-20261016/inline-attempt1/fresh-release.json",
+  "freshReleaseReceiptSHA256": "c4b7c991c37278cface10acefd3891efd76dd97dee374305e2934f0ca4629ffe",
+  "resourceLaneReleased": true,
+  "exportExitCode": 0,
+  "automaticRetry": false
+}

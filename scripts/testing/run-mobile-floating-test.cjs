@@ -54,13 +54,38 @@ const server = http.createServer(async (request, response) => {
 });
 
 (async () => {
-  let session, focusMonitor, browserPid, primaryError, focusError, cleanupStarted = false, focusTimer;
+  let session, focusMonitor, browserPid, primaryError, focusError, cleanupStarted = false, focusTimer, ownedClosePromise;
+  let ownedBrowserClosing = false;
+  function closeOwnedBrowser() {
+    if (!session) return Promise.resolve();
+    ownedClosePromise ||= (async () => {
+      ownedBrowserClosing = true;
+      const errors = []; let timer;
+      try {if (browserPid) {
+        // CDP 连接的 browser.close() 仅断开传输；先请求本次精确归属实例正常退出，仍由原 guard 核实 PID 消失。
+        report.gracefulBrowserClose = {requestedAt: Date.now(), method: 'Browser.close'}; save();
+        await Promise.race([
+          (async () => {const cdp = await session.context.browser().newBrowserCDPSession(); await cdp.send('Browser.close');})(),
+          new Promise((resolve, reject) => {timer = setTimeout(() => reject(new Error('Owned Browser.close exceeded 1500ms')), 1500);}),
+        ]);
+        report.gracefulBrowserClose.returnedAt = Date.now();
+      }} catch (error) {errors.push(error); if (report.gracefulBrowserClose) report.gracefulBrowserClose.error = String(error);}
+      finally {
+        clearTimeout(timer);
+        // 报告写入或协议退出失败也必须完成原 guard 的清理；只有它成功才有 PID 消失凭据。
+        try {await session.close(); report.browserCloseReceipt = 'shared-guard-fulfilled';} catch (error) {errors.push(error);}
+      }
+      try {save();} catch (error) {errors.push(error);}
+      if (errors.length) throw new AggregateError(errors, 'Owned browser close failed');
+    })();
+    return ownedClosePromise;
+  }
   let rejectFatal;
   const fatal = new Promise((resolve, reject) => {rejectFatal = reject;});
   void fatal.catch(() => {});
   const fail = error => {
     focusError ||= error; primaryError ||= error; report.ok = false; report.error = error.stack || String(error); save(); rejectFatal(error);
-    void session?.close().catch(closeError => {report.asynchronousCloseError = String(closeError); save();});
+    void closeOwnedBrowser().catch(closeError => {report.asynchronousCloseError = String(closeError); save();});
   };
   async function step(name, action, timeoutMs = 30000, ignoreFatal = false) {
     report.stage = name; report.stages.push({name, state: 'before', at: Date.now()}); save();
@@ -97,7 +122,7 @@ const server = http.createServer(async (request, response) => {
     browserPid = await step('ownership-capture', () => getGuardedBrowserPid(session)); report.browserPid = browserPid;
     assert(!focusMonitor.events.some(event => event.pid === browserPid), 'Browser must not become foreground during launch');
     const context = session.context; context.setDefaultTimeout(15000);
-    context.browser().on('disconnected', () => {if (!cleanupStarted) fail(new Error('Test browser disconnected before validation completed'));});
+    context.browser().on('disconnected', () => {if (!cleanupStarted && !ownedBrowserClosing) fail(new Error('Test browser disconnected before validation completed'));});
     async function checkFocus() {
       if (focusError) throw focusError;
       const front = await helper.queryMacFrontmostApplication();
@@ -163,6 +188,10 @@ const server = http.createServer(async (request, response) => {
     const extensionWorld = () => worlds.find(value => value.origin?.includes(new URL(origin).host) && value.auxData?.type==='isolated') || worlds.find(value => value.name?.includes(new URL(origin).host));
     const inExtension = async expression => {const world=extensionWorld();assert(world,'Extension isolated world missing');const result=await cdp.send('Runtime.evaluate',{contextId:world.id,expression,returnByValue:true});assert(!result.exceptionDetails,JSON.stringify(result.exceptionDetails));return result.result.value;};
     await cdp.send('Emulation.setTouchEmulationEnabled', {enabled: true, maxTouchPoints: 5});
+    // 触摸能力必须在生产组件的新文档挂载前生效，避免仅由动态媒体查询撑绿。
+    await step('reload-with-touch-capability-before-mount', () => page.reload());
+    await step('touch-capable-content-ready', ready);
+    report.touchCapabilitySetup = {maxTouchPoints: 5, beforeFreshDocumentMount: true, nativeMobileEvidence: false}; save();
     const {findCdpNode, hasCdpClass} = require('../run-selection-trigger-test.cjs');
     async function inspect(selector, body) {
       const {root} = await cdp.send('DOM.getDocument', {depth: -1, pierce: true});
@@ -177,7 +206,41 @@ const server = http.createServer(async (request, response) => {
         return result.result.value;
       } finally {await cdp.send('Runtime.releaseObject', {objectId: object.objectId});}
     }
-    const metrics = () => inspect('', `const r = this.getBoundingClientRect(); const main = this.querySelector('.floating-ball-main'), m = main.getBoundingClientRect(); return {dock:{x:r.x,y:r.y,width:r.width,height:r.height,right:r.right,bottom:r.bottom}, main:{x:m.x,y:m.y,width:m.width,height:m.height,right:m.right,bottom:m.bottom}, position:this.dataset.position, status:this.dataset.translationStatus, style:main.getAttribute('style'), expanded:this.classList.contains('floating-ball-expanded'), viewport:{width:innerWidth,height:innerHeight}, coarse:matchMedia('(pointer:coarse)').matches};`);
+    const metrics = () => inspect('', `
+      const r = this.getBoundingClientRect();
+      const main = this.querySelector('.floating-ball-main'), m = main.getBoundingClientRect();
+      const css = getComputedStyle(main), shadow = this.getRootNode(), host = shadow instanceof ShadowRoot ? shadow.host : this;
+      const visual = window.visualViewport;
+      const left = visual?.offsetLeft ?? 0, top = visual?.offsetTop ?? 0;
+      const width = visual?.width ?? innerWidth, height = visual?.height ?? innerHeight;
+      // 圆形按钮的命中点放在内侧，不把矩形包围盒的圆角空白当作故障。
+      const samples = [['center', .5, .5], ['upper-left', .25, .25], ['upper-right', .75, .25], ['lower-left', .25, .75], ['lower-right', .75, .75]];
+      const hitSamples = samples.map(([name, xRatio, yRatio]) => {
+        const x = m.x + m.width * xRatio, y = m.y + m.height * yRatio;
+        const rootHit = shadow.elementFromPoint(x, y), documentHit = main.ownerDocument.elementFromPoint(x, y);
+        return {name, x, y, rootHitTarget: rootHit === main || main.contains(rootHit),
+          documentHitOwn: documentHit === host || (!(shadow instanceof ShadowRoot) && host.contains(documentHit))};
+      });
+      return {dock:{x:r.x,y:r.y,width:r.width,height:r.height,right:r.right,bottom:r.bottom},
+        main:{x:m.x,y:m.y,width:m.width,height:m.height,right:m.right,bottom:m.bottom},
+        position:this.dataset.position, status:this.dataset.translationStatus, style:main.getAttribute('style'),
+        expanded:this.classList.contains('floating-ball-expanded'), viewport:{width:innerWidth,height:innerHeight},
+        visualViewport:{left,top,width,height,right:left+width,bottom:top+height,scale:visual?.scale ?? 1},
+        coarse:matchMedia('(pointer:coarse)').matches, anyPointerCoarse:matchMedia('(any-pointer:coarse)').matches,
+        maxTouchPoints:navigator.maxTouchPoints ?? 0, hardwareTouchClass:this.classList.contains('is-touch-capable'),
+        computedStyle:{display:css.display,visibility:css.visibility,opacity:css.opacity,pointerEvents:css.pointerEvents,
+          transform:css.transform,transformIsIdentity:css.transform === 'none' || new DOMMatrixReadOnly(css.transform).isIdentity,clipPath:css.clipPath}, hitSamples};
+    `);
+    function assertMainTouchable(m, label, fixtureBounds) {
+      // 几何、样式与命中均读取生产节点；可选边界只用于下方已明确标注的 VisualViewport fixture。
+      const viewport = fixtureBounds || m.visualViewport, detail = JSON.stringify({label, fixtureBounds, metrics:m});
+      assert(m.maxTouchPoints === 5 && m.hardwareTouchClass, detail);
+      assert(m.main.width >= 43.9 && m.main.height >= 43.9, detail);
+      assert(m.main.x >= viewport.left - .5 && m.main.right <= viewport.right + .5 && m.main.y >= viewport.top - .5 && m.main.bottom <= viewport.bottom + .5, detail);
+      assert(m.computedStyle.display !== 'none' && m.computedStyle.visibility === 'visible' && m.computedStyle.pointerEvents === 'auto', detail);
+      assert(Number(m.computedStyle.opacity) >= .699 && m.computedStyle.transformIsIdentity && m.computedStyle.clipPath === 'none', detail);
+      assert(m.hitSamples.length === 5 && m.hitSamples.every(point => point.rootHitTarget && point.documentHitOwn), detail);
+    }
     async function box(selector) {return inspect(selector, 'const r = el.getBoundingClientRect(); return {x:r.x,y:r.y,width:r.width,height:r.height};');}
     async function tap(selector) {
       const r = await box(selector); const point = {x:r.x+r.width/2,y:r.y+r.height/2};
@@ -189,7 +252,7 @@ const server = http.createServer(async (request, response) => {
     async function shot(name) {await checkFocus(); await page.screenshot({path:path.join(artifactsDir,`${name}.png`)}); report.screenshots.push(`${name}.png`); save();}
     await page.setViewportSize({width:390,height:844});
     await delay(600);
-    let m = await metrics(); assert(m.coarse); assert(m.main.width >= 44 && m.main.height >= 44); assert(m.main.x >= 0 && m.main.right <= 390);
+    let m = await metrics(); assert(m.coarse); assertMainTouchable(m, 'portrait-idle');
     record('touch-handle-full-44px',{metrics:m}); await shot('portrait-idle');
     await inspect('.floating-ball-main',`el.__events=[]; for(const name of ['pointerdown','pointerup','pointercancel','click']) el.addEventListener(name,event=>el.__events.push({type:event.type,pointerId:event.pointerId,button:event.button,detail:event.detail,trusted:event.isTrusted}));window.addEventListener('blur',()=>el.__events.push({type:'windowblur'}));return true;`);
     await tap('.floating-ball-main');
@@ -218,9 +281,9 @@ const server = http.createServer(async (request, response) => {
     for(let i=1;i<=8;i++) await cdp.send('Input.dispatchTouchEvent',{type:'touchMove',touchPoints:[{x:r.x+r.width/2+(45-r.x-r.width/2)*i/8,y:r.y+r.height/2+(620-r.y-r.height/2)*i/8}]});
     await delay(100); const dragging = await metrics(); assert(Math.abs(dragging.main.y+dragging.main.height/2-620)<3,JSON.stringify(dragging));
     await cdp.send('Input.dispatchTouchEvent',{type:'touchEnd',touchPoints:[]}); await delay(500);
-    m=await metrics(); assert.equal(m.position,'left'); assert.equal(m.status,beforeStatus); record('drag-persists-without-translation-toggle',{metrics:m});
-    await page.reload(); await step('content-ready-after-refresh', ready); await delay(600); m=await metrics(); assert.equal(m.position,'left'); record('refresh-restores-dock',{metrics:m});
-    await page.setViewportSize({width:844,height:390}); await delay(400); m=await metrics(); assert(m.main.x>=0 && m.main.right<=844 && m.main.y>=0 && m.main.bottom<=390); record('landscape-dock-visible',{metrics:m}); await shot('landscape-dock');
+    m=await metrics(); assert.equal(m.position,'left'); assert.equal(m.status,beforeStatus); assertMainTouchable(m, 'drag-completed'); record('drag-persists-without-translation-toggle',{metrics:m});
+    await page.reload(); await step('content-ready-after-refresh', ready); await delay(600); m=await metrics(); assert.equal(m.position,'left'); assertMainTouchable(m, 'refresh-restores-dock'); record('refresh-restores-dock',{metrics:m});
+    await page.setViewportSize({width:844,height:390}); await delay(400); m=await metrics(); assertMainTouchable(m, 'landscape-dock-visible'); record('landscape-dock-visible',{metrics:m}); await shot('landscape-dock');
     await page.setViewportSize({width:390,height:844});
     await patchStoredConfig(control,{floatingBallToolsDisplay:'always',theme:'dark'}); await delay(500);
     await tap('.floating-ball-settings');
@@ -231,10 +294,10 @@ const server = http.createServer(async (request, response) => {
     await page.keyboard.press('Escape'); await delay(200);
     // Deterministic VisualViewport injection is confined to the extension isolated world; it is a geometry fixture, not a phone keyboard test.
     await inExtension(`Object.defineProperty(window,'visualViewport',{configurable:true,value:Object.assign(new EventTarget(),{offsetLeft:25,offsetTop:180,width:340,height:300})});window.dispatchEvent(new Event('resize'));true`);
-    await delay(250); m=await metrics(); assert(m.main.x>=25 && m.main.right<=365 && m.main.y>=180 && m.main.bottom<=480); record('visual-viewport-keyboard-offset-fixture',{evidence:'isolated-world viewport fixture; not actual keyboard',metrics:m}); await shot('keyboard-geometry-fixture');
+    await delay(250); m=await metrics(); assertMainTouchable(m, 'visual-viewport-keyboard-offset-fixture', {left:25,top:180,right:365,bottom:480}); record('visual-viewport-keyboard-offset-fixture',{evidence:'isolated-world viewport fixture; not actual keyboard',metrics:m}); await shot('keyboard-geometry-fixture');
     await patchStoredConfig(control,{disableFloatingBall:true}); await delay(300);
     const absent = await cdp.send('DOM.getDocument',{depth:-1,pierce:true}); assert(!findCdpNode(absent.root,node=>hasCdpClass(node,'fr-floating-ball'))); record('disable-unmounts-floating-controls');
-    await patchStoredConfig(control,{disableFloatingBall:false}); await delay(400); assert((await metrics()).main.width>=44); const mounted=await cdp.send('DOM.getDocument',{depth:-1,pierce:true}); let count=0; const walk=node=>{if(hasCdpClass(node,'fr-floating-ball'))count++;for(const child of [...(node.children||[]),...(node.shadowRoots||[])])walk(child);};walk(mounted.root);assert.equal(count,1);record('reenable-remounts-once',{count});
+    await patchStoredConfig(control,{disableFloatingBall:false}); await delay(400); m=await metrics(); assertMainTouchable(m, 'reenable-remounts-once', {left:25,top:180,right:365,bottom:480}); const mounted=await cdp.send('DOM.getDocument',{depth:-1,pierce:true}); let count=0; const walk=node=>{if(hasCdpClass(node,'fr-floating-ball'))count++;for(const child of [...(node.children||[]),...(node.shadowRoots||[])])walk(child);};walk(mounted.root);assert.equal(count,1);record('reenable-remounts-once',{count,metrics:m});
     await inspect('.floating-ball-main','el.click(); return true;'); await page.locator('.fluent-read-bilingual-content').first().waitFor(); record('click-only-activation-fixture',{evidence:'DOM click without pointer events; does not establish VoiceOver acceptance'});
     report.workerUnhandledErrors = await worker.evaluate(() => globalThis.__pageNoticeUnhandledErrors || []); assert.equal(report.workerUnhandledErrors.length,0);
     assert.equal(report.consoleErrors.length,0,JSON.stringify(report.consoleErrors)); await checkFocus(); report.ok=true;
@@ -245,7 +308,7 @@ const server = http.createServer(async (request, response) => {
     }
   } finally {
     cleanupStarted = true; clearInterval(focusTimer);
-    if (session) try {await step('close-owned-browser', () => session.close(), 15000, true); report.browserCloseReceipt = 'shared-guard-fulfilled';}
+    if (session) try {await step('close-owned-browser', closeOwnedBrowser, 15000, true); report.browserCloseReceipt = 'shared-guard-fulfilled';}
     catch (error) {primaryError ||= error; report.cleanupError = String(error); report.ok = false;}
     if (focusMonitor) {
       report.focusEvents = [...focusMonitor.events];

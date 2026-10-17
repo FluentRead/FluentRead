@@ -1,0 +1,23 @@
+{
+  "laneReleased": true,
+  "finalDevice": {
+    "lastBootedAt": "2026-10-16T21:47:58Z",
+    "dataPath": "/Users/thinkstu/Library/Developer/CoreSimulator/Devices/A407390F-7AA8-42AE-AFEB-F93EE99E9FF8/data",
+    "dataPathSize": 2799218688,
+    "logPath": "/Users/thinkstu/Library/Logs/CoreSimulator/A407390F-7AA8-42AE-AFEB-F93EE99E9FF8",
+    "udid": "A407390F-7AA8-42AE-AFEB-F93EE99E9FF8",
+    "isAvailable": true,
+    "logPathSize": 716800,
+    "deviceTypeIdentifier": "com.apple.CoreSimulator.SimDeviceType.iPhone-16-Pro",
+    "state": "Shutdown",
+    "name": "FluentRead-PR995-FreshPermissions-20261015"
+  },
+  "originalRestoredAndVerified": true,
+  "installedIdentityAtEnd": "ORIGINAL_D9_FULL485_VERIFIED",
+  "remainingOwnedProcesses": [],
+  "focusEvents": [],
+  "violations": [],
+  "cleanupErrors": [],
+  "elapsedMs": 54509,
+  "privateScope": "Native FR App data17 hash baseline only; not all extension settings/storage/cache. Record post-UI changes; do not copy files back."
+}

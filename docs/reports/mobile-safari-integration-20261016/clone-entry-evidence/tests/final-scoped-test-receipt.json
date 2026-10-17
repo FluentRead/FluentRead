@@ -1,0 +1,57 @@
+{
+  "at": "2026-10-16T23:00:46.866Z",
+  "exitCode": 0,
+  "tests": {
+    "total": 99,
+    "passed": 99,
+    "failed": 0,
+    "pending": 0
+  },
+  "coverage": {
+    "lines": {
+      "total": 403,
+      "covered": 403,
+      "skipped": 0,
+      "pct": 100
+    },
+    "statements": {
+      "total": 403,
+      "covered": 403,
+      "skipped": 0,
+      "pct": 100
+    },
+    "functions": {
+      "total": 34,
+      "covered": 34,
+      "skipped": 0,
+      "pct": 100
+    },
+    "branches": {
+      "total": 287,
+      "covered": 287,
+      "skipped": 0,
+      "pct": 100
+    },
+    "branchesTrue": {
+      "total": 0,
+      "covered": 0,
+      "skipped": 0,
+      "pct": "Unknown"
+    }
+  },
+  "files": {
+    "src/features/video-subtitle/content/videoPlayerBinding.ts": {
+      "sha256": "0789013139caf5e43783e4d3501b9a96c5d97324213efcbdfa941e1eb34fdec4",
+      "bytes": 23201
+    },
+    "tests/videoPlayerBinding.test.ts": {
+      "sha256": "68fb776e05d95ec9d7d95430bfe4d3ad704703fb6f0513da05c33984074e81b0",
+      "bytes": 101967
+    },
+    "scripts/run-mobile-video-subtitle-test.cjs": {
+      "sha256": "d060eed1349c017e611b0d749b9374c457c58d1656ef64fac703634e3a66839c",
+      "bytes": 60558
+    }
+  },
+  "oldArtifactCheck": "/Users/thinkstu/Desktop/copy/research/mobile-safari-20261015/mobile-youtube-fr-node-identity-probe-20261017/same-scope-clone-repair-20261017/pre-repair-chrome-artifact-check.json"
+}

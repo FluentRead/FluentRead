@@ -1,0 +1,44 @@
+{
+  "at": "2026-10-16T10:23:39.845455+00:00",
+  "status": "PASS_WITH_PROVENANCE_LIMITS",
+  "caseCount": 1,
+  "runtimeCommit": "d6b135e1e8383b3b4fd323ce36da4e639377f178",
+  "files": 478,
+  "bytes": 62344476,
+  "recordHash": "8ce57b1a076767cd6ddadc4acc5d9b61461cb637b39a28a4a317e9fccd9c05ff",
+  "rawByteHash": "9d2ed18771f174ddc5ceee4d9c39fc28f28fc83926c98e49e2b404160dd398f6",
+  "translationNodeCounts": [
+    0,
+    5,
+    0,
+    5
+  ],
+  "sixOriginalsRestoredExact": true,
+  "arFrOutcome": "Corresponding Chinese twice; observed malformed F21 outputs not reproduced",
+  "oldCacheInvalidation": "NOT_PROVEN",
+  "winningProvider": "UNKNOWN",
+  "documentProvenance": "UNKNOWN existing document; no navigation/reload",
+  "imageCount": 23,
+  "allOriginalImagesViewed": true,
+  "nativeKeyImages": [
+    "f22-10-first-ar-visible.png",
+    "f22-15-restored-visible.png",
+    "f22-19-retranslated-visible.png",
+    "f22-21-retranslated-ar-visible.png"
+  ],
+  "roundCompleteObservedSeconds": [
+    53.426579,
+    23.110067
+  ],
+  "laneReleased": true,
+  "cleanup": "cleanup.json",
+  "evidence": [
+    "runtime-acceptance.json",
+    "paragraph-correspondence.json",
+    "functional-checks.json",
+    "visual-review.json",
+    "postflight-identity.json"
+  ],
+  "sourceHeadAfter": "d6b135e1e8383b3b4fd323ce36da4e639377f178",
+  "sourceStatusAfter": ""
+}

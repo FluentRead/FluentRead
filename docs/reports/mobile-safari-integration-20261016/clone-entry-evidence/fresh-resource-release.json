@@ -1,0 +1,48 @@
+{
+  "at": "2026-10-16T23:23:58.011193+00:00",
+  "phase": "post-lifecycle-and-native-inspection",
+  "knownOwnedPidsOrGroups": [
+    52462,
+    52465,
+    53344,
+    53348,
+    53597,
+    53601,
+    54396,
+    54415,
+    54423,
+    54459,
+    54899,
+    55268,
+    55852,
+    55855
+  ],
+  "remainingOwnedBrowserOrMonitorOrBuildGroup": [],
+  "heavyProcesses": [],
+  "bootedAppleSimulators": [],
+  "taskSimulatorState": "Shutdown",
+  "ports": {
+    "5048": {
+      "returnCode": 1,
+      "listeners": ""
+    },
+    "5580": {
+      "returnCode": 1,
+      "listeners": ""
+    },
+    "5581": {
+      "returnCode": 1,
+      "listeners": ""
+    },
+    "52911": {
+      "returnCode": 1,
+      "listeners": ""
+    },
+    "51231": {
+      "returnCode": 1,
+      "listeners": ""
+    }
+  },
+  "hostAdbKeyMetadataUnchangedSinceF34": true,
+  "laneReleased": true
+}

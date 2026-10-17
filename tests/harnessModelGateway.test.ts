@@ -27,6 +27,32 @@ describe('harness model gateway', () => {
     planBuild.enabled = false;
   });
 
+  it.each([
+    ['mimo', 'https://api.xiaomimimo.com/v1/chat/completions', 'mimo-v2.5', 'mimo-v2.6-flash'],
+    ['mimo', 'https://token-plan-sgp.xiaomimimo.com/v1/chat/completions', 'mimo-v2.5-pro', 'mimo-v2.6-pro'],
+    ['custom:mimo', 'https://api.xiaomimimo.com/v1', 'mimo-v2.5-pro', 'mimo-v2.6-pro'],
+    ['mimo', 'https://gateway.example/v1/chat/completions', 'mimo-v2.5', 'mimo-v2.5'],
+  ])('reading/writing gateway maps %s at %s without editing saved settings', async (service, endpoint, legacy, expected) => {
+    const config = new Config();
+    config.harness.model = legacy;
+    config.writing.model = legacy;
+    if (service.startsWith('custom:')) {
+      config.customOpenAIProviders = [{id: service, name: 'MiMo', endpoint, models: [legacy]}];
+    } else config.proxy[service] = endpoint;
+    const before = JSON.stringify(config);
+    const bodies: Record<string, unknown>[] = [];
+    setRuntimeFetch(async (_input, init) => {
+      const body = JSON.parse(String(init?.body)); bodies.push(body);
+      if (body.stream) return new Response('data: {"choices":[{"index":0,"delta":{"content":"done"},"finish_reason":null}]}\n\ndata: {"choices":[{"index":0,"delta":{},"finish_reason":"stop"}]}\n\ndata: [DONE]\n\n', {headers: {'content-type': 'text/event-stream'}});
+      return response({choices: [{message: {role: 'assistant', content: 'done'}, finish_reason: 'stop'}]});
+    });
+    const model = createHarnessLanguageModel(config, service, legacy);
+    expect((await generateText({model, prompt: 'Explain', maxRetries: 0})).text).toBe('done');
+    expect(await streamText({model, prompt: 'Explain', maxRetries: 0}).text).toBe('done');
+    expect(bodies.map(body => body.model)).toEqual([expected, expected]);
+    expect(JSON.stringify(config)).toBe(before);
+  });
+
   it('refuses saved ChatGPT requests in the public build before any transport and preserves their configuration', () => {
     const config = new Config(); config.service = services.chatgptPlan;
     config.model[services.chatgptPlan] = 'saved-account-model';
@@ -40,6 +66,38 @@ describe('harness model gateway', () => {
     expect(createHarnessLanguageModel(config, services.chatgptPlan, 'saved-account-model'))
       .toMatchObject({provider: 'fluentread-chatgpt-plan', modelId: 'saved-account-model'});
     expect(fetch).not.toHaveBeenCalled();
+  });
+
+  it('keys the local plan input only by the trimmed model while preserving saved configuration', () => {
+    const config = new Config();
+    const key = getHarnessModelInputKey(config, services.chatgptPlan, ' account-model ');
+    config.token[services.chatgptPlan] = 'unused-fixture-key';
+    config.proxy[services.chatgptPlan] = 'https://unused.fixture/v1';
+    config.apiKeys[services.chatgptPlan] = ['unused-fixture-A', 'unused-fixture-B'];
+    const before = JSON.stringify(config);
+    expect(key).toMatch(/^[a-f0-9]{64}$/u);
+    expect(getHarnessModelInputKey(config, services.chatgptPlan, 'account-model')).toBe(key);
+    expect(getHarnessModelInputKey(config, services.chatgptPlan, 'other-model')).not.toBe(key);
+    expect(JSON.stringify(config)).toBe(before);
+  });
+
+  it('changes the provider input key when rotation, required credentials or thinking changes', () => {
+    const config = new Config();
+    const service = services.deepseek, model = 'deepseek-v4-flash';
+    delete config.token[service];
+    const withoutCredential = getHarnessModelInputKey(config, service, model);
+    config.token[service] = 'fixture-A';
+    expect(getHarnessModelInputKey(config, service, model)).not.toBe(withoutCredential);
+    config.apiKeys[service] = ['fixture-A', 'fixture-B'];
+    const rotating = getHarnessModelInputKey(config, service, model);
+    config.apiKeyRecoveryMs += 60_000;
+    const changedRecovery = getHarnessModelInputKey(config, service, model);
+    expect(changedRecovery).not.toBe(rotating);
+    config.apiKeyRotationEnabled[service] = false;
+    const fixedKey = getHarnessModelInputKey(config, service, model);
+    expect(fixedKey).not.toBe(changedRecovery);
+    config.modelThinking[service] = {[model]: true};
+    expect(getHarnessModelInputKey(config, service, model)).not.toBe(fixedKey);
   });
 
   it('uses the fixed anonymous Bilibili endpoint without residual keys, proxy, tools or model overrides', async () => {

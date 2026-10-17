@@ -9,6 +9,7 @@ import videoLearningText from './video-learning/ja-JP.json';
 import selfHelpText from './self-help/ja-JP.json';
 import {compositeTranslationMessages, compositeTranslationLegacyText} from './compositeTranslation';
 import {aiRequestTimeoutMessages} from './aiRequestTimeout';
+import {mimoRetirementLegacyText} from './mimoRetirement';
 import {pdfReadingMessages} from './pdfReading';
 import {informationHighlightMessages} from './informationHighlight';
 import reencounterText from './reencounter/ja-JP.json';
@@ -2388,6 +2389,7 @@ const jaJPLegacyTextBase: Readonly<Record<string, string>> = {
     "API 凭据和翻译次数不会随设置版本恢复": 'APIの認証情報や翻訳数は設定されたバージョンで元に戻ることはありません。',
     'FluentRead 备份': 'FluentRead バックアップ',
     'FluentRead 翻译中心': 'FluentRead 翻訳センター',
+    ...mimoRetirementLegacyText['ja-JP'],
     "MiMo 按量付费 Key 通常以 sk- 开头；请确认 Key 来自 API Keys 页面": 'MiMoの従量分支払キーは通常sk-で始まります;キーがAPIキーのページから取得されていることを確認してください。',
     'OCR 服务初始化失败，请重新打开设置页后重试。': 'OCRサービスの初期化に失敗しました。設定ページを再度開いて、もう一度お試しください。',
     'Offscreen 文档': 'オフスクリーン文書',

@@ -2,7 +2,7 @@
  * @file src/providers/translation/ai-sdk/openai-transport.ts
  *
  * 文件职责：组织 OpenAI 兼容翻译请求的共享准备、响应归一和生命周期，向扩展 SDK 与 standalone HTTP 执行器提供同一端口。
- * 主要内容：冻结请求级配置，解析服务 endpoint 与模型，构造 commonMsgTemplate，将固定 payload 交给执行端口；把真实 HTTP 请求和响应读取登记到后台并发租约，避免取消提前释放槽位；统一清理推理内容、执行预算和归一错误。公开 translateOpenAICompatible 及请求、执行端口类型，不依赖任一具体执行器。
+ * 主要内容：冻结请求级配置，解析服务 endpoint 与模型，构造 commonMsgTemplate，将固定 payload 交给执行端口；把真实 HTTP 请求和响应读取登记到后台并发租约，避免取消提前释放槽位；在自定义请求体合并后仅为官方 MiMo 端点兜底退役编号；统一清理推理内容、执行预算和归一错误。公开 translateOpenAICompatible 及请求、执行端口类型，不依赖任一具体执行器。
  * 模块边界：本文件位于 provider 适配层，只把统一翻译请求转换为外部或浏览器服务协议；不管理页面 DOM、UI 生命周期或配置持久化，缓存、去重和超时总预算由 translation broker 统一协调。
  */
 
@@ -13,6 +13,7 @@ import {isCustomOpenAIProviderId} from '@/src/core/config/customOpenAI';
 import {parseCustomHeaders, mergeCustomHeaders} from '@/src/core/config/customHeaders';
 import {
   resolveOpenAICompatibleEndpoint,
+  resolveOfficialMimoModel,
   type ResolvedOpenAICompatibleEndpoint,
 } from './endpoints';
 import {LlmTransportError} from './transport-errors';
@@ -347,6 +348,10 @@ async function translateSingle(
       imageInput: getTranslationImageInput(request),
   }
   ));
+
+  // 必须在 customBody 合并及 model 去空白之后处理，覆盖自定义模型、历史快照和
+  // 自定义 OpenAI 服务直连官方 API；只改本次 payload，不改保存的别名及 Thinking 偏好。
+  payload.model = resolveOfficialMimoModel(endpoint.endpoint, payload.model);
 
   // 协议的 stream 标记由 SDK 管理。自定义请求体仍可替换 model/messages，并添加任意
   // OpenAI 兼容 provider 字段，但不能绕过解析器把 generateText 调用切换为 SSE。

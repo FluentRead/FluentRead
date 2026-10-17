@@ -383,6 +383,7 @@ export default defineConfig({
                 'src/core/config/model.ts',
                 'src/core/config/aiRequestTimeout.ts',
                 'src/core/i18n/messages/aiRequestTimeout.ts',
+                'src/core/i18n/messages/mimoRetirement.ts',
                 'src/core/config/modelThinking.ts',
                 'src/core/config/quickTranslation.ts',
                 'src/core/config/inputTranslation.ts',

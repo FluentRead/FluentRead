@@ -9,6 +9,7 @@ import videoLearningText from './video-learning/ko-KR.json';
 import selfHelpText from './self-help/ko-KR.json';
 import {compositeTranslationMessages, compositeTranslationLegacyText} from './compositeTranslation';
 import {aiRequestTimeoutMessages} from './aiRequestTimeout';
+import {mimoRetirementLegacyText} from './mimoRetirement';
 import {pdfReadingMessages} from './pdfReading';
 import {informationHighlightMessages} from './informationHighlight';
 import reencounterText from './reencounter/ko-KR.json';
@@ -2388,6 +2389,7 @@ const koKRLegacyTextBase: Readonly<Record<string, string>> = {
     "API 凭据和翻译次数不会随设置版本恢复": 'API 자격 증명과 번역 수는 설정된 버전과 함께 되돌리지 않습니다.',
     'FluentRead 备份': '플루언트리드 백업',
     'FluentRead 翻译中心': '플루언트리드 번역 센터',
+    ...mimoRetirementLegacyText['ko-KR'],
     "MiMo 按量付费 Key 通常以 sk- 开头；请确认 Key 来自 API Keys 页面": 'MiMo의 페이 페이 유 키는 보통 sk-로 시작합니다; 키가 API 키 페이지에서 가져오는지 꼭 확인해 주세요.',
     'OCR 服务初始化失败，请重新打开设置页后重试。': 'OCR 서비스 초기화가 실패했습니다. 설정 페이지를 다시 열고 다시 시도해 주세요.',
     'Offscreen 文档': '오프스크린 문서',

@@ -1,3 +1,4 @@
+import {mimoRetirementSource, mimoRetirementLegacyText} from '@/src/core/i18n/messages/mimoRetirement';
 import {readFileSync} from 'node:fs';
 import {createHash} from 'node:crypto';
 import {resolve} from 'node:path';
@@ -22,6 +23,12 @@ const deeplxCopy = (language: keyof typeof extensionBundles) => Object.fromEntri
 const resourceCommit = '70d3d901033a579e32a5bf5e6af14555f0d140bb';
 
 describe('userscript remote UI language data', () => {
+    it('keeps the complete settings notice aligned with the shared locale source', () => {
+        const component = readFileSync(resolve(process.cwd(), 'src/features/settings/ui/services/ServiceConfiguration.vue'), 'utf8');
+        expect(component).toContain("translateLegacy('" + mimoRetirementSource + "')");
+        expect(component).toContain('data-mimo-retirement-note');
+    });
+
     afterEach(() => {
         vi.unstubAllGlobals();
         vi.resetModules();
@@ -48,11 +55,12 @@ describe('userscript remote UI language data', () => {
         vi.stubGlobal('__FLUENTREAD_USERSCRIPT_LANGUAGE_BUNDLES__', {'en-US': 'invalid-if-selected'});
         vi.stubGlobal('__FLUENTREAD_USERSCRIPT_REMOTE_LANGUAGES__', {});
 
-        const {hasUiLanguageBundle, translate} = await import('@/src/core/i18n');
+        const {hasUiLanguageBundle, translate, translateLegacyText} = await import('@/src/core/i18n');
         expect(hasUiLanguageBundle('en-US')).toBe(false);
         const loader = await import('@/userscript/uiLanguageBundles');
         await expect(loader.ensureUiLanguageBundle('en-US')).resolves.toBe(true);
         expect(hasUiLanguageBundle('en-US')).toBe(true);
+        expect(translateLegacyText(mimoRetirementSource, 'en-US')).toBe(extensionBundles['en-US'].legacyText[mimoRetirementSource]);
         for (const key of deeplxKeys) expect(translate(key, 'en-US')).toBe(extensionBundles['en-US'].messages[key]);
         expect(JSON.stringify(pinned.english)).toBe(original);
         expect(requests).toEqual([]);
@@ -73,7 +81,7 @@ describe('userscript remote UI language data', () => {
         vi.stubGlobal('pako', {ungzip});
         const original = UI_LANGUAGE_BUNDLES['en-US'];
         const messages = Object.fromEntries(Object.entries(original.messages).filter(([key]) => !key.startsWith('document.')));
-        const expected = {...original, messages};
+        const expected = {...original, messages, legacyText: {...original.legacyText, ...mimoRetirementLegacyText['en-US']}};
         const core = await import('@/src/core/i18n');
         expect(core.hasUiLanguageBundle('en-US')).toBe(false);
         const register = vi.spyOn(core, 'registerUiLanguageBundle');
@@ -81,6 +89,7 @@ describe('userscript remote UI language data', () => {
             const loader = await import('@/userscript/uiLanguageBundles');
             await expect(loader.ensureUiLanguageBundle('en-US')).resolves.toBe(true);
             expect(core.hasUiLanguageBundle('en-US')).toBe(true);
+            expect(core.translateLegacyText(mimoRetirementSource, 'en-US')).toBe(extensionBundles['en-US'].legacyText[mimoRetirementSource]);
             expect(register).toHaveBeenCalledTimes(1);
             expect(register).toHaveBeenCalledWith('en-US', expected);
             // 对实际注册后的每一条保留稳定 key 使用核心翻译入口，包含参数占位文案。
@@ -150,11 +159,14 @@ describe('userscript remote UI language data', () => {
         ]);
     });
 
-    it.each(['ja-JP', 'ko-KR', 'fr-FR', 'ru-RU', 'es-ES'] as const)('localizes recovery and DeepLX copy after loading pinned %s data and after an offline cache reload', async language => {
+    it.each(['ja-JP', 'ko-KR', 'fr-FR', 'ru-RU', 'es-ES'] as const)('localizes recovery, DeepLX and MiMo copy after loading pinned %s data and after an offline cache reload', async language => {
         const digest = createHash('sha256').update(JSON.stringify(UI_LANGUAGE_BUNDLES[language])).digest('hex').slice(0, 16);
         const remoteFile = `${language}.${digest}.json`;
         const remoteSource = readFileSync(resolve(languageDir, remoteFile), 'utf8');
         const original = JSON.parse(remoteSource);
+        expect(original.legacyText).not.toHaveProperty(mimoRetirementSource);
+        expect(extensionBundles[language].legacyText[mimoRetirementSource]).toBeTruthy();
+        expect(extensionBundles[language].legacyText[mimoRetirementSource]).not.toBe(mimoRetirementSource);
         expect(original.messages).not.toHaveProperty('sectionTranslation.picker.dragging');
         expect(original.messages).not.toHaveProperty('sectionTranslation.scope.selected');
         expect(original.messages).not.toHaveProperty('learning.panelLoadError');
@@ -192,9 +204,10 @@ describe('userscript remote UI language data', () => {
                 const loader = await import('@/userscript/uiLanguageBundles');
                 await expect(loader.ensureUiLanguageBundle(language)).resolves.toBe(true);
                 await assertSweepCopy();
+                expect(core.translateLegacyText(mimoRetirementSource, language)).toBe(extensionBundles[language].legacyText[mimoRetirementSource]);
                 expect(register).toHaveBeenCalledTimes(1);
                 expect(register).toHaveBeenCalledWith(language, {
-                    ...original, messages: {...recovery, ...original.messages, ...aiRequestTimeoutMessages[language], ...sweepCopy(language), ...deeplxCopy(language)},
+                    ...original, legacyText: {...original.legacyText, ...mimoRetirementLegacyText[language]}, messages: {...recovery, ...original.messages, ...aiRequestTimeoutMessages[language], ...sweepCopy(language), ...deeplxCopy(language)},
                 });
                 for (const [key, text] of Object.entries(recovery)) {
                     expect(core.translate(key, language)).toBe(text);
@@ -206,6 +219,7 @@ describe('userscript remote UI language data', () => {
                 }
                 await expect(loader.ensureUiLanguageBundle(language)).resolves.toBe(true);
                 await assertSweepCopy();
+                expect(core.translateLegacyText(mimoRetirementSource, language)).toBe(extensionBundles[language].legacyText[mimoRetirementSource]);
                 expect(register).toHaveBeenCalledTimes(1);
             } finally { register.mockRestore(); }
         }
@@ -239,7 +253,7 @@ describe('userscript remote UI language data', () => {
             await expect(loader.ensureUiLanguageBundle('fr-FR')).resolves.toBe(true);
             expect(register).toHaveBeenCalledTimes(1);
             expect(register).toHaveBeenCalledWith('fr-FR', {
-                ...supplied, messages: {...supplied.messages, ...aiRequestTimeoutMessages['fr-FR'], ...sweepCopy('fr-FR'), ...deeplxCopy('fr-FR')},
+                ...supplied, legacyText: {...supplied.legacyText, ...mimoRetirementLegacyText['fr-FR']}, messages: {...supplied.messages, ...aiRequestTimeoutMessages['fr-FR'], ...sweepCopy('fr-FR'), ...deeplxCopy('fr-FR')},
             });
             expect(core.translate('learning.panelLoadError', 'fr-FR')).toBe('Remote section recovery');
             expect(core.translate('learning.reloadPage', 'fr-FR')).toBe('Remote reload');

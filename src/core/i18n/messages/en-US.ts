@@ -10,6 +10,7 @@ import videoLearningText from './video-learning/en-US.json';
 import selfHelpText from './self-help/en-US.json';
 import {compositeTranslationMessages, compositeTranslationLegacyText} from './compositeTranslation';
 import {aiRequestTimeoutMessages} from './aiRequestTimeout';
+import {mimoRetirementLegacyText} from './mimoRetirement';
 import {pdfReadingMessages} from './pdfReading';
 import {informationHighlightMessages} from './informationHighlight';
 import reencounterText from './reencounter/en-US.json';
@@ -2377,6 +2378,7 @@ const enUSLegacyTextBase: Readonly<Record<string, string>> = {
     "API 凭据和翻译次数不会随设置版本恢复": 'API credentials and translation counts do not revert with the set version.',
     'FluentRead 备份': 'FluentRead backup',
     'FluentRead 翻译中心': 'FluentRead Translation Center',
+    ...mimoRetirementLegacyText['en-US'],
     "MiMo 按量付费 Key 通常以 sk- 开头；请确认 Key 来自 API Keys 页面": 'MiMo pay-as-you-go keys usually start with sk-; Please make sure the Key comes from the API Keys page.',
     'OCR 服务初始化失败，请重新打开设置页后重试。': 'OCR service initialization failed. Please reopen the settings page and try again.',
     'Offscreen 文档': 'Offscreen document',

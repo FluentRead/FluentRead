@@ -2,7 +2,7 @@
  * @file src/services/harness/modelGateway.ts
  * 文件职责：把已配置的 FluentRead AI 服务适配为 Harness 可消费的 LanguageModel。
  * 主要内容：解析 OpenAI 兼容端点、注入凭据与供应商头、保留 tools/messages/system
- * 语义，单独适配固定端点与模型的 B站匿名讲解，并对未开放的 ChatGPT 套餐、DeepSeek Responses 配置和其他机器翻译服务给出明确错误。
+ * 语义，直连官方 MiMo 时兼容退役编号而保留配置值，单独适配固定端点与模型的 B站匿名讲解，并对未开放的 ChatGPT 套餐、DeepSeek Responses 配置和其他机器翻译服务给出明确错误。
  * 模块边界：本文件只负责模型 transport，不管理会话、UI、提示词、缓存或配置持久化；
  * 请求由 AI SDK 执行，网络统一经过 runtimeFetch。
  */
@@ -20,6 +20,7 @@ import {normalizeAiSdkError} from '@/src/providers/translation/ai-sdk/errors';
 import {
   parseChatCompletionsEndpoint,
   resolveOpenAICompatibleEndpoint,
+  resolveOfficialMimoModel,
   type ResolvedOpenAICompatibleEndpoint,
 } from '@/src/providers/translation/ai-sdk/endpoints';
 import {isHarnessService} from '@/src/core/config/harness';
@@ -164,7 +165,7 @@ function createSingleHarnessLanguageModel(config: Config, service: string, model
       ...init, headers: mergeCustomHeaders(init?.headers, customHeaders), redirect: 'error',
     }),
   });
-  return provider(requestedModel);
+  return provider(resolveOfficialMimoModel(endpoint.endpoint, requestedModel));
 }
 
 type LanguageModelGenerateOptions = Parameters<ConcreteLanguageModel['doGenerate']>[0];
@@ -203,7 +204,7 @@ export function createHarnessLanguageModel(config: Config, service: string, mode
   if (service === services.chatgptPlan) {
     const unavailable = getTranslationServiceUnavailableMessage(service);
     if (unavailable) throw Object.assign(new Error(unavailable), {kind: 'bad-request', retryable: false});
-    return createChatGPTPlanHarnessModel(model);
+    return createSingleHarnessLanguageModel(config, service, model);
   }
   if (service === services.bilibili) return createSingleHarnessLanguageModel(config, service, model);
   const keys = getServiceApiKeys(config, service);

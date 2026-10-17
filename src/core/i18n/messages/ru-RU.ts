@@ -9,6 +9,7 @@ import videoLearningText from './video-learning/ru-RU.json';
 import selfHelpText from './self-help/ru-RU.json';
 import {compositeTranslationMessages, compositeTranslationLegacyText} from './compositeTranslation';
 import {aiRequestTimeoutMessages} from './aiRequestTimeout';
+import {mimoRetirementLegacyText} from './mimoRetirement';
 import {pdfReadingMessages} from './pdfReading';
 import {informationHighlightMessages} from './informationHighlight';
 import reencounterText from './reencounter/ru-RU.json';
@@ -2388,6 +2389,7 @@ const ruRULegacyTextBase: Readonly<Record<string, string>> = {
     "API 凭据和翻译次数不会随设置版本恢复": 'Учетные данные API и количество переводов не возвращаются с версией набора.',
     'FluentRead 备份': 'FluentRead резервное копие',
     'FluentRead 翻译中心': 'Центр перевода FluentRead',
+    ...mimoRetirementLegacyText['ru-RU'],
     "MiMo 按量付费 Key 通常以 sk- 开头；请确认 Key 来自 API Keys 页面": 'Клавиши MiMo pay-as-you-go обычно начинаются с sk-; Пожалуйста, убедитесь, что ключ взят со страницы ключей API.',
     'OCR 服务初始化失败，请重新打开设置页后重试。': 'Инициализация сервиса OCR не удалась. Пожалуйста, откройте страницу настроек и попробуйте снова.',
     'Offscreen 文档': 'Документ за кадром',

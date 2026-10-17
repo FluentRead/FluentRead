@@ -1,7 +1,7 @@
 /**
  * @file userscript/uiLanguageBundles.ts
  * 文件职责：按需加载并注册 userscript 的六种非中文界面语言。
- * 主要内容：英文内嵌 gzip；其他语言从静态 JSON 获取并缓存在 GM 私有存储中，注册时补齐缺少的错误恢复、AI 翻译超时、局部划选与 DeepLX 直连文案，保留已发布远端文件内容与提交号。
+ * 主要内容：英文内嵌 gzip；其他语言从静态 JSON 获取并缓存在 GM 私有存储中，注册时补齐缺少的错误恢复、AI 翻译超时、局部划选、DeepLX 直连与 MiMo 退役文案，保留已发布远端文件内容与提交号。
  * 模块边界：只注册核心 i18n 资源，不访问宿主网页存储；扩展继续使用自己的按需资源加载器。
  */
 import {
@@ -15,6 +15,7 @@ import type {EnsureUiLanguageBundle, renderWithUiLanguageBundle as RenderWithUiL
 import {inflateGzipBase64} from './compression';
 import {userscriptFetch} from './http';
 import {getStoredValue, setStoredValue} from './storage';
+import {mimoRetirementLegacyText} from '@/src/core/i18n/messages/mimoRetirement';
 import {aiRequestTimeoutMessages} from '@/src/core/i18n/messages/aiRequestTimeout';
 
 const pending = new Map<RegisteredUiLanguage, Promise<boolean>>();
@@ -170,7 +171,7 @@ export const ensureUiLanguageBundle: EnsureUiLanguageBundle = (value) => {
             registerUiLanguageBundle(registered, {...bundle, messages: {
                 ...recovery, ...bundle.messages, ...aiRequestTimeoutMessages[registered], ...sectionSweepMessages[registered],
                 ...deeplxMessages[registered],
-            }});
+            }, legacyText: {...bundle.legacyText, ...mimoRetirementLegacyText[registered]}});
             return true;
         })
         .catch((error: unknown) => {

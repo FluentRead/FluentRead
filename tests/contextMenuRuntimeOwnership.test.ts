@@ -1,7 +1,7 @@
 /**
  * @file tests/contextMenuRuntimeOwnership.test.ts
  * 文件职责：验证原生右键菜单异步查询、结构重建和点击的归属及写入次序。
- * 主要内容：使用真实菜单快照与后台 runtime，延迟浏览器 API 回复以覆盖切换标签页、配置关闭、状态乱序和原生写入交错。
+ * 主要内容：使用真实菜单快照与后台 runtime，延迟浏览器 API 回复以覆盖切换标签页、配置关闭、状态乱序、权威快照复用和原生写入交错。
  * 模块边界：浏览器 API、语言加载与翻译动作是受控端口；不表示操作系统菜单或真实翻译服务验证。
  */
 import {afterEach, beforeEach, describe, expect, it, vi} from 'vitest';
@@ -15,10 +15,10 @@ vi.mock('@/src/app/background/contextMenuFeedback', () => ({reportContextMenuFai
 function deferred<T = unknown>() {let resolve!: (value: T) => void, reject!: (error: unknown) => void;const promise = new Promise<T>((yes, no) => {resolve = yes;reject = no;});return {promise, resolve, reject};}
 const neutral = {status: 'success', isTranslated: false, isSiteDisabled: false};
 const pageId = 'fluent-read:page:translatePage';
-let active: number, api: any;
+let active: number, api: any, translationStates: import('@/src/app/background/tabTranslationState').TabTranslationStateStore;
 async function settle() {for (let i = 0; i < 100; i++) await Promise.resolve();}
 function change(values: Record<string, unknown>) {Object.assign(state.config, values);state.listeners.at(-1)!();}
-async function install() {const {installBackgroundContextMenus} = await import('@/src/app/background/contextMenuRuntime');const {TabTranslationStateStore} = await import('@/src/app/background/tabTranslationState');return installBackgroundContextMenus(new TabTranslationStateStore());}
+async function install() {const {installBackgroundContextMenus} = await import('@/src/app/background/contextMenuRuntime');const {TabTranslationStateStore} = await import('@/src/app/background/tabTranslationState');translationStates = new TabTranslationStateStore();return installBackgroundContextMenus(translationStates);}
 async function start() {const runtime = await install();await settle();api.contextMenus.update.mockClear();api.contextMenus.create.mockClear();api.contextMenus.removeAll.mockClear();api.tabs.sendMessage.mockClear();return runtime;}
 function pageTitles() {return api.contextMenus.update.mock.calls.filter(([id]: any[]) => id === pageId).map(([, value]: any[]) => value.title);}
 beforeEach(() => {
@@ -157,6 +157,56 @@ describe('右键菜单原生写入的异步归属', () => {
         api.tabs.sendMessage.mockResolvedValue({...neutral,isTranslated:true});await runtime.update(9);
         expect(api.contextMenus.update).toHaveBeenCalledTimes(1);expect(pageTitles()).toEqual(['显示页面原文']);
         await runtime.update(9);expect(api.contextMenus.update).toHaveBeenCalledTimes(1);
+    });
+    it('点击确认后的展示刷新复用结果，普通刷新仍重新读取页面', async () => {
+        const runtime = await start();
+        state.action.mockResolvedValue({handled:true,isTranslated:true});
+        api.contextMenus.onClicked.addListener.mock.calls[0][0]({menuItemId:pageId},{id:9});await settle();
+        // 点击前有一次真值查询；点击后的既有快照路径不再回源。
+        expect(api.tabs.sendMessage).toHaveBeenCalledTimes(1);
+        expect(pageTitles()).toEqual(['显示页面原文']);
+        api.tabs.sendMessage.mockResolvedValue({...neutral,isTranslated:true});
+        await runtime.update(9);
+        expect(api.tabs.sendMessage).toHaveBeenCalledTimes(2);
+    });
+    it.each(['loading', 'removed'])('点击结果等待展示查询时 %s 失效，后续查询失败也不借用新文档', async event => {
+        await start();state.action.mockResolvedValue({handled:true,isTranslated:true});
+        const query = deferred();api.tabs.query.mockReturnValueOnce(query.promise);
+        api.contextMenus.onClicked.addListener.mock.calls[0][0]({menuItemId:pageId},{id:9});await settle();
+        const error = vi.spyOn(console,'error').mockImplementation(() => {});
+        // 使用真实导航事件；新页查询失败不应让旧点击快照重新获得展示权。
+        if (event === 'loading') {
+            api.tabs.query.mockRejectedValueOnce(new Error('new document is not available yet'));
+            api.tabs.onUpdated.addListener.mock.calls[0][0](9,{status:'loading'});
+        } else api.tabs.onRemoved.addListener.mock.calls[0][0](9);
+        await settle();query.resolve([{id:9}]);await settle();
+        expect(api.contextMenus.update).not.toHaveBeenCalled();
+        expect(api.tabs.sendMessage).toHaveBeenCalledTimes(1);
+        if (event === 'loading') expect(error).toHaveBeenCalled();
+    });
+    it.each(['initial', 'queued'])('点击结果在 %s 活动页查询等待中被新权威状态替换时不回写', async phase => {
+        await start();state.action.mockResolvedValue({handled:true,isTranslated:true});
+        const query = deferred();
+        if (phase === 'queued') api.tabs.query.mockResolvedValueOnce([{id:9}]);
+        api.tabs.query.mockReturnValueOnce(query.promise);
+        api.contextMenus.onClicked.addListener.mock.calls[0][0]({menuItemId:pageId},{id:9});await settle();
+        // 模拟随后到达的恢复原文通知写入同一仓库；不改内部实现或伪造新公开入口。
+        translationStates.setTranslated(9, false, 'idle');
+        query.resolve([{id:9}]);await settle();
+        expect(api.contextMenus.update).not.toHaveBeenCalled();
+        expect(api.tabs.sendMessage).toHaveBeenCalledTimes(1);
+    });
+    it('点击结果在原生单项写入期间失效时不继续写其余项目，后续真值可修复已发出的写入', async () => {
+        const runtime = await start();state.action.mockResolvedValue({handled:true,isSiteDisabled:true});
+        const write = deferred();api.contextMenus.update.mockReturnValueOnce(write.promise);
+        api.contextMenus.onClicked.addListener.mock.calls[0][0]({menuItemId:pageId},{id:9});await settle();
+        expect(api.contextMenus.update).toHaveBeenCalledTimes(1);
+        translationStates.setSiteDisabled(9, false);
+        write.resolve(undefined);await settle();
+        expect(api.contextMenus.update).toHaveBeenCalledTimes(1);
+        await runtime.update(9);
+        expect(api.contextMenus.update).toHaveBeenCalledTimes(2);
+        expect(api.tabs.sendMessage).toHaveBeenCalledTimes(2);
     });
     it('活动页查询失败通过事件路径受控结束，后续更新仍可执行', async () => {
         await start();const error = vi.spyOn(console,'error').mockImplementation(() => {});api.tabs.query.mockRejectedValueOnce(new Error('query unavailable'));

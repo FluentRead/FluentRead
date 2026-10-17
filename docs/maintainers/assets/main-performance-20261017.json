@@ -1,0 +1,432 @@
+{
+  "baseline": "877ee77b5e3c905f6cc016db63633342dceb2419",
+  "node": "v24.19.0",
+  "platform": "linux",
+  "arch": "x64",
+  "typescript": "5.7.3",
+  "warmups": 1,
+  "repetitions": 5,
+  "scope": "Local in-memory scheduling and document prioritization; excludes compilation, provider/network work, UI, and storage. Timings are informational, not CI thresholds.",
+  "sources": {
+    "baseline": {
+      "src/core/config/requestLimits.ts": "87455e3aa972dd8e4c7599071c924166cbc8d630971a7833a41f06176f0c3241",
+      "src/core/config/scheduling.ts": "5e626322d4d4cc2a9da9466e1351a6666e1803d23a079bfdf48c930600a79c48",
+      "src/features/document-translation/services/translation.ts": "c4fc09eed8418a4fea4054e3b269ed3f7388c0d98d918978b89614151a92bef1",
+      "src/services/translation/context/discourse.ts": "01264ddc81c21c6b0c30b4e26ec5f896ac3cabaa0c051215e4d04f8aec23ee93",
+      "src/services/translation/errors.ts": "5a1ea77a8f9e0db3df03e5f9b65dba84cabc2d46a8ade8e40130e0bd25dde871",
+      "src/services/translation/requestScheduler.ts": "a1b55270e0066c2cdb63c4665804aa49cb1d5a1fedcdf3a4c10c074626ed5e22"
+    },
+    "current": {
+      "src/core/config/requestLimits.ts": "87455e3aa972dd8e4c7599071c924166cbc8d630971a7833a41f06176f0c3241",
+      "src/core/config/scheduling.ts": "5e626322d4d4cc2a9da9466e1351a6666e1803d23a079bfdf48c930600a79c48",
+      "src/features/document-translation/services/translation.ts": "37ec202e3e6dea1821a0d27f0fac263e3d9148b3b58aff8cd8f80db55a4bdb19",
+      "src/services/translation/context/discourse.ts": "01264ddc81c21c6b0c30b4e26ec5f896ac3cabaa0c051215e4d04f8aec23ee93",
+      "src/services/translation/errors.ts": "5a1ea77a8f9e0db3df03e5f9b65dba84cabc2d46a8ade8e40130e0bd25dde871",
+      "src/services/translation/requestScheduler.ts": "18f7f38e4c68f548900e29a2a5221f67e7a137837c8230d02784de72f04df48f"
+    }
+  },
+  "results": [
+    {
+      "scenario": "blocked-scheduler-burst-with-cancellation",
+      "count": 500,
+      "verifiedEqual": true,
+      "behavior": {
+        "started": 1,
+        "cancelled": 500,
+        "outputSha256": "7c0dbb822516f41ed68a41676da29acf29a19275bac9d22e08f0a3bc33b87aa7"
+      },
+      "baseline": {
+        "counts": {
+          "enqueueIdentityReads": 125751,
+          "cancelIdentityReads": 125250
+        },
+        "timings": {
+          "enqueue": {
+            "medianMs": 30.655,
+            "samplesMs": [
+              41.433,
+              28.841,
+              31.011,
+              30.655,
+              27.064
+            ]
+          },
+          "cancel": {
+            "medianMs": 32.81,
+            "samplesMs": [
+              31.655,
+              31.517,
+              37.373,
+              32.81,
+              33.101
+            ]
+          }
+        }
+      },
+      "current": {
+        "counts": {
+          "enqueueIdentityReads": 501,
+          "cancelIdentityReads": 0
+        },
+        "timings": {
+          "enqueue": {
+            "medianMs": 1.426,
+            "samplesMs": [
+              2.695,
+              1.922,
+              1.186,
+              1.199,
+              1.426
+            ]
+          },
+          "cancel": {
+            "medianMs": 6.204,
+            "samplesMs": [
+              6.204,
+              6.516,
+              5.852,
+              5.525,
+              6.58
+            ]
+          }
+        }
+      }
+    },
+    {
+      "scenario": "blocked-scheduler-burst-with-cancellation",
+      "count": 1000,
+      "verifiedEqual": true,
+      "behavior": {
+        "started": 1,
+        "cancelled": 1000,
+        "outputSha256": "74ca32eace7a8b47addcec7d037caf809047e9ff9b09b0257438ca80e3282618"
+      },
+      "baseline": {
+        "counts": {
+          "enqueueIdentityReads": 501501,
+          "cancelIdentityReads": 500500
+        },
+        "timings": {
+          "enqueue": {
+            "medianMs": 121.067,
+            "samplesMs": [
+              121.067,
+              104.457,
+              129.099,
+              121.552,
+              108.152
+            ]
+          },
+          "cancel": {
+            "medianMs": 121.1,
+            "samplesMs": [
+              121.1,
+              150.333,
+              156.473,
+              112.964,
+              116.672
+            ]
+          }
+        }
+      },
+      "current": {
+        "counts": {
+          "enqueueIdentityReads": 1001,
+          "cancelIdentityReads": 0
+        },
+        "timings": {
+          "enqueue": {
+            "medianMs": 2.587,
+            "samplesMs": [
+              2.761,
+              2.587,
+              1.766,
+              2.842,
+              1.719
+            ]
+          },
+          "cancel": {
+            "medianMs": 12.791,
+            "samplesMs": [
+              12.791,
+              12.835,
+              12.211,
+              12.925,
+              10.973
+            ]
+          }
+        }
+      }
+    },
+    {
+      "scenario": "blocked-scheduler-burst-with-cancellation",
+      "count": 2000,
+      "verifiedEqual": true,
+      "behavior": {
+        "started": 1,
+        "cancelled": 2000,
+        "outputSha256": "af84cb62881a0d8856ccc25157a72ba50a1fef4c02ded68e9b6cb86e6151deab"
+      },
+      "baseline": {
+        "counts": {
+          "enqueueIdentityReads": 2003001,
+          "cancelIdentityReads": 2001000
+        },
+        "timings": {
+          "enqueue": {
+            "medianMs": 399.628,
+            "samplesMs": [
+              454.59,
+              479.921,
+              399.628,
+              390.881,
+              396.445
+            ]
+          },
+          "cancel": {
+            "medianMs": 423.353,
+            "samplesMs": [
+              423.353,
+              460.991,
+              428.274,
+              421.598,
+              415.217
+            ]
+          }
+        }
+      },
+      "current": {
+        "counts": {
+          "enqueueIdentityReads": 2001,
+          "cancelIdentityReads": 0
+        },
+        "timings": {
+          "enqueue": {
+            "medianMs": 3.272,
+            "samplesMs": [
+              4.161,
+              3.272,
+              6.622,
+              2.863,
+              3.112
+            ]
+          },
+          "cancel": {
+            "medianMs": 21.844,
+            "samplesMs": [
+              24.121,
+              24.161,
+              21.633,
+              20.578,
+              21.844
+            ]
+          }
+        }
+      }
+    },
+    {
+      "scenario": "blocked-scheduler-burst-with-cancellation",
+      "count": 4000,
+      "verifiedEqual": true,
+      "behavior": {
+        "started": 1,
+        "cancelled": 4000,
+        "outputSha256": "f25861c0e8646ae76abc7c400eaa0a4b307ee081d8650d273750a63ca380cb08"
+      },
+      "baseline": {
+        "counts": {
+          "enqueueIdentityReads": 8006001,
+          "cancelIdentityReads": 8002000
+        },
+        "timings": {
+          "enqueue": {
+            "medianMs": 1574.56,
+            "samplesMs": [
+              1557.219,
+              1574.56,
+              1620.06,
+              1592.854,
+              1568.596
+            ]
+          },
+          "cancel": {
+            "medianMs": 1651.348,
+            "samplesMs": [
+              1608.697,
+              1638.587,
+              1651.348,
+              1724.352,
+              1676.284
+            ]
+          }
+        }
+      },
+      "current": {
+        "counts": {
+          "enqueueIdentityReads": 4001,
+          "cancelIdentityReads": 0
+        },
+        "timings": {
+          "enqueue": {
+            "medianMs": 6.753,
+            "samplesMs": [
+              8.501,
+              6.753,
+              10.948,
+              5.662,
+              5.565
+            ]
+          },
+          "cancel": {
+            "medianMs": 47.105,
+            "samplesMs": [
+              48.187,
+              51.128,
+              47.105,
+              44.416,
+              43.812
+            ]
+          }
+        }
+      }
+    },
+    {
+      "scenario": "document-stable-reading-priority",
+      "count": 1000,
+      "verifiedEqual": true,
+      "behavior": {
+        "requests": 63,
+        "committed": 1000,
+        "outputSha256": "1e01d40cad71600e33e2a98526cdf7d90bad6e4247f74a8a274ca67bc176f217"
+      },
+      "baseline": {
+        "counts": {
+          "prioritizations": 63,
+          "visited": 31752
+        },
+        "timings": {
+          "translate": {
+            "medianMs": 8.837,
+            "samplesMs": [
+              9.414,
+              8.109,
+              8.3,
+              10.282,
+              8.837
+            ]
+          }
+        }
+      },
+      "current": {
+        "counts": {
+          "prioritizations": 1,
+          "visited": 1000
+        },
+        "timings": {
+          "translate": {
+            "medianMs": 2.68,
+            "samplesMs": [
+              2.68,
+              1.872,
+              3.674,
+              2.993,
+              2.407
+            ]
+          }
+        }
+      }
+    },
+    {
+      "scenario": "document-stable-reading-priority",
+      "count": 5000,
+      "verifiedEqual": true,
+      "behavior": {
+        "requests": 313,
+        "committed": 5000,
+        "outputSha256": "7fde3bcf700754a0cd948a9abbb63646fb83f941b4d79d195cc49b1c6d79ceac"
+      },
+      "baseline": {
+        "counts": {
+          "prioritizations": 313,
+          "visited": 783752
+        },
+        "timings": {
+          "translate": {
+            "medianMs": 216.068,
+            "samplesMs": [
+              278.164,
+              216.068,
+              221.354,
+              215.512,
+              183.691
+            ]
+          }
+        }
+      },
+      "current": {
+        "counts": {
+          "prioritizations": 1,
+          "visited": 5000
+        },
+        "timings": {
+          "translate": {
+            "medianMs": 10.223,
+            "samplesMs": [
+              12.529,
+              10.223,
+              10.956,
+              9.365,
+              9.305
+            ]
+          }
+        }
+      }
+    },
+    {
+      "scenario": "document-stable-reading-priority",
+      "count": 10000,
+      "verifiedEqual": true,
+      "behavior": {
+        "requests": 625,
+        "committed": 10000,
+        "outputSha256": "ace8114262ffbf440a55964a30fc1e13d505008300591e0aa270efb6f9e658b5"
+      },
+      "baseline": {
+        "counts": {
+          "prioritizations": 625,
+          "visited": 3130000
+        },
+        "timings": {
+          "translate": {
+            "medianMs": 913.023,
+            "samplesMs": [
+              924.915,
+              913.023,
+              868.163,
+              830.883,
+              927.369
+            ]
+          }
+        }
+      },
+      "current": {
+        "counts": {
+          "prioritizations": 1,
+          "visited": 10000
+        },
+        "timings": {
+          "translate": {
+            "medianMs": 24.794,
+            "samplesMs": [
+              24.247,
+              25.101,
+              28.695,
+              24.794,
+              22.326
+            ]
+          }
+        }
+      }
+    }
+  ]
+}

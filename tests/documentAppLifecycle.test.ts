@@ -105,6 +105,63 @@ beforeEach(async () => {
 afterEach(async () => {ports.pagePending?.resolve(ports.tasks.find(value => value.role === 'preview')?.page); ports.renderPending?.resolve(); app?.unmount(); await flush(); await vi.dynamicImportSettled(); windowTimers.forEach(timer => clearTimeout(timer)); windowTimers.clear(); vi.restoreAllMocks(); vi.unstubAllGlobals();});
 
 describe('documentbinaryAudit actual DocumentApp SFC ownership', () => {
+    it('reuses the reading priority identity until rich-text scroll crosses a segment or document length changes', async () => {
+        await state.loadFiles([file('priority.txt', Array.from({length: 10}, (_, index) => `Paragraph ${index}`).join('\n\n'))]); await flush();
+        const scroller = {scrollHeight: 1_000, scrollTop: 0};
+        state.richFrame = {contentDocument: {scrollingElement: scroller}};
+        const initial = state.readingPriorityKey();
+        expect(initial).toMatchObject({start: 0, total: 10, pages: null});
+        expect(state.readingPriorityKey()).toBe(initial);
+        scroller.scrollTop = 20; expect(state.readingPriorityKey()).toBe(initial);
+        scroller.scrollTop = 150;
+        const moved = state.readingPriorityKey();
+        expect(moved).not.toBe(initial); expect(moved.start).toBe(1);
+        expect(state.prioritizeReadingPosition(state.parsedDocument.segments)[0].id).toBe(1);
+        expect(state.readingPriorityKey()).toBe(moved);
+        const parsed = state.parsedDocument;
+        state.parsedDocument = markRaw({...parsed, segments: [...parsed.segments, {id: 10, source: 'Additional paragraph'}]});
+        const expanded = state.readingPriorityKey();
+        expect(expanded).not.toBe(moved); expect(expanded.total).toBe(11);
+        state.richFrame = null;
+    });
+
+    it('includes PDF page selection and page-to-segment mapping in the reading priority identity', async () => {
+        ports.pageCount = 3;
+        await state.loadFiles([file('priority.pdf')]); await flush();
+        const initial = state.readingPriorityKey();
+        expect(initial.pages.count).toBe(3); expect(state.readingPriorityKey()).toBe(initial);
+        state.pdfPage = 2;
+        const moved = state.readingPriorityKey();
+        expect(moved).not.toBe(initial); expect(moved.start).toBe(1);
+        const parsed = state.parsedDocument;
+        expect(state.prioritizeReadingPosition(parsed.segments)[0].id).toBe(parsed.binary.pages[1].segmentIndexes[0]);
+        state.parsedDocument = markRaw({...parsed, binary: {...parsed.binary, pages: [...parsed.binary.pages].reverse()}});
+        const remapped = state.readingPriorityKey();
+        expect(remapped).not.toBe(moved); expect(remapped.pages).not.toBe(moved.pages);
+        expect(state.readingPriorityKey()).toBe(remapped);
+    });
+
+    it('derives keyed priority from native DOCX parts, EPUB chapters, and paginated reader anchors', async () => {
+        await state.loadFiles([new File([readFileSync('examples/document-translation/sample.docx')], 'priority.docx', {type: getDocumentMimeType('docx')})]); await flush();
+        const body = state.readingPriorityKey();
+        state.docxPartIndex = 1; await flush();
+        const part = state.readingPriorityKey();
+        expect(part).not.toBe(body); expect(part.start).toBe(state.currentDocxPart.paragraphSegments[0].segmentIndex);
+        expect(state.readingPriorityKey()).toBe(part);
+        await state.loadFiles([new File([readFileSync('examples/document-translation/sample.epub')], 'priority.epub', {type: getDocumentMimeType('epub')})]); await flush();
+        const chapter = state.readingPriorityKey();
+        state.epubChapterIndex = 1; await flush();
+        expect(state.readingPriorityKey()).not.toBe(chapter);
+        expect(state.readingPriorityKey().start).toBe(state.currentEpubChapter.segmentOffset);
+        await state.loadFiles([file('priority.json', JSON.stringify(Array.from({length: 90}, (_, index) => `Visible sentence ${index}`)))]); await flush();
+        const firstPage = state.readingPriorityKey();
+        state.readerPage = 2;
+        const secondPage = state.readingPriorityKey();
+        expect(secondPage).not.toBe(firstPage); expect(secondPage.start).toBe(80);
+        expect(state.prioritizeReadingPosition(state.parsedDocument.segments)[0].id).toBe(80);
+        expect(state.readingPriorityKey()).toBe(secondPage);
+    });
+
     it('independent material entry renders and saves while vocabulary and reading AI are both off', async () => {
         state.config.vocabularyBookEnabled = false; state.config.harness.enabled = false; state.config.on = true;
         await state.loadFiles([file('same-title.txt', 'Original learning paragraph')]); await flush();

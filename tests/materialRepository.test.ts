@@ -287,6 +287,80 @@ describe('local material lifecycle', () => {
     });
 });
 describe('material capacity, migration and backup edge contracts', () => {
+    it('counts capacity once for a batch import while preserving every inserted material', async () => {
+        const template = await repository.capture({source}, 100);
+        await db.materials.clear();
+        const materials = Array.from({length: 128}, (_, index) => ({...template,
+            id: `batch-${index}`, source: {...source, url: `https://batch.test/${index}`},
+        }));
+        const count = vi.spyOn(db.materials, 'count');
+        expect(await repository.importData({format: 'fluentread-learning-materials', version: 1, materials}, 200))
+            .toEqual({inserted: 128, updated: 0, skipped: 0});
+        expect(await db.materials.toArray()).toHaveLength(128);
+        expect(count).toHaveBeenCalledTimes(1);
+    });
+    it('counts capacity once for legacy migration and preserves all references', async () => {
+        const legacy = Array.from({length: 128}, (_, index) => ({id: `legacy-${index}`,
+            contexts: [{sourceUrl: `https://legacy-batch.test/${index}`, text: 'saved phrase', capturedAt: 1}],
+        })) as VocabularyEntry[];
+        const count = vi.spyOn(db.materials, 'count');
+        const records = await new MaterialRepository(db, async () => legacy).list();
+        expect(records).toHaveLength(128);
+        expect(records.every(record => record.references.length === 1)).toBe(true);
+        expect(count).toHaveBeenCalledTimes(1);
+    });
+    it('tracks new identities within a nearly full import without counting updates twice', async () => {
+        const template = await repository.capture({source}, 100);
+        const count = vi.spyOn(db.materials, 'count').mockResolvedValue(10000).mockResolvedValueOnce(9999);
+        const first = {...template, id: 'last-slot', source: {...source, url: 'https://batch.test/last'}, updatedAt: 200};
+        const materials = [first, {...first, title: 'newer same source', updatedAt: 300},
+            {...template, id: 'overflow', source: {...source, url: 'https://batch.test/overflow'}, updatedAt: 200},
+            {...template, title: 'updated existing', updatedAt: 300}];
+        expect(await repository.importData({format: 'fluentread-learning-materials', version: 1, materials}, 400))
+            .toEqual({inserted: 1, updated: 2, skipped: 1});
+        expect((await db.materials.toArray()).map(record => record.title).sort())
+            .toEqual(['newer same source', 'updated existing']);
+        expect(count).toHaveBeenCalledTimes(1);
+    });
+    it('keeps migration capacity local to its transaction and allows existing-reference updates', async () => {
+        await repository.capture({source}, 100);
+        const count = vi.spyOn(db.materials, 'count').mockResolvedValue(10000).mockResolvedValueOnce(9999);
+        const legacy = [{id: 'legacy', contexts: [
+            {sourceUrl: 'https://legacy-batch.test/last', text: 'first', capturedAt: 1},
+            {sourceUrl: 'https://legacy-batch.test/last', text: 'duplicate', capturedAt: 2},
+            {sourceUrl: 'https://legacy-batch.test/overflow', text: 'overflow', capturedAt: 3},
+            {sourceUrl: source.url, text: 'existing', capturedAt: 4},
+        ]}] as VocabularyEntry[];
+        const records = await new MaterialRepository(db, async () => legacy).list();
+        expect(records).toHaveLength(2);
+        expect(records.every(record => record.references.length === 1)).toBe(true);
+        expect(count).toHaveBeenCalledTimes(1);
+    });
+    it('rolls back a failed bulk import and recounts capacity on retry', async () => {
+        const template = await repository.capture({source}, 100);
+        await db.materials.clear();
+        const materials = [0, 1].map(index => ({...template, id: `retry-${index}`,
+            source: {...source, url: `https://retry.test/${index}`}}));
+        const backup = {format: 'fluentread-learning-materials', version: 1, materials};
+        const count = vi.spyOn(db.materials, 'count');
+        const originalPut = db.materials.put.bind(db.materials);
+        const put = vi.spyOn(db.materials, 'put').mockImplementationOnce(record => originalPut(record))
+            .mockRejectedValueOnce(new Error('storage failed'));
+        await expect(repository.importData(backup, 200)).rejects.toThrow('storage failed');
+        expect(await db.materials.toArray()).toHaveLength(0);
+        put.mockRestore();
+        expect(await repository.importData(backup, 200)).toEqual({inserted: 2, updated: 0, skipped: 0});
+        expect(count).toHaveBeenCalledTimes(2);
+        expect(await db.materials.toArray()).toHaveLength(2);
+    });
+    it('does not read capacity for update-only or invalid imports', async () => {
+        const template = await repository.capture({source}, 100);
+        const count = vi.spyOn(db.materials, 'count');
+        const materials = [{...template, title: 'new title', updatedAt: 200}, null];
+        expect(await repository.importData({format: 'fluentread-learning-materials', version: 1, materials}, 300))
+            .toEqual({inserted: 0, updated: 1, skipped: 1});
+        expect(count).not.toHaveBeenCalled();
+    });
     it('migrates missing-title articles and original video positions once, skipping location-free and duplicate contexts', async () => {
         const legacy = [{id:'v',contexts:[
             {text:'word only',capturedAt:1},

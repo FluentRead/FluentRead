@@ -881,6 +881,93 @@ describe('document translation reading-order priority and batch sizing', () => {
         expect(result).toEqual(segments.map(segment => `译 ${segment.source}`));
     });
 
+    it.each([true, false])('visits a stable priority queue once with batch support %s', async batch => {
+        mocks.defaultService = batch ? 'microsoft' : 'openai';
+        mocks.translateTextBatch.mockImplementation(echo);
+        mocks.translateText.mockImplementation(async source => `译 ${source}`);
+        const many = Array.from({length: 1_024}, (_, id) => ({id, source: `Source ${id}`}));
+        let visits = 0;
+        const key = {};
+        const prioritize = vi.fn((pending: readonly typeof many[number][]) => {visits += pending.length; return [...pending].reverse();});
+        const result = await translateDocumentSegments(many, {fileName: 'large.txt', prioritize, priorityKey: () => key});
+        expect(prioritize).toHaveBeenCalledOnce();
+        expect(visits).toBe(many.length);
+        expect(result).toEqual(many.map(segment => `译 ${segment.source}`));
+        expect((batch ? mocks.translateTextBatch : mocks.translateText).mock.calls[0][0]).toEqual(batch
+            ? many.slice(-16).reverse().map(segment => segment.source) : many.at(-1)!.source);
+    });
+
+    it('rebuilds only unclaimed positions when the priority key changes, retaining duplicate occurrences', async () => {
+        mocks.translateTextBatch.mockImplementation(echo);
+        const repeated = ['First', 'Repeat', 'Middle', 'Last', 'Repeat'].map((source, id) => ({id, source}));
+        let focus = 0;
+        const pendingIds: number[][] = [], committed: number[] = [];
+        const result = await translateDocumentSegments(repeated, {
+            fileName: 'paper.pdf', batchLimits: {items: 1}, batchConcurrency: 1,
+            priorityKey: () => focus,
+            prioritize: pending => {
+                pendingIds.push(pending.map(segment => segment.id));
+                return [...pending].sort((left, right) => Math.abs(left.id - focus) - Math.abs(right.id - focus));
+            },
+            onSegment: ({id}) => {committed.push(id); if (id === 0) focus = 4;},
+        });
+        expect(pendingIds).toEqual([[0, 1, 4, 2, 3], [1, 4, 2, 3]]);
+        expect(mocks.translateTextBatch.mock.calls.map(call => call[0])).toEqual([['First'], ['Repeat'], ['Last'], ['Middle']]);
+        expect(committed).toEqual([0, 1, 4, 3, 2]);
+        expect(result).toEqual(repeated.map(segment => `译 ${segment.source}`));
+    });
+
+    it('keeps claimed batches isolated from a priority change while other requests are in flight', async () => {
+        const releases: Array<{sources: string[]; release(): void}> = [];
+        mocks.translateTextBatch.mockImplementation((sources: string[]) => new Promise<string[]>(resolve => {
+            releases.push({sources, release: () => resolve(sources.map(source => `译 ${source}`))});
+        }));
+        let focus = 0;
+        const prioritize = vi.fn((pending: readonly typeof segments[number][]) => [...pending].sort((left, right) => Math.abs(left.id - focus) - Math.abs(right.id - focus)));
+        const running = translateDocumentSegments(segments, {fileName: 'concurrent.pdf', batchLimits: {items: 1}, prioritize, priorityKey: () => focus});
+        await vi.waitFor(() => expect(releases).toHaveLength(3));
+        focus = 5; releases[1].release();
+        await vi.waitFor(() => expect(releases).toHaveLength(4));
+        expect(releases[3].sources).toEqual(['Source 5']);
+        releases[0].release(); releases[2].release();
+        await vi.waitFor(() => expect(releases).toHaveLength(6));
+        releases.slice(3).forEach(request => request.release());
+        expect(await running).toEqual(segments.map(segment => `译 ${segment.source}`));
+        expect(prioritize).toHaveBeenCalledTimes(2);
+        expect(releases.flatMap(request => request.sources).sort()).toEqual(segments.map(segment => segment.source));
+    });
+
+    it('cancels a stable queue without late commits and recreates priority order on resume', async () => {
+        let finish!: (value: string[]) => void;
+        mocks.translateTextBatch.mockImplementationOnce(() => new Promise<string[]>(resolve => {finish = resolve;}));
+        const controller = new AbortController();
+        const committed = vi.fn();
+        const prioritize = vi.fn((pending: readonly typeof segments[number][]) => [...pending].reverse());
+        const options = {fileName: 'resume.txt', batchLimits: {items: 1}, batchConcurrency: 1, prioritize, priorityKey: () => 'unchanged'};
+        const running = translateDocumentSegments(segments, {...options, signal: controller.signal, onSegment: committed});
+        const aborted = expect(running).rejects.toMatchObject({name: 'AbortError'});
+        await vi.waitFor(() => expect(mocks.translateTextBatch).toHaveBeenCalledOnce());
+        controller.abort(); await aborted; finish(['late']);
+        await Promise.resolve(); await Promise.resolve();
+        expect(committed).not.toHaveBeenCalled();
+        mocks.translateTextBatch.mockReset().mockImplementation(echo);
+        const result = await translateDocumentSegments(segments, {...options, initialTranslations: ['', 'saved'], onSegment: committed});
+        expect(prioritize).toHaveBeenCalledTimes(2);
+        expect(mocks.translateTextBatch.mock.calls.map(call => call[0])).toEqual([['Source 5'], ['Source 4'], ['Source 3'], ['Source 2'], ['Source 0']]);
+        expect(result).toEqual(segments.map(segment => segment.id === 1 ? 'saved' : `译 ${segment.source}`));
+    });
+
+    it('does not evaluate priority keys without a prioritizer and still validates keyed ordering', async () => {
+        mocks.translateTextBatch.mockImplementation(echo);
+        const priorityKey = vi.fn(() => 'stable');
+        await translateDocumentSegments(segments, {fileName: 'plain.txt', priorityKey});
+        expect(priorityKey).not.toHaveBeenCalled();
+        const prioritize = vi.fn((pending: readonly typeof segments[number][]) => pending.slice(1));
+        const result = await translateDocumentSegments(segments, {fileName: 'invalid.txt', batchLimits: {items: 1}, prioritize, priorityKey});
+        expect(prioritize).toHaveBeenCalledOnce();
+        expect(result).toEqual(segments.map(segment => `译 ${segment.source}`));
+    });
+
     it('keeps several batches in flight so the first finished batch is shown first, and stops claiming work after a failure', async () => {
         const releases: Array<() => void> = [];
         let inFlight = 0, peak = 0;

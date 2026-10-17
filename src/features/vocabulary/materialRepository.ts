@@ -1,7 +1,7 @@
 /**
  * @file src/features/vocabulary/materialRepository.ts
  * 文件职责：持久化独立于可同步配置的本地材料与学习位置，提供原子写入和可撤销归档。
- * 主要内容：Dexie 唯一来源索引、按引用及来源兼容键去重的旧收藏惰性投影、清空世代与迟到位置保护；词书隐私地址仅作兼容比较，不改写材料规范身份。
+ * 主要内容：Dexie 唯一来源索引、按引用及来源兼容键去重的旧收藏惰性投影、清空世代与迟到位置保护；批量写入在同一事务内复用容量计数，词书隐私地址仅作兼容比较，不改写材料规范身份。
  * 模块边界：不访问网页与浏览器消息；旧收藏只读不改写，材料正文、URL 与笔记不会进入配置同步。
  */
 import Dexie, {type Table} from 'dexie';
@@ -62,6 +62,8 @@ export class MaterialRepository {
                     linkedSources.set(reference.id, keys);
                 }
             }
+            // 读写事务隔离其他写入；仅首次新增读取容量，后续成功新增在本事务内递增。
+            let materialCount: number | undefined;
             for (const entry of entries) for (const context of entry.contexts) {
                 if (!context.sourceUrl) continue;
                 try {
@@ -80,7 +82,12 @@ export class MaterialRepository {
                         locator: context.video ? {kind: 'video', startMs: context.video.startMs, endMs: context.video.endMs, quote: context.text} : {kind: 'text', quote: context.text},
                     };
                     if (!record.references.some(ref => ref.kind === reference.kind && ref.id === reference.id) && record.references.length < 1000) record.references.push(reference);
-                    if (previous || await this.db.materials.count() < 10000) await this.db.materials.put(record);
+                    if (!previous) {
+                        materialCount ??= await this.db.materials.count();
+                        if (materialCount >= 10000) continue;
+                    }
+                    await this.db.materials.put(record);
+                    if (!previous) materialCount!++;
                 } catch (error) {
                     if (!(error instanceof MaterialError)) throw error;
                 }
@@ -193,6 +200,8 @@ export class MaterialRepository {
         return this.db.transaction('rw', this.db.materials, this.db.meta, async () => {
             const meta = await this.db.meta.get('state') ?? initialMeta();
             if (meta.generation !== generation || (guard !== undefined && guard.capturedAt <= meta.clearedAt)) throw new MaterialError('stale-operation', '导入期间材料已清空，请重新选择备份');
+            // 容量只在这个原子导入内缓存，不能跨事务复用，亦不为已有记录更新计数。
+            let materialCount: number | undefined;
             for (const item of value.materials!) {
                 let record: MaterialRecord & {aliases: string[]};
                 try {record = normalizeImportedMaterial(item, now);} catch (error) {
@@ -213,11 +222,13 @@ export class MaterialRepository {
                     record.createdAt = Math.min(previous.createdAt, record.createdAt);
                     result.updated++;
                 } else {
-                    if (await this.db.materials.count() >= 10000) {result.skipped++; continue;}
+                    materialCount ??= await this.db.materials.count();
+                    if (materialCount >= 10000) {result.skipped++; continue;}
                     if (await this.db.materials.get(record.id)) record.id = crypto.randomUUID();
                     result.inserted++;
                 }
                 await this.db.materials.put(record);
+                if (!previous) materialCount!++;
             }
             return result;
         });

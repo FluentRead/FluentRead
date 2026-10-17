@@ -1,12 +1,12 @@
 /**
  * @file src/app/background/contextMenuUpdates.ts
  * 文件职责：按活动标签页的真实状态更新全局右键菜单，并保证迟到查询不会覆盖当前菜单。
- * 主要内容：捕获设置与结构身份，按接受顺序屏蔽旧请求，只读取一次页面真值，仅为标题或可见性发生变化的条目写入原生菜单；在原生队列内再次确认活动页，查询或单项写入失败受控结束且可重试。
+ * 主要内容：提供文档和快照归属捕获工厂，捕获设置与结构身份，按接受顺序屏蔽旧请求，复用点击结果快照或只读取一次页面真值，仅为标题或可见性发生变化的条目写入原生菜单；在原生队列内再次确认活动页，查询或单项写入失败受控结束且可重试。
  * 模块边界：只处理菜单标题与可见性的异步更新，不创建或删除菜单、不订阅配置、不执行点击；原生串行队列及结构生命周期由安装模块持有。
  */
 import {resolveContextMenuPresentation, type ContextMenuPlanItem} from '@/src/core/context-menu/domain';
 import {renderContextMenuTitle} from '@/src/core/context-menu/presentation';
-import {isBrowserTabId, type TabTranslationState} from './tabTranslationState';
+import {isBrowserTabId, type TabTranslationState, type TabTranslationStateStore} from './tabTranslationState';
 import type {TabTranslationStateReader} from './tabTranslationQuery';
 import type {ContextMenuClickTab} from './contextMenuActions';
 import type {ContextMenuSettingsSnapshot} from './contextMenuPreferences';
@@ -23,11 +23,29 @@ interface ContextMenuUpdateDependencies {
     readonly getPlan: () => readonly ContextMenuPlanItem[];
     readonly mutate: (work: () => Promise<void>) => Promise<void>;
     readonly readTabTranslationState: TabTranslationStateReader;
+    readonly captureState: (tabId: number, known?: TabTranslationState) => () => boolean;
     readonly appliedPresentations: Map<string, ContextMenuNativePresentation>;
 }
 
+/** 文档身份和已知真值属于同一次更新；等待活动页查询或原生写入时持续复验。 */
+export function createContextMenuStateCapture(
+    tabTranslationStates: Pick<TabTranslationStateStore, 'captureDocument' | 'get'>,
+): ContextMenuUpdateDependencies['captureState'] {
+    return (tabId, known) => {
+        const currentDocument = tabTranslationStates.captureDocument(tabId);
+        return () => {
+            if (!currentDocument()) return false;
+            if (!known) return true;
+            // 快照等待活动页查询或原生队列时可能被更新；旧状态不能借用新文档或覆盖新真值。
+            const latest = tabTranslationStates.get(tabId);
+            return known.isTranslated === latest.isTranslated && known.isSiteDisabled === latest.isSiteDisabled
+                && known.toolbarStatus === latest.toolbarStatus;
+        };
+    };
+}
+
 /** 配置与结构读取器提供当前身份；mutate 与重建共享同一原生写入队列。 */
-export function createContextMenuUpdater({isSupported, getSettings, getPlan, mutate, readTabTranslationState, appliedPresentations}: ContextMenuUpdateDependencies) {
+export function createContextMenuUpdater({isSupported, getSettings, getPlan, mutate, readTabTranslationState, captureState, appliedPresentations}: ContextMenuUpdateDependencies) {
     let updateRequest = 0;
     let acceptedUpdate = 0;
     const unchanged = (menuItemId: string, properties: ContextMenuNativePresentation): boolean => {
@@ -37,7 +55,8 @@ export function createContextMenuUpdater({isSupported, getSettings, getPlan, mut
     return async (tabId: number, known?: TabTranslationState): Promise<void> => {
         if (!isSupported || getPlan().length === 0 || !isBrowserTabId(tabId)) return;
         const snapshot = getSettings(), items = getPlan(), request = ++updateRequest;
-        const ownsMenu = () => snapshot === getSettings() && items === getPlan();
+        const ownsState = captureState(tabId, known);
+        const ownsMenu = () => ownsState() && snapshot === getSettings() && items === getPlan();
         const current = () => ownsMenu() && request === acceptedUpdate;
         try {
             // 只接受当前活动页；忽略后台页请求时，不取消已接受的活动页更新。

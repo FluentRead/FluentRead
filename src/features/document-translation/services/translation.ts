@@ -1,7 +1,7 @@
 /**
  * @file src/features/document-translation/services/translation.ts
  * 文件职责：编排文档片段的批量翻译流程，在固定语言和服务快照下按数量及字符预算拆批，并向调用方持续报告确定性进度。
- * 主要内容：定义进度与逐段提交契约，在本次文档调用中默认启用机器批量或 AI 多段槽请求而不改变全局设置，按阅读位置重排待译片段并可收紧单批大小，同时保持数批请求在途、先返回的先提交，以章节内一次去重和游标领取避免重复原文挤占批量预算或反复扫描长文队列，按原生章节和位置构建有界篇章参考并区分人工确认译文，提交前移除服务凭空加入的表情符号，请求失败时可按退避间隔自动重试并报告真实等待数量，被服务原样返回的专名与短词保留原文而不中断全文，复用已有译文继续未完成片段，提供文件解析所有权，固定文件级上下文，透传全局暂停状态、校验批次结果，服务失败后停止派发但收齐在途成功译文，显式取消后立即退出并禁止迟到提交。
+ * 主要内容：定义进度与逐段提交契约，在本次文档调用中默认启用机器批量或 AI 多段槽请求而不改变全局设置，按阅读位置标识变化重排待译片段、其余批次复用游标并可收紧单批大小，同时保持数批请求在途、先返回的先提交，以章节内一次去重和游标领取避免重复原文挤占批量预算或反复扫描长文队列，按原生章节和位置构建有界篇章参考并区分人工确认译文，提交前移除服务凭空加入的表情符号，请求失败时可按退避间隔自动重试并报告真实等待数量，被服务原样返回的专名与短词保留原文而不中断全文，复用已有译文继续未完成片段，提供文件解析所有权，固定文件级上下文，透传全局暂停状态、校验批次结果，服务失败后停止派发但收齐在途成功译文，显式取消后立即退出并禁止迟到提交。
  * 模块边界：该层不解析文件、不持久化配置，也不直接绑定具体 provider；上层负责冻结用户设置并注入 gateway，文档结构由 core 提供，网络和缓存语义由应用翻译客户端承担。
  */
 import {serializeTranslationError, TranslationRequestError} from '@/src/services/translation/errors';
@@ -36,6 +36,8 @@ export interface DocumentTranslationOptions {
     batchTranslation?: boolean;
     /** 每次领取下一批之前重排尚未翻译的片段，让阅读器把正在看的页排到前面；返回值必须恰好是传入的那些片段。 */
     prioritize?: (pending: readonly DocumentSegment[]) => readonly DocumentSegment[];
+    /** 可选的不可变优先级标识；Object.is 相同时复用剩余顺序，变化时重新排列全部未领取位置（含重复原文）。不提供时仍每批调用 prioritize。 */
+    priorityKey?: () => unknown;
     /** 收紧单批的片段数与字符数，译文可以更细地逐批显示；只能小于默认上限。 */
     batchLimits?: {items?: number; characters?: number};
     /** 支持批量的服务同时在途的批次数，默认 3；设为 1 即逐批顺序请求。 */
@@ -393,8 +395,12 @@ export function createDocumentSegmentTranslator(
                 queue.push(segment);
             }
             let cursor = 0;
+            let priorityInitialized = false;
+            let previousPriorityKey: unknown;
             const nextBatch = (items: number, characters: number): DocumentSegment[] => {
-                if (options.prioritize) {
+                const priorityKey = options.prioritize ? options.priorityKey?.() : undefined;
+                if (options.prioritize && (!priorityInitialized || !options.priorityKey || !Object.is(priorityKey, previousPriorityKey))) {
+                    // 阅读位置未变时只移动游标，避免长文档每批重新扫描、校验和排序所有剩余片段。
                     // 同一原文可能同时出现在首尾页：把所有尚未认领的位置交给阅读优先级，再只发送最先选中的代表。
                     const remaining = [...queuedSources].flatMap(source => twins.get(source)!);
                     const ordered = prioritized(remaining, options.prioritize);
@@ -406,6 +412,8 @@ export function createDocumentSegmentTranslator(
                         return true;
                     });
                     cursor = 0;
+                    previousPriorityKey = priorityKey;
+                    priorityInitialized = true;
                 }
                 const taken = takeBatch(queue, cursor, items, characters);
                 cursor += taken.length;

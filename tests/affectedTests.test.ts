@@ -105,6 +105,10 @@ describe('affected behavior test planning', () => {
         expect(select(['tests/b.test.ts']).testFiles).toEqual(['tests/architecture/boundary.test.ts', 'tests/b.test.ts']);
         expect(select(['docs/testing.md'])).toMatchObject({testFiles: ['tests/architecture/boundary.test.ts'], coverageFiles: [], extensionChanged: false});
     });
+    it.each(['integrations/obsidian/main.ts', 'integrations/zotero/vite.config.ts', 'scripts/safari/package.mjs'])
+    ('keeps production builds required when only %s changes', file => {
+        expect(select([file])).toMatchObject({testFiles: ['tests/architecture/boundary.test.ts'], extensionChanged: true});
+    });
     it('explicitly widens behavior scope when shared test configuration changes', () => {
         expect(select(['vitest.config.ts'])).toMatchObject({testFiles: ['tests/a.test.ts', 'tests/architecture/boundary.test.ts', 'tests/b.test.ts', 'tests/fixture.test.ts'],
             coverageFiles: [], globalInputs: ['vitest.config.ts'], reason: 'shared-test-configuration'});
@@ -148,6 +152,23 @@ describe('affected behavior test planning', () => {
         save(root, 'src/core/a.ts', 'export const a = 2;');
         expect(createPlan(root, base)).toMatchObject({base, head: base, changed: ['src/core/a.ts'],
             testFiles: ['tests/a.test.ts', 'tests/architecture/boundary.test.ts', 'tests/b.test.ts'], coverageFiles: ['src/core/a.ts']});
+    });
+    it('reads integration source dependencies from real Git files so shared changes select their actual consumers', () => {
+        const root = directory();git(root, 'init', '-q');git(root, 'config', 'user.email', 'fixture@example.test');git(root, 'config', 'user.name', 'Fixture');
+        save(root, 'src/provider.ts', 'export const provider = 1;');
+        save(root, 'integrations/obsidian/gateway.ts', "export {provider} from '../../src/provider';");
+        save(root, 'integrations/obsidian/main.ts', "export {provider} from './gateway';");
+        save(root, 'integrations/other/main.ts', 'export const other = 1;');
+        save(root, 'tests/consumer.test.ts', "import {provider} from '../integrations/obsidian/main';");
+        save(root, 'tests/unrelated.test.ts', "import {other} from '../integrations/other/main';");
+        save(root, 'tests/test-matrix.json', JSON.stringify({groups: {unit: ['tests/consumer.test.ts', 'tests/unrelated.test.ts']}}));
+        save(root, 'vitest.coverage.config.ts', 'export default {test:{coverage:{include:[]}}}');
+        git(root, 'add', '.');git(root, 'commit', '-qm', 'integration baseline');const base = git(root, 'rev-parse', 'HEAD');
+        save(root, 'src/provider.ts', 'export const provider = 2;');
+        expect(createPlan(root, base)).toMatchObject({testFiles: ['tests/consumer.test.ts'], extensionChanged: true});
+        git(root, 'checkout', '--', 'src/provider.ts');
+        save(root, 'integrations/obsidian/gateway.ts', "export {provider} from '../../src/provider'; export const changed = true;");
+        expect(createPlan(root, base)).toMatchObject({testFiles: ['tests/consumer.test.ts'], extensionChanged: true});
     });
     it('tracks actual root asset readers and builds even when an unrelated asset has no behavior reader', () => {
         const root = directory();git(root, 'init', '-q');git(root, 'config', 'user.email', 'fixture@example.test');git(root, 'config', 'user.name', 'Fixture');

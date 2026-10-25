@@ -6,6 +6,8 @@ node_modules
 # Testing
 coverage
 temp
+reports/ci-builds/
+reports/ci-preview/
 
 # Production
 build

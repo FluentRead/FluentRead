@@ -34,7 +34,7 @@ env:
 
 jobs:
   plan:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 10
     outputs:
       extension_changed: ${{ steps.affected.outputs.extension_changed }}
@@ -45,7 +45,7 @@ jobs:
           fetch-depth: 0
           persist-credentials: false
       - name: Set up pnpm
-        uses: pnpm/action-setup@v4
+        uses: pnpm/action-setup@v5
       - name: Set up Node.js and dependency cache
         uses: actions/setup-node@v6
         with:
@@ -59,7 +59,7 @@ jobs:
 
   tests:
     needs: plan
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     # Keep one Vitest worker; build lanes run on separate standard runners.
     timeout-minutes: 75
     steps:
@@ -69,7 +69,7 @@ jobs:
           fetch-depth: 0
           persist-credentials: false
       - name: Set up pnpm
-        uses: pnpm/action-setup@v4
+        uses: pnpm/action-setup@v5
       - name: Set up Node.js and dependency cache
         uses: actions/setup-node@v6
         with:
@@ -111,7 +111,7 @@ jobs:
   builds:
     needs: plan
     if: needs.plan.outputs.extension_changed == 'true' || github.event_name == 'workflow_dispatch'
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 30
     strategy:
       fail-fast: false
@@ -123,7 +123,7 @@ jobs:
         with:
           persist-credentials: false
       - name: Set up pnpm
-        uses: pnpm/action-setup@v4
+        uses: pnpm/action-setup@v5
       - name: Set up Node.js and dependency cache
         uses: actions/setup-node@v6
         with:
@@ -207,7 +207,7 @@ jobs:
   extension-quality:
     if: always()
     needs: [plan, tests, builds]
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 5
     steps:
       - name: Require all planned checks to pass

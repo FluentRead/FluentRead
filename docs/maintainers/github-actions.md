@@ -14,13 +14,15 @@
 - 扩展：TypeScript/Vue、Chrome、Firefox、生成清单、Safari 网页产物校验，以及复用 Firefox 产物生成 Thunderbird 安装包。
 - 配套出口：标准与 standalone userscript 及其校验、Zotero 构建与校验、Obsidian 构建。
 
+运行环境固定为 Ubuntu 24.04、Node.js 22 和 `packageManager` 指定的 pnpm 9；`pnpm/action-setup@v5` 自身使用 Node.js 24，不改变构建使用的 Node.js 版本。系统迁移应单独验证后修改 runner 标签。
+
 每个 runner 内的命令串行，测试使用单 worker；不同 runner 同时工作，减少单任务排队时间。普通 PR/push 的纯文档变化仍经过测试任务，无需重建扩展；手动运行始终执行两条构建任务，即使影响计划没有扩展变化。最终 `extension-quality` 检查所有应执行任务，不能以构建任务被意外跳过代替通过。
 
 PR 更新会取消旧提交的检查和文档预览。主线扩展检查按 SHA 分组保留每批提交的检查，避免新的主线提交使上一批影响范围失去验证。主线文档部署不取消正在执行的任务；GitHub 仍可能用较新的提交替换同一组中尚未开始的部署。
 
 ## 免费条件与存储控制
 
-按当前 [GitHub Actions 计费说明](https://docs.github.com/en/billing/concepts/product-billing/github-actions)，公开仓库使用标准 GitHub 托管 runner 的计算时间免费；larger runner 始终计费。这里使用 `ubuntu-latest`，不申请 larger runner，也不接入付费计算服务。规则可能变化，不能承诺永久免费。
+按当前 [GitHub Actions 计费说明](https://docs.github.com/en/billing/concepts/product-billing/github-actions)，公开仓库使用标准 GitHub 托管 runner 的计算时间免费；larger runner 始终计费。这里使用标准 `ubuntu-24.04`，不申请 larger runner，也不接入付费计算服务。规则可能变化，不能承诺永久免费。
 
 构建产物与 GitHub Packages 共用账号套餐的存储额度，超额可能收费；日志和 job summary 不占 artifact 额度。日常只上传小型 JSON，手动请求的 Chrome/Firefox 包仅保留一天，减少持续占用。短期保留能降低后续占用，不能撤销已经累计的计费用量。账号实际额度和账单须在 GitHub 的 Billing 页面核对；工作流不会修改账号预算。
 

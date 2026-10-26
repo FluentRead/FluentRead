@@ -1,5 +1,5 @@
 {
-  "version": 2,
+  "version": 3,
   "baseCommit": "d9aa61c04201ddb023061f6646a46ac701be477f",
   "status": "Draft candidate; full-page quality acceptance remains incomplete",
   "description": "Bounded ASCII whitespace insertion observes the existing SDK read and successful inference, preserving SDK decoder/results/Box identity. Extra output scanning is accounted inside the existing inference pacer. No new model session or readback. Argmax scans the union of original controller and SDK valid prefixes; common unused padding no longer participates in finite validation. Full-T recovery coordinates, arrays and page ledger remain unchanged.",
@@ -14,12 +14,13 @@
     "tests/mangaOcrColor.test.ts": "e1a9c4f71a945fcc5c3c4ed126ea1a3d48738feb058d1f729e315dd46c144c64",
     "tests/mangaRecognitionInput.test.ts": "2d0d39bc149715e1b5b2c868dfd6e74521a90f2934ee4851d200bcebdd79c8be",
     "tests/mangaRecognitionWhitespace.test.ts": "2d83f0c25c363f75b003bc35abf746a2d74ec9dcaba52fb83317a339807b49ff",
-    "tests/mangaRecognitionWhitespaceSdk.test.ts": "b2fac643b4d64429abb3c9cc4a77827bde83138e2d2166807594b7b4f867e626"
+    "tests/mangaRecognitionWhitespaceSdk.test.ts": "b2fac643b4d64429abb3c9cc4a77827bde83138e2d2166807594b7b4f867e626",
+    "tests/mangaRecognitionWhitespaceRecordings.test.ts": "c8e703afd815ac4c35b80c69ef61065e17e21002e9c328637c3aa94171e0a1e2"
   },
   "targeted": {
-    "files": 5,
-    "tests": 386,
-    "passed": 386,
+    "files": 6,
+    "tests": 410,
+    "passed": 410,
     "coverage": {
       "src/features/image-translation/services/mangaOcr.ts": {
         "statements": 100,
@@ -84,6 +85,14 @@
       "whitespace-valid-prefix-firefox.log": 0,
       "whitespace-valid-prefix-manifests.log": 0,
       "whitespace-valid-prefix-audit.log": 0
+    },
+    "portableFollowup": {
+      "combinedTestsExit": 0,
+      "compileExit": 0,
+      "auditExit": 0,
+      "independentReviewOpenFindings": 0,
+      "initialRootConfigStartupFailurePreserved": true,
+      "buildScope": "Production files unchanged from9ec; prior Chrome/Firefox artifacts are not claimed as a rerun of the portable tests."
     }
   },
   "workspaceEvidenceRoot": "workspace-data/evidence/image-manga-quality-1068-20261025",
@@ -187,9 +196,46 @@
     "iteration-v16/whitespace-followup/rgba-rebuild/execution/report.json": {
       "bytes": 44863,
       "sha256": "dd5d7f20cc3d670d6aa9b6cc7489202d2a863642e572460fd39c9aeb6478461a"
+    },
+    "iteration-v16/whitespace-portable-final-targeted.log": {
+      "bytes": 2713,
+      "sha256": "a85e24cfb50626e0227f7123187e603895e144d0f7d52d541826c8d58b881775"
+    },
+    "iteration-v16/whitespace-portable-final-targeted-config-missing.log": {
+      "bytes": 2130,
+      "sha256": "f73d86a2ecac98c5e782270b817decdac67dd621ff11f74820aa1d6c7a68d4a2"
+    },
+    "iteration-v16/whitespace-portable-regression-feasibility/delivery-freeze.json": {
+      "bytes": 9512,
+      "sha256": "8de4fb6d74b3df43ea84804bf86f3515afd45ecdead5102aa1b517448f5bdc4c"
+    },
+    "iteration-v16/whitespace-portable-regression-feasibility/delivery-readme-clarification-addendum.json": {
+      "bytes": 8903,
+      "sha256": "f0d53f669089e6e1bcbb30e68769aabe233a9de4edb2a98d29664832bcbe6451"
+    },
+    "iteration-v16/whitespace-portable-regression-feasibility/compile-final.log": {
+      "bytes": 362,
+      "sha256": "f68643131d298186559b5c86f6b7fca8468657cea46094978f016ae30a79a48e"
+    },
+    "iteration-v16/whitespace-portable-regression-feasibility/audit.log": {
+      "bytes": 419,
+      "sha256": "d743b588713d46e8598af817065a8f52fa66b05a758a53ebcec3ddc1d635d0f1"
+    },
+    "iteration-v16/whitespace-portable-independent-review/review.json": {
+      "bytes": 4310,
+      "sha256": "0fa5d0a415fee380a887aa8cc06c65fb5072eaa7bcf7d3f5aa017eb3af82c14d"
+    },
+    "iteration-v16/whitespace-portable-independent-review/final-freeze.json": {
+      "bytes": 8208,
+      "sha256": "46a4465a08874b3e88d8cb903fb39046a55676707b7f9356f60e68b38f657b68"
+    },
+    "iteration-v16/whitespace-valid-prefix-ci-final.json": {
+      "bytes": 1228,
+      "sha256": "59f81d193c15a936c9e4363d8fc13c09c539eef47d497eabb785d975b2418b25"
     }
   },
   "stillOpen": [
+    "full-page THE RIVERIS missing space",
     "full-page POSTCARD missing space",
     "full-page Japanese extra space",
     "nonwhite paragraph ownership",
@@ -311,5 +357,48 @@
     "runtimePassed": true,
     "cleanupPassed": true,
     "limitation": "Same original PNG and public Canvas pipeline, constrained by nine exact normalized RGB input SHA. Rebuilt RGBA is research material, not the historical RGBA original or proof of historical alpha equality; fake blank output is not OCR/CTC or quality acceptance."
+  },
+  "previousValidPrefixDelivery": {
+    "commit": "9ec3c1c2d31cc46dd029b48d0e82c1b35aee9606",
+    "testsPassed": 386,
+    "ciQuality": "success",
+    "ciDocs": "success",
+    "scope": "The portable followup changes only tests/helper/fixtures/docs; production sources and prior Chrome/Firefox build inputs remain identical."
+  },
+  "helperSha256": {
+    "scripts/testing/manga-whitespace-recordings.cjs": "30aa6866e59736c112ca8a6f54e160b19e178bda599e8fae9cb5408503083201"
+  },
+  "portableReplay": {
+    "directory": "tests/fixtures/manga-whitespace-recordings",
+    "rows": 32,
+    "completeObservedCohorts": 6,
+    "frames": 3752,
+    "uniqueRgbaPngs": 22,
+    "observedDictionaryFacts": 50,
+    "dataFiles": 29,
+    "dataBytes": 629007,
+    "manifestSha256": "c438ddc18b13d67fcd0661ebad215f67a20599763612266651b55e0200e5c870",
+    "old20Exact": 20,
+    "old18RawCorrectPreserved": 18,
+    "cabinsRepaired": 2,
+    "new12OriginalTextPreserved": 12,
+    "scored": 29,
+    "exact": 26,
+    "unscoredNoise": 3,
+    "knownAccuracyFailures": [
+      "THE RIVERIS CLEAR TODAY",
+      "POSTCARD FROMTHE FERRY",
+      "雨あがり の市場へ"
+    ],
+    "accuracyPassed": false,
+    "newModelRuns": 0,
+    "downloads": 0,
+    "browserRuns": 0,
+    "sparseDictionaryForRealInference": false,
+    "historicalFullpageLedgerReproduced": false,
+    "missingUnselectedFullpageRgbaRows": 42,
+    "historicalAlphaProved": false,
+    "logitScope": "Only recorded argmax/max/blank/space sufficient statistics; unobserved classes zero-filled. Not original full logits.",
+    "positionsScope": "Old20 positions derive from diagnostic projection.emissions, not retained SDK position objects; text/confidence were originally asserted equal to SDK. New12 SDK raw positions are recorded and independently equal."
   }
 }

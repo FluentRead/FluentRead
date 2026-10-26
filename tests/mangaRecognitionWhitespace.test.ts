@@ -125,6 +125,75 @@ describe('物理提前准入和CTC反例',()=>{
     });
 });
 
+describe('控制器和SDK有效前缀并域，原恢复域/完整T坐标与累计预算保持',()=>{
+    const paddedBoxes=()=>[box(),{width:240,height:48}];
+    function paddedOutput(){
+        const data=new Float32Array(2*80*C);data.set(output().data);
+        return{dims:[2,80,C],data};
+    }
+    function runPadded(controller:ReturnType<typeof create>,boxes:readonly object[],out:{dims:readonly number[];data:unknown}){
+        borrowed(controller);const input={};
+        controller.bindInput(input,{readIndices:[0,1],resizedWidths:[120,240],paddedWidth:240,height:48});
+        controller.observeOutput(input,out);const original=[{text:'AB12CD',box:boxes[0]}];
+        return{original,result:controller.applyToSdkResults(original)};
+    }
+    it.each([
+        {label:'blank NaN',channel:0,invalid:NaN},{label:'blank Infinity',channel:0,invalid:Infinity},
+        {label:'space NaN',channel:C-1,invalid:NaN},{label:'space Infinity',channel:C-1,invalid:Infinity},
+        {label:'max Infinity',channel:65,invalid:Infinity},
+    ])('padding $label 不回退，相同坏值进入有效prefix仍保持原文且Tensor不变',({channel,invalid})=>{
+        for(const t of [60,21]){
+            const boxes=paddedBoxes(),{controller}=start({boxes}),out=paddedOutput();out.data[t*C+channel]=invalid;
+            const before=Buffer.from(new Uint8Array(out.data.buffer)),r=runPadded(controller,boxes,out);
+            if(t===60)expect(r.result[0].text).toBe('AB12 CD');else expect(r.result).toBe(r.original);
+            expect(Buffer.from(out.data.buffer).equals(before)).toBe(true);
+        }
+    });
+    it('任意finite padding尾部不影响结果，比例坐标仍为fullT而非validSeq',()=>{
+        const boxes=paddedBoxes(),a=start({boxes}),b=start({boxes}),base=paddedOutput(),tail=paddedOutput();
+        for(let t=40;t<80;t++){tail.data[t*C]=.1;tail.data[t*C+C-1]=.5;tail.data[t*C+90]=.9;}
+        const clean=runPadded(a.controller,boxes,base),changed=runPadded(b.controller,boxes,tail);
+        // t21 的点为(21.5)*240/80=64.5，在原gap内；若误用valid40分母会落到129而拒绝。
+        expect(clean.result[0].text).toBe('AB12 CD');expect(changed.result[0].text).toBe(clean.result[0].text);
+    });
+    it('padding不发生任何数值读取；prefix真实读取异常仍原对象上抛',()=>{
+        const boxes=paddedBoxes(),native=new Error('prefix read first');
+        for(const throwPrefix of [false,true]){
+            const {controller}=start({boxes}),out=paddedOutput();let largest=-1;
+            const data=new Proxy(out.data,{get(target,key){
+                if(typeof key==='string'&&/^\d+$/.test(key)){const index=Number(key);largest=Math.max(largest,index);if(index>=40*C||throwPrefix)throw native;}
+                return Reflect.get(target,key,target);
+            }});
+            if(throwPrefix){try{runPadded(controller,boxes,{dims:out.dims,data});throw Error('must throw');}catch(actual){expect(actual).toBe(native);}}
+            else{expect(runPadded(controller,boxes,{dims:out.dims,data}).result[0].text).toBe('AB12 CD');expect(largest).toBe(40*C-1);}
+        }
+    });
+    it('25*56/200与25*(56/200)边界不同：SDK额外t7仍校验，但不进入原恢复域',()=>{
+        const T=25,width=56,paddedWidth=200;
+        expect(Math.ceil(T*width/paddedWidth)).toBe(7);expect(Math.ceil(T*(width/paddedWidth))).toBe(8);
+        for(const [at,invalid]of [[7,false],[7,true],[8,true]] as const){
+            const boxes=[{width,height:48},{width:paddedWidth,height:48}],{controller}=start({boxes}),pixels=new Uint8ClampedArray(width*48*4);
+            for(let p=0;p<pixels.length;p+=4)pixels.set([24,44,68,255],p);
+            for(const [left,right]of [[3,5],[8,10],[13,15],[18,20],[34,36],[39,41]])for(let x=left;x<right;x++)for(let y=12;y<36;y++)pixels[(y*width+x)*4]=230;
+            controller.observeBorrowedRead(0,width,48,pixels);
+            const input={};controller.bindInput(input,{readIndices:[0,1],resizedWidths:[width,paddedWidth],paddedWidth,height:48});
+            const data=new Float32Array(2*T*C);for(let t=0;t<T;t++)data[t*C]=.9;
+            for(const [t,char]of [[0,'A'],[2,'B'],[4,'C'],[6,'D']] as const){data[t*C]=.01;data[t*C+char.charCodeAt(0)]=.99;}
+            data[3*C+C-1]=.4;data[at*C]=invalid?Infinity:.01;data[at*C+90]=.99;
+            controller.observeOutput(input,{dims:[2,T,C],data});const original=[{text:'ABCD',box:boxes[0]}],result=controller.applyToSdkResults(original);
+            if(at===7&&invalid)expect(result).toBe(original);else expect(result[0].text).toBe('AB CD');
+        }
+    });
+    it('短prefix仍按fullT80跨run扣账，2000后第26行完全不读取output',()=>{
+        const controller=create(),out=paddedOutput();controller.beginPage();
+        for(let n=0;n<26;n++){
+            const boxes=paddedBoxes();controller.beginRun({boxes,batchSize:2,dictionary,supportedPerBox:true,sourceRatioOne:true});
+            const value=n<25?out:{dims:[2,80,C],get data():unknown{throw new Error('fullT budget must prevent read');}};
+            expect(runPadded(controller,boxes,value).result[0].text).toBe(n<25?'AB12 CD':'AB12CD');controller.endRun();
+        }
+    });
+});
+
 describe('字典/身份/形状与生命周期的完整回退',()=>{
     it.each([
         {supportedPerBox:false},{sourceRatioOne:false},{batchSize:0},{batchSize:1.5},{batchSize:8193},

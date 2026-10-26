@@ -1,25 +1,25 @@
 {
-  "version": 1,
+  "version": 2,
   "baseCommit": "d9aa61c04201ddb023061f6646a46ac701be477f",
   "status": "Draft candidate; full-page quality acceptance remains incomplete",
-  "description": "Bounded ASCII whitespace insertion observes the existing SDK read and successful inference, preserving SDK decoder/results/Box identity. Extra output scanning is accounted inside the existing inference pacer. No new model session or readback.",
+  "description": "Bounded ASCII whitespace insertion observes the existing SDK read and successful inference, preserving SDK decoder/results/Box identity. Extra output scanning is accounted inside the existing inference pacer. No new model session or readback. Argmax scans the union of original controller and SDK valid prefixes; common unused padding no longer participates in finite validation. Full-T recovery coordinates, arrays and page ledger remain unchanged.",
   "sourceSha256": {
     "src/features/image-translation/services/mangaOcr.ts": "ac9d9284825800f34d81bc6c0b7f203d37bad8c5830874dfe16e687d09312973",
     "src/features/image-translation/services/mangaOcrColor.ts": "70843ddbed7fb1a2e830c4dfb06ba700268ebb0e0b5e62b0af2f46f40f8e6395",
     "src/features/image-translation/services/mangaRecognitionInput.ts": "023a8b1cc5ad8028d70f2ece7cfc04b40f5a4954aee1dff772fe63e2e2d9c309",
-    "src/features/image-translation/services/mangaRecognitionWhitespace.ts": "e7aa0fccada8c55111cddd3acd64c24e0486b79d1155eb495e0c24800a536ef5"
+    "src/features/image-translation/services/mangaRecognitionWhitespace.ts": "02804605e619d4c56ca5825ca59f520493dea02ad87eb77f335c8c95cf163e17"
   },
   "testSha256": {
     "tests/mangaOcr.test.ts": "c1d6a3498235b5c27adbf43453cfc8ae561e454d9eda04f5e178edcce817fa4a",
     "tests/mangaOcrColor.test.ts": "e1a9c4f71a945fcc5c3c4ed126ea1a3d48738feb058d1f729e315dd46c144c64",
     "tests/mangaRecognitionInput.test.ts": "2d0d39bc149715e1b5b2c868dfd6e74521a90f2934ee4851d200bcebdd79c8be",
-    "tests/mangaRecognitionWhitespace.test.ts": "9ed7fc77d6af298ded422dfa9ebec1a158b1444caaeb0b33c208461c35f829f4",
+    "tests/mangaRecognitionWhitespace.test.ts": "2d83f0c25c363f75b003bc35abf746a2d74ec9dcaba52fb83317a339807b49ff",
     "tests/mangaRecognitionWhitespaceSdk.test.ts": "b2fac643b4d64429abb3c9cc4a77827bde83138e2d2166807594b7b4f867e626"
   },
   "targeted": {
     "files": 5,
-    "tests": 377,
-    "passed": 377,
+    "tests": 386,
+    "passed": 386,
     "coverage": {
       "src/features/image-translation/services/mangaOcr.ts": {
         "statements": 100,
@@ -75,8 +75,16 @@
       "manifests-pacing.log": 0,
       "audit-final.log": 0
     },
-    "independentReviews": "No new blocking regression in frozen source/protocol; not all-scene or semantic correctness proof",
-    "failedRunPreserved": "targeted-final.log:376 passed/1 test-spy implementation failure; repaired test helper, current source unchanged and final377 passed"
+    "independentReviews": "No new blocking regression in frozen integration and valid-prefix review; common-padding validation policy is explicitly narrowed. Not all-scene or semantic correctness proof.",
+    "failedRunPreserved": "targeted-final.log:376 passed/1 test-spy implementation failure; repaired test helper, current source unchanged and final377 passed",
+    "currentLocalCommandsExitCode": {
+      "whitespace-valid-prefix-targeted.log": 0,
+      "whitespace-valid-prefix-compile.log": 0,
+      "whitespace-valid-prefix-chrome.log": 0,
+      "whitespace-valid-prefix-firefox.log": 0,
+      "whitespace-valid-prefix-manifests.log": 0,
+      "whitespace-valid-prefix-audit.log": 0
+    }
   },
   "workspaceEvidenceRoot": "workspace-data/evidence/image-manga-quality-1068-20261025",
   "evidenceFiles": {
@@ -131,6 +139,54 @@
     "iteration-v15/fullpage-whitespace-attribution/execution-launch-failed-default/cleanup-root.json": {
       "bytes": 220,
       "sha256": "3021441c3558bc390398ea7d56ad96ee43ed98dd4d5d856d533d351a1f89c812"
+    },
+    "iteration-v16/whitespace-valid-prefix-targeted.log": {
+      "bytes": 2639,
+      "sha256": "32985238abdc8eda6ed9725f2e9ca6592afbf3d4d28c37c9a8da24c70fe14c6e"
+    },
+    "iteration-v16/whitespace-valid-prefix-compile.log": {
+      "bytes": 279,
+      "sha256": "91d9e49bbcd0e6b79d36dc97e0f309e3a21d9c962dfed57d9772eecb48757db4"
+    },
+    "iteration-v16/whitespace-valid-prefix-chrome.log": {
+      "bytes": 92291,
+      "sha256": "4d7f6591d896cf8a2216a72e045a93d17f97ec11c30e66565f816e11a0f89bf8"
+    },
+    "iteration-v16/whitespace-valid-prefix-firefox.log": {
+      "bytes": 92878,
+      "sha256": "d6997b991963d7f7571728dc5d449966c08551eb0a6f6491987afe78bf0145c8"
+    },
+    "iteration-v16/whitespace-valid-prefix-manifests.log": {
+      "bytes": 1285,
+      "sha256": "f8312cd2c6a130af00edf7048689fac42878c55d3228023cd6d64f040b694cf0"
+    },
+    "iteration-v16/whitespace-valid-prefix-audit.log": {
+      "bytes": 333,
+      "sha256": "929d2750adac6f4a0102aea63108826f4079e1dfae6ece0b88f5663f420097ab"
+    },
+    "iteration-v16/whitespace-valid-prefix-implementation/freeze.json": {
+      "bytes": 10652,
+      "sha256": "5b52a26d0cff80b8c08b530b91bd469f0828f15e74fc0da8096e7cb33119fb72"
+    },
+    "iteration-v16/whitespace-valid-prefix-implementation/replay-actual20.json": {
+      "bytes": 10319,
+      "sha256": "133602f6ead784c8fd3a8c13fd09ae653b077ffc6e41c224e87810a410df7bb2"
+    },
+    "iteration-v16/whitespace-valid-prefix-review/freeze.json": {
+      "bytes": 5089,
+      "sha256": "f20cb1c00cce0328b47b95826bcff5700249f90d9decc49c064033e8e4fd5d86"
+    },
+    "iteration-v16/whitespace-valid-prefix-review/review.json": {
+      "bytes": 11969,
+      "sha256": "a2c57289c094b61302b4a0bde9caf84464c20d47dd184f09eed6f189cb1e29a7"
+    },
+    "iteration-v16/whitespace-followup/rgba-rebuild/freeze.json": {
+      "bytes": 7252,
+      "sha256": "99fe5800f3268b011dab1b29d25bd746728583edfda2d0d102cb44c2d53e6e42"
+    },
+    "iteration-v16/whitespace-followup/rgba-rebuild/execution/report.json": {
+      "bytes": 44863,
+      "sha256": "dd5d7f20cc3d670d6aa9b6cc7489202d2a863642e572460fd39c9aeb6478461a"
     }
   },
   "stillOpen": [
@@ -169,7 +225,8 @@
         "events": 160,
         "omittedEvents": 0,
         "incomplete": [],
-        "complete": true
+        "complete": true,
+        "eventsNote": "160 is the page-final summary count before emitting itself; the complete raw capture has 161 continuous records."
       }
     },
     "qualityFailures": [
@@ -211,5 +268,48 @@
       "cleanupErrors": []
     },
     "limits": "Only two geometrically preselected complete original cohorts have full-T data; RRR final texts are historical, no paired causal CTC comparison; input float projection cannot prove source alpha"
+  },
+  "previousDelivery": {
+    "commit": "f398bd26ace54fb02fa07b55c525e0277fb16c69",
+    "targetedTests": 377,
+    "whitespaceSourceSha256": "e7aa0fccada8c55111cddd3acd64c24e0486b79d1155eb495e0c24800a536ef5",
+    "evidenceScope": "Original V15 logs and coverage are preserved; V16 valid-prefix checks bind the current source."
+  },
+  "validPrefix": {
+    "policy": "max(controllerValid,sdkValid); original recovery.valid unchanged; common padding finite rejection intentionally removed",
+    "floatingBoundary": {
+      "T": 25,
+      "width": 56,
+      "paddedWidth": 200,
+      "controllerValid": 7,
+      "sdkValid": 8
+    },
+    "recordedBgrStudyRows": 10,
+    "originalExtraScanSteps": 985,
+    "currentExtraScanSteps": 635,
+    "extraClassComparisonsSaved": 6548150,
+    "extraClassLoopReduction": 0.3553299492385787,
+    "newInferenceCalls": 0,
+    "wholePageRuntimeMeasured": false,
+    "new12RowsIncludedInSavings": false,
+    "worstCaseBudgetAndMetadataUnchanged": true
+  },
+  "rgbaResearchRebuild": {
+    "passed": true,
+    "freezeSha256": "99fe5800f3268b011dab1b29d25bd746728583edfda2d0d102cb44c2d53e6e42",
+    "matchedOriginalInputBatches": 9,
+    "savedRows": 12,
+    "savedRgbaPixels": 367392,
+    "savedRgbaBytes": 1469568,
+    "explicitExtraRgbaPixelVisits": 1836960,
+    "modelsLoaded": 0,
+    "modelFilesRead": 0,
+    "fakeSessionCalls": 9,
+    "inferenceSessionCreateAttempts": 0,
+    "dictionaryBytesRead": 74948,
+    "loopbackRequests": 5,
+    "runtimePassed": true,
+    "cleanupPassed": true,
+    "limitation": "Same original PNG and public Canvas pipeline, constrained by nine exact normalized RGB input SHA. Rebuilt RGBA is research material, not the historical RGBA original or proof of historical alpha equality; fake blank output is not OCR/CTC or quality acceptance."
   }
 }

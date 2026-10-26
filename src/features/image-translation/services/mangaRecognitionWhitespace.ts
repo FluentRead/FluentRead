@@ -4,6 +4,7 @@
  * 主要内容：借用既有四十八像素高的单次 RGBA 读回，完整验证不透明恒色外周并预筛显著内部空隙；
  * 通过原读回索引、稳定宽度批次及 Tensor/Box 对象关联，只为有物理候选的行额外扫描有界 CTC 输出；
  * 原有空格逐字保留，缺少字典、形状或身份依据均返回原文；页内累计约束像素、crop、support run 和完整时间步，
+ * argmax 仅观察原控制器与 SDK 有效前缀的并域，共同 padding 不再检查有限值；恢复域、数组长度、比例坐标及预算不变；
  * 推理前不保留 RGBA，收尾清除元数据，不接管 Tensor 或创建任何 Canvas/模型/重试。
  * 模块边界：只给锁定的 per-box、原比例 SDK 路径提供可选文字后处理，不导入 SDK 私有解码器，不修改概率或原像素；
  * CTC 横坐标只是空间候选，不是字形或擦除边界，物理空隙仍不能证明作者的语义空格，真实异常由调用方保留首因。
@@ -63,13 +64,16 @@ export function createMangaRecognitionWhitespace(){
     }
     function capture(data:Float32Array,row:number,T:number,width:number,paddedWidth:number):Trace|undefined {
         const indices=new Uint32Array(T),spaces=new Float32Array(T),C=limits.classes;
-        for(let t=0;t<T;t++){
+        const valid=Math.max(1,Math.min(T,Math.ceil(T*width/paddedWidth)));
+        // 两种合法浮点算序可能相差一帧；保留原恢复域，同时校验 SDK 仍有效的额外边界帧。
+        const sdkValid=Math.max(1,Math.min(T,Math.ceil(T*(width/paddedWidth)))),scanLength=Math.max(valid,sdkValid);
+        for(let t=0;t<scanLength;t++){
             const base=(row*T+t)*C,blank=data[base],space=data[base+C-1];let max=blank,index=0;
             for(let c=1;c<C;c++)if(data[base+c]>max){max=data[base+c];index=c;}
             if(![blank,space,max].every(Number.isFinite))return;
             indices[t]=index;spaces[t]=space;
         }
-        return{indices,spaces,paddedWidth,valid:Math.max(1,Math.min(T,Math.ceil(T*width/paddedWidth)))};
+        return{indices,spaces,paddedWidth,valid};
     }
     function recover(text:string,trace:Trace,projection:Projection,dictionary:readonly string[]):string {
         const chars:Array<{character:string;t:number;index:number}>=[];let last=-1;

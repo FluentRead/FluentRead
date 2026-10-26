@@ -1816,6 +1816,81 @@ describe('视频预览不自动显示图片翻译', () => {
         else expect((env.roots.at(-1)!.querySelector('.fr-image-prepare') as HTMLButtonElement).hidden).toBe(false);
         stop();
     });
+    async function queuedPausedManga() {
+        const env = readerPage();settings.from = 'ru';settings.imageTranslationMangaDownloadConfirmed = true;
+        client.prepare.mockRejectedValueOnce(new Error('first download failed'));
+        toggleMangaTranslation();await flush();toggleMangaTranslation();
+        const old = deferred<void>();client.prepare.mockReturnValueOnce(old.promise);
+        env.dispatch(env.image, 'contextmenu');expect(toggleContextMenuImage(env.image.src)).toBe(true);await flush();
+        toggleMangaTranslation();await flush();toggleMangaTranslation();
+        env.dispatch(env.image, 'contextmenu');expect(toggleContextMenuImage(env.image.src)).toBe(true);await flush();
+        expect(client.prepare).toHaveBeenCalledTimes(2);
+        const feedback = env.roots.at(-1)!.querySelector('.fr-image-feedback') as HTMLElement;
+        return {env, old, feedback};
+    }
+    it('暂停后右键单页等待旧任务结束时展示可取消的排队反馈', async () => {
+        const {old, feedback} = await queuedPausedManga();
+        expect(feedback.hidden).toBe(false);
+        expect(feedback.textContent).toMatch(/等待|排队/);
+        expect(Array.from(feedback.querySelectorAll('button')).some(button => !button.hidden && /取消/.test(button.textContent || ''))).toBe(true);
+        old.resolve();await flush();await flush();
+        expect(client.prepare).toHaveBeenCalledTimes(3);expect(client.translate).toHaveBeenCalledOnce();
+    });
+    it.each(['resolve', 'reject'] as const)('取消暂停单页排队，旧任务迟到 %s 不启动待处理任务', async late => {
+        const {env, old, feedback} = await queuedPausedManga();
+        const cancel = Array.from(feedback.querySelectorAll('button')).find(button => !button.hidden && /取消/.test(button.textContent || ''));
+        expect(cancel).toBeTruthy();env.dispatch(cancel!, 'click');await flush();
+        expect(feedback.hidden).toBe(true);
+        if (late === 'resolve') old.resolve();else old.reject(new Error('late failure'));
+        await flush();await flush();env.runFrames();await flush();
+        expect(client.prepare).toHaveBeenCalledTimes(2);expect(client.translate).not.toHaveBeenCalled();
+        expect(env.bitmap()).toBeNull();
+    });
+    it.each(['resolve', 'reject'] as const)('取消排队后再次右键，旧任务迟到 %s 只启动新等待一次', async late => {
+        const {env, old, feedback} = await queuedPausedManga();
+        const cancel = Array.from(feedback.querySelectorAll('button')).find(button => !button.hidden && /取消/.test(button.textContent || ''));
+        expect(cancel).toBeTruthy();env.dispatch(cancel!, 'click');await flush();
+        const next = deferred<void>();client.prepare.mockReturnValueOnce(next.promise);
+        env.dispatch(env.image, 'contextmenu');expect(toggleContextMenuImage(env.image.src)).toBe(true);await flush();
+        expect(feedback.hidden).toBe(false);expect(feedback.textContent).toMatch(/等待|排队/);
+        if (late === 'resolve') old.resolve();else old.reject(new Error('late failure'));
+        await flush();await flush();expect(client.prepare).toHaveBeenCalledTimes(3);expect(client.translate).not.toHaveBeenCalled();
+        next.resolve();await flush();await flush();expect(client.translate).toHaveBeenCalledOnce();expect(env.bitmap()).not.toBeNull();
+    });
+    it.each([['source', 'resolve'], ['source', 'reject'], ['config', 'resolve'], ['config', 'reject'], ['unmount', 'resolve'], ['unmount', 'reject']] as const)(
+        '暂停单页排队期间 %s，旧任务迟到 %s 不启动待处理任务', async (change, late) => {
+            const {env, old} = await queuedPausedManga();
+            if (change === 'source') {env.image.src = 'https://example.test/changed-page.png';env.notify();env.runFrames();}
+            if (change === 'config') settings.from = 'en';
+            if (change === 'unmount') unmountImageTranslator();
+            await flush();
+            if (late === 'resolve') old.resolve();else old.reject(new Error('late failure'));
+            await flush();await flush();env.runFrames();await flush();
+            expect(client.prepare).toHaveBeenCalledTimes(2);expect(client.translate).not.toHaveBeenCalled();
+            expect(env.bitmap()).toBeNull();
+        });
+    it.each(['resolve', 'reject'] as const)('暂停单页排队后来源先变化而布局帧未运行，旧任务迟到 %s 也清除等待提示', async late => {
+        const {env, old, feedback} = await queuedPausedManga();
+        expect(feedback.hidden).toBe(false);env.image.src = 'https://example.test/changed-before-layout.png';
+        if (late === 'resolve') old.resolve();else old.reject(new Error('late failure'));
+        await flush();await flush();
+        expect(client.prepare).toHaveBeenCalledTimes(2);expect(client.translate).not.toHaveBeenCalled();
+        expect(feedback.hidden).toBe(true);expect(env.bitmap()).toBeNull();
+    });
+    it.each(['resolve', 'reject'] as const)('暂停单页排队后重开漫画，旧任务迟到 %s 只启动会话拥有的任务', async late => {
+        const {env, old, feedback} = await queuedPausedManga();
+        const next = deferred<void>();client.prepare.mockReturnValueOnce(next.promise);
+        const statuses: MangaTranslationStatus[] = [], stop = subscribeMangaTranslation(status => statuses.push(status));
+        toggleMangaTranslation();await flush();expect(statuses.at(-1)).toMatchObject({active: true, pending: true});
+        expect(client.prepare).toHaveBeenCalledTimes(2);
+        if (late === 'resolve') old.resolve();else old.reject(new Error('late failure'));
+        await flush();await flush();env.runFrames();await flush();
+        expect(client.prepare).toHaveBeenCalledTimes(3);expect(client.translate).not.toHaveBeenCalled();
+        expect(statuses.at(-1)).toMatchObject({active: true, pending: true});
+        expect(feedback.textContent).not.toMatch(/排队/);
+        next.resolve();await flush();await flush();expect(client.translate).toHaveBeenCalledOnce();
+        expect(env.bitmap()).not.toBeNull();stop();
+    });
     it('接管右键准备后暂停取消，旧任务迟到不清除新的单页任务', async () => {
         const env = readerPage(); settings.from = 'ru'; settings.imageTranslationMangaDownloadConfirmed = true;
         client.prepare.mockRejectedValueOnce(new Error('first download failed'));

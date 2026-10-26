@@ -69,6 +69,7 @@ interface ImageTranslationState {
     abortController: AbortController | null;
     translationTask?: {promise: Promise<void>; invalidated: boolean; manga: boolean; source: string; identity: string};
     translationGeneration?: number;
+    queuedTranslation?: {promise: Promise<void>};
     hovered: boolean;
     hoverEntry: boolean;
     hoverTimer: number | null;
@@ -220,7 +221,12 @@ export function subscribeMangaTranslation(listener: (status: MangaTranslationSta
 }
 
 export function toggleMangaTranslation(): boolean {
-    return mangaReader?.toggle() ?? false;
+    const toggled = mangaReader?.toggle() ?? false;
+    // 连续会话接管时撤销单页等待；新会话按自己的队列重新判断当前页。
+    if (toggled && mangaReader?.status().active) activeStates.forEach(state => {
+        if (state.queuedTranslation) restoreImageTranslation(state);
+    });
+    return toggled;
 }
 
 function publishMangaStatus(status: MangaTranslationStatus): void {
@@ -883,6 +889,7 @@ function setButtonState(state: ImageTranslationState, phase: ImageControlPhase, 
     if (state.manga && phase === 'loading') publishMangaStatus({...mangaStatus, message, progress, stage});
     state.controls.update(phase, message, {
         prepare: phase === 'error' && state.needsPreparation, animations: config.animations, progress, quiet: state.manga === true,
+        queued: phase === 'loading' && Boolean(state.queuedTranslation),
         modelSettings: phase === 'error' && Boolean(state.localFailure),
         serviceSettings: phase === 'error' && !state.needsPreparation, errorDetails: state.errorDetails,
     });
@@ -974,9 +981,11 @@ function requestIsCurrent(state: ImageTranslationState, controller: AbortControl
 function invalidateTranslationTask(state: ImageTranslationState): void {
     state.translationGeneration = (state.translationGeneration ?? 0) + 1;
     if (state.translationTask) state.translationTask.invalidated = true;
+    state.queuedTranslation = undefined;
 }
 
 function translateImage(state: ImageTranslationState, prepareLanguages = false): Promise<void> {
+    if (state.queuedTranslation) return state.queuedTranslation.promise;
     const manga = state.manga === true, source = sourceIdentity(state.image), identity = configurationIdentity(manga);
     const previous = state.translationTask;
     if (previous) {
@@ -986,12 +995,23 @@ function translateImage(state: ImageTranslationState, prepareLanguages = false):
         if (!previous.invalidated) restoreImageTranslation(state);
         if (manga) {
             const generation = state.translationGeneration;
-            return previous.promise.then(() => {
-                if (states.get(state.image) !== state || state.translationGeneration !== generation || !state.image.isConnected
+            const queued = {promise: Promise.resolve()};
+            const start = () => {
+                if (state.queuedTranslation !== queued || states.get(state.image) !== state || state.translationGeneration !== generation || !state.image.isConnected
                     || state.manga !== true || sourceIdentity(state.image) !== source || configurationIdentity(true) !== identity
-                    || mangaReader?.status().active) return;
+                    || mangaReader?.status().active) {
+                    // 来源或状态可能在布局通知前变化，不能留下无人持有的等待提示。
+                    if (state.queuedTranslation === queued && states.get(state.image) === state) restoreImageTranslation(state);
+                    return;
+                }
+                state.queuedTranslation = undefined;
+                setButtonState(state, 'idle', '翻译图片');
                 return translateImage(state, prepareLanguages);
-            });
+            };
+            queued.promise = previous.promise.then(start, start);
+            state.queuedTranslation = queued;
+            setButtonState(state, 'loading', '等待上一项任务结束…');
+            return queued.promise;
         }
     }
     if (sourceIdentity(state.image) !== state.sourceIdentity || !presentationMatchesSource(state.image, state.presentation)) invalidateSource(state);

@@ -1,7 +1,7 @@
 /**
  * @file src/features/image-translation/content/controls.ts
  * 文件职责：创建图片翻译的轻量操作条，支持单图反馈和不遮挡阅读的漫画模式，支持取消、重试和首次语言准备与模型/服务设置导航。
- * 主要内容：单图提供无额外外框的淡色图标入口、隔离操作条、可信手势按钮与全文详情，品牌提示沿用注入的界面本地化端口；漫画处理时在图片可见边缘延迟显示无交互的单行进度，失败时在同一边缘提供紧凑的单页重试、详情及设置入口，恢复动作先于独立滚动的长错误详情，完成或切回原图即撤下，不展开常驻阅读面板；任务旋转独立于装饰动画开关并保留系统减少动态效果偏好。
+ * 主要内容：单图提供无额外外框的淡色图标入口、隔离操作条、可信手势按钮与全文详情，品牌提示沿用注入的界面本地化端口；漫画处理时在图片可见边缘延迟显示轻量进度，暂停会话后的单页排队可取消，失败时在同一边缘提供紧凑的重试、详情及设置入口，恢复动作先于独立滚动的长错误详情，完成或切回原图即撤下，不展开常驻阅读面板；任务旋转独立于装饰动画开关并保留系统减少动态效果偏好。
  * 模块边界：仅操作所属 Shadow DOM，不读取配置、不访问网络、不持有图片请求；业务动作及生命周期由 content/runtime 注入。
  */
 import {createImageTextReader, IMAGE_READER_CSS, type ImageReaderLine} from './textReader';
@@ -51,6 +51,9 @@ export const IMAGE_CONTROLS_CSS = IMAGE_READER_CSS + `
  .fr-image-feedback[data-manga=true][data-phase=loading] {flex-direction:row;align-items:center;gap:6px;transform:none;min-width:0;padding:6px 9px;font-size:11px;pointer-events:none;animation:fr-manga-feedback .12s ease .15s both;}
 .fr-image-feedback[data-manga=true] .fr-image-status {gap:6px;min-width:0;}
 .fr-image-feedback[data-manga=true] .fr-image-status>span:last-child {overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.fr-image-feedback[data-manga=true][data-phase=loading][data-queued=true] {pointer-events:auto;}
+.fr-image-feedback[data-manga=true][data-queued=true] .fr-image-actions {padding:0;gap:0;}
+.fr-image-feedback[data-manga=true][data-queued=true] .fluent-read-image-translation-button {min-height:24px;padding:3px 7px;background:transparent;color:inherit;font-weight:500;}
 .fr-image-feedback[data-manga=true][data-phase=error] {width:280px;max-width:280px;transform:none;gap:5px;padding:8px 10px;border-color:#ffffff99;background:rgba(250,251,253,.94);box-shadow:0 2px 8px rgba(27,36,57,.08);font-size:11px;}
 .fr-image-feedback[data-manga=true][data-phase=error] .fr-image-status>span:last-child {display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;white-space:normal;min-width:0;flex:1;}
 .fr-image-feedback[data-manga=true][data-phase=error] .fr-image-actions {gap:4px;padding:0;}
@@ -208,12 +211,13 @@ export function createImageControls(actions: {onAction(): void; onPrepare(): voi
     row.append(button, prepare, inspect, dismiss, modelSettings, serviceSettings);
     feedback.append(heading, status, progressBar, errorDetails);
     element.append(details, row);
-    const update = (next: ImageControlPhase, message: string, options: {prepare?: boolean; animations?: boolean; progress?: number; quiet?: boolean; modelSettings?: boolean; serviceSettings?: boolean; errorDetails?: string} = {}) => {
+    const update = (next: ImageControlPhase, message: string, options: {prepare?: boolean; animations?: boolean; progress?: number; quiet?: boolean; queued?: boolean; modelSettings?: boolean; serviceSettings?: boolean; errorDetails?: string} = {}) => {
         phase = next;
         element.dataset.phase = next;
         button.dataset.phase = next;
         feedback.dataset.phase = next;
         feedback.dataset.manga = String(options.quiet === true);
+        feedback.dataset.queued = String(next === 'loading' && options.queued === true);
         heading.hidden = next !== 'error' || options.quiet === true;
         feedback.dataset.preparation = String(next === 'error' && options.prepare === true);
         element.dataset.preparation = feedback.dataset.preparation;
@@ -237,7 +241,7 @@ export function createImageControls(actions: {onAction(): void; onPrepare(): voi
         feedback.dataset.animations = element.dataset.animations;
         prepare.hidden = next !== 'error' || !options.prepare;
         dismiss.hidden = next !== 'error' || options.prepare === true;
-        const feedbackOwnsActions = next === 'error';
+        const feedbackOwnsActions = next === 'error' || (next === 'loading' && options.queued === true);
         const actionsOwner = feedbackOwnsActions ? feedback : element;
         // 进度更新会频繁刷新状态；仅在状态容器变化时移动操作条，避免重挂载打断悬停与焦点。
         if (row.parentElement !== actionsOwner) actionsOwner.insertBefore(row, feedbackOwnsActions ? errorDetails : null);

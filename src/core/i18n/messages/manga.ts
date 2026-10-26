@@ -5,6 +5,7 @@
  * 模块边界：静态界面词典，不翻译漫画内容、不读取配置、不调用服务。
  */
 const english = {
+  "等待上一项任务结束…": "Waiting for the previous task…",
   "识别资源": "Recognition resources",
   "标准识别": "Standard recognition",
   "轻量识别": "Lightweight recognition",
@@ -134,6 +135,7 @@ const english = {
 export const mangaLegacyMessages = {
   "en-US": english,
   "ja-JP": {...english, ...{
+  "等待上一项任务结束…": "前の処理が終わるのを待っています…",
   "识别资源": "認識リソース",
   "标准识别": "標準認識",
   "轻量识别": "軽量認識",
@@ -230,6 +232,7 @@ export const mangaLegacyMessages = {
   "支持的网站": "対応サイト"
 }},
   "ko-KR": {...english, ...{
+  "等待上一项任务结束…": "이전 작업이 끝나기를 기다리는 중…",
   "识别资源": "인식 리소스",
   "标准识别": "표준 인식",
   "轻量识别": "경량 인식",
@@ -326,6 +329,7 @@ export const mangaLegacyMessages = {
   "支持的网站": "지원 사이트"
 }},
   "fr-FR": {...english, ...{
+  "等待上一项任务结束…": "En attente de la fin de la tâche précédente…",
   "识别资源": "Ressources de reconnaissance",
   "标准识别": "Reconnaissance standard",
   "轻量识别": "Reconnaissance légère",
@@ -422,6 +426,7 @@ export const mangaLegacyMessages = {
   "支持的网站": "Sites pris en charge"
 }},
   "ru-RU": {...english, ...{
+  "等待上一项任务结束…": "Ожидание завершения предыдущей задачи…",
   "识别资源": "Ресурсы распознавания",
   "标准识别": "Стандартное распознавание",
   "轻量识别": "Облегчённое распознавание",
@@ -518,6 +523,7 @@ export const mangaLegacyMessages = {
   "支持的网站": "Поддерживаемые сайты"
 }},
   "es-ES": {...english, ...{
+  "等待上一项任务结束…": "Esperando a que termine la tarea anterior…",
   "识别资源": "Recursos de reconocimiento",
   "标准识别": "Reconocimiento estándar",
   "轻量识别": "Reconocimiento ligero",

@@ -1223,7 +1223,7 @@ async function verifyPipelinePerformance(extensionId) {
         else await wait(async()=>!!await ball(`return this.querySelector('.floating-ball-manga')`),30000);
         const before=await ops();const start=Date.now();
         await modelObserver.command('Runtime.evaluate',{expression:'globalThis.__pipelineSamples.workers=[];globalThis.__pipelineSamples.runs=[];globalThis.__pipelineSamples.encodes=[];globalThis.__pipelineSamples.reads=[];globalThis.__pipelineSamples.sessions=[];globalThis.__pipelineSamples.canvasCalls={};globalThis.__pipelineSamples.yields=[];globalThis.__pipelineSamples.gpuSubmissions=0'});
-        const measured=await require('./local-model-browser-helpers.cjs').measureBrowser(launched.context,`manga-round-${round+1}`,artifacts,async()=>{
+        const measured=await require('./local-model-browser-helpers.cjs').measureBrowser(launched.context,`manga-case-${report.pipeline.length+1}-round-${round+1}`,artifacts,async()=>{
             await toggle();
             await wait(async()=>await imageUi(`return !!this.querySelector('.fr-image-feedback:not([hidden]) .fr-image-spinner:not([hidden])')`),10000);
             report.loadingFrames??=[];

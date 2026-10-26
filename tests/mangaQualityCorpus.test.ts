@@ -115,6 +115,21 @@ describe('通用独立段落门禁',()=>{
 });
 
 describe('真实漫画runner多轮layout采集的有界容量',()=>{
+    it('逐景资源轨迹具有独立文件名，多景同轮及同名图片不覆盖前次采样',()=>{
+        let label:ts.Expression|undefined;
+        const visit=(node:ts.Node)=>{
+            if(ts.isCallExpression(node)&&node.expression.getText(runnerAst).endsWith('.measureBrowser'))label=node.arguments[1];
+            ts.forEachChild(node,visit);
+        };
+        visit(runnerAst);expect(label).toBeDefined();
+        const labels=new Set<string>();
+        for(let scene=0;scene<32;scene++)for(let round=0;round<5;round++){
+            const name=runInNewContext(label!.getText(runnerAst),{report:{pipeline:{length:labels.size}},round,caseName:'same-input-name'});
+            expect(name).toMatch(/^manga-case-\d+-round-\d+$/);
+            expect(labels.has(name)).toBe(false);labels.add(name);
+        }
+        expect(labels.size).toBe(160);
+    });
     it('32景五轮保留全部160次响应及预留，承诺以外的记录仍有硬上限',async()=>{
         const source=readFileSync(new URL('../scripts/testing/run-manga-translation-test.cjs',import.meta.url),'utf8');
         const ast=ts.createSourceFile('runner.cjs',source,ts.ScriptTarget.Latest,true,ts.ScriptKind.JS);

@@ -207,6 +207,23 @@ describe('漫画会话所有权与可见页调度', () => {
         expect(f.session.toggle()).toBe(false); f.session.refresh(f.snapshot);
         expect(f.session.status()).toEqual({available: false, active: false, pending: false, errors: 0, completed: 0, prefetching: false, ahead: 0});
     });
+    it.each(['resolve', 'reject'] as const)('重复卸载且旧任务迟到 %s，不重复通知关闭或释放页面', async outcome => {
+        const f = sessionFixture();
+        let resolve!: () => void, reject!: (reason: Error) => void;
+        const pending = new Promise<void>((yes, no) => {resolve = yes;reject = no;});
+        f.ports.translate.mockReturnValueOnce(pending);f.start();await flush();
+        f.ports.changed.mockClear();f.session.dispose();
+        const closed = f.ports.changed.mock.calls.length;
+        expect(f.ports.changed.mock.calls.filter(([status]) => !status.available)).toHaveLength(1);
+        expect(f.ports.changed).toHaveBeenLastCalledWith(expect.objectContaining({available: false, active: false}));
+        expect(f.ports.release).toHaveBeenCalledOnce();
+        f.session.dispose();
+        if (outcome === 'resolve') resolve(); else reject(new Error('late failure'));
+        await flush();
+        expect(f.ports.changed).toHaveBeenCalledTimes(closed);
+        expect(f.ports.release).toHaveBeenCalledOnce();
+        expect(f.ports.translate).toHaveBeenCalledOnce();
+    });
     it('页面移除后的拒绝不会计入当前会话', async () => {
         const f = sessionFixture(); let reject!: (error: Error) => void;
         f.ports.translate.mockReturnValueOnce(new Promise<void>((_, no) => {reject = no;}));
@@ -598,6 +615,29 @@ describe('漫画站点适配与 DOM 生命周期', () => {
         expect(reuse).toHaveBeenCalledWith(cached);expect(f.ports.translate).toHaveBeenCalledOnce();
         expect(f.reader.status()).toMatchObject({pending:true,completed:1});
         pending.resolve();await flush();expect(f.reader.status()).toMatchObject({pending:false,completed:2});f.reader.dispose();
+    });
+    it('附近离屏画布停稳后进入预译队列，不作为当前可见页', async () => {
+        vi.useFakeTimers();
+        const current = deferred(), ahead = deferred();
+        const canvasPorts = {identity: vi.fn().mockReturnValue('canvas-ahead'), translate: vi.fn().mockReturnValue(ahead.promise),
+            reuse: vi.fn().mockReturnValue(false), restore: vi.fn(), release: vi.fn(), failed: vi.fn().mockReturnValue(false),
+            update: vi.fn(), invalidate: vi.fn()};
+        const f = readerFixture(false, 'https://comic-zenon.com/episode/12207421983509986288', undefined, () => 1, undefined, canvasPorts);
+        f.image.className = 'page-image';f.image.parentElement!.className = 'page-area';
+        const canvas = f.document.createElement('canvas') as HTMLCanvasElement;
+        canvas.className = 'js-page-image';canvas.width = 400;canvas.height = 300;
+        canvas.getBoundingClientRect = () => ({left: 0, right: 400, top: 1000, bottom: 1300, width: 400, height: 300}) as DOMRect;
+        f.image.parentElement!.append(canvas);f.ports.translate.mockReturnValueOnce(current.promise);
+        f.reader.schedule();f.run();f.reader.toggle();await flush();
+        expect(canvasPorts.invalidate).toHaveBeenCalledWith(canvas);
+        expect(f.ports.translate).toHaveBeenCalledOnce();expect(canvasPorts.translate).not.toHaveBeenCalled();
+        f.scroll();current.resolve();await flush();
+        expect(canvasPorts.translate).not.toHaveBeenCalled();
+        vi.advanceTimersByTime(180);f.run();await flush();
+        expect(canvasPorts.translate).toHaveBeenCalledOnce();expect(canvasPorts.translate).toHaveBeenCalledWith(canvas);
+        expect(f.reader.status()).toMatchObject({pending: true, prefetching: true, ahead: 0});
+        ahead.resolve();await flush();expect(f.reader.status()).toMatchObject({pending: false, prefetching: false, ahead: 1, completed: 2});
+        f.reader.dispose();
     });
     it('可读画布与正文图片共用串行队列，重绘失效、暂停恢复和不可读降级不选推广图', async () => {
         const pending=deferred(), canvasPorts={identity:vi.fn().mockReturnValue('canvas-1'),translate:vi.fn().mockResolvedValue(undefined),reuse:vi.fn().mockReturnValue(false),restore:vi.fn(),release:vi.fn(),failed:vi.fn().mockReturnValue(false),update:vi.fn()};

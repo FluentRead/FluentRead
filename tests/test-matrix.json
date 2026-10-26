@@ -629,6 +629,8 @@
       "tests/mangaOcr.test.ts",
       "tests/mangaOcrColor.test.ts",
       "tests/mangaRecognitionInput.test.ts",
+      "tests/mangaRecognitionWhitespace.test.ts",
+      "tests/mangaRecognitionWhitespaceSdk.test.ts",
       "tests/mangaOcrDeskew.test.ts",
       "tests/mangaOcrAssets.test.ts",
       "tests/mangaOnnxBuild.test.ts",

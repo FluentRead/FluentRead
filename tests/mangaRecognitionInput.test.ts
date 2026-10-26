@@ -1,6 +1,6 @@
 import {afterEach,describe,expect,it,vi} from 'vitest';
 import {createRequire} from 'node:module';
-import {createMangaRecognitionInput,MANGA_RECOGNITION_INPUT_RECORDS} from '@/src/features/image-translation/services/mangaRecognitionInput';
+import {createMangaRecognitionInput,MANGA_RECOGNITION_INPUT_RECORDS,type MangaRecognitionInputObserver,type MangaRecognitionBatchReceipt} from '@/src/features/image-translation/services/mangaRecognitionInput';
 import {createMangaOcrColorAdapter,withMangaOcrColorRead} from '@/src/features/image-translation/services/mangaOcrColor';
 
 const image=(width=8,color=[255,0,255,255])=>{
@@ -17,8 +17,8 @@ function stacked(images:Array<{data:Uint8ClampedArray}>,widths:number[],order=[0
     }
     return data;
 }
-const start=(count:number,batchSize=6,order:'bgr'|'rgb'='bgr')=>{
-    const input=createMangaRecognitionInput(order);input.adapter.beginPage();input.beginRun({cropCount:count,batchSize,enabled:true});return input;
+const start=(count:number,batchSize=6,order:'bgr'|'rgb'='bgr',observer?:MangaRecognitionInputObserver)=>{
+    const input=createMangaRecognitionInput(order,observer);input.adapter.beginPage();input.beginRun({cropCount:count,batchSize,enabled:true});return input;
 };
 const capture=(input:ReturnType<typeof start>,sample:ReturnType<typeof image>,width=8)=>input.adapter.transform(width,48,()=>sample,value=>value);
 afterEach(()=>{vi.unstubAllGlobals();vi.restoreAllMocks();});
@@ -117,19 +117,96 @@ describe('原批次三通道输入的完整性与资源合同',()=>{
     });
 });
 
+describe('已准入原始读回观察与稳定批次凭据',()=>{
+    it('只借用一次原RGBA且不新增read/replace；同宽顺序及跨批凭据来自唯一原chunk',()=>{
+        const widths=[10,8,10,9,8],samples=widths.map((width,index)=>image(width,[125,10+index*20,240-index*20,255]));
+        const observed:Array<{index:number;width:number;height:number}>=[];
+        const observer:MangaRecognitionInputObserver={observeBorrowedRead(index,width,height,pixels){
+            expect(this).toBe(observer);expect(pixels).toBe(samples[index].data);expect(height).toBe(48);expect(width).toBe(widths[index]);
+            observed.push({index,width,height});
+        }};
+        const input=start(5,2,'bgr',observer);let reads=0,replaces=0;
+        samples.forEach((sample,index)=>{expect(input.adapter.transform(widths[index],48,()=>{reads++;return sample;},value=>{replaces++;return value;})).toBe(sample);});
+        expect(reads).toBe(5);expect(replaces).toBe(5);expect(observed.map(item=>item.index)).toEqual([0,1,2,3,4]);
+        const receipts:MangaRecognitionBatchReceipt[]=[];
+        for(const indices of [[1,4],[3,0],[2]]){
+            const images=indices.map(index=>samples[index]),sizes=indices.map(index=>widths[index]),padded=Math.max(...sizes),data=stacked(images,sizes,[0,0,0]);
+            const receipt=input.patchInput(['float32',data,[indices.length,3,48,padded]])!;receipts.push(receipt);
+            expect(receipt).toEqual({readIndices:indices,resizedWidths:sizes,paddedWidth:padded,height:48});
+            expect(data).toEqual(stacked(images,sizes,[2,1,0]));expect(Object.keys(receipt).sort()).toEqual(['height','paddedWidth','readIndices','resizedWidths']);
+        }
+        expect(receipts[0].readIndices).not.toBe(receipts[1].readIndices);expect(receipts[0].readIndices).toEqual([1,4]);
+        expect(reads).toBe(5);expect(replaces).toBe(5);expect(input.retainedPixels).toBe(0);expect(input.pendingReads).toBe(0);input.endRun();
+        expect(input.patchInput([])).toBeUndefined();
+    });
+    it('无observer不创建receipt两个map数组，原有校验map与BGR结果不变',()=>{
+        for(const enabled of [false,true]){
+            const input=start(1,1,'bgr',enabled?{observeBorrowedRead(){}}:undefined),sample=image();capture(input,sample);
+            const data=stacked([sample],[8],[0,0,0]),expected=stacked([sample],[8],[2,1,0]),map=vi.spyOn(Array.prototype,'map');let calls=0,receipt:MangaRecognitionBatchReceipt|undefined;
+            try{receipt=input.patchInput(['float32',data,[1,3,48,8]]);calls=map.mock.calls.length;}finally{map.mockRestore();}
+            expect(calls).toBe(enabled?3:1);expect(receipt===undefined).toBe(!enabled);expect(data).toEqual(expected);expect(input.retainedPixels).toBe(0);input.endRun();
+        }
+    });
+    it('观察异常保存同一首因，禁止Tensor改写或replace，finally释放此前已借用RGBA',()=>{
+        const failure={message:'observer projection failed'},sample=image(),replace=vi.fn(value=>value),observe=vi.fn((index:number)=>{if(index===1)throw failure;});
+        const input=start(2,2,'bgr',{observeBorrowedRead:observe});capture(input,sample);
+        try{input.adapter.transform(8,48,()=>sample,replace);throw Error('missing observer failure');}catch(error){expect(error).toBe(failure);}
+        expect(observe).toHaveBeenCalledTimes(2);expect(replace).not.toHaveBeenCalled();expect(input.retainedPixels).toBe(8*48);
+        const data=stacked([sample,sample],[8,8],[0,0,0]),before=data.slice();
+        try{input.patchInput(['float32',data,[2,3,48,8]]);throw Error('missing retained failure');}catch(error){expect(error).toBe(failure);}
+        expect(data).toEqual(before);input.fail(new Error('later failure'));
+        try{input.endRun();throw Error('missing endRun failure');}catch(error){expect(error).toBe(failure);}
+        expect(input.pendingReads).toBe(0);expect(input.retainedPixels).toBe(0);
+    });
+    it.each(['abort','end','begin'] as const)('observer同步%s后不回挂旧RGBA或调用replace',kind=>{
+        const abort=new AbortController(),replace=vi.fn(value=>value);let calls=0;
+        const input=createMangaRecognitionInput('bgr',{observeBorrowedRead(){calls++;if(kind==='abort')abort.abort();else if(kind==='end')input.adapter.endPage();else input.adapter.beginPage();}});
+        input.adapter.beginPage(abort.signal);input.beginRun({cropCount:1,batchSize:1,enabled:true});
+        expect(input.adapter.transform(8,48,()=>image(),replace)).toBeUndefined();expect(calls).toBe(1);expect(replace).not.toHaveBeenCalled();expect(input.retainedPixels).toBe(0);
+        if(kind==='abort'){expect(()=>input.patchInput([])).toThrow('已取消');expect(()=>input.endRun()).toThrow('已取消');}
+        else{expect(input.patchInput([])).toBeUndefined();input.endRun();}
+    });
+    it.each(['abort','end','begin','rgba'] as const)('read阶段%s在observer之前被现有校验拒绝',kind=>{
+        const abort=new AbortController(),observe=vi.fn(),input=createMangaRecognitionInput('bgr',{observeBorrowedRead:observe});input.adapter.beginPage(abort.signal);input.beginRun({cropCount:1,batchSize:1,enabled:true});
+        const read=()=>{if(kind==='abort')abort.abort();else if(kind==='end')input.adapter.endPage();else if(kind==='begin')input.adapter.beginPage();return kind==='rgba'?{data:new Uint8ClampedArray(1)}:image();};
+        if(kind==='rgba')expect(()=>input.adapter.transform(8,48,read,value=>value)).toThrow('不匹配');else expect(input.adapter.transform(8,48,read,value=>value)).toBeUndefined();
+        expect(observe).not.toHaveBeenCalled();expect(input.retainedPixels).toBe(0);
+        if(kind==='rgba')expect(()=>input.endRun()).toThrow('不匹配');else input.endRun(false);
+    });
+    it('超预算行不触发observer/read，但receipt保留其整批原索引与尺寸',()=>{
+        const observe=vi.fn(),input=start(2,6,'bgr',{observeBorrowedRead:observe}),small=image(),huge=image(5462),denied=vi.fn(()=>huge);
+        expect(input.adapter.transform(5462,48,denied,value=>value)).toBeUndefined();capture(input,small);
+        expect(denied).not.toHaveBeenCalled();expect(observe).toHaveBeenCalledOnce();expect(observe.mock.calls[0][0]).toBe(1);
+        const data=stacked([small,huge],[8,5462],[0,0,0]),receipt=input.patchInput(['float32',data,[2,3,48,5462]]);
+        expect(receipt).toEqual({readIndices:[1,0],resizedWidths:[8,5462],paddedWidth:5462,height:48});expect(input.retainedPixels).toBe(0);input.endRun();
+    });
+    it('观察不会重复扣共享页预算，多个run共享2MP且原页重置后恢复',()=>{
+        const observe=vi.fn(),input=createMangaRecognitionInput('bgr',{observeBorrowedRead:observe}),sample=image(5000);input.adapter.beginPage();input.beginRun({cropCount:8,batchSize:1,enabled:true});
+        for(let index=0;index<8;index++)expect(capture(input,sample,5000)).toBe(sample);
+        expect(observe).toHaveBeenCalledTimes(8);input.endRun(false);expect(input.retainedPixels).toBe(0);
+        input.beginRun({cropCount:1,batchSize:1,enabled:true});const read=vi.fn(()=>sample);expect(input.adapter.transform(5000,48,read,value=>value)).toBeUndefined();expect(read).not.toHaveBeenCalled();expect(observe).toHaveBeenCalledTimes(8);input.endRun();
+        input.adapter.beginPage();input.beginRun({cropCount:1,batchSize:1,enabled:true});expect(capture(input,sample,5000)).toBe(sample);expect(observe).toHaveBeenCalledTimes(9);input.endRun(false);
+    });
+    it('禁用及无run不观察也不分配receipt，legacy原增强保持',()=>{
+        const observe=vi.fn(),input=createMangaRecognitionInput('bgr',{observeBorrowedRead:observe});expect(input.patchInput([])).toBeUndefined();input.adapter.beginPage();
+        input.beginRun({cropCount:1,batchSize:1,enabled:false});const sample=image();expect(capture(input,sample)).toBe(sample);expect(sample.data[(8+1)*4]).toBeLessThan(255);
+        expect(input.patchInput([])).toBeUndefined();expect(observe).not.toHaveBeenCalled();input.endRun();
+    });
+});
+
 // 测试通过依赖自己的 package exports 加载它已锁定的原生 Canvas；不引用用户路径或另一个仓库。
 const localRequire=createRequire(import.meta.url),sdkRequire=createRequire(localRequire.resolve('ppu-paddle-ocr/web'));
 const canvasRequire=createRequire(sdkRequire.resolve('ppu-ocv/canvas-web'));
 const native=canvasRequire('@napi-rs/canvas');
 
 async function publicSdkAdapter(input:ReturnType<typeof createMangaRecognitionInput>,session:unknown,
-    options:Partial<import('ppu-paddle-ocr/web').RecognitionOptions>,batchSize:number){
+    options:Partial<import('ppu-paddle-ocr/web').RecognitionOptions>,batchSize:number,onTensor?:(tensor:object,receipt:MangaRecognitionBatchReceipt|undefined)=>void){
     const {RecognitionService}=await import('ppu-paddle-ocr/web');
     class Adapter extends RecognitionService{
         private restores=new Set<()=>void>();
         constructor(){
             super(session as ConstructorParameters<typeof RecognitionService>[0],options);
-            const original=this.platform.ort;this.platform.ort={...original,Tensor:new Proxy(original.Tensor,{construct(target,args,newTarget){try{input.patchInput(args);return Reflect.construct(target,args,newTarget);}catch(error){input.fail(error);throw error;}}})};
+            const original=this.platform.ort;this.platform.ort={...original,Tensor:new Proxy(original.Tensor,{construct(target,args,newTarget){try{const receipt=input.patchInput(args),tensor=Reflect.construct(target,args,newTarget);onTensor?.(tensor,receipt);return tensor;}catch(error){input.fail(error);throw error;}}})};
             const create=this.platform.canvas.createProcessor.bind(this.platform.canvas);
             this.platform.canvas.createProcessor=canvas=>{const processor=create(canvas),resize=processor.resize.bind(processor);processor.resize=options=>{
                 try{
@@ -169,6 +246,25 @@ describe('实际public SDK的裁图顺序及批处理合同（fake session，不
         expect(run).toHaveBeenCalledOnce();expect(result.map(item=>item.box)).toEqual(boxes);
         // W230只解码ceil(8*230/288)=7步，W288为8步；原spaceRecovery插入的空格保留。
         expect(result.map(item=>item.text)).toEqual([' A B A B A B A B',' A B A B A B A']);input.adapter.endPage();
+    });
+    it('实际public SDK在原Tensor构造后绑定receipt，关联原读序而非同R颜色或输出文字',async()=>{
+        const ort=await import('onnxruntime-web');vi.stubGlobal('document',{createElement:()=>native.createCanvas(1,1)});vi.stubGlobal('OffscreenCanvas',undefined);
+        const widths=[17,8,17,9,8,10],source=native.createCanvas(180,48),context=source.getContext('2d'),boxes=widths.map((width,index)=>({x:index*28,y:0,width,height:48})).reverse();
+        boxes.forEach((box,index)=>{context.fillStyle=`rgb(125,${20+index*20},${220-index*20})`;context.fillRect(box.x,0,box.width,48);});
+        const observed:Array<{index:number;width:number}>=[],input=createMangaRecognitionInput('bgr',{observeBorrowedRead(index,width,height,pixels){
+            expect(height).toBe(48);expect(pixels.length).toBe(width*height*4);observed.push({index,width});
+        }}),receipts=new WeakMap<object,MangaRecognitionBatchReceipt>(),seen:MangaRecognitionBatchReceipt[]=[],cohort=boxes.map((box,index)=>({box,index})).sort((a,b)=>a.box.width-b.box.width||a.index-b.index);let offset=0;
+        const session={inputMetadata:[{shape:['N',3,48,'W']}],run:vi.fn(async(feeds:Record<string,{dims:readonly number[];data:Float32Array}>)=>{
+            const tensor=feeds.x,receipt=receipts.get(tensor)!,chunk=cohort.slice(offset,offset+2);offset+=chunk.length;
+            expect(receipt).toEqual({readIndices:chunk.map(item=>item.index),resizedWidths:chunk.map(item=>item.box.width),paddedWidth:Math.max(...chunk.map(item=>item.box.width)),height:48});seen.push(receipt);
+            expect(input.pendingReads).toBe(boxes.length-offset);
+            const output=new Float32Array(chunk.length*2*4);for(let row=0;row<chunk.length;row++){output[row*8+1]=.99;output[row*8+4]=.99;}
+            return {out:new ort.Tensor('float32',output,[chunk.length,2,4])};
+        })};
+        const recognizer=await publicSdkAdapter(input,session,{charactersDictionary:['','A','B',' '],recBatchSize:2,mainThreadYieldMs:0,minimumConfidence:0,maxCropSourceSideLength:8192,rotateVerticalCrops:false},2,(tensor,receipt)=>{expect(receipt).toBeDefined();receipts.set(tensor,receipt!);});
+        input.adapter.beginPage();const result=await recognizer.run(source,boxes,undefined,'per-box');
+        expect(observed).toEqual(boxes.map((box,index)=>({index,width:box.width})));expect(seen).toHaveLength(3);expect(seen[0].readIndices).toEqual([1,4]);expect(result.every(item=>item.text==='A')).toBe(true);
+        expect(input.pendingReads).toBe(0);expect(input.retainedPixels).toBe(0);input.adapter.endPage();
     });
     it.each([{requested:1,fixed:false},{requested:2,fixed:false},{requested:6,fixed:false},{requested:6,fixed:true}])('同宽同R异GB跨batch%j与两个原序均保持颜色身份、原批数及解码位置',async({requested,fixed})=>{
         const batchSize=fixed?1:requested;

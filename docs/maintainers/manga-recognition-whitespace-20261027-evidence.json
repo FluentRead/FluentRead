@@ -1,0 +1,215 @@
+{
+  "version": 1,
+  "baseCommit": "d9aa61c04201ddb023061f6646a46ac701be477f",
+  "status": "Draft candidate; full-page quality acceptance remains incomplete",
+  "description": "Bounded ASCII whitespace insertion observes the existing SDK read and successful inference, preserving SDK decoder/results/Box identity. Extra output scanning is accounted inside the existing inference pacer. No new model session or readback.",
+  "sourceSha256": {
+    "src/features/image-translation/services/mangaOcr.ts": "ac9d9284825800f34d81bc6c0b7f203d37bad8c5830874dfe16e687d09312973",
+    "src/features/image-translation/services/mangaOcrColor.ts": "70843ddbed7fb1a2e830c4dfb06ba700268ebb0e0b5e62b0af2f46f40f8e6395",
+    "src/features/image-translation/services/mangaRecognitionInput.ts": "023a8b1cc5ad8028d70f2ece7cfc04b40f5a4954aee1dff772fe63e2e2d9c309",
+    "src/features/image-translation/services/mangaRecognitionWhitespace.ts": "e7aa0fccada8c55111cddd3acd64c24e0486b79d1155eb495e0c24800a536ef5"
+  },
+  "testSha256": {
+    "tests/mangaOcr.test.ts": "c1d6a3498235b5c27adbf43453cfc8ae561e454d9eda04f5e178edcce817fa4a",
+    "tests/mangaOcrColor.test.ts": "e1a9c4f71a945fcc5c3c4ed126ea1a3d48738feb058d1f729e315dd46c144c64",
+    "tests/mangaRecognitionInput.test.ts": "2d0d39bc149715e1b5b2c868dfd6e74521a90f2934ee4851d200bcebdd79c8be",
+    "tests/mangaRecognitionWhitespace.test.ts": "9ed7fc77d6af298ded422dfa9ebec1a158b1444caaeb0b33c208461c35f829f4",
+    "tests/mangaRecognitionWhitespaceSdk.test.ts": "b2fac643b4d64429abb3c9cc4a77827bde83138e2d2166807594b7b4f867e626"
+  },
+  "targeted": {
+    "files": 5,
+    "tests": 377,
+    "passed": 377,
+    "coverage": {
+      "src/features/image-translation/services/mangaOcr.ts": {
+        "statements": 100,
+        "branches": 100,
+        "functions": 100,
+        "lines": 100
+      },
+      "src/features/image-translation/services/mangaOcrColor.ts": {
+        "statements": 100,
+        "branches": 100,
+        "functions": 100,
+        "lines": 100
+      },
+      "src/features/image-translation/services/mangaRecognitionInput.ts": {
+        "statements": 100,
+        "branches": 100,
+        "functions": 100,
+        "lines": 100
+      },
+      "src/features/image-translation/services/mangaRecognitionWhitespace.ts": {
+        "statements": 100,
+        "branches": 100,
+        "functions": 100,
+        "lines": 100
+      }
+    },
+    "scope": "Native Canvas and real public SDK preprocessing/decoder with fake session; no model or browser"
+  },
+  "replay": {
+    "rows": 20,
+    "equalToFrozenV2": 20,
+    "missingSpaceRepairs": 2,
+    "independentCorrectControlRowsPreserved": 16,
+    "newInferenceCalls": 0,
+    "limitation": "Original recorded argmax/max/blank/space sufficient statistics and original resized RGBA; unrecorded logits zero-filled, not original full-tensor reproduction"
+  },
+  "budget": {
+    "existingSharedPagePixels": 2000000,
+    "projectionCrops": 128,
+    "supportRuns": 4096,
+    "fullOutputRowTimesteps": 2000,
+    "extraArgmaxComparisonsUpperBound": 37418000,
+    "indexedFloatReadsUpperBound": 74840000,
+    "pacing": "Includes optional output scan before next inference rest; no claim of total Worker CPU bound",
+    "metadata": "Typed arrays, JS maps/gaps/receipt/pending slots and results add bounded nonzero memory; no heap/RSS measurement"
+  },
+  "validation": {
+    "localCommandsExitCode": {
+      "targeted-pacing-final.log": 0,
+      "compile-pacing.log": 0,
+      "build-chrome-pacing.log": 0,
+      "build-firefox-pacing.log": 0,
+      "manifests-pacing.log": 0,
+      "audit-final.log": 0
+    },
+    "independentReviews": "No new blocking regression in frozen source/protocol; not all-scene or semantic correctness proof",
+    "failedRunPreserved": "targeted-final.log:376 passed/1 test-spy implementation failure; repaired test helper, current source unchanged and final377 passed"
+  },
+  "workspaceEvidenceRoot": "workspace-data/evidence/image-manga-quality-1068-20261025",
+  "evidenceFiles": {
+    "iteration-v15/whitespace-production/targeted-pacing-final.log": {
+      "bytes": 2497,
+      "sha256": "1960fd6dfb318e631975e4a9ed48b2e2bf50c69d0a30148c5437325f05a70c42"
+    },
+    "iteration-v15/whitespace-production/compile-pacing.log": {
+      "bytes": 279,
+      "sha256": "91d9e49bbcd0e6b79d36dc97e0f309e3a21d9c962dfed57d9772eecb48757db4"
+    },
+    "iteration-v15/whitespace-production/build-chrome-pacing.log": {
+      "bytes": 92291,
+      "sha256": "f0f56bed86a721af7c3643d0dfae9d7a1a91170b4a1e63ac211d97e08d6347c9"
+    },
+    "iteration-v15/whitespace-production/build-firefox-pacing.log": {
+      "bytes": 92878,
+      "sha256": "a9d0671af2296c496e50f7687dc508865d6c2d503dff31ec874abe709f4695f6"
+    },
+    "iteration-v15/whitespace-production/manifests-pacing.log": {
+      "bytes": 1285,
+      "sha256": "f8312cd2c6a130af00edf7048689fac42878c55d3228023cd6d64f040b694cf0"
+    },
+    "iteration-v15/whitespace-production/audit-final.log": {
+      "bytes": 333,
+      "sha256": "5a2fb43a059eabb2b5aae1706e95f2621d7e45fec0ad8dc60d2c1da31d1b8e04"
+    },
+    "iteration-v15/whitespace-production-implementation/replay-actual20.json": {
+      "bytes": 10250,
+      "sha256": "77a6ddf23b544b2fb8102326bcbcea932f16d144389883abb4d911ad1e0e2683"
+    },
+    "iteration-v15/whitespace-production/integration-review/pacing-addendum/review.json": {
+      "bytes": 5764,
+      "sha256": "853c237ac9973a2c05fe8878f327c649a730c486a4adc85a504a725a08ab7d0e"
+    },
+    "iteration-v15/whitespace-production/independent-review/final-addendum.json": {
+      "bytes": 943,
+      "sha256": "46d23a403149e659ad4cfdac5708e805e440998e4913d6240f65bc217b2b9bf6"
+    },
+    "iteration-v15/fullpage-whitespace-attribution/freeze.json": {
+      "bytes": 9829,
+      "sha256": "3f01e9423c888a04cb979767a8ef9ef7fb38e2d60c211e98291df0ffad5492d5"
+    },
+    "iteration-v15/fullpage-whitespace-attribution/execution/attribution.json": {
+      "bytes": 2065428,
+      "sha256": "886bf9bcaf32d0be8fc2cb2af19c5a189d057444c2cb715765451d6b7698c0ed"
+    },
+    "iteration-v15/fullpage-whitespace-attribution/execution/artifacts/preflight.json": {
+      "bytes": 2776,
+      "sha256": "94765efc526a8686eeb1f0e977ddd04284f02fcc066a5e4ecec6a04dcdd961ec"
+    },
+    "iteration-v15/fullpage-whitespace-attribution/execution-launch-failed-default/cleanup-root.json": {
+      "bytes": 220,
+      "sha256": "3021441c3558bc390398ea7d56ad96ee43ed98dd4d5d856d533d351a1f89c812"
+    }
+  },
+  "stillOpen": [
+    "full-page POSTCARD missing space",
+    "full-page Japanese extra space",
+    "nonwhite paragraph ownership",
+    "ruby detection",
+    "Atlas artwork protection",
+    "raw transparent pixel roundtrip",
+    "runtime warning gate",
+    "live provider and linguistic acceptance",
+    "comparable full competitor pipeline performance"
+  ],
+  "publication": "Draft PR1106 only; no merge authorization for this candidate",
+  "fullpageDiagnostic": {
+    "build": "Frozen V14 BGR without new whitespace recovery",
+    "complete": true,
+    "qualityStatus": "failed",
+    "counts": {
+      "pages": 2,
+      "logicalBatches": 9,
+      "actualNativeRecognitionAttempts": 9,
+      "selectedWholeCohorts": 2,
+      "fullRowSteps": 1782,
+      "observer": {
+        "actualRecognitionAttempts": 9,
+        "logicalRecognitionCalls": 9,
+        "geometryRecords": 54,
+        "fullRowSteps": 1782,
+        "additionalTensorPixels": 367392,
+        "hashedBytes": 304122084,
+        "sessionCalls": {
+          "detection": 2,
+          "recognition": 9
+        },
+        "events": 160,
+        "omittedEvents": 0,
+        "incomplete": [],
+        "complete": true
+      }
+    },
+    "qualityFailures": [
+      {
+        "scene": "watercolor-ferry-translucent-notification",
+        "round": 0,
+        "type": "paragraph-order",
+        "anchors": [
+          "THE RIVER IS CLEAR TODAY.",
+          "PLEASE STEP ABOARD QUIETLY."
+        ],
+        "paragraphIndex": -1,
+        "found": false,
+        "reason": "Each general group must match a complete normalized actual source paragraph in order, without borrowing text from other groups"
+      },
+      {
+        "scene": "lantern-market-oblique-bilingual-captions",
+        "round": 0,
+        "type": "paragraph-order",
+        "anchors": [
+          "THE LANTERNS ARE STILL WARM.",
+          "LET US WALK HOME TOGETHER."
+        ],
+        "paragraphIndex": -1,
+        "found": false,
+        "reason": "Each general group must match a complete normalized actual source paragraph in order, without borrowing text from other groups"
+      }
+    ],
+    "runtimeCounts": {
+      "errors": 0,
+      "warnings": 1,
+      "rawErrors": 0,
+      "rawWarnings": 2,
+      "advisories": 0
+    },
+    "cleanup": {
+      "browserClosed": true,
+      "profileRemoved": true,
+      "cleanupErrors": []
+    },
+    "limits": "Only two geometrically preselected complete original cohorts have full-T data; RRR final texts are historical, no paired causal CTC comparison; input float projection cannot prove source alpha"
+  }
+}

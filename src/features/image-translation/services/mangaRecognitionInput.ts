@@ -1,18 +1,29 @@
 /**
  * @file src/features/image-translation/services/mangaRecognitionInput.ts
  * 文件职责：在锁定的 PaddleOCR 批处理输入中保留三个颜色通道，同时复用原裁切、缩放、排序和解码。
- * 主要内容：借用 SDK 一次读回的独占像素，和旧红通道增强共享每页两百万像素准入；按原读回索引关联稳定宽度排序的批次，完整校验原 RRR 与边缘补齐后才原地改写既有张量；每批进入原生推理前释放像素引用，未知关联保守失败并保存同一异常首因。
+ * 主要内容：借用 SDK 一次读回的独占像素，和旧红通道增强共享每页两百万像素准入；按原读回索引关联稳定宽度排序的批次，完整校验原 RRR 与边缘补齐后才原地改写既有张量；每批进入原生推理前释放像素引用，可向同步只读观察者借出一次已准入读回，并在释放后返回同一稳定分批的数字身份凭据；未知关联保守失败并保存同一异常首因。
  * 模块边界：纯输入适配，不导入 SDK 私有函数、不访问模型或全局 Tensor，不新增画布、读回、会话或重试；BGR 为依据上游配置的候选，导出模型的语义和实际质量须独立验证。
  */
 import {createMangaOcrColorAdapter, createMangaOcrColorAdmission, type MangaOcrColorAdapter, type MangaOcrColorImage} from './mangaOcrColor';
 
 export const MANGA_RECOGNITION_INPUT_RECORDS = 8192;
 export interface MangaRecognitionRun {cropCount: number; batchSize: number; enabled: boolean}
+/** readIndex 按每次 beginRun 原读序从零开始，含预算拒绝占位；像素只在同步回调内借用，不得改写或保留，元数据仍受调用方页预算约束。 */
+export interface MangaRecognitionInputObserver {
+    observeBorrowedRead(readIndex: number, width: number, height: number, pixels: Uint8ClampedArray): void;
+}
+/** 原生 Tensor 仍由调用方构造；这里只交付同一稳定 chunk 的数字身份，不保存 Tensor 或 RGBA。 */
+export interface MangaRecognitionBatchReceipt {
+    readonly readIndices: readonly number[];
+    readonly resizedWidths: readonly number[];
+    readonly paddedWidth: number;
+    readonly height: 48;
+}
 interface Crop {width: number; index: number; data?: Uint8ClampedArray}
 interface Run {enabled: boolean; count: number; batchSize: number; crops: Crop[]; ordered?: Crop[]; offset: number}
 
 /** 一个实例仅用于串行识别；RGB 参数供固定对照，产品调用使用默认 BGR，不按识别输出选通道。 */
-export function createMangaRecognitionInput(order: 'bgr' | 'rgb' = 'bgr') {
+export function createMangaRecognitionInput(order: 'bgr' | 'rgb' = 'bgr', observer?: MangaRecognitionInputObserver) {
     const admission = createMangaOcrColorAdmission(), legacy = createMangaOcrColorAdapter(admission);
     let run: Run | undefined, failure: {error: unknown} | undefined;
     let signal: AbortSignal | undefined, active = false, retainedPixels = 0;
@@ -40,6 +51,11 @@ export function createMangaRecognitionInput(order: 'bgr' | 'rgb' = 'bgr') {
                 const image = read(), data = image.data;
                 if (!(data instanceof Uint8ClampedArray) || data.length !== width * height * 4) return mismatch();
                 if (scope !== run || !admission.current(page)) return;
+                if (observer) {
+                    observer.observeBorrowedRead(crop.index, width, height, data);
+                    // 同步观察可能触发调用方取消或换页；不能把旧页借用像素重新挂入已清空的队列。
+                    if (scope !== run || !admission.current(page)) return;
+                }
                 crop.data = data;retainedPixels += width * height;
                 // 原读回保持完整 RGB，不能先运行只改变 R 的旧增强。
                 return replace(image);
@@ -60,7 +76,7 @@ export function createMangaRecognitionInput(order: 'bgr' | 'rgb' = 'bgr') {
                 count: options.cropCount, batchSize: options.batchSize, crops: [], offset: 0};
         },
         /** 只接收原 Tensor 构造参数；先验证整批，绝不在失败后留下半批三通道数据。 */
-        patchInput(args: readonly unknown[]) {
+        patchInput(args: readonly unknown[]): MangaRecognitionBatchReceipt | undefined {
             const scope = run;
             if (!scope?.enabled) return;
             if (signal?.aborted) {
@@ -107,6 +123,8 @@ export function createMangaRecognitionInput(order: 'bgr' | 'rgb' = 'bgr') {
                 crop.data = undefined;
             }
             scope.offset += count;
+            // 无观察者沿用旧路径且不分配凭据数组；超预算行仍在原 chunk 身份中，不能另外排序或猜来源。
+            if (observer) return {readIndices: chunk.map(crop => crop.index), resizedWidths: chunk.map(crop => crop.width), paddedWidth: width, height: 48};
         },
         /** SDK 可吞预处理错误；保存的首因须在 super.run 收尾后以同一对象重抛。 */
         endRun(completed = true) {

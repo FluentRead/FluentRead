@@ -64,6 +64,71 @@ describe('图片译文排版与绘制', () => {
         expect(layout.lineHeight).toBeLessThanOrEqual(100);
     });
 
+    it.each(['𠀀', '𠀀\u{E0100}', '𛀁', '𛄠', 'ｶﾞ'])('扩展东亚字素 %s 不将紧邻的完整英文词拆开', eastAsian => {
+        const text = `${eastAsian}HELLO`;
+        const layout = layoutImageTranslationText(text, 5, 2.5, measure, 1);
+        expect(layout.lines).toEqual([eastAsian, 'HELLO']);
+        expect(layout.lines.join('')).toBe(text);
+    });
+
+    it('Unicode 词界不拆开组合字素、英文长词及原有空格和显式换行', () => {
+        const text = '𠀀\u{E0100} HELLO\nｶﾞWORLD 👨‍👩‍👧‍👦';
+        const layout = layoutImageTranslationText(text, 5, 10, measure, 1);
+        expect(layout.lines).toEqual(['𠀀\u{E0100}', 'HELLO', 'ｶﾞ', 'WORLD', '👨‍👩‍👧‍👦']);
+        expect(layout.lines.every(line => !/^[\uFF9E\uFF9F\p{Mark}]/u.test(line))).toBe(true);
+        expect(layoutImageTranslationText('𠀀ABCDEFGHIJ', 5, 4, measure, 1).lines).toEqual(['𠀀', 'ABCDE', 'FGHIJ']);
+        expect(layoutImageTranslationText('A B\nC', 20, 5, measure, 1).lines).toEqual(['A B', 'C']);
+    });
+
+    it('无 Segmenter 时扩展东亚码点与完整英文词仍分别换行', async () => {
+        vi.stubGlobal('Intl', {Segmenter: undefined});
+        const {layoutImageTranslationText: fallbackLayout} = await import('@/src/features/image-translation/services/rendering');
+        const layout = fallbackLayout('𠀀HELLO', 5, 2.5, (value, size) => Array.from(value).length * size, 1);
+        expect(layout.lines).toEqual(['𠀀', 'HELLO']);
+        expect(fallbackLayout('ｶﾞHELLO', 5, 2.5, (value, size) => Array.from(value).length * size, 1).lines)
+            .toEqual(['ｶﾞ', 'HELLO']);
+        expect(fallbackLayout('𠀀\u{E0100}HELLO', 5, 2.5, (value, size) => Array.from(value).length * size, 1).lines)
+            .toEqual(['𠀀\u{E0100}', 'HELLO']);
+    });
+
+    it('扩展汉字邻接 emoji ZWJ 时保持原始字素和完整文本', () => {
+        const text = '𠀀👨‍👩‍👧‍👦HELLO';
+        const layout = layoutImageTranslationText(text, 5, 4, measure, 1);
+        expect(layout.lines.join('')).toBe(text);
+        expect(layout.lines.filter(line => line.includes('👨'))).toHaveLength(1);
+        expect(layout.lines.find(line => line.includes('👨'))).toContain('👨‍👩‍👧‍👦');
+        expect(layout.lines.every(line => !line.startsWith('\u200d') && !line.endsWith('\u200d'))).toBe(true);
+    });
+
+    it('扩展汉字末尾的连接符不从原字素分离', () => {
+        const text = '𠀀\u200d👨HELLO';
+        const layout = layoutImageTranslationText(text, 1, 20, measure, 1);
+        expect(layout.lines.join('')).toBe(text);
+        expect(layout.lines[0]).toBe('𠀀\u200d');
+        expect(layout.lines.every(line => !line.startsWith('\u200d'))).toBe(true);
+    });
+
+    it('东亚符号组成的 emoji ZWJ 序列不在换行时拆散', () => {
+        for (const text of ['㊙️‍👨HELLO', 'x👩‍㊗️HELLO']) {
+            const layout = layoutImageTranslationText(text, 1, 20, measure, 1);
+            expect(layout.lines.join('')).toBe(text);
+            expect(layout.lines).toContain(text.startsWith('x') ? '👩‍㊗️' : '㊙️‍👨');
+        }
+        // 合成测宽模拟连接前后字形宽度变化，迫使排版在潜在词界处作换行决策。
+        const text = 'x👩‍㊗️HELLO';
+        const nonAdditive = (value: string, size: number) => (value === 'x👩‍' ? 1 : measure(value, 1)) * size;
+        const layout = layoutImageTranslationText(text, 1, 20, nonAdditive, 1);
+        expect(layout.lines).toContain('👩‍㊗️');
+        expect(layout.lines.join('')).toBe(text);
+    });
+
+    it('韩文音节与相邻 Jamo 不从同一字素中拆开', () => {
+        const text = '각HELLO';
+        const layout = layoutImageTranslationText(text, 1, 20, measure, 1);
+        expect(layout.lines.join('')).toBe(text);
+        expect(layout.lines[0]).toBe('각');
+    });
+
     it('长段落允许超过三行且全部保留，每一行和总高度均在 OCR 框内', () => {
         const text = '这是用于验证完整译文不会被三行上限截掉的一段长文字。'.repeat(5);
         const layout = layoutImageTranslationText(text, 80, 80, measure);

@@ -80,12 +80,50 @@ export interface ImageTranslationTextLayout {
 }
 
 const IMAGE_TEXT_FONT = 'system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif';
-const CJK_TOKENS = /\s+|[\u2e80-\u9fff\u3040-\u30ff\uac00-\ud7af]\p{Mark}*|[^\s\u2e80-\u9fff\u3040-\u30ff\uac00-\ud7af]+/gu;
+// 补充平面汉字与假名要与英文分词，附着的组合标记和连接符仍属于前一字素。
+const CJK_TOKENS = /\s+|[\uFF66-\uFF9D][\uFF9E\uFF9F](?:\p{Mark}|[\u200c\u200d])*|[\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}\u2e80-\u9fff\u3040-\u30ff\uac00-\ud7af](?:\p{Mark}|[\u200c\u200d])*|[^\s\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}\u2e80-\u9fff\u3040-\u30ff\uac00-\ud7af]+/gu;
 const graphemeSegmenter = typeof Intl.Segmenter === 'function'
     ? new Intl.Segmenter(undefined, { granularity: 'grapheme' }) : undefined;
 
 function graphemes(text: string): string[] {
     return graphemeSegmenter ? Array.from(graphemeSegmenter.segment(text), part => part.segment) : Array.from(text);
+}
+
+function tokenize(paragraph: string): Array<string | null> {
+    const tokens = paragraph.match(CJK_TOKENS) || [];
+    // 仅在连接符或韩文 Jamo 位于词界时校准字素；没有 Segmenter 时保留原有码点回退。
+    const mayCrossBoundary = tokens.length > 1 && graphemeSegmenter
+        && /[\u200d\u1100-\u11ff\ua960-\ua97f\ud7b0-\ud7ff]/u.test(paragraph)
+        && tokens.some((token, index) => index > 0 && (
+            (/\u200d$/u.test(tokens[index - 1]) && /^\p{Extended_Pictographic}/u.test(token))
+            || /[\u1100-\u11ff\ua960-\ua97f\ud7b0-\ud7ff]$/u.test(tokens[index - 1])
+            || /^[\u1100-\u11ff\ua960-\ua97f\ud7b0-\ud7ff]/u.test(token)
+        ));
+    if (mayCrossBoundary && graphemeSegmenter) {
+        const iterator = graphemeSegmenter.segment(paragraph)[Symbol.iterator]();
+        const merged: string[] = [];
+        let offset = 0;
+        let end = 0;
+        let pending = '';
+        for (const token of tokens) {
+            offset += token.length;
+            while (end < offset) end += iterator.next().value!.segment.length;
+            if (/^\s+$/u.test(token)) {
+                if (pending) merged.push(pending);
+                merged.push(token);
+                pending = '';
+            } else {
+                pending += token;
+                if (offset === end) {
+                    merged.push(pending);
+                    pending = '';
+                }
+            }
+        }
+        if (pending) merged.push(pending);
+        return merged.map(token => /^\s+$/u.test(token) ? null : token);
+    }
+    return tokens.map(token => /^\s+$/u.test(token) ? null : token);
 }
 
 /** 保留单词、显式换行和混排空格；过长单词才按字素拆分，不截断译文。 */
@@ -101,7 +139,7 @@ export function layoutImageTranslationText(
         return { lines: [], fontSize: 0, lineHeight: 0 };
     }
     const paragraphs = normalized.split('\n').map(paragraph => paragraph.trim());
-    const tokens = paragraphs.map(paragraph => paragraph.match(CJK_TOKENS) || []);
+    const tokens = paragraphs.map(tokenize);
     const segments = new Map<string, string[]>();
     let measuredSize = 0;
     const widths = new Map<string, number>();
@@ -125,7 +163,7 @@ export function layoutImageTranslationText(
             let current = '';
             let space = '';
             for (const token of paragraph) {
-                if (/^\s+$/u.test(token)) {
+                if (token === null) {
                     space = ' ';
                     continue;
                 }

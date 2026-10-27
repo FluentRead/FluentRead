@@ -129,6 +129,22 @@ describe('图片译文排版与绘制', () => {
         expect(layout.lines[0]).toBe('각');
     });
 
+    it.each(['かﾞ', 'ｶﾞﾞ', '漢🏽', '㊗️🏽', '\u0600𠀀', '\u0d4e𠀀'])('跨词界字素 %s 不在窄框中拆开', cluster => {
+        const text = `${cluster}HELLO`;
+        const layout = layoutImageTranslationText(text, 1, 20, measure, 1);
+        expect(layout.lines.join('')).toBe(text);
+        expect(layout.lines[0]).toBe(cluster);
+    });
+
+    it('普通中日文与全角标点使用安全快路径，混合组合字符才校准词界', () => {
+        const split = vi.spyOn(Intl.Segmenter.prototype, 'segment');
+        const codepointMeasure = (value: string, size: number) => Array.from(value).length * size;
+        layoutImageTranslationText('𠀀HELLO，こんにちは！', 100, 10, codepointMeasure, 1);
+        expect(split).not.toHaveBeenCalled();
+        layoutImageTranslationText('かﾞHELLO', 100, 10, codepointMeasure, 1);
+        expect(split).toHaveBeenCalledOnce();
+    });
+
     it('长段落允许超过三行且全部保留，每一行和总高度均在 OCR 框内', () => {
         const text = '这是用于验证完整译文不会被三行上限截掉的一段长文字。'.repeat(5);
         const layout = layoutImageTranslationText(text, 80, 80, measure);

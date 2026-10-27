@@ -82,6 +82,9 @@ export interface ImageTranslationTextLayout {
 const IMAGE_TEXT_FONT = 'system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif';
 // 补充平面汉字与假名要与英文分词，附着的组合标记和连接符仍属于前一字素。
 const CJK_TOKENS = /\s+|[\uFF66-\uFF9D][\uFF9E\uFF9F](?:\p{Mark}|[\u200c\u200d])*|[\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}\u2e80-\u9fff\u3040-\u30ff\uac00-\ud7af](?:\p{Mark}|[\u200c\u200d])*|[^\s\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}\u2e80-\u9fff\u3040-\u30ff\uac00-\ud7af]+/gu;
+// 这些字符各自是完整字素：不含组合标记、连接符、韩文 Jamo、表情修饰符或 Prepend。
+const SIMPLE_IMAGE_TEXT = /^[\x20-\x7e\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}\u2e80-\u9fff\uac00-\ud7a3\uff01-\uff65]*$/u;
+const IMAGE_TEXT_EXTEND = /[\p{Mark}\p{Grapheme_Extend}]/u;
 const graphemeSegmenter = typeof Intl.Segmenter === 'function'
     ? new Intl.Segmenter(undefined, { granularity: 'grapheme' }) : undefined;
 
@@ -91,14 +94,11 @@ function graphemes(text: string): string[] {
 
 function tokenize(paragraph: string): Array<string | null> {
     const tokens = paragraph.match(CJK_TOKENS) || [];
-    // 仅在连接符或韩文 Jamo 位于词界时校准字素；没有 Segmenter 时保留原有码点回退。
+    // 相邻非空白词的交界可能位于字素内，使用分割器的实际边界合并；空白仍按原规则归一化。
+    // 没有 Segmenter 时保留原有码点回退，不将其误认为完整字素分割。
     const mayCrossBoundary = tokens.length > 1 && graphemeSegmenter
-        && /[\u200d\u1100-\u11ff\ua960-\ua97f\ud7b0-\ud7ff]/u.test(paragraph)
-        && tokens.some((token, index) => index > 0 && (
-            (/\u200d$/u.test(tokens[index - 1]) && /^\p{Extended_Pictographic}/u.test(token))
-            || /[\u1100-\u11ff\ua960-\ua97f\ud7b0-\ud7ff]$/u.test(tokens[index - 1])
-            || /^[\u1100-\u11ff\ua960-\ua97f\ud7b0-\ud7ff]/u.test(token)
-        ));
+        && tokens.some((token, index) => index > 0 && !/^\s/u.test(token) && !/^\s/u.test(tokens[index - 1]))
+        && !(SIMPLE_IMAGE_TEXT.test(paragraph) && !IMAGE_TEXT_EXTEND.test(paragraph));
     if (mayCrossBoundary && graphemeSegmenter) {
         const iterator = graphemeSegmenter.segment(paragraph)[Symbol.iterator]();
         const merged: string[] = [];

@@ -5,7 +5,7 @@
  * 模块边界：仅使用调用方注入的只读候选、读取、复制及本地化端口，不扫描页面、不执行 OCR、不访问网络或保存结果；入口与生命周期尚未接入。
  -->
 <template>
-  <section v-if="opened" ref="panel" class="fr-manga-reading" :data-theme="theme" role="dialog" :aria-label="t('漫画文字')" tabindex="-1" @keydown.stop="handleKeydown" @click.stop @pointerdown.stop @keyup.stop @wheel.stop>
+  <section v-if="opened" ref="panel" class="fr-manga-reading" :data-theme="theme" role="dialog" :aria-label="t('漫画文字')" tabindex="-1" @keydown.stop="handleKeydown" @click.stop @pointerdown.stop @touchstart.passive.stop @touchmove.passive.stop @touchend.passive.stop @touchcancel.passive.stop @keyup.stop @wheel.stop>
     <header>
       <strong>{{ t('漫画文字') }}</strong>
       <button type="button" :aria-label="t('关闭文字面板')" @click="close">×</button>
@@ -16,7 +16,7 @@
         <button v-for="(item, index) in items" :key="index" ref="candidateButtons" type="button" @click="select(item, $event)">{{ label(item) }}</button>
       </div>
       <p v-if="status" role="status">{{ message(status) }}</p>
-      <button v-if="status === 'stale' || status === 'unavailable' || status === 'noCandidates'" ref="refreshButton" type="button" @click="refreshFromButton($event)">{{ t('重新查看可见页面') }}</button>
+      <button v-if="status === 'stale' || status === 'unavailable' || status === 'noCandidates' || status === 'overBudget' || status === 'error'" ref="refreshButton" type="button" @click="refreshFromButton($event)">{{ t('重新查看可见页面') }}</button>
     </div>
     <template v-else>
       <div class="fr-manga-reading-heading"><button ref="backButton" type="button" @click="back($event)">{{ t('选择其他页面') }}</button><span>{{ label(selected) }}</span></div>
@@ -90,10 +90,39 @@ function refresh() {
   try {const list = props.list();items.value = list.status === 'ready' ? list.items : [];status.value = list.status === 'ready' ? (list.items.length ? '' : 'noCandidates') : list.status;}
   catch {items.value = [];status.value = 'error';}
 }
+// 只比较可访问的焦点链；其他组件的 closed shadow root 内部不可观测。
+function focusPath(root?: Document | ShadowRoot): Element[] {
+  const path: Element[] = [];let focused = root?.activeElement;
+  while (focused) {path.push(focused);focused = focused.shadowRoot?.activeElement;}
+  return path;
+}
+function sameFocus(root: Document | ShadowRoot | undefined, previous: Element[]): boolean {
+  const current = focusPath(root);
+  return current.length === previous.length && current.every((element, index) => element === previous[index]);
+}
+function mayTakeFocus(from: HTMLElement | null | undefined): boolean {
+  const doc = from?.ownerDocument;
+  if (!from?.isConnected || !doc) return false;
+  const source = from.getRootNode() as Document | ShadowRoot;
+  const noFocus = !!doc.activeElement && (doc.activeElement === doc.body || doc.activeElement === doc.documentElement)
+    && !doc.activeElement.matches(':focus-within')
+    && (source === doc || source.activeElement === null);
+  let current: Node = from, ownsFocus = true;
+  for (;;) {
+    const root = current.getRootNode() as Document | ShadowRoot;
+    if (root.activeElement !== current) ownsFocus = false;
+    if (root === doc) return ownsFocus || noFocus;
+    if (!('host' in root) || !root.host) return false;
+    current = root.host;
+  }
+}
 async function open(event: Event, from?: HTMLElement | null) {
   if (!event.isTrusted || disposed) return false;
+  const sourceRoot = from?.getRootNode?.() as Document | ShadowRoot | undefined;
+  const canFocus = mayTakeFocus(from), sourceFocus = focusPath(sourceRoot), doc = from?.ownerDocument, documentFocus = focusPath(doc);
   cancel();opened.value = true;trigger = from ?? null;refresh();const owner = revision;emit('opened');
-  await nextTick();if (opened.value && owner === revision) panel.value?.focus({preventScroll:true});
+  await nextTick();
+  if (canFocus && from?.isConnected && from.getRootNode() === sourceRoot && opened.value && owner === revision && sameFocus(sourceRoot, sourceFocus) && sameFocus(doc, documentFocus)) panel.value?.focus({preventScroll:true});
   return true;
 }
 function close() {
@@ -173,8 +202,8 @@ defineExpose({open, close, invalidate});
 </script>
 <style scoped>
 .fr-manga-reading {position:fixed;right:16px;top:16px;width:min(420px,calc(100vw - 24px));max-height:calc(100dvh - 32px);display:flex;flex-direction:column;box-sizing:border-box;background:#fff;color:#172033;border:1px solid #e5e8ef;border-radius:12px;box-shadow:0 12px 40px #17203326;font:13px/1.6 system-ui,sans-serif;pointer-events:auto;z-index:2147483647}
-.fr-manga-reading header,.fr-manga-reading footer,.fr-manga-reading-heading,.fr-manga-reading-tools {display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:8px 12px}.fr-manga-reading header strong {flex:1}.fr-manga-reading button {font:inherit;min-height:30px;cursor:pointer}.fr-manga-reading button:focus-visible {outline:2px solid #dc315f;outline-offset:2px}.fr-manga-reading button:disabled {cursor:default;opacity:.55}.fr-manga-reading-body {overflow:auto;overscroll-behavior:contain;min-height:0;padding:0 14px;user-select:text}.fr-manga-reading-list {display:flex;flex-direction:column;gap:4px}.fr-manga-reading article {padding:12px 0}.fr-manga-reading article+article {border-top:1px solid #e5e8ef}.fr-manga-reading pre {margin:0;white-space:pre-wrap;overflow-wrap:anywhere;font:inherit}.fr-manga-reading-source {color:#737c8f}.fr-manga-reading footer {border-top:1px solid #e5e8ef}.fr-manga-reading footer span {flex:1}
-.fr-manga-reading-context {margin:0;padding:0 12px;color:#737c8f}
+.fr-manga-reading header,.fr-manga-reading footer,.fr-manga-reading-heading,.fr-manga-reading-tools {display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:8px 12px}.fr-manga-reading header strong {flex:1}.fr-manga-reading button {font:inherit;min-height:30px;cursor:pointer}.fr-manga-reading button:focus-visible {outline:2px solid #dc315f;outline-offset:2px}.fr-manga-reading button:disabled {cursor:default;opacity:.55}.fr-manga-reading-body {overflow:auto;overscroll-behavior:contain;min-height:0;padding:0 14px;user-select:text}.fr-manga-reading-list {display:flex;flex-direction:column;gap:4px}.fr-manga-reading article {padding:12px 0}.fr-manga-reading article+article {border-top:1px solid #e5e8ef}.fr-manga-reading pre {margin:0;white-space:pre-wrap;overflow-wrap:anywhere;font:inherit}.fr-manga-reading-source {color:#667085}.fr-manga-reading footer {border-top:1px solid #e5e8ef}.fr-manga-reading footer span {flex:1}
+.fr-manga-reading-context {margin:0;padding:0 12px;color:#667085}
 .fr-manga-reading[data-theme=dark] {background:#2b2630;color:#ece5ef;border-color:#49404c}.fr-manga-reading[data-theme=dark] :is(.fr-manga-reading-source,.fr-manga-reading-context) {color:#c1b1c5}
 @media (prefers-color-scheme:dark) {.fr-manga-reading[data-theme=auto] {background:#2b2630;color:#ece5ef;border-color:#49404c}.fr-manga-reading[data-theme=auto] :is(.fr-manga-reading-source,.fr-manga-reading-context) {color:#c1b1c5}}
 </style>

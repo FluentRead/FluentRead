@@ -17,6 +17,10 @@ const node = (tag:string,text=''):Node => {
   const value:Node = {tag,text,props:{},children:[],parent:null,isConnected:true,focus:vi.fn(() => {active = value;}),getRootNode:()=>({get activeElement(){return active;}}),contains:(child) => {for(let current:Node|null=child;current;current=current.parent)if(current===value)return true;return false;}};
   return value;
 };
+function focusedTrigger() {
+  const trigger=node('trigger'), document={get activeElement(){return active;},body:node('body'),documentElement:node('html')};
+  Object.assign(trigger,{ownerDocument:document,getRootNode:()=>document,matches:()=>false,getClientRects:()=>[{}]});active=trigger;return trigger;
+}
 function find(root:Node,predicate:(node:Node)=>boolean):Node|undefined {if(predicate(root))return root;for(const child of root.children){const result=find(child,predicate);if(result)return result;}}
 function deferred<T>() {let resolve!:(value:T)=>void, reject!:(reason:unknown)=>void;const promise = new Promise<T>((yes,no)=>{resolve=yes;reject=no;});return {promise,resolve,reject};}
 const trusted = {isTrusted:true} as MouseEvent;
@@ -40,7 +44,7 @@ async function mount(theme:'light'|'dark' = 'light') {
 describe('standalone manga reading panel prototype',()=>{
   it('requires an explicit trusted open and exposes distinguishable candidates without reading them',async()=>{
     const h=await mount();expect(h.props.list).not.toHaveBeenCalled();expect(await h.instance.open({isTrusted:false})).toBe(false);expect(h.props.list).not.toHaveBeenCalled();
-    await h.instance.open(trusted);await h.tick();expect(h.props.onOpened).toHaveBeenCalledOnce();expect(h.props.list).toHaveBeenCalledOnce();expect(h.props.read).not.toHaveBeenCalled();
+    await h.instance.open(trusted,focusedTrigger());await h.tick();expect(h.props.onOpened).toHaveBeenCalledOnce();expect(h.props.list).toHaveBeenCalledOnce();expect(h.props.read).not.toHaveBeenCalled();
     for(const text of ['图片 1','画布 2','背景图片 3','长图片段 4 · 像素位置 2048–3072'])expect(h.button(text)).toBeDefined();
     expect(h.get(n=>n.props.role==='dialog')?.props['aria-label']).toBe('漫画文字');expect(active).toBe(h.get(n=>n.props.role==='dialog'));
   });
@@ -76,9 +80,76 @@ describe('standalone manga reading panel prototype',()=>{
     const wait=deferred<void>();h.props.copy.mockReturnValueOnce(wait.promise);h.button('复制全部')!.props.onClick(trusted);h.instance.close();wait.resolve();await h.tick();expect(h.panel.feedback).toBe('');
   });
   it('restores focus only to a connected visible trigger while panel owns focus',async()=>{
-    const h=await mount(), focus=vi.fn(), trigger={isConnected:true,matches:()=>false,getClientRects:()=>[{}],focus};await h.instance.open(trusted,trigger);h.instance.close();expect(h.props.onClosed).toHaveBeenCalledOnce();expect(focus).toHaveBeenCalledOnce();
-    await h.instance.open(trusted,trigger);active=node('outside');h.instance.close();expect(focus).toHaveBeenCalledOnce();
-    await h.instance.open(trusted,{...trigger,isConnected:false});h.instance.close();expect(focus).toHaveBeenCalledOnce();
+    const h=await mount(), trigger=focusedTrigger(),focus=trigger.focus;await h.instance.open(trusted,trigger);h.instance.close();expect(h.props.onClosed).toHaveBeenCalledOnce();expect(focus).toHaveBeenCalledOnce();
+    active=trigger;await h.instance.open(trusted,trigger);active=node('outside');h.instance.close();expect(focus).toHaveBeenCalledOnce();
+    active=trigger;await h.instance.open(trusted,{...trigger,isConnected:false});h.instance.close();expect(focus).toHaveBeenCalledOnce();
+  });
+  it('does not steal focus if focus moves away while opening',async()=>{
+    const h=await mount(),trigger=focusedTrigger(),outside=node('outside');
+    const opening=h.instance.open(trusted,trigger);active=outside;await opening;await h.tick();
+    expect(active===outside).toBe(true);expect(h.get(n=>n.props.role==='dialog')).toBeDefined();
+  });
+  it('checks document focus separately when opening from a shadow root',async()=>{
+    const h=await mount(),trigger=node('trigger'),outside=node('outside'),host=node('host');active=trigger;
+    const document={activeElement:host,body:node('body'),documentElement:node('html')};Object.assign(host,{getRootNode:()=>document});
+    const sourceRoot:{host:Node;activeElement:Node|null}={host,activeElement:trigger};Object.assign(trigger,{ownerDocument:document,getRootNode:()=>sourceRoot});
+    const opening=h.instance.open(trusted,trigger);document.activeElement=outside;sourceRoot.activeElement=null;active=outside;await opening;await h.tick();
+    expect(active===outside).toBe(true);expect(h.get(n=>n.props.role==='dialog')).toBeDefined();
+  });
+  it.each(['iframe','closed shadow host','other control'])('does not focus the panel when %s already owns focus',async kind=>{
+    const h=await mount(),trigger=node('trigger'),outside=node(kind),host=node('trigger-host'),body=node('body');active=outside;
+    const document={activeElement:outside,body,documentElement:node('html')};
+    Object.assign(trigger,{ownerDocument:document,getRootNode:()=>({activeElement:null,host})});
+    await h.instance.open(trusted,trigger);await h.tick();expect(active===outside).toBe(true);expect(h.get(n=>n.props.role==='dialog')).toBeDefined();
+  });
+  it('does not assume focus ownership when the entry trigger is unavailable',async()=>{
+    const h=await mount(),outside=node('outside');active=outside;await h.instance.open(trusted);await h.tick();
+    expect(active===outside).toBe(true);expect(h.get(n=>n.props.role==='dialog')).toBeDefined();
+  });
+  it.each([1,2])('focuses the panel from the entry through %s closed shadow roots',async depth=>{
+    const h=await mount(),trigger=node('trigger'),body=node('body'),outerHost=node('outer-host');active=trigger;
+    const document={activeElement:outerHost,body,documentElement:node('html')};Object.assign(outerHost,{getRootNode:()=>document});
+    let host=outerHost;
+    if(depth===2){const innerHost=node('inner-host'),outerRoot={host:outerHost,activeElement:innerHost};Object.assign(innerHost,{getRootNode:()=>outerRoot});host=innerHost;}
+    const sourceRoot={host,activeElement:trigger};Object.assign(trigger,{ownerDocument:document,getRootNode:()=>sourceRoot});
+    await h.instance.open(trusted,trigger);await h.tick();expect(active===h.get(n=>n.props.role==='dialog')).toBe(true);
+  });
+  it('focuses the panel when the document has no focused control',async()=>{
+    const h=await mount(),trigger=node('trigger'),body=node('body'),host=node('host');active=body;
+    Object.assign(body,{matches:()=>false});
+    const document={activeElement:body,body,documentElement:node('html')};Object.assign(host,{getRootNode:()=>document});
+    const sourceRoot={host,activeElement:null};Object.assign(trigger,{ownerDocument:document,getRootNode:()=>sourceRoot});
+    await h.instance.open(trusted,trigger);await h.tick();expect(active===h.get(n=>n.props.role==='dialog')).toBe(true);
+  });
+  it('preserves external document focus that changes while the entry root remains unfocused',async()=>{
+    const h=await mount(),trigger=node('trigger'),body=node('body'),outside=node('outside'),host=node('host');active=body;
+    Object.assign(body,{matches:()=>false});const document={activeElement:body,body,documentElement:node('html')};
+    Object.assign(host,{getRootNode:()=>document});const sourceRoot={host,activeElement:null};Object.assign(trigger,{ownerDocument:document,getRootNode:()=>sourceRoot});
+    const opening=h.instance.open(trusted,trigger);document.activeElement=outside;active=outside;await opening;await h.tick();
+    expect(sourceRoot.activeElement).toBeNull();expect(active===outside).toBe(true);
+  });
+  it('does not treat a focused shadow descendant of body as an unfocused document',async()=>{
+    const h=await mount(),trigger=node('trigger'),body=node('body'),host=node('host');active=body;
+    Object.assign(body,{matches:(selector:string)=>selector===':focus-within'});
+    const document={activeElement:body,body,documentElement:node('html')};Object.assign(host,{getRootNode:()=>document});
+    const sourceRoot={host,activeElement:null};Object.assign(trigger,{ownerDocument:document,getRootNode:()=>sourceRoot});
+    await h.instance.open(trusted,trigger);await h.tick();expect(active===body).toBe(true);
+  });
+  it('does not focus the panel if the entry disconnects while opening',async()=>{
+    const h=await mount(),trigger=node('trigger'),body=node('body'),host=node('host');active=body;
+    Object.assign(body,{matches:()=>false});const document={activeElement:body,body,documentElement:node('html')};
+    Object.assign(host,{getRootNode:()=>document});const sourceRoot={host,activeElement:null};Object.assign(trigger,{ownerDocument:document,getRootNode:()=>sourceRoot});
+    const opening=h.instance.open(trusted,trigger);trigger.isConnected=false;await opening;await h.tick();expect(active===body).toBe(true);
+  });
+  it.each([1,2])('preserves focus changes %s open shadow roots deep while opening',async depth=>{
+    const h=await mount(),trigger=node('trigger'),host=node('host'),foreignHost=node('foreign-host'),first=node('first'),second=node('second');active=trigger;
+    const document={activeElement:host,body:node('body'),documentElement:node('html')};Object.assign(host,{getRootNode:()=>document});
+    const sourceRoot={host,activeElement:trigger};Object.assign(host,{shadowRoot:sourceRoot});Object.assign(trigger,{ownerDocument:document,getRootNode:()=>sourceRoot});
+    const leafRoot={activeElement:first};let shadowRoot:object=leafRoot;
+    if(depth===2){const nestedHost=node('nested');Object.assign(nestedHost,{shadowRoot:leafRoot});shadowRoot={activeElement:nestedHost};}
+    Object.assign(foreignHost,{shadowRoot});
+    const opening=h.instance.open(trusted,trigger);sourceRoot.activeElement=foreignHost;leafRoot.activeElement=second;active=second;await opening;await h.tick();
+    expect(active===second).toBe(true);expect(h.get(n=>n.props.role==='dialog')).toBeDefined();
   });
   it('localizes labels and empty state without triggering a read',async()=>{
     const h=await mount();h.props.translate.mockImplementation(text=>({'漫画文字':'Manga text','图片':'Image','当前没有可查看的页面':'No visible pages'} as Record<string,string>)[text]??text);
@@ -86,12 +157,19 @@ describe('standalone manga reading panel prototype',()=>{
     h.props.list.mockReturnValueOnce({status:'ready',items:[]});h.panel.refresh();await h.tick();expect(h.get(n=>n.text==='No visible pages')).toBeDefined();expect(h.props.read).not.toHaveBeenCalled();
   });
   it('handles keyboard Escape and restores the invoking control',async()=>{
-    const h=await mount(), focus=vi.fn(), trigger={isConnected:true,matches:()=>false,getClientRects:()=>[{}],focus};
+    const h=await mount(), trigger=focusedTrigger(),focus=trigger.focus;
     await h.instance.open(trusted,trigger);const stopPropagation=vi.fn(),preventDefault=vi.fn();
     h.get(n=>n.props.role==='dialog')!.props.onKeydown({key:'ArrowDown',isTrusted:true,stopPropagation,preventDefault});
     expect(stopPropagation).toHaveBeenCalledOnce();expect(preventDefault).not.toHaveBeenCalled();stopPropagation.mockClear();
     h.get(n=>n.props.role==='dialog')!.props.onKeydown({key:'Escape',isTrusted:true,stopPropagation,preventDefault});await h.tick();
     expect(stopPropagation).toHaveBeenCalledOnce();expect(preventDefault).toHaveBeenCalledOnce();expect(focus).toHaveBeenCalledOnce();expect(h.get(n=>n.props.role==='dialog')).toBeUndefined();
+  });
+  it('isolates bubbling touch gestures without cancelling native scrolling',async()=>{
+    const h=await mount();await h.instance.open(trusted);await h.tick();const dialog=h.get(n=>n.props.role==='dialog')!;
+    for(const name of ['onTouchstartPassive','onTouchmovePassive','onTouchendPassive','onTouchcancelPassive']) {
+      const stopPropagation=vi.fn(),preventDefault=vi.fn();expect(dialog.props[name]).toBeTypeOf('function');
+      dialog.props[name]({stopPropagation,preventDefault});expect(stopPropagation).toHaveBeenCalledOnce();expect(preventDefault).not.toHaveBeenCalled();
+    }
   });
   it('moves keyboard focus from the selected candidate to the result and back to the list',async()=>{
     const h=await mount();await h.instance.open(trusted);await h.tick();const candidate=h.button('图片 1')!;active=candidate;
@@ -118,9 +196,27 @@ describe('standalone manga reading panel prototype',()=>{
     expect(panel).toMatch(/\[data-theme=dark\] :is\(\.fr-manga-reading-source,\.fr-manga-reading-context\) \{color:#c1b1c5\}/);
     expect(panel).toMatch(/@media \(prefers-color-scheme:dark\)[\s\S]*\[data-theme=auto\] :is\(\.fr-manga-reading-source,\.fr-manga-reading-context\) \{color:#c1b1c5\}/);
   });
+  it('keeps source text and guidance readable against each panel background',()=>{
+    const panel=readFileSync(resolve('src/features/image-translation/ui/MangaReadingPanel.vue'),'utf8');
+    const luminance=(hex:string)=>{const rgb=hex.match(/[\da-f]{2}/gi)!.map(v=>parseInt(v,16)/255).map(v=>v<=.04045?v/12.92:((v+.055)/1.055)**2.4);return .2126*rgb[0]+.7152*rgb[1]+.0722*rgb[2];};
+    const contrast=(a:string,b:string)=>{const x=luminance(a),y=luminance(b);return (Math.max(x,y)+.05)/(Math.min(x,y)+.05);};
+    const source=panel.match(/\.fr-manga-reading-source \{color:#([\da-f]{6})\}/i)?.[1];
+    const context=panel.match(/\.fr-manga-reading-context \{[^}]*color:#([\da-f]{6})/i)?.[1];
+    const dark=panel.match(/\[data-theme=dark\] :is\(\.fr-manga-reading-source,\.fr-manga-reading-context\) \{color:#([\da-f]{6})\}/i)?.[1];
+    expect(source).toBeDefined();expect(context).toBeDefined();expect(dark).toBeDefined();
+    expect(contrast(source!,'ffffff')).toBeGreaterThanOrEqual(4.5);expect(contrast(context!,'ffffff')).toBeGreaterThanOrEqual(4.5);expect(contrast(dark!,'2b2630')).toBeGreaterThanOrEqual(4.5);
+  });
   it('reports a list budget failure without listing or reading a partial selection',async()=>{
     const h=await mount();h.props.list.mockReturnValueOnce({status:'overBudget'} as any);await h.instance.open(trusted);await h.tick();
     expect(h.panel.status).toBe('overBudget');expect(h.button('图片 1')).toBeUndefined();expect(h.props.read).not.toHaveBeenCalled();
+  });
+  it.each(['overBudget','error'] as const)('allows a manual recheck after list %s without reading',async failure=>{
+    const h=await mount();
+    if(failure==='error') h.props.list.mockImplementationOnce(()=>{throw Error('temporary error');});
+    else h.props.list.mockReturnValueOnce({status:'overBudget'} as any);
+    await h.instance.open(trusted);await h.tick();expect(h.panel.status).toBe(failure);expect(h.props.read).not.toHaveBeenCalled();
+    const retry=h.button('重新查看可见页面')!;expect(retry).toBeDefined();active=retry;retry.props.onClick({isTrusted:true,currentTarget:retry});await h.tick();
+    expect(h.button('图片 1')).toBeDefined();expect(active).toBe(h.button('图片 1'));expect(h.props.list).toHaveBeenCalledTimes(2);expect(h.props.read).not.toHaveBeenCalled();
   });
   it('allows an explicit recheck after an empty list without starting a read',async()=>{
     const h=await mount();h.props.list.mockReturnValueOnce({status:'ready',items:[]});await h.instance.open(trusted);await h.tick();

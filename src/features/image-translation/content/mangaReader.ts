@@ -341,8 +341,11 @@ export function createMangaReader(ports: {
     function scheduleLayout(check=true): void {
         invalidateReading(check);
         if(readingFrame!==null){window.cancelAnimationFrame(readingFrame);readingFrame=null;}
-        if (disposed || frame !== null) return;
+        if (disposed) return;
+        if (frame !== null) {session.deferScheduling();return;}
         if (!session.status().available && !mangaReaderSelector(window.location?.href || 'about:blank', ports.siteRules?.())) return;
+        // 变化通知与本帧测量之间可能有在途任务完成；先关闸，避免用旧页序启动下一页。
+        session.deferScheduling();
         frame = window.requestAnimationFrame(() => { frame = null; refresh(); });
     }
     function schedule(): void { discoveryDirty = true; scheduleLayout(); }

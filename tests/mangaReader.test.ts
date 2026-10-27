@@ -833,6 +833,62 @@ describe('漫画站点适配与 DOM 生命周期', () => {
         pending.resolve();await flush();expect(order).toEqual(['image-a','image-c','canvas-b']);
         expect(f.ports.translate).toHaveBeenCalledTimes(2);expect(canvasPorts.translate).toHaveBeenCalledOnce();expect(f.ports.release).not.toHaveBeenCalled();expect(canvasPorts.release).not.toHaveBeenCalled();f.reader.dispose();
     });
+    it('正文变动通知后、刷新帧前完成的识别不启动旧顺序，刷新后按新顺序继续',async()=>{
+        const order:string[]=[],pending=deferred();
+        const canvasPorts={identity:vi.fn(()=>'canvas-b'),translate:vi.fn(async()=>{order.push('canvas-b');}),reuse:vi.fn(()=>false),restore:vi.fn(),release:vi.fn(),failed:vi.fn(()=>false),update:vi.fn()};
+        const f=readerFixture(false,'https://comic-zenon.com/episode/12207421983509986288',undefined,()=>0,undefined,canvasPorts);
+        const parent=f.image.parentElement!;parent.className='page-area';f.image.className='page-image';
+        const canvas=f.document.createElement('canvas') as HTMLCanvasElement;canvas.className='page-image';canvas.width=400;canvas.height=300;canvas.getBoundingClientRect=()=>({left:0,right:400,top:0,bottom:300,width:400,height:300}) as DOMRect;
+        const last=f.image.cloneNode() as HTMLImageElement;last.src='blob:page-c';Object.defineProperties(last,{complete:{value:true},naturalWidth:{value:800},naturalHeight:{value:1200}});last.getBoundingClientRect=()=>({left:0,right:800,top:0,bottom:1200,width:800,height:1200}) as DOMRect;parent.append(canvas,last);
+        f.ports.translate.mockImplementation(async image=>{if(image===f.image){order.push('image-a');await pending.promise;}else order.push('image-c');});
+        f.reader.schedule();f.run();f.reader.toggle();await flush();expect(order).toEqual(['image-a']);
+        parent.append(canvas);f.mo.callback([{type:'childList',target:parent} as unknown as MutationRecord],{} as MutationObserver);
+        pending.resolve();await flush();expect(order).toEqual(['image-a']);
+        f.run();await flush();expect(order).toEqual(['image-a','image-c','canvas-b']);
+        expect(f.ports.release).not.toHaveBeenCalled();expect(canvasPorts.release).not.toHaveBeenCalled();f.reader.dispose();
+    });
+    it('宿主连续变动与已排队帧合并，下一帧仍可启动可见页',async()=>{
+        const f=readerFixture(false), pending=deferred(), next=f.image.cloneNode() as HTMLImageElement;
+        next.src='blob:next';Object.defineProperties(next,{complete:{value:true},naturalWidth:{value:800},naturalHeight:{value:1200}});next.getBoundingClientRect=f.image.getBoundingClientRect;
+        f.image.parentElement!.append(next);f.ports.translate.mockReturnValueOnce(pending.promise);
+        f.reader.schedule();f.run();f.reader.toggle();await flush();expect(f.ports.translate).toHaveBeenCalledTimes(1);
+        for(let i=0;i<100;i++)f.mo.callback([{type:'childList',target:f.document.body} as unknown as MutationRecord],{} as MutationObserver);
+        pending.resolve();await flush();expect(f.ports.translate).toHaveBeenCalledTimes(1);
+        f.run();await flush();expect(f.ports.translate.mock.calls.map(c=>c[0])).toEqual([f.image,next]);f.reader.dispose();
+    });
+    it.each(['style','resize'] as const)('%s 布局变动在测量前暂缓旧队列并于下一帧继续',async kind=>{
+        const f=readerFixture(false),pending=deferred(),next=f.image.cloneNode() as HTMLImageElement;
+        next.src='blob:next';Object.defineProperties(next,{complete:{value:true},naturalWidth:{value:800},naturalHeight:{value:1200}});next.getBoundingClientRect=f.image.getBoundingClientRect;
+        f.image.parentElement!.append(next);f.ports.translate.mockReturnValueOnce(pending.promise);f.reader.schedule();f.run();f.reader.toggle();await flush();
+        if(kind==='style')f.mo.callback([{type:'attributes',attributeName:'style',target:f.document.body} as unknown as MutationRecord],{} as MutationObserver);
+        else f.window.addEventListener.mock.calls.find(([name])=>name==='resize')![1]();
+        pending.resolve();await flush();expect(f.ports.translate).toHaveBeenCalledTimes(1);f.run();await flush();expect(f.ports.translate.mock.calls.map(c=>c[0])).toEqual([f.image,next]);f.reader.dispose();
+    });
+    it('正文变动后显式重试先同步刷新，不被待处理帧阻塞',async()=>{
+        const f=readerFixture(false);f.ports.failed.mockReturnValue(true);f.reader.toggle();await flush();expect(f.reader.status().errors).toBe(1);
+        f.mo.callback([{type:'childList',target:f.document.body} as unknown as MutationRecord],{} as MutationObserver);
+        f.ports.failed.mockReturnValue(false);expect(f.reader.retry(f.image)).toBe(true);await flush();expect(f.ports.translate).toHaveBeenCalledTimes(2);expect(f.reader.status().errors).toBe(0);
+        f.run();await flush();expect(f.ports.translate).toHaveBeenCalledTimes(2);f.reader.dispose();
+    });
+    it('扩展界面自身变动不会暂停待处理页',async()=>{
+        const f=readerFixture(false),pending=deferred(),next=f.image.cloneNode() as HTMLImageElement;
+        next.src='blob:next';Object.defineProperties(next,{complete:{value:true},naturalWidth:{value:800},naturalHeight:{value:1200}});next.getBoundingClientRect=f.image.getBoundingClientRect;
+        f.image.parentElement!.append(next);f.ports.translate.mockReturnValueOnce(pending.promise);f.reader.schedule();f.run();f.reader.toggle();await flush();
+        const ui=f.document.createElement('div');ui.setAttribute('data-fluent-read-ui','');f.document.body.append(ui);
+        f.mo.callback([{type:'childList',target:ui} as unknown as MutationRecord],{} as MutationObserver);pending.resolve();await flush();
+        expect(f.ports.translate.mock.calls.map(c=>c[0])).toEqual([f.image,next]);f.reader.dispose();
+    });
+    it.each(['pause','dispose','hidden'] as const)('正文变动待刷新时 %s 不启动旧任务',async action=>{
+        const f=readerFixture(false),pending=deferred(),next=f.image.cloneNode() as HTMLImageElement;
+        next.src='blob:next';Object.defineProperties(next,{complete:{value:true},naturalWidth:{value:800},naturalHeight:{value:1200}});next.getBoundingClientRect=f.image.getBoundingClientRect;
+        f.image.parentElement!.append(next);f.ports.translate.mockReturnValueOnce(pending.promise);f.reader.schedule();f.run();f.reader.toggle();await flush();
+        f.mo.callback([{type:'childList',target:f.document.body} as unknown as MutationRecord],{} as MutationObserver);
+        if(action==='pause') f.reader.toggle();else if(action==='dispose') f.reader.dispose();else {f.setHidden(true);f.document.dispatchEvent(new f.dom.Event('visibilitychange'));}
+        pending.resolve();await flush();f.run();await flush();expect(f.ports.translate).toHaveBeenCalledTimes(1);
+        if(action==='hidden'){f.setHidden(false);f.document.dispatchEvent(new f.dom.Event('visibilitychange'));f.run();await flush();expect(f.ports.translate).toHaveBeenCalledTimes(2);}
+        if(action==='pause'){f.reader.toggle();await flush();expect(f.ports.translate.mock.calls.length).toBeGreaterThan(1);}
+        f.reader.dispose();
+    });
     it('长图各分段保持页内顺序，并与中间画布及下一张图片按正文顺序排列', async()=>{
         const values=new Map<HTMLImageElement,import('@/src/features/image-translation/content/mangaImageSegments').MangaImageSegment[]>();
         const segments={identity:vi.fn(s=>s.source),translate:vi.fn().mockResolvedValue(undefined),reuse:vi.fn(()=>false),restore:vi.fn(),release:vi.fn(),failed:vi.fn(()=>false),update:vi.fn(),prepare:vi.fn(()=>values),pixels:vi.fn(()=>1_800_000),bounds:vi.fn(()=>({left:0,top:0,right:800,bottom:600,width:800,height:600}) as DOMRect)};

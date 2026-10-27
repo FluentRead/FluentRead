@@ -21,6 +21,7 @@ import {parseMangaPatchPacket} from '../mangaPatchResult';
 
 interface OffscreenResponse {
     readonly mangaPatches?: unknown;
+    readonly imageUnchanged?: unknown;
     readonly success?: boolean;
     readonly error?: string;
     readonly errorCode?: unknown;
@@ -55,11 +56,16 @@ function errorMessage(response: OffscreenResponse | undefined, fallback: string)
 function parseTranslationResult(
     response: OffscreenResponse | undefined,
     fallback: string,
+    manga = false,
 ): OffscreenImageTranslationResult {
-    if (!response?.success || (typeof response.image !== 'string' && response.mangaPatches === undefined) || !Array.isArray(response.lines)) {
+    const unchanged = response?.imageUnchanged === true && !manga && response.image === '' && response.mangaPatches === undefined;
+    if (!response?.success || (response.imageUnchanged !== undefined && !unchanged)
+        || (typeof response.image !== 'string' && response.mangaPatches === undefined) || !Array.isArray(response.lines)
+        || (unchanged && response.lines.length === 0)) {
         throw createImageTranslationFailure(errorMessage(response, fallback), response);
     }
     return {image: typeof response.image === 'string' ? response.image : '', lines: response.lines as OffscreenImageTranslationResult['lines'],
+        ...(unchanged ? {imageUnchanged: true as const} : {}),
         ...(response.mangaPatches === undefined ? {} : {mangaPatches: parseMangaPatchPacket(response.mangaPatches)})};
 }
 
@@ -102,7 +108,7 @@ export function createImageTranslationOffscreenAdapter(client: OffscreenClient =
             const response = options
                 ? await client.send<OffscreenResponse>(message, sendOptions(options))
                 : await client.send<OffscreenResponse>(message);
-            return parseTranslationResult(response, '图片翻译失败');
+            return parseTranslationResult(response, '图片翻译失败', options?.manga === true);
         },
 
         async fetchImage(

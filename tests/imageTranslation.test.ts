@@ -1,9 +1,18 @@
 import { describe, expect, it } from 'vitest';
 import { getOcrLanguages, normalizeOcrLines, selectChangedTranslations } from '@/src/features/image-translation/core';
-import { inpaintTextRegions } from '@/src/features/image-translation/services/inpainting';
+import { imageMaskBoxIntersects, inpaintTextRegions } from '@/src/features/image-translation/services/inpainting';
 import { getImageOcrModelLanguages, IMAGE_OCR_LANGUAGE_PACKS, IMAGE_OCR_RECOMMENDED_LANGUAGES, normalizeImageOcrLanguageCodes } from '@/src/features/image-translation/ocrLanguages';
 import { getImageTextBackgroundColor, getImageTextColor } from '@/src/features/image-translation/services/rendering';
 
+it.each([
+    [{x0:0,y0:0,x1:5,y1:5},{x0:6,y0:0,x1:8,y1:4},true],
+    [{x0:0,y0:0,x1:5,y1:5},{x0:7,y0:0,x1:8,y1:4},false],
+    [{x0:80,y0:80,x1:90,y1:120},{x0:76,y0:90,x1:77,y1:91},true],
+    [{x0:80,y0:80,x1:90,y1:120},{x0:75,y0:90,x1:76,y1:91},false],
+    [{x0:-10,y0:0,x1:-1,y1:5},{x0:0,y0:0,x1:2,y1:5},false],
+] as const)('图片修补碰撞使用裁剪后的实际遮罩：%j、%j', (box,target,expected) => {
+    expect(imageMaskBoxIntersects(box,100,100,target)).toBe(expected);
+});
 describe('图片翻译 OCR 工具', () => {
     it.each([
         ["two supplementary Han", "𠀀", "𠀁", "𠀀𠀁"],

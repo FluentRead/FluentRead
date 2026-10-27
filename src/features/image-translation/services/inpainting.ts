@@ -1,7 +1,7 @@
 /**
  * @file src/features/image-translation/services/inpainting.ts
  * 文件职责：依据有效 OCR 文本框在像素缓冲区中修复原文字，保留修复区域以外的图像内容。
- * 主要内容：按源行框及有界边缘修补，保留行间图案；相接簇用链表连接成员后一次展开，避免重复复制和参数展开；全部八邻域已知边界为同一非透明颜色时等价填充去重蒙版并省去队列，否则按预乘透明度逐层修补；默认保留输入，也可显式复用调用方独占的像素缓冲。
+ * 主要内容：按源行框及有界边缘修补，提供与实际蒙版一致的碰撞判断，保留行间图案；相接簇用链表连接成员后一次展开，避免重复复制和参数展开；全部八邻域已知边界为同一非透明颜色时等价填充去重蒙版并省去队列，否则按预乘透明度逐层修补；默认保留输入，也可显式复用调用方独占的像素缓冲。
  * 模块边界：本模块是无 DOM、无网络的轻量像素算法，不进行 OCR 或译文绘制，也不宣称能够重建复杂纹理；输入和输出保持原图尺寸，无法取得已知边界时保留原像素。
  */
 import type {OcrLine} from '@/src/shared/image/types';
@@ -62,6 +62,13 @@ function getMaskRectangle(line: OcrLine, width: number, height: number): MaskRec
         right: Math.min(width, Math.ceil(x1 + padding)),
         bottom: Math.min(height, Math.ceil(y1 + padding)),
     };
+}
+
+/** 使用与实际修补相同的逐行扩边判断是否会碰到需要保留的原文。 */
+export function imageMaskBoxIntersects(box: OcrLine['bbox'], width: number, height: number, target: OcrLine['bbox']): boolean {
+    const rectangle = getMaskRectangle({text: '', bbox: box}, width, height);
+    return !!rectangle && rectangle.left < target.x1 && target.x0 < rectangle.right
+        && rectangle.top < target.y1 && target.y0 < rectangle.bottom;
 }
 
 /** 使用八邻域边界扩散修复文字区域；默认不修改输入，inPlace 仅适用于调用方独占的缓冲。 */

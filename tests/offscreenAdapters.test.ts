@@ -102,6 +102,19 @@ describe('area translation Offscreen adapter', () => {
 
 describe('image translation Offscreen adapter', () => {
     const adapter = createImageTranslationOffscreenAdapter(client);
+    it('仅普通图的非空文字结果可标记为保留宿主原图',async()=>{
+        const lines=[{text:'你好',sourceText:'Hello',renderSkipped:true}];
+        send.mockResolvedValueOnce({success:true,image:'',imageUnchanged:true,lines});
+        await expect(adapter.translateImage('source','en','Page')).resolves.toEqual({image:'',imageUnchanged:true,lines});
+        for (const response of [
+            {success:true,image:'encoded',imageUnchanged:true,lines},
+            {success:true,image:'',imageUnchanged:false,lines},
+            {success:true,image:'',imageUnchanged:true,lines:[]},
+            {success:true,image:'',imageUnchanged:true,lines,mangaPatches:{width:1,height:1,patches:[]}},
+        ]) {send.mockResolvedValueOnce(response);await expect(adapter.translateImage('source','en','Page')).rejects.toThrow();}
+        send.mockResolvedValueOnce({success:true,image:'',imageUnchanged:true,lines});
+        await expect(adapter.translateImage('source','en','Page',{manga:true,requestId:'m',signal:new AbortController().signal,timeoutMs:1000})).rejects.toThrow();
+    });
     it('单图识别选择透传到 Offscreen，不把普通图片变成漫画模式', async () => {
         send.mockResolvedValueOnce({success:true,image:'translated',lines:[]});
         await adapter.translateImage('source','ja','Page',{ocrEngine:'paddle',requestId:'single-paddle',signal:new AbortController().signal,timeoutMs:5000});

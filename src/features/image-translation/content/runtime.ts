@@ -658,7 +658,7 @@ function updateOverlayPosition(state: ImageTranslationState): void {
     state.overlay.style.clipPath = `inset(${top - rect.top}px ${rect.right - right}px ${rect.bottom - bottom}px ${left - rect.left}px)`;
     state.controls.element.style.setProperty('left', `${left - rect.left + 8}px`, 'important');
     state.controls.element.style.setProperty('bottom', `${rect.bottom - bottom + 8}px`, 'important');
-    const edgeFeedback = state.manga && (state.phase === 'loading' || state.phase === 'error' || state.controls.feedback.dataset.warning === 'true');
+    const edgeFeedback = (state.manga && (state.phase === 'loading' || state.phase === 'error')) || state.controls.feedback.dataset.warning === 'true';
     state.controls.feedback.style.left = `${edgeFeedback ? left - rect.left + 8 : (left + right) / 2 - rect.left}px`;
     state.controls.feedback.style.top = `${edgeFeedback ? top - rect.top + 8 : (top + bottom) / 2 - rect.top}px`;
     state.controls.feedback.style.maxHeight = `${Math.max(0, bottom - top - 16)}px`;
@@ -905,9 +905,10 @@ function setButtonState(state: ImageTranslationState, phase: ImageControlPhase, 
     if (state.manga && phase === 'loading') publishMangaStatus({...mangaStatus, message, progress, stage});
     state.controls.update(phase, message, {
         prepare: phase === 'error' && state.needsPreparation, animations: config.animations, progress, quiet: state.manga === true,
-        warning: state.manga === true && phase === 'translated'
-            && (state.lines.some(line => line.renderSkipped) || (!state.translatedImage && state.lines.length > 0)),
-        warningAction: state.manga === true && state.lines.some(line => line.renderSkipped),
+        warning: phase === 'translated' && (state.lines.some(line => line.renderSkipped)
+            || (!state.translatedImage && state.lines.length > 0)),
+        warningAction: phase === 'translated' && (state.lines.some(line => line.renderSkipped)
+            || (state.manga !== true && !state.translatedImage && state.lines.length > 0)),
         queued: phase === 'loading' && Boolean(state.queuedTranslation),
         modelSettings: phase === 'error' && Boolean(state.localFailure),
         serviceSettings: phase === 'error' && !state.needsPreparation, errorDetails: state.errorDetails,
@@ -969,8 +970,8 @@ function showTranslatedImage(state: ImageTranslationState): void {
         state.overlay.prepend(image);
     }
     state.controls.setLines(state.lines);
-    setButtonState(state, 'translated', state.manga && state.lines.some(line => line.renderSkipped)
-        ? '部分译文未绘制，请查看漫画文字' : state.manga && !image && state.lines.length
+    setButtonState(state, 'translated', state.lines.some(line => line.renderSkipped)
+        ? state.manga ? '部分译文未绘制，请查看漫画文字' : '部分译文未绘制，请查看图片文字' : !image && state.lines.length
             ? '已识别文字，原图未改动' : image || state.lines.length ? '已翻译 · 点击恢复原图' : '未检测到文字，已保留原图');
     updateOverlayPosition(state);
 }
@@ -1125,7 +1126,7 @@ async function performImageTranslation(state: ImageTranslationState, prepareLang
         setButtonState(state, 'loading', '正在生成译图…');
         const page = state.manga && result.mangaPatches ? compressMangaPage(result.mangaPatches, result.lines) : undefined;
         const translatedImage = page ? (page.patches.length ? await composeMangaPage(state.image, page, controller.signal) : null)
-            : await withTimeout(loadImage(result.image, controller.signal), IMAGE_READ_TIMEOUT_MS, '译图加载超时', controller.signal);
+            : result.imageUnchanged ? null : await withTimeout(loadImage(result.image, controller.signal), IMAGE_READ_TIMEOUT_MS, '译图加载超时', controller.signal);
         if (!requestIsCurrent(state, controller)) {
             if (translatedImage?.tagName === 'CANVAS') {(translatedImage as HTMLCanvasElement).width = 0; (translatedImage as HTMLCanvasElement).height = 0;}
             return;

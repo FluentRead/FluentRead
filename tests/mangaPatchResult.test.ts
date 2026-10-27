@@ -1,5 +1,5 @@
 import {describe, it, expect, vi} from 'vitest';
-import {parseMangaPatchPacket, mangaPatchRects, mangaMaskBoxes, compressMangaPage, createMangaLightCache} from '@/src/features/image-translation/mangaPatchResult';
+import {parseMangaPatchPacket, mangaPatchRects, mangaMaskBoxes, mangaMaskBoxIntersects, compressMangaPage, createMangaLightCache} from '@/src/features/image-translation/mangaPatchResult';
 import {normalizeMangaCachePages, mangaCachePixelBudget} from '@/src/core/config/manga';
 const region = (x0=10,y0=10,x1=20,y1=20,fontSize=10) => ({text:'Hello',bbox:{x0,y0,x1,y1},fontSize});
 const packet = () => ({width:100,height:100,patches:[{x:1,y:2,width:10,height:20,image:'data:image/png;base64,AQID'}]});
@@ -17,6 +17,15 @@ describe('漫画局部结果与有界轻量缓存',()=>{
     it('描边余量与源行蒙版一致，夹紧边缘且字号余量有上限',()=>{
         expect(mangaMaskBoxes(region(-1,-1,20,20,1000),25,25)).toEqual([{x0:0,y0:0,x1:25,y1:25}]);
         expect(mangaMaskBoxes({...region(),sourceBoxes:[{x0:1.2,y0:2.3,x1:8.1,y1:9.1}]},100,100)).toEqual([{x0:0,y0:0,x1:11,y1:12}]);
+    });
+    it('不分配蒙版的相交判断与原蒙版一致，包括小数、边缘、越界和紧贴',()=>{
+        const boxes=[{x0:-2.1,y0:-1,x1:2.2,y1:3.4},{x0:10.2,y0:20.2,x1:19.1,y1:30.9},{x0:95,y0:95,x1:105,y1:105}];
+        const targets=[{x0:0,y0:0,x1:1,y1:1},{x0:0,y0:10,x1:5,y1:20},{x0:22,y0:20,x1:25,y1:35},{x0:98,y0:98,x1:100,y1:100}];
+        for(const source of boxes)for(const target of targets)for(const fontSize of [0,10,1000]){
+            const region={text:'text',bbox:source,fontSize},mask=mangaMaskBoxes(region,100,100)[0];
+            const expected=mask.x0<target.x1&&target.x0<mask.x1&&mask.y0<target.y1&&target.y0<mask.y1;
+            expect(mangaMaskBoxIntersects(source,fontSize,100,100,target)).toBe(expected);
+        }
     });
     it('合并链式重叠并保留独立区域，包含整段译文和框外描边',()=>{
         const a=region(5,5,15,15), b=region(35,5,45,15), bridge=region(14,5,36,15), far=region(80,80,90,90);

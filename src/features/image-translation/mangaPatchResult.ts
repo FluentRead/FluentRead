@@ -13,6 +13,13 @@ const MAX_PIXELS = 16_777_216;
 export const MANGA_LIGHT_CACHE_BYTES = 16 * 1024 * 1024;
 export const MANGA_LIGHT_CACHE_PAGES = 100;
 
+/** 与修补蒙版共用边界，直接判断单框相交而不分配整组蒙版。 */
+export function mangaMaskBoxIntersects(box: OcrLine['bbox'], fontSize: number, width: number, height: number, target: OcrLine['bbox']): boolean {
+    const margin = Math.max(2, Math.min(14, Math.ceil(fontSize * .2)));
+    return Math.max(0, Math.floor(box.x0)-margin)<target.x1 && target.x0<Math.min(width, Math.ceil(box.x1)+margin)
+        && Math.max(0, Math.floor(box.y0)-margin)<target.y1 && target.y0<Math.min(height, Math.ceil(box.y1)+margin);
+}
+
 export function mangaMaskBoxes(region: MangaRegion, width: number, height: number) {
     const margin = Math.max(2, Math.min(14, Math.ceil(region.fontSize * .2)));
     return (region.sourceBoxes || [region.bbox]).map(box => ({

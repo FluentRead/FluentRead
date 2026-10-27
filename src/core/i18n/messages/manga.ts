@@ -6,7 +6,7 @@
  */
 const locales = ['en-US', 'ja-JP', 'ko-KR', 'fr-FR', 'ru-RU', 'es-ES'] as const;
 const rows: Array<readonly [string, string, string, string, string, string, string]> = [
-  ['附近有数字，此译文未绘制到图片','This translation was not drawn because numbers are nearby','近くに数字があるため、この翻訳は画像に描画されていません','주변에 숫자가 있어 이 번역은 이미지에 표시되지 않았습니다','Cette traduction ne figure pas sur l’image car des nombres sont proches','Этот перевод не нанесён на изображение из-за расположенных рядом чисел','Esta traducción no se dibujó en la imagen porque hay números cerca'],
+  ['为保留原文，此译文未绘制到图片','This translation was not drawn to preserve the original text','原文を残すため、この翻訳は画像に描画されていません','원문을 보존하기 위해 이 번역을 이미지에 표시하지 않았습니다','Cette traduction ne figure pas sur l’image afin de préserver le texte original','Этот перевод не нанесён, чтобы сохранить оригинальный текст','Esta traducción no se dibujó para conservar el texto original'],
   ['部分译文未绘制，请查看漫画文字','Some translations were not drawn; view manga text','一部の翻訳は描画されていません。漫画の文字を確認してください','일부 번역이 표시되지 않았습니다. 만화 텍스트를 확인하세요','Certaines traductions ne figurent pas sur l’image ; consultez le texte du manga','Некоторые переводы не нанесены; откройте текст манги','Algunas traducciones no se dibujaron; consulta el texto del manga'],
   ['已识别文字，原图未改动','Text recognized; original image unchanged','文字を認識しました。元画像は変更されていません','텍스트를 인식했으며 원본 이미지는 변경되지 않았습니다','Texte reconnu ; image originale inchangée','Текст распознан; исходное изображение не изменено','Texto reconocido; imagen original sin cambios'],
   ['未绘制','Not drawn','未描画','표시 안 됨','Non affiché','Не нанесено','Sin dibujar'],

@@ -80,12 +80,50 @@ export interface ImageTranslationTextLayout {
 }
 
 const IMAGE_TEXT_FONT = 'system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif';
-const CJK_TOKENS = /\s+|[\u2e80-\u9fff\u3040-\u30ff\uac00-\ud7af]\p{Mark}*|[^\s\u2e80-\u9fff\u3040-\u30ff\uac00-\ud7af]+/gu;
+// 补充平面汉字与假名要与英文分词，附着的组合标记和连接符仍属于前一字素。
+const CJK_TOKENS = /\s+|[\uFF66-\uFF9D][\uFF9E\uFF9F](?:\p{Mark}|[\u200c\u200d])*|[\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}\u2e80-\u9fff\u3040-\u30ff\uac00-\ud7af](?:\p{Mark}|[\u200c\u200d])*|[^\s\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}\u2e80-\u9fff\u3040-\u30ff\uac00-\ud7af]+/gu;
+// 这些字符各自是完整字素：不含组合标记、连接符、韩文 Jamo、表情修饰符或 Prepend。
+const SIMPLE_IMAGE_TEXT = /^[\x20-\x7e\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}\u2e80-\u9fff\uac00-\ud7a3\uff01-\uff65]*$/u;
+const IMAGE_TEXT_EXTEND = /[\p{Mark}\p{Grapheme_Extend}]/u;
 const graphemeSegmenter = typeof Intl.Segmenter === 'function'
     ? new Intl.Segmenter(undefined, { granularity: 'grapheme' }) : undefined;
 
 function graphemes(text: string): string[] {
     return graphemeSegmenter ? Array.from(graphemeSegmenter.segment(text), part => part.segment) : Array.from(text);
+}
+
+function tokenize(paragraph: string): Array<string | null> {
+    const tokens = paragraph.match(CJK_TOKENS) || [];
+    // 相邻非空白词的交界可能位于字素内，使用分割器的实际边界合并；空白仍按原规则归一化。
+    // 没有 Segmenter 时保留原有码点回退，不将其误认为完整字素分割。
+    const mayCrossBoundary = tokens.length > 1 && graphemeSegmenter
+        && tokens.some((token, index) => index > 0 && !/^\s/u.test(token) && !/^\s/u.test(tokens[index - 1]))
+        && !(SIMPLE_IMAGE_TEXT.test(paragraph) && !IMAGE_TEXT_EXTEND.test(paragraph));
+    if (mayCrossBoundary && graphemeSegmenter) {
+        const iterator = graphemeSegmenter.segment(paragraph)[Symbol.iterator]();
+        const merged: string[] = [];
+        let offset = 0;
+        let end = 0;
+        let pending = '';
+        for (const token of tokens) {
+            offset += token.length;
+            while (end < offset) end += iterator.next().value!.segment.length;
+            if (/^\s+$/u.test(token)) {
+                if (pending) merged.push(pending);
+                merged.push(token);
+                pending = '';
+            } else {
+                pending += token;
+                if (offset === end) {
+                    merged.push(pending);
+                    pending = '';
+                }
+            }
+        }
+        if (pending) merged.push(pending);
+        return merged.map(token => /^\s+$/u.test(token) ? null : token);
+    }
+    return tokens.map(token => /^\s+$/u.test(token) ? null : token);
 }
 
 /** 保留单词、显式换行和混排空格；过长单词才按字素拆分，不截断译文。 */
@@ -101,7 +139,7 @@ export function layoutImageTranslationText(
         return { lines: [], fontSize: 0, lineHeight: 0 };
     }
     const paragraphs = normalized.split('\n').map(paragraph => paragraph.trim());
-    const tokens = paragraphs.map(paragraph => paragraph.match(CJK_TOKENS) || []);
+    const tokens = paragraphs.map(tokenize);
     const segments = new Map<string, string[]>();
     let measuredSize = 0;
     const widths = new Map<string, number>();
@@ -125,7 +163,7 @@ export function layoutImageTranslationText(
             let current = '';
             let space = '';
             for (const token of paragraph) {
-                if (/^\s+$/u.test(token)) {
+                if (token === null) {
                     space = ' ';
                     continue;
                 }

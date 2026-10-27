@@ -1,7 +1,7 @@
 /**
  * @file src/features/image-translation/services/mangaRegions.ts
  * 文件职责：把漫画专用 OCR 和通用 OCR 行转换成可整段翻译与修补的气泡或旁白区域。
- * 主要内容：校验并夹紧坐标，过滤纯符号和源语言不符的短片段；神经 OCR 保留置信度策略，语言无关地保留高置信多位数字、合法时间日期与货币金额，只为判定执行 NFKC 而保留原文；仅独立气泡容许高置信度大单字，通用 OCR 从行框补足字号与原始修补框；按方向、字号、重叠与间距合并相邻行，按完整 Unicode 码点连接东亚文字，保留硬连字符且只移除行末软连字符；仅已定位的独立气泡容许略宽横排行距与有界宽竖列距，保持不同气泡分离。
+ * 主要内容：校验并夹紧坐标，过滤纯符号和源语言不符的短片段；神经 OCR 保留置信度策略，语言无关地保留高置信多位数字、合法时间日期与货币金额，只为判定执行 NFKC 而保留原文；仅独立气泡容许高置信度大单字，通用 OCR 保留连续韩文 Unicode 字母，并从行框补足字号与原始修补框；按方向、字号、重叠与间距合并相邻行，按完整 Unicode 码点连接东亚文字，保留硬连字符且只移除行末软连字符；仅已定位的独立气泡容许略宽横排行距与有界宽竖列距，保持不同气泡分离。
  * 模块边界：纯数据算法，不运行模型、不读取 DOM 或配置，也不修补图片；只输出可核对的识别原文和区域，不推测缺失文字。
  */
 import type {OcrLine} from '@/src/shared/image/types';
@@ -49,7 +49,7 @@ export function groupMangaText(items: MangaOcrItem[], sourceLanguage: string, wi
         if (!Number.isFinite(item.confidence) || item.confidence < 0.65 || !text) return [];
         const numeric=item.confidence>=0.9&&numericInformation(text);
         if ((!numeric && (!/\p{L}/u.test(text)
-            || (english && (!/[a-z]/iu.test(text) || /[\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}\u3040-\u30ff\u3400-\u9fff\uac00-\ud7af]/u.test(text)))
+            || (english && (!/[a-z]/iu.test(text) || /[\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}\p{Script=Hangul}\u3040-\u30ff\u3400-\u9fff\uac00-\ud7af]/u.test(text)))
             || (japanese && !/[\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}\u3040-\u30ff\u3400-\u9fff]/u.test(text) && text.replace(/[^a-z]/giu,'').length < 4)))
             || ![box.x, box.y, box.width, box.height].every(Number.isFinite) || box.width <= 0 || box.height <= 0) return [];
         const bbox = {x0: Math.max(0, box.x), y0: Math.max(0, box.y),
@@ -84,7 +84,8 @@ export function groupMangaOcrLines(lines: NumericEvidenceOcrLine[], sourceLangua
         if (!text || (!numeric && !/\p{L}/u.test(text)) || ![x0, y0, x1, y1].every(Number.isFinite)) return [];
         // 与日文专用模型一致，排除绘画上误识别的短拉丁碎片；合法源语言字和完整英文词仍保留。
         const native = language === 'ru' ? /\p{Script=Cyrillic}/u.test(text)
-            : language === 'ko' ? /[\uac00-\ud7a3]/u.test(text) : true;
+            // 保留预组韩文单字；分解音节及兼容字母须连续出现，排除声调、装饰与不可见填充。
+            : language === 'ko' ? /[\uac00-\ud7a3]|(?:(?![\u115f\u1160\u3164\uffa0])(?=\p{L})\p{Script=Hangul}){2}/u.test(text) : true;
         if (!numeric && !native && text.replace(/[^a-z]/giu, '').length < 4) return [];
         const bbox = {x0: Math.max(0, x0), y0: Math.max(0, y0), x1: Math.min(width, x1), y1: Math.min(height, y1)};
         if (bbox.x1 <= bbox.x0 || bbox.y1 <= bbox.y0) return [];

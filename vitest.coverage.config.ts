@@ -307,6 +307,7 @@ export default defineConfig({
                 'src/core/i18n/messages/manga.ts',
                 'src/features/image-translation/content/mangaSession.ts',
                 'src/features/image-translation/services/mangaRegions.ts',
+                'src/features/image-translation/services/mangaNumeric.ts',
                 'src/features/image-translation/services/mangaRendering.ts',
                 'src/features/image-translation/services/mangaOcr.ts',
                 'src/features/image-translation/services/mangaOcrColor.ts',

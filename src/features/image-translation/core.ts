@@ -7,6 +7,7 @@
 import {hasDistinctTranslation} from '@/src/core/translation/result';
 import { getRequiredImageOcrLanguages, type ImageOcrLanguageCode } from './ocrLanguages';
 import type {OcrLine} from '@/src/shared/image/types';
+import {numericInformation} from './services/mangaNumeric';
 
 export type { OcrLine } from '@/src/shared/image/types';
 
@@ -80,6 +81,8 @@ function isValidOcrBox(bbox: OcrLine['bbox']): boolean {
         && bbox.x1 > bbox.x0 && bbox.y1 > bbox.y0;
 }
 
+export type NumericEvidenceOcrLine = OcrLine & {numericConfidence?: number};
+
 type OcrBox = OcrLine['bbox'];
 type OcrAxis = {start: 'x0' | 'y0'; end: 'x1' | 'y1'};
 const X_AXIS: OcrAxis = {start: 'x0', end: 'x1'};
@@ -142,7 +145,7 @@ function joinVerticalColumns(members: OcrLine[]): OcrLine {
  * 漫画气泡的一句话常跨多列；逐列翻译会拆散语义，逐列绘制也只有一个字宽。
  * 相邻竖列与同列片段合成一个区域，放在其首个成员原来的位置，横排行保持原样和顺序。
  */
-function mergeVerticalOcrColumns(lines: OcrLine[]): OcrLine[] {
+function mergeVerticalOcrColumns(lines: NumericEvidenceOcrLine[], protectNumeric = false): NumericEvidenceOcrLine[] {
     const vertical = lines.flatMap((line, index) => line.vertical ? [index] : []);
     if (vertical.length < 2) return lines;
     const parent = new Map(vertical.map(index => [index, index]));
@@ -160,6 +163,9 @@ function mergeVerticalOcrColumns(lines: OcrLine[]): OcrLine[] {
         for (let next = position + 1; next < vertical.length; next++) {
             const right = vertical[next];
             if (!areAdjacentVerticalColumns(lines[left].bbox, lines[right].bbox)) continue;
+            // 漫画视图不能让可靠独立数字与旁边对白先合列，否则之后无法保护其原框。
+            const numeric = (line: NumericEvidenceOcrLine) => (line.numericConfidence ?? -1) >= 90 && numericInformation(line.text);
+            if (protectNumeric && (numeric(lines[left]) || numeric(lines[right]))) continue;
             const leftRoot = find(left);
             const rightRoot = find(right);
             if (leftRoot !== rightRoot) parent.set(Math.max(leftRoot, rightRoot), Math.min(leftRoot, rightRoot));
@@ -193,8 +199,7 @@ export function getOcrLanguages(sourceLanguage: string): ImageOcrLanguageCode[] 
     return getRequiredImageOcrLanguages(sourceLanguage);
 }
 
-export function normalizeOcrLines(
-    blocks: Array<{
+type OcrBlocks = Array<{
         paragraphs?: Array<{
             lines?: Array<{
                 text: string;
@@ -204,11 +209,15 @@ export function normalizeOcrLines(
                 words?: Array<{ text: string; confidence?: number; bbox: OcrLine['bbox'] }>;
             }>;
         }>;
-    }> | null | undefined,
-): OcrLine[] {
+    }> | null | undefined;
+
+/** 将原始识别结果清洗和拆行；结果用于各视图独立去重，不改变输入。 */
+function parseOcrLines(blocks: OcrBlocks, includeNumericEvidence: boolean): NumericEvidenceOcrLine[] {
     if (!blocks) return [];
 
-    const normalized: OcrLine[] = [];
+    const normalized: NumericEvidenceOcrLine[] = [];
+    const validConfidence = (value: number | undefined): value is number =>
+        typeof value === 'number' && Number.isFinite(value) && value >= 0 && value <= 100;
     blocks.flatMap(block => block.paragraphs || []).flatMap(paragraph => paragraph.lines || []).forEach(line => {
         // 竖排行沿 y 轴书写：词按 y0 排序，并以列宽判断同列与间距；横排保持原有 x 轴规则。
         const vertical = isVerticalOcrLine(line.baseline);
@@ -218,6 +227,7 @@ export function normalizeOcrLines(
             .map(word => ({
                 text: word.text.replace(/[\s\u3000]+/g, ' ').trim(),
                 confidence: word.confidence ?? 100,
+                explicitConfidence: word.confidence,
                 bbox: word.bbox,
             }))
             .filter(word => word.text.length > 0 && Number.isFinite(word.confidence) && word.confidence >= 25
@@ -230,12 +240,14 @@ export function normalizeOcrLines(
             const text = line.text.replace(/[\s\u3000]+/g, ' ').trim();
             const confidence = line.confidence ?? 100;
             if (text && Number.isFinite(confidence) && confidence >= 25 && isValidOcrBox(line.bbox)) {
-                normalized.push({ text, bbox: line.bbox, ...orientation });
+                normalized.push({ text, bbox: line.bbox, ...orientation,
+                    ...(includeNumericEvidence && validConfidence(line.confidence) ? {numericConfidence: line.confidence} : {}) });
             }
             return;
         }
 
         let current = [words[0]];
+        const startIndex = normalized.length;
         const flush = () => {
             const bbox = unionOcrBoxes(current.map(word => word.bbox));
             const text = current.map(word => word.text).reduce(joinOcrWords, '');
@@ -258,20 +270,53 @@ export function normalizeOcrLines(
             }
         }
         flush();
+        // 只有整个原行完整、未拆分且每个词均有可信显式分数时才保存证据。
+        const rawLine = line.text.replace(/\s/gu, '');
+        const joinedWords = words.map(word => word.text).join('').replace(/\s/gu, '');
+        if (includeNumericEvidence && normalized.length === startIndex + 1 && words.length === line.words?.length
+            && rawLine === joinedWords && words.every(word => validConfidence(word.explicitConfidence))
+            && (line.confidence === undefined || validConfidence(line.confidence))) {
+            const scores = words.map(word => word.explicitConfidence as number);
+            if (line.confidence !== undefined) scores.push(line.confidence);
+            normalized[startIndex].numericConfidence = scores.reduce((minimum, score) => Math.min(minimum, score), 100);
+        }
     });
+    return normalized;
+}
+
+/** 独立处理每个视图的重复框与竖排合列，避免漫画保护信息影响普通图片。 */
+function finalizeOcrLines(normalized: NumericEvidenceOcrLine[], includeNumericEvidence: boolean): NumericEvidenceOcrLine[] {
     // 相同文字且几乎完全重叠才视为重复检测；不同位置的按钮、数字和重复行必须保留。
-    const seen = new Map<string, OcrLine[]>();
+    const seen = new Map<string, NumericEvidenceOcrLine[]>();
     const unique = normalized.filter(line => {
         const key = `${line.vertical ? 'vertical' : 'horizontal'}\0${line.text}`;
         const candidates = seen.get(key) ?? [];
-        const duplicate = candidates.some(previous => {
+        const duplicate = candidates.find(previous => {
             const intersection = Math.max(0, getAxisOverlap(previous.bbox, line.bbox, X_AXIS))
                 * Math.max(0, getAxisOverlap(previous.bbox, line.bbox, Y_AXIS));
             const area = (box: OcrBox) => getAxisSize(box, X_AXIS) * getAxisSize(box, Y_AXIS);
             return intersection / (area(previous.bbox) + area(line.bbox) - intersection) >= 0.9;
         });
         if (!duplicate) {candidates.push(line); seen.set(key, candidates);}
+        else if (duplicate.numericConfidence === undefined || line.numericConfidence === undefined) delete duplicate.numericConfidence;
+        else if (includeNumericEvidence && duplicate.numericConfidence >= 90 && line.numericConfidence >= 90 && numericInformation(line.text)) {
+            duplicate.bbox = unionOcrBoxes([duplicate.bbox, line.bbox]);
+            duplicate.numericConfidence = Math.min(duplicate.numericConfidence, line.numericConfidence);
+        }
+        else duplicate.numericConfidence = Math.min(duplicate.numericConfidence, line.numericConfidence);
         return !duplicate;
     });
-    return mergeVerticalOcrColumns(unique);
+    return mergeVerticalOcrColumns(unique, includeNumericEvidence);
+}
+
+export function normalizeOcrLines(blocks: OcrBlocks, includeNumericEvidence = false): NumericEvidenceOcrLine[] {
+    return finalizeOcrLines(parseOcrLines(blocks, includeNumericEvidence), includeNumericEvidence);
+}
+
+/** 共享文本解析；每个视图独立去重和合列，坐标回映仍由调用方在合列之后执行。 */
+export function normalizeOcrLineViews(blocks: OcrBlocks): {ordinary: OcrLine[]; manga: NumericEvidenceOcrLine[]} {
+    const parsed = parseOcrLines(blocks, true);
+    // finalize 可能删除置信字段或替换框，因此普通视图必须拥有独立行对象。
+    const ordinary = parsed.map(line => ({text: line.text, bbox: {...line.bbox}, ...(line.vertical ? {vertical: true as const} : {})}));
+    return {ordinary: finalizeOcrLines(ordinary, false), manga: finalizeOcrLines(parsed, true)};
 }

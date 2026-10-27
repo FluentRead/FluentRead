@@ -16,12 +16,13 @@ import {mangaOcrRuntime} from './mangaOcr';
 import {drawMangaTranslations, sampleMangaBackgrounds} from './mangaRendering';
 import {planMangaAlphaProtection} from './mangaAlphaProtection';
 import {groupMangaOcrLines, type MangaRegion} from './mangaRegions';
+import {numericInformation} from './mangaNumeric';
 import {mangaInpaintingRuntime} from './mangaInpainting';
 import {encodeImageCanvas} from './imageEncoding';
-import {mangaPatchRects, type MangaPatchPacket} from '../mangaPatchResult';
+import {mangaMaskBoxes, mangaPatchRects, type MangaPatchPacket} from '../mangaPatchResult';
 import {getMangaOcrEngine} from '../ocrLanguages';
 
-export type OffscreenImageTranslationLine = OcrLine & { backgroundColor: string; sourceText?: string };
+export type OffscreenImageTranslationLine = OcrLine & { backgroundColor: string; sourceText?: string; renderSkipped?: true };
 
 export interface OffscreenImageTranslationResult {
     image: string;
@@ -213,8 +214,28 @@ async function prepareTranslatedImage(
     requestId?: string,
 ): Promise<OffscreenImageTranslationResult> {
     await checkImageCancellation(signal);
-    const translatedLines = selectChangedTranslations(lines, translations);
-    const readingLines = lines.map((line, index) => ({...line, sourceText: line.text, text: translations[index]?.trim() || line.text, backgroundColor: 'transparent'}));
+    const numeric = manga ? lines.filter(line => numericInformation(line.text)) : [];
+    const width = source.naturalWidth || source.width, height = source.naturalHeight || source.height;
+    const protectedBoxes = numeric.map(({bbox}) => ({x0: Math.max(0, Math.floor(bbox.x0) - 2), y0: Math.max(0, Math.floor(bbox.y0) - 2),
+        x1: Math.min(width, Math.ceil(bbox.x1) + 2), y1: Math.min(height, Math.ceil(bbox.y1) + 2)}));
+    const intersects = (a: OcrLine['bbox'], b: OcrLine['bbox']) => a.x0 < b.x1 && b.x0 < a.x1 && a.y0 < b.y1 && b.y0 < a.y1;
+    let comparisons = 0;
+    const skipped = new Set<number>();
+    const translatedLines = lines.flatMap((line, index) => {
+        if (manga && numericInformation(line.text)) return [];
+        const changed = selectChangedTranslations([line], [translations[index]]);
+        if (!changed.length) return [];
+        if (manga && protectedBoxes.length) {
+            const region = changed[0] as MangaRegion;
+            const touched = [region.bbox, ...mangaMaskBoxes(region, width, height)];
+            for (const box of touched) for (const protectedBox of protectedBoxes) {
+                if (++comparisons > 1_000_000 || intersects(box, protectedBox)) { skipped.add(index); return []; }
+            }
+        }
+        return changed;
+    });
+    const readingLines = lines.map((line, index) => ({...line, sourceText: line.text, text: translations[index]?.trim() || line.text, backgroundColor: 'transparent',
+        ...(skipped.has(index) ? {renderSkipped: true as const} : {})}));
     // 品牌名或已经是目标语言的文字仍可阅读/复制，不应把识别成功显示为错误。
     if (translatedLines.length === 0) return manga ? {image: '', mangaPatches: {width: source.naturalWidth || source.width, height: source.naturalHeight || source.height, patches: []}, lines: readingLines} : {image: source.src, lines: readingLines};
     const canvas = document.createElement('canvas');
@@ -313,6 +334,7 @@ export async function translateImageInOffscreen(
             source.naturalHeight || source.height, signal,
             (stage, percent) => {if (!signal?.aborted) reportProgress(requestId, stage, percent);}, source, manga ? 'manga' : 'image') : await recognizeImage(image, sourceLanguage, signal, {
             decodedImage: source,
+            ...(manga ? {includeMangaNumericConfidence: true} : {}),
             onProgress: percent => { if (!signal?.aborted) reportProgress(requestId, 'recognizing', percent); },
         });
         throwIfImageOperationAborted(signal);
@@ -322,10 +344,13 @@ export async function translateImageInOffscreen(
             if (manga) return {image,lines:[]};
             throw new Error('没有识别到图片文字');
         }
-        reportProgress(requestId, 'translating');
-        const translations = await translateImageTextsInExtension(
-            lines.map(line => line.text), title, requestId, signal,
-        );
+        const translatable = lines.map((line, index) => ({line, index})).filter(({line}) => !manga || !numericInformation(line.text));
+        const translations = lines.map(line => line.text);
+        if (translatable.length) {
+            reportProgress(requestId, 'translating');
+            const translated = await translateImageTextsInExtension(translatable.map(({line}) => line.text), title, requestId, signal);
+            translatable.forEach(({index}, position) => {translations[index] = translated[position] ?? lines[index].text;});
+        }
         throwIfImageOperationAborted(signal);
         reportProgress(requestId, manga ? 'cleaning' : 'rendering');
         return await prepareTranslatedImage(source, lines, translations, signal, manga, requestId);

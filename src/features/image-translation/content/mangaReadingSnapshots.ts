@@ -8,6 +8,7 @@ import type {OcrLine} from '@/src/shared/image/types';
 
 export interface MangaReadingLine extends OcrLine {
     sourceText?: string;
+    renderSkipped?: true;
     backgroundColor?: string;
 }
 
@@ -47,10 +48,10 @@ function validKey(key: number): boolean {return Number.isSafeInteger(key) && key
 function copyLine(value: unknown): MangaReadingLine | undefined {
     if (!value || typeof value !== 'object' || Array.isArray(value)) return;
     const item = value as Record<string, unknown>;
-    const {text, sourceText, backgroundColor, vertical, bbox: box} = item;
+    const {text, sourceText, backgroundColor, vertical, renderSkipped, bbox: box} = item;
     if (typeof text !== 'string' || (sourceText !== undefined && typeof sourceText !== 'string')
         || (backgroundColor !== undefined && typeof backgroundColor !== 'string')
-        || (vertical !== undefined && vertical !== true)) return;
+        || (vertical !== undefined && vertical !== true) || (renderSkipped !== undefined && renderSkipped !== true)) return;
     if (!box || typeof box !== 'object' || Array.isArray(box)) return;
     const {x0, y0, x1, y1} = box as Record<string, unknown>;
     if (typeof x0 !== 'number' || typeof y0 !== 'number' || typeof x1 !== 'number' || typeof y1 !== 'number'
@@ -58,7 +59,8 @@ function copyLine(value: unknown): MangaReadingLine | undefined {
     return {text, bbox: {x0, y0, x1, y1},
         ...(sourceText !== undefined ? {sourceText} : {}),
         ...(backgroundColor !== undefined ? {backgroundColor} : {}),
-        ...(vertical === true ? {vertical: true as const} : {})};
+        ...(vertical === true ? {vertical: true as const} : {}),
+        ...(renderSkipped === true ? {renderSkipped: true as const} : {})};
 }
 
 /** 只复制指定页的可读字段；适用于现有缓存命中，不将结果额外驻留。 */

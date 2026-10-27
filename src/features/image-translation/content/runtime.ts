@@ -37,6 +37,14 @@ import {createMangaBackground} from './mangaBackground';
 import {createMangaImageSegments, type MangaImageSegment} from './mangaImageSegments';
 import {getMangaOcrEngine} from '../ocrLanguages';
 
+let mangaReadingOpener: ((event: MouseEvent) => boolean) | undefined;
+/** 漫画入口注册可信点击动作；卸载时只撤销自己的注册。 */
+export function registerMangaReadingOpener(opener: (event: MouseEvent) => boolean): () => void {
+    mangaReadingOpener = opener;
+    return () => {if (mangaReadingOpener === opener) mangaReadingOpener = undefined;};
+}
+const openMangaReading = (event: MouseEvent) => mangaReadingOpener?.(event) ?? false;
+
 const IMAGE_TRANSLATION_OVERLAY = 'fluent-read-image-translation-overlay';
 const IMAGE_TRANSLATION_ROOT = 'fluent-read-image-translation-root';
 const MIN_IMAGE_WIDTH = 80;
@@ -55,7 +63,7 @@ function surfacePixels(surface: TranslatedSurface): number {
         : (surface as HTMLImageElement).naturalWidth * (surface as HTMLImageElement).naturalHeight;
 }
 
-type ImageTranslationLine = OcrLine & {backgroundColor: string; sourceText?: string};
+type ImageTranslationLine = OcrLine & {backgroundColor: string; sourceText?: string; renderSkipped?: true};
 type ImageControls = ReturnType<typeof createImageControls>;
 
 interface ImageTranslationState {
@@ -650,7 +658,7 @@ function updateOverlayPosition(state: ImageTranslationState): void {
     state.overlay.style.clipPath = `inset(${top - rect.top}px ${rect.right - right}px ${rect.bottom - bottom}px ${left - rect.left}px)`;
     state.controls.element.style.setProperty('left', `${left - rect.left + 8}px`, 'important');
     state.controls.element.style.setProperty('bottom', `${rect.bottom - bottom + 8}px`, 'important');
-    const edgeFeedback = state.manga && (state.phase === 'loading' || state.phase === 'error');
+    const edgeFeedback = state.manga && (state.phase === 'loading' || state.phase === 'error' || state.controls.feedback.dataset.warning === 'true');
     state.controls.feedback.style.left = `${edgeFeedback ? left - rect.left + 8 : (left + right) / 2 - rect.left}px`;
     state.controls.feedback.style.top = `${edgeFeedback ? top - rect.top + 8 : (top + bottom) / 2 - rect.top}px`;
     state.controls.feedback.style.maxHeight = `${Math.max(0, bottom - top - 16)}px`;
@@ -691,6 +699,7 @@ function createState(image: HTMLImageElement, hoverEntry = false): ImageTranslat
     overlay.dataset.fluentReadImageTranslation = 'true';
     const controls = createImageControls({
         translate: (source) => translateLegacyText(source, normalizeUiLanguage(config.uiLanguage)),
+        onWarning: openMangaReading,
         onAction: () => {
             const state = states.get(image);
             if (!state || !imageTranslationAllowed(state.manga === true)) return;
@@ -896,6 +905,9 @@ function setButtonState(state: ImageTranslationState, phase: ImageControlPhase, 
     if (state.manga && phase === 'loading') publishMangaStatus({...mangaStatus, message, progress, stage});
     state.controls.update(phase, message, {
         prepare: phase === 'error' && state.needsPreparation, animations: config.animations, progress, quiet: state.manga === true,
+        warning: state.manga === true && phase === 'translated'
+            && (state.lines.some(line => line.renderSkipped) || (!state.translatedImage && state.lines.length > 0)),
+        warningAction: state.manga === true && state.lines.some(line => line.renderSkipped),
         queued: phase === 'loading' && Boolean(state.queuedTranslation),
         modelSettings: phase === 'error' && Boolean(state.localFailure),
         serviceSettings: phase === 'error' && !state.needsPreparation, errorDetails: state.errorDetails,
@@ -957,7 +969,9 @@ function showTranslatedImage(state: ImageTranslationState): void {
         state.overlay.prepend(image);
     }
     state.controls.setLines(state.lines);
-    setButtonState(state, 'translated', image || state.lines.length ? '已翻译 · 点击恢复原图' : '未检测到文字，已保留原图');
+    setButtonState(state, 'translated', state.manga && state.lines.some(line => line.renderSkipped)
+        ? '部分译文未绘制，请查看漫画文字' : state.manga && !image && state.lines.length
+            ? '已识别文字，原图未改动' : image || state.lines.length ? '已翻译 · 点击恢复原图' : '未检测到文字，已保留原图');
     updateOverlayPosition(state);
 }
 
@@ -1401,6 +1415,7 @@ export function mountImageTranslator(): void {
         cacheEnabled: () => config.useCache,
         readingSnapshots,
         recovery,
+        openReading: openMangaReading,
         acceptsInteractionLayer: (_canvas, hit) => {
             const selector = resolveMangaSite(window.location.href, config.imageTranslationMangaSites)?.canvasInteractionSelector;
             return !!selector && hit.matches(selector);
@@ -1413,6 +1428,7 @@ export function mountImageTranslator(): void {
         cacheEnabled: () => config.useCache,
         readingSnapshots,
         recovery,
+        openReading: openMangaReading,
         ready: () => mangaReader?.schedule(),
         translate: translateSnapshot,
     });
@@ -1422,6 +1438,7 @@ export function mountImageTranslator(): void {
         cacheEnabled: () => config.useCache,
         readingSnapshots,
         recovery,
+        openReading: openMangaReading,
         imageIdentity: sourceIdentity,
         readSource: (image, signal) => readAuthorizedImage(image, {signal}),
         translate: translateSnapshot,

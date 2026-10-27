@@ -92,3 +92,11 @@ describe('漫画按需阅读的有界临时文字持有', () => {
         cache.remove(1);expect(cache.stats()).toEqual({entries:0,bytes:0});
     });
 });
+
+
+it('文字快照仅接受未绘制状态 true，并隔离复制',()=>{
+    const source={...line(),renderSkipped:true as const};
+    const result=prepareMangaReadingLines([source]);
+    expect(result.status).toBe('ready');if(result.status==='ready')expect(result.lines[0].renderSkipped).toBe(true);
+    expect(prepareMangaReadingLines([{...source,renderSkipped:false}])).toEqual({status:'invalid'});
+});

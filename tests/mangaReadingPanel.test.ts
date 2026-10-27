@@ -55,6 +55,11 @@ describe('standalone manga reading panel prototype',()=>{
     expect(h.get(n=>n.text==='此片段可能包含相邻片段的文字') !== undefined).toBe(item.kind==='segment');
     expect(h.get(n=>n.text==='画布文字来自最近完成的翻译快照，画面变化可能尚未同步') !== undefined).toBe(item.kind==='canvas');
   });
+  it('identifies translations withheld from the image',async()=>{
+    const h=await mount();h.props.read.mockResolvedValueOnce({status:'ready',lines:[{...line('译文'),renderSkipped:true}]});
+    await h.instance.open(trusted);h.button('图片 1')!.props.onClick(trusted);await h.tick();
+    expect(h.get(n=>n.text==='附近有数字，此译文未绘制到图片')).toBeDefined();
+  });
   it('rejects oversize content completely and paginates complete lines without truncation',async()=>{
     const h=await mount();h.props.read.mockResolvedValueOnce({status:'ready',lines:[line('x'.repeat(16001))]}).mockResolvedValueOnce({status:'ready',lines:Array.from({length:40},(_,i)=>line(`行 ${i}`))});
     await h.instance.open(trusted);h.button('图片 1')!.props.onClick(trusted);await h.tick();expect(h.panel.status).toBe('overBudget');expect(h.get(n=>n.tag==='pre')).toBeUndefined();

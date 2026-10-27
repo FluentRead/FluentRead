@@ -13,7 +13,7 @@ import {config, requestConfigPatch, subscribeConfig} from '@/src/services/config
 import {isFloatingBallDisabledOnSite} from '@/src/core/site-rules/domain';
 import {resolveMangaSite, resolveMangaSourceLanguage} from '@/src/core/config/manga';
 import MangaEntry from '../ui/MangaEntry.vue';
-import {subscribeMangaTranslation, toggleMangaTranslation, getMangaReadingCandidates, readMangaReadingCandidate, observeMangaReadingCandidate, registerMangaReadingOverlayHost} from './runtime';
+import {subscribeMangaTranslation, toggleMangaTranslation, getMangaReadingCandidates, readMangaReadingCandidate, observeMangaReadingCandidate, registerMangaReadingOverlayHost, registerMangaReadingOpener} from './runtime';
 import type {MangaTranslationStatus} from './mangaSession';
 import {getMangaOcrEngine, getRequiredImageOcrLanguages, normalizeImageOcrLanguageCodes, type ImageOcrStatusResponse} from '../ocrLanguages';
 
@@ -53,6 +53,7 @@ export function mountMangaEntry(ctx: ContentScriptContext, ports: {startAreaTran
     const sync = () => {Object.assign(settings, {sourceLanguage: sourceLanguage(), promptEnabled: config.imageTranslationMangaPromptEnabled, floatingBallVisible: !config.disableFloatingBall && !isFloatingBallDisabledOnSite(location.href, config.floatingBallDisabledDomains), to: config.to,
         service: config.imageTranslationService, downloadConfirmed: config.imageTranslationMangaDownloadConfirmed, animations: config.animations, toolsDisplay: config.floatingBallToolsDisplay ?? 'always', prefetchPages: config.imageTranslationMangaPrefetchPages});
         reading.theme = theme();Object.assign(page, {site: resolveMangaSite(location.href, config.imageTranslationMangaSites)?.name ?? '', route: location.href});};
+    const stopOpener = registerMangaReadingOpener(event => openMangaReading(event, false));
     const stopStatus = subscribeMangaTranslation(value => Object.assign(status, value));
     const stopConfig = subscribeConfig(sync);
     document.addEventListener('fluentread-route-change', sync);
@@ -61,7 +62,7 @@ export function mountMangaEntry(ctx: ContentScriptContext, ports: {startAreaTran
     const remove = () => {
         if (removed) return;
         removed = true;
-        stopStatus();stopConfig();releaseOverlay?.();releaseOverlay = undefined;document.removeEventListener('fluentread-route-change', sync);
+        stopOpener();stopStatus();stopConfig();releaseOverlay?.();releaseOverlay = undefined;document.removeEventListener('fluentread-route-change', sync);
         if (cleanup === remove) {cleanup = undefined;if(canRead===allowed)canRead=undefined;publishReading(false);}
     };
     cleanup = remove;
@@ -99,13 +100,13 @@ export function openMangaEntry(): boolean {
     if (!instance?.open) return false;
     instance.open();return true;
 }
-export function openMangaReading(event: MouseEvent):boolean {
+export function openMangaReading(event: MouseEvent, toggle = true):boolean {
     if (!event.isTrusted || !canRead?.()) return false;
     const target = event.currentTarget as HTMLElement | null;
     const current = ui;
     const instance = current?.mounted?.instance as {openReading?: (event:Event,target:HTMLElement)=>Promise<boolean>;closeReading?:()=>void} | undefined;
     if (!target?.isConnected || typeof target.focus !== 'function' || !instance?.openReading) return false;
-    if (readingOpen) {if (!instance.closeReading) return false;instance.closeReading();return true;}
+    if (readingOpen) {if (!toggle) return true;if (!instance.closeReading) return false;instance.closeReading();return true;}
     void instance.openReading(event,target).catch(() => {if(ui===current){instance.closeReading?.();publishReading(false);}});return true;
 }
 export function unmountMangaEntry(): void {owner++;pending = null;cleanup?.();cleanup = undefined;ui?.remove();ui = null;}

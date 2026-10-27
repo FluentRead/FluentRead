@@ -5,11 +5,13 @@
  * 模块边界：只读取公开 DOM 画布或注入的已展示正文快照，不访问站点接口、不读取受污染像素、不更改原画布像素；本模块仅为原生画布借用透明度，背景资源与样式归还由载体端口负责，不隐藏背景元素或共享长图宿主；识别和翻译由注入的现有图片客户端完成。
  */
 import {compressMangaPage, createMangaLightCache, type MangaCompressedPage, type MangaPatchPacket} from '../mangaPatchResult';
-import {encodeImageCanvas} from '../services/imageEncoding';
+import {encodeImageCanvas, encodeReadingImageCanvas, readingImageEncodingBusy} from '../services/imageEncoding';
 import {composeMangaPage} from './mangaCompositor';
 import {createImageControls, IMAGE_CONTROLS_CSS, type ImageSettingsSection} from './controls';
 import {imageTranslationFailureCode, imageLocalFailureMessage} from '../failure';
 import {sha256Hex} from '@/src/shared/function/sha256';
+import {prepareMangaReadingLines, type createMangaReadingSnapshots} from './mangaReadingSnapshots';
+import type {MangaReadingResult} from './mangaReadingCoordinator';
 
 interface CanvasState {
     identity: string;
@@ -21,6 +23,8 @@ interface CanvasState {
     recovery: ReturnType<typeof createImageControls> | null;
     validationPending: boolean;
     contentKey?: string;
+    readingKey?: number;
+    readingFailure?: 'overBudget' | 'error';
     presentation?: MangaSurfacePresentation;
     sourceLease?: {
         opacity: StyleProperty;
@@ -86,10 +90,15 @@ export function createMangaCanvas<T extends object = HTMLCanvasElement>(ports: {
     enabled: () => boolean;
     configurationIdentity: () => string;
     cacheEnabled: () => boolean;
+    readingSnapshots?: ReturnType<typeof createMangaReadingSnapshots>;
+    lightCacheLimits?: {pages:number;bytes:number};
     acceptsInteractionLayer?: (canvas: T, hit: Element) => boolean;
     source?: {
         anchor?: (element: T) => HTMLElement;
         identity: (element: T) => string | null;
+        /** 只读身份检查；背景载体须避免 identity 中的异步探测副作用。 */
+        readingIdentity?: (element:T) => string | null;
+        readingBounds?: (element:T) => DOMRect | null;
         capture: (element: T, target: HTMLCanvasElement, signal: AbortSignal) => Promise<void>;
         bounds: (element: T) => DOMRect;
         viewport?: (element: T) => {x: number; y: number; width: number; height: number};
@@ -104,9 +113,23 @@ export function createMangaCanvas<T extends object = HTMLCanvasElement>(ports: {
     translate: (image: string, signal: AbortSignal) => Promise<{mangaPatches?: MangaPatchPacket; lines: MangaCompressedPage['lines']}>;
 }) {
     const states = new Map<T, CanvasState>();
+    // key 含每个载体的实例 id，活动完成页可按键常数时间定位，无需遍历全部页面。
+    const completedByKey = new Map<string,CanvasState>();
+    const untrack=(state:CanvasState)=>{if(state.contentKey&&completedByKey.get(state.contentKey)===state)completedByKey.delete(state.contentKey);};
+    const track=(state:CanvasState)=>{if(state.completed&&state.contentKey)completedByKey.set(state.contentKey,state);};
     const ids = new WeakMap<T, number>();
     const revisions = new WeakMap<T, number>();
-    const lightCache = createMangaLightCache();
+    const lightCache = createMangaLightCache(ports.lightCacheLimits?.pages,ports.lightCacheLimits?.bytes,(key,page)=>{
+        // 仅容量淘汰时将仍显示的活动结果转移到共享预算；未淘汰的缓存无需重复驻留。
+        if(!ports.readingSnapshots)return;
+        const state=completedByKey.get(key);
+        if(state?.completed&&state.showing&&state.readingKey===undefined)try {
+            const readingKey=ports.readingSnapshots.allocateKey();
+            if(readingKey===undefined)state.readingFailure='overBudget';
+            else {const stored=ports.readingSnapshots.put(readingKey,page.lines);
+                if(stored==='stored')state.readingKey=readingKey;else state.readingFailure=stored==='overBudget'?'overBudget':'error';}
+        }catch{state.readingFailure='error';}
+    });
     let sequence = 0;
     let sample: HTMLCanvasElement | null = null;
     let host: HTMLDivElement | null = null, root: ShadowRoot | null = null;
@@ -178,10 +201,12 @@ export function createMangaCanvas<T extends object = HTMLCanvasElement>(ports: {
     function release(canvas: T): void {
         const state = states.get(canvas);
         if (!state) return;
+        untrack(state);
         restoreSource(canvas, state);
         state.presentation?.dispose();
         state.controller?.abort();
         state.recovery?.dispose();
+        if(state.readingKey!==undefined)ports.readingSnapshots?.remove(state.readingKey);
         releaseSurface(state.surface);
         states.delete(canvas);
     }
@@ -313,11 +338,12 @@ export function createMangaCanvas<T extends object = HTMLCanvasElement>(ports: {
         if (!owner || !ports.enabled() || !anchor(canvas).isConnected) return;
         const previous = states.get(canvas);
         const retained = !ports.source && previous?.completed && !previous.failed ? previous : undefined;
-        if (retained) {restoreSource(canvas, retained);retained.surface?.remove();}
+        if (retained) {untrack(retained);restoreSource(canvas, retained);retained.surface?.remove();}
         else release(canvas);
         const controller = new AbortController();
         const revision = revisions.get(canvas) ?? 0;
-        const state: CanvasState = {identity: owner, controller, surface: retained?.surface ?? null, completed: false, failed: false, showing: true, recovery: null, validationPending: !ports.source};
+        const state: CanvasState = {identity: owner, controller, surface: retained?.surface ?? null, completed: false, failed: false, showing: true, recovery: null, validationPending: !ports.source,
+            readingKey:retained?.readingKey,readingFailure:retained?.readingFailure};
         states.set(canvas, state);
         const original = document.createElement('canvas');
         let surface: HTMLCanvasElement | null = null;
@@ -336,11 +362,14 @@ export function createMangaCanvas<T extends object = HTMLCanvasElement>(ports: {
                 key = `${owner}:${await imageDigest(image)}`;
                 if (!current()) return;
                 if (retained?.contentKey === key) {
-                    state.contentKey = key;state.completed = true;state.validationPending = false;show(state);return;
+                    state.contentKey = key;state.completed = true;state.validationPending = false;track(state);show(state);return;
                 }
+                if(state.readingKey!==undefined)ports.readingSnapshots?.remove(state.readingKey);
+                state.readingKey=undefined;state.readingFailure=undefined;
                 releaseSurface(state.surface);state.surface = null;
             }
             let page = ports.cacheEnabled() ? lightCache.get(key) : undefined;
+            let retainedInLightCache = !!page;
             if (!page) {
                 image ??= await encodeImageCanvas(original, controller.signal);
                 if (!current()) return;
@@ -351,7 +380,7 @@ export function createMangaCanvas<T extends object = HTMLCanvasElement>(ports: {
                     if (!result.mangaPatches) throw new Error('漫画译图数据无效');
                     page = compressMangaPage(result.mangaPatches, result.lines);
                 }
-                if (ports.source && ports.cacheEnabled()) lightCache.put(key, page);
+                if (ports.source && ports.cacheEnabled()) retainedInLightCache=lightCache.put(key, page);
             }
             surface = page.patches.length ? await composeMangaPage(original, page, controller.signal) : null;
             if (!current()) return;
@@ -363,7 +392,7 @@ export function createMangaCanvas<T extends object = HTMLCanvasElement>(ports: {
                 const latestKey = `${owner}:${await imageDigest(latest)}`;
                 if (!current()) return;
                 if (latestKey !== key) throw new Error('画布内容已变化，请重试');
-                if (ports.cacheEnabled()) lightCache.put(key, page);
+                if (ports.cacheEnabled()) retainedInLightCache=lightCache.put(key, page);
             }
             if (surface && ports.source?.viewport) {
                 const viewport = ports.source.viewport(canvas);
@@ -382,10 +411,19 @@ export function createMangaCanvas<T extends object = HTMLCanvasElement>(ports: {
                 if (!current()) return;
                 releaseSurface(surface);surface = null;
             }
+            if(!retainedInLightCache && ports.readingSnapshots) try {
+                const readingKey=ports.readingSnapshots.allocateKey();
+                if(readingKey===undefined)state.readingFailure='overBudget';
+                else {
+                    const stored=ports.readingSnapshots.put(readingKey,page.lines);
+                    if(stored==='stored')state.readingKey=readingKey;
+                    else state.readingFailure=stored==='overBudget'?'overBudget':'error';
+                }
+            }catch{state.readingFailure='error';}
             state.presentation = presentation;presentation = undefined;
-            state.surface = surface;surface = null;state.contentKey = key;state.completed = true;state.validationPending = false;show(state);
+            state.surface = surface;surface = null;state.contentKey = key;state.completed = true;state.validationPending = false;track(state);show(state);
         } catch (error) {
-            if (current()) {restoreSource(canvas, state);state.presentation?.dispose();state.presentation = undefined;state.failed = true;state.validationPending = false;releaseSurface(state.surface);state.surface = null;showFailure(canvas, state, error);throw error;}
+            if (current()) {untrack(state);if(state.readingKey!==undefined)try{ports.readingSnapshots?.remove(state.readingKey);}catch{/* 文字快照故障不影响译图错误处理 */}state.readingKey=undefined;restoreSource(canvas, state);state.presentation?.dispose();state.presentation = undefined;state.failed = true;state.validationPending = false;releaseSurface(state.surface);state.surface = null;showFailure(canvas, state, error);throw error;}
         } finally {
             presentation?.dispose();
             releaseSurface(surface);
@@ -394,14 +432,86 @@ export function createMangaCanvas<T extends object = HTMLCanvasElement>(ports: {
         }
     }
 
+    function readingIdentity(canvas:T):string|null {
+        if(!ports.source)return identity(canvas);
+        if(!ports.source.readingIdentity)return null;
+        const fingerprint=ports.source.readingIdentity(canvas),id=ids.get(canvas);
+        return fingerprint&&id?`${id}:${fingerprint}:${ports.configurationIdentity()}`:null;
+    }
+
+    function readingVisible(canvas:T,verifiedIdentity?:string|null,readingHost?:HTMLElement|null):boolean {
+        try {
+            const state=states.get(canvas),element=anchor(canvas);
+            if(!state||!state.showing||!element.isConnected||document.hidden
+                ||!ports.enabled()||(verifiedIdentity===undefined?readingIdentity(canvas):verifiedIdentity)!==state.identity)return false;
+            const rect=ports.source?ports.source.readingBounds?.(canvas):element.getBoundingClientRect();
+            if(!rect||rect.width<=0||rect.height<=0)return false;
+            let left=Math.max(0,rect.left),right=Math.min(window.innerWidth,rect.right),top=Math.max(0,rect.top),bottom=Math.min(window.innerHeight,rect.bottom);
+            for(let parent:Element|null=element;parent;parent=parent.parentElement){
+                const style=getComputedStyle(parent);
+                const opacity=parent===element&&state.sourceLease?state.sourceLease.computedOpacity:style.opacity;
+                if(style.display==='none'||style.visibility==='hidden'||style.visibility==='collapse'||opacity==='0')return false;
+                if(parent===document.documentElement||parent===document.scrollingElement)continue;
+                if(/^(hidden|clip|auto|scroll)$/.test(style.overflowX)||/^(hidden|clip|auto|scroll)$/.test(style.overflowY)){
+                    const bounds=parent.getBoundingClientRect();
+                    if(/^(hidden|clip|auto|scroll)$/.test(style.overflowX)){left=Math.max(left,bounds.left);right=Math.min(right,bounds.right);}
+                    if(/^(hidden|clip|auto|scroll)$/.test(style.overflowY)){top=Math.max(top,bounds.top);bottom=Math.min(bottom,bounds.bottom);}
+                }
+            }
+            if(right<=left||bottom<=top||typeof document.elementFromPoint!=='function')return false;
+            const x=(left+right)/2,y=(top+bottom)/2;
+            let hit=document.elementFromPoint(x,y);
+            if(hit===host||host?.contains(hit)||hit===readingHost||readingHost?.contains(hit))hit=document.elementsFromPoint?.(x,y)
+                .find(item=>item!==host&&!host?.contains(item)&&item!==readingHost&&!readingHost?.contains(item))??null;
+            return !!hit&&(hit===element||hit.contains(element)||ports.acceptsInteractionLayer?.(canvas,hit)===true);
+        } catch {return false;}
+    }
+
+    async function readLines(canvas:T, signal:AbortSignal):Promise<MangaReadingResult> {
+        if(signal.aborted)return {status:'cancelled'};
+        if(ports.source&&!ports.source.readingIdentity)return {status:'unavailable'};
+        const state=states.get(canvas);
+        if(!state)return {status:'unavailable'};
+        if(!state.completed)return {status:state.failed?'error':'pending'};
+        const current=()=>{try{return !disposed&&!signal.aborted&&!document.hidden&&states.get(canvas)===state&&state.showing&&!state.validationPending
+            && anchor(canvas).isConnected&&ports.enabled()&&readingIdentity(canvas)===state.identity;}catch{return false;}};
+        if(!current())return {status:'stale'};
+        let original:HTMLCanvasElement|undefined;
+        let failure:MangaReadingResult|undefined;
+        try {
+            if(!ports.source) {
+                // 可取消地重捕获已发布的完整像素；这是捕获时刻验证，不能保证之后的无事件重绘。
+                if(readingImageEncodingBusy())return {status:'unavailable'};
+                original=document.createElement('canvas');captureNative(canvas,original);
+                const image=await encodeReadingImageCanvas(original,signal);if(!current())return {status:signal.aborted?'cancelled':'stale'};
+                // 摘要本身无法物理取消，等待前先释放整页临时画布。
+                original.width=original.height=0;original=undefined;
+                // data URL 已编码完成；限制后续 UTF-8 摘要输入，不代表浏览器内部编码的硬内存峰值。
+                if(image.length>32*1024*1024)return {status:'overBudget'};
+                const digest=await imageDigest(image);if(!current())return {status:signal.aborted?'cancelled':'stale'};
+                if(`${state.identity}:${digest}`!==state.contentKey)return {status:'stale'};
+            }
+            const cached=ports.cacheEnabled()&&state.contentKey?lightCache.get(state.contentKey):undefined;
+            const lines=cached?.lines ?? (state.readingKey===undefined?undefined:ports.readingSnapshots?.get(state.readingKey));
+            if(!lines)return {status:state.readingFailure ?? 'unavailable'};
+            const prepared=prepareMangaReadingLines(lines);
+            if(prepared.status!=='ready')return {status:prepared.status==='overBudget'?'overBudget':'error'};
+            return prepared.lines.length?{status:'ready',lines:prepared.lines}:{status:'empty'};
+        } catch {
+            failure=signal.aborted?{status:'cancelled'}:{status:'error'};
+        }
+        finally {if(original)original.width=original.height=0;}
+        return failure!;
+    }
     const clear = () => {Array.from(states.keys()).forEach(release);lightCache.clear();};
     return {
-        identity, translate, reuse, release, update, invalidate,
+        identity, readingIdentity, readingVisible, translate, reuse, release, update, invalidate, readLines,
+        readingVersion(canvas:T):object|undefined {const state=states.get(canvas);return state?.completed?state:undefined;},
         refreshLanguage() {states.forEach(state => state.recovery?.refreshLanguage());},
         failed: (canvas: T) => states.get(canvas)?.failed === true,
         restore(canvas: T) {
             const state = states.get(canvas);
-            if (state) {restoreSource(canvas, state);state.presentation?.hide();state.controller?.abort();state.showing = false;state.surface?.remove();state.recovery?.dispose();state.recovery = null;}
+            if (state) {if(state.readingKey!==undefined)ports.readingSnapshots?.remove(state.readingKey);state.readingKey=undefined;restoreSource(canvas, state);state.presentation?.hide();state.controller?.abort();state.showing = false;state.surface?.remove();state.recovery?.dispose();state.recovery = null;}
         },
         resetCache: clear,
         dispose() {disposed = true;clear();if (sample) sample.width = sample.height = 0;host?.remove();host = null;root = null;},

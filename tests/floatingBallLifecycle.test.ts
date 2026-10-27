@@ -110,6 +110,14 @@ function mountBall(initial: Record<string, unknown> = {}, navigatorPort: {maxTou
 async function flush() {await Vue.nextTick(); await Vue.nextTick();}
 
 describe('FloatingBall actual SFC lifecycle', () => {
+  it('offers the injected secondary manga reading action without changing the main toggle', async () => {
+    const read=vi.fn();const port=mountBall({manga:{available:true,active:true,pending:false,errors:0},onMangaReading:read,presentation:{toolsDisplay:'hover',hoverDelay:0}});await flush();
+    port.ball().dispatchEvent(port.event('mouseenter'));await flush();const button=port.document.querySelector<HTMLElement>('.floating-ball-reading')!;
+    expect(button.getAttribute('aria-label')).toBe('查看漫画文字');expect(button.getAttribute('aria-expanded')).toBe('false');port.click(button,0);expect(read).toHaveBeenCalledOnce();expect(port.mangaToggle).not.toHaveBeenCalled();
+    expect(button.querySelector('svg')?.getAttribute('aria-hidden')).toBe('true');expect(button.textContent?.trim()).toBe('');
+    port.props.mangaReadingOpen=true;await flush();port.ball().dispatchEvent(port.event('mouseleave'));vi.advanceTimersByTime(3000);await flush();expect(port.ball().classList.contains('floating-ball-expanded')).toBe(true);expect(button.getAttribute('aria-expanded')).toBe('true');expect(button.getAttribute('aria-label')).toBe('关闭漫画文字');
+    port.props.manga.areaFallback=true;await flush();expect(port.document.querySelector('.floating-ball-reading')).toBeNull();
+  });
   it.each([
     {name: 'navigator missing', navigatorPort: null, expected: false},
     {name: 'maxTouchPoints missing', navigatorPort: {}, expected: false},

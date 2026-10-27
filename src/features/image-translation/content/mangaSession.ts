@@ -26,6 +26,7 @@ export interface MangaPageSnapshot<T = HTMLImageElement> {
     visible: boolean;
     prefetch?: boolean;
     retain?: boolean;
+    ordinal?: number;
 }
 
 export interface MangaSnapshot<T = HTMLImageElement> {
@@ -49,7 +50,7 @@ export function createMangaSession<T = HTMLImageElement>(ports: {
     let active = false;
     let disposed = false;
     let epoch = 0;
-    type Page = {identity: string; attempted: boolean; failed: boolean; completed: boolean; visible: boolean; retained: boolean; scheduled: boolean; ahead: boolean};
+    type Page = {identity: string; ordinal?: number; attempted: boolean; failed: boolean; completed: boolean; visible: boolean; retained: boolean; scheduled: boolean; ahead: boolean};
     let running: {image: T; page: Page} | null = null;
     let suspended = false;
     let schedulingDeferred = false;
@@ -118,7 +119,7 @@ export function createMangaSession<T = HTMLImageElement>(ports: {
         const selected = new Map(snapshot.pages.filter(page => page.visible || page.prefetch || page.retain).map(page => [page.image, page]));
         pages.forEach((page, image) => {
             const next = selected.get(image);
-            if (next?.identity === page.identity) {page.visible = next.visible;page.retained = true;page.scheduled = next.visible || next.prefetch === true;page.ahead = next.prefetch === true;return;}
+            if (next?.identity === page.identity) {page.ordinal=next.ordinal;page.visible = next.visible;page.retained = true;page.scheduled = next.visible || next.prefetch === true;page.ahead = next.prefetch === true;return;}
             if (active && running?.image === image && current.get(image)?.identity === page.identity) {
                 page.visible = false;page.retained = false;return;
             }
@@ -126,7 +127,7 @@ export function createMangaSession<T = HTMLImageElement>(ports: {
             pages.delete(image);
         });
         if (active) selected.forEach((page, image) => {
-            if (!pages.has(image)) pages.set(image, {identity: page.identity, attempted: false, failed: false, completed: false, visible: page.visible, retained: true, scheduled: page.visible || page.prefetch === true, ahead: page.prefetch === true});
+            if (!pages.has(image)) pages.set(image, {identity: page.identity, ordinal:page.ordinal, attempted: false, failed: false, completed: false, visible: page.visible, retained: true, scheduled: page.visible || page.prefetch === true, ahead: page.prefetch === true});
         });
         // 已解码结果的显示交接不能排在另一页的耗时 OCR 后面；这里只做同步复用，不启动推理。
         if (active && !suspended) pages.forEach((page, image) => {
@@ -164,6 +165,16 @@ export function createMangaSession<T = HTMLImageElement>(ports: {
 
     return {
         status, refresh, toggle,
+        /** 仅按用户请求复制保留页，超预算保留第 65 项供调用方明确拒绝。 */
+        readingPages() {
+            const result:Array<{image:T;identity:string;ordinal:number}>=[];
+            if(disposed||!active||suspended)return result;
+            for(const [image,page] of pages) {
+                if(page.visible&&page.retained&&page.ordinal!==undefined)result.push({image,identity:page.identity,ordinal:page.ordinal});
+                if(result.length>64)break;
+            }
+            return result.sort((a,b)=>a.ordinal-b.ordinal);
+        },
         // 事件到达时同步关闸，防止上一页的 finally 在下一次布局测量前启动排队预译。
         deferScheduling() { if (!disposed) schedulingDeferred = true; },
         retry(image: T): boolean {

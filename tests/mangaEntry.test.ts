@@ -12,7 +12,7 @@ vi.mock('@/src/platform/shadow-ui', () => ({createVueShadowUi: mocks.create}));
 vi.mock('@/src/services/config/store', () => ({config: mocks.config, subscribeConfig: mocks.subscribe, requestConfigPatch: mocks.persist}));
 vi.mock('webextension-polyfill', () => ({default: {runtime: {sendMessage: mocks.send}}}));
 vi.mock('@/src/features/image-translation/content/runtime', () => ({subscribeMangaTranslation: mocks.status, toggleMangaTranslation: mocks.toggle,
-    getMangaReadingCandidates:mocks.listReading,readMangaReadingCandidate:mocks.readReading,observeMangaReadingCandidate:mocks.observeReading,registerMangaReadingOverlayHost:mocks.registerHost}));
+    getMangaReadingCandidates:mocks.listReading,readMangaReadingCandidate:mocks.readReading,observeMangaReadingCandidate:mocks.observeReading,registerMangaReadingOverlayHost:mocks.registerHost,registerMangaReadingOpener:()=>()=>{}}));
 vi.mock('@/src/features/image-translation/ui/MangaEntry.vue', () => ({default: {name: 'MangaEntry'}}));
 import {isImageTranslatorNeeded, isMangaReaderPage, mountMangaEntry, openMangaEntry, openMangaReading, subscribeMangaReading, unmountMangaEntry} from '@/src/features/image-translation/content/mangaEntry';
 
@@ -86,6 +86,7 @@ describe('独立漫画入口所有权和配置端口', () => {
         expect(openMangaReading({isTrusted:false,currentTarget:target} as unknown as MouseEvent)).toBe(false);
         expect(openMangaReading(event)).toBe(true);expect(openReading).toHaveBeenCalledWith(event,target);
         props().readingChanged(true);expect(listener).toHaveBeenLastCalledWith(true);expect(props().readingState.open).toBe(true);
+        expect(openMangaReading(event,false)).toBe(true);expect(closeReading).not.toHaveBeenCalled();
         props().readManga(event);expect(closeReading).toHaveBeenCalledOnce();expect(openReading).toHaveBeenCalledOnce();expect(listener).toHaveBeenLastCalledWith(false);
         props().readManga(event);expect(openReading).toHaveBeenCalledTimes(2);expect(mocks.create).toHaveBeenCalledOnce();
         props().readingChanged(true);unmountMangaEntry();expect(listener).toHaveBeenLastCalledWith(false);expect(mocks.releaseHost).toHaveBeenCalledOnce();expect(remove).toHaveBeenCalledOnce();

@@ -197,3 +197,35 @@ describe('漫画字号和安全绘制', () => {
         expect(context.fillRect).toHaveBeenCalledOnce();
     });
 });
+
+describe('漫画数字证据：Tesseract 数字保留与分组',()=>{
+    const bbox={x0:20,y0:20,x1:100,y1:40};
+    it.each(['ru','ko'])('高置信独立数字信息在 %s 中保留原文和物理框',language=>{
+        for(const text of ['42','23:59','2024-02-29','₩12,000','￥１２８０']) {
+            const line={text,bbox,numericConfidence:90};expect(groupMangaOcrLines([line],language,400,300)).toEqual([{text,bbox,fontSize:20,sourceBoxes:[bbox]}]);
+        }
+    });
+    it('缺失/低值/非法置信和非法数字形态仍不作为可读数字',()=>{
+        for(const confidence of [undefined,89.999,NaN,Infinity,-1,101]) {
+            expect(groupMangaOcrLines([{text:'12:34',bbox,numericConfidence:confidence}],'ko',400,300)).toEqual([]);
+        }
+        for(const text of ['1','3 3','①②','24:00','2023-02-29','$1,23']) {
+            expect(groupMangaOcrLines([{text,bbox,numericConfidence:99}],'ko',400,300)).toEqual([]);
+        }
+    });
+    it('数字与近邻正文及其他数字始终独立，正文之间的现有合段不受影响',()=>{
+        const a={text:'안녕',bbox:{x0:20,y0:20,x1:100,y1:40}},n={text:'12:34',bbox:{x0:20,y0:44,x1:100,y1:64},numericConfidence:99};
+        const b={text:'반가워',bbox:{x0:20,y0:68,x1:100,y1:88}},n2={text:'2024-02-29',bbox:{x0:20,y0:92,x1:100,y1:112},numericConfidence:99};
+        expect(groupMangaOcrLines([a,n,b,n2],'ko',400,300).map(x=>x.text)).toEqual(['안녕','12:34','반가워','2024-02-29']);
+    });
+});
+
+
+describe('漫画数字与对白分组',()=>{
+    it('Paddle 漫画保留高置信数字且不与对白合段，普通分组契约不变',()=>{
+        const samples=[item('Hello',20,20,80,20),item('12:34',20,42,80,20),item('again',20,64,80,20)];
+        expect(groupMangaText(samples,'en',400,400,'bubble',true).map(row=>row.text)).toEqual(['Hello again','12:34']);
+        expect(groupMangaText(samples,'en',400,400,'bubble').map(row=>row.text)).toEqual(['Hello 12:34 again']);
+        expect(groupMangaText([item('12:34',20,20,80,20,.89)],'en',400,400,'bubble',true)).toEqual([]);
+    });
+});

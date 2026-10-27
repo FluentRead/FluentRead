@@ -32,6 +32,35 @@ describe('图片 OCR 处理与结果缓存', () => {
     let context: {drawImage: ReturnType<typeof vi.fn>; getImageData: ReturnType<typeof vi.fn>; putImageData: ReturnType<typeof vi.fn>; fillRect: ReturnType<typeof vi.fn>; fillStyle: string; imageSmoothingEnabled: boolean; imageSmoothingQuality: string};
     let onImageCreated: (() => void) | undefined;
 
+    it.each([false,true])('漫画数字证据与普通调用共享同一 OCR 缓存且普通返回不泄漏置信：漫画先=%s', async mangaFirst => {
+        const bbox={x0:10,y0:10,x1:50,y1:30};
+        recognize.mockResolvedValueOnce({data:{blocks:[{paragraphs:[{lines:[{text:'12:34',bbox,words:[{text:'12:34',bbox,confidence:96}]}]}]}]}});
+        const options=mangaFirst?{includeMangaNumericConfidence:true}:undefined;
+        const first=await recognizeImage('shared-numeric','ko',undefined,options);
+        const second=await recognizeImage('shared-numeric','ko',undefined,mangaFirst?undefined:{includeMangaNumericConfidence:true});
+        const [manga,ordinary]=mangaFirst?[first,second]:[second,first];
+        expect(recognize).toHaveBeenCalledOnce();expect(manga[0]).toMatchObject({text:'12:34',bbox,numericConfidence:96});
+        expect(ordinary).toEqual([{text:'12:34',bbox}]);
+        (manga[0] as any).numericConfidence=1;
+        expect((await recognizeImage('shared-numeric','ko',undefined,{includeMangaNumericConfidence:true}))[0]).toMatchObject({numericConfidence:96});
+    });
+    it.each([false,true])('竖排数字与对白仅漫画视图分开且复用识别，漫画先=%s', async mangaFirst=>{
+        const numericBox={x0:70,y0:10,x1:90,y1:70},textBox={x0:45,y0:10,x1:65,y1:70};
+        const make=(text:string,bbox:typeof numericBox)=>({text,bbox,baseline:{x0:bbox.x0+10,y0:bbox.y0,x1:bbox.x0+11,y1:bbox.y1},words:[{text,bbox,confidence:98}]});
+        recognize.mockResolvedValueOnce({data:{blocks:[{paragraphs:[{lines:[make('12:34',numericBox),make('안녕하세요',textBox)]}]}]}});
+        const options={includeMangaNumericConfidence:true};
+        const first=await recognizeImage('vertical-mixed','ko',undefined,mangaFirst?options:{});
+        const second=await recognizeImage('vertical-mixed','ko',undefined,mangaFirst?{}:options);
+        const [manga,ordinary]=mangaFirst?[first,second]:[second,first];
+        expect(recognize).toHaveBeenCalledOnce();expect(ordinary).toHaveLength(1);
+        expect(manga).toHaveLength(2);expect(manga[0]).toMatchObject({text:'12:34',numericConfidence:98});
+        expect(manga[1].text).toBe('안녕하세요');
+    });
+    it('漫画数字证据随降采样坐标回映，不改变原始置信', async()=>{
+        const bbox={x0:10,y0:10,x1:50,y1:30};recognize.mockResolvedValueOnce({data:{blocks:[{paragraphs:[{lines:[{text:'12:34',bbox,words:[{text:'12:34',bbox,confidence:94}]}]}]}]}});
+        const decoded={naturalWidth:2048,naturalHeight:8192,src:'borrowed'} as HTMLImageElement;
+        expect(await recognizeImage('data:image/jpeg;base64,numeric','ru',undefined,{decodedImage:decoded,includeMangaNumericConfidence:true})).toEqual([{text:'12:34',bbox:{x0:20,y0:20,x1:100,y1:60},numericConfidence:94}]);
+    });
     it('把任务进度回调传入 OCR Worker，缓存命中不重放旧识别进度', async () => {
         const onProgress = vi.fn();
         recognize.mockImplementationOnce(async (_image, _languages, _signal, _mode, progress) => {progress(42);return blockResult();});

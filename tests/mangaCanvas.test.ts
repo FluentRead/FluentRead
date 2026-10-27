@@ -947,3 +947,77 @@ describe('公开可读漫画画布的任务与显示所有权', () => {
         expect(f.canvas.getAttribute('style')).toBe(original);f.runtime.dispose();
     });
 });
+
+
+describe('漫画载体的未绘制提示',()=>{
+    it.each(['canvas','background'] as const)('%s 在完成、缓存恢复和释放时正确维护提示',async kind=>{
+        const f=fixture({retry:()=>false,openSettings:async()=>{},translateUi:text=>`本地化:${text}`});
+        f.ports.translate.mockResolvedValueOnce({mangaPatches:{...packet,patches:[]},lines:[{...result.lines[0],renderSkipped:true}]});
+        const source=kind==='background'?{identity:()=> 'background',bounds:()=>f.bounds as DOMRect,capture:async(_element:HTMLCanvasElement,target:HTMLCanvasElement)=>{target.width=400;target.height=300;}}:undefined;
+        const runtime=kind==='canvas'?f.runtime:createMangaCanvas({...f.ports,readingSnapshots:f.readingSnapshots,source});
+        await runtime.translate(f.canvas);
+        const warning=()=>f.roots.flatMap(root=>Array.from(root.querySelectorAll<HTMLElement>('.fr-manga-render-warning'))).at(-1);
+        expect(warning()?.textContent).toBe('本地化:未绘制');expect(warning()?.title).toBe('本地化:部分译文未绘制，请查看漫画文字');expect(warning()?.hidden).toBe(false);
+        if(kind==='canvas'){
+            expect(runtime.reuse(f.canvas)).toBe(true);
+            expect(f.roots.at(-1)?.lastElementChild).toBe(warning());
+        }
+        runtime.restore(f.canvas);expect(warning()).toBeUndefined();
+        expect(runtime.reuse(f.canvas)).toBe(true);expect(warning()?.hidden).toBe(false);
+        expect(f.ports.translate).toHaveBeenCalledOnce();runtime.release(f.canvas);expect(warning()).toBeUndefined();
+        runtime.dispose();if(kind==='background')f.runtime.dispose();
+    });
+});
+
+
+it('已绘制的画布重复复用后提示仍在画布之上',async()=>{
+    const f=fixture();f.ports.translate.mockResolvedValueOnce({...result,lines:[{...result.lines[0],renderSkipped:true}]});
+    await f.runtime.translate(f.canvas);expect(f.outputs).toHaveLength(1);
+    expect(f.runtime.reuse(f.canvas)).toBe(true);
+    const root=f.roots.at(-1)!;expect(root.lastElementChild?.className).toBe('fr-manga-render-warning');
+    expect(root.lastElementChild?.previousElementSibling).toBe(f.outputs[0]);f.runtime.dispose();
+});
+
+
+it('纯数字结果显示原图未改动的完成提示，恢复时清理',async()=>{
+    const f=fixture();f.ports.translate.mockResolvedValueOnce({mangaPatches:{...packet,patches:[]},lines:[{text:'12:34',bbox:{x0:1,y0:1,x1:20,y1:8},backgroundColor:'transparent'}]});
+    await f.runtime.translate(f.canvas);const warning=f.roots.at(-1)?.querySelector('.fr-manga-render-warning');
+    expect(warning?.textContent).toBe('已识别');expect(warning?.getAttribute('aria-label')).toBe('已识别文字，原图未改动');expect(warning?.hasAttribute('hidden')).toBe(false);
+    f.runtime.restore(f.canvas);expect(warning?.isConnected).toBe(false);f.runtime.dispose();
+});
+
+
+it('未绘制提示隔离点击、指针和按键，避免触发宿主翻页',async()=>{
+    const f=fixture();f.ports.translate.mockResolvedValueOnce({...result,lines:[{...result.lines[0],renderSkipped:true}]});
+    await f.runtime.translate(f.canvas);const warning=f.roots.at(-1)!.querySelector('.fr-manga-render-warning')!;
+    const outside=vi.fn();warning.parentNode!.addEventListener('click',outside);
+    for(const type of ['click','pointerdown','keydown','keyup','touchstart','touchmove','touchend','touchcancel']){
+        const listener=vi.fn();warning.parentNode!.addEventListener(type,listener);
+        const event=new f.window.Event(type,{bubbles:true,cancelable:true});warning.dispatchEvent(event);
+        expect(listener).not.toHaveBeenCalled();expect(event.defaultPrevented).toBe(false);
+    }
+    expect(outside).not.toHaveBeenCalled();f.runtime.dispose();
+});
+
+
+it('可信警示动作打开文字并隔离未可信点击；更新语言和来源后清理旧提示',async()=>{
+    const f=fixture({retry:()=>false,openSettings:async()=>{},translateUi:text=>`L:${text}`});
+    const openReading=vi.fn();const runtime=createMangaCanvas({...f.ports,openReading});
+    f.ports.translate.mockResolvedValue({...result,lines:[{...result.lines[0],renderSkipped:true}]});
+    await runtime.translate(f.canvas);const warning=f.roots.at(-1)!.querySelector<HTMLElement>('.fr-manga-render-warning')!;
+    const click=(trusted:boolean)=>{const event=new f.window.Event('click',{bubbles:true});Object.defineProperty(event,'isTrusted',{value:trusted});warning.dispatchEvent(event);};
+    click(false);expect(openReading).not.toHaveBeenCalled();click(true);expect(openReading).toHaveBeenCalledOnce();
+    runtime.refreshLanguage();expect(warning.title).toBe('L:部分译文未绘制，请查看漫画文字');
+    f.canvas.dataset.pixel='2';await runtime.translate(f.canvas);expect(warning.isConnected).toBe(false);
+    runtime.invalidate(f.canvas);expect(f.roots.at(-1)!.querySelector('.fr-manga-render-warning')).toBeNull();
+    runtime.dispose();f.runtime.dispose();
+});
+
+
+it('未配置本地化端口时完成提示的语言刷新保留可访问说明',async()=>{
+    const f=fixture();f.ports.translate.mockResolvedValueOnce({mangaPatches:{...packet,patches:[]},lines:[{...result.lines[0]}]});
+    await f.runtime.translate(f.canvas);f.runtime.refreshLanguage();
+    const warning=f.roots.at(-1)!.querySelector<HTMLElement>('.fr-manga-render-warning')!;
+    expect(warning.textContent).toBe('已识别');expect(warning.title).toBe('已识别文字，原图未改动');
+    f.runtime.dispose();
+});

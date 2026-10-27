@@ -75,8 +75,18 @@ export function createMangaSession<T = HTMLImageElement>(ports: {
 
     function pump(): void {
         if (disposed || !active || suspended || schedulingDeferred || running) return;
-        const candidates = Array.from(pages).filter(([, page]) => page.retained && page.scheduled && !page.attempted);
-        const next = candidates.find(([, page]) => page.visible) ?? candidates[0];
+        let next: [T, Page] | undefined, first: [T, Page] | undefined, missingOrdinal = false;
+        for (const [image, page] of pages) {
+            if (!page.retained || !page.scheduled || page.attempted) continue;
+            const current = next?.[1];
+            if (!current || (page.visible && !current.visible)) {
+                first = next = [image, page];missingOrdinal = page.ordinal === undefined;continue;
+            }
+            if (page.visible !== current.visible) continue;
+            // 同级全部有序号才按最新正文序号选页；任一页缺序号则整体保持进入顺序。
+            if (page.ordinal === undefined) {missingOrdinal = true;next = first;}
+            else if (!missingOrdinal && page.ordinal < current.ordinal!) next = [image, page];
+        }
         if (!next) return;
         const [image, page] = next;
         page.attempted = true;

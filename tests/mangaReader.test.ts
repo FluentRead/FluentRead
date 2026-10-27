@@ -3,6 +3,7 @@ import {parseHTML} from 'linkedom';
 import {createMangaSession, type MangaSnapshot} from '@/src/features/image-translation/content/mangaSession';
 import {createMangaReader, mangaReaderSelector} from '@/src/features/image-translation/content/mangaReader';
 import {normalizeConfig} from '@/src/core/config/model';
+import * as mangaConfig from '@/src/core/config/manga';
 
 const flush = async () => { for (let i = 0; i < 30; i++) await Promise.resolve(); };
 function deferred() { let resolve!: () => void; const promise = new Promise<void>(yes => {resolve = yes;}); return {promise, resolve}; }
@@ -27,6 +28,30 @@ describe('漫画会话所有权与可见页调度', () => {
         const visible=session.readingPages();expect(visible).toHaveLength(65);expect(visible[0].ordinal).toBe(2);expect(visible.at(-1)?.ordinal).toBe(66);
         session.refresh({...snapshot,suspended:true});expect(session.readingPages()).toEqual([]);
         session.dispose();expect(session.readingPages()).toEqual([]);
+    });
+    it.each([
+        {ordinals:[5,undefined,1], expected:0},
+        {ordinals:[5,3,undefined], expected:0},
+        {ordinals:[5,3,1], expected:2},
+    ])('同优先级序号缺失时整体保持进入顺序，完整时按最小序号调度 $ordinals',async({ordinals,expected})=>{
+        const pages=ordinals.map((ordinal,index)=>({image:{id:index} as unknown as HTMLImageElement,identity:String(index),visible:true,ordinal}));
+        const ports={translate:vi.fn().mockResolvedValue(undefined),restore:vi.fn(),release:vi.fn(),failed:()=>false,changed:vi.fn()};
+        const session=createMangaSession(ports),snapshot={route:'chapter',available:true,pages};session.refresh(snapshot);session.toggle();session.refresh(snapshot);await flush();
+        expect(ports.translate.mock.calls[0][0]).toBe(pages[expected].image);session.dispose();
+    });
+    it('离屏预译缺少序号不影响可见页按有效序号选择',async()=>{
+        const pages=[{image:{} as HTMLImageElement,identity:'ahead',visible:false,prefetch:true},
+            {image:{} as HTMLImageElement,identity:'visible-later',visible:true,ordinal:3},
+            {image:{} as HTMLImageElement,identity:'visible-first',visible:true,ordinal:1}];
+        const ports={translate:vi.fn().mockResolvedValue(undefined),restore:vi.fn(),release:vi.fn(),failed:()=>false,changed:vi.fn()};
+        const session=createMangaSession(ports),snapshot={route:'chapter',available:true,pages};session.refresh(snapshot);session.toggle();session.refresh(snapshot);await flush();
+        expect(ports.translate.mock.calls[0][0]).toBe(pages[2].image);session.dispose();
+    });
+    it('页面暂缓后仍保留在串行队列，可再次完成而不伪造失败',async()=>{
+        const image={} as HTMLImageElement,ports={translate:vi.fn().mockResolvedValueOnce('deferred').mockResolvedValueOnce(undefined),restore:vi.fn(),release:vi.fn(),failed:vi.fn(()=>false),changed:vi.fn()};
+        const session=createMangaSession(ports),snapshot={route:'chapter',available:true,pages:[{image,identity:'one',visible:true}]};
+        session.refresh(snapshot);session.toggle();session.refresh(snapshot);await flush();
+        expect(ports.translate).toHaveBeenCalledTimes(2);expect(session.status()).toMatchObject({completed:1,errors:0,pending:false});session.dispose();
     });
     it('移动关闸同步阻止下一页启动，停留后按最新可见页继续；缓存交接仍立即执行', async () => {
         const reuse = vi.fn().mockReturnValue(false), f = sessionFixture({reuse}), pending = deferred();
@@ -741,6 +766,127 @@ describe('漫画站点适配与 DOM 生命周期', () => {
         expect(reuse).toHaveBeenCalledWith(cached);expect(f.ports.translate).toHaveBeenCalledOnce();
         expect(f.reader.status()).toMatchObject({pending:true,completed:1});
         pending.resolve();await flush();expect(f.reader.status()).toMatchObject({pending:false,completed:2});f.reader.dispose();
+    });
+    it.each(['image', 'canvas'] as const)('混合图片和画布按照正文顺序预译 %s 页后的最近页', async current => {
+        const order: string[] = [];
+        const canvasPorts = {identity: vi.fn(() => 'canvas-b'), translate: vi.fn(async () => {order.push('canvas-b');}),
+            reuse: vi.fn(() => false), restore: vi.fn(), release: vi.fn(), failed: vi.fn(() => false), update: vi.fn()};
+        const f = readerFixture(false, 'https://comic-zenon.com/episode/12207421983509986288', undefined, () => 1, undefined, canvasPorts);
+        const parent = f.image.parentElement!;parent.className = 'page-area';f.image.className = 'page-image';
+        const canvas = f.document.createElement('canvas') as HTMLCanvasElement;canvas.className = 'js-page-image';canvas.width = 400;canvas.height = 300;
+        const last = f.image.cloneNode() as HTMLImageElement;last.src = 'blob:page-c';
+        Object.defineProperties(last, {complete:{value:true}, naturalWidth:{value:800}, naturalHeight:{value:1200}});
+        parent.append(canvas, last);
+        const rect = (top:number, width:number, height:number) => ({left:0,right:width,top,bottom:top+height,width,height}) as DOMRect;
+        f.image.getBoundingClientRect = () => rect(current === 'image' ? 0 : -1300, 800, 1200);
+        canvas.getBoundingClientRect = () => rect(current === 'image' ? 1000 : 0, 400, 300);
+        last.getBoundingClientRect = () => rect(current === 'image' ? 1500 : 1000, 800, 1200);
+        f.ports.translate.mockImplementation(async image => {order.push(image === f.image ? 'image-a' : 'image-c');});
+        f.reader.schedule();f.run();f.reader.toggle();await flush();
+        expect(order).toEqual(current === 'image' ? ['image-a','canvas-b'] : ['canvas-b','image-c']);
+        f.reader.dispose();
+    });
+    it('模拟规则中的图片、背景和画布按 DOM 次序列出，而不是按载体类型列出', async () => {
+        vi.spyOn(mangaConfig,'resolveMangaSite').mockReturnValue({name:'fixture',selector:'.page-area img',canvasSelector:'.page-area canvas',backgroundSelector:'.page-area .page-background',custom:false});
+        const reading={live:()=>true,load:vi.fn(async()=>({status:'empty' as const}))};
+        const canvasPorts={identity:vi.fn(()=>'canvas-c'),translate:vi.fn().mockResolvedValue(undefined),reuse:vi.fn(()=>false),restore:vi.fn(),release:vi.fn(),failed:vi.fn(()=>false),update:vi.fn()};
+        const background={identity:vi.fn(()=> 'background-b'),translate:vi.fn().mockResolvedValue(undefined),reuse:vi.fn(()=>false),restore:vi.fn(),release:vi.fn(),failed:vi.fn(()=>false),update:vi.fn(),prepare:vi.fn(),pixels:vi.fn(()=>300000),bounds:vi.fn((node:HTMLElement)=>node.getBoundingClientRect())};
+        const f=readerFixture(false,undefined,undefined,()=>0,undefined,canvasPorts,{background,reading});
+        const parent=f.image.parentElement!;parent.className='page-area';
+        const backgroundNode=f.document.createElement('div') as HTMLElement;backgroundNode.className='page-background';backgroundNode.getBoundingClientRect=()=>({left:0,right:400,top:0,bottom:300,width:400,height:300}) as DOMRect;
+        const canvas=f.document.createElement('canvas') as HTMLCanvasElement;canvas.width=400;canvas.height=300;canvas.getBoundingClientRect=backgroundNode.getBoundingClientRect;parent.append(backgroundNode,canvas);
+        f.reader.schedule();f.run();f.reader.toggle();await flush();const list=f.reader.readingCandidates();if(list.status!=='ready')throw Error('unexpected');
+        expect(list.items.map(({kind,ordinal})=>[kind,ordinal])).toEqual([['image',1],['background',2],['canvas',3]]);
+        expect(reading.load).not.toHaveBeenCalled();f.reader.dispose();
+    });
+    it('混合载体阅读序号跟随 DOM 重排，原有结果不重跑 OCR 或释放', async () => {
+        const reading = {live:()=>true, load:vi.fn(async()=>({status:'empty' as const}))};
+        const canvasPorts = {identity: vi.fn(()=>'canvas-b'), translate: vi.fn().mockResolvedValue(undefined),
+            reuse: vi.fn(()=>false), restore:vi.fn(), release:vi.fn(), failed:vi.fn(()=>false), update:vi.fn()};
+        const f = readerFixture(false, 'https://comic-zenon.com/episode/12207421983509986288', undefined, () => 0, undefined, canvasPorts, {reading});
+        const parent=f.image.parentElement!;parent.className='page-area';f.image.className='page-image';
+        const canvas=f.document.createElement('canvas') as HTMLCanvasElement;canvas.className='page-image';canvas.width=400;canvas.height=300;
+        canvas.getBoundingClientRect=()=>({left:0,right:400,top:0,bottom:300,width:400,height:300}) as DOMRect;
+        const last=f.image.cloneNode() as HTMLImageElement;last.src='blob:page-c';Object.defineProperties(last,{complete:{value:true},naturalWidth:{value:800},naturalHeight:{value:1200}});
+        last.getBoundingClientRect=()=>({left:0,right:800,top:0,bottom:1200,width:800,height:1200}) as DOMRect;parent.append(canvas,last);
+        f.reader.schedule();f.run();f.reader.toggle();await flush();
+        let list=f.reader.readingCandidates();if(list.status!=='ready')throw Error('unexpected');
+        expect(list.items.map(({kind,ordinal})=>[kind,ordinal])).toEqual([['image',1],['canvas',2],['image',3]]);
+        const images=f.ports.translate.mock.calls.length, canvases=canvasPorts.translate.mock.calls.length;
+        parent.insertBefore(canvas,f.image);f.mo.callback([{type:'childList',target:parent} as unknown as MutationRecord],{} as MutationObserver);f.run();await flush();
+        list=f.reader.readingCandidates();if(list.status!=='ready')throw Error('unexpected');
+        expect(list.items.map(({kind,ordinal})=>[kind,ordinal])).toEqual([['canvas',1],['image',2],['image',3]]);
+        expect(f.ports.translate).toHaveBeenCalledTimes(images);expect(canvasPorts.translate).toHaveBeenCalledTimes(canvases);
+        expect(f.ports.release).not.toHaveBeenCalled();expect(canvasPorts.release).not.toHaveBeenCalled();expect(reading.load).not.toHaveBeenCalled();
+        f.reader.dispose();
+    });
+    it('当前页识别期间正文重排后，后续可见页按新次序启动且不重复处理',async()=>{
+        const order:string[]=[],pending=deferred();
+        const canvasPorts={identity:vi.fn(()=>'canvas-b'),translate:vi.fn(async()=>{order.push('canvas-b');}),reuse:vi.fn(()=>false),restore:vi.fn(),release:vi.fn(),failed:vi.fn(()=>false),update:vi.fn()};
+        const f=readerFixture(false,'https://comic-zenon.com/episode/12207421983509986288',undefined,()=>0,undefined,canvasPorts);
+        const parent=f.image.parentElement!;parent.className='page-area';f.image.className='page-image';
+        const canvas=f.document.createElement('canvas') as HTMLCanvasElement;canvas.className='page-image';canvas.width=400;canvas.height=300;canvas.getBoundingClientRect=()=>({left:0,right:400,top:0,bottom:300,width:400,height:300}) as DOMRect;
+        const last=f.image.cloneNode() as HTMLImageElement;last.src='blob:page-c';Object.defineProperties(last,{complete:{value:true},naturalWidth:{value:800},naturalHeight:{value:1200}});last.getBoundingClientRect=()=>({left:0,right:800,top:0,bottom:1200,width:800,height:1200}) as DOMRect;parent.append(canvas,last);
+        f.ports.translate.mockImplementation(async image=>{if(image===f.image){order.push('image-a');await pending.promise;}else order.push('image-c');});
+        f.reader.schedule();f.run();f.reader.toggle();await flush();expect(order).toEqual(['image-a']);
+        parent.append(canvas);f.mo.callback([{type:'childList',target:parent} as unknown as MutationRecord],{} as MutationObserver);f.run();
+        pending.resolve();await flush();expect(order).toEqual(['image-a','image-c','canvas-b']);
+        expect(f.ports.translate).toHaveBeenCalledTimes(2);expect(canvasPorts.translate).toHaveBeenCalledOnce();expect(f.ports.release).not.toHaveBeenCalled();expect(canvasPorts.release).not.toHaveBeenCalled();f.reader.dispose();
+    });
+    it('长图各分段保持页内顺序，并与中间画布及下一张图片按正文顺序排列', async()=>{
+        const values=new Map<HTMLImageElement,import('@/src/features/image-translation/content/mangaImageSegments').MangaImageSegment[]>();
+        const segments={identity:vi.fn(s=>s.source),translate:vi.fn().mockResolvedValue(undefined),reuse:vi.fn(()=>false),restore:vi.fn(),release:vi.fn(),failed:vi.fn(()=>false),update:vi.fn(),prepare:vi.fn(()=>values),pixels:vi.fn(()=>1_800_000),bounds:vi.fn(()=>({left:0,top:0,right:800,bottom:600,width:800,height:600}) as DOMRect)};
+        const reading={live:()=>true,load:vi.fn(async()=>({status:'empty' as const}))};
+        const canvasPorts={identity:vi.fn(()=>'canvas-b'),translate:vi.fn().mockResolvedValue(undefined),reuse:vi.fn(()=>false),restore:vi.fn(),release:vi.fn(),failed:vi.fn(()=>false),update:vi.fn()};
+        const f=readerFixture(false,'https://comic-zenon.com/episode/12207421983509986288',undefined,()=>0,undefined,canvasPorts,{segments,reading});
+        const parent=f.image.parentElement!;parent.className='page-area';f.image.className='page-image';
+        const first={image:f.image,top:0,height:600,width:800,contextTop:0,contextHeight:600,source:'one'},second={...first,top:600,source:'two'};values.set(f.image,[first,second]);
+        const canvas=f.document.createElement('canvas') as HTMLCanvasElement;canvas.className='page-image';canvas.width=400;canvas.height=300;canvas.getBoundingClientRect=()=>({left:0,right:400,top:0,bottom:300,width:400,height:300}) as DOMRect;
+        const last=f.image.cloneNode() as HTMLImageElement;last.src='blob:page-c';Object.defineProperties(last,{complete:{value:true},naturalWidth:{value:800},naturalHeight:{value:1200}});last.getBoundingClientRect=()=>({left:0,right:800,top:0,bottom:1200,width:800,height:1200}) as DOMRect;parent.append(canvas,last);
+        f.reader.schedule();f.run();f.reader.toggle();await flush();const list=f.reader.readingCandidates();if(list.status!=='ready')throw Error('unexpected');
+        expect(list.items.map(({kind,ordinal,segment})=>[kind,ordinal,segment?.top])).toEqual([['segment',1,0],['segment',2,600],['canvas',3,undefined],['image',4,undefined]]);
+        f.reader.dispose();
+    });
+    it('混合正文滚动复用发现结果，合并比较次数随页数线性增长',()=>{
+        const canvasPorts={identity:vi.fn((node:HTMLCanvasElement)=>node.id),translate:vi.fn(),reuse:vi.fn(()=>false),restore:vi.fn(),release:vi.fn(),failed:vi.fn(()=>false),update:vi.fn()};
+        const f=readerFixture(false,'https://comic-zenon.com/episode/12207421983509986288',undefined,undefined,undefined,canvasPorts);
+        const parent=f.image.parentElement!;parent.className='page-area';f.image.className='page-image';
+        const images=[f.image],rect=()=>({left:0,right:400,top:0,bottom:300,width:400,height:300}) as DOMRect;
+        for(let i=0;i<20;i++){
+            const canvas=f.document.createElement('canvas') as HTMLCanvasElement;canvas.id=`canvas-${i}`;canvas.className='page-image';canvas.width=400;canvas.height=300;canvas.getBoundingClientRect=rect;parent.append(canvas);
+            if(i<19){const image=f.image.cloneNode() as HTMLImageElement;image.src=`blob:page-${i}`;Object.defineProperties(image,{complete:{value:true},naturalWidth:{value:800},naturalHeight:{value:1200}});image.getBoundingClientRect=rect;parent.append(image);images.push(image);}
+        }
+        const comparisons=images.map(image=>vi.spyOn(image,'compareDocumentPosition'));
+        f.reader.schedule();f.run();comparisons.forEach(spy=>spy.mockClear());const query=vi.spyOn(f.document,'querySelectorAll');
+        f.scroll();expect(query).not.toHaveBeenCalled();expect(comparisons.reduce((sum,spy)=>sum+spy.mock.calls.length,0)).toBeLessThanOrEqual(39);
+        expect(f.ports.translate).not.toHaveBeenCalled();expect(canvasPorts.translate).not.toHaveBeenCalled();f.reader.dispose();
+    });
+    it('发现期间载体被移出时稳定退化并在下一次 DOM 更新清除，不启动离线画布识别',async()=>{
+        let remove=false;
+        const canvasPorts={identity:vi.fn((node:HTMLCanvasElement)=>{if(remove)node.remove();return 'detached';}),translate:vi.fn(),reuse:vi.fn(()=>false),restore:vi.fn(),release:vi.fn(),failed:vi.fn(()=>false),update:vi.fn()};
+        const f=readerFixture(false,'https://comic-zenon.com/episode/12207421983509986288',undefined,undefined,undefined,canvasPorts);
+        const parent=f.image.parentElement!;parent.className='page-area';f.image.className='page-image';
+        const canvas=f.document.createElement('canvas') as HTMLCanvasElement;canvas.className='page-image';canvas.width=400;canvas.height=300;canvas.getBoundingClientRect=()=>({left:0,right:400,top:0,bottom:300,width:400,height:300}) as DOMRect;parent.append(canvas);
+        const compare=vi.spyOn(f.image,'compareDocumentPosition');remove=true;f.reader.schedule();expect(()=>f.run()).not.toThrow();
+        expect(compare).toHaveBeenCalledWith(canvas);expect(canvas.isConnected).toBe(false);
+        remove=false;f.mo.callback([{type:'childList',target:parent} as unknown as MutationRecord],{} as MutationObserver);f.run();f.reader.toggle();await flush();
+        expect(f.reader.status().pageCount).toBe(1);expect(canvasPorts.translate).not.toHaveBeenCalled();expect(f.ports.translate).toHaveBeenCalledTimes(1);f.reader.dispose();
+    });
+    it('刷新关闸后等待新布局，旧任务结束不会先启动其他可见页',async()=>{
+        const f=readerFixture(false),pending=deferred(),last=f.image.cloneNode() as HTMLImageElement;last.src='blob:page-c';
+        Object.defineProperties(last,{complete:{value:true},naturalWidth:{value:800},naturalHeight:{value:1200}});last.getBoundingClientRect=()=>({left:0,right:800,top:0,bottom:1200,width:800,height:1200}) as DOMRect;f.image.parentElement!.append(last);
+        f.ports.translate.mockReturnValueOnce(pending.promise);f.reader.schedule();f.run();f.reader.toggle();await flush();expect(f.ports.translate).toHaveBeenCalledOnce();
+        f.reader.deferForRefresh();pending.resolve();await flush();expect(f.ports.translate).toHaveBeenCalledOnce();
+        f.run();await flush();expect(f.ports.translate).toHaveBeenCalledTimes(2);f.reader.dispose();
+    });
+    it('显式重试可见画布时重新验证来源，原有图片不重复识别',async()=>{
+        const canvasPorts={identity:vi.fn(()=>'canvas'),translate:vi.fn().mockResolvedValue(undefined),reuse:vi.fn(()=>false),restore:vi.fn(),release:vi.fn(),failed:vi.fn(()=>false),update:vi.fn(),invalidate:vi.fn()};
+        const f=readerFixture(false,'https://comic-zenon.com/episode/12207421983509986288',undefined,()=>0,undefined,canvasPorts);
+        const parent=f.image.parentElement!;parent.className='page-area';f.image.className='page-image';
+        const canvas=f.document.createElement('canvas') as HTMLCanvasElement;canvas.className='page-image';canvas.width=400;canvas.height=300;canvas.getBoundingClientRect=()=>({left:0,right:400,top:0,bottom:300,width:400,height:300}) as DOMRect;parent.append(canvas);
+        f.reader.schedule();f.run();f.reader.toggle();await flush();canvasPorts.invalidate.mockClear();
+        expect(f.reader.retry(canvas)).toBe(true);await flush();expect(canvasPorts.invalidate).toHaveBeenCalledOnce();expect(canvasPorts.invalidate).toHaveBeenCalledWith(canvas);
+        expect(canvasPorts.translate).toHaveBeenCalledTimes(2);expect(f.ports.translate).toHaveBeenCalledOnce();f.reader.dispose();
     });
     it('附近离屏画布停稳后进入预译队列，不作为当前可见页', async () => {
         vi.useFakeTimers();

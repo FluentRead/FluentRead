@@ -22,7 +22,7 @@ PaddleOCR automatically enhances recognition contrast for some colored text on l
 2. Click the manga button. If resources are missing, confirm preparation; choosing Later or closing the prompt starts no download.
 3. Visible pages translate first. Scroll to translate more pages, click the manga button again to show originals and pause, and click again to resume.
 
-After starting, expand the controls next to the manga button and choose **View manga text**. Select a visible page or long-image segment to read, compare, or copy its completed text. Click the entry again to close it. Numbers identify the current visible candidates, not chapter page numbers.
+After starting, expand the controls next to the manga button and choose **View manga text**. Select a visible page or long-image segment to read, compare, or copy its completed text. Click the entry again to close it. The list follows the page structure; its numbers are not chapter page numbers. If the site changes the visual order with styles, the list order may differ.
 
 The panel reads existing results without starting recognition or translation. It reports when a page is still processing, a result has been released, or content is too large to display; return to the page and check again. A long-image segment may include text from adjacent segments. Canvas text comes from the latest completed translation snapshot and may not reflect later changes to the canvas.
 

@@ -14,6 +14,30 @@ type MangaCandidate = {image: MangaSurface; identity: string; ready: boolean; vi
 const isSegment = (surface: MangaSurface): surface is MangaImageSegment => 'image' in surface;
 const isCanvas = (surface: MangaSurface): surface is HTMLCanvasElement => !isSegment(surface) && surface.tagName === 'CANVAS';
 const isImage = (surface: MangaSurface): surface is HTMLImageElement => !isSegment(surface) && surface.tagName === 'IMG';
+const candidateElement = (candidate: MangaCandidate): HTMLElement => isSegment(candidate.image) ? candidate.image.image : candidate.image;
+
+/** 各正文选择器已经按 DOM 顺序返回；线性合并避免每帧重新排序和扫描。 */
+function mergeCandidateStreams(streams: MangaCandidate[][]): MangaCandidate[] {
+    const active = streams.filter(stream => stream.length > 0);
+    if (active.length === 0) return [];
+    if (active.length === 1) return active[0];
+    const positions = active.map(() => 0), merged: MangaCandidate[] = [];
+    while (true) {
+        let next = -1;
+        for (let i = 0; i < active.length; i++) {
+            const candidate = active[i][positions[i]];
+            if (!candidate) continue;
+            if (next < 0) {next = i;continue;}
+            const first = candidateElement(active[next][positions[next]]);
+            const other = candidateElement(candidate);
+            // 断开的节点不具可比较页序；保留发现次序，等待后续 DOM 更新重新发现。
+            const position = first.compareDocumentPosition(other);
+            if (!(position & 1) && (position & 2)) next = i;
+        }
+        if (next < 0) return merged;
+        merged.push(active[next][positions[next]++]);
+    }
+}
 interface SurfacePorts<T> {
     identity: (surface: T) => string | null;
     translate: (surface: T) => Promise<void>;
@@ -226,7 +250,7 @@ export function createMangaReader(ports: {
                     && rect.right > 0 && rect.left < window.innerWidth && style.display !== 'none' && style.visibility !== 'hidden' && inViewport(element, rect);
             });} catch { /* 无效选择器不影响宿主页面。 */ }
         }
-        const candidates: MangaCandidate[] = [...images.flatMap<MangaCandidate>(image => {
+        const imageCandidates = images.flatMap<MangaCandidate>(image => {
             const rect = image.getBoundingClientRect();
             const style = getComputedStyle(image);
             // 明确阅读器内的正文允许可点击图片和 presentation 角色，不能复用普通悬浮图标的装饰图排除。
@@ -240,17 +264,20 @@ export function createMangaReader(ports: {
             });
             return [{image, identity: `${ports.identity(image)}:${imageLoadTracker.revision(image)}`, ready, visible: ready
                 && inViewport(image,rect), pixels: image.naturalWidth * image.naturalHeight}];
-        }), ...canvases.map(({canvas, identity}) => {
+        });
+        const canvasCandidates = canvases.map(({canvas, identity}) => {
             const rect = canvas.getBoundingClientRect(), style = getComputedStyle(canvas);
             const ready = rect.width >= 80 && rect.height >= 40 && style.display !== 'none'
                 && style.visibility !== 'hidden' && style.visibility !== 'collapse';
             return {image: canvas, identity: identity!, ready, visible: ready && inViewport(canvas, rect), pixels: canvas.width * canvas.height};
-        }), ...backgrounds.map(({element, identity}) => {
+        });
+        const backgroundCandidates = backgrounds.map(({element, identity}) => {
             const rect = ports.background!.bounds(element), style = getComputedStyle(element);
             const ready = rect.width >= 80 && rect.height >= 40 && style.display !== 'none'
                 && style.visibility !== 'hidden' && style.visibility !== 'collapse';
             return {image: element, identity: identity!, ready, visible: ready && inViewport(element, rect), pixels: ports.background!.pixels(element)};
-        })];
+        });
+        const candidates = mergeCandidateStreams([imageCandidates, canvasCandidates, backgroundCandidates]);
         // 原生 IO 会通知普通图片进出视口；分段在同一张长图内移动、画布和自定义选择器仍逐帧更新。
         needsScrollLayout = !intersection || custom || !!site?.generic || candidates.some(page => !isImage(page.image));
         const anchor = candidates.reduce((last, page, index) => page.visible ? index : last, -1);

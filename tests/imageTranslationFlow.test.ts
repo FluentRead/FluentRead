@@ -6,6 +6,7 @@ import {IMAGE_PROGRESS_MESSAGE_TYPE, isImageTranslationStage, normalizeImageProg
 import {createOpenOptionsPageHandler} from '@/src/features/settings/background';
 import {IMAGE_LOCAL_FAILURES, imageLocalFailureMessage, imageTranslationFailureCode, imageTranslationFailureResponse, createImageTranslationFailure} from '@/src/features/image-translation/failure';
 import {createImageControls} from '@/src/features/image-translation/content/controls';
+import {IMAGE_READER_CSS} from '@/src/features/image-translation/content/textReader';
 import {sendCancellableImageOperation, prepareImageOcrLanguages} from '@/src/features/image-translation/services/client';
 import {imageTranslationProgressTransport} from '@/src/features/image-translation/background/offscreenAdapter';
 import {getTranslationRequestControl, attachTranslationGlossaryContext} from '@/src/services/translation/requestSnapshot';
@@ -745,4 +746,44 @@ it('警示按钮只对可信点击调用阅读入口',()=>{
     const warning=ui.feedback.querySelector('.fr-image-warning-button')!;
     for(const trusted of [false,true]){const event=new window.Event('click',{bubbles:true});Object.defineProperty(event,'isTrusted',{value:trusted});warning.dispatchEvent(event);}
     expect(onWarning).toHaveBeenCalledOnce();ui.dispose();
+});
+
+it('普通图片未绘制译文时显示可操作提示，并在文字面板标明对应段落',()=>{
+    const {document,window}=parseHTML('<html><body></body></html>');vi.stubGlobal('document',document);
+    const ui=createImageControls({onAction(){},onPrepare(){}});document.body.append(ui.element,ui.feedback);
+    ui.setLines([{text:'你好',sourceText:'Hello',renderSkipped:true},{text:'KEEP',sourceText:'KEEP'}]);
+    ui.update('translated','部分译文未绘制，请查看图片文字',{warning:true,warningAction:true});
+    const warning=ui.feedback.querySelector<HTMLButtonElement>('.fr-image-warning-button')!;
+    expect(ui.feedback.hidden).toBe(false);expect(warning?.hidden).toBe(false);
+    const click=(trusted:boolean)=>{const event=new window.Event('click',{bubbles:true});Object.defineProperty(event,'isTrusted',{value:trusted});warning.dispatchEvent(event);};
+    click(false);expect(ui.reader.hidden).toBe(true);click(true);expect(ui.reader.hidden).toBe(false);
+    expect(ui.reader.textContent).toContain('为保留原文，此译文未绘制到图片');expect(ui.reader.textContent).toContain('你好');
+    const host=vi.fn();for(const type of ['touchstart','touchmove','touchend','touchcancel'])document.body.addEventListener(type,host);
+    for(const type of ['touchstart','touchmove','touchend','touchcancel']){const event=new window.Event(type,{bubbles:true,cancelable:true});ui.reader.dispatchEvent(event);expect(event.defaultPrevented).toBe(false);}
+    expect(host).not.toHaveBeenCalled();
+    ui.dispose();
+});
+
+it('普通窄图提示使用短图标和完整本地化名称，键盘与触摸输入不冒泡',()=>{
+    const {document,window}=parseHTML('<html><body></body></html>');vi.stubGlobal('document',document);
+    const ui=createImageControls({onAction(){},onPrepare(){},translate:source=>translateLegacyText(source,'fr-FR')});document.body.append(ui.element,ui.feedback);
+    ui.feedback.style.maxWidth='64px';ui.setLines([{text:'Bonjour',sourceText:'Hello',renderSkipped:true}]);
+    ui.update('translated','部分译文未绘制，请查看图片文字',{warning:true,warningAction:true});
+    const warning=ui.feedback.querySelector<HTMLButtonElement>('.fr-image-warning-button')!;
+    expect(warning.textContent).toBe('!');expect(warning.getAttribute('aria-label')).toContain(translateLegacyText('部分译文未绘制，请查看图片文字','fr-FR'));expect(warning.getAttribute('aria-label')).toContain(translateLegacyText('查看图片文字','fr-FR'));
+    const host=vi.fn();for(const type of ['keydown','touchstart','touchend'])document.body.addEventListener(type,host);
+    for(const type of ['keydown','touchstart','touchend']){const event=new window.Event(type,{bubbles:true,cancelable:true});warning.dispatchEvent(event);expect(event.defaultPrevented).toBe(false);}
+    expect(host).not.toHaveBeenCalled();const click=new window.Event('click',{bubbles:true});Object.defineProperty(click,'isTrusted',{value:true});warning.dispatchEvent(click);
+    expect(ui.reader.hidden).toBe(false);expect(ui.reader.textContent).toContain(translateLegacyText('为保留原文，此译文未绘制到图片','fr-FR'));ui.dispose();
+});
+
+it('普通图片文字提示在明暗面板背景上保持可读对比度',()=>{
+    const light=IMAGE_READER_CSS.match(/--fr-image-muted:#([\da-f]{6})/)?.[1],dark=IMAGE_READER_CSS.match(/\[data-theme=dark\][^{]*\{[^}]*--fr-image-muted:#([\da-f]{6})/)?.[1];
+    const luminance=(hex:string)=>{const rgb=hex.match(/[\da-f]{2}/gi)!.map(v=>parseInt(v,16)/255).map(v=>v<=.04045?v/12.92:((v+.055)/1.055)**2.4);return .2126*rgb[0]+.7152*rgb[1]+.0722*rgb[2];};
+    const contrast=(a:string,b:string)=>{const x=luminance(a),y=luminance(b);return (Math.max(x,y)+.05)/(Math.min(x,y)+.05);};
+    expect(light).toBeDefined();expect(dark).toBeDefined();expect(contrast(light!,'ffffff')).toBeGreaterThanOrEqual(4.5);expect(contrast(dark!,'2b2630')).toBeGreaterThanOrEqual(4.5);
+});
+
+it.each(['en-US','ja-JP','ko-KR','fr-FR','ru-RU','es-ES'] as const)('普通图片保留原文提示使用 %s 界面文案',language=>{
+    for(const message of ['部分译文未绘制，请查看图片文字','为保留原文，此译文未绘制到图片','查看图片文字']) expect(translateLegacyText(message,language)).not.toBe(message);
 });

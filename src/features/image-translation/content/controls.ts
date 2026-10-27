@@ -49,8 +49,9 @@ export const IMAGE_CONTROLS_CSS = IMAGE_READER_CSS + `
 .fr-image-feedback .fr-image-prepare:hover,.fr-image-feedback .fr-image-model-settings:hover,.fr-image-feedback[data-preparation=false][data-recovery=false] .fluent-read-image-translation-button:hover {background:#c62752;color:#fff;}
 .fr-image-feedback .fr-image-dismiss,.fr-image-feedback[data-preparation=true] .fluent-read-image-translation-button {color:var(--fr-image-muted);}
  .fr-image-feedback[data-manga=true][data-phase=loading] {flex-direction:row;align-items:center;gap:6px;transform:none;min-width:0;padding:6px 9px;font-size:11px;pointer-events:none;animation:fr-manga-feedback .12s ease .15s both;}
-.fr-image-feedback[data-manga=true][data-warning=true] {flex-direction:row;transform:none;min-width:0;max-height:24px;padding:0;border:0;font-size:11px;pointer-events:auto;}
+.fr-image-feedback[data-warning=true] {flex-direction:row;transform:none;min-width:0;max-height:24px;padding:0;border:0;font-size:11px;pointer-events:auto;}
 .fr-image-feedback[data-warning=true] .fr-image-warning-button {min-height:24px;padding:3px 6px;white-space:nowrap;}
+.fr-image-feedback[data-manga=false][data-warning=true] .fr-image-warning-button {min-width:24px;font-weight:700;}
 .fr-image-feedback[data-manga=true][data-warning=true] .fr-image-status>span:last-child {white-space:normal;overflow-wrap:anywhere;}
 .fr-image-feedback[data-manga=true] .fr-image-status {gap:6px;min-width:0;}
 .fr-image-feedback[data-manga=true] .fr-image-status>span:last-child {overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
@@ -160,8 +161,9 @@ export function createImageControls(actions: {onAction(): void; onPrepare(): voi
         button.title = `${brand} · ${button.title}`;
         button.setAttribute('aria-label', button.title);
         const localizedMessage = localize(sourceMessage);
-        warningButton.textContent = localize('未绘制');warningButton.title = localizedMessage;
-        warningButton.setAttribute('aria-label', localizedMessage);
+        warningButton.textContent = feedback.dataset.manga === 'true' ? localize('未绘制') : sourceMessage === '已识别文字，原图未改动' ? 'ℹ' : '!';
+        warningButton.title = feedback.dataset.manga === 'true' ? localizedMessage : `${localizedMessage} · ${localize('查看图片文字')}`;
+        warningButton.setAttribute('aria-label', warningButton.title);
         statusText.textContent = (feedback.dataset.warning === 'true' && feedback.dataset.warningAction !== 'true'
             ? localize('已识别') : localizedMessage) + (progress === undefined ? '' : ` ${progress}%`);
         if (feedback.dataset.warning === 'true') status.setAttribute('aria-label', localizedMessage);else status.removeAttribute('aria-label');
@@ -216,7 +218,14 @@ export function createImageControls(actions: {onAction(): void; onPrepare(): voi
         row.addEventListener(event, isolate);
         feedback.addEventListener(event, isolate);
     }
-    const handleWarning = (event: MouseEvent) => {if (!event.isTrusted || disposed) return;event.stopPropagation();actions.onWarning?.(event);};
+    const handleWarning = (event: MouseEvent) => {
+        if (!event.isTrusted || disposed) return;
+        event.stopPropagation();
+        if (feedback.dataset.manga === 'true') actions.onWarning?.(event);
+        else if (hasLines && details.hidden) {
+            reader.open();inspect.setAttribute('aria-expanded', 'true');actions.onInspect?.();refreshVisibility();
+        }
+    };
     warningButton.addEventListener('click', handleWarning);
     feedback.addEventListener('click', isolate);
     row.append(button, prepare, inspect, dismiss, modelSettings, serviceSettings);
@@ -229,7 +238,7 @@ export function createImageControls(actions: {onAction(): void; onPrepare(): voi
         feedback.dataset.phase = next;
         feedback.dataset.manga = String(options.quiet === true);
         feedback.dataset.queued = String(next === 'loading' && options.queued === true);
-        feedback.dataset.warning = String(next === 'translated' && options.quiet === true && options.warning === true);
+        feedback.dataset.warning = String(next === 'translated' && options.warning === true);
         feedback.dataset.warningAction = String(options.warningAction === true);
         heading.hidden = next !== 'error' || options.quiet === true;
         feedback.dataset.preparation = String(next === 'error' && options.prepare === true);
@@ -242,7 +251,7 @@ export function createImageControls(actions: {onAction(): void; onPrepare(): voi
         warningButton.hidden = !(feedback.dataset.warning === 'true' && options.warningAction === true);
         if (warningButton.hidden) warningButton.remove();else if (warningButton.parentElement !== feedback) feedback.append(warningButton);
         status.hidden = next === 'idle' || (next === 'translated' && (feedback.dataset.warning !== 'true' || !warningButton.hidden));
-        feedback.hidden = options.quiet === true ? next !== 'loading' && next !== 'error' && feedback.dataset.warning !== 'true' : status.hidden;
+        feedback.hidden = feedback.dataset.warning === 'true' ? false : options.quiet === true ? next !== 'loading' && next !== 'error' : status.hidden;
         progressBar.hidden = options.quiet !== true || progress === undefined;
         refreshVisibility();
         modelSettings.hidden = next !== 'error' || options.modelSettings !== true;

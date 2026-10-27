@@ -227,6 +227,50 @@ beforeEach(() => {
 afterEach(() => {unmountImageTranslator();while (restoreAnimationPorts.length) restoreAnimationPorts.pop()!(); vi.restoreAllMocks(); vi.unstubAllGlobals(); vi.useRealTimers();});
 
 describe('图片翻译前台交互与生命周期', () => {
+    it('大尺寸原图全部保留时不加载缩放译图，提示可阅读且缓存恢复不重译', async () => {
+        client.translate.mockResolvedValueOnce({image:'',imageUnchanged:true,lines:[{text:'你好',sourceText:'Hello',renderSkipped:true,bbox:{x0:0,y0:0,x1:20,y1:10},backgroundColor:'transparent'}]});
+        const env=setup();Object.defineProperties(env.image,{naturalWidth:{value:6000,configurable:true},naturalHeight:{value:4000,configurable:true}});
+        env.hover();env.click();await flush();
+        expect(env.button().dataset.phase).toBe('translated');expect(env.bitmap()).toBeFalsy();expect(env.image.style.opacity).not.toBe('0');expect(env.decoded).toHaveLength(0);
+        const warning=env.roots[0].querySelector<HTMLButtonElement>('.fr-image-warning-button')!;expect(warning).toBeTruthy();
+        env.dispatch(warning,'click');const reader=env.roots[0].querySelector<HTMLElement>('.fr-image-reader')!;
+        expect(reader.hidden).toBe(false);expect(reader.textContent).toContain('为保留原文，此译文未绘制到图片');
+        env.click();expect(env.image.style.opacity).not.toBe('0');env.click();await flush();
+        expect(env.image.style.opacity).not.toBe('0');expect(env.bitmap()).toBeFalsy();expect(client.translate).toHaveBeenCalledOnce();
+    });
+    it('关闭缓存时保留原图的结果可恢复且再次翻译不会复用旧结果',async()=>{
+        settings.useCache=false;
+        client.translate.mockResolvedValue({image:'',imageUnchanged:true,lines:[{text:'你好',sourceText:'Hello',renderSkipped:true,bbox:{x0:0,y0:0,x1:20,y1:10},backgroundColor:'transparent'}]});
+        const env=setup();env.hover();env.click();await flush();expect(env.button().dataset.phase).toBe('translated');
+        env.click();expect(env.image.style.opacity).not.toBe('0');env.click();await flush();
+        expect(client.translate).toHaveBeenCalledTimes(2);expect(env.bitmap()).toBeFalsy();expect(env.image.style.opacity).not.toBe('0');
+    });
+    it('普通图片所有文字均未变化时仍提供触屏可达的文字入口',async()=>{
+        client.translate.mockResolvedValueOnce({image:'',imageUnchanged:true,lines:[{text:'KEEP',sourceText:'KEEP',bbox:{x0:0,y0:0,x1:20,y1:10},backgroundColor:'transparent'}]});
+        const env=setup();env.hover();env.click();await flush();env.dispatch(env.image,'pointerout');
+        const warning=env.roots[0].querySelector<HTMLButtonElement>('.fr-image-warning-button')!;
+        expect(warning).toBeTruthy();expect(warning.textContent).toBe('ℹ');expect(warning.title).toContain('已识别文字，原图未改动');expect(warning.getAttribute('aria-label')).toContain('查看图片文字');
+        env.dispatch(warning,'click',true,{pointerType:'touch'});const reader=env.roots[0].querySelector<HTMLElement>('.fr-image-reader')!;
+        expect(reader.hidden).toBe(false);expect(reader.textContent).toContain('KEEP');
+        env.dispatch(warning,'click',true,{pointerType:'touch'});expect(reader.hidden).toBe(false);expect(env.image.style.opacity).not.toBe('0');
+        expect(client.translate).toHaveBeenCalledOnce();
+    });
+    it('保留原图的缓存遇到同 URL 重载或语言变化仍失效',async()=>{
+        client.translate.mockResolvedValue({image:'',imageUnchanged:true,lines:[{text:'你好',sourceText:'Hello',renderSkipped:true,bbox:{x0:0,y0:0,x1:20,y1:10},backgroundColor:'transparent'}]});
+        const env=setup();env.hover();env.click();await flush();env.click();
+        env.dispatch(env.image,'pointerout');vi.advanceTimersByTime(200);env.dispatch(env.image,'load');env.hover();env.click();await flush();
+        expect(client.translate).toHaveBeenCalledTimes(2);expect(env.image.style.opacity).not.toBe('0');
+        env.click();settings.to='fr';env.click();await flush();expect(client.translate).toHaveBeenCalledTimes(3);
+        expect(env.image.style.opacity).not.toBe('0');expect(env.bitmap()).toBeFalsy();
+    });
+    it('保留原图的结果在取消后迟到时不显示提示或文字',async()=>{
+        const noPaint={image:'',imageUnchanged:true as const,lines:[{text:'你好',sourceText:'Hello',renderSkipped:true as const,bbox:{x0:0,y0:0,x1:20,y1:10},backgroundColor:'transparent'}]};
+        const pending=deferred<typeof noPaint>();client.translate.mockReturnValueOnce(pending.promise);
+        const env=setup();env.hover();env.click();await flush();env.click();
+        pending.resolve(noPaint);await flush();
+        expect(env.button().dataset.phase).toBe('idle');expect(env.image.style.opacity).not.toBe('0');expect(env.bitmap()).toBeFalsy();
+        expect(env.roots[0].querySelector('.fr-image-warning-button')).toBeNull();
+    });
     it('打开宿主大图后撤下被遮挡的缩略译图与文字面板，关闭后复用同一译图', async () => {
         const env = setup(); env.hover(); env.click(); await flush();
         const bitmap = env.bitmap()!;

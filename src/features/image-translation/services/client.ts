@@ -21,6 +21,7 @@ interface ImageTranslationLine extends OcrLine {
 interface ImageTranslationResponse {
     success: boolean;
     image?: string;
+    imageUnchanged?: unknown;
     mangaPatches?: unknown;
     lines?: ImageTranslationLine[];
     error?: string;
@@ -190,7 +191,7 @@ export async function translateImageInExtension(
     sourceLanguage: string,
     title: string,
     options: ImageExtensionOperationOptions = {},
-): Promise<{ image: string; lines: ImageTranslationLine[]; mangaPatches?: MangaPatchPacket }> {
+): Promise<{ image: string; lines: ImageTranslationLine[]; imageUnchanged?: true; mangaPatches?: MangaPatchPacket }> {
     const message = {
         type: 'fluentReadImageTranslate',
         image,
@@ -211,10 +212,14 @@ export async function translateImageInExtension(
             const response = await sendCancellableImageOperation<ImageTranslationResponse>(
                 message, {...options, requestId, timeoutMs: remainingMs}, '图片翻译超时',
             );
-            if (!response?.success || (!response.image && !(options.manga && response.mangaPatches !== undefined)) || !Array.isArray(response.lines)) {
+            const unchanged = response?.imageUnchanged === true && !options.manga && response.image === '' && response.mangaPatches === undefined;
+            if (!response?.success || (response.imageUnchanged !== undefined && !unchanged)
+                || (!response.image && !unchanged && !(options.manga && response.mangaPatches !== undefined)) || !Array.isArray(response.lines)
+                || (unchanged && response.lines.length === 0)) {
                 throw createImageTranslationFailure(response?.error || '图片翻译服务不可用', response);
             }
             return {image: response.image || '', lines: response.lines,
+                ...(unchanged ? {imageUnchanged: true as const} : {}),
                 ...(options.manga && response.mangaPatches !== undefined ? {mangaPatches: parseMangaPatchPacket(response.mangaPatches)} : {})};
         } catch (error) {
             if (isContextInvalidatedError(error)) throw normalizeTranslationTransportError(error);

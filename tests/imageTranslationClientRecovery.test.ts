@@ -47,6 +47,20 @@ describe('图片翻译客户端断线恢复', () => {
         sendMessage.mockResolvedValue({success:true,image:'',lines:[],mangaPatches:{...mangaPatches,width:0}});
         await expect(translateImageInExtension('source','en','Page',{manga:true})).rejects.toThrow('无效');expect(listeners.size).toBe(0);
     });
+    it('普通图片未绘制结果不加载重编码输入，并拒绝不一致的消息形态',async()=>{
+        const lines=[{text:'你好',sourceText:'Hello',renderSkipped:true,bbox:{x0:0,y0:0,x1:5,y1:5},backgroundColor:'transparent'}];
+        sendMessage.mockResolvedValue({success:true,image:'',imageUnchanged:true,lines});
+        await expect(translateImageInExtension('source','en','Page')).resolves.toEqual({image:'',imageUnchanged:true,lines});
+        await expect(translateImageInExtension('source','en','Page',{manga:true})).rejects.toThrow();
+        for (const response of [
+            {success:true,image:'data:image/png,encoded',imageUnchanged:true,lines},
+            {success:true,image:'',imageUnchanged:false,lines},
+            {success:true,image:'',imageUnchanged:'true',lines},
+            {success:true,image:'',imageUnchanged:true,lines:[]},
+            {success:true,image:'',imageUnchanged:true,lines,mangaPatches:{width:1,height:1,patches:[]}},
+        ]) {sendMessage.mockResolvedValueOnce(response);await expect(translateImageInExtension('source','en','Page')).rejects.toThrow();}
+        expect(listeners.size).toBe(0);
+    });
     it('嵌套 Offscreen 断线响应只重试一次，保留首个 ID 并为重试生成新 ID', async () => {
         sendMessage
             .mockResolvedValueOnce({success: false, error: 'The message port closed before a response was received.'})

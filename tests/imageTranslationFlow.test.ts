@@ -787,3 +787,76 @@ it('普通图片文字提示在明暗面板背景上保持可读对比度',()=>{
 it.each(['en-US','ja-JP','ko-KR','fr-FR','ru-RU','es-ES'] as const)('普通图片保留原文提示使用 %s 界面文案',language=>{
     for(const message of ['部分译文未绘制，请查看图片文字','为保留原文，此译文未绘制到图片','查看图片文字']) expect(translateLegacyText(message,language)).not.toBe(message);
 });
+
+describe('普通图片提示入口的焦点与恢复', () => {
+    function fixture() {
+        const {document,window}=parseHTML('<html><body><button id="outside">外部</button></body></html>');vi.stubGlobal('document',document);
+        const onAction=vi.fn(),ui=createImageControls({onAction,onPrepare(){}});document.body.append(ui.element,ui.feedback);
+        ui.setLines([{sourceText:'Hello',text:'你好',renderSkipped:true}]);ui.update('translated','部分译文未绘制，请查看图片文字',{warning:true,warningAction:true});ui.setHovered(false);
+        const warning=ui.feedback.querySelector<HTMLButtonElement>('.fr-image-warning-button')!,inspect=ui.element.querySelector<HTMLButtonElement>('[aria-expanded]')!,outside=document.querySelector<HTMLButtonElement>('#outside')!;
+        let active:Element|null=null;Object.defineProperty(document,'activeElement',{configurable:true,get:()=>active});
+        const readerFocus=vi.spyOn(ui.reader,'focus').mockImplementation(()=>{if(!ui.element.hidden)active=ui.reader;});
+        const warningFocus=vi.spyOn(warning,'focus').mockImplementation(()=>{active=warning;});
+        const inspectFocus=vi.spyOn(inspect,'focus').mockImplementation(()=>{active=inspect;});
+        const click=(node:Element,detail=0)=>{const e=new window.Event('click',{bubbles:true,cancelable:true});Object.defineProperties(e,{isTrusted:{value:true},detail:{value:detail}});node.dispatchEvent(e);};
+        const key=(node:Element,name:string)=>{const e=new window.Event('keydown',{bubbles:true,cancelable:true});Object.defineProperties(e,{isTrusted:{value:true},key:{value:name}});node.dispatchEvent(e);return e;};
+        return {document,window,ui,warning,inspect,outside,readerFocus,warningFocus,inspectFocus,onAction,click,key,setActive:(element:Element|null)=>{active=element;},active:()=>active};
+    }
+    it.each([['keyboard',0],['pointer',1]] as const)('%s 从非悬停警示打开时先显示祖先，再聚焦阅读器并由 Escape 返回入口',(_kind,detail)=>{
+        const f=fixture();expect(f.ui.element.hidden).toBe(true);f.setActive(f.warning);f.click(f.warning,detail);
+        expect(f.ui.element.hidden).toBe(false);expect(f.active()).toBe(f.ui.reader);expect(f.readerFocus).toHaveBeenCalledOnce();
+        expect(f.key(f.ui.reader,'Escape').defaultPrevented).toBe(true);expect(f.ui.reader.hidden).toBe(true);expect(f.active()).toBe(f.warning);expect(f.warningFocus).toHaveBeenCalledOnce();expect(f.inspectFocus).not.toHaveBeenCalled();f.ui.dispose();
+    });
+    it('打开时焦点已在外部控件，不抢走焦点；关闭时也不抢回入口',()=>{
+        const f=fixture();f.setActive(f.outside);f.click(f.warning,1);expect(f.ui.reader.hidden).toBe(false);expect(f.active()).toBe(f.outside);expect(f.readerFocus).not.toHaveBeenCalled();
+        f.click(f.ui.reader.querySelectorAll('header button')[1]);expect(f.ui.reader.hidden).toBe(true);expect(f.active()).toBe(f.outside);expect(f.warningFocus).not.toHaveBeenCalled();expect(f.inspectFocus).not.toHaveBeenCalled();f.ui.dispose();
+    });
+    it('工具栏文字入口打开后关闭时归还到该入口',()=>{
+        const f=fixture();f.ui.setHovered(true);f.setActive(f.inspect);f.click(f.inspect);
+        expect(f.active()).toBe(f.ui.reader);f.key(f.ui.reader,'Escape');
+        expect(f.active()).toBe(f.inspect);expect(f.inspectFocus).toHaveBeenCalledOnce();expect(f.warningFocus).not.toHaveBeenCalled();f.ui.dispose();
+    });
+    it('已脱离页面的入口触发时不移动焦点',()=>{
+        const f=fixture();f.setActive(f.outside);f.warning.remove();f.click(f.warning);
+        expect(f.readerFocus).not.toHaveBeenCalled();expect(f.active()).toBe(f.outside);f.ui.dispose();
+    });
+    it('焦点离开阅读器后关闭，或入口被移除，均不窃取外部焦点',()=>{
+        const f=fixture();f.setActive(f.warning);f.click(f.warning);expect(f.active()).toBe(f.ui.reader);f.setActive(f.outside);
+        f.click(f.ui.reader.querySelectorAll('header button')[1]);expect(f.active()).toBe(f.outside);expect(f.warningFocus).not.toHaveBeenCalled();
+        f.setActive(f.warning);f.click(f.warning);f.warning.remove();f.key(f.ui.reader,'Escape');expect(f.warningFocus).not.toHaveBeenCalled();expect(f.inspectFocus).not.toHaveBeenCalled();f.ui.dispose();
+    });
+    it('原图动作仍按可信点击执行，阅读面板触摸事件不阻止默认且不冒泡',()=>{
+        const f=fixture();f.setActive(f.warning);f.click(f.warning);const host=vi.fn();f.document.body.addEventListener('touchstart',host);
+        const touch=new f.window.Event('touchstart',{bubbles:true,cancelable:true});f.ui.reader.dispatchEvent(touch);expect(touch.defaultPrevented).toBe(false);expect(host).not.toHaveBeenCalled();
+        f.key(f.ui.reader,'Escape');f.click(f.ui.button);expect(f.onAction).toHaveBeenCalledOnce();f.ui.dispose();
+    });
+});
+
+describe('图片文字面板 Shadow DOM 焦点边界',()=>{
+    function fixture() {
+        const {document,window}=parseHTML('<html><body><div id="host"></div><button id="external">外部</button></body></html>');vi.stubGlobal('document',document);
+        const host=document.querySelector<HTMLElement>('#host')!,external=document.querySelector<HTMLElement>('#external')!,shadow=host.attachShadow({mode:'closed'});
+        const ui=createImageControls({onAction(){},onPrepare(){}});shadow.append(ui.element,ui.feedback);ui.setLines([{sourceText:'Hello',text:'你好',renderSkipped:true}]);ui.update('translated','部分译文未绘制，请查看图片文字',{warning:true,warningAction:true});ui.setHovered(false);
+        const warning=ui.feedback.querySelector<HTMLButtonElement>('.fr-image-warning-button')!;
+        let docActive:Element|null=host,shadowActive:Element|null=warning;
+        Object.defineProperty(document,'activeElement',{configurable:true,get:()=>docActive});Object.defineProperty(shadow,'activeElement',{configurable:true,get:()=>shadowActive});
+        const readerFocus=vi.spyOn(ui.reader,'focus').mockImplementation(()=>{if(!ui.element.hidden){docActive=host;shadowActive=ui.reader;}});
+        const warningFocus=vi.spyOn(warning,'focus').mockImplementation(()=>{docActive=host;shadowActive=warning;});
+        const click=(node:Element)=>{const e=new window.Event('click',{bubbles:true,cancelable:true});Object.defineProperty(e,'isTrusted',{value:true});node.dispatchEvent(e);};
+        const key=(node:Element)=>{const e=new window.Event('keydown',{bubbles:true,cancelable:true});Object.defineProperties(e,{isTrusted:{value:true},key:{value:'Escape'}});node.dispatchEvent(e);};
+        return {document,ui,shadow,warning,host,external,readerFocus,warningFocus,click,key,docActive:()=>docActive,shadowActive:()=>shadowActive,setFocus:(doc:Element|null,inner:Element|null)=>{docActive=doc;shadowActive=inner;}};
+    }
+    it('封闭 ShadowRoot 内的入口可聚焦面板，Escape 将焦点归还该入口',()=>{
+        const f=fixture();f.click(f.warning);expect(f.shadowActive()).toBe(f.ui.reader);expect(f.docActive()).toBe(f.host);
+        f.key(f.ui.reader);expect(f.shadowActive()).toBe(f.warning);expect(f.warningFocus).toHaveBeenCalledOnce();f.ui.dispose();
+    });
+    it('提示打开前或阅读中焦点已转到宿主其他控件，不主动转移或归还',()=>{
+        const f=fixture();f.setFocus(f.external,null);f.click(f.warning);expect(f.readerFocus).not.toHaveBeenCalled();expect(f.docActive()).toBe(f.external);
+        f.click(f.ui.reader.querySelectorAll('header button')[1]);expect(f.docActive()).toBe(f.external);expect(f.warningFocus).not.toHaveBeenCalled();f.ui.dispose();
+    });
+    it('页面没有焦点时可将焦点移入面板，但 body 内存在隐藏焦点时不抢占',()=>{
+        const f=fixture();const matches=vi.spyOn(f.document.body,'matches').mockImplementation(selector=>selector===':focus-within' ? false : false);
+        f.setFocus(f.document.body,null);f.click(f.warning);expect(f.shadowActive()).toBe(f.ui.reader);f.key(f.ui.reader);
+        matches.mockReturnValue(true);f.setFocus(f.document.body,null);f.click(f.warning);expect(f.shadowActive()).toBeNull();expect(f.readerFocus).toHaveBeenCalledTimes(1);f.ui.dispose();
+    });
+});

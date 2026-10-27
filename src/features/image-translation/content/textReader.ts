@@ -25,7 +25,7 @@ export const IMAGE_READER_CSS = `
 @media(max-width:480px) {.fr-image-reader{right:12px;top:12px;max-height:calc(100dvh - 24px)}}
 `;
 
-export function createImageTextReader(localize: (source: string) => string, onClose: () => void) {
+export function createImageTextReader(localize: (source: string) => string, onClose: (ownedFocus: boolean) => void) {
     const element = document.createElement('section');
     element.className = 'fr-image-reader';
     element.hidden = true;
@@ -94,10 +94,13 @@ export function createImageTextReader(localize: (source: string) => string, onCl
         refreshLanguage();
     };
     const closeReader = () => {
+        const root = element.getRootNode() as Document | ShadowRoot;
+        const active = root.activeElement;
+        const ownedFocus = !!active && element.contains(active);
         element.hidden = true;
         revision += 1;
         clearTimeout(feedbackTimer);
-        onClose();
+        onClose(ownedFocus);
     };
     const handleClick = async (event: MouseEvent) => {
         if (!event.isTrusted || disposed) return;
@@ -128,7 +131,7 @@ export function createImageTextReader(localize: (source: string) => string, onCl
     return {
         element, refreshLanguage,
         setLines(next: ImageReaderLine[]) {revision += 1; clearTimeout(feedbackTimer); lines = next.map(line => ({...line})); render();},
-        open() {element.hidden = false; element.focus({preventScroll: true});},
+        open(takeFocus = true) {element.hidden = false; if (takeFocus) element.focus({preventScroll: true});},
         close: closeReader,
         dispose() {
             disposed = true;

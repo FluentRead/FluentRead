@@ -73,6 +73,23 @@ export const IMAGE_CONTROLS_CSS = IMAGE_READER_CSS + `
 
 export type ImageSettingsSection = 'settings-services' | 'settings-image-translation';
 
+/** 只在入口拥有焦点或页面没有焦点时转移，避免抢走其他控件的焦点。 */
+function mayFocusReader(trigger: HTMLElement): boolean {
+    const doc = trigger.ownerDocument;
+    if (!trigger.isConnected) return false;
+    const source = trigger.getRootNode() as Document | ShadowRoot;
+    const active = doc.activeElement;
+    const noFocus = !!active && (active === doc.body || active === doc.documentElement)
+        && !active.matches(':focus-within') && (source === doc || source.activeElement === null);
+    let current: Node = trigger, owned = true;
+    for (;;) {
+        const root = current.getRootNode() as Document | ShadowRoot;
+        if (root.activeElement !== current) owned = false;
+        if (root === doc) return owned || noFocus;
+        current = (root as ShadowRoot).host;
+    }
+}
+
 export function createImageControls(actions: {onAction(): void; onPrepare(): void; onDismiss?(): void; onInspect?(): void; onSettings?(section: ImageSettingsSection): void; translate?(source: string): string; onWarning?(event: MouseEvent): void}) {
     const localize = (source: string) => actions.translate?.(source) ?? source;
     const element = document.createElement('div');
@@ -128,9 +145,12 @@ export function createImageControls(actions: {onAction(): void; onPrepare(): voi
     dismiss.type = 'button';
     dismiss.className = 'fr-image-dismiss';
     dismiss.textContent = '关闭';
-    const reader = createImageTextReader(localize, () => {
+    let readerTrigger: HTMLElement | null = null;
+    const reader = createImageTextReader(localize, ownedFocus => {
         inspect.setAttribute('aria-expanded', 'false');
-        if (!disposed && !inspect.hidden) inspect.focus({preventScroll: true});
+        const trigger = readerTrigger;readerTrigger = null;
+        const available = trigger === warningButton ? !feedback.hidden && !warningButton.hidden : trigger === inspect && !inspect.hidden && !element.hidden;
+        if (!disposed && ownedFocus && trigger?.isConnected && available) trigger.focus({preventScroll: true});
         if (!disposed) refreshVisibility();
     });
     const details = reader.element;
@@ -143,6 +163,16 @@ export function createImageControls(actions: {onAction(): void; onPrepare(): voi
     let phase: ImageControlPhase = 'idle';
     let sourceMessage = '翻译图片';
     let progress: number | undefined;
+    const openReader = (trigger: HTMLElement) => {
+        const takeFocus = mayFocusReader(trigger);
+        readerTrigger = trigger;
+        // warning 位于独立 feedback 中；祖先还隐藏时 focus 会被浏览器忽略。
+        element.hidden = false;
+        reader.open(takeFocus);
+        inspect.setAttribute('aria-expanded', 'true');
+        actions.onInspect?.();
+        refreshVisibility();
+    };
     const refreshLanguage = () => {
         const brand = localize('流畅阅读');
         heading.textContent = `${brand} · ${localize('图片翻译')}`;
@@ -189,9 +219,9 @@ export function createImageControls(actions: {onAction(): void; onPrepare(): voi
         if (target === serviceSettings) actions.onSettings?.('settings-image-translation');
         if (target === dismiss) actions.onDismiss?.();
         if (target === inspect) {
-            if (details.hidden) reader.open(); else reader.close();
+            if (details.hidden) openReader(inspect); else reader.close();
             inspect.setAttribute('aria-expanded', String(!details.hidden));
-            actions.onInspect?.();
+            if (details.hidden) actions.onInspect?.();
             refreshVisibility();
         }
     };
@@ -222,9 +252,7 @@ export function createImageControls(actions: {onAction(): void; onPrepare(): voi
         if (!event.isTrusted || disposed) return;
         event.stopPropagation();
         if (feedback.dataset.manga === 'true') actions.onWarning?.(event);
-        else if (hasLines && details.hidden) {
-            reader.open();inspect.setAttribute('aria-expanded', 'true');actions.onInspect?.();refreshVisibility();
-        }
+        else if (hasLines && details.hidden) openReader(warningButton);
     };
     warningButton.addEventListener('click', handleWarning);
     feedback.addEventListener('click', isolate);

@@ -9,7 +9,7 @@ import {
     getAreaOcrImageSize,
     getOcrImageSize,
     getOcrLanguages,
-    normalizeOcrLines,
+    normalizeOcrLineViews,
     restoreOcrLineCoordinates,
     type OcrLine,
     type NumericEvidenceOcrLine,
@@ -196,10 +196,13 @@ export async function recognizeImage(
         if (signal?.aborted) throw abortRecognition();
         const result = await ocrWorkerRuntime.recognize(recognitionImage, languages, signal, layoutMode, onProgress);
         if (signal?.aborted) throw abortRecognition();
-        const readLines = (recognition: TesseractRecognitionResult): RecognitionViews => ({
-            ordinary: restoreOcrLineCoordinates(normalizeOcrLines(recognition.data.blocks), sourceWidth, sourceHeight, size.width, size.height, size.padding),
-            manga: restoreOcrLineCoordinates(normalizeOcrLines(recognition.data.blocks, true), sourceWidth, sourceHeight, size.width, size.height, size.padding),
-        });
+        const readLines = (recognition: TesseractRecognitionResult): RecognitionViews => {
+            const views = normalizeOcrLineViews(recognition.data.blocks);
+            return {
+                ordinary: restoreOcrLineCoordinates(views.ordinary, sourceWidth, sourceHeight, size.width, size.height, size.padding),
+                manga: restoreOcrLineCoordinates(views.manga, sourceWidth, sourceHeight, size.width, size.height, size.padding),
+            };
+        };
         let views = readLines(result);
         if (views.ordinary.length === 0 && (profile === 'area' || (sourceWidth <= 1000 && sourceHeight <= 500))) {
             // 圈选与小图片空结果才尝试单块分割，不给大型整页翻倍耗时，不降低噪声阈值。

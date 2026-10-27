@@ -199,8 +199,7 @@ export function getOcrLanguages(sourceLanguage: string): ImageOcrLanguageCode[] 
     return getRequiredImageOcrLanguages(sourceLanguage);
 }
 
-export function normalizeOcrLines(
-    blocks: Array<{
+type OcrBlocks = Array<{
         paragraphs?: Array<{
             lines?: Array<{
                 text: string;
@@ -210,9 +209,10 @@ export function normalizeOcrLines(
                 words?: Array<{ text: string; confidence?: number; bbox: OcrLine['bbox'] }>;
             }>;
         }>;
-    }> | null | undefined,
-    includeNumericEvidence = false,
-): NumericEvidenceOcrLine[] {
+    }> | null | undefined;
+
+/** 将原始识别结果清洗和拆行；结果用于各视图独立去重，不改变输入。 */
+function parseOcrLines(blocks: OcrBlocks, includeNumericEvidence: boolean): NumericEvidenceOcrLine[] {
     if (!blocks) return [];
 
     const normalized: NumericEvidenceOcrLine[] = [];
@@ -281,6 +281,11 @@ export function normalizeOcrLines(
             normalized[startIndex].numericConfidence = scores.reduce((minimum, score) => Math.min(minimum, score), 100);
         }
     });
+    return normalized;
+}
+
+/** 独立处理每个视图的重复框与竖排合列，避免漫画保护信息影响普通图片。 */
+function finalizeOcrLines(normalized: NumericEvidenceOcrLine[], includeNumericEvidence: boolean): NumericEvidenceOcrLine[] {
     // 相同文字且几乎完全重叠才视为重复检测；不同位置的按钮、数字和重复行必须保留。
     const seen = new Map<string, NumericEvidenceOcrLine[]>();
     const unique = normalized.filter(line => {
@@ -302,4 +307,16 @@ export function normalizeOcrLines(
         return !duplicate;
     });
     return mergeVerticalOcrColumns(unique, includeNumericEvidence);
+}
+
+export function normalizeOcrLines(blocks: OcrBlocks, includeNumericEvidence = false): NumericEvidenceOcrLine[] {
+    return finalizeOcrLines(parseOcrLines(blocks, includeNumericEvidence), includeNumericEvidence);
+}
+
+/** 共享文本解析；每个视图独立去重和合列，坐标回映仍由调用方在合列之后执行。 */
+export function normalizeOcrLineViews(blocks: OcrBlocks): {ordinary: OcrLine[]; manga: NumericEvidenceOcrLine[]} {
+    const parsed = parseOcrLines(blocks, true);
+    // finalize 可能删除置信字段或替换框，因此普通视图必须拥有独立行对象。
+    const ordinary = parsed.map(line => ({text: line.text, bbox: {...line.bbox}, ...(line.vertical ? {vertical: true as const} : {})}));
+    return {ordinary: finalizeOcrLines(ordinary, false), manga: finalizeOcrLines(parsed, true)};
 }

@@ -318,6 +318,7 @@
       "tests/harnessSessionHandler.test.ts",
       "tests/readingAssistantClient.test.ts",
       "tests/imageOcrNormalization.test.ts",
+      "tests/ocrDualViewDifferential.test.ts",
       "tests/imageTranslationRendering.test.ts",
       "tests/imageTranslationInpainting.test.ts",
       "tests/videoTranscriptionCacheClient.test.ts",

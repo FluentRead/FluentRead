@@ -295,6 +295,27 @@ describe('图片 OCR 处理与结果缓存', () => {
         expect(sources).toHaveLength(1);
     });
 
+    it.each([false, true])('普通和漫画并发时取消一个订阅仍共享识别，取消漫画=%s', async cancelManga => {
+        const bbox = {x0: 10, y0: 10, x1: 50, y1: 30};
+        const result = {data: {blocks: [{paragraphs: [{lines: [{text: '12:34', bbox, words: [{text: '12:34', bbox, confidence: 96}]}]}]}]}};
+        let complete!: (value: typeof result) => void;
+        let underlying!: AbortSignal;
+        recognize.mockImplementationOnce((_image, _languages, signal) => {underlying = signal; return new Promise(resolve => {complete = resolve;});});
+        const controller = new AbortController();
+        const ordinary = recognizeImage('cross-view', 'ko', cancelManga ? undefined : controller.signal);
+        const manga = recognizeImage('cross-view', 'ko', cancelManga ? controller.signal : undefined, {includeMangaNumericConfidence: true});
+        const cancelled = expect(cancelManga ? manga : ordinary).rejects.toMatchObject({name: 'AbortError'});
+        await vi.waitFor(() => expect(recognize).toHaveBeenCalledOnce());
+        controller.abort(); await cancelled; expect(underlying.aborted).toBe(false);
+        complete(result);
+        const remaining = await (cancelManga ? ordinary : manga);
+        if (cancelManga) expect(remaining).toEqual([{text: '12:34', bbox}]);
+        else expect(remaining).toEqual([{text: '12:34', bbox, numericConfidence: 96}]);
+        expect(await recognizeImage('cross-view', 'ko')).toEqual([{text: '12:34', bbox}]);
+        expect(await recognizeImage('cross-view', 'ko', undefined, {includeMangaNumericConfidence: true})).toEqual([{text: '12:34', bbox, numericConfidence: 96}]);
+        expect(recognize).toHaveBeenCalledOnce();
+    });
+
     it('扩展 Worker 使用本地资源目录并复用语言下载边界及取消信号', async () => {
         vi.stubGlobal('chrome', {runtime: {getURL: (path: string) => `chrome-extension://test${path}`}});
         const onProgress = vi.fn();

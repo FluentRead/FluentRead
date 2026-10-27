@@ -52,6 +52,33 @@ describe('超长漫画图片的稳定分段与原始分辨率',()=>{
         const bounds=f.runtime.bounds(segments[1]);expect(bounds).toMatchObject({left:20,top:1024,width:400,height:1024});
         expect(f.runtime.pixels(segments[1])).toBe(800*2560);f.runtime.dispose();
     });
+    it.each(['', 'fill'])('默认或 fill 的身份检查无需读取未使用的矩形：%s', fit=>{
+        const f=fixture();f.style.objectFit=fit;const segments=f.segments();
+        const rect=vi.spyOn(f.image,'getBoundingClientRect');
+        for(const segment of segments) {expect(f.runtime.identity(segment)).not.toBeNull();f.runtime.bounds(segment);}
+        // bounds 仍逐段读取当前几何，身份检查不应多做一次无效的矩形测量。
+        expect(rect).toHaveBeenCalledTimes(segments.length);f.runtime.dispose();
+    });
+    it('contain 身份检查仍逐段核对实时宽高比',()=>{
+        const f=fixture();f.style.objectFit='contain';const segments=f.segments();
+        const rect=vi.spyOn(f.image,'getBoundingClientRect');
+        expect(f.runtime.identity(segments[0])).not.toBeNull();f.runtime.bounds(segments[0]);
+        f.rect.height=100;
+        expect(f.runtime.identity(segments[1])).toBeNull();expect(rect).toHaveBeenCalledTimes(3);f.runtime.dispose();
+    });
+    it('身份端口同步改变几何或样式后，下一段仍读取新状态',()=>{
+        const f=fixture(),segments=f.segments();
+        f.ports.imageIdentity.mockImplementationOnce(image=>{f.rect.top=-100;f.style.borderTopWidth='2px';return image.src;});
+        expect(f.runtime.identity(segments[0])).not.toBeNull();
+        expect(f.runtime.bounds(segments[0]).top).toBe(-100);
+        expect(f.runtime.identity(segments[1])).toBeNull();f.runtime.dispose();
+    });
+    it('配置端口同步换图后，下一段不再沿用旧来源',()=>{
+        const f=fixture(),segments=f.segments();
+        f.ports.configurationIdentity.mockImplementationOnce(()=>{f.image.src='https://cdn.example/new';return 'config';});
+        expect(f.runtime.identity(segments[0])).not.toBeNull();
+        expect(f.runtime.identity(segments[1])).toBeNull();f.runtime.dispose();
+    });
     it('读取上下文而只覆盖核心段，滚动缩放保持定位，暂停和返页复用不改原图',async()=>{
         const f=fixture(),original=f.image.outerHTML,segment=f.segments()[1];
         f.rect.top=-1024;f.rect.bottom-=1024;await f.runtime.translate(segment);

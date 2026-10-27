@@ -1,5 +1,6 @@
 import {describe, expect, it} from 'vitest';
 import {groupImageParagraphs, type ImageTextRegion} from '@/src/features/image-translation/paragraphs';
+import {endsEastAsianText, startsEastAsianText} from '@/src/features/image-translation/textBoundary';
 import bambuLines from './fixtures/image-translation/bambu-ocr-lines.json';
 import {
     getOcrImageSize,
@@ -13,6 +14,18 @@ import {getMangaOcrEngine, getRequiredImageOcrLanguages} from '@/src/features/im
 describe('普通图片按完整段落翻译', () => {
     const line = (text: string, x0: number, y0: number, width = 200, h = 12): ImageTextRegion =>
         ({text, bbox: {x0, y0, x1: x0 + width, y1: y0 + h}});
+
+    it('东亚边界只逆向读取完整码点及选择符，不把孤立标记或 emoji 当作续行文字', () => {
+        for (const text of ['漢', '𠀀\u{E0100}', 'あ\uFE0E', 'ｶﾞ', 'ｶﾞ\uFE0F', '。', '한국어', '字'+'\u{E0100}'.repeat(32)])
+            expect(endsEastAsianText(text), text).toBe(true);
+        for (const text of ['', '\uFE0F', '\u{E0100}', '\uFE0F\u{E0100}', 'A', '😀\uFE0F', '㊙\uFE0F', '〽\uFE0E', '。\uFE0E', '字'+'\u{E0100}'.repeat(33), 'ﾞ', 'Aﾞ', '\uD800', '\uDC00'])
+            expect(endsEastAsianText(text), text).toBe(false);
+        expect(endsEastAsianText('。\uFE00')).toBe(true);
+        expect(endsEastAsianText('、\uFE01')).toBe(true);
+        expect(endsEastAsianText('字'+'\u{E0100}'.repeat(1024))).toBe(false);
+        for (const text of ['字', '𠀀', '𛀁', 'ｶ', '한글']) expect(startsEastAsianText(text), text).toBe(true);
+        for (const text of ['', 'word', '😀', '\uD800', '\uDC00']) expect(startsEastAsianText(text), text).toBe(false);
+    });
 
     it('Bambu 原图的真实稀疏 OCR：两段三行说明合为整段，标题和底部链接分离', () => {
         const regions = groupImageParagraphs(bambuLines);
@@ -32,7 +45,25 @@ describe('普通图片按完整段落翻译', () => {
         ["BMP then supplementary", "汉", "𠀁", "汉𠀁"],
         ["supplementary then BMP", "𠀀", "字", "𠀀字"],
         ["extended G Han", "𰀀", "𠀁", "𰀀𠀁"],
+        ["supplementary Han with IVS", "第一𠀀\u{E0100}", "𠀁世界", "第一𠀀\u{E0100}𠀁世界"],
+        ["BMP Han with variation selector", "漢\uFE00", "字", "漢\uFE00字"],
+        ["halfwidth kana with voiced mark", "こんにちはｶﾞ", "ｷﾞ世界", "こんにちはｶﾞｷﾞ世界"],
+        ["supplementary kana", "古い𛀁", "𛀂文字", "古い𛀁𛀂文字"],
+        ["halfwidth kana without voiced mark", "あｶ", "ﾅ文字", "あｶﾅ文字"],
         ["Latin", "alpha", "beta", "alpha beta"],
+        ["Korean then Latin", "한국어 단어", "words", "한국어 단어 words"],
+        ["Latin then Korean", "word", "한글 문장", "word 한글 문장"],
+        ["emoji variation then Han", "😀\uFE0F", "字", "😀\uFE0F 字"],
+        ["CJK-range emoji presentation then Han", "秘密㊙\uFE0F", "文字", "秘密㊙\uFE0F 文字"],
+        ["CJK-range text presentation then Han", "案内〽\uFE0E", "文字", "案内〽\uFE0E 文字"],
+        ["kana text presentation", "あ\uFE0E", "文字", "あ\uFE0E文字"],
+        ["halfwidth voiced kana with variation selector", "ｶﾞ\uFE0F", "文字", "ｶﾞ\uFE0F文字"],
+        ["CJK punctuation with text selector retains prior boundary", "案内。\uFE0E", "文字", "案内。\uFE0E 文字"],
+        ["standardized Japanese full stop variation", "案内。\uFE00", "文字", "案内。\uFE00文字"],
+        ["standardized Japanese comma variation", "案内、\uFE01", "文字", "案内、\uFE01文字"],
+        ["Japanese punctuation before supplementary kana", "日本語。", "𛀂文字", "日本語。𛀂文字"],
+        ["Korean continuation keeps existing boundary", "한국어", "문장", "한국어문장"],
+        ["Han with IVS then emoji", "𠀀\u{E0100}", "😀", "𠀀\u{E0100} 😀"],
         ["emoji", "😀", "😁", "😀 😁"],
         ["closing punctuation", "hello", ")", "hello)"],
         ["opening punctuation", "(", "world", "(world"],
@@ -93,6 +124,17 @@ describe('普通图片按完整段落翻译', () => {
         const before = structuredClone(input);
         expect(groupImageParagraphs(input)).toEqual([{
             text: '今日は楽しかった。', bbox: {x0: 76, y0: 20, x1: 102, y1: 120},
+            vertical: true, fontSize: 12, sourceBoxes: [right.bbox, left.bbox], textAlign: 'center',
+        }]);
+        expect(input).toEqual(before);
+    });
+
+    it('竖排续列保留扩展字符和逐列来源框，不改变输入或列序', () => {
+        const right = {...line('𠀀\u{E0100}', 90, 20, 12, 100), vertical: true as const};
+        const left = {...line('ｶﾞ𛀁', 76, 21, 12, 99), vertical: true as const};
+        const input = [left, right], before = structuredClone(input);
+        expect(groupImageParagraphs(input)).toEqual([{
+            text: '𠀀\u{E0100}ｶﾞ𛀁', bbox: {x0: 76, y0: 20, x1: 102, y1: 120},
             vertical: true, fontSize: 12, sourceBoxes: [right.bbox, left.bbox], textAlign: 'center',
         }]);
         expect(input).toEqual(before);

@@ -5,6 +5,7 @@
  * 模块边界：纯数据算法，不运行模型、不读取 DOM 或配置，也不修补图片；只输出可核对的识别原文和区域，不推测缺失文字。
  */
 import type {OcrLine} from '@/src/shared/image/types';
+import {endsEastAsianText, startsEastAsianText} from '../textBoundary';
 import type {NumericEvidenceOcrLine} from '../core';
 import {numericInformation} from './mangaNumeric';
 
@@ -125,8 +126,8 @@ function mergeMangaLines(lines: MangaRegion[], lineGap = 0.8, columnGap = 0.8): 
         const text=members.reduce((text, member) => {
             if (text.endsWith('\u00ad')) return text.slice(0,-1) + member.text;
             // 用 Unicode 边界而非 UTF-16 单元取首尾，避免拆开补充平面汉字。
-            const endsCjk = /(?:[\uFF66-\uFF9D][\uFF9E\uFF9F]|[\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}\u2e80-\u9fff\u3040-\u30ff\uac00-\ud7af])[\uFE00-\uFE0F\u{E0100}-\u{E01EF}]*$/u.test(text);
-            const startsCjk = /^[\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}\u2e80-\u9fff\u3040-\u30ff\uac00-\ud7af]/u.test(member.text);
+            const endsCjk = endsEastAsianText(text);
+            const startsCjk = startsEastAsianText(member.text);
             const hyphen = /\p{L}-$/u.test(text) && /^\p{L}/u.test(member.text);
             const separator = !text || members[0].vertical || hyphen || ((endsCjk || /[。！？、」』】）]$/u.test(text)) && startsCjk) ? '' : ' ';
             return text + separator + member.text;

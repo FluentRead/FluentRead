@@ -5,6 +5,7 @@
  * 模块边界：只处理原图坐标与识别文本，不运行 OCR、不调用翻译或 Canvas；漫画仍使用其气泡分组策略。
  */
 import type {OcrLine} from '@/src/shared/image/types';
+import {endsEastAsianText, startsEastAsianText} from './textBoundary';
 export interface ImageTextRegion extends OcrLine {
     sourceBoxes?: OcrLine['bbox'][];
     /** 典型源行字形高度，用于限制译文字号；不是合并段落的总高度。 */
@@ -71,7 +72,7 @@ function joinLines(previous: string, next: string): string {
     // 硬连字符可能属于复合词，保留它；只有明确的软连字符才可删除。
     if (/\p{L}-$/u.test(previous) && /^\p{L}/u.test(next))
         return previous + next;
-    const cjk = /[\p{Script=Han}\u2e80-\u9fff\uac00-\ud7af]$/u.test(previous) && /^[\p{Script=Han}\u2e80-\u9fff\uac00-\ud7af]/u.test(next);
+    const cjk = endsEastAsianText(previous) && startsEastAsianText(next);
     const punctuation = /^[,.;:!?%。，、！？：；)\]}’”]/u.test(next) || /[([{‘“]$/u.test(previous);
     return previous + (cjk || punctuation ? '' : ' ') + next;
 }

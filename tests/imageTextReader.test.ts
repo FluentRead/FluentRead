@@ -51,6 +51,53 @@ describe('图片文字独立阅读面板', () => {
         writeText.mockRejectedValueOnce(new Error('denied'));
         event(copy());await Promise.resolve();expect(feedback().textContent).toContain('手动复制');
     });
+    it.each(['old-fails', 'old-succeeds'] as const)('较早复制迟到时不覆盖较新的复制反馈：%s', async outcome => {
+        let resolveOld!: () => void, rejectOld!: (error: Error) => void;
+        let resolveNew!: () => void, rejectNew!: (error: Error) => void;
+        writeText.mockImplementationOnce(() => new Promise<void>((resolve, reject) => {resolveOld = resolve;rejectOld = reject;}));
+        writeText.mockImplementationOnce(() => new Promise<void>((resolve, reject) => {resolveNew = resolve;rejectNew = reject;}));
+        reader.setLines([{sourceText:'Hello',text:'你好'}]);reader.open();
+        event(copy());event(copy());
+        if (outcome === 'old-fails') resolveNew();else rejectNew(new Error('new failure'));
+        await Promise.resolve();
+        const expected = outcome === 'old-fails' ? '已复制' : '复制失败，请选中文字后手动复制';
+        expect(feedback().textContent).toBe(expected);
+        if (outcome === 'old-fails') rejectOld(new Error('old failure'));else resolveOld();
+        await Promise.resolve();expect(feedback().textContent).toBe(expected);
+        expect(vi.getTimerCount()).toBe(1);
+        await vi.advanceTimersByTimeAsync(2500);expect(feedback().textContent).toContain('本地 OCR');
+    });
+    it('切换对照后旧复制结果和旧反馈计时器不能覆盖新模式', async () => {
+        let finish!: () => void;
+        writeText.mockImplementationOnce(() => new Promise<void>(resolve => {finish = resolve;}));
+        reader.setLines([{sourceText:'Hello',text:'你好'}]);reader.open();event(copy());
+        event(compare());event(compare());finish();await Promise.resolve();
+        expect(feedback().textContent).toContain('本地 OCR');expect(vi.getTimerCount()).toBe(0);
+        event(compare());
+        event(copy());await Promise.resolve();expect(feedback().textContent).toBe('已复制');
+        event(compare());expect(feedback().textContent).toContain('本地 OCR');expect(vi.getTimerCount()).toBe(0);
+    });
+    it('新复制开始时清除旧反馈计时器，结果只保留自己的完整展示时间', async () => {
+        let finish!: () => void;
+        reader.setLines([{text:'译文'}]);reader.open();event(copy());await Promise.resolve();
+        expect(feedback().textContent).toBe('已复制');await vi.advanceTimersByTimeAsync(2000);
+        writeText.mockImplementationOnce(() => new Promise<void>(resolve => {finish = resolve;}));
+        event(copy());expect(feedback().textContent).toContain('本地 OCR');expect(vi.getTimerCount()).toBe(0);
+        finish();await Promise.resolve();await vi.advanceTimersByTimeAsync(500);
+        expect(feedback().textContent).toBe('已复制');await vi.advanceTimersByTimeAsync(2000);
+        expect(feedback().textContent).toContain('本地 OCR');
+    });
+    it('复制进行中切换界面语言后，用当前语言显示完成结果', async () => {
+        let finish!: () => void;
+        let language = 'zh';
+        reader.dispose();
+        reader = createImageTextReader(text => language === 'en' && text === '已复制' ? 'Copied' : text, onClose);
+        document.body.append(reader.element);
+        writeText.mockImplementationOnce(() => new Promise<void>(resolve => {finish = resolve;}));
+        reader.setLines([{text:'译文'}]);reader.open();event(copy());
+        language = 'en';reader.refreshLanguage();finish();await Promise.resolve();
+        expect(feedback().textContent).toBe('Copied');
+    });
     it('面板内部键盘与滚轮被隔离，Escape 和关闭按钮归还入口焦点', () => {
         reader.open();const host = vi.fn();document.body.addEventListener('wheel', host);
         event(body(), 'wheel');expect(host).not.toHaveBeenCalled();
@@ -61,15 +108,20 @@ describe('图片文字独立阅读面板', () => {
         reader.open();event(reader.element.querySelectorAll('header button')[1]);
         expect(onClose).toHaveBeenCalledTimes(2);
     });
-    it.each(['replace','close','hide','dispose'])('复制异步返回后不覆盖已经%s的阅读面板', async action => {
+    it.each([
+        ['replace', 'resolve'], ['replace', 'reject'], ['close', 'resolve'], ['close', 'reject'],
+        ['hide', 'resolve'], ['hide', 'reject'], ['dispose', 'resolve'], ['dispose', 'reject'],
+    ] as const)('复制异步 %s 后迟到 %s 不覆盖阅读面板', async (action, outcome) => {
         let complete!: () => void;
-        writeText.mockImplementationOnce(() => new Promise<void>(resolve => {complete = resolve;}));
+        let fail!: (error: Error) => void;
+        writeText.mockImplementationOnce(() => new Promise<void>((resolve, reject) => {complete = resolve;fail = reject;}));
         reader.setLines([{text:'旧结果'}]);reader.open();event(copy());
         if(action==='replace') reader.setLines([{text:'新结果'}]);
         else if(action==='close') reader.close();
         else if(action==='hide') reader.element.hidden=true;
         else reader.dispose();
-        complete();await Promise.resolve();expect(feedback().textContent).not.toBe('已复制');
+        if (outcome === 'resolve') complete();else fail(new Error('late failure'));
+        await Promise.resolve();expect(feedback().textContent).toContain('本地 OCR');
         expect(vi.getTimerCount()).toBe(0);
     });
     it('卸载后即使收到保留的可信回调也不再执行动作', () => {

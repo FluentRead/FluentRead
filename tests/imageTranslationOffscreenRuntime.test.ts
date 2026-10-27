@@ -1,5 +1,6 @@
 import {afterEach, beforeEach, describe, expect, it, vi} from 'vitest';
 import {mangaMaskBoxes} from '@/src/features/image-translation/mangaPatchResult';
+import type {ImageTextRegion} from '@/src/features/image-translation/paragraphs';
 
 const mocks = vi.hoisted(() => ({recognize: vi.fn(), inpaint: vi.fn(), background: vi.fn(), draw: vi.fn(), mangaRecognize:vi.fn(), repair:vi.fn(), mangaDraw:vi.fn(), sampleManga:vi.fn(), alphaProtection:vi.fn(), encode:vi.fn()}));
 vi.mock('@/src/features/image-translation/services/mangaAlphaProtection',()=>({planMangaAlphaProtection:mocks.alphaProtection}));
@@ -694,4 +695,194 @@ it('相邻数字与远处正文同时存在时，模拟修补像素只触及远�
     for(let y=numeric.bbox.y0;y<numeric.bbox.y1;y++)for(let x=numeric.bbox.x0;x<numeric.bbox.x1;x++)
         expect(raster![(y*100+x)*4]).toBe(0);
     expect(raster![(55*100+10)*4]).toBe(255);
+});
+
+it('未变化的品牌原文与相邻译文冲突时保留品牌，远处对白仍可绘制',async()=>{
+    imageOptions.push({width:100,height:80});
+    const close={text:'Hello',bbox:{x0:2,y0:2,x1:19,y1:10},fontSize:8,sourceBoxes:[{x0:2,y0:2,x1:19,y1:10}]};
+    const brand={text:'KEEP',bbox:{x0:20,y0:2,x1:40,y1:10},fontSize:8,sourceBoxes:[{x0:20,y0:2,x1:40,y1:10}]};
+    const distant={text:'Goodbye',bbox:{x0:4,y0:50,x1:35,y1:60},fontSize:10,sourceBoxes:[{x0:4,y0:50,x1:35,y1:60}]};
+    mocks.mangaRecognize.mockResolvedValueOnce([close,brand,distant]);
+    sendMessage.mockImplementation((message,callback)=>callback(message.type==='fluentReadImageTranslateTexts'?{success:true,translations:['你好','KEEP','再见']}:undefined));
+    let raster:Uint8ClampedArray|undefined;
+    mocks.repair.mockImplementationOnce(async(pixels,width,height,regions)=>{
+        raster=pixels;for(const region of regions)for(const b of mangaMaskBoxes(region,width,height))
+            for(let y=b.y0;y<b.y1;y++)for(let x=b.x0;x<b.x1;x++)pixels[(y*width+x)*4]=255;
+        return pixels;
+    });
+    const result=await translateImageInOffscreen('brand-conflict','en','Page',undefined,'brand-conflict',true);
+    expect(raster).toBeDefined();
+    expect(raster![(5*100+20)*4]).toBe(0);
+    expect(raster![(55*100+10)*4]).toBe(255);
+    expect(result.lines.find(line=>line.sourceText==='Hello')).toMatchObject({text:'你好',renderSkipped:true});
+    expect(result.lines.find(line=>line.sourceText==='KEEP')).toMatchObject({text:'KEEP'});
+});
+
+it.each(['forward','reverse'] as const)('一处需保留原文使相邻译文跳过后，继续保护该译文的原文直至稳定（%s）',async order=>{
+    imageOptions.push({width:100,height:80});
+    const box=(x0:number,x1:number,y0=2,y1=10)=>({x0,y0,x1,y1});
+    const a={text:'FIRST',bbox:box(2,20),fontSize:8,sourceBoxes:[box(2,20)]};
+    const b={text:'SECOND',bbox:box(22,40),fontSize:8,sourceBoxes:[box(22,40)]};
+    const original={text:'BRAND',bbox:box(42,60),fontSize:8,sourceBoxes:[box(42,60)]};
+    const far={text:'DISTANT',bbox:box(5,25,50,60),fontSize:10,sourceBoxes:[box(5,25,50,60)]};
+    const rows=order==='forward'?[a,b,original,far]:[b,a,original,far];
+    mocks.mangaRecognize.mockResolvedValueOnce(rows);
+    sendMessage.mockImplementation((message,callback)=>callback(message.type==='fluentReadImageTranslateTexts'?{success:true,translations:order==='forward'?['一','二','BRAND','远']:['二','一','BRAND','远']}:undefined));
+    mocks.repair.mockImplementationOnce(async pixels=>pixels);
+    const result=await translateImageInOffscreen('chain','en','Page',undefined,'chain',true);
+    expect(result.lines.map(line=>line.renderSkipped===true)).toEqual([true,true,false,false]);
+    expect(mocks.repair.mock.calls[0][3].map((line:ImageTextRegion)=>line.text)).toEqual(['远']);
+});
+
+it('保留原文同时检查合并框和全部源框，包括源框超出合并框的防御情形',async()=>{
+    imageOptions.push({width:100,height:80});
+    const close={text:'Hello',bbox:{x0:2,y0:2,x1:19,y1:10},fontSize:8,sourceBoxes:[{x0:2,y0:2,x1:19,y1:10}]};
+    const original={text:'BRAND',bbox:{x0:60,y0:40,x1:80,y1:50},fontSize:10,sourceBoxes:[{x0:70,y0:40,x1:80,y1:50},{x0:20,y0:2,x1:30,y1:10}]};
+    mocks.mangaRecognize.mockResolvedValueOnce([close,original]);
+    sendMessage.mockImplementation((message,callback)=>callback(message.type==='fluentReadImageTranslateTexts'?{success:true,translations:['你好','BRAND']}:undefined));
+    const result=await translateImageInOffscreen('source-box','en','Page',undefined,'source-box',true);
+    expect(result.lines[0]).toMatchObject({renderSkipped:true});expect(result.mangaPatches?.patches).toEqual([]);
+    expect(mocks.repair).not.toHaveBeenCalled();expect(mocks.mangaDraw).not.toHaveBeenCalled();
+});
+
+it('翻译服务缺少相邻行结果时保留回退原文',async()=>{
+    imageOptions.push({width:100,height:80});
+    const close={text:'Hello',bbox:{x0:2,y0:2,x1:19,y1:10},fontSize:8,sourceBoxes:[{x0:2,y0:2,x1:19,y1:10}]};
+    const fallback={text:'BRAND',bbox:{x0:20,y0:2,x1:40,y1:10},fontSize:8,sourceBoxes:[{x0:20,y0:2,x1:40,y1:10}]};
+    mocks.mangaRecognize.mockResolvedValueOnce([close,fallback]);
+    sendMessage.mockImplementation((message,callback)=>callback(message.type==='fluentReadImageTranslateTexts'?{success:true,translations:['你好']}:undefined));
+    const result=await translateImageInOffscreen('missing','en','Page',undefined,'missing',true);
+    expect(result.lines[0]).toMatchObject({text:'你好',renderSkipped:true});expect(result.lines[1]).toMatchObject({text:'BRAND',sourceText:'BRAND'});
+    expect(result.mangaPatches?.patches).toEqual([]);expect(mocks.repair).not.toHaveBeenCalled();
+});
+
+it('通用 OCR 在对角相邻时保留未变俄文及可读译文',async()=>{
+    imageOptions.push({width:100,height:80});
+    const close={text:'Привет',bbox:{x0:2,y0:2,x1:22,y1:22}};
+    const original={text:'БРЕНД',bbox:{x0:25,y0:25,x1:45,y1:45}};
+    mocks.recognize.mockResolvedValueOnce([close,original]);
+    sendMessage.mockImplementation((message,callback)=>callback(message.type==='fluentReadImageTranslateTexts'?{success:true,translations:['你好','БРЕНД']}:undefined));
+    const result=await translateImageInOffscreen('tesseract-original','ru','Page',undefined,'tesseract-original',true);
+    expect(result.lines.find(line=>line.sourceText==='Привет')).toMatchObject({text:'你好',renderSkipped:true});
+    expect(result.lines.find(line=>line.sourceText==='БРЕНД')).toMatchObject({text:'БРЕНД'});
+    expect(result.mangaPatches?.patches).toEqual([]);expect(mocks.repair).not.toHaveBeenCalled();
+});
+
+it('候选缺少源框时仍用原框余量检查，并保护未变化的相邻原文',async()=>{
+    imageOptions.push({width:100,height:80});
+    mocks.mangaRecognize.mockResolvedValueOnce([{text:'Hello',bbox:{x0:2,y0:2,x1:19,y1:10},fontSize:8},
+        {text:'BRAND',bbox:{x0:21,y0:2,x1:40,y1:10},fontSize:8}]);
+    sendMessage.mockImplementation((message,callback)=>callback(message.type==='fluentReadImageTranslateTexts'?{success:true,translations:['你好','BRAND']}:undefined));
+    const result=await translateImageInOffscreen('default-source','en','Page',undefined,'default-source',true);
+    expect(result.lines[0]).toMatchObject({renderSkipped:true});expect(result.mangaPatches?.patches).toEqual([]);expect(mocks.repair).not.toHaveBeenCalled();
+});
+
+it('候选源框无效时不继续绘制，避免依据无效几何判断原文安全',async()=>{
+    imageOptions.push({width:100,height:80});
+    mocks.mangaRecognize.mockResolvedValueOnce([{text:'Hello',bbox:{x0:2,y0:2,x1:19,y1:10},fontSize:8,sourceBoxes:[null]},
+        {text:'12:34',bbox:{x0:60,y0:50,x1:80,y1:60},fontSize:10}]);
+    sendMessage.mockImplementation((message,callback)=>callback(message.type==='fluentReadImageTranslateTexts'?{success:true,translations:['你好']}:undefined));
+    const result=await translateImageInOffscreen('invalid-source','en','Page',undefined,'invalid-source',true);
+    expect(result.lines[0]).toMatchObject({renderSkipped:true});expect(result.mangaPatches?.patches).toEqual([]);expect(mocks.repair).not.toHaveBeenCalled();
+});
+
+it('完全位于图外的保留框不阻断其他可安全绘制区域',async()=>{
+    imageOptions.push({width:100,height:80});
+    mocks.mangaRecognize.mockResolvedValueOnce([{text:'Hello',bbox:{x0:2,y0:2,x1:19,y1:10},fontSize:8},
+        {text:'12:34',bbox:{x0:150,y0:10,x1:160,y1:20},fontSize:10,sourceBoxes:[]}]);
+    sendMessage.mockImplementation((message,callback)=>callback(message.type==='fluentReadImageTranslateTexts'?{success:true,translations:['你好']}:undefined));
+    mocks.repair.mockImplementationOnce(async pixels=>pixels);
+    const result=await translateImageInOffscreen('outside-original','en','Page',undefined,'outside-original',true);
+    expect(result.lines[0].renderSkipped).toBeUndefined();expect(mocks.repair).toHaveBeenCalledOnce();expect(mocks.mangaDraw).toHaveBeenCalledOnce();
+});
+
+it('比较预算耗尽时保留全部原图并标记所有未绘制译文',async()=>{
+    imageOptions.push({width:100,height:80});
+    const changed=Array.from({length:1000},(_,index)=>({text:`WORD${index}`,bbox:{x0:2,y0:2,x1:10,y1:10},fontSize:8,sourceBoxes:[{x0:2,y0:2,x1:10,y1:10}]}));
+    const originals=Array.from({length:600},(_,index)=>{const x=40+index%50,y=20+Math.floor(index/50);return {text:'12:34',bbox:{x0:x,y0:y,x1:x+1,y1:y+1},fontSize:1};});
+    mocks.mangaRecognize.mockResolvedValueOnce([...changed,...originals]);
+    sendMessage.mockImplementation((message,callback)=>callback(message.type==='fluentReadImageTranslateTexts'?{success:true,translations:Array.from({length:changed.length},()=> '译文')}:undefined));
+    const result=await translateImageInOffscreen('budget','en','Page',undefined,'budget',true);
+    expect(result.lines.slice(0,changed.length).every(line=>line.renderSkipped===true)).toBe(true);
+    expect(result.mangaPatches?.patches).toEqual([]);expect(mocks.repair).not.toHaveBeenCalled();expect(mocks.mangaDraw).not.toHaveBeenCalled();
+});
+
+it('待保留框超出有界集合时保留原图而非漏掉后续原文',async()=>{
+    imageOptions.push({width:200,height:200});
+    const changed={text:'TEXT',bbox:{x0:2,y0:150,x1:20,y1:160},fontSize:10,sourceBoxes:[{x0:2,y0:150,x1:20,y1:160}]};
+    const originals=Array.from({length:8193},(_,index)=>{const x=4+index%100,y=4+Math.floor(index/100);return {text:'12:34',bbox:{x0:x,y0:y,x1:x+1,y1:y+1},fontSize:1};});
+    mocks.mangaRecognize.mockResolvedValueOnce([changed,...originals]);
+    sendMessage.mockImplementation((message,callback)=>callback(message.type==='fluentReadImageTranslateTexts'?{success:true,translations:['译文']}:undefined));
+    const result=await translateImageInOffscreen('many-boxes','en','Page',undefined,'many-boxes',true);
+    expect(result.lines[0]).toMatchObject({renderSkipped:true});expect(result.mangaPatches?.patches).toEqual([]);expect(mocks.repair).not.toHaveBeenCalled();
+});
+
+it('巨大源框列表逐项计入预算，传播耗尽时远处译文也保留原图',async()=>{
+    imageOptions.push({width:100,height:80});
+    const repeated={x0:2,y0:2,x1:19,y1:10},sources=Array.from({length:250_001},()=>repeated);
+    const near=Array.from({length:4},(_,index)=>({text:`TEXT${index}`,bbox:repeated,fontSize:8,sourceBoxes:sources}));
+    const original={text:'BRAND',bbox:{x0:20,y0:2,x1:40,y1:10},fontSize:8,sourceBoxes:[{x0:20,y0:2,x1:40,y1:10}]};
+    const far={text:'DISTANT',bbox:{x0:5,y0:50,x1:25,y1:60},fontSize:10,sourceBoxes:[{x0:5,y0:50,x1:25,y1:60}]};
+    mocks.mangaRecognize.mockResolvedValueOnce([...near,original,far]);
+    sendMessage.mockImplementation((message,callback)=>callback(message.type==='fluentReadImageTranslateTexts'?{success:true,translations:['一','二','三','四','BRAND','远']}:undefined));
+    const result=await translateImageInOffscreen('many-sources','en','Page',undefined,'many-sources',true);
+    expect(result.lines.slice(0,4).every(line=>line.renderSkipped===true)).toBe(true);
+    expect(result.lines[5]).toMatchObject({renderSkipped:true});expect(result.mangaPatches?.patches).toEqual([]);expect(mocks.repair).not.toHaveBeenCalled();
+});
+
+it('大量已跳过候选的后续访问也计入预算，不能让队列空遍历失控',async()=>{
+    imageOptions.push({width:100,height:80});
+    const box={x0:2,y0:2,x1:19,y1:10};
+    const near=Array.from({length:1000},(_,index)=>({text:`TEXT${index}`,bbox:box,fontSize:8,sourceBoxes:[box]}));
+    const original={text:'BRAND',bbox:{x0:20,y0:2,x1:40,y1:10},fontSize:8,sourceBoxes:[{x0:20,y0:2,x1:40,y1:10}]};
+    const far={text:'DISTANT',bbox:{x0:2,y0:60,x1:20,y1:70},fontSize:10,sourceBoxes:[{x0:2,y0:60,x1:20,y1:70}]};
+    const others=Array.from({length:1100},(_,index)=>{const x=40+index%50,y=20+Math.floor(index/50);return {text:'12:34',bbox:{x0:x,y0:y,x1:x+1,y1:y+1},fontSize:1};});
+    mocks.mangaRecognize.mockResolvedValueOnce([...near,original,far,...others]);
+    sendMessage.mockImplementation((message,callback)=>callback(message.type==='fluentReadImageTranslateTexts'?{success:true,translations:[...Array.from({length:near.length},()=> '译文'),'BRAND','远']}:undefined));
+    const result=await translateImageInOffscreen('skipped-queue','en','Page',undefined,'skipped-queue',true);
+    expect(result.lines[near.length+1]).toMatchObject({renderSkipped:true});expect(result.mangaPatches?.patches).toEqual([]);expect(mocks.repair).not.toHaveBeenCalled();
+});
+
+it('翻译期间取消时保留全部原图且不执行碰撞后的修补',async()=>{
+    const controller=new AbortController();
+    mocks.mangaRecognize.mockResolvedValueOnce([{text:'Hello',bbox:{x0:2,y0:2,x1:11,y1:6},fontSize:4},{text:'BRAND',bbox:{x0:12,y0:2,x1:27,y1:6},fontSize:4}]);
+    sendMessage.mockImplementation((message,callback)=>{if(message.type==='fluentReadImageTranslateTexts'){controller.abort();callback({success:true,translations:['你好','BRAND']});}else callback(undefined);});
+    await expect(translateImageInOffscreen('cancel-original','en','Page',controller.signal,'cancel-original',true)).rejects.toThrow('已取消');
+    expect(mocks.repair).not.toHaveBeenCalled();expect(mocks.mangaDraw).not.toHaveBeenCalled();
+});
+
+it('碰撞扫描进行中收到取消时在有界检查点退出，不启动修补',async()=>{
+    imageOptions.push({width:100,height:80});
+    const controller=new AbortController(),box={x0:2,y0:2,x1:10,y1:10};let scanning=false;
+    const sources=new Proxy(Array.from({length:40_000},()=>box),{get(target,key,receiver){
+        if(key==='1000'&&!scanning){scanning=true;setTimeout(()=>controller.abort(),0);}
+        return Reflect.get(target,key,receiver);
+    }});
+    const translated={text:'Hello',bbox:box,fontSize:8,sourceBoxes:sources};
+    const original={text:'12:34',bbox:{x0:60,y0:50,x1:80,y1:60},fontSize:10};
+    mocks.mangaRecognize.mockResolvedValueOnce([translated,original]);
+    sendMessage.mockImplementation((message,callback)=>callback(message.type==='fluentReadImageTranslateTexts'?{success:true,translations:['你好']}:undefined));
+    await expect(translateImageInOffscreen('scan-cancel','en','Page',controller.signal,'scan-cancel',true)).rejects.toThrow('已取消');
+    expect(scanning).toBe(true);expect(mocks.repair).not.toHaveBeenCalled();expect(mocks.mangaDraw).not.toHaveBeenCalled();
+});
+
+it('碰撞传播完成前收到取消时，即使无译图也不能返回成功结果',async()=>{
+    const controller=new AbortController(),box={x0:12,y0:2,x1:27,y1:6};let scheduled=false;
+    const sources=new Proxy([box],{get(target,key,receiver){if(key==='0'&&!scheduled){scheduled=true;queueMicrotask(()=>controller.abort());}return Reflect.get(target,key,receiver);}});
+    mocks.mangaRecognize.mockResolvedValueOnce([{text:'Hello',bbox:{x0:2,y0:2,x1:11,y1:6},fontSize:4},
+        {text:'BRAND',bbox:box,fontSize:4,sourceBoxes:sources}]);
+    sendMessage.mockImplementation((message,callback)=>callback(message.type==='fluentReadImageTranslateTexts'?{success:true,translations:['你好','BRAND']}:undefined));
+    await expect(translateImageInOffscreen('last-cancel','en','Page',controller.signal,'last-cancel',true)).rejects.toThrow('已取消');
+    expect(scheduled).toBe(true);expect(mocks.repair).not.toHaveBeenCalled();expect(mocks.mangaDraw).not.toHaveBeenCalled();
+});
+
+it('保护框预算耗尽时收到取消仍以取消结束，不把空译图当成功',async()=>{
+    imageOptions.push({width:200,height:200});const controller=new AbortController();let scheduled=false;
+    const changed={text:'TEXT',bbox:{x0:2,y0:150,x1:20,y1:160},fontSize:10};
+    const originals=Array.from({length:8193},(_,index)=>{const x=4+index%100,y=4+Math.floor(index/100);return {text:'12:34',bbox:{x0:x,y0:y,x1:x+1,y1:y+1},fontSize:1};});
+    const last=originals[8192],lastBox=last.bbox;Object.defineProperty(last,'bbox',{get(){if(!scheduled){scheduled=true;queueMicrotask(()=>controller.abort());}return lastBox;}});
+    mocks.mangaRecognize.mockResolvedValueOnce([changed,...originals]);
+    sendMessage.mockImplementation((message,callback)=>callback(message.type==='fluentReadImageTranslateTexts'?{success:true,translations:['译文']}:undefined));
+    await expect(translateImageInOffscreen('budget-cancel','en','Page',controller.signal,'budget-cancel',true)).rejects.toThrow('已取消');
+    expect(scheduled).toBe(true);expect(mocks.repair).not.toHaveBeenCalled();expect(mocks.mangaDraw).not.toHaveBeenCalled();
 });

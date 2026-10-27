@@ -58,7 +58,7 @@ describe('standalone manga reading panel prototype',()=>{
   it('identifies translations withheld from the image',async()=>{
     const h=await mount();h.props.read.mockResolvedValueOnce({status:'ready',lines:[{...line('译文'),renderSkipped:true}]});
     await h.instance.open(trusted);h.button('图片 1')!.props.onClick(trusted);await h.tick();
-    expect(h.get(n=>n.text==='附近有数字，此译文未绘制到图片')).toBeDefined();
+    expect(h.get(n=>n.text==='为保留原文，此译文未绘制到图片')).toBeDefined();
   });
   it('rejects oversize content completely and paginates complete lines without truncation',async()=>{
     const h=await mount();h.props.read.mockResolvedValueOnce({status:'ready',lines:[line('x'.repeat(16001))]}).mockResolvedValueOnce({status:'ready',lines:Array.from({length:40},(_,i)=>line(`行 ${i}`))});

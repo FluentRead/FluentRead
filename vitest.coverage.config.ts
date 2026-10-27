@@ -292,6 +292,8 @@ export default defineConfig({
                 'src/features/writing-assistant/reference.ts',
                 'src/services/writing/runtime.ts',
                 'src/features/image-translation/content/mangaReader.ts',
+                'src/features/image-translation/content/mangaReadingCoordinator.ts',
+                'src/features/image-translation/content/mangaReadingSnapshots.ts',
                 'src/features/image-translation/content/mangaCanvas.ts',
                 'src/features/image-translation/content/mangaBackground.ts',
                 'src/features/image-translation/content/mangaImageSegments.ts',

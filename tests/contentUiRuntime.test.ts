@@ -5,6 +5,9 @@ const mocks = vi.hoisted(() => ({
   subscribeMangaTranslation: vi.fn(),
   openMangaEntry: vi.fn(),
   unsubscribeMangaTranslation: vi.fn(),
+  subscribeMangaReading: vi.fn(),
+  unsubscribeMangaReading: vi.fn(),
+  openMangaReading: vi.fn(),
   config: {
     disableFloatingBall: false,
     floatingBallPosition: '' as '' | 'left' | 'right',
@@ -59,7 +62,7 @@ vi.mock('@/src/features/full-page-translation/public', () => ({
   restoreOriginalContent: mocks.restoreOriginalContent,
   subscribeFullPageTranslationProgress: mocks.subscribeFullPageTranslationProgress,
 }));
-vi.mock('@/src/features/image-translation/public', () => ({subscribeMangaTranslation: mocks.subscribeMangaTranslation, openMangaEntry: mocks.openMangaEntry}));
+vi.mock('@/src/features/image-translation/public', () => ({subscribeMangaTranslation: mocks.subscribeMangaTranslation, openMangaEntry: mocks.openMangaEntry,subscribeMangaReading:mocks.subscribeMangaReading,openMangaReading:mocks.openMangaReading}));
 vi.mock('@/src/features/floating-ball/ui/FloatingBall.vue', () => ({default: {name: 'FloatingBall'}}));
 vi.mock('@/src/features/full-page-translation/ui/TranslationProgressPanel.vue', () => ({
   default: {name: 'TranslationProgressPanel'},
@@ -118,6 +121,9 @@ beforeEach(() => {
     mocks.subscribeMangaTranslation,
     mocks.openMangaEntry,
     mocks.unsubscribeMangaTranslation,
+    mocks.subscribeMangaReading,
+    mocks.unsubscribeMangaReading,
+    mocks.openMangaReading,
     mocks.createVueShadowUi,
     mocks.createAnchoredPopup,
     mocks.togglePopup,
@@ -139,6 +145,7 @@ beforeEach(() => {
     Object.assign(mocks.config, patch);
   });
   mocks.subscribeMangaTranslation.mockImplementation(listener => {listener({available: false, active: false, pending: false, errors: 0}); return mocks.unsubscribeMangaTranslation;});
+  mocks.subscribeMangaReading.mockImplementation(listener => {listener(false);return mocks.unsubscribeMangaReading;});
   mocks.sendMessage.mockResolvedValue({success: true});
   mocks.autoTranslateEnglishPage.mockResolvedValue(undefined);
   mocks.isFullPageTranslationActive.mockReturnValue(false);
@@ -648,5 +655,8 @@ describe('全文翻译进度面板 content runtime', () => {
     expect(props.manga).toEqual({available: true, active: true, pending: true, errors: 0});
     props.onMangaToggle({isTrusted: false}); expect(mocks.openMangaEntry).not.toHaveBeenCalled();
     props.onMangaToggle({isTrusted: true}); expect(mocks.openMangaEntry).toHaveBeenCalledOnce();
-    runtime.unmountFloatingBall(); expect(mocks.unsubscribeMangaTranslation).toHaveBeenCalledOnce();
+    props.onMangaReading({isTrusted:false});expect(mocks.openMangaReading).not.toHaveBeenCalled();
+    const event={isTrusted:true};props.onMangaReading(event);expect(mocks.openMangaReading).toHaveBeenCalledWith(event);
+    mocks.subscribeMangaReading.mock.calls[0][0](true);expect(props.mangaReadingState.open).toBe(true);
+    runtime.unmountFloatingBall(); expect(mocks.unsubscribeMangaTranslation).toHaveBeenCalledOnce();expect(mocks.unsubscribeMangaReading).toHaveBeenCalledOnce();
  });

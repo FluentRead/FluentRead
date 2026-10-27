@@ -23,7 +23,7 @@ vi.mock('@/src/services/config/store', async () => {
 });
 import {createImageTranslationFailure} from '@/src/features/image-translation/failure';
 import {config as settings} from '@/src/services/config/store';
-import {mountImageTranslator, unmountImageTranslator, toggleContextMenuImage, toggleMangaTranslation, subscribeMangaTranslation} from '@/src/features/image-translation/content';
+import {mountImageTranslator, unmountImageTranslator, toggleContextMenuImage, toggleMangaTranslation, subscribeMangaTranslation, getMangaReadingCandidates, readMangaReadingCandidate, observeMangaReadingCandidate, registerMangaReadingOverlayHost} from '@/src/features/image-translation/content';
 import type {MangaTranslationStatus} from '@/src/features/image-translation/content/mangaSession';
 import {registerAllUiLanguageBundles} from './helpers/uiLanguageBundles';
 import * as controlsModule from '@/src/features/image-translation/content/controls';
@@ -1496,6 +1496,71 @@ describe('视频预览不自动显示图片翻译', () => {
         env.image.className = 'zao-image'; env.parent.className = 'zao-image-container';
         return env;
     }
+    it('按需读取已显示图片，换源后拒绝旧令牌且不启动翻译', async () => {
+        const env=readerPage();Object.assign(document,{elementsFromPoint:()=>[env.image,env.parent,document.body]});
+        mountImageTranslator();expect(toggleMangaTranslation()).toBe(true);await flush();env.runFrames();await flush();
+        const list=getMangaReadingCandidates();expect(list.status).toBe('ready');
+        if(list.status!=='ready')throw new Error('no candidates');
+        expect(list.items).toHaveLength(1);expect(list.items[0].kind).toBe('image');
+        const calls=client.translate.mock.calls.length;
+        expect(await readMangaReadingCandidate(list.items[0].token,new AbortController().signal)).toMatchObject({status:'ready',lines:[{text:'完整译文'}]});
+        const invalid=vi.fn(),stop=observeMangaReadingCandidate(list.items[0].token,invalid);expect(stop).toBeTypeOf('function');
+        for(const [name,listener] of env.windowObject.addEventListener.mock.calls)if(name==='scroll')(listener as EventListener)(new Event('scroll'));
+        expect(invalid).not.toHaveBeenCalled();
+        env.image.src='https://example.test/changed.png';
+        expect(await readMangaReadingCandidate(list.items[0].token,new AbortController().signal)).toEqual({status:'stale'});
+        for(const [name,listener] of env.windowObject.addEventListener.mock.calls)if(name==='scroll')(listener as EventListener)(new Event('scroll'));
+        env.runFrames();
+        expect(invalid).toHaveBeenCalledOnce();stop!();
+        expect(client.translate).toHaveBeenCalledTimes(calls);
+    });
+    it.each(['scroll','route','configuration','unmount'] as const)('按需图片令牌在 %s 后失效，重挂不能复活旧身份',async change=>{
+        const env=readerPage();settings.useCache=false;Object.assign(document,{elementsFromPoint:()=>[env.image,env.parent,document.body]});
+        mountImageTranslator();toggleMangaTranslation();await flush();env.runFrames();await flush();
+        const list=getMangaReadingCandidates();if(list.status!=='ready'||!list.items.length)throw Error('missing image');
+        const token=list.items[0].token;
+        if(change==='scroll')for(const [name,listener] of env.windowObject.addEventListener.mock.calls)if(name==='scroll')(listener as EventListener)(new Event('scroll'));
+        if(change==='route')Object.assign(env.windowObject,{location:{href:'https://mangaplus.shueisha.co.jp/viewer/999'}});
+        if(change==='configuration'){settings.to='en';await flush();}
+        if(change==='unmount'){unmountImageTranslator();mountImageTranslator();toggleMangaTranslation();await flush();}
+        expect((await readMangaReadingCandidate(token,new AbortController().signal)).status).not.toBe('ready');
+    });
+    it('按需遮挡只忽略扩展持有的面板，不相信网页伪造标记',async()=>{
+        const env=readerPage(),owned=document.createElement('aside'),fake=document.createElement('aside');
+        fake.setAttribute('data-fluent-read-ui','');document.body.append(owned,fake);
+        let front=owned;Object.assign(document,{elementsFromPoint:()=>[front,env.image,env.parent,document.body]});
+        const release=registerMangaReadingOverlayHost(owned);mountImageTranslator();toggleMangaTranslation();await flush();env.runFrames();await flush();
+        const list=getMangaReadingCandidates();if(list.status!=='ready'||!list.items.length)throw Error('missing image');
+        expect((await readMangaReadingCandidate(list.items[0].token,new AbortController().signal)).status).toBe('ready');
+        const releaseCurrent=registerMangaReadingOverlayHost(owned);release();
+        expect((await readMangaReadingCandidate(list.items[0].token,new AbortController().signal)).status).toBe('ready');
+        front=fake;expect(await readMangaReadingCandidate(list.items[0].token,new AbortController().signal)).toEqual({status:'stale'});
+        releaseCurrent();owned.remove();fake.remove();
+    });
+    it('网页预置伪造标记的兄弟层变为前景时关闭已读快照',async()=>{
+        const env=readerPage(),fake=document.createElement('aside');fake.setAttribute('data-fluent-read-ui','');document.body.append(fake);
+        let covered=false;Object.assign(document,{elementsFromPoint:()=>covered?[fake,env.image,env.parent,document.body]:[env.image,env.parent,document.body]});
+        toggleMangaTranslation();await flush();env.runFrames();await flush();
+        const list=getMangaReadingCandidates();if(list.status!=='ready'||!list.items.length)throw Error('missing image');
+        expect((await readMangaReadingCandidate(list.items[0].token,new AbortController().signal)).status).toBe('ready');
+        const invalid=vi.fn(),release=observeMangaReadingCandidate(list.items[0].token,invalid);expect(release).toBeTypeOf('function');
+        const reader=env.observers.find(observer=>observer.observe.mock.calls[0]?.[1]?.attributeFilter?.includes('data-manga-reader'))!;
+        covered=true;reader.callback([{target:fake,type:'attributes',attributeName:'style'} as unknown as MutationRecord],{} as MutationObserver);
+        env.runFrames();expect(invalid).toHaveBeenCalledOnce();release!();fake.remove();
+    });
+    it.each(['hide','source'] as const)('网页标记祖先后 %s 仍立即关闭已读快照',async change=>{
+        const env=readerPage();Object.assign(document,{elementsFromPoint:()=>[env.image,env.parent,document.body]});
+        toggleMangaTranslation();await flush();env.runFrames();await flush();
+        const list=getMangaReadingCandidates();if(list.status!=='ready'||!list.items.length)throw Error('missing image');
+        expect((await readMangaReadingCandidate(list.items[0].token,new AbortController().signal)).status).toBe('ready');
+        const invalid=vi.fn(),release=observeMangaReadingCandidate(list.items[0].token,invalid);expect(release).toBeTypeOf('function');
+        env.parent.setAttribute('data-fluent-read-ui','');
+        if(change==='hide')env.extraStyles.set(env.parent,{display:'none',visibility:'visible',opacity:'1'});
+        else env.image.src='https://example.test/changed.png';
+        const reader=env.observers.find(observer=>observer.observe.mock.calls[0]?.[1]?.attributeFilter?.includes('data-manga-reader'))!;
+        reader.callback([{target:change==='hide'?env.parent:env.image,type:'attributes',attributeName:change==='hide'?'style':'src'} as unknown as MutationRecord],{} as MutationObserver);
+        expect(invalid).toHaveBeenCalledOnce();release!();
+    });
     function cacheChapter(env: ReturnType<typeof readerPage>, count: number) {
         let current = 0, nearby = -1;
         const rect = (index: number) => ({left:20,right:420,top:current===index?40:nearby===index?900:5000,
@@ -1530,6 +1595,23 @@ describe('视频预览不自动显示图片翻译', () => {
         vi.stubGlobal('createImageBitmap', vi.fn(async () => ({width: 10, height: 20, close: vi.fn()})));
         return {...env, page, interaction};
     }
+    it('取消后的原生编码迟迟不回调，重挂也不能开始下一次读取',async()=>{
+        const env=canvasChapter();client.translate.mockResolvedValue({...result,image:'',mangaPatches:{width:400,height:200,patches:[]}});
+        toggleMangaTranslation();await flush();env.runFrames();await flush();
+        let list=getMangaReadingCandidates();if(list.status!=='ready'||!list.items.length)throw Error('missing canvas');
+        env.setAutoEncode(false);const abort=new AbortController(),pending=readMangaReadingCandidate(list.items[0].token,abort.signal);
+        try {
+            await flush();expect(env.pendingPng).toHaveLength(1);abort.abort();expect(await pending).toEqual({status:'cancelled'});
+            for(let attempt=0;attempt<3;attempt++){
+                unmountImageTranslator();mountImageTranslator();env.setAutoEncode(true);toggleMangaTranslation();await flush();env.runFrames();await flush();
+                list=getMangaReadingCandidates();if(list.status!=='ready'||!list.items.length)throw Error('missing remounted canvas');
+                expect(await readMangaReadingCandidate(list.items[0].token,new AbortController().signal)).toEqual({status:'unavailable'});
+                expect(env.pendingPng).toHaveLength(1);
+            }
+            env.pendingPng[0](new Blob(['late']));await flush();
+            expect((await readMangaReadingCandidate(list.items[0].token,new AbortController().signal)).status).toBe('ready');
+        } finally {abort.abort();env.pendingPng[0]?.(new Blob(['cleanup']));}
+    });
     it('完整入口把画布准备、阶段进度、交互遮罩和缓存复用接到同一漫画会话', async () => {
         const env = canvasChapter(), statuses: MangaTranslationStatus[] = [];
         const stop = subscribeMangaTranslation(status => statuses.push(status));
@@ -1544,6 +1626,10 @@ describe('视频预览不自动显示图片翻译', () => {
         expect(statuses).toContainEqual(expect.objectContaining({stage: 'recognizing', progress: 50}));
         const surface = env.roots.at(-1)!.querySelector('canvas')!;
         expect(surface.style.display).toBe('block'); expect(env.page.width).toBe(400);
+        const candidates=getMangaReadingCandidates();expect(candidates.status).toBe('ready');
+        if(candidates.status!=='ready')throw Error('missing canvas');
+        expect(candidates.items[0].kind).toBe('canvas');
+        expect(await readMangaReadingCandidate(candidates.items[0].token,new AbortController().signal)).toMatchObject({status:'ready',lines:[{text:'完整译文'}]});
         toggleMangaTranslation(); await flush(); expect(surface.style.display).toBe('none');
         toggleMangaTranslation(); await flush(); expect(surface.style.display).toBe('block'); expect(client.translate).toHaveBeenCalledOnce();
         Object.assign(document, {elementFromPoint: () => document.createElement('aside')});
@@ -1577,6 +1663,10 @@ describe('视频预览不自动显示图片翻译', () => {
         toggleMangaTranslation(); await flush(); env.runFrames(); await flush();
         expect(toggleMangaTranslation()).toBe(true); await flush(); env.runFrames(); await flush();
         expect(client.translate).toHaveBeenCalledWith(expect.any(String), 'auto', 'Image fixture', expect.objectContaining({manga: true}));
+        const candidates=getMangaReadingCandidates();expect(candidates.status).toBe('ready');
+        if(candidates.status!=='ready')throw Error('missing background');
+        expect(candidates.items[0].kind).toBe('background');
+        expect(await readMangaReadingCandidate(candidates.items[0].token,new AbortController().signal)).toEqual({status:'empty'});
         toggleMangaTranslation(); await flush(); toggleMangaTranslation(); await flush(); expect(client.translate).toHaveBeenCalledOnce();
         expect(page.style.backgroundImage).toContain('blob:https://comic.pixiv.net/fixture');
         unmountImageTranslator(); expect(env.canvases.every(canvas => canvas.width === 0 && canvas.height === 0)).toBe(true);
@@ -1658,6 +1748,11 @@ describe('视频预览不自动显示图片翻译', () => {
         expect(client.prepare).toHaveBeenCalledWith('ko',expect.any(AbortSignal),expect.any(Function));
         expect(client.translate).toHaveBeenCalledWith(expect.any(String),'ko',expect.any(String),expect.objectContaining({manga:true}));
         expect(settings.from).toBe('auto');expect(env.image.naturalHeight).toBe(6000);
+        Object.assign(document,{elementFromPoint:()=>env.image});env.runFrames();await flush();
+        const candidates=getMangaReadingCandidates();expect(candidates.status).toBe('ready');
+        if(candidates.status!=='ready')throw Error('missing segment');
+        expect(candidates.items[0]).toMatchObject({kind:'segment',segment:{top:0}});
+        expect(await readMangaReadingCandidate(candidates.items[0].token,new AbortController().signal)).toEqual({status:'empty'});
         unmountImageTranslator();expect(env.image.style.opacity).not.toBe('0');
     });
     it.each(['ru', 'ko-KR'])('漫画 %s 已确认后准备语言包，暂停再开复用译图，单图引擎不影响准备', async source => {

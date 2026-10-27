@@ -25,6 +25,8 @@ import {resolveImagePresentation, surfaceStyleToBitmap, presentationMatchesSourc
 import {createImageControls, IMAGE_CONTROLS_CSS, type ImageControlPhase, type ImageSettingsSection} from './controls';
 import {isImageHoverEligible} from './hoverEligibility';
 import {createMangaReader} from './mangaReader';
+import {createMangaReadingSnapshots, prepareMangaReadingLines} from './mangaReadingSnapshots';
+import type {MangaReadingList, MangaReadingResult} from './mangaReadingCoordinator';
 import type {MangaTranslationStatus} from './mangaSession';
 import {imageLoadTracker} from './imageLoads';
 import {normalizeMangaCachePages, mangaCachePixelBudget, resolveMangaSite, resolveMangaSourceLanguage} from '@/src/core/config/manga';
@@ -206,6 +208,11 @@ let mangaReader: ReturnType<typeof createMangaReader> | null = null;
 let mangaCanvas: ReturnType<typeof createMangaCanvas<HTMLCanvasElement>> | null = null;
 let mangaBackground: ReturnType<typeof createMangaBackground> | null = null;
 let mangaSegments: ReturnType<typeof createMangaImageSegments> | null = null;
+let mangaReadingOverlay:{host:HTMLElement}|null=null;
+/** 仅豁免扩展实际持有的阅读层，不信任页面可伪造的标记属性。 */
+export function registerMangaReadingOverlayHost(host:HTMLElement):()=>void {
+    const owner={host};mangaReadingOverlay=owner;return ()=>{if(mangaReadingOverlay===owner)mangaReadingOverlay=null;};
+}
 let mangaStatus: MangaTranslationStatus = {available: false, active: false, pending: false, errors: 0};
 const mangaListeners = new Set<(status: MangaTranslationStatus) => void>();
 
@@ -1362,6 +1369,7 @@ function syncLayoutObservation(): void {
 export function mountImageTranslator(): void {
     if (mounted) return;
     mounted = true;
+    const readingSnapshots = createMangaReadingSnapshots();
     stopConfigurationWatch = watchTranslationConfiguration();
     const translateSnapshot = async (image: string, signal: AbortSignal) => {
         const identity = configurationIdentity(true);
@@ -1391,6 +1399,7 @@ export function mountImageTranslator(): void {
         enabled: () => mounted && imageTranslationAllowed(true),
         configurationIdentity: () => configurationIdentity(true),
         cacheEnabled: () => config.useCache,
+        readingSnapshots,
         recovery,
         acceptsInteractionLayer: (_canvas, hit) => {
             const selector = resolveMangaSite(window.location.href, config.imageTranslationMangaSites)?.canvasInteractionSelector;
@@ -1402,6 +1411,7 @@ export function mountImageTranslator(): void {
         enabled: () => mounted && imageTranslationAllowed(true),
         configurationIdentity: () => configurationIdentity(true),
         cacheEnabled: () => config.useCache,
+        readingSnapshots,
         recovery,
         ready: () => mangaReader?.schedule(),
         translate: translateSnapshot,
@@ -1410,6 +1420,7 @@ export function mountImageTranslator(): void {
         enabled: () => mounted && imageTranslationAllowed(true),
         configurationIdentity: () => configurationIdentity(true),
         cacheEnabled: () => config.useCache,
+        readingSnapshots,
         recovery,
         imageIdentity: sourceIdentity,
         readSource: (image, signal) => readAuthorizedImage(image, {signal}),
@@ -1429,6 +1440,57 @@ export function mountImageTranslator(): void {
         release: image => { const state = states.get(image); if (state) removeState(state); },
         failed: image => states.get(image)?.phase === 'error',
         changed: publishMangaStatus,
+        reading: {
+            version: source => {
+                if(source.kind==='image') {
+                    const state=states.get(source.surface as HTMLImageElement);
+                    return state?.phase==='translated'&&state.resultIdentity===configurationIdentity(true)?state.lines:undefined;
+                }
+                const controller=source.kind==='canvas'?mangaCanvas:source.kind==='background'?mangaBackground:mangaSegments;
+                return controller?.readingVersion(source.surface as never);
+            },
+            live: source => {
+                if(source.kind!=='image') {
+                    const controller=source.kind==='canvas'?mangaCanvas:source.kind==='background'?mangaBackground:mangaSegments;
+                    if(!controller)return false;
+                    // 各载体必须明确提供无网络、副作用的来源查询。
+                    const surface=source.surface as never;
+                    const identity=controller.readingIdentity(surface);
+                    return identity===source.identity&&controller.readingVisible(surface,identity,mangaReadingOverlay?.host);
+                }
+                const image=source.surface as HTMLImageElement,state=states.get(image);
+                if(!state||!state.manga||!image.isConnected||!imageTranslationAllowed(true)
+                    ||source.identity!==`${sourceIdentity(image)}:${configurationIdentity(true)}:${imageLoadTracker.revision(image)}`
+                    ||state.sourceIdentity!==sourceIdentity(image)||!presentationMatchesSource(image,state.presentation))return false;
+                const surface=state.presentation.element;
+                if(!surface.isConnected||typeof document.elementsFromPoint!=='function')return false;
+                const rect=surface.getBoundingClientRect();let left=Math.max(0,rect.left),right=Math.min(window.innerWidth,rect.right);
+                let top=Math.max(0,rect.top),bottom=Math.min(window.innerHeight,rect.bottom);
+                for(let item:Element|null=surface;item;item=item.parentElement){
+                    const style=getComputedStyle(item),opacity=item===surface&&state.sourceStyleLease?state.sourceStyleLease.computedOpacity:style.opacity;
+                    if(style.display==='none'||style.visibility==='hidden'||style.visibility==='collapse'||opacity==='0')return false;
+                    if(item===document.documentElement||item===document.scrollingElement)continue;
+                    if(item!==surface){const x=/^(hidden|clip|auto|scroll)$/.test(style.overflowX),y=/^(hidden|clip|auto|scroll)$/.test(style.overflowY);
+                        if(x||y){const clip=item.getBoundingClientRect();if(x){left=Math.max(left,clip.left);right=Math.min(right,clip.right);}if(y){top=Math.max(top,clip.top);bottom=Math.min(bottom,clip.bottom);}}}
+                }
+                return right>left&&bottom>top&&!isImagePresentationOccluded(surface,{left,top,right,bottom},imageOverlayHost,image,mangaReadingOverlay?.host);
+            },
+            load: async (source,signal) => {
+                if(signal.aborted)return {status:'cancelled'};
+                if(source.kind!=='image') {
+                    const controller=source.kind==='canvas'?mangaCanvas:source.kind==='background'?mangaBackground:mangaSegments;
+                    return controller?.readLines(source.surface as never,signal)??{status:'unavailable'};
+                }
+                const state=states.get(source.surface as HTMLImageElement);
+                if(!state||!state.manga)return {status:'unavailable'};
+                if(state.phase==='loading')return {status:'pending'};
+                if(state.phase==='error')return {status:'error'};
+                if(state.phase!=='translated'||state.resultIdentity!==configurationIdentity(true))return {status:'unavailable'};
+                const prepared=prepareMangaReadingLines(state.lines);
+                if(prepared.status!=='ready')return {status:prepared.status==='overBudget'?'overBudget':'error'};
+                return prepared.lines.length?{status:'ready',lines:prepared.lines}:{status:'empty'};
+            },
+        },
         canvas: mangaCanvas,
         background: mangaBackground,
         segments: mangaSegments,
@@ -1477,11 +1539,22 @@ export function mountImageTranslator(): void {
         window.removeEventListener('resize', scheduleViewportChange);
         layoutObserver?.disconnect();
         layoutObserver = null;
+        readingSnapshots.clear();
         if (positionFrame !== null) {
             window.cancelAnimationFrame(positionFrame);
             positionFrame = null;
         }
     };
+}
+
+/** 仅使用当前会话已发现的候选；不会触发识别或图片读取。 */
+export function getMangaReadingCandidates():MangaReadingList {return mangaReader?.readingCandidates()??{status:'unavailable'};}
+export function readMangaReadingCandidate(token:object,signal:AbortSignal):Promise<MangaReadingResult> {
+    return mangaReader?.readReadingCandidate(token,signal)??Promise.resolve({status:signal.aborted?'cancelled':'unavailable'});
+}
+/** 读取成功后立即建立唯一观察；返回 undefined 表示目标已经失效。 */
+export function observeMangaReadingCandidate(token:object,onInvalid:()=>void):(()=>void)|undefined {
+    return mangaReader?.observeReadingCandidate(token,onInvalid);
 }
 
 export function unmountImageTranslator(): void {

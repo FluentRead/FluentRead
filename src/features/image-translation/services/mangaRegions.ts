@@ -1,7 +1,7 @@
 /**
  * @file src/features/image-translation/services/mangaRegions.ts
  * 文件职责：把漫画专用 OCR 和通用 OCR 行转换成可整段翻译与修补的气泡或旁白区域。
- * 主要内容：校验并夹紧坐标，过滤纯符号和源语言不符的短片段；神经 OCR 保留置信度策略，语言无关地保留高置信多位数字、合法时间日期与货币金额，只为判定执行 NFKC 而保留原文；仅独立气泡容许高置信度大单字，通用 OCR 从行框补足字号与原始修补框；按方向、字号、重叠与间距合并相邻行，东亚相邻文字不插入空格，保留硬连字符且只移除行末软连字符；仅已定位的独立气泡容许略宽横排行距与有界宽竖列距，保持不同气泡分离。
+ * 主要内容：校验并夹紧坐标，过滤纯符号和源语言不符的短片段；神经 OCR 保留置信度策略，语言无关地保留高置信多位数字、合法时间日期与货币金额，只为判定执行 NFKC 而保留原文；仅独立气泡容许高置信度大单字，通用 OCR 从行框补足字号与原始修补框；按方向、字号、重叠与间距合并相邻行，按完整 Unicode 码点连接东亚文字，保留硬连字符且只移除行末软连字符；仅已定位的独立气泡容许略宽横排行距与有界宽竖列距，保持不同气泡分离。
  * 模块边界：纯数据算法，不运行模型、不读取 DOM 或配置，也不修补图片；只输出可核对的识别原文和区域，不推测缺失文字。
  */
 import type {OcrLine} from '@/src/shared/image/types';
@@ -49,8 +49,8 @@ export function groupMangaText(items: MangaOcrItem[], sourceLanguage: string, wi
         if (!Number.isFinite(item.confidence) || item.confidence < 0.65 || !text) return [];
         const numeric=item.confidence>=0.9&&numericInformation(text);
         if ((!numeric && (!/\p{L}/u.test(text)
-            || (english && (!/[a-z]/iu.test(text) || /[\u3040-\u30ff\u3400-\u9fff\uac00-\ud7af]/u.test(text)))
-            || (japanese && !/[\u3040-\u30ff\u3400-\u9fff]/u.test(text) && text.replace(/[^a-z]/giu,'').length < 4)))
+            || (english && (!/[a-z]/iu.test(text) || /[\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}\u3040-\u30ff\u3400-\u9fff\uac00-\ud7af]/u.test(text)))
+            || (japanese && !/[\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}\u3040-\u30ff\u3400-\u9fff]/u.test(text) && text.replace(/[^a-z]/giu,'').length < 4)))
             || ![box.x, box.y, box.width, box.height].every(Number.isFinite) || box.width <= 0 || box.height <= 0) return [];
         const bbox = {x0: Math.max(0, box.x), y0: Math.max(0, box.y),
             x1: Math.min(width, box.x + box.width), y1: Math.min(height, box.y + box.height)};
@@ -123,10 +123,11 @@ function mergeMangaLines(lines: MangaRegion[], lineGap = 0.8, columnGap = 0.8): 
         const sizes = members.map(member => member.fontSize).sort((a, b) => a - b);
         const text=members.reduce((text, member) => {
             if (text.endsWith('\u00ad')) return text.slice(0,-1) + member.text;
-            const cjk = /[\u2e80-\u9fff\u3040-\u30ff\uac00-\ud7af]/u;
-            const last = text.slice(-1), next = member.text.slice(0,1);
+            // 用 Unicode 边界而非 UTF-16 单元取首尾，避免拆开补充平面汉字。
+            const endsCjk = /(?:[\uFF66-\uFF9D][\uFF9E\uFF9F]|[\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}\u2e80-\u9fff\u3040-\u30ff\uac00-\ud7af])[\uFE00-\uFE0F\u{E0100}-\u{E01EF}]*$/u.test(text);
+            const startsCjk = /^[\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}\u2e80-\u9fff\u3040-\u30ff\uac00-\ud7af]/u.test(member.text);
             const hyphen = /\p{L}-$/u.test(text) && /^\p{L}/u.test(member.text);
-            const separator = !text || members[0].vertical || hyphen || ((cjk.test(last) || /[。！？、」』】）]/u.test(last)) && cjk.test(next)) ? '' : ' ';
+            const separator = !text || members[0].vertical || hyphen || ((endsCjk || /[。！？、」』】）]$/u.test(text)) && startsCjk) ? '' : ' ';
             return text + separator + member.text;
         }, '');
         return {text,

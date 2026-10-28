@@ -43,6 +43,62 @@ describe('material identities and locators', () => {
         expect(normalizeMaterialReference({kind:'note',id:'n',note:' hi ',createdAt:300},100)).toMatchObject({note:'hi',createdAt:100});
         expect(() => normalizeMaterialReference({kind:'unknown',id:'n'} as never,100)).toThrow();
     });
+    it('normalizes each reference field once while preserving NFC, trimming and UTF-16 truncation', () => {
+        const normalize = vi.spyOn(String.prototype, 'normalize');
+        try {
+            const reference = normalizeMaterialReference({
+                kind: 'note', id: '  e\u0301\u0000  ',
+                excerpt: `${'x'.repeat(5999)}😀 remaining`,
+                note: `  ${'界'.repeat(12000)} more  `,
+                createdAt: 150, updatedAt: 250,
+            }, 200);
+            expect(reference).toEqual({kind:'note',id:'é',excerpt:`${'x'.repeat(5999)}\ud83d`,note:'界'.repeat(12000),createdAt:150,updatedAt:200});
+            expect(normalize).toHaveBeenCalledTimes(3);
+        } finally {normalize.mockRestore();}
+    });
+    it('does not read private note content for non-note references or fields after an invalid identity', () => {
+        const reference = {kind:'session' as const,id:'s',excerpt:' before '} as {kind:'session';id:string;excerpt:string;note?:string};
+        Object.defineProperty(reference, 'note', {get() {throw Error('private note read');}});
+        Object.defineProperty(reference, 'updatedAt', {get() {throw Error('private timestamp read');}});
+        expect(normalizeMaterialReference(reference, 10)).toEqual({kind:'session',id:'s',excerpt:'before',createdAt:10});
+        const invalid = {kind:'note' as const,id:'  '} as {kind:'note';id:string;excerpt?:string;note?:string};
+        Object.defineProperty(invalid, 'excerpt', {get() {throw Error('unexpected excerpt read');}});
+        Object.defineProperty(invalid, 'note', {get() {throw Error('unexpected note read');}});
+        Object.defineProperty(invalid, 'updatedAt', {get() {throw Error('unexpected timestamp read');}});
+        Object.defineProperty(invalid, 'createdAt', {get() {throw Error('unexpected timestamp read');}});
+        expect(() => normalizeMaterialReference(invalid, 10)).toThrow('学习引用无效');
+        expect(() => normalizeMaterialReference(null as never, 10)).toThrow('学习引用无效');
+        expect(() => normalizeMaterialReference({kind:'unknown',id:'valid'} as never, 10)).toThrow('学习引用无效');
+    });
+    it('snapshots kind and timestamps before using them for validation and output', () => {
+        let kinds = 0, createdReads = 0, updatedReads = 0;
+        const reference = {
+            get kind() {return ++kinds === 1 ? 'note' as const : 'session' as const;},
+            id:'n', note:' private ',
+            get createdAt() {return ++createdReads === 1 ? 5 : NaN;},
+            get updatedAt() {return ++updatedReads === 1 ? 20 : NaN;},
+        };
+        expect(normalizeMaterialReference(reference, 10)).toEqual({kind:'note',id:'n',note:'private',updatedAt:10,createdAt:5});
+        expect([kinds, createdReads, updatedReads]).toEqual([1, 1, 1]);
+
+        let sessionKindReads = 0;
+        const session = {
+            get kind() {return ++sessionKindReads === 1 ? 'session' as const : 'note' as const;},
+            id:'s', get note(): string {throw Error('private note read');},
+            get updatedAt(): number {throw Error('private timestamp read');}, createdAt:0,
+        };
+        expect(normalizeMaterialReference(session, 10)).toEqual({kind:'session',id:'s',createdAt:0});
+        expect(sessionKindReads).toBe(1);
+
+        let invalidKindReads = 0;
+        const invalid = {get kind() {return ++invalidKindReads === 1 ? 'invalid' : 'note';}, get id() {throw Error('unexpected id read');}};
+        expect(() => normalizeMaterialReference(invalid as never, 10)).toThrow('学习引用无效');
+        expect(invalidKindReads).toBe(1);
+        for (const timestamp of [undefined, NaN, Infinity, -1, '5']) {
+            expect(normalizeMaterialReference({kind:'note',id:'n',createdAt:timestamp,updatedAt:timestamp} as never, 10)).toEqual({kind:'note',id:'n',createdAt:10});
+        }
+        expect(normalizeMaterialReference({kind:'note',id:'n',createdAt:0,updatedAt:0}, 10)).toEqual({kind:'note',id:'n',createdAt:0,updatedAt:0});
+    });
 });
 describe('local material lifecycle', () => {
     it('deduplicates sources atomically but keeps identical titles from different sources separate', async () => {

@@ -3,13 +3,13 @@ import Dexie from 'dexie';
 import {afterEach,describe,expect,it,vi} from 'vitest';
 import {sha256} from '@noble/hashes/sha256';
 import {bytesToHex} from '@noble/hashes/utils';
-import {MaterialImportStageDatabase,createStage,createImportCapability} from '@/src/features/vocabulary/materialImportStage';
-import {MaterialRepository} from '@/src/features/vocabulary/materialRepository';
+import {createStage,createImportCapability} from '@/src/features/vocabulary/materialImportStage';
+import {MaterialDatabase,MaterialRepository} from '@/src/features/vocabulary/materialRepository';
 import {attachReadingStreamPort} from '@/src/features/reading-assistant/streamPort';
 import {createWritingHandler} from '@/src/features/writing-assistant/background';
 import {decodeWireFrame,makePortBridge,MAX_BASE64_LENGTH,MAX_FRAME_BYTES,PORT_NAME,type MaterialImportPort} from '@/src/features/vocabulary/materialImportPort';
 
-let serial=0;const dbs:MaterialImportStageDatabase[]=[];const names:string[]=[];
+let serial=0;const dbs:MaterialDatabase[]=[];const names:string[]=[];
 const bridges:Array<ReturnType<typeof makePortBridge>>=[];
 const trackedBridge=(...args:Parameters<typeof makePortBridge>)=>{const bridge=makePortBridge(...args);bridges.push(bridge);return bridge;};
 const deferred=()=>{let resolve!:()=>void;const promise=new Promise<void>(r=>{resolve=r;});return {promise,resolve};};
@@ -26,7 +26,7 @@ class MockPort implements MaterialImportPort{
   request(id:number,body:Record<string,unknown>){const promise=new Promise<any>(resolve=>this.waiters.set(id,resolve));this.emit({id,...body});return promise;}
 }
 function harness(serialization:'json'|'clone'='json',beforeAppend?:()=>Promise<void>){
-  const name=`port-bridge-${++serial}`;names.push(name);const db=new MaterialImportStageDatabase(name);dbs.push(db);
+  const name=`port-bridge-${++serial}`;names.push(name);const db=new MaterialDatabase(name);dbs.push(db);
   const stage=createStage(db,{clock:()=>100,limits:{frameBytes:MAX_FRAME_BYTES,ttlMs:1000,receiptTtlMs:10000},beforeAppend});
   const bridge=trackedBridge(stage,{isTrustedSender:trustSender,onCommitted:()=>{},isPrivateContext:()=>false});
   const port=new MockPort(serialization);expect(bridge.attach(port)).toBe(true);return {db,stage,bridge,port,repo:new MaterialRepository(db)};
@@ -165,7 +165,7 @@ describe('material stage Port bridge',()=>{
     // Reload stage module to discard its per-runtime admission cache, then open
     // a fresh connection to the same IndexedDB before querying the receipt.
     vi.resetModules();const fresh=await import('@/src/features/vocabulary/materialImportStage');
-    const restartedDb=new fresh.MaterialImportStageDatabase(h.db.name);dbs.push(restartedDb);await restartedDb.open();
+    const restartedDb=new MaterialDatabase(h.db.name);dbs.push(restartedDb);await restartedDb.open();
     const restarted=fresh.createStage(restartedDb,{clock:()=>100,limits:{frameBytes:MAX_FRAME_BYTES,ttlMs:1000,receiptTtlMs:10000}});
     const restartedBridge=trackedBridge(restarted,{isTrustedSender:trustSender,onCommitted:()=>{},isPrivateContext:()=>false});
     const second=new MockPort();expect(restartedBridge.attach(second)).toBe(true);

@@ -5,12 +5,13 @@ import {sha256} from '@noble/hashes/sha256';
 import {afterEach, expect, it, vi} from 'vitest';
 import {installMaterialImportRuntime} from '@/src/app/background/materialImportRuntime';
 import {PORT_NAME} from '@/src/features/vocabulary/materialImportPort';
-import {MaterialImportStageDatabase, createStage} from '@/src/features/vocabulary/materialImportStage';
+import {createStage} from '@/src/features/vocabulary/materialImportStage';
+import {MaterialDatabase} from '@/src/features/vocabulary/materialRepository';
 
 vi.mock('webextension-polyfill', () => ({default: {}}));
 
 const dbName = 'material-import-runtime-database-test';
-const opened: MaterialImportStageDatabase[] = [];
+const opened: MaterialDatabase[] = [];
 afterEach(async () => {for (const db of opened.splice(0)) db.close(); await Dexie.delete(dbName);});
 
 function event() {
@@ -35,7 +36,7 @@ it('reclaims expired stage budget when the receiver is reinstalled', async () =>
   let now = 100;
   const browserRuntime = runtime();
   const deps = {runtime: browserRuntime, isPrivateContext: () => false, ready: Promise.resolve(), createStage: () => {
-    const db = new MaterialImportStageDatabase(dbName); opened.push(db);
+    const db = new MaterialDatabase(dbName); opened.push(db);
     return {stage: createStage(db, {clock: () => now, limits: {slots: 1, ttlMs: 1000, receiptTtlMs: 1000}}), close: () => db.close()};
   }};
   let dispose = installMaterialImportRuntime(deps as never);
@@ -52,9 +53,9 @@ it('reclaims expired stage budget when the receiver is reinstalled', async () =>
 });
 
 it('recovers a sealed session and broadcasts only after the database commits', async () => {
-  const browserRuntime = runtime(); let database: MaterialImportStageDatabase;
+  const browserRuntime = runtime(); let database: MaterialDatabase;
   const deps = {runtime: browserRuntime, isPrivateContext: () => false, ready: Promise.resolve(), createStage: () => {
-    database = new MaterialImportStageDatabase(dbName); opened.push(database);
+    database = new MaterialDatabase(dbName); opened.push(database);
     return {stage: createStage(database, {clock: () => 100, limits: {ttlMs: 1000}}), close: () => database.close()};
   }};
   const cap = capability('00000000-0000-4000-8000-000000000003');

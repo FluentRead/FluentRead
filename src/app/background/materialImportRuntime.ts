@@ -5,7 +5,8 @@
  * 模块边界：不读取文件、不管理界面，也不改变现有恢复大小限制。
  */
 import browser from 'webextension-polyfill';
-import {createStage, MaterialImportStageDatabase} from '@/src/features/vocabulary/materialImportStage';
+import {createStage} from '@/src/features/vocabulary/materialImportStage';
+import {MaterialDatabase} from '@/src/features/vocabulary/materialRepository';
 import {makePortBridge, PORT_NAME, type MaterialImportPort} from '@/src/features/vocabulary/materialImportPort';
 import {MATERIAL_CHANGED_MESSAGE} from '@/src/features/vocabulary/materialProtocol';
 import {isTrustedSettingsSender} from './handlers/trustedSettingsSender';
@@ -159,7 +160,7 @@ export function installBrowserMaterialImportRuntime(ready: Promise<unknown>): vo
         isPrivateContext: () => browser.extension.inIncognitoContext === true,
         ready,
         createStage: () => {
-            const database = new MaterialImportStageDatabase();
+            const database = new MaterialDatabase();
             try { return {stage: createStage(database), close: () => database.close()}; }
             catch (error) { database.close(); throw error; }
         },

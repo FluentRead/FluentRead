@@ -1,7 +1,7 @@
 /**
  * @file src/features/vocabulary/materialRepository.ts
  * 文件职责：持久化独立于可同步配置的本地材料与学习位置，提供原子写入和可撤销归档。
- * 主要内容：Dexie 唯一来源索引、按引用及来源兼容键去重的旧收藏惰性投影、清空世代与迟到位置保护；批量写入在同一事务内复用容量计数，词书隐私地址仅作兼容比较，不改写材料规范身份。
+ * 主要内容：Dexie 唯一来源索引、旧收藏惰性投影、清空世代与迟到位置保护；材料和未完成恢复暂存统一事务清空，批量写入复用容量计数。
  * 模块边界：不访问网页与浏览器消息；旧收藏只读不改写，材料正文、URL 与笔记不会进入配置同步。
  */
 import Dexie, {type Table} from 'dexie';
@@ -15,6 +15,8 @@ export class MaterialDatabase extends Dexie {
     constructor(name = 'FluentReadMaterials') {
         super(name);
         this.version(1).stores({materials: 'id,&identityKey,*aliases,updatedAt', meta: 'key'});
+        // 所有材料连接共享同一结构，清空时才能与恢复暂存共享原子事务。
+        this.version(2).stores({materials:'id,&identityKey,*aliases,updatedAt',meta:'key',stageFrames:'[session+seq]',stageSessions:'id,expiresAt',stageReceipts:'id,expiresAt',stageBudget:'key',stageStarts:'id,expiresAt'});
     }
 }
 const initialMeta = (): MaterialMeta => ({key: 'state', generation: 0, migrated: false, clearedAt: 0});
@@ -248,8 +250,16 @@ export class MaterialRepository {
         });
     }
     async clear(now = Date.now()): Promise<void> {
-        await this.db.transaction('rw', this.db.materials, this.db.meta, async () => {
+        const frames = this.db.table('stageFrames'), sessions = this.db.table('stageSessions'), receipts = this.db.table('stageReceipts');
+        const budgets = this.db.table<{key: string; reserved: number; reservedFrames: number; slots: number}, string>('stageBudget');
+        await this.db.transaction('rw', [this.db.materials, this.db.meta, frames, sessions, receipts, budgets], async () => {
             const meta = await this.db.meta.get('state') ?? initialMeta();
+            const slots = await receipts.count();
+            // 即使旧暂存额度损坏，仍可清除私密分片；只为仍保留的已提交回执计数。
+            await frames.clear();
+            await sessions.clear();
+            if (slots) await budgets.put({key: 'stage', reserved: 0, reservedFrames: 0, slots});
+            else await budgets.delete('stage');
             await this.db.materials.clear();
             await this.db.meta.put({key: 'state', generation: meta.generation + 1, migrated: true, clearedAt: now});
         });

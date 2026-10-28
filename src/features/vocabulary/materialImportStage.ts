@@ -119,15 +119,7 @@ async function waitForReady(ready:Promise<void>|undefined,signal:AbortSignal):Pr
   });
 }
 
-/** Only a staged import opens the upgraded schema; ordinary material operations retain v1. */
-export class MaterialImportStageDatabase extends MaterialDatabase {
-  constructor(name = 'FluentReadMaterials') {
-    super(name);
-    this.version(2).stores({materials:'id,&identityKey,*aliases,updatedAt',meta:'key',stageFrames:'[session+seq]',stageSessions:'id,expiresAt',stageReceipts:'id,expiresAt',stageBudget:'key',stageStarts:'id,expiresAt'});
-  }
-}
-
-export function createStage(db:MaterialImportStageDatabase, options:{limits?:Partial<Limits>; clock?:()=>number; beforeAppend?:()=>Promise<void>}={}) {
+export function createStage(db:MaterialDatabase, options:{limits?:Partial<Limits>; clock?:()=>number; beforeAppend?:()=>Promise<void>}={}) {
   const limits={...DEFAULTS,...options.limits};
   for (const value of Object.values(limits)) if (!Number.isSafeInteger(value)||value<=0) throw Error('invalid limits');
   // Each digest prefix is an unsigned 32-bit record length. Larger values would wrap.

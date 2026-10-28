@@ -4,12 +4,12 @@ import {afterEach, describe, expect, it, vi} from 'vitest';
 import {MaterialDatabase, MaterialRepository} from '@/src/features/vocabulary/materialRepository';
 import {sha256} from '@noble/hashes/sha256';
 import {bytesToHex} from '@noble/hashes/utils';
-import {MaterialImportStageDatabase, createStage as createProductStage, type Capability, type Frame, type Manifest} from '@/src/features/vocabulary/materialImportStage';
+import {createStage as createProductStage, type Capability, type Frame, type Manifest} from '@/src/features/vocabulary/materialImportStage';
 
 let serial=0;
-const names=new Set<string>(), open:MaterialDatabase[]=[];
+const names=new Set<string>(), open:Dexie[]=[];
 const opts={frameBytes:128,recordBytes:1024*1024,totalBytes:2*1024*1024,frameCount:10000,totalFrames:10000,slots:256,inflight:8,ttlMs:1000,receiptTtlMs:10000};
-function createStage(db:MaterialImportStageDatabase, options:Parameters<typeof createProductStage>[1]={}) {
+function createStage(db:MaterialDatabase, options:Parameters<typeof createProductStage>[1]={}) {
   return {...createProductStage(db,options), frames:db.table<any,[string,number]>('stageFrames'), sessions:db.table<any,string>('stageSessions'), receipts:db.table<any,string>('stageReceipts'), budgets:db.table<any,string>('stageBudget'), limits:{...opts,...options.limits}};
 }
 const lengthBytes=(n:number)=>new Uint8Array([(n>>>24)&255,(n>>>16)&255,(n>>>8)&255,n&255]);
@@ -23,7 +23,8 @@ function frameRecords(records:unknown[], frameBytes:number):{manifest:Manifest;f
   return {manifest:{records:records.length,frames:output.length,bytes,digest:bytesToHex(hash.digest())},frames:output};
 }
 
-function database(name=`material-stage-test-${++serial}`){names.add(name);const db=new MaterialImportStageDatabase(name);open.push(db);return db;}
+function database(name=`material-stage-test-${++serial}`){names.add(name);const db=new MaterialDatabase(name);open.push(db);return db;}
+function legacyDatabase(name:string){const db=new Dexie(name);db.version(1).stores({materials:'id,&identityKey,*aliases,updatedAt',meta:'key'});open.push(db);return db as unknown as MaterialDatabase;}
 function instance(clock={now:100}, extra:Parameters<typeof createStage>[1]={}){
   const db=database(),stage=createStage(db,{limits:opts,clock:()=>clock.now,...extra});return {db,stage,repo:new MaterialRepository(db),clock};
 }
@@ -37,6 +38,91 @@ async function upload(stage:ReturnType<typeof createStage>, records:unknown[], c
   return {token,input};
 }
 const deferred=()=>{let resolve!:()=>void;const promise=new Promise<void>(done=>resolve=done);return {promise,resolve};};
+
+describe('clearing materials and import staging',()=>{
+  it('rejects overlapping record applications without leaking writes',async()=>{
+    const target=instance(),record=await material('consumer-guard'),guard={generation:0,capturedAt:100};
+    await expect(target.repo.importRecords(async apply=>{
+      const first=apply(record),second=apply(record);await Promise.all([first,second]);
+    },100,guard)).rejects.toThrow('材料导入顺序或数量无效');
+    expect(await target.db.materials.count()).toBe(0);
+  });
+  it('rejects record applications after the consumer finishes',async()=>{
+    const target=instance(),record=await material('consumer-late'),guard={generation:0,capturedAt:100};
+    let late!:(item:unknown)=>Promise<void>;
+    expect(await target.repo.importRecords(async apply=>{late=apply;await apply(record);},100,guard)).toEqual({inserted:1,updated:0,skipped:0});
+    await expect(late(record)).rejects.toThrow('材料导入顺序或数量无效');
+  });
+  it('rejects an unawaited record application without leaking writes',async()=>{
+    const target=instance(),record=await material('consumer-unawaited'),guard={generation:0,capturedAt:100};
+    let pending:Promise<void>|undefined;
+    const another={...record,identityKey:'ignored',source:{...record.source,url:'https://example.test/unawaited'}};
+    await expect(target.repo.importRecords(async apply=>{pending=apply(another);void pending.catch(()=>{});},100,guard)).rejects.toThrow('材料导入尚未完成');
+    await pending?.catch(()=>{});expect(await Dexie.ignoreTransaction(()=>target.db.materials.count())).toBe(0);
+  });
+  it('rolls back an import that exceeds the record limit',async()=>{
+    const target=instance(),record=await material('consumer-limit');
+    await expect(target.repo.importRecords(async apply=>{
+      await apply(record);for(let i=0;i<10000;i++)await apply(null);
+    },100,{generation:0,capturedAt:100})).rejects.toThrow('材料导入顺序或数量无效');
+    expect(await target.db.materials.count()).toBe(0);
+  });
+  it('atomically clears pending private frames across connections while retaining receipts and replay tombstones',async()=>{
+    const clock={now:100},target=instance(clock),peer=database(target.db.name),repository=new MaterialRepository(peer);
+    const guard={generation:0,capturedAt:100},empty=frameRecords([],opts.frameBytes).manifest;
+    const capability=()=>({id:crypto.randomUUID(),token:bytesToHex(crypto.getRandomValues(new Uint8Array(32)))});
+    const completed=capability();await target.stage.beginRecoverable(empty,guard,completed,{deadline:1000});
+    await target.stage.seal(completed);const result=await target.stage.commit(completed);
+    const pending=capability(), payload=frameRecords([{note:'private staging note'}],opts.frameBytes);
+    await target.stage.beginRecoverable(payload.manifest,guard,pending,{deadline:1000});
+    await target.stage.append(pending,payload.frames[0]);
+    expect((await target.stage.budgets.get('stage'))?.slots).toBe(2);
+    await target.stage.budgets.put({key:'stage',reserved:999,reservedFrames:999,slots:-1});
+    await repository.clear(101);
+    expect(await target.stage.frames.count()).toBe(0);expect(await target.stage.sessions.count()).toBe(0);
+    expect(await target.stage.budgets.get('stage')).toMatchObject({reserved:0,reservedFrames:0,slots:1});
+    expect(await target.stage.status(completed)).toEqual({state:'committed',result});
+    expect(await target.stage.beginRecoverable(empty,guard,completed,{deadline:1000})).toEqual(completed);
+    expect(await target.db.table('stageStarts').count()).toBe(2);
+    await expect(target.stage.append(pending,payload.frames[0])).rejects.toThrow('session unavailable');
+    await expect(target.stage.beginRecoverable(payload.manifest,guard,pending,{deadline:1000})).rejects.toThrow('session unavailable');
+    await expect(target.stage.beginRecoverable(empty,guard,capability(),{deadline:1000})).rejects.toThrow('stale operation');
+    await target.stage.acknowledge(completed);expect((await target.stage.budgets.get('stage'))?.slots).toBe(0);
+    clock.now=102;const fresh=capability();await target.stage.beginRecoverable(empty,{generation:1,capturedAt:102},fresh,{deadline:1000});
+    expect(await target.stage.status(fresh)).toEqual({state:'open',nextSeq:0});
+  });
+  it('rejects an authenticated append delayed across clear without recreating private frames',async()=>{
+    const ready=deferred(),gate=deferred(),target=instance({now:100},{beforeAppend:()=>{ready.resolve();return gate.promise;}});
+    const peer=database(target.db.name),repository=new MaterialRepository(peer),payload=frameRecords([{note:'delayed private note'}],opts.frameBytes);
+    const cap=await target.stage.begin(payload.manifest,{generation:0,capturedAt:100});
+    const pending=target.stage.append(cap,payload.frames[0]);await ready.promise;
+    await repository.clear(101);gate.resolve();
+    await expect(pending).rejects.toThrow('session unavailable');
+    expect(await target.stage.frames.count()).toBe(0);expect(await target.stage.sessions.count()).toBe(0);
+    expect((await target.stage.budgets.get('stage'))?.slots??0).toBe(0);
+  });
+  it('rolls back material, frame, session and budget changes together when cleanup fails',async()=>{
+    const target=instance(),record=await target.repo.capture({source:{kind:'article',url:'https://example.test/clear-rollback',title:'preserve'},capturedAt:10},10);
+    const {token}=await upload(target.stage,[{note:'private staged data'}]);
+    const fail=()=>{throw Error('injected stage budget failure');};target.stage.budgets.hook('deleting',fail);
+    try{await expect(target.repo.clear(101)).rejects.toThrow('injected stage budget failure');}
+    finally{target.stage.budgets.hook('deleting').unsubscribe(fail);}
+    expect(await target.repo.get(record.id)).not.toBeNull();expect(await target.stage.frames.count()).toBe(1);
+    expect(await target.stage.sessions.count()).toBe(1);expect((await target.stage.budgets.get('stage'))?.slots).toBe(1);
+    expect(await target.repo.generation()).toBe(0);expect(await target.stage.status(token)).toMatchObject({state:'open'});
+    await target.repo.clear(101);expect(await target.stage.frames.count()).toBe(0);expect(await target.repo.get(record.id)).toBeNull();
+  });
+  it('clears an empty staged session despite a missing or corrupt reservation',async()=>{
+    const target=instance(),record=await target.repo.capture({source:{kind:'article',url:'https://example.test/clear-budget',title:'preserve'},capturedAt:10},10);
+    const empty=frameRecords([],opts.frameBytes).manifest,cap=await target.stage.begin(empty,{generation:0,capturedAt:100});
+    const budget=await target.stage.budgets.get('stage');expect(budget).toMatchObject({reserved:0,reservedFrames:0,slots:1});
+    await target.stage.budgets.delete('stage');
+    await target.repo.clear(101);
+    expect(await target.stage.sessions.count()).toBe(0);expect(await target.stage.budgets.get('stage')).toBeUndefined();
+    expect(await target.repo.get(record.id)).toBeNull();
+    await expect(target.stage.status(cap)).rejects.toThrow('session unavailable');
+  });
+});
 
 describe('committed material change notifications',()=>{
   it('notifies once after a new commit, including other stage instances, without passing private data',async()=>{
@@ -260,7 +346,7 @@ describe('isolated same-database material staging',()=>{
     expect(await target.stage.beginRecoverable(original.manifest,original.guard,original.cap,{deadline:1000})).toEqual(original.cap);
   });
   it('upgrades an existing v1 database and retains its materials with recoverable starts',async()=>{
-    const name=`material-stage-test-${++serial}`;names.add(name);const old=new MaterialDatabase(name);open.push(old);const repo=new MaterialRepository(old);
+    const name=`material-stage-test-${++serial}`;names.add(name);const old=legacyDatabase(name);const repo=new MaterialRepository(old);
     await repo.capture({source:{kind:'article',url:'https://example.test/v1-recoverable',title:'v1'},capturedAt:10},10);
     const db=database(name);await db.open();const stage=createStage(db,{limits:opts,clock:()=>100});
     const cap={id:crypto.randomUUID(),token:bytesToHex(crypto.getRandomValues(new Uint8Array(32)))},empty=frameRecords([],opts.frameBytes).manifest;
@@ -547,7 +633,7 @@ describe('isolated same-database material staging',()=>{
   it('rejects stale clear generation without reviving records; newer edits still win at commit',async()=>{
     const target=instance(),records=[await material('alpha')],{token}=await upload(target.stage,records);await target.stage.seal(token);
     await target.repo.clear(101);
-    await expect(target.stage.commit(token)).rejects.toThrow('导入期间材料已清空');
+    await expect(target.stage.commit(token)).rejects.toThrow('session unavailable');
     expect(await target.db.materials.count()).toBe(0);
     const newer=instance(),next=await upload(newer.stage,records);await newer.stage.seal(next.token);
     await newer.repo.capture({source:{kind:'article',url:'https://example.test/alpha',title:'current'},capturedAt:90},90);
@@ -672,7 +758,7 @@ describe('isolated same-database material staging',()=>{
     expect(await target.stage.commit(token)).toEqual({inserted:0,updated:0,skipped:0});
     expect(await target.stage.commit(token)).toEqual({inserted:0,updated:0,skipped:0});
     const other=instance(),second=await upload(other.stage,[]);await other.stage.seal(second.token);await other.repo.clear(101);
-    await expect(other.stage.commit(second.token)).rejects.toThrow('导入期间材料已清空');
+    await expect(other.stage.commit(second.token)).rejects.toThrow('session unavailable');
   });
   it('bounds zero-byte sessions and retained receipts by a shared slot budget',async()=>{
     const clock={now:100},target=instance(clock);
@@ -717,7 +803,7 @@ describe('isolated same-database material staging',()=>{
     expect(await target.stage.commit(token)).toEqual(result);expect(await target.db.materials.count()).toBe(0);
   },20000);
   it('preserves existing material data across a simulated v1-to-v2 Dexie schema upgrade',async()=>{
-    const name=`material-stage-test-${++serial}`;names.add(name);const old=new MaterialDatabase(name);open.push(old);const repo=new MaterialRepository(old);
+    const name=`material-stage-test-${++serial}`;names.add(name);const old=legacyDatabase(name);const repo=new MaterialRepository(old);
     await repo.capture({source:{kind:'article',url:'https://example.test/preupgrade',title:'before'},capturedAt:10},10);
     expect(old.isOpen()).toBe(true);
     const newer=database(old.name),stage=createStage(newer,{limits:opts,clock:()=>100});
@@ -740,8 +826,8 @@ describe('isolated same-database material staging',()=>{
     expect(await stage.commit(first.token)).toEqual({inserted:0,updated:0,skipped:1});
     expect((await repo.get(original.id))?.updatedAt).toBe(20);
     const second=await upload(stage,[backup]);await stage.seal(second.token);
-    await repo.clear(101);
-    await expect(stage.commit(second.token)).rejects.toThrow('导入期间材料已清空');
+    await new MaterialRepository(newer).clear(101);
+    await expect(stage.commit(second.token)).rejects.toThrow('session unavailable');
     expect(await newer.materials.count()).toBe(0);
   });
 });

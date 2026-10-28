@@ -60,8 +60,9 @@ describe('AI SDK 首批服务路由', () => {
             services.cerebras,
             services.deepinfra,
             services.perplexity,
+            services.runcrate,
         ]);
-        expect(new Set(AI_SDK_SERVICE_IDS).size).toBe(26);
+        expect(new Set(AI_SDK_SERVICE_IDS).size).toBe(27);
         expect(getAiSdkEndpointRoute(services.custom)).toBe('custom');
         expect(getAiSdkEndpointRoute(services.newapi)).toBe('newapi');
         expect(getAiSdkEndpointRoute(services.azureOpenai)).toBe('azure');

@@ -38,6 +38,7 @@
 | `cerebras` | [`cerebras.svg`](https://github.com/lobehub/lobe-icons/blob/53ead06d734cc6c003db5a87860907c4bbadfbc0/packages/static-svg/icons/cerebras.svg) |
 | `deepinfra` | [`deepinfra.svg`](https://github.com/lobehub/lobe-icons/blob/53ead06d734cc6c003db5a87860907c4bbadfbc0/packages/static-svg/icons/deepinfra.svg) |
 | `perplexity` | [`perplexity.svg`](https://github.com/lobehub/lobe-icons/blob/53ead06d734cc6c003db5a87860907c4bbadfbc0/packages/static-svg/icons/perplexity.svg) |
+| `runcrate` | Lobe Icons 未收录；单色路径取自 Runcrate 官方应用图标（圆角方块内的终端提示符），由 Runcrate 提供 |
 | `googleCloudTranslation` | [`googlecloud.svg`](https://github.com/lobehub/lobe-icons/blob/53ead06d734cc6c003db5a87860907c4bbadfbc0/packages/static-svg/icons/googlecloud.svg) |
 | `azureTranslator` | [`azure.svg`](https://github.com/lobehub/lobe-icons/blob/53ead06d734cc6c003db5a87860907c4bbadfbc0/packages/static-svg/icons/azure.svg) |
 | `aliyunTranslation` | [`alibabacloud.svg`](https://github.com/lobehub/lobe-icons/blob/53ead06d734cc6c003db5a87860907c4bbadfbc0/packages/static-svg/icons/alibabacloud.svg) |

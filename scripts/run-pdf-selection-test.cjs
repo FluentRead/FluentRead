@@ -110,7 +110,9 @@ async function createFixture(files, {paperLayout = false, includePaperTail = fal
       const prompt = body.messages.filter(message => message.role === 'user').map(message => typeof message.content === 'string' ? message.content : JSON.stringify(message.content)).join('\n');
       const source = /SOURCE_BEGIN([\s\S]*?)SOURCE_END/u.exec(prompt)?.[1];
       assert.equal(typeof source, 'string', '翻译夹具需要明确的 SOURCE_BEGIN/SOURCE_END 原文边界');
-      const translation = preserveProtectedTokens ? harnessFixtureTranslation(source, state.paperExpansion)
+      // 任务交互验证恢复与选择，不依赖回显英文；使用中文夹具避免错语种校验拒绝长段原文。
+      const translation = taskInteraction ? `测试译文：${harnessFixtureTranslation(source, state.paperExpansion)}`
+        : preserveProtectedTokens ? harnessFixtureTranslation(source, state.paperExpansion)
         : paperLayout ? paperFixtureTranslation(source, state.paperExpansion, includePaperTail) : `测试译文：${source}`;
       const entry = {source, model: body.model, translation, ...(paperLayout ? {expansion: state.paperExpansion, evidence: 'manually generated Chinese layout fixture; not translation quality'} : {}), startedAt: Date.now()}; state.requests.push(entry);
       const transient = state.transientFailures.shift();
@@ -333,6 +335,9 @@ async function main() {
   if (harnessLayoutOnly) assert(arxivPath, '--harness-layout-only 需要真实 --arxiv-pdf 论文夹具');
   const {chromium} = createRequire(path.join(path.resolve(packages), 'pdf-selection-runner.cjs'))('playwright');
   const helper = require(path.resolve(arg('focus-safe-helper', path.join(__dirname, 'testing/focus-safe-browser.cjs'))));
+  const diagnosticsPath = arg('runtime-diagnostics-helper', process.env.FLUENTREAD_RUNTIME_DIAGNOSTICS_HELPER);
+  assert(diagnosticsPath, '需要 --runtime-diagnostics-helper 或 FLUENTREAD_RUNTIME_DIAGNOSTICS_HELPER');
+  const diagnostics = require(path.resolve(diagnosticsPath)).createRuntimeDiagnostics();
   fs.mkdirSync(artifactsDir, {recursive: true});
   const profileDir = fs.mkdtempSync(path.join(os.tmpdir(), 'fluentread-pdf-selection-'));
   // Chromium 原生键盘浏览非编辑文字需启用 caret browsing；只设置新建临时 profile，不读取用户 profile。
@@ -343,7 +348,7 @@ async function main() {
     profileMode: 'new temporary profile', nativeCaretBrowsing: {enabled: true, scope: 'new temporary test profile only', preference: 'settings.a11y.caretbrowsing.enabled'}, selectionInput: 'real Playwright mouse drag and keyboard over PDF.js TextLayer',
     selectionLimits: {paperTitle: 'Not claimed: prior isolated background Input title drags collapsed with unchanged text-node identity and user-select:text; no product cause demonstrated. This suite selects meaningful abstract source text.'}};
   if (skipRotations) report.skipped = ['rotatedPDF'];
-  let fixture, launched, page, launchAttempted = false;
+  let fixture, launched, page, launchAttempted = false, diagnosticsStarted = false;
   const record = name => {report.cases.push(name); process.stdout.write(`PASS ${name}\n`);};
   try {
     const smallPdf = await createPdf(retranslationOnly ? 1 : 3, 0, taskInteraction || retranslationOnly), longPdf = await createPdf(120);
@@ -359,6 +364,7 @@ async function main() {
     Object.assign(report, {launchMode: launched.launchMode, focusPolicy: launched.focusPolicy, windowPlacement: launched.windowPlacement});
     assert.equal(launched.windowPlacement.browserFrontmost, false, '测试浏览器不能成为用户前台应用');
     const context = launched.context;
+    await diagnostics.start(context); diagnosticsStarted = true;
     const browserPid = await getGuardedBrowserPid(launched);
     const checkFocus = async stage => {
       if (process.platform !== 'darwin') return;
@@ -369,8 +375,10 @@ async function main() {
       assert.notEqual(frontmost.pid, browserPid, `测试 Edge 成为前台，停止 ${stage}`);
     };
     const {worker, extensionId} = await support.waitForWorker(context);
+    diagnostics.setExtensionId(extensionId);
     const origin = `chrome-extension://${extensionId}`;
     const preparePage = async next => {
+      await diagnostics.attachPage(next, 'document');
       next.setDefaultTimeout(30000);
       next.on('pageerror', error => report.consoleErrors.push({url: next.url(), error: error.message}));
       next.on('console', message => {if (message.type() === 'error') report.consoleErrors.push({url: next.url(), error: message.text()});});
@@ -636,7 +644,7 @@ async function main() {
     if (taskInteraction) {
       const {runPdfTaskInteractions} = require('./testing/pdf-task-interactions.cjs');
       page = await openDocument(); await load('selection-fixture.pdf', smallPdf);
-      await runPdfTaskInteractions({page, fixture, report, shot, record, patch, service, until, wait, resourceState, uiNode, translateDrag,
+      await runPdfTaskInteractions({page, fixture, report, shot, record, patch, service, until, wait, resourceState, uiNode, uiText, clickNode, translateDrag,
         baseline: process.argv.includes('--selection-baseline-only')});
       await checkFocus('PDF interaction recovery complete');
       assert.equal(report.consoleErrors.length, 0, `浏览器错误：${JSON.stringify(report.consoleErrors)}`);
@@ -1241,6 +1249,14 @@ async function main() {
     if (!report.ok) process.exitCode = 1;
   } catch (error) {report.ok = false; report.error = error.stack || String(error); process.exitCode = 1; if (page && !page.isClosed()) {try {const file = path.join(artifactsDir, 'failure.png'); await page.screenshot({path: file}); report.screenshots.push(file);} catch {}}}
   finally {
+    if (diagnosticsStarted) {
+      try {
+        await diagnostics.flush();
+        if (report.ok) diagnostics.assertClean();
+      } catch (error) {report.ok = false; report.diagnosticsError = String(error); process.exitCode = 1;}
+      try {diagnostics.write(artifactsDir, report);} catch (error) {report.ok = false; report.diagnosticsWriteError = String(error); process.exitCode = 1;}
+      try {await diagnostics.stop();} catch (error) {report.ok = false; report.diagnosticsCleanupError = String(error); process.exitCode = 1;}
+    }
     let closed = false;
     try {if (launched) {await launched.close(); closed = true;}} catch (error) {report.ok = false; report.cleanupError = error.stack || String(error); process.exitCode = 1;}
     if (fixture) {report.fixtureRequests = fixture.state; await fixture.close();}

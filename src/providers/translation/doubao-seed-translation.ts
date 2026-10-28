@@ -94,7 +94,7 @@ async function translateSingle(
             throw createHttpStatusError(response, '火山方舟翻译请求失败');
         }
 
-        const result = await readJsonResponse<any>(response, '火山方舟返回的不是有效 JSON');
+        const result = await readJsonResponse<any>(response, '火山方舟返回的不是有效 JSON', message.abortSignal);
         if (message.abortSignal?.aborted) throw abortErrorFromSignal(message.abortSignal);
         const actualModel = typeof result?.model === 'string' && result.model.trim()
             ? result.model

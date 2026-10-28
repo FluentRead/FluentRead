@@ -5,7 +5,7 @@
  * 已完成上传却无法核验时返回明确的待核验状态提示，避免把上传后的错误误报为未写入。
  * 模块边界：只接受加密封装，账号会话由 auth 管理，配置合并由同步服务管理。
  */
-import {cancelResponseReader, cancelUnreadResponseBody} from '@/src/platform/http/runtime';
+import {cancelResponseReader, cancelUnreadResponseBody, createRuntimeAbortContext} from '@/src/platform/http/runtime';
 import {DriveError, type DriveSession} from './auth';
 import {strongCloudEtag} from '@/src/core/config/cloudSync';
 import {GOOGLE_DRIVE_CONFIG_FILE_NAME, GOOGLE_DRIVE_MAX_BYTES} from './constants';
@@ -33,13 +33,14 @@ function v2File(value: unknown): DriveFile {
 }
 export function createDriveApi(fetcher: typeof fetch) {
     async function request<T>(session: DriveSession, url: string, init: RequestInit, consume: (response: Response) => Promise<T>, allowMissing = false): Promise<T> {
+        init.signal?.throwIfAborted();
         return session.request(async token => {
-            const controller = new AbortController();
-            const timer = setTimeout(() => controller.abort(), 30_000);
+            init.signal?.throwIfAborted();
+            const context = createRuntimeAbortContext(30_000, init.signal ?? undefined);
             const operation = (async () => {
                 let response: Response | undefined;
                 try {
-                    response = await fetcher(url, {...init, headers: {...init.headers, Authorization: `Bearer ${token}`}, signal: controller.signal, redirect: 'error', credentials: 'omit', cache: 'no-store', referrerPolicy: 'no-referrer'});
+                    response = await fetcher(url, {...init, headers: {...init.headers, Authorization: `Bearer ${token}`}, signal: context.signal, redirect: 'error', credentials: 'omit', cache: 'no-store', referrerPolicy: 'no-referrer'});
                     if (!response.ok && !(allowMissing && response.status === 404)) {
                         if (response.status === 412) throw new DriveError('云端配置已变化，请重新生成预览。', 412);
                         if (response.status === 403) throw new DriveError('Google Drive 拒绝访问，请检查授权范围、测试用户及 API 配额。', 403);
@@ -54,13 +55,13 @@ export function createDriveApi(fetcher: typeof fetch) {
             return operation.catch(error => {
                 if (error instanceof DriveError) throw error;
                 throw new DriveError('Google Drive 网络请求失败或响应无效，请检查网络后重试。');
-            }).finally(() => clearTimeout(timer));
-        });
+            }).finally(context.cleanup);
+        }, init.signal ?? undefined);
     }
-    async function read(session: DriveSession): Promise<DriveRemote | null> {
+    async function read(session: DriveSession, signal?: AbortSignal): Promise<DriveRemote | null> {
         const url = new URL(BASE);
         url.search = new URLSearchParams({spaces: 'appDataFolder', q: `name = '${GOOGLE_DRIVE_CONFIG_FILE_NAME}' and trashed = false`, pageSize: '2', fields: `nextPageToken,files(${FIELDS})`}).toString();
-        const metadata = await request(session, url.href, {}, async response => {
+        const metadata = await request(session, url.href, {signal}, async response => {
             const data: unknown = await response.json();
             if (!data || typeof data !== 'object' || !('files' in data) || !Array.isArray(data.files)) throw new DriveError('Google Drive 文件列表无效。');
             if (data.files.length > 1 || ('nextPageToken' in data && data.nextPageToken)) throw new DriveError('发现多个同名同步文件，请先在 Google Drive 应用管理中清理重复数据。', 409);
@@ -69,8 +70,8 @@ export function createDriveApi(fetcher: typeof fetch) {
         if (!metadata) return null;
         const encoded = encodeURIComponent(metadata.id);
         // 读取媒体前后再取元数据，避免预览基于上传过程中混合的版本。
-        const before = await request(session, `${BASE}/${encoded}?fields=${FIELDS}`, {}, async response => file(await response.json(), response.headers.get('etag')));
-        const content = await request(session, `${BASE}/${encoded}?alt=media`, {}, async response => {
+        const before = await request(session, `${BASE}/${encoded}?fields=${FIELDS}`, {signal}, async response => file(await response.json(), response.headers.get('etag')));
+        const content = await request(session, `${BASE}/${encoded}?alt=media`, {signal}, async response => {
             if (Number(response.headers.get('content-length')) > GOOGLE_DRIVE_MAX_BYTES) throw new DriveError('同步文件过大，请使用完整数据备份。');
             const reader = response.body?.getReader();
             if (!reader) throw new DriveError('无法读取同步文件。');
@@ -94,12 +95,12 @@ export function createDriveApi(fetcher: typeof fetch) {
             for (const chunk of chunks) {bytes.set(chunk, offset); offset += chunk.byteLength;}
             return new TextDecoder('utf-8', {fatal: true}).decode(bytes);
         });
-        const after = await request(session, `${BASE}/${encoded}?fields=${FIELDS}`, {}, async response => file(await response.json(), response.headers.get('etag')));
+        const after = await request(session, `${BASE}/${encoded}?fields=${FIELDS}`, {signal}, async response => file(await response.json(), response.headers.get('etag')));
         if (before.id !== metadata.id || after.id !== metadata.id || before.version !== after.version) throw new DriveReadChangedError('读取期间云端配置已变化，请重试。');
         if (after.etag) return {file: after, content};
         // v3 File 没有 etag 字段，响应头也可能不提供。v2 的资源 ETag
         // 只在文件 ID 与单调版本均相同的情况下使用，不能把另一个版本配给已下载的密文。
-        const compatible = await request(session, `${V2_BASE}/${encoded}?fields=${V2_FIELDS}`, {}, async response => v2File(await response.json()));
+        const compatible = await request(session, `${V2_BASE}/${encoded}?fields=${V2_FIELDS}`, {signal}, async response => v2File(await response.json()));
         if (compatible.id !== after.id || compatible.version !== after.version) throw new DriveReadChangedError('读取期间云端配置已变化，请重试。');
         return {file: {...after, ...compatible}, content};
     }

@@ -16,6 +16,7 @@ import claude from '@/src/providers/translation/claude';
 import tongyi from '@/src/providers/translation/tongyi';
 import zhipu from '@/src/providers/translation/zhipu';
 import deepseek from '@/src/providers/translation/deepseek';
+import doubaoSeedTranslation from '@/src/providers/translation/doubao-seed-translation';
 import {withProviderSnapshot} from './helpers/providerSnapshot';
 
 const image = 'data:image/jpeg;base64,/9j/4AAQSkZJRg==';
@@ -30,6 +31,44 @@ function request(config: Config, service: string, model: string) {
 
 describe('translation vision provider payloads', () => {
     afterEach(() => setRuntimeFetch());
+
+    it.each([
+        ['deepseek-chat', deepseek], ['deepseek-responses', deepseek], ['tongyi', tongyi],
+        ['zhipu', zhipu], ['doubao', doubaoSeedTranslation],
+    ] as const)('%s propagates abort during successful response JSON reading', async (name, adapter) => {
+        const service = name.startsWith('deepseek') ? 'deepseek' : name;
+        const config = new Config();
+        config.service = service;
+        config.model.doubao = 'doubao-seed-translation';
+        config.token[service] = service === 'zhipu' ? 'id.secret' : 'synthetic-key';
+        config.deepseekApiType = name === 'deepseek-responses' ? 'responses' : 'chat';
+        const owner = new AbortController();
+        let notifyRead!: () => void;
+        const readStarted = new Promise<void>(resolve => {notifyRead = resolve;});
+        setRuntimeFetch(async (_input, init) => new Response(new ReadableStream<Uint8Array>({
+            start(output) {init!.signal!.addEventListener('abort', () => output.error(new DOMException('aborted', 'AbortError')), {once: true});},
+            pull() {notifyRead();},
+        }, {highWaterMark: 0})));
+        const pending = adapter(withProviderSnapshot({origin: 'hello', serviceOverride: service, abortSignal: owner.signal}, config)).catch(error => error);
+        await readStarted;
+        owner.abort();
+        await expect(pending).resolves.toMatchObject({name: 'AbortError'});
+    });
+
+    it.each([
+        ['deepseek-chat', deepseek], ['deepseek-responses', deepseek], ['tongyi', tongyi],
+        ['zhipu', zhipu], ['doubao', doubaoSeedTranslation], ['gemini', gemini], ['claude', claude],
+    ] as const)('%s keeps malformed JSON and credentials out of error text without cancellation', async (name, adapter) => {
+        const service = name.startsWith('deepseek') ? 'deepseek' : name;
+        const config = new Config(); config.service = service;
+        config.model.doubao = 'doubao-seed-translation';
+        config.token[service] = service === 'zhipu' ? 'private-id.private-secret' : 'private-secret';
+        config.deepseekApiType = name === 'deepseek-responses' ? 'responses' : 'chat';
+        setRuntimeFetch(async () => new Response('{private-secret'));
+        const error = await adapter(withProviderSnapshot({origin: 'private-original', serviceOverride: service}, config)).catch(cause => cause);
+        expect(error.message).toContain('不是有效 JSON');
+        expect(error.message).not.toMatch(/private-secret|private-original/u);
+    });
 
     it.each(['deepseek-chat', 'deepseek-responses', 'sdk', 'gemini', 'claude', 'tongyi', 'zhipu'])('preserves explicit image rejection through %s transport', async kind => {
         const config = new Config();

@@ -43,13 +43,19 @@ function restrictLegacyStorageToTrustedContexts(): void {
     type RestrictedStorageArea = {
         setAccessLevel?: (options: {accessLevel: 'TRUSTED_CONTEXTS'}) => Promise<void>;
     };
-    const areas = [browser.storage?.local, browser.storage?.session]
-        .filter((area): area is RestrictedStorageArea => Boolean(area));
-    for (const area of areas) {
-        if (typeof area.setAccessLevel !== 'function') continue;
-        void area.setAccessLevel({accessLevel: 'TRUSTED_CONTEXTS'}).catch(error => {
+    for (const name of ['local', 'session'] as const) {
+        const warn = (error: unknown) => {
             console.warn('[FluentRead] 配置旧存储访问级别收紧失败', error);
-        });
+        };
+        try {
+            const area = browser.storage?.[name] as RestrictedStorageArea | undefined;
+            if (!area) continue;
+            if (typeof area.setAccessLevel !== 'function') continue;
+            void area.setAccessLevel({accessLevel: 'TRUSTED_CONTEXTS'}).catch(warn);
+        } catch (error) {
+            // 与异步拒绝保持一致：一个区域失败不能阻止其他区域尝试收紧或配置恢复。
+            warn(error);
+        }
     }
 }
 

@@ -1,8 +1,8 @@
 /**
  * @file src/features/document-translation/services/history.ts
  * 文件职责：在浏览器本地保存最近翻译过的文档及其译文，使文档翻译首页可以列出记录并一键恢复阅读。
- * 主要内容：以文件内容摘要为稳定标识，在独立的 IndexedDB 库中保存原始文件字节、解析结果快照、译文、进度与设置指纹；解析规则变化后按原文与双向唯一的原生位置或邻文恢复未变化片段的独立校订，歧义校订独立保留，复用同文件中页号、展示尺寸与旋转一致的已识别扫描页；原文件、逐行及逐项稳定几何均一致时，保留因字体指标修正而合并的连续普通文字段，使用新字形重建边界而不拼接译文；其余文字页保持新解析结果，统一重编号全文片段；本次复用的旧索引保留独立校订与空槽并从原文匹配池排除，不写入解析快照；列表与淘汰使用游标逐条提取摘要和原始字节数，不聚合持有所有原文件及解析快照，再按最近更新时间排序；超过条数或总字节上限时淘汰最旧的记录；数据库不可用、被其他标签页占用而超时或读写失败时安静降级为“没有记录”，并在其他标签页需要升级或删除时让出连接，不影响打开和翻译文档。
- * 保存生命周期：超时撤销后续写入资格并取消活跃写事务，只有真实事务提交后才确认保存成功；放弃的数据库打开请求迟到成功时关闭旧连接，旧连接事件不能重置已恢复连接；重译跳过缓存只接受并保存显式 true，刷新后继续当前重译不会恢复旧缓存。
+ * 主要内容：以文件内容摘要为稳定标识，在独立的 IndexedDB 库中保存原始文件字节、解析结果快照、译文、进度与设置指纹；解析规则变化后按原文与双向唯一的原生位置或邻文恢复未变化片段的独立校订，歧义校订独立保留，复用同文件中页号、展示尺寸与旋转一致的已识别扫描页；原文件、逐行及逐项稳定几何均一致时，保留因字体指标修正而合并的连续普通文字段，使用新字形重建边界而不拼接译文；其余文字页保持新解析结果，统一重编号全文片段；本次复用的旧索引保留独立校订与空槽并从原文匹配池排除，不写入解析快照；列表与淘汰使用游标逐条提取摘要和原始字节数，不聚合持有所有原文件及解析快照，按事务内保存序列排序（旧记录按更新时间排序），并在超过条数或总字节上限时淘汰最旧的记录；普通查询在数据库不可用时降级为默认值，受检读取则明确报告不可用；其他标签页需要升级或删除时让出连接，不影响打开和翻译文档。
+ * 保存生命周期：提供可区分读取失败与确实没有记录的检查接口；超时撤销后续写入资格并取消活跃写事务，只有真实事务提交后才确认保存成功；放弃的数据库打开请求迟到成功时关闭旧连接，旧连接事件不能重置已恢复连接；重译跳过缓存只接受并保存显式 true，刷新后继续当前重译不会恢复旧缓存。
  * 模块边界：只负责本地存取与已有译文匹配，不解析文档、不发起翻译、不读取配置，也不把任何内容发送到网络；页面状态、解析版本与何时保存由文档页面组合根决定。
  */
 import {documentSourceLocators, matchDocumentSourceLocators} from '../core/materialLocator';
@@ -12,6 +12,9 @@ export const DOCUMENT_HISTORY_MAX_ENTRIES = 20;
 export const DOCUMENT_HISTORY_MAX_BYTES = 80 * 1024 * 1024;
 const DATABASE = 'FluentReadDocumentHistory';
 const STORE = 'documents';
+const META = 'metadata';
+const GENERATION = 'generation';
+const SEQUENCE = 'sequence';
 
 export interface DocumentHistorySummary {
     id: string;
@@ -23,6 +26,8 @@ export interface DocumentHistorySummary {
     total: number;
     completed: number;
     updatedAt: number;
+    /** 列表读取时观察到的本地写入身份，用于安全删除。 */
+    historyVersion?: string;
 }
 export interface DocumentHistoryRecord extends DocumentHistorySummary {
     bytes: Uint8Array;
@@ -37,14 +42,27 @@ export interface DocumentHistoryRecord extends DocumentHistorySummary {
     parsedVersion?: number;
     /** 解析变化后无法安全套用的旧校订，只作为可复制资料保留，不计入当前译文或进度。 */
     retainedRevisions?: DocumentRetainedRevision[];
+    /** 本地存储写入身份；旧记录未携带该字段。 */
+    storageVersion?: string;
+    /** 单调保存次序，用于淘汰排序，独立于展示时间。 */
+    storageOrder?: number;
 }
 export interface DocumentRetainedRevision {source: string; translation: string; contextLabel?: string;}
+export type DocumentHistoryVersion = string | null;
+export function documentHistoryVersion(record: DocumentHistoryRecord | null): DocumentHistoryVersion {
+    return record ? typeof record.storageVersion === 'string' && record.storageVersion.startsWith('v:') ? record.storageVersion : 'legacy' : null;
+}
 export interface DocumentHistory {
     list(): Promise<DocumentHistorySummary[]>;
+    listChecked(): Promise<{status: 'ok'; entries: DocumentHistorySummary[]} | {status: 'unavailable'}>;
     load(id: string): Promise<DocumentHistoryRecord | null>;
+    /** 明确区分没有记录与读取不可用，供后续可能写回同一标识的导入使用。 */
+    loadChecked(id: string): Promise<{status: 'ok'; record: DocumentHistoryRecord | null; version: string} | {status: 'unavailable'}>;
     save(record: DocumentHistoryRecord): Promise<boolean>;
-    remove(id: string): Promise<void>;
-    clear(): Promise<void>;
+    saveChecked(record: DocumentHistoryRecord, expected: DocumentHistoryVersion): Promise<{status: 'saved'; version: string} | {status: 'conflict' | 'unavailable'}>;
+    remove(id: string): Promise<boolean>;
+    removeChecked(id: string, expected: string): Promise<{status: 'removed' | 'conflict' | 'unavailable'}>;
+    clear(): Promise<boolean>;
 }
 
 /**
@@ -263,11 +281,9 @@ export async function documentHistoryId(bytes: Uint8Array, subtle: Pick<SubtleCr
     } catch {return '';}
 }
 
-function request<T>(target: IDBRequest<T>): Promise<T> {
-    return new Promise((resolve, reject) => {
-        target.onsuccess = () => resolve(target.result);
-        target.onerror = () => reject(target.error);
-    });
+function historyOrder(record: DocumentHistoryRecord): number {
+    if (record.storageOrder !== undefined && (!Number.isSafeInteger(record.storageOrder) || record.storageOrder <= 0)) throw new Error('Invalid history order');
+    return record.storageOrder ?? 0;
 }
 
 function summary(record: DocumentHistoryRecord): DocumentHistorySummary {
@@ -298,8 +314,17 @@ export function createDocumentHistory(factory: IDBFactory | undefined = globalTh
         const generation = ++openingGeneration;
         openingOwners.set(signal, generation);
         return opening = new Promise<IDBDatabase>((resolve, reject) => {
-            const opened = factory!.open(DATABASE, 1);
-            opened.onupgradeneeded = () => {opened.result.createObjectStore(STORE, {keyPath: 'id'});};
+            const opened = factory!.open(DATABASE, 2);
+            opened.onupgradeneeded = () => {
+                if (generation !== openingGeneration || signal.aborted) {opened.transaction!.abort();return;}
+                const db = opened.result;
+                if (!db.objectStoreNames.contains(STORE)) db.createObjectStore(STORE, {keyPath: 'id'});
+                if (!db.objectStoreNames.contains(META)) {
+                    const meta = db.createObjectStore(META, {keyPath: 'key'});
+                    meta.put({key: GENERATION, value: `g:${globalThis.crypto.randomUUID()}`});
+                    meta.put({key: SEQUENCE, value: 0});
+                }
+            };
             opened.onsuccess = () => {
                 const database = opened.result;
                 if (generation !== openingGeneration) {
@@ -322,10 +347,10 @@ export function createDocumentHistory(factory: IDBFactory | undefined = globalTh
         return database.transaction(STORE, 'readonly').objectStore(STORE);
     };
     /** 撤销资格贯穿数据库打开等待与真实事务；请求成功还不代表事务已经提交。 */
-    const write = async (signal: AbortSignal, enqueue: (target: IDBObjectStore) => void): Promise<void> => {
+    const write = async (signal: AbortSignal, enqueue: (target: IDBObjectStore, meta: IDBObjectStore) => void): Promise<void> => {
         const database = await open(signal);
         signal.throwIfAborted();
-        const transaction = database.transaction(STORE, 'readwrite');
+        const transaction = database.transaction([STORE, META], 'readwrite');
         const settled = new Promise<void>((resolve, reject) => {
             transaction.oncomplete = () => resolve();
             transaction.onabort = () => reject(transaction.error);
@@ -335,7 +360,7 @@ export function createDocumentHistory(factory: IDBFactory | undefined = globalTh
         };
         signal.addEventListener('abort', abort, {once: true});
         try {
-            try {enqueue(transaction.objectStore(STORE));} catch {abort();}
+            try {enqueue(transaction.objectStore(STORE), transaction.objectStore(META));} catch {abort();}
             await settled;
         } finally {signal.removeEventListener('abort', abort);}
     };
@@ -355,42 +380,137 @@ export function createDocumentHistory(factory: IDBFactory | undefined = globalTh
         clearTimeout(timer);
         return result;
     };
-    const all = async (signal: AbortSignal): Promise<Array<{summary: DocumentHistorySummary; bytes: number}>> => {
+    const all = async (signal: AbortSignal): Promise<Array<{summary: DocumentHistorySummary; bytes: number; order: number; version: DocumentHistoryVersion}>> => {
         const target = await readStore(signal);
         return new Promise((resolve, reject) => {
-            const entries: Array<{summary: DocumentHistorySummary; bytes: number}> = [];
+            const entries: Array<{summary: DocumentHistorySummary; bytes: number; order: number; version: DocumentHistoryVersion}> = [];
+            let finished = false;
+            target.transaction.oncomplete = () => finished ? resolve(entries.sort((left, right) => right.order - left.order || right.summary.updatedAt - left.summary.updatedAt)) : reject(new Error('Incomplete history scan'));
+            target.transaction.onabort = () => reject(target.transaction.error);
             const cursor = target.openCursor();
             cursor.onerror = () => reject(cursor.error);
             cursor.onsuccess = () => {
                 try {
                     signal.throwIfAborted();
                     const current = cursor.result;
-                    if (!current) {resolve(entries.sort((left, right) => right.summary.updatedAt - left.summary.updatedAt)); return;}
+                    if (!current) {finished = true;return;}
                     const value = current.value as DocumentHistoryRecord;
-                    entries.push({summary: summary(value), bytes: value.bytes.byteLength});
+                    entries.push({summary: summary(value), bytes: value.bytes.byteLength, order: historyOrder(value), version: documentHistoryVersion(value)});
                     current.continue();
                 } catch (error) {reject(error);}
             };
         });
     };
+    // 保存、限额计算、淘汰及删除世代推进必须在同一事务完成。
+    const enforceLimit = (target: IDBObjectStore, meta: IDBObjectStore, protectedId: string, signal: AbortSignal) => {
+        const entries: Array<{id: string; updatedAt: number; order: number; bytes: number}> = [];
+        const cursor = target.openCursor();
+        cursor.onsuccess = () => {
+            try {
+                signal.throwIfAborted();
+                const current = cursor.result;
+                if (current) {
+                    const value = current.value as DocumentHistoryRecord;
+                    entries.push({id: value.id, updatedAt: value.updatedAt, order: historyOrder(value), bytes: value.bytes.byteLength});
+                    current.continue();return;
+                }
+                entries.sort((a, b) => Number(b.id === protectedId) - Number(a.id === protectedId) || b.order - a.order || b.updatedAt - a.updatedAt);
+                let bytes = 0, removed = false;
+                for (const [index, entry] of entries.entries()) {
+                    bytes += entry.bytes;
+                    if (index >= DOCUMENT_HISTORY_MAX_ENTRIES || bytes > DOCUMENT_HISTORY_MAX_BYTES) {target.delete(entry.id);removed = true;}
+                }
+                if (removed) meta.put({key: GENERATION, value: `g:${globalThis.crypto.randomUUID()}`});
+            } catch {target.transaction.abort();}
+        };
+    };
+    // 序列与记录写入同事务提交，不受系统时间回拨影响；旧记录保持原来的时间排序。
+    const nextOrder = (target: IDBObjectStore, meta: IDBObjectStore, done: (order: number) => void) => {
+        const request = meta.get(SEQUENCE);
+        request.onsuccess = () => {
+            try {
+                const previous = request.result?.value;
+                if (!Number.isSafeInteger(previous) || previous < 0 || previous >= Number.MAX_SAFE_INTEGER) throw new Error('Invalid history sequence');
+                const order = previous + 1;
+                meta.put({key: SEQUENCE, value: order});
+                done(order);
+            } catch {target.transaction.abort();}
+        };
+    };
+    const readVersion = (target: IDBObjectStore, meta: IDBObjectStore, id: string, done: (record: DocumentHistoryRecord | null, version: string) => void) => {
+        const recordRequest = target.get(id), generationRequest = meta.get(GENERATION);
+        let pending = 2;
+        const complete = () => {
+            if (--pending) return;
+            try {
+                const generation = generationRequest.result?.value;
+                if (typeof generation !== 'string' || !generation.startsWith('g:')) throw new Error('Invalid history generation');
+                let record = (recordRequest.result as DocumentHistoryRecord | undefined) ?? null;
+                if (record && documentHistoryVersion(record) === 'legacy') {
+                    record = {...record, storageVersion: `v:${globalThis.crypto.randomUUID()}`};
+                    target.put(record);
+                }
+                done(record, record ? record.storageVersion! : generation);
+            } catch {target.transaction.abort();}
+        };
+        recordRequest.onsuccess = complete;
+        generationRequest.onsuccess = complete;
+    };
+    const loadChecked: DocumentHistory['loadChecked'] = id => guarded<Awaited<ReturnType<DocumentHistory['loadChecked']>>>({status: 'unavailable'}, async signal => {
+        let result: Awaited<ReturnType<DocumentHistory['loadChecked']>> = {status: 'unavailable'};
+        await write(signal, (target, meta) => readVersion(target, meta, id, (record, version) => {
+            result = {status: 'ok', record: record ? normalizeDocumentHistoryCachePolicy(record) : null, version};
+        }));
+        return result;
+    });
+    type CheckedSave = Awaited<ReturnType<DocumentHistory['saveChecked']>>;
+    const saveChecked: DocumentHistory['saveChecked'] = (record, expected) => guarded<CheckedSave>({status: 'unavailable'}, async signal => {
+        if (!record.id || record.bytes.byteLength > DOCUMENT_HISTORY_MAX_BYTES) return {status: 'unavailable'};
+        const version = `v:${globalThis.crypto.randomUUID()}`;
+        const saved = {...normalizeDocumentHistoryCachePolicy(record), storageVersion: version, bytes: record.bytes.slice(), translations: [...record.translations],
+            retainedRevisions: retainedDocumentRevisions(Array.isArray(record.retainedRevisions) ? record.retainedRevisions : [])};
+        let conflict = false;
+        await write(signal, (target, meta) => readVersion(target, meta, record.id, (_current, actual) => {
+            if (actual !== expected) {conflict = true;return;}
+            nextOrder(target, meta, order => {target.put({...saved, storageOrder: order});enforceLimit(target, meta, record.id, signal);});
+        }));
+        return conflict ? {status: 'conflict'} : {status: 'saved', version};
+    });
+
     return {
         list: () => guarded<DocumentHistorySummary[]>([], async signal => (await all(signal)).map(entry => entry.summary)),
-        load: id => guarded<DocumentHistoryRecord | null>(null, async signal => {
-            const record = await request((await readStore(signal)).get(id)) as DocumentHistoryRecord | undefined;
-            return record ? normalizeDocumentHistoryCachePolicy(record) : null;
-        }),
+        listChecked: () => guarded<{status: 'ok'; entries: DocumentHistorySummary[]} | {status: 'unavailable'}>({status: 'unavailable'}, async signal => ({status: 'ok', entries: (await all(signal)).map(entry => ({...entry.summary, historyVersion: entry.version!}))})),
+        load: async id => {const result = await loadChecked(id);return result.status === 'ok' ? result.record : null;},
+        loadChecked,
+        saveChecked,
         save: record => guarded(false, async signal => {
             if (!record.id || record.bytes.byteLength > DOCUMENT_HISTORY_MAX_BYTES) return false;
-            const saved = {...normalizeDocumentHistoryCachePolicy(record), bytes: record.bytes.slice(), translations: [...record.translations],
+            const saved = {...normalizeDocumentHistoryCachePolicy(record), storageVersion: `v:${globalThis.crypto.randomUUID()}`, bytes: record.bytes.slice(), translations: [...record.translations],
                 retainedRevisions: retainedDocumentRevisions(Array.isArray(record.retainedRevisions) ? record.retainedRevisions : [])};
-            await write(signal, target => {target.put(saved);});
-            // 先写入再淘汰：保留最近的记录，直到条数与总字节都回到上限以内。
-            let bytes = 0;
-            const stale = (await all(signal)).filter((entry, index) => {bytes += entry.bytes; return index >= DOCUMENT_HISTORY_MAX_ENTRIES || bytes > DOCUMENT_HISTORY_MAX_BYTES;});
-            if (stale.length) await write(signal, target => {stale.forEach(entry => target.delete(entry.summary.id));});
+            await write(signal, (target, meta) => nextOrder(target, meta, order => {target.put({...saved, storageOrder: order});enforceLimit(target, meta, record.id, signal);}));
             return true;
         }),
-        remove: id => guarded(undefined, signal => write(signal, target => {target.delete(id);})),
-        clear: () => guarded(undefined, signal => write(signal, target => {target.clear();})),
+        removeChecked: (id, expected) => guarded<{status: 'removed' | 'conflict' | 'unavailable'}>({status: 'unavailable'}, async signal => {
+            let conflict = false;
+            await write(signal, (target, meta) => {
+                const read = target.get(id), generation = meta.get(GENERATION);
+                let pending = 2;
+                const complete = () => {
+                    if (--pending) return;
+                    try {
+                        const value = generation.result?.value;
+                        if (typeof value !== 'string' || !value.startsWith('g:')) throw new Error('Invalid history generation');
+                        const record = (read.result as DocumentHistoryRecord | undefined) ?? null;
+                        if (!record || documentHistoryVersion(record) !== expected) {conflict = true;return;}
+                        target.delete(id);
+                        meta.put({key: GENERATION, value: `g:${globalThis.crypto.randomUUID()}`});
+                    } catch {target.transaction.abort();}
+                };
+                read.onsuccess = complete;generation.onsuccess = complete;
+            });
+            return {status: conflict ? 'conflict' : 'removed'};
+        }),
+        remove: id => guarded(false, async signal => {await write(signal, (target, meta) => {target.delete(id);meta.put({key: GENERATION, value: `g:${globalThis.crypto.randomUUID()}`});});return true;}),
+        clear: () => guarded(false, async signal => {await write(signal, (target, meta) => {target.clear();meta.put({key: GENERATION, value: `g:${globalThis.crypto.randomUUID()}`});});return true;}),
     };
 }

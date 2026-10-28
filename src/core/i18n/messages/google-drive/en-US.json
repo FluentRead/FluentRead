@@ -104,6 +104,7 @@
     "空值": "Empty",
     "同步未完成，请重试。": "Sync did not complete. Try again.",
     "同步文件无法解密或已损坏；请检查云端备份，本机配置未被修改。": "The sync file cannot be decrypted or is damaged. Check the cloud backup; device settings have not changed.",
+    "上次 Google 授权仍在结束，请稍后重试。": "The previous Google authorization is still finishing. Please try again shortly.",
     "Google 授权未完成，请点击同步按钮后重试。": "Google authorization was not completed. Click the sync button to retry.",
     "Google 未返回有效授权，请点击同步按钮重试。": "Google did not return valid authorization. Click the sync button to retry.",
     "未允许 Google Drive 配置数据权限，请重新同步并在 Google 授权页面允许访问配置数据。": "Google Drive configuration access was not allowed. Sync again and allow configuration data access on the Google consent page.",

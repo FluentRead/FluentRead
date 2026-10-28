@@ -135,6 +135,29 @@ describe('真实后台广播工厂共享接收者适配器', () => {
         expect(ports.storage.setItem).toHaveBeenCalledWith('local:fluentReadImageOcrLanguages', {languages: ['zh']});
     });
 
+    it('扩展自身页面不登记为 Safari 网页接收者，真实网页仍能接收通知', async () => {
+        const tabBroadcast = installBrowserTabBroadcastRuntime('safari');
+        await tabBroadcast.registerContentReceiver({id: 'fluentread', url: 'safari-web-extension://fluentread/options.html', tab: {id: 11}});
+        await tabBroadcast.registerContentReceiver({id: 'fluentread', url: 'https://example.test/article', tab: {id: 7}});
+        await tabBroadcast.broadcastTabMessage({type: 'translationCacheCleared'});
+        expect(ports.browser.tabs.sendMessage).toHaveBeenCalledWith(7, {type: 'translationCacheCleared'});
+        expect(ports.browser.tabs.sendMessage).not.toHaveBeenCalledWith(11, expect.anything());
+        expect(ports.browser.storage.session.set).toHaveBeenLastCalledWith({[TAB_BROADCAST_SESSION_KEY]: [7]});
+    });
+
+    it('OCR 元数据持久化读写失败会传递错误，恢复后可以重试', async () => {
+        const storage = createConfigImageOcrLanguageStorage();
+        const failure = new Error('fixture storage failure');
+        ports.storage.getItem.mockRejectedValueOnce(failure).mockResolvedValueOnce({languages: ['en']});
+        await expect(storage.get('fluentReadImageOcrLanguages')).rejects.toBe(failure);
+        await expect(storage.get('fluentReadImageOcrLanguages')).resolves.toEqual({fluentReadImageOcrLanguages: {languages: ['en']}});
+        ports.storage.setItem.mockRejectedValueOnce(failure).mockResolvedValueOnce(undefined);
+        await expect(storage.set({fluentReadImageOcrLanguages: {languages: ['zh']}})).rejects.toBe(failure);
+        await expect(storage.set({fluentReadImageOcrLanguages: {languages: ['zh']}})).resolves.toBeUndefined();
+        expect(ports.storage.setItem).toHaveBeenCalledTimes(2);
+        expect(ports.storage.setItem).toHaveBeenLastCalledWith('local:fluentReadImageOcrLanguages', {languages: ['zh']});
+    });
+
     it('真实会话故障只告警，配置读取仍能完成并在后续广播恢复', async () => {
         const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
         ports.browser.storage.session.get.mockRejectedValueOnce(new Error('session wake failure'));

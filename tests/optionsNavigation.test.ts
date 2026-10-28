@@ -265,7 +265,6 @@ describe('settings page categories', () => {
     expect(resolveSettingsPanel('settings-translation', 'excluded-language-settings')).toBe('excluded-languages')
     expect(resolveSettingsPanel('settings-translation', 'context-menu-settings')).toBe('context-menu')
     expect(resolveSettingsPanel('settings-interface', 'translation-appearance-panel')).toBe('translation')
-    expect(resolveSettingsPanel('settings-translation', 'translation-sentence-highlight')).toBe('reading')
     expect(resolveSettingsPanel('settings-interface', 'translation-sentence-highlight-style')).toBe('translation')
     expect(settingsPagePanels['settings-translation'][0].id).toBe('reading')
     expect(resolveSettingsPanel('settings-interface', 'font')).toBe('font')

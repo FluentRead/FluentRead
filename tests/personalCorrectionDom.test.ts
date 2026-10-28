@@ -57,6 +57,20 @@ beforeEach(() => {
 });
 afterEach(() => {disableVisiblePersonalCorrections(); vi.unstubAllGlobals(); vi.unstubAllEnvs();});
 describe('个人校订的网页所有权端口', () => {
+    it('初查预取消不发查询；查询失败时已取消不能当作普通翻译降级', async () => {
+        const node = document.querySelector('p')!;
+        const controller = new AbortController();
+        controller.abort();
+        await expect(lookupPersonalCorrection(node, query.source, 'en', 'zh', controller.signal)).rejects.toMatchObject({name: 'AbortError'});
+        expect(fixture.lookup).not.toHaveBeenCalled();
+        const inFlight = new AbortController();
+        let reject!: (reason: unknown) => void;
+        fixture.lookup.mockReturnValueOnce(new Promise((_resolve, fail) => {reject = fail;}));
+        const pending = lookupPersonalCorrection(node, query.source, 'en', 'zh', inFlight.signal);
+        inFlight.abort();
+        reject(new Error('late failure'));
+        await expect(pending).rejects.toMatchObject({name: 'AbortError'});
+    });
     it('关闭时零记忆查询；关闭再开启也丢弃上一启用代次的查询和提交', async () => {
         const node = document.querySelector('p')!;
         fixture.config.personalCorrectionsEnabled = false;
@@ -109,6 +123,27 @@ describe('个人校订的网页所有权端口', () => {
         resolve({exact: {id: 'late', translation: '迟到'}}); await pending;
         expect(state.bilingualReplay.translations).toEqual(['团队准备好了。']); expect(state.bilingualReplay.personalCorrectionId).toBeUndefined();
     });
+    it.each(['new-refresh', 'disable', 'ordinary-failure'] as const)(
+        '校订刷新遇到失败时按 %s 的所有权决定是否继续读取', async scenario => {
+            const first = pair(true, 'saved');
+            const secondNode = first.node.cloneNode(true) as HTMLElement;
+            document.body.append(secondNode);
+            const secondContent = secondNode.querySelector<HTMLElement>('.fluent-read-bilingual-content')!;
+            const secondState = {...first.state, bilingualContent: secondContent,
+                bilingualReplay: {...first.state.bilingualReplay, translations: [...first.state.bilingualReplay.translations]}};
+            fixture.states.set(secondNode, secondState);
+            registerPersonalCorrectionResult(secondNode, secondState as any, {...first.snapshot});
+            let rejectOld!: (reason: unknown) => void;
+            fixture.lookup.mockReturnValueOnce(new Promise((_resolve, reject) => {rejectOld = reject;}));
+            const oldRefresh = refreshVisiblePersonalCorrections();
+            expect(fixture.lookup).toHaveBeenCalledTimes(1);
+            if (scenario === 'new-refresh') await refreshVisiblePersonalCorrections();
+            if (scenario === 'disable') disableVisiblePersonalCorrections();
+            const callsBeforeReject = fixture.lookup.mock.calls.length;
+            rejectOld(new Error('lookup unavailable'));
+            await oldRefresh;
+            expect(fixture.lookup).toHaveBeenCalledTimes(callsBeforeReject + (scenario === 'ordinary-failure' ? 1 : 0));
+        });
     it('主动开启后按原请求语言校订现有服务译文，准备编辑对不查询记忆或改译文', () => {
         fixture.config.personalCorrectionsEnabled = false; const {content, state} = pair();
         fixture.config.personalCorrectionsEnabled = true;

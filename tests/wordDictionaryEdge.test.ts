@@ -727,3 +727,29 @@ describe('word dictionary lookup orchestration', () => {
         expect(await dictionary.lookup('recovered')).not.toBeNull();
     });
 });
+
+it('falls back to the next dictionary source without waiting for an oversized stream cancellation handshake', async () => {
+    optionalDictionaryCache();let release!:()=>void;
+    const cancel=vi.fn(()=>new Promise<void>(resolve=>{release=resolve;}));
+    const body=new ReadableStream<Uint8Array>({start(controller){controller.enqueue(new Uint8Array(3_913_557));},cancel});
+    const fetch=vi.fn().mockResolvedValueOnce(new Response(body)).mockResolvedValueOnce(new Response(fullEcdictBytes()));
+    setRuntimeFetch(fetch);
+    const download=downloadFullEcdict();let settled=false;void download.then(()=>{settled=true;});
+    await vi.waitFor(()=>expect(cancel).toHaveBeenCalledOnce());
+    const promptly=await Promise.race([download.then(()=>true),new Promise<boolean>(resolve=>setTimeout(()=>resolve(false),100))]);
+    release();await download;
+    expect(promptly).toBe(true);expect(settled).toBe(true);expect(body.locked).toBe(false);expect(fetch).toHaveBeenCalledTimes(2);
+});
+
+it('removes an oversized cached dictionary without waiting for a late failing cancellation', async () => {
+    const {cache}=optionalDictionaryCache();let fail!: (error:Error)=>void;
+    const cancel=vi.fn(()=>new Promise<void>((_resolve,reject)=>{fail=reject;}));
+    const body=new ReadableStream<Uint8Array>({start(controller){controller.enqueue(new Uint8Array(3_913_557));},cancel});
+    vi.spyOn(cache,'match').mockResolvedValueOnce(new Response(body));
+    const remove=vi.spyOn(cache,'delete');const read=readCachedFullEcdict();
+    await vi.waitFor(()=>expect(cancel).toHaveBeenCalledOnce());
+    const promptly=await Promise.race([read.then(()=>true),new Promise<boolean>(resolve=>setTimeout(()=>resolve(false),100))]);
+    fail(new Error('late cache stream cancellation failure'));await read;
+    expect(promptly).toBe(true);expect(remove).toHaveBeenCalledOnce();expect(body.locked).toBe(false);
+    await new Promise(resolve=>setTimeout(resolve,0));
+});

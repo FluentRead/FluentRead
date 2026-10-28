@@ -65,7 +65,7 @@ beforeEach(async () => {
   persist = vi.fn().mockResolvedValue(undefined);
   const api = {...materialPorts, ...catalog, ...compositeTranslation, ...documentCore, ...presentation, ...preview, ...richPreviewSync, ...pdfOcr, ...documentTasks, useConfigEditor, createPdfPageRecognizer: () => async () => [], hasDistinctTranslation, Config, TranslationRequestError, serializeTranslationError, createDocumentImportWorkflow, createDocumentRecognitionWorkflow, createDocumentExportWorkflow,
     documentRetryBackoff: {maxWaitMs: 0}, createDocumentHistoryCommitter,
-    createDocumentHistory: () => ({list: async () => [], load: async () => null, save: async () => false, remove: async () => {}, clear: async () => {}}), documentHistoryId: async () => '',
+    createDocumentHistory: () => ({list: async () => [], listChecked: async () => ({status: 'ok', entries: []}), load: async () => null, loadChecked: async () => ({status: 'ok', record: null}), save: async () => false, saveChecked: async () => ({status: 'unavailable'}), remove: async () => false, removeChecked: async () => ({status: 'unavailable'}), clear: async () => false}), documentHistoryId: async () => '',
     parseDocumentFile: parseFile, translateDocumentSegments: translate, createDocumentDownload: download, generateDocumentArchive,
     buildGlossaryRevision: () => '', runtimeConfig: new Config(), configReady: Promise.resolve(),
     subscribeConfig: () => () => {}, requestConfigPatch: persist,

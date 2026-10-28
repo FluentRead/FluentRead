@@ -925,9 +925,12 @@ async function resetStats(): Promise<void> {
     resetDialogOpen.value = false
     setSettingsBackgroundInert(false)
     resetMessage.value = t('translationStats.reset.done')
-    await loadSnapshot()
+    // 清除已获后台确认；后续查询可能挂起，不应继续占用确认会话。
+    resetting.value = false
+    const refresh = loadSnapshot()
     await nextTick()
     if (mounted && props.active && revision === resetRevision.value && !resetDialogOpen.value) resetButton.value?.focus()
+    await refresh
   } catch (error) {
     if (mounted && revision === resetRevision.value) resetError.value = error instanceof Error ? error.message : t('translationStats.reset.failed')
   } finally {

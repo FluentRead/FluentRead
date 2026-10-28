@@ -6,6 +6,7 @@
  */
 import type {HarnessActionId} from '@/src/core/config/harness';
 import type {HarnessSession, HarnessStoredTurn, HarnessStoredTurnStatus} from './sessionTypes';
+import {truncateUtf16} from '@/src/shared/function/truncateUtf16';
 
 export const HARNESS_SESSION_TTL_MS = 30 * 24 * 60 * 60 * 1000;
 export const HARNESS_SESSION_TEXT_MAX = 4_096;
@@ -16,18 +17,19 @@ export const HARNESS_SESSION_ANSWER_MAX = 16_000;
 const ACTIONS = new Set<HarnessActionId>(['meaning', 'grammar', 'usage', 'practice']);
 const STATUSES = new Set<HarnessStoredTurnStatus>(['streaming', 'completed', 'stopped', 'error']);
 
-function boundedString(value: unknown, max: number, field: string, required = false): string {
+function boundedString(value: unknown, max: number, field: string, required = false, preservePair = true): string {
     if (typeof value !== 'string') {
         if (!required && value === undefined) return '';
         throw new TypeError(`Harness 会话 ${field} 必须是字符串`);
     }
     const normalized = value.normalize('NFC').replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F]/gu, '').trim();
     if (required && !normalized) throw new TypeError(`Harness 会话 ${field} 不能为空`);
-    return normalized.slice(0, max);
+    return preservePair ? truncateUtf16(normalized, max) : normalized.slice(0, max);
 }
 
 function stableId(value: unknown, field: string): string {
-    const id = boundedString(value, 200, field, true);
+    // ID 必须按原有代码单元切片后校验；不能因字符边界修复而接受旧版拒绝的非法 ID。
+    const id = boundedString(value, 200, field, true, false);
     if (!/^[A-Za-z0-9._:-]+$/u.test(id)) throw new TypeError(`Harness 会话 ${field} 格式无效`);
     return id;
 }

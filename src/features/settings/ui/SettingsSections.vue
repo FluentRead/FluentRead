@@ -75,7 +75,7 @@
 </SettingsPanel>
     <SettingsPanel name="adaptation">
       <ServiceRepairReturn :active="viewActive && props.activeSection === 'settings-sites'" :context="siteRepairContext" context-key="settings-sites:adaptation" />
-      <SiteAdaptationSettings :model-value="config.siteAdaptation" :save-settings="saveSiteAdaptationSettings" :inspect-rule-id="siteRuleInspectId" />
+      <SiteAdaptationSettings :model-value="config.siteAdaptation" :save-settings="saveSiteAdaptationSettings" :inspect-rule-id="siteRuleInspectId" :active="viewActive && props.activeSection === 'settings-sites'" />
 </SettingsPanel>
     <SettingsPanel name="preview">
       <SiteRulePreview :settings="config" :adaptation="config.siteAdaptation" :scope="config.translationScope" @inspect-rule="inspectSiteRule" />

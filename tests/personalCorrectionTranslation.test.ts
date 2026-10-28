@@ -52,4 +52,31 @@ describe('网页翻译在公共缓存之前精确复用个人记忆', () => {
         expect(await createTranslationRequest(document.querySelector('p')!, 'content', 'bilingual', snapshot)).toMatchObject({translations: ['团队准备好了。']});
         expect(runtime.provider).toHaveBeenCalledOnce();
     });
+
+    it.each(['resolve', 'reject'] as const)('翻译初查期间取消，迟到的校订 %s 不触发服务请求', async outcome => {
+        const controller = new AbortController();
+        let resolve!: (value: unknown) => void;
+        let reject!: (error: unknown) => void;
+        runtime.lookup.mockReturnValueOnce(new Promise((done, fail) => {resolve = done;reject = fail;}));
+        const request = createTranslationRequest(document.querySelector('p')!, 'content', 'bilingual', snapshot, controller.signal);
+        const cancelled = expect(request).rejects.toMatchObject({name: 'AbortError'});
+        expect(runtime.lookup).toHaveBeenCalledOnce();
+        controller.abort();
+        if (outcome === 'resolve') resolve({exact: {id: 'late', revision: 1, translation: '过期译文'}});
+        else reject(new Error('late storage failure'));
+        await cancelled;
+        expect(runtime.provider).not.toHaveBeenCalled();
+    });
+
+    it('带未取消信号的成功校订仍直接复用，缺少信号的查询失败继续使用服务翻译', async () => {
+        const controller = new AbortController();
+        runtime.lookup.mockResolvedValueOnce({exact: {id: 'saved', revision: 1, translation: '已确认译文'}})
+            .mockRejectedValueOnce(new Error('memory unavailable'));
+        await expect(createTranslationRequest(document.querySelector('p')!, 'content', 'bilingual', snapshot, controller.signal))
+            .resolves.toMatchObject({translations: ['已确认译文']});
+        expect(runtime.provider).not.toHaveBeenCalled();
+        await expect(createTranslationRequest(document.querySelector('p')!, 'content', 'bilingual', snapshot))
+            .resolves.toMatchObject({translations: ['团队准备好了。']});
+        expect(runtime.provider).toHaveBeenCalledOnce();
+    });
 });

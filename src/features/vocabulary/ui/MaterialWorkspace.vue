@@ -20,6 +20,7 @@
       <div class="fr-material-actions"><button type="button" :disabled="busy" @click="clearMaterials">确认清空</button><button type="button" :disabled="busy" @click="confirmClear = false">取消</button></div>
     </section>
     <p v-if="error" class="fr-material-feedback error" role="alert">{{ error }} <button type="button" :disabled="busy" @click="reload()">重试</button></p>
+    <p v-if="backupWarning" class="fr-material-feedback error" role="alert">{{ backupWarning }}</p>
     <p v-if="feedback" class="fr-material-feedback" role="status">{{ feedback }}</p>
     <p v-if="archived" class="fr-material-feedback">已移除的材料仍保留原句与笔记，恢复后可继续阅读。原有收藏与问答不受影响。</p>
     <div v-if="loading && !materials.length" class="fr-material-empty" role="status">正在读取材料…</div>
@@ -100,10 +101,11 @@ import type { HarnessSession } from '@/src/services/harness/sessionTypes';
 import type { VocabularyEntry } from '../learningModel';
 import { VOCABULARY_BOOK_MESSAGE, type VocabularyBookResponse } from '../protocol';
 import type { MaterialRecord, MaterialReference } from '../materialProtocol';
-import { MATERIAL_CHANGED_MESSAGE } from '../materialProtocol';
+import { MATERIAL_BACKUP_MAX_BYTES, MATERIAL_CHANGED_MESSAGE } from '../materialProtocol';
 import { materialList, materialCapture, materialUpdate, materialArchive, materialRestore, materialRemoveReference, materialClear, materialExport, materialImport, materialGeneration } from '../materialClient';
 import { materialResumeLink } from '../materialSource';
 import { useRenderDateFormatter } from '@/src/ui/dateFormat';
+import { downloadTextFile } from '@/src/shared/dom/downloadTextFile';
 const emit = defineEmits<{
     navigate: [
         section: string
@@ -117,6 +119,7 @@ const keptAliveVisible = ref(true);
 const viewVisible = computed(() => (props.isVisible?.() ?? true) && keptAliveVisible.value);
 const materials = ref<MaterialRecord[]>([]), selectedId = ref(''), query = ref(''), topic = ref(''), archived = ref(false);
 const loading = ref(false), busy = ref(false), error = ref(''), feedback = ref(''), editing = ref(false), note = ref('');
+const backupWarning = ref('');
 const draft = ref({ title: '', topics: '', url: '' });
 const confirmClear = ref(false), importInput = ref<HTMLInputElement>(), editingNoteId = ref('');
 const noteInput = ref<HTMLTextAreaElement>();
@@ -468,21 +471,15 @@ async function exportMaterials() {
     const ticket = ++generation;
     loading.value = false;
     error.value = '';
+    backupWarning.value = '';
     try {
         const data = await materialExport();
         if (!active || ticket !== generation)
             return;
-        const url = URL.createObjectURL(new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' }));
-        try {
-            const anchor = document.createElement('a');
-            anchor.href = url;
-            anchor.download = `fluentread-materials-${new Date().toISOString().slice(0, 10)}.json`;
-            anchor.click();
-        }
-        finally {
-            URL.revokeObjectURL(url);
-        }
+        const bytes = downloadTextFile(`fluentread-materials-${new Date().toISOString().slice(0, 10)}.json`, JSON.stringify(data, null, 2), 'application/json');
         feedback.value = '材料备份已导出，包含来源、原句与个人笔记，请妥善保存。';
+        if (bytes > MATERIAL_BACKUP_MAX_BYTES)
+            backupWarning.value = '此备份超过 20 MB，当前版本无法恢复。请保留现有材料，并妥善保存备份文件。';
     }
     catch (failure) {
         if (active && ticket === generation)
@@ -498,7 +495,7 @@ async function importMaterials(event: Event) {
     input.value = '';
     if (!file || busy.value)
         return;
-    if (file.size > 20 * 1024 * 1024) {
+    if (file.size > MATERIAL_BACKUP_MAX_BYTES) {
         error.value = '材料备份超过 20 MB，请选择较小的备份文件。';
         return;
     }

@@ -72,7 +72,7 @@ async function claude(message: TranslationProviderRequest<string>) {
             throw error;
         }
 
-        const result = await readJsonResponse<any>(resp, 'Claude 返回的不是有效 JSON');
+        const result = await readJsonResponse<any>(resp, 'Claude 返回的不是有效 JSON', abortContext.signal);
         if (abortContext.signal.aborted) throw abortErrorFromSignal(abortContext.signal);
         const actualModel = typeof result?.model === 'string' && result.model.trim()
             ? result.model

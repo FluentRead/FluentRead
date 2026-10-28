@@ -15,6 +15,49 @@ function setup(overrides = {}) {
 }
 afterEach(() => vi.useRealTimers());
 describe('Writing request leases', () => {
+  it('同步重入取消不能把最初的普通取消改写成配置恢复信号', async () => {
+    let handler!: ReturnType<typeof createWritingHandler>;
+    const deps = {extensionId:'ext',optionsUrl:'chrome-extension://ext/options.html',ready:Promise.resolve(),eligibility:()=>undefined,
+      run: (_r: WritingRequest, signal:AbortSignal) => {signal.addEventListener('abort',()=>handler.cancelAll(undefined,()=>true));return new Promise<WritingResponse>(()=>{});}};
+    handler=createWritingHandler(deps);const p=port();handler.connect(p);p.onMessage.fire({...request,intent:'translate'});await flush();
+    handler.cancelAll();expect(p.postMessage).toHaveBeenCalledOnce();expect(p.postMessage.mock.calls[0][0].response).not.toHaveProperty('reason');
+  });
+  it.each(['disconnect','timeout'] as const)('%s 同步重入配置变更不会发送错误恢复信号', async mode => {
+    if(mode==='timeout')vi.useFakeTimers();
+    let handler!: ReturnType<typeof createWritingHandler>;
+    const deps = {extensionId:'ext',optionsUrl:'chrome-extension://ext/options.html',ready:Promise.resolve(),eligibility:()=>undefined,
+      run: (_r: WritingRequest, signal:AbortSignal) => {signal.addEventListener('abort',()=>handler.cancelAll(undefined,()=>true));return new Promise<WritingResponse>(()=>{});}};
+    handler=createWritingHandler(deps);const p=port();handler.connect(p);p.onMessage.fire({...request,intent:'translate'});
+    if(mode==='timeout') {await vi.advanceTimersByTimeAsync(0);await vi.advanceTimersByTimeAsync(60000);expect(p.postMessage).toHaveBeenCalledOnce();expect(p.postMessage.mock.calls[0][0].response).not.toHaveProperty('reason');}
+    else {await flush();p.onDisconnect.fire();expect(p.postMessage).not.toHaveBeenCalled();}
+  });
+  it('取消触发端口断开时不发送迟到回执', async () => {
+    const p=port();let handler!: ReturnType<typeof createWritingHandler>;
+    const deps={extensionId:'ext',optionsUrl:'chrome-extension://ext/options.html',ready:Promise.resolve(),eligibility:()=>undefined,
+      run:(_r:WritingRequest,signal:AbortSignal)=>{signal.addEventListener('abort',()=>p.onDisconnect.fire());return new Promise<WritingResponse>(()=>{});}};
+    handler=createWritingHandler(deps);handler.connect(p);p.onMessage.fire({...request,intent:'translate'});await flush();
+    handler.cancelAll(undefined,()=>true);expect(p.postMessage).not.toHaveBeenCalled();
+  });
+  it('恢复资格检查失败时只返回普通取消', async () => {
+    const {handler,deps}=setup();deps.run.mockImplementation(()=>new Promise(()=>{}));const p=port();handler.connect(p);p.onMessage.fire({...request,intent:'translate'});await flush();
+    handler.cancelAll(undefined,()=>{throw Error('private fixture');});
+    expect(p.postMessage.mock.calls[0][0].response).not.toHaveProperty('reason');expect(JSON.stringify(p.postMessage.mock.calls)).not.toContain('private fixture');
+  });
+  it('旧取消同步创建的新请求不被旧批次取消', async () => {
+    const first=port(), next=port({id:'ext',url:'https://github.com/b',tab:{id:2}});let handler!: ReturnType<typeof createWritingHandler>;
+    const deps={extensionId:'ext',optionsUrl:'chrome-extension://ext/options.html',ready:Promise.resolve(),eligibility:()=>undefined,
+      run:(_r:WritingRequest,signal:AbortSignal)=>{signal.addEventListener('abort',()=>{handler.connect(next);next.onMessage.fire({...request,requestId:'new'});},{once:true});return new Promise<WritingResponse>(()=>{});}};
+    handler=createWritingHandler(deps);handler.connect(first);first.onMessage.fire({...request,intent:'translate'});await flush();
+    handler.cancelAll();expect(first.postMessage).toHaveBeenCalledOnce();expect(next.postMessage).not.toHaveBeenCalled();next.onDisconnect.fire();
+  });
+  it('按冻结的请求选择取消，其他页面继续，随后仍可全部取消', async () => {
+    const {handler, deps} = setup(); deps.run.mockImplementation(() => new Promise(() => {}));
+    const first = port({id:'ext',url:'https://github.com/a',tab:{id:1}}), second = port({id:'ext',url:'https://github.com/b',tab:{id:2}});
+    handler.connect(first);handler.connect(second);first.onMessage.fire({...request,intent:'translate',requestId:'translation'});second.onMessage.fire({...request,intent:'reply',requestId:'reply'});
+    await flush();handler.cancelAll(value => value.intent !== 'translate');
+    expect(first.postMessage).not.toHaveBeenCalled();expect(second.postMessage.mock.calls[0][0].response.cancelled).toBe(true);
+    handler.cancelAll();expect(first.postMessage.mock.calls[0][0].response.cancelled).toBe(true);
+  });
   it('streams a single request and cleans both listeners after completion', async () => {
     const {handler, deps} = setup(); const p = port(); handler.connect(p); p.onMessage.fire(request); p.onMessage.fire(request); await flush();
     expect(deps.run).toHaveBeenCalledOnce(); expect((deps.run.mock.calls[0] as unknown[])[3]).toBe(p.sender); expect(p.postMessage).toHaveBeenCalledWith({type: 'result', requestId: 'write-1', response: success}); expect(p.onMessage.listeners.size).toBe(0); expect(p.onDisconnect.listeners.size).toBe(0);

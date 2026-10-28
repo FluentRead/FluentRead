@@ -22,7 +22,10 @@ import {
 
 export interface VocabularyBackgroundContext {
     sender?: {
+        id?: string;
+        url?: string;
         tab?: {
+            id?: number;
             incognito?: boolean;
         };
     };
@@ -50,10 +53,16 @@ export interface VocabularyBookRepositoryContract {
     relearn(entryId: string): Promise<unknown>;
     getReviewLogs(entryId: string): Promise<unknown>;
     remove(entryId: string): Promise<unknown>;
-    removeWithSnapshot(entryId: string): Promise<unknown>;
     clear(): Promise<void>;
     exportData(options?: VocabularyExportOptions): Promise<unknown>;
     importData(data: Record<string, unknown>): Promise<unknown>;
+}
+
+export interface VocabularyUndoRepositoryContract {
+    removeWithUndo(entryId: string): Promise<unknown>;
+    listUndo(): Promise<unknown>;
+    restoreUndo(undoId: string): Promise<'restored' | 'previously-restored' | 'expired' | 'missing'>;
+    discardUndo(undoId: string): Promise<void>;
 }
 
 export interface VocabularyBookBackgroundDependencies {
@@ -61,8 +70,10 @@ export interface VocabularyBookBackgroundDependencies {
     readonly isVocabularyBookEnabled: () => boolean;
     readonly isReencounterEnabled?: () => boolean;
     readonly vocabularyBook: VocabularyBookRepositoryContract;
+    readonly vocabularyUndo?: VocabularyUndoRepositoryContract;
     readonly broadcastChanged: VocabularyBookChangedBroadcaster;
     readonly logOperationFailure: (error: unknown) => void;
+    readonly isTrustedUndoSender?: (sender: VocabularyBackgroundContext['sender']) => boolean;
 }
 
 export const VOCABULARY_BOOK_CHANGED_ACK_RESPONSE = {success: true} as const;
@@ -90,6 +101,13 @@ function requiredText(value: unknown, message: string): string {
 
 function vocabularyEntryId(value: unknown): string {
     return requiredText(value, '缺少有效的单词条目标识');
+}
+
+function vocabularyUndoId(value: unknown): string {
+    if (typeof value !== 'string' || !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/iu.test(value)) {
+        throw new VocabularyBookHandlerError('invalid-input', '删除恢复标识无效');
+    }
+    return value;
 }
 
 function validateGetByTermMessage(message: VocabularyBookRuntimeMessage): {sourceLanguage: string; term: string} {
@@ -276,11 +294,31 @@ export function createVocabularyBookHandler(
                         if (removed) notifyVocabularyBookChanged(dependencies, 'remove', entryId);
                         return {success: true, data: removed};
                     }
-                    case 'removeWithSnapshot': {
-                        const entryId = vocabularyEntryId(message.entryId);
-                        const snapshot = await dependencies.vocabularyBook.removeWithSnapshot(entryId);
-                        if (snapshot) notifyVocabularyBookChanged(dependencies, 'remove', entryId);
-                        return {success: true, data: snapshot};
+                    case 'removeWithUndo':
+                    case 'listUndo':
+                    case 'restoreUndo':
+                    case 'discardUndo': {
+                        if (import.meta.env.BROWSER === 'userscript') throw new VocabularyBookHandlerError('invalid-input', '操作不支持');
+                        // 原文和复习历史只留在后台数据库；不能让网页内容脚本枚举或恢复删除记录。
+                        if (context.sender?.tab?.incognito === true || !dependencies.vocabularyUndo || !dependencies.isTrustedUndoSender?.(context.sender)) {
+                            throw new VocabularyBookHandlerError('invalid-input', '请从扩展设置页面管理删除恢复记录');
+                        }
+                        if (message.action === 'listUndo') return {success: true, data: await dependencies.vocabularyUndo.listUndo()};
+                        if (message.action === 'removeWithUndo') {
+                            const entryId = vocabularyEntryId(message.entryId);
+                            const ticket = await dependencies.vocabularyUndo.removeWithUndo(entryId);
+                            if (ticket) notifyVocabularyBookChanged(dependencies, 'remove', entryId);
+                            return {success: true, data: ticket};
+                        }
+                        const undoId = vocabularyUndoId(message.undoId);
+                        if (message.action === 'discardUndo') {
+                            await dependencies.vocabularyUndo.discardUndo(undoId);
+                            notifyVocabularyBookChanged(dependencies, 'undo');
+                            return {success: true, data: true};
+                        }
+                        const result = await dependencies.vocabularyUndo.restoreUndo(undoId);
+                        if (result === 'restored') notifyVocabularyBookChanged(dependencies, 'import');
+                        return {success: true, data: result};
                     }
                     case 'clear':
                         await dependencies.vocabularyBook.clear();
@@ -298,6 +336,15 @@ export function createVocabularyBookHandler(
                 }
             } catch (error) {
                 // 步骤 2：保持旧 background 行为：词书错误转为结构化响应，未知错误转为 storage-error。
+                if (message.action === 'clear' || (import.meta.env.BROWSER !== 'userscript' && typeof message.action === 'string' && ['removeWithUndo', 'listUndo', 'restoreUndo', 'discardUndo'].includes(message.action))) {
+                    if (error instanceof VocabularyBookHandlerError) return {success: false, error: {code: error.code, message: error.message}};
+                    if (error instanceof Error && error.name === 'VocabularyBookError' && 'code' in error) {
+                        if (error.code === 'limit-exceeded') return {success: false, error: {code: 'limit-exceeded', message: '收藏或恢复记录空间已满，请先处理已有记录'}};
+                        if (error.code === 'invalid-input') return {success: false, error: {code: 'invalid-input', message: '已有相同收藏或复习记录，请先检查现有数据'}};
+                    }
+                    // 存储异常不写出可能包含原文、URL 或其他私密字段的异常对象。
+                    return {success: false, error: {code: 'storage-error', message: '收藏操作未确认，请检查收藏后重试'}};
+                }
                 return vocabularyFailure(error, dependencies.logOperationFailure);
             }
         },

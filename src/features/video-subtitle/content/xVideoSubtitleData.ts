@@ -277,6 +277,10 @@ export function parseXSubtitleResource(source: string, baseUrl: string, segmentS
   if (/^WEBVTT(?:\s|$)/i.test(trimmed)) {
     return { cues: parseWebVttSubtitleResponse(trimmed, segmentStartMs), resources: [] };
   }
+  // 完整 HLS 列表有 EXTM3U 头；桥接也允许单独捕获的字幕 MEDIA 标签。
+  // 不能把 200 错误页或普通正文当作相对资源。
+  if (!/^#EXTM3U(?:\s|$)/i.test(trimmed)
+    && !/^\s*#EXT-X-MEDIA:[^\n]*TYPE=SUBTITLES/im.test(trimmed)) return {cues: [], resources: []};
 
   const resources: XSubtitleResource[] = [];
   const lines = trimmed.replace(/\r/g, '').split('\n');

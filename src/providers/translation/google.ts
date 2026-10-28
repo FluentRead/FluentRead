@@ -27,6 +27,7 @@ import {isNativeTranslationBatchEnabled} from '@/src/core/config/nativeBatch';
 import {createGoogleRequestGate, googleRequestDeadlineError} from './googleRequestGate';
 import {isNativeBatchResponseError, NativeBatchResponseError} from '@/src/core/translation/nativeBatch';
 import {hasTranslationContent} from '@/src/core/translation/result';
+import {inspectGoogleErrorBody, isGoogleHtmlResponse} from './googleErrorBody';
 
 const GOOGLE_TRANSLATE_RPC_ID = 'MkEWBc';
 const GOOGLE_TRANSLATE_BATCH_URLS = [
@@ -208,17 +209,13 @@ export function parseGoogleBatchResponse(responseBody: string): string {
     throw new Error('返回格式异常');
 }
 
-function isHtmlResponse(responseBody: string): boolean {
-    return /<!doctype html|<html[\s>]/i.test(responseBody);
-}
-
 function getErrorMessage(error: unknown): string {
     return error instanceof Error ? error.message : String(error);
 }
 
 function createGoogleParseError(error: unknown, responseBody: string): Error {
     const message = getErrorMessage(error);
-    return isHtmlResponse(responseBody) ? new Error(`${message}（${GOOGLE_CAPTCHA_HINT}）`)
+    return isGoogleHtmlResponse(responseBody) ? new Error(`${message}（${GOOGLE_CAPTCHA_HINT}）`)
         : new NativeBatchResponseError(message);
 }
 
@@ -271,9 +268,11 @@ async function fetchGoogleResponse(
         }
         // 自定义 transport 可能忽略 abort 后仍返回响应；即便调用方已结束，真实正文
         // 也要结算后才归还传输许可。迟到结果在读取后继续检查取消，不能标记探测成功。
-        let responseBody: string;
+        let responseBody = '';
+        let errorMarkers: Awaited<ReturnType<typeof inspectGoogleErrorBody>> | undefined;
         try {
-            responseBody = await response.text();
+            if (response.ok) responseBody = await response.text();
+            else errorMarkers = await inspectGoogleErrorBody(response);
         } catch {
             if (callerSignal?.aborted) throw abortErrorFromSignal(callerSignal);
             if (abortContext.didTimeout()) {
@@ -284,10 +283,10 @@ async function fetchGoogleResponse(
         if (callerSignal.aborted) throw abortErrorFromSignal(callerSignal);
         if (abortContext.didTimeout()) throw new Error(`请求超时（${timeoutMs / 1000} 秒）`);
         if (!response.ok) {
-            if (response.status === 400 && /"xsrf"/u.test(responseBody)) {
+            if (response.status === 400 && errorMarkers?.xsrf) {
                 Object.assign(statusError!, {googleXsrfRejected: true});
             }
-            if (isHtmlResponse(responseBody)) {
+            if (errorMarkers?.html) {
                 // CAPTCHA 提示只扩展安全文案，保留标准 HTTP 状态供外层判断冷却。
                 statusError!.message = `${statusError!.message}（${GOOGLE_CAPTCHA_HINT}）`;
             }

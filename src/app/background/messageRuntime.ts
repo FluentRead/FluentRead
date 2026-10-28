@@ -35,7 +35,7 @@ import {createTranslationCancelHandler, createTranslationRequestFallback, create
 import {createSelectionTtsBackgroundHandlers, type SelectionTtsContext} from './handlers/selectionTts';
 import {createSelectionWordLookupHandler} from './handlers/selectionWordLookup';
 import {isBrowserTabId, type TabTranslationStateStore} from './tabTranslationState';
-import {createBrowserVocabularyBookChangedBroadcaster, createVocabularyBackgroundHandlers, type VocabularyBackgroundContext} from './handlers/vocabulary';
+import {createBrowserVocabularyBookChangedBroadcaster, createBrowserVocabularyUndoOptions, createVocabularyBackgroundHandlers, type VocabularyBackgroundContext} from './handlers/vocabulary';
 import {browserCapabilities, type BrowserCapabilities} from '@/src/platform/browser/capabilities';
 import {supportsTranslationBatch} from '@/src/services/translation/capabilities';
 import {imageTranslationOffscreenAdapter, imageTranslationProgressTransport, imageTranslationSourceTransport} from '@/src/features/image-translation/background/offscreenAdapter';
@@ -154,6 +154,7 @@ export function installBackgroundMessageRuntime(options: BackgroundMessageRuntim
             configReady,
             isVocabularyBookEnabled: () => config.vocabularyBookEnabled === true, isReencounterEnabled: () => config.on && config.vocabularyReencounterEnabled === true && !browser.extension.inIncognitoContext,
             vocabularyBook,
+            ...createBrowserVocabularyUndoOptions(),
             broadcastChanged: createBrowserVocabularyBookChangedBroadcaster({
                 sendRuntimeMessage: (message) => browser.runtime.sendMessage(message),
                 ...tabBroadcast,

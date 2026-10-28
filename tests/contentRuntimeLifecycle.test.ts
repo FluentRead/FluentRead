@@ -480,7 +480,47 @@ describe('content composition root 冷启动与暂停恢复', () => {
         }});
     });
 
-    afterEach(() => { invalidated?.(); vi.unstubAllGlobals(); });
+    afterEach(() => { invalidated?.(); vi.unstubAllGlobals(); vi.unstubAllEnvs(); });
+
+    it('userscript 无快照协调复用当前生命周期，不重复启动或恢复用户已手动恢复的全文', async () => {
+        vi.stubEnv('BROWSER', 'userscript'); mocks.config.autoTranslate = true;
+        const {startContentApp} = await import('@/src/app/content/runtime');
+        const starting = startContentApp(context as never); ready(); await starting;
+        const state = mocks.createMessageHandler.mock.calls[0]![1] as {reconcileUserscriptPage(): Promise<boolean>};
+        expect(mocks.autoTranslate).toHaveBeenCalledOnce();
+        mocks.fullPageActive = false; // 用户手动恢复后，重新应用设置不能覆盖其意图。
+        expect(await state.reconcileUserscriptPage()).toBe(true);
+        expect(mocks.installPageStyles).toHaveBeenCalledOnce(); expect(mocks.autoTranslate).toHaveBeenCalledOnce();
+        mocks.config.on = false; mocks.subscribeConfig.mock.calls[0]![0](mocks.config);
+        expect(await state.reconcileUserscriptPage()).toBe(true);
+        expect(mocks.removeStyles).toHaveBeenCalledOnce();
+        mocks.config.on = true; mocks.subscribeConfig.mock.calls[0]![0](mocks.config);
+        expect(await state.reconcileUserscriptPage()).toBe(true);
+        expect(mocks.installPageStyles).toHaveBeenCalledTimes(2);
+        transition(page, 'pagehide', true);
+        expect(await state.reconcileUserscriptPage()).toBe(false);
+        expect(mocks.installPageStyles).toHaveBeenCalledTimes(2);
+        invalidated(); expect(await state.reconcileUserscriptPage()).toBe(false);
+    });
+
+    it('userscript 协调等待旧挂载期间停用，迟到结果不能复活旧页面', async () => {
+        vi.stubEnv('BROWSER', 'userscript');
+        const features = await import('@/src/app/content/features');
+        let finish!: () => void; const gate = new Promise<void>(resolve => {finish = resolve;});
+        vi.mocked(features.mountSelectionTranslator).mockReturnValueOnce(gate as never);
+        const {startContentApp} = await import('@/src/app/content/runtime');
+        const starting = startContentApp(context as never); ready(); await starting;
+        const state = mocks.createMessageHandler.mock.calls[0]![1] as {reconcileUserscriptPage(): Promise<boolean>};
+        mocks.config.disableSelectionTranslator = false;
+        mocks.subscribeConfig.mock.calls[0]![0](mocks.config);
+        await vi.waitFor(() => expect(features.mountSelectionTranslator).toHaveBeenCalledOnce());
+        const pending = state.reconcileUserscriptPage();
+        mocks.config.on = false; mocks.subscribeConfig.mock.calls[0]![0](mocks.config);
+        expect(mocks.removeStyles).toHaveBeenCalledOnce();
+        finish(); expect(await pending).toBe(true); // 最新配置已停用并完成同步清理。
+        expect(features.mountSelectionTranslator).toHaveBeenCalledOnce();
+        expect(mocks.installPageStyles).toHaveBeenCalledOnce();
+    });
 
     it('全局字体在水合后启用并跨锚点和文章路由保留，停用与 BFCache 暂停撤样式后按原偏好恢复', async () => {
         mocks.config.browserDefaultTranslationFont = true;

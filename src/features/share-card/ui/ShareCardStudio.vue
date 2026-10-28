@@ -191,16 +191,21 @@ function showFeedback(key: string, error = false): void {
 }
 function saveImage(): void {
     if (!ready.value || !dialog.value || busy.value) return;
-    busy.value = true;
-    const link = document.createElement('a'); link.href = imageUrl.value; link.download = shareCardFilename();
+    const current = openGeneration; busy.value = true;
+    let link: HTMLAnchorElement | undefined;
     try {
+        link = document.createElement('a'); link.href = imageUrl.value; link.download = shareCardFilename();
         dialog.value.append(link); link.click();
-        showFeedback('shareCard.saved');
-    } catch { showFeedback('shareCard.saveFailed', true); }
+        if (!disposed && opened.value && current === openGeneration) showFeedback('shareCard.saved');
+    } catch { if (!disposed && opened.value && current === openGeneration) showFeedback('shareCard.saveFailed', true); }
     finally {
-        link.remove();
+        try { link?.remove(); } catch { /* 清理失败不影响提示和后续操作。 */ }
         // 下载是同步交付，短暂锁定覆盖真实双击的第二个事件；关闭/重开会清除此计时器。
-        clearTimeout(saveTimer); saveTimer = setTimeout(() => { busy.value = false; }, 400);
+        if (!disposed && opened.value && current === openGeneration) {
+            clearTimeout(saveTimer); saveTimer = setTimeout(() => {
+                if (!disposed && opened.value && current === openGeneration) busy.value = false;
+            }, 400);
+        }
     }
 }
 async function copyImage(): Promise<void> {

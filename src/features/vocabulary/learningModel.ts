@@ -317,6 +317,14 @@ export interface VocabularyRemovalSnapshot {
   reviewLogs: VocabularyReviewLog[];
 }
 
+/** 只向可信扩展设置页展示的撤销票据；正文与复习记录保留在后台数据库。 */
+export type VocabularyUndoRecord = {id: string; createdAt: number; expiresAt: number} & (
+  | {state: 'pending'; snapshot: VocabularyRemovalSnapshot}
+  | {state: 'restored'}
+);
+
+export interface VocabularyUndoTicket {id: string; term: string; createdAt: number; expiresAt: number}
+
 /**
  * 导出中的上下文字段可选：隐私安全导出默认省略页面内容和位置，只保留采集时间。
  */
@@ -374,7 +382,9 @@ export type VocabularyBookRequest =
   | { type: typeof VOCABULARY_BOOK_MESSAGE; action: 'relearn'; entryId: string }
   | { type: typeof VOCABULARY_BOOK_MESSAGE; action: 'getReviewLogs'; entryId: string }
   | { type: typeof VOCABULARY_BOOK_MESSAGE; action: 'remove'; entryId: string }
-  | { type: typeof VOCABULARY_BOOK_MESSAGE; action: 'removeWithSnapshot'; entryId: string }
+  | { type: typeof VOCABULARY_BOOK_MESSAGE; action: 'removeWithUndo'; entryId: string }
+  | { type: typeof VOCABULARY_BOOK_MESSAGE; action: 'listUndo' }
+  | { type: typeof VOCABULARY_BOOK_MESSAGE; action: 'restoreUndo' | 'discardUndo'; undoId: string }
   | { type: typeof VOCABULARY_BOOK_MESSAGE; action: 'clear' }
   | {
       type: typeof VOCABULARY_BOOK_MESSAGE;

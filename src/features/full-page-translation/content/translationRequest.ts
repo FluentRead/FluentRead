@@ -448,8 +448,13 @@ function createRequestCacheKey(
     });
 }
 
-function waitForCaller<T>(result: Promise<T>, signal?: AbortSignal): Promise<T> {
-    throwIfAborted(signal);
+/** 可取消地等待异步工作，调用者退出时及时解除监听且消费迟到的结果。 */
+export function waitForCaller<T>(result: Promise<T>, signal?: AbortSignal): Promise<T> {
+    if (signal?.aborted) {
+        // 调用方可能在创建 result 的同步过程里取消；仍需消费已创建任务的迟到拒绝。
+        void result.catch(() => undefined);
+        return Promise.reject(createAbortError());
+    }
     if (!signal) return result;
     return new Promise<T>((resolve, reject) => {
         let settled = false;

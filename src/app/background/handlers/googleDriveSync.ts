@@ -17,14 +17,6 @@ import {DriveConfigError} from '@/src/core/config/driveSync';
 export const GOOGLE_DRIVE_SYNC_MESSAGE_TYPE = 'googleDriveEncryptedSync';
 export interface DriveSyncMessage {type: typeof GOOGLE_DRIVE_SYNC_MESSAGE_TYPE; action?: unknown; clientId?: unknown; id?: unknown; direction?: unknown; includeSensitive?: unknown; choices?: unknown}
 type Service = ReturnType<typeof createGoogleDriveSync>;
-export function isGoogleDriveSettingsSender(sender: ConfigPersistenceContext['sender'], extensionId: string, optionsUrl: string): boolean {
-    if (!sender?.url || sender.id !== extensionId) return false;
-    try {
-        const source = new URL(sender.url);
-        const expected = new URL(optionsUrl);
-        return source.protocol === expected.protocol && source.host === expected.host && source.pathname === expected.pathname;
-    } catch {return false;}
-}
 export function createGoogleDriveSyncHandler(service: Service, trusted: (sender: ConfigPersistenceContext['sender']) => boolean): BackgroundMessageHandler<ConfigPersistenceContext, DriveSyncMessage> {
     return {
         type: GOOGLE_DRIVE_SYNC_MESSAGE_TYPE,

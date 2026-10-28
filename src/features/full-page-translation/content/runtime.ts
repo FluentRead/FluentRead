@@ -44,6 +44,7 @@ import { consumeEagerTranslationBudget } from "@/src/features/full-page-translat
 import {cancelTranslationQueueSession, createTranslationQueueSession} from "@/src/services/translation/queue";
 import {
     finishFullPageTranslationProgress,
+    getFullPageTranslationProgress,
     startFullPageTranslationProgress,
     updateFullPageTranslationProgress,
 } from '@/src/features/full-page-translation/progress';
@@ -91,6 +92,7 @@ import {
     captureFullPageTranslationConfig,
     getFullPageTranslationCandidateConcurrency,
     getTranslationInvocationIdentity,
+    waitForCaller,
     type FullPageTranslationConfigSnapshot, type FullPageTranslationSessionCache,
     type PageTranslationConfigOverrides,
 } from '@/src/features/full-page-translation/content/translationRequest';
@@ -134,6 +136,7 @@ import {restorePageTranslationContent, consumeOrphanedOwnerClassMutation, isText
 import {bindFullPageRequestSessionAttempt, createAbortError, getHoverTranslationRequestSession, invalidateContextSensitiveRequestCache, invalidateFullPageRequestSessionCache, invalidateHoverTranslationRequestSession, resetHoverTranslationRequestSession} from '@/src/features/full-page-translation/content/requestSession';
 import {resetFullPageRouteSession} from './routeLifecycle';
 import {HoverTranslationScheduler, type HoverTranslationInvocation} from './hoverScheduler';
+import {resolveFullPageVisibilityAnchor} from './visibilityAnchor';
 import {personalCorrectionIsCurrent, registerPersonalCorrectionResult} from './personalCorrections';
 import {getSiteAdapterAttributeFilter} from '@/src/core/site-adaptation/compiler';
 import {isElementNode, asHTMLElement, mutationTargetElement, isConnectedMutationRoot, allMutationNodesMatch, createMutationRescanSelector, createTranslationAttributeMutationFilter, createTranslationMutationObserverOptions, isOwnSyntheticSegmentMarkerMutation, mutationRootContains as nodeContains, collapseMutationRescanRoot as broadRescanRoot} from './mutationObservation';
@@ -280,18 +283,6 @@ function candidateSourceText(
         protectionOptions,
     );
 }
-function translateNode(
-    node: unknown,
-    displayMode: "bilingual" | "single",
-    slide: boolean,
-    owner?: FullPageSession,
-): void {
-    const target = asHTMLElement(node);
-    if (!target) return;
-    const candidate = getCurrentTranslationCore(owner?.scope ?? config.translationScope).resolve(target);
-    if (candidate) void translateTarget(candidate, displayMode, slide, owner);
-}
-
 function transferEquivalentBilingualOwners(session: FullPageSession | undefined, mutations: readonly MutationRecord[]): RemovedTranslationOwnerResolver {
     const resolveRemovedOwners = createRemovedTranslationOwnerResolver();
     const sessionIdentity = session ? getTranslationInvocationIdentity(session.translationConfig) : undefined;
@@ -409,7 +400,10 @@ async function renderTranslation(
         // 缓存命中/批量响应会在同一个微任务检查点完成很多段。给每个全文提交独立的
         // 浏览器任务，让输入与绘制能够穿插；让出后仍须复验取消、generation 和宿主节点。
         if (owner) await new Promise<void>(resolve => window.setTimeout(resolve, 0));
-        if (import.meta.env.BROWSER !== 'userscript' && !await personalCorrectionIsCurrent(result.personalCorrection, node)) return staleOutcome();
+        if (state.controller.signal.aborted) return staleOutcome();
+        if (import.meta.env.BROWSER !== 'userscript' && !await waitForCaller(
+            personalCorrectionIsCurrent(result.personalCorrection, node), state.controller.signal,
+        )) return staleOutcome();
         if (state.controller.signal.aborted || getTranslationState(node) !== state || (owner && !owner.active)) return staleOutcome();
         if ((requestSession.renderCommitGeneration ?? 0) !== requestCommitGeneration) return staleOutcome();
         const spinner = state.spinner;
@@ -503,51 +497,6 @@ async function renderTranslation(
         if (node === candidate.element && !candidate.nodes?.length && !candidateIsCurrent(candidate)) return staleOutcome();
         return markFailedTranslation(node, candidate, attempt, state.spinner, error, owner, snapshot);
     }
-}
-
-function hasIntersectionLayoutBox(element: HTMLElement): boolean {
-    if (typeof element.getClientRects !== "function") return false;
-    try {
-        const rects = element.getClientRects();
-        for (let index = 0; index < rects.length; index += 1) {
-            const rect = rects[index];
-            if (rect && rect.width > 0 && rect.height > 0) return true;
-        }
-    } catch {
-        // 脱离文档或自定义元素在重建布局时可能抛出异常。
-    }
-    return false;
-}
-
-/**
- * IntersectionObserver 无法可靠唤醒不生成布局盒的目标，典型情况是
- * `display: contents`。候选自身有布局盒时优先使用自身，否则按文档顺序遍历
- * 非扩展后代；找不到锚点时由调用方直接排队，并继续受全文 drain 并发限制。
- */
-function resolveFullPageVisibilityAnchor(candidate: HTMLElement): HTMLElement | null {
-    if (hasIntersectionLayoutBox(candidate)) return candidate;
-
-    const pending: Element[] = [];
-    const pushChildrenInReverse = (container: ParentNode) => {
-        for (let index = container.children.length - 1; index >= 0; index -= 1) {
-            const child = container.children.item(index);
-            if (child) pending.push(child);
-        }
-    };
-    pushChildrenInReverse(candidate);
-
-    while (pending.length > 0) {
-        const element = pending.pop();
-        if (!element || element.matches(TRANSLATION_ARTIFACT_SELECTOR)) continue;
-        const htmlElement = asHTMLElement(element);
-        if (htmlElement && hasIntersectionLayoutBox(htmlElement)) return htmlElement;
-
-        // open Shadow DOM 既作为独立观察根参与全文翻译，也可能是宿主唯一的渲染盒。
-        // 先压入 light DOM 子节点，使 LIFO 顺序优先访问 shadow 子节点。
-        pushChildrenInReverse(element);
-        if (element.shadowRoot) pushChildrenInReverse(element.shadowRoot);
-    }
-    return null;
 }
 
 function removeCandidateObservation(session: FullPageSession, key: Node): void {
@@ -923,7 +872,7 @@ export async function translateTarget(candidate: TranslationCandidate, displayMo
     const releaseRequestSession = bindFullPageRequestSessionAttempt(requestSession, attempt.state.controller);
     const cancelQueuedRequest = () => cancelTranslationQueueSession(queueSession, createAbortError());
     signal.addEventListener('abort', cancelQueuedRequest, {once: true});
-    const request = createTranslationRequest(
+    const request = waitForCaller(createTranslationRequest(
         node,
         kind,
         displayMode,
@@ -935,8 +884,8 @@ export async function translateTarget(candidate: TranslationCandidate, displayMo
         forceFailedRequest,
         candidate.scope,
         () => getTranslationState(node) === attempt.state ? attempt.state.spinner : undefined,
-    )
-        .finally(() => { signal.removeEventListener('abort', cancelQueuedRequest); releaseRequestSession(); });
+    ), signal)
+        .finally(() => { signal.removeEventListener('abort', cancelQueuedRequest); });
     if (synthetic) node.setAttribute('data-fr-translation-segment', 'true');
     const cancelLoading = scheduleTranslationLoadingIndicator(node, attempt.state, Boolean(owner));
     registerSessionStatefulTarget(statefulSession, candidate.element, node);
@@ -949,7 +898,10 @@ export async function translateTarget(candidate: TranslationCandidate, displayMo
         requestSession,
         requestCommitGeneration,
         requestOwner,
-    ).finally(() => { if (statefulSession) scheduleFullPageProgressPublish(statefulSession); });
+    ).finally(() => {
+        releaseRequestSession();
+        if (statefulSession) scheduleFullPageProgressPublish(statefulSession);
+    });
     if ((outcome.status === "stale" || outcome.status === "not-current" || outcome.status === "empty" ||
         outcome.status === "unchanged") && (!getTranslationState(node) || getTranslationState(node) === attempt.state)) {
         unregisterSessionStatefulTarget(statefulSession, node);
@@ -2005,8 +1957,8 @@ function processFullPageMutations(session: FullPageSession, mutations: readonly 
 
 function createFullPageSession(
     root: HTMLElement,
-    invocation: PageTranslationInvocation = {},
-    inheritedConfig?: FullPageTranslationConfigSnapshot,
+    settings: {translationMode: FullPageTranslationMode; scope: TranslationScope; translationConfig: FullPageTranslationConfigSnapshot},
+    progressSessionId: number,
 ): FullPageSession {
     let session!: FullPageSession;
     const observer = new IntersectionObserver((entries) => {
@@ -2049,10 +2001,10 @@ function createFullPageSession(
     });
 
     session = createFullPageSessionState({root,
-        translationMode: invocation.fullPageMode ?? config.fullPageTranslationMode,
-        scope: invocation.scope ?? config.translationScope,
-        translationConfig: inheritedConfig ? {...inheritedConfig} : captureFullPageTranslationConfig(invocation),
-        progressSessionId: startFullPageTranslationProgress(), observer, mutationObserver, scrollController,
+        translationMode: settings.translationMode,
+        scope: settings.scope,
+        translationConfig: settings.translationConfig,
+        progressSessionId, observer, mutationObserver, scrollController,
         createAbortError, clearTimeout: timer => window.clearTimeout(timer),
         clearModalPresentation: () => syncModalTranslationHint(null, 'none', false),
         releaseSourceStability: current => translationSourceStability.dispose(current),
@@ -2112,7 +2064,7 @@ export function restoreOriginalContent(): void {
  * 限制，并持续观察新增 DOM/open ShadowRoot。这样 body 被 SPA 替换后仍能
  * 继续工作，也不会一次性给整页发出数百个请求。
  */
-export function autoTranslateEnglishPage(invocation: PageTranslationInvocation = {}, inheritedConfig?: FullPageTranslationConfigSnapshot): void {
+export function autoTranslateEnglishPage(invocation: PageTranslationInvocation = {}, inheritedConfig?: FullPageTranslationConfigSnapshot): number | undefined {
     if (fullPageSession?.active || !checkConfig(invocation, true)) return;
     const root = document.documentElement;
     if (!root) return;
@@ -2120,7 +2072,22 @@ export function autoTranslateEnglishPage(invocation: PageTranslationInvocation =
     const core = getCurrentTranslationCore(invocation.scope ?? config.translationScope);
     prepareManpageContent(root, core.url, core.adapters);
 
-    const session = createFullPageSession(root, invocation, inheritedConfig);
+    // 保持启动时快照，即使进度订阅者同步更新全局配置。
+    const settings = {translationMode: invocation.fullPageMode ?? config.fullPageTranslationMode,
+        scope: invocation.scope ?? config.translationScope,
+        translationConfig: inheritedConfig ? {...inheritedConfig} : captureFullPageTranslationConfig(invocation)};
+    // 进度订阅者可以同步恢复或启动新会话；旧调用在创建资源前让出所有权。
+    const stateRevision = getFullPageTranslationStateRevision();
+    const progressSessionId = startFullPageTranslationProgress();
+    const progress = getFullPageTranslationProgress();
+    if (fullPageSession?.active || progress.sessionId !== progressSessionId || !progress.active
+        || getFullPageTranslationStateRevision() !== stateRevision) {
+        finishFullPageTranslationProgress(progressSessionId);
+        return;
+    }
+    let session: FullPageSession;
+    try { session = createFullPageSession(root, settings, progressSessionId); }
+    catch (error) { finishFullPageTranslationProgress(progressSessionId); throw error; }
     fullPageSession = session;
     // 标题不在正文候选范围内（<head> 属硬裁剪标签），单独随会话翻译并跟随 SPA 改写；
     // 高级设置可关闭，关闭后标签页保持原标题。
@@ -2156,6 +2123,12 @@ export function autoTranslateEnglishPage(invocation: PageTranslationInvocation =
     refreshFullPageModal(session);
     enqueueFullPageRescan(session, root);
     notifyFullPageTranslationState(true);
+    // 状态订阅者也可能同步替换当前会话；只返回本次仍然有效的所有权。
+    return fullPageSession === session && session.active ? session.progressSessionId : undefined;
+}
+/** 当前全文会话的只读身份；与生命周期事件及页面内容无关。 */
+export function getFullPageTranslationSessionId(): number | undefined {
+    return fullPageSession?.active ? fullPageSession.progressSessionId : undefined;
 }
 /** 仅共享无凭据的会话快照；旧 QQ 邮件 frame 使用同一目标语言、服务和展示设置。 */
 export function getFullPageTranslationFrameState(): Omit<FrameTranslationState, 'enabled'> {
@@ -2195,8 +2168,4 @@ export function handleTranslation(
     const core = getCurrentTranslationCore(invocation.scope ?? config.translationScope);
     prepareManpageContent(document.documentElement, core.url, core.adapters);
     hoverTranslationScheduler.handle(mouseX, mouseY, invocation);
-}
-
-export function handleBilingualTranslation(node: unknown, slide: boolean): void {
-    translateNode(node, "bilingual", slide);
 }

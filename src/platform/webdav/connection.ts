@@ -26,7 +26,7 @@ export function normalizeWebDavUrl(value: unknown, allowInsecure = false): strin
     url.pathname = url.pathname.replace(/\/+$/u, '') + '/';
     return url.href;
 }
-export function parseWebDavConnection(input: WebDavConnectionInput, previous: WebDavConnection | null): WebDavConnection {
+function normalizeWebDavConnection(input: WebDavConnectionInput, previous: WebDavConnection | null): Omit<WebDavConnection, 'revision'> {
     if (!input || typeof input !== 'object' || Array.isArray(input)) throw new WebDavError('credentials');
     if (input.revision !== (previous?.revision ?? null)) throw new WebDavError('changed');
     const allowInsecure = input.allowInsecure === true;
@@ -35,7 +35,10 @@ export function parseWebDavConnection(input: WebDavConnectionInput, previous: We
     const username = input.username.trim();
     const password = input.password === '' && previous?.url === url && previous.username === username ? previous.password : input.password;
     if (typeof password !== 'string' || !password || password.length > 4096 || /[\x00-\x1f\x7f]/u.test(password)) throw new WebDavError('credentials');
-    return {url, username, password, allowInsecure, revision: crypto.randomUUID()};
+    return {url, username, password, allowInsecure};
+}
+export function parseWebDavConnection(input: WebDavConnectionInput, previous: WebDavConnection | null): WebDavConnection {
+    return {...normalizeWebDavConnection(input, previous), revision: crypto.randomUUID()};
 }
 export function webDavConnectionSummary(value: WebDavConnection | null): WebDavConnectionSummary | null {
     return value ? {url: value.url, username: value.username, allowInsecure: value.allowInsecure, hasPassword: Boolean(value.password), revision: value.revision} : null;
@@ -47,7 +50,7 @@ export function createWebDavConnectionStore(storage: Pick<ConfigStoragePort, 'ge
             if (!value) return null;
             // 仓库中损坏的数据必须停止操作，不能退回匿名请求或默认地址。
             if (typeof value.revision !== 'string' || !value.revision) throw new WebDavError('credentials');
-            return {...parseWebDavConnection(value, value), revision: value.revision};
+            return {...normalizeWebDavConnection(value, value), revision: value.revision};
         },
         write: (value: WebDavConnection) => storage.setItem(WEBDAV_CONNECTION_KEY, value),
         remove: () => storage.removeItem(WEBDAV_CONNECTION_KEY),

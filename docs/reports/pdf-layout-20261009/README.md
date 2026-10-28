@@ -64,6 +64,7 @@
 pnpm test:pdf-selection \
   --extension-dir .output/chrome-mv3 \
   --playwright-root "$PLAYWRIGHT_ROOT" \
+  --runtime-diagnostics-helper "$FLUENTREAD_RUNTIME_DIAGNOSTICS_HELPER" \
   --arxiv-pdf /path/to/arxiv-v7.pdf \
   --artifacts-dir /private/tmp/fluentread-pdf-layout-recheck \
   --paper-layout-only --paper-layout-followup

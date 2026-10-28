@@ -49,6 +49,7 @@ import {
     hasMeaningfulTranslationTextInNodes,
     isIdentifierLikeText,
     isTranslationTextNodeProtected,
+    setMinimumTranslationTextLength,
 } from '@/src/core/translation/text';
 import {
     findAdapterPrunedAncestor,
@@ -4002,6 +4003,26 @@ describe('translation candidate core', () => {
             expect(isMeaningfulTranslationText('🙂🙃')).toBe(false);
             expect(isMeaningfulTranslationText('!!!a!!!')).toBe(false);
             expect(isMeaningfulTranslationText(' !!!a\n\tβ!!! ')).toBe(true);
+        }
+    });
+
+    it('最短字符阈值以空白归一后的 UTF-16 长度计算，同时保留标识符和时间过滤', () => {
+        try {
+            setMinimumTranslationTextLength(6);
+            expect(isMeaningfulTranslationText('  Go   now  ')).toBe(true);
+            expect(isMeaningfulTranslationText('  Go  ')).toBe(false);
+            expect(isMeaningfulTranslationText('12:30 UTC')).toBe(false);
+            expect(isMeaningfulTranslationText('https://example.test')).toBe(false);
+            setMinimumTranslationTextLength(2);
+            expect(isMeaningfulTranslationText('你好')).toBe(true);
+            expect(isMeaningfulTranslationText('𝒜')).toBe(false);
+            expect(isMeaningfulTranslationText('𝒜𝒞')).toBe(true);
+            setMinimumTranslationTextLength(1);
+            expect(isMeaningfulTranslationText('')).toBe(false);
+            expect(isMeaningfulTranslationText('a')).toBe(false);
+            expect(isMeaningfulTranslationText('Go')).toBe(true);
+        } finally {
+            setMinimumTranslationTextLength(2);
         }
     });
 

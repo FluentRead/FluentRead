@@ -19,6 +19,7 @@ const mocks = vi.hoisted(() => ({
     subscribeConfig: vi.fn(), installStyles: vi.fn(), removeStyles: vi.fn(), syncHighlight: vi.fn(),
     mountSelection: vi.fn(), unmountSelection: vi.fn(),
     fontSet: vi.fn(), fontReset: vi.fn(), fontDispose: vi.fn(),
+    mountHover: vi.fn(), mountQuick: vi.fn(), invalidateCache: vi.fn(),
 }));
 
 vi.mock('@/src/services/config/store', () => ({
@@ -32,7 +33,7 @@ vi.mock('@/src/features/full-page-translation/public', () => ({
     createPageTranslationDisplayModeSync: (_initial: unknown, apply: (next: any) => void) => apply,
     autoTranslateEnglishPage: mocks.autoTranslateEnglishPage,
     getFullPageTranslationFrameState: mocks.getState,
-    invalidateFullPageTranslationSessionCache: vi.fn(),
+    invalidateFullPageTranslationSessionCache: mocks.invalidateCache,
     restoreOriginalContent: mocks.restoreOriginalContent,
     resetFullPageTranslationRouteState: mocks.resetRouteState,
     cancelPendingHoverTranslation: vi.fn(), handleTranslation: vi.fn(), noteBilingualHostGesture: vi.fn(),
@@ -40,7 +41,7 @@ vi.mock('@/src/features/full-page-translation/public', () => ({
 vi.mock('@/src/services/translation/client', () => ({cancelAllTranslations: vi.fn()}));
 vi.mock('@/src/services/translation/context', () => ({resetPageTranslationContextCache: mocks.resetContext}));
 vi.mock('@/src/shared/geometry/touch', () => ({getCenterPoint: vi.fn()}));
-vi.mock('@/src/features/hover-translation/public', () => ({mountHoverTranslationContentFeature: () => vi.fn()}));
+vi.mock('@/src/features/hover-translation/public', () => ({mountHoverTranslationContentFeature: mocks.mountHover}));
 vi.mock('@/src/features/selection-translation/public', () => ({
     mountSelectionTranslator: mocks.mountSelection, unmountSelectionTranslator: mocks.unmountSelection,
 }));
@@ -48,7 +49,7 @@ vi.mock('@/src/app/content/hotkeyRuntime', async importOriginal => {
     const actual = await importOriginal<typeof import('@/src/app/content/hotkeyRuntime')>();
     return {createContentHotkeyRuntime: (...args: Parameters<typeof actual.createContentHotkeyRuntime>) => mocks.realHotkeys ? actual.createContentHotkeyRuntime(...args) : {installFloatingBallHotkey: () => vi.fn()}};
 });
-vi.mock('@/src/app/content/quickTranslationRuntime', () => ({mountConfiguredQuickTranslation: vi.fn()}));
+vi.mock('@/src/app/content/quickTranslationRuntime', () => ({mountConfiguredQuickTranslation: mocks.mountQuick}));
 vi.mock('@/src/app/content/pageStyles', () => ({installPageStyles: mocks.installStyles}));
 vi.mock('@/src/app/content/bilingualSentenceHighlight', () => ({syncBilingualSentenceHighlight: mocks.syncHighlight}));
 vi.mock('@/src/app/content/pageTranslationFont', () => ({createPageTranslationFontRuntime: () => ({
@@ -106,6 +107,7 @@ beforeEach(() => {
     mocks.routeChanged.mockReset().mockReturnValue(false);
     mocks.getState.mockReset().mockReturnValue({sessionId: null, translationConfig: undefined, fullPageMode: 'all'});
     mocks.fontSet.mockReset(); mocks.fontReset.mockReset(); mocks.fontDispose.mockReset();
+    mocks.mountHover.mockReset().mockReturnValue(vi.fn()); mocks.mountQuick.mockReset(); mocks.invalidateCache.mockReset();
     mocks.config.on = true;
     mocks.config.browserDefaultTranslationFont = false;
     mocks.realHotkeys = false;
@@ -415,6 +417,218 @@ describe('frame bridge cleanup after extension reload', () => {
         fail = false;mocks.addRuntimeListener.mock.calls[0][0]({type: kind === 'qq' ? 'qqMailFrameRefresh' : 'embeddedFrameRefresh'}, {id: 'extension-id'});
         await vi.waitFor(() => expect(mocks.installStyles).toHaveBeenCalledTimes(2));press();await vi.waitFor(() => expect(mocks.sendMessage.mock.calls.filter(([message]) => message.action === 'toggle')).toHaveLength(2));
         invalidate();expect(mocks.removeStyles).toHaveBeenCalledTimes(2);
+    });
+
+    it.each((['qq', 'netease', 'embedded'] as const).flatMap(kind => (['failure', 'success'] as const).map(outcome => ({kind, outcome}))))('$kind handles an old toggle $outcome after BFCache reauthorization', async ({kind, outcome}) => {
+        mocks.realHotkeys = true;
+        const {start, listeners, window} = await readingFrame(kind);
+        let rejectOld!: (error: Error) => void;
+        let resolveOld!: () => void;
+        mocks.sendMessage.mockImplementation(message => message.action === 'toggle'
+            ? new Promise<void>((resolve, reject) => { resolveOld = resolve; rejectOld = reject; })
+            : Promise.resolve({enabled: true, revision: 0, sessionId: null}));
+        let invalidate!: () => void;
+        await start({isInvalid: false, onInvalidated: (callback: () => void) => {invalidate = callback;}} as never);
+        try {
+            const key = Object.assign(new Event('keydown'), {key: 't', code: 'KeyT', altKey: true, repeat: false});
+            Object.defineProperty(key, 'isTrusted', {value: true});
+            for (const listener of [...listeners.get('keydown') ?? []]) listener(key);
+            expect(rejectOld).toBeTypeOf('function');
+            for (const type of ['pagehide', 'pageshow']) {
+                const event = Object.assign(new Event(type), {persisted: true});
+                Object.defineProperty(event, 'isTrusted', {value: true});
+                window.dispatchEvent(event);
+            }
+            await vi.waitFor(() => expect(mocks.installStyles).toHaveBeenCalledTimes(2));
+            const readsBefore = mocks.sendMessage.mock.calls.filter(([message]) => message.action === 'state').length;
+            if (outcome === 'failure') rejectOld(new Error('old request failed'));
+            else resolveOld();
+            if (outcome === 'success') await vi.waitFor(() => expect(mocks.sendMessage.mock.calls.filter(([message]) => message.action === 'state')).toHaveLength(readsBefore + 1));
+            else { await Promise.resolve(); await Promise.resolve(); await Promise.resolve(); }
+            expect(mocks.removeStyles).toHaveBeenCalledTimes(1);
+            expect(listeners.get('keydown')?.size).toBeGreaterThan(0);
+        } finally { invalidate(); }
+    });
+
+    it.each(['qq', 'netease', 'embedded'] as const)('%s does not let an earlier failed toggle revoke a later successful toggle', async kind => {
+        mocks.realHotkeys = true;
+        const {start, listeners} = await readingFrame(kind);
+        let rejectOld!: (error: Error) => void;
+        let toggleCount = 0;
+        mocks.sendMessage.mockImplementation(message => {
+            if (message.action !== 'toggle') return Promise.resolve({enabled: true, revision: 0, sessionId: null});
+            return ++toggleCount === 1 ? new Promise((_resolve, reject) => { rejectOld = reject; }) : Promise.resolve();
+        });
+        let invalidate!: () => void;
+        await start({isInvalid: false, onInvalidated: (callback: () => void) => {invalidate = callback;}} as never);
+        try {
+            const press = () => {
+                for (const type of ['keydown', 'keyup']) {
+                    const key = Object.assign(new Event(type), {key: 't', code: 'KeyT', altKey: true, repeat: false});
+                    Object.defineProperty(key, 'isTrusted', {value: true});
+                    for (const listener of [...listeners.get(type) ?? []]) listener(key);
+                }
+            };
+            press(); press();
+            await vi.waitFor(() => expect(mocks.sendMessage.mock.calls.filter(([message]) => message.action === 'state')).toHaveLength(2));
+            rejectOld(new Error('old request failed'));
+            await Promise.resolve(); await Promise.resolve(); await Promise.resolve();
+            expect(mocks.removeStyles).not.toHaveBeenCalled();
+            expect(listeners.get('keydown')?.size).toBeGreaterThan(0);
+        } finally { invalidate(); }
+    });
+
+    it.each(['qq', 'netease', 'embedded'] as const)('%s preserves a newer external top session when an old toggle rejects', async kind => {
+        mocks.realHotkeys = true;
+        const {start, listeners} = await readingFrame(kind);
+        let rejectOld!: (error: Error) => void;
+        let state: any = {enabled: true, revision: 0, sessionId: null};
+        mocks.sendMessage.mockImplementation(message => message.action === 'toggle'
+            ? new Promise((_resolve, reject) => { rejectOld = reject; }) : Promise.resolve(state));
+        let invalidate!: () => void;
+        await start({isInvalid: false, onInvalidated: (callback: () => void) => {invalidate = callback;}} as never);
+        try {
+            const key = Object.assign(new Event('keydown'), {key: 't', code: 'KeyT', altKey: true, repeat: false});
+            Object.defineProperty(key, 'isTrusted', {value: true});
+            for (const listener of [...listeners.get('keydown') ?? []]) listener(key);
+            state = {enabled: true, revision: 1, sessionId: 1, fullPageMode: 'all', translationConfig: {
+                service: 'freeTranslation', model: '', sourceLanguage: 'en', targetLanguage: 'zh-CN', thinking: false,
+                useCache: true, enableAIContext: false, enableAIMultiSegment: false, displayMode: 'bilingual', style: 0,
+            }};
+            const type = kind === 'qq' ? 'qqMailFrameRefresh' : kind === 'netease' ? 'neteaseMailFrameRefresh' : 'embeddedFrameRefresh';
+            mocks.addRuntimeListener.mock.calls[0][0]({type}, {id: 'extension-id'});
+            await vi.waitFor(() => expect(mocks.autoTranslateEnglishPage).toHaveBeenCalledOnce());
+            const restores = mocks.restoreOriginalContent.mock.calls.length;
+            rejectOld(new Error('old request failed'));
+            await Promise.resolve(); await Promise.resolve(); await Promise.resolve();
+            expect(mocks.removeStyles).not.toHaveBeenCalled();
+            expect(mocks.restoreOriginalContent).toHaveBeenCalledTimes(restores);
+            expect(listeners.get('keydown')?.size).toBeGreaterThan(0);
+        } finally { invalidate(); }
+    });
+
+    it.each(['qq', 'netease', 'embedded'] as const)('%s rechecks a newer top session if an old toggle fails during its state read', async kind => {
+        mocks.realHotkeys = true;
+        const {start, listeners} = await readingFrame(kind);
+        let rejectOld!: (error: Error) => void;
+        let resolveStale!: (state: unknown) => void;
+        let reads = 0;
+        const oldState = {enabled: true, revision: 0, sessionId: null};
+        const newState = {enabled: true, revision: 1, sessionId: 1, fullPageMode: 'all', translationConfig: {
+            service: 'freeTranslation', model: '', sourceLanguage: 'en', targetLanguage: 'zh-CN', thinking: false,
+            useCache: true, enableAIContext: false, enableAIMultiSegment: false, displayMode: 'bilingual', style: 0,
+        }};
+        mocks.sendMessage.mockImplementation(message => {
+            if (message.action === 'toggle') return new Promise((_resolve, reject) => { rejectOld = reject; });
+            if (++reads === 1) return Promise.resolve(oldState);
+            if (reads === 2) return new Promise(resolve => {resolveStale = resolve;});
+            return Promise.resolve(newState);
+        });
+        let invalidate!: () => void;
+        await start({isInvalid: false, onInvalidated: (callback: () => void) => {invalidate = callback;}} as never);
+        try {
+            const key = Object.assign(new Event('keydown'), {key: 't', code: 'KeyT', altKey: true, repeat: false});
+            Object.defineProperty(key, 'isTrusted', {value: true});
+            for (const listener of [...listeners.get('keydown') ?? []]) listener(key);
+            const type = kind === 'qq' ? 'qqMailFrameRefresh' : kind === 'netease' ? 'neteaseMailFrameRefresh' : 'embeddedFrameRefresh';
+            mocks.addRuntimeListener.mock.calls[0][0]({type}, {id: 'extension-id'});
+            await vi.waitFor(() => expect(reads).toBe(2));
+            rejectOld(new Error('old request failed'));
+            await vi.waitFor(() => expect(mocks.autoTranslateEnglishPage).toHaveBeenCalledOnce());
+            expect(reads).toBe(3);
+            resolveStale(oldState);
+            await Promise.resolve(); await Promise.resolve();
+            expect(mocks.autoTranslateEnglishPage).toHaveBeenCalledOnce();
+            expect(listeners.get('keydown')?.size).toBeGreaterThan(0);
+        } finally { invalidate(); }
+    });
+
+    it.each(['qq', 'netease', 'embedded'] as const)('%s releases current authorization when the latest toggle rejects', async kind => {
+        mocks.realHotkeys = true;
+        const {start, listeners} = await readingFrame(kind);
+        let unavailable = false;
+        mocks.sendMessage.mockImplementation(message => {
+            if (message.action === 'toggle') {unavailable = true; return Promise.reject(new Error('current request failed'));}
+            return unavailable ? Promise.reject(new Error('state unavailable')) : Promise.resolve({enabled: true, revision: 0, sessionId: null});
+        });
+        let invalidate!: () => void;
+        await start({isInvalid: false, onInvalidated: (callback: () => void) => {invalidate = callback;}} as never);
+        try {
+            const key = Object.assign(new Event('keydown'), {key: 't', code: 'KeyT', altKey: true, repeat: false});
+            Object.defineProperty(key, 'isTrusted', {value: true});
+            for (const listener of [...listeners.get('keydown') ?? []]) listener(key);
+            await vi.waitFor(() => expect(mocks.removeStyles).toHaveBeenCalledOnce());
+            expect(listeners.get('keydown')?.size).toBe(0);
+            unavailable = false;
+            const type = kind === 'qq' ? 'qqMailFrameRefresh' : kind === 'netease' ? 'neteaseMailFrameRefresh' : 'embeddedFrameRefresh';
+            mocks.addRuntimeListener.mock.calls[0][0]({type}, {id: 'extension-id'});
+            await vi.waitFor(() => expect(mocks.installStyles).toHaveBeenCalledTimes(2));
+        } finally { invalidate(); }
+    });
+
+    it.each(['qq', 'netease', 'embedded'] as const)('%s releases and can recover when following a toggled session throws', async kind => {
+        mocks.realHotkeys = true;
+        const {start, listeners} = await readingFrame(kind);
+        let active = false;
+        const config = {service: 'freeTranslation', model: '', sourceLanguage: 'en', targetLanguage: 'zh-CN', thinking: false,
+            useCache: true, enableAIContext: false, enableAIMultiSegment: false, displayMode: 'bilingual', style: 0};
+        mocks.sendMessage.mockImplementation(message => {
+            if (message.action === 'toggle') {active = true; return Promise.resolve();}
+            return Promise.resolve(active ? {enabled: true, revision: 1, sessionId: 1, fullPageMode: 'all', translationConfig: config}
+                : {enabled: true, revision: 0, sessionId: null});
+        });
+        mocks.autoTranslateEnglishPage.mockImplementationOnce(() => {throw new Error('cannot start frame session');});
+        let invalidate!: () => void;
+        await start({isInvalid: false, onInvalidated: (callback: () => void) => {invalidate = callback;}} as never);
+        try {
+            const key = Object.assign(new Event('keydown'), {key: 't', code: 'KeyT', altKey: true, repeat: false});
+            Object.defineProperty(key, 'isTrusted', {value: true});
+            for (const listener of [...listeners.get('keydown') ?? []]) listener(key);
+            await vi.waitFor(() => expect(mocks.removeStyles).toHaveBeenCalledOnce());
+            expect(listeners.get('keydown')?.size).toBe(0);
+            const type = kind === 'qq' ? 'qqMailFrameRefresh' : kind === 'netease' ? 'neteaseMailFrameRefresh' : 'embeddedFrameRefresh';
+            mocks.addRuntimeListener.mock.calls[0][0]({type}, {id: 'extension-id'});
+            await vi.waitFor(() => expect(mocks.autoTranslateEnglishPage).toHaveBeenCalledTimes(2));
+            expect(listeners.get('keydown')?.size).toBeGreaterThan(0);
+        } finally { invalidate(); }
+    });
+
+    it('forwards a configured embedded quick profile, guards hover and ignores a late failure after disposal', async () => {
+        const {start} = await readingFrame('embedded');
+        let rejectOld!: (error: Error) => void;
+        mocks.sendMessage.mockImplementation(message => message.action === 'toggle'
+            ? new Promise((_resolve, reject) => {rejectOld = reject;})
+            : Promise.resolve({enabled: true, revision: 0, sessionId: null}));
+        let invalidate!: () => void;
+        await start({isInvalid: false, onInvalidated: (callback: () => void) => {invalidate = callback;}} as never);
+        const toggle = mocks.mountQuick.mock.calls[0][5];
+        const isSiteDisabled = mocks.mountHover.mock.calls[0][0].isSiteDisabled;
+        expect(isSiteDisabled()).toBe(false);
+        const invocation = {service: 'test-service', fullPageMode: 'viewport'};
+        toggle(invocation);
+        expect(mocks.sendMessage).toHaveBeenCalledWith({type: 'embeddedFrameRequest', action: 'toggle', invocation});
+        invalidate();
+        expect(isSiteDisabled()).toBe(true);
+        const calls = mocks.sendMessage.mock.calls.length;
+        toggle(invocation);
+        rejectOld(new Error('late failure'));
+        await Promise.resolve(); await Promise.resolve();
+        expect(mocks.sendMessage).toHaveBeenCalledTimes(calls);
+        expect(mocks.removeStyles).toHaveBeenCalledOnce();
+    });
+
+    it('invalidates the embedded page cache only for extension-owned messages', async () => {
+        const {start} = await readingFrame('embedded');
+        mocks.sendMessage.mockResolvedValue({enabled: true, revision: 0, sessionId: null});
+        let invalidate!: () => void;
+        await start({isInvalid: false, onInvalidated: (callback: () => void) => {invalidate = callback;}} as never);
+        try {
+            const listener = mocks.addRuntimeListener.mock.calls[0][0];
+            expect(listener({type: 'translationCacheCleared'}, {id: 'external'})).toBe(false);
+            expect(mocks.invalidateCache).not.toHaveBeenCalled();
+            expect(listener({type: 'translationCacheCleared'}, {id: 'extension-id'})).toBe(false);
+            expect(mocks.invalidateCache).toHaveBeenCalledOnce();
+        } finally { invalidate(); }
     });
 
     it.each(['qq', 'netease', 'embedded'] as const)(
@@ -729,6 +943,49 @@ describe('frame bridge cleanup after extension reload', () => {
 });
 
 describe('Hugging Face Space top frame bridge', () => {
+    it('rejects unrelated top and child pages and tolerates a removed runtime during notification', async () => {
+        const {installEmbeddedTopFrameBridge, startEmbeddedFrameApp} = await import('@/src/app/content/embeddedFrameRuntime');
+        installGlobals('https://example.com/');
+        installEmbeddedTopFrameBridge(() => true, new AbortController().signal);
+        await startEmbeddedFrameApp({isInvalid: false, onInvalidated: vi.fn()} as never);
+        expect(mocks.addRuntimeListener).not.toHaveBeenCalled();
+        expect(mocks.sendMessage).not.toHaveBeenCalled();
+        const {window} = installGlobals('https://www.omgubuntu.co.uk/2026/09/era-rust-calendar-gnome-beta');
+        window.top = {};
+        installEmbeddedTopFrameBridge(() => true, new AbortController().signal);
+        await startEmbeddedFrameApp({isInvalid: false, onInvalidated: vi.fn()} as never);
+        expect(mocks.addRuntimeListener).not.toHaveBeenCalled();
+        window.top = window;
+        mocks.sendMessage.mockImplementation(() => {throw new Error('extension removed');});
+        const lifetime = new AbortController();
+        expect(() => installEmbeddedTopFrameBridge(() => true, lifetime.signal)).not.toThrow();
+        expect(mocks.addRuntimeListener).toHaveBeenCalledOnce();
+        lifetime.abort();
+    });
+
+    it('applies enabled, matching profile, scope and mode to top frame toggle commands', async () => {
+        installGlobals('https://huggingface.co/spaces/FineEnvs/RL-Explorer');
+        const {installEmbeddedTopFrameBridge} = await import('@/src/app/content/embeddedFrameRuntime');
+        let enabled = false;
+        const lifetime = new AbortController();
+        installEmbeddedTopFrameBridge(() => enabled, lifetime.signal);
+        const listener = mocks.addRuntimeListener.mock.calls[0][0];
+        const send = (invocation?: unknown) => listener({type: 'embeddedFrameCommand', action: 'toggle', invocation}, {id: 'extension-id'}, vi.fn());
+        mocks.getState.mockReturnValue({sessionId: 3, revision: 2, fullPageMode: 'all', scope: 'content', translationConfig: {service: 's'}});
+        send();
+        expect(mocks.restoreOriginalContent).not.toHaveBeenCalled();
+        enabled = true;
+        send({service: 's', fullPageMode: 'all', scope: 'content'});
+        expect(mocks.restoreOriginalContent).toHaveBeenCalledOnce();
+        expect(mocks.autoTranslateEnglishPage).not.toHaveBeenCalled();
+        send({service: 's', fullPageMode: 'viewport', scope: 'content'});
+        expect(mocks.restoreOriginalContent).toHaveBeenCalledTimes(2);
+        expect(mocks.autoTranslateEnglishPage).toHaveBeenCalledWith({service: 's', fullPageMode: 'viewport', scope: 'content'});
+        send({service: 's', fullPageMode: 'all', scope: 'all'});
+        expect(mocks.autoTranslateEnglishPage).toHaveBeenCalledWith({service: 's', fullPageMode: 'all', scope: 'all'});
+        lifetime.abort();
+    });
+
     it('从首页软导航进入 Space 后同步会话，离开应用页拒绝命令并清理监听', async () => {
         const {window, listeners} = installGlobals('https://huggingface.co/');
         const {installEmbeddedTopFrameBridge} = await import('@/src/app/content/embeddedFrameRuntime');
@@ -912,8 +1169,8 @@ describe('expired-frame language initialization', () => {
         } finally {release();invalidate?.();}
     });
 
-    it('lets a shared language load finish after its frame becomes invalid without installing stale tools', async () => {
-        const f = await fixture('qq');let release!: () => void, invalidate: (() => void) | undefined, invalid = false;
+    it.each(kinds)('%s lets a shared language load finish after its frame becomes invalid without installing stale tools', async kind => {
+        const f = await fixture(kind);let release!: () => void, invalidate: (() => void) | undefined, invalid = false;
         const resource = new Promise<void>(resolve => {release = resolve;});
         f.fetch.mockImplementationOnce(async () => {await resource;return f.response;});
         const starting = f.start({get isInvalid() {return invalid;}, onInvalidated: (callback: () => void) => {invalidate = callback;}} as never);

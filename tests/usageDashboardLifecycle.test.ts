@@ -423,6 +423,23 @@ describe.each(['model','stats'] as const)('%s dashboard real DOM controls',kind=
         expect(document.querySelector('.settings-app')!.hasAttribute('inert')).toBe(false);
         expect(document.querySelectorAll('tbody tr')).toHaveLength(0);
     });
+    it('清除已确认后刷新挂起时恢复焦点并允许再次打开确认', async () => {
+        await mount(kind,true,true);const answered=new Set<object>();await answerDashboard(kind,answered);
+        const opener=kind==='stats'?'.stats-actions .stats-button-quiet':'.usage-reset-button';
+        const confirm=kind==='stats'?'.stats-button-danger':'.usage-dialog-backdrop .danger';
+        await clickDashboard(opener);await clickDashboard(confirm);
+        messages.filter(item=>item.message.action==='reset').at(-1)!.resolve({success:true,data:{cleared:true}});await settle();
+        const refresh=messages.filter(item=>item.message.action==='query').at(-1)!;
+        expect(answered.has(refresh)).toBe(false);
+        expect(state.resetting).toBe(false);expect(document.activeElement).toBe(document.querySelector(opener));
+        await clickDashboard(opener);expect(document.querySelector('[role="alertdialog"]')).not.toBeNull();
+        await clickDashboard(confirm);expect(state.resetting).toBe(true);
+        refresh.resolve({success:false,error:'late refresh failure'});await settle();
+        expect(document.querySelector('[role="alertdialog"]')).not.toBeNull();expect(state.resetError).toBe('');expect(state.resetting).toBe(true);
+        messages.filter(item=>item.message.action==='reset').at(-1)!.resolve({success:true,data:{cleared:true}});await settle();
+        await answerDashboard(kind,answered,true);expect(state.resetting).toBe(false);
+        expect(document.querySelector('[role="alertdialog"]')).toBeNull();
+    });
 
     it('updates model and record filters, expands distribution, and operates chart keyboard focus', async () => {
         await mount(kind,true,true);const answered=new Set<object>();await answerDashboard(kind,answered);

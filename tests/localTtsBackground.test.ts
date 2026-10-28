@@ -299,7 +299,8 @@ describe('local TTS Worker response metadata boundary', () => {
         try {
             await vi.advanceTimersByTimeAsync(0);
             expect(inferenceBudget.run).toHaveBeenCalledTimes(2);
-            expect(inferenceBudget.run).toHaveBeenLastCalledWith(expect.any(Function), controller.signal);
+            expect(inferenceBudget.run).toHaveBeenLastCalledWith(expect.any(Function), expect.any(AbortSignal));
+            expect(inferenceBudget.run.mock.calls.at(-1)?.[1].aborted).toBe(false);
             expect(workers[0].postMessage).toHaveBeenCalledOnce();
             expect(vi.getTimerCount()).toBe(0);
             // t=10s 发起第二次请求，预算在 t=145s 才放行，跨过旧 idle 的 t=120s。

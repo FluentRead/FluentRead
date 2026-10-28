@@ -7,7 +7,7 @@ import {
 import {extractConfigCredentials, LOCAL_CREDENTIALS_STORAGE_KEY, mergeConfigCredentials, parseStoredCredentials} from '@/src/core/config/credentials';
 import {configStorage} from './storage';
 import {createConfigPersistenceBatchHandler, createConfigPersistenceHandler} from '@/src/app/background/handlers/configPersistence';
-import {dispatchContentMessage, UNHANDLED_RUNTIME_MESSAGE} from './browser';
+import {dispatchContentNotification, UNHANDLED_RUNTIME_MESSAGE} from './browser';
 import {createModelUsageHandler, MODEL_USAGE_MESSAGE_TYPE} from '@/src/app/background/handlers/modelUsage';
 import {getModelUsageRepository} from '@/src/platform/storage/modelUsageRepository';
 import {createVocabularyBookChangedMessage, createVocabularyBookHandler} from '@/src/features/vocabulary/background/handler';
@@ -15,6 +15,7 @@ import {VOCABULARY_BOOK_MESSAGE} from '@/src/features/vocabulary/protocol';
 import {vocabularyBook} from '@/src/features/vocabulary/repository';
 import {isUserscriptSettingsUrl} from './settingsPage';
 import {isUserscriptPrivateContext} from './api';
+import {createMemoryVocabularyUndo} from './memoryVocabularyUndo';
 
 /** 完整设置的权威快照、CAS、批量持久化和本地管理消息；通用翻译/取消/缓存契约共用 compact 适配器。 */
 export function createPlatformMessageHandler(openSettings: (section?: string) => void) {
@@ -50,9 +51,14 @@ export function createPlatformMessageHandler(openSettings: (section?: string) =>
         isVocabularyBookEnabled: () => config.vocabularyBookEnabled === true,
         vocabularyBook,
         broadcastChanged: (reason, entryId) => {
-            void dispatchContentMessage(createVocabularyBookChangedMessage(reason, entryId));
+            dispatchContentNotification(createVocabularyBookChangedMessage(reason, entryId));
         },
         logOperationFailure: (error) => console.error('[FluentRead userscript] 单词本操作失败', error),
+    });
+
+    // 旧脚本环境不创建明文持久撤销；关闭页面后只保留既有收藏数据。
+    const memoryUndo = createMemoryVocabularyUndo(vocabularyBook, (reason, entryId) => {
+        dispatchContentNotification(createVocabularyBookChangedMessage(reason, entryId));
     });
 
     const handle = async (message: any): Promise<any> => {
@@ -68,6 +74,16 @@ export function createPlatformMessageHandler(openSettings: (section?: string) =>
         }
 
         if (message.type === VOCABULARY_BOOK_MESSAGE) {
+            if (['removeWithUndo','listUndo','restoreUndo','discardUndo'].includes(message.action)) {
+                if (isUserscriptPrivateContext()) return {success:false,error:{code:'invalid-input',message:'无痕窗口不能管理撤销记录'}};
+                return memoryUndo(message);
+            }
+            if (message.action === 'clear') {
+                if (!memoryUndo.beginClear()) return {success:false,error:{code:'invalid-input',message:'操作进行中，请稍后重试'}};
+                let success=false;
+                try {const result=await vocabularyBookHandler.handle(message, {sender:{tab:{incognito:isUserscriptPrivateContext()}}});success=result.success;return result;}
+                finally {memoryUndo.endClear(success);}
+            }
             return vocabularyBookHandler.handle(message, {sender: {tab: {incognito: isUserscriptPrivateContext()}}});
         }
 
@@ -88,6 +104,7 @@ export function createPlatformMessageHandler(openSettings: (section?: string) =>
     return Object.assign(handle, {connect: handleCommonMessage.connect, dispose() {
         if (disposed) return;
         disposed = true;
+        memoryUndo.dispose();
         let failed = false;
         let firstError: unknown;
         // 清空归属后再逐个释放，允许 stop 同步重入；首个异常不能阻断另一订阅。

@@ -134,6 +134,9 @@ importers:
         specifier: 3.25.76
         version: 3.25.76
     devDependencies:
+      '@gfx/zopfli':
+        specifier: 1.0.15
+        version: 1.0.15
       '@storybook/addon-essentials':
         specifier: 8.6.18
         version: 8.6.18(@types/react@18.3.31)(storybook@8.6.18)
@@ -738,6 +741,10 @@ packages:
 
   '@floating-ui/utils@0.2.10':
     resolution: {integrity: sha512-aGTxbpbg8/b5JfU1HXSrbH3wXZuLPJcNEcZQFMxLs3oSzgtVu6nFPkbbGGUvBcUjKV2YyB9Wxxabo+HEH9tcRQ==}
+
+  '@gfx/zopfli@1.0.15':
+    resolution: {integrity: sha512-7mBgpi7UD82fsff5ThQKet0uBTl4BYerQuc+/qA1ELTwWEiIedRTcD3JgiUu9wwZ2kytW8JOb165rSdAt8PfcQ==}
+    engines: {node: '>= 8'}
 
   '@huggingface/jinja@0.5.10':
     resolution: {integrity: sha512-SgS1D1bglQ94ceD4ZCL6eayUDy9uV1xuyk61OjgSxU5GJh7upqZCKII0JoTYMc6wWsg3JUgaPRX0ElQzXPk3Cw==}
@@ -4751,6 +4758,10 @@ snapshots:
       '@floating-ui/utils': 0.2.10
 
   '@floating-ui/utils@0.2.10': {}
+
+  '@gfx/zopfli@1.0.15':
+    dependencies:
+      base64-js: 1.5.1
 
   '@huggingface/jinja@0.5.10': {}
 

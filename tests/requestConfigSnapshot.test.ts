@@ -227,6 +227,36 @@ describe('translation provider request config snapshot', () => {
             expect(getTranslationGlossarySourceText(text)).toBe(text);
         }
     });
+    it('短命名空间的长正文不会分配按全文长度增长的边界表', () => {
+        const text = 'readable words. '.repeat(15000);
+        const packet = serializeTranslationSlots([text], 'short');
+        const NativeArray = globalThis.Uint32Array;
+        const allocations: number[] = [];
+        vi.stubGlobal('Uint32Array', new Proxy(NativeArray, {
+            construct(target, args) {
+                if (typeof args[0] === 'number') allocations.push(args[0]);
+                return Reflect.construct(target, args);
+            },
+        }));
+        try {
+            expect(getTranslationGlossarySourceSlots(packet.payload)).toEqual({packet, texts: [text]});
+            expect(allocations.length).toBeGreaterThan(0);
+            expect(Math.max(...allocations)).toBeLessThan(256);
+        } finally { vi.unstubAllGlobals(); }
+    });
+    it('正文中的完整重复前缀不能冒充外层槽边界', () => {
+        const start = '___FLUENTREAD_x_0_BEGIN___';
+        const end = '___FLUENTREAD_x_0_END___';
+        const malformed = `${start} ${start} text ${end}`;
+        expect(getTranslationGlossarySourceSlots(malformed)).toBeUndefined();
+        expect(getTranslationGlossarySourceText(malformed)).toBe(malformed);
+    });
+    it('当合法前缀覆盖长正文时仍正确恢复来源和字面重叠标记', () => {
+        const texts = ['a'.repeat(5000), '___FLUENTREAD_literal_999_BEGIN___ and readable source'];
+        const packet = serializeTranslationSlots(texts, 'literal');
+        expect(getTranslationGlossarySourceSlots(packet.payload)).toEqual({packet, texts});
+    });
+
     it('keeps out-of-range and nonstandard literal markers inside their source slots', () => {
         const sources = ['An agent reads ___FLUENTREAD_literal_999_BEGIN___example___FLUENTREAD_literal_999_END___ and ___FLUENTREAD_literal_01_BEGIN___text___FLUENTREAD_literal_01_END___.',
             'The next source explains translation settings.'];

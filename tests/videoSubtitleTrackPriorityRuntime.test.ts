@@ -255,12 +255,12 @@ function fixture(nativeText?: string, platform: 'x' | 'youtube' = 'x') {
   });
   const callsFor = (text: string) => ports.translate.mock.calls.filter(([source]) => source === text).length;
   const setCaption = (text: string) => {document.querySelector('.ytp-caption-segment')!.textContent = text;};
-  const emitTimedText = (cues: readonly {startMs: number; durationMs: number; text: string}[]) => {
+  const emitTimedText = (cues: readonly {startMs: number; durationMs: number; text: string}[], url = 'https://www.youtube.com/api/timedtext?v=cue-proof&lang=en&fmt=json3') => {
     const event = new window.Event('message');
     Object.defineProperties(event, {
       source: {value: window}, origin: {value: window.location.origin},
       data: {value: {source: 'fluent-read', type: YOUTUBE_TIMED_TEXT_MESSAGE,
-        url: 'https://www.youtube.com/api/timedtext?v=cue-proof&lang=en&fmt=json3',
+        url,
         responseText: JSON.stringify({events: cues.map(cue => ({tStartMs: cue.startMs, dDurationMs: cue.durationMs, segs: [{utf8: cue.text}]}))})}},
     });
     window.dispatchEvent(event);
@@ -1720,4 +1720,40 @@ describe('public mounted YouTube nonfinite time and human track fallback', () =>
     expect(ports.fetch.mock.calls.map(([input]) => new URL(String(input)).searchParams.get('lang')).sort()).toEqual(['en', 'zh-Hans']);
     expect(missSelections).toBe(1);
   });
+});
+
+
+it('YouTube 同语言切换命名字幕轨时撤销旧翻译，签名刷新不误触发切轨', async () => {
+  const tasks: Array<{source: string; signal: AbortSignal; resolve: (text: string) => void}> = [];
+  ports.translate.mockImplementation((source: string, signal: AbortSignal) => {
+    const task = deferred<string>(); tasks.push({source, signal, resolve: task.resolve}); return task.promise;
+  });
+  Object.assign(ports.config, {videoPreferHumanSubtitles: false});
+  const f = fixture(undefined, 'youtube'); f.setCaption('Shared caption'); f.start();
+  const cues = [{startMs: 0, durationMs: 6000, text: 'Shared caption'}];
+  const trackA = 'https://www.youtube.com/api/timedtext?v=cue-proof&lang=en&name=Speaker+A&sig=old';
+  f.emitTimedText(cues, trackA); await vi.advanceTimersByTimeAsync(300);
+  const first = tasks.at(-1)!; expect(first.source).toBe('Shared caption'); expect(first.signal.aborted).toBe(false);
+  f.emitTimedText(cues, trackA.replace('sig=old', 'sig=new')); await vi.advanceTimersByTimeAsync(100);
+  expect(first.signal.aborted).toBe(false); expect(tasks.at(-1)).toBe(first);
+  f.emitTimedText(cues, trackA.replace('Speaker+A', 'Speaker+B')); await vi.advanceTimersByTimeAsync(300);
+  expect(first.signal.aborted).toBe(true);
+  const second = tasks.at(-1)!; expect(second).not.toBe(first); expect(second.signal.aborted).toBe(false);
+  first.resolve('Obsolete track translation'); second.resolve('Current track translation'); await vi.advanceTimersByTimeAsync(200);
+  expect(f.displayed().translated).toBe('Current track translation');
+});
+
+it('原文模式收到大量新命名轨时保留当前轨，恢复双语仍使用当前轨', async () => {
+  Object.assign(ports.config, {videoPreferHumanSubtitles: false});
+  const f = fixture(undefined, 'youtube'); f.setCaption('Original active sentence.'); f.start();
+  const active = [{startMs: 0, durationMs: 6000, text: 'Original active sentence.'}];
+  f.emitTimedText(active, 'https://www.youtube.com/api/timedtext?v=cue-proof&lang=en&name=active');
+  await vi.advanceTimersByTimeAsync(300);
+  expect(f.displayed().source).toBe('Original active sentence.');
+  f.changeConfig({videoSubtitleDisplayMode: 'original-only'}); await settle();
+  for (let i = 0; i < 30; i++) {
+    f.emitTimedText([{startMs: 0, durationMs: 6000, text: `Other track ${i}.`}], `https://www.youtube.com/api/timedtext?v=cue-proof&lang=en&name=other-${i}`);
+  }
+  f.changeConfig({videoSubtitleDisplayMode: 'bilingual'}); f.emitVideo('timeupdate'); await vi.advanceTimersByTimeAsync(300);
+  expect(f.displayed()).toMatchObject({source: 'Original active sentence.', translated: translation('Original active sentence.')});
 });

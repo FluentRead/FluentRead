@@ -194,8 +194,14 @@ function captureReadablePage(): CapturedReadablePage {
     let bodySnapshot: HTMLElement | null = null;
     if (!documentSnapshot) {
         try {
-            bodySnapshot = document.body?.cloneNode(true) as HTMLElement | null;
-            if (bodySnapshot) sanitizePageContextSnapshot(bodySnapshot);
+            const body = document.body;
+            // 克隆后的 body 已脱离祖先；先在原文档检查自身及祖先是否属于排除范围。
+            if (body && typeof body.closest === 'function' && !body.closest(PAGE_CONTEXT_EXCLUDED_SELECTOR)) {
+                const clone = body.cloneNode(true) as HTMLElement;
+                // 只有清洗成功才能发布回退副本；异常时绝不返回部分清洗的正文。
+                sanitizePageContextSnapshot(clone);
+                bodySnapshot = clone;
+            }
         } catch (error) {
             console.warn('[FluentRead] failed to capture detached body snapshot:', error);
         }

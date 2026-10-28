@@ -104,7 +104,16 @@ function isWithinSection(root: Element, node: Node): boolean {
 /** 单个区域保持原有调用方式；多区域去掉重复与已由所选祖先完整覆盖的节点。 */
 function sectionRoots(selection: Element | readonly Element[]): readonly Element[] {
     const roots = [...new Set(Array.isArray(selection) ? selection as Element[] : [selection as Element])];
-    return roots.filter(root => !roots.some(other => other !== root && isWithinSection(other, root)));
+    if (roots.length < 2) return roots;
+    const selected = new Set(roots);
+    return roots.filter(root => {
+        let current: Element | null = getComposedParent(root);
+        for (let depth = 1; current && depth <= maxComposedAncestorDepth; depth += 1) {
+            if (current !== root && selected.has(current)) return false;
+            current = getComposedParent(current);
+        }
+        return true;
+    });
 }
 
 function sameSelection(roots: readonly Element[], operation: SectionOperation): boolean {

@@ -73,6 +73,7 @@
   "材料备份已导出，包含来源、原句与个人笔记，请妥善保存。": "Backup exported. It contains sources, quotes and personal notes; keep it safe.",
   "导出失败，请重试。": "Export failed. Try again.",
   "材料备份超过 20 MB，请选择较小的备份文件。": "The material backup exceeds 20 MB. Choose a smaller backup file.",
+  "此备份超过 20 MB，当前版本无法恢复。请保留现有材料，并妥善保存备份文件。": "This backup exceeds 20 MB and cannot be restored in the current version. Keep your existing materials and store the backup safely.",
   "备份文件无法读取，请选择有效的材料 JSON 备份。": "Could not read the backup. Select a valid material JSON backup.",
   "恢复失败，请检查材料备份文件。": "Restore failed. Check the material backup file.",
   "无痕窗口不读取或保存学习材料": "Learning materials are not read or saved in private windows",

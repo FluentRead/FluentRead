@@ -2950,3 +2950,21 @@ describe('macOS 前台 native CDP helper 的启动与窗口契约（受控端口
     }
   });
 });
+
+
+describe('划词生命周期 CLI 诊断前置', () => {
+    it('需要诊断的专项均在启动资源前拒绝缺失采集器，其余模式保留原有参数校验', () => {
+        const script = resolve(PROJECT_ROOT, 'scripts/run-selection-trigger-test.cjs');
+        for (const mode of ['--lifecycle-only', '--document-shell-only', '--click-selection-only', '--click-selection-stress-only']) {
+            const result = spawnSync(process.execPath, [script, mode], {encoding: 'utf8'});
+            expect(result.status).toBe(1);
+            expect(result.stderr).toContain('划词专项需要 --runtime-diagnostics');
+        }
+        for (const mode of ['--direction-only', '--context-menu-only']) {
+            const result = spawnSync(process.execPath, [script, mode], {encoding: 'utf8'});
+            expect(result.status).toBe(1);
+            expect(result.stderr).toContain('必须传入 --playwright-root');
+            expect(result.stderr).not.toContain('划词专项需要 --runtime-diagnostics');
+        }
+    });
+});

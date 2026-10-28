@@ -1647,6 +1647,8 @@ function liveSharedTranslationLayoutOverride(
         else if (!owner.isConnected) disconnectedOwners.push(owner);
     });
     disconnectedOwners.forEach((owner) => {
+        // 丢弃前一个 owner 会同步触发 abort 监听；宿主可能在回调中重新接入后续节点。
+        if (owner.isConnected) return;
         const state = states.get(owner);
         if (state) discardTranslation(owner, state);
     });

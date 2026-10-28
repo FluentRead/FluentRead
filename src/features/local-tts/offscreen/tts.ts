@@ -7,7 +7,7 @@
 
 import {readWorkerRequestId} from '@/src/core/messaging/validation';
 import type {InferenceBackend} from '@/src/core/messaging/inference';
-import {withLocalInferenceBudget} from '@/src/shared/onnx/resources';
+import {createLocalInferenceBudget, withLocalInferenceBudget} from '@/src/shared/onnx/resources';
 import {localModelIdleMs} from '@/src/shared/onnx/modelResidency';
 import {
     LOCAL_TTS_MODEL,
@@ -52,9 +52,10 @@ let workerGeneration = 0;
 let workerRequestId = 0;
 let pendingRequests = new Map<number, PendingWorkerRequest>();
 let idleDisposeTimer: number | undefined;
-let workerQueue: Promise<void> = Promise.resolve();
+const runInTtsQueue = createLocalInferenceBudget(1);
 // Worker 重建允许 CPU 回退；显式释放才作废整批在途/排队的调用。
 let cancellationGeneration = 0;
+let synthesisLifetime = new AbortController();
 let activeSyntheses = 0;
 let preparingModels = 0;
 let removingModel = false;
@@ -77,6 +78,26 @@ function createAbortError(): Error {
     const error = new Error('本地 TTS 请求已取消');
     error.name = 'AbortError';
     return error;
+}
+
+/** 释放调用者的等待；不声称中断 Cache Storage 等底层操作。 */
+function awaitCancellable<T>(promise: Promise<T>, signal: AbortSignal | undefined, lifetime: AbortSignal): Promise<T> {
+    return new Promise((resolve, reject) => {
+        let settled = false;
+        const finish = (action: () => void) => {
+            if (settled) return;
+            settled = true;
+            signal?.removeEventListener('abort', onAbort);
+            lifetime.removeEventListener('abort', onAbort);
+            action();
+        };
+        const onAbort = () => finish(() => reject(createAbortError()));
+        // 即使等待已取消，也必须消费底层任务的迟到失败。
+        void promise.then(value => finish(() => resolve(value)), error => finish(() => reject(error)));
+        if (signal?.aborted || lifetime.aborted) {onAbort();return;}
+        signal?.addEventListener('abort', onAbort, {once: true});
+        lifetime.addEventListener('abort', onAbort, {once: true});
+    });
 }
 
 function clearIdleDispose(): void {
@@ -210,10 +231,17 @@ async function requestWorkerWithCpuFallback(
     }
 }
 
-function runSerial<T>(operation: () => Promise<T>): Promise<T> {
-    const run = workerQueue.then(operation, operation);
-    workerQueue = run.then(() => undefined, () => undefined);
-    return run;
+function runSerial<T>(operation: (signal: AbortSignal) => Promise<T>, signal: AbortSignal | undefined, lifetime: AbortSignal): Promise<T> {
+    const linked = new AbortController();
+    const onAbort = () => linked.abort();
+    // 上游已在同一同步调用栈中验证两种取消状态。
+    signal?.addEventListener('abort', onAbort, {once: true});
+    lifetime.addEventListener('abort', onAbort, {once: true});
+    // 排队取消会从共享的 FIFO 中移除，已启动的任务也把取消传给推理预算和 Worker。
+    return runInTtsQueue(() => operation(linked.signal), linked.signal).finally(() => {
+        signal?.removeEventListener('abort', onAbort);
+        lifetime.removeEventListener('abort', onAbort);
+    });
 }
 
 export async function prepareLocalTtsModel(
@@ -275,21 +303,21 @@ export async function synthesizeLocalTts(
     // 文件校验和共享预算等待也属于本次请求，先撤销上一轮空闲回收。
     clearIdleDispose();
     const generation = cancellationGeneration;
+    const lifetime = synthesisLifetime.signal;
     activeSyntheses += 1;
     try {
-        if (!(await isLocalTtsModelCached())) throw new LocalTtsModelNotDownloadedError();
+        if (!(await awaitCancellable(isLocalTtsModelCached(), signal, lifetime))) throw new LocalTtsModelNotDownloadedError();
         if (signal?.aborted || generation !== cancellationGeneration) throw createAbortError();
 
         const voice = localTtsVoiceForLanguage(language, preferredVoice);
-        const response = await runSerial(() => {
-            if (signal?.aborted || generation !== cancellationGeneration) throw createAbortError();
+        const response = await runSerial(linkedSignal => {
             return requestWorkerWithCpuFallback({
                 type: 'synthesize',
                 text,
                 voice,
                 speed: 1,
-            }, SYNTHESIS_TIMEOUT_MS, signal);
-        });
+            }, SYNTHESIS_TIMEOUT_MS, linkedSignal);
+        }, signal, lifetime);
         if (signal?.aborted || generation !== cancellationGeneration) throw createAbortError();
         if (!response.audio) throw new Error('本地 TTS 未返回音频');
         return {
@@ -320,6 +348,9 @@ export async function removeLocalTtsModel(): Promise<void> {
 
 export function disposeLocalTtsWorker(): void {
     cancellationGeneration += 1;
+    const previousLifetime = synthesisLifetime;
+    synthesisLifetime = new AbortController();
+    previousLifetime.abort();
     terminateWorker(createAbortError());
 }
 

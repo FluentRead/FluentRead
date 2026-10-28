@@ -6,6 +6,8 @@
       "tests/architecture/providerBoundaries.test.ts",
       "tests/architecture/sourceFileHeaders.test.ts",
       "tests/architecture/verificationOwnership.test.ts",
+      "tests/backgroundConfigComposition.test.ts",
+      "tests/backgroundMaintenanceComposition.test.ts",
       "tests/backgroundConfigPersistenceHandler.test.ts",
       "tests/backgroundConfigStorage.test.ts",
       "tests/backgroundConnectionTestHandler.test.ts",
@@ -44,6 +46,7 @@
       "tests/testConfiguration.test.ts"
     ],
     "unit": [
+      "tests/downloadTextFile.test.ts",
       "tests/safariTabBroadcast.test.ts",
       "tests/safariTabBroadcastIntegration.test.ts",
       "tests/materialOriginalText.test.ts",
@@ -61,6 +64,7 @@
       "tests/compositeTranslationConnection.test.ts",
       "tests/compositeServiceEditor.test.ts",
       "tests/imageOcrPixels.test.ts",
+      "tests/googleErrorBody.test.ts",
       "tests/googleRequestGate.test.ts",
       "tests/implementationAudit48H.test.ts",
       "tests/translationCenterSession.test.ts",
@@ -259,6 +263,7 @@
       "tests/userscriptManagerSmokeCli.test.ts",
       "tests/userscriptPageContext.test.ts",
       "tests/userscriptPlatform.test.ts",
+      "tests/userscriptMemoryVocabularyUndo.test.ts",
       "tests/userscriptRequires.test.ts",
       "tests/userscriptStorage.test.ts",
       "tests/userscriptUnsupportedCapabilities.test.ts",
@@ -270,6 +275,7 @@
       "tests/wordDictionary.test.ts",
       "tests/wordDictionaryEdge.test.ts",
       "tests/youtubeSubtitleData.test.ts",
+      "tests/timedTextTrackCache.test.ts",
       "tests/xVideoSubtitleData.test.ts",
       "tests/xSubtitleLoader.test.ts",
       "tests/hlsAudio.test.ts",
@@ -501,7 +507,8 @@
       "tests/pdfResources.test.ts",
       "tests/clickSelectionConfig.test.ts",
       "tests/pointerSelectionSession.test.ts",
-      "tests/aiMultiSegmentConfig.test.ts"
+      "tests/aiMultiSegmentConfig.test.ts",
+      "tests/areaRuntimeComposition.test.ts"
     ],
     "functional": [
       "tests/affectedTests.test.ts",
@@ -767,6 +774,7 @@
       "tests/videoSubtitle.test.ts",
       "tests/videoSubtitleAppearanceSettingsLifecycle.test.ts",
       "tests/videoSubtitleTrackPriorityRuntime.test.ts",
+      "tests/xVideoBridgeComposition.test.ts",
       "tests/visionProbeStatusLifecycle.test.ts",
       "tests/vocabularyBook.test.ts",
       "tests/vocabularyBookComponent.test.ts",

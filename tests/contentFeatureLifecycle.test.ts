@@ -3,7 +3,7 @@ import {readFileSync} from 'node:fs';
 
 import { ensureContentFeatureMounted } from '@/src/app/content/featureLifecycle';
 import {
-    createContentPageAvailabilityRuntime,
+    createContentPageAvailabilityRuntime, reconcileCurrentContentPage,
     createContentRouteChangeHandler,
     getAutoTranslationPageIdentity,
 } from '@/src/app/content/pageAvailability';
@@ -567,5 +567,32 @@ describe('content 路由协调边界', () => {
         expect(dependencies.applySiteDisabledState).toHaveBeenCalledWith(true);
         expect(dependencies.reconcileFeatures).toHaveBeenCalledOnce();
         expect(dependencies.pageAvailability.refreshAutoTranslation).toHaveBeenCalledOnce();
+    });
+});
+
+
+describe('当前配置的页面重协调', () => {
+    it('已停用、页面失效或无注册表时不启动功能', async () => {
+        const reconcile = vi.fn(async () => {}), apply = vi.fn(async () => [{status: 'mounted'}]);
+        const registry = {reconcileEnabled: apply};
+        expect(await reconcileCurrentContentPage(reconcile, () => registry, () => false, () => true)).toBe(false);
+        expect(await reconcileCurrentContentPage(reconcile, () => registry, () => true, () => false)).toBe(true);
+        expect(await reconcileCurrentContentPage(reconcile, () => null, () => true, () => true)).toBe(false);
+        expect(apply).not.toHaveBeenCalled();
+    });
+    it.each(['success', 'failed', 'invalidated', 'disabled', 'owner-changed'] as const)('等待功能挂载期间 %s 后只确认当前所有权', async outcome => {
+        const gate = deferred<readonly {status: string}[]>(); let available = true, enabled = true;
+        const owner = {reconcileEnabled: vi.fn(() => gate.promise)};
+        let current: typeof owner | null = owner;
+        const result = reconcileCurrentContentPage(async () => {}, () => current, () => available, () => enabled);
+        await Promise.resolve();
+        if (outcome === 'invalidated') available = false;
+        if (outcome === 'disabled') enabled = false;
+        if (outcome === 'owner-changed') current = {reconcileEnabled: vi.fn(() => gate.promise)};
+        gate.resolve([{status: outcome === 'failed' ? 'failed' : 'mounted'}]);
+        expect(await result).toBe(outcome === 'success');
+    });
+    it('协调抛错原样交由消息处理器判断，不报告成功', async () => {
+        await expect(reconcileCurrentContentPage(async () => {throw new Error('unavailable');}, () => null, () => true, () => true)).rejects.toThrow('unavailable');
     });
 });

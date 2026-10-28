@@ -211,3 +211,13 @@ describe('Google Drive appDataFolder HTTP 边界', () => {
         expect((await request).message).toContain('网络请求失败');
     });
 });
+
+it('does not start a follow-up metadata request after an aborted read receives a late list', async () => {
+    const controller=new AbortController();let release!: (response:Response)=>void;
+    const fetcher=vi.fn<typeof fetch>(()=>new Promise(resolve=>{release=resolve;}));
+    const read=createDriveApi(fetcher).read(session,controller.signal).catch(error=>error);
+    await vi.waitFor(()=>expect(release).toBeTypeOf('function'));
+    controller.abort();release(json({files:[metadata]}));
+    expect(await read).toMatchObject({name:'AbortError'});
+    expect(fetcher).toHaveBeenCalledOnce();
+});

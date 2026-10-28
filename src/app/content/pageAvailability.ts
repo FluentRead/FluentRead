@@ -31,6 +31,22 @@ export interface ContentPageAvailabilityRuntime {
     disposeVideoSubtitlePage(): void;
 }
 
+/** 以最新页面配置重试功能挂载；跨 await 后复核当前 owner，不复活失效页面。 */
+export async function reconcileCurrentContentPage(
+    reconcile: () => Promise<void>,
+    getRegistry: () => {reconcileEnabled(): Promise<readonly {status: string}[]>} | null,
+    isAvailable: () => boolean,
+    isEnabled: () => boolean,
+): Promise<boolean> {
+    await reconcile();
+    if (!isAvailable()) return false;
+    if (!isEnabled()) return true;
+    const owner = getRegistry();
+    if (!owner) return false;
+    const results = await owner.reconcileEnabled();
+    return isAvailable() && isEnabled() && getRegistry() === owner && results.every(result => result.status !== 'failed');
+}
+
 /** 创建一个 document 私有的可用性协调器，避免配置订阅和路由事件各自维护半套状态。 */
 export function createContentPageAvailabilityRuntime(
     dependencies: ContentPageAvailabilityDependencies,

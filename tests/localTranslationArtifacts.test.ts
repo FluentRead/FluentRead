@@ -2,11 +2,12 @@ import {afterEach, beforeEach, describe, expect, it, vi} from 'vitest';
 import {sha256} from '@noble/hashes/sha256';
 import {
   MODEL_CHUNK_SIZE, artifactComplete, artifactDownloadedBytes, artifactUrl,
-  downloadTranslationArtifact, removeTranslationArtifact, translationArtifactBlob,
+  downloadTranslationArtifact, invalidateTranslationArtifactReceipt, removeTranslationArtifact, translationArtifactBlob,
   getTranslationArtifacts, type TranslationArtifact,
   matchTranslationArtifact,
 } from '@/src/features/local-translation/offscreen/artifactStore';
 import {LOCAL_TRANSLATION_MODEL_IDS} from '@/src/core/config/localTranslation';
+import {createLocalTranslationDownloadManager} from '@/src/features/local-translation/offscreen/downloads';
 
 function fileFor(bytes: Uint8Array): TranslationArtifact {
   return {repo: 'test/model', revision: 'pinned-revision', path: 'weights.bin', size: bytes.length,
@@ -17,6 +18,9 @@ const cache = {
   match: vi.fn(async (key: string) => entries.get(key)?.clone()),
   put: vi.fn(async (key: string, value: Response) => { entries.set(key, value.clone()); }),
   delete: vi.fn(async (key: string) => entries.delete(key)),
+  keys: vi.fn(async (key: string, options?: {ignoreSearch?: boolean}) => [...entries.keys()]
+    .filter(value => options?.ignoreSearch ? value.split('?')[0] === key.split('?')[0] : value === key)
+    .map(value => new Request(value))),
 };
 beforeEach(() => {
   entries.clear();
@@ -56,11 +60,83 @@ describe('verified resumable model downloads', () => {
     await expect(translationArtifactBlob(file)).rejects.toThrow('NOT_DOWNLOADED');
     entries.set(`${url}?fluent-read-verified=${file.sha256}`, new Response('{}'));
     await expect(translationArtifactBlob(file)).rejects.toThrow('NOT_DOWNLOADED');
+    await expect(matchTranslationArtifact(url)).rejects.toThrow('NOT_DOWNLOADED');
     entries.set(`${url}?fluent-read-part=0`, new Response('wrong size'));
     await expect(translationArtifactBlob(file)).rejects.toThrow('INTEGRITY');
-    entries.set(`${url}?fluent-read-part=0`, new Response(new Uint8Array(file.size)));
+    entries.set(`${url}?fluent-read-part=0`, new Response(new Uint8Array(file.size), {headers: {'Content-Length': String(file.size)}}));
     expect((await translationArtifactBlob(file)).type).toBe('application/json');
     expect((await matchTranslationArtifact(new Request(url)))?.headers.get('Content-Length')).toBe(String(file.size));
+  });
+
+  it('rejects a verified receipt with a missing chunk and repairs the file on retry', async () => {
+    const bytes = new Uint8Array(MODEL_CHUNK_SIZE + 1).fill(7);
+    const file = fileFor(bytes);
+    vi.stubGlobal('fetch', vi.fn(async () => new Response(bytes)));
+    await downloadTranslationArtifact(file, new AbortController().signal, () => undefined);
+    entries.delete(`${artifactUrl(file)}?fluent-read-part=1`);
+    expect(await artifactComplete(file)).toBe(false);
+    let release!: () => void;
+    const gate = new Promise<void>(resolve => {release = resolve;});
+    const retry = vi.fn(async (_url: RequestInfo | URL, _options?: RequestInit) => {
+      await gate;
+      return new Response(bytes.subarray(MODEL_CHUNK_SIZE), {
+        status: 206, headers: {'Content-Range': `bytes ${MODEL_CHUNK_SIZE}-${bytes.length - 1}/${bytes.length}`},
+      });
+    });
+    vi.stubGlobal('fetch', retry);
+    const repair = downloadTranslationArtifact(file, new AbortController().signal, () => undefined);
+    await vi.waitFor(() => expect(retry).toHaveBeenCalledOnce());
+    expect(entries.has(`${artifactUrl(file)}?fluent-read-verified=${file.sha256}`)).toBe(false);
+    await expect(translationArtifactBlob(file)).rejects.toThrow('NOT_DOWNLOADED');
+    release();await repair;
+    expect(retry).toHaveBeenCalledOnce();
+    expect(await artifactComplete(file)).toBe(true);
+    expect((await translationArtifactBlob(file)).size).toBe(bytes.length);
+  });
+
+  it('restores a damaged model as paused instead of ready after offscreen restart', async () => {
+    const model = LOCAL_TRANSLATION_MODEL_IDS.opusZhEn;
+    const files = getTranslationArtifacts(model);
+    for (const file of files) {
+      entries.set(`${artifactUrl(file)}?fluent-read-verified=${file.sha256}`, new Response('{}'));
+      for (let index = 0; index < Math.ceil(file.size / MODEL_CHUNK_SIZE); index++) {
+        const size = Math.min(MODEL_CHUNK_SIZE, file.size - index * MODEL_CHUNK_SIZE);
+        entries.set(`${artifactUrl(file)}?fluent-read-part=${index}`, new Response('', {headers: {'Content-Length': String(size)}}));
+      }
+    }
+    const damaged = files.find(file => file.size > MODEL_CHUNK_SIZE)!;
+    entries.delete(`${artifactUrl(damaged)}?fluent-read-part=0`);
+    const state = (await createLocalTranslationDownloadManager().status()).tasks.find(task => task.model === model)!;
+    expect(state.phase).toBe('paused');
+    expect(state.downloadedBytes).toBeLessThan(state.totalBytes);
+  });
+
+  it('propagates cache read failures instead of interpreting them as missing model data', async () => {
+    const file = fileFor(new Uint8Array([7]));
+    entries.set(`${artifactUrl(file)}?fluent-read-verified=${file.sha256}`, new Response('{}'));
+    cache.match.mockRejectedValueOnce(new Error('cache unavailable'));
+    await expect(artifactComplete(file)).rejects.toThrow('cache unavailable');
+  });
+
+  it('reverifies existing bytes and redownloads a truncated chunk after integrity retry', async () => {
+    const bytes = new Uint8Array([7, 8]);const file = fileFor(bytes), url = artifactUrl(file);
+    entries.set(`${url}?fluent-read-verified=${file.sha256}`, new Response('{}'));
+    entries.set(`${url}?fluent-read-part=0`, new Response(new Uint8Array([7]), {headers: {'Content-Length': '2'}}));
+    await expect(translationArtifactBlob(file)).rejects.toThrow('LOCAL_TRANSLATION_INTEGRITY');
+    await invalidateTranslationArtifactReceipt(file);
+    const fetcher = vi.fn(async () => new Response(bytes));vi.stubGlobal('fetch', fetcher);
+    await downloadTranslationArtifact(file, new AbortController().signal, () => undefined);
+    expect(fetcher).toHaveBeenCalledOnce();
+    expect(await artifactComplete(file)).toBe(true);
+    expect(Array.from(new Uint8Array(await (await translationArtifactBlob(file)).arrayBuffer()))).toEqual([7, 8]);
+  });
+
+  it('does not delete a receipt when the cache key listing fails', async () => {
+    const file = fileFor(new Uint8Array([7]));
+    const receipt = `${artifactUrl(file)}?fluent-read-verified=${file.sha256}`;
+    entries.set(receipt, new Response('{}'));cache.keys.mockRejectedValueOnce(new Error('cache offline'));
+    await expect(downloadTranslationArtifact(file, new AbortController().signal, () => undefined)).rejects.toThrow('cache offline');
+    expect(entries.has(receipt)).toBe(true);expect(cache.delete).not.toHaveBeenCalled();
   });
 
   it('finishes verification from disk without redownloading after interruption', async () => {

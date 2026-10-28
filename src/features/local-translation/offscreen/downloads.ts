@@ -11,38 +11,41 @@ import {
 } from '@/src/core/config/localTranslation';
 import {
     LOCAL_MODEL_CACHE, artifactComplete, artifactDownloadedBytes, downloadTranslationArtifact,
-    getTranslationArtifacts, removeTranslationArtifact,
+    getTranslationArtifacts, invalidateTranslationArtifactReceipt, removeTranslationArtifact,
 } from './artifactStore';
 import {isLocalTranslationModelCached, removeLocalTranslationModelFiles} from './modelCache';
 import {supportsHunyuanTranslation} from '@/src/platform/browser/localTranslationSupport';
 
 const STATE_URL = 'https://fluentread.invalid/local-translation-downloads-v2';
+type StoredDownloadState = LocalTranslationDownloadState & {needsReverification?: boolean};
 export interface LocalTranslationDownloadDependencies {
     onChange?(state: LocalTranslationDownloadSnapshot): Promise<void>;
     beforeRemove?(model: LocalTranslationModelId): void;
 }
 
 export function createLocalTranslationDownloadManager(dependencies: LocalTranslationDownloadDependencies = {}) {
-    const states = new Map<LocalTranslationModelId, LocalTranslationDownloadState>();
+    const states = new Map<LocalTranslationModelId, StoredDownloadState>();
     const jobs = new Map<LocalTranslationModelId, {controller: AbortController; done: Promise<void>; started: boolean}>();
     const removals = new Set<LocalTranslationModelId>();
+    const rechecks = new Map<LocalTranslationModelId, {updatedAt: number}>();
     let initialized: Promise<void> | undefined;
     let queue = Promise.resolve();
     let writes = Promise.resolve();
     let lastProgress = 0;
 
-    const snapshot = (): LocalTranslationDownloadSnapshot => ({version: 2, tasks: [...states.values()].map((task) => ({...task}))});
+    const snapshot = (): LocalTranslationDownloadSnapshot => ({version: 2, tasks: [...states.values()].map(({needsReverification: _internal, ...task}) => ({...task}))});
     const persist = (): Promise<void> => {
         const state = snapshot();
+        const stored = {version: 2, tasks: [...states.values()].map(task => ({...task}))};
         const write = writes.then(async () => {
             const cache = await caches.open(LOCAL_MODEL_CACHE);
-            await cache.put(STATE_URL, new Response(JSON.stringify(state)));
+            await cache.put(STATE_URL, new Response(JSON.stringify(stored)));
             await dependencies.onChange?.(state).catch(() => undefined);
         });
         writes = write.catch(() => undefined);
         return write;
     };
-    const update = (model: LocalTranslationModelId, patch: Partial<LocalTranslationDownloadState>) => {
+    const update = (model: LocalTranslationModelId, patch: Partial<StoredDownloadState>) => {
         Object.assign(states.get(model)!, patch, {updatedAt: Math.max(Date.now(), states.get(model)!.updatedAt + 1)});
     };
     const initialize = (): Promise<void> => {
@@ -50,7 +53,7 @@ export function createLocalTranslationDownloadManager(dependencies: LocalTransla
         initialized = (async () => {
             const cache = await caches.open(LOCAL_MODEL_CACHE);
             const response = await cache.match(STATE_URL);
-            const saved = await response?.json().catch(() => undefined) as LocalTranslationDownloadSnapshot | undefined;
+            const saved = await response?.json().catch(() => undefined) as {version: 2; tasks: StoredDownloadState[]} | undefined;
             for (const model of LOCAL_TRANSLATION_MODELS) {
                 const artifacts = getTranslationArtifacts(model.value);
                 let downloadedBytes = 0;
@@ -66,13 +69,17 @@ export function createLocalTranslationDownloadManager(dependencies: LocalTransla
                 }
                 const previous = saved?.version === 2 && Array.isArray(saved.tasks)
                     ? saved.tasks.find((state) => state.model === model.value) : undefined;
+                // 重验中断后即使所有键都存在，也不能丢掉尚未完成的哈希校验意图。
+                const reverify = !model.legacy && previous?.phase !== 'idle'
+                    && (previous?.needsReverification === true || previous?.error === 'integrity');
                 states.set(model.value, {
                     model: model.value,
-                    phase: complete ? 'ready' : downloadedBytes || previous && previous.phase !== 'idle' ? 'paused' : 'idle',
+                    phase: reverify ? 'paused' : complete ? 'ready' : downloadedBytes || previous && previous.phase !== 'idle' ? 'paused' : 'idle',
                     downloadedBytes,
                     totalBytes: artifacts.reduce((sum, file) => sum + file.size, 0) || model.downloadSizeMb * 1_000_000,
                     bytesPerSecond: 0,
                     updatedAt: Math.max(Date.now(), (previous?.updatedAt || 0) + 1),
+                    ...(reverify ? {needsReverification: true} : {}),
                 });
             }
             await persist();
@@ -84,7 +91,7 @@ export function createLocalTranslationDownloadManager(dependencies: LocalTransla
         return value;
     };
 
-    const run = async (model: LocalTranslationModelId, controller: AbortController): Promise<void> => {
+    const run = async (model: LocalTranslationModelId, controller: AbortController, reverify: boolean): Promise<void> => {
         try {
             if (controller.signal.aborted) return;
             const files = getTranslationArtifacts(model);
@@ -100,6 +107,8 @@ export function createLocalTranslationDownloadManager(dependencies: LocalTransla
             let lastBytes = states.get(model)!.downloadedBytes;
             let lastAt = Date.now();
             for (const file of files) {
+                if (controller.signal.aborted) throw new DOMException('Paused', 'AbortError');
+                if (reverify) await invalidateTranslationArtifactReceipt(file);
                 if (controller.signal.aborted) throw new DOMException('Paused', 'AbortError');
                 await downloadTranslationArtifact(file, controller.signal, (bytes, verifying) => {
                     const now = Date.now();
@@ -119,7 +128,7 @@ export function createLocalTranslationDownloadManager(dependencies: LocalTransla
                 });
                 if (controller.signal.aborted) throw new DOMException('Paused', 'AbortError');
             }
-            update(model, {phase: 'ready', downloadedBytes: states.get(model)!.totalBytes, bytesPerSecond: 0});
+            update(model, {phase: 'ready', downloadedBytes: states.get(model)!.totalBytes, bytesPerSecond: 0, error: undefined, needsReverification: undefined});
         } catch (error) {
             const code = error instanceof Error && error.name === 'QuotaExceededError' ? 'storage'
                 : error instanceof Error && error.message === 'LOCAL_TRANSLATION_INTEGRITY' ? 'integrity' : 'network';
@@ -136,6 +145,38 @@ export function createLocalTranslationDownloadManager(dependencies: LocalTransla
             await initialize();
             return snapshot();
         },
+        // 只在 Worker 报告模型文件缺失时核查，避免每次翻译都扫描大模型分块。
+        async reconcileUnavailable(value: unknown, expectedUpdatedAt: number, reason: 'missing' | 'integrity' = 'missing'): Promise<void> {
+            await initialize();
+            const model = requireModel(value);
+            const current = states.get(model)!;
+            if (current.phase !== 'ready' || current.updatedAt !== expectedUpdatedAt || jobs.has(model) || removals.has(model)) return;
+            if (reason === 'integrity') {
+                update(model, {phase: 'error', error: 'integrity', bytesPerSecond: 0, needsReverification: true});
+                await persist();
+                return;
+            }
+            // 相同模型和状态版本最多保留一次复验；调用方无需等待可能挂起的缓存。
+            if (rechecks.get(model)?.updatedAt === expectedUpdatedAt) return;
+            const owner = {updatedAt: expectedUpdatedAt};
+            rechecks.set(model, owner);
+            try {
+                const files = getTranslationArtifacts(model);
+                if (!files.length) return;
+                let bytes = 0, incomplete = false;
+                for (const file of files) {
+                    const complete = await artifactComplete(file);
+                    if (!complete) incomplete = true;
+                    bytes += complete ? file.size : await artifactDownloadedBytes(file);
+                }
+                if (!incomplete || current.phase !== 'ready' || current.updatedAt !== expectedUpdatedAt
+                    || jobs.has(model) || removals.has(model)) return;
+                update(model, {phase: 'paused', downloadedBytes: bytes, bytesPerSecond: 0, error: undefined});
+                await persist();
+            } finally {
+                if (rechecks.get(model) === owner) rechecks.delete(model);
+            }
+        },
         async start(value: unknown): Promise<LocalTranslationDownloadSnapshot> {
             await initialize();
             const model = requireModel(value);
@@ -150,6 +191,7 @@ export function createLocalTranslationDownloadManager(dependencies: LocalTransla
                 return manager.start(model);
             }
             if (existing || states.get(model)!.phase === 'ready') return snapshot();
+            const reverify = states.get(model)!.needsReverification === true;
             const controller = new AbortController();
             update(model, {phase: 'queued', error: undefined, bytesPerSecond: 0});
             const saved = persist();
@@ -157,7 +199,7 @@ export function createLocalTranslationDownloadManager(dependencies: LocalTransla
             const done = queue.then(() => saved).then(() => {
                 if (jobs.get(model) !== job) return;
                 job.started = true;
-                return run(model, controller);
+                return run(model, controller, reverify);
             }).catch(async () => {
                 if (jobs.get(model) !== job) return;
                 jobs.delete(model);
@@ -198,7 +240,7 @@ export function createLocalTranslationDownloadManager(dependencies: LocalTransla
                 dependencies.beforeRemove?.(model);
                 if (getLocalTranslationModel(model).legacy) await removeLocalTranslationModelFiles(model);
                 else for (const file of getTranslationArtifacts(model)) await removeTranslationArtifact(file);
-                update(model, {phase: 'idle', downloadedBytes: 0, error: undefined});
+                update(model, {phase: 'idle', downloadedBytes: 0, error: undefined, needsReverification: undefined});
             } catch (error) {
                 update(model, {phase: 'error', error: 'storage'});
                 throw error;

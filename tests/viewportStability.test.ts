@@ -615,6 +615,35 @@ describe('全文翻译视口稳定性', () => {
         expect(scroller.scrollTop).toBe(100);
     });
 
+    it.each(['detached', 'connected', 'from-page'] as const)(
+        '全局锚点变更滚动面（%s）时不滚动旧容器或页面', kind => {
+            const scroller = document.createElement('div');
+            const anchor = document.createElement('p');
+            document.body.append(scroller);
+            if (kind === 'from-page') document.body.append(anchor);
+            else scroller.append(anchor);
+            scroller.scrollTop = 100;
+            Object.defineProperties(scroller, {scrollHeight: {value: 1000}, clientHeight: {value: 200}});
+            Object.defineProperty(window, 'getComputedStyle', {configurable: true,
+                value: (element: HTMLElement) => ({overflowY: element === scroller ? 'auto' : 'visible'})});
+            Object.defineProperty(window, 'scrollY', {configurable: true, value: 200});
+            Object.defineProperty(document, 'elementFromPoint', {configurable: true, value: () => anchor});
+            let moved = false;
+            anchor.getBoundingClientRect = () => ({width: 200, height: 40, top: moved ? 160 : 110} as DOMRect);
+            const scrollBy = vi.fn();
+            Object.defineProperty(window, 'scrollBy', {configurable: true, value: scrollBy});
+            withFullPageViewportAnchor(() => {
+                moved = true;
+                if (kind === 'from-page') scroller.append(anchor);
+                else {
+                    document.body.append(anchor);
+                    if (kind === 'detached') scroller.remove();
+                }
+            });
+            expect(scrollBy).not.toHaveBeenCalled();
+            expect(scroller.scrollTop).toBe(100);
+        });
+
     it('超过祖先预算时不把未知内层滚动面当作文档，局部捕获与全量恢复均安全放弃补偿', () => {
         let parent = document.body;
         for (let depth = 0; depth < 514; depth++) {

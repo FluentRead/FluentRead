@@ -73,6 +73,7 @@
   "材料备份已导出，包含来源、原句与个人笔记，请妥善保存。": "Sauvegarde exportée. Elle contient les sources, citations et notes personnelles ; conservez-la en lieu sûr.",
   "导出失败，请重试。": "Échec de l’exportation. Réessayez.",
   "材料备份超过 20 MB，请选择较小的备份文件。": "La sauvegarde dépasse 20 MB. Choisissez un fichier plus petit.",
+  "此备份超过 20 MB，当前版本无法恢复。请保留现有材料，并妥善保存备份文件。": "Cette sauvegarde dépasse 20 MB et ne peut pas être restaurée dans la version actuelle. Conservez vos documents et gardez la sauvegarde en lieu sûr.",
   "备份文件无法读取，请选择有效的材料 JSON 备份。": "Impossible de lire la sauvegarde. Choisissez une sauvegarde JSON de ressources valide.",
   "恢复失败，请检查材料备份文件。": "Échec de la restauration. Vérifiez la sauvegarde des ressources.",
   "无痕窗口不读取或保存学习材料": "Les ressources ne sont ni lues ni enregistrées en navigation privée",

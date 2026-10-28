@@ -499,6 +499,90 @@ const rotationChange = () => {external.config.apiKeyRotationEnabled.deepseek = f
 const thinkingSetup = () => {external.config.modelThinking.deepseek = {'fixture-model': false};};
 const thinkingChange = () => {external.config.modelThinking.deepseek['fixture-model'] = true;};
 describe('audit49B real installed background generation ownership', () => {
+    it('显式目标的忠实翻译不因全局目标或无关写作偏好变化取消', async () => {
+        configureBackground();installBackground('writing');
+        const port=makePort('fluentReadWritingStream',{id:'fixture',tab:{id:92,url:'https://github.com/fixture/repository/issues/1'},frameId:0,documentId:'translation-doc',url:'https://github.com/fixture/repository/issues/1'});
+        external.onConnect.forEach(listener=>listener(port));
+        port.onMessage.fire({...writingRequest,requestId:'explicit-reference',intent:'translate',draft:'English reply',instruction:'',language:'zh-Hans'});
+        await untilFixture(()=>external.requests.length===1);const request=external.requests[0];
+        external.config.to='ja';external.config.harness.memoryEnabled=true;
+        external.config.writing={...external.config.writing,tone:'friendly',length:'detailed'};
+        notifyConfiguration();expect(request.signal.aborted).toBe(false);
+        request.complete();await untilFixture(()=>port.postMessage.mock.calls.some(([value])=>value.type==='result'));
+        expect(port.postMessage).toHaveBeenCalledWith(expect.objectContaining({type:'result',response:expect.objectContaining({success:true})}));
+    });
+    it('跟随全局目标的忠实翻译在目标变化后仍会取消', async () => {
+        configureBackground();installBackground('writing');
+        const port=makePort('fluentReadWritingStream',{id:'fixture',tab:{id:92,url:'https://github.com/fixture/repository/issues/1'},frameId:0,documentId:'target-doc',url:'https://github.com/fixture/repository/issues/1'});
+        external.onConnect.forEach(listener=>listener(port));
+        port.onMessage.fire({...writingRequest,requestId:'target-reference',intent:'translate',draft:'English reply',instruction:'',language:'target'});
+        await untilFixture(()=>external.requests.length===1);const request=external.requests[0];
+        external.config.to='ja';notifyConfiguration();expect(request.signal.aborted).toBe(true);
+    });
+    it('忠实翻译仍因实际认证变化而取消，取消回执不泄露密钥', async () => {
+        configureBackground();external.config.apiKeys.deepseek=['fixture-secret-first'];installBackground('writing');
+        const port=makePort('fluentReadWritingStream',{id:'fixture',tab:{id:92,url:'https://github.com/fixture/repository/issues/1'},frameId:0,documentId:'credentials-doc',url:'https://github.com/fixture/repository/issues/1'});
+        external.onConnect.forEach(listener=>listener(port));
+        port.onMessage.fire({...writingRequest,requestId:'credential-reference',intent:'translate',draft:'English reply',instruction:'',language:'zh-Hans'});
+        await untilFixture(()=>external.requests.length===1);const request=external.requests[0];
+        external.config.apiKeys.deepseek=['fixture-secret-next'];notifyConfiguration();expect(request.signal.aborted).toBe(true);
+        await untilFixture(()=>port.postMessage.mock.calls.some(([value])=>value.type==='result'));
+        expect(JSON.stringify(port.postMessage.mock.calls)).not.toContain('fixture-secret');
+        expect(port.postMessage).toHaveBeenCalledWith(expect.objectContaining({response:expect.objectContaining({cancelled:true})}));
+        expect(port.postMessage).toHaveBeenCalledWith(expect.objectContaining({response:expect.objectContaining({reason:'configuration-changed'})}));
+    });
+    it('公开模型设置同时变化时不发送私有变更恢复信号', async () => {
+        configureBackground();external.config.apiKeys.deepseek=['fixture-secret-first'];external.config.modelThinking.deepseek={'fixture-model':false};installBackground('writing');
+        const port=makePort('fluentReadWritingStream',{id:'fixture',tab:{id:92,url:'https://github.com/fixture/repository/issues/1'},frameId:0,documentId:'public-change-doc',url:'https://github.com/fixture/repository/issues/1'});
+        external.onConnect.forEach(listener=>listener(port));port.onMessage.fire({...writingRequest,requestId:'combined-change',intent:'translate',draft:'English reply',instruction:'',language:'zh-Hans'});
+        await untilFixture(()=>external.requests.length===1);
+        external.config.apiKeys.deepseek=['fixture-secret-next'];external.config.modelThinking.deepseek['fixture-model']=true;notifyConfiguration();
+        expect(external.requests[0].signal.aborted).toBe(true);await untilFixture(()=>port.postMessage.mock.calls.some(([value])=>value.type==='result'));
+        const response=port.postMessage.mock.calls.find(([value])=>value.type==='result')![0].response;
+        expect(response.cancelled).toBe(true);expect(response).not.toHaveProperty('reason');expect(JSON.stringify(response)).not.toContain('fixture-secret');
+    });
+    it.each(['once','ABA'])('私有变更取消期间同步发生公开模型 %s 变化时不发送旧恢复信号', async mode => {
+        configureBackground();external.config.apiKeys.deepseek=['fixture-secret-first'];external.config.modelThinking.deepseek={'fixture-model':false};installBackground('writing');
+        const port=makePort('fluentReadWritingStream',{id:'fixture',tab:{id:92,url:'https://github.com/fixture/repository/issues/1'},frameId:0,documentId:'reentrant-change-doc',url:'https://github.com/fixture/repository/issues/1'});
+        external.onConnect.forEach(listener=>listener(port));port.onMessage.fire({...writingRequest,requestId:'reentrant-change',intent:'translate',draft:'English reply',instruction:'',language:'zh-Hans'});
+        await untilFixture(()=>external.requests.length===1);
+        external.requests[0].signal.addEventListener('abort',()=>{external.config.modelThinking.deepseek['fixture-model']=true;notifyConfiguration();
+            if(mode==='ABA'){external.config.modelThinking.deepseek['fixture-model']=false;notifyConfiguration();}},{once:true});
+        external.config.apiKeys.deepseek=['fixture-secret-next'];notifyConfiguration();
+        await untilFixture(()=>port.postMessage.mock.calls.some(([value])=>value.type==='result'));
+        const response=port.postMessage.mock.calls.find(([value])=>value.type==='result')![0].response;
+        expect(response.cancelled).toBe(true);expect(response).not.toHaveProperty('reason');
+    });
+    it('先变更其他服务代理后，私有认证变化仍能识别并恢复', async () => {
+        configureBackground();external.config.apiKeys.deepseek=['fixture-secret-first'];installBackground('writing');
+        const port=makePort('fluentReadWritingStream',{id:'fixture',tab:{id:92,url:'https://github.com/fixture/repository/issues/1'},frameId:0,documentId:'other-proxy-doc',url:'https://github.com/fixture/repository/issues/1'});
+        external.onConnect.forEach(listener=>listener(port));port.onMessage.fire({...writingRequest,requestId:'other-proxy',intent:'translate',draft:'English reply',instruction:'',language:'zh-Hans'});
+        await untilFixture(()=>external.requests.length===1);
+        external.config.proxy.openai='https://unused.example.test';notifyConfiguration();expect(external.requests[0].signal.aborted).toBe(false);
+        external.config.apiKeys.deepseek=['fixture-secret-next'];notifyConfiguration();
+        await untilFixture(()=>port.postMessage.mock.calls.some(([value])=>value.type==='result'));
+        expect(port.postMessage).toHaveBeenCalledWith(expect.objectContaining({response:expect.objectContaining({reason:'configuration-changed'})}));
+    });
+    it('私有取消同步重入其他服务代理 ABA 时不发旧恢复信号', async () => {
+        configureBackground();external.config.apiKeys.deepseek=['fixture-secret-first'];installBackground('writing');
+        const port=makePort('fluentReadWritingStream',{id:'fixture',tab:{id:92,url:'https://github.com/fixture/repository/issues/1'},frameId:0,documentId:'other-proxy-aba-doc',url:'https://github.com/fixture/repository/issues/1'});
+        external.onConnect.forEach(listener=>listener(port));port.onMessage.fire({...writingRequest,requestId:'other-proxy-aba',intent:'translate',draft:'English reply',instruction:'',language:'zh-Hans'});
+        await untilFixture(()=>external.requests.length===1);const original=external.config.proxy.openai;
+        external.requests[0].signal.addEventListener('abort',()=>{external.config.proxy.openai='https://unused.example.test';notifyConfiguration();external.config.proxy.openai=original;notifyConfiguration();},{once:true});
+        external.config.apiKeys.deepseek=['fixture-secret-next'];notifyConfiguration();
+        await untilFixture(()=>port.postMessage.mock.calls.some(([value])=>value.type==='result'));
+        expect(port.postMessage.mock.calls.find(([value])=>value.type==='result')![0].response).not.toHaveProperty('reason');
+    });
+    it('私有取消期间仅有计数回声时仍发送安全恢复信号', async () => {
+        configureBackground();external.config.apiKeys.deepseek=['fixture-secret-first'];installBackground('writing');
+        const port=makePort('fluentReadWritingStream',{id:'fixture',tab:{id:92,url:'https://github.com/fixture/repository/issues/1'},frameId:0,documentId:'count-echo-doc',url:'https://github.com/fixture/repository/issues/1'});
+        external.onConnect.forEach(listener=>listener(port));port.onMessage.fire({...writingRequest,requestId:'count-echo',intent:'translate',draft:'English reply',instruction:'',language:'zh-Hans'});
+        await untilFixture(()=>external.requests.length===1);
+        external.requests[0].signal.addEventListener('abort',()=>{external.config.count+=1;notifyConfiguration();},{once:true});
+        external.config.apiKeys.deepseek=['fixture-secret-next'];notifyConfiguration();
+        await untilFixture(()=>port.postMessage.mock.calls.some(([value])=>value.type==='result'));
+        expect(port.postMessage).toHaveBeenCalledWith(expect.objectContaining({response:expect.objectContaining({reason:'configuration-changed'})}));
+    });
     it('reading cancels changed active custom headers and the next real HTTP request uses the new header', () => proveEffectiveChange('reading', headerSetup, headerChange, request => expect(request.headers.get('x-fixture')).toBe('fixture-header-first'), request => expect(request.headers.get('x-fixture')).toBe('fixture-header-next')));
     it('writing cancels changed active custom headers and the next real HTTP request uses the new header', () => proveEffectiveChange('writing', headerSetup, headerChange, request => expect(request.headers.get('x-fixture')).toBe('fixture-header-first'), request => expect(request.headers.get('x-fixture')).toBe('fixture-header-next')));
     it('reading cancels a changed effective apiKeys row and the next request uses that key', () => proveEffectiveChange('reading', keySetup, keyChange, request => expect(request.headers.get('authorization')).toBe('Bearer fixture-secret-first'), request => expect(request.headers.get('authorization')).toBe('Bearer fixture-secret-next')));
@@ -555,6 +639,62 @@ function writingRequestAt(index=external.ports.length-1) {const port=external.po
 async function writingFailure(error:string,cancelled=false) {const {port,request}=writingRequestAt();port.onMessage.fire({type:'result',requestId:request.requestId,response:{success:false,error,cancelled}});await flush();}
 
 describe('audit49B WritingPanel actual drafting workflows',()=>{
+    it('私有凭据变化后真实页面端口与后台重新请求当前对照，回执不暴露密钥',async()=>{
+        configureBackground();external.config.apiKeys.deepseek=['fixture-secret-first'];
+        external.config.writing={...external.config.writing,language:'en',referenceLanguage:'zh-Hans'};
+        installBackground('writing');const backgroundListener=[...external.subscribers][0];const sent: unknown[]=[];
+        external.connect.mockImplementation(({name})=>{
+            const client=makePort(name),server=makePort(name,{id:'fixture',tab:{id:92,url:'https://github.com/fixture/repository/issues/1'},frameId:0,documentId:'panel-doc',url:'https://github.com/fixture/repository/issues/1'});
+            client.postMessage.mockImplementation(value=>queueMicrotask(()=>server.onMessage.fire(value)));
+            server.postMessage.mockImplementation(value=>{sent.push(value);queueMicrotask(()=>client.onMessage.fire(value));});
+            client.disconnect.mockImplementation(()=>queueMicrotask(()=>server.onDisconnect.fire()));
+            external.ports.push(client);external.onConnect.forEach(listener=>listener(server));return client;
+        });
+        const {host}=mount(WritingPanel,{active:true,sessionKey:1,initialDraft:'Source'});await flush();
+        await untilFixture(()=>external.requests.length===1);external.requests[0].complete();
+        await untilFixture(()=>external.requests.length===2);const old=external.requests[1];
+        expect(old.headers.get('authorization')).toBe('Bearer fixture-secret-first');
+        external.config.apiKeys.deepseek=['fixture-secret-next'];backgroundListener(external.config);
+        expect(old.signal.aborted).toBe(true);await untilFixture(()=>external.requests.length===3);
+        expect(external.requests[2].headers.get('authorization')).toBe('Bearer fixture-secret-next');
+        external.requests[2].complete();await untilFixture(()=>host.querySelector('[data-writing-reference]')?.textContent?.includes('Finished') === true);
+        expect(external.requests).toHaveLength(3);expect(JSON.stringify(sent)).not.toContain('fixture-secret');
+    });
+    it('私有变更回执到达后同栈关闭或公开模型变化，不重启过期对照',async()=>{
+        external.config.writing.language='en';external.config.writing.referenceLanguage='zh-Hans';external.config.model.deepseek='fixture-model';
+        const {host,props}=mount(WritingPanel,{active:true,sessionKey:1,initialDraft:'Source'});await flush();await writingComplete('English reply');
+        const first=writingRequestAt();first.port.onMessage.fire({type:'result',requestId:first.request.requestId,response:{success:false,error:'已停止生成',cancelled:true,reason:'configuration-changed'}});
+        props.active=false;await flush();expect(external.ports).toHaveLength(2);
+        props.active=true;await flush();expect(external.ports).toHaveLength(3);
+        const second=writingRequestAt();second.port.onMessage.fire({type:'result',requestId:second.request.requestId,response:{success:false,error:'已停止生成',cancelled:true,reason:'configuration-changed'}});
+        external.config.modelThinking={...external.config.modelThinking,deepseek:{'fixture-model':true}};
+        external.subscribers.forEach(listener=>listener({...external.config}));await flush();
+        expect(external.ports).toHaveLength(4);await writingComplete('当前对照');expect(host.querySelector('[data-writing-reference]')?.textContent).toContain('当前对照');
+    });
+    it('有效模型思考设置变化后重新请求对照，迟到旧结果不能覆盖新对照',async()=>{
+        external.config.writing.language='en';external.config.writing.referenceLanguage='zh-Hans';
+        external.config.model.deepseek='fixture-model';external.config.modelThinking.deepseek={'fixture-model':false};
+        const {host}=mount(WritingPanel,{active:true,sessionKey:1,initialDraft:'Source'});await flush();await writingComplete('English reply');
+        const {port:old,request}=writingRequestAt();expect(request.intent).toBe('translate');
+        external.config.modelThinking={...external.config.modelThinking,deepseek:{'fixture-model':true}};
+        external.subscribers.forEach(listener=>listener({...external.config}));await flush();
+        expect(old.disconnect).toHaveBeenCalledOnce();expect(external.ports).toHaveLength(3);
+        old.onMessage.fire({type:'result',requestId:request.requestId,response:{...result,text:'obsolete'}});await flush();
+        expect(host.querySelector('[data-writing-reference]')?.textContent).not.toContain('obsolete');
+        await writingComplete('新对照');expect(host.querySelector('[data-writing-reference]')?.textContent).toContain('新对照');
+    });
+    it('已完成对照只因当前模型的有效思考设置改变而重新生成',async()=>{
+        external.config.writing.language='en';external.config.writing.referenceLanguage='zh-Hans';
+        external.config.model.deepseek='fixture-model';external.config.modelThinking.deepseek={'fixture-model':false};
+        const {host}=mount(WritingPanel,{active:true,sessionKey:1,initialDraft:'Source'});await flush();await writingComplete('English reply');await writingComplete('旧对照');
+        external.config.modelThinking={...external.config.modelThinking,deepseek:{'fixture-model':false,'other-model':true}};
+        external.subscribers.forEach(listener=>listener({...external.config}));await flush();
+        expect(external.ports).toHaveLength(2);expect(host.querySelector('[data-writing-reference]')?.textContent).toContain('旧对照');
+        external.config.modelThinking={...external.config.modelThinking,deepseek:{'fixture-model':true,'other-model':true}};
+        external.subscribers.forEach(listener=>listener({...external.config}));await flush();
+        expect(external.ports).toHaveLength(3);expect(host.querySelector('[data-writing-reference]')?.textContent).not.toContain('旧对照');
+        await writingComplete('新对照');expect(host.querySelector('[data-writing-reference]')?.textContent).toContain('新对照');
+    });
     it('restores edited output, instructions, versions and unconfirmed style after hiding the same session', async () => {
         const {host, props} = mount(WritingPanel, {active: true, sessionKey: 1, initialDraft: 'Source'});
         await flush(); await writingComplete('First reply');

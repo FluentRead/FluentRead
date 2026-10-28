@@ -2,7 +2,7 @@
  * @file src/services/config/webDavBackup.ts
  * 文件职责：编排 WebDAV 连接管理与共用配置云备份事务。
  * 主要内容：只读连接测试、带修订号的保存与清除、同步与删除预览的页面所有权、后台重启恢复；
- * 连接密码单独保存在本机，切换服务器或账号会使旧预览和共同基线失效。
+ * 连接密码单独保存在本机，切换服务器或账号会使旧预览和共同基线失效；关闭页面可取消排队中或正在读取的预览。
  * 模块边界：通过端口调用 WebDAV 和配置仓库，不直接访问浏览器，不向 UI 返回密码。
  */
 import {CloudSyncError} from '@/src/core/config/cloudSync';
@@ -19,15 +19,28 @@ export function createWebDavBackup(ports: WebDavBackupPorts) {
     const availability = () => ({available: true, reason: ''});
     const sync = createRemoteConfigSync({...ports, auth: {
         availability,
-        async open(interactive = false) {
+        async open(interactive = false, signal?: AbortSignal) {
             const connection = await ports.connections.read();
+            signal?.throwIfAborted();
             if (!connection) throw new WebDavError('missing');
-            if (interactive) await ports.api.test(connection);
+            if (interactive) await ports.api.test(connection, signal);
+            signal?.throwIfAborted();
             return createWebDavSession(connection, ports.connections.read);
         },
         async disconnect() {},
     }});
     let queue: Promise<unknown> = Promise.resolve();
+    const pendingPreviews = new Set<{tabId?: number; clientId?: string; cancelled: boolean}>();
+    function preview<T>(tabId: number | undefined, clientId: string | undefined, operation: () => Promise<T>): Promise<T> {
+        const owner = {tabId, clientId, cancelled: false}; pendingPreviews.add(owner);
+        return exclusive(() => {
+            if (owner.cancelled) throw new DOMException('Preview cancelled', 'AbortError');
+            return operation();
+        }).finally(() => {pendingPreviews.delete(owner);});
+    }
+    function cancelPreviews(tabId?: number, clientId?: string) {
+        for (const owner of pendingPreviews) if ((tabId === undefined || owner.tabId === tabId) && (clientId === undefined || owner.clientId === clientId)) owner.cancelled = true;
+    }
     function exclusive<T>(operation: () => Promise<T>): Promise<T> {
         const result = queue.then(operation);
         queue = result.catch(() => undefined);
@@ -67,11 +80,11 @@ export function createWebDavBackup(ports: WebDavBackupPorts) {
             await ports.connections.remove();
             await ports.removeState();
         }),
-        prepare: (...args: Parameters<typeof sync.prepare>) => exclusive(() => sync.prepare(...args)),
-        prepareDelete: (...args: Parameters<typeof sync.prepareDelete>) => exclusive(() => sync.prepareDelete(...args)),
+        prepare: (...args: Parameters<typeof sync.prepare>) => preview(args[1], args[2], () => sync.prepare(...args)),
+        prepareDelete: (...args: Parameters<typeof sync.prepareDelete>) => preview(args[0], args[1], () => sync.prepareDelete(...args)),
         commitDelete: (...args: Parameters<typeof sync.commitDelete>) => exclusive(() => sync.commitDelete(...args)),
         commit: (...args: Parameters<typeof sync.commit>) => exclusive(() => sync.commit(...args)),
-        cancel: (...args: Parameters<typeof sync.cancel>) => exclusive(() => sync.cancel(...args)),
-        cancelTab: (...args: Parameters<typeof sync.cancelTab>) => exclusive(() => sync.cancelTab(...args)),
+        cancel: (...args: Parameters<typeof sync.cancel>) => {if (args[0] === undefined) cancelPreviews(args[1], args[2]); return sync.cancel(...args);},
+        cancelTab: (...args: Parameters<typeof sync.cancelTab>) => {cancelPreviews(args[0]); return sync.cancelTab(...args);},
     };
 }

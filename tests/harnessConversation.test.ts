@@ -18,6 +18,13 @@ const tick = async () => {for (let index = 0; index < 8; index++) await Promise.
 
 describe('Harness persistent conversation coordination', () => {
     afterEach(() => vi.useRealTimers());
+    it('会话的选文、追问和模型输入按预算截断时不产生半个代理项', async () => {
+        const {conversation, store, runtime} = setup();
+        await conversation.run(request({selection: {text: `${'a'.repeat(4095)}😀tail`, context: '', sentence: ''}, question: `${'q'.repeat(999)}😀tail`}), new AbortController().signal);
+        expect(store.upsertTurn.mock.calls[0][0].text).toBe('a'.repeat(4095));
+        expect(store.upsertTurn.mock.calls[0][1].question).toBe('q'.repeat(999));
+        expect(runtime.run.mock.calls[0][0].selection.text).toBe('a'.repeat(4095));
+    });
     it('saves a streaming turn then final response and reports its session', async () => {
         const {conversation, store, runtime} = setup();
         const progress = vi.fn();

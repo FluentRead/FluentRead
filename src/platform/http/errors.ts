@@ -9,8 +9,11 @@
 type HttpStatus = Pick<Response, 'status' | 'statusText'> & {headers?: Pick<Headers, 'get'>};
 type JsonResponse = Pick<Response, 'json'>;
 import {isExplicitImageInputRejection} from '@/src/core/config/visionProbe';
+import {abortErrorFromSignal, cancelResponseReader} from './runtime';
 
 const MAX_PROVIDER_CODE_LENGTH = 16;
+const MAX_IMAGE_ERROR_BYTES = 32_768;
+const IMAGE_ERROR_READ_TIMEOUT_MS = 1000;
 
 /**
  * 构造不回显第三方响应正文的 HTTP 错误。
@@ -35,13 +38,42 @@ export function createHttpStatusError(response: HttpStatus, label = '请求失�
 export async function createImageInputHttpError(response: Response, label = '请求失败'): Promise<Error> {
     const error = createHttpStatusError(response, label);
     if (response.status !== 400 && response.status !== 422) return error;
+    let reader: ReadableStreamDefaultReader<Uint8Array> | undefined;
+    let cancelTimer: (() => void) | undefined;
     try {
-        const body = await response.clone().json();
-        const detail = body?.error?.message ?? body?.message;
+        // 原始响应仍可能由 SDK 读取；只检查克隆分支，限制未知错误正文的体积和等待时间。
+        const body = response.clone().body;
+        if (!body) return error;
+        reader = body.getReader();
+        const current = reader;
+        const collect = async (): Promise<string | undefined> => {
+            const decoder = new TextDecoder(); let bytes = 0, text = '';
+            while (true) {
+                const part = await current.read();
+                if (part.done) return text + decoder.decode();
+                bytes += part.value.byteLength;
+                if (bytes > MAX_IMAGE_ERROR_BYTES) return undefined;
+                text += decoder.decode(part.value, {stream: true});
+            }
+        };
+        const text = await Promise.race([
+            collect(),
+            new Promise<undefined>(resolve => {
+                const timer = setTimeout(() => resolve(undefined), IMAGE_ERROR_READ_TIMEOUT_MS);
+                cancelTimer = () => clearTimeout(timer);
+            }),
+        ]);
+        if (text === undefined) return error;
+        const parsed = JSON.parse(text);
+        const detail = parsed?.error?.message ?? parsed?.message;
         if (typeof detail === 'string' && detail.length <= 2048 && isExplicitImageInputRejection(response.status, detail)) {
             Object.assign(error, {imageInputUnsupported: true});
         }
-    } catch { /* 非 JSON 或未知错误只保留 HTTP 状态，不能认定模型没有视觉能力。 */ }
+    } catch { /* 非 JSON、过大或无法读取时只保留状态，不能认定模型没有视觉能力。 */ }
+    finally {
+        cancelTimer?.();
+        if (reader) cancelResponseReader(reader);
+    }
     return error;
 }
 
@@ -68,14 +100,17 @@ export function createProviderCodeError(label: string, value: unknown): Error {
 /**
  * 解析第三方 JSON，但不传播 parser 自带的输入预览。
  * V8 的 SyntaxError 可能包含损坏 JSON 的片段，其中可能有原文或代理诊断。
+ * 仅明确传入的 signal 已取消时保留调用方原因；不提前结束或释放不合作的读取。
  */
 export async function readJsonResponse<T = unknown>(
     response: JsonResponse,
     label = '返回的不是有效 JSON',
+    signal?: AbortSignal,
 ): Promise<T> {
     try {
         return await response.json() as T;
     } catch {
+        if (signal?.aborted) throw abortErrorFromSignal(signal);
         throw new Error(label);
     }
 }

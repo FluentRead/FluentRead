@@ -46,7 +46,7 @@ import {splitLocalTranslationText, assertLocalTranslationOutput, hunyuanTranslat
 import {isLikelyPageContextLeak, isDefinitePageContextLeak} from '@/src/core/translation/prompts';
 import {createLocalTranslationBackgroundRuntime} from '@/src/features/local-translation/background/runtime';
 import {createLocalTranslationDownloadManager} from '@/src/features/local-translation/offscreen/downloads';
-import {artifactUrl, getTranslationArtifacts, downloadTranslationArtifact, artifactComplete, translationArtifactBlob, type TranslationArtifact} from '@/src/features/local-translation/offscreen/artifactStore';
+import {artifactUrl, getTranslationArtifacts, downloadTranslationArtifact, artifactComplete, translationArtifactBlob, MODEL_CHUNK_SIZE, type TranslationArtifact} from '@/src/features/local-translation/offscreen/artifactStore';
 import {LOCAL_TRANSLATION_MODEL_IDS as ids} from '@/src/core/config/localTranslation';
 import {createImageOcrLanguageRepository} from '@/src/features/image-translation/background/ocrLanguageRepository';
 import {IMAGE_OCR_LANGUAGE_STATE_KEY} from '@/src/features/image-translation/ocrLanguages';
@@ -75,6 +75,10 @@ let onMatch: ((key: string) => void | Promise<void>) | undefined;
 const keyOf = (key: RequestInfo | URL) => typeof key === 'string' ? key : key instanceof URL ? key.href : key.url;
 const cachePort = {
     async match(input: RequestInfo | URL) {const key = keyOf(input); await onMatch?.(key); return entries.get(key)?.clone();},
+    async keys(input: RequestInfo | URL, options?: {ignoreSearch?: boolean}) {
+        const key = keyOf(input);
+        return [...entries.keys()].filter(value => options?.ignoreSearch ? value.split('?')[0] === key.split('?')[0] : value === key).map(value => new Request(value));
+    },
     async put(input: RequestInfo | URL, value: Response) {
         const key = keyOf(input);
         if (failStateWrite && key.endsWith('/local-translation-downloads-v2')) {failStateWrite = false; throw new Error('controlled state disk failure');}
@@ -164,7 +168,10 @@ describe('audit 49 E actual translation and cache entries', () => {
             if (phase === 'paused' || phase === 'ready') {if (++terminalWrites === 2) terminal.resolve();}
         }});
         await manager.status(); const files = getTranslationArtifacts(ids.opusZhEn);
-        for (const file of files) entries.set(artifactUrl(file) + '?fluent-read-verified=' + file.sha256, new Response('verified fixture receipt'));
+        for (const file of files) {
+            entries.set(artifactUrl(file) + '?fluent-read-verified=' + file.sha256, new Response('verified fixture receipt'));
+            for (let index = 0; index < Math.ceil(file.size / MODEL_CHUNK_SIZE); index++) entries.set(`${artifactUrl(file)}?fluent-read-part=${index}`, new Response());
+        }
         const last = files[files.length - 1]!; let paused = false;
         onMatch = async key => {if (!paused && key === artifactUrl(last) + '?fluent-read-verified=' + last.sha256) {paused = true; await manager.pause(ids.opusZhEn);}};
         await manager.start(ids.opusZhEn); await terminal.promise;

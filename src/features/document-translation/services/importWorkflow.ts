@@ -1,7 +1,7 @@
 /**
  * @file src/features/document-translation/services/importWorkflow.ts
  * 文件职责：拥有文档文件、在线 PDF 与本地历史重新打开的导入生命周期。
- * 主要内容：在同一取消代次中校验格式和大小、读取格式、恢复 OCR 与人工校订历史以及当前任务的重译缓存策略，再把完整任务交给页面；取消后丢弃迟到读取，失败文件独立入队，不改写已有文档的译文或翻译错误。
+ * 主要内容：在同一取消代次中校验格式和大小、读取格式、恢复 OCR 与人工校订历史以及当前任务的重译缓存策略；历史不可读取时标记任务以阻止旧记录被自动覆盖；取消后丢弃迟到读取，失败文件独立入队，不改写已有文档的译文或翻译错误。
  * 模块边界：不持有任务队列、当前选择、进度或历史提交副本；读取、任务提交和展示均经显式端口，历史保存仍由页面的 historyCommitter 负责。
  */
 import {getDocumentFormat, getDocumentMaxBytes, type ParsedDocument} from '../core/document';
@@ -13,7 +13,7 @@ import type {DocumentQueueItem} from '../ui/useDocumentTasks';
 export interface DocumentImportPorts {
     parseFile: typeof parseDocumentFile;
     fetchPdf: typeof fetchOnlinePdf;
-    history: Pick<DocumentHistory, 'load'> | null;
+    history: Pick<DocumentHistory, 'loadChecked'> | null;
     parsedVersion: number;
     createTask(file: File, sourceUrl?: string): DocumentQueueItem;
     appendTask(task: DocumentQueueItem, select: boolean): void;
@@ -23,6 +23,7 @@ export interface DocumentImportPorts {
     onReadProgress(progress: {completed: number; total: number}): void;
     onDownloadProgress(progress: PdfDownloadProgress): void;
     onOnlineError(error: unknown): void;
+    onHistoryUnavailable(): void;
     onFinished(): void;
     onHistoryMissing(): Promise<void>;
 }
@@ -71,14 +72,19 @@ export function createDocumentImportWorkflow(ports: DocumentImportPorts) {
                     if (!operation.current()) return;
                     const historyId = await documentHistoryId(bytes);
                     if (!operation.current()) return;
-                    const saved = historyId ? await ports.history.load(historyId) : null;
+                    const result = historyId ? await ports.history.loadChecked(historyId) : {status: 'unavailable' as const};
                     if (!operation.current()) return;
                     Object.assign(task, {historyId, bytes, mimeType: file.type});
+                    if (!historyId || result.status === 'unavailable') task.historyReadUnavailable = true;
+                    const saved = result.status === 'ok' ? result.record : null;
+                    if (result.status === 'ok') task.historyVersion = result.version;
                     if (saved) {
                         const restored = restoreDocumentHistoryPdfOcr(saved, parsed);
                         task.document = restored.document;
                         Object.assign(task, restoreDocumentHistoryRevisions(saved, restored.document, ports.parsedVersion, restored.segmentOrigins),
                             {fingerprint: saved.fingerprint, bypassCache: saved.bypassCache === true});
+                        // 同版本记录刚被读取，未经编辑不应立刻生成新写入身份干扰其他页面。
+                        if (saved.parsedVersion === ports.parsedVersion) task.savedRevision = 0;
                     }
                 }
             } catch (error) {
@@ -118,14 +124,17 @@ export function createDocumentImportWorkflow(ports: DocumentImportPorts) {
         }),
         openHistory: (id: string) => run(async operation => {
             ports.onPhase('reading');
-            const record = await ports.history?.load(id);
+            const result = await ports.history?.loadChecked(id);
             if (!operation.current()) return;
+            if (result?.status === 'unavailable') {ports.onHistoryUnavailable();return;}
+            if (!result || result.status !== 'ok') {await ports.onHistoryMissing();return;}
+            const record = result.record;
             if (!record) {await ports.onHistoryMissing();return;}
             const snapshot = record.parsedVersion === ports.parsedVersion ? record.parsed as ParsedDocument | undefined : undefined;
             const file = new File([record.bytes], record.name, {type: record.mimeType});
             if (!snapshot?.segments) {await readFiles([file], record.sourceUrl, operation);return;}
             const task = ports.createTask(file, record.sourceUrl);
-            Object.assign(task, {document: snapshot, historyId: record.id, bytes: record.bytes, mimeType: record.mimeType,
+            Object.assign(task, {document: snapshot, historyId: record.id, historyVersion: result.version, bytes: record.bytes, mimeType: record.mimeType,
                 ...restoreDocumentHistoryRevisions(record, snapshot, ports.parsedVersion), fingerprint: record.fingerprint,
                 bypassCache: record.bypassCache === true,
                 savedRevision: 0});

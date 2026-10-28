@@ -118,7 +118,7 @@ export function createContentHotkeyRuntime(isSiteDisabled: () => boolean,
         ];
         const discardUnavailableGesture = (event: KeyboardEvent): boolean => {
             if (!config.on || isSiteDisabled()
-                || (isMac && (event.metaKey || normalizeHotkeyEventKey(event) === 'meta'))) {
+                || event.metaKey || normalizeHotkeyEventKey(event) === 'meta') {
                 resetKeyboardGesture();
                 return true;
             }
@@ -148,7 +148,6 @@ export function createContentHotkeyRuntime(isSiteDisabled: () => boolean,
 
             if (event.altKey) hotkeysPressed.add('alt');
             if (event.ctrlKey) hotkeysPressed.add('control');
-            if (event.metaKey && !isMac) hotkeysPressed.add('control');
             if (event.shiftKey) hotkeysPressed.add('shift');
             addPressedHotkeyEventKey(event, hotkeysPressed, hotkeyByCode);
 
@@ -197,7 +196,6 @@ export function createContentHotkeyRuntime(isSiteDisabled: () => boolean,
             deletePressedHotkeyEventKey(event, hotkeysPressed, hotkeyByCode);
             if (!event.altKey) hotkeysPressed.delete('alt');
             if (!event.ctrlKey) hotkeysPressed.delete('control');
-            if (!event.metaKey) hotkeysPressed.delete('control');
             if (!event.shiftKey) hotkeysPressed.delete('shift');
         }, {signal, capture: true});
 

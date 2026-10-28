@@ -45,6 +45,7 @@ const EXPECTED_PROVIDER_FILES = [
     'bilibili-free.ts',
     'gemini.ts',
     'google.ts',
+    'googleErrorBody.ts',
     'googleRequestGate.ts',
     'hunyuan-translation.ts',
     'local-translation.ts',

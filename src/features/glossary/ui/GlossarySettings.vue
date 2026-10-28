@@ -8,6 +8,7 @@
   <div class="fluentread-glossary" data-testid="glossary-settings" data-i18n-ignore>
     <FeatureEnableCard :model-value="enabled" :title="t('glossary.enable')" :description="t('glossary.simpleIntro')" :disabled="busy || !ready" @update:model-value="setEnabled" />
     <p v-if="error" class="glossary-error glossary-notice" role="alert">{{ error }}</p>
+    <p v-if="exportError" class="glossary-error glossary-notice" role="alert">{{ t('glossary.exportFailed') }}</p>
 
     <div>
       <div class="glossary-toolbar glossary-main-toolbar">
@@ -195,6 +196,8 @@ const ready = ref(false);
 const busy = ref(false);
 const saved = ref(false);
 const error = ref('');
+const exportError = ref(false);
+let exportRevision = 0;
 const viewRevision = ref(0);
 const query = ref('');
 const entryPage = ref(0);
@@ -477,10 +480,16 @@ function downloadLibrary(): void {
   if (!selected.value) return;
   const format = exportFormat.value.toLowerCase() as GlossaryImportFormat;
   const mime = format === 'json' ? 'application/json' : format === 'tsv' ? 'text/tab-separated-values' : 'text/csv';
-  const url = URL.createObjectURL(new Blob([exportGlossary(selected.value, format)], {type: `${mime};charset=utf-8`}));
-  const anchor = document.createElement('a'); anchor.href = url;
-  anchor.download = `${selected.value.name.replace(/[\\/:*?"<>|]/gu, '_')}.${format}`;
-  anchor.click(); URL.revokeObjectURL(url);
+  const revision = ++exportRevision;
+  exportError.value = false;
+  let url: string | undefined;
+  try {
+    url = URL.createObjectURL(new Blob([exportGlossary(selected.value, format)], {type: `${mime};charset=utf-8`}));
+    const anchor = document.createElement('a'); anchor.href = url;
+    anchor.download = `${selected.value.name.replace(/[\\/:*?"<>|]/gu, '_')}.${format}`;
+    anchor.click();
+  } catch { if (!disposed && active.value && revision === exportRevision) exportError.value = true; }
+  finally { if (url) { try {URL.revokeObjectURL(url);} catch { /* 浏览器清理失败不覆盖导出结果。 */ } } }
 }
 
 const previewText = ref('');

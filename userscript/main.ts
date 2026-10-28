@@ -1,6 +1,9 @@
 import {setRuntimeFetch} from '@/src/platform/http/runtime';
 import {installShadowAndRouteBridge} from '@/src/platform/shadow-ui/pageBridge';
+import {showPageNotice} from '@/src/features/page-notice/public';
+import {normalizeUiLanguage, translate} from '@/src/core/i18n';
 import browser, {resetPlatformMessageHandler, setPlatformMessageHandler} from './browser';
+import {restoreUserscriptIcon} from './iconData';
 import {createUserscriptContentContext} from './context';
 import {userscriptFetch} from './http';
 import {ensureUserscriptConfig} from './initialize';
@@ -40,6 +43,7 @@ function registerMenu(label: string, listener: () => void): void {
 async function bootstrap(): Promise<void> {
     if (globalThis.__fluentReadUserscriptBootstrapped) return;
     globalThis.__fluentReadUserscriptBootstrapped = true;
+    if (globalThis.__FLUENTREAD_ICON_DATA__) globalThis.__FLUENTREAD_ICON_DATA__ = restoreUserscriptIcon(globalThis.__FLUENTREAD_ICON_DATA__);
 
     // 独立设置标签页只挂载设置 UI；不把主世界桥或内容翻译装进底层网页。
     const settingsPage = __FLUENTREAD_FULL_OPTIONS__ && isUserscriptSettingsUrl(globalThis.location?.href || '');
@@ -146,20 +150,16 @@ async function bootstrap(): Promise<void> {
             if (translationModule.isFullPageTranslationActive()) translationModule.restoreOriginalContent();
             else void translationModule.autoTranslateEnglishPage();
         });
+        let menuToggleRevision = 0;
         registerMenu('流畅阅读：启用 / 暂停', () => {
-            const enabled = !configModule.config.on;
-            configModule.config.on = enabled;
-            void configModule.saveConfig().then(async () => {
-                await browser.tabs.sendMessage(1, {
-                    type: 'toggleFloatingBall',
-                    isEnabled: enabled && !configModule.config.disableFloatingBall,
+            const revision = ++menuToggleRevision;
+            // 通过权威 patch 通知页面生命周期；不能把临时暂停写成各功能偏好。
+            void configModule.requestConfigPatch({on: !configModule.config.on})
+                .catch(() => {
+                    if (revision !== menuToggleRevision || ctx.isInvalid) return;
+                    console.error('[FluentRead userscript] 启停设置结果未确认，请检查设置。');
+                    try {showPageNotice(translate('userscript.toggleUnconfirmed', normalizeUiLanguage(configModule.config.uiLanguage)), 'error', {key: 'userscript-toggle'});} catch { /* 页面通知不可用时保留固定诊断。 */ }
                 });
-                await browser.tabs.sendMessage(1, {
-                    type: 'updateSelectionTranslatorMode',
-                    mode: enabled ? configModule.config.selectionTranslatorMode : 'disabled',
-                });
-                if (!enabled) translationModule.restoreOriginalContent();
-            });
         });
         registerMenu('流畅阅读：清空翻译缓存', () => {
             void browser.runtime.sendMessage({type: 'clearTranslationCache'});

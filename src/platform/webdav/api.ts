@@ -7,7 +7,7 @@
  * 禁止跟随重定向、携带浏览器 Cookie 或返回服务器异常正文，防止连接凭据流向其他地址。
  * 模块边界：只消费后台会话与密文，不读取配置或保存密码；冲突合并由云备份服务处理。
  */
-import {cancelResponseReader, cancelUnreadResponseBody} from '@/src/platform/http/runtime';
+import {cancelResponseReader, cancelUnreadResponseBody, createRuntimeAbortContext} from '@/src/platform/http/runtime';
 import {canMutateCloudFile, strongCloudEtag, type CloudSyncFile, type CloudSyncRemote} from '@/src/core/config/cloudSync';
 import {parseWebDavProperties} from './properties';
 import {GOOGLE_DRIVE_MAX_BYTES} from '@/src/platform/google-drive/constants';
@@ -52,30 +52,31 @@ export function createWebDavApi(fetcher: typeof fetch, options: {timeoutMs?: num
         return new TextDecoder('utf-8', {fatal: true}).decode(bytes);
     }
     async function request<T>(session: WebDavSession, url: string, init: RequestInit, consume: (response: Response) => Promise<T>): Promise<T> {
+        init.signal?.throwIfAborted();
         return session.request(async authorization => {
-            const controller = new AbortController();
-            const timer = setTimeout(() => controller.abort(), options.timeoutMs ?? 30_000);
+            init.signal?.throwIfAborted();
+            const context = createRuntimeAbortContext(options.timeoutMs ?? 30_000, init.signal ?? undefined);
             return (async () => {
                 let response: Response | undefined;
                 let requestError: WebDavError | undefined;
                 try {
-                    response = await fetcher(url, {...init, headers: {...init.headers, Authorization: authorization}, signal: controller.signal, redirect: 'error', credentials: 'omit', cache: 'no-store', referrerPolicy: 'no-referrer'});
+                    response = await fetcher(url, {...init, headers: {...init.headers, Authorization: authorization}, signal: context.signal, redirect: 'error', credentials: 'omit', cache: 'no-store', referrerPolicy: 'no-referrer'});
                     return await consume(response);
                 } catch (error) {
                     requestError = error instanceof WebDavError
                         ? error
-                        : new WebDavError(controller.signal.aborted ? 'timeout' : 'network');
+                        : new WebDavError(context.signal.aborted ? 'timeout' : 'network');
                 } finally {
                     if (response) cancelUnreadResponseBody(response);
                 }
                 throw requestError;
-            })().finally(() => clearTimeout(timer));
+            })().finally(context.cleanup);
         });
     }
     const directory = (session: WebDavSession) => new URL(WEBDAV_BACKUP_DIRECTORY, session.connection.url).href;
     const filename = (session: WebDavSession) => new URL(WEBDAV_BACKUP_FILE, directory(session)).href;
-    async function checkDirectory(session: WebDavSession, url: string, allowMissing = false): Promise<boolean> {
-        return request(session, url, {method: 'PROPFIND', headers: {Depth: '0', 'Content-Type': 'application/xml; charset=utf-8'}, body: '<?xml version="1.0"?><d:propfind xmlns:d="DAV:"><d:prop><d:resourcetype/></d:prop></d:propfind>'}, async response => {
+    async function checkDirectory(session: WebDavSession, url: string, allowMissing = false, signal?: AbortSignal): Promise<boolean> {
+        return request(session, url, {method: 'PROPFIND', signal, headers: {Depth: '0', 'Content-Type': 'application/xml; charset=utf-8'}, body: '<?xml version="1.0"?><d:propfind xmlns:d="DAV:"><d:prop><d:resourcetype/></d:prop></d:propfind>'}, async response => {
             if (allowMissing && [404, 409].includes(response.status)) return false;
             if (response.status !== 207) throw response.ok ? new WebDavError('invalidDav') : failure(response.status);
             const xml = await consumeText(response, XML_LIMIT);
@@ -84,18 +85,18 @@ export function createWebDavApi(fetcher: typeof fetch, options: {timeoutMs?: num
             return true;
         });
     }
-    async function test(connection: WebDavConnection): Promise<void> {
-        await checkDirectory(createWebDavSession(connection, async () => connection), connection.url);
+    async function test(connection: WebDavConnection, signal?: AbortSignal): Promise<void> {
+        await checkDirectory(createWebDavSession(connection, async () => connection), connection.url, false, signal);
     }
-    async function read(session: WebDavSession): Promise<CloudSyncRemote | null> {
+    async function read(session: WebDavSession, signal?: AbortSignal): Promise<CloudSyncRemote | null> {
         const url = filename(session);
-        const remote = await request(session, url, {method: 'GET'}, async response => {
+        const remote = await request(session, url, {method: 'GET', signal}, async response => {
             if (response.status === 404) return null;
             if (response.status === 409) {
                 // 坚果云等服务在备份父目录尚不存在时返回 409。先验证用户入口仍有效，
                 // 再只读检查专属目录；不得将已有目录的未知冲突当成空备份或提前创建目录。
-                await checkDirectory(session, session.connection.url);
-                if (!await checkDirectory(session, directory(session), true)) return null;
+                await checkDirectory(session, session.connection.url, false, signal);
+                if (!await checkDirectory(session, directory(session), true, signal)) return null;
                 throw new WebDavError('http', response.status);
             }
             if (response.status !== 200) throw failure(response.status);
@@ -108,7 +109,7 @@ export function createWebDavApi(fetcher: typeof fetch, options: {timeoutMs?: num
             return {file: {id: filename(session), version, modifiedTime: response.headers.get('last-modified') ?? '', ...(etag ? {etag} : {}), ...(unquotedEtag ? {unquotedEtag} : {})}, content};
         });
         if (!remote || remote.file.etag) return remote;
-        let etag = await request(session, url, {method: 'PROPFIND', headers: {Depth: '0', 'Content-Type': 'application/xml; charset=utf-8'}, body: '<?xml version="1.0"?><d:propfind xmlns:d="DAV:"><d:prop><d:getetag/></d:prop></d:propfind>'}, async response => {
+        let etag = await request(session, url, {method: 'PROPFIND', signal, headers: {Depth: '0', 'Content-Type': 'application/xml; charset=utf-8'}, body: '<?xml version="1.0"?><d:propfind xmlns:d="DAV:"><d:prop><d:getetag/></d:prop></d:propfind>'}, async response => {
             // 不具备属性能力仍可恢复；真正的鉴权、版本或网络错误必须提示用户。
             if ([405, 501].includes(response.status)) return undefined;
             if (response.status !== 207) throw failure(response.status);
@@ -116,7 +117,7 @@ export function createWebDavApi(fetcher: typeof fetch, options: {timeoutMs?: num
         });
         // 部分服务仅在 HEAD 中返回文件 ETag。它与属性值一样，必须经过条件
         // GET 和密文核对，不能仅凭时间戳、自己计算的 hash 或弱 ETag 来覆盖。
-        if (!etag) etag = await request(session, url, {method: 'HEAD'}, async response => {
+        if (!etag) etag = await request(session, url, {method: 'HEAD', signal}, async response => {
             if ([405, 501].includes(response.status)) return undefined;
             if (response.status !== 200) throw failure(response.status);
             return strongCloudEtag(response.headers.get('etag'));
@@ -124,7 +125,7 @@ export function createWebDavApi(fetcher: typeof fetch, options: {timeoutMs?: num
         if (!etag) return {...remote, file: {...remote.file, contentGuard: true}};
         // 属性与下载之间可能被另一设备更新。条件重读且逐字核对密文，
         // 防止把旧内容与新 ETag 配对后覆盖对方的修改。
-        await request(session, url, {method: 'GET', headers: {'If-Match': etag}}, async response => {
+        await request(session, url, {method: 'GET', signal, headers: {'If-Match': etag}}, async response => {
             if (response.status !== 200) throw failure(response.status);
             const returnedEtag = strongCloudEtag(response.headers.get('etag'));
             if (returnedEtag && returnedEtag !== etag || await consumeText(response, maxBytes) !== remote.content) throw new WebDavError('conflict');

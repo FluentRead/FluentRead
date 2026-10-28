@@ -3,6 +3,17 @@ import {parseHTML} from 'linkedom';
 import {readingAnswerBlocks, readingAnswerSpans} from '@/src/features/reading-assistant/answerFormat';
 import {captureReadingSelection, sentenceAroundSelection} from '@/src/features/reading-assistant/selectionContext';
 import {buildReadingEvidence, parseReadingEvidence} from '@/src/core/harness/evidence';
+import {truncateUtf16} from '@/src/shared/function/truncateUtf16';
+
+it('UTF-16 截断只回退被截开的代理对，并遵守零预算和原有短文本', () => {
+    expect(truncateUtf16('A😀B', 2)).toBe('A');
+    expect(truncateUtf16('A😀B', 3)).toBe('A😀');
+    expect(truncateUtf16('A😀B', 4)).toBe('A😀B');
+    expect(truncateUtf16('ABC', 0)).toBe('');
+    expect(truncateUtf16('ABCD', 2)).toBe('AB');
+    expect(truncateUtf16('A\ud83dX', 2)).toBe('A\ud83d');
+    expect(truncateUtf16('A\udc00B', 2)).toBe('A\udc00');
+});
 
 function fixture(html: string, selector = '#selected', offset = 0) {
     const {document, window} = parseHTML(`<html><body>${html}</body></html>`);
@@ -12,6 +23,13 @@ function fixture(html: string, selector = '#selected', offset = 0) {
 }
 
 describe('reading context respects the selected prose boundary', () => {
+    it('选文达到长度预算时不把边界上的辅助平面字符拆成半个代理项', () => {
+        const value = `${'a'.repeat(4095)}😀tail`;
+        const {range} = fixture(`<p id="selected">${value}</p>`);
+        const result = captureReadingSelection(range, value, 0);
+        expect(result.text).toBe('a'.repeat(4095));
+        expect(result.sentence).toBe(result.text);
+    });
     it('keeps surrounding words, removes controls, and never captures an adjacent paragraph', () => {
         const {range} = fixture('<p>Before <span id="selected">practice</span> makes progress.<button>BUTTON SECRET</button><input value="INPUT SECRET"><span hidden>HIDDEN SECRET</span><span class="fluent-read-bilingual-content">TRANSLATION SECRET</span></p><p>OTHER PARAGRAPH SECRET</p>');
         expect(captureReadingSelection(range, 'practice', 1500)).toEqual({

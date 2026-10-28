@@ -31,6 +31,12 @@ describe('Writing client cleanup', () => {
   });
 });
 describe('Writing mounting and background composition', () => {
+  it('同步重入的配置更新保持最新快照，不让旧回调恢复旧取消基线', () => {
+    installWritingBackgroundRuntime();const changed=m.subscribe.mock.calls[0][0];
+    m.config.to='ja';m.handler.cancelAll.mockImplementationOnce(() => {m.config.to='en';changed(m.config);});
+    changed(m.config);expect(m.handler.cancelAll).toHaveBeenCalledTimes(2);
+    changed(m.config);expect(m.handler.cancelAll).toHaveBeenCalledTimes(2);
+  });
   it('removes late mounts and replaces only its own previous surface', async () => {
     unmountWritingAssistant(); expect(isWritingAssistantMounted()).toBe(false);
     let resolve!: (value: any) => void; const late = {remove: vi.fn()}; m.shadow.mockImplementationOnce(() => new Promise(r => {resolve = r;})); const pending = mountWritingAssistant({} as any); unmountWritingAssistant(); resolve(late); await pending; expect(late.remove).toHaveBeenCalledOnce();

@@ -122,6 +122,7 @@ export async function createVueShadowUi(
       try {
         if (options.configureApp) options.configureApp(app, container);
         else app.use(createUiI18nPlugin());
+        if (ctx.isInvalid) throw new DOMException('扩展上下文已失效', 'AbortError');
         // 配置 hook 同步重装时，旧 app 不能再覆盖新 owner 的容器。
         if (currentMount === mounted) mounted.instance = app.mount(container);
         return mounted;
@@ -162,9 +163,11 @@ export async function createVueShadowUi(
     ui.shadowHost.setAttribute('data-fluent-read-ui', options.name);
     if (options.viewport) ui.shadowHost.setAttribute('data-fluent-read-viewport-ui', 'true');
     ui.mount();
+    // WXT 在 onMount 返回后才记录 mounted；Vue 同步挂载时失效需要再清理一次已返回的 app。
+    if (ctx.isInvalid) throw new DOMException('扩展上下文已失效', 'AbortError');
   } catch (error) {
     // mount 端口可能在 app 已返回后抛错；新一代已接管时只保留新 UI。
-    if (!ui.mounted || ui.mounted === initialMount) {
+    if (ctx.isInvalid || !ui.mounted || ui.mounted === initialMount) {
       try { ui.remove(); } catch { /* 清理失败不能覆盖构建错误。 */ }
     }
     throw error;

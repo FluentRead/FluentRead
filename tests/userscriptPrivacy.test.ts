@@ -203,8 +203,9 @@ describe('standalone userscript privacy boundaries', () => {
         expect(errorFunction).not.toContain('responseText');
     });
 
-    it('uses the safe JSON reader for successful Gemini responses', () => {
-        expect(gemini).toContain("readJsonResponse<any>(resp, 'Gemini 返回的不是有效 JSON')");
+    it('uses the safe, abort-aware JSON reader for successful Gemini responses', () => {
+        expect(gemini).toContain("readJsonResponse<any>(resp, 'Gemini 返回的不是有效 JSON', abortContext.signal)");
+        expect(gemini).toContain('if (abortContext.signal.aborted) throw abortErrorFromSignal(abortContext.signal)');
         expect(gemini).not.toMatch(/JSON\.parse\(/);
         expect(httpError).toContain('catch {');
     });

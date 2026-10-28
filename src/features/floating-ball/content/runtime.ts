@@ -25,6 +25,8 @@ import type { ContentScriptContext } from 'wxt/utils/content-script-context';
 import type { ShadowRootContentScriptUi } from 'wxt/utils/content-script-ui/shadow-root';
 import {createVueShadowUi, type VueShadowMount} from '@/src/platform/shadow-ui';
 import {createAnchoredPopup} from './anchoredPopup';
+import {normalizeUiLanguage, translate} from '@/src/core/i18n';
+import {dismissPageNotice, showPageNotice} from '@/src/features/page-notice/public';
 
 interface FloatingBallExposed {
   toggleTranslation: () => void;
@@ -38,6 +40,8 @@ let floatingBallInstance: FloatingBallExposed | null = null;
 let floatingBallUi: ShadowRootContentScriptUi<VueShadowMount> | null = null;
 let mountingPromise: Promise<FloatingBallExposed | null> | null = null;
 let mountRequestId = 0;
+let unfinishedMounts = 0;
+let retryMountWhenAvailable = false;
 let contentScriptContext: ContentScriptContext | null = null;
 let unsubscribeFullPageTranslationProgress: (() => void) | null = null;
 let unsubscribeTranslationToolbarStatus: (() => void) | null = null;
@@ -46,6 +50,44 @@ let floatingBallPresentation: FloatingBallPresentation | null = null;
 let removeFullscreenListener: (() => void) | null = null;
 let unsubscribeMangaTranslation: (() => void) | null = null;
 let anchoredPopup: ReturnType<typeof createAnchoredPopup> | null = null;
+const MOUNT_WAIT_NOTICE = 'floating-ball-mount-wait';
+let removeMountWaitVisibility: (() => void) | null = null;
+
+function detachMountWaitVisibility(): void {
+    const removeVisibility = removeMountWaitVisibility;
+    removeMountWaitVisibility = null;
+    try {removeVisibility?.();} catch (error) {console.error('[FluentRead] 悬浮球恢复提示清理失败', error);}
+}
+
+function clearMountWaitNotice(): void {
+    detachMountWaitVisibility();
+    try {dismissPageNotice(MOUNT_WAIT_NOTICE);} catch (error) {console.error('[FluentRead] 悬浮球恢复提示清理失败', error);}
+}
+
+/** 隐藏页面的计时提示可能在用户切回前消失，首次可见时再提供恢复路径。 */
+function announceMountWait(): void {
+    const show = () => {
+      try {showPageNotice(translate('floatingBall.mountPending', normalizeUiLanguage(config.uiLanguage)), 'error', {key: MOUNT_WAIT_NOTICE, durationMs: 10_000});}
+      catch (error) {console.error('[FluentRead] 悬浮球恢复提示失败', error);}
+    };
+    if (document.visibilityState !== 'hidden') {show(); return;}
+    let active = true;
+    const reveal = () => {
+      if (!active || document.visibilityState === 'hidden') return;
+      detachMountWaitVisibility();
+      if (config.on !== false && !config.disableFloatingBall && !floatingBallUi) show();
+    };
+    document.addEventListener('visibilitychange', reveal);
+    removeMountWaitVisibility = () => {active = false; document.removeEventListener('visibilitychange', reveal);};
+}
+
+function finishMountAttempt(): void {
+    unfinishedMounts -= 1;
+    if (retryMountWhenAvailable && unfinishedMounts < 2 && config.on !== false) {
+      retryMountWhenAvailable = false;
+      void mountFloatingBall();
+    }
+}
 
 /** 把实时配置折叠为组件需要的展示契约；字段语义与归一化都由 core/config 保证。 */
 function readPresentation(source: Config): FloatingBallPresentation {
@@ -125,6 +167,16 @@ export function mountFloatingBall(ctx?: ContentScriptContext) {
   }
 
   if (!contentScriptContext || contentScriptContext.isInvalid) return;
+  // WXT 创建过程不支持取消；限制重叠创建，避免连续切换时积累无限挂起的资源。
+  if (unfinishedMounts >= 2) {
+    const shouldNotify = !retryMountWhenAvailable;
+    retryMountWhenAvailable = true;
+    if (shouldNotify) {
+      try {announceMountWait();} catch (error) {console.error('[FluentRead] 悬浮球恢复提示失败', error);}
+    }
+    return null;
+  }
+  retryMountWhenAvailable = false;
 
   const ballPosition = config.floatingBallPosition || 'right';
   const requestId = ++mountRequestId;
@@ -134,10 +186,14 @@ export function mountFloatingBall(ctx?: ContentScriptContext) {
   const presentation = reactive(readPresentation(config));
   floatingBallPresentation = presentation;
   const manga = reactive<MangaTranslationStatus>({available: false, active: false, pending: false, errors: 0});
-  const stopManga = subscribeMangaTranslation(status => Object.assign(manga, status));
+  const unsubscribeManga = subscribeMangaTranslation(status => Object.assign(manga, status));
+  let mangaStopped = false;
+  const stopManga = () => {if (!mangaStopped) {mangaStopped = true; unsubscribeManga();}};
   unsubscribeMangaTranslation = stopManga;
 
-  mountingPromise = createVueShadowUi(contentScriptContext, {
+  unfinishedMounts += 1;
+  let creation: ReturnType<typeof createVueShadowUi>;
+  try {creation = createVueShadowUi(contentScriptContext, {
     name: 'fluent-read-floating-ball-ui',
     hostId: 'fluent-read-floating-ball-container',
     component: FloatingBall,
@@ -173,7 +229,15 @@ export function mountFloatingBall(ctx?: ContentScriptContext) {
     },
     // 宿主页可以向开放的 Shadow Tree 派发合成点击，因此翻译、设置和位置控件必须留在 closed 边界内。
     mode: 'closed',
-  }).then((ui) => {
+  });} catch (error) {
+    stopManga();
+    if (unsubscribeMangaTranslation === stopManga) unsubscribeMangaTranslation = null;
+    if (floatingBallPresentation === presentation) floatingBallPresentation = null;
+    console.error('[FluentRead] 悬浮球挂载失败', error);
+    finishMountAttempt();
+    return Promise.resolve(null);
+  }
+  const request = creation.then((ui) => {
     // 异步挂载返回时重新核对请求所有权，禁止已禁用的旧实例回到页面。
     if (requestId !== mountRequestId || config.disableFloatingBall || !isFloatingBallAllowedOnPage()) {
       ui.remove();
@@ -181,6 +245,7 @@ export function mountFloatingBall(ctx?: ContentScriptContext) {
     }
 
     floatingBallUi = ui;
+    clearMountWaitNotice();
     // 单例门禁保证没有活动实例；重建前的统一卸载已经释放所有旧订阅。
     removeFullscreenListener = subscribeFullscreenVisibility(ui);
     // 订阅只服务当前实例；迟到的旧订阅不得继续写回已被替换的展示契约。
@@ -217,10 +282,11 @@ export function mountFloatingBall(ctx?: ContentScriptContext) {
       stopManga();
       if (unsubscribeMangaTranslation === stopManga) unsubscribeMangaTranslation = null;
     }
-    mountingPromise = null;
+    if (requestId === mountRequestId) mountingPromise = null;
+    finishMountAttempt();
   });
-
-  return mountingPromise;
+  if (requestId === mountRequestId) mountingPromise = request;
+  return request;
 }
 
 /**
@@ -239,6 +305,9 @@ export function toggleFloatingBallTranslation(): boolean {
 export function unmountFloatingBall() {
   // 先使仍在等待的挂载失效，再释放当前实例，避免迟到的 Promise 重新写回句柄。
   mountRequestId++;
+  mountingPromise = null;
+  retryMountWhenAvailable = false;
+  clearMountWaitNotice();
   if (import.meta.env.BROWSER !== 'userscript') {
     anchoredPopup?.close();
     anchoredPopup = null;

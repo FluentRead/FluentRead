@@ -1,6 +1,6 @@
 import {afterEach, describe, expect, it, vi} from 'vitest';
 import {translateMicrosoftTextsWithTransport} from '@/src/providers/translation/microsoftTransport';
-import microsoft from '@/src/providers/translation/microsoft';
+import microsoft, {translateMicrosoftTexts} from '@/src/providers/translation/microsoft';
 import {setRuntimeFetch} from '@/src/platform/http/runtime';
 import {attachTranslationRequestScheduler} from '@/src/services/translation/requestSnapshot';
 import {createTranslationRequestScheduler} from '@/src/services/translation/requestScheduler';
@@ -24,6 +24,35 @@ async function flushMicrotasks() {
 }
 
 describe('shared Microsoft translation transport', () => {
+    it('public batch helper uses the default batching policy and preserves the input slots', async () => {
+        const sent: string[][] = [];
+        setRuntimeFetch(async (_url, init) => {
+            const sources = JSON.parse(String(init?.body)) as string[];
+            sent.push(sources);
+            return response(sources.map(source => ({translations: [{text: `译:${source}`}]})));
+        });
+        await expect(translateMicrosoftTexts(['first', '', 'second'], 'en', 'zh-Hans'))
+            .resolves.toEqual(['译:first', '', '译:second']);
+        expect(sent).toEqual([['first', 'second']]);
+    });
+
+    it('adapter honors a frozen disabled preference and lets an explicit request enable batching', async () => {
+        const sent: string[][] = [];
+        setRuntimeFetch(async (_url, init) => {
+            const sources = JSON.parse(String(init?.body)) as string[];
+            sent.push(sources);
+            return response(sources.map(source => ({translations: [{text: `译:${source}`}]})));
+        });
+        const config = {service: 'microsoft', nativeBatchTranslationEnabled: {microsoft: false}};
+        const message = {origin: ['first', 'second'], sourceLanguage: 'en', targetLanguage: 'zh-Hans'};
+        await expect(microsoft(withProviderSnapshot(message, config))).resolves.toEqual(['译:first', '译:second']);
+        expect(sent).toEqual([['first'], ['second']]);
+        sent.length = 0;
+        await expect(microsoft(withProviderSnapshot({...message, enableNativeBatch: true}, config)))
+            .resolves.toEqual(['译:first', '译:second']);
+        expect(sent).toEqual([['first', 'second']]);
+    });
+
     it.each([true, false])('actual adapter preserves blank array slots and frozen/explicit preferences with batching=%s', async batch => {
         const scheduler = createTranslationRequestScheduler(() => ({maxConcurrentTranslations: 1}));
         const sent: string[][] = [];

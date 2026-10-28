@@ -97,6 +97,17 @@ export async function dispatchContentMessage(message: any): Promise<any> {
     return undefined;
 }
 
+/** 广播不收集响应；独立隔离监听器异常，其他监听者仍能收到变更。 */
+export function dispatchContentNotification(message: unknown): void {
+    const warn = () => console.warn('[FluentRead userscript] 变更通知监听器失败');
+    for (const listener of runtimeListeners) {
+        try {
+            const result = listener(message, {tab: {id: 1, windowId: 1}, frameId: 0}, () => undefined);
+            if (result && typeof (result as PromiseLike<unknown>).then === 'function') void Promise.resolve(result).catch(warn);
+        } catch {warn();}
+    }
+}
+
 function runtimeAssetUrl(path: string): string {
     if (/icon\/(?:32|48|64|128|256|512)\.png$/u.test(path)) {
         return globalThis.__FLUENTREAD_ICON_DATA__ || '';

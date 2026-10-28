@@ -226,6 +226,91 @@ afterEach(() => {
 });
 
 describe('局部翻译选择模式', () => {
+    it('扩大大量独立区域时避免逐对读取父级，并可缩回原选区', async () => {
+        const h = await createHarness({initialPoint: {x: 50, y: 2}});
+        const count = 120;
+        const paragraphs: HTMLElement[] = [];
+        const wrappers: HTMLElement[] = [];
+        let parentReads = 0;
+        for (let index = 0; index < count; index++) {
+            const wrapper = h.document.createElement('section');
+            const paragraph = h.document.createElement('p');
+            paragraph.textContent = `Readable paragraph ${index}`;
+            wrapper.getBoundingClientRect = () => rect(20, index * 4, 500, 30) as DOMRect;
+            paragraph.getBoundingClientRect = () => rect(30, index * 4, 400, 20) as DOMRect;
+            wrapper.append(paragraph); h.document.body.append(wrapper);
+            const parent = wrapper.parentElement;
+            Object.defineProperty(wrapper, 'parentElement', {configurable: true, get() { parentReads++; return parent; }});
+            wrappers.push(wrapper); paragraphs.push(paragraph);
+        }
+        h.document.elementFromPoint = (_x, y) => paragraphs[Math.min(count - 1, Math.max(0, Math.floor(y / 4)))]!;
+        h.picker.startSectionPicker(h.options as never); h.flushFrames();
+        h.emit('pointerdown', {pointerId: 1, clientX: 50, clientY: 2});
+        for (let index = 1; index < count; index++) h.emit('pointermove', {pointerId: 1, buttons: 1, clientX: 50, clientY: index * 4 + 2});
+        h.emit('pointerup', {pointerId: 1, clientX: 50, clientY: (count - 1) * 4 + 2});
+        h.flushFrames(); vi.advanceTimersByTime(90);
+        expect(h.host()!.getAttribute('data-selection-count')).toBe(String(count - 1));
+        parentReads = 0;
+        clickButton(h, 'expand');
+        expect(parentReads).toBeLessThan(25_000);
+        h.flushFrames(); vi.advanceTimersByTime(90);
+        expect(h.inspect).toHaveBeenLastCalledWith(wrappers.filter((_wrapper, index) => index !== 1));
+        clickButton(h, 'shrink'); h.flushFrames(); vi.advanceTimersByTime(90);
+        expect(h.inspect).toHaveBeenLastCalledWith(paragraphs.filter((_paragraph, index) => index !== 1));
+        h.picker.stopSectionPicker();
+    });
+
+    it.each([511, 512])('扩大选区时保留 %i 层 composed 祖先边界', async distance => {
+        const h = await createHarness({initialPoint: {x: 50, y: 70}});
+        const outer = h.document.createElement('article');
+        outer.getBoundingClientRect = () => rect(10, 30, 700, 300) as DOMRect;
+        h.document.body.append(outer);
+        let inner = outer;
+        for (let depth = 0; depth < distance; depth++) {
+            const next = h.document.createElement('section'); inner.append(next); inner = next;
+        }
+        inner.getBoundingClientRect = () => rect(20, 50, 500, 100) as DOMRect;
+        const first = h.document.createElement('p'); first.textContent = 'First readable paragraph';
+        first.getBoundingClientRect = () => rect(30, 60, 400, 40) as DOMRect; inner.append(first);
+        const second = h.document.createElement('p'); second.textContent = 'Second readable paragraph';
+        second.getBoundingClientRect = () => rect(30, 120, 400, 40) as DOMRect; outer.append(second);
+        h.document.elementFromPoint = (_x, y) => y < 110 ? first : second;
+        h.picker.startSectionPicker(h.options as never); h.flushFrames();
+        h.emit('pointerdown', {pointerId: 1, clientX: 50, clientY: 70});
+        h.emit('pointermove', {pointerId: 1, buttons: 1, clientX: 50, clientY: 130});
+        h.emit('pointerup', {pointerId: 1, clientX: 50, clientY: 130}); h.flushFrames(); vi.advanceTimersByTime(90);
+        expect(h.inspect).toHaveBeenLastCalledWith([first, second]);
+        clickButton(h, 'expand'); h.flushFrames(); vi.advanceTimersByTime(90);
+        expect(h.inspect).toHaveBeenLastCalledWith(distance === 511 ? outer : [inner, outer]);
+        h.picker.stopSectionPicker();
+    });
+
+    it('扩大跨开放 ShadowRoot 的多选时只保留已选组合祖先', async () => {
+        const h = await createHarness({initialPoint: {x: 50, y: 70}});
+        const outer = h.document.createElement('article');
+        outer.getBoundingClientRect = () => rect(10, 30, 700, 300) as DOMRect;
+        h.document.body.append(outer);
+        const host = h.document.createElement('div'); outer.append(host);
+        const shadow = host.attachShadow({mode: 'open'});
+        const inner = h.document.createElement('section');
+        inner.getBoundingClientRect = () => rect(20, 50, 500, 100) as DOMRect; shadow.append(inner);
+        const first = h.document.createElement('p'); first.textContent = 'First readable paragraph';
+        first.getBoundingClientRect = () => rect(30, 60, 400, 40) as DOMRect; inner.append(first);
+        const second = h.document.createElement('p'); second.textContent = 'Second readable paragraph';
+        second.getBoundingClientRect = () => rect(30, 120, 400, 40) as DOMRect; outer.append(second);
+        h.document.elementFromPoint = (_x, y) => y < 110 ? host : second;
+        shadow.elementFromPoint = () => first;
+        h.picker.startSectionPicker(h.options as never); h.flushFrames();
+        h.emit('pointerdown', {pointerId: 1, clientX: 50, clientY: 70});
+        h.emit('pointermove', {pointerId: 1, buttons: 1, clientX: 50, clientY: 130});
+        h.emit('pointerup', {pointerId: 1, clientX: 50, clientY: 130}); h.flushFrames(); vi.advanceTimersByTime(90);
+        expect(h.inspect).toHaveBeenLastCalledWith([first, second]);
+        clickButton(h, 'expand'); h.flushFrames(); vi.advanceTimersByTime(90);
+        expect(h.inspect).toHaveBeenLastCalledWith(outer);
+        clickButton(h, 'shrink'); h.flushFrames(); vi.advanceTimersByTime(90);
+        expect(h.inspect).toHaveBeenLastCalledWith([first, second]);
+        h.picker.stopSectionPicker();
+    });
     it('真实选择器在指针会话交接时退出未确认选择，旧释放不影响新模式', async () => {
         const h = await createHarness();
         // createHarness 重置模块后再加载，必须与真实 picker 使用同一份会话身份。

@@ -52,23 +52,26 @@
         <div v-if="historySessions.length" class="harness-history-toolbar">
           <button v-if="historyHasMore" type="button" class="harness-secondary-button" :disabled="historyLoading || historyMutating" @click="loadMoreHistory">{{ historyLoading ? '正在读取…' : '加载更多' }}</button>
           <span v-else class="harness-history-count">{{ historySessions.length }} 条记录</span>
-          <button type="button" class="harness-text-button" :disabled="historyMutating" @click="clearHistory">清空记录</button>
+          <button type="button" class="harness-text-button" :disabled="historyMutating || confirmingClear" @click="clearHistory">清空记录</button>
         </div>
       </template>
     </div>
+    <el-dialog :key="clearRevision" :model-value="confirmingClear" :onUpdate:modelValue="clearActions.open" :title="t('common.confirm')" width="min(460px, calc(100vw - 32px))" destroy-on-close>
+      <p>{{ translateLegacy('清空本机全部阅读记录？删除后无法恢复。') }}</p>
+      <template #footer><el-button :onClick="clearActions.cancel">{{ t('common.cancel') }}</el-button><el-button type="danger" :onClick="clearActions.confirm">{{ t('common.confirm') }}</el-button></template>
+    </el-dialog>
   </section>
 </template>
 <script setup lang="ts">
-import {ElMessageBox} from 'element-plus';
-import 'element-plus/es/components/message-box/style/css';
 import {useUiI18n} from "@/src/ui/i18n"
 import {useRenderDateFormatter} from '@/src/ui/dateFormat'
 const {t, translateLegacy} = useUiI18n()
-import {onBeforeUnmount, onMounted, ref} from 'vue'
+import {computed, onBeforeUnmount, onDeactivated, onMounted, ref, watch} from 'vue'
 import ReadingAnswer from './ReadingAnswer.vue'
 import {clearHarnessSessions, deleteHarnessSession, getHarnessSession, listHarnessSessions} from '../client'
 import type {HarnessSession, HarnessSessionSummary} from '@/src/services/harness/sessionTypes'
 
+const props = defineProps<{isVisible?: () => boolean}>()
 const historySessions = ref<HarnessSessionSummary[]>([])
 const historyOffset = ref(0)
 const historyHasMore = ref(false)
@@ -76,10 +79,15 @@ const selectedHistory = ref<HarnessSession | null>(null)
 const historyLoading = ref(false)
 const historyDetailLoading = ref(false)
 const historyMutating = ref(false)
+const confirmingClear = ref(false)
 const historyError = ref('')
 let historyGeneration = 0
 let detailGeneration = 0
 let active = true
+const clearRevision = ref(0)
+function invalidateClearConfirmation() { clearRevision.value += 1; confirmingClear.value = false }
+watch(() => props.isVisible?.() ?? true, visible => {if (!visible) invalidateClearConfirmation()}, {flush: 'sync'})
+onDeactivated(invalidateClearConfirmation)
 const actionLabelFor = (value: string) => ({meaning: '读懂', grammar: '拆句', usage: '用法', practice: '练习'}[value] || '学习')
 const statusLabel = (value: string) => ({streaming: '生成中', completed: '已完成', stopped: '已停止', error: '未完成'}[value] || '未完成')
 const formatDate = useRenderDateFormatter({month: 'numeric', day: 'numeric', hour: 'numeric', minute: '2-digit'})
@@ -154,11 +162,23 @@ async function removeHistory(id: string) {
     historyMutating.value = false
   }
 }
-async function clearHistory() {
-  if (!active || historyMutating.value) return
-  try { await ElMessageBox.confirm(translateLegacy('清空本机全部阅读记录？删除后无法恢复。'), t('common.confirm'), {type: 'warning', confirmButtonText: t('common.confirm'), cancelButtonText: t('common.cancel')}) }
-  catch { return }
-  if (!active || historyMutating.value) return
+function clearHistory() {
+  if (!active || historyMutating.value || confirmingClear.value || props.isVisible?.() === false) return
+  clearRevision.value += 1
+  confirmingClear.value = true
+}
+const clearActions = computed(() => {
+  const revision = clearRevision.value
+  const isCurrent = () => active && confirmingClear.value && revision === clearRevision.value && props.isVisible?.() !== false
+  return {
+    open: (value: boolean) => {if (!value && isCurrent()) invalidateClearConfirmation()},
+    cancel: () => {if (isCurrent()) invalidateClearConfirmation()},
+    confirm: () => {if (isCurrent()) void commitClear()},
+  }
+})
+async function commitClear() {
+  confirmingClear.value = false
+  if (historyMutating.value) return
   historyMutating.value = true
   historyError.value = ''
   historyGeneration += 1
@@ -179,6 +199,7 @@ async function clearHistory() {
 onMounted(() => { void reloadHistory() })
 onBeforeUnmount(() => {
   active = false
+  invalidateClearConfirmation()
   historyGeneration += 1
   detailGeneration += 1
 })

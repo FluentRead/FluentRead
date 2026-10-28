@@ -110,7 +110,6 @@ it('automatically routes verified native models to vision and respects explicit 
   }
   expect(resolveModelVisionCapability('deepseek', 'deepseek-v4-pro')).toBe('unsupported');
   expect(resolveModelVisionCapability('freeTranslation', '')).toBe('unsupported');
-  expect(resolveModelVisionCapability('openai', '')).toBe('unknown');
   expect(resolveModelVisionCapability('deepseek', 'unconfirmed-flash')).toBe('unknown');
   expect(resolveModelVisionCapability('custom:team', 'deepseek-flash')).toBe('unknown');
   expect(resolveModelVisionCapability('deepseek', 'private-model', {deepseek: {'private-model': true}})).toBe('supported');

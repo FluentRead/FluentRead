@@ -145,6 +145,8 @@ function translationTextSlotParts(
     protectionCache: TranslationTextProtectionCache,
 ): TranslationTextSlotParts | null {
     const value = node.nodeValue ?? '';
+    // 纯空白会让槽位正则反复回溯；短文本沿用原路径，长文本先用同一 Unicode 空白规则快速排除。
+    if (value.length >= 64 && !/\S/u.test(value)) return null;
     const match = value.match(/^(\s*)([\s\S]*?\S)(\s*)$/u);
     if (!match || isTranslationTextNodeProtected(
         node,

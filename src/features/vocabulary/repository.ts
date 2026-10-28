@@ -30,6 +30,7 @@ import {
   type VocabularyReviewRating,
   type VocabularyReviewResult,
   type VocabularyRemovalSnapshot,
+  type VocabularyUndoRecord,
   type VocabularyScheduledReviewRating,
   type VocabularyStatus,
   type VocabularyTranslationSnapshot,
@@ -140,7 +141,7 @@ function isUuid(value: unknown): value is string {
   return typeof value === 'string' && UUID_PATTERN.test(value);
 }
 
-function createUuid(): string {
+export function createUuid(): string {
   if (typeof globalThis.crypto?.randomUUID === 'function') {
     return globalThis.crypto.randomUUID();
   }
@@ -322,7 +323,7 @@ function cloneTranslations(translations: VocabularyTranslations): VocabularyTran
   );
 }
 
-function cloneEntry(entry: VocabularyEntry): VocabularyEntry {
+export function cloneEntry(entry: VocabularyEntry): VocabularyEntry {
   return {
     ...entry,
     translations: cloneTranslations(entry.translations),
@@ -379,6 +380,7 @@ function prepareUpsert(input: VocabularyUpsertInput, now: number) {
 export class FluentReadVocabularyBookDatabase extends Dexie {
   entries!: Table<VocabularyEntry, string>;
   reviewLogs!: Table<VocabularyReviewLog, string>;
+  undo!: Table<VocabularyUndoRecord, string>;
 
   constructor(name = 'FluentReadVocabularyBook') {
     super(name);
@@ -387,10 +389,23 @@ export class FluentReadVocabularyBookDatabase extends Dexie {
         '&id, &identityKey, sourceLanguage, createdAt, updatedAt, lastSeenAt, masteryLevel, status, nextReviewAt',
       reviewLogs: '&id, entryId, reviewedAt, [entryId+reviewedAt]',
     });
+    if (import.meta.env.BROWSER !== 'userscript') this.version(2).stores({undo: '&id, state, expiresAt'});
   }
 }
 
 export const vocabularyBookDb = new FluentReadVocabularyBookDatabase();
+
+/** 调用方持有词条和日志写事务；冲突时保留已有数据与原快照。 */
+export async function restoreVocabularySnapshot(db: FluentReadVocabularyBookDatabase, snapshot: VocabularyRemovalSnapshot): Promise<void> {
+  const {entry, reviewLogs} = snapshot;
+  if (await db.entries.get(entry.id) || await db.entries.where('identityKey').equals(entry.identityKey).first()
+    || (await db.reviewLogs.bulkGet(reviewLogs.map(log => log.id))).some(Boolean)) {
+    throw new VocabularyBookError('invalid-input', '已有相同收藏或复习记录，请先检查现有数据。');
+  }
+  if (await db.entries.count() >= VOCABULARY_BOOK_MAX_ENTRIES) throw new VocabularyBookError('limit-exceeded', '收藏已达上限，无法恢复删除记录。');
+  await db.entries.add(entry);
+  if (reviewLogs.length) await db.reviewLogs.bulkAdd(reviewLogs);
+}
 
 export class VocabularyBookRepository {
   constructor(private readonly db: FluentReadVocabularyBookDatabase = vocabularyBookDb) {}
@@ -655,10 +670,20 @@ export class VocabularyBookRepository {
     });
   }
 
-  async clear(): Promise<void> {
+  async restoreSnapshot(snapshot: VocabularyRemovalSnapshot, expiresAt: number): Promise<void> {
     await this.db.transaction('rw', this.db.entries, this.db.reviewLogs, async () => {
+      if (Date.now() >= expiresAt) throw new VocabularyBookError('not-found', '恢复记录已过期');
+      await restoreVocabularySnapshot(this.db, snapshot);
+      if (Date.now() >= expiresAt) throw new VocabularyBookError('not-found', '恢复记录已过期');
+    });
+  }
+
+  async clear(): Promise<void> {
+    const tables = import.meta.env.BROWSER === 'userscript' ? [this.db.entries, this.db.reviewLogs] : [this.db.entries, this.db.reviewLogs, this.db.undo];
+    await this.db.transaction('rw', tables, async () => {
       await this.db.reviewLogs.clear();
       await this.db.entries.clear();
+      if (import.meta.env.BROWSER !== 'userscript') await this.db.undo.clear();
     });
   }
 

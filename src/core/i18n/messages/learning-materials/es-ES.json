@@ -73,6 +73,7 @@
   "材料备份已导出，包含来源、原句与个人笔记，请妥善保存。": "Copia exportada. Contiene orígenes, citas y notas personales; guárdala en un lugar seguro.",
   "导出失败，请重试。": "Error al exportar. Reinténtalo.",
   "材料备份超过 20 MB，请选择较小的备份文件。": "La copia de materiales supera los 20 MB. Selecciona un archivo más pequeño.",
+  "此备份超过 20 MB，当前版本无法恢复。请保留现有材料，并妥善保存备份文件。": "Esta copia supera los 20 MB y no se puede restaurar en la versión actual. Conserva los materiales existentes y guarda la copia en un lugar seguro.",
   "备份文件无法读取，请选择有效的材料 JSON 备份。": "No se pudo leer la copia. Selecciona una copia JSON de materiales válida.",
   "恢复失败，请检查材料备份文件。": "Error al restaurar. Comprueba el archivo de copia de materiales.",
   "无痕窗口不读取或保存学习材料": "Los materiales no se leen ni guardan en ventanas privadas",

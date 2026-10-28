@@ -1,5 +1,6 @@
 <!--
  * @file src/features/selection-translation/ui/SelectionTranslator.vue
+ * 来源提交：翻译与词典异步结果交付前复核已克隆选区的正文、连接和适配器边界，不依赖原生高亮仍然存在；来源失效时撤销旧卡片，词书保存仍保留失联上下文回退。
  * 两点选取：默认关闭及文档适配器跳过快捷键冲突计算，快捷键开启单次起终点选择并放行开放 Shadow DOM 编辑区；复用原生选区与现有划词入口，完成后的首次选区读取保留同轮延迟滚动，随后恢复普通滚动收起，取消、编辑与卸载撤销首帧保护；短状态提示不捕获页面指针，未命中文字或起终点重合时说明可继续操作，配置变更和卸载释放控制器。
  * 通知布局：收藏与语音设置通知沿用安全可见视口订阅，触摸动作保留完整命中区；通知不增加独立监听或请求。
  * 极矮视口：同一卡片改为整卡滚动并收紧顶栏间距，保留输入与请求、手动几何和语音状态；Safari 键盘视口变化后仅在当前有限窗口内滚动卡片自身显露原聚焦输入，主动操作取消待处理显露；恢复尺寸后沿用原定位，不增加监听或计时器。
@@ -1320,6 +1321,13 @@ function isContentRequestCurrent(request: SelectionContentRequest): boolean {
   return Boolean(current && current.generation === request.generation && current.text === request.text && current.targetLanguage === request.targetLanguage);
 }
 
+function isResultSourceCurrent(request: SelectionContentRequest): boolean {
+  const current = currentContentRequest.value;
+  if (!current || current.generation !== request.generation || current.text !== request.text || current.targetLanguage !== request.targetLanguage) return false;
+  restoreSelectionSource();
+  return currentContentRequest.value === current;
+}
+
 function dictionaryDefinitions(card: WordCardData, targetLanguage: string): string {
   return resolveSelectionDictionaryFallback(targetLanguage, card.meanings.flatMap(meaning => meaning.definitions).map(definition => definition.translatedDefinition));
 }
@@ -1482,12 +1490,12 @@ async function requestTranslation(request: SelectionContentRequest): Promise<voi
       ? await translateSelectionParts(parts, texts => translateTextBatch(texts, title, options))
       : [{kind: 'text' as const, text: await translateText(text, title, options)}];
     const result = translated.map(part => part.text).join('');
-    if (requestId !== translationRequestId || !isContentRequestCurrent(request)) return;
+    if (requestId !== translationRequestId || !isResultSourceCurrent(request)) return;
     translationParts.value = translated;
     translationResult.value = result;
     translationAnswer.value = {...request, answer: result};
   } catch (cause) {
-    if (requestId !== translationRequestId || !isContentRequestCurrent(request)) return;
+    if (requestId !== translationRequestId || !isResultSourceCurrent(request)) return;
     if (cause instanceof Error && cause.name === 'AbortError') return;
     console.error('Selection translation error:', cause);
     const kind = serializeTranslationError(cause).kind;
@@ -1539,7 +1547,7 @@ async function requestWordCard(request: SelectionContentRequest): Promise<void> 
   wordCardError.value = '';
   try {
     const response = await sendWordCardRequest(word, request.targetLanguage, false, controller.signal);
-    if (requestId !== wordLookupRequestId || !isContentRequestCurrent(request)) return;
+    if (requestId !== wordLookupRequestId || !isResultSourceCurrent(request)) return;
     if (!response?.success) throw new Error('Dictionary response unavailable');
     if (!response.data) {
       wordCard.value = null;
@@ -1553,7 +1561,7 @@ async function requestWordCard(request: SelectionContentRequest): Promise<void> 
       isWordCardSupportLoading.value = true;
       try {
         const enriched = await sendWordCardRequest(word, request.targetLanguage, true, controller.signal);
-        if (requestId !== wordLookupRequestId || !isContentRequestCurrent(request)) return;
+        if (requestId !== wordLookupRequestId || !isResultSourceCurrent(request)) return;
         if (enriched?.success && enriched.data) {
           wordCard.value = enriched.data;
           dictionaryAnswer.value = {...request, answer: dictionaryDefinitions(enriched.data, request.targetLanguage)};
@@ -1563,7 +1571,7 @@ async function requestWordCard(request: SelectionContentRequest): Promise<void> 
       }
     }
   } catch (cause) {
-    if (requestId !== wordLookupRequestId || !isContentRequestCurrent(request)) return;
+    if (requestId !== wordLookupRequestId || !isResultSourceCurrent(request)) return;
     console.warn('Selection word lookup unavailable:', cause);
     wordCard.value = null;
     dictionaryAnswer.value = null;

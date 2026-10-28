@@ -16,7 +16,7 @@ import {inflateGzipBase64} from './compression';
 import {userscriptFetch} from './http';
 import {getStoredValue, setStoredValue} from './storage';
 import type {UserscriptLanguageUpdate} from './languageBundles';
-import {unpackUiLanguageBundle} from './languageData';
+import {unpackLanguageUpdates, unpackUiLanguageBundle} from './languageData';
 import {readDefaultMessageKeys} from './defaultMessageData';
 
 const pending = new Map<RegisteredUiLanguage, Promise<boolean>>();
@@ -27,7 +27,7 @@ let updates: Promise<Readonly<Partial<Record<RegisteredUiLanguage, UserscriptLan
 function loadUpdates(): Promise<Readonly<Partial<Record<RegisteredUiLanguage, UserscriptLanguageUpdate>>>> {
     if (!updates) {
         const compressed = typeof __FLUENTREAD_USERSCRIPT_LANGUAGE_UPDATES__ === 'string' ? __FLUENTREAD_USERSCRIPT_LANGUAGE_UPDATES__ : '';
-        updates = (compressed ? inflateGzipBase64(compressed).then(value => JSON.parse(value)) : Promise.resolve({}))
+        updates = (compressed ? inflateGzipBase64(compressed).then(value => unpackLanguageUpdates(JSON.parse(value))) : Promise.resolve({}))
             .catch(error => {updates = undefined;throw error;});
     }
     return updates;

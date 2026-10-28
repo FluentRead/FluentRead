@@ -7,6 +7,8 @@ import {createDocumentRecognitionWorkflow, type DocumentRecognitionPorts} from '
 import {createDocumentExportWorkflow, type DocumentExportPorts} from '@/src/features/document-translation/services/exportWorkflow';
 import {generateDocumentArchive} from '@/src/features/document-translation/services/archive';
 import type {DocumentHistoryRecord} from '@/src/features/document-translation/services/history';
+import {createDocumentHistory, documentHistoryId} from '@/src/features/document-translation/services/history';
+import {IDBFactory} from 'fake-indexeddb';
 import type {DocumentDownload} from '@/src/features/document-translation/services/binary';
 
 const cleanups: Array<() => void> = [];
@@ -27,20 +29,72 @@ function record(parsed = document(), parsedVersion = 16): DocumentHistoryRecord 
 function importFixture() {
     let id = 0;
     const tasks: DocumentQueueItem[] = [];
-    const load = vi.fn<NonNullable<DocumentImportPorts['history']>['load']>().mockResolvedValue(null);
+    const load = vi.fn<(id: string) => Promise<DocumentHistoryRecord | null>>().mockResolvedValue(null);
+    const history = {loadChecked: async (id: string) => ({status: 'ok' as const, record: await load(id), version: 'v:fixture'})};
     const ports: DocumentImportPorts = {
         parseFile: vi.fn(async file => parseDocument(file.name, await file.text())),
         fetchPdf: vi.fn<DocumentImportPorts['fetchPdf']>().mockResolvedValue(new File(['Source.'], 'online.txt')),
         history: null, parsedVersion: 16,
         createTask: (file, sourceUrl) => ({...createDocumentTaskState(), id: ++id, name: file.name, sourceUrl}),
         appendTask: vi.fn(item => {tasks.push(item);}), releaseDocument: vi.fn(), onStart: vi.fn(), onPhase: vi.fn(),
-        onReadProgress: vi.fn(), onDownloadProgress: vi.fn(), onOnlineError: vi.fn(), onFinished: vi.fn(), onHistoryMissing: vi.fn(async () => {}),
+        onReadProgress: vi.fn(), onDownloadProgress: vi.fn(), onOnlineError: vi.fn(), onHistoryUnavailable: vi.fn(), onFinished: vi.fn(), onHistoryMissing: vi.fn(async () => {}),
     };
     const workflow = createDocumentImportWorkflow(ports);cleanups.push(workflow.dispose);
-    return {ports, workflow, tasks, load};
+    return {ports, workflow, tasks, load, history};
 }
 
 describe('document import workflow ownership', () => {
+    it.each(['blocked', 'timeout'] as const)('preserves existing history after a transient %s read and a later successful save', async failure => {
+        const f = importFixture(), factory = new IDBFactory(), history = createDocumentHistory(factory);
+        const bytes = new TextEncoder().encode('Source.'), id = await documentHistoryId(bytes);
+        const prior = {...record(), id, bytes};
+        expect(await history.save(prior)).toBe(true);
+        let block = true;
+        const late = {result: {close: vi.fn()}} as unknown as IDBOpenDBRequest;
+        const flaky = createDocumentHistory({open(name: string, version?: number) {
+            if (!block) return factory.open(name, version);
+            block = false;
+            if (failure === 'blocked') queueMicrotask(() => late.onblocked?.(new Event('blocked') as IDBVersionChangeEvent));
+            return late;
+        }} as IDBFactory, 20);
+        f.ports.history = flaky;
+        let written: Promise<boolean> | undefined;
+        vi.mocked(f.ports.onFinished).mockImplementation(() => {
+            const item = f.tasks[0];
+            if (item.document && item.historyId && item.bytes && !item.historyReadUnavailable) written = flaky.save({...prior,
+                id: item.historyId, bytes: item.bytes, translations: [...item.translations], completed: 0});
+        });
+        await f.workflow.loadFiles([new File([bytes], 'source.txt', {type: 'text/plain'})]);
+        await written;
+        expect(f.tasks[0].historyReadUnavailable).toBe(true);
+        expect(written).toBeUndefined();
+        f.tasks[0].translations = ['Current correction']; f.tasks[0].revision = 1;
+        await f.workflow.loadFiles([new File([bytes], 'source.txt', {type: 'text/plain'})]);
+        expect(f.tasks[0].translations).toEqual(['Current correction']);
+        expect(f.tasks[1].translations).toEqual(['Kept correction']);
+        expect(f.tasks[1].historyReadUnavailable).toBeUndefined();
+        late.onsuccess!(new Event('success'));
+        expect(late.result.close).toHaveBeenCalledOnce();
+        expect((await history.load(id))?.translations).toEqual(['Kept correction']);
+    });
+    it('does not publish an obsolete unavailable history result over a replacement import', async () => {
+        const f = importFixture(), old = pending<{status: 'ok'; record: DocumentHistoryRecord | null; version: string} | {status: 'unavailable'}>({status: 'unavailable'});
+        const checked = vi.fn().mockReturnValueOnce(old.promise).mockResolvedValueOnce({status: 'ok', record: record(), version: 'v:fixture'});
+        f.ports.history = {loadChecked: checked};
+        const first = f.workflow.loadFiles([new File(['Old.'], 'old.txt')]);
+        await vi.waitFor(() => expect(checked).toHaveBeenCalledOnce());
+        const second = f.workflow.loadFiles([new File(['Source.'], 'next.txt')]);
+        await second;old.resolve({status: 'unavailable'});await first;
+        expect(f.tasks).toHaveLength(1);
+        expect(f.tasks[0]).toMatchObject({name: 'next.txt', translations: ['Kept correction']});
+        expect(f.tasks[0].historyReadUnavailable).toBeUndefined();
+    });
+    it('reports an unavailable history reopen without treating it as a missing record', async () => {
+        const f = importFixture();f.ports.history = {loadChecked: vi.fn().mockResolvedValue({status: 'unavailable'})};
+        await f.workflow.openHistory('history');
+        expect(f.ports.onHistoryUnavailable).toHaveBeenCalledOnce();
+        expect(f.ports.onHistoryMissing).not.toHaveBeenCalled();expect(f.tasks).toEqual([]);
+    });
     it('rejects files independently, leaves existing corrections untouched, and selects the first readable task only', async () => {
         const f = importFixture(), existing = task();f.tasks.push(existing);
         const huge = new File(['Source.'], 'huge.txt');Object.defineProperty(huge, 'size', {value: DOCUMENT_MAX_BYTES + 1});
@@ -99,7 +153,7 @@ describe('document import workflow ownership', () => {
     });
 
     it('uses parsed PDF source bytes for restart history and forwards progress only while import owns the document', async () => {
-        const f = importFixture();f.ports.history = {load: f.load};
+        const f = importFixture();f.ports.history = f.history;
         const bytes = new Uint8Array([1, 2, 3]);
         const pdf = {...document(), fileName: 'restart.pdf', format: 'pdf', binary: {kind: 'pdf', bytes, pages: []}} as ParsedDocument;
         const saved = {...record(pdf), bypassCache: true, translations: [''], completed: 0, bytes};
@@ -128,7 +182,7 @@ describe('document import workflow ownership', () => {
     });
 
     it('restores matching history from file bytes and reuses a current history snapshot without parsing', async () => {
-        const f = importFixture();f.ports.history = {load: f.load};f.load.mockResolvedValue(record());
+        const f = importFixture();f.ports.history = f.history;f.load.mockResolvedValue(record());
         await f.workflow.loadFiles([new File(['Source.'], 'source.txt', {type: 'text/plain'})]);
         expect(f.tasks[0]).toMatchObject({translations: ['Kept correction'], fingerprint: 'settings', mimeType: 'text/plain'});
         expect(f.tasks[0].bytes).toEqual(new TextEncoder().encode('Source.'));
@@ -138,7 +192,7 @@ describe('document import workflow ownership', () => {
     });
 
     it.each([[15, 16], [17, 18]])('reparses an obsolete version %i history snapshot for version %i and recovers edits by matching original text', async (obsoleteVersion, currentVersion) => {
-        const f = importFixture();f.ports.history = {load: f.load};f.ports.parsedVersion = currentVersion;
+        const f = importFixture();f.ports.history = f.history;f.ports.parsedVersion = currentVersion;
         f.load.mockResolvedValue(record(document(), obsoleteVersion));
         await f.workflow.openHistory('history');expect(f.ports.parseFile).toHaveBeenCalledOnce();
         expect(f.tasks[0].translations).toEqual(['Kept correction']);expect(f.tasks[0].historyId).toBeTruthy();
@@ -149,7 +203,7 @@ describe('document import workflow ownership', () => {
     });
 
     it.each([undefined, false, true, 'true', 1])('restores only an explicit cache bypass through same-file import and history snapshots: %j', async bypassCache => {
-        const f = importFixture();f.ports.history = {load: f.load};
+        const f = importFixture();f.ports.history = f.history;
         const saved = {...record(), bypassCache: bypassCache as boolean, translations: [''], completed: 0};
         f.load.mockResolvedValue(saved);
         await f.workflow.loadFiles([new File(['Source.'], 'source.txt', {type: 'text/plain'})]);
@@ -165,7 +219,7 @@ describe('document import workflow ownership', () => {
     });
 
     it.each(['bytes', 'history'] as const)('checks cancellation again after pending %s before advancing import', async stage => {
-        const f = importFixture();f.ports.history = {load: f.load};
+        const f = importFixture();f.ports.history = f.history;
         const buffer = new ArrayBuffer(7);new Uint8Array(buffer).set(new TextEncoder().encode('Source.'));
         const bytes = pending(buffer), saved = pending<DocumentHistoryRecord | null>(record());
         const input = new File(['Source.'], 'source.txt');
@@ -184,7 +238,7 @@ describe('document import workflow ownership', () => {
 
     it('ignores pending history lookups after disposal and handles disabled history as missing', async () => {
         const f = importFixture();await f.workflow.openHistory('disabled');expect(f.ports.onHistoryMissing).toHaveBeenCalledOnce();
-        f.ports.history = {load: f.load};const gate = pending<DocumentHistoryRecord | null>(record());f.load.mockReturnValueOnce(gate.promise);
+        f.ports.history = f.history;const gate = pending<DocumentHistoryRecord | null>(record());f.load.mockReturnValueOnce(gate.promise);
         const running = f.workflow.openHistory('history');f.workflow.dispose();gate.resolve(record());await running;
         expect(f.tasks).toEqual([]);
     });
@@ -197,7 +251,7 @@ describe('document import workflow ownership', () => {
     });
 
     it('drops import after its pending content digest is invalidated, and tolerates unavailable digest support', async () => {
-        const f = importFixture();f.ports.history = {load: f.load};
+        const f = importFixture();f.ports.history = f.history;
         const digest = pending(new Uint8Array(32).buffer);
         const hash = vi.spyOn(globalThis.crypto.subtle, 'digest').mockReturnValueOnce(digest.promise);
         const running = f.workflow.loadFiles([new File(['Source.'], 'source.txt')]);
@@ -205,7 +259,13 @@ describe('document import workflow ownership', () => {
         digest.resolve(new Uint8Array(32).buffer);await running;expect(f.load).not.toHaveBeenCalled();expect(f.tasks).toEqual([]);
         hash.mockRejectedValueOnce(new Error('digest unavailable'));
         await f.workflow.loadFiles([new File(['Source.'], 'unhashed.txt')]);
-        expect(f.tasks[0].historyId).toBe('');expect(f.tasks[0].translations).toEqual([]);expect(f.load).not.toHaveBeenCalled();
+        expect(f.tasks[0].historyId).toBe('');expect(f.tasks[0].historyReadUnavailable).toBe(true);
+        expect(f.tasks[0].translations).toEqual([]);expect(f.load).not.toHaveBeenCalled();
+        f.tasks[0].translations = ['Unsaved edit'];f.tasks[0].revision = 1;
+        await f.workflow.loadFiles([new File(['Source.'], 'unhashed.txt')]);
+        expect(f.tasks[0].translations).toEqual(['Unsaved edit']);
+        expect(f.tasks[1].historyId).toBeTruthy();expect(f.tasks[1].historyReadUnavailable).toBeUndefined();
+        expect(f.load).toHaveBeenCalledOnce();
     });
 });
 

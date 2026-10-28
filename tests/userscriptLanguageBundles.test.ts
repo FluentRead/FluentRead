@@ -10,7 +10,7 @@ import {gzipUserscriptBuildData} from '../userscript/buildGzip';
 import {UI_LANGUAGE_BUNDLES as extensionBundles} from '@/src/core/i18n/bundles';
 import {aiRequestTimeoutMessages} from '@/src/core/i18n/messages/aiRequestTimeout';
 import {ungzip} from 'pako';
-import {packMessageCatalog, packUiLanguageBundle, unpackMessageCatalog, unpackUiLanguageBundle} from '@/userscript/languageData';
+import {packKeyColumn, unpackKeyColumn, packLanguageUpdates, unpackLanguageUpdates, packMessageCatalog, packUiLanguageBundle, unpackMessageCatalog, unpackUiLanguageBundle} from '@/userscript/languageData';
 import userscriptConfig from '../userscript/vite.config';
 
 const languageDir = resolve(process.cwd(), 'userscript/languages');
@@ -20,6 +20,38 @@ const source = readFileSync(resolve(languageDir, fileName), 'utf8');
 const resourceCommit = '70d3d901033a579e32a5bf5e6af14555f0d140bb';
 
 describe('embedded language columns', () => {
+    it('roundtrips shared update columns, missing keys, empty values, patterns and legacy object format',()=>{
+        const updates={
+          'ja-JP':{messages:{a:'',b:'日本語'},legacyText:{x:'旧'},legacyPatterns:{early:[['same','一'],['same','二']],late:[]},patternOrder:{early:[1,-1]}},
+          'fr-FR':{messages:{b:'français',c:'autre'},legacyText:{y:''},legacyPatterns:{early:[],late:[]}},
+        } as const;
+        const packed=JSON.parse(JSON.stringify(packLanguageUpdates(updates)));
+        expect(unpackLanguageUpdates(packed)).toEqual(updates);expect(unpackLanguageUpdates(updates)).toBe(updates);
+        expect(()=>unpackLanguageUpdates({...packed,rows:{bad:[['wrong'],[],{},null]}})).toThrow(TypeError);
+        expect(()=>unpackLanguageUpdates({...packed,messages:[2]})).toThrow(TypeError);
+        expect(()=>unpackLanguageUpdates([])).toThrow(TypeError);
+        expect(()=>unpackLanguageUpdates({...packed,rows:{bad:[]}})).toThrow(TypeError);
+    });
+    it('roundtrips prefix keys including duplicate, long and non-BMP strings without changing ordering', () => {
+        const keys = ['', '__proto__', 'repeat', 'repeat', '😀a', '😀b', 'x'.repeat(120), 'x'.repeat(120)+'tail', 'constructor'];
+        expect(unpackKeyColumn(JSON.parse(JSON.stringify(packKeyColumn(keys))))).toEqual(keys);
+        const values=keys.map((_,index)=>`value${index}`);
+        expect(unpackMessageCatalog([packKeyColumn(keys),values])).toEqual(Object.fromEntries(keys.map((key,index)=>[key,values[index]])));
+        for(const invalid of [{p:['']},{p:['!oops']},{p:[1]},{p:[],extra:true},{p:'bad'}]) expect(()=>unpackKeyColumn(invalid)).toThrow(TypeError);
+    });
+    it.each(Object.keys(UI_LANGUAGE_BUNDLES))('preserves the complete %s bundle when legacy keys are prefix encoded', language => {
+        const bundle=UI_LANGUAGE_BUNDLES[language as keyof typeof UI_LANGUAGE_BUNDLES];
+        const keys=packMessageCatalog(bundle.messages)[0];
+        const packed=packUiLanguageBundle(bundle,keys,true);
+        expect(unpackUiLanguageBundle(JSON.parse(JSON.stringify(packed)),keys)).toEqual(bundle);
+        expect(unpackUiLanguageBundle(JSON.parse(JSON.stringify(packUiLanguageBundle(bundle))))).toEqual(bundle);
+    });
+    it('retains exact ordered prefix keys in the shared default catalog, even with repeated and numeric keys',async()=>{
+        vi.resetModules();const provider=await import('@/userscript/defaultMessageData');
+        const keys=['1','10','2','repeat','repeat','__proto__','😀'];const values=keys.map((_,index)=>String(index));
+        expect(provider.restoreDefaultMessageColumns([packKeyColumn(keys),values])).toEqual(Object.fromEntries(keys.map((key,index)=>[key,values[index]])));
+        expect(provider.readDefaultMessageKeys()).toEqual(keys);
+    });
     it('roundtrips sorted catalogs and preserves duplicate patterns and optional captures', () => {
         const bundle = {messages: {z: '末尾', a: 'first'}, legacyText: {'旧文案': 'legacy'}, legacyPatterns: {
             early: [], late: [['^same$', 'localized'], ['^same$', 'fallback', []], ['^(.+)$', '{1}', [1]]],

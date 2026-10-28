@@ -12,6 +12,7 @@ import {
     type VocabularyBookBackgroundDependencies,
 } from '@/src/features/vocabulary/background';
 import {createBackgroundMessageRouter} from '@/src/services/messaging/backgroundRouter';
+import {isTrustedSettingsSender} from '@/src/app/background/handlers/trustedSettingsSender';
 import {
     VOCABULARY_BOOK_CHANGED_MESSAGE,
     VOCABULARY_BOOK_MESSAGE,
@@ -92,7 +93,10 @@ function createRepository() {
         relearn: vi.fn(async (entryId: string) => ({method: 'relearn', entryId})),
         getReviewLogs: vi.fn(async (entryId: string) => ({method: 'getReviewLogs', entryId})),
         remove: vi.fn(async (entryId: string): Promise<unknown> => ({id: entryId, removed: true})),
-        removeWithSnapshot: vi.fn(async (entryId: string): Promise<unknown> => ({id: entryId, snapshot: true})),
+        removeWithUndo: vi.fn(async (entryId: string): Promise<unknown> => ({id:'00000000-0000-4000-8000-000000000001',term:entryId})),
+        listUndo: vi.fn(async () => []),
+        restoreUndo: vi.fn(async () => 'restored' as const),
+        discardUndo: vi.fn(async () => undefined),
         clear: vi.fn(async () => undefined),
         exportData: vi.fn(async (options) => ({method: 'exportData', options})),
         importData: vi.fn(async (data) => ({method: 'importData', data})),
@@ -105,6 +109,7 @@ function createDependencies(overrides: Partial<VocabularyBookBackgroundDependenc
         configReady: Promise.resolve(),
         isVocabularyBookEnabled: () => true,
         vocabularyBook: repository as unknown as VocabularyBookBackgroundDependencies['vocabularyBook'],
+        vocabularyUndo: repository,
         broadcastChanged: vi.fn(),
         logOperationFailure: vi.fn(),
         ...overrides,
@@ -113,6 +118,54 @@ function createDependencies(overrides: Partial<VocabularyBookBackgroundDependenc
 }
 
 describe('vocabulary background message handlers', () => {
+    it('only lets the same extension settings page access durable deletion recovery', async () => {
+        const {dependencies, repository} = createDependencies({isTrustedUndoSender: sender =>
+            isTrustedSettingsSender(sender, 'fixture-id', 'chrome-extension://fixture-id/options.html')});
+        const handler = createVocabularyBookHandler(dependencies);
+        const id = '00000000-0000-4000-8000-000000000001';
+        const actions = [
+            {type:VOCABULARY_BOOK_MESSAGE,action:'listUndo'},
+            {type:VOCABULARY_BOOK_MESSAGE,action:'removeWithUndo',entryId:'entry'},
+            {type:VOCABULARY_BOOK_MESSAGE,action:'restoreUndo',undoId:id},
+            {type:VOCABULARY_BOOK_MESSAGE,action:'discardUndo',undoId:id},
+        ];
+        for (const sender of [undefined, {id:'fixture-id',url:'https://example.test/'},
+            {id:'other',url:'chrome-extension://fixture-id/options.html'},
+            {id:'fixture-id',url:'chrome-extension://fixture-id/popup.html'},
+            {id:'fixture-id',url:'chrome-extension://fixture-id/options.html',tab:{incognito:true}}]) {
+            for (const message of actions) expect(await handler.handle(message, {sender})).toMatchObject({success:false,error:{code:'invalid-input'}});
+        }
+        const missingPolicy=createDependencies();
+        expect(await createVocabularyBookHandler(missingPolicy.dependencies).handle(actions[0],{sender:{id:'fixture-id',url:'chrome-extension://fixture-id/options.html'}})).toMatchObject({success:false});
+        expect(missingPolicy.repository.listUndo).not.toHaveBeenCalled();
+        expect(repository.listUndo).not.toHaveBeenCalled(); expect(repository.removeWithUndo).not.toHaveBeenCalled();
+        expect(repository.restoreUndo).not.toHaveBeenCalled(); expect(repository.discardUndo).not.toHaveBeenCalled();
+        const sender = {id:'fixture-id',url:'chrome-extension://fixture-id/options.html#settings-vocabulary'};
+        for (const message of actions) expect(await handler.handle(message, {sender})).toMatchObject({success:true});
+        expect(await handler.handle({...actions[2],undoId:'not-a-ticket'}, {sender})).toMatchObject({success:false,error:{code:'invalid-input'}});
+        expect(repository.restoreUndo).toHaveBeenCalledOnce();
+        expect(dependencies.logOperationFailure).not.toHaveBeenCalled();
+    });
+    it.each(['invalid-input','limit-exceeded'])('maps confirmed undo errors to fixed safe messages: %s',async code=>{
+        const {dependencies,repository}=createDependencies({isTrustedUndoSender:()=>true});
+        repository.listUndo.mockRejectedValueOnce(Object.assign(new Error('private secret'),{name:'VocabularyBookError',code}));
+        const result=await createVocabularyBookHandler(dependencies).handle({type:VOCABULARY_BOOK_MESSAGE,action:'listUndo'},{});
+        expect(result).toMatchObject({success:false,error:{code}});expect(JSON.stringify(result)).not.toContain('private secret');
+        expect(dependencies.logOperationFailure).not.toHaveBeenCalled();
+    });
+    it('does not leak private text through clear failure diagnostics',async()=>{
+        const {dependencies,repository}=createDependencies();repository.clear.mockRejectedValueOnce(new Error('private reading https://secret.test'));
+        const result=await createVocabularyBookHandler(dependencies).handle({type:VOCABULARY_BOOK_MESSAGE,action:'clear'},{});
+        expect(result).toMatchObject({success:false,error:{code:'storage-error'}});
+        expect(JSON.stringify(result)).not.toContain('private');expect(dependencies.logOperationFailure).not.toHaveBeenCalled();
+    });
+    it('never logs or returns undo storage exceptions containing private text',async()=>{
+        const {dependencies,repository}=createDependencies({isTrustedUndoSender:()=>true});
+        repository.listUndo.mockRejectedValueOnce(new Error('private text https://example.test/secret'));
+        const result=await createVocabularyBookHandler(dependencies).handle({type:VOCABULARY_BOOK_MESSAGE,action:'listUndo'},{});
+        expect(result).toMatchObject({success:false,error:{code:'storage-error'}});
+        expect(JSON.stringify(result)).not.toContain('private');expect(dependencies.logOperationFailure).not.toHaveBeenCalled();
+    });
     it('再次遇见只返回最小表达列表，并在主动打开后才返回对应收藏原句', async () => {
         const {dependencies, repository} = createDependencies({isReencounterEnabled: () => true});
         const entry = {id: 'art', term: 'art', sourceLanguage: 'en', contexts: [{text: 'Art matters.', capturedAt: 1}], translations: {zh: {text: '艺术', updatedAt: 1}}, reviewCount: 7};
@@ -242,16 +295,12 @@ describe('vocabulary background message handlers', () => {
         await expect(handler.handle({type: VOCABULARY_BOOK_MESSAGE, action: 'remove', entryId: 'entry-missing'}, {}))
             .resolves.toEqual({success: true, data: false});
         await expect(handler.handle({type: VOCABULARY_BOOK_MESSAGE, action: 'removeWithSnapshot', entryId: 'entry-2'}, {}))
-            .resolves.toEqual({success: true, data: {id: 'entry-2', snapshot: true}});
-        repository.removeWithSnapshot.mockResolvedValueOnce(null);
-        await expect(handler.handle({type: VOCABULARY_BOOK_MESSAGE, action: 'removeWithSnapshot', entryId: 'entry-missing'}, {}))
-            .resolves.toEqual({success: true, data: null});
+            .resolves.toMatchObject({success:false});
         await expect(handler.handle({type: VOCABULARY_BOOK_MESSAGE, action: 'exportData', options: {format: 'anki'}}, {}))
             .resolves.toEqual({success: true, data: {method: 'exportData', options: {format: 'anki'}}});
 
         expect(dependencies.broadcastChanged).toHaveBeenCalledWith('remove', 'entry-1');
-        expect(dependencies.broadcastChanged).toHaveBeenCalledWith('remove', 'entry-2');
-        expect(dependencies.broadcastChanged).toHaveBeenCalledTimes(2);
+        expect(dependencies.broadcastChanged).toHaveBeenCalledTimes(1);
     });
 
     it('功能未启用、无痕窗口和非法 entryId 都返回词书业务错误', async () => {

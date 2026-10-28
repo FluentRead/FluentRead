@@ -11,7 +11,7 @@ import {createWebDavConnectionStore, WEBDAV_SYNC_STATE_KEY} from '@/src/platform
 import {createWebDavApi} from '@/src/platform/webdav/api';
 import {createWebDavBackup} from '@/src/services/config/webDavBackup';
 import {createWebDavBackupHandler} from './handlers/webDavBackup';
-import {isGoogleDriveSettingsSender} from './handlers/googleDriveSync';
+import {isTrustedSettingsSender} from './handlers/trustedSettingsSender';
 import type {ConfigMutationCoordinator} from './handlers/configPersistence';
 
 export function createWebDavBackupRuntime(mutations: ConfigMutationCoordinator) {
@@ -33,5 +33,5 @@ export function createWebDavBackupRuntime(mutations: ConfigMutationCoordinator) 
     });
     browser.tabs.onRemoved.addListener((tabId: number) => {void service.cancelTab(tabId).catch(() => undefined);});
     browser.tabs.onUpdated.addListener((tabId: number, change: {status?: string}) => {if (change.status === 'loading') void service.cancelTab(tabId).catch(() => undefined);});
-    return createWebDavBackupHandler({...service, commit: (...args) => mutations.run(() => service.commit(...args))}, sender => isGoogleDriveSettingsSender(sender, browser.runtime.id, browser.runtime.getURL('options.html')));
+    return createWebDavBackupHandler({...service, commit: (...args) => mutations.run(() => service.commit(...args))}, sender => isTrustedSettingsSender(sender, browser.runtime.id, browser.runtime.getURL('options.html')));
 }

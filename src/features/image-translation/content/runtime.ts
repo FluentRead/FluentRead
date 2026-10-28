@@ -1252,8 +1252,21 @@ function scheduleViewportChange(): void {
 
 function handleLayoutMutations(records: MutationRecord[]): void {
     // 资源替换必须在下一次绘制之前撤下旧译图；一般布局变化合并到一帧。
-    const sourceChanged = records.some(record => record.type === 'childList'
-        || ['src', 'srcset', 'sizes', 'media', 'type'].includes(record.attributeName || ''));
+    const sourceChanged = records.some(record => {
+        if (record.type !== 'childList') return ['src', 'srcset', 'sizes', 'media', 'type'].includes(record.attributeName || '');
+        // 普通正文的纯文本更新不改变 picture 的声明。仍安排一帧更新位置，
+        // 其中会复核响应式选源；移除、样式/头部与 picture 内的变化保持同步复核。
+        if (record.removedNodes?.length !== 0 || !record.addedNodes?.length || record.addedNodes.length > 8 || record.target.nodeType !== 1) return true;
+        const target = record.target as Element;
+        try {
+            if (target.closest('picture, head, style')) return true;
+            for (const node of record.addedNodes) if (node.nodeType !== 3 && node.nodeType !== 8) return true;
+            return false;
+        } catch {
+            // 宿主覆盖 DOM 方法时保守复核，不让观察回调失去布局更新。
+            return true;
+        }
+    });
     if (sourceChanged) {
         activeStates.forEach(state => {
             if (!state.image.isConnected) removeState(state);

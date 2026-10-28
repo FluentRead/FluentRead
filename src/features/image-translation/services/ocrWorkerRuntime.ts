@@ -1,10 +1,11 @@
 /**
  * @file src/features/image-translation/services/ocrWorkerRuntime.ts
  * 文件职责：实现与具体 OCR 引擎无关的 Worker 生命周期和串行任务队列，保证识别、参数设置、语言切换及销毁不会在并发请求间交叉污染。
- * 主要内容：定义 OcrWorkerPort、依赖与 runtime 契约，复用 Worker 并串行重新初始化语言与分割参数；累计模型超过五个时重建以限制内存，按设备内存限制空闲驻留；排队、识别和校验期间保留 Worker，显式销毁立即取消全部任务，迟到的语言切换不得污染后续任务；提供任务隔离的真实进度、识别和语言预加载。
+ * 主要内容：定义 OcrWorkerPort、依赖与 runtime 契约，复用 Worker 并串行重新初始化语言与分割参数；累计模型超过五个时重建以限制内存，按设备内存限制空闲驻留；排队取消及时移除待处理任务并清理所有权，仍在运行的识别和模型清理保持互斥；显式销毁立即取消全部任务，迟到的语言切换不得污染后续任务；提供任务隔离的真实进度、识别和语言预加载。
  * 模块边界：此层不依赖 Tesseract.js 类型、浏览器 storage 或图片翻译 UI；具体 worker 工厂由 ocrRuntime 注入，语言状态记录和 Offscreen 消息编排位于其他模块。
  */
 import {localModelIdleMs} from '@/src/shared/onnx/modelResidency';
+import {createLocalInferenceBudget} from '@/src/shared/onnx/resources';
 
 /**
  * OCR Worker 的最小能力边界。
@@ -60,7 +61,7 @@ export function createOcrWorkerRuntime<TResult>(
     let configuredWorker: OcrWorkerPort<TResult> | null = null;
     let configuredMode: string | number | undefined;
     let workerOwnershipGeneration = 0;
-    let operationTail: Promise<void> = Promise.resolve();
+    const runInOcrQueue = createLocalInferenceBudget(1);
     let jobSequence = 0;
     let activeProgress: {jobId: string; last: number; signal: AbortSignal; notify?: (percent: number) => void} | null = null;
     let idleTimer: ReturnType<typeof setTimeout> | undefined;
@@ -138,16 +139,14 @@ export function createOcrWorkerRuntime<TResult>(
             if (controller.signal.aborted) throw createOcrAbortError();
             return operation(controller.signal);
         };
-        // 步骤 1：无论上一项成功还是失败，后续 OCR 操作都必须继续执行。
-        const result = operationTail.then(execute, execute).finally(() => {
+        // 已取消的等待者从队列移除；在运行的 OCR 或模型清理仍持槽直到退出。
+        // 保留下一微任务启动，避免与既有调用时序和同步取消重入产生变化。
+        const result = runInOcrQueue(() => Promise.resolve().then(execute), controller.signal).finally(() => {
             signal?.removeEventListener('abort', cancel);
             operations.delete(controller);
             keepWarm();
         });
-        // 步骤 2：尾链只保存完成信号，调用方仍收到原始结果或异常。
-        operationTail = result.then(() => undefined, () => undefined);
-        // 排队请求尚未持有 worker，取消只能结束自己的等待；尾链仍等待
-        // 前一任务完成，避免后来的请求越过正在进行的 OCR。
+        // 运行中的底层操作可能还在退出，调用方取消时仍须立即停止等待。
         return runAbortable(result, controller.signal, false);
     }
 

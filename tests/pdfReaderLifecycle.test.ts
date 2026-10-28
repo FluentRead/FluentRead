@@ -54,7 +54,7 @@ beforeEach(() => {
         if (tag !== 'canvas') return element;
         const context: any = {drawImage: vi.fn(), fillRect: vi.fn(), measureText: vi.fn((value: string) => ({width: value.length * 8})), fillText: vi.fn(), save: vi.fn(), restore: vi.fn(), translate: vi.fn(), rotate: vi.fn(), beginPath: vi.fn(), rect: vi.fn(), clip: vi.fn(), getImageData: vi.fn((_x: number, _y: number, width: number, height: number) => ({data: new Uint8ClampedArray(width * height * 4).fill(255)}))};
         context.canvas = element;
-        Object.assign(element, {width: 0, height: 0, getContext: () => context, toBlob: vi.fn()});
+        Object.assign(element, {width: 0, height: 0, getContext: vi.fn(() => context), toBlob: vi.fn()});
         canvases.push(element); return element;
     });
     let nextFrame = 1;
@@ -263,6 +263,8 @@ describe('PDF reader actual PDF.js resource adapter', () => {
         await expect(reader.render(pageModel(1), settings(), new AbortController().signal)).rejects.toThrow('loading failed');
         const bilingual = await reader.render(pageModel(1), settings('bilingual', 1.5, 'bilingual'), new AbortController().signal);
         expect(canvases).toHaveLength(2); expect(bilingual.sourceCanvas).toBe(canvases[0]); expect(bilingual.translatedCanvas).toBe(canvases[1]); expect(bilingual.sourceText).toBeTruthy();
+        expect(canvases[0].getContext).toHaveBeenNthCalledWith(1, '2d', {alpha: false});
+        expect(canvases[1].getContext).toHaveBeenNthCalledWith(1, '2d', {alpha: false, willReadFrequently: true});
         expect(bilingual.sourceCanvas!.getAttribute('data-pdf-resource')).toBe('source'); expect(bilingual.translatedCanvas!.getAttribute('data-pdf-resource')).toBe('translation');
         expect(bilingual.translatedCanvas).toMatchObject({width: bilingual.sourceCanvas!.width, height: bilingual.sourceCanvas!.height});
         expect(bilingual.translatedCanvas!.style.width).toBe('918px'); expect(bilingual.translatedCanvas!.style.height).toBe('1188px');
@@ -274,11 +276,13 @@ describe('PDF reader actual PDF.js resource adapter', () => {
         bilingual.dispose();
         const translated = await reader.render(pageModel(1), settings('translated', 1.5, 'translated'), new AbortController().signal);
         expect(canvases).toHaveLength(3); expect(translated.translatedCanvas).toBe(canvases[2]);
+        expect(canvases[2].getContext).toHaveBeenNthCalledWith(1, '2d', {alpha: false, willReadFrequently: true});
         expect(translated.sourceCanvas).toBeUndefined(); expect(translated.sourceText).toBeUndefined(); expect(ports.textLayers).toHaveLength(1);
         expect(translated.translatedCanvas!.getAttribute('data-pdf-resource')).toBe('translation'); expect(translated.translatedCanvas!.width).toBeGreaterThan(0);
         expect((translated.translatedCanvas!.getContext('2d') as any).drawImage).not.toHaveBeenCalled(); expect((translated.translatedCanvas!.getContext('2d') as any).fillText).not.toHaveBeenCalled();
         const source = await reader.render(pageModel(1), settings('source', 1, 'source'), new AbortController().signal);
         expect(canvases).toHaveLength(4); expect(source.sourceCanvas).toBe(canvases[3]); expect(source.sourceText).toBeTruthy(); expect(source.translatedCanvas).toBeUndefined();
+        expect(canvases[3].getContext).toHaveBeenNthCalledWith(1, '2d', {alpha: false});
         expect(source.sourceCanvas!.getAttribute('data-pdf-resource')).toBe('source');
         translated.dispose(); source.dispose(); reader.dispose(); expect(canvases.every(canvas => canvas.width === 0 && canvas.height === 0)).toBe(true);
         expect(() => createPdfReaderRenderPort({...doc, binary: undefined})).toThrow('PDF 文档状态无效');

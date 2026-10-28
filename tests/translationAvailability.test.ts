@@ -1,4 +1,10 @@
 import {describe, expect, it, vi} from 'vitest';
+import {build} from 'vite';
+import {execFileSync} from 'node:child_process';
+import {mkdtempSync, rmSync} from 'node:fs';
+import {tmpdir} from 'node:os';
+import {join} from 'node:path';
+import {fileURLToPath, pathToFileURL} from 'node:url';
 import {createTranslationAvailability} from '@/src/services/translation/availability';
 import {attachTranslationRequestControl, getTranslationRequestControl, markTranslationRemainingBudget} from '@/src/services/translation/requestSnapshot';
 import {TRANSLATION_REMAINING_BUDGET} from '@/src/services/translation/types';
@@ -23,6 +29,40 @@ function fixture(on = true, ready: Promise<unknown> = Promise.resolve()) {
 const message = (): TranslationRequestMessage => ({origin: 'Source text', context: 'test'});
 
 describe('全局翻译开关的共享请求边界', () => {
+    it('启动失败记录诊断而不产生未处理拒绝，后续翻译保留原始错误', async () => {
+        const output = mkdtempSync(join(tmpdir(), 'fluentread-availability-'));
+        try {
+            await build({configFile: false, publicDir: false, logLevel: 'silent',
+                resolve: {alias: {'@': fileURLToPath(new URL('../', import.meta.url))}},
+                build: {outDir: output, target: 'es2022', lib: {
+                    entry: fileURLToPath(new URL('../src/services/translation/availability.ts', import.meta.url)),
+                    formats: ['es'], fileName: () => 'availability.mjs',
+                }}});
+            const observed = execFileSync(process.execPath, ['--input-type=module', '-e', `
+                const {createTranslationAvailability} = await import(${JSON.stringify(pathToFileURL(join(output, 'availability.mjs')).href)});
+                const unhandled = [], diagnostics = [];
+                process.on('unhandledRejection', error => unhandled.push(error.message));
+                let throwLog = false;
+                console.error = (...args) => {if (throwLog) throw new Error('logger failure'); diagnostics.push(args.join(' '));};
+                const make = mode => createTranslationAvailability({
+                    ready: mode === 'hydration' ? Promise.reject(new Error('hydration failure')) : Promise.resolve(),
+                    getConfig: () => ({on: true}),
+                    subscribe: () => {throw new Error('subscription failure');},
+                    translate: async () => 'unexpected',
+                });
+                const first = make('hydration'), second = make('subscription');
+                await new Promise(resolve => setTimeout(resolve, 25));
+                throwLog = true;
+                const third = make('hydration');
+                await new Promise(resolve => setTimeout(resolve, 25));
+                const errors = await Promise.all([first, second, third].map(api => api.translateWithCache({origin: 'source'})
+                    .then(() => 'unexpected', error => error.message)));
+                console.log(JSON.stringify({unhandled, errors, diagnostics}));
+            `], {encoding: 'utf8', timeout: 5_000});
+            expect(JSON.parse(observed)).toEqual({unhandled: [], errors: ['hydration failure', 'subscription failure', 'hydration failure'],
+                diagnostics: Array(2).fill('[FluentRead] translation availability initialization failed; check configuration storage.')});
+        } finally {rmSync(output, {recursive: true, force: true});}
+    });
     it('共享入口在配置水合前固定原文和选项，仍保留内部预算与取消所有权', async () => {
         const hydration = deferred<void>();
         const f = fixture(true, hydration.promise);
@@ -50,9 +90,25 @@ describe('全局翻译开关的共享请求边界', () => {
 
     it('水合失败不会发送请求', async () => {
         const error = new Error('configuration unavailable');
-        const f = fixture(true, Promise.reject(error));
-        await expect(f.api.translateWithCache(message())).rejects.toBe(error);
-        expect(f.translate).not.toHaveBeenCalled();
+        const diagnostic = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+        try {
+            const f = fixture(true, Promise.reject(error));
+            await expect(f.api.translateWithCache(message())).rejects.toBe(error);
+            expect(f.translate).not.toHaveBeenCalled();
+            expect(diagnostic).toHaveBeenCalledOnce();
+            expect(diagnostic.mock.calls[0]).toEqual(['[FluentRead] translation availability initialization failed; check configuration storage.']);
+        } finally {diagnostic.mockRestore();}
+    });
+
+    it('诊断端口抛错不会改变翻译初始化失败或产生新的拒绝', async () => {
+        const error = new Error('configuration unavailable');
+        const diagnostic = vi.spyOn(console, 'error').mockImplementation(() => {throw new Error('logger unavailable');});
+        try {
+            const f = fixture(true, Promise.reject(error));
+            await expect(f.api.translateWithCache(message())).rejects.toBe(error);
+            expect(f.translate).not.toHaveBeenCalled();
+            expect(diagnostic).toHaveBeenCalledOnce();
+        } finally {diagnostic.mockRestore();}
     });
 
     it('保留内部不可枚举预算、消息字段和调用者所有权，完成后移除取消监听', async () => {

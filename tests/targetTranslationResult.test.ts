@@ -2,10 +2,26 @@
  * @file tests/targetTranslationResult.test.ts
  * 以真实语言识别验证目标语言排版回显兜底，同时保留数字、否定、字形、符号和近似语种的有效变化。
  */
-import {describe, expect, it} from 'vitest';
+import {describe, expect, it, vi} from 'vitest';
 import {hasDistinctTargetTranslation} from '@/src/core/translation/targetResult';
 
 describe('目标语言译文排版回显', () => {
+    it('逐字回显不扫描大量代码字面量，内容变化仍保留展示', () => {
+        const source = 'Readable `code` example. '.repeat(2000);
+        const duplicate: string = JSON.parse(JSON.stringify(source));
+        const NativeMap = globalThis.Map;
+        let allocations = 0;
+        vi.stubGlobal('Map', new Proxy(NativeMap, {
+            construct(target, args) {allocations += 1; return Reflect.construct(target, args)},
+        }));
+        let distinct: boolean;
+        try {distinct = hasDistinctTargetTranslation(source, duplicate, 'zh-Hans')}
+        finally {vi.unstubAllGlobals()}
+        expect(distinct).toBe(false);
+        expect(allocations).toBe(0);
+        expect(hasDistinctTargetTranslation(source, source.replace('`code`', '`changed`'), 'zh-Hans')).toBe(true);
+    });
+
     it.each([
         ['我们已经完成文档翻译，支持离线阅读。', '我们已经完成文档翻译,支持离线阅读', 'zh-Hans'],
         ['這個軟體讀取文件並翻譯這個頁面上的語言。', '這 個 軟 體 讀 取 文 件 並 翻 譯 這 個 頁 面 上 的 語 言.', 'zh-Hant'],

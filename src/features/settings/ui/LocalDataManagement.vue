@@ -147,6 +147,7 @@
 </template>
 
 <script setup lang="ts">
+import {downloadTextFile as downloadFile} from '@/src/shared/dom/downloadTextFile';
 import UiIcon from '@/src/ui/components/UiIcon.vue'
 import {computed, nextTick, ref, shallowRef, useTemplateRef} from 'vue';
 import {Download, Upload} from '@element-plus/icons-vue';
@@ -528,14 +529,7 @@ function dateStamp(): string {
   return new Date().toISOString().slice(0, 10);
 }
 
-function downloadFile(name: string, body: string, type: string): void {
-  const url = URL.createObjectURL(new Blob([body], {type}));
-  const anchor = document.createElement('a');
-  anchor.href = url;
-  anchor.download = name;
-  anchor.click();
-  window.setTimeout(() => URL.revokeObjectURL(url), 1000);
-}
+
 
 function errorMessage(error: unknown): string {
   if (error instanceof TypeError && error.message === '不是受支持的 FluentRead 备份或旧版配置文件') {

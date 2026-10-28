@@ -41,6 +41,62 @@ beforeEach(() => {
 afterEach(() => { vi.unstubAllGlobals(); vi.useRealTimers(); });
 
 describe('Vue Shadow UI 平台适配器', () => {
+  it('releases an app when the content context invalidates synchronously during its mount', async () => {
+    const {window, document} = parseHTML('<html><head></head><body></body></html>');
+    vi.stubGlobal('window', window);
+    vi.stubGlobal('document', document);
+    const actual = await vi.importActual<typeof import('wxt/utils/content-script-ui/shadow-root')>('wxt/utils/content-script-ui/shadow-root');
+    mocks.createShadowRootUi.mockImplementation(actual.createShadowRootUi);
+    let invalidate!: () => void;
+    const ctx = {isInvalid: false, onInvalidated: (callback: () => void) => { invalidate = callback; }};
+    const app = {use: vi.fn(), mount: vi.fn(() => {ctx.isInvalid = true; invalidate(); return {}; }), unmount: vi.fn()};
+    mocks.createApp.mockReturnValue(app);
+    await expect(createVueShadowUi(ctx as never, {name: 'invalidated-during-mount', hostId: 'invalidated-during-mount', component: {}}))
+      .rejects.toMatchObject({name: 'AbortError'});
+    expect(app.unmount).toHaveBeenCalledOnce();
+    expect(document.getElementById('invalidated-during-mount')).toBeNull();
+  });
+
+  it('does not mount when the context invalidates during app configuration', async () => {
+    const {window, document} = parseHTML('<html><head></head><body></body></html>');
+    vi.stubGlobal('window', window); vi.stubGlobal('document', document);
+    const actual = await vi.importActual<typeof import('wxt/utils/content-script-ui/shadow-root')>('wxt/utils/content-script-ui/shadow-root');
+    mocks.createShadowRootUi.mockImplementation(actual.createShadowRootUi);
+    let invalidate!: () => void;
+    const ctx = {isInvalid: false, onInvalidated: (callback: () => void) => {invalidate = callback;}};
+    const app = {use: vi.fn(), mount: vi.fn(), unmount: vi.fn()};
+    mocks.createApp.mockReturnValue(app);
+    await expect(createVueShadowUi(ctx as never, {
+      name: 'invalidated-during-config', hostId: 'invalidated-during-config', component: {},
+      configureApp: () => {ctx.isInvalid = true; invalidate();},
+    })).rejects.toMatchObject({name: 'AbortError'});
+    expect(app.mount).not.toHaveBeenCalled();
+    expect(app.unmount).toHaveBeenCalledOnce();
+    expect(document.getElementById('invalidated-during-config')).toBeNull();
+  });
+
+  it('unmounts a real Vue component invalidated in its mounted hook', async () => {
+    const {window, document} = parseHTML('<html><head></head><body></body></html>');
+    vi.stubGlobal('window', window); vi.stubGlobal('document', document);
+    vi.stubGlobal('Element', window.Element); vi.stubGlobal('SVGElement', window.SVGElement);
+    const actualWxt = await vi.importActual<typeof import('wxt/utils/content-script-ui/shadow-root')>('wxt/utils/content-script-ui/shadow-root');
+    mocks.createShadowRootUi.mockImplementation(actualWxt.createShadowRootUi);
+    const vue = await vi.importActual<typeof import('vue')>('vue');
+    mocks.createApp.mockImplementation(vue.createApp);
+    let invalidate!: () => void;
+    const ctx = {isInvalid: false, onInvalidated: (callback: () => void) => {invalidate = callback;}};
+    const mounted = vi.fn(), unmounted = vi.fn();
+    const component = vue.defineComponent({setup() {
+      vue.onMounted(() => {mounted(); ctx.isInvalid = true; invalidate();});
+      vue.onUnmounted(unmounted);
+      return () => vue.h('button', 'test');
+    }});
+    await expect(createVueShadowUi(ctx as never, {name: 'invalidated-real-vue', hostId: 'invalidated-real-vue', component, configureApp: () => {}}))
+      .rejects.toMatchObject({name: 'AbortError'});
+    expect(mounted).toHaveBeenCalledOnce();
+    expect(unmounted).toHaveBeenCalledOnce();
+    expect(document.getElementById('invalidated-real-vue')).toBeNull();
+  });
   it.each([false, true])('实际 WXT 宿主跨延迟 body 替换保留同一组件，失效时正常卸载（viewport=%s）', async viewport => {
     const {window, document} = parseHTML('<html><head></head><body><main>First page</main></body></html>');
     vi.stubGlobal('window', window);

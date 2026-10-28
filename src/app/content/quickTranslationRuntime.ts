@@ -1,7 +1,7 @@
 /**
  * @file src/app/content/quickTranslationRuntime.ts
  * 文件职责：把快捷翻译手势 feature 与当前页面配置、划词优先级及全文、悬停和局部容器选择执行器组装起来。
- * 主要内容：解析方案的请求级覆盖，协调旧单例监听器与多方案路由，并保持全文切换与悬停取消语义；实际执行悬停或全文方案前结束尚未确认的指针选区。
+ * 主要内容：解析方案的请求级覆盖，协调旧单例监听器与多方案路由，并用全文会话身份保持快捷方案切换与悬停取消语义；实际执行悬停或全文方案前结束尚未确认的指针选区。
  * 模块边界：本文件只做 content composition；手势判定属于 quick-translation feature，翻译请求与 DOM 状态属于 full-page feature。
  */
 import type {PageTranslationInvocation} from '@/src/features/full-page-translation/public';
@@ -18,6 +18,7 @@ import {
     cancelPendingHoverTranslation,
     handleTranslation,
     isFullPageTranslationActive,
+    getFullPageTranslationSessionId,
     restoreOriginalContent,
 } from '@/src/features/full-page-translation/public';
 
@@ -31,9 +32,7 @@ export function mountConfiguredQuickTranslation(
     runFullPage?: (invocation: PageTranslationInvocation) => void,
 ): void {
     let activeFullPageInvocation = '';
-    const clearActiveInvocation = () => { activeFullPageInvocation = ''; };
-    document.addEventListener('fluentread-translation-started', clearActiveInvocation, {signal});
-    document.addEventListener('fluentread-translation-ended', clearActiveInvocation, {signal});
+    let activeFullPageSessionId: number | undefined;
     mountQuickTranslationContentFeature({
         config,
         document,
@@ -61,14 +60,19 @@ export function mountConfiguredQuickTranslation(
             const invocationIdentity = JSON.stringify(invocation);
             cancelPendingHoverTranslation();
             if (isFullPageTranslationActive()) {
-                const shouldStop = activeFullPageInvocation === invocationIdentity;
+                const shouldStop = activeFullPageInvocation === invocationIdentity
+                    && activeFullPageSessionId !== undefined
+                    && activeFullPageSessionId === getFullPageTranslationSessionId();
                 restoreOriginalContent();
                 if (shouldStop) return;
             } else {
                 restoreOriginalContent();
             }
-            autoTranslateEnglishPage(invocation);
-            if (isFullPageTranslationActive()) activeFullPageInvocation = invocationIdentity;
+            const sessionId = autoTranslateEnglishPage(invocation);
+            if (sessionId !== undefined && getFullPageTranslationSessionId() === sessionId) {
+                activeFullPageInvocation = invocationIdentity;
+                activeFullPageSessionId = sessionId;
+            }
         },
     }, signal);
 }

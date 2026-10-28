@@ -8,6 +8,7 @@ import {HARNESS_ACTIONS, type HarnessPreferences} from '@/src/core/config/harnes
 import type {ReadingProgress, ReadingRequest, ReadingResponse} from '@/src/features/reading-assistant/types';
 import type {HarnessRuntime} from './runtime';
 import type {HarnessSession, HarnessSessionStore, HarnessStoredTurn} from './sessionTypes';
+import {truncateUtf16} from '@/src/shared/function/truncateUtf16';
 
 interface ConversationDependencies {
     runtime: HarnessRuntime;
@@ -19,7 +20,7 @@ interface ConversationDependencies {
 const SAVE_WARNING = '本次会话未能保存，仍可继续阅读。请稍后检查本机存储。';
 const CANCELLED: ReadingResponse = {success: false, error: '已停止理解', cancelled: true};
 const INVALID_ANCHOR: ReadingResponse = {success: false, error: '当前回答已过期或不属于这个学习动作，请重新生成后追问'};
-const clip = (value: unknown, limit: number) => typeof value === 'string' ? value.trim().slice(0, limit) : '';
+const clip = (value: unknown, limit: number) => typeof value === 'string' ? truncateUtf16(value.trim(), limit) : '';
 
 export function createHarnessConversationRuntime(deps: ConversationDependencies) {
     const now = deps.now ?? Date.now;
@@ -100,7 +101,7 @@ export function createHarnessConversationRuntime(deps: ConversationDependencies)
             let finished = false;
             const publish = (progress: ReadingProgress) => {
                 if (finished || signal.aborted) return;
-                if (progress.kind === 'text') turn.answer = progress.text.slice(0, 16000);
+                if (progress.kind === 'text') turn.answer = truncateUtf16(progress.text, 16000);
                 if (progress.kind === 'model') { turn.service = progress.service; turn.model = progress.model; }
                 notify(progress);
                 if (persistent && !timer) timer = setTimeout(() => { timer = undefined; void save(); }, 500);

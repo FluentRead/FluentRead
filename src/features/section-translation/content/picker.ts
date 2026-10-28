@@ -628,8 +628,20 @@ function createPickerSession(options: SectionPickerOptions): PickerSession {
         cancelSettling();
         if (swept.length > 0) {
             const expanded = swept.map(root => expandSectionElement(root, geometry) ?? root);
-            const unique = [...new Set(expanded)].filter(root => !expanded.some(other => other !== root && containsContent(other, root)));
-            if (unique.length === swept.length && unique.every(root => swept.includes(root))) {showTopmostNotice(); return;}
+            const expandedSet = new Set(expanded);
+            const unique = [...expandedSet].filter(root => {
+                if (expandedSet.size < 2) return true;
+                let current = getComposedParent(root);
+                for (let depth = 1; current && depth < 512; depth += 1) {
+                    if (current !== root && expandedSet.has(current)) return false;
+                    current = getComposedParent(current);
+                }
+                return true;
+            });
+            if (unique.length === swept.length) {
+                const previous = new Set(swept);
+                if (unique.every(root => previous.has(root))) {showTopmostNotice(); return;}
+            }
             sweepExpansion.push(swept);
             setSwept(unique);
             return;

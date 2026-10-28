@@ -12,8 +12,8 @@
     <p v-if="activeTab === 'saved'" class="fr-learning-center-purpose">{{ t(`learning.${activeTab}Description`) }}</p>
     <VocabularyBook v-if="activeTab === 'saved'" :is-visible="isPanelVisible" @navigate="emit('navigate', $event)" />
     <MaterialWorkspace v-else-if="materialWorkspaceAvailable && activeTab === 'materials'" :is-visible="isPanelVisible" @navigate="emit('navigate', $event)" @open-tab="activeTab = $event" />
-    <HarnessReadingHistory v-else-if="activeTab === 'history'" />
-    <LearningMemoryManager v-else :enabled="memoryEnabled" @navigate="emit('navigate', $event)" />
+    <HarnessReadingHistory v-else-if="activeTab === 'history'" :is-visible="isPanelVisible" />
+    <LearningMemoryManager v-else :enabled="memoryEnabled" :is-visible="isPanelVisible" @navigate="emit('navigate', $event)" />
     <footer class="fr-learning-local">
       <details class="fr-learning-storage" @keydown.esc.stop.prevent="($event.currentTarget as HTMLDetailsElement).open = false">
         <summary><UiIcon name="shield" :size="14" />{{ t('learning.localStorage') }}<UiIcon name="chevron-down" :size="12" /></summary>

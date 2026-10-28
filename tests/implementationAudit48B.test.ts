@@ -673,6 +673,36 @@ describe('implementation audit 48 B: controlled public storage and backup flows'
         await expect(runtime.configStorage.getItem('session:credentials')).resolves.toBeNull();
     });
 
+    it('a synchronous access restriction failure does not prevent the other area or config hydration', async () => {
+        const local = {setAccessLevel: vi.fn(() => { throw new Error('controlled synchronous restriction failure'); })};
+        const session = {get: vi.fn(), set: vi.fn(), setAccessLevel: vi.fn(async () => undefined)};
+        const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+        vi.stubGlobal('location', {protocol: 'chrome-extension:'});
+        vi.stubGlobal('document', undefined);
+        vi.stubGlobal('browser', {storage: {local, session}, runtime: {}});
+        legacyRuntime.values.set('local:config', storedConfig);
+        vi.resetModules();
+        const runtime = await vi.importActual<typeof import('@/src/platform/storage/configStorageRuntime')>('@/src/platform/storage/configStorageRuntime');
+        expect(local.setAccessLevel).toHaveBeenCalledWith({accessLevel: 'TRUSTED_CONTEXTS'});
+        expect(session.setAccessLevel).toHaveBeenCalledWith({accessLevel: 'TRUSTED_CONTEXTS'});
+        expect(warn).toHaveBeenCalled();
+        await expect(runtime.configStorage.getItem('local:config')).resolves.toEqual(storedConfig);
+        expect(legacyRuntime.values.has('local:config')).toBe(false);
+    });
+
+    it('a throwing local area getter still attempts session restriction and retains config access', async () => {
+        const session = {get: vi.fn(), set: vi.fn(), setAccessLevel: vi.fn(async () => undefined)};
+        vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+        vi.stubGlobal('location', {protocol: 'chrome-extension:'});
+        vi.stubGlobal('document', undefined);
+        vi.stubGlobal('browser', {storage: {get local() {throw new Error('controlled local getter failure');}, session}, runtime: {}});
+        legacyRuntime.values.set('local:config', storedConfig);
+        vi.resetModules();
+        const runtime = await vi.importActual<typeof import('@/src/platform/storage/configStorageRuntime')>('@/src/platform/storage/configStorageRuntime');
+        expect(session.setAccessLevel).toHaveBeenCalledWith({accessLevel: 'TRUSTED_CONTEXTS'});
+        await expect(runtime.configStorage.getItem('local:config')).resolves.toEqual(storedConfig);
+    });
+
     it('Firefox background runtime retains its explicit memory-session fallback without native session storage', async () => {
         const window = {};
         vi.spyOn(console, 'warn').mockImplementation(() => undefined);

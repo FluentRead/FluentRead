@@ -11,6 +11,7 @@ import {config} from '@/src/services/config/store';
 import {type VideoSubtitleDisplayMode} from '@/src/core/config/model';
 import {cuesToSrt, sanitizeSubtitleFilename, type VideoSubtitleCue} from './youtubeSubtitleData';
 import {getCaptionPlatform} from './platforms';
+import {timedTextTrackKey} from './timedTextTrackCache';
 import {fitVideoSubtitleFontSize} from './subtitleLayout';
 import {getYoutubeSubtitleControlsScope} from './youtubeControlsScope';
 import {getVisibleYoutubeSubtitleControls, positionMobileYoutubeSubtitle, resetSubtitlePanelLayout, finishSubtitlePanelLayout,
@@ -204,19 +205,7 @@ export function renderVideoReadingAnnotation(player: HTMLElement, text: string, 
 }
 
 
-export function getTimedTextCacheKey(url: string): string {
-  try {
-    const parsed = new URL(url, window.location.href);
-    return [
-      parsed.searchParams.get('v') || '',
-      parsed.searchParams.get('lang') || '',
-      parsed.searchParams.get('tlang') || '',
-      parsed.searchParams.get('kind') || '',
-    ].join(':');
-  } catch {
-    return url;
-  }
-}
+export function getTimedTextCacheKey(url: string): string { return timedTextTrackKey(url, window.location.href); }
 
 export function isOriginalTimedTextUrl(url: string): boolean {
   try {

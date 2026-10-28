@@ -257,7 +257,8 @@ describe('vocabulary extension-page TTS cancellation through public runtime', ()
         ctx.clickSpeech(); await settle(); ctx.jobs[0].task.resolve(audio()); await settle();
         expect(ctx.fetchPageAudio).not.toHaveBeenCalled();
         expect(ctx.online).not.toHaveBeenCalled(); expect(ctx.browserSpeech).not.toHaveBeenCalled();
-        expect(ctx.traffic.map(row => row.message.type)).toEqual(['selectionTts']);
+        expect(ctx.traffic.filter(row => row.message.type === 'fluentReadVocabularyBook').map(row => row.message.action)).toEqual(['listUndo']);
+        expect(ctx.traffic.filter(row => row.message.type !== 'fluentReadVocabularyBook').map(row => row.message.type)).toEqual(['selectionTts']);
         expect(ctx.document.querySelector('.entry-speech-status')).toBeNull();
     });
     it('ignores a pending HTML play rejection after the user stops playback', async () => {
@@ -289,7 +290,8 @@ describe('vocabulary extension-page TTS cancellation through public runtime', ()
         const ctx = await mountBook(); ctx.clickSpeech(); await settle();
         ctx.jobs[0].task.reject(new Error('Edge test failure')); await settle();
         expect(ctx.document.querySelector('.book-toast')?.textContent).toContain('Edge test failure');
-        expect(ctx.traffic.map(row => row.message.type)).toEqual(['selectionTts']);
+        expect(ctx.traffic.filter(row => row.message.type === 'fluentReadVocabularyBook').map(row => row.message.action)).toEqual(['listUndo']);
+        expect(ctx.traffic.filter(row => row.message.type !== 'fluentReadVocabularyBook').map(row => row.message.type)).toEqual(['selectionTts']);
         expect(ctx.online).not.toHaveBeenCalled();
         expect(ctx.document.querySelector('.entry-speech-status')).toBeNull();
     });

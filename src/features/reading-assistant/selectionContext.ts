@@ -6,6 +6,7 @@
  */
 import {summarizeSelectionContext} from '@/src/features/selection-translation/core/public';
 import type {ReadingSelection} from './types';
+import {truncateUtf16} from '@/src/shared/function/truncateUtf16';
 
 const EXCLUDED = 'script,style,noscript,template,textarea,input,select,button,code,pre,svg,math,nav,aside,[hidden],[inert],[aria-hidden="true"],[contenteditable]:not([contenteditable="false"]),[role="textbox"],[role="button"],.notranslate,[data-notranslate="true"],[data-fluent-read-ui],.fluent-read-bilingual-content';
 const PROSE = 'p,li,blockquote,dd,dt,figcaption,h1,h2,h3,h4,h5,h6';
@@ -26,7 +27,7 @@ export function sentenceAroundSelection(context: string, selected: string, selec
 
 /** 捕获严格局限于本段的正文；异常、脱离文档或无法核对原文时退回选中文本。 */
 export function captureReadingSelection(range: Range, text: string, contextLimit: number): ReadingSelection {
-    const selected = normalize(text).slice(0, 4096);
+    const selected = truncateUtf16(normalize(text), 4096);
     const fallback: ReadingSelection = {text: selected, context: '', sentence: selected};
     if (contextLimit <= 0 || !range.startContainer.isConnected || !range.endContainer.isConnected) return fallback;
     const start = range.startContainer.nodeType === 1 ? range.startContainer as Element : range.startContainer.parentElement;

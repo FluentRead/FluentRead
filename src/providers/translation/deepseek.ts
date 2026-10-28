@@ -89,7 +89,7 @@ async function deepseek(message: TranslationProviderRequest<string>) {
             throw error;
         }
 
-        const result = await readJsonResponse<any>(resp, 'DeepSeek 返回的不是有效 JSON');
+        const result = await readJsonResponse<any>(resp, 'DeepSeek 返回的不是有效 JSON', message.abortSignal);
         if (message.abortSignal?.aborted) throw abortErrorFromSignal(message.abortSignal);
         const actualModel = typeof result?.model === 'string' && result.model.trim()
             ? result.model

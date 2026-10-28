@@ -12,7 +12,7 @@ export interface WritingRequest {
     history: Array<{question: string; answer: string}>;
 }
 export type WritingResponse = {success: true; text: string; service: string; model: string}
-    | {success: false; error: string; cancelled?: boolean};
+    | {success: false; error: string; cancelled?: boolean; reason?: 'configuration-changed'};
 export type WritingProgress = {kind: 'text'; text: string} | {kind: 'model'; service: string; model: string};
 export type WritingStreamMessage = {requestId: string} & (
     {type: 'progress'; progress: WritingProgress} | {type: 'result'; response: WritingResponse});

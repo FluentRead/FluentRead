@@ -210,3 +210,27 @@ describe('DeepL 原生数组的源槽对应', () => {
         expect(fetchMock).not.toHaveBeenCalled();
     });
 });
+
+describe('DeepL 取消边界', () => {
+    it('请求开始前取消时不访问网络', async () => {
+        const controller = new AbortController();
+        controller.abort();
+        await expect(deepl(withProviderSnapshot({origin: 'Hello', abortSignal: controller.signal}, mockConfig)))
+            .rejects.toMatchObject({name: 'AbortError'});
+        expect(fetchMock).not.toHaveBeenCalled();
+    });
+
+    it('正文读取期间取消，即使响应最终完整也不发布结果或启动下一个分包', async () => {
+        const controller = new AbortController();
+        const origin = Array.from({length: 33}, (_, index) => `item ${index}`);
+        const bytes = new TextEncoder().encode(JSON.stringify({translations:
+            Array.from({length: 32}, () => ({text: '译文'}))}));
+        const stream = new ReadableStream<Uint8Array>({
+            pull(output) {controller.abort(); output.enqueue(bytes); output.close();},
+        }, {highWaterMark: 0});
+        fetchMock.mockResolvedValue(new Response(stream));
+        await expect(deepl(withProviderSnapshot({origin, abortSignal: controller.signal}, mockConfig)))
+            .rejects.toMatchObject({name: 'AbortError'});
+        expect(fetchMock).toHaveBeenCalledOnce();
+    });
+});

@@ -39,6 +39,14 @@ describe('Harness runtime', () => {
         createModel.mockClear();
         normalizeError.mockClear();
     });
+    it('直接传入超长选文与追问时不向模型发送截断的代理对', async () => {
+        const current = config(); generateText.mockResolvedValue({text: 'Feedback'});
+        const result = await createHarnessRuntime(() => current).run({type: 'fluentReadHarness', action: 'run', requestId: 'unicode', intent: 'meaning', question: `${'q'.repeat(999)}😀tail`, selection: {text: `${'a'.repeat(4095)}😀tail`, context: '', sentence: ''}}, new AbortController().signal);
+        expect(result.success).toBe(true);
+        const user = generateText.mock.calls[0][0].messages.at(-1).content as string;
+        expect(user).toContain('a'.repeat(4095));expect(user).toContain('q'.repeat(999));
+        expect(user).not.toContain('\ud83d');expect(user).not.toContain('tail');
+    });
     it('rejects an unavailable saved ChatGPT service before reading memory, creating a model or generating', async () => {
         const current = config(); current.harness.service = services.chatgptPlan; current.harness.model = 'saved-account-model'; current.harness.memoryEnabled = true;
         const before = JSON.stringify(current); const recall = vi.fn();

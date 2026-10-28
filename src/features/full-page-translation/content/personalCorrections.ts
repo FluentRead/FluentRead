@@ -1,7 +1,7 @@
 /**
  * @file src/features/full-page-translation/content/personalCorrections.ts
  * 文件职责：把读者主动确认的校订记忆接入安全的网页翻译单元，提供双语编辑、预览及两种显示模式下撤销后的可逆渲染端口。
- * 主要内容：按材料摘要、源目标语言及最近标题构造匹配身份，在 provider 请求前查找精确校订；以弱映射保留服务底稿，复用活动所有者索引与当前模式重绘端口，删除且无底稿时恢复原文；标题、移动或 SPA 材料变化时以无 IO 观察立即恢复旧语境的个人结果，普通结构变更先有界探查局部索引，避免逐节点枚举全页译文。
+ * 主要内容：按材料摘要、源目标语言及最近标题构造匹配身份，在 provider 请求前查找精确校订，取消后不将查询失败误作普通降级；以弱映射保留服务底稿，复用活动所有者索引与当前模式重绘端口，失效刷新不继续读取；标题、移动或 SPA 材料变化时以无 IO 观察立即恢复旧语境的个人结果，普通结构变更先有界探查局部索引，避免逐节点枚举全页译文。
  * 模块边界：只处理全文功能内部的 DOM 所有权与公共记忆服务适配，不持久化阅读历史、不改变请求队列、不把个人结果写入供应商缓存；含代码、公式等不能安全拍平的单元不开放编辑。
  */
 import {createMaterialId, type CorrectionQuery} from '@/src/core/personal-corrections/public';
@@ -55,6 +55,7 @@ export function readPersonalCorrectionContext(node: HTMLElement): string {
 
 export async function lookupPersonalCorrection(node: HTMLElement, source: string, sourceLanguage: string,
     targetLanguage: string, signal?: AbortSignal): Promise<PersonalCorrectionSnapshot | undefined> {
+    if (signal?.aborted) throw new DOMException('校订匹配已取消', 'AbortError');
     const href = globalThis.location?.href;
     if (!href || !/^https?:/u.test(href) || import.meta.env.BROWSER === 'userscript' || !isPersonalCorrectionEnabled()) return undefined;
     const generation = enableGeneration;
@@ -62,7 +63,10 @@ export async function lookupPersonalCorrection(node: HTMLElement, source: string
         context: readPersonalCorrectionContext(node), materialId: createMaterialId(href)};
     let match;
     try { match = await personalCorrections.lookup(query); }
-    catch { return undefined; } // 记忆读取失败不阻断正常翻译。
+    catch {
+        if (signal?.aborted) throw new DOMException('校订匹配已取消', 'AbortError');
+        return undefined; // 未取消的记忆读取失败不阻断正常翻译。
+    }
     if (signal?.aborted) throw new DOMException('校订匹配已取消', 'AbortError');
     if (!isPersonalCorrectionEnabled() || generation !== enableGeneration) return undefined;
     return {query, enableGeneration: generation, ...(match.exact ? {recordId: match.exact.id, recordRevision: match.exact.revision, translation: match.exact.translation} : {})};
@@ -296,7 +300,8 @@ export async function refreshVisiblePersonalCorrections(): Promise<void> {
     for (const {node, state, snapshot} of correctionOwners()) {
         if (!currentPair(node, state, snapshot)) continue;
         let match;
-        try { match = await personalCorrections.lookup(snapshot.query); } catch { continue; }
+        try { match = await personalCorrections.lookup(snapshot.query); }
+        catch { if (revision !== refreshRevision) return; continue; }
         if (revision !== refreshRevision) return;
         if (!isPersonalCorrectionEnabled()) {disableVisiblePersonalCorrections(); return;}
         if (!currentPair(node, state, snapshot)) continue;

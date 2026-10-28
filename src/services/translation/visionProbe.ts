@@ -52,15 +52,28 @@ export function createModelVisionProbe(deps: {
     let loaded: Promise<void> | undefined;
     let writes = Promise.resolve();
     const active = new Map<string, ActiveVisionProbe>();
+    const invalidated = new Set<string>();
     const load = () => loaded ??= deps.storage.load().then(value => { records = normalizeVisionProbeRecords(value, now()); })
         .catch(error => { loaded = undefined; throw error; });
-    const save = () => {
-        const snapshot = normalizeVisionProbeRecords(records, now());
-        const write = writes.catch(() => undefined).then(() => deps.storage.save(snapshot));
+    const updateRecords = (update: (current: VisionProbeRecord[]) => VisionProbeRecord[], signal?: AbortSignal, committedIdentity?: string) => {
+        const write = writes.catch(() => undefined).then(async () => {
+            signal?.throwIfAborted();
+            const previous = normalizeVisionProbeRecords(records.filter(item => !invalidated.has(item.identity)), now());
+            const snapshot = normalizeVisionProbeRecords(update(previous), now());
+            await deps.storage.save(snapshot);
+            signal?.throwIfAborted();
+            if (committedIdentity) invalidated.delete(committedIdentity);
+            records = snapshot;
+            for (const identity of invalidated) {
+                if (!records.some(record => record.identity === identity)) invalidated.delete(identity);
+            }
+        });
         writes = write;
         return write;
     };
     const cached = (identity: string): VisionProbeResult | undefined => {
+        // 强制探测启动后，等待清除落盘时也不能继续使用旧结果。
+        if (invalidated.has(identity) || active.has(identity)) return undefined;
         records = normalizeVisionProbeRecords(records, now());
         const record = records.find(item => item.identity === identity);
         return record ? {capability: record.capability, source: 'probe', checkedAt: record.checkedAt} : undefined;
@@ -113,8 +126,8 @@ export function createModelVisionProbe(deps: {
         }
     }
     async function execute(source: TranslationConfigSource, service: string, model: string, identity: string, signal: AbortSignal): Promise<VisionProbeResult> {
-        records = records.filter(item => item.identity !== identity);
-        await save();
+        if (records.some(item => item.identity === identity)) invalidated.add(identity);
+        await updateRecords(current => current.filter(item => item.identity !== identity), signal);
         signal.throwIfAborted();
         const random = deps.random ? deps.random() : crypto.getRandomValues(new Uint8Array(3));
         const challenge = createVisionProbeImage(random);
@@ -140,8 +153,7 @@ export function createModelVisionProbe(deps: {
         }
         if (capability === 'unknown') return {capability, source: 'unknown'};
         const checkedAt = now();
-        records = [{identity, capability, checkedAt}, ...records];
-        await save();
+        await updateRecords(current => [{identity, capability, checkedAt}, ...current.filter(item => item.identity !== identity)], signal, identity);
         signal.throwIfAborted();
         return {capability, source: 'probe', checkedAt};
     }

@@ -74,7 +74,7 @@ export function createRememberedSectionRuntime(ports: RememberedSectionPorts, si
         for (const rule of rules) for (const path of rule.selectors) for (const selector of path) {
             for (const match of selector.matchAll(/\[([\w-]+)/gu)) attributes.add(match[1]);
         }
-        observer.observe(root, {subtree: true, childList: true, characterData: true, attributes: true, attributeFilter: [...attributes]});
+        observer.observe(root, {subtree: true, childList: true, characterData: true, attributes: true, attributeOldValue: true, attributeFilter: [...attributes]});
     };
     const relevantMutation = (record: MutationRecord): boolean => {
         if (ownNode(record.target)) return false;
@@ -86,10 +86,29 @@ export function createRememberedSectionRuntime(ports: RememberedSectionPorts, si
         if (record.type === 'characterData') return inside;
         if (record.type === 'attributes') {
             if (inside || [...trackedRoots, ...trackedHosts].some(root => within(record.target, root))) return true;
-            // 还未出现的区域可能由宿主改写 id/class 后变得可定位；只检查这个元素自身。
+            // 未定位的子区域可能因祖先锚点变化而出现；歧义也可能因旧锚点消失而解除。
             const target = record.target as Element;
             return rules.some(rule => rule.selectors.some(path => path.some(selector => {
-                try { return target.matches(selector); } catch { return false; }
+                try {
+                    if (target.matches(selector)) return true;
+                    const attribute = record.attributeName;
+                    if (!attribute) return false;
+                    if ((attribute === 'hidden' || attribute === 'aria-hidden') && target.querySelector(selector)) return true;
+                    if (!selector.includes(`[${attribute}`) && !(attribute === 'id' && selector.includes('#'))
+                        && !(attribute === 'class' && selector.includes('.'))) return false;
+                    const referenced = (input: string | null): boolean => input === ''
+                        ? selector.includes('=""') || selector.includes("=''")
+                        : Boolean(input && (selector.includes('\\') ||
+                        [input, ...input.split(/\s+/u)].some(value => {
+                            if (!value) return false;
+                            if (selector.includes(`"${value}"`) || selector.includes(`'${value}'`)) return true;
+                            if (attribute !== 'id' && attribute !== 'class') return false;
+                            const literal = value.replace(/[.*+?^${}()|[\]\\]/gu, '\\$&');
+                            return new RegExp(`[.#]${literal}(?=$|[.#[:>\\s])`, 'u').test(selector);
+                        })));
+                    return referenced(record.oldValue) || referenced(target.getAttribute(attribute)) && Boolean(target.querySelector(selector));
+                } catch { /* 无效选择器仍由定位器安全拒绝。 */ }
+                return false;
             })));
         }
         const changed = [...record.addedNodes, ...record.removedNodes].filter(node => !ownNode(node));

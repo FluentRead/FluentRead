@@ -133,6 +133,103 @@ beforeEach(async () => {
 afterEach(async () => {ports.pagePending?.resolve(ports.tasks.find(value => value.role === 'preview')?.page); ports.renderPending?.resolve(); app?.unmount(); await flush(); await vi.dynamicImportSettled(); windowTimers.forEach(timer => clearTimeout(timer)); windowTimers.clear(); vi.restoreAllMocks(); vi.unstubAllGlobals();});
 
 describe('documentbinaryAudit actual DocumentApp SFC ownership', () => {
+    it('keeps the last confirmed list on read or mutation failure and retries without losing stored data', async () => {
+        const factory = new IDBFactory(), history = createDocumentHistory(factory);
+        const bytes = new TextEncoder().encode('Source.'), id = await documentHistoryId(bytes);
+        await history.save({id, name: 'kept.txt', format: 'txt', size: bytes.length, total: 1, completed: 1,
+            updatedAt: 1, bytes, mimeType: 'text/plain', translations: ['Kept'], fingerprint: ''});
+        app.unmount();vi.stubGlobal('indexedDB', factory);root = node('root');app = renderer.createApp(DocumentApp);app.mount(root);state = app._instance.setupState;
+        await vi.waitFor(() => expect(state.historyEntries).toHaveLength(1));
+        vi.spyOn(state.history, 'listChecked').mockResolvedValueOnce({status: 'unavailable'});
+        await state.refreshHistory();await flush();
+        expect(state.historyEntries).toHaveLength(1);expect(state.historyError).toBe('document.historyListUnavailable');
+        expect(walkHost(root).some(entry => entry.props['data-testid'] === 'document-history-list-error')).toBe(true);
+        await state.refreshHistory();expect(state.historyError).toBe('');
+        vi.spyOn(state.history, 'removeChecked').mockResolvedValueOnce({status: 'unavailable'});
+        await state.removeHistory(state.historyEntries[0]);await flush();
+        expect(state.historyError).toBe('document.historyChangeUnavailable');expect(state.historyEntries).toHaveLength(1);
+        expect((await history.load(id))?.translations).toEqual(['Kept']);
+        await state.refreshHistory();expect(state.historyError).toBe('');
+        vi.spyOn(state.history, 'clear').mockResolvedValueOnce(false);
+        await state.clearHistory();expect(state.historyError).toBe('document.historyChangeUnavailable');
+        expect((await history.load(id))?.translations).toEqual(['Kept']);
+        await state.refreshHistory();await state.clearHistory();expect(state.historyEntries).toHaveLength(0);
+    });
+    it('warns and preserves a record changed in another tab before stale-list deletion', async () => {
+        const factory = new IDBFactory(), other = createDocumentHistory(factory);
+        const bytes = new TextEncoder().encode('Source.'), id = await documentHistoryId(bytes);
+        await other.save({id, name: 'race.txt', format: 'txt', size: bytes.length, total: 1, completed: 1,
+            updatedAt: 1, bytes, mimeType: 'text/plain', translations: ['Before'], fingerprint: ''});
+        app.unmount();vi.stubGlobal('indexedDB', factory);root = node('root');app = renderer.createApp(DocumentApp);app.mount(root);state = app._instance.setupState;
+        await vi.waitFor(() => expect(state.historyEntries).toHaveLength(1));
+        const fresh = await other.loadChecked(id);if (fresh.status !== 'ok' || !fresh.record) throw new Error('expected record');
+        expect((await other.saveChecked({...fresh.record, translations: ['Other tab']}, fresh.version)).status).toBe('saved');
+        await state.removeHistory(state.historyEntries[0]);await flush();
+        expect(state.historyError).toBe('document.historyRemoveConflict');
+        expect(hostText(walkHost(root).find(entry => entry.props['data-testid'] === 'document-history-list-error')!)).toContain('document.historyRemoveConflict');
+        expect((await other.load(id))?.translations).toEqual(['Other tab']);
+        await state.refreshHistory();await state.removeHistory(state.historyEntries[0]);expect(await other.load(id)).toBeNull();
+    });
+    it('ignores a stale list response after a newer successful refresh', async () => {
+        const first = deferred<{status: 'ok'; entries: []} | {status: 'unavailable'}>();
+        vi.spyOn(state.history, 'listChecked').mockReturnValueOnce(first.promise).mockResolvedValueOnce({status: 'ok', entries: []});
+        const pending = state.refreshHistory();await state.refreshHistory();first.resolve({status: 'unavailable'});await pending;
+        expect(state.historyError).toBe('');expect(state.historyLoading).toBe(false);
+    });
+    it('preserves both document edits and warns the stale tab after concurrent history writes', async () => {
+        const factory = new IDBFactory(), history = createDocumentHistory(factory);
+        const bytes = new TextEncoder().encode('Source.'), id = await documentHistoryId(bytes), parsed = parseDocument('race.txt', 'Source.');
+        await history.save({id, name: 'race.txt', format: 'txt', size: bytes.length, total: 1, completed: 1,
+            updatedAt: 1, bytes, mimeType: 'text/plain', translations: ['Original correction'], fingerprint: '', parsed, parsedVersion: 20});
+        app.unmount();vi.stubGlobal('indexedDB', factory);
+        root = node('root');app = renderer.createApp(DocumentApp);app.mount(root);state = app._instance.setupState;
+        const secondRoot = node('root'), secondApp = renderer.createApp(DocumentApp);secondApp.mount(secondRoot);
+        const other = (secondApp._instance as any).setupState;
+        try {
+            const input = new File([bytes], 'race.txt', {type: 'text/plain'});
+            await Promise.all([state.loadFiles([input]), other.loadFiles([input])]);await flush();
+            state.editSegment(0, 'First tab edit');state.persistHistory();
+            await vi.waitFor(async () => expect((await history.load(id))?.translations).toEqual(['First tab edit']));
+            other.editSegment(0, 'Second tab edit');other.persistHistory();
+            await vi.waitFor(() => expect(other.activeTask.historyConflict).toBe(true));await flush();
+            expect((await history.load(id))?.translations).toEqual(['First tab edit']);
+            expect(other.translatedSegments).toEqual(['Second tab edit']);
+            const notice = walkHost(secondRoot).find(entry => entry.props['data-testid'] === 'document-history-unavailable');
+            expect(hostText(notice!)).toContain('document.historyConflict');
+            await other.retryDocumentHistory();await flush();
+            expect(other.documentQueue).toHaveLength(2);
+            expect(other.documentQueue[0].translations).toEqual(['Second tab edit']);
+            expect(other.documentQueue[1].translations).toEqual(['First tab edit']);
+        } finally {secondApp.unmount();}
+    });
+    it('keeps edits and old history separate when a failed read is retried', async () => {
+        const factory = new IDBFactory(), history = createDocumentHistory(factory);
+        const bytes = new TextEncoder().encode('Source.'), id = await documentHistoryId(bytes);
+        const parsed = parseDocument('retry.txt', 'Source.');
+        await history.save({id, name: 'retry.txt', format: 'txt', size: bytes.length, total: 1, completed: 1,
+            updatedAt: 1, bytes, mimeType: 'text/plain', translations: ['Previous correction'], fingerprint: '', parsed, parsedVersion: 20});
+        const session = new Map<string, string>();
+        app.unmount();vi.stubGlobal('indexedDB', factory);
+        vi.stubGlobal('sessionStorage', {getItem: (key: string) => session.get(key) ?? null, setItem: (key: string, value: string) => session.set(key, value), removeItem: (key: string) => session.delete(key)});
+        root = node('root');app = renderer.createApp(DocumentApp);app.mount(root);state = app._instance.setupState;await flush();
+        vi.spyOn(state.history, 'loadChecked').mockResolvedValueOnce({status: 'unavailable'});
+        await state.loadFiles([new File([bytes], 'retry.txt', {type: 'text/plain'})]);await flush();
+        expect(state.documentQueue[0].historyReadUnavailable).toBe(true);
+        expect(session.has('fluentread.document.open')).toBe(false);
+        const warning = walkHost(root).find(entry => entry.props['data-testid'] === 'document-history-unavailable');
+        expect(warning?.parent?.props['data-testid']).toBe('document-task-notices');
+        expect(walkHost(root).some(entry => entry.type === 'button' && hostText(entry).includes('document.historyRetry'))).toBe(true);
+        expect(state.documentMaterialSelection()).toBeUndefined();
+        state.editSegment(0, 'New correction');state.persistHistory();await flush();
+        expect((await history.load(id))?.translations).toEqual(['Previous correction']);
+        await state.retryDocumentHistory();await flush();
+        expect(state.documentQueue).toHaveLength(2);
+        expect(state.documentQueue[0].translations).toEqual(['New correction']);
+        expect(state.documentQueue[1].translations).toEqual(['Previous correction']);
+        expect(state.activeDocumentId).toBe(state.documentQueue[1].id);
+        expect(session.get('fluentread.document.open')).toBe(id);
+        expect((await history.load(id))?.translations).toEqual(['Previous correction']);
+    });
     it('consumes online URL input and PDF child navigation events without requesting translation', async () => {
         const input = walkHost(root).find(entry => entry.props.id === 'online-pdf-url')! as any;
         input.value = 'https://example.test/paper.pdf'; input.dispatchEvent(new Event('input'));
@@ -665,6 +762,7 @@ describe('documentbinaryAudit actual DocumentApp SFC ownership', () => {
         expect(ports.sendMessage.mock.calls.some(([message]) => message.type === 'fluentReadMaterials')).toBe(false);
     });
     it('keeps missing local materials recoverable and clears the restoring shell when an old session exists', async () => {
+        app.unmount();vi.stubGlobal('indexedDB', new IDBFactory());root = node('root');app = renderer.createApp(DocumentApp);app.mount(root);state = app._instance.setupState;await flush();
         ports.sendMessage.mockImplementation(async (message: any) => message.type === 'fluentReadMaterials' ? {success: true, data: {id: 'missing-material', kind: 'document', source: {kind: 'document', fingerprint: 'b'.repeat(32)}, locator: {kind: 'document', page: 2}}} : undefined);
         state.restoring = true; await state.restoreMaterialDocument('missing-material'); await flush();
         expect(state.restoring).toBe(false); expect(state.importError).toContain('请选择原文件');
@@ -673,6 +771,12 @@ describe('documentbinaryAudit actual DocumentApp SFC ownership', () => {
         expect(state.importError).toContain('内容指纹不一致'); expect(state.documentMaterialId).toBe('');
         state.documentQueue[0].historyId = 'b'.repeat(32); await state.applyMaterialResume(); await flush();
         expect(state.documentMaterialId).toBe('missing-material');
+    });
+    it('reports unavailable material history without claiming the record was removed', async () => {
+        ports.sendMessage.mockImplementation(async (message: any) => message.type === 'fluentReadMaterials' ? {success: true, data: {id: 'unavailable', kind: 'document', source: {kind: 'document', fingerprint: 'b'.repeat(32)}, locator: {kind: 'document', page: 2}}} : undefined);
+        await state.restoreMaterialDocument('unavailable');await flush();
+        expect(state.importError).toBe('document.historyOpenUnavailable');
+        expect(state.importError).not.toContain('已移除');
     });
     it('cancels pending material saves when the document changes and preserves the newly active file', async () => {
         await state.loadFiles([file('first.txt'), file('second.txt')]); await flush();

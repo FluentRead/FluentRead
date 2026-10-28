@@ -1,7 +1,7 @@
 /**
  * @file src/features/input-translation/content/inputBox.ts
  * 文件职责：提供输入框快捷翻译使用的纯 DOM 判定与提交守卫，统一处理非敏感 input、textarea、contenteditable 编辑宿主（含富文本编辑器）和 Shadow DOM 深层焦点。
- * 主要内容：定义三连空格/等号/减号触发类型，包含活动元素查找、原生控件与编辑宿主识别（含 fieldset 继承禁用）、文本与值快照读取、原生控件选区读取、请求提交有效性判断、键盘匹配，以及本次实际插入字符区间的清理。
+ * 主要内容：定义三连空格/等号/减号触发类型，包含活动元素查找、原生控件与编辑宿主识别（含 fieldset 与跨 Shadow DOM 的 ARIA 继承禁用）、文本与值快照读取、原生控件选区读取、请求提交有效性判断、键盘匹配，以及本次实际插入字符区间的清理。
  * 模块边界：该模块不注册事件、不发送翻译请求也不改变控件值；编辑宿主的光标度量与原生编辑写回位于 editableHost.ts，content/index.ts 负责生命周期与写回编排，后台 handler 负责翻译，函数保持可单测且不持有全局状态。
  */
 const TEXT_INPUT_TYPES = new Set(['text', 'search', 'url', 'email', 'tel']);
@@ -39,6 +39,18 @@ export function isFormControl(element: Element): element is HTMLInputElement | H
     return tagName === 'input' || tagName === 'textarea';
 }
 
+/** ARIA 禁用也约束可聚焦后代；跨开放 ShadowRoot 时继续检查宿主及其祖先。 */
+function isAriaDisabled(element: Element): boolean {
+    let current: Element | null = element;
+    while (current) {
+        if (current.getAttribute('aria-disabled')?.toLowerCase() === 'true'
+            || current.closest('[aria-disabled="true" i]')) return true;
+        const root = current.getRootNode?.();
+        current = root && 'host' in root ? (root as ShadowRoot).host : null;
+    }
+    return false;
+}
+
 /**
  * 判断元素是否是可参与翻译的 contenteditable 编辑宿主，包括富文本编辑器。
  * 富文本写回不直接改写 innerText/innerHTML，而是交给 editableHost.ts 的原生编辑路径，
@@ -47,7 +59,7 @@ export function isFormControl(element: Element): element is HTMLInputElement | H
 export function isEditableHost(element: Element): element is HTMLElement {
     const value = element.getAttribute('contenteditable');
     if (value === null || !EDITABLE_HOST_VALUES.has(value.toLowerCase())) return false;
-    if (element.getAttribute('aria-readonly') === 'true' || element.getAttribute('aria-disabled') === 'true') return false;
+    if (element.getAttribute('aria-readonly')?.toLowerCase() === 'true' || isAriaDisabled(element)) return false;
     return !element.closest(CODE_EDITOR_SELECTOR);
 }
 
@@ -58,6 +70,8 @@ export function isInputElement(element: Element | null): element is HTMLElement 
     if ('readOnly' in element && Boolean((element as HTMLInputElement | HTMLTextAreaElement).readOnly)) return false;
 
     const tagName = element.tagName.toLowerCase();
+    if ((tagName === 'input' || tagName === 'textarea')
+        && (element.getAttribute('aria-readonly')?.toLowerCase() === 'true' || isAriaDisabled(element))) return false;
     // disabled 属性不包含 fieldset 的继承状态；浏览器的伪类同时保留首个 legend 的可编辑例外。
     if ((tagName === 'input' || tagName === 'textarea') && element.matches?.(':disabled')) return false;
     if (tagName === 'input') {

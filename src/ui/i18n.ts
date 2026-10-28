@@ -89,11 +89,33 @@ export function localizeServiceOptions<T extends LocalizableServiceOption>(
 
 export const UI_I18N_KEY: InjectionKey<UiI18nContext> = Symbol('fluentread-ui-i18n');
 
+/** 每种语言的未完成加载只绑定一个 Promise 回调；卸载的界面可以移除自己的监听。 */
+const pendingUiBundles = new Map<UiLanguage, {listeners: Set<(loaded: boolean) => void>}>();
+function subscribePendingUiBundle(language: UiLanguage, listener: (loaded: boolean) => void): () => void {
+    let owner = pendingUiBundles.get(language);
+    if (!owner) {
+        owner = {listeners: new Set()};
+        pendingUiBundles.set(language, owner);
+        const current = owner;
+        const finish = (loaded: boolean) => {
+            if (pendingUiBundles.get(language) !== current) return;
+            pendingUiBundles.delete(language);
+            const listeners = [...current.listeners];
+            current.listeners.clear();
+            for (const notify of listeners) {try {notify(loaded);} catch { /* 一个已失效界面不能阻止其他界面。 */ }}
+        };
+        try {void ensureUiLanguageBundle(language).then(finish, () => finish(false));}
+        catch (error) {pendingUiBundles.delete(language); throw error;}
+    }
+    owner.listeners.add(listener);
+    return () => {owner.listeners.delete(listener);};
+}
+
 export function createUiI18nContext(): UiI18nContext {
     const languageState = ref<UiLanguage>(normalizeUiLanguage(config.uiLanguage || DEFAULT_UI_LANGUAGE));
     const bundleRevisionState = ref(0);
     let disposed = false;
-    let renderRevision = 0;
+    const pendingBundleLoads = new Map<UiLanguage, () => void>();
     type LanguageChange = {
         language: UiLanguage;
         previousLanguage: UiLanguage;
@@ -108,14 +130,25 @@ export function createUiI18nContext(): UiI18nContext {
     const applyLanguage = (value: unknown): void => {
         if (disposed) return;
         const nextLanguage = normalizeUiLanguage(value);
-        const revision = ++renderRevision;
+        const sameLanguage = languageState.value === nextLanguage;
         languageState.value = nextLanguage;
-        // 普通配置变化频繁触发订阅；资源已注册时不做任何额外刷新。未注册时先按中文回退渲染，
-        // 资源到达后只刷新仍在使用该语言的界面。
-        if (hasUiLanguageBundle(nextLanguage)) return;
-        void ensureUiLanguageBundle(nextLanguage).then((loaded) => {
-            if (loaded && !disposed && revision === renderRevision) bundleRevisionState.value += 1;
-        }).catch(() => undefined);
+        // 同一语言的挂起请求只附加一次回调；往返切换时仍由当前语言决定是否刷新。
+        if (hasUiLanguageBundle(nextLanguage)) {
+            // 另一个界面可能已注册资源，但本界面的原请求尚未回执。
+            const stop = pendingBundleLoads.get(nextLanguage);
+            if (stop) {
+                pendingBundleLoads.delete(nextLanguage);
+                stop();
+                if (sameLanguage) bundleRevisionState.value += 1;
+            }
+            return;
+        }
+        if (pendingBundleLoads.has(nextLanguage)) return;
+        const stop = subscribePendingUiBundle(nextLanguage, (loaded) => {
+            pendingBundleLoads.delete(nextLanguage);
+            if (loaded && !disposed && languageState.value === nextLanguage) bundleRevisionState.value += 1;
+        });
+        pendingBundleLoads.set(nextLanguage, stop);
     };
 
     applyLanguage(languageState.value);
@@ -216,6 +249,8 @@ export function createUiI18nContext(): UiI18nContext {
             if (disposed) return;
             disposed = true;
             currentChange = undefined;
+            for (const stop of pendingBundleLoads.values()) stop();
+            pendingBundleLoads.clear();
             unsubscribe();
         },
     };

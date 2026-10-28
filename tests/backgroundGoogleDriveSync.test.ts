@@ -1,5 +1,6 @@
 import {describe, expect, it, vi} from 'vitest';
-import {createGoogleDriveSyncHandler, isGoogleDriveSettingsSender, GOOGLE_DRIVE_SYNC_MESSAGE_TYPE as type} from '@/src/app/background/handlers/googleDriveSync';
+import {createGoogleDriveSyncHandler, GOOGLE_DRIVE_SYNC_MESSAGE_TYPE as type} from '@/src/app/background/handlers/googleDriveSync';
+import {isTrustedSettingsSender} from '@/src/app/background/handlers/trustedSettingsSender';
 import {GOOGLE_DRIVE_APPLICATION_PASSPHRASE} from '@/src/platform/google-drive/constants';
 import {DriveError} from '@/src/platform/google-drive/auth';
 import {DriveUploadVerificationError} from '@/src/platform/google-drive/api';
@@ -25,9 +26,9 @@ describe('Google Drive 可信消息协议', () => {
     });
     it('设置页可操作，其他扩展、网页、popup、路径前缀和非法 URL 都不能操作', () => {
         const options = 'chrome-extension://fixture/options.html';
-        expect(isGoogleDriveSettingsSender({id: 'fixture', url: `${options}?test=1#backup`}, 'fixture', options)).toBe(true);
-        for (const sender of [undefined, {}, {id: 'fixture'}, {id: 'other', url: options}, {id: 'fixture', url: 'invalid'}, {id: 'fixture', url: 'https://fixture/options.html'}, {id: 'fixture', url: 'chrome-extension://other/options.html'}, {id: 'fixture', url: 'chrome-extension://fixture/popup.html'}, {id: 'fixture', url: `${options}.evil`}]) expect(isGoogleDriveSettingsSender(sender, 'fixture', options)).toBe(false);
-        expect(isGoogleDriveSettingsSender({id: 'fixture', url: options}, 'fixture', 'invalid')).toBe(false);
+        expect(isTrustedSettingsSender({id: 'fixture', url: `${options}?test=1#backup`}, 'fixture', options)).toBe(true);
+        for (const sender of [undefined, {}, {id: 'fixture'}, {id: 'other', url: options}, {id: 'fixture', url: 'invalid'}, {id: 'fixture', url: 'https://fixture/options.html'}, {id: 'fixture', url: 'chrome-extension://other/options.html'}, {id: 'fixture', url: 'chrome-extension://fixture/popup.html'}, {id: 'fixture', url: `${options}.evil`}]) expect(isTrustedSettingsSender(sender, 'fixture', options)).toBe(false);
+        expect(isTrustedSettingsSender({id: 'fixture', url: options}, 'fixture', 'invalid')).toBe(false);
     });
     it('拒绝内容脚本发送者，合法设置消息只向服务传递必要参数', async () => {
         const f = fixture(false);

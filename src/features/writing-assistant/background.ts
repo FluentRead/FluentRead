@@ -35,9 +35,11 @@ export function createWritingHandler(deps: {
     eligibility(sender: WritingSender): string | undefined;
     run(request: WritingRequest, signal: AbortSignal, progress: (value: WritingProgress) => void, sender: WritingSender): Promise<WritingResponse>;
 }) {
-    const active = new Set<{sender: WritingSender; owner: string; cancel(): void}>();
+    const active = new Set<{sender: WritingSender; owner: string; request: WritingRequest | undefined; cancel(mayRecover?: () => boolean): void}>();
     return {
-        cancelAll() { for (const entry of [...active]) entry.cancel(); },
+        cancelAll(predicate?: (request: WritingRequest) => boolean, mayRecover?: () => boolean) {
+            for (const entry of [...active]) if (!predicate || predicate(entry.request!)) entry.cancel(mayRecover);
+        },
         cancelTab(tabId: number) { for (const entry of [...active]) if (entry.sender.tab?.id === tabId) entry.cancel(); },
         connect(port: WritingPort) {
             if (port.name !== 'fluentReadWritingStream') return;
@@ -47,6 +49,7 @@ export function createWritingHandler(deps: {
                 sender.url?.split(/[?#]/u)[0] === deps.optionsUrl
                 || (Number.isSafeInteger(sender.tab?.id) && sender.tab!.id! >= 0 && /^https?:\/\//u.test(sender.url ?? '')));
             let finished = false;
+            let cancelling = false;
             let started = false;
             let requestId = '';
             const controller = new AbortController();
@@ -60,19 +63,28 @@ export function createWritingHandler(deps: {
                 if (finished) return;
                 post({type: 'result', requestId, response}); cleanup();
             };
-            const disconnect = () => { controller.abort(); cleanup(); };
-            const entry = {sender, owner, cancel() { controller.abort(); finish({success: false, error: '已停止生成', cancelled: true}); }};
+            const disconnect = () => { cancelling = true; controller.abort(); cleanup(); };
+            const entry = {sender, owner, request: undefined as WritingRequest | undefined, cancel(mayRecover?: () => boolean) {
+                if (finished || cancelling) return;
+                cancelling = true;
+                controller.abort();
+                let recover = false;
+                try {recover = Boolean(mayRecover && entry.request?.intent === 'translate' && !deps.eligibility(sender) && mayRecover());} catch { /* 无法确认所有权时不重试。 */ }
+                finish({success: false, error: '已停止生成', cancelled: true,
+                    ...(recover ? {reason: 'configuration-changed' as const} : {})});
+            }};
             const onMessage = (raw: unknown) => {
                 if (started || finished) return;
                 started = true;
                 if (raw && typeof raw === 'object' && 'requestId' in raw && typeof raw.requestId === 'string') requestId = raw.requestId.slice(0, 128);
                 const request = parseWritingRequest(raw);
                 if (!trusted || !request) { finish({success: false, error: '无效的写作请求'}); return; }
+                entry.request = request;
                 // 同一 document 的新面板替换旧请求，其他页面互不影响。
                 for (const other of [...active]) if (other.owner === owner) other.cancel();
                 if (active.size >= 4) { finish({success: false, error: '正在处理其他写作请求，请稍后重试'}); return; }
                 active.add(entry);
-                timer = setTimeout(() => { controller.abort(); finish({success: false, error: '生成超时，请重试'}); }, 60000);
+                timer = setTimeout(() => { cancelling = true; controller.abort(); finish({success: false, error: '生成超时，请重试'}); }, 60000);
                 void (async () => {
                     try {
                         await deps.ready;

@@ -4,9 +4,9 @@ const sendMessage = vi.hoisted(() => vi.fn());
 const privateContext = vi.hoisted(()=>({inIncognitoContext:false}));
 const fakeRepository = vi.hoisted(()=>({generation:vi.fn(async()=>0),list:vi.fn(async()=>[]),capture:vi.fn(async()=>({id:'material'}))}));
 const legacyFactory = vi.hoisted(()=>vi.fn());
-vi.mock('webextension-polyfill', () => ({default:{runtime:{sendMessage,getURL:(path:string)=>`chrome-extension://test${path}`},extension:privateContext}}));
+vi.mock('webextension-polyfill', () => ({default:{runtime:{id:'test',sendMessage,getURL:(path:string)=>`chrome-extension://test/${path.replace(/^\//,'')}`},extension:privateContext}}));
 vi.mock('@/src/features/vocabulary/materialRepository',()=>({MaterialRepository:vi.fn(function(_db:unknown,legacy:unknown){legacyFactory(legacy);return fakeRepository;})}));
-import {createBrowserMaterialHandler} from '@/src/app/background/handlers/vocabulary';
+import {createBrowserMaterialHandler,createBrowserVocabularyUndoOptions} from '@/src/app/background/handlers/vocabulary';
 import type {MaterialRequest} from '@/src/features/vocabulary/materialProtocol';
 import {materialArchive,materialCapture,materialClear,materialExport,materialGeneration,materialGet,materialImport,materialList,materialRemoveReference,materialResolve,materialRestore,materialUpdate} from '@/src/features/vocabulary/materialClient';
 beforeEach(()=>{sendMessage.mockReset();privateContext.inIncognitoContext=false;});
@@ -41,6 +41,14 @@ describe('typed local material client',()=>{
 });
 
 describe('browser material composition privacy and collection settings',()=>{
+    it('composes the extension-only undo repository with a trusted options sender',()=>{
+        const undo=createBrowserVocabularyUndoOptions();
+        expect(undo.vocabularyUndo).toBeDefined();
+        expect(undo.isTrustedUndoSender({id:'test',url:'chrome-extension://test/options.html#settings-vocabulary'})).toBe(true);
+        expect(undo.isTrustedUndoSender({id:'test',url:'https://example.test/options.html'})).toBe(false);
+        privateContext.inIncognitoContext=true;
+        expect(undo.isTrustedUndoSender({id:'test',url:'chrome-extension://test/options.html'})).toBe(false);
+    });
     it('wires read-only legacy migration and applies collection flags, site rules and private context',async()=>{
         sendMessage.mockResolvedValue({success:true});
         const config = {on:true,vocabularyBookEnabled:false,harness:{enabled:false,memoryEnabled:false},disabledExtensionDomains:['blocked.test']};

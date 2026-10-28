@@ -11,6 +11,11 @@ import {createUiI18nPlugin, UI_I18N_KEY, useUiI18n, type UiI18nContext} from '@/
 import {createUiLanguageBundleLoader} from '@/src/platform/i18n/uiLanguageBundles';
 
 const languageLoader = vi.hoisted(() => ({ensure: vi.fn<(language: unknown) => Promise<boolean>>()}));
+const targetBrowser = vi.hoisted(() => ({value: ''}));
+vi.mock('@/src/platform/browser/capabilities', async importOriginal => {
+  const actual = await importOriginal<typeof import('@/src/platform/browser/capabilities')>();
+  return {...actual,browserCapabilities:{...actual.browserCapabilities,get browser(){return targetBrowser.value || actual.browserCapabilities.browser;}}};
+});
 vi.mock('@/src/platform/i18n/uiLanguageBundles', async importOriginal => ({
   ...await importOriginal<typeof import('@/src/platform/i18n/uiLanguageBundles')>(),
   ensureUiLanguageBundle: (language: unknown) => languageLoader.ensure(language),
@@ -63,7 +68,9 @@ afterEach(async () => {
   vi.useRealTimers();
   vi.restoreAllMocks();
   vi.unstubAllGlobals();
+  vi.unstubAllEnvs();
   languageLoader.ensure.mockReset();
+  targetBrowser.value = '';
   setComponentTestState(undefined);
 });
 
@@ -84,22 +91,28 @@ function deferred<T>() {
 async function mountBook(confirm: (...args: unknown[]) => Promise<unknown> = async () => undefined,
   response?: (message: Record<string, unknown>) => Promise<unknown>,
   configPatch: (patch: unknown) => Promise<void> = async () => undefined,
-  options: {keepAlive?: boolean; ready?: Promise<void>; entries?: (entry: VocabularyEntry) => VocabularyEntry[]; list?: () => Promise<unknown>; language?: UiLanguage; realI18nPlugin?: boolean; parent?: boolean; parentGate?: Promise<void>} = {}) {
+  options: {keepAlive?: boolean; ready?: Promise<void>; entries?: (entry: VocabularyEntry) => VocabularyEntry[]; list?: () => Promise<unknown>; language?: UiLanguage; realI18nPlugin?: boolean; parent?: boolean; parentGate?: Promise<void>; pending?: Array<{id:string;term:string;createdAt:number;expiresAt:number}>} = {}) {
   const entry = {id:'saved-a', term:'art', normalizedTerm:'art', identityKey:'en:art', sourceLanguage:'en', kind:'expression',
     translations:{'zh-cn':{text:'艺术',updatedAt:1}}, contexts:[{text:'We study art.',sourceUrl:'https://example.test/private-reading',capturedAt:1}], note:'A saved explanation.', phonetic:'',partOfSpeech:'',
     createdAt:1,updatedAt:1,lastSeenAt:1,encounterCount:1,masteryLevel:0,status:'new',nextReviewAt:1,lastReviewedAt:null,
     reviewCount:0,lapseCount:0,schemaVersion:1} as VocabularyEntry;
   let stored = options.entries?.(entry) ?? [structuredClone(entry)]; const messages: Record<string, unknown>[] = [];
+  let pending: Array<{id:string;term:string;createdAt:number;expiresAt:number}> = structuredClone(options.pending ?? []);
+  const ticket = (item: VocabularyEntry) => ({id:'00000000-0000-4000-8000-000000000001',term:item.term,createdAt:1,expiresAt:2});
   const listeners = new Set<(message:unknown)=>unknown>();const configListeners = new Set<(config:any)=>void>();const navigate=vi.fn();let listReply=options.list;
   const exported = (): VocabularyBookExport => ({format:'fluentread-vocabulary-book',version:1,exportedAt:1,
     includesPrivateContext:false,entries:structuredClone(stored),reviewLogs:[]});
   const sendMessage = vi.fn(async (message: Record<string, unknown>) => {
     messages.push(message);
     if (message.action === 'list') return listReply ? listReply() : {success:true,data:structuredClone(stored)};
+    if (message.action === 'listUndo') return {success:true,data:structuredClone(pending)};
     if (response) return response(message);
-    if (message.action === 'clear') {stored = []; return {success:true,data:true};}
+    if (message.action === 'clear') {stored = []; pending = []; return {success:true,data:true};}
     if (message.action === 'exportData') return {success:true,data:exported()};
-    if (message.action === 'removeWithSnapshot') return {success:true,data:{entry,reviewLogs:[]}};
+    if (message.action === 'removeWithUndo') {pending = [ticket(entry), ...pending]; stored = stored.filter(item=>item.id!==message.entryId); return {success:true,data:ticket(entry)};}
+    if (message.action === 'restoreUndo') {pending=[]; stored=[entry]; return {success:true,data:'restored'};}
+    if (message.action === 'discardUndo') {pending=[]; return {success:true,data:true};}
+    if (message.action === 'importData') return {success:true,data:{inserted:1,updated:0,skipped:0,reviewLogsImported:0}};
     return {success:true,data:{entry:{...entry,status:'mastered'},log:{}}};
   });
   setComponentTestState({browser:{runtime:{sendMessage,onMessage:{addListener:listener=>{listeners.add(listener)},removeListener:listener=>{listeners.delete(listener)}}}},
@@ -166,7 +179,7 @@ async function mountBook(confirm: (...args: unknown[]) => Promise<unknown> = asy
   mountedBooks.push(unmount);
   const flush = async () => {for(let i=0;i<12;i++){await Promise.resolve();await runtime.nextTick();const found=findBook((app as any)._instance);if(found)panel=found;}};
   await flush(); if (!options.ready && !options.list && !options.parentGate) expect(panel.entries).toHaveLength(stored.length);
-  return {get panel(){return panel;},get parentPanel(){return parentPanel;},sourceVisible,warnings,entry,messages,exported,download,clicks,unmount,flush,shown,window,host,windowAdd,windowRemove,i18n,stored:()=>stored,navigate,listeners,setStored:(entries:VocabularyEntry[])=>{stored=entries},setListReply:(reply?:()=>Promise<unknown>)=>{listReply=reply},emitMessage:(message:unknown)=>{for(const listener of listeners)listener(message)},updateConfig:(patch:Record<string,unknown>)=>{const config=(globalThis as any)[TEST_STATE_KEY].config;Object.assign(config,patch);testLanguage.value = config.uiLanguage;for(const listener of configListeners)listener(config)}};
+  return {get panel(){return panel;},get parentPanel(){return parentPanel;},sourceVisible,warnings,entry,messages,exported,download,clicks,unmount,flush,shown,window,host,windowAdd,windowRemove,i18n,stored:()=>stored,navigate,listeners,setStored:(entries:VocabularyEntry[])=>{stored=entries},setPending:(tickets:typeof pending)=>{pending=tickets},setListReply:(reply?:()=>Promise<unknown>)=>{listReply=reply},emitMessage:(message:unknown)=>{for(const listener of listeners)listener(message)},updateConfig:(patch:Record<string,unknown>)=>{const config=(globalThis as any)[TEST_STATE_KEY].config;Object.assign(config,patch);testLanguage.value = config.uiLanguage;for(const listener of configListeners)listener(config)}};
 }
 
 describe('VocabularyBook shared language resources', () => {
@@ -272,12 +285,12 @@ describe('VocabularyBook asynchronous action ownership', () => {
     expect(book.panel.studyEntry).toBeUndefined();
     expect(book.panel.entries).toBe(collection);
     expect(book.panel.entries[0]).toBe(emptyIdRow);
-    expect(book.messages.filter(message => message.action && message.action !== 'list')).toEqual([]);
+    expect(book.messages.filter(message => message.action && !['list','listUndo'].includes(String(message.action)))).toEqual([]);
   });
   it.each(['clearVocabulary','exportAnki','removeEntry'])('does not start %s after its confirmation outlives the book', async action => {
     const confirmation = deferred<unknown>(); const book = await mountBook(()=>confirmation.promise);
     const pending = book.panel[action](book.entry); book.unmount(); confirmation.resolve(undefined); await pending;
-    expect(book.messages.filter(message=>message.action && message.action!=='list')).toEqual([]);
+    expect(book.messages.filter(message=>message.action && !['list','listUndo'].includes(String(message.action)))).toEqual([]);
     expect(book.stored()).toHaveLength(1); expect(book.download).not.toHaveBeenCalled();
   });
   it.each(['clearVocabulary','exportAnki'])('holds the action slot while %s awaits confirmation and releases it on cancel', async action => {
@@ -285,7 +298,7 @@ describe('VocabularyBook asynchronous action ownership', () => {
     const pending = book.panel[action]();
     expect(book.panel.actionBusy).toBe(true);
     await book.panel.setMastered(book.entry); const duplicate = book.panel[action]();
-    expect(book.messages.filter(message=>message.action && message.action!=='list')).toEqual([]);
+    expect(book.messages.filter(message=>message.action && !['list','listUndo'].includes(String(message.action)))).toEqual([]);
     // close 和 cancel 对 Anki 含义不同，用 close 代表用户取消导出。
     confirmation.resolve(Promise.reject('close')); await pending; await duplicate;
     expect(book.panel.actionBusy).toBe(false); expect(book.stored()).toHaveLength(1);
@@ -295,7 +308,7 @@ describe('VocabularyBook asynchronous action ownership', () => {
     vi.spyOn(book.panel.moreMenu, 'querySelector').mockReturnValue({focus} as any);
     Object.defineProperty(book.panel.moreMenu, 'open', {configurable:true,get(){return true;},set(_value:boolean){book.unmount();}});
     await book.panel[action]();
-    expect(focus).not.toHaveBeenCalled(); expect(book.messages.filter(message=>message.action && message.action!=='list')).toEqual([]);
+    expect(focus).not.toHaveBeenCalled(); expect(book.messages.filter(message=>message.action && !['list','listUndo'].includes(String(message.action)))).toEqual([]);
   });
   it.each(['setBetaEnabled','setReencounterEnabled'])('ignores %s failure rollback after the book unmounts', async action => {
     const response = deferred<unknown>(); const patch = vi.fn(async () => {await response.promise;});
@@ -306,22 +319,129 @@ describe('VocabularyBook asynchronous action ownership', () => {
     expect({beta:book.panel.betaEnabled,reencounter:book.panel.reencounterEnabled}).toEqual(before);
     await book.panel[action](action !== 'setReencounterEnabled'); expect(patch).toHaveBeenCalledTimes(1);
   });
+  it('releases collection export URL when initiating the download fails', async () => {
+    const book = await mountBook();
+    book.clicks.mockImplementationOnce(() => {throw new Error('download unavailable');});
+    await book.panel.exportCollection();
+    expect(book.download).toHaveBeenCalledOnce();
+    expect(URL.revokeObjectURL).toHaveBeenCalledWith('blob:synthetic-download');
+    expect(book.panel.actionBusy).toBe(false);
+  });
   it('does not copy or request a collection export through an unmounted action reference', async () => {
     const book = await mountBook(); const writeText = vi.fn(async () => undefined);
     vi.stubGlobal('navigator',{clipboard:{writeText}}); book.unmount();
     await book.panel.copyEntry(book.entry,true); await book.panel.exportCollection();
-    expect(writeText).not.toHaveBeenCalled(); expect(book.messages.filter(message=>message.action!=='list')).toEqual([]);
+    expect(writeText).not.toHaveBeenCalled(); expect(book.messages.filter(message=>!['list','listUndo'].includes(String(message.action)))).toEqual([]);
     expect(book.download).not.toHaveBeenCalled();
   });
-  it('removes and restores an entry with its snapshot while releasing the action slot', async () => {
+  it('explains userscript deletion is only recoverable within the current page',async()=>{
+    targetBrowser.value='userscript';vi.stubEnv('BROWSER','userscript');const confirm=vi.fn(async(..._args:unknown[])=>undefined);
+    const ticket={id:'00000000-0000-4000-8000-000000000001',term:'art',createdAt:1,expiresAt:2};
+    const book=await mountBook(confirm,undefined,undefined,{pending:[ticket]});
+    expect(book.host.textContent).toContain('刷新或关闭后无法恢复');
+    await book.panel.removeEntry(book.entry);expect(confirm.mock.calls[0]?.[0]).toContain('刷新或关闭后无法恢复');
+  });
+  it('recovers durable pending records when the settings page is mounted again', async () => {
+    const ticket={id:'00000000-0000-4000-8000-000000000001',term:'previously deleted',createdAt:1,expiresAt:2};
+    const book=await mountBook(undefined,undefined,undefined,{entries:()=>[],pending:[ticket]});
+    expect(book.panel.undoTickets).toEqual([ticket]);
+    expect(book.host.textContent).toContain('previously deleted');
+    expect(book.host.textContent).toContain('24 小时');
+    expect(bookButton(book,'放弃撤销')).toBeTruthy();
+  });
+  it('removes and restores an entry using only a background ticket', async () => {
     const book = await mountBook();
-    await book.panel.removeEntry(book.entry);
-    expect(book.panel.entries).toEqual([]); expect(book.panel.actionBusy).toBe(false);
-    expect(book.panel.undoExport.entries).toEqual([book.entry]);
-    await book.panel.undoRemove();await book.flush();
-    expect(book.panel.undoExport).toBeNull(); expect(book.panel.entries).toEqual([book.entry]);
-    expect(book.messages.find(message => message.action === 'importData')?.data).toMatchObject({entries:[book.entry]});
-    expect(book.panel.actionBusy).toBe(false);
+    await book.panel.removeEntry(book.entry); await book.flush();
+    expect(book.panel.entries).toEqual([]);
+    expect(book.panel.undoTickets).toHaveLength(1);
+    await book.panel.undoRemove(book.panel.undoTickets[0]); await book.flush();
+    expect(book.panel.undoTickets).toEqual([]); expect(book.panel.entries).toEqual([book.entry]);
+    expect(book.messages.find(message=>message.action==='restoreUndo')).toEqual({type:'fluentReadVocabularyBook',action:'restoreUndo',undoId:'00000000-0000-4000-8000-000000000001'});
+    expect(book.messages.some(message=>message.action==='importData')).toBe(false);
+  });
+  it('retains an uncertain ticket and retries only on explicit action', async () => {
+    const gate=deferred<unknown>();let attempts=0;
+    const ticket={id:'00000000-0000-4000-8000-000000000001',term:'art',createdAt:1,expiresAt:2};
+    const book=await mountBook(undefined,async message=>message.action==='removeWithUndo'?{success:true,data:ticket}
+      : message.action==='restoreUndo' ? (++attempts===1?gate.promise:{success:true,data:'restored'}) : {success:true});
+    await book.panel.removeEntry(book.entry); book.panel.undoTickets=[ticket];
+    const operation=book.panel.undoRemove(ticket); await book.flush();
+    await book.panel.undoRemove(ticket);expect(attempts).toBe(1);
+    gate.resolve({success:false,error:{message:'unknown'}});await operation;
+    expect(book.panel.undoTickets).toEqual([ticket]);expect(book.panel.toastMessage).toContain('未确认');
+    await book.panel.undoRemove(ticket);expect(attempts).toBe(2);expect(book.panel.undoTickets).toEqual([]);
+  });
+  it.each([undefined,{},'unrecognized'])('retains a malformed restore result without replay: %j',async result=>{
+    const ticket={id:'00000000-0000-4000-8000-000000000001',term:'art',createdAt:1,expiresAt:2};let calls=0;
+    const book=await mountBook(undefined,async message=>{if(message.action==='restoreUndo')calls++;return {success:true,data:result};});
+    book.panel.undoTickets=[ticket];await book.panel.undoRemove(ticket);
+    expect(book.panel.undoTickets).toEqual([ticket]);expect(calls).toBe(1);expect(book.panel.toastMessage).toContain('未确认');
+  });
+  it.each([undefined,{},false])('does not report malformed delete response as a confirmed missing entry: %j',async result=>{
+    const book=await mountBook(undefined,async()=>({success:true,data:result}));
+    await book.panel.removeEntry(book.entry);await book.flush();
+    expect(book.panel.toastMessage).toContain('未确认');expect(book.panel.toastMessage).not.toContain('不存在');
+  });
+  it('finds a committed deletion after its reply is lost and after remount',async()=>{
+    const ticket={id:'00000000-0000-4000-8000-000000000001',term:'art',createdAt:1,expiresAt:2};
+    const book=await mountBook(undefined,async message=>{
+      if(message.action==='removeWithUndo') {book.setStored([]);book.setPending([ticket]);throw new Error('reply lost');}
+      return {success:true};
+    });
+    await book.panel.removeEntry(book.entry);await book.flush();
+    expect(book.panel.toastMessage).toContain('未确认');expect(book.panel.undoTickets).toEqual([ticket]);
+    book.unmount();
+    const remounted=await mountBook(undefined,undefined,undefined,{entries:()=>[],pending:[ticket]});
+    expect(remounted.panel.undoTickets).toEqual([ticket]);
+  });
+  it('refreshes other-page deletion, restoration, discard and clear notifications, including while busy', async()=>{
+    const gate=deferred<unknown>();const ticket={id:'00000000-0000-4000-8000-000000000001',term:'art',createdAt:1,expiresAt:2};
+    const book=await mountBook(undefined,async()=>gate.promise);
+    for(const reason of ['remove','import','undo','clear']) {
+      book.setPending(reason==='remove'?[ticket]:[]);
+      book.emitMessage({type:'fluentReadVocabularyBookChanged',reason});await book.flush();
+      expect(book.panel.undoTickets).toEqual(reason==='remove'?[ticket]:[]);
+    }
+    const action=book.panel.setMastered(book.entry);await book.flush();
+    book.setPending([ticket]);book.emitMessage({type:'fluentReadVocabularyBookChanged',reason:'remove'});await book.flush();
+    expect(book.panel.undoTickets).toEqual([]);
+    gate.resolve({success:true,data:{entry:{...book.entry,status:'mastered'}}});await action;await book.flush();
+    expect(book.panel.undoTickets).toEqual([ticket]);
+  });
+  it('refreshes pending records on focus when a separate userscript tab changed them',async()=>{
+    const ticket={id:'00000000-0000-4000-8000-000000000001',term:'art',createdAt:1,expiresAt:2};
+    const book=await mountBook();book.setPending([ticket]);
+    book.window.dispatchEvent(new book.window.Event('focus'));await book.flush();
+    expect(book.panel.undoTickets).toEqual([ticket]);
+  });
+  it('describes an old restore receipt as historical rather than current state',async()=>{
+    const ticket={id:'00000000-0000-4000-8000-000000000001',term:'art',createdAt:1,expiresAt:2};
+    const book=await mountBook(undefined,async()=>({success:true,data:'previously-restored'}),undefined,{pending:[ticket]});
+    await book.panel.undoRemove(ticket);expect(book.panel.toastMessage).toContain('此前已完成');expect(book.panel.toastMessage).toContain('检查当前');
+  });
+  it.each(['invalid-input','limit-exceeded'])('explains a confirmed restore rejection (%s)',async code=>{
+    const ticket={id:'00000000-0000-4000-8000-000000000001',term:'art',createdAt:1,expiresAt:2};
+    const book=await mountBook(undefined,async()=>({success:false,error:{code,message:'safe'}}),undefined,{pending:[ticket]});
+    await book.panel.undoRemove(ticket);expect(book.panel.undoTickets).toEqual([ticket]);
+    expect(book.panel.toastMessage).not.toContain('未确认');
+  });
+  it('does not claim a malformed discard response cleared the record',async()=>{
+    const ticket={id:'00000000-0000-4000-8000-000000000001',term:'art',createdAt:1,expiresAt:2};
+    const book=await mountBook(undefined,async()=>({success:true,data:false}),undefined,{pending:[ticket]});
+    await book.panel.discardUndo(ticket);await book.flush();
+    expect(book.panel.toastMessage).toContain('未确认');expect(book.panel.undoTickets).toEqual([ticket]);
+  });
+  it('ignores a late restore reply after unmount',async()=>{
+    const ticket={id:'00000000-0000-4000-8000-000000000001',term:'art',createdAt:1,expiresAt:2};const gate=deferred<unknown>();
+    const book=await mountBook(undefined,async()=>gate.promise);book.panel.undoTickets=[ticket];
+    const operation=book.panel.undoRemove(ticket);await book.flush();book.unmount();
+    gate.resolve({success:true,data:'restored'});await operation;expect(book.panel.undoTickets).toEqual([ticket]);
+  });
+  it('discards the record explicitly through the background',async()=>{
+    const book=await mountBook();await book.panel.removeEntry(book.entry);await book.flush();
+    await clickBook(book,bookButton(book,'放弃撤销'));
+    expect(book.panel.undoTickets).toEqual([]);
+    expect(book.messages.filter(message=>message.action==='discardUndo')).toHaveLength(1);
   });
   it('releases a failed clear for retry and still resets the active review after success', async () => {
     let attempts = 0;
@@ -352,7 +472,7 @@ describe('VocabularyBook asynchronous action ownership', () => {
     expect(input.value).toBe(''); expect(book.panel.actionBusy).toBe(true);
     await book.panel.setMastered(book.entry);
     confirmation.resolve(Promise.reject('cancel')); await pending;
-    expect(text).not.toHaveBeenCalled(); expect(book.messages.filter(message=>message.action!=='list')).toEqual([]);
+    expect(text).not.toHaveBeenCalled(); expect(book.messages.filter(message=>!['list','listUndo'].includes(String(message.action)))).toEqual([]);
     expect(book.panel.actionBusy).toBe(false);
   });
   it('releases a malformed import for retry and imports a valid collection afterwards', async () => {
@@ -362,15 +482,6 @@ describe('VocabularyBook asynchronous action ownership', () => {
     await book.panel.importCollection({target:{value:'good.json',files:[{size:10,text:async()=>JSON.stringify(book.exported())}]}});
     expect(book.messages.filter(message=>message.action==='importData')).toHaveLength(1);
     expect(book.panel.entries).toHaveLength(1); expect(book.panel.actionBusy).toBe(false);
-  });
-  it('keeps the undo snapshot unchanged when a restore response outlives the book', async () => {
-    const response = deferred<unknown>();
-    const book = await mountBook(undefined, async message => message.action==='removeWithSnapshot'
-      ? {success:true,data:{entry:book.entry,reviewLogs:[]}} : response.promise);
-    await book.panel.removeEntry(book.entry); const snapshot = book.panel.undoExport;
-    const pending = book.panel.undoRemove(); await book.flush(); book.unmount();
-    response.resolve({success:true,data:{inserted:1,updated:0,skipped:0}}); await pending;
-    expect(book.panel.undoExport).toBe(snapshot); expect(book.panel.entries).toEqual([]);
   });
   it('never creates a late Anki download after an exported response outlives the book', async () => {
     const exportResponse = deferred<unknown>(); const book = await mountBook(undefined,()=>exportResponse.promise);
@@ -383,9 +494,9 @@ describe('VocabularyBook asynchronous action ownership', () => {
     const response = deferred<unknown>(); const book = await mountBook(undefined,()=>response.promise);
     book.panel.startReview(); book.panel.reviewAnswerVisible = true;
     const pending = action==='rateReview' ? book.panel.rateReview('good') : book.panel[action](book.entry);
-    await book.flush(); const before = JSON.stringify({entries:book.panel.entries,stats:book.panel.reviewStats,queue:book.panel.reviewQueue,undo:book.panel.undoExport});
+    await book.flush(); const before = JSON.stringify({entries:book.panel.entries,stats:book.panel.reviewStats,queue:book.panel.reviewQueue,undo:book.panel.undoTickets});
     book.unmount(); response.resolve({success:true,data:action==='clearVocabulary' ? true : action==='removeEntry' ? {entry:book.entry,reviewLogs:[]} : {entry:{...book.entry,status:'mastered',updatedAt:2},log:{}}}); await pending;
-    expect(JSON.stringify({entries:book.panel.entries,stats:book.panel.reviewStats,queue:book.panel.reviewQueue,undo:book.panel.undoExport})).toBe(before);
+    expect(JSON.stringify({entries:book.panel.entries,stats:book.panel.reviewStats,queue:book.panel.reviewQueue,undo:book.panel.undoTickets})).toBe(before);
   });
 });
 
@@ -604,8 +715,8 @@ it('copies through the rendered collection row, filters and resets it, then remo
   copy.mockRejectedValueOnce(new Error('blocked'));await clickBook(book,bookButton(book,'复制原文'));expect(book.host.textContent).toContain('复制失败');
   const search=book.host.querySelector<HTMLInputElement>('input[type="search"]')!;search.value='unmatched';search.dispatchEvent(new book.window.Event('input',{bubbles:true}));await book.flush();expect(book.host.querySelector('.word-row')).toBeNull();
   await clickBook(book,book.host.querySelector('.collection-results button')!);expect(book.host.querySelector('.entry-open')?.textContent).toBe('art');
-  await clickBook(book,bookButton(book,'删除收藏'));expect(confirm).toHaveBeenCalledOnce();expect(book.host.querySelector('.word-row')).toBeNull();expect(book.messages).toContainEqual({type:'fluentReadVocabularyBook',action:'removeWithSnapshot',entryId:'saved-a'});
-  await clickBook(book,bookButton(book,'撤销'));expect(book.host.querySelector('.entry-open')?.textContent).toBe('art');expect(book.messages).toContainEqual(expect.objectContaining({action:'importData',data:expect.objectContaining({includesPrivateContext:true,entries:[book.entry]})}));
+  await clickBook(book,bookButton(book,'删除收藏'));expect(confirm).toHaveBeenCalledOnce();expect(book.host.querySelector('.word-row')).toBeNull();expect(book.messages).toContainEqual({type:'fluentReadVocabularyBook',action:'removeWithUndo',entryId:'saved-a'});
+  await clickBook(book,bookButton(book,'恢复'));expect(book.host.querySelector('.entry-open')?.textContent).toBe('art');expect(book.messages).toContainEqual(expect.objectContaining({action:'restoreUndo'}));
 });
 it('completes a review through the rendered recall form and rating control without changing the collection identity',async()=>{
   const book=await mountBook();await clickBook(book,book.host.querySelector('.start-review')!);
@@ -836,7 +947,7 @@ it('uses real feature switches and empty-state navigation while rolling failed p
 });
 it('refreshes and clears through the management menu and keeps protected removal and export failures retryable',async()=>{
   let removeMissing=true,exportFails=true;const book=await mountBook(undefined,async message=>{
-    if(message.action==='removeWithSnapshot')return {success:true,data:removeMissing?null:{entry:book.entry,reviewLogs:[]}};
+    if(message.action==='removeWithUndo')return {success:true,data:removeMissing?null:{id:'00000000-0000-4000-8000-000000000001',term:book.entry.term,createdAt:1,expiresAt:2}};
     if(message.action==='exportData')return exportFails?{success:false,error:{message:'Anki unavailable'}}:{success:true,data:book.exported()};
     return {success:true,data:true};
   });
@@ -981,15 +1092,13 @@ describe('VocabularyBook visible read ownership', () => {
     expect(book.panel.toastMessage).toContain(failure?'Accepted save failure':'已标记为掌握');
   });
 
-  it.each([false,true])('retains accepted undo ownership hidden (failure=%s) without awaiting a forbidden hidden list',async failure=>{
-    const gate=deferred<unknown>();let removing=true;
-    const book=await mountBook(undefined,async()=>removing?{success:true,data:{entry:book.entry,reviewLogs:[]}}:gate.promise,undefined,{keepAlive:true});
-    await book.panel.removeEntry(book.entry);removing=false;const initial=lists(book);
-    const pending=book.panel.undoRemove();await book.flush();expect(book.panel.actionBusy).toBe(true);book.shown.value=false;await book.flush();
-    gate.resolve(failure?{success:false,error:{message:'Restore failed'}}:{success:true,data:{inserted:1,updated:0,skipped:0}});await pending;await book.flush();
-    expect(book.panel.actionBusy).toBe(false);expect(lists(book)).toBe(initial);expect(book.panel.undoExport).toBeNull(); // Existing failure toast also clears undo; this change preserves that behavior.
-    expect(book.panel.toastMessage).toContain(failure?'Restore failed':'已恢复');
-    book.shown.value=true;await book.flush();expect(lists(book)).toBe(initial+1);expect(book.panel.entries).toHaveLength(1);
+  it.each([false,true])('retains accepted undo ownership hidden (failure=%s)',async failure=>{
+    const gate=deferred<unknown>();const ticket={id:'00000000-0000-4000-8000-000000000001',term:'art',createdAt:1,expiresAt:2};
+    const book=await mountBook(undefined,async()=>gate.promise,undefined,{keepAlive:true});book.panel.undoTickets=[ticket];const initial=lists(book);
+    const operation=book.panel.undoRemove(ticket);await book.flush();book.shown.value=false;await book.flush();
+    gate.resolve(failure?{success:false,error:{message:'failed'}}:{success:true,data:'restored'});await operation;await book.flush();
+    expect(lists(book)).toBe(initial);expect(book.panel.undoTickets.length).toBe(failure?1:0);
+    book.shown.value=true;await book.flush();expect(lists(book)).toBe(initial+1);
   });
 
   it.each(['confirmation','file','transport'] as const)('continues an accepted import hidden from its %s await and refreshes once after resume',async boundary=>{

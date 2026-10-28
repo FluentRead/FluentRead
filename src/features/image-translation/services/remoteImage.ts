@@ -1,7 +1,7 @@
 /**
  * @file src/features/image-translation/services/remoteImage.ts
  * 文件职责：为网页 CORS 与 Offscreen 读取图片提供统一的有界响应处理，把图片字节转换为 OCR 可消费的 data URL。
- * 主要内容：扩展读取仅允许公网 HTTPS 域名、拒绝凭据、端口和重定向；共享 MIME、16 MiB、取消与总时限校验，区分网络失败和不可重试的响应错误。
+ * 主要内容：扩展读取仅允许公网 HTTPS 域名、拒绝凭据、端口和重定向；共享 MIME、16 MiB、取消与总时限校验，每次流读取后释放取消监听，区分网络失败和不可重试的响应错误。
  * 模块边界：本文件不监听 runtime 消息、不读取页面 DOM；消息路由和 Offscreen 生命周期由 app 层负责，内容脚本只能拿到最终 data URL。
  */
 
@@ -91,6 +91,8 @@ function discardResponseBody(response: RemoteImageResponse, reason: unknown): vo
 async function readResponseBuffer(
     response: RemoteImageResponse,
     abortPromise: Promise<never>,
+    signal: AbortSignal,
+    abortReason: () => Error,
 ): Promise<ArrayBuffer> {
     if (!response.body) return Promise.race([response.arrayBuffer(), abortPromise]);
 
@@ -99,7 +101,20 @@ async function readResponseBuffer(
     let byteLength = 0;
     try {
         while (true) {
-            const {done, value} = await Promise.race([reader.read(), abortPromise]);
+            if (signal.aborted) throw abortReason();
+            let onAbort!: () => void;
+            const interrupted = new Promise<never>((_resolve, reject) => {
+                onAbort = () => reject(abortReason());
+                signal.addEventListener('abort', onAbort, {once: true});
+            });
+            let chunk: ReadableStreamReadResult<Uint8Array>;
+            try {
+                const pending = new Promise<ReadableStreamReadResult<Uint8Array>>(resolve => resolve(reader.read()));
+                chunk = await Promise.race([pending, interrupted]);
+            } finally {
+                signal.removeEventListener('abort', onAbort);
+            }
+            const {done, value} = chunk;
             if (done) break;
             if (!value || value.byteLength === 0) continue;
             byteLength += value.byteLength;
@@ -192,7 +207,7 @@ async function fetchImageForOcr(
             throw error;
         }
         try {
-            const buffer = await readResponseBuffer(response, abortPromise);
+            const buffer = await readResponseBuffer(response, abortPromise, controller.signal, () => abortReason!);
             if (controller.signal.aborted) throw abortReason!;
             return imageBufferToDataUrl(buffer, mimeType);
         } catch (error) {

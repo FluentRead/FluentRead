@@ -248,6 +248,14 @@ describe('audit48 J actual ShareCardStudio client template and public runtime',(
   const create=(ctx.doc.createElement as any).getMockImplementation();vi.spyOn(ctx.doc,'createElement').mockImplementation(((tag:string)=>{const node:any=create(tag);if(tag==='a')node.click=()=>{throw Error('blocked download');};return node;}) as any);
   await ctx.event('.fr-card-primary');await settle();expect(ctx.doc.querySelector('.fr-card-feedback')?.textContent).toContain('shareCard.saveFailed');expect(ctx.doc.querySelector('a')).toBeNull();
  });
+ it('下载节点清理失败时真实组件仍反馈成功并允许再次保存',async()=>{
+  const ctx=await client();await ctx.studio.open(ctx.source);await ctx.paint();
+  const create=(ctx.doc.createElement as any).getMockImplementation();let first=true;const remove=vi.fn(()=>{throw Error('remove failed');});
+  vi.spyOn(ctx.doc,'createElement').mockImplementation(((tag:string)=>{const node:any=create(tag);if(tag==='a'&&first){first=false;const click=node.click;node.click=()=>{click();node.remove=remove;};}return node;}) as any);
+  await ctx.event('.fr-card-primary');await settle();
+  expect(remove).toHaveBeenCalledOnce();expect(ctx.downloads).toHaveLength(1);expect(ctx.doc.querySelector('.fr-card-feedback')?.textContent).toContain('shareCard.saved');
+  await vi.advanceTimersByTimeAsync(401);await ctx.event('.fr-card-primary');await settle();expect(ctx.downloads).toHaveLength(2);
+ });
  it('opens through public runtime with actual client, safe source and late disable/invalidation cleanup',async()=>{
   const ctx=await client();runtime=await import('@/src/features/share-card/public');
   ports.create.mockImplementation(async (_context,options)=>{expect(options.mode).toBe('closed');return {mounted:{instance:ctx.studio},remove(){app?.unmount();app=undefined;}};});

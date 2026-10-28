@@ -192,7 +192,7 @@ describe('saved sentence explanation lifecycle', () => {
     finish('Current complete answer',call);
     expect(panel.busy).toBe(false); expect(panel.completedExplanation).toBe(true);
     expect(panel.explanation).toBe('Current complete answer'); expect(sendMessage).not.toHaveBeenCalled();
-  });
+  }, 15_000); // Each case starts and transforms a fresh Vite server; shared CI resources can delay startup.
 
   it.each(relevantConfigChanges)('invalidates current stream ownership for a real $name input change', async change => {
     const {panel,calls,config,notifyConfig,finish} = await mountStudy();

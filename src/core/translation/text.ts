@@ -63,9 +63,9 @@ export function setMinimumTranslationTextLength(value: unknown): number {
 
 export function isMeaningfulTranslationText(value: string): boolean {
     const text = normalizeTranslationText(value);
-    if (!text || matchesIdentifierPatterns(text) || isNonTranslatableLiveData(text)) return false;
-    // 字符长度按用户设定过滤短碎片；字母数仍保留原有的纯符号与编号防护。
-    if (text.length < minimumTranslationTextLength) return false;
+    // 先过滤肯定不合阈值的短碎片，避免对其重复执行标识符和时间数值识别。
+    if (!text || text.length < minimumTranslationTextLength) return false;
+    if (matchesIdentifierPatterns(text) || isNonTranslatableLiveData(text)) return false;
     return meaningfulLetters.test(text);
 }
 

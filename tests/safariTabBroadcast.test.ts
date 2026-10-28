@@ -329,10 +329,12 @@ describe('Safari 存储失败与无值失效恢复', () => {
         await page.runtime.broadcastTabMessage({...vocabularyChanged,
             body: 'fixture private vocabulary text', url: 'https://private.example/fixture'});
         await page.runtime.broadcastTabMessage({type: vocabularyChanged.type, reason: 'clear'});
+        await page.runtime.broadcastTabMessage({type: vocabularyChanged.type, reason: 'undo', body: 'private snapshot'});
 
         expect(deliveries(page.sendTabMessage)).toEqual([
             {tabId: 21, message: vocabularyChanged},
             {tabId: 21, message: {type: vocabularyChanged.type, reason: 'clear'}},
+            {tabId: 21, message: {type: vocabularyChanged.type, reason: 'undo'}},
         ]);
         expect(page.writeSessionRecipients).not.toHaveBeenCalled();
     });

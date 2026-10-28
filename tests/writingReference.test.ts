@@ -11,6 +11,36 @@ function setup() {
   return {controller, calls, stream, finish, state: () => state};
 }
 describe('Writing reading translation ownership', () => {
+  it('私有模型配置变化导致取消后只自动重试一次，重复变化保留手动恢复', async () => {
+    const m=setup();m.controller.update(base);
+    const changed={success:false,error:'已停止生成',cancelled:true,reason:'configuration-changed'} as WritingResponse;
+    m.calls[0].handlers.result(changed);await new Promise(resolve=>setTimeout(resolve,0));expect(m.calls).toHaveLength(2);
+    m.calls[1].handlers.result(changed);await new Promise(resolve=>setTimeout(resolve,0));expect(m.calls).toHaveLength(2);expect(m.state().status).toBe('error');
+    m.controller.retry();expect(m.calls).toHaveLength(3);m.finish(2,'新对照');expect(m.state().text).toBe('新对照');
+  });
+  it('自动恢复前若页面切换或被关闭，迟到回执不再发送请求', async () => {
+    const changed={success:false,error:'已停止生成',cancelled:true,reason:'configuration-changed'} as WritingResponse;
+    for (const change of [{active:false},{session:2},{source:'new reply'},{language:'es'}]) {
+      const m=setup();m.controller.update(base);m.calls[0].handlers.result(changed);
+      m.controller.update({...base,...change});const count=m.calls.length;await new Promise(resolve=>setTimeout(resolve,0));expect(m.calls).toHaveLength(count);
+      m.controller.dispose();
+    }
+    const m=setup();m.controller.update(base);m.calls[0].handlers.result(changed);m.controller.dispose();await new Promise(resolve=>setTimeout(resolve,0));expect(m.calls).toHaveLength(1);
+  });
+  it('手动重试取代排队中的自动恢复，普通断连不会自动重试', async () => {
+    const m=setup();m.controller.update(base);
+    m.calls[0].handlers.result({success:false,error:'已停止生成',cancelled:true,reason:'configuration-changed'});
+    m.controller.retry();await new Promise(resolve=>setTimeout(resolve,0));expect(m.calls).toHaveLength(2);
+    m.calls[1].handlers.result({success:false,error:'连接中断'});await new Promise(resolve=>setTimeout(resolve,0));
+    expect(m.calls).toHaveLength(2);expect(m.state().status).toBe('error');
+  });
+  it('调用方不能确认当前页面归属时不自动恢复', async () => {
+    let handlers!: {progress(value:WritingProgress):void;result(value:WritingResponse):void};
+    const stream=vi.fn((_source,_language,next)=>{handlers=next;return ()=>{};});
+    const controller=createWritingReference({stream,changed:()=>{},canRecover:()=>false});controller.update(base);
+    handlers.result({success:false,error:'已停止生成',cancelled:true,reason:'configuration-changed'});
+    await new Promise(resolve=>setTimeout(resolve,0));expect(stream).toHaveBeenCalledOnce();controller.dispose();
+  });
   it('streams a frozen reply into a separate state, deduplicates and caches complete translations', () => {
     const m = setup(); const snapshot = {...base}; m.controller.update(snapshot); snapshot.source = 'changed externally';
     expect(m.calls[0]).toMatchObject({source: base.source, language: 'zh-Hans'}); expect(m.state()).toEqual({status: 'loading', text: ''});

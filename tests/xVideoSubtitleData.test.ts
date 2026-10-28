@@ -188,6 +188,11 @@ describe('X 视频字幕资源', () => {
   it('覆盖无效时间、无效属性、非法资源和无正文输入', () => {
     expect(parseWebVttSubtitleResponse('WEBVTT\n\n1\n00:xx --> 00:01.000\nx\n\n2\n00:00:01,000 --> 00:00:02,000\n')).toEqual([]);
     expect(parseXSubtitleResource('', 'https://video.twimg.com/a.m3u8')).toEqual({cues: [], resources: []});
+    expect(parseXSubtitleResource('unrecognized body', 'https://video.twimg.com/captions/a.m3u8')).toEqual({cues: [], resources: []});
+    expect(parseXSubtitleResource('#EXT-X-MEDIA:TYPE=SUBTITLES,LANGUAGE="en",URI="segment.vtt"', 'https://video.twimg.com/captions/a.m3u8'))
+      .toMatchObject({resources: [{url: 'https://video.twimg.com/captions/segment.vtt', languageCode: 'en'}]});
+    expect(parseXSubtitleResource('#EXTM3U\n\n#EXTINF:1,\nsegment.vtt', 'https://video.twimg.com/captions/a.m3u8'))
+      .toMatchObject({resources: [{url: 'https://video.twimg.com/captions/segment.vtt'}]});
     expect(parseXSubtitleResource('#EXTM3U\n#EXT-X-MEDIA:TYPE=SUBTITLES,URI="not a url"\n#EXTINF:x,\nnot-a-url', 'https://video.twimg.com/a.m3u8')).toEqual({cues: [], resources: []});
     expect(parseXSubtitleResource('#EXTM3U\n#EXT-X-MEDIA:TYPE=SUBTITLES,URI="captions/en.vtt"\n#EXTINF:1,\n#EXT-X-DISCONTINUITY\npart.vtt', 'http://video.twimg.com/a.m3u8')).toEqual({cues: [], resources: []});
     expect(parseXSubtitleResource('WEBVTT\n\n00:00:01.000 --> 00:00:02.000\ncue', 'https://video.twimg.com/a.vtt', 500)).toMatchObject({cues: [{startMs: 1000}]});

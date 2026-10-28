@@ -102,15 +102,17 @@
           <div><input id="online-pdf-url" v-model="onlinePdfUrl" type="url" inputmode="url" required placeholder="https://arxiv.org/pdf/1706.03762" :disabled="queueBusy" /><button class="ghost-button" type="submit" :disabled="queueBusy">{{ t('document.pdfReading.openOnline') }}</button></div>
           <small>{{ t('document.pdfReading.onlineHint') }}</small>
         </form>
-        <section v-if="historyEntries.length" class="document-history" aria-label="最近翻译">
-          <header><h2>最近翻译</h2><button type="button" :disabled="queueBusy" @click="clearHistory">清空记录</button></header>
+        <section v-if="historyLoading || historyError || historyEntries.length" class="document-history" aria-label="最近翻译" :aria-busy="historyLoading">
+          <header><h2>最近翻译</h2><button v-if="historyEntries.length" type="button" :disabled="queueBusy || historyMutationPending" @click="clearHistory">清空记录</button></header>
+          <p v-if="historyLoading">{{ t('document.historyLoading') }}</p>
+          <p v-if="historyError" class="notice warning" role="alert" data-testid="document-history-list-error">{{ t(historyError) }} <button type="button" :disabled="historyLoading || historyMutationPending" @click="refreshHistory">{{ t('document.historyRetry') }}</button></p>
           <ul>
             <li v-for="entry in historyEntries" :key="entry.id">
               <button class="history-open" type="button" :disabled="queueBusy" @click="openHistory(entry)">
                 <b>{{ historyFormat(entry) }}</b>
                 <span><strong data-i18n-ignore :title="entry.name">{{ entry.name }}</strong><small>{{ historyStatus(entry) }}</small></span>
               </button>
-              <button class="history-remove" type="button" :disabled="queueBusy" :aria-label="`移除记录 ${entry.name}`" title="移除记录" @click="removeHistory(entry)">×</button>
+              <button class="history-remove" type="button" :disabled="queueBusy || historyMutationPending" :aria-label="`移除记录 ${entry.name}`" title="移除记录" @click="removeHistory(entry)">×</button>
             </li>
           </ul>
         </section>
@@ -180,6 +182,7 @@
           <div v-if="showTranslationProgress" class="task-progress" :class="{ complete: translationComplete }" role="progressbar" :aria-label="t('document.translationProgress.label')" :aria-valuetext="translationProgressLabel" :aria-valuenow="progress" :aria-valuemin="0" :aria-valuemax="100" data-testid="document-translation-progress"><i :style="{width: `${progress}%`}" /></div>
           <!-- 持续状态占据正常布局；当前翻译只显示最需要处理的一条，独立导入始终保留取消入口。 -->
           <div class="taskbar-notices" data-testid="document-task-notices">
+          <p v-if="activeTask?.historyReadUnavailable || activeTask?.historyConflict" class="notice warning task-notice" role="alert" data-testid="document-history-unavailable">{{ t(activeTask.historyConflict ? 'document.historyConflict' : 'document.historyReadUnavailable') }} <button type="button" :disabled="queueBusy" @click="retryDocumentHistory">{{ t('document.historyRetry') }}</button></p>
           <p v-if="openingFile || downloadingPdf" class="document-import-progress" role="status">{{ importProgress }} <button class="ghost-button" type="button" @click="cancelImport">{{ t('document.pdfReading.cancelImport') }}</button></p>
           <p v-if="configSaveError || credentialWarning" class="notice error task-notice" role="alert">{{ configSaveError || credentialWarning }} <button type="button" @click="documentSettingsDialog?.showModal()">调整设置</button></p>
           <div v-else-if="translationFailureVisible" class="translation-recovery" role="alert" data-testid="document-translation-recovery">
@@ -674,7 +677,7 @@ function activateDocument(item: DocumentQueueItem): void {
   releaseDocumentPreview(parsedDocument.value);
   recognitionProgress.value = '';
   activeDocumentId.value = item.id;
-  rememberOpenDocument(item.historyId);
+  rememberOpenDocument(item.historyReadUnavailable || item.historyConflict ? null : item.historyId);
   settledTranslations.value = [...item.translations];
   downloadNotice.value = '';
   originalDownloadError.value = '';
@@ -694,8 +697,27 @@ function queueProgress(item: DocumentQueueItem): number {
 // 最近翻译：只在浏览器提供 IndexedDB 时启用；记录留在本机，重新打开同一份文件会接着上次的译文继续。
 const historyAvailable = typeof indexedDB !== 'undefined';
 const history = createDocumentHistory();
-const historyCommitter = createDocumentHistoryCommitter(record => history.save(record));
+const historyCommitter = createDocumentHistoryCommitter<DocumentQueueItem>(async (record, owner) => {
+  if (owner.historyVersion === undefined || owner.historyConflict) return false;
+  const result = await history.saveChecked(record, owner.historyVersion);
+  if (result.status === 'conflict') {
+    owner.historyConflict = true;
+    if (activeDocumentId.value === owner.id) rememberOpenDocument(null);
+    return false;
+  }
+  if (result.status !== 'saved') {
+    owner.historyReadUnavailable = true;
+    if (activeDocumentId.value === owner.id) rememberOpenDocument(null);
+    return false;
+  }
+  owner.historyVersion = result.version;
+  return true;
+});
 const historyEntries = ref<DocumentHistorySummary[]>([]);
+const historyLoading = ref(true);
+const historyError = ref('');
+const historyMutationPending = ref(false);
+let historyRequestEpoch = 0;
 const materialPrivate = browser.extension?.inIncognitoContext === true;
 const materialSaving = ref(false);
 const documentMaterialId = ref('');
@@ -716,7 +738,7 @@ function materialReadingPointerDown(event: PointerEvent): void {focusNativeReade
 /** 阅读器仅返回当前模型索引；完整原文引用由持有已核验文件摘要与模型的组合根创建。 */
 function captureDocumentMaterialSelection(range: Range, quote: string): MaterialSelection | undefined {
   const item = activeTask.value, doc = parsedDocument.value, reader = materialPdfReader.value;
-  if (disposed || !config.on || materialPrivate || !item?.historyId || !doc || doc.binary?.kind !== 'pdf' || typeof reader?.resolveMaterialSelection !== 'function') return;
+  if (disposed || !config.on || materialPrivate || !item?.historyId || item.historyReadUnavailable || item.historyConflict || !doc || doc.binary?.kind !== 'pdf' || typeof reader?.resolveMaterialSelection !== 'function') return;
   const index = reader.resolveMaterialSelection(range);
   const locator = index === undefined ? undefined : captureDocumentMaterialLocator(item.historyId, doc, index, READER_PAGE_SIZE);
   if (!locator?.documentReference) return;
@@ -726,7 +748,7 @@ function captureDocumentMaterialSelection(range: Range, quote: string): Material
 defineExpose({captureDocumentMaterialSelection});
 function documentMaterialSelection(): MaterialSelection | undefined {
   const item = activeTask.value; const doc = parsedDocument.value;
-  if (!item?.historyId || !doc) return;
+  if (!item?.historyId || item.historyReadUnavailable || item.historyConflict || !doc) return;
   const index = isPdfDocument.value ? materialPdfReader.value?.captureMaterialLocation?.()
     : isDocxDocument.value ? currentDocxPart.value?.paragraphSegments[(readerPage.value - 1) * READER_PAGE_SIZE]?.segmentIndex
       : isEpubDocument.value ? currentEpubChapter.value?.segmentOffset : (readerPage.value - 1) * READER_PAGE_SIZE;
@@ -740,6 +762,7 @@ function documentMaterialSelection(): MaterialSelection | undefined {
 }
 async function saveDocumentMaterial(): Promise<void> {
   if (!config.on || materialPrivate || materialSaving.value) return;
+  if (activeTask.value?.historyReadUnavailable || activeTask.value?.historyConflict) {downloadNotice.value = t('document.historyOpenUnavailable'); return;}
   const selection = documentMaterialSelection();
   if (!selection) {downloadNotice.value = '当前段落尚未显示，请等待页面加载或滚动到文字后重试；原阅读位置已保留。'; return;}
   const owner = materialEpoch; const capturedAt = Date.now(); materialSaving.value = true;
@@ -797,7 +820,9 @@ async function restoreMaterialDocument(id: string): Promise<void> {
   try {const record = await materialGet(id); if (disposed || owner !== materialEpoch) return;
     if (!record || record.kind !== 'document' || !record.source.fingerprint) throw new Error('材料已移除或文档来源不完整，请从学习工作区检查。');
     pendingMaterialResume = record;
-    const existing = await history.load(record.source.fingerprint); if (disposed || owner !== materialEpoch) return;
+    const loaded = await history.loadChecked(record.source.fingerprint); if (disposed || owner !== materialEpoch) return;
+    if (loaded.status === 'unavailable') {importError.value = t('document.historyOpenUnavailable');return;}
+    const existing = loaded.record;
     if (!existing) {importError.value = '本机文件记录已移除。请选择原文件，FluentRead 会按内容指纹找回阅读位置与学习记录。';return;}
     await openHistory(existing); await applyMaterialResume();
   } catch (error) {if (!disposed && owner === materialEpoch) importError.value = error instanceof Error ? error.message : '恢复材料失败，请重新打开或选择原文件。';}
@@ -825,16 +850,21 @@ function queueMaterialPositionCapture(): void {
 watch([pdfPage, readerPage, epubChapterIndex, docxPartIndex], queueMaterialPositionCapture);
 let historyTimer: ReturnType<typeof setTimeout> | undefined;
 async function refreshHistory(): Promise<void> {
-  if (!historyAvailable) return;
-  const entries = await history.list();
-  if (!disposed) historyEntries.value = entries;
+  const epoch = ++historyRequestEpoch;
+  historyLoading.value = true;
+  const result = await history.listChecked();
+  if (disposed || epoch !== historyRequestEpoch) return;
+  historyLoading.value = false;
+  if (result.status === 'unavailable') {historyError.value = 'document.historyListUnavailable';return;}
+  historyEntries.value = result.entries;
+  historyError.value = '';
 }
 function persistHistory(): void {
   if (historyTimer !== undefined) {clearTimeout(historyTimer); historyTimer = undefined;}
   if (!historyAvailable) return;
   for (const item of documentQueue.value) {
     const completed = item.translations.filter(text => text?.trim()).length;
-    if (!item.document || !item.historyId || !item.bytes || item.revision === item.savedRevision) continue;
+    if (!item.document || !item.historyId || !item.bytes || item.historyReadUnavailable || item.historyConflict || item.revision === item.savedRevision) continue;
     void historyCommitter.save(item, {id: item.historyId, name: item.name, format: item.document.format, size: item.bytes.byteLength, sourceUrl: item.sourceUrl, mimeType: item.mimeType || '',
       total: item.document.segments.length, completed, updatedAt: Date.now(), bytes: item.bytes, translations: [...item.translations], ...(item.bypassCache ? {bypassCache: true} : {}), retainedRevisions: item.retainedRevisions ? toRaw(item.retainedRevisions) : undefined, fingerprint: item.fingerprint, parsed: toRaw(item.document), parsedVersion: PARSED_VERSION}).then(written => {if (written) void refreshHistory();});
   }
@@ -868,13 +898,23 @@ async function openHistory(entry: DocumentHistorySummary): Promise<void> {
   if (disposed || queueBusy.value) return;
   await importWorkflow.openHistory(entry.id);
 }
-async function removeHistory(entry: DocumentHistorySummary): Promise<void> {
-  await history.remove(entry.id);
+async function changeHistory(operation: () => Promise<boolean | {status: 'removed' | 'conflict' | 'unavailable'}>): Promise<void> {
+  if (historyMutationPending.value) return;
+  historyMutationPending.value = true;
+  ++historyRequestEpoch;
+  historyLoading.value = false;
+  const confirmed = await operation();
+  if (disposed) return;
+  historyMutationPending.value = false;
+  if (typeof confirmed !== 'boolean' && confirmed.status === 'conflict') {historyError.value = 'document.historyRemoveConflict';return;}
+  if (confirmed === false || typeof confirmed !== 'boolean' && confirmed.status === 'unavailable') {historyError.value = 'document.historyChangeUnavailable';return;}
   await refreshHistory();
 }
+async function removeHistory(entry: DocumentHistorySummary): Promise<void> {
+  await changeHistory(() => entry.historyVersion ? history.removeChecked(entry.id, entry.historyVersion) : Promise.resolve({status: 'unavailable'}));
+}
 async function clearHistory(): Promise<void> {
-  await history.clear();
-  await refreshHistory();
+  await changeHistory(() => history.clear());
 }
 function historyFormat(entry: DocumentHistorySummary): string {
   return entry.format === 'markdown' ? 'MD' : entry.format.toUpperCase();
@@ -912,9 +952,18 @@ const importWorkflow = createDocumentImportWorkflow({
       : t('document.pdfReading.downloadBytes', {size});
   },
   onOnlineError: error => {importError.value = error instanceof Error ? error.message : String(error);},
+  onHistoryUnavailable: () => {importError.value = t('document.historyOpenUnavailable');},
   onFinished: persistHistory,
   onHistoryMissing: refreshHistory,
 });
+async function retryDocumentHistory(): Promise<void> {
+  const item = activeTask.value;
+  if (queueBusy.value || !(item?.historyReadUnavailable || item?.historyConflict)) return;
+  const file = item.originalFile ?? (item.bytes ? new File([item.bytes.slice().buffer as ArrayBuffer], item.name, {type: item.mimeType || ''}) : undefined);
+  if (!file) return;
+  // 保留当前任务和用户修改，重新读取的历史作为另一任务加入队列。
+  await importWorkflow.loadFiles([file], item.sourceUrl);
+}
 const recognitionWorkflow = createDocumentRecognitionWorkflow({
   recognize: (document, recognize, options) => recognizePdfDocument(document, recognize, options),
   createRecognizer: language => createPdfPageRecognizer(language),

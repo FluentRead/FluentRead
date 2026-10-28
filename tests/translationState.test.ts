@@ -108,6 +108,31 @@ describe('普通 owner 的结构签名与真实 Text 槽一致', () => {
     });
 });
 
+it('preserves a reconnected shared-layout owner during synchronous abort of another detached owner', () => {
+    const {document} = parseHTML('<html><body><article style="height: 20px"><p>first</p><p>second</p><p>new</p></article></body></html>');
+    const article = document.querySelector<HTMLElement>('article')!;
+    const [first, second, newest] = Array.from(article.querySelectorAll<HTMLElement>('p'));
+    const attempts = [first, second, newest].map(owner => beginTranslation(owner, 'bilingual')!);
+    expect(markTranslationComplete(second, attempts[1].state, attempts[1].generation)).toBe(true);
+    const wrapper = document.createElement('span');
+    wrapper.className = 'fluent-read-bilingual-content'; wrapper.setAttribute('data-fr-translation-owned', 'true');
+    wrapper.textContent = '已翻译'; second.appendChild(wrapper); setBilingualContent(second, wrapper);
+    try {
+        expect(acquireTranslationLayoutOverride(first, article, [{property: 'height', value: 'auto', priority: 'important'}])).toBe(true);
+        expect(acquireTranslationLayoutOverride(second, article, [])).toBe(true);
+        attempts[0].state.controller.signal.addEventListener('abort', () => article.appendChild(second), {once: true});
+        first.remove(); second.remove();
+        expect(acquireTranslationLayoutOverride(newest, article, [])).toBe(true);
+        expect(second.isConnected).toBe(true);
+        expect(getTranslationState(second)).toBe(attempts[1].state);
+        expect(wrapper.parentNode).toBe(second);
+        expect(restoreTranslation(newest)).toBe(true);
+        expect(article.style.getPropertyValue('height')).toBe('auto');
+        expect(restoreTranslation(second)).toBe(true);
+        expect(article.style.getPropertyValue('height')).toBe('20px');
+    } finally { [first, second, newest].forEach(owner => restoreTranslation(owner)); }
+});
+
 /**
  * 用最小的 DOM 替身测试状态机，不把 jsdom 引入生产依赖。
  * 这些对象只实现 translationState.ts 真正使用的节点能力。

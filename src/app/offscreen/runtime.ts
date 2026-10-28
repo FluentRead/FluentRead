@@ -23,7 +23,7 @@ import {DEFAULT_INFORMATION_HIGHLIGHT_MODEL_ID} from '@/src/core/config/informat
 import {INFORMATION_HIGHLIGHT_DOWNLOAD_ID} from '@/src/features/information-highlight/protocol';
 import {withLocalInferenceBudget} from '@/src/shared/onnx/resources';
 import {parseSelectionTtsRoute} from '@/src/features/selection-translation/protocol';
-import {createDownloadProgressPublisher, LOCAL_TTS_DOWNLOAD_ID, ocrLanguageDownloadId, videoModelDownloadId} from '@/src/core/download/progress';
+import {createCoalescedDownloadNotifier, createDownloadProgressPublisher, LOCAL_TTS_DOWNLOAD_ID, ocrLanguageDownloadId, videoModelDownloadId} from '@/src/core/download/progress';
 import {normalizeVideoLocalTranscriptionModel} from '@/src/features/video-subtitle/transcription';
 import {createSelectionTtsPlayer} from './ttsPlayback';
 import {disposeChromeTranslationModels, translateWithChromeApi, type ChromeTranslationEnvironment} from './translation';
@@ -55,12 +55,15 @@ function decodeAudioBase64(audioBase64: string): Uint8Array {
 /** 组装 Offscreen 的实验 API、Audio/Blob 和图片 OCR 浏览器能力。 */
 export function startOffscreenApp(): void {
     const readingAnnotation = createReadingAnnotationRuntime({createWorker: () => new Worker(chrome.runtime.getURL('readingAnnotationWorker.js'), {type: 'module'})});
-    configureLocalTranslationDownloadNotifications((snapshot) => new Promise<void>((resolve) => {
-        chrome.runtime.sendMessage({type: 'fluentReadLocalTranslationDownloadProgress', snapshot}, () => {
-            void chrome.runtime.lastError;
-            resolve();
-        });
+    const downloadNotifications = createCoalescedDownloadNotifier((snapshot) => new Promise<void>((resolve) => {
+        try {
+            chrome.runtime.sendMessage({type: 'fluentReadLocalTranslationDownloadProgress', snapshot}, () => {
+                try {void chrome.runtime.lastError;} catch { /* 已失效的 runtime 无需再次通知。 */ }
+                resolve();
+            });
+        } catch {resolve();}
     }));
+    configureLocalTranslationDownloadNotifications(downloadNotifications.notify);
     // 离屏页面不能直接写扩展存储；进度交给后台转存，设置页与网页内界面再从存储变化事件读取。
     const downloads = createDownloadProgressPublisher((message) => {
         chrome.runtime.sendMessage(message, () => void chrome.runtime.lastError);
@@ -148,6 +151,7 @@ export function startOffscreenApp(): void {
 
     chrome.runtime.onMessage.addListener(listener);
     window.addEventListener('pagehide', () => {
+        downloadNotifications.dispose();
         readingAnnotation.dispose();
         ttsPlayer.dispose();
         disposeChromeTranslationModels(self as ChromeTranslationEnvironment);

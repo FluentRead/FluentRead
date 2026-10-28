@@ -8,6 +8,7 @@ import {describe, expect, it, vi} from 'vitest';
 import {
     DOWNLOAD_PROGRESS_MESSAGE,
     LOCAL_TTS_DOWNLOAD_ID,
+    createCoalescedDownloadNotifier,
     createDownloadProgressPublisher,
     createDownloadCompletionSummary,
     createDownloadProgressTracker,
@@ -231,5 +232,59 @@ describe('download progress publisher', () => {
         } finally {
             vi.useRealTimers();
         }
+    });
+});
+
+
+describe('后台进度通知的有限等待和快照合并', () => {
+    it('正常回执前维持顺序，期间只发送最新快照', async () => {
+        let acknowledge!: () => void;
+        const send = vi.fn((value: number) => value === 1 ? new Promise<void>(resolve => {acknowledge = resolve;}) : Promise.resolve());
+        const notifier = createCoalescedDownloadNotifier(send);
+        const first = notifier.notify(1); await Promise.resolve();
+        let returned = false; void first.then(() => {returned = true;});
+        await notifier.notify(2); await notifier.notify(3); expect(send.mock.calls).toEqual([[1]]); expect(returned).toBe(false);
+        acknowledge(); await first; await vi.waitFor(() => expect(send.mock.calls).toEqual([[1], [3]]));
+        notifier.dispose();
+    });
+    it('永久不回复时只保留一个发送和最新快照，超时释放调用方，迟到回执恢复发送', async () => {
+        vi.useFakeTimers();
+        try {
+            let acknowledge!: () => void;
+            const send = vi.fn((value: number) => value === 0 ? new Promise<void>(resolve => {acknowledge = resolve;}) : Promise.resolve());
+            const notifier = createCoalescedDownloadNotifier(send, 1000);
+            const first = notifier.notify(0); await Promise.resolve();
+            for (let value = 1; value <= 10_000; value++) await notifier.notify(value);
+            expect(send.mock.calls).toEqual([[0]]);
+            await vi.advanceTimersByTimeAsync(1000); await first;
+            expect(send.mock.calls).toEqual([[0]]);
+            acknowledge(); for (let i = 0; i < 8; i++) await Promise.resolve();
+            expect(send.mock.calls).toEqual([[0], [10_000]]); notifier.dispose();
+        } finally {vi.useRealTimers();}
+    });
+    it.each(['throw', 'reject'])('%s 不阻塞下一次新快照', async failure => {
+        const send = vi.fn().mockImplementationOnce(() => {if (failure === 'throw') throw new Error('fixture'); return Promise.reject(new Error('fixture'));})
+            .mockResolvedValue(undefined);
+        const notifier = createCoalescedDownloadNotifier(send); await notifier.notify(1); await notifier.notify(2);
+        expect(send.mock.calls).toEqual([[1], [2]]); notifier.dispose();
+    });
+    it('通知刚入队即同步释放时，不调用底层发送', async () => {
+        const send = vi.fn(async () => undefined);
+        const notifier = createCoalescedDownloadNotifier(send);
+        const pending = notifier.notify(1); notifier.dispose(); await pending;
+        for (let i = 0; i < 5; i++) await Promise.resolve();
+        expect(send).not.toHaveBeenCalled();
+    });
+    it('释放立即结束调用方等待，丢弃排队快照并阻止迟到回执触发新发送', async () => {
+        vi.useFakeTimers();
+        try {
+            let acknowledge!: () => void;
+            const send = vi.fn(() => new Promise<void>(resolve => {acknowledge = resolve;}));
+            const notifier = createCoalescedDownloadNotifier(send);
+            const pending = notifier.notify(1); await Promise.resolve(); await notifier.notify(2);
+            notifier.dispose(); await pending; await notifier.notify(3);
+            acknowledge(); for (let i = 0; i < 8; i++) await Promise.resolve();
+            expect(send.mock.calls).toEqual([[1]]); expect(vi.getTimerCount()).toBe(0); notifier.dispose();
+        } finally {vi.useRealTimers();}
     });
 });

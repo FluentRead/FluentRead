@@ -106,7 +106,8 @@ Firefox 需安装本次 production MV2 产物到独立 profile，并执行实际
 # 划词入口：删除挂载节点、在途恢复、取消、失败重试、键盘、390px 深色
 node scripts/testing/run-resource-safe.mjs -- node scripts/run-selection-trigger-test.cjs \
   --lifecycle-only --extension-dir .output/chrome-mv3 \
-  --playwright-root <Node包目录> --artifacts-dir <划词证据目录>
+  --playwright-root <Node包目录> --runtime-diagnostics <runtime-diagnostics.cjs> \
+  --artifacts-dir <划词证据目录>
 
 # 原生 Mastodon 公开帖子：真实滚轮分页和同文档路由，不登录、不发帖
 node scripts/testing/run-resource-safe.mjs -- node scripts/testing/run-web-native-feed-test.cjs \

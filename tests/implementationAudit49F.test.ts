@@ -660,6 +660,7 @@ describe('49F actual settings client template', () => {
         const root = document.createElement('div'); document.body.append(root);
         app = createApp(SettingsPanel); app.mount(root);
         await nextTick(); await nextTick();
+        ports.send.mockResolvedValue({status: 'success'});
         const input = root.querySelector<HTMLInputElement>('.toggle input')!;
         expect(input.checked).toBe(true);
         input.checked = false; input.dispatchEvent(new Event('change', {bubbles: true}));
@@ -669,9 +670,7 @@ describe('49F actual settings client template', () => {
         await vi.waitFor(() => expect(root.querySelector('.status')!.textContent).toBe('本次提交已保存，并已应用到当前页面。'));
         expect(ports.patch).toHaveBeenCalledOnce();
         expect(ports.patch.mock.calls[0][0]).toMatchObject({on: false, contextMenuEnabled: false, disableImageTranslator: true});
-        expect(ports.send.mock.calls.map(call => call[1])).toEqual([
-            {type: 'toggleFloatingBall', isEnabled: false}, {type: 'updateSelectionTranslatorMode', mode: 'disabled'}, {type: 'toggleTranslationProgressPanel', isEnabled: false},
-        ]);
+        expect(ports.send.mock.calls.map(call => call[1])).toEqual([{type: 'reconcileUserscriptPage'}]);
     });
 });
 
@@ -735,7 +734,7 @@ describe('49F real config-store ownership through the full platform public handl
         vi.doMock('@/src/app/translation/visionProbeRuntime', () => ({modelVisionProbe: {resolve: vi.fn()}}));
         vi.doMock('@/src/app/translation/runtime', () => ({cleanupTranslationCache: vi.fn(), clearTranslationCache: vi.fn(), translateWithCache: vi.fn()}));
         vi.doMock('@/src/platform/storage/modelUsageRepository', () => ({getModelUsageRepository: () => ({})}));
-        vi.doMock('@/src/features/vocabulary/repository', () => ({vocabularyBook: {}}));
+        vi.doMock('@/src/features/vocabulary/repository', () => ({vocabularyBook: {pruneUndo: async () => undefined}}));
         const {default: adapter, setPlatformMessageHandler, resetPlatformMessageHandler} = await import('@/userscript/browser');
         let ready = false;
         try {
@@ -809,7 +808,7 @@ describe('49F full platform cleanup through the public browser owner', () => {
         vi.doMock('@/src/app/translation/visionProbeRuntime', () => ({modelVisionProbe: {resolve: vi.fn()}}));
         vi.doMock('@/src/app/translation/runtime', () => ({cleanupTranslationCache: vi.fn(), clearTranslationCache: vi.fn(), translateWithCache: vi.fn()}));
         vi.doMock('@/src/platform/storage/modelUsageRepository', () => ({getModelUsageRepository: () => ({})}));
-        vi.doMock('@/src/features/vocabulary/repository', () => ({vocabularyBook: {}}));
+        vi.doMock('@/src/features/vocabulary/repository', () => ({vocabularyBook: {pruneUndo: async () => undefined}}));
         const browser = await import('@/userscript/browser');
         const platform = await import('@/userscript/platformFull');
         type OwnedWatch = {key: string; callback: (value: any) => void; stop: ReturnType<typeof vi.fn>; release(): void; error?: Error; onStop?: () => void};
@@ -1369,7 +1368,7 @@ describe('49F actual pinned-data virtual catalog consumer', () => {
 });
 
 describe('49F actual userscript main module lifecycle ownership', () => {
-    async function mainFixture(startFailure?: Error, cleanupFailure?: Error) {
+    async function mainFixture(startFailure?: Error, cleanupFailure?: Error, contentMessages = false) {
         delete globalThis.__fluentReadUserscriptBootstrapped;
         vi.stubGlobal('__FLUENTREAD_FULL_OPTIONS__', false);
         vi.stubGlobal('defineContentScript', (entry: unknown) => entry);
@@ -1379,6 +1378,30 @@ describe('49F actual userscript main module lifecycle ownership', () => {
         const originalPush = historyPort.pushState;
         const originalReplace = historyPort.replaceState;
         const menus = new Map<string, () => void>();
+        let realApp: Awaited<ReturnType<typeof import('@/src/services/config/application')['createConfigApplication']>> | undefined;
+        let storedConfig: () => unknown = () => undefined;
+        let pendingConfigWrite: {gate: Promise<void>; entered: () => void} | undefined;
+        const blockNextConfigWrite = () => {const gate = deferred<void>(), started = deferred<void>(); pendingConfigWrite = {gate: gate.promise, entered: started.resolve}; return {...gate, entered: started.promise};};
+        if (contentMessages) {
+            const {createConfigApplication} = await import('@/src/services/config/application');
+            const {sanitizeConfigCredentials, extractConfigCredentials} = await import('@/src/core/config/credentials');
+            const records = new Map<string, unknown>([['local:config', {...sanitizeConfigCredentials(ports.config), __fluentConfigRevision: 1}], ['local:credentials', extractConfigCredentials(ports.config)]]);
+            const watchers = new Map<string, Set<(value: unknown) => void>>();
+            const notify = (key: string) => {for (const callback of watchers.get(key) ?? []) callback(structuredClone(records.get(key) ?? null));};
+            const storage = {
+                writeOwner: true,
+                getItem: async <T>(key: string) => structuredClone(records.get(key) ?? null) as T | null,
+                setItem: async <T>(key: string, value: T) => {records.set(key, structuredClone(value)); notify(key);},
+                setItems: async (entries: Map<string, unknown>, removeKeys: string[] = []) => {if (entries.has('local:config') && pendingConfigWrite) {const wait = pendingConfigWrite; pendingConfigWrite = undefined; wait.entered(); await wait.gate;} for (const [key, value] of entries) records.set(key, structuredClone(value)); for (const key of removeKeys) records.delete(key); for (const key of [...entries.keys(), ...removeKeys]) notify(key);},
+                removeItem: async (key: string) => {records.delete(key); notify(key);},
+                watch: (key: string, callback: (value: any) => void) => {const set = watchers.get(key) ?? new Set(); set.add(callback); watchers.set(key, set); return () => set.delete(callback);},
+            };
+            realApp = createConfigApplication({storage, trustedContext: true}); await realApp.start();
+            ports.config = realApp.config;
+            const app = realApp;
+            vi.doMock('@/src/services/config/store', () => app);
+            storedConfig = () => records.get('local:config');
+        }
         const values = new Map<string, unknown>([['local:config', JSON.stringify(ports.config)]]);
         vi.stubGlobal('GM', {
             getValue: (key: string, fallback: unknown) => values.has(key) ? values.get(key) : fallback,
@@ -1394,12 +1417,15 @@ describe('49F actual userscript main module lifecycle ownership', () => {
         });
         vi.spyOn(window, 'removeEventListener').mockImplementation((type, listener, options) => {events.get(type)?.delete(listener); nativeRemove(type, listener, options);});
         const closes = vi.fn();
+        const notice = vi.fn();
+        if (contentMessages) vi.doMock('@/src/features/page-notice/public', () => ({showPageNotice: notice, dismissPageNotice: vi.fn(), sendErrorMessage: vi.fn()}));
         const opens = vi.fn().mockResolvedValue(undefined);
         vi.doMock('@/userscript/settings', () => ({openUserscriptSettings:opens,closeUserscriptSettings:closes}));
         const sentinel = (await import('@/userscript/browser')).UNHANDLED_RUNTIME_MESSAGE;
         const platform = vi.fn(async (message: any) => message?.type === 'audit49f-platform-owned' ? {success:true} : sentinel);
         vi.doMock('@/userscript/platform', () => ({createPlatformMessageHandler: () => platform}));
-        vi.doMock('@/src/app/content/features', () => ({isFullPageTranslationActive: () => false,restoreOriginalContent:vi.fn(),autoTranslateEnglishPage:vi.fn()}));
+        const contentActions = {mountFloatingBall: vi.fn(), unmountFloatingBall: vi.fn(), mountSelectionTranslator: vi.fn(), unmountSelectionTranslator: vi.fn()};
+        vi.doMock('@/src/app/content/features', () => ({isFullPageTranslationActive: () => false,restoreOriginalContent:vi.fn(),autoTranslateEnglishPage:vi.fn(), ...contentActions}));
         const cleanup = vi.fn(() => {if (cleanupFailure) throw cleanupFailure;});
         const laterCleanup = vi.fn();
         let context!: import('@/userscript/context').UserscriptContentContext;
@@ -1407,6 +1433,12 @@ describe('49F actual userscript main module lifecycle ownership', () => {
         const start = vi.fn(async (ctx: typeof context) => {
             loaded = true; context = ctx;
             ctx.onInvalidated(cleanup); ctx.onInvalidated(laterCleanup);
+            if (contentMessages) {
+                const {createContentRuntimeMessageHandler} = await import('@/src/app/content/messageRuntime');
+                const handler = createContentRuntimeMessageHandler(ctx as never, {isSiteDisabled: () => false, updateSiteDisabled: async () => undefined});
+                adapter.runtime.onMessage.addListener(handler as never);
+                ctx.onInvalidated(() => adapter.runtime.onMessage.removeListener(handler as never));
+            }
             if (startFailure) throw startFailure;
         });
         // 真实 entrypoints/content 仍经 defineContentScript 加载；只控制它调用的内容应用启动端口。
@@ -1416,9 +1448,10 @@ describe('49F actual userscript main module lifecycle ownership', () => {
         await import('@/userscript/main');
         try { await vi.waitFor(() => expect(start).toHaveBeenCalledOnce(), {timeout:1500}); } catch { throw new Error(`main entry not loaded: ${errors.mock.calls.map(call => call.map(value => value instanceof Error ? value.stack : String(value)).join(' ')).join(' | ')}`); }
         expect(loaded).toBe(true); // 明确区分入口加载成功与 runtime 故障。
+        if (contentMessages) await start.mock.results[0]?.value;
         await new Promise(resolve => setTimeout(resolve, 0));
         const bridge = await import('@/src/platform/shadow-ui/pageBridgeCore');
-        return {context, loaded, start, cleanup, laterCleanup, errors, adapter, closes, opens, events, bridge, platform,
+        return {context, loaded, start, cleanup, laterCleanup, errors, adapter, closes, opens, events, bridge, platform, menus, contentActions, realApp, storedConfig, blockNextConfigWrite, notice,
             pagehide(persisted: boolean, isTrusted = true) {
                 const listeners = [...(events.get('pagehide') ?? [])];
                 for (const listener of listeners) {
@@ -1443,7 +1476,74 @@ describe('49F actual userscript main module lifecycle ownership', () => {
         };
     }
     afterEach(() => {
-        for (const path of ['@/userscript/settings','@/userscript/platform','@/src/app/content/features','@/src/app/content/runtime']) vi.doUnmock(path);
+        for (const path of ['@/userscript/settings','@/userscript/platform','@/src/app/content/features','@/src/app/content/runtime','@/src/features/page-notice/public']) vi.doUnmock(path);
+        vi.doMock('@/src/services/config/store', () => ({config: ports.config, configReady: ports.ready, saveConfig: ports.save, subscribeConfig: ports.subscribe, requestConfigPatch: ports.patch, getConfigRevision: () => 0}));
+    });
+
+    it('userscript 菜单暂停再启用，真实配置权威通知并持久化且不改变功能偏好', async () => {
+        const fixture = await mainFixture(undefined, undefined, true);
+        const app = fixture.realApp!;
+        try {
+            await app.requestConfigPatch({on: true, disableFloatingBall: false, selectionTranslatorMode: 'bilingual', translationProgressPanelEnabled: true});
+            const observed: boolean[] = [];
+            const unsubscribe = app.subscribeConfig(next => {observed.push(next.on);});
+            const menu = fixture.menus.get('流畅阅读：启用 / 暂停')!;
+            expect(menu).toBeTypeOf('function');
+            menu();
+            await vi.waitFor(() => expect(fixture.storedConfig()).toMatchObject({on: false}));
+            expect(app.config).toMatchObject({on: false, disableFloatingBall: false, selectionTranslatorMode: 'bilingual', disableSelectionTranslator: false, translationProgressPanelEnabled: true});
+            menu();
+            await vi.waitFor(() => expect(fixture.storedConfig()).toMatchObject({on: true}));
+            expect(fixture.storedConfig()).toMatchObject({on: true, disableFloatingBall: false, selectionTranslatorMode: 'bilingual', translationProgressPanelEnabled: true});
+            expect(observed).toContain(false); expect(observed.at(-1)).toBe(true);
+            unsubscribe();
+        } finally {await app.flushConfigHistory(); fixture.disposeFixture();}
+    });
+
+    it('userscript 菜单快速暂停再启用，迟到保存不覆盖新状态或功能偏好', async () => {
+        const fixture = await mainFixture(undefined, undefined, true); const app = fixture.realApp!;
+        try {
+            await app.requestConfigPatch({on: true, disableFloatingBall: false, selectionTranslatorMode: 'bilingual'});
+            const gate = fixture.blockNextConfigWrite(), menu = fixture.menus.get('流畅阅读：启用 / 暂停')!;
+            menu(); await gate.entered; expect(app.config.on).toBe(false);
+            menu(); expect(app.config.on).toBe(true);
+            gate.resolve(); await app.waitForConfigPersistenceQueue();
+            await vi.waitFor(() => expect(fixture.storedConfig()).toMatchObject({on: true, disableFloatingBall: false, selectionTranslatorMode: 'bilingual'}));
+            expect(app.config).toMatchObject({on: true, disableFloatingBall: false, selectionTranslatorMode: 'bilingual'});
+        } finally {await app.flushConfigHistory(); fixture.disposeFixture();}
+    });
+
+    it('旧暂停请求迟到失败时不覆盖或误报之后的启用', async () => {
+        const fixture = await mainFixture(undefined, undefined, true); const app = fixture.realApp!;
+        try {
+            await app.requestConfigPatch({on: true, disableFloatingBall: false, selectionTranslatorMode: 'bilingual'});
+            const priorRevision = (fixture.storedConfig() as {__fluentConfigRevision: number}).__fluentConfigRevision;
+            const gate = fixture.blockNextConfigWrite(), menu = fixture.menus.get('流畅阅读：启用 / 暂停')!;
+            menu(); await gate.entered; menu(); expect(app.config.on).toBe(true);
+            gate.reject(new Error('obsolete-private-error'));
+            await app.waitForConfigPersistenceQueue().catch(() => undefined);
+            await vi.waitFor(() => {
+                expect(fixture.storedConfig()).toMatchObject({on: true});
+                expect((fixture.storedConfig() as {__fluentConfigRevision: number}).__fluentConfigRevision).toBeGreaterThan(priorRevision);
+            });
+            expect(app.config.on).toBe(true); expect(fixture.notice).not.toHaveBeenCalled();
+            expect(fixture.errors).not.toHaveBeenCalledWith('[FluentRead userscript] 启停设置结果未确认，请检查设置。');
+        } finally {await app.flushConfigHistory(); fixture.disposeFixture();}
+    });
+
+    it('userscript 菜单保存失败后回读权威状态并给出不含原始异常的错误', async () => {
+        const fixture = await mainFixture(undefined, undefined, true); const app = fixture.realApp!;
+        try {
+            await app.requestConfigPatch({on: true, disableFloatingBall: false, selectionTranslatorMode: 'bilingual'});
+            const gate = fixture.blockNextConfigWrite(); fixture.menus.get('流畅阅读：启用 / 暂停')!();
+            await gate.entered; expect(app.config.on).toBe(false);
+            gate.reject(new Error('private-storage-detail'));
+            await vi.waitFor(() => expect(fixture.errors).toHaveBeenCalledWith('[FluentRead userscript] 启停设置结果未确认，请检查设置。'));
+            expect(app.config).toMatchObject({on: true, disableFloatingBall: false, selectionTranslatorMode: 'bilingual'});
+            expect(fixture.storedConfig()).toMatchObject({on: true});
+            expect(fixture.notice).toHaveBeenCalledWith(expect.any(String), 'error', {key: 'userscript-toggle'});
+            expect(JSON.stringify(fixture.errors.mock.calls)).not.toContain('private-storage-detail');
+        } finally {await app.flushConfigHistory(); fixture.disposeFixture();}
     });
 
     it.each([false, true])('cleans the actual main bridge and listeners on trusted non-BFcache pagehide with invalidation failure=%s', async throws => {

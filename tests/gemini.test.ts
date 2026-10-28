@@ -22,6 +22,8 @@ import {customModelString} from '@/src/core/config/catalog';
 import {Config, normalizeConfig} from '@/src/core/config/model';
 import {prepareConfigForImport} from '@/src/core/config/transfer';
 import {
+    attachTranslationImageInput,
+    attachTranslationModelUsageObserver,
     attachTranslationProviderConfig,
     createTranslationProviderConfigSnapshot,
 } from '@/src/services/translation/requestSnapshot';
@@ -276,5 +278,72 @@ describe('gemini AI 请求超时预算', () => {
         await expect(outcome).resolves.toMatchObject({name: 'AbortError'});
         expect(signal.aborted).toBe(true);
         expect(vi.getTimerCount()).toBe(0);
+    });
+});
+
+
+it('未结束的超大图片错误返回安全 HTTP 状态并释放原始流', async () => {
+    let controller!: ReadableStreamDefaultController<Uint8Array>;
+    const body = new ReadableStream<Uint8Array>({start(stream) {controller = stream; stream.enqueue(new Uint8Array(128 * 1024));}});
+    fetchMock.mockResolvedValue(new Response(body, {status: 400}));
+    const request = withProviderSnapshot(attachTranslationImageInput({origin: 'source', serviceOverride: 'gemini'}, 'data:image/png;base64,AAAA'), mockConfig);
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    try {
+        const result = await Promise.race([
+            gemini(request).catch(error => error),
+            new Promise<'unsettled'>(resolve => {timer = setTimeout(() => resolve('unsettled'), 300);}),
+        ]);
+        expect(result).toMatchObject({statusCode: 400}); expect((result as Error).message).not.toContain('google-secret-key');
+    } finally {clearTimeout(timer); try {controller.close();} catch { /* provider 已取消原流 */ }}
+});
+
+describe('Gemini 响应读取期间的取消', () => {
+    it('正文读取截止时仍区分超时和用户取消', async () => {
+        vi.useFakeTimers();
+        let notifyRead!: () => void;
+        const readStarted = new Promise<void>(resolve => {notifyRead = resolve;});
+        fetchMock.mockImplementation(async (_input, init) => new Response(new ReadableStream<Uint8Array>({
+            start(stream) {init!.signal!.addEventListener('abort', () => stream.error(new DOMException('aborted', 'AbortError')), {once: true});},
+            pull() {notifyRead();},
+        }, {highWaterMark: 0})));
+        const outcome = gemini(withProviderSnapshot({origin: 'hello', requestTimeoutMs: 10}, mockConfig)).catch(error => error);
+        await readStarted;
+        await vi.advanceTimersByTimeAsync(10);
+        await expect(outcome).resolves.toMatchObject({name: 'TimeoutError', kind: 'timeout', retryable: true});
+        expect(vi.getTimerCount()).toBe(0);
+    });
+
+    it('取消后不合作的传输返回完整正文也不发布译文', async () => {
+        const owner = new AbortController();
+        const stream = new ReadableStream<Uint8Array>({
+            pull(output) {
+                owner.abort();
+                output.enqueue(new TextEncoder().encode(JSON.stringify({candidates: [{content: {parts: [{text: '迟到译文'}]}}]})));
+                output.close();
+            },
+        }, {highWaterMark: 0});
+        fetchMock.mockResolvedValue(new Response(stream));
+        await expect(gemini(withProviderSnapshot({origin: 'hello', abortSignal: owner.signal}, mockConfig)))
+            .rejects.toMatchObject({name: 'AbortError'});
+    });
+
+    it('用户取消已返回的响应流应返回 AbortError 而非格式错误', async () => {
+        const owner = new AbortController();
+        let notifyRead!: () => void;
+        const readStarted = new Promise<void>(resolve => {notifyRead = resolve;});
+        fetchMock.mockImplementation(async (_input, init) => new Response(new ReadableStream<Uint8Array>({
+            start(stream) {init!.signal!.addEventListener('abort', () => stream.error(new DOMException('aborted', 'AbortError')), {once: true});},
+            pull() {notifyRead();},
+        }, {highWaterMark: 0})));
+        const observed = vi.fn();
+        const message = withProviderSnapshot(attachTranslationModelUsageObserver(
+            {origin: 'private text', abortSignal: owner.signal}, observed,
+        ), mockConfig);
+        const outcome = gemini(message).catch(error => error);
+        await readStarted;
+        owner.abort();
+        await expect(outcome).resolves.toMatchObject({name: 'AbortError'});
+        expect(observed).toHaveBeenCalledOnce();
+        expect(observed.mock.calls[0]?.[0]).toMatchObject({outcome: 'cancelled', usageAvailability: 'unreported'});
     });
 });

@@ -15,13 +15,14 @@ export interface WritingReferenceState {
 export function createWritingReference(deps: {
     stream(source: string, language: string, handlers: {progress(value: WritingProgress): void; result(value: WritingResponse): void}): () => void;
     changed(state: WritingReferenceState): void;
+    canRecover?(snapshot: WritingReferenceSnapshot): boolean;
 }) {
     let current: WritingReferenceSnapshot | undefined;
-    let generation = 0; let cancel: (() => void) | undefined; let disposed = false; let key = '';
+    let generation = 0; let cancel: (() => void) | undefined; let recoveryTimer: ReturnType<typeof setTimeout> | undefined; let disposed = false; let key = '';
     const cache = new Map<string, string>();
     const publish = (status: WritingReferenceState['status'], text = '') => deps.changed({status, text});
-    function stop() { generation++; cancel?.(); cancel = undefined; }
-    function update(snapshot: WritingReferenceSnapshot, retry = false) {
+    function stop() { generation++; clearTimeout(recoveryTimer); recoveryTimer = undefined; cancel?.(); cancel = undefined; }
+    function update(snapshot: WritingReferenceSnapshot, retry = false, automaticRetries = 0) {
         if (disposed) return;
         const nextKey = JSON.stringify([snapshot.session, snapshot.source, snapshot.sourceLanguage, snapshot.language, snapshot.owner, snapshot.active]);
         if (!retry && nextKey === key) return;
@@ -43,6 +44,15 @@ export function createWritingReference(deps: {
                 result(value) {
                     if (owner !== generation || settled) return;
                     settled = true; cancel = undefined;
+                    if (!value.success && value.cancelled && value.reason === 'configuration-changed' && automaticRetries === 0) {
+                        // 等待当前用户动作及 Vue 父子状态交接，再核验原快照是否仍可见。
+                        recoveryTimer = setTimeout(() => {
+                            recoveryTimer = undefined;
+                            if (disposed || owner !== generation || !current || deps.canRecover?.(current) === false) return;
+                            update(current, true, 1);
+                        }, 0);
+                        return;
+                    }
                     if (!value.success || !value.text.trim()) { publish('error'); return; }
                     cache.set(cacheKey, value.text);
                     if (cache.size > 5) cache.delete(cache.keys().next().value!);

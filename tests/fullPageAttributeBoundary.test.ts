@@ -1,3 +1,4 @@
+import {translateBilingualFixture} from './helpers/translateBilingualFixture';
 import {afterEach, beforeEach, describe, expect, it, vi} from 'vitest';
 import {parseHTML} from 'linkedom';
 import {TranslationCandidateCore} from '@/src/core/translation/engine';
@@ -62,7 +63,7 @@ vi.mock('@/src/features/full-page-translation/content/titleTranslation', () => (
 vi.mock('@/src/features/page-notice/public', () => ({showPageNotice: () => undefined}));
 vi.mock('@/src/core/config/customOpenAI', () => ({getCustomOpenAIProviderLabel: () => 'Fixture provider'}));
 
-import {autoTranslateEnglishPage, handleBilingualTranslation, restoreOriginalContent} from '@/src/features/full-page-translation/content/runtime';
+import {autoTranslateEnglishPage, restoreOriginalContent} from '@/src/features/full-page-translation/content/runtime';
 import {getTranslationState} from '@/src/features/full-page-translation/content/state';
 import * as indicators from '@/src/features/full-page-translation/ui/translationIndicators';
 import * as translationState from '@/src/features/full-page-translation/content/state';
@@ -241,7 +242,7 @@ describe('full page site attribute boundary lifecycle', () => {
         const originalHTML = host.innerHTML;
         const pending = deferred<string[]>();
         fixture.requests.mockImplementationOnce(() => pending.promise);
-        handleBilingualTranslation(host, false);
+        translateBilingualFixture(host, false);
         await vi.advanceTimersByTimeAsync(50);
         const segment = host.querySelector<HTMLElement>('[data-fr-translation-segment="true"]')!;
         const state = getTranslationState(segment)!;

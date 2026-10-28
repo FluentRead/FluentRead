@@ -91,18 +91,38 @@ export async function startEmbeddedFrameApp(ctx: ContentScriptContext): Promise<
     if (ctx.isInvalid || disposed) { cleanup(); return; }
 
     let activation: AbortController | null = null;
+    let toggleGeneration = 0;
+    let observedRevision: number | undefined;
+    let observedSessionId: number | null = null;
     let removeStyles: (() => void) | null = null;
     let authorized = false;
     const pageTranslationFont = createPageTranslationFontRuntime({document});
     const enabled = () => !disposed && !pageLifecycle.isSuspended() && config.on !== false &&
         !isExtensionDisabledOnSite(window.location.href, config.disabledExtensionDomains);
+    const refreshAfterToggle = () => {
+        const currentActivation = activation;
+        const currentGeneration = toggleGeneration;
+        return controller.refresh().catch(() => {
+            if (activation === currentActivation && toggleGeneration === currentGeneration && enabled() && authorized) controller.suspend();
+        });
+    };
     const toggle = (invocation?: PageTranslationInvocation) => {
         if (!enabled() || !authorized) return;
+        const requestActivation = activation;
+        const requestGeneration = ++toggleGeneration;
+        const requestRevision = observedRevision;
+        const requestSessionId = observedSessionId;
+        const onFailure = () => {
+            if (!enabled() || !authorized) return;
+            if (requestActivation === activation && requestGeneration === toggleGeneration &&
+                requestRevision === observedRevision && requestSessionId === observedSessionId) controller.suspend();
+            void refreshAfterToggle();
+        };
         try {
             void browser.runtime.sendMessage({type: EMBEDDED_FRAME_REQUEST, action: 'toggle',
                 ...(invocation ? {invocation} : {})})
-                .then(() => controller.refresh()).catch(() => controller.suspend());
-        } catch { controller.suspend(); }
+                .then(refreshAfterToggle, onFailure);
+        } catch { onFailure(); }
     };
     const hotkeys = createContentHotkeyRuntime(() => !enabled() || !authorized,
         {toggleFullPage: toggle, selectionAvailable: false});
@@ -135,6 +155,10 @@ export async function startEmbeddedFrameApp(ctx: ContentScriptContext): Promise<
     const controller = createFrameSessionController({
         readState: () => browser.runtime.sendMessage({type: EMBEDDED_FRAME_REQUEST, action: 'state'}),
         isEnabled: enabled, setAvailable, restore,
+        syncState: state => {
+            observedRevision = state.revision;
+            observedSessionId = state.sessionId;
+        },
         start: (state) => autoTranslateEnglishPage({
             service: state.translationConfig!.service, model: state.translationConfig!.model,
             targetLanguage: state.translationConfig!.targetLanguage, displayMode: state.translationConfig!.displayMode,

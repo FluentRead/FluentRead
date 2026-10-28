@@ -1,5 +1,5 @@
 import {afterEach, beforeEach, describe, expect, it, vi} from 'vitest';
-import {nextTick} from 'vue';
+import {nextTick, watch} from 'vue';
 import {parseHTML} from 'linkedom';
 
 const store = vi.hoisted(() => {
@@ -151,4 +151,140 @@ describe('Vue 界面语言资源按需刷新', () => {
         expect(context.language.value).toBe('fr-FR');
         context.dispose();
     });
+});
+
+    it('资源挂起时同语言的高频配置回声只订阅一次，资源到达仍刷新当前界面', async () => {
+        const pending = deferred(); loader.ensure.mockReturnValue(pending.promise);
+        const reactions = vi.spyOn(pending.promise, 'then');
+        const context = createUiI18nContext();
+        try {
+            store.emit({uiLanguage: 'ja-JP'});
+            for (let i = 0; i < 5000; i++) store.emit({uiLanguage: 'ja-JP'});
+            await Promise.resolve();
+            expect(loader.ensure).toHaveBeenCalledTimes(1);
+            expect(reactions.mock.calls.length).toBeLessThanOrEqual(2);
+            expect(context.language.value).toBe('ja-JP');
+            registerUiLanguageBundle('ja-JP', {messages: {'popup.donationTitle': '寄付'}, legacyText: {}, legacyPatterns: {early: [], late: []}});
+            pending.resolve(true); await pending.promise; await nextTick();
+            expect(context.bundleRevision.value).toBe(1); expect(context.t('popup.donationTitle')).toBe('寄付');
+        } finally {context.dispose(); pending.resolve(false);}
+    });
+
+
+it('资源挂起时反复创建和卸载界面，不为每个旧上下文保留 Promise 回调', async () => {
+    const pending = deferred(); loader.ensure.mockReturnValue(pending.promise);
+    const reactions = vi.spyOn(pending.promise, 'then');
+    const contexts: ReturnType<typeof createUiI18nContext>[] = [];
+    try {
+        for (let i = 0; i < 1000; i++) {
+            store.config.uiLanguage = 'ru-RU';
+            const context = createUiI18nContext(); contexts.push(context); context.dispose();
+        }
+        await Promise.resolve();
+        expect(store.listeners.size).toBe(0);
+        expect(loader.ensure).toHaveBeenCalledOnce();
+        expect(reactions.mock.calls.length).toBeLessThanOrEqual(2);
+        pending.resolve(false); await pending.promise; for (let i = 0; i < 4; i++) await Promise.resolve();
+        expect(contexts.every(context => context.bundleRevision.value === 0)).toBe(true);
+    } finally {for (const context of contexts) context.dispose(); pending.resolve(false);}
+});
+
+it('多个界面共享资源加载，卸载旧界面后仍刷新存活界面', async () => {
+    const pending = deferred(); loader.ensure.mockReturnValue(pending.promise);
+    store.config.uiLanguage = 'ru-RU';
+    const first = createUiI18nContext(), second = createUiI18nContext();
+    try {
+        first.dispose(); pending.resolve(true); await pending.promise; await nextTick();
+        expect(loader.ensure).toHaveBeenCalledOnce();
+        expect(first.bundleRevision.value).toBe(0); expect(second.bundleRevision.value).toBe(1);
+    } finally {first.dispose(); second.dispose(); pending.resolve(false);}
+});
+
+it('加载回调触发另一个界面卸载时，迟到订阅不能更新已卸载界面', async () => {
+    const pending = deferred(); loader.ensure.mockReturnValue(pending.promise); store.config.uiLanguage = 'ru-RU';
+    const first = createUiI18nContext(), second = createUiI18nContext();
+    const stop = watch(first.bundleRevision, () => second.dispose(), {flush: 'sync'});
+    try {
+        pending.resolve(true); await pending.promise; await nextTick();
+        expect(first.bundleRevision.value).toBe(1); expect(second.bundleRevision.value).toBe(0);
+        expect(store.listeners.size).toBe(1);
+    } finally {stop(); first.dispose(); second.dispose(); pending.resolve(false);}
+});
+
+it('一个界面的同步刷新抛错不会阻止其他界面收到资源', async () => {
+    const pending = deferred(); loader.ensure.mockReturnValue(pending.promise); store.config.uiLanguage = 'ru-RU';
+    const first = createUiI18nContext(), second = createUiI18nContext();
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const stop = watch(first.bundleRevision, () => {throw new Error('fixture watcher');}, {flush: 'sync'});
+    try {
+        pending.resolve(true); await pending.promise; await nextTick();
+        expect(first.bundleRevision.value).toBe(1); expect(second.bundleRevision.value).toBe(1);
+    } finally {stop(); first.dispose(); second.dispose(); pending.resolve(false); warn.mockRestore();}
+});
+
+it('同步创建加载任务失败后不残留共享条目，下一次仍能重试', async () => {
+    loader.ensure.mockImplementationOnce(() => {throw new Error('controlled loader');}).mockResolvedValueOnce(false);
+    store.config.uiLanguage = 'ru-RU';
+    expect(() => createUiI18nContext()).toThrow('controlled loader');
+    const retry = createUiI18nContext();
+    try {expect(loader.ensure).toHaveBeenCalledTimes(2);}
+    finally {retry.dispose();}
+    await Promise.resolve();
+});
+
+it('加载异步拒绝后可由后续配置事件重试', async () => {
+    const second = deferred();
+    loader.ensure.mockImplementationOnce(() => Promise.reject(new Error('controlled loader'))).mockReturnValueOnce(second.promise);
+    const context = createUiI18nContext();
+    try {
+        store.emit({uiLanguage: 'ru-RU'});
+        for (let i = 0; i < 5; i++) await Promise.resolve();
+        store.emit({uiLanguage: 'ru-RU'}); expect(loader.ensure).toHaveBeenCalledTimes(2);
+    } finally {context.dispose(); second.resolve(false);}
+});
+
+it('失败后允许重试，旧失败不能删除新的语言请求', async () => {
+    const first = deferred(), next = deferred();
+    loader.ensure.mockReturnValueOnce(first.promise).mockReturnValueOnce(next.promise);
+    const context = createUiI18nContext();
+    try {
+        store.emit({uiLanguage: 'ru-RU'}); first.resolve(false);
+        await first.promise; for (let i = 0; i < 4; i++) await Promise.resolve();
+        store.emit({uiLanguage: 'ru-RU'}); expect(loader.ensure).toHaveBeenCalledTimes(2);
+        store.emit({uiLanguage: 'ru-RU'}); expect(loader.ensure).toHaveBeenCalledTimes(2);
+        context.dispose(); next.resolve(true); await next.promise; await nextTick();
+        expect(context.bundleRevision.value).toBe(0);
+    } finally {context.dispose(); first.resolve(false); next.resolve(false);}
+});
+
+it('不同语言请求各持一份回调，往返后只刷新当前语言', async () => {
+    const russian = deferred(), spanish = deferred();
+    loader.ensure.mockImplementation(language => language === 'ru-RU' ? russian.promise : spanish.promise);
+    const ruReactions = vi.spyOn(russian.promise, 'then'), esReactions = vi.spyOn(spanish.promise, 'then');
+    const context = createUiI18nContext();
+    try {
+        for (let i = 0; i < 1000; i++) {store.emit({uiLanguage: 'ru-RU'}); store.emit({uiLanguage: 'es-ES'});}
+        store.emit({uiLanguage: 'ru-RU'}); await Promise.resolve();
+        expect(loader.ensure).toHaveBeenCalledTimes(2);
+        expect(ruReactions.mock.calls.length).toBeLessThanOrEqual(2); expect(esReactions.mock.calls.length).toBeLessThanOrEqual(2);
+        registerUiLanguageBundle('ru-RU', {messages: {'popup.donationTitle': 'Поддержка'}, legacyText: {}, legacyPatterns: {early: [], late: []}});
+        registerUiLanguageBundle('es-ES', {messages: {'popup.donationTitle': 'Apoyo'}, legacyText: {}, legacyPatterns: {early: [], late: []}});
+        russian.resolve(true); spanish.resolve(true); await Promise.all([russian.promise, spanish.promise]); await nextTick();
+        expect(context.bundleRevision.value).toBe(1); expect(context.t('popup.donationTitle')).toBe('Поддержка');
+        store.emit({uiLanguage: 'es-ES'}); expect(context.t('popup.donationTitle')).toBe('Apoyo');
+        expect(context.bundleRevision.value).toBe(1);
+    } finally {context.dispose(); russian.resolve(false); spanish.resolve(false);}
+});
+
+it('另一界面先注册相同语言时，下一次配置回声刷新中文回退且迟到回执不重复刷新', async () => {
+    const pending = deferred(); loader.ensure.mockReturnValue(pending.promise);
+    const context = createUiI18nContext();
+    try {
+        store.emit({uiLanguage: 'en-US'});
+        registerUiLanguageBundle('en-US', {messages: {'popup.donationTitle': 'Support'}, legacyText: {}, legacyPatterns: {early: [], late: []}});
+        store.emit({uiLanguage: 'en-US'});
+        expect(context.bundleRevision.value).toBe(1); expect(context.t('popup.donationTitle')).toBe('Support');
+        pending.resolve(true); await pending.promise; await nextTick();
+        expect(context.bundleRevision.value).toBe(1);
+    } finally {context.dispose(); pending.resolve(false);}
 });

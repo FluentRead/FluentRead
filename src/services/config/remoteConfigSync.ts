@@ -2,7 +2,7 @@
  * @file src/services/config/remoteConfigSync.ts
  * 文件职责：编排 Google Drive 与 WebDAV 共用的范围化云备份和单次用户确认事务。
  * 主要内容：单次授权、账号绑定、上次成功同步的账号记录、密文基线、三方合并、
- * 掩码预览、只读恢复与内容核验兼容能力、绑定账号与文件版本的删除确认、过期检查与授权缓存清理；清理失败独立提示。
+ * 掩码预览、可安全中断读取的预览取消、只读恢复与内容核验兼容能力、绑定账号与文件版本的删除确认、过期检查与授权缓存清理；清理失败独立提示。
  * 模块边界：通过端口读写配置与云端存储；不持久化口令，不向设置页面传递完整配置。
  */
 import {buildDriveSyncDiff, driveSyncPayload, driveValuesEqual, parseDriveSyncPayload, resolveDriveSyncDiff, toDriveSyncConfig, parseDriveSyncSnapshot, projectDriveSyncConfig, restoreDriveSyncSettings, validateDriveSyncConsent, type DriveSyncConfig, type DriveSyncDiff} from '@/src/core/config/driveSync';
@@ -37,14 +37,15 @@ export interface DriveSyncPreview {
 }
 export type DriveSyncDirection = 'upload' | 'download' | 'merge';
 export interface DriveSyncPorts<Session extends DriveSession = DriveSession> {
-    auth: {availability(): {available: boolean; reason: string}; open(interactive?: boolean): Promise<Session>; disconnect(): Promise<void>};
-    api: {read(session: Session): Promise<DriveRemote | null>; write(session: Session, content: string, previous: DriveFile | null): Promise<DriveFile>; remove(session: Session, previous: DriveFile): Promise<void>};
+    auth: {availability(): {available: boolean; reason: string}; open(interactive?: boolean, signal?: AbortSignal): Promise<Session>; disconnect(): Promise<void>};
+    api: {read(session: Session, signal?: AbortSignal): Promise<DriveRemote | null>; write(session: Session, content: string, previous: DriveFile | null): Promise<DriveFile>; remove(session: Session, previous: DriveFile): Promise<void>};
     snapshot(): Promise<Record<string, unknown>>;
     apply(config: DriveSyncConfig): Promise<void>;
     readState(): Promise<unknown>;
     writeState(state: DriveSyncState): Promise<void>;
     now(): number;
     accountChangedError?: string;
+    /** 仅在认证及读取端口可在取消后阻止后续带凭据请求时启用。 */
 }
 interface Pending {
     preview: DriveSyncPreview;
@@ -78,6 +79,20 @@ function owns(state: DriveSyncState, tabId?: number, clientId?: string): boolean
 }
 export function createRemoteConfigSync<Session extends DriveSession>(ports: DriveSyncPorts<Session>) {
     let pending: Pending | null = null;
+    const preparations = new Set<{tabId?: number; clientId?: string; controller: AbortController}>();
+    const waitForReadOnly = <T>(operation: Promise<T>, signal: AbortSignal): Promise<T> => {
+        return new Promise((resolve, reject) => {
+            const abort = () => { signal.removeEventListener('abort', abort); reject(signal.reason); };
+            signal.addEventListener('abort', abort, {once: true});
+            operation.then(value => {signal.removeEventListener('abort', abort); resolve(value);}, error => {signal.removeEventListener('abort', abort); reject(error);});
+            if (signal.aborted) abort();
+        });
+    };
+    const cancelPreparing = (tabId?: number, clientId?: string) => {
+        for (const owner of preparations) {
+            if ((tabId === undefined || owner.tabId === tabId) && (clientId === undefined || owner.clientId === clientId)) owner.controller.abort();
+        }
+    };
     let queue: Promise<unknown> = Promise.resolve();
     function exclusive<T>(operation: () => Promise<T>): Promise<T> {
         const result = queue.then(operation);
@@ -115,18 +130,21 @@ export function createRemoteConfigSync<Session extends DriveSession>(ports: Driv
         }
         return {...availability, account: state.lastSyncedAccount ?? null, lastSyncedAt: state.lastSyncedAt, ...(cleanupPending ? {cleanupPending} : {})};
     }
-    async function assertAvailable(tabId?: number, clientId?: string) {
-        const state = readState(await ports.readState());
+    async function assertAvailable(tabId: number | undefined, clientId: string | undefined, signal: AbortSignal) {
+        const state = readState(await waitForReadOnly(ports.readState(), signal));
         if (state.prepared && state.prepared.expiresAt > ports.now() && !owns(state, tabId, clientId)) throw new CloudSyncError('另一个设置页面正在确认同步，请先完成或取消该页面的预览。');
     }
-    async function prepareDelete(tabId?: number, clientId?: string): Promise<CloudBackupDeletePreview> {
+    async function prepareDelete(tabId: number | undefined, clientId: string | undefined, signal: AbortSignal): Promise<CloudBackupDeletePreview> {
         pending = null;
-        const session = await ports.auth.open(true);
-        const state = readState(await ports.readState());
+        const session = await waitForReadOnly(ports.auth.open(true, signal), signal);
+        const state = readState(await waitForReadOnly(ports.readState(), signal));
         // 只读取不透明密文和版本，不解密或导入；旧版、未知格式和损坏密文均可清理。
-        const remote = await ports.api.read(session);
+        signal.throwIfAborted();
+        const remote = await waitForReadOnly(ports.api.read(session, signal), signal);
+        signal.throwIfAborted();
         const preview = {id: crypto.randomUUID(), account: session.account, hasRemote: Boolean(remote), canDelete: !remote || canMutateCloudFile(remote.file), ...(remote?.file.contentGuard ? {requiresExclusiveAccess: true as const} : {}), expiresAt: ports.now() + 10 * 60_000};
         // 不设置 scope：旧客户端不能把删除事务误认为同步同意。MV3 重启后仍能核对同一账号及版本。
+        signal.throwIfAborted();
         await ports.writeState({...state, connected: true, prepared: {id: preview.id, expiresAt: preview.expiresAt, content: '', operation: 'delete', tabId, clientId, deletion: {account: session.account, remote}}});
         return preview;
     }
@@ -153,18 +171,20 @@ export function createRemoteConfigSync<Session extends DriveSession>(ports: Driv
         await ports.writeState(emptyState());
         return {...ports.auth.availability(), account: null, lastSyncedAt: null, deleted: Boolean(current)};
     }
-    async function prepare(passphrase: string, tabId?: number, clientId?: string, includeSensitive = false): Promise<DriveSyncPreview> {
+    async function prepare(passphrase: string, tabId: number | undefined, clientId: string | undefined, includeSensitive: boolean, signal: AbortSignal): Promise<DriveSyncPreview> {
         validateDriveSyncConsent(includeSensitive);
         validateDrivePassphrase(passphrase);
         pending = null;
-        const session = await ports.auth.open(true);
-        const previous = readState(await ports.readState());
+        const session = await waitForReadOnly(ports.auth.open(true, signal), signal);
+        const previous = readState(await waitForReadOnly(ports.readState(), signal));
         // 换账号只重置合并基线；取消或授权失败时仍能看到上次成功同步的账号及时间。
         const state = previous.accountId === session.account.id ? previous : {...emptyState(), lastSyncedAt: previous.lastSyncedAt, ...(previous.lastSyncedAccount ? {lastSyncedAccount: previous.lastSyncedAccount} : {})};
         delete state.prepared;
-        const originalLocal = structuredClone(await ports.snapshot());
+        const originalLocal = structuredClone(await waitForReadOnly(ports.snapshot(), signal));
         const local = toDriveSyncConfig(originalLocal);
-        const remote = await ports.api.read(session);
+        signal.throwIfAborted();
+        const remote = await waitForReadOnly(ports.api.read(session, signal), signal);
+        signal.throwIfAborted();
         const remoteSnapshot = remote ? parseDriveSyncSnapshot(await decryptDriveConfig(remote.content, passphrase)) : null;
         const remoteIncludesSensitive = remoteSnapshot?.includesSensitive ?? false;
         const sensitiveDiff = includeSensitive && remoteIncludesSensitive;
@@ -182,6 +202,7 @@ export function createRemoteConfigSync<Session extends DriveSession>(ports: Driv
         pending = {preview, local, originalLocal, remote, remoteConfig, diff, proof: await proof(preview.id, passphrase)};
         // MV3 休眠后的授权范围同时保存在密文与事务元数据中；完整原始本机快照供检测与回滚。
         const content = await encryptDrivePreview({preview: {...preview, changes: []}, local: originalLocal, proof: pending.proof}, passphrase);
+        signal.throwIfAborted();
         await ports.writeState({...state, connected: true, accountId: session.account.id, prepared: {id: preview.id, expiresAt: preview.expiresAt, content, tabId, clientId, format: 2, scope: includeSensitive ? 'complete' : 'settings', remote}});
         return preview;
     }
@@ -248,10 +269,15 @@ export function createRemoteConfigSync<Session extends DriveSession>(ports: Driv
     }
     return {
         status: () => exclusive(status),
-        prepareDelete: (tabId?: number, clientId?: string) => exclusive(async () => {
-            await assertAvailable(tabId, clientId);
-            try {return await prepareDelete(tabId, clientId);} catch (error) {await finishSession().catch(() => undefined); throw error;}
-        }),
+        prepareDelete: (tabId?: number, clientId?: string) => {
+            const owner = {tabId, clientId, controller: new AbortController()}; preparations.add(owner);
+            return exclusive(async () => {
+                owner.controller.signal.throwIfAborted();
+                await assertAvailable(tabId, clientId, owner.controller.signal);
+                owner.controller.signal.throwIfAborted();
+                try {return await prepareDelete(tabId, clientId, owner.controller.signal);} catch (error) {await finishSession().catch(() => undefined); throw error;}
+            }).finally(() => {preparations.delete(owner);});
+        },
         commitDelete: (id: string, tabId?: number, clientId?: string) => exclusive(async () => {
             const state = readState(await ports.readState());
             if (state.prepared && (!owns(state, tabId, clientId) || state.prepared.id !== id)) throw new CloudSyncError('删除预览属于其他页面或已失效，请在原设置页面继续。');
@@ -260,10 +286,15 @@ export function createRemoteConfigSync<Session extends DriveSession>(ports: Driv
             try {await finishSession();} catch {return {...result, cleanupPending: true};}
             return result;
         }),
-        prepare: (passphrase: string, tabId?: number, clientId?: string, includeSensitive = false) => exclusive(async () => {
-            await assertAvailable(tabId, clientId);
-            try {return await prepare(passphrase, tabId, clientId, includeSensitive);} catch (error) {await finishSession().catch(() => undefined); throw error;}
-        }),
+        prepare: (passphrase: string, tabId?: number, clientId?: string, includeSensitive = false) => {
+            const owner = {tabId, clientId, controller: new AbortController()}; preparations.add(owner);
+            return exclusive(async () => {
+                owner.controller.signal.throwIfAborted();
+                await assertAvailable(tabId, clientId, owner.controller.signal);
+                owner.controller.signal.throwIfAborted();
+                try {return await prepare(passphrase, tabId, clientId, includeSensitive, owner.controller.signal);} catch (error) {await finishSession().catch(() => undefined); throw error;}
+            }).finally(() => {preparations.delete(owner);});
+        },
         commit: (id: string, passphrase: string, direction: DriveSyncDirection, choices: Record<string, unknown>, tabId?: number, clientId?: string) => exclusive(async () => {
             const state = readState(await ports.readState());
             // 不属于调用方的错误确认不能清理其他页面的事务或令牌。
@@ -276,17 +307,17 @@ export function createRemoteConfigSync<Session extends DriveSession>(ports: Driv
             try {await finishSession();} catch {return {...result, cleanupPending: true};}
             return result;
         }),
-        cancel: (id?: string, tabId?: number, clientId?: string) => exclusive(async () => {
+        cancel: (id?: string, tabId?: number, clientId?: string) => {if (id === undefined) cancelPreparing(tabId, clientId); return exclusive(async () => {
             if (id === undefined && tabId === undefined && clientId === undefined) return finishSession();
             const state = readState(await ports.readState());
             if (state.prepared && (!owns(state, tabId, clientId) || (id !== undefined && state.prepared.id !== id))) return;
             // 没有预览时，UI 的取消不触碰另一页仍在授权的缓存；内部调用仍可清理旧状态。
             if (!state.prepared && clientId !== undefined) return;
             await finishSession();
-        }),
-        cancelTab: (tabId: number) => exclusive(async () => {
+        });},
+        cancelTab: (tabId: number) => {cancelPreparing(tabId); return exclusive(async () => {
             const state = readState(await ports.readState());
             if (state.prepared?.tabId === tabId) await finishSession();
-        }),
+        });},
     };
 }

@@ -72,7 +72,9 @@ describe('视频 AI 字幕转写配置', () => {
     }
   });
 
-  it('使用扩展内本地 Whisper 模型，并对非法选择回退到 Small', () => {
+  it('使用扩展内本地 Whisper 模型，推荐并默认 Small，保留 Tiny/Base 选择', () => {
+    expect(VIDEO_LOCAL_TRANSCRIPTION_RECOMMENDED_MODEL).toBe('small');
+    expect(normalizeVideoLocalTranscriptionModel(undefined)).toBe('small');
     expect(normalizeVideoLocalTranscriptionModel('tiny')).toBe('tiny');
     expect(normalizeVideoLocalTranscriptionModel('base')).toBe('base');
     expect(normalizeVideoLocalTranscriptionModel('small')).toBe('small');
@@ -84,13 +86,6 @@ describe('视频 AI 字幕转写配置', () => {
     expect(getVideoLocalTranscriptionModelId('small')).toBe('onnx-community/whisper-small');
     expect(getVideoLocalTranscriptionDownloadBytes('small')).toBe(590_000_000);
     expect(normalizeVideoLocalTranscriptionModels(['tiny', 'base', 'small', 'unknown', 'tiny', 'small'])).toEqual(['tiny', 'base', 'small']);
-  });
-
-  it('默认及推荐 Small，保留已有 Tiny/Base 选择', () => {
-    expect(VIDEO_LOCAL_TRANSCRIPTION_RECOMMENDED_MODEL).toBe('small');
-    expect(normalizeVideoLocalTranscriptionModel(undefined)).toBe('small');
-    expect(normalizeVideoLocalTranscriptionModel('tiny')).toBe('tiny');
-    expect(normalizeVideoLocalTranscriptionModel('base')).toBe('base');
   });
 
   it('分模块精度只透传真实枚举，不从 legacy dtype 或模型名猜造', () => {

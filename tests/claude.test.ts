@@ -20,6 +20,7 @@ const {mockConfig} = vi.hoisted(() => ({
 vi.mock('@/src/services/config/store', () => ({config: mockConfig}));
 
 import claude from '@/src/providers/translation/claude';
+import {attachTranslationModelUsageObserver} from '@/src/services/translation/requestSnapshot';
 
 const fetchMock = vi.fn<typeof fetch>();
 
@@ -119,5 +120,76 @@ describe('claude AI 请求超时预算', () => {
         await expect(outcome).resolves.toMatchObject({name: 'AbortError'});
         expect(signal.aborted).toBe(true);
         expect(vi.getTimerCount()).toBe(0);
+    });
+});
+
+describe('Claude 响应正文的取消语义', () => {
+    it('请求前取消不发送网络请求', async () => {
+        const controller = new AbortController();
+        controller.abort();
+        await expect(claude(withProviderSnapshot({origin: 'hello', abortSignal: controller.signal}, mockConfig)))
+            .rejects.toMatchObject({name: 'AbortError'});
+        expect(fetchMock).not.toHaveBeenCalled();
+    });
+
+    it('不合作传输在取消后返回完整正文也不发布译文', async () => {
+        const controller = new AbortController();
+        const stream = new ReadableStream<Uint8Array>({
+            pull(output) {
+                controller.abort();
+                output.enqueue(new TextEncoder().encode(JSON.stringify({content: [{type: 'text', text: '迟到译文'}]})));
+                output.close();
+            },
+        }, {highWaterMark: 0});
+        fetchMock.mockResolvedValue(new Response(stream));
+        await expect(claude(withProviderSnapshot({origin: 'hello', abortSignal: controller.signal}, mockConfig)))
+            .rejects.toMatchObject({name: 'AbortError'});
+    });
+
+    it('未取消的损坏 JSON 不泄露正文，仍报告格式错误', async () => {
+        fetchMock.mockResolvedValue(new Response('{private text'));
+        const outcome = await claude(withProviderSnapshot({origin: 'hello'}, mockConfig)).catch(error => error);
+        expect(outcome.message).toBe('Claude 返回的不是有效 JSON');
+        expect(outcome.message).not.toContain('private text');
+    });
+
+    it('正文读取截止时仍区分超时和用户取消', async () => {
+        vi.useFakeTimers();
+        let notifyRead!: () => void;
+        const readStarted = new Promise<void>(resolve => {notifyRead = resolve;});
+        fetchMock.mockImplementation(async (_input, init) => new Response(new ReadableStream<Uint8Array>({
+            start(output) {init!.signal!.addEventListener('abort', () => output.error(new DOMException('aborted', 'AbortError')), {once: true});},
+            pull() {notifyRead();},
+        }, {highWaterMark: 0})));
+        const outcome = claude(withProviderSnapshot({origin: 'hello', requestTimeoutMs: 10}, mockConfig)).catch(error => error);
+        await readStarted;
+        await vi.advanceTimersByTimeAsync(10);
+        await expect(outcome).resolves.toMatchObject({name: 'TimeoutError', kind: 'timeout', retryable: true});
+        expect(vi.getTimerCount()).toBe(0);
+    });
+
+    it('响应已返回且 JSON 正在读取时用户取消，保留 AbortError 而非报格式错误', async () => {
+        const controller = new AbortController();
+        let notifyRead!: () => void;
+        const readStarted = new Promise<void>(resolve => {notifyRead = resolve;});
+        fetchMock.mockImplementation(async (_input, init) => {
+            const stream = new ReadableStream<Uint8Array>({
+                start(output) {
+                    init!.signal!.addEventListener('abort', () => output.error(new DOMException('aborted', 'AbortError')), {once: true});
+                },
+                pull() {notifyRead();},
+            }, {highWaterMark: 0});
+            return new Response(stream, {headers: {'content-type': 'application/json'}});
+        });
+        const observed = vi.fn();
+        const message = withProviderSnapshot(attachTranslationModelUsageObserver(
+            {origin: 'private text', abortSignal: controller.signal}, observed,
+        ), mockConfig);
+        const result = claude(message).catch(error => error);
+        await readStarted;
+        controller.abort();
+        await expect(result).resolves.toMatchObject({name: 'AbortError'});
+        expect(observed).toHaveBeenCalledOnce();
+        expect(observed.mock.calls[0]?.[0]).toMatchObject({outcome: 'cancelled', usageAvailability: 'unreported'});
     });
 });

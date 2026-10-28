@@ -96,7 +96,8 @@ export function extensionCspBuildPlugin(): Plugin {
             if (!/(?:^|\/)pdfjs-dist\/legacy\/build\/pdf\.worker\.min\.mjs$/.test(file)
                 || !new URLSearchParams(id.split('?')[1] ?? '').has('url')) return;
             const source = patchExtensionVendorSource('pdfjs-worker', fs.readFileSync(file, 'utf8'));
-            const reference = this.emitFile({type: 'asset', name: 'pdf.worker.min.mjs', source});
+            // 仅在构建产物真正引用 URL 时保留资源；其他入口可能加载模块但被摇树移除。
+            const reference = this.emitFile({type: 'asset', name: 'pdf.worker.min.mjs', source, needsCodeReference: true});
             return `export default import.meta.ROLLUP_FILE_URL_${reference};`;
         },
         transform(source, id) {

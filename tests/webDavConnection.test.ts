@@ -36,6 +36,24 @@ describe('WebDAV 本机连接边界', () => {
         for (const value of [{}, {...next, revision: 1}, {...next, revision: ''}, {...next, password: ''}]) {record = value; await expect(store.read()).rejects.toThrow(WebDavError);}
         await store.remove(); expect(await store.read()).toBeNull();
     });
+    it('读取和请求前的修订校验复用已存 revision，不创建新的 UUID', async () => {
+        const saved = parseWebDavConnection(input, null);
+        let record: unknown = saved;
+        const store = createWebDavConnectionStore({getItem: vi.fn(async () => record)} as never);
+        const randomUUID = vi.spyOn(crypto, 'randomUUID');
+        try {
+            expect(await store.read()).toEqual(saved);
+            const session = createWebDavSession(saved, store.read);
+            await expect(session.request(async () => 'ok')).resolves.toBe('ok');
+            await expect(session.request(async () => 'again')).resolves.toBe('again');
+            expect(randomUUID).not.toHaveBeenCalled();
+            record = {...saved, password: ''};
+            await expect(store.read()).rejects.toThrow(WebDavError);
+            expect(randomUUID).not.toHaveBeenCalled();
+        } finally {
+            randomUUID.mockRestore();
+        }
+    });
     it('会话支持 Unicode Basic Auth，每次请求都检查连接修订号', async () => {
         const connection = parseWebDavConnection({...input, username: '虚构用户'}, null);
         const session = createWebDavSession(connection, async () => connection);

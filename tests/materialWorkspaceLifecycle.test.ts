@@ -3,6 +3,8 @@ import {parseHTML} from 'linkedom';
 import MaterialWorkspace from '@/src/features/vocabulary/ui/MaterialWorkspace.vue';
 import {afterEach, describe, expect, it, vi} from 'vitest';
 import type {MaterialRecord} from '@/src/features/vocabulary/materialProtocol';
+import {translateLegacyText} from '@/src/core/i18n';
+import {registerAllUiLanguageBundles} from './helpers/uiLanguageBundles';
 
 const KEY = '__fluentreadMaterialUiTest';
 const dispose: Array<() => unknown> = [];
@@ -233,10 +235,47 @@ it('paginates material and reference lists, resets the visible page for search, 
   await activate(ui,namedButton(ui,'清空全部材料'));expect(ui.api.materialClear).not.toHaveBeenCalled();await activate(ui,namedButton(ui,'取消'));expect(ui.api.materialClear).not.toHaveBeenCalled();
   await activate(ui,namedButton(ui,'清空全部材料'));await activate(ui,namedButton(ui,'确认清空'));expect(ui.document.body.textContent).toContain('从一段值得留下的原文开始');await activate(ui,namedButton(ui,'查看我的收藏'));expect(ui.openTab).toHaveBeenCalledWith('saved');
 });
+it('超大备份提醒在所有界面语言都有实际译文',()=>{
+  registerAllUiLanguageBundles();
+  const message='此备份超过 20 MB，当前版本无法恢复。请保留现有材料，并妥善保存备份文件。';
+  expect(translateLegacyText(message,'zh-CN')).toBe(message);
+  for (const language of ['en-US','es-ES','fr-FR','ja-JP','ko-KR','ru-RU'] as const) {
+    expect(translateLegacyText(message,language)).not.toBe(message);
+    expect(translateLegacyText(message,language).length).toBeGreaterThan(20);
+  }
+});
+it('提醒超大导出文件无法在当前版本恢复，并仍然保留下载',async()=>{
+  const ui=await mount();
+  const oversized={format:'fluentread-learning-materials',version:1,materials:[],padding:'x'.repeat(20*1024*1024)};
+  ui.api.materialExport.mockResolvedValue(oversized);
+  const create=vi.spyOn(URL,'createObjectURL').mockReturnValue('blob:oversize');
+  const revoke=vi.spyOn(URL,'revokeObjectURL').mockImplementation(()=>{});
+  vi.spyOn(ui.window,'setTimeout').mockImplementation((()=>1) as unknown as typeof window.setTimeout);
+  const click=vi.spyOn(ui.window.HTMLElement.prototype,'click').mockImplementation(()=>{});
+  await activate(ui,namedButton(ui,'导出材料备份'));
+  expect(create).toHaveBeenCalledOnce();expect(click).toHaveBeenCalledOnce();
+  expect(ui.document.querySelector('[role="alert"]')?.textContent).toContain('当前版本无法恢复');
+  expect(ui.document.body.textContent).toContain('请保留现有材料');
+  expect(revoke).not.toHaveBeenCalled();
+});
+it('不把恰好处于恢复大小上限的导出错误标记为不可恢复',async()=>{
+  const ui=await mount();const data={format:'fluentread-learning-materials',version:1,materials:[],padding:''};
+  data.padding='x'.repeat(20*1024*1024-JSON.stringify(data,null,2).length);
+  ui.api.materialExport.mockResolvedValue(data);
+  const create=vi.spyOn(URL,'createObjectURL').mockReturnValue('blob:at-limit');
+  vi.spyOn(URL,'revokeObjectURL').mockImplementation(()=>{});
+  vi.spyOn(ui.window,'setTimeout').mockImplementation((()=>1) as unknown as typeof window.setTimeout);
+  vi.spyOn(ui.window.HTMLElement.prototype,'click').mockImplementation(()=>{});
+  await activate(ui,namedButton(ui,'导出材料备份'));
+  expect((create.mock.calls[0][0] as Blob).size).toBe(20*1024*1024);
+  expect(ui.document.querySelector('[role="alert"]')).toBeNull();
+  expect(ui.document.body.textContent).toContain('材料备份已导出');
+});
 it('exports through the rendered action, releases its download URL and reports a retryable storage failure',async()=>{
   const ui=await mount();const create=vi.spyOn(URL,'createObjectURL').mockReturnValue('blob:materials');const revoke=vi.spyOn(URL,'revokeObjectURL').mockImplementation(()=>{});
+  const scheduled:Array<()=>void>=[];vi.spyOn(ui.window,'setTimeout').mockImplementation(((callback:()=>void)=>{scheduled.push(callback);return 1;}) as typeof window.setTimeout);
   const downloads: string[]=[];vi.spyOn(ui.window.HTMLElement.prototype,'click').mockImplementation(function(this:HTMLElement){if(this.tagName==='A')downloads.push((this as HTMLAnchorElement).download);});
-  await activate(ui,namedButton(ui,'导出材料备份'));expect(create).toHaveBeenCalledOnce();expect(revoke).toHaveBeenCalledWith('blob:materials');expect(downloads[0]).toMatch(/^fluentread-materials-.*\.json$/u);expect(ui.document.body.textContent).toContain('材料备份已导出');
+  await activate(ui,namedButton(ui,'导出材料备份'));expect(create).toHaveBeenCalledOnce();expect(revoke).not.toHaveBeenCalled();scheduled.shift()!();expect(revoke).toHaveBeenCalledWith('blob:materials');expect(downloads[0]).toMatch(/^fluentread-materials-.*\.json$/u);expect(ui.document.body.textContent).toContain('材料备份已导出');
   ui.api.materialExport.mockRejectedValueOnce(new Error('Export unavailable'));await activate(ui,namedButton(ui,'导出材料备份'));expect(ui.document.body.textContent).toContain('Export unavailable');expect(ui.panel.busy).toBe(false);
   await activate(ui,namedButton(ui,'导出材料备份'));expect(downloads).toHaveLength(2);
 });
@@ -291,18 +330,20 @@ describe('material workspace hidden accepted actions and focus ownership',()=>{
   it.each(['success','download-failure','storage-failure'] as const)('settles an accepted export after hiding with %s and releases every created URL',async outcome=>{
     const shown=runtime.ref(true),ui=await mount({shown}),exported=deferred<Awaited<ReturnType<typeof ui.api.materialExport>>>();ui.api.materialExport.mockReturnValueOnce(exported.promise);
     const create=vi.spyOn(URL,'createObjectURL').mockReturnValue('blob:hidden-materials'),revoke=vi.spyOn(URL,'revokeObjectURL').mockImplementation(()=>{}),downloads:Element[]=[];
+    const scheduled:Array<()=>void>=[];vi.spyOn(ui.window,'setTimeout').mockImplementation(((callback:()=>void)=>{scheduled.push(callback);return 1;}) as typeof window.setTimeout);
     vi.spyOn(ui.window.HTMLElement.prototype,'click').mockImplementation(function(this:HTMLElement){if(this.tagName==='A'){downloads.push(this);if(outcome==='download-failure')throw new Error('Download failed');}});
     const exporting=ui.panel.exportMaterials();await visibility(ui,shown,false);
     if(outcome==='storage-failure')exported.reject(new Error('Export storage failed'));else exported.resolve({format:'fluentread-learning-materials',version:1,materials:[record()]});
     await exporting;expect(ui.panel.busy).toBe(false);
     if(outcome==='storage-failure'){expect(create).not.toHaveBeenCalled();expect(revoke).not.toHaveBeenCalled();expect(ui.panel.error).toBe('Export storage failed');}
-    else {expect(create).toHaveBeenCalledOnce();expect(downloads).toHaveLength(1);expect(revoke).toHaveBeenCalledOnce();expect(revoke).toHaveBeenCalledWith('blob:hidden-materials');if(outcome==='success')expect(ui.panel.feedback).toContain('材料备份已导出');else expect(ui.panel.error).toBe('Download failed');}
+    else {expect(create).toHaveBeenCalledOnce();expect(downloads).toHaveLength(1);if(outcome==='success'){expect(revoke).not.toHaveBeenCalled();scheduled.shift()!();}expect(revoke).toHaveBeenCalledOnce();expect(revoke).toHaveBeenCalledWith('blob:hidden-materials');if(outcome==='success')expect(ui.panel.feedback).toContain('材料备份已导出');else expect(ui.panel.error).toBe('Download failed');}
     await visibility(ui,shown,true);expect(ui.panel.busy).toBe(false);
   });
 
   it('remembers a list read interrupted by accepted export and refreshes once after returning idle and visible',async()=>{
     const shown=runtime.ref(true),first=deferred<MaterialRecord[]>();let lists=0;
     const ui=await mount({shown,list:()=>++lists===1?first.promise:Promise.resolve([record('refreshed')])}),exported=deferred<Awaited<ReturnType<typeof ui.api.materialExport>>>();expect(ui.panel.loading).toBe(true);ui.api.materialExport.mockReturnValueOnce(exported.promise);
+    vi.spyOn(ui.window,'setTimeout').mockImplementation((()=>1) as unknown as typeof window.setTimeout);
     const create=vi.spyOn(URL,'createObjectURL').mockReturnValue('blob:pending-list');vi.spyOn(URL,'revokeObjectURL').mockImplementation(()=>{});vi.spyOn(ui.window.HTMLElement.prototype,'click').mockImplementation(()=>{});
     const exporting=ui.panel.exportMaterials();await visibility(ui,shown,false);first.resolve([record('obsolete')]);exported.resolve({format:'fluentread-learning-materials',version:1,materials:[]});await exporting;await ui.flush();
     expect(ui.panel.busy).toBe(false);expect(ui.api.materialList).toHaveBeenCalledOnce();expect(create).toHaveBeenCalledOnce();
@@ -571,4 +612,20 @@ describe('material workspace reference equality on reload',()=>{
     ui.api.materialList.mockResolvedValueOnce([snapshot([{kind:'session',id:'new-detail',createdAt:1}],3)]);await ui.panel.reload();await ui.flush();expect(session).toHaveBeenCalledWith('new-detail');expect(ui.document.body.textContent).toContain('Authoritative fresh detail');
     old.resolve({id:'old-detail',text:'Obsolete late detail',turns:[]});await ui.flush();expect(ui.document.body.textContent).not.toContain('Obsolete late detail');expect(ui.document.body.textContent).toContain('Authoritative fresh detail');expect(ui.panel.detailLoading).toBe(false);expect(ui.panel.selectedId).toBe('references');expect(ui.panel.draft).toBe(draft);expect(ui.panel.note).toBe('Pending note');
   });
+});
+
+it('retains the exported materials URL until the browser has time to start reading',async()=>{
+  const ui=await mount();let live=false;const callbacks:Array<()=>void>=[];
+  vi.spyOn(URL,'createObjectURL').mockImplementation(()=>{live=true;return 'blob:readable';});
+  const revoked=vi.spyOn(URL,'revokeObjectURL').mockImplementation(()=>{live=false;});
+  vi.spyOn(ui.window,'setTimeout').mockImplementation(((fn:()=>void,delay:number)=>{expect(delay).toBe(1000);callbacks.push(fn);return 1;}) as typeof window.setTimeout);
+  let consume!:()=>boolean;vi.spyOn(ui.window.HTMLElement.prototype,'click').mockImplementation(function(this:HTMLElement){if(this.tagName==='A')consume=()=>live;});
+  await activate(ui,namedButton(ui,'导出材料备份'));expect(consume()).toBe(true);expect(revoked).not.toHaveBeenCalled();expect(callbacks).toHaveLength(1);
+  callbacks[0]!();expect(revoked).toHaveBeenCalledWith('blob:readable');expect(consume()).toBe(false);
+});
+
+it('releases the material URL and reports failure if scheduling cleanup throws',async()=>{
+  const ui=await mount();vi.spyOn(URL,'createObjectURL').mockReturnValue('blob:timer-failure');const revoke=vi.spyOn(URL,'revokeObjectURL').mockImplementation(()=>{});
+  vi.spyOn(ui.window.HTMLElement.prototype,'click').mockImplementation(()=>{});vi.spyOn(ui.window,'setTimeout').mockImplementation(()=>{throw new Error('Timer unavailable');});
+  await activate(ui,namedButton(ui,'导出材料备份'));expect(revoke).toHaveBeenCalledWith('blob:timer-failure');expect(ui.document.body.textContent).toContain('Timer unavailable');expect(ui.panel.busy).toBe(false);
 });

@@ -290,6 +290,45 @@ describe('双语正文整块翻译', () => {
         expect(runtime.translateTextSlots).toHaveBeenCalledOnce();
     });
 
+    it('行内代码请求等待期间插入受控 spinner 后仍可提交，取消时不发逐槽回退', async () => {
+        const target = owner('<p>Use <code>fetch</code> before <code>parse</code> now.</p>');
+        const style = {display: 'inline', visibility: 'visible', contentVisibility: 'visible', opacity: '1', whiteSpace: 'normal',
+            fontFamily: 'Arial', position: 'static', overflow: 'visible', width: '20px', height: '20px', clip: 'auto', clipPath: 'none'};
+        Object.defineProperty(target.ownerDocument.defaultView, 'getComputedStyle', {configurable: true, value: () => style});
+        let release!: () => void;
+        const pending = new Promise<void>(resolve => { release = resolve; });
+        let spinner: HTMLElement | undefined;
+        runtime.tryTranslateInlineCodeSentence.mockImplementationOnce(async (source, decode, _snapshot, _signal, _queue, isCurrent) => {
+            await pending;
+            expect(isCurrent()).toBe(true);
+            const [a, b] = source.match(/__FRCODE_[a-f0-9]+_\d+__/gu);
+            return decode(`使用${a}之前先${b}，现在。`);
+        });
+        const request = createTranslationRequest(target, 'content', 'bilingual', {...bilingual, targetLanguage: 'zh-Hans'},
+            undefined, undefined, undefined, undefined, false, undefined, () => spinner);
+        await vi.waitFor(() => expect(runtime.tryTranslateInlineCodeSentence).toHaveBeenCalledOnce());
+        spinner = target.ownerDocument.createElement('span');
+        spinner.textContent = 'Loading';
+        target.appendChild(spinner);
+        release();
+        expect(await request).toMatchObject({kind: 'snapshot', translations: ['使用', '之前先', '，现在。']});
+        expect(runtime.translateTextSlots).not.toHaveBeenCalled();
+
+        target.removeChild(spinner);
+        const controller = new AbortController();
+        runtime.tryTranslateInlineCodeSentence.mockClear();
+        runtime.tryTranslateInlineCodeSentence.mockImplementationOnce((_source, _decode, _snapshot, signal) => new Promise((_resolve, reject) => {
+            signal.addEventListener('abort', () => reject(new DOMException('aborted', 'AbortError')), {once: true});
+        }));
+        const cancelled = createTranslationRequest(target, 'content', 'bilingual', {...bilingual, targetLanguage: 'zh-Hans'},
+            controller.signal, undefined, undefined, undefined, false, undefined, () => spinner);
+        await vi.waitFor(() => expect(runtime.tryTranslateInlineCodeSentence).toHaveBeenCalledOnce());
+        target.appendChild(spinner);
+        controller.abort();
+        await expect(cancelled).rejects.toMatchObject({name: 'AbortError'});
+        expect(runtime.translateTextSlots).not.toHaveBeenCalled();
+    });
+
     it('整句响应期间代码变化时不显示旧译文，也不发逐槽回退', async () => {
         const target = owner('<p>Use <code>fetch</code> before <code>parse</code> now.</p>');
         const style = {display: 'inline', visibility: 'visible', contentVisibility: 'visible', opacity: '1', whiteSpace: 'normal',

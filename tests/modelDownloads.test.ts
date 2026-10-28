@@ -12,6 +12,52 @@ function deferred<T>() {
 }
 
 describe('model download source and stream boundaries', () => {
+    it('keeps cancellation bookkeeping bounded while reading many model chunks', async () => {
+        let remaining = 2048;
+        const body = new ReadableStream<Uint8Array>({
+            pull(stream) {
+                if (remaining-- > 0) stream.enqueue(new Uint8Array([7]));
+                else stream.close();
+            },
+        });
+        vi.stubGlobal('fetch', vi.fn(async () => new Response(body)));
+        const nativeRace = Promise.race.bind(Promise), registrations = new WeakMap<object, number>();
+        let mostRegistrations = 0;
+        const race = vi.spyOn(Promise, 'race').mockImplementation(values => {
+            const inputs = Array.from(values);
+            if (inputs.length === 2 && inputs[1] instanceof Promise) {
+                const count = (registrations.get(inputs[1]) ?? 0) + 1;
+                registrations.set(inputs[1], count); mostRegistrations = Math.max(mostRegistrations, count);
+            }
+            return nativeRace(inputs);
+        });
+        try {
+            const bytes = new Uint8Array(await withModelDownload('https://example.com/model', response => response.arrayBuffer()));
+            expect(bytes).toEqual(new Uint8Array(2048).fill(7));
+            expect(mostRegistrations).toBeLessThanOrEqual(2);
+        } finally {
+            race.mockRestore();
+        }
+    });
+    it('does not commit a chunk when cancellation arrives as its read settles', async () => {
+        const caller = new AbortController(), progress: number[] = [];
+        vi.stubGlobal('fetch', vi.fn(async () => new Response(new Uint8Array([7]))));
+        const nativeRace = Promise.race.bind(Promise);
+        let calls = 0;
+        const race = vi.spyOn(Promise, 'race').mockImplementation(values => {
+            const result = nativeRace(values);
+            if (++calls === 3) return result.then(value => {caller.abort(); return value;});
+            return result;
+        });
+        try {
+            await expect(withModelDownload('https://example.com/model', item => item.arrayBuffer(), {
+                signal: caller.signal, onProgress: loaded => progress.push(loaded),
+            })).rejects.toMatchObject({name: 'AbortError'});
+            expect(progress).toEqual([0]);
+        } finally {
+            race.mockRestore();
+        }
+    });
     it('retains exact historical cached provenance while never downloading from its retired origin', () => {
         const pinned = `${url}?download=true`, legacy = pinned.replace('huggingface.co', 'hf-mirror.net');
         expect(isModelCacheSource(pinned, pinned)).toBe(true);

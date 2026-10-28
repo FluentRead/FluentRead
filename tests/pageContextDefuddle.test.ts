@@ -198,7 +198,7 @@ afterEach(() => {
 describe('Defuddle page snapshot adapter', () => {
     it('uses the window location and safely captures an empty fallback without any location or mutable attributes', async () => {
         const clone = {textContent: '', querySelectorAll: (selector: string) => selector === '*' ? [{}, {attributes: []}] : []};
-        Object.defineProperty(globalThis, 'document', {value: {title: '', body: {cloneNode: () => clone}, querySelector: () => null}, configurable: true});
+        Object.defineProperty(globalThis, 'document', {value: {title: '', body: {closest: () => null, cloneNode: () => clone}, querySelector: () => null}, configurable: true});
         Object.defineProperty(globalThis, 'location', {value: undefined, configurable: true});
         Object.defineProperty(globalThis, 'window', {value: {location: {href: 'https://example.com/window-location'}}, configurable: true});
         expect(await getPageTranslationContext()).toBe('');
@@ -299,6 +299,51 @@ describe('Defuddle page snapshot adapter', () => {
         expect(clonedParagraph.ownerDocument).toBe(snapshot);
         expect(snapshot.querySelector('reading-context')?.namespaceURI).toBe(paragraph.namespaceURI);
         expect(paragraph.querySelector('reading-context')).toBe(namespaceNode);
+    });
+
+    it.each([
+        ['editable body', '<html><body contenteditable="true"><p>PRIVATE_ROOT_DRAFT</p></body></html>'],
+        ['hidden ancestor', '<html hidden><body><p>PRIVATE_ROOT_DRAFT</p></body></html>'],
+        ['aria-hidden body', '<html><body aria-hidden="true"><p>PRIVATE_ROOT_DRAFT</p></body></html>'],
+        ['excluded ancestor', '<html data-notranslate><body><p>PRIVATE_ROOT_DRAFT</p></body></html>'],
+    ])('never extracts excluded %s in the body-clone fallback', async (_label, html) => {
+        const {document} = parseHTML(html);
+        Object.defineProperty(document, 'implementation', {configurable: true, value: undefined});
+        Object.defineProperty(globalThis, 'document', {value: document, configurable: true});
+        Object.defineProperty(globalThis, 'location', {value: {href: 'https://example.com/private-root'}, configurable: true});
+        expect(await getPageTranslationContext()).not.toContain('PRIVATE_ROOT_DRAFT');
+        expect(document.body.textContent).toContain('PRIVATE_ROOT_DRAFT');
+    });
+
+    it('fails closed when the fallback body cannot check its ancestors', async () => {
+        const clone = {textContent: 'PRIVATE_UNCHECKED_BODY', querySelectorAll: () => []};
+        const cloneNode = vi.fn(() => clone);
+        Object.defineProperty(globalThis, 'document', {value: {title: '', body: {cloneNode}, querySelector: () => null}, configurable: true});
+        Object.defineProperty(globalThis, 'location', {value: {href: 'https://example.com/no-closest'}, configurable: true});
+        expect(await getPageTranslationContext()).not.toContain('PRIVATE_UNCHECKED_BODY');
+        expect(cloneNode).not.toHaveBeenCalled();
+    });
+
+    it('does not include sensitive attributes of a non-excluded fallback root', async () => {
+        const {document} = parseHTML('<html><body title="PRIVATE_ROOT_TITLE" data-secret="PRIVATE_ROOT_DATA"><main>VISIBLE_BODY</main></body></html>');
+        Object.defineProperty(document, 'implementation', {configurable: true, value: undefined});
+        Object.defineProperty(globalThis, 'document', {value: document, configurable: true});
+        Object.defineProperty(globalThis, 'location', {value: {href: 'https://example.com/root-attributes'}, configurable: true});
+        const context = await getPageTranslationContext();
+        expect(context).toContain('VISIBLE_BODY');expect(context).not.toContain('PRIVATE_ROOT_TITLE');expect(context).not.toContain('PRIVATE_ROOT_DATA');
+    });
+
+    it('does not use a cloned body if sanitization fails', async () => {
+        const {document} = parseHTML('<html><body><form>PRIVATE_FAILED_SANITIZE</form></body></html>');
+        Object.defineProperty(document, 'implementation', {configurable: true, value: undefined});
+        const clone = document.body.cloneNode(true) as HTMLElement;
+        vi.spyOn(clone, 'querySelectorAll').mockImplementation(() => {throw new Error('controlled sanitize failure');});
+        vi.spyOn(document.body, 'cloneNode').mockReturnValue(clone);
+        const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+        Object.defineProperty(globalThis, 'document', {value: document, configurable: true});
+        Object.defineProperty(globalThis, 'location', {value: {href: 'https://example.com/sanitization-failure'}, configurable: true});
+        expect(await getPageTranslationContext()).not.toContain('PRIVATE_FAILED_SANITIZE');
+        expect(warn).toHaveBeenCalled();expect(document.body.textContent).toContain('PRIVATE_FAILED_SANITIZE');
     });
 
     it('在 body clone fallback 路径执行同一敏感节点清洗', async () => {
@@ -616,7 +661,7 @@ describe('Defuddle page snapshot adapter', () => {
         const failure = new Error('controlled extractor import failure');
         vi.doMock('defuddle', () => {throw failure;});
         const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
-        Object.defineProperty(globalThis, 'document', {value: {title: '', body: {cloneNode: () => ({textContent: 'Safe fallback', querySelectorAll: () => []})}, querySelector: () => null}, configurable: true});
+        Object.defineProperty(globalThis, 'document', {value: {title: '', body: {closest: () => null, cloneNode: () => ({textContent: 'Safe fallback', querySelectorAll: () => []})}, querySelector: () => null}, configurable: true});
         Object.defineProperty(globalThis, 'location', {value: {href: 'https://example.com/retry-import'}, configurable: true});
         try {
             const isolated = await import('@/src/services/translation/context/browser');

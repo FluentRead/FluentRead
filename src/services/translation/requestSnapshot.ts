@@ -129,12 +129,18 @@ function slotNamespaceFromBoundaries(origin: string, finalOrdinalOffset: number)
     const prefix = origin.match(/^___FLUENTREAD_[a-z0-9_-]+/iu);
     if (!prefix) return undefined;
     const markerPrefix = '___FLUENTREAD_';
-    const borders = new Uint32Array(finalOrdinalOffset);
+    // 只有位于合法前缀内的边界可能成为 namespace；过长的匹配沿前缀表回退。
+    const maxBoundary = Math.min(prefix[0].length, finalOrdinalOffset);
+    const borders = new Uint32Array(maxBoundary);
     let matched = 0;
-    for (let index = 1; index < finalOrdinalOffset; index += 1) {
+    for (let index = 1; index < maxBoundary; index += 1) {
         while (matched > 0 && origin[index] !== origin[matched]) matched = borders[matched - 1]!;
         if (origin[index] === origin[matched]) matched += 1;
         borders[index] = matched;
+    }
+    for (let index = maxBoundary; index < finalOrdinalOffset; index += 1) {
+        while (matched > 0 && (matched === maxBoundary || origin[index] !== origin[matched])) matched = borders[matched - 1]!;
+        if (origin[index] === origin[matched]) matched += 1;
     }
     // 选择最长合法 namespace，先排除 BEGIN/END 自身重叠的伪边界；来源可与
     // 标记共享下划线，但不能把该重叠扩为 namespace。随后仍通过完整严格 parser。

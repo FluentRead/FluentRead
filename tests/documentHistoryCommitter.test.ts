@@ -17,6 +17,24 @@ const flush = async () => {for (let step = 0; step < 5; step++) await Promise.re
 afterEach(() => {vi.useRealTimers(); vi.restoreAllMocks();});
 
 describe('document history durable revision ownership', () => {
+    it('uses the committed version for a later queued edit by the same owner', async () => {
+        const history = createDocumentHistory(new IDBFactory()), start = deferred<void>();
+        const loaded = await history.loadChecked('same');
+        if (loaded.status !== 'ok') throw new Error('expected readable');
+        const owner: {revision: number; savedRevision?: number; historyVersion: string | null} = {revision: 1, historyVersion: loaded.version};
+        let calls = 0;
+        const writer = createDocumentHistoryCommitter<typeof owner>(async (value, current) => {
+            if (++calls === 1) await start.promise;
+            const result = await history.saveChecked(value, current.historyVersion);
+            if (result.status !== 'saved') return false;
+            current.historyVersion = result.version;return true;
+        });
+        const first = writer.save(owner, record('same', 'Earlier'));
+        owner.revision = 2;const second = writer.save(owner, record('same', 'Latest'));
+        start.resolve();
+        expect(await first).toBe(true);expect(await second).toBe(true);
+        expect(owner.savedRevision).toBe(2);expect((await history.load('same'))?.translations).toEqual(['Latest']);
+    });
     it('acknowledges only committed writes and deduplicates the same pending revision', async () => {
         const commit = deferred<boolean>();
         const save = vi.fn<(value: DocumentHistoryRecord) => Promise<boolean>>().mockReturnValueOnce(commit.promise).mockResolvedValue(true);
@@ -115,7 +133,7 @@ describe('document history durable revision ownership', () => {
         expect(task.savedRevision).toBe(2);
         // 真实 IndexedDB 的两次 open 各有独立连接；旧请求迟到后释放自己的连接，不能借用当前已恢复的连接。
         const lateDatabase = await new Promise<IDBDatabase>((resolve, reject) => {
-            const request = actualOpen('FluentReadDocumentHistory', 1);
+            const request = actualOpen('FluentReadDocumentHistory', 2);
             request.onsuccess = () => resolve(request.result);
             request.onerror = () => reject(request.error);
         });
@@ -205,7 +223,7 @@ describe('document history durable revision ownership', () => {
                             const put = target.put.bind(target);
                             vi.spyOn(target, 'put').mockImplementation(value => {
                                 const stored = put(value);
-                                stored.addEventListener('success', () => savedRevisionsAtRequestSuccess.push(task.savedRevision));
+                                if (target.name === 'documents') stored.addEventListener('success', () => savedRevisionsAtRequestSuccess.push(task.savedRevision));
                                 return stored;
                             });
                             return target;
@@ -274,65 +292,18 @@ describe('document history durable revision ownership', () => {
         expect((await history.load('same'))?.translations).toEqual(['Latest correction']);
     });
 
-    it('does not let a late eviction snapshot delete the next revision that has already committed', async () => {
-        vi.useFakeTimers({toFake: ['setTimeout', 'clearTimeout']});
-        const factory = new IDBFactory();
-        const seedHistory = createDocumentHistory(factory);
-        for (let index = 0; index < 20; index++) {
-            expect(await seedHistory.save({...record(`seed-${index}`, 'Seed translation'), updatedAt: index + 10})).toBe(true);
-        }
-        const actualOpen = factory.open.bind(factory);
-        const snapshotReady = deferred<void>();
-        const delayed = {} as IDBRequest<IDBCursorWithValue | null>;
-        let entriesRead = 0;
-        let intercept = true;
-        vi.spyOn(factory, 'open').mockImplementation((name, version) => {
-            const request = actualOpen(name, version);
-            request.addEventListener('success', () => {
-                const database = request.result;
-                const transact = database.transaction.bind(database);
-                vi.spyOn(database, 'transaction').mockImplementation((stores, mode, options) => {
-                    const transaction = transact(stores, mode, options);
-                    if (mode === 'readonly' && intercept) {
-                        intercept = false;
-                        const objectStore = transaction.objectStore.bind(transaction);
-                        vi.spyOn(transaction, 'objectStore').mockImplementation(store => {
-                            const target = objectStore(store);
-                            const openCursor = target.openCursor.bind(target);
-                            vi.spyOn(target, 'openCursor').mockImplementation(() => {
-                                const reading = openCursor();
-                                reading.addEventListener('success', () => {
-                                    Object.defineProperty(delayed, 'result', {value: reading.result, configurable: true});
-                                    if (reading.result) {
-                                        entriesRead++;
-                                        delayed.onsuccess!(new Event('success'));
-                                    } else snapshotReady.resolve();
-                                });
-                                return delayed;
-                            });
-                            return target;
-                        });
-                    }
-                    return transaction;
-                });
-            });
-            return request;
-        });
-        const history = createDocumentHistory(factory, 30);
-        const writer = createDocumentHistoryCommitter(value => history.save(value));
-        const task = {revision: 1, savedRevision: 0};
-        const first = writer.save(task, record('same', 'Earlier correction'));
-        await snapshotReady.promise;
-        expect(entriesRead).toBe(21);
-        expect(delayed.result).toBeNull();
-        await vi.advanceTimersByTimeAsync(30);
-        expect(await first).toBe(false);
-        task.revision = 2;
-        expect(await writer.save(task, {...record('same', 'Latest correction'), updatedAt: 1000})).toBe(true);
-        expect(task.savedRevision).toBe(2);
-        delayed.onsuccess!(new Event('success'));
-        await flush();
-        expect((await history.load('same'))?.translations).toEqual(['Latest correction']);
-        expect((await history.list()).map(entry => entry.id)).toContain('same');
+    it('serializes concurrent capacity changes and never removes a newly committed record due to clock rollback', async () => {
+        const factory = new IDBFactory(), first = createDocumentHistory(factory), second = createDocumentHistory(factory);
+        for (let index = 0; index < 20; index++) expect(await first.save({...record(`seed-${index}`, 'Old'), updatedAt: index + 10})).toBe(true);
+        const missing = await second.loadChecked('new');
+        if (missing.status !== 'ok') throw new Error('expected readable');
+        const [saved] = await Promise.all([
+            second.saveChecked({...record('new', 'New'), updatedAt: -100}, missing.version),
+            first.remove('seed-19'),
+        ]);
+        // If removal wins the transaction race, the absence token deliberately conflicts.
+        if (saved.status === 'saved') expect((await second.load('new'))?.translations).toEqual(['New']);
+        else expect(saved.status).toBe('conflict');
+        expect((await second.list()).length).toBeLessThanOrEqual(20);
     });
 });

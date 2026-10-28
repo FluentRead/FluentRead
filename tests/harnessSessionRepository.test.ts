@@ -37,6 +37,17 @@ function turn(id: string, createdAt = Date.now(), overrides: Partial<HarnessStor
 }
 
 describe('Harness session normalization', () => {
+    it('截断边界拆开代理对时，非法会话及问答 ID 保持拒绝', () => {
+        const invalid = `${'a'.repeat(199)}😀tail`;
+        expect(() => normalizeHarnessSession({...session(invalid), turns: []})).toThrow('格式无效');
+        expect(() => normalizeHarnessStoredTurn(turn(invalid))).toThrow('格式无效');
+        expect(normalizeHarnessSession({...session('a'.repeat(200)), turns: []}).id).toHaveLength(200);
+    });
+    it('限制会话和回答长度时不把完整的 Unicode 字符拆开', () => {
+        const value = normalizeHarnessSession({...session(), text: `${'x'.repeat(4095)}😀tail`, context: `${'c'.repeat(3999)}😀tail`, turns: [turn('t', 10, {question: `${'q'.repeat(999)}😀tail`, answer: `${'a'.repeat(15999)}😀tail`})]});
+        expect(value.text).toBe('x'.repeat(4095)); expect(value.context).toBe('c'.repeat(3999));
+        expect(value.turns[0].question).toBe('q'.repeat(999)); expect(value.turns[0].answer).toBe('a'.repeat(15999));
+    });
     it('bounds and cleans all user text without altering valid fields', () => {
         const value = normalizeHarnessSession({...session(), text: `  ${'x'.repeat(5000)}  `, context: ` ${'c'.repeat(5000)} `, turns: [turn('t', 10, {question: ` ${'q'.repeat(2000)} `, answer: ` ${'a'.repeat(17000)} `})]});
         expect(value.text).toHaveLength(4096);

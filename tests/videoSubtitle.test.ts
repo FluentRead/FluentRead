@@ -397,6 +397,11 @@ describe('YouTube timedtext MAIN bridge 消息边界', () => {
         )?.cues).toHaveLength(1);
     });
 
+    it('拒绝超长桥接 URL，保留正常签名参数', () => {
+        expect(validateYoutubeTimedTextMessage({...payload, url: payload.url + '&sig=' + 'x'.repeat(100)}, 'https://www.youtube.com/watch?v=current-video')).not.toBeNull();
+        expect(validateYoutubeTimedTextMessage({...payload, url: payload.url + '&name=' + 'x'.repeat(32_768)}, 'https://www.youtube.com/watch?v=current-video')).toBeNull();
+    });
+
     it('拒绝伪造协议、非 timedtext 资源与非播放页消息', () => {
         expect(validateYoutubeTimedTextMessage(
             {...payload, source: 'page-script'},

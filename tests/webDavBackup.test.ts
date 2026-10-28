@@ -212,3 +212,106 @@ it('WebDAV 默认普通范围经 worker 休眠仍去密，单次同意完整备�
     expect(restore.local.apiKeys).toEqual({});
     expect(restore.ports.api.write).not.toHaveBeenCalled();
 });
+
+describe('cancel pending WebDAV preview', () => {
+    it('releases cancellation and ignores late read before accepting a new preview', async () => {
+        const f=fixture(); await f.service.save(input);
+        let release!: (value: CloudSyncRemote | null) => void;
+        vi.mocked(f.ports.api.read).mockImplementationOnce(() => new Promise(resolve=>{release=resolve;}));
+        const old=f.service.prepare(password, 7, 'old-page').catch(error=>error);
+        await vi.waitFor(()=>expect(release).toBeTypeOf('function'));
+        const closed=f.service.cancelTab(7);
+        const result=await Promise.race([closed.then(()=>true),new Promise<boolean>(resolve=>setTimeout(()=>resolve(false),100))]);
+        expect(result).toBe(true);
+        const fresh=await f.service.prepare(password,8,'new-page');
+        release(null);await old;
+        expect(f.state.prepared?.id).toBe(fresh.id);
+        expect(f.state.prepared?.tabId).toBe(8);
+    });
+});
+
+it('does not cancel another tab preview and ignores a late rejected network response after owner closes', async () => {
+    const f=fixture();await f.service.save(input);
+    let reject!: (error:Error)=>void;
+    vi.mocked(f.ports.api.read).mockImplementationOnce(()=>new Promise((_resolve,fail)=>{reject=fail;}));
+    const old=f.service.prepareDelete(7,'owner').catch(error=>error);
+    await vi.waitFor(()=>expect(reject).toBeTypeOf('function'));
+    const unrelated=f.service.cancelTab(8);
+    const owner=f.service.cancelTab(7);
+    await Promise.all([unrelated,owner]);
+    const fresh=await f.service.prepare(password,8,'next');
+    reject(new Error('late fixture error'));await old;
+    expect(f.state.prepared?.id).toBe(fresh.id);
+    expect(f.state.prepared?.tabId).toBe(8);
+});
+
+it('does not start a queued preview after its tab closes', async () => {
+    const f=fixture();await f.service.save(input);
+    let release!:()=>void;
+    vi.mocked(f.ports.readState).mockImplementationOnce(async()=>{await new Promise<void>(resolve=>{release=resolve;});return f.state;});
+    const status=f.service.status();await vi.waitFor(()=>expect(release).toBeTypeOf('function'));
+    const old=f.service.prepare(password,7,'closed').catch(error=>error);
+    const close=f.service.cancelTab(7);
+    release();await Promise.all([status,close]);
+    expect(await old).toMatchObject({name:'AbortError'});
+    expect(f.ports.api.read).not.toHaveBeenCalled();
+});
+
+it('closes promptly during a pending connection test and ignores the late result', async () => {
+    const f=fixture();await f.service.save(input);
+    let release!:()=>void;
+    vi.mocked(f.ports.api.test).mockImplementationOnce(()=>new Promise<void>(resolve=>{release=resolve;}));
+    const old=f.service.prepare(password,7,'old-page').catch(error=>error);
+    await vi.waitFor(()=>expect(release).toBeTypeOf('function'));
+    const closed=f.service.cancelTab(7);
+    expect(await Promise.race([closed.then(()=>true),new Promise<boolean>(resolve=>setTimeout(()=>resolve(false),100))])).toBe(true);
+    const fresh=await f.service.prepare(password,8,'new-page');
+    release();await old;
+    expect(f.state.prepared?.id).toBe(fresh.id);
+    expect(f.ports.api.read).toHaveBeenCalledTimes(1);
+});
+
+it('cancels the matching page client when a read synchronously requests cancellation', async () => {
+    const f=fixture();await f.service.save(input);
+    let closed!:Promise<void>;
+    vi.mocked(f.ports.api.read).mockImplementationOnce(async (_session,signal)=>{
+        closed=f.service.cancel(undefined,7,'owner');
+        expect(signal?.aborted).toBe(true);
+        return null;
+    });
+    const old=await f.service.prepare(password,7,'owner').catch(error=>error);
+    await closed;
+    expect(old).toMatchObject({name:'AbortError'});
+    expect(f.state?.prepared).toBeUndefined();
+    const fresh=await f.service.prepare(password,8,'new-page');
+    expect(f.state.prepared?.id).toBe(fresh.id);
+});
+
+it.each(['availability', 'snapshot'] as const)('releases cancellation while local %s is suspended and ignores its late result', async stage => {
+    const f=fixture();await f.service.save(input);
+    let release!:()=>void;
+    if(stage==='availability') vi.mocked(f.ports.readState).mockImplementationOnce(async()=>{await new Promise<void>(resolve=>{release=resolve;});return f.state;});
+    else vi.mocked(f.ports.snapshot).mockImplementationOnce(async()=>{await new Promise<void>(resolve=>{release=resolve;});return f.local;});
+    const old=f.service.prepare(password,7,'old').catch(error=>error);
+    await vi.waitFor(()=>expect(release).toBeTypeOf('function'));
+    const close=f.service.cancelTab(7);
+    const promptly=await Promise.race([close.then(()=>true),new Promise<boolean>(resolve=>setTimeout(()=>resolve(false),100))]);
+    if(!promptly) {release();await Promise.all([old,close]);}
+    expect(promptly).toBe(true);
+    const fresh=await f.service.prepare(password,8,'new');
+    release();expect(await old).toMatchObject({name:'AbortError'});
+    expect(f.state.prepared?.id).toBe(fresh.id);
+});
+
+it.each(['sync', 'delete'] as const)('ignores a late rejected local state read during %s preview', async kind => {
+    const f=fixture();await f.service.save(input);let reject!: (error:Error)=>void;
+    vi.mocked(f.ports.readState).mockResolvedValueOnce(f.state).mockImplementationOnce(()=>new Promise((_resolve,fail)=>{reject=fail;}));
+    const old=(kind==='sync'?f.service.prepare(password,7,'old'):f.service.prepareDelete(7,'old')).catch(error=>error);
+    await vi.waitFor(()=>expect(reject).toBeTypeOf('function'));
+    const close=f.service.cancelTab(7);
+    expect(await Promise.race([close.then(()=>true),new Promise<boolean>(resolve=>setTimeout(()=>resolve(false),100))])).toBe(true);
+    const fresh=await f.service.prepare(password,8,'new');
+    reject(new Error('late local read failure'));expect(await old).toMatchObject({name:'AbortError'});
+    await new Promise(resolve=>setTimeout(resolve,0));
+    expect(f.state.prepared?.id).toBe(fresh.id);
+});

@@ -49,7 +49,7 @@ export function createUserscriptServiceBrandIconsCompressionPlugin(root: string,
             const paths: unknown = JSON.parse(source.toString('utf8'));
             validateBrandPaths(paths);
             const serialized = JSON.stringify(paths);
-            const compressed = encodeUserscriptDataCompact(gzipUserscriptBuildData(Buffer.from(serialized, 'utf8')));
+            const compressed = encodeUserscriptDataCompact(gzipUserscriptBuildData(Buffer.from(serialized, 'utf8'), 8));
             const sourceSha256 = createHash('sha256').update(source).digest('hex');
             return [
                 `/* Non-code Lobe Icons paths; original JSON sha256 ${sourceSha256}; existing MIT notice retained. */`,

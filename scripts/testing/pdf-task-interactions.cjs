@@ -4,7 +4,7 @@
 const assert = require('node:assert/strict');
 const path = require('node:path');
 
-async function runPdfTaskInteractions({page, fixture, report, shot, record, patch, service, until, wait, resourceState, uiNode, translateDrag, baseline}) {
+async function runPdfTaskInteractions({page, fixture, report, shot, record, patch, service, until, wait, resourceState, uiNode, uiText, clickNode, translateDrag, baseline}) {
   report.runScope = baseline ? 'translated-selection-baseline' : 'pdf-selection-progress-recovery';
   const workspace = page.locator('[aria-label="文档工作区"]');
   const view = name => workspace.getByRole('button', {name, exact: true}).click();
@@ -120,12 +120,22 @@ async function runPdfTaskInteractions({page, fixture, report, shot, record, patc
     (report.translationSelections ||= []).push({label, ...selected});
     if (baseline) {await shot('pdf-translated-selection-baseline'); return selected;}
     assert(selected.text?.trim() && !selected.collapsed, `${label}: 真实鼠标应能选中译文`);
+    if (label === 'layout-forward') {
+      await until(() => uiNode('fr-selection-indicator'), '混合语种译文选区应提供划词入口');
+      assert.equal(fixture.state.requests.length, requestCount, '选择译文不得自动请求翻译');
+      await clickNode('fr-selection-indicator');
+      await until(async () => (await uiText()).includes(selected.text), '划词卡片未绑定实际选中的译文');
+      await page.keyboard.press('Escape');
+    } else {
+      // 已是目标语言的选区可按配置隐藏入口；保留实际观察，不把它等同于划词失败。
+      report.translationSelections.at(-1).indicatorPresent = Boolean(await uiNode('fr-selection-indicator'));
+    }
     await page.evaluate(() => {globalThis.__pdfTaskCopy = null; document.addEventListener('copy', event => {globalThis.__pdfTaskCopy = {text: getSelection()?.toString(), trusted: event.isTrusted}; event.preventDefault();}, {once: true});});
     await page.keyboard.press(process.platform === 'darwin' ? 'Meta+C' : 'Control+C');
     await until(async () => Boolean(await page.evaluate(() => globalThis.__pdfTaskCopy)), '复制快捷键未触发原生事件');
     const copy = await page.evaluate(() => globalThis.__pdfTaskCopy);
     assert(copy.trusted && copy.text === selected.text); await wait(150);
-    assert.equal(fixture.state.requests.length, requestCount, '译文选择不应触发翻译'); assert.equal(await uiNode('fr-selection-indicator'), null);
+    if (label !== 'layout-forward') assert.equal(fixture.state.requests.length, requestCount, '选择译文不得自动请求翻译');
     await shot(`pdf-${label}-selected`); return selected;
   };
   const first = page.locator('.pdf-page-column.translated .pdf-translation-text span').first();

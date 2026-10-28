@@ -77,3 +77,70 @@ describe('translation vision broker boundaries', () => {
         expect(provider).not.toHaveBeenCalled();
     });
 });
+
+describe('provider response cancellation holds the actual broker lease', () => {
+    it.each([
+        ['claude', 'claude'], ['gemini', 'gemini'], ['deepseek-chat', 'deepseek'],
+        ['deepseek-responses', 'deepseek'], ['tongyi', 'tongyi'], ['zhipu', 'zhipu'], ['doubao', 'doubao'],
+    ] as const)('%s retains the real slot through late stream rejection after cancellation and timeout', async (name, service) => {
+        const [{default: claude}, {default: gemini}, {default: deepseek}, {default: tongyi}, {default: zhipu},
+            {default: doubao}, {Config}, {setRuntimeFetch}] = await Promise.all([
+            import('@/src/providers/translation/claude'), import('@/src/providers/translation/gemini'),
+            import('@/src/providers/translation/deepseek'), import('@/src/providers/translation/tongyi'),
+            import('@/src/providers/translation/zhipu'), import('@/src/providers/translation/doubao-seed-translation'),
+            import('@/src/core/config/model'), import('@/src/platform/http/runtime'),
+        ]);
+        const adapter = {claude, gemini, deepseek, tongyi, zhipu, doubao}[service];
+        const config = new Config(); Object.assign(config, {service, from: 'en', to: 'zh-Hans', useCache: false,
+            enableAIContext: false, maxConcurrentTranslations: 1, translationRequestsPerSecond: 0,
+            translationRequestsPerMinute: 0, translationMaxRetries: 0});
+        config.token[service] = service === 'zhipu' ? 'id.secret' : 'fixture-key';
+        config.model.doubao = 'doubao-seed-translation';
+        config.deepseekApiType = name === 'deepseek-responses' ? 'responses' : 'chat';
+        const reply = service === 'claude' ? {content: [{type: 'text', text: '有效译文'}]}
+            : service === 'gemini' ? {candidates: [{content: {parts: [{text: '有效译文'}]}}]}
+            : service === 'doubao' ? {output_text: '有效译文'}
+            : name === 'deepseek-responses' ? {output_text: '有效译文'}
+            : {choices: [{message: {content: '有效译文'}}]};
+        const broker = createTranslationBroker({ready: Promise.resolve(), getConfig: () => config,
+            providers: {[service]: adapter}, cache: {get: async () => null, set: async () => true, clear: async () => {}, cleanup: async () => {}},
+            serviceTypes: {machine: new Set(), isAI: () => true, isAiSdk: () => false, isUseAIContext: () => false},
+            endpointResolver: {resolveOpenAICompatibleEndpoint: () => '', aiSdkTransportProfile: ''},
+            promptBuilder: {buildPageSummaryPrompt: () => '', buildPageSummarySystemPrompt: () => ''},
+            getMissingCredentialMessage: () => null, getTranslationLanguages: () => ({sourceLanguage: 'en', targetLanguage: 'zh-Hans'}),
+            resolveConfiguredModel: (selected?: string, custom?: string) => custom || selected || '',
+            buildTranslationCacheKey: (identity: Record<string, unknown>) => JSON.stringify(identity),
+        } as any);
+        vi.useFakeTimers();
+        try {
+            for (const mode of ['cancel', 'timeout'] as const) {
+                let stream!: ReadableStreamDefaultController<Uint8Array>;
+                let read!: () => void;
+                const reading = new Promise<void>(resolve => {read = resolve;});
+                const transport = vi.fn(async () => transport.mock.calls.length === 1
+                    ? new Response(new ReadableStream<Uint8Array>({start(value) {stream = value;}, pull() {read();}}, {highWaterMark: 0}))
+                    : Response.json(reply));
+                setRuntimeFetch(transport);
+                const owner = new AbortController();
+                const firstRequest = attachTranslationRequestControl({origin: `First English paragraph ${mode}.`, useCache: false,
+                    requestTimeoutMs: 1000}, {signal: owner.signal, ownershipKey: `first-${mode}`});
+                const first = broker.translateWithCache(firstRequest).catch(error => error);
+                await reading;
+                const next = broker.translateWithCache({origin: `Another English paragraph ${mode}.`, useCache: false,
+                    requestTimeoutMs: 10000});
+                if (mode === 'cancel') owner.abort();
+                else await vi.advanceTimersByTimeAsync(1000);
+                const error = await first;
+                expect(error.name).toBe(mode === 'cancel' ? 'AbortError' : 'TranslationProviderDeadlineError');
+                if (mode === 'cancel') await vi.advanceTimersByTimeAsync(1000);
+                else owner.abort();
+                expect(await first).toBe(error);
+                expect(transport).toHaveBeenCalledTimes(1);
+                stream.error(new Error('late private transport failure'));
+                await expect(next).resolves.toBe('有效译文');
+                expect(transport).toHaveBeenCalledTimes(2);
+                owner.abort();
+            }
+        } finally {setRuntimeFetch(); vi.useRealTimers();}
+    }, 15000);
+});

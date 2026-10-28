@@ -19,6 +19,7 @@ import defaultChromeTranslator, {
     createChromeTranslator,
 } from '@/src/providers/translation/chrome-translator';
 import {buildChromeOffscreenTranslationData} from '@/src/providers/translation/chromeTranslatorRequest';
+import browser from 'webextension-polyfill';
 
 const chromeTranslator = createChromeTranslator({
     capabilities: {chromeTranslation: true},
@@ -196,6 +197,35 @@ describe('Chrome translator 请求级语言回归', () => {
         await expect(provider(withProviderSnapshot({origin: 'hello', abortSignal: controller.signal}, mocks.config))).rejects.toMatchObject({name: 'AbortError'});
         expect(mocks.send).not.toHaveBeenCalled();
         expect(set).not.toHaveBeenCalled();
+    });
+
+    it('不保存无效的待准备语言对，并向调用者提供缺省提示', async () => {
+        const set = vi.fn(async () => undefined);
+        const provider = createChromeTranslator({
+            capabilities: {chromeTranslation: true}, offscreenClient: {send: mocks.send},
+            createRequestId: mocks.createRequestId, preparationStore: {set},
+        });
+        mocks.send.mockResolvedValueOnce({
+            success: false, requestId: 'chrome-request-1', errorCode: 'preparation-required',
+            sourceLanguage: 'auto', targetLanguage: 'zh',
+        });
+        await expect(provider(withProviderSnapshot({origin: 'hello'}, mocks.config)))
+            .rejects.toThrow('Chrome 本地翻译模型需要用户激活');
+        expect(set).not.toHaveBeenCalled();
+    });
+
+    it('未注入准备存储时使用生产会话存储，保存规范化语言对', async () => {
+        mocks.send.mockResolvedValueOnce({
+            success: false, requestId: 'chrome-request-1', errorCode: 'preparation-required',
+            sourceLanguage: 'en', targetLanguage: 'zh-Hans', error: 'prepare',
+        });
+        await expect(chromeTranslator(withProviderSnapshot({origin: 'hello'}, mocks.config)))
+            .rejects.toThrow('prepare');
+        expect(browser.storage.session.set).toHaveBeenCalledWith({
+            'fluentread.chromeTranslationPreparation.en:zh': {
+                sourceLanguage: 'en', targetLanguage: 'zh', updatedAt: expect.any(Number),
+            },
+        });
     });
 
     it('生产 requestId 使用浏览器安全随机 UUID', () => {

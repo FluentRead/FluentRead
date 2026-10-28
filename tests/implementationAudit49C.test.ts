@@ -381,51 +381,58 @@ describe('audit49C local TTS lifecycle through real controls and backend message
     });
 });
 
-describe('audit49C learning-memory confirmation lifetime', () => {
-    it('does not send a clear mutation after the requesting component is unmounted', async () => {
-        const confirm = deferred<void>(); ports.confirm.mockImplementationOnce(() => confirm.promise);
-        ports.send.mockResolvedValue({success: true, memories: [{id: '12345678-1234-4234-8234-123456789abc', kind: 'note', content: 'Retained fixture', updatedAt: 1, createdAt: 1}]});
-        const {host, stop} = await mount(LearningMemoryManager, {enabled: true});
-        const clear = Array.from(host.querySelectorAll<HTMLButtonElement>('button')).find(button => button.textContent === 'learning.memoryClear')!;
-        expect(clear).not.toBeUndefined(); clear.click(); await settle(); stop(); confirm.resolve(); await settle();
-        expect(ports.send.mock.calls.map(([message]) => message.action)).not.toContain('memory-clear');
+describe.each(['history','memory'] as const)('audit49C %s 清空确认归属', kind => {
+    const reply = () => kind==='history'
+        ? {success:true,sessions:[{id:'session-fixture',text:'Retained reading fixture',intent:'meaning',updatedAt:1,turnCount:1}],hasMore:false}
+        : {success:true,memories:[{id:'12345678-1234-4234-8234-123456789abc',kind:'note',content:'Retained fixture',updatedAt:1,createdAt:1}]};
+    const action = () => kind==='history'?'sessions-clear':'memory-clear';
+    const clearButton = (host:HTMLElement) => [...host.querySelectorAll<HTMLButtonElement>('button')].find(button=>button.textContent===(kind==='history'?'清空记录':'learning.memoryClear'))!;
+    const dialog = (host:HTMLElement) => host.querySelector<HTMLElement>('[data-dialog-visible="true"]');
+    const button = (host:HTMLElement, label:string) => [...dialog(host)!.querySelectorAll<HTMLButtonElement>('button')].find(item=>item.textContent===label)!;
+    const calls = () => ports.send.mock.calls.filter(([message])=>message.action===action());
+    it('连续触发只打开一个确认，重复旧事件不会再次清空', async () => {
+        ports.send.mockResolvedValue(reply());const {host}=await mount(kind==='history'?HarnessReadingHistory:LearningMemoryManager,{enabled:true});
+        const clear=clearButton(host);clear.click();clear.click();await settle();expect(host.querySelectorAll('[data-dialog-visible="true"]')).toHaveLength(1);
+        const accept=button(host,'common.confirm');accept.click();await settle();expect(calls()).toHaveLength(1);
+        accept.click();await settle();expect(calls()).toHaveLength(1);
     });
-    it('still clears after confirmation while mounted and keeps data when confirmation is cancelled', async () => {
-        ports.send.mockResolvedValue({success: true, memories: [{id: '12345678-1234-4234-8234-123456789abc', kind: 'note', content: 'Retained fixture', updatedAt: 1, createdAt: 1}]});
-        const {host} = await mount(LearningMemoryManager, {enabled: true});
-        const findClear = () => Array.from(host.querySelectorAll<HTMLButtonElement>('button')).find(button => button.textContent === 'learning.memoryClear')!;
-        ports.confirm.mockRejectedValueOnce('cancel'); findClear().click(); await settle(); expect(host.textContent).toContain('Retained fixture');
-        expect(ports.send.mock.calls.map(([message]) => message.action)).not.toContain('memory-clear');
-        findClear().click(); await settle(); expect(ports.send.mock.calls.map(([message]) => message.action)).toContain('memory-clear');
-        expect(host.textContent).not.toContain('Retained fixture'); expect(host.textContent).toContain('learning.memoryCleared');
+    it('取消后保留数据，重新确认可清空', async () => {
+        ports.send.mockResolvedValue(reply());const {host}=await mount(kind==='history'?HarnessReadingHistory:LearningMemoryManager,{enabled:true});
+        clearButton(host).click();await settle();button(host,'common.cancel').click();await settle();expect(dialog(host)).toBeNull();expect(calls()).toHaveLength(0);
+        expect(host.textContent).toContain(kind==='history'?'Retained reading fixture':'Retained fixture');
+        clearButton(host).click();await settle();button(host,'common.confirm').click();await settle();expect(calls()).toHaveLength(1);
+        expect(host.textContent).not.toContain(kind==='history'?'Retained reading fixture':'Retained fixture');
     });
-});
-
-describe('audit49C reading-history confirmation lifetime', () => {
-    const history = () => ({success: true, sessions: [{id: 'session-fixture', text: 'Retained reading fixture', intent: 'meaning', updatedAt: 1, turnCount: 1}], hasMore: false});
-    const findClear = (host: HTMLElement) => Array.from(host.querySelectorAll<HTMLButtonElement>('button')).find(button => button.textContent === '清空记录')!;
-
-    it('keeps reading history when a pending confirmation resolves after its owner unmounts', async () => {
-        const confirm = deferred<void>(); ports.confirm.mockImplementationOnce(() => confirm.promise);
-        ports.send.mockResolvedValue(history());
-        const {host, stop} = await mount(HarnessReadingHistory);
-        expect(host.textContent).toContain('Retained reading fixture');
-        findClear(host).click(); await settle();
-        expect(ports.confirm).toHaveBeenCalledTimes(1);
-        stop(); confirm.resolve(); await settle();
-        expect(ports.send.mock.calls.map(([message]) => message.action)).not.toContain('sessions-clear');
+    it('缓存面板隐藏时关闭遮罩，旧确认不能清空当前数据', async () => {
+        ports.send.mockResolvedValue(reply());const {host,shown}=await mount(kind==='history'?HarnessReadingHistory:LearningMemoryManager,{enabled:true},true);
+        clearButton(host).click();await settle();const old=button(host,'common.confirm');shown.value=false;await settle();expect(dialog(host)).toBeNull();
+        shown.value=true;await settle();old.click();await settle();expect(calls()).toHaveLength(0);
     });
-
-    it('preserves cancellation and clears the list after confirmation while its owner is mounted', async () => {
-        ports.send.mockResolvedValue(history());
-        const {host} = await mount(HarnessReadingHistory);
-        ports.confirm.mockRejectedValueOnce('cancel'); findClear(host).click(); await settle();
-        expect(host.textContent).toContain('Retained reading fixture');
-        expect(ports.send.mock.calls.map(([message]) => message.action)).not.toContain('sessions-clear');
-        findClear(host).click(); await settle();
-        expect(ports.send.mock.calls.map(([message]) => message.action).filter(action => action === 'sessions-clear')).toHaveLength(1);
-        expect(host.textContent).not.toContain('Retained reading fixture');
-        expect(host.textContent).toContain('还没有阅读记录');
+    it('导航可见性同步关闭再恢复后，旧确认不能清空数据', async () => {
+        const visible=ref(true);ports.send.mockResolvedValue(reply());const {host}=await mount(kind==='history'?HarnessReadingHistory:LearningMemoryManager,{enabled:true,isVisible:()=>visible.value});
+        clearButton(host).click();await settle();const old=button(host,'common.confirm');visible.value=false;visible.value=true;await settle();expect(dialog(host)).toBeNull();old.click();await settle();expect(calls()).toHaveLength(0);
+    });
+    it('旧确认迟到不能关闭新确认，当前确认仍能清空一次', async () => {
+        ports.send.mockResolvedValue(reply());const {host,shown}=await mount(kind==='history'?HarnessReadingHistory:LearningMemoryManager,{enabled:true},true);
+        clearButton(host).click();await settle();const old=button(host,'common.confirm');shown.value=false;await settle();shown.value=true;await settle();clearButton(host).click();await settle();
+        old.click();await settle();expect(dialog(host)).not.toBeNull();expect(calls()).toHaveLength(0);button(host,'common.confirm').click();await settle();expect(calls()).toHaveLength(1);
+    });
+    it('旧对话框关闭事件不会关闭新确认', async () => {
+        ports.send.mockResolvedValue(reply());const {host,shown}=await mount(kind==='history'?HarnessReadingHistory:LearningMemoryManager,{enabled:true},true);
+        clearButton(host).click();await settle();
+        const old=host.querySelector<HTMLButtonElement>('[data-dialog-close]')!;
+        shown.value=false;await settle();shown.value=true;await settle();clearButton(host).click();await settle();old.click();await settle();
+        expect(dialog(host)).not.toBeNull();expect(calls()).toHaveLength(0);host.querySelector<HTMLButtonElement>('[data-dialog-close]')!.click();await settle();expect(dialog(host)).toBeNull();
+    });
+    it('卸载后旧确认不能清空', async () => {
+        ports.send.mockResolvedValue(reply());const {host,stop}=await mount(kind==='history'?HarnessReadingHistory:LearningMemoryManager,{enabled:true});
+        clearButton(host).click();await settle();const old=button(host,'common.confirm');stop();old.click();await settle();expect(calls()).toHaveLength(0);
+    });
+    it('确认已提交后隐藏不会撤销用户已接受的清空', async () => {
+        const pending=deferred<unknown>();ports.send.mockImplementation((message:any)=>message.action===action()?pending.promise:Promise.resolve(reply()));
+        const {host,shown}=await mount(kind==='history'?HarnessReadingHistory:LearningMemoryManager,{enabled:true},true);
+        clearButton(host).click();await settle();button(host,'common.confirm').click();await settle();expect(calls()).toHaveLength(1);
+        shown.value=false;await settle();pending.resolve({success:true});await settle();shown.value=true;await settle();expect(calls()).toHaveLength(1);
     });
 });
 
@@ -1334,6 +1341,37 @@ describe('audit49C local backup confirmation ownership', () => {
                 f.button().click(); await settle(); expect(f.download).toHaveBeenCalledTimes(2); expect(ports.messages).toHaveBeenCalledOnce();
             }
         } finally {io.resolve(prepareConfigForExport(ports.config as Config)); await settle(); await f.close();}
+    });
+
+    it.each(['click', 'timer'] as const)('releases the sensitive backup object URL when download %s throws', async failure => {
+        const f = await fixture();
+        let timer: {mockRestore(): void} | undefined;
+        try {
+            if (failure === 'click') f.download.mockImplementationOnce(() => {throw new Error('download unavailable');});
+            else timer = vi.spyOn(window, 'setTimeout').mockImplementationOnce(() => {throw new Error('timer unavailable');});
+            f.button().click(); await settle();
+            expect(f.create).toHaveBeenCalledOnce();expect(f.download).toHaveBeenCalledOnce();
+            expect(f.revoke).toHaveBeenCalledWith('blob:owned-backup-1');expect(f.blobs.size).toBe(0);
+            expect(ports.messages).toHaveBeenCalledOnce();expect(f.button().disabled).toBe(false);
+        } finally {
+            timer?.mockRestore();
+            for (const url of f.blobs.keys()) URL.revokeObjectURL(url);
+            await f.close();
+        }
+    });
+
+    it('retains the download error when object URL cleanup also throws', async () => {
+        const f = await fixture();
+        try {
+            f.download.mockImplementationOnce(() => {throw new Error('download unavailable');});
+            f.revoke.mockImplementationOnce(() => {throw new Error('cleanup unavailable');});
+            f.button().click();await settle();
+            expect(ports.messages).toHaveBeenCalledWith('error', '导出失败：download unavailable');
+            expect(f.revoke).toHaveBeenCalledOnce();expect(f.button().disabled).toBe(false);
+        } finally {
+            for (const url of f.blobs.keys()) URL.revokeObjectURL(url);
+            await f.close();
+        }
     });
 
     it('releases busy after a stale accepted IO failure and allows a fresh export on reactivation', async () => {

@@ -15,8 +15,8 @@ const tables = [
     ['src/core/config/translationAppearance.ts', 'TRANSLATION_STYLE_PRESETS'],
 ] as const;
 
-function transform(code: string, id = resolve(root, tables[0][0]), enabled = true) {
-    const plugin = createUserscriptSettingsDataPlugin(root, enabled);
+function transform(code: string, id = resolve(root, tables[0][0]), enabled = true, fullOptions = true) {
+    const plugin = createUserscriptSettingsDataPlugin(root, enabled, fullOptions);
     const run = plugin.transform as (code: string, id: string) => {code: string} | null;
     return run(code, id);
 }
@@ -47,11 +47,23 @@ describe('standalone static settings data representation', () => {
         const after = value(initializer(transformed, name));
         expect(JSON.stringify(after)).toBe(JSON.stringify(before));
         const encoded = JSON.parse(initializer(transformed, name).match(/__fluentreadDecodeSettingsData\(("[^"]+")\)/u)![1]) as string;
-        expect(encoded.startsWith('~85:')).toBe(true);
+        expect(encoded.startsWith('~91:')).toBe(true);
         expect(Buffer.from(decodeUserscriptData(encoded))).toEqual(gzipUserscriptBuildData(Buffer.from(JSON.stringify(before))));
         expect(initializer(transformed, name)).not.toContain('eval');
         // Every other byte of the owning source stays in place; functions and declarations remain executable code.
         expect(transformed.replace(initializer(transformed, name), initializer(source, name)).replace('/* @__PURE__ */ ', '').endsWith(source)).toBe(true);
+    });
+
+    it('keeps the standard build style table in Base85 with identical gzip bytes and values', () => {
+        const [path, name] = tables[2];
+        const source = readFileSync(resolve(root, path), 'utf8');
+        const transformed = transform(source, resolve(root, path), true, false)!.code;
+        const before = value(initializer(source, name));
+        const after = value(initializer(transformed, name));
+        const encoded = JSON.parse(initializer(transformed, name).match(/__fluentreadDecodeSettingsData\(("[^"]+")\)/u)![1]) as string;
+        expect(encoded.startsWith('~85:')).toBe(true);
+        expect(Buffer.from(decodeUserscriptData(encoded))).toEqual(gzipUserscriptBuildData(Buffer.from(JSON.stringify(before))));
+        expect(JSON.stringify(after)).toBe(JSON.stringify(before));
     });
 
     it('keeps all six translated prompt catalogs and their actual placeholders after synchronous decode', () => {

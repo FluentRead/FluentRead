@@ -123,6 +123,8 @@ function presentationComparable(value: string, evidence: LiteralEvidence): strin
 /** 只有已有同目标证据且所有字词仍相同才隐藏排版回显；相近语言和高比例但有实质修改的文本继续展示。 */
 export function hasDistinctTargetTranslation(source: string, translation: string | undefined, targetLanguage: string): boolean {
     if (!hasTranslationContent(translation ?? '')) return false;
+    // 逐字相同时无需扫描引用或归一化，仍保留不同字符串中的字面量保护。
+    if (source === translation) return false;
     // 转义引号会改变引用边界，保守使用原始比较，不让任何内部字符变化被归一化吞掉。
     if (/\\["'`]/u.test(source) || /\\["'`]/u.test(translation!)) return source !== translation;
     // 共享精确比较会折叠空白；字面量变化须先保护，避免它绕过下方展示兜底。

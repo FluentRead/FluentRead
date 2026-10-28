@@ -160,7 +160,7 @@ describe('Google Drive 同步事务', () => {
         expect(f.ports.auth.open).not.toHaveBeenCalled();
         const preview = await f.service.prepare(password, undefined, undefined, true);
         expect(f.ports.auth.open).toHaveBeenCalledOnce();
-        expect(f.ports.auth.open).toHaveBeenCalledWith(true);
+        expect(f.ports.auth.open).toHaveBeenCalledWith(true, expect.any(AbortSignal));
         expect(preview).toMatchObject({hasRemote: false, hasBaseline: false, changes: []});
         expect(f.ports.api.write).not.toHaveBeenCalled();
         expect(await f.service.status()).toMatchObject({account: null});
@@ -177,7 +177,7 @@ describe('Google Drive 同步事务', () => {
         expect(f.ports.auth.disconnect).toHaveBeenCalledOnce();
         const again = await f.service.prepare(password, undefined, undefined, true);
         expect(again.hasBaseline).toBe(true);
-        expect(f.ports.auth.open).toHaveBeenLastCalledWith(true);
+        expect(f.ports.auth.open).toHaveBeenLastCalledWith(true, expect.any(AbortSignal));
         await f.service.cancel();
         expect(f.state).toEqual(persisted);
         expect(f.ports.auth.disconnect).toHaveBeenCalledTimes(2);
@@ -743,5 +743,32 @@ describe('单次敏感范围事务', () => {
         for (const consent of [null, 1, 'true', {}, []]) await expect(f.service.prepare(password, undefined, undefined, consent as boolean)).rejects.toThrow('布尔值');
         expect(f.ports.auth.open).not.toHaveBeenCalled();
         expect(f.ports.api.write).not.toHaveBeenCalled();
+    });
+});
+
+describe('Google pending authorization ownership', () => {
+    it('frees cancellation, blocks a new token until old cleanup, and never lets its late result touch the new session', async () => {
+        const {createDriveAuth} = await import('@/src/platform/google-drive/auth');
+        const {GOOGLE_DRIVE_SCOPES} = await import('@/src/platform/google-drive/constants');
+        const f=fixture();let release!: (value:{token:string})=>void;
+        const identity={getAuthToken:vi.fn().mockImplementationOnce(()=>new Promise(resolve=>{release=resolve;})).mockResolvedValue({token:'fresh-token',grantedScopes:[...GOOGLE_DRIVE_SCOPES]}),removeCachedAuthToken:vi.fn(async()=>undefined),clearAllCachedAuthTokens:vi.fn(async()=>undefined)};
+        const network=vi.fn(async()=>new Response(JSON.stringify({user:{permissionId:'new-account'}})));
+        f.ports.auth=createDriveAuth({identity,fetch:network,userAgent:()=> 'Chrome/142.0',runtime:{id:'fixture',getManifest:()=>({oauth2:{client_id:'fixture-custom',scopes:[...GOOGLE_DRIVE_SCOPES]}})}});
+        const service=createGoogleDriveSync(f.ports);
+        const old=service.prepare(password,7,'old').catch(error=>error);
+        await vi.waitFor(()=>expect(release).toBeTypeOf('function'));
+        const close=service.cancelTab(7);
+        expect(await Promise.race([close.then(()=>true),new Promise<boolean>(resolve=>setTimeout(()=>resolve(false),100))])).toBe(true);
+        expect(await old).toMatchObject({name:'AbortError'});
+        expect((await service.status()).available).toBe(true);
+        await expect(service.prepare(password,8,'new')).rejects.toThrow('上次 Google 授权');
+        expect(identity.getAuthToken).toHaveBeenCalledOnce();expect(network).not.toHaveBeenCalled();
+        release({token:'old-token'});
+        await vi.waitFor(()=>expect(identity.removeCachedAuthToken).toHaveBeenCalledWith({token:'old-token'}));
+        const clears=identity.clearAllCachedAuthTokens.mock.calls.length;
+        const preview=await service.prepare(password,8,'new');
+        expect((f.state as DriveSyncState).prepared?.id).toBe(preview.id);
+        expect(identity.clearAllCachedAuthTokens).toHaveBeenCalledTimes(clears);
+        expect(identity.removeCachedAuthToken).toHaveBeenCalledTimes(1);
     });
 });

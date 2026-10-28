@@ -1551,6 +1551,7 @@ pnpm test:pdf-selection -- \
   --extension-dir .output/chrome-mv3 \
   --playwright-root <Node包目录> \
   --focus-safe-helper <浏览器测试技能>/scripts/focus-safe-browser.cjs \
+  --runtime-diagnostics-helper <浏览器测试技能>/scripts/runtime-diagnostics.cjs \
   --arxiv-pdf <已下载的1706.03762.pdf> \
   --live-arxiv \
   --artifacts-dir /private/tmp/fluentread-pdf-selection

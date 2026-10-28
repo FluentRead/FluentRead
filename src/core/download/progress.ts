@@ -209,3 +209,47 @@ export function createDownloadProgressPublisher(
     };
     return publisher;
 }
+
+/** 单个外部通知在途时仅保留最新快照；等待超时只释放调用方，不伪称取消传输。 */
+export function createCoalescedDownloadNotifier<T>(
+    send: (value: T) => Promise<void>, timeoutMs = 1000,
+): {notify(value: T): Promise<void>; dispose(): void} {
+    let active: Promise<void> | undefined;
+    let queued: T | undefined;
+    let hasQueued = false;
+    let disposed = false;
+    const waiters = new Set<() => void>();
+    const start = (value: T): Promise<void> => {
+        const request = Promise.resolve().then(() => {if (!disposed) return send(value);}).catch(() => undefined);
+        active = request;
+        void request.then(() => {
+            active = undefined;
+            if (disposed || !hasQueued) return;
+            const latest = queued as T;
+            queued = undefined;
+            hasQueued = false;
+            start(latest);
+        });
+        return request;
+    };
+    return {
+        notify(value) {
+            if (disposed) return Promise.resolve();
+            if (active) {queued = value; hasQueued = true; return Promise.resolve();}
+            const request = start(value);
+            return new Promise<void>((resolve) => {
+                let timer: ReturnType<typeof setTimeout>;
+                const finish = () => {clearTimeout(timer); waiters.delete(finish); resolve();};
+                waiters.add(finish);
+                timer = setTimeout(finish, timeoutMs);
+                void request.then(finish);
+            });
+        },
+        dispose() {
+            disposed = true;
+            queued = undefined;
+            hasQueued = false;
+            for (const finish of waiters) finish();
+        },
+    };
+}

@@ -226,6 +226,80 @@ it('opens a built-in rule, prepares a custom override, and exports the selected 
   await textClick(view.host,'关闭详情');expect(view.host.querySelector('[data-rule-detail]')).toBeNull();
 });
 
+it('releases a private site-rule export URL when the anchor click throws',async()=>{
+  vi.useFakeTimers();
+  const view=await site();const nativeClick=dom.window.HTMLElement.prototype.click;
+  const anchor=vi.spyOn(dom.window.HTMLElement.prototype,'click').mockImplementation(function(this:HTMLElement){
+    if(this.tagName==='A')throw new Error('private transport detail');return nativeClick.call(this);
+  });
+  try {
+    await textClick(view.host,'导出已保存规则');
+    expect(URL.createObjectURL).toHaveBeenCalledOnce();expect(URL.revokeObjectURL).toHaveBeenCalledWith('blob:controlled-export');
+    expect(view.host.querySelector('[role="alert"]')?.textContent).toBe('siteAdaptation.exportFailed');
+    expect(view.host.textContent).not.toContain('private transport detail');expect(view.save).not.toHaveBeenCalled();
+    anchor.mockRestore();await textClick(view.host,'导出已保存规则');
+    expect(view.host.querySelector('[role="alert"]')).toBeNull();expect(URL.createObjectURL).toHaveBeenCalledTimes(2);
+    await vi.advanceTimersByTimeAsync(1000);expect(URL.revokeObjectURL).toHaveBeenCalledTimes(2);
+  } finally {anchor.mockRestore();vi.useRealTimers();}
+});
+
+it.each(['old-fails','new-fails'] as const)('keeps the newer export status under synchronous reentry: %s',async mode=>{
+  vi.useFakeTimers();const view=await site();const nativeClick=dom.window.HTMLElement.prototype.click;let nested=false;
+  vi.mocked(URL.createObjectURL).mockReturnValueOnce('blob:old').mockReturnValueOnce('blob:new');
+  const anchor=vi.spyOn(dom.window.HTMLElement.prototype,'click').mockImplementation(function(this:HTMLElement){
+    if(this.tagName!=='A')return nativeClick.call(this);
+    if(nested){if(mode==='new-fails')throw new Error('new');return;}
+    nested=true;button(view.host,'导出已保存规则').dispatchEvent(new dom.window.Event('click',{bubbles:true}));
+    if(mode==='old-fails')throw new Error('old');
+  });
+  try {
+    await textClick(view.host,'导出已保存规则');expect(URL.createObjectURL).toHaveBeenCalledTimes(2);
+    expect(view.host.querySelector('[role="alert"]')?.textContent ?? '').toBe(mode==='new-fails'?'siteAdaptation.exportFailed':'');
+    await vi.advanceTimersByTimeAsync(1000);expect(URL.revokeObjectURL).toHaveBeenCalledWith('blob:old');expect(URL.revokeObjectURL).toHaveBeenCalledWith('blob:new');
+  } finally {anchor.mockRestore();vi.useRealTimers();}
+});
+
+it('cleans the export URL without reporting a stale failure after synchronous unmount',async()=>{
+  const view=await site(),nativeClick=dom.window.HTMLElement.prototype.click;
+  const anchor=vi.spyOn(dom.window.HTMLElement.prototype,'click').mockImplementation(function(this:HTMLElement){
+    if(this.tagName==='A'){view.stop();throw new Error('late');}return nativeClick.call(this);
+  });
+  try {await textClick(view.host,'导出已保存规则');expect(URL.revokeObjectURL).toHaveBeenCalledWith('blob:controlled-export');expect(ports.errors).toEqual([]);}
+  finally {anchor.mockRestore();}
+});
+
+it('does not revive a stale export failure after synchronous KeepAlive deactivation',async()=>{
+  vi.useFakeTimers();const shown=Vue.ref(true), settings=Vue.reactive({enabled:true,disabledRuleIds:[],custom:{version:1,rules:[]}} as Settings);
+  const Other={render:()=>null};
+  const Shell=Vue.defineComponent({setup:()=>()=>Vue.h(Vue.KeepAlive,null,{default:()=>shown.value
+    ? Vue.h(SiteAdaptationSettings,{modelValue:settings,saveSettings:async()=>{}}) : Vue.h(Other,{key:'other'})})});
+  const view=await mount(Shell,{}),nativeClick=dom.window.HTMLElement.prototype.click;
+  const anchor=vi.spyOn(dom.window.HTMLElement.prototype,'click').mockImplementation(function(this:HTMLElement){
+    if(this.tagName==='A'){shown.value=false;throw new Error('late');}return nativeClick.call(this);
+  });
+  try {
+    await textClick(view.host,'导出已保存规则');expect(URL.revokeObjectURL).toHaveBeenCalledWith('blob:controlled-export');
+    shown.value=true;await settle();expect(view.host.querySelector('[role="alert"]')).toBeNull();
+    anchor.mockRestore();await textClick(view.host,'导出已保存规则');expect(URL.createObjectURL).toHaveBeenCalledTimes(2);
+    await vi.advanceTimersByTimeAsync(1000);expect(URL.revokeObjectURL).toHaveBeenCalledTimes(2);
+  } finally {anchor.mockRestore();vi.useRealTimers();}
+});
+
+it('does not revive a stale export failure after the parent hides the settings section',async()=>{
+  vi.useFakeTimers();const active=Vue.ref(true),settings=Vue.reactive({enabled:true,disabledRuleIds:[],custom:{version:1,rules:[]}} as Settings);
+  const Shell=Vue.defineComponent({setup:()=>()=>Vue.h(SiteAdaptationSettings,{active:active.value,modelValue:settings,saveSettings:async()=>{}})});
+  const view=await mount(Shell,{}),nativeClick=dom.window.HTMLElement.prototype.click;
+  const anchor=vi.spyOn(dom.window.HTMLElement.prototype,'click').mockImplementation(function(this:HTMLElement){
+    if(this.tagName==='A'){active.value=false;throw new Error('late');}return nativeClick.call(this);
+  });
+  try {
+    await textClick(view.host,'导出已保存规则');expect(URL.revokeObjectURL).toHaveBeenCalledWith('blob:controlled-export');
+    active.value=true;await settle();expect(view.host.querySelector('[role="alert"]')).toBeNull();
+    anchor.mockRestore();await textClick(view.host,'导出已保存规则');expect(URL.createObjectURL).toHaveBeenCalledTimes(2);
+    await vi.advanceTimersByTimeAsync(1000);expect(URL.revokeObjectURL).toHaveBeenCalledTimes(2);
+  } finally {anchor.mockRestore();vi.useRealTimers();}
+});
+
 it('round-trips advanced visual rule controls into the saved scope and preserves them when reopened',async()=>{
   const view=await site();await textClick(view.host,'新建规则');
   for(const [label,value] of [['规则名称','Scoped reading'],['匹配域名','example.test'],['匹配路径（可选）','/articles/*'],['规则标识','fixture-scoped-reading'],['排除路径（可选）','/articles/private/*'],['优先级','23'],['保留原文区域（可选）','code\n.math'],['排除扫描区域（可选）','nav\n.advertisement'],['忽略动态变化区域（可选）','.clock']])await input(view.host,`[aria-label="${label}"]`,value);

@@ -18,6 +18,39 @@ import {
 } from '@/src/core/translation/text';
 
 describe('translation snapshot mapping performance', () => {
+    it('大段纯空白不运行可能反复回溯的文本槽正则，可读文本仍保留精确空白', () => {
+        const {document} = parseHTML('<html><body><div id="root"></div></body></html>');
+        const root = document.querySelector('#root')! as HTMLElement;
+        const blank = ' \n\t\u00a0\ufeff'.repeat(2400);
+        root.append(document.createTextNode(blank));
+        root.append(document.createTextNode(' \u00a0Visible\u200b text\ufeff '));
+        const match = String.prototype.match;
+        let expensiveWhitespaceMatches = 0;
+        const spy = vi.spyOn(String.prototype, 'match').mockImplementation(function (this: string, pattern) {
+            if (String(this) === blank && pattern instanceof RegExp && pattern.source === '^(\\s*)([\\s\\S]*?\\S)(\\s*)$') expensiveWhitespaceMatches += 1;
+            return match.call(this, pattern);
+        });
+        try {
+            const slots = collectLiveTranslationTextSlots(root);
+            expect(slots).toHaveLength(1);
+            expect(slots[0]).toMatchObject({prefix: ' \u00a0', source: 'Visible\u200b text', suffix: '\ufeff '});
+            const snapshot = createTranslationSourceSnapshot(root);
+            expect(snapshot.slots).toHaveLength(1);
+            expect(snapshot.slots[0]).toMatchObject({prefix: ' \u00a0', source: 'Visible\u200b text', suffix: '\ufeff '});
+            expect(expensiveWhitespaceMatches).toBe(0);
+        } finally { spy.mockRestore(); }
+    });
+
+    it('空白预检边界仍保留长缩进、零宽字符和尾部空格', () => {
+        const {document} = parseHTML('<html><body><div id="root"></div></body></html>');
+        const root = document.querySelector('#root')! as HTMLElement;
+        for (const size of [63, 64, 65]) root.append(document.createTextNode(' '.repeat(size)));
+        root.append(document.createTextNode(`${' '.repeat(65)}Hello\u200b world\u00a0`));
+        const slots = collectLiveTranslationTextSlots(root);
+        expect(slots).toHaveLength(1);
+        expect(slots[0]).toMatchObject({prefix: ' '.repeat(65), source: 'Hello\u200b world', suffix: '\u00a0'});
+    });
+
     it('rebuilds translated slots with the original packet, including empty and whitespace values', () => {
         const literal = '___FLUENTREAD_literal_0_BEGIN___文字___FLUENTREAD_literal_0_END___';
         const packet = serializeTranslationSlots(['First', 'Second', 'Third'], 'fixed');

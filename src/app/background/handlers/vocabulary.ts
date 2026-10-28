@@ -14,11 +14,22 @@ export {createMaterialBackgroundHandler, type MaterialBackgroundContext} from '@
 
 import browser from 'webextension-polyfill';
 import type {Config} from '@/src/core/config/model';
-import type {VocabularyBookRepository} from '@/src/features/vocabulary/repository';
+import {vocabularyBookDb, type VocabularyBookRepository} from '@/src/features/vocabulary/repository';
+import {VocabularyPersistentUndo} from '@/src/features/vocabulary/background/persistentUndo';
+import {isTrustedSettingsSender} from './trustedSettingsSender';
 import {MaterialRepository} from '@/src/features/vocabulary/materialRepository';
 import {MATERIAL_CHANGED_MESSAGE} from '@/src/features/vocabulary/materialProtocol';
 import {createMaterialBackgroundHandler} from '@/src/features/vocabulary/materialBackground';
 import {isExtensionDisabledOnSite} from '@/src/core/site-rules/domain';
+
+/** 扩展后台拥有持久撤销，并限制仅设置页能读取或操作删除票据。 */
+export function createBrowserVocabularyUndoOptions() {
+    return {
+        vocabularyUndo: new VocabularyPersistentUndo(vocabularyBookDb),
+        isTrustedUndoSender: (sender: Parameters<typeof isTrustedSettingsSender>[0]) => browser.extension.inIncognitoContext !== true
+            && isTrustedSettingsSender(sender, browser.runtime.id, browser.runtime.getURL('options.html')),
+    };
+}
 
 /** 将本地材料端口绑定到扩展权限、已有收藏与隐私开关，保持总 runtime 注册函数紧凑。 */
 export function createBrowserMaterialHandler(dependencies: {

@@ -5,6 +5,9 @@
  * 模块边界：本文件是后台组合层，不实现注册筛选、到期算法、快照格式或缓存清理策略；具体行为分别留在相邻纯模块和 services/config。
  */
 import {installTranslationCacheCleanup} from './cacheCleanup';
+import {vocabularyBookDb} from '@/src/features/vocabulary/repository';
+import {VocabularyPersistentUndo} from '@/src/features/vocabulary/background/persistentUndo';
+import {installVocabularyUndoMaintenance} from '@/src/features/vocabulary/background/undoMaintenance';
 import {
     installConfigAutoBackupRuntime,
     type ConfigAutoBackupAlarmApi,
@@ -21,6 +24,7 @@ import {
 
 /** 把浏览器 alarm/storage 适配到可独立测试的后台维护任务。 */
 export function installBackgroundMaintenance(): void {
+    installVocabularyUndoMaintenance({alarms: browser.alarms, prune: () => new VocabularyPersistentUndo(vocabularyBookDb).pruneUndo(), warn: message => console.warn(message)});
     const scripting = (browser as unknown as {scripting?: RetiredContentScriptsPort}).scripting;
     if (scripting) {
         void unregisterRetiredContentScripts(scripting).catch((error) => {

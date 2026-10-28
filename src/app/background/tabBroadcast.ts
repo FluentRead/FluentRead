@@ -31,7 +31,7 @@ export interface TabBroadcastDependencies {
 type Invalidation = {type: string; key?: 'local:config'; reason?: VocabularyBookChangedMessage['reason']; entryId?: string};
 interface InvalidationOwner {message: Invalidation; sequence: number; signal?: AbortSignal; waiters: Array<() => void>}
 const VOCABULARY_REASONS = new Set<VocabularyBookChangedMessage['reason']>([
-    'upsert', 'note', 'review', 'manual-mastered', 'relearn', 'remove', 'clear', 'import',
+    'upsert', 'note', 'review', 'manual-mastered', 'relearn', 'remove', 'undo', 'clear', 'import',
 ]);
 function invalidationIntent(message: unknown): Invalidation {
     if (message && typeof message === 'object' && !Array.isArray(message)) {

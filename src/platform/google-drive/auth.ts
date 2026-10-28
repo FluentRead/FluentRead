@@ -11,7 +11,7 @@ import {GOOGLE_DRIVE_DEFAULT_CLIENT_ID, GOOGLE_DRIVE_EXTENSION_ID, GOOGLE_DRIVE_
 export interface DriveAccount {id: string; email: string}
 export interface DriveSession {
     account: DriveAccount;
-    request<T>(operation: (token: string) => Promise<T>): Promise<T>;
+    request<T>(operation: (token: string) => Promise<T>, signal?: AbortSignal): Promise<T>;
 }
 export interface DriveIdentity {
     getAuthToken(details: {interactive: boolean; enableGranularPermissions: boolean; scopes: string[]}): Promise<{token?: string; grantedScopes?: string[]}>;
@@ -29,6 +29,19 @@ export interface DriveAuthPorts {
 }
 
 export function createDriveAuth(ports: DriveAuthPorts) {
+    // Native identity cannot be cancelled. A late token must be cleared before
+    // another authorization can use the same browser cache.
+    const abandonedIdentities = new Set<Promise<void>>();
+    let abandonedCleanupFailed = false;
+    const waitForSignal = <T>(operation: Promise<T>, signal?: AbortSignal): Promise<T> => {
+        if (!signal) return operation;
+        return new Promise((resolve, reject) => {
+            const abort = () => {signal.removeEventListener('abort', abort); reject(signal.reason);};
+            signal.addEventListener('abort', abort, {once: true});
+            operation.then(value => {signal.removeEventListener('abort', abort); resolve(value);}, error => {signal.removeEventListener('abort', abort); reject(error);});
+            if (signal.aborted) abort();
+        });
+    };
     function availability(): {available: boolean; reason: string} {
         const oauth = ports.runtime.getManifest().oauth2;
         if (!/\bChrome\//u.test(ports.userAgent()) || /\b(?:Edg|OPR)\//u.test(ports.userAgent()) || !ports.identity?.getAuthToken || !oauth?.client_id) return {available: false, reason: 'Google Drive 同步目前支持 Chrome 扩展；其他浏览器可使用下方完整数据备份。'};
@@ -36,18 +49,57 @@ export function createDriveAuth(ports: DriveAuthPorts) {
         if (!GOOGLE_DRIVE_SCOPES.every(scope => oauth.scopes?.includes(scope))) return {available: false, reason: '扩展缺少 Google Drive 应用数据授权范围，请重新构建。'};
         return {available: true, reason: ''};
     }
-    async function token(interactive: boolean): Promise<string> {
+    async function token(interactive: boolean, signal?: AbortSignal): Promise<string> {
         const state = availability();
         if (!state.available) throw new DriveError(state.reason);
+        if (abandonedIdentities.size || abandonedCleanupFailed) throw new DriveError('上次 Google 授权仍在结束，请稍后重试。');
+        signal?.throwIfAborted();
+        const request = Promise.resolve().then(() => {
+            signal?.throwIfAborted();
+            return ports.identity!.getAuthToken({interactive, enableGranularPermissions: true, scopes: [...GOOGLE_DRIVE_SCOPES]});
+        });
         let result: Awaited<ReturnType<DriveIdentity['getAuthToken']>>;
-        try {result = await ports.identity!.getAuthToken({interactive, enableGranularPermissions: true, scopes: [...GOOGLE_DRIVE_SCOPES]});}
-        catch {throw new DriveError('Google 授权未完成，请点击同步按钮后重试。');}
+        const quarantine = () => {
+            const cleanup = request.then(async late => {if (late.token) await ports.identity!.removeCachedAuthToken({token: late.token});}, () => undefined)
+                .catch(() => {abandonedCleanupFailed = true;});
+            abandonedIdentities.add(cleanup);
+            void cleanup.then(() => {abandonedIdentities.delete(cleanup);});
+        };
+        const abort = () => {quarantine();};
+        signal?.addEventListener('abort', abort, {once: true});
+        try {
+            result = await waitForSignal(request, signal);
+            signal?.throwIfAborted();
+        } catch (error) {
+            if (signal?.aborted) throw signal.reason;
+            throw new DriveError('Google 授权未完成，请点击同步按钮后重试。');
+        } finally {signal?.removeEventListener('abort', abort);}
         if (!result.token) throw new DriveError('Google 未返回有效授权，请点击同步按钮重试。');
         if (result.grantedScopes && !result.grantedScopes.includes(GOOGLE_DRIVE_SCOPES[0])) throw new DriveError('未允许 Google Drive 配置数据权限，请重新同步并在 Google 授权页面允许访问配置数据。');
         return result.token;
     }
-    async function account(accessToken: string): Promise<DriveAccount> {
+    async function evictToken(accessToken: string, signal?: AbortSignal): Promise<void> {
+        signal?.throwIfAborted();
+        const operation = Promise.resolve().then(() => {
+            signal?.throwIfAborted();
+            return ports.identity!.removeCachedAuthToken({token: accessToken});
+        });
+        const abort = () => {
+            const cleanup = operation.catch(() => {abandonedCleanupFailed = true;});
+            abandonedIdentities.add(cleanup);
+            void cleanup.then(() => {abandonedIdentities.delete(cleanup);});
+        };
+        signal?.addEventListener('abort', abort, {once: true});
+        try {
+            await waitForSignal(operation, signal);
+            signal?.throwIfAborted();
+        } finally {signal?.removeEventListener('abort', abort);}
+    }
+    async function account(accessToken: string, signal?: AbortSignal): Promise<DriveAccount> {
+        signal?.throwIfAborted();
         const controller = new AbortController();
+        const abort = () => controller.abort(signal?.reason);
+        signal?.addEventListener('abort', abort, {once: true});
         const timer = setTimeout(() => controller.abort(), 30_000);
         const operation = (async () => {
             let response: Response | undefined;
@@ -63,29 +115,33 @@ export function createDriveAuth(ports: DriveAuthPorts) {
                 if (response) cancelUnreadResponseBody(response);
             }
         })();
-        return operation.catch(error => {
+        return waitForSignal(operation, signal).catch(error => {
+            if (signal?.aborted) throw signal.reason;
             if (error instanceof DriveError) throw error;
             throw new DriveError('无法读取 Google 账号，请检查网络后重试。');
-        }).finally(() => clearTimeout(timer));
+        }).finally(() => {clearTimeout(timer); signal?.removeEventListener('abort', abort);});
     }
-    async function open(interactive = false): Promise<DriveSession> {
-        let accessToken = await token(interactive);
+    async function open(interactive = false, signal?: AbortSignal): Promise<DriveSession> {
+        let accessToken = await token(interactive, signal);
         let owner: DriveAccount;
-        try {owner = await account(accessToken);} catch (error) {
+        try {owner = await account(accessToken, signal);} catch (error) {
+            signal?.throwIfAborted();
             if (!(error instanceof DriveError) || error.status !== 401) throw error;
-            await ports.identity!.removeCachedAuthToken({token: accessToken});
-            accessToken = await token(false);
-            owner = await account(accessToken);
+            await evictToken(accessToken, signal);
+            accessToken = await token(false, signal);
+            owner = await account(accessToken, signal);
         }
         return {
             account: owner,
-            async request(operation) {
+            async request(operation, requestSignal) {
+                requestSignal?.throwIfAborted();
                 const requestToken = accessToken;
                 try {return await operation(requestToken);} catch (error) {
+                    requestSignal?.throwIfAborted();
                     if (!(error instanceof DriveError) || error.status !== 401) throw error;
-                    await ports.identity!.removeCachedAuthToken({token: requestToken});
-                    const refreshedToken = await token(false);
-                    const refreshed = await account(refreshedToken);
+                    await evictToken(requestToken, requestSignal);
+                    const refreshedToken = await token(false, requestSignal);
+                    const refreshed = await account(refreshedToken, requestSignal);
                     if (refreshed.id !== owner.id) throw new DriveError('Google 账号已切换，请重新生成同步预览。');
                     // 只有验证属于本会话账号的令牌才可成为后续请求的凭据。
                     accessToken = refreshedToken;
@@ -95,7 +151,10 @@ export function createDriveAuth(ports: DriveAuthPorts) {
         };
     }
     async function disconnect() {
-        if (ports.identity) await ports.identity.clearAllCachedAuthTokens();
+        if (ports.identity) {
+            await ports.identity.clearAllCachedAuthTokens();
+            if (!abandonedIdentities.size) abandonedCleanupFailed = false;
+        }
     }
     return {availability, open, disconnect};
 }

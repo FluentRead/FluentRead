@@ -9,6 +9,7 @@ import {afterEach, beforeEach, describe, expect, it, vi} from 'vitest';
 import {createNativePdfSelectionAdapter, mountNativePdfSelectionApp, parseNativePdfSelectionPayload, readNativePdfSelectionToken,
     type NativePdfSelectionPageDependencies} from '@/src/app/selection/page';
 import {observeNativePdfSelectionCard} from '@/src/app/selection/cardVisibility';
+import {createNativePdfSelectionBridge, NATIVE_PDF_SELECTION_TTL_MS} from '@/src/features/selection-translation/background/nativePdfSelection';
 
 const ports = vi.hoisted(() => ({createApp: vi.fn(), plugin: vi.fn(), sendMessage: vi.fn(), translate: vi.fn(), subscribeConfig: vi.fn(),
     config: {on: true, disableSelectionTranslator: false, selectionTranslatorMode: 'bilingual', disabledExtensionDomains: [] as string[]}}));
@@ -56,6 +57,21 @@ function fixture(hash = `#token=${token}`, selected = true) {
 }
 
 describe('原生 PDF 选区交接验证', () => {
+    it('后台主动过期后结果页显示重新选择提示并保留用户关闭入口', async () => {
+        vi.useFakeTimers();
+        try {
+            let now = 0;const key = 'a'.repeat(32), url = 'chrome-extension://test/selection.html';
+            const bridge = createNativePdfSelectionBridge({extensionId:'test', resultUrl:url, now:() => now, wallNow:() => now,
+                randomToken:() => key, openWindow:async () => ({id:12,tabs:[{id:21}]})});
+            expect(await bridge.open(payload)).toBe(true);now += NATIVE_PDF_SELECTION_TTL_MS;
+            await vi.advanceTimersByTimeAsync(NATIVE_PDF_SELECTION_TTL_MS);
+            const f = fixture(`#token=${key}`);
+            f.dependencies.claim = requested => bridge.claim(requested, {id:'test',url,frameId:0,tab:{id:21,windowId:12}});
+            await f.start().ready;
+            expect(f.document.querySelector('[role="status"]')!.textContent).toBe('选区已失效，请返回 PDF 重新选中文字并右键翻译。');
+            expect(f.dependencies.mountCard).not.toHaveBeenCalled();f.document.querySelector('button')!.click();expect(f.dependencies.close).toHaveBeenCalledOnce();
+        } finally {vi.useRealTimers();}
+    });
     it('只读取随机令牌，不把原文放进 URL', () => {
         expect(readNativePdfSelectionToken(`#token=${token}`)).toBe(token);
         expect(readNativePdfSelectionToken(`#${token}`)).toBe(token);

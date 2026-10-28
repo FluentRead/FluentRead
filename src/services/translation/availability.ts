@@ -1,7 +1,7 @@
 /**
  * @file src/services/translation/availability.ts
  * 文件职责：把全局翻译开关接入共享翻译入口，关闭时拒绝新请求并取消所有在途请求。
- * 主要内容：在等待前复制请求字段与可编辑数组，等待配置水合、订阅启停状态、合并调用者取消信号，按启用代次隔离请求所有权，保留消息上的内部快照与预算。
+ * 主要内容：在等待前复制请求字段与可编辑数组，等待配置水合、订阅启停状态、合并调用者取消信号，按启用代次隔离请求所有权，保留消息上的内部快照与预算；水合失败在无请求时记录不含配置的诊断，后续请求仍收到原始错误。
  * 模块边界：只组合注入的配置和翻译端口，不访问浏览器、不改写用户设置，也不清除已完成译文或缓存。
  */
 import type {TranslationBroker, TranslationRequestMessage} from './types';
@@ -40,6 +40,11 @@ export function createTranslationAvailability(deps: AvailabilityDependencies) {
     const ready = deps.ready.then(() => {
         deps.subscribe(apply);
         apply(deps.getConfig());
+    });
+    // 启动时可能还没有翻译请求监听 ready；记录不含配置的诊断，保留原拒绝供后续调用者读取。
+    void ready.catch(() => {
+        try {console.error('[FluentRead] translation availability initialization failed; check configuration storage.');}
+        catch { /* 诊断端口失效不再派生未处理拒绝。 */ }
     });
 
     async function translateWithCache(message: TranslationRequestMessage): Promise<string | string[]> {

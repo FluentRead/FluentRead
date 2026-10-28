@@ -97,7 +97,8 @@ import {useUiI18n} from '@/src/ui/i18n';
 import WritingStyleEditor from './WritingStyleEditor.vue';
 import WritingLanguagePicker from './WritingLanguagePicker.vue';
 import {config as initialConfig, subscribeConfig, requestConfigPatch} from '@/src/services/config/store';
-import {options} from '@/src/core/config/catalog';
+import {options, services} from '@/src/core/config/catalog';
+import {isModelThinkingEnabled} from '@/src/core/config/modelThinking';
 import {resolveWritingReadiness} from '@/src/core/config/writingReadiness';
 import {getTranslationServiceUnavailableMessage} from '@/src/services/translation/capabilities';
 import {WRITING_LANGUAGES, WRITING_LENGTHS, WRITING_TONES, resolveWritingLanguage, resolveWritingReferenceLanguage, type WritingPreferences, type WritingIntent} from '@/src/core/config/writing';
@@ -168,14 +169,19 @@ function handleInsertKeydown(event: KeyboardEvent) {
   const index = items.indexOf(current as HTMLButtonElement); items[(index + (event.key === 'ArrowDown' ? 1 : -1) + items.length) % items.length]?.focus();
 }
 const referenceOwner = ref(0);
-watch(() => JSON.stringify([service.value, configuredModel.value, config.value.proxy, config.value.token, config.value.customOpenAIProviders]), () => { referenceOwner.value++; });
+const referenceOwnerKey = () => JSON.stringify([service.value, configuredModel.value, config.value.proxy, config.value.token, config.value.customOpenAIProviders,
+  service.value === services.deepseek && isModelThinkingEnabled(config.value.modelThinking, service.value, configuredModel.value)]);
+let observedReferenceOwnerKey = referenceOwnerKey();
+watch(referenceOwnerKey, value => {observedReferenceOwnerKey = value; referenceOwner.value++; });
+const referenceSnapshot = () => ({session: props.sessionKey ?? 0, source: result.value, sourceLanguage: resultLanguage.value, language: referenceLanguage.value, owner: referenceOwner.value,
+  active: props.active && !busy.value && !saving.value && !versions.value[versionIndex.value]?.incomplete && view.value !== 'edit' && view.value !== 'reference-language' && config.value.on && config.value.writing.enabled && readiness.value.ready});
 const referenceController = createWritingReference({
   changed: state => { referenceState.value = state; },
+  canRecover: snapshot => referenceOwnerKey() === observedReferenceOwnerKey && JSON.stringify(referenceSnapshot()) === JSON.stringify(snapshot),
   stream: (source, target, handlers) => streamWriting({type: 'fluentReadWriting', action: 'run', requestId: `writing-reference-${crypto.randomUUID()}`, intent: 'translate', instruction: '', draft: source, context: '', language: target, tone: 'natural', length: 'standard', style: 'auto', role: 'auto', history: []}, handlers),
 });
 watch(() => [props.active, props.sessionKey, result.value, resultLanguage.value, referenceLanguage.value, referenceOwner.value, busy.value, saving.value, view.value, config.value.on, config.value.writing.enabled, readiness.value.ready, versions.value[versionIndex.value]?.incomplete], () => {
-  referenceController.update({session: props.sessionKey ?? 0, source: result.value, sourceLanguage: resultLanguage.value, language: referenceLanguage.value, owner: referenceOwner.value,
-    active: props.active && !busy.value && !saving.value && !versions.value[versionIndex.value]?.incomplete && view.value !== 'edit' && view.value !== 'reference-language' && config.value.on && config.value.writing.enabled && readiness.value.ready});
+  referenceController.update(referenceSnapshot());
 }, {immediate: true});
 onBeforeUnmount(() => referenceController.dispose());
 let generation = 0; let cancel: (() => void) | undefined;

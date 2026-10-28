@@ -806,3 +806,41 @@ describe('Google owner-local native array transport', () => {
         expect(vi.getTimerCount()).toBe(0);
     });
 });
+
+it('Google 错误正文以流式方式检查完整内容，不把大错误体整段转为字符串', async () => {
+    const encoder = new TextEncoder();
+    const prefix = encoder.encode('x'.repeat(65536));
+    let reads = 0;
+    const stream = new ReadableStream<Uint8Array>({pull(controller) {
+        reads++;
+        if (reads <= 64) controller.enqueue(prefix);
+        else if (reads === 65) controller.enqueue(encoder.encode('"xs'));
+        else if (reads === 66) controller.enqueue(encoder.encode('rf"'));
+        else controller.close();
+    }});
+    const rejected = new Response(stream, {status: 400});
+    const text = vi.spyOn(rejected, 'text');
+    fetchMock.mockResolvedValueOnce(rejected).mockResolvedValueOnce(response(['后备译文']));
+    await expect(flush(api.translateGoogleText('Source', 'en', 'zh'))).resolves.toBe('后备译文');
+    expect(reads).toBe(67); expect(text).not.toHaveBeenCalled();
+    expect(hosts()).toEqual([HTML, LIST]);
+});
+
+it.each(['close', 'error'] as const)('Google 错误流 owner 已取消时仍持槽直到真实 %s', async outcome => {
+    let body!: ReadableStreamDefaultController<Uint8Array>;
+    const rejected = new Response(new ReadableStream<Uint8Array>({start(controller) {body = controller;}}), {status: 500});
+    fetchMock.mockResolvedValueOnce(rejected)
+        .mockImplementation(async (url, init) => successfulResponse(url, requestData(url, init).texts.map(() => '下一条译文')));
+    const {start} = await scheduledGoogle(); const owner = new AbortController();
+    const first = start('Slow error body', owner.signal).catch(error => error);
+    await vi.advanceTimersByTimeAsync(120); expect(rejected.body?.locked).toBe(true);
+    owner.abort(); await expect(first).resolves.toMatchObject({name: 'AbortError'});
+    const next = start('Next request');
+    try {await vi.advanceTimersByTimeAsync(200); expect(fetchMock).toHaveBeenCalledOnce();}
+    finally {
+        if (outcome === 'close') {body.enqueue(new TextEncoder().encode('late error')); body.close();}
+        else body.error(new Error('late stream error'));
+        await vi.advanceTimersByTimeAsync(200); await expect(next).resolves.toBe('下一条译文');
+    }
+    expect(fetchMock).toHaveBeenCalledTimes(2); expect(vi.getTimerCount()).toBe(0);
+});

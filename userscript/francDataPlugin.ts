@@ -9,7 +9,7 @@ import {readFileSync, realpathSync} from 'node:fs';
 import {createRequire} from 'node:module';
 import {dirname, resolve} from 'node:path';
 import {gzipUserscriptBuildData} from './buildGzip';
-import {encodeUserscriptData} from './buildDataEncoding';
+import {encodeUserscriptDataCompact} from './buildDataEncoding';
 import ts from 'typescript';
 import {normalizePath, type Plugin} from 'vite';
 
@@ -73,7 +73,7 @@ export function createUserscriptFrancDataCompressionPlugin(root: string, enabled
             if (JSON.stringify(Object.keys(data)) !== JSON.stringify(['Latin', 'Cyrillic', 'Arabic', 'Devanagari'])
                 || Object.values(data).reduce((count, models) => count + Object.keys(models).length, 0) !== 66) throw unsupported();
             const bytes = gzipUserscriptBuildData(Buffer.from(JSON.stringify(data)));
-            const compressed = compact ? encodeUserscriptData(bytes) : bytes.toString('base64');
+            const compressed = compact ? encodeUserscriptDataCompact(bytes) : bytes.toString('base64');
             const digest = createHash('sha256').update(code).digest('hex');
             return {
                 code: [

@@ -45,7 +45,7 @@ import {installEmbeddedTopFrameBridge} from './embeddedFrameRuntime';
 import {browserCapabilities, type BrowserCapabilities} from '@/src/platform/browser/capabilities';
 import {setMainWorldBridgesEnabled} from './mainWorldBridgeLifecycle';
 import {
-    createContentPageAvailabilityRuntime,
+    createContentPageAvailabilityRuntime, reconcileCurrentContentPage,
     createContentRouteChangeHandler,
     type ContentPageAvailabilityRuntime,
 } from './pageAvailability';
@@ -228,10 +228,10 @@ export async function startContentApp(ctx: ContentScriptContext,
         applySiteDisabledState, pageAvailability,
         reconcileFeatures: () => { void activePageFeatureRegistry?.reconcileEnabled(); },
     }), {signal: pageEventController.signal});
-
     const runtimeMessageListener: ContentRuntimeMessageHandler = createContentRuntimeMessageHandler(ctx, {
         ...(import.meta.env.BROWSER === 'userscript' ? {} : {pageTranslationFont}), isSiteDisabled: () => currentPageSiteDisabled, updateSiteDisabled: applySiteDisabledState,
-        isPageSuspended: pageLifecycle.isSuspended, ...(import.meta.env.BROWSER === 'userscript' ? {} : {informationHighlight}),
+        isPageSuspended: pageLifecycle.isSuspended, ...(import.meta.env.BROWSER === 'userscript' ? {reconcileUserscriptPage: () => reconcileCurrentContentPage(
+            () => pageAvailability!.reconcile(), () => activePageFeatureRegistry, () => !cleanedUp && !ctx.isInvalid && !pageLifecycle.isSuspended() && !currentPageSiteDisabled, () => config.on)} : {informationHighlight}),
     }, capabilities);
     cleanup = (): void => {
         if (cleanedUp) return;

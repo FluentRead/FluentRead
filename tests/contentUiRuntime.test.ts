@@ -3,9 +3,12 @@ import {parseHTML} from 'linkedom';
 
 const mocks = vi.hoisted(() => ({
   subscribeMangaTranslation: vi.fn(),
+  showPageNotice: vi.fn(),
+  dismissPageNotice: vi.fn(),
   openMangaEntry: vi.fn(),
   unsubscribeMangaTranslation: vi.fn(),
   config: {
+    on: true,
     disableFloatingBall: false,
     floatingBallPosition: '' as '' | 'left' | 'right',
     floatingBallVerticalPosition: null as number | null,
@@ -23,6 +26,7 @@ const mocks = vi.hoisted(() => ({
   togglePopup: vi.fn(),
   closePopup: vi.fn(),
   requestConfigPatch: vi.fn(),
+  getURL: vi.fn(),
   subscribeConfig: vi.fn(),
   unsubscribeConfig: vi.fn(),
   sendMessage: vi.fn(),
@@ -46,7 +50,7 @@ vi.mock('@/src/platform/shadow-ui', () => ({createVueShadowUi: mocks.createVueSh
 vi.mock('webextension-polyfill', () => ({
   default: {
     runtime: {
-      getURL: (path: string) => `chrome-extension://fixture${path}`,
+      getURL: mocks.getURL,
       sendMessage: mocks.sendMessage,
     },
   },
@@ -60,6 +64,7 @@ vi.mock('@/src/features/full-page-translation/public', () => ({
   subscribeFullPageTranslationProgress: mocks.subscribeFullPageTranslationProgress,
 }));
 vi.mock('@/src/features/image-translation/public', () => ({subscribeMangaTranslation: mocks.subscribeMangaTranslation, openMangaEntry: mocks.openMangaEntry}));
+vi.mock('@/src/features/page-notice/public', () => ({showPageNotice:mocks.showPageNotice,dismissPageNotice:mocks.dismissPageNotice}));
 vi.mock('@/src/features/floating-ball/ui/FloatingBall.vue', () => ({default: {name: 'FloatingBall'}}));
 vi.mock('@/src/features/full-page-translation/ui/TranslationProgressPanel.vue', () => ({
   default: {name: 'TranslationProgressPanel'},
@@ -83,13 +88,16 @@ function ui(instance: unknown = {mounted: true}): MockUi {
   };
 }
 
-function pendingUi(): {promise: Promise<MockUi>; resolve: (value: MockUi) => void} {
+function pendingUi(): {promise: Promise<MockUi>; resolve: (value: MockUi) => void; reject: (error: unknown) => void} {
   let resolve!: (value: MockUi) => void;
+  let reject!: (error: unknown) => void;
   return {
-    promise: new Promise<MockUi>((done) => {
+    promise: new Promise<MockUi>((done, fail) => {
       resolve = done;
+      reject = fail;
     }),
     resolve,
+    reject,
   };
 }
 
@@ -102,6 +110,7 @@ beforeEach(() => {
   vi.stubGlobal('HTMLElement', parsed.window.HTMLElement);
   vi.resetModules();
   Object.assign(mocks.config, {
+    on: true,
     disableFloatingBall: false,
     floatingBallPosition: '',
     floatingBallVerticalPosition: null,
@@ -116,6 +125,8 @@ beforeEach(() => {
   });
   for (const mock of [
     mocks.subscribeMangaTranslation,
+    mocks.showPageNotice,
+    mocks.dismissPageNotice,
     mocks.openMangaEntry,
     mocks.unsubscribeMangaTranslation,
     mocks.createVueShadowUi,
@@ -123,6 +134,7 @@ beforeEach(() => {
     mocks.togglePopup,
     mocks.closePopup,
     mocks.requestConfigPatch,
+    mocks.getURL,
     mocks.sendMessage,
     mocks.autoTranslateEnglishPage,
     mocks.isFullPageTranslationActive,
@@ -140,6 +152,7 @@ beforeEach(() => {
   });
   mocks.subscribeMangaTranslation.mockImplementation(listener => {listener({available: false, active: false, pending: false, errors: 0}); return mocks.unsubscribeMangaTranslation;});
   mocks.sendMessage.mockResolvedValue({success: true});
+  mocks.getURL.mockImplementation((path:string)=>`chrome-extension://fixture${path}`);
   mocks.autoTranslateEnglishPage.mockResolvedValue(undefined);
   mocks.isFullPageTranslationActive.mockReturnValue(false);
   mocks.getTranslationToolbarStatus.mockReturnValue('idle');
@@ -490,6 +503,198 @@ describe('悬浮球 content runtime', () => {
     expect(staleUi.remove).toHaveBeenCalledOnce();
   });
 
+  it.each(['old-first','new-first'] as const)('reopens after enable-disable-enable while mounts resolve %s', async order => {
+    const first=pendingUi(),second=pendingUi();const stale=ui(),live=ui({toggleTranslation:vi.fn()});
+    const stopOld=vi.fn(),stopNew=vi.fn();mocks.subscribeMangaTranslation.mockReturnValueOnce(stopOld).mockReturnValueOnce(stopNew);
+    mocks.createVueShadowUi.mockReturnValueOnce(first.promise).mockReturnValueOnce(second.promise);
+    const runtime=await import('@/src/features/floating-ball/content/runtime');
+    vi.doMock('@/src/app/content/features',()=>({mountFloatingBall:runtime.mountFloatingBall,unmountFloatingBall:runtime.unmountFloatingBall}));
+    const {createContentRuntimeMessageHandler}=await import('@/src/app/content/messageRuntime');
+    const handler=createContentRuntimeMessageHandler({} as never,{isSiteDisabled:()=>false,updateSiteDisabled:async()=>undefined} as never);
+    try {
+      const respond=vi.fn();
+      handler({type:'toggleFloatingBall',isEnabled:true},{},respond);
+      handler({type:'toggleFloatingBall',isEnabled:false},{},respond);
+      handler({type:'toggleFloatingBall',isEnabled:true},{},respond);
+      expect(mocks.createVueShadowUi).toHaveBeenCalledTimes(2);expect(stopOld).toHaveBeenCalledOnce();
+      const current=runtime.mountFloatingBall();
+      if(order==='old-first') {
+        first.resolve(stale);await vi.waitFor(()=>expect(stale.remove).toHaveBeenCalledOnce());
+        expect(runtime.mountFloatingBall()).toBe(current);second.resolve(live);await current;
+      } else {
+        second.resolve(live);await current;first.resolve(stale);
+        await vi.waitFor(()=>expect(stale.remove).toHaveBeenCalledOnce());
+      }
+      expect(runtime.toggleFloatingBallTranslation()).toBe(true);expect(live.remove).not.toHaveBeenCalled();
+      expect(stopOld).toHaveBeenCalledOnce();expect(stopNew).not.toHaveBeenCalled();
+    } finally {runtime.unmountFloatingBall();vi.doUnmock('@/src/app/content/features');}
+    expect(stopNew).toHaveBeenCalledOnce();
+  });
+
+  it('keeps the current mount owned when a canceled earlier mount fails late', async () => {
+    const first=pendingUi(),second=pendingUi();const live=ui({toggleTranslation:vi.fn()});
+    mocks.createVueShadowUi.mockReturnValueOnce(first.promise).mockReturnValueOnce(second.promise);
+    const consoleError=vi.spyOn(console,'error').mockImplementation(()=>undefined);
+    const runtime=await import('@/src/features/floating-ball/content/runtime');
+    try {
+      const old=runtime.mountFloatingBall({} as never);runtime.unmountFloatingBall();const current=runtime.mountFloatingBall();
+      first.reject(new Error('old mount failed'));await expect(old).resolves.toBeNull();
+      expect(consoleError).toHaveBeenCalledWith('[FluentRead] 悬浮球挂载失败',expect.any(Error));
+      expect(runtime.mountFloatingBall()).toBe(current);second.resolve(live);await current;
+      expect(runtime.toggleFloatingBallTranslation()).toBe(true);expect(live.remove).not.toHaveBeenCalled();
+    } finally {runtime.unmountFloatingBall();consoleError.mockRestore();}
+  });
+
+  it('does not let a synchronously reentered old creation replace the newer mount promise', async () => {
+    const first=pendingUi(),second=pendingUi();const stale=ui(),live=ui({toggleTranslation:vi.fn()});
+    const runtime=await import('@/src/features/floating-ball/content/runtime');const ctx={} as never;
+    let newer:ReturnType<typeof runtime.mountFloatingBall>;
+    mocks.createVueShadowUi.mockImplementationOnce(()=>{runtime.unmountFloatingBall();newer=runtime.mountFloatingBall(ctx);return first.promise;})
+      .mockReturnValueOnce(second.promise);
+    const older=runtime.mountFloatingBall(ctx);
+    expect(mocks.createVueShadowUi).toHaveBeenCalledTimes(2);expect(runtime.mountFloatingBall()).toBe(newer!);
+    first.resolve(stale);await older;expect(stale.remove).toHaveBeenCalledOnce();expect(runtime.mountFloatingBall()).toBe(newer!);
+    second.resolve(live);await newer!;expect(runtime.toggleFloatingBallTranslation()).toBe(true);runtime.unmountFloatingBall();
+  });
+
+  it('bounds synchronously reentered creation and resumes the latest intent when a slot frees', async () => {
+    const first=pendingUi(),second=pendingUi(),third=pendingUi();
+    const runtime=await import('@/src/features/floating-ball/content/runtime');const ctx={} as never;
+    const reenter=(pending:ReturnType<typeof pendingUi>)=>{runtime.unmountFloatingBall();runtime.mountFloatingBall(ctx);return pending.promise;};
+    mocks.createVueShadowUi.mockImplementationOnce(()=>reenter(first)).mockImplementationOnce(()=>reenter(second)).mockReturnValueOnce(third.promise);
+    const older=runtime.mountFloatingBall(ctx);expect(mocks.createVueShadowUi).toHaveBeenCalledTimes(2);
+    expect(mocks.showPageNotice).toHaveBeenCalledOnce();const stale=ui();first.resolve(stale);await older;
+    await vi.waitFor(()=>expect(mocks.createVueShadowUi).toHaveBeenCalledTimes(3));
+    const live=ui({toggleTranslation:vi.fn()});third.resolve(live);await vi.waitFor(()=>expect(runtime.toggleFloatingBallTranslation()).toBe(true));
+    const other=ui();second.resolve(other);await vi.waitFor(()=>expect(other.remove).toHaveBeenCalledOnce());runtime.unmountFloatingBall();
+  });
+
+  it.each(['getURL','create'] as const)('cleans synchronous %s failures without consuming mount slots', async failure => {
+    const stopFirst=vi.fn(),stopSecond=vi.fn(),stopLive=vi.fn();
+    mocks.subscribeMangaTranslation.mockReturnValueOnce(stopFirst).mockReturnValueOnce(stopSecond).mockReturnValueOnce(stopLive);
+    const error=new Error('context unavailable');
+    if(failure==='getURL')mocks.getURL.mockImplementationOnce(()=>{throw error;}).mockImplementationOnce(()=>{throw error;});
+    else mocks.createVueShadowUi.mockImplementationOnce(()=>{throw error;}).mockImplementationOnce(()=>{throw error;});
+    const live=ui({toggleTranslation:vi.fn()});mocks.createVueShadowUi.mockResolvedValue(live);
+    const consoleError=vi.spyOn(console,'error').mockImplementation(()=>undefined);
+    const runtime=await import('@/src/features/floating-ball/content/runtime');
+    try {
+      await expect(runtime.mountFloatingBall({} as never)).resolves.toBeNull();
+      await expect(runtime.mountFloatingBall()).resolves.toBeNull();
+      expect(stopFirst).toHaveBeenCalledOnce();expect(stopSecond).toHaveBeenCalledOnce();
+      await runtime.mountFloatingBall();expect(runtime.toggleFloatingBallTranslation()).toBe(true);
+      expect(mocks.showPageNotice).not.toHaveBeenCalled();expect(consoleError).toHaveBeenCalledTimes(2);
+    } finally {runtime.unmountFloatingBall();consoleError.mockRestore();}
+    expect(stopLive).toHaveBeenCalledOnce();
+  });
+
+  it('bounds hung WXT creations during rapid toggles and retries only the latest enabled request', async () => {
+    const first=pendingUi(),second=pendingUi(),third=pendingUi();
+    mocks.createVueShadowUi.mockReturnValueOnce(first.promise).mockReturnValueOnce(second.promise).mockReturnValueOnce(third.promise);
+    const runtime=await import('@/src/features/floating-ball/content/runtime');
+    const ctx={} as never;
+    for(let i=0;i<100;i++) {mocks.config.disableFloatingBall=false;runtime.mountFloatingBall(ctx);mocks.config.disableFloatingBall=true;runtime.unmountFloatingBall();}
+    mocks.showPageNotice.mockClear();mocks.config.disableFloatingBall=false;runtime.mountFloatingBall(ctx);runtime.mountFloatingBall(ctx);
+    expect(mocks.createVueShadowUi).toHaveBeenCalledTimes(2);
+    expect(mocks.showPageNotice).toHaveBeenCalledOnce();
+    expect(mocks.showPageNotice).toHaveBeenCalledWith(expect.stringContaining('刷新'), 'error', expect.objectContaining({key:'floating-ball-mount-wait'}));
+    const staleFirst=ui(),staleSecond=ui(),live=ui({toggleTranslation:vi.fn()});
+    first.resolve(staleFirst);await vi.waitFor(()=>expect(mocks.createVueShadowUi).toHaveBeenCalledTimes(3));
+    third.resolve(live);await vi.waitFor(()=>expect(runtime.toggleFloatingBallTranslation()).toBe(true));
+    expect(mocks.dismissPageNotice).toHaveBeenCalledWith('floating-ball-mount-wait');
+    second.resolve(staleSecond);await vi.waitFor(()=>expect(staleSecond.remove).toHaveBeenCalledOnce());
+    expect(staleFirst.remove).toHaveBeenCalledOnce();expect(live.remove).not.toHaveBeenCalled();runtime.unmountFloatingBall();
+  });
+
+  it.each(['show','listen'] as const)('keeps the pending retry and logs an error when the notice %s fails', async failure => {
+    const first=pendingUi(),second=pendingUi(),third=pendingUi();
+    mocks.createVueShadowUi.mockReturnValueOnce(first.promise).mockReturnValueOnce(second.promise).mockReturnValueOnce(third.promise);
+    const consoleError=vi.spyOn(console,'error').mockImplementation(()=>undefined);
+    const runtime=await import('@/src/features/floating-ball/content/runtime');const ctx={} as never;
+    try {
+      runtime.mountFloatingBall(ctx);runtime.unmountFloatingBall();runtime.mountFloatingBall(ctx);runtime.unmountFloatingBall();
+      if(failure==='show')mocks.showPageNotice.mockImplementationOnce(()=>{throw new Error('notice unavailable');});
+      else {Object.defineProperty(document,'visibilityState',{configurable:true,value:'hidden'});vi.spyOn(document,'addEventListener').mockImplementationOnce(()=>{throw new Error('listener unavailable');});}
+      runtime.mountFloatingBall(ctx);
+      expect(consoleError).toHaveBeenCalledWith('[FluentRead] 悬浮球恢复提示失败',expect.any(Error));
+      const stale=ui(),live=ui({toggleTranslation:vi.fn()});first.resolve(stale);
+      await vi.waitFor(()=>expect(mocks.createVueShadowUi).toHaveBeenCalledTimes(3));third.resolve(live);
+      await vi.waitFor(()=>expect(runtime.toggleFloatingBallTranslation()).toBe(true));
+      const old=ui();second.resolve(old);await vi.waitFor(()=>expect(old.remove).toHaveBeenCalledOnce());
+    } finally {runtime.unmountFloatingBall();vi.restoreAllMocks();}
+  });
+
+  it('does not retry a delayed mount after the user disables the feature', async () => {
+    const first=pendingUi(),second=pendingUi();
+    mocks.createVueShadowUi.mockReturnValueOnce(first.promise).mockReturnValueOnce(second.promise);
+    const runtime=await import('@/src/features/floating-ball/content/runtime');const ctx={} as never;
+    runtime.mountFloatingBall(ctx);runtime.unmountFloatingBall();runtime.mountFloatingBall(ctx);runtime.unmountFloatingBall();
+    runtime.mountFloatingBall(ctx);mocks.config.disableFloatingBall=true;runtime.unmountFloatingBall();
+    const old=ui();first.resolve(old);await vi.waitFor(()=>expect(old.remove).toHaveBeenCalledOnce());
+    expect(mocks.createVueShadowUi).toHaveBeenCalledTimes(2);second.resolve(ui());await second.promise;
+  });
+
+  it('does not restart a delayed mount while the entire extension is off', async () => {
+    const first=pendingUi(),second=pendingUi(),third=pendingUi();
+    mocks.createVueShadowUi.mockReturnValueOnce(first.promise).mockReturnValueOnce(second.promise).mockReturnValueOnce(third.promise);
+    const runtime=await import('@/src/features/floating-ball/content/runtime');const ctx={} as never;
+    runtime.mountFloatingBall(ctx);runtime.unmountFloatingBall();runtime.mountFloatingBall(ctx);runtime.unmountFloatingBall();runtime.mountFloatingBall(ctx);
+    mocks.config.on=false;const old=ui();first.resolve(old);await vi.waitFor(()=>expect(old.remove).toHaveBeenCalledOnce());
+    expect(mocks.createVueShadowUi).toHaveBeenCalledTimes(2);mocks.config.on=true;
+    const current=runtime.mountFloatingBall(ctx);expect(mocks.createVueShadowUi).toHaveBeenCalledTimes(3);
+    const live=ui({toggleTranslation:vi.fn()});third.resolve(live);await current;
+    expect(runtime.toggleFloatingBallTranslation()).toBe(true);const older=ui();second.resolve(older);
+    await vi.waitFor(()=>expect(older.remove).toHaveBeenCalledOnce());runtime.unmountFloatingBall();
+  });
+
+  it.each(['show','disable','off','fail'] as const)('defers the bounded-mount recovery notice until visible and handles %s', async mode => {
+    Object.defineProperty(document,'visibilityState',{configurable:true,value:'hidden'});
+    const first=pendingUi(),second=pendingUi();
+    mocks.createVueShadowUi.mockReturnValueOnce(first.promise).mockReturnValueOnce(second.promise);
+    const runtime=await import('@/src/features/floating-ball/content/runtime');const ctx={} as never;
+    runtime.mountFloatingBall(ctx);runtime.unmountFloatingBall();runtime.mountFloatingBall(ctx);runtime.unmountFloatingBall();runtime.mountFloatingBall(ctx);
+    expect(mocks.showPageNotice).not.toHaveBeenCalled();document.dispatchEvent(new Event('visibilitychange'));
+    expect(mocks.showPageNotice).not.toHaveBeenCalled();
+    if(mode==='disable'){mocks.config.disableFloatingBall=true;runtime.unmountFloatingBall();}
+    if(mode==='off')Object.assign(mocks.config,{on:false});
+    const consoleError=mode==='fail'?vi.spyOn(console,'error').mockImplementation(()=>undefined):undefined;
+    if(mode==='fail')mocks.showPageNotice.mockImplementationOnce(()=>{throw new Error('notice unavailable');});
+    Object.defineProperty(document,'visibilityState',{configurable:true,value:'visible'});
+    document.dispatchEvent(new Event('visibilitychange'));document.dispatchEvent(new Event('visibilitychange'));
+    expect(mocks.showPageNotice).toHaveBeenCalledTimes(mode==='show'||mode==='fail'?1:0);
+    if(mode==='fail')expect(consoleError).toHaveBeenCalledWith('[FluentRead] 悬浮球恢复提示失败',expect.any(Error));
+    runtime.unmountFloatingBall();const one=ui(),two=ui();first.resolve(one);second.resolve(two);
+    await vi.waitFor(()=>{expect(one.remove).toHaveBeenCalledOnce();expect(two.remove).toHaveBeenCalledOnce();});
+    if(mode==='off')Object.assign(mocks.config,{on:true});
+    consoleError?.mockRestore();
+  });
+
+  it.each(['mount','unmount'] as const)('preserves floating ball ownership if notice dismissal fails during %s', async phase => {
+    const live=ui({toggleTranslation:vi.fn()});mocks.createVueShadowUi.mockResolvedValue(live);
+    const runtime=await import('@/src/features/floating-ball/content/runtime');const consoleError=vi.spyOn(console,'error').mockImplementation(()=>undefined);
+    try {
+      if(phase==='mount')mocks.dismissPageNotice.mockImplementationOnce(()=>{throw new Error('dismiss failed');});
+      await runtime.mountFloatingBall({} as never);expect(runtime.toggleFloatingBallTranslation()).toBe(true);
+      if(phase==='unmount')mocks.dismissPageNotice.mockImplementationOnce(()=>{throw new Error('dismiss failed');});
+      runtime.unmountFloatingBall();expect(live.remove).toHaveBeenCalledOnce();
+      expect(consoleError).toHaveBeenCalledWith('[FluentRead] 悬浮球恢复提示清理失败',expect.any(Error));
+    } finally {runtime.unmountFloatingBall();consoleError.mockRestore();}
+  });
+
+  it('invalidates a visibility callback even if removing its listener throws', async () => {
+    Object.defineProperty(document,'visibilityState',{configurable:true,value:'hidden'});
+    const first=pendingUi(),second=pendingUi();mocks.createVueShadowUi.mockReturnValueOnce(first.promise).mockReturnValueOnce(second.promise);
+    const runtime=await import('@/src/features/floating-ball/content/runtime');const ctx={} as never;
+    const consoleError=vi.spyOn(console,'error').mockImplementation(()=>undefined);
+    try {
+      runtime.mountFloatingBall(ctx);runtime.unmountFloatingBall();runtime.mountFloatingBall(ctx);runtime.unmountFloatingBall();runtime.mountFloatingBall(ctx);
+      vi.spyOn(document,'removeEventListener').mockImplementationOnce(()=>{throw new Error('remove failed');});runtime.unmountFloatingBall();
+      Object.defineProperty(document,'visibilityState',{configurable:true,value:'visible'});document.dispatchEvent(new Event('visibilitychange'));
+      expect(mocks.showPageNotice).not.toHaveBeenCalled();expect(consoleError).toHaveBeenCalledWith('[FluentRead] 悬浮球恢复提示清理失败',expect.any(Error));
+      const one=ui(),two=ui();first.resolve(one);second.resolve(two);await vi.waitFor(()=>{expect(one.remove).toHaveBeenCalledOnce();expect(two.remove).toHaveBeenCalledOnce();});
+    } finally {runtime.unmountFloatingBall();vi.restoreAllMocks();}
+  });
+
   it('没有 exposed instance 时仍防止重复挂载并可完整清理', async () => {
     const mountedUi = {
       remove: vi.fn(),
@@ -616,14 +821,142 @@ describe('全文翻译进度面板 content runtime', () => {
     const request = runtime.mountTranslationProgressPanel({} as never)!;
     runtime.unmountTranslationProgressPanel();
     mocks.config.translationProgressPanelEnabled = true;
-    expect(runtime.mountTranslationProgressPanel()).toBe(request);
+    const fresh = runtime.mountTranslationProgressPanel();
+    expect(fresh).not.toBe(request);
+    await expect(fresh).resolves.toEqual({panel: 'current'});
     pending.resolve(staleUi);
     await expect(request).resolves.toBeNull();
-    await vi.waitFor(() => expect(mocks.createVueShadowUi).toHaveBeenCalledTimes(2));
+    expect(mocks.createVueShadowUi).toHaveBeenCalledTimes(2);
 
     expect(staleUi.remove).toHaveBeenCalledOnce();
     runtime.unmountTranslationProgressPanel();
     expect(currentUi.remove).toHaveBeenCalledOnce();
+  });
+
+  it('reopens a progress panel without waiting for an old rejected mount', async () => {
+    const pending = pendingUi(); const current = ui({panel: 'current'});
+    const log = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    mocks.createVueShadowUi.mockReturnValueOnce(pending.promise).mockResolvedValueOnce(current);
+    const runtime = await import('@/src/features/full-page-translation/content/progressPanel');
+    const old = runtime.mountTranslationProgressPanel({isInvalid: false} as never)!;
+    runtime.unmountTranslationProgressPanel();
+    const fresh = runtime.mountTranslationProgressPanel()!;
+    let settled = false;
+    void fresh.then(value => {settled = (value as {panel?: string} | null)?.panel === 'current';});
+    for (let turn = 0; turn < 10; turn++) await Promise.resolve();
+    const prompt = settled;
+    if (!prompt) {pending.reject(new Error('old mount failed'));await old;}
+    expect(prompt).toBe(true);
+    pending.reject(new Error('old mount failed'));await old;
+    expect(runtime.mountTranslationProgressPanel()).toBeNull();
+    runtime.unmountTranslationProgressPanel();expect(current.remove).toHaveBeenCalledOnce();log.mockRestore();
+  });
+
+  it('bounds hung progress panel creations and retries the latest request when a slot opens', async () => {
+    const first = pendingUi(), second = pendingUi();
+    const staleFirst = ui(), staleSecond = ui(), live = ui({panel: 'latest'});
+    mocks.createVueShadowUi.mockReturnValueOnce(first.promise).mockReturnValueOnce(second.promise).mockResolvedValueOnce(live);
+    const runtime = await import('@/src/features/full-page-translation/content/progressPanel');
+    const old = runtime.mountTranslationProgressPanel({isInvalid: false} as never)!;
+    runtime.unmountTranslationProgressPanel();
+    const previous = runtime.mountTranslationProgressPanel()!;
+    runtime.unmountTranslationProgressPanel();
+    expect(runtime.mountTranslationProgressPanel()).toBeNull();
+    expect(mocks.createVueShadowUi).toHaveBeenCalledTimes(2);
+    expect(mocks.showPageNotice).toHaveBeenCalledWith(expect.stringContaining('进度面板'), 'error', expect.objectContaining({key: 'translation-progress-mount-wait'}));
+    first.resolve(staleFirst);await old;
+    await vi.waitFor(() => expect(mocks.createVueShadowUi).toHaveBeenCalledTimes(3));
+    await vi.waitFor(() => expect(runtime.mountTranslationProgressPanel()).toBeNull());
+    second.resolve(staleSecond);await previous;
+    expect(staleFirst.remove).toHaveBeenCalledOnce();expect(staleSecond.remove).toHaveBeenCalledOnce();
+    expect(live.remove).not.toHaveBeenCalled();runtime.unmountTranslationProgressPanel();expect(live.remove).toHaveBeenCalledOnce();
+    expect(mocks.dismissPageNotice).toHaveBeenCalledWith('translation-progress-mount-wait');
+  });
+
+  it('defers the recovery notice until the page is visible and removes it on disable', async () => {
+    const first = pendingUi(), second = pendingUi();
+    mocks.createVueShadowUi.mockReturnValueOnce(first.promise).mockReturnValueOnce(second.promise);
+    Object.defineProperty(document, 'visibilityState', {configurable: true, value: 'hidden'});
+    const runtime = await import('@/src/features/full-page-translation/content/progressPanel');
+    runtime.mountTranslationProgressPanel({} as never);runtime.unmountTranslationProgressPanel();
+    runtime.mountTranslationProgressPanel();runtime.unmountTranslationProgressPanel();
+    mocks.showPageNotice.mockClear();runtime.mountTranslationProgressPanel();
+    expect(mocks.showPageNotice).not.toHaveBeenCalled();
+    document.dispatchEvent(new Event('visibilitychange'));expect(mocks.showPageNotice).not.toHaveBeenCalled();
+    Object.defineProperty(document, 'visibilityState', {configurable: true, value: 'visible'});
+    document.dispatchEvent(new Event('visibilitychange'));
+    expect(mocks.showPageNotice).toHaveBeenCalledOnce();
+    runtime.unmountTranslationProgressPanel();expect(mocks.dismissPageNotice).toHaveBeenCalledWith('translation-progress-mount-wait');
+    first.resolve(ui());second.resolve(ui());await Promise.all([first.promise, second.promise]);
+  });
+
+  it.each(['show', 'listen', 'dismiss', 'remove'] as const)('keeps the panel lifecycle safe when notice %s fails', async failure => {
+    const first = pendingUi(), second = pendingUi(), third = pendingUi();
+    mocks.createVueShadowUi.mockReturnValueOnce(first.promise).mockReturnValueOnce(second.promise).mockReturnValueOnce(third.promise);
+    const log = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    const runtime = await import('@/src/features/full-page-translation/content/progressPanel');
+    runtime.mountTranslationProgressPanel({} as never);runtime.unmountTranslationProgressPanel();runtime.mountTranslationProgressPanel();runtime.unmountTranslationProgressPanel();
+    if (failure === 'show') mocks.showPageNotice.mockImplementationOnce(() => {throw new Error('show');});
+    if (failure === 'listen') {Object.defineProperty(document, 'visibilityState', {configurable:true,value:'hidden'});vi.spyOn(document,'addEventListener').mockImplementationOnce(() => {throw new Error('listen');});}
+    if (failure === 'remove') {Object.defineProperty(document, 'visibilityState', {configurable:true,value:'hidden'});vi.spyOn(document,'removeEventListener').mockImplementationOnce(() => {throw new Error('remove');});}
+    runtime.mountTranslationProgressPanel();
+    if (failure === 'dismiss') mocks.dismissPageNotice.mockImplementationOnce(() => {throw new Error('dismiss');});
+    if (failure === 'remove') {Object.defineProperty(document, 'visibilityState', {configurable:true,value:'visible'});document.dispatchEvent(new Event('visibilitychange'));}
+    first.resolve(ui());await vi.waitFor(() => expect(mocks.createVueShadowUi).toHaveBeenCalledTimes(3));
+    third.resolve(ui());await vi.waitFor(() => expect(mocks.dismissPageNotice).toHaveBeenCalledWith('translation-progress-mount-wait'));
+    expect(log).toHaveBeenCalled();runtime.unmountTranslationProgressPanel();second.resolve(ui());await second.promise;vi.restoreAllMocks();
+  });
+
+  it.each([false, true])('cleans a hidden recovery listener on disable, even if removal throws: %s', async throws => {
+    const first = pendingUi(), second = pendingUi();
+    mocks.createVueShadowUi.mockReturnValueOnce(first.promise).mockReturnValueOnce(second.promise);
+    Object.defineProperty(document, 'visibilityState', {configurable: true, value: 'hidden'});
+    const log = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    const runtime = await import('@/src/features/full-page-translation/content/progressPanel');
+    runtime.mountTranslationProgressPanel({} as never);runtime.unmountTranslationProgressPanel();
+    runtime.mountTranslationProgressPanel();runtime.unmountTranslationProgressPanel();runtime.mountTranslationProgressPanel();
+    if (throws) vi.spyOn(document, 'removeEventListener').mockImplementationOnce(() => {throw new Error('remove');});
+    runtime.unmountTranslationProgressPanel();
+    Object.defineProperty(document, 'visibilityState', {configurable: true, value: 'visible'});
+    document.dispatchEvent(new Event('visibilitychange'));expect(mocks.showPageNotice).not.toHaveBeenCalled();
+    if (throws) expect(log).toHaveBeenCalled();
+    first.resolve(ui());second.resolve(ui());await Promise.all([first.promise, second.promise]);vi.restoreAllMocks();
+  });
+
+  it('does not let an older progress creation clear a newer pending mount', async () => {
+    const first = pendingUi(), second = pendingUi();const stale = ui(), live = ui({panel: 'new'});
+    mocks.createVueShadowUi.mockReturnValueOnce(first.promise).mockReturnValueOnce(second.promise);
+    const runtime = await import('@/src/features/full-page-translation/content/progressPanel');
+    const old = runtime.mountTranslationProgressPanel({isInvalid: false} as never)!;
+    runtime.unmountTranslationProgressPanel();const current = runtime.mountTranslationProgressPanel()!;
+    first.resolve(stale);await old;
+    expect(runtime.mountTranslationProgressPanel()).toBe(current);
+    second.resolve(live);await expect(current).resolves.toEqual({panel: 'new'});
+    expect(stale.remove).toHaveBeenCalledOnce();expect(live.remove).not.toHaveBeenCalled();
+    runtime.unmountTranslationProgressPanel();
+  });
+
+  it('preserves the new owner during synchronous unmount and remount from creation', async () => {
+    const first = pendingUi(), second = pendingUi();const stale = ui(), live = ui({panel: 'new'});
+    const runtime = await import('@/src/features/full-page-translation/content/progressPanel');
+    let current: Promise<unknown> | null | undefined;
+    mocks.createVueShadowUi.mockImplementationOnce(() => {
+      runtime.unmountTranslationProgressPanel();current = runtime.mountTranslationProgressPanel();return first.promise;
+    }).mockReturnValueOnce(second.promise);
+    const old = runtime.mountTranslationProgressPanel({isInvalid: false} as never)!;
+    expect(runtime.mountTranslationProgressPanel()).toBe(current);
+    first.resolve(stale);await old;expect(runtime.mountTranslationProgressPanel()).toBe(current);
+    second.resolve(live);await expect(current).resolves.toEqual({panel: 'new'});
+    expect(stale.remove).toHaveBeenCalledOnce();runtime.unmountTranslationProgressPanel();
+  });
+
+  it('releases the progress panel creation slot on synchronous creation failure', async () => {
+    const error = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    mocks.createVueShadowUi.mockImplementationOnce(() => {throw new Error('synchronous failure');}).mockResolvedValueOnce(ui({panel: 'retry'}));
+    const runtime = await import('@/src/features/full-page-translation/content/progressPanel');
+    expect(await runtime.mountTranslationProgressPanel({isInvalid: false} as never)).toBeNull();
+    await expect(runtime.mountTranslationProgressPanel()).resolves.toEqual({panel: 'retry'});
+    expect(error).toHaveBeenCalled();runtime.unmountTranslationProgressPanel();error.mockRestore();
   });
 
   it('面板没有 exposed instance 时仍保持单例', async () => {

@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 
 // 使用临时 Edge profile 验证划词翻译的触发矩阵；--context-menu-only 只运行右键入口专项，
-// --lifecycle-only 仅检查宿主节点恢复、启停、路由、失败重试与键盘/窄屏界面。
+// --lifecycle-only 检查宿主节点恢复、启停、路由、失败重试与键盘/窄屏界面，要求 --runtime-diagnostics。
 // --document-shell-only 只验证 DeepSeek 类文档根禁译外壳下的划词入口与局部保护。
 // --click-selection-only 只验证按需两点选取；通过 --runtime-diagnostics 传入 CDP 诊断收集器。
 // --click-selection-stress-only 只诊断滚动后立即确认终点的重复手势与事件时序。
@@ -52,7 +52,7 @@ function parseArgs(argv) {
     clickSelectionStressOnly: argv.includes('--click-selection-stress-only'),
     runtimeDiagnostics: readArg(argv, 'runtime-diagnostics', ''),
   };
-  if ((args.clickSelectionOnly || args.documentShellOnly) && (!args.runtimeDiagnostics || !fs.existsSync(args.runtimeDiagnostics))) {
+  if ((args.clickSelectionOnly || args.documentShellOnly || args.lifecycleOnly) && (!args.runtimeDiagnostics || !fs.existsSync(args.runtimeDiagnostics))) {
     throw new Error('划词专项需要 --runtime-diagnostics <runtime-diagnostics.cjs> 以采集扩展隔离世界及后台诊断');
   }
   if (!args.playwrightRoot) throw new Error('必须传入 --playwright-root，或设置 PLAYWRIGHT_ROOT');
@@ -2031,6 +2031,8 @@ async function main() {
     for await (const chunk of request) chunks.push(chunk);
     translationRequestCount += 1;
     translationRequestEvents.push(Date.now());
+    let fixtureBody;try {fixtureBody = JSON.parse(Buffer.concat(chunks).toString('utf8'));} catch {}
+    (result.fixtureRequests ||= []).push({body: fixtureBody, controlledFailure: translationFailureResponses > 0});
     if (translationResponseDelayMs > 0) {
       await new Promise(resolve => setTimeout(resolve, translationResponseDelayMs));
     }
@@ -2056,7 +2058,7 @@ async function main() {
       'content-type': 'application/json; charset=utf-8',
     });
     const directionSuffix = args.directionOnly ? ` [to=${fixtureRequestUrl.searchParams.get('to') || ''}]` : '';
-    response.end(JSON.stringify((args.inlineCodeOnly || args.contextMenuOnly ? sources : [source]).map(text => ({ translations: [{ text: `测试译文：${text}${directionSuffix}` }] }))));
+    response.end(JSON.stringify((args.inlineCodeOnly || args.contextMenuOnly ? sources : [source]).map(text => ({ translations: [{ text: args.lifecycleOnly ? `测试译文：这是用于验证划词翻译和界面交互的中文内容，保留选区标识以核对请求归属。原文标识：「${text}」` : `测试译文：${text}${directionSuffix}` }] }))));
   });
   try {
     await new Promise((resolve, reject) => {
@@ -2115,7 +2117,7 @@ async function main() {
       result.focusPolicy = 'foreground-authorized';
       result.windowPlacement = { mode: 'headed-explicit-foreground', windowState: 'normal', viewport: { width: 1280, height: 900 } };
     }
-    if (args.clickSelectionOnly || args.documentShellOnly) {
+    if (args.clickSelectionOnly || args.documentShellOnly || args.lifecycleOnly) {
       runtimeDiagnostics = require(path.resolve(args.runtimeDiagnostics)).createRuntimeDiagnostics();
       await runtimeDiagnostics.start(context);
     }
@@ -2330,6 +2332,7 @@ async function main() {
       result.cases.push({id: 'lifecycle.escape-cancels-late-result', status: 'passed'});
 
       await selectFresh('A failed selection translation can be retried with the keyboard.');
+      runtimeDiagnostics?.setPhase('controlled-provider-failure');
       translationFailureResponses = 1;
       expectingProviderFailure = true;
       await clickSelectionIndicator(page);
@@ -2338,6 +2341,7 @@ async function main() {
       await keyboardActivate('fr-error-state');
       await waitForSelectionUi(page, {tooltip: true, translation: true, error: false, resultPrefix: '测试译文：'}, '键盘重试完成');
       expectingProviderFailure = false;
+      runtimeDiagnostics?.setPhase('narrow-followup');
       result.cases.push({id: 'lifecycle.error-and-keyboard-retry', status: 'passed'});
 
       await patchStoredConfig(popup, {theme: 'dark'});
@@ -2369,6 +2373,8 @@ async function main() {
       await page.waitForTimeout(250);
       await assertBackgroundFocus('selection lifecycle final cleanup');
       result.cases.push({id: 'lifecycle.final-unmount', status: 'passed', hostCount: await page.locator(hostSelector).count()});
+      await runtimeDiagnostics?.flush();
+      if (runtimeDiagnostics) {result.runtimeDiagnostics = runtimeDiagnostics.snapshot();runtimeDiagnostics.assertClean();}
       result.ok = result.consoleErrors.length === 0;
       assert(result.ok, `划词生命周期控制台异常：${JSON.stringify(result.consoleErrors)}`);
       result.providerEvidence = 'Production extension in isolated desktop Edge; local Microsoft HTTP fixture and controlled host/body mutations. Trusted CDP input (DOM range fallback recorded when needed), real closed Shadow DOM. 390px is desktop viewport emulation, not mobile hardware. No live-provider, Firefox or Safari claim.';

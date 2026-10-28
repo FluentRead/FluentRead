@@ -99,6 +99,29 @@ describe('输入框快捷键', () => {
         expect(isInputElement(legendInput)).toBe(true);
     });
 
+    it.each(['INPUT', 'TEXTAREA'])('%s 带自身 ARIA 禁用或只读状态时不参与翻译', tag => {
+        for (const name of ['aria-disabled', 'aria-readonly']) {
+            expect(isInputElement(fakeElement(tag, {[name]: 'true'}))).toBe(false);
+            expect(isInputElement(fakeElement(tag, {[name]: 'false'}))).toBe(true);
+        }
+    });
+
+    it('祖先 ARIA 禁用涵盖控件与编辑宿主，包括 Shadow DOM 的宿主', () => {
+        const {document} = parseHTML('<section aria-disabled="true"><input type="text"><div contenteditable="true"></div><div id="shadow"></div></section>');
+        const input = document.querySelector('input') as unknown as HTMLElement;
+        const editable = document.querySelector('[contenteditable]') as unknown as HTMLElement;
+        const shadow = document.querySelector('#shadow')!.attachShadow({mode: 'open'});
+        shadow.innerHTML = '<textarea></textarea>';
+        const textarea = shadow.querySelector('textarea') as unknown as HTMLElement;
+        expect(isInputElement(input)).toBe(false);
+        expect(isEditableHost(editable)).toBe(false);
+        expect(isInputElement(textarea)).toBe(false);
+        document.querySelector('section')!.setAttribute('aria-disabled', 'false');
+        expect(isInputElement(input)).toBe(true);
+        expect(isInputElement(editable)).toBe(true);
+        expect(isInputElement(textarea)).toBe(true);
+    });
+
     it('能穿透开放 Shadow DOM 获取真实焦点，但仍拒绝其中的密码框', () => {
         const inner = {...fakeElement('INPUT'), type: 'password'} as unknown as HTMLElement;
         const host = {

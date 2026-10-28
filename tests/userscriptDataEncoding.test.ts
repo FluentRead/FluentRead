@@ -25,6 +25,8 @@ it('round-trips compact standalone data for every byte, offset and tail length',
     // 两字符和三字符分别覆盖非零尾部位与超出字节范围的尾部符号。
     expect(() => decodeUserscriptData('~91:!%')).toThrow(/Invalid userscript resource padding/u);
     expect(() => decodeUserscriptData('~91:!!&')).toThrow(/Invalid userscript resource padding/u);
+    // 此输入通过尾部位校验，但存在等价的非规范末尾；必须拒绝，而非接受不唯一的编码。
+    expect(() => decodeUserscriptData('~91:PxNC{.~qS*g!')).toThrow(/Invalid userscript resource padding/u);
 });
 
 it('keeps every byte value and every padding width, including offset Uint8Array views', () => {
@@ -38,6 +40,32 @@ it('keeps every byte value and every padding width, including offset Uint8Array 
     }
     expect(decodeUserscriptData(encodeUserscriptData(new Uint8Array(4).fill(255)))).toEqual(new Uint8Array(4).fill(255));
     expect(new Set(USERSCRIPT_DATA_ALPHABET).size).toBe(85);
+});
+
+it('roundtrips compact Base91 for every length, all byte values and offset views',()=>{
+    const input=Uint8Array.from({length:4099},(_,index)=>(index*73+29)&255);
+    for(let length=0;length<=4096;length++) {
+      const bytes=input.subarray(2,2+length),encoded=encodeUserscriptDataCompact(bytes);
+      expect(encoded).toMatch(/^~91:/);expect(encoded).not.toMatch(/["\\\/\s\u0080-\uffff]/u);
+      expect(decodeUserscriptData(encoded)).toEqual(bytes);
+    }
+    expect(()=>decodeUserscriptData('~91:"')).toThrow(/Invalid userscript resource/);
+    expect(new Set(USERSCRIPT_COMPACT_DATA_ALPHABET).size).toBe(91);
+    expect(()=>decodeUserscriptData('~91:!')).toThrow(/Invalid userscript resource/);
+    expect(()=>decodeUserscriptData('~91:+f6w4.|X-2= ')).toThrow(/Invalid userscript resource/);
+    for (const a of USERSCRIPT_COMPACT_DATA_ALPHABET) for (const b of USERSCRIPT_COMPACT_DATA_ALPHABET) {
+      const encoded='~91:'+a+b;
+      try { expect(encodeUserscriptDataCompact(decodeUserscriptData(encoded))).toBe(encoded); }
+      catch (error) { if (!(error instanceof Error && error.message.startsWith('Invalid userscript resource'))) throw error; }
+    }
+    let random=0x9e3779b9;
+    for(let sample=0;sample<5000;sample++) {
+      random=(Math.imul(random,1664525)+1013904223)>>>0;
+      let encoded='~91:';const length=4+(random%30);
+      for(let i=0;i<length;i++){random=(Math.imul(random,1664525)+1013904223)>>>0;encoded+=USERSCRIPT_COMPACT_DATA_ALPHABET[random%91];}
+      try {expect(encodeUserscriptDataCompact(decodeUserscriptData(encoded))).toBe(encoded);}
+      catch(error){if(!(error instanceof Error && error.message.startsWith('Invalid userscript resource')))throw error;}
+    }
 });
 
 it('restores gzip CSS, UTF-8 dictionary data and binary images without changing decoded bytes', () => {

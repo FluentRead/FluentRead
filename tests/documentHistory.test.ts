@@ -7,7 +7,7 @@
 import {IDBFactory, IDBObjectStore} from 'fake-indexeddb';
 import {describe, expect, it, vi} from 'vitest';
 import {parseDocument, type ParsedDocument, type PdfDocumentBlock, type PdfDocumentLine} from '@/src/features/document-translation/core/document';
-import {createDocumentHistory, documentHistoryId, restoreDocumentHistoryPdfOcr, restoreDocumentHistoryRevisions, DOCUMENT_HISTORY_MAX_BYTES, DOCUMENT_HISTORY_MAX_ENTRIES, type DocumentHistoryRecord} from '@/src/features/document-translation/services/history';
+import {createDocumentHistory, documentHistoryId, documentHistoryVersion, restoreDocumentHistoryPdfOcr, restoreDocumentHistoryRevisions, DOCUMENT_HISTORY_MAX_BYTES, DOCUMENT_HISTORY_MAX_ENTRIES, type DocumentHistoryRecord} from '@/src/features/document-translation/services/history';
 
 const record = (id: string, updatedAt: number, extra: Partial<DocumentHistoryRecord> = {}): DocumentHistoryRecord => ({id, name: `${id}.pdf`, format: 'pdf', size: 3, total: 4, completed: 2, updatedAt,
     bytes: new Uint8Array([1, 2, 3]), mimeType: 'application/pdf', translations: ['甲', '', '丙', ''], fingerprint: 'fp', ...extra});
@@ -401,6 +401,300 @@ describe('document history identity', () => {
 });
 
 describe('document history storage', () => {
+    it('does not overwrite another tab after both successfully read the same record', async () => {
+        const factory = new IDBFactory(), first = createDocumentHistory(factory), second = createDocumentHistory(factory);
+        expect(await first.save(record('shared', 1, {translations: ['Original']}))).toBe(true);
+        const a = await first.load('shared'), b = await second.load('shared');
+        expect(a?.translations).toEqual(['Original']);expect(b?.translations).toEqual(['Original']);
+        expect((await first.saveChecked({...a!, translations: ['First tab edit']}, documentHistoryVersion(a))).status).toBe('saved');
+        expect((await second.saveChecked({...b!, translations: ['Second tab edit']}, documentHistoryVersion(b))).status).toBe('conflict');
+        expect((await first.load('shared'))?.translations).toEqual(['First tab edit']);
+    });
+    it('atomically accepts only one simultaneous writer and distinguishes deleted and recreated records', async () => {
+        const factory = new IDBFactory(), first = createDocumentHistory(factory), second = createDocumentHistory(factory);
+        expect(await first.save(record('shared', 1))).toBe(true);
+        const original = (await first.load('shared'))!, version = documentHistoryVersion(original);
+        const outcomes = await Promise.all([
+            first.saveChecked({...original, translations: ['A']}, version),
+            second.saveChecked({...original, translations: ['B']}, version),
+        ]);
+        expect(outcomes.map(result => result.status).sort()).toEqual(['conflict', 'saved']);
+        const current = (await first.load('shared'))!;
+        expect(['A', 'B']).toContain(current.translations[0]);
+        await second.clear();
+        expect((await first.saveChecked(current, documentHistoryVersion(current))).status).toBe('conflict');
+        const absent = await second.loadChecked('shared');
+        if (absent.status !== 'ok') throw new Error('expected readable');
+        const recreated = await second.saveChecked({...original, translations: ['After clear']}, absent.version);
+        expect(recreated.status).toBe('saved');
+        expect((await first.saveChecked(current, documentHistoryVersion(current))).status).toBe('conflict');
+        expect((await first.load('shared'))?.translations).toEqual(['After clear']);
+    });
+    it('migrates a v1 record and prevents old-version clients from silently writing', async () => {
+        expect(documentHistoryVersion(null)).toBeNull();
+        const factory = new IDBFactory();
+        const old = await new Promise<IDBDatabase>((resolve, reject) => {
+            const req = factory.open('FluentReadDocumentHistory', 1);
+            req.onupgradeneeded = () => req.result.createObjectStore('documents', {keyPath: 'id'});
+            req.onsuccess = () => resolve(req.result); req.onerror = () => reject(req.error);
+        });
+        await new Promise<void>((resolve, reject) => {
+            const tx = old.transaction('documents', 'readwrite');tx.objectStore('documents').put(record('legacy', 1));
+            tx.oncomplete = () => resolve();tx.onabort = () => reject(tx.error);
+        });
+        old.onversionchange = () => old.close();
+        const history = createDocumentHistory(factory), loaded = await history.loadChecked('legacy');
+        expect(loaded.status).toBe('ok');
+        if (loaded.status !== 'ok') throw new Error('expected readable');
+        expect(loaded.version).toMatch(/^v:/u);
+        expect((await history.saveChecked({...loaded.record!, translations: ['updated']}, loaded.version)).status).toBe('saved');
+        expect((await history.saveChecked(record('legacy', 2), loaded.version)).status).toBe('conflict');
+        const oldError = await new Promise<string | undefined>(resolve => {
+            const req = factory.open('FluentReadDocumentHistory', 1);
+            req.onerror = () => resolve(req.error?.name);req.onsuccess = () => {req.result.close();resolve(undefined);};
+        });
+        expect(oldError).toBe('VersionError');
+    });
+    it('compares the displayed version atomically before deleting a record', async () => {
+        const factory = new IDBFactory(), first = createDocumentHistory(factory), second = createDocumentHistory(factory);
+        expect(await first.save(record('same', 1, {translations: ['before']}))).toBe(true);
+        const listed = await first.listChecked(), loaded = await second.loadChecked('same');
+        if (listed.status !== 'ok' || loaded.status !== 'ok') throw new Error('expected readable');
+        expect((await second.saveChecked(record('same', 2, {translations: ['other tab']}), loaded.version)).status).toBe('saved');
+        expect(await first.removeChecked('same', listed.entries[0].historyVersion!)).toEqual({status: 'conflict'});
+        expect((await second.load('same'))?.translations).toEqual(['other tab']);
+        const refreshed = await first.listChecked();if (refreshed.status !== 'ok') throw new Error('expected readable');
+        expect(await first.removeChecked('same', refreshed.entries[0].historyVersion!)).toEqual({status: 'removed'});
+        expect(await first.removeChecked('same', refreshed.entries[0].historyVersion!)).toEqual({status: 'conflict'});
+        expect(await first.load('same')).toBeNull();
+    });
+    it('deletes an unchanged legacy entry and reports missing metadata as unavailable', async () => {
+        const factory = new IDBFactory();
+        const db = await new Promise<IDBDatabase>((resolve, reject) => {
+            const req = factory.open('FluentReadDocumentHistory', 1);req.onupgradeneeded = () => req.result.createObjectStore('documents', {keyPath: 'id'});
+            req.onsuccess = () => resolve(req.result);req.onerror = () => reject(req.error);
+        });
+        await new Promise<void>((resolve, reject) => {const tx = db.transaction('documents', 'readwrite');tx.objectStore('documents').put(record('legacy', 1));tx.oncomplete = () => resolve();tx.onabort = () => reject(tx.error);});
+        db.onversionchange = () => db.close();
+        const history = createDocumentHistory(factory), list = await history.listChecked();
+        if (list.status !== 'ok') throw new Error('expected readable');
+        expect(list.entries[0].historyVersion).toBe('legacy');
+        expect(await history.removeChecked('legacy', 'legacy')).toEqual({status: 'removed'});
+        const current = await new Promise<IDBDatabase>((resolve, reject) => {const req = factory.open('FluentReadDocumentHistory', 2);req.onsuccess = () => resolve(req.result);req.onerror = () => reject(req.error);});
+        await new Promise<void>((resolve, reject) => {const tx = current.transaction('metadata', 'readwrite');tx.objectStore('metadata').clear();tx.oncomplete = () => resolve();tx.onabort = () => reject(tx.error);});
+        expect(await history.removeChecked('legacy', 'legacy')).toEqual({status: 'unavailable'});current.close();
+    });
+    it('does not confirm a list when its read transaction aborts after the cursor finishes', async () => {
+        const factory = new IDBFactory(), history = createDocumentHistory(factory);
+        await history.save(record('kept', 1));
+        const original = IDBObjectStore.prototype.openCursor;
+        let abortRead = true;
+        const spy = vi.spyOn(IDBObjectStore.prototype, 'openCursor').mockImplementation(function (this: IDBObjectStore, ...args) {
+            const cursor = original.apply(this, args);
+            if (abortRead && this.transaction.mode === 'readonly') {
+                abortRead = false;
+                const tx = this.transaction;
+                cursor.addEventListener('success', () => {if (!cursor.result) tx.abort();});
+            }
+            return cursor;
+        });
+        try {
+            expect(await history.listChecked()).toEqual({status: 'unavailable'});
+            expect(await history.listChecked()).toMatchObject({status: 'ok', entries: [{id: 'kept'}]});
+        } finally {spy.mockRestore();}
+    });
+    it('reports a cursor request failure and retries the same list successfully', async () => {
+        const factory = new IDBFactory(), history = createDocumentHistory(factory);
+        await history.save(record('kept', 1));
+        const original = IDBObjectStore.prototype.openCursor;
+        let failRead = true;
+        const spy = vi.spyOn(IDBObjectStore.prototype, 'openCursor').mockImplementation(function (this: IDBObjectStore, ...args) {
+            if (failRead && this.transaction.mode === 'readonly') {
+                failRead = false;
+                const failed = {error: new Error('cursor failure')} as unknown as IDBRequest<IDBCursorWithValue | null>;
+                queueMicrotask(() => failed.onerror?.call(failed, new Event('error')));
+                return failed;
+            }
+            return original.apply(this, args);
+        });
+        try {
+            expect(await history.listChecked()).toEqual({status: 'unavailable'});
+            expect(await history.listChecked()).toMatchObject({status: 'ok', entries: [{id: 'kept'}]});
+        } finally {spy.mockRestore();}
+    });
+    it('reports blocked listing and mutations, preserves old data, then confirms the retried state', async () => {
+        const factory = new IDBFactory();
+        const old = await new Promise<IDBDatabase>((resolve, reject) => {
+            const req = factory.open('FluentReadDocumentHistory', 1);
+            req.onupgradeneeded = () => req.result.createObjectStore('documents', {keyPath: 'id'});
+            req.onsuccess = () => resolve(req.result);req.onerror = () => reject(req.error);
+        });
+        await new Promise<void>((resolve, reject) => {
+            const tx = old.transaction('documents', 'readwrite');tx.objectStore('documents').put(record('kept', 1));
+            tx.oncomplete = () => resolve();tx.onabort = () => reject(tx.error);
+        });
+        const history = createDocumentHistory(factory, 50);
+        expect(await history.listChecked()).toEqual({status: 'unavailable'});
+        expect(await history.remove('kept')).toBe(false);
+        expect(await history.clear()).toBe(false);
+        old.close();
+        expect(await history.listChecked()).toMatchObject({status: 'ok', entries: [{id: 'kept'}]});
+        expect(await history.remove('kept')).toBe(true);
+        expect(await history.listChecked()).toEqual({status: 'ok', entries: []});
+        expect(await history.clear()).toBe(true);
+    });
+    it('fails closed when an old open connection blocks migration and retries after it closes', async () => {
+        const factory = new IDBFactory();
+        const old = await new Promise<IDBDatabase>((resolve, reject) => {
+            const req = factory.open('FluentReadDocumentHistory', 1);
+            req.onupgradeneeded = () => req.result.createObjectStore('documents', {keyPath: 'id'});
+            req.onsuccess = () => resolve(req.result);req.onerror = () => reject(req.error);
+        });
+        const history = createDocumentHistory(factory, 50);
+        expect(await history.loadChecked('missing')).toEqual({status: 'unavailable'});
+        old.close();
+        // A blocked open request may trigger an upgrade late; it must abort before the retry can succeed.
+        expect((await history.loadChecked('missing')).status).toBe('ok');
+    });
+    it('rejects missing-record ABA after deletion or clear and protects the newest save from clock rollback', async () => {
+        const factory = new IDBFactory(), a = createDocumentHistory(factory), b = createDocumentHistory(factory);
+        for (const operation of ['remove', 'clear'] as const) {
+            const missing = await a.loadChecked(operation);
+            if (missing.status !== 'ok') throw new Error('expected readable');
+            expect((await b.saveChecked(record(operation, 1), missing.version)).status).toBe('saved');
+            if (operation === 'remove') await b.remove(operation); else await b.clear();
+            expect((await a.saveChecked(record(operation, 2), missing.version)).status).toBe('conflict');
+        }
+        for (let index = 0; index < DOCUMENT_HISTORY_MAX_ENTRIES; index++) expect(await a.save(record(`old-${index}`, index + 10))).toBe(true);
+        const missing = await b.loadChecked('clock-rollback');
+        if (missing.status !== 'ok') throw new Error('expected readable');
+        expect((await b.saveChecked(record('clock-rollback', -100), missing.version)).status).toBe('saved');
+        expect(await a.load('clock-rollback')).not.toBeNull();
+        expect(await a.list()).toHaveLength(DOCUMENT_HISTORY_MAX_ENTRIES);
+        const subsequent = await b.loadChecked('after-rollback');
+        if (subsequent.status !== 'ok') throw new Error('expected readable');
+        expect((await b.saveChecked(record('after-rollback', -200), subsequent.version)).status).toBe('saved');
+        expect(await a.load('clock-rollback')).not.toBeNull();
+        expect(await a.load('old-0')).toBeNull();
+        const list = await a.listChecked();if (list.status !== 'ok') throw new Error('expected readable');
+        expect(list.entries.slice(0, 2).map(item => [item.id, item.updatedAt])).toEqual([['after-rollback', -200], ['clock-rollback', -100]]);
+        expect(await createDocumentHistory(null as never).saveChecked(record('x', 1), missing.version)).toEqual({status: 'unavailable'});
+        expect(await a.saveChecked(record('', 1), missing.version)).toEqual({status: 'unavailable'});
+        expect(await a.saveChecked(record('huge', 1, {bytes: new Uint8Array(DOCUMENT_HISTORY_MAX_BYTES + 1)}), missing.version)).toEqual({status: 'unavailable'});
+    });
+    it('invalidates a missing token when a record is created and later evicted', async () => {
+        const factory = new IDBFactory(), reader = createDocumentHistory(factory), writer = createDocumentHistory(factory);
+        const missing = await reader.loadChecked('evicted');
+        if (missing.status !== 'ok') throw new Error('expected readable');
+        expect((await writer.saveChecked(record('evicted', 1), missing.version)).status).toBe('saved');
+        for (let index = 0; index < DOCUMENT_HISTORY_MAX_ENTRIES; index++) expect(await writer.save(record(`new-${index}`, index + 10))).toBe(true);
+        expect(await reader.load('evicted')).toBeNull();
+        expect((await reader.saveChecked(record('evicted', 3), missing.version)).status).toBe('conflict');
+    });
+    it('refuses a checked read and write when generation metadata is missing', async () => {
+        const factory = new IDBFactory(), history = createDocumentHistory(factory);
+        const initial = await history.loadChecked('missing');
+        if (initial.status !== 'ok') throw new Error('expected readable');
+        const db = await new Promise<IDBDatabase>((resolve, reject) => {
+            const req = factory.open('FluentReadDocumentHistory', 2);req.onsuccess = () => resolve(req.result);req.onerror = () => reject(req.error);
+        });
+        await new Promise<void>((resolve, reject) => {
+            const tx = db.transaction('metadata', 'readwrite');tx.objectStore('metadata').clear();tx.oncomplete = () => resolve();tx.onabort = () => reject(tx.error);
+        });
+        expect(await history.loadChecked('missing')).toEqual({status: 'unavailable'});
+        expect((await history.saveChecked(record('missing', 1), initial.version)).status).toBe('unavailable');db.close();
+    });
+    it('keeps legacy records ordered by their original timestamps when newly saved records use the sequence', async () => {
+        const factory = new IDBFactory();
+        const old = await new Promise<IDBDatabase>((resolve, reject) => {const req = factory.open('FluentReadDocumentHistory', 1);req.onupgradeneeded = () => req.result.createObjectStore('documents', {keyPath: 'id'});req.onsuccess = () => resolve(req.result);req.onerror = () => reject(req.error);});
+        await new Promise<void>((resolve, reject) => {const tx = old.transaction('documents', 'readwrite');for (let i = 0; i < DOCUMENT_HISTORY_MAX_ENTRIES; i++) tx.objectStore('documents').put(record(`legacy-${i}`, i + 10));tx.oncomplete = () => resolve();tx.onabort = () => reject(tx.error);});
+        old.onversionchange = () => old.close();
+        const history = createDocumentHistory(factory), absent = await history.loadChecked('new');if (absent.status !== 'ok') throw new Error('expected readable');
+        expect((await history.saveChecked(record('new', -100), absent.version)).status).toBe('saved');
+        expect(await history.load('legacy-0')).toBeNull();expect(await history.load('legacy-19')).not.toBeNull();
+        const list = await history.list();expect(list[0]?.id).toBe('new');expect(list[0]?.updatedAt).toBe(-100);
+        expect(list.slice(1).map(item => item.id)).toEqual(Array.from({length: DOCUMENT_HISTORY_MAX_ENTRIES - 1}, (_, index) => `legacy-${DOCUMENT_HISTORY_MAX_ENTRIES - 1 - index}`));
+    });
+    it('assigns distinct monotonic eviction orders to concurrent checked saves', async () => {
+        const factory = new IDBFactory(), a = createDocumentHistory(factory), b = createDocumentHistory(factory);
+        const absentA = await a.loadChecked('a'), absentB = await b.loadChecked('b');
+        if (absentA.status !== 'ok' || absentB.status !== 'ok') throw new Error('expected readable');
+        const outcomes = await Promise.all([a.saveChecked(record('a', 100), absentA.version), b.saveChecked(record('b', -100), absentB.version)]);
+        expect(outcomes.map(result => result.status)).toEqual(['saved', 'saved']);
+        const first = await a.load('a'), second = await b.load('b');
+        expect([first?.storageOrder, second?.storageOrder].sort()).toEqual([1, 2]);
+    });
+    it('aborts and retries when a metadata request cannot be enqueued', async () => {
+        const history = createDocumentHistory(new IDBFactory());
+        expect(await history.save(record('kept', 1))).toBe(true);
+        const original = IDBObjectStore.prototype.get;let fail = true;
+        const spy = vi.spyOn(IDBObjectStore.prototype, 'get').mockImplementation(function (this: IDBObjectStore, key) {
+            if (fail && this.name === 'metadata') {fail = false;throw new Error('metadata request failed');}
+            return original.call(this, key);
+        });
+        try {
+            expect(await history.loadChecked('kept')).toEqual({status: 'unavailable'});
+            expect(await history.loadChecked('kept')).toMatchObject({status: 'ok', record: {id: 'kept'}});
+        } finally {spy.mockRestore();}
+    });
+    it('fails closed if the durable save sequence is missing or exhausted', async () => {
+        const factory = new IDBFactory(), history = createDocumentHistory(factory);
+        const initial = await history.loadChecked('missing');if (initial.status !== 'ok') throw new Error('expected readable');
+        const db = await new Promise<IDBDatabase>((resolve, reject) => {const req = factory.open('FluentReadDocumentHistory', 2);req.onsuccess = () => resolve(req.result);req.onerror = () => reject(req.error);});
+        for (const value of [undefined, Number.MAX_SAFE_INTEGER]) {
+            await new Promise<void>((resolve, reject) => {const tx = db.transaction('metadata', 'readwrite'), store = tx.objectStore('metadata');if (value === undefined) store.delete('sequence');else store.put({key: 'sequence', value});tx.oncomplete = () => resolve();tx.onabort = () => reject(tx.error);});
+            expect((await history.saveChecked(record('missing', 1), initial.version)).status).toBe('unavailable');
+            expect(await history.load('missing')).toBeNull();
+        }
+        db.close();
+    });
+    it('aborts quota enforcement when a stored save order is corrupt', async () => {
+        const factory = new IDBFactory(), history = createDocumentHistory(factory);
+        const absent = await history.loadChecked('new');if (absent.status !== 'ok') throw new Error('expected readable');
+        const db = await new Promise<IDBDatabase>((resolve, reject) => {const req = factory.open('FluentReadDocumentHistory', 2);req.onsuccess = () => resolve(req.result);req.onerror = () => reject(req.error);});
+        await new Promise<void>((resolve, reject) => {const tx = db.transaction('documents', 'readwrite');tx.objectStore('documents').put({...record('kept', 1), storageOrder: -1});tx.oncomplete = () => resolve();tx.onabort = () => reject(tx.error);});
+        expect((await history.saveChecked(record('new', 2), absent.version)).status).toBe('unavailable');
+        expect(await history.load('kept')).not.toBeNull();expect(await history.load('new')).toBeNull();db.close();
+    });
+    it('fails safely when a stored entry cannot be scanned for quota or listing', async () => {
+        const factory = new IDBFactory(), history = createDocumentHistory(factory);
+        const missing = await history.loadChecked('new');
+        if (missing.status !== 'ok') throw new Error('expected readable');
+        const db = await new Promise<IDBDatabase>((resolve, reject) => {
+            const req = factory.open('FluentReadDocumentHistory', 2);req.onsuccess = () => resolve(req.result);req.onerror = () => reject(req.error);
+        });
+        await new Promise<void>((resolve, reject) => {
+            const tx = db.transaction('documents', 'readwrite');tx.objectStore('documents').put({id: 'broken', bytes: null});tx.oncomplete = () => resolve();tx.onabort = () => reject(tx.error);
+        });
+        expect(await history.list()).toEqual([]);
+        expect((await history.saveChecked(record('new', 1), missing.version)).status).toBe('unavailable');
+        expect(await history.load('new')).toBeNull();db.close();
+    });
+    it('distinguishes an absent or deliberately removed record from an unavailable read', async () => {
+        const factory = new IDBFactory(), history = createDocumentHistory(factory);
+        expect(await history.loadChecked('missing')).toMatchObject({status: 'ok', record: null, version: expect.stringMatching(/^g:/u)});
+        expect(await history.save(record('existing', 1))).toBe(true);
+        expect(await history.loadChecked('existing')).toMatchObject({status: 'ok', record: {id: 'existing'}});
+        await history.clear();
+        expect(await history.loadChecked('existing')).toMatchObject({status: 'ok', record: null, version: expect.stringMatching(/^g:/u)});
+        expect(await createDocumentHistory(null as never).loadChecked('existing')).toEqual({status: 'unavailable'});
+    });
+    it.each(['blocked', 'timeout'] as const)('does not publish a late %s history read as missing or invalidate a recovered read', async reason => {
+        vi.useFakeTimers({toFake: ['setTimeout', 'clearTimeout']});
+        try {
+            const factory = new IDBFactory(), pending = {result: {close: vi.fn()}} as unknown as IDBOpenDBRequest;
+            const open = vi.fn().mockReturnValueOnce(pending).mockImplementation((name, version) => factory.open(name, version));
+            const history = createDocumentHistory({open} as unknown as IDBFactory, 20);
+            const first = history.loadChecked('existing');
+            if (reason === 'blocked') pending.onblocked!(new Event('blocked') as IDBVersionChangeEvent);
+            else await vi.advanceTimersByTimeAsync(20);
+            expect(await first).toEqual({status: 'unavailable'});
+            expect(await history.loadChecked('existing')).toMatchObject({status: 'ok', record: null, version: expect.stringMatching(/^g:/u)});
+            pending.onsuccess!(new Event('success'));
+            expect(pending.result.close).toHaveBeenCalledOnce();
+            expect(await history.loadChecked('existing')).toMatchObject({status: 'ok', record: null, version: expect.stringMatching(/^g:/u)});
+        } finally {vi.useRealTimers();}
+    });
     it('tolerates the restart deadline racing a committed transaction and can safely save the next revision', async () => {
         vi.useFakeTimers({toFake: ['setTimeout', 'clearTimeout']});
         try {
@@ -452,7 +746,7 @@ describe('document history storage', () => {
             else expect(saved).not.toHaveProperty('bypassCache');
         }
         const database = await new Promise<IDBDatabase>((resolve, reject) => {
-            const opened = factory.open('FluentReadDocumentHistory', 1);
+            const opened = factory.open('FluentReadDocumentHistory', 2);
             opened.onsuccess = () => resolve(opened.result);opened.onerror = () => reject(opened.error);
         });
         const stored = await new Promise<DocumentHistoryRecord[]>((resolve, reject) => {
@@ -515,6 +809,13 @@ describe('document history storage', () => {
         expect(ids).toHaveLength(DOCUMENT_HISTORY_MAX_ENTRIES);
         expect(ids[0]).toBe(`doc-${DOCUMENT_HISTORY_MAX_ENTRIES + 2}`); expect(ids).not.toContain('doc-0'); expect(ids).not.toContain('doc-2'); expect(ids).toContain('doc-3');
     });
+    it('retains the recent prefix when mixed record sizes exceed the byte limit', async () => {
+        const history = createDocumentHistory(new IDBFactory()), unit = 1024 * 1024;
+        expect(await history.save(record('old-small', 1, {bytes: new Uint8Array(10 * unit)}))).toBe(true);
+        expect(await history.save(record('middle-large', 2, {bytes: new Uint8Array(60 * unit)}))).toBe(true);
+        expect(await history.save(record('new-small', 3, {bytes: new Uint8Array(30 * unit)}))).toBe(true);
+        expect((await history.list()).map(item => item.id)).toEqual(['new-small']);
+    });
     it('evicts older records when the total stored bytes exceed the budget and refuses oversized or anonymous records', async () => {
         const history = createDocumentHistory(new IDBFactory());
         const half = Math.floor(DOCUMENT_HISTORY_MAX_BYTES / 2);
@@ -573,6 +874,7 @@ describe('document history storage', () => {
                         const result = transaction(stores, mode, options);
                         if (delay && mode === 'readonly') {
                             delay = false;
+                            Object.defineProperty(result, 'oncomplete', {set: () => {}, configurable: true});
                             const objectStore = result.objectStore.bind(result);
                             vi.spyOn(result, 'objectStore').mockImplementation(store => {
                                 const target = objectStore(store);
@@ -613,6 +915,7 @@ describe('document history storage', () => {
                     vi.spyOn(database, 'transaction').mockImplementation((stores, mode, options) => {
                         const result = transaction(stores, mode, options);
                         if (mode === 'readonly' && delayedReads < 2) {
+                            Object.defineProperty(result, 'oncomplete', {set: () => {}, configurable: true});
                             const objectStore = result.objectStore.bind(result);
                             vi.spyOn(result, 'objectStore').mockImplementation(store => {
                                 const target = objectStore(store);
@@ -640,7 +943,7 @@ describe('document history storage', () => {
     it('degrades to empty results when IndexedDB is missing, refuses to open or fails mid-request, and can recover afterwards', async () => {
         const absent = createDocumentHistory(null as never);
         expect(await absent.list()).toEqual([]); expect(await absent.load('a')).toBeNull(); expect(await absent.save(record('a', 1))).toBe(false);
-        await expect(absent.remove('a')).resolves.toBeUndefined(); await expect(absent.clear()).resolves.toBeUndefined();
+        await expect(absent.remove('a')).resolves.toBe(false); await expect(absent.clear()).resolves.toBe(false);
         const real = new IDBFactory(); let blocked = true;
         const flaky = {open: (name: string, version?: number) => {
             if (!blocked) return real.open(name, version);
@@ -663,7 +966,7 @@ describe('document history storage', () => {
             return opened;
         }} as unknown as IDBFactory);
         expect(await rejecting.list()).toEqual([]); expect(await rejecting.load('a')).toBeNull(); expect(await rejecting.save(record('a', 1))).toBe(false);
-        await expect(rejecting.remove('a')).resolves.toBeUndefined(); await expect(rejecting.clear()).resolves.toBeUndefined();
+        await expect(rejecting.remove('a')).resolves.toBe(false); await expect(rejecting.clear()).resolves.toBe(false);
         // 被其他标签页占用：打开请求被阻塞或一直没有结果，都在时限内退化为空结果，之后可以恢复。
         const blockedFactory = {open: () => {const pending = {} as unknown as IDBOpenDBRequest; queueMicrotask(() => pending.onblocked?.(new Event('blocked') as IDBVersionChangeEvent)); return pending;}} as unknown as IDBFactory;
         expect(await createDocumentHistory(blockedFactory).list()).toEqual([]);

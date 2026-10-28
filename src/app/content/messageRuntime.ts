@@ -28,6 +28,7 @@ import {handleInformationHighlightMessage, type InformationHighlightMessageState
 import {handlePageTranslationFontMessage, type PageTranslationFontMessageState} from './pageTranslationFontMessage';
 export interface ContentRuntimeMessageState extends InformationHighlightMessageState, PageTranslationFontMessageState {
     updateSiteDisabled(disabled: boolean): Promise<void>;
+    reconcileUserscriptPage?(): Promise<boolean>;
 }
 export type ContentRuntimeMessageHandler = (message: unknown, sender: unknown, sendResponse: (response?: unknown) => void) => boolean;
 /** 创建当前 document 私有的 runtime message handler，避免跨生命周期共享可变状态。 */
@@ -43,6 +44,15 @@ export function createContentRuntimeMessageHandler(ctx: ContentScriptContext, st
             if (notice !== undefined) return notice;
             const handled = handleInformationHighlightMessage(payload, state, ctx.isInvalid || config.on === false, sendResponse);
             if (handled !== undefined) return handled;
+        }
+        if (import.meta.env.BROWSER === 'userscript' && payload.type === 'reconcileUserscriptPage') {
+            if (ctx.isInvalid || state.isSiteDisabled() || state.isPageSuspended?.() || !state.reconcileUserscriptPage) {
+                sendResponse({status: 'unavailable'});
+                return true;
+            }
+            void Promise.resolve().then(() => state.reconcileUserscriptPage!()).then(success => sendResponse({status: success ? 'success' : 'failed'}))
+                .catch(() => sendResponse({status: 'failed'}));
+            return true;
         }
         if (payload.type === 'qqMailFrameCommand' || payload.type === 'qqMailFrameRefresh' ||
             payload.type === 'embeddedFrameCommand' || payload.type === 'embeddedFrameRefresh') return false;

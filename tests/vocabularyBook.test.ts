@@ -1,5 +1,7 @@
 import 'fake-indexeddb/auto';
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import {VocabularyPersistentUndo, VOCABULARY_UNDO_TTL_MS, VOCABULARY_UNDO_MAX_PENDING} from '@/src/features/vocabulary/background/persistentUndo';
+import Dexie from 'dexie';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   VOCABULARY_BOOK_EXPORT_FORMAT,
   VOCABULARY_BOOK_EXPORT_VERSION,
@@ -29,11 +31,13 @@ const NOW = 1_000_000;
 let databaseSequence = 0;
 let db: FluentReadVocabularyBookDatabase;
 let repository: VocabularyBookRepository;
+let undo: VocabularyPersistentUndo;
 
 beforeEach(() => {
   databaseSequence += 1;
   db = new FluentReadVocabularyBookDatabase(`FluentReadVocabularyBookTest-${databaseSequence}`);
   repository = new VocabularyBookRepository(db);
+  undo = new VocabularyPersistentUndo(db);
 });
 
 afterEach(async () => {
@@ -330,6 +334,10 @@ describe('vocabulary identity and upsert', () => {
       repository.upsert(baseInput({ term: 'Unseen', translation: '未见过' }), NOW + 2),
     ).rejects.toMatchObject({ code: 'limit-exceeded' });
     await expect(db.entries.count()).resolves.toBe(VOCABULARY_BOOK_MAX_ENTRIES);
+    const ticket=(await undo.removeWithUndo(template.id,NOW+3))!;
+    await repository.upsert(baseInput({term:'Unseen'}),NOW+4);
+    await expect(undo.restoreUndo(ticket.id,NOW+5)).rejects.toMatchObject({code:'limit-exceeded'});
+    expect(await undo.listUndo(NOW+5)).toEqual([ticket]);
   });
 });
 
@@ -463,6 +471,202 @@ describe('review scheduling and logs', () => {
 });
 
 describe('repository transactions', () => {
+  it('refuses to merge an in-memory undo snapshot into a newly saved same-identity entry',async()=>{
+    const old=await repository.upsert(baseInput({translation:'old private'}),NOW);
+    await repository.review(old.id,'good',NOW+1);const snapshot=(await repository.removeWithSnapshot(old.id))!;
+    const newer=await repository.upsert(baseInput({translation:'newer',note:'new note'}),NOW+2);
+    await expect(repository.restoreSnapshot(snapshot,Number.MAX_SAFE_INTEGER)).rejects.toMatchObject({code:'invalid-input'});
+    expect(await repository.get(newer.id)).toMatchObject({note:'new note',translations:{'zh-cn':{text:'newer'}}});
+    expect(await repository.getReviewLogs(newer.id)).toEqual([]);
+    expect(snapshot.entry.translations['zh-cn'].text).toBe('old private');
+  });
+  it('migrates a v1 database without losing entries before enabling persistent undo', async () => {
+    const name = `FluentReadVocabularyMigration-${++databaseSequence}`;
+    const legacy = new Dexie(name);
+    legacy.version(1).stores({entries:'&id, &identityKey, sourceLanguage, createdAt, updatedAt, lastSeenAt, masteryLevel, status, nextReviewAt',reviewLogs:'&id, entryId, reviewedAt, [entryId+reviewedAt]'});
+    await legacy.table('entries').add({id:'legacy-id',identityKey:'en\u0000legacy',term:'legacy'});
+    legacy.close();
+    const migrated = new FluentReadVocabularyBookDatabase(name);
+    expect(await migrated.entries.get('legacy-id')).toMatchObject({term:'legacy'});
+    expect(await migrated.undo.count()).toBe(0);
+    migrated.close(); await migrated.delete();
+  });
+
+  it('persists deletion and logs atomically across database reopen, then restores exactly once', async () => {
+    const entry = await repository.upsert(baseInput({note:'private note',context:{text:'private context',capturedAt:NOW}}), NOW);
+    await repository.review(entry.id, 'good', NOW + 1);
+    const previous = await repository.get(entry.id), logs = await repository.getReviewLogs(entry.id);
+    const ticket = (await undo.removeWithUndo(entry.id, NOW + 2))!;
+    expect(ticket).toMatchObject({term:entry.term,expiresAt:NOW + 2 + VOCABULARY_UNDO_TTL_MS});
+    expect(JSON.stringify(ticket)).not.toContain('private context');
+    expect(await repository.get(entry.id)).toBeNull();
+    expect(await repository.getReviewLogs(entry.id)).toEqual([]);
+    const name = db.name;
+    db.close(); db = new FluentReadVocabularyBookDatabase(name); repository = new VocabularyBookRepository(db); undo = new VocabularyPersistentUndo(db);
+    expect(await undo.listUndo(NOW+3)).toEqual([ticket]);
+    expect(await undo.restoreUndo(ticket.id, NOW+4)).toBe('restored');
+    db.close(); db = new FluentReadVocabularyBookDatabase(name); repository = new VocabularyBookRepository(db); undo = new VocabularyPersistentUndo(db);
+    expect(await undo.restoreUndo(ticket.id, NOW+5)).toBe('previously-restored');
+    expect(await repository.get(entry.id)).toEqual(previous);
+    expect(await repository.getReviewLogs(entry.id)).toEqual(logs);
+    expect(await undo.listUndo(NOW+6)).toEqual([]);
+    expect(JSON.stringify(await db.undo.get(ticket.id))).not.toContain('private');
+  });
+
+  it('serializes concurrent removal and restoration and keeps deleted data out of exports', async () => {
+    const entry=await repository.upsert(baseInput({term:'private unique term',note:'private unique note'}),NOW);
+    await repository.review(entry.id,'good',NOW+1);
+    const deletions=await Promise.all([undo.removeWithUndo(entry.id,NOW+2),undo.removeWithUndo(entry.id,NOW+2)]);
+    const ticket=deletions.find(Boolean)!;
+    expect(deletions.filter(Boolean)).toHaveLength(1);
+    expect(JSON.stringify(await repository.exportData({includePrivateContext:true}))).not.toContain('private unique');
+    expect(await Promise.all([undo.restoreUndo(ticket.id,NOW+3),undo.restoreUndo(ticket.id,NOW+3)])).toEqual(['restored','previously-restored']);
+    expect(await repository.getReviewLogs(entry.id)).toHaveLength(1);
+  });
+  it('does not claim a stale successful restore means the item is still present',async()=>{
+    const entry=await repository.upsert(baseInput(),NOW);const old=(await undo.removeWithUndo(entry.id,NOW+1))!;
+    expect(await undo.restoreUndo(old.id,NOW+2)).toBe('restored');
+    const newer=(await undo.removeWithUndo(entry.id,NOW+3))!;
+    db.close();db=new FluentReadVocabularyBookDatabase(db.name);repository=new VocabularyBookRepository(db);undo=new VocabularyPersistentUndo(db);
+    expect(await undo.restoreUndo(old.id,NOW+4)).toBe('previously-restored');
+    expect(await repository.get(entry.id)).toBeNull();expect(await undo.listUndo(NOW+4)).toEqual([newer]);
+  });
+  it('rejects a restore that expires while waiting for the write transaction',async()=>{
+    const entry=await repository.upsert(baseInput(),NOW);const ticket=(await undo.removeWithUndo(entry.id,NOW))!;
+    let clock=NOW+1;const date=vi.spyOn(Date,'now').mockImplementation(()=>clock);
+    let release!:()=>void;const gate=new Promise<void>(resolve=>{release=resolve});let locked=false;
+    const hold=db.transaction('rw',db.entries,db.reviewLogs,db.undo,async()=>{locked=true;await Dexie.waitFor(gate);});
+    await vi.waitFor(()=>expect(locked).toBe(true));const restoring=undo.restoreUndo(ticket.id);
+    clock=ticket.expiresAt;release();await hold;expect(await restoring).toBe('expired');expect(await repository.get(entry.id)).toBeNull();date.mockRestore();
+  });
+  it('starts the retention period when a queued deletion obtains its write lock',async()=>{
+    const entry=await repository.upsert(baseInput(),NOW);let clock=NOW;const date=vi.spyOn(Date,'now').mockImplementation(()=>clock);
+    let release!:()=>void;const gate=new Promise<void>(resolve=>{release=resolve});let locked=false;
+    const hold=db.transaction('rw',db.entries,db.reviewLogs,db.undo,async()=>{locked=true;await Dexie.waitFor(gate);});
+    await vi.waitFor(()=>expect(locked).toBe(true));const removing=undo.removeWithUndo(entry.id);
+    clock=NOW+VOCABULARY_UNDO_TTL_MS;release();await hold;const ticket=(await removing)!;
+    expect(ticket.createdAt).toBe(clock);expect(ticket.expiresAt).toBe(clock+VOCABULARY_UNDO_TTL_MS);date.mockRestore();
+  });
+  it('rolls back deletion if its undo ticket expires before the transaction completes',async()=>{
+    const entry=await repository.upsert(baseInput(),NOW);let clock=NOW;const date=vi.spyOn(Date,'now').mockImplementation(()=>clock);
+    const remove=db.entries.delete.bind(db.entries);
+    const spy=vi.spyOn(db.entries,'delete').mockImplementationOnce(id=>remove(id).then(()=>{clock=NOW+VOCABULARY_UNDO_TTL_MS;}));
+    await expect(undo.removeWithUndo(entry.id)).rejects.toMatchObject({code:'storage-error'});
+    expect(await repository.get(entry.id)).toMatchObject({id:entry.id});expect(await db.undo.count()).toBe(0);spy.mockRestore();date.mockRestore();
+  });
+  it('rolls back a restore that reaches expiry during the transaction',async()=>{
+    const entry=await repository.upsert(baseInput(),NOW);const ticket=(await undo.removeWithUndo(entry.id,NOW))!;
+    let clock=NOW+1;const date=vi.spyOn(Date,'now').mockImplementation(()=>clock);const put=db.undo.put.bind(db.undo);
+    const spy=vi.spyOn(db.undo,'put').mockImplementationOnce(record=>put(record).then(result=>{clock=ticket.expiresAt;return result;}));
+    expect(await undo.restoreUndo(ticket.id)).toBe('expired');expect(await repository.get(entry.id)).toBeNull();expect(await db.undo.get(ticket.id)).toBeUndefined();spy.mockRestore();date.mockRestore();
+  });
+  it('rejects an in-memory restore that expires while queued',async()=>{
+    const entry=await repository.upsert(baseInput(),NOW);const snapshot=(await repository.removeWithSnapshot(entry.id))!;
+    let clock=NOW+1;const date=vi.spyOn(Date,'now').mockImplementation(()=>clock);
+    let release!:()=>void;const gate=new Promise<void>(resolve=>{release=resolve});let locked=false;
+    const hold=db.transaction('rw',db.entries,db.reviewLogs,async()=>{locked=true;await Dexie.waitFor(gate);});
+    await vi.waitFor(()=>expect(locked).toBe(true));const restoring=repository.restoreSnapshot(snapshot,NOW+10);
+    const rejected=expect(restoring).rejects.toMatchObject({code:'not-found'});clock=NOW+10;release();await hold;await rejected;
+    expect(await repository.get(entry.id)).toBeNull();date.mockRestore();
+  });
+  it('rolls back an in-memory restore when it expires during the transaction', async () => {
+    const entry = await repository.upsert(baseInput(), NOW);
+    await repository.review(entry.id, 'good', NOW + 1);
+    const snapshot = (await repository.removeWithSnapshot(entry.id))!;
+    let clock = NOW + 2;
+    const date = vi.spyOn(Date, 'now').mockImplementation(() => clock);
+    const add = db.entries.add.bind(db.entries);
+    const entryAdd = vi.spyOn(db.entries, 'add').mockImplementationOnce((...args) => add(...args).then(result => {clock = NOW + 10; return result;}));
+    try {
+      await expect(repository.restoreSnapshot(snapshot, NOW + 10)).rejects.toMatchObject({code: 'not-found'});
+      expect(await repository.get(entry.id)).toBeNull();
+      expect(await repository.getReviewLogs(entry.id)).toEqual([]);
+    } finally {entryAdd.mockRestore(); date.mockRestore();}
+  });
+  it('restores an in-memory snapshot and its review history before expiry', async () => {
+    const entry = await repository.upsert(baseInput(), NOW);
+    await repository.review(entry.id, 'good', NOW + 1);
+    const snapshot = (await repository.removeWithSnapshot(entry.id))!;
+    await repository.restoreSnapshot(snapshot, Number.MAX_SAFE_INTEGER);
+    expect(await repository.get(entry.id)).toEqual(snapshot.entry);
+    expect(await repository.getReviewLogs(entry.id)).toEqual(snapshot.reviewLogs);
+  });
+  it('clears a userscript vocabulary database without requiring the extension undo table', async () => {
+    vi.stubEnv('BROWSER', 'userscript');
+    const scriptDb = new FluentReadVocabularyBookDatabase(`FluentReadVocabularyScriptTest-${++databaseSequence}`);
+    const scriptRepository = new VocabularyBookRepository(scriptDb);
+    try {
+      const entry = await scriptRepository.upsert(baseInput(), NOW);
+      await scriptRepository.review(entry.id, 'good', NOW + 1);
+      await scriptRepository.clear();
+      expect(await scriptRepository.get(entry.id)).toBeNull();
+      expect(await scriptRepository.getReviewLogs(entry.id)).toEqual([]);
+      expect(scriptDb.tables.map(table => table.name)).not.toContain('undo');
+    } finally {scriptDb.close(); await scriptDb.delete(); vi.unstubAllEnvs();}
+  });
+  it('rolls back a restore if its receipt cannot be written',async()=>{
+    const entry=await repository.upsert(baseInput(),NOW);await repository.review(entry.id,'good',NOW+1);
+    const ticket=(await undo.removeWithUndo(entry.id,NOW+2))!;
+    const failure=vi.spyOn(db.undo,'put').mockRejectedValueOnce(new Error('failure'));
+    await expect(undo.restoreUndo(ticket.id,NOW+3)).rejects.toThrow();failure.mockRestore();
+    expect(await repository.get(entry.id)).toBeNull();expect(await repository.getReviewLogs(entry.id)).toEqual([]);
+    expect(await undo.listUndo(NOW+3)).toEqual([ticket]);
+    expect(await undo.restoreUndo(ticket.id,NOW+4)).toBe('restored');
+  });
+  it('refuses to retain oversized legacy data without deleting it',async()=>{
+    const entry=await repository.upsert(baseInput(),NOW);
+    await db.entries.update(entry.id,{note:'x'.repeat(9*1024*1024)});
+    await expect(undo.removeWithUndo(entry.id,NOW+1)).rejects.toMatchObject({code:'limit-exceeded'});
+    expect(await repository.get(entry.id)).not.toBeNull();expect(await undo.listUndo(NOW+2)).toEqual([]);
+  });
+  it('rolls back deletion if writing its durable undo snapshot fails', async () => {
+    const entry = await repository.upsert(baseInput(), NOW);
+    await repository.review(entry.id, 'good', NOW+1);
+    const failure = vi.spyOn(db.undo, 'add').mockRejectedValueOnce(new Error('synthetic write failure'));
+    await expect(undo.removeWithUndo(entry.id, NOW+2)).rejects.toThrow('synthetic write failure');
+    failure.mockRestore();
+    expect(await repository.get(entry.id)).not.toBeNull();
+    expect(await repository.getReviewLogs(entry.id)).toHaveLength(1);
+    expect(await undo.listUndo(NOW+3)).toEqual([]);
+  });
+
+  it('prunes expired records without touching a newer pending deletion',async()=>{
+    const first=await repository.upsert(baseInput(),NOW);const old=(await undo.removeWithUndo(first.id,NOW))!;
+    const next=await repository.upsert(baseInput({term:'later'}),NOW+1);const recent=(await undo.removeWithUndo(next.id,NOW+1))!;
+    await undo.pruneUndo(NOW+VOCABULARY_UNDO_TTL_MS);
+    expect(await db.undo.get(old.id)).toBeUndefined();expect(await undo.listUndo(NOW+VOCABULARY_UNDO_TTL_MS)).toEqual([recent]);
+  });
+  it('refuses expired, explicitly discarded and cleared tickets without reviving data', async () => {
+    const first = await repository.upsert(baseInput(), NOW);
+    const expired = (await undo.removeWithUndo(first.id, NOW))!;
+    expect(await undo.restoreUndo(expired.id, NOW + VOCABULARY_UNDO_TTL_MS)).toBe('expired');
+    expect(await undo.restoreUndo(expired.id, NOW + VOCABULARY_UNDO_TTL_MS)).toBe('missing');
+    const second = await repository.upsert(baseInput({term:'second'}), NOW);
+    const discarded = (await undo.removeWithUndo(second.id, NOW))!;
+    await undo.discardUndo(discarded.id);
+    expect(await undo.restoreUndo(discarded.id, NOW+1)).toBe('missing');
+    const third = await repository.upsert(baseInput({term:'third'}), NOW);
+    const cleared = (await undo.removeWithUndo(third.id, NOW))!;
+    await repository.clear();
+    expect(await undo.restoreUndo(cleared.id, NOW+1)).toBe('missing');
+  });
+
+  it('preserves snapshots on identity conflicts and limits simultaneous pending deletes', async () => {
+    const old = await repository.upsert(baseInput(), NOW);
+    const ticket = (await undo.removeWithUndo(old.id, NOW))!;
+    const newer = await repository.upsert(baseInput({translation:'newer'}), NOW+1);
+    await expect(undo.restoreUndo(ticket.id, NOW+2)).rejects.toThrow('相同收藏');
+    expect(await repository.get(newer.id)).toMatchObject({translations:{'zh-cn':{text:'newer'}}});
+    expect(await undo.listUndo(NOW+2)).toContainEqual(ticket);
+    for (let index=1; index<VOCABULARY_UNDO_MAX_PENDING; index++) {
+      const next = await repository.upsert(baseInput({term:`term ${index}`}), NOW+index);
+      await undo.removeWithUndo(next.id, NOW+index);
+    }
+    const overflow = await repository.upsert(baseInput({term:'overflow'}), NOW+100);
+    await expect(undo.removeWithUndo(overflow.id, NOW+101)).rejects.toMatchObject({code:'limit-exceeded'});
+    expect(await repository.get(overflow.id)).not.toBeNull();
+  });
+
   it('atomically returns a plain snapshot while deleting an entry and its review logs', async () => {
     const entry = await repository.upsert(baseInput(), NOW);
     await repository.review(entry.id, 'good', NOW + 1);
@@ -481,6 +685,21 @@ describe('repository transactions', () => {
     await expect(repository.getReviewLogs(entry.id)).resolves.toEqual([]);
     await expect(repository.removeWithSnapshot(entry.id)).resolves.toBeNull();
     await expect(repository.remove(entry.id)).resolves.toBe(false);
+  });
+
+  it('restores a deletion snapshot and its reviews; a repeated import is explicitly idempotent', async () => {
+    const entry = await repository.upsert(baseInput({note:'saved note', context:{text:'Context for this word.',capturedAt:NOW}}), NOW);
+    await repository.review(entry.id, 'good', NOW + 1);
+    await repository.review(entry.id, 'again', NOW + 2);
+    const snapshot = (await repository.removeWithSnapshot(entry.id))!;
+    const backup: VocabularyBookExport = {format:VOCABULARY_BOOK_EXPORT_FORMAT,version:VOCABULARY_BOOK_EXPORT_VERSION,
+      exportedAt:NOW+3,includesPrivateContext:true,entries:[snapshot.entry],reviewLogs:snapshot.reviewLogs};
+    expect(await repository.importData(backup, NOW+4)).toMatchObject({inserted:1,updated:0,reviewLogsImported:2});
+    expect(await repository.get(entry.id)).toEqual(snapshot.entry);
+    expect(await repository.getReviewLogs(entry.id)).toEqual(snapshot.reviewLogs);
+    expect(await repository.importData(backup, NOW+5)).toMatchObject({inserted:0,updated:0,reviewLogsImported:0});
+    expect(await repository.get(entry.id)).toEqual(snapshot.entry);
+    expect(await repository.getReviewLogs(entry.id)).toEqual(snapshot.reviewLogs);
   });
 });
 

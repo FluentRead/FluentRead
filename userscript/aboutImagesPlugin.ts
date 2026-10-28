@@ -20,7 +20,7 @@ export function createUserscriptAboutImagesCompressionPlugin(root: string, enabl
         const image = readFileSync(resolve(root, relativePath));
         const dataUrl = `data:image/jpeg;base64,${image.toString('base64')}`;
         return {
-            compressed: encodeUserscriptDataCompact(gzipUserscriptBuildData(Buffer.from(dataUrl, 'utf8'))),
+            compressed: encodeUserscriptDataCompact(gzipUserscriptBuildData(Buffer.from(dataUrl, 'utf8'), 9)),
             sha256: createHash('sha256').update(image).digest('hex'),
         };
     };

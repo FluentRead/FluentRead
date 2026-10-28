@@ -21,7 +21,7 @@ vi.mock('@/src/services/config/store', () => ({
 vi.mock('@/src/app/translation/runtime', () => ({cleanupTranslationCache: vi.fn(), clearTranslationCache: vi.fn(), translateWithCache: vi.fn()}));
 vi.mock('@/src/app/translation/visionProbeRuntime', () => ({modelVisionProbe: {resolve: vi.fn()}}));
 vi.mock('@/src/platform/storage/modelUsageRepository', () => ({getModelUsageRepository: () => ({})}));
-vi.mock('@/src/features/vocabulary/repository', () => ({vocabularyBook: {}}));
+vi.mock('@/src/features/vocabulary/repository', () => ({vocabularyBook: {pruneUndo: async () => undefined}}));
 vi.mock('ai', () => ({streamText: (...args: unknown[]) => state.model(...args), tool: (definition: unknown) => definition}));
 vi.mock('@/src/services/harness/modelGateway', async original => ({
     ...await original<typeof import('@/src/services/harness/modelGateway')>(), createHarnessLanguageModel: () => ({}),

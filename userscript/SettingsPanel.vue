@@ -451,6 +451,7 @@ watch(() => draft.value.service, cancelAddCustomModel);
 
 let disposed = false;
 let submitted = false;
+let pageApplied = false;
 const configEditor = createConfigEditor({
   copySnapshot: normalizeUserscriptConfig,
   readDraft: () => draft.value,
@@ -459,10 +460,10 @@ const configEditor = createConfigEditor({
     submitted = true;
     // 本地 patch 仍由 store 记录即时历史；失败回读权威状态，避免把乐观回声当成保存成功。
     await requestConfigPatch(snapshot);
-    if (!disposed) await syncCurrentPage(normalizeUserscriptConfig(runtimeConfig));
+    if (!disposed) pageApplied = await syncCurrentPage();
   },
   onEdited: () => {status.value = '';statusIsError.value = false;},
-  onSaved: () => {status.value = '本次提交已保存，并已应用到当前页面。';},
+  onSaved: () => {statusIsError.value = !pageApplied; status.value = pageApplied ? '本次提交已保存，并已应用到当前页面。' : '设置已保存，当前页面应用状态未确认，请重试或刷新页面。';},
   onSaveError: error => {
     statusIsError.value = true;
     status.value = `保存失败：${error instanceof Error ? error.message : String(error)}`;
@@ -506,19 +507,16 @@ function close(): void {
   emit('close');
 }
 
-async function syncCurrentPage(next: Config): Promise<void> {
-  await browser.tabs.sendMessage(1, {
-    type: 'toggleFloatingBall',
-    isEnabled: next.on && !next.disableFloatingBall,
-  });
-  await browser.tabs.sendMessage(1, {
-    type: 'updateSelectionTranslatorMode',
-    mode: next.on ? next.selectionTranslatorMode : 'disabled',
-  });
-  await browser.tabs.sendMessage(1, {
-    type: 'toggleTranslationProgressPanel',
-    isEnabled: next.on && next.translationProgressPanelEnabled,
-  });
+async function syncCurrentPage(): Promise<boolean> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  try {
+    const response = await Promise.race([
+      browser.tabs.sendMessage(1, {type: 'reconcileUserscriptPage'}),
+      new Promise<undefined>(resolve => {timer = setTimeout(() => resolve(undefined), 2000);}),
+    ]);
+    return Boolean(response && typeof response === 'object' && 'status' in response && response.status === 'success');
+  } catch {return false;}
+  finally {if (timer !== undefined) clearTimeout(timer);}
 }
 
 async function save(): Promise<void> {
@@ -534,8 +532,11 @@ async function save(): Promise<void> {
     await configEditor.save();
     // 无变化的手动保存仍允许把已有设置重新应用到页面，不生成空持久化请求。
     if (!submitted && !disposed) {
-      await syncCurrentPage(normalizeUserscriptConfig(runtimeConfig));
-      if (!disposed && feedbackRevision === pageFeedbackRevision && !status.value) status.value = '本次提交已保存，并已应用到当前页面。';
+      const applied = await syncCurrentPage();
+      if (!disposed && feedbackRevision === pageFeedbackRevision && !status.value) {
+        statusIsError.value = !applied;
+        status.value = applied ? '本次提交已保存，并已应用到当前页面。' : '设置已保存，当前页面应用状态未确认，请重试或刷新页面。';
+      }
     }
   } catch (error) {
     if (!disposed && feedbackRevision === pageFeedbackRevision && !status.value) {

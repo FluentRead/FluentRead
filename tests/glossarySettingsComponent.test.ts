@@ -1046,6 +1046,84 @@ describe('Glossary real template workflows', () => {
     anchorClick.mockRestore();create.mockRestore();revoke.mockRestore();
   });
 
+  it('releases the glossary download URL when the click fails', async () => {
+    await state.persist({glossaryLibraries: [fixture('private')]});
+    const create = vi.spyOn(URL, 'createObjectURL').mockReturnValue('blob:glossary-sensitive');
+    const revoke = vi.spyOn(URL, 'revokeObjectURL').mockImplementation(() => {});
+    const anchor = vi.spyOn(dom.window.HTMLElement.prototype, 'click').mockImplementation(() => {throw new Error('download failed');});
+    try {
+      await click(button('glossary.export'));
+      expect(create).toHaveBeenCalledOnce();expect(revoke).toHaveBeenCalledWith('blob:glossary-sensitive');
+      expect(document.querySelector('[role="alert"]')?.textContent).toBe(tr('glossary.exportFailed'));
+      anchor.mockImplementation(() => {});await click(button('glossary.export'));
+      expect(create).toHaveBeenCalledTimes(2);expect(revoke).toHaveBeenCalledTimes(2);
+      expect(document.querySelector('[role="alert"]')).toBeNull();
+    } finally {anchor.mockRestore();create.mockRestore();revoke.mockRestore();}
+  });
+
+  it('shows a recoverable fixed error when creating the glossary URL fails', async () => {
+    await state.persist({glossaryLibraries: [fixture('private')]});
+    const create = vi.spyOn(URL, 'createObjectURL').mockImplementation(() => {throw new Error('sensitive detail');});
+    const revoke = vi.spyOn(URL, 'revokeObjectURL').mockImplementation(() => {});
+    try {
+      await click(button('glossary.export'));
+      expect(revoke).not.toHaveBeenCalled();
+      expect(document.querySelector('[role="alert"]')?.textContent).toBe(tr('glossary.exportFailed'));
+      expect(document.body.textContent).not.toContain('sensitive detail');
+    } finally {create.mockRestore();revoke.mockRestore();}
+  });
+
+  it('attempts cleanup after a synchronous unmount without publishing a stale export error', async () => {
+    await state.persist({glossaryLibraries: [fixture('private')]});
+    const create = vi.spyOn(URL, 'createObjectURL').mockReturnValue('blob:glossary-sensitive');
+    const revoke = vi.spyOn(URL, 'revokeObjectURL').mockImplementation(() => {});
+    const anchor = vi.spyOn(dom.window.HTMLElement.prototype, 'click').mockImplementation(() => {app.unmount();throw new Error('late');});
+    try {
+      await click(button('glossary.export'));expect(revoke).toHaveBeenCalledWith('blob:glossary-sensitive');
+      expect(document.querySelector('[role="alert"]')).toBeNull();
+    } finally {anchor.mockRestore();create.mockRestore();revoke.mockRestore();}
+  });
+
+  it('does not turn a successful glossary download into an error when cleanup throws', async () => {
+    await state.persist({glossaryLibraries: [fixture('private')]});
+    const create = vi.spyOn(URL, 'createObjectURL').mockReturnValue('blob:glossary-sensitive');
+    const revoke = vi.spyOn(URL, 'revokeObjectURL').mockImplementation(() => {throw new Error('cleanup');});
+    const anchor = vi.spyOn(dom.window.HTMLElement.prototype, 'click').mockImplementation(() => {});
+    try {
+      await click(button('glossary.export'));expect(revoke).toHaveBeenCalledWith('blob:glossary-sensitive');
+      expect(document.querySelector('[role="alert"]')).toBeNull();
+    } finally {anchor.mockRestore();create.mockRestore();revoke.mockRestore();}
+  });
+
+  it('keeps a newer synchronously reentered export success when the older click fails', async () => {
+    await state.persist({glossaryLibraries: [fixture('private')]});
+    const create = vi.spyOn(URL, 'createObjectURL').mockReturnValueOnce('blob:old').mockReturnValueOnce('blob:new');
+    const revoke = vi.spyOn(URL, 'revokeObjectURL').mockImplementation(() => {});let nested = false;
+    const anchor = vi.spyOn(dom.window.HTMLElement.prototype, 'click').mockImplementation(() => {
+      if (!nested) {nested = true;button('glossary.export')!.dispatchEvent(new dom.window.Event('click', {bubbles:true}));throw new Error('old failed');}
+    });
+    try {
+      await click(button('glossary.export'));expect(create).toHaveBeenCalledTimes(2);
+      expect(revoke).toHaveBeenCalledWith('blob:old');expect(revoke).toHaveBeenCalledWith('blob:new');
+      expect(document.querySelector('[role="alert"]')).toBeNull();
+    } finally {anchor.mockRestore();create.mockRestore();revoke.mockRestore();}
+  });
+
+  it('keeps a newer synchronously reentered export failure when the older click succeeds', async () => {
+    await state.persist({glossaryLibraries: [fixture('private')]});
+    const create = vi.spyOn(URL, 'createObjectURL').mockReturnValueOnce('blob:old').mockReturnValueOnce('blob:new');
+    const revoke = vi.spyOn(URL, 'revokeObjectURL').mockImplementation(() => {});let nested = false;
+    const anchor = vi.spyOn(dom.window.HTMLElement.prototype, 'click').mockImplementation(() => {
+      if (nested) throw new Error('new failed');
+      nested = true;button('glossary.export')!.dispatchEvent(new dom.window.Event('click', {bubbles:true}));
+    });
+    try {
+      await click(button('glossary.export'));expect(create).toHaveBeenCalledTimes(2);
+      expect(revoke).toHaveBeenCalledWith('blob:old');expect(revoke).toHaveBeenCalledWith('blob:new');
+      expect(document.querySelector('[role="alert"]')?.textContent).toBe(tr('glossary.exportFailed'));
+    } finally {anchor.mockRestore();create.mockRestore();revoke.mockRestore();}
+  });
+
   it('adds and edits entries from the empty state, exposes duplicate recovery and deletes via actual table actions', async () => {
     await click(button('glossary.addEntry'));expect(config.glossaryLibraries).toHaveLength(1);
     await input(document.querySelector('input[required]'), 'unique-token');

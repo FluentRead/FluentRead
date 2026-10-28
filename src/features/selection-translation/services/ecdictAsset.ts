@@ -4,7 +4,7 @@
  * 主要内容：限制响应体积与下载时长、验证 SHA-256、复用 CacheStorage 中的可信副本，并允许镜像失败后重试。
  * 模块边界：只处理可选词库资产，不传输查询词、不解析词义，也不加载远程脚本或 WASM。
  */
-import {cancelUnreadResponseBody, runtimeFetch} from '@/src/platform/http/runtime';
+import {cancelResponseReader, cancelUnreadResponseBody, runtimeFetch} from '@/src/platform/http/runtime';
 
 export type EcdictCompactRow = readonly [string, string, string, string];
 
@@ -49,7 +49,7 @@ async function readBounded(response: Response): Promise<Uint8Array> {
             offset += value.byteLength;
         }
     } finally {
-        await reader.cancel().catch(() => {});
+        cancelResponseReader(reader);
     }
     if (offset !== FULL_BYTES) throw new Error('Optional dictionary response incomplete');
     return bytes;

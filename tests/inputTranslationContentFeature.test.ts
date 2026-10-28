@@ -1200,6 +1200,43 @@ describe('input translation content feature', () => {
         expect(input.value).toBe('Public draft');
     });
 
+    it.each(['aria-disabled', 'aria-readonly'])('控件请求期间变为 %s 时拒绝迟到译文，解除后可重新翻译', async name => {
+        let release!: (value: unknown) => void;
+        const {fakeDocument, sendMessage} = mountHarness({sendMessage: () => new Promise(resolve => {release = resolve;})});
+        const input = fakeElement('textarea');
+        input.value = 'Public draft';
+        fakeDocument.activeElement = input;
+        const pending = fakeDocument.emit('keydown', trustedKey({key: 'Enter', ctrlKey: true}));
+        await vi.waitFor(() => expect(sendMessage).toHaveBeenCalledOnce());
+        input.getAttribute.mockImplementation((attribute: string) => attribute === name ? 'true' : null);
+        release({success: true, translatedText: '不应覆盖'});
+        await pending;
+        expect(input.value).toBe('Public draft');
+        input.getAttribute.mockReturnValue(null);
+        const next = fakeDocument.emit('keydown', trustedKey({key: 'Enter', ctrlKey: true}));
+        await vi.waitFor(() => expect(sendMessage).toHaveBeenCalledTimes(2));
+        release({success: true, translatedText: '新的译文'});
+        await next;
+        expect(input.value).toBe('新的译文');
+    });
+
+    it.each(['textarea', 'div'])('请求期间祖先禁用 %s 时拒绝写回迟到译文', async tag => {
+        let release!: (value: unknown) => void;
+        const {fakeDocument, sendMessage} = mountHarness({sendMessage: () => new Promise(resolve => {release = resolve;})});
+        const input = fakeElement(tag, tag === 'div' ? {contenteditable: 'true'} : {});
+        input.value = 'Public draft'; input.innerText = 'Public draft'; input.textContent = 'Public draft';
+        let disabled = false;
+        input.closest.mockImplementation((selector: string) => selector.includes('aria-disabled') && disabled ? {} : null);
+        fakeDocument.activeElement = input;
+        const pending = fakeDocument.emit('keydown', trustedKey({key: 'Enter', ctrlKey: true}));
+        await vi.waitFor(() => expect(sendMessage).toHaveBeenCalledOnce());
+        disabled = true;
+        release({success: true, translatedText: '不应覆盖'});
+        await pending;
+        expect(input.value).toBe('Public draft');
+        expect(editable.replaceEditableText).not.toHaveBeenCalled();
+    });
+
     it.each([
         ['ctrl_enter', [{key: 'Enter', code: 'Enter', ctrlKey: true}], 'Secret42'],
         ['triple_space', Array.from({length: 3}, () => ({key: ' ', code: 'Space'})), 'Secret42   '],

@@ -184,7 +184,8 @@ export function createPdfReaderRenderPort(document: ParsedDocument): PdfReaderRe
                 canvas.style.height = `${viewport.height}px`;
                 canvas.setAttribute('aria-hidden', 'true');
                 canvas.setAttribute('data-pdf-resource', 'source');
-                const context = canvas.getContext('2d', {alpha: false});
+                // 仅译文原版排版直接从此画布逐段取色；其他源画布无需牺牲绘制加速。
+                const context = canvas.getContext('2d', {alpha: false, ...(!readable && !showSource ? {willReadFrequently: true} : {})});
                 if (!context) throw new Error('浏览器 Canvas 初始化失败');
                 renderTask = page.render({canvasContext: context, viewport, transform: [size.outputScale, 0, 0, size.outputScale, 0, 0], background: '#ffffff'});
                 const work = [abortable(renderTask.promise, controller.signal)];
@@ -243,7 +244,7 @@ export function createPdfReaderRenderPort(document: ParsedDocument): PdfReaderRe
                         translatedCanvas.style.width = canvas.style.width;
                         translatedCanvas.style.height = canvas.style.height;
                         translatedCanvas.setAttribute('aria-hidden', 'true');
-                        const translatedContext = translatedCanvas.getContext('2d', {alpha: false});
+                        const translatedContext = translatedCanvas.getContext('2d', {alpha: false, willReadFrequently: true});
                         if (!translatedContext) throw new Error('浏览器 Canvas 初始化失败');
                         translatedContext.drawImage(canvas, 0, 0);
                     } else translatedCanvas = canvas;

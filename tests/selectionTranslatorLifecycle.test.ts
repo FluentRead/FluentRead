@@ -156,10 +156,11 @@ function mountSelection(privateContext = false, selectionAdapter?: Record<string
     });
     const media = eventTarget('media');
     const documentPort = {...eventTarget('document'), getElementById: vi.fn(() => null), dispatchEvent: vi.fn()};
-    // 组合回归使用同一真实节点树；事件可信度与 Selection 几何仍由受控浏览器端口提供。
+    // 选区来源与挂载组件共享真实节点树；事件可信度和几何仍为受控端口。
+    const sourcePort = renderPort ? {document: renderPort.document, window: renderPort.domWindow} : parseHTML('<html><body></body></html>');
     const document = runtimeIntegration
-        ? Object.assign(renderPort!.document, eventTarget('document')) as unknown as typeof documentPort
-        : documentPort;
+        ? Object.assign(sourcePort.document, eventTarget('document')) as unknown as typeof documentPort
+        : Object.assign(sourcePort.document, documentPort);
     const window = {
         ...eventTarget('window'), innerWidth: 1000, innerHeight: 800, document,
         matchMedia: () => ({matches: false, ...media}),
@@ -170,6 +171,8 @@ function mountSelection(privateContext = false, selectionAdapter?: Record<string
     };
     vi.stubGlobal('document', document);
     vi.stubGlobal('window', window);
+    vi.stubGlobal('Node', sourcePort.window.Node);
+    vi.stubGlobal('Element', sourcePort.window.Element);
     const event = {addListener: vi.fn(), removeListener: vi.fn()};
     const browser = {
         runtime: {onMessage: event, getURL: (path: string) => path,
@@ -236,7 +239,24 @@ function mountSelection(privateContext = false, selectionAdapter?: Record<string
         return vm;
     };
     if (!runtimeIntegration) mountActual();
-    return {get state() {return state;}, event, browser, config, listeners, window, document, material, unsubscribeConfig, requestConfigPatch, notifyConfig, releaseContextMenu, translateText, translateTextBatch, stopTts: stopTts!,
+    const selectedSnapshot = (text: string, setupSource?: (parent: HTMLElement, source: Text) => void) => {
+        const parent = sourcePort.document.createElement('p');
+        parent.textContent = text;
+        sourcePort.document.body.appendChild(parent);
+        const source = parent.firstChild! as Text;
+        setupSource?.(parent as unknown as HTMLElement, source);
+        const rect = {left: 20, right: 310, top: 150, bottom: 174, width: 290, height: 24};
+        const range = Vue.markRaw({startContainer: source, endContainer: source, commonAncestorContainer: source,
+            startOffset: 0, endOffset: text.length, collapsed: false, getClientRects: () => [rect],
+            getBoundingClientRect: () => rect, cloneRange: () => range, toString: () => source.textContent || ''});
+        const selection = {rangeCount: 1, isCollapsed: false, anchorNode: source, anchorOffset: 0,
+            getRangeAt: () => range, toString: () => text, containsNode: () => false};
+        Object.assign(window, {getSelection: () => selection});
+        const result = state.readSelectionSnapshot();
+        if (!result) throw new Error('Test source must create a real selection snapshot');
+        return result;
+    };
+    return {get state() {return state;}, event, browser, config, listeners, window, document, material, unsubscribeConfig, requestConfigPatch, notifyConfig, releaseContextMenu, translateText, translateTextBatch, stopTts: stopTts!, selectedSnapshot,
         component, mountActual,
         registerContextMenu, get contextMenuHandler() {return contextMenuHandler;},
         captureMaterialSelection, beginMaterialCapture, completeMaterialCapture, materialGeneration: materialPorts.generation, materialCapture: materialPorts.capture,
@@ -326,7 +346,7 @@ describe('completed two-click selection first-frame scroll ordering', () => {
         const rect = {left: 20, right: 310, top: 150, bottom: 174, width: 290, height: 24};
         const range = Vue.markRaw({startContainer: source, endContainer: source, commonAncestorContainer: source,
             startOffset: 0, endOffset: text.length, collapsed: false, getClientRects: () => [rect],
-            getBoundingClientRect: () => rect, cloneRange: () => range, toString: () => text});
+            getBoundingClientRect: () => rect, cloneRange: () => range, toString: () => source.textContent || ''});
         const selection = {rangeCount: 1, isCollapsed: false, anchorNode: source, anchorOffset: 0,
             getRangeAt: () => range, toString: () => text, containsNode: () => false};
         Object.assign(fixture.window, {getSelection: () => selection});
@@ -361,6 +381,70 @@ describe('completed two-click selection first-frame scroll ordering', () => {
         fixture.send('window', 'scroll');
         await vi.advanceTimersByTimeAsync(50); await Vue.nextTick();
         expect(fixture.state.snapshot).toBeNull(); expect(fixture.state.showIndicator).toBe(false);
+        expect(fixture.lifecycleErrors).not.toHaveBeenCalled();
+    });
+
+    it.each(['text changed', 'source removed'])('discards an asynchronous answer if the original selection %s without an event', async change => {
+        const fixture = await prepare();
+        let resolve!: (value: string) => void;
+        fixture.translateText.mockImplementationOnce(() => new Promise<string>(done => {resolve = done;}));
+        fixture.complete();
+        await vi.advanceTimersByTimeAsync(16); await Vue.nextTick();
+        fixture.state.openTooltip();
+        expect(fixture.translateText).toHaveBeenCalledOnce();
+        expect(fixture.state.showTooltip).toBe(true);
+        if (change === 'text changed') fixture.paragraph.firstChild!.nodeValue = 'This source has changed.';
+        else fixture.paragraph.remove();
+        resolve('A late translation.');
+        await Promise.resolve(); await Vue.nextTick();
+        expect(fixture.state.translationResult).toBe('');
+        expect(fixture.state.showTooltip).toBe(false);
+        expect(fixture.lifecycleErrors).not.toHaveBeenCalled();
+    });
+
+    it('keeps the explicitly opened card when native selection is cleared but the source remains valid', async () => {
+        const fixture = await prepare();
+        let resolve!: (value: string) => void;
+        fixture.translateText.mockImplementationOnce(() => new Promise<string>(done => {resolve = done;}));
+        fixture.complete();
+        await vi.advanceTimersByTimeAsync(16); await Vue.nextTick();
+        fixture.state.openTooltip();
+        Object.assign(fixture.window, {getSelection: () => null});
+        resolve('Still current.');
+        await Promise.resolve(); await Vue.nextTick();
+        expect(fixture.state.translationResult).toBe('Still current.');
+        expect(fixture.state.showTooltip).toBe(true);
+        expect(fixture.lifecycleErrors).not.toHaveBeenCalled();
+    });
+
+    it.each([false, true])('checks a long cross-node selection on delivery when a source node changes=%s', async changed => {
+        const fixture = await prepare();
+        const first = fixture.paragraph.firstChild!;
+        first.nodeValue = 'First passage. '.repeat(130);
+        const last = fixture.renderPort!.document.createTextNode('Second passage. '.repeat(125));
+        fixture.paragraph.appendChild(last);
+        const text = first.textContent! + last.textContent!;
+        expect(text.length).toBeGreaterThan(3500);
+        expect(text.length).toBeLessThanOrEqual(4096);
+        const rect = {left: 20, right: 310, top: 150, bottom: 174, width: 290, height: 24};
+        const range = Vue.markRaw({startContainer: first, endContainer: last, commonAncestorContainer: fixture.paragraph,
+            startOffset: 0, endOffset: last.textContent!.length, collapsed: false,
+            getClientRects: () => [rect], getBoundingClientRect: () => rect, cloneRange: () => range,
+            toString: () => (first.textContent || '') + (last.textContent || '')});
+        Object.assign(fixture.window, {getSelection: () => ({rangeCount: 1, isCollapsed: false,
+            anchorNode: first, anchorOffset: 0, getRangeAt: () => range, toString: () => text, containsNode: () => false})});
+        fixture.state.snapshot = fixture.state.readSelectionSnapshot();
+        expect(fixture.state.snapshot?.text).toBe(text.trim());
+        fixture.state.selectedText = fixture.state.snapshot.text;
+        fixture.state.showTooltip = true;
+        let resolve!: (value: string) => void;
+        fixture.translateText.mockImplementationOnce(() => new Promise<string>(done => {resolve = done;}));
+        fixture.state.requestSelectionContent(fixture.state.selectedText);
+        if (changed) last.nodeValue = 'Changed last node.';
+        resolve('Long answer.');
+        await Promise.resolve(); await Vue.nextTick();
+        expect(fixture.state.translationResult).toBe(changed ? '' : 'Long answer.');
+        expect(fixture.state.showTooltip).toBe(!changed);
         expect(fixture.lifecycleErrors).not.toHaveBeenCalled();
     });
 
@@ -448,7 +532,7 @@ describe('explicit free selection explanation', () => {
         const captureReading = vi.fn(() => ({text, context: text, sentence: text}));
         const fixture = mountSelection(false, {acceptsRange: () => true, captureReading}, browserTarget, configReady);
         const select = () => {
-            fixture.state.snapshot = {text, range: {}, parts: [{kind: 'text', text}]};
+            fixture.state.snapshot = fixture.selectedSnapshot(text);
             fixture.state.selectedText = text;
             fixture.state.showTooltip = true;
             fixture.state.translationResult = '练习带来进步。';
@@ -812,7 +896,7 @@ describe('selection card language configuration without header switches', () => 
         let resolveOld!: (value: string) => void;
         fixture.translateText.mockImplementationOnce(() => new Promise<string>(resolve => {resolveOld = resolve;}));
         fixture.translateText.mockResolvedValueOnce('A fresh English answer.');
-        fixture.state.snapshot = {text, parts: [{kind: 'text', text}]};
+        fixture.state.snapshot = fixture.selectedSnapshot(text);
         fixture.state.selectedText = text;
         fixture.state.showTooltip = true;
         fixture.state.requestSelectionContent(text);
@@ -823,7 +907,7 @@ describe('selection card language configuration without header switches', () => 
         await Vue.nextTick();
         await Promise.resolve();
         expect(oldOptions.signal.aborted).toBe(true);
-        expect(fixture.translateText).toHaveBeenLastCalledWith(text, undefined, expect.objectContaining({sourceLanguage: 'auto', targetLanguage: 'en'}));
+        expect(fixture.translateText).toHaveBeenLastCalledWith(text, '', expect.objectContaining({sourceLanguage: 'auto', targetLanguage: 'en'}));
         expect(fixture.state.translationResult).toBe('A fresh English answer.');
         resolveOld('An obsolete Chinese answer.');
         await Promise.resolve();
@@ -1142,7 +1226,7 @@ describe('SelectionTranslator lifecycle after extension reload', () => {
     const card = (word: string) => ({word, normalizedWord: word, phonetics: [], sources: [],
         meanings: [{partOfSpeech: '名词', definitions: [{definition: 'an English definition'}]}]});
     function beginWord(fixture: ReturnType<typeof mountSelection>, word: string) {
-        fixture.state.snapshot = {text: word};
+        fixture.state.snapshot = fixture.selectedSnapshot(word);
         fixture.state.selectedText = word;
         return fixture.state.beginSelectionContentRequest(word);
     }
@@ -2194,7 +2278,7 @@ describe('Safari and Firefox explicit touch selection consumption', () => {
         expect(fixture.state.showTooltip).toBe(false);expect(fixture.state.touchOpenedSelection).toBeNull();
     });
     it.each(['safari', 'firefox'] as const)('does not clear a newer native selection when the %s old entry is clicked', async target => {
-        const fixture=prepare(target);fixture.replaceSelection('A newer native selection.');
+        const fixture=prepare(target);fixture.selectedSnapshot('A newer native selection.');
         await clickEntry(fixture);
         expect(fixture.state.showTooltip).toBe(true);expect(fixture.removeAllRanges).not.toHaveBeenCalled();
         expect(fixture.state.touchOpenedSelection).toBeNull();
@@ -2971,6 +3055,37 @@ describe('context menu selection ownership', () => {
 });
 
 describe('selection card on an extension PDF page', () => {
+    it.each([
+        ['native', false], ['native', true], ['document', false], ['document', true],
+    ] as const)('validates %s PDF source on result delivery when changed=%s', async (kind, changed) => {
+        const {createNativePdfSelectionAdapter} = await vi.importActual<typeof import('@/src/app/selection/page')>('@/src/app/selection/page');
+        const {createPdfSelectionAdapter} = await vi.importActual<typeof import('@/src/app/document-translation/selectionRuntime')>('@/src/app/document-translation/selectionRuntime');
+        let adapter: {acceptsRange(range: Range): boolean};
+        const fixture = mountSelection(false, {acceptsRange: (range: Range) => adapter.acceptsRange(range)}, 'chrome', true);
+        const text = 'A selected PDF source passage.';
+        const selected = fixture.selectedSnapshot(text, (parent, source) => {
+            if (kind === 'native') adapter = createNativePdfSelectionAdapter(source,
+                {text, sourceUrl: 'https://example.test/file.pdf', title: 'Fixture'}, () => true);
+            else {
+                parent.setAttribute('data-fluentread-pdf-text', '');
+                adapter = createPdfSelectionAdapter((fixture.document as unknown as Document).body);
+            }
+        });
+        fixture.state.snapshot = selected;
+        fixture.state.selectedText = text;
+        fixture.state.showTooltip = true;
+        let resolve!: (value: string) => void;
+        fixture.translateText.mockImplementationOnce(() => new Promise<string>(done => {resolve = done;}));
+        fixture.state.requestSelectionContent(text);
+        Object.assign(fixture.window, {getSelection: () => null});
+        if (changed) selected.range.startContainer.nodeValue = 'The PDF source changed.';
+        resolve('PDF translation.');
+        await Promise.resolve(); await Vue.nextTick();
+        expect(fixture.state.translationResult).toBe(changed ? '' : 'PDF translation.');
+        expect(fixture.state.showTooltip).toBe(!changed);
+        expect(fixture.lifecycleErrors).not.toHaveBeenCalled();
+    });
+
     function preparePdf() {
         const acceptsRange = vi.fn(() => true);
         const context = vi.fn(() => ({text: 'The Transformer uses attention.', title: 'Attention Is All You Need', sourceUrl: 'https://arxiv.org/pdf/1706.03762'}));
@@ -3680,8 +3795,7 @@ describe('selection translation authentication copy and request ownership', () =
     function begin(fixture: ReturnType<typeof mountSelection>, text = 'Good ideas deserve attention.') {
         fixture.config.from = 'en';
         fixture.config.to = 'zh-Hans';
-        fixture.state.snapshot = Vue.markRaw({text, parts: [{kind: 'text', text}],
-            range: {getClientRects: () => []} as unknown as Range});
+        fixture.state.snapshot = fixture.selectedSnapshot(text);
         fixture.state.selectedText = text;
         fixture.state.showTooltip = true;
         return fixture.state.beginSelectionContentRequest(text);
@@ -3979,8 +4093,7 @@ describe('selection authentication settings action ownership and rendered entry'
     }
 
     function begin(fixture: Fixture, text = 'Good ideas deserve attention.') {
-        fixture.state.snapshot = Vue.markRaw({text, parts: [{kind: 'text', text}],
-            range: {getClientRects: () => []} as unknown as Range});
+        fixture.state.snapshot = fixture.selectedSnapshot(text);
         fixture.state.selectedText = text;
         fixture.state.showTooltip = true;
         return fixture.state.beginSelectionContentRequest(text);
@@ -4955,7 +5068,7 @@ it('connects rendered reading navigation, evidence and source playback to the cu
     const fixture=mountSelection(false,{acceptsRange:()=>true,captureReading},{},true);
     fixture.config.harness={...fixture.config.harness,enabled:true,service:services.openai,actions:['meaning','grammar'],defaultAction:'meaning'};
     fixture.state.selectionConfigVersion+=1;fixture.notifyConfig();await Vue.nextTick();await Promise.resolve();await Vue.nextTick();
-    Object.assign(fixture.state,{snapshot:{text,parts:[{kind:'text',text}],range:{}},selectedText:text,translationResult:'完整译文',showTooltip:true});await Vue.nextTick();
+    Object.assign(fixture.state,{snapshot:fixture.selectedSnapshot(text),selectedText:text,translationResult:'完整译文',showTooltip:true});await Vue.nextTick();
     const port=fixture.renderPort!;const history=[...port.root.querySelectorAll('button')].find(button=>button.textContent==='记录')!;
     await port.click(history);await Vue.nextTick();expect(captureReading).toHaveBeenCalledOnce();expect(port.root.querySelector('[data-reading-port]')!.getAttribute('data-history')).toBe('true');
     const anchor=selectionPorts.evidence;
@@ -4982,7 +5095,7 @@ it('retries the dictionary from its rendered error, copies the selected word and
     const card={word:'hello',normalizedWord:'hello',phonetics:[],sources:[{id:'fixture',label:'Dictionary',url:'https://dictionary.test/hello'}],meanings:[{partOfSpeech:'感叹词',definitions:[{definition:'A greeting',translatedDefinition:'打招呼',example:'Hello again',translatedExample:'再次问好'}]}]};
     let lookups=0;fixture.browser.runtime.sendMessage.mockImplementation(message=>Promise.resolve(message.type==='selectionWordLookup'?++lookups===1?{success:false}:{success:true,data:card}:message.type==='selectionTts'?{success:true,transport:'offscreen'}:{success:true,zoom:1}));
     vi.spyOn(console,'warn').mockImplementation(()=>{});const writeText=vi.fn(async(_text:string)=>{});vi.stubGlobal('navigator',{clipboard:{writeText}});
-    fixture.translateText.mockResolvedValue('你好');const text='hello';Object.assign(fixture.state,{snapshot:{text,parts:[{kind:'text',text}],range:{}},selectedText:text,showTooltip:true});fixture.state.requestSelectionContent(text);
+    fixture.translateText.mockResolvedValue('你好');const text='hello';Object.assign(fixture.state,{snapshot:fixture.selectedSnapshot(text),selectedText:text,showTooltip:true});fixture.state.requestSelectionContent(text);
     for(let i=0;i<8;i++){await Promise.resolve();await Vue.nextTick()}
     const port=fixture.renderPort!;expect(port.root.textContent).toContain('词典暂时未能返回结果');expect(port.root.textContent).toContain('你好');
     await port.click(port.root.querySelector('.fr-word-fallback-note button')!);for(let i=0;i<8;i++){await Promise.resolve();await Vue.nextTick()}
@@ -5035,8 +5148,8 @@ describe('rendered notice settings response ownership', () => {
 describe('rendered hover entry and native copy events',()=>{
     async function entry(){
         const fixture=mountSelection(false,{acceptsRange:()=>true},'chrome',true);fixture.config.selectionTranslatorTrigger='hover';fixture.config.harness={...fixture.config.harness,hoverDelay:200};fixture.state.selectionConfigVersion+=1;fixture.notifyConfig();await Vue.nextTick();await Promise.resolve();await Vue.nextTick();
-        const text='Read a complete source sentence.',range={getClientRects:()=>[{left:20,right:210,top:150,bottom:174,width:190,height:24}],getBoundingClientRect:()=>({left:20,right:210,top:150,bottom:174,width:190,height:24})};
-        Object.assign(fixture.state,{snapshot:{text,parts:[{kind:'text',text}],range},selectedText:text,showIndicator:true});await Vue.nextTick();
+        const text='Read a complete source sentence.';
+        Object.assign(fixture.state,{snapshot:fixture.selectedSnapshot(text),selectedText:text,showIndicator:true});await Vue.nextTick();
         const port=fixture.renderPort!;const pointer=(type:string,properties:Record<string,unknown>={})=>{const event=new port.domWindow.Event(type);Object.defineProperties(event,Object.fromEntries(Object.entries({isTrusted:true,pointerType:'mouse',...properties}).map(([key,value])=>[key,{value}])));port.root.querySelector('.fr-selection-indicator')!.dispatchEvent(event)};
         return {...fixture,port,pointer};
     }

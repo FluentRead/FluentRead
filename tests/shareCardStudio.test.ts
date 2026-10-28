@@ -42,6 +42,46 @@ function fixture() {
     return {state, copy, patch, render, click, remove, open};
 }
 describe('制作卡片操作反馈与生命周期', () => {
+    it('无法创建下载节点时提示失败并允许随后重试', async () => {
+        const f = fixture(); await f.open();
+        const create = vi.spyOn(document, 'createElement').mockImplementationOnce(() => {throw Error('blocked');});
+        expect(() => f.state.saveImage()).not.toThrow();
+        expect(f.state.status).toBe('shareCard.saveFailed'); expect(f.state.statusError).toBe(true);
+        await vi.advanceTimersByTimeAsync(401); f.state.saveImage();
+        expect(f.click).toHaveBeenCalledOnce(); expect(f.state.status).toBe('shareCard.saved');
+        create.mockRestore();
+    });
+    it('保存触发同步关闭并重开时旧解锁计时器不影响新卡片的复制', async () => {
+        const f = fixture(); await f.open();
+        let reopened!: Promise<void>;
+        f.click.mockImplementationOnce(() => {
+            f.state.close(); reopened = f.state.open({original: 'New', translation: '新', source: ''});
+        });
+        f.state.saveImage(); await reopened; await vi.advanceTimersByTimeAsync(100);
+        let finish!: () => void;
+        f.copy.mockReturnValueOnce(new Promise<void>(resolve => {finish = resolve;}));
+        const copy = f.state.copyImage(); expect(f.state.busy).toBe(true);
+        await vi.advanceTimersByTimeAsync(401); expect(f.state.busy).toBe(true);
+        f.state.saveImage(); expect(f.click).toHaveBeenCalledOnce();
+        finish(); await copy; expect(f.state.status).toBe('shareCard.copied');
+    });
+    it('旧保存同步关闭后抛错不会向新卡片报告失败', async () => {
+        const f = fixture(); await f.open(); let reopened!: Promise<void>;
+        f.click.mockImplementationOnce(() => {
+            f.state.close(); reopened = f.state.open({original: 'New', translation: '新', source: ''});
+            throw Error('late');
+        });
+        expect(() => f.state.saveImage()).not.toThrow(); await reopened;
+        expect(f.state.status).toBe(''); expect(f.remove).toHaveBeenCalledOnce();
+    });
+    it('下载节点清理抛错不遮挡失败提示或阻止下一次操作', async () => {
+        const f = fixture(); await f.open();
+        f.click.mockImplementationOnce(() => {throw Error('blocked');});
+        f.remove.mockImplementationOnce(() => {throw Error('remove failed');});
+        expect(() => f.state.saveImage()).not.toThrow(); expect(f.state.status).toBe('shareCard.saveFailed');
+        await vi.advanceTimersByTimeAsync(401); f.state.saveImage();
+        expect(f.state.status).toBe('shareCard.saved'); expect(f.remove).toHaveBeenCalledTimes(2);
+    });
     it('保存反馈、重复保存重新通知、异常提示并释放下载节点', async () => {
         const f = fixture(); await f.open(); f.state.saveImage();
         expect(f.state.status).toBe('shareCard.saved'); expect(f.state.statusError).toBe(false);

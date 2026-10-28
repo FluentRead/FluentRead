@@ -86,7 +86,7 @@ async function zhipu(message: TranslationProviderRequest<string>) {
             cancelUnreadResponseBody(resp);
             throw error;
         }
-        const result = await readJsonResponse<any>(resp, '智谱返回的不是有效 JSON');
+        const result = await readJsonResponse<any>(resp, '智谱返回的不是有效 JSON', message.abortSignal);
         if (message.abortSignal?.aborted) throw abortErrorFromSignal(message.abortSignal);
         const actualModel = typeof result?.model === 'string' && result.model.trim()
             ? result.model

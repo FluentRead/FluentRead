@@ -17,6 +17,7 @@
       <p v-if="!modelValue.enabled" class="rule-notice">{{ tr('正文适配已关闭，规则仍保留；网页使用通用正文识别') }}</p>
       <div v-if="(isDirty || saving) && !form" class="draft-bar" role="status"><span>{{ tr(saving ? '正在保存，等待后台确认' : '草稿未保存，网页仍使用已保存规则') }}</span><button type="button" class="rule-primary" :disabled="saving || !!form || draftConflict" :aria-busy="saving" @click="saveDraft">{{ tr(saving ? '正在保存' : '保存并应用') }}</button></div>
       <p v-if="draftConflict" class="rule-error" role="alert">{{ tr('已保存规则在其他页面发生变化。草稿已保留，请先导出或复制草稿，再恢复最新配置并重新合并。') }}</p>
+      <p v-if="downloadError" class="rule-error" role="alert">{{ t('siteAdaptation.exportFailed') }}</p>
       <div v-if="!form" class="catalog-toolbar">
         <label class="rule-field"><span class="sr-only">{{ tr('搜索网站规则') }}</span><input v-model="search" type="search" :aria-label="tr('搜索网站规则')" :placeholder="tr('输入网站名称、域名或规则标识')" @input="visibleLimit = 30" /></label>
         <button type="button" class="rule-primary" :disabled="saving || !!form" @click="startForm()">{{ tr('新建规则') }}</button>
@@ -91,7 +92,8 @@
 </template>
 <script setup lang="ts">
 import UiSelect from '@/src/ui/components/UiSelect.vue';
-import {computed, nextTick, onBeforeUnmount, ref, watch} from 'vue';
+import {downloadTextFile} from '@/src/shared/dom/downloadTextFile';
+import {computed, nextTick, onActivated, onBeforeUnmount, onDeactivated, ref, watch} from 'vue';
 import {builtinSiteRulePack} from '@/src/core/site-adaptation/catalog';
 import {resolveSiteRule} from '@/src/core/site-adaptation/compiler';
 import {SITE_RULE_LIMITS} from '@/src/core/site-adaptation/schema';
@@ -101,12 +103,16 @@ import {buildSiteRuleFromForm, completeSiteRuleDraftSave, copySiteRuleToDraft, c
   createSiteRuleDraftImportGuard, createSiteRuleForm, formatSiteRulePack, listSiteRuleCatalog, mergeSiteRuleDraft,
   parseSiteAdaptationDraft, reconcileSiteRuleDraft, searchSiteRules, setSiteRuleEnabled, SITE_ADAPTATION_EXAMPLE,
   upsertSiteRuleDraft, type SiteRuleCatalogItem, type SiteRuleForm} from '../model/siteAdaptationEditor';
-const props = defineProps<{modelValue: SiteAdaptationSettings; saveSettings: (value: SiteAdaptationSettings) => Promise<void>; inspectRuleId?: string}>();
-const {translateLegacy: tr} = useUiI18n();
+const props = withDefaults(defineProps<{modelValue: SiteAdaptationSettings; saveSettings: (value: SiteAdaptationSettings) => Promise<void>; inspectRuleId?: string; active?: boolean}>(), {active: true});
+const {translateLegacy: tr, t} = useUiI18n();
 const search = ref(''); const filter = ref('all'); const visibleLimit = ref(30); const selectedId = ref('');
 const draft = ref(formatSiteRulePack(props.modelValue.custom)); const draftOwned = ref(false);
 const draftBase = ref(draft.value); const formArea = ref<HTMLElement | null>(null); const catalogArea = ref<HTMLElement | null>(null);
 const saving = ref(false); const undoDraft = ref<string | null>(null); const issues = ref<SiteRuleIssue[]>([]); const status = ref('');
+const downloadError = ref(false); let downloadRevision = 0; let alive = true;
+watch(() => props.active, active => {if (!active) {downloadRevision += 1; downloadError.value = false;}}, {flush: 'sync'});
+onActivated(() => {alive = true;});
+onDeactivated(() => {alive = false; downloadRevision += 1; downloadError.value = false;});
 const fileInput = ref<HTMLInputElement | null>(null); const importMode = ref('merge'); const jsonOpen = ref(false);
 const form = ref<SiteRuleForm | null>(null); const originalRule = ref<SiteRule>(); const editingId = ref<string | null>(null);
 let formBaseline = ''; let formSettingsBaseline = ''; let formInitial = '';
@@ -122,7 +128,7 @@ watch(hasUnsavedWork, active => {
   if (active) window.addEventListener('beforeunload', warnBeforeExit);
   else window.removeEventListener('beforeunload', warnBeforeExit);
 }, {immediate: true});
-onBeforeUnmount(() => window.removeEventListener('beforeunload', warnBeforeExit));
+onBeforeUnmount(() => {alive = false; window.removeEventListener('beforeunload', warnBeforeExit);});
 const draftConflict = computed(() => draftOwned.value && isDirty.value && !saving.value && draftBase.value !== formatSiteRulePack(props.modelValue.custom));
 const parsedDraft = computed(() => parseSiteAdaptationDraft(draft.value, document));
 const workingPack = computed(() => parsedDraft.value.ok ? parsedDraft.value.pack : props.modelValue.custom);
@@ -249,9 +255,9 @@ async function importFile(event: Event) {
   } catch { if (importGuard.check(ticket, draft.value) === 'current') issues.value = [{path: '$', message: '无法读取文件，请重新选择本地 JSON 文件'}]; }
 }
 function downloadPack(pack: SiteRulePack, filename: string) {
-  const url = URL.createObjectURL(new Blob([formatSiteRulePack(pack)], {type: 'application/json;charset=utf-8'}));
-  const link = document.createElement('a'); link.href = url; link.download = filename; link.click();
-  setTimeout(() => URL.revokeObjectURL(url), 1000);
+  const revision = ++downloadRevision; downloadError.value = false;
+  try {downloadTextFile(filename, formatSiteRulePack(pack), 'application/json;charset=utf-8');}
+  catch {if (alive && props.active && revision === downloadRevision) downloadError.value = true;}
 }
 </script>
 <style scoped>

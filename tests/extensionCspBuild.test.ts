@@ -120,7 +120,37 @@ describe('extension dependency CSP packaging', () => {
         const load = plugin.load as (this: unknown, id: string) => string | undefined;
         expect(load.call({emitFile}, sources['pdfjs-worker'])).toBeUndefined();
         expect(load.call({emitFile}, `${sources['pdfjs-worker']}?url`)).toBe('export default import.meta.ROLLUP_FILE_URL_fixture;');
-        expect(emitFile).toHaveBeenCalledWith({type: 'asset', name: 'pdf.worker.min.mjs', source: patched('pdfjs-worker')});
+        expect(emitFile).toHaveBeenCalledWith({type: 'asset', name: 'pdf.worker.min.mjs', source: patched('pdfjs-worker'), needsCodeReference: true});
+    });
+
+    it('摇树删除未使用的 PDF Worker，实际引用时保留 CSP 安全的资源', async () => {
+        const {rollup} = createRequire(require.resolve('vite'))('rollup');
+        const build = async (used: boolean) => {
+            const bundle = await rollup({
+                input: 'fixture-entry',
+                plugins: [{
+                    name: 'fixture',
+                    resolveId(id: string) {
+                        if (id === 'fixture-entry') return '\0fixture-entry';
+                        if (id === 'fixture-worker') return `${sources['pdfjs-worker']}?url`;
+                    },
+                    load(id: string) {
+                        if (id === '\0fixture-entry') return `import worker from 'fixture-worker'; export const value = ${used ? 'worker' : '1'};`;
+                    },
+                }, extensionCspBuildPlugin()],
+            });
+            try {
+                return (await bundle.generate({format: 'es'})).output;
+            } finally {
+                await bundle.close();
+            }
+        };
+        expect((await build(false)).filter((file: {type: string}) => file.type === 'asset')).toHaveLength(0);
+        const output = await build(true);
+        const assets = output.filter((file: {type: string}) => file.type === 'asset');
+        expect(assets).toHaveLength(1);
+        expect(assets[0].source).toBe(patched('pdfjs-worker'));
+        expect(output.find((file: {type: string}) => file.type === 'chunk').code).toContain(assets[0].fileName);
     });
 });
 

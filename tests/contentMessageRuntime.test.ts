@@ -983,3 +983,32 @@ describe('右键菜单操作反馈', () => {
     });
 
 });
+
+
+describe('userscript 当前配置页面协调消息', () => {
+    afterEach(() => vi.unstubAllEnvs());
+    it.each(['success', 'failed', 'throws'] as const)('只传无快照消息并明确返回 %s', async result => {
+        vi.stubEnv('BROWSER', 'userscript'); vi.resetModules();
+        const {createContentRuntimeMessageHandler} = await import('@/src/app/content/messageRuntime');
+        const reconcile = vi.fn(async () => {if (result === 'throws') throw new Error('private fixture'); return result === 'success';});
+        const respond = vi.fn();
+        const handler = createContentRuntimeMessageHandler({isInvalid: false} as never,
+            {isSiteDisabled: () => false, updateSiteDisabled: async () => {}, reconcileUserscriptPage: reconcile});
+        expect(handler({type: 'reconcileUserscriptPage'}, {}, respond)).toBe(true);
+        await vi.waitFor(() => expect(respond).toHaveBeenCalledOnce());
+        expect(reconcile).toHaveBeenCalledWith();
+        expect(respond).toHaveBeenCalledWith({status: result === 'success' ? 'success' : 'failed'});
+        expect(JSON.stringify(respond.mock.calls)).not.toContain('private fixture');
+    });
+    it.each(['invalid', 'disabled', 'suspended', 'missing'] as const)('%s 页面不重新启动功能', async reason => {
+        vi.stubEnv('BROWSER', 'userscript'); vi.resetModules();
+        const {createContentRuntimeMessageHandler} = await import('@/src/app/content/messageRuntime');
+        const reconcile = vi.fn(async () => true), respond = vi.fn();
+        const handler = createContentRuntimeMessageHandler({isInvalid: reason === 'invalid'} as never, {
+            isSiteDisabled: () => reason === 'disabled', isPageSuspended: () => reason === 'suspended',
+            updateSiteDisabled: async () => {}, ...(reason === 'missing' ? {} : {reconcileUserscriptPage: reconcile}),
+        });
+        expect(handler({type: 'reconcileUserscriptPage'}, {}, respond)).toBe(true);
+        expect(respond).toHaveBeenCalledWith({status: 'unavailable'}); expect(reconcile).not.toHaveBeenCalled();
+    });
+});

@@ -31,6 +31,8 @@ const harness = vi.hoisted(() => ({
     byRoot: new Map<unknown, unknown[]>(),
     requestSession: {requestSignal: new AbortController().signal, renderCommitGeneration: 0},
     stateListeners: new Set<(owner: unknown, state: Record<string, unknown> | undefined, previousState?: Record<string, unknown>) => void>(),
+    parentReads: 0,
+    seenRoots: [] as unknown[],
 }));
 
 vi.mock('@/src/services/config/store', () => ({config: harness.config}));
@@ -58,7 +60,7 @@ vi.mock('@/src/features/full-page-translation/content/state', () => ({
     },
 }));
 vi.mock('@/src/core/translation/public', () => ({
-    getComposedParent: (element: FakeElement & {shadowHost?: FakeElement}) => element.parentElement ?? element.shadowHost ?? null,
+    getComposedParent: (element: FakeElement & {shadowHost?: FakeElement}) => {harness.parentReads++; return element.parentElement ?? element.shadowHost ?? null;},
     maxComposedAncestorDepth: 512,
     getTranslationCandidateKey: (candidate: FakeCandidate) => candidate.nodes?.find(node => node.nodeType === 1 || node.nodeType === 3) ?? candidate.element,
     getTranslatableControlValueAttribute: (element: {getAttribute?: (name: string) => string}) => element.getAttribute ? 'value' : null,
@@ -67,6 +69,7 @@ vi.mock('@/src/core/translation/public', () => ({
         isWithinStructuralRegion: harness.structural,
         *discoverSteps(root: unknown) {
             harness.scopesUsed.push(scope);
+            harness.seenRoots.push(root);
             for (const step of harness.byRoot.get(root) ?? harness.discoveries[scope]) yield step;
         },
     }),
@@ -122,6 +125,7 @@ beforeEach(() => {
     harness.discoveries.all = [];
     harness.structural.mockReturnValue(false);
     harness.scopesUsed.length = 0;
+    harness.seenRoots.length = 0;
     harness.byRoot.clear();
     vi.stubGlobal('window', {innerHeight: 600});
 });
@@ -991,6 +995,38 @@ describe('区域批次响应、取消和精确所有权', () => {
 
 
 describe('连续划选的多个区域', () => {
+    it('多区域盘点按祖先深度而不是区域数平方读取父级', () => {
+        const count = 400;
+        const roots = Array.from({length: count}, (_, index) => element(`root-${index}`, index, root));
+        harness.parentReads = 0;
+        expect(inspectTranslationSection(roots as unknown as Element[])).toMatchObject({action: 'empty'});
+        expect(harness.parentReads).toBeLessThanOrEqual(count * 4);
+    });
+
+    it('按首次出现顺序去重，并跨 Shadow host 识别已选祖先', () => {
+        harness.config.translationScope = 'all';
+        const parent = element('parent', 0, root), child = element('child', 0, parent);
+        const standalone = element('standalone', 0, root), host = element('host', 0, root);
+        const shadowChild = Object.assign(element('shadow-child'), {shadowHost: host});
+        const selection = [child, standalone, shadowChild, parent, child, host, standalone];
+        expect(inspectTranslationSection(selection as unknown as Element[])).toMatchObject({action: 'empty'});
+        expect(harness.seenRoots).toEqual([standalone, parent, host]);
+    });
+
+    it('仅把 512 层以内的 composed 祖先当作已覆盖区域', () => {
+        harness.config.translationScope = 'all';
+        const leaf = element('deep-leaf'); let current = leaf;
+        let at512!: FakeElement;
+        for (let depth = 1; depth <= 513; depth++) {
+            const parent = element(`ancestor-${depth}`); current.parentElement = parent; current = parent;
+            if (depth === 512) at512 = parent;
+        }
+        inspectTranslationSection([leaf, at512] as unknown as Element[]);
+        expect(harness.seenRoots).toEqual([at512]);
+        harness.seenRoots.length = 0;
+        inspectTranslationSection([leaf, current] as unknown as Element[]);
+        expect(harness.seenRoots).toEqual([leaf, current]);
+    });
     it('仅翻译实际选中的两个区域，重叠根去重且统一按阅读位置派发', async () => {
         const first = element('first', 100, root), second = element('second', 30, root), outside = element('outside', 60, root);
         harness.byRoot.set(first, steps([candidate(first)])); harness.byRoot.set(second, steps([candidate(second)]));

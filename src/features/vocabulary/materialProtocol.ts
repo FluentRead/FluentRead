@@ -8,6 +8,7 @@ import type {DocumentMaterialReference} from '@/src/features/document-translatio
 
 export const MATERIAL_MESSAGE = 'fluentReadMaterials' as const;
 export const MATERIAL_CHANGED_MESSAGE = 'fluentReadMaterialsChanged' as const;
+export const MATERIAL_BACKUP_MAX_BYTES = 20 * 1024 * 1024;
 export type MaterialKind = 'article' | 'document' | 'video';
 export interface MaterialSource {kind: MaterialKind; url?: string; title?: string; fingerprint?: string}
 export interface MaterialLocator {

@@ -6,7 +6,8 @@ import {VISION_PROBE_MESSAGE} from '@/src/services/translation/types';
 import {extractConfigCredentials, LOCAL_CREDENTIALS_STORAGE_KEY} from '@/src/core/config/credentials';
 import browser from '@/userscript/browser';
 import {TRANSLATION_CANCEL_MESSAGE_TYPE} from '@/src/services/translation/types';
-import {UNHANDLED_RUNTIME_MESSAGE} from '@/userscript/browser';
+import {UNHANDLED_RUNTIME_MESSAGE, setPlatformMessageHandler, resetPlatformMessageHandler} from '@/userscript/browser';
+import {parseHTML} from 'linkedom';
 
 const mocks = vi.hoisted(() => ({
     config: {count: 0},
@@ -21,7 +22,7 @@ const mocks = vi.hoisted(() => ({
     lookupWord: vi.fn(),
     preparePatch: vi.fn(), prepareSave: vi.fn(), parseStored: vi.fn(), watch: vi.fn(), vision: vi.fn(),
     watched: [] as {key: string; callback: (value: unknown) => void; stop: ReturnType<typeof vi.fn>}[],
-    usage: {getDashboard: vi.fn(), clear: vi.fn()}, vocabulary: {list: vi.fn(), clear: vi.fn(), upsert: vi.fn(), updateNote: vi.fn()},
+    usage: {getDashboard: vi.fn(), clear: vi.fn()}, vocabulary: {list: vi.fn(), clear: vi.fn(), upsert: vi.fn(), updateNote: vi.fn(), removeWithSnapshot: vi.fn(), restoreSnapshot: vi.fn()},
 }));
 
 vi.mock('@/src/services/config/store', () => ({
@@ -68,7 +69,7 @@ vi.mock('@/src/features/selection-translation/services/wordDictionary', () => ({
 vi.mock('@/userscript/storage', () => ({configStorage: {watch: mocks.watch}}));
 vi.mock('@/src/app/translation/visionProbeRuntime', () => ({modelVisionProbe: {resolve: mocks.vision}}));
 vi.mock('@/src/platform/storage/modelUsageRepository', () => ({getModelUsageRepository: () => (mocks.usage)}));
-vi.mock('@/src/features/vocabulary/repository', () => ({vocabularyBook: mocks.vocabulary}));
+vi.mock('@/src/features/vocabulary/repository', () => ({vocabularyBook: mocks.vocabulary,createUuid:()=>crypto.randomUUID()}));
 
 import {createPlatformMessageHandler} from '@/userscript/platform';
 import {createPlatformMessageHandler as createFullPlatformMessageHandler} from '@/userscript/platformFull';
@@ -109,6 +110,54 @@ describe('userscript 平台消息适配', () => {
         mocks.incrementUserscriptConfigCount.mockResolvedValue(14);
     });
 
+    it('完整脚本只在内存中删除和恢复，重建处理器不保留快照并拒绝无痕',async()=>{
+        const handler=createFullPlatformMessageHandler(vi.fn());
+        const entry={id:'entry',term:'private'};mocks.vocabulary.removeWithSnapshot.mockResolvedValue({entry,reviewLogs:[]});
+        mocks.vocabulary.restoreSnapshot.mockResolvedValue(undefined);
+        const removed=await handler({type:'fluentReadVocabularyBook',action:'removeWithUndo',entryId:'entry',sender:{url:'https://forged.invalid'}});
+        expect(removed).toMatchObject({success:true,data:{term:'private'}});
+        expect(await handler({type:'fluentReadVocabularyBook',action:'listUndo'})).toMatchObject({success:true,data:[{id:removed.data.id}]});
+        expect(await handler({type:'fluentReadVocabularyBook',action:'restoreUndo',undoId:removed.data.id})).toMatchObject({success:true,data:'restored'});
+        expect(await handler({type:'fluentReadVocabularyBook',action:'restoreUndo',undoId:removed.data.id})).toMatchObject({success:true,data:'previously-restored'});
+        expect(mocks.vocabulary.restoreSnapshot).toHaveBeenCalledOnce();handler.dispose();
+        const restarted=createFullPlatformMessageHandler(vi.fn());expect(await restarted({type:'fluentReadVocabularyBook',action:'listUndo'})).toMatchObject({success:true,data:[]});
+        vi.stubGlobal('GM_info',{isIncognito:true});expect(await restarted({type:'fluentReadVocabularyBook',action:'listUndo'})).toMatchObject({success:false});
+        vi.unstubAllGlobals();restarted.dispose();
+    });
+    it('clears in-memory undo with collection clear, and rejects the obsolete snapshot action',async()=>{
+        const handler=createFullPlatformMessageHandler(vi.fn());mocks.vocabulary.removeWithSnapshot.mockResolvedValue({entry:{id:'e',term:'private'},reviewLogs:[]});
+        expect(await handler({type:'fluentReadVocabularyBook',action:'removeWithUndo',entryId:'e'})).toMatchObject({success:true});
+        expect(await handler({type:'fluentReadVocabularyBook',action:'removeWithSnapshot',entryId:'e'})).toMatchObject({success:false});
+        mocks.vocabulary.clear.mockResolvedValue(undefined);
+        expect(await handler({type:'fluentReadVocabularyBook',action:'clear'})).toMatchObject({success:true});
+        expect(await handler({type:'fluentReadVocabularyBook',action:'listUndo'})).toMatchObject({success:true,data:[]});handler.dispose();
+    });
+    it('establishes a clear barrier before awaiting storage and retains tickets when clear fails',async()=>{
+        const handler=createFullPlatformMessageHandler(vi.fn());mocks.vocabulary.removeWithSnapshot.mockResolvedValue({entry:{id:'e',term:'private'},reviewLogs:[]});
+        const removed=await handler({type:'fluentReadVocabularyBook',action:'removeWithUndo',entryId:'e'});const id=removed.data.id;
+        let finish!:(value:unknown)=>void;mocks.vocabulary.clear.mockImplementationOnce(()=>new Promise(resolve=>{finish=resolve}));
+        const clearing=handler({type:'fluentReadVocabularyBook',action:'clear'});await Promise.resolve();
+        expect(await handler({type:'fluentReadVocabularyBook',action:'restoreUndo',undoId:id})).toMatchObject({success:false,error:{code:'invalid-input'}});
+        expect(mocks.vocabulary.restoreSnapshot).not.toHaveBeenCalled();finish(Promise.reject(new Error('failure')));
+        expect(await clearing).toMatchObject({success:false});expect(await handler({type:'fluentReadVocabularyBook',action:'listUndo'})).toMatchObject({success:true,data:[{id}]});handler.dispose();
+    });
+    it('isolates failed notification listeners without changing an already committed deletion',async()=>{
+        const warn=vi.spyOn(console,'warn').mockImplementation(()=>undefined);const later=vi.fn();
+        const throws=()=>{throw new Error('private input')};const rejects=()=>Promise.reject(new Error('private input'));
+        browser.runtime.onMessage.addListener(throws);browser.runtime.onMessage.addListener(rejects);browser.runtime.onMessage.addListener(later);
+        const handler=createFullPlatformMessageHandler(vi.fn());mocks.vocabulary.removeWithSnapshot.mockResolvedValue({entry:{id:'e',term:'private'},reviewLogs:[]});
+        expect(await handler({type:'fluentReadVocabularyBook',action:'removeWithUndo',entryId:'e'})).toMatchObject({success:true});
+        await Promise.resolve();await Promise.resolve();expect(later).toHaveBeenCalled();expect(warn).toHaveBeenCalledTimes(2);
+        expect(JSON.stringify(warn.mock.calls)).not.toContain('private input');
+        browser.runtime.onMessage.removeListener(throws);browser.runtime.onMessage.removeListener(rejects);browser.runtime.onMessage.removeListener(later);handler.dispose();warn.mockRestore();
+    });
+    it('does not route forged page message events into the sandbox runtime handler',async()=>{
+        const {window}=parseHTML('<html><body></body></html>');vi.stubGlobal('window',window);
+        const handler=createFullPlatformMessageHandler(vi.fn());setPlatformMessageHandler(handler);
+        const event=new window.Event('message');Object.defineProperty(event,'data',{value:{type:'fluentReadVocabularyBook',action:'removeWithUndo',entryId:'e'}});
+        window.dispatchEvent(event);await Promise.resolve();await Promise.resolve();
+        expect(mocks.vocabulary.removeWithSnapshot).not.toHaveBeenCalled();resetPlatformMessageHandler();vi.unstubAllGlobals();
+    });
     it('通过 userscript 专用副本累加，并避免把瞬时总数作为跨标签持久投影', async () => {
         mocks.config.count = 12;
         const handler = createPlatformMessageHandler(vi.fn());

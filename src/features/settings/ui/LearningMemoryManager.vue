@@ -50,24 +50,26 @@
           <footer><button type="button" class="fr-memory-link" :disabled="mutating" @click="editMemory(memory)">{{ translateLegacy('编辑') }}</button><button type="button" class="fr-memory-link" :disabled="mutating" @click="removeMemory(memory.id)">{{ translateLegacy('删除') }}</button></footer>
         </article>
       </div>
-      <div v-if="memories.length" class="fr-memory-bottom"><small v-if="memories.length >= 200">{{ t('learning.memoryLimit') }}</small><span v-else /><button type="button" class="fr-memory-link" :disabled="mutating" @click="clearMemories">{{ t('learning.memoryClear') }}</button></div>
+      <div v-if="memories.length" class="fr-memory-bottom"><small v-if="memories.length >= 200">{{ t('learning.memoryLimit') }}</small><span v-else /><button type="button" class="fr-memory-link" :disabled="mutating || confirmingClear" @click="clearMemories">{{ t('learning.memoryClear') }}</button></div>
     </template>
+    <el-dialog :key="clearRevision" :model-value="confirmingClear" :onUpdate:modelValue="clearActions.open" :title="t('common.confirm')" width="min(460px, calc(100vw - 32px))" destroy-on-close>
+      <p>{{ t('learning.memoryClearConfirm') }}</p>
+      <template #footer><el-button :onClick="clearActions.cancel">{{ t('common.cancel') }}</el-button><el-button type="danger" :onClick="clearActions.confirm">{{ t('common.confirm') }}</el-button></template>
+    </el-dialog>
   </section>
 </template>
 <script setup lang="ts">
-import {ElMessageBox} from 'element-plus';
-import 'element-plus/es/components/message-box/style/css';
 import UiSelect from '@/src/ui/components/UiSelect.vue';
 import {ElOption} from 'element-plus';
 import {useUiI18n as useControlI18n} from '@/src/ui/i18n';
 const {translateLegacy: translateControlLabel} = useControlI18n();
 
-import {computed, onBeforeUnmount, onMounted, ref} from 'vue'
+import {computed, onBeforeUnmount, onDeactivated, onMounted, ref, watch} from 'vue'
 import {clearLearningMemories, deleteLearningMemory, listLearningMemories, saveLearningMemory, type LearningMemory} from '@/src/features/reading-assistant/public'
 import {useUiI18n} from '@/src/ui/i18n'
 import {useRenderDateFormatter} from '@/src/ui/dateFormat'
 
-defineProps<{enabled: boolean}>()
+const props = defineProps<{enabled: boolean; isVisible?: () => boolean}>()
 const emit = defineEmits<{navigate: [section: string]}>()
 const {t, translateLegacy} = useUiI18n()
 const memories = ref<LearningMemory[]>([])
@@ -90,6 +92,11 @@ const kindLabel = (kind: LearningMemory['kind']) => kinds.value.find(item => ite
 const formatDate = useRenderDateFormatter({month: 'numeric', day: 'numeric', hour: 'numeric', minute: '2-digit'})
 let generation = 0
 let active = true
+const confirmingClear = ref(false)
+const clearRevision = ref(0)
+function invalidateClearConfirmation() { clearRevision.value += 1; confirmingClear.value = false }
+watch(() => props.isVisible?.() ?? true, visible => {if (!visible) invalidateClearConfirmation()}, {flush: 'sync'})
+onDeactivated(invalidateClearConfirmation)
 const errorText = (failure: unknown) => failure instanceof Error ? failure.message : t('learning.memoryError')
 function sortMemories(items: LearningMemory[]) { return [...items].sort((a, b) => b.updatedAt - a.updatedAt || a.id.localeCompare(b.id)) }
 async function loadMemories() {
@@ -153,11 +160,23 @@ async function removeMemory(id: string) {
     if (active) mutating.value = false
   }
 }
-async function clearMemories() {
-  if (!active || mutating.value) return
-  try { await ElMessageBox.confirm(t('learning.memoryClearConfirm'), t('common.confirm'), {type: 'warning', confirmButtonText: t('common.confirm'), cancelButtonText: t('common.cancel')}) }
-  catch { return }
-  if (!active || mutating.value) return
+function clearMemories() {
+  if (!active || mutating.value || confirmingClear.value || props.isVisible?.() === false) return
+  clearRevision.value += 1
+  confirmingClear.value = true
+}
+const clearActions = computed(() => {
+  const revision = clearRevision.value
+  const isCurrent = () => active && confirmingClear.value && revision === clearRevision.value && props.isVisible?.() !== false
+  return {
+    open: (value: boolean) => {if (!value && isCurrent()) invalidateClearConfirmation()},
+    cancel: () => {if (isCurrent()) invalidateClearConfirmation()},
+    confirm: () => {if (isCurrent()) void commitClear()},
+  }
+})
+async function commitClear() {
+  confirmingClear.value = false
+  if (mutating.value) return
   generation += 1
   loading.value = false
   mutating.value = true
@@ -174,7 +193,7 @@ async function clearMemories() {
   }
 }
 onMounted(() => { void loadMemories() })
-onBeforeUnmount(() => { active = false; generation += 1 })
+onBeforeUnmount(() => { active = false; invalidateClearConfirmation(); generation += 1 })
 </script>
 <style scoped>
 .fr-learning-memory { color:var(--ink); }

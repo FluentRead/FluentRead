@@ -147,6 +147,83 @@ describe('记忆区域规则调度', () => {
         expect(f.ports.translate).toHaveBeenLastCalledWith([replacement], expect.anything(), expect.any(AbortSignal));
     });
 
+    it('rechecks a saved child path when an existing parent gains its locator anchor', async () => {
+        const f = fixture([rule('late-child', 'auto', [['[id="late"] > p:nth-of-type(1)']])]);
+        await tick(); expect(f.ports.translate).not.toHaveBeenCalled();
+        f.region.id = 'late';
+        const record = {target:f.region, type:'attributes', attributeName:'id', oldValue:'region', addedNodes:[], removedNodes:[]} as unknown as MutationRecord;
+        for (const observer of ControlledObserver.instances) observer.fire(record);
+        await tick();
+        expect(f.ports.translate).toHaveBeenCalledWith([f.region.firstElementChild], expect.anything(), expect.any(AbortSignal));
+    });
+
+    it('rechecks an ambiguous saved locator when one duplicate loses its id', async () => {
+        const f = fixture(); f.outside.id = 'region'; await tick();
+        expect(f.ports.translate).not.toHaveBeenCalled();
+        f.outside.id = 'other';
+        const record = {target:f.outside, type:'attributes', attributeName:'id', oldValue:'region', addedNodes:[], removedNodes:[]} as unknown as MutationRecord;
+        for (const observer of ControlledObserver.instances) observer.fire(record);
+        await tick(); expect(f.ports.translate).toHaveBeenCalledWith([f.region], expect.anything(), expect.any(AbortSignal));
+    });
+
+    it.each(['"', "'"])('rechecks ambiguity when a duplicate loses an empty attribute value quoted %s', async quote => {
+        const f = fixture([rule('empty', 'auto', [[`[data-slot=${quote}${quote}]`]])]);
+        f.region.setAttribute('data-slot', '');f.outside.setAttribute('data-slot', '');await tick();
+        expect(f.ports.translate).not.toHaveBeenCalled();
+        f.outside.setAttribute('data-slot', 'other');
+        const record = {target:f.outside, type:'attributes', attributeName:'data-slot', oldValue:'', addedNodes:[], removedNodes:[]} as unknown as MutationRecord;
+        for (const observer of ControlledObserver.instances) observer.fire(record);
+        await tick();expect(f.ports.translate).toHaveBeenCalledWith([f.region], expect.anything(), expect.any(AbortSignal));
+    });
+
+    it('does not rescan for unrelated attribute churn while the saved path is missing', async () => {
+        const f = fixture([rule('late', 'auto', [['[id="late"] > p:nth-of-type(1)']])]);
+        await tick();expect(f.ports.resolve).toHaveBeenCalledOnce();
+        for (let index = 0; index < 100; index++) {
+            const record = {target:f.outside, type:'attributes', attributeName:'class', oldValue:'unrelated', addedNodes:[], removedNodes:[]} as unknown as MutationRecord;
+            for (const observer of ControlledObserver.instances) observer.fire(record);
+        }
+        await tick();expect(f.ports.resolve).toHaveBeenCalledOnce();
+    });
+
+    it('does not mistake an unrelated short old class for a substring of the saved class', async () => {
+        const f = fixture([rule('late', 'auto', [['article[class~="late"] > p:nth-of-type(1)']])]);
+        await tick();
+        const record = {target:f.outside, type:'attributes', attributeName:'class', oldValue:'a', addedNodes:[], removedNodes:[]} as unknown as MutationRecord;
+        for (const observer of ControlledObserver.instances) observer.fire(record);
+        await tick();expect(f.ports.resolve).toHaveBeenCalledOnce();
+    });
+
+    it.each([
+        {selector:'article[class~="late"] > p', attribute:'class', old:' a '},
+        {selector:'article[data-slot="late"] > p', attribute:'data-slot', old:'unrelated'},
+    ])('ignores an unrelated old $attribute value while preserving its saved path', async ({selector, attribute, old}) => {
+        const f = fixture([rule('late', 'auto', [[selector]])]);await tick();
+        const record = {target:f.outside, type:'attributes', attributeName:attribute, oldValue:old, addedNodes:[], removedNodes:[]} as unknown as MutationRecord;
+        for (const observer of ControlledObserver.instances) observer.fire(record);
+        await tick();expect(f.ports.resolve).toHaveBeenCalledOnce();
+    });
+
+    it('rechecks a descendant when a previously hidden ancestor becomes visible', async () => {
+        const f = fixture([rule('late', 'auto', [['[id="region"] > p:nth-of-type(1)']])]);
+        const wrapper = f.document.createElement('div');wrapper.setAttribute('hidden', '');f.region.parentNode!.insertBefore(wrapper, f.region);wrapper.append(f.region);
+        f.ports.resolve.mockImplementation((selectors, doc) => wrapper.hasAttribute('hidden') ? [] : [doc.querySelector(selectors[0][0])!]);
+        await tick();expect(f.ports.translate).not.toHaveBeenCalled();
+        wrapper.removeAttribute('hidden');
+        const record = {target:wrapper, type:'attributes', attributeName:'hidden', oldValue:'', addedNodes:[], removedNodes:[]} as unknown as MutationRecord;
+        for (const observer of ControlledObserver.instances) observer.fire(record);
+        await tick();expect(f.ports.translate).toHaveBeenCalledWith([f.region.firstElementChild], expect.anything(), expect.any(AbortSignal));
+    });
+
+    it('keeps escaped locator anchors intact while detecting a parent attribute change', async () => {
+        const f = fixture([rule('escaped', 'auto', [['#late\\-anchor > p:nth-of-type(1)']])]);
+        await tick();expect(f.ports.translate).not.toHaveBeenCalled();
+        f.region.id = 'late-anchor';
+        const record = {target:f.region, type:'attributes', attributeName:'id', oldValue:'region', addedNodes:[], removedNodes:[]} as unknown as MutationRecord;
+        for (const observer of ControlledObserver.instances) observer.fire(record);
+        await tick();expect(f.ports.translate).toHaveBeenCalledWith([f.region.firstElementChild], expect.anything(), expect.any(AbortSignal));
+    });
+
     it('按具体路径优先，重叠区域仅交给先命中的规则', async () => {
         const f = fixture([rule('wide', 'auto', [['#region']]), rule('specific', 'auto', [['#region > p']], 'example.com/docs/')]);
         await tick();

@@ -1,4 +1,25 @@
 import {describe, expect, it, vi} from 'vitest';
+import {installVocabularyUndoMaintenance, VOCABULARY_UNDO_ALARM} from '@/src/features/vocabulary/background/undoMaintenance';
+
+describe('vocabulary undo expiry maintenance', () => {
+    it('cleans at startup and its own alarm, never from unrelated alarms', async () => {
+        let listener!: (alarm: {name:string}) => void;
+        const create = vi.fn(); const prune = vi.fn(async () => undefined); const warn = vi.fn();
+        installVocabularyUndoMaintenance({alarms:{onAlarm:{addListener: next => {listener = next;}},create},prune,warn});
+        await vi.waitFor(() => expect(prune).toHaveBeenCalledOnce());
+        expect(create).toHaveBeenCalledWith(VOCABULARY_UNDO_ALARM,{periodInMinutes:360});
+        listener({name:'other'}); await Promise.resolve(); expect(prune).toHaveBeenCalledOnce();
+        listener({name:VOCABULARY_UNDO_ALARM}); await vi.waitFor(() => expect(prune).toHaveBeenCalledTimes(2));
+        expect(warn).not.toHaveBeenCalled();
+    });
+    it('reports fixed messages without including storage or scheduling errors', async () => {
+        const warn = vi.fn();
+        installVocabularyUndoMaintenance({alarms:{onAlarm:{addListener: () => {}},create: () => {throw new Error('private marker');}},
+            prune: async () => {throw new Error('private marker');},warn});
+        await vi.waitFor(() => expect(warn).toHaveBeenCalledTimes(2));
+        expect(JSON.stringify(warn.mock.calls)).not.toContain('private marker');
+    });
+});
 
 import {
     CONFIG_AUTO_BACKUP_ALARM,

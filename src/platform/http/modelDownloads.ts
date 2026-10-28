@@ -1,7 +1,7 @@
 /**
  * @file src/platform/http/modelDownloads.ts
  * 文件职责：为按需模型数据下载提供地域提示、多来源回退与流式接收超时。
- * 主要内容：保留固定文件路径和版本，以语言提示排列可信来源；连接、断流和整体等待都有独立墙钟边界，失败切换来源，取消与磁盘不足立即结束；流式接收不构造整份模型缓冲区，并回报实际字节与安全来源状态。
+ * 主要内容：保留固定文件路径和版本，以语言提示排列可信来源；连接、断流和整体等待都有独立墙钟边界，失败切换来源，取消与磁盘不足立即结束；流式接收不构造整份模型缓冲区，每次读取独立释放取消监听，并回报实际字节与安全来源状态。
  * 模块边界：只下载模型数据，不执行远程 JS/WASM、不处理用户文本或凭据；语言仅影响尝试顺序，不推断实际所在地。
  */
 import type {ModelDownloadStatus} from '@/src/core/download/progress';
@@ -112,7 +112,20 @@ export async function withModelDownload<T>(
                 async pull(output) {
                     try {
                         arm();
-                        const chunk = await Promise.race([reader!.read(), interrupted]);
+                        let onAbort!: () => void;
+                        const readInterrupted = new Promise<never>((_resolve, reject) => {
+                            onAbort = () => reject(new DOMException('模型下载超时或已取消', 'TimeoutError'));
+                            controller.signal.addEventListener('abort', onAbort, {once: true});
+                        });
+                        // 不复用整次下载的未决 Promise：每次 race 都会在它上面保留 reaction，
+                        // 模型流的分块越多，下载完成前保留的回调就越多。
+                        let chunk: ReadableStreamReadResult<Uint8Array>;
+                        try {
+                            const pending = new Promise<ReadableStreamReadResult<Uint8Array>>(resolve => resolve(reader!.read()));
+                            chunk = await Promise.race([pending, readInterrupted]);
+                        } finally {
+                            controller.signal.removeEventListener('abort', onAbort);
+                        }
                         if (controller.signal.aborted) throw new DOMException('模型下载超时', 'TimeoutError');
                         if (chunk.done) {
                             if (total !== undefined && loaded !== total) throw new Error('模型文件响应长度不完整');

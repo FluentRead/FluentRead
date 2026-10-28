@@ -1,5 +1,6 @@
 <!--
  * @file src/features/vocabulary/ui/VocabularyBook.vue
+ * 撤销归属：后台事务保存删除快照并保留 24 小时的恢复期限，页面只持票据；失败时提示未确认，不自动重放。
  * 文件职责：组织内容优先的学习收藏列表与主动复习，协调句子听读、解释保存、筛选与文件操作。
  * 主要内容：相同译文保留原文且不重复展示；把复习作为列表主操作，收藏开关与文件动作收进管理菜单；搜索与类型筛选合为一行，每条收藏直接提供学习入口；筛选排序独立于搜索输入，正文索引按需建立并限制文本字符总量，超预算词条继续完整匹配；界面文案订阅共享语言与资源修订，缓存期间首次加载的语言也能自动更新。配置、数据和朗读沿用已有消息协议，后台进度保持播放状态、结束或停止才释放，页面音频失败按在线与浏览器两级有限回退并合并重复错误通知；音频恢复后复验代次再解码，浏览器语音只接受当前话语的开始事件；收藏面板或文档隐藏时延后普通读取并停止到期扫描，恢复可见后串行读取，已接受的保存继续结算；确认开始即占用操作状态，等待、菜单让步及响应后校验生命周期，拒绝迟到请求、文件下载和已卸载界面更新。
  * 模块边界：UI 不直接访问 Dexie 或上传学习数据；完整备份进入备份与恢复页，收藏文件只包含本领域数据，数据库操作集中在后台 repository/handler，上下文和来源只有用户明确选择时才导出。
@@ -78,14 +79,27 @@
                 <button type="button" :disabled="actionBusy || loading" @click="closeMoreMenuAndFocus(); importInput?.click()">导入收藏</button>
                 <button type="button" :disabled="actionBusy || loading || !filteredEntries.length" @click="closeMoreMenuAndFocus(); exportCollection()">导出当前列表</button>
                 <button type="button" :disabled="actionBusy || !entries.length" @click="exportAnki">导出到 Anki</button>
-                <button type="button" :disabled="loading" @click="closeMoreMenuAndFocus(); loadEntries()">{{ loading ? '读取中…' : '刷新列表' }}</button>
-                <button type="button" class="danger" :disabled="actionBusy || entries.length === 0" @click="clearVocabulary">{{ t('learning.collection.clear') }}</button>
+                <button type="button" :disabled="loading" @click="closeMoreMenuAndFocus(); loadEntries(); loadUndoTickets()">{{ loading ? '读取中…' : '刷新列表' }}</button>
+                <button type="button" class="danger" :disabled="actionBusy || (entries.length === 0 && undoTickets.length === 0)" @click="clearVocabulary">{{ t('learning.collection.clear') }}</button>
               </div>
             </details>
           </div>
           <input ref="importInput" type="file" accept=".json,application/json" hidden aria-label="导入收藏文件" @change="importCollection" />
         </section>
 
+        <section v-if="undoTickets.length" class="recent-deletions" :aria-label="t('learning.collection.recentDeleted', {count: undoTickets.length})">
+          <div class="recent-deletions-heading">
+            <h3>{{ t('learning.collection.recentDeleted', {count: undoTickets.length}) }}</h3>
+            <p>{{ t(isUserscriptBuild ? 'learning.collection.undoScriptNotice' : 'learning.collection.undoExtensionNotice') }}</p>
+          </div>
+          <div v-for="ticket in undoTickets" :key="ticket.id" class="recent-deletion-row">
+            <span class="recent-deletion-term" data-i18n-ignore>{{ ticket.term }}</span>
+            <div class="recent-deletion-actions">
+              <button class="recent-deletion-restore" type="button" :disabled="actionBusy" @click="undoRemove(ticket)">{{ t('learning.collection.restoreDeleted') }}</button>
+              <button type="button" :disabled="actionBusy" @click="discardUndo(ticket)">{{ t('learning.collection.discardUndo') }}</button>
+            </div>
+          </div>
+        </section>
         <section v-if="entries.length" class="toolbar" aria-label="搜索与筛选收藏">
           <label class="search-field"><span aria-hidden="true"><UiIcon name="search" :size="16" /></span><input v-model.trim="query" type="search" aria-label="搜索收藏" placeholder="搜索原文、译文或解释" /></label>
           <UiSelect v-model="kindFilter" class="collection-type" :aria-label="t('learning.collection.type')">
@@ -141,12 +155,13 @@
     </template>
 
     <div v-if="toastMessage" class="book-toast" role="status">
-      <span>{{ toastMessage }}</span><button v-if="undoExport" type="button" @click="undoRemove">撤销</button>
+      <span>{{ toastMessage }}</span>
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
+import {downloadTextFile as downloadFile} from '@/src/shared/dom/downloadTextFile';
 import {hasDistinctTranslation} from '@/src/core/translation/result';
 import UiIcon from '@/src/ui/components/UiIcon.vue'
 import FeatureEnableCard from '@/src/ui/components/FeatureEnableCard.vue';
@@ -184,8 +199,6 @@ import {
   reconcileVocabularyReviewSession,
   vocabularyReviewSessionProgress,
   VOCABULARY_BOOK_CHANGED_MESSAGE,
-  VOCABULARY_BOOK_EXPORT_FORMAT,
-  VOCABULARY_BOOK_EXPORT_VERSION,
   VOCABULARY_BOOK_MESSAGE,
   type VocabularyBookChangedMessage,
   type VocabularyBookExport,
@@ -194,7 +207,7 @@ import {
   type VocabularyContext,
   type VocabularyEntry,
   type VocabularyImportResult,
-  type VocabularyRemovalSnapshot,
+  type VocabularyUndoTicket,
   type VocabularyReviewResult,
   type VocabularyReviewSessionState,
   type VocabularyScheduledReviewRating,
@@ -207,6 +220,7 @@ const documentVisible = ref(true);
 const viewVisible = computed(() => (props.isVisible?.() ?? true) && keptAliveVisible.value && documentVisible.value);
 const emit = defineEmits<{ navigate: [section: string] }>();
 const {t, translateLegacy: translateControlLabel} = useUiI18n();
+const isUserscriptBuild = import.meta.env.BROWSER === 'userscript' || browserCapabilities.browser === 'userscript';
 const reencounterSupported = browserCapabilities.browser !== 'userscript';
 const betaEnabled = ref(false);
 const reencounterEnabled = ref(false);
@@ -241,8 +255,10 @@ const reviewAnswerVisible = ref(false);
 const reviewStarted = ref(false);
 const reviewStats = ref({ reviewed: 0, good: 0, again: 0 });
 const toastMessage = ref('');
-// 保持可结构化克隆的快照为原始对象，避免 browser.runtime.sendMessage 收到 Vue Proxy。
-const undoExport = shallowRef<VocabularyBookExport | null>(null);
+const undoTickets = shallowRef<VocabularyUndoTicket[]>([]);
+let undoReadEpoch = 0;
+let undoRefreshPending = false;
+let undoReadsInFlight = 0;
 const moreMenu = ref<HTMLDetailsElement | null>(null);
 const currentTime = ref(Date.now());
 const lifecycle = createVocabularyLifecycleGuard();
@@ -556,7 +572,7 @@ function handleEntrySpeechState(message: unknown): undefined {
 
 async function requestVocabulary<T>(request: VocabularyBookRequest): Promise<T> {
   const response = await browser.runtime.sendMessage(request) as VocabularyBookResponse<T>;
-  if (!response?.success) throw new Error(response?.error?.message || '单词本操作失败');
+  if (!response?.success) throw Object.assign(new Error(response?.error?.message || '单词本操作失败'), {code: response?.error?.code});
   return response.data;
 }
 
@@ -597,11 +613,11 @@ function canReadEntries(): boolean {
 watch(viewVisible, visible => {
   readEpoch += 1;
   scheduleTimeRefresh();
-  if (visible && configured) void loadEntries();
+  if (visible && configured) {void loadEntries(); void loadUndoTickets();}
 }, {flush: 'sync'});
 watch(actionBusy, busy => {
-  if (busy) readEpoch += 1;
-  else void flushPendingEntries();
+  if (busy) {readEpoch += 1; undoReadEpoch += 1; if (undoReadsInFlight) undoRefreshPending = true;}
+  else {void flushPendingEntries(); if (undoRefreshPending) void loadUndoTickets();}
 }, {flush: 'sync'});
 
 async function loadEntries(): Promise<void> {
@@ -780,49 +796,95 @@ async function relearn(entry: VocabularyEntry): Promise<void> {
   finally { if (lifecycle.isActive()) actionBusy.value = false; }
 }
 
+function isUndoTicket(value: unknown): value is VocabularyUndoTicket {
+  if (!value || typeof value !== 'object') return false;
+  const ticket = value as Partial<VocabularyUndoTicket>;
+  return typeof ticket.id === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/iu.test(ticket.id)
+    && typeof ticket.term === 'string' && ticket.term.length > 0
+    && typeof ticket.createdAt === 'number' && Number.isFinite(ticket.createdAt)
+    && typeof ticket.expiresAt === 'number' && Number.isFinite(ticket.expiresAt) && ticket.expiresAt > ticket.createdAt;
+}
+
+async function loadUndoTickets(): Promise<void> {
+  if (!lifecycle.isActive()) return;
+  if (!viewVisible.value || actionBusy.value) {undoRefreshPending = true; undoReadEpoch += 1; return;}
+  undoRefreshPending = false;
+  const epoch = ++undoReadEpoch;
+  undoReadsInFlight += 1;
+  try {
+    const tickets = await requestVocabulary<VocabularyUndoTicket[]>({type: VOCABULARY_BOOK_MESSAGE, action: 'listUndo'});
+    if (!Array.isArray(tickets) || !tickets.every(isUndoTicket)) throw new Error('invalid tickets');
+    if (lifecycle.isActive() && viewVisible.value && !actionBusy.value && epoch === undoReadEpoch) undoTickets.value = tickets;
+  } catch {
+    if (lifecycle.isActive() && epoch === undoReadEpoch) showToast(t('learning.collection.undoListFailed'));
+  } finally {
+    undoReadsInFlight -= 1;
+    if (undoRefreshPending && lifecycle.isActive() && viewVisible.value && !actionBusy.value) void loadUndoTickets();
+  }
+}
+
 async function removeEntry(entry: VocabularyEntry): Promise<void> {
   if (!lifecycle.isActive() || actionBusy.value) return;
   actionBusy.value = true;
+  undoReadEpoch += 1;
+  let requested = false;
   try {
     try { await ElMessageBox.confirm(translateLegacyText(
-      `确认删除“${entry.term}”及其复习记录吗？`, normalizeUiLanguage(runtimeConfig.uiLanguage)),
+      t('learning.collection.deleteConfirm', {term: entry.term, notice: t(isUserscriptBuild ? 'learning.collection.undoScriptNotice' : 'learning.collection.undoExtensionNotice')}), normalizeUiLanguage(runtimeConfig.uiLanguage)),
       translateControlLabel('删除'), {type: 'warning', confirmButtonText: translateControlLabel('删除'), cancelButtonText: translateControlLabel('取消')}); }
     catch { return; }
     if (!lifecycle.isActive()) return;
-    const snapshot = await requestVocabulary<VocabularyRemovalSnapshot | null>({
-      type: VOCABULARY_BOOK_MESSAGE,
-      action: 'removeWithSnapshot',
-      entryId: entry.id,
-    });
+    requested = true;
+    const ticket = await requestVocabulary<VocabularyUndoTicket | null>({type: VOCABULARY_BOOK_MESSAGE, action: 'removeWithUndo', entryId: entry.id});
     if (!lifecycle.isActive()) return;
-    if (!snapshot) throw new Error('词条已不存在');
+    if (ticket === null) {showToast(t('learning.collection.entryMissing')); return;}
+    if (!isUndoTicket(ticket)) throw new Error('invalid ticket');
     entries.value = entries.value.filter(item => item.id !== entry.id);
-    undoExport.value = {
-      format: VOCABULARY_BOOK_EXPORT_FORMAT,
-      version: VOCABULARY_BOOK_EXPORT_VERSION,
-      exportedAt: Date.now(),
-      includesPrivateContext: true,
-      entries: [snapshot.entry],
-      reviewLogs: snapshot.reviewLogs,
-    };
+    undoTickets.value = [ticket, ...undoTickets.value.filter(item => item.id !== ticket.id)];
     scheduleTimeRefresh();
-    showToast(`已删除 ${entry.term}`, true);
-  } catch (cause) { showToast(cause instanceof Error ? cause.message : '删除失败'); }
-  finally { if (lifecycle.isActive()) actionBusy.value = false; }
+    showToast(t('learning.collection.deletedRecoverable', {term:entry.term}));
+  } catch (cause) {
+    if (lifecycle.isActive()) showToast(cause instanceof Error && 'code' in cause && cause.code === 'limit-exceeded' ? t('learning.collection.undoCapacity') : t('learning.collection.deleteUnconfirmed'));
+  } finally {
+    if (lifecycle.isActive()) {
+      actionBusy.value = false;
+      if (requested) {void loadEntries(); void loadUndoTickets();}
+    }
+  }
 }
 
-async function undoRemove(): Promise<void> {
-  const data = undoExport.value;
-  if (!lifecycle.isActive() || !data || actionBusy.value) return;
+async function undoRemove(ticket: VocabularyUndoTicket): Promise<void> {
+  if (!lifecycle.isActive() || !ticket || actionBusy.value) return;
   actionBusy.value = true;
+  undoReadEpoch += 1;
   try {
-    await requestVocabulary<VocabularyImportResult>({ type: VOCABULARY_BOOK_MESSAGE, action: 'importData', data });
+    const result = await requestVocabulary<'restored' | 'previously-restored' | 'expired' | 'missing'>({type: VOCABULARY_BOOK_MESSAGE, action: 'restoreUndo', undoId: ticket.id});
     if (!lifecycle.isActive()) return;
-    undoExport.value = null;
-    await loadEntries();
-    showToast('已恢复刚才删除的词条');
-  } catch (cause) { showToast(cause instanceof Error ? cause.message : '恢复失败'); }
-  finally { if (lifecycle.isActive()) actionBusy.value = false; }
+    if (result !== 'restored' && result !== 'previously-restored' && result !== 'expired' && result !== 'missing') throw new Error('unknown result');
+    undoTickets.value = undoTickets.value.filter(item => item.id !== ticket.id);
+    showToast(result === 'restored' ? t('learning.collection.deletedRestored') : result === 'previously-restored' ? t('learning.collection.restorePreviously') : t('learning.collection.restoreExpired'));
+  } catch (cause) {
+    if (lifecycle.isActive()) showToast(cause instanceof Error && 'code' in cause && cause.code === 'invalid-input' ? t('learning.collection.restoreConflict') : cause instanceof Error && 'code' in cause && cause.code === 'limit-exceeded' ? t('learning.collection.restoreCapacity') : t('learning.collection.undoUnconfirmed'));
+  } finally {
+    if (lifecycle.isActive()) {actionBusy.value = false; void loadEntries();}
+  }
+}
+
+async function discardUndo(ticket: VocabularyUndoTicket): Promise<void> {
+  if (!lifecycle.isActive() || actionBusy.value) return;
+  actionBusy.value = true;
+  undoReadEpoch += 1;
+  try {
+    const discarded = await requestVocabulary<boolean>({type: VOCABULARY_BOOK_MESSAGE, action: 'discardUndo', undoId: ticket.id});
+    if (!lifecycle.isActive()) return;
+    if (discarded !== true) throw new Error('unknown discard result');
+    undoTickets.value = undoTickets.value.filter(item => item.id !== ticket.id);
+    showToast(t('learning.collection.undoDiscarded'));
+  } catch (cause) {
+    if (lifecycle.isActive()) showToast(cause instanceof Error && 'code' in cause && cause.code === 'invalid-input' ? t('learning.collection.undoBusy') : t('learning.collection.discardUnconfirmed'));
+  } finally {
+    if (lifecycle.isActive()) {actionBusy.value = false; void loadUndoTickets();}
+  }
 }
 
 async function chooseAnkiContext(): Promise<boolean | null> {
@@ -927,12 +989,12 @@ async function importCollection(event: Event): Promise<void> {
 }
 
 async function clearVocabulary(): Promise<void> {
-  if (!lifecycle.isActive() || actionBusy.value || entries.value.length === 0) return;
+  if (!lifecycle.isActive() || actionBusy.value || (entries.value.length === 0 && undoTickets.value.length === 0)) return;
   actionBusy.value = true;
   try {
     try {
       await ElMessageBox.confirm(
-        t('learning.collection.clearHelp'),
+        `${t('learning.collection.clearHelp')} ${t('learning.collection.clearUndoNotice')}`,
         t('learning.collection.clearTitle'),
         {confirmButtonText: '确认清空', cancelButtonText: '取消', type: 'warning'},
       );
@@ -945,11 +1007,13 @@ async function clearVocabulary(): Promise<void> {
     await requestVocabulary<boolean>({type: VOCABULARY_BOOK_MESSAGE, action: 'clear'});
     if (!lifecycle.isActive()) return;
     entries.value = [];
+    undoReadEpoch += 1;
+    undoTickets.value = [];
     finishReview();
     scheduleTimeRefresh();
     showToast(t('learning.collection.cleared'));
   } catch (cause) {
-    showToast(cause instanceof Error ? cause.message : '清空失败');
+    showToast(cause instanceof Error && 'code' in cause && cause.code === 'invalid-input' ? t('learning.collection.undoBusy') : cause instanceof Error ? cause.message : '清空失败');
   } finally {
     if (lifecycle.isActive()) actionBusy.value = false;
   }
@@ -964,14 +1028,7 @@ async function closeMoreMenuAndFocus(): Promise<void> {
   if (visible && viewVisible.value && epoch === readEpoch && lifecycle.isActive() && details.isConnected && moreMenu.value === details) details.querySelector<HTMLElement>('summary')?.focus();
 }
 
-function downloadFile(name: string, body: string, type: string): void {
-  const url = URL.createObjectURL(new Blob([body], {type}));
-  const anchor = document.createElement('a');
-  anchor.href = url;
-  anchor.download = name;
-  anchor.click();
-  window.setTimeout(() => URL.revokeObjectURL(url), 1000);
-}
+
 
 function entryTranslation(entry: Pick<VocabularyEntry, 'translations'>): string {
   const preferred = entry.translations[targetLanguageKey.value];
@@ -995,16 +1052,19 @@ function normalizeLanguageKey(value: unknown): string {
 function goodIntervalLabel(entry: VocabularyEntry): string {
   return ['1 天后', '1 天后', '3 天后', '7 天后', '14 天后', '30 天后'][Math.min(5, entry.masteryLevel + 1)] || '30 天后';
 }
-function showToast(message: string, keepUndo = false, durationMs = keepUndo ? 5000 : 2600): void {
+function showToast(message: string, _keepUndo = false, durationMs = _keepUndo ? 5000 : 2600): void {
   if (!lifecycle.isActive()) return;
   toastMessage.value = message;
-  if (!keepUndo) undoExport.value = null;
   if (toastTimer !== null) window.clearTimeout(toastTimer);
-  toastTimer = window.setTimeout(() => { toastMessage.value = ''; undoExport.value = null; }, durationMs);
+  toastTimer = durationMs > 0 ? window.setTimeout(() => {toastMessage.value = '';}, durationMs) : null;
+}
+
+function handleVocabularyFocus(): void {
+  if (lifecycle.isActive() && viewVisible.value && configured) {void loadEntries(); void loadUndoTickets();}
 }
 
 function handleBookChanged(message: unknown): undefined {
-  if (lifecycle.isActive() && (message as VocabularyBookChangedMessage)?.type === VOCABULARY_BOOK_CHANGED_MESSAGE) void loadEntries();
+  if (lifecycle.isActive() && (message as VocabularyBookChangedMessage)?.type === VOCABULARY_BOOK_CHANGED_MESSAGE) {void loadEntries(); void loadUndoTickets();}
   return undefined;
 }
 // 缓存保留复习会话与已接受的保存，只有当前显示的页面处理全局复习按键。
@@ -1044,10 +1104,12 @@ onMounted(async () => {
     browser.runtime.onMessage.addListener(handleBookChanged);
     browser.runtime.onMessage.addListener(handleEntrySpeechState);
     window.addEventListener('keydown', handleReviewKeyboard);
+    window.addEventListener('focus', handleVocabularyFocus);
     document.addEventListener('visibilitychange', handleVisibilityChange);
     documentVisible.value = document.visibilityState !== 'hidden';
     configured = true;
     await loadEntries();
+    await loadUndoTickets();
   });
 });
 
@@ -1058,6 +1120,7 @@ onBeforeUnmount(() => {
   browser.runtime.onMessage.removeListener(handleBookChanged);
   browser.runtime.onMessage.removeListener(handleEntrySpeechState);
   window.removeEventListener('keydown', handleReviewKeyboard);
+  window.removeEventListener('focus', handleVocabularyFocus);
   document.removeEventListener('visibilitychange', handleVisibilityChange);
   darkMedia?.removeEventListener('change', applyTheme);
   if (toastTimer !== null) window.clearTimeout(toastTimer);
@@ -1072,6 +1135,16 @@ onBeforeUnmount(() => {
 .collection-overview h2 { margin:0; color:var(--ink); font-size:18px; font-weight:650; line-height:1.5; }
 .collection-overview > span { display:block; margin-top:4px; color:var(--muted); font-size:11px; line-height:1.7; }
 .collection-management { display:flex; align-items:center; flex:none; gap:10px; }
+.recent-deletions { padding:12px 14px; border:1px solid var(--line); border-radius:10px; background:var(--surface); }
+.recent-deletions-heading h3 { margin:0; color:var(--ink); font-size:12px; font-weight:600; }
+.recent-deletions-heading p { margin:4px 0 0; color:var(--muted); font-size:11px; line-height:1.6; }
+.recent-deletion-row { display:flex; align-items:center; justify-content:space-between; gap:12px; padding-top:10px; }
+.recent-deletion-term { min-width:0; color:var(--ink); font-size:12px; overflow-wrap:anywhere; }
+.recent-deletion-actions { display:flex; flex:none; gap:4px; }
+.recent-deletion-actions button { min-height:30px; padding:0 9px; border:0; border-radius:7px; color:var(--muted); background:transparent; cursor:pointer; font:inherit; font-size:12px; }
+.recent-deletion-actions .recent-deletion-restore { color:var(--brand-strong); background:var(--brand-soft); }
+.recent-deletion-actions button:hover:not(:disabled) { color:var(--brand-strong); background:var(--brand-soft); }
+.recent-deletion-actions button:focus-visible { outline:2px solid var(--brand); outline-offset:2px; }
 .collection-switches { display:grid; gap:4px; padding:4px 0 10px; margin-bottom:6px; border-bottom:1px solid var(--line); }
 .collection-switches .vocabulary-saving-control { margin:0; border:0; background:transparent; }
 .vocabulary-saving-control :deep(button) { min-height:58px; padding:8px 10px; gap:12px; }
@@ -1180,6 +1253,8 @@ button:disabled { cursor: not-allowed; opacity: .55; }
 .book-toast { position: fixed; z-index: 30; right: 28px; bottom: 24px; display: flex; align-items: center; gap: 12px; padding: 11px 14px; border-radius: 11px; color: #fff; background: #252a33; box-shadow: 0 12px 30px rgba(0,0,0,.2); font-size: 11px; }
 .book-toast button { padding: 0; border: 0; color: #ffb8ce; background: transparent; cursor: pointer; font: inherit; font-weight: 600; }
 @media (max-width: 560px) {
+  .recent-deletion-row { align-items:flex-start; flex-wrap:wrap; gap:4px 12px; }
+  .recent-deletion-term { flex:1 1 100%; }
   .collection-tools { align-items:flex-start; gap:12px; }
   .collection-management { flex:1; min-width:0; max-width:65%; gap:3px; flex-wrap:wrap; justify-content:flex-end; }
   .collection-management .book-more { max-width:100%; }

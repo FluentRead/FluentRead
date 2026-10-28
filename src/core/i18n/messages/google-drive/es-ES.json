@@ -104,6 +104,7 @@
     "空值": "Vacío",
     "同步未完成，请重试。": "La sincronización no se completó. Inténtalo de nuevo.",
     "同步文件无法解密或已损坏；请检查云端备份，本机配置未被修改。": "No se puede descifrar el archivo o está dañado. Revisa la copia del cloud; los ajustes locales no han cambiado.",
+    "上次 Google 授权仍在结束，请稍后重试。": "La autorización anterior de Google aún está finalizando. Vuelve a intentarlo en breve.",
     "Google 授权未完成，请点击同步按钮后重试。": "La autorización de Google no se ha completado. Pulsa el botón de sincronización para reintentar.",
     "Google 未返回有效授权，请点击同步按钮重试。": "Google no ha devuelto una autorización válida. Pulsa el botón de sincronización para reintentar.",
     "未允许 Google Drive 配置数据权限，请重新同步并在 Google 授权页面允许访问配置数据。": "No se ha permitido el acceso a los datos de configuración de Google Drive. Vuelve a sincronizar y permite el acceso en la página de Google.",

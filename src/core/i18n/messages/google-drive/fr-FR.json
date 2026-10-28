@@ -104,6 +104,7 @@
     "空值": "Vide",
     "同步未完成，请重试。": "Synchronisation inachevée. Réessayez.",
     "同步文件无法解密或已损坏；请检查云端备份，本机配置未被修改。": "Le fichier est indéchiffrable ou endommagé. Vérifiez la sauvegarde du cloud ; les réglages locaux n’ont pas changé.",
+    "上次 Google 授权仍在结束，请稍后重试。": "L’autorisation Google précédente est encore en cours de finalisation. Réessayez dans quelques instants.",
     "Google 授权未完成，请点击同步按钮后重试。": "L’autorisation Google n’a pas abouti. Cliquez sur le bouton de synchronisation pour réessayer.",
     "Google 未返回有效授权，请点击同步按钮重试。": "Google n’a pas renvoyé d’autorisation valide. Cliquez sur le bouton de synchronisation pour réessayer.",
     "未允许 Google Drive 配置数据权限，请重新同步并在 Google 授权页面允许访问配置数据。": "L’accès aux données de configuration Google Drive n’a pas été autorisé. Relancez la synchronisation et autorisez cet accès sur la page Google.",

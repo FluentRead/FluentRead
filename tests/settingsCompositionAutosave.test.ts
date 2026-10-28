@@ -4,7 +4,7 @@ import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { parseHTML } from 'linkedom';
 import * as ts from 'typescript';
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterAll, afterEach, describe, expect, it, vi } from 'vitest';
 import vue from '@vitejs/plugin-vue';
 import {createServer, type ViteDevServer} from 'vite';
 
@@ -83,7 +83,10 @@ function compositionEvent(window: any, type: string, data: string): Event {
   return event;
 }
 
-afterEach(async () => {vi.unstubAllGlobals();await server?.close();server = undefined;});
+// 组件定义无状态，三个用例只需编译和加载一次；每次挂载仍使用独立 DOM 与 app。
+let cachedEditor: Promise<import('vue').Component> | undefined;
+afterEach(() => {vi.unstubAllGlobals();});
+afterAll(async () => {await server?.close();server = undefined;cachedEditor = undefined;});
 
 async function mountEditor() {
   const {window} = parseHTML('<html><body><div id="app"></div></body></html>');
@@ -106,7 +109,7 @@ async function mountEditor() {
 
   const require = createRequire(import.meta.url);
   const vueRuntime = require('vue') as typeof import('vue');
-  const editor = await loadPromptTemplateEditor(vueRuntime);
+  const editor = await (cachedEditor ??= loadPromptTemplateEditor(vueRuntime));
   const updates: string[] = [];
   const saves: string[] = [];
   let setExternalValue: (value: string) => void = () => undefined;

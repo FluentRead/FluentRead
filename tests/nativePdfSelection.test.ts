@@ -15,10 +15,10 @@ function deferred<T>() {let resolve!: (value: T) => void, reject!: (reason: unkn
 async function settle() {for (let at = 0; at < 12; at++) await Promise.resolve();}
 function fixture(overrides: Partial<NativePdfSelectionDependencies> = {}) {
     let time = 1_000, sequence = 0;
-    const dependencies = {extensionId: 'test', resultUrl: PAGE, now: () => time,
+    const dependencies = {extensionId: 'test', resultUrl: PAGE, now: () => time, wallNow: () => time,
         randomToken: vi.fn(() => (++sequence).toString(16).padStart(32, '0')),
         openWindow: vi.fn<NativePdfSelectionDependencies['openWindow']>().mockResolvedValue({id: 12, tabs: [{id: 21, windowId: 12}]}),
-        closeWindow: vi.fn<NativePdfSelectionDependencies['closeWindow']>().mockResolvedValue(undefined), ...overrides};
+        ...overrides};
     return {...dependencies, bridge: createNativePdfSelectionBridge(dependencies), advance: (ms: number) => {time += ms;}};
 }
 beforeEach(() => vi.clearAllMocks());
@@ -31,7 +31,7 @@ describe('原生 PDF 菜单选区的一次性窗口交付', () => {
         expect(run.openWindow).toHaveBeenCalledTimes(1);
         expect(run.openWindow).toHaveBeenCalledWith({url: `${PAGE}#token=${TOKEN}`, type: 'popup', width: 520, height: 680});
         expect(await run.bridge.claim(TOKEN, SENDER)).toEqual({...INPUT, sourceUrl: 'https://www.usenix.org/paper.pdf?download=1'});
-        expect(await run.bridge.claim(TOKEN, SENDER)).toBeNull(); expect(run.closeWindow).not.toHaveBeenCalled();
+        expect(await run.bridge.claim(TOKEN, SENDER)).toBeNull();
     });
     it.each([
         {text: ''}, {text: ' \n\t'}, {text: 'x'.repeat(4097)}, {text: undefined}, {sourceUrl: 'file:///tmp/paper.pdf'},
@@ -72,26 +72,25 @@ describe('原生 PDF 菜单选区的一次性窗口交付', () => {
         const opened = run.bridge.open(INPUT), wrong = run.bridge.claim(TOKEN, {...SENDER, tab: {windowId: 99}});
         window.resolve({id: 12}); await opened; expect(await wrong).toBeNull(); expect(await run.bridge.claim(TOKEN, SENDER)).not.toBeNull();
     });
-    it('到期票据无法领取并回收其未使用窗口；回收失败不传播错误', async () => {
-        const closeWindow = vi.fn().mockRejectedValue(new Error('already closed')), run = fixture({closeWindow}); await run.bridge.open(INPUT);
+    it('到期票据无法领取', async () => {
+        const run = fixture(); await run.bridge.open(INPUT);
         run.advance(NATIVE_PDF_SELECTION_TTL_MS); expect(await run.bridge.claim(TOKEN, SENDER)).toBeNull(); await settle();
-        expect(closeWindow).toHaveBeenCalledTimes(1); expect(closeWindow).toHaveBeenCalledWith(12);
     });
-    it('创建等待跨过到期时间，即使窗口迟到成功也回收且只关闭一次', async () => {
-        const window = deferred<{id: number}>(), closeWindow = vi.fn().mockResolvedValue(undefined), run = fixture({closeWindow, openWindow: vi.fn().mockReturnValue(window.promise)});
-        const opened = run.bridge.open(INPUT), claim = run.bridge.claim(TOKEN, SENDER); run.advance(NATIVE_PDF_SELECTION_TTL_MS);
-        window.resolve({id: 12}); expect(await opened).toBe(false); expect(await claim).toBeNull(); await settle(); expect(closeWindow).toHaveBeenCalledTimes(1);
+    it('创建等待跨过到期时间，迟到窗口保留且不能领取', async () => {
+        const window = deferred<{id: number}>(), run = fixture({openWindow: vi.fn().mockReturnValue(window.promise)});
+        const opened = run.bridge.open(INPUT), claim = run.bridge.claim(TOKEN, SENDER); await settle(); run.advance(NATIVE_PDF_SELECTION_TTL_MS);
+        window.resolve({id: 12}); expect(await opened).toBe(false); expect(await claim).toBeNull(); await settle();
     });
     it('兑换开始后票据才到期，异步等待不能延长交付有效期', async () => {
-        const closeWindow = vi.fn().mockResolvedValue(undefined), run = fixture({closeWindow}); await run.bridge.open(INPUT);
+        const run = fixture(); await run.bridge.open(INPUT);
         const claim = run.bridge.claim(TOKEN, SENDER); run.advance(NATIVE_PDF_SELECTION_TTL_MS);
-        expect(await claim).toBeNull(); expect(closeWindow).toHaveBeenCalledTimes(1);
+        expect(await claim).toBeNull();
     });
-    it('等待创建的票据被过期清理后，新窗口迟到仍回收且不污染新票据', async () => {
-        const window = deferred<{id: number}>(), closeWindow = vi.fn().mockResolvedValue(undefined), run = fixture({closeWindow, openWindow: vi.fn().mockReturnValueOnce(window.promise).mockResolvedValue({id: 13})});
+    it('等待创建的票据过期后，迟到窗口不能污染新票据', async () => {
+        const window = deferred<{id: number}>(), run = fixture({openWindow: vi.fn().mockReturnValueOnce(window.promise).mockResolvedValue({id: 13})});
         const old = run.bridge.open(INPUT); await settle(); run.advance(NATIVE_PDF_SELECTION_TTL_MS); expect(await run.bridge.claim(TOKEN, SENDER)).toBeNull();
-        expect(await run.bridge.open(INPUT)).toBe(true); window.resolve({id: 12}); expect(await old).toBe(false);
-        expect(closeWindow).toHaveBeenCalledWith(12); expect(await run.bridge.claim('00000000000000000000000000000002', {...SENDER, tab: {windowId: 13}})).not.toBeNull();
+        expect(await run.bridge.open(INPUT)).toBe(true); window.resolve({id: 12}); expect(await old).toBe(false); await settle();
+        expect(await run.bridge.claim('00000000000000000000000000000002', {...SENDER, tab: {windowId: 13}})).not.toBeNull();
     });
     it.each([undefined, -1, 1.5, NaN])('窗口身份 %s 不完整时不发出可兑换票据', async id => {
         const run = fixture({openWindow: vi.fn().mockResolvedValue({id})}); expect(await run.bridge.open(INPUT)).toBe(false); expect(await run.bridge.claim(TOKEN, SENDER)).toBeNull();
@@ -101,20 +100,129 @@ describe('原生 PDF 菜单选区的一次性窗口交付', () => {
         const opened = run.bridge.open(INPUT), claim = run.bridge.claim(TOKEN, SENDER); window.reject(new Error('popup unavailable'));
         expect(await opened).toBe(false); expect(await claim).toBeNull();
     });
-    it('签票时清理过期已打开窗口，新票据仍可交付', async () => {
-        const closeWindow = vi.fn().mockResolvedValue(undefined), run = fixture({closeWindow}); await run.bridge.open(INPUT); run.advance(NATIVE_PDF_SELECTION_TTL_MS);
-        expect(await run.bridge.open(INPUT)).toBe(true); expect(closeWindow).toHaveBeenCalledTimes(1); expect(await run.bridge.claim(TOKEN, SENDER)).toBeNull();
+    it('签票时清理过期票据，新票据仍可交付', async () => {
+        const run = fixture(); await run.bridge.open(INPUT); run.advance(NATIVE_PDF_SELECTION_TTL_MS);
+        expect(await run.bridge.open(INPUT)).toBe(true); expect(await run.bridge.claim(TOKEN, SENDER)).toBeNull();
     });
-    it('容量超过十六条时只淘汰最旧票据并关闭它的孤儿窗口', async () => {
-        const closeWindow = vi.fn().mockResolvedValue(undefined), run = fixture({closeWindow});
+    it('主动到期清除未领取票据，保留可能已被用户导航的窗口', async () => {
+        vi.useFakeTimers();
+        try {
+            const run = fixture();
+            await run.bridge.open(INPUT);expect(vi.getTimerCount()).toBe(1);run.advance(NATIVE_PDF_SELECTION_TTL_MS);
+            await vi.advanceTimersByTimeAsync(NATIVE_PDF_SELECTION_TTL_MS);
+            expect(vi.getTimerCount()).toBe(0);expect(await run.bridge.claim(TOKEN, SENDER)).toBeNull();
+        } finally {vi.useRealTimers();}
+    });
+
+    it('窗口创建挂起时到期释放打开和领取，迟到窗口保留', async () => {
+        vi.useFakeTimers();
+        try {
+            const window = deferred<{id: number}>();
+            const run = fixture({openWindow: vi.fn().mockReturnValue(window.promise)});
+            const opened = run.bridge.open(INPUT), claim = run.bridge.claim(TOKEN, SENDER);await settle();
+            run.advance(NATIVE_PDF_SELECTION_TTL_MS);await vi.advanceTimersByTimeAsync(NATIVE_PDF_SELECTION_TTL_MS);
+            expect(await opened).toBe(false);expect(await claim).toBeNull();
+            window.resolve({id:12});await settle();expect(await run.bridge.claim(TOKEN, SENDER)).toBeNull();
+        } finally {vi.useRealTimers();}
+    });
+
+    it('主动过期后消费窗口创建的迟到失败', async () => {
+        vi.useFakeTimers();
+        try {
+            const window = deferred<never>(), run = fixture({openWindow: vi.fn().mockReturnValue(window.promise)});
+            const opened = run.bridge.open(INPUT);await settle();run.advance(NATIVE_PDF_SELECTION_TTL_MS);
+            await vi.advanceTimersByTimeAsync(NATIVE_PDF_SELECTION_TTL_MS);expect(await opened).toBe(false);
+            window.reject(new Error('late failure'));await settle();
+        } finally {vi.useRealTimers();}
+    });
+
+    it('成功领取后撤销到期清理，不关闭用户的结果窗口', async () => {
+        vi.useFakeTimers();
+        try {
+            const run = fixture();
+            await run.bridge.open(INPUT);expect(await run.bridge.claim(TOKEN, SENDER)).not.toBeNull();
+            run.advance(NATIVE_PDF_SELECTION_TTL_MS);await vi.advanceTimersByTimeAsync(NATIVE_PDF_SELECTION_TTL_MS);
+            expect(vi.getTimerCount()).toBe(0);
+        } finally {vi.useRealTimers();}
+    });
+
+    it('旧计时回调迟到时不能清除碰巧复用相同令牌的新票据', async () => {
+        vi.useFakeTimers();
+        try {
+            const setTimer = vi.spyOn(globalThis, 'setTimeout'), run = fixture({randomToken: () => TOKEN});
+            await run.bridge.open(INPUT);const stale = setTimer.mock.calls[0][0] as () => void;
+            expect(await run.bridge.claim(TOKEN, SENDER)).not.toBeNull();
+            await run.bridge.open({...INPUT, text:'new'});stale();
+            expect((await run.bridge.claim(TOKEN, SENDER))?.text).toBe('new');expect(vi.getTimerCount()).toBe(0);
+        } finally {vi.restoreAllMocks();vi.useRealTimers();}
+    });
+
+    it('系统时钟回退时重新安排剩余有效期', async () => {
+        vi.useFakeTimers();
+        try {
+            const run = fixture();
+            await run.bridge.open(INPUT);await vi.advanceTimersByTimeAsync(NATIVE_PDF_SELECTION_TTL_MS);
+            expect(vi.getTimerCount()).toBe(1);
+            run.advance(NATIVE_PDF_SELECTION_TTL_MS);await vi.advanceTimersByTimeAsync(NATIVE_PDF_SELECTION_TTL_MS);
+            expect(vi.getTimerCount()).toBe(0);expect(await run.bridge.claim(TOKEN, SENDER)).toBeNull();
+        } finally {vi.useRealTimers();}
+    });
+
+    it('异常时钟大幅回退不会把长计时钳成频繁唤醒', async () => {
+        vi.useFakeTimers();
+        try {
+            const timer = vi.spyOn(globalThis, 'setTimeout'), run = fixture();
+            await run.bridge.open(INPUT);run.advance(-3_000_000_000);
+            await vi.advanceTimersByTimeAsync(NATIVE_PDF_SELECTION_TTL_MS);
+            expect(timer.mock.lastCall?.[1]).toBe(2_147_483_647);expect(vi.getTimerCount()).toBe(1);
+            run.advance(3_000_000_000 + NATIVE_PDF_SELECTION_TTL_MS);
+            await vi.advanceTimersByTimeAsync(2_147_483_647);
+            expect(vi.getTimerCount()).toBe(0);expect(await run.bridge.claim(TOKEN, SENDER)).toBeNull();
+        } finally {vi.restoreAllMocks();vi.useRealTimers();}
+    });
+
+    it('墙钟先快进再回拨时，单调截止点仍限制新票据', async () => {
+        let monotonic = 0, wall = 86_400_000;
+        const run = fixture({now:() => monotonic, wallNow:() => wall});
+        await run.bridge.open(INPUT);wall = 0;monotonic = NATIVE_PDF_SELECTION_TTL_MS;
+        expect(await run.bridge.claim(TOKEN, SENDER)).toBeNull();
+    });
+
+    it('容量超过十六条时只淘汰最旧票据，不关闭用户窗口', async () => {
+        const run = fixture();
         for (let at = 0; at < 17; at++) expect(await run.bridge.open({...INPUT, text: `selection ${at}`})).toBe(true);
-        expect(closeWindow).toHaveBeenCalledTimes(1); expect(await run.bridge.claim(TOKEN, SENDER)).toBeNull();
+         expect(await run.bridge.claim(TOKEN, SENDER)).toBeNull();
         expect((await run.bridge.claim('00000000000000000000000000000011', SENDER))?.text).toBe('selection 16');
     });
-    it('容量淘汰尚在创建的票据，迟到的窗口也会回收', async () => {
-        const firstWindow = deferred<{id: number}>(), closeWindow = vi.fn().mockResolvedValue(undefined), run = fixture({closeWindow, openWindow: vi.fn().mockReturnValueOnce(firstWindow.promise).mockResolvedValue({id: 13})});
+    it('并发超额时不再启动已淘汰票据的窗口创建', async () => {
+        vi.useFakeTimers();
+        try {
+            const run = fixture();const results = await Promise.all(Array.from({length:17}, () => run.bridge.open(INPUT)));
+            expect(results.filter(Boolean)).toHaveLength(16);expect(run.openWindow).toHaveBeenCalledTimes(16);
+            run.advance(NATIVE_PDF_SELECTION_TTL_MS);await vi.advanceTimersByTimeAsync(NATIVE_PDF_SELECTION_TTL_MS);
+            expect(vi.getTimerCount()).toBe(0);
+        } finally {vi.useRealTimers();}
+    });
+    it('限制无法取消的挂起窗口创建，迟到结束后释放容量', async () => {
+        vi.useFakeTimers();
+        try {
+            const pending = Array.from({length:16}, () => deferred<{id:number}>());let count = 0;
+            const openWindow = vi.fn(() => count < pending.length ? pending[count++].promise : Promise.resolve({id:99}));
+            const run = fixture({openWindow});const requests = pending.map(() => run.bridge.open(INPUT));await settle();
+            expect(openWindow).toHaveBeenCalledTimes(16);run.advance(NATIVE_PDF_SELECTION_TTL_MS);
+            await vi.advanceTimersByTimeAsync(NATIVE_PDF_SELECTION_TTL_MS);
+            expect(await Promise.all(requests)).toEqual(Array(16).fill(false));
+            expect(await run.bridge.open(INPUT)).toBe(false);expect(openWindow).toHaveBeenCalledTimes(16);
+            pending[0].resolve({id:12});await settle();expect(await run.bridge.open(INPUT)).toBe(true);
+            for (const request of pending.slice(1)) request.reject(new Error('late'));
+            await settle();run.advance(NATIVE_PDF_SELECTION_TTL_MS);await vi.advanceTimersByTimeAsync(NATIVE_PDF_SELECTION_TTL_MS);
+            expect(vi.getTimerCount()).toBe(0);
+        } finally {vi.useRealTimers();}
+    });
+    it('容量淘汰尚在创建的票据，迟到的窗口仍保留', async () => {
+        const firstWindow = deferred<{id: number}>(), run = fixture({openWindow: vi.fn().mockReturnValueOnce(firstWindow.promise).mockResolvedValue({id: 13})});
         const first = run.bridge.open(INPUT); await settle(); for (let at = 0; at < 16; at++) await run.bridge.open(INPUT);
-        firstWindow.resolve({id: 12}); expect(await first).toBe(false); expect(closeWindow).toHaveBeenCalledTimes(1); expect(closeWindow).toHaveBeenCalledWith(12);
+        firstWindow.resolve({id: 12}); expect(await first).toBe(false); await settle();
     });
     it.each(['', 'predictable', 'x'.repeat(32)])('随机数端口返回非法 token %s 不创建结果页', async token => {
         const run = fixture({randomToken: () => token}); expect(await run.bridge.open(INPUT)).toBe(false); expect(run.openWindow).not.toHaveBeenCalled();
@@ -126,6 +234,20 @@ describe('原生 PDF 菜单选区的一次性窗口交付', () => {
 });
 
 describe('后台原生 PDF bridge 的懒加载装配', () => {
+    it('超长提示与正常选区共用窗口创建上限，迟到结束后恢复', async () => {
+        vi.resetModules();const pending=Array.from({length:16},() => deferred<{id:number}>());let count=0;
+        const create=vi.fn(() => count<pending.length ? pending[count++].promise : Promise.resolve({id:12}));
+        vi.stubGlobal('browser',{runtime:{id:'test',getURL:() => PAGE},windows:{create}});
+        vi.stubGlobal('crypto',{getRandomValues:(bytes:Uint8Array) => {bytes.fill(0);bytes[15]=1;return bytes;}});
+        const module=await import('@/src/app/background/nativePdfSelection');
+        const requests=pending.map(() => module.openNativePdfSelection({...INPUT,text:'x'.repeat(4097)}));await settle();
+        expect(create).toHaveBeenCalledTimes(16);
+        expect(await module.openNativePdfSelection({...INPUT,text:'x'.repeat(4097)})).toBe(false);
+        expect(await module.openNativePdfSelection(INPUT)).toBe(false);expect(create).toHaveBeenCalledTimes(16);
+        pending[0].resolve({id:12});expect(await requests[0]).toBe(true);
+        expect(await module.openNativePdfSelection({...INPUT,text:'x'.repeat(4097)})).toBe(true);
+        for(const request of pending.slice(1))request.reject(new Error('late'));await Promise.all(requests);
+    });
     it.each([true, false])('超长原文仅打开无正文无来源的错误窗口，创建成功 %s 如实返回', async opened => {
         vi.resetModules(); const create = vi.fn();
         if (opened) create.mockResolvedValue({id: 12}); else create.mockRejectedValue(new Error('window blocked'));
@@ -151,12 +273,36 @@ describe('后台原生 PDF bridge 的懒加载装配', () => {
         expect(await handler.handle({type: 'claimNativePdfSelection', token: TOKEN} as any, {sender: SENDER})).toEqual({...INPUT, sourceUrl: 'https://www.usenix.org/paper.pdf?download=1'});
         expect(await handler.handle({type: 'claimNativePdfSelection', token: TOKEN} as any, {sender: SENDER})).toBeNull();
     });
-    it('后台重启或调用上下文缺失时返回 null，过期票据通过浏览器 remove 回收', async () => {
+    it('后台重启或调用上下文缺失时返回 null，过期不关闭用户窗口', async () => {
         vi.resetModules(); const api = {runtime: {id: 'test', getURL: () => PAGE}, windows: {create: vi.fn().mockResolvedValue({id: 12}), remove: vi.fn().mockResolvedValue(undefined)}};
         vi.stubGlobal('browser', api); vi.stubGlobal('crypto', {getRandomValues: (bytes: Uint8Array) => {bytes.fill(0); bytes[15] = 1; return bytes;}});
-        const time = vi.spyOn(Date, 'now').mockReturnValue(0), module = await import('@/src/app/background/nativePdfSelection'), handler = module.createNativePdfSelectionHandler();
+        const time = vi.spyOn(performance, 'now').mockReturnValue(0), module = await import('@/src/app/background/nativePdfSelection'), handler = module.createNativePdfSelectionHandler();
         expect(await handler.handle({type: 'claimNativePdfSelection'}, undefined)).toBeNull(); await module.openNativePdfSelection(INPUT);
         time.mockReturnValue(NATIVE_PDF_SELECTION_TTL_MS); expect(await handler.handle({type: 'claimNativePdfSelection', token: TOKEN} as any, {sender: SENDER})).toBeNull();
-        expect(api.windows.remove).toHaveBeenCalledWith(12); time.mockRestore();
+        expect(api.windows.remove).not.toHaveBeenCalled(); time.mockRestore();
+    });
+    it('单调时钟暂停时仍按经过的墙钟时间拒绝过期领取', async () => {
+        vi.resetModules();const api = {runtime:{id:'test',getURL:() => PAGE},windows:{create:vi.fn().mockResolvedValue({id:12}),remove:vi.fn()}};
+        vi.stubGlobal('browser',api);vi.stubGlobal('crypto',{getRandomValues:(bytes:Uint8Array) => {bytes.fill(0);bytes[15]=1;return bytes;}});
+        const monotonic=vi.spyOn(performance,'now').mockReturnValue(0),wall=vi.spyOn(Date,'now').mockReturnValue(1000);
+        try {
+            const module=await import('@/src/app/background/nativePdfSelection');expect(await module.openNativePdfSelection(INPUT)).toBe(true);
+            wall.mockReturnValue(1000+NATIVE_PDF_SELECTION_TTL_MS);
+            expect(await module.createNativePdfSelectionHandler().handle({type:'claimNativePdfSelection',token:TOKEN} as any,{sender:SENDER})).toBeNull();
+            expect(api.windows.remove).not.toHaveBeenCalled();
+        } finally {monotonic.mockRestore();wall.mockRestore();}
+    });
+    it('容量淘汰与到期都不会关闭可能已被用户接管的真实窗口端口', async () => {
+        vi.useFakeTimers();
+        try {
+            vi.resetModules();let sequence = 0;
+            const api = {runtime:{id:'test',getURL:() => PAGE}, windows:{create:vi.fn().mockResolvedValue({id:12}), remove:vi.fn()}};
+            vi.stubGlobal('browser', api);vi.stubGlobal('crypto', {getRandomValues:(bytes:Uint8Array) => {bytes.fill(0);bytes[15]=++sequence;return bytes;}});
+            const module = await import('@/src/app/background/nativePdfSelection');
+            for (let at = 0; at < 17; at++) expect(await module.openNativePdfSelection(INPUT)).toBe(true);
+            expect(api.windows.remove).not.toHaveBeenCalled();
+            await vi.advanceTimersByTimeAsync(NATIVE_PDF_SELECTION_TTL_MS);
+            expect(api.windows.remove).not.toHaveBeenCalled();
+        } finally {vi.useRealTimers();}
     });
 });

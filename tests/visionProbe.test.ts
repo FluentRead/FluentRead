@@ -9,7 +9,7 @@ import {getTranslationImageInput, getTranslationProviderConfig, getTranslationRe
 import {createImageInputHttpError} from '@/src/platform/http/errors';
 
 const base = () => { const config = new Config(); config.model.deepseek = 'future-vision'; config.token.deepseek = 'test-key'; return config; };
-const store = () => ({load: vi.fn(async (): Promise<unknown> => []), save: vi.fn(async (_records: unknown) => undefined)});
+const store = () => ({load: vi.fn(async (): Promise<unknown> => []), save: vi.fn(async (_records: unknown): Promise<void> => undefined)});
 const random = () => Uint8Array.from([0xab, 0xcd, 0xef]);
 const pending = () => { let resolve!: (v: string) => void; const promise = new Promise<string>(r => {resolve = r;}); return {promise, resolve}; };
 
@@ -184,5 +184,138 @@ describe('共享识图探测服务', () => {
         const retry=createModelVisionProbe({storage:badWrite,translate,random});
         await expect(retry.resolve(base(),'deepseek','future-vision',{force:true})).rejects.toThrow('write failed');
         await expect(retry.resolve(base(),'deepseek','future-vision',{force:true})).resolves.toMatchObject({capability:'unknown'});
+    });
+    it('探测结果写入失败后，不应把未保存的结论当成缓存命中', async () => {
+        const storage = store();
+        storage.save.mockResolvedValueOnce(undefined).mockRejectedValueOnce(new Error('commit failed'));
+        const translate = vi.fn(async () => 'ABCDEF');
+        const service = createModelVisionProbe({storage, translate, random});
+        await expect(service.resolve(base(), 'deepseek', 'future-vision', {force: true})).rejects.toThrow('commit failed');
+        await expect(service.resolve(base(), 'deepseek', 'future-vision')).resolves.toEqual({capability: 'unknown', source: 'unknown'});
+        expect(translate).toHaveBeenCalledOnce();
+    });
+    it('结果写入完成之前其他调用不能读取未提交的结论', async () => {
+        let rejectWrite!: (error: Error) => void;
+        const writing = new Promise<void>((_, reject) => {rejectWrite = reject;});
+        const storage = store();
+        storage.save.mockResolvedValueOnce(undefined).mockImplementationOnce(() => writing);
+        const translate = vi.fn(async () => 'ABCDEF');
+        const service = createModelVisionProbe({storage, translate, random});
+        const attempt = service.resolve(base(), 'deepseek', 'future-vision', {force: true});
+        const failure = expect(attempt).rejects.toThrow('commit failed');
+        await vi.waitFor(() => expect(storage.save).toHaveBeenCalledTimes(2));
+        await expect(service.resolve(base(), 'deepseek', 'future-vision')).resolves.toEqual({capability: 'unknown', source: 'unknown'});
+        rejectWrite(new Error('commit failed'));
+        await failure;
+    });
+    it('强制重测正在清除旧缓存时，其他调用不能沿用旧结果', async () => {
+        let finish!: () => void;
+        const writing = new Promise<void>(resolve => {finish = resolve;});
+        const source = base();
+        const identity = createVisionProbeIdentity(source, 'deepseek', 'future-vision');
+        const storage = store();
+        storage.load.mockResolvedValue([{identity, capability: 'unsupported', checkedAt: 10}]);
+        storage.save.mockImplementationOnce(() => writing);
+        const translate = vi.fn(async () => 'ABCDEF');
+        const service = createModelVisionProbe({storage, translate, random, now: () => 20});
+        const attempt = service.resolve(source, 'deepseek', 'future-vision', {force: true});
+        await vi.waitFor(() => expect(storage.save).toHaveBeenCalledOnce());
+        await expect(service.resolve(source, 'deepseek', 'future-vision')).resolves.toEqual({capability: 'unknown', source: 'unknown'});
+        finish();
+        await expect(attempt).resolves.toMatchObject({capability: 'supported'});
+    });
+    it.each(['failure', 'cancel'])('旧缓存清除写入 %s 后，旧结论不在当前实例重新出现', async mode => {
+        let resolve!: () => void;
+        let reject!: (error: Error) => void;
+        const writing = new Promise<void>((yes, no) => {resolve = yes; reject = no;});
+        const source = base();
+        const identity = createVisionProbeIdentity(source, 'deepseek', 'future-vision');
+        const storage = store();
+        storage.load.mockResolvedValue([{identity, capability: 'unsupported', checkedAt: 10}]);
+        storage.save.mockImplementationOnce(() => writing);
+        const service = createModelVisionProbe({storage, translate: vi.fn(async () => 'ABCDEF'), random, now: () => 20});
+        const controller = new AbortController();
+        const attempt = service.resolve(source, 'deepseek', 'future-vision', {force: true, signal: controller.signal});
+        const failure = mode === 'failure' ? expect(attempt).rejects.toThrow('failed') : expect(attempt).rejects.toMatchObject({name: 'AbortError'});
+        await vi.waitFor(() => expect(storage.save).toHaveBeenCalledOnce());
+        if (mode === 'failure') reject(new Error('failed'));
+        else controller.abort();
+        await failure;
+        await expect(service.resolve(source, 'deepseek', 'future-vision')).resolves.toEqual({capability: 'unknown', source: 'unknown'});
+        if (mode === 'cancel') resolve();
+    });
+    it('强制重测排队后取消，旧结论不会在同实例恢复', async () => {
+        let finish!: () => void;
+        const writing = new Promise<void>(resolve => {finish = resolve;});
+        const storage = store();
+        const source = base();
+        const identity = createVisionProbeIdentity(source, 'deepseek', 'another-vision');
+        let disk: unknown = [{identity, capability: 'supported', checkedAt: 10}];
+        storage.load.mockImplementation(async () => disk);
+        storage.save.mockImplementationOnce(async snapshot => {await writing; disk = snapshot;})
+            .mockImplementation(async snapshot => {disk = snapshot;});
+        const translate = vi.fn(async () => 'ABCDEF');
+        const service = createModelVisionProbe({storage, translate, random, now: () => 20});
+        const first = service.resolve(source, 'deepseek', 'future-vision', {force: true});
+        await vi.waitFor(() => expect(storage.save).toHaveBeenCalledTimes(1));
+        const controller = new AbortController();
+        const attempt = service.resolve(source, 'deepseek', 'another-vision', {force: true, signal: controller.signal});
+        const failure = expect(attempt).rejects.toMatchObject({name: 'AbortError'});
+        await new Promise(resolve => setTimeout(resolve, 0));
+        controller.abort();
+        await failure;
+        finish();
+        await first;
+        await expect(service.resolve(source, 'deepseek', 'another-vision')).resolves.toEqual({capability: 'unknown', source: 'unknown'});
+        const restarted = createModelVisionProbe({storage, translate, random, now: () => 20});
+        // 另一身份的后续快照可能携带这次重测造成的旧缓存失效。
+        await expect(restarted.resolve(source, 'deepseek', 'another-vision')).resolves.toEqual({capability: 'unknown', source: 'unknown'});
+        expect(translate).toHaveBeenCalledTimes(1);
+    });
+    it('不同身份并发完成时，串行持久化不会覆盖先完成的结果', async () => {
+        const storage = store();
+        const translate = vi.fn(async () => 'ABCDEF');
+        const service = createModelVisionProbe({storage, translate, random});
+        const source = base();
+        await Promise.all([
+            service.resolve(source, 'deepseek', 'future-vision', {force: true}),
+            service.resolve(source, 'deepseek', 'another-vision', {force: true}),
+        ]);
+        expect(storage.save.mock.calls.at(-1)?.[0]).toEqual(expect.arrayContaining([
+            expect.objectContaining({identity: createVisionProbeIdentity(source, 'deepseek', 'future-vision')}),
+            expect.objectContaining({identity: createVisionProbeIdentity(source, 'deepseek', 'another-vision')}),
+        ]));
+        await expect(service.resolve(source, 'deepseek', 'future-vision')).resolves.toMatchObject({capability: 'supported'});
+        await expect(service.resolve(source, 'deepseek', 'another-vision')).resolves.toMatchObject({capability: 'supported'});
+        expect(translate).toHaveBeenCalledTimes(2);
+    });
+    it('提交在途取消不会发布到同实例，但已开始的存储写可能在重建后可见', async () => {
+        let finish!: () => void;
+        const writing = new Promise<void>(resolve => {finish = resolve;});
+        let disk: unknown = [];
+        let writes = 0;
+        let committed!: () => void;
+        const finished = new Promise<void>(resolve => {committed = resolve;});
+        const storage = {
+            load: vi.fn(async () => disk),
+            save: vi.fn(async (snapshot: unknown) => {
+                if (++writes === 2) await writing;
+                disk = snapshot;
+                if (writes === 2) committed();
+            }),
+        };
+        const translate = vi.fn(async () => 'ABCDEF');
+        const service = createModelVisionProbe({storage, translate, random});
+        const controller = new AbortController();
+        const attempt = service.resolve(base(), 'deepseek', 'future-vision', {force: true, signal: controller.signal});
+        const failure = expect(attempt).rejects.toMatchObject({name: 'AbortError'});
+        await vi.waitFor(() => expect(storage.save).toHaveBeenCalledTimes(2));
+        controller.abort();
+        await failure;
+        finish();
+        await finished;
+        await expect(service.resolve(base(), 'deepseek', 'future-vision')).resolves.toEqual({capability: 'unknown', source: 'unknown'});
+        const restarted = createModelVisionProbe({storage, translate, random});
+        await expect(restarted.resolve(base(), 'deepseek', 'future-vision')).resolves.toMatchObject({capability: 'supported'});
     });
 });

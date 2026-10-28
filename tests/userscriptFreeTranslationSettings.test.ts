@@ -106,7 +106,7 @@ async function mountCompactSettings(initial: Partial<Config> = {}, readiness: Pr
         for (const listener of listeners) listener(normalizeConfig(authority));
     };
     const saved = vi.fn(async (snapshot: Config) => {broadcast(snapshot);});
-    const sent = vi.fn(async (_tab: number, _message: {type: string; isEnabled?: boolean; mode?: string}): Promise<unknown> => undefined);
+    const sent = vi.fn(async (_tab: number, _message: {type: string; isEnabled?: boolean; mode?: string}): Promise<unknown> => ({status: 'success'}));
     const subscribe = (listener: (snapshot: Config) => void) => {listeners.add(listener);return () => {listeners.delete(listener);};};
     (globalThis as Record<string, unknown>)[fixtureKey] = {config: authority, saved, sent, subscribe, readiness};
     const component = SettingsPanel;
@@ -321,16 +321,41 @@ describe('compact userscript manual save ownership in the actual SFC', () => {
         fixture.broadcast(fixture.saved.mock.calls[0][0]);fixture.state.draft.on = true;await settleSettings();
         gate.resolve();await saving;
         expect(fixture.state.draft.on).toBe(true);
-        expect(fixture.sent.mock.calls.map(([, message]) => message)).toEqual([
-            {type: 'toggleFloatingBall', isEnabled: false},
-            {type: 'updateSelectionTranslatorMode', mode: 'disabled'},
-            {type: 'toggleTranslationProgressPanel', isEnabled: false},
-        ]);
+        expect(fixture.sent.mock.calls.map(([, message]) => message)).toEqual([{type: 'reconcileUserscriptPage'}]);
         await fixture.state.save();expect(fixture.authority.on).toBe(true);
         fixture.sent.mockClear();await fixture.state.save();
         expect(fixture.saved).toHaveBeenCalledTimes(2);
         expect(fixture.sent.mock.calls.map(([, message]) => message.type))
-            .toEqual(['toggleFloatingBall', 'updateSelectionTranslatorMode', 'toggleTranslationProgressPanel']);
+            .toEqual(['reconcileUserscriptPage']);
+    });
+
+    it.each(['unavailable', 'rejected'])('页面应用 %s 时已保存状态与页面应用结果分别提示', async outcome => {
+        const fixture = await mountCompactSettings(initialCompactConfig());
+        if (outcome === 'unavailable') fixture.sent.mockResolvedValueOnce({status: 'failed'});
+        else fixture.sent.mockRejectedValueOnce(new Error('controlled page failure'));
+        fixture.state.draft.on = false; await settleSettings();
+        await fixture.state.save(); await settleSettings();
+        expect(fixture.saved).toHaveBeenCalledOnce(); expect(fixture.authority.on).toBe(false);
+        expect(fixture.state.status).toContain('设置已保存');
+        expect(fixture.state.status).toContain('应用状态未确认');
+        expect(fixture.state.statusIsError).toBe(true);
+        expect(fixture.sent.mock.calls.map(([, message]) => message)).toEqual([{type: 'reconcileUserscriptPage'}]);
+    });
+
+    it('页面协调未结束时及时提示未确认，迟到回复不更改结果', async () => {
+        const fixture = await mountCompactSettings(initialCompactConfig());
+        vi.useFakeTimers();
+        try {
+            const gate = pendingSave(); fixture.sent.mockReturnValueOnce(gate.promise);
+            fixture.state.draft.on = false; await settleSettings();
+            const saving = fixture.state.save(); await settleSettings();
+            await vi.advanceTimersByTimeAsync(2000); await saving;
+            expect(fixture.state.status).toContain('设置已保存');
+            expect(fixture.state.status).toContain('应用状态未确认');
+            expect(fixture.state.statusIsError).toBe(true);
+            gate.resolve(); await settleSettings();
+            expect(fixture.state.status).toContain('应用状态未确认');
+        } finally {vi.useRealTimers();}
     });
 
     it('adopts external untouched fields while preserving pending and later edits without making a request', async () => {
@@ -358,7 +383,7 @@ describe('compact userscript manual save ownership in the actual SFC', () => {
 
     it.each([new Error('current application failed'), 'current application failed'])('reports a current unchanged apply failure and retries without extra persistence: %s', async failure => {
         const h = await mountCompactSettings(initialCompactConfig());h.sent.mockRejectedValueOnce(failure);
-        await h.state.save();expect(h.state.status).toContain('current application failed');expect(h.state.statusIsError).toBe(true);expect(h.saved).not.toHaveBeenCalled();
+        await h.state.save();expect(h.state.status).toContain('设置已保存');expect(h.state.status).toContain('应用状态未确认');expect(h.state.statusIsError).toBe(true);expect(h.saved).not.toHaveBeenCalled();
         await h.state.save();expect(h.state.status).toContain('本次提交已保存');expect(h.state.statusIsError).toBe(false);expect(h.saved).not.toHaveBeenCalled();
     });
 
@@ -366,7 +391,7 @@ describe('compact userscript manual save ownership in the actual SFC', () => {
         const fixture = await mountCompactSettings(initialCompactConfig());
         await fixture.change('目标语言', 'fr');fixture.sent.mockRejectedValueOnce(new Error('page channel unavailable'));
         await fixture.state.save();
-        expect(fixture.state.status).toContain('page channel unavailable');expect(fixture.state.draft.to).toBe('fr');
+        expect(fixture.state.status).toContain('设置已保存');expect(fixture.state.status).toContain('应用状态未确认');expect(fixture.state.draft.to).toBe('fr');
         await fixture.state.save();expect(fixture.saved).toHaveBeenCalledOnce();
         expect(fixture.state.statusIsError).toBe(false);expect(fixture.state.status).toContain('本次提交已保存');
     });

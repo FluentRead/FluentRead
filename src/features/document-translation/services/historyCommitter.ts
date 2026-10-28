@@ -11,12 +11,12 @@ interface DocumentHistoryRevisionOwner {
     savedRevision?: number;
 }
 
-export function createDocumentHistoryCommitter(save: (record: DocumentHistoryRecord) => Promise<boolean>) {
+export function createDocumentHistoryCommitter<T extends DocumentHistoryRevisionOwner = DocumentHistoryRevisionOwner>(save: (record: DocumentHistoryRecord, owner: T) => Promise<boolean>) {
     const tails = new Map<string, Promise<void>>();
     const pending = new WeakMap<DocumentHistoryRevisionOwner, Map<number, Promise<boolean>>>();
 
     return {
-        save(owner: DocumentHistoryRevisionOwner, record: DocumentHistoryRecord): Promise<boolean> {
+        save(owner: T, record: DocumentHistoryRecord): Promise<boolean> {
             const revision = owner.revision;
             if (revision === owner.savedRevision) return Promise.resolve(true);
             const previousRequest = pending.get(owner)?.get(revision);
@@ -24,7 +24,7 @@ export function createDocumentHistoryCommitter(save: (record: DocumentHistoryRec
             const requests = pending.get(owner) ?? new Map<number, Promise<boolean>>();
             pending.set(owner, requests);
             const previous = tails.get(record.id) ?? Promise.resolve();
-            const operation = previous.then(() => save(record)).then(written => {
+            const operation = previous.then(() => save(record, owner)).then(written => {
                 if (written) owner.savedRevision = Math.max(owner.savedRevision ?? -1, revision);
                 return written;
             }).catch(() => false);

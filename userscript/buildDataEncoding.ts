@@ -6,26 +6,6 @@
  */
 import {USERSCRIPT_DATA_ALPHABET, USERSCRIPT_DATA_PREFIX, USERSCRIPT_COMPACT_DATA_ALPHABET, USERSCRIPT_COMPACT_DATA_PREFIX} from './dataEncoding';
 
-/** 紧凑格式仅用于 standalone；原 Base85 与 Base64 解码继续保留。 */
-export function encodeUserscriptDataCompact(bytes: Uint8Array): string {
-    let encoded = USERSCRIPT_COMPACT_DATA_PREFIX, buffer = 0, bits = 0;
-    for (const byte of bytes) {
-        buffer |= byte << bits;
-        bits += 8;
-        if (bits > 13) {
-            let value = buffer & 8191;
-            if (value > 88) { buffer >>>= 13; bits -= 13; }
-            else { value = buffer & 16383; buffer >>>= 14; bits -= 14; }
-            encoded += USERSCRIPT_COMPACT_DATA_ALPHABET[value % 91] + USERSCRIPT_COMPACT_DATA_ALPHABET[Math.floor(value / 91)];
-        }
-    }
-    if (bits) {
-        encoded += USERSCRIPT_COMPACT_DATA_ALPHABET[buffer % 91];
-        if (bits > 7 || buffer > 90) encoded += USERSCRIPT_COMPACT_DATA_ALPHABET[Math.floor(buffer / 91)];
-    }
-    return encoded;
-}
-
 export function encodeUserscriptData(bytes: Uint8Array): string {
     let encoded = USERSCRIPT_DATA_PREFIX + (4 - bytes.length % 4) % 4;
     for (let index = 0; index < bytes.length; index += 4) {
@@ -39,4 +19,19 @@ export function encodeUserscriptData(bytes: Uint8Array): string {
         encoded += characters;
     }
     return encoded;
+}
+
+/** 大块静态字节使用安全 ASCII Base91；旧 Base85 表示仍可解码。 */
+export function encodeUserscriptDataCompact(bytes: Uint8Array): string {
+    let output = USERSCRIPT_COMPACT_DATA_PREFIX, buffer = 0, bits = 0;
+    for (const byte of bytes) {
+        buffer |= byte << bits;bits += 8;
+        if (bits > 13) {
+            let value = buffer & 8191;
+            if (value > 88) {buffer >>>= 13;bits -= 13;} else {value = buffer & 16383;buffer >>>= 14;bits -= 14;}
+            output += USERSCRIPT_COMPACT_DATA_ALPHABET[value % 91] + USERSCRIPT_COMPACT_DATA_ALPHABET[Math.floor(value / 91)];
+        }
+    }
+    if (bits) {output += USERSCRIPT_COMPACT_DATA_ALPHABET[buffer % 91];if (bits > 7 || buffer > 90) output += USERSCRIPT_COMPACT_DATA_ALPHABET[Math.floor(buffer / 91)];}
+    return output;
 }

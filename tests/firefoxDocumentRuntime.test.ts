@@ -342,3 +342,22 @@ describe('shared offscreen composition through actual message routing', () => {
         expect(disposeOcr).toHaveBeenCalledOnce(); expect(translation.disposeLocalTranslationWorker).toHaveBeenCalledOnce(); expect(speech.disposeLocalTtsWorker).toHaveBeenCalledOnce();
     });
 });
+
+describe('offscreen 本地模型进度通知边界', () => {
+    it.each(['send-throws', 'last-error-throws'])('通知 %s 不阻止本地状态路径', async failure => {
+        const configure = vi.fn();
+        vi.doMock('@/src/features/local-translation/offscreen/translation', async original => ({
+            ...await original<typeof import('@/src/features/local-translation/offscreen/translation')>(),
+            configureLocalTranslationDownloadNotifications: configure,
+        }));
+        const page = new EventTarget(); vi.stubGlobal('window', page); vi.stubGlobal('self', page);
+        const runtime = {id: 'fixture', onMessage: {addListener: vi.fn()},
+            sendMessage: (_value: unknown, callback: () => void) => {if (failure === 'send-throws') throw new Error('fixture'); callback();},
+            get lastError() {if (failure === 'last-error-throws') throw new Error('fixture'); return undefined;}};
+        vi.stubGlobal('chrome', {runtime});
+        (await import('@/src/app/offscreen/runtime')).startOffscreenApp();
+        const notify = configure.mock.calls[0][0] as (snapshot: unknown) => Promise<void>;
+        await expect(notify(translationSnapshot())).resolves.toBeUndefined();
+        page.dispatchEvent(new Event('pagehide'));
+    });
+});

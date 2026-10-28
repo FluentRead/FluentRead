@@ -6,14 +6,14 @@
  */
 import type {BackgroundMessageHandler} from '@/src/services/messaging/backgroundRouter';
 import type {ConfigPersistenceContext} from './handlers/configPersistence';
-import {isGoogleDriveSettingsSender} from './handlers/googleDriveSync';
+import {isTrustedSettingsSender} from './handlers/trustedSettingsSender';
 import {chatGPTPlanBridge, CHATGPT_PLAN_USAGE_URL, ChatGPTPlanError} from '@/src/platform/chatgpt-plan/bridge';
 import {CHATGPT_PLAN_MESSAGE_TYPE} from '@/src/services/chatgpt-plan/client';
 import {chatGPTPlanDevelopmentEnabled} from '@/src/platform/chatgpt-plan/buildMode';
 interface ChatGPTPlanMessage {type: typeof CHATGPT_PLAN_MESSAGE_TYPE; action?: unknown; code?: unknown; newAccount?: unknown}
 export function createChatGPTPlanHandler(
     bridge = chatGPTPlanBridge,
-    trusted: (sender: ConfigPersistenceContext['sender']) => boolean = sender => isGoogleDriveSettingsSender(sender, browser.runtime.id, browser.runtime.getURL('/options.html')),
+    trusted: (sender: ConfigPersistenceContext['sender']) => boolean = sender => isTrustedSettingsSender(sender, browser.runtime.id, browser.runtime.getURL('/options.html')),
     open: (url: string) => Promise<unknown> = url => browser.tabs.create({url}),
     enabled = chatGPTPlanDevelopmentEnabled,
 ): BackgroundMessageHandler<ConfigPersistenceContext, ChatGPTPlanMessage> {

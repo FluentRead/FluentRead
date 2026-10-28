@@ -33,7 +33,7 @@ describe('getPageTranslationContext', () => {
         Object.defineProperty(globalThis, 'document', {
             value: {
                 title: 'An article',
-                body: {cloneNode: () => clone},
+                body: {closest: () => null, cloneNode: () => clone},
                 querySelector: (selector: string) => selector === 'meta[name="description"]'
                     ? {getAttribute: () => 'A short description'}
                     : null,
@@ -64,7 +64,7 @@ describe('getPageTranslationContext', () => {
         Object.defineProperty(globalThis, 'document', {
             value: {
                 title: '',
-                body: {cloneNode: () => clone},
+                body: {closest: () => null, cloneNode: () => clone},
                 querySelector: () => null,
             },
             configurable: true,

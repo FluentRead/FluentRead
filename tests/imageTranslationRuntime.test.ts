@@ -2085,3 +2085,71 @@ describe('视频预览不自动显示图片翻译', () => {
         expect(env.bitmap()).toBeNull(); expect(env.image.style.opacity).not.toBe('0');
     });
  });
+
+it('正文文本新增不重复读取图片资源身份，但 picture 新 source 与移除仍立即失效', async () => {
+    const env = setup();
+    const picture = document.createElement('picture');
+    env.parent.append(picture); picture.append(env.image);
+    env.hover(); env.click(); await flush();
+    expect(env.bitmap()).not.toBeNull();
+    const read = vi.spyOn(env.image, 'getAttribute');
+    const unrelated = document.createElement('div'); document.body.append(unrelated);
+    const record = {type: 'childList', target: unrelated, addedNodes: [document.createTextNode('update')], removedNodes: []} as unknown as MutationRecord;
+    for (let count = 0; count < 1000; count++) env.observers[0].callback([record], {} as MutationObserver);
+    expect(read.mock.calls.filter(([name]) => name === 'srcset')).toHaveLength(0);
+    expect(env.bitmap()).not.toBeNull();
+    const source = document.createElement('source'); source.setAttribute('srcset', 'https://example.test/other.png'); picture.prepend(source);
+    env.observers[0].callback([{type: 'childList', target: picture, addedNodes: [source], removedNodes: []} as unknown as MutationRecord], {} as MutationObserver);
+    expect(env.bitmap()).toBeNull();
+    expect(env.image.style.opacity).not.toBe('0');
+    env.click(); await flush(); expect(env.bitmap()).not.toBeNull();
+    picture.remove();
+    env.observers[0].callback([{type: 'childList', target: env.parent, addedNodes: [], removedNodes: [picture]} as unknown as MutationRecord], {} as MutationObserver);
+    expect(env.observers[0].disconnect).toHaveBeenCalled();
+});
+
+it('正文文本触发的响应式换图在下一帧复核并恢复原图', async () => {
+    const env = setup(); env.hover(); env.click(); await flush();
+    expect(env.bitmap()).not.toBeNull();
+    Object.defineProperty(env.image, 'currentSrc', {configurable: true, get: () => 'https://example.test/reselected.png'});
+    const paragraph = document.createElement('p'); document.body.append(paragraph);
+    env.observers[0].callback([{type: 'childList', target: paragraph, addedNodes: [document.createTextNode('content')], removedNodes: []} as unknown as MutationRecord], {} as MutationObserver);
+    env.runFrames();
+    expect(env.bitmap()).toBeNull(); expect(env.image.style.opacity).not.toBe('0');
+});
+
+it('正文文本更新后在途结果即使先于帧返回也不能覆盖已换源的图片', async () => {
+    const pending = deferred<typeof result>(); client.translate.mockReturnValueOnce(pending.promise);
+    const env = setup(); env.hover(); env.click(); await flush();
+    Object.defineProperty(env.image, 'currentSrc', {configurable: true, get: () => 'https://example.test/reselected.png'});
+    const paragraph = document.createElement('p'); document.body.append(paragraph);
+    env.observers[0].callback([{type: 'childList', target: paragraph, addedNodes: [document.createTextNode('content')], removedNodes: []} as unknown as MutationRecord], {} as MutationObserver);
+    pending.resolve(result); await flush();
+    expect(env.bitmap()).toBeNull(); expect(env.image.style.opacity).not.toBe('0');
+});
+
+it.each(['head', 'style'] as const)('%s 中新增文本仍同步复核图片资源', async tag => {
+    const env = setup(); env.hover(); env.click(); await flush(); expect(env.bitmap()).not.toBeNull();
+    Object.defineProperty(env.image, 'currentSrc', {configurable: true, get: () => 'https://example.test/reselected.png'});
+    const target = tag === 'head' ? document.head : document.createElement('style');
+    if (tag === 'style') document.body.append(target);
+    env.observers[0].callback([{type: 'childList', target, addedNodes: [document.createTextNode('content')], removedNodes: []} as unknown as MutationRecord], {} as MutationObserver);
+    expect(env.bitmap()).toBeNull(); expect(env.image.style.opacity).not.toBe('0');
+});
+
+it.each(['throw', 'missing'] as const)('正文元素 closest %s 时保守复核并继续调度布局', async mode => {
+    const env = setup(); env.hover(); env.click(); await flush(); expect(env.bitmap()).not.toBeNull();
+    Object.defineProperty(env.image, 'currentSrc', {configurable: true, get: () => 'https://example.test/reselected.png'});
+    const target = document.createElement('p'); document.body.append(target);
+    Object.defineProperty(target, 'closest', {configurable: true, value: mode === 'throw' ? () => {throw new Error('host override');} : undefined});
+    expect(() => env.observers[0].callback([{type: 'childList', target, addedNodes: [document.createTextNode('content')], removedNodes: []} as unknown as MutationRecord], {} as MutationObserver)).not.toThrow();
+    expect(env.bitmap()).toBeNull(); expect(env.windowObject.requestAnimationFrame).toHaveBeenCalled();
+});
+
+it('大量文本节点的批量更新采用有界保守检查', async () => {
+    const env = setup(); env.hover(); env.click(); await flush(); expect(env.bitmap()).not.toBeNull();
+    Object.defineProperty(env.image, 'currentSrc', {configurable: true, get: () => 'https://example.test/reselected.png'});
+    const target = document.createElement('p'); document.body.append(target);
+    env.observers[0].callback([{type: 'childList', target, addedNodes: Array.from({length: 9}, () => document.createTextNode('x')), removedNodes: []} as unknown as MutationRecord], {} as MutationObserver);
+    expect(env.bitmap()).toBeNull();
+});

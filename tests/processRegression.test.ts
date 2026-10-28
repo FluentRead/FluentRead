@@ -17,6 +17,7 @@ const nativeGroups = [
     'tests/releaseEdge.test.mjs',
   ], arguments: ['--test-concurrency=1']},
   {name: 'agent bridge', files: ['tests/agentBridge.test.mjs'], arguments: []},
+  {name: 'pinned userscript language resources', files: ['tests/pinnedUserscriptLanguagePreflight.test.mjs'], arguments: []},
   {name: 'focus-safe lifecycle', files: [
     'tests/focusSafeBrowserOrdinaryLifecycle.test.mjs',
     'tests/focusSafeBrowserBackgroundSignal.test.mjs',

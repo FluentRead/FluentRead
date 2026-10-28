@@ -11,7 +11,8 @@ import {createDriveApi} from '@/src/platform/google-drive/api';
 import {GOOGLE_DRIVE_SYNC_STATE_KEY} from '@/src/platform/google-drive/constants';
 import {configStorage} from '@/src/platform/storage/configStorageRuntime';
 import {createGoogleDriveSync} from '@/src/services/config/googleDriveSync';
-import {createGoogleDriveSyncHandler, isGoogleDriveSettingsSender} from './handlers/googleDriveSync';
+import {createGoogleDriveSyncHandler} from './handlers/googleDriveSync';
+import {isTrustedSettingsSender} from './handlers/trustedSettingsSender';
 import type {ConfigMutationCoordinator} from './handlers/configPersistence';
 
 export function createGoogleDriveSyncRuntime(mutations: ConfigMutationCoordinator) {
@@ -33,5 +34,5 @@ export function createGoogleDriveSyncRuntime(mutations: ConfigMutationCoordinato
     });
     browser.tabs.onRemoved.addListener((tabId: number) => {void service.cancelTab(tabId).catch(() => undefined);});
     browser.tabs.onUpdated.addListener((tabId: number, change: {status?: string}) => {if (change.status === 'loading') void service.cancelTab(tabId).catch(() => undefined);});
-    return createGoogleDriveSyncHandler({...service, commit: (...args) => mutations.run(() => service.commit(...args))}, sender => isGoogleDriveSettingsSender(sender, browser.runtime.id, browser.runtime.getURL('options.html')));
+    return createGoogleDriveSyncHandler({...service, commit: (...args) => mutations.run(() => service.commit(...args))}, sender => isTrustedSettingsSender(sender, browser.runtime.id, browser.runtime.getURL('options.html')));
 }

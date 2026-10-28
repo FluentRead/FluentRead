@@ -1,6 +1,7 @@
 {
   "extends": "./.wxt/tsconfig.json",
   "compilerOptions": {
+    "allowArbitraryExtensions": true,
     "noUnusedLocals": true,
     "noUnusedParameters": true
   },

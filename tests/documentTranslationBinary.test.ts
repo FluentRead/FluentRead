@@ -8,7 +8,6 @@ import {describe, expect, it, vi} from 'vitest';
 import {
     getDocumentAcceptAttribute,
     getDocumentMaxBytes,
-    getDocumentFormat,
     getDocumentMimeType,
     parseDocument,
 } from '@/src/features/document-translation/core/document';
@@ -343,10 +342,7 @@ describe('binary document translation formats', () => {
         }
     });
 
-    it('识别 PDF、ePub、DOCX 并提供正确 MIME 与上传 accept', () => {
-        expect(getDocumentFormat('paper.PDF')).toBe('pdf');
-        expect(getDocumentFormat('book.epub')).toBe('epub');
-        expect(getDocumentFormat('brief.docx')).toBe('docx');
+    it('二进制文件格式提供正确 MIME、上传 accept 和大小限制', () => {
         expect(getDocumentMimeType('pdf')).toBe('application/pdf');
         expect(getDocumentMimeType('epub')).toBe('application/epub+zip');
         expect(getDocumentMimeType('docx')).toContain('wordprocessingml.document');

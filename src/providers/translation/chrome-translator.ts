@@ -92,7 +92,7 @@ export function createChromeTranslator(dependencies: ChromeTranslatorDependencie
                         sourceLanguage: response.sourceLanguage,
                         targetLanguage: response.targetLanguage,
                     };
-                    if (!message.abortSignal?.aborted && isChromeTranslationPreparationRequest(preparation)) {
+                    if (isChromeTranslationPreparationRequest(preparation)) {
                         await (dependencies.preparationStore || chromeTranslationPreparationStore).set(preparation);
                     }
                     throw new Error(response.error || 'Chrome 本地翻译模型需要用户激活');

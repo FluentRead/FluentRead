@@ -244,6 +244,32 @@ describe('工具栏原生三态角标', () => {
             expect(action.setBadgeText).toHaveBeenLastCalledWith({tabId:1,text:''});
         },
     );
+    it('一个标签页的角标 API 挂起时，其他标签页仍可完成并在关闭后重置自身状态', async () => {
+        const {store,badge,tabs,action}=setup();
+        let release!:()=>void;
+        action.setBadgeBackgroundColor.mockImplementationOnce(()=>new Promise<void>(resolve=>{release=resolve;}));
+        store.setTranslated(1,true,'translated');
+        const first=badge.update(1);await settle();
+        store.setTranslated(2,true,'error');await badge.update(2);
+        expect(action.setBadgeText).toHaveBeenCalledWith({tabId:2,text:'!'});
+        tabs.onRemoved.emit(1);release();await first;
+        expect(action.setBadgeText).not.toHaveBeenCalledWith({tabId:1,text:'✓'});
+        store.setTranslated(2,true,'translated');await badge.update(2);
+        expect(action.setBadgeText).toHaveBeenLastCalledWith({tabId:2,text:'✓'});
+        expect(action.setIcon.mock.calls.filter(([details])=>details.tabId===2)).toHaveLength(1);
+    });
+    it('当前角标文字写入失败时记录错误并允许同态重试', async () => {
+        const {store,badge,action}=setup();
+        const error=vi.spyOn(console,'error').mockImplementation(()=>{});
+        const failure=new Error('badge text unavailable');
+        action.setBadgeText.mockRejectedValueOnce(failure);
+        store.setTranslated(1,true,'translated');await badge.update(1);
+        expect(error).toHaveBeenCalledWith('Failed to update toolbar translation status:',failure);
+        await badge.update(1);
+        expect(action.setBadgeText).toHaveBeenCalledTimes(2);
+        expect(action.setBadgeText).toHaveBeenLastCalledWith({tabId:1,text:'✓'});
+        expect(action.setIcon).toHaveBeenCalledTimes(1);
+    });
     it('没有文字颜色 API 时仍能显示完成角标', async () => {
         const {store,badge,action}=setup('browserAction');
         delete (action as any).setBadgeTextColor;

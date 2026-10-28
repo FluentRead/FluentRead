@@ -29,7 +29,7 @@ async function mountLearning(initialTab?: string, options: {listGate?: Tab; brow
   const frames = new Map<number, FrameRequestCallback>();let frame = 0
   vi.stubGlobal('requestAnimationFrame', (callback: FrameRequestCallback) => {frames.set(++frame, callback);return frame})
   vi.stubGlobal('cancelAnimationFrame', (id: number) => frames.delete(id))
-  const language = runtime.ref('zh-CN'), shown = runtime.ref(true), props = runtime.reactive({initialTab})
+  const language = runtime.ref('zh-CN'), shown = runtime.ref(true), paneVisible = runtime.ref(true), props = runtime.reactive({initialTab})
   const configListeners = new Set<(value: any) => void>(), clientErrors: unknown[] = [], navigations: string[] = [], reloads: string[] = []
   const listGate = deferred<Record<string, unknown>>(), writeGate = deferred<Record<string, unknown>>()
   let pendingWrite = false, stopped = false, heldList = options.listGate
@@ -90,7 +90,8 @@ async function mountLearning(initialTab?: string, options: {listGate?: Tab; brow
   vi.doMock('../src/features/vocabulary/ui/public', () => ({VocabularyBook: saved, MaterialWorkspace: material}))
   vi.doMock('../src/features/reading-assistant/public', () => client)
   vi.doMock('element-plus/es/components/message-box/style/css', () => ({}))
-  vi.doMock('element-plus', () => ({ElMessageBox: {confirm: async () => undefined}, ElOption: display}))
+  const confirm = vi.fn(async (): Promise<void> => undefined)
+  vi.doMock('element-plus', () => ({ElMessageBox: {confirm}, ElOption: display}))
   vi.doMock('../src/ui/components/UiIcon.vue', () => ({default: display}))
   vi.doMock('../src/ui/components/UiSelect.vue', () => ({default: runtime.defineComponent({props: ['modelValue'], emits: ['update:modelValue'],
     setup: (props, {emit, attrs, slots}) => () => runtime.h('span', [runtime.h('input', {...attrs, value: props.modelValue,
@@ -128,11 +129,13 @@ async function mountLearning(initialTab?: string, options: {listGate?: Tab; brow
     },
   })
   const mountedParent=options.parentGate?runtime.defineAsyncComponent(async()=>{await options.parentGate;return parent}):parent
-  const isVisible=()=>shown.value
+  const isVisible=()=>shown.value && paneVisible.value
   const warnings:string[]=[]
   const otherPage = {render: () => null}, host = document.createElement('main');document.body.append(host)
   const app: App = renderer.createApp({setup: () => () => runtime.h(runtime.KeepAlive, null, {default: () => shown.value
     ? runtime.h(mountedParent, {...props, ...(options.parentVisibility===false?{}:{isVisible}), onNavigate: (section: string) => navigations.push(section), onReload: (tab: string) => reloads.push(tab)}) : runtime.h(otherPage)})})
+  app.component('el-dialog', runtime.defineComponent({props:['modelValue'],emits:['update:modelValue'],setup:(props,{slots})=>()=>props.modelValue ? runtime.h('div',{'data-confirm-dialog':''},[...slots.default?.() ?? [], ...slots.footer?.() ?? []]) : null}))
+  app.component('el-button', runtime.defineComponent({setup:(_,{attrs,slots})=>()=>runtime.h('button',attrs,slots.default?.())}))
   app.config.errorHandler = error => clientErrors.push(error);app.config.warnHandler = message => warnings.push(message)
   const settle = async () => {for (let i = 0; i < 12; i++) {await Promise.resolve();await runtime.nextTick()}}
   function stop() {if (!stopped) {stopped = true;app.unmount()}}
@@ -143,7 +146,7 @@ async function mountLearning(initialTab?: string, options: {listGate?: Tab; brow
   const choose = async (tab: 'saved' | Tab) => {host.querySelector<HTMLButtonElement>(`[data-option-index="${(options.browser === 'userscript' ? ['saved', 'history', 'memory'] : ['saved', 'materials', 'history', 'memory']).indexOf(tab)}"]`)!.click();await settle()}
   const resolvePanel = async (tab: Tab) => {gates[tab].at(-1)?.resolve(namespaces[tab]);await settle()}
   const actions = (action: string) => send.mock.calls.filter(([message]) => message.action === action)
-  return {host, props, shown, language, loads, gates, namespaces, clientErrors, navigations, reloads, send, configListeners, config, materialMount, savedVisibility, warnings,
+  return {host, props, shown, paneVisible, confirm, language, loads, gates, namespaces, clientErrors, navigations, reloads, send, configListeners, config, materialMount, savedVisibility, warnings,
     memories, sessions, memory, session, listGate, writeGate, settle, choose, resolvePanel, stop, actions,
     pendingWrite: () => {pendingWrite = true}, listReply: () => ({success: true, memories: [...memories], sessions: [...sessions], hasMore: false}),
     notifyMemory: (enabled: boolean) => {config.harness.memoryEnabled = enabled;for (const listener of configListeners) listener(normalizeConfig(config))},
@@ -153,6 +156,16 @@ async function mountLearning(initialTab?: string, options: {listGate?: Tab; brow
 }
 
 describe('LearningCenter actual client pane loading and lifetime', () => {
+  it.each(['history','memory'] as const)('propagates live navigation ownership to %s clear confirmation', async tab => {
+    const h=await mountLearning(tab);await h.resolvePanel(tab)
+    const clear=tab==='history'?'.harness-history-toolbar .harness-text-button':'.fr-memory-bottom button'
+    h.host.querySelector<HTMLButtonElement>(clear)!.click();await h.settle();
+    const old=[...h.host.querySelectorAll<HTMLButtonElement>('[data-confirm-dialog] button')].find(button=>button.textContent?.includes('common.confirm'))!
+    expect(old).toBeDefined();h.paneVisible.value=false;h.paneVisible.value=true;await h.settle()
+    expect(h.host.querySelector('[data-confirm-dialog]')).toBeNull();old.click();await h.settle()
+    expect(h.actions(tab==='history'?'sessions-clear':'memory-clear')).toHaveLength(0)
+    expect(tab==='history'?h.sessions:h.memories).toHaveLength(1)
+  })
   it.each([undefined, 'materials'])('keeps userscript saved reachable for initial %s and omits the unsupported materials control', async initial => {
     const h = await mountLearning(initial, {browser: 'userscript'})
     expect(h.host.querySelectorAll('[role="radio"]')).toHaveLength(3)
@@ -372,6 +385,7 @@ describe('LearningCenter actual client pane loading and lifetime', () => {
         h.host.querySelector('form')!.dispatchEvent(new Event('submit', {cancelable: true}))
       } else h.host.querySelector<HTMLButtonElement>(operation === 'delete' ? '.fr-memory-item footer button:last-child' : '.fr-memory-bottom button')!.click()
       await h.settle()
+      if (operation === 'clear') {h.host.querySelectorAll<HTMLButtonElement>('[data-confirm-dialog] button')[1]!.click();await h.settle()}
     }
     if (operation !== 'read') {h.send.mockResolvedValueOnce({success: false, error: `controlled ${operation} failure`});await perform()}
     expect(h.host.querySelector('[role="alert"]')!.textContent).toContain(`controlled ${operation} failure`)
@@ -406,6 +420,7 @@ describe('LearningCenter actual client pane loading and lifetime', () => {
       const selector = operation === 'list' ? '.harness-history-heading button' : operation === 'detail' ? '.harness-history-open'
         : operation === 'delete' ? '.harness-history-row > button:last-child' : '.harness-history-toolbar button:last-child'
       h.host.querySelector<HTMLButtonElement>(selector)!.click();await h.settle()
+      if (operation === 'clear') {h.host.querySelectorAll<HTMLButtonElement>('[data-confirm-dialog] button')[1]!.click();await h.settle()}
     }
     if (operation !== 'list') {h.send.mockRejectedValueOnce(new Error(`controlled ${operation} failure`));await perform()}
     expect(h.host.querySelector('[role="alert"]')).not.toBeNull()

@@ -10,6 +10,8 @@ import type { ContentScriptContext } from 'wxt/utils/content-script-context';
 import type { ShadowRootContentScriptUi } from 'wxt/utils/content-script-ui/shadow-root';
 import {createVueShadowUi, type VueShadowMount} from '@/src/platform/shadow-ui';
 import {syncModalTranslationHint} from '../ui/modalProgressHint';
+import {normalizeUiLanguage, translate} from '@/src/core/i18n';
+import {dismissPageNotice, showPageNotice} from '@/src/features/page-notice/public';
 
 let progressPanelInstance: unknown = null;
 let progressPanelUi: ShadowRootContentScriptUi<VueShadowMount> | null = null;
@@ -17,51 +19,102 @@ let mountingPromise: Promise<unknown | null> | null = null;
 let mountRequestId = 0;
 let contentScriptContext: ContentScriptContext | null = null;
 let mountRequested = false;
+let unfinishedMounts = 0;
+let retryWhenAvailable = false;
+const MOUNT_WAIT_NOTICE = 'translation-progress-mount-wait';
+let removeWaitVisibility: (() => void) | null = null;
+
+function clearWaitNotice(): void {
+  const remove = removeWaitVisibility;
+  removeWaitVisibility = null;
+  try {remove?.();} catch (error) {console.error('[FluentRead] 翻译进度面板恢复提示清理失败', error);}
+  try {dismissPageNotice(MOUNT_WAIT_NOTICE);} catch (error) {console.error('[FluentRead] 翻译进度面板恢复提示清理失败', error);}
+}
+
+function announceMountWait(): void {
+  const show = () => {
+    try {showPageNotice(translate('fullPage.progress.mountPending', normalizeUiLanguage(config.uiLanguage)), 'error', {key: MOUNT_WAIT_NOTICE, durationMs: 10_000});}
+    catch (error) {console.error('[FluentRead] 翻译进度面板恢复提示失败', error);}
+  };
+  if (document.visibilityState !== 'hidden') {show(); return;}
+  let active = true;
+  const reveal = () => {
+    if (!active || document.visibilityState === 'hidden') return;
+    const remove = removeWaitVisibility;
+    removeWaitVisibility = null;
+    try {remove?.();} catch (error) {console.error('[FluentRead] 翻译进度面板恢复提示清理失败', error);}
+    if (mountRequested && config.on !== false && config.translationProgressPanelEnabled === true && !progressPanelUi) show();
+  };
+  document.addEventListener('visibilitychange', reveal);
+  removeWaitVisibility = () => {active = false; document.removeEventListener('visibilitychange', reveal);};
+}
+
+function finishMountAttempt(): void {
+  unfinishedMounts -= 1;
+  if (retryWhenAvailable && unfinishedMounts < 2 && mountRequested && config.on !== false) {
+    retryWhenAvailable = false;
+    void mountTranslationProgressPanel();
+  }
+}
 
 export function mountTranslationProgressPanel(ctx?: ContentScriptContext) {
   if (ctx) contentScriptContext = ctx;
-  mountRequested = config.translationProgressPanelEnabled === true;
+  mountRequested = config.on !== false && config.translationProgressPanelEnabled === true;
   if (progressPanelUi || progressPanelInstance || mountingPromise || !mountRequested) {
     return mountingPromise;
   }
-  if (!contentScriptContext) return;
-
+  if (!contentScriptContext || contentScriptContext.isInvalid) return;
+  // WXT 创建不可取消；允许新一代越过一个卡住的旧请求，但限制重叠数量。
+  if (unfinishedMounts >= 2) {
+    const shouldNotify = !retryWhenAvailable;
+    retryWhenAvailable = true;
+    if (shouldNotify) {
+      try {announceMountWait();} catch (error) {console.error('[FluentRead] 翻译进度面板恢复提示失败', error);}
+    }
+    return null;
+  }
+  retryWhenAvailable = false;
   const requestId = ++mountRequestId;
-  let retryAfterStaleMount = false;
-  mountingPromise = createVueShadowUi(contentScriptContext, {
+  unfinishedMounts += 1;
+  let creation: ReturnType<typeof createVueShadowUi>;
+  try { creation = createVueShadowUi(contentScriptContext, {
     name: 'fluent-read-translation-progress-ui',
     // 保留旧版 host id，继续兼容既有 DOM 排除规则和自动化定位。
     hostId: 'fluent-read-translation-status-container',
     component: TranslationProgressPanel,
     zIndex: 2_147_483_645,
-  }).then((ui) => {
-    if (requestId !== mountRequestId || config.translationProgressPanelEnabled !== true) {
-      retryAfterStaleMount = requestId !== mountRequestId;
+  }); } catch (error) {
+    console.error('[FluentRead] 翻译进度面板挂载失败', error);
+    finishMountAttempt();
+    return Promise.resolve(null);
+  }
+  const request = creation.then((ui) => {
+    if (requestId !== mountRequestId || config.on === false || config.translationProgressPanelEnabled !== true) {
       ui.remove();
       return null;
     }
     progressPanelUi = ui;
     progressPanelInstance = ui.mounted?.instance ?? null;
+    clearWaitNotice();
     return progressPanelInstance;
   }).catch((error) => {
     console.error('[FluentRead] 翻译进度面板挂载失败', error);
     return null;
   }).finally(() => {
-    mountingPromise = null;
-    // 设置页可能在 Shadow UI 首次挂载完成前快速关闭再开启。旧请求会按
-    // requestId 自行移除，这里补发用户最后一次明确保留的挂载请求。
-    if (retryAfterStaleMount && mountRequested && !progressPanelInstance) {
-      void mountTranslationProgressPanel();
-    }
+    if (requestId === mountRequestId) mountingPromise = null;
+    finishMountAttempt();
   });
-
-  return mountingPromise;
+  if (requestId === mountRequestId) mountingPromise = request;
+  return request;
 }
 
 export function unmountTranslationProgressPanel(): void {
   syncModalTranslationHint(null, 'none', false);
   mountRequested = false;
+  retryWhenAvailable = false;
+  clearWaitNotice();
   mountRequestId += 1;
+  mountingPromise = null;
   progressPanelUi?.remove();
   progressPanelUi = null;
   progressPanelInstance = null;

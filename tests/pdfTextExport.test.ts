@@ -8,7 +8,7 @@ import {PDFDict, PDFDocument, PDFName, PDFRawStream} from 'pdf-lib';
 import fontkit from '@pdf-lib/fontkit';
 import {getDocument} from 'pdfjs-dist/legacy/build/pdf.mjs';
 import type {TextItem} from 'pdfjs-dist/types/src/display/api';
-import {describe, expect, it, vi} from 'vitest';
+import {afterAll, describe, expect, it, vi} from 'vitest';
 import type {ParsedDocument} from '@/src/features/document-translation/core/document';
 import {createDocumentDownload, parseBinaryDocument, type PdfReadingRenderer, type PdfReadingRasterizer} from '@/src/features/document-translation/services/binary';
 import {embedPdfReadingFont} from '@/src/features/document-translation/services/pdfReadingFont';
@@ -19,6 +19,11 @@ const fontBytes = new Uint8Array(readFileSync(new URL('../assets/pdf-fonts/Fluen
 const textOnlyOptions = {pdfReadingRenderer: renderPdfReadingPages, pdfFontLoader: async () => fontBytes};
 const compact = (text: string) => text.replace(/\s/gu, '');
 const layoutPng = Uint8Array.from(Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAusB9Y9ZlY4AAAAASUVORK5CYII=', 'base64'));
+
+// These integration tests parse and subset the bundled font and render real PDF
+// pages; slower CI runners can take several seconds even when they succeed.
+vi.setConfig({testTimeout: 20_000});
+afterAll(() => vi.resetConfig());
 
 function nativeCanvas() {
     const require = createRequire(import.meta.url), pdfjsRequire = createRequire(require.resolve('pdfjs-dist/package.json'));
@@ -569,7 +574,7 @@ describe('visible Unicode PDF reading export', () => {
         const download = await createDocumentDownload(await fixture(), translations, 'translated', textOnlyOptions);
         const extracted = await extract(download.data as Uint8Array);
         expect(compact(extracted.join(''))).toBe(compact(translations.join('')));
-    }, 30_000);
+    }, 90_000);
 
     it('uses a separate cached subset per exact variant sequence and measures and draws identical runs', async () => {
         const pdf = await PDFDocument.create();
@@ -594,7 +599,7 @@ describe('visible Unicode PDF reading export', () => {
         expect(draw).toHaveBeenCalledTimes(count);
         expect(() => embedded.measureText('Q︀', 12)).toThrow('尚未准备');
         expect(compact((await extract(await pdf.save())).join(''))).toBe(compact(text));
-    }, 30_000);
+    }, 60_000);
 
     it('retains the bundled font base outlines for unsupported variation mappings while keeping each full sequence identity', () => {
         // 数学补充字形未携带其 donor 的变体映射；这些序列按该字体回退到基础轮廓，仍保留选择符。

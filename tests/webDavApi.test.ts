@@ -348,3 +348,17 @@ describe('WebDAV 文件协议', () => {
         }
     });
 });
+
+it('aborted preview read cannot start follow-up DAV requests when fetch ignores cancellation', async () => {
+    const controller=new AbortController();
+    let release!: (value:Response)=>void;
+    const fetcher=vi.fn<typeof fetch>(()=>new Promise(resolve=>{release=resolve;}));
+    const pending=createWebDavApi(fetcher).read(session,controller.signal).catch(error=>error);
+    await vi.waitFor(()=>expect(release).toBeTypeOf('function'));
+    const requestSignal=fetcher.mock.calls[0][1]!.signal!;
+    controller.abort();
+    expect(requestSignal.aborted).toBe(true);
+    release(response(null,409));
+    await pending;
+    expect(fetcher).toHaveBeenCalledTimes(1);
+});

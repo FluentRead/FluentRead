@@ -1,7 +1,7 @@
 /**
  * @file src/features/full-page-translation/content/viewportStability.ts
  * 文件职责：隔离全文翻译对页面滚动稳定性的辅助逻辑，避免动态页面在插入译文时发生视觉跳动或重复重排。
- * 主要内容：局部变化只补偿同一滚动面上方的内容并在面内命中，全量恢复按已知 owner 保护各滚动面上沿；同步只读捕获共享祖先与几何，写入后重新测量，按实际滚动响应有界校正缩放单位与取整，另提供滚动空闲门控。
+ * 主要内容：局部变化只补偿同一滚动面上方的内容并在面内命中，全量恢复按已知 owner 保护各滚动面上沿；同步只读捕获共享祖先与几何，写入后复验滚动面并重新测量，按实际滚动响应有界校正缩放单位与取整，另提供滚动空闲门控。
  * 模块边界：本文件只管理可逆的浏览器视口状态与延迟回调，具体重启目标仍由全文 runtime 决定。
  */
 import {getComposedParent, maxComposedAncestorDepth} from '@/src/core/translation/public';
@@ -161,11 +161,12 @@ function restoreViewportAnchor(anchor: FullPageViewportAnchor | null): void {
     if (!anchor?.element.isConnected) return;
     try {
         const measurements: ViewportCaptureMeasurements = {scrollContainers: new Map(), rects: new Map()};
-        if (anchor.relativeToScrollContainer &&
-            findScrollableAncestor(anchor.element, measurements) !== anchor.scrollContainer) return;
+        // 页面同步重挂锚点后，其新位置不再是原滚动面的位移证据；无论使用
+        // 视口绝对坐标还是容器相对坐标，都不能向旧容器或文档追加滚动。
+        if (findScrollableAncestor(anchor.element, measurements) !== anchor.scrollContainer) return;
         const offset = anchorTop(anchor, measurements) - anchor.top;
         if (Math.abs(offset) <= 0.5) return;
-        const surface = anchor.scrollContainer?.isConnected ? anchor.scrollContainer : null;
+        const surface = anchor.scrollContainer;
         if (!surface && typeof window.scrollBy !== 'function') return;
         const applied = applyScrollCompensation(surface, offset);
         if (!Number.isFinite(applied) || applied === 0 || !anchor.element.isConnected) return;

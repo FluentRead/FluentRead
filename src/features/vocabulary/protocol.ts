@@ -76,7 +76,10 @@ export type VocabularyBookAction =
     | 'relearn'
     | 'getReviewLogs'
     | 'remove'
-    | 'removeWithSnapshot'
+    | 'removeWithUndo'
+    | 'listUndo'
+    | 'restoreUndo'
+    | 'discardUndo'
     | 'clear'
     | 'exportData'
     | 'importData';
@@ -85,6 +88,7 @@ export interface VocabularyBookRuntimeMessage {
     type: typeof VOCABULARY_BOOK_MESSAGE;
     action?: unknown;
     entryId?: unknown;
+    undoId?: unknown;
     term?: unknown;
     word?: unknown;
     sourceLanguage?: unknown;
@@ -114,6 +118,7 @@ export interface VocabularyBookChangedMessage {
         | 'manual-mastered'
         | 'relearn'
         | 'remove'
+        | 'undo'
         | 'clear'
         | 'import';
     entryId?: string;

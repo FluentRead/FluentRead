@@ -10,6 +10,7 @@ const mocks = vi.hoisted(() => ({
     cancelPendingHoverTranslation: vi.fn(),
     handleTranslation: vi.fn(),
     isFullPageTranslationActive: vi.fn(() => false),
+    getFullPageTranslationSessionId: vi.fn<() => number | undefined>(() => 1),
     restoreOriginalContent: vi.fn(),
     startSectionTranslationPicker: vi.fn(),
     serviceAvailable: vi.fn(),
@@ -26,6 +27,7 @@ vi.mock('@/src/features/full-page-translation/public', () => ({
     cancelPendingHoverTranslation: mocks.cancelPendingHoverTranslation,
     handleTranslation: mocks.handleTranslation,
     isFullPageTranslationActive: mocks.isFullPageTranslationActive,
+    getFullPageTranslationSessionId: mocks.getFullPageTranslationSessionId,
     restoreOriginalContent: mocks.restoreOriginalContent,
 }));
 
@@ -82,6 +84,7 @@ describe('快捷翻译 content composition', () => {
         vi.clearAllMocks();
         mocks.mountedDependencies = null;
         mocks.isFullPageTranslationActive.mockReturnValue(false);
+        mocks.getFullPageTranslationSessionId.mockReturnValue(1);
         vi.stubGlobal('document', {addEventListener: vi.fn()});
         vi.stubGlobal('window', {});
     });
@@ -98,17 +101,103 @@ describe('快捷翻译 content composition', () => {
         expect(mocks.serviceAvailable.mock.calls).toEqual([[services.microsoft], [services.google]]);
         let active = false;
         mocks.isFullPageTranslationActive.mockImplementation(() => active);
-        mocks.autoTranslateEnglishPage.mockImplementation(() => {active = true;});
+        mocks.autoTranslateEnglishPage.mockImplementation(() => {active = true;return 1;});
         mocks.restoreOriginalContent.mockImplementation(() => {active = false;});
         const selected = profile({action: 'full-page'});
         dependencies.runFullPage(selected);
-        for (const type of ['fluentread-translation-started', 'fluentread-translation-ended']) {
-            const listener = vi.mocked(document.addEventListener).mock.calls.find(([event]) => event === type)![1] as () => void;
-            listener();
+        for (const sessionId of [2, 3]) {
+            mocks.getFullPageTranslationSessionId.mockReturnValue(sessionId);
             dependencies.runFullPage(selected);
         }
         expect(mocks.autoTranslateEnglishPage).toHaveBeenCalledTimes(3);
         expect(mocks.restoreOriginalContent).toHaveBeenCalledTimes(3);
+    });
+
+    it('宿主页面伪造全文生命周期事件不能改变快捷方案的恢复动作', () => {
+        const pageDocument = new EventTarget();vi.stubGlobal('document', pageDocument);
+        let active = false;
+        mocks.isFullPageTranslationActive.mockImplementation(() => active);
+        mocks.autoTranslateEnglishPage.mockImplementation(() => {active = true;pageDocument.dispatchEvent(new Event('fluentread-translation-started'));return 1;});
+        mocks.restoreOriginalContent.mockImplementation(() => {active = false;pageDocument.dispatchEvent(new Event('fluentread-translation-ended'));});
+        mountConfiguredQuickTranslation(config(), {} as any, () => false, new AbortController().signal);
+        const selected = profile({action: 'full-page'}), deps = mocks.mountedDependencies!;
+        deps.runFullPage(selected);
+        pageDocument.dispatchEvent(new Event('fluentread-translation-started'));
+        deps.runFullPage(selected);
+        expect(active).toBe(false);
+        expect(mocks.autoTranslateEnglishPage).toHaveBeenCalledOnce();
+        expect(mocks.restoreOriginalContent).toHaveBeenCalledTimes(2);
+    });
+
+    it('用会话身份区分外部会话和页面伪造事件', async () => {
+        const lifecycle = await import('@/src/features/full-page-translation/content/stateNotification');
+        const pageDocument = new EventTarget();vi.stubGlobal('document', pageDocument);
+        let active = false, currentSession = 0;
+        mocks.getFullPageTranslationSessionId.mockImplementation(() => active ? currentSession : undefined);
+        mocks.isFullPageTranslationActive.mockImplementation(() => active);
+        mocks.autoTranslateEnglishPage.mockImplementation(() => {active = true;const session = ++currentSession;lifecycle.notifyFullPageTranslationState(true);return session;});
+        mocks.restoreOriginalContent.mockImplementation(() => {active = false;lifecycle.notifyFullPageTranslationState(false);});
+        mountConfiguredQuickTranslation(config(), {} as any, () => false, new AbortController().signal);
+        const selected = profile({action: 'full-page'}), deps = mocks.mountedDependencies!;
+        deps.runFullPage(selected);
+        pageDocument.dispatchEvent(new Event('fluentread-translation-ended'));
+        deps.runFullPage(selected);
+        expect(active).toBe(false);expect(mocks.autoTranslateEnglishPage).toHaveBeenCalledOnce();
+        deps.runFullPage(selected);
+        mocks.restoreOriginalContent();mocks.autoTranslateEnglishPage(); // 另一个入口建立新会话。
+        deps.runFullPage(selected);
+        expect(active).toBe(true);expect(mocks.autoTranslateEnglishPage).toHaveBeenCalledTimes(4);
+    });
+
+    it('同步通知重入的外部会话不被标记成快捷方案的会话', async () => {
+        const lifecycle = await import('@/src/features/full-page-translation/content/stateNotification');
+        vi.stubGlobal('document', new EventTarget());
+        let active = false, session = 0, externalStarts = 0, quickStarts = 0, armed = false;
+        mocks.getFullPageTranslationSessionId.mockImplementation(() => active ? session : undefined);
+        mocks.isFullPageTranslationActive.mockImplementation(() => active);
+        mocks.autoTranslateEnglishPage.mockImplementation(() => {
+            if (active) return undefined;
+            active = true;const ownSession = ++session;quickStarts++;lifecycle.notifyFullPageTranslationState(true);
+            return active && session === ownSession ? ownSession : undefined;
+        });
+        mocks.restoreOriginalContent.mockImplementation(() => {active = false;lifecycle.notifyFullPageTranslationState(false);});
+        const unsubscribe = lifecycle.subscribeTranslationToolbarStatus(status => {
+            if (status !== 'idle' || !armed) return;
+            armed = false;active = true;session++;externalStarts++;lifecycle.notifyFullPageTranslationState(true);
+        });
+        try {
+            mountConfiguredQuickTranslation(config(), {} as any, () => false, new AbortController().signal);
+            const deps = mocks.mountedDependencies!, selected = profile({action: 'full-page'});
+            armed = true;deps.runFullPage(selected);
+            expect(externalStarts).toBe(1);expect(quickStarts).toBe(0);
+            deps.runFullPage(selected);
+            expect(active).toBe(true);expect(quickStarts).toBe(1);
+        } finally {unsubscribe();mocks.restoreOriginalContent();}
+    });
+
+    it('启动通知期间被替换的会话不能被认作快捷方案', async () => {
+        const lifecycle = await import('@/src/features/full-page-translation/content/stateNotification');
+        vi.stubGlobal('document', new EventTarget());
+        let active = false, session = 0, quickStarts = 0, armed = true;
+        mocks.getFullPageTranslationSessionId.mockImplementation(() => active ? session : undefined);
+        mocks.isFullPageTranslationActive.mockImplementation(() => active);
+        mocks.restoreOriginalContent.mockImplementation(() => {active = false;lifecycle.notifyFullPageTranslationState(false);});
+        mocks.autoTranslateEnglishPage.mockImplementation(() => {
+            if (active) return undefined;
+            active = true;const own = ++session;quickStarts++;lifecycle.notifyFullPageTranslationState(true);
+            return active && session === own ? own : undefined;
+        });
+        const unsubscribe = lifecycle.subscribeTranslationToolbarStatus(status => {
+            if (status !== 'translating' || !armed) return;
+            armed = false;active = false;lifecycle.notifyFullPageTranslationState(false);
+            active = true;session++;lifecycle.notifyFullPageTranslationState(true);
+        });
+        try {
+            mountConfiguredQuickTranslation(config(), {} as any, () => false, new AbortController().signal);
+            const deps = mocks.mountedDependencies!, selected = profile({action: 'full-page'});
+            deps.runFullPage(selected);deps.runFullPage(selected);
+            expect(quickStarts).toBe(2);expect(active).toBe(true);
+        } finally {unsubscribe();mocks.restoreOriginalContent();}
     });
 
     it('把每条悬停方案解析为独立请求覆盖后交给共享翻译引擎', () => {
@@ -140,7 +229,7 @@ describe('快捷翻译 content composition', () => {
         let active = false;
         mocks.isFullPageTranslationActive.mockImplementation(() => active);
         mocks.restoreOriginalContent.mockImplementation(() => {active = false;});
-        mocks.autoTranslateEnglishPage.mockImplementation(() => {active = true;});
+        mocks.autoTranslateEnglishPage.mockImplementation(() => {active = true;return 1;});
         const current = config();
         mountConfiguredQuickTranslation(current, {} as any, () => false, new AbortController().signal);
         const deps = mocks.mountedDependencies!, selected = profile({displayMode: 'inherit'});
@@ -174,7 +263,7 @@ describe('快捷翻译 content composition', () => {
         let active = false;
         mocks.isFullPageTranslationActive.mockImplementation(() => active);
         mocks.restoreOriginalContent.mockImplementation(() => { active = false; });
-        mocks.autoTranslateEnglishPage.mockImplementation(() => { active = true; });
+        mocks.autoTranslateEnglishPage.mockImplementation(() => { active = true; return 1; });
         const current = config();
         mountConfiguredQuickTranslation(current, {
             shouldReserveSelectionShortcut: vi.fn(),

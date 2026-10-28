@@ -93,6 +93,12 @@ function loadingPostShell(state: Fixture) {
 afterEach(() => {vi.unstubAllGlobals();vi.restoreAllMocks();});
 
 describe('bounded native Facebook hydration before strict preparation', () => {
+    it('focus failure before native dismissal prevents the click', async () => {
+        const state = fixture(), page = fakePage(state);
+        const failure = Object.assign(new Error('focus lost'), {code: 'FOCUS_SAFETY_VIOLATION'});
+        await expect(prepareFacebookPublicPost(page, expectedUrl, 1000, () => {throw failure;})).rejects.toBe(failure);
+        expect(page.calls.some(call => call.action === 'native-click')).toBe(false);
+    });
     it('waits for the exact native loading article and IDREF title, then applies every original preparation guard', async () => {
         const state = fixture(), shell = loadingPostShell(state), source = state.document.documentElement.outerHTML;
         expect(readHydration({expectedUrl})).toBe(false);

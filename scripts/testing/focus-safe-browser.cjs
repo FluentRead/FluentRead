@@ -190,15 +190,18 @@ function isWindowFullyContained(bounds, display) {
     && bounds.top + bounds.height <= display.top + display.height + tolerance;
 }
 
-async function placeBackgroundWindowOnDisplay(session, targetId, viewport, displayTarget) {
+async function placeBackgroundWindowOnDisplay(session, targetId, viewport, displayTarget, assertFocusAllowed = () => {}) {
   const layout = await queryMacScreenLayout();
+  assertFocusAllowed();
   if (!layout) throw new Error('无法读取显示器布局，停止窗口定位');
   const normalizedTarget = normalizeDisplayTarget(displayTarget);
   const mainDisplay = resolveMainWindowDisplay(layout, viewport);
   const display = resolveVisibleDisplayBounds(layout, normalizedTarget, mainDisplay);
   const requestedBounds = centeredWindowBounds(viewport, display);
   const { windowId } = await session.send('Browser.getWindowForTarget', { targetId });
+  assertFocusAllowed();
   const { bounds: currentBounds } = await session.send('Browser.getWindowBounds', { windowId });
+  assertFocusAllowed();
   // 创建新页签时通常复用同一个窗口；不要重复切换已正常定位的原生窗口状态。
   const alreadyPlaced = currentBounds?.windowState === 'normal'
     && Object.entries(requestedBounds).every(([key, value]) => currentBounds[key] === value);
@@ -208,7 +211,9 @@ async function placeBackgroundWindowOnDisplay(session, targetId, viewport, displ
       windowId,
       bounds: { ...requestedBounds, windowState: 'normal' },
     });
+    assertFocusAllowed();
     ({ bounds } = await session.send('Browser.getWindowBounds', { windowId }));
+    assertFocusAllowed();
   }
   if (bounds.windowState !== 'normal' || !isWindowFullyContained(bounds, display)) {
     throw new Error(`测试 Edge 窗口未完全位于目标显示器可用区域：${JSON.stringify({ bounds, display })}`);
@@ -583,41 +588,80 @@ async function newPageWithoutForeground(context, timeout = 10000) {
 
   const browser = context.browser();
   if (!browser) throw Object.assign(new Error('无法获取隔离浏览器实例；为避免抢占前台焦点，已停止创建页面'), {code: 'FOCUS_SAFETY_VIOLATION'});
-  const session = await browser.newBrowserCDPSession();
+  const backgroundState = backgroundContexts.get(context);
+  if (backgroundState.focusViolation) throw backgroundState.focusViolation;
+  const assertFocusAllowed = () => {if (backgroundState.focusViolation) throw backgroundState.focusViolation;};
+  // 每次建页都使用新证据，不能沿用上一页成功时的前台状态。
+  const focusSafety = {browserPid: backgroundState.browserPid, targetId: null, outcome: 'in-progress', samples: []};
+  backgroundState.windowPlacement.focusSafety = focusSafety;
+  backgroundState.windowPlacement.browserFrontmost = null;
+  backgroundState.windowPlacement.frontmostAfter = null;
+  const checkFocus = async stage => {
+    if (backgroundState.focusViolation) throw backgroundState.focusViolation;
+    const application = await queryMacFrontmostApplication();
+    // 并发建页时，一次失败必须阻止其他检查继续写入成功快照。
+    if (backgroundState.focusViolation) throw backgroundState.focusViolation;
+    focusSafety.samples.push({stage, at: Date.now(), application});
+    const browserFrontmost = application ? application.pid === backgroundState.browserPid : null;
+    backgroundState.windowPlacement.browserFrontmost = browserFrontmost;
+    backgroundState.windowPlacement.frontmostAfter = application;
+    if (browserFrontmost !== false) {
+      const message = application
+        ? `测试 Edge 进程 ${backgroundState.browserPid} 成为了前台应用；测试已停止`
+        : '无法读取 macOS 前台应用；为避免测试窗口争抢焦点，测试已停止';
+      // 一些调用方只保存 stack；同时保留有界的阶段快照供事后定位。
+      backgroundState.windowPlacement.focusSafety = focusSafety;
+      focusSafety.outcome = 'focus-violation';
+      const error = Object.assign(new Error(`${message}；前台检查记录：${JSON.stringify(focusSafety)}`),
+        {code: 'FOCUS_SAFETY_VIOLATION', focusSafety});
+      backgroundState.focusViolation = error;
+      throw error;
+    }
+  };
   const markerUrl = `about:blank#fluentread-background-${crypto.randomUUID()}`;
-  let targetId;
+  let targetId, session;
   try {
+    session = await browser.newBrowserCDPSession();
+    assertFocusAllowed();
+    await checkFocus('before-target');
+    assertFocusAllowed();
     ({ targetId } = await session.send('Target.createTarget', { url: markerUrl, background: true }));
-    const backgroundState = backgroundContexts.get(context);
+    focusSafety.targetId = targetId;
+    // 若创建页签时已经抢占焦点，不再执行窗口定位。
+    await checkFocus('after-target');
+    assertFocusAllowed();
     const placement = await placeBackgroundWindowOnDisplay(
       session,
       targetId,
       backgroundState.viewport,
       backgroundState.displayTarget,
+      assertFocusAllowed,
     );
+    assertFocusAllowed();
     Object.assign(backgroundState.windowPlacement, placement);
-    const frontmostAfter = await queryMacFrontmostApplication();
-    if (!frontmostAfter) {
-      throw Object.assign(new Error('无法读取 macOS 前台应用；为避免测试窗口争抢焦点，测试已停止'), {code: 'FOCUS_SAFETY_VIOLATION'});
-    }
-    if (frontmostAfter.pid === backgroundState.browserPid) {
-      throw Object.assign(new Error(`测试 Edge 进程 ${backgroundState.browserPid} 成为了前台应用；测试已停止`), {code: 'FOCUS_SAFETY_VIOLATION'});
-    }
-    backgroundState.windowPlacement.browserFrontmost = false;
+    await checkFocus('after-placement');
+    assertFocusAllowed();
     backgroundState.windowPlacement.frontmostBefore = backgroundState.frontmostBefore;
-    backgroundState.windowPlacement.frontmostAfter = frontmostAfter;
     const deadline = Date.now() + timeout;
     while (Date.now() < deadline) {
       const page = context.pages().find(candidate => candidate.url() === markerUrl);
-      if (page) return page;
+      if (page) {await checkFocus('before-return'); assertFocusAllowed(); focusSafety.outcome = 'complete'; return page;}
       await delay(25);
     }
     throw new Error(`后台页签未在 ${timeout}ms 内进入 Playwright 上下文`);
   } catch (error) {
+    // 创建或定位失败时，先前阶段的非前台读数不能当作完整建页成功。
+    if (!backgroundState.focusViolation) {
+      focusSafety.outcome = 'incomplete';
+      backgroundState.windowPlacement.focusSafety = focusSafety;
+      backgroundState.windowPlacement.browserFrontmost = null;
+      backgroundState.windowPlacement.frontmostAfter = null;
+      try {if (error && typeof error === 'object') error.focusSafety = focusSafety;} catch {}
+    }
     if (targetId) await session.send('Target.closeTarget', { targetId }).catch(() => {});
     throw error;
   } finally {
-    await session.detach().catch(() => {});
+    if (session) await session.detach().catch(() => {});
   }
 }
 

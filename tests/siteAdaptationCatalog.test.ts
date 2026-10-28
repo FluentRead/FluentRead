@@ -590,6 +590,64 @@ describe('网站正文规则目录', () => {
         expect(adapter.matches(new URL('https://other.bsky.app/profile/example.test'))).toBe(false);
     });
 
+    it('Bluesky 转发身份链接保留原文，同时保留正文和正文中的用户提及', () => {
+        // 结构取自公开资料页的 native-scroll-header-fixed/failure-dom.html：
+        // 原生转发链接自身无 dir，其中文身份描述位于两层 div 后的 dir=auto。
+        const document = documentFor(`<main><div data-testid="feedItem-by-author.example" role="link"><div>
+            <div></div><div><div></div><div>
+                <a id="repost" href="/profile/bsky.app" role="link" aria-label="由 Bluesky 转发" aria-pressed="false" data-no-underline="1">
+                    <svg><path d="M16.793 2.293"></path></svg><div><div><div id="repost-text" dir="auto">由 Bluesky 转发</div></div></div>
+                </a>
+                <a id="post-link" href="/profile/bsky.app/post/123" role="link" aria-label="Read post" aria-pressed="false" data-no-underline="1"><svg></svg><div><div><div dir="auto">Read post explanation</div></div></div></a>
+            </div></div><div><div id="body" data-testid="postText" dir="auto">This account mentions <a id="mention" href="/profile/bsky.app" role="link" aria-label="Bluesky profile" aria-pressed="false" data-no-underline="1"><svg><path d="M16.793 2.293"></path></svg><div><div><div dir="auto">Bluesky</div></div></div></a> in ordinary readable prose.</div></div>
+        </div></div></main>`);
+        const core = new TranslationCandidateCore({url: new URL('https://bsky.app/profile/bsky.app'), adapters});
+        const repost = document.querySelector<HTMLElement>('#repost')!;
+        const repostText = document.querySelector<HTMLElement>('#repost-text')!;
+        const body = document.querySelector<HTMLElement>('#body')!;
+        const mention = document.querySelector<HTMLElement>('#mention')!;
+        const candidates = core.discover(document);
+        const sources = candidates.map(candidate => extractTranslationTextFromNodes(
+            candidate.nodes ?? [candidate.element], core.shouldStayOriginal)).join('\n');
+        // 用当前引擎和仅移除本次规则的旧规则包重现旧候选来源。
+        const beforePack = structuredClone(pack);
+        const beforeRule = beforePack.rules.find(rule => rule.id === 'bluesky-profile-metadata')!;
+        expect(beforeRule.exclude?.some(selector => selector.includes('[data-no-underline]'))).toBe(true);
+        beforeRule.exclude = beforeRule.exclude?.filter(selector => !selector.includes('[data-no-underline]'));
+        const before = new TranslationCandidateCore({url: new URL('https://bsky.app/profile/bsky.app'), adapters: compileSiteRulePack(beforePack)});
+        const beforeSources = before.discover(document).map(candidate => extractTranslationTextFromNodes(
+            candidate.nodes ?? [candidate.element], before.shouldStayOriginal)).join('\n');
+        expect(beforeSources).toContain('由 Bluesky 转发');
+        expect(core.shouldStayOriginal(repost)).toBe(true);
+        // 图标可能在已译文字之后才挂载；保留父节点变更，使运行时能恢复旧译文。
+        expect(adapterById.get('bluesky-profile-metadata')!.shouldIgnoreMutation?.(repost, {url: new URL('https://bsky.app/profile/bsky.app')})).toBe(false);
+        expect(core.resolve(repostText.firstChild)).toBeNull();
+        expect(candidates.some(candidate => repost.contains(candidate.element))).toBe(false);
+        expect(sources).not.toContain('由 Bluesky 转发');
+        expect(core.shouldStayOriginal(body)).toBe(false);
+        expect(core.shouldStayOriginal(mention)).toBe(false);
+        expect(core.shouldStayOriginal(document.querySelector('#post-link')!)).toBe(false);
+        expect(sources).toContain('This account mentions');
+        expect(sources).toContain('ordinary readable prose');
+        const snapshot = createTranslationSourceSnapshot(body, core.shouldStayOriginal);
+        const rendered = applyTranslationsToSnapshot(snapshot, snapshot.slots.map(() => '译文'));
+        expect(rendered).toContain('/profile/bsky.app');
+        expect(repost.getAttribute('href')).toBe('/profile/bsky.app');
+        const original = repost.outerHTML;
+        const clone = repost.cloneNode(true) as HTMLElement;
+        clone.id = 'dynamic-repost';
+        repost.parentElement!.appendChild(clone);
+        expect(core.shouldStayOriginal(clone)).toBe(true);
+        expect(core.discover(document).some(candidate => clone.contains(candidate.element))).toBe(false);
+        expect(repost.outerHTML).toBe(original);
+        const quotedDocument = documentFor(`<div role="link" aria-label="Quoted post">${document.body.innerHTML}</div>`);
+        const quotedRepost = quotedDocument.querySelector('#repost')!;
+        const quotedCore = new TranslationCandidateCore({url: new URL('https://bsky.app/profile/bsky.app'), adapters});
+        expect(quotedCore.shouldStayOriginal(quotedRepost)).toBe(false);
+        const otherCore = new TranslationCandidateCore({url: new URL('https://example.com/profile/bsky.app'), adapters});
+        expect(otherCore.shouldStayOriginal(repost)).toBe(false);
+    });
+
     it('Bluesky 引用卡片只保护直接身份栏，引用正文、嵌套引用及提及链接仍由通用引擎翻译', () => {
         const fixture = blueskyQuoteFixture;
         const url = new URL(fixture.url);
@@ -897,10 +955,18 @@ describe('网站正文规则目录', () => {
                 if (rule.id === 'facebook-public-post') {
                     expect(standalone.protect?.length).toBe(2);
                     expect(standalone.watchIgnore).toEqual(standalone.protect);
+                } else if (rule.id === 'microsoft-learn-translator-v3-parameters') {
+                    expect(standalone.literalTokens).toHaveLength(4);
+                    expect(standalone.exclude ?? []).toEqual([]);
                 } else {
                     expect(rule.id).toBe(blueskyMetadataFixture.id);
                     expect(standalone.exclude?.length, rule.id).toBeGreaterThan(0);
-                    expect(standalone.watchIgnore, rule.id).toEqual(expect.arrayContaining(standalone.exclude!));
+                    // 转发链接的 SVG 可晚于文字挂载；即使之后被排除，仍需观察父节点变化以撤销先前译文。
+                    const lateRepost = standalone.exclude!.find(selector => selector.includes('[data-no-underline]'));
+                    expect(lateRepost).toBeTruthy();
+                    expect(standalone.watchIgnore, rule.id).not.toContain(lateRepost);
+                    expect(standalone.watchIgnore, rule.id).toEqual(expect.arrayContaining(
+                        standalone.exclude!.filter(selector => selector !== lateRepost)));
                 }
             }
         }

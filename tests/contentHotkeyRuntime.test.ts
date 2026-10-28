@@ -609,7 +609,7 @@ describe('受支持的 F9 全文快捷键使用真实 core 仲裁', () => {
         windowTarget.emit('keyup', up);
         documentTarget.emit('keyup', up);
         expect(handleTranslation).toHaveBeenCalledOnce();
-        expect(handleTranslation).toHaveBeenCalledWith(32, 48);
+        expect(handleTranslation).toHaveBeenCalledWith(32, 48, {inputSource: 'mouse-shortcut'});
         expect(mocks.autoTranslateEnglishPage).not.toHaveBeenCalled();
         expect(mocks.restoreOriginalContent).not.toHaveBeenCalled();
 

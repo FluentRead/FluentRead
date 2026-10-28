@@ -45,6 +45,20 @@ export function isLiteralLabel(element: Element, selectors: readonly string[]): 
 export function isLiteralToken(element: Element, selectors: readonly string[]): boolean {
     return selectors.some((selector) => {
         const token = safeClosest(element, selector);
-        return Boolean(token && literalTokenPattern.test(token.textContent!.trim()));
+        if (!token) return false;
+        // 双语译文是附加副本；仅译文模式的 single-slot 则包含原文，必须保留。
+        const ownedBilingual = '.fluent-read-bilingual-content[data-fr-translation-owned="true"]';
+        if (!token.querySelector(ownedBilingual)) return literalTokenPattern.test(token.textContent!.trim());
+        // 只读遍历保留原文，不克隆自定义元素以免触发构造器或站点副作用。
+        const pending = Array.from(token.childNodes).reverse();
+        let text = '';
+        while (pending.length) {
+            const node = pending.pop()!;
+            if (node.nodeType === 3 || node.nodeType === 4) text += (node as CharacterData).data;
+            else if (node.nodeType === 1 && !(node as Element).matches(ownedBilingual)) {
+                for (let index = node.childNodes.length - 1; index >= 0; index -= 1) pending.push(node.childNodes[index]!);
+            }
+        }
+        return literalTokenPattern.test(text.trim());
     });
 }

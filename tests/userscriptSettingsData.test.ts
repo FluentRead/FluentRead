@@ -48,7 +48,7 @@ describe('standalone static settings data representation', () => {
         expect(JSON.stringify(after)).toBe(JSON.stringify(before));
         const encoded = JSON.parse(initializer(transformed, name).match(/__fluentreadDecodeSettingsData\(("[^"]+")\)/u)![1]) as string;
         expect(encoded.startsWith('~91:')).toBe(true);
-        expect(Buffer.from(decodeUserscriptData(encoded))).toEqual(gzipUserscriptBuildData(Buffer.from(JSON.stringify(before))));
+        expect(Buffer.from(decodeUserscriptData(encoded))).toEqual(gzipUserscriptBuildData(Buffer.from(JSON.stringify(before)), undefined, true));
         expect(initializer(transformed, name)).not.toContain('eval');
         // Every other byte of the owning source stays in place; functions and declarations remain executable code.
         expect(transformed.replace(initializer(transformed, name), initializer(source, name)).replace('/* @__PURE__ */ ', '').endsWith(source)).toBe(true);

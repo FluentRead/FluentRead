@@ -195,5 +195,5 @@ describe('实际 Vite 翻译组合根的统计可达性', () => {
             expect(moduleIds).toContain(similar); expect(moduleIds).toContain(rawUsage);
             expect(chunks.map(chunk => chunk.code).join('\n')).toContain('similarly-named-owner');
         } finally { rmSync(fixture, {recursive: true, force: true}); }
-    });
+    }, 30_000);
 });

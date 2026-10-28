@@ -27,6 +27,7 @@ export interface HoverTranslationGestureConstants {
 export interface HoverTranslationInvocation {
     delayMs?: number;
     continuous?: boolean;
+    inputSource?: 'mouse-shortcut';
 }
 
 export interface HoverTranslationContentDependencies {
@@ -371,7 +372,7 @@ export function mountHoverTranslationContentFeature(
                 event.preventDefault();
                 // 共享归属绑定手势开始；释放修饰键后仍须让 Document 清理划词/全文按键状态。
                 if (!screen.gestureSharedWithSelection) event.stopPropagation();
-                invokeTranslation(screen.mouseX, screen.mouseY);
+                invokeTranslation(screen.mouseX, screen.mouseY, {inputSource: 'mouse-shortcut'});
             }
         }
 

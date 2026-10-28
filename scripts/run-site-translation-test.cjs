@@ -6,7 +6,8 @@
 // 浏览器，也不会通过 page.evaluate 派发伪造的键盘事件。Control 和 Alt+T
 // 都由 Playwright keyboard API 发送真实的浏览器按键。
 
-const {guardBrowserClose} = require('./testing/owned-browser-close.cjs');
+const {guardBrowserClose, getGuardedBrowserPid} = require('./testing/owned-browser-close.cjs');
+const {createSiteFocusGuard} = require('./testing/site-focus-guard.cjs');
 const {installControlledProvider} = require('./site-translation/controlled-provider.cjs');
 const {interactionHrefsEquivalent} = require('./site-translation/interaction-url.cjs');
 const {runStabilityProbes, runNativeCommentToggle} = require('./site-translation/stability-probes.cjs');
@@ -37,6 +38,8 @@ const trustedCompletionStatuses = new WeakMap();
 const protectedNavContractHandles = new WeakMap();
 // 仅成功的原生准备可以绑定本页原始帖子 dialog；选择器近似或后续替换的 dialog 不继承豁免。
 const facebookReadingDialogs = new WeakMap();
+const pageFocusGuards = new WeakMap();
+function assertPageFocusAllowed(page) {pageFocusGuards.get(page)?.check();}
 const SINGLE_TOKEN_TECHNICAL_WORDS = new Set([
   'accept', 'api', 'authorization', 'cookie', 'css', 'etag', 'host', 'html', 'http', 'https', 'json',
   'referer', 'referrer', 'sql', 'tcp', 'tls', 'udp', 'uri', 'url', 'user-agent', 'xml',
@@ -1631,6 +1634,7 @@ async function waitForStableTarget(page, selector, timeout) {
           Boolean(target.textContent?.trim());
       }), selector);
     if (revealIndex >= 0) {
+      assertPageFocusAllowed(page);
       await page.locator(selector).nth(revealIndex).scrollIntoViewIfNeeded({timeout});
     }
     await waitFor(page, (targetSelector) => {
@@ -1650,8 +1654,10 @@ async function waitForStableTarget(page, selector, timeout) {
         return rect.width > 0 && rect.height > 0 && style.display !== 'none' && style.visibility !== 'hidden' &&
           Boolean(target.textContent?.trim());
       }), selector);
+    assertPageFocusAllowed(page);
     await page.locator(selector).nth(rawIndex).scrollIntoViewIfNeeded();
   } catch (error) {
+    assertPageFocusAllowed(page);
     const diagnostics = await page.evaluate((targetSelector) => ({
       url: location.href,
       title: document.title,
@@ -1776,6 +1782,7 @@ async function prepareDismissiblePromotion(page, config, expectedUrl, timeout) {
     const before = await page.evaluate(readDismissiblePromotionStateInPage, argument);
     if (before.action === 'none') return {status: 'not-present', nativeClicks: 0, ...normalized, url: expectedUrl};
     if (Date.now() >= deadline) throw new Error('native preparation deadline exceeded before click');
+    assertPageFocusAllowed(page);
     await page.locator(normalized.buttonSelector).click({timeout: remaining()});
     if (page.url() !== expectedUrl) throw new Error('URL changed after click');
     const ready = await page.waitForFunction(readDismissiblePromotionStateInPage,
@@ -1785,6 +1792,7 @@ async function prepareDismissiblePromotion(page, config, expectedUrl, timeout) {
     if (!after || after.action !== 'none' || page.url() !== expectedUrl) throw new Error('public content did not become readable');
     return {status: 'dismissed', nativeClicks: 1, ...normalized, url: expectedUrl};
   } catch (error) {
+    assertPageFocusAllowed(page);
     let details;
     try {details = await page.evaluate(readDismissiblePromotionStateInPage, {...argument, diagnostics: true});}
     catch (diagnosticError) {details = {status: 'unavailable', reason: diagnosticError.message};}
@@ -2240,9 +2248,12 @@ async function waitForTranslationIdle(page, timeout, phase, minimumRetryBudget =
     throw new Error(`${phase} 等待翻译请求结束超时：${error?.message || String(error)}`, {cause: error});
   } finally {
     // context finally 是最终清理边界；迟到或拒绝的 key 删除不阻塞失败传播。
-    void Promise.resolve().then(() => page.evaluate((key) => { delete window[key]; }, idleKey)).catch(() => {});
+    if (!pageFocusGuards.get(page)?.failure) void Promise.resolve().then(() => {
+      assertPageFocusAllowed(page); return page.evaluate((key) => { delete window[key]; }, idleKey);
+    }).catch(() => {});
   }
 
+  assertPageFocusAllowed(page);
   const retries = await page.evaluate((selector) => {
     const notices = () => [...(document.querySelector('#fluent-read-page-notice-host')?.shadowRoot
       ?.querySelectorAll('.page-notice') || [])];
@@ -2303,14 +2314,14 @@ async function scrollAndWaitFullPage(page, timeout, scrollContainerSelector, tar
       maxDistance: Math.max(0, extent - viewport),
     };
   }, scrollContainerSelector || '');
-  const moveTo = (position) => page.evaluate(({position: nextPosition, selector}) => {
+  const moveTo = (position) => {assertPageFocusAllowed(page); return page.evaluate(({position: nextPosition, selector}) => {
       const container = selector ? document.querySelector(selector) : null;
       if (container instanceof HTMLElement) {
         container.scrollTop = nextPosition;
         return;
       }
       window.scrollTo({top: nextPosition, behavior: 'instant'});
-    }, {position, selector: scrollContainerSelector || ''});
+    }, {position, selector: scrollContainerSelector || ''});};
 
   await moveTo(0);
   await page.waitForTimeout(400);
@@ -2391,6 +2402,7 @@ async function scrollAndWaitFullPage(page, timeout, scrollContainerSelector, tar
   await settleCoverageByReveal(page, timeout, '全文覆盖收敛', 0, verifyUnchanged);
 
   await page.waitForTimeout(800);
+  assertPageFocusAllowed(page);
   await page.evaluate((selector) => {
     const container = selector ? document.querySelector(selector) : null;
     if (container instanceof HTMLElement) container.scrollTop = 0;
@@ -2409,8 +2421,10 @@ async function scrollAndWaitFullPage(page, timeout, scrollContainerSelector, tar
 async function revealFullPageTarget(page, selector) {
   const target = page.locator(selector).first();
   try {
+    assertPageFocusAllowed(page);
     await target.scrollIntoViewIfNeeded({timeout: 10000});
   } catch {
+    assertPageFocusAllowed(page);
     // GitHub 的虚拟化 React 列表可能让已连接且可读的元素暂时处于不可操作状态。
     // 此处直接滚动 DOM 即可；所有翻译输入仍使用可信键盘事件，而不是页面合成事件。
     await target.evaluate((node) => node.scrollIntoView({block: 'center', inline: 'nearest'}));
@@ -2488,7 +2502,18 @@ function findHoverTextPointInPage({selector, index, textIncludes = []}) {
     if (typeof location !== 'undefined' && location.hostname === 'news.google.com' && location.pathname === '/home' &&
       parent === target && target.matches('main a[href^="./read/"]:not([aria-hidden="true"])')) {
       const wrapper = hit.parentElement;
-      const card = target.parentElement;
+      const headlineParent = target.parentElement;
+      const contentShell = headlineParent?.parentElement;
+      // 当前公开页也会在同一卡片的首个空链接与标题之间嵌两层正文容器。
+      // 精确验证已观察的父子/相邻关系及标题唯一性，不向任意祖先或其它卡片穿透。
+      const nestedCard = contentShell?.parentElement;
+      const nested = Boolean(wrapper && headlineParent && contentShell && nestedCard &&
+        wrapper.parentElement === nestedCard && wrapper.nextElementSibling === contentShell &&
+        contentShell.children.length === 1 && contentShell.firstElementChild === headlineParent &&
+        headlineParent.lastElementChild === target &&
+        nestedCard.querySelectorAll('a[href^="./read/"]:not([aria-hidden="true"])').length === 1 &&
+        nestedCard.querySelector('a[href^="./read/"]:not([aria-hidden="true"])') === target);
+      const card = nested ? nestedCard : headlineParent;
       const barrier = 'dialog, [role="dialog"], [role="alertdialog"], [aria-modal="true"], button, [role="button"], ' +
         'input, textarea, select, [contenteditable]:not([contenteditable="false"]), [role="textbox"], [role="combobox"], [role="searchbox"]';
       const nonAriaExcluded = '[data-fr-translation-owned="true"], .fluent-read-bilingual-content, ' +
@@ -2504,17 +2529,34 @@ function findHoverTextPointInPage({selector, index, textIncludes = []}) {
         !href || hit.getAttribute('href') !== href || destination !== '_blank' || hit.getAttribute('target') !== destination ||
         !stack || stack[0] !== hit || stack[1] !== wrapper || stack[2] !== target) return null;
       const paintlessStretchedBox = owner => {
-        const style = getComputedStyle(owner);
-        const transparent = style.backgroundColor === 'transparent' || /^rgba\(\s*0\s*,\s*0\s*,\s*0\s*,\s*0\s*\)$/u.test(style.backgroundColor);
-        return style.position === 'absolute' && ['left', 'right', 'top', 'bottom'].every(key => style[key] === '0px') &&
-          transparent && style.backgroundImage === 'none' && style.boxShadow === 'none' && style.filter === 'none' &&
-          (!style.backdropFilter || style.backdropFilter === 'none') && style.opacity === '1' &&
-          ['borderTopWidth', 'borderRightWidth', 'borderBottomWidth', 'borderLeftWidth', 'outlineWidth'].every(key => style[key] === '0px');
+        try {
+          const style = getComputedStyle(owner);
+          const transparent = style.backgroundColor === 'transparent' || /^rgba\(\s*0\s*,\s*0\s*,\s*0\s*,\s*0\s*\)$/u.test(style.backgroundColor);
+          return style.position === 'absolute' && ['left', 'right', 'top', 'bottom'].every(key => style[key] === '0px') &&
+            transparent && style.backgroundImage === 'none' && style.boxShadow === 'none' && style.filter === 'none' &&
+            (!style.backdropFilter || style.backdropFilter === 'none') && style.opacity === '1' &&
+            ['borderTopWidth', 'borderRightWidth', 'borderBottomWidth', 'borderLeftWidth', 'outlineWidth'].every(key => style[key] === '0px');
+        } catch { return false; }
       };
       if (![hit, wrapper].every(paintlessStretchedBox)) return null;
-      for (const owner of [hit, wrapper, target, card]) {
+      // 未出现在命中栈的共同或独立祖先也可能隐藏整张卡片。路径有界、必须到达当前文档根。
+      const visiblyConnected = owner => {
+        try {
+          let current = owner, depth = 0;
+          while (current && ++depth <= 128) {
+            const style = getComputedStyle(current), opacity = Number(style.opacity);
+            if (style.display === 'none' || style.visibility !== 'visible' || !Number.isFinite(opacity) || opacity <= 0) return false;
+            if (current === document.documentElement) return true;
+            current = current.parentElement;
+          }
+        } catch { /* 未能读取样式时拒绝该例外。 */ }
+        return false;
+      };
+      if (![hit, target].every(visiblyConnected)) return null;
+      for (const owner of new Set([hit, wrapper, target, headlineParent, ...(nested ? [contentShell, card] : [card])])) {
         for (const pseudo of ['::before', '::after']) {
-          const content = getComputedStyle(owner, pseudo).content;
+          let content;
+          try { content = getComputedStyle(owner, pseudo).content; } catch { return null; }
           if (content !== 'none' && content !== 'normal' && content !== '') return null;
         }
       }
@@ -2597,7 +2639,9 @@ function findHoverTextPointInPage({selector, index, textIncludes = []}) {
     if (!parent || parent.closest(excluded) || !textNode.textContent?.trim()) continue;
     const originalText = textNode.textContent.replace(/\s+/gu, ' ').trim();
     if (!textIncludes.every(fragment => originalText.includes(fragment))) continue;
-    const style = getComputedStyle(parent);
+    let style;
+    try { style = getComputedStyle(parent); } catch { continue; }
+    if (!style) continue;
     if (style.display === 'none' || style.visibility === 'hidden') continue;
     const range = document.createRange();
     range.selectNodeContents(textNode);
@@ -2641,6 +2685,7 @@ async function waitForHoverPointer(page, targetConfig, timeout, prepareClickText
         const clickBudget = timeout - (Date.now() - started);
         if (clickBudget <= 0) break;
         prepared = true;
+        assertPageFocusAllowed(page);
         await button.click({timeout: clickBudget});
         const hideBudget = timeout - (Date.now() - started);
         if (hideBudget <= 0) break;
@@ -2656,7 +2701,7 @@ async function waitForHoverPointer(page, targetConfig, timeout, prepareClickText
       Math.abs(point.x - previous.x) < 0.5 && Math.abs(point.y - previous.y) < 0.5;
     if (!stable) {
       stableSince = Date.now();
-      if (point) await page.mouse.move(point.x, point.y);
+      if (point) {assertPageFocusAllowed(page); await page.mouse.move(point.x, point.y);}
     } else if (Date.now() - stableSince >= 200) {
       return point;
     }
@@ -2720,16 +2765,16 @@ async function waitForHoverPointer(page, targetConfig, timeout, prepareClickText
 
 async function toggleHover(page, target, targetConfig, expectedCount, timeout, attempt, prepareClickText) {
   const {selector, index} = targetConfig;
-  await target.scrollIntoViewIfNeeded();
+  assertPageFocusAllowed(page); await target.scrollIntoViewIfNeeded();
   // viewport 内的原文仍可能被原生 sticky 标题遮住。先用原生滚动居中，
   // 再由下面原有的 TextRange / 实际命中 / 稳定期门禁决定能否发送手势。
-  await target.evaluate((node) => node.scrollIntoView({block: 'center', inline: 'nearest', behavior: 'instant'}));
+  assertPageFocusAllowed(page); await target.evaluate((node) => node.scrollIntoView({block: 'center', inline: 'nearest', behavior: 'instant'}));
   // 还原译文会改变布局，宿主也可能继续滚动或播放入场动画。固定等待后取外框
   // 坐标会落到空白容器；按键前等待真实原文行稳定并保持命中，按键只发送一次。
   const point = await waitForHoverPointer(page, targetConfig, timeout, prepareClickText);
   const {x, y} = point;
-  await page.keyboard.down('Control');
-  await page.keyboard.up('Control');
+  assertPageFocusAllowed(page); await page.keyboard.down('Control');
+  assertPageFocusAllowed(page); await page.keyboard.up('Control');
   try {
     await page.waitForFunction(
       ({targetSelector, targetIndex, count}) =>
@@ -2839,9 +2884,9 @@ async function resolveHoverTarget(page, targetConfig, timeout) {
 
 async function toggleFull(page) {
   // 全文翻译使用产品真实快捷键 Alt+T，而不是点击浮球或构造 KeyboardEvent。
-  await page.keyboard.down('Alt');
-  await page.keyboard.press('t');
-  await page.keyboard.up('Alt');
+  assertPageFocusAllowed(page); await page.keyboard.down('Alt');
+  assertPageFocusAllowed(page); await page.keyboard.press('t');
+  assertPageFocusAllowed(page); await page.keyboard.up('Alt');
 }
 
 async function closeInteractionDialog(page, scenario, timeout, phase) {
@@ -2861,7 +2906,7 @@ async function closeInteractionDialog(page, scenario, timeout, phase) {
     for (let attempt = 1; attempt <= scenario.closeAttempts; attempt += 1) {
       const timing = {attempt, start: nodeStamp()};
       attemptTimings.push(timing);
-      await page.keyboard.press(scenario.closeKey);
+      assertPageFocusAllowed(page); await page.keyboard.press(scenario.closeKey);
       timing.keyDone = nodeStamp();
       try {
         // 检查全部匹配的 dialog 与原 trigger；保留每次时限和真实 Escape 次数。
@@ -2990,15 +3035,17 @@ async function runInteractionScenarios(page, scenarios, timeout, phase) {
     }));
 
     if (scenario.openKey === 'click') {
+      assertPageFocusAllowed(page);
       await page.locator(scenario.triggerSelector).first().click();
     } else {
+      assertPageFocusAllowed(page);
       await page.keyboard.press(scenario.openKey);
     }
     await page.waitForSelector(scenario.dialogSelector, {state: 'visible', timeout});
     const dialogLocator = page.locator(scenario.dialogSelector).first();
     const comboboxLocator = dialogLocator.locator(scenario.comboboxSelector).first();
     await comboboxLocator.waitFor({state: 'visible', timeout});
-    if (scenario.inputText) await comboboxLocator.fill(scenario.inputText);
+    if (scenario.inputText) {assertPageFocusAllowed(page); await comboboxLocator.fill(scenario.inputText);}
     await page.waitForFunction(({dialogSelector, comboboxSelector, listboxSelector, inputText}) => {
       const isVisible = (node) => {
         const rect = node?.getBoundingClientRect();
@@ -3508,6 +3555,8 @@ async function main() {
   fs.mkdirSync(artifactsDir, {recursive: true});
   const {chromium} = loadPlaywright(args.playwrightRoot);
   const focusSafeHelper = loadFocusSafeHelper(args.focusSafeHelper);
+  const monitorAvailable = typeof focusSafeHelper?.startFocusEventMonitor === 'function';
+  const focusGuard = args.background ? createSiteFocusGuard(focusSafeHelper?.startFocusEventMonitor) : null;
   const viewport = {width: 1280, height: 900};
   const browserArgs = [
     `--disable-extensions-except=${extensionDir}`,
@@ -3519,13 +3568,23 @@ async function main() {
     ? focusSafeHelper.newPageWithoutForeground
     : async (targetContext) => targetContext.newPage();
   const createPage = async (...parameters) => {
+    focusGuard?.mark('page-create-start');
+    focusGuard?.check();
     const target = await newPage(...parameters);
+    if (focusGuard) pageFocusGuards.set(target, focusGuard);
+    focusGuard?.check();
     await runtimeDiagnostics.attachPage(target, 'site-test-page');
+    focusGuard?.check();
+    focusGuard?.mark('page-create-complete');
     return target;
   };
-  const activateTab = focusSafeHelper
-    ? focusSafeHelper.activateExtensionTabWithoutForeground
-    : async () => undefined;
+  const activateTab = async (...parameters) => {
+    focusGuard?.mark('tab-activate-start');
+    focusGuard?.check();
+    if (focusSafeHelper) await focusSafeHelper.activateExtensionTabWithoutForeground(...parameters);
+    focusGuard?.check();
+    focusGuard?.mark('tab-activate-complete');
+  };
   const profileDir = fs.mkdtempSync(path.join(os.tmpdir(), 'fluentread-site-case-'));
   let context;
   let launched;
@@ -3543,6 +3602,13 @@ async function main() {
   const attemptStartedAt = Date.now();
   try {
     assertDedicatedProfile(profileDir);
+    if (focusGuard && process.platform !== 'darwin') {
+      throw Object.assign(new Error('后台焦点事件监控目前只支持 macOS；本次未启动浏览器'), {code: 'FOCUS_SAFETY_VIOLATION'});
+    }
+    if (focusGuard && !monitorAvailable) {
+      throw Object.assign(new Error('后台模式必须支持原生焦点事件监控，不能仅依赖前台采样'), {code: 'FOCUS_SAFETY_VIOLATION'});
+    }
+    if (focusGuard) {await focusGuard.start(); focusGuard.mark('launch'); focusGuard.check();}
     if (focusSafeHelper) {
       launchAttempted = true;
       launched = await focusSafeHelper.launchFocusSafePersistentContext({
@@ -3556,6 +3622,14 @@ async function main() {
         timeout: args.timeout,
       });
       guardBrowserClose(launched, profileDir);
+      if (focusGuard) {
+        focusGuard.register(launched);
+        let browserPid;
+        try {browserPid = await getGuardedBrowserPid(launched);}
+        catch (error) {focusGuard.fail(error); throw focusGuard.failure;}
+        focusGuard.bind(launched, browserPid);
+        focusGuard.mark('initialization');
+      }
     } else {
       launchAttempted = true;
       context = await chromium.launchPersistentContext(profileDir, {
@@ -3578,9 +3652,11 @@ async function main() {
       };
     }
     context = launched.context;
+    focusGuard?.check();
     runtimeDiagnostics.setPhase(`${args.case}/${args.mode}/initialization`);
     await runtimeDiagnostics.start(context);
     runtimeStarted = true;
+    focusGuard?.check();
     const initialWorker = context.serviceWorkers()[0] || await context.waitForEvent('serviceworker', {timeout: args.timeout});
     extensionId = new URL(initialWorker.url()).host;
     runtimeDiagnostics.setExtensionId(extensionId);
@@ -3588,6 +3664,7 @@ async function main() {
     page = await createPage(context, args.timeout);
     await runtimeDiagnostics.attachPage(page, 'translation-page');
     runtimeDiagnostics.setPhase(`${args.case}/${args.mode}/navigation`);
+    focusGuard?.mark('navigation'); focusGuard?.check();
     const navigation = await page.goto(args.url, {waitUntil: 'domcontentloaded', timeout: args.timeout});
     if (navigation && navigation.status() >= 400) throw new Error(`External site returned HTTP ${navigation.status()}: ${args.url}`);
     await activateTab(context, page, args.timeout);
@@ -3601,6 +3678,7 @@ async function main() {
       const appeared = await button.waitFor({state: 'visible', timeout: Math.min(args.timeout, 10000)})
         .then(() => true, () => false);
       if (appeared) {
+        assertPageFocusAllowed(page);
         await button.click({timeout: args.timeout});
         await button.waitFor({state: 'hidden', timeout: args.timeout});
         reportProgress(`已关闭站点对话框：${args.prepareClickText}`);
@@ -3609,6 +3687,7 @@ async function main() {
     if (args.prepareScrollSelector) {
       // Some landing pages reveal existing DOM only after it enters the viewport.
       // Use normal browser scrolling; never remove the site's hidden markers.
+      assertPageFocusAllowed(page);
       await page.locator(args.prepareScrollSelector).first().scrollIntoViewIfNeeded({timeout: args.timeout});
       reportProgress(`页面预滚动已完成：${args.prepareScrollSelector}`);
     }
@@ -3623,7 +3702,7 @@ async function main() {
     if (args.prepareFacebookPublicPost) {
       runtimeDiagnostics.setPhase(`${args.case}/${args.mode}/facebook-public-post-preparation`);
       facebookPreparation = {status: 'started'};
-      facebookPreparation = await prepareFacebookPublicPost(page, args.url, args.timeout);
+      facebookPreparation = await prepareFacebookPublicPost(page, args.url, args.timeout, () => assertPageFocusAllowed(page));
       await authorizeFacebookReadingDialog(page, facebookPreparation);
       reportProgress(`Facebook 公开帖子准备完成：${facebookPreparation.status}，绑定原生正文 dialog`);
     }
@@ -3650,6 +3729,7 @@ async function main() {
       args.mutableForbiddenSelectors,
     );
     const configResult = await readConfig(context, args.timeout, createPage, activateTab);
+    focusGuard?.check();
     extensionId = configResult.extensionId;
     runtimeDiagnostics.setExtensionId(extensionId);
     diagnosticService = configResult.config?.service || args.service;
@@ -3663,6 +3743,7 @@ async function main() {
     if (args.mode === 'full' && config.floatingBallHotkey !== expectedHotkey) throw new Error(`全文快捷键不符：${config.floatingBallHotkey}`);
     reportProgress(`${args.case}/${args.mode} 页面 contract 与扩展配置已就绪`);
     runtimeDiagnostics.setPhase(`${args.case}/${args.mode}/translate-restore-retranslate`);
+    focusGuard?.mark('translate-restore-retranslate'); focusGuard?.check();
 
     const result = args.mode === 'hover'
       ? await runHoverCase(
@@ -3692,10 +3773,12 @@ async function main() {
         controlledProvider,
         args.fullPageScope,
       );
+    focusGuard?.check();
     const nativeComments = args.stabilityProbes && args.case === 'hacker-news-8863'
-      ? await runNativeCommentToggle({page, timeout: args.timeout, artifactsDir}) : undefined;
+      ? await runNativeCommentToggle({page, timeout: args.timeout, artifactsDir, checkFocus: () => assertPageFocusAllowed(page)}) : undefined;
     const stability = args.stabilityProbes
-      ? await runStabilityProbes({page, selector: args.selector, timeout: args.timeout, artifactsDir, toggleFull, observeMs: 5000}) : undefined;
+      ? await runStabilityProbes({page, selector: args.selector, timeout: args.timeout, artifactsDir, toggleFull, observeMs: 5000, checkFocus: () => assertPageFocusAllowed(page)}) : undefined;
+    focusGuard?.check();
     output = {
       ok: true,
       artifactsDir,
@@ -3734,6 +3817,9 @@ async function main() {
     };
   } catch (error) {
     primaryError = error;
+    if (focusGuard && monitorAvailable && process.platform === 'darwin' && error?.code === 'FOCUS_SAFETY_VIOLATION') focusGuard.fail(error);
+    if (focusGuard?.failure) throw focusGuard.failure;
+    if (focusGuard && (!monitorAvailable || process.platform !== 'darwin')) throw error;
     runtimeDiagnostics.setPhase(`${args.case}/${args.mode}/failure-evidence`);
     // 只在失败后、既有清理前旁路取证；共用最多 2 秒，不修改测试/provider 预算或重试。
     const budgetMs = Math.min(args.timeout, 2000);
@@ -3933,8 +4019,8 @@ async function main() {
     throw error;
   }
   finally {
-    controlledProvider?.dispose();
     const cleanupErrors = [];
+    try {controlledProvider?.dispose();} catch (error) {cleanupErrors.push(error);}
     output ||= {ok: false, artifactsDir, case: args.case, mode: args.mode, url: args.url,
       launchMode: launched?.launchMode, focusPolicy: launched?.focusPolicy, windowPlacement: launched?.windowPlacement};
     if (promotionPreparation) output.promotionPreparation = promotionPreparation;
@@ -3945,6 +4031,7 @@ async function main() {
     if (primaryError?.facebookPreparation) output.facebookPreparation = primaryError.facebookPreparation;
     if (failureDomEvidence) output.failureNativeDom = failureDomEvidence;
     try {
+      if (focusGuard?.failure) throw focusGuard.failure;
       output.unload = await unloadRuntimePage(page, runtimeDiagnostics, `${args.case}/${args.mode}/unload`);
       if (output.ok && output.unload.status !== 'observed') throw new Error('未观察到目标文档卸载，不能判定本轮通过');
     }
@@ -3952,19 +4039,28 @@ async function main() {
       output.unload = {status: 'failed', message: redact(error.message || error)};
       cleanupErrors.push(error);
     }
-    runtimeDiagnostics.setPhase(`${args.case}/${args.mode}/cleanup`);
-    const diagnosticFailures = await finishRuntimeDiagnostics(runtimeDiagnostics, output, artifactsDir);
+    try {runtimeDiagnostics.setPhase(`${args.case}/${args.mode}/cleanup`);} catch (error) {cleanupErrors.push(error);}
+    let diagnosticFailures = [];
+    try {diagnosticFailures = await finishRuntimeDiagnostics(runtimeDiagnostics, output, artifactsDir);}
+    catch (error) {cleanupErrors.push(error); output.ok = false;}
     cleanupErrors.push(...diagnosticFailures.map(({error}) => error));
     if (!runtimeStarted) {
       output.runtimeDiagnostics = {...output.runtimeDiagnostics, passed: false, status: 'not-started'};
     }
     if (diagnosticFailures.length) output.finalizationErrors = diagnosticFailures.map(({stage, error}) => ({stage, message: redact(error.message || error)}));
-    try {await releaseFacebookReadingDialog(page);} catch (error) {cleanupErrors.push(error);}
+    if (!focusGuard?.failure) try {await releaseFacebookReadingDialog(page);} catch (error) {cleanupErrors.push(error);}
     let browserClosed = false;
+    focusGuard?.mark('browser-close');
     try {
-      if (launched?.close) {await launched.close(); browserClosed = true;}
+      if (launched?.close) {await (focusGuard?.requestClose() || launched.close()); browserClosed = true;}
       else if (context) {await context.close(); browserClosed = true;}
     } catch (error) {cleanupErrors.push(error);}
+    if (focusGuard) {
+      focusGuard.mark('observer-stop');
+      try {await focusGuard.stop();} catch (error) {cleanupErrors.push(error);}
+      output.focusObservation = focusGuard.snapshot();
+      if (output.focusObservation.status !== 'complete') output.ok = false;
+    } else output.focusObservation = {status: 'not-monitored', reason: 'explicit-headed-mode'};
     try {
       if (browserClosed) fs.rmSync(profileDir, {recursive: true, force: true, maxRetries: 5, retryDelay: 200});
       else if (!launchAttempted) {
@@ -3974,13 +4070,15 @@ async function main() {
       }
     } catch (error) {cleanupErrors.push(error);}
     output.cleanupConfirmed = browserClosed;
-    output.profileRemoved = !fs.existsSync(profileDir);
+    try {output.profileRemoved = !fs.existsSync(profileDir);} catch (error) {output.profileRemoved = null; cleanupErrors.push(error);}
     if (cleanupErrors.length) {
       output.ok = false;
       output.cleanupErrors = cleanupErrors.map(error => ({message: redact(error.message || error)}));
     }
+    try {if (output.runtimeDiagnostics) fs.writeFileSync(path.join(artifactsDir, 'runtime-diagnostics.json'), JSON.stringify(output.runtimeDiagnostics, null, 2));}
+    catch (error) {cleanupErrors.push(error); output.ok = false;}
+    if (cleanupErrors.length) output.cleanupErrors = cleanupErrors.map(error => ({message: redact(error.message || error)}));
     try {
-      if (output.runtimeDiagnostics) fs.writeFileSync(path.join(artifactsDir, 'runtime-diagnostics.json'), JSON.stringify(output.runtimeDiagnostics, null, 2));
       fs.writeFileSync(path.join(artifactsDir, 'result.json'), JSON.stringify(output, null, 2));
       reportProgress(`证据目录：${artifactsDir}`);
     } catch (error) {cleanupErrors.push(error); output.ok = false;}
@@ -3988,6 +4086,7 @@ async function main() {
       process.stderr.write(`Cleanup failed: ${error.stack || error}\n`);
       reportErrorCodes(error, 'cleanup');
     }
+    if (focusGuard?.failure) throw focusGuard.failure;
     if (cleanupErrors.length && !primaryError) throw cleanupErrors[0];
   }
   process.stdout.write(`${JSON.stringify(output, null, 2)}\n`);

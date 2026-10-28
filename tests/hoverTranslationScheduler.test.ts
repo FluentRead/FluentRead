@@ -22,6 +22,24 @@ describe('悬浮候选停留调度', () => {
     beforeEach(() => vi.useFakeTimers());
     afterEach(() => {vi.clearAllTimers(); vi.useRealTimers(); vi.restoreAllMocks();});
 
+    it('新停留仅替换待派发工作，显式取消才释放在途重挂观察', async () => {
+        const {ports, candidate, snapshot} = fixture();
+        const cancelTracked = vi.fn(), dispatchTracked = vi.fn();
+        const scheduler = new HoverTranslationScheduler({...ports, cancelTracked, dispatchTracked});
+        scheduler.handle(1, 2, {delayMs: 100});
+        scheduler.handle(3, 4, {delayMs: 200});
+        expect(cancelTracked).not.toHaveBeenCalled();
+        await vi.advanceTimersByTimeAsync(200);
+        expect(dispatchTracked).toHaveBeenCalledWith(candidate, snapshot, false, 3, 4, 'content', {}, undefined, undefined);
+        expect(ports.translate).not.toHaveBeenCalled();
+        scheduler.handle(5, 6);
+        await vi.advanceTimersByTimeAsync(0);
+        expect(cancelTracked).not.toHaveBeenCalled();
+        expect(dispatchTracked).toHaveBeenCalledTimes(2);
+        scheduler.cancel();
+        expect(cancelTracked).toHaveBeenCalledOnce();
+    });
+
     it('零延迟保持下一任务派发，只在派发时解析一次当前坐标', async () => {
         const {ports, scheduler, candidate, snapshot} = fixture();
         scheduler.cancel();

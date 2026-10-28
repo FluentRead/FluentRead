@@ -81,6 +81,13 @@ function serializeUiMessages(value: unknown): string {
     return JSON.stringify(value, (_key, item) => item && typeof item === 'object' && !Array.isArray(item)
         ? Object.fromEntries(Object.entries(item).sort(([a], [b]) => a < b ? -1 : a > b ? 1 : 0)) : item);
 }
+/** 独立版消息优先比较现有紧凑 gzip，再选择经构建 worker 校验的较小结果。 */
+export async function gzipStandaloneUiMessages(input: Uint8Array,
+    compress = gzipLargeStandaloneUserscriptData): Promise<Buffer> {
+    const baseline = gzipUserscriptBuildData(input, undefined, true);
+    const candidate = await compress(input, root);
+    return candidate.byteLength < baseline.byteLength ? candidate : baseline;
+}
 // 与中文内嵌目录一致，仅投影扩展文档页专用 key；固定远程与外部资源继续使用原 bundle。
 const defaultMessageColumns = packMessageCatalog(userscriptPageMessages(zhCNMessages));
 const compressedUiLanguageBundles: Record<string, string> = {};
@@ -113,9 +120,9 @@ const uiLanguageUpdates = Object.fromEntries(Object.entries(UI_LANGUAGE_BUNDLES)
     return [[language, createUserscriptLanguageUpdate(currentUserscriptLanguageBundle(language as RegisteredUiLanguage),
         language === 'en-US' ? pinnedData!.english : baseline)]];
 }));
-const languageUpdateData = Buffer.from(serializeUiMessages(bundleLibraries ? packLanguageUpdates(uiLanguageUpdates) : uiLanguageUpdates));
-// 独立版的大型语言增量复用构建期隔离压缩，运行时仍仅解压同一份标准 gzip 数据。
-const languageUpdateBytes = bundleLibraries ? await gzipLargeStandaloneUserscriptData(languageUpdateData, root) : gzipUserscriptBuildData(languageUpdateData);
+const languageUpdateInput = Buffer.from(serializeUiMessages(bundleLibraries ? packLanguageUpdates(uiLanguageUpdates) : uiLanguageUpdates));
+const languageUpdateBytes = bundleLibraries && !greasyForkSource ? await gzipStandaloneUiMessages(languageUpdateInput)
+    : gzipUserscriptBuildData(languageUpdateInput, undefined, bundleLibraries);
 const compressedUiLanguageUpdates = bundleLibraries ? encodeUserscriptDataCompact(languageUpdateBytes) : languageUpdateBytes.toString('base64');
 const unicodeNotice = `/*\n${fs.readFileSync(resolve(root, 'public/third-party-notices/unicode-17.0.0.txt'), 'utf8')}\n*/`;
 const serviceIconsLicense = fs.readFileSync(resolve(root, 'public/third-party-notices/lobe-icons-MIT.txt'), 'utf8');
@@ -172,20 +179,21 @@ export function createUserscriptCatalogCompressionPlugin(compressStandalone = gz
                 }
                 const contents = serializeUiMessages(bundleLibraries ? [packKeyColumn(defaultMessageColumns[0] as readonly string[]), defaultMessageColumns[1]] : userscriptPageMessages(zhCNMessages));
                 const input = Buffer.from(contents);
-                const render = (compressedBytes: Buffer) => {
+                const emit = (compressedBytes: Buffer) => {
                     const compressed = bundleLibraries ? encodeUserscriptDataCompact(compressedBytes) : compressedBytes.toString('base64');
                     return [
-                        `/* Non-code Chinese UI messages; sha256 ${createHash('sha256').update(contents).digest('hex')}. */`,
-                        "import {inflateWithPako} from '@/userscript/pakoRuntime';",
-                        ...(bundleLibraries ? ["import {decodeUserscriptData} from '@/userscript/dataEncoding';",
-                            "import {restoreDefaultMessageColumns} from '@/userscript/defaultMessageData';"] : []),
-                        bundleLibraries ? `const bytes = decodeUserscriptData(${JSON.stringify(compressed)});`
-                            : `const bytes = Uint8Array.from(atob(${JSON.stringify(compressed)}), (character) => character.charCodeAt(0));`,
-                        bundleLibraries ? 'export const zhCNMessages = restoreDefaultMessageColumns(JSON.parse(inflateWithPako(bytes)));'
-                            : 'export const zhCNMessages = JSON.parse(inflateWithPako(bytes));',
+                    `/* Non-code Chinese UI messages; sha256 ${createHash('sha256').update(contents).digest('hex')}. */`,
+                    "import {inflateWithPako} from '@/userscript/pakoRuntime';",
+                    ...(bundleLibraries ? ["import {decodeUserscriptData} from '@/userscript/dataEncoding';",
+                        "import {restoreDefaultMessageColumns} from '@/userscript/defaultMessageData';"] : []),
+                    bundleLibraries ? `const bytes = decodeUserscriptData(${JSON.stringify(compressed)});`
+                        : `const bytes = Uint8Array.from(atob(${JSON.stringify(compressed)}), (character) => character.charCodeAt(0));`,
+                    bundleLibraries ? 'export const zhCNMessages = restoreDefaultMessageColumns(JSON.parse(inflateWithPako(bytes)));'
+                        : 'export const zhCNMessages = JSON.parse(inflateWithPako(bytes));',
                     ].join('\n');
                 };
-                return bundleLibraries ? compressStandalone(input, root).then(render) : render(gzipUserscriptBuildData(input));
+                return bundleLibraries ? gzipStandaloneUiMessages(input, compressStandalone).then(emit)
+                    : emit(gzipUserscriptBuildData(input));
             }
             if (!id.startsWith(compressedCatalogPrefix)) return null;
             const sourcePath = id.slice(compressedCatalogPrefix.length, -'.js'.length);
@@ -215,15 +223,23 @@ export function createUserscriptCatalogCompressionPlugin(compressStandalone = gz
                 ].join('\n');
             }
             const contents = JSON.stringify(JSON.parse(fs.readFileSync(sourcePath, 'utf8')));
-            const compressed = (bundleLibraries ? encodeUserscriptDataCompact : encodeUserscriptData)(gzipUserscriptBuildData(Buffer.from(contents)));
+            const data = Buffer.from(contents);
+            const baseline = gzipUserscriptBuildData(data, undefined, bundleLibraries);
             const digest = createHash('sha256').update(contents).digest('hex');
-            return [
+            const emit = (bytes: Uint8Array) => {
+                const compressed = (bundleLibraries ? encodeUserscriptDataCompact : encodeUserscriptData)(bytes);
+                return [
                 `/* Non-code site rules: ${normalizePath(sourcePath).slice(projectRoot.length)}; sha256 ${digest}. */`,
                 "import {inflateWithPako} from '@/userscript/pakoRuntime';",
                 "import {decodeUserscriptData} from '@/userscript/dataEncoding';",
                 `const bytes = decodeUserscriptData(${JSON.stringify(compressed)});`,
                 'export default JSON.parse(inflateWithPako(bytes));',
-            ].join('\n');
+                ].join('\n');
+            };
+            // 独立版站点目录使用构建期 worker；较大结果保留现有紧凑 gzip。
+            return bundleLibraries
+                ? gzipLargeStandaloneUserscriptData(data, root, 0).then(candidate => emit(candidate.byteLength < baseline.byteLength ? candidate : baseline))
+                : emit(baseline);
         },
     };
 }
@@ -634,7 +650,7 @@ export const userscriptAliases = [
 export default defineConfig({
     root,
     publicDir: false,
-    plugins: [...(!greasyForkSource ? [createStandaloneOpenAITransportPlugin()] : []), createUserscriptSettingsDataPlugin(root, !greasyForkSource, bundleLibraries), createDeepLXRuntimeBuildPlugin(root), unwrapWxtEntrypoints(), createUserscriptCatalogCompressionPlugin(), createUserscriptCharacterDataCompressionPlugin(root, !greasyForkSource), createUserscriptFrancDataCompressionPlugin(root, !greasyForkSource, !greasyForkSource), createUserscriptTldtsDataCompressionPlugin(root, bundleLibraries && !greasyForkSource, bundleLibraries && !greasyForkSource), createUserscriptAboutImagesCompressionPlugin(root, bundleLibraries && !greasyForkSource), createUserscriptServiceBrandIconsCompressionPlugin(root, bundleLibraries && !greasyForkSource), injectUserscriptBrowserShim(), vue(), bundleUserscriptCss(), createUserscriptInlineCssCompressionPlugin(root, !greasyForkSource, bundleLibraries)],
+    plugins: [...(!greasyForkSource ? [createStandaloneOpenAITransportPlugin()] : []), createUserscriptSettingsDataPlugin(root, !greasyForkSource, bundleLibraries, bundleLibraries), createDeepLXRuntimeBuildPlugin(root), unwrapWxtEntrypoints(), createUserscriptCatalogCompressionPlugin(), createUserscriptCharacterDataCompressionPlugin(root, !greasyForkSource, bundleLibraries), createUserscriptFrancDataCompressionPlugin(root, !greasyForkSource, !greasyForkSource, bundleLibraries), createUserscriptTldtsDataCompressionPlugin(root, bundleLibraries && !greasyForkSource, bundleLibraries && !greasyForkSource, bundleLibraries && !greasyForkSource), createUserscriptAboutImagesCompressionPlugin(root, bundleLibraries && !greasyForkSource, bundleLibraries), createUserscriptServiceBrandIconsCompressionPlugin(root, bundleLibraries && !greasyForkSource, bundleLibraries), injectUserscriptBrowserShim(), vue(), bundleUserscriptCss(), createUserscriptInlineCssCompressionPlugin(root, !greasyForkSource, bundleLibraries)],
     resolve: {
         alias: userscriptAliases,
     },

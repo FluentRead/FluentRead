@@ -12,7 +12,12 @@ export interface MangaAlphaProtection {
     /** 每项依次是 y、x0、x1，同行区间不重叠且不相邻。 */
     runs: Uint16Array;
     rowStarts: Uint32Array;
-    rectangles: Box[];
+    rectangles: readonly Readonly<Box>[];
+}
+// 仅标记本模块创建并冻结的数组；包装它的 Proxy 和调用方自造数组都不可信。
+const trustedRectangles=new WeakSet<readonly Readonly<Box>[]>();
+export function isTrustedMangaAlphaRectangles(rectangles:readonly Readonly<Box>[]):boolean {
+    return trustedRectangles.has(rectangles);
 }
 export interface MangaAlphaLayoutBudget {remaining:number}
 // 源并集逐行只扫描一次，受16MP尺寸上限约束；此额外预算只计算外周采样和区间事件。
@@ -94,6 +99,8 @@ export function planMangaAlphaProtection(pixels: Uint8ClampedArray, width: numbe
         previous=next;
     }
     rowStarts[height]=cursor;
+    for(const rect of rectangles)Object.freeze(rect);
+    Object.freeze(rectangles);trustedRectangles.add(rectangles);
     return {runs,rowStarts,rectangles};
 }
 

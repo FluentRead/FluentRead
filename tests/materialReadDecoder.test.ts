@@ -111,6 +111,31 @@ describe('material summary stream decoder', () => {
         const trailing = Uint8Array.from([...lines(header,complete(0,0,0)),32]);
         await expect(decoded(trailing,1)).rejects.toThrow();
     });
+    it.each([null, [], 0, true, 'header'])('rejects non-object JSON records %#', async value => {
+        await expect(decoded(lines(value))).rejects.toThrow('Invalid material summary stream');
+    });
+    it('accepts a valid archived timestamp and rejects invalid archived timestamps and summary fields', async () => {
+        const archived = summary('archived',{archivedAt:42});
+        expect((await decoded(lines(header,msg(archived),complete(1,1,0)))).summaries[0].archivedAt).toBe(42);
+        const invalid = [
+            {...summary('x'),archivedAt:-1}, {...summary('x'),archivedAt:'yesterday'},
+            {...summary('x'),updatedAt:-1}, {...summary('x'),sourceUrl:123},
+            {...summary('x'),title:''}, {...summary('x'),kind:'other'},
+            {...summary('x'),topics:'invalid'}, {...summary('x'),referenceCount:-1},
+        ];
+        for (const item of invalid) await expect(decoded(lines(header,{type:'summary',value:item},complete(1,1,0)))).rejects.toThrow();
+    });
+    it('rejects a summary beyond the maximum without returning the previous 10000', async () => {
+        const result = decodeMaterialSummaries(async onChunk => {
+            onChunk(lines(header));
+            for (let i=0;i<10001;i++) onChunk(lines(msg(summary(String(i)))));
+            onChunk(lines(complete(10001,10001,0)));
+        });
+        await expect(result).rejects.toThrow('Invalid material summary stream');
+    });
+    it('rejects a non-byte chunk from an injected transport', async () => {
+        await expect(decodeMaterialSummaries(async onChunk => {onChunk('not bytes' as never);})).rejects.toThrow('Invalid material summary stream');
+    });
     it('limits each line by encoded bytes before parsing', async () => {
         const tooLarge = encoder.encode('中'.repeat(Math.floor(MATERIAL_SUMMARY_LINE_BYTES/3)+1));
         expect(tooLarge.length).toBeGreaterThan(MATERIAL_SUMMARY_LINE_BYTES);
@@ -137,5 +162,26 @@ describe('material summary stream decoder', () => {
         const controller = new AbortController(); controller.abort(); let started = false;
         await expect(decodeMaterialSummaries(async()=>{started=true;},{signal:controller.signal})).rejects.toMatchObject({name:'AbortError'});
         expect(started).toBe(false);
+    });
+    it('does not start transport when cancelled before its scheduled startup', async () => {
+        const controller = new AbortController(); let started = false;
+        const result = decodeMaterialSummaries(async()=>{started=true;},{signal:controller.signal});
+        controller.abort();
+        await expect(result).rejects.toMatchObject({name:'AbortError'}); expect(started).toBe(false);
+    });
+    it('rejects a chunk delivered synchronously after abort and never exposes partial data', async () => {
+        const controller = new AbortController(); let push!:(chunk:Uint8Array)=>void, finish!:()=>void;
+        const result=decodeMaterialSummaries(async onChunk => {push=onChunk;onChunk(lines(header,msg(summary('partial'))));
+            await new Promise<void>(resolve=>{finish=resolve;});},{signal:controller.signal});
+        await Promise.resolve(); controller.abort();
+        expect(()=>push(lines(complete(1,1,0)))).toThrow('材料读取已取消');
+        await expect(result).rejects.toMatchObject({name:'AbortError'}); finish();
+    });
+    it('reports cancellation instead of a source error when verification is interrupted', async () => {
+        const controller = new AbortController(); let finish!:()=>void;
+        const result = decodeMaterialSummaries(async onChunk => {onChunk(lines(header,{type:'error',code:'stale-operation'}));
+            await new Promise<void>(resolve=>{finish=resolve;});},{signal:controller.signal});
+        await Promise.resolve(); controller.abort();
+        await expect(result).rejects.toMatchObject({name:'AbortError'}); finish();
     });
 });

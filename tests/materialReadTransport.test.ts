@@ -130,6 +130,11 @@ describe('material read transport',()=>{
     const {ports,states}=pair();await expect(sendMaterialRead(ports[0],chunks(),{idleTimeoutMs:Infinity})).rejects.toThrow('timeout');
     expect(states[0].closed).toBe(true);
   });
+  it('keeps the invalid-timeout error if a stale port throws while being closed',async()=>{
+    const {ports}=pair();
+    ports[0].disconnect=()=>{throw Error('extension context invalidated');};
+    await expect(sendMaterialRead(ports[0],chunks(),{idleTimeoutMs:0})).rejects.toThrow('Invalid material read timeout');
+  });
   it('supports empty streams',async()=>{
     const {ports}=pair();await Promise.all([receiveMaterialRead(ports[1],()=>{throw Error('unexpected');}),sendMaterialRead(ports[0],chunks())]);
   });

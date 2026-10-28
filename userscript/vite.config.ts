@@ -113,7 +113,9 @@ const uiLanguageUpdates = Object.fromEntries(Object.entries(UI_LANGUAGE_BUNDLES)
     return [[language, createUserscriptLanguageUpdate(currentUserscriptLanguageBundle(language as RegisteredUiLanguage),
         language === 'en-US' ? pinnedData!.english : baseline)]];
 }));
-const languageUpdateBytes = gzipUserscriptBuildData(Buffer.from(serializeUiMessages(bundleLibraries ? packLanguageUpdates(uiLanguageUpdates) : uiLanguageUpdates)));
+const languageUpdateData = Buffer.from(serializeUiMessages(bundleLibraries ? packLanguageUpdates(uiLanguageUpdates) : uiLanguageUpdates));
+// 独立版的大型语言增量复用构建期隔离压缩，运行时仍仅解压同一份标准 gzip 数据。
+const languageUpdateBytes = bundleLibraries ? await gzipLargeStandaloneUserscriptData(languageUpdateData, root) : gzipUserscriptBuildData(languageUpdateData);
 const compressedUiLanguageUpdates = bundleLibraries ? encodeUserscriptDataCompact(languageUpdateBytes) : languageUpdateBytes.toString('base64');
 const unicodeNotice = `/*\n${fs.readFileSync(resolve(root, 'public/third-party-notices/unicode-17.0.0.txt'), 'utf8')}\n*/`;
 const serviceIconsLicense = fs.readFileSync(resolve(root, 'public/third-party-notices/lobe-icons-MIT.txt'), 'utf8');

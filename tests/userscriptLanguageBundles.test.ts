@@ -6,7 +6,7 @@ import {runInNewContext} from 'node:vm';
 import {afterEach, beforeEach, describe, expect, it, vi} from 'vitest';
 // 脚本发布的语言资源不含智能高亮文案；摘要必须按脚本实际使用的投影计算。
 import {UI_LANGUAGE_BUNDLES, currentUserscriptLanguageBundle, createUserscriptLanguageUpdate, userscriptPageMessages, zhCNMessages} from '../userscript/languageBundles';
-import {gzipUserscriptBuildData} from '../userscript/buildGzip';
+import {gzipLargeStandaloneUserscriptData, gzipUserscriptBuildData} from '../userscript/buildGzip';
 import {UI_LANGUAGE_BUNDLES as extensionBundles} from '@/src/core/i18n/bundles';
 import {aiRequestTimeoutMessages} from '@/src/core/i18n/messages/aiRequestTimeout';
 import {ungzip} from 'pako';
@@ -20,6 +20,15 @@ const source = readFileSync(resolve(languageDir, fileName), 'utf8');
 const resourceCommit = '70d3d901033a579e32a5bf5e6af14555f0d140bb';
 
 describe('embedded language columns', () => {
+    it('preserves all real language updates after standalone build compression',async()=>{
+        const updates=Object.fromEntries(Object.entries(UI_LANGUAGE_BUNDLES).filter(([language])=>language!=='en-US')
+            .map(([language,baseline])=>[language,createUserscriptLanguageUpdate(currentUserscriptLanguageBundle(language as keyof typeof UI_LANGUAGE_BUNDLES),baseline)]));
+        const raw=Buffer.from(JSON.stringify(packLanguageUpdates(updates)));
+        const compressed=await gzipLargeStandaloneUserscriptData(raw,process.cwd());
+        const restored=JSON.parse(Buffer.from(ungzip(compressed)).toString('utf8'));
+        expect(unpackLanguageUpdates(restored)).toEqual(updates);
+        expect(compressed.byteLength).toBeLessThanOrEqual(gzipUserscriptBuildData(raw).byteLength);
+    });
     it('roundtrips shared update columns, missing keys, empty values, patterns and legacy object format',()=>{
         const updates={
           'ja-JP':{messages:{a:'',b:'日本語'},legacyText:{x:'旧'},legacyPatterns:{early:[['same','一'],['same','二']],late:[]},patternOrder:{early:[1,-1]}},

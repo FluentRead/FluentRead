@@ -134,6 +134,83 @@ describe('material backup source reader', () => {
       await expect(reader.prepareMaterialBackup(new Blob([oversizedLast]))).rejects.toMatchObject({name: 'MaterialBackupCapacityError'});
     } finally {vi.doUnmock('@/src/features/vocabulary/materialProtocol'); vi.resetModules();}
   });
+  it('bounds decoding of overwritten oversized records while preserving raw hash and invalid UTF-8 semantics', async () => {
+    vi.resetModules();
+    vi.doMock('@/src/features/vocabulary/materialProtocol', async importOriginal => ({
+      ...await importOriginal<object>(), MATERIAL_IMPORT_FRAME_BYTES: 8, MATERIAL_IMPORT_MAX_RECORD_BYTES: 4,
+      MATERIAL_IMPORT_MAX_FRAMES: 100,
+    }));
+    const decode = vi.spyOn(TextDecoder.prototype, 'decode');
+    try {
+      const reader = await import('@/src/features/vocabulary/materialBackupReader');
+      const prefix = encoder.encode('{"format":"fluentread-learning-materials","version":1,"materials":["');
+      const badUtf8 = new Uint8Array(2 * 1024 * 1024); badUtf8.fill(0xff);
+      const suffix = encoder.encode('"],"materials":["a"]}');
+      const source = new Blob([prefix, badUtf8, suffix]);
+      const expected = JSON.parse(await source.text()).materials;
+      decode.mockClear();
+      const prepared = await reader.prepareMaterialBackup(source);
+      expect(prepared.plan.fileDigest).toBe(bytesToHex(sha256(new Uint8Array(await source.arrayBuffer()))));
+      expect(decode.mock.calls.filter(([, options]) => options?.stream === true).length).toBeLessThan(8);
+      const frames: Frame[] = []; await reader.sendMaterialBackup(source, prepared, async frame => {frames.push(frame);});
+      expect(JSON.parse(await new Blob(frames.map(frame => frame.bytes)).text())).toEqual(expected[0]);
+      const changed = new Uint8Array(await source.arrayBuffer()); changed[prefix.length + 8] = 0xfe;
+      const changedBlob = new Blob([changed]), changedSliceOriginal = source.slice.bind(source);
+      source.slice = (start, end, type) => changedBlob.slice(start, end, type);
+      try {await expect(reader.sendMaterialBackup(source, prepared, async () => {})).rejects.toThrow('改变');}
+      finally {source.slice = changedSliceOriginal;}
+      const malformed = new Blob([prefix, badUtf8, encoder.encode('"],"materials":["a"],"ignored":[1,]}')]);
+      await expect(reader.prepareMaterialBackup(malformed)).rejects.toBeInstanceOf(SyntaxError);
+      const finalTooLarge = new Blob([prefix, badUtf8, encoder.encode('"]}')]);
+      await expect(reader.prepareMaterialBackup(finalTooLarge)).rejects.toMatchObject({name: 'MaterialBackupCapacityError'});
+      const sameChunk = new Blob(['{"format":"fluentread-learning-materials","version":1,"materials":["oversized","a"],"materials":["b"]}']);
+      expect((await reader.prepareMaterialBackup(sameChunk)).manifest.records).toBe(1);
+      await expect(reader.prepareMaterialBackup(new Blob([wrap('"oversized","a"')]))).rejects.toMatchObject({name: 'MaterialBackupCapacityError'});
+      const abortSource = source.slice(), originalSlice = abortSource.slice.bind(abortSource), controller = new AbortController();
+      let slices = 0;
+      abortSource.slice = (start, end, type) => {const part = originalSlice(start, end, type); if (++slices === 3) controller.abort(); return part;};
+      await expect(reader.prepareMaterialBackup(abortSource, {signal: controller.signal})).rejects.toMatchObject({name: 'AbortError'});
+      expect(slices).toBe(3);
+    } finally {decode.mockRestore();vi.doUnmock('@/src/features/vocabulary/materialProtocol'); vi.resetModules();}
+  });
+  it('uses decoded UTF-8 length at the exact material record boundary', async () => {
+    vi.resetModules();
+    vi.doMock('@/src/features/vocabulary/materialProtocol', async importOriginal => ({
+      ...await importOriginal<object>(), MATERIAL_IMPORT_FRAME_BYTES: 8, MATERIAL_IMPORT_MAX_RECORD_BYTES: 5,
+      MATERIAL_IMPORT_MAX_FRAMES: 100,
+    }));
+    try {
+      const reader = await import('@/src/features/vocabulary/materialBackupReader');
+      const prefix = encoder.encode(wrap('"').slice(0, -2));
+      const source = new Blob([prefix, new Uint8Array([0xff]), encoder.encode('"]}')]);
+      const prepared = await reader.prepareMaterialBackup(source);
+      expect(prepared.manifest.bytes).toBe(5); // 两个引号加替换字符的三个 UTF-8 字节。
+      const frames: Frame[] = []; await reader.sendMaterialBackup(source, prepared, async frame => {frames.push(frame);});
+      expect(JSON.parse(await new Blob(frames.map(frame => frame.bytes)).text())).toBe('\ufffd');
+      const tooLarge = new Blob([prefix, new Uint8Array([0xff, 0xff]), encoder.encode('"]}')]);
+      await expect(reader.prepareMaterialBackup(tooLarge)).rejects.toMatchObject({name: 'MaterialBackupCapacityError'});
+    } finally {vi.doUnmock('@/src/features/vocabulary/materialProtocol'); vi.resetModules();}
+  });
+  it('counts a UTF-8 character split across source chunks at the exact boundary', async () => {
+    const prefix = encoder.encode('{"format":"fluentread-learning-materials","version":1,"materials":["');
+    const pad = new Uint8Array(65535 - prefix.length); pad.fill(0x61);
+    const limit = pad.length + 6; // 两个引号和四字节字符。
+    vi.resetModules();
+    vi.doMock('@/src/features/vocabulary/materialProtocol', async importOriginal => ({
+      ...await importOriginal<object>(), MATERIAL_IMPORT_FRAME_BYTES: 128 * 1024, MATERIAL_IMPORT_MAX_RECORD_BYTES: limit,
+      MATERIAL_IMPORT_MAX_FRAMES: 100,
+    }));
+    try {
+      const reader = await import('@/src/features/vocabulary/materialBackupReader');
+      const emoji = encoder.encode('😀'), source = new Blob([prefix, pad, emoji, encoder.encode('"]}')]);
+      const prepared = await reader.prepareMaterialBackup(source);
+      expect(prepared.manifest.bytes).toBe(limit);
+      const frames: Frame[] = []; await reader.sendMaterialBackup(source, prepared, async frame => {frames.push(frame);});
+      expect(JSON.parse(await new Blob(frames.map(frame => frame.bytes)).text())).toBe('a'.repeat(pad.length) + '😀');
+      const tooLong = new Blob([prefix, pad, emoji, encoder.encode('x"]}')]);
+      await expect(reader.prepareMaterialBackup(tooLong)).rejects.toMatchObject({name: 'MaterialBackupCapacityError'});
+    } finally {vi.doUnmock('@/src/features/vocabulary/materialProtocol'); vi.resetModules();}
+  });
   it('rejects wrong scalar metadata and unknown oversized keys do not shadow known keys', async () => {
     const key = 'version' + 'x'.repeat(140000), escapedFormat = [...'format'].map(ch => `\\u${ch.charCodeAt(0).toString(16).padStart(4, '0')}`).join('');
     const text = `{"${key}":3,"${escapedFormat}":"fluentread-learning-materials","version":1,"materials":[{},[]]}`;

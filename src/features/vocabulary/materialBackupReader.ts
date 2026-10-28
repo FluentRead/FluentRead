@@ -139,7 +139,7 @@ class RecordCollector {
   private active?: CollectedRecord;
   private count = 0;
   private readonly encoder = new TextEncoder();
-  constructor(private readonly maxLength = MAX_RECORD_LENGTH, private readonly hashToken = false) {}
+  constructor(private readonly maxLength = MATERIAL_IMPORT_MAX_RECORD_BYTES, private readonly hashToken = false) {}
   reset() {this.pending = []; this.values = []; this.active = undefined; this.count = 0;}
   start(at: number) {
     this.count++;
@@ -152,10 +152,18 @@ class RecordCollector {
     const end = at + bytes.length;
     for (const row of this.pending) {
       const start = Math.max(at, row.start), stop = Math.min(end, row.end ?? end);
-      if (stop > start) {const text = row.decoder.decode(bytes.subarray(start - at, stop - at), {stream: true}); if (text) {const encoded = this.encoder.encode(text); row.hash?.update(encoded); row.length += encoded.length;}}
+      // 超限材料已无法进入恢复协议；保留哨兵并继续验证全文，使后续重复键仍可覆盖它。
+      // 版本数值另需完整摘要，不能跳过或饱和其解码。
+      if (stop > start && (this.hashToken || row.length <= this.maxLength)) {
+        const text = row.decoder.decode(bytes.subarray(start - at, stop - at), {stream: true});
+        if (text) {
+          const encoded = this.encoder.encode(text); row.hash?.update(encoded); row.length += encoded.length;
+          if (!this.hashToken && row.length > this.maxLength) row.length = this.maxLength + 1;
+        }
+      }
       // JSON 记录结束字节始终为 ASCII；不完整 UTF-8 已在遇到该字节时替换。
       if (row.end !== undefined && row.end <= end) {if (row.hash) row.digest = bytesToHex(row.hash.digest()); row.complete = true;}
-      if (!Number.isSafeInteger(row.length) || row.length > this.maxLength) throw capacityError('材料记录超过恢复大小限制');
+      if (this.hashToken && (!Number.isSafeInteger(row.length) || row.length > this.maxLength)) throw capacityError('材料记录超过恢复大小限制');
     }
     this.pending = this.pending.filter(row => !row.complete);
   }

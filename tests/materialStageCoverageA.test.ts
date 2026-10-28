@@ -163,6 +163,27 @@ describe('material staging stored metadata boundaries',()=>{
     await vi.waitFor(async()=>expect(await stage.append(cap,frame)).toEqual({nextSeq:1}));
     expect(await db.table('stageFrames').count()).toBe(1);
   });
+  it('preserves the actual append result if cancellation cannot abort its write transaction',async()=>{
+    const {db,stage}=setup(),{input,frame}=sampleFrame(),cap=createMaterialImportCapability();
+    await stage.beginRecoverable(input,guard,cap,{deadline:1000});
+    const controller=new AbortController(),sessions=db.table('stageSessions');
+    let reads=0,abortFailed=false;
+    const onRead=(row:{id:string}|undefined)=>{
+      if(row?.id===cap.id&&++reads===2){
+        const tx=Dexie.currentTransaction;if(!tx)throw Error('missing transaction');
+        const fail=vi.spyOn(Object.getPrototypeOf(tx),'abort').mockImplementation(()=>{abortFailed=true;throw Error('abort failed');});
+        try{controller.abort();}finally{fail.mockRestore();}
+      }
+      return row;
+    };
+    sessions.hook('reading',onRead);
+    try {await expect(stage.append(cap,frame,{signal:controller.signal})).resolves.toEqual({nextSeq:1});}
+    finally {sessions.hook('reading').unsubscribe(onRead);}
+    expect(abortFailed).toBe(true);
+    expect(await db.table('stageFrames').count()).toBe(1);
+    expect(await stage.status(cap)).toEqual({state:'open',nextSeq:1});
+    await expect(stage.append(cap,frame)).resolves.toEqual({nextSeq:1});
+  });
   it('cancels a seal queued behind a database lock without sealing the session',async()=>{
     const {db,stage,begin}=setup(),cap=await begin(),peer=new MaterialDatabase(db.name);databases.push(peer);await peer.open();
     let release!:()=>void,entered!:()=>void;
@@ -207,6 +228,19 @@ describe('material staging stored metadata boundaries',()=>{
     try {await expect(stage.resume(cap,{signal:controller.signal})).rejects.toThrow('cancelled');}
     finally {spy.mockRestore();}
     expect(await db.table('stageSessions').count()).toBe(1);
+    await vi.waitFor(async()=>expect(await stage.resume(cap)).toBeUndefined());
+    expect(await stage.status(cap)).toEqual({state:'open',nextSeq:0});
+  });
+  it('rejects a resume cancelled after its read settles but before authentication continues',async()=>{
+    const {db,stage,begin}=setup(),cap=await begin(),controller=new AbortController();
+    const remove=controller.signal.removeEventListener.bind(controller.signal);let scheduled=false;
+    const spy=vi.spyOn(controller.signal,'removeEventListener').mockImplementation(((...args:Parameters<AbortSignal['removeEventListener']>)=>{
+      remove(...args);
+      if(!scheduled&&args[0]==='abort'){scheduled=true;queueMicrotask(()=>controller.abort());}
+    }) as AbortSignal['removeEventListener']);
+    try {await expect(stage.resume(cap,{signal:controller.signal})).rejects.toThrow('cancelled');}
+    finally {spy.mockRestore();}
+    expect(scheduled).toBe(true);expect(await db.table('stageSessions').count()).toBe(1);
     await vi.waitFor(async()=>expect(await stage.resume(cap)).toBeUndefined());
     expect(await stage.status(cap)).toEqual({state:'open',nextSeq:0});
   });

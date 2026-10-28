@@ -3,11 +3,11 @@ import Dexie from 'dexie';
 import {afterEach,describe,expect,it,vi} from 'vitest';
 import {sha256} from '@noble/hashes/sha256';
 import {bytesToHex} from '@noble/hashes/utils';
-import {createStage,createImportCapability} from '@/src/features/vocabulary/materialImportStage';
+import {createStage} from '@/src/features/vocabulary/materialImportStage';
 import {MaterialDatabase,MaterialRepository} from '@/src/features/vocabulary/materialRepository';
 import {attachReadingStreamPort} from '@/src/features/reading-assistant/streamPort';
 import {createWritingHandler} from '@/src/features/writing-assistant/background';
-import {decodeWireFrame,makePortBridge,MAX_BASE64_LENGTH,MAX_FRAME_BYTES,PORT_NAME,type MaterialImportPort} from '@/src/features/vocabulary/materialImportPort';
+import {createMaterialImportCapability as createImportCapability,decodeWireFrame,makePortBridge,MAX_BASE64_LENGTH,MAX_FRAME_BYTES,PORT_NAME,snapshotMaterialImportCapability,type MaterialImportPort} from '@/src/features/vocabulary/materialImportPort';
 
 let serial=0;const dbs:MaterialDatabase[]=[];const names:string[]=[];
 const bridges:Array<ReturnType<typeof makePortBridge>>=[];
@@ -43,6 +43,127 @@ afterEach(async()=>{for(const bridge of bridges.splice(0))bridge.dispose();for(c
 const trustSender=(sender:any)=>{if(!sender?.url||sender.id!=='fixture')return false;try{const u=new URL(sender.url);return u.protocol==='chrome-extension:'&&u.host==='fixture'&&u.pathname==='/options.html';}catch{return false;}};
 
 describe('material stage Port bridge',()=>{
+  it('rejects non-object capability and frame payloads before accessing their fields',()=>{
+    for(const input of [null,undefined,[],42,'secret']){
+      expect(()=>snapshotMaterialImportCapability(input)).toThrow('invalid');
+      expect(()=>decodeWireFrame(input)).toThrow('invalid');
+    }
+  });
+  it('does not expose decoder failure details to the port caller',()=>{
+    const decode=vi.spyOn(globalThis,'atob').mockImplementation(()=>{throw Error('PRIVATE_DECODER_DETAILS');});
+    try {
+      expect(()=>decodeWireFrame({seq:0,record:0,part:0,total:1,recordBytes:1,base64:'AA=='})).toThrow('invalid');
+    } finally {decode.mockRestore();}
+  });
+  it('disconnects malformed begin envelopes without retaining the port',()=>{
+    const {bridge,port:initial}=harness();initial.disconnect();
+    const cap=createImportCapability(),manifest=emptyManifest(),guard={generation:0,capturedAt:100};
+    for(const fields of [
+      {capability:cap,manifest:null,guard,deadline:1000},
+      {capability:cap,manifest,guard:[],deadline:1000},
+      {capability:cap,manifest,guard,deadline:-1},
+      {capability:cap,manifest:{...manifest,digest:'short'},guard,deadline:1000},
+      {capability:cap,manifest,guard:{...guard,generation:NaN},deadline:1000},
+      {capability:cap,manifest,guard:{...guard,capturedAt:Infinity},deadline:1000},
+    ]){
+      const port=new MockPort('clone');expect(bridge.attach(port)).toBe(true);
+      port.emit({id:1,action:'begin',...fields});expect(port.disconnected).toBe(true);
+      expect(port.output).toHaveLength(0);expect(bridge.activePorts).toBe(0);
+    }
+  });
+  it('closes on a reused request id after a previous response',async()=>{
+    const {port,bridge}=harness();
+    expect(await port.request(1,{action:'status'})).toMatchObject({ok:false});
+    port.emit({id:1,action:'status'});expect(port.disconnected).toBe(true);
+    expect(port.output).toHaveLength(1);expect(bridge.activePorts).toBe(0);
+  });
+  it('rejects a second capability binding without losing the current session',async()=>{
+    const {port}=harness(),cap=createImportCapability();
+    expect(await port.request(1,{action:'begin',capability:cap,manifest:emptyManifest(),guard:{generation:0,capturedAt:100},deadline:1000})).toMatchObject({ok:true});
+    expect(await port.request(2,{action:'resume',capability:cap})).toMatchObject({ok:false});
+    expect(await port.request(3,{action:'status'})).toMatchObject({ok:true,data:{state:'open'}});
+    port.disconnect();
+  });
+  it('does not send a late begin response after disconnect; the capability remains recoverable',async()=>{
+    const {stage,port:initial}=harness();initial.disconnect();
+    const ready=deferred(),release=deferred(),cap=createImportCapability();
+    const wrapped={...stage,status:async(...args:Parameters<typeof stage.status>)=>{ready.resolve();await release.promise;return stage.status(...args);}};
+    const bridge=trackedBridge(wrapped,{isTrustedSender:trustSender,onCommitted:()=>{},isPrivateContext:()=>false});
+    const port=new MockPort();expect(bridge.attach(port)).toBe(true);
+    port.emit({id:1,action:'begin',capability:cap,manifest:emptyManifest(),guard:{generation:0,capturedAt:100},deadline:1000});
+    await ready.promise;port.disconnect();release.resolve();
+    await vi.waitFor(async()=>expect(await stage.status(cap)).toMatchObject({state:'open'}));
+    expect(port.output).toHaveLength(0);expect(bridge.activePorts).toBe(0);
+  });
+  it('rejects an unavailable privacy decision and survives an already-disconnected port',()=>{
+    const {stage,port:initial}=harness();initial.disconnect();
+    const bridge=trackedBridge(stage,{isTrustedSender:trustSender,onCommitted:()=>{},isPrivateContext:()=>{throw Error('unavailable');}});
+    const port=new MockPort();vi.spyOn(port,'disconnect').mockImplementation(()=>{throw Error('closed');});
+    expect(bridge.attach(port)).toBe(false);expect(bridge.activePorts).toBe(0);
+  });
+  it('frees port capacity and aborts requests even if the browser cannot remove listeners',async()=>{
+    const {bridge,port,stage}=harness(),started=deferred(),release=deferred();
+    const active=vi.spyOn(stage,'resume').mockImplementation(async()=>{started.resolve();await release.promise;});
+    vi.spyOn(port.onMessage,'removeListener').mockImplementation(()=>{throw Error('closed');});
+    vi.spyOn(port.onDisconnect,'removeListener').mockImplementation(()=>{throw Error('closed');});
+    port.emit({id:1,action:'resume',capability:createImportCapability()});await started.promise;
+    port.disconnect();port.onDisconnect.emit();expect(bridge.activePorts).toBe(0);release.resolve();
+    await Promise.resolve();port.onMessage.emit({id:2,action:'status'});
+    expect(port.output).toHaveLength(0);expect(active).toHaveBeenCalledOnce();
+  });
+  it('keeps a committed receipt bound after discard and releases it only on acknowledgement',async()=>{
+    const {port,stage}=harness(),cap=createImportCapability();
+    expect(await port.request(1,{action:'begin',capability:cap,manifest:emptyManifest(),guard:{generation:0,capturedAt:100},deadline:1000})).toMatchObject({ok:true});
+    expect(await port.request(2,{action:'seal'})).toMatchObject({ok:true});
+    expect(await port.request(3,{action:'commit'})).toMatchObject({ok:true});
+    expect(await port.request(4,{action:'discard'})).toMatchObject({ok:true,data:'committed'});
+    expect(await port.request(5,{action:'status'})).toMatchObject({ok:true,data:{state:'committed'}});
+    expect(await port.request(6,{action:'acknowledge'})).toMatchObject({ok:true});
+    expect(await port.request(7,{action:'status'})).toMatchObject({ok:false});
+    expect(await stage.acknowledge(cap)).toBe('released-or-unavailable');port.disconnect();
+  });
+  it('unbinds a discarded session and prevents later operations from reviving it',async()=>{
+    const {port,stage}=harness(),cap=createImportCapability();
+    expect(await port.request(1,{action:'begin',capability:cap,manifest:emptyManifest(),guard:{generation:0,capturedAt:100},deadline:1000})).toMatchObject({ok:true});
+    expect(await port.request(2,{action:'discard'})).toMatchObject({ok:true,data:'discarded'});
+    expect(await port.request(3,{action:'commit'})).toMatchObject({ok:false});
+    await expect(stage.resume(cap)).rejects.toThrow('session unavailable');port.disconnect();
+  });
+  it('releases its slot when disconnect itself throws after a protocol violation',()=>{
+    const {bridge,port}=harness();vi.spyOn(port,'disconnect').mockImplementation(()=>{throw Error('already closed');});
+    port.emit({id:1,action:'unknown'});expect(bridge.activePorts).toBe(0);expect(port.output).toHaveLength(0);
+  });
+  it.each(['onMessage','onDisconnect'] as const)('contains listener cleanup failure during %s registration',which=>{
+    const {stage,port:initial}=harness();initial.disconnect();
+    const bridge=trackedBridge(stage,{isTrustedSender:trustSender,onCommitted:()=>{},isPrivateContext:()=>false,maxPorts:1});
+    const port=new MockPort(),hub=port[which] as EventHub<(value:unknown)=>void>,add=hub.addListener;
+    vi.spyOn(hub,'addListener').mockImplementation(listener=>{add(listener);throw Error('registration failure');});
+    vi.spyOn(port.onMessage,'removeListener').mockImplementation(()=>{throw Error('closed');});
+    vi.spyOn(port.onDisconnect,'removeListener').mockImplementation(()=>{throw Error('closed');});
+    expect(bridge.attach(port)).toBe(false);expect(bridge.activePorts).toBe(0);
+    const next=new MockPort();expect(bridge.attach(next)).toBe(true);next.disconnect();
+  });
+  it.each(['onMessage','onDisconnect'] as const)('releases the port when disconnect and listener cleanup race during %s registration',which=>{
+    const {stage,port:initial}=harness();initial.disconnect();
+    const bridge=trackedBridge(stage,{isTrustedSender:trustSender,onCommitted:()=>{},isPrivateContext:()=>false,maxPorts:1});
+    const port=new MockPort(),hub=port[which] as EventHub<(value:unknown)=>void>,add=hub.addListener;
+    vi.spyOn(hub,'addListener').mockImplementation(listener=>{
+      if(which==='onDisconnect')listener(undefined);else port.disconnect();
+      add(listener);
+    });
+    vi.spyOn(hub,'removeListener').mockImplementation(()=>{throw Error('already removed');});
+    expect(bridge.attach(port)).toBe(false);expect(bridge.activePorts).toBe(0);
+    port.onMessage.emit({id:1,action:'status'});expect(port.output).toHaveLength(0);
+    const next=new MockPort();expect(bridge.attach(next)).toBe(true);next.disconnect();
+  });
+  it('contains a throwing message id accessor and disconnects without a response',()=>{
+    const {port,bridge}=harness();
+    // A browser port normally serializes messages; this also checks the
+    // injected-port boundary used by non-browser adapters.
+    const hostile=Object.defineProperty({},'id',{get(){throw Error('PRIVATE_VALUE');}});
+    expect(()=>port.onMessage.emit(hostile)).not.toThrow();
+    expect(port.disconnected).toBe(true);expect(port.output).toHaveLength(0);expect(bridge.activePorts).toBe(0);
+  });
   it('attaches the same live Port only once without interrupting it',async()=>{
     const {bridge,port}=harness();
     expect(bridge.attach(port)).toBe(true);expect(bridge.activePorts).toBe(1);
@@ -351,5 +472,52 @@ describe('material import Port client',()=>{
     const {createMaterialImportPortClient,MaterialImportPortDisconnectedError}=await import('@/src/features/vocabulary/materialImportPortClient');
     const port=new ClientPort();vi.spyOn(port,'postMessage').mockImplementation(()=>{throw Error('sensitive');});const client=createMaterialImportPortClient(port);
     await expect(client.commit()).rejects.toBeInstanceOf(MaterialImportPortDisconnectedError);expect(port.closed).toBe(true);expect(port.postMessage).toHaveBeenCalledOnce();
+  });
+  it('rejects empty or non-byte frames without sending a message',async()=>{
+    const {createMaterialImportPortClient}=await import('@/src/features/vocabulary/materialImportPortClient');
+    const port=new ClientPort(),client=createMaterialImportPortClient(port);
+    const frame={seq:0,record:0,part:0,total:1,recordBytes:1};
+    await expect(client.append({...frame,bytes:new Uint8Array()})).rejects.toThrow('材料恢复分片无效');
+    await expect(client.append({...frame,bytes:'not bytes'} as unknown as Parameters<typeof client.append>[0])).rejects.toThrow('材料恢复分片无效');
+    expect(port.sent).toHaveLength(0);client.close();
+  });
+  it.each([null,[],false,'bad'])('closes on malformed response %s without hanging the pending request',async value=>{
+    const {createMaterialImportPortClient,MaterialImportPortDisconnectedError}=await import('@/src/features/vocabulary/materialImportPortClient');
+    const port=new ClientPort(),client=createMaterialImportPortClient(port),pending=client.commit();
+    port.onMessage.emit(value);await expect(pending).rejects.toBeInstanceOf(MaterialImportPortDisconnectedError);
+    expect(port.closed).toBe(true);expect(port.onDisconnect.listeners.size).toBe(0);
+  });
+  it('continues rejecting pending work when the disconnect listener is already unavailable',async()=>{
+    const {createMaterialImportPortClient,MaterialImportPortDisconnectedError}=await import('@/src/features/vocabulary/materialImportPortClient');
+    const port=new ClientPort(),client=createMaterialImportPortClient(port),pending=client.commit();
+    vi.spyOn(port.onDisconnect,'removeListener').mockImplementation(()=>{throw Error('closed');});
+    port.disconnect();await expect(pending).rejects.toBeInstanceOf(MaterialImportPortDisconnectedError);
+    expect(port.onMessage.listeners.size).toBe(0);
+  });
+  it('ignores a late response after close even if listener removal failed',async()=>{
+    const {createMaterialImportPortClient,MaterialImportPortDisconnectedError}=await import('@/src/features/vocabulary/materialImportPortClient');
+    const port=new ClientPort(),client=createMaterialImportPortClient(port),pending=client.commit();
+    vi.spyOn(port.onMessage,'removeListener').mockImplementation(()=>{throw Error('closed');});
+    port.disconnect();await expect(pending).rejects.toBeInstanceOf(MaterialImportPortDisconnectedError);
+    port.onMessage.emit({id:1,ok:true,data:{inserted:1}});
+    await expect(client.status()).rejects.toBeInstanceOf(MaterialImportPortDisconnectedError);
+  });
+  it('rejects an in-flight request when disconnect itself fails',async()=>{
+    const {createMaterialImportPortClient,MaterialImportPortDisconnectedError}=await import('@/src/features/vocabulary/materialImportPortClient');
+    const port=new ClientPort(),client=createMaterialImportPortClient(port),pending=client.commit();
+    vi.spyOn(port,'disconnect').mockImplementation(()=>{throw Error('already closed');});
+    client.close();await expect(pending).rejects.toBeInstanceOf(MaterialImportPortDisconnectedError);
+    expect(port.onMessage.listeners.size).toBe(0);expect(port.onDisconnect.listeners.size).toBe(0);
+  });
+  it('sends recovery, discard and acknowledgement over distinct client connections',async()=>{
+    const {createMaterialImportPortClient}=await import('@/src/features/vocabulary/materialImportPortClient');
+    const cap=createImportCapability(),port=new ClientPort(),client=createMaterialImportPortClient(port);
+    const resume=client.resume(cap);expect(port.sent).toEqual([{id:1,action:'resume',capability:cap}]);
+    port.onMessage.emit({id:1,ok:true,data:{state:'open',nextSeq:0}});expect(await resume).toEqual({state:'open',nextSeq:0});
+    const discard=client.discard();port.onMessage.emit({id:2,ok:true,data:'discarded'});expect(await discard).toBe('discarded');
+    client.close();
+    const other=new ClientPort(),recovered=createMaterialImportPortClient(other);
+    const acknowledgement=recovered.acknowledge();expect(other.sent).toEqual([{id:1,action:'acknowledge'}]);
+    other.onMessage.emit({id:1,ok:true,data:'released-or-unavailable'});expect(await acknowledgement).toBe('released-or-unavailable');recovered.close();
   });
 });

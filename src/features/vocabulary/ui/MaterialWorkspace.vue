@@ -103,7 +103,7 @@ import type { HarnessSession } from '@/src/services/harness/sessionTypes';
 import type { VocabularyEntry } from '../learningModel';
 import { VOCABULARY_BOOK_MESSAGE, type VocabularyBookResponse } from '../protocol';
 import type { MaterialRecord, MaterialReference } from '../materialProtocol';
-import { MATERIAL_BACKUP_MAX_BYTES, MATERIAL_CHANGED_MESSAGE } from '../materialProtocol';
+import { MATERIAL_INLINE_BACKUP_MAX_BYTES, MATERIAL_CHANGED_MESSAGE } from '../materialProtocol';
 import { materialList, materialCapture, materialUpdate, materialArchive, materialRestore, materialRemoveReference, materialClear, materialExport, materialImport, materialGeneration } from '../materialClient';
 import {restoreLargeMaterialBackup, queryMaterialBackup, acknowledgeMaterialBackup, discardMaterialBackup} from '../materialBackupRestore';
 import type {Capability} from '../materialImportStage';
@@ -485,7 +485,7 @@ async function exportMaterials() {
             return;
         const bytes = downloadTextFile(`fluentread-materials-${new Date().toISOString().slice(0, 10)}.json`, JSON.stringify(data, null, 2), 'application/json');
         feedback.value = '材料备份已导出，包含来源、原句与个人笔记，请妥善保存。';
-        if (bytes > MATERIAL_BACKUP_MAX_BYTES)
+        if (bytes > MATERIAL_INLINE_BACKUP_MAX_BYTES)
             backupWarning.value = '备份较大，恢复可能受设备空间和单份材料大小限制。请保留现有材料并妥善保存备份文件。';
     }
     catch (failure) {
@@ -508,7 +508,7 @@ async function importMaterials(event: Event) {
     loading.value = false;
     error.value = '';
     const capturedAt = Date.now();
-    const controller = file.size > MATERIAL_BACKUP_MAX_BYTES ? new AbortController() : undefined;
+    const controller = file.size > MATERIAL_INLINE_BACKUP_MAX_BYTES ? new AbortController() : undefined;
     let committed = false;
     if (controller) {backupController = controller; largeRestoreRunning.value = true;}
     try {

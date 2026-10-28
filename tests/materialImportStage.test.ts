@@ -5,12 +5,18 @@ import {MaterialDatabase, MaterialRepository} from '@/src/features/vocabulary/ma
 import {sha256} from '@noble/hashes/sha256';
 import {bytesToHex} from '@noble/hashes/utils';
 import {createStage as createProductStage, type Capability, type Frame, type Manifest} from '@/src/features/vocabulary/materialImportStage';
+import {createMaterialImportCapability} from '@/src/features/vocabulary/materialImportPort';
+import type {MaterialOperationGuard} from '@/src/features/vocabulary/materialProtocol';
 
 let serial=0;
 const names=new Set<string>(), open:Dexie[]=[];
 const opts={frameBytes:128,recordBytes:1024*1024,totalBytes:2*1024*1024,frameCount:10000,totalFrames:10000,slots:256,inflight:8,ttlMs:1000,receiptTtlMs:10000};
 function createStage(db:MaterialDatabase, options:Parameters<typeof createProductStage>[1]={}) {
-  return {...createProductStage(db,options), frames:db.table<any,[string,number]>('stageFrames'), sessions:db.table<any,string>('stageSessions'), receipts:db.table<any,string>('stageReceipts'), budgets:db.table<any,string>('stageBudget'), limits:{...opts,...options.limits}};
+  const stage=createProductStage(db,options), clock=options.clock??Date.now, ttl=options.limits?.ttlMs??30*60*1000;
+  // 测试便捷入口仍走实际的可恢复协议；能力在发送之前由调用方创建。
+  const begin=(manifest:Manifest,guard:MaterialOperationGuard,request:{signal?:AbortSignal}={})=>
+    stage.beginRecoverable(manifest,guard,createMaterialImportCapability(),{deadline:clock()+Math.min(ttl,5*60*1000),signal:request.signal});
+  return {...stage,begin,frames:db.table<any,[string,number]>('stageFrames'),sessions:db.table<any,string>('stageSessions'),receipts:db.table<any,string>('stageReceipts'),budgets:db.table<any,string>('stageBudget'),limits:{...opts,...options.limits}};
 }
 const lengthBytes=(n:number)=>new Uint8Array([(n>>>24)&255,(n>>>16)&255,(n>>>8)&255,n&255]);
 function frameRecords(records:unknown[], frameBytes:number):{manifest:Manifest;frames:Frame[]}{
@@ -141,6 +147,16 @@ describe('committed material change notifications',()=>{
     const next=await upload(target.stage,[await material('notify-next')]);await target.stage.seal(next.token);await target.stage.commit(next.token);
     expect(local).toHaveBeenCalledOnce();expect(other).toHaveBeenCalledOnce();
   });
+  it('honors observer removal during notification and refuses non-function subscribers',async()=>{
+    const target=instance(),called=vi.fn();let stopSecond=()=>{};
+    expect(()=>target.stage.observeCommitted(null as never)).toThrow('commit observer must be a function');
+    const stopFirst=target.stage.observeCommitted(()=>stopSecond());
+    stopSecond=target.stage.observeCommitted(called);
+    try {
+      const {token}=await upload(target.stage,[]);await target.stage.seal(token);await target.stage.commit(token);
+      expect(called).not.toHaveBeenCalled();
+    } finally {stopFirst();stopSecond();}
+  });
   it('does not notify a rolled-back transaction and isolates observer failures from successful commits',async()=>{
     const target=instance(),successful=vi.fn(),warn=vi.spyOn(console,'warn').mockImplementation(()=>{});
     const stopBad=target.stage.observeCommitted(()=>{throw Error('private observer details');});
@@ -197,6 +213,191 @@ describe('committed material change notifications',()=>{
 });
 
 describe('isolated same-database material staging',()=>{
+  it.each([0,-1,0.5,NaN,Infinity,257,Number.MAX_SAFE_INTEGER+1])('rejects invalid resource limits before opening a receiver: %s',value=>{
+    const target=instance();
+    expect(()=>createProductStage(target.db,{limits:{slots:value}})).toThrow('invalid limits');
+  });
+  it.each([undefined,null,[],1,'not-a-manifest'])('rejects invalid recovery manifest shapes: %s',async value=>{
+    const target=instance(),cap=createMaterialImportCapability();
+    await expect(target.stage.beginRecoverable(value as never,{generation:0,capturedAt:100},cap,{deadline:500})).rejects.toThrow('invalid manifest');
+    expect(await target.stage.sessions.count()).toBe(0);
+  });
+  it.each([
+    {reserved:NaN,reservedFrames:0,slots:0},
+    {reserved:0,reservedFrames:Infinity,slots:0},
+    {reserved:0,reservedFrames:0,slots:-1},
+    {reserved:0,reservedFrames:0,slots:0.5},
+    {reserved:0,reservedFrames:Number.MAX_SAFE_INTEGER+1,slots:0},
+    {reserved:'not-a-number',reservedFrames:0,slots:0},
+  ])('rejects a corrupted shared budget before reserving another import: %o',async values=>{
+    const target=instance(),manifest=frameRecords([],opts.frameBytes).manifest;
+    await target.stage.budgets.put({key:'stage',...values});
+    const capability={id:'00000000-0000-4000-8000-000000000000',token:'a'.repeat(64)};
+    await expect(target.stage.beginRecoverable(manifest,{generation:0,capturedAt:100},capability,{deadline:500})).rejects.toThrow('budget corruption');
+    expect(await target.stage.sessions.count()).toBe(0);
+  });
+  it('rejects an orphaned safe-integer budget instead of reserving against it',async()=>{
+    const target=instance({now:100},{limits:{...opts,totalBytes:Number.MAX_SAFE_INTEGER}});
+    await target.stage.budgets.put({key:'stage',reserved:Number.MAX_SAFE_INTEGER,reservedFrames:0,slots:0});
+    const input=frameRecords([{}],opts.frameBytes);
+    await expect(target.stage.begin(input.manifest,{generation:0,capturedAt:100})).rejects.toThrow('budget corruption');
+    expect(await target.stage.sessions.count()).toBe(0);
+    expect((await target.stage.budgets.get('stage')).reserved).toBe(Number.MAX_SAFE_INTEGER);
+  });
+  it.each(['missing','zero','undercounted'] as const)('rejects %s budget rows across independent connections without creating a second session',async kind=>{
+    const target=instance({now:100},{limits:{...opts,totalBytes:2}}),input=frameRecords([{}],opts.frameBytes);
+    expect(input.manifest.bytes).toBe(2);
+    const first=await target.stage.begin(input.manifest,{generation:0,capturedAt:100});
+    if(kind==='missing')await target.stage.budgets.delete('stage');
+    else if(kind==='zero')await target.stage.budgets.put({key:'stage',reserved:0,reservedFrames:0,slots:0});
+    else await target.stage.budgets.put({key:'stage',reserved:1,reservedFrames:1,slots:1});
+    const db2=database(target.db.name);await db2.open();
+    const second=createStage(db2,{limits:{...opts,totalBytes:2},clock:()=>100});
+    await expect(second.begin(input.manifest,{generation:0,capturedAt:100})).rejects.toThrow('budget corruption');
+    expect(await target.stage.sessions.count()).toBe(1);expect((await target.stage.status(first)).state).toBe('open');
+    await target.repo.clear(101);expect(await target.stage.sessions.count()).toBe(0);
+  });
+  it('rejects undercounted receipt slots before starting a second recovery',async()=>{
+    const target=instance({now:100},{limits:{...opts,slots:2}}),empty=frameRecords([],opts.frameBytes).manifest;
+    const first=await target.stage.begin(empty,{generation:0,capturedAt:100});await target.stage.seal(first);await target.stage.commit(first);
+    await target.stage.budgets.put({key:'stage',reserved:0,reservedFrames:0,slots:0});
+    const db2=database(target.db.name);await db2.open();const second=createStage(db2,{limits:{...opts,slots:2},clock:()=>100});
+    await expect(second.begin(empty,{generation:0,capturedAt:100})).rejects.toThrow('budget corruption');
+    expect(await target.stage.sessions.count()).toBe(0);expect(await target.stage.receipts.count()).toBe(1);
+    await target.repo.clear(101);expect((await target.stage.budgets.get('stage')).slots).toBe(1);
+  });
+  it('serializes concurrent reservations from independent database connections',async()=>{
+    const target=instance({now:100},{limits:{...opts,totalBytes:2}}),input=frameRecords([{}],opts.frameBytes);
+    const otherDb=database(target.db.name);await otherDb.open();
+    const other=createStage(otherDb,{limits:{...opts,totalBytes:2},clock:()=>100});
+    const guard={generation:0,capturedAt:100};
+    const outcomes=await Promise.allSettled([target.stage.begin(input.manifest,guard),other.begin(input.manifest,guard)]);
+    expect(outcomes.filter(item=>item.status==='fulfilled')).toHaveLength(1);
+    expect(outcomes.filter(item=>item.status==='rejected')).toHaveLength(1);
+    expect(await target.stage.sessions.count()).toBe(1);
+    expect(await target.stage.budgets.get('stage')).toMatchObject({reserved:2,reservedFrames:1,slots:1});
+  });
+  it('rejects an unbounded corrupted session table before iterating metadata and allows explicit clear',async()=>{
+    const target=instance(),rows=Array.from({length:257},(_,i)=>({id:`damaged-${i}`,bytes:0,frames:0,expiresAt:1000}));
+    await target.stage.sessions.bulkPut(rows);await target.stage.budgets.put({key:'stage',reserved:0,reservedFrames:0,slots:257});
+    const read=vi.fn((value:unknown)=>value);target.stage.sessions.hook('reading',read);
+    try {await expect(target.stage.cleanup()).rejects.toThrow('budget corruption');expect(read).not.toHaveBeenCalled();}
+    finally {target.stage.sessions.hook('reading').unsubscribe(read);}
+    expect(await target.stage.sessions.count()).toBe(257);
+    await target.repo.clear(101);expect(await target.stage.sessions.count()).toBe(0);
+  });
+  it.each([NaN,undefined,-1,1.5])('removes only uncommitted sessions with an invalid expiration: %s',async expiry=>{
+    const target=instance(),input=frameRecords([{}],opts.frameBytes);
+    const bad=await target.stage.begin(input.manifest,{generation:0,capturedAt:100});
+    await target.stage.append(bad,input.frames[0]);
+    const good=await target.stage.begin(input.manifest,{generation:0,capturedAt:100});
+    const empty=frameRecords([],opts.frameBytes).manifest,done=await target.stage.begin(empty,{generation:0,capturedAt:100});
+    await target.stage.seal(done);const result=await target.stage.commit(done);
+    await target.stage.sessions.update(bad.id,{expiresAt:expiry});
+    await expect(target.stage.status(bad)).rejects.toThrow('invalid expiry');
+    target.clock.now=150;
+    expect(await target.stage.cleanup()).toEqual({sessions:1,receipts:0,corruptSessions:1});
+    expect(await target.stage.frames.count()).toBe(0);
+    expect(await target.stage.status(good)).toEqual({state:'open',nextSeq:0});
+    expect(await target.stage.status(done)).toEqual({state:'committed',result});
+    expect(await target.stage.budgets.get('stage')).toMatchObject({reserved:input.manifest.bytes,reservedFrames:input.manifest.frames,slots:2});
+  });
+  it.each([NaN,undefined,-1,1.5])('does not trust or delete a committed receipt with an invalid expiration: %s',async expiry=>{
+    const target=instance(),empty=frameRecords([],opts.frameBytes).manifest;
+    const cap=await target.stage.begin(empty,{generation:0,capturedAt:100});await target.stage.seal(cap);await target.stage.commit(cap);
+    await target.stage.receipts.update(cap.id,{expiresAt:expiry});
+    await expect(target.stage.status(cap)).rejects.toThrow('invalid expiry');
+    await expect(target.stage.acknowledge(cap)).rejects.toThrow('invalid expiry');
+    target.clock.now+=opts.receiptTtlMs;
+    expect(await target.stage.cleanup()).toEqual({sessions:0,receipts:0,corruptReceipts:1});
+    expect(await target.stage.receipts.count()).toBe(1);expect((await target.stage.budgets.get('stage')).slots).toBe(1);
+  });
+  it.each([NaN,undefined,-1,1.5])('retains and reports an invalid start tombstone instead of allowing replay: %s',async expiry=>{
+    const target=instance(),empty=frameRecords([],opts.frameBytes).manifest,guard={generation:0,capturedAt:100};
+    const cap=await target.stage.begin(empty,guard);await target.stage.discard(cap);
+    await target.db.table('stageStarts').update(cap.id,{expiresAt:expiry});
+    expect(await target.stage.cleanup()).toEqual({sessions:0,receipts:0,corruptStarts:1});
+    expect(await target.db.table('stageStarts').get(cap.id)).toBeDefined();
+    await expect(target.stage.beginRecoverable(empty,guard,cap,{deadline:1000})).rejects.toThrow('invalid expiry');
+  });
+  it('rolls back a commit and expiry cleanup when a shared budget is corrupted, then clears private data safely',async()=>{
+    const target=instance(),{token,input}=await upload(target.stage,[await material('corrupt-budget')]);
+    await target.stage.seal(token);
+    await target.stage.budgets.update('stage',{reserved:NaN});
+    await expect(target.stage.commit(token)).rejects.toThrow('budget corruption');
+    expect(await target.db.materials.count()).toBe(0);expect(await target.stage.receipts.count()).toBe(0);
+    expect(await target.stage.frames.count()).toBe(input.frames.length);expect((await target.stage.status(token)).state).toBe('sealed');
+    target.clock.now+=opts.ttlMs;
+    await expect(target.stage.cleanup()).rejects.toThrow('budget corruption');
+    expect(await target.stage.frames.count()).toBe(input.frames.length);expect(await target.stage.sessions.count()).toBe(1);
+    await target.repo.clear(target.clock.now);
+    expect(await target.stage.frames.count()).toBe(0);expect(await target.stage.sessions.count()).toBe(0);
+    expect(await target.stage.budgets.get('stage')).toBeUndefined();
+  });
+  it('refuses to release corrupted session or receipt counts and preserves all staged data',async()=>{
+    const target=instance(),first=await upload(target.stage,[await material('corrupt-session')]);
+    await target.stage.sessions.update(first.token.id,{bytes:-1});
+    await expect(target.stage.discard(first.token)).rejects.toThrow('budget corruption');
+    expect(await target.stage.frames.count()).toBe(first.input.frames.length);
+    expect(await target.stage.sessions.count()).toBe(1);
+    target.clock.now+=opts.ttlMs;
+    await expect(target.stage.cleanup()).rejects.toThrow('budget corruption');
+    expect(await target.stage.frames.count()).toBe(first.input.frames.length);
+    await target.repo.clear(target.clock.now);
+
+    target.clock.now++;
+    const empty=frameRecords([],opts.frameBytes).manifest;
+    const committed=await target.stage.begin(empty,{generation:1,capturedAt:target.clock.now});
+    await target.stage.seal(committed);await target.stage.commit(committed);
+    await target.stage.budgets.update('stage',{slots:0});
+    await expect(target.stage.acknowledge(committed)).rejects.toThrow('budget corruption');
+    expect(await target.stage.receipts.count()).toBe(1);
+    target.clock.now+=opts.receiptTtlMs;
+    await expect(target.stage.cleanup()).rejects.toThrow('budget corruption');
+    expect(await target.stage.receipts.count()).toBe(1);
+    await target.repo.clear(target.clock.now);
+    expect((await target.stage.budgets.get('stage')).slots).toBe(1);
+    expect(await target.stage.cleanup()).toEqual({sessions:0,receipts:1});
+  });
+  it('allows an older reservation above a reduced limit to be discarded before accepting new work',async()=>{
+    const target=instance(),input=frameRecords([{}],opts.frameBytes);
+    const token=await target.stage.begin(input.manifest,{generation:0,capturedAt:100});
+    const smaller=createStage(target.db,{limits:{...opts,totalBytes:1},clock:()=>100});
+    await expect(smaller.begin(frameRecords([],opts.frameBytes).manifest,{generation:0,capturedAt:100})).rejects.toThrow('stage budget exceeded');
+    expect(await smaller.discard(token)).toBe('discarded');
+    const next=await smaller.begin(frameRecords([],opts.frameBytes).manifest,{generation:0,capturedAt:100});
+    expect(await smaller.discard(next)).toBe('discarded');
+  });
+  it('permits existing sessions to be released after the configured slot limit decreases',async()=>{
+    const clock={now:100},target=instance(clock,{limits:{...opts,slots:2}}),empty=frameRecords([],opts.frameBytes).manifest,guard={generation:0,capturedAt:100};
+    const a=await target.stage.begin(empty,guard),b=await target.stage.begin(empty,guard);
+    const smaller=createStage(target.db,{limits:{...opts,slots:1},clock:()=>clock.now});
+    await expect(smaller.begin(empty,guard)).rejects.toThrow('stage budget exceeded');
+    expect(await smaller.discard(a)).toBe('discarded');expect(await smaller.discard(b)).toBe('discarded');
+    expect((await smaller.budgets.get('stage')).slots).toBe(0);
+    clock.now+=opts.ttlMs;expect(await smaller.cleanup()).toEqual({sessions:0,receipts:0});
+    const next=await smaller.begin(empty,guard);expect(await smaller.discard(next)).toBe('discarded');
+  });
+  it('rejects pre-cancelled operations without reading payloads or starting database work',async()=>{
+    const target=instance(),input=frameRecords([{}],opts.frameBytes),token=await target.stage.begin(input.manifest,{generation:0,capturedAt:100});
+    const controller=new AbortController();controller.abort();
+    const transaction=vi.spyOn(target.db,'transaction');
+    const frame={...input.frames[0]};Object.defineProperty(frame,'bytes',{get(){throw Error('payload unexpectedly read');}});
+    const operations=[
+      ()=>target.stage.beginRecoverable(input.manifest,{generation:0,capturedAt:100},token,{deadline:500,signal:controller.signal}),
+      ()=>target.stage.resume(token,{signal:controller.signal}),
+      ()=>target.stage.append(token,frame,{signal:controller.signal}),
+      ()=>target.stage.seal(token,{signal:controller.signal}),
+      ()=>target.stage.status(token,{signal:controller.signal}),
+      ()=>target.stage.commit(token,{signal:controller.signal}),
+      ()=>target.stage.discard(token,{signal:controller.signal}),
+      ()=>target.stage.acknowledge(token,{signal:controller.signal}),
+      ()=>target.stage.cleanup({signal:controller.signal}),
+    ];
+    for(const operation of operations)await expect(operation()).rejects.toThrow('cancelled');
+    expect(transaction).not.toHaveBeenCalled();transaction.mockRestore();
+    expect(await target.stage.frames.count()).toBe(0);expect((await target.stage.status(token)).state).toBe('open');
+  });
   it('rejects record limits that do not fit the 32-bit digest length prefix',()=>{
     const target=instance(),max=0xffffffff;
     // The protocol's 4-byte prefix cannot distinguish these two lengths.
@@ -204,7 +405,7 @@ describe('isolated same-database material staging',()=>{
     expect(()=>createProductStage(target.db,{limits:{recordBytes:max}})).not.toThrow();
     expect(()=>createProductStage(target.db,{limits:{recordBytes:max+1}})).toThrow('invalid limits');
   });
-  it('rejects impossible manifests before either begin method reserves shared budget',async()=>{
+  it('rejects impossible manifests before reserving shared budget',async()=>{
     const target=instance({now:100},{limits:{...opts,recordBytes:256,totalBytes:4096}}),guard={generation:0,capturedAt:100};
     const cases=[
       {records:1,frames:1,bytes:129}, // a single frame cannot exceed its limit
@@ -215,7 +416,6 @@ describe('isolated same-database material staging',()=>{
     for(const input of cases){
       const manifest={...input,digest:'0'.repeat(64)};
       const cap={id:crypto.randomUUID(),token:bytesToHex(crypto.getRandomValues(new Uint8Array(32)))};
-      await expect(target.stage.begin(manifest,guard)).rejects.toThrow('invalid manifest');
       await expect(target.stage.beginRecoverable(manifest,guard,cap,{deadline:1000})).rejects.toThrow('invalid manifest');
     }
     expect(await target.stage.budgets.get('stage')).toBeUndefined();
@@ -227,10 +427,8 @@ describe('isolated same-database material staging',()=>{
     const cap={id:crypto.randomUUID(),token:bytesToHex(crypto.getRandomValues(new Uint8Array(32)))};
     // Two 5-byte records need four frames, not three.
     const impossible={records:2,frames:3,bytes:10,digest:'0'.repeat(64)};
-    await expect(target.stage.begin(impossible,guard)).rejects.toThrow('invalid manifest');
     await expect(target.stage.beginRecoverable(impossible,guard,cap,{deadline:1000})).rejects.toThrow('invalid manifest');
     const feasible={...impossible,bytes:9};
-    const session=await target.stage.begin(feasible,guard);await target.stage.discard(session);
     expect(await target.stage.beginRecoverable(feasible,guard,cap,{deadline:1000})).toEqual(cap);
     await target.stage.discard(cap);
   });
@@ -239,10 +437,8 @@ describe('isolated same-database material staging',()=>{
     const target=instance({now:100},{limits:{...opts,frameBytes:max,recordBytes:recordMax,totalBytes:max}});
     const cap={id:crypto.randomUUID(),token:bytesToHex(crypto.getRandomValues(new Uint8Array(32)))};
     const impossible={records:2,frames:2,bytes:recordMax*2+1,digest:'0'.repeat(64)};
-    await expect(target.stage.begin(impossible,guard)).rejects.toThrow('invalid manifest');
     await expect(target.stage.beginRecoverable(impossible,guard,cap,{deadline:1000})).rejects.toThrow('invalid manifest');
     const feasible={...impossible,bytes:recordMax*2};
-    const session=await target.stage.begin(feasible,guard);await target.stage.discard(session);
     expect(await target.stage.beginRecoverable(feasible,guard,cap,{deadline:1000})).toEqual(cap);
     await target.stage.discard(cap);
   });
@@ -251,7 +447,6 @@ describe('isolated same-database material staging',()=>{
     const cases=[{records:0,frames:0,bytes:0},{records:1,frames:2,bytes:256},{records:2,frames:3,bytes:3}];
     for(const input of cases){
       const manifest={...input,digest:'0'.repeat(64)};
-      const legacy=await target.stage.begin(manifest,guard);await target.stage.discard(legacy);
       const cap={id:crypto.randomUUID(),token:bytesToHex(crypto.getRandomValues(new Uint8Array(32)))};
       expect(await target.stage.beginRecoverable(manifest,guard,cap,{deadline:1000})).toEqual(cap);
       await target.stage.discard(cap);
@@ -279,7 +474,9 @@ describe('isolated same-database material staging',()=>{
     await target.stage.beginRecoverable(empty,guard,cap,{deadline:1000});
     const attempts=[{manifest:empty,guard,cap:{...cap,token:'0'.repeat(64)},deadline:1000},{manifest:{...empty,digest:'f'.repeat(64)},guard,cap,deadline:1000},{manifest:empty,guard:{...guard,capturedAt:101},cap,deadline:1000},{manifest:empty,guard:{...guard,generation:1},cap,deadline:1000},{manifest:empty,guard,cap,deadline:999}];
     for(const x of attempts)await expect(target.stage.beginRecoverable(x.manifest,x.guard,x.cap,{deadline:x.deadline})).rejects.toThrow('session unavailable');
-    const legacy=await target.stage.begin(empty,guard);await expect(target.stage.beginRecoverable(empty,guard,legacy,{deadline:1000})).rejects.toThrow('session unavailable');
+    const legacy=await target.stage.begin(empty,guard);
+    await target.db.table('stageStarts').delete(legacy.id); // 未记录开始请求的历史会话不得被覆盖。
+    await expect(target.stage.beginRecoverable(empty,guard,legacy,{deadline:1000})).rejects.toThrow('session unavailable');
     expect(await target.stage.sessions.count()).toBe(2);expect((await target.stage.budgets.get('stage'))?.slots).toBe(2);
   });
   it('retries a committed begin until acknowledgement, then prevents recreation until deadline',async()=>{
@@ -361,7 +558,7 @@ describe('isolated same-database material staging',()=>{
     expect(await starts.count()).toBe(0);expect(await target.stage.sessions.count()).toBe(0);expect((await target.stage.budgets.get('stage'))?.slots??0).toBe(0);
     expect(await target.stage.beginRecoverable(empty,guard,cap,{deadline:1000})).toEqual(cap);
   });
-  it('releases only acknowledged receipts so completed imports no longer exhaust slots',async()=>{
+  it('releases acknowledged receipt capacity while retaining start tombstones until expiry',async()=>{
     const target=instance({now:100},{limits:{...opts,slots:2}}),empty=frameRecords([],opts.frameBytes).manifest,guard={generation:0,capturedAt:100};
     const a=await target.stage.begin(empty,guard),b=await target.stage.begin(empty,guard);
     await target.stage.seal(a);await target.stage.seal(b);
@@ -371,6 +568,9 @@ describe('isolated same-database material staging',()=>{
     expect(await target.stage.acknowledge(a)).toBe('released-or-unavailable');
     expect(await target.stage.status(b)).toEqual({state:'committed',result});
     expect((await target.stage.budgets.get('stage'))?.slots).toBe(1);
+    // 已确认结果释放回执槽位，但开始请求的防重放记录必须保留至 deadline。
+    await expect(target.stage.begin(empty,guard)).rejects.toThrow('stage budget exceeded');
+    target.clock.now+=opts.ttlMs;expect(await target.stage.cleanup()).toEqual({sessions:0,receipts:0});
     expect(await target.stage.begin(empty,guard)).toEqual(expect.objectContaining({id:expect.any(String)}));
   });
   it('authenticates receipt release, refuses open sessions and leaves expired receipts for cleanup',async()=>{
@@ -400,6 +600,16 @@ describe('isolated same-database material staging',()=>{
     expect((await target.stage.budgets.get('stage'))?.slots).toBe(0);
     await expect(restarted.status(token)).rejects.toThrow('session unavailable');
     await expect(restarted.commit(token)).rejects.toThrow('session unavailable');
+  });
+  it('does not double-release a receipt acknowledged by a different runtime',async()=>{
+    const target=instance(),empty=frameRecords([],opts.frameBytes).manifest,token=await target.stage.begin(empty,{generation:0,capturedAt:100});
+    await target.stage.seal(token);await target.stage.commit(token);
+    vi.resetModules();const fresh=await import('@/src/features/vocabulary/materialImportStage');
+    const restarted=fresh.createStage(target.db,{limits:opts,clock:()=>100});
+    expect(await restarted.acknowledge(token)).toBe('released-or-unavailable');
+    // 原运行时仍可能缓存授权提示，但事务必须核实回执是否存在。
+    expect(await target.stage.acknowledge(token)).toBe('released-or-unavailable');
+    expect((await target.stage.budgets.get('stage'))?.slots).toBe(0);
   });
   it('rolls back both receipt deletion and slot release if the budget write fails',async()=>{
     const target=instance(),empty=frameRecords([],opts.frameBytes).manifest,token=await target.stage.begin(empty,{generation:0,capturedAt:100});
@@ -587,6 +797,41 @@ describe('isolated same-database material staging',()=>{
     await expect(target.stage.seal(bad)).rejects.toThrow('incomplete or corrupt backup');
     expect(await target.db.materials.count()).toBe(0);
   });
+  it('rolls back rejected multipart lengths so a valid retry can finish',async()=>{
+    const target=instance({now:100},{limits:{...opts,frameBytes:4}}),input=frameRecords([{a:1}],4);
+    const token=await target.stage.begin(input.manifest,{generation:0,capturedAt:100});
+    const [first,last]=input.frames;
+    expect(await target.stage.append(token,first)).toEqual({nextSeq:1});
+    await expect(target.stage.append(token,{...last,total:3})).rejects.toThrow('invalid frame length');
+    await expect(target.stage.append(token,{...last,recordBytes:6})).rejects.toThrow('invalid frame length');
+    await expect(target.stage.append(token,{...last,bytes:last.bytes.slice(0,2)})).rejects.toThrow('incomplete record');
+    expect(await target.stage.status(token)).toEqual({state:'open',nextSeq:1});
+    expect(await target.stage.frames.count()).toBe(1);
+    expect(await target.stage.append(token,last)).toEqual({nextSeq:2});
+    await target.stage.seal(token);
+    expect(await target.stage.commit(token)).toEqual({inserted:0,updated:0,skipped:1});
+  });
+  it('rejects multipart data exceeding the declared transfer budget and retains the first frame',async()=>{
+    const target=instance({now:100},{limits:{...opts,frameBytes:4}}),input=frameRecords([{a:1}],4);
+    const token=await target.stage.begin(input.manifest,{generation:0,capturedAt:100}),[first,last]=input.frames;
+    await target.stage.append(token,{...first,recordBytes:8});
+    await expect(target.stage.append(token,{...last,recordBytes:8,bytes:new Uint8Array(4)})).rejects.toThrow('invalid frame length');
+    expect(await target.stage.status(token)).toEqual({state:'open',nextSeq:1});
+    expect(await target.stage.frames.count()).toBe(1);
+    await target.stage.discard(token);
+    expect(await target.stage.frames.count()).toBe(0);
+    expect(await target.stage.budgets.get('stage')).toMatchObject({reserved:0,reservedFrames:0,slots:0});
+  });
+  it('rejects malformed frame payloads and treats repeated seal as idempotent',async()=>{
+    const target=instance(),input=frameRecords([{}],opts.frameBytes),cap=await target.stage.begin(input.manifest,{generation:0,capturedAt:100});
+    await expect(target.stage.append(cap,null as never)).rejects.toThrow('invalid frame');
+    await expect(target.stage.append(cap,{...input.frames[0],bytes:'{}' as never})).rejects.toThrow('invalid frame');
+    expect(await target.stage.frames.count()).toBe(0);
+    await target.stage.append(cap,input.frames[0]);await target.stage.seal(cap);
+    await expect(target.stage.seal(cap)).resolves.toBeUndefined();
+    await expect(target.stage.append(cap,input.frames[0])).rejects.toThrow('session sealed');
+    expect(await target.stage.commit(cap)).toEqual({inserted:0,updated:0,skipped:1});
+  });
   it('rechecks sealed frames during commit and rolls back all earlier writes on corruption',async()=>{
     const target=instance(),input=frameRecords([await material('alpha'),await material('bravo')],1024);
     const stage=createStage(target.db,{limits:{...opts,frameBytes:1024},clock:()=>target.clock.now});
@@ -600,6 +845,24 @@ describe('isolated same-database material staging',()=>{
     expect(await target.db.materials.count()).toBe(0);expect(await stage.receipts.count()).toBe(0);
     expect((await stage.status(token)).state).toBe('sealed');
   });
+  it.each(['missing-first','wrong-record','wrong-part','wrong-total','empty-frame','short-record'] as const)(
+    'rejects independently corrupted staged frames at seal: %s',async mutation=>{
+      const target=instance(),input=frameRecords([await material('tampered-frame')],opts.frameBytes);
+      expect(input.frames.length).toBeGreaterThan(1);
+      const token=await target.stage.begin(input.manifest,{generation:0,capturedAt:100});
+      for(const frame of input.frames)await target.stage.append(token,frame);
+      const first=await target.stage.frames.get([token.id,0]),last=await target.stage.frames.get([token.id,input.frames.length-1]);
+      if(mutation==='missing-first')await target.stage.frames.delete([token.id,0]);
+      else if(mutation==='wrong-record')await target.stage.frames.put({...first,record:1});
+      else if(mutation==='wrong-part')await target.stage.frames.put({...first,part:1});
+      else if(mutation==='wrong-total')await target.stage.frames.put({...first,total:0});
+      else if(mutation==='empty-frame')await target.stage.frames.put({...last,bytes:new Uint8Array(0)});
+      else await target.stage.frames.put({...last,bytes:last.bytes.slice(1)});
+      await expect(target.stage.seal(token)).rejects.toThrow();
+      expect(await target.db.materials.count()).toBe(0);expect(await target.stage.receipts.count()).toBe(0);
+      expect((await target.stage.status(token)).state).toBe('open');
+    },
+  );
   it('rolls back a mid-commit failure and cancellation, then allows retry of the sealed transfer',async()=>{
     const target=instance(),{token}=await upload(target.stage,[await material('alpha'),await material('bravo')]);await target.stage.seal(token);
     await expect(target.stage.commit(token,{onApplied:i=>{if(i===0)throw Error('injected failure');}})).rejects.toThrow('injected failure');
@@ -769,7 +1032,9 @@ describe('isolated same-database material staging',()=>{
     await stage.seal(a);await stage.commit(a);
     // A durable receipt continues to occupy a slot until its expiry.
     await expect(stage.begin(empty,guard)).rejects.toThrow('stage budget exceeded');
-    await stage.discard(b);const c=await stage.begin(empty,guard);
+    await stage.discard(b);await expect(stage.begin(empty,guard)).rejects.toThrow('stage budget exceeded');
+    clock.now+=opts.ttlMs;expect(await stage.cleanup()).toEqual({sessions:0,receipts:0});
+    const c=await stage.begin(empty,guard);
     expect((await stage.budgets.get('stage'))?.slots).toBe(2);
     clock.now+=opts.ttlMs;expect(await stage.cleanup()).toEqual({sessions:1,receipts:0});
     expect((await stage.budgets.get('stage'))?.slots).toBe(1);
@@ -913,12 +1178,24 @@ describe('adversarial admission and mutable caller input',()=>{
     await vi.waitFor(async()=>expect(await Dexie.ignoreTransaction(()=>target.stage.sessions.count())).toBe(0));
     expect(await Dexie.ignoreTransaction(()=>target.stage.budgets.get('stage'))).toBeUndefined();
   });
+  it('rejects a recoverable start whose deadline expires behind the database write lock',async()=>{
+    const clock={now:100},target=instance(clock),other=database(target.db.name);await other.open();
+    const hold=deferred(),ready=deferred(),manifest=frameRecords([],opts.frameBytes).manifest;
+    const cap=createMaterialImportCapability(),guard={generation:0,capturedAt:100};
+    const locking=other.transaction('rw',other.meta,async()=>{ready.resolve();await Dexie.waitFor(hold.promise);});await ready.promise;
+    const pending=Dexie.ignoreTransaction(()=>target.stage.beginRecoverable(manifest,guard,cap,{deadline:200}));
+    const rejected=expect(pending).rejects.toThrow('session unavailable');
+    clock.now=200;hold.resolve();await locking;
+    await rejected;
+    expect(await target.stage.sessions.count()).toBe(0);expect(await target.stage.budgets.get('stage')).toBeUndefined();
+    expect(await target.db.table('stageStarts').count()).toBe(0);
+  });
   it('starts a new session TTL when its blocked creation actually reaches storage',async()=>{
     const clock={now:100},target=instance(clock),manifest=frameRecords([],opts.frameBytes).manifest,other=database(target.db.name);await other.open();
     const hold=deferred(),ready=deferred();
     const locking=other.transaction('rw',other.meta,async()=>{ready.resolve();await Dexie.waitFor(hold.promise);});await ready.promise;
     const pending=Dexie.ignoreTransaction(()=>target.stage.begin(manifest,{generation:0,capturedAt:100}));
-    clock.now+=opts.ttlMs+1;hold.resolve();await locking;
+    clock.now+=Math.floor(opts.ttlMs/2);hold.resolve();await locking;
     const token=await pending;
     expect(await Dexie.ignoreTransaction(()=>target.stage.status(token))).toEqual({state:'open',nextSeq:0});
     expect((await Dexie.ignoreTransaction(()=>target.stage.sessions.get(token.id))).expiresAt).toBe(clock.now+opts.ttlMs);
@@ -936,30 +1213,6 @@ describe('adversarial admission and mutable caller input',()=>{
     await expect(target.stage.begin(manifest,{generation:0,capturedAt:100})).rejects.toThrow('backpressure');
     first.resolve();second.resolve();
     await vi.waitFor(async()=>{const cap=await target.stage.begin(manifest,{generation:0,capturedAt:100});await target.stage.discard(cap);});
-  });
-  it('removes a committed but undelivered begin after cancellation wins the acknowledgement race',async()=>{
-    const target=instance(), manifest=frameRecords([],opts.frameBytes).manifest, controller=new AbortController();
-    const original=target.db.transaction.bind(target.db) as (...args:any[])=>Promise<unknown>;
-    vi.spyOn(target.db,'transaction').mockImplementationOnce(((...args:any[])=>Promise.resolve(original(...args)).then(value=>{controller.abort();return value;})) as never);
-    await expect(target.stage.begin(manifest,{generation:0,capturedAt:100},{signal:controller.signal})).rejects.toThrow('cancelled');
-    await vi.waitFor(async()=>expect(await target.stage.sessions.count()).toBe(0));
-    expect(await target.stage.budgets.get('stage')).toMatchObject({reserved:0,reservedFrames:0,slots:0});
-  });
-  it('reports failed abandoned-session cleanup and allows later TTL recovery',async()=>{
-    const clock={now:100},target=instance(clock), manifest=frameRecords([],opts.frameBytes).manifest, controller=new AbortController();
-    const fail=()=>{throw new DOMException('simulated quota','QuotaExceededError');};
-    target.stage.sessions.hook('deleting',fail);
-    const warn=vi.spyOn(console,'warn').mockImplementation(()=>{});
-    const original=target.db.transaction.bind(target.db) as (...args:any[])=>Promise<unknown>;
-    vi.spyOn(target.db,'transaction').mockImplementationOnce(((...args:any[])=>Promise.resolve(original(...args)).then(value=>{controller.abort();return value;})) as never);
-    try{
-      await expect(target.stage.begin(manifest,{generation:0,capturedAt:100},{signal:controller.signal})).rejects.toThrow('cancelled');
-      await vi.waitFor(()=>expect(warn).toHaveBeenCalledWith('[FluentRead] Abandoned material import cleanup failed; the session requires expiry cleanup.'));
-      expect(await target.stage.sessions.count()).toBe(1);
-      target.stage.sessions.hook('deleting').unsubscribe(fail);clock.now+=opts.ttlMs;
-      expect(await target.stage.cleanup()).toEqual({sessions:1,receipts:0});
-      expect(await target.stage.sessions.count()).toBe(0);
-    }finally{target.stage.sessions.hook('deleting').unsubscribe(fail);warn.mockRestore();}
   });
   it('keeps admitted operations separate from saturated cold authentication',async()=>{
     const target=instance({now:100},{limits:{...opts,inflight:2}}),manifest=frameRecords([],opts.frameBytes).manifest;

@@ -82,7 +82,7 @@ class Lexer {
         case 'expdigits': if (isDigit(byte)) next = 'expdigits'; break;
       }
       if (next) {this.num = next; this.capture(byte); return;}
-      if (!['zero', 'int', 'frac', 'expdigits'].includes(this.num)) invalid();
+      // 未完成的数字状态已在上面的状态转换中直接拒绝当前字节。
       this.token('number', at); this.byte(byte, at); return;
     }
     if (this.mode === 'literal') {
@@ -129,7 +129,7 @@ class Lexer {
 
 const scalar = (token: Token): Metadata => {
   if (!token.raw) return {oversize: true, type: token.type, start: token.start, end: token.end};
-  try {return {value: JSON.parse(utf8Decoder().decode(Uint8Array.from(token.raw)))};} catch {return invalid();}
+  return {value: JSON.parse(utf8Decoder().decode(Uint8Array.from(token.raw)))};
 };
 
 type CollectedRecord = {start: number; end?: number; hash?: ReturnType<typeof hash>; decoder: TextDecoder; length: number; digest?: string; complete: boolean};
@@ -153,7 +153,8 @@ class RecordCollector {
     for (const row of this.pending) {
       const start = Math.max(at, row.start), stop = Math.min(end, row.end ?? end);
       if (stop > start) {const text = row.decoder.decode(bytes.subarray(start - at, stop - at), {stream: true}); if (text) {const encoded = this.encoder.encode(text); row.hash?.update(encoded); row.length += encoded.length;}}
-      if (row.end !== undefined && row.end <= end) {const text = row.decoder.decode(); if (text) {const encoded = this.encoder.encode(text); row.hash?.update(encoded); row.length += encoded.length;} if (row.hash) row.digest = bytesToHex(row.hash.digest()); row.complete = true;}
+      // JSON 记录结束字节始终为 ASCII；不完整 UTF-8 已在遇到该字节时替换。
+      if (row.end !== undefined && row.end <= end) {if (row.hash) row.digest = bytesToHex(row.hash.digest()); row.complete = true;}
       if (!Number.isSafeInteger(row.length) || row.length > this.maxLength) throw capacityError('材料记录超过恢复大小限制');
     }
     this.pending = this.pending.filter(row => !row.complete);
@@ -213,9 +214,8 @@ class Parser {
     }
   }
   private close(t: Token) {
-    const top = this.stack.at(-1);
-    if (!top || (t.type === '}' ? top.kind !== 'object' : top.kind !== 'array')) return invalid();
-    this.stack.pop();
+    // 只有 token() 验证了栈顶种类和结束符之后才会调用。
+    const top = this.stack.pop()!;
     if (top.recordStart !== undefined) {if (this.recordCount <= MAX_RECORDS) this.records.push({start: top.recordStart, end: t.end}); this.collector.end(t.end);}
     if (top.isRoot) this.root = 'done';
   }
@@ -279,7 +279,6 @@ async function inspect(blob: Blob, signal?: AbortSignal): Promise<SourcePlan> {
   if (collector.incomplete || collector.values.length !== records.length) throw Error('材料记录不完整');
   return {records: records.map((record, index) => {
     const row = collector.values[index];
-    if (!row.complete) throw Error('材料记录不完整');
     return {...record, length: row.length};
   }), fileDigest: bytesToHex(sourceHash.digest()), size: blob.size};
 }
@@ -287,12 +286,11 @@ async function inspect(blob: Blob, signal?: AbortSignal): Promise<SourcePlan> {
 type Visitor = {start(index: number): void | Promise<void>; chunk(bytes: Uint8Array, index: number): void | Promise<void>; end(index: number): void | Promise<void>};
 async function traverse(blob: Blob, input: SourcePlan, visitor: Visitor, signal?: AbortSignal): Promise<void> {
   check(signal);
-  if (!input || !Array.isArray(input.records) || input.records.length > MAX_RECORDS) throw TypeError('无效的备份计划');
+  // 此处只接收 inspect 的结果或 sendMaterialBackup 的有界快照。
   const {size, fileDigest} = input;
   if (!Number.isSafeInteger(size) || size < 0 || typeof fileDigest !== 'string' || !/^[0-9a-f]{64}$/u.test(fileDigest)) throw TypeError('无效的备份计划');
   let lastEnd = 0;
   const records = input.records.map(row => {
-    if (!row || typeof row !== 'object') throw TypeError('无效的备份计划');
     const {start, end, length} = row;
     if (!Number.isSafeInteger(start) || !Number.isSafeInteger(end) || start < lastEnd || end <= start || end > size || !Number.isSafeInteger(length) || length < 1 || length > MAX_RECORD_LENGTH) throw TypeError('无效的备份计划');
     lastEnd = end; return {start, end, length};
@@ -329,12 +327,22 @@ export async function prepareMaterialBackup(blob: Blob, options: ReadOptions = {
 
 /** 第三遍发送后核验整个文件；失败时调用方不得封存或提交。 */
 export async function sendMaterialBackup(blob: Blob, prepared: PreparedMaterialBackup, emit: (frame: Frame) => Promise<unknown>, options: ReadOptions = {}): Promise<void> {
-  if (!prepared || !prepared.plan || !Array.isArray(prepared.plan.records) || !prepared.manifest || typeof emit !== 'function') throw TypeError('无效的备份计划');
-  const {size, fileDigest} = prepared.plan, plan = {size, fileDigest, records: prepared.plan.records.map(record => {
+  if (!prepared || typeof prepared !== 'object' || typeof emit !== 'function') throw TypeError('无效的备份计划');
+  const {plan: sourcePlan, manifest} = prepared;
+  if (!sourcePlan || !manifest || typeof manifest !== 'object') throw TypeError('无效的备份计划');
+  const {size, fileDigest, records: sourceRecords} = sourcePlan;
+  // 在复制或读取记录前拒绝过量计划，稀疏数组也不能绕过逐项校验。
+  if (!Array.isArray(sourceRecords)) throw TypeError('无效的备份计划');
+  const recordCount = sourceRecords.length;
+  if (!Number.isSafeInteger(recordCount) || recordCount < 0 || recordCount > MAX_RECORDS) throw TypeError('无效的备份计划');
+  const recordsSnapshot: RecordPlan[] = [];
+  for (let i = 0; i < recordCount; i++) {
+    const record = sourceRecords[i];
     if (!record || typeof record !== 'object') throw TypeError('无效的备份计划');
-    const {start, end, length} = record; return {start, end, length};
-  })};
-  const {records, bytes, frames, digest: expectedDigest} = prepared.manifest, lengths = plan.records.map(record => record.length);
+    const {start, end, length} = record; recordsSnapshot.push({start, end, length});
+  }
+  const plan = {size, fileDigest, records: recordsSnapshot};
+  const {records, bytes, frames, digest: expectedDigest} = manifest, lengths = recordsSnapshot.map(record => record.length);
   if (records !== lengths.length || lengths.some(n => !Number.isSafeInteger(n) || n < 1 || n > MAX_RECORD_LENGTH) ||
     !Number.isSafeInteger(bytes) || bytes !== lengths.reduce((a, b) => a + b, 0) || !Number.isSafeInteger(frames) || frames !== lengths.reduce((a, b) => a + Math.ceil(b / MATERIAL_IMPORT_FRAME_BYTES), 0) ||
     typeof expectedDigest !== 'string' || !/^[0-9a-f]{64}$/u.test(expectedDigest)) throw TypeError('无效的备份计划');

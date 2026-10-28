@@ -8,7 +8,8 @@ import type {DocumentMaterialReference} from '@/src/features/document-translatio
 
 export const MATERIAL_MESSAGE = 'fluentReadMaterials' as const;
 export const MATERIAL_CHANGED_MESSAGE = 'fluentReadMaterialsChanged' as const;
-export const MATERIAL_BACKUP_MAX_BYTES = 20 * 1024 * 1024;
+/** 较小文件沿用直接 JSON.parse 恢复；这不是分片恢复的总量上限。 */
+export const MATERIAL_INLINE_BACKUP_MAX_BYTES = 20 * 1024 * 1024;
 /** 大备份暂存的当前默认预算；设备动态预算若启用，须同步更新读取端的准入方式。 */
 export const MATERIAL_IMPORT_FRAME_BYTES = 128 * 1024;
 export const MATERIAL_IMPORT_MAX_RECORD_BYTES = 128 * 1024 * 1024;

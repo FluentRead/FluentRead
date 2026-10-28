@@ -6,7 +6,7 @@
  */
 import browser from 'webextension-polyfill';
 import {prepareMaterialBackup, sendMaterialBackup} from './materialBackupReader';
-import {PORT_NAME} from './materialImportPort';
+import {createMaterialImportCapability, PORT_NAME} from './materialImportPort';
 import {createMaterialImportPortClient, type MaterialImportClientPort, type MaterialImportStatus} from './materialImportPortClient';
 import type {Capability} from './materialImportStage';
 import type {MaterialImportResult, MaterialOperationGuard} from './materialProtocol';
@@ -42,10 +42,6 @@ function connect(): Client {
   const port = browser.runtime.connect({name: PORT_NAME}) as unknown as MaterialImportClientPort;
   return createMaterialImportPortClient(port);
 }
-function capability(): Capability {
-  const token = Array.from(crypto.getRandomValues(new Uint8Array(32)), value => value.toString(16).padStart(2, '0')).join('');
-  return {id: crypto.randomUUID(), token};
-}
 function validResult(result: MaterialImportResult): boolean {
   return !!result && [result.inserted, result.updated, result.skipped].every(value => Number.isSafeInteger(value) && value >= 0);
 }
@@ -58,7 +54,7 @@ export async function restoreLargeMaterialBackup(file: Blob, guard: MaterialOper
     check(signal);
     const prepared = await prepareMaterialBackup(file, {signal});
     check(signal);
-    cap = capability();
+    cap = createMaterialImportCapability();
     options.onCapability(cap);
     check(signal);
     client = connect();

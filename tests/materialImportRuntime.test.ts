@@ -108,6 +108,20 @@ describe('material import background registration',()=>{
     expect(f.stage.cleanup).toHaveBeenCalledTimes(2);expect(f.stage.beginRecoverable).toHaveBeenCalledOnce();dispose();
   });
 
+  it.each(['corruptSessions','corruptReceipts','corruptStarts'] as const)('reports %s without disclosing stored data',async key=>{
+    const f=fixture(),m=maintenanceFixture();
+    f.stage.cleanup.mockResolvedValueOnce({sessions:0,receipts:0,[key]:1} as {sessions:number;receipts:number});
+    const dispose=installMaterialImportRuntime({...f.deps,maintenance:m} as never),p=f.port();
+    f.runtime.onConnect.fire(p.port);
+    p.onMessage.fire({id:1,action:'begin',capability,manifest,guard,deadline:10_000});
+    await vi.waitFor(()=>expect(p.messages).toHaveLength(1));
+    expect(p.messages[0]).toMatchObject({ok:true});
+    expect(m.warn).toHaveBeenCalledOnce();
+    expect(m.warn).toHaveBeenCalledWith('[FluentRead] 材料恢复暂存元数据损坏，请检查材料与备份。');
+    expect(JSON.stringify(m.warn.mock.calls)).not.toContain(capability.token);
+    dispose();
+  });
+
   it('does not start cleanup after a pending operation disconnects or becomes private',async()=>{
     const f=fixture();let ready!:()=>void;f.deps.ready=new Promise<void>(resolve=>{ready=resolve;});
     const dispose=installMaterialImportRuntime(f.deps as never),p=f.port();f.runtime.onConnect.fire(p.port);

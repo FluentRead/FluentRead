@@ -91,10 +91,18 @@ export function installMaterialImportRuntime(options: Options): () => void {
             const abort = () => controller.abort();
             cleanupController.signal.addEventListener('abort', abort, {once: true});
             const timer = setTimeout(abort, 30_000);
-            const pending = wait(Promise.resolve().then(() => {
+            const operation = Promise.resolve().then(() => {
                 assertAvailable();
                 return stage.cleanup({signal: controller.signal});
-            }), controller.signal);
+            });
+            // 等待方可能已超时，真实事务随后仍可完成；只在观察到损坏结果时
+            // 发出不包含材料、会话 ID 或令牌的诊断。
+            void operation.then(result => {
+                if (result.corruptSessions || result.corruptReceipts || result.corruptStarts) {
+                    try {options.maintenance?.warn('[FluentRead] 材料恢复暂存元数据损坏，请检查材料与备份。');} catch { /* 不改变清理结果。 */ }
+                }
+            }, () => undefined);
+            const pending = wait(operation, controller.signal);
             cleanup = pending;
             void pending.then(() => { if (cleanup === pending) cleanup = undefined; }, () => { if (cleanup === pending) cleanup = undefined; })
                 .finally(() => { clearTimeout(timer); cleanupController.signal.removeEventListener('abort', abort); });

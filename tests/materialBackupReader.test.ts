@@ -5,6 +5,7 @@ import {sha256} from '@noble/hashes/sha256';
 import {bytesToHex} from '@noble/hashes/utils';
 import {prepareMaterialBackup, sendMaterialBackup} from '@/src/features/vocabulary/materialBackupReader';
 import {createStage} from '@/src/features/vocabulary/materialImportStage';
+import {createMaterialImportCapability} from '@/src/features/vocabulary/materialImportPort';
 import {MaterialDatabase, MaterialRepository} from '@/src/features/vocabulary/materialRepository';
 import type {Frame} from '@/src/features/vocabulary/materialImportStage';
 
@@ -49,6 +50,8 @@ describe('material backup source reader', () => {
     '{"format":"fluentread-learning-materials","version":1,"materials":[0.]}',
     '{"format":"fluentread-learning-materials","version":1,"materials":[0.1e+]}',
     '{"format":"fluentread-learning-materials","version":1,"materials":[truex]}',
+    '{"format":"fluentread-learning-materials","version":1,"materials":[{"a":[1}}]}',
+    '{"format":"fluentread-learning-materials","version":1,"materials":[{"a":{]}}]}',
     '{"format":"fluentread-learning-materials","version":1,"materials":["\\z"]}',
     '{"format":"fluentread-learning-materials","version":1,"materials":[{}',
     '\ufeff',
@@ -117,6 +120,10 @@ describe('material backup source reader', () => {
     const source = new Blob([encoder.encode(prefix), pad, new Uint8Array([0xf0, 0x9f, 0x28, 0xff]), encoder.encode('"}]}')]);
     expect((await read(source)).actual).toEqual(JSON.parse(await source.text()).materials);
   });
+  it('replaces incomplete UTF-8 immediately before the end of a record', async () => {
+    const source = new Blob([encoder.encode(wrap('"').slice(0, -2)), new Uint8Array([0xf0, 0x9f]), encoder.encode('" , 1]}')]);
+    expect((await read(source)).actual).toEqual(JSON.parse(await source.text()).materials);
+  });
   it('agrees with JSON.parse on a seeded corpus of malformed and valid byte mutations', async () => {
     let state = 0xdecafbad; const random = () => {state = (Math.imul(state, 1664525) + 1013904223) >>> 0; return state;};
     const samples = [wrap('{"text":"😀","nested":[true,false,null,-0,1e400]}'), wrap('"ok",42,{"\\u0061":"x"}'), '{"format":"wrong","format":"fluentread-learning-materials","version":1,"materials":[1],"materials":["x"]}'];
@@ -175,6 +182,10 @@ describe('material backup source reader', () => {
     await expect(sendMaterialBackup(source, null as never, async () => {})).rejects.toThrow('无效的备份计划');
     const missing = structuredClone(plan); missing.plan.records[0] = null as never;
     await expect(sendMaterialBackup(source, missing, async () => {})).rejects.toThrow('无效的备份计划');
+    const nonRecord = structuredClone(plan); nonRecord.plan.records[0] = 'not a record' as never;
+    await expect(sendMaterialBackup(source, nonRecord, async () => {})).rejects.toThrow('无效的备份计划');
+    const nonManifest = {...plan, manifest: 'not a manifest' as never};
+    await expect(sendMaterialBackup(source, nonManifest, async () => {})).rejects.toThrow('无效的备份计划');
     const badDigest = structuredClone(plan); badDigest.plan.fileDigest = 'x';
     await expect(sendMaterialBackup(source, badDigest, async () => {})).rejects.toThrow('无效的备份计划');
     await expect(sendMaterialBackup(new Blob(['shorter']), plan, async () => {})).rejects.toThrow('改变');
@@ -184,6 +195,26 @@ describe('material backup source reader', () => {
     }
     const tampered = structuredClone(plan); tampered.manifest.digest = '0'.repeat(64);
     await expect(sendMaterialBackup(source, tampered, async () => {})).rejects.toThrow('改变');
+  });
+  it('rejects overlong or sparse prepared record lists before reading entries or sending frames', async () => {
+    const source = new Blob([wrap('1')]), plan = await prepareMaterialBackup(source);
+    const tooMany = structuredClone(plan), entries = new Array(10001);
+    Object.defineProperty(entries, '0', {get() {throw Error('overlong plan was read');}});
+    tooMany.plan.records = entries;
+    const emit = vi.fn(async () => undefined), slice = vi.spyOn(source, 'slice');
+    await expect(sendMaterialBackup(source, tooMany, emit)).rejects.toThrow('无效的备份计划');
+    expect(emit).not.toHaveBeenCalled();expect(slice).not.toHaveBeenCalled();
+    const sparse = structuredClone(plan); sparse.plan.records = new Array(1);
+    await expect(sendMaterialBackup(source, sparse, emit)).rejects.toThrow('无效的备份计划');
+    expect(emit).not.toHaveBeenCalled();expect(slice).not.toHaveBeenCalled();
+  });
+  it('snapshots the record count before reading mutable entries', async () => {
+    const source = new Blob([wrap('1')]), plan = await prepareMaterialBackup(source);
+    const rows = plan.plan.records, original = rows[0];
+    Object.defineProperty(rows, '0', {get() {rows.length = 10001; return original;}});
+    const frames: Frame[] = [];
+    await sendMaterialBackup(source, plan, async frame => {frames.push(frame);});
+    expect(frames).toHaveLength(1);
   });
   it('rejects a corrupted plan that ends in the middle of a multibyte character', async () => {
     const blob = new Blob([wrap('{"value":"😀"}')]), plan = await prepareMaterialBackup(blob);
@@ -226,7 +257,8 @@ describe('material backup source reader', () => {
   it('sends a >20 MiB synthetic record through the actual stage transaction', async () => {
     const record = `{"id":"one","source":{"kind":"article","url":"https://example.test/a"},"title":"A","topics":[],"references":[],"createdAt":1,"updatedAt":2,"archivedAt":null,"unused":"${'x'.repeat(21 * 1024 * 1024)}"}`;
     const blob = new Blob([wrap(record)]), plan = await prepareMaterialBackup(blob), db = database(), repo = new MaterialRepository(db), stage = createStage(db, {clock: () => 1000});
-    const cap = await stage.begin(plan.manifest, {generation: 0, capturedAt: 1});
+    const cap = createMaterialImportCapability();
+    await stage.beginRecoverable(plan.manifest, {generation: 0, capturedAt: 1}, cap, {deadline: 301000});
     await sendMaterialBackup(blob, plan, frame => stage.append(cap, frame));
     await stage.seal(cap); expect(await stage.commit(cap)).toEqual({inserted: 1, updated: 0, skipped: 0});
     expect((await repo.get('one'))?.source.url).toBe('https://example.test/a');

@@ -22,6 +22,9 @@ interface RecoverableStart extends Manifest {id:string; ownerHash:string; guard:
 interface Budget {key:string; reserved:number; reservedFrames:number; slots:number}
 export interface Limits {frameBytes:number; recordBytes:number; totalBytes:number; frameCount:number; totalFrames:number; slots:number; inflight:number; ttlMs:number; receiptTtlMs:number}
 const DEFAULTS:Limits={frameBytes:MATERIAL_IMPORT_FRAME_BYTES, recordBytes:MATERIAL_IMPORT_MAX_RECORD_BYTES, totalBytes:MATERIAL_IMPORT_MAX_TOTAL_BYTES, frameCount:MATERIAL_IMPORT_MAX_FRAMES, totalFrames:200000, slots:256, inflight:8, ttlMs:30*60*1000, receiptTtlMs:7*24*60*60*1000};
+// All existing production databases have at most this many sessions and receipts.
+// Keeping the bound independent of a lower current limit still permits recovery.
+const MAX_TRACKED_SLOTS=256;
 const encoder=new TextEncoder();
 // Read the actual typed-array size even if a direct caller shadows its public properties.
 const typedArrayByteLength=Object.getOwnPropertyDescriptor(Object.getPrototypeOf(Uint8Array.prototype),'byteLength')!.get!;
@@ -47,8 +50,6 @@ const requireCapability=(input:Capability):Capability=>{
   return {id,token};
 };
 const owner=(row:{ownerHash:string}|undefined, cap:Capability)=>!!row&&secureEqual(row.ownerHash,hashToken(cap.token));
-/** Create and retain this capability before sending a recoverable begin request. */
-export function createImportCapability():Capability {return {id:crypto.randomUUID(),token:bytesToHex(crypto.getRandomValues(new Uint8Array(32)))};}
 const framesRange=(id:string)=>[[id,Dexie.minKey],[id,Dexie.maxKey]] as [[string, typeof Dexie.minKey],[string, typeof Dexie.maxKey]];
 // Shared by stage instances in this one JavaScript runtime. A production
 // background receiver must additionally bind its port lifetime to a signal.
@@ -124,7 +125,7 @@ export function createStage(db:MaterialDatabase, options:{limits?:Partial<Limits
   const limits={...DEFAULTS,...options.limits};
   for (const value of Object.values(limits)) if (!Number.isSafeInteger(value)||value<=0) throw Error('invalid limits');
   // Each digest prefix is an unsigned 32-bit record length. Larger values would wrap.
-  if(limits.recordBytes>0xffffffff)throw Error('invalid limits');
+  if(limits.recordBytes>0xffffffff||limits.slots>MAX_TRACKED_SLOTS)throw Error('invalid limits');
   const frames=db.table<StoredFrame,[string,number]>('stageFrames');
   const sessions=db.table<Session,string>('stageSessions');
   const receipts=db.table<Receipt,string>('stageReceipts');
@@ -141,10 +142,36 @@ export function createStage(db:MaterialDatabase, options:{limits?:Partial<Limits
     if(!admitted.has(id)&&admitted.size>=limits.slots)admitted.delete(admitted.keys().next().value!);
     admitted.set(id,{ownerHash,expiresAt});
   }
-  const getBudget=async()=>await budgets.get('stage')??{key:'stage',reserved:0,reservedFrames:0,slots:0};
+  const getBudget=async(allowInvalidExpiry=false)=>{
+    const stored=await budgets.get('stage');
+    const budget=stored??{key:'stage',reserved:0,reservedFrames:0,slots:0};
+    // 持久数据不可信：NaN、字符串或超出安全整数范围的计数会绕过大小比较。
+    if(!budget||!validInteger(budget.reserved)||!validInteger(budget.reservedFrames)||!validInteger(budget.slots))throw Error('budget corruption');
+    // 同一写事务内核对有界元数据，既防止丢失预算行或少计造成超额预约，
+    // 也不扫描含材料正文的帧。count 先拒绝异常超限，最多读取 256 个 session。
+    const [sessionCount,receiptCount]=await Promise.all([sessions.count(),receipts.count()]);
+    if(!validInteger(sessionCount)||!validInteger(receiptCount)||sessionCount>MAX_TRACKED_SLOTS||receiptCount>MAX_TRACKED_SLOTS-sessionCount)throw Error('budget corruption');
+    let reserved=0,reservedFrames=0;
+    await sessions.toCollection().each(session=>{
+      if(!validInteger(session.bytes)||!validInteger(session.frames)||session.bytes>Number.MAX_SAFE_INTEGER-reserved||session.frames>Number.MAX_SAFE_INTEGER-reservedFrames)throw Error('budget corruption');
+      if(!allowInvalidExpiry&&!validInteger(session.expiresAt))throw Error('invalid expiry');
+      reserved+=session.bytes;reservedFrames+=session.frames;
+    });
+    if(budget.reserved!==reserved||budget.reservedFrames!==reservedFrames||budget.slots!==sessionCount+receiptCount)throw Error('budget corruption');
+    return budget;
+  };
+  const reserveBudget=(budget:Budget,bytes:number,count:number)=>{
+    // 减法比较既防止求和丢失精度，也允许回收超过新限额的旧预约。
+    if(bytes>limits.totalBytes-budget.reserved||count>limits.totalFrames-budget.reservedFrames||budget.slots>=limits.slots)throw Error('stage budget exceeded');
+    budget.reserved+=bytes;budget.reservedFrames+=count;budget.slots++;
+  };
+  const releaseSessionBudget=(budget:Budget,s:Pick<Session,'bytes'|'frames'>,releaseSlot:boolean)=>{
+    if(!validInteger(s.bytes)||!validInteger(s.frames)||s.bytes>budget.reserved||s.frames>budget.reservedFrames||(releaseSlot&&budget.slots<1))throw Error('budget corruption');
+    budget.reserved-=s.bytes;budget.reservedFrames-=s.frames;if(releaseSlot)budget.slots--;
+  };
   const removeFrames=async(id:string)=>{const [lower,upper]=framesRange(id);await frames.where('[session+seq]').between(lower,upper,true,true).delete();};
-  const assertSession=(row:Session|undefined,cap:Capability)=>{if(!owner(row,cap))throw Error('session unavailable');if(row!.expiresAt<=clock())throw Error('session expired');return row!;};
-  const assertReceipt=(row:Receipt|undefined,cap:Capability)=>{if(!owner(row,cap))throw Error('session unavailable');if(row!.expiresAt<=clock())throw Error('receipt expired');return row!;};
+  const assertSession=(row:Session|undefined,cap:Capability)=>{if(!owner(row,cap))throw Error('session unavailable');if(!validInteger(row!.expiresAt))throw Error('invalid expiry');if(row!.expiresAt<=clock())throw Error('session expired');return row!;};
+  const assertReceipt=(row:Receipt|undefined,cap:Capability)=>{if(!owner(row,cap))throw Error('session unavailable');if(!validInteger(row!.expiresAt))throw Error('invalid expiry');if(row!.expiresAt<=clock())throw Error('receipt expired');return row!;};
   async function guardTransaction<T>(signal:AbortSignal|undefined,task:()=>Promise<T>):Promise<T>{
     const tx=Dexie.currentTransaction;
     const onAbort=()=>{try{tx?.abort();}catch{/* It may already be committed. */}};
@@ -168,60 +195,6 @@ export function createStage(db:MaterialDatabase, options:{limits?:Partial<Limits
     if(!admitted||admitted.expiresAt<=clock()||!secureEqual(admitted.ownerHash,hashToken(cap.token)))await resume(cap,{signal});
     if(signal?.aborted)throw Error('cancelled');
   }
-  async function begin(manifest:Manifest,guard:MaterialOperationGuard,options:{signal?:AbortSignal}={}):Promise<Capability>{
-    const signal=options.signal;
-    if(signal?.aborted)throw Error('cancelled');
-    if(!manifest||typeof manifest!=='object'||Array.isArray(manifest))throw Error('invalid manifest or guard');
-    const {records,frames:count,bytes,digest}=manifest, now=clock();
-    const guardSnapshot=guard&&{generation:guard.generation,capturedAt:guard.capturedAt};
-    if (!validInteger(records)||records>10000||!validInteger(count)||count>limits.frameCount||!validInteger(bytes)||bytes>limits.totalBytes||typeof digest!=='string'||digest.length!==64||!/^([0-9a-f]{64})$/u.test(digest)||
-      (records===0&&(count!==0||bytes!==0))||(records>0&&(count<records||bytes<count||!withinCapacity(bytes,count,records,limits.frameBytes,limits.recordBytes)))||!guardSnapshot||!validInteger(guardSnapshot.generation)||!Number.isFinite(guardSnapshot.capturedAt)||guardSnapshot.capturedAt<0||guardSnapshot.capturedAt>now+60000) throw Error('invalid manifest or guard');
-    const cap=createImportCapability();
-    const release=takeControl(db.name,'begin',undefined,limits.inflight);
-    let abandoned=false,delivered=false;
-    const abandon=()=>{abandoned=true;};
-    signal?.addEventListener('abort',abandon,{once:true});
-    let operation:Promise<number>;
-    try{operation=Promise.resolve(db.transaction('rw',db.meta,sessions,receipts,budgets,async()=>guardTransaction(signal,async()=>{
-      const state=await db.meta.get('state');
-      if((state?.generation??0)!==guardSnapshot!.generation||guardSnapshot!.capturedAt<=(state?.clearedAt??0))throw Error('stale operation');
-      const budget=await getBudget();
-      if(budget.reserved+bytes>limits.totalBytes||budget.reservedFrames+count>limits.totalFrames||budget.slots>=limits.slots)throw Error('stage budget exceeded');
-      budget.reserved+=bytes;budget.reservedFrames+=count;budget.slots++;await budgets.put(budget);
-      const expiresAt=clock()+limits.ttlMs;
-      await sessions.add({id:cap.id,ownerHash:hashToken(cap.token),records,frames:count,bytes,digest,phase:'open',guard:guardSnapshot!,nextSeq:0,nextRecord:0,nextPart:0,currentTotal:0,currentBytes:0,receivedBytes:0,expiresAt});
-      return expiresAt;
-    })));}catch(error){signal?.removeEventListener('abort',abandon);release();throw error;}
-    // A capability which was never delivered cannot be recovered by the
-    // caller. If commit won the abort race, remove its empty session before
-    // releasing the control slot. A failed cleanup still requires TTL recovery.
-    return new Promise<Capability>((resolve,reject)=>{
-      const onAbort=()=>{if(delivered)return;abandoned=true;signal?.removeEventListener('abort',onAbort);reject(Error('cancelled; creation outcome may be unknown'));};
-      signal?.addEventListener('abort',onAbort,{once:true});
-      operation.then(async(expiresAt)=>{
-        if(abandoned){
-          try{await db.transaction('rw',frames,sessions,budgets,async()=>{
-            const row=await sessions.get(cap.id);if(!owner(row,cap)||row!.nextSeq!==0)return;
-            const budget=await getBudget();budget.reserved-=row!.bytes;budget.reservedFrames-=row!.frames;budget.slots--;
-            if(budget.reserved<0||budget.reservedFrames<0||budget.slots<0)throw Error('budget corruption');
-            await removeFrames(cap.id);await sessions.delete(cap.id);await budgets.put(budget);
-          });}finally{signal?.removeEventListener('abort',abandon);release();}
-          return;
-        }
-        remember(cap.id,hashToken(cap.token),expiresAt);
-        delivered=true;signal?.removeEventListener('abort',onAbort);signal?.removeEventListener('abort',abandon);
-        resolve(cap);release();
-      },error=>{
-        signal?.removeEventListener('abort',onAbort);signal?.removeEventListener('abort',abandon);release();
-        if(!abandoned)reject(error);
-      }).catch(error=>{
-        signal?.removeEventListener('abort',onAbort);signal?.removeEventListener('abort',abandon);release();
-        if(abandoned)console.warn('[FluentRead] Abandoned material import cleanup failed; the session requires expiry cleanup.');
-        else if(!delivered)reject(error);
-      });
-      if(signal?.aborted)onAbort();
-    });
-  }
   // The caller retains this capability and the full request before sending.
   // The start record prevents reuse after discard or acknowledgement until the
   // fixed deadline; expiry and clock rollback do not provide permanent replay protection.
@@ -238,6 +211,7 @@ export function createStage(db:MaterialDatabase, options:{limits?:Partial<Limits
         const previous=await starts.get(cap.id);
         if(deadline<=clock())throw Error('session unavailable');
         if(previous){
+          if(!validInteger(previous.expiresAt))throw Error('invalid expiry');
           if(!owner(previous,cap)||previous.expiresAt!==deadline||previous.records!==records||previous.frames!==count||previous.bytes!==bytes||previous.digest!==digest||previous.guard.generation!==guardSnapshot.generation||previous.guard.capturedAt!==guardSnapshot.capturedAt)throw Error('session unavailable');
           const receipt=await receipts.get(cap.id);
           const row=receipt?assertReceipt(receipt,cap):assertSession(await sessions.get(cap.id),cap);
@@ -249,10 +223,10 @@ export function createStage(db:MaterialDatabase, options:{limits?:Partial<Limits
         const state=await db.meta.get('state');
         if((state?.generation??0)!==guardSnapshot.generation||guardSnapshot.capturedAt<=(state?.clearedAt??0))throw Error('stale operation');
         const budget=await getBudget();
-        if(budget.reserved+bytes>limits.totalBytes||budget.reservedFrames+count>limits.totalFrames||budget.slots>=limits.slots||await starts.count()>=limits.slots)throw Error('stage budget exceeded');
+        reserveBudget(budget,bytes,count);
+        if(await starts.count()>=limits.slots)throw Error('stage budget exceeded');
         if(deadline<=clock())throw Error('session unavailable');
         const ownerHash=hashToken(cap.token),sessionExpiry=clock()+limits.ttlMs;
-        budget.reserved+=bytes;budget.reservedFrames+=count;budget.slots++;
         await budgets.put(budget);
         await starts.add({id:cap.id,ownerHash,records,frames:count,bytes,digest,guard:guardSnapshot,expiresAt:deadline});
         await sessions.add({id:cap.id,ownerHash,records,frames:count,bytes,digest,phase:'open',guard:guardSnapshot,nextSeq:0,nextRecord:0,nextPart:0,currentTotal:0,currentBytes:0,receivedBytes:0,expiresAt:sessionExpiry});
@@ -295,6 +269,8 @@ export function createStage(db:MaterialDatabase, options:{limits?:Partial<Limits
   }
   async function append(capInput:Capability,input:Frame,requestOptions:{signal?:AbortSignal}={}):Promise<{nextSeq:number}> {
     const cap=requireCapability(capInput),callerSignal=requestOptions.signal;
+    // 已取消的请求无需复制分片或启动读取事务。
+    if(callerSignal?.aborted)throw Error('cancelled');
     const admittedOwner=admissionsByDatabase.get(db.name)?.get(cap.id);
     if(!admittedOwner||admittedOwner.expiresAt<=clock()||!secureEqual(admittedOwner.ownerHash,hashToken(cap.token)))throw Error('session unavailable: resume required');
     const active=activeFor(db.name);
@@ -435,7 +411,7 @@ export function createStage(db:MaterialDatabase, options:{limits?:Partial<Limits
           });
         },now,s.guard);
         if(cancelled)throw Error('cancelled');
-        const budget=await getBudget();budget.reserved-=s.bytes;budget.reservedFrames-=s.frames;if(budget.reserved<0||budget.reservedFrames<0)throw Error('budget corruption');
+        const budget=await getBudget();releaseSessionBudget(budget,s,false);
         await receipts.add({id:s.id,ownerHash:s.ownerHash,result,expiresAt:now+limits.receiptTtlMs});
         await removeFrames(s.id);await sessions.delete(s.id);await budgets.put(budget);
         createdReceipt=true;
@@ -470,7 +446,7 @@ export function createStage(db:MaterialDatabase, options:{limits?:Partial<Limits
       const result=await db.transaction('rw',frames,sessions,receipts,budgets,async()=>guardTransaction(signal,async()=>{
         const receipt=await receipts.get(cap.id);if(receipt){assertReceipt(receipt,cap);return 'committed' as const;}
         const s=assertSession(await sessions.get(cap.id),cap),budget=await getBudget();
-        budget.reserved-=s.bytes;budget.reservedFrames-=s.frames;budget.slots--;if(budget.reserved<0||budget.reservedFrames<0||budget.slots<0)throw Error('budget corruption');
+        releaseSessionBudget(budget,s,true);
         await removeFrames(s.id);await sessions.delete(s.id);await budgets.put(budget);return 'discarded' as const;
       }));
       if(result==='discarded'){forget(cap.id);activeByDatabase.get(db.name)?.get(cap.id)?.controller.abort();}
@@ -498,30 +474,40 @@ export function createStage(db:MaterialDatabase, options:{limits?:Partial<Limits
           return false;
         }
         assertReceipt(receipt,cap);
-        const budget=await getBudget();budget.slots--;
-        if(budget.slots<0)throw Error('budget corruption');
+        const budget=await getBudget();if(budget.slots<1)throw Error('budget corruption');budget.slots--;
         await receipts.delete(cap.id);await budgets.put(budget);return true;
       }));
       if(removed)forget(cap.id);
       return 'released-or-unavailable' as const;
     });
   }
-  async function cleanup(options:{signal?:AbortSignal}={}):Promise<{sessions:number;receipts:number}>{
+  async function cleanup(options:{signal?:AbortSignal}={}):Promise<{sessions:number;receipts:number;corruptSessions?:number;corruptReceipts?:number;corruptStarts?:number}>{
     const signal=options.signal;
     return runControl('cleanup',undefined,signal,async()=>{
       const expiredIds:string[]=[];
       const result=await db.transaction('rw',[frames,sessions,receipts,budgets,starts],async()=>guardTransaction(signal,async()=>{
-        const now=clock(),expired=await sessions.where('expiresAt').belowOrEqual(now).toArray(),budget=await getBudget();
-        for(const s of expired){await removeFrames(s.id);await sessions.delete(s.id);budget.reserved-=s.bytes;budget.reservedFrames-=s.frames;budget.slots--;expiredIds.push(s.id);}
-        const count=await receipts.where('expiresAt').belowOrEqual(now).delete();budget.slots-=count;
-        await starts.where('expiresAt').belowOrEqual(now).delete();
-        if(budget.reserved<0||budget.reservedFrames<0||budget.slots<0)throw Error('budget corruption');await budgets.put(budget);
-        return {sessions:expired.length,receipts:count};
+        const now=clock(),budget=await getBudget(true),all=await sessions.toArray();
+        // 缺失/损坏 expiry 不会出现在 IndexedDB 索引中；未提交且不可恢复的
+        // 会话必须连同私密帧一并清理，已提交回执和防重放记录仍保留。
+        const expired=all.filter(s=>!validInteger(s.expiresAt)||s.expiresAt<=now),corruptSessions=expired.filter(s=>!validInteger(s.expiresAt)).length;
+        for(const s of expired){releaseSessionBudget(budget,s,true);await removeFrames(s.id);await sessions.delete(s.id);expiredIds.push(s.id);}
+        const allReceipts=await receipts.toArray(),startCount=await starts.count();
+        if(!validInteger(startCount)||startCount>MAX_TRACKED_SLOTS)throw Error('start corruption');
+        const allStarts=await starts.toArray();
+        const expiredReceipts=allReceipts.filter(r=>validInteger(r.expiresAt)&&r.expiresAt<=now);
+        const expiredStarts=allStarts.filter(s=>validInteger(s.expiresAt)&&s.expiresAt<=now);
+        const corruptReceipts=allReceipts.filter(r=>!validInteger(r.expiresAt)).length;
+        const corruptStarts=allStarts.filter(s=>!validInteger(s.expiresAt)).length;
+        const count=expiredReceipts.length;if(count>budget.slots)throw Error('budget corruption');budget.slots-=count;
+        await receipts.bulkDelete(expiredReceipts.map(r=>r.id));
+        await starts.bulkDelete(expiredStarts.map(s=>s.id));
+        await budgets.put(budget);
+        return {sessions:expired.length,receipts:count,...(corruptSessions?{corruptSessions}:{}),...(corruptReceipts?{corruptReceipts}:{}),...(corruptStarts?{corruptStarts}:{})};
       }));
       for(const id of expiredIds){forget(id);activeByDatabase.get(db.name)?.get(id)?.controller.abort();}
       return result;
     });
   }
-  return {begin,beginRecoverable,resume,append,seal,commit,status,discard,acknowledge,cleanup,
+  return {beginRecoverable,resume,append,seal,commit,status,discard,acknowledge,cleanup,
     observeCommitted:(listener:()=>void)=>observeDatabaseCommit(db.name,listener)};
 }

@@ -12,6 +12,12 @@ export const PORT_NAME='fluentReadMaterialsImportV1';
 export const MAX_FRAME_BYTES=MATERIAL_IMPORT_FRAME_BYTES;
 export const MAX_BASE64_LENGTH=Math.ceil(MAX_FRAME_BYTES/3)*4;
 
+/** 调用方在开始恢复之前持有能力，以便断线后查询真实结果。 */
+export function createMaterialImportCapability():Capability {
+  const token=Array.from(crypto.getRandomValues(new Uint8Array(32)),byte=>byte.toString(16).padStart(2,'0')).join('');
+  return {id:crypto.randomUUID(),token};
+}
+
 type Sender={id?:string;url?:string;incognito?:boolean;tab?:{id?:number;incognito?:boolean}};
 type Events<T extends (...args:any[])=>void>={addListener(fn:T):void;removeListener(fn:T):void};
 export type MaterialImportPort={name:string;sender?:Sender;onMessage:Events<(message:unknown)=>void>;onDisconnect:Events<()=>void>;postMessage(message:unknown):void;disconnect():void};

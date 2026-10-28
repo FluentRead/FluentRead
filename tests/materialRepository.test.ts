@@ -231,6 +231,76 @@ describe('local material lifecycle', () => {
         await r.list(); expect(legacy).toHaveBeenCalledTimes(1);
         await r.clear(); await r.list(); expect(legacy).toHaveBeenCalledTimes(1);
     });
+    it('indexes large existing materials one cursor record at a time and preserves source matching', async () => {
+        const seed = await repository.capture({source}, 100);
+        const records = Array.from({length:12}, (_, index) => ({...seed, id:`material-${String(index).padStart(2,'0')}`,
+            identityKey:`article:https://example.test/read?id=${index}`, source:{...seed.source,url:`https://example.test/read?id=${index}`},
+            references:[{kind:'vocabulary' as const,id:'shared',excerpt:'existing',createdAt:1},
+                ...Array.from({length:80}, (_, n)=>({kind:'note' as const,id:`note-${n}`,note:'x'.repeat(12000),createdAt:1}))]})).reverse();
+        await db.materials.clear(); await db.materials.bulkPut(records);
+        const context = [{id:'shared',contexts:[{sourceUrl:'https://example.test/read',text:'duplicate',capturedAt:10},
+            {sourceUrl:'https://another.test/source',text:'separate',capturedAt:11}]}] as VocabularyEntry[];
+        const toCollection = db.materials.toCollection.bind(db.materials), seen:string[]=[];
+        let eachCalls=0;
+        const cursor = vi.spyOn(db.materials,'toCollection').mockImplementation(()=>{
+            const collection=toCollection(), each=collection.each.bind(collection);
+            collection.each=callback=>{eachCalls++;return each((value,cursor)=>{seen.push(value.id);return callback(value,cursor);});};
+            return collection;
+        });
+        const all = vi.spyOn(db.materials,'toArray');
+        try {
+            const rows = await new MaterialRepository(db,async()=>context).list();
+            expect(eachCalls).toBe(1); expect(all).toHaveBeenCalledOnce(); // Final list, not migration.
+            expect(seen).toEqual(records.map(record=>record.id).sort());
+            expect(rows).toHaveLength(13);
+            for (const record of records) expect(rows.find(row=>row.id===record.id)).toEqual(record);
+            expect(rows.find(row=>row.source.url==='https://another.test/source')?.references).toMatchObject([{kind:'vocabulary',id:'shared',excerpt:'separate'}]);
+            expect(rows.some(row=>row.source.url==='https://example.test/read')).toBe(false);
+        } finally {cursor.mockRestore();all.mockRestore();}
+    });
+    it('propagates corrupt cursor records and leaves migration uncommitted so repair can retry', async () => {
+        const current=await repository.capture({source,reference:{kind:'vocabulary',id:'v'}},100);
+        await db.materials.update(current.id,{references:null} as never);
+        await db.materials.put({...current,id:'z-after-corrupt',identityKey:'article:https://after.test/',source:{kind:'article',url:'https://after.test/'}});
+        const legacy=[{id:'new',contexts:[{sourceUrl:'https://legacy-retry.test/',text:'saved',capturedAt:10}]}] as VocabularyEntry[];
+        const migrated=new MaterialRepository(db,async()=>legacy), seen:string[]=[];
+        const toCollection=db.materials.toCollection.bind(db.materials);
+        const cursor=vi.spyOn(db.materials,'toCollection').mockImplementation(()=>{
+            const collection=toCollection(), each=collection.each.bind(collection);
+            collection.each=callback=>each((value,key)=>{seen.push(value.id);return callback(value,key);});return collection;
+        });
+        try {await expect(migrated.list()).rejects.toBeInstanceOf(TypeError);} finally {cursor.mockRestore();}
+        expect(seen).toEqual([current.id]);
+        expect((await db.meta.get('state'))?.migrated).not.toBe(true);
+        expect(await db.materials.count()).toBe(2);
+        expect((await db.materials.get(current.id))?.references).toBeNull();
+        await db.materials.update(current.id,{references:current.references});
+        expect(await migrated.list()).toHaveLength(3);expect((await db.meta.get('state'))?.migrated).toBe(true);
+    });
+    it('preserves reading-hook transformations and propagates hook failures without committing migration', async () => {
+        const current=await repository.capture({source,reference:{kind:'vocabulary',id:'v'}},100);
+        const legacy=[{id:'v',contexts:[{sourceUrl:'https://alias-hook.test/',text:'matched alias',capturedAt:10}]}] as VocabularyEntry[];
+        const migrated=new MaterialRepository(db,async()=>legacy);
+        const error=Error('reading hook failed');
+        const fail=()=>{throw error;};db.materials.hook('reading',fail);
+        try {await expect(migrated.list()).rejects.toBe(error);} finally {db.materials.hook('reading').unsubscribe(fail);}
+        expect((await db.meta.get('state'))?.migrated).not.toBe(true);expect(await db.materials.count()).toBe(1);
+        const addAlias=(record:typeof current)=>({...record,aliases:[...(record.aliases??[]),'article:https://alias-hook.test/']});
+        db.materials.hook('reading',addAlias);
+        try {const rows=await migrated.list();expect(rows).toHaveLength(1);expect(rows[0].id).toBe(current.id);}
+        finally {db.materials.hook('reading').unsubscribe(addAlias);}
+        expect((await db.materials.get(current.id))?.aliases).toBeUndefined();
+    });
+    it('rolls back earlier migration writes and the migration marker after a later write fails', async () => {
+        const legacy=[{id:'v',contexts:[{sourceUrl:'https://migration-rollback.test/first',text:'one',capturedAt:1},
+            {sourceUrl:'https://migration-rollback.test/second',text:'two',capturedAt:2}]}] as VocabularyEntry[];
+        const migrated=new MaterialRepository(db,async()=>legacy), put=db.materials.put.bind(db.materials);
+        let writes=0;
+        const failure=vi.spyOn(db.materials,'put').mockImplementation((...args)=>{if(++writes===2)return Promise.reject(Error('second write failed')) as ReturnType<typeof put>;return put(...args);});
+        try {await expect(migrated.list()).rejects.toThrow('second write failed');} finally {failure.mockRestore();}
+        expect(writes).toBe(2);expect(await db.materials.count()).toBe(0);expect((await db.meta.get('state'))?.migrated).not.toBe(true);
+        expect(await migrated.list()).toHaveLength(2);
+    });
     it('does not remigrate a newly linked vocabulary context under its privacy-stripped URL', async () => {
         const entry = {id:'new-vocabulary',contexts:[{sourceUrl:'https://example.test/read',text:'Original translated context',capturedAt:100}]} as VocabularyEntry;
         const r = new MaterialRepository(db,async () => [entry]);

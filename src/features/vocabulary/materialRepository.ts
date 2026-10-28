@@ -115,11 +115,9 @@ export class MaterialRepository {
             // 首次打开材料前可能已经显式收藏。一次索引现有引用的来源，避免把这次
             // 新收藏当旧词书再次导入；同词条的其他明确来源仍正常迁移。
             const linkedSources = new Map<string, Set<string>>();
-            // Dexie 的 reading 钩子和游标回调中的同步异常可能不会拒绝 each。
-            // 使用原始游标并在受保护区域内调用钩子，再在同一事务内重抛。
-            let scanFailed = false, scanError: unknown;
+            let cursorFailed = false, cursorError: unknown;
             const readMaterial = this.db.materials.hook.reading.fire;
-            await this.db.materials.toCollection().raw().until(() => scanFailed).each(rawMaterial => {
+            await this.db.materials.toCollection().raw().until(() => cursorFailed).each(rawMaterial => {
                 try {
                     const material = readMaterial(rawMaterial) as MaterialRecord;
                     const sources = [material.identityKey, ...(material.aliases ?? [])];
@@ -136,11 +134,11 @@ export class MaterialRepository {
                         for (const key of sources) keys.add(key);
                         linkedSources.set(reference.id, keys);
                     }
-                } catch (error) {
-                    scanFailed = true; scanError = error;
-                }
+                } catch (error) {cursorFailed = true; cursorError = error;}
             });
-            if (scanFailed) throw scanError;
+            // Dexie 的游标回调会吞掉同步异常；在捕获范围内运行原读取钩子，
+            // 停止游标后在事务内重新抛出，保持原有失败回滚语义。
+            if (cursorFailed) throw cursorError;
             // 读写事务隔离其他写入；仅首次新增读取容量，后续成功新增在本事务内递增。
             let materialCount: number | undefined, changed = false;
             for (const entry of entries) for (const context of entry.contexts) {

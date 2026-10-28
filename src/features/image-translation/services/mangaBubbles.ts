@@ -5,7 +5,7 @@
  * 模块边界：纯像素和坐标算法，不创建 Canvas、不访问网络、不运行模型；气泡本身不作为文字证据，只有后续识别出的有效文本进入翻译。
  */
 import {groupMangaText,type MangaOcrItem,type MangaRegion} from './mangaRegions';
-import {numericInformation,numericProtection} from './mangaNumeric';
+import {numericEvidenceKey,numericInformation,numericProtection} from './mangaNumeric';
 type Box=MangaRegion['bbox'];
 export interface MangaLayoutOwner extends Box {exclusions?:Box[]}
 export interface MangaLayoutBubble {bbox:Box;members:number[]}
@@ -147,7 +147,7 @@ export function collectMangaRegions(page:MangaOcrPage,language:string,width:numb
         const bbox={x0:Math.max(0,b.x),y0:Math.max(0,b.y),x1:Math.min(width,b.x+b.width),y1:Math.min(height,b.y+b.height)};
         if(bbox.x1<=bbox.x0||bbox.y1<=bbox.y0)continue;
         const key=[bbox.x0,bbox.y0,bbox.x1,bbox.y1].join(','),previous=guardEvidence.get(key);
-        if(previous){previous.uncertain ||= !reliable(item) || previous.text !== text;continue;}
+        if(previous){previous.uncertain ||= !reliable(item) || numericEvidenceKey(previous.text) !== numericEvidenceKey(text);continue;}
         if(guards.length>=4096)throw new Error('图片数字保护区域过于复杂，已保留原图');
         guardEvidence.set(key,{text,uncertain:!reliable(item)});guards.push({text:'',bbox,fontSize:bbox.y1-bbox.y0,guardOnly:true});
     }
@@ -191,27 +191,45 @@ export function collectMangaRegions(page:MangaOcrPage,language:string,width:numb
     return appendUncoveredNumericGuards(mergeNumericRegions(regions),guards,guardEvidence);
 }
 
-/** 已有数值框完整覆盖时不重复计费；比较超额仍保留未证明覆盖的物理框。 */
+/** 已有数值框完整覆盖时不重复计费；仍标记所有相交数值，比较超额保留未证明框。 */
 function appendUncoveredNumericGuards(regions:MangaRegion[],guards:MangaRegion[],evidence:Map<string,{text:string;uncertain:boolean}>):MangaRegion[]{
     if(!guards.length)return regions;
     const numericRegions=regions.filter(region=>numericProtection(region.text));
+    const numericKeys=new Map(numericRegions.map(region=>[region,numericEvidenceKey(region.text)]));
     const boxes=numericRegions.map(region=>region.bbox);
     if(!boxes.length)return [...regions,...guards];
     const key=(box:Box)=>[box.x0,box.y0,box.x1,box.y1].join(',');
     const exact=new Map<string,MangaRegion[]>();
     for(const region of numericRegions){const k=key(region.bbox),items=exact.get(k);if(items)items.push(region);else exact.set(k,[region]);}
+    // 精确匹配仍须检查其他相交数值；按 x 建立有界索引避免每个相同框都退化为全量扫描。
+    const indexed=numericRegions.slice().sort((a,b)=>a.bbox.x0-b.bbox.x0),rightmost:number[]=[];
+    for(const [index,region] of indexed.entries())rightmost[index]=Math.max(index?rightmost[index-1]:-Infinity,region.bbox.x1);
     let comparisons=0,exhausted=false;
     const uncovered=guards.filter(guard=>{
         const g=guard.bbox,k=key(g),item=evidence.get(k)!,matching=exact.get(k);
-        const mark=(region:MangaRegion)=>{if(item.uncertain||item.text!==region.text.replace(/\s+/gu,' ').trim())region.numericUncertain=true;};
-        if(matching){matching.forEach(mark);return false;}
+        const itemKey=numericEvidenceKey(item.text);
+        const mark=(region:MangaRegion)=>{if(item.uncertain||itemKey!==numericKeys.get(region))region.numericUncertain=true;};
+        if(matching){
+            matching.forEach(mark);
+            let start=0,end=indexed.length;
+            // 排除所有右边界不可能越过 guard 左边界的前缀。
+            while(start<end){const mid=(start+end)>>>1;if(rightmost[mid]<=g.x0)start=mid+1;else end=mid;}
+            for(let index=start;index<indexed.length&&indexed[index].bbox.x0<g.x1;index++){
+                const region=indexed[index],b=region.bbox;
+                if(b.x0===g.x0&&b.y0===g.y0&&b.x1===g.x1&&b.y1===g.y1)continue; // 这些候选已全部在 matching 中处理。
+                if(++comparisons>1_000_000){exhausted=true;return true;}
+                if(Math.min(b.x1,g.x1)>Math.max(b.x0,g.x0)&&Math.min(b.y1,g.y1)>Math.max(b.y0,g.y0))mark(region);
+            }
+            return false;
+        }
+        let covered=false;
         for(const region of numericRegions){
             if(++comparisons>1_000_000){exhausted=true;return true;}
             const b=region.bbox;
             if(Math.min(b.x1,g.x1)>Math.max(b.x0,g.x0)&&Math.min(b.y1,g.y1)>Math.max(b.y0,g.y0))mark(region);
-            if(b.x0<=g.x0&&b.y0<=g.y0&&b.x1>=g.x1&&b.y1>=g.y1)return false;
+            if(b.x0<=g.x0&&b.y0<=g.y0&&b.x1>=g.x1&&b.y1>=g.y1)covered=true;
         }
-        return true;
+        return !covered;
     });
     if(exhausted)numericRegions.forEach(item=>item.numericUncertain=true);
     return [...regions,...uncovered];
@@ -223,7 +241,7 @@ function mergeNumericRegions(regions: MangaRegion[]): MangaRegion[] {
     for (const region of regions) {
         let existing: MangaRegion | undefined;
         const isNumber = numericInformation(region.text);
-        const normalized=isNumber?region.text.replace(/\s+/gu,' ').trim():'';
+        const normalized=isNumber?numericEvidenceKey(region.text):'';
         if (isNumber) for (const candidate of numbers) {
             if (++comparisons > 1_000_000) break;
             const a = candidate.bbox, b = region.bbox;

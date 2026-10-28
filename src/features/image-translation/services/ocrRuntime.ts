@@ -23,6 +23,7 @@ import { createOcrWorkerRuntime, type OcrWorkerPort } from './ocrWorkerRuntime';
 import {createSharedOcrTasks} from './sharedOcrTasks';
 import {encodeImageCanvas} from './imageEncoding';
 import {flattenOcrAlpha} from './ocrPixels';
+import {numericEvidenceKey} from './mangaNumeric';
 
 function extensionAsset(path: string): string {
     const getRuntimeUrl = chrome.runtime.getURL as (assetPath: string) => string;
@@ -77,16 +78,24 @@ function copyOcrLines(lines: NumericEvidenceOcrLine[], includeEvidence = true): 
 
 /** 源坐标回映后相同物理框只计一次，避免缩放和 fallback 的重复消耗保护预算。 */
 function deduplicateOcrGuards(lines:NumericEvidenceOcrLine[]):NumericEvidenceOcrLine[] {
-    const seen=new Set<string>();
+    const seen=new Map<string,{line:NumericEvidenceOcrLine;key:string}>();
     return lines.filter(line=>{
         if(!line.guardOnly)return true;
+        // 唯一生产者 collectRawNumericGuards 保证每个守卫均带原始证据；缺失时抛错，保留原图。
+        const value=numericEvidenceKey(line.numericGuardText!);
         const b=line.bbox,key=[b.x0,b.y0,b.x1,b.y1].join(',');
-        if(seen.has(key))return false;seen.add(key);return true;
+        const previous=seen.get(key);
+        if(previous){
+            if(line.numericGuardConflict || previous.key!==value)previous.line.numericGuardConflict=true;
+            return false;
+        }
+        seen.set(key,{line,key:value});return true;
     });
 }
 
 function cacheRecognition(key: string, views: RecognitionViews): void {
-    const bytes = key.length * 2 + [...views.ordinary, ...views.manga].reduce((total, line) => total + line.text.length * 2 + 64, 0);
+    const lines:NumericEvidenceOcrLine[]=[...views.ordinary, ...views.manga];
+    const bytes = key.length * 2 + lines.reduce((total, line) => total + (line.text.length + (line.numericGuardText?.length ?? 0)) * 2 + 64, 0);
     if (bytes > MAX_CACHED_OCR_BYTES) return;
     // 同键在途任务已合并，完成缓存命中直接返回，因此这里只会写入新条目。
     completedRecognitionCache.set(key, {views: {ordinary: copyOcrLines(views.ordinary), manga: copyOcrLines(views.manga)}, bytes});

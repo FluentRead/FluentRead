@@ -16,7 +16,7 @@ import {mangaOcrRuntime} from './mangaOcr';
 import {drawMangaTranslations, sampleMangaBackgrounds} from './mangaRendering';
 import {planMangaAlphaProtection} from './mangaAlphaProtection';
 import {groupMangaOcrLines, type MangaRegion} from './mangaRegions';
-import {numericProtection} from './mangaNumeric';
+import {numericEvidenceKey,numericProtection} from './mangaNumeric';
 import {mangaInpaintingRuntime} from './mangaInpainting';
 import {encodeImageCanvas} from './imageEncoding';
 import {mangaMaskBoxes, mangaPatchRects, type MangaPatchPacket} from '../mangaPatchResult';
@@ -343,7 +343,7 @@ export async function translateImageInOffscreen(
             onProgress: percent => { if (!signal?.aborted) reportProgress(requestId, 'recognizing', percent); },
         });
         throwIfImageOperationAborted(signal);
-        const guards:ImageTextRegion[]=[],guardKeys=new Set<string>();
+        const guards:ImageTextRegion[]=[],guardKeys=new Map<string,{text?:string;conflict?:true; bbox:OcrLine['bbox']}>();
         const width=source.naturalWidth || source.width,height=source.naturalHeight || source.height;
         const eligible=recognized.filter(line=>{
             const numericConfidence='numericConfidence' in line ? line.numericConfidence : undefined;
@@ -355,13 +355,44 @@ export async function translateImageInOffscreen(
                 throw new Error('图片数字保护位置无效，已保留原图');
             const bbox={x0:Math.max(0,b.x0),y0:Math.max(0,b.y0),x1:Math.min(width,b.x1),y1:Math.min(height,b.y1)};
             if(bbox.x1<=bbox.x0||bbox.y1<=bbox.y0)return false;
-            const key=[bbox.x0,bbox.y0,bbox.x1,bbox.y1].join(',');if(guardKeys.has(key))return false;
+            const key=[bbox.x0,bbox.y0,bbox.x1,bbox.y1].join(',');
+            const evidence='numericGuardText' in line ? line.numericGuardText : line.text || undefined;
+            const text=evidence===undefined?undefined:numericEvidenceKey(evidence);
+            const conflict='numericGuardConflict' in line && line.numericGuardConflict === true;
+            const previous=guardKeys.get(key);
+            if(previous){if(conflict || previous.text!==text)previous.conflict=true;return false;}
             if(guards.length>=4096)throw new Error('图片数字保护区域过于复杂，已保留原图');
-            guardKeys.add(key);guards.push({text:'',bbox,guardOnly:true});return false;
+            guardKeys.set(key,{bbox,text,...(conflict?{conflict:true as const}:{})});guards.push({text:'',bbox,guardOnly:true});return false;
         });
-        const readable = manga ? usePaddle ? eligible : groupMangaOcrLines(eligible, sourceLanguage,
+        const readable:ImageTextRegion[] = manga ? usePaddle ? eligible : groupMangaOcrLines(eligible, sourceLanguage,
             source.naturalWidth || source.width, source.naturalHeight || source.height)
             : groupImageParagraphs(eligible.map(line => numericProtection(line.text) ? {...line,sourceBoxes:[line.bbox]} : line));
+        if (!usePaddle) {
+            // 原始数值证据仅用于本地提示，不进入阅读结果或翻译请求。
+            const numbers=readable.filter(line=>numericProtection(line.text)).map(line=>({line,key:numericEvidenceKey(line.text)}));
+            let comparisons=0,exhausted=false;
+            for(const guard of guardKeys.values()) {
+                const guardKey=guard.text;
+                for(const number of numbers) {
+                    const {line,key}=number;
+                    if(++comparisons>1_000_000){exhausted=true;break;}
+                    const a=guard.bbox,b=line.bbox;
+                    if(a.x0<b.x1 && b.x0<a.x1 && a.y0<b.y1 && b.y0<a.y1
+                        && (guard.conflict || guardKey!==key))
+                        line.numericUncertain=true;
+                }
+                if(exhausted)break;
+            }
+            // 原始同值框可能已被可信结果覆盖而省略，但其他可信结果仍可能与其冲突。
+            for(let i=0;!exhausted && i<numbers.length;i++) for(let j=i+1;j<numbers.length;j++) {
+                if(++comparisons>1_000_000){exhausted=true;break;}
+                const left=numbers[i],right=numbers[j],a=left.line.bbox,b=right.line.bbox;
+                if(a.x0<b.x1 && b.x0<a.x1 && a.y0<b.y1 && b.y0<a.y1
+                    && left.key!==right.key)
+                    left.line.numericUncertain=right.line.numericUncertain=true;
+            }
+            if(exhausted)numbers.forEach(({line})=>line.numericUncertain=true);
+        }
         if (readable.length === 0) {
             if (manga) return {image,lines:[]};
             throw new Error('没有识别到图片文字');

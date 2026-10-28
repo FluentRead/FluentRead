@@ -7,7 +7,7 @@
 import {hasDistinctTranslation} from '@/src/core/translation/result';
 import { getRequiredImageOcrLanguages, type ImageOcrLanguageCode } from './ocrLanguages';
 import type {OcrLine} from '@/src/shared/image/types';
-import {numericInformation,numericProtection} from './services/mangaNumeric';
+import {numericEvidenceKey,numericInformation,numericProtection} from './services/mangaNumeric';
 
 export type { OcrLine } from '@/src/shared/image/types';
 
@@ -87,7 +87,7 @@ function ocrBoxIou(a:OcrBox,b:OcrBox):number {
     return intersection/(area(a)+area(b)-intersection);
 }
 
-export type NumericEvidenceOcrLine = OcrLine & {numericConfidence?: number; guardOnly?: true};
+export type NumericEvidenceOcrLine = OcrLine & {numericConfidence?: number; guardOnly?: true; numericGuardText?: string; numericGuardConflict?: true};
 
 type OcrBox = OcrLine['bbox'];
 type OcrAxis = {start: 'x0' | 'y0'; end: 'x1' | 'y1'};
@@ -223,7 +223,7 @@ type OcrBlocks = Array<{
  */
 export function collectRawNumericGuards(blocks: OcrBlocks, recognized:readonly NumericEvidenceOcrLine[]=[],
     options?:{trustedWorkerData?:boolean}): NumericEvidenceOcrLine[] {
-    const guards:NumericEvidenceOcrLine[]=[],keys=new Set<string>();let comparisons=0;
+    const guards:NumericEvidenceOcrLine[]=[],keys=new Map<string,NumericEvidenceOcrLine>();let comparisons=0;
     let byText:Map<string,NumericEvidenceOcrLine[]>|undefined;
     let exact:Map<string,NumericEvidenceOcrLine>|undefined;
     let unstable:Set<string>|undefined;
@@ -234,8 +234,9 @@ export function collectRawNumericGuards(blocks: OcrBlocks, recognized:readonly N
             return JSON.stringify([text,...coordinates.map(value=>value!.value)]);
         } catch {return;}
     };
-    const add=(raw:string,bbox:OcrLine['bbox'])=>{
+    const add=(raw:string,bbox:OcrLine['bbox'], evidence=raw)=>{
         const text=raw.replace(/\s+/gu,' ').trim();
+        const evidenceText=evidence.replace(/\s+/gu,' ').trim();
         if (!numericProtection(text)) return;
         if (!bbox || !isValidOcrBox(bbox)) throw new Error('图片数字保护位置无效，已保留原图');
         // 只有可信完整行的实际返回框覆盖原始框时才能省略保护；词丢失、拆分或框缩小均保留原框。
@@ -244,7 +245,7 @@ export function collectRawNumericGuards(blocks: OcrBlocks, recognized:readonly N
             for(const candidate of recognized){
                 const confidence=candidate.numericConfidence;
                 if(typeof confidence!=='number'||!Number.isFinite(confidence)||confidence<90||confidence>100)continue;
-                const candidateText=candidate.text;
+                const candidateText=numericEvidenceKey(candidate.text);
                 if(!numericInformation(candidateText))continue;
                 const matches=byText.get(candidateText)??[];matches.push(candidate);byText.set(candidateText,matches);
                 if(options?.trustedWorkerData){
@@ -258,31 +259,36 @@ export function collectRawNumericGuards(blocks: OcrBlocks, recognized:readonly N
         }
         let represented=false;
         // 同文候选只要有未知坐标，必须按原顺序访问，不能跳过更早的异常或副作用。
-        const exactKey=options?.trustedWorkerData?stableKey(text,bbox):undefined;
-        const exactCandidate=exactKey&&!unstable!.has(text)&&exact!.get(exactKey);
+        const comparisonText=numericEvidenceKey(text);
+        const exactKey=options?.trustedWorkerData?stableKey(comparisonText,bbox):undefined;
+        const exactCandidate=exactKey&&!unstable!.has(comparisonText)&&exact!.get(exactKey);
         if(exactCandidate){
             const b=exactCandidate.bbox;
             represented=b.x0<=bbox.x0&&b.y0<=bbox.y0&&b.x1>=bbox.x1&&b.y1>=bbox.y1;
         }
-        for(const candidate of represented?[]:byText.get(text)??[]){
+        for(const candidate of represented?[]:byText.get(comparisonText)??[]){
             if(++comparisons>1_000_000)throw new Error('图片数字保护区域过于复杂，已保留原图');
             const b=candidate.bbox;
             if(b.x0<=bbox.x0&&b.y0<=bbox.y0&&b.x1>=bbox.x1&&b.y1>=bbox.y1){represented=true;break;}
         }
         if(represented)return;
-        const key=[bbox.x0,bbox.y0,bbox.x1,bbox.y1].join(',');if(keys.has(key))return;
+        const key=[bbox.x0,bbox.y0,bbox.x1,bbox.y1].join(',');const previous=keys.get(key);
+        if(previous){if(numericEvidenceKey(previous.numericGuardText!)!==numericEvidenceKey(evidenceText))previous.numericGuardConflict=true;return;}
         if (guards.length>=4096) throw new Error('图片数字保护区域过于复杂，已保留原图');
-        keys.add(key);guards.push({text:'',bbox:{...bbox},guardOnly:true});
+        const guard:NumericEvidenceOcrLine={text:'',bbox:{...bbox},guardOnly:true,numericGuardText:evidenceText};
+        keys.set(key,guard);guards.push(guard);
     };
     const sourceObservations=new Map<string,{incompatibleWordBox:boolean;noWords:boolean}>();
     for (const block of blocks ?? []) for (const paragraph of block.paragraphs ?? []) for (const line of paragraph.lines ?? []) {
         const lineText=line.text,lineBox=line.bbox;
         add(lineText,lineBox);
         const numericLine=numericProtection(lineText.replace(/\s+/gu,' ').trim());
+        const compactLineText=numericLine?lineText.replace(/\s+/gu,''):'';
         let coverageBox=lineBox;const wordBoxes:OcrBox[]=[];
         for(const word of line.words??[]) {
             const text=word.text,bbox=word.bbox;
-            add(text,bbox);
+            const partOfNumericLine=numericLine && compactLineText.includes(text.replace(/\s+/gu,''));
+            add(text,bbox,partOfNumericLine?lineText:text);
             // 保持原行、词的读取顺序；整行数值的非法标点框同样无法安全修补。圈选不调用此阶段。
             if (numericLine) {
                 if (!bbox||!isValidOcrBox(bbox) || bbox.x0<lineBox.x0-2 || bbox.y0<lineBox.y0-2
@@ -436,8 +442,8 @@ function finalizeOcrLines(normalized: ParsedOcrLine[], includeNumericEvidence: b
         for(const line of normalized) {
             if (!line.rawNumericText || !line.numericSourceBox || line.suppressNumericResidual) continue;
             const b=line.numericSourceBox,p=line.bbox,key=[b.x0,b.y0,b.x1,b.y1,p.x0,p.y0,p.x1,p.y1].join(','),group=byBox.get(key);
-            if (!group) {byBox.set(key,{first:line.rawNumericText,lines:[line],conflict:false});continue;}
-            if (!group.conflict && group.first!==line.rawNumericText) {
+            if (!group) {byBox.set(key,{first:numericEvidenceKey(line.rawNumericText),lines:[line],conflict:false});continue;}
+            if (!group.conflict && group.first!==numericEvidenceKey(line.rawNumericText)) {
                 group.conflict=true;for(const other of group.lines)other.numericRawConflict=true;
             }
             if(group.conflict)line.numericRawConflict=true;
@@ -446,7 +452,7 @@ function finalizeOcrLines(normalized: ParsedOcrLine[], includeNumericEvidence: b
     }
     const unique = normalized.filter(line => {
         if (line.suppressNumericResidual) return false;
-        const key = `${line.vertical ? 'vertical' : 'horizontal'}\0${line.rawNumericText ?? line.text}`;
+        const key = `${line.vertical ? 'vertical' : 'horizontal'}\0${line.rawNumericText !== undefined ? numericEvidenceKey(line.rawNumericText) : line.text}`;
         const candidates = seen.get(key) ?? [];
         const duplicate = candidates.find(previous => {
             const a=previous.rawNumericText && line.rawNumericText ? previous.numericSourceBox! : previous.bbox;
@@ -458,7 +464,7 @@ function finalizeOcrLines(normalized: ParsedOcrLine[], includeNumericEvidence: b
             if (line.hiddenNumericEvidence) duplicate.hiddenNumericEvidence=true;
             if (line.numericRawConflict) duplicate.numericRawConflict=true;
             if (includeNumericEvidence && (duplicate.rawNumericText !== undefined || line.rawNumericText !== undefined)
-                && duplicate.rawNumericText !== line.rawNumericText) duplicate.numericRawConflict=true;
+                && (duplicate.rawNumericText === undefined || line.rawNumericText === undefined || numericEvidenceKey(duplicate.rawNumericText) !== numericEvidenceKey(line.rawNumericText))) duplicate.numericRawConflict=true;
             if (duplicate.numericConfidence === undefined || line.numericConfidence === undefined) delete duplicate.numericConfidence;
             else if (includeNumericEvidence && duplicate.numericConfidence >= 90 && line.numericConfidence >= 90 && numericInformation(line.text)) {
                 duplicate.bbox = unionOcrBoxes([duplicate.bbox, line.bbox]);

@@ -430,4 +430,41 @@ describe('数字结果的歧义提示',()=>{
         const lines=collectMangaRegions({results:[text('08:45',80,80,100,20)],bubbles:[{bbox:box(40,40,240,150),results:[{...text('12:34',80,80,100,20),confidence:.3}]}]},'en',400,400,profile);
         expect(lines).toHaveLength(1);expect(lines[0]).toMatchObject({text:'08:45',numericUncertain:true});
     });
+    it.each(['manga','image'] as const)('在 %s 对覆盖或精确匹配的证据继续检查其他相交数值',profile=>{
+        // 第三个框恰好贴在精确证据右边，不能因边界接触而误报。
+        const before=text('40%',1,10,5,20),left=text('90%',10,10,100,20),right=text('80%',90,10,100,20),far=text('60%',110,10,20,20);
+        for(const [guard,retained] of [
+            [{...text('70%',95,12,10,12),confidence:.3},0],
+            [{...text('70%',10,10,100,20),confidence:.3},0],
+            [{...text('70%',95,5,10,30),confidence:.3},1],
+        ] as const){
+            for(const results of [[before,left,right,far],[far,right,left,before]]){
+                const lines=collectMangaRegions({results,numericEvidence:[guard]},'en',400,100,profile);
+                expect(lines.filter(line=>line.guardOnly)).toHaveLength(retained);
+                expect(lines.find(line=>line.text==='90%')?.numericUncertain).toBe(true);
+                expect(lines.find(line=>line.text==='80%')?.numericUncertain).toBe(true);
+                expect(lines.find(line=>line.text==='60%')?.numericUncertain).toBeUndefined();
+                expect(lines.find(line=>line.text==='40%')?.numericUncertain).toBeUndefined();
+            }
+        }
+    });
+    it.each(['manga','image'] as const)('在 %s 模式只忽略百分号前空白',profile=>{
+        for(const [first,second,uncertain] of [
+            ['90%','90 %',false],['90％','90   ％',false],['90%','80 %',true],
+            ['$1000','$1 000',true],
+        ] as const){
+            const lines=collectMangaRegions({results:[text(first,10,10,100,20),text(second,15,10,100,20)]},'en',300,100,profile);
+            expect(lines.every(line=>line.numericUncertain === (uncertain?true:undefined))).toBe(true);
+            expect(lines).toHaveLength(uncertain?2:1);
+        }
+    });
+    it('精确框仍有超过比较预算的候选时全部提示核对并保留未完成检查的保护框',()=>{
+        // x 相同但 y 分离，精确匹配不能跳过同列其他数值；最后一个 guard 超过一百万次比较。
+        const results=Array.from({length:1001},(_,index)=>text('90%',10,10+index*2,1,1));
+        const numericEvidence=results.map(item=>({...item,confidence:.3}));
+        const lines=collectMangaRegions({results,numericEvidence},'en',100,2500,'image');
+        expect(lines.filter(line=>!line.guardOnly)).toHaveLength(1001);
+        expect(lines.filter(line=>!line.guardOnly).every(line=>line.numericUncertain)).toBe(true);
+        expect(lines.some(line=>line.guardOnly)).toBe(true);
+    });
 });

@@ -46,7 +46,7 @@ describe('图片 OCR 处理与结果缓存', () => {
             words:[{text:'SALE',bbox:label,confidence:99},{text:'90%',bbox:word,confidence}]};
         recognize.mockResolvedValueOnce({data:{blocks:[{paragraphs:[{lines:[raw]}]}]}});
         const lines=await recognizeImage('mixed-raw','en',undefined,{includeMangaNumericConfidence:true});
-        expect(lines.filter(line=>line.guardOnly)).toEqual([{text:'',bbox:word,guardOnly:true}]);
+        expect(lines.filter(line=>line.guardOnly)).toEqual([expect.objectContaining({text:'',bbox:word,guardOnly:true})]);
         expect(lines.some(line=>!line.guardOnly&&line.text.startsWith('SALE'))).toBe(true);
         expect(recognize).toHaveBeenCalledOnce();
     });
@@ -102,7 +102,28 @@ describe('图片 OCR 处理与结果缓存', () => {
         recognize.mockResolvedValueOnce({data:{blocks:[{paragraphs:[{lines:[number]}]}]}})
             .mockResolvedValueOnce({data:{blocks:[{paragraphs:[{lines:[{text:'HELLO',bbox:{x0:1,y0:50,x1:20,y1:60},confidence:99},number]}]}]}});
         const result=await recognizeImage('guard-fallback-duplicate','en',undefined,{includeMangaNumericConfidence:true});
-        expect(result.filter(line=>line.guardOnly)).toEqual([{text:'',bbox,guardOnly:true}]);
+        expect(result.filter(line=>line.guardOnly)).toEqual([{text:'',bbox,guardOnly:true,numericGuardText:'90%'}]);
+    });
+    it('回退与缓存中同框百分号空白不同不会视为数值冲突',async()=>{
+        const bbox={x0:10,y0:10,x1:30,y1:20};
+        const raw=(value:string)=>({text:value,bbox,confidence:20});
+        recognize.mockResolvedValueOnce({data:{blocks:[{paragraphs:[{lines:[raw('90 %')]}]}]}})
+            .mockResolvedValueOnce({data:{blocks:[{paragraphs:[{lines:[{text:'HELLO',bbox:{x0:1,y0:50,x1:20,y1:60},confidence:99},raw('90%')]}]}]}});
+        const result=await recognizeImage('guard-fallback-percent-space','en',undefined,{includeMangaNumericConfidence:true});
+        expect(result.filter(line=>line.guardOnly)).toEqual([{text:'',bbox,guardOnly:true,numericGuardText:'90%'}]);
+        const cached=await recognizeImage('guard-fallback-percent-space','en',undefined,{includeMangaNumericConfidence:true});
+        expect(cached.filter(line=>line.guardOnly)).toEqual(result.filter(line=>line.guardOnly));
+    });
+    it('回退与缓存合并同框不同数值的保护证据',async()=>{
+        const bbox={x0:10,y0:10,x1:30,y1:20};
+        const raw=(value:string)=>({text:value,bbox,confidence:20});
+        recognize.mockResolvedValueOnce({data:{blocks:[{paragraphs:[{lines:[raw('70%')]}]}]}})
+            .mockResolvedValueOnce({data:{blocks:[{paragraphs:[{lines:[{text:'HELLO',bbox:{x0:1,y0:50,x1:20,y1:60},confidence:99},raw('90%')]}]}]}});
+        const result=await recognizeImage('guard-fallback-conflict','en',undefined,{includeMangaNumericConfidence:true});
+        expect(result.filter(line=>line.guardOnly)).toEqual([{text:'',bbox,guardOnly:true,numericGuardText:'90%',numericGuardConflict:true}]);
+        const cached=await recognizeImage('guard-fallback-conflict','en',undefined,{includeMangaNumericConfidence:true});
+        expect(cached.filter(line=>line.guardOnly)).toEqual(result.filter(line=>line.guardOnly));
+        expect(recognize).toHaveBeenCalledTimes(2);
     });
     it.each([false,true])('共享 OCR 一方取消时防擦框仍随有效视图与缓存返回，取消保护视图=%s',async cancelProtected=>{
         const bbox={x0:10,y0:10,x1:30,y1:20};
@@ -118,7 +139,7 @@ describe('图片 OCR 处理与结果缓存', () => {
         complete(result);const remaining=await(cancelProtected?ordinary:protectedView);
         expect(remaining.some(line=>line.guardOnly)).toBe(!cancelProtected);
         const cached=await recognizeImage('shared-low-guard','ko',undefined,{includeMangaNumericConfidence:true});
-        expect(cached.filter(line=>line.guardOnly)).toEqual([{text:'',bbox,guardOnly:true}]);
+        expect(cached.filter(line=>line.guardOnly)).toEqual([{text:'',bbox,guardOnly:true,numericGuardText:'90%'}]);
         expect((await recognizeImage('shared-low-guard','ko')).some(line=>line.guardOnly)).toBe(false);
         expect(recognize).toHaveBeenCalledOnce();
     });

@@ -2,7 +2,7 @@ import {describe, expect, it, vi} from 'vitest';
 import {groupMangaText, groupMangaOcrLines, type MangaOcrItem} from '@/src/features/image-translation/services/mangaRegions';
 import {drawMangaTranslations,mangaRegionBackground} from '@/src/features/image-translation/services/mangaRendering';
 import {layoutImageTranslationText} from '@/src/features/image-translation/services/rendering';
-import {numericInformation,numericProtection} from '@/src/features/image-translation/services/mangaNumeric';
+import {numericEvidenceKey,numericInformation,numericProtection} from '@/src/features/image-translation/services/mangaNumeric';
 
 const item = (text: string, x = 20, y = 20, width = 80, height = 20, confidence = 0.99): MangaOcrItem =>
     ({text, box: {x, y, width, height}, confidence});
@@ -253,5 +253,15 @@ describe('漫画与图片的完整数值形态',()=>{
     it.each(['①②','²³','1/0','3 / 4','90%%','20C','38°','3.','--20','3..14','3 3','4/0','1,,000','1,00,0','€1,234,56','1.234.50 €'])('不把无效或装饰形态 %s 当作完整数字',text=>{
         expect(groupMangaText([item(text)],'ja',500,500,'page',true)).toEqual([]);
         expect(groupMangaOcrLines([{text,bbox:{x0:20,y0:20,x1:100,y1:40},numericConfidence:99}],'ko',500,500)).toEqual([]);
+    });
+});
+
+describe('数值证据键',()=>{
+    it('只处理百分号前空白，保留数字内部和小数间空格',()=>{
+        expect(numericEvidenceKey(' 90   % ')).toBe(numericEvidenceKey('90%'));
+        expect(numericEvidenceKey('90　％')).toBe(numericEvidenceKey('90％'));
+        expect(numericEvidenceKey('$1 000')).not.toBe(numericEvidenceKey('$1000'));
+        expect(numericEvidenceKey('12 .30')).not.toBe(numericEvidenceKey('12.30'));
+        expect(numericEvidenceKey('1 0%')).not.toBe(numericEvidenceKey('10%'));
     });
 });

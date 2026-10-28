@@ -52,3 +52,8 @@ export function numericInformation(text: string): boolean {
 export function numericProtection(text:string):boolean {
     return /^[0-9０-９٠-٩۰-۹]$/u.test(text)||numericInformation(text);
 }
+
+/** 数值证据比较只消除百分号前空白；数字间空格可能是数值组成部分。 */
+export function numericEvidenceKey(text:string):string {
+    return text.replace(/\s+/gu,' ').trim().replace(/ +(?=[%％])/gu,'');
+}

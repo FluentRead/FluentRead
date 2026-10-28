@@ -7,6 +7,8 @@
 import type {OcrLine} from '@/src/shared/image/types';
 export interface ImageTextRegion extends OcrLine {
     sourceBoxes?: OcrLine['bbox'][];
+    /** 不可信数值的物理保护框，不参与翻译或阅读。 */
+    guardOnly?: true;
     /** 典型源行字形高度，用于限制译文字号；不是合并段落的总高度。 */
     fontSize?: number;
     textAlign?: 'left' | 'center' | 'right';

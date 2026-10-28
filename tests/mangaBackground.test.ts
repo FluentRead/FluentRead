@@ -4,6 +4,7 @@ import {createMangaBackground} from '@/src/features/image-translation/content/ma
 import {composeMangaPage} from '@/src/features/image-translation/content/mangaCompositor';
 import {encodeImageCanvas} from '@/src/features/image-translation/services/imageEncoding';
 import * as canvasModule from '@/src/features/image-translation/content/mangaCanvas';
+import {createMangaReadingSnapshots} from '@/src/features/image-translation/content/mangaReadingSnapshots';
 vi.mock('@/src/features/image-translation/content/mangaCompositor', () => ({composeMangaPage: vi.fn()}));
 vi.mock('@/src/features/image-translation/services/imageEncoding', () => ({encodeImageCanvas: vi.fn()}));
 const flush = async () => {for (let n=0;n<20;n++) await Promise.resolve();};
@@ -58,7 +59,7 @@ function fixture(acceptsInteractionLayer?: (element: HTMLElement, hit: Element) 
         return {...style,backgroundImage:!denyPresentation&&inline.includes('fluent-read-translated-')?inline:style.backgroundImage};
     });
     document.elementFromPoint=()=>element;
-    const ports={enabled:vi.fn(()=>true),configurationIdentity:vi.fn(()=>'config'),cacheEnabled:vi.fn(()=>true),ready:vi.fn(),acceptsInteractionLayer,
+    const ports={enabled:vi.fn(()=>true),configurationIdentity:vi.fn(()=>'config'),cacheEnabled:vi.fn(()=>true),readingSnapshots:createMangaReadingSnapshots(),ready:vi.fn(),acceptsInteractionLayer,
         translate:vi.fn().mockResolvedValue({mangaPatches:{width:713,height:1024,patches:[{x:0,y:0,width:1,height:1,image:'data:image/png;base64,AQ=='}]},lines:[{text:'译文',bbox:{x0:0,y0:0,x1:1,y1:1},backgroundColor:'#fff'}]})};
     vi.mocked(composeMangaPage).mockImplementation(async()=>{const output=document.createElement('canvas') as HTMLCanvasElement;output.width=713;output.height=1024;outputs.push(output);return output;});
     const originalCreate=canvasModule.createMangaCanvas;
@@ -80,6 +81,23 @@ function presentation(f:ReturnType<typeof fixture>,signal=new AbortController().
 afterEach(()=>{vi.restoreAllMocks();vi.resetAllMocks();vi.unstubAllGlobals();vi.useRealTimers();});
 
 describe('公开背景漫画正文接入既有连续翻译',()=>{
+    it('只读背景身份与边界在未准备、换源、断连和卸载后均保守拒绝且不发起探测',async()=>{
+        const f=fixture(),source=f.bindings().source!;
+        expect(source.readingBounds!(f.element)).toBeNull();expect(source.readingIdentity!(f.element)).toBeNull();expect(f.images).toHaveLength(0);
+        await f.ready();expect(source.readingBounds!(f.element)).not.toBeNull();const count=f.images.length;
+        f.style.backgroundImage='url("blob:https://palcy.jp/other")';expect(source.readingBounds!(f.element)).toBeNull();expect(source.readingIdentity!(f.element)).toBeNull();
+        f.element.remove();expect(source.readingIdentity!(f.element)).toBeNull();f.runtime.dispose();expect(source.readingIdentity!(f.element)).toBeNull();
+        expect(f.images).toHaveLength(count);
+    });
+    it('按需阅读未准备或来源变更时只读拒绝，不触发 Image 探测或归还宿主样式',async()=>{
+        const f=fixture();expect(await f.runtime.readLines(f.element,new AbortController().signal)).toEqual({status:'unavailable'});expect(f.images).toHaveLength(0);
+        await f.ready();await f.translate();const count=f.images.length;
+        expect((await f.runtime.readLines(f.element,new AbortController().signal)).status).toBe('ready');
+        f.element.style.setProperty('background-image','url(blob:https://palcy.jp/new-page)','important');f.style.backgroundImage='url(blob:https://palcy.jp/new-page)';
+        const prior=f.element.getAttribute('style');
+        expect(await f.runtime.readLines(f.element,new AbortController().signal)).toEqual({status:'stale'});
+        expect(f.images).toHaveLength(count);expect(f.element.getAttribute('style')).toBe(prior);expect(f.revokeUrl).not.toHaveBeenCalled();f.runtime.dispose();
+    });
     it('串行探测附近页，译图留在原背景绘制层，归还原属性并释放对象地址',async()=>{
         const f=fixture(),original=f.element.outerHTML;
         const other=f.element.cloneNode() as HTMLElement;other.id='page-2';other.getBoundingClientRect=()=>f.rect as DOMRect;f.document.body.append(other);

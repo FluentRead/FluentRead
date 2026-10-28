@@ -4,8 +4,11 @@ import {createMangaCanvas} from '@/src/features/image-translation/content/mangaC
 import {composeMangaPage} from '@/src/features/image-translation/content/mangaCompositor';
 import {encodeImageCanvas} from '@/src/features/image-translation/services/imageEncoding';
 import {createMangaReader} from '@/src/features/image-translation/content/mangaReader';
+import {createMangaReadingSnapshots} from '@/src/features/image-translation/content/mangaReadingSnapshots';
 vi.mock('@/src/features/image-translation/content/mangaCompositor', () => ({composeMangaPage: vi.fn()}));
-vi.mock('@/src/features/image-translation/services/imageEncoding', () => ({encodeImageCanvas: vi.fn()}));
+vi.mock('@/src/features/image-translation/services/imageEncoding', () => {
+    const encodeImageCanvas=vi.fn();return {encodeImageCanvas,encodeReadingImageCanvas:(canvas:HTMLCanvasElement,signal:AbortSignal)=>encodeImageCanvas(canvas,signal),readingImageEncodingBusy:()=>false};
+});
 const compose = vi.mocked(composeMangaPage);
 const encode = vi.mocked(encodeImageCanvas);
 const packet = {width: 400, height: 300, patches: [{x: 0, y: 0, width: 1, height: 1, image: 'data:image/png;base64,AQ=='}]};
@@ -14,7 +17,7 @@ const deferred = <T,>() => {let resolve!: (value: T) => void, reject!: (error: E
 const flush = async () => {for (let n = 0; n < 30; n++) await Promise.resolve();};
 const restoreAnimationPorts: Array<() => void> = [];
 
-function fixture(recovery?: Parameters<typeof createMangaCanvas>[0]['recovery']) {
+function fixture(recovery?: Parameters<typeof createMangaCanvas>[0]['recovery'], readingSnapshots = createMangaReadingSnapshots(),lightCacheLimits?:{pages:number;bytes:number}) {
     encode.mockResolvedValue('data:image/png;base64,AQ==');
     const {document, window} = parseHTML('<html><body><div id="reader"></div></body></html>');
     const prototype = window.Element.prototype, animationPort = Object.getOwnPropertyDescriptor(prototype, 'getAnimations');
@@ -71,10 +74,241 @@ function fixture(recovery?: Parameters<typeof createMangaCanvas>[0]['recovery'])
     vi.stubGlobal('getComputedStyle', (element: Element) => ({display: 'block', visibility: 'visible', opacity: (element as HTMLElement).style.opacity || '1', overflowX: 'visible', overflowY: 'visible', ...styles.get(element)}));
     compose.mockImplementation(async () => {const output = document.createElement('canvas') as HTMLCanvasElement;output.width = 400;output.height = 300;outputs.push(output);return output;});
     const ports = {enabled: vi.fn(() => true), configurationIdentity: vi.fn(() => 'config-1'), cacheEnabled: vi.fn(() => true), recovery, acceptsInteractionLayer:vi.fn((_canvas:HTMLCanvasElement,_hit:Element)=>false), translate: vi.fn().mockResolvedValue(result)};
-    const runtime = createMangaCanvas(ports);
-    return {document, window, canvas, bounds, styles, hit, snapshots, outputs, roots, ports, runtime,
+    const runtime = createMangaCanvas({...ports, readingSnapshots,lightCacheLimits});
+    return {document, window, canvas, bounds, styles, hit, snapshots, outputs, roots, ports, runtime, readingSnapshots,
         missingContext: () => {missingCaptureContext = true;}};
 }
+
+describe('漫画画布按需阅读快照',()=>{
+    it('未注入阅读存储的旧调用方仍可翻译，轻缓存淘汰不会引入失败',async()=>{
+        const f=fixture(),runtime=createMangaCanvas({...f.ports,lightCacheLimits:{pages:1,bytes:1024*1024}});
+        const second=f.document.createElement('canvas') as HTMLCanvasElement;second.width=400;second.height=300;second.dataset.pixel='1';
+        second.getBoundingClientRect=f.canvas.getBoundingClientRect;f.document.getElementById('reader')!.append(second);
+        await runtime.translate(f.canvas);await expect(runtime.translate(second)).resolves.toBeUndefined();
+        expect((await runtime.readLines(f.canvas,new AbortController().signal)).status).toBe('unavailable');runtime.dispose();f.runtime.dispose();
+    });
+    it('自定义载体没有可验证边界时不公开阅读目标',async()=>{
+        const f=fixture(),source={identity:()=> 'surface',readingIdentity:vi.fn(()=> 'surface'),readingBounds:()=>null,
+            bounds:()=>f.bounds as DOMRect,capture:async(_canvas:HTMLCanvasElement,target:HTMLCanvasElement)=>{target.width=400;target.height=300;}};
+        const runtime=createMangaCanvas({...f.ports,source});expect(runtime.readingIdentity(f.canvas)).toBeNull();
+        await runtime.translate(f.canvas);expect(runtime.readingIdentity(f.canvas)).not.toBeNull();expect(runtime.readingVisible(f.canvas)).toBe(false);
+        source.readingIdentity.mockImplementation(()=>{throw Error('source unavailable');});
+        expect((await runtime.readLines(f.canvas,new AbortController().signal)).status).toBe('stale');
+        runtime.dispose();f.runtime.dispose();
+    });
+    it('自身译层命中时继续检查下层，缺少下层目标则拒绝',async()=>{
+        const f=fixture();await f.runtime.translate(f.canvas);
+        const host=f.document.getElementById('fluent-read-manga-canvas-container')!;f.hit.mockReturnValue(host);
+        Object.assign(f.document,{elementsFromPoint:()=>[host,f.canvas]});expect(f.runtime.readingVisible(f.canvas)).toBe(true);
+        Object.assign(f.document,{elementsFromPoint:()=>[host]});expect(f.runtime.readingVisible(f.canvas)).toBe(false);f.runtime.dispose();
+    });
+    it('浏览器无法检查译层之下的命中目标时保守拒绝',async()=>{
+        const f=fixture();await f.runtime.translate(f.canvas);const host=f.document.getElementById('fluent-read-manga-canvas-container')!;
+        f.hit.mockReturnValue(host);Reflect.deleteProperty(f.document,'elementsFromPoint');expect(f.runtime.readingVisible(f.canvas)).toBe(false);f.runtime.dispose();
+    });
+    it('可信阅读宿主的子节点不会被误判为网页遮挡',async()=>{
+        const f=fixture();await f.runtime.translate(f.canvas);const host=f.document.createElement('div'),child=f.document.createElement('button');
+        host.append(child);f.document.body.append(host);f.hit.mockReturnValue(child);
+        Object.assign(f.document,{elementsFromPoint:()=>[child,host,f.canvas]});expect(f.runtime.readingVisible(f.canvas,undefined,host)).toBe(true);f.runtime.dispose();
+    });
+    it('译图提交阶段出错时清理已分配的临时文字，不泄漏活动预算',async()=>{
+        const f=fixture();f.ports.cacheEnabled.mockReturnValue(false);const original=globalThis.getComputedStyle;let failed=false;
+        vi.stubGlobal('getComputedStyle',(element:Element)=>{if(!failed){failed=true;throw Error('render failure');}return original(element);});
+        await expect(f.runtime.translate(f.canvas)).rejects.toThrow('render failure');expect(f.readingSnapshots.stats().entries).toBe(0);
+        vi.stubGlobal('getComputedStyle',original);f.runtime.dispose();
+    });
+    it('提交出错且文字存储释放异常时仍归还译图状态',async()=>{
+        const f=fixture();f.ports.cacheEnabled.mockReturnValue(false);const remove=vi.spyOn(f.readingSnapshots,'remove').mockImplementation(()=>{throw Error('remove failure');});
+        const original=globalThis.getComputedStyle;let failed=false;
+        vi.stubGlobal('getComputedStyle',(element:Element)=>{if(!failed){failed=true;throw Error('render failure');}return original(element);});
+        await expect(f.runtime.translate(f.canvas)).rejects.toThrow('render failure');expect(remove).toHaveBeenCalledOnce();
+        vi.stubGlobal('getComputedStyle',original);remove.mockRestore();f.runtime.dispose();
+    });
+    it('关闭、隐藏或来源身份异常时不得读取已完成结果',async()=>{
+        const f=fixture();await f.runtime.translate(f.canvas);f.ports.enabled.mockReturnValue(false);
+        expect(f.runtime.readingVisible(f.canvas)).toBe(false);expect((await f.runtime.readLines(f.canvas,new AbortController().signal)).status).toBe('stale');
+        f.ports.enabled.mockReturnValue(true);Object.defineProperty(f.document,'hidden',{configurable:true,value:true});expect(f.runtime.readingVisible(f.canvas)).toBe(false);
+        Object.defineProperty(f.document,'hidden',{configurable:true,value:false});f.ports.configurationIdentity.mockImplementationOnce(()=>{throw Error('config unavailable');});
+        expect((await f.runtime.readLines(f.canvas,new AbortController().signal)).status).toBe('stale');f.runtime.dispose();
+    });
+    it.each(['invalid','overBudget'] as const)('已有缓存内的 %s 阅读数据安全拒绝，不截断',async mode=>{
+        const f=fixture(),bad={...result.lines[0],bbox:{x0:2,y0:0,x1:1,y1:1}};
+        f.ports.translate.mockResolvedValueOnce({...result,lines:mode==='invalid'?[bad]:Array.from({length:513},()=>result.lines[0])});
+        await f.runtime.translate(f.canvas);expect((await f.runtime.readLines(f.canvas,new AbortController().signal)).status).toBe(mode==='invalid'?'error':'overBudget');f.runtime.dispose();
+    });
+    it('读取编码报错时若已经取消，状态保留取消而非伪报故障',async()=>{
+        const f=fixture();await f.runtime.translate(f.canvas);const abort=new AbortController();
+        encode.mockImplementationOnce(()=>{abort.abort();throw Error('late encoding failure');});
+        expect(await f.runtime.readLines(f.canvas,abort.signal)).toEqual({status:'cancelled'});f.runtime.dispose();
+    });
+    it('清理时才发生取消，仍保留清理前判定的编码错误',async()=>{
+        const f=fixture();await f.runtime.translate(f.canvas);const abort=new AbortController(),pending=deferred<string>();
+        encode.mockReturnValueOnce(pending.promise);const reading=f.runtime.readLines(f.canvas,abort.signal);await flush();
+        const snapshot=f.snapshots.at(-1)!;let width=snapshot.width;
+        Object.defineProperty(snapshot,'width',{configurable:true,get:()=>width,set:(value:number)=>{width=value;if(value===0)abort.abort();}});
+        pending.reject(Error('encoding failure'));expect(await reading).toEqual({status:'error'});expect(abort.signal.aborted).toBe(true);f.runtime.dispose();
+    });
+    it('等待编码期间取消后异步拒绝，仍只报告取消并清理快照',async()=>{
+        const f=fixture();await f.runtime.translate(f.canvas);const abort=new AbortController(),pending=deferred<string>();
+        encode.mockReturnValueOnce(pending.promise);const read=f.runtime.readLines(f.canvas,abort.signal);await flush();
+        abort.abort();pending.reject(Error('encoding rejected after abort'));
+        expect(await read).toEqual({status:'cancelled'});f.runtime.dispose();
+    });
+    it.each(['cancel','config'] as const)('完整摘要期间 %s 不会返回迟到的旧结果',async change=>{
+        const f=fixture();await f.runtime.translate(f.canvas);const pending=deferred<ArrayBuffer>();
+        vi.stubGlobal('crypto',{subtle:{digest:vi.fn(()=>pending.promise)}});
+        const abort=new AbortController(),read=f.runtime.readLines(f.canvas,abort.signal);await flush();
+        if(change==='cancel')abort.abort();else f.ports.configurationIdentity.mockReturnValue('new-config');
+        pending.resolve(new Uint8Array(32).buffer);expect(await read).toEqual({status:change==='cancel'?'cancelled':'stale'});f.runtime.dispose();
+    });
+    it('已编码图片过大时停止摘要，明确报告超预算',async()=>{
+        const f=fixture();await f.runtime.translate(f.canvas);const digest=vi.fn();vi.stubGlobal('crypto',{subtle:{digest}});
+        encode.mockResolvedValueOnce('a'.repeat(32*1024*1024+1));
+        expect(await f.runtime.readLines(f.canvas,new AbortController().signal)).toEqual({status:'overBudget'});expect(digest).not.toHaveBeenCalled();f.runtime.dispose();
+    });
+    it.each(['no-key','invalid'] as const)('轻缓存淘汰时快照 %s 明确失败但不会影响译图',async mode=>{
+        const snapshots=createMangaReadingSnapshots();if(mode==='no-key')vi.spyOn(snapshots,'allocateKey').mockReturnValue(undefined);
+        else vi.spyOn(snapshots,'put').mockReturnValue('invalid');
+        const f=fixture(undefined,snapshots,{pages:1,bytes:1024*1024});const second=f.document.createElement('canvas') as HTMLCanvasElement;
+        second.width=400;second.height=300;second.dataset.pixel='1';second.getBoundingClientRect=f.canvas.getBoundingClientRect;f.document.getElementById('reader')!.append(second);
+        await f.runtime.translate(f.canvas);await expect(f.runtime.translate(second)).resolves.toBeUndefined();
+        expect((await f.runtime.readLines(f.canvas,new AbortController().signal)).status).toBe(mode==='no-key'?'overBudget':'error');f.runtime.dispose();
+    });
+    it('观察版本仅表示当前已完成的载体，释放后无法复用',async()=>{
+        const f=fixture();expect(f.runtime.readingVersion(f.canvas)).toBeUndefined();await f.runtime.translate(f.canvas);
+        const version=f.runtime.readingVersion(f.canvas);expect(version).toBeDefined();f.runtime.release(f.canvas);
+        expect(f.runtime.readingVersion(f.canvas)).toBeUndefined();await f.runtime.translate(f.canvas);
+        expect(f.runtime.readingVersion(f.canvas)).not.toBe(version);f.runtime.dispose();
+    });
+    it('缓存无空间或快照端口抛错不影响译图，阅读结果分别报告可用与错误',async()=>{
+        const f=fixture(undefined,createMangaReadingSnapshots(),{pages:0,bytes:1024*1024});await f.runtime.translate(f.canvas);
+        expect((await f.runtime.readLines(f.canvas,new AbortController().signal)).status).toBe('ready');f.runtime.dispose();
+        const broken=createMangaReadingSnapshots();vi.spyOn(broken,'put').mockImplementation(()=>{throw Error('snapshot error');});
+        const g=fixture(undefined,broken,{pages:0,bytes:1024*1024});await expect(g.runtime.translate(g.canvas)).resolves.toBeUndefined();
+        expect((await g.runtime.readLines(g.canvas,new AbortController().signal)).status).toBe('error');g.runtime.dispose();
+    });
+    it('读取预取消以及样式查询失败均安全退出',async()=>{
+        const f=fixture();await f.runtime.translate(f.canvas);const abort=new AbortController();abort.abort();
+        expect(await f.runtime.readLines(f.canvas,abort.signal)).toEqual({status:'cancelled'});
+        const style=globalThis.getComputedStyle;vi.stubGlobal('getComputedStyle',()=>{throw Error('style unavailable');});
+        expect(f.runtime.readingVisible(f.canvas)).toBe(false);vi.stubGlobal('getComputedStyle',style);f.runtime.dispose();
+    });
+    it('读取只保留祖先裁切后仍可见的区域；离屏或祖先隐藏均拒绝',async()=>{
+        const f=fixture();await f.runtime.translate(f.canvas);const parent=f.document.getElementById('reader')!;
+        const bounds={left:600,right:700,top:0,bottom:200,width:100,height:200};parent.getBoundingClientRect=()=>bounds as DOMRect;
+        f.styles.set(parent,{overflowX:'hidden',overflowY:'hidden'});expect(f.runtime.readingVisible(f.canvas)).toBe(false);
+        Object.assign(bounds,{left:150,right:450,top:100,bottom:250});expect(f.runtime.readingVisible(f.canvas)).toBe(true);
+        Object.assign(bounds,{top:400,bottom:500});expect(f.runtime.readingVisible(f.canvas)).toBe(false);
+        f.styles.set(parent,{display:'none'});expect(f.runtime.readingVisible(f.canvas)).toBe(false);f.runtime.dispose();
+    });
+    it('未完成和失败页面分别报告等待与错误，不启动额外请求',async()=>{
+        const f=fixture(),pending=deferred<typeof result>();f.ports.translate.mockReturnValueOnce(pending.promise);
+        const task=f.runtime.translate(f.canvas);await flush();expect(await f.runtime.readLines(f.canvas,new AbortController().signal)).toEqual({status:'pending'});
+        pending.reject(Error('recognition failed'));await expect(task).rejects.toThrow('recognition failed');
+        expect(await f.runtime.readLines(f.canvas,new AbortController().signal)).toEqual({status:'error'});expect(f.ports.translate).toHaveBeenCalledOnce();f.runtime.dispose();
+    });
+    it('空结果和无效识别行被明确区分，异常快照读取不会影响显示',async()=>{
+        const f=fixture();f.ports.cacheEnabled.mockReturnValue(false);f.ports.translate.mockResolvedValueOnce({...result,lines:[]});
+        await f.runtime.translate(f.canvas);expect(await f.runtime.readLines(f.canvas,new AbortController().signal)).toEqual({status:'empty'});f.runtime.release(f.canvas);
+        f.ports.translate.mockResolvedValueOnce({...result,lines:[{...result.lines[0],bbox:{x0:9,y0:0,x1:1,y1:1}}]});
+        await f.runtime.translate(f.canvas);expect(await f.runtime.readLines(f.canvas,new AbortController().signal)).toEqual({status:'error'});f.runtime.dispose();
+        const other=fixture();other.ports.cacheEnabled.mockReturnValue(false);await other.runtime.translate(other.canvas);
+        vi.spyOn(other.readingSnapshots,'get').mockImplementation(()=>{throw Error('bad storage');});
+        expect(await other.runtime.readLines(other.canvas,new AbortController().signal)).toEqual({status:'error'});other.runtime.dispose();
+    });
+    it('无可用快照身份时明确报告预算耗尽，不影响已完成译图',async()=>{
+        const snapshots=createMangaReadingSnapshots();vi.spyOn(snapshots,'allocateKey').mockReturnValue(undefined);
+        const f=fixture(undefined,snapshots);f.ports.cacheEnabled.mockReturnValue(false);await f.runtime.translate(f.canvas);
+        expect(await f.runtime.readLines(f.canvas,new AbortController().signal)).toEqual({status:'overBudget'});
+        expect(f.ports.translate).toHaveBeenCalledOnce();f.runtime.dispose();
+    });
+    it('两个相同像素画布分别持有身份，轻缓存淘汰活动页时有界转移并可释放',async()=>{
+        const snapshots=createMangaReadingSnapshots(),f=fixture(undefined,snapshots,{pages:1,bytes:1024*1024});
+        const second=f.document.createElement('canvas') as HTMLCanvasElement;second.width=400;second.height=300;
+        second.dataset.pixel='1';second.getBoundingClientRect=f.canvas.getBoundingClientRect;f.document.getElementById('reader')!.append(second);
+        await f.runtime.translate(f.canvas);expect(snapshots.stats().entries).toBe(0);
+        await f.runtime.translate(second);expect(snapshots.stats().entries).toBe(1);
+        expect((await f.runtime.readLines(f.canvas,new AbortController().signal)).status).toBe('ready');
+        expect((await f.runtime.readLines(second,new AbortController().signal)).status).toBe('ready');expect(f.ports.translate).toHaveBeenCalledTimes(2);
+        f.runtime.release(f.canvas);expect(snapshots.stats().entries).toBe(0);f.runtime.dispose();
+    });
+    it.each(['overBudget','throws'] as const)('活动文字转移 %s 不影响译图并明确报告',async failure=>{
+        const snapshots=createMangaReadingSnapshots(failure==='overBudget'?{maxBytes:64}:{});
+        if(failure==='throws')vi.spyOn(snapshots,'put').mockImplementation(()=>{throw Error('broken snapshot');});
+        const f=fixture(undefined,snapshots,{pages:1,bytes:1024*1024});
+        const second=f.document.createElement('canvas') as HTMLCanvasElement;second.width=400;second.height=300;
+        second.dataset.pixel='2';second.getBoundingClientRect=f.canvas.getBoundingClientRect;f.document.getElementById('reader')!.append(second);
+        await f.runtime.translate(f.canvas);await expect(f.runtime.translate(second)).resolves.toBeUndefined();
+        expect((await f.runtime.readLines(f.canvas,new AbortController().signal)).status).toBe(failure==='throws'?'error':'overBudget');
+        expect((await f.runtime.readLines(second,new AbortController().signal)).status).toBe('ready');expect(f.ports.translate).toHaveBeenCalledTimes(2);f.runtime.dispose();
+    });
+    it('已释放的页面在缓存淘汰时不产生文字副本',async()=>{
+        const snapshots=createMangaReadingSnapshots(),f=fixture(undefined,snapshots,{pages:1,bytes:1024*1024});
+        const second=f.document.createElement('canvas') as HTMLCanvasElement;second.width=400;second.height=300;
+        second.dataset.pixel='1';second.getBoundingClientRect=f.canvas.getBoundingClientRect;f.document.getElementById('reader')!.append(second);
+        await f.runtime.translate(f.canvas);f.runtime.release(f.canvas);await f.runtime.translate(second);
+        expect(snapshots.stats().entries).toBe(0);expect(await f.runtime.readLines(f.canvas,new AbortController().signal)).toEqual({status:'unavailable'});f.runtime.dispose();
+    });
+    it('画布遮挡检查只豁免实际持有的阅读层，网页伪造标记仍遮挡',async()=>{
+        const f=fixture();await f.runtime.translate(f.canvas);
+        const fake=f.document.createElement('div');fake.setAttribute('data-fluent-read-ui','');f.document.body.append(fake);
+        f.hit.mockReturnValue(fake);Object.assign(f.document,{elementsFromPoint:()=>[fake,f.canvas]});
+        expect(f.runtime.readingVisible(f.canvas)).toBe(false);
+        expect(f.runtime.readingVisible(f.canvas,undefined,fake)).toBe(true);f.runtime.dispose();
+    });
+    it('自定义载体未提供明确纯查询身份时拒绝，不回退到可能触发副作用的 identity',async()=>{
+        const f=fixture(),identity=vi.fn(()=>null);
+        const source={identity,capture:vi.fn(),bounds:vi.fn(()=>f.bounds as DOMRect)};
+        const runtime=createMangaCanvas({...f.ports,source,readingSnapshots:f.readingSnapshots});
+        expect(await runtime.readLines(f.canvas,new AbortController().signal)).toEqual({status:'unavailable'});
+        expect(runtime.readingIdentity(f.canvas)).toBeNull();
+        expect(identity).not.toHaveBeenCalled();runtime.dispose();f.runtime.dispose();
+    });
+    it('缓存关闭仍能读取活动页的有界文字，停止会话后释放；不重新翻译',async()=>{
+        const f=fixture();f.ports.cacheEnabled.mockReturnValue(false);await f.runtime.translate(f.canvas);
+        const read=await f.runtime.readLines(f.canvas,new AbortController().signal);
+        expect(read).toEqual({status:'ready',lines:result.lines});expect(f.ports.translate).toHaveBeenCalledOnce();
+        f.runtime.release(f.canvas);expect(f.readingSnapshots.stats().entries).toBe(0);
+        expect(await f.runtime.readLines(f.canvas,new AbortController().signal)).toEqual({status:'unavailable'});f.runtime.dispose();
+    });
+    it('缓存关闭时暂停立即释放临时文字，返页不悄悄重新识别',async()=>{
+        const f=fixture();f.ports.cacheEnabled.mockReturnValue(false);await f.runtime.translate(f.canvas);
+        expect(f.readingSnapshots.stats().entries).toBe(1);f.runtime.restore(f.canvas);
+        expect(f.readingSnapshots.stats().entries).toBe(0);expect(f.runtime.reuse(f.canvas)).toBe(true);
+        expect(await f.runtime.readLines(f.canvas,new AbortController().signal)).toEqual({status:'unavailable'});
+        expect(f.ports.translate).toHaveBeenCalledOnce();f.runtime.dispose();
+    });
+    it('画布重新校验期间旧文字不可读，同摘要验证后可复用且不识别',async()=>{
+        const f=fixture();f.ports.cacheEnabled.mockReturnValue(false);await f.runtime.translate(f.canvas);
+        f.runtime.invalidate(f.canvas);expect((await f.runtime.readLines(f.canvas,new AbortController().signal)).status).not.toBe('ready');
+        await f.runtime.translate(f.canvas);expect((await f.runtime.readLines(f.canvas,new AbortController().signal)).status).toBe('ready');
+        expect(f.ports.translate).toHaveBeenCalledOnce();f.runtime.dispose();
+    });
+    it('原生画布完整摘要变化时拒绝旧文字，即便 8×8 指纹不变',async()=>{
+        const f=fixture();encode.mockImplementation(async canvas=>`data:image/png;base64,${btoa(canvas.dataset.content || 'A')}`);
+        await f.runtime.translate(f.canvas);f.canvas.dataset.content='B';
+        expect(await f.runtime.readLines(f.canvas,new AbortController().signal)).toEqual({status:'stale'});
+        expect(f.ports.translate).toHaveBeenCalledOnce();f.runtime.dispose();
+    });
+    it('完整摘要期间取消、来源变化或释放不能返回迟到文字',async()=>{
+        for(const action of ['cancel','config','release'] as const){
+            const f=fixture();await f.runtime.translate(f.canvas);const wait=deferred<string>();encode.mockReturnValueOnce(wait.promise);
+            const controller=new AbortController(),read=f.runtime.readLines(f.canvas,controller.signal);await flush();
+            if(action==='cancel')controller.abort();else if(action==='config')f.ports.configurationIdentity.mockReturnValue('config-2');else f.runtime.release(f.canvas);
+            wait.resolve('data:image/png;base64,AQ==');expect((await read).status).not.toBe('ready');f.runtime.dispose();vi.clearAllMocks();
+        }
+    });
+    it('新来源文字超预算不会从旧状态复活，旧活动项被释放',async()=>{
+        const f=fixture();f.ports.cacheEnabled.mockReturnValue(false);
+        encode.mockImplementation(async canvas=>`data:image/png;base64,${btoa(canvas.dataset.content || 'A')}`);
+        await f.runtime.translate(f.canvas);expect((await f.runtime.readLines(f.canvas,new AbortController().signal)).status).toBe('ready');
+        f.runtime.invalidate(f.canvas);f.canvas.dataset.content='B';
+        f.ports.translate.mockResolvedValueOnce({...result,lines:Array.from({length:513},()=>result.lines[0])});
+        await f.runtime.translate(f.canvas);
+        expect(await f.runtime.readLines(f.canvas,new AbortController().signal)).toEqual({status:'overBudget'});
+        expect(f.readingSnapshots.stats().entries).toBe(0);f.runtime.dispose();
+    });
+});
 
 function readerFor(f: ReturnType<typeof fixture>) {
     const outer = f.document.createElement('div');outer.className = 'images-container';
@@ -712,4 +946,78 @@ describe('公开可读漫画画布的任务与显示所有权', () => {
         await f.runtime.translate(f.canvas);expect(f.canvas.style.opacity).toBe('0');f.runtime.restore(f.canvas);
         expect(f.canvas.getAttribute('style')).toBe(original);f.runtime.dispose();
     });
+});
+
+
+describe('漫画载体的未绘制提示',()=>{
+    it.each(['canvas','background'] as const)('%s 在完成、缓存恢复和释放时正确维护提示',async kind=>{
+        const f=fixture({retry:()=>false,openSettings:async()=>{},translateUi:text=>`本地化:${text}`});
+        f.ports.translate.mockResolvedValueOnce({mangaPatches:{...packet,patches:[]},lines:[{...result.lines[0],renderSkipped:true}]});
+        const source=kind==='background'?{identity:()=> 'background',bounds:()=>f.bounds as DOMRect,capture:async(_element:HTMLCanvasElement,target:HTMLCanvasElement)=>{target.width=400;target.height=300;}}:undefined;
+        const runtime=kind==='canvas'?f.runtime:createMangaCanvas({...f.ports,readingSnapshots:f.readingSnapshots,source});
+        await runtime.translate(f.canvas);
+        const warning=()=>f.roots.flatMap(root=>Array.from(root.querySelectorAll<HTMLElement>('.fr-manga-render-warning'))).at(-1);
+        expect(warning()?.textContent).toBe('本地化:未绘制');expect(warning()?.title).toBe('本地化:部分译文未绘制，请查看漫画文字');expect(warning()?.hidden).toBe(false);
+        if(kind==='canvas'){
+            expect(runtime.reuse(f.canvas)).toBe(true);
+            expect(f.roots.at(-1)?.lastElementChild).toBe(warning());
+        }
+        runtime.restore(f.canvas);expect(warning()).toBeUndefined();
+        expect(runtime.reuse(f.canvas)).toBe(true);expect(warning()?.hidden).toBe(false);
+        expect(f.ports.translate).toHaveBeenCalledOnce();runtime.release(f.canvas);expect(warning()).toBeUndefined();
+        runtime.dispose();if(kind==='background')f.runtime.dispose();
+    });
+});
+
+
+it('已绘制的画布重复复用后提示仍在画布之上',async()=>{
+    const f=fixture();f.ports.translate.mockResolvedValueOnce({...result,lines:[{...result.lines[0],renderSkipped:true}]});
+    await f.runtime.translate(f.canvas);expect(f.outputs).toHaveLength(1);
+    expect(f.runtime.reuse(f.canvas)).toBe(true);
+    const root=f.roots.at(-1)!;expect(root.lastElementChild?.className).toBe('fr-manga-render-warning');
+    expect(root.lastElementChild?.previousElementSibling).toBe(f.outputs[0]);f.runtime.dispose();
+});
+
+
+it('纯数字结果显示原图未改动的完成提示，恢复时清理',async()=>{
+    const f=fixture();f.ports.translate.mockResolvedValueOnce({mangaPatches:{...packet,patches:[]},lines:[{text:'12:34',bbox:{x0:1,y0:1,x1:20,y1:8},backgroundColor:'transparent'}]});
+    await f.runtime.translate(f.canvas);const warning=f.roots.at(-1)?.querySelector('.fr-manga-render-warning');
+    expect(warning?.textContent).toBe('已识别');expect(warning?.getAttribute('aria-label')).toBe('已识别文字，原图未改动');expect(warning?.hasAttribute('hidden')).toBe(false);
+    f.runtime.restore(f.canvas);expect(warning?.isConnected).toBe(false);f.runtime.dispose();
+});
+
+
+it('未绘制提示隔离点击、指针和按键，避免触发宿主翻页',async()=>{
+    const f=fixture();f.ports.translate.mockResolvedValueOnce({...result,lines:[{...result.lines[0],renderSkipped:true}]});
+    await f.runtime.translate(f.canvas);const warning=f.roots.at(-1)!.querySelector('.fr-manga-render-warning')!;
+    const outside=vi.fn();warning.parentNode!.addEventListener('click',outside);
+    for(const type of ['click','pointerdown','keydown','keyup','touchstart','touchmove','touchend','touchcancel']){
+        const listener=vi.fn();warning.parentNode!.addEventListener(type,listener);
+        const event=new f.window.Event(type,{bubbles:true,cancelable:true});warning.dispatchEvent(event);
+        expect(listener).not.toHaveBeenCalled();expect(event.defaultPrevented).toBe(false);
+    }
+    expect(outside).not.toHaveBeenCalled();f.runtime.dispose();
+});
+
+
+it('可信警示动作打开文字并隔离未可信点击；更新语言和来源后清理旧提示',async()=>{
+    const f=fixture({retry:()=>false,openSettings:async()=>{},translateUi:text=>`L:${text}`});
+    const openReading=vi.fn();const runtime=createMangaCanvas({...f.ports,openReading});
+    f.ports.translate.mockResolvedValue({...result,lines:[{...result.lines[0],renderSkipped:true}]});
+    await runtime.translate(f.canvas);const warning=f.roots.at(-1)!.querySelector<HTMLElement>('.fr-manga-render-warning')!;
+    const click=(trusted:boolean)=>{const event=new f.window.Event('click',{bubbles:true});Object.defineProperty(event,'isTrusted',{value:trusted});warning.dispatchEvent(event);};
+    click(false);expect(openReading).not.toHaveBeenCalled();click(true);expect(openReading).toHaveBeenCalledOnce();
+    runtime.refreshLanguage();expect(warning.title).toBe('L:部分译文未绘制，请查看漫画文字');
+    f.canvas.dataset.pixel='2';await runtime.translate(f.canvas);expect(warning.isConnected).toBe(false);
+    runtime.invalidate(f.canvas);expect(f.roots.at(-1)!.querySelector('.fr-manga-render-warning')).toBeNull();
+    runtime.dispose();f.runtime.dispose();
+});
+
+
+it('未配置本地化端口时完成提示的语言刷新保留可访问说明',async()=>{
+    const f=fixture();f.ports.translate.mockResolvedValueOnce({mangaPatches:{...packet,patches:[]},lines:[{...result.lines[0]}]});
+    await f.runtime.translate(f.canvas);f.runtime.refreshLanguage();
+    const warning=f.roots.at(-1)!.querySelector<HTMLElement>('.fr-manga-render-warning')!;
+    expect(warning.textContent).toBe('已识别');expect(warning.title).toBe('已识别文字，原图未改动');
+    f.runtime.dispose();
 });

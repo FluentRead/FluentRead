@@ -179,6 +179,29 @@ describe('漫画局部神经修补',()=>{
             }
         }
     });
+    it.each([
+        {width:33,height:37,bbox:{x0:-6,y0:-4,x1:20,y1:31},sourceBox:{x0:-3,y0:0,x1:6,y1:12},alpha:123,expectedAlpha:undefined},
+        {width:541,height:131,bbox:{x0:-8,y0:-9,x1:520,y1:115},sourceBox:{x0:10,y0:8,x1:27,y1:22},alpha:123,expectedAlpha:123},
+        {width:96,height:128,bbox:{x0:60,y0:70,x1:103,y1:133},sourceBox:{x0:82,y0:112,x1:99,y1:130},alpha:255,expectedAlpha:undefined},
+    ])('负坐标和边界补丁按逐像素参考保留 RGB、蒙版与 alpha：$width×$height',({width,height,bbox,sourceBox,alpha,expectedAlpha})=>{
+        const input=new Uint8ClampedArray(width*height*4);
+        for(let y=0;y<height;y++)for(let x=0;x<width;x++) input.set([(x*11+y*3)%256,(x*7+y*13)%256,(x+y*17)%256,alpha],(y*width+x)*4);
+        const original=input.slice(),candidate={...region,fontSize:13.5,bbox,sourceBoxes:[sourceBox]};
+        const mapping=createMangaPatch(input,width,height,candidate),{patch,left,top,sourceWidth,sourceHeight}=mapping,count=patch.width*patch.height;
+        const expectedImage=new Float32Array(count*3),expectedMask=new Float32Array(count);
+        const margin=3,box={x0:Math.max(0,Math.floor(sourceBox.x0)-margin),y0:Math.max(0,Math.floor(sourceBox.y0)-margin),x1:Math.min(width,Math.ceil(sourceBox.x1)+margin),y1:Math.min(height,Math.ceil(sourceBox.y1)+margin)};
+        for(let y=0;y<patch.height;y++)for(let x=0;x<patch.width;x++){
+            const sx=left+Math.min(sourceWidth-1,Math.floor(x*sourceWidth/patch.width));
+            const sy=top+Math.min(sourceHeight-1,Math.floor(y*sourceHeight/patch.height));
+            const position=y*patch.width+x,source=(sy*width+sx)*4;
+            for(let channel=0;channel<3;channel++)expectedImage[channel*count+position]=input[source+channel]/255;
+            expectedMask[position]=Number(sx>=box.x0&&sx<box.x1&&sy>=box.y0&&sy<box.y1);
+        }
+        expect(Buffer.from(patch.image.buffer).equals(Buffer.from(expectedImage.buffer))).toBe(true);
+        expect(Buffer.from(patch.mask.buffer).equals(Buffer.from(expectedMask.buffer))).toBe(true);
+        expect(mapping.alpha).toBe(expectedAlpha);
+        expect(input).toEqual(original);
+    });
     it('不透明补丁沿用原始行的 RGB，图外和行间画面与 alpha 完全不变',()=>{
         const input=pixels(),result=new Uint8ClampedArray(input),r={...region,sourceBoxes:[{x0:30,y0:30,x1:60,y1:50}]},mapping=createMangaPatch(input,128,128,r);
         const output=zero(mapping.patch);output.fill(2,0,mapping.patch.width*mapping.patch.height);applyMangaPatch(result,128,r,mapping,output);

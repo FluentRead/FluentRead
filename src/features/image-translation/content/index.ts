@@ -10,4 +10,8 @@ export {
     toggleContextMenuImage,
     mountImageTranslator,
     unmountImageTranslator,
+    getMangaReadingCandidates,
+    readMangaReadingCandidate,
+    observeMangaReadingCandidate,
+    registerMangaReadingOverlayHost,
 } from './runtime';

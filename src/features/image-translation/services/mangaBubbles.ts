@@ -1,14 +1,15 @@
 /**
  * @file src/features/image-translation/services/mangaBubbles.ts
  * 文件职责：从漫画像素定位封闭浅色气泡，让小字以局部高分辨率识别并排除绘画噪声。
- * 主要内容：以扫描行四邻域填充亮色连通区域，按待处理行段增长轻量栈，不为整图预分配逐像素队列；最多二十四个小裁图参与局部识别，大型曲边浅底组件只提供保守内接区域且不增加推理；用上下边缘占比、行包络实心度、密度和面积界限排除大型矩形或多洞面板，行跨度数组按高度有界复用；同次扫描为大气泡记录最多一百二十八处内部独立浅色岛，超限撤回新增归属，仅排除完整落在岛内的物理框且不传输排除元数据；从已有原像素核对候选边缘浅底，成员绑定原 OCR 结果索引，角落与独立旁白维持原分组；按最小局部候选优先消除嵌套候选对同一物理行的重复，逐行以可靠局部识别替换重叠的全页结果，保留局部漏行与失败时的全页回退；漫画在最紧的所属气泡内合并局部及回退行并保留气泡外可靠旁白，普通图片保留物理行供独立段落策略处理。
+ * 主要内容：以扫描行四邻域填充亮色连通区域，按待处理行段增长轻量栈，不为整图预分配逐像素队列；最多二十四个小裁图参与局部识别，大型曲边浅底组件只提供保守内接区域且不增加推理；用上下边缘占比、行包络实心度、密度和面积界限排除大型矩形或多洞面板，行跨度数组按高度有界复用；同次扫描为大气泡记录最多一百二十八处内部独立浅色岛，超限撤回新增归属，仅排除完整落在岛内的物理框且不传输排除元数据；从已有原像素核对候选边缘浅底，成员绑定原 OCR 结果索引，角落与独立旁白维持原分组；按最小局部候选优先消除嵌套候选对同一物理行的重复，逐行以可靠局部识别替换重叠的全页结果，保留局部漏行与失败时的全页回退；漫画在最紧的所属气泡内合并局部及回退行并保留气泡外可靠旁白，普通图片保留物理行供独立段落策略处理；漫画与图片均保留冲突数字证据并合并重复数字保护框。
  * 模块边界：纯像素和坐标算法，不创建 Canvas、不访问网络、不运行模型；气泡本身不作为文字证据，只有后续识别出的有效文本进入翻译。
  */
 import {groupMangaText,type MangaOcrItem,type MangaRegion} from './mangaRegions';
+import {numericInformation,numericProtection} from './mangaNumeric';
 type Box=MangaRegion['bbox'];
 export interface MangaLayoutOwner extends Box {exclusions?:Box[]}
 export interface MangaLayoutBubble {bbox:Box;members:number[]}
-export interface MangaOcrPage {results:MangaOcrItem[];bubbles?:Array<{bbox:Box;results:MangaOcrItem[]}>;layoutBubbles?:MangaLayoutBubble[]}
+export interface MangaOcrPage {results:MangaOcrItem[];numericEvidence?:MangaOcrItem[];bubbles?:Array<{bbox:Box;results:MangaOcrItem[];numericEvidence?:MangaOcrItem[]}>;layoutBubbles?:MangaLayoutBubble[]}
 
 export function findMangaBubbles(pixels:Uint8ClampedArray,width:number,height:number):Box[]{
     return findMangaBubbleLayout(pixels,width,height).recognition;
@@ -133,6 +134,25 @@ export function collectMangaRegions(page:MangaOcrPage,language:string,width:numb
     const inside=(item:MangaOcrItem,index:number)=>index<bubbles.length?itemCenterInside(item,owners[index]):memberships.get(item)?.has(index)===true;
     const context = (item: MangaOcrItem) => bubbles.some(bubble => itemCenterInside(item,bubble.bbox)) ? 'bubble' as const : 'page' as const;
     const reliable = (item: MangaOcrItem) => groupMangaText([item], language, width, height, context(item)).length > 0;
+    // 即使识别置信不足或孤字被过滤，也不让邻近译文擦掉疑似数值的物理区域。
+    const guards:MangaRegion[]=[],guardKeys=new Set<string>();
+    const candidates=[...page.results,...bubbles.flatMap(bubble=>bubble.results)].map(item=>({item,force:false}));
+    candidates.push(...[...(page.numericEvidence??[]),...bubbles.flatMap(bubble=>bubble.numericEvidence??[])].map(item=>({item,force:true})));
+    for(const {item,force} of candidates){
+        const text=item.text?.replace(/\s+/gu,' ').trim();
+        if(!text||!numericProtection(text)||(!force&&reliable(item)))continue;
+        const b=item.box;
+        if(!b||![b.x,b.y,b.width,b.height].every(Number.isFinite)||b.width<=0||b.height<=0)
+            throw new Error('图片数字保护位置无效，已保留原图');
+        const bbox={x0:Math.max(0,b.x),y0:Math.max(0,b.y),x1:Math.min(width,b.x+b.width),y1:Math.min(height,b.y+b.height)};
+        if(bbox.x1<=bbox.x0||bbox.y1<=bbox.y0)continue;
+        const key=[bbox.x0,bbox.y0,bbox.x1,bbox.y1].join(',');if(guardKeys.has(key))continue;
+        if(guards.length>=4096)throw new Error('图片数字保护区域过于复杂，已保留原图');
+        guardKeys.add(key);guards.push({text:'',bbox,fontSize:bbox.y1-bbox.y0,guardOnly:true});
+    }
+    const numeric = (item: MangaOcrItem) => item.confidence >= .9 && numericInformation(item.text.trim());
+    // 不同识别视图发生数字冲突时都保留，供后续按区域保守跳过绘制。
+    const numericConflict = (a: MangaOcrItem, b: MangaOcrItem) => numeric(a) || numeric(b);
     // 先按原始物理行去重，再合段；否则跨气泡的包围框中心会误删整段，或局部漏行无法并回同一对白。
     const bubbleOrder = bubbles.map((bubble,index)=>({index,area:(bubble.bbox.x1-bubble.bbox.x0)*(bubble.bbox.y1-bubble.bbox.y0)}))
         .sort((a,b)=>a.area-b.area).map(bubble=>bubble.index);
@@ -142,27 +162,69 @@ export function collectMangaRegions(page:MangaOcrPage,language:string,width:numb
     for(const index of bubbleOrder)for(const item of bubbles[index].results.filter(reliable)){
         // 浅色面板和内部气泡可能同时入选；只按跨候选且双向高重叠的几何证据去重，
         // 更紧的局部裁剪优先，同候选独立行、不同位置的相同对白均保留。
-        if(accepted.some(previous=>previous.index!==index&&overlapsOcrLine(item,previous.item,.65)))continue;
+        if(accepted.some(previous=>previous.index!==index&&overlapsOcrLine(item,previous.item,.65)&&!numericConflict(item,previous.item)))continue;
         accepted.push({item,index});
         // 检测来源和对白归属分别保留：外层裁剪补回的漏行也属于最紧的气泡，
         // 不能在去重后把同一对白的首行与后续行分到内外两个段落。
         const owner=profile==='manga'?ownerOrder.find(candidate=>candidate===index||inside(item,candidate))!:index;
         local[owner].push(item);
     }
-    const remaining = page.results.filter(reliable).filter(item => !local.some(items => items.some(candidate => overlapsOcrLine(item, candidate))));
+    const remaining = page.results.filter(reliable).filter(item => !local.some(items => items.some(candidate => overlapsOcrLine(item, candidate) && !numericConflict(item,candidate))));
     if (profile === 'image') {
         // 普通截图不能套用漫画宽松气泡间距：保留可靠物理行，交给普通段落策略合并。
-        return [...remaining, ...local.flat()]
+        const lines = [...remaining, ...local.flat()]
             .flatMap(item => groupMangaText([item],language,width,height,context(item)))
-            .map(({sourceBoxes: _boxes, ...line}) => line)
+            // 数字不能随普通正文合段，否则将来无法单独阻止翻译和保护原图。
+            .map(({sourceBoxes: _boxes, ...line}) => numericInformation(line.text) ? {...line,sourceBoxes:[line.bbox]} : line)
             .sort((a,b) => a.bbox.y0-b.bbox.y0 || a.bbox.x0-b.bbox.x0);
+        return appendUncoveredNumericGuards(mergeNumericRegions(lines),guards);
     }
     const fallback = owners.map(() => [] as MangaOcrItem[]), outsideItems: MangaOcrItem[] = [];
     for (const item of remaining) {
         const index = ownerOrder.find(index => inside(item, index));
         if (index === undefined) outsideItems.push(item); else fallback[index].push(item);
     }
-    const paragraphs=owners.map((_bubble,index)=>groupMangaText([...local[index],...fallback[index]],language,width,height,'bubble'));
-    const outside=groupMangaText(outsideItems,language,width,height);
-    return [...outside,...paragraphs.flat()].sort((a,b)=>a.bbox.y0-b.bbox.y0||b.bbox.x0-a.bbox.x0);
+    const paragraphs=owners.map((_bubble,index)=>groupMangaText([...local[index],...fallback[index]],language,width,height,'bubble',true));
+    const outside=groupMangaText(outsideItems,language,width,height,'page',true);
+    const regions = [...outside,...paragraphs.flat()].sort((a,b)=>a.bbox.y0-b.bbox.y0||b.bbox.x0-a.bbox.x0);
+    return appendUncoveredNumericGuards(mergeNumericRegions(regions),guards);
+}
+
+/** 已有数值框完整覆盖时不重复计费；比较超额仍保留未证明覆盖的物理框。 */
+function appendUncoveredNumericGuards(regions:MangaRegion[],guards:MangaRegion[]):MangaRegion[]{
+    if(!guards.length)return regions;
+    const boxes=regions.filter(region=>numericProtection(region.text)).map(region=>region.bbox);
+    if(!boxes.length)return [...regions,...guards];
+    const key=(box:Box)=>[box.x0,box.y0,box.x1,box.y1].join(',');
+    const exact=new Set(boxes.map(key));let comparisons=0;
+    const uncovered=guards.filter(guard=>{
+        const g=guard.bbox;if(exact.has(key(g)))return false;
+        for(const b of boxes){
+            if(++comparisons>1_000_000)return true;
+            if(b.x0<=g.x0&&b.y0<=g.y0&&b.x1>=g.x1&&b.y1>=g.y1)return false;
+        }
+        return true;
+    });
+    return [...regions,...uncovered];
+}
+
+/** 同文重叠数字在阅读中只显示一次，但其保护框覆盖所有检测位置。 */
+function mergeNumericRegions(regions: MangaRegion[]): MangaRegion[] {
+    const merged: MangaRegion[] = []; let comparisons = 0;
+    for (const region of regions) {
+        let existing: MangaRegion | undefined;
+        if (numericInformation(region.text)) for (const candidate of merged) {
+            if (++comparisons > 1_000_000) break;
+            const a = candidate.bbox, b = region.bbox;
+            const intersection = Math.max(0, Math.min(a.x1,b.x1)-Math.max(a.x0,b.x0))
+                * Math.max(0, Math.min(a.y1,b.y1)-Math.max(a.y0,b.y0));
+            const larger = Math.max((a.x1-a.x0)*(a.y1-a.y0),(b.x1-b.x0)*(b.y1-b.y0));
+            if (candidate.text === region.text && intersection >= larger * .5) {existing = candidate;break;}
+        }
+        if (!existing) {merged.push(region);continue;}
+        const a = existing.bbox, b = region.bbox;
+        existing.bbox = {x0:Math.min(a.x0,b.x0),y0:Math.min(a.y0,b.y0),x1:Math.max(a.x1,b.x1),y1:Math.max(a.y1,b.y1)};
+        existing.sourceBoxes = [existing.bbox];
+    }
+    return merged;
 }

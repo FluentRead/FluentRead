@@ -4,11 +4,11 @@
  * 主要内容：Dexie 唯一来源索引、旧收藏惰性投影、清空世代与迟到位置保护；材料和未完成恢复暂存统一事务清空，批量写入复用容量计数。
  * 模块边界：不访问网页与浏览器消息；旧收藏只读不改写，材料正文、URL 与笔记不会进入配置同步。
  */
-import Dexie, {type Table} from 'dexie';
+import Dexie, {type Table, type Transaction} from 'dexie';
 import type {VocabularyEntry} from './learningModel';
 import type {MaterialOperationGuard, MaterialBackup, MaterialImportResult, MaterialCaptureInput, MaterialListOptions, MaterialPatch, MaterialRecord, MaterialReference} from './materialProtocol';
 import {MaterialError, canonicalMaterialUrl, materialText, normalizeMaterialLocator, normalizeMaterialReference, normalizeMaterialSource, normalizeMaterialTopics} from './materialModel';
-interface MaterialMeta {key: string; generation: number; migrated: boolean; clearedAt: number}
+interface MaterialMeta {key: string; generation: number; migrated: boolean; clearedAt: number; revision?: number}
 export class MaterialDatabase extends Dexie {
     materials!: Table<MaterialRecord, string>;
     meta!: Table<MaterialMeta, string>;
@@ -19,7 +19,20 @@ export class MaterialDatabase extends Dexie {
         this.version(2).stores({materials:'id,&identityKey,*aliases,updatedAt',meta:'key',stageFrames:'[session+seq]',stageSessions:'id,expiresAt',stageReceipts:'id,expiresAt',stageBudget:'key',stageStarts:'id,expiresAt'});
     }
 }
-const initialMeta = (): MaterialMeta => ({key: 'state', generation: 0, migrated: false, clearedAt: 0});
+const cancelled = () => new DOMException('材料读取已取消', 'AbortError');
+function checkCancelled(signal?: AbortSignal): void {if (signal?.aborted) throw cancelled();}
+const initialMeta = (): MaterialMeta => ({key: 'state', generation: 0, migrated: false, clearedAt: 0, revision: 0});
+/** 旧数据库没有 revision；损坏或耗尽时拒绝读写，避免误认混合快照。 */
+function materialRevision(meta?: MaterialMeta): number {
+    const revision = meta?.revision === undefined ? 0 : meta.revision;
+    if (!Number.isSafeInteger(revision) || revision < 0) throw new MaterialError('storage-error', '材料版本无效');
+    return revision;
+}
+function nextMaterialRevision(meta: MaterialMeta): number {
+    const revision = materialRevision(meta);
+    if (revision === Number.MAX_SAFE_INTEGER) throw new MaterialError('storage-error', '材料版本已耗尽');
+    return revision + 1;
+}
 /** 仅用于比对旧词书隐私地址，不回写材料身份；视频必须使用其完整规范身份。 */
 function privateArticleSource(url: string): string | undefined {
     const canonical = canonicalMaterialUrl(url);
@@ -33,39 +46,103 @@ export class MaterialRepository {
         return await this.db.materials.where('identityKey').equals(key).first() ?? await this.db.materials.where('aliases').equals(key).first();
     }
     async generation(): Promise<number> {return (await this.db.meta.get('state'))?.generation ?? 0;}
+    /** 要与记录一致地读取版本，调用方需在包含 materials 和 meta 的同一只读事务中调用。 */
+    async revision(): Promise<number> {return materialRevision(await this.db.meta.get('state'));}
+    /** Wait for the actual transaction to settle before releasing an aborted read. */
+    private async snapshotTransaction<T>(mode:'r'|'rw', tables:Table[], signal:AbortSignal|undefined, run:()=>Promise<T>):Promise<T> {
+        checkCancelled(signal);
+        let transaction:Transaction|undefined;
+        const abort = () => {try {transaction?.abort();} catch {/* Transaction may already have completed. */}};
+        signal?.addEventListener('abort', abort, {once:true});
+        try {
+            const result = await this.db.transaction(mode, tables, async tx => {
+                transaction = tx;
+                if (signal?.aborted) {abort(); throw cancelled();}
+                const value = await run();
+                checkCancelled(signal);
+                return value;
+            });
+            checkCancelled(signal);
+            return result;
+        } catch (error) {
+            if (signal?.aborted) throw cancelled();
+            throw error;
+        } finally {signal?.removeEventListener('abort', abort);}
+    }
+    /** 只复制有界的主键，不复制全文；后续按 ID 单条读取并在完成后再次校验版本。 */
+    async openSnapshot(signal?:AbortSignal): Promise<{revision: number; ids: string[]}> {
+        await this.migrate(signal);
+        return this.snapshotTransaction('r', [this.db.materials, this.db.meta], signal, async () => {
+            const revision = await this.revision();
+            const ids = await this.db.materials.limit(10001).primaryKeys();
+            if (ids.length > 10000) throw new MaterialError('limit-exceeded', '材料数量已超过快照上限');
+            if (ids.some(id => typeof id !== 'string' || !id || id.length > 256)) throw new MaterialError('storage-error', '材料标识无效');
+            return {revision, ids};
+        });
+    }
+    private async requireRevision(expected: number): Promise<void> {
+        if (!Number.isSafeInteger(expected) || expected < 0) throw new MaterialError('invalid-input', '材料版本无效');
+        if (await this.revision() !== expected) throw new MaterialError('stale-operation', '材料已发生变化，请重新读取');
+    }
+    /** 检查与获取在同一事务内；不能将此事务保持到跨进程发送时。 */
+    async readSnapshotRecord(revision: number, id: string, signal?:AbortSignal): Promise<MaterialRecord | null> {
+        this.id(id);
+        return this.snapshotTransaction('r', [this.db.materials, this.db.meta], signal, async () => {
+            await this.requireRevision(revision);
+            return await this.db.materials.get(id) ?? null;
+        });
+    }
+    async checkSnapshot(revision: number, signal?:AbortSignal): Promise<void> {
+        await this.snapshotTransaction('r', [this.db.meta], signal, () => this.requireRevision(revision));
+    }
     async get(id: string): Promise<MaterialRecord | null> {return await this.db.materials.get(this.id(id)) ?? null;}
     private id(id: unknown): string {
         if (typeof id !== 'string' || !id || id.length > 256) throw new MaterialError('invalid-input', '材料标识无效');
         return id;
     }
-    private async migrate(): Promise<void> {
-        if (!this.legacyEntries || (await this.db.meta.get('state'))?.migrated) return;
-        const startGeneration = await this.generation();
+    private async migrate(signal?:AbortSignal): Promise<void> {
+        checkCancelled(signal);
+        if (!this.legacyEntries) return;
+        const state = await this.snapshotTransaction('r', [this.db.meta], signal, () => this.db.meta.get('state'));
+        if (state?.migrated) return;
+        const startGeneration = state?.generation ?? 0;
+        // Legacy storage may be non-cancellable; wait for it to settle before returning.
         const entries = await this.legacyEntries();
-        await this.db.transaction('rw', this.db.materials, this.db.meta, async () => {
+        checkCancelled(signal);
+        await this.snapshotTransaction('rw', [this.db.materials, this.db.meta], signal, async () => {
             const meta = await this.db.meta.get('state') ?? initialMeta();
             if (meta.migrated || meta.generation !== startGeneration) return;
             // 首次打开材料前可能已经显式收藏。一次索引现有引用的来源，避免把这次
             // 新收藏当旧词书再次导入；同词条的其他明确来源仍正常迁移。
             const linkedSources = new Map<string, Set<string>>();
-            for (const material of await this.db.materials.toArray()) {
-                const sources = [material.identityKey, ...(material.aliases ?? [])];
-                if (material.kind === 'document' && material.source.url) {
-                    const url = canonicalMaterialUrl(material.source.url);
-                    if (url) sources.push(`article:${url}`);
+            // Dexie 的 reading 钩子和游标回调中的同步异常可能不会拒绝 each。
+            // 使用原始游标并在受保护区域内调用钩子，再在同一事务内重抛。
+            let scanFailed = false, scanError: unknown;
+            const readMaterial = this.db.materials.hook.reading.fire;
+            await this.db.materials.toCollection().raw().until(() => scanFailed).each(rawMaterial => {
+                try {
+                    const material = readMaterial(rawMaterial) as MaterialRecord;
+                    const sources = [material.identityKey, ...(material.aliases ?? [])];
+                    if (material.kind === 'document' && material.source.url) {
+                        const url = canonicalMaterialUrl(material.source.url);
+                        if (url) sources.push(`article:${url}`);
+                    }
+                    for (const key of [...sources]) if (key.startsWith('article:')) {
+                        const url = privateArticleSource(key.slice('article:'.length));
+                        if (url) sources.push(`legacy-article:${url}`);
+                    }
+                    for (const reference of material.references) if (reference.kind === 'vocabulary') {
+                        const keys = linkedSources.get(reference.id) ?? new Set<string>();
+                        for (const key of sources) keys.add(key);
+                        linkedSources.set(reference.id, keys);
+                    }
+                } catch (error) {
+                    scanFailed = true; scanError = error;
                 }
-                for (const key of [...sources]) if (key.startsWith('article:')) {
-                    const url = privateArticleSource(key.slice('article:'.length));
-                    if (url) sources.push(`legacy-article:${url}`);
-                }
-                for (const reference of material.references) if (reference.kind === 'vocabulary') {
-                    const keys = linkedSources.get(reference.id) ?? new Set<string>();
-                    for (const key of sources) keys.add(key);
-                    linkedSources.set(reference.id, keys);
-                }
-            }
+            });
+            if (scanFailed) throw scanError;
             // 读写事务隔离其他写入；仅首次新增读取容量，后续成功新增在本事务内递增。
-            let materialCount: number | undefined;
+            let materialCount: number | undefined, changed = false;
             for (const entry of entries) for (const context of entry.contexts) {
                 if (!context.sourceUrl) continue;
                 try {
@@ -89,12 +166,13 @@ export class MaterialRepository {
                         if (materialCount >= 10000) continue;
                     }
                     await this.db.materials.put(record);
+                    changed = true;
                     if (!previous) materialCount!++;
                 } catch (error) {
                     if (!(error instanceof MaterialError)) throw error;
                 }
             }
-            await this.db.meta.put({...meta, migrated: true});
+            await this.db.meta.put({...meta, migrated: true, ...(changed ? {revision: nextMaterialRevision(meta)} : {})});
         });
     }
     async list(options: MaterialListOptions = {}): Promise<MaterialRecord[]> {
@@ -148,6 +226,7 @@ export class MaterialRepository {
             // 显式收藏可以恢复来源；归档状态由专门的恢复操作控制，自动采集不复活用户删除。
             if (normalized.source.url && normalized.identityKey === record.identityKey) record.source.url = normalized.source.url;
             await this.db.materials.put(record);
+            await this.db.meta.put({...meta, revision: nextMaterialRevision(meta)});
             return record;
         });
     }
@@ -182,9 +261,11 @@ export class MaterialRepository {
     async restore(id: string): Promise<MaterialRecord> {return this.mutate(id, record => {record.archivedAt = null;});}
     private async mutate(id: string, apply: (record: MaterialRecord) => void | Promise<void>, now = Date.now()): Promise<MaterialRecord> {
         this.id(id);
-        return this.db.transaction('rw', this.db.materials, async () => {
+        return this.db.transaction('rw', this.db.materials, this.db.meta, async () => {
             const record = await this.db.materials.get(id); if (!record) throw new MaterialError('not-found', '这份材料已不存在');
-            await apply(record); record.updatedAt = now; await this.db.materials.put(record); return record;
+            const meta = await this.db.meta.get('state') ?? initialMeta();
+            await apply(record); record.updatedAt = now; await this.db.materials.put(record);
+            await this.db.meta.put({...meta, revision: nextMaterialRevision(meta)}); return record;
         });
     }
     /** 仅显式用户操作生成完整私密备份；不接入配置同步或旧词书导出。 */
@@ -245,6 +326,7 @@ export class MaterialRepository {
             try {
                 await consume(apply);
                 if (applying) throw new MaterialError('invalid-input', '材料导入尚未完成');
+                if (result.inserted || result.updated) await this.db.meta.put({...meta, revision: nextMaterialRevision(meta)});
                 return result;
             } finally {active = false;}
         });
@@ -261,7 +343,7 @@ export class MaterialRepository {
             if (slots) await budgets.put({key: 'stage', reserved: 0, reservedFrames: 0, slots});
             else await budgets.delete('stage');
             await this.db.materials.clear();
-            await this.db.meta.put({key: 'state', generation: meta.generation + 1, migrated: true, clearedAt: now});
+            await this.db.meta.put({...meta, generation: meta.generation + 1, migrated: true, clearedAt: now, revision: nextMaterialRevision(meta)});
         });
     }
 }

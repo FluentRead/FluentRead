@@ -21,6 +21,12 @@ export default defineConfig({
             include: [
                 'src/features/vocabulary/materialBackupReader.ts',
                 'src/features/vocabulary/materialBackupRestore.ts',
+                'src/features/vocabulary/materialReadBridge.ts',
+                'src/features/vocabulary/materialReadDecoder.ts',
+                'src/features/vocabulary/materialPageSession.ts',
+                'src/features/vocabulary/materialReadSource.ts',
+                'src/features/vocabulary/materialReadTransport.ts',
+                'src/features/vocabulary/materialSummary.ts',
                 'src/features/vocabulary/materialImportCapacity.ts',
                 'src/features/vocabulary/materialImportStage.ts',
                 'src/features/vocabulary/materialImportPort.ts',

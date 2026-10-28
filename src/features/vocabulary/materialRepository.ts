@@ -350,10 +350,11 @@ export class MaterialRepository {
 function normalizeImportedMaterial(value: MaterialRecord, now: number): MaterialRecord & {aliases: string[]} {
     if (!value || typeof value !== 'object' || !Array.isArray(value.references) || value.references.length > 1000) throw new MaterialError('invalid-input', '材料记录无效');
     const normalized = normalizeMaterialSource(value.source);
-    const title = materialText(value.title, 240);
-    if (!title) throw new MaterialError('invalid-input', '材料标题无效');
     const timestamp = (value: unknown): number => typeof value === 'number' && Number.isFinite(value) && value >= 0 ? Math.min(value, now) : now;
     const aliases: string[] = [];
+    // 仅保留与已验证来源主机名一致的自动标题，避免无关长字符串绕过标题限制。
+    const longTitle = typeof value.title === 'string' && value.title.length > 240;
+    let matchesSourceHost = longTitle && normalized.source.url !== undefined && new URL(normalized.source.url).hostname === value.title;
     if (value.aliases !== undefined) {
         if (!Array.isArray(value.aliases) || value.aliases.length > 100) throw new MaterialError('invalid-input', '材料来源历史无效');
         for (const alias of value.aliases) {
@@ -365,8 +366,11 @@ function normalizeImportedMaterial(value: MaterialRecord, now: number): Material
             const safe = normalizeMaterialSource(source);
             if (safe.identityKey !== alias) throw new MaterialError('invalid-input', '材料来源历史身份不匹配');
             aliases.push(alias);
+            if (longTitle && safe.source.url !== undefined && new URL(safe.source.url).hostname === value.title) matchesSourceHost = true;
         }
     }
+    const title = matchesSourceHost ? value.title : materialText(value.title, 240);
+    if (!title) throw new MaterialError('invalid-input', '材料标题无效');
     const references = value.references.map(ref => normalizeMaterialReference(ref, now));
     if (new Set(references.map(ref => `${ref.kind}:${ref.id}`)).size !== references.length) throw new MaterialError('invalid-input', '学习引用重复');
     return {id: materialText(value.id, 256) || crypto.randomUUID(), identityKey: normalized.identityKey, aliases: [...new Set(aliases)], kind: normalized.source.kind, source: normalized.source,

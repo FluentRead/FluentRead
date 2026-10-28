@@ -175,6 +175,50 @@ describe('local material lifecycle', () => {
         await repository.importData(backup,500);
         expect((await repository.get(original.id))?.references[0].updatedAt).toBe(100);
     });
+    it('restores a generated long hostname title after its source changes while keeping explicit titles bounded', async () => {
+        const hostname = `${Array(4).fill('a'.repeat(60)).join('.')}.test`;
+        const original = await repository.capture({source:{kind:'article',url:`https://${hostname}/article`}},100);
+        expect(original.title).toBe(hostname);
+        await repository.update(original.id,{source:{kind:'article',url:'https://moved.test/article'}},200);
+        const explicit = await repository.capture({source:{kind:'article',url:'https://named.test/',title:'x'.repeat(300)}},100);
+        expect(explicit.title).toBe('x'.repeat(240));
+        expect((await repository.update(explicit.id,{title:'y'.repeat(300)},200)).title).toBe('y'.repeat(240));
+        const directHost = `${Array(4).fill('b'.repeat(60)).join('.')}.test`;
+        const direct = await repository.capture({source:{kind:'article',url:`https://${directHost}/article`}},100);
+
+        const backup = await repository.exportData(300);
+        const arbitrary = {...explicit,id:'arbitrary',source:{kind:'article' as const,url:'https://arbitrary.test/'},title:'not a host '.repeat(30)};
+        const noncanonical = {...explicit,id:'noncanonical',source:{kind:'article' as const,url:'https://noncanonical.test/'},title:'A'.repeat(300)};
+        const unrelated = {...explicit,id:'unrelated',source:{kind:'article' as const,url:'https://unrelated.test/'},title:`${Array(4).fill('c'.repeat(60)).join('.')}.test`};
+        const missingHistory = {...original,id:'missing-history',source:{kind:'article' as const,url:'https://missing.test/'},aliases:[]};
+        const oversized = {...explicit,id:'oversized',source:{kind:'article' as const,url:'https://oversized.test/'},title:'z'.repeat(8192 * 16 + 17)};
+        await repository.clear(400);
+        expect(await repository.importData({...backup,materials:[...backup.materials,arbitrary,noncanonical,unrelated,missingHistory,oversized]},500))
+            .toEqual({inserted:8,updated:0,skipped:0});
+        expect((await repository.get(original.id))?.title).toBe(hostname);
+        expect((await repository.get(direct.id))?.title).toBe(directHost);
+        expect((await repository.get(explicit.id))?.title).toBe('y'.repeat(240));
+        expect((await repository.get('arbitrary'))?.title).toBe(arbitrary.title.trim().slice(0,240));
+        expect((await repository.get('noncanonical'))?.title).toBe('A'.repeat(240));
+        expect((await repository.get('unrelated'))?.title).toBe(unrelated.title.slice(0,240));
+        expect((await repository.get('missing-history'))?.title).toBe(hostname.slice(0,240));
+        expect((await repository.get('oversized'))?.title).toBe('z'.repeat(240));
+        const secondBackup = await repository.exportData(600);
+        await repository.clear(700);
+        await repository.importData(secondBackup,800);
+        expect((await repository.get(original.id))?.title).toBe(hostname);
+        expect((await repository.get(direct.id))?.title).toBe(directHost);
+    });
+    it('bounds a document title when the previous URL cannot be proven from its fingerprint identity history', async () => {
+        const hostname = `${Array(4).fill('d'.repeat(60)).join('.')}.test`;
+        const original = await repository.capture({source:{kind:'document',fingerprint:'sha256:doc',url:`https://${hostname}/document`}},100);
+        await repository.update(original.id,{source:{kind:'document',fingerprint:'sha256:doc',url:'https://moved.test/document'}},200);
+        const backup = await repository.exportData(300);
+        expect(backup.materials[0].aliases).toBeUndefined();
+        await repository.clear(400);
+        await repository.importData(backup,500);
+        expect((await repository.get(original.id))?.title).toBe(hostname.slice(0,240));
+    });
     it('filters topics/search/archive and preserves soft-deleted data during captures', async () => {
         const a = await repository.capture({source,locator:{kind:'text',quote:'原句'},reference:{kind:'note',id:'n',note:'a useful thought'}},100);
         await repository.update(a.id,{topics:['AI',' ML ','AI'],title:'Reading'});

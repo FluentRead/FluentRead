@@ -1,7 +1,7 @@
 /**
  * @file src/features/image-translation/content/mangaReader.ts
  * 文件职责：把漫画站点的正文图片、超长图分段、可读画布、公开背景图和页面生命周期接入同一连续翻译会话。
- * 主要内容：按站点规则发现正文，圈选页发布区域入口；已确认的 GANMA 路径内页码和 Mangahub 正整数查询页码不视为换章，其他查询参数仍参与章节身份，来源授权保留完整地址；已开启的同章哔哩哔哩会话在可见的原站加载提示期间保留等待，不识别空像素；滚动及可见性移动后短暂停留才启动新识别，已完成结果仍按实际位置立即交接，普通图片滚动通过可见性通知减少全量测量；画布显式开启和重试先隐藏旧译层并要求完整来源验证，自动布局保留轻量指纹；当前页优先的有界队列与附近页共享像素预算，换章、隐藏和卸载清理监听器与停留计时器。
+ * 主要内容：按站点规则发现正文，圈选页发布区域入口；已确认的 GANMA 路径内页码和 Mangahub 正整数查询页码不视为换章，其他查询参数仍参与章节身份，来源授权保留完整地址；已开启的同章哔哩哔哩会话在可见的原站加载提示期间保留等待，不识别空像素；滚动及可见性移动后短暂停留才启动新识别，隐藏事件同步关闭调度闸，任务交接等待后重新发现再排队；已完成结果仍按实际位置立即交接，普通图片滚动通过可见性通知减少全量测量；画布显式开启和重试先隐藏旧译层并要求完整来源验证，自动布局保留轻量指纹；当前页优先的有界队列与附近页共享像素预算，换章、隐藏和卸载清理监听器与停留计时器。
  * 模块边界：只检查已展示正文，不抓取章节、不读取站点私有数据或绕过访问限制；图片与画布的读取、翻译、缓存和原图恢复通过注入端口复用图片运行时。
  */
 import {createMangaSession, type MangaTranslationStatus} from './mangaSession';
@@ -35,7 +35,7 @@ export function createMangaReader(ports: {
     prefetchPages?: () => number;
     cachePages?: () => number;
     identity: (image: HTMLImageElement) => string;
-    translate: (image: HTMLImageElement) => Promise<void>;
+    translate: (image: HTMLImageElement) => Promise<void | 'deferred'>;
     reuse?: (image: HTMLImageElement) => boolean;
     warm?: (images: HTMLImageElement[]) => void;
     resetCache?: () => void;
@@ -311,7 +311,7 @@ export function createMangaReader(ports: {
         // IO 只作变化通知，快返页仍以本帧实际位置复用位图，不能直接相信旧条目。
         scheduleLayout();
     }
-    function visibilityChanged(): void {cancelSettling();scheduleLayout();}
+    function visibilityChanged(): void {cancelSettling();if (document.hidden) session.deferScheduling();scheduleLayout();}
     function loaded(event: Event): void {
         const image = event.target as HTMLImageElement;
         if (observed.has(image)) imageLoadTracker.loaded(event);
@@ -325,6 +325,7 @@ export function createMangaReader(ports: {
     refresh();
     return {
         status: () => decorate(session.status()),
+        deferForRefresh() { session.deferScheduling();schedule(); },
         schedule,
         retry(image: MangaSurface) { cancelSettling();refresh();const retried = session.retry(image);if (retried && isCanvas(image)) ports.canvas?.invalidate?.(image);return retried; },
         toggle() { cancelSettling();discoveryDirty = true; refresh(); if (areaFallback) return false; if (!session.status().active) selectedCanvases.forEach(canvas => ports.canvas?.invalidate?.(canvas));const toggled = session.toggle(); refresh(); return toggled; },

@@ -1,7 +1,7 @@
 /**
  * @file src/features/image-translation/content/mangaSession.ts
  * 文件职责：管理当前漫画章节的连续翻译会话，保证一次开启、逐页执行、原文暂停与异步任务所有权。
- * 主要内容：接收可见页和有界提前翻译窗口，当前页优先、串行处理；阅读器移动期间暂停新识别但立即复用已完成结果，短暂离屏不取消在途推理，停稳后未译当前页可取消远处旧任务，最近页面仅保留不抢占队列；隐藏时停止新任务，换图、换章和关闭取消旧任务；显式单页重试进入同一队列并清除旧错误，不循环请求或并发绕过会话。
+ * 主要内容：接收可见页和有界提前翻译窗口，当前页优先、串行处理；阅读器移动期间暂停新识别但立即复用已完成结果，短暂离屏不取消在途推理，停稳后未译当前页可取消远处旧任务，最近页面仅保留不抢占队列；隐藏时停止新任务，换图、换章和关闭取消旧任务；显式单页重试进入同一队列并清除旧错误，不循环请求或并发绕过会话；未启动的延后任务重新排队，卸载后不再发送迟到通知。
  * 模块边界：只依赖注入的页面翻译与恢复端口，图片和可读画布共用一个队列；不查询 DOM、保存配置或实现 OCR；位图缓存、宿主样式与语言包由图片运行时管理。
  */
 import type {ImageTranslationStage} from '../progress';
@@ -37,7 +37,7 @@ export interface MangaSnapshot<T = HTMLImageElement> {
 }
 
 export function createMangaSession<T = HTMLImageElement>(ports: {
-    translate: (image: T) => Promise<void>;
+    translate: (image: T) => Promise<void | 'deferred'>;
     reuse?: (image: T) => boolean;
     restore: (image: T) => void;
     release: (image: T) => void;
@@ -62,7 +62,7 @@ export function createMangaSession<T = HTMLImageElement>(ports: {
         prefetching: active && running !== null && !running.page.visible,
         ahead: Array.from(pages.values()).filter(page => page.retained && page.ahead && !page.visible && page.completed && !page.failed).length,
     });
-    const notify = () => ports.changed(status());
+    const notify = (final = false) => {if (!disposed || final) ports.changed(status());};
 
     function reset() {
         epoch++;
@@ -79,9 +79,10 @@ export function createMangaSession<T = HTMLImageElement>(ports: {
         if (!next) return;
         const [image, page] = next;
         page.attempted = true;
-        const task = running = {image, page};
         const owner = epoch;
+        const task = running = {image, page};
         let started = false;
+        let deferred = false;
         notify();
         // 同步抛错和 Promise 拒绝都归入该页失败；取消后的迟到结果不更新新会话。
         void Promise.resolve().then(() => {
@@ -89,11 +90,12 @@ export function createMangaSession<T = HTMLImageElement>(ports: {
             // scroll 可以在这个微任务前到达；尚未请求的页面回到队列，不能被当成已完成。
             if (suspended || schedulingDeferred || !page.scheduled) {page.attempted = false;return;}
             started = true;
-            return ports.translate(image);
+            return ports.translate(image).then(result => {deferred = result === 'deferred';});
         }).catch(() => { if (owner === epoch && pages.get(image) === page) page.failed = true; })
             .finally(() => {
                 if (started && owner === epoch && pages.get(image) === page) {
-                    if (page.retained) {page.failed ||= ports.failed(image);page.completed = true;}
+                    if (page.retained && deferred) page.attempted = false;
+                    else if (page.retained) {page.failed ||= ports.failed(image);page.completed = true;}
                     else {ports.release(image);pages.delete(image);}
                 }
                 if (running === task) running = null;
@@ -172,6 +174,6 @@ export function createMangaSession<T = HTMLImageElement>(ports: {
             page.attempted = false;page.failed = false;page.completed = false;
             notify();pump();return true;
         },
-        dispose() { reset(); disposed = true; available = false; notify(); },
+        dispose() { if (disposed) return; reset(); disposed = true; available = false; notify(true); },
     };
 }

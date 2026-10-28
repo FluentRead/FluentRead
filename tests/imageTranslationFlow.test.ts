@@ -185,6 +185,18 @@ describe('图片翻译流程优化',()=>{
         expect(ui.button.parentElement!.parentElement).toBe(ui.element);expect(ui.feedback.querySelector('button')).toBeNull();ui.dispose();
     });
 
+    it('漫画单页排队时提供取消操作，开始处理后恢复普通轻量进度', () => {
+        const {document} = parseHTML('<html><body></body></html>');vi.stubGlobal('document', document);
+        const ui = createImageControls({onAction(){},onPrepare(){},translate:source=>translateLegacyText(source,'en-US')});
+        ui.update('loading', '等待上一项任务结束…', {quiet:true, queued:true});
+        expect(ui.feedback.hidden).toBe(false);expect(ui.feedback.dataset.queued).toBe('true');
+        expect(ui.status.textContent).toBe('Waiting for the previous task…');
+        expect(ui.button.parentElement!.parentElement).toBe(ui.feedback);expect(ui.button.textContent).toBe('Cancel');
+        ui.update('loading', '正在识别图片文字…', {quiet:true});
+        expect(ui.feedback.dataset.queued).toBe('false');expect(ui.feedback.querySelector('button')).toBeNull();
+        expect(ui.button.parentElement!.parentElement).toBe(ui.element);ui.dispose();
+    });
+
     it('漫画错误恢复保留详情、键盘和设置入口，拒绝合成动作且不触发宿主翻页快捷键', () => {
         const {document,window} = parseHTML('<html><body></body></html>');vi.stubGlobal('document',document);
         const onAction=vi.fn(),onDismiss=vi.fn(),onSettings=vi.fn();

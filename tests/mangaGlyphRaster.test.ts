@@ -7,6 +7,7 @@ import {
     auditMangaGlyphRaster,createMangaGlyphRasterLedger,MANGA_GLYPH_RASTER_LIMITS as LIMITS,rasterizeMangaGlyphs,
     type MangaGlyphRasterBox,type MangaGlyphRasterPlan,
 } from '@/src/features/image-translation/services/mangaGlyphRaster';
+import {isTrustedMangaAlphaRectangles,planMangaAlphaProtection} from '@/src/features/image-translation/services/mangaAlphaProtection';
 
 const box={x0:10.25,y0:20.5,x1:30.25,y1:40.5};
 const plan:MangaGlyphRasterPlan={font:'italic 600 23.9681px sans-serif',lineWidth:3.355534,chunks:[{text:'A complete line.',x:12.125,y:33.875}]};
@@ -25,13 +26,14 @@ interface PortOptions {
     ink?:{x:number;y:number;alpha?:number};empty?:boolean;differentChannel?:number;
     fail?:{layer:number;method:string;error:Error};nullContext?:number;
     cleanupErrors?:Map<number,Error>;createError?:Error;
+    onCall?:(layer:number,method:string)=>void;
 }
 function canvasPorts(options:PortOptions={}){
     const layers:Array<{canvas:HTMLCanvasElement;context:CanvasRenderingContext2D;calls:Array<[string,...unknown[]]>;size:()=>[number,number]}> = [];
     const createElement=vi.fn(()=>{
         if(options.createError)throw options.createError;
         const index=layers.length,calls:Array<[string,...unknown[]]>=[];
-        const call=(method:string,...args:unknown[])=>{calls.push([method,...args]);if(options.fail?.layer===index&&options.fail.method===method)throw options.fail.error;};
+        const call=(method:string,...args:unknown[])=>{calls.push([method,...args]);options.onCall?.(index,method);if(options.fail?.layer===index&&options.fail.method===method)throw options.fail.error;};
         let width=0,height=0;
         const context={
             translate:(...args:unknown[])=>call('translate',...args),beginPath:()=>call('beginPath'),rect:(...args:unknown[])=>call('rect',...args),clip:(...args:unknown[])=>call('clip',...args),
@@ -168,6 +170,56 @@ describe('完整读回域预筛不改变绘制或未知输入语义',()=>{
 });
 
 describe('局部裁图保留原坐标相位并复用同一bitmap',()=>{
+    it('仅可信冻结矩形跳过远孔，完整校验和像素审计账本仍等同原全部裁剪',()=>{
+        const width=64,height=64,source=new Uint8ClampedArray(width*height*4).fill(255);
+        for(const [x,y] of [[24,25],[40,25],[50,25]])source[(y*width+x)*4+3]=0;
+        const protection=planMangaAlphaProtection(source,width,height,[{text:'',fontSize:10,bbox:{x0:4,y0:4,x1:60,y1:60}}])!;
+        const trusted=protection.rectangles,ordinary=trusted.map(h=>({...h}));
+        expect(isTrustedMangaAlphaRectangles(trusted)).toBe(true);expect(Object.isFrozen(trusted)).toBe(true);
+        expect(trusted.every(Object.isFrozen)).toBe(true);expect(isTrustedMangaAlphaRectangles(new Proxy(trusted,{}))).toBe(false);
+        expect(isTrustedMangaAlphaRectangles(ordinary)).toBe(false);
+        expect(()=>{(trusted as MangaGlyphRasterBox[]).push({x0:1,y0:1,x1:2,y1:2});}).toThrow();
+        expect(()=>{(trusted[0] as MangaGlyphRasterBox).x0=0;}).toThrow();
+        const first=canvasPorts(),a=createMangaGlyphRasterLedger(),r1=rasterizeMangaGlyphs(plan,box,trusted,styles,a);
+        const second=canvasPorts(),b=createMangaGlyphRasterLedger(),r2=rasterizeMangaGlyphs(plan,box,ordinary,styles,b);
+        expect(r1.kind).toBe('accepted');expect(r2.kind).toBe('accepted');expect(a).toEqual(b);
+        // x=40 与完整读回右界 39 相距一像素，保守保留；x=50 跳过。
+        expect(first.layers[1].calls.filter(c=>c[0]==='clip')).toHaveLength(3);
+        expect(second.layers[1].calls.filter(c=>c[0]==='clip')).toHaveLength(4);
+        if(r1.kind==='accepted')r1.dispose();if(r2.kind==='accepted')r2.dispose();expect(a).toEqual(b);
+        const full=createMangaGlyphRasterLedger();full.holeChecks=LIMITS.holeChecks;
+        const ports=canvasPorts();expect(rasterizeMangaGlyphs(plan,box,trusted,styles,full)).toEqual({kind:'budget',reason:'intersection'});
+        expect(ports.layers.every(l=>l.size().every(v=>v===0))).toBe(true);expect(full.liveCanvasPixels+full.liveReadbackPixels).toBe(0);
+    });
+    it('未知可变对象、访问器和代理仍执行全部裁剪并保留原异常',()=>{
+        const far={x0:50,y0:25,x1:51,y1:26},proxy=new Proxy(far,{}),ports=canvasPorts();
+        const result=rasterizeMangaGlyphs(plan,box,[far,proxy],styles,createMangaGlyphRasterLedger());
+        expect(result.kind).toBe('accepted');expect(ports.layers[1].calls.filter(c=>c[0]==='clip')).toHaveLength(3);
+        if(result.kind==='accepted')result.dispose();
+        const error=new Error('coordinate second read');let reads=0;
+        const getter={get x0(){if(++reads>2)throw error;return 50;},y0:25,x1:51,y1:26};
+        const failed=canvasPorts(),ledger=createMangaGlyphRasterLedger();
+        expect(capture(()=>rasterizeMangaGlyphs(plan,box,[getter],styles,ledger))).toBe(error);
+        expect(failed.layers.every(l=>l.size().every(v=>v===0))).toBe(true);expect(ledger.liveCanvasPixels+ledger.liveReadbackPixels).toBe(0);
+    });
+    it('未知孔在初始裁剪时被回调改变时仍读取其新坐标',()=>{
+        const far={x0:50,y0:25,x1:51,y1:26};let changed=false;
+        const ports=canvasPorts({onCall:(layer,method)=>{if(layer===1&&method==='clip'&&!changed){changed=true;far.x0=24;far.x1=26;}}});
+        const r=rasterizeMangaGlyphs(plan,box,[far],styles,createMangaGlyphRasterLedger());
+        expect(changed).toBe(true);expect(ports.layers[1].calls).toContainEqual(['rect',24,25,2,1]);
+        if(r.kind==='accepted')r.dispose();
+    });
+    it('可信近孔裁剪的原生异常保持首因并释放两层画布',()=>{
+        const width=64,height=64,source=new Uint8ClampedArray(width*height*4).fill(255);
+        source[(25*width+24)*4+3]=0;source[(25*width+50)*4+3]=0;
+        const holes=planMangaAlphaProtection(source,width,height,[{text:'',fontSize:10,bbox:{x0:4,y0:4,x1:60,y1:60}}])!.rectangles;
+        const error=new Error('near-hole native clip');let clips=0;
+        const ports=canvasPorts({onCall:(layer,method)=>{if(layer===1&&method==='clip'&&++clips===2)throw error;}}),ledger=createMangaGlyphRasterLedger();
+        expect(capture(()=>rasterizeMangaGlyphs(plan,box,holes,styles,ledger))).toBe(error);
+        expect(clips).toBe(2);expect(ports.layers.every(l=>l.size().every(v=>v===0))).toBe(true);
+        expect(ledger.liveCanvasPixels+ledger.liveReadbackPixels).toBe(0);expect(ledger.canvasPixels).toBe(2738);
+        expect(ports.layers.every(l=>!l.calls.some(c=>c[0]==='getImageData'))).toBe(true);
+    });
     it('仅两张局部画布/两次读取，完整文字与原样式不变，成功只把原glyph交给调用方',()=>{
         const ports=canvasPorts(),ledger=createMangaGlyphRasterLedger(),hole={x0:24,y0:25,x1:26,y1:30};
         const result=rasterizeMangaGlyphs(plan,box,[hole,hole],styles,ledger);

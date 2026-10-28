@@ -100,6 +100,22 @@ describe('paged material query sessions', () => {
         read.mockImplementationOnce(async (_rev,id) => material(id)).mockImplementationOnce(async (_rev,id) => {f.change();return material(id);});
         await expect(session.getPage({offset:0})).rejects.toMatchObject({code:'stale-operation'}); await session.close();
     });
+    it('fails snapshot construction or a page if a record is missing or has the wrong identity', async () => {
+        for (const invalid of [null, material('wrong')]) {
+            const f = fake([material('a')]);
+            f.repository.readSnapshotRecord.mockResolvedValueOnce(invalid);
+            await expect(createMaterialPageSession(f.repository)).rejects.toMatchObject({code:'storage-error'});
+            const session = await createMaterialPageSession(f.repository);
+            f.repository.readSnapshotRecord.mockResolvedValueOnce(invalid);
+            await expect(session.getPage({offset:0})).rejects.toMatchObject({code:'storage-error'});
+            await session.close();
+        }
+    });
+    it('rejects a changed snapshot during index construction without publishing a session', async () => {
+        const f = fake([material('a'),material('b')]);
+        f.repository.readSnapshotRecord.mockImplementationOnce(async (_revision,id) => {f.change();return material(id);});
+        await expect(createMaterialPageSession(f.repository)).rejects.toMatchObject({code:'stale-operation'});
+    });
     it('validates query and page bounds, including empty results', async () => {
         const {repository} = fake([]);
         for (const value of [{search:'x'.repeat(131073)},{topic:'x'.repeat(81)},{archived:'yes'},{extra:true}])
@@ -130,6 +146,22 @@ describe('paged material query sessions', () => {
         let closed = false; const close = session.close().then(() => {closed=true;});
         await Promise.resolve(); expect(closed).toBe(false);
         finish(material('a')); await expect(outcome).resolves.toMatchObject({name:'AbortError'}); await close; expect(closed).toBe(true);
+    });
+    it('cancels one page through its caller signal and permits a later retry', async () => {
+        const f = fake([material('a')]), session = await createMaterialPageSession(f.repository);
+        const already = new AbortController(); already.abort();
+        const before = f.repository.checkSnapshot.mock.calls.length;
+        await expect(session.getPage({offset:0,signal:already.signal})).rejects.toMatchObject({name:'AbortError'});
+        expect(f.repository.checkSnapshot).toHaveBeenCalledTimes(before);
+        let finish!:(value:MaterialRecord|null)=>void, began!:()=>void;
+        const pending = new Promise<MaterialRecord|null>(resolve => {finish=resolve;}), started = new Promise<void>(resolve => {began=resolve;});
+        f.repository.readSnapshotRecord.mockImplementationOnce(() => {began();return pending;});
+        const caller = new AbortController(), page = session.getPage({offset:0,signal:caller.signal});
+        const outcome = page.catch(error => error);
+        await started; caller.abort(); finish(material('a'));
+        await expect(outcome).resolves.toMatchObject({name:'AbortError'});
+        expect((await session.getPage({offset:0})).items.map(item => item.id)).toEqual(['a']);
+        await session.close();
     });
     it('binds the creation signal to the session and waits for an active read after abort', async () => {
         const f = fake([material('a')]), controller = new AbortController();

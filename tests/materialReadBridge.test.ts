@@ -65,11 +65,29 @@ describe('material read bridge', () => {
         expect(repo.openSnapshot).toHaveBeenCalledOnce(); bridge.dispose();
     });
     it('rejects malformed, extra, and oversized starts without leaking the request or reading', async () => {
-        for (const request of [start({search:'x'.repeat(128*1024+1)}), start({topic:'x'.repeat(81)}), start({extra:'secret'}),
-            {...start(), extra:'private'}, {...start(),v:2}, start({archived:'yes'})]) {
+        for (const request of [null, [], start(null), start([]), start({search:'x'.repeat(128*1024+1)}), start({search:12}),
+            start({topic:'x'.repeat(81)}), start({topic:42}), start({extra:'secret'}),
+            {...start(), extra:'private'}, {...start(),v:2}, {...start(),type:'wrong'}, {...start(),operation:'wrong'}, start({archived:'yes'})]) {
             const {repo,bridge} = setup(), [server,client] = pair(); bridge.connect(server); client.postMessage(request);
             await tick(); expect(server.closed).toBe(true); expect(server.sent).toEqual([]); expect(repo.openSnapshot).not.toHaveBeenCalled(); bridge.dispose();
         }
+    });
+    it('validates limits and refuses access if trusted-context checks fail', () => {
+        for (const extra of [{maxPorts:0},{maxPorts:33},{maxPorts:1.5},{idleTimeoutMs:0},{idleTimeoutMs:Infinity},{idleTimeoutMs:2_147_483_648}])
+            expect(()=>setup(extra)).toThrow('limits');
+        for (const extra of [{isPrivateContext:()=>{throw Error('context unavailable');}}, {isTrustedSender:()=>{throw Error('sender unavailable');}}]) {
+            const {repo,bridge}=setup(extra), [server]=pair();
+            expect(bridge.connect(server)).toBe(true); expect(server.closed).toBe(true); expect(repo.openSnapshot).not.toHaveBeenCalled(); bridge.dispose();
+        }
+    });
+    it('rechecks privacy after readiness and fails closed without opening storage', async () => {
+        let release!:()=>void, privateContext = false;
+        const ready = new Promise<void>(resolve=>{release=resolve;});
+        const {repo,bridge} = setup({ready,isPrivateContext:()=>privateContext}), [server,client]=pair();
+        bridge.connect(server); client.postMessage(start());
+        privateContext=true; release(); await tick();
+        expect(server.closed).toBe(true); expect(repo.openSnapshot).not.toHaveBeenCalled(); expect(server.sent).toEqual([]);
+        bridge.dispose();
     });
     it('does not register a port twice or leave listeners after synchronous disconnect', () => {
         const {bridge} = setup({maxPorts:1});
@@ -88,12 +106,67 @@ describe('material read bridge', () => {
         expect(racing.onDisconnect.listeners.size).toBe(0);
         next.bridge.dispose();
     });
+    it('closes the connection if event registration fails after context invalidation', () => {
+        for (const event of ['onMessage','onDisconnect'] as const) {
+            const {repo,bridge}=setup(), [server]=pair();
+            server[event].addListener=()=>{throw Error('extension context invalidated');};
+            expect(bridge.connect(server)).toBe(true); expect(server.closed).toBe(true);
+            expect(server.onMessage.listeners.size).toBe(0); expect(server.onDisconnect.listeners.size).toBe(0);
+            expect(repo.openSnapshot).not.toHaveBeenCalled(); bridge.dispose();
+        }
+    });
+    it('continues disconnect cleanup if removing one listener throws', () => {
+        for (const event of ['onMessage','onDisconnect'] as const) {
+            const {bridge}=setup(), [server]=pair(); bridge.connect(server);
+            server[event].removeListener=()=>{throw Error('extension context invalidated');};
+            expect(()=>bridge.dispose()).not.toThrow(); expect(server.closed).toBe(true);
+            const other=event==='onMessage'?'onDisconnect':'onMessage';
+            expect(server[other].listeners.size).toBe(0);
+        }
+    });
+    it('tolerates a disconnected browser context during rejection and disposal', () => {
+        const first=setup(), [untrusted]=pair();
+        untrusted.sender={id:'wrong',url:'chrome-extension://abc/options.html'};
+        untrusted.disconnect=()=>{throw Error('extension context invalidated');};
+        expect(()=>first.bridge.connect(untrusted)).not.toThrow(); expect(first.repo.openSnapshot).not.toHaveBeenCalled(); first.bridge.dispose();
+        const second=setup(), [active]=pair(); second.bridge.connect(active);
+        active.disconnect=()=>{throw Error('extension context invalidated');};
+        expect(()=>second.bridge.dispose()).not.toThrow(); expect(active.onMessage.listeners.size).toBe(0);
+        expect(active.onDisconnect.listeners.size).toBe(0); expect(second.repo.openSnapshot).not.toHaveBeenCalled();
+    });
     it('closes duplicated handshakes, cancels pending ready, and times out silent ports', async () => {
         const ready = new Promise<void>(() => {}), {repo,bridge} = setup({ready,idleTimeoutMs:20,maxPorts:1});
         const [server,client] = pair(); bridge.connect(server); client.postMessage(start()); client.postMessage(start());
         await tick(); expect(server.closed).toBe(true); expect(repo.openSnapshot).not.toHaveBeenCalled();
         const [silent] = pair(); bridge.connect(silent); await new Promise(resolve => setTimeout(resolve, 40)); expect(silent.closed).toBe(true);
         bridge.dispose();
+    });
+    it('removes a cancelled readiness waiter and does not reopen it when readiness resolves', async () => {
+        let release!:()=>void;
+        const ready = new Promise<void>(resolve=>{release=resolve;});
+        const {repo,bridge}=setup({ready,maxPorts:1}), [server,client]=pair();
+        bridge.connect(server); client.postMessage(start()); client.disconnect();
+        await tick(); release(); await tick();
+        expect(repo.openSnapshot).not.toHaveBeenCalled();
+        const [next]=pair(); bridge.connect(next); expect(next.closed).toBe(false);
+        bridge.dispose(); bridge.dispose();
+        const [after]=pair(); bridge.connect(after); expect(after.closed).toBe(true);
+    });
+    it('allows another authorized read to finish while one connection waits on storage', async () => {
+        let finish!:(snapshot:{revision:number;ids:string[]})=>void, began!:()=>void;
+        const pending = new Promise<{revision:number;ids:string[]}>(resolve=>{finish=resolve;}), started = new Promise<void>(resolve=>{began=resolve;});
+        let calls=0;
+        const repo={openSnapshot:vi.fn(()=>++calls===1?(began(),pending):Promise.resolve({revision:1,ids:[]})),
+            readSnapshotRecord:vi.fn(async()=>null),checkSnapshot:vi.fn(async()=>{})};
+        const {bridge}=setup({repository:repo,maxPorts:2}), [first,client1]=pair(), [second,client2]=pair();
+        bridge.connect(first); bridge.connect(second);
+        const firstRead=receiveMaterialRead(client1 as MaterialReadPort,()=>{}).then(()=>undefined,error=>error);
+        const secondChunks:Uint8Array[]=[];
+        const secondRead=receiveMaterialRead(client2 as MaterialReadPort,chunk=>{secondChunks.push(chunk);});
+        client1.postMessage(start()); await started; client2.postMessage(start()); await secondRead;
+        expect(repo.openSnapshot).toHaveBeenCalledTimes(2);
+        expect(new TextDecoder().decode(Uint8Array.from(secondChunks.flatMap(chunk=>[...chunk])))).toContain('"type":"complete"');
+        client1.disconnect(); expect(await firstRead).toBeInstanceOf(Error); finish({revision:1,ids:[]}); await tick(); bridge.dispose();
     });
     it('keeps its capacity lease until an uncooperative underlying read really finishes', async () => {
         let complete!: (snapshot:{revision:number;ids:string[]}) => void;
@@ -148,6 +221,11 @@ describe('material read bridge', () => {
         expect(server.closed).toBe(true); expect(server.sent).toEqual([]);
         const next = setup(), [waiting] = pair(); next.bridge.connect(waiting); next.bridge.dispose();
         expect(waiting.closed).toBe(true); bridge.dispose();
+    });
+    it('rejects a handshake when the readiness gate had already failed', async () => {
+        const {repo,bridge}=setup({ready:Promise.reject(Error('private data'))});
+        await tick(); const [server,client]=pair(); bridge.connect(server); client.postMessage(start()); await tick();
+        expect(server.closed).toBe(true); expect(server.sent).toEqual([]); expect(repo.openSnapshot).not.toHaveBeenCalled(); bridge.dispose();
     });
     it('does not forward repository errors or accept partial data as complete', async () => {
         const repo = {openSnapshot:async () => ({revision:1,ids:['m']}),

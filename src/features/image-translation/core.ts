@@ -81,6 +81,12 @@ function isValidOcrBox(bbox: OcrLine['bbox']): boolean {
         && bbox.x1 > bbox.x0 && bbox.y1 > bbox.y0;
 }
 
+function ocrBoxIou(a:OcrBox,b:OcrBox):number {
+    const intersection=Math.max(0,getAxisOverlap(a,b,X_AXIS))*Math.max(0,getAxisOverlap(a,b,Y_AXIS));
+    const area=(box:OcrBox)=>getAxisSize(box,X_AXIS)*getAxisSize(box,Y_AXIS);
+    return intersection/(area(a)+area(b)-intersection);
+}
+
 export type NumericEvidenceOcrLine = OcrLine & {numericConfidence?: number; guardOnly?: true};
 
 type OcrBox = OcrLine['bbox'];
@@ -268,18 +274,44 @@ export function collectRawNumericGuards(blocks: OcrBlocks, recognized:readonly N
         if (guards.length>=4096) throw new Error('图片数字保护区域过于复杂，已保留原图');
         keys.add(key);guards.push({text:'',bbox:{...bbox},guardOnly:true});
     };
+    const sourceObservations=new Map<string,{incompatibleWordBox:boolean;noWords:boolean}>();
     for (const block of blocks ?? []) for (const paragraph of block.paragraphs ?? []) for (const line of paragraph.lines ?? []) {
-        add(line.text,line.bbox);
-        for(const word of line.words??[])add(word.text,word.bbox);
+        const lineText=line.text,lineBox=line.bbox;
+        add(lineText,lineBox);
+        const numericLine=numericProtection(lineText.replace(/\s+/gu,' ').trim());
+        let coverageBox=lineBox;const wordBoxes:OcrBox[]=[];
+        for(const word of line.words??[]) {
+            const text=word.text,bbox=word.bbox;
+            add(text,bbox);
+            // 保持原行、词的读取顺序；整行数值的非法标点框同样无法安全修补。圈选不调用此阶段。
+            if (numericLine) {
+                if (!bbox||!isValidOcrBox(bbox) || bbox.x0<lineBox.x0-2 || bbox.y0<lineBox.y0-2
+                    || bbox.x1>lineBox.x1+2 || bbox.y1>lineBox.y1+2) throw new Error('图片数字保护位置无效，已保留原图');
+                wordBoxes.push(bbox);coverageBox=unionOcrBoxes([coverageBox,bbox]);
+            }
+        }
+        if (numericLine) {
+            const wordBox=wordBoxes.length?unionOcrBoxes(wordBoxes):undefined;
+            if (wordBox && getAxisSize(lineBox,X_AXIS)*getAxisSize(lineBox,Y_AXIS)>4*getAxisSize(wordBox,X_AXIS)*getAxisSize(wordBox,Y_AXIS))
+                throw new Error('图片数字保护位置无效，已保留原图');
+            const key=[lineText.trim(),lineBox.x0,lineBox.y0,lineBox.x1,lineBox.y1].join('\0'),previous=sourceObservations.get(key);
+            const noWords=!wordBox||previous?.noWords===true;
+            const incompatibleWordBox=previous?.incompatibleWordBox===true || Boolean(wordBox && ocrBoxIou(lineBox,wordBox)<.9);
+            if (noWords && incompatibleWordBox) throw new Error('图片数字保护位置无效，已保留原图');
+            sourceObservations.set(key,{noWords,incompatibleWordBox});
+            if (coverageBox.x0!==lineBox.x0||coverageBox.y0!==lineBox.y0||coverageBox.x1!==lineBox.x1||coverageBox.y1!==lineBox.y1)
+                add(lineText,coverageBox);
+        }
     }
     return guards;
 }
 
 /** 将原始识别结果清洗和拆行；结果用于各视图独立去重，不改变输入。 */
-function parseOcrLines(blocks: OcrBlocks, includeNumericEvidence: boolean, fast?:{noNumeric:boolean}): NumericEvidenceOcrLine[] {
+type ParsedOcrLine = NumericEvidenceOcrLine & {rawNumericText?: string; numericSourceBox?: OcrBox; numericRawConflict?: true; suppressNumericResidual?: true; hiddenNumericEvidence?: true};
+function parseOcrLines(blocks: OcrBlocks, includeNumericEvidence: boolean, fast?:{noNumeric:boolean}): ParsedOcrLine[] {
     if (!blocks) return [];
 
-    const normalized: NumericEvidenceOcrLine[] = [];
+    const normalized: ParsedOcrLine[] = [];
     const validConfidence = (value: number | undefined): value is number =>
         typeof value === 'number' && Number.isFinite(value) && value >= 0 && value <= 100;
     blocks.flatMap(block => block.paragraphs || []).flatMap(paragraph => paragraph.lines || []).forEach(line => {
@@ -287,26 +319,58 @@ function parseOcrLines(blocks: OcrBlocks, includeNumericEvidence: boolean, fast?
         const vertical = isVerticalOcrLine(line.baseline);
         const [main, cross] = vertical ? [Y_AXIS, X_AXIS] : [X_AXIS, Y_AXIS];
         const orientation = vertical ? {vertical: true as const} : {};
-        const words = (line.words || [])
-            .map(word => {
-                const text=word.text.replace(/[\s\u3000]+/g, ' ').trim();
-                if(fast&&/\p{N}/u.test(text))fast.noNumeric=false;
-                return {text,confidence:word.confidence??100,explicitConfidence:word.confidence,bbox:word.bbox};
-            })
-            .filter(word => word.text.length > 0 && Number.isFinite(word.confidence) && word.confidence >= 25
+        const rawWords = (line.words || []).map(word => {
+            const text=word.text.replace(/[\s\u3000]+/g, ' ').trim();
+            if(fast&&/\p{N}/u.test(text))fast.noNumeric=false;
+            return {text,confidence:word.confidence??100,explicitConfidence:word.confidence,bbox:word.bbox};
+        });
+        const words = rawWords.filter(word => word.text.length > 0 && Number.isFinite(word.confidence) && word.confidence >= 25
                 && isValidOcrBox(word.bbox))
             .sort((left, right) => left.bbox[main.start] - right.bbox[main.start]);
+
+        const recordRawNumericEvidence=(startIndex:number,rawText:string,rawLine:string)=>{
+            if (includeNumericEvidence && numericInformation(rawText) && line.bbox && isValidOcrBox(line.bbox)
+                && rawWords.every(word=>word.text && word.bbox && isValidOcrBox(word.bbox)
+                    && word.bbox.x0>=line.bbox.x0-2 && word.bbox.y0>=line.bbox.y0-2
+                    && word.bbox.x1<=line.bbox.x1+2 && word.bbox.y1<=line.bbox.y1+2)) {
+                const fullWords=[...rawWords].sort((a,b)=>a.bbox[main.start]-b.bbox[main.start]);
+                const oneLine=fullWords.every((word,index)=>{
+                    if(index===0)return true;
+                    const previous=fullWords[index-1],thickness=Math.min(getAxisSize(previous.bbox,cross),getAxisSize(word.bbox,cross));
+                    return getAxisOverlap(previous.bbox,word.bbox,cross)>=thickness*.35
+                        && word.bbox[main.start]-previous.bbox[main.end]<=Math.max(6,getAxisSize(previous.bbox,cross)*4);
+                });
+                if (oneLine && rawLine===fullWords.map(word=>word.text).join('').replace(/\s/gu,'')) {
+                    if (normalized.length===startIndex+1 && words.length===rawWords.length) {normalized[startIndex].rawNumericText=rawText;normalized[startIndex].numericSourceBox=line.bbox;}
+                    else {
+                        // 不可信缺词仅作为同框去重证据；真实残片只在可证明来自该纯数值行时移除。
+                        for(let index=startIndex;index<normalized.length;index++)normalized[index].suppressNumericResidual=true;
+                        const text=fullWords.map(word=>word.text).reduce(joinOcrWords,'');
+                        normalized.push({text,bbox:unionOcrBoxes(fullWords.map(word=>word.bbox)),...orientation,rawNumericText:rawText,numericSourceBox:line.bbox,hiddenNumericEvidence:true});
+                    }
+                }
+            }
+        };
 
         if (words.length === 0) {
             // 回退行可能直接持有调用方 bbox；避免快路径改变未知 getter 的读取次数。
             if(fast)fast.noNumeric=false;
             // 有 word 数据却全部被过滤时，整行文本来自同一批噪声，不能再次回退复活。
-            if (line.words?.length) return;
-            const text = line.text.replace(/[\s\u3000]+/g, ' ').trim();
+            if (line.words?.length) {
+                if (includeNumericEvidence && rawWords.some(word=>/\p{N}/u.test(word.text))) {
+                    const rawText=line.text.trim();recordRawNumericEvidence(normalized.length,rawText,rawText.replace(/\s/gu,''));
+                }
+                return;
+            }
+            const sourceText=line.text;
+            const text = sourceText.replace(/[\s\u3000]+/g, ' ').trim();
             const confidence = line.confidence ?? 100;
-            if (text && Number.isFinite(confidence) && confidence >= 25 && isValidOcrBox(line.bbox)) {
-                normalized.push({ text, bbox: line.bbox, ...orientation,
-                    ...(includeNumericEvidence && validConfidence(line.confidence) ? {numericConfidence: line.confidence} : {}) });
+            const numeric=includeNumericEvidence && numericInformation(text);
+            if (text && (Number.isFinite(confidence) && confidence >= 25 || numeric) && isValidOcrBox(line.bbox)) {
+                if (Number.isFinite(confidence) && confidence >= 25) normalized.push({ text, bbox: line.bbox, ...orientation,
+                    ...(includeNumericEvidence && validConfidence(line.confidence) ? {numericConfidence: line.confidence} : {}),
+                    ...(numeric ? {rawNumericText:sourceText.trim(),numericSourceBox:line.bbox} : {}) });
+                else if (numeric) normalized.push({text,bbox:line.bbox,...orientation,rawNumericText:sourceText.trim(),numericSourceBox:line.bbox,hiddenNumericEvidence:true});
             }
             return;
         }
@@ -336,7 +400,8 @@ function parseOcrLines(blocks: OcrBlocks, includeNumericEvidence: boolean, fast?
         }
         flush();
         // 只有整个原行完整、未拆分且每个词均有可信显式分数时才保存证据。
-        const rawLine = line.text.replace(/\s/gu, '');
+        const rawText = line.text.trim();
+        const rawLine = rawText.replace(/\s/gu, '');
         if(fast&&/\p{N}/u.test(rawLine))fast.noNumeric=false;
         const joinedWords = words.map(word => word.text).join('').replace(/\s/gu, '');
         if (includeNumericEvidence && normalized.length === startIndex + 1 && words.length === line.words?.length
@@ -346,33 +411,81 @@ function parseOcrLines(blocks: OcrBlocks, includeNumericEvidence: boolean, fast?
             if (line.confidence !== undefined) scores.push(line.confidence);
             normalized[startIndex].numericConfidence = scores.reduce((minimum, score) => Math.min(minimum, score), 100);
         }
+        recordRawNumericEvidence(startIndex,rawText,rawLine);
     });
     return normalized;
 }
 
 /** 独立处理每个视图的重复框与竖排合列，避免漫画保护信息影响普通图片。 */
-function finalizeOcrLines(normalized: NumericEvidenceOcrLine[], includeNumericEvidence: boolean): NumericEvidenceOcrLine[] {
+function finalizeOcrLines(normalized: ParsedOcrLine[], includeNumericEvidence: boolean): NumericEvidenceOcrLine[] {
     // 相同文字且几乎完全重叠才视为重复检测；不同位置的按钮、数字和重复行必须保留。
-    const seen = new Map<string, NumericEvidenceOcrLine[]>();
+    const seen = new Map<string, ParsedOcrLine[]>();
+    // 完全同一原框出现不同原值时不能猜测；两者都只作为防擦证据。
+    if (includeNumericEvidence) {
+        const byNormalizedBox=new Map<string,{hasRaw:boolean;lines:ParsedOcrLine[];conflict:boolean}>();
+        for(const line of normalized) {
+            if(line.suppressNumericResidual)continue;
+            const b=line.bbox,key=`${line.vertical?'v':'h'}\0${line.text}\0${[b.x0,b.y0,b.x1,b.y1].join(',')}`;
+            const hasRaw=line.rawNumericText!==undefined,group=byNormalizedBox.get(key);
+            if(!group){byNormalizedBox.set(key,{hasRaw,lines:[line],conflict:false});continue;}
+            if(!group.conflict && group.hasRaw!==hasRaw){group.conflict=true;for(const other of group.lines)other.numericRawConflict=true;}
+            if(group.conflict)line.numericRawConflict=true;
+            group.lines.push(line);
+        }
+        const byBox=new Map<string,{first:string;lines:ParsedOcrLine[];conflict:boolean}>();
+        for(const line of normalized) {
+            if (!line.rawNumericText || !line.numericSourceBox || line.suppressNumericResidual) continue;
+            const b=line.numericSourceBox,p=line.bbox,key=[b.x0,b.y0,b.x1,b.y1,p.x0,p.y0,p.x1,p.y1].join(','),group=byBox.get(key);
+            if (!group) {byBox.set(key,{first:line.rawNumericText,lines:[line],conflict:false});continue;}
+            if (!group.conflict && group.first!==line.rawNumericText) {
+                group.conflict=true;for(const other of group.lines)other.numericRawConflict=true;
+            }
+            if(group.conflict)line.numericRawConflict=true;
+            group.lines.push(line);
+        }
+    }
     const unique = normalized.filter(line => {
-        const key = `${line.vertical ? 'vertical' : 'horizontal'}\0${line.text}`;
+        if (line.suppressNumericResidual) return false;
+        const key = `${line.vertical ? 'vertical' : 'horizontal'}\0${line.rawNumericText ?? line.text}`;
         const candidates = seen.get(key) ?? [];
         const duplicate = candidates.find(previous => {
-            const intersection = Math.max(0, getAxisOverlap(previous.bbox, line.bbox, X_AXIS))
-                * Math.max(0, getAxisOverlap(previous.bbox, line.bbox, Y_AXIS));
-            const area = (box: OcrBox) => getAxisSize(box, X_AXIS) * getAxisSize(box, Y_AXIS);
-            return intersection / (area(previous.bbox) + area(line.bbox) - intersection) >= 0.9;
+            const a=previous.rawNumericText && line.rawNumericText ? previous.numericSourceBox! : previous.bbox;
+            const b=previous.rawNumericText && line.rawNumericText ? line.numericSourceBox! : line.bbox;
+            return ocrBoxIou(a,b) >= 0.9 && ocrBoxIou(previous.bbox,line.bbox) >= 0.9;
         });
         if (!duplicate) {candidates.push(line); seen.set(key, candidates);}
-        else if (duplicate.numericConfidence === undefined || line.numericConfidence === undefined) delete duplicate.numericConfidence;
-        else if (includeNumericEvidence && duplicate.numericConfidence >= 90 && line.numericConfidence >= 90 && numericInformation(line.text)) {
-            duplicate.bbox = unionOcrBoxes([duplicate.bbox, line.bbox]);
-            duplicate.numericConfidence = Math.min(duplicate.numericConfidence, line.numericConfidence);
+        else {
+            if (line.hiddenNumericEvidence) duplicate.hiddenNumericEvidence=true;
+            if (line.numericRawConflict) duplicate.numericRawConflict=true;
+            if (includeNumericEvidence && (duplicate.rawNumericText !== undefined || line.rawNumericText !== undefined)
+                && duplicate.rawNumericText !== line.rawNumericText) duplicate.numericRawConflict=true;
+            if (duplicate.numericConfidence === undefined || line.numericConfidence === undefined) delete duplicate.numericConfidence;
+            else if (includeNumericEvidence && duplicate.numericConfidence >= 90 && line.numericConfidence >= 90 && numericInformation(line.text)) {
+                duplicate.bbox = unionOcrBoxes([duplicate.bbox, line.bbox]);
+                duplicate.numericConfidence = Math.min(duplicate.numericConfidence, line.numericConfidence);
+            }
+            else duplicate.numericConfidence = Math.min(duplicate.numericConfidence, line.numericConfidence);
         }
-        else duplicate.numericConfidence = Math.min(duplicate.numericConfidence, line.numericConfidence);
         return !duplicate;
     });
-    return mergeVerticalOcrColumns(unique, includeNumericEvidence);
+    return mergeVerticalOcrColumns(includeNumericEvidence ? restoreNumericRawText(unique) : unique, includeNumericEvidence);
+}
+
+function restoreNumericRawText(lines:ParsedOcrLine[]):NumericEvidenceOcrLine[] {
+    let write=0;
+    for (const line of lines) {
+        const raw=line.rawNumericText, conflict=line.numericRawConflict, hidden=line.hiddenNumericEvidence;
+        delete line.rawNumericText;delete line.numericSourceBox;delete line.numericRawConflict;delete line.hiddenNumericEvidence;
+        if (hidden) continue;
+        if (conflict) {delete line.numericConfidence;if (!numericProtection(line.text)) continue;}
+        else if (raw !== undefined) {
+            if ((line.numericConfidence ?? -1) >= 90) line.text=raw;
+            else if (!numericProtection(line.text)) continue;
+        }
+        lines[write++]=line;
+    }
+    lines.length=write;
+    return lines;
 }
 
 export function normalizeOcrLines(blocks: OcrBlocks, includeNumericEvidence = false): NumericEvidenceOcrLine[] {
@@ -390,6 +503,6 @@ export function normalizeOcrLineViews(blocks: OcrBlocks): {ordinary: OcrLine[]; 
         return {ordinary,manga};
     }
     // finalize 可能删除置信字段或替换框，因此普通视图必须拥有独立行对象。
-    const ordinary = parsed.map(line => ({text: line.text, bbox: {...line.bbox}, ...(line.vertical ? {vertical: true as const} : {})}));
+    const ordinary = parsed.filter(line=>!line.hiddenNumericEvidence).map(line => ({text: line.text, bbox: {...line.bbox}, ...(line.vertical ? {vertical: true as const} : {})}));
     return {ordinary: finalizeOcrLines(ordinary, false), manga: finalizeOcrLines(parsed, true)};
 }

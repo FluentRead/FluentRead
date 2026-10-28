@@ -2,6 +2,7 @@ import {describe, expect, it, vi} from 'vitest';
 import {groupMangaText, groupMangaOcrLines, type MangaOcrItem} from '@/src/features/image-translation/services/mangaRegions';
 import {drawMangaTranslations,mangaRegionBackground} from '@/src/features/image-translation/services/mangaRendering';
 import {layoutImageTranslationText} from '@/src/features/image-translation/services/rendering';
+import {numericInformation,numericProtection} from '@/src/features/image-translation/services/mangaNumeric';
 
 const item = (text: string, x = 20, y = 20, width = 80, height = 20, confidence = 0.99): MangaOcrItem =>
     ({text, box: {x, y, width, height}, confidence});
@@ -232,7 +233,7 @@ describe('漫画数字与对白分组',()=>{
 
 
 describe('漫画与图片的完整数值形态',()=>{
-    it.each(['90%','９０％','-3.5%','3.14','3,14','1,000','1,000,000','1 000','123 456','90 %','1,234.50','€1.234,56','1.234,50 €','$1,23','$1.234','3,14%','38,5°C','−20','1/2','38°C','３８℃','−10℉'])('保留高置信数值 %s 的原文和位置',text=>{
+    it.each(['90  %','90\t%','90　%','1  000','1\t000','12/31/2026','31/12/2026','2026年10月28日','10:30 AM','USD 10','+¥100','١٢','١٢:٣٠','۱۲','۱۲:۳۰','02/29/2024','29/02/2024','29/02/2000','2024年2月29日','12:30 PM','EUR 1.234,56','−¥100','90%','９０％','-3.5%','3.14','3,14','1,000','1,000,000','1 000','123 456','90 %','1,234.50','€1.234,56','1.234,50 €','$1,23','$1.234','3,14%','38,5°C','−20','1/2','38°C','３８℃','−10℉'])('保留高置信数值 %s 的原文和位置',text=>{
         for(const language of ['en','ja','auto']) {
             const source=item(text,20,30,90,18,.99),regions=groupMangaText([source],language,500,500,'page',true);
             expect(regions).toEqual([{text,bbox:{x0:20,y0:30,x1:110,y1:48},fontSize:18,sourceBoxes:[{x0:20,y0:30,x1:110,y1:48}]}]);
@@ -241,6 +242,13 @@ describe('漫画与图片的完整数值形态',()=>{
         const bbox={x0:20,y0:30,x1:110,y1:48};
         expect(groupMangaOcrLines([{text,bbox,numericConfidence:99}],'ko',500,500)).toMatchObject([{text,bbox}]);
         expect(groupMangaOcrLines([{text,bbox,numericConfidence:89}],'ko',500,500)).toEqual([]);
+    });
+    it.each(['31/02/2026','29/02/1900','01/01/0000','3  3','3\t3','02/29/2023','00/12/2026','2026年2月29日','2026年13月1日','2026年10月28日発売','13:30 PM','00:30 AM','10:60 AM','USD 10 sale','BOOK 10','USD','XXX 10','+¥100 OFF','١٢ cats','१२'])('不把无效日期、未知单位或混合正文 %s 当作纯数值',text=>{
+        expect(numericInformation(text)).toBe(false);expect(numericProtection(text)).toBe(false);
+    });
+    it.each(['١','۱'])('单个阿拉伯数字 %s 只作图片保护，不放宽漫画识别',text=>{
+        expect(numericInformation(text)).toBe(false);expect(numericProtection(text)).toBe(true);
+        expect(groupMangaText([item(text)],'ja',500,500,'page',true)).toEqual([]);
     });
     it.each(['①②','²³','1/0','3 / 4','90%%','20C','38°','3.','--20','3..14','3 3','4/0','1,,000','1,00,0','€1,234,56','1.234.50 €'])('不把无效或装饰形态 %s 当作完整数字',text=>{
         expect(groupMangaText([item(text)],'ja',500,500,'page',true)).toEqual([]);

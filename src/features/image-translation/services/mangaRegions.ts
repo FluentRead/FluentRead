@@ -44,7 +44,8 @@ export function groupMangaText(items: MangaOcrItem[], sourceLanguage: string, wi
     const english = /^en(?:-|$)/i.test(sourceLanguage);
     const japanese = /^(?:ja|jpn)(?:-|$)/i.test(sourceLanguage);
     const lines: MangaRegion[] = items.flatMap(item => {
-        const text = item.text.replace(/\s+/gu, ' ').trim();
+        const sourceText=item.text.trim();
+        const text=numericInformation(sourceText) ? sourceText : sourceText.replace(/\s+/gu, ' ');
         const box = item.box;
         if (!Number.isFinite(item.confidence) || item.confidence < 0.65 || item.confidence > 1 || !text) return [];
         const numericSyntax=numericInformation(text);
@@ -79,7 +80,8 @@ export function groupMangaOcrLines(lines: NumericEvidenceOcrLine[], sourceLangua
     if (![width, height].every(value => Number.isSafeInteger(value) && value > 0)) return [];
     const language = sourceLanguage.trim().replace(/_/gu, '-').toLowerCase().split('-')[0];
     const regions: MangaRegion[] = lines.flatMap(line => {
-        const text = line.text.replace(/\s+/gu, ' ').trim();
+        const sourceText=line.text.trim();
+        const text=numericInformation(sourceText) ? sourceText : sourceText.replace(/\s+/gu, ' ');
         const {x0, y0, x1, y1} = line.bbox;
         const numeric = typeof line.numericConfidence === 'number' && Number.isFinite(line.numericConfidence)
             && line.numericConfidence >= 90 && line.numericConfidence <= 100 && numericInformation(text);

@@ -734,7 +734,7 @@ describe('漫画与普通图片数值保护',()=>{
         expect(result.mangaPatches?.patches).toEqual([]);
         expect(mocks.repair).not.toHaveBeenCalled();expect(mocks.mangaDraw).not.toHaveBeenCalled();
     });
-    it.each(['90%','９０％','3.14','3,14','1,000','1,000,000','1 000','90 %','1,234.50','€1.234,56','1.234,50 €','3,14%','38,5°C','−20','1/2','38°C'])('单图从 Tesseract 原始单词结果提取 %s 并保护原值',async text=>{
+    it.each(['12/31/2026','31/12/2026','2026年10月28日','10:30 AM','USD 10','+¥100','١٢','١٢:٣٠','۱۲','۱۲:۳۰','02/29/2024','29/02/2024','2024年2月29日','12:30 PM','EUR 1.234,56','−¥100','90%','９０％','3.14','3,14','1,000','1,000,000','1 000','90 %','1,234.50','€1.234,56','1.234,50 €','3,14%','38,5°C','−20','1/2','38°C'])('单图从 Tesseract 原始单词结果提取 %s 并保护原值',async text=>{
         const {normalizeOcrLineViews}=await import('@/src/features/image-translation/core');
         const raw=[{paragraphs:[{lines:[{text,bbox:box,confidence:99,words:[{text,bbox:box,confidence:99}]}]}]}];
         const recognized=normalizeOcrLineViews(raw).manga;
@@ -745,7 +745,7 @@ describe('漫画与普通图片数值保护',()=>{
         expect(sendMessage.mock.calls.some(([m])=>m.type==='fluentReadImageTranslateTexts')).toBe(false);
         expect(mocks.inpaint).not.toHaveBeenCalled();expect(mocks.draw).not.toHaveBeenCalled();
     });
-    it.each(['42','08:45','$19.99','90%','９０％','3.14','3,14','1,000','1,000,000','1 000','90 %','1,234.50','€1.234,56','1.234,50 €','3,14%','38,5°C','−20','1/2','38°C'])('单图 Paddle 数值 %s 只读原文，不发翻译和画布',async text=>{
+    it.each(['12/31/2026','31/12/2026','2026年10月28日','10:30 AM','USD 10','+¥100','١٢','١٢:٣٠','۱۲','۱۲:۳۰','02/29/2024','29/02/2024','2024年2月29日','12:30 PM','EUR 1.234,56','−¥100','42','08:45','$19.99','90%','９０％','3.14','3,14','1,000','1,000,000','1 000','90 %','1,234.50','€1.234,56','1.234,50 €','3,14%','38,5°C','−20','1/2','38°C'])('单图 Paddle 数值 %s 只读原文，不发翻译和画布',async text=>{
         const {collectMangaRegions}=await import('@/src/features/image-translation/services/mangaBubbles');
         const recognized=collectMangaRegions({results:[{text,confidence:.99,box:{x:50,y:40,width:30,height:10}}]},'ja',100,80,'image');
         imageOptions.push({width:100,height:80});mocks.mangaRecognize.mockResolvedValueOnce(recognized);
@@ -755,13 +755,69 @@ describe('漫画与普通图片数值保护',()=>{
         expect(sendMessage.mock.calls.some(([m])=>m.type==='fluentReadImageTranslateTexts')).toBe(false);
         expect(mocks.inpaint).not.toHaveBeenCalled();expect(mocks.draw).not.toHaveBeenCalled();expect(canvases).toHaveLength(0);
     });
-    it.each(['1','７','42','08:45','$19.99','90%','９０％','3.14','3,14','1,000','1,000,000','1 000','90 %','1,234.50','€1.234,56','1.234,50 €','3,14%','38,5°C','−20','1/2','38°C'])('单图 Tesseract 数值 %s 只读原文，不发翻译和画布',async text=>{
+    it.each(['12/31/2026','31/12/2026','2026年10月28日','10:30 AM','USD 10','+¥100','١٢','١٢:٣٠','۱۲','۱۲:۳۰','02/29/2024','29/02/2024','2024年2月29日','12:30 PM','EUR 1.234,56','−¥100','1','７','42','08:45','$19.99','90%','９０％','3.14','3,14','1,000','1,000,000','1 000','90 %','1,234.50','€1.234,56','1.234,50 €','3,14%','38,5°C','−20','1/2','38°C'])('单图 Tesseract 数值 %s 只读原文，不发翻译和画布',async text=>{
         imageOptions.push({width:100,height:80});mocks.recognize.mockResolvedValueOnce([{text,bbox:box,numericConfidence:99}]);
         const result=await translateImageInOffscreen('numbers','ja','Page',undefined,'image-tesseract',false,'tesseract');
         expect(result.lines.map(line=>[line.sourceText,line.text])).toEqual([[text,text]]);
         expect(result.image).toBe('numbers');
         expect(sendMessage.mock.calls.some(([m])=>m.type==='fluentReadImageTranslateTexts')).toBe(false);
         expect(mocks.inpaint).not.toHaveBeenCalled();expect(mocks.draw).not.toHaveBeenCalled();expect(canvases).toHaveLength(0);
+    });
+    it.each([['12:30 PM',['12',':','30','PM']],['31/12/2026',['31','/','12','/','2026']],['2026年10月28日',['2026','年','10','月','28','日']]])('Tesseract 多词 %s 在漫画和普通图中保留原行且不发送翻译',async(text,parts)=>{
+        const {normalizeOcrLineViews,collectRawNumericGuards}=await import('@/src/features/image-translation/core');let x=2;
+        const words=parts.map(part=>{const bbox={x0:x,y0:2,x1:x+8,y1:12};x+=9;return {text:part,bbox,confidence:99};});
+        const raw=[{paragraphs:[{lines:[{text,bbox:{x0:2,y0:2,x1:x-1,y1:12},confidence:99,words}]}]}];
+        const parsed=normalizeOcrLineViews(raw).manga;const recognized=[...parsed,...collectRawNumericGuards(raw,parsed)];
+        expect(recognized.filter(line=>!line.guardOnly)).toMatchObject([{text,numericConfidence:99}]);
+        for(const manga of [false,true]){
+            imageOptions.push({width:100,height:80});mocks.recognize.mockResolvedValueOnce(recognized);
+            const result=await translateImageInOffscreen('numbers','ko','Page',undefined,`split-${manga}`,manga,'tesseract');
+            expect(result.lines.map(line=>[line.sourceText,line.text])).toEqual([[text,text]]);
+        }
+        expect(sendMessage.mock.calls.some(([m])=>m.type==='fluentReadImageTranslateTexts')).toBe(false);
+        expect(mocks.inpaint).not.toHaveBeenCalled();expect(mocks.mangaDraw).not.toHaveBeenCalled();
+    });
+    it.each(['90  %','90\t%','90　%','1  000','1\t000'])('空白形态 %s 保留精确原文且不与邻近正文合段送翻',async text=>{
+        const {normalizeOcrLineViews,collectRawNumericGuards}=await import('@/src/features/image-translation/core');
+        for(const split of [false,true]){
+            const parts=text.includes('%')?['90','%']:['1','000'];let x=20;
+            const words=split?parts.map(part=>{const bbox={x0:x,y0:2,x1:x+8,y1:12};x+=9;return {text:part,bbox,confidence:99};}):[];
+            const number={text,bbox:{x0:20,y0:2,x1:38,y1:12},confidence:99,words},close={text:'SALE',bbox:{x0:2,y0:2,x1:19,y1:12},confidence:99};
+            const away={text:'Away',bbox:{x0:4,y0:50,x1:35,y1:60},confidence:99},blocks=[{paragraphs:[{lines:[number,close,away]}]}];
+            const parsed=normalizeOcrLineViews(blocks).manga,guards=collectRawNumericGuards(blocks,parsed);
+            imageOptions.push({width:100,height:80});mocks.recognize.mockResolvedValueOnce([...parsed,...guards]);
+            sendMessage.mockImplementation((message,callback)=>callback(message.type==='fluentReadImageTranslateTexts'?{success:true,translations:['近','远']}:undefined));
+            const result=await translateImageInOffscreen('spaces','en','Page',undefined,`spaces-${split}`,false,'tesseract');
+            expect(result.lines.find(line=>line.sourceText===text)?.text).toBe(text);
+            const calls=sendMessage.mock.calls.filter(([message])=>message.type==='fluentReadImageTranslateTexts');
+            expect(calls.at(-1)![0].texts).toEqual(['SALE','Away']);
+        }
+    });
+    it.each(['90  %','90\t%','90　%','1  000','1\t000'])('Paddle 普通图片完整保留 %s，正文仍按原规则规范空白',async text=>{
+        const {collectMangaRegions}=await import('@/src/features/image-translation/services/mangaBubbles');
+        const items=[{text,confidence:.99,box:{x:20,y:2,width:18,height:10}},
+            {text:'Hello  world',confidence:.99,box:{x:2,y:30,width:60,height:10}}];
+        const recognized=collectMangaRegions({results:items},'en',100,80,'image');
+        expect(recognized.map(line=>line.text)).toEqual([text,'Hello world']);
+        imageOptions.push({width:100,height:80});mocks.mangaRecognize.mockResolvedValueOnce(recognized);
+        sendMessage.mockImplementation((message,callback)=>callback(message.type==='fluentReadImageTranslateTexts'?{success:true,translations:['你好']} :undefined));
+        const result=await translateImageInOffscreen('paddle-spaces','en','Page',undefined,'paddle-spaces',false,'paddle');
+        expect(result.lines.find(line=>line.sourceText===text)?.text).toBe(text);
+        expect(sendMessage.mock.calls.filter(([message])=>message.type==='fluentReadImageTranslateTexts')[0][0].texts).toEqual(['Hello world']);
+    });
+    it.each(['paddle','tesseract'] as const)('漫画 %s 保留数值内部空白且不把其送翻',async engine=>{
+        const text='90\t%',bbox={x0:20,y0:2,x1:38,y1:12},close={text:'Hello',bbox:{x0:2,y0:2,x1:19,y1:12}},away={text:'Away',bbox:{x0:4,y0:50,x1:35,y1:60}};
+        const lines=[{text,bbox,numericConfidence:99},close,away];imageOptions.push({width:100,height:80});
+        if(engine==='paddle'){
+            const {collectMangaRegions}=await import('@/src/features/image-translation/services/mangaBubbles');
+            const items=lines.map(line=>({text:line.text,confidence:.99,box:{x:line.bbox.x0,y:line.bbox.y0,width:line.bbox.x1-line.bbox.x0,height:line.bbox.y1-line.bbox.y0}}));
+            mocks.mangaRecognize.mockResolvedValueOnce(collectMangaRegions({results:items},'ja',100,80,'manga'));
+        } else mocks.recognize.mockResolvedValueOnce(lines);
+        mocks.repair.mockImplementationOnce(async pixels=>pixels);
+        sendMessage.mockImplementation((message,callback)=>callback(message.type==='fluentReadImageTranslateTexts'?{success:true,translations:['近','远']}:undefined));
+        const result=await translateImageInOffscreen('spaces',engine==='paddle'?'ja':'ko','Page',undefined,`spaces-manga-${engine}`,true,engine);
+        expect(result.lines.find(line=>line.sourceText===text)?.text).toBe(text);
+        expect(sendMessage.mock.calls.filter(([message])=>message.type==='fluentReadImageTranslateTexts')[0][0].texts).toEqual(['Hello','Away']);
     });
     it.each(['paddle','tesseract'] as const)('单图 %s 将邻近冲突对白保留为阅读译文，只对远处正文执行真实修补',async engine=>{
         const close={text:'Close',bbox:{x0:2,y0:2,x1:19,y1:10}};
@@ -800,6 +856,48 @@ describe('漫画与普通图片数值保护',()=>{
 
 
 describe('低置信数值物理保护',()=>{
+    it.each([false,true])('低置信多词原行仅作物理保护，%s 漫画模式不阅读和送翻残片',async manga=>{
+        const {normalizeOcrLineViews,collectRawNumericGuards}=await import('@/src/features/image-translation/core');let x=20;
+        const words=['12',':','30','PM'].map(text=>{const bbox={x0:x,y0:2,x1:x+5,y1:10};x+=6;return {text,bbox,confidence:89};});
+        const raw=[{text:'12:30 PM',bbox:{x0:20,y0:2,x1:x-1,y1:10},confidence:89,words},
+            {text:'Close',bbox:{x0:2,y0:2,x1:19,y1:10},confidence:99},
+            {text:'Away',bbox:{x0:4,y0:50,x1:35,y1:60},confidence:99}];
+        const blocks=[{paragraphs:[{lines:raw}]}],parsed=normalizeOcrLineViews(blocks).manga,guards=collectRawNumericGuards(blocks,parsed);
+        expect(parsed.map(line=>line.text)).toEqual(['Close','Away']);expect(guards).toContainEqual({text:'',bbox:raw[0].bbox,guardOnly:true});
+        imageOptions.push({width:100,height:80});mocks.recognize.mockResolvedValueOnce([...parsed,...guards]);
+        if(manga)mocks.repair.mockImplementationOnce(async pixels=>pixels);
+        sendMessage.mockImplementation((message,callback)=>callback(message.type==='fluentReadImageTranslateTexts'?{success:true,translations:['近','远']}:undefined));
+        const result=await translateImageInOffscreen('low-split',manga?'ko':'en','Page',undefined,`low-split-${manga}`,manga,'tesseract');
+        expect(sendMessage.mock.calls.filter(([m])=>m.type==='fluentReadImageTranslateTexts')[0][0].texts).toEqual(['Close','Away']);
+        expect(result.lines.map(line=>line.sourceText)).toEqual(['Close','Away']);expect(result.lines[0]).toMatchObject({renderSkipped:true});
+    });
+    it.each(['low-split','conflicting-values'] as const)('同一原框 %s 不进入阅读或翻译，远处正文仍正常翻译',async kind=>{
+        const {normalizeOcrLineViews,collectRawNumericGuards}=await import('@/src/features/image-translation/core');let x=20;
+        const words=['12',':','30','PM'].map(text=>{const bbox={x0:x,y0:2,x1:x+5,y1:10};x+=6;return {text,bbox,confidence:kind==='low-split'?89:99};});
+        const bbox={x0:20,y0:2,x1:x-1,y1:10},first={text:'12:30 PM',bbox,confidence:99,words:[]},
+            second={text:kind==='low-split'?'12:30 PM':'12:31 PM',bbox,confidence:kind==='low-split'?89:99,words};
+        if(kind==='conflicting-values')second.words[2].text='31';
+        const away={text:'Away',bbox:{x0:4,y0:50,x1:35,y1:60},confidence:99};
+        const raw=[{paragraphs:[{lines:[first,second,away]}]}],parsed=normalizeOcrLineViews(raw).manga,guards=collectRawNumericGuards(raw,parsed);
+        imageOptions.push({width:100,height:80});mocks.recognize.mockResolvedValueOnce([...parsed,...guards]);
+        sendMessage.mockImplementation((message,callback)=>callback(message.type==='fluentReadImageTranslateTexts'?{success:true,translations:['远']}:undefined));
+        const result=await translateImageInOffscreen('duplicate-values','en','Page',undefined,`same-box-${kind}`,false,'tesseract');
+        expect(sendMessage.mock.calls.filter(([m])=>m.type==='fluentReadImageTranslateTexts')[0][0].texts).toEqual(['Away']);
+        expect(result.lines.map(line=>line.sourceText)).toEqual(['Away']);
+    });
+    it.each(['same','different'] as const)('超宽原框内 %s 数值的位置无法确认时整图报错，中间正文不被擦除',async kind=>{
+        const {normalizeOcrLineViews,collectRawNumericGuards}=await import('@/src/features/image-translation/core');
+        const bbox={x0:0,y0:2,x1:100,y1:12},left={text:'90%',bbox,confidence:99,words:[{text:'90%',bbox:{x0:0,y0:2,x1:10,y1:12},confidence:99}]};
+        const value=kind==='same'?'90%':'80%',right={text:value,bbox,confidence:99,words:[{text:value,bbox:{x0:90,y0:2,x1:100,y1:12},confidence:99}]};
+        const center={text:'HELLO',bbox:{x0:40,y0:2,x1:60,y1:12},confidence:99};
+        for(const lines of [[left,right,center],[right,left,center]]){
+            const raw=[{paragraphs:[{lines}]}];imageOptions.push({width:100,height:80});
+            mocks.recognize.mockImplementationOnce(async()=>{const parsed=normalizeOcrLineViews(raw).manga;return [...parsed,...collectRawNumericGuards(raw,parsed)];});
+            await expect(translateImageInOffscreen('wide-source','en','Page',undefined,`wide-${kind}`,false,'tesseract')).rejects.toThrow('保护位置无效');
+        }
+        expect(sendMessage.mock.calls.some(([message])=>message.type==='fluentReadImageTranslateTexts')).toBe(false);
+        expect(mocks.inpaint).not.toHaveBeenCalled();expect(mocks.draw).not.toHaveBeenCalled();
+    });
     it('Tesseract 混排行低分数值词被过滤时，保留物理框并阻止邻近文字擦图',async()=>{
         const {normalizeOcrLineViews,collectRawNumericGuards}=await import('@/src/features/image-translation/core');
         const label={x0:2,y0:2,x1:19,y1:10},number={x0:20,y0:2,x1:40,y1:10};

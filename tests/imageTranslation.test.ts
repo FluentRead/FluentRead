@@ -272,14 +272,15 @@ describe('漫画数字证据：OCR 规范化', () => {
     });
     it('同一行多个词采用最低可靠度，显式行级置信更低时也不能抬高',()=>{
         const words=[{text:'₩',bbox:{x0:10,y0:10,x1:20,y1:30},confidence:97},{text:'12,000',bbox:{x0:21,y0:10,x1:80,y1:30},confidence:91}];
-        expect(normalized('₩12,000',words)[0]).toMatchObject({text:'₩ 12,000',numericConfidence:91});
+        expect(normalized('₩12,000',words)[0]).toMatchObject({text:'₩12,000',numericConfidence:91});
+        expect(normalizeOcrLines([{paragraphs:[{lines:[{text:'₩12,000',bbox,words}]}]}],false)[0].text).toBe('₩ 12,000');
         expect(normalized('₩12,000',words,89)[0]).toMatchObject({numericConfidence:89});
         expect(normalized('₩12,000',[words[0],{...words[1],confidence:undefined}])[0]).not.toHaveProperty('numericConfidence');
     });
     it('低置信词、坏框或行文字与词序不一致均不能把残片升级成可信数字',()=>{
         const a={text:'12',bbox:{x0:10,y0:10,x1:25,y1:30},confidence:97};
         for(const b of [{text:'.34',bbox:{x0:26,y0:10,x1:80,y1:30},confidence:24},{text:'.34',bbox:{x0:26,y0:10,x1:26,y1:30},confidence:97}]) {
-            const line=normalized('12.34',[a,b]);expect(line[0]).not.toHaveProperty('numericConfidence');
+            const line=normalized('12.34',[a,b]);expect(line.every(value=>!('numericConfidence' in value))).toBe(true);
         }
         expect(normalized('12.34',[a])[0]).not.toHaveProperty('numericConfidence');
     });

@@ -50,6 +50,24 @@ describe('图片 OCR 处理与结果缓存', () => {
         expect(lines.some(line=>!line.guardOnly&&line.text.startsWith('SALE'))).toBe(true);
         expect(recognize).toHaveBeenCalledOnce();
     });
+    it('独立数值行标点框非法时图片保留原图报错，圈选仍返回可读正文',async()=>{
+        const raw={text:'12:30 PM',bbox:{x0:2,y0:10,x1:60,y1:20},confidence:89,
+            words:[{text:'12',bbox:{x0:2,y0:10,x1:12,y1:20},confidence:89},{text:':',bbox:{x0:13,y0:10,x1:13,y1:20},confidence:89},
+                {text:'30',bbox:{x0:14,y0:10,x1:24,y1:20},confidence:89},{text:'PM',bbox:{x0:25,y0:10,x1:40,y1:20},confidence:89}]};
+        const payload={data:{blocks:[{paragraphs:[{lines:[raw,{text:'Nearby',bbox:{x0:2,y0:40,x1:60,y1:50},confidence:99}]}]}]}};
+        recognize.mockResolvedValueOnce(payload).mockResolvedValueOnce(payload);
+        await expect(recognizeImage('bad-punctuation-image','en',undefined,{includeMangaNumericConfidence:true})).rejects.toThrow('图片数字保护位置无效');
+        const area=await recognizeImage('bad-punctuation-area','en',undefined,{profile:'area'});
+        expect(area.map(line=>line.text)).toContain('Nearby');expect(area.some(line=>line.text.includes('PM'))).toBe(true);
+    });
+    it('过宽数值行在图片模式保守失败，圈选仍返回普通文字',async()=>{
+        const bbox={x0:0,y0:0,x1:40,y1:10},number={text:'90%',bbox,confidence:99,words:[{text:'90%',bbox:{x0:0,y0:0,x1:9,y1:10},confidence:99}]};
+        const nearby={text:'Nearby',bbox:{x0:10,y0:20,x1:50,y1:30},confidence:99};
+        const payload={data:{blocks:[{paragraphs:[{lines:[number,nearby]}]}]}};
+        recognize.mockResolvedValueOnce(payload).mockResolvedValueOnce(payload);
+        await expect(recognizeImage('wide-number-image','en',undefined,{includeMangaNumericConfidence:true})).rejects.toThrow('图片数字保护位置无效');
+        const area=await recognizeImage('wide-number-area','en',undefined,{profile:'area'});expect(area.map(line=>line.text)).toContain('Nearby');
+    });
     it('混排行数值词坐标非法时明确失败，不发布潜在破坏图片',async()=>{
         const raw={text:'SALE 90%',bbox:{x0:2,y0:10,x1:40,y1:20},confidence:99,
             words:[{text:'SALE',bbox:{x0:2,y0:10,x1:19,y1:20},confidence:99},{text:'90%',bbox:{x0:NaN,y0:10,x1:40,y1:20},confidence:20}]};

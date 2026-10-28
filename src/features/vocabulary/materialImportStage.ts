@@ -9,6 +9,7 @@ import {sha256} from '@noble/hashes/sha256';
 import {bytesToHex} from '@noble/hashes/utils';
 import {MaterialDatabase, MaterialRepository} from '@/src/features/vocabulary/materialRepository';
 import type {MaterialImportResult, MaterialOperationGuard} from '@/src/features/vocabulary/materialProtocol';
+import {MATERIAL_IMPORT_FRAME_BYTES, MATERIAL_IMPORT_MAX_RECORD_BYTES, MATERIAL_IMPORT_MAX_TOTAL_BYTES, MATERIAL_IMPORT_MAX_FRAMES} from '@/src/features/vocabulary/materialProtocol';
 
 export interface Manifest {records:number; frames:number; bytes:number; digest:string}
 export interface Frame {seq:number; record:number; part:number; total:number; recordBytes:number; bytes:Uint8Array}
@@ -20,7 +21,7 @@ interface Receipt {id:string; ownerHash:string; result:MaterialImportResult; exp
 interface RecoverableStart extends Manifest {id:string; ownerHash:string; guard:MaterialOperationGuard; expiresAt:number}
 interface Budget {key:string; reserved:number; reservedFrames:number; slots:number}
 export interface Limits {frameBytes:number; recordBytes:number; totalBytes:number; frameCount:number; totalFrames:number; slots:number; inflight:number; ttlMs:number; receiptTtlMs:number}
-const DEFAULTS:Limits={frameBytes:128*1024, recordBytes:128*1024*1024, totalBytes:256*1024*1024, frameCount:20000, totalFrames:200000, slots:256, inflight:8, ttlMs:30*60*1000, receiptTtlMs:7*24*60*60*1000};
+const DEFAULTS:Limits={frameBytes:MATERIAL_IMPORT_FRAME_BYTES, recordBytes:MATERIAL_IMPORT_MAX_RECORD_BYTES, totalBytes:MATERIAL_IMPORT_MAX_TOTAL_BYTES, frameCount:MATERIAL_IMPORT_MAX_FRAMES, totalFrames:200000, slots:256, inflight:8, ttlMs:30*60*1000, receiptTtlMs:7*24*60*60*1000};
 const encoder=new TextEncoder();
 // Read the actual typed-array size even if a direct caller shadows its public properties.
 const typedArrayByteLength=Object.getOwnPropertyDescriptor(Object.getPrototypeOf(Uint8Array.prototype),'byteLength')!.get!;

@@ -5,13 +5,13 @@
  * 模块边界：只通过本地材料与既有学习客户端读写，不访问数据库或供应商；来源恢复由公共适配器处理，个人内容不进入配置同步。
  -->
 <template>
-  <section class="fr-materials" aria-label="阅读材料" :aria-busy="loading">
+  <section class="fr-materials" aria-label="阅读材料" :aria-busy="loading || busy">
     <div class="fr-material-toolbar">
       <label v-if="materials.length" class="fr-material-search"><UiIcon name="search" :size="16" /><input v-model="query" type="search" aria-label="搜索阅读材料" placeholder="搜索材料、原句或笔记" /></label>
       <select v-if="materials.length && (topics.length || topic)" v-model="topic" aria-label="按主题筛选"><option value="">全部主题</option><option v-for="item in topics" :key="item" :value="item">{{ item }}</option></select>
       <details class="fr-material-menu" @keydown.esc.stop.prevent="closeMenu">
         <summary aria-label="材料管理"><UiIcon name="sliders" :size="16" /></summary>
-        <div @click="closeMenu"><button type="button" :disabled="loading || busy" @click="reload()">刷新材料</button><button type="button" :disabled="busy" @click="toggleArchive">{{ archived ? '返回阅读材料' : '查看已移除材料' }}</button><button type="button" :disabled="busy" @click="exportMaterials">导出材料备份</button><button type="button" :disabled="busy" @click="importInput?.click()">恢复材料备份</button><button type="button" :disabled="busy" @click="confirmClear = true">清空全部材料</button></div>
+        <div @click="closeMenu"><button type="button" :disabled="loading || busy" @click="reload()">刷新材料</button><button type="button" :disabled="busy" @click="toggleArchive">{{ archived ? '返回阅读材料' : '查看已移除材料' }}</button><button type="button" :disabled="busy" @click="exportMaterials">导出材料备份</button><button type="button" :disabled="busy || !!pendingImport" @click="importInput?.click()">恢复材料备份</button><button type="button" :disabled="busy" @click="confirmClear = true">清空全部材料</button></div>
       </details>
       <input ref="importInput" type="file" accept=".json,application/json" hidden aria-label="恢复材料备份" @change="importMaterials" />
     </div>
@@ -21,6 +21,8 @@
     </section>
     <p v-if="error" class="fr-material-feedback error" role="alert">{{ error }} <button type="button" :disabled="busy" @click="reload()">重试</button></p>
     <p v-if="backupWarning" class="fr-material-feedback error" role="alert">{{ backupWarning }}</p>
+    <p v-if="largeRestoreRunning" class="fr-material-feedback" role="status"><span>正在读取并恢复材料备份…</span> <span>请保持此页面打开，以便中断后查询结果。</span> <button type="button" @click="cancelLargeRestore">取消恢复</button></p>
+    <p v-if="pendingImport && !largeRestoreRunning" class="fr-material-feedback" role="status">上次恢复结果或暂存状态尚待确认。关闭此页面后将无法继续查询本次结果。 <button type="button" :disabled="busy" @click="checkPendingImport">检查恢复结果</button> <button type="button" :disabled="busy" @click="endPendingImport">结束未完成恢复</button> <button v-if="canForgetPending" type="button" :disabled="busy" @click="forgetPendingImport">不再查询</button></p>
     <p v-if="feedback" class="fr-material-feedback" role="status">{{ feedback }}</p>
     <p v-if="archived" class="fr-material-feedback">已移除的材料仍保留原句与笔记，恢复后可继续阅读。原有收藏与问答不受影响。</p>
     <div v-if="loading && !materials.length" class="fr-material-empty" role="status">正在读取材料…</div>
@@ -103,6 +105,9 @@ import { VOCABULARY_BOOK_MESSAGE, type VocabularyBookResponse } from '../protoco
 import type { MaterialRecord, MaterialReference } from '../materialProtocol';
 import { MATERIAL_BACKUP_MAX_BYTES, MATERIAL_CHANGED_MESSAGE } from '../materialProtocol';
 import { materialList, materialCapture, materialUpdate, materialArchive, materialRestore, materialRemoveReference, materialClear, materialExport, materialImport, materialGeneration } from '../materialClient';
+import {restoreLargeMaterialBackup, queryMaterialBackup, acknowledgeMaterialBackup, discardMaterialBackup} from '../materialBackupRestore';
+import type {Capability} from '../materialImportStage';
+import type {MaterialImportResult} from '../materialProtocol';
 import { materialResumeLink } from '../materialSource';
 import { useRenderDateFormatter } from '@/src/ui/dateFormat';
 import { downloadTextFile } from '@/src/shared/dom/downloadTextFile';
@@ -120,6 +125,8 @@ const viewVisible = computed(() => (props.isVisible?.() ?? true) && keptAliveVis
 const materials = ref<MaterialRecord[]>([]), selectedId = ref(''), query = ref(''), topic = ref(''), archived = ref(false);
 const loading = ref(false), busy = ref(false), error = ref(''), feedback = ref(''), editing = ref(false), note = ref('');
 const backupWarning = ref('');
+const pendingImport = ref<Capability>(), largeRestoreRunning = ref(false), canForgetPending = ref(false);
+let backupController: AbortController | undefined;
 const draft = ref({ title: '', topics: '', url: '' });
 const confirmClear = ref(false), importInput = ref<HTMLInputElement>(), editingNoteId = ref('');
 const noteInput = ref<HTMLTextAreaElement>();
@@ -479,7 +486,7 @@ async function exportMaterials() {
         const bytes = downloadTextFile(`fluentread-materials-${new Date().toISOString().slice(0, 10)}.json`, JSON.stringify(data, null, 2), 'application/json');
         feedback.value = '材料备份已导出，包含来源、原句与个人笔记，请妥善保存。';
         if (bytes > MATERIAL_BACKUP_MAX_BYTES)
-            backupWarning.value = '此备份超过 20 MB，当前版本无法恢复。请保留现有材料，并妥善保存备份文件。';
+            backupWarning.value = '备份较大，恢复可能受设备空间和单份材料大小限制。请保留现有材料并妥善保存备份文件。';
     }
     catch (failure) {
         if (active && ticket === generation)
@@ -493,22 +500,38 @@ async function exportMaterials() {
 async function importMaterials(event: Event) {
     const input = event.target as HTMLInputElement, file = input.files?.[0];
     input.value = '';
-    if (!file || busy.value)
+    if (!file || busy.value || pendingImport.value)
         return;
-    if (file.size > MATERIAL_BACKUP_MAX_BYTES) {
-        error.value = '材料备份超过 20 MB，请选择较小的备份文件。';
-        return;
-    }
     if (loading.value) pendingRefresh = true;
     busy.value = true;
     const ticket = ++generation;
     loading.value = false;
     error.value = '';
     const capturedAt = Date.now();
+    const controller = file.size > MATERIAL_BACKUP_MAX_BYTES ? new AbortController() : undefined;
+    let committed = false;
+    if (controller) {backupController = controller; largeRestoreRunning.value = true;}
     try {
-        const storageGeneration = await materialGeneration();
+        const storageGeneration = await (controller ? backupGeneration(controller.signal) : materialGeneration());
         if (!active || ticket !== generation)
             return;
+        if (controller) {
+            const outcome = await restoreLargeMaterialBackup(file, {generation: storageGeneration, capturedAt}, {
+                signal: controller.signal,
+                onCapability: value => {if (active && ticket === generation) {pendingImport.value = value; canForgetPending.value = false;} else controller.abort();},
+            });
+            if (!active || ticket !== generation) return;
+            if (outcome.kind === 'committed') {
+                committed = true;
+                feedback.value = importFeedback(outcome.result);
+                await refreshImported(outcome.capability, ticket, controller.signal);
+            } else if (outcome.kind === 'unknown') error.value = '无法确认材料是否已恢复，请先检查恢复结果。';
+            else {
+                if (!outcome.cleanupPending) pendingImport.value = undefined;
+                error.value = outcome.kind === 'cancelled' ? '已取消恢复。' : backupErrorMessage(outcome.error);
+            }
+            return;
+        }
         const text = await file.text();
         if (!active || ticket !== generation)
             return;
@@ -520,16 +543,83 @@ async function importMaterials(event: Event) {
             return;
         materials.value = items;
         resetSelection();
-        feedback.value = result.inserted + result.updated === 0 ? `没有恢复材料，跳过 ${result.skipped} 条无效、冲突或较旧的记录。` : `已恢复 ${result.inserted + result.updated} 份材料（新增 ${result.inserted} · 更新 ${result.updated} · 跳过 ${result.skipped}）。`;
+        feedback.value = importFeedback(result);
     }
     catch (failure) {
         if (active && ticket === generation)
-            error.value = failure instanceof SyntaxError ? '备份文件无法读取，请选择有效的材料 JSON 备份。' : failure instanceof Error ? failure.message : '恢复失败，请检查材料备份文件。';
+            error.value = committed ? '材料已恢复，但列表尚未刷新。可检查恢复结果后重试。' : failure instanceof SyntaxError ? '备份文件无法读取，请选择有效的材料 JSON 备份。' : failure instanceof Error ? failure.message : '恢复失败，请检查材料备份文件。';
     }
     finally {
+        if (backupController === controller) backupController = undefined;
+        if (controller) largeRestoreRunning.value = false;
         if (active && ticket === generation)
             {busy.value = false; flushVisibleReads();}
     }
+}
+function importFeedback(result: MaterialImportResult): string {
+    return result.inserted + result.updated === 0 ? `没有恢复材料，跳过 ${result.skipped} 条无效、冲突或较旧的记录。` : `已恢复 ${result.inserted + result.updated} 份材料（新增 ${result.inserted} · 更新 ${result.updated} · 跳过 ${result.skipped}）。`;
+}
+function backupErrorMessage(failure: unknown): string {
+    if (failure instanceof SyntaxError) return '备份文件无法读取，请选择有效的材料 JSON 备份。';
+    if (failure instanceof Error && failure.name === 'MaterialBackupCapacityError') {
+        if (failure.message === '材料记录超过恢复大小限制') return '材料记录超过恢复大小限制，请保留原材料和备份文件。';
+        if (failure.message === '备份文件嵌套层级超过恢复限制') return '备份文件嵌套层级超过恢复限制，请保留原材料和备份文件。';
+        if (failure.message === '备份版本字段超过恢复大小限制') return '备份版本字段超过恢复大小限制，请保留原材料和备份文件。';
+        return '材料备份超出当前恢复容量，请保留原材料和备份文件。';
+    }
+    return failure instanceof Error && failure.name === 'TimeoutError' ? '恢复请求超时，请重试。' : '恢复失败，请检查材料备份文件。';
+}
+/** 只停止等待，不能声称底层只读消息已经终止。 */
+function backupRead<T>(start: () => Promise<T>, signal: AbortSignal | undefined, timeoutMessage: string): Promise<T> {
+    return new Promise<T>((resolve, reject) => {
+        let done = false;
+        const finish = (error?: Error, value?: T) => {
+            if (done) return;
+            done = true; signal?.removeEventListener('abort', abort); clearTimeout(timer);
+            if (error) reject(error); else resolve(value!);
+        };
+        const abort = () => finish(Object.assign(new Error('已取消恢复。'), {name: 'AbortError'}));
+        const timer = setTimeout(() => finish(new Error(timeoutMessage)), 30_000);
+        signal?.addEventListener('abort', abort, {once: true});
+        if (signal?.aborted) {abort(); return;}
+        Promise.resolve().then(() => {if (signal?.aborted) throw Object.assign(new Error('已取消恢复。'), {name: 'AbortError'}); return start();})
+            .then(value => finish(undefined, value), failure => finish(failure instanceof Error ? failure : new Error('材料状态读取失败。')));
+    });
+}
+function backupGeneration(signal: AbortSignal): Promise<number> {return backupRead(materialGeneration, signal, '材料状态读取超时，请重试。');}
+async function refreshImported(capability: Capability, ticket: number, signal?: AbortSignal): Promise<void> {
+    const items = await backupRead(() => materialList({archived: archived.value}), signal, '材料列表读取超时，请重试。');
+    if (!active || ticket !== generation) return;
+    materials.value = items; resetSelection();
+    await nextTick();
+    if (!active || ticket !== generation) return;
+    // 结果已展示并刷新；确认失败只保留后台回执直至过期，不改变提交结果。
+    pendingImport.value = undefined; canForgetPending.value = false;
+    void acknowledgeMaterialBackup(capability).catch(() => undefined);
+}
+function cancelLargeRestore(): void {backupController?.abort();}
+async function resolvePendingImport(discard: boolean): Promise<void> {
+    const cap = pendingImport.value;
+    if (!cap || busy.value) return;
+    busy.value = true; error.value = ''; const ticket = ++generation;
+    let committed = false;
+    try {
+        const state = discard ? await discardMaterialBackup(cap) : await queryMaterialBackup(cap);
+        if (!active || ticket !== generation) return;
+        if (state.state === 'committed') {committed = true; feedback.value = importFeedback(state.result); await refreshImported(cap, ticket);}
+        else if (state.state === 'discarded') {pendingImport.value = undefined; canForgetPending.value = false; feedback.value = '未完成的恢复已结束。';}
+        else error.value = '恢复尚未完成。可继续检查，或结束未完成的恢复。';
+    } catch {if (active && ticket === generation) {if (discard && !committed) canForgetPending.value = true; error.value = committed ? '材料已恢复，但列表尚未刷新。可检查恢复结果后重试。' : '暂时无法确认恢复状态，请检查材料列表后重试。';}}
+    finally {if (active && ticket === generation) {busy.value = false; flushVisibleReads();}}
+}
+function checkPendingImport(): Promise<void> {return resolvePendingImport(false);}
+function endPendingImport(): Promise<void> {return resolvePendingImport(true);}
+function forgetPendingImport(): void {
+    if (busy.value) return;
+    pendingImport.value = undefined;
+    canForgetPending.value = false;
+    error.value = '';
+    feedback.value = '恢复结果尚未确认，暂存可能仍在本机。请先检查材料列表，再决定是否重新恢复。';
 }
 const onChanged = (message: unknown): undefined => {
     if (active && typeof message === 'object' && message !== null && (message as {type?: string}).type === MATERIAL_CHANGED_MESSAGE) {
@@ -551,7 +641,7 @@ watch(viewVisible, visible => {
 onActivated(() => {keptAliveVisible.value = true;});
 onDeactivated(() => {keptAliveVisible.value = false;});
 onMounted(() => { void reload(); browser.runtime.onMessage.addListener(onChanged); });
-onBeforeUnmount(() => { active = false; generation++; detailGeneration++; clearSearchMemo(); browser.runtime.onMessage.removeListener(onChanged); });
+onBeforeUnmount(() => { active = false; generation++; detailGeneration++; backupController?.abort(); clearSearchMemo(); browser.runtime.onMessage.removeListener(onChanged); });
 </script>
 <style scoped>
 .fr-materials {

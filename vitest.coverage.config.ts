@@ -19,6 +19,12 @@ export default defineConfig({
             reportsDirectory: 'coverage/core',
             reporter: ['text', 'json-summary', 'json', 'html'],
             include: [
+                'src/features/vocabulary/materialBackupReader.ts',
+                'src/features/vocabulary/materialBackupRestore.ts',
+                'src/features/vocabulary/materialImportStage.ts',
+                'src/features/vocabulary/materialImportPort.ts',
+                'src/features/vocabulary/materialImportPortClient.ts',
+                'src/app/background/materialImportRuntime.ts',
                 'src/app/options/index.ts',
                 'src/providers/translation/ai-sdk/boundedErrorResponse.ts',
                 'userscript/buildGzip.ts',

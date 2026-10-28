@@ -3,6 +3,8 @@ import {parseHTML} from 'linkedom';
 import MaterialWorkspace from '@/src/features/vocabulary/ui/MaterialWorkspace.vue';
 import {afterEach, describe, expect, it, vi} from 'vitest';
 import type {MaterialRecord} from '@/src/features/vocabulary/materialProtocol';
+import type {MaterialBackupOutcome} from '@/src/features/vocabulary/materialBackupRestore';
+import type {MaterialImportStatus} from '@/src/features/vocabulary/materialImportPortClient';
 import {translateLegacyText} from '@/src/core/i18n';
 import {registerAllUiLanguageBundles} from './helpers/uiLanguageBundles';
 
@@ -16,6 +18,9 @@ vi.mock('@/src/features/vocabulary/materialClient', () => Object.fromEntries([
   'materialList','materialCapture','materialUpdate','materialArchive','materialRestore',
   'materialRemoveReference','materialClear','materialExport','materialImport','materialGeneration',
 ].map(name => [name, (...args: unknown[]) => (globalThis as any).__fluentreadMaterialUiTest.api[name](...args)])));
+vi.mock('@/src/features/vocabulary/materialBackupRestore', () => Object.fromEntries([
+  'restoreLargeMaterialBackup','queryMaterialBackup','acknowledgeMaterialBackup','discardMaterialBackup',
+].map(name => [name, (...args: unknown[]) => (globalThis as any).__fluentreadMaterialUiTest.backup[name](...args)])));
 vi.mock('webextension-polyfill', () => ({default: {get runtime() {return (globalThis as any).__fluentreadMaterialUiTest.browser.runtime;}}}));
 vi.mock('@/src/features/reading-assistant/public', () => ({getHarnessSession: (...args: unknown[]) => (globalThis as any).__fluentreadMaterialUiTest.getSession(...args), listLearningMemories: (...args: unknown[]) => (globalThis as any).__fluentreadMaterialUiTest.memories(...args)}));
 vi.mock('@/src/features/reading-assistant/ui/answer/public', () => ({ReadingAnswer: {render: () => null}}));
@@ -35,7 +40,13 @@ async function mount(options: {shown?: import('vue').Ref<boolean>; list?: (...ar
     materialGeneration:vi.fn(async()=>0),
   };
   const removeListener = vi.fn();
-  (globalThis as any)[KEY] = {api,getSession:options.session || (async()=>null),memories:options.memories || (async()=>[]),browser:{runtime:{getURL:(p:string)=>`chrome-extension://fixture/${p}`,sendMessage:options.getEntry || (async()=>({success:true,data:null})),onMessage:{addListener:(value:typeof listener)=>{listener=value;},removeListener}}}};
+  const cap={id:'00000000-0000-4000-8000-000000000000',token:'a'.repeat(64)};
+  const backup={
+    restoreLargeMaterialBackup:vi.fn(async(_file:Blob,_guard:unknown,options:{onCapability:(value:typeof cap)=>void}):Promise<MaterialBackupOutcome>=>{options.onCapability(cap);return {kind:'committed',result:{inserted:1,updated:0,skipped:0},capability:cap};}),
+    queryMaterialBackup:vi.fn(async():Promise<MaterialImportStatus>=>({state:'committed',result:{inserted:1,updated:0,skipped:0}})),
+    acknowledgeMaterialBackup:vi.fn(async()=>undefined),discardMaterialBackup:vi.fn(async():Promise<{state:'discarded'}|{state:'committed';result:{inserted:number;updated:number;skipped:number}}>=>({state:'discarded'})),
+  };
+  (globalThis as any)[KEY] = {api,backup,getSession:options.session || (async()=>null),memories:options.memories || (async()=>[]),browser:{runtime:{getURL:(p:string)=>`chrome-extension://fixture/${p}`,sendMessage:options.getEntry || (async()=>({success:true,data:null})),onMessage:{addListener:(value:typeof listener)=>{listener=value;},removeListener}}}};
   const {document, window} = parseHTML('<html><body><main></main></body></html>');
   vi.stubGlobal('document', document); vi.stubGlobal('window', window);
   for (const key of ['Node','Element','HTMLElement','SVGElement']) vi.stubGlobal(key, (window as any)[key]);
@@ -65,7 +76,7 @@ async function mount(options: {shown?: import('vue').Ref<boolean>; list?: (...ar
   let active=true; const unmount=()=>{if(active){active=false;app.unmount();}}; dispose.push(unmount);
   const flush=async()=>{for(let i=0;i<15;i++){await Promise.resolve();await runtime.nextTick();}};
   await flush();
-  return {panel,api,flush,unmount,document,window,openTab,removeListener,notify:()=>listener?.({type:'fluentReadMaterialsChanged'})};
+  return {panel,api,backup,cap,flush,unmount,document,window,openTab,removeListener,notify:()=>listener?.({type:'fluentReadMaterialsChanged'})};
 }
 describe('material workspace action ownership',()=>{
   it('keeps lightweight list, topic/search and exact selected source; persists editing and notes through real clients',async()=>{
@@ -235,16 +246,14 @@ it('paginates material and reference lists, resets the visible page for search, 
   await activate(ui,namedButton(ui,'清空全部材料'));expect(ui.api.materialClear).not.toHaveBeenCalled();await activate(ui,namedButton(ui,'取消'));expect(ui.api.materialClear).not.toHaveBeenCalled();
   await activate(ui,namedButton(ui,'清空全部材料'));await activate(ui,namedButton(ui,'确认清空'));expect(ui.document.body.textContent).toContain('从一段值得留下的原文开始');await activate(ui,namedButton(ui,'查看我的收藏'));expect(ui.openTab).toHaveBeenCalledWith('saved');
 });
-it('超大备份提醒在所有界面语言都有实际译文',()=>{
+it('大备份恢复的状态和限制在所有界面语言都有实际译文',()=>{
   registerAllUiLanguageBundles();
-  const message='此备份超过 20 MB，当前版本无法恢复。请保留现有材料，并妥善保存备份文件。';
-  expect(translateLegacyText(message,'zh-CN')).toBe(message);
-  for (const language of ['en-US','es-ES','fr-FR','ja-JP','ko-KR','ru-RU'] as const) {
-    expect(translateLegacyText(message,language)).not.toBe(message);
-    expect(translateLegacyText(message,language).length).toBeGreaterThan(20);
+  for (const message of ['备份较大，恢复可能受设备空间和单份材料大小限制。请保留现有材料并妥善保存备份文件。','正在读取并恢复材料备份…','取消恢复','上次恢复结果或暂存状态尚待确认。关闭此页面后将无法继续查询本次结果。','检查恢复结果','结束未完成恢复','无法确认材料是否已恢复，请先检查恢复结果。','已取消恢复。','恢复请求超时，请重试。','材料备份超出当前恢复容量，请保留原材料和备份文件。','材料记录超过恢复大小限制，请保留原材料和备份文件。','备份文件嵌套层级超过恢复限制，请保留原材料和备份文件。','备份版本字段超过恢复大小限制，请保留原材料和备份文件。','未完成的恢复已结束。','恢复尚未完成。可继续检查，或结束未完成的恢复。','暂时无法确认恢复状态，请检查材料列表后重试。','材料状态读取超时，请重试。','材料状态读取失败。','不再查询','请保持此页面打开，以便中断后查询结果。','恢复结果尚未确认，暂存可能仍在本机。请先检查材料列表，再决定是否重新恢复。','材料已恢复，但列表尚未刷新。可检查恢复结果后重试。']) {
+    expect(translateLegacyText(message,'zh-CN')).toBe(message);
+    for (const language of ['en-US','es-ES','fr-FR','ja-JP','ko-KR','ru-RU'] as const) expect(translateLegacyText(message,language)).not.toBe(message);
   }
 });
-it('提醒超大导出文件无法在当前版本恢复，并仍然保留下载',async()=>{
+it('提醒大备份可能受恢复资源限制，并仍然保留下载',async()=>{
   const ui=await mount();
   const oversized={format:'fluentread-learning-materials',version:1,materials:[],padding:'x'.repeat(20*1024*1024)};
   ui.api.materialExport.mockResolvedValue(oversized);
@@ -254,7 +263,7 @@ it('提醒超大导出文件无法在当前版本恢复，并仍然保留下载'
   const click=vi.spyOn(ui.window.HTMLElement.prototype,'click').mockImplementation(()=>{});
   await activate(ui,namedButton(ui,'导出材料备份'));
   expect(create).toHaveBeenCalledOnce();expect(click).toHaveBeenCalledOnce();
-  expect(ui.document.querySelector('[role="alert"]')?.textContent).toContain('当前版本无法恢复');
+  expect(ui.document.querySelector('[role="alert"]')?.textContent).toContain('恢复可能受设备空间');
   expect(ui.document.body.textContent).toContain('请保留现有材料');
   expect(revoke).not.toHaveBeenCalled();
 });
@@ -281,8 +290,65 @@ it('exports through the rendered action, releases its download URL and reports a
 });
 it('validates a chosen backup before import and displays the actual restored counts through the template',async()=>{
   const ui=await mount();const input=ui.document.querySelector<HTMLInputElement>('input[type="file"]')!;const picker=vi.spyOn(input,'click').mockImplementation(()=>{});await activate(ui,namedButton(ui,'恢复材料备份'));expect(picker).toHaveBeenCalledOnce();
-  Object.defineProperty(input,'files',{configurable:true,value:[{size:21*1024*1024,text:vi.fn()}]});input.dispatchEvent(new ui.window.Event('change',{bubbles:true}));await ui.flush();expect(ui.document.body.textContent).toContain('超过 20 MB');expect(ui.api.materialImport).not.toHaveBeenCalled();
+  Object.defineProperty(input,'files',{configurable:true,value:[{size:21*1024*1024,text:vi.fn()}]});input.dispatchEvent(new ui.window.Event('change',{bubbles:true}));await ui.flush();expect(ui.backup.restoreLargeMaterialBackup).toHaveBeenCalledOnce();expect(ui.api.materialImport).not.toHaveBeenCalled();expect(ui.backup.acknowledgeMaterialBackup).toHaveBeenCalledWith(ui.cap);
   Object.defineProperty(input,'files',{configurable:true,value:[{size:2,text:async()=>'{}'}]});input.dispatchEvent(new ui.window.Event('change',{bubbles:true}));await ui.flush();expect(ui.api.materialImport).toHaveBeenCalledOnce();expect(ui.document.body.textContent).toContain('已恢复 1 份材料');
+});
+it('checks a lost commit acknowledgement with the original capability before releasing it',async()=>{
+  const ui=await mount(),input=ui.document.querySelector<HTMLInputElement>('input[type="file"]')!;
+  ui.backup.restoreLargeMaterialBackup.mockImplementationOnce(async(_file,_guard,options)=>{options.onCapability(ui.cap);return {kind:'unknown',commitDispatched:true,capability:ui.cap};});
+  Object.defineProperty(input,'files',{configurable:true,value:[{size:21*1024*1024}]});input.dispatchEvent(new ui.window.Event('change',{bubbles:true}));await ui.flush();
+  expect(ui.document.body.textContent).toContain('无法确认材料是否已恢复');expect(namedButton(ui,'恢复材料备份').hasAttribute('disabled')).toBe(true);
+  await activate(ui,namedButton(ui,'检查恢复结果'));
+  expect(ui.backup.queryMaterialBackup).toHaveBeenCalledWith(ui.cap);expect(ui.backup.acknowledgeMaterialBackup).toHaveBeenCalledWith(ui.cap);
+  expect(ui.document.body.textContent).toContain('已恢复 1 份材料');expect(ui.panel.pendingImport).toBeUndefined();
+});
+it('allows a user to end an uncommitted session without reporting a false commit',async()=>{
+  const ui=await mount(),input=ui.document.querySelector<HTMLInputElement>('input[type="file"]')!;
+  ui.backup.restoreLargeMaterialBackup.mockImplementationOnce(async(_file,_guard,options)=>{options.onCapability(ui.cap);return {kind:'cancelled',cleanupPending:true,capability:ui.cap};});
+  Object.defineProperty(input,'files',{configurable:true,value:[{size:21*1024*1024}]});input.dispatchEvent(new ui.window.Event('change',{bubbles:true}));await ui.flush();
+  expect(ui.document.body.textContent).toContain('已取消恢复');await activate(ui,namedButton(ui,'结束未完成恢复'));
+  expect(ui.backup.discardMaterialBackup).toHaveBeenCalledWith(ui.cap);expect(ui.document.body.textContent).toContain('未完成的恢复已结束');expect(ui.panel.pendingImport).toBeUndefined();
+});
+it('lets the user stop checking an expired or unavailable result without claiming a rollback',async()=>{
+  const ui=await mount(),input=ui.document.querySelector<HTMLInputElement>('input[type="file"]')!;
+  ui.backup.restoreLargeMaterialBackup.mockImplementationOnce(async(_file,_guard,options)=>{options.onCapability(ui.cap);return {kind:'unknown',commitDispatched:true,capability:ui.cap};});
+  ui.backup.queryMaterialBackup.mockRejectedValueOnce(new Error('unavailable'));
+  ui.backup.discardMaterialBackup.mockRejectedValueOnce(new Error('unavailable'));
+  Object.defineProperty(input,'files',{configurable:true,value:[{size:21*1024*1024}]});input.dispatchEvent(new ui.window.Event('change',{bubbles:true}));await ui.flush();
+  await activate(ui,namedButton(ui,'检查恢复结果'));expect(ui.document.body.textContent).toContain('暂时无法确认恢复状态');
+  await activate(ui,namedButton(ui,'结束未完成恢复'));expect(ui.backup.discardMaterialBackup).toHaveBeenCalledWith(ui.cap);
+  await activate(ui,namedButton(ui,'不再查询'));expect(ui.panel.pendingImport).toBeUndefined();expect(ui.document.body.textContent).toContain('恢复结果尚未确认，暂存可能仍在本机');
+});
+it('explains a restore size limit and retains the existing materials',async()=>{
+  const ui=await mount(),input=ui.document.querySelector<HTMLInputElement>('input[type="file"]')!;
+  ui.backup.restoreLargeMaterialBackup.mockResolvedValueOnce({kind:'failed',cleanupPending:false,error:Object.assign(new Error('材料记录超过恢复大小限制'),{name:'MaterialBackupCapacityError'})});
+  Object.defineProperty(input,'files',{configurable:true,value:[{size:21*1024*1024}]});input.dispatchEvent(new ui.window.Event('change',{bubbles:true}));await ui.flush();
+  expect(ui.document.body.textContent).toContain('材料记录超过恢复大小限制，请保留原材料和备份文件');expect(ui.panel.materials.map((item:MaterialRecord)=>item.id)).toEqual(['a','b']);
+  expect(ui.panel.pendingImport).toBeUndefined();expect(ui.api.materialImport).not.toHaveBeenCalled();
+});
+it('cancels while waiting for the read-only generation and never starts a restore later',async()=>{
+  const ui=await mount(),input=ui.document.querySelector<HTMLInputElement>('input[type="file"]')!,generation=deferred<number>();ui.api.materialGeneration.mockReturnValueOnce(generation.promise);
+  Object.defineProperty(input,'files',{configurable:true,value:[{size:21*1024*1024}]});input.dispatchEvent(new ui.window.Event('change',{bubbles:true}));await ui.flush();
+  expect(ui.panel.busy).toBe(true);expect(ui.document.querySelector('.fr-materials')?.getAttribute('aria-busy')).toBe('true');expect(ui.document.body.textContent).toContain('请保持此页面打开');await activate(ui,namedButton(ui,'取消恢复'));expect(ui.panel.busy).toBe(false);
+  generation.resolve(0);await ui.flush();expect(ui.backup.restoreLargeMaterialBackup).not.toHaveBeenCalled();
+});
+it('retains a confirmed commit if its list refresh is cancelled and ignores the late list',async()=>{
+  const ui=await mount(),input=ui.document.querySelector<HTMLInputElement>('input[type="file"]')!,late=deferred<MaterialRecord[]>();ui.api.materialList.mockReturnValueOnce(late.promise);
+  Object.defineProperty(input,'files',{configurable:true,value:[{size:21*1024*1024}]});input.dispatchEvent(new ui.window.Event('change',{bubbles:true}));await ui.flush();
+  expect(ui.document.body.textContent).toContain('已恢复 1 份材料');expect(ui.panel.busy).toBe(true);
+  await activate(ui,namedButton(ui,'取消恢复'));expect(ui.panel.busy).toBe(false);expect(ui.panel.pendingImport).toEqual(ui.cap);
+  expect(ui.document.body.textContent).toContain('材料已恢复，但列表尚未刷新');expect(ui.backup.acknowledgeMaterialBackup).not.toHaveBeenCalled();
+  late.resolve([record('late')]);await ui.flush();expect(ui.panel.materials.map((item:MaterialRecord)=>item.id)).toEqual(['a','b']);
+  await activate(ui,namedButton(ui,'检查恢复结果'));expect(ui.backup.acknowledgeMaterialBackup).toHaveBeenCalledWith(ui.cap);expect(ui.panel.pendingImport).toBeUndefined();
+});
+it('times out a hung list refresh without losing a confirmed recovery receipt',async()=>{
+  vi.useFakeTimers();try {
+    const ui=await mount(),input=ui.document.querySelector<HTMLInputElement>('input[type="file"]')!;
+    ui.api.materialList.mockReturnValueOnce(new Promise(()=>{}));
+    Object.defineProperty(input,'files',{configurable:true,value:[{size:21*1024*1024}]});input.dispatchEvent(new ui.window.Event('change',{bubbles:true}));await ui.flush();
+    expect(ui.panel.busy).toBe(true);await vi.advanceTimersByTimeAsync(30_000);await ui.flush();
+    expect(ui.panel.busy).toBe(false);expect(ui.panel.pendingImport).toEqual(ui.cap);expect(ui.document.body.textContent).toContain('材料已恢复，但列表尚未刷新');expect(ui.backup.acknowledgeMaterialBackup).not.toHaveBeenCalled();
+  } finally {vi.useRealTimers();}
 });
 it('keeps source text visible when stored source or learning memories cannot be read, retries, and follows a broadcast refresh',async()=>{
   const damaged: MaterialRecord={...record(),source:{kind:'article',url:'not-a-url'},references:[{kind:'memory',id:'memory-a',excerpt:'A recoverable original.'}]};
@@ -369,14 +435,14 @@ describe('material workspace hidden accepted actions and focus ownership',()=>{
   it.each(['success','failure'] as const)('preserves a newer backup validation error after an already pending automatic refresh %s',async outcome=>{
     const ui=await mount(),automatic=deferred<MaterialRecord[]>();ui.api.materialList.mockReturnValueOnce(automatic.promise).mockResolvedValueOnce([record('retried')]);
     ui.notify();await ui.flush();expect(ui.panel.loading).toBe(true);expect(ui.api.materialList).toHaveBeenCalledTimes(2);
-    const input=ui.document.querySelector<HTMLInputElement>('input[type="file"]')!,read=vi.fn();
-    Object.defineProperty(input,'files',{configurable:true,value:[{size:21*1024*1024,text:read}]});input.dispatchEvent(new ui.window.Event('change',{bubbles:true}));await ui.flush();
-    expect(ui.document.querySelector('[role="alert"]')?.textContent).toContain('超过 20 MB');expect(read).not.toHaveBeenCalled();expect(ui.api.materialImport).not.toHaveBeenCalled();
+    const input=ui.document.querySelector<HTMLInputElement>('input[type="file"]')!,read=vi.fn(async()=>'{');
+    Object.defineProperty(input,'files',{configurable:true,value:[{size:2,text:read}]});input.dispatchEvent(new ui.window.Event('change',{bubbles:true}));await ui.flush();
+    expect(ui.document.querySelector('[role="alert"]')?.textContent).toContain('备份文件无法读取');expect(read).toHaveBeenCalledOnce();expect(ui.api.materialImport).not.toHaveBeenCalled();
     if(outcome==='success')automatic.resolve([record('automatic')]);else automatic.reject(new Error('Automatic read failure after validation'));
     await ui.flush();const afterAutomatic=ui.document.querySelector('[role="alert"]')?.textContent||'';
-    await activate(ui,namedButton(ui,'重试'));const afterExplicit=ui.document.querySelector('[role="alert"]')?.textContent||'';
+    ui.api.materialList.mockResolvedValueOnce([record('retried')]);await activate(ui,namedButton(ui,'重试'));const afterExplicit=ui.document.querySelector('[role="alert"]')?.textContent||'';
     if(process.env.FLUENTREAD_MATERIAL_RECOVERY_METRICS==='1')console.info(`MATERIAL_VALIDATION_RECOVERY ${JSON.stringify({outcome,afterAutomatic,afterExplicit,listRequests:ui.api.materialList.mock.calls.length})}`);
-    expect(afterAutomatic).toContain('超过 20 MB');expect(afterAutomatic).not.toContain('Automatic read failure after validation');expect(afterExplicit).toBe('');expect(ui.panel.materials.map((item:MaterialRecord)=>item.id)).toEqual(['retried']);
+    expect(afterAutomatic).toContain('备份文件无法读取');expect(afterAutomatic).not.toContain('Automatic read failure after validation');expect(afterExplicit).toBe('');expect(ui.panel.materials.map((item:MaterialRecord)=>item.id)).toEqual(['retried']);
   });
 
   it.each(['edit-note','start-edit','cancel-edit','back-to-list'] as const)('does not run the queued %s focus after KeepAlive deactivation',async action=>{

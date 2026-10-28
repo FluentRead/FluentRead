@@ -1,5 +1,8 @@
 import {afterEach, describe, expect, it, vi} from 'vitest';
-import {installMaterialImportRuntime} from '@/src/app/background/materialImportRuntime';
+import browser from 'webextension-polyfill';
+import * as materialStage from '@/src/features/vocabulary/materialImportStage';
+import {MaterialDatabase} from '@/src/features/vocabulary/materialRepository';
+import {installBrowserMaterialImportRuntime, installMaterialImportRuntime, MATERIAL_IMPORT_CLEANUP_ALARM} from '@/src/app/background/materialImportRuntime';
 import {PORT_NAME} from '@/src/features/vocabulary/materialImportPort';
 
 vi.mock('webextension-polyfill',()=>({default:{}}));
@@ -15,6 +18,7 @@ const guard={generation:0,capturedAt:1};
 function fixture() {
   const onConnect=event<(port:any)=>void>(), notifications:unknown[]=[];
   const runtime={id:'fixture',getURL:(path:string)=>`chrome-extension://fixture/${path.replace(/^\//u,'')}`,onConnect,
+    onStartup:event<()=>void>(),onInstalled:event<()=>void>(),
     sendMessage:vi.fn(async (message:unknown)=>{notifications.push(message);})};
   const privateContext={value:false};
   let notify:()=>void=()=>undefined;
@@ -31,6 +35,17 @@ function fixture() {
     return {port:result,onMessage,onDisconnect,messages};
   };
   return {deps,runtime,privateContext,createStage,closeDatabase,stage,unsubscribe,port,notify:()=>notify(),notifications};
+}
+
+function maintenanceFixture() {
+  const onAlarm=event<(alarm:{name:string})=>void>();
+  const state:{marker:boolean; period?:number}={marker:false};
+  const alarms={onAlarm,
+    get:vi.fn(async()=>state.period===undefined?undefined:{periodInMinutes:state.period}),
+    create:vi.fn(async(_name:string,{periodInMinutes}:{periodInMinutes:number})=>{state.period=periodInMinutes;})};
+  const storage={get:vi.fn(async()=>({fluentreadMaterialImportMaintenance:state.marker})),
+    set:vi.fn(async()=>{state.marker=true;})};
+  return {state,alarms,storage,warn:vi.fn()};
 }
 
 describe('material import background registration',()=>{
@@ -150,5 +165,272 @@ describe('material import background registration',()=>{
     complete();await vi.waitFor(()=>expect(f.notifications).toHaveLength(1));
     expect(f.notifications).toEqual([{type:'fluentReadMaterialsChanged'}]);
     dispose();expect(f.unsubscribe).toHaveBeenCalledOnce();
+  });
+  it('routes discard and acknowledgement through the same readiness and privacy gate',async()=>{
+    const f=fixture(),dispose=installMaterialImportRuntime(f.deps as never);
+    for(const action of ['discard','acknowledge'] as const){
+      const p=f.port();f.runtime.onConnect.fire(p.port);
+      p.onMessage.fire({id:1,action:'begin',capability,manifest,guard,deadline:10_000});
+      await vi.waitFor(()=>expect(p.messages).toHaveLength(1));
+      p.onMessage.fire({id:2,action});await vi.waitFor(()=>expect(p.messages).toHaveLength(2));
+      expect(p.messages[1]).toMatchObject({ok:true});p.onDisconnect.fire();
+    }
+    expect(f.stage.discard).toHaveBeenCalledOnce();expect(f.stage.acknowledge).toHaveBeenCalledOnce();dispose();
+  });
+  it('does not allow notification transport failure to change an already committed result',()=>{
+    const f=fixture();f.runtime.sendMessage.mockImplementation(()=>{throw Error('transport unavailable');});
+    const dispose=installMaterialImportRuntime(f.deps as never),p=f.port();f.runtime.onConnect.fire(p.port);
+    expect(()=>f.notify()).not.toThrow();expect(f.runtime.sendMessage).toHaveBeenCalledOnce();dispose();
+  });
+  it('stops pending readiness waits when the runtime is disposed',async()=>{
+    const f=fixture();let ready!:()=>void;f.deps.ready=new Promise<void>(resolve=>{ready=resolve;});
+    const dispose=installMaterialImportRuntime(f.deps as never),p=f.port();f.runtime.onConnect.fire(p.port);
+    p.onMessage.fire({id:1,action:'begin',capability,manifest,guard,deadline:10_000});dispose();ready();
+    await Promise.resolve();await Promise.resolve();expect(f.stage.beginRecoverable).not.toHaveBeenCalled();expect(f.stage.cleanup).not.toHaveBeenCalled();
+  });
+  it('wires the browser composition root and disposes its lazy service',async()=>{
+    const f=fixture(),m=maintenanceFixture();
+    Object.assign(browser,{runtime:f.runtime,extension:{inIncognitoContext:false},alarms:m.alarms,storage:{local:m.storage}});
+    installBrowserMaterialImportRuntime(Promise.resolve());
+    await vi.waitFor(()=>expect(m.storage.get).toHaveBeenCalledOnce());
+    const denied=f.port({id:'fixture',url:'chrome-extension://fixture/popup.html'});f.runtime.onConnect.fire(denied.port);
+    expect(denied.port.disconnect).toHaveBeenCalledOnce();
+    const trusted=f.port();f.runtime.onConnect.fire(trusted.port);expect(trusted.port.disconnect).not.toHaveBeenCalled();
+    // Idempotent install returns the existing browser composition root's disposer.
+    const dispose=installMaterialImportRuntime(f.deps as never);dispose();expect(f.runtime.onConnect.listeners.size).toBe(0);
+  });
+  it('closes the browser database if its stage cannot initialize',async()=>{
+    const f=fixture(),m=maintenanceFixture();
+    Object.assign(browser,{runtime:f.runtime,extension:{inIncognitoContext:false},alarms:m.alarms,storage:{local:m.storage}});
+    const create=vi.spyOn(materialStage,'createStage').mockImplementationOnce(()=>{throw Error('cannot initialize');});
+    const close=vi.spyOn(MaterialDatabase.prototype,'close');
+    installBrowserMaterialImportRuntime(Promise.resolve());await vi.waitFor(()=>expect(m.storage.get).toHaveBeenCalledOnce());
+    const p=f.port();f.runtime.onConnect.fire(p.port);
+    expect(create).toHaveBeenCalledOnce();expect(close).toHaveBeenCalledOnce();expect(p.port.disconnect).toHaveBeenCalledOnce();
+    installMaterialImportRuntime(f.deps as never)();
+  });
+  it('releases stage resources even when a listener cannot be unregistered',()=>{
+    const f=fixture(),m=maintenanceFixture(),dispose=installMaterialImportRuntime({...f.deps,maintenance:m} as never);
+    const p=f.port();f.runtime.onConnect.fire(p.port);
+    vi.spyOn(m.alarms.onAlarm,'removeListener').mockImplementation(()=>{throw Error('removed');});
+    vi.spyOn(f.runtime.onStartup,'removeListener').mockImplementation(()=>{throw Error('removed');});
+    vi.spyOn(f.runtime.onInstalled,'removeListener').mockImplementation(()=>{throw Error('removed');});
+    expect(()=>dispose()).not.toThrow();expect(f.unsubscribe).toHaveBeenCalledOnce();expect(f.closeDatabase).toHaveBeenCalledOnce();
+  });
+  it('rejects an unverifiable sender even if its disconnect operation fails',()=>{
+    const f=fixture(),dispose=installMaterialImportRuntime(f.deps as never),p=f.port();
+    Object.defineProperty(p.port,'sender',{get(){throw Error('sender inaccessible');}});
+    p.port.disconnect.mockImplementation(()=>{throw Error('already closed');});
+    expect(()=>f.runtime.onConnect.fire(p.port)).not.toThrow();expect(f.createStage).not.toHaveBeenCalled();dispose();
+  });
+  it('continues rejecting a failed initialization when closing the database and port also fail',()=>{
+    const f=fixture();f.stage.observeCommitted.mockImplementationOnce(()=>{throw Error('stage init');});
+    f.closeDatabase.mockImplementationOnce(()=>{throw Error('db closed');});
+    const dispose=installMaterialImportRuntime(f.deps as never),broken=f.port();
+    broken.port.disconnect.mockImplementation(()=>{throw Error('port closed');});
+    expect(()=>f.runtime.onConnect.fire(broken.port)).not.toThrow();
+    const good=f.port();f.runtime.onConnect.fire(good.port);expect(f.createStage).toHaveBeenCalledTimes(2);
+    expect(good.port.disconnect).not.toHaveBeenCalled();dispose();
+  });
+});
+
+describe('material import expiry scheduling',()=>{
+  afterEach(()=>vi.restoreAllMocks());
+  it('does not create a database or alarm before a trusted begin and schedules before writing',async()=>{
+    const f=fixture(),m=maintenanceFixture();
+    const dispose=installMaterialImportRuntime({...f.deps,maintenance:m} as never);
+    await vi.waitFor(()=>expect(m.storage.get).toHaveBeenCalled());
+    expect(f.createStage).not.toHaveBeenCalled();expect(m.alarms.create).not.toHaveBeenCalled();
+    const p=f.port();f.runtime.onConnect.fire(p.port);
+    p.onMessage.fire({id:1,action:'begin',capability,manifest,guard,deadline:10_000});
+    await vi.waitFor(()=>expect(p.messages).toHaveLength(1));expect(p.messages[0]).toMatchObject({ok:true});
+    expect(m.state.marker).toBe(true);expect(m.state.period).toBe(60);
+    expect(m.storage.set.mock.invocationCallOrder[0]).toBeLessThan(m.alarms.create.mock.invocationCallOrder[0]);
+    expect(m.alarms.create.mock.invocationCallOrder[0]).toBeLessThan(f.stage.beginRecoverable.mock.invocationCallOrder[0]);
+    m.alarms.onAlarm.fire({name:MATERIAL_IMPORT_CLEANUP_ALARM});
+    await vi.waitFor(()=>expect(f.stage.cleanup).toHaveBeenCalledTimes(2));
+    expect(m.state.marker).toBe(true);expect(m.state.period).toBe(60);
+    dispose();expect(m.alarms.onAlarm.listeners.size).toBe(0);
+  });
+  it('reconstructs a missing periodic alarm on worker restart without dropping the marker',async()=>{
+    const f=fixture(),m=maintenanceFixture();m.state.marker=true;
+    const dispose=installMaterialImportRuntime({...f.deps,maintenance:m} as never);
+    await vi.waitFor(()=>expect(f.stage.cleanup).toHaveBeenCalledOnce());
+    expect(m.state.marker).toBe(true);expect(m.state.period).toBe(60);
+    expect(m.alarms.create).toHaveBeenCalledOnce();
+    expect(f.runtime.onStartup.listeners.size).toBe(1);expect(f.runtime.onInstalled.listeners.size).toBe(1);
+    dispose();expect(f.runtime.onStartup.listeners.size).toBe(0);expect(f.runtime.onInstalled.listeners.size).toBe(0);
+  });
+  it.each(['onStartup','onInstalled'] as const)('recovers a lost alarm on browser %s',async eventName=>{
+    const f=fixture(),m=maintenanceFixture();const dispose=installMaterialImportRuntime({...f.deps,maintenance:m} as never);
+    await vi.waitFor(()=>expect(m.storage.get).toHaveBeenCalled());expect(f.createStage).not.toHaveBeenCalled();
+    m.state.marker=true;f.runtime[eventName].fire();
+    await vi.waitFor(()=>expect(f.stage.cleanup).toHaveBeenCalledOnce());expect(m.state.period).toBe(60);dispose();
+  });
+  it('keeps the marker and refuses begin if alarm installation fails, then recovers after restart',async()=>{
+    const f=fixture(),m=maintenanceFixture();let dispose=installMaterialImportRuntime({...f.deps,maintenance:m} as never);
+    await vi.waitFor(()=>expect(m.storage.get).toHaveBeenCalled());m.alarms.create.mockRejectedValueOnce(Error('unavailable'));
+    const p=f.port();f.runtime.onConnect.fire(p.port);p.onMessage.fire({id:1,action:'begin',capability,manifest,guard,deadline:10_000});
+    await vi.waitFor(()=>expect(p.messages).toHaveLength(1));expect(p.messages[0]).toMatchObject({ok:false});
+    expect(m.state.marker).toBe(true);expect(f.stage.beginRecoverable).not.toHaveBeenCalled();expect(m.warn).toHaveBeenCalledOnce();dispose();
+    dispose=installMaterialImportRuntime({...f.deps,maintenance:m} as never);
+    await vi.waitFor(()=>expect(m.state.period).toBe(60));expect(m.state.marker).toBe(true);dispose();
+  });
+  it('refuses begin without writing if local marker storage fails',async()=>{
+    const f=fixture(),m=maintenanceFixture();const dispose=installMaterialImportRuntime({...f.deps,maintenance:m} as never);
+    await vi.waitFor(()=>expect(m.storage.get).toHaveBeenCalled());m.storage.set.mockRejectedValueOnce(Error('unavailable'));
+    const p=f.port();f.runtime.onConnect.fire(p.port);p.onMessage.fire({id:1,action:'begin',capability,manifest,guard,deadline:10_000});
+    await vi.waitFor(()=>expect(p.messages).toHaveLength(1));expect(p.messages[0]).toMatchObject({ok:false});
+    expect(f.stage.beginRecoverable).not.toHaveBeenCalled();expect(m.alarms.create).not.toHaveBeenCalled();expect(m.warn).toHaveBeenCalledOnce();dispose();
+  });
+  it('does not open or schedule material maintenance in a private context',async()=>{
+    const f=fixture(),m=maintenanceFixture();f.privateContext.value=true;m.state.marker=true;
+    const dispose=installMaterialImportRuntime({...f.deps,maintenance:m} as never);
+    m.alarms.onAlarm.fire({name:MATERIAL_IMPORT_CLEANUP_ALARM});await Promise.resolve();await Promise.resolve();
+    expect(m.storage.get).not.toHaveBeenCalled();expect(m.alarms.create).not.toHaveBeenCalled();expect(f.createStage).not.toHaveBeenCalled();dispose();
+  });
+  it('retains a periodic retry and records a fixed warning when cleanup fails',async()=>{
+    const f=fixture(),m=maintenanceFixture();m.state.marker=true;f.stage.cleanup.mockRejectedValueOnce(Error('private user content'));
+    const dispose=installMaterialImportRuntime({...f.deps,maintenance:m} as never);
+    await vi.waitFor(()=>expect(m.warn).toHaveBeenCalledOnce());
+    expect(m.state.marker).toBe(true);expect(m.state.period).toBe(60);
+    expect(m.warn.mock.calls[0][0]).not.toContain('private user content');dispose();
+  });
+  it.each(['storage','alarm'] as const)('retries %s lookup failures on the next alarm without opening the database early',async which=>{
+    const f=fixture(),m=maintenanceFixture();m.state.marker=true;
+    if(which==='storage')m.storage.get.mockRejectedValueOnce(Error('unavailable'));
+    else m.alarms.get.mockRejectedValueOnce(Error('unavailable'));
+    const dispose=installMaterialImportRuntime({...f.deps,maintenance:m} as never);
+    await vi.waitFor(()=>expect(m.warn).toHaveBeenCalledOnce());expect(f.createStage).not.toHaveBeenCalled();
+    m.alarms.onAlarm.fire({name:MATERIAL_IMPORT_CLEANUP_ALARM});
+    await vi.waitFor(()=>expect(f.stage.cleanup).toHaveBeenCalledOnce());expect(m.state.period).toBe(60);dispose();
+  });
+  it('replaces an obsolete alarm period before cleaning',async()=>{
+    const f=fixture(),m=maintenanceFixture();m.state.marker=true;m.state.period=120;
+    const dispose=installMaterialImportRuntime({...f.deps,maintenance:m} as never);
+    await vi.waitFor(()=>expect(f.stage.cleanup).toHaveBeenCalledOnce());
+    expect(m.alarms.create).toHaveBeenCalledWith(MATERIAL_IMPORT_CLEANUP_ALARM,{periodInMinutes:60});expect(m.state.period).toBe(60);dispose();
+  });
+  it('reports a failed config readiness without claiming cleanup, retaining the periodic plan',async()=>{
+    const f=fixture(),m=maintenanceFixture();m.state.marker=true;f.deps.ready=Promise.reject(Error('bad config'));
+    const dispose=installMaterialImportRuntime({...f.deps,maintenance:m} as never);
+    await vi.waitFor(()=>expect(m.warn).toHaveBeenCalledOnce());
+    expect(m.state.period).toBe(60);expect(f.createStage).not.toHaveBeenCalled();dispose();
+  });
+  it('bounds a hung marker lookup and retries maintenance on a later alarm',async()=>{
+    vi.useFakeTimers();
+    try {
+      const f=fixture(),m=maintenanceFixture();m.state.marker=true;
+      let release!:(value:{fluentreadMaterialImportMaintenance:boolean})=>void;
+      m.storage.get.mockImplementationOnce(()=>new Promise(resolve=>{release=resolve;}));
+      const dispose=installMaterialImportRuntime({...f.deps,maintenance:m} as never);
+      await vi.advanceTimersByTimeAsync(30_000);expect(m.warn).toHaveBeenCalledOnce();expect(f.createStage).not.toHaveBeenCalled();
+      m.alarms.onAlarm.fire({name:MATERIAL_IMPORT_CLEANUP_ALARM});await vi.advanceTimersByTimeAsync(0);
+      expect(f.stage.cleanup).toHaveBeenCalledOnce();expect(m.state.period).toBe(60);
+      release({fluentreadMaterialImportMaintenance:true});await vi.advanceTimersByTimeAsync(0);
+      expect(f.stage.cleanup).toHaveBeenCalledOnce();dispose();
+    } finally {vi.useRealTimers();}
+  });
+  it('preserves cleanup and retry even if the diagnostic callback itself fails',async()=>{
+    const f=fixture(),m=maintenanceFixture();m.state.marker=true;
+    f.stage.cleanup.mockRejectedValueOnce(Error('failure'));m.warn.mockImplementation(()=>{throw Error('diagnostics unavailable');});
+    const dispose=installMaterialImportRuntime({...f.deps,maintenance:m} as never);
+    await vi.waitFor(()=>expect(m.warn).toHaveBeenCalledOnce());
+    m.alarms.onAlarm.fire({name:MATERIAL_IMPORT_CLEANUP_ALARM});
+    await vi.waitFor(()=>expect(f.stage.cleanup).toHaveBeenCalledTimes(2));expect(m.state.marker).toBe(true);dispose();
+  });
+  it('uses the browser diagnostic adapter without exposing the underlying error',async()=>{
+    const f=fixture(),m=maintenanceFixture();m.storage.get.mockRejectedValueOnce(Error('private note text'));
+    Object.assign(browser,{runtime:f.runtime,extension:{inIncognitoContext:false},alarms:m.alarms,storage:{local:m.storage}});
+    const warn=vi.spyOn(console,'warn').mockImplementation(()=>{});
+    installBrowserMaterialImportRuntime(Promise.resolve());await vi.waitFor(()=>expect(warn).toHaveBeenCalledOnce());
+    expect(String(warn.mock.calls[0][0])).not.toContain('private note text');installMaterialImportRuntime(f.deps as never)();
+  });
+  it('ignores unrelated alarms and never opens materials after the context becomes private',async()=>{
+    const f=fixture(),m=maintenanceFixture(),dispose=installMaterialImportRuntime({...f.deps,maintenance:m} as never);
+    await vi.waitFor(()=>expect(m.storage.get).toHaveBeenCalledOnce());m.state.marker=true;f.privateContext.value=true;
+    m.alarms.onAlarm.fire({name:'unrelated'});m.alarms.onAlarm.fire({name:MATERIAL_IMPORT_CLEANUP_ALARM});f.runtime.onStartup.fire();
+    await Promise.resolve();await Promise.resolve();expect(f.createStage).not.toHaveBeenCalled();expect(m.alarms.create).not.toHaveBeenCalled();dispose();
+  });
+  it('ignores queued startup and alarm callbacks after disposal',async()=>{
+    const f=fixture(),m=maintenanceFixture();const dispose=installMaterialImportRuntime({...f.deps,maintenance:m} as never);
+    await vi.waitFor(()=>expect(m.storage.get).toHaveBeenCalledOnce());
+    const alarm=[...m.alarms.onAlarm.listeners][0],startup=[...f.runtime.onStartup.listeners][0];
+    dispose();m.state.marker=true;alarm({name:MATERIAL_IMPORT_CLEANUP_ALARM});startup();
+    await Promise.resolve();await Promise.resolve();expect(f.createStage).not.toHaveBeenCalled();expect(m.storage.get).toHaveBeenCalledOnce();
+  });
+  it('does not access materials if private-context checks fail during alarm or startup',async()=>{
+    const f=fixture(),m=maintenanceFixture(),privacy=vi.fn(()=>false);
+    const dispose=installMaterialImportRuntime({...f.deps,isPrivateContext:privacy,maintenance:m} as never);
+    await vi.waitFor(()=>expect(m.storage.get).toHaveBeenCalledOnce());m.state.marker=true;
+    privacy.mockImplementation(()=>{throw Error('privacy status unavailable');});
+    expect(()=>m.alarms.onAlarm.fire({name:MATERIAL_IMPORT_CLEANUP_ALARM})).not.toThrow();
+    expect(()=>f.runtime.onStartup.fire()).not.toThrow();
+    await Promise.resolve();expect(f.createStage).not.toHaveBeenCalled();dispose();
+  });
+  it('rejects new sessions if the alarm listener cannot be installed',async()=>{
+    const f=fixture(),m=maintenanceFixture();vi.spyOn(m.alarms.onAlarm,'addListener').mockImplementation(()=>{throw Error('unavailable');});
+    const dispose=installMaterialImportRuntime({...f.deps,maintenance:m} as never);expect(m.warn).toHaveBeenCalledOnce();
+    const p=f.port();f.runtime.onConnect.fire(p.port);p.onMessage.fire({id:1,action:'begin',capability,manifest,guard,deadline:10_000});
+    await vi.waitFor(()=>expect(p.messages).toHaveLength(1));expect(p.messages[0]).toMatchObject({ok:false});
+    expect(f.stage.beginRecoverable).not.toHaveBeenCalled();expect(m.storage.set).not.toHaveBeenCalled();dispose();
+  });
+  it.each(['set','create'] as const)('keeps the lease while a %s operation remains pending and rejects a cancelled queued begin',async which=>{
+    vi.useFakeTimers();
+    try {
+      const f=fixture(),m=maintenanceFixture();let release!:()=>void;const held=new Promise<void>(resolve=>{release=resolve;});
+      if(which==='set')m.storage.set.mockImplementationOnce(async()=>{await held;m.state.marker=true;});
+      else m.alarms.create.mockImplementationOnce(async(_name,{periodInMinutes})=>{await held;m.state.period=periodInMinutes;});
+      const dispose=installMaterialImportRuntime({...f.deps,maintenance:m} as never);await vi.advanceTimersByTimeAsync(0);
+      const first=f.port(),second=f.port();f.runtime.onConnect.fire(first.port);f.runtime.onConnect.fire(second.port);
+      const begin={action:'begin',capability,manifest,guard,deadline:10_000};first.onMessage.fire({id:1,...begin});
+      await vi.advanceTimersByTimeAsync(0);second.onMessage.fire({id:1,...begin});await vi.advanceTimersByTimeAsync(30_001);
+      expect(m.warn).toHaveBeenCalled();expect(f.stage.beginRecoverable).not.toHaveBeenCalled();
+      second.onDisconnect.fire();release();await vi.advanceTimersByTimeAsync(0);
+      expect(first.messages[0]).toMatchObject({ok:true});expect(f.stage.beginRecoverable).toHaveBeenCalledOnce();
+      expect(m.state.marker).toBe(true);expect(m.state.period).toBe(60);dispose();
+    } finally {vi.useRealTimers();}
+  });
+  it.each(['set','create'] as const)('old worker late %s cannot disable a newer worker cleanup plan',async which=>{
+    const f=fixture(),m=maintenanceFixture();let release!:()=>void;const held=new Promise<void>(resolve=>{release=resolve;});
+    if(which==='set')m.storage.set.mockImplementationOnce(async()=>{await held;m.state.marker=true;});
+    else m.alarms.create.mockImplementationOnce(async(_name,{periodInMinutes})=>{await held;m.state.period=periodInMinutes;});
+    const old=installMaterialImportRuntime({...f.deps,maintenance:m} as never);
+    await vi.waitFor(()=>expect(m.storage.get).toHaveBeenCalled());
+    const a=f.port();f.runtime.onConnect.fire(a.port);a.onMessage.fire({id:1,action:'begin',capability,manifest,guard,deadline:10_000});
+    await vi.waitFor(()=>expect(which==='set'?m.storage.set:m.alarms.create).toHaveBeenCalledOnce());
+    a.onDisconnect.fire();old();
+    const current=installMaterialImportRuntime({...f.deps,maintenance:m} as never),b=f.port();f.runtime.onConnect.fire(b.port);
+    b.onMessage.fire({id:1,action:'begin',capability,manifest,guard,deadline:10_000});
+    await vi.waitFor(()=>expect(b.messages).toHaveLength(1));expect(b.messages[0]).toMatchObject({ok:true});
+    release();await new Promise(resolve=>setTimeout(resolve,0));
+    expect(m.state.marker).toBe(true);expect(m.state.period).toBe(60);expect(f.stage.beginRecoverable).toHaveBeenCalledOnce();current();
+  });
+  it.each(['set','create'] as const)('bounds repeated abandoned requests while %s is hung and recovers capacity after settlement',async which=>{
+    vi.useFakeTimers();
+    try {
+      const f=fixture(),m=maintenanceFixture();let release!:()=>void;const held=new Promise<void>(resolve=>{release=resolve;});
+      if(which==='set')m.storage.set.mockImplementationOnce(async()=>{await held;m.state.marker=true;});
+      else m.alarms.create.mockImplementationOnce(async(_name,{periodInMinutes})=>{await held;m.state.period=periodInMinutes;});
+      const dispose=installMaterialImportRuntime({...f.deps,maintenance:m} as never);await vi.advanceTimersByTimeAsync(0);
+      const begin={action:'begin',capability,manifest,guard,deadline:10_000},first=f.port();
+      f.runtime.onConnect.fire(first.port);first.onMessage.fire({id:1,...begin});await vi.advanceTimersByTimeAsync(0);
+      expect(which==='set'?m.storage.set:m.alarms.create).toHaveBeenCalledOnce();first.onDisconnect.fire();
+      let failed=0;
+      for(let i=0;i<40;i++){
+        const next=f.port();f.runtime.onConnect.fire(next.port);next.onMessage.fire({id:1,...begin});
+        await vi.advanceTimersByTimeAsync(0);
+        if(next.messages.some(message=>(message as {ok?:boolean}).ok===false))failed++;
+        next.onDisconnect.fire();
+      }
+      expect(failed).toBeGreaterThan(0);expect(f.stage.beginRecoverable).not.toHaveBeenCalled();
+      // A flood cannot emit an unbounded number of identical backpressure warnings.
+      expect(m.warn.mock.calls.length).toBeLessThanOrEqual(1);
+      await vi.advanceTimersByTimeAsync(30_001);expect(m.warn).toHaveBeenCalled();
+      release();await vi.advanceTimersByTimeAsync(0);
+      const final=f.port();f.runtime.onConnect.fire(final.port);final.onMessage.fire({id:1,...begin});
+      await vi.advanceTimersByTimeAsync(0);expect(final.messages[0]).toMatchObject({ok:true});
+      expect(f.stage.beginRecoverable).toHaveBeenCalledOnce();expect(m.state.marker).toBe(true);expect(m.state.period).toBe(60);dispose();
+    } finally {vi.useRealTimers();}
   });
 });

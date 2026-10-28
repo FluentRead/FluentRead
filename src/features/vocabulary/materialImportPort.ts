@@ -6,9 +6,10 @@
  */
 import type {Capability, Frame, Manifest} from '@/src/features/vocabulary/materialImportStage';
 import type {MaterialOperationGuard} from '@/src/features/vocabulary/materialProtocol';
+import {MATERIAL_IMPORT_FRAME_BYTES} from '@/src/features/vocabulary/materialProtocol';
 
 export const PORT_NAME='fluentReadMaterialsImportV1';
-export const MAX_FRAME_BYTES=128*1024;
+export const MAX_FRAME_BYTES=MATERIAL_IMPORT_FRAME_BYTES;
 export const MAX_BASE64_LENGTH=Math.ceil(MAX_FRAME_BYTES/3)*4;
 
 type Sender={id?:string;url?:string;incognito?:boolean;tab?:{id?:number;incognito?:boolean}};

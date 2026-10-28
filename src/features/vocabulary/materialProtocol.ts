@@ -9,6 +9,11 @@ import type {DocumentMaterialReference} from '@/src/features/document-translatio
 export const MATERIAL_MESSAGE = 'fluentReadMaterials' as const;
 export const MATERIAL_CHANGED_MESSAGE = 'fluentReadMaterialsChanged' as const;
 export const MATERIAL_BACKUP_MAX_BYTES = 20 * 1024 * 1024;
+/** 大备份暂存的当前默认预算；设备动态预算若启用，须同步更新读取端的准入方式。 */
+export const MATERIAL_IMPORT_FRAME_BYTES = 128 * 1024;
+export const MATERIAL_IMPORT_MAX_RECORD_BYTES = 128 * 1024 * 1024;
+export const MATERIAL_IMPORT_MAX_TOTAL_BYTES = 256 * 1024 * 1024;
+export const MATERIAL_IMPORT_MAX_FRAMES = 20_000;
 export type MaterialKind = 'article' | 'document' | 'video';
 export interface MaterialSource {kind: MaterialKind; url?: string; title?: string; fingerprint?: string}
 export interface MaterialLocator {

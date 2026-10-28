@@ -3,7 +3,7 @@ import Dexie from 'dexie';
 import {bytesToHex} from '@noble/hashes/utils';
 import {sha256} from '@noble/hashes/sha256';
 import {afterEach, expect, it, vi} from 'vitest';
-import {installMaterialImportRuntime} from '@/src/app/background/materialImportRuntime';
+import {installMaterialImportRuntime, MATERIAL_IMPORT_CLEANUP_ALARM} from '@/src/app/background/materialImportRuntime';
 import {PORT_NAME} from '@/src/features/vocabulary/materialImportPort';
 import {createStage} from '@/src/features/vocabulary/materialImportStage';
 import {MaterialDatabase} from '@/src/features/vocabulary/materialRepository';
@@ -74,4 +74,36 @@ it('recovers a sealed session and broadcasts only after the database commits', a
   expect(current.messages[2].ok).toBe(true); expect(browserRuntime.messages).toEqual([{type: 'fluentReadMaterialsChanged'}]);
   current.onMessage.fire({id: 4, action: 'commit'}); await vi.waitFor(() => expect(current.messages).toHaveLength(4));
   expect(current.messages[3].ok).toBe(true); expect(browserRuntime.messages).toHaveLength(1); dispose();
+});
+
+it('cleans expired private frames after an alarm while preserving a live session during clock rollback', async () => {
+  let now = 100, marker = false, period: number | undefined;
+  const browserRuntime = runtime(), onAlarm = event(), warnings: string[] = [];
+  const maintenance = {warn: (message: string) => warnings.push(message),
+    storage: {get: async () => ({fluentreadMaterialImportMaintenance: marker}), set: async () => {marker = true;}},
+    alarms: {onAlarm, get: async () => period === undefined ? undefined : {periodInMinutes: period},
+      create: async (_name: string, options: {periodInMinutes: number}) => {period = options.periodInMinutes;}}};
+  let db: MaterialDatabase, stage: ReturnType<typeof createStage>;
+  const deps = {runtime: browserRuntime, maintenance, isPrivateContext: () => false, ready: Promise.resolve(), createStage: () => {
+    db = new MaterialDatabase(dbName); opened.push(db);
+    stage = createStage(db, {clock: () => now, limits: {ttlMs: 1000, receiptTtlMs: 1000}});
+    return {stage, close: () => db.close()};
+  }};
+  const raw = new TextEncoder().encode('null'), bytes = new Uint8Array([0,0,0,raw.length,...raw]);
+  const recordManifest = {records: 1, frames: 1, bytes: raw.length, digest: bytesToHex(sha256(bytes))};
+  const dispose = installMaterialImportRuntime(deps as never), p = port(); browserRuntime.onConnect.fire(p.port);
+  const cap = capability('00000000-0000-4000-8000-000000000004');
+  p.onMessage.fire({id: 1, action: 'begin', capability: cap, manifest: recordManifest, guard: {generation: 0, capturedAt: now}, deadline: 1000});
+  await vi.waitFor(() => expect(p.messages).toHaveLength(1)); expect(p.messages[0].ok).toBe(true);
+  p.onMessage.fire({id: 2, action: 'append', frame: {seq: 0, record: 0, part: 0, total: 1, recordBytes: raw.length, base64: 'bnVsbA=='}});
+  await vi.waitFor(() => expect(p.messages).toHaveLength(2)); expect(p.messages[1].ok).toBe(true);
+  expect(await db!.table('stageFrames').count()).toBe(1);
+  const cleanup = vi.spyOn(stage!, 'cleanup');
+  now = 50; onAlarm.fire({name: MATERIAL_IMPORT_CLEANUP_ALARM});
+  await vi.waitFor(() => expect(cleanup).toHaveBeenCalledTimes(1)); await cleanup.mock.results[0].value;
+  expect(await db!.table('stageFrames').count()).toBe(1); expect(await db!.table('stageSessions').count()).toBe(1); expect(marker).toBe(true);
+  now = 1200; onAlarm.fire({name: MATERIAL_IMPORT_CLEANUP_ALARM});
+  await vi.waitFor(async () => expect(await db!.table('stageFrames').count()).toBe(0));
+  expect(await db!.table('stageFrames').count()).toBe(0); expect(await db!.table('stageSessions').count()).toBe(0);
+  expect(await db!.table('stageStarts').count()).toBe(0); expect(marker).toBe(true); expect(period).toBe(60); expect(warnings).toEqual([]); dispose();
 });

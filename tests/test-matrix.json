@@ -664,6 +664,8 @@
       "tests/bilingualFlowLayout.test.ts",
       "tests/insideListLayout.test.ts",
       "tests/directLayoutTranslation.test.ts",
+      "tests/materialBackupReader.test.ts",
+      "tests/materialBackupRestore.test.ts",
       "tests/materialImportPort.test.ts",
       "tests/materialImportRuntime.test.ts",
       "tests/materialImportRuntimeDatabase.test.ts",

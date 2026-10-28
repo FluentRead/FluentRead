@@ -65,6 +65,8 @@ Removing a material is reversible and keeps original saved expressions and quest
 
 Use the material manager’s separate export and restore actions. Its private JSON includes sources, passages, topics, and personal notes. Keep it safe; it is separate from collection and configuration backups.
 
+Backups over 20 MiB are checked and staged in chunks on this device, then restored in one transaction. The current staging limits are 256 MiB for all material records and 128 MiB for one record. Keep the original materials and backup if storage is insufficient or the file exceeds these limits. If cancellation or disconnection leaves the result uncertain, check it or end the unfinished restore on the current page. After closing the page, this result can no longer be queried; check the material list first. Stopping the check does not confirm that the restore was cancelled or that staged data was deleted. Clearing all materials also deletes uncommitted staged content.
+
 <span id="data-and-migration"></span>
 
 ## Keep your collection safe

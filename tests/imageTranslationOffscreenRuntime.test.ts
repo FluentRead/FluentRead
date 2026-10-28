@@ -708,7 +708,7 @@ describe('漫画与普通图片数值保护',()=>{
         const bbox={x0:2,y0:2,x1:10,y1:10};
         const label={text:'Hello',bbox,fontSize:8,sourceBoxes:Array.from({length:900},()=>({...bbox}))};
         imageOptions.push({width:1000,height:1000});mocks.mangaRecognize.mockResolvedValueOnce([label,...regions]);
-        let pixels:Uint8ClampedArray|undefined;
+        let pixels:Uint8ClampedArray<ArrayBuffer>|undefined;
         vi.stubGlobal('document',{createElement:vi.fn(()=>{const canvas=makeCanvas();canvas.context.getImageData.mockImplementation(()=>{
             pixels=new Uint8ClampedArray(canvas.width*canvas.height*4).fill(255);pixels[(5*1000+5)*4]=0;pixels[(105*1000+105)*4]=0;return {data:pixels};
         });return canvas;})});
@@ -832,7 +832,7 @@ describe('漫画与普通图片数值保护',()=>{
         }
         sendMessage.mockImplementation((message,callback)=>callback(message.type==='fluentReadImageTranslateTexts'?{success:true,translations:['近','远']}:undefined));
         const actual=await vi.importActual<typeof import('@/src/features/image-translation/services/inpainting')>('@/src/features/image-translation/services/inpainting');
-        let pixels:Uint8ClampedArray|undefined;let original:Uint8ClampedArray|undefined;
+        let pixels:Uint8ClampedArray<ArrayBuffer>|undefined;let original:Uint8ClampedArray|undefined;
         vi.stubGlobal('document',{createElement:vi.fn(()=>{
             const canvas=makeCanvas();canvas.context.getImageData.mockImplementation(()=>{
                 pixels=new Uint8ClampedArray(canvas.width*canvas.height*4).fill(255);
@@ -937,7 +937,7 @@ describe('低置信数值物理保护',()=>{
             mocks.recognize.mockResolvedValueOnce(recognized);
         }
         sendMessage.mockImplementation((message,callback)=>callback(message.type==='fluentReadImageTranslateTexts'?{success:true,translations:['近','远']}:undefined));
-        let pixels:Uint8ClampedArray|undefined;let original:Uint8ClampedArray|undefined;
+        let pixels:Uint8ClampedArray<ArrayBuffer>|undefined;let original:Uint8ClampedArray|undefined;
         vi.stubGlobal('document',{createElement:vi.fn(()=>{
             const canvas=makeCanvas();canvas.context.getImageData.mockImplementation(()=>{
                 pixels=new Uint8ClampedArray(canvas.width*canvas.height*4).fill(255);

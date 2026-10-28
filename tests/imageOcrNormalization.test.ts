@@ -426,7 +426,7 @@ describe('原始数值证据的有界保护',()=>{
     });
     it('同文首个候选的未知 bbox getter 抛错时保留首因，不越过它命中后面的精确框',()=>{
         const failure=new Error('bbox getter first'),bbox={x0:2,y0:2,x1:20,y1:10};
-        const first={text:'90%',numericConfidence:99,get bbox(){throw failure;}};
+        const first={text:'90%',numericConfidence:99,get bbox():never {throw failure;}};
         const exact={text:'90%',numericConfidence:99,bbox};
         for(const options of [undefined,{trustedWorkerData:true}])
             expect(()=>collectRawNumericGuards([{paragraphs:[{lines:[{text:'90%',bbox,confidence:20}]}]}],[first,exact],options)).toThrow(failure);

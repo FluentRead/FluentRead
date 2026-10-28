@@ -194,6 +194,13 @@ export class MaterialRepository {
         if (!input || typeof input !== 'object' || Array.isArray(input)) throw new MaterialError('invalid-input', '材料备份无效');
         const value = input as Partial<MaterialBackup>;
         if (value.format !== 'fluentread-learning-materials' || value.version !== 1 || !Array.isArray(value.materials) || value.materials.length > 10000) throw new MaterialError('invalid-input', '不支持的材料备份格式或超过材料上限');
+        return this.importRecords(async apply => {for (const item of value.materials!) await apply(item);}, now, guard);
+    }
+    /**
+     * 在同一事务内顺序应用材料记录。consume 只能等待同库操作，不能等待
+     * 文件或跨进程消息；每次 apply 必须完成后才能提交下一条记录。
+     */
+    async importRecords(consume: (apply: (item: unknown) => Promise<void>) => Promise<void>, now = Date.now(), guard?: MaterialOperationGuard): Promise<MaterialImportResult> {
         if (guard !== undefined && (!guard || !Number.isSafeInteger(guard.generation) || guard.generation < 0 || !Number.isFinite(guard.capturedAt) || guard.capturedAt < 0 || guard.capturedAt > now + 60_000)) throw new MaterialError('invalid-input', '材料导入操作无效');
         const generation = guard?.generation ?? await this.generation();
         const result: MaterialImportResult = {inserted: 0, updated: 0, skipped: 0};
@@ -201,36 +208,43 @@ export class MaterialRepository {
             const meta = await this.db.meta.get('state') ?? initialMeta();
             if (meta.generation !== generation || (guard !== undefined && guard.capturedAt <= meta.clearedAt)) throw new MaterialError('stale-operation', '导入期间材料已清空，请重新选择备份');
             // 容量只在这个原子导入内缓存，不能跨事务复用，亦不为已有记录更新计数。
-            let materialCount: number | undefined;
-            for (const item of value.materials!) {
-                let record: MaterialRecord & {aliases: string[]};
-                try {record = normalizeImportedMaterial(item, now);} catch (error) {
-                    if (!(error instanceof MaterialError)) throw error;
-                    result.skipped++; continue;
-                }
-                const previous = await this.findIdentity(record.identityKey);
-                let conflict = false;
-                for (const alias of record.aliases) {
-                    const owner = await this.findIdentity(alias);
-                    if (owner && owner.id !== previous?.id) {conflict = true; break;}
-                }
-                if (conflict || (previous && previous.updatedAt >= record.updatedAt)) {result.skipped++; continue;}
-                if (previous) {
-                    // 选择更新的整份快照，避免旧备份复活用户刚删掉的笔记或归档状态。
-                    record.id = previous.id;
-                    record.aliases = [...new Set([...(previous.aliases ?? []), previous.identityKey, ...record.aliases])].filter(key => key !== record.identityKey).slice(-100);
-                    record.createdAt = Math.min(previous.createdAt, record.createdAt);
-                    result.updated++;
-                } else {
-                    materialCount ??= await this.db.materials.count();
-                    if (materialCount >= 10000) {result.skipped++; continue;}
-                    if (await this.db.materials.get(record.id)) record.id = crypto.randomUUID();
-                    result.inserted++;
-                }
-                await this.db.materials.put(record);
-                if (!previous) materialCount!++;
-            }
-            return result;
+            let materialCount: number | undefined, count = 0, active = true, applying = false;
+            const apply = async (item: unknown): Promise<void> => {
+                if (!active || applying || ++count > 10000) throw new MaterialError('invalid-input', '材料导入顺序或数量无效');
+                applying = true;
+                try {
+                    let record: MaterialRecord & {aliases: string[]};
+                    try {record = normalizeImportedMaterial(item as MaterialRecord, now);} catch (error) {
+                        if (!(error instanceof MaterialError)) throw error;
+                        result.skipped++; return;
+                    }
+                    const previous = await this.findIdentity(record.identityKey);
+                    let conflict = false;
+                    for (const alias of record.aliases) {
+                        const owner = await this.findIdentity(alias);
+                        if (owner && owner.id !== previous?.id) {conflict = true; break;}
+                    }
+                    if (conflict || (previous && previous.updatedAt >= record.updatedAt)) {result.skipped++; return;}
+                    if (previous) {
+                        record.id = previous.id;
+                        record.aliases = [...new Set([...(previous.aliases ?? []), previous.identityKey, ...record.aliases])].filter(key => key !== record.identityKey).slice(-100);
+                        record.createdAt = Math.min(previous.createdAt, record.createdAt);
+                        result.updated++;
+                    } else {
+                        materialCount ??= await this.db.materials.count();
+                        if (materialCount >= 10000) {result.skipped++; return;}
+                        if (await this.db.materials.get(record.id)) record.id = crypto.randomUUID();
+                        result.inserted++;
+                    }
+                    await this.db.materials.put(record);
+                    if (!previous) materialCount!++;
+                } finally {applying = false;}
+            };
+            try {
+                await consume(apply);
+                if (applying) throw new MaterialError('invalid-input', '材料导入尚未完成');
+                return result;
+            } finally {active = false;}
         });
     }
     async clear(now = Date.now()): Promise<void> {

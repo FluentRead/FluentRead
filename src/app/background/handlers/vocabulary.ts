@@ -43,6 +43,7 @@ export function createBrowserMaterialHandler(dependencies: {
         ready: dependencies.ready,
         isPrivateContext: () => browser.extension.inIncognitoContext === true,
         isExtensionUrl: url => url.startsWith(browser.runtime.getURL('/')),
+        isTrustedWorkspace: sender => isTrustedSettingsSender(sender, browser.runtime.id, browser.runtime.getURL('/options.html')),
         canCapture: (kind, sourceUrl) => {
             if (sourceUrl && (!config.on || isExtensionDisabledOnSite(sourceUrl, config.disabledExtensionDomains))) return false;
             // 独立材料保存与位置更新不依赖 AI 或词书；memoryEnabled 只控制模型回忆。

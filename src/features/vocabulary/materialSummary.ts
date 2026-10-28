@@ -1,6 +1,8 @@
 /**
- * Lightweight material list data. Full references remain in the repository and
- * are only used here to compute the existing preview and search semantics.
+ * @file src/features/vocabulary/materialSummary.ts
+ * 文件职责：生成材料列表摘要并保持工作区的原有全文搜索语义。
+ * 主要内容：提取显示字段、精确预览及引用数量，对完整拼接文本执行大小写搜索。
+ * 模块边界：不访问数据库、消息或界面；不将全部引用正文放入列表摘要。
  */
 import type {MaterialKind, MaterialRecord} from './materialProtocol';
 
@@ -16,6 +18,7 @@ export interface MaterialSummary {
     preview: string;
     referenceCount: number;
 }
+export interface MaterialSummaryQuery {archived?: boolean; topic?: string; search?: string}
 
 export function summarizeMaterial(record: MaterialRecord): MaterialSummary {
     return {
@@ -32,7 +35,6 @@ export function summarizeMaterial(record: MaterialRecord): MaterialSummary {
         referenceCount: record.references.length,
     };
 }
-
 /** Match the workspace's original whole-string search, including field spaces. */
 export function normalizeMaterialSearch(query: string): string {return query.trim().toLocaleLowerCase();}
 
@@ -42,12 +44,4 @@ export function matchesNormalizedMaterialSearch(record: MaterialRecord, search: 
     return [record.title, record.source.url, ...record.topics,
         ...record.references.flatMap(reference => [reference.excerpt, reference.note])]
         .join(' ').toLocaleLowerCase().includes(search);
-}
-
-export function matchesMaterialSearch(record: MaterialRecord, query: string): boolean {
-    return matchesNormalizedMaterialSearch(record, normalizeMaterialSearch(query));
-}
-
-export function compareMaterialSummaries(a: MaterialSummary, b: MaterialSummary): number {
-    return b.lastReadAt - a.lastReadAt || b.updatedAt - a.updatedAt || a.id.localeCompare(b.id);
 }

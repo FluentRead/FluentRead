@@ -527,7 +527,8 @@ describe('Safari unsigned delivery contract', () => {
             {browser: 'edge', manifestVersion: 3}, {browser: 'firefox', manifestVersion: 2}, {browser: 'firefox', manifestVersion: 3},
             {browser: 'safari', manifestVersion: 3}] as const) {
             const manifest = createExtensionManifest(env);
-            expect(manifest.optional_permissions).toBeUndefined(); expect(manifest.optional_host_permissions).toBeUndefined();
+            expect(manifest.optional_permissions).toEqual(env.browser === 'firefox' ? ['downloads'] : undefined);
+            expect(manifest.permissions).not.toContain('downloads'); expect(manifest.optional_host_permissions).toBeUndefined();
             expect(manifest.host_permissions).toEqual(source.host_permissions);
         }
     });

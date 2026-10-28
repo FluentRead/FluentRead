@@ -1,4 +1,9 @@
-/** Bounded, acknowledged transport for a single authorized material read. */
+/**
+ * @file src/features/vocabulary/materialReadTransport.ts
+ * 文件职责：为材料读取提供可取消、有背压的分帧传输。
+ * 主要内容：限制每帧大小和在途数量，校验序号、总长度、SHA-256，并处理取消、超时及断连。
+ * 模块边界：不决定端口来源权限、不读取材料或管理 UI；调用者负责授权、快照一致性和部分结果隔离。
+ */
 import {sha256} from '@noble/hashes/sha256';
 
 export const MATERIAL_READ_PORT_NAME = 'fluentread-material-read-v1';

@@ -49,6 +49,8 @@ export type MaterialResponse<T = unknown> = {success: true; data: T} | {success:
 export interface MaterialBackup {format: 'fluentread-learning-materials'; version: 1; exportedAt: number; materials: MaterialRecord[]}
 export interface MaterialOperationGuard {generation: number; capturedAt: number}
 export interface MaterialImportResult {inserted: number; updated: number; skipped: number}
+/** 设置页写入成功后只传递 ID；未知结果必须重新读取，不能盲目重放写入。 */
+export interface MaterialWorkspaceWriteReceipt {id: string}
 export type MaterialRequest =
     | {type: typeof MATERIAL_MESSAGE; action: 'list'; options?: MaterialListOptions}
     | {type: typeof MATERIAL_MESSAGE; action: 'generation'}
@@ -58,4 +60,8 @@ export type MaterialRequest =
     | {type: typeof MATERIAL_MESSAGE; action: 'update'; id: string; patch: MaterialPatch}
     | {type: typeof MATERIAL_MESSAGE; action: 'archive' | 'restore'; id: string}
     | {type: typeof MATERIAL_MESSAGE; action: 'clear' | 'exportData'}
-    | {type: typeof MATERIAL_MESSAGE; action: 'importData'; data: unknown; guard?: MaterialOperationGuard};
+    | {type: typeof MATERIAL_MESSAGE; action: 'importData'; data: unknown; guard?: MaterialOperationGuard}
+    | {type: typeof MATERIAL_MESSAGE; action: 'workspaceCapture'; input: MaterialCaptureInput}
+    | {type: typeof MATERIAL_MESSAGE; action: 'workspaceUpdate'; id: string; patch: MaterialPatch}
+    | {type: typeof MATERIAL_MESSAGE; action: 'workspaceRemoveReference'; id: string; kind: MaterialReference['kind']; referenceId: string}
+    | {type: typeof MATERIAL_MESSAGE; action: 'workspaceArchive' | 'workspaceRestore'; id: string};

@@ -1,5 +1,5 @@
 import {describe, expect, it} from 'vitest';
-import {compareMaterialSummaries, matchesMaterialSearch, summarizeMaterial} from '@/src/features/vocabulary/materialSummary';
+import {matchesNormalizedMaterialSearch, normalizeMaterialSearch, summarizeMaterial} from '@/src/features/vocabulary/materialSummary';
 import type {MaterialRecord} from '@/src/features/vocabulary/materialProtocol';
 
 function material(overrides: Partial<MaterialRecord> = {}): MaterialRecord {
@@ -51,14 +51,9 @@ describe('material summaries', () => {
         ];
         const queries = ['', ' ', 'A', 'a   b', 'ΟΣ', 'ος', 'οσα', 'Σ', 'σ', 'ς', 'İ', 'i', 'ΘΈΜΑ', 'note', 'no match'];
         for (const record of records) for (const query of queries) {
-            expect(matchesMaterialSearch(record, query), JSON.stringify({record, query})).toBe(oldSearch(record, query));
+            expect(matchesNormalizedMaterialSearch(record, normalizeMaterialSearch(query)), JSON.stringify({record, query})).toBe(oldSearch(record, query));
         }
-        expect(matchesMaterialSearch(records[0], 'a   b')).toBe(true);
+        expect(matchesNormalizedMaterialSearch(records[0], normalizeMaterialSearch('a   b'))).toBe(true);
     });
 
-    it('preserves repository last-read, updated and id ordering', () => {
-        const inputs = [material({id: 'c', lastReadAt: 1, updatedAt: 20}), material({id: 'b', lastReadAt: 2, updatedAt: 1}),
-            material({id: 'a', lastReadAt: 2, updatedAt: 1}), material({id: 'd', lastReadAt: 2, updatedAt: 2})];
-        expect(inputs.map(summarizeMaterial).sort(compareMaterialSummaries).map(item => item.id)).toEqual(['d', 'a', 'b', 'c']);
-    });
 });

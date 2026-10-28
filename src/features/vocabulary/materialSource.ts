@@ -12,7 +12,7 @@ export const MATERIAL_RESUME_PARAMETER = '__fluentread_material';
 export interface MaterialResumeLink {href?: string; label: string; recovery?: string}
 
 /** 个人原句和文件字节永不写入地址；恢复时由本地仓库核对来源身份。 */
-export function materialResumeLink(record: MaterialRecord, documentPageUrl?: string): MaterialResumeLink {
+export function materialResumeLink(record: Pick<MaterialRecord, 'id'|'kind'|'source'|'locator'>, documentPageUrl?: string): MaterialResumeLink {
     if (record.kind === 'document') {
         if (!documentPageUrl || !record.source.fingerprint) return {label: '重新打开文件', recovery: '请选择原文件；将按内容指纹找回材料与阅读位置。'};
         const target = new URL(documentPageUrl);

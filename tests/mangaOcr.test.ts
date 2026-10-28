@@ -18,7 +18,7 @@ vi.mock('@/src/features/image-translation/services/imageEncoding',()=>({encodeIm
 vi.mock('@/src/features/image-translation/services/mangaOcrDeskew',async original=>({...await original<any>(),planMangaOcrDeskew:mocks.planDeskew,trimMangaOcrDeskew:mocks.trimDeskew}));
 import {createBrowserMangaOcr, createMangaOcrRuntime, mangaOcrRuntime, removeMangaModels, disposeMangaModels,padMangaOcrDetectionBox,shouldRotateMangaOcrRetry} from '@/src/features/image-translation/services/mangaOcr';
 import * as mangaOcrColor from '@/src/features/image-translation/services/mangaOcrColor';
-import {planMangaOcrTiles, mergeMangaOcrTiles} from '@/src/features/image-translation/services/mangaOcrTiles';
+import {planMangaOcrTiles, mergeMangaOcrTiles,collectMangaOcrTileNumericEvidence} from '@/src/features/image-translation/services/mangaOcrTiles';
 const opaquePixels=()=>{const pixels=new Uint8ClampedArray(200*200*4);for(let index=3;index<pixels.length;index+=4)pixels[index]=255;return pixels;};
 const response = {results:[{text:'Hello world',confidence:0.99,box:{x:10,y:10,width:100,height:20}}]};
 const deferred = <T,>() => {let resolve!:(v:T)=>void,reject!:(e:unknown)=>void;const promise=new Promise<T>((a,b)=>{resolve=a;reject=b});return {promise,resolve,reject}};
@@ -29,6 +29,107 @@ beforeEach(()=>{vi.useFakeTimers();vi.clearAllMocks();mocks.contexts=[];mocks.ca
     vi.stubGlobal('document',{createElement:vi.fn(()=>{const ctx={drawImage:vi.fn(),fillRect:vi.fn(),putImageData:vi.fn(),translate:vi.fn(),rotate:vi.fn(),getImageData:vi.fn(()=>({data:opaquePixels()}))};const canvas={width:0,height:0,getContext:vi.fn(()=>ctx)};mocks.contexts.push(ctx);mocks.canvases.push(canvas);return canvas;})});
 });
 afterEach(async()=>{await mangaOcrRuntime.dispose().catch(()=>undefined);vi.clearAllTimers();vi.useRealTimers();vi.unstubAllGlobals();vi.restoreAllMocks()});
+
+it('方向复识别覆盖原数字时保留原始物理证据，避免重跑模型',async()=>{
+    const source={text:'90%',confidence:.8,box:{x:30,y:20,width:20,height:100}};
+    mocks.recognize.mockResolvedValueOnce({results:[source]});
+    mocks.retryRecognition.mockResolvedValueOnce([{text:'SALE',confidence:.95,box:{...source.box}}]);
+    const port=await createBrowserMangaOcr(),page=await port.recognize('image',{flatten:true,noCache:true,strategy:'per-box'});
+    expect(page.results).toEqual([{text:'SALE',confidence:.95,box:source.box}]);expect(page.numericEvidence).toEqual([source]);
+    const {collectMangaRegions}=await import('@/src/features/image-translation/services/mangaBubbles');
+    expect(collectMangaRegions(page,'en',200,200,'image').filter(item=>item.guardOnly).map(item=>item.bbox))
+        .toEqual([{x0:30,y0:20,x1:50,y1:120}]);
+    expect(mocks.recognize).toHaveBeenCalledOnce();expect(mocks.retryRecognition).toHaveBeenCalledOnce();await port.destroy();
+});
+it('Worker 返回数值证据后，OCR 运行时将其保留为不可阅读的物理保护框',async()=>{
+    const bbox={x:30,y:20,width:20,height:10},page={results:[{text:'SALE',confidence:.99,box:bbox}],
+        numericEvidence:[{text:'90%',confidence:.8,box:bbox}]};
+    const destroy=vi.fn(),port={recognize:vi.fn(async()=>page),destroy},runtime=createMangaOcrRuntime(async()=>port);
+    const lines=await runtime.recognize('image','en',200,200,undefined,undefined,undefined,'image');
+    expect(lines.filter(line=>!line.guardOnly).map(line=>line.text)).toEqual(['SALE']);
+    expect(lines.filter(line=>line.guardOnly)).toMatchObject([{text:'',bbox:{x0:30,y0:20,x1:50,y1:30}}]);
+    expect(port.recognize).toHaveBeenCalledOnce();await runtime.dispose();expect(destroy).toHaveBeenCalledOnce();
+});
+it('旋转复识别发现但不采用的数字，仍映回原始框作为防擦证据',async()=>{
+    const source={text:'SALE',confidence:.8,box:{x:30,y:20,width:20,height:100}};
+    mocks.recognize.mockResolvedValueOnce({results:[source]});
+    mocks.retryRecognition.mockResolvedValueOnce([{text:'90%',confidence:.81,box:{x:0,y:0,width:20,height:100}}]);
+    const port=await createBrowserMangaOcr(),page=await port.recognize('image',{flatten:true,noCache:true,strategy:'per-box'});
+    expect(page.results).toEqual([source]);expect(page.numericEvidence).toEqual([{text:'90%',confidence:.81,box:source.box}]);
+    expect(mocks.retryRecognition).toHaveBeenCalledOnce();await port.destroy();
+});
+it('直向复识别出现与原弱框不匹配的数字，不创建无关防擦框',async()=>{
+    const source={text:'左の列',confidence:.8,box:{x:30,y:20,width:20,height:100}};
+    mocks.recognize.mockResolvedValueOnce({results:[source]});
+    mocks.retryRecognition.mockResolvedValueOnce([{text:'90%',confidence:.99,box:{x:70,y:20,width:20,height:100}}]);
+    const port=await createBrowserMangaOcr(),page=await port.recognize('image',{flatten:true,noCache:true,strategy:'per-box'});
+    expect(page.results).toEqual([source]);expect(page.numericEvidence).toBeUndefined();
+    expect(mocks.retryRecognition).toHaveBeenCalledOnce();await port.destroy();
+});
+it('真实瓦片编排在全图去重前保留跨瓦片冲突数字，并映回全图坐标',async()=>{
+    const first={text:'90%',confidence:.89,box:{x:900,y:20,width:40,height:10}};
+    const second={text:'SALE',confidence:.99,box:{x:36,y:20,width:40,height:10}};
+    mocks.recognize.mockResolvedValueOnce({results:[first]}).mockResolvedValueOnce({results:[second]});
+    const source={naturalWidth:2400,naturalHeight:200} as HTMLImageElement,port=await createBrowserMangaOcr();
+    const page=await port.recognize('tiles',{flatten:true,noCache:true,strategy:'per-box',decodedImage:source});
+    expect(page.results.map(item=>item.text)).toEqual(['SALE']);expect(page.numericEvidence).toEqual([first]);
+    const {collectMangaRegions}=await import('@/src/features/image-translation/services/mangaBubbles');
+    expect(collectMangaRegions(page,'en',2400,200,'image').filter(item=>item.guardOnly).map(item=>item.bbox))
+        .toEqual([{x0:900,y0:20,x1:940,y1:30}]);
+    expect(mocks.recognize).toHaveBeenCalledTimes(2);expect(mocks.canvases.every(c=>c.width===0&&c.height===0)).toBe(true);await port.destroy();
+});
+it('放大气泡的数字证据按真实缩放还原为原图物理框',async()=>{
+    const pixels=opaquePixels();for(let y=40;y<90;y++)for(let x=30;x<80;x++)pixels.fill(255,(y*200+x)*4,(y*200+x)*4+4);
+    const original=vi.mocked(document.createElement).getMockImplementation()!;let main=true;
+    vi.mocked(document.createElement).mockImplementation(()=>{const canvas=original('canvas');if(main){main=false;mocks.contexts.at(-1).getImageData.mockReturnValue({data:pixels});}return canvas;});
+    mocks.recognize.mockResolvedValueOnce(response).mockResolvedValueOnce({results:[{text:'90%',confidence:.8,box:{x:15,y:30,width:90,height:30}}]});
+    const port=await createBrowserMangaOcr(),page=await port.recognize('image',{flatten:true,noCache:true,strategy:'per-box'});
+    expect(page.bubbles?.[0].numericEvidence?.[0].box).toEqual({x:35,y:50,width:30,height:10});
+    const {collectMangaRegions}=await import('@/src/features/image-translation/services/mangaBubbles');
+    expect(collectMangaRegions(page,'en',200,200,'image').filter(item=>item.guardOnly).map(item=>item.bbox))
+        .toEqual([{x0:35,y0:50,x1:65,y1:60}]);
+    expect(mocks.recognize).toHaveBeenCalledTimes(2);expect(mocks.canvases.every(c=>c.width===0&&c.height===0)).toBe(true);await port.destroy();
+});
+it.each([false,true])('瓦片去重前保留冲突数字的全图坐标且正常结果不变，数字先=%s',numberFirst=>{
+    const tileA={x:0,y:0,width:100,height:100},tileB={x:50,y:0,width:100,height:100};
+    const number={text:'90%',confidence:.89,box:{x:60,y:20,width:30,height:10}};
+    const label={text:'SALE',confidence:.99,box:{x:10,y:20,width:30,height:10}};
+    const pages=numberFirst?[{tile:tileA,results:[number]},{tile:tileB,results:[label]}]
+        :[{tile:tileB,results:[label]},{tile:tileA,results:[number]}];
+    expect(mergeMangaOcrTiles(pages,150,100).map(item=>item.text)).toEqual(['SALE']);
+    const evidence=collectMangaOcrTileNumericEvidence(pages,150,100);expect(evidence).toEqual([number]);
+    expect(collectMangaOcrTileNumericEvidence([{tile:tileB,results:[{...number,box:{x:-5,y:20,width:20,height:10}}]}],150,100)[0].box)
+        .toEqual({x:50,y:20,width:15,height:10});
+});
+it('同文重复数值框去重，不同位置仍保留；非法坐标与超量数字明确报错',()=>{
+    const tile={x:0,y:0,width:100,height:100};
+    const item={text:'90%',confidence:.8,box:{x:10,y:10,width:20,height:10}};
+    const other={...item,box:{...item.box,x:40}};
+    expect(collectMangaOcrTileNumericEvidence([{tile,results:[item,{...item,confidence:.99},other,{...item,text:'SALE'}]}],100,100))
+        .toEqual([item,other]);
+    expect(()=>collectMangaOcrTileNumericEvidence([{tile,results:[{...item,box:{...item.box,x:NaN}}]}],100,100)).toThrow('保护位置无效');
+    const many=Array.from({length:4097},(_,i)=>({...item,box:{x:i/100,y:10,width:.5,height:1}}));
+    expect(()=>collectMangaOcrTileNumericEvidence([{tile,results:many}],100,100)).toThrow('保护区域过于复杂');
+});
+it('过多首次数值证据会报错，且取消后清理识别画布，不发起重识别',async()=>{
+    const many=Array.from({length:4097},(_,i)=>({text:'90%',confidence:.99,box:{x:i%100,y:1,width:1,height:1}}));
+    mocks.recognize.mockResolvedValueOnce({results:many});
+    const port=await createBrowserMangaOcr();
+    await expect(port.recognize('too-many',{flatten:true,noCache:true,strategy:'per-box'})).rejects.toThrow('保护区域过于复杂');
+    expect(mocks.retryRecognition).not.toHaveBeenCalled();expect(mocks.canvases.every(canvas=>canvas.width===0&&canvas.height===0)).toBe(true);
+    await port.destroy();
+});
+it('SDK 返回无文本结果时不构造数字证据，原识别结果保持不变',async()=>{
+    const item={text:undefined,confidence:.99,box:{x:10,y:10,width:20,height:10}};
+    mocks.recognize.mockResolvedValueOnce({results:[item]});
+    const port=await createBrowserMangaOcr(),page=await port.recognize('empty-text',{flatten:true,noCache:true,strategy:'per-box'});
+    expect(page.results).toEqual([item]);expect(page.numericEvidence).toBeUndefined();await port.destroy();
+});
+it('瓦片图外数值不构造保护框，空文本和异常瓦片位置独立处理',()=>{
+    const tile={x:10,y:10,width:40,height:40},item={text:'90%',confidence:.8,box:{x:50,y:1,width:10,height:10}};
+    expect(collectMangaOcrTileNumericEvidence([{tile,results:[item,{...item,text:''},{...item,text:undefined!}]}],100,100)).toEqual([]);
+    expect(()=>collectMangaOcrTileNumericEvidence([{tile:{...tile,width:0},results:[item]}],100,100)).toThrow('保护位置无效');
+});
 
 describe('漫画检测平面的字行厚度 padding',()=>{
     it('长竖列按短边留白，不吞入邻列；裁边后再沿用检测平面坐标舍入',()=>{

@@ -941,13 +941,14 @@ describe('isolated same-database material staging',()=>{
   );
   it('rolls back a mid-commit failure and cancellation, then allows retry of the sealed transfer',async()=>{
     const target=instance(),{token}=await upload(target.stage,[await material('alpha'),await material('bravo')]);await target.stage.seal(token);
+    const notified=vi.fn(),stop=target.stage.observeCommitted(notified);
     let written=0;
     const fail=function(this:{onsuccess?:(id:string)=>void}){if(written===1)throw Error('injected failure');this.onsuccess=()=>written++;};
     target.db.materials.hook('creating',fail);
     try{await expect(target.stage.commit(token)).rejects.toThrow('injected failure');}
     finally{target.db.materials.hook('creating').unsubscribe(fail);}
     expect(written).toBe(1);
-    expect(await target.db.materials.count()).toBe(0);expect(await target.stage.receipts.count()).toBe(0);
+    expect(await target.db.materials.count()).toBe(0);expect(await target.stage.receipts.count()).toBe(0);expect(notified).not.toHaveBeenCalled();
     const controller=new AbortController();
     let cancelledAfterWrite=false;
     const cancel=function(this:{onsuccess?:(id:string)=>void}){this.onsuccess=()=>{cancelledAfterWrite=true;controller.abort();};};
@@ -956,8 +957,9 @@ describe('isolated same-database material staging',()=>{
     finally{target.db.materials.hook('creating').unsubscribe(cancel);}
     expect(cancelledAfterWrite).toBe(true);
     await vi.waitFor(async()=>expect(await target.stage.status(token)).toMatchObject({state:'sealed'}));
-    expect(await target.db.materials.count()).toBe(0);expect(await target.stage.receipts.count()).toBe(0);
+    expect(await target.db.materials.count()).toBe(0);expect(await target.stage.receipts.count()).toBe(0);expect(notified).not.toHaveBeenCalled();
     expect(await target.stage.commit(token)).toEqual({inserted:2,updated:0,skipped:0});
+    expect(notified).toHaveBeenCalledOnce();stop();
   });
   it('rolls back both materials and receipt if the receipt store rejects the transaction',async()=>{
     const target=instance(),{token}=await upload(target.stage,[await material('alpha'),await material('bravo')]);await target.stage.seal(token);

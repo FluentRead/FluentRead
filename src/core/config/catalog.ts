@@ -71,6 +71,7 @@ export const services = {
     cerebras: "cerebras", // Cerebras
     deepinfra: "deepinfra", // DeepInfra
     perplexity: "perplexity", // Perplexity
+    runcrate: "runcrate", // Runcrate
 };
 
 /**
@@ -115,6 +116,7 @@ export const referenceAiPlatformServices = Object.freeze([
     services.cerebras,
     services.deepinfra,
     services.perplexity,
+    services.runcrate,
 ]);
 
 export const servicesType = {
@@ -461,6 +463,7 @@ export const defaultModelIds = {
     [services.fireworks]: "accounts/fireworks/models/gpt-oss-20b",
     [services.deepinfra]: "Qwen/Qwen3.5-9B",
     [services.perplexity]: "sonar",
+    [services.runcrate]: "deepseek-ai/DeepSeek-V4.1-Flash",
     [services.ollama]: "gemma3:4b",
 } as const;
 
@@ -505,6 +508,7 @@ export const models = new Map<string, Array<string>>([
     [services.fireworks, [defaultModelIds[services.fireworks], "accounts/fireworks/models/gpt-oss-120b", "accounts/fireworks/models/qwen3-30b-a3b", "accounts/fireworks/models/deepseek-v3p2", customModelString]],
     [services.deepinfra, [defaultModelIds[services.deepinfra], "Qwen/Qwen3.5-35B-A3B", "deepseek-ai/DeepSeek-V3.2", "meta-llama/Llama-3.3-70B-Instruct", customModelString]],
     [services.perplexity, [defaultModelIds[services.perplexity], "sonar-pro", "sonar-reasoning", customModelString]],
+    [services.runcrate, [defaultModelIds[services.runcrate], "zai-org/GLM-5.3-Flash", "Qwen/Qwen3.8-Flash", "openai/gpt-oss-120b", customModelString]],
     [services.ollama, [defaultModelIds[services.ollama], "qwen3:8b", "gemma3:12b", "llama3.2:3b", "mistral:7b", customModelString]],
 ]);
 
@@ -647,6 +651,7 @@ export const options = {
         {value: services.fireworks, label: "Fireworks AI", catalogKind: "platform"},
         {value: services.deepinfra, label: "DeepInfra", catalogKind: "platform"},
         {value: services.perplexity, label: "Perplexity", catalogKind: "platform"},
+        {value: services.runcrate, label: "Runcrate", catalogKind: "platform"},
         {value: services.ollama, label: "Ollama", description: "连接本机 Ollama，无需密钥，模型与数据都留在本地。", catalogKind: "platform", searchTerms: ["local localhost 本地"]},
         {value: services.custom, label: "自定义接口", catalogKind: "platform"},
     ],

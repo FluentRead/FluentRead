@@ -3296,7 +3296,7 @@ async function main() {
     ];
     const expectedPlatformServices = [
       'siliconCloud', 'newapi', 'infini', 'openrouter', 'groq', 'azureOpenai',
-      'mistral', 'cohere', 'cerebras', 'togetherai', 'fireworks', 'deepinfra', 'perplexity', 'ollama',
+      'mistral', 'cohere', 'cerebras', 'togetherai', 'fireworks', 'deepinfra', 'perplexity', 'runcrate', 'ollama',
     ];
     const serviceViews = await serviceCatalog.locator('[data-service-view]')
       .evaluateAll(buttons => buttons.map(button => button.dataset.serviceView));

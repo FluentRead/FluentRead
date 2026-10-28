@@ -55,6 +55,13 @@ describe('standalone manga reading panel prototype',()=>{
     expect(h.get(n=>n.text==='此片段可能包含相邻片段的文字') !== undefined).toBe(item.kind==='segment');
     expect(h.get(n=>n.text==='画布文字来自最近完成的翻译快照，画面变化可能尚未同步') !== undefined).toBe(item.kind==='canvas');
   });
+  it('shows and copies the warning with uncertain alternative numbers',async()=>{
+    const h=await mount();h.props.read.mockResolvedValueOnce({status:'ready',lines:[{...line('08:45'),numericUncertain:true},{...line('12:34'),numericUncertain:true}]});
+    await h.instance.open(trusted);h.button('图片 1')!.props.onClick(trusted);await h.tick();
+    expect(h.get(n=>n.text==='数字识别可能有误，请对照原图')).toBeDefined();
+    h.button('复制全部')!.props.onClick(trusted);await h.tick();
+    expect(h.props.copy).toHaveBeenCalledWith('08:45\n数字识别可能有误，请对照原图\n\n12:34\n数字识别可能有误，请对照原图');
+  });
   it('identifies translations withheld from the image',async()=>{
     const h=await mount();h.props.read.mockResolvedValueOnce({status:'ready',lines:[{...line('译文'),renderSkipped:true}]});
     await h.instance.open(trusted);h.button('图片 1')!.props.onClick(trusted);await h.tick();

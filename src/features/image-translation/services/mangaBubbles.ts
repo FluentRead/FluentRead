@@ -135,7 +135,7 @@ export function collectMangaRegions(page:MangaOcrPage,language:string,width:numb
     const context = (item: MangaOcrItem) => bubbles.some(bubble => itemCenterInside(item,bubble.bbox)) ? 'bubble' as const : 'page' as const;
     const reliable = (item: MangaOcrItem) => groupMangaText([item], language, width, height, context(item)).length > 0;
     // 即使识别置信不足或孤字被过滤，也不让邻近译文擦掉疑似数值的物理区域。
-    const guards:MangaRegion[]=[],guardKeys=new Set<string>();
+    const guards:MangaRegion[]=[],guardEvidence=new Map<string,{text:string;uncertain:boolean}>();
     const candidates=[...page.results,...bubbles.flatMap(bubble=>bubble.results)].map(item=>({item,force:false}));
     candidates.push(...[...(page.numericEvidence??[]),...bubbles.flatMap(bubble=>bubble.numericEvidence??[])].map(item=>({item,force:true})));
     for(const {item,force} of candidates){
@@ -146,9 +146,10 @@ export function collectMangaRegions(page:MangaOcrPage,language:string,width:numb
             throw new Error('图片数字保护位置无效，已保留原图');
         const bbox={x0:Math.max(0,b.x),y0:Math.max(0,b.y),x1:Math.min(width,b.x+b.width),y1:Math.min(height,b.y+b.height)};
         if(bbox.x1<=bbox.x0||bbox.y1<=bbox.y0)continue;
-        const key=[bbox.x0,bbox.y0,bbox.x1,bbox.y1].join(',');if(guardKeys.has(key))continue;
+        const key=[bbox.x0,bbox.y0,bbox.x1,bbox.y1].join(','),previous=guardEvidence.get(key);
+        if(previous){previous.uncertain ||= !reliable(item) || previous.text !== text;continue;}
         if(guards.length>=4096)throw new Error('图片数字保护区域过于复杂，已保留原图');
-        guardKeys.add(key);guards.push({text:'',bbox,fontSize:bbox.y1-bbox.y0,guardOnly:true});
+        guardEvidence.set(key,{text,uncertain:!reliable(item)});guards.push({text:'',bbox,fontSize:bbox.y1-bbox.y0,guardOnly:true});
     }
     const numeric = (item: MangaOcrItem) => item.confidence >= .9 && numericInformation(item.text.trim());
     // 不同识别视图发生数字冲突时都保留，供后续按区域保守跳过绘制。
@@ -177,7 +178,7 @@ export function collectMangaRegions(page:MangaOcrPage,language:string,width:numb
             // 数字不能随普通正文合段，否则将来无法单独阻止翻译和保护原图。
             .map(({sourceBoxes: _boxes, ...line}) => numericInformation(line.text) ? {...line,sourceBoxes:[line.bbox]} : line)
             .sort((a,b) => a.bbox.y0-b.bbox.y0 || a.bbox.x0-b.bbox.x0);
-        return appendUncoveredNumericGuards(mergeNumericRegions(lines),guards);
+        return appendUncoveredNumericGuards(mergeNumericRegions(lines),guards,guardEvidence);
     }
     const fallback = owners.map(() => [] as MangaOcrItem[]), outsideItems: MangaOcrItem[] = [];
     for (const item of remaining) {
@@ -187,44 +188,59 @@ export function collectMangaRegions(page:MangaOcrPage,language:string,width:numb
     const paragraphs=owners.map((_bubble,index)=>groupMangaText([...local[index],...fallback[index]],language,width,height,'bubble',true));
     const outside=groupMangaText(outsideItems,language,width,height,'page',true);
     const regions = [...outside,...paragraphs.flat()].sort((a,b)=>a.bbox.y0-b.bbox.y0||b.bbox.x0-a.bbox.x0);
-    return appendUncoveredNumericGuards(mergeNumericRegions(regions),guards);
+    return appendUncoveredNumericGuards(mergeNumericRegions(regions),guards,guardEvidence);
 }
 
 /** 已有数值框完整覆盖时不重复计费；比较超额仍保留未证明覆盖的物理框。 */
-function appendUncoveredNumericGuards(regions:MangaRegion[],guards:MangaRegion[]):MangaRegion[]{
+function appendUncoveredNumericGuards(regions:MangaRegion[],guards:MangaRegion[],evidence:Map<string,{text:string;uncertain:boolean}>):MangaRegion[]{
     if(!guards.length)return regions;
-    const boxes=regions.filter(region=>numericProtection(region.text)).map(region=>region.bbox);
+    const numericRegions=regions.filter(region=>numericProtection(region.text));
+    const boxes=numericRegions.map(region=>region.bbox);
     if(!boxes.length)return [...regions,...guards];
     const key=(box:Box)=>[box.x0,box.y0,box.x1,box.y1].join(',');
-    const exact=new Set(boxes.map(key));let comparisons=0;
+    const exact=new Map<string,MangaRegion[]>();
+    for(const region of numericRegions){const k=key(region.bbox),items=exact.get(k);if(items)items.push(region);else exact.set(k,[region]);}
+    let comparisons=0,exhausted=false;
     const uncovered=guards.filter(guard=>{
-        const g=guard.bbox;if(exact.has(key(g)))return false;
-        for(const b of boxes){
-            if(++comparisons>1_000_000)return true;
+        const g=guard.bbox,k=key(g),item=evidence.get(k)!,matching=exact.get(k);
+        const mark=(region:MangaRegion)=>{if(item.uncertain||item.text!==region.text.replace(/\s+/gu,' ').trim())region.numericUncertain=true;};
+        if(matching){matching.forEach(mark);return false;}
+        for(const region of numericRegions){
+            if(++comparisons>1_000_000){exhausted=true;return true;}
+            const b=region.bbox;
+            if(Math.min(b.x1,g.x1)>Math.max(b.x0,g.x0)&&Math.min(b.y1,g.y1)>Math.max(b.y0,g.y0))mark(region);
             if(b.x0<=g.x0&&b.y0<=g.y0&&b.x1>=g.x1&&b.y1>=g.y1)return false;
         }
         return true;
     });
+    if(exhausted)numericRegions.forEach(item=>item.numericUncertain=true);
     return [...regions,...uncovered];
 }
 
 /** 同文重叠数字在阅读中只显示一次，但其保护框覆盖所有检测位置。 */
 function mergeNumericRegions(regions: MangaRegion[]): MangaRegion[] {
-    const merged: MangaRegion[] = []; let comparisons = 0;
+    const merged: MangaRegion[] = [], numbers: MangaRegion[] = [], canonical=new Map<MangaRegion,string>(); let comparisons = 0;
     for (const region of regions) {
         let existing: MangaRegion | undefined;
-        if (numericInformation(region.text)) for (const candidate of merged) {
+        const isNumber = numericInformation(region.text);
+        const normalized=isNumber?region.text.replace(/\s+/gu,' ').trim():'';
+        if (isNumber) for (const candidate of numbers) {
             if (++comparisons > 1_000_000) break;
             const a = candidate.bbox, b = region.bbox;
             const intersection = Math.max(0, Math.min(a.x1,b.x1)-Math.max(a.x0,b.x0))
                 * Math.max(0, Math.min(a.y1,b.y1)-Math.max(a.y0,b.y0));
             const larger = Math.max((a.x1-a.x0)*(a.y1-a.y0),(b.x1-b.x0)*(b.y1-b.y0));
-            if (candidate.text === region.text && intersection >= larger * .5) {existing = candidate;break;}
+            if (intersection < larger * .5) continue;
+            if (canonical.get(candidate) === normalized) {existing ??= candidate;continue;}
+            candidate.numericUncertain = true;region.numericUncertain = true;
         }
-        if (!existing) {merged.push(region);continue;}
+        if (!existing) {merged.push(region);if(isNumber){numbers.push(region);canonical.set(region,normalized);}continue;}
+        if(region.numericUncertain)existing.numericUncertain=true;
         const a = existing.bbox, b = region.bbox;
         existing.bbox = {x0:Math.min(a.x0,b.x0),y0:Math.min(a.y0,b.y0),x1:Math.max(a.x1,b.x1),y1:Math.max(a.y1,b.y1)};
         existing.sourceBoxes = [existing.bbox];
     }
+    // 预算耗尽时不能断言未检查的候选一致：提示核对而非猜测真实数值。
+    if(comparisons>1_000_000)numbers.forEach(region=>region.numericUncertain=true);
     return merged;
 }

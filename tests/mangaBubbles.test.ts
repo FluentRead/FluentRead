@@ -370,6 +370,7 @@ describe('疑似数字物理框边界',()=>{
         const uncertain=Array.from({length:1001},(_,i)=>({...number,box:{x:i*2,y:40,width:1,height:1}}));
         const result=collectMangaRegions({results:readable,numericEvidence:uncertain},'en',5000,100,'image');
         expect(result.filter(region=>region.guardOnly)).toHaveLength(1001);
+        expect(result.filter(region=>!region.guardOnly).every(region=>region.numericUncertain)).toBe(true);
     });
 });
 
@@ -388,4 +389,45 @@ it('数字去重比较预算耗尽时仍保留后续物理框',()=>{
     const results=Array.from({length:1500},(_,index)=>({text:String(1000+index),confidence:.99,box:{x:(index%40)*20,y:Math.floor(index/40)*20,width:8,height:8}}));
     const regions=collectMangaRegions({results},'en',1000,1000,'manga');
     expect(regions).toHaveLength(results.length);expect(regions.some(region=>region.text==='2499')).toBe(true);
+    expect(regions.every(region=>region.numericUncertain)).toBe(true);
+});
+
+describe('数字结果的歧义提示',()=>{
+    it.each(['manga','image'] as const)('在 %s 标记两个方向的重叠不同数值，合并同值且不误标近邻',profile=>{
+        const bubble=box(40,40,240,150);
+        for(const [first,second] of [['08:45','12:34'],['12:34','08:45']]){
+            const lines=collectMangaRegions({results:[text(first,80,80,100,20)],bubbles:[{bbox:bubble,results:[text(second,82,80,100,20)]}]},'en',400,400,profile);
+            expect(lines.map(line=>line.text).sort()).toEqual([first,second].sort());
+            expect(lines.every(line=>line.numericUncertain===true)).toBe(true);
+        }
+        const same=collectMangaRegions({results:[text('08:45',80,80,100,20)],bubbles:[{bbox:bubble,results:[text('08:45',82,80,100,20)]}]},'en',400,400,profile);
+        expect(same).toHaveLength(1);expect(same[0].numericUncertain).toBeUndefined();
+        for(const [first,second] of [['USD   100','USD 100'],['USD 100','USD   100']]){
+            const sameSpaced=collectMangaRegions({results:[text(first,80,80,100,20)],bubbles:[{bbox:bubble,results:[text(second,82,80,100,20)]}]},'en',400,400,profile);
+            expect(sameSpaced).toHaveLength(1);expect(sameSpaced[0].numericUncertain).toBeUndefined();
+            expect([first,second]).toContain(sameSpaced[0].text);
+        }
+        const separate=collectMangaRegions({results:[text('08:45',80,80,100,20)],bubbles:[{bbox:bubble,results:[text('12:34',80,105,100,20)]}]},'en',400,400,profile);
+        expect(separate).toHaveLength(2);expect(separate.every(line=>!line.numericUncertain)).toBe(true);
+    });
+    it('多个数值证据共框时对合并的同值和不同值均提示核对',()=>{
+        const a=text('08:45',80,80,100,20),b=text('12:34',80,80,100,20);
+        const lines=collectMangaRegions({results:[a,b,a],numericEvidence:[a]},'en',400,400,'image');
+        expect(lines.map(item=>item.text)).toEqual(['08:45','12:34']);
+        expect(lines.every(item=>item.numericUncertain)).toBe(true);
+    });
+    it.each(['manga','image'] as const)('在 %s 区分数值证据的可信度与文本',profile=>{
+        const number=text('08:45',80,80,100,20);
+        const run=(evidence:typeof number[])=>collectMangaRegions({results:[number],numericEvidence:evidence},'en',400,400,profile);
+        expect(run([number])[0].numericUncertain).toBeUndefined();
+        const spaced=text('USD   100',80,80,100,20);
+        expect(collectMangaRegions({results:[spaced],numericEvidence:[spaced]},'en',400,400,profile)[0].numericUncertain).toBeUndefined();
+        expect(run([{...number,text:'12:34'}])[0].numericUncertain).toBe(true);
+        expect(run([{...number,confidence:.3}])[0].numericUncertain).toBe(true);
+        expect(run([number,{...number,text:'12:34'}])[0].numericUncertain).toBe(true);
+    });
+    it.each(['manga','image'] as const)('在 %s 对低置信重叠数字保留原图并标记可信数字需核对',profile=>{
+        const lines=collectMangaRegions({results:[text('08:45',80,80,100,20)],bubbles:[{bbox:box(40,40,240,150),results:[{...text('12:34',80,80,100,20),confidence:.3}]}]},'en',400,400,profile);
+        expect(lines).toHaveLength(1);expect(lines[0]).toMatchObject({text:'08:45',numericUncertain:true});
+    });
 });

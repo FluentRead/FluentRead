@@ -100,3 +100,9 @@ it('文字快照仅接受未绘制状态 true，并隔离复制',()=>{
     expect(result.status).toBe('ready');if(result.status==='ready')expect(result.lines[0].renderSkipped).toBe(true);
     expect(prepareMangaReadingLines([{...source,renderSkipped:false}])).toEqual({status:'invalid'});
 });
+
+it('保留并校验数字不确定标记',()=>{
+    const result=prepareMangaReadingLines([{...line('08:45'),numericUncertain:true}]);
+    expect(result.status).toBe('ready');if(result.status==='ready')expect(result.lines[0].numericUncertain).toBe(true);
+    expect(prepareMangaReadingLines([{...line(),numericUncertain:false}])).toEqual({status:'invalid'});
+});

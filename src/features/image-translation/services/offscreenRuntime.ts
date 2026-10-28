@@ -22,7 +22,7 @@ import {encodeImageCanvas} from './imageEncoding';
 import {mangaMaskBoxes, mangaPatchRects, type MangaPatchPacket} from '../mangaPatchResult';
 import {getMangaOcrEngine} from '../ocrLanguages';
 
-export type OffscreenImageTranslationLine = OcrLine & { backgroundColor: string; sourceText?: string; renderSkipped?: true };
+export type OffscreenImageTranslationLine = OcrLine & { backgroundColor: string; sourceText?: string; renderSkipped?: true; numericUncertain?: true };
 
 export interface OffscreenImageTranslationResult {
     image: string;

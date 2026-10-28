@@ -27,6 +27,13 @@ beforeEach(() => {
 afterEach(() => {reader.dispose();vi.useRealTimers();vi.unstubAllGlobals();});
 
 describe('图片文字独立阅读面板', () => {
+    it('不确定的数字在显示和复制时提示核对原图', async () => {
+        reader.setLines([{text:'08:45',numericUncertain:true},{text:'12:34',numericUncertain:true}]);reader.open();
+        expect(body().querySelectorAll('.fr-image-reader-note')).toHaveLength(2);
+        expect(body().textContent).toContain('数字识别可能有误，请对照原图');
+        event(copy());await Promise.resolve();
+        expect(writeText).toHaveBeenLastCalledWith('08:45\n数字识别可能有误，请对照原图\n\n12:34\n数字识别可能有误，请对照原图');
+    });
     it('数字附近无法绘制时在对应译文显示原因，复制仍只包含文字', async () => {
         reader.setLines([{sourceText:'Close',text:'近',renderSkipped:true},{sourceText:'90%',text:'90%'}]);
         reader.open();

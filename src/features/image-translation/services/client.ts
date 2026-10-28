@@ -15,6 +15,7 @@ import {watchDownloadProgress} from '@/src/platform/storage/downloadProgress';
 interface ImageTranslationLine extends OcrLine {
     sourceText?: string;
     renderSkipped?: true;
+    numericUncertain?: true;
     backgroundColor: string;
 }
 

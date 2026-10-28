@@ -6,6 +6,7 @@
  */
 const locales = ['en-US', 'ja-JP', 'ko-KR', 'fr-FR', 'ru-RU', 'es-ES'] as const;
 const rows: Array<readonly [string, string, string, string, string, string, string]> = [
+  ['数字识别可能有误，请对照原图','Number recognition may be inaccurate; check the original image','数字の認識に誤りがある可能性があります。元画像を確認してください','숫자 인식이 정확하지 않을 수 있습니다. 원본 이미지를 확인하세요','La reconnaissance des nombres peut être inexacte ; vérifiez l’image originale','Числа могли быть распознаны неверно; сверьтесь с исходным изображением','El reconocimiento de números puede ser impreciso; comprueba la imagen original'],
   ['为保护数字，此译文未绘制到图片','To protect numbers, this translation was not drawn on the image','数字を保護するため、この翻訳は画像に描画されていません','숫자를 보호하기 위해 이 번역을 이미지에 표시하지 않았습니다','Pour protéger les nombres, cette traduction ne figure pas sur l’image','Чтобы сохранить числа, этот перевод не нанесён на изображение','Para proteger los números, esta traducción no se dibujó en la imagen'],
   ['部分译文未绘制，请查看漫画文字','Some translations were not drawn; view manga text','一部の翻訳は描画されていません。漫画の文字を確認してください','일부 번역이 표시되지 않았습니다. 만화 텍스트를 확인하세요','Certaines traductions ne figurent pas sur l’image ; consultez le texte du manga','Некоторые переводы не нанесены; откройте текст манги','Algunas traducciones no se dibujaron; consulta el texto del manga'],
   ['已识别文字，原图未改动','Text recognized; original image unchanged','文字を認識しました。元画像は変更されていません','텍스트를 인식했으며 원본 이미지는 변경되지 않았습니다','Texte reconnu ; image originale inchangée','Текст распознан; исходное изображение не изменено','Texto reconocido; imagen original sin cambios'],

@@ -8,7 +8,7 @@ import type {OcrLine} from './core';
 import type {MangaRegion} from './services/mangaRegions';
 export interface MangaPatchRect {x: number; y: number; width: number; height: number}
 export interface MangaPatchPacket {width: number; height: number; patches: Array<MangaPatchRect & {image: string}>}
-export interface MangaCompressedPage {width: number; height: number; patches: Array<MangaPatchRect & {bytes: Uint8Array}>; lines: Array<OcrLine & {backgroundColor: string; sourceText?: string; renderSkipped?: true}>}
+export interface MangaCompressedPage {width: number; height: number; patches: Array<MangaPatchRect & {bytes: Uint8Array}>; lines: Array<OcrLine & {backgroundColor: string; sourceText?: string; renderSkipped?: true; numericUncertain?: true}>}
 const MAX_PIXELS = 16_777_216;
 export const MANGA_LIGHT_CACHE_BYTES = 16 * 1024 * 1024;
 export const MANGA_LIGHT_CACHE_PAGES = 100;

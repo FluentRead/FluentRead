@@ -63,7 +63,7 @@ function surfacePixels(surface: TranslatedSurface): number {
         : (surface as HTMLImageElement).naturalWidth * (surface as HTMLImageElement).naturalHeight;
 }
 
-type ImageTranslationLine = OcrLine & {backgroundColor: string; sourceText?: string; renderSkipped?: true};
+type ImageTranslationLine = OcrLine & {backgroundColor: string; sourceText?: string; renderSkipped?: true; numericUncertain?: true};
 type ImageControls = ReturnType<typeof createImageControls>;
 
 interface ImageTranslationState {

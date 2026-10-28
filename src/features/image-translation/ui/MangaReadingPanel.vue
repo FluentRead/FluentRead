@@ -34,6 +34,7 @@
           <article v-for="(line, index) in pages[pageIndex]" :key="index">
             <pre v-if="compare && line.sourceText !== undefined && line.sourceText !== line.text" class="fr-manga-reading-source" dir="auto">{{ line.sourceText }}</pre>
             <pre dir="auto">{{ line.text }}</pre>
+            <p v-if="line.numericUncertain" class="fr-manga-reading-context">{{ t('数字识别可能有误，请对照原图') }}</p>
             <p v-if="line.renderSkipped" class="fr-manga-reading-context">{{ t('为保护数字，此译文未绘制到图片') }}</p>
           </article>
         </div>
@@ -188,7 +189,10 @@ async function select(item: MangaReadingCandidate, event: MouseEvent) {
   } catch {if (opened.value && !disposed && owner === revision && !signal.aborted) status.value = 'error';}
 }
 function textFor(source: MangaReadingLine[]) {
-  return source.map(line => compare.value && line.sourceText !== undefined && line.sourceText !== line.text ? `${line.sourceText}\n${line.text}` : line.text).join('\n\n');
+  return source.map(line => {
+    const text = compare.value && line.sourceText !== undefined && line.sourceText !== line.text ? `${line.sourceText}\n${line.text}` : line.text;
+    return line.numericUncertain ? `${text}\n${t('数字识别可能有误，请对照原图')}` : text;
+  }).join('\n\n');
 }
 async function copyText(text: string, event: MouseEvent) {
   if (!event.isTrusted || !opened.value || status.value !== 'ready') return;

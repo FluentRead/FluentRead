@@ -1133,3 +1133,15 @@ describe('识别颜色适配器的公有 SDK 接入与页生命周期',()=>{
         await expect(createBrowserMangaOcr()).rejects.toBe(failure);expect(adapters[0].beginPage).not.toHaveBeenCalled();expect(adapters[0].endPage).toHaveBeenCalledOnce();
     });
 });
+
+it.each(['manga','image'] as const)('原始高置信数字证据在 %s 不被误标为不确定',async profile=>{
+    const number={text:'08:45',confidence:.99,box:{x:30,y:20,width:80,height:20}};
+    mocks.recognize.mockResolvedValueOnce({results:[number]});
+    const port=await createBrowserMangaOcr();
+    const page=await port.recognize('image',{flatten:true,noCache:true,strategy:'per-box'});
+    expect(page.results).toEqual([number]);expect(page.numericEvidence).toEqual([number]);
+    const {collectMangaRegions}=await import('@/src/features/image-translation/services/mangaBubbles');
+    const lines=collectMangaRegions(page,'en',200,200,profile);
+    expect(lines).toHaveLength(1);expect(lines[0]).toMatchObject({text:'08:45'});expect(lines[0].numericUncertain).toBeUndefined();
+    await port.destroy();
+});

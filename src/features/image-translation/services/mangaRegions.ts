@@ -13,7 +13,7 @@ export interface MangaOcrItem {
     confidence: number;
     box: {x: number; y: number; width: number; height: number};
 }
-export interface MangaRegion extends OcrLine {fontSize: number; sourceBoxes?: OcrLine['bbox'][]; guardOnly?: true}
+export interface MangaRegion extends OcrLine {fontSize: number; sourceBoxes?: OcrLine['bbox'][]; numericUncertain?: true; guardOnly?: true}
 
 function union(left: OcrLine['bbox'], right: OcrLine['bbox']): OcrLine['bbox'] {
     return {x0: Math.min(left.x0, right.x0), y0: Math.min(left.y0, right.y0),

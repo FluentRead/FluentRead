@@ -1004,3 +1004,18 @@ describe('低置信数值物理保护',()=>{
         expect(sendMessage.mock.calls.some(([m])=>m.type==='fluentReadImageTranslateTexts')).toBe(false);expect(mocks.repair).not.toHaveBeenCalled();
     });
 });
+
+describe('重叠数字候选跨识别与阅读链路',()=>{
+    it.each(['manga','image'] as const)('%s 保留冲突候选、标记核对且不翻译或绘制数字',async profile=>{
+        const {collectMangaRegions}=await import('@/src/features/image-translation/services/mangaBubbles');
+        const box={x:80,y:80,width:100,height:20};
+        const recognized=collectMangaRegions({results:[{text:'08:45',confidence:.99,box}],bubbles:[{bbox:{x0:40,y0:40,x1:250,y1:180},results:[{text:'12:34',confidence:.99,box}]}]},'en',400,400,profile);
+        imageOptions.push({width:400,height:400});mocks.mangaRecognize.mockResolvedValueOnce(recognized);
+        const result=await translateImageInOffscreen('fixture','en','Page',undefined,'numeric-conflict',profile==='manga','paddle');
+        expect(result.lines.map(line=>line.text).sort()).toEqual(['08:45','12:34']);
+        expect(result.lines.every(line=>line.numericUncertain)).toBe(true);
+        expect(sendMessage.mock.calls.some(([message])=>message.type==='fluentReadImageTranslateTexts')).toBe(false);
+        expect(mocks.mangaDraw).not.toHaveBeenCalled();expect(mocks.draw).not.toHaveBeenCalled();
+        if(profile==='manga')expect(result.mangaPatches?.patches).toEqual([]);else expect(result.image).toBe('fixture');
+    });
+});

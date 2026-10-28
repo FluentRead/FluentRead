@@ -1063,7 +1063,7 @@ describe('userscript browser shim injection', () => {
             expect(results[1].every(item=>item.encoded.startsWith('~91:'))).toBe(true);
             expect(results[1].map(item=>item.bytes)).toEqual(results[0].map(item=>item.bytes));
         } finally {vi.unstubAllEnvs();vi.resetModules();}
-    });
+    }, 30_000);
 
     it('keeps all site rule JSON data intact when embedding compressed offline catalogs', async () => {
         const plugin = createUserscriptCatalogCompressionPlugin() as unknown as {

@@ -16,6 +16,7 @@ import {prepareMaterialBackup, sendMaterialBackup} from '@/src/features/vocabula
 import {createStage} from '@/src/features/vocabulary/materialImportStage';
 import {createMaterialImportCapability} from '@/src/features/vocabulary/materialImportPort';
 import type {MaterialRecord} from '@/src/features/vocabulary/materialProtocol';
+import type {MaterialBackupExportStatistics} from '@/src/features/vocabulary/materialBackupExportProtocol';
 
 let serial = 0;
 const databases:MaterialDatabase[] = [];
@@ -158,5 +159,21 @@ describe('streamed material backup', () => {
         const restored=(await target.exportData(100)).materials.sort((a,b)=>a.id.localeCompare(b.id));
         // 现有恢复路径为缺省 aliases/locator 显式补充空值；其他字段须一致。
         expect(restored).toEqual(original.map(item=>({...item,aliases:item.aliases ?? [],locator:item.locator})));
+    });
+    it('counts exact UTF-8 record sizes and per-record frames in the same way as the restore reader',async()=>{
+        const records=[record('unicode',{title:'😀长\ud800',references:[{kind:'note',id:'one',note:'甲😀"\\'.repeat(18_000)}]}),
+            record('ascii',{references:[{kind:'note',id:'two',note:'x'.repeat(132_000)}]})];
+        let statistics:MaterialBackupExportStatistics|undefined;
+        const bytes=await collect(streamMaterialBackup(fake(records),{exportedAt:123,onStatistics:value=>{statistics=value;}}));
+        const plan=await prepareMaterialBackup(new Blob([bytes.buffer as ArrayBuffer]));
+        const lengths=records.map(value=>new TextEncoder().encode(JSON.stringify(value)).length);
+        expect(statistics).toEqual({records:2,recordBytes:plan.manifest.bytes,maxRecordBytes:Math.max(...lengths),frames:plan.manifest.frames});
+        expect(plan.manifest.bytes).toBe(lengths.reduce((a,b)=>a+b,0));
+    });
+    it('does not report complete statistics when the stream is cancelled or abandoned',async()=>{
+        const repo=fake([record('large',{title:'x'.repeat(100_000)})]),report=vi.fn(),controller=new AbortController();
+        const source=streamMaterialBackup(repo,{signal:controller.signal,onStatistics:report});
+        expect((await source.next()).done).toBe(false);controller.abort();await expect(source.next()).rejects.toMatchObject({name:'AbortError'});expect(report).not.toHaveBeenCalled();
+        const abandoned=streamMaterialBackup(repo,{onStatistics:report});expect((await abandoned.next()).done).toBe(false);await abandoned.return(undefined);expect(report).not.toHaveBeenCalled();
     });
 });

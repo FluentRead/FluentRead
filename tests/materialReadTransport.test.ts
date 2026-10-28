@@ -205,6 +205,26 @@ describe('material read transport',()=>{
     await new Promise(resolve=>setTimeout(resolve,0));controller.abort();
     await expect(result).rejects.toThrow('cancelled');release();
   });
+  it('preserves cancellation if a consumer finishes immediately before its acknowledgement is sent',async()=>{
+    const {ports,sent}=pair(),controller=new AbortController();
+    const result=receiveMaterialRead(ports[1],()=>{
+      // Two microtasks model a user cancellation arriving after the guarded
+      // callback resolves but before the awaiting receiver resumes.
+      queueMicrotask(()=>queueMicrotask(()=>controller.abort()));
+    },{signal:controller.signal});
+    ports[0].postMessage({v:1,type:'frame',seq:0,length:1,data:'YQ=='});
+    await expect(result).rejects.toThrow('cancelled');
+    expect(sent[1]).toEqual([]);
+  });
+  it('preserves a protocol violation arriving between consumer completion and acknowledgement',async()=>{
+    const {ports,sent}=pair();
+    const result=receiveMaterialRead(ports[1],()=>{
+      queueMicrotask(()=>ports[0].postMessage({v:1,type:'frame',seq:1,length:1,data:'Yg=='}));
+    });
+    ports[0].postMessage({v:1,type:'frame',seq:0,length:1,data:'YQ=='});
+    await expect(result).rejects.toThrow('Unexpected material read message');
+    expect(sent[1]).toEqual([]);
+  });
   it('aborts a cooperative producer when the peer disconnects',async()=>{
     const {ports}=pair();let aborted=false;
     const result=sendMaterialRead(ports[0],async function* (signal){

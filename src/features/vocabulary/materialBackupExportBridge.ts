@@ -8,7 +8,7 @@ import {MaterialError} from './materialModel';
 import type {MaterialRepository} from './materialRepository';
 import {streamMaterialBackup} from './materialBackupExport';
 import {sendMaterialRead, type MaterialReadPort} from './materialReadTransport';
-import {MATERIAL_BACKUP_EXPORT_PORT_NAME, MATERIAL_BACKUP_EXPORT_ERROR_CODES, type MaterialBackupExportErrorCode} from './materialBackupExportProtocol';
+import {MATERIAL_BACKUP_EXPORT_PORT_NAME, MATERIAL_BACKUP_EXPORT_ERROR_CODES, type MaterialBackupExportErrorCode, type MaterialBackupExportStatistics} from './materialBackupExportProtocol';
 
 type Repository = Pick<MaterialRepository,'openSnapshot'|'readSnapshotRecord'|'checkSnapshot'>;
 export type MaterialBackupExportSender = {id?:string;url?:string;frameId?:number;incognito?:boolean;tab?:{id?:number;incognito?:boolean}};
@@ -19,14 +19,19 @@ function aborted(signal?:AbortSignal):void {if(signal?.aborted)throw new DOMExce
 /** 二进制数据记录有长度前缀，终止记录不携带私密错误文本。 */
 async function* exportWire(repository:Repository, signal:AbortSignal):AsyncGenerator<Uint8Array> {
     try {
-        for await (const chunk of streamMaterialBackup(repository,{signal})) {
+        let statistics:MaterialBackupExportStatistics|undefined;
+        for await (const chunk of streamMaterialBackup(repository,{signal,onStatistics:value=>{statistics=value;}})) {
             aborted(signal);
             // streamMaterialBackup 只产出长度为 1..MATERIAL_READ_FRAME_BYTES 的分片。
             const length = chunk.length;
             yield new Uint8Array([1,(length>>>24)&255,(length>>>16)&255,(length>>>8)&255,length&255]);
             aborted(signal);yield chunk;
         }
-        aborted(signal);yield new Uint8Array([2]);
+        aborted(signal);
+        if(!statistics)throw Error('材料备份统计不可用');
+        const info=new Uint8Array(33), view=new DataView(info.buffer);info[0]=4;
+        for(const [index,value] of [statistics.records,statistics.recordBytes,statistics.maxRecordBytes,statistics.frames].entries())view.setBigUint64(1+index*8,BigInt(value));
+        yield info;aborted(signal);yield new Uint8Array([2]);
     } catch(error) {
         if (signal.aborted) throw error;
         const codes:readonly string[]=MATERIAL_BACKUP_EXPORT_ERROR_CODES;

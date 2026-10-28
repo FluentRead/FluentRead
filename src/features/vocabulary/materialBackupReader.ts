@@ -356,8 +356,9 @@ export async function sendMaterialBackup(blob: Blob, prepared: PreparedMaterialB
   }
   const plan = {size, fileDigest, records: recordsSnapshot};
   const {records, bytes, frames, digest: expectedDigest} = manifest, lengths = recordsSnapshot.map(record => record.length);
-  if (records !== lengths.length || lengths.some(n => !Number.isSafeInteger(n) || n < 1 || n > MAX_RECORD_LENGTH) ||
+  if (records !== lengths.length || lengths.some(n => !Number.isSafeInteger(n) || n < 1 || n > MATERIAL_IMPORT_MAX_RECORD_BYTES) ||
     !Number.isSafeInteger(bytes) || bytes !== lengths.reduce((a, b) => a + b, 0) || !Number.isSafeInteger(frames) || frames !== lengths.reduce((a, b) => a + Math.ceil(b / MATERIAL_IMPORT_FRAME_BYTES), 0) ||
+    frames > MATERIAL_IMPORT_MAX_FRAMES ||
     typeof expectedDigest !== 'string' || !/^[0-9a-f]{64}$/u.test(expectedDigest)) throw TypeError('无效的备份计划');
   const digest = hash(); let frame = new Uint8Array(MATERIAL_IMPORT_FRAME_BYTES), used = 0, part = 0, seq = 0, recordBytes = 0;
   const signal = options.signal;

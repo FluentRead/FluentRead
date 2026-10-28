@@ -7,9 +7,12 @@
 import {MaterialError} from './materialModel';
 import type {MaterialRepository} from './materialRepository';
 import {MATERIAL_READ_FRAME_BYTES} from './materialReadTransport';
+import {MATERIAL_IMPORT_FRAME_BYTES} from './materialProtocol';
+import type {MaterialBackupExportStatistics} from './materialBackupExportProtocol';
 
 type Repository = Pick<MaterialRepository, 'openSnapshot'|'readSnapshotRecord'|'checkSnapshot'>;
-export interface MaterialBackupExportOptions {exportedAt?:number; signal?:AbortSignal}
+export interface MaterialBackupExportOptions {exportedAt?:number; signal?:AbortSignal; onStatistics?:(statistics:MaterialBackupExportStatistics)=>void}
+const RECORD_START=Symbol('record-start'), RECORD_END=Symbol('record-end');
 
 function check(signal?:AbortSignal):void {
     if (signal?.aborted) throw new DOMException('材料导出已取消', 'AbortError');
@@ -77,7 +80,7 @@ function* jsonValue(value:unknown, ancestors:Set<object>):Generator<string> {
     } finally {ancestors.delete(value);}
 }
 
-async function* tokens(repository:Repository, exportedAt:number, signal?:AbortSignal):AsyncGenerator<string> {
+async function* tokens(repository:Repository, exportedAt:number, signal?:AbortSignal):AsyncGenerator<string|typeof RECORD_START|typeof RECORD_END> {
     check(signal);
     const snapshot = await repository.openSnapshot(signal);
     check(signal);
@@ -89,9 +92,11 @@ async function* tokens(repository:Repository, exportedAt:number, signal?:AbortSi
         check(signal);
         if (!record || record.id !== id) throw new MaterialError('storage-error','材料快照记录不存在');
         if (index) yield ',';
+        yield RECORD_START;
         const key = String(index), holder:Record<string,unknown> = {[key]:record};
         const value = prepared(holder,key);
         if (omitted(value)) yield 'null'; else yield* jsonValue(value,new Set());
+        yield RECORD_END;
     }
     check(signal);
     await repository.checkSnapshot(snapshot.revision,signal);
@@ -104,10 +109,20 @@ export async function* streamMaterialBackup(repository:Repository, options:Mater
     const {signal} = options, exportedAt = options.exportedAt ?? Date.now();
     if (!Number.isFinite(exportedAt) || exportedAt < 0) throw new MaterialError('invalid-input','材料导出时间无效');
     const encoder = new TextEncoder(), buffer = new Uint8Array(MATERIAL_READ_FRAME_BYTES);
-    let used = 0;
+    let used = 0, recordSize:number|undefined;
+    const statistics:MaterialBackupExportStatistics={records:0,recordBytes:0,maxRecordBytes:0,frames:0};
     for await (const token of tokens(repository,exportedAt,signal)) {
         check(signal);
+        if(token===RECORD_START){recordSize=0;continue;}
+        if(token===RECORD_END){
+            const size=recordSize!;
+            statistics.records++;statistics.recordBytes+=size;statistics.maxRecordBytes=Math.max(statistics.maxRecordBytes,size);
+            statistics.frames+=Math.ceil(size/MATERIAL_IMPORT_FRAME_BYTES);recordSize=undefined;
+            if(!Number.isSafeInteger(statistics.recordBytes)||!Number.isSafeInteger(statistics.frames))throw new MaterialError('limit-exceeded','材料备份统计超出安全范围');
+            continue;
+        }
         const encoded = encoder.encode(token);
+        if(recordSize!==undefined){recordSize+=encoded.length;if(!Number.isSafeInteger(recordSize))throw new MaterialError('limit-exceeded','材料备份统计超出安全范围');}
         for (let offset = 0; offset < encoded.length;) {
             const length = Math.min(buffer.length-used,encoded.length-offset);
             buffer.set(encoded.subarray(offset,offset+length),used); used += length; offset += length;
@@ -116,4 +131,6 @@ export async function* streamMaterialBackup(repository:Repository, options:Mater
     }
     check(signal);
     if (used) yield buffer.slice(0,used);
+    check(signal);
+    options.onStatistics?.(statistics);
 }

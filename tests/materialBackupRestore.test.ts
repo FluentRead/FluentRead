@@ -33,6 +33,20 @@ describe('material backup recovery orchestration',()=>{
     expect(active.begin).toHaveBeenCalledWith(received,prepared.manifest,guard,expect.any(Number));expect(active.close).toHaveBeenCalledOnce();expect(active.acknowledge).not.toHaveBeenCalled();
     await acknowledgeMaterialBackup(received);expect(active.resume).toHaveBeenCalledWith(received);expect(active.acknowledge).toHaveBeenCalledOnce();
   });
+  it('retains the original session capability if the published copy changes during recovery',async()=>{
+    const gate=deferred<void>();let published:{id:string;token:string}|undefined;
+    mocks.send.mockImplementationOnce(async()=>gate.promise);
+    const pending=restoreLargeMaterialBackup(file,guard,{onCapability:value=>{published=value;}});
+    await vi.waitFor(()=>expect(mocks.send).toHaveBeenCalledOnce());
+    const started={...published!};
+    published!.id='modified';published!.token='modified';
+    gate.resolve();
+    const outcome=await pending;
+    expect(outcome).toEqual({kind:'committed',result,capability:started});
+    expect(outcome.kind==='committed'&&outcome.capability).not.toBe(published);
+    expect(active.begin).toHaveBeenCalledWith(started,prepared.manifest,guard,expect.any(Number));
+    expect(active.commit).toHaveBeenCalledOnce();expect(active.close).toHaveBeenCalledOnce();
+  });
   it('does not seal or commit after full source verification fails and discards the staged session',async()=>{
     mocks.send.mockRejectedValue(Error('file changed'));const out=await restoreLargeMaterialBackup(file,guard,{onCapability:()=>{}});
     expect(out).toMatchObject({kind:'failed',cleanupPending:false});expect(active.discard).toHaveBeenCalledOnce();expect(active.seal).not.toHaveBeenCalled();expect(active.commit).not.toHaveBeenCalled();

@@ -104,7 +104,7 @@ function channel(port:MaterialReadPort, options:MaterialReadOptions) {
     },
     assertOpen(){if(closed)throw failure??Error('Material read disconnected');},
     pause(){accepting=false;},
-    send(message:unknown){if(closed)throw Error('Material read disconnected');touch();try {port.postMessage(message);} catch {fail(Error('Material read send failed'));throw Error('Material read send failed');}},
+    send(message:unknown){if(closed)throw failure??Error('Material read disconnected');touch();try {port.postMessage(message);} catch {fail(Error('Material read send failed'));throw Error('Material read send failed');}},
     resume(){accepting=true;},
     fail,
     close(){if(closed)return;closed=true;closeListeners();},

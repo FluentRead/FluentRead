@@ -55,7 +55,8 @@ export async function restoreLargeMaterialBackup(file: Blob, guard: MaterialOper
     const prepared = await prepareMaterialBackup(file, {signal});
     check(signal);
     cap = createMaterialImportCapability();
-    options.onCapability(cap);
+    // 交给界面的副本不能反向修改正在进行的会话身份；断连时须保留原始能力查询结果。
+    options.onCapability({...cap});
     check(signal);
     client = connect();
     const deadline = Date.now() + BEGIN_DEADLINE_MS;

@@ -3,7 +3,7 @@ import * as runtime from 'vue';
 import {parseHTML} from 'linkedom';
 import MaterialWorkspace from '@/src/features/vocabulary/ui/MaterialWorkspace.vue';
 import {afterEach, describe, expect, it, vi} from 'vitest';
-import type {MaterialRecord} from '@/src/features/vocabulary/materialProtocol';
+import {MATERIAL_IMPORT_MAX_FRAMES,MATERIAL_IMPORT_MAX_RECORD_BYTES,type MaterialRecord} from '@/src/features/vocabulary/materialProtocol';
 import type {MaterialBackupOutcome} from '@/src/features/vocabulary/materialBackupRestore';
 import type {MaterialImportStatus} from '@/src/features/vocabulary/materialImportPortClient';
 import {translateLegacyText} from '@/src/core/i18n';
@@ -21,7 +21,7 @@ vi.mock('@/src/features/vocabulary/materialClient', () => Object.fromEntries([
   'materialRemoveReference','materialClear','materialExport','materialImport','materialGeneration',
   'workspaceMaterialCapture','workspaceMaterialUpdate','workspaceMaterialArchive','workspaceMaterialRestore','workspaceMaterialRemoveReference',
 ].map(name => [name, (...args: unknown[]) => (globalThis as any).__fluentreadMaterialUiTest.api[name.replace('workspaceMaterial','material')](...args)])));
-vi.mock('@/src/features/vocabulary/materialBackupExportClient', () => ({receiveMaterialBackupExport: (...args: any[]) => (globalThis as any).__fluentreadMaterialUiTest.exportReceive(...args)}));
+vi.mock('@/src/features/vocabulary/materialBackupExportClient', () => ({receiveMaterialBackupExport: async (...args: any[]) => (await (globalThis as any).__fluentreadMaterialUiTest.exportReceive(...args)) ?? {records:0,recordBytes:0,maxRecordBytes:0,frames:0}}));
 vi.mock('@/src/features/vocabulary/materialBackupBrowserSave', () => ({
   beginFirefoxMaterialBackup: (...args: any[]) => (globalThis as any).__fluentreadMaterialUiTest.browserSave(...args),
   beginFirefoxRecoveredMaterialBackup: (...args: any[]) => (globalThis as any).__fluentreadMaterialUiTest.recoverTemporary(...args),
@@ -324,6 +324,9 @@ it('paginates material and reference lists, resets the visible page for search, 
 });
 it('大备份恢复的状态和限制在所有界面语言都有实际译文',()=>{
   registerAllUiLanguageBundles();
+  for(const message of ['确认保存超出恢复上限的备份','备份超过当前恢复上限','备份中有材料超过 128 MiB，当前版本无法恢复该材料。','备份超过 20,000 个恢复分片，当前版本无法完整恢复。','仍可保存以备后续处理；恢复还受设备可用空间限制。','仍然保存备份'])
+    for(const language of ['en-US','es-ES','fr-FR','ja-JP','ko-KR','ru-RU'] as const)
+      expect(translateLegacyText(message,language)).not.toBe(message);
   for(const message of ['正在导出材料备份…','材料备份已保存，包含来源、原句与个人笔记，请妥善保管。','已发起材料备份下载，包含来源、原句与个人笔记，请检查浏览器下载。','下载完成前请保持此页面打开。','取消导出','当前浏览器使用内存准备下载，大备份可能占用较多内存。','下载已发起，关闭页面可能中断下载。请先确认浏览器下载完成，再释放临时数据。','下载已完成，释放临时数据'])
     for(const language of ['en-US','es-ES','fr-FR','ja-JP','ko-KR','ru-RU'] as const)
       expect(translateLegacyText(message,language)).not.toBe(message);
@@ -347,6 +350,100 @@ it('文件流超过小备份上限时提示恢复资源限制并完成保存',as
   (ui.window as any).showSaveFilePicker=vi.fn(async()=>({createWritable:async()=>({write:async(chunk:Uint8Array)=>{bytes+=chunk.byteLength;},close:async()=>{},abort:async()=>{}})}));
   ui.exportReceive.mockImplementationOnce(async(_port,consume)=>{const chunk=new Uint8Array(24*1024);for(let i=0;i<854;i++)await consume(chunk);});
   await ui.panel.exportMaterials();expect(bytes).toBeGreaterThan(20*1024*1024);expect(ui.panel.feedback).toContain('材料备份已保存');expect(ui.panel.backupWarning).toContain('总计 20,000 个 128 KiB 分片');expect(ui.browserSave).not.toHaveBeenCalled();
+});
+it.each([
+  ['record',MATERIAL_IMPORT_MAX_RECORD_BYTES+1,1025],
+  ['frames',MATERIAL_IMPORT_MAX_RECORD_BYTES,MATERIAL_IMPORT_MAX_FRAMES+1],
+  ['both',MATERIAL_IMPORT_MAX_RECORD_BYTES+1,MATERIAL_IMPORT_MAX_FRAMES+1],
+] as const)('asks before committing a backup that exceeds the %s restore limit',async(_kind,maxRecordBytes,frames)=>{
+  const ui=await mount(),write=vi.fn(async()=>{}),close=vi.fn(async()=>{}),abort=vi.fn(async()=>{});
+  (ui.window as any).showSaveFilePicker=vi.fn(async()=>({createWritable:async()=>({write,close,abort})}));
+  (ui.exportReceive as any).mockImplementationOnce(async(_port:unknown,consume:(chunk:Uint8Array)=>Promise<void>)=>{
+    await consume(new TextEncoder().encode('{}'));return {records:frames>1025?30:1,recordBytes:frames>1025?frames*128*1024-1:maxRecordBytes,maxRecordBytes,frames};
+  });
+  const pending=ui.panel.exportMaterials();await ui.flush();
+  const prompt=ui.document.querySelector('[aria-label="确认保存超出恢复上限的备份"]')!;
+  expect(prompt).toBeTruthy();expect(close).not.toHaveBeenCalled();
+  expect(prompt.textContent?.includes('材料超过 128 MiB')).toBe(maxRecordBytes>MATERIAL_IMPORT_MAX_RECORD_BYTES);
+  expect(prompt.textContent?.includes('20,000 个恢复分片')).toBe(frames>MATERIAL_IMPORT_MAX_FRAMES);
+  await activate(ui,namedButton(ui,'仍然保存备份'));await pending;
+  expect(close).toHaveBeenCalledOnce();expect(abort).not.toHaveBeenCalled();expect(ui.panel.feedback).toContain('材料备份已保存');
+});
+it.each(['button','signal','unmount'] as const)('aborts an over-limit export before saving when cancelled by %s',async mode=>{
+  const ui=await mount(),close=vi.fn(async()=>{}),abort=vi.fn(async()=>{});
+  (ui.window as any).showSaveFilePicker=vi.fn(async()=>({createWritable:async()=>({write:async()=>{},close,abort})}));
+  (ui.exportReceive as any).mockImplementationOnce(async(_port:unknown,consume:(chunk:Uint8Array)=>Promise<void>)=>{
+    await consume(new TextEncoder().encode('{}'));return {records:1,recordBytes:MATERIAL_IMPORT_MAX_RECORD_BYTES+1,maxRecordBytes:MATERIAL_IMPORT_MAX_RECORD_BYTES+1,frames:1025};
+  });
+  const pending=ui.panel.exportMaterials();await ui.flush();expect(ui.panel.exportCapacityPrompt).toBeTruthy();
+  if(mode==='button'){
+    const prompt=ui.document.querySelector('[aria-label="确认保存超出恢复上限的备份"]')!;
+    const cancel=[...prompt.querySelectorAll('button')].find(button=>button.textContent?.trim()==='取消导出')!;await activate(ui,cancel);
+  }else if(mode==='signal')ui.panel.exportController.abort();else ui.unmount();
+  await pending;expect(close).not.toHaveBeenCalled();expect(abort).toHaveBeenCalledOnce();expect(ui.panel.exportCapacityPrompt).toBeNull();
+});
+it('does not request confirmation at the exact restore limits',async()=>{
+  const ui=await mount(),close=vi.fn(async()=>{});
+  (ui.window as any).showSaveFilePicker=vi.fn(async()=>({createWritable:async()=>({write:async()=>{},close,abort:async()=>{}})}));
+  (ui.exportReceive as any).mockImplementationOnce(async(_port:unknown,consume:(chunk:Uint8Array)=>Promise<void>)=>{
+    await consume(new TextEncoder().encode('{}'));return {records:25,recordBytes:MATERIAL_IMPORT_MAX_FRAMES*128*1024,maxRecordBytes:MATERIAL_IMPORT_MAX_RECORD_BYTES,frames:MATERIAL_IMPORT_MAX_FRAMES};
+  });
+  await ui.panel.exportMaterials();expect(close).toHaveBeenCalledOnce();expect(ui.panel.exportCapacityPrompt).toBeNull();
+});
+it('keeps an over-limit decision pending while the material view is hidden',async()=>{
+  const shown=runtime.ref(true),ui=await mount({shown}),close=vi.fn(async()=>{}),abort=vi.fn(async()=>{});
+  (ui.window as any).showSaveFilePicker=vi.fn(async()=>({createWritable:async()=>({write:async()=>{},close,abort})}));
+  (ui.exportReceive as any).mockImplementationOnce(async(_port:unknown,consume:(chunk:Uint8Array)=>Promise<void>)=>{
+    await consume(new TextEncoder().encode('{}'));return {records:1,recordBytes:MATERIAL_IMPORT_MAX_RECORD_BYTES+1,maxRecordBytes:MATERIAL_IMPORT_MAX_RECORD_BYTES+1,frames:1025};
+  });
+  const pending=ui.panel.exportMaterials();await ui.flush();expect(ui.panel.exportCapacityPrompt).toBeTruthy();
+  shown.value=false;await ui.flush();expect(close).not.toHaveBeenCalled();expect(abort).not.toHaveBeenCalled();
+  shown.value=true;await ui.flush();expect(ui.document.querySelector('[aria-label="确认保存超出恢复上限的备份"]')).toBeTruthy();
+  await activate(ui,namedButton(ui,'仍然保存备份'));await pending;expect(close).toHaveBeenCalledOnce();expect(abort).not.toHaveBeenCalled();
+});
+it('preserves the pending decision when the material view is hidden before statistics arrive',async()=>{
+  const shown=runtime.ref(true),ui=await mount({shown}),gate=deferred<void>(),close=vi.fn(async()=>{}),abort=vi.fn(async()=>{});
+  (ui.window as any).showSaveFilePicker=vi.fn(async()=>({createWritable:async()=>({write:async()=>{},close,abort})}));
+  (ui.exportReceive as any).mockImplementationOnce(async(_port:unknown,consume:(chunk:Uint8Array)=>Promise<void>)=>{
+    await gate.promise;await consume(new TextEncoder().encode('{}'));return {records:1,recordBytes:MATERIAL_IMPORT_MAX_RECORD_BYTES+1,maxRecordBytes:MATERIAL_IMPORT_MAX_RECORD_BYTES+1,frames:1025};
+  });
+  const pending=ui.panel.exportMaterials();await ui.flush();shown.value=false;await ui.flush();gate.resolve();await ui.flush();
+  expect(close).not.toHaveBeenCalled();expect(ui.panel.exportCapacityPrompt).toBeTruthy();
+  shown.value=true;await ui.flush();const prompt=ui.document.querySelector('[aria-label="确认保存超出恢复上限的备份"]')!;
+  const cancel=[...prompt.querySelectorAll('button')].find(button=>button.textContent?.trim()==='取消导出')!;
+  await activate(ui,cancel);await pending;expect(close).not.toHaveBeenCalled();expect(abort).toHaveBeenCalledOnce();
+});
+it.each(['continue','cancel'] as const)('handles an over-limit Firefox target before commit on %s',async decision=>{
+  const ui=await mount(),target={write:vi.fn(async()=>{}),commit:vi.fn(async()=> 'saved' as const),abort:vi.fn(async()=>{})};
+  ui.browserSave.mockResolvedValueOnce({status:'ready',target});
+  (ui.exportReceive as any).mockImplementationOnce(async(_port:unknown,consume:(chunk:Uint8Array)=>Promise<void>)=>{
+    await consume(new TextEncoder().encode('{}'));return {records:1,recordBytes:MATERIAL_IMPORT_MAX_RECORD_BYTES+1,maxRecordBytes:MATERIAL_IMPORT_MAX_RECORD_BYTES+1,frames:1025};
+  });
+  const pending=ui.panel.exportMaterials();await ui.flush();expect(target.commit).not.toHaveBeenCalled();
+  const prompt=ui.document.querySelector('[aria-label="确认保存超出恢复上限的备份"]')!;
+  const button=[...prompt.querySelectorAll('button')].find(value=>value.textContent?.trim()===(decision==='continue'?'仍然保存备份':'取消导出'))!;
+  await activate(ui,button);await pending;
+  expect(target.commit).toHaveBeenCalledTimes(decision==='continue'?1:0);expect(target.abort).toHaveBeenCalledTimes(decision==='cancel'?1:0);
+});
+it.each(['continue','cancel'] as const)('does not start a buffered download before the over-limit decision on %s',async decision=>{
+  const ui=await mount(),create=vi.spyOn(URL,'createObjectURL').mockReturnValue('blob:over-limit');vi.spyOn(URL,'revokeObjectURL').mockImplementation(()=>{});
+  vi.spyOn(ui.window.HTMLElement.prototype,'click').mockImplementation(()=>{});
+  (ui.exportReceive as any).mockImplementationOnce(async(_port:unknown,consume:(chunk:Uint8Array)=>Promise<void>)=>{
+    await consume(new TextEncoder().encode('{}'));return {records:1,recordBytes:MATERIAL_IMPORT_MAX_RECORD_BYTES+1,maxRecordBytes:MATERIAL_IMPORT_MAX_RECORD_BYTES+1,frames:1025};
+  });
+  const pending=ui.panel.exportMaterials();await ui.flush();expect(create).not.toHaveBeenCalled();
+  const prompt=ui.document.querySelector('[aria-label="确认保存超出恢复上限的备份"]')!;
+  const button=[...prompt.querySelectorAll('button')].find(value=>value.textContent?.trim()===(decision==='continue'?'仍然保存备份':'取消导出'))!;
+  await activate(ui,button);await pending;expect(create).toHaveBeenCalledTimes(decision==='continue'?1:0);
+});
+it.each(['picker','firefox','buffered'] as const)('never prompts or commits a %s target when export integrity fails',async kind=>{
+  const ui=await mount(),close=vi.fn(async()=>{}),abort=vi.fn(async()=>{}),commit=vi.fn(async()=> 'saved' as const);
+  if(kind==='picker')(ui.window as any).showSaveFilePicker=vi.fn(async()=>({createWritable:async()=>({write:async()=>{},close,abort})}));
+  if(kind==='firefox')ui.browserSave.mockResolvedValueOnce({status:'ready',target:{write:async()=>{},commit,abort}});
+  const create=vi.spyOn(URL,'createObjectURL').mockReturnValue('blob:invalid');
+  ui.exportReceive.mockImplementationOnce(async(_port,consume)=>{await consume(new Uint8Array([1]));throw Error('摘要校验失败');});
+  await ui.panel.exportMaterials();expect(ui.panel.exportCapacityPrompt).toBeNull();expect(close).not.toHaveBeenCalled();expect(commit).not.toHaveBeenCalled();expect(create).not.toHaveBeenCalled();
+  if(kind!=='buffered')expect(abort).toHaveBeenCalledOnce();expect(ui.panel.error).toContain('摘要校验失败');
 });
 it('starts Firefox permission in the user action and keeps the page open while the download completes',async()=>{
   const ui=await mount(),finished=deferred<'saved'>();

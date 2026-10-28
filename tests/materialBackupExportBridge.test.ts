@@ -47,6 +47,11 @@ function setup(overrides:Partial<Parameters<typeof createMaterialBackupExportBri
     return {repo,bridge};
 }
 async function* bytes(...chunks:number[][]){for(const value of chunks)yield new Uint8Array(value);}
+function wireStatistics(records:number,recordBytes:number,maxRecordBytes:number,frames:number):number[] {
+    const data=new Uint8Array(33),view=new DataView(data.buffer);data[0]=4;
+    for(const [index,value] of [records,recordBytes,maxRecordBytes,frames].entries())view.setBigUint64(1+index*8,BigInt(value));
+    return [...data];
+}
 
 describe('material backup export bridge',()=>{
     it('rejects invalid resource limits before installing any listener',()=>{
@@ -168,11 +173,13 @@ describe('material backup export bridge',()=>{
             const parts:Uint8Array[]=[];
             const file:MaterialBackupWritable={write:async chunk=>{parts.push(chunk.slice());},close:vi.fn(async()=>{}),abort:vi.fn(async()=>{})};
             const sink=await chooseMaterialBackupTarget('backup.json',{pick:async()=>({createWritable:async()=>file})});
-            const result=await saveMaterialBackup(sink,async (consume,signal)=>{const transfer=receiveMaterialBackupExport(client as MaterialReadPort,consume,{signal});client.postMessage(start);await transfer;});
+            let statistics:Awaited<ReturnType<typeof receiveMaterialBackupExport>>|undefined;
+            const result=await saveMaterialBackup(sink,async (consume,signal)=>{const transfer=receiveMaterialBackupExport(client as MaterialReadPort,consume,{signal});client.postMessage(start);statistics=await transfer;});
             expect(result.state).toBe('saved');expect(file.close).toHaveBeenCalledOnce();expect(file.abort).not.toHaveBeenCalled();
             const size=parts.reduce((sum,item)=>sum+item.length,0),data=new Uint8Array(size);let at=0;
             for(const part of parts){data.set(part,at);at+=part.length;}
             const blob=new Blob([data.buffer]),plan=await prepareMaterialBackup(blob),stage=createStage(targetDb,{clock:()=>100}),cap=createMaterialImportCapability();
+            expect(statistics).toMatchObject({records:plan.manifest.records,recordBytes:plan.manifest.bytes,frames:plan.manifest.frames});
             await stage.beginRecoverable(plan.manifest,{generation:0,capturedAt:100},cap,{deadline:1000});
             await sendMaterialBackup(blob,plan,async frame=>{await stage.append(cap,frame);});await stage.seal(cap);
             expect(await stage.commit(cap)).toEqual({inserted:2,updated:0,skipped:0});
@@ -214,8 +221,26 @@ describe('material backup wire reader',()=>{
     it('parses length headers and data split at arbitrary transport boundaries',async()=>{
         const [server,client]=pair(),out:number[]=[];
         const read=receiveMaterialBackupExport(client as MaterialReadPort,async value=>{out.push(...value);});
-        const write=sendMaterialRead(server as MaterialReadPort,bytes([1],[0,0],[0,3,65],[66,67,2]));
-        await Promise.all([read,write]);expect(out).toEqual([65,66,67]);
+        const info=wireStatistics(1,3,3,1);
+        const write=sendMaterialRead(server as MaterialReadPort,bytes([1],[0,0],[0,3,65],[66,67,...info.slice(0,4)],[...info.slice(4),2]));
+        const [statistics]=await Promise.all([read,write]);expect(out).toEqual([65,66,67]);
+        expect(statistics).toEqual({records:1,recordBytes:3,maxRecordBytes:3,frames:1});
+    });
+    it('returns zero statistics for a valid empty backup and withholds them if the transport digest is corrupted',async()=>{
+        const {bridge}=setup({repository:{openSnapshot:async()=>({revision:1,ids:[]}),readSnapshotRecord:async()=>null,checkSnapshot:async()=>{}}});
+        const [server,client]=pair();bridge.connect(server);const chunks:Uint8Array[]=[];
+        const read=receiveMaterialBackupExport(client as MaterialReadPort,async chunk=>{chunks.push(chunk);});client.postMessage(start);
+        expect(await read).toEqual({records:0,recordBytes:0,maxRecordBytes:0,frames:0});
+        expect(JSON.parse(new TextDecoder().decode(Uint8Array.from(chunks.flatMap(chunk=>[...chunk])))).materials).toEqual([]);await bridge.dispose();
+
+        const [tampered,receiver]=pair(),original=tampered.postMessage.bind(tampered);
+        tampered.postMessage=(value:unknown)=>{
+            const message=value as {type?:string;digest?:string};
+            original(message.type==='end'?{...message,digest:'0'.repeat(64)}:value);
+        };
+        const result=receiveMaterialBackupExport(receiver as MaterialReadPort,async()=>{});
+        const write=sendMaterialRead(tampered as MaterialReadPort,bytes([1,0,0,0,1,65,...wireStatistics(1,1,1,1),2])).catch(error=>error);
+        await expect(result).rejects.toThrow();await write;
     });
     it.each([
         [[2]],[[1,0,0,0,0]],[[1,0,1,0,0]],[[1,0,0,0,1]],[[3,99]],[[99]],[[1,0,0,0,1,65,2,7]],[[3,1,2]],
@@ -228,5 +253,21 @@ describe('material backup wire reader',()=>{
         const [server,client]=pair(),read=receiveMaterialBackupExport(client as MaterialReadPort,async()=>{});
         const write=sendMaterialRead(server as MaterialReadPort,bytes([3,1]));
         await expect(read).rejects.toMatchObject({code:'stale-operation'});await write;
+    });
+    it.each([
+        [1,0,0,0,1,65,2],
+        [1,0,0,0,1,65,4,0,0],
+        [1,0,0,0,1,65,...wireStatistics(0,1,1,1),2],
+        [1,0,0,0,1,65,...wireStatistics(1,2,2,1),2],
+        [1,0,0,0,1,65,...wireStatistics(1,1,1,2),2],
+        [1,0,0,0,1,65,...wireStatistics(1,1,1,1),...wireStatistics(1,1,1,1),2],
+        [1,0,0,0,1,65,...wireStatistics(1,1,1,1),1,0,0,0,1,66,2],
+        [...wireStatistics(0,0,0,0),1,0,0,0,1,65,2],
+        [1,0,0,0,1,65,...wireStatistics(1,1,1,1),3,0],
+        [1,0,0,0,1,65,...wireStatistics(2**53,1,1,1),2],
+    ])('rejects missing, truncated, inconsistent or repeated statistics %#',async (...wire)=>{
+        const [server,client]=pair(),read=receiveMaterialBackupExport(client as MaterialReadPort,async()=>{});
+        const write=sendMaterialRead(server as MaterialReadPort,bytes(wire)).catch(error=>error);
+        await expect(read).rejects.toThrow();await write;
     });
 });

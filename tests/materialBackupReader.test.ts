@@ -141,6 +141,21 @@ describe('material backup source reader', () => {
       expect(reads).toBe(1);
     } finally {vi.doUnmock('@/src/features/vocabulary/materialProtocol'); vi.resetModules();}
   });
+  it('sends a valid prepared backup at both record and total frame limits', async () => {
+    vi.resetModules();
+    vi.doMock('@/src/features/vocabulary/materialProtocol', async importOriginal => ({
+      ...await importOriginal<object>(), MATERIAL_IMPORT_FRAME_BYTES: 2, MATERIAL_IMPORT_MAX_RECORD_BYTES: 4,
+      MATERIAL_IMPORT_MAX_FRAMES: 4,
+    }));
+    try {
+      const reader = await import('@/src/features/vocabulary/materialBackupReader');
+      const source = new Blob([wrap('"ab","cd"')]), plan = await reader.prepareMaterialBackup(source), frames: Frame[] = [];
+      expect(plan.manifest).toMatchObject({records: 2, bytes: 8, frames: 4});
+      await reader.sendMaterialBackup(source, plan, async frame => {frames.push(frame);});
+      expect(frames.map(frame => [frame.record, frame.part, frame.bytes.length])).toEqual([[0,0,2],[0,1,2],[1,0,2],[1,1,2]]);
+      expect(await new Blob(frames.map(frame => frame.bytes)).text()).toBe('"ab""cd"');
+    } finally {vi.doUnmock('@/src/features/vocabulary/materialProtocol'); vi.resetModules();}
+  });
   it('lets the background budget admit records exceeding the former fixed total', async () => {
     vi.resetModules();
     vi.doMock('@/src/features/vocabulary/materialProtocol', async importOriginal => ({
@@ -388,6 +403,21 @@ describe('material backup source reader', () => {
     const nonArray = {...plan, plan: {...plan.plan, records: {length: 1} as never}};
     await expect(sendMaterialBackup(source, nonArray, emit)).rejects.toThrow('无效的备份计划');
     expect(emit).not.toHaveBeenCalled();expect(slice).not.toHaveBeenCalled();
+  });
+  it('rejects forged plans exceeding restore record or frame limits before reading or sending', async () => {
+    const frameBytes = 128 * 1024, recordLimit = 128 * 1024 * 1024;
+    for (const lengths of [[recordLimit + 1], Array.from({length: 20}, () => recordLimit)]) {
+      const source = new Blob([]), emit = vi.fn(async () => undefined);
+      let size = 0;
+      const records = lengths.map(length => {const start = size; size += length; return {start, end: size, length};});
+      const frames = lengths.reduce((total, length) => total + Math.ceil(length / frameBytes), 0);
+      Object.defineProperty(source, 'size', {value: size});
+      const slice = vi.spyOn(source, 'slice');
+      const plan = {plan: {records, size, fileDigest: '0'.repeat(64)}, manifest: {records: records.length, bytes: size, frames, digest: '0'.repeat(64)}};
+      await expect(sendMaterialBackup(source, plan, emit)).rejects.toThrow('无效的备份计划');
+      expect(slice).not.toHaveBeenCalled();
+      expect(emit).not.toHaveBeenCalled();
+    }
   });
   it('snapshots the record count before reading mutable entries', async () => {
     const source = new Blob([wrap('1')]), plan = await prepareMaterialBackup(source);

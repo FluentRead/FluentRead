@@ -25,6 +25,13 @@
     <p v-if="backupWarning" class="fr-material-feedback error" role="alert">{{ backupWarning }}</p>
     <p v-if="largeRestoreRunning" class="fr-material-feedback" role="status"><span>正在读取并恢复材料备份…</span> <span>请保持此页面打开，以便中断后查询结果。</span> <button type="button" @click="cancelLargeRestore">取消恢复</button></p>
     <p v-if="exportRunning" class="fr-material-feedback" role="status">正在导出材料备份… <span v-if="exportKeepOpen">下载完成前请保持此页面打开。</span> <span v-if="exportBuffered">当前浏览器使用内存准备下载，大备份可能占用较多内存。</span> <button type="button" @click="exportController?.abort()">取消导出</button></p>
+    <section v-if="exportCapacityPrompt" class="fr-material-editor" aria-label="确认保存超出恢复上限的备份">
+      <strong>备份超过当前恢复上限</strong>
+      <p v-if="exportCapacityPrompt.recordTooLarge">备份中有材料超过 128 MiB，当前版本无法恢复该材料。</p>
+      <p v-if="exportCapacityPrompt.tooManyFrames">备份超过 20,000 个恢复分片，当前版本无法完整恢复。</p>
+      <p>仍可保存以备后续处理；恢复还受设备可用空间限制。</p>
+      <div class="fr-material-actions"><button type="button" @click="answerExportCapacity(true)">仍然保存备份</button><button type="button" @click="answerExportCapacity(false)">取消导出</button></div>
+    </section>
     <p v-if="fallbackDownloadUrl" class="fr-material-feedback" role="status">下载已发起，关闭页面可能中断下载。请先确认浏览器下载完成，再释放临时数据。 <button type="button" @click="releaseFallbackDownload">下载已完成，释放临时数据</button></p>
     <p v-if="lateBackupWarning" class="fr-material-feedback error" role="alert">{{ lateBackupWarning }} <button type="button" @click="clearLateBackupWarning">知道了</button></p>
     <p v-if="lateBackupStatus" class="fr-material-feedback" role="status">{{ lateBackupStatus }} <button type="button" aria-label="关闭保存结果提示" @click="clearLateBackupStatus">知道了</button></p>
@@ -140,7 +147,7 @@ import type { HarnessSession } from '@/src/services/harness/sessionTypes';
 import type { VocabularyEntry } from '../learningModel';
 import { VOCABULARY_BOOK_MESSAGE, type VocabularyBookResponse } from '../protocol';
 import type { MaterialPatch, MaterialReference } from '../materialProtocol';
-import { MATERIAL_INLINE_BACKUP_MAX_BYTES, MATERIAL_CHANGED_MESSAGE } from '../materialProtocol';
+import { MATERIAL_INLINE_BACKUP_MAX_BYTES, MATERIAL_CHANGED_MESSAGE, MATERIAL_IMPORT_MAX_FRAMES, MATERIAL_IMPORT_MAX_RECORD_BYTES } from '../materialProtocol';
 import { workspaceMaterialCapture, workspaceMaterialUpdate, workspaceMaterialArchive, workspaceMaterialRestore, workspaceMaterialRemoveReference, materialClear, materialImport, materialGeneration } from '../materialClient';
 import {MaterialPageClientError, requestMaterialPage, requestMaterialDetail, requestMaterialTopics} from '../materialPageClient';
 import type {MaterialSummary} from '../materialSummary';
@@ -178,6 +185,8 @@ let backupController: AbortController | undefined;
 const exportRunning = ref(false);
 const exportKeepOpen = ref(false);
 const exportBuffered = ref(false);
+const exportCapacityPrompt=ref<{recordTooLarge:boolean;tooManyFrames:boolean}|null>(null);
+let exportCapacityAnswer:((proceed:boolean)=>void)|undefined;
 const fallbackDownloadUrl = sharedFallbackDownloadUrl;
 const lateBackupWarning = computed(()=>sharedLateBackupWarnings.value[0] ?? '');
 const lateBackupStatus = computed(()=>sharedLateBackupStatuses.value[0] ?? '');
@@ -675,6 +684,21 @@ function releaseFallbackDownload() {
     if (!fallbackDownloadUrl.value) return;
     URL.revokeObjectURL(fallbackDownloadUrl.value);fallbackDownloadUrl.value='';
 }
+function answerExportCapacity(proceed:boolean) {exportCapacityAnswer?.(proceed);}
+function confirmExportCapacity(statistics:{maxRecordBytes:number;frames:number},signal:AbortSignal):Promise<void> {
+    const recordTooLarge=statistics.maxRecordBytes>MATERIAL_IMPORT_MAX_RECORD_BYTES,tooManyFrames=statistics.frames>MATERIAL_IMPORT_MAX_FRAMES;
+    if(!recordTooLarge&&!tooManyFrames)return Promise.resolve();
+    return new Promise((resolve,reject)=>{
+        let settled=false;
+        const finish=(proceed:boolean)=>{
+            if(settled)return;settled=true;signal.removeEventListener('abort',abort);exportCapacityAnswer=undefined;exportCapacityPrompt.value=null;
+            if(proceed)resolve();else reject(new DOMException('材料导出已取消','AbortError'));
+        };
+        const abort=()=>finish(false);
+        exportCapacityAnswer=finish;exportCapacityPrompt.value={recordTooLarge,tooManyFrames};
+        signal.addEventListener('abort',abort,{once:true});if(signal.aborted)abort();
+    });
+}
 async function exportMaterials() {
     if (busy.value || fallbackDownloadUrl.value)
         return;
@@ -716,7 +740,7 @@ async function exportMaterials() {
         const result=await saveMaterialBackup(target,async (consume,signal)=>{
             const port=browser.runtime.connect({name:MATERIAL_BACKUP_EXPORT_PORT_NAME}) as unknown as MaterialReadPort;
             const receiving=receiveMaterialBackupExport(port,consume,{signal});void receiving.catch(()=>{});
-            try {port.postMessage({v:1,type:'start',operation:'export'});await receiving;}
+            try {port.postMessage({v:1,type:'start',operation:'export'});const statistics=await receiving;await confirmExportCapacity(statistics,signal);}
             catch(failure){try{port.disconnect();}catch{/* 端口可能已关闭。 */}await receiving.catch(()=>{});throw failure;}
         },{signal:controller.signal});
         const message=result.state==='saved'?'材料备份已保存，包含来源、原句与个人笔记，请妥善保管。':'已发起材料备份下载，包含来源、原句与个人笔记，请检查浏览器下载。';

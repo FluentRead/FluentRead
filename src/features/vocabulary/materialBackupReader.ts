@@ -163,7 +163,8 @@ class RecordCollector {
       }
       // JSON 记录结束字节始终为 ASCII；不完整 UTF-8 已在遇到该字节时替换。
       if (row.end !== undefined && row.end <= end) {if (row.hash) row.digest = bytesToHex(row.hash.digest()); row.complete = true;}
-      if (this.hashToken && (!Number.isSafeInteger(row.length) || row.length > this.maxLength)) throw capacityError('材料记录超过恢复大小限制');
+      // 版本 token 的上限为 MAX_SAFE_INTEGER；安全整数检查已包含超上限的情况。
+      if (this.hashToken && !Number.isSafeInteger(row.length)) throw capacityError('材料记录超过恢复大小限制');
     }
     this.pending = this.pending.filter(row => !row.complete);
   }
@@ -258,15 +259,18 @@ async function slice(blob: Blob, start: number, end: number, signal?: AbortSigna
 }
 
 async function inspect(blob: Blob, signal?: AbortSignal): Promise<SourcePlan> {
-  if (!(blob instanceof Blob) || !Number.isSafeInteger(blob.size)) throw TypeError('无效的备份文件');
+  if (!(blob instanceof Blob)) throw TypeError('无效的备份文件');
+  const size = blob.size;
+  if (!Number.isSafeInteger(size) || size < 0) throw TypeError('无效的备份文件');
   const collector = new RecordCollector(), versionCollector = new RecordCollector(Number.MAX_SAFE_INTEGER, true);
   const parser = new Parser(collector, versionCollector), lexer = new Lexer(token => parser.token(token), (at, byte) => parser.begin(at, byte)), sourceHash = hash();
   check(signal);
-  for (let at = 0; at < blob.size; at += CHUNK_BYTES) {
-    const bytes = await slice(blob, at, Math.min(blob.size, at + CHUNK_BYTES), signal);
+  for (let at = 0; at < size; at += CHUNK_BYTES) {
+    const bytes = await slice(blob, at, Math.min(size, at + CHUNK_BYTES), signal);
     sourceHash.update(bytes); lexer.feed(bytes); collector.process(bytes, at); versionCollector.process(bytes, at);
     if ((at / CHUNK_BYTES + 1) % 16 === 0) await yieldControl(signal);
   }
+  if (blob.size !== size) throw Error('备份文件在读取过程中改变');
   lexer.finish(); const records = parser.finish();
   if (parser.version.oversize) {
     const {type, start, end} = parser.version;
@@ -284,11 +288,12 @@ async function inspect(blob: Blob, signal?: AbortSignal): Promise<SourcePlan> {
     if (JSON.parse(text) !== 1) throw Error('不支持的材料备份格式或超过材料上限');
   }
   check(signal);
+  if (blob.size !== size) throw Error('备份文件在读取过程中改变');
   if (collector.incomplete || collector.values.length !== records.length) throw Error('材料记录不完整');
   return {records: records.map((record, index) => {
     const row = collector.values[index];
     return {...record, length: row.length};
-  }), fileDigest: bytesToHex(sourceHash.digest()), size: blob.size};
+  }), fileDigest: bytesToHex(sourceHash.digest()), size};
 }
 
 type Visitor = {start(index: number): void | Promise<void>; chunk(bytes: Uint8Array, index: number): void | Promise<void>; end(index: number): void | Promise<void>};
@@ -319,7 +324,7 @@ async function traverse(blob: Blob, input: SourcePlan, visitor: Visitor, signal?
     if ((at / CHUNK_BYTES + 1) % 16 === 0) await yieldControl(signal);
   }
   check(signal);
-  if (index !== records.length || bytesToHex(sourceHash.digest()) !== fileDigest) throw Error('备份文件在读取过程中改变');
+  if (index !== records.length || bytesToHex(sourceHash.digest()) !== fileDigest || blob.size !== size) throw Error('备份文件在读取过程中改变');
 }
 
 /** 前两遍完整检查和计算 stage 使用的原始记录摘要。 */

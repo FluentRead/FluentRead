@@ -37,6 +37,21 @@ describe('material backup recovery orchestration',()=>{
     mocks.send.mockRejectedValue(Error('file changed'));const out=await restoreLargeMaterialBackup(file,guard,{onCapability:()=>{}});
     expect(out).toMatchObject({kind:'failed',cleanupPending:false});expect(active.discard).toHaveBeenCalledOnce();expect(active.seal).not.toHaveBeenCalled();expect(active.commit).not.toHaveBeenCalled();
   });
+  it('discards emitted frames if the actual reader detects a size change before sealing',async()=>{
+    const reader=await vi.importActual<typeof import('@/src/features/vocabulary/materialBackupReader')>('@/src/features/vocabulary/materialBackupReader');
+    class ChangingAfterAppend extends Blob {
+      changed=false;
+      get size(){return super.size+Number(this.changed);}
+    }
+    const source=new ChangingAfterAppend(['{"format":"fluentread-learning-materials","version":1,"materials":[{"a":1}]}']);
+    mocks.prepare.mockImplementation(reader.prepareMaterialBackup);
+    mocks.send.mockImplementation(reader.sendMaterialBackup);
+    active.append.mockImplementation(async()=>{source.changed=true;return {nextSeq:1};});
+    const out=await restoreLargeMaterialBackup(source,guard,{onCapability:()=>{}});
+    expect(out).toMatchObject({kind:'failed',cleanupPending:false,error:expect.objectContaining({message:'备份文件在读取过程中改变'})});
+    expect(active.append).toHaveBeenCalledOnce();expect(active.discard).toHaveBeenCalledOnce();
+    expect(active.seal).not.toHaveBeenCalled();expect(active.commit).not.toHaveBeenCalled();expect(active.close).toHaveBeenCalledOnce();
+  });
   it.each([true,false])('handles an unreadable error name while preserving discard status: %s',async discarded=>{
     const failure=Error('read failed');
     Object.defineProperty(failure,'name',{get(){throw Error('error metadata inaccessible');}});

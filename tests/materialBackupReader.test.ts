@@ -24,6 +24,49 @@ async function read(blob: Blob) {
 }
 
 describe('material backup source reader', () => {
+  it('rejects a changed Blob size after scanning instead of accepting an inconsistent plan', async () => {
+    class ChangingSize extends Blob {
+      reads = 0;
+      get size() {return super.size - (++this.reads === 1 ? 1 : 0);}
+    }
+    const source = new ChangingSize([wrap('')]);
+    await expect(prepareMaterialBackup(source)).rejects.toThrow('备份文件在读取过程中改变');
+    expect(source.reads).toBe(2);
+  });
+  it('keeps its initial read bound when a Blob later reports an infinite size', async () => {
+    const json = wrap(''), block = json + ' '.repeat(65536 - json.length);
+    class GrowingSize extends Blob {
+      reads = 0; slices = 0;
+      get size() {return ++this.reads === 1 ? 65536 : Infinity;}
+      slice(start?: number, end?: number) {
+        if (++this.slices > 2) throw Error('unexpected extra read');
+        return new Blob([start === 0 ? block : ' '.repeat((end ?? 0) - (start ?? 0))]);
+      }
+    }
+    const source = new GrowingSize([block]);
+    await expect(prepareMaterialBackup(source)).rejects.toThrow('备份文件在读取过程中改变');
+    expect(source.slices).toBe(1); expect(source.reads).toBe(2);
+  });
+  it('rejects a size change while rereading a long version token', async () => {
+    const version = '1.' + '0'.repeat(1200), json = wrap('', version), start = json.indexOf(version);
+    class ChangingDuringVersion extends Blob {
+      changed = false;
+      get size() {return super.size + Number(this.changed);}
+      slice(from?: number, to?: number, type?: string) {
+        if (from === start) this.changed = true;
+        return super.slice(from, to, type);
+      }
+    }
+    const source = new ChangingDuringVersion([json]);
+    await expect(prepareMaterialBackup(source)).rejects.toThrow('备份文件在读取过程中改变');
+    expect(source.changed).toBe(true);
+  });
+  it.each([-1, NaN, Infinity, Number.MAX_SAFE_INTEGER + 1])('rejects invalid initial Blob size before reading: %s', async size => {
+    class InvalidSize extends Blob {get size() {return size;}}
+    const source = new InvalidSize([wrap('')]), readSlice = vi.spyOn(source, 'slice');
+    await expect(prepareMaterialBackup(source)).rejects.toThrow('无效的备份文件');
+    expect(readSlice).not.toHaveBeenCalled();
+  });
   it('retains exact last-key, UTF-8 replacement, numeric and long-token semantics', async () => {
     const title = 'A' + '\u0315'.repeat(131072) + '\u0300', number = '1' + '0'.repeat(140000) + 'e-140000';
     const prefix = `\ufeff{"format":"bad","format":"fluentread-learning-materials","version":2,"version":1,"materials":[0],"m\\u0061terials":[{"title":${JSON.stringify(title)},"number":${number},"negative":-0,"huge":1e400,"value":"`;
@@ -269,6 +312,29 @@ describe('material backup source reader', () => {
     const unstable = new Blob([original]), slice = unstable.slice.bind(unstable); let reads = 0;
     unstable.slice = (start, end) => ++reads > 1 ? changed.slice(start, end) : slice(start, end);
     await expect(prepareMaterialBackup(unstable)).rejects.toThrow('改变');
+  });
+  it('rejects a size change during the second prepare scan even when file bytes match', async () => {
+    class ChangingOnSecondScan extends Blob {
+      scans = 0; changed = false;
+      get size() {return super.size + Number(this.changed);}
+      slice(start?: number, end?: number, type?: string) {
+        if (++this.scans === 2) this.changed = true;
+        return super.slice(start, end, type);
+      }
+    }
+    const source = new ChangingOnSecondScan([wrap('{"a":1}')]);
+    await expect(prepareMaterialBackup(source)).rejects.toThrow('备份文件在读取过程中改变');
+    expect(source.scans).toBe(2); expect(source.changed).toBe(true);
+  });
+  it('rejects a size change after frames are emitted so the caller cannot seal them', async () => {
+    class ChangingAfterFrame extends Blob {
+      changed = false;
+      get size() {return super.size + Number(this.changed);}
+    }
+    const source = new ChangingAfterFrame([wrap('{"a":1}')]), plan = await prepareMaterialBackup(source), frames: Frame[] = [];
+    await expect(sendMaterialBackup(source, plan, async frame => {frames.push(frame); source.changed = true;}))
+      .rejects.toThrow('备份文件在读取过程中改变');
+    expect(frames).toHaveLength(1);
   });
   it('detects short source reads, rejected callbacks and invalid prepared plans', async () => {
     const source = new Blob([wrap('{"a":1}')]), plan = await prepareMaterialBackup(source), short = new Blob([source]);

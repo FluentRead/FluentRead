@@ -139,6 +139,30 @@ describe('material staging stored metadata boundaries',()=>{
     await expect(stage.append(cap,frame)).resolves.toEqual({nextSeq:1});
     expect(await db.table('stageFrames').count()).toBe(1);
   });
+  it('rejects an append cancelled while its write transaction waits for another connection',async()=>{
+    const {db,stage}=setup(),{input,frame}=sampleFrame(),cap=createMaterialImportCapability();
+    await stage.beginRecoverable(input,guard,cap,{deadline:1000});
+    const peer=new MaterialDatabase(db.name);databases.push(peer);await peer.open();
+    let release!:()=>void,entered!:()=>void;
+    const hold=new Promise<void>(resolve=>release=resolve),ready=new Promise<void>(resolve=>entered=resolve);
+    const lock=peer.transaction('rw',peer.table('stageFrames'),async()=>{entered();await Dexie.waitFor(hold);});
+    await ready;
+    const controller=new AbortController(),transaction=vi.spyOn(db,'transaction');
+    let rejected:Promise<void>|undefined;
+    try {
+      const pending=Dexie.ignoreTransaction(()=>stage.append(cap,frame,{signal:controller.signal}));
+      rejected=expect(pending).rejects.toThrow();
+      // 认证只读事务已完成，实际写事务已请求但仍受另一连接的帧表锁阻塞。
+      await vi.waitFor(()=>expect(transaction).toHaveBeenCalledTimes(2));
+      controller.abort();
+    } finally {release();await lock;transaction.mockRestore();}
+    await rejected;
+    expect(await db.table('stageFrames').count()).toBe(0);
+    expect(await db.table('stageBudget').get('stage')).toMatchObject({reserved:input.bytes,reservedFrames:1,slots:1});
+    expect(await stage.status(cap)).toEqual({state:'open',nextSeq:0});
+    await vi.waitFor(async()=>expect(await stage.append(cap,frame)).toEqual({nextSeq:1}));
+    expect(await db.table('stageFrames').count()).toBe(1);
+  });
   it('cancels a seal queued behind a database lock without sealing the session',async()=>{
     const {db,stage,begin}=setup(),cap=await begin(),peer=new MaterialDatabase(db.name);databases.push(peer);await peer.open();
     let release!:()=>void,entered!:()=>void;

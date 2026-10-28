@@ -1,7 +1,7 @@
 /**
  * @file src/features/image-translation/services/mangaTypography.ts
  * 文件职责：在漫画原有区域内排版完整译文，区分对白与大标题并保持东亚标点的阅读习惯。
- * 主要内容：保留词、字素与显式换行，扩展东亚文字与英文分词，必要时按字素边界合并词；闭标点跟随前字、开标点跟随后字；按真实 Canvas 字宽和可用字形上下界二分适配字号，单行不重复扣除行距，多行仍保留基线间距，缺少完整字形指标时沿用行框；合并字形有效性与最大行距遍历，基线数组就地归一化，减少临时数组而不改变浮点运算顺序；同一区域共享分词与长词字素，候选仅保留数字状态，最大字号预检后按二分上界跳过不可能胜出的搜索；普通单框仍保留原度量顺序；逐项求最大宽高以兼容大量段落与行；末行过短时平衡行宽而不增加行数或越过字形预算，不截字、不横向压缩。
+ * 主要内容：保留词、字素与显式换行，扩展东亚文字与英文分词，必要时按字素边界合并词；纯同类标点直接绑定，避免拆开后又重新合并，闭标点跟随前字、开标点跟随后字；按真实 Canvas 字宽和可用字形上下界二分适配字号，单行不重复扣除行距，多行仍保留基线间距，缺少完整字形指标时沿用行框；合并字形有效性与最大行距遍历，基线数组就地归一化，减少临时数组而不改变浮点运算顺序；同一区域共享分词与长词字素，候选仅保留数字状态，最大字号预检后按二分上界跳过不可能胜出的搜索；普通单框仍保留原度量顺序；逐项求最大宽高以兼容大量段落与行；末行过短时平衡行宽而不增加行数或越过字形预算，不截字、不横向压缩。
  * 模块边界：纯文字和度量算法，不读取页面、配置或字体资源，不识别、翻译或修补图片；普通图片继续使用独立的通用排版。
  */
 import type {ImageTranslationTextLayout} from './rendering';
@@ -58,7 +58,8 @@ function splitEdgePunctuation(tokens:string[]):string[] {
     const result:string[]=[];
     for(let index=0;index<tokens.length;index++){
         const token=tokens[index];
-        if(token.length===1){result.push(token);continue;}
+        // 同类纯标点在绑定阶段会合并成完全相同的内容，无须先逐字素拆开。
+        if(token.length===1||OPEN.test(token)||CLOSE.test(token)){result.push(token);continue;}
         const prefix=index>0&&!/^\s+$/u.test(tokens[index-1])&&!/^[A-Za-z0-9]/u.test(token)&&CLOSE_ANY.test(token);
         const suffix=index<tokens.length-1&&!/[A-Za-z0-9]$/u.test(token)&&OPEN_ANY.test(token);
         if(!prefix&&!suffix){result.push(token);continue;}

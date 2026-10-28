@@ -48,6 +48,17 @@ describe('透明图案与完整译文共同排版',()=>{
     });
 });
 describe('漫画专用完整排版',()=>{
+    it.each(['你好！！再见……','A（（文字））B','「「对白？！」」\n……旁白！！','）？！开始','结尾（（'])
+    ('连续标点场景 %s 保留全文与可用宽度，直接排版与搜索一致',text=>{
+        const widthOf=(value:string,size:number)=>Array.from(value).length*size;
+        for(const width of [3,6,12]){
+            const layout=layoutMangaTranslationText(text,width,100,widthOf,1);
+            expect(layout.lines.join('')).toBe(text.replace('\n',''));
+            expect(layout.lines.every(line=>widthOf(line,layout.fontSize)<=width)).toBe(true);
+            const search=createMangaTranslationSearch(text,widthOf,1);
+            expect(search.finish(search.prepare(width,100))).toEqual(layout);
+        }
+    });
     it.each(['東京𠀀HELLO（文字）','𠀀HELLO(文字)','𠀀HELLO[文字]','𠀀HELLO“文字”',
         '𠀀!HELLO','ｶﾞ?WORLD','𠀀,HELLO','𠀀.HELLO','𠀀)HELLO','𠀀]HELLO','𠀀!?HELLO'])
     ('混排 %s 的标点不落在错误的行首或行尾',text=>{

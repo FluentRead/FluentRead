@@ -32,6 +32,108 @@ describe('图片 OCR 处理与结果缓存', () => {
     let context: {drawImage: ReturnType<typeof vi.fn>; getImageData: ReturnType<typeof vi.fn>; putImageData: ReturnType<typeof vi.fn>; fillRect: ReturnType<typeof vi.fn>; fillStyle: string; imageSmoothingEnabled: boolean; imageSmoothingQuality: string};
     let onImageCreated: (() => void) | undefined;
 
+    it.each(['invalid','too-many'] as const)('只读圈选忽略 %s 的低分数字噪声，正常返回正文',async problem=>{
+        const word={text:'HELLO',bbox:{x0:30,y0:30,x1:90,y1:50},confidence:99};
+        const noisy=problem==='invalid'?[{text:'90%',bbox:{x0:NaN,y0:20,x1:30,y1:30},confidence:20}]
+            :Array.from({length:4097},()=>({text:'90%',bbox:{x0:10,y0:10,x1:20,y1:20},confidence:20}));
+        recognize.mockResolvedValueOnce({data:{blocks:[{paragraphs:[{lines:[word,...noisy]}]}]}});
+        const lines=await recognizeImage('area-noise','en',undefined,{profile:'area'});
+        expect(lines.map(line=>line.text)).toEqual(['HELLO']);expect(recognize).toHaveBeenCalledOnce();
+    });
+    it.each([20,99])('Tesseract 混排行数字词置信 %i 仍保留独立防擦框',async confidence=>{
+        const word={x0:20,y0:10,x1:40,y1:20},label={x0:2,y0:10,x1:19,y1:20};
+        const raw={text:'SALE 90%',bbox:{x0:2,y0:10,x1:40,y1:20},confidence:99,
+            words:[{text:'SALE',bbox:label,confidence:99},{text:'90%',bbox:word,confidence}]};
+        recognize.mockResolvedValueOnce({data:{blocks:[{paragraphs:[{lines:[raw]}]}]}});
+        const lines=await recognizeImage('mixed-raw','en',undefined,{includeMangaNumericConfidence:true});
+        expect(lines.filter(line=>line.guardOnly)).toEqual([{text:'',bbox:word,guardOnly:true}]);
+        expect(lines.some(line=>!line.guardOnly&&line.text.startsWith('SALE'))).toBe(true);
+        expect(recognize).toHaveBeenCalledOnce();
+    });
+    it('混排行数值词坐标非法时明确失败，不发布潜在破坏图片',async()=>{
+        const raw={text:'SALE 90%',bbox:{x0:2,y0:10,x1:40,y1:20},confidence:99,
+            words:[{text:'SALE',bbox:{x0:2,y0:10,x1:19,y1:20},confidence:99},{text:'90%',bbox:{x0:NaN,y0:10,x1:40,y1:20},confidence:20}]};
+        recognize.mockResolvedValueOnce({data:{blocks:[{paragraphs:[{lines:[raw]}]}]}});
+        await expect(recognizeImage('mixed-invalid','en',undefined,{includeMangaNumericConfidence:true})).rejects.toThrow('图片数字保护位置无效');
+    });
+    it('首轮低分数字在回退识别后仍作为防擦框保留，缓存复用不泄漏到普通视图',async()=>{
+        const first={x0:10,y0:10,x1:30,y1:20},second={x0:50,y0:10,x1:70,y1:20};
+        recognize.mockResolvedValueOnce({data:{blocks:[{paragraphs:[{lines:[{text:'90%',bbox:first,confidence:20}]}]}]}});
+        recognize.mockResolvedValueOnce({data:{blocks:[{paragraphs:[{lines:[{text:'HELLO',bbox:{x0:10,y0:50,x1:50,y1:60},confidence:99},
+            {text:'3,14',bbox:second,confidence:30}]}]}]}});
+        const manga=await recognizeImage('guard-fallback','ko',undefined,{includeMangaNumericConfidence:true});
+        expect(recognize).toHaveBeenCalledTimes(2);
+        expect(manga.filter(line=>line.guardOnly).map(line=>line.bbox)).toEqual([second,first]);
+        const normal=await recognizeImage('guard-fallback','ko');
+        expect(normal.some(line=>line.guardOnly)).toBe(false);expect(recognize).toHaveBeenCalledTimes(2);
+        manga.find(line=>line.guardOnly)!.bbox.x0=999;
+        expect((await recognizeImage('guard-fallback','ko',undefined,{includeMangaNumericConfidence:true})).filter(line=>line.guardOnly).map(line=>line.bbox)).toEqual([second,first]);
+    });
+    it('首次与回退的数值保护框合计超预算时报告错误而不缓存部分结果',async()=>{
+        const make=(base:number)=>Array.from({length:2050},(_,i)=>{const x=(base+i)%90,y=Math.floor((base+i)/90);
+            return {text:'90%',bbox:{x0:x,y0:y,x1:x+.5,y1:y+.5},confidence:20};});
+        recognize.mockResolvedValueOnce({data:{blocks:[{paragraphs:[{lines:make(0)}]}]}})
+            .mockResolvedValueOnce({data:{blocks:[{paragraphs:[{lines:[{text:'HELLO',bbox:{x0:1,y0:50,x1:20,y1:60},confidence:99},...make(2050)]}]}]}});
+        await expect(recognizeImage('guard-fallback-limit','en',undefined,{includeMangaNumericConfidence:true})).rejects.toThrow('保护区域过于复杂');
+        expect(recognize).toHaveBeenCalledTimes(2);
+        expect(await recognizeImage('guard-fallback-limit','en')).toEqual([{text:'hello',bbox:{x0:10,y0:10,x1:50,y1:30}}]);
+        expect(recognize).toHaveBeenCalledTimes(3);
+    });
+    it('首次与回退中相同坐标只保留一个保护框',async()=>{
+        const bbox={x0:10,y0:10,x1:30,y1:20},number={text:'90%',bbox,confidence:20};
+        recognize.mockResolvedValueOnce({data:{blocks:[{paragraphs:[{lines:[number]}]}]}})
+            .mockResolvedValueOnce({data:{blocks:[{paragraphs:[{lines:[{text:'HELLO',bbox:{x0:1,y0:50,x1:20,y1:60},confidence:99},number]}]}]}});
+        const result=await recognizeImage('guard-fallback-duplicate','en',undefined,{includeMangaNumericConfidence:true});
+        expect(result.filter(line=>line.guardOnly)).toEqual([{text:'',bbox,guardOnly:true}]);
+    });
+    it.each([false,true])('共享 OCR 一方取消时防擦框仍随有效视图与缓存返回，取消保护视图=%s',async cancelProtected=>{
+        const bbox={x0:10,y0:10,x1:30,y1:20};
+        const result={data:{blocks:[{paragraphs:[{lines:[{text:'HELLO',bbox:{x0:10,y0:50,x1:50,y1:60},confidence:99},
+            {text:'90%',bbox,confidence:20}]}]}]}};
+        let complete!:(value:typeof result)=>void;let underlying!:AbortSignal;
+        recognize.mockImplementationOnce((_image,_languages,signal)=>{underlying=signal;return new Promise(resolve=>{complete=resolve;});});
+        const controller=new AbortController();
+        const ordinary=recognizeImage('shared-low-guard','ko',cancelProtected?undefined:controller.signal);
+        const protectedView=recognizeImage('shared-low-guard','ko',cancelProtected?controller.signal:undefined,{includeMangaNumericConfidence:true});
+        const rejected=expect(cancelProtected?protectedView:ordinary).rejects.toMatchObject({name:'AbortError'});
+        await vi.waitFor(()=>expect(recognize).toHaveBeenCalledOnce());controller.abort();await rejected;expect(underlying.aborted).toBe(false);
+        complete(result);const remaining=await(cancelProtected?ordinary:protectedView);
+        expect(remaining.some(line=>line.guardOnly)).toBe(!cancelProtected);
+        const cached=await recognizeImage('shared-low-guard','ko',undefined,{includeMangaNumericConfidence:true});
+        expect(cached.filter(line=>line.guardOnly)).toEqual([{text:'',bbox,guardOnly:true}]);
+        expect((await recognizeImage('shared-low-guard','ko')).some(line=>line.guardOnly)).toBe(false);
+        expect(recognize).toHaveBeenCalledOnce();
+    });
+
+    it.each([false,true])('漫画数字证据与普通调用共享同一 OCR 缓存且普通返回不泄漏置信：漫画先=%s', async mangaFirst => {
+        const bbox={x0:10,y0:10,x1:50,y1:30};
+        recognize.mockResolvedValueOnce({data:{blocks:[{paragraphs:[{lines:[{text:'12:34',bbox,words:[{text:'12:34',bbox,confidence:96}]}]}]}]}});
+        const options=mangaFirst?{includeMangaNumericConfidence:true}:undefined;
+        const first=await recognizeImage('shared-numeric','ko',undefined,options);
+        const second=await recognizeImage('shared-numeric','ko',undefined,mangaFirst?undefined:{includeMangaNumericConfidence:true});
+        const [manga,ordinary]=mangaFirst?[first,second]:[second,first];
+        expect(recognize).toHaveBeenCalledOnce();expect(manga[0]).toMatchObject({text:'12:34',bbox,numericConfidence:96});
+        expect(ordinary).toEqual([{text:'12:34',bbox}]);
+        (manga[0] as any).numericConfidence=1;
+        expect((await recognizeImage('shared-numeric','ko',undefined,{includeMangaNumericConfidence:true}))[0]).toMatchObject({numericConfidence:96});
+    });
+    it.each([false,true])('竖排数字与对白仅漫画视图分开且复用识别，漫画先=%s', async mangaFirst=>{
+        const numericBox={x0:70,y0:10,x1:90,y1:70},textBox={x0:45,y0:10,x1:65,y1:70};
+        const make=(text:string,bbox:typeof numericBox)=>({text,bbox,baseline:{x0:bbox.x0+10,y0:bbox.y0,x1:bbox.x0+11,y1:bbox.y1},words:[{text,bbox,confidence:98}]});
+        recognize.mockResolvedValueOnce({data:{blocks:[{paragraphs:[{lines:[make('12:34',numericBox),make('안녕하세요',textBox)]}]}]}});
+        const options={includeMangaNumericConfidence:true};
+        const first=await recognizeImage('vertical-mixed','ko',undefined,mangaFirst?options:{});
+        const second=await recognizeImage('vertical-mixed','ko',undefined,mangaFirst?{}:options);
+        const [manga,ordinary]=mangaFirst?[first,second]:[second,first];
+        expect(recognize).toHaveBeenCalledOnce();expect(ordinary).toHaveLength(1);
+        expect(manga).toHaveLength(2);expect(manga[0]).toMatchObject({text:'12:34',numericConfidence:98});
+        expect(manga[1].text).toBe('안녕하세요');
+    });
+    it('漫画数字证据随降采样坐标回映，不改变原始置信', async()=>{
+        const bbox={x0:10,y0:10,x1:50,y1:30};recognize.mockResolvedValueOnce({data:{blocks:[{paragraphs:[{lines:[{text:'12:34',bbox,words:[{text:'12:34',bbox,confidence:94}]}]}]}]}});
+        const decoded={naturalWidth:2048,naturalHeight:8192,src:'borrowed'} as HTMLImageElement;
+        expect(await recognizeImage('data:image/jpeg;base64,numeric','ru',undefined,{decodedImage:decoded,includeMangaNumericConfidence:true})).toEqual([{text:'12:34',bbox:{x0:20,y0:20,x1:100,y1:60},numericConfidence:94}]);
+    });
     it('把任务进度回调传入 OCR Worker，缓存命中不重放旧识别进度', async () => {
         const onProgress = vi.fn();
         recognize.mockImplementationOnce(async (_image, _languages, _signal, _mode, progress) => {progress(42);return blockResult();});
@@ -264,6 +366,27 @@ describe('图片 OCR 处理与结果缓存', () => {
         expect((await recognizeImage('shared', 'en'))[0].text).toBe('hello');
         expect(progress).toHaveBeenCalledWith(42);
         expect(sources).toHaveLength(1);
+    });
+
+    it.each([false, true])('普通和漫画并发时取消一个订阅仍共享识别，取消漫画=%s', async cancelManga => {
+        const bbox = {x0: 10, y0: 10, x1: 50, y1: 30};
+        const result = {data: {blocks: [{paragraphs: [{lines: [{text: '12:34', bbox, words: [{text: '12:34', bbox, confidence: 96}]}]}]}]}};
+        let complete!: (value: typeof result) => void;
+        let underlying!: AbortSignal;
+        recognize.mockImplementationOnce((_image, _languages, signal) => {underlying = signal; return new Promise(resolve => {complete = resolve;});});
+        const controller = new AbortController();
+        const ordinary = recognizeImage('cross-view', 'ko', cancelManga ? undefined : controller.signal);
+        const manga = recognizeImage('cross-view', 'ko', cancelManga ? controller.signal : undefined, {includeMangaNumericConfidence: true});
+        const cancelled = expect(cancelManga ? manga : ordinary).rejects.toMatchObject({name: 'AbortError'});
+        await vi.waitFor(() => expect(recognize).toHaveBeenCalledOnce());
+        controller.abort(); await cancelled; expect(underlying.aborted).toBe(false);
+        complete(result);
+        const remaining = await (cancelManga ? ordinary : manga);
+        if (cancelManga) expect(remaining).toEqual([{text: '12:34', bbox}]);
+        else expect(remaining).toEqual([{text: '12:34', bbox, numericConfidence: 96}]);
+        expect(await recognizeImage('cross-view', 'ko')).toEqual([{text: '12:34', bbox}]);
+        expect(await recognizeImage('cross-view', 'ko', undefined, {includeMangaNumericConfidence: true})).toEqual([{text: '12:34', bbox, numericConfidence: 96}]);
+        expect(recognize).toHaveBeenCalledOnce();
     });
 
     it('扩展 Worker 使用本地资源目录并复用语言下载边界及取消信号', async () => {

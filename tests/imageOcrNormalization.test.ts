@@ -5,6 +5,8 @@ import {
     getOcrImageSize,
     getAreaOcrImageSize,
     normalizeOcrLines,
+    normalizeOcrLineViews,
+    collectRawNumericGuards,
     restoreOcrLineCoordinates,
     selectChangedTranslations,
 } from '@/src/features/image-translation/core';
@@ -203,6 +205,76 @@ describe('普通图片按完整段落翻译', () => {
         const output = groupImageParagraphs(input);
         expect(output).toEqual(input);
         expect(coordinateReads).toBeLessThan(30_000);
+    });
+});
+
+describe('原始数值证据的有界保护',()=>{
+    it('空识别块或不完整层级不会产生保护框',()=>{
+        expect(collectRawNumericGuards(undefined)).toEqual([]);
+        expect(collectRawNumericGuards([{}])).toEqual([]);
+        expect(collectRawNumericGuards([{paragraphs:[{}]}])).toEqual([]);
+    });
+    it('一千个相同文本、不同物理框直接匹配，不应因重复比较导致整图失败',()=>{
+        const lines=Array.from({length:1000},(_,i)=>{const bbox={x0:i*2,y0:0,x1:i*2+1,y1:1};
+            return {text:'90%',bbox,confidence:99,words:[{text:'90%',bbox,confidence:99}]};});
+        const blocks=[{paragraphs:[{lines}]}],views=normalizeOcrLineViews(blocks);
+        expect(views.manga).toHaveLength(1000);expect(collectRawNumericGuards(blocks,views.manga,{trustedWorkerData:true})).toEqual([]);
+    });
+    it('只有完整覆盖的可信框可去掉保护；部分覆盖仍保留原物理框',()=>{
+        const bbox={x0:2,y0:2,x1:20,y1:10},blocks=[{paragraphs:[{lines:[{text:'90%',bbox,confidence:20}]}]}];
+        const candidate={text:'90%',bbox:{x0:0,y0:0,x1:21,y1:11},numericConfidence:99};
+        expect(collectRawNumericGuards(blocks,[candidate],{trustedWorkerData:true})).toEqual([]);
+        expect(collectRawNumericGuards(blocks,[{...candidate,bbox:{...candidate.bbox,x1:19}}]))
+            .toEqual([{text:'',bbox,guardOnly:true}]);
+    });
+    it('访问器和无法反射的对象不走几何快路径，仍按实际边界判断',()=>{
+        const bbox={get x0(){return 2;},y0:2,x1:20,y1:10};
+        const blocks=[{paragraphs:[{lines:[{text:'90%',bbox,confidence:20}]}]}];
+        const candidate=new Proxy({text:'90%',numericConfidence:99,bbox:{x0:0,y0:0,x1:21,y1:11}},
+            {getOwnPropertyDescriptor(){throw new Error('unavailable');}});
+        expect(collectRawNumericGuards(blocks,[candidate])).toEqual([]);
+        expect(collectRawNumericGuards(blocks,[])).toEqual([{text:'',bbox:{x0:2,y0:2,x1:20,y1:10},guardOnly:true}]);
+    });
+    it('原始 bbox 无法反射时保守回退，不吞掉本可证明覆盖的结果',()=>{
+        const bbox=new Proxy({x0:2,y0:2,x1:20,y1:10},{getOwnPropertyDescriptor(){throw new Error('unavailable');}});
+        const candidate={text:'90%',numericConfidence:99,bbox:{x0:2,y0:2,x1:20,y1:10}};
+        expect(collectRawNumericGuards([{paragraphs:[{lines:[{text:'90%',bbox,confidence:20}]}]}],[candidate],{trustedWorkerData:true})).toEqual([]);
+    });
+    it('可信模式遇到继承坐标及无法反射的候选时按实际覆盖结果回退',()=>{
+        const bbox={x0:2,y0:2,x1:20,y1:10};
+        const blocks=[{paragraphs:[{lines:[{text:'90%',bbox,confidence:20}]}]}];
+        const inherited=Object.create({x0:0,y0:0,x1:21,y1:11}) as typeof bbox;
+        const candidate={text:'90%',numericConfidence:99,bbox:inherited};
+        expect(collectRawNumericGuards(blocks,[candidate],{trustedWorkerData:true})).toEqual([]);
+        const reflected=new Proxy({...candidate,bbox:{x0:2,y0:2,x1:19,y1:10}},
+            {getOwnPropertyDescriptor(){throw new Error('unavailable');}});
+        expect(collectRawNumericGuards(blocks,[reflected],{trustedWorkerData:true}))
+            .toEqual([{text:'',bbox,guardOnly:true}]);
+    });
+    it('同文首个候选的未知 bbox getter 抛错时保留首因，不越过它命中后面的精确框',()=>{
+        const failure=new Error('bbox getter first'),bbox={x0:2,y0:2,x1:20,y1:10};
+        const first={text:'90%',numericConfidence:99,get bbox(){throw failure;}};
+        const exact={text:'90%',numericConfidence:99,bbox};
+        for(const options of [undefined,{trustedWorkerData:true}])
+            expect(()=>collectRawNumericGuards([{paragraphs:[{lines:[{text:'90%',bbox,confidence:20}]}]}],[first,exact],options)).toThrow(failure);
+    });
+    it('未知输入中的 Proxy 即使伪装数据描述符，也不跳过首个 bbox 读取异常',()=>{
+        const failure=new Error('bbox proxy first'),bbox={x0:2,y0:2,x1:20,y1:10};
+        const deceptive=new Proxy({...bbox},{get(target,key,receiver){if(key==='x0')throw failure;return Reflect.get(target,key,receiver);}});
+        const first={text:'90%',numericConfidence:99,bbox:deceptive};
+        const exact={text:'90%',numericConfidence:99,bbox};
+        expect(()=>collectRawNumericGuards([{paragraphs:[{lines:[{text:'90%',bbox,confidence:20}]}]}],[first,exact])).toThrow(failure);
+    });
+    it('非法位置和超过保护框数量上限时明确报错',()=>{
+        const invalid=[{paragraphs:[{lines:[{text:'90%',bbox:{x0:NaN,y0:0,x1:2,y1:2},confidence:20}]}]}];
+        expect(()=>collectRawNumericGuards(invalid)).toThrow('保护位置无效');
+        const lines=Array.from({length:4097},(_,i)=>({text:'90%',bbox:{x0:i*2,y0:0,x1:i*2+1,y1:1},confidence:20}));
+        expect(()=>collectRawNumericGuards([{paragraphs:[{lines}]}])).toThrow('保护区域过于复杂');
+    });
+    it('同文候选无法证明覆盖并超过比较预算时保留原图而不伪装成功',()=>{
+        const recognized=Array.from({length:1001},(_,i)=>({text:'90%',numericConfidence:99,bbox:{x0:i*2,y0:0,x1:i*2+1,y1:1}}));
+        const lines=Array.from({length:1001},(_,i)=>({text:'90%',bbox:{x0:100000+i*2,y0:0,x1:100001+i*2,y1:1},confidence:20}));
+        expect(()=>collectRawNumericGuards([{paragraphs:[{lines}]}],recognized)).toThrow('保护区域过于复杂');
     });
 });
 

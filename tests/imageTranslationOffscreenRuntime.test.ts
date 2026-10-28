@@ -1,4 +1,5 @@
 import {afterEach, beforeEach, describe, expect, it, vi} from 'vitest';
+import {mangaMaskBoxes} from '@/src/features/image-translation/mangaPatchResult';
 
 const mocks = vi.hoisted(() => ({recognize: vi.fn(), inpaint: vi.fn(), background: vi.fn(), draw: vi.fn(), mangaRecognize:vi.fn(), repair:vi.fn(), mangaDraw:vi.fn(), sampleManga:vi.fn(), alphaProtection:vi.fn(), encode:vi.fn()}));
 vi.mock('@/src/features/image-translation/services/mangaAlphaProtection',()=>({planMangaAlphaProtection:mocks.alphaProtection}));
@@ -225,7 +226,7 @@ describe('Offscreen 图片完整操作生命周期', () => {
         const result = await translateImageInOffscreen('original-image', 'en', 'Page', controller.signal, 'image-1');
         expect(result).toEqual({image: 'data:image/png;base64,translated', lines: [{...lines[0], text: '你好', sourceText: 'Hello', backgroundColor: 'transparent'}]});
         expect(images).toHaveLength(1);
-        expect(mocks.recognize).toHaveBeenCalledWith('original-image', 'en', controller.signal, {decodedImage:images[0], onProgress:expect.any(Function)});
+        expect(mocks.recognize).toHaveBeenCalledWith('original-image', 'en', controller.signal, {decodedImage:images[0], includeMangaNumericConfidence:true, onProgress:expect.any(Function)});
         expect(canvases[0].context.drawImage).toHaveBeenCalledWith(images[0], 0, 0, 32, 16);
         expect(mocks.background).toHaveBeenCalledOnce();
         expect(sendMessage.mock.calls.filter(([message]) => message.type === 'fluentReadImageProgress').map(([message]) => message.stage))
@@ -608,4 +609,300 @@ describe('Offscreen 图片文本 RPC 预算', () => {
             await expect(translateImageTextsInExtension(['text'], '', 'response')).rejects.toThrow(response?.error || '图片文字翻译失败');
         },
     );
+});
+
+describe('漫画数字证据：保留源文且不发送或重绘独立数字',()=>{
+    const numeric={text:'12:34',bbox:{x0:3,y0:7,x1:27,y1:13},numericConfidence:96};
+    it.each(['ru','ko'])('纯数字 %s 返回阅读行和空 patches，不访问翻译服务或画布',async language=>{
+        mocks.recognize.mockResolvedValueOnce([numeric]);
+        const result=await translateImageInOffscreen('numbers',language,'Page',undefined,'numbers-only',true,'paddle');
+        expect(mocks.recognize).toHaveBeenCalledWith('numbers',language,undefined,expect.objectContaining({includeMangaNumericConfidence:true}));
+        expect(result).toEqual({image:'',mangaPatches:{width:32,height:16,patches:[]},lines:[{text:'12:34',sourceText:'12:34',bbox:numeric.bbox,fontSize:6,sourceBoxes:[numeric.bbox],backgroundColor:'transparent'}]});
+        expect(sendMessage.mock.calls.some(([m])=>m.type==='fluentReadImageTranslateTexts')).toBe(false);
+        expect(mocks.repair).not.toHaveBeenCalled();expect(mocks.mangaDraw).not.toHaveBeenCalled();expect(canvases).toHaveLength(0);
+    });
+    it('数字与正文相邻时独立保留，provider 和清字只接收文字行，返回顺序对应原行',async()=>{
+        const label={text:'안녕',bbox:{x0:3,y0:1,x1:24,y1:5}};
+        mocks.recognize.mockResolvedValueOnce([label,numeric]);mocks.repair.mockImplementationOnce(async pixels=>pixels);
+        const result=await translateImageInOffscreen('mixed','ko','Page',undefined,'numeric-mixed',true,'paddle');
+        expect(sendMessage.mock.calls.filter(([m])=>m.type==='fluentReadImageTranslateTexts')[0][0].texts).toEqual(['안녕']);
+        expect(result.lines.map(line=>[line.sourceText,line.text])).toEqual([['안녕','你好'],['12:34','12:34']]);
+        expect(result.lines[0]).toMatchObject({renderSkipped:true});
+        expect(result.mangaPatches?.patches).toEqual([]);
+        expect(mocks.repair).not.toHaveBeenCalled();
+        expect(mocks.mangaDraw).not.toHaveBeenCalled();
+    });
+    it('数字在文字之前仍按原顺序返回，多个数字均不送 provider',async()=>{
+        const first={...numeric,text:'09:15',bbox:{x0:3,y0:0,x1:15,y1:3}};
+        const label={text:'안녕',bbox:{x0:3,y0:5,x1:24,y1:8}};
+        mocks.recognize.mockResolvedValueOnce([first,label,numeric]);mocks.repair.mockImplementationOnce(async pixels=>pixels);
+        const result=await translateImageInOffscreen('ordered','ko','Page',undefined,'numeric-order',true,'paddle');
+        expect(sendMessage.mock.calls.filter(([m])=>m.type==='fluentReadImageTranslateTexts')[0][0].texts).toEqual(['안녕']);
+        expect(result.lines.map(line=>line.sourceText)).toEqual(['09:15','안녕','12:34']);
+    });
+    it('取消后不返回数字阅读结果，也不启动网络和修补',async()=>{
+        const controller=new AbortController();mocks.recognize.mockImplementationOnce(async()=>{controller.abort();return [numeric];});
+        await expect(translateImageInOffscreen('cancel-numbers','ko','Page',controller.signal,'cancel-numbers',true,'paddle')).rejects.toThrow('已取消');
+        expect(sendMessage.mock.calls.some(([m])=>m.type==='fluentReadImageTranslateTexts')).toBe(false);expect(mocks.repair).not.toHaveBeenCalled();
+    });
+});
+
+
+describe('漫画数字保护的绘制边界',()=>{
+    it.each(['ru','ja'])('%s 的相邻修补框与数字相交时只返回可读译文',async language=>{
+        const text={text:language==='ru'?'Привет':'こんにちは',bbox:{x0:2,y0:2,x1:11,y1:6},fontSize:4,sourceBoxes:[{x0:2,y0:2,x1:11,y1:6}]};
+        const number={text:'12:34',bbox:{x0:12,y0:2,x1:27,y1:6},fontSize:4,sourceBoxes:[{x0:12,y0:2,x1:27,y1:6}]};
+        if(language==='ru') mocks.recognize.mockResolvedValueOnce([{...text},{...number,numericConfidence:97}]);
+        else mocks.mangaRecognize.mockResolvedValueOnce([text,number]);
+        const result=await translateImageInOffscreen('collision',language,'Page',undefined,'collision',true);
+        expect(result.lines.map(line=>line.sourceText)).toEqual(expect.arrayContaining([text.text,number.text]));
+        expect(result.lines.find(line=>line.sourceText===text.text)).toMatchObject({text:'你好',renderSkipped:true});
+        expect(result.mangaPatches?.patches).toEqual([]);
+        expect(mocks.repair).not.toHaveBeenCalled();expect(mocks.mangaDraw).not.toHaveBeenCalled();
+        expect(sendMessage.mock.calls.filter(([message])=>message.type==='fluentReadImageTranslateTexts')[0][0].texts).toEqual([text.text]);
+    });
+    it('间距足够时只绘制非数字区域',async()=>{
+        imageOptions.push({width:100,height:80});
+        const text={text:'안녕',bbox:{x0:2,y0:2,x1:25,y1:10}};
+        const number={text:'12:34',bbox:{x0:50,y0:40,x1:80,y1:50},numericConfidence:98};
+        mocks.recognize.mockResolvedValueOnce([text,number]);mocks.repair.mockImplementationOnce(async pixels=>pixels);
+        const result=await translateImageInOffscreen('separate','ko','Page',undefined,'separate',true);
+        expect(mocks.repair.mock.calls[0][3]).toHaveLength(1);
+        expect(mocks.mangaDraw.mock.calls[0][4][0].text).toBe('你好');
+        expect(result.lines.every(line=>!line.renderSkipped)).toBe(true);
+    });
+});
+
+
+it('相邻数字与远处正文同时存在时，模拟修补像素只触及远处正文',async()=>{
+    imageOptions.push({width:100,height:80});
+    const close={text:'Привет',bbox:{x0:2,y0:2,x1:19,y1:10}};
+    const numeric={text:'12:34',bbox:{x0:20,y0:2,x1:40,y1:10},numericConfidence:98};
+    const distant={text:'Пока',bbox:{x0:4,y0:50,x1:35,y1:60}};
+    mocks.recognize.mockResolvedValueOnce([close,numeric,distant]);
+    sendMessage.mockImplementation((message,callback)=>callback(message.type==='fluentReadImageTranslateTexts'?{success:true,translations:['你好','再见']}:undefined));
+    let raster:Uint8ClampedArray|undefined;
+    mocks.repair.mockImplementationOnce(async(pixels,width,height,regions)=>{
+        raster=pixels;for(const region of regions)for(const b of mangaMaskBoxes(region,width,height))
+            for(let y=b.y0;y<b.y1;y++)for(let x=b.x0;x<b.x1;x++)pixels[(y*width+x)*4]=255;
+        return pixels;
+    });
+    const result=await translateImageInOffscreen('pixel-conflict','ru','Page',undefined,'pixels',true);
+    expect(result.lines.find(line=>line.sourceText===close.text)).toMatchObject({renderSkipped:true});
+    expect(result.lines.find(line=>line.sourceText===distant.text)).not.toHaveProperty('renderSkipped');
+    expect(raster).toBeDefined();
+    for(let y=numeric.bbox.y0;y<numeric.bbox.y1;y++)for(let x=numeric.bbox.x0;x<numeric.bbox.x1;x++)
+        expect(raster![(y*100+x)*4]).toBe(0);
+    expect(raster![(55*100+10)*4]).toBe(255);
+});
+
+
+describe('漫画与普通图片数值保护',()=>{
+    const box={x0:50,y0:40,x1:80,y1:50};
+    it('密集数值重复框不提前耗尽预算，远处真实修补仍不触及数字像素',async()=>{
+        const {collectMangaRegions}=await import('@/src/features/image-translation/services/mangaBubbles');
+        const numbers=Array.from({length:600},(_,i)=>({text:'90%',confidence:.99,
+            box:{x:100+(i%30)*20,y:100+Math.floor(i/30)*20,width:10,height:10}}));
+        const regions=collectMangaRegions({results:numbers,numericEvidence:numbers},'en',1000,1000,'manga');
+        expect(regions).toHaveLength(600);expect(regions.some(line=>line.guardOnly)).toBe(false);
+        const bbox={x0:2,y0:2,x1:10,y1:10};
+        const label={text:'Hello',bbox,fontSize:8,sourceBoxes:Array.from({length:900},()=>({...bbox}))};
+        imageOptions.push({width:1000,height:1000});mocks.mangaRecognize.mockResolvedValueOnce([label,...regions]);
+        let pixels:Uint8ClampedArray|undefined;
+        vi.stubGlobal('document',{createElement:vi.fn(()=>{const canvas=makeCanvas();canvas.context.getImageData.mockImplementation(()=>{
+            pixels=new Uint8ClampedArray(canvas.width*canvas.height*4).fill(255);pixels[(5*1000+5)*4]=0;pixels[(105*1000+105)*4]=0;return {data:pixels};
+        });return canvas;})});
+        const actual=await vi.importActual<typeof import('@/src/features/image-translation/services/mangaInpainting')>('@/src/features/image-translation/services/mangaInpainting');
+        mocks.repair.mockImplementationOnce(async(data,width,height,translated)=>{
+            for(const region of translated){const patch=actual.createMangaPatch(data,width,height,region);
+                actual.applyMangaPatch(data,width,region,patch,new Float32Array(patch.patch.width*patch.patch.height*3).fill(1));}
+            return data;
+        });
+        const result=await translateImageInOffscreen('dense','en','Page',undefined,'dense-numbers',true,'paddle');
+        expect(result.lines[0]).toMatchObject({sourceText:'Hello',text:'你好'});expect(result.lines[0]).not.toHaveProperty('renderSkipped');
+        expect(mocks.repair).toHaveBeenCalledOnce();expect(pixels![(5*1000+5)*4]).toBe(255);
+        expect(pixels![(105*1000+105)*4]).toBe(0);
+    });
+    it('保护比较预算耗尽时即使数字并不邻近也保守跳过绘制并返回阅读译文',async()=>{
+        imageOptions.push({width:100,height:80});
+        const bbox={x0:2,y0:2,x1:10,y1:10};
+        const text={text:'Hello',bbox,fontSize:8,sourceBoxes:Array.from({length:1001},()=>({...bbox}))};
+        const numbers=Array.from({length:1000},()=>({text:'90%',bbox:{x0:80,y0:60,x1:90,y1:70},fontSize:10}));
+        mocks.mangaRecognize.mockResolvedValueOnce([text,...numbers]);
+        const result=await translateImageInOffscreen('budget','en','Page',undefined,'numeric-budget',true,'paddle');
+        expect(result.lines[0]).toMatchObject({sourceText:'Hello',text:'你好',renderSkipped:true});
+        expect(result.mangaPatches?.patches).toEqual([]);
+        expect(mocks.repair).not.toHaveBeenCalled();expect(mocks.mangaDraw).not.toHaveBeenCalled();
+    });
+    it.each(['90%','９０％','3.14','3,14','1,000','1,000,000','1 000','90 %','1,234.50','€1.234,56','1.234,50 €','3,14%','38,5°C','−20','1/2','38°C'])('单图从 Tesseract 原始单词结果提取 %s 并保护原值',async text=>{
+        const {normalizeOcrLineViews}=await import('@/src/features/image-translation/core');
+        const raw=[{paragraphs:[{lines:[{text,bbox:box,confidence:99,words:[{text,bbox:box,confidence:99}]}]}]}];
+        const recognized=normalizeOcrLineViews(raw).manga;
+        expect(recognized).toMatchObject([{text,bbox:box,numericConfidence:99}]);
+        imageOptions.push({width:100,height:80});mocks.recognize.mockResolvedValueOnce(recognized);
+        const result=await translateImageInOffscreen('numbers','ja','Page',undefined,'image-raw',false,'tesseract');
+        expect(result.lines.map(line=>line.text)).toEqual([text]);expect(result.image).toBe('numbers');
+        expect(sendMessage.mock.calls.some(([m])=>m.type==='fluentReadImageTranslateTexts')).toBe(false);
+        expect(mocks.inpaint).not.toHaveBeenCalled();expect(mocks.draw).not.toHaveBeenCalled();
+    });
+    it.each(['42','08:45','$19.99','90%','９０％','3.14','3,14','1,000','1,000,000','1 000','90 %','1,234.50','€1.234,56','1.234,50 €','3,14%','38,5°C','−20','1/2','38°C'])('单图 Paddle 数值 %s 只读原文，不发翻译和画布',async text=>{
+        const {collectMangaRegions}=await import('@/src/features/image-translation/services/mangaBubbles');
+        const recognized=collectMangaRegions({results:[{text,confidence:.99,box:{x:50,y:40,width:30,height:10}}]},'ja',100,80,'image');
+        imageOptions.push({width:100,height:80});mocks.mangaRecognize.mockResolvedValueOnce(recognized);
+        const result=await translateImageInOffscreen('numbers','ja','Page',undefined,'image-paddle',false,'paddle');
+        expect(result.lines.map(line=>[line.sourceText,line.text])).toEqual([[text,text]]);
+        expect(result.image).toBe('numbers');
+        expect(sendMessage.mock.calls.some(([m])=>m.type==='fluentReadImageTranslateTexts')).toBe(false);
+        expect(mocks.inpaint).not.toHaveBeenCalled();expect(mocks.draw).not.toHaveBeenCalled();expect(canvases).toHaveLength(0);
+    });
+    it.each(['1','７','42','08:45','$19.99','90%','９０％','3.14','3,14','1,000','1,000,000','1 000','90 %','1,234.50','€1.234,56','1.234,50 €','3,14%','38,5°C','−20','1/2','38°C'])('单图 Tesseract 数值 %s 只读原文，不发翻译和画布',async text=>{
+        imageOptions.push({width:100,height:80});mocks.recognize.mockResolvedValueOnce([{text,bbox:box,numericConfidence:99}]);
+        const result=await translateImageInOffscreen('numbers','ja','Page',undefined,'image-tesseract',false,'tesseract');
+        expect(result.lines.map(line=>[line.sourceText,line.text])).toEqual([[text,text]]);
+        expect(result.image).toBe('numbers');
+        expect(sendMessage.mock.calls.some(([m])=>m.type==='fluentReadImageTranslateTexts')).toBe(false);
+        expect(mocks.inpaint).not.toHaveBeenCalled();expect(mocks.draw).not.toHaveBeenCalled();expect(canvases).toHaveLength(0);
+    });
+    it.each(['paddle','tesseract'] as const)('单图 %s 将邻近冲突对白保留为阅读译文，只对远处正文执行真实修补',async engine=>{
+        const close={text:'Close',bbox:{x0:2,y0:2,x1:19,y1:10}};
+        const numeric={text:'90%',bbox:{x0:20,y0:2,x1:40,y1:10}};
+        const distant={text:'Away',bbox:{x0:4,y0:50,x1:35,y1:60}};
+        imageOptions.push({width:100,height:80});
+        if(engine==='tesseract')mocks.recognize.mockResolvedValueOnce([close,{...numeric,numericConfidence:99},distant]);
+        else {
+            const {collectMangaRegions}=await import('@/src/features/image-translation/services/mangaBubbles');
+            const items=[close,numeric,distant].map(({text,bbox})=>({text,confidence:.99,box:{x:bbox.x0,y:bbox.y0,width:bbox.x1-bbox.x0,height:bbox.y1-bbox.y0}}));
+            mocks.mangaRecognize.mockResolvedValueOnce(collectMangaRegions({results:items},'en',100,80,'image'));
+        }
+        sendMessage.mockImplementation((message,callback)=>callback(message.type==='fluentReadImageTranslateTexts'?{success:true,translations:['近','远']}:undefined));
+        const actual=await vi.importActual<typeof import('@/src/features/image-translation/services/inpainting')>('@/src/features/image-translation/services/inpainting');
+        let pixels:Uint8ClampedArray|undefined;let original:Uint8ClampedArray|undefined;
+        vi.stubGlobal('document',{createElement:vi.fn(()=>{
+            const canvas=makeCanvas();canvas.context.getImageData.mockImplementation(()=>{
+                pixels=new Uint8ClampedArray(canvas.width*canvas.height*4).fill(255);
+                for(let y=2;y<10;y++)for(let x=20;x<40;x++)pixels[(y*100+x)*4]=0;
+                for(let y=50;y<60;y++)for(let x=4;x<35;x++)pixels[(y*100+x)*4]=0;
+                original=pixels.slice();return {data:pixels};
+            });return canvas;
+        })});
+        mocks.inpaint.mockImplementation(actual.inpaintTextRegions);
+        const result=await translateImageInOffscreen('mixed','en','Page',undefined,'collision',false,engine);
+        expect(sendMessage.mock.calls.filter(([m])=>m.type==='fluentReadImageTranslateTexts')[0][0].texts).toEqual(['Close','Away']);
+        expect(result.lines.find(line=>line.sourceText==='90%')).toMatchObject({text:'90%'});
+        expect(result.lines.find(line=>line.sourceText==='Close')).toMatchObject({text:'近',renderSkipped:true});
+        expect(result.lines.find(line=>line.sourceText==='Away')).toMatchObject({text:'远'});
+        expect(mocks.inpaint.mock.calls[0][3]).toHaveLength(1);expect(mocks.inpaint.mock.calls[0][3][0].text).toBe('远');
+        expect(mocks.draw).toHaveBeenCalledOnce();expect(pixels).toBeDefined();
+        for(let y=2;y<10;y++)for(let x=20;x<40;x++) {const i=(y*100+x)*4;expect(pixels!.slice(i,i+4)).toEqual(original!.slice(i,i+4));}
+        expect(pixels![(55*100+10)*4]).not.toBe(original![(55*100+10)*4]);
+    });
+});
+
+
+describe('低置信数值物理保护',()=>{
+    it('Tesseract 混排行低分数值词被过滤时，保留物理框并阻止邻近文字擦图',async()=>{
+        const {normalizeOcrLineViews,collectRawNumericGuards}=await import('@/src/features/image-translation/core');
+        const label={x0:2,y0:2,x1:19,y1:10},number={x0:20,y0:2,x1:40,y1:10};
+        const raw=[{text:'SALE 90%',bbox:{x0:2,y0:2,x1:40,y1:10},confidence:99,
+            words:[{text:'SALE',bbox:label,confidence:99},{text:'90%',bbox:number,confidence:20}]},
+            {text:'Away',bbox:{x0:4,y0:50,x1:35,y1:60},confidence:99}];
+        const blocks=[{paragraphs:[{lines:raw}]}],parsed=normalizeOcrLineViews(blocks).manga;
+        const recognized=[...parsed,...collectRawNumericGuards(blocks,parsed)];
+        expect(recognized.filter(line=>line.guardOnly)).toEqual([{text:'',bbox:number,guardOnly:true}]);
+        imageOptions.push({width:100,height:80});mocks.recognize.mockResolvedValueOnce(recognized);
+        sendMessage.mockImplementation((message,callback)=>callback(message.type==='fluentReadImageTranslateTexts'?{success:true,translations:['促销','远']}:undefined));
+        const result=await translateImageInOffscreen('mixed-word','en','Page',undefined,'mixed-word',false,'tesseract');
+        expect(sendMessage.mock.calls.filter(([m])=>m.type==='fluentReadImageTranslateTexts')[0][0].texts).toEqual(['SALE','Away']);
+        expect(result.lines.map(line=>line.sourceText)).toEqual(['SALE','Away']);
+        expect(result.lines[0]).toMatchObject({text:'促销',renderSkipped:true});expect(result.lines[1]).not.toHaveProperty('renderSkipped');
+        expect(mocks.inpaint.mock.calls[0][3]).toHaveLength(1);expect(mocks.inpaint.mock.calls[0][3][0].text).toBe('远');
+    });
+    it.each(['paddle-manga-low','paddle-manga-missing','paddle-image-low','paddle-image-missing','paddle-image-single','tesseract-manga-low','tesseract-manga-missing','tesseract-image-below-threshold'] as const)('%s 仅保护疑似数值，保留远处译文且不向服务发送数字',async scenario=>{
+        const manga=scenario.includes('manga'),engine=scenario.startsWith('paddle')?'paddle':'tesseract';
+        const sourceLanguage=engine==='tesseract'&&manga?'ko':'en';
+        const close={text:sourceLanguage==='ko'?'안녕':'Close',bbox:{x0:2,y0:2,x1:19,y1:10}};
+        const number={text:scenario.endsWith('single')?'1':'90%',bbox:{x0:20,y0:2,x1:40,y1:10}};
+        const distant={text:sourceLanguage==='ko'?'다음':'Away',bbox:{x0:4,y0:50,x1:35,y1:60}};
+        imageOptions.push({width:100,height:80});
+        if(engine==='paddle'){
+            const {collectMangaRegions}=await import('@/src/features/image-translation/services/mangaBubbles');
+            const items=[close,number,distant].map(({text,bbox},i)=>({text,confidence:i===1?(scenario.endsWith('missing')?undefined!:scenario.endsWith('single')?.99:.89):.99,box:{x:bbox.x0,y:bbox.y0,width:bbox.x1-bbox.x0,height:bbox.y1-bbox.y0}}));
+            const recognized=collectMangaRegions({results:items},sourceLanguage,100,80,manga?'manga':'image');
+            expect(recognized.filter(line=>!line.guardOnly).map(line=>line.text)).toEqual([close.text,distant.text]);
+            expect(recognized.some(line=>line.guardOnly)).toBe(true);mocks.mangaRecognize.mockResolvedValueOnce(recognized);
+        }else {
+            const {normalizeOcrLineViews,collectRawNumericGuards}=await import('@/src/features/image-translation/core');
+            const numberConfidence=scenario.endsWith('missing')?undefined:scenario.endsWith('threshold')?20:89;
+            const raw=[close,number,distant].map(({text,bbox},i)=>({text,bbox,confidence:i===1?numberConfidence:99,words:[{text,bbox,confidence:i===1?numberConfidence:99}]}));
+            const blocks=[{paragraphs:[{lines:raw}]}];
+            const recognized=[...normalizeOcrLineViews(blocks).manga,...collectRawNumericGuards(blocks)];
+            mocks.recognize.mockResolvedValueOnce(recognized);
+        }
+        sendMessage.mockImplementation((message,callback)=>callback(message.type==='fluentReadImageTranslateTexts'?{success:true,translations:['近','远']}:undefined));
+        let pixels:Uint8ClampedArray|undefined;let original:Uint8ClampedArray|undefined;
+        vi.stubGlobal('document',{createElement:vi.fn(()=>{
+            const canvas=makeCanvas();canvas.context.getImageData.mockImplementation(()=>{
+                pixels=new Uint8ClampedArray(canvas.width*canvas.height*4).fill(255);
+                pixels[(5*100+20)*4]=0;
+                for(let y=50;y<60;y++)for(let x=4;x<35;x++)pixels[(y*100+x)*4]=0;
+                original=pixels.slice();return {data:pixels};
+            });return canvas;
+        })});
+        if(manga){
+            const actual=await vi.importActual<typeof import('@/src/features/image-translation/services/mangaInpainting')>('@/src/features/image-translation/services/mangaInpainting');
+            mocks.repair.mockImplementationOnce(async(pixels,width,height,regions)=>{
+                for(const region of regions){const patch=actual.createMangaPatch(pixels,width,height,region);const white=new Float32Array(patch.patch.width*patch.patch.height*3).fill(1);actual.applyMangaPatch(pixels,width,region,patch,white);}return pixels;
+            });
+        }else {
+            const actual=await vi.importActual<typeof import('@/src/features/image-translation/services/inpainting')>('@/src/features/image-translation/services/inpainting');
+            mocks.inpaint.mockImplementation(actual.inpaintTextRegions);
+        }
+        const result=await translateImageInOffscreen('mixed',sourceLanguage,'Page',undefined,'numeric-negative',manga,engine);
+        expect(result.lines.map(line=>line.sourceText)).toEqual([close.text,distant.text]);
+        expect(result.lines[0]).toMatchObject({renderSkipped:true});
+        expect(sendMessage.mock.calls.filter(([m])=>m.type==='fluentReadImageTranslateTexts')[0][0].texts).toEqual([close.text,distant.text]);
+        expect(pixels).toBeDefined();
+        expect(pixels![(5*100+20)*4]).toBe(original![(5*100+20)*4]);
+        expect(pixels![(55*100+10)*4]).not.toBe(original![(55*100+10)*4]);
+    });
+    it('低分数字形态的绘画噪声只参与保护，但会保守跳过邻近译文',async()=>{
+        const {collectMangaRegions}=await import('@/src/features/image-translation/services/mangaBubbles');
+        const close={text:'Close',confidence:.99,box:{x:2,y:2,width:17,height:8}};
+        const artifact={text:'90%',confidence:.2,box:{x:20,y:2,width:20,height:8}};
+        const far={text:'Away',confidence:.99,box:{x:4,y:50,width:31,height:10}};
+        const recognized=collectMangaRegions({results:[close,artifact,far]},'en',100,80,'image');
+        imageOptions.push({width:100,height:80});mocks.mangaRecognize.mockResolvedValueOnce(recognized);
+        sendMessage.mockImplementation((message,callback)=>callback(message.type==='fluentReadImageTranslateTexts'?{success:true,translations:['近','远']}:undefined));
+        const result=await translateImageInOffscreen('art-noise','en','Page',undefined,'art-noise',false,'paddle');
+        expect(result.lines.map(line=>line.sourceText)).toEqual(['Close','Away']);
+        expect(result.lines[0]).toMatchObject({text:'近',renderSkipped:true});
+        expect(result.lines[1]).not.toHaveProperty('renderSkipped');
+        expect(sendMessage.mock.calls.filter(([m])=>m.type==='fluentReadImageTranslateTexts')[0][0].texts).toEqual(['Close','Away']);
+    });
+    it.each(['invalid','too-many'] as const)('保护框 %s 时明确报错，不请求翻译或发布部分图片',async problem=>{
+        imageOptions.push({width:100,height:80});
+        const label={text:'Hello',bbox:{x0:1,y0:1,x1:10,y1:8},fontSize:7};
+        const guards=problem==='invalid'?[{text:'',bbox:{x0:NaN,y0:1,x1:10,y1:8},guardOnly:true}]
+            :Array.from({length:4097},(_,i)=>({text:'',bbox:{x0:i/100,y0:10,x1:i/100+.5,y1:11},guardOnly:true}));
+        mocks.mangaRecognize.mockResolvedValueOnce([label,...guards]);
+        await expect(translateImageInOffscreen('guard-error','en','Page',undefined,'guard-error',true,'paddle'))
+            .rejects.toThrow(problem==='invalid'?'图片数字保护位置无效':'图片数字保护区域过于复杂');
+        expect(sendMessage.mock.calls.some(([m])=>m.type==='fluentReadImageTranslateTexts')).toBe(false);
+        expect(mocks.repair).not.toHaveBeenCalled();expect(mocks.mangaDraw).not.toHaveBeenCalled();
+    });
+    it('完全位于原图外的疑似框不阻止正文翻译',async()=>{
+        const label={text:'Hello',bbox:{x0:2,y0:2,x1:10,y1:8},fontSize:6};
+        const outside={text:'',bbox:{x0:200,y0:200,x1:210,y1:210},guardOnly:true};
+        imageOptions.push({width:100,height:80});mocks.mangaRecognize.mockResolvedValueOnce([label,outside]);
+        mocks.repair.mockImplementationOnce(async pixels=>pixels);
+        const result=await translateImageInOffscreen('outside-guard','en','Page',undefined,'outside-guard',true,'paddle');
+        expect(result.lines).toHaveLength(1);expect(result.lines[0]).not.toHaveProperty('renderSkipped');
+        expect(mocks.repair).toHaveBeenCalledOnce();
+    });
+    it('含疑似数值的识别结果在取消后不发翻译也不发布图像',async()=>{
+        const controller=new AbortController();
+        mocks.mangaRecognize.mockImplementationOnce(async()=>{controller.abort();return [{text:'',bbox:{x0:1,y0:1,x1:10,y1:8},guardOnly:true}];});
+        await expect(translateImageInOffscreen('guard-cancel','en','Page',controller.signal,'guard-cancel',true,'paddle')).rejects.toMatchObject({name:'AbortError'});
+        expect(sendMessage.mock.calls.some(([m])=>m.type==='fluentReadImageTranslateTexts')).toBe(false);expect(mocks.repair).not.toHaveBeenCalled();
+    });
 });

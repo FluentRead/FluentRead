@@ -22,6 +22,10 @@ PaddleOCR automatically enhances recognition contrast for some colored text on l
 2. Click the manga button. If resources are missing, confirm preparation; choosing Later or closing the prompt starts no download.
 3. Visible pages translate first. Scroll to translate more pages, click the manga button again to show originals and pause, and click again to resume.
 
+After starting, expand the controls next to the manga button and choose **View manga text**. Select a visible page or long-image segment to read, compare, or copy its completed text. Click the entry again to close it. Numbers identify the current visible candidates, not chapter page numbers.
+
+The panel reads existing results without starting recognition or translation. It reports when a page is still processing, a result has been released, or content is too large to display; return to the page and check again. A long-image segment may include text from adjacent segments. Canvas text comes from the latest completed translation snapshot and may not reflect later changes to the canvas.
+
 By default, FluentRead prepares the next **3 images** already loaded by the website. Choose **0–5** in settings; 0 translates visible pages only. More upcoming pages use more device resources and translation requests. It does not load an entire chapter or the next chapter for you.
 
 Failed pages keep their originals while other pages continue. Switch to originals and back to retry. Changing chapters, leaving the page, or disabling manga translation stops old work. Image translation and floating-button switches are independent of manga; adjust its separate entry under **Standalone manga button**.
@@ -52,7 +56,7 @@ Small or decorative text, names, tilted lettering, and background repairs can be
 - **Translation fails:** retry as prompted or change the image translation service. After an extension update or reload, refresh the webpage first.
 - **A local model fails:** use **Adjust local model** to check resources and supported languages, or **Change image translation service**. Return to the image and retry after making changes. Text is not automatically sent to an online service instead.
 
-Numbers, URLs, version numbers, and similar identifiers remain unchanged. You can still read and copy recognized text when nothing needs translating. Animated images produce a static translation; switch back to see the animation. Repairs may leave visible marks, and the original can always be restored.
+Numbers, times, dates, amounts and percentages recognized as separate lines remain in the original image and are not sent for translation. If nearby translated text would cover one, that text is available in the text panel instead. Numbers within a text line may not be protected separately; check the original. URLs, version numbers, and similar identifiers may also remain unchanged. You can still read and copy recognized text when nothing needs translating. Animated images produce a static translation; switch back to see the animation. Repairs may leave visible marks, and the original can always be restored.
 
 <details class="guide-details">
 <summary>Source language and language packs</summary>

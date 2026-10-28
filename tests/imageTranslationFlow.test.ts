@@ -185,6 +185,18 @@ describe('图片翻译流程优化',()=>{
         expect(ui.button.parentElement!.parentElement).toBe(ui.element);expect(ui.feedback.querySelector('button')).toBeNull();ui.dispose();
     });
 
+    it('漫画单页排队时提供取消操作，开始处理后恢复普通轻量进度', () => {
+        const {document} = parseHTML('<html><body></body></html>');vi.stubGlobal('document', document);
+        const ui = createImageControls({onAction(){},onPrepare(){},translate:source=>translateLegacyText(source,'en-US')});
+        ui.update('loading', '等待上一项任务结束…', {quiet:true, queued:true});
+        expect(ui.feedback.hidden).toBe(false);expect(ui.feedback.dataset.queued).toBe('true');
+        expect(ui.status.textContent).toBe('Waiting for the previous task…');
+        expect(ui.button.parentElement!.parentElement).toBe(ui.feedback);expect(ui.button.textContent).toBe('Cancel');
+        ui.update('loading', '正在识别图片文字…', {quiet:true});
+        expect(ui.feedback.dataset.queued).toBe('false');expect(ui.feedback.querySelector('button')).toBeNull();
+        expect(ui.button.parentElement!.parentElement).toBe(ui.element);ui.dispose();
+    });
+
     it('漫画错误恢复保留详情、键盘和设置入口，拒绝合成动作且不触发宿主翻页快捷键', () => {
         const {document,window} = parseHTML('<html><body></body></html>');vi.stubGlobal('document',document);
         const onAction=vi.fn(),onDismiss=vi.fn(),onSettings=vi.fn();
@@ -703,4 +715,34 @@ describe('图片结果面板所有权', () => {
         expect(ui.reader.hidden).toBe(true);expect(inspect.getAttribute('aria-expanded')).toBe('false');
         ui.dispose();
     });
+});
+
+
+it('漫画未绘制提示在安静完成状态仍可见并在恢复后撤下',()=>{
+    const {document}=parseHTML('<html><body></body></html>');vi.stubGlobal('document',document);
+    const ui=createImageControls({onAction:()=>{},onPrepare:()=>{}});
+    ui.update('translated','部分译文未绘制，请查看漫画文字',{quiet:true,warning:true,warningAction:true});
+    expect(ui.feedback.hidden).toBe(false);expect(ui.status.hidden).toBe(true);
+    const warning=ui.feedback.querySelector('.fr-image-warning-button')!;
+    expect(warning.textContent).toBe('未绘制');expect(warning.getAttribute('aria-label')).toBe('部分译文未绘制，请查看漫画文字');
+    ui.update('idle','翻译图片',{quiet:true});expect(ui.feedback.hidden).toBe(true);ui.dispose();
+});
+
+
+it('纯识别状态以短文案显示并保留完整无障碍说明',()=>{
+    const {document}=parseHTML('<html><body></body></html>');vi.stubGlobal('document',document);
+    const ui=createImageControls({onAction:()=>{},onPrepare:()=>{}});
+    ui.update('translated','已识别文字，原图未改动',{quiet:true,warning:true});
+    expect(ui.feedback.hidden).toBe(false);expect(ui.status.textContent).toBe('已识别');
+    expect(ui.status.getAttribute('aria-label')).toBe('已识别文字，原图未改动');ui.dispose();
+});
+
+
+it('警示按钮只对可信点击调用阅读入口',()=>{
+    const {document,window}=parseHTML('<html><body></body></html>');vi.stubGlobal('document',document);
+    const onWarning=vi.fn(),ui=createImageControls({onAction:()=>{},onPrepare:()=>{},onWarning});
+    ui.update('translated','部分译文未绘制，请查看漫画文字',{quiet:true,warning:true,warningAction:true});
+    const warning=ui.feedback.querySelector('.fr-image-warning-button')!;
+    for(const trusted of [false,true]){const event=new window.Event('click',{bubbles:true});Object.defineProperty(event,'isTrusted',{value:trusted});warning.dispatchEvent(event);}
+    expect(onWarning).toHaveBeenCalledOnce();ui.dispose();
 });

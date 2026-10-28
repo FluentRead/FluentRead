@@ -23,6 +23,33 @@ function setup(){
 afterEach(async()=>{vi.restoreAllMocks();const opened=databases.splice(0),names=new Set(opened.map(db=>db.name));for(const db of opened)db.close();for(const name of names)await Dexie.delete(name);clock.now=100;});
 
 describe('material staging stored metadata boundaries',()=>{
+  it.each(['seal','commit'] as const)('stops %s when cancellation occurs during the admission clock read',async action=>{
+    const db=new MaterialDatabase(`material-stage-a-${crypto.randomUUID()}`);databases.push(db);
+    const controller=new AbortController();let cancelOnRead=false;
+    const stage=createStage(db,{clock:()=>{if(cancelOnRead){cancelOnRead=false;controller.abort();}return 100;},limits:{ttlMs:1000}});
+    const cap=createMaterialImportCapability();await stage.beginRecoverable(manifest,guard,cap,{deadline:1000});
+    if(action==='commit')await stage.seal(cap);
+    cancelOnRead=true;
+    await expect(stage[action](cap,{signal:controller.signal})).rejects.toThrow('cancelled');
+    expect(controller.signal.aborted).toBe(true);
+    expect(await db.table('stageReceipts').count()).toBe(0);
+    expect(await db.table('stageSessions').count()).toBe(1);
+    expect(await stage.status(cap)).toEqual({state:action==='seal'?'open':'sealed',nextSeq:0});
+    if(action==='seal')await stage.seal(cap);
+    expect(await stage.commit(cap)).toEqual({inserted:0,updated:0,skipped:0});
+  });
+  it('does not write an append cancelled while the admission clock is read',async()=>{
+    const db=new MaterialDatabase(`material-stage-a-${crypto.randomUUID()}`);databases.push(db);
+    const controller=new AbortController();let cancelOnRead=false;
+    const stage=createStage(db,{clock:()=>{if(cancelOnRead){cancelOnRead=false;controller.abort();}return 100;},limits:{ttlMs:1000}});
+    const {input,frame}=sampleFrame(),cap=createMaterialImportCapability();
+    await stage.beginRecoverable(input,guard,cap,{deadline:1000});
+    cancelOnRead=true;
+    await expect(stage.append(cap,frame,{signal:controller.signal})).rejects.toThrow('cancelled');
+    expect(controller.signal.aborted).toBe(true);expect(await db.table('stageFrames').count()).toBe(0);
+    expect(await stage.status(cap)).toEqual({state:'open',nextSeq:0});
+    await vi.waitFor(async()=>expect(await stage.append(cap,frame)).toEqual({nextSeq:1}));
+  });
   it('rejects a missing capability before touching storage',async()=>{
     const {db,stage}=setup();
     await expect(stage.resume(null as never)).rejects.toThrow('session unavailable');

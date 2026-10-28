@@ -468,17 +468,18 @@ export function createMangaCanvas<T extends object = HTMLCanvasElement>(ports: {
         return fingerprint&&id?`${id}:${fingerprint}:${ports.configurationIdentity()}`:null;
     }
 
-    function readingVisible(canvas:T,verifiedIdentity?:string|null,readingHost?:HTMLElement|null):boolean {
+    function readingVisible(canvas:T,verifiedIdentity?:string|null,readingHost?:HTMLElement|null,waiting=false):boolean {
         try {
             const state=states.get(canvas),element=anchor(canvas);
-            if(!state||!state.showing||!element.isConnected||document.hidden
-                ||!ports.enabled()||(verifiedIdentity===undefined?readingIdentity(canvas):verifiedIdentity)!==state.identity)return false;
+            const identity=verifiedIdentity===undefined?readingIdentity(canvas):verifiedIdentity;
+            if(!identity||!element.isConnected||document.hidden||!ports.enabled()
+                ||(!waiting&&(!state||!state.showing||identity!==state.identity)))return false;
             const rect=ports.source?ports.source.readingBounds?.(canvas):element.getBoundingClientRect();
             if(!rect||rect.width<=0||rect.height<=0)return false;
             let left=Math.max(0,rect.left),right=Math.min(window.innerWidth,rect.right),top=Math.max(0,rect.top),bottom=Math.min(window.innerHeight,rect.bottom);
             for(let parent:Element|null=element;parent;parent=parent.parentElement){
                 const style=getComputedStyle(parent);
-                const opacity=parent===element&&state.sourceLease?state.sourceLease.computedOpacity:style.opacity;
+                const opacity=parent===element&&state?.identity===identity&&state.sourceLease?state.sourceLease.computedOpacity:style.opacity;
                 if(style.display==='none'||style.visibility==='hidden'||style.visibility==='collapse'||opacity==='0')return false;
                 if(parent===document.documentElement||parent===document.scrollingElement)continue;
                 if(/^(hidden|clip|auto|scroll)$/.test(style.overflowX)||/^(hidden|clip|auto|scroll)$/.test(style.overflowY)){

@@ -175,6 +175,14 @@ export function createMangaSession<T = HTMLImageElement>(ports: {
             }
             return result.sort((a,b)=>a.ordinal-b.ordinal);
         },
+        /** 查询仍属于当前可见会话的排队或失败页，不启动翻译。 */
+        readingWaiting(image:T, identity:string):'pending'|'error'|undefined {
+            const page=pages.get(image);
+            if(disposed || !active || suspended || !page || page.identity!==identity
+                || !page.visible || !page.retained || !page.scheduled)return;
+            if(page.failed)return 'error';
+            if(!page.completed && (!page.attempted || running?.image===image))return 'pending';
+        },
         // 事件到达时同步关闸，防止上一页的 finally 在下一次布局测量前启动排队预译。
         deferScheduling() { if (!disposed) schedulingDeferred = true; },
         retry(image: T): boolean {

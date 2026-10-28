@@ -1479,25 +1479,27 @@ export function mountImageTranslator(): void {
                 const controller=source.kind==='canvas'?mangaCanvas:source.kind==='background'?mangaBackground:mangaSegments;
                 return controller?.readingVersion(source.surface as never);
             },
-            live: source => {
+            live: (source,waiting) => {
                 if(source.kind!=='image') {
                     const controller=source.kind==='canvas'?mangaCanvas:source.kind==='background'?mangaBackground:mangaSegments;
                     if(!controller)return false;
                     // 各载体必须明确提供无网络、副作用的来源查询。
                     const surface=source.surface as never;
                     const identity=controller.readingIdentity(surface);
-                    return identity===source.identity&&controller.readingVisible(surface,identity,mangaReadingOverlay?.host);
+                    return identity===source.identity&&controller.readingVisible(surface,identity,mangaReadingOverlay?.host,waiting);
                 }
                 const image=source.surface as HTMLImageElement,state=states.get(image);
-                if(!state||!state.manga||!image.isConnected||!imageTranslationAllowed(true)
+                if((!state||!state.manga)&&!waiting)return false;
+                if(!image.isConnected||!imageTranslationAllowed(true)
                     ||source.identity!==`${sourceIdentity(image)}:${configurationIdentity(true)}:${imageLoadTracker.revision(image)}`
-                    ||state.sourceIdentity!==sourceIdentity(image)||!presentationMatchesSource(image,state.presentation))return false;
-                const surface=state.presentation.element;
+                    ||(state?.manga && (state.sourceIdentity!==sourceIdentity(image)||!presentationMatchesSource(image,state.presentation))))return false;
+                const presentation=state?.manga?state.presentation:resolveImagePresentation(image);
+                const surface=presentation.element;
                 if(!surface.isConnected||typeof document.elementsFromPoint!=='function')return false;
                 const rect=surface.getBoundingClientRect();let left=Math.max(0,rect.left),right=Math.min(window.innerWidth,rect.right);
                 let top=Math.max(0,rect.top),bottom=Math.min(window.innerHeight,rect.bottom);
                 for(let item:Element|null=surface;item;item=item.parentElement){
-                    const style=getComputedStyle(item),opacity=item===surface&&state.sourceStyleLease?state.sourceStyleLease.computedOpacity:style.opacity;
+                    const style=getComputedStyle(item),opacity=item===surface&&state?.manga&&state.sourceStyleLease?state.sourceStyleLease.computedOpacity:style.opacity;
                     if(style.display==='none'||style.visibility==='hidden'||style.visibility==='collapse'||opacity==='0')return false;
                     if(item===document.documentElement||item===document.scrollingElement)continue;
                     if(item!==surface){const x=/^(hidden|clip|auto|scroll)$/.test(style.overflowX),y=/^(hidden|clip|auto|scroll)$/.test(style.overflowY);

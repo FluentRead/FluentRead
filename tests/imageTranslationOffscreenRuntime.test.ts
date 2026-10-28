@@ -1,4 +1,5 @@
 import {afterEach, beforeEach, describe, expect, it, vi} from 'vitest';
+import {mangaMaskBoxes} from '@/src/features/image-translation/mangaPatchResult';
 
 const mocks = vi.hoisted(() => ({recognize: vi.fn(), inpaint: vi.fn(), background: vi.fn(), draw: vi.fn(), mangaRecognize:vi.fn(), repair:vi.fn(), mangaDraw:vi.fn(), sampleManga:vi.fn(), alphaProtection:vi.fn(), encode:vi.fn()}));
 vi.mock('@/src/features/image-translation/services/mangaAlphaProtection',()=>({planMangaAlphaProtection:mocks.alphaProtection}));
@@ -608,4 +609,89 @@ describe('Offscreen 图片文本 RPC 预算', () => {
             await expect(translateImageTextsInExtension(['text'], '', 'response')).rejects.toThrow(response?.error || '图片文字翻译失败');
         },
     );
+});
+
+describe('漫画数字证据：保留源文且不发送或重绘独立数字',()=>{
+    const numeric={text:'12:34',bbox:{x0:3,y0:7,x1:27,y1:13},numericConfidence:96};
+    it.each(['ru','ko'])('纯数字 %s 返回阅读行和空 patches，不访问翻译服务或画布',async language=>{
+        mocks.recognize.mockResolvedValueOnce([numeric]);
+        const result=await translateImageInOffscreen('numbers',language,'Page',undefined,'numbers-only',true,'paddle');
+        expect(mocks.recognize).toHaveBeenCalledWith('numbers',language,undefined,expect.objectContaining({includeMangaNumericConfidence:true}));
+        expect(result).toEqual({image:'',mangaPatches:{width:32,height:16,patches:[]},lines:[{text:'12:34',sourceText:'12:34',bbox:numeric.bbox,fontSize:6,sourceBoxes:[numeric.bbox],backgroundColor:'transparent'}]});
+        expect(sendMessage.mock.calls.some(([m])=>m.type==='fluentReadImageTranslateTexts')).toBe(false);
+        expect(mocks.repair).not.toHaveBeenCalled();expect(mocks.mangaDraw).not.toHaveBeenCalled();expect(canvases).toHaveLength(0);
+    });
+    it('数字与正文相邻时独立保留，provider 和清字只接收文字行，返回顺序对应原行',async()=>{
+        const label={text:'안녕',bbox:{x0:3,y0:1,x1:24,y1:5}};
+        mocks.recognize.mockResolvedValueOnce([label,numeric]);mocks.repair.mockImplementationOnce(async pixels=>pixels);
+        const result=await translateImageInOffscreen('mixed','ko','Page',undefined,'numeric-mixed',true,'paddle');
+        expect(sendMessage.mock.calls.filter(([m])=>m.type==='fluentReadImageTranslateTexts')[0][0].texts).toEqual(['안녕']);
+        expect(result.lines.map(line=>[line.sourceText,line.text])).toEqual([['안녕','你好'],['12:34','12:34']]);
+        expect(result.lines[0]).toMatchObject({renderSkipped:true});
+        expect(result.mangaPatches?.patches).toEqual([]);
+        expect(mocks.repair).not.toHaveBeenCalled();
+        expect(mocks.mangaDraw).not.toHaveBeenCalled();
+    });
+    it('数字在文字之前仍按原顺序返回，多个数字均不送 provider',async()=>{
+        const first={...numeric,text:'09:15',bbox:{x0:3,y0:0,x1:15,y1:3}};
+        const label={text:'안녕',bbox:{x0:3,y0:5,x1:24,y1:8}};
+        mocks.recognize.mockResolvedValueOnce([first,label,numeric]);mocks.repair.mockImplementationOnce(async pixels=>pixels);
+        const result=await translateImageInOffscreen('ordered','ko','Page',undefined,'numeric-order',true,'paddle');
+        expect(sendMessage.mock.calls.filter(([m])=>m.type==='fluentReadImageTranslateTexts')[0][0].texts).toEqual(['안녕']);
+        expect(result.lines.map(line=>line.sourceText)).toEqual(['09:15','안녕','12:34']);
+    });
+    it('取消后不返回数字阅读结果，也不启动网络和修补',async()=>{
+        const controller=new AbortController();mocks.recognize.mockImplementationOnce(async()=>{controller.abort();return [numeric];});
+        await expect(translateImageInOffscreen('cancel-numbers','ko','Page',controller.signal,'cancel-numbers',true,'paddle')).rejects.toThrow('已取消');
+        expect(sendMessage.mock.calls.some(([m])=>m.type==='fluentReadImageTranslateTexts')).toBe(false);expect(mocks.repair).not.toHaveBeenCalled();
+    });
+});
+
+
+describe('漫画数字保护的绘制边界',()=>{
+    it.each(['ru','ja'])('%s 的相邻修补框与数字相交时只返回可读译文',async language=>{
+        const text={text:language==='ru'?'Привет':'こんにちは',bbox:{x0:2,y0:2,x1:11,y1:6},fontSize:4,sourceBoxes:[{x0:2,y0:2,x1:11,y1:6}]};
+        const number={text:'12:34',bbox:{x0:12,y0:2,x1:27,y1:6},fontSize:4,sourceBoxes:[{x0:12,y0:2,x1:27,y1:6}]};
+        if(language==='ru') mocks.recognize.mockResolvedValueOnce([{...text},{...number,numericConfidence:97}]);
+        else mocks.mangaRecognize.mockResolvedValueOnce([text,number]);
+        const result=await translateImageInOffscreen('collision',language,'Page',undefined,'collision',true);
+        expect(result.lines.map(line=>line.sourceText)).toEqual(expect.arrayContaining([text.text,number.text]));
+        expect(result.lines.find(line=>line.sourceText===text.text)).toMatchObject({text:'你好',renderSkipped:true});
+        expect(result.mangaPatches?.patches).toEqual([]);
+        expect(mocks.repair).not.toHaveBeenCalled();expect(mocks.mangaDraw).not.toHaveBeenCalled();
+        expect(sendMessage.mock.calls.filter(([message])=>message.type==='fluentReadImageTranslateTexts')[0][0].texts).toEqual([text.text]);
+    });
+    it('间距足够时只绘制非数字区域',async()=>{
+        imageOptions.push({width:100,height:80});
+        const text={text:'안녕',bbox:{x0:2,y0:2,x1:25,y1:10}};
+        const number={text:'12:34',bbox:{x0:50,y0:40,x1:80,y1:50},numericConfidence:98};
+        mocks.recognize.mockResolvedValueOnce([text,number]);mocks.repair.mockImplementationOnce(async pixels=>pixels);
+        const result=await translateImageInOffscreen('separate','ko','Page',undefined,'separate',true);
+        expect(mocks.repair.mock.calls[0][3]).toHaveLength(1);
+        expect(mocks.mangaDraw.mock.calls[0][4][0].text).toBe('你好');
+        expect(result.lines.every(line=>!line.renderSkipped)).toBe(true);
+    });
+});
+
+
+it('相邻数字与远处正文同时存在时，模拟修补像素只触及远处正文',async()=>{
+    imageOptions.push({width:100,height:80});
+    const close={text:'Привет',bbox:{x0:2,y0:2,x1:19,y1:10}};
+    const numeric={text:'12:34',bbox:{x0:20,y0:2,x1:40,y1:10},numericConfidence:98};
+    const distant={text:'Пока',bbox:{x0:4,y0:50,x1:35,y1:60}};
+    mocks.recognize.mockResolvedValueOnce([close,numeric,distant]);
+    sendMessage.mockImplementation((message,callback)=>callback(message.type==='fluentReadImageTranslateTexts'?{success:true,translations:['你好','再见']}:undefined));
+    let raster:Uint8ClampedArray|undefined;
+    mocks.repair.mockImplementationOnce(async(pixels,width,height,regions)=>{
+        raster=pixels;for(const region of regions)for(const b of mangaMaskBoxes(region,width,height))
+            for(let y=b.y0;y<b.y1;y++)for(let x=b.x0;x<b.x1;x++)pixels[(y*width+x)*4]=255;
+        return pixels;
+    });
+    const result=await translateImageInOffscreen('pixel-conflict','ru','Page',undefined,'pixels',true);
+    expect(result.lines.find(line=>line.sourceText===close.text)).toMatchObject({renderSkipped:true});
+    expect(result.lines.find(line=>line.sourceText===distant.text)).not.toHaveProperty('renderSkipped');
+    expect(raster).toBeDefined();
+    for(let y=numeric.bbox.y0;y<numeric.bbox.y1;y++)for(let x=numeric.bbox.x0;x<numeric.bbox.x1;x++)
+        expect(raster![(y*100+x)*4]).toBe(0);
+    expect(raster![(55*100+10)*4]).toBe(255);
 });

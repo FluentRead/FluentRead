@@ -314,3 +314,38 @@ describe('漫画局部气泡识别边界',()=>{
         }
     });
 });
+
+
+describe('冲突识别不得删掉数字保护证据',()=>{
+    const number={text:'12:34',confidence:.99,box:{x:80,y:80,width:100,height:20}};
+    const text={text:'HELLO',confidence:.99,box:{x:80,y:80,width:100,height:20}};
+    const box={x0:40,y0:40,x1:250,y1:180};
+    it('局部正文与整页数字重叠时仅漫画保留两种证据',()=>{
+        const page={results:[number],bubbles:[{bbox:box,results:[text]}]};
+        expect(collectMangaRegions(page,'en',400,400,'manga').map(row=>row.text)).toEqual(expect.arrayContaining(['12:34','HELLO']));
+        expect(collectMangaRegions(page,'en',400,400,'image').map(row=>row.text)).toEqual(['HELLO']);
+    });
+    it.each([false,true])('跨气泡局部正文与数字冲突时按任意顺序保留：%s',numericFirst=>{
+        const other={x0:30,y0:30,x1:260,y1:200};
+        const choices=numericFirst?[number,text]:[text,number];
+        const page={results:[],bubbles:[{bbox:box,results:[choices[0]]},{bbox:other,results:[choices[1]]}]};
+        expect(collectMangaRegions(page,'en',400,400,'manga').map(row=>row.text)).toEqual(expect.arrayContaining(['12:34','HELLO']));
+    });
+});
+
+
+it('同文不同框数字候选的全部物理覆盖都必须保留',()=>{
+    const broad={text:'12:34',confidence:.99,box:{x:80,y:80,width:100,height:20}};
+    const narrow={...broad,box:{...broad.box,width:51}};
+    const page={results:[broad],bubbles:[{bbox:{x0:40,y0:40,x1:250,y1:180},results:[narrow]}]};
+    const result=collectMangaRegions(page,'en',400,400,'manga');
+    expect(result.filter(row=>row.text==='12:34')).toHaveLength(1);
+    expect(result[0].bbox).toEqual({x0:80,y0:80,x1:180,y1:100});
+});
+
+
+it('数字去重比较预算耗尽时仍保留后续物理框',()=>{
+    const results=Array.from({length:1500},(_,index)=>({text:String(1000+index),confidence:.99,box:{x:(index%40)*20,y:Math.floor(index/40)*20,width:8,height:8}}));
+    const regions=collectMangaRegions({results},'en',1000,1000,'manga');
+    expect(regions).toHaveLength(results.length);expect(regions.some(region=>region.text==='2499')).toBe(true);
+});

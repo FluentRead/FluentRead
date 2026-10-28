@@ -1,6 +1,7 @@
 import {createRequire} from 'node:module';
 import {afterEach, beforeAll, describe, expect, it, vi} from 'vitest';
 import type {MangaTranslationStatus} from '@/src/features/image-translation/content/mangaSession';
+import type {MangaReadingList,MangaReadingResult} from '@/src/features/image-translation/content/mangaReadingCoordinator';
 
 // Execute the actual SFC setup and template with Vue's renderer; native browser evidence covers DOM and CSS.
 vi.mock('@/src/ui/i18n', () => ({useUiI18n:() => ({translateLegacy:(text: string) => text})}));
@@ -10,13 +11,13 @@ beforeAll(async () => {
   component = (await import('@/src/features/image-translation/ui/MangaEntry.vue')).default;
   expect(component.render).toBeTypeOf('function');
 });
-afterEach(() => {unmount?.(); unmount = undefined; vi.useRealTimers();});
+afterEach(() => {unmount?.(); unmount = undefined; vi.useRealTimers();vi.unstubAllGlobals();});
 
 interface HostNode {
   tag: string; children: HostNode[]; props: Record<string, any>; text: string; parent: HostNode | null;
-  matches: (selector: string) => boolean; blur: () => void;
+  matches: (selector: string) => boolean; blur: () => void;focus: () => void;getRootNode:()=>{activeElement:null};contains:()=>boolean;
 }
-const node = (tag: string, text = ''): HostNode => ({tag,text,children:[],props:{},parent:null,matches:() => false,blur:() => undefined});
+const node = (tag: string, text = ''): HostNode => ({tag,text,children:[],props:{},parent:null,matches:() => false,blur:() => undefined,focus:()=>undefined,getRootNode:()=>({activeElement:null}),contains:()=>false});
 function find(root: HostNode, predicate: (value: HostNode) => boolean): HostNode | undefined {
   if (predicate(root)) return root;
   for (const child of root.children) {const value = find(child,predicate); if (value) return value;}
@@ -33,7 +34,8 @@ async function mountEntry(toolsDisplay?: 'hover' | 'always') {
     page:{site:'fixture', route:'/chapter/1'},
     settings:{sourceLanguage:undefined as string | undefined, promptEnabled:true, floatingBallVisible:false, downloadConfirmed:false, animations:true, ...(toolsDisplay === undefined ? {} : {toolsDisplay})},
     toggle:vi.fn(), inspectResources:vi.fn(async () => false), persist:vi.fn(async (_patch: Record<string, unknown>) => undefined), openSettings:vi.fn(),
-    startAreaTranslation:vi.fn(async () => true),
+    startAreaTranslation:vi.fn(async () => true), readManga:undefined as ((event:MouseEvent)=>void) | undefined, readingOpen:false,readingChanged:vi.fn(),
+    reading:undefined as {list:()=>MangaReadingList;read:(token:object,signal:AbortSignal)=>Promise<MangaReadingResult>;observe:(token:object,invalid:()=>void)=>(()=>void)|undefined;copy:(text:string)=>Promise<void>;theme:'light'|'dark'|'auto'}|undefined,
   });
   const remove = (value: HostNode) => {if (value.parent) {const at = value.parent.children.indexOf(value); if (at >= 0) value.parent.children.splice(at,1); value.parent = null;}};
   const renderer = runtime.createRenderer<HostNode, HostNode>({
@@ -44,7 +46,7 @@ async function mountEntry(toolsDisplay?: 'hover' | 'always') {
     nextSibling:value => value.parent?.children[value.parent.children.indexOf(value)+1] ?? null,
     querySelector:()=>null, setScopeId:()=>undefined, insertStaticContent:()=>{throw new Error('Unexpected static HTML insertion');},
   });
-  let panel: any, exposed: {open: () => Promise<void>};
+  let panel: any, exposed: {open: () => Promise<void>;openReading:(event:Event,from?:HTMLElement|null)=>Promise<boolean>};
   const app = renderer.createApp({setup:()=>()=>runtime.h(component,{...props,ref:(instance:any)=>{if(instance){panel=instance.$.setupState;exposed=instance;}}})});
   app.provide(runtime.ssrContextKey,{modules:new Set<string>()}); app.config.warnHandler=()=>undefined;
   const root = node('root'); app.mount(root); unmount = () => app.unmount(); await runtime.nextTick();
@@ -60,6 +62,70 @@ function launcher(panel: any) {
 }
 
 describe('actual manga entry resource consent and lifecycle', () => {
+  it.each((['check','confirm'] as const).flatMap(phase => (['route','route-return','language','language-return','fallback','fallback-return','active','active-return','availability'] as const).map(change => [phase,change] as const)))('does not start after %s resolves in the same turn as %s changes',async (phase,change)=>{
+    const {panel,props,tick}=await mountEntry(), pending=deferred<any>();
+    if(phase==='check')props.inspectResources.mockReturnValueOnce(pending.promise);
+    else {await panel.start();props.persist.mockReturnValueOnce(pending.promise);}
+    const work=phase==='check'?panel.start():panel.confirm();await tick();pending.resolve(phase==='check'?true:undefined);
+    if(change==='route'||change==='route-return'){props.page.route='/chapter/2';if(change==='route-return')props.page.route='/chapter/1';}
+    else if(change==='language'||change==='language-return'){props.settings.sourceLanguage='ru';if(change==='language-return')props.settings.sourceLanguage=undefined;}
+    else if(change==='fallback'||change==='fallback-return'){props.status.areaFallback=true;if(change==='fallback-return')props.status.areaFallback=undefined;}
+    else if(change==='active'||change==='active-return'){props.status.active=true;if(change==='active-return')props.status.active=false;}
+    else {props.status.available=false;props.status.available=true;}
+    await work;await tick();expect(props.toggle,`${phase} ${change}`).not.toHaveBeenCalled();expect(panel.consent).toBe(false);
+  });
+  it.each(['check','confirm'] as const)('does not expose a stale %s error after resolving the same turn as a route change',async phase=>{
+    const {panel,props,tick}=await mountEntry(),pending=deferred<any>();
+    if(phase==='check')props.inspectResources.mockReturnValueOnce(pending.promise);else {await panel.start();props.persist.mockReturnValueOnce(pending.promise);}
+    const work=phase==='check'?panel.start():panel.confirm();await tick();pending.reject(new Error('旧页面失败'));props.page.route='/chapter/2';
+    await work;await tick();expect(props.toggle).not.toHaveBeenCalled();expect(panel.error).toBe('');expect(panel.consent).toBe(false);
+  });
+  it.each(['check','confirm'] as const)('does not start after %s resolves in the same turn as unmount',async phase=>{
+    const {panel,props,dispose,tick}=await mountEntry(),pending=deferred<any>();
+    if(phase==='check')props.inspectResources.mockReturnValueOnce(pending.promise);
+    else {await panel.start();props.persist.mockReturnValueOnce(pending.promise);}
+    const work=phase==='check'?panel.start():panel.confirm();await tick();pending.resolve(phase==='check'?true:undefined);dispose();await work;expect(props.toggle).not.toHaveBeenCalled();
+  });
+  it.each(['pause','route'] as const)('mounts one actual reading panel and closes its observation on %s',async reason=>{
+    const {props,exposed,tick,find}=await mountEntry();const token={},stop=vi.fn(),list=vi.fn(()=>({status:'ready' as const,items:[{token,kind:'image' as const,ordinal:1}]})),
+      read=vi.fn(async()=>({status:'ready' as const,lines:[{text:'translated',bbox:{x0:0,y0:0,x1:10,y1:10}}]}));
+    props.reading={list,read,observe:()=>stop,copy:vi.fn(async()=>{}),theme:'auto'};props.status.active=true;await tick();
+    expect(list).not.toHaveBeenCalled();expect(await exposed.openReading({isTrusted:true} as Event)).toBe(true);await tick();
+    find(value=>value.tag==='button'&&value.text==='图片 1')!.props.onClick({isTrusted:true});await tick();await tick();expect(read).toHaveBeenCalledOnce();expect(props.readingChanged).toHaveBeenCalledWith(true);
+    if(reason==='pause')props.status.active=false;else props.page.route='/chapter/2';await tick();expect(stop).toHaveBeenCalledOnce();expect(props.readingChanged).toHaveBeenCalledWith(false);expect(find(value=>value.props.role==='dialog')).toBeUndefined();
+  });
+  it.each(['list','pending'] as const)('closes %s on transition to area fallback and ignores late results',async phase=>{
+    const {props,exposed,tick,find}=await mountEntry(), token={}, pending=deferred<MangaReadingResult>(), read=vi.fn((_token:object,_signal:AbortSignal)=>pending.promise),observe=vi.fn(()=>()=>{});
+    props.reading={list:()=>({status:'ready',items:[{token,kind:'image',ordinal:1}]}),read,observe,copy:vi.fn(async()=>{}),theme:'auto'};
+    props.status.active=true;await tick();await exposed.openReading({isTrusted:true} as Event);await tick();
+    if(phase==='pending'){find(value=>value.tag==='button'&&value.text==='图片 1')!.props.onClick({isTrusted:true});await tick();}
+    props.status.areaFallback=true;await tick();expect(find(value=>value.props.role==='dialog')).toBeUndefined();
+    if(phase==='pending'){expect(read.mock.calls[0][1].aborted).toBe(true);pending.resolve({status:'ready',lines:[{text:'late',bbox:{x0:0,y0:0,x1:1,y1:1}}]});await tick();await tick();expect(observe).not.toHaveBeenCalled();expect(find(value=>value.text==='late')).toBeUndefined();}
+    expect(props.readingChanged).toHaveBeenLastCalledWith(false);
+  });
+  it('exposes a secondary reading action only when enabled and active without toggling manga', async () => {
+    const {props,tick,find} = await mountEntry();const read=vi.fn();props.readManga=read;await tick();
+    expect(find(value => value.props.class?.includes('fr-manga-reading-launcher'))).toBeUndefined();
+    props.status.active=true;await tick();const button=find(value => value.props.class?.includes('fr-manga-reading-launcher'))!;
+    expect(button.props['aria-label']).toBe('查看漫画文字');expect(button.props['aria-expanded']).toBe(false);
+    expect(find(value => value.tag === 'svg' && value.parent === button)?.props['aria-hidden']).toBe('true');
+    const event={stopPropagation:vi.fn()};button.props.onClick(event);expect(event.stopPropagation).toHaveBeenCalledOnce();expect(read).toHaveBeenCalledWith(event);expect(props.toggle).not.toHaveBeenCalled();
+    props.readingOpen=true;await tick();expect(button.props['aria-expanded']).toBe(true);expect(button.props['aria-label']).toBe('关闭漫画文字');expect(button.props.class).toContain('is-expanded');
+    props.status.areaFallback=true;await tick();expect(find(value => value.props.class?.includes('fr-manga-reading-launcher'))).toBeUndefined();
+  });
+  it('keeps the secondary action visible while it has keyboard focus or the panel is open', async () => {
+    const {panel,props,tick} = await mountEntry('hover');vi.useFakeTimers({toFake:['setTimeout','clearTimeout']});
+    props.readManga=vi.fn();props.status.active=true;await tick();panel.launcher.matches=()=>false;panel.readingLauncher.matches=()=>true;
+    panel.reveal();vi.advanceTimersByTime(3000);expect(panel.expanded).toBe(true);expect(vi.getTimerCount()).toBe(0);
+    panel.readingLauncher.matches=()=>false;panel.retract({relatedTarget:panel.readingLauncher});expect(panel.expanded).toBe(true);
+    props.readingOpen=true;panel.retract();await tick();expect(panel.readingLauncher.props.class).toContain('is-expanded');
+  });
+  it('keeps the secondary action reachable on touch after hover mode times out without pausing the session',async()=>{
+    vi.stubGlobal('navigator',{maxTouchPoints:1});const {panel,props,tick,find}=await mountEntry('hover');vi.useFakeTimers({toFake:['setTimeout','clearTimeout']});
+    const read=vi.fn();props.readManga=read;props.status.active=true;await tick();panel.reveal();vi.advanceTimersByTime(3000);await tick();
+    const button=find(value=>value.props.class?.includes('fr-manga-reading-launcher'))!;expect(panel.expanded).toBe(false);expect(button.props.class).toContain('is-touch');
+    const event={stopPropagation:vi.fn()};button.props.onClick(event);expect(read).toHaveBeenCalledOnce();expect(props.toggle).not.toHaveBeenCalled();
+  });
   it.each([['ru', '俄语和英语', '16 MB'], ['ko', '韩语和英语', '13 MB']])('shows the actual %s resource disclosure and closes it after a source change', async (language, languages, size) => {
     const {props,tick,find} = await mountEntry();
     props.settings.sourceLanguage = language; await tick();

@@ -4,7 +4,51 @@
  * 主要内容：英文完整回退目录与各语言核心操作文案；当前资源用途与准备状态优先展示，备用识别、语言包及下载管理采用简短入口。
  * 模块边界：静态界面词典，不翻译漫画内容、不读取配置、不调用服务。
  */
+const locales = ['en-US', 'ja-JP', 'ko-KR', 'fr-FR', 'ru-RU', 'es-ES'] as const;
+const rows: Array<readonly [string, string, string, string, string, string, string]> = [
+  ['附近有数字，此译文未绘制到图片','This translation was not drawn because numbers are nearby','近くに数字があるため、この翻訳は画像に描画されていません','주변에 숫자가 있어 이 번역은 이미지에 표시되지 않았습니다','Cette traduction ne figure pas sur l’image car des nombres sont proches','Этот перевод не нанесён на изображение из-за расположенных рядом чисел','Esta traducción no se dibujó en la imagen porque hay números cerca'],
+  ['部分译文未绘制，请查看漫画文字','Some translations were not drawn; view manga text','一部の翻訳は描画されていません。漫画の文字を確認してください','일부 번역이 표시되지 않았습니다. 만화 텍스트를 확인하세요','Certaines traductions ne figurent pas sur l’image ; consultez le texte du manga','Некоторые переводы не нанесены; откройте текст манги','Algunas traducciones no se dibujaron; consulta el texto del manga'],
+  ['已识别文字，原图未改动','Text recognized; original image unchanged','文字を認識しました。元画像は変更されていません','텍스트를 인식했으며 원본 이미지는 변경되지 않았습니다','Texte reconnu ; image originale inchangée','Текст распознан; исходное изображение не изменено','Texto reconocido; imagen original sin cambios'],
+  ['未绘制','Not drawn','未描画','표시 안 됨','Non affiché','Не нанесено','Sin dibujar'],
+  ['已识别','Scanned','認識済み','인식됨','Analysé','Распознано','Leído'],
+  ['漫画文字','Manga text','漫画の文字','만화 텍스트','Texte du manga','Текст манги','Texto del manga'],
+  ['查看漫画文字','View manga text','漫画の文字を見る','만화 텍스트 보기','Voir le texte du manga','Посмотреть текст манги','Ver texto del manga'],
+  ['关闭漫画文字','Close manga text','漫画の文字を閉じる','만화 텍스트 닫기','Fermer le texte du manga','Закрыть текст манги','Cerrar texto del manga'],
+  ['关闭文字面板','Close text panel','文字パネルを閉じる','텍스트 패널 닫기','Fermer le panneau de texte','Закрыть панель текста','Cerrar panel de texto'],
+  ['选择当前可见的页面或片段','Choose a visible page or segment','表示中のページまたは部分を選択','현재 보이는 페이지 또는 구간 선택','Choisissez une page ou une partie visible','Выберите видимую страницу или фрагмент','Elige una página o sección visible'],
+  ['重新查看可见页面','Check visible pages again','表示中のページを再確認','보이는 페이지 다시 확인','Revoir les pages visibles','Проверить видимые страницы снова','Volver a ver las páginas visibles'],
+  ['选择其他页面','Choose another page','別のページを選択','다른 페이지 선택','Choisir une autre page','Выбрать другую страницу','Elegir otra página'],
+  ['原文对照','Compare original','原文を比較','원문 비교','Comparer l’original','Сравнить с оригиналом','Comparar con el original'],
+  ['文字部分','Text section','テキストの部分','텍스트 구간','Partie du texte','Часть текста','Parte del texto'],
+  ['上一部分','Previous section','前の部分','이전 구간','Partie précédente','Предыдущая часть','Parte anterior'],
+  ['下一部分','Next section','次の部分','다음 구간','Partie suivante','Следующая часть','Parte siguiente'],
+  ['复制当前部分','Copy this section','この部分をコピー','현재 구간 복사','Copier cette partie','Копировать эту часть','Copiar esta parte'],
+  ['复制全部','Copy all','すべてコピー','전체 복사','Tout copier','Копировать всё','Copiar todo'],
+  ['图片','Image','画像','이미지','Image','Изображение','Imagen'],
+  ['画布','Canvas','キャンバス','캔버스','Canevas','Холст','Lienzo'],
+  ['背景图片','Background image','背景画像','배경 이미지','Image d’arrière-plan','Фоновое изображение','Imagen de fondo'],
+  ['长图片段','Long-image segment','長い画像の部分','긴 이미지 구간','Partie d’une image longue','Фрагмент длинного изображения','Sección de imagen larga'],
+  ['像素位置','Pixel position','ピクセル位置','픽셀 위치','Position en pixels','Позиция в пикселях','Posición en píxeles'],
+  ['此片段可能包含相邻片段的文字','This segment may include text from adjacent segments','この部分には隣接する部分の文字が含まれる場合があります','이 구간에 인접 구간의 텍스트가 포함될 수 있습니다','Cette partie peut contenir du texte des parties adjacentes','Фрагмент может содержать текст соседних фрагментов','Esta sección puede incluir texto de secciones adyacentes'],
+  ['画布文字来自最近完成的翻译快照，画面变化可能尚未同步','Canvas text is from the latest completed translation snapshot; later changes may not be reflected','キャンバスの文字は直近の翻訳結果です。画面の変更が反映されていない場合があります','캔버스 텍스트는 최근 완료된 번역 스냅샷이며 이후 화면 변경이 반영되지 않을 수 있습니다','Le texte du canevas provient du dernier instantané traduit ; les changements ultérieurs peuvent ne pas apparaître','Текст холста взят из последнего завершённого перевода; последующие изменения могут не отображаться','El texto del lienzo procede de la última traducción completada; puede no reflejar cambios posteriores'],
+  ['正在读取已有文字','Reading available text','保存済みの文字を読み込み中','기존 텍스트 읽는 중','Lecture du texte disponible','Чтение имеющегося текста','Leyendo el texto disponible'],
+  ['当前页面正在处理','This page is being processed','このページを処理中','현재 페이지 처리 중','Cette page est en cours de traitement','Страница обрабатывается','Esta página se está procesando'],
+  ['未检测到文字','No text detected','文字が検出されませんでした','텍스트를 찾지 못했습니다','Aucun texte détecté','Текст не обнаружен','No se detectó texto'],
+  ['无法读取当前结果','Could not read this result','この結果を読み取れません','현재 결과를 읽을 수 없습니다','Impossible de lire ce résultat','Не удалось прочитать результат','No se pudo leer este resultado'],
+  ['当前结果不可用','This result is unavailable','この結果は利用できません','현재 결과를 사용할 수 없습니다','Ce résultat est indisponible','Результат недоступен','Este resultado no está disponible'],
+  ['页面已变化，请重新选择','The page changed. Select it again.','ページが変わりました。選び直してください','페이지가 변경되었습니다. 다시 선택하세요','La page a changé. Sélectionnez-la à nouveau.','Страница изменилась. Выберите её снова.','La página cambió. Vuelve a seleccionarla.'],
+  ['读取已取消','Reading cancelled','読み込みをキャンセルしました','읽기 취소됨','Lecture annulée','Чтение отменено','Lectura cancelada'],
+  ['内容过大，暂时无法完整显示','Content is too large to display in full','内容が大きすぎるため全体を表示できません','내용이 너무 커서 전체를 표시할 수 없습니다','Contenu trop volumineux pour être affiché en entier','Содержимое слишком велико для полного отображения','El contenido es demasiado grande para mostrarlo completo'],
+  ['当前没有可查看的页面','No pages are available to view','表示できるページはありません','볼 수 있는 페이지가 없습니다','Aucune page disponible','Нет доступных страниц','No hay páginas disponibles'],
+  ['已复制','Copied','コピーしました','복사됨','Copié','Скопировано','Copiado'],
+  ['复制失败，请选中文字后手动复制','Copy failed. Select the text to copy it manually.','コピーできませんでした。文字を選んで手動でコピーしてください','복사하지 못했습니다. 텍스트를 선택하여 수동으로 복사하세요','Échec de la copie. Sélectionnez le texte pour le copier manuellement.','Не удалось скопировать. Выделите текст и скопируйте вручную.','No se pudo copiar. Selecciona el texto para copiarlo manualmente.'],
+  ['本地 OCR · 请核对名称和数字','Local OCR · Check names and numbers','ローカル OCR · 名前と数字を確認','로컬 OCR · 이름과 숫자를 확인하세요','OCR local · Vérifiez les noms et les nombres','Локальное OCR · Проверьте имена и числа','OCR local · Comprueba nombres y números'],
+];
+export const mangaReadingLegacyMessages = Object.fromEntries(locales.map((locale, index) => [locale,
+  Object.fromEntries(rows.map(row => [row[0], row[index + 1]]))])) as Record<(typeof locales)[number], Record<string,string>>;
 const english = {
+  ...mangaReadingLegacyMessages['en-US'],
+  "等待上一项任务结束…": "Waiting for the previous task…",
   "识别资源": "Recognition resources",
   "标准识别": "Standard recognition",
   "轻量识别": "Lightweight recognition",
@@ -134,6 +178,8 @@ const english = {
 export const mangaLegacyMessages = {
   "en-US": english,
   "ja-JP": {...english, ...{
+  ...mangaReadingLegacyMessages['ja-JP'],
+  "等待上一项任务结束…": "前の処理が終わるのを待っています…",
   "识别资源": "認識リソース",
   "标准识别": "標準認識",
   "轻量识别": "軽量認識",
@@ -230,6 +276,8 @@ export const mangaLegacyMessages = {
   "支持的网站": "対応サイト"
 }},
   "ko-KR": {...english, ...{
+  ...mangaReadingLegacyMessages['ko-KR'],
+  "等待上一项任务结束…": "이전 작업이 끝나기를 기다리는 중…",
   "识别资源": "인식 리소스",
   "标准识别": "표준 인식",
   "轻量识别": "경량 인식",
@@ -326,6 +374,8 @@ export const mangaLegacyMessages = {
   "支持的网站": "지원 사이트"
 }},
   "fr-FR": {...english, ...{
+  ...mangaReadingLegacyMessages['fr-FR'],
+  "等待上一项任务结束…": "En attente de la fin de la tâche précédente…",
   "识别资源": "Ressources de reconnaissance",
   "标准识别": "Reconnaissance standard",
   "轻量识别": "Reconnaissance légère",
@@ -422,6 +472,8 @@ export const mangaLegacyMessages = {
   "支持的网站": "Sites pris en charge"
 }},
   "ru-RU": {...english, ...{
+  ...mangaReadingLegacyMessages['ru-RU'],
+  "等待上一项任务结束…": "Ожидание завершения предыдущей задачи…",
   "识别资源": "Ресурсы распознавания",
   "标准识别": "Стандартное распознавание",
   "轻量识别": "Облегчённое распознавание",
@@ -518,6 +570,8 @@ export const mangaLegacyMessages = {
   "支持的网站": "Поддерживаемые сайты"
 }},
   "es-ES": {...english, ...{
+  ...mangaReadingLegacyMessages['es-ES'],
+  "等待上一项任务结束…": "Esperando a que termine la tarea anterior…",
   "识别资源": "Recursos de reconocimiento",
   "标准识别": "Reconocimiento estándar",
   "轻量识别": "Reconocimiento ligero",

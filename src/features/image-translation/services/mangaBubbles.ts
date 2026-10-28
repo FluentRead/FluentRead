@@ -5,6 +5,7 @@
  * 模块边界：纯像素和坐标算法，不创建 Canvas、不访问网络、不运行模型；气泡本身不作为文字证据，只有后续识别出的有效文本进入翻译。
  */
 import {groupMangaText,type MangaOcrItem,type MangaRegion} from './mangaRegions';
+import {numericInformation} from './mangaNumeric';
 type Box=MangaRegion['bbox'];
 export interface MangaLayoutOwner extends Box {exclusions?:Box[]}
 export interface MangaLayoutBubble {bbox:Box;members:number[]}
@@ -133,6 +134,10 @@ export function collectMangaRegions(page:MangaOcrPage,language:string,width:numb
     const inside=(item:MangaOcrItem,index:number)=>index<bubbles.length?itemCenterInside(item,owners[index]):memberships.get(item)?.has(index)===true;
     const context = (item: MangaOcrItem) => bubbles.some(bubble => itemCenterInside(item,bubble.bbox)) ? 'bubble' as const : 'page' as const;
     const reliable = (item: MangaOcrItem) => groupMangaText([item], language, width, height, context(item)).length > 0;
+    const numeric = (item: MangaOcrItem) => item.confidence >= .9 && numericInformation(item.text.trim());
+    // 不同识别视图发生数字冲突时都保留，供后续按区域保守跳过绘制。
+    const numericConflict = (a: MangaOcrItem, b: MangaOcrItem) => profile === 'manga'
+        && (numeric(a) || numeric(b));
     // 先按原始物理行去重，再合段；否则跨气泡的包围框中心会误删整段，或局部漏行无法并回同一对白。
     const bubbleOrder = bubbles.map((bubble,index)=>({index,area:(bubble.bbox.x1-bubble.bbox.x0)*(bubble.bbox.y1-bubble.bbox.y0)}))
         .sort((a,b)=>a.area-b.area).map(bubble=>bubble.index);
@@ -142,14 +147,14 @@ export function collectMangaRegions(page:MangaOcrPage,language:string,width:numb
     for(const index of bubbleOrder)for(const item of bubbles[index].results.filter(reliable)){
         // 浅色面板和内部气泡可能同时入选；只按跨候选且双向高重叠的几何证据去重，
         // 更紧的局部裁剪优先，同候选独立行、不同位置的相同对白均保留。
-        if(accepted.some(previous=>previous.index!==index&&overlapsOcrLine(item,previous.item,.65)))continue;
+        if(accepted.some(previous=>previous.index!==index&&overlapsOcrLine(item,previous.item,.65)&&!numericConflict(item,previous.item)))continue;
         accepted.push({item,index});
         // 检测来源和对白归属分别保留：外层裁剪补回的漏行也属于最紧的气泡，
         // 不能在去重后把同一对白的首行与后续行分到内外两个段落。
         const owner=profile==='manga'?ownerOrder.find(candidate=>candidate===index||inside(item,candidate))!:index;
         local[owner].push(item);
     }
-    const remaining = page.results.filter(reliable).filter(item => !local.some(items => items.some(candidate => overlapsOcrLine(item, candidate))));
+    const remaining = page.results.filter(reliable).filter(item => !local.some(items => items.some(candidate => overlapsOcrLine(item, candidate) && !numericConflict(item,candidate))));
     if (profile === 'image') {
         // 普通截图不能套用漫画宽松气泡间距：保留可靠物理行，交给普通段落策略合并。
         return [...remaining, ...local.flat()]
@@ -162,7 +167,25 @@ export function collectMangaRegions(page:MangaOcrPage,language:string,width:numb
         const index = ownerOrder.find(index => inside(item, index));
         if (index === undefined) outsideItems.push(item); else fallback[index].push(item);
     }
-    const paragraphs=owners.map((_bubble,index)=>groupMangaText([...local[index],...fallback[index]],language,width,height,'bubble'));
-    const outside=groupMangaText(outsideItems,language,width,height);
-    return [...outside,...paragraphs.flat()].sort((a,b)=>a.bbox.y0-b.bbox.y0||b.bbox.x0-a.bbox.x0);
+    const paragraphs=owners.map((_bubble,index)=>groupMangaText([...local[index],...fallback[index]],language,width,height,'bubble',true));
+    const outside=groupMangaText(outsideItems,language,width,height,'page',true);
+    const regions = [...outside,...paragraphs.flat()].sort((a,b)=>a.bbox.y0-b.bbox.y0||b.bbox.x0-a.bbox.x0);
+    // 同文重叠数字在阅读中只显示一次，但其保护框覆盖所有检测位置。
+    const merged: MangaRegion[] = []; let comparisons = 0;
+    for (const region of regions) {
+        let existing: MangaRegion | undefined;
+        if (numericInformation(region.text)) for (const candidate of merged) {
+            if (++comparisons > 1_000_000) break;
+            const a = candidate.bbox, b = region.bbox;
+            const intersection = Math.max(0, Math.min(a.x1,b.x1)-Math.max(a.x0,b.x0))
+                * Math.max(0, Math.min(a.y1,b.y1)-Math.max(a.y0,b.y0));
+            const larger = Math.max((a.x1-a.x0)*(a.y1-a.y0),(b.x1-b.x0)*(b.y1-b.y0));
+            if (candidate.text === region.text && intersection >= larger * .5) {existing = candidate;break;}
+        }
+        if (!existing) {merged.push(region);continue;}
+        const a = existing.bbox, b = region.bbox;
+        existing.bbox = {x0:Math.min(a.x0,b.x0),y0:Math.min(a.y0,b.y0),x1:Math.max(a.x1,b.x1),y1:Math.max(a.y1,b.y1)};
+        existing.sourceBoxes = [existing.bbox];
+    }
+    return merged;
 }

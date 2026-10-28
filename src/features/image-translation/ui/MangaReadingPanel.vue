@@ -1,8 +1,8 @@
 <!--
  * @file src/features/image-translation/ui/MangaReadingPanel.vue
- * 文件职责：提供用户主动打开的漫画可见目标选择和文字阅读面板原型。
+ * 文件职责：提供用户主动打开的漫画可见目标选择和文字阅读面板。
  * 主要内容：按目标显示完整文字和原文对照，以有界分页提供选择和复制，区分等待、过期及预算状态，关闭或失效时撤销在途读取。
- * 模块边界：仅使用调用方注入的只读候选、读取、复制及本地化端口，不扫描页面、不执行 OCR、不访问网络或保存结果；入口与生命周期尚未接入。
+ * 模块边界：由漫画入口管理挂载与生命周期，仅使用注入的只读候选、读取、复制及本地化端口，不扫描页面、不执行 OCR、不访问网络或保存结果。
  -->
 <template>
   <section v-if="opened" ref="panel" class="fr-manga-reading" :data-theme="theme" role="dialog" :aria-label="t('漫画文字')" tabindex="-1" @keydown.stop="handleKeydown" @click.stop @pointerdown.stop @touchstart.passive.stop @touchmove.passive.stop @touchend.passive.stop @touchcancel.passive.stop @keyup.stop @wheel.stop>

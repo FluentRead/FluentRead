@@ -113,6 +113,27 @@ describe('material backup source reader', () => {
       expect((await Promise.all(frames.map(frame => new Blob([frame.bytes]).text()))).map(value => JSON.parse(value))).toEqual(['a','b']);
     } finally {vi.doUnmock('@/src/features/vocabulary/materialProtocol'); vi.resetModules();}
   });
+  it('validates the entire file before applying the record limit to the last materials key', async () => {
+    vi.resetModules();
+    vi.doMock('@/src/features/vocabulary/materialProtocol', async importOriginal => ({
+      ...await importOriginal<object>(), MATERIAL_IMPORT_FRAME_BYTES: 8, MATERIAL_IMPORT_MAX_RECORD_BYTES: 4,
+      MATERIAL_IMPORT_MAX_FRAMES: 100,
+    }));
+    try {
+      const reader = await import('@/src/features/vocabulary/materialBackupReader');
+      const first = `"${'x'.repeat(70_000)}"`;
+      const source = `{"format":"fluentread-learning-materials","version":1,"materials":[${first}],"materials":["a"]}`;
+      const blob = new Blob([source]);
+      const plan = await reader.prepareMaterialBackup(blob), frames: Frame[] = [];
+      await reader.sendMaterialBackup(blob, plan, async frame => {frames.push(frame);});
+      expect(plan.manifest.records).toBe(1);
+      expect(await new Blob(frames.map(frame => frame.bytes)).text()).toBe('"a"');
+      await expect(reader.prepareMaterialBackup(new Blob([source.slice(0, -1) + ',"ignored":[1,]}'])))
+        .rejects.toBeInstanceOf(SyntaxError);
+      const oversizedLast = `{"format":"fluentread-learning-materials","version":1,"materials":["a"],"materials":[${first}]}`;
+      await expect(reader.prepareMaterialBackup(new Blob([oversizedLast]))).rejects.toMatchObject({name: 'MaterialBackupCapacityError'});
+    } finally {vi.doUnmock('@/src/features/vocabulary/materialProtocol'); vi.resetModules();}
+  });
   it('rejects wrong scalar metadata and unknown oversized keys do not shadow known keys', async () => {
     const key = 'version' + 'x'.repeat(140000), escapedFormat = [...'format'].map(ch => `\\u${ch.charCodeAt(0).toString(16).padStart(4, '0')}`).join('');
     const text = `{"${key}":3,"${escapedFormat}":"fluentread-learning-materials","version":1,"materials":[{},[]]}`;

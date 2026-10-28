@@ -79,6 +79,34 @@ describe('material import background registration',()=>{
     } finally {registration.mockRestore();dispose();}
   });
 
+  it('does not recreate a stage when maintenance finishes scheduling after disposal',async()=>{
+    const f=fixture(),m=maintenanceFixture();m.state.marker=true;
+    let finish!:()=>void;
+    m.alarms.create.mockImplementationOnce(async()=>{await new Promise<void>(resolve=>{finish=resolve;});});
+    const dispose=installMaterialImportRuntime({...f.deps,maintenance:m} as never);
+    await vi.waitFor(()=>expect(m.alarms.create).toHaveBeenCalledOnce());
+    dispose();finish();
+    await vi.waitFor(()=>expect(m.warn).toHaveBeenCalledOnce());
+    expect(f.createStage).not.toHaveBeenCalled();expect(f.stage.cleanup).not.toHaveBeenCalled();
+  });
+
+  it('never begins if the port disconnects while attaching a cleanup cancellation listener',async()=>{
+    const f=fixture(),dispose=installMaterialImportRuntime(f.deps as never),p=f.port();
+    f.runtime.onConnect.fire(p.port);
+    const add=AbortSignal.prototype.addEventListener;let registrations=0,intercepted=false,wasAborted=false;
+    vi.spyOn(AbortSignal.prototype,'addEventListener').mockImplementation(function(this:AbortSignal,...args:Parameters<AbortSignal['addEventListener']>){
+      if(args[0]==='abort'&&++registrations===4){intercepted=true;p.port.disconnect();wasAborted=this.aborted;}
+      return add.apply(this,args);
+    });
+    try {
+      p.onMessage.fire({id:1,action:'begin',capability,manifest,guard,deadline:10_000});
+      await vi.waitFor(()=>expect(intercepted).toBe(true));
+      expect(wasAborted).toBe(true);
+      await Promise.resolve();await Promise.resolve();
+      expect(f.stage.beginRecoverable).not.toHaveBeenCalled();expect(p.messages).toHaveLength(0);
+    } finally {vi.restoreAllMocks();dispose();}
+  });
+
   it('ignores unrelated ports, rejects untrusted or private senders before creating the stage',()=>{
     const f=fixture(),dispose=installMaterialImportRuntime(f.deps as never);
     const other=f.port(undefined,'reading-stream');f.runtime.onConnect.fire(other.port);

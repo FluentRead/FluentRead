@@ -23,14 +23,14 @@ type Events<T extends (...args:any[])=>void>={addListener(fn:T):void;removeListe
 export type MaterialImportPort={name:string;sender?:Sender;onMessage:Events<(message:unknown)=>void>;onDisconnect:Events<()=>void>;postMessage(message:unknown):void;disconnect():void};
 type Stage={
   observeCommitted(listener:()=>void):()=>void;
-  beginRecoverable(manifest:Manifest,guard:MaterialOperationGuard,cap:Capability,options:{deadline:number;signal?:AbortSignal}):Promise<Capability>;
-  resume(cap:Capability,options:{signal?:AbortSignal}):Promise<void>;
-  append(cap:Capability,frame:Frame,options:{signal?:AbortSignal}):Promise<{nextSeq:number}>;
-  seal(cap:Capability,options:{signal?:AbortSignal}):Promise<void>;
-  commit(cap:Capability,options:{signal?:AbortSignal}):Promise<{inserted:number;updated:number;skipped:number}>;
-  status(cap:Capability,options:{signal?:AbortSignal}):Promise<unknown>;
-  discard(cap:Capability,options:{signal?:AbortSignal}):Promise<unknown>;
-  acknowledge(cap:Capability,options:{signal?:AbortSignal}):Promise<unknown>;
+  beginRecoverable(manifest:Manifest,guard:MaterialOperationGuard,cap:Capability,options:{deadline:number;signal:AbortSignal}):Promise<Capability>;
+  resume(cap:Capability,options:{signal:AbortSignal}):Promise<void>;
+  append(cap:Capability,frame:Frame,options:{signal:AbortSignal}):Promise<{nextSeq:number}>;
+  seal(cap:Capability,options:{signal:AbortSignal}):Promise<void>;
+  commit(cap:Capability,options:{signal:AbortSignal}):Promise<{inserted:number;updated:number;skipped:number}>;
+  status(cap:Capability,options:{signal:AbortSignal}):Promise<unknown>;
+  discard(cap:Capability,options:{signal:AbortSignal}):Promise<unknown>;
+  acknowledge(cap:Capability,options:{signal:AbortSignal}):Promise<unknown>;
 };
 const obj=(value:unknown):value is Record<string,unknown>=>typeof value==='object'&&value!==null&&!Array.isArray(value);
 const integer=(value:unknown):value is number=>typeof value==='number'&&Number.isSafeInteger(value)&&value>=0;

@@ -74,8 +74,7 @@ export function installMaterialImportRuntime(options: Options): () => void {
     const assertAvailable = (signal?: AbortSignal) => {
         if (disposed || signal?.aborted || options.isPrivateContext()) throw Error('unavailable');
     };
-    const wait = <T>(promise: Promise<T>, signal?: AbortSignal): Promise<T> => {
-        if (!signal) return promise;
+    const wait = <T>(promise: Promise<T>, signal: AbortSignal): Promise<T> => {
         if (signal.aborted) return Promise.reject(Error('unavailable'));
         return new Promise<T>((resolve, reject) => {
             const abort = () => { signal.removeEventListener('abort', abort); reject(Error('unavailable')); };
@@ -138,7 +137,7 @@ export function installMaterialImportRuntime(options: Options): () => void {
         if (!existing || existing.periodInMinutes !== MAINTENANCE_PERIOD_MINUTES)
             await mutation(Promise.resolve().then(() => maintenance!.alarms.create(MATERIAL_IMPORT_CLEANUP_ALARM, {periodInMinutes: MAINTENANCE_PERIOD_MINUTES})));
     };
-    const prepareMaintenance = (signal?: AbortSignal): Promise<void> => serialize(async () => {
+    const prepareMaintenance = (signal: AbortSignal): Promise<void> => serialize(async () => {
         assertAvailable(signal);
         if (!maintenanceAvailable) throw Error('maintenance unavailable');
         // 标记必须先于恢复事务持久化，alarm 失败时禁止开始写入。
@@ -190,7 +189,7 @@ export function installMaterialImportRuntime(options: Options): () => void {
             try {
                 service = ensureService();
                 const stage = service.stage;
-                const gate = async <T>(signal: AbortSignal | undefined, task: () => Promise<T>, needsCleanup = false): Promise<T> => {
+                const gate = async <T>(signal: AbortSignal, task: () => Promise<T>, needsCleanup = false): Promise<T> => {
                     await waitReady(signal);
                     assertAvailable(signal);
                     if (needsCleanup) {

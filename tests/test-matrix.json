@@ -671,6 +671,8 @@
       "tests/materialImportRuntime.test.ts",
       "tests/materialImportRuntimeDatabase.test.ts",
       "tests/materialImportStage.test.ts",
+      "tests/materialStageCoverageA.test.ts",
+      "tests/materialStageCoverageB.test.ts",
       "tests/materialRepository.test.ts",
       "tests/mimo.test.ts",
       "tests/modelDownloads.test.ts",

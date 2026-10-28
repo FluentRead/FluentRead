@@ -181,11 +181,17 @@ export function createStage(db:MaterialDatabase, options:{limits?:Partial<Limits
     const [sessionCount,receiptCount]=await Promise.all([sessions.count(),receipts.count()]);
     if(!validInteger(sessionCount)||!validInteger(receiptCount)||sessionCount>MAX_TRACKED_SLOTS||receiptCount>MAX_TRACKED_SLOTS-sessionCount)throw Error('budget corruption');
     let reserved=0,reservedFrames=0;
-    await sessions.toCollection().each(session=>{
-      if(!validInteger(session.bytes)||!validInteger(session.frames)||session.bytes>Number.MAX_SAFE_INTEGER-reserved||session.frames>Number.MAX_SAFE_INTEGER-reservedFrames)throw Error('budget corruption');
-      if(!allowInvalidExpiry&&!validInteger(session.expiresAt))throw Error('invalid expiry');
-      reserved+=session.bytes;reservedFrames+=session.frames;
-    });
+    // Dexie 游标回调可能吞掉异常；捕获后停止遍历，再在事务内抛出。
+    let failed=false, failure:unknown;
+    await sessions.toCollection().until(session=>{
+      try {
+        if(!validInteger(session.bytes)||!validInteger(session.frames)||session.bytes>Number.MAX_SAFE_INTEGER-reserved||session.frames>Number.MAX_SAFE_INTEGER-reservedFrames)throw Error('budget corruption');
+        if(!allowInvalidExpiry&&!validInteger(session.expiresAt))throw Error('invalid expiry');
+        reserved+=session.bytes;reservedFrames+=session.frames;
+        return false;
+      } catch(error) {failed=true;failure=error;return true;}
+    }).each(()=>{});
+    if(failed)throw failure;
     if(budget.reserved!==reserved||budget.reservedFrames!==reservedFrames||budget.slots!==sessionCount+receiptCount)throw Error('budget corruption');
     return budget;
   };

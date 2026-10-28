@@ -393,6 +393,26 @@ describe('material import Port client',()=>{
     postMessage(value:unknown){if(this.closed)throw Error('closed');this.sent.push(structuredClone(value));}
     disconnect(){if(this.closed)return;this.closed=true;this.onDisconnect.emit();}
   }
+  it('closes before reusing a request ID when the safe integer limit is exhausted',async()=>{
+    const {createMaterialImportPortClient,MaterialImportPortDisconnectedError}=await import('@/src/features/vocabulary/materialImportPortClient');
+    const port=new ClientPort(),client=createMaterialImportPortClient(port);
+    for(const id of [1,2]) {
+      const pending=client.status();port.onMessage.emit({id,ok:true,data:{state:'open',nextSeq:0}});
+      expect(await pending).toEqual({state:'open',nextSeq:0});
+    }
+    const numberWithSmallLimit=Object.create(Number) as typeof Number;
+    Object.defineProperty(numberWithSmallLimit,'MAX_SAFE_INTEGER',{value:2});
+    let rejected:ReturnType<typeof client.status>;
+    try {
+      // Narrow the host limit only during this synchronous call; production IDs and API remain unchanged.
+      vi.stubGlobal('Number',numberWithSmallLimit);
+      rejected=client.status();
+    } finally {vi.unstubAllGlobals();}
+    await expect(rejected).rejects.toBeInstanceOf(MaterialImportPortDisconnectedError);
+    expect(port.sent).toEqual([{id:1,action:'status'},{id:2,action:'status'}]);
+    expect(port.closed).toBe(true);expect(port.onMessage.listeners.size).toBe(0);expect(port.onDisconnect.listeners.size).toBe(0);
+    await expect(client.status()).rejects.toBeInstanceOf(MaterialImportPortDisconnectedError);
+  });
   it.each(['onMessage','onDisconnect'] as const)('cleans partial client listener registration when %s throws',async which=>{
     const {createMaterialImportPortClient}=await import('@/src/features/vocabulary/materialImportPortClient');
     const port=new ClientPort(),hub=port[which] as EventHub<(value:unknown)=>void>,add=hub.addListener;

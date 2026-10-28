@@ -3,11 +3,12 @@ import {parseHTML} from 'linkedom';
 import {createMangaImageSegments} from '@/src/features/image-translation/content/mangaImageSegments';
 import {composeMangaPage} from '@/src/features/image-translation/content/mangaCompositor';
 import {encodeImageCanvas} from '@/src/features/image-translation/services/imageEncoding';
+import {createMangaReadingSnapshots} from '@/src/features/image-translation/content/mangaReadingSnapshots';
 vi.mock('@/src/features/image-translation/content/mangaCompositor', () => ({composeMangaPage: vi.fn()}));
 vi.mock('@/src/features/image-translation/services/imageEncoding', () => ({encodeImageCanvas: vi.fn()}));
 const flush = async () => {for (let i=0;i<20;i++) await Promise.resolve();};
 
-function fixture() {
+function fixture(lightCacheLimits?:{pages:number;bytes:number}) {
     vi.mocked(encodeImageCanvas).mockImplementation(async canvas=>`data:image/png;base64,${canvas.width}x${canvas.height}`);
     const {document}=parseHTML('<html><body><div id="reader"><img src="https://cdn.example/chapter.webp"></div></body></html>');
     const image=document.querySelector('img')! as {-readonly [K in keyof HTMLImageElement]: HTMLImageElement[K]};
@@ -36,13 +37,21 @@ function fixture() {
     const ports={enabled:vi.fn(()=>true),configurationIdentity:vi.fn(()=>'config'),cacheEnabled:vi.fn(()=>true),imageIdentity:vi.fn((img:HTMLImageElement)=>img.src),readSource:vi.fn().mockResolvedValue('data:image/webp;base64,source'),translate:vi.fn().mockResolvedValue({mangaPatches:{width:800,height:2560,patches:[{x:1,y:1,width:1,height:1,image:'data:image/png;base64,AQ=='}]},lines:[{text:'译文',bbox:{x0:1,y0:1,x1:2,y1:2},backgroundColor:'#fff'}]})};
     const composed:HTMLCanvasElement[]=[];
     vi.mocked(composeMangaPage).mockImplementation(async()=>{const c=document.createElement('canvas') as HTMLCanvasElement;c.width=800;c.height=2560;composed.push(c);return c;});
-    const runtime=createMangaImageSegments(ports);
+    const readingSnapshots=createMangaReadingSnapshots();
+    const runtime=createMangaImageSegments({...ports,readingSnapshots,lightCacheLimits});
     const segments=()=>runtime.prepare([image]).get(image)!;
-    return {document,image,rect,style,decoded,canvases,draws,ports,composed,runtime,segments,taint:()=>{taint=true;},missing:()=>{missing=true;},drawError:()=>{drawError=true;}};
+    return {document,image,rect,style,decoded,canvases,draws,ports,composed,runtime,segments,readingSnapshots,taint:()=>{taint=true;},missing:()=>{missing=true;},drawError:()=>{drawError=true;}};
 }
 afterEach(()=>{vi.restoreAllMocks();vi.resetAllMocks();vi.unstubAllGlobals();vi.useRealTimers();});
 
 describe('超长漫画图片的稳定分段与原始分辨率',()=>{
+    it('不同长图段挤出轻缓存时仍可读旧活动段，释放后回收文字',async()=>{
+        const f=fixture({pages:1,bytes:1024*1024}),segments=f.segments();f.rect.top=-1024;f.rect.bottom-=1024;
+        await f.runtime.translate(segments[1]);expect(f.readingSnapshots.stats().entries).toBe(0);
+        f.rect.top=-2048;await f.runtime.translate(segments[2]);expect(f.readingSnapshots.stats().entries).toBe(1);
+        f.rect.top=-1024;expect((await f.runtime.readLines(segments[1],new AbortController().signal)).status).toBe('ready');
+        expect(f.ports.translate).toHaveBeenCalledTimes(2);f.runtime.release(segments[1]);expect(f.readingSnapshots.stats().entries).toBe(0);f.runtime.dispose();
+    });
     it('覆盖首尾且保持自然宽度，每段有上下文；未进入队列不读取整图或创建画布',()=>{
         const f=fixture(),segments=f.segments();expect(segments).toHaveLength(8);
         expect(segments[0]).toMatchObject({top:0,height:2048,width:800,contextTop:0,contextHeight:2304});
@@ -65,6 +74,15 @@ describe('超长漫画图片的稳定分段与原始分辨率',()=>{
         f.runtime.release(segment);expect(output.width).toBe(0);await f.runtime.translate(segment);expect(f.ports.translate).toHaveBeenCalledOnce();
         expect(f.image.outerHTML).toBe(original);f.runtime.dispose();expect(f.canvases.every(c=>c.width===0&&c.height===0)).toBe(true);
         expect(f.runtime.prepare([f.image]).size).toBe(0);expect(f.runtime.identity(segment)).toBeNull();
+    });
+    it('按需读取指定可见片段，不重新加载图片或翻译，换源后拒绝旧片段',async()=>{
+        const f=fixture(),segment=f.segments()[1];f.rect.top=-1024;f.rect.bottom-=1024;
+        await f.runtime.translate(segment);const reads=f.ports.readSource.mock.calls.length;
+        expect(f.runtime.readingVisible(segment)).toBe(true);
+        expect(await f.runtime.readLines(segment,new AbortController().signal)).toMatchObject({status:'ready',lines:[{text:'译文'}]});
+        expect(f.ports.readSource).toHaveBeenCalledTimes(reads);expect(f.ports.translate).toHaveBeenCalledOnce();
+        f.image.src='https://cdn.example/other.webp';
+        expect(await f.runtime.readLines(segment,new AbortController().signal)).toEqual({status:'stale'});f.runtime.dispose();
     });
     it('宽长图按像素预算减小段高，尾段不遗漏小于一行的像素',()=>{
         const f=fixture();f.image.naturalWidth=4096;f.image.naturalHeight=15001;

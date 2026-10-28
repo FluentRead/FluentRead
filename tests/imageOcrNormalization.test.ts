@@ -5,6 +5,8 @@ import {
     getOcrImageSize,
     getAreaOcrImageSize,
     normalizeOcrLines,
+    normalizeOcrLineViews,
+    collectRawNumericGuards,
     restoreOcrLineCoordinates,
     selectChangedTranslations,
 } from '@/src/features/image-translation/core';
@@ -203,6 +205,249 @@ describe('普通图片按完整段落翻译', () => {
         const output = groupImageParagraphs(input);
         expect(output).toEqual(input);
         expect(coordinateReads).toBeLessThan(30_000);
+    });
+});
+
+describe('多词独立数值恢复',()=>{
+    const raw=(text:string,parts:string[],confidence:number|undefined=99,lineConfidence:number|undefined=99)=>{
+        let x=0;const words=parts.map(part=>{const bbox={x0:x,y0:0,x1:x+12,y1:10};x+=14;return {text:part,bbox,confidence};});
+        return [{paragraphs:[{lines:[{text,bbox:{x0:0,y0:0,x1:x-2,y1:10},confidence:lineConfidence,words}]}]}];
+    };
+    it.each([['12:30 PM',['12',':','30','PM']],['31/12/2026',['31','/','12','/','2026']],['2026年10月28日',['2026','年','10','月','28','日']],['USD 10',['USD','10']]])('可信完整分词恢复 %s 原行而普通视图仍保留原分词语义',(text,parts)=>{
+        const blocks=raw(text,parts),views=normalizeOcrLineViews(blocks);
+        expect(views.manga).toMatchObject([{text,numericConfidence:99}]);
+        expect(views.ordinary).toEqual(normalizeOcrLines(blocks,false));
+        expect(normalizeOcrLines(blocks,true)).toEqual(views.manga);
+        const guards=collectRawNumericGuards(blocks,views.manga);expect(guards.every(g=>g.guardOnly&&g.bbox.x0>=0&&g.bbox.x1<=views.manga[0].bbox.x1)).toBe(true);
+    });
+    it('只从数值证据视图移除能严格关联的低置信残片，保留圈选视图和原始保护框',()=>{
+        const blocks=raw('12:30 PM',['12',':','30','PM'],89),views=normalizeOcrLineViews(blocks);
+        expect(views.ordinary[0].text).toBe('12: 30 PM');expect(views.manga).toEqual([]);
+        expect(collectRawNumericGuards(blocks,views.manga)).toContainEqual({text:'',bbox:blocks[0].paragraphs[0].lines[0].bbox,guardOnly:true});
+    });
+    it('原行与词不一致时保留相邻正文；非法词框无法安全消除且数值守卫明确报错',()=>{
+        const mismatch=raw('12:30 PM',['12',':','30','PM','SALE'],89),views=normalizeOcrLineViews(mismatch);
+        expect(views.manga.map(line=>line.text).join(' ')).toContain('SALE');
+        const bad=raw('12:30 PM',['12',':','30','PM'],89),word=bad[0].paragraphs[0].lines[0].words[0];word.bbox.x1=word.bbox.x0;
+        const parsed=normalizeOcrLineViews(bad);expect(parsed.manga.length).toBeGreaterThan(0);
+        expect(()=>collectRawNumericGuards(bad,parsed.manga)).toThrow('保护位置无效');
+    });
+    it.each(['low','missing','invalid','all-low','all-invalid'] as const)('同框可信和 %s 拆词结果合并时不可升级，顺序不影响',kind=>{
+        const high=raw('12:30 PM',['12',':','30','PM'],99)[0].paragraphs[0].lines[0];
+        const low=structuredClone(high);low.confidence=kind==='low'?89:99;
+        if(kind==='low')for(const word of low.words)word.confidence=89;
+        if(kind==='missing')delete (low.words[2] as {confidence?:number}).confidence;
+        if(kind==='invalid')low.words[2].confidence=NaN;
+        if(kind==='all-low')for(const word of low.words)word.confidence=20;
+        if(kind==='all-invalid')for(const word of low.words)word.confidence=NaN;
+        for(const lines of [[high,low],[low,high]]){
+            const blocks=[{paragraphs:[{lines}]}],views=normalizeOcrLineViews(blocks);
+            expect(views.manga.some(line=>line.text==='12:30 PM')).toBe(false);
+            expect(collectRawNumericGuards(blocks,views.manga)).toContainEqual({text:'',bbox:high.bbox,guardOnly:true});
+        }
+    });
+    it('已有合行允许的中间间距不会泄漏低置信数值，也不移除不匹配的相邻正文',()=>{
+        const blocks=raw('12:30 PM',['12',':','30','PM'],89),line=blocks[0].paragraphs[0].lines[0];
+        line.words[3].bbox.x0+=18;line.words[3].bbox.x1+=18;line.bbox.x1+=18;
+        const ordinary=normalizeOcrLineViews(blocks).ordinary;expect(ordinary[0].text).toBe('12: 30 PM');
+        const parsed=normalizeOcrLineViews(blocks).manga;expect(parsed).toEqual([]);
+        expect(collectRawNumericGuards(blocks,parsed)).toContainEqual({text:'',bbox:line.bbox,guardOnly:true});
+        line.words.push({text:'SALE',confidence:89,bbox:{x0:line.bbox.x1+1,y0:0,x1:line.bbox.x1+13,y1:10}});line.bbox.x1+=13;
+        expect(normalizeOcrLineViews(blocks).manga.map(value=>value.text).join(' ')).toContain('SALE');
+    });
+    it.each(['12:30 PM','₩12,000'] as const)('同框分词一致而原始数值字符串 %s 不一致时不提升可信结果',text=>{
+        const parts=text.startsWith('₩')?['₩','12,000']:['12',':','30','PM'];
+        const first=raw(text,parts,99)[0].paragraphs[0].lines[0],second=structuredClone(first);
+        second.text=text.startsWith('₩')?'₩ 12,000':'12 :30 PM';
+        for(const lines of [[first,second],[second,first]]){
+            const blocks=[{paragraphs:[{lines}]}],views=normalizeOcrLineViews(blocks);
+            expect(views.manga.every(line=>line.numericConfidence===undefined)).toBe(true);
+            expect(collectRawNumericGuards(blocks,views.manga)).toContainEqual({text:'',bbox:first.bbox,guardOnly:true});
+        }
+    });
+    it.each(['far','outside','other-line'] as const)('%s 时不能静默删除不确定的相邻内容',kind=>{
+        const blocks=raw('12:30 PM',['12',':','30','PM'],89),line=blocks[0].paragraphs[0].lines[0],last=line.words[3];
+        if(kind==='far'){last.bbox.x0=700;last.bbox.x1=712;line.bbox.x1=712;}
+        if(kind==='outside'){line.bbox.x1=last.bbox.x0+1;}
+        if(kind==='other-line'){last.bbox.y0=50;last.bbox.y1=60;line.bbox.y1=60;}
+        const views=normalizeOcrLineViews(blocks);expect(views.manga.map(value=>value.text).join(' ')).toContain('PM');
+    });
+    it.each(['low','missing','all-low','all-invalid'] as const)('同一原框有词/无词 %s 置信合并不因输入顺序升级',kind=>{
+        const low=raw('12:30 PM',['12',':','30','PM'],kind==='low'?89:99)[0].paragraphs[0].lines[0];
+        if(kind==='missing')delete (low.words[2] as {confidence?:number}).confidence;
+        if(kind==='all-low')for(const word of low.words)word.confidence=20;
+        if(kind==='all-invalid')for(const word of low.words)word.confidence=NaN;
+        const high={text:low.text,bbox:{...low.bbox},confidence:99,words:[]};
+        for(const lines of [[high,low],[low,high]]){
+            const blocks=[{paragraphs:[{lines}]}],views=normalizeOcrLineViews(blocks);
+            expect(views.manga.every(line=>line.numericConfidence===undefined||line.numericConfidence<90)).toBe(true);
+            expect(collectRawNumericGuards(blocks,views.manga)).toContainEqual({text:'',bbox:high.bbox,guardOnly:true});
+            expect(views.ordinary).toEqual(normalizeOcrLines(blocks,false));
+        }
+    });
+    it('同一原框出现不同可信数值时均不猜测，保留物理保护',()=>{
+        const first=raw('12:30 PM',['12',':','30','PM'],99)[0].paragraphs[0].lines[0];
+        const second=structuredClone(first);second.text='12:31 PM';second.words[2].text='31';
+        for(const lines of [[first,second],[second,first],[first,second,structuredClone(first)]]){
+            const blocks=[{paragraphs:[{lines}]}],views=normalizeOcrLineViews(blocks);
+            expect(views.manga.every(line=>line.numericConfidence===undefined)).toBe(true);
+            expect(collectRawNumericGuards(blocks,views.manga)).toContainEqual({text:'',bbox:first.bbox,guardOnly:true});
+        }
+    });
+    it('轻微越界扩张整行守卫覆盖全部词；明显越界时保守报错',()=>{
+        const blocks=raw('12:30 PM',['12',':','30','PM'],89),line=blocks[0].paragraphs[0].lines[0];
+        line.bbox.x1-=1;const parsed=normalizeOcrLineViews(blocks).manga,guards=collectRawNumericGuards(blocks,parsed);
+        expect(guards).toContainEqual({text:'',bbox:{...line.bbox,x1:line.bbox.x1+1},guardOnly:true});
+        line.bbox.x1-=3;expect(()=>collectRawNumericGuards(blocks,normalizeOcrLineViews(blocks).manga)).toThrow('保护位置无效');
+    });
+    it.each(['same','different'] as const)('超宽原框中 %s 数值的独立词位置不合并，不可靠防擦报错',kind=>{
+        const bbox={x0:0,y0:0,x1:200,y1:10},left={text:'90%',bbox,confidence:99,words:[{text:'90%',bbox:{x0:0,y0:0,x1:20,y1:10},confidence:99}]};
+        const value=kind==='same'?'90%':'80%',right={text:value,bbox,confidence:99,words:[{text:value,bbox:{x0:180,y0:0,x1:200,y1:10},confidence:99}]};
+        const center={text:'HELLO',bbox:{x0:80,y0:0,x1:120,y1:10},confidence:99};
+        for(const lines of [[left,right,center],[right,left,center]]){
+            const blocks=[{paragraphs:[{lines}]}],views=normalizeOcrLineViews(blocks);
+            expect(views.manga.filter(line=>line.text==='90%'||line.text==='80%')).toHaveLength(2);
+            expect(views.manga.some(line=>line.text==='HELLO')).toBe(true);
+            expect(()=>collectRawNumericGuards(blocks,views.manga)).toThrow('保护位置无效');
+        }
+    });
+    it('同框有词和无词结果无法对应物理范围时保守失败',()=>{
+        const bbox={x0:0,y0:0,x1:40,y1:10},without={text:'90%',bbox,confidence:99,words:[]};
+        const withWords={text:'90%',bbox,confidence:89,words:[{text:'90%',bbox:{x0:0,y0:0,x1:20,y1:10},confidence:89}]};
+        for(const lines of [[without,withWords],[withWords,without]]){
+            const blocks=[{paragraphs:[{lines}]}],views=normalizeOcrLineViews(blocks);
+            expect(()=>collectRawNumericGuards(blocks,views.manga)).toThrow('保护位置无效');
+        }
+    });
+    it('无词、窄词、整行词的六种顺序一致失败，不漏掉较早的矛盾框',()=>{
+        const bbox={x0:0,y0:0,x1:40,y1:10},make=(wordBox:typeof bbox|undefined)=>({text:'90%',bbox,confidence:99,
+            words:wordBox?[{text:'90%',bbox:wordBox,confidence:99}]:[]});
+        const narrow=make({x0:0,y0:0,x1:10,y1:10}),full=make(bbox),empty=make(undefined);
+        const center={text:'HELLO',bbox:{x0:16,y0:20,x1:40,y1:30},confidence:99};
+        for(const lines of [[narrow,full,empty],[narrow,empty,full],[full,narrow,empty],[full,empty,narrow],[empty,full,narrow],[empty,narrow,full]]){
+            const blocks=[{paragraphs:[{lines:[...lines,center]}]}],views=normalizeOcrLineViews(blocks);
+            expect(views.ordinary.some(line=>line.text==='HELLO')).toBe(true);
+            expect(()=>collectRawNumericGuards(blocks,views.manga)).toThrow('保护位置无效');
+        }
+    });
+    it('原文两侧空白忽略用于同框身份；内部空白不同不误认同一原值',()=>{
+        const bbox={x0:0,y0:0,x1:40,y1:10},plain={text:'90%',bbox,confidence:99,words:[]},
+            spaced={text:' 90% ',bbox,confidence:89,words:[{text:'90%',bbox:{x0:0,y0:0,x1:10,y1:10},confidence:89}]};
+        for(const lines of [[plain,spaced],[spaced,plain]]){
+            const blocks=[{paragraphs:[{lines}]}],views=normalizeOcrLineViews(blocks);
+            expect(()=>collectRawNumericGuards(blocks,views.manga)).toThrow('保护位置无效');
+        }
+        const interior={...spaced,text:'90 %',words:[{...spaced.words[0],text:'90 %'}]};
+        const blocks=[{paragraphs:[{lines:[plain,interior]}]}];
+        expect(()=>collectRawNumericGuards(blocks,normalizeOcrLineViews(blocks).manga)).not.toThrow();
+    });
+    it('面积恰为 4 倍时允许独立词框，超过时保护失败',()=>{
+        const bbox={x0:0,y0:0,x1:40,y1:10},wordBox={x0:0,y0:0,x1:10,y1:10};
+        const line={text:'90%',bbox,confidence:99,words:[{text:'90%',bbox:wordBox,confidence:99}]},blocks=[{paragraphs:[{lines:[line]}]}];
+        expect(()=>collectRawNumericGuards(blocks,normalizeOcrLineViews(blocks).manga)).not.toThrow();
+        wordBox.x1=9.9;expect(()=>collectRawNumericGuards(blocks,normalizeOcrLineViews(blocks).manga)).toThrow('保护位置无效');
+    });
+    it('同框的原始数字行与分词不一致行不得相互抬高置信度',()=>{
+        const high=raw('12:30 PM',['12',':','30','PM'],99)[0].paragraphs[0].lines[0];
+        const other={text:'NOT THAT',bbox:{...high.bbox},confidence:99,words:[{text:'12:30 PM',bbox:{...high.bbox},confidence:99}]};
+        for(const lines of [[high,other],[other,high]]){
+            const blocks=[{paragraphs:[{lines}]}],views=normalizeOcrLineViews(blocks);
+            expect(views.manga.every(line=>line.numericConfidence===undefined)).toBe(true);
+            expect(collectRawNumericGuards(blocks,views.manga)).toContainEqual({text:'',bbox:high.bbox,guardOnly:true});
+        }
+    });
+    it('部分重叠但不满足去重阈值时保留低置信独立物理框',()=>{
+        const high=raw('12:30 PM',['12',':','30','PM'],99)[0].paragraphs[0].lines[0],low=structuredClone(high);
+        low.confidence=89;low.bbox.x0+=8;low.bbox.x1+=8;for(const word of low.words){word.confidence=89;word.bbox.x0+=8;word.bbox.x1+=8;}
+        const blocks=[{paragraphs:[{lines:[high,low]}]}],views=normalizeOcrLineViews(blocks);
+        expect(views.manga).toMatchObject([{text:'12:30 PM',numericConfidence:99}]);
+        expect(collectRawNumericGuards(blocks,views.manga)).toContainEqual({text:'',bbox:low.bbox,guardOnly:true});
+    });
+    it('缺词、不一致或缺失/低置信时不复活原行，原始完整数值框仍可保护',()=>{
+        const variants=[raw('12:30 PM',['12',':','30','PM'],89),raw('12:30 PM',['12',':','30','PM'],undefined),
+            raw('12:30 PM',['12',':','31','PM']),raw('12:30 PM',['12',':','30','PM'],99,89),raw('12:30 PM',['12',':','30','PM'],20)];
+        // undefined 默认参数无法表达缺失置信度，单独删除源字段。
+        for(const word of variants[1][0].paragraphs[0].lines[0].words) delete (word as {confidence?:number}).confidence;
+        for(const blocks of variants){const views=normalizeOcrLineViews(blocks);expect(views.manga.some(line=>line.text==='12:30 PM'&&line.numericConfidence===99)).toBe(false);
+            expect(collectRawNumericGuards(blocks,views.manga)).toContainEqual({text:'',bbox:blocks[0].paragraphs[0].lines[0].bbox,guardOnly:true});}
+    });
+});
+
+describe('原始数值证据的有界保护',()=>{
+    it('空识别块或不完整层级不会产生保护框',()=>{
+        expect(collectRawNumericGuards(undefined)).toEqual([]);
+        expect(collectRawNumericGuards([{}])).toEqual([]);
+        expect(collectRawNumericGuards([{paragraphs:[{}]}])).toEqual([]);
+    });
+    it('一千个相同文本、不同物理框直接匹配，不应因重复比较导致整图失败',()=>{
+        const lines=Array.from({length:1000},(_,i)=>{const bbox={x0:i*2,y0:0,x1:i*2+1,y1:1};
+            return {text:'90%',bbox,confidence:99,words:[{text:'90%',bbox,confidence:99}]};});
+        const blocks=[{paragraphs:[{lines}]}],views=normalizeOcrLineViews(blocks);
+        expect(views.manga).toHaveLength(1000);expect(collectRawNumericGuards(blocks,views.manga,{trustedWorkerData:true})).toEqual([]);
+    });
+    it('只有完整覆盖的可信框可去掉保护；部分覆盖仍保留原物理框',()=>{
+        const bbox={x0:2,y0:2,x1:20,y1:10},blocks=[{paragraphs:[{lines:[{text:'90%',bbox,confidence:20}]}]}];
+        const candidate={text:'90%',bbox:{x0:0,y0:0,x1:21,y1:11},numericConfidence:99};
+        expect(collectRawNumericGuards(blocks,[candidate],{trustedWorkerData:true})).toEqual([]);
+        expect(collectRawNumericGuards(blocks,[{...candidate,bbox:{...candidate.bbox,x1:19}}]))
+            .toEqual([{text:'',bbox,guardOnly:true}]);
+    });
+    it('访问器和无法反射的对象不走几何快路径，仍按实际边界判断',()=>{
+        const bbox={get x0(){return 2;},y0:2,x1:20,y1:10};
+        const blocks=[{paragraphs:[{lines:[{text:'90%',bbox,confidence:20}]}]}];
+        const candidate=new Proxy({text:'90%',numericConfidence:99,bbox:{x0:0,y0:0,x1:21,y1:11}},
+            {getOwnPropertyDescriptor(){throw new Error('unavailable');}});
+        expect(collectRawNumericGuards(blocks,[candidate])).toEqual([]);
+        expect(collectRawNumericGuards(blocks,[])).toEqual([{text:'',bbox:{x0:2,y0:2,x1:20,y1:10},guardOnly:true}]);
+    });
+    it('整行和词框依次校验，保留行框及前一数值词的原始首因',()=>{
+        const lineError=Error('line first'),wordError=Error('word second');
+        const line={text:'12:30 PM',get bbox():any {throw lineError;},words:[{text:'12',get bbox():any {throw wordError;}}]};
+        expect(()=>collectRawNumericGuards([{paragraphs:[{lines:[line]}]}])).toThrow(lineError);
+        const word={text:'12',get bbox():any {throw wordError;}},punctuation={text:':',get bbox():any {throw Error('later punctuation');}};
+        const raw={text:'12:30 PM',bbox:{x0:0,y0:0,x1:30,y1:10},words:[word,punctuation]};
+        expect(()=>collectRawNumericGuards([{paragraphs:[{lines:[raw]}]}])).toThrow(wordError);
+    });
+    it('原始 bbox 无法反射时保守回退，不吞掉本可证明覆盖的结果',()=>{
+        const bbox=new Proxy({x0:2,y0:2,x1:20,y1:10},{getOwnPropertyDescriptor(){throw new Error('unavailable');}});
+        const candidate={text:'90%',numericConfidence:99,bbox:{x0:2,y0:2,x1:20,y1:10}};
+        expect(collectRawNumericGuards([{paragraphs:[{lines:[{text:'90%',bbox,confidence:20}]}]}],[candidate],{trustedWorkerData:true})).toEqual([]);
+    });
+    it('可信模式遇到继承坐标及无法反射的候选时按实际覆盖结果回退',()=>{
+        const bbox={x0:2,y0:2,x1:20,y1:10};
+        const blocks=[{paragraphs:[{lines:[{text:'90%',bbox,confidence:20}]}]}];
+        const inherited=Object.create({x0:0,y0:0,x1:21,y1:11}) as typeof bbox;
+        const candidate={text:'90%',numericConfidence:99,bbox:inherited};
+        expect(collectRawNumericGuards(blocks,[candidate],{trustedWorkerData:true})).toEqual([]);
+        const reflected=new Proxy({...candidate,bbox:{x0:2,y0:2,x1:19,y1:10}},
+            {getOwnPropertyDescriptor(){throw new Error('unavailable');}});
+        expect(collectRawNumericGuards(blocks,[reflected],{trustedWorkerData:true}))
+            .toEqual([{text:'',bbox,guardOnly:true}]);
+    });
+    it('同文首个候选的未知 bbox getter 抛错时保留首因，不越过它命中后面的精确框',()=>{
+        const failure=new Error('bbox getter first'),bbox={x0:2,y0:2,x1:20,y1:10};
+        const first={text:'90%',numericConfidence:99,get bbox(){throw failure;}};
+        const exact={text:'90%',numericConfidence:99,bbox};
+        for(const options of [undefined,{trustedWorkerData:true}])
+            expect(()=>collectRawNumericGuards([{paragraphs:[{lines:[{text:'90%',bbox,confidence:20}]}]}],[first,exact],options)).toThrow(failure);
+    });
+    it('未知输入中的 Proxy 即使伪装数据描述符，也不跳过首个 bbox 读取异常',()=>{
+        const failure=new Error('bbox proxy first'),bbox={x0:2,y0:2,x1:20,y1:10};
+        const deceptive=new Proxy({...bbox},{get(target,key,receiver){if(key==='x0')throw failure;return Reflect.get(target,key,receiver);}});
+        const first={text:'90%',numericConfidence:99,bbox:deceptive};
+        const exact={text:'90%',numericConfidence:99,bbox};
+        expect(()=>collectRawNumericGuards([{paragraphs:[{lines:[{text:'90%',bbox,confidence:20}]}]}],[first,exact])).toThrow(failure);
+    });
+    it('非法位置和超过保护框数量上限时明确报错',()=>{
+        const invalid=[{paragraphs:[{lines:[{text:'90%',bbox:{x0:NaN,y0:0,x1:2,y1:2},confidence:20}]}]}];
+        expect(()=>collectRawNumericGuards(invalid)).toThrow('保护位置无效');
+        const lines=Array.from({length:4097},(_,i)=>({text:'90%',bbox:{x0:i*2,y0:0,x1:i*2+1,y1:1},confidence:20}));
+        expect(()=>collectRawNumericGuards([{paragraphs:[{lines}]}])).toThrow('保护区域过于复杂');
+    });
+    it('同文候选无法证明覆盖并超过比较预算时保留原图而不伪装成功',()=>{
+        const recognized=Array.from({length:1001},(_,i)=>({text:'90%',numericConfidence:99,bbox:{x0:i*2,y0:0,x1:i*2+1,y1:1}}));
+        const lines=Array.from({length:1001},(_,i)=>({text:'90%',bbox:{x0:100000+i*2,y0:0,x1:100001+i*2,y1:1},confidence:20}));
+        expect(()=>collectRawNumericGuards([{paragraphs:[{lines}]}],recognized)).toThrow('保护区域过于复杂');
     });
 });
 

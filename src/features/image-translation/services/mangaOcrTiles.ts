@@ -5,11 +5,30 @@
  * 模块边界：纯几何与数据算法，不读取像素、不创建 Canvas、不运行模型，不推测或拼接未识别出的文字。
  */
 import type {MangaOcrItem} from './mangaRegions';
+import {numericProtection} from './mangaNumeric';
 
 export interface MangaOcrTile {x: number; y: number; width: number; height: number}
-export interface MangaOcrTileResult {tile: MangaOcrTile; results: MangaOcrItem[]}
+export interface MangaOcrTileResult {tile: MangaOcrTile; results: MangaOcrItem[]; numericEvidence?: MangaOcrItem[]}
 const TILE_SIDE = 1536;
 const TILE_STRIDE = 1024;
+
+/** 去重前收集数值物理证据，按瓦片可见边界映回整图；不改变正常识别结果的去重。 */
+export function collectMangaOcrTileNumericEvidence(pages:MangaOcrTileResult[],width:number,height:number):MangaOcrItem[] {
+    const output:MangaOcrItem[]=[],keys=new Set<string>();
+    for(const {tile,results,numericEvidence} of pages)for(const item of numericEvidence??results){
+        if(!numericProtection(item.text?.replace(/\s+/gu,' ').trim()??''))continue;
+        const b=item.box;
+        if(!b||![tile.x,tile.y,tile.width,tile.height,b.x,b.y,b.width,b.height].every(Number.isFinite)
+            ||tile.width<=0||tile.height<=0||b.width<=0||b.height<=0)throw new Error('图片数字保护位置无效，已保留原图');
+        const x=Math.max(0,tile.x,tile.x+b.x),y=Math.max(0,tile.y,tile.y+b.y);
+        const right=Math.min(width,tile.x+tile.width,tile.x+b.x+b.width),bottom=Math.min(height,tile.y+tile.height,tile.y+b.y+b.height);
+        if(right<=x||bottom<=y)continue;
+        const key=[x,y,right,bottom].join(',');if(keys.has(key))continue;
+        if(output.length>=4096)throw new Error('图片数字保护区域过于复杂，已保留原图');
+        keys.add(key);output.push({...item,box:{x,y,width:right-x,height:bottom-y}});
+    }
+    return output;
+}
 
 /** 检测框可能退让边缘数像素；另一完整框跨越本窗口时，以其真实可见切片核对裁边证据。 */
 function matchesVisibleSlice(candidate: {item: MangaOcrItem; tile: MangaOcrTile}, whole: MangaOcrItem['box']): boolean {

@@ -113,7 +113,9 @@ const uiLanguageUpdates = Object.fromEntries(Object.entries(UI_LANGUAGE_BUNDLES)
     return [[language, createUserscriptLanguageUpdate(currentUserscriptLanguageBundle(language as RegisteredUiLanguage),
         language === 'en-US' ? pinnedData!.english : baseline)]];
 }));
-const languageUpdateBytes = gzipUserscriptBuildData(Buffer.from(serializeUiMessages(bundleLibraries ? packLanguageUpdates(uiLanguageUpdates) : uiLanguageUpdates)));
+const languageUpdateData = Buffer.from(serializeUiMessages(bundleLibraries ? packLanguageUpdates(uiLanguageUpdates) : uiLanguageUpdates));
+// 独立版的大型语言增量复用构建期隔离压缩，运行时仍仅解压同一份标准 gzip 数据。
+const languageUpdateBytes = bundleLibraries ? await gzipLargeStandaloneUserscriptData(languageUpdateData, root) : gzipUserscriptBuildData(languageUpdateData);
 const compressedUiLanguageUpdates = bundleLibraries ? encodeUserscriptDataCompact(languageUpdateBytes) : languageUpdateBytes.toString('base64');
 const unicodeNotice = `/*\n${fs.readFileSync(resolve(root, 'public/third-party-notices/unicode-17.0.0.txt'), 'utf8')}\n*/`;
 const serviceIconsLicense = fs.readFileSync(resolve(root, 'public/third-party-notices/lobe-icons-MIT.txt'), 'utf8');
@@ -144,7 +146,7 @@ const compressedCatalogPrefix = '\0fluentread-userscript-site-catalog:';
 const externalChineseMessagesId = '\0fluentread-userscript-zh-cn.js';
 
 /** 只压缩站点规则与中文文案数据；产品逻辑仍留在可审查的 userscript 主文件中。 */
-export function createUserscriptCatalogCompressionPlugin(): Plugin {
+export function createUserscriptCatalogCompressionPlugin(compressStandalone = gzipLargeStandaloneUserscriptData): Plugin {
     return {
         name: 'compress-userscript-site-catalog',
         enforce: 'pre',
@@ -169,18 +171,21 @@ export function createUserscriptCatalogCompressionPlugin(): Plugin {
                     ].join('\n');
                 }
                 const contents = serializeUiMessages(bundleLibraries ? [packKeyColumn(defaultMessageColumns[0] as readonly string[]), defaultMessageColumns[1]] : userscriptPageMessages(zhCNMessages));
-                const compressedBytes = gzipUserscriptBuildData(Buffer.from(contents));
-                const compressed = bundleLibraries ? encodeUserscriptDataCompact(compressedBytes) : compressedBytes.toString('base64');
-                return [
-                    `/* Non-code Chinese UI messages; sha256 ${createHash('sha256').update(contents).digest('hex')}. */`,
-                    "import {inflateWithPako} from '@/userscript/pakoRuntime';",
-                    ...(bundleLibraries ? ["import {decodeUserscriptData} from '@/userscript/dataEncoding';",
-                        "import {restoreDefaultMessageColumns} from '@/userscript/defaultMessageData';"] : []),
-                    bundleLibraries ? `const bytes = decodeUserscriptData(${JSON.stringify(compressed)});`
-                        : `const bytes = Uint8Array.from(atob(${JSON.stringify(compressed)}), (character) => character.charCodeAt(0));`,
-                    bundleLibraries ? 'export const zhCNMessages = restoreDefaultMessageColumns(JSON.parse(inflateWithPako(bytes)));'
-                        : 'export const zhCNMessages = JSON.parse(inflateWithPako(bytes));',
-                ].join('\n');
+                const input = Buffer.from(contents);
+                const render = (compressedBytes: Buffer) => {
+                    const compressed = bundleLibraries ? encodeUserscriptDataCompact(compressedBytes) : compressedBytes.toString('base64');
+                    return [
+                        `/* Non-code Chinese UI messages; sha256 ${createHash('sha256').update(contents).digest('hex')}. */`,
+                        "import {inflateWithPako} from '@/userscript/pakoRuntime';",
+                        ...(bundleLibraries ? ["import {decodeUserscriptData} from '@/userscript/dataEncoding';",
+                            "import {restoreDefaultMessageColumns} from '@/userscript/defaultMessageData';"] : []),
+                        bundleLibraries ? `const bytes = decodeUserscriptData(${JSON.stringify(compressed)});`
+                            : `const bytes = Uint8Array.from(atob(${JSON.stringify(compressed)}), (character) => character.charCodeAt(0));`,
+                        bundleLibraries ? 'export const zhCNMessages = restoreDefaultMessageColumns(JSON.parse(inflateWithPako(bytes)));'
+                            : 'export const zhCNMessages = JSON.parse(inflateWithPako(bytes));',
+                    ].join('\n');
+                };
+                return bundleLibraries ? compressStandalone(input, root).then(render) : render(gzipUserscriptBuildData(input));
             }
             if (!id.startsWith(compressedCatalogPrefix)) return null;
             const sourcePath = id.slice(compressedCatalogPrefix.length, -'.js'.length);

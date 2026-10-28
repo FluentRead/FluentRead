@@ -74,9 +74,13 @@ export async function restoreLargeMaterialBackup(file: Blob, guard: MaterialOper
     return {kind: 'committed', result, capability: cap};
   } catch (error) {
     if (commitDispatched && cap) return {kind: 'unknown', capability: cap, commitDispatched: true};
-    const interrupted = signal?.aborted || error instanceof Error && (error.name === 'AbortError' || error.name === 'TimeoutError');
+    // 捕获值可能来自文件读取或调用方；异常元数据本身不可阻止暂存清理。
+    let failure = error, name: string | undefined;
+    try {if (error instanceof Error) name = error.name;}
+    catch {failure = new Error('材料恢复操作失败');}
+    const interrupted = signal?.aborted || name === 'AbortError' || name === 'TimeoutError';
     // This category is sent only for a begin admission that rolled back.
-    const rejectedAdmission = !interrupted && error instanceof Error && error.name === 'MaterialBackupCapacityError';
+    const rejectedAdmission = !interrupted && name === 'MaterialBackupCapacityError';
     let cleanupPending = beginDispatched && !opened && !rejectedAdmission;
     if (opened && client) {
       if (interrupted) cleanupPending = true;
@@ -86,7 +90,7 @@ export async function restoreLargeMaterialBackup(file: Blob, guard: MaterialOper
       }
     }
     const result = {cleanupPending, ...(cleanupPending && cap ? {capability: cap} : {})};
-    return interrupted && signal?.aborted ? {kind: 'cancelled', ...result} : {kind: 'failed', error, ...result};
+    return interrupted && signal?.aborted ? {kind: 'cancelled', ...result} : {kind: 'failed', error: failure, ...result};
   } finally {client?.close();}
 }
 

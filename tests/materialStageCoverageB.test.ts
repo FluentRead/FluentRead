@@ -1,9 +1,9 @@
 import 'fake-indexeddb/auto';
-import Dexie from 'dexie';
+import Dexie, {type Transaction} from 'dexie';
 import {afterEach, describe, expect, it, vi} from 'vitest';
 import {sha256} from '@noble/hashes/sha256';
 import {bytesToHex} from '@noble/hashes/utils';
-import {MaterialDatabase} from '@/src/features/vocabulary/materialRepository';
+import {MaterialDatabase, MaterialRepository} from '@/src/features/vocabulary/materialRepository';
 import {createStage, type Frame} from '@/src/features/vocabulary/materialImportStage';
 import {createMaterialImportCapability} from '@/src/features/vocabulary/materialImportPort';
 
@@ -21,6 +21,17 @@ function make(options:Parameters<typeof createStage>[1]={}) {
   return {db,stage,frame,begin};
 }
 const deferred=()=>{let resolve!:()=>void;const promise=new Promise<void>(done=>resolve=done);return {promise,resolve};};
+async function uploadMaterial(x:ReturnType<typeof make>) {
+  const sourceName=`material-stage-b-source-${crypto.randomUUID()}`,sourceDb=new MaterialDatabase(sourceName);
+  names.push(sourceName);connections.push(sourceDb);
+  const record=await new MaterialRepository(sourceDb).capture({source:{kind:'article',url:'https://example.test/abort',title:'preserve'},reference:{kind:'note',id:'n',note:'private'}},10);
+  const bytes=new TextEncoder().encode(JSON.stringify(record)),hash=sha256.create(),size=bytes.length;
+  hash.update(new Uint8Array([(size>>>24)&255,(size>>>16)&255,(size>>>8)&255,size&255]));hash.update(bytes);
+  const total=Math.ceil(size/limits.frameBytes),cap=createMaterialImportCapability();
+  await x.stage.beginRecoverable({records:1,frames:total,bytes:size,digest:bytesToHex(hash.digest())},{generation:0,capturedAt:100},cap,{deadline:1000});
+  for(let seq=0;seq<total;seq++)await x.stage.append(cap,{seq,record:0,part:seq,total,recordBytes:size,bytes:bytes.slice(seq*limits.frameBytes,(seq+1)*limits.frameBytes)});
+  await x.stage.seal(cap);return {cap,total};
+}
 
 describe('material staging transaction boundaries',()=>{
   it('rejects an append when a completed transfer is sealed during its transport delay',async()=>{
@@ -41,6 +52,44 @@ describe('material staging transaction boundaries',()=>{
     await expect(x.stage.commit(second)).rejects.toThrow('backpressure: receiver busy');
     gate.resolve();await pending;
     expect(await x.stage.status(second)).toEqual({state:'sealed',nextSeq:1});
+  });
+  it('rolls back a cancelled commit even if aborting the transaction throws',async()=>{
+    const x=make(),controller=new AbortController();
+    const {cap,total}=await uploadMaterial(x);
+    let intercepted=false;
+    const cancel=function(this:{onsuccess?:(id:string)=>void},_key:unknown,_obj:unknown,transaction:Transaction){
+      this.onsuccess=()=>{
+        const abort=vi.spyOn(Object.getPrototypeOf(transaction),'abort').mockImplementation(()=>{intercepted=true;throw Error('transaction abort failed');});
+        try {controller.abort();} finally {abort.mockRestore();}
+      };
+    };
+    x.db.materials.hook('creating',cancel);
+    try{await expect(x.stage.commit(cap,{signal:controller.signal})).rejects.toThrow('cancelled');}
+    finally{x.db.materials.hook('creating').unsubscribe(cancel);}
+    await vi.waitFor(async()=>expect(await x.stage.status(cap)).toEqual({state:'sealed',nextSeq:total}));
+    expect(intercepted).toBe(true);expect(await x.db.materials.count()).toBe(0);
+    expect(await x.db.table('stageFrames').count()).toBe(total);expect(await x.db.table('stageReceipts').count()).toBe(0);
+    expect(await x.stage.commit(cap)).toEqual({inserted:1,updated:0,skipped:0});
+  });
+  it('does not apply a record if cancellation wins while reading its last frame',async()=>{
+    const x=make(),controller=new AbortController(),{cap,total}=await uploadMaterial(x);
+    const frames=x.db.table('stageFrames');let reads=0,intercepted=false;
+    const onRead=(row:Frame|undefined)=>{
+      if(row&&++reads===total+1) {
+        const transaction=Dexie.currentTransaction;
+        if(!transaction)throw Error('missing transaction');
+        const abort=vi.spyOn(Object.getPrototypeOf(transaction),'abort').mockImplementation(()=>{intercepted=true;throw Error('transaction abort failed');});
+        try {controller.abort();} finally {abort.mockRestore();}
+      }
+      return row;
+    };
+    frames.hook('reading',onRead);
+    try {await expect(x.stage.commit(cap,{signal:controller.signal})).rejects.toThrow('cancelled');}
+    finally {frames.hook('reading').unsubscribe(onRead);}
+    await vi.waitFor(async()=>expect(await x.stage.status(cap)).toEqual({state:'sealed',nextSeq:total}));
+    expect(intercepted).toBe(true);expect(await x.db.materials.count()).toBe(0);
+    expect(await frames.count()).toBe(total);expect(await x.db.table('stageReceipts').count()).toBe(0);
+    expect(await x.stage.commit(cap)).toEqual({inserted:1,updated:0,skipped:0});
   });
   it('isolates rejection from a callable cleanup diagnostic thenable after the transaction commits',async()=>{
     const warn=vi.spyOn(console,'warn').mockImplementation(()=>{});

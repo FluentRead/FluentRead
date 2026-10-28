@@ -153,4 +153,61 @@ describe('material staging stored metadata boundaries',()=>{
     await vi.waitFor(async()=>expect(await stage.seal(cap)).toBeUndefined());
     expect(await stage.status(cap)).toEqual({state:'sealed',nextSeq:0});
   });
+  it('releases the seal admission when starting its database transaction throws synchronously',async()=>{
+    const {db,stage,begin}=setup(),cap=await begin();
+    const transaction=vi.spyOn(db,'transaction').mockImplementationOnce(()=>{throw Error('database unavailable');});
+    try {await expect(stage.seal(cap)).rejects.toThrow('database unavailable');}
+    finally {transaction.mockRestore();}
+    expect(await stage.status(cap)).toEqual({state:'open',nextSeq:0});
+    await stage.seal(cap);
+    expect(await stage.status(cap)).toEqual({state:'sealed',nextSeq:0});
+  });
+  it('rolls back a cancelled empty import after material processing and before creating a receipt',async()=>{
+    const {db,stage,begin}=setup(),cap=await begin(),controller=new AbortController();
+    await stage.seal(cap);
+    const original=MaterialRepository.prototype.importRecords;
+    const spy=vi.spyOn(MaterialRepository.prototype,'importRecords').mockImplementationOnce(function(this:MaterialRepository,...args:Parameters<MaterialRepository['importRecords']>){
+      return original.apply(this,args).then(result=>{controller.abort();return result;});
+    });
+    try {await expect(stage.commit(cap,{signal:controller.signal})).rejects.toThrow();}
+    finally {spy.mockRestore();}
+    expect(await db.table('stageReceipts').count()).toBe(0);
+    expect(await stage.status(cap)).toEqual({state:'sealed',nextSeq:0});
+    await expect(stage.commit(cap)).resolves.toEqual({inserted:0,updated:0,skipped:0});
+  });
+  it('rejects a replacement owner while an existing transfer holds the session',async()=>{
+    const db=new MaterialDatabase(`material-stage-a-${crypto.randomUUID()}`);databases.push(db);
+    let release!:()=>void,started!:()=>void;
+    const held=new Promise<void>(resolve=>release=resolve),ready=new Promise<void>(resolve=>started=resolve);
+    const stage=createStage(db,{clock:()=>clock.now,limits:{ttlMs:1000},beforeAppend:async()=>{started();await held;}});
+    const bytes=new TextEncoder().encode('{}'),hash=sha256.create();hash.update(new Uint8Array([0,0,0,bytes.length]));hash.update(bytes);
+    const input={records:1,frames:1,bytes:bytes.length,digest:bytesToHex(hash.digest())};
+    const frame={seq:0,record:0,part:0,total:1,recordBytes:bytes.length,bytes},owner=createMaterialImportCapability();
+    await stage.beginRecoverable(input,guard,owner,{deadline:1000});
+    const pending=stage.append(owner,frame);await ready;
+    const replacement={...createMaterialImportCapability(),id:owner.id};
+    const tokenHash=(token:string)=>bytesToHex(sha256(new TextEncoder().encode(token)));
+    try {
+      await db.table('stageSessions').update(owner.id,{ownerHash:tokenHash(replacement.token)});
+      await stage.resume(replacement);
+      await expect(stage.append(replacement,frame)).rejects.toThrow('session unavailable');
+      await expect(stage.commit(replacement)).rejects.toThrow('session unavailable');
+      expect(await db.table('stageFrames').count()).toBe(0);
+    } finally {
+      await db.table('stageSessions').update(owner.id,{ownerHash:tokenHash(owner.token)});
+      release();
+    }
+    await expect(pending).resolves.toEqual({nextSeq:1});
+    expect(await db.table('stageFrames').count()).toBe(1);
+  });
+  it('isolates a callable rejected observer thenable from a successful material commit',async()=>{
+    const {stage,begin}=setup(),warn=vi.spyOn(console,'warn').mockImplementation(()=>{}),cap=await begin();
+    const stop=stage.observeCommitted(()=>Object.assign(()=>{}, {then:(_resolve:unknown,reject:(error:Error)=>void)=>reject(Error('private observer error'))}));
+    await stage.seal(cap);
+    try {
+      await expect(stage.commit(cap)).resolves.toEqual({inserted:0,updated:0,skipped:0});
+      await vi.waitFor(()=>expect(warn).toHaveBeenCalledOnce());
+      expect(warn).toHaveBeenCalledWith('[FluentRead] 学习材料变更通知失败');
+    } finally {stop();}
+  });
 });

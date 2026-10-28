@@ -37,6 +37,18 @@ describe('material backup recovery orchestration',()=>{
     mocks.send.mockRejectedValue(Error('file changed'));const out=await restoreLargeMaterialBackup(file,guard,{onCapability:()=>{}});
     expect(out).toMatchObject({kind:'failed',cleanupPending:false});expect(active.discard).toHaveBeenCalledOnce();expect(active.seal).not.toHaveBeenCalled();expect(active.commit).not.toHaveBeenCalled();
   });
+  it.each([true,false])('handles an unreadable error name while preserving discard status: %s',async discarded=>{
+    const failure=Error('read failed');
+    Object.defineProperty(failure,'name',{get(){throw Error('error metadata inaccessible');}});
+    mocks.send.mockRejectedValueOnce(failure);
+    if(!discarded)active.discard.mockRejectedValueOnce(Error('disconnect'));
+    let cap:unknown;
+    const out=await restoreLargeMaterialBackup(file,guard,{onCapability:value=>{cap=value;}});
+    expect(out).toMatchObject({kind:'failed',cleanupPending:!discarded,error:expect.objectContaining({name:'Error',message:'材料恢复操作失败'})});
+    if(!discarded)expect(out).toMatchObject({capability:cap});
+    else expect(out).not.toHaveProperty('capability');
+    expect(active.discard).toHaveBeenCalledOnce();expect(active.commit).not.toHaveBeenCalled();expect(active.close).toHaveBeenCalledOnce();
+  });
   it('keeps the capability when begin is interrupted and never assumes a session was discarded',async()=>{
     const block=deferred<any>(),controller=new AbortController();active.begin.mockReturnValue(block.promise);
     let cap:any;const pending=restoreLargeMaterialBackup(file,guard,{signal:controller.signal,onCapability:value=>{cap=value;}});

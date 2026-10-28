@@ -163,7 +163,9 @@ describe('committed material change notifications',()=>{
     const stopGood=target.stage.observeCommitted(successful);
     try {
       const first=await upload(target.stage,[await material('rollback-notify')]);await target.stage.seal(first.token);
-      await expect(target.stage.commit(first.token,{onApplied:()=>{throw Error('injected rollback');}})).rejects.toThrow('injected rollback');
+      const fail=()=>{throw Error('injected rollback');};target.db.materials.hook('creating',fail);
+      try{await expect(target.stage.commit(first.token)).rejects.toThrow('injected rollback');}
+      finally{target.db.materials.hook('creating').unsubscribe(fail);}
       expect(successful).not.toHaveBeenCalled();expect(warn).not.toHaveBeenCalled();
       expect(await target.stage.commit(first.token)).toEqual({inserted:1,updated:0,skipped:0});
       expect(successful).toHaveBeenCalledOnce();expect(warn).toHaveBeenCalledOnce();
@@ -939,10 +941,21 @@ describe('isolated same-database material staging',()=>{
   );
   it('rolls back a mid-commit failure and cancellation, then allows retry of the sealed transfer',async()=>{
     const target=instance(),{token}=await upload(target.stage,[await material('alpha'),await material('bravo')]);await target.stage.seal(token);
-    await expect(target.stage.commit(token,{onApplied:i=>{if(i===0)throw Error('injected failure');}})).rejects.toThrow('injected failure');
+    let written=0;
+    const fail=function(this:{onsuccess?:(id:string)=>void}){if(written===1)throw Error('injected failure');this.onsuccess=()=>written++;};
+    target.db.materials.hook('creating',fail);
+    try{await expect(target.stage.commit(token)).rejects.toThrow('injected failure');}
+    finally{target.db.materials.hook('creating').unsubscribe(fail);}
+    expect(written).toBe(1);
     expect(await target.db.materials.count()).toBe(0);expect(await target.stage.receipts.count()).toBe(0);
     const controller=new AbortController();
-    await expect(target.stage.commit(token,{signal:controller.signal,onApplied:i=>{if(i===0)controller.abort();}})).rejects.toThrow();
+    let cancelledAfterWrite=false;
+    const cancel=function(this:{onsuccess?:(id:string)=>void}){this.onsuccess=()=>{cancelledAfterWrite=true;controller.abort();};};
+    target.db.materials.hook('creating',cancel);
+    try{await expect(target.stage.commit(token,{signal:controller.signal})).rejects.toThrow();}
+    finally{target.db.materials.hook('creating').unsubscribe(cancel);}
+    expect(cancelledAfterWrite).toBe(true);
+    await vi.waitFor(async()=>expect(await target.stage.status(token)).toMatchObject({state:'sealed'}));
     expect(await target.db.materials.count()).toBe(0);expect(await target.stage.receipts.count()).toBe(0);
     expect(await target.stage.commit(token)).toEqual({inserted:2,updated:0,skipped:0});
   });
@@ -1132,9 +1145,14 @@ describe('isolated same-database material staging',()=>{
     const other=database(target.db.name),otherStage=createStage(other,{limits:opts,clock:()=>target.clock.now});await other.open();
     const otherRepo=new MaterialRepository(other),started=deferred();
     let clearPromise:Promise<void>|undefined,discardPromise:Promise<'discarded'|'committed'>|undefined,commitDone=false,beganDuringCommit=false;
-    const result=await target.stage.commit(token,{onApplied:i=>{if(i===0)setTimeout(()=>{
+    let scheduled=false;
+    const schedule=function(this:{onsuccess?:(id:string)=>void}){this.onsuccess=()=>{if(!scheduled){scheduled=true;setTimeout(()=>{
       beganDuringCommit=!commitDone;clearPromise=otherRepo.clear(101);discardPromise=otherStage.discard(token);started.resolve();
-    },0);}});
+    },0);}};};
+    target.db.materials.hook('creating',schedule);
+    let result:Awaited<ReturnType<typeof target.stage.commit>>;
+    try{result=await target.stage.commit(token);}
+    finally{target.db.materials.hook('creating').unsubscribe(schedule);}
     commitDone=true;await started.promise;expect(beganDuringCommit).toBe(true);await clearPromise;
     expect(await discardPromise).toBe('committed');
     expect(result.inserted).toBe(80);expect(await target.db.materials.count()).toBe(0);

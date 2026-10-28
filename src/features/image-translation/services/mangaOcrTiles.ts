@@ -5,16 +5,17 @@
  * 模块边界：纯几何与数据算法，不读取像素、不创建 Canvas、不运行模型，不推测或拼接未识别出的文字。
  */
 import type {MangaOcrItem} from './mangaRegions';
-import {numericProtection} from './mangaNumeric';
+import {numericEvidenceKey,numericProtection} from './mangaNumeric';
 
 export interface MangaOcrTile {x: number; y: number; width: number; height: number}
 export interface MangaOcrTileResult {tile: MangaOcrTile; results: MangaOcrItem[]; numericEvidence?: MangaOcrItem[]}
 const TILE_SIDE = 1536;
 const TILE_STRIDE = 1024;
 
-/** 去重前收集数值物理证据，按瓦片可见边界映回整图；不改变正常识别结果的去重。 */
+/** 去重前收集数值物理证据，按瓦片可见边界映回整图；每框保留首项、最低置信项和异值项，不改变正常识别结果的去重。 */
 export function collectMangaOcrTileNumericEvidence(pages:MangaOcrTileResult[],width:number,height:number):MangaOcrItem[] {
-    const output:MangaOcrItem[]=[],keys=new Set<string>();
+    const boxes=new Map<string,{first:MangaOcrItem;weakest:MangaOcrItem;conflict?:MangaOcrItem;value:string}>();
+    const confidence=(item:MangaOcrItem)=>Number.isFinite(item.confidence)&&item.confidence>=0&&item.confidence<=1?item.confidence:-Infinity;
     for(const {tile,results,numericEvidence} of pages)for(const item of numericEvidence??results){
         if(!numericProtection(item.text?.replace(/\s+/gu,' ').trim()??''))continue;
         const b=item.box;
@@ -23,9 +24,26 @@ export function collectMangaOcrTileNumericEvidence(pages:MangaOcrTileResult[],wi
         const x=Math.max(0,tile.x,tile.x+b.x),y=Math.max(0,tile.y,tile.y+b.y);
         const right=Math.min(width,tile.x+tile.width,tile.x+b.x+b.width),bottom=Math.min(height,tile.y+tile.height,tile.y+b.y+b.height);
         if(right<=x||bottom<=y)continue;
-        const key=[x,y,right,bottom].join(',');if(keys.has(key))continue;
-        if(output.length>=4096)throw new Error('图片数字保护区域过于复杂，已保留原图');
-        keys.add(key);output.push({...item,box:{x,y,width:right-x,height:bottom-y}});
+        const key=[x,y,right,bottom].join(','),previous=boxes.get(key);
+        if(previous){
+            const weaker=confidence(item)<confidence(previous.weakest);
+            const conflict=!previous.conflict && numericEvidenceKey(item.text)!==previous.value;
+            if(weaker||conflict){
+                const mapped={...item,box:{x,y,width:right-x,height:bottom-y}};
+                if(weaker)previous.weakest=mapped;
+                if(conflict)previous.conflict=mapped;
+            }
+            continue;
+        }
+        if(boxes.size>=4096)throw new Error('图片数字保护区域过于复杂，已保留原图');
+        const mapped={...item,box:{x,y,width:right-x,height:bottom-y}};
+        boxes.set(key,{first:mapped,weakest:mapped,value:numericEvidenceKey(item.text)});
+    }
+    const output:MangaOcrItem[]=[];
+    for(const {first,weakest,conflict} of boxes.values()){
+        output.push(first);
+        if(weakest!==first)output.push(weakest);
+        if(conflict&&conflict!==first&&conflict!==weakest)output.push(conflict);
     }
     return output;
 }

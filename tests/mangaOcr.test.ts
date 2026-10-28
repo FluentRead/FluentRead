@@ -19,6 +19,7 @@ vi.mock('@/src/features/image-translation/services/mangaOcrDeskew',async origina
 import {createBrowserMangaOcr, createMangaOcrRuntime, mangaOcrRuntime, removeMangaModels, disposeMangaModels,padMangaOcrDetectionBox,shouldRotateMangaOcrRetry} from '@/src/features/image-translation/services/mangaOcr';
 import * as mangaOcrColor from '@/src/features/image-translation/services/mangaOcrColor';
 import {planMangaOcrTiles, mergeMangaOcrTiles,collectMangaOcrTileNumericEvidence} from '@/src/features/image-translation/services/mangaOcrTiles';
+import {collectMangaRegions} from '@/src/features/image-translation/services/mangaBubbles';
 const opaquePixels=()=>{const pixels=new Uint8ClampedArray(200*200*4);for(let index=3;index<pixels.length;index+=4)pixels[index]=255;return pixels;};
 const response = {results:[{text:'Hello world',confidence:0.99,box:{x:10,y:10,width:100,height:20}}]};
 const deferred = <T,>() => {let resolve!:(v:T)=>void,reject!:(e:unknown)=>void;const promise=new Promise<T>((a,b)=>{resolve=a;reject=b});return {promise,resolve,reject}};
@@ -110,6 +111,42 @@ it('同文重复数值框去重，不同位置仍保留；非法坐标与超量�
     expect(()=>collectMangaOcrTileNumericEvidence([{tile,results:[{...item,box:{...item.box,x:NaN}}]}],100,100)).toThrow('保护位置无效');
     const many=Array.from({length:4097},(_,i)=>({...item,box:{x:i/100,y:10,width:.5,height:1}}));
     expect(()=>collectMangaOcrTileNumericEvidence([{tile,results:many}],100,100)).toThrow('保护区域过于复杂');
+});
+it.each(['conflict','weak','duplicate','both','invalid','outOfRange'] as const)('分块同框数值证据保留核对提示：%s',scenario=>{
+    const tile={x:0,y:0,width:100,height:100};
+    const readable={text:'90%',confidence:.99,box:{x:10,y:10,width:20,height:10}};
+    const conflict={...readable,text:'80%'};
+    const weak={...readable,confidence:.2};
+    const rest=scenario==='conflict'?[conflict]:scenario==='weak'?[weak]:scenario==='both'?[conflict,weak]
+        :scenario==='invalid'?[{...readable,confidence:NaN}]:scenario==='outOfRange'?[{...readable,confidence:1.1}]:[readable,readable];
+    const all=[readable,...rest];
+    const evidence=collectMangaOcrTileNumericEvidence([{tile,results:[readable],numericEvidence:all}],100,100);
+    const lines=collectMangaRegions({results:[readable],numericEvidence:evidence},'en',100,100,'manga');
+    expect(lines).toHaveLength(1);
+    expect(lines[0]).toMatchObject({text:'90%'});
+    expect(lines[0].numericUncertain).toBe(scenario==='duplicate'?undefined:true);
+    expect(evidence.length).toBeLessThanOrEqual(3);
+    if(scenario==='duplicate')expect(evidence).toEqual([readable]);
+});
+it('重叠瓦片映回同一全图框后，不同顺序的三个数值和非法置信仍提示核对',()=>{
+    const tiles=[{x:0,y:0,width:100,height:100},{x:50,y:0,width:100,height:100}];
+    const box={x:60,y:20,width:30,height:10};
+    const candidates=[{text:'90%',confidence:.99,box},{text:'80%',confidence:.98,box},{text:'70%',confidence:1.1,box}];
+    const permutations=[[0,1,2],[0,2,1],[1,0,2],[1,2,0],[2,0,1],[2,1,0]];
+    const toPage=(index:number,position:number)=>{
+        const tile=tiles[position%2],candidate=candidates[index];
+        return {tile,results:[],numericEvidence:[{...candidate,box:{...candidate.box,x:candidate.box.x-tile.x}}]};
+    };
+    for(const order of permutations){
+        const evidence=collectMangaOcrTileNumericEvidence(order.map(toPage),150,100);
+        expect(evidence.every(item=>item.box.x===60&&item.box.y===20)).toBe(true);
+        expect(evidence.length).toBeLessThanOrEqual(3);
+        const lines=collectMangaRegions({results:[candidates[0]],numericEvidence:evidence},'en',150,100,'manga');
+        expect(lines).toHaveLength(1);expect(lines[0]).toMatchObject({text:'90%',numericUncertain:true});
+    }
+    const duplicate=collectMangaOcrTileNumericEvidence([toPage(0,0),toPage(0,1)],150,100);
+    expect(duplicate).toEqual([candidates[0]]);
+    expect(collectMangaRegions({results:[candidates[0]],numericEvidence:duplicate},'en',150,100,'manga')[0].numericUncertain).toBeUndefined();
 });
 it('过多首次数值证据会报错，且取消后清理识别画布，不发起重识别',async()=>{
     const many=Array.from({length:4097},(_,i)=>({text:'90%',confidence:.99,box:{x:i%100,y:1,width:1,height:1}}));

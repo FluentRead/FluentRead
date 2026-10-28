@@ -37,7 +37,10 @@ function encodeFrame(frame:Frame):Omit<Frame,'bytes'> & {base64:string} {
 export function createMaterialImportPortClient(port:MaterialImportClientPort) {
   let nextId=0,closed=false;
   let pending:{id:number;resolve:(value:unknown)=>void;reject:(reason:unknown)=>void}|undefined;
-  const closeListeners=()=>{port.onMessage.removeListener(onMessage);port.onDisconnect.removeListener(onDisconnect);};
+  const closeListeners=()=>{
+    try{port.onMessage.removeListener(onMessage);}catch{/* 另一个监听仍须移除。 */}
+    try{port.onDisconnect.removeListener(onDisconnect);}catch{/* 端口可能已经被浏览器释放。 */}
+  };
   const onDisconnect=()=>{
     if(closed)return;
     closed=true;closeListeners();const active=pending;pending=undefined;
@@ -52,7 +55,12 @@ export function createMaterialImportPortClient(port:MaterialImportClientPort) {
     const active=pending;pending=undefined;
     if(response.ok)active.resolve(response.data);else active.reject(new Error('材料恢复操作失败，请查询当前会话后重试。'));
   };
-  port.onMessage.addListener(onMessage);port.onDisconnect.addListener(onDisconnect);
+  try {
+    port.onDisconnect.addListener(onDisconnect);
+    if(!closed)port.onMessage.addListener(onMessage);
+    // 注册期间同步断连时，监听可能在关闭回调之后才被加入。
+    if(closed)closeListeners();
+  } catch(error) {disconnect();closeListeners();throw error;}
   function request<T>(action:string,fields:Record<string,unknown>={}):Promise<T>{
     if(closed)return Promise.reject(new MaterialImportPortDisconnectedError());
     if(pending)return Promise.reject(new Error('材料恢复请求尚未完成。'));

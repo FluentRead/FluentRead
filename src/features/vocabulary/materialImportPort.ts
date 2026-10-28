@@ -153,10 +153,10 @@ export function makePortBridge(stage:Stage, options:{isTrustedSender:(sender:Sen
     };
     stops.add(stop);
     try {
-      port.onMessage.addListener(onMessage);
-      if(closed){try{port.onMessage.removeListener(onMessage);}catch{}return false;}
       port.onDisconnect.addListener(close);
       if(closed){try{port.onDisconnect.removeListener(close);}catch{}return false;}
+      port.onMessage.addListener(onMessage);
+      if(closed){try{port.onMessage.removeListener(onMessage);}catch{}return false;}
       armIdle();return true;
     } catch {stop();try{port.onMessage.removeListener(onMessage);}catch{}try{port.onDisconnect.removeListener(close);}catch{}return false;}
   },dispose(){if(disposed)return;disposed=true;for(const stop of [...stops])stop();unsubscribe();},get activePorts(){return ports;}};

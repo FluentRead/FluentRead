@@ -96,6 +96,15 @@ describe('material stage Port bridge',()=>{
     expect(bridge.attach(broken)).toBe(false);expect(broken.onMessage.listeners.size).toBe(0);
     expect(broken.onDisconnect.listeners.size).toBe(0);expect(bridge.activePorts).toBe(0);
   });
+  it('releases capacity if the port disconnects while its message listener is registered',()=>{
+    const {stage,port:initial}=harness();initial.disconnect();
+    const bridge=trackedBridge(stage,{isTrustedSender:trustSender,onCommitted:()=>{},isPrivateContext:()=>false,maxPorts:1});
+    const broken=new MockPort(),add=broken.onMessage.addListener;
+    vi.spyOn(broken.onMessage,'addListener').mockImplementation(listener=>{broken.disconnect();add(listener);});
+    expect(bridge.attach(broken)).toBe(false);expect(bridge.activePorts).toBe(0);
+    expect(broken.onMessage.listeners.size).toBe(0);expect(broken.onDisconnect.listeners.size).toBe(0);
+    const next=new MockPort();expect(bridge.attach(next)).toBe(true);next.disconnect();
+  });
   it('rejects wrong extension, URL, frame, incognito, private context and idle-port exhaustion before stage calls',async()=>{
     const {stage,bridge,port}=harness();const spy=vi.spyOn(stage,'status');
     const denied=[{}, {id:'other',url:'chrome-extension://fixture/options.html'}, {id:'fixture',url:'chrome-extension://other/options.html'}, {id:'fixture',url:'https://fixture/options.html'}, {id:'fixture',url:'chrome-extension://fixture/options.html.evil'}, {id:'fixture',url:'chrome-extension://fixture/popup.html'}, {id:'fixture',url:'chrome-extension://fixture/options.html',tab:{incognito:true}}, {id:'fixture',url:'chrome-extension://fixture/options.html',incognito:true}];
@@ -263,6 +272,39 @@ describe('material import Port client',()=>{
     postMessage(value:unknown){if(this.closed)throw Error('closed');this.sent.push(structuredClone(value));}
     disconnect(){if(this.closed)return;this.closed=true;this.onDisconnect.emit();}
   }
+  it.each(['onMessage','onDisconnect'] as const)('cleans partial client listener registration when %s throws',async which=>{
+    const {createMaterialImportPortClient}=await import('@/src/features/vocabulary/materialImportPortClient');
+    const port=new ClientPort(),hub=port[which] as EventHub<(value:unknown)=>void>,add=hub.addListener;
+    vi.spyOn(hub,'addListener').mockImplementation(listener=>{add(listener);throw Error('registration failed');});
+    expect(()=>createMaterialImportPortClient(port)).toThrow('registration failed');
+    expect(port.closed).toBe(true);expect(port.onMessage.listeners.size).toBe(0);expect(port.onDisconnect.listeners.size).toBe(0);
+  });
+  it.each(['onMessage','onDisconnect'] as const)('closes cleanly when disconnect fires during %s registration',async which=>{
+    const {createMaterialImportPortClient,MaterialImportPortDisconnectedError}=await import('@/src/features/vocabulary/materialImportPortClient');
+    const port=new ClientPort(),hub=port[which] as EventHub<(value:unknown)=>void>,add=hub.addListener;
+    vi.spyOn(hub,'addListener').mockImplementation(listener=>{add(listener);port.disconnect();});
+    const client=createMaterialImportPortClient(port);
+    expect(port.onMessage.listeners.size).toBe(0);expect(port.onDisconnect.listeners.size).toBe(0);
+    await expect(client.status()).rejects.toBeInstanceOf(MaterialImportPortDisconnectedError);
+    expect(port.onMessage.listeners.size).toBe(0);expect(port.onDisconnect.listeners.size).toBe(0);
+  });
+  it.each(['onMessage','onDisconnect'] as const)('removes late listeners when %s disconnects and then registration throws',async which=>{
+    const {createMaterialImportPortClient}=await import('@/src/features/vocabulary/materialImportPortClient');
+    const port=new ClientPort(),hub=port[which] as EventHub<(value:unknown)=>void>,add=hub.addListener;
+    vi.spyOn(hub,'addListener').mockImplementation(listener=>{
+      if(which==='onDisconnect')listener(undefined);else port.disconnect();
+      add(listener);throw Error('registration failed');
+    });
+    expect(()=>createMaterialImportPortClient(port)).toThrow('registration failed');
+    expect(port.closed).toBe(true);expect(port.onMessage.listeners.size).toBe(0);expect(port.onDisconnect.listeners.size).toBe(0);
+  });
+  it('rejects an in-flight request even when one listener cannot be removed',async()=>{
+    const {createMaterialImportPortClient,MaterialImportPortDisconnectedError}=await import('@/src/features/vocabulary/materialImportPortClient');
+    const port=new ClientPort(),client=createMaterialImportPortClient(port);
+    const pending=client.commit();vi.spyOn(port.onMessage,'removeListener').mockImplementation(()=>{throw Error('removed externally');});
+    port.disconnect();await expect(pending).rejects.toBeInstanceOf(MaterialImportPortDisconnectedError);
+    expect(port.onDisconnect.listeners.size).toBe(0);
+  });
   it('snapshots only protocol data and bounds binary frame encoding',async()=>{
     const {createMaterialImportPortClient}=await import('@/src/features/vocabulary/materialImportPortClient');
     const port=new ClientPort(),client=createMaterialImportPortClient(port),cap=createImportCapability();

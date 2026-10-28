@@ -9,7 +9,8 @@ import {createMaterialImportCapability} from '@/src/features/vocabulary/material
 
 const names:string[]=[];
 const connections:MaterialDatabase[]=[];
-afterEach(async()=>{for(const db of connections.splice(0))db.close();for(const name of names.splice(0))await Dexie.delete(name);vi.restoreAllMocks();});
+const pendingDelays=new Set<()=>void>();
+afterEach(async()=>{for(const release of pendingDelays)release();for(const db of connections.splice(0))db.close();for(const name of names.splice(0))await Dexie.delete(name);vi.restoreAllMocks();});
 const limits={frameBytes:128,recordBytes:1024*1024,totalBytes:2*1024*1024,frameCount:10000,totalFrames:10000,slots:256,inflight:8,ttlMs:1000,receiptTtlMs:10000};
 function make(options:Parameters<typeof createStage>[1]={}) {
   const name=`material-stage-b-${crypto.randomUUID()}`,db=new MaterialDatabase(name);names.push(name);connections.push(db);
@@ -21,6 +22,18 @@ function make(options:Parameters<typeof createStage>[1]={}) {
   return {db,stage,frame,begin};
 }
 const deferred=()=>{let resolve!:()=>void;const promise=new Promise<void>(done=>resolve=done);return {promise,resolve};};
+// Delay the result of a real IDB authentication read only in this fixture;
+// the transaction itself has already completed and does not block seal.
+function delayNextAuthentication(db:MaterialDatabase) {
+  const started=deferred(),gate=deferred(),transaction=db.transaction.bind(db);
+  const spy=vi.spyOn(db,'transaction').mockImplementationOnce(((...args:unknown[])=>{
+    if(args[0]!=='r')throw Error('expected authentication read');
+    const result=(transaction as (...values:unknown[])=>Promise<unknown>)(...args);
+    return Promise.resolve(result).then(async value=>{started.resolve();await gate.promise;return value;});
+  }) as never);
+  const release=()=>{gate.resolve();spy.mockRestore();pendingDelays.delete(release);};
+  pendingDelays.add(release);return {started,release};
+}
 async function uploadMaterial(x:ReturnType<typeof make>) {
   const sourceName=`material-stage-b-source-${crypto.randomUUID()}`,sourceDb=new MaterialDatabase(sourceName);
   names.push(sourceName);connections.push(sourceDb);
@@ -34,23 +47,21 @@ async function uploadMaterial(x:ReturnType<typeof make>) {
 }
 
 describe('material staging transaction boundaries',()=>{
-  it('rejects an append when a completed transfer is sealed during its transport delay',async()=>{
-    const ready=deferred(),gate=deferred();let blocked=false;
-    const x=make({beforeAppend:async()=>{if(blocked){ready.resolve();await gate.promise;}}});
-    const cap=await x.begin();await x.stage.append(cap,x.frame);blocked=true;
-    const pending=x.stage.append(cap,x.frame);await ready.promise;
-    await x.stage.seal(cap);gate.resolve();
+  it('rejects an append when a completed transfer is sealed after its authentication read',async()=>{
+    const x=make(),cap=await x.begin();await x.stage.append(cap,x.frame);
+    const delayed=delayNextAuthentication(x.db);
+    const pending=x.stage.append(cap,x.frame);await delayed.started.promise;
+    await x.stage.seal(cap);delayed.release();
     await expect(pending).rejects.toThrow('session sealed');
     expect(await x.db.table('stageFrames').count()).toBe(1);
     expect(await x.stage.status(cap)).toEqual({state:'sealed',nextSeq:1});
   });
   it('rejects a second commit while another admitted operation holds the only inflight slot',async()=>{
-    const ready=deferred(),gate=deferred();let blocked=false;
-    const x=make({limits:{...limits,inflight:1},beforeAppend:async()=>{if(blocked){ready.resolve();await gate.promise;}}});
+    const x=make({limits:{...limits,inflight:1}});
     const first=await x.begin(),second=await x.begin();await x.stage.append(second,x.frame);await x.stage.seal(second);
-    blocked=true;const pending=x.stage.append(first,x.frame);await ready.promise;
+    const delayed=delayNextAuthentication(x.db),pending=x.stage.append(first,x.frame);await delayed.started.promise;
     await expect(x.stage.commit(second)).rejects.toThrow('backpressure: receiver busy');
-    gate.resolve();await pending;
+    delayed.release();await pending;
     expect(await x.stage.status(second)).toEqual({state:'sealed',nextSeq:1});
   });
   it('rolls back a cancelled commit even if aborting the transaction throws',async()=>{

@@ -112,18 +112,7 @@ function waitWithAbort<T>(work:Promise<T>,signal:AbortSignal|undefined,message='
     if(signal.aborted)onAbort();
   });
 }
-async function waitForReady(ready:Promise<void>|undefined,signal:AbortSignal):Promise<void>{
-  if(signal.aborted)throw Error('cancelled');
-  if(!ready)return;
-  await new Promise<void>((resolve,reject)=>{
-    const onAbort=()=>{signal.removeEventListener('abort',onAbort);reject(Error('cancelled'));};
-    signal.addEventListener('abort',onAbort,{once:true});
-    ready.then(()=>{signal.removeEventListener('abort',onAbort);resolve();},error=>{signal.removeEventListener('abort',onAbort);reject(error);});
-    if(signal.aborted)onAbort();
-  });
-}
-
-export function createStage(db:MaterialDatabase, options:{limits?:Partial<Limits>; clock?:()=>number; beforeAppend?:()=>Promise<void>; onCleanupCorruption?:()=>void; estimate?:()=>Promise<unknown>}={}) {
+export function createStage(db:MaterialDatabase, options:{limits?:Partial<Limits>; clock?:()=>number; onCleanupCorruption?:()=>void; estimate?:()=>Promise<unknown>}={}) {
   const limits={...DEFAULTS,...options.limits};
   const onCleanupCorruption=options.onCleanupCorruption;
   if(onCleanupCorruption!==undefined&&typeof onCleanupCorruption!=='function')throw TypeError('invalid cleanup observer');
@@ -332,14 +321,12 @@ export function createStage(db:MaterialDatabase, options:{limits?:Partial<Limits
       // Snapshot only the bounded protocol fields before any async boundary.
       // Extra properties must not be read, copied, or stored outside the budget.
       const frame:Frame={seq,record,part,total,recordBytes,bytes:new Uint8Array(bytes)};
-      // Do not let an unauthenticated request reach a slow or non-cooperating
-      // transport hook and occupy the authorized owner's slot indefinitely.
+      // Authenticate the owner before starting the write transaction.
       authentication=Promise.resolve(db.transaction('r',sessions,async()=>{const s=assertSession(await sessions.get(cap.id),cap);if(s.phase!=='open')throw Error('session sealed');}));
       // A blocked IndexedDB transaction cannot be assumed to stop on abort.
       // Return promptly to the caller but keep its admission slot until the
       // underlying authentication has actually settled.
-      await waitForReady(authentication,controller.signal);
-      await waitForReady(options.beforeAppend?.(),controller.signal);
+      await waitWithAbort(authentication,controller.signal);
       const result=await db.transaction('rw',frames,sessions,async()=>{
         const tx=Dexie.currentTransaction;
         const onAbort=()=>{try{tx?.abort();}catch{/* transaction may already be committed */}};

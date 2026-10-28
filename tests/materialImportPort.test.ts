@@ -11,6 +11,7 @@ import {createMaterialImportCapability as createImportCapability,decodeWireFrame
 
 let serial=0;const dbs:MaterialDatabase[]=[];const names:string[]=[];
 const bridges:Array<ReturnType<typeof makePortBridge>>=[];
+const pendingDelays=new Set<()=>void>();
 const trackedBridge=(...args:Parameters<typeof makePortBridge>)=>{const bridge=makePortBridge(...args);bridges.push(bridge);return bridge;};
 const deferred=()=>{let resolve!:()=>void;const promise=new Promise<void>(r=>{resolve=r;});return {promise,resolve};};
 class EventHub<T extends (...args:any[])=>void>{listeners=new Set<T>();addListener=(f:T)=>{this.listeners.add(f);};removeListener=(f:T)=>{this.listeners.delete(f);};emit(...args:Parameters<T>){for(const f of [...this.listeners])f(...args);}}
@@ -25,11 +26,24 @@ class MockPort implements MaterialImportPort{
   emit(value:unknown){this.onMessage.emit(this.wire(value));}
   request(id:number,body:Record<string,unknown>){const promise=new Promise<any>(resolve=>this.waiters.set(id,resolve));this.emit({id,...body});return promise;}
 }
-function harness(serialization:'json'|'clone'='json',beforeAppend?:()=>Promise<void>){
+function harness(serialization:'json'|'clone'='json'){
   const name=`port-bridge-${++serial}`;names.push(name);const db=new MaterialDatabase(name);dbs.push(db);
-  const stage=createStage(db,{clock:()=>100,limits:{frameBytes:MAX_FRAME_BYTES,ttlMs:1000,receiptTtlMs:10000},beforeAppend});
+  const stage=createStage(db,{clock:()=>100,limits:{frameBytes:MAX_FRAME_BYTES,ttlMs:1000,receiptTtlMs:10000}});
   const bridge=trackedBridge(stage,{isTrustedSender:trustSender,onCommitted:()=>{},isPrivateContext:()=>false});
   const port=new MockPort(serialization);expect(bridge.attach(port)).toBe(true);return {db,stage,bridge,port,repo:new MaterialRepository(db)};
+}
+// Hold only the result of the next real authentication read, after its IDB
+// transaction has finished. This lets the test drive port races without a
+// production-only scheduling hook or a live write lock.
+function delayNextAuthentication(db:MaterialDatabase) {
+  const started=deferred(),gate=deferred(),transaction=db.transaction.bind(db);
+  const spy=vi.spyOn(db,'transaction').mockImplementationOnce(((...args:unknown[])=>{
+    if(args[0]!=='r')throw Error('expected authentication read');
+    const result=(transaction as (...values:unknown[])=>Promise<unknown>)(...args);
+    return Promise.resolve(result).then(async value=>{started.resolve();await gate.promise;return value;});
+  }) as never);
+  const release=()=>{gate.resolve();spy.mockRestore();pendingDelays.delete(release);};
+  pendingDelays.add(release);return {started,release};
 }
 function dataRecord(){return '{"id":"n","source":{"kind":"article","url":"https://example.test/a"},"title":"A","topics":[],"references":[{"kind":"note","id":"p","note":"PRIVATE_FIXTURE_CONTENT"}],"createdAt":-0,"updatedAt":12,"lastReadAt":11,"archivedAt":null}';}
 function frames(raw=dataRecord()){
@@ -38,7 +52,7 @@ function frames(raw=dataRecord()){
   return {manifest:{records:1,frames:1,bytes:n,digest:bytesToHex(hash.digest())},frame:{seq:0,record:0,part:0,total:1,recordBytes:n,base64:Buffer.from(bytes).toString('base64')}};
 }
 const emptyManifest=()=>({records:0,frames:0,bytes:0,digest:bytesToHex(sha256(new Uint8Array()))});
-afterEach(async()=>{for(const bridge of bridges.splice(0))bridge.dispose();for(const db of dbs.splice(0))db.close();for(const name of names.splice(0))await Dexie.delete(name);});
+afterEach(async()=>{for(const release of pendingDelays)release();for(const bridge of bridges.splice(0))bridge.dispose();for(const db of dbs.splice(0))db.close();for(const name of names.splice(0))await Dexie.delete(name);});
 
 const trustSender=(sender:any)=>{if(!sender?.url||sender.id!=='fixture')return false;try{const u=new URL(sender.url);return u.protocol==='chrome-extension:'&&u.host==='fixture'&&u.pathname==='/options.html';}catch{return false;}};
 
@@ -255,18 +269,20 @@ describe('material stage Port bridge',()=>{
     expect(JSON.stringify(port.output)).not.toContain(cap.token);expect(JSON.stringify(port.output)).not.toContain('PRIVATE_FIXTURE_CONTENT');port.disconnect();
   });
   it('does not queue messages on a busy port and closes listener references',async()=>{
-    const block=deferred(),started=deferred(),{port,bridge,stage}=harness('json',()=>{started.resolve();return block.promise;}),cap=createImportCapability(),{manifest,frame}=frames();
+    const {port,bridge,stage,db}=harness(),cap=createImportCapability(),{manifest,frame}=frames();
     await port.request(1,{action:'begin',capability:cap,manifest,guard:{generation:0,capturedAt:100},deadline:1000});
-    port.emit({id:2,action:'append',frame});await started.promise;
+    const delayed=delayNextAuthentication(db);
+    port.emit({id:2,action:'append',frame});await delayed.started.promise;
     port.emit({id:3,action:'status'});expect(port.disconnected).toBe(true);expect(port.output.some(row=>row.id===3)).toBe(false);
-    block.resolve();await vi.waitFor(()=>expect(port.onMessage.listeners.size).toBe(0));expect(port.onDisconnect.listeners.size).toBe(0);expect(bridge.activePorts).toBe(0);
+    delayed.release();await vi.waitFor(()=>expect(port.onMessage.listeners.size).toBe(0));expect(port.onDisconnect.listeners.size).toBe(0);expect(bridge.activePorts).toBe(0);
     await vi.waitFor(async()=>expect(await stage.status(cap)).toMatchObject({state:'open',nextSeq:0}));
   });
   it('closes on duplicate IDs while an operation is pending rather than emitting a misleading busy reply',async()=>{
-    const block=deferred(),started=deferred(),{port,bridge}=harness('json',()=>{started.resolve();return block.promise;}),cap=createImportCapability(),{manifest,frame}=frames();
+    const {port,bridge,db}=harness(),cap=createImportCapability(),{manifest,frame}=frames();
     await port.request(1,{action:'begin',capability:cap,manifest,guard:{generation:0,capturedAt:100},deadline:1000});
-    port.emit({id:2,action:'append',frame});await started.promise;port.emit({id:2,action:'append',frame});
-    expect(port.disconnected).toBe(true);expect(port.output.some(row=>row.id===2)).toBe(false);expect(bridge.activePorts).toBe(0);block.resolve();
+    const delayed=delayNextAuthentication(db);
+    port.emit({id:2,action:'append',frame});await delayed.started.promise;port.emit({id:2,action:'append',frame});
+    expect(port.disconnected).toBe(true);expect(port.output.some(row=>row.id===2)).toBe(false);expect(bridge.activePorts).toBe(0);delayed.release();
   });
   it('notifies a real late commit after disconnect and recovers its receipt without notifying twice',async()=>{
     const h=harness(),cap=createImportCapability(),{manifest,frame}=frames(),changed=vi.fn();
@@ -306,12 +322,13 @@ describe('material stage Port bridge',()=>{
     await third.request(8,{action:'acknowledge'});third.disconnect();
   });
   it('closes on a flooded busy port without queuing replies and can reconnect safely',async()=>{
-    const block=deferred(),started=deferred(),h=harness('json',()=>{started.resolve();return block.promise;}),cap=createImportCapability(),{manifest,frame}=frames();
+    const h=harness(),cap=createImportCapability(),{manifest,frame}=frames();
     await h.port.request(1,{action:'begin',capability:cap,manifest,guard:{generation:0,capturedAt:100},deadline:1000});
-    h.port.emit({id:2,action:'append',frame});await started.promise;
+    const delayed=delayNextAuthentication(h.db);
+    h.port.emit({id:2,action:'append',frame});await delayed.started.promise;
     for(let id=3;id<10003;id++)h.port.emit({id,action:'status'});
     expect(h.port.disconnected).toBe(true);expect(h.port.output).toHaveLength(1);expect(h.bridge.activePorts).toBe(0);
-    block.resolve();const recovered=new MockPort();expect(h.bridge.attach(recovered)).toBe(true);
+    delayed.release();const recovered=new MockPort();expect(h.bridge.attach(recovered)).toBe(true);
     expect(await recovered.request(1,{action:'resume',capability:cap})).toMatchObject({ok:true,data:{state:'open',nextSeq:0}});
     recovered.disconnect();
   });

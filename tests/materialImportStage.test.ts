@@ -11,8 +11,19 @@ import type {MaterialOperationGuard} from '@/src/features/vocabulary/materialPro
 let serial=0;
 const names=new Set<string>(), open:Dexie[]=[];
 const opts={frameBytes:128,recordBytes:1024*1024,totalBytes:2*1024*1024,frameCount:10000,totalFrames:10000,slots:256,inflight:8,ttlMs:1000,receiptTtlMs:10000};
-function createStage(db:MaterialDatabase, options:Parameters<typeof createProductStage>[1]={}) {
-  const stage=createProductStage(db,options), clock=options.clock??Date.now, ttl=options.limits?.ttlMs??30*60*1000;
+type TestStageOptions=Parameters<typeof createProductStage>[1] & {beforeAppend?:()=>Promise<void>};
+function createStage(db:MaterialDatabase, options:TestStageOptions={}) {
+  const {beforeAppend,...productOptions}=options;
+  if(beforeAppend){
+    // 测试侧延迟认证事务的回包，模拟 IDB 结果迟到；真实写事务仍由产品负责。
+    const transaction=db.transaction.bind(db) as (...args:any[])=>Promise<any>;
+    db.transaction=((...args:any[])=>{
+      const result=transaction(...args);
+      return args[0]==='r'&&args[1]?.name==='stageSessions'&&typeof args[2]==='function'
+        ? Promise.resolve(result).then(async value=>{await beforeAppend();return value;}) : result;
+    }) as typeof db.transaction;
+  }
+  const stage=createProductStage(db,productOptions), clock=options.clock??Date.now, ttl=options.limits?.ttlMs??30*60*1000;
   // 测试便捷入口仍走实际的可恢复协议；能力在发送之前由调用方创建。
   const begin=(manifest:Manifest,guard:MaterialOperationGuard,request:{signal?:AbortSignal}={})=>
     stage.beginRecoverable(manifest,guard,createMaterialImportCapability(),{deadline:clock()+Math.min(ttl,5*60*1000),signal:request.signal});
@@ -1024,18 +1035,19 @@ describe('isolated same-database material staging',()=>{
     await expect(pending).rejects.toThrow('cancelled');
     expect(await target.stage.frames.count()).toBe(0);expect((await target.stage.budgets.get('stage'))?.reserved).toBe(0);
   });
-  it('settles a pending append when its underlying producer never resolves and the session is discarded',async()=>{
-    const target=instance({now:100},{beforeAppend:()=>new Promise<void>(()=>{})}),input=frameRecords([await material('alpha')],opts.frameBytes);
+  it('settles a pending append when its underlying authentication remains unresolved and the session is discarded',async()=>{
+    const ready=deferred(),gate=deferred(),target=instance({now:100},{beforeAppend:()=>{ready.resolve();return gate.promise;}}),input=frameRecords([await material('alpha')],opts.frameBytes);
     const token=await target.stage.begin(input.manifest,{generation:0,capturedAt:100});
-    const pending=target.stage.append(token,input.frames[0]);
+    const pending=target.stage.append(token,input.frames[0]);await ready.promise;
     expect(await target.stage.discard(token)).toBe('discarded');
     const outcome=await Promise.race([pending.then(()=> 'accepted',error=>error.message),new Promise<string>(resolve=>setTimeout(()=>resolve('blocked'),50))]);
     expect(outcome).toBe('cancelled');
+    gate.resolve();
     expect(await target.stage.frames.count()).toBe(0);expect((await target.stage.budgets.get('stage'))?.reserved).toBe(0);
   });
-  it('checks ownership before a blocking producer and aborts it when another connection discards the session',async()=>{
-    const ready=deferred();let calls=0;
-    const target=instance({now:100},{beforeAppend:()=>{calls++;ready.resolve();return new Promise<void>(()=>{});}});
+  it('checks ownership before delayed authentication and aborts it when another connection discards the session',async()=>{
+    const ready=deferred(),gate=deferred();let calls=0;
+    const target=instance({now:100},{beforeAppend:()=>{calls++;ready.resolve();return gate.promise;}});
     const input=frameRecords([await material('alpha')],opts.frameBytes),token=await target.stage.begin(input.manifest,{generation:0,capturedAt:100});
     const wrong={...token,token:'0'.repeat(64)};
     await expect(target.stage.append(wrong,input.frames[0])).rejects.toThrow('session unavailable');expect(calls).toBe(0);
@@ -1044,23 +1056,25 @@ describe('isolated same-database material staging',()=>{
     await expect(second.append(wrong,input.frames[0])).rejects.toThrow('session unavailable');
     await expect(second.discard(wrong)).rejects.toThrow('session unavailable');
     expect(await second.discard(token)).toBe('discarded');
-    expect(await outcome).toBe('cancelled');expect(await target.stage.frames.count()).toBe(0);
+    expect(await outcome).toBe('cancelled');gate.resolve();expect(await target.stage.frames.count()).toBe(0);
   });
-  it('settles a non-cooperative append on caller abort and permits a later authorized retry',async()=>{
-    const ready=deferred(),target=instance({now:100},{beforeAppend:()=>{ready.resolve();return new Promise<void>(()=>{});}});
+  it('keeps an aborted append slot until its delayed authentication settles, then permits retry',async()=>{
+    const ready=deferred(),gate=deferred(),target=instance({now:100},{beforeAppend:()=>{ready.resolve();return gate.promise;}});
     const input=frameRecords([await material('alpha')],opts.frameBytes),token=await target.stage.begin(input.manifest,{generation:0,capturedAt:100});
     const controller=new AbortController(),pending=target.stage.append(token,input.frames[0],{signal:controller.signal});
     const outcome=pending.then(()=> 'accepted',error=>error.message);await ready.promise;controller.abort();
     expect(await outcome).toBe('cancelled');expect(await target.stage.status(token)).toEqual({state:'open',nextSeq:0});
     const db2=database(target.db.name),second=createStage(db2,{limits:opts,clock:()=>100});await db2.open();
-    expect(await second.append(token,input.frames[0])).toEqual({nextSeq:1});
+    await expect(second.append(token,input.frames[0])).rejects.toThrow('backpressure');
+    gate.resolve();
+    await vi.waitFor(async()=>expect(await second.append(token,input.frames[0])).toEqual({nextSeq:1}));
   });
   it('aborts a pending non-cooperative append when another connection cleans up its expired session',async()=>{
-    const ready=deferred(),clock={now:100},target=instance(clock,{beforeAppend:()=>{ready.resolve();return new Promise<void>(()=>{});}});
+    const ready=deferred(),gate=deferred(),clock={now:100},target=instance(clock,{beforeAppend:()=>{ready.resolve();return gate.promise;}});
     const input=frameRecords([await material('alpha')],opts.frameBytes),token=await target.stage.begin(input.manifest,{generation:0,capturedAt:100});
     const pending=target.stage.append(token,input.frames[0]),outcome=pending.then(()=> 'accepted',error=>error.message);await ready.promise;
     const db2=database(target.db.name),second=createStage(db2,{limits:opts,clock:()=>clock.now});await db2.open();clock.now+=opts.ttlMs;
-    expect(await second.cleanup()).toEqual({sessions:1,receipts:0});expect(await outcome).toBe('cancelled');
+    expect(await second.cleanup()).toEqual({sessions:1,receipts:0});expect(await outcome).toBe('cancelled');gate.resolve();
     expect(await target.stage.frames.count()).toBe(0);expect((await target.stage.budgets.get('stage'))?.reserved).toBe(0);
   });
   it('rolls back an append when its caller aborts during the frame transaction',async()=>{

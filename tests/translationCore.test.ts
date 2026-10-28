@@ -4760,6 +4760,49 @@ describe('translation candidate core', () => {
 });
 
 describe('X 动态正文候选形态回归', () => {
+    it('excludes engagement counts while keeping post text and adjacent prose readable', () => {
+        const {document, core} = page(`
+            <main><article id="post">
+                <div id="body" data-testid="tweetText">The Moon shines above our planet.</div>
+                <p id="nearby">The neighboring explanation remains readable.</p>
+                <div id="engagement">
+                    <div data-engagement-action="reply"><a href="/compose/post"><span>318</span></a></div>
+                    <div data-engagement-action="retweet"><button><span>1万</span></button></div>
+                    <div data-engagement-action="like"><button><span>2.2万</span></button></div>
+                    <div><div><div data-engagement-action="bookmark"><button><span>430</span></button></div></div></div>
+                </div>
+                <div id="other"><div data-engagement-action="reply">A readable reply explanation.</div></div>
+            </article></main>
+        `, 'https://x.com/NASA/status/1571977394151383042');
+        const body = document.getElementById('body')!;
+        const nearby = document.getElementById('nearby')!;
+        const engagement = document.getElementById('engagement')!;
+        const reply = engagement.querySelector('[data-engagement-action="reply"] span')!;
+        const candidates = core.discover(document);
+        expect(candidates.some(candidate => candidate.element === body)).toBe(true);
+        expect(candidates.some(candidate => candidate.element === nearby)).toBe(true);
+        expect(candidates.some(candidate => candidate.element === engagement || engagement.contains(candidate.element))).toBe(false);
+        expect(core.resolve(reply.firstChild)).toBeNull();
+        expect(core.resolve(body.firstChild)?.element).toBe(body);
+        expect(core.resolve(nearby.firstChild)?.element).toBe(nearby);
+        expect(core.shouldStayOriginal(engagement)).toBe(true);
+        expect(core.shouldStayOriginal(document.getElementById('other')!)).toBe(false);
+        expect(core.resolve(document.querySelector('#other [data-engagement-action="reply"]')!.firstChild)).not.toBeNull();
+        const articleSource = extractTranslationText(document.getElementById('post')!, core.shouldStayOriginal);
+        expect(articleSource).toContain('The Moon shines above our planet.');
+        expect(articleSource).toContain('The neighboring explanation remains readable.');
+        expect(articleSource).not.toMatch(/318|1万|2\.2万|430/u);
+
+        const replyAction = engagement.querySelector('[data-engagement-action="reply"]')!;
+        const nextSibling = replyAction.nextSibling;
+        replyAction.remove();
+        expect(core.shouldStayOriginal(engagement)).toBe(false);
+        expect(core.discover(document).some(candidate => candidate.element === engagement || engagement.contains(candidate.element))).toBe(true);
+        engagement.insertBefore(replyAction, nextSibling);
+        expect(core.shouldStayOriginal(engagement)).toBe(true);
+        expect(core.discover(document).some(candidate => candidate.element === engagement || engagement.contains(candidate.element))).toBe(false);
+    });
+
     it('含 emoji 与链接的 tweetText 仍由 X 适配器作为原子 owner，不 materialize synthetic run', () => {
         const {document, core} = page(`
             <article data-testid="tweet">

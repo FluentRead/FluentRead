@@ -19,6 +19,8 @@ export default defineConfig({
             reportsDirectory: 'coverage/core',
             reporter: ['text', 'json-summary', 'json', 'html'],
             include: [
+                'src/app/options/index.ts',
+                'src/providers/translation/ai-sdk/boundedErrorResponse.ts',
                 'userscript/buildGzip.ts',
                 'src/platform/storage/configStorageRuntime.ts',
                 'src/shared/dom/downloadTextFile.ts',

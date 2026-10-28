@@ -19,6 +19,8 @@ import {
 import {LlmTransportError} from './transport-errors';
 import {createImageInputHttpError} from '@/src/platform/http/errors';
 import {cancelUnreadResponseBody, runtimeFetch} from '@/src/platform/http/runtime';
+import {boundErrorResponse} from './boundedErrorResponse';
+import type {TranslationRequestLease} from '@/src/services/translation/requestScheduler';
 import {
     requireTranslationProviderConfig,
     getTranslationRequestScheduler,
@@ -200,23 +202,36 @@ function compatibilityFetch(
       const schedulerContext = getTranslationRequestScheduler(request);
       const identity = {...schedulerContext?.identity,
         service: request.serviceOverride || schedulerContext?.identity?.service, model: requestedModel};
-      const fetchAttempt = () => {
+      const fetchAttempt = (attemptLease?: TranslationRequestLease) => {
+        // 使用独立的传输 signal：错误正文超限时可终止真实 fetch，且不把这次局部
+        // 终止误当作调用方取消（原始 signal 仍负责调度和错误归属）。
+        const callerSignal = init?.signal ?? (typeof Request !== 'undefined' && input instanceof Request ? input.signal : undefined);
+        const transport = new AbortController();
+        const onAbort = () => transport.abort(callerSignal?.reason);
+        if (callerSignal?.aborted) onAbort();
+        else callerSignal?.addEventListener('abort', onAbort, {once: true});
+        let drained: Promise<void> | undefined;
         const settlement = (async () => {
-          const response = await runtimeFetch(endpoint.exactEndpoint || input, init);
-          schedulerContext?.scheduler.observeResponse(identity, response);
-          const normalized = await normalizeSuccessfulTextResponse(response);
-          // SDK 还会读取失败响应体；先读完克隆，确保取消时该网络读取也受并发槽约束。
-          if (schedulerContext && !response.ok) {
-            try {
-              await response.clone().arrayBuffer();
-            } catch {
-              // 响应读取失败仍交给 SDK 解析，保留 HTTP 状态、限流与鉴权错误分类。
-            }
+          const upstream = await runtimeFetch(endpoint.exactEndpoint || input, {...init, signal: transport.signal});
+          schedulerContext?.scheduler.observeResponse(identity, upstream);
+          let response = upstream;
+          if (!response.ok) {
+            const bounded = boundErrorResponse(response, callerSignal ?? undefined, () => transport.abort());
+            drained = bounded.drained;
+            response = await bounded.result;
           }
+          const normalized = await normalizeSuccessfulTextResponse(response);
           return {response, normalized};
         })();
-        // scheduleAttempt 会在 signal 取消时立即返回；租约必须跟随真实传输结算。
-        schedulerContext?.lease?.holdUntil(settlement);
+        // 给调用方返回有界错误不代表不合作的底层传输已结束；同时持有真实
+        // attempt 与旧外层槽直到原 reader 的 EOF/异常，不由超时提前释放槽位。
+        const lifecycle = settlement.then(
+          async value => {await drained; return value;},
+          async error => {await drained; throw error;},
+        ).finally(() => callerSignal?.removeEventListener('abort', onAbort));
+        attemptLease?.holdUntil(lifecycle);
+        schedulerContext?.lease?.holdUntil(lifecycle);
+        void lifecycle.catch(() => undefined);
         return settlement;
       };
       result = schedulerContext

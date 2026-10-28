@@ -9,6 +9,7 @@ const PROVIDER_ROOT = resolve(PROJECT_ROOT, 'src/providers/translation');
 const EXPECTED_PROVIDER_FILES = [
     'registry.ts',
     'chatgpt-plan.ts',
+    'ai-sdk/boundedErrorResponse.ts',
     'ai-sdk/endpoints.ts',
     'ai-sdk/errors.ts',
     'ai-sdk/openai-compatible.ts',
@@ -233,7 +234,7 @@ describe('translation provider architecture', () => {
 
     it('共享 OpenAI transport 通过 runtimeFetch，两个执行器都不绕过其网络端口', () => {
         const source = readProjectFile('src/providers/translation/ai-sdk/openai-transport.ts');
-        expect(source).toContain('runtimeFetch(endpoint.exactEndpoint || input, init)');
+        expect(source).toContain('runtimeFetch(endpoint.exactEndpoint || input, {...init, signal: transport.signal})');
         expect(source).not.toMatch(/\bawait\s+fetch\(/u);
         const sdk = readProjectFile('src/providers/translation/ai-sdk/openai-compatible.ts');
         const http = readProjectFile('src/providers/translation/ai-sdk/openai-http.ts');

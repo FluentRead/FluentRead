@@ -61,7 +61,7 @@ export interface TranslationRequestAttemptOptions {
 export interface TranslationRequestScheduler {
     schedule<T>(task: (lease: TranslationRequestLease) => Promise<T>, options?: TranslationRequestSchedulerTaskOptions): Promise<T>;
     /** 真实 HTTP attempt 可取得并发和速率；缺省仍复用直调的外层并发 lease。 */
-    scheduleAttempt<T>(task: () => Promise<T>, options?: TranslationRequestAttemptOptions): Promise<T>;
+    scheduleAttempt<T>(task: (lease: TranslationRequestLease) => Promise<T>, options?: TranslationRequestAttemptOptions): Promise<T>;
     /** transport 收到响应后、归还 attempt 前反馈；不增加重试或修改供应商响应。 */
     observeResponse(identity: TranslationRequestIdentity | undefined, response: Pick<Response, 'status' | 'headers'>): void;
 }
@@ -568,8 +568,8 @@ export function createTranslationRequestScheduler(
             reject: undefined as never,
             settled: false,
         }),
-        scheduleAttempt: <T>(task: () => Promise<T>, options: TranslationRequestAttemptOptions = {}) => enqueue({
-            task: async () => task(),
+        scheduleAttempt: <T>(task: (lease: TranslationRequestLease) => Promise<T>, options: TranslationRequestAttemptOptions = {}) => enqueue({
+            task: async lease => task(lease),
             signal: options.signal,
             deadlineAt: options.deadlineAt,
             identity: options.identity,

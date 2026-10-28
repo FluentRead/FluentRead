@@ -128,6 +128,26 @@ it('键盘焦点在操作条与文字面板之间转移后继续保留入口，�
     ui.dispose();
 });
 
+it.each([
+    ['hideReader', 'resolve'], ['hideReader', 'reject'], ['phase', 'resolve'], ['phase', 'reject'],
+] as const)('文字面板经 %s 隐藏后重开，旧复制 %s 不影响反馈或焦点', async (action, outcome) => {
+    const {document, window} = parseHTML('<html><body></body></html>');vi.stubGlobal('document', document);
+    vi.useFakeTimers();const operation = deferred<void>();
+    vi.stubGlobal('navigator', {clipboard:{writeText:vi.fn(() => operation.promise)}});
+    const ui = createImageControls({onAction(){},onPrepare(){}});document.body.append(ui.element,ui.feedback,ui.reader);
+    const click = (target: Element) => {const event=new window.Event('click',{bubbles:true});Object.defineProperty(event,'isTrusted',{value:true});target.dispatchEvent(event);};
+    ui.setLines([{text:'译文',sourceText:'Source'}]);ui.update('translated','完成');
+    const inspect=ui.element.querySelector<HTMLButtonElement>('[aria-expanded]')!;
+    const focus=vi.spyOn(inspect,'focus');click(inspect);click(ui.reader.querySelector('footer button')!);
+    if (action === 'hideReader') ui.hideReader();else {ui.update('loading','正在处理');ui.update('translated','完成');}
+    expect(ui.reader.hidden).toBe(true);expect(focus).not.toHaveBeenCalled();click(inspect);
+    expect(ui.reader.hidden).toBe(false);
+    if (outcome === 'resolve') operation.resolve();else operation.reject(new Error('late clipboard failure'));
+    await Promise.resolve();
+    expect(ui.reader.querySelector('[role=status]')!.textContent).toContain('本地 OCR');
+    expect(vi.getTimerCount()).toBe(0);ui.dispose();
+});
+
 describe('图片翻译流程优化',()=>{
     it.each(['ru', 'ko-KR'])('漫画 %s 先核对语言包，继续携带漫画模式且不采用单图引擎设置', async sourceLanguage => {
         const {handler, dependencies} = setup({getImageOcrEngine: () => 'paddle'});

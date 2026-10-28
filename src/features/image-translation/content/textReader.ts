@@ -1,7 +1,7 @@
 /**
  * @file src/features/image-translation/content/textReader.ts
  * 文件职责：提供图片翻译的可访问文字阅读面板，让小图与长译文也能完整阅读、核对原文和复制。
- * 主要内容：相同译文保留原文且不重复展示；以安全 textContent 渲染对照段落，提供仅译文/原文对照、复制反馈、关闭和局部 Escape；面板固定在视口内并继承扩展自己的深浅色变量。
+ * 主要内容：相同译文保留原文且不重复展示；以安全 textContent 渲染对照段落，提供仅译文/原文对照、复制反馈、关闭和局部 Escape；复制反馈只由当前操作和当前展示周期更新；面板固定在视口内并继承扩展自己的深浅色变量。
  * 模块边界：仅操作所属 Shadow DOM，不发送识别或翻译请求、不访问配置；宿主定位与生命周期由图片 runtime 管理，调用者提供本次结果和本地化函数。
  */
 import {hasDistinctTranslation} from '@/src/core/translation/result';
@@ -95,9 +95,16 @@ export function createImageTextReader(localize: (source: string) => string, onCl
         if (!event.isTrusted || disposed) return;
         event.stopPropagation();
         if (event.target === close) closeReader();
-        if (event.target === compare) { comparing = !comparing; render(); }
+        if (event.target === compare) {
+            revision += 1;
+            clearTimeout(feedbackTimer);
+            comparing = !comparing;
+            render();
+        }
         if (event.target !== copy) return;
-        const owner = revision;
+        const owner = ++revision;
+        clearTimeout(feedbackTimer);
+        feedback.textContent = localize('本地 OCR · 请核对名称和数字');
         const text = lines.map(line => comparing && line.sourceText !== undefined && hasDistinctTranslation(line.sourceText, line.text) ? `${line.sourceText}\n${line.text}` : line.sourceText !== undefined && !hasDistinctTranslation(line.sourceText, line.text) ? line.sourceText : line.text).join('\n\n');
         let message = '已复制';
         try { await navigator.clipboard.writeText(text); }
@@ -105,7 +112,9 @@ export function createImageTextReader(localize: (source: string) => string, onCl
         if (disposed || owner !== revision || element.hidden) return;
         feedback.textContent = localize(message);
         clearTimeout(feedbackTimer);
-        feedbackTimer = setTimeout(refreshLanguage, 2500);
+        feedbackTimer = setTimeout(() => {
+            if (!disposed && owner === revision && !element.hidden) refreshLanguage();
+        }, 2500);
     };
     const isolate = (event: Event) => event.stopPropagation();
     const handleKeydown = (event: KeyboardEvent) => {
@@ -119,7 +128,14 @@ export function createImageTextReader(localize: (source: string) => string, onCl
     return {
         element, refreshLanguage,
         setLines(next: ImageReaderLine[]) {revision += 1; clearTimeout(feedbackTimer); lines = next.map(line => ({...line})); render();},
-        open() {element.hidden = false; element.focus({preventScroll: true});},
+        open() {
+            // 外层也可直接隐藏面板；新展示周期必须拒绝先前复制的迟到反馈。
+            revision += 1;
+            clearTimeout(feedbackTimer);
+            refreshLanguage();
+            element.hidden = false;
+            element.focus({preventScroll: true});
+        },
         close: closeReader,
         dispose() {
             disposed = true;

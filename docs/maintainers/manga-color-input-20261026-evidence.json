@@ -1,0 +1,1537 @@
+{
+  "version": 1,
+  "baselineCommit": "172c713d5aed4fd11e00d35a17eea2ed9e7f7a5c",
+  "candidateSourceSha256": {
+    "src/features/image-translation/services/mangaOcr.ts": "a8e0b693761c5994b6223347f94bb249f407366097889f879e6186c7de83bc90",
+    "src/features/image-translation/services/mangaOcrColor.ts": "70843ddbed7fb1a2e830c4dfb06ba700268ebb0e0b5e62b0af2f46f40f8e6395",
+    "src/features/image-translation/services/mangaRecognitionInput.ts": "bcadb95e5bca0656216abbc96d7ef03cb0fe884394d8d68f74aca873a6c54966"
+  },
+  "description": "Four actual full production extension runs; controlled translation transport. Quality/pixels remain failed; not speed, provider, linguistic or competitor acceptance.",
+  "pipelineRunHashes": {
+    "manga14-baseline": {
+      "report.json": "0498bbd241643fdff287a1477930b5d876bafcbdb23c8077e6f1a666b0ec1162",
+      "pixel-report.json": "9fb269fd881e16f711a50bbec22128babfbfa74b22b5e12584ab3fedc38b26ea",
+      "runtime-diagnostics.json": "705219ff510792a13686ff2472af12757b3dfb94b10729919e4474790c745db2",
+      "pixel-receipts.json": "952089948b4aff18228b5a26be9e26b1dde739308e89e34101d63678b8cfb4ae"
+    },
+    "manga14-candidate": {
+      "report.json": "4e03cdc9985cd65f955f5bdca4f91bf6a0bfada7c2092d588b3f32c38043fa7b",
+      "pixel-report.json": "a50de8c839387b0d12d93016794a56f72d4e681f2959d1a159a63d1194731617",
+      "runtime-diagnostics.json": "8613b0fd88d7669951ed09a7c8e4bb80599d62d49129c32bb628aa0c1cadae99",
+      "pixel-receipts.json": "3c166e173aa948e2574e7976ad1b34f3f1312d53ccef5ea1dd3af54e329448f9"
+    },
+    "ordinary7-baseline": {
+      "report.json": "b2169a6e3db4618aa3e169d9e6d414a97c057eb3eed67e5e27bca45102f56871",
+      "pixel-report.json": "0eefddd73b63577edf505c32fe347241cfc724d73dfe3ef77c9c0c9988c2d236",
+      "runtime-diagnostics.json": "00baf56efe74ac4b65fa9992c2f2d8502c4b5c69f5fe84c2cb8a11e84377b9ea",
+      "pixel-receipts.json": "c5d7321b0c22f4e3dbe912e116b555b95aef9681237ef7061fbdcec872f68773"
+    },
+    "ordinary7-candidate": {
+      "report.json": "5b27d2f25a90736f001d4122b79906b72f1c2a34a7be617797f8d692d7ede495",
+      "pixel-report.json": "65f5c7ba635789ff210a30385085240da72edffb25418149c3416c3725411c9f",
+      "runtime-diagnostics.json": "1b2e257f5393dc89abb768626a1b1bf13a21a0fef5e05a9945488e26c88b1e47",
+      "pixel-receipts.json": "3ce0eb917e0ec6ba3a8b2928747032c98504ee8c8fccbdb7d7966ec21f643c91"
+    }
+  },
+  "runs": [
+    {
+      "preset": "manga14-baseline",
+      "completedScenes": 14,
+      "expectedScenes": 14,
+      "anchors": {
+        "total": 63,
+        "matched": 53,
+        "failed": 10
+      },
+      "qualityFailureTypes": {
+        "ocr-anchor": 10,
+        "paragraph-order": 20,
+        "unexpected-ocr-characters": 2,
+        "protected-artwork-pixel": 1
+      },
+      "qualityFailures": [
+        {
+          "scene": "harbor-same-red-channel-dialogue",
+          "round": 0,
+          "type": "ocr-anchor",
+          "anchor": "THE FERRY LEAVES AT DAWN.",
+          "occurrences": 0,
+          "expectedOccurrences": 1,
+          "reason": "Actual production OCR does not contain the normalized expected anchor"
+        },
+        {
+          "scene": "harbor-same-red-channel-dialogue",
+          "round": 0,
+          "type": "ocr-anchor",
+          "anchor": "BRING THE BLUE MAP.",
+          "occurrences": 0,
+          "expectedOccurrences": 1,
+          "reason": "Actual production OCR does not contain the normalized expected anchor"
+        },
+        {
+          "scene": "harbor-same-red-channel-dialogue",
+          "round": 0,
+          "type": "ocr-anchor",
+          "anchor": "I WILL WAIT BY THE PIER.",
+          "occurrences": 0,
+          "expectedOccurrences": 1,
+          "reason": "Actual production OCR does not contain the normalized expected anchor"
+        },
+        {
+          "scene": "harbor-same-red-channel-dialogue",
+          "round": 0,
+          "type": "ocr-anchor",
+          "anchor": "KEEP THE LANTERN LIT.",
+          "occurrences": 0,
+          "expectedOccurrences": 1,
+          "reason": "Actual production OCR does not contain the normalized expected anchor"
+        },
+        {
+          "scene": "harbor-same-red-channel-dialogue",
+          "round": 0,
+          "type": "paragraph-order",
+          "anchors": [
+            "THE FERRY LEAVES AT DAWN.",
+            "BRING THE BLUE MAP."
+          ],
+          "paragraphIndex": -1,
+          "found": false,
+          "reason": "Each general group must match a complete normalized actual source paragraph in order, without borrowing text from other groups"
+        },
+        {
+          "scene": "harbor-same-red-channel-dialogue",
+          "round": 0,
+          "type": "paragraph-order",
+          "anchors": [
+            "I WILL WAIT BY THE PIER.",
+            "KEEP THE LANTERN LIT."
+          ],
+          "paragraphIndex": -1,
+          "found": false,
+          "reason": "Each general group must match a complete normalized actual source paragraph in order, without borrowing text from other groups"
+        },
+        {
+          "scene": "prism-platform-gradient-signs",
+          "round": 0,
+          "type": "paragraph-order",
+          "anchors": [
+            "FOLLOW THE EASTERN TRACK",
+            "THE NEXT TRAIN IS ALMOST HERE"
+          ],
+          "paragraphIndex": -1,
+          "found": false,
+          "reason": "Each general group must match a complete normalized actual source paragraph in order, without borrowing text from other groups"
+        },
+        {
+          "scene": "rain-garden-vertical-ruby-sidebar",
+          "round": 0,
+          "type": "ocr-anchor",
+          "anchor": "風の音を聞いて",
+          "occurrences": 0,
+          "expectedOccurrences": 1,
+          "reason": "Actual production OCR does not contain the normalized expected anchor"
+        },
+        {
+          "scene": "rain-garden-vertical-ruby-sidebar",
+          "round": 0,
+          "type": "ocr-anchor",
+          "anchor": "小道で待っている",
+          "occurrences": 0,
+          "expectedOccurrences": 1,
+          "reason": "Actual production OCR does not contain the normalized expected anchor"
+        },
+        {
+          "scene": "rain-garden-vertical-ruby-sidebar",
+          "round": 0,
+          "type": "ocr-anchor",
+          "anchor": "かぜ",
+          "occurrences": 0,
+          "expectedOccurrences": 1,
+          "reason": "Actual production OCR does not contain the normalized expected anchor"
+        },
+        {
+          "scene": "rain-garden-vertical-ruby-sidebar",
+          "round": 0,
+          "type": "paragraph-order",
+          "anchors": [
+            "風の音を聞いて",
+            "小道で待っている"
+          ],
+          "paragraphIndex": -1,
+          "found": false,
+          "reason": "Each general group must match a complete normalized actual source paragraph in order, without borrowing text from other groups"
+        },
+        {
+          "scene": "rain-garden-vertical-ruby-sidebar",
+          "round": 0,
+          "type": "paragraph-order",
+          "anchors": [
+            "かぜ"
+          ],
+          "paragraphIndex": -1,
+          "found": false,
+          "reason": "Each general group must match a complete normalized actual source paragraph in order, without borrowing text from other groups"
+        },
+        {
+          "scene": "rain-garden-vertical-ruby-sidebar",
+          "round": 0,
+          "type": "paragraph-order",
+          "anchors": [
+            "沿着花园的小路慢慢走。",
+            "雨停以后，我们在桥边见。"
+          ],
+          "paragraphIndex": -1,
+          "found": false,
+          "reason": "Each general group must match a complete normalized actual source paragraph in order, without borrowing text from other groups"
+        },
+        {
+          "scene": "chess-picnic-neighbor-inverse-bubbles",
+          "round": 0,
+          "type": "paragraph-order",
+          "anchors": [
+            "THE BOARD IS READY.",
+            "I SAVED YOU A SEAT."
+          ],
+          "paragraphIndex": -1,
+          "found": false,
+          "reason": "Each general group must match a complete normalized actual source paragraph in order, without borrowing text from other groups"
+        },
+        {
+          "scene": "lantern-market-oblique-bilingual-captions",
+          "round": 0,
+          "type": "paragraph-order",
+          "anchors": [
+            "THE LANTERNS ARE STILL WARM.",
+            "LET US WALK HOME TOGETHER."
+          ],
+          "paragraphIndex": -1,
+          "found": false,
+          "reason": "Each general group must match a complete normalized actual source paragraph in order, without borrowing text from other groups"
+        },
+        {
+          "scene": "watercolor-ferry-translucent-notification",
+          "round": 0,
+          "type": "paragraph-order",
+          "anchors": [
+            "THE RIVER IS CLEAR TODAY.",
+            "PLEASE STEP ABOARD QUIETLY."
+          ],
+          "paragraphIndex": -1,
+          "found": false,
+          "reason": "Each general group must match a complete normalized actual source paragraph in order, without borrowing text from other groups"
+        },
+        {
+          "scene": "orbital-greenhouse-cutout-dialogue",
+          "round": 0,
+          "type": "paragraph-order",
+          "anchors": [
+            "新的叶子已经展开了。",
+            "把水送到靠窗的一排。"
+          ],
+          "paragraphIndex": -1,
+          "found": false,
+          "reason": "Each general group must match a complete normalized actual source paragraph in order, without borrowing text from other groups"
+        },
+        {
+          "scene": "orbital-greenhouse-cutout-dialogue",
+          "round": 0,
+          "type": "paragraph-order",
+          "anchors": [
+            "ここなら星が見える。",
+            "明日も一緒に育てよう。"
+          ],
+          "paragraphIndex": -1,
+          "found": false,
+          "reason": "Each general group must match a complete normalized actual source paragraph in order, without borrowing text from other groups"
+        },
+        {
+          "scene": "transparent-lantern-bridge-balloons",
+          "round": 0,
+          "type": "paragraph-order",
+          "anchors": [
+            "FOLLOW THE LANTERNS",
+            "THE PATH IS STILL OPEN"
+          ],
+          "paragraphIndex": -1,
+          "found": false,
+          "reason": "Each general group must match a complete normalized actual source paragraph in order, without borrowing text from other groups"
+        },
+        {
+          "scene": "transparent-lantern-bridge-balloons",
+          "round": 0,
+          "type": "paragraph-order",
+          "anchors": [
+            "橋のそばで待っていて。",
+            "地図を持って戻るよ。"
+          ],
+          "paragraphIndex": -1,
+          "found": false,
+          "reason": "Each general group must match a complete normalized actual source paragraph in order, without borrowing text from other groups"
+        },
+        {
+          "scene": "translucent-riverside-notice",
+          "round": 0,
+          "type": "paragraph-order",
+          "anchors": [
+            "The last ferry leaves at eight.",
+            "Please keep the riverside gate clear."
+          ],
+          "paragraphIndex": -1,
+          "found": false,
+          "reason": "Each general group must match a complete normalized actual source paragraph in order, without borrowing text from other groups"
+        },
+        {
+          "scene": "perforated-alpha-dock-note",
+          "round": 0,
+          "type": "ocr-anchor",
+          "anchor": "THE DOCK IS QUIET",
+          "occurrences": 0,
+          "expectedOccurrences": 1,
+          "reason": "Actual production OCR does not contain the normalized expected anchor"
+        },
+        {
+          "scene": "perforated-alpha-dock-note",
+          "round": 0,
+          "type": "ocr-anchor",
+          "anchor": "KEEP A LIGHT ON",
+          "occurrences": 0,
+          "expectedOccurrences": 1,
+          "reason": "Actual production OCR does not contain the normalized expected anchor"
+        },
+        {
+          "scene": "perforated-alpha-dock-note",
+          "round": 0,
+          "type": "unexpected-ocr-characters",
+          "excess": [
+            {
+              "character": "I",
+              "expected": 3,
+              "actual": 5,
+              "excess": 2
+            }
+          ],
+          "reason": "Actual offscreen source text contains more normalized characters than declared source truth"
+        },
+        {
+          "scene": "perforated-alpha-dock-note",
+          "round": 0,
+          "type": "paragraph-order",
+          "anchors": [
+            "THE DOCK IS QUIET",
+            "KEEP A LIGHT ON"
+          ],
+          "paragraphIndex": -1,
+          "found": false,
+          "reason": "Each general group must match a complete normalized actual source paragraph in order, without borrowing text from other groups"
+        },
+        {
+          "scene": "same-tone-cabin-controls",
+          "round": 0,
+          "type": "paragraph-order",
+          "anchors": [
+            "KEEP THE CABIN CLOSED",
+            "THE CREW RETURNS AT DAWN"
+          ],
+          "paragraphIndex": -1,
+          "found": false,
+          "reason": "Each general group must match a complete normalized actual source paragraph in order, without borrowing text from other groups"
+        },
+        {
+          "scene": "inverse-neighbor-tidal-balloons",
+          "round": 0,
+          "type": "paragraph-order",
+          "anchors": [
+            "WE CAN CROSS NOW",
+            "THE TIDE IS FALLING"
+          ],
+          "paragraphIndex": -1,
+          "found": false,
+          "reason": "Each general group must match a complete normalized actual source paragraph in order, without borrowing text from other groups"
+        },
+        {
+          "scene": "bound-atlas-rule-and-inset-card",
+          "round": 0,
+          "type": "ocr-anchor",
+          "anchor": "INDEX 09",
+          "occurrences": 0,
+          "expectedOccurrences": 1,
+          "reason": "Actual production OCR does not contain the normalized expected anchor"
+        },
+        {
+          "scene": "bound-atlas-rule-and-inset-card",
+          "round": 0,
+          "type": "unexpected-ocr-characters",
+          "excess": [
+            {
+              "character": "0",
+              "expected": 1,
+              "actual": 2,
+              "excess": 1
+            }
+          ],
+          "reason": "Actual offscreen source text contains more normalized characters than declared source truth"
+        },
+        {
+          "scene": "bound-atlas-rule-and-inset-card",
+          "round": 0,
+          "type": "paragraph-order",
+          "anchors": [
+            "Turn toward the old lighthouse.",
+            "The narrow path follows the sea."
+          ],
+          "paragraphIndex": -1,
+          "found": false,
+          "reason": "Each general group must match a complete normalized actual source paragraph in order, without borrowing text from other groups"
+        },
+        {
+          "scene": "bound-atlas-rule-and-inset-card",
+          "round": 0,
+          "type": "paragraph-order",
+          "anchors": [
+            "Wait until the bells are quiet.",
+            "Then take the eastern stairs."
+          ],
+          "paragraphIndex": -1,
+          "found": false,
+          "reason": "Each general group must match a complete normalized actual source paragraph in order, without borrowing text from other groups"
+        },
+        {
+          "scene": "bound-atlas-rule-and-inset-card",
+          "round": 0,
+          "type": "paragraph-order",
+          "anchors": [
+            "INDEX 09"
+          ],
+          "paragraphIndex": -1,
+          "found": false,
+          "reason": "Each general group must match a complete normalized actual source paragraph in order, without borrowing text from other groups"
+        },
+        {
+          "scene": "bound-atlas-rule-and-inset-card",
+          "round": 0,
+          "type": "protected-artwork-pixel",
+          "probe": 2,
+          "source": [
+            60,
+            56,
+            50,
+            255
+          ],
+          "actual": [
+            245,
+            240,
+            217,
+            255
+          ],
+          "reason": "Protected artwork survives source mask repair: bound-atlas-rule-and-inset-card probe 2"
+        }
+      ],
+      "pixelOracle": {
+        "rawTruthPasses": 10,
+        "nativePreservationPasses": 13,
+        "total": 14,
+        "passed": false
+      },
+      "pixelSceneResults": [
+        {
+          "scene": "harbor-same-red-channel-dialogue",
+          "rawTruthPassed": true,
+          "nativePreservationPassed": true,
+          "sourcePngSha256": "e4ec2d8c2b44cf4e3c6c0b52a29f9d3b41d8be6be7b84dcde2d1a54dbcd04c1d",
+          "outputPngSha256": "05e2a3f2aebe8d9c011f79fa276616947a07b93d96f968a5cad06d5b93f3681e"
+        },
+        {
+          "scene": "prism-platform-gradient-signs",
+          "rawTruthPassed": true,
+          "nativePreservationPassed": true,
+          "sourcePngSha256": "3d02324e422c6adc2211ed02e324617cf96a836783eeffc7085b8bc3800f4b0a",
+          "outputPngSha256": "986fb2c5a445bca58ea4c93e53bef7902b6fdf02eed279ecf5cdbd9ba78070df"
+        },
+        {
+          "scene": "rain-garden-vertical-ruby-sidebar",
+          "rawTruthPassed": true,
+          "nativePreservationPassed": true,
+          "sourcePngSha256": "0e83ffc139235a80f7cc4b8450215dc1d69e7f94b35cfd6d76c506880329c961",
+          "outputPngSha256": "9d1b7d6361d8e1b34d2924a23cc202ffeaf540923b28f6dd8acf61a94b37d431"
+        },
+        {
+          "scene": "chess-picnic-neighbor-inverse-bubbles",
+          "rawTruthPassed": true,
+          "nativePreservationPassed": true,
+          "sourcePngSha256": "e34e68efb159a557bac3a35d1d763ddc6aae47de498faa0b42c86aa777635096",
+          "outputPngSha256": "98206a87d3ce473af6dbb07e89e8741f0ab799457c14b5b6f516f154f9888b01"
+        },
+        {
+          "scene": "lantern-market-oblique-bilingual-captions",
+          "rawTruthPassed": true,
+          "nativePreservationPassed": true,
+          "sourcePngSha256": "ead8da29d5545e1e3dbd7553b74e6c93e1484adc0290e30c1c3e47147899f42d",
+          "outputPngSha256": "f3255a8c9da29fe2dc8cf42cd1de5d87d8b1ff79c296764a1f8e5f0fa3e69c5a"
+        },
+        {
+          "scene": "watercolor-ferry-translucent-notification",
+          "rawTruthPassed": false,
+          "nativePreservationPassed": true,
+          "sourcePngSha256": "cc67edb19e4f6705a4165efd2208ba2b90225174823da0d23552a03d11770134",
+          "outputPngSha256": "239d7f959a4a2dd8de51dc2938dd4a7924641f346adc0d0fad6b0ec3002ca9f5"
+        },
+        {
+          "scene": "orbital-greenhouse-cutout-dialogue",
+          "rawTruthPassed": false,
+          "nativePreservationPassed": true,
+          "sourcePngSha256": "438e5c1c29cb2669a66fe855a934b0853ac7b9cafa6f32b26b02fdbabbdc8249",
+          "outputPngSha256": "08aecb09b843455a6b09dbf71f0b22b26515f0517775d27152017d70b7c33206"
+        },
+        {
+          "scene": "wordless-stained-glass-cutout-garden",
+          "rawTruthPassed": true,
+          "nativePreservationPassed": true,
+          "sourcePngSha256": "41b58fc3a1482a0780dee2236ac36e28b100735948dbe94e548c0e1ac7f1c6a0",
+          "outputPngSha256": "41b58fc3a1482a0780dee2236ac36e28b100735948dbe94e548c0e1ac7f1c6a0"
+        },
+        {
+          "scene": "transparent-lantern-bridge-balloons",
+          "rawTruthPassed": true,
+          "nativePreservationPassed": true,
+          "sourcePngSha256": "fdce5d1a79f6dfe558abdbb1e3307ebcaccca09d7307a0b06a3aa6d621a4bc16",
+          "outputPngSha256": "618905e32d4063f563ef5a77551b083c467a0f07a95218e60c4afe9e14888b59"
+        },
+        {
+          "scene": "translucent-riverside-notice",
+          "rawTruthPassed": true,
+          "nativePreservationPassed": true,
+          "sourcePngSha256": "941fe820142c24644e6d1d8a5085d38c9812c25edc85c57452cab6530360d1de",
+          "outputPngSha256": "7fe39148b9f1f02693acc6e5301772df22a0725ff8eb039a649573d65177bc7a"
+        },
+        {
+          "scene": "perforated-alpha-dock-note",
+          "rawTruthPassed": false,
+          "nativePreservationPassed": true,
+          "sourcePngSha256": "7ee6fc9e7cb9199e33d22390780836c7203f7162067c028d9e7f0f94d0309fc9",
+          "outputPngSha256": "af8d3a74712471791397b1cd10b024d5edac51c4969da55b3562d2ca470447ab"
+        },
+        {
+          "scene": "same-tone-cabin-controls",
+          "rawTruthPassed": true,
+          "nativePreservationPassed": true,
+          "sourcePngSha256": "a936c32bd80d647928968850feec0dfaa0e3e9708633223cf325b8c5a17c9422",
+          "outputPngSha256": "2ec20b1779e83c273e6d29659f06e492bf4c9a07ac84d7fb5960a70d248ba9bc"
+        },
+        {
+          "scene": "inverse-neighbor-tidal-balloons",
+          "rawTruthPassed": true,
+          "nativePreservationPassed": true,
+          "sourcePngSha256": "8cd55c1b36d7c92f6f8a241e64695fa455ac3289adccf379d6fce6889e227dfb",
+          "outputPngSha256": "9e4c47ec50d5ef31e7d929c49dcc8b5d8d5dc83d129f69ffd430dbc88627147e"
+        },
+        {
+          "scene": "bound-atlas-rule-and-inset-card",
+          "rawTruthPassed": false,
+          "nativePreservationPassed": false,
+          "sourcePngSha256": "f85c12942c8f681b03ba8e80afb6c52c373b76908d583099c30ca4cb69c39169",
+          "outputPngSha256": "e7ef8c800835a6512e877f0766ebf8bf1414e6887246dc70389cd64933a1ed05"
+        }
+      ],
+      "diagnostics": {
+        "errors": 0,
+        "warnings": 1,
+        "rawErrors": 0,
+        "rawWarnings": 2,
+        "advisories": 0
+      },
+      "observedOwnRemoteRequests": 0,
+      "browserClosed": true,
+      "profileRemoved": true,
+      "cleanupErrors": []
+    },
+    {
+      "preset": "manga14-candidate",
+      "completedScenes": 14,
+      "expectedScenes": 14,
+      "anchors": {
+        "total": 63,
+        "matched": 59,
+        "failed": 4
+      },
+      "qualityFailureTypes": {
+        "paragraph-order": 20,
+        "ocr-anchor": 4,
+        "unexpected-ocr-characters": 2,
+        "protected-artwork-pixel": 1
+      },
+      "qualityFailures": [
+        {
+          "scene": "harbor-same-red-channel-dialogue",
+          "round": 0,
+          "type": "paragraph-order",
+          "anchors": [
+            "THE FERRY LEAVES AT DAWN.",
+            "BRING THE BLUE MAP."
+          ],
+          "paragraphIndex": -1,
+          "found": false,
+          "reason": "Each general group must match a complete normalized actual source paragraph in order, without borrowing text from other groups"
+        },
+        {
+          "scene": "harbor-same-red-channel-dialogue",
+          "round": 0,
+          "type": "paragraph-order",
+          "anchors": [
+            "I WILL WAIT BY THE PIER.",
+            "KEEP THE LANTERN LIT."
+          ],
+          "paragraphIndex": -1,
+          "found": false,
+          "reason": "Each general group must match a complete normalized actual source paragraph in order, without borrowing text from other groups"
+        },
+        {
+          "scene": "prism-platform-gradient-signs",
+          "round": 0,
+          "type": "paragraph-order",
+          "anchors": [
+            "FOLLOW THE EASTERN TRACK",
+            "THE NEXT TRAIN IS ALMOST HERE"
+          ],
+          "paragraphIndex": -1,
+          "found": false,
+          "reason": "Each general group must match a complete normalized actual source paragraph in order, without borrowing text from other groups"
+        },
+        {
+          "scene": "rain-garden-vertical-ruby-sidebar",
+          "round": 0,
+          "type": "ocr-anchor",
+          "anchor": "かぜ",
+          "occurrences": 0,
+          "expectedOccurrences": 1,
+          "reason": "Actual production OCR does not contain the normalized expected anchor"
+        },
+        {
+          "scene": "rain-garden-vertical-ruby-sidebar",
+          "round": 0,
+          "type": "paragraph-order",
+          "anchors": [
+            "風の音を聞いて",
+            "小道で待っている"
+          ],
+          "paragraphIndex": -1,
+          "found": false,
+          "reason": "Each general group must match a complete normalized actual source paragraph in order, without borrowing text from other groups"
+        },
+        {
+          "scene": "rain-garden-vertical-ruby-sidebar",
+          "round": 0,
+          "type": "paragraph-order",
+          "anchors": [
+            "かぜ"
+          ],
+          "paragraphIndex": -1,
+          "found": false,
+          "reason": "Each general group must match a complete normalized actual source paragraph in order, without borrowing text from other groups"
+        },
+        {
+          "scene": "rain-garden-vertical-ruby-sidebar",
+          "round": 0,
+          "type": "paragraph-order",
+          "anchors": [
+            "沿着花园的小路慢慢走。",
+            "雨停以后，我们在桥边见。"
+          ],
+          "paragraphIndex": -1,
+          "found": false,
+          "reason": "Each general group must match a complete normalized actual source paragraph in order, without borrowing text from other groups"
+        },
+        {
+          "scene": "chess-picnic-neighbor-inverse-bubbles",
+          "round": 0,
+          "type": "paragraph-order",
+          "anchors": [
+            "THE BOARD IS READY.",
+            "I SAVED YOU A SEAT."
+          ],
+          "paragraphIndex": -1,
+          "found": false,
+          "reason": "Each general group must match a complete normalized actual source paragraph in order, without borrowing text from other groups"
+        },
+        {
+          "scene": "lantern-market-oblique-bilingual-captions",
+          "round": 0,
+          "type": "paragraph-order",
+          "anchors": [
+            "THE LANTERNS ARE STILL WARM.",
+            "LET US WALK HOME TOGETHER."
+          ],
+          "paragraphIndex": -1,
+          "found": false,
+          "reason": "Each general group must match a complete normalized actual source paragraph in order, without borrowing text from other groups"
+        },
+        {
+          "scene": "watercolor-ferry-translucent-notification",
+          "round": 0,
+          "type": "paragraph-order",
+          "anchors": [
+            "THE RIVER IS CLEAR TODAY.",
+            "PLEASE STEP ABOARD QUIETLY."
+          ],
+          "paragraphIndex": -1,
+          "found": false,
+          "reason": "Each general group must match a complete normalized actual source paragraph in order, without borrowing text from other groups"
+        },
+        {
+          "scene": "orbital-greenhouse-cutout-dialogue",
+          "round": 0,
+          "type": "paragraph-order",
+          "anchors": [
+            "新的叶子已经展开了。",
+            "把水送到靠窗的一排。"
+          ],
+          "paragraphIndex": -1,
+          "found": false,
+          "reason": "Each general group must match a complete normalized actual source paragraph in order, without borrowing text from other groups"
+        },
+        {
+          "scene": "orbital-greenhouse-cutout-dialogue",
+          "round": 0,
+          "type": "paragraph-order",
+          "anchors": [
+            "ここなら星が見える。",
+            "明日も一緒に育てよう。"
+          ],
+          "paragraphIndex": -1,
+          "found": false,
+          "reason": "Each general group must match a complete normalized actual source paragraph in order, without borrowing text from other groups"
+        },
+        {
+          "scene": "transparent-lantern-bridge-balloons",
+          "round": 0,
+          "type": "paragraph-order",
+          "anchors": [
+            "FOLLOW THE LANTERNS",
+            "THE PATH IS STILL OPEN"
+          ],
+          "paragraphIndex": -1,
+          "found": false,
+          "reason": "Each general group must match a complete normalized actual source paragraph in order, without borrowing text from other groups"
+        },
+        {
+          "scene": "transparent-lantern-bridge-balloons",
+          "round": 0,
+          "type": "paragraph-order",
+          "anchors": [
+            "橋のそばで待っていて。",
+            "地図を持って戻るよ。"
+          ],
+          "paragraphIndex": -1,
+          "found": false,
+          "reason": "Each general group must match a complete normalized actual source paragraph in order, without borrowing text from other groups"
+        },
+        {
+          "scene": "translucent-riverside-notice",
+          "round": 0,
+          "type": "paragraph-order",
+          "anchors": [
+            "The last ferry leaves at eight.",
+            "Please keep the riverside gate clear."
+          ],
+          "paragraphIndex": -1,
+          "found": false,
+          "reason": "Each general group must match a complete normalized actual source paragraph in order, without borrowing text from other groups"
+        },
+        {
+          "scene": "perforated-alpha-dock-note",
+          "round": 0,
+          "type": "ocr-anchor",
+          "anchor": "THE DOCK IS QUIET",
+          "occurrences": 0,
+          "expectedOccurrences": 1,
+          "reason": "Actual production OCR does not contain the normalized expected anchor"
+        },
+        {
+          "scene": "perforated-alpha-dock-note",
+          "round": 0,
+          "type": "ocr-anchor",
+          "anchor": "KEEP A LIGHT ON",
+          "occurrences": 0,
+          "expectedOccurrences": 1,
+          "reason": "Actual production OCR does not contain the normalized expected anchor"
+        },
+        {
+          "scene": "perforated-alpha-dock-note",
+          "round": 0,
+          "type": "unexpected-ocr-characters",
+          "excess": [
+            {
+              "character": "I",
+              "expected": 3,
+              "actual": 5,
+              "excess": 2
+            }
+          ],
+          "reason": "Actual offscreen source text contains more normalized characters than declared source truth"
+        },
+        {
+          "scene": "perforated-alpha-dock-note",
+          "round": 0,
+          "type": "paragraph-order",
+          "anchors": [
+            "THE DOCK IS QUIET",
+            "KEEP A LIGHT ON"
+          ],
+          "paragraphIndex": -1,
+          "found": false,
+          "reason": "Each general group must match a complete normalized actual source paragraph in order, without borrowing text from other groups"
+        },
+        {
+          "scene": "same-tone-cabin-controls",
+          "round": 0,
+          "type": "paragraph-order",
+          "anchors": [
+            "KEEP THE CABIN CLOSED",
+            "THE CREW RETURNS AT DAWN"
+          ],
+          "paragraphIndex": -1,
+          "found": false,
+          "reason": "Each general group must match a complete normalized actual source paragraph in order, without borrowing text from other groups"
+        },
+        {
+          "scene": "inverse-neighbor-tidal-balloons",
+          "round": 0,
+          "type": "paragraph-order",
+          "anchors": [
+            "WE CAN CROSS NOW",
+            "THE TIDE IS FALLING"
+          ],
+          "paragraphIndex": -1,
+          "found": false,
+          "reason": "Each general group must match a complete normalized actual source paragraph in order, without borrowing text from other groups"
+        },
+        {
+          "scene": "bound-atlas-rule-and-inset-card",
+          "round": 0,
+          "type": "ocr-anchor",
+          "anchor": "INDEX 09",
+          "occurrences": 0,
+          "expectedOccurrences": 1,
+          "reason": "Actual production OCR does not contain the normalized expected anchor"
+        },
+        {
+          "scene": "bound-atlas-rule-and-inset-card",
+          "round": 0,
+          "type": "unexpected-ocr-characters",
+          "excess": [
+            {
+              "character": "0",
+              "expected": 1,
+              "actual": 2,
+              "excess": 1
+            }
+          ],
+          "reason": "Actual offscreen source text contains more normalized characters than declared source truth"
+        },
+        {
+          "scene": "bound-atlas-rule-and-inset-card",
+          "round": 0,
+          "type": "paragraph-order",
+          "anchors": [
+            "Turn toward the old lighthouse.",
+            "The narrow path follows the sea."
+          ],
+          "paragraphIndex": -1,
+          "found": false,
+          "reason": "Each general group must match a complete normalized actual source paragraph in order, without borrowing text from other groups"
+        },
+        {
+          "scene": "bound-atlas-rule-and-inset-card",
+          "round": 0,
+          "type": "paragraph-order",
+          "anchors": [
+            "Wait until the bells are quiet.",
+            "Then take the eastern stairs."
+          ],
+          "paragraphIndex": -1,
+          "found": false,
+          "reason": "Each general group must match a complete normalized actual source paragraph in order, without borrowing text from other groups"
+        },
+        {
+          "scene": "bound-atlas-rule-and-inset-card",
+          "round": 0,
+          "type": "paragraph-order",
+          "anchors": [
+            "INDEX 09"
+          ],
+          "paragraphIndex": -1,
+          "found": false,
+          "reason": "Each general group must match a complete normalized actual source paragraph in order, without borrowing text from other groups"
+        },
+        {
+          "scene": "bound-atlas-rule-and-inset-card",
+          "round": 0,
+          "type": "protected-artwork-pixel",
+          "probe": 2,
+          "source": [
+            60,
+            56,
+            50,
+            255
+          ],
+          "actual": [
+            245,
+            240,
+            217,
+            255
+          ],
+          "reason": "Protected artwork survives source mask repair: bound-atlas-rule-and-inset-card probe 2"
+        }
+      ],
+      "pixelOracle": {
+        "rawTruthPasses": 10,
+        "nativePreservationPasses": 13,
+        "total": 14,
+        "passed": false
+      },
+      "pixelSceneResults": [
+        {
+          "scene": "harbor-same-red-channel-dialogue",
+          "rawTruthPassed": true,
+          "nativePreservationPassed": true,
+          "sourcePngSha256": "e4ec2d8c2b44cf4e3c6c0b52a29f9d3b41d8be6be7b84dcde2d1a54dbcd04c1d",
+          "outputPngSha256": "2cd6defcb37e93bd3dfa3f128ce1e86a3874ef417224913a1fb0f1204eaf0983"
+        },
+        {
+          "scene": "prism-platform-gradient-signs",
+          "rawTruthPassed": true,
+          "nativePreservationPassed": true,
+          "sourcePngSha256": "3d02324e422c6adc2211ed02e324617cf96a836783eeffc7085b8bc3800f4b0a",
+          "outputPngSha256": "986fb2c5a445bca58ea4c93e53bef7902b6fdf02eed279ecf5cdbd9ba78070df"
+        },
+        {
+          "scene": "rain-garden-vertical-ruby-sidebar",
+          "rawTruthPassed": true,
+          "nativePreservationPassed": true,
+          "sourcePngSha256": "0e83ffc139235a80f7cc4b8450215dc1d69e7f94b35cfd6d76c506880329c961",
+          "outputPngSha256": "a82c3b7c9276603f4c56abb0597754ad3a854b429f4a108b8a5e69a91ec649c9"
+        },
+        {
+          "scene": "chess-picnic-neighbor-inverse-bubbles",
+          "rawTruthPassed": true,
+          "nativePreservationPassed": true,
+          "sourcePngSha256": "e34e68efb159a557bac3a35d1d763ddc6aae47de498faa0b42c86aa777635096",
+          "outputPngSha256": "98206a87d3ce473af6dbb07e89e8741f0ab799457c14b5b6f516f154f9888b01"
+        },
+        {
+          "scene": "lantern-market-oblique-bilingual-captions",
+          "rawTruthPassed": true,
+          "nativePreservationPassed": true,
+          "sourcePngSha256": "ead8da29d5545e1e3dbd7553b74e6c93e1484adc0290e30c1c3e47147899f42d",
+          "outputPngSha256": "f3255a8c9da29fe2dc8cf42cd1de5d87d8b1ff79c296764a1f8e5f0fa3e69c5a"
+        },
+        {
+          "scene": "watercolor-ferry-translucent-notification",
+          "rawTruthPassed": false,
+          "nativePreservationPassed": true,
+          "sourcePngSha256": "cc67edb19e4f6705a4165efd2208ba2b90225174823da0d23552a03d11770134",
+          "outputPngSha256": "239d7f959a4a2dd8de51dc2938dd4a7924641f346adc0d0fad6b0ec3002ca9f5"
+        },
+        {
+          "scene": "orbital-greenhouse-cutout-dialogue",
+          "rawTruthPassed": false,
+          "nativePreservationPassed": true,
+          "sourcePngSha256": "438e5c1c29cb2669a66fe855a934b0853ac7b9cafa6f32b26b02fdbabbdc8249",
+          "outputPngSha256": "08aecb09b843455a6b09dbf71f0b22b26515f0517775d27152017d70b7c33206"
+        },
+        {
+          "scene": "wordless-stained-glass-cutout-garden",
+          "rawTruthPassed": true,
+          "nativePreservationPassed": true,
+          "sourcePngSha256": "41b58fc3a1482a0780dee2236ac36e28b100735948dbe94e548c0e1ac7f1c6a0",
+          "outputPngSha256": "41b58fc3a1482a0780dee2236ac36e28b100735948dbe94e548c0e1ac7f1c6a0"
+        },
+        {
+          "scene": "transparent-lantern-bridge-balloons",
+          "rawTruthPassed": true,
+          "nativePreservationPassed": true,
+          "sourcePngSha256": "fdce5d1a79f6dfe558abdbb1e3307ebcaccca09d7307a0b06a3aa6d621a4bc16",
+          "outputPngSha256": "618905e32d4063f563ef5a77551b083c467a0f07a95218e60c4afe9e14888b59"
+        },
+        {
+          "scene": "translucent-riverside-notice",
+          "rawTruthPassed": true,
+          "nativePreservationPassed": true,
+          "sourcePngSha256": "941fe820142c24644e6d1d8a5085d38c9812c25edc85c57452cab6530360d1de",
+          "outputPngSha256": "7fe39148b9f1f02693acc6e5301772df22a0725ff8eb039a649573d65177bc7a"
+        },
+        {
+          "scene": "perforated-alpha-dock-note",
+          "rawTruthPassed": false,
+          "nativePreservationPassed": true,
+          "sourcePngSha256": "7ee6fc9e7cb9199e33d22390780836c7203f7162067c028d9e7f0f94d0309fc9",
+          "outputPngSha256": "af8d3a74712471791397b1cd10b024d5edac51c4969da55b3562d2ca470447ab"
+        },
+        {
+          "scene": "same-tone-cabin-controls",
+          "rawTruthPassed": true,
+          "nativePreservationPassed": true,
+          "sourcePngSha256": "a936c32bd80d647928968850feec0dfaa0e3e9708633223cf325b8c5a17c9422",
+          "outputPngSha256": "2ec20b1779e83c273e6d29659f06e492bf4c9a07ac84d7fb5960a70d248ba9bc"
+        },
+        {
+          "scene": "inverse-neighbor-tidal-balloons",
+          "rawTruthPassed": true,
+          "nativePreservationPassed": true,
+          "sourcePngSha256": "8cd55c1b36d7c92f6f8a241e64695fa455ac3289adccf379d6fce6889e227dfb",
+          "outputPngSha256": "9e4c47ec50d5ef31e7d929c49dcc8b5d8d5dc83d129f69ffd430dbc88627147e"
+        },
+        {
+          "scene": "bound-atlas-rule-and-inset-card",
+          "rawTruthPassed": false,
+          "nativePreservationPassed": false,
+          "sourcePngSha256": "f85c12942c8f681b03ba8e80afb6c52c373b76908d583099c30ca4cb69c39169",
+          "outputPngSha256": "e7ef8c800835a6512e877f0766ebf8bf1414e6887246dc70389cd64933a1ed05"
+        }
+      ],
+      "diagnostics": {
+        "errors": 0,
+        "warnings": 1,
+        "rawErrors": 0,
+        "rawWarnings": 2,
+        "advisories": 0
+      },
+      "observedOwnRemoteRequests": 0,
+      "browserClosed": true,
+      "profileRemoved": true,
+      "cleanupErrors": []
+    },
+    {
+      "preset": "ordinary7-baseline",
+      "completedScenes": 7,
+      "expectedScenes": 7,
+      "anchors": {
+        "total": 34,
+        "matched": 27,
+        "failed": 7
+      },
+      "qualityFailureTypes": {
+        "ocr-anchor": 7,
+        "paragraph-order": 12
+      },
+      "qualityFailures": [
+        {
+          "scene": "harbor-same-red-channel-dialogue",
+          "round": 0,
+          "type": "ocr-anchor",
+          "anchor": "THE FERRY LEAVES AT DAWN.",
+          "occurrences": 0,
+          "expectedOccurrences": 1,
+          "reason": "Actual production OCR does not contain the normalized expected anchor"
+        },
+        {
+          "scene": "harbor-same-red-channel-dialogue",
+          "round": 0,
+          "type": "ocr-anchor",
+          "anchor": "BRING THE BLUE MAP.",
+          "occurrences": 0,
+          "expectedOccurrences": 1,
+          "reason": "Actual production OCR does not contain the normalized expected anchor"
+        },
+        {
+          "scene": "harbor-same-red-channel-dialogue",
+          "round": 0,
+          "type": "ocr-anchor",
+          "anchor": "I WILL WAIT BY THE PIER.",
+          "occurrences": 0,
+          "expectedOccurrences": 1,
+          "reason": "Actual production OCR does not contain the normalized expected anchor"
+        },
+        {
+          "scene": "harbor-same-red-channel-dialogue",
+          "round": 0,
+          "type": "ocr-anchor",
+          "anchor": "KEEP THE LANTERN LIT.",
+          "occurrences": 0,
+          "expectedOccurrences": 1,
+          "reason": "Actual production OCR does not contain the normalized expected anchor"
+        },
+        {
+          "scene": "harbor-same-red-channel-dialogue",
+          "round": 0,
+          "type": "paragraph-order",
+          "anchors": [
+            "THE FERRY LEAVES AT DAWN.",
+            "BRING THE BLUE MAP."
+          ],
+          "paragraphIndex": -1,
+          "found": false,
+          "reason": "Each general group must match a complete normalized actual source paragraph in order, without borrowing text from other groups"
+        },
+        {
+          "scene": "harbor-same-red-channel-dialogue",
+          "round": 0,
+          "type": "paragraph-order",
+          "anchors": [
+            "I WILL WAIT BY THE PIER.",
+            "KEEP THE LANTERN LIT."
+          ],
+          "paragraphIndex": -1,
+          "found": false,
+          "reason": "Each general group must match a complete normalized actual source paragraph in order, without borrowing text from other groups"
+        },
+        {
+          "scene": "prism-platform-gradient-signs",
+          "round": 0,
+          "type": "paragraph-order",
+          "anchors": [
+            "FOLLOW THE EASTERN TRACK",
+            "THE NEXT TRAIN IS ALMOST HERE"
+          ],
+          "paragraphIndex": -1,
+          "found": false,
+          "reason": "Each general group must match a complete normalized actual source paragraph in order, without borrowing text from other groups"
+        },
+        {
+          "scene": "rain-garden-vertical-ruby-sidebar",
+          "round": 0,
+          "type": "ocr-anchor",
+          "anchor": "風の音を聞いて",
+          "occurrences": 0,
+          "expectedOccurrences": 1,
+          "reason": "Actual production OCR does not contain the normalized expected anchor"
+        },
+        {
+          "scene": "rain-garden-vertical-ruby-sidebar",
+          "round": 0,
+          "type": "ocr-anchor",
+          "anchor": "小道で待っている",
+          "occurrences": 0,
+          "expectedOccurrences": 1,
+          "reason": "Actual production OCR does not contain the normalized expected anchor"
+        },
+        {
+          "scene": "rain-garden-vertical-ruby-sidebar",
+          "round": 0,
+          "type": "ocr-anchor",
+          "anchor": "かぜ",
+          "occurrences": 0,
+          "expectedOccurrences": 1,
+          "reason": "Actual production OCR does not contain the normalized expected anchor"
+        },
+        {
+          "scene": "rain-garden-vertical-ruby-sidebar",
+          "round": 0,
+          "type": "paragraph-order",
+          "anchors": [
+            "風の音を聞いて",
+            "小道で待っている"
+          ],
+          "paragraphIndex": -1,
+          "found": false,
+          "reason": "Each general group must match a complete normalized actual source paragraph in order, without borrowing text from other groups"
+        },
+        {
+          "scene": "rain-garden-vertical-ruby-sidebar",
+          "round": 0,
+          "type": "paragraph-order",
+          "anchors": [
+            "かぜ"
+          ],
+          "paragraphIndex": -1,
+          "found": false,
+          "reason": "Each general group must match a complete normalized actual source paragraph in order, without borrowing text from other groups"
+        },
+        {
+          "scene": "rain-garden-vertical-ruby-sidebar",
+          "round": 0,
+          "type": "paragraph-order",
+          "anchors": [
+            "沿着花园的小路慢慢走。",
+            "雨停以后，我们在桥边见。"
+          ],
+          "paragraphIndex": -1,
+          "found": false,
+          "reason": "Each general group must match a complete normalized actual source paragraph in order, without borrowing text from other groups"
+        },
+        {
+          "scene": "chess-picnic-neighbor-inverse-bubbles",
+          "round": 0,
+          "type": "paragraph-order",
+          "anchors": [
+            "YOUR MOVE WAS CLEVER.",
+            "LET US TRY ONCE MORE."
+          ],
+          "paragraphIndex": -1,
+          "found": false,
+          "reason": "Each general group must match a complete normalized actual source paragraph in order, without borrowing text from other groups"
+        },
+        {
+          "scene": "chess-picnic-neighbor-inverse-bubbles",
+          "round": 0,
+          "type": "paragraph-order",
+          "anchors": [
+            "THE BOARD IS READY.",
+            "I SAVED YOU A SEAT."
+          ],
+          "paragraphIndex": -1,
+          "found": false,
+          "reason": "Each general group must match a complete normalized actual source paragraph in order, without borrowing text from other groups"
+        },
+        {
+          "scene": "lantern-market-oblique-bilingual-captions",
+          "round": 0,
+          "type": "paragraph-order",
+          "anchors": [
+            "THE LANTERNS ARE STILL WARM.",
+            "LET US WALK HOME TOGETHER."
+          ],
+          "paragraphIndex": -1,
+          "found": false,
+          "reason": "Each general group must match a complete normalized actual source paragraph in order, without borrowing text from other groups"
+        },
+        {
+          "scene": "watercolor-ferry-translucent-notification",
+          "round": 0,
+          "type": "paragraph-order",
+          "anchors": [
+            "THE RIVER IS CLEAR TODAY.",
+            "PLEASE STEP ABOARD QUIETLY."
+          ],
+          "paragraphIndex": -1,
+          "found": false,
+          "reason": "Each general group must match a complete normalized actual source paragraph in order, without borrowing text from other groups"
+        },
+        {
+          "scene": "orbital-greenhouse-cutout-dialogue",
+          "round": 0,
+          "type": "paragraph-order",
+          "anchors": [
+            "新的叶子已经展开了。",
+            "把水送到靠窗的一排。"
+          ],
+          "paragraphIndex": -1,
+          "found": false,
+          "reason": "Each general group must match a complete normalized actual source paragraph in order, without borrowing text from other groups"
+        },
+        {
+          "scene": "orbital-greenhouse-cutout-dialogue",
+          "round": 0,
+          "type": "paragraph-order",
+          "anchors": [
+            "ここなら星が見える。",
+            "明日も一緒に育てよう。"
+          ],
+          "paragraphIndex": -1,
+          "found": false,
+          "reason": "Each general group must match a complete normalized actual source paragraph in order, without borrowing text from other groups"
+        }
+      ],
+      "pixelOracle": {
+        "rawTruthPasses": 5,
+        "nativePreservationPasses": 7,
+        "total": 7,
+        "passed": false
+      },
+      "pixelSceneResults": [
+        {
+          "scene": "harbor-same-red-channel-dialogue",
+          "rawTruthPassed": true,
+          "nativePreservationPassed": true,
+          "sourcePngSha256": "e4ec2d8c2b44cf4e3c6c0b52a29f9d3b41d8be6be7b84dcde2d1a54dbcd04c1d",
+          "outputPngSha256": "8c9a32005d20bc28cfb7a1d5a1716ebb67e7b592dde4eb0c0db91d99d92b6cc8"
+        },
+        {
+          "scene": "prism-platform-gradient-signs",
+          "rawTruthPassed": true,
+          "nativePreservationPassed": true,
+          "sourcePngSha256": "3d02324e422c6adc2211ed02e324617cf96a836783eeffc7085b8bc3800f4b0a",
+          "outputPngSha256": "cecb6a8459ebe252b05584cdb984e181bf23f0cf1f09e533f1ac1d1803331062"
+        },
+        {
+          "scene": "rain-garden-vertical-ruby-sidebar",
+          "rawTruthPassed": true,
+          "nativePreservationPassed": true,
+          "sourcePngSha256": "0e83ffc139235a80f7cc4b8450215dc1d69e7f94b35cfd6d76c506880329c961",
+          "outputPngSha256": "de2a219991b77cad8c99963007cb91f71f8cc18ee22d87cec6fa10e940b70c9d"
+        },
+        {
+          "scene": "chess-picnic-neighbor-inverse-bubbles",
+          "rawTruthPassed": true,
+          "nativePreservationPassed": true,
+          "sourcePngSha256": "e34e68efb159a557bac3a35d1d763ddc6aae47de498faa0b42c86aa777635096",
+          "outputPngSha256": "7283b35e487c12439fc92358f5efadbae2a9050006bc6feac42dc55232d931e6"
+        },
+        {
+          "scene": "lantern-market-oblique-bilingual-captions",
+          "rawTruthPassed": true,
+          "nativePreservationPassed": true,
+          "sourcePngSha256": "ead8da29d5545e1e3dbd7553b74e6c93e1484adc0290e30c1c3e47147899f42d",
+          "outputPngSha256": "94fde57ce405fc9bf28af0503e76dcbc6cf47fb007912981ca83bffc18743378"
+        },
+        {
+          "scene": "watercolor-ferry-translucent-notification",
+          "rawTruthPassed": false,
+          "nativePreservationPassed": true,
+          "sourcePngSha256": "cc67edb19e4f6705a4165efd2208ba2b90225174823da0d23552a03d11770134",
+          "outputPngSha256": "84b309288f0de78562f177a735427d59eb33fbe0375dbe37097b9bd1a1e92cc2"
+        },
+        {
+          "scene": "orbital-greenhouse-cutout-dialogue",
+          "rawTruthPassed": false,
+          "nativePreservationPassed": true,
+          "sourcePngSha256": "438e5c1c29cb2669a66fe855a934b0853ac7b9cafa6f32b26b02fdbabbdc8249",
+          "outputPngSha256": "45a4f61109d5c569b22194cea26ca5bf620909349d6a26c127929089e0303971"
+        }
+      ],
+      "diagnostics": {
+        "errors": 0,
+        "warnings": 1,
+        "rawErrors": 0,
+        "rawWarnings": 2,
+        "advisories": 0
+      },
+      "observedOwnRemoteRequests": 0,
+      "browserClosed": true,
+      "profileRemoved": true,
+      "cleanupErrors": []
+    },
+    {
+      "preset": "ordinary7-candidate",
+      "completedScenes": 7,
+      "expectedScenes": 7,
+      "anchors": {
+        "total": 34,
+        "matched": 33,
+        "failed": 1
+      },
+      "qualityFailureTypes": {
+        "paragraph-order": 12,
+        "ocr-anchor": 1
+      },
+      "qualityFailures": [
+        {
+          "scene": "harbor-same-red-channel-dialogue",
+          "round": 0,
+          "type": "paragraph-order",
+          "anchors": [
+            "THE FERRY LEAVES AT DAWN.",
+            "BRING THE BLUE MAP."
+          ],
+          "paragraphIndex": -1,
+          "found": false,
+          "reason": "Each general group must match a complete normalized actual source paragraph in order, without borrowing text from other groups"
+        },
+        {
+          "scene": "harbor-same-red-channel-dialogue",
+          "round": 0,
+          "type": "paragraph-order",
+          "anchors": [
+            "I WILL WAIT BY THE PIER.",
+            "KEEP THE LANTERN LIT."
+          ],
+          "paragraphIndex": -1,
+          "found": false,
+          "reason": "Each general group must match a complete normalized actual source paragraph in order, without borrowing text from other groups"
+        },
+        {
+          "scene": "prism-platform-gradient-signs",
+          "round": 0,
+          "type": "paragraph-order",
+          "anchors": [
+            "FOLLOW THE EASTERN TRACK",
+            "THE NEXT TRAIN IS ALMOST HERE"
+          ],
+          "paragraphIndex": -1,
+          "found": false,
+          "reason": "Each general group must match a complete normalized actual source paragraph in order, without borrowing text from other groups"
+        },
+        {
+          "scene": "rain-garden-vertical-ruby-sidebar",
+          "round": 0,
+          "type": "ocr-anchor",
+          "anchor": "かぜ",
+          "occurrences": 0,
+          "expectedOccurrences": 1,
+          "reason": "Actual production OCR does not contain the normalized expected anchor"
+        },
+        {
+          "scene": "rain-garden-vertical-ruby-sidebar",
+          "round": 0,
+          "type": "paragraph-order",
+          "anchors": [
+            "風の音を聞いて",
+            "小道で待っている"
+          ],
+          "paragraphIndex": -1,
+          "found": false,
+          "reason": "Each general group must match a complete normalized actual source paragraph in order, without borrowing text from other groups"
+        },
+        {
+          "scene": "rain-garden-vertical-ruby-sidebar",
+          "round": 0,
+          "type": "paragraph-order",
+          "anchors": [
+            "かぜ"
+          ],
+          "paragraphIndex": -1,
+          "found": false,
+          "reason": "Each general group must match a complete normalized actual source paragraph in order, without borrowing text from other groups"
+        },
+        {
+          "scene": "rain-garden-vertical-ruby-sidebar",
+          "round": 0,
+          "type": "paragraph-order",
+          "anchors": [
+            "沿着花园的小路慢慢走。",
+            "雨停以后，我们在桥边见。"
+          ],
+          "paragraphIndex": -1,
+          "found": false,
+          "reason": "Each general group must match a complete normalized actual source paragraph in order, without borrowing text from other groups"
+        },
+        {
+          "scene": "chess-picnic-neighbor-inverse-bubbles",
+          "round": 0,
+          "type": "paragraph-order",
+          "anchors": [
+            "YOUR MOVE WAS CLEVER.",
+            "LET US TRY ONCE MORE."
+          ],
+          "paragraphIndex": -1,
+          "found": false,
+          "reason": "Each general group must match a complete normalized actual source paragraph in order, without borrowing text from other groups"
+        },
+        {
+          "scene": "chess-picnic-neighbor-inverse-bubbles",
+          "round": 0,
+          "type": "paragraph-order",
+          "anchors": [
+            "THE BOARD IS READY.",
+            "I SAVED YOU A SEAT."
+          ],
+          "paragraphIndex": -1,
+          "found": false,
+          "reason": "Each general group must match a complete normalized actual source paragraph in order, without borrowing text from other groups"
+        },
+        {
+          "scene": "lantern-market-oblique-bilingual-captions",
+          "round": 0,
+          "type": "paragraph-order",
+          "anchors": [
+            "THE LANTERNS ARE STILL WARM.",
+            "LET US WALK HOME TOGETHER."
+          ],
+          "paragraphIndex": -1,
+          "found": false,
+          "reason": "Each general group must match a complete normalized actual source paragraph in order, without borrowing text from other groups"
+        },
+        {
+          "scene": "watercolor-ferry-translucent-notification",
+          "round": 0,
+          "type": "paragraph-order",
+          "anchors": [
+            "THE RIVER IS CLEAR TODAY.",
+            "PLEASE STEP ABOARD QUIETLY."
+          ],
+          "paragraphIndex": -1,
+          "found": false,
+          "reason": "Each general group must match a complete normalized actual source paragraph in order, without borrowing text from other groups"
+        },
+        {
+          "scene": "orbital-greenhouse-cutout-dialogue",
+          "round": 0,
+          "type": "paragraph-order",
+          "anchors": [
+            "新的叶子已经展开了。",
+            "把水送到靠窗的一排。"
+          ],
+          "paragraphIndex": -1,
+          "found": false,
+          "reason": "Each general group must match a complete normalized actual source paragraph in order, without borrowing text from other groups"
+        },
+        {
+          "scene": "orbital-greenhouse-cutout-dialogue",
+          "round": 0,
+          "type": "paragraph-order",
+          "anchors": [
+            "ここなら星が見える。",
+            "明日も一緒に育てよう。"
+          ],
+          "paragraphIndex": -1,
+          "found": false,
+          "reason": "Each general group must match a complete normalized actual source paragraph in order, without borrowing text from other groups"
+        }
+      ],
+      "pixelOracle": {
+        "rawTruthPasses": 5,
+        "nativePreservationPasses": 7,
+        "total": 7,
+        "passed": false
+      },
+      "pixelSceneResults": [
+        {
+          "scene": "harbor-same-red-channel-dialogue",
+          "rawTruthPassed": true,
+          "nativePreservationPassed": true,
+          "sourcePngSha256": "e4ec2d8c2b44cf4e3c6c0b52a29f9d3b41d8be6be7b84dcde2d1a54dbcd04c1d",
+          "outputPngSha256": "7d693bebbb290e52051dbf8c91324b88398dd89d2b2c5050672b873551624a28"
+        },
+        {
+          "scene": "prism-platform-gradient-signs",
+          "rawTruthPassed": true,
+          "nativePreservationPassed": true,
+          "sourcePngSha256": "3d02324e422c6adc2211ed02e324617cf96a836783eeffc7085b8bc3800f4b0a",
+          "outputPngSha256": "cecb6a8459ebe252b05584cdb984e181bf23f0cf1f09e533f1ac1d1803331062"
+        },
+        {
+          "scene": "rain-garden-vertical-ruby-sidebar",
+          "rawTruthPassed": true,
+          "nativePreservationPassed": true,
+          "sourcePngSha256": "0e83ffc139235a80f7cc4b8450215dc1d69e7f94b35cfd6d76c506880329c961",
+          "outputPngSha256": "cce0fb54fcc6379ff434594e24a887068ad56662ae6626f793765345ea46bc6f"
+        },
+        {
+          "scene": "chess-picnic-neighbor-inverse-bubbles",
+          "rawTruthPassed": true,
+          "nativePreservationPassed": true,
+          "sourcePngSha256": "e34e68efb159a557bac3a35d1d763ddc6aae47de498faa0b42c86aa777635096",
+          "outputPngSha256": "7283b35e487c12439fc92358f5efadbae2a9050006bc6feac42dc55232d931e6"
+        },
+        {
+          "scene": "lantern-market-oblique-bilingual-captions",
+          "rawTruthPassed": true,
+          "nativePreservationPassed": true,
+          "sourcePngSha256": "ead8da29d5545e1e3dbd7553b74e6c93e1484adc0290e30c1c3e47147899f42d",
+          "outputPngSha256": "94fde57ce405fc9bf28af0503e76dcbc6cf47fb007912981ca83bffc18743378"
+        },
+        {
+          "scene": "watercolor-ferry-translucent-notification",
+          "rawTruthPassed": false,
+          "nativePreservationPassed": true,
+          "sourcePngSha256": "cc67edb19e4f6705a4165efd2208ba2b90225174823da0d23552a03d11770134",
+          "outputPngSha256": "84b309288f0de78562f177a735427d59eb33fbe0375dbe37097b9bd1a1e92cc2"
+        },
+        {
+          "scene": "orbital-greenhouse-cutout-dialogue",
+          "rawTruthPassed": false,
+          "nativePreservationPassed": true,
+          "sourcePngSha256": "438e5c1c29cb2669a66fe855a934b0853ac7b9cafa6f32b26b02fdbabbdc8249",
+          "outputPngSha256": "45a4f61109d5c569b22194cea26ca5bf620909349d6a26c127929089e0303971"
+        }
+      ],
+      "diagnostics": {
+        "errors": 0,
+        "warnings": 1,
+        "rawErrors": 0,
+        "rawWarnings": 2,
+        "advisories": 0
+      },
+      "observedOwnRemoteRequests": 0,
+      "browserClosed": true,
+      "profileRemoved": true,
+      "cleanupErrors": []
+    }
+  ],
+  "scope": {
+    "nativeInferenceCounterScope": "Original report runs=0 is Offscreen-only; separate Worker inference is not counted there. It is not a zero-native-inference claim.",
+    "qualityScope": "Real production OCR and rendering; controlled deterministic text transport, not linguistic/provider or competitor acceptance.",
+    "performanceScope": "One round each, no speed or superiority conclusion.",
+    "downloadScope": "Verified fixed file cache hits; throw-on-fetch helper; no observed own-target remote HTTP(S). Before Network.enable and browser-internal transfer gaps remain.",
+    "knownWhitespaceRegressionsRetained": true
+  }
+}

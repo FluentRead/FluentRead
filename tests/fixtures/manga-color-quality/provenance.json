@@ -1,0 +1,85 @@
+{
+  "version": 1,
+  "sourceBeforeAnyOcr": true,
+  "selectionByOcrResult": false,
+  "sourceTruthChangedDuringMigration": false,
+  "fontsBundled": false,
+  "modelWeightsBundled": false,
+  "externalArtworkOrImplementationCopied": false,
+  "originalManifestSha256": "3ceb90f8fc34d3b261898ae5045d4002873ca471dd7ff8e57e72dee6274b444f",
+  "originalDesignSha256": "b24b2d1ee63ea1ad03e1770126410cea2f82b271c35fd14d0a4f15295cc68acf",
+  "originalGeneratorSha256": "1ee1ff0a9644eee547c863559296b58580f45053880ec6f01be2e6bdb21a9dc7",
+  "originalSourceFreezeSha256": "03adba03166607db7d309a7bd8cb29a77cf7afb60b0d20e3b0d24d5bdee66c08",
+  "originalSourceFrozenAtUtc": "2026-10-25 18:32:10 UTC",
+  "migration": "Exact copy of all 60 original design/manifest/pixel files. Historical generator fields and firstOcrStatus are unchanged. Only new scripts/README/provenance/baseline are added.",
+  "maintainedGenerator": {
+    "path": "scripts/testing/generate-manga-color-quality-fixtures.py",
+    "sha256": "7ff9bfcd5c6b167c659da820272c7c0895c33d5c0139b2249de250136af8988c",
+    "changes": "Portable default paths, exact reference-manifest admission, full content verification before exclusive new-directory creation. Drawing/glyph/source-over logic is unchanged."
+  },
+  "maintainedChecker": {
+    "path": "scripts/testing/check-manga-color-quality-fixtures.cjs",
+    "sha256": "20a0f8c646630545b705d8378d5318508726cf7ede2e101a9f47b4cfafbc1df5",
+    "scope": "Node-only immutable input/pixel declarations and public quality-gate counterexamples; not a production OCR or output pixel pass."
+  },
+  "firstOcrBaseline": {
+    "file": "first-ocr-baseline.json",
+    "sha256": "9fb02356959b5611f51f76406676f4db2b06bda0bd80a994b02a3a1ef5d3936b",
+    "productionHead": "172c713d5aed4fd11e00d35a17eea2ed9e7f7a5c",
+    "scope": "First eight scenes from the actual stock fourteen-scene invocation. 27/34 anchors, 1/8 strict scenes, raw protected pixels 6/8, native preservation 8/8. Failures retained."
+  },
+  "payload": {
+    "sourcePngs": 8,
+    "backgroundPngs": 8,
+    "glyphPngs": 34,
+    "sourceRgbaGzipFiles": 8,
+    "fixedFilesIncludingDesignAndManifest": 60,
+    "fixedBytes": 1663952,
+    "sourceRgbaBytes": 44880000,
+    "maxSourceRgbaBytes": 6600000,
+    "anchors": 34,
+    "paragraphs": 23,
+    "negativeRegions": 15,
+    "rgbProbes": 21,
+    "rgbaProbes": 8,
+    "transparentProtectedPixels": 4800
+  },
+  "fonts": [
+    {
+      "key": "bold",
+      "sha256": "d72db21f9242aedd6b917d8549ad5921766b24d5f8d0becfda2ff4c620b3c2e0",
+      "source": "Local system font at exact path in design, or explicitly supplied same-SHA path. No font bytes redistributed."
+    },
+    {
+      "key": "regular",
+      "sha256": "525979822591a3447cfc49d943d6f7683508e25543407871c0ed8fed05fd2bd9",
+      "source": "Local system font at exact path in design, or explicitly supplied same-SHA path. No font bytes redistributed."
+    },
+    {
+      "key": "cjk",
+      "sha256": "cf8cf2c882e1e344ac2e6207fe172657a30dc2c6e1ee65a9e29a7b582c4d4154",
+      "source": "Local system font at exact path in design, or explicitly supplied same-SHA path. No font bytes redistributed."
+    },
+    {
+      "key": "zh",
+      "sha256": "ca1e9bf621f13ddc4800bfb74d0124571dfc25a1678a28d6e7dbcf39fad2504a",
+      "source": "Local system font at exact path in design, or explicitly supplied same-SHA path. No font bytes redistributed."
+    }
+  ],
+  "preFirstOcrCorrections": [
+    {
+      "change": "Use an exact Chinese font for five existing Chinese text regions instead of the Japanese font lacking those glyphs.",
+      "boundary": "Before first OCR; all wording, position, size, colors and paragraph IDs retained."
+    },
+    {
+      "change": "After glyph coverage resize, assign the frozen solid RGB and retain the same glyph alpha before source-over blending.",
+      "boundary": "Before first OCR; removes incidental premultiplied resize RGB variation. Original full source freeze already includes this change; migration makes no further pixel edits."
+    }
+  ],
+  "limitations": [
+    "Fixed-source/functional tests do not execute OCR, online translation, inpainting or browser presentation.",
+    "Stock production runner currently reads RGB probes; additional RGBA point and full-rectangle output acceptance remains a separate native pixel oracle.",
+    "No test-matrix, production source or existing fixture is modified by these fixture-owned files.",
+    "Default macOS paths are rebuild dependencies; Linux CI uses frozen assets and Node checker, not alternate fonts or forced regeneration."
+  ]
+}

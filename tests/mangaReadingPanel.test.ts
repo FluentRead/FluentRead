@@ -58,7 +58,7 @@ describe('standalone manga reading panel prototype',()=>{
   it('identifies translations withheld from the image',async()=>{
     const h=await mount();h.props.read.mockResolvedValueOnce({status:'ready',lines:[{...line('译文'),renderSkipped:true}]});
     await h.instance.open(trusted);h.button('图片 1')!.props.onClick(trusted);await h.tick();
-    expect(h.get(n=>n.text==='附近有数字，此译文未绘制到图片')).toBeDefined();
+    expect(h.get(n=>n.text==='为保护数字，此译文未绘制到图片')).toBeDefined();
   });
   it('rejects oversize content completely and paginates complete lines without truncation',async()=>{
     const h=await mount();h.props.read.mockResolvedValueOnce({status:'ready',lines:[line('x'.repeat(16001))]}).mockResolvedValueOnce({status:'ready',lines:Array.from({length:40},(_,i)=>line(`行 ${i}`))});
@@ -255,6 +255,18 @@ describe('standalone manga reading panel prototype',()=>{
   it('rejects more than the total line budget instead of rendering a truncated result',async()=>{
     const h=await mount();h.props.read.mockResolvedValueOnce({status:'ready',lines:Array.from({length:513},()=>line('a'))});
     await h.instance.open(trusted);h.button('图片 1')!.props.onClick(trusted);await h.tick();expect(h.panel.status).toBe('overBudget');expect(h.get(n=>n.tag==='pre')).toBeUndefined();
+  });
+  it('releases observation and exposes no partial text when a result exceeds the character budget',async()=>{
+    const h=await mount(),stop=vi.fn();h.props.observe.mockReturnValueOnce(stop);
+    h.props.read.mockResolvedValueOnce({status:'ready',lines:[line('x'.repeat(50000))]});
+    await h.instance.open(trusted);h.button('图片 1')!.props.onClick(trusted);await h.tick();
+    expect(h.panel.status).toBe('overBudget');expect(stop).toHaveBeenCalledOnce();expect(h.get(n=>n.tag==='pre')).toBeUndefined();expect(h.props.copy).not.toHaveBeenCalled();
+  });
+  it('shows a read failure but ignores a late failure after the panel closes',async()=>{
+    const h=await mount(),pending=deferred<MangaReadingResult>();h.props.read.mockRejectedValueOnce(Error('failed')).mockReturnValueOnce(pending.promise);
+    await h.instance.open(trusted);h.button('图片 1')!.props.onClick(trusted);await h.tick();expect(h.panel.status).toBe('error');
+    h.button('选择其他页面')!.props.onClick(trusted);await h.tick();h.button('图片 1')!.props.onClick(trusted);h.instance.close();pending.reject(Error('late'));await h.tick();
+    expect(h.get(n=>n.props.role==='dialog')).toBeUndefined();expect(h.props.observe).not.toHaveBeenCalled();
   });
   it('does not let the completion of an earlier copy overwrite a later copy',async()=>{
     const h=await mount(), first=deferred<void>(),second=deferred<void>();h.props.copy.mockReturnValueOnce(first.promise).mockReturnValueOnce(second.promise);

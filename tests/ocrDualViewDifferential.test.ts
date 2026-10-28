@@ -257,6 +257,35 @@ const expected = {
 } as const;
 
 describe('OCR dual views preserve the pre-optimization output', () => {
+  it('无数字合列快路径保持两视图、原始输入与返回框隔离',()=>{
+    const input=[{paragraphs:[{lines:Array.from({length:1000},(_,i)=>{
+      const bbox={x0:i*20,y0:0,x1:i*20+10,y1:15},text=i%2?'Hello':'你好';
+      return {text,bbox,words:[{text,bbox,confidence:99}]};
+    })}]}];
+    const before=structuredClone(input),views=normalizeOcrLineViews(input);
+    expect(views.ordinary).toEqual(normalizeOcrLines(input));expect(views.manga).toEqual(normalizeOcrLines(input,true));
+    views.ordinary[0].bbox.x0=-1;expect(views.manga[0].bbox.x0).toBe(0);expect(input).toEqual(before);
+  });
+  it('快路径不重复读取原始文字 getter，全部低分词的未知原行仍保守回退',()=>{
+    let lineReads=0,wordReads=0;
+    const bbox={x0:0,y0:0,x1:10,y1:10};
+    const word={get text(){wordReads++;return 'hello';},bbox,confidence:99};
+    const line={get text(){lineReads++;return 'hello';},bbox,words:[word]};
+    const result=normalizeOcrLineViews([{paragraphs:[{lines:[line]}]}]);
+    expect(result.ordinary).toEqual([{text:'hello',bbox}]);expect([lineReads,wordReads]).toEqual([1,1]);
+    let filteredReads=0;
+    const filtered={get text(){filteredReads++;return '90%';},bbox,words:[{text:'noise',bbox,confidence:20}]};
+    expect(normalizeOcrLineViews([{paragraphs:[{lines:[filtered]}]}])).toEqual({ordinary:[],manga:[]});
+    expect(filteredReads).toBe(0);
+  });
+  it('被过滤词的 Unicode 数字仍关闭快路径，保护视图保持独立合列',()=>{
+    const first={x0:70,y0:10,x1:90,y1:70},second={x0:45,y0:10,x1:65,y1:70};
+    const input=[{paragraphs:[{lines:[
+      {text:'12:34',bbox:first,baseline:{x0:80,y0:10,x1:81,y1:70},words:[{text:'12:34',bbox:first,confidence:98}]},
+      {text:'hello',bbox:second,baseline:{x0:55,y0:10,x1:56,y1:70},words:[{text:'hello',bbox:second,confidence:98}]},
+    ]}]}];
+    const views=normalizeOcrLineViews(input);expect(views.ordinary).toHaveLength(1);expect(views.manga).toHaveLength(2);
+  });
   it.each(Object.entries(fixtures))('%s retains both views, ordering and scaled boxes', (name, input) => {
     const expectedViews = expected[name as keyof typeof expected];
     const result = normalizeOcrLineViews(input);

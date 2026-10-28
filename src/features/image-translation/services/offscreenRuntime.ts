@@ -1,7 +1,7 @@
 /**
  * @file src/features/image-translation/services/offscreenRuntime.ts
  * 文件职责：在隔离 Offscreen 文档中编排图片重绘翻译，并为圈选文本翻译提供仅裁剪和本地 OCR 的独立入口。
- * 主要内容：单图可选与漫画共用的 PaddleOCR，两种引擎均按普通段落合行翻译、限制字号并保留对齐，擦除只使用原始行框；保留单图完整译图与原文对照，不自动加载漫画修补模型；图片解码时前置尺寸校验和取消/超时清理，普通修补复用独占像素，完整译图、漫画局部图块和圈选裁剪共用可取消的异步 PNG 编码；漫画在原始像素尚未回写前计算全局透明孔保护，与背景分类一起交给修补及绘字，避免重叠写入破坏已保护的画面；确认整页均匀时复用本次独占 ImageData 并跳过同一数组的拷回，复杂页仍分离输入与输出，完成或失败后释放临时图像与画布。
+ * 主要内容：单图可选与漫画共用的 PaddleOCR，两种引擎均按普通段落合行翻译、限制字号并保留对齐，擦除只使用原始行框；独立数字保留原图与可读原文，不发送翻译，碰撞的文字只显示于阅读面板；保留单图完整译图与原文对照，不自动加载漫画修补模型；图片解码时前置尺寸校验和取消/超时清理，普通修补复用独占像素，完整译图、漫画局部图块和圈选裁剪共用可取消的异步 PNG 编码；漫画在原始像素尚未回写前计算全局透明孔保护，与背景分类一起交给修补及绘字，避免重叠写入破坏已保护的画面；确认整页均匀时复用本次独占 ImageData 并跳过同一数组的拷回，复杂页仍分离输入与输出，完成或失败后释放临时图像与画布。
  * 模块边界：该运行时只在具备 Canvas/DOM 的 Offscreen 环境执行，不直接接收 browser.runtime 事件；消息入口由 app/offscreen 组装，翻译函数由依赖注入，几何算法来自 area feature。
  */
 import {createImageTranslationFailure} from '../failure';
@@ -16,7 +16,7 @@ import {mangaOcrRuntime} from './mangaOcr';
 import {drawMangaTranslations, sampleMangaBackgrounds} from './mangaRendering';
 import {planMangaAlphaProtection} from './mangaAlphaProtection';
 import {groupMangaOcrLines, type MangaRegion} from './mangaRegions';
-import {numericInformation} from './mangaNumeric';
+import {numericProtection} from './mangaNumeric';
 import {mangaInpaintingRuntime} from './mangaInpainting';
 import {encodeImageCanvas} from './imageEncoding';
 import {mangaMaskBoxes, mangaPatchRects, type MangaPatchPacket} from '../mangaPatchResult';
@@ -214,7 +214,7 @@ async function prepareTranslatedImage(
     requestId?: string,
 ): Promise<OffscreenImageTranslationResult> {
     await checkImageCancellation(signal);
-    const numeric = manga ? lines.filter(line => numericInformation(line.text)) : [];
+    const numeric = lines.filter(line => line.guardOnly || numericProtection(line.text));
     const width = source.naturalWidth || source.width, height = source.naturalHeight || source.height;
     const protectedBoxes = numeric.map(({bbox}) => ({x0: Math.max(0, Math.floor(bbox.x0) - 2), y0: Math.max(0, Math.floor(bbox.y0) - 2),
         x1: Math.min(width, Math.ceil(bbox.x1) + 2), y1: Math.min(height, Math.ceil(bbox.y1) + 2)}));
@@ -222,20 +222,25 @@ async function prepareTranslatedImage(
     let comparisons = 0;
     const skipped = new Set<number>();
     const translatedLines = lines.flatMap((line, index) => {
-        if (manga && numericInformation(line.text)) return [];
+        if (line.guardOnly || numericProtection(line.text)) return [];
         const changed = selectChangedTranslations([line], [translations[index]]);
         if (!changed.length) return [];
-        if (manga && protectedBoxes.length) {
-            const region = changed[0] as MangaRegion;
-            const touched = [region.bbox, ...mangaMaskBoxes(region, width, height)];
+        if (protectedBoxes.length) {
+            const region = changed[0];
+            const pad = Math.max(4, Math.ceil((region.fontSize ?? region.bbox.y1 - region.bbox.y0) * .18));
+            const expand = (box: OcrLine['bbox'], margin: number) => ({x0:box.x0-margin,y0:box.y0-margin,x1:box.x1+margin,y1:box.y1+margin});
+            // 单图译文裁切框会在页边夹紧后扩大至多两倍余量；清字对每个源框最多外扩四像素。
+            const touched = manga ? [region.bbox, ...mangaMaskBoxes(region as MangaRegion, width, height)]
+                : [expand(region.bbox,pad*2),...(region.sourceBoxes ?? [region.bbox]).map(box=>expand(box,4))];
             for (const box of touched) for (const protectedBox of protectedBoxes) {
-                if (++comparisons > 1_000_000 || intersects(box, protectedBox)) { skipped.add(index); return []; }
+                if (++comparisons > 1_000_000 || ![box.x0,box.y0,box.x1,box.y1].every(Number.isFinite)
+                    || intersects(box, protectedBox)) { skipped.add(index); return []; }
             }
         }
         return changed;
     });
-    const readingLines = lines.map((line, index) => ({...line, sourceText: line.text, text: translations[index]?.trim() || line.text, backgroundColor: 'transparent',
-        ...(skipped.has(index) ? {renderSkipped: true as const} : {})}));
+    const readingLines = lines.flatMap((line, index) => line.guardOnly ? [] : [{...line, sourceText: line.text, text: translations[index]?.trim() || line.text, backgroundColor: 'transparent',
+        ...(skipped.has(index) ? {renderSkipped: true as const} : {})}]);
     // 品牌名或已经是目标语言的文字仍可阅读/复制，不应把识别成功显示为错误。
     if (translatedLines.length === 0) return manga ? {image: '', mangaPatches: {width: source.naturalWidth || source.width, height: source.naturalHeight || source.height, patches: []}, lines: readingLines} : {image: source.src, lines: readingLines};
     const canvas = document.createElement('canvas');
@@ -334,17 +339,35 @@ export async function translateImageInOffscreen(
             source.naturalHeight || source.height, signal,
             (stage, percent) => {if (!signal?.aborted) reportProgress(requestId, stage, percent);}, source, manga ? 'manga' : 'image') : await recognizeImage(image, sourceLanguage, signal, {
             decodedImage: source,
-            ...(manga ? {includeMangaNumericConfidence: true} : {}),
+            includeMangaNumericConfidence: true,
             onProgress: percent => { if (!signal?.aborted) reportProgress(requestId, 'recognizing', percent); },
         });
         throwIfImageOperationAborted(signal);
-        const lines = manga ? usePaddle ? recognized : groupMangaOcrLines(recognized, sourceLanguage,
-            source.naturalWidth || source.width, source.naturalHeight || source.height) : groupImageParagraphs(recognized);
-        if (lines.length === 0) {
+        const guards:ImageTextRegion[]=[],guardKeys=new Set<string>();
+        const width=source.naturalWidth || source.width,height=source.naturalHeight || source.height;
+        const eligible=recognized.filter(line=>{
+            const numericConfidence='numericConfidence' in line ? line.numericConfidence : undefined;
+            const suspected=line.guardOnly || (!usePaddle && numericProtection(line.text)
+                && !(typeof numericConfidence==='number' && Number.isFinite(numericConfidence) && numericConfidence>=90 && numericConfidence<=100));
+            if(!suspected)return true;
+            const b=line.bbox;
+            if(!b||![b.x0,b.y0,b.x1,b.y1].every(Number.isFinite)||b.x1<=b.x0||b.y1<=b.y0)
+                throw new Error('图片数字保护位置无效，已保留原图');
+            const bbox={x0:Math.max(0,b.x0),y0:Math.max(0,b.y0),x1:Math.min(width,b.x1),y1:Math.min(height,b.y1)};
+            if(bbox.x1<=bbox.x0||bbox.y1<=bbox.y0)return false;
+            const key=[bbox.x0,bbox.y0,bbox.x1,bbox.y1].join(',');if(guardKeys.has(key))return false;
+            if(guards.length>=4096)throw new Error('图片数字保护区域过于复杂，已保留原图');
+            guardKeys.add(key);guards.push({text:'',bbox,guardOnly:true});return false;
+        });
+        const readable = manga ? usePaddle ? eligible : groupMangaOcrLines(eligible, sourceLanguage,
+            source.naturalWidth || source.width, source.naturalHeight || source.height)
+            : groupImageParagraphs(eligible.map(line => numericProtection(line.text) ? {...line,sourceBoxes:[line.bbox]} : line));
+        if (readable.length === 0) {
             if (manga) return {image,lines:[]};
             throw new Error('没有识别到图片文字');
         }
-        const translatable = lines.map((line, index) => ({line, index})).filter(({line}) => !manga || !numericInformation(line.text));
+        const lines:ImageTextRegion[]=[...readable,...guards];
+        const translatable = lines.map((line, index) => ({line, index})).filter(({line}) => !line.guardOnly && !numericProtection(line.text));
         const translations = lines.map(line => line.text);
         if (translatable.length) {
             reportProgress(requestId, 'translating');

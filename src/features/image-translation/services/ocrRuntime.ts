@@ -10,6 +10,7 @@ import {
     getOcrImageSize,
     getOcrLanguages,
     normalizeOcrLineViews,
+    collectRawNumericGuards,
     restoreOcrLineCoordinates,
     type OcrLine,
     type NumericEvidenceOcrLine,
@@ -72,6 +73,16 @@ function abortRecognition(): Error {
 function copyOcrLines(lines: NumericEvidenceOcrLine[], includeEvidence = true): NumericEvidenceOcrLine[] {
     return lines.map(({numericConfidence, ...line}) => ({...line, bbox: {...line.bbox},
         ...(includeEvidence && numericConfidence !== undefined ? {numericConfidence} : {})}));
+}
+
+/** 源坐标回映后相同物理框只计一次，避免缩放和 fallback 的重复消耗保护预算。 */
+function deduplicateOcrGuards(lines:NumericEvidenceOcrLine[]):NumericEvidenceOcrLine[] {
+    const seen=new Set<string>();
+    return lines.filter(line=>{
+        if(!line.guardOnly)return true;
+        const b=line.bbox,key=[b.x0,b.y0,b.x1,b.y1].join(',');
+        if(seen.has(key))return false;seen.add(key);return true;
+    });
 }
 
 function cacheRecognition(key: string, views: RecognitionViews): void {
@@ -174,7 +185,7 @@ export async function recognizeImage(
     sourceLanguage: string,
     signal?: AbortSignal,
     options: OcrRecognitionOptions = {},
-): Promise<OcrLine[]> {
+): Promise<NumericEvidenceOcrLine[]> {
     if (signal?.aborted) throw abortRecognition();
     const packs = getOcrLanguages(sourceLanguage);
     const models = getImageOcrModelLanguages(packs);
@@ -200,7 +211,8 @@ export async function recognizeImage(
             const views = normalizeOcrLineViews(recognition.data.blocks);
             return {
                 ordinary: restoreOcrLineCoordinates(views.ordinary, sourceWidth, sourceHeight, size.width, size.height, size.padding),
-                manga: restoreOcrLineCoordinates(views.manga, sourceWidth, sourceHeight, size.width, size.height, size.padding),
+                // 圈选只读文字不擦图，不需要数字物理保护门禁，避免噪声框阻断合法识别。
+                manga: deduplicateOcrGuards(restoreOcrLineCoordinates([...views.manga,...(profile==='area'?[]:collectRawNumericGuards(recognition.data.blocks,views.manga,{trustedWorkerData:true}))], sourceWidth, sourceHeight, size.width, size.height, size.padding)),
             };
         };
         let views = readLines(result);
@@ -208,7 +220,10 @@ export async function recognizeImage(
             // 圈选与小图片空结果才尝试单块分割，不给大型整页翻倍耗时，不降低噪声阈值。
             const fallback = await ocrWorkerRuntime.recognize(recognitionImage, languages, signal, PSM.SINGLE_BLOCK);
             if (signal?.aborted) throw abortRecognition();
+            const firstGuards=views.manga.filter(line=>line.guardOnly);
             views = readLines(fallback);
+            views.manga=deduplicateOcrGuards([...views.manga,...firstGuards]);
+            if(views.manga.filter(line=>line.guardOnly).length>4096)throw new Error('图片数字保护区域过于复杂，已保留原图');
         }
         // 空结果不是稳定成功；用户重试时应重新识别，避免暂时失败被负缓存永久复用。
         if (views.ordinary.length > 0) cacheRecognition(cacheKey, views);

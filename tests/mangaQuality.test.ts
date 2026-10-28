@@ -96,9 +96,9 @@ describe('漫画整段识别与噪声边界', () => {
         }
     });
     it('数字支路不放开低置信、孤立数字、无效日期时间与金额及空格艺术碎片', () => {
-        const noise=['1','７','3 3','123 456','①②','²³','..',':','$','09::17','24:00','12:60','9:5','99:99',
+        const noise=['1','７','3 3','①②','²³','..',':','$','09::17','24:00','12:60','9:5','99:99',
             '2023-02-29','2024-02-30','2026-13-01','2026-00-01','2026-01-00','0000-01-01','2026-1-32','2026/01-02',
-            '$1,23','$1.234','$1,2345','12 34€','123--'];
+            '$1,2345','12 34€','123--'];
         for(const language of ['en','ja','auto']) {
             expect(groupMangaText(noise.map(text=>item(text)),language,500,500,'bubble')).toEqual([]);
             for(const text of ['42','23:59','2024-02-29','$8','￥１２８０']) {
@@ -209,7 +209,7 @@ describe('漫画数字证据：Tesseract 数字保留与分组',()=>{
         for(const confidence of [undefined,89.999,NaN,Infinity,-1,101]) {
             expect(groupMangaOcrLines([{text:'12:34',bbox,numericConfidence:confidence}],'ko',400,300)).toEqual([]);
         }
-        for(const text of ['1','3 3','①②','24:00','2023-02-29','$1,23']) {
+        for(const text of ['1','3 3','①②','24:00','2023-02-29','$1,2345']) {
             expect(groupMangaOcrLines([{text,bbox,numericConfidence:99}],'ko',400,300)).toEqual([]);
         }
     });
@@ -227,5 +227,23 @@ describe('漫画数字与对白分组',()=>{
         expect(groupMangaText(samples,'en',400,400,'bubble',true).map(row=>row.text)).toEqual(['Hello again','12:34']);
         expect(groupMangaText(samples,'en',400,400,'bubble').map(row=>row.text)).toEqual(['Hello 12:34 again']);
         expect(groupMangaText([item('12:34',20,20,80,20,.89)],'en',400,400,'bubble',true)).toEqual([]);
+    });
+});
+
+
+describe('漫画与图片的完整数值形态',()=>{
+    it.each(['90%','９０％','-3.5%','3.14','3,14','1,000','1,000,000','1 000','123 456','90 %','1,234.50','€1.234,56','1.234,50 €','$1,23','$1.234','3,14%','38,5°C','−20','1/2','38°C','３８℃','−10℉'])('保留高置信数值 %s 的原文和位置',text=>{
+        for(const language of ['en','ja','auto']) {
+            const source=item(text,20,30,90,18,.99),regions=groupMangaText([source],language,500,500,'page',true);
+            expect(regions).toEqual([{text,bbox:{x0:20,y0:30,x1:110,y1:48},fontSize:18,sourceBoxes:[{x0:20,y0:30,x1:110,y1:48}]}]);
+            expect(groupMangaText([{...source,confidence:.89}],language,500,500,'page',true)).toEqual([]);
+        }
+        const bbox={x0:20,y0:30,x1:110,y1:48};
+        expect(groupMangaOcrLines([{text,bbox,numericConfidence:99}],'ko',500,500)).toMatchObject([{text,bbox}]);
+        expect(groupMangaOcrLines([{text,bbox,numericConfidence:89}],'ko',500,500)).toEqual([]);
+    });
+    it.each(['①②','²³','1/0','3 / 4','90%%','20C','38°','3.','--20','3..14','3 3','4/0','1,,000','1,00,0','€1,234,56','1.234.50 €'])('不把无效或装饰形态 %s 当作完整数字',text=>{
+        expect(groupMangaText([item(text)],'ja',500,500,'page',true)).toEqual([]);
+        expect(groupMangaOcrLines([{text,bbox:{x0:20,y0:20,x1:100,y1:40},numericConfidence:99}],'ko',500,500)).toEqual([]);
     });
 });

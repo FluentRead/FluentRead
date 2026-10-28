@@ -27,6 +27,7 @@ import {mountImageTranslator, unmountImageTranslator, toggleContextMenuImage, to
 import type {MangaTranslationStatus} from '@/src/features/image-translation/content/mangaSession';
 import {registerAllUiLanguageBundles} from './helpers/uiLanguageBundles';
 import * as controlsModule from '@/src/features/image-translation/content/controls';
+import {registerMangaReadingOpener} from '@/src/features/image-translation/content/runtime';
 
 // 本文件断言非中文界面文案；扩展运行时按需加载，测试中一次注册全部语言资源包。
 registerAllUiLanguageBundles();
@@ -349,6 +350,16 @@ describe('图片翻译前台交互与生命周期', () => {
         expect(firstReader.textContent).toContain('完整译文');
     });
 
+    it('阅读入口替换后旧卸载不能撤销新入口，当前入口撤销后不再响应提示',()=>{
+        const create=controlsModule.createImageControls;
+        const port=vi.spyOn(controlsModule,'createImageControls').mockImplementation(actions=>create(actions));
+        const env=setup();env.hover();const warning=port.mock.calls[0][0].onWarning!;
+        const event={isTrusted:true} as MouseEvent,old=vi.fn(()=>true),current=vi.fn(()=>true);
+        warning(event);expect(old).not.toHaveBeenCalled();
+        const stopOld=registerMangaReadingOpener(old);warning(event);expect(old).toHaveBeenCalledWith(event);
+        const stopCurrent=registerMangaReadingOpener(current);stopOld();warning(event);expect(current).toHaveBeenCalledOnce();
+        stopCurrent();warning(event);expect(current).toHaveBeenCalledOnce();
+    });
     it('迟到控件回调在卸载后不能重建状态、启动识别或读取器', async () => {
         const create = controlsModule.createImageControls;
         const port = vi.spyOn(controlsModule, 'createImageControls').mockImplementation(actions => create(actions));

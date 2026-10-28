@@ -56,7 +56,7 @@ Small or decorative text, names, tilted lettering, and background repairs can be
 - **Translation fails:** retry as prompted or change the image translation service. After an extension update or reload, refresh the webpage first.
 - **A local model fails:** use **Adjust local model** to check resources and supported languages, or **Change image translation service**. Return to the image and retry after making changes. Text is not automatically sent to an online service instead.
 
-Numbers, URLs, version numbers, and similar identifiers remain unchanged. You can still read and copy recognized text when nothing needs translating. Animated images produce a static translation; switch back to see the animation. Repairs may leave visible marks, and the original can always be restored.
+Numbers, times, dates, amounts and percentages recognized as separate lines remain in the original image and are not sent for translation. If nearby translated text would cover one, that text is available in the text panel instead. Numbers within a text line may not be protected separately; check the original. URLs, version numbers, and similar identifiers may also remain unchanged. You can still read and copy recognized text when nothing needs translating. Animated images produce a static translation; switch back to see the animation. Repairs may leave visible marks, and the original can always be restored.
 
 <details class="guide-details">
 <summary>Source language and language packs</summary>

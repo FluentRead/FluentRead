@@ -320,16 +320,56 @@ describe('冲突识别不得删掉数字保护证据',()=>{
     const number={text:'12:34',confidence:.99,box:{x:80,y:80,width:100,height:20}};
     const text={text:'HELLO',confidence:.99,box:{x:80,y:80,width:100,height:20}};
     const box={x0:40,y0:40,x1:250,y1:180};
-    it('局部正文与整页数字重叠时仅漫画保留两种证据',()=>{
+    it('局部正文与整页数字重叠时漫画与图片均保留两种证据',()=>{
         const page={results:[number],bubbles:[{bbox:box,results:[text]}]};
         expect(collectMangaRegions(page,'en',400,400,'manga').map(row=>row.text)).toEqual(expect.arrayContaining(['12:34','HELLO']));
-        expect(collectMangaRegions(page,'en',400,400,'image').map(row=>row.text)).toEqual(['HELLO']);
+        expect(collectMangaRegions(page,'en',400,400,'image').map(row=>row.text)).toEqual(expect.arrayContaining(['12:34','HELLO']));
     });
     it.each([false,true])('跨气泡局部正文与数字冲突时按任意顺序保留：%s',numericFirst=>{
         const other={x0:30,y0:30,x1:260,y1:200};
         const choices=numericFirst?[number,text]:[text,number];
         const page={results:[],bubbles:[{bbox:box,results:[choices[0]]},{bbox:other,results:[choices[1]]}]};
         expect(collectMangaRegions(page,'en',400,400,'manga').map(row=>row.text)).toEqual(expect.arrayContaining(['12:34','HELLO']));
+    });
+});
+
+describe('重复的数值物理保护',()=>{
+    it.each(['manga','image'] as const)('%s 完整覆盖时不添加重复框，部分覆盖和不同位置仍保留',profile=>{
+        const number={text:'90%',confidence:.99,box:{x:80,y:80,width:100,height:20}};
+        const identical={...number,confidence:.8};
+        const partial={...identical,box:{x:75,y:80,width:110,height:20}};
+        const far={...identical,box:{x:240,y:80,width:100,height:20}};
+        const group=(numericEvidence:typeof number[])=>collectMangaRegions({results:[number],numericEvidence},'en',400,400,profile);
+        expect(group([identical]).filter(region=>region.guardOnly)).toEqual([]);
+        expect(group([partial]).filter(region=>region.guardOnly).map(region=>region.bbox)).toEqual([{x0:75,y0:80,x1:185,y1:100}]);
+        expect(group([far]).filter(region=>region.guardOnly).map(region=>region.bbox)).toEqual([{x0:240,y0:80,x1:340,y1:100}]);
+    });
+});
+
+describe('疑似数字物理框边界',()=>{
+    const number={text:'90%',confidence:.8,box:{x:10,y:10,width:20,height:10}};
+    it.each([{x:NaN},{width:0},{height:-1}])('非法疑似数值框明确报错 %j',change=>{
+        expect(()=>collectMangaRegions({results:[{...number,box:{...number.box,...change}}]},'en',100,100,'image'))
+            .toThrow('保护位置无效');
+    });
+    it('图外框无像素需保护，相同物理框只保留一次',()=>{
+        const outside={...number,box:{x:200,y:200,width:10,height:10}};
+        const regions=collectMangaRegions({results:[outside,number,number]},'en',100,100,'image');
+        expect(regions.filter(region=>region.guardOnly).map(region=>region.bbox)).toEqual([{x0:10,y0:10,x1:30,y1:20}]);
+    });
+    it('非相同但完整覆盖的可信数字框可以保护原物理框',()=>{
+        const readable={...number,confidence:.99,box:{x:9,y:9,width:22,height:12}};
+        expect(collectMangaRegions({results:[readable],numericEvidence:[number]},'en',100,100,'manga').filter(region=>region.guardOnly)).toEqual([]);
+    });
+    it('过多不同疑似框时明确报错而不输出部分结果',()=>{
+        const many=Array.from({length:4097},(_,i)=>({...number,box:{x:i,y:10,width:.5,height:1}}));
+        expect(()=>collectMangaRegions({results:[],numericEvidence:many},'en',5000,100,'image')).toThrow('保护区域过于复杂');
+    });
+    it('候选框过多而不能完整证明包含关系时继续保留未证明框',()=>{
+        const readable=Array.from({length:1001},(_,i)=>({...number,confidence:.99,box:{x:i*2,y:10,width:1,height:1}}));
+        const uncertain=Array.from({length:1001},(_,i)=>({...number,box:{x:i*2,y:40,width:1,height:1}}));
+        const result=collectMangaRegions({results:readable,numericEvidence:uncertain},'en',5000,100,'image');
+        expect(result.filter(region=>region.guardOnly)).toHaveLength(1001);
     });
 });
 

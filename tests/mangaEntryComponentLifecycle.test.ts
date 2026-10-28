@@ -34,7 +34,7 @@ async function mountEntry(toolsDisplay?: 'hover' | 'always') {
     page:{site:'fixture', route:'/chapter/1'},
     settings:{sourceLanguage:undefined as string | undefined, promptEnabled:true, floatingBallVisible:false, downloadConfirmed:false, animations:true, ...(toolsDisplay === undefined ? {} : {toolsDisplay})},
     toggle:vi.fn(), inspectResources:vi.fn(async () => false), persist:vi.fn(async (_patch: Record<string, unknown>) => undefined), openSettings:vi.fn(),
-    startAreaTranslation:vi.fn(async () => true), readManga:undefined as ((event:MouseEvent)=>void) | undefined, readingOpen:false,readingChanged:vi.fn(),
+    startAreaTranslation:vi.fn(async () => true), readManga:undefined as ((event:MouseEvent)=>void) | undefined, readingOpen:false,readingState:undefined as {open:boolean} | undefined,readingChanged:vi.fn(),
     reading:undefined as {list:()=>MangaReadingList;read:(token:object,signal:AbortSignal)=>Promise<MangaReadingResult>;observe:(token:object,invalid:()=>void)=>(()=>void)|undefined;copy:(text:string)=>Promise<void>;theme:'light'|'dark'|'auto'}|undefined,
   });
   const remove = (value: HostNode) => {if (value.parent) {const at = value.parent.children.indexOf(value); if (at >= 0) value.parent.children.splice(at,1); value.parent = null;}};
@@ -119,6 +119,25 @@ describe('actual manga entry resource consent and lifecycle', () => {
     panel.reveal();vi.advanceTimersByTime(3000);expect(panel.expanded).toBe(true);expect(vi.getTimerCount()).toBe(0);
     panel.readingLauncher.matches=()=>false;panel.retract({relatedTarget:panel.readingLauncher});expect(panel.expanded).toBe(true);
     props.readingOpen=true;panel.retract();await tick();expect(panel.readingLauncher.props.class).toContain('is-expanded');
+  });
+  it('enables the reading control after a touch pointer, while mouse leaves it unchanged',async()=>{
+    vi.stubGlobal('navigator',{maxTouchPoints:0});vi.stubGlobal('window',{matchMedia:()=>({matches:false})});
+    const {props,tick,find,exposed}=await mountEntry('hover');props.readManga=vi.fn();props.status.active=true;await tick();
+    const launcher=find(value=>value.props.class?.split(/\s+/).includes('fr-manga-launcher'))!;
+    const reader=find(value=>value.props.class?.includes('fr-manga-reading-launcher'))!;
+    launcher.props.onPointerdown({pointerType:'mouse'});await tick();expect(reader.props.class).not.toContain('is-touch');
+    launcher.props.onPointerdown({pointerType:'touch'});await tick();expect(reader.props.class).toContain('is-touch');
+    reader.props.onKeydown({key:'Escape',stopPropagation:vi.fn()});await tick();expect(reader.props.class).toContain('is-touch');
+    props.readingState={open:true};await tick();expect(reader.props['aria-expanded']).toBe(true);expect(reader.props['aria-label']).toBe('关闭漫画文字');
+    props.readingState.open=false;await tick();expect(reader.props['aria-label']).toBe('查看漫画文字');
+    expect(await exposed.openReading({isTrusted:true} as Event)).toBe(false);
+    props.status.areaFallback=true;await tick();expect(await exposed.openReading({isTrusted:true} as Event)).toBe(false);
+    props.status.areaFallback=false;props.status.available=false;await tick();expect(await exposed.openReading({isTrusted:true} as Event)).toBe(false);
+  });
+  it('detects a coarse pointer even when touch point count is zero',async()=>{
+    vi.stubGlobal('navigator',{maxTouchPoints:0});vi.stubGlobal('window',{matchMedia:()=>({matches:true})});
+    const {props,tick,find}=await mountEntry('hover');props.readManga=vi.fn();props.status.active=true;await tick();
+    expect(find(value=>value.props.class?.includes('fr-manga-reading-launcher'))!.props.class).toContain('is-touch');
   });
   it('keeps the secondary action reachable on touch after hover mode times out without pausing the session',async()=>{
     vi.stubGlobal('navigator',{maxTouchPoints:1});const {panel,props,tick,find}=await mountEntry('hover');vi.useFakeTimers({toFake:['setTimeout','clearTimeout']});

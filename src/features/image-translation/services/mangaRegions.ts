@@ -1,7 +1,7 @@
 /**
  * @file src/features/image-translation/services/mangaRegions.ts
  * 文件职责：把漫画专用 OCR 和通用 OCR 行转换成可整段翻译与修补的气泡或旁白区域。
- * 主要内容：校验并夹紧坐标，过滤纯符号和源语言不符的短片段；神经 OCR 保留置信度策略，语言无关地保留高置信多位数字、合法时间日期与货币金额，只为判定执行 NFKC 而保留原文；仅独立气泡容许高置信度大单字，通用 OCR 从行框补足字号与原始修补框；按方向、字号、重叠与间距合并相邻行，东亚相邻文字不插入空格，保留硬连字符且只移除行末软连字符；仅已定位的独立气泡容许略宽横排行距与有界宽竖列距，保持不同气泡分离。
+ * 主要内容：校验并夹紧坐标，过滤纯符号和源语言不符的短片段；神经 OCR 保留置信度策略，语言无关地保留高置信多位数字、合法时间日期、货币金额、百分数、小数、分数和温度，只为判定执行 NFKC 而保留原文；仅独立气泡容许高置信度大单字，通用 OCR 从行框补足字号与原始修补框；按方向、字号、重叠与间距合并相邻行，东亚相邻文字不插入空格，保留硬连字符且只移除行末软连字符；仅已定位的独立气泡容许略宽横排行距与有界宽竖列距，保持不同气泡分离。
  * 模块边界：纯数据算法，不运行模型、不读取 DOM 或配置，也不修补图片；只输出可核对的识别原文和区域，不推测缺失文字。
  */
 import type {OcrLine} from '@/src/shared/image/types';
@@ -13,7 +13,7 @@ export interface MangaOcrItem {
     confidence: number;
     box: {x: number; y: number; width: number; height: number};
 }
-export interface MangaRegion extends OcrLine {fontSize: number; sourceBoxes?: OcrLine['bbox'][]}
+export interface MangaRegion extends OcrLine {fontSize: number; sourceBoxes?: OcrLine['bbox'][]; guardOnly?: true}
 
 function union(left: OcrLine['bbox'], right: OcrLine['bbox']): OcrLine['bbox'] {
     return {x0: Math.min(left.x0, right.x0), y0: Math.min(left.y0, right.y0),
@@ -46,8 +46,10 @@ export function groupMangaText(items: MangaOcrItem[], sourceLanguage: string, wi
     const lines: MangaRegion[] = items.flatMap(item => {
         const text = item.text.replace(/\s+/gu, ' ').trim();
         const box = item.box;
-        if (!Number.isFinite(item.confidence) || item.confidence < 0.65 || !text) return [];
-        const numeric=item.confidence>=0.9&&numericInformation(text);
+        if (!Number.isFinite(item.confidence) || item.confidence < 0.65 || item.confidence > 1 || !text) return [];
+        const numericSyntax=numericInformation(text);
+        const numeric=item.confidence>=0.9&&numericSyntax;
+        if (numericSyntax && !numeric) return [];
         if ((!numeric && (!/\p{L}/u.test(text)
             || (english && (!/[a-z]/iu.test(text) || /[\u3040-\u30ff\u3400-\u9fff\uac00-\ud7af]/u.test(text)))
             || (japanese && !/[\u3040-\u30ff\u3400-\u9fff]/u.test(text) && text.replace(/[^a-z]/giu,'').length < 4)))
@@ -81,6 +83,7 @@ export function groupMangaOcrLines(lines: NumericEvidenceOcrLine[], sourceLangua
         const {x0, y0, x1, y1} = line.bbox;
         const numeric = typeof line.numericConfidence === 'number' && Number.isFinite(line.numericConfidence)
             && line.numericConfidence >= 90 && line.numericConfidence <= 100 && numericInformation(text);
+        if (numericInformation(text) && !numeric) return [];
         if (!text || (!numeric && !/\p{L}/u.test(text)) || ![x0, y0, x1, y1].every(Number.isFinite)) return [];
         // 与日文专用模型一致，排除绘画上误识别的短拉丁碎片；合法源语言字和完整英文词仍保留。
         const native = language === 'ru' ? /\p{Script=Cyrillic}/u.test(text)

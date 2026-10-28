@@ -118,6 +118,14 @@ describe('FloatingBall actual SFC lifecycle', () => {
     port.props.mangaReadingOpen=true;await flush();port.ball().dispatchEvent(port.event('mouseleave'));vi.advanceTimersByTime(3000);await flush();expect(port.ball().classList.contains('floating-ball-expanded')).toBe(true);expect(button.getAttribute('aria-expanded')).toBe('true');expect(button.getAttribute('aria-label')).toBe('关闭漫画文字');
     port.props.manga.areaFallback=true;await flush();expect(port.document.querySelector('.floating-ball-reading')).toBeNull();
   });
+  it('keeps the hover tool expanded while shared reading state is open and collapses after it closes',async()=>{
+    const port=mountBall({manga:{available:true,active:true,pending:false,errors:0},onMangaReading:vi.fn(),mangaReadingState:{open:true},presentation:{toolsDisplay:'hover',hoverDelay:0}});await flush();
+    port.ball().dispatchEvent(port.event('mouseenter'));await flush();port.ball().dispatchEvent(port.event('mouseleave'));vi.advanceTimersByTime(3000);await flush();
+    const button=port.document.querySelector<HTMLElement>('.floating-ball-reading')!;
+    expect(port.ball().classList.contains('floating-ball-expanded')).toBe(true);expect(button.getAttribute('aria-expanded')).toBe('true');
+    port.props.mangaReadingState.open=false;await flush();port.ball().dispatchEvent(port.event('mouseleave'));vi.advanceTimersByTime(3000);await flush();
+    expect(port.ball().classList.contains('floating-ball-expanded')).toBe(false);expect(button.getAttribute('aria-expanded')).toBe('false');
+  });
   it.each([
     {name: 'navigator missing', navigatorPort: null, expected: false},
     {name: 'maxTouchPoints missing', navigatorPort: {}, expected: false},

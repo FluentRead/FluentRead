@@ -35,6 +35,19 @@ describe('runtime HTTP transport', () => {
         expect(await result.json()).toEqual({ok: true});
     });
 
+    it('passes an explicit local error-body policy only to the installed transport', async () => {
+        const transport = vi.fn(async () => new Response('ok'));
+        setRuntimeFetch(transport);
+        const policy = {errorBodyLimit: {maxBytes: 32, replacement: 'bounded'}};
+        await runtimeFetch('https://example.com/translate', {method: 'POST'}, policy);
+        expect(transport).toHaveBeenCalledWith('https://example.com/translate', {method: 'POST'}, policy);
+        const native = vi.fn(async () => new Response('native'));
+        vi.spyOn(globalThis, 'fetch').mockImplementation(native);
+        setRuntimeFetch();
+        await runtimeFetch('https://example.com/translate', {method: 'POST'}, policy);
+        expect(native).toHaveBeenCalledWith('https://example.com/translate', {method: 'POST'});
+    });
+
     it('reset 后恢复调用运行环境的原生 fetch', async () => {
         const originalFetch = globalThis.fetch;
         const nativeFetch = vi.fn(async () => new Response('native'));

@@ -118,7 +118,7 @@ export function createUserscriptSettingsDataPlugin(root: string, enabled: boolea
                     } else data = literal(initializer, !target.appearance);
                     if (target.appearance && (!Array.isArray(data) || !data.length)) throw unsupported();
                     const json = JSON.stringify(data);
-                    const compressed = gzipUserscriptBuildData(Buffer.from(json));
+                    const compressed = gzipUserscriptBuildData(Buffer.from(json), undefined, fullOptions);
                     if (target.appearance && JSON.stringify(JSON.parse(gunzipSync(compressed).toString('utf8'))) !== json) throw unsupported();
                     // 和原字面量一样，未被消费的表不应触发还原；整个闭包只还原固定数据，无外部写入。
                     const encoded = fullOptions ? encodeUserscriptDataCompact(compressed) : encodeUserscriptData(compressed);

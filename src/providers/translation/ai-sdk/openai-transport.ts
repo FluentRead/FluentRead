@@ -19,7 +19,7 @@ import {
 import {LlmTransportError} from './transport-errors';
 import {createImageInputHttpError} from '@/src/platform/http/errors';
 import {cancelUnreadResponseBody, runtimeFetch} from '@/src/platform/http/runtime';
-import {boundErrorResponse} from './boundedErrorResponse';
+import {boundErrorResponse, OPENAI_ERROR_BODY_LIMIT} from './boundedErrorResponse';
 import type {TranslationRequestLease} from '@/src/services/translation/requestScheduler';
 import {
     requireTranslationProviderConfig,
@@ -212,7 +212,9 @@ function compatibilityFetch(
         else callerSignal?.addEventListener('abort', onAbort, {once: true});
         let drained: Promise<void> | undefined;
         const settlement = (async () => {
-          const upstream = await runtimeFetch(endpoint.exactEndpoint || input, {...init, signal: transport.signal});
+          const upstream = await runtimeFetch(endpoint.exactEndpoint || input, {...init, signal: transport.signal}, {
+            errorBodyLimit: OPENAI_ERROR_BODY_LIMIT,
+          });
           schedulerContext?.scheduler.observeResponse(identity, upstream);
           let response = upstream;
           if (!response.ok) {

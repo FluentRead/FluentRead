@@ -667,7 +667,27 @@
         "/auth/*"
       ]
     },
-    "profile": "documentation"
+    "profile": "documentation",
+    "exclude": [
+      "main [data-code-block-header] > span.code-block-header-language"
+    ]
+  },
+  {
+    "id": "microsoft-learn-translator-v3-parameters",
+    "name": "Microsoft Learn Translator v3 参数",
+    "match": {
+      "hosts": ["learn.microsoft.com"],
+      "paths": [
+        "/en-us/azure/ai-services/translator/text-translation/reference/v3/translate",
+        "/en-us/azure/ai-services/translator/text-translation/reference/v3/translate/"
+      ]
+    },
+    "literalTokens": [
+      "main table[aria-label=\"Required parameters\"] tbody tr > td:first-child",
+      "main table[aria-label=\"Optional parameters\"] tbody tr > td:first-child",
+      "main table[aria-label=\"Response headers\"] tbody tr > td:first-child",
+      "main table[aria-label=\"Handle profanity\"] tbody tr > td:nth-child(-n+2)"
+    ]
   },
   {
     "id": "apple-docs",
@@ -5524,7 +5544,8 @@
       "article.article-main > header .publisher-author-card > .base-main-card__info > .base-main-card__metadata",
       "article.article-main .inline-articles .inline-article-meta",
       "main .right-rail .aside-article-card .base-aside-card__metadata",
-      "main .article-social-activity a.social-action-bar__button"
+      "main .article-social-activity a.social-action-bar__button",
+      "main .comments section.comment .comment__actions a.comment__reply[data-feed-action=\"replyToComment\"]:not(.comment__text *)"
     ],
     "watchIgnore": [
       "article.article-main > header .publisher-author-card > .base-main-card__info > .base-main-card__title",
@@ -6172,6 +6193,7 @@
     "exclude": [
       "[data-testid=\"profileHeaderDisplayName\"]",
       "[data-testid^=\"feedItem-by-\"] a[aria-label][dir=\"auto\"][href^=\"/profile/\"]:not([href*=\"/post/\"]):not([data-testid=\"postText\"] a):not(div[role=\"link\"][aria-label] a)",
+      "[data-testid^=\"feedItem-by-\"] > div > div:nth-child(2) > div:nth-child(2) > a[role=\"link\"][aria-label][aria-pressed][data-no-underline][href^=\"/profile/\"]:not([href*=\"/post/\"]):has(> svg):has(> div > div > div[dir=\"auto\"]):not([data-testid=\"postText\"] a):not(div[role=\"link\"][aria-label] a)",
       "[data-testid^=\"feedItem-by-\"] a[data-tooltip][href*=\"/post/\"]",
       "[data-testid^=\"feedItem-by-\"] div:has(> div > [data-testid=\"replyBtn\"]):has([data-testid=\"likeCount\"])",
       "div:has(> [data-testid=\"profileHeaderDisplayName\"]) + div > div[dir=\"auto\"]:not([data-testid=\"profileHeaderDescription\"]):only-child",

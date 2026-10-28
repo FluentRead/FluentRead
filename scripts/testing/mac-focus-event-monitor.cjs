@@ -9,8 +9,7 @@ const fs = require('node:fs/promises');
 const os = require('node:os');
 const path = require('node:path');
 const cp = require('node:child_process');
-const {promisify} = require('node:util');
-const {StringDecoder} = require('node:string_decoder');
+const {promisify, TextDecoder} = require('node:util');
 const execFile = promisify(cp.execFile);
 const SOURCE = path.join(__dirname, 'mac-focus-event-observer.swift');
 
@@ -18,8 +17,10 @@ function failure(code, message) {const error = new Error(message); error.code = 
 function createFocusEventMonitor({onEvent = () => {}, onError = () => {}, readinessTimeoutMs = 30000} = {}, ports) {
   if (typeof onEvent !== 'function' || typeof onError !== 'function' || !Number.isFinite(readinessTimeoutMs) || readinessTimeoutMs <= 0) throw new TypeError('Invalid focus event monitor options');
   const events = [];
-  const decoder = new StringDecoder('utf8');
-  let child, stopped = false, stopPromise, exitObserved = false, settled = false, lastMonotonic = -1, buffered = '', permanentError;
+  const decoder = new TextDecoder('utf-8', {fatal: true});
+  let decoderBroken = false;
+  let child, stopped = false, stopPromise, exitObserved = false, processExited = false, settled = false, lastMonotonic = -1, buffered = '', permanentError;
+  const sentSignals = new Set();
   let resolveReady, rejectReady, resolveClosed;
   const closed = new Promise(resolve => {resolveClosed = resolve;});
   const ready = new Promise((resolve, reject) => {resolveReady = resolve; rejectReady = reject;});
@@ -49,7 +50,9 @@ function createFocusEventMonitor({onEvent = () => {}, onError = () => {}, readin
     }
   }
   function data(chunk) {
-    buffered += decoder.write(chunk);
+    if (decoderBroken) return;
+    try {buffered += decoder.decode(chunk, {stream: true});}
+    catch {decoderBroken = true; fail(failure('FOCUS_OBSERVER_PROTOCOL', 'Observer output contains invalid UTF-8')); return;}
     if (buffered.length > 65536) {fail(failure('FOCUS_OBSERVER_PROTOCOL', 'Observer line buffer exceeded its bound')); return;}
     let end;
     while ((end = buffered.indexOf('\n')) !== -1) {const line = buffered.slice(0, end); buffered = buffered.slice(end + 1); if (line.trim()) record(line);}
@@ -62,11 +65,27 @@ function createFocusEventMonitor({onEvent = () => {}, onError = () => {}, readin
     child.on('error', error => {fail(error);});
     child.stdout.on('data', data);
     child.stderr.on('data', chunk => {if (String(chunk).trim()) fail(failure('FOCUS_OBSERVER_STDERR', String(chunk).slice(0, 2048)));});
-    child.stdin.on('error', error => {if (!stopped) fail(error);});
+    child.stdin.on('error', error => {fail(error);});
+    child.on('exit', (code, signal) => {
+      processExited = true;
+      if (!stopped) fail(failure('FOCUS_OBSERVER_EXIT', `Observer exited before stop (${code ?? signal})`));
+    });
     child.on('close', (code, signal) => {
-      exitObserved = true; resolveClosed({code, signal});
+      exitObserved = true;
+      // close 在 stdout 完成后触发，检查最后残缺的 UTF-8 或 JSON 行。
+      if (!decoderBroken) {
+        try {buffered += decoder.decode();}
+        catch {decoderBroken = true; fail(failure('FOCUS_OBSERVER_PROTOCOL', 'Observer ended with incomplete UTF-8'));}
+      }
+      if (buffered.length) fail(failure('FOCUS_OBSERVER_PROTOCOL', 'Observer ended with an incomplete record'));
       if (!stopped) fail(failure('FOCUS_OBSERVER_EXIT', `Observer exited before stop (${code ?? signal})`));
       else if (!settled) fail(failure('FOCUS_OBSERVER_STOPPED', 'Observer stopped before ready'));
+      else if (code !== 0 || signal !== null) {
+        if (signal && sentSignals.has(signal)) fail(failure('FOCUS_OBSERVER_FORCED_STOP', `Owned observer required ${signal}; observation may be incomplete`));
+        else fail(failure('FOCUS_OBSERVER_EXIT', `Observer exited unexpectedly while stopping (${code ?? signal})`));
+      }
+      else if (sentSignals.size) fail(failure('FOCUS_OBSERVER_FORCED_STOP', 'Owned observer required a termination signal; observation may be incomplete'));
+      resolveClosed({code, signal});
     });
     if (!Number.isSafeInteger(child.pid) || child.pid <= 0) throw failure('FOCUS_OBSERVER_SPAWN', 'No owned observer process');
   }).catch(error => {fail(error);});
@@ -76,18 +95,36 @@ function createFocusEventMonitor({onEvent = () => {}, onError = () => {}, readin
     try {return await Promise.race([closed.then(() => true), new Promise(resolve => {timer = setTimeout(() => resolve(false), milliseconds);})]);}
     finally {clearTimeout(timer);}
   }
+  function sendOwnedSignal(signal) {
+    // 子进程已退出但 stdio 尚未关闭时，绝不向可能已复用的 PID 发信号。
+    if (processExited || child.exitCode != null || child.signalCode != null) return;
+    sentSignals.add(signal);
+    try {if (!child.kill(signal)) sentSignals.delete(signal);}
+    catch (error) {sentSignals.delete(signal); fail(error);}
+  }
   function stop() {
     if (stopPromise) return stopPromise;
     stopped = true; clearTimeout(readinessTimer);
-    if (!settled) fail(failure('FOCUS_OBSERVER_STOPPED', 'Observer stopped before ready'));
-    stopPromise = (async () => {
+    // 在触发 onError 前先公布同一个 Promise，避免回调重入重复清理。
+    stopPromise = Promise.resolve().then(async () => {
+      if (!settled) fail(failure('FOCUS_OBSERVER_STOPPED', 'Observer stopped before ready'));
       await setup;
       if (child && !exitObserved) {
-        try {child.stdin.end('stop\n');} catch {}
-        if (!await waitClosed(1000)) {child.kill('SIGTERM'); if (!await waitClosed(1000)) {child.kill('SIGKILL'); if (!await waitClosed(1500)) throw failure('FOCUS_OBSERVER_CLOSE_TIMEOUT', 'Owned observer did not close; retain its temporary executable');}}
+        try {child.stdin.end('stop\n');} catch (error) {fail(error);}
+        if (!await waitClosed(1000)) {
+          sendOwnedSignal('SIGTERM');
+          if (!await waitClosed(1000)) {
+            sendOwnedSignal('SIGKILL');
+            if (!await waitClosed(1500)) {
+              fail(failure('FOCUS_OBSERVER_CLOSE_TIMEOUT', 'Owned observer did not close; retain its temporary executable'));
+              throw permanentError;
+            }
+          }
+        }
       }
-      await ports.cleanup();
-    })();
+      try {await ports.cleanup();} catch (error) {fail(error);}
+      if (permanentError) throw permanentError;
+    });
     return stopPromise;
   }
   return {ready, stop, events, get error() {return permanentError;}, get monitorPid() {return child?.pid ?? null;}};

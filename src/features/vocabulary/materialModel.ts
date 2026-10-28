@@ -86,8 +86,17 @@ export function normalizeMaterialLocator(input: MaterialLocator | undefined, sou
 }
 /** 原句只用于定位；回答与长期记忆由权威仓库管理，材料仅对个人笔记保留 note 正文。 */
 export function normalizeMaterialReference(input: MaterialReference, now: number): MaterialReference {
-    if (!input || !['vocabulary', 'session', 'memory', 'note'].includes(input.kind) || !materialText(input.id, 256)) throw new MaterialError('invalid-input', '学习引用无效');
-    return {kind: input.kind, id: materialText(input.id, 256), ...(materialText(input.excerpt, 6000) ? {excerpt: materialText(input.excerpt, 6000)} : {}), ...(input.kind === 'note' && materialText(input.note, 12000) ? {note: materialText(input.note, 12000)} : {}), ...(input.kind === 'note' && Number.isFinite(input.updatedAt) && input.updatedAt! >= 0 ? {updatedAt: Math.min(input.updatedAt!, now)} : {}), createdAt: Number.isFinite(input.createdAt) && input.createdAt! >= 0 ? Math.min(input.createdAt!, now) : now};
+    if (!input) throw new MaterialError('invalid-input', '学习引用无效');
+    const kind = input.kind;
+    if (!['vocabulary', 'session', 'memory', 'note'].includes(kind)) throw new MaterialError('invalid-input', '学习引用无效');
+    const id = materialText(input.id, 256);
+    if (!id) throw new MaterialError('invalid-input', '学习引用无效');
+    const excerpt = materialText(input.excerpt, 6000);
+    // 非笔记引用不读取、也不保存其他存储域的私有正文。
+    const note = kind === 'note' ? materialText(input.note, 12000) : '';
+    const updatedAt = kind === 'note' ? input.updatedAt : undefined;
+    const createdAt = input.createdAt;
+    return {kind, id, ...(excerpt ? {excerpt} : {}), ...(note ? {note} : {}), ...(Number.isFinite(updatedAt) && updatedAt! >= 0 ? {updatedAt: Math.min(updatedAt!, now)} : {}), createdAt: Number.isFinite(createdAt) && createdAt! >= 0 ? Math.min(createdAt!, now) : now};
 }
 export function normalizeMaterialTopics(input: unknown): string[] {
     if (!Array.isArray(input) || input.length > 30 || input.some(value => typeof value !== 'string' || value.length > 80)) throw new MaterialError('invalid-input', '主题最多 30 个，每个最多 80 字');

@@ -1750,6 +1750,46 @@ describe('state 公共入口的降级与资源恢复边界', () => {
         }
     });
 
+    it.each(['loading', 'aborted', 'translated'] as const)('布局观察器清理断开的 %s owner 时只标记有效 loading', async phase => {
+        const {document, window} = parseHTML('<html><body><article><p>Original text</p></article></body></html>');
+        const owner = document.querySelector<HTMLElement>('p')!;
+        const attempt = beginTranslation(owner, 'bilingual')!;
+        expect(ensureTranslationTruncationLayout(owner)).toBe(true);
+        if (phase === 'aborted') attempt.state.controller.abort();
+        if (phase === 'translated') expect(markTranslationComplete(owner, attempt.state, attempt.generation, false)).toBe(true);
+        owner.remove();
+        window.dispatchEvent(new window.Event('resize'));
+        await Promise.resolve(); await Promise.resolve();
+        expect(getTranslationState(owner)).toBeUndefined();
+        expect(attempt.state.controller.signal.aborted).toBe(true);
+        expect(attempt.state.layoutDetachedDiscard).toBe(phase === 'loading' ? true : undefined);
+    });
+
+    it('共享布局清理断开的 loading owner 时记录脱离原因，主动恢复不记录', async () => {
+        const {hasTranslationLayoutOverride} = await import('@/src/features/full-page-translation/content/state');
+        const {document} = parseHTML('<html><body><article style="height:24px"><p id="detached">Source</p><p id="restored">Other source</p><p id="aborted">Cancelled source</p></article></body></html>');
+        const detached = document.querySelector<HTMLElement>('#detached')!;
+        const restored = document.querySelector<HTMLElement>('#restored')!;
+        const aborted = document.querySelector<HTMLElement>('#aborted')!;
+        const ancestor = document.querySelector<HTMLElement>('article')!;
+        const detachedAttempt = beginTranslation(detached, 'bilingual')!;
+        const restoredAttempt = beginTranslation(restored, 'bilingual')!;
+        const abortedAttempt = beginTranslation(aborted, 'bilingual')!;
+        expect(acquireTranslationLayoutOverride(detached, ancestor, [{property: 'height', value: 'auto', priority: 'important'}])).toBe(true);
+        detached.remove();
+        expect(hasTranslationLayoutOverride(ancestor)).toBe(false);
+        expect(detachedAttempt.state.layoutDetachedDiscard).toBe(true);
+        expect(detachedAttempt.state.controller.signal.aborted).toBe(true);
+        restored.remove();
+        expect(restoreTranslation(restored)).toBe(true);
+        expect(restoredAttempt.state.layoutDetachedDiscard).toBeUndefined();
+        expect(acquireTranslationLayoutOverride(aborted, ancestor, [{property: 'height', value: 'auto', priority: 'important'}])).toBe(true);
+        abortedAttempt.state.controller.abort();
+        aborted.remove();
+        expect(hasTranslationLayoutOverride(ancestor)).toBe(false);
+        expect(abortedAttempt.state.layoutDetachedDiscard).toBeUndefined();
+    });
+
     it('共享布局查询释放模拟已回收的最后租户，精确恢复宿主样式', async () => {
         const {hasTranslationLayoutOverride} = await import('@/src/features/full-page-translation/content/state');
         const {document} = parseHTML('<html><body><article style="height:24px"><p>Source</p></article></body></html>');

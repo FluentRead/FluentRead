@@ -1,5 +1,6 @@
 import {afterEach, describe, expect, it, vi} from 'vitest';
 import {userscriptFetch} from '@/userscript/http';
+import {OPENAI_ERROR_BODY_LIMIT} from '@/src/providers/translation/ai-sdk/boundedErrorResponse';
 import {DOUBAO_GUEST_HEADER} from '@/src/platform/http/doubaoGuest';
 
 describe('userscript HTTP transport', () => {
@@ -9,6 +10,68 @@ describe('userscript HTTP transport', () => {
         globalThis.GM_info = undefined;
         vi.restoreAllMocks();
         vi.unstubAllGlobals();
+    });
+
+    it.each(['callback', 'promise'] as const)('bounds only opted-in failed GM responses before constructing Response (%s)', async mode => {
+        const long = 'x'.repeat(4 * 1024 * 1024);
+        const payload = {status: 429, statusText: 'Too Many Requests', responseText: long,
+            responseHeaders: 'content-type: text/plain\r\ncontent-length: 4194304\r\ncontent-encoding: gzip\r\nretry-after: 7\r\nx-request-id: fixture'};
+        const detailsSeen: UserscriptXmlHttpRequestDetails[] = [];
+        if (mode === 'callback') globalThis.GM_xmlhttpRequest = details => {
+            detailsSeen.push(details); queueMicrotask(() => details.onload?.(payload)); return {abort() {}};
+        };
+        else globalThis.GM = {xmlHttpRequest: details => {detailsSeen.push(details); return Promise.resolve(payload);}};
+        const encode = vi.spyOn(TextEncoder.prototype, 'encode');
+        const response = await userscriptFetch('https://api.example.test/openai', {method: 'POST', body: '{}'}, {errorBodyLimit: OPENAI_ERROR_BODY_LIMIT});
+        expect(response.status).toBe(429);
+        expect(response.statusText).toBe('Too Many Requests');
+        expect(response.headers.get('retry-after')).toBe('7');
+        expect(response.headers.get('x-request-id')).toBe('fixture');
+        expect(response.headers.has('content-length')).toBe(false);
+        expect(response.headers.has('content-encoding')).toBe(false);
+        expect(response.headers.get('content-type')).toBe('application/json');
+        expect(await response.text()).toBe(OPENAI_ERROR_BODY_LIMIT.replacement);
+        expect(encode.mock.calls.some(([text]) => text === long)).toBe(false);
+        expect(detailsSeen[0].headers).not.toHaveProperty('errorBodyLimit');
+    });
+
+    it.each([
+        ['a'.repeat(32_768), false],
+        ['a'.repeat(32_769), true],
+        ['中'.repeat(10_922) + 'ab', false],
+        ['中'.repeat(10_923), true],
+        ['😀'.repeat(8_192), false],
+        ['😀'.repeat(8_192) + 'x', true],
+        ['\ud800'.repeat(10_923), true],
+    ])('preserves or bounds opted-in errors at the UTF-8 byte limit', async (body, oversized) => {
+        globalThis.GM_xmlhttpRequest = details => {queueMicrotask(() => details.onload?.({status: 400, responseText: body}));};
+        const result = await userscriptFetch('https://api.example.test/utf8', undefined, {errorBodyLimit: OPENAI_ERROR_BODY_LIMIT});
+        expect(await result.text()).toBe(oversized ? OPENAI_ERROR_BODY_LIMIT.replacement : new TextDecoder().decode(new TextEncoder().encode(body)));
+    });
+
+    it('does not limit success, unrelated GM callers, null bodies, or invalid policies', async () => {
+        const long = 'x'.repeat(32_769); let status = 200;
+        globalThis.GM_xmlhttpRequest = details => {queueMicrotask(() => details.onload?.({status, responseText: long}));};
+        const policy = {errorBodyLimit: OPENAI_ERROR_BODY_LIMIT};
+        expect(await (await userscriptFetch('https://api.example.test/success', undefined, policy)).text()).toBe(long);
+        status = 400;
+        expect(await (await userscriptFetch('https://api.example.test/unrelated')).text()).toBe(long);
+        expect(await (await userscriptFetch('https://api.example.test/bad-policy', undefined, {errorBodyLimit: {maxBytes: -1, replacement: 'bad'}})).text()).toBe(long);
+        status = 304;
+        expect(await (await userscriptFetch('https://api.example.test/empty', undefined, policy)).text()).toBe('');
+    });
+
+    it('preserves caller cancellation when abort synchronously delivers a late oversized response', async () => {
+        const controller = new AbortController(); const long = 'x'.repeat(1024 * 1024);
+        let ready!: () => void; const started = new Promise<void>(resolve => {ready = resolve;});
+        globalThis.GM_xmlhttpRequest = details => {
+            ready(); return {abort() {details.onload?.({status: 400, responseText: long}); details.onabort?.({status: 0});}};
+        };
+        const encode = vi.spyOn(TextEncoder.prototype, 'encode');
+        const pending = userscriptFetch('https://api.example.test/cancel', {signal: controller.signal}, {errorBodyLimit: OPENAI_ERROR_BODY_LIMIT});
+        const rejection = expect(pending).rejects.toMatchObject({name: 'AbortError'});
+        await started; controller.abort(); await rejection;
+        expect(encode.mock.calls.some(([text]) => text === long)).toBe(false);
     });
 
     it('uses Safari Userscripts promise-only GM.xmlHttpRequest without falling back to page fetch', async () => {

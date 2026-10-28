@@ -11,6 +11,10 @@ const databases:MaterialDatabase[]=[];
 const clock={now:100};
 const manifest={records:0,frames:0,bytes:0,digest:bytesToHex(sha256(new Uint8Array()))};
 const guard={generation:0,capturedAt:100};
+function sampleFrame(){
+  const bytes=new TextEncoder().encode('{}'),hash=sha256.create();hash.update(new Uint8Array([0,0,0,bytes.length]));hash.update(bytes);
+  return {input:{records:1,frames:1,bytes:bytes.length,digest:bytesToHex(hash.digest())},frame:{seq:0,record:0,part:0,total:1,recordBytes:bytes.length,bytes}};
+}
 function setup(){
   const db=new MaterialDatabase(`material-stage-a-${crypto.randomUUID()}`);databases.push(db);
   const stage=createStage(db,{clock:()=>clock.now,limits:{ttlMs:1000,receiptTtlMs:10000}});
@@ -127,9 +131,7 @@ describe('material staging stored metadata boundaries',()=>{
     const db=new MaterialDatabase(`material-stage-a-${crypto.randomUUID()}`);databases.push(db);
     const controller=new AbortController();let first=true;
     const stage=createStage(db,{clock:()=>clock.now,limits:{ttlMs:1000},beforeAppend:async()=>{if(first){first=false;controller.abort();}}});
-    const bytes=new TextEncoder().encode('{}'),hash=sha256.create();hash.update(new Uint8Array([0,0,0,bytes.length]));hash.update(bytes);
-    const input={records:1,frames:1,bytes:bytes.length,digest:bytesToHex(hash.digest())};
-    const frame={seq:0,record:0,part:0,total:1,recordBytes:bytes.length,bytes},cap=createMaterialImportCapability();
+    const {input,frame}=sampleFrame(),cap=createMaterialImportCapability();
     await stage.beginRecoverable(input,guard,cap,{deadline:1000});
     await expect(stage.append(cap,frame,{signal:controller.signal})).rejects.toThrow('cancelled');
     expect(await db.table('stageFrames').count()).toBe(0);
@@ -152,6 +154,50 @@ describe('material staging stored metadata boundaries',()=>{
     await vi.waitFor(async()=>expect(await stage.status(cap)).toEqual({state:'open',nextSeq:0}));
     await vi.waitFor(async()=>expect(await stage.seal(cap)).toBeUndefined());
     expect(await stage.status(cap)).toEqual({state:'sealed',nextSeq:0});
+  });
+  it('keeps the cleanup slot while cancellation races with starting a locked transaction',async()=>{
+    const db=new MaterialDatabase(`material-stage-a-${crypto.randomUUID()}`);databases.push(db);
+    const stage=createStage(db,{clock:()=>clock.now,limits:{ttlMs:1000,inflight:1}});
+    const peer=new MaterialDatabase(db.name);databases.push(peer);await peer.open();
+    let release!:()=>void,entered!:()=>void;
+    const hold=new Promise<void>(resolve=>release=resolve),ready=new Promise<void>(resolve=>entered=resolve);
+    const lock=peer.transaction('rw',peer.table('stageSessions'),async()=>{entered();await Dexie.waitFor(hold);});
+    await ready;
+    const controller=new AbortController(),original=db.transaction.bind(db);
+    const spy=vi.spyOn(db,'transaction').mockImplementationOnce(((...args:unknown[])=>{
+      const operation=(original as (...values:unknown[])=>Promise<unknown>)(...args);
+      controller.abort();return operation;
+    }) as never);
+    try {
+      await expect(Dexie.ignoreTransaction(()=>stage.cleanup({signal:controller.signal}))).rejects.toThrow('cancelled');
+      await expect(Dexie.ignoreTransaction(()=>stage.cleanup())).rejects.toThrow('backpressure');
+    } finally {spy.mockRestore();release();await lock;}
+    await vi.waitFor(async()=>expect(await stage.cleanup()).toEqual({sessions:0,receipts:0}));
+  });
+  it('rejects resume if an abort is delivered while registering its listener',async()=>{
+    const {db,stage,begin}=setup(),cap=await begin(),controller=new AbortController();
+    const add=controller.signal.addEventListener.bind(controller.signal);
+    const spy=vi.spyOn(controller.signal,'addEventListener').mockImplementation(((...args:Parameters<AbortSignal['addEventListener']>)=>{
+      controller.abort();return add(...args);
+    }) as AbortSignal['addEventListener']);
+    try {await expect(stage.resume(cap,{signal:controller.signal})).rejects.toThrow('cancelled');}
+    finally {spy.mockRestore();}
+    expect(await db.table('stageSessions').count()).toBe(1);
+    await vi.waitFor(async()=>expect(await stage.resume(cap)).toBeUndefined());
+    expect(await stage.status(cap)).toEqual({state:'open',nextSeq:0});
+  });
+  it('does not append when cancellation races with registering the authentication listener',async()=>{
+    const {db,stage}=setup(),{input,frame}=sampleFrame(),cap=createMaterialImportCapability(),controller=new AbortController();
+    await stage.beginRecoverable(input,guard,cap,{deadline:1000});
+    const add=AbortSignal.prototype.addEventListener;let intercepted=false;
+    const spy=vi.spyOn(AbortSignal.prototype,'addEventListener').mockImplementation(function(this:AbortSignal,...args:Parameters<AbortSignal['addEventListener']>){
+      if(!intercepted&&this!==controller.signal&&args[0]==='abort'){intercepted=true;controller.abort();}
+      return add.apply(this,args);
+    });
+    try {await expect(stage.append(cap,frame,{signal:controller.signal})).rejects.toThrow('cancelled');}
+    finally {spy.mockRestore();}
+    expect(intercepted).toBe(true);expect(await db.table('stageFrames').count()).toBe(0);
+    await vi.waitFor(async()=>expect(await stage.append(cap,frame)).toEqual({nextSeq:1}));
   });
   it('releases the seal admission when starting its database transaction throws synchronously',async()=>{
     const {db,stage,begin}=setup(),cap=await begin();
@@ -180,9 +226,7 @@ describe('material staging stored metadata boundaries',()=>{
     let release!:()=>void,started!:()=>void;
     const held=new Promise<void>(resolve=>release=resolve),ready=new Promise<void>(resolve=>started=resolve);
     const stage=createStage(db,{clock:()=>clock.now,limits:{ttlMs:1000},beforeAppend:async()=>{started();await held;}});
-    const bytes=new TextEncoder().encode('{}'),hash=sha256.create();hash.update(new Uint8Array([0,0,0,bytes.length]));hash.update(bytes);
-    const input={records:1,frames:1,bytes:bytes.length,digest:bytesToHex(hash.digest())};
-    const frame={seq:0,record:0,part:0,total:1,recordBytes:bytes.length,bytes},owner=createMaterialImportCapability();
+    const {input,frame}=sampleFrame(),owner=createMaterialImportCapability();
     await stage.beginRecoverable(input,guard,owner,{deadline:1000});
     const pending=stage.append(owner,frame);await ready;
     const replacement={...createMaterialImportCapability(),id:owner.id};

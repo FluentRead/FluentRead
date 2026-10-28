@@ -91,6 +91,26 @@ describe('material staging transaction boundaries',()=>{
     expect(await frames.count()).toBe(total);expect(await x.db.table('stageReceipts').count()).toBe(0);
     expect(await x.stage.commit(cap)).toEqual({inserted:1,updated:0,skipped:0});
   });
+  it('treats a cancelled cleanup as uncertain when transaction abort fails',async()=>{
+    const x=make(),controller=new AbortController(),cap=await x.begin();await x.stage.append(cap,x.frame);
+    const sessions=x.db.table('stageSessions');await sessions.update(cap.id,{expiresAt:0});
+    let intercepted=false;
+    const onRead=(row:{id:string}|undefined)=>{
+      if(row?.id===cap.id&&!intercepted){
+        const transaction=Dexie.currentTransaction;if(!transaction)throw Error('missing transaction');
+        const abort=vi.spyOn(Object.getPrototypeOf(transaction),'abort').mockImplementation(()=>{intercepted=true;throw Error('transaction abort failed');});
+        try{controller.abort();}finally{abort.mockRestore();}
+      }
+      return row;
+    };
+    sessions.hook('reading',onRead);
+    try{await expect(x.stage.cleanup({signal:controller.signal})).rejects.toThrow('cancelled');}
+    finally{sessions.hook('reading').unsubscribe(onRead);}
+    expect(intercepted).toBe(true);
+    await vi.waitFor(async()=>expect(await sessions.count()).toBe(0));
+    expect(await x.db.table('stageFrames').count()).toBe(0);
+    expect(await x.db.table('stageBudget').get('stage')).toMatchObject({reserved:0,reservedFrames:0,slots:0});
+  });
   it('isolates rejection from a callable cleanup diagnostic thenable after the transaction commits',async()=>{
     const warn=vi.spyOn(console,'warn').mockImplementation(()=>{});
     const callback=vi.fn(()=>Object.assign(()=>{}, {then:(_resolve:unknown,reject:(error:Error)=>void)=>reject(Error('observer failed'))}));

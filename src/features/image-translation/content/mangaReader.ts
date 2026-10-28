@@ -45,7 +45,7 @@ export function createMangaReader(ports: {
     failed: (image: HTMLImageElement) => boolean;
     changed: (status: MangaTranslationStatus) => void;
     /** 按需读取端口只检查已有状态，不得启动发现、OCR、网络或模型。 */
-    reading?: {live:(source:MangaReadingSource<MangaSurface>)=>boolean;load:(source:MangaReadingSource<MangaSurface>,signal:AbortSignal)=>Promise<MangaReadingResult>;version?:(source:MangaReadingSource<MangaSurface>)=>object|undefined};
+    reading?: {live:(source:MangaReadingSource<MangaSurface>,waiting:boolean)=>boolean;load:(source:MangaReadingSource<MangaSurface>,signal:AbortSignal)=>Promise<MangaReadingResult>;version?:(source:MangaReadingSource<MangaSurface>)=>object|undefined};
     canvas?: SurfacePorts<HTMLCanvasElement>;
     segments?: SurfacePorts<MangaImageSegment> & {
         prepare: (images: HTMLImageElement[]) => ReadonlyMap<HTMLImageElement, MangaImageSegment[]>;
@@ -86,10 +86,14 @@ export function createMangaReader(ports: {
         changed: status => ports.changed(decorate(status)),
     });
     const snapshotLive=(source:MangaReadingSource<MangaSurface>)=>!disposed&&!document.hidden&&session.status().active
-        && (window.location?.href||'about:blank')===readingHref && ports.reading?.live(source)===true;
+        && (window.location?.href||'about:blank')===readingHref && ports.reading?.live(source,!!session.readingWaiting(source.surface,source.identity))===true;
     const reading=createMangaReadingCoordinator<MangaSurface>({
         live: source => !readingPending&&snapshotLive(source),
-        load: (source,signal) => ports.reading?.load(source,signal) ?? Promise.resolve({status:'unavailable'}),
+        load: (source,signal) => {
+            const waiting=session.readingWaiting(source.surface,source.identity);
+            return waiting ? Promise.resolve({status:waiting})
+                : ports.reading?.load(source,signal) ?? Promise.resolve({status:'unavailable'});
+        },
     });
     function checkOpened():void {
         const current=opened;if(!current)return;

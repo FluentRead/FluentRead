@@ -1038,6 +1038,7 @@ describe('userscript browser shim injection', () => {
         } finally {rmSync(fixture, {recursive: true, force: true});vi.unstubAllEnvs();vi.resetModules();}
     });
 
+    // Two modes each compress three catalogs using multiple gzip configurations.
     it('standard and standalone site catalogs preserve identical gzip bytes and rules', async () => {
         const results: Array<Array<{encoded:string; bytes:Buffer}>> = [];
         try {
@@ -1063,7 +1064,7 @@ describe('userscript browser shim injection', () => {
             expect(results[1].every(item=>item.encoded.startsWith('~91:'))).toBe(true);
             expect(results[1].map(item=>item.bytes)).toEqual(results[0].map(item=>item.bytes));
         } finally {vi.unstubAllEnvs();vi.resetModules();}
-    }, 30_000);
+    }, 15_000);
 
     it('keeps all site rule JSON data intact when embedding compressed offline catalogs', async () => {
         const plugin = createUserscriptCatalogCompressionPlugin() as unknown as {

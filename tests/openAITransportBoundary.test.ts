@@ -16,6 +16,7 @@ import {setRuntimeFetch} from '@/src/platform/http/runtime';
 import {attachTranslationImageInput, attachTranslationModelUsageObserver, attachTranslationRequestScheduler, attachTranslationProviderConfig, requireTranslationProviderConfig} from '@/src/services/translation/requestSnapshot';
 import {createTranslationRequestScheduler} from '@/src/services/translation/requestScheduler';
 import {boundErrorResponse} from '@/src/providers/translation/ai-sdk/boundedErrorResponse';
+import {userscriptFetch} from '@/userscript/http';
 import type {TranslationConfigSource} from '@/src/services/translation/types';
 
 const config = () => providerConfigFixture({service: 'custom', model: {custom: 'fixture-model'}, token: {},
@@ -29,6 +30,26 @@ const flush = async () => {for (let i = 0; i < 20; i++) await Promise.resolve();
 afterEach(() => {setRuntimeFetch(); vi.restoreAllMocks(); vi.useRealTimers();});
 
 describe('shared OpenAI request and response boundary', () => {
+  it('passes its local error-body policy through the real GM adapter without sending it as a header', async () => {
+    const huge = 'x'.repeat(1024 * 1024); let details!: UserscriptXmlHttpRequestDetails;
+    globalThis.GM_xmlhttpRequest = value => {
+      details = value;
+      queueMicrotask(() => value.onload?.({status: 429, responseText: huge, responseHeaders: 'retry-after: 3\r\nx-request-id: gm-fixture'}));
+      return {abort() {}};
+    };
+    setRuntimeFetch(userscriptFetch);
+    try {
+      await translateOpenAICompatible(request(), execution(async call => {
+        const response = await call.fetch('https://fixture.invalid/v1/chat/completions', {method: 'POST', body: '{}'});
+        expect(response.status).toBe(429);
+        expect(response.headers.get('retry-after')).toBe('3');
+        expect(response.headers.get('x-request-id')).toBe('gm-fixture');
+        expect(await response.text()).toContain('上游错误响应过大');
+        return 'checked';
+      }));
+      expect(Object.keys(details.headers ?? {}).some(name => name.toLowerCase().includes('errorbody'))).toBe(false);
+    } finally {globalThis.GM_xmlhttpRequest = undefined;}
+  });
   it('re-exports one error class instead of producing incompatible SDK and standalone identities', () => {
     expect(SharedError).toBe(LlmTransportError);
   });

@@ -6,9 +6,11 @@
  */
 import {abortErrorFromSignal} from '@/src/platform/http/runtime';
 
-const MAX_ERROR_BYTES = 32_768;
+export const OPENAI_ERROR_BODY_LIMIT = Object.freeze({
+  maxBytes: 32_768,
+  replacement: '{"error":{"message":"上游错误响应过大、读取超时或无法读取。"}}',
+});
 const ERROR_BODY_TIMEOUT_MS = 1_000;
-const BOUNDED_ERROR = '{"error":{"message":"上游错误响应过大、读取超时或无法读取。"}}';
 
 function copyResponse(response: Response, bytes: Uint8Array | null, synthetic: boolean): Response {
   const headers = new Headers(response.headers);
@@ -42,7 +44,7 @@ export function boundErrorResponse(
   let resolveResult!: (value: Response) => void;
   let rejectResult!: (error: unknown) => void;
   const result = new Promise<Response>((resolve, reject) => {resolveResult = resolve; rejectResult = reject;});
-  const bytes = new Uint8Array(MAX_ERROR_BYTES);
+  const bytes = new Uint8Array(OPENAI_ERROR_BODY_LIMIT.maxBytes);
   let count = 0, readChunks = 0, decided = false;
   let timer: ReturnType<typeof setTimeout> | undefined;
   const finish = () => {
@@ -59,7 +61,7 @@ export function boundErrorResponse(
     if (decided) return;
     decided = true;
     finish();
-    resolveResult(copyResponse(response, new TextEncoder().encode(BOUNDED_ERROR), true));
+    resolveResult(copyResponse(response, new TextEncoder().encode(OPENAI_ERROR_BODY_LIMIT.replacement), true));
     abortTransport();
   };
   if (signal?.aborted) onAbort();
@@ -80,7 +82,7 @@ export function boundErrorResponse(
           return;
         }
         if (!decided) {
-          if (part.value.byteLength > MAX_ERROR_BYTES - count) fallback();
+          if (part.value.byteLength > OPENAI_ERROR_BODY_LIMIT.maxBytes - count) fallback();
           else {
             bytes.set(part.value, count);
             count += part.value.byteLength;

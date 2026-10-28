@@ -259,9 +259,34 @@ describe('committed cleanup corruption notifications',()=>{
     const db=database();expect(()=>createProductStage(db,{onCleanupCorruption:null as never})).toThrow('invalid cleanup observer');
     expect(db.isOpen()).toBe(false);
   });
+  it('keeps a committed cleanup successful when its diagnostic logger also throws',async()=>{
+    const warn=vi.spyOn(console,'warn').mockImplementation(()=>{throw Error('logger unavailable');});
+    const target=instance({now:100},{onCleanupCorruption:()=>{throw Error('private diagnostic');}});
+    try{
+      const {token}=await upload(target.stage,[{note:'private staged note'}]);
+      await target.stage.sessions.update(token.id,{expiresAt:NaN});
+      expect(await target.stage.cleanup()).toEqual({sessions:1,receipts:0,corruptSessions:1});
+      expect(warn).toHaveBeenCalledOnce();expect(await target.stage.frames.count()).toBe(0);
+    }finally{warn.mockRestore();}
+  });
 });
 
 describe('isolated same-database material staging',()=>{
+  it('rejects a non-function capacity estimator before opening storage',()=>{
+    const db=database();expect(()=>createProductStage(db,{estimate:null as never})).toThrow('invalid capacity estimator');
+    expect(db.isOpen()).toBe(false);
+  });
+  it('preserves data and refuses unbounded corrupted start tombstones during cleanup',async()=>{
+    const target=instance(),input=frameRecords([{note:'private staged note'}],opts.frameBytes);
+    const cap=await target.stage.begin(input.manifest,{generation:0,capturedAt:100});
+    await target.stage.append(cap,input.frames[0]);
+    const starts=target.db.table('stageStarts');
+    await starts.bulkPut(Array.from({length:256},(_,i)=>({id:`corrupt-${i}`,expiresAt:1})));
+    target.clock.now=1101;
+    await expect(target.stage.cleanup()).rejects.toThrow('start corruption');
+    expect(await target.stage.sessions.count()).toBe(1);expect(await target.stage.frames.count()).toBe(1);
+    expect(await starts.count()).toBe(257);expect(await target.stage.budgets.get('stage')).toMatchObject({slots:1});
+  });
   it.each([0,-1,0.5,NaN,Infinity,257,Number.MAX_SAFE_INTEGER+1])('rejects invalid resource limits before opening a receiver: %s',value=>{
     const target=instance();
     expect(()=>createProductStage(target.db,{limits:{slots:value}})).toThrow('invalid limits');

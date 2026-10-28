@@ -51,6 +51,34 @@ function maintenanceFixture() {
 describe('material import background registration',()=>{
   afterEach(()=>vi.restoreAllMocks());
 
+  it('does not begin after disposal reenters the trusted-sender privacy check',async()=>{
+    const f=fixture(),dispose=installMaterialImportRuntime(f.deps as never),p=f.port();
+    f.runtime.onConnect.fire(p.port);
+    vi.spyOn(f.deps,'isPrivateContext').mockImplementationOnce(()=>{dispose();return false;});
+    p.onMessage.fire({id:1,action:'begin',capability,manifest,guard,deadline:10_000});
+    await Promise.resolve();await Promise.resolve();
+    expect(f.stage.cleanup).not.toHaveBeenCalled();expect(f.stage.beginRecoverable).not.toHaveBeenCalled();
+    expect(p.messages).toHaveLength(0);expect(f.closeDatabase).toHaveBeenCalledOnce();
+  });
+
+  it('cancels readiness when the port disconnects during abort-listener registration',async()=>{
+    const f=fixture();let ready!:()=>void;
+    f.deps.ready=new Promise<void>(resolve=>{ready=resolve;});
+    const dispose=installMaterialImportRuntime(f.deps as never),p=f.port();
+    f.runtime.onConnect.fire(p.port);
+    const add=AbortSignal.prototype.addEventListener;let interrupted=false;
+    const registration=vi.spyOn(AbortSignal.prototype,'addEventListener').mockImplementation(function(this:AbortSignal,...args:Parameters<AbortSignal['addEventListener']>){
+      if(!interrupted&&args[0]==='abort'){interrupted=true;p.port.disconnect();}
+      return add.apply(this,args);
+    });
+    try {
+      p.onMessage.fire({id:1,action:'begin',capability,manifest,guard,deadline:10_000});
+      await Promise.resolve();ready();await Promise.resolve();await Promise.resolve();
+      expect(interrupted).toBe(true);expect(f.stage.cleanup).not.toHaveBeenCalled();
+      expect(f.stage.beginRecoverable).not.toHaveBeenCalled();expect(p.messages).toHaveLength(0);
+    } finally {registration.mockRestore();dispose();}
+  });
+
   it('ignores unrelated ports, rejects untrusted or private senders before creating the stage',()=>{
     const f=fixture(),dispose=installMaterialImportRuntime(f.deps as never);
     const other=f.port(undefined,'reading-stream');f.runtime.onConnect.fire(other.port);

@@ -19,6 +19,29 @@ describe('material identities and locators', () => {
         expect(normalizeMaterialSource(source).identityKey).not.toBe(normalizeMaterialSource({...source, url:'https://example.test/read?id=2'}).identityKey);
         for (const url of ['javascript:alert(1)', 'https://user:pass@example.test/', 'blob:https://example.test/a', 'invalid']) expect(canonicalMaterialUrl(url)).toBe('');
     });
+    it('preserves long canonical URLs while bounding and rejecting noncanonical long inputs', () => {
+        const path = 'https://example.test/' + '中'.repeat(1000);
+        const canonical = canonicalMaterialUrl(path);
+        expect(canonical.length).toBeGreaterThan(8192);
+        expect(canonicalMaterialUrl(canonical)).toBe(canonical);
+        const query = canonical + '?a=1&a=2&z=3#/chapter/一';
+        // Routing fragments use the URL serializer's stored representation.
+        const stored = new URL(query).href;
+        expect(canonicalMaterialUrl(stored)).toBe(stored);
+        for (const invalid of [
+            canonical + '?z=1&a=1', canonical + '#paragraph', canonical + '?utm_source=x',
+            canonical.replace('https://', 'https://user:pass@'),
+            canonical.replace('https://', 'javascript:'),
+            'https://example.test/' + 'a'.repeat(131100),
+            'https://example.test/' + '中'.repeat(15000),
+        ]) expect(canonicalMaterialUrl(invalid)).toBe('');
+    });
+    it('rejects an oversized tracking query before performing repeated deletions', () => {
+        const input = 'https://example.test/?' + 'utm_source=x&'.repeat(8000);
+        const remove = vi.spyOn(URLSearchParams.prototype, 'delete');
+        try {expect(canonicalMaterialUrl(input)).toBe('');expect(remove).not.toHaveBeenCalled();}
+        finally {remove.mockRestore();}
+    });
     it('unifies YouTube platforms while preserving X multi-video identities', () => {
         const youtube = (url: string) => normalizeMaterialSource({kind:'video',url}).identityKey;
         expect(youtube('https://youtu.be/abcdefghijk?t=4')).toBe(youtube('https://music.youtube.com/watch?v=abcdefghijk&t=30'));
@@ -297,6 +320,31 @@ describe('local material lifecycle', () => {
         expect((await repository.list({archived:true}))[0]).toMatchObject({id:original.id,topics:['AI'],locator:{quote:'private paragraph'}});
         expect((await repository.capture({source})).id).toBe(original.id);
         expect(await repository.importData(backup)).toEqual({inserted:0,updated:0,skipped:1});
+    });
+    it('round trips long multilingual URLs and historical aliases through an actual backup',async()=>{
+        const originalUrl = 'https://example.test/' + '中'.repeat(1000);
+        const original = await repository.capture({source:{kind:'article',url:originalUrl,title:'中文材料'}},100);
+        expect(original.source.url!.length).toBeGreaterThan(8192);
+        const firstBackup = JSON.parse(JSON.stringify(await repository.exportData(150)));
+        await repository.clear(200);
+        expect(await repository.importData(firstBackup,250)).toEqual({inserted:1,updated:0,skipped:0});
+        expect(await repository.get(original.id)).toMatchObject({source:{url:original.source.url},identityKey:original.identityKey});
+        expect((await repository.capture({source:{kind:'article',url:originalUrl}},260)).id).toBe(original.id);
+
+        await repository.update(original.id,{source:{kind:'article',url:'https://example.test/moved',title:'中文材料'}},300);
+        const secondBackup = JSON.parse(JSON.stringify(await repository.exportData(350)));
+        expect(secondBackup.materials[0].aliases).toContain(original.identityKey);
+        await repository.clear(400);
+        expect(await repository.importData(secondBackup,450)).toEqual({inserted:1,updated:0,skipped:0});
+        expect((await repository.capture({source:{kind:'article',url:originalUrl}},460)).id).toBe(original.id);
+        expect((await repository.get(original.id))?.aliases).toContain(original.identityKey);
+        // 用户在已有材料上编辑来源后，其百分号编码地址也必须能再次导入。
+        await repository.update(original.id,{source:{kind:'article',url:originalUrl,title:'中文材料'}},500);
+        const thirdBackup = JSON.parse(JSON.stringify(await repository.exportData(550)));
+        await repository.clear(600);
+        expect(await repository.importData(thirdBackup,650)).toEqual({inserted:1,updated:0,skipped:0});
+        expect(await repository.get(original.id)).toMatchObject({source:{url:original.source.url},identityKey:original.identityKey});
+        expect((await repository.capture({source:{kind:'article',url:'https://example.test/moved'}},660)).id).toBe(original.id);
     });
     it('rejects a backup read started before clear while allowing a new explicit restore',async()=>{
         await repository.capture({source},100);

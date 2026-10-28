@@ -10,6 +10,7 @@ import {bytesToHex} from '@noble/hashes/utils';
 import {MaterialDatabase, MaterialRepository} from '@/src/features/vocabulary/materialRepository';
 import type {MaterialImportResult, MaterialOperationGuard} from '@/src/features/vocabulary/materialProtocol';
 import {MATERIAL_IMPORT_FRAME_BYTES, MATERIAL_IMPORT_MAX_RECORD_BYTES, MATERIAL_IMPORT_MAX_TOTAL_BYTES, MATERIAL_IMPORT_MAX_FRAMES} from '@/src/features/vocabulary/materialProtocol';
+import {materialImportCapacity} from '@/src/features/vocabulary/materialImportCapacity';
 
 export interface Manifest {records:number; frames:number; bytes:number; digest:string}
 export interface Frame {seq:number; record:number; part:number; total:number; recordBytes:number; bytes:Uint8Array}
@@ -21,7 +22,8 @@ interface Receipt {id:string; ownerHash:string; result:MaterialImportResult; exp
 interface RecoverableStart extends Manifest {id:string; ownerHash:string; guard:MaterialOperationGuard; expiresAt:number}
 interface Budget {key:string; reserved:number; reservedFrames:number; slots:number}
 export interface Limits {frameBytes:number; recordBytes:number; totalBytes:number; frameCount:number; totalFrames:number; slots:number; inflight:number; ttlMs:number; receiptTtlMs:number}
-const DEFAULTS:Limits={frameBytes:MATERIAL_IMPORT_FRAME_BYTES, recordBytes:MATERIAL_IMPORT_MAX_RECORD_BYTES, totalBytes:MATERIAL_IMPORT_MAX_TOTAL_BYTES, frameCount:MATERIAL_IMPORT_MAX_FRAMES, totalFrames:200000, slots:256, inflight:8, ttlMs:30*60*1000, receiptTtlMs:7*24*60*60*1000};
+const DEFAULTS:Limits={frameBytes:MATERIAL_IMPORT_FRAME_BYTES, recordBytes:MATERIAL_IMPORT_MAX_RECORD_BYTES, totalBytes:MATERIAL_IMPORT_MAX_FRAMES*MATERIAL_IMPORT_FRAME_BYTES, frameCount:MATERIAL_IMPORT_MAX_FRAMES, totalFrames:200000, slots:256, inflight:8, ttlMs:30*60*1000, receiptTtlMs:7*24*60*60*1000};
+const capacityError=()=>Object.assign(new Error('stage budget exceeded'),{name:'MaterialBackupCapacityError'});
 // All existing production databases have at most this many sessions and receipts.
 // Keeping the bound independent of a lower current limit still permits recovery.
 const MAX_TRACKED_SLOTS=256;
@@ -121,8 +123,10 @@ async function waitForReady(ready:Promise<void>|undefined,signal:AbortSignal):Pr
   });
 }
 
-export function createStage(db:MaterialDatabase, options:{limits?:Partial<Limits>; clock?:()=>number; beforeAppend?:()=>Promise<void>}={}) {
+export function createStage(db:MaterialDatabase, options:{limits?:Partial<Limits>; clock?:()=>number; beforeAppend?:()=>Promise<void>; onCleanupCorruption?:()=>void; estimate?:()=>Promise<unknown>}={}) {
   const limits={...DEFAULTS,...options.limits};
+  const onCleanupCorruption=options.onCleanupCorruption;
+  if(onCleanupCorruption!==undefined&&typeof onCleanupCorruption!=='function')throw TypeError('invalid cleanup observer');
   for (const value of Object.values(limits)) if (!Number.isSafeInteger(value)||value<=0) throw Error('invalid limits');
   // Each digest prefix is an unsigned 32-bit record length. Larger values would wrap.
   if(limits.recordBytes>0xffffffff||limits.slots>MAX_TRACKED_SLOTS)throw Error('invalid limits');
@@ -133,6 +137,31 @@ export function createStage(db:MaterialDatabase, options:{limits?:Partial<Limits
   const starts=db.table<RecoverableStart,string>('stageStarts');
   const repo=new MaterialRepository(db);
   const clock=options.clock??Date.now;
+  const estimate=options.estimate;
+  if(estimate!==undefined&&typeof estimate!=='function')throw TypeError('invalid capacity estimator');
+  async function estimateLimit(signal:AbortSignal|undefined):Promise<{limit:number;sampledAt?:number}>{
+    const fallback={limit:Math.min(limits.totalBytes,MATERIAL_IMPORT_MAX_TOTAL_BYTES)};
+    if(signal?.aborted)throw Error('cancelled');
+    if(!estimate)return fallback;
+    let release:()=>void;
+    try{release=takeControl(db.name,'estimate',undefined,limits.inflight);}catch{return fallback;}
+    const sampledAt=clock();
+    const work=Promise.resolve().then(()=>estimate());
+    // Keep the lane occupied until the underlying API settles even after timeout.
+    void work.then(release,release);
+    return new Promise((resolve,reject)=>{
+      let done=false;
+      const finish=(result:{limit:number;sampledAt?:number}|undefined)=>{
+        if(done)return;done=true;clearTimeout(timer);signal?.removeEventListener('abort',abort);
+        if(result)resolve(result);else reject(Error('cancelled'));
+      };
+      const abort=()=>finish(undefined);
+      const timer=setTimeout(()=>finish(fallback),2000);
+      signal?.addEventListener('abort',abort,{once:true});
+      work.then(value=>finish({limit:Math.min(limits.totalBytes,materialImportCapacity(value)),sampledAt}),()=>finish(fallback));
+      if(signal?.aborted)abort();
+    });
+  }
   // Shared in this runtime; cache hits are only admission hints.
   function admission(){let entries=admissionsByDatabase.get(db.name);if(!entries){entries=new Map();admissionsByDatabase.set(db.name,entries);}return entries;}
   function forget(id:string){const entries=admissionsByDatabase.get(db.name);entries?.delete(id);if(entries?.size===0)admissionsByDatabase.delete(db.name);}
@@ -160,9 +189,9 @@ export function createStage(db:MaterialDatabase, options:{limits?:Partial<Limits
     if(budget.reserved!==reserved||budget.reservedFrames!==reservedFrames||budget.slots!==sessionCount+receiptCount)throw Error('budget corruption');
     return budget;
   };
-  const reserveBudget=(budget:Budget,bytes:number,count:number)=>{
+  const reserveBudget=(budget:Budget,bytes:number,count:number,maxTotal:number)=>{
     // 减法比较既防止求和丢失精度，也允许回收超过新限额的旧预约。
-    if(bytes>limits.totalBytes-budget.reserved||count>limits.totalFrames-budget.reservedFrames||budget.slots>=limits.slots)throw Error('stage budget exceeded');
+    if(bytes>maxTotal-budget.reserved||count>limits.totalFrames-budget.reservedFrames||budget.slots>=limits.slots)throw capacityError();
     budget.reserved+=bytes;budget.reservedFrames+=count;budget.slots++;
   };
   const releaseSessionBudget=(budget:Budget,s:Pick<Session,'bytes'|'frames'>,releaseSlot:boolean)=>{
@@ -206,6 +235,10 @@ export function createStage(db:MaterialDatabase, options:{limits?:Partial<Limits
     if (!validInteger(records)||records>10000||!validInteger(count)||count>limits.frameCount||!validInteger(bytes)||bytes>limits.totalBytes||typeof digest!=='string'||digest.length!==64||!/^([0-9a-f]{64})$/u.test(digest)||
       (records===0&&(count!==0||bytes!==0))||(records>0&&(count<records||bytes<count||!withinCapacity(bytes,count,records,limits.frameBytes,limits.recordBytes)))||!guardSnapshot||!validInteger(guardSnapshot.generation)||!Number.isFinite(guardSnapshot.capturedAt)||guardSnapshot.capturedAt<0||guardSnapshot.capturedAt>now+60000||!Number.isSafeInteger(deadline)||deadline<=now||deadline>now+limits.ttlMs)throw Error('invalid manifest, guard or deadline');
     return runControl('begin',cap.id,signal,async()=>{
+      // Existing starts and receipts must remain recoverable even if the storage
+      // estimation API is unavailable or never settles.
+      const existing=await db.transaction('r',starts,()=>starts.get(cap.id));
+      const capacity=existing?undefined:await estimateLimit(signal);
       const expiresAt=await db.transaction('rw',[db.meta,sessions,receipts,budgets,starts],async()=>guardTransaction(signal,async()=>{
         if(deadline<=clock())throw Error('session unavailable');
         const previous=await starts.get(cap.id);
@@ -220,11 +253,13 @@ export function createStage(db:MaterialDatabase, options:{limits?:Partial<Limits
         }
         // A caller-provided id must never overwrite a legacy session or receipt.
         if(await sessions.get(cap.id)||await receipts.get(cap.id))throw Error('session unavailable');
+        if(!capacity)throw Error('session unavailable');
         const state=await db.meta.get('state');
         if((state?.generation??0)!==guardSnapshot.generation||guardSnapshot.capturedAt<=(state?.clearedAt??0))throw Error('stale operation');
         const budget=await getBudget();
-        reserveBudget(budget,bytes,count);
-        if(await starts.count()>=limits.slots)throw Error('stage budget exceeded');
+        if(capacity.sampledAt!==undefined&&(clock()<capacity.sampledAt||clock()-capacity.sampledAt>5000))throw Error('capacity estimate expired');
+        reserveBudget(budget,bytes,count,capacity.limit);
+        if(await starts.count()>=limits.slots)throw capacityError();
         if(deadline<=clock())throw Error('session unavailable');
         const ownerHash=hashToken(cap.token),sessionExpiry=clock()+limits.ttlMs;
         await budgets.put(budget);
@@ -502,6 +537,16 @@ export function createStage(db:MaterialDatabase, options:{limits?:Partial<Limits
         await receipts.bulkDelete(expiredReceipts.map(r=>r.id));
         await starts.bulkDelete(expiredStarts.map(s=>s.id));
         await budgets.put(budget);
+        if((corruptSessions||corruptReceipts||corruptStarts)&&onCleanupCorruption){
+          // 通知绑定到真正的 IDB 提交事件：等待方可能已取消，回滚不得报告。
+          Dexie.currentTransaction?.on('complete',()=>{
+            const failed=()=>{try{console.warn('[FluentRead] 材料恢复清理诊断失败');}catch{/* 已提交事务不受诊断影响。 */}};
+            try{
+              const outcome:unknown=onCleanupCorruption();
+              if(outcome&&(typeof outcome==='object'||typeof outcome==='function'))void Promise.resolve(outcome).catch(failed);
+            }catch{failed();}
+          });
+        }
         return {sessions:expired.length,receipts:count,...(corruptSessions?{corruptSessions}:{}),...(corruptReceipts?{corruptReceipts}:{}),...(corruptStarts?{corruptStarts}:{})};
       }));
       for(const id of expiredIds){forget(id);activeByDatabase.get(db.name)?.get(id)?.controller.abort();}

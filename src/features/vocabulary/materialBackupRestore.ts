@@ -75,7 +75,9 @@ export async function restoreLargeMaterialBackup(file: Blob, guard: MaterialOper
   } catch (error) {
     if (commitDispatched && cap) return {kind: 'unknown', capability: cap, commitDispatched: true};
     const interrupted = signal?.aborted || error instanceof Error && (error.name === 'AbortError' || error.name === 'TimeoutError');
-    let cleanupPending = beginDispatched && !opened;
+    // This category is sent only for a begin admission that rolled back.
+    const rejectedAdmission = !interrupted && error instanceof Error && error.name === 'MaterialBackupCapacityError';
+    let cleanupPending = beginDispatched && !opened && !rejectedAdmission;
     if (opened && client) {
       if (interrupted) cleanupPending = true;
       else {

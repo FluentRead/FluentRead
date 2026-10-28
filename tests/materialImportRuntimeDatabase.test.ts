@@ -107,3 +107,40 @@ it('cleans expired private frames after an alarm while preserving a live session
   expect(await db!.table('stageFrames').count()).toBe(0); expect(await db!.table('stageSessions').count()).toBe(0);
   expect(await db!.table('stageStarts').count()).toBe(0); expect(marker).toBe(true); expect(period).toBe(60); expect(warnings).toEqual([]); dispose();
 });
+
+it('reports committed corruption cleanup even if runtime is disposed before the transaction result is delivered', async () => {
+  const db = new MaterialDatabase(dbName), other = new MaterialDatabase(dbName); opened.push(db, other);
+  let onCleanupCorruption = () => {};
+  const stage = createStage(db, {clock: () => 100, limits: {ttlMs: 1000}, onCleanupCorruption: () => onCleanupCorruption()});
+  const cap = capability('00000000-0000-4000-8000-000000000005');
+  const raw = new TextEncoder().encode('{"note":"synthetic private content"}'), hashInput = new Uint8Array(4 + raw.length);
+  new DataView(hashInput.buffer).setUint32(0, raw.length); hashInput.set(raw, 4);
+  await stage.beginRecoverable({records: 1, frames: 1, bytes: raw.length, digest: bytesToHex(sha256(hashInput))},
+    {generation: 0, capturedAt: 100}, cap, {deadline: 1000});
+  await stage.append(cap, {seq: 0, record: 0, part: 0, total: 1, recordBytes: raw.length, bytes: raw});
+  await db.table('stageSessions').update(cap.id, {expiresAt: NaN});
+
+  let committed!: () => void, deliver!: () => void;
+  const arrived = new Promise<void>(resolve => {committed = resolve;}), release = new Promise<void>(resolve => {deliver = resolve;});
+  const original = db.transaction.bind(db) as (...args: any[]) => Promise<any>;
+  const transaction = vi.spyOn(db, 'transaction').mockImplementation(((...args: any[]) => Promise.resolve(original(...args)).then(async value => {
+    if (value?.corruptSessions === 1) {committed(); await release;} return value;
+  })) as never);
+  const browserRuntime = runtime(), onAlarm = event(), warnings: string[] = [];
+  const maintenance = {warn: (message: string) => warnings.push(message),
+    storage: {get: async () => ({fluentreadMaterialImportMaintenance: true}), set: async () => {}},
+    alarms: {onAlarm, get: async () => ({periodInMinutes: 60}), create: async () => {}}};
+  const deps = {runtime: browserRuntime, maintenance, isPrivateContext: () => false, ready: Promise.resolve(),
+    createStage: (notify: () => void) => {onCleanupCorruption = notify; return {stage, close: () => {}};}};
+  const dispose = installMaterialImportRuntime(deps as never);
+  try {
+    await arrived;
+    expect(await other.table('stageFrames').count()).toBe(0); expect(await other.table('stageSessions').count()).toBe(0);
+    expect(warnings).toEqual(['[FluentRead] 材料恢复暂存元数据损坏，请检查材料与备份。']);
+    expect(JSON.stringify(warnings)).not.toContain(cap.token);
+    dispose(); deliver(); await new Promise(resolve => setTimeout(resolve, 10));
+    expect(warnings.filter(message => message.includes('元数据损坏'))).toHaveLength(1);
+    expect(warnings.every(message => message === '[FluentRead] 材料恢复暂存元数据损坏，请检查材料与备份。'
+      || message === '[FluentRead] 材料恢复暂存维护未确认，将在后续维护时重试')).toBe(true);
+  } finally {deliver(); dispose(); transaction.mockRestore();}
+});

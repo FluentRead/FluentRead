@@ -212,6 +212,55 @@ describe('committed material change notifications',()=>{
   });
 });
 
+describe('committed cleanup corruption notifications',()=>{
+  it('notifies when the transaction commits even if its reply is delayed past cancellation',async()=>{
+    const notified=vi.fn(),target=instance({now:100},{onCleanupCorruption:notified});
+    const {token}=await upload(target.stage,[{note:'private staged note'}]);
+    await target.stage.sessions.update(token.id,{expiresAt:NaN});
+    const original=target.db.transaction.bind(target.db) as (...args:any[])=>Promise<unknown>;
+    const committed=deferred(),deliver=deferred(),controller=new AbortController();
+    const spy=vi.spyOn(target.db,'transaction').mockImplementationOnce(((...args:any[])=>Promise.resolve(original(...args)).then(async value=>{committed.resolve();await deliver.promise;return value;})) as never);
+    try{
+      const pending=target.stage.cleanup({signal:controller.signal});
+      await committed.promise;expect(notified).toHaveBeenCalledOnce();expect(notified).toHaveBeenCalledWith();
+      controller.abort();await expect(pending).rejects.toThrow('cancelled');deliver.resolve();
+      expect(await target.stage.frames.count()).toBe(0);expect(await target.stage.sessions.count()).toBe(0);
+      expect(notified).toHaveBeenCalledOnce();
+    }finally{deliver.resolve();spy.mockRestore();}
+  });
+  it('never notifies a rolled-back cleanup and notifies exactly once on retry',async()=>{
+    const notified=vi.fn(),target=instance({now:100},{onCleanupCorruption:notified});
+    const {token}=await upload(target.stage,[{note:'private staged note'}]);
+    await target.stage.sessions.update(token.id,{expiresAt:NaN});
+    const fail=()=>{throw Error('injected cleanup failure');};target.stage.frames.hook('deleting',fail);
+    try{await expect(target.stage.cleanup()).rejects.toThrow('injected cleanup failure');}
+    finally{target.stage.frames.hook('deleting').unsubscribe(fail);}
+    expect(notified).not.toHaveBeenCalled();expect(await target.stage.frames.count()).toBe(1);
+    expect(await target.stage.cleanup()).toEqual({sessions:1,receipts:0,corruptSessions:1});
+    expect(notified).toHaveBeenCalledOnce();expect(await target.stage.frames.count()).toBe(0);
+  });
+  it('does not report ordinary expiry as corruption',async()=>{
+    const notified=vi.fn(),clock={now:100},target=instance(clock,{onCleanupCorruption:notified});
+    await upload(target.stage,[{note:'ordinary staged note'}]);clock.now+=opts.ttlMs;
+    expect(await target.stage.cleanup()).toEqual({sessions:1,receipts:0});expect(notified).not.toHaveBeenCalled();
+  });
+  it.each(['throw','reject'] as const)('isolates %s from the committed cleanup without private diagnostics',async failure=>{
+    const warn=vi.spyOn(console,'warn').mockImplementation(()=>{});
+    const target=instance({now:100},{onCleanupCorruption:failure==='throw'?()=>{throw Error('PRIVATE_DETAILS');}:async()=>{throw Error('PRIVATE_DETAILS');}});
+    try{
+      const {token}=await upload(target.stage,[{note:'private staged note'}]);await target.stage.sessions.update(token.id,{expiresAt:NaN});
+      expect(await target.stage.cleanup()).toEqual({sessions:1,receipts:0,corruptSessions:1});
+      await vi.waitFor(()=>expect(warn).toHaveBeenCalledOnce());
+      expect(warn).toHaveBeenCalledWith('[FluentRead] 材料恢复清理诊断失败');
+      expect(JSON.stringify(warn.mock.calls)).not.toContain('PRIVATE_DETAILS');expect(await target.stage.frames.count()).toBe(0);
+    }finally{warn.mockRestore();}
+  });
+  it('rejects an invalid cleanup observer before opening storage',()=>{
+    const db=database();expect(()=>createProductStage(db,{onCleanupCorruption:null as never})).toThrow('invalid cleanup observer');
+    expect(db.isOpen()).toBe(false);
+  });
+});
+
 describe('isolated same-database material staging',()=>{
   it.each([0,-1,0.5,NaN,Infinity,257,Number.MAX_SAFE_INTEGER+1])('rejects invalid resource limits before opening a receiver: %s',value=>{
     const target=instance();
@@ -439,8 +488,8 @@ describe('isolated same-database material staging',()=>{
     const impossible={records:2,frames:2,bytes:recordMax*2+1,digest:'0'.repeat(64)};
     await expect(target.stage.beginRecoverable(impossible,guard,cap,{deadline:1000})).rejects.toThrow('invalid manifest');
     const feasible={...impossible,bytes:recordMax*2};
-    expect(await target.stage.beginRecoverable(feasible,guard,cap,{deadline:1000})).toEqual(cap);
-    await target.stage.discard(cap);
+    // Geometry accepts the feasible value, then the conservative capacity gate rejects it.
+    await expect(target.stage.beginRecoverable(feasible,guard,cap,{deadline:1000})).rejects.toMatchObject({name:'MaterialBackupCapacityError'});
   });
   it('admits empty backups and possible arbitrary subdivisions at capacity boundaries',async()=>{
     const target=instance({now:100},{limits:{...opts,recordBytes:256,totalBytes:4096}}),guard={generation:0,capturedAt:100};
@@ -1408,5 +1457,86 @@ describe('adversarial admission and mutable caller input',()=>{
     hold.resolve();await locking;
     expect((await Promise.all([a,b])).every(x=>x.includes('session unavailable'))).toBe(true);
     expect(await valid).toEqual({nextSeq:1});
+  });
+});
+
+describe('dynamic staging capacity',()=>{
+  const large:Manifest={records:3,frames:2511,bytes:328773783,digest:'0'.repeat(64)};
+  const guard={generation:0,capturedAt:100};
+  const request={deadline:10000};
+  const bigEstimate=()=>Promise.resolve({quota:2*1024**3,usage:0});
+  it('reserves a 329 MB manifest with sufficient estimated space without allocating payloads',async()=>{
+    const db=database(),stage=createStage(db,{clock:()=>100,estimate:bigEstimate}),cap=createMaterialImportCapability();
+    await expect(stage.beginRecoverable(large,guard,cap,request)).resolves.toEqual(cap);
+    expect(await stage.budgets.get('stage')).toMatchObject({reserved:large.bytes,reservedFrames:large.frames,slots:1});
+    await stage.discard(cap);expect(await stage.budgets.get('stage')).toMatchObject({reserved:0,reservedFrames:0,slots:0});
+  });
+  it.each([undefined,()=>Promise.reject(Error('private failure')),()=>Promise.resolve({quota:NaN,usage:0})])('uses a conservative fallback for unavailable or invalid estimates',async estimate=>{
+    const db=database(),stage=createStage(db,{clock:()=>100,estimate}),cap=createMaterialImportCapability();
+    await expect(stage.beginRecoverable(large,guard,cap,request)).rejects.toMatchObject({name:'MaterialBackupCapacityError'});
+    expect(await stage.sessions.count()).toBe(0);expect(await stage.budgets.get('stage')).toBeUndefined();
+  });
+  it('rejects reservations exceeding a low valid estimate with no writes',async()=>{
+    const db=database(),stage=createStage(db,{clock:()=>100,estimate:async()=>({quota:128*1024**2+3000,usage:0})});
+    const manifest={records:1,frames:1,bytes:1001,digest:'0'.repeat(64)};
+    await expect(stage.beginRecoverable(manifest,guard,createMaterialImportCapability(),request)).rejects.toMatchObject({name:'MaterialBackupCapacityError'});
+    expect(await stage.sessions.count()).toBe(0);expect(await db.table('stageStarts').count()).toBe(0);
+  });
+  it('serializes competing reservations from independent database connections',async()=>{
+    const db=database(),peer=database(db.name),estimate=async()=>({quota:128*1024**2+3000,usage:0});
+    const a=createStage(db,{clock:()=>100,estimate}),b=createStage(peer,{clock:()=>100,estimate});
+    const manifest={records:1,frames:1,bytes:600,digest:'0'.repeat(64)};
+    const results=await Promise.allSettled([a.beginRecoverable(manifest,guard,createMaterialImportCapability(),request),b.beginRecoverable(manifest,guard,createMaterialImportCapability(),request)]);
+    expect(results.filter(x=>x.status==='fulfilled')).toHaveLength(1);
+    expect(results.find(x=>x.status==='rejected')).toMatchObject({reason:{name:'MaterialBackupCapacityError'}});
+    expect(await a.budgets.get('stage')).toMatchObject({reserved:600,slots:1});
+  });
+  it('rejects an estimate invalidated by clock rollback without creating a session',async()=>{
+    const clock={now:100},db=database(),stage=createStage(db,{clock:()=>clock.now,estimate:async()=>{clock.now=99;return {quota:2*1024**3,usage:0};}});
+    await expect(stage.beginRecoverable(large,guard,createMaterialImportCapability(),request)).rejects.toThrow('capacity estimate expired');
+    expect(await stage.sessions.count()).toBe(0);expect(await stage.budgets.get('stage')).toBeUndefined();
+  });
+  it('rejects an estimate that became stale before the write transaction',async()=>{
+    const clock={now:100},db=database(),entered=deferred(),release=deferred();
+    const stage=createStage(db,{clock:()=>clock.now,estimate:async()=>{entered.resolve();await release.promise;return {quota:2*1024**3,usage:0};}});
+    const pending=stage.beginRecoverable(large,guard,createMaterialImportCapability(),request);
+    await entered.promise;clock.now=5200;release.resolve();
+    await expect(pending).rejects.toThrow('capacity estimate expired');
+    expect(await stage.sessions.count()).toBe(0);expect(await stage.budgets.get('stage')).toBeUndefined();
+  });
+  it('rolls back the reservation if IndexedDB rejects the session write for quota',async()=>{
+    const db=database(),stage=createStage(db,{clock:()=>100,estimate:bigEstimate});
+    const fail=()=>{throw new DOMException('quota','QuotaExceededError');};stage.sessions.hook('creating',fail);
+    try{await expect(stage.beginRecoverable(large,guard,createMaterialImportCapability(),request)).rejects.toMatchObject({name:'QuotaExceededError'});}
+    finally{stage.sessions.hook('creating').unsubscribe(fail);}
+    expect(await stage.sessions.count()).toBe(0);expect(await stage.budgets.get('stage')).toBeUndefined();expect(await db.table('stageStarts').count()).toBe(0);
+  });
+  it('cancels while estimating without reserving storage',async()=>{
+    const db=database(),started=deferred(),blocked=deferred(),controller=new AbortController();
+    const stage=createStage(db,{clock:()=>100,estimate:async()=>{started.resolve();await blocked.promise;return {quota:2*1024**3,usage:0};}});
+    const pending=stage.beginRecoverable(large,guard,createMaterialImportCapability(),{...request,signal:controller.signal});
+    await started.promise;controller.abort();await expect(pending).rejects.toThrow('cancelled');blocked.resolve();
+    expect(await stage.sessions.count()).toBe(0);expect(await stage.budgets.get('stage')).toBeUndefined();
+  });
+  it('recovers existing sessions and receipts without calling a stalled estimator',async()=>{
+    const db=database(),estimate=vi.fn(bigEstimate),stage=createStage(db,{clock:()=>100,estimate});
+    const manifest=frameRecords([],128).manifest,cap=createMaterialImportCapability();
+    await stage.beginRecoverable(manifest,guard,cap,request);
+    estimate.mockImplementation(()=>new Promise(()=>{}));
+    await expect(stage.beginRecoverable(manifest,guard,cap,request)).resolves.toEqual(cap);
+    await stage.seal(cap);await stage.commit(cap);
+    await expect(stage.beginRecoverable(manifest,guard,cap,request)).resolves.toEqual(cap);
+    expect(estimate).toHaveBeenCalledTimes(1);
+  });
+  it('bounds stalled estimators and falls back after timeout',async()=>{
+    const blocked=deferred(),estimate=vi.fn(()=>blocked.promise.then(()=>({quota:2*1024**3,usage:0})));
+    try{
+      const db=database(),stage=createStage(db,{clock:()=>100,estimate,limits:{inflight:1}}),empty=frameRecords([],128).manifest;
+      const first=stage.beginRecoverable(empty,guard,createMaterialImportCapability(),request);
+      await first;
+      await stage.beginRecoverable(empty,guard,createMaterialImportCapability(),request);
+      expect(estimate).toHaveBeenCalledTimes(1);
+      blocked.resolve();await Promise.resolve();await Promise.resolve();
+    } finally{blocked.resolve();}
   });
 });

@@ -21,20 +21,20 @@ function fixture() {
     onStartup:event<()=>void>(),onInstalled:event<()=>void>(),
     sendMessage:vi.fn(async (message:unknown)=>{notifications.push(message);})};
   const privateContext={value:false};
-  let notify:()=>void=()=>undefined;
+  let notify:()=>void=()=>undefined, notifyCorruption:()=>void=()=>undefined;
   const unsubscribe=vi.fn();
   const stage={observeCommitted:vi.fn((listener:()=>void)=>{notify=listener;return unsubscribe;}),
     beginRecoverable:vi.fn(async()=>capability),resume:vi.fn(async()=>undefined),append:vi.fn(async()=>({nextSeq:1})),
     seal:vi.fn(async()=>undefined),commit:vi.fn(async()=>({inserted:1,updated:0,skipped:0})),
     status:vi.fn(async()=>({state:'open',nextSeq:0})),discard:vi.fn(async()=> 'discarded'),acknowledge:vi.fn(async()=> 'released-or-unavailable'),cleanup:vi.fn(async()=>({sessions:0,receipts:0}))};
-  const closeDatabase=vi.fn(),createStage=vi.fn(()=>({stage,close:closeDatabase}));
+  const closeDatabase=vi.fn(),createStage=vi.fn((onCleanupCorruption:()=>void)=>{notifyCorruption=onCleanupCorruption;return {stage,close:closeDatabase};});
   const deps={runtime,isPrivateContext:()=>privateContext.value,createStage,ready:Promise.resolve()};
   const port=(sender:unknown={id:'fixture',url:'chrome-extension://fixture/options.html'},name=PORT_NAME)=>{
     const onMessage=event<(message:unknown)=>void>(),onDisconnect=event<()=>void>(),messages:unknown[]=[];
     const result={name,sender,onMessage,onDisconnect,postMessage:vi.fn((message:unknown)=>{messages.push(message);}),disconnect:vi.fn(()=>onDisconnect.fire())};
     return {port:result,onMessage,onDisconnect,messages};
   };
-  return {deps,runtime,privateContext,createStage,closeDatabase,stage,unsubscribe,port,notify:()=>notify(),notifications};
+  return {deps,runtime,privateContext,createStage,closeDatabase,stage,unsubscribe,port,notify:()=>notify(),notifyCorruption:()=>notifyCorruption(),notifications};
 }
 
 function maintenanceFixture() {
@@ -110,7 +110,7 @@ describe('material import background registration',()=>{
 
   it.each(['corruptSessions','corruptReceipts','corruptStarts'] as const)('reports %s without disclosing stored data',async key=>{
     const f=fixture(),m=maintenanceFixture();
-    f.stage.cleanup.mockResolvedValueOnce({sessions:0,receipts:0,[key]:1} as {sessions:number;receipts:number});
+    f.stage.cleanup.mockImplementationOnce(async()=>{f.notifyCorruption();return {sessions:0,receipts:0,[key]:1};});
     const dispose=installMaterialImportRuntime({...f.deps,maintenance:m} as never),p=f.port();
     f.runtime.onConnect.fire(p.port);
     p.onMessage.fire({id:1,action:'begin',capability,manifest,guard,deadline:10_000});
@@ -119,6 +119,19 @@ describe('material import background registration',()=>{
     expect(m.warn).toHaveBeenCalledOnce();
     expect(m.warn).toHaveBeenCalledWith('[FluentRead] 材料恢复暂存元数据损坏，请检查材料与备份。');
     expect(JSON.stringify(m.warn.mock.calls)).not.toContain(capability.token);
+    dispose();
+  });
+
+  it('does not turn a completed cleanup into a failed restore when diagnostics are unavailable',async()=>{
+    const f=fixture(),m=maintenanceFixture();
+    f.stage.cleanup.mockImplementationOnce(async()=>{f.notifyCorruption();return {sessions:1,receipts:0,corruptSessions:1};});
+    m.warn.mockImplementation(()=>{throw Error('diagnostic sink unavailable');});
+    const dispose=installMaterialImportRuntime({...f.deps,maintenance:m} as never),p=f.port();
+    f.runtime.onConnect.fire(p.port);
+    p.onMessage.fire({id:1,action:'begin',capability,manifest,guard,deadline:10_000});
+    await vi.waitFor(()=>expect(p.messages).toHaveLength(1));
+    expect(p.messages[0]).toMatchObject({ok:true});
+    expect(f.stage.beginRecoverable).toHaveBeenCalledOnce();expect(m.warn).toHaveBeenCalledOnce();
     dispose();
   });
 
@@ -212,6 +225,39 @@ describe('material import background registration',()=>{
     const trusted=f.port();f.runtime.onConnect.fire(trusted.port);expect(trusted.port.disconnect).not.toHaveBeenCalled();
     // Idempotent install returns the existing browser composition root's disposer.
     const dispose=installMaterialImportRuntime(f.deps as never);dispose();expect(f.runtime.onConnect.listeners.size).toBe(0);
+  });
+  it('injects a lazy origin quota estimate and handles unavailable browser APIs',async()=>{
+    const f=fixture(),m=maintenanceFixture();
+    const storage={estimate:vi.fn(async()=>({quota:800_000_000,usage:12_000_000}))};
+    vi.stubGlobal('navigator',{storage});
+    const create=vi.spyOn(materialStage,'createStage');
+    Object.assign(browser,{runtime:f.runtime,extension:{inIncognitoContext:false},alarms:m.alarms,storage:{local:m.storage}});
+    installBrowserMaterialImportRuntime(Promise.resolve());
+    try {
+      await vi.waitFor(()=>expect(m.storage.get).toHaveBeenCalledOnce());
+      expect(storage.estimate).not.toHaveBeenCalled();
+      const p=f.port();f.runtime.onConnect.fire(p.port);
+      expect(create).toHaveBeenCalledOnce();expect(storage.estimate).not.toHaveBeenCalled();
+      const options=create.mock.calls[0][1]!;
+      expect(await options.estimate!()).toEqual({quota:800_000_000,usage:12_000_000});
+      expect(storage.estimate).toHaveBeenCalledOnce();
+      vi.stubGlobal('navigator',{});
+      await expect(options.estimate!()).rejects.toThrow('storage estimate unavailable');
+      vi.stubGlobal('navigator',undefined);
+      await expect(options.estimate!()).rejects.toThrow('storage estimate unavailable');
+    } finally {installMaterialImportRuntime(f.deps as never)();vi.unstubAllGlobals();}
+  });
+  it('does not access quota or material storage for a private browser context',async()=>{
+    const f=fixture(),m=maintenanceFixture(),estimate=vi.fn(async()=>({quota:800_000_000,usage:0}));
+    vi.stubGlobal('navigator',{storage:{estimate}});
+    const create=vi.spyOn(materialStage,'createStage');
+    Object.assign(browser,{runtime:f.runtime,extension:{inIncognitoContext:true},alarms:m.alarms,storage:{local:m.storage}});
+    installBrowserMaterialImportRuntime(Promise.resolve());
+    try {
+      const p=f.port();f.runtime.onConnect.fire(p.port);
+      expect(p.port.disconnect).toHaveBeenCalledOnce();expect(create).not.toHaveBeenCalled();expect(estimate).not.toHaveBeenCalled();
+      expect(m.storage.get).not.toHaveBeenCalled();
+    } finally {installMaterialImportRuntime(f.deps as never)();vi.unstubAllGlobals();}
   });
   it('closes the browser database if its stage cannot initialize',async()=>{
     const f=fixture(),m=maintenanceFixture();

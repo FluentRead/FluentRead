@@ -36,7 +36,7 @@ function encodeFrame(frame:Frame):Omit<Frame,'bytes'> & {base64:string} {
 /** 只允许一个在途请求；断连后绝不自动重放可能已提交的操作。 */
 export function createMaterialImportPortClient(port:MaterialImportClientPort) {
   let nextId=0,closed=false;
-  let pending:{id:number;resolve:(value:unknown)=>void;reject:(reason:unknown)=>void}|undefined;
+  let pending:{id:number;action:string;resolve:(value:unknown)=>void;reject:(reason:unknown)=>void}|undefined;
   const closeListeners=()=>{
     try{port.onMessage.removeListener(onMessage);}catch{/* 另一个监听仍须移除。 */}
     try{port.onDisconnect.removeListener(onDisconnect);}catch{/* 端口可能已经被浏览器释放。 */}
@@ -50,10 +50,12 @@ export function createMaterialImportPortClient(port:MaterialImportClientPort) {
   const onMessage=(value:unknown)=>{
     if(closed)return;
     if(!value||typeof value!=='object'||Array.isArray(value)){disconnect();return;}
-    const response=value as {id?:unknown;ok?:unknown;data?:unknown};
+    const response=value as {id?:unknown;ok?:unknown;data?:unknown;error?:unknown};
     if(!pending||response.id!==pending.id||typeof response.ok!=='boolean'){disconnect();return;}
     const active=pending;pending=undefined;
-    if(response.ok)active.resolve(response.data);else active.reject(new Error('材料恢复操作失败，请查询当前会话后重试。'));
+    if(response.ok)active.resolve(response.data);
+    else if(active.action==='begin'&&response.error==='capacity-exceeded')active.reject(Object.assign(new Error('材料备份超出当前恢复容量，请保留原材料和备份文件。'),{name:'MaterialBackupCapacityError'}));
+    else active.reject(new Error('材料恢复操作失败，请查询当前会话后重试。'));
   };
   try {
     port.onDisconnect.addListener(onDisconnect);
@@ -67,7 +69,7 @@ export function createMaterialImportPortClient(port:MaterialImportClientPort) {
     if(nextId>=Number.MAX_SAFE_INTEGER){disconnect();return Promise.reject(new MaterialImportPortDisconnectedError());}
     const id=++nextId;
     return new Promise<T>((resolve,reject)=>{
-      pending={id,resolve:value=>resolve(value as T),reject};
+      pending={id,action,resolve:value=>resolve(value as T),reject};
       try{port.postMessage({id,action,...fields});}catch{disconnect();}
     });
   }

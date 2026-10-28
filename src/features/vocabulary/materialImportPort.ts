@@ -124,12 +124,18 @@ export function makePortBridge(stage:Stage, options:{isTrustedSender:(sender:Sen
       input=undefined; // 不让异步回调持有调用者附加的未知字段。
       void (async()=>{
         let result:unknown;
+        let failure:'operation-failed'|'capacity-exceeded'='operation-failed';
         try {
           const signal=controller.signal;
           if(request.action==='begin'){
             if(bound)throw Error('invalid');
             const {capability,manifest,guard,deadline}=request;
-            await stage.beginRecoverable(manifest,guard,capability,{deadline,signal});
+            try {await stage.beginRecoverable(manifest,guard,capability,{deadline,signal});}
+            catch(error) {
+              // Only begin admission guarantees rollback before reporting this category.
+              if(error instanceof Error&&error.name==='MaterialBackupCapacityError')failure='capacity-exceeded';
+              throw error;
+            }
             // 断线可能发生在事务提交后；相同能力须重新查询实际状态。
             const status=await stage.status(capability,{signal});
             if(!closed){bound=capability;result=status;}
@@ -153,7 +159,7 @@ export function makePortBridge(stage:Stage, options:{isTrustedSender:(sender:Sen
           send({id,ok:true,data:result});
         } catch {
           // 同一连接最多返回三次失败；后续断连由调用方使用原能力查询状态。
-          if(!closed&&++failures<=3)send({id,ok:false,error:'operation-failed'});else if(!closed)stop();
+          if(!closed&&++failures<=3)send({id,ok:false,error:failure});else if(!closed)stop();
         }
         finally {busy=false;armIdle();}
       })();

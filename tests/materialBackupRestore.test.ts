@@ -73,6 +73,25 @@ describe('material backup recovery orchestration',()=>{
     const cap=vi.fn(),out=await restoreLargeMaterialBackup(file,guard,{onCapability:cap});
     expect(out).toMatchObject({kind:'failed',error:expect.objectContaining({name:'MaterialBackupCapacityError'}),cleanupPending:false});expect(cap).not.toHaveBeenCalled();expect(mocks.connect).not.toHaveBeenCalled();
   });
+  it('clears the saved capability when begin receives a confirmed capacity rejection',async()=>{
+    const error=Object.assign(new Error('容量不足'),{name:'MaterialBackupCapacityError'});
+    active.begin.mockRejectedValueOnce(error);const onCapability=vi.fn();
+    expect(await restoreLargeMaterialBackup(file,guard,{onCapability})).toEqual({kind:'failed',error,cleanupPending:false});
+    expect(onCapability).toHaveBeenCalledOnce();expect(active.discard).not.toHaveBeenCalled();expect(active.close).toHaveBeenCalledOnce();
+  });
+  it.each([true,false])('handles append quota failure according to whether discard succeeds: %s',async discarded=>{
+    const error=Object.assign(new Error('quota'),{name:'QuotaExceededError'});let cap:unknown;
+    active.append.mockRejectedValueOnce(error);mocks.send.mockImplementationOnce(async(_file,_plan,emit)=>{await emit({seq:0});});
+    if(!discarded)active.discard.mockRejectedValueOnce(Error('disconnect'));
+    const out=await restoreLargeMaterialBackup(file,guard,{onCapability:value=>{cap=value;}});
+    expect(out).toEqual({kind:'failed',error,cleanupPending:!discarded,...(!discarded?{capability:cap}:{})});
+    expect(active.discard).toHaveBeenCalledOnce();expect(active.commit).not.toHaveBeenCalled();
+  });
+  it('preserves the capability if commit reports a quota failure',async()=>{
+    active.commit.mockRejectedValueOnce(Object.assign(new Error('quota'),{name:'QuotaExceededError'}));let cap:unknown;
+    expect(await restoreLargeMaterialBackup(file,guard,{onCapability:value=>{cap=value;}})).toEqual({kind:'unknown',capability:cap,commitDispatched:true});
+    expect(active.discard).not.toHaveBeenCalled();
+  });
   it('does not discard or misreport a commit which wins the explicit discard race',async()=>{
     active.resume.mockResolvedValueOnce({state:'open',nextSeq:0} as any);active.discard.mockResolvedValueOnce('committed' as any);
     const state=await discardMaterialBackup({id:'00000000-0000-4000-8000-000000000000',token:'a'.repeat(64)});

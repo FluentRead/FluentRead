@@ -32,7 +32,7 @@ type Maintenance = {
     storage: {get(key: string): Promise<Record<string, unknown>>; set(items: Record<string, unknown>): Promise<void>};
     warn(message: string): void;
 };
-type Options = {runtime: Runtime; isPrivateContext(): boolean; createStage(): Service; ready: Promise<unknown>; maintenance?: Maintenance};
+type Options = {runtime: Runtime; isPrivateContext(): boolean; createStage(onCleanupCorruption: () => void): Service; ready: Promise<unknown>; maintenance?: Maintenance};
 export const MATERIAL_IMPORT_CLEANUP_ALARM = 'fluentread-material-import-cleanup';
 const MAINTENANCE_MARKER = 'fluentreadMaterialImportMaintenance';
 const MAINTENANCE_PERIOD_MINUTES = 60;
@@ -84,7 +84,11 @@ export function installMaterialImportRuntime(options: Options): () => void {
             if (signal.aborted) abort();
         });
     };
-    const ensureService = (): Service => service ??= options.createStage();
+    const reportCleanupCorruption = () => {
+        // 仅由 stage 的事务完成事件调用，不包含材料、会话 ID 或令牌。
+        try {options.maintenance?.warn('[FluentRead] 材料恢复暂存元数据损坏，请检查材料与备份。');} catch { /* 不改变已提交的事务。 */ }
+    };
+    const ensureService = (): Service => service ??= options.createStage(reportCleanupCorruption);
     const runCleanup = (stage: Service['stage']): Promise<unknown> => {
         if (!cleanup) {
             const controller = new AbortController();
@@ -95,13 +99,6 @@ export function installMaterialImportRuntime(options: Options): () => void {
                 assertAvailable();
                 return stage.cleanup({signal: controller.signal});
             });
-            // 等待方可能已超时，真实事务随后仍可完成；只在观察到损坏结果时
-            // 发出不包含材料、会话 ID 或令牌的诊断。
-            void operation.then(result => {
-                if (result.corruptSessions || result.corruptReceipts || result.corruptStarts) {
-                    try {options.maintenance?.warn('[FluentRead] 材料恢复暂存元数据损坏，请检查材料与备份。');} catch { /* 不改变清理结果。 */ }
-                }
-            }, () => undefined);
             const pending = wait(operation, controller.signal);
             cleanup = pending;
             void pending.then(() => { if (cleanup === pending) cleanup = undefined; }, () => { if (cleanup === pending) cleanup = undefined; })
@@ -116,7 +113,7 @@ export function installMaterialImportRuntime(options: Options): () => void {
             if (warnedBackpressure) return;
             warnedBackpressure = true;
         }
-        try {maintenance?.warn('[FluentRead] 材料恢复暂存清理失败，将在下次维护时重试');} catch {/* 诊断不可改变清理状态。 */}
+        try {maintenance?.warn('[FluentRead] 材料恢复暂存维护未确认，将在后续维护时重试');} catch {/* 诊断不可改变清理状态。 */}
     };
     const serialize = <T>(task: () => Promise<T>): Promise<T> => {
         if (scheduledCount >= MAX_MAINTENANCE_OPERATIONS) return Promise.reject(Object.assign(Error('maintenance busy'), {name: 'MaterialMaintenanceBusyError'}));
@@ -267,9 +264,17 @@ export function installBrowserMaterialImportRuntime(ready: Promise<unknown>): vo
             storage: browser.storage.local as unknown as Maintenance['storage'],
             warn: message => console.warn(message),
         },
-        createStage: () => {
+        createStage: onCleanupCorruption => {
             const database = new MaterialDatabase();
-            try { return {stage: createStage(database), close: () => database.close()}; }
+            try { return {stage: createStage(database, {
+                onCleanupCorruption,
+                // 仅在新会话准入时读取扩展源的近似配额；不可用或失败由暂存层安全回退。
+                estimate: async () => {
+                    const storage = typeof navigator === 'undefined' ? undefined : navigator.storage;
+                    if (!storage || typeof storage.estimate !== 'function') throw Error('storage estimate unavailable');
+                    return storage.estimate();
+                },
+            }), close: () => database.close()}; }
             catch (error) { database.close(); throw error; }
         },
     });

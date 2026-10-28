@@ -468,6 +468,54 @@ describe('material import Port client',()=>{
     expect(changed).toHaveBeenCalledOnce();expect(await client.commit()).toEqual({inserted:0,updated:0,skipped:0});expect(changed).toHaveBeenCalledOnce();
     client.close();bridge.dispose();h.bridge.dispose();h.port.disconnect();
   });
+  it('reports a real rolled-back capacity admission through the serialized bridge without exposing details',async()=>{
+    const {createMaterialImportPortClient}=await import('@/src/features/vocabulary/materialImportPortClient');
+    const h=harness(),stage=createStage(h.db,{clock:()=>100,limits:{ttlMs:1000},estimate:async()=>({quota:1,usage:0})});
+    const bridge=trackedBridge(stage,{isTrustedSender:trustSender,onCommitted:()=>{},isPrivateContext:()=>false});
+    const server=new MockPort('json'),clientPort=new ClientPort(),closeClient=clientPort.disconnect.bind(clientPort);
+    clientPort.postMessage=(value:unknown)=>server.emit(value);
+    clientPort.disconnect=()=>{closeClient();server.disconnect();};server.onDisconnect.addListener(closeClient);
+    const replies:unknown[]=[];server.postMessage=(value:unknown)=>{replies.push(value);clientPort.onMessage.emit(JSON.parse(JSON.stringify(value)));};
+    expect(bridge.attach(server)).toBe(true);const client=createMaterialImportPortClient(clientPort),cap=createImportCapability();
+    await expect(client.begin(cap,frames().manifest,{generation:0,capturedAt:100},1000)).rejects.toMatchObject({name:'MaterialBackupCapacityError',message:'材料备份超出当前恢复容量，请保留原材料和备份文件。'});
+    expect(replies).toEqual([{id:1,ok:false,error:'capacity-exceeded'}]);
+    expect(await h.db.table('stageStarts').count()).toBe(0);expect(await h.db.table('stageSessions').count()).toBe(0);
+    client.close();
+  });
+  it('reports a real capacity rejection through backup reader, bridge and recovery orchestrator',async()=>{
+    const h=harness(),stage=createStage(h.db,{estimate:async()=>({quota:1,usage:0})});
+    const bridge=trackedBridge(stage,{isTrustedSender:trustSender,onCommitted:()=>{},isPrivateContext:()=>false});
+    const server=new MockPort('json'),clientPort=new ClientPort(),closeClient=clientPort.disconnect.bind(clientPort);
+    clientPort.postMessage=(value:unknown)=>server.emit(value);clientPort.disconnect=()=>{closeClient();server.disconnect();};server.onDisconnect.addListener(closeClient);
+    server.postMessage=(value:unknown)=>clientPort.onMessage.emit(JSON.parse(JSON.stringify(value)));
+    expect(bridge.attach(server)).toBe(true);
+    vi.doMock('webextension-polyfill',()=>({default:{runtime:{connect:()=>clientPort},extension:{inIncognitoContext:false}}}));
+    try {
+      const {restoreLargeMaterialBackup}=await import('@/src/features/vocabulary/materialBackupRestore');
+      const file=new Blob([JSON.stringify({format:'fluentread-learning-materials',version:1,materials:[{}]})]);
+      const onCapability=vi.fn(),out=await restoreLargeMaterialBackup(file,{generation:0,capturedAt:Date.now()},{onCapability});
+      expect(out).toMatchObject({kind:'failed',cleanupPending:false,error:{name:'MaterialBackupCapacityError',message:'材料备份超出当前恢复容量，请保留原材料和备份文件。'}});
+      expect(onCapability).toHaveBeenCalledOnce();expect(await h.db.table('stageStarts').count()).toBe(0);expect(await h.db.table('stageSessions').count()).toBe(0);
+    } finally {vi.doUnmock('webextension-polyfill');clientPort.disconnect();}
+  });
+  it('does not classify a capacity-named failure after begin has completed as a safe admission rejection',async()=>{
+    const {createMaterialImportPortClient}=await import('@/src/features/vocabulary/materialImportPortClient');
+    const h=harness(),sensitive=Object.assign(Error('PRIVATE_CAPACITY_DETAILS'),{name:'MaterialBackupCapacityError'});
+    const stage={...h.stage,status:async()=>{throw sensitive;}};
+    const bridge=trackedBridge(stage,{isTrustedSender:trustSender,onCommitted:()=>{},isPrivateContext:()=>false});
+    const server=new MockPort('json'),clientPort=new ClientPort(),closeClient=clientPort.disconnect.bind(clientPort);
+    clientPort.postMessage=(value:unknown)=>server.emit(value);clientPort.disconnect=()=>{closeClient();server.disconnect();};server.onDisconnect.addListener(closeClient);
+    const replies:unknown[]=[];server.postMessage=(value:unknown)=>{replies.push(value);clientPort.onMessage.emit(JSON.parse(JSON.stringify(value)));};
+    expect(bridge.attach(server)).toBe(true);const client=createMaterialImportPortClient(clientPort),cap=createImportCapability();
+    await expect(client.begin(cap,emptyManifest(),{generation:0,capturedAt:100},1000)).rejects.toThrow('材料恢复操作失败，请查询当前会话后重试。');
+    expect(replies).toEqual([{id:1,ok:false,error:'operation-failed'}]);expect(await h.db.table('stageStarts').count()).toBe(1);client.close();
+  });
+  it('ignores capacity categories for actions other than begin',async()=>{
+    const {createMaterialImportPortClient}=await import('@/src/features/vocabulary/materialImportPortClient');
+    const port=new ClientPort(),client=createMaterialImportPortClient(port),pending=client.commit();
+    port.onMessage.emit({id:1,ok:false,error:'capacity-exceeded'});
+    await expect(pending).rejects.toThrow('材料恢复操作失败，请查询当前会话后重试。');client.close();
+  });
   it('reports a send failure as disconnected without automatically retrying',async()=>{
     const {createMaterialImportPortClient,MaterialImportPortDisconnectedError}=await import('@/src/features/vocabulary/materialImportPortClient');
     const port=new ClientPort();vi.spyOn(port,'postMessage').mockImplementation(()=>{throw Error('sensitive');});const client=createMaterialImportPortClient(port);

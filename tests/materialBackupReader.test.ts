@@ -83,20 +83,34 @@ describe('material backup source reader', () => {
     await expect(prepareMaterialBackup(new Blob([deep]))).rejects.toMatchObject({name: 'MaterialBackupCapacityError', message: '备份文件嵌套层级超过恢复限制'});
   });
   it.each([
-    {frame: 8, record: 4, total: 100, frames: 100, records: '"abcd"'},
-    {frame: 8, record: 100, total: 5, frames: 100, records: '"a","b"'},
-    {frame: 2, record: 100, total: 100, frames: 1, records: '"ab"'},
-  ])('rejects a record, total or frame budget after one scan', async ({frame, record, total, frames, records}) => {
+    {frame: 8, record: 4, frames: 100, records: '"abcd"'},
+    {frame: 2, record: 100, frames: 1, records: '"ab"'},
+  ])('rejects a record or frame protocol limit after one scan', async ({frame, record, frames, records}) => {
     vi.resetModules();
     vi.doMock('@/src/features/vocabulary/materialProtocol', async importOriginal => ({
       ...await importOriginal<object>(), MATERIAL_IMPORT_FRAME_BYTES: frame, MATERIAL_IMPORT_MAX_RECORD_BYTES: record,
-      MATERIAL_IMPORT_MAX_TOTAL_BYTES: total, MATERIAL_IMPORT_MAX_FRAMES: frames,
+      MATERIAL_IMPORT_MAX_FRAMES: frames,
     }));
     try {
       const reader = await import('@/src/features/vocabulary/materialBackupReader'), blob = new Blob([wrap(records)]), original = blob.slice.bind(blob);
       let reads = 0; blob.slice = (start, end) => {reads++; return original(start, end);};
       await expect(reader.prepareMaterialBackup(blob)).rejects.toMatchObject({name: 'MaterialBackupCapacityError', message: '材料备份超过当前恢复容量限制'});
       expect(reads).toBe(1);
+    } finally {vi.doUnmock('@/src/features/vocabulary/materialProtocol'); vi.resetModules();}
+  });
+  it('lets the background budget admit records exceeding the former fixed total', async () => {
+    vi.resetModules();
+    vi.doMock('@/src/features/vocabulary/materialProtocol', async importOriginal => ({
+      ...await importOriginal<object>(), MATERIAL_IMPORT_FRAME_BYTES: 8, MATERIAL_IMPORT_MAX_RECORD_BYTES: 100,
+      MATERIAL_IMPORT_MAX_TOTAL_BYTES: 5, MATERIAL_IMPORT_MAX_FRAMES: 100,
+    }));
+    try {
+      const reader = await import('@/src/features/vocabulary/materialBackupReader'), source = new Blob([wrap('"a","b"')]);
+      const plan = await reader.prepareMaterialBackup(source), frames: Frame[] = [];
+      expect(plan.manifest.bytes).toBe(6);
+      await reader.sendMaterialBackup(source, plan, async frame => {frames.push(frame);});
+      expect(frames.map(frame => frame.record)).toEqual([0, 1]);
+      expect((await Promise.all(frames.map(frame => new Blob([frame.bytes]).text()))).map(value => JSON.parse(value))).toEqual(['a','b']);
     } finally {vi.doUnmock('@/src/features/vocabulary/materialProtocol'); vi.resetModules();}
   });
   it('rejects wrong scalar metadata and unknown oversized keys do not shadow known keys', async () => {
@@ -207,6 +221,9 @@ describe('material backup source reader', () => {
     const sparse = structuredClone(plan); sparse.plan.records = new Array(1);
     await expect(sendMaterialBackup(source, sparse, emit)).rejects.toThrow('无效的备份计划');
     expect(emit).not.toHaveBeenCalled();expect(slice).not.toHaveBeenCalled();
+    const nonArray = {...plan, plan: {...plan.plan, records: {length: 1} as never}};
+    await expect(sendMaterialBackup(source, nonArray, emit)).rejects.toThrow('无效的备份计划');
+    expect(emit).not.toHaveBeenCalled();expect(slice).not.toHaveBeenCalled();
   });
   it('snapshots the record count before reading mutable entries', async () => {
     const source = new Blob([wrap('1')]), plan = await prepareMaterialBackup(source);
@@ -253,6 +270,23 @@ describe('material backup source reader', () => {
     const sending = sendMaterialBackup(source, plan, async () => {calls++; await hold;}, {signal: controller2.signal});
     await viUntil(() => calls === 1); controller2.abort(); await expect(sending).rejects.toMatchObject({name: 'AbortError'});
     resume(); await new Promise(resolve => setTimeout(resolve, 0)); expect(calls).toBe(1);
+  });
+  it('observes cancellation during listener registration before a pending read can settle', async () => {
+    const source = new Blob([wrap('{}')]), controller = new AbortController();
+    let release!: (value: ArrayBuffer) => void, reads = 0;
+    const pending = new Promise<ArrayBuffer>(resolve => {release = resolve;});
+    source.slice = () => ({arrayBuffer() {reads++; return pending;}} as Blob);
+    const add = controller.signal.addEventListener.bind(controller.signal);
+    const registration = vi.spyOn(controller.signal, 'addEventListener').mockImplementation(((type: string, listener: EventListenerOrEventListenerObject, options?: boolean | AddEventListenerOptions) => {
+      controller.abort();
+      add(type, listener, options);
+    }) as typeof controller.signal.addEventListener);
+    try {
+      await expect(prepareMaterialBackup(source, {signal: controller.signal})).rejects.toMatchObject({name: 'AbortError'});
+      release(new ArrayBuffer(0));
+      await new Promise(resolve => setTimeout(resolve, 0));
+      expect(reads).toBe(1);
+    } finally {registration.mockRestore();}
   });
   it('sends a >20 MiB synthetic record through the actual stage transaction', async () => {
     const record = `{"id":"one","source":{"kind":"article","url":"https://example.test/a"},"title":"A","topics":[],"references":[],"createdAt":1,"updatedAt":2,"archivedAt":null,"unused":"${'x'.repeat(21 * 1024 * 1024)}"}`;

@@ -6,7 +6,7 @@
  */
 import {sha256} from '@noble/hashes/sha256';
 import {bytesToHex} from '@noble/hashes/utils';
-import {MATERIAL_IMPORT_FRAME_BYTES, MATERIAL_IMPORT_MAX_FRAMES, MATERIAL_IMPORT_MAX_RECORD_BYTES, MATERIAL_IMPORT_MAX_TOTAL_BYTES} from './materialProtocol';
+import {MATERIAL_IMPORT_FRAME_BYTES, MATERIAL_IMPORT_MAX_FRAMES, MATERIAL_IMPORT_MAX_RECORD_BYTES} from './materialProtocol';
 import type {Frame, Manifest} from './materialImportStage';
 
 const CHUNK_BYTES = 64 * 1024;
@@ -318,8 +318,8 @@ async function traverse(blob: Blob, input: SourcePlan, visitor: Visitor, signal?
 export async function prepareMaterialBackup(blob: Blob, options: ReadOptions = {}): Promise<PreparedMaterialBackup> {
   const signal = options.signal, plan = await inspect(blob, signal), lengths = plan.records.map(record => record.length);
   const bytes = lengths.reduce((a, b) => a + b, 0), frames = lengths.reduce((a, b) => a + Math.ceil(b / MATERIAL_IMPORT_FRAME_BYTES), 0);
-  // 后台当前使用固定默认预算；将来动态调整容量时须同时更新此准入判断。
-  if (!Number.isSafeInteger(bytes) || bytes > MATERIAL_IMPORT_MAX_TOTAL_BYTES || !Number.isSafeInteger(frames) || frames > MATERIAL_IMPORT_MAX_FRAMES || lengths.some(length => length > MATERIAL_IMPORT_MAX_RECORD_BYTES)) throw capacityError('材料备份超过当前恢复容量限制');
+  // 帧数及单条上限是协议边界；设备可用暂存额度由后台在事务中判断。
+  if (!Number.isSafeInteger(bytes) || !Number.isSafeInteger(frames) || frames > MATERIAL_IMPORT_MAX_FRAMES || lengths.some(length => length > MATERIAL_IMPORT_MAX_RECORD_BYTES)) throw capacityError('材料备份超过当前恢复容量限制');
   const digest = hash();
   await traverse(blob, plan, {start(index) {digest.update(u32(lengths[index]));}, chunk(data) {digest.update(data);}, end() {}}, signal);
   return {plan, manifest: {records: lengths.length, bytes, frames, digest: bytesToHex(digest.digest())}};

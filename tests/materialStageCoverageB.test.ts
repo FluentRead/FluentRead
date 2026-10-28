@@ -47,6 +47,20 @@ async function uploadMaterial(x:ReturnType<typeof make>) {
 }
 
 describe('material staging transaction boundaries',()=>{
+  it('releases the capacity-estimation slot when the clock throws before the estimate starts',async()=>{
+    let clockCalls=0;
+    const estimate=vi.fn(async()=>({quota:2*1024**3,usage:0}));
+    const x=make({clock:()=>{if(++clockCalls===2)throw Error('clock unavailable');return 100;},estimate,limits:{inflight:1}});
+    const manifest={records:3,frames:2511,bytes:328773783,digest:'0'.repeat(64)},guard={generation:0,capturedAt:100},request={deadline:10000};
+    const retry=createMaterialImportCapability();
+    await expect(x.stage.beginRecoverable(manifest,guard,retry,request)).rejects.toThrow('clock unavailable');
+    expect(estimate).not.toHaveBeenCalled();
+    expect(await x.db.table('stageSessions').count()).toBe(0);
+    await expect(x.stage.beginRecoverable(manifest,guard,retry,request)).resolves.toEqual(retry);
+    expect(estimate).toHaveBeenCalledOnce();
+    expect(await x.db.table('stageBudget').get('stage')).toMatchObject({reserved:manifest.bytes,reservedFrames:manifest.frames,slots:1});
+    await expect(x.stage.discard(retry)).resolves.toBe('discarded');
+  });
   it('rejects an append when a completed transfer is sealed after its authentication read',async()=>{
     const x=make(),cap=await x.begin();await x.stage.append(cap,x.frame);
     const delayed=delayNextAuthentication(x.db);

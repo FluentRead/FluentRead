@@ -23,6 +23,27 @@ function setup(){
 afterEach(async()=>{vi.restoreAllMocks();const opened=databases.splice(0),names=new Set(opened.map(db=>db.name));for(const db of opened)db.close();for(const name of names)await Dexie.delete(name);clock.now=100;});
 
 describe('material staging stored metadata boundaries',()=>{
+  it('keeps an estimator lease until its work settles when the clock triggers cancellation before listener registration',async()=>{
+    const db=new MaterialDatabase(`material-stage-a-${crypto.randomUUID()}`);databases.push(db);
+    const controller=new AbortController();let clockCalls=0,release!:()=>void;
+    const held=new Promise<void>(resolve=>release=resolve);
+    const estimate=vi.fn().mockImplementationOnce(async()=>{await held;return {quota:2*1024**3,usage:0};}).mockResolvedValue({quota:2*1024**3,usage:0});
+    const stage=createStage(db,{clock:()=>{if(++clockCalls===2)controller.abort();return 100;},estimate,limits:{inflight:1}});
+    const large={records:3,frames:2511,bytes:328773783,digest:'0'.repeat(64)},request={deadline:10000};
+    try {
+      await expect(stage.beginRecoverable(large,guard,createMaterialImportCapability(),{...request,signal:controller.signal})).rejects.toThrow('cancelled');
+      await vi.waitFor(()=>expect(estimate).toHaveBeenCalledOnce());
+      expect(await db.table('stageSessions').count()).toBe(0);
+      expect(await db.table('stageBudget').get('stage')).toBeUndefined();
+      await expect(stage.beginRecoverable(large,guard,createMaterialImportCapability(),request)).rejects.toMatchObject({name:'MaterialBackupCapacityError'});
+      expect(estimate).toHaveBeenCalledOnce();
+      release();
+      const retry=createMaterialImportCapability();
+      await vi.waitFor(async()=>expect(await stage.beginRecoverable(large,guard,retry,request)).toEqual(retry));
+      expect(estimate).toHaveBeenCalledTimes(2);
+      await expect(stage.discard(retry)).resolves.toBe('discarded');
+    } finally {release();}
+  });
   it.each(['seal','commit'] as const)('stops %s when cancellation occurs during the admission clock read',async action=>{
     const db=new MaterialDatabase(`material-stage-a-${crypto.randomUUID()}`);databases.push(db);
     const controller=new AbortController();let cancelOnRead=false;

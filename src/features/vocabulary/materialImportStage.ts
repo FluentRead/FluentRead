@@ -134,7 +134,9 @@ export function createStage(db:MaterialDatabase, options:{limits?:Partial<Limits
     if(!estimate)return fallback;
     let release:()=>void;
     try{release=takeControl(db.name,'estimate',undefined,limits.inflight);}catch{return fallback;}
-    const sampledAt=clock();
+    // 若时钟同步失败，尚未创建底层工作，必须立即释放已占用的估算槽位。
+    let sampledAt:number;
+    try{sampledAt=clock();}catch(error){release();throw error;}
     const work=Promise.resolve().then(()=>estimate());
     // Keep the lane occupied until the underlying API settles even after timeout.
     void work.then(release,release);

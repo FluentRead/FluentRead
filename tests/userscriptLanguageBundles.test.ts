@@ -255,6 +255,17 @@ describe('userscript remote UI language data', () => {
         }
     });
 
+    it('propagates a standalone Chinese compression failure instead of emitting incomplete data',async()=>{
+        vi.stubEnv('FLUENTREAD_USERSCRIPT_STANDALONE','1');vi.resetModules();
+        try {
+            const {createUserscriptCatalogCompressionPlugin:createPlugin}=await import('@/userscript/vite.config');
+            const failure=new Error('controlled Chinese compression failure'),compress=vi.fn(async()=>{throw failure;});
+            const plugin=createPlugin(compress) as unknown as {resolveId:(source:string,importer:string)=>string;load:(id:string)=>Promise<string>};
+            const id=plugin.resolveId('./messages/zh-CN',resolve(process.cwd(),'src/core/i18n/index.ts'));
+            await expect(plugin.load(id)).rejects.toBe(failure);expect(compress).toHaveBeenCalledOnce();
+        } finally {vi.unstubAllEnvs();vi.resetModules();}
+    });
+
     it('feeds the actual standalone Chinese virtual module to core and shares its provider with the actual English define', async () => {
         vi.stubEnv('FLUENTREAD_USERSCRIPT_STANDALONE', '1');
         vi.resetModules();
@@ -264,8 +275,12 @@ describe('userscript remote UI language data', () => {
             const provider = await import('@/userscript/defaultMessageData');
             const encoding = await import('@/userscript/dataEncoding');
             expect(provider.readDefaultMessageKeys()).toBeUndefined();
-            const plugin = createPlugin() as unknown as {resolveId: (source: string, importer: string) => string; load: (id: string) => string};
-            const generated = plugin.load(plugin.resolveId('./messages/zh-CN', resolve(process.cwd(), 'src/core/i18n/index.ts')));
+            const plugin = createPlugin() as unknown as {resolveId: (source: string, importer: string) => string; load: (id: string) => Promise<string>};
+            const generated = await plugin.load(plugin.resolveId('./messages/zh-CN', resolve(process.cwd(), 'src/core/i18n/index.ts')));
+            const encoded = JSON.parse(generated.match(/decodeUserscriptData\(("[^"\n]+")\)/u)![1]) as string;
+            const expectedColumns=packMessageCatalog(userscriptPageMessages(zhCNMessages));
+            const expectedBytes=Buffer.from(JSON.stringify([packKeyColumn(expectedColumns[0]),expectedColumns[1]]));
+            expect(Buffer.from(ungzip(encoding.decodeUserscriptData(encoded)))).toEqual(expectedBytes);
             const compiled = await transformWithEsbuild(generated, 'standalone-default-messages.js', {format: 'cjs', target: 'es2018'});
             const realm = {module: {exports: {} as {zhCNMessages: Record<string, string>}}, require: (id: string) => {
                 if (id === '@/userscript/pakoRuntime') return {inflateWithPako: (bytes: Uint8Array) => ungzip(bytes, {to: 'string'})};

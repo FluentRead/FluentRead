@@ -840,6 +840,12 @@ describe('userscript browser shim injection', () => {
             expect(committed).toBe(readFileSync(resolve(process.cwd(), path), 'utf8'));
         }
     });
+    it('keeps normal Chinese catalog compression synchronous and does not invoke standalone compression',()=>{
+        const compress=vi.fn(async()=>{throw Error('standalone compressor must not run');});
+        const plugin=createUserscriptCatalogCompressionPlugin(compress) as unknown as {resolveId:(source:string,importer:string)=>string;load:(id:string)=>string};
+        const id=plugin.resolveId('./messages/zh-CN',resolve(process.cwd(),'src/core/i18n/index.ts'));
+        expect(plugin.load(id)).toContain('export const zhCNMessages');expect(compress).not.toHaveBeenCalled();
+    });
     it('embeds the Chinese fallback catalog, minus the extension document and full-options statistics keys, as lossless static data', () => {
         const plugin = createUserscriptCatalogCompressionPlugin() as unknown as {
             resolveId: (source: string, importer: string) => string | null;
@@ -963,8 +969,8 @@ describe('userscript browser shim injection', () => {
             vi.resetModules();
             const {default: standalone, createUserscriptCatalogCompressionPlugin: createPlugin} = await import('@/userscript/vite.config');
             const defines = (standalone as {define: Record<string, string>}).define;
-            const plugin = createPlugin() as unknown as {resolveId: (source: string, importer: string) => string; load: (id: string) => string};
-            const source = plugin.load(plugin.resolveId('./messages/zh-CN', resolve(process.cwd(), 'src/core/i18n/index.ts')));
+            const plugin = createPlugin() as unknown as {resolveId: (source: string, importer: string) => string; load: (id: string) => Promise<string>};
+            const source = await plugin.load(plugin.resolveId('./messages/zh-CN', resolve(process.cwd(), 'src/core/i18n/index.ts')));
             const {transformWithEsbuild} = await import('vite');
             const provider = await import('@/userscript/defaultMessageData');
             const compiled = await transformWithEsbuild(source, 'standalone-chinese.js', {format: 'cjs', target: 'es2018'});

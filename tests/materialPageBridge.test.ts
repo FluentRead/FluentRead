@@ -523,4 +523,45 @@ describe('trusted material page bridge',()=>{
         expect(await transfer(bridge,page(header(first).capability!,0))).toEqual([{type:'error',code:'stale-operation'}]);
         expect(complete(await transfer(bridge,start())).count).toBe(2);bridge.dispose();
     });
+    it('clears delayed progress when a slow receiver disconnects while the scan continues',async()=>{
+        const realSetTimeout=globalThis.setTimeout,realClearTimeout=globalThis.clearTimeout;
+        const bounded=async<T>(work:Promise<T>):Promise<T>=>{
+            let timer:ReturnType<typeof setTimeout>|undefined;
+            try{return await Promise.race([work,new Promise<never>((_,reject)=>{timer=realSetTimeout(()=>reject(Error('bridge did not drain')),1000);})]);}
+            finally{if(timer!==undefined)realClearTimeout(timer);}
+        };
+        let bridge:ReturnType<typeof createMaterialPageBridge>|undefined;
+        let resolveSecond:((value:MaterialRecord|null)=>void)|undefined,resolveThird:((value:MaterialRecord|null)=>void)|undefined,resolveFourth:((value:MaterialRecord|null)=>void)|undefined,releaseAck:(()=>void)|undefined;
+        const restore:(()=>void)[]=[];
+        try{
+            vi.useFakeTimers({toFake:['setTimeout','clearTimeout','performance']});
+            // A constant offset retains a monotonic sub-millisecond clock.
+            const baseNow=performance.now.bind(performance);let last=-Infinity;
+            const clockSpy=vi.spyOn(performance,'now').mockImplementation(()=>{const t=baseNow(),value=t+0.5;if(value<last)throw Error('clock moved backwards');last=value;return value;});restore.push(()=>clockSpy.mockRestore());
+            const {repo}=fixture(4);let fourthStarted=false,firstReceived=false,readResult:unknown;
+            const second=new Promise<MaterialRecord|null>(resolve=>{resolveSecond=resolve;});
+            const third=new Promise<MaterialRecord|null>(resolve=>{resolveThird=resolve;});
+            const fourth=new Promise<MaterialRecord|null>(resolve=>{resolveFourth=resolve;});
+            const ack=new Promise<void>(resolve=>{releaseAck=resolve;});
+            const setSpy=vi.spyOn(globalThis,'setTimeout');restore.push(()=>setSpy.mockRestore());
+            const clearSpy=vi.spyOn(globalThis,'clearTimeout');restore.push(()=>clearSpy.mockRestore());
+            const original=repo.readSnapshotRecord.getMockImplementation()!;let calls=0;
+            repo.readSnapshotRecord.mockImplementation(async(revision,id)=>{calls++;if(calls===2)return second;if(calls===3)return third;if(calls===4){fourthStarted=true;return fourth;}return original(revision,id);});
+            bridge=createMaterialPageBridge({repository:repo,ready:Promise.resolve(),isPrivateContext:()=>false,isTrustedSender:()=>true,maxSessions:1});
+            const [server,client]=pair();bridge.connect(server);
+            void receiveMaterialRead(client as MaterialReadPort,async()=>{firstReceived=true;await ack;}).then(()=>{readResult='complete';},error=>{readResult=error;});
+            await vi.advanceTimersByTimeAsync(1);
+            client.postMessage(start());await vi.advanceTimersByTimeAsync(26);expect(firstReceived).toBe(true);resolveSecond!(item('01'));
+            await vi.advanceTimersByTimeAsync(500);resolveThird!(item('02'));await vi.advanceTimersByTimeAsync(0);expect(fourthStarted).toBe(true);
+            const candidate=setSpy.mock.calls.map((call,index)=>({delay:call[1],timer:setSpy.mock.results[index]?.value})).filter(x=>typeof x.delay==='number'&&x.delay>300&&x.delay<=500).at(-1);
+            expect(candidate).toBeDefined();expect(clearSpy.mock.calls.some(args=>args[0]===candidate!.timer)).toBe(false);
+            client.disconnect();await vi.advanceTimersByTimeAsync(0);expect(readResult).toBeInstanceOf(Error);
+            resolveFourth!(item('03'));releaseAck!();await bounded(bridge.dispose());
+            expect(clearSpy.mock.calls.some(args=>args[0]===candidate!.timer)).toBe(true);
+        }finally{
+            resolveSecond?.(item('01'));resolveThird?.(item('02'));resolveFourth?.(item('03'));releaseAck?.();
+            try{if(bridge)await bounded(bridge.dispose());}finally{for(const undo of restore.reverse())undo();vi.useRealTimers();}
+        }
+    });
+
 });

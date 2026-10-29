@@ -69,6 +69,17 @@ describe('trusted material page bridge',()=>{
         expect(server.closed).toBe(true);expect(server.onMessage.listeners.size).toBe(0);expect(server.onDisconnect.listeners.size).toBe(0);
         expect(repo.openSnapshot).not.toHaveBeenCalled();bridge.dispose();
     });
+    it('ignores a request callback already queued when another listener disconnects the port',async()=>{
+        const {repo}=fixture(),bridge=createMaterialPageBridge({repository:repo,ready:Promise.resolve(),isPrivateContext:()=>false,isTrustedSender:()=>true,maxPorts:1});
+        const [server,client]=pair();
+        server.onMessage.addListener(()=>server.disconnect());
+        bridge.connect(server);
+        try {
+            client.postMessage(start());await tick();
+            expect(server.closed).toBe(true);expect(repo.openSnapshot).not.toHaveBeenCalled();
+            expect(complete(await transfer(bridge,start())).count).toBe(2);
+        } finally {await bridge.dispose();}
+    });
     it.each(['before-registration','after-registration'] as const)('removes listeners if a disconnect arrives %s',async phase=>{
         const {bridge,repo}=fixture(),[server]=pair();
         const add=server.onDisconnect.addListener.bind(server.onDisconnect);

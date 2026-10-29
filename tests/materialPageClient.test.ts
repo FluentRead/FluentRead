@@ -155,6 +155,19 @@ describe('material page client',()=>{
         await expect(requestMaterialPage(open,{signal:controller.signal},connect)).rejects.toMatchObject({name:'AbortError'});
         expect(connect).not.toHaveBeenCalled();
     });
+    it('does not connect if cancellation arrives while checking the browser context',async()=>{
+        const controller=new AbortController(),connect=vi.fn(),original=Object.getOwnPropertyDescriptor(privateContext,'inIncognitoContext')!;
+        Object.defineProperty(privateContext,'inIncognitoContext',{configurable:true,get(){controller.abort();return false;}});
+        try {
+            await expect(requestMaterialPage(open,{signal:controller.signal},connect)).rejects.toMatchObject({name:'AbortError'});
+            expect(connect).not.toHaveBeenCalled();
+        } finally {Object.defineProperty(privateContext,'inIncognitoContext',original);}
+    });
+    it('disconnects without sending if cancellation occurs while connecting',async()=>{
+        const controller=new AbortController(),[client,server]=pair(),send=vi.spyOn(client,'postMessage');
+        await expect(requestMaterialPage(open,{signal:controller.signal},()=>{controller.abort();return client;})).rejects.toMatchObject({name:'AbortError'});
+        expect(send).not.toHaveBeenCalled();expect(server.closed).toBe(true);
+    });
     it('honors cancellation during the final transport acknowledgement',async()=>{
         const fixture=serve([header(),{type:'summary',value:summary},{type:'complete',count:1}]);
         const controller=new AbortController(),post=fixture.client.postMessage.bind(fixture.client);

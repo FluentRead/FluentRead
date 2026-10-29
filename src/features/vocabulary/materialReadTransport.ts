@@ -48,6 +48,12 @@ function record(value:unknown, keys:string[]):Record<string,unknown> {
   return object;
 }
 
+/** Classify errors without allowing hostile thrown objects to replace the original failure. */
+function pipeFailure(error:unknown):Error {
+  try {if(error instanceof Error)return error;} catch {/* The thrown object's prototype may itself throw. */}
+  return Error('Material read failed');
+}
+
 /** Single-message mailbox. A full mailbox or a message during processing is a protocol violation. */
 function channel(port:MaterialReadPort, options:MaterialReadOptions) {
   const timeout=options.idleTimeoutMs??30_000;
@@ -174,10 +180,10 @@ export async function sendMaterialRead(port:MaterialReadPort, source:AsyncIterab
     const ack=record(await pipe.next(),['v','type','seq']);
     if(ack.type!=='done'||ack.seq!==seq)throw Error('Invalid material read completion');
     complete=true;
-  } catch(error) {pipe.fail(error instanceof Error?error:Error('Material read failed'));throw error;}
+  } catch(error) {pipe.fail(pipeFailure(error));throw error;}
   finally {
     pipe.close();
-    if(!complete&&iterator?.return) {try {void Promise.resolve(iterator.return()).catch(()=>{});} catch {/* Cleanup must not hide the original error. */}}
+    if(!complete&&iterator) {try {const cleanup=iterator.return;if(cleanup)void Promise.resolve(cleanup.call(iterator)).catch(()=>{});} catch {/* Cleanup must not hide the original error. */}}
     if(complete) {try {port.disconnect();} catch {/* The peer may already have closed the dedicated port. */}}
   }
 }
@@ -219,6 +225,6 @@ async function receiveMaterialReadFromChannel(pipe:ReturnType<typeof channel>, o
         pipe.send({v:VERSION,type:'done',seq});return;
       } else throw Error('Invalid material read message');
     }
-  } catch(error) {pipe.fail(error instanceof Error?error:Error('Material read failed'));throw error;}
+  } catch(error) {pipe.fail(pipeFailure(error));throw error;}
   finally {pipe.close();}
 }

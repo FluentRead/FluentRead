@@ -364,9 +364,11 @@ describe('material read transport',()=>{
     await expect(result).rejects.toThrow('cancelled');expect(aborted).toBe(true);
   });
   it('runs iterator cleanup after a producer failure',async()=>{
-    const {ports}=pair(), cleanup=vi.fn();
-    const source={ [Symbol.asyncIterator](){return {next:async()=>{throw Error('read failed');},return:async()=>{cleanup();return {done:true as const,value:undefined};}};} };
-    await expect(sendMaterialRead(ports[0],source)).rejects.toThrow('read failed');expect(cleanup).toHaveBeenCalledOnce();
+    const {ports}=pair(), original=Error('read failed');let reads=0, observedThis:unknown;
+    const iterator={next:async()=>{throw original;},get return(){reads++;return function(this:unknown){observedThis=this;return Promise.reject(Error('cleanup failed'));};}};
+    const source={ [Symbol.asyncIterator](){return iterator;} };
+    await expect(sendMaterialRead(ports[0],source)).rejects.toBe(original);
+    expect(reads).toBe(1);expect(observedThis).toBe(iterator);
   });
   it('signals a cooperative stalled source on timeout',async()=>{
     vi.useFakeTimers();try {
@@ -432,5 +434,38 @@ describe('material read transport',()=>{
     const {ports}=pair();const consumer=receiveMaterialRead(ports[1],()=>{throw Error('consumer failed');});
     const producer=sendMaterialRead(ports[0],chunks(bytes(1)));
     await expect(consumer).rejects.toThrow('consumer failed');await expect(producer).rejects.toThrow('disconnected');
+  });
+});
+
+describe('hostile throwable and iterator cleanup',()=>{
+  it('preserves a consumer proxy rejection and immediately disconnects the sender',async()=>{
+    const {ports,states}=pair(), trap=Error('receiver prototype trap');
+    const original=new Proxy({}, {getPrototypeOf(){throw trap;}});
+    const receiving=receiveMaterialRead(ports[1],()=>{throw original;},{idleTimeoutMs:2000}).then(()=>undefined,error=>error);
+    const sending=sendMaterialRead(ports[0],chunks(bytes(1)),{idleTimeoutMs:2000}).then(()=>undefined,error=>error);
+    const receiverError=await receiving;
+    expect(receiverError===original).toBe(true);expect(states.every(state=>state.closed)).toBe(true);
+    const senderError=await sending;expect(senderError.message).toBe('Material read disconnected');
+    expect(states.every(s=>s.messages.size===0&&s.disconnects.size===0)).toBe(true);
+  });
+  it('preserves a producer proxy rejection and immediately disconnects the receiver',async()=>{
+    const {ports,states}=pair(), trap=Error('producer prototype trap');
+    const original=new Proxy({}, {getPrototypeOf(){throw trap;}});
+    const receiving=receiveMaterialRead(ports[1],()=>{},{idleTimeoutMs:2000}).then(()=>undefined,error=>error);
+    const sending=sendMaterialRead(ports[0],()=>{throw original;},{idleTimeoutMs:2000}).then(()=>undefined,error=>error);
+    const producerError=await sending;
+    expect(producerError===original).toBe(true);expect(states.every(state=>state.closed)).toBe(true);
+    const receiverError=await receiving;expect(receiverError.message).toBe('Material read disconnected');
+    expect(states.every(s=>s.messages.size===0&&s.disconnects.size===0)).toBe(true);
+  });
+  it('preserves the original source failure if the iterator return getter throws',async()=>{
+    const {ports,states}=pair(),original=Error('original read failure'),cleanup=Error('return getter failure');
+    const source={ [Symbol.asyncIterator](){return {next:async()=>{throw original;},get return():()=>Promise<IteratorResult<Uint8Array>>{throw cleanup;}};} };
+    const receiving=receiveMaterialRead(ports[1],()=>{},{idleTimeoutMs:2000}).then(()=>undefined,error=>error);
+    const sending=sendMaterialRead(ports[0],source,{idleTimeoutMs:2000}).then(()=>undefined,error=>error);
+    const [producerError,receiverError]=await Promise.all([sending,receiving]);
+    expect(producerError===original).toBe(true);
+    expect(receiverError.message).toBe('Material read disconnected');
+    expect(states.every(s=>s.messages.size===0&&s.disconnects.size===0)).toBe(true);
   });
 });

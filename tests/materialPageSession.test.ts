@@ -200,6 +200,14 @@ describe('paged material query sessions', () => {
         await expect(createMaterialPageSession(second.repository, {}, controller.signal, () => controller.abort())).rejects.toMatchObject({name:'AbortError'});
         expect(second.repository.readSnapshotRecord).toHaveBeenCalledTimes(1);
     });
+    it('stops a scan when its progress observer throws and allows a fresh session', async () => {
+        const f = fake([material('a'), material('b')]), failure = Error('progress callback failed');
+        await expect(createMaterialPageSession(f.repository, {}, undefined, () => {throw failure;})).rejects.toBe(failure);
+        expect(f.repository.readSnapshotRecord).toHaveBeenCalledTimes(1);
+        const retry = await createMaterialPageSession(f.repository);
+        expect((await retry.getPage({offset:0})).items.map(item => item.id)).toEqual(['a','b']);
+        await retry.close();
+    });
     it('sorts once and returns every matching item without duplication across pages', async () => {
         const records = Array.from({length:71}, (_,i) => material(`id-${String(i).padStart(3,'0')}`,
             {lastReadAt:i % 5, updatedAt:i % 3, archivedAt:i % 13 === 0 ? 5 : null}));

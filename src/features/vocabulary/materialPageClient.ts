@@ -7,7 +7,7 @@
 import browser from 'webextension-polyfill';
 import {MATERIAL_PAGE_PORT_NAME, MATERIAL_PAGE_MAX_LINE_BYTES, type MaterialPageErrorCode, type MaterialPageRequest} from './materialPageProtocol';
 import {parseMaterialSummary} from './materialSummaryValidation';
-import {receiveMaterialRead, type MaterialReadPort} from './materialReadTransport';
+import {startMaterialRead, type MaterialReadPort} from './materialReadTransport';
 import type {MaterialSummary} from './materialSummary';
 import type {MaterialDetailMetadata, MaterialDetailPage} from './materialDetailPage';
 import type {MaterialReference} from './materialProtocol';
@@ -52,38 +52,55 @@ async function receiveLines(request:MaterialPageRequest, options:Options, connec
     if (options.signal?.aborted) abort();
     let port:MaterialReadPort|undefined;
     let line = '', lineBytes = 0, decoder = new TextDecoder('utf-8',{fatal:true,ignoreBOM:true});
-    const onChunk = (chunk:Uint8Array) => {
-        for (let start=0;start<chunk.length;) {
-            if (isTerminal()) return invalid();
-            const end=chunk.indexOf(10,start), stop=end<0?chunk.length:end;
-            lineBytes+=stop-start;
-            if (lineBytes>MATERIAL_PAGE_MAX_LINE_BYTES) throw Error('材料分页数据过大，请重试。');
-            line+=decoder.decode(chunk.subarray(start,stop),{stream:true});
-            if (end<0) break;
-            line+=decoder.decode(); accept(line);
-            if (controller.signal.aborted) throw cancelled();
-            line=''; lineBytes=0;
-            decoder=new TextDecoder('utf-8',{fatal:true,ignoreBOM:true}); start=end+1;
+    let processingFailed = false, processingFailure:unknown;
+    const onChunk = (chunk:Uint8Array, transportSignal:AbortSignal) => {
+        try {
+            for (let start=0;start<chunk.length;) {
+                if (isTerminal()) return invalid();
+                const end=chunk.indexOf(10,start), stop=end<0?chunk.length:end;
+                lineBytes+=stop-start;
+                if (lineBytes>MATERIAL_PAGE_MAX_LINE_BYTES) throw Error('材料分页数据过大，请重试。');
+                line+=decoder.decode(chunk.subarray(start,stop),{stream:true});
+                if (end<0) break;
+                line+=decoder.decode(); accept(line);
+                if (transportSignal.aborted) throw cancelled();
+                line=''; lineBytes=0;
+                decoder=new TextDecoder('utf-8',{fatal:true,ignoreBOM:true}); start=end+1;
+            }
+        } catch(error) {
+            // 同步解析或回调失败先于随后到达的取消，需要保留原始错误。
+            if (!transportSignal.aborted) {processingFailed = true; processingFailure = error;}
+            throw error;
         }
     };
     let receiving:Promise<void>|undefined, received = false;
     try {
         if (controller.signal.aborted) throw cancelled();
         port=connect();
-        receiving=receiveMaterialRead(port,onChunk,{signal:controller.signal,idleTimeoutMs:options.idleTimeoutMs});
+        if (controller.signal.aborted) throw cancelled();
+        const receiver=startMaterialRead(port,onChunk,{signal:controller.signal,idleTimeoutMs:options.idleTimeoutMs});
+        receiving=receiver.result;
         void receiving.catch(()=>{});
-        port.postMessage(request);
+        try {port.postMessage(request);} catch(error) {receiver.assertOpen(); throw error;}
         await receiving;
         received = true;
         if (controller.signal.aborted) throw cancelled();
         if (lineBytes !== 0) return invalid();
     } catch (error) {
+        // 清理端口可能异步等待；较晚的取消不能覆盖已经发生的失败。
+        const callerCancelled = options.signal?.aborted;
         if (!received) {
             controller.abort();
             try {port?.disconnect();} catch {/* 端口可能已关闭。 */}
         }
         if (receiving) await receiving.catch(()=>{});
-        if (options.signal?.aborted) throw cancelled();
+        if (processingFailed) throw processingFailure;
+        if (callerCancelled) {
+            let aborted=false;
+            try {aborted=(error as {name?:unknown}|null)?.name === 'AbortError';}
+            catch {/* 不可信错误的 name 属性可能抛错；保留原始错误。 */}
+            if (aborted) throw cancelled();
+        }
         throw error;
     } finally {options.signal?.removeEventListener('abort',abort);}
 }

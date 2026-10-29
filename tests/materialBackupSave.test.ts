@@ -186,11 +186,35 @@ describe('material backup save targets', () => {
         aborting.resolve();await Promise.resolve();expect(settled).toBe(false);
         write.resolve();await expect(captured).resolves.toMatchObject({name:'AbortError'});expect(settled).toBe(true);expect(target.commit).not.toHaveBeenCalled();
     });
+    it('preserves cancellation when a pending write fails afterwards',async()=>{
+        const write=deferred<void>(),started=deferred<void>(),controller=new AbortController();
+        const target:MaterialBackupSaveTarget={write:async()=>{started.resolve();await write.promise;},commit:vi.fn(async()=> 'saved' as const),abort:vi.fn(async()=>{})};
+        const result=saveMaterialBackup(target,(consume,signal)=>new Promise<void>((_resolve,reject)=>{
+            void consume(new Uint8Array([1])).catch(()=>{});
+            signal.addEventListener('abort',()=>reject(new DOMException('cancelled','AbortError')),{once:true});
+        }),{signal:controller.signal});
+        const outcome=result.catch(error=>error);await started.promise;controller.abort();write.reject(Error('late write failure'));
+        await expect(outcome).resolves.toMatchObject({name:'AbortError'});expect(target.abort).toHaveBeenCalledOnce();expect(target.commit).not.toHaveBeenCalled();
+    });
     it('reports failed cleanup instead of claiming the partial target is gone', async () => {
         const original=Error('write failed'), target:MaterialBackupSaveTarget={write:async()=>{throw original;},commit:vi.fn(async()=> 'saved' as const),abort:async()=>{throw Error('cleanup failed');}};
         await expect(saveMaterialBackup(target,async consume=>{await consume(new Uint8Array([1]));}))
             .rejects.toMatchObject({name:'MaterialBackupSaveCleanupError',cause:original});
         expect(target.commit).not.toHaveBeenCalled();
+    });
+    it.each([false,true])('cleans the target if the failure name getter throws, with earlier write failure: %s',async writeFirst=>{
+        const failure=Object.defineProperty(Error('receiver failed'),'name',{get(){throw Error('name getter failed');}});
+        const target:MaterialBackupSaveTarget={write:async()=>{throw Error('write failed');},commit:vi.fn(async()=> 'saved' as const),abort:vi.fn(async()=>{})};
+        const receiving=async(consume:(chunk:Uint8Array)=>Promise<void>)=>{if(writeFirst)await consume(new Uint8Array([1])).catch(()=>{});throw failure;};
+        const actual=await saveMaterialBackup(target,receiving).then(()=>undefined,error=>error);
+        expect(actual===failure).toBe(true);
+        expect(target.abort).toHaveBeenCalledOnce();expect(vi.mocked(target.abort).mock.calls[0][0]===failure).toBe(true);expect(target.commit).not.toHaveBeenCalled();
+    });
+    it('reports cleanup failure while retaining an original error with a throwing name getter',async()=>{
+        const failure=Object.defineProperty(Error('receiver failed'),'name',{get(){throw Error('name getter failed');}});
+        const target:MaterialBackupSaveTarget={write:async()=>{},commit:vi.fn(async()=> 'saved' as const),abort:vi.fn(async()=>{throw Error('cleanup failed');})};
+        const actual=await saveMaterialBackup(target,async()=>{throw failure;}).then(()=>undefined,error=>error);
+        expect(actual.name).toBe('MaterialBackupSaveCleanupError');expect(actual.cause===failure).toBe(true);expect(target.abort).toHaveBeenCalledOnce();
     });
     it('does not accept late frames after successful receipt and copies caller-owned bytes', async () => {
         const written=deferred<void>(), started=deferred<void>();let captured:Uint8Array|undefined, late!:(chunk:Uint8Array)=>Promise<void>;

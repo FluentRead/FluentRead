@@ -140,6 +140,35 @@ describe('material read transport',()=>{
     ports[0].disconnect=()=>{throw Error('extension context invalidated');};
     await expect(sendMaterialRead(ports[0],chunks(),{idleTimeoutMs:0})).rejects.toThrow('Invalid material read timeout');
   });
+  it('returns a rejected promise, rather than throwing, if receiver setup fails',async()=>{
+    const {ports}=pair(),failure=new DOMException('listener setup failed','AbortError');
+    ports[1].onMessage.addListener=()=>{throw failure;};
+    let result!:Promise<void>;
+    expect(()=>{result=receiveMaterialRead(ports[1],()=>{});}).not.toThrow();
+    await expect(result).rejects.toBe(failure);
+  });
+  it.each(['cancel-first','disconnect-first'] as const)('retains the first failure if %s occurs while registering a listener',async order=>{
+    const {ports,states}=pair(),controller=new AbortController(),port=ports[1];
+    const register=port.onDisconnect.addListener.bind(port.onDisconnect);
+    port.onDisconnect.addListener=listener=>{
+      if(order==='cancel-first'){controller.abort();register(listener);listener();}
+      else {register(listener);listener();controller.abort();}
+    };
+    const result=receiveMaterialRead(port,()=>{},{signal:controller.signal});
+    await expect(result).rejects.toMatchObject(order==='cancel-first'?{name:'AbortError'}:{name:'Error',message:'Material read disconnected'});
+    expect(states[1].disconnects.size).toBe(0);expect(states[1].messages.size).toBe(0);
+  });
+  it.each(['cancel-first','disconnect-first'] as const)('retains %s when listener registration subsequently throws',async order=>{
+    const {ports,states}=pair(),controller=new AbortController(),port=ports[1];
+    const failure=Error('later registration failure');
+    port.onMessage.addListener=()=>{
+      if(order==='cancel-first')controller.abort();
+      else for(const listener of [...states[1].disconnects])listener();
+      throw failure;
+    };
+    await expect(receiveMaterialRead(port,()=>{},{signal:controller.signal})).rejects.toMatchObject(order==='cancel-first'?{name:'AbortError'}:{name:'Error',message:'Material read disconnected'});
+    expect(states[1].disconnects.size).toBe(0);expect(states[1].messages.size).toBe(0);
+  });
   it('supports empty streams',async()=>{
     const {ports}=pair();await Promise.all([receiveMaterialRead(ports[1],()=>{throw Error('unexpected');}),sendMaterialRead(ports[0],chunks())]);
   });

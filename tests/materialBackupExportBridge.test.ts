@@ -54,6 +54,13 @@ function wireStatistics(records:number,recordBytes:number,maxRecordBytes:number,
 }
 
 describe('material backup export bridge',()=>{
+    it('keeps receiver setup failures in the public Promise contract',async()=>{
+        const [,client]=pair(),failure=Error('listener setup failed');
+        client.onMessage.addListener=()=>{throw failure;};
+        let receiving!:ReturnType<typeof receiveMaterialBackupExport>;
+        expect(()=>{receiving=receiveMaterialBackupExport(client as MaterialReadPort,async()=>{});}).not.toThrow();
+        await expect(receiving).rejects.toBe(failure);
+    });
     it('rejects invalid resource limits before installing any listener',()=>{
         for(const overrides of [{maxPorts:0},{maxPorts:33},{maxPorts:1.5},{idleTimeoutMs:0},{idleTimeoutMs:2_147_483_648}])
             expect(()=>setup(overrides)).toThrow('材料导出端口限制无效');
@@ -177,6 +184,24 @@ describe('material backup export bridge',()=>{
         await expect(saving).rejects.toMatchObject({name:'AbortError'});
         expect(file.write).toHaveBeenCalled();expect(file.abort).toHaveBeenCalledOnce();expect(file.close).not.toHaveBeenCalled();
         await bridge.dispose();expect(server.closed).toBe(true);
+    });
+    it.each([false,true])('preserves a failed file write observed before cancellation when cleanup fails: %s',async cleanupFails=>{
+        const {bridge}=setup(),[server,client]=pair(),controller=new AbortController(),failure=Error('write failed first');bridge.connect(server);
+        let observed=false;
+        const file:MaterialBackupWritable={write:vi.fn(async()=>{throw failure;}),close:vi.fn(async()=>{}),abort:vi.fn(async()=>{if(cleanupFails)throw Error('cleanup failed');})};
+        const target=await chooseMaterialBackupTarget('backup.json',{pick:async()=>({createWritable:async()=>file})});
+        const saving=saveMaterialBackup(target,async (consume,signal)=>{
+            const receiving=receiveMaterialBackupExport(client as MaterialReadPort,chunk=>{
+                const writing=consume(chunk);
+                // saveMaterialBackup registered its failure observer before returning writing.
+                void writing.catch(()=>{observed=true;controller.abort();});
+                return writing;
+            },{signal});client.postMessage(start);await receiving;
+        },{signal:controller.signal});
+        const outcome=await saving.catch(error=>error);
+        if(cleanupFails)expect(outcome).toMatchObject({name:'MaterialBackupSaveCleanupError',cause:failure});else expect(outcome).toBe(failure);
+        expect(observed).toBe(true);expect(controller.signal.aborted).toBe(true);
+        expect(file.abort).toHaveBeenCalledOnce();expect(file.close).not.toHaveBeenCalled();await bridge.dispose();
     });
     it('sends only a verified public stale code and aborts the partially written target',async()=>{
         const repo={openSnapshot:async()=>({revision:1,ids:['m']}),readSnapshotRecord:async()=>material(),

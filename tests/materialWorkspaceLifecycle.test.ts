@@ -21,7 +21,7 @@ vi.mock('@/src/features/vocabulary/materialClient', () => Object.fromEntries([
   'materialRemoveReference','materialClear','materialExport','materialImport','materialGeneration',
   'workspaceMaterialCapture','workspaceMaterialUpdate','workspaceMaterialArchive','workspaceMaterialRestore','workspaceMaterialRemoveReference',
 ].map(name => [name, (...args: unknown[]) => (globalThis as any).__fluentreadMaterialUiTest.api[name.replace('workspaceMaterial','material')](...args)])));
-vi.mock('@/src/features/vocabulary/materialBackupExportClient', () => ({receiveMaterialBackupExport: async (...args: any[]) => (await (globalThis as any).__fluentreadMaterialUiTest.exportReceive(...args)) ?? {records:0,recordBytes:0,maxRecordBytes:0,frames:0}}));
+vi.mock('@/src/features/vocabulary/materialBackupExportClient', () => ({startMaterialBackupExport: (...args: any[]) => (globalThis as any).__fluentreadMaterialUiTest.exportStart(...args)}));
 vi.mock('@/src/features/vocabulary/materialBackupBrowserSave', () => ({
   prepareFirefoxMaterialBackupContext: () => (globalThis as any).__fluentreadMaterialUiTest.prepareBackupContext(),
   beginFirefoxMaterialBackup: (...args: any[]) => (globalThis as any).__fluentreadMaterialUiTest.browserSave(...args),
@@ -57,6 +57,7 @@ async function mount(options: {shown?: import('vue').Ref<boolean>; list?: (...ar
     materialGeneration:vi.fn(async()=>0),
   };
   const exportReceive=vi.fn(async (_port:unknown, consume:(bytes:Uint8Array)=>Promise<void>)=>{await consume(new TextEncoder().encode('{}'));});
+  const exportStart=vi.fn((...args:any[])=>({result:Promise.resolve((exportReceive as any)(...args)).then(value=>value ?? {records:0,recordBytes:0,maxRecordBytes:0,frames:0}),assertOpen:()=>{}}));
   const browserSave=vi.fn(async (_name:string):Promise<any>=>({status:'unavailable'}));
   const recoverTemporary=vi.fn(async (_name:string,_filename:string):Promise<any>=>({status:'unavailable'}));
   const listTemporary=vi.fn(async ():Promise<any>=>({items:[],truncated:false,failed:0}));
@@ -70,7 +71,7 @@ async function mount(options: {shown?: import('vue').Ref<boolean>; list?: (...ar
     acknowledgeMaterialBackup:vi.fn(async()=>undefined),discardMaterialBackup:vi.fn(async():Promise<{state:'discarded'}|{state:'committed';result:{inserted:number;updated:number;skipped:number}}>=>({state:'discarded'})),
   };
   const prepareBackupContext=vi.fn(async()=>true);
-  (globalThis as any)[KEY] = {api,pages:materialPageFixture(api),backup,exportReceive,browserSave,recoverTemporary,listTemporary,removeTemporary,prepareBackupContext,getSession:options.session || (async()=>null),memories:options.memories || (async()=>[]),browser:{runtime:{connect:()=>exportPort,getURL:(p:string)=>`chrome-extension://fixture/${p}`,sendMessage:options.getEntry || (async()=>({success:true,data:null})),onMessage:{addListener:(value:typeof listener)=>{listener=value;},removeListener}}}};
+  (globalThis as any)[KEY] = {api,pages:materialPageFixture(api),backup,exportReceive,exportStart,browserSave,recoverTemporary,listTemporary,removeTemporary,prepareBackupContext,getSession:options.session || (async()=>null),memories:options.memories || (async()=>[]),browser:{runtime:{connect:()=>exportPort,getURL:(p:string)=>`chrome-extension://fixture/${p}`,sendMessage:options.getEntry || (async()=>({success:true,data:null})),onMessage:{addListener:(value:typeof listener)=>{listener=value;},removeListener}}}};
   const {document, window} = options.surface || parseHTML('<html><body><main></main></body></html>');
   delete (window as any).showSaveFilePicker;
   vi.stubGlobal('document', document); vi.stubGlobal('window', window);
@@ -101,7 +102,7 @@ async function mount(options: {shown?: import('vue').Ref<boolean>; list?: (...ar
   let active=true; const unmount=()=>{if(active){active=false;app.unmount();}}; dispose.push(()=>{if(panel?.fallbackDownloadUrl)panel.releaseFallbackDownload();while(panel?.lateBackupWarning)panel.clearLateBackupWarning();while(panel?.lateBackupStatus)panel.clearLateBackupStatus();unmount();});
   const flush=async()=>{for(let i=0;i<15;i++){await Promise.resolve();await runtime.nextTick();}};
   await flush();
-  return {panel,api,backup,cap,exportReceive,browserSave,recoverTemporary,listTemporary,removeTemporary,exportPort,flush,unmount,document,window,openTab,removeListener,notify:()=>listener?.({type:'fluentReadMaterialsChanged'})};
+  return {panel,api,backup,cap,exportReceive,exportStart,browserSave,recoverTemporary,listTemporary,removeTemporary,exportPort,flush,unmount,document,window,openTab,removeListener,notify:()=>listener?.({type:'fluentReadMaterialsChanged'})};
 }
 describe('material workspace action ownership',()=>{
   it.each(['export','edit'] as const)('applies a pending topic search after %s finishes',async operation=>{
@@ -473,6 +474,35 @@ it('keeps the small-download fallback when optional Firefox permission is denied
   vi.spyOn(URL,'createObjectURL').mockReturnValue('blob:permission-denied');vi.spyOn(URL,'revokeObjectURL').mockImplementation(()=>{});
   vi.spyOn(ui.window.HTMLElement.prototype,'click').mockImplementation(()=>{});
   await ui.panel.exportMaterials();expect(ui.panel.feedback).toContain('已发起材料备份下载');expect(ui.exportReceive).toHaveBeenCalledOnce();
+});
+it('preserves an export receiver startup failure and cleans the selected file',async()=>{
+  const ui=await mount(),failure=Error('listener registration failed');
+  const actual=await vi.importActual<typeof import('@/src/features/vocabulary/materialBackupExportClient')>('@/src/features/vocabulary/materialBackupExportClient');
+  const events={addListener:()=>{},removeListener:()=>{}};
+  Object.assign(ui.exportPort,{onDisconnect:events,onMessage:{...events,addListener:()=>{throw failure;}},postMessage:vi.fn(()=>{throw Error('closed');})});
+  ui.exportStart.mockImplementationOnce(actual.startMaterialBackupExport as any);
+  const target={write:vi.fn(async()=>{}),commit:vi.fn(async()=> 'saved'),abort:vi.fn(async()=>{})};
+  ui.browserSave.mockResolvedValueOnce({status:'ready',target});
+  await ui.panel.exportMaterials();
+  expect(ui.panel.error).toBe('listener registration failed');expect(ui.exportPort.postMessage).not.toHaveBeenCalled();expect(target.abort).toHaveBeenCalledOnce();expect(target.commit).not.toHaveBeenCalled();
+});
+it.each(['post-failure','protocol-first','disconnect-first','cancel-first'] as const)('preserves %s during export startup and cleans the selected file',async order=>{
+  const ui=await mount(),actual=await vi.importActual<typeof import('@/src/features/vocabulary/materialBackupExportClient')>('@/src/features/vocabulary/materialBackupExportClient');
+  const messages=new Set<(value:unknown)=>void>(),disconnects=new Set<()=>void>();
+  Object.assign(ui.exportPort,{
+    onDisconnect:{addListener:(fn:()=>void)=>{disconnects.add(fn);if(order==='disconnect-first')fn();},removeListener:(fn:()=>void)=>disconnects.delete(fn)},
+    onMessage:{addListener:(fn:(value:unknown)=>void)=>{messages.add(fn);if(order==='cancel-first')ui.panel.exportController.abort();},removeListener:(fn:(value:unknown)=>void)=>messages.delete(fn)},
+    postMessage:vi.fn(()=>{
+      if(order==='protocol-first')for(const frame of [{v:1,type:'frame',seq:0,length:1,data:'YQ=='},{v:1,type:'frame',seq:1,length:1,data:'Yg=='}])for(const fn of [...messages])fn(frame);
+      throw Error('post failed');
+    }),
+  });
+  ui.exportStart.mockImplementationOnce(actual.startMaterialBackupExport as any);
+  const target={write:vi.fn(async()=>{}),commit:vi.fn(async()=> 'saved'),abort:vi.fn(async()=>{})};ui.browserSave.mockResolvedValueOnce({status:'ready',target});
+  await ui.panel.exportMaterials();
+  expect(ui.panel.error).toBe(order==='cancel-first'?'已取消导出。':order==='disconnect-first'?'Material read disconnected':order==='protocol-first'?'Unexpected material read message':'post failed');
+  if(order==='disconnect-first'||order==='cancel-first')expect(ui.exportPort.postMessage).not.toHaveBeenCalled();
+  expect(target.abort).toHaveBeenCalledOnce();expect(target.commit).not.toHaveBeenCalled();expect(messages.size).toBe(0);expect(disconnects.size).toBe(0);
 });
 it.each(['denied','unavailable'] as const)('exports an intact backup larger than 20 MiB with %s fallback',async status=>{
   const ui=await mount(),hash=createHash('sha256'),chunk=Uint8Array.from({length:24*1024},(_,i)=>i%251);ui.browserSave.mockResolvedValueOnce({status});
@@ -1019,4 +1049,41 @@ it('displays an invalid backup transfer with a translated diagnostic',async()=>{
   expect(ui.panel.error).toBe('材料备份传输不完整');
   await ui.flush();expect(ui.document.body.textContent).toContain('材料备份传输不完整');
   expect(translateLegacyText(ui.panel.error,'en-US')).toBe('The material backup transfer is incomplete');
+});
+it.each(['name','message'] as const)('shows a fallback when an export failure %s getter throws',async property=>{
+  const ui=await mount(),failure=Object.defineProperty(Error('export failed'),property,{get(){throw Error('failure getter failed');}});
+  ui.exportReceive.mockRejectedValueOnce(failure);
+  await ui.panel.exportMaterials();await ui.flush();
+  expect(ui.panel.error).toBe('导出失败，请重试。');expect(ui.panel.busy).toBe(false);
+  expect(ui.document.body.textContent).toContain('导出失败，请重试。');
+});
+it.each([
+  ['firefox','MaterialBackupOpfsCleanupError','备份已下载，但临时文件未清理。'],
+  ['firefox','MaterialBackupSaveCleanupError','备份未完成，临时文件清理失败。'],
+  ['picker','MaterialBackupSaveCleanupError','材料备份未完成，清理失败，请检查保存位置是否存在不完整文件'],
+] as const)('keeps the %s cleanup warning when %s has an unreadable message',async(kind,name,expected)=>{
+  const ui=await mount(),failure=Object.defineProperty(Object.assign(Error('cleanup failed'),{name}),'message',{get(){throw Error('message unavailable');}});
+  if(kind==='firefox')ui.browserSave.mockResolvedValueOnce({status:'ready',target:{write:async()=>{},commit:async()=>{throw failure;},abort:async()=>{}}});
+  else (ui.window as any).showSaveFilePicker=vi.fn(async()=>({createWritable:async()=>({write:async()=>{},close:async()=>{throw failure;},abort:async()=>{}})}));
+  await ui.panel.exportMaterials();expect(ui.panel.error).toContain(expected);expect(ui.panel.busy).toBe(false);
+});
+it.each([
+  ['firefox','MaterialBackupOpfsCleanupError','备份已下载，但临时文件未清理。'],
+  ['firefox','MaterialBackupSaveCleanupError','备份未完成，临时文件清理失败。'],
+  ['picker','MaterialBackupSaveCleanupError','备份未完成且无法清理已选择的文件'],
+] as const)('retains the %s cleanup warning after unmount when %s has an unreadable message',async(kind,name,expected)=>{
+  const surface=parseHTML('<html><body><main></main></body></html>'),ui=await mount({surface}),gate=deferred<void>(),commit=vi.fn(()=>gate.promise);
+  const failure=Object.defineProperty(Object.assign(Error('cleanup failed'),{name}),'message',{get(){throw Error('message unavailable');}});
+  if(kind==='firefox')ui.browserSave.mockResolvedValueOnce({status:'ready',target:{write:async()=>{},commit,abort:async()=>{}}});
+  else (ui.window as any).showSaveFilePicker=vi.fn(async()=>({createWritable:async()=>({write:async()=>{},close:commit,abort:async()=>{}})}));
+  const pending=ui.panel.exportMaterials();await vi.waitFor(()=>expect(commit).toHaveBeenCalledOnce());ui.unmount();gate.reject(failure);await pending;
+  const next=await mount({surface});expect(next.panel.lateBackupWarning).toContain(expected);
+});
+it.each(['name','message'] as const)('retains a fallback when an unmounted export failure %s getter throws',async property=>{
+  const surface=parseHTML('<html><body><main></main></body></html>'),ui=await mount({surface}),gate=deferred<void>();
+  const failure=Object.defineProperty(Error('export failed'),property,{get(){throw Error('failure getter failed');}});
+  ui.exportReceive.mockImplementationOnce(async()=>gate.promise);
+  const pending=ui.panel.exportMaterials();await vi.waitFor(()=>expect(ui.exportReceive).toHaveBeenCalledOnce());
+  ui.unmount();gate.reject(failure);await pending;
+  const next=await mount({surface});expect(next.panel.lateBackupWarning).toBe('导出失败，请重试。');
 });

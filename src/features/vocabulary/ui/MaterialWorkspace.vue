@@ -154,7 +154,7 @@ import type {MaterialSummary} from '../materialSummary';
 import type {MaterialDetailMetadata} from '../materialDetailPage';
 import {chooseMaterialBackupTarget, saveMaterialBackup, waitForMaterialBackupTarget, type MaterialBackupSavePlatform} from '../materialBackupSave';
 import {beginFirefoxMaterialBackup, beginFirefoxRecoveredMaterialBackup, listFirefoxMaterialBackupLeftovers, removeFirefoxMaterialBackupLeftover, prepareFirefoxMaterialBackupContext, type MaterialBackupLeftover} from '../materialBackupBrowserSave';
-import {receiveMaterialBackupExport} from '../materialBackupExportClient';
+import {startMaterialBackupExport} from '../materialBackupExportClient';
 import {MATERIAL_BACKUP_EXPORT_PORT_NAME} from '../materialBackupExportProtocol';
 import type {MaterialReadPort} from '../materialReadTransport';
 import {formatMaterialTopics, parseMaterialTopics} from '../materialTopicsInput';
@@ -612,24 +612,36 @@ function recordBackupWarning(message:string) {sharedLateBackupWarnings.value.pus
 function clearLateBackupWarning() {sharedLateBackupWarnings.value.shift();}
 function recordBackupStatus(message:string) {sharedLateBackupStatuses.value.push(message);}
 function clearLateBackupStatus() {sharedLateBackupStatuses.value.shift();}
+function isBackupError(failure:unknown,name:string):boolean {
+    try {return failure instanceof Error && failure.name===name;} catch {return false;}
+}
 function backupFailureMessage(failure:unknown,cancelledMessage:string,fallback:string,firefoxTarget=false):string {
-    if(!(failure instanceof Error))return fallback;
-    if(failure.name==='AbortError')return cancelledMessage;
-    if(['无法确认材料备份下载状态，临时文件已保留，请检查浏览器下载','无法确认材料备份下载是否已开始，临时文件已保留，请检查浏览器下载'].includes(failure.message))
-        return '无法确认备份下载状态。请先检查浏览器下载，确认没有下载进行后重载当前页面以释放占用，再在临时文件列表处理。';
-    if(failure.name==='MaterialBackupOpfsCleanupError')
-        return '备份已下载，但临时文件未清理。确认没有下载进行后重载当前页面以释放占用，再在临时文件列表处理。';
-    if(firefoxTarget && failure.name==='MaterialBackupSaveCleanupError')
-        return '备份未完成，临时文件清理失败。确认没有下载进行后重载当前页面以释放占用，再在临时文件列表处理。';
-    return failure.message;
+    try {
+        if(!(failure instanceof Error))return fallback;
+        const name=failure.name;
+        if(name==='AbortError')return cancelledMessage;
+        if(name==='MaterialBackupOpfsCleanupError')
+            return '备份已下载，但临时文件未清理。确认没有下载进行后重载当前页面以释放占用，再在临时文件列表处理。';
+        if(name==='MaterialBackupSaveCleanupError')
+            return firefoxTarget?'备份未完成，临时文件清理失败。确认没有下载进行后重载当前页面以释放占用，再在临时文件列表处理。':'材料备份未完成，清理失败，请检查保存位置是否存在不完整文件';
+        const message=failure.message;
+        if(['无法确认材料备份下载状态，临时文件已保留，请检查浏览器下载','无法确认材料备份下载是否已开始，临时文件已保留，请检查浏览器下载'].includes(message))
+            return '无法确认备份下载状态。请先检查浏览器下载，确认没有下载进行后重载当前页面以释放占用，再在临时文件列表处理。';
+        return message;
+    } catch {return fallback;}
 }
 function retainUnmountedBackupFailure(failure:unknown,kind:'firefox'|'picker'|'buffered') {
-    if(!(failure instanceof Error)||failure.name==='AbortError')return;
-    if(kind==='firefox' && (failure.name==='MaterialBackupSaveCleanupError' || failure.name==='MaterialBackupOpfsCleanupError'
-        || ['无法确认材料备份下载状态，临时文件已保留，请检查浏览器下载','无法确认材料备份下载是否已开始，临时文件已保留，请检查浏览器下载'].includes(failure.message)))
-        recordBackupWarning(backupFailureMessage(failure,'已取消导出。','导出失败，请重试。',true));
-    else if(kind==='picker' && failure.name==='MaterialBackupSaveCleanupError')
-        recordBackupWarning('备份未完成且无法清理已选择的文件，请检查保存位置是否留有不完整文件。');
+    try {
+        if(!(failure instanceof Error))return;
+        const name=failure.name;
+        if(name==='AbortError')return;
+        if(kind==='firefox' && (name==='MaterialBackupSaveCleanupError' || name==='MaterialBackupOpfsCleanupError'))
+            recordBackupWarning(backupFailureMessage(failure,'已取消导出。','导出失败，请重试。',true));
+        else if(kind==='picker' && name==='MaterialBackupSaveCleanupError')
+            recordBackupWarning('备份未完成且无法清理已选择的文件，请检查保存位置是否留有不完整文件。');
+        else if(['无法确认材料备份下载状态，临时文件已保留，请检查浏览器下载','无法确认材料备份下载是否已开始，临时文件已保留，请检查浏览器下载'].includes(failure.message) && kind==='firefox')
+            recordBackupWarning(backupFailureMessage(failure,'已取消导出。','导出失败，请重试。',true));
+    } catch {recordBackupWarning('导出失败，请重试。');}
 }
 async function openTemporaryBackups() {
     const ticket=++temporaryGeneration;showTemporaryBackups.value=true;temporaryLoading.value=true;
@@ -672,9 +684,9 @@ async function recoverTemporaryBackup(item:MaterialBackupLeftover) {
         if(active&&ticket===generation)feedback.value=message;
         else recordBackupStatus(result.state==='saved'?'此前开始的临时备份下载已完成，临时文件仍保留；确认后可删除。':'此前开始的临时备份下载已发起，临时文件仍保留；请确认下载完成后再处理。');
     } catch(failure) {
-        if(failure instanceof Error && failure.name==='MaterialBackupContextError')void prepareFirefoxMaterialBackupContext();
+        if(isBackupError(failure,'MaterialBackupContextError'))void prepareFirefoxMaterialBackupContext();
         if(active&&ticket===generation)temporaryError.value=backupFailureMessage(failure,'已取消取回备份。','取回备份失败，请重试。',true);
-        else if(failure instanceof Error&&failure.name==='AbortError')recordBackupStatus('此前开始的临时备份取回已取消。');
+        else if(isBackupError(failure,'AbortError'))recordBackupStatus('此前开始的临时备份取回已取消。');
         else retainUnmountedBackupFailure(failure,'firefox');
     } finally {
         if(exportController===controller)exportController=undefined;exportRunning.value=false;exportKeepOpen.value=false;
@@ -727,8 +739,8 @@ async function exportMaterials() {
     });
     let selectedFirefox=false,selectedBuffered=false;
     const targetPromise=firefoxChoice?firefoxChoice.catch(failure=>{
-        if(failure instanceof Error && failure.name==='MaterialBackupContextError') {void prepareFirefoxMaterialBackupContext();throw failure;}
-        if(failure instanceof Error && failure.name==='MaterialBackupInitializationCleanupError')
+        if(isBackupError(failure,'MaterialBackupContextError')) {void prepareFirefoxMaterialBackupContext();throw failure;}
+        if(isBackupError(failure,'MaterialBackupInitializationCleanupError'))
             recordBackupWarning('创建备份时未能清理新建的空临时文件，请在临时文件列表检查。');
         return {status:'unavailable' as const};
     }).then(choice=>{
@@ -741,9 +753,16 @@ async function exportMaterials() {
         exportKeepOpen.value=selectedFirefox;exportBuffered.value=selectedBuffered;
         const result=await saveMaterialBackup(target,async (consume,signal)=>{
             const port=browser.runtime.connect({name:MATERIAL_BACKUP_EXPORT_PORT_NAME}) as unknown as MaterialReadPort;
-            const receiving=receiveMaterialBackupExport(port,consume,{signal});void receiving.catch(()=>{});
-            try {port.postMessage({v:1,type:'start',operation:'export'});const statistics=await receiving;await confirmExportCapacity(statistics,signal);}
-            catch(failure){try{port.disconnect();}catch{/* 端口可能已关闭。 */}await receiving.catch(()=>{});throw failure;}
+            const readController=new AbortController(),cancelRead=()=>readController.abort();
+            signal.addEventListener('abort',cancelRead,{once:true});if(signal.aborted)cancelRead();
+            let receiving:Promise<import('../materialBackupExportProtocol').MaterialBackupExportStatistics>|undefined;
+            try {
+                const receiver=startMaterialBackupExport(port,consume,{signal:readController.signal});receiving=receiver.result;void receiving.catch(()=>{});
+                try {port.postMessage({v:1,type:'start',operation:'export'});} catch(error) {receiver.assertOpen();throw error;}
+                const statistics=await receiving;await confirmExportCapacity(statistics,signal);
+            }
+            catch(failure){cancelRead();try{port.disconnect();}catch{/* 端口可能已关闭。 */}if(receiving)await receiving.catch(()=>{});throw failure;}
+            finally {signal.removeEventListener('abort',cancelRead);}
         },{signal:controller.signal});
         const message=result.state==='saved'?'材料备份已保存，包含来源、原句与个人笔记，请妥善保管。':'已发起材料备份下载，包含来源、原句与个人笔记，请检查浏览器下载。';
         if (!active || ticket !== generation) {
@@ -760,7 +779,7 @@ async function exportMaterials() {
     catch (failure) {
         if (active && ticket === generation)
             error.value = backupFailureMessage(failure,'已取消导出。','导出失败，请重试。',selectedFirefox);
-        else if(failure instanceof Error && failure.name==='AbortError')recordBackupStatus('此前开始的材料备份导出已取消。');
+        else if(isBackupError(failure,'AbortError'))recordBackupStatus('此前开始的材料备份导出已取消。');
         else retainUnmountedBackupFailure(failure,selectedFirefox?'firefox':picker?'picker':'buffered');
     }
     finally {

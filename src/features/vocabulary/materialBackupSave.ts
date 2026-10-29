@@ -104,6 +104,7 @@ export async function saveMaterialBackup(target:MaterialBackupSaveTarget, receiv
     caller?.addEventListener('abort',abort,{once:true});
     if (caller?.aborted) abort();
     let pending:Promise<void>|undefined, failed = false, failure:unknown, bytes = 0, accepting = true;
+    let writeFailedBeforeCancel = false, writeFailure:unknown;
     const reject = (error:unknown):Promise<void> => {
         if (!failed) {failed = true;failure = error;}
         const rejected = Promise.reject(error);void rejected.catch(()=>{});return rejected;
@@ -117,7 +118,10 @@ export async function saveMaterialBackup(target:MaterialBackupSaveTarget, receiv
         const copy = chunk.slice();
         const work = Promise.resolve().then(async()=>{check(controller.signal);await target.write(copy);check(controller.signal);bytes += copy.byteLength;});
         pending = work;
-        void work.then(()=>{if(pending===work)pending=undefined;},error=>{if(!failed){failed=true;failure=error;}if(pending===work)pending=undefined;});
+        void work.then(()=>{if(pending===work)pending=undefined;},error=>{
+            if(!controller.signal.aborted && !writeFailedBeforeCancel){writeFailedBeforeCancel=true;writeFailure=error;}
+            if(!failed){failed=true;failure=error;}if(pending===work)pending=undefined;
+        });
         return work;
     };
     try {
@@ -132,10 +136,16 @@ export async function saveMaterialBackup(target:MaterialBackupSaveTarget, receiv
         return {state,bytes};
     } catch (error) {
         accepting = false;
+        // 写入错误已被观察后才取消时，传输层的取消不能掩盖它。
+        let cause=error;
+        if(writeFailedBeforeCancel){
+            try {if((error as {name?:unknown}|null)?.name==='AbortError')cause=writeFailure;}
+            catch {/* 不可信错误的 name 属性不能阻止清理或覆盖原错误。 */}
+        }
         controller.abort();
-        const cleanup = Promise.resolve().then(()=>target.abort(error));
+        const cleanup = Promise.resolve().then(()=>target.abort(cause));
         const settled = await Promise.allSettled(pending ? [cleanup,pending] : [cleanup]);
-        if (settled[0].status === 'rejected') throw Object.assign(new Error('材料备份未完成，清理失败，请检查保存位置是否存在不完整文件'),{name:'MaterialBackupSaveCleanupError',cause:error});
-        throw error;
+        if (settled[0].status === 'rejected') throw Object.assign(new Error('材料备份未完成，清理失败，请检查保存位置是否存在不完整文件'),{name:'MaterialBackupSaveCleanupError',cause});
+        throw cause;
     } finally {caller?.removeEventListener('abort',abort);}
 }

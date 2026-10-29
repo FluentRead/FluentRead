@@ -81,11 +81,14 @@ function channel(port:MaterialReadPort, options:MaterialReadOptions) {
     pending=message;hasPending=true;touch();wake?.();wake=undefined;
   };
   try {
-    port.onDisconnect.addListener(onDisconnect);
-    if(!closed)port.onMessage.addListener(onMessage);
     if(options.signal?.aborted)onAbort();else options.signal?.addEventListener('abort',onAbort,{once:true});
+    if(!closed)port.onDisconnect.addListener(onDisconnect);
+    if(!closed)port.onMessage.addListener(onMessage);
     if(closed)closeListeners();else touch();
-  } catch(error) {fail(Error('Material read listener failed'));closeListeners();throw error;}
+  } catch(error) {
+    const earlierFailure=failure;
+    fail(Error('Material read listener failed'));closeListeners();throw earlierFailure??error;
+  }
   return {
     signal:controller.signal,
     async next():Promise<unknown> {
@@ -179,9 +182,22 @@ export async function sendMaterialRead(port:MaterialReadPort, source:AsyncIterab
   }
 }
 
+export interface MaterialReadReceiver {result:Promise<void>;assertOpen():void}
+
+/** Install the receiver before the caller sends its first message. */
+export function startMaterialRead(port:MaterialReadPort, onChunk:(chunk:Uint8Array, signal:AbortSignal)=>void|Promise<void>, options:MaterialReadOptions={}):MaterialReadReceiver {
+  const hash=sha256.create(), pipe=channel(port,options);
+  // A listener may synchronously report a disconnected port during registration.
+  pipe.assertOpen();
+  return {result:receiveMaterialReadFromChannel(pipe,onChunk,hash),assertOpen:()=>pipe.assertOpen()};
+}
+
 /** Deliver verified frames one at a time. Treat data as complete only after this resolves. */
 export async function receiveMaterialRead(port:MaterialReadPort, onChunk:(chunk:Uint8Array, signal:AbortSignal)=>void|Promise<void>, options:MaterialReadOptions={}):Promise<void> {
-  const pipe=channel(port,options), hash=sha256.create();
+  return startMaterialRead(port,onChunk,options).result;
+}
+
+async function receiveMaterialReadFromChannel(pipe:ReturnType<typeof channel>, onChunk:(chunk:Uint8Array, signal:AbortSignal)=>void|Promise<void>, hash:ReturnType<typeof sha256.create>):Promise<void> {
   let seq=0, bytes=0;
   try {
     for(;;) {

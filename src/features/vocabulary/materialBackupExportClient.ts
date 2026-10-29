@@ -4,7 +4,7 @@
  * 主要内容：解析有界二进制数据帧与公开错误码，在传输摘要通过且成功终止后才报告完成。
  * 模块边界：不导入或访问后台仓库、不打开端口和文件；调用方必须先安装接收器再发送握手，并在错误时中止保存。
  */
-import {MATERIAL_READ_FRAME_BYTES,receiveMaterialRead,type MaterialReadPort} from './materialReadTransport';
+import {MATERIAL_READ_FRAME_BYTES,startMaterialRead,type MaterialReadPort} from './materialReadTransport';
 import {MATERIAL_IMPORT_FRAME_BYTES} from './materialProtocol';
 import {MATERIAL_BACKUP_EXPORT_ERROR_CODES,type MaterialBackupExportErrorCode,type MaterialBackupExportStatistics} from './materialBackupExportProtocol';
 
@@ -34,13 +34,13 @@ function parseStatistics(data:Uint8Array,bytes:number):MaterialBackupExportStati
     return {records,recordBytes,maxRecordBytes,frames};
 }
 
-/** 接收者必须先安装此函数的监听，再向后台发送 start。 */
-export async function receiveMaterialBackupExport(port:MaterialReadPort, onChunk:(chunk:Uint8Array)=>Promise<void>, options:{signal?:AbortSignal;idleTimeoutMs?:number}={}):Promise<MaterialBackupExportStatistics> {
+/** 同步安装监听，供调用方在发送 start 前检查初始化结果。 */
+export function startMaterialBackupExport(port:MaterialReadPort, onChunk:(chunk:Uint8Array)=>Promise<void>, options:{signal?:AbortSignal;idleTimeoutMs?:number}={}):{result:Promise<MaterialBackupExportStatistics>;assertOpen():void} {
     let mode:'tag'|'length'|'data'|'statistics'|'error'|'done'|'failed' = 'tag', length = 0, lengthBytes = 0, remaining = 0;
     let failure:MaterialBackupExportErrorCode|undefined, bytes = 0;
     let statistics:MaterialBackupExportStatistics|undefined, statisticsLength=0;
     const statisticsBytes=new Uint8Array(32);
-    await receiveMaterialRead(port,async (chunk,signal)=>{
+    const receiver=startMaterialRead(port,async (chunk,signal)=>{
         for(let at=0;at<chunk.length;) {
             aborted(signal);
             if(mode === 'done' || mode === 'failed') throw Error('材料备份传输包含多余数据');
@@ -71,9 +71,17 @@ export async function receiveMaterialBackupExport(port:MaterialReadPort, onChunk
             }
         }
     },options);
-    if(failure)throw new MaterialBackupExportError(failure);
-    // 接收回调在异步消息处理时修改 mode；此函数在传输摘要确认后读取它。
-    const complete=()=>mode==='done';
-    if(!complete()||!statistics)throw Error('材料备份传输不完整');
-    return statistics;
+    const result=receiver.result.then(()=>{
+        if(failure)throw new MaterialBackupExportError(failure);
+        // 接收回调在异步消息处理时修改 mode；此函数在传输摘要确认后读取它。
+        const complete=()=>mode==='done';
+        if(!complete()||!statistics)throw Error('材料备份传输不完整');
+        return statistics;
+    });
+    return {result,assertOpen:receiver.assertOpen};
+}
+
+/** 保留既有异步接口：初始化错误也以 Promise 拒绝报告。 */
+export async function receiveMaterialBackupExport(port:MaterialReadPort, onChunk:(chunk:Uint8Array)=>Promise<void>, options:{signal?:AbortSignal;idleTimeoutMs?:number}={}):Promise<MaterialBackupExportStatistics> {
+    return startMaterialBackupExport(port,onChunk,options).result;
 }

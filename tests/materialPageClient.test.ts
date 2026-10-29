@@ -188,6 +188,122 @@ describe('material page client',()=>{
         client.disconnect=()=>{throw Error('disconnect failed');};
         await expect(requestMaterialPage(open,{},()=>client)).rejects.toThrow('post failed');
     });
+    it('preserves the transport startup failure when it closes the port before posting',async()=>{
+        const [client,server]=pair();
+        await expect(requestMaterialPage(open,{idleTimeoutMs:0},()=>client)).rejects.toThrow('Invalid material read timeout');
+        expect(client.closed).toBe(true);expect(server.closed).toBe(true);
+    });
+    it('preserves a listener registration failure that precedes a closed-port send',async()=>{
+        const [client,server]=pair(),failure=Error('listener registration failed');
+        client.onMessage.addListener=()=>{throw failure;};
+        await expect(requestMaterialPage(open,{},()=>client)).rejects.toBe(failure);
+        expect(client.closed).toBe(true);expect(server.closed).toBe(true);
+    });
+    it('preserves an AbortError thrown by listener registration without treating it as caller cancellation',async()=>{
+        const [client]=pair(),failure=new DOMException('listener setup failed','AbortError');
+        client.onMessage.addListener=()=>{throw failure;};
+        await expect(requestMaterialPage(open,{},()=>client)).rejects.toBe(failure);
+    });
+    it('does not post if a disconnect arrives while registering the transport listener',async()=>{
+        const [client]=pair(),post=vi.spyOn(client,'postMessage');
+        client.onDisconnect.addListener=listener=>{listener();};
+        await expect(requestMaterialPage(open,{},()=>client)).rejects.toThrow('Material read disconnected');
+        expect(post).not.toHaveBeenCalled();
+    });
+    it('preserves a request failure when cancellation arrives during port cleanup',async()=>{
+        const [client]=pair(),controller=new AbortController(),failure=Error('post failed');
+        client.postMessage=()=>{queueMicrotask(()=>controller.abort());throw failure;};
+        await expect(requestMaterialPage(open,{signal:controller.signal},()=>client)).rejects.toBe(failure);
+        expect(client.onMessage.listeners.size).toBe(0);expect(client.onDisconnect.listeners.size).toBe(0);
+    });
+    it('preserves an earlier synchronous protocol failure when posting then throws',async()=>{
+        const [client]=pair();
+        client.postMessage=()=>{
+            client.onMessage.fire({v:1,type:'frame',seq:0,length:1,data:'YQ=='});
+            client.onMessage.fire({v:1,type:'frame',seq:1,length:1,data:'Yg=='});
+            throw Error('later post failure');
+        };
+        await expect(requestMaterialPage(open,{},()=>client)).rejects.toThrow('Unexpected material read message');
+    });
+    it('preserves a protocol failure that precedes cancellation and a posting failure',async()=>{
+        const [client]=pair(),controller=new AbortController();
+        client.postMessage=()=>{
+            client.onMessage.fire({v:1,type:'frame',seq:0,length:1,data:'YQ=='});
+            client.onMessage.fire({v:1,type:'frame',seq:1,length:1,data:'Yg=='});
+            controller.abort();throw Error('later post failure');
+        };
+        await expect(requestMaterialPage(open,{signal:controller.signal},()=>client)).rejects.toThrow('Unexpected material read message');
+    });
+    it('reports cancellation when it precedes a posting failure',async()=>{
+        const [client]=pair(),controller=new AbortController();
+        client.postMessage=()=>{controller.abort();throw Error('later post failure');};
+        await expect(requestMaterialPage(open,{signal:controller.signal},()=>client)).rejects.toMatchObject({name:'AbortError'});
+    });
+    it('preserves an earlier posting failure when a protocol error is queued later',async()=>{
+        const [client]=pair(),failure=Error('post failed');
+        client.postMessage=()=>{queueMicrotask(()=>client.onMessage.fire({v:1,type:'frame',seq:1,length:1,data:'Yg=='}));throw failure;};
+        await expect(requestMaterialPage(open,{},()=>client)).rejects.toBe(failure);
+    });
+    it('preserves a progress handler failure if cancellation follows it',async()=>{
+        const fixture=serve([{type:'progress',processed:1,total:2}],4096),controller=new AbortController(),failure=Error('progress failed');
+        const onProgress=()=>{queueMicrotask(()=>controller.abort());throw failure;};
+        await expect(requestMaterialPage(open,{signal:controller.signal,onProgress},()=>fixture.client)).rejects.toBe(failure);
+        await fixture.serverResult?.catch(()=>{});
+    });
+    it('reports cancellation when a progress handler cancels before it throws',async()=>{
+        const fixture=serve([{type:'progress',processed:1,total:2}],4096),controller=new AbortController();
+        const onProgress=()=>{controller.abort();throw Error('later failure');};
+        await expect(requestMaterialPage(open,{signal:controller.signal,onProgress},()=>fixture.client)).rejects.toMatchObject({name:'AbortError'});
+        await fixture.serverResult?.catch(()=>{});
+    });
+    it('preserves an earlier protocol failure when a progress handler throws afterwards',async()=>{
+        const fixture=serve([{type:'progress',processed:1,total:2}],4096);
+        const onProgress=()=>{
+            fixture.client.onMessage.fire({v:1,type:'frame',seq:1,length:1,data:'Yg=='});
+            throw Error('later progress failure');
+        };
+        await expect(requestMaterialPage(open,{onProgress},()=>fixture.client)).rejects.toThrow('Unexpected material read message');
+        await fixture.serverResult?.catch(()=>{});
+    });
+    it('stops the current frame after a progress handler triggers a protocol failure',async()=>{
+        const fixture=serve([{type:'progress',processed:1,total:2},{type:'progress',processed:2,total:2}],4096);
+        const onProgress=vi.fn(()=>fixture.client.onMessage.fire({v:1,type:'frame',seq:1,length:1,data:'Yg=='}));
+        await expect(requestMaterialPage(open,{onProgress},()=>fixture.client)).rejects.toThrow('Unexpected material read message');
+        expect(onProgress).toHaveBeenCalledOnce();await fixture.serverResult?.catch(()=>{});
+    });
+    it('preserves an earlier progress failure when a protocol violation follows',async()=>{
+        const fixture=serve([{type:'progress',processed:1,total:2}],4096),failure=Error('progress failed');
+        const onProgress=()=>{
+            queueMicrotask(()=>fixture.client.onMessage.fire({v:1,type:'frame',seq:1,length:1,data:'Yg=='}));
+            throw failure;
+        };
+        await expect(requestMaterialPage(open,{onProgress},()=>fixture.client)).rejects.toBe(failure);
+        await fixture.serverResult?.catch(()=>{});
+    });
+    it('preserves a protocol failure if cancellation follows its arrival',async()=>{
+        const [client,server]=pair(),controller=new AbortController();
+        server.onMessage.addListener(()=>server.postMessage({v:1,type:'frame',seq:0,length:1,data:'invalid'}));
+        const result=requestMaterialPage(open,{signal:controller.signal},()=>client);
+        client.onMessage.addListener(()=>queueMicrotask(()=>controller.abort()));
+        await expect(result).rejects.toThrow('Invalid material read frame');
+        expect(client.onDisconnect.listeners.size).toBe(0);
+    });
+    it('preserves a protocol failure whose name getter throws after later cancellation',async()=>{
+        const [client,server]=pair(),controller=new AbortController();
+        const failure=Object.defineProperty(Error('protocol failed'),'name',{get(){throw Error('name getter failed');}});
+        const malformed={get type(){throw failure;}};
+        server.onMessage.addListener(()=>server.postMessage(malformed));
+        const result=requestMaterialPage(open,{signal:controller.signal},()=>client);
+        client.onMessage.addListener(()=>queueMicrotask(()=>controller.abort()));
+        await expect(result).rejects.toBe(failure);
+        expect(client.onDisconnect.listeners.size).toBe(0);
+    });
+    it('reports cancellation when it precedes a subsequent disconnect',async()=>{
+        const [client,server]=pair(),controller=new AbortController();
+        const result=requestMaterialPage(open,{signal:controller.signal},()=>client);
+        controller.abort();server.disconnect();
+        await expect(result).rejects.toMatchObject({name:'AbortError'});
+    });
     it('accepts a summary page whose next offset follows the received items',async()=>{
         const fixture=serve([{...header(),total:2,matched:2,nextOffset:1},{type:'summary',value:summary},{type:'complete',count:1}]);
         expect((await requestMaterialPage(open,{},()=>fixture.client))?.nextOffset).toBe(1);

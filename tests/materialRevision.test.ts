@@ -370,6 +370,71 @@ describe('material snapshot revisions', () => {
 });
 
 describe('snapshot transaction cancellation', () => {
+    it.each(['before','after'] as const)('preserves snapshot success, failure and cancellation if signal cleanup throws %s removal',async mode=>{
+        const db=database(),repo=new MaterialRepository(db),snapshot=await repo.openSnapshot(),controller=new AbortController();
+        const native=controller.signal.removeEventListener.bind(controller.signal),original=Error('snapshot read failed');
+        const remove=vi.spyOn(controller.signal,'removeEventListener').mockImplementation((type,listener,options)=>{
+            if(mode==='after')native(type,listener,options);
+            throw Error('signal cleanup failed');
+        });
+        try {
+            await expect(repo.checkSnapshot(snapshot,controller.signal)).resolves.toBeUndefined();
+            const get=vi.spyOn(db.meta,'get').mockRejectedValue(original as never);
+            try {await expect(repo.checkSnapshot(snapshot,controller.signal)).rejects.toBe(original);}
+            finally {get.mockRestore();}
+            const cancelGet=vi.spyOn(db.meta,'get').mockImplementation(()=>{controller.abort();return Promise.reject(original) as never;});
+            try {await expect(repo.checkSnapshot(snapshot,controller.signal)).rejects.toMatchObject({name:'AbortError'});}
+            finally {cancelGet.mockRestore();}
+            expect(remove).toHaveBeenCalled();
+        } finally {remove.mockRestore();}
+        await expect(repo.checkSnapshot(snapshot)).resolves.toBeUndefined();
+    });
+    it.each(['before','after'] as const)('cleans a listener when snapshot signal registration throws %s installation',async mode=>{
+        const db=database(),repo=new MaterialRepository(db),snapshot=await repo.openSnapshot(),controller=new AbortController(),original=Error('signal registration failed');
+        const nativeAdd=controller.signal.addEventListener.bind(controller.signal),nativeRemove=controller.signal.removeEventListener.bind(controller.signal);
+        let installed=false;
+        const add=vi.spyOn(controller.signal,'addEventListener').mockImplementation((type,listener,options)=>{
+            if(mode==='after'){nativeAdd(type,listener,options);installed=true;}
+            throw original;
+        });
+        const remove=vi.spyOn(controller.signal,'removeEventListener').mockImplementation((type,listener,options)=>{
+            nativeRemove(type,listener,options);installed=false;
+        });
+        const transaction=vi.spyOn(db,'transaction');
+        try {
+            await expect(repo.checkSnapshot(snapshot,controller.signal)).rejects.toBe(original);
+            expect(remove).toHaveBeenCalledWith('abort',expect.any(Function));expect(installed).toBe(false);
+            expect(transaction).not.toHaveBeenCalled();
+        } finally {add.mockRestore();remove.mockRestore();transaction.mockRestore();}
+        await expect(repo.checkSnapshot(snapshot)).resolves.toBeUndefined();
+    });
+    it.each(['return','throw'] as const)('releases a snapshot listener installed after synchronous cancellation when registration will %s',async mode=>{
+        const db=database(),repo=new MaterialRepository(db),snapshot=await repo.openSnapshot(),controller=new AbortController();
+        const nativeAdd=controller.signal.addEventListener.bind(controller.signal),nativeRemove=controller.signal.removeEventListener.bind(controller.signal);
+        let installed=false;
+        const add=vi.spyOn(controller.signal,'addEventListener').mockImplementation((type,listener,options)=>{
+            controller.abort();nativeAdd(type,listener,options);installed=true;
+            if(mode==='throw')throw Error('signal registration failed');
+        });
+        const remove=vi.spyOn(controller.signal,'removeEventListener').mockImplementation((type,listener,options)=>{
+            nativeRemove(type,listener,options);installed=false;
+        });
+        try {
+            await expect(repo.checkSnapshot(snapshot,controller.signal)).rejects.toMatchObject({name:'AbortError'});
+            expect(remove).toHaveBeenCalledWith('abort',expect.any(Function));expect(installed).toBe(false);
+        } finally {add.mockRestore();remove.mockRestore();}
+        await expect(repo.checkSnapshot(snapshot)).resolves.toBeUndefined();
+    });
+    it('preserves a snapshot registration error if inspecting cancellation also throws',async()=>{
+        const db=database(),repo=new MaterialRepository(db),snapshot=await repo.openSnapshot(),controller=new AbortController(),original=Error('signal registration failed');
+        const getter=vi.spyOn(controller.signal,'aborted','get').mockReturnValueOnce(false).mockImplementation(()=>{throw Error('signal state failed');});
+        const add=vi.spyOn(controller.signal,'addEventListener').mockImplementation(()=>{throw original;});
+        const remove=vi.spyOn(controller.signal,'removeEventListener');
+        try {
+            await expect(repo.checkSnapshot(snapshot,controller.signal)).rejects.toBe(original);
+            expect(remove).toHaveBeenCalledWith('abort',expect.any(Function));
+        } finally {getter.mockRestore();add.mockRestore();remove.mockRestore();}
+    });
     it.each(['storage failure','cancellation'] as const)('releases the listener after a snapshot %s and allows retry',async outcome=>{
         const db=database(),repo=new MaterialRepository(db),controller=new AbortController();
         const snapshot=await repo.openSnapshot(),error=Error('snapshot storage failed');

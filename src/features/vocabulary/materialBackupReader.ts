@@ -152,19 +152,17 @@ class RecordCollector {
     const end = at + bytes.length;
     for (const row of this.pending) {
       const start = Math.max(at, row.start), stop = Math.min(end, row.end ?? end);
-      // 超限材料已无法进入恢复协议；保留哨兵并继续验证全文，使后续重复键仍可覆盖它。
-      // 版本数值另需完整摘要，不能跳过或饱和其解码。
-      if (stop > start && (this.hashToken || row.length <= this.maxLength)) {
+      // 超限值无法进入恢复协议；保留哨兵并继续验证全文，使后续重复键仍可覆盖它。
+      // 未超限的版本数值需要完整摘要，以验证再次读取时未被修改。
+      if (stop > start && row.length <= this.maxLength) {
         const text = row.decoder.decode(bytes.subarray(start - at, stop - at), {stream: true});
         if (text) {
           const encoded = this.encoder.encode(text); row.hash?.update(encoded); row.length += encoded.length;
-          if (!this.hashToken && row.length > this.maxLength) row.length = this.maxLength + 1;
+          if (row.length > this.maxLength) row.length = this.maxLength + 1;
         }
       }
       // JSON 记录结束字节始终为 ASCII；不完整 UTF-8 已在遇到该字节时替换。
-      if (row.end !== undefined && row.end <= end) {if (row.hash) row.digest = bytesToHex(row.hash.digest()); row.complete = true;}
-      // 版本 token 的上限为 MAX_SAFE_INTEGER；安全整数检查已包含超上限的情况。
-      if (this.hashToken && !Number.isSafeInteger(row.length)) throw capacityError('材料记录超过恢复大小限制');
+      if (row.end !== undefined && row.end <= end) {if (row.hash && row.length <= this.maxLength) row.digest = bytesToHex(row.hash.digest()); row.complete = true;}
     }
     this.pending = this.pending.filter(row => !row.complete);
   }
@@ -276,7 +274,7 @@ async function inspect(blob: Blob, signal?: AbortSignal): Promise<SourcePlan> {
   if (!(blob instanceof Blob)) throw TypeError('无效的备份文件');
   const size = blob.size;
   if (!Number.isSafeInteger(size) || size < 0) throw TypeError('无效的备份文件');
-  const collector = new RecordCollector(), versionCollector = new RecordCollector(Number.MAX_SAFE_INTEGER, true);
+  const collector = new RecordCollector(), versionCollector = new RecordCollector(MAX_VERSION_TOKEN_BYTES, true);
   const parser = new Parser(collector, versionCollector), lexer = new Lexer(token => parser.token(token), (at, byte) => parser.begin(at, byte)), sourceHash = hash();
   check(signal);
   for (let at = 0; at < size; at += CHUNK_BYTES) {

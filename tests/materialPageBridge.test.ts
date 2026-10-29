@@ -44,6 +44,26 @@ const header=(messages:MaterialPageMessage[])=>messages.find(value=>value.type==
 const complete=(messages:MaterialPageMessage[])=>messages.find(value=>value.type==='complete') as Extract<MaterialPageMessage,{type:'complete'}>;
 
 describe('trusted material page bridge',()=>{
+    it.each([2,3,4,5])('releases a just-created session when disconnect follows in microtask %s',async turns=>{
+        const actual=sessions.createMaterialPageSession;
+        const {repo}=fixture(0),bridge=createMaterialPageBridge({repository:repo,ready:Promise.resolve(),isPrivateContext:()=>false,isTrustedSender:()=>true,maxSessions:1}),[server,client]=pair();
+        const factory=vi.spyOn(sessions,'createMaterialPageSession').mockImplementation(async(...args)=>{
+            const session=await actual(...args);
+            // Different native Promise continuations can run before the port's disconnect event.
+            let remaining=turns;
+            const advance=()=>{if(remaining-- > 0)queueMicrotask(advance);else client.disconnect();};
+            queueMicrotask(advance);
+            return session;
+        });
+        try {
+            bridge.connect(server);const chunks:Uint8Array[]=[];
+            const read=receiveMaterialRead(client as MaterialReadPort,bytes=>{chunks.push(bytes);}).then(()=>undefined,error=>error);
+            client.postMessage(start());const failure=await read;await tick();await tick();
+            expect(failure).toMatchObject({name:'Error',message:'Material read disconnected'});
+            expect(client.closed).toBe(true);expect(chunks).toEqual([]);
+            factory.mockRestore();expect(complete(await transfer(bridge,start())).count).toBe(0);
+        } finally {await bridge.dispose();factory.mockRestore();}
+    });
     it('does not retain an open session when the port disconnects as creation finishes',async()=>{
         const actual=sessions.createMaterialPageSession;
         let release!:()=>void,notifyReady!:()=>void;

@@ -55,8 +55,8 @@ export class MaterialRepository {
         checkCancelled(signal);
         let transaction:Transaction|undefined;
         const abort = () => {try {transaction?.abort();} catch {/* Transaction may already have completed. */}};
-        signal?.addEventListener('abort', abort, {once:true});
         try {
+            signal?.addEventListener('abort', abort, {once:true});
             const result = await this.db.transaction(mode, tables, async tx => {
                 transaction = tx;
                 if (signal?.aborted) {abort(); throw cancelled();}
@@ -67,9 +67,11 @@ export class MaterialRepository {
             checkCancelled(signal);
             return result;
         } catch (error) {
-            if (signal?.aborted) throw cancelled();
+            let aborted = false;
+            try {aborted = signal?.aborted === true;} catch {/* Preserve the transaction or registration failure. */}
+            if (aborted) throw cancelled();
             throw error;
-        } finally {signal?.removeEventListener('abort', abort);}
+        } finally {try {signal?.removeEventListener('abort', abort);} catch {/* Preserve the transaction result. */}}
     }
     /** 只复制有界的主键，不复制全文；后续按 ID 单条读取并在完成后再次校验版本。 */
     async openSnapshot(signal?:AbortSignal): Promise<MaterialSnapshotVersion & {ids: string[]}> {

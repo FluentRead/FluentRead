@@ -132,6 +132,33 @@ describe('material backup source reader', () => {
     expect(JSON.parse(deep).materials).toEqual([]);
     await expect(prepareMaterialBackup(new Blob([deep]))).rejects.toMatchObject({name: 'MaterialBackupCapacityError', message: '备份文件嵌套层级超过恢复限制'});
   });
+  it('bounds work for an oversized version overwritten later while still validating the full source', async () => {
+    const version = '1.' + '0'.repeat(3 * 1024 * 1024);
+    const prefix = '{"format":"fluentread-learning-materials","version":';
+    const suffix = ',"version":1,"materials":[]}';
+    const source = new Blob([prefix, version, suffix]);
+    const decode = vi.spyOn(TextDecoder.prototype, 'decode');
+    try {
+      const prepared = await prepareMaterialBackup(source);
+      expect(prepared.manifest.records).toBe(0);
+      const streamedBytes = decode.mock.calls.filter(([, options]) => options?.stream === true)
+        .reduce((total, [input]) => total + (input?.byteLength ?? 0), 0);
+      // One crossing chunk and the final one-byte version are the only excess work.
+      expect(streamedBytes).toBeGreaterThan(1024 * 1024);
+      expect(streamedBytes).toBeLessThanOrEqual(1024 * 1024 + 65536 + 1);
+      expect(prepared.plan.fileDigest).toBe(bytesToHex(sha256(new Uint8Array(await source.arrayBuffer()))));
+
+      const changed = new Uint8Array(await source.arrayBuffer());
+      changed[prefix.length + 2 * 1024 * 1024] = 49;
+      const altered = new Blob([changed]), originalSlice = source.slice.bind(source);
+      source.slice = (start, end, type) => altered.slice(start, end, type);
+      try {await expect(sendMaterialBackup(source, prepared, async () => {})).rejects.toThrow('改变');}
+      finally {source.slice = originalSlice;}
+
+      const malformed = new Blob([prefix, version, ',"version":1,"materials":[],"ignored":[1,]}']);
+      await expect(prepareMaterialBackup(malformed)).rejects.toBeInstanceOf(SyntaxError);
+    } finally {decode.mockRestore();}
+  });
   it.each([
     {frame: 8, record: 4, frames: 100, records: '"abcd"'},
     {frame: 2, record: 100, frames: 1, records: '"ab"'},

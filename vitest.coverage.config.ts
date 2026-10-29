@@ -19,6 +19,9 @@ export default defineConfig({
             reportsDirectory: 'coverage/core',
             reporter: ['text', 'json-summary', 'json', 'html'],
             include: [
+                'src/core/config/privateTranslation.ts',
+                'src/services/translation/privateRouting.ts',
+                'src/features/settings/ui/PrivateTranslationSettings.vue',
                 'src/app/options/index.ts',
                 'src/providers/translation/ai-sdk/boundedErrorResponse.ts',
                 'userscript/buildGzip.ts',
@@ -57,6 +60,7 @@ export default defineConfig({
                 'userscript/readingStorage.ts',
                 'userscript/dataEncoding.ts',
                 'userscript/buildDataEncoding.ts',
+                'userscript/buildGzip.ts',
                 'userscript/readingRuntime.ts',
                 'userscript/readingGeneration.ts',
                 'src/services/harness/modelConfig.ts',

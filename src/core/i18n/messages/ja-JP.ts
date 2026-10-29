@@ -33,6 +33,14 @@ import {personalCorrectionMessages} from './personalCorrections';
 import countForms from './count-forms.json';
 
 export const jaJPMessages = {
+    "privateTranslation.title": "プライベート翻訳モデル",
+    "privateTranslation.scope": "ブラウザーが確認したプライベート要求の共通翻訳のみ。独立した読解・作文・辞書・音声・OCRは対象外。ユーザースクリプトは判定できません。 有効時にプライバシー状態を確認できない要求は通常モデルへ送らず拒否します。",
+    "privateTranslation.service": "プライベート翻訳サービス",
+    "privateTranslation.credentials": "選択した接続と認証情報を使用します。別の認証情報にはカスタム AI サービスを作成してください。",
+    "privateTranslation.model": "プライベートモデル ID",
+    "privateTranslation.policy": "OpenAI とカスタム OpenAI 互換接続の標準本文のみ対応。カスタム本文は無視せずエラーにします。モデル ID は必須で通常モデルに戻りません。提供者はデータを保存する場合があります。 専用翻訳は共有の訳文・要約キャッシュを読み書きせず、再要求でモデルを再度呼び出す場合があります。",
+    "privateTranslation.required": "有効なサービスとモデル ID を設定しない場合、プライベート翻訳は失敗します。",
+
     ...countForms['ja-JP'],
     ...personalCorrectionMessages['ja-JP'],
     "document.config.loadFailed": "設定を読み込めませんでした。再読み込みしてもう一度お試しください。",

@@ -33,6 +33,14 @@ import {personalCorrectionMessages} from './personalCorrections';
 import countForms from './count-forms.json';
 
 export const koKRMessages = {
+    "privateTranslation.title": "비공개 번역 모델",
+    "privateTranslation.scope": "브라우저가 확인한 비공개 요청의 공통 번역에만 적용됩니다. 별도 읽기, 쓰기, 사전, 음성, OCR은 제외됩니다. 사용자 스크립트는 비공개 상태를 확인할 수 없습니다. 활성화 시 비공개 여부를 확인할 수 없는 요청은 일반 모델로 보내지 않고 거부합니다.",
+    "privateTranslation.service": "비공개 번역 서비스",
+    "privateTranslation.credentials": "선택한 서비스의 연결과 인증 정보를 사용합니다. 별도 인증 정보는 사용자 지정 AI 서비스를 만드세요.",
+    "privateTranslation.model": "비공개 모델 ID",
+    "privateTranslation.policy": "OpenAI 및 사용자 지정 OpenAI 호환 연결의 표준 본문만 지원합니다. 사용자 지정 본문은 무시하지 않고 오류를 냅니다. 모델 ID가 필요하며 일반 모델로 전환하지 않습니다. 제공업체가 데이터를 보관할 수 있습니다. 전용 번역은 공유 번역·요약 캐시를 읽거나 저장하지 않으며 반복 요청 시 모델을 다시 호출할 수 있습니다.",
+    "privateTranslation.required": "사용 가능한 서비스와 모델 ID를 지정하지 않으면 비공개 번역이 실패합니다.",
+
     ...countForms['ko-KR'],
     ...personalCorrectionMessages['ko-KR'],
     "document.config.loadFailed": "설정을 불러오지 못했습니다. 새로고침 후 다시 시도하세요.",

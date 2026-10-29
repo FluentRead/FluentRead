@@ -516,6 +516,8 @@
       "tests/clickSelectionConfig.test.ts",
       "tests/pointerSelectionSession.test.ts",
       "tests/aiMultiSegmentConfig.test.ts",
+      "tests/userscriptBuildGzip.test.ts",
+      "tests/privateTranslation.test.ts",
       "tests/areaRuntimeComposition.test.ts"
     ],
     "functional": [
@@ -814,7 +816,9 @@
       "tests/zoteroFontCache.test.ts",
       "tests/clickSelection.test.ts",
       "tests/clickSelectionSettingsLifecycle.test.ts",
-      "tests/aiMultiSegmentSettingsLifecycle.test.ts"
+      "tests/aiMultiSegmentSettingsLifecycle.test.ts",
+      "tests/privateTranslationIntegration.test.ts",
+      "tests/privateTranslationSettingsLifecycle.test.ts"
     ],
     "regression": [
       "tests/discordServerIconBoundary.test.ts",

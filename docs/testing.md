@@ -1637,3 +1637,7 @@ Popup 服务概览显示默认、继承和独立功能在配置中选择的模�
 生成语音和播放状态栏位于正文之后，带独立分隔线并按控件实际高度参与布局。自动尺寸卡片为底栏自然增高，达到当前位置的可用高度上限时正文滚动；手动调整过尺寸的卡片保留用户外框，正文独立滚动。停止后底栏收起，自动卡恢复自然高度。
 
 针对该边界运行 `pnpm test tests/selectionTranslatorLifecycle.test.ts`。生产构建后运行 `node scripts/run-selection-speech-test.cjs --layout-only --extension-dir .output/chrome-mv3 --playwright-root <Node包目录> --focus-safe-helper scripts/testing/focus-safe-browser.cjs --runtime-diagnostics <扩展界面测试技能>/scripts/runtime-diagnostics.cjs --artifacts-dir <证据目录>`，验证等待生成、播放、停止和重播、原文与译文切换、窄屏与深色，以及手动缩小卡片后正文末尾和操作按钮仍可访问。断言正文滚动区域不与底栏相交，所有播放按钮完整位于底栏内；自动卡未到高度上限时不得因语音栏出现而压缩正文。测试使用临时后台 Edge 和确定性翻译/WAV 夹具，不能代替外部语音合成质量或 Firefox 实机验证。
+
+## 无痕专用共享翻译模型
+
+`privateTranslation`、`privateTranslationIntegration` 和 `privateTranslationSettingsLifecycle` 验证默认关闭、不可用选择保留、仅可信 sender 隐私身份启用、独立模型快照与迟到设置事件。专用模型开关开启与关闭均验证可信无痕请求不读写共享译文或摘要缓存。集成测试经过真实 fallback、broker 和锁定 OpenAI-compatible SDK，用离线 HTTP 端口检查最终模型、连接与凭据、统计、批量、并发/缓存隔离、取消、配置变化和不可用时不回退。新增纯配置、路由及设置组件纳入严格四维覆盖；已有配置归一化、快照和 broker 仍由各自全集回归守护。功能与限制见[无痕专用翻译模型](./guide/private-translation.md)。离线通过不代表真实无痕窗口、Firefox 实机、供应商质量或独立 OCR/阅读/写作验收。

@@ -29,6 +29,14 @@ import {personalCorrectionChineseMessages} from './personalCorrections';
 import countForms from './count-forms.json';
 
 export const zhCNMessages = {
+    "privateTranslation.title": "无痕专用翻译模型",
+    "privateTranslation.scope": "仅浏览器确认的无痕请求生效，覆盖共享翻译链路；不包含独立的阅读、写作、词典、语音和 OCR。油猴版不识别无痕身份。 启用后无法确认隐私身份时会拒绝翻译，不会转用普通模型。",
+    "privateTranslation.service": "无痕翻译服务",
+    "privateTranslation.credentials": "沿用所选服务的连接和凭据；需要独立凭据时请新建自定义 AI 服务。",
+    "privateTranslation.model": "无痕模型编号",
+    "privateTranslation.policy": "仅支持 OpenAI 与自定义 OpenAI 兼容连接及标准请求体；非空自定义请求体会报错，不会被忽略。必须填写模型编号，失败不回退到普通模型。无痕不代表供应商不留存数据。 专用无痕翻译不读取或保存共享译文及摘要缓存，重复请求可能再次调用模型。",
+    "privateTranslation.required": "请选择可用服务并填写模型编号，否则无痕翻译会报错。",
+
     ...countForms['zh-CN'],
     ...personalCorrectionChineseMessages,
     "document.config.loadFailed": "设置未能读取，请重新加载后再试。",

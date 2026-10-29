@@ -1,7 +1,7 @@
 /**
  * @file src/features/input-translation/background/handler.ts
  * 文件职责：定义输入框快捷翻译的后台消息处理器，在调用共享翻译 broker 前校验原文和目标语言，并统一返回成功译文结构。
- * 主要内容：包含 inputBoxTranslation 消息常量、请求/响应与依赖接口、非空字符串、可选请求标识和有界超时解析，按发送者注册可取消请求，在配置水合和共享翻译 broker 调用期间响应取消，并冻结本地服务配置与超时快照；可信属于本次目标的普通文本直接保留原文。
+ * 主要内容：包含 inputBoxTranslation 消息常量、请求/响应与依赖接口、非空字符串、可选请求标识和有界超时解析，按发送者注册可取消请求，在配置水合和共享翻译 broker 调用期间响应取消，先按可信隐私身份确定有效服务，再绑定输入提示词并冻结服务配置与超时快照；可信属于本次目标的普通文本直接保留原文。
  * 模块边界：此文件不监听键盘、不修改输入框也不绑定具体 provider；content feature 负责触发和提交，翻译实现与请求注册表由 composition root 注入，统一路由负责错误响应。网页消息只能携带纯文本、目标语言、取消标识和不超出配置的请求预算，服务、模型、提示词与凭据均从后台配置读取。
  */
 import {servicesType, resolveConfiguredModel} from '@/src/core/config/catalog';
@@ -23,6 +23,8 @@ import {
     attachTranslationRequestControl,
     createTranslationProviderConfigSnapshot,
 } from '@/src/services/translation/requestSnapshot';
+import {resolvePrivateTranslation} from '@/src/services/translation/privateRouting';
+import type {TrustedTranslationGlossaryContext} from '@/src/services/translation/requestSnapshot';
 import type {TranslationRequestControl} from '@/src/services/translation/types';
 import type {TranslationSingleRequestMessage} from '@/src/services/translation/types';
 export const INPUT_BOX_TRANSLATION_MESSAGE_TYPE = 'inputBoxTranslation' as const;
@@ -137,33 +139,41 @@ export function createInputBoxTranslationRequest(
     text: string,
     targetLanguage: string,
     requestTimeoutMs?: number,
+    privacyContext: TrustedTranslationGlossaryContext = {},
 ): TranslationSingleRequestMessage {
-    const service = normalizeInputBoxTranslationService(
+    const normalService = normalizeInputBoxTranslationService(
         current.inputBoxTranslationService,
         current.customOpenAIProviders,
         current.compositeTranslationProviders,
     ) || current.service;
-    const model = normalizeInputBoxTranslationModel(current.inputBoxTranslationModel);
-    const configuredModel = resolveConfiguredModel(current.model[service], current.customModel[service]);
+    const normalModel = normalizeInputBoxTranslationModel(current.inputBoxTranslationModel);
+    // 先解析可信路由，再把输入提示词绑定到有效服务；broker 仍复核同一不可变路由，不复制 feature 提示词。
+    const routed = resolvePrivateTranslation(createTranslationProviderConfigSnapshot(current),
+        attachTranslationGlossaryContext({origin: text, serviceOverride: normalService,
+            ...(servicesType.isUseModel(normalService) && normalModel ? {modelOverride: normalModel} : {})}, privacyContext));
+    const service = routed.request.serviceOverride!;
+    const model = routed.request.modelOverride;
+    const effective = routed.config;
+    const configuredModel = resolveConfiguredModel(effective.model[service], effective.customModel[service]);
     const effectiveModel = model || configuredModel;
     const promptEnabled = supportsInputBoxTranslationPrompt(service, effectiveModel);
     const snapshotSource = {
-        ...current,
+        ...effective,
         ...(promptEnabled ? {
             system_role: {
-                ...current.system_role,
+                ...effective.system_role,
                 [service]: normalizeInputBoxTranslationPrompt(current.inputBoxTranslationSystemPrompt)
                     .trim() || DEFAULT_INPUT_BOX_TRANSLATION_SYSTEM_PROMPT,
             },
             user_role: {
-                ...current.user_role,
+                ...effective.user_role,
                 [service]: completeInputBoxTranslationPrompt(current.inputBoxTranslationPrompt),
             },
         } : {}),
     };
     const snapshot = createTranslationProviderConfigSnapshot(snapshotSource);
     const configuredTimeoutMs = servicesType.isAI(service) ? normalizeAiRequestTimeoutMs(snapshot.aiRequestTimeoutMs) : 45_000;
-    return attachTranslationProviderConfig({
+    return attachTranslationGlossaryContext(attachTranslationProviderConfig({
         origin: text,
         sourceLanguage: 'auto',
         targetLanguage,
@@ -171,9 +181,9 @@ export function createInputBoxTranslationRequest(
         glossaryIds: [],
         serviceOverride: service,
         ...(servicesType.isUseModel(service) && model ? {modelOverride: model} : {}),
-        useCache: current.useCache,
+        useCache: effective.useCache,
         requestTimeoutMs: Math.min(configuredTimeoutMs, requestTimeoutMs ?? configuredTimeoutMs),
-    }, snapshot);
+    }, snapshot), privacyContext);
 }
 
 /** 创建输入框翻译 handler；服务、模型、提示词和凭据均由后台配置快照决定。 */
@@ -193,8 +203,7 @@ export function createInputBoxTranslationHandler(
                 const signal = control?.signal;
                 await waitForReady(dependencies.ready, signal);
                 // 步骤 2：服务、模型、提示词和凭据均从配置读取，并在 provider await 前冻结。
-                const request = createInputBoxTranslationRequest(dependencies.getConfig(), text, targetLanguage, requestTimeoutMs);
-                attachTranslationGlossaryContext(request, privacyContext);
+                const request = createInputBoxTranslationRequest(dependencies.getConfig(), text, targetLanguage, requestTimeoutMs, privacyContext);
                 if (control) attachTranslationRequestControl(request, control);
                 if (shouldSkipTranslationForTarget(text, targetLanguage)) {
                     throwIfAborted(signal);

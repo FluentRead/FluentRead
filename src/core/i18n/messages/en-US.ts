@@ -34,6 +34,14 @@ import {personalCorrectionMessages} from './personalCorrections';
 import countForms from './count-forms.json';
 
 export const enUSMessages = {
+    "privateTranslation.title": "Private browsing translation model",
+    "privateTranslation.scope": "Applies only to browser-confirmed private requests through shared translation. Excludes separate reading, writing, dictionary, speech and OCR. Userscripts cannot identify private browsing. When enabled, requests with unknown privacy identity are rejected, not sent to the regular model.",
+    "privateTranslation.service": "Private translation service",
+    "privateTranslation.credentials": "Uses the selected service’s connection and credentials. Create a custom AI service for separate credentials.",
+    "privateTranslation.model": "Private model ID",
+    "privateTranslation.policy": "Only OpenAI and custom OpenAI-compatible connections with standard request bodies are supported. Nonempty custom bodies cause an error, not silent removal. A model ID is required; failures never fall back. Providers may retain data. Private-model translation does not read or save shared translation or summary caches; repeated requests may call the model again.",
+    "privateTranslation.required": "Choose an available service and enter a model ID, or private translation will fail.",
+
     ...countForms['en-US'],
     ...personalCorrectionMessages['en-US'],
     "document.config.loadFailed": "Could not load settings. Reload and try again.",

@@ -3,6 +3,7 @@
  *
  * 文件职责：定义 FluentRead 完整配置模型、默认值及各项设置的合法范围，包括默认开启并按服务独立保存的原生翻译合批偏好，是配置读取、保存、迁移和 UI 绑定共同依赖的领域契约。
  * 主要内容：支持单图选择本地识别引擎，包含正文/全部节点识别范围，保留各功能独立服务，并将所有功能服务的空值解释为继承网页默认；统一中文简繁标识及历史配置别名，并保存常用服务顺序，保存默认空的 Origin/Referer 域名移除名单和组合翻译配置；组合成员只引用普通服务，删除自定义成员与组合时精确清理无效选择，包含 Config 接口、字幕和翻译模式类型、延迟与字号范围、默认 API 地址及多项功能开关，使新增配置项在一个位置获得类型和初始语义；归一化时以迭代克隆保留深层数据和共享引用，安全迁移任意自有凭据键，升级历史默认提示词，只迁移已登记模型编号，并在线性目录遍历中保护自定义服务的当前模型和 Thinking 偏好。 可核对的公开符号包括 DeepSeekApiType、DeepSeekThinkingMode、VideoSubtitleDisplayMode、FullPageTranslationMode、DEFAULT_VIDEO_SUBTITLE_FONT_SIZE、DEFAULT_NEW_API_URL、DEFAULT_MOUSE_HOVER_TRANSLATION_DELAY。
+ * 无痕专用翻译：默认关闭，保存独立连接与实际模型编号；不可用选择保留并在运行时明确失败。
  * 两点选取：默认关闭，独立保存单次启动快捷键，非法组合回到带修饰键的默认值。
  * 局部区域记忆：默认空列表，按专用 schema 保留网站/路径、有限 CSS 定位、自动/提醒模式和可选快捷方案引用，不保存网页文字或请求凭据。
  * AI 多段预算：默认每批最多 8 个可翻译片段、2000 原文字符，关闭功能保留预算，读取与导入时共享有界数字规范化。
@@ -10,6 +11,7 @@
  * 模块边界：本文件属于 core 领域层，只定义规则、类型与纯转换；个人校订默认关闭且仅接受显式布尔开启，userscript 不保留该不可用设置；不直接读写浏览器存储、不发起网络请求、不挂载 Vue/WXT 入口，持久化、协议调用和界面编排分别由 services、providers 与 features 承担。
  */
 
+import {normalizePrivateTranslation, type PrivateTranslationConfig} from './privateTranslation';
 import {DEFAULT_AI_MULTI_SEGMENT_MAX_SEGMENTS, DEFAULT_AI_MULTI_SEGMENT_MAX_CHARACTERS, normalizeAiMultiSegmentMaxSegments, normalizeAiMultiSegmentMaxCharacters} from './aiMultiSegment';
 import {DEFAULT_CLICK_SELECTION_HOTKEY, normalizeClickSelectionHotkey} from './clickSelection';
 import {DEFAULT_SENTENCE_HIGHLIGHT_STYLE, DEFAULT_SENTENCE_HIGHLIGHT_APPEARANCE, normalizeSentenceHighlightStyle, normalizeSentenceHighlightAppearance, normalizeSentenceHighlightProfiles, type SentenceHighlightStyle, type SentenceHighlightAppearance, type SentenceHighlightProfile} from './sentenceHighlight';
@@ -380,6 +382,7 @@ export class Config {
     selectionTranslationService: string; // 普通划词翻译服务，空值跟随默认网页服务
     imageTranslationService: string; // 图片 OCR 后的文字翻译服务，空值跟随默认网页服务
     imageTranslationOcrEngine: 'tesseract' | 'paddle'; // 单图识别方式；漫画按源语言选择专用模型，俄语/韩语使用既有语言包
+    privateTranslation: PrivateTranslationConfig; // 仅可信无痕来源的共享翻译请求使用
     documentService: string; // 文档服务，空值跟随网页默认
     documentModel: IMapping; // 文档翻译按服务保存的独立模型选择
     documentCustomModel: IMapping; // 文档翻译按服务保存的独立自定义模型
@@ -590,6 +593,7 @@ export class Config {
         this.selectionTranslationService = '';
         this.imageTranslationService = '';
         this.imageTranslationOcrEngine = 'paddle';
+        this.privateTranslation = normalizePrivateTranslation(undefined);
         this.documentService = '';
         this.documentModel = Object.fromEntries(
             [...defaultModels].filter(([service]) => service !== LEGACY_CUSTOM_OPENAI_PROVIDER_ID),
@@ -1106,6 +1110,7 @@ export function normalizeConfig(value: unknown): Config {
             ? legacyTranslationStatus
             : false;
     }
+    normalized.privateTranslation = normalizePrivateTranslation(source.privateTranslation);
     normalized.informationHighlight = normalizeInformationHighlightPreferences(source.informationHighlight);
     normalized.nativeBatchTranslationEnabled = normalizeNativeBatchTranslationEnabled(source.nativeBatchTranslationEnabled);
     normalized.bilingualSentenceHighlightEnabled = source.bilingualSentenceHighlightEnabled === true;

@@ -12,6 +12,7 @@ const mocks = vi.hoisted(() => ({
   ) => Promise<number>>(async () => 0),
   getMissingCredentialMessage: vi.fn(() => null as string | null),
   config: {
+    privateTranslation: undefined as {enabled: boolean; service: string; model: string} | undefined,
     glossaryEnabled: false,
     glossaryLibraries: [] as GlossaryLibrary[],
     videoGlossaryIds: null as string[] | null,
@@ -117,6 +118,7 @@ describe('translation API request lifecycle performance', () => {
     mocks.getPageTranslationContext.mockReset();
     mocks.persistCountIncrement.mockReset().mockResolvedValue(0);
     mocks.getMissingCredentialMessage.mockReset().mockReturnValue(null);
+    mocks.config.privateTranslation = undefined;
     mocks.config.count = 0;
     mocks.config.glossaryEnabled = false;
     mocks.config.glossaryLibraries = [];
@@ -297,6 +299,46 @@ describe('translation API request lifecycle performance', () => {
       .resolves.toEqual(['网页批量译文']);
 
     expect(mocks.sendMessage).toHaveBeenCalledTimes(1);
+  });
+
+  it.each(['single', 'batch'] as const)('%s 扩展页面启用专用模型时将凭据校验交给可信后台', async kind => {
+    Object.defineProperty(globalThis, 'location', {value: {protocol: 'chrome-extension:'}, configurable: true});
+    mocks.config.service = 'mock-ai';
+    mocks.config.privateTranslation = {enabled: true, service: 'custom:private', model: 'private-model'};
+    mocks.getMissingCredentialMessage.mockReturnValue('普通连接需要 API Key，当前尚未配置');
+    mocks.sendMessage.mockResolvedValue(kind === 'batch' ? ['专用译文'] : '专用译文');
+    const options = {maxRetries: 0, glossaryContext: 'document' as const};
+    const request = kind === 'batch' ? translateTextBatch(['Readable source'], 'Document', options)
+      : translateText('Readable source', 'Document', options);
+    await expect(request).resolves.toEqual(kind === 'batch' ? ['专用译文'] : '专用译文');
+    expect(mocks.getMissingCredentialMessage).not.toHaveBeenCalled();
+    expect(mocks.sendMessage).toHaveBeenCalledTimes(1);
+    const payload = mocks.sendMessage.mock.calls[0][0];
+    expect(payload).toMatchObject({serviceOverride: 'mock-ai', modelOverride: 'mock-ai-model', glossaryContext: 'document'});
+    expect(payload).not.toHaveProperty('privateContext');
+    expect(payload).not.toHaveProperty('incognito');
+  });
+
+  it.each(['single', 'batch'] as const)('%s 专用模式客户端保留后台拒绝且不重试普通连接', async kind => {
+    Object.defineProperty(globalThis, 'location', {value: {protocol: 'chrome-extension:'}, configurable: true});
+    mocks.config.privateTranslation = {enabled: true, service: 'custom:private', model: 'private-model'};
+    mocks.getMissingCredentialMessage.mockReturnValue('普通连接需要 API Key，当前尚未配置');
+    mocks.sendMessage.mockResolvedValue({marker: 'fluentread-translation-error-v1',
+      message: '无法确认窗口隐私身份', kind: 'bad-request', retryable: false, code: 'PRIVATE_TRANSLATION_UNAVAILABLE'});
+    const request = kind === 'batch' ? translateTextBatch(['Readable source'], 'Document')
+      : translateText('Readable source', 'Document');
+    await expect(request).rejects.toMatchObject({code: 'PRIVATE_TRANSLATION_UNAVAILABLE', retryable: false});
+    expect(mocks.getMissingCredentialMessage).not.toHaveBeenCalled();
+    expect(mocks.sendMessage).toHaveBeenCalledTimes(1);
+  });
+
+  it('扩展页面关闭专用模式后批量翻译仍按普通凭据快速失败', async () => {
+    Object.defineProperty(globalThis, 'location', {value: {protocol: 'chrome-extension:'}, configurable: true});
+    mocks.config.privateTranslation = {enabled: false, service: 'custom:private', model: 'private-model'};
+    mocks.getMissingCredentialMessage.mockReturnValue('普通连接需要 API Key，当前尚未配置');
+    await expect(translateTextBatch(['Readable source'], 'Document', {maxRetries: 0})).rejects.toThrow('普通连接需要 API Key');
+    expect(mocks.getMissingCredentialMessage).toHaveBeenCalledTimes(1);
+    expect(mocks.sendMessage).not.toHaveBeenCalled();
   });
 
   it('批量客户端拒绝数量正确但包含稀疏空槽的响应', async () => {

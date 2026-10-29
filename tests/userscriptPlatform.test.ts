@@ -44,7 +44,8 @@ vi.mock('@/userscript/count', () => ({
     incrementUserscriptConfigCount: mocks.incrementUserscriptConfigCount,
 }));
 
-vi.mock('@/src/core/config/constants', () => ({
+vi.mock('@/src/core/config/constants', async importOriginal => ({
+    ...await importOriginal<typeof import('@/src/core/config/constants')>(),
     CONNECTION_TEST_MESSAGE: 'testTranslationServiceConnection',
 }));
 
@@ -71,6 +72,11 @@ vi.mock('@/src/app/translation/visionProbeRuntime', () => ({modelVisionProbe: {r
 vi.mock('@/src/platform/storage/modelUsageRepository', () => ({getModelUsageRepository: () => (mocks.usage)}));
 vi.mock('@/src/features/vocabulary/repository', () => ({vocabularyBook: mocks.vocabulary,createUuid:()=>crypto.randomUUID()}));
 
+import {createTranslationBroker} from '@/src/services/translation/broker';
+import {resolveConfiguredModel, servicesType} from '@/src/core/config/catalog';
+import {resolveTranslationLanguages} from '@/src/core/translation/languages';
+import {resolveOpenAICompatibleEndpoint} from '@/src/providers/translation/ai-sdk/endpoints';
+import {buildPageSummaryPrompt, buildPageSummarySystemPrompt} from '@/src/core/translation/prompts';
 import {createPlatformMessageHandler} from '@/userscript/platform';
 import {createPlatformMessageHandler as createFullPlatformMessageHandler} from '@/userscript/platformFull';
 import {getTranslationGlossaryContext, getTranslationRequestControl} from '@/src/services/translation/requestSnapshot';
@@ -285,6 +291,37 @@ describe('userscript 平台消息适配', () => {
     });
 
     describe.each([['compact',createPlatformMessageHandler],['full',createFullPlatformMessageHandler]] as const)('%s shared message contract',(_name,createHandler)=>{
+        it('rejects imported enabled private routing before every provider and preserves ordinary page/input behavior when disabled', async () => {
+            vi.stubEnv('BROWSER', 'userscript');
+            const current = mocks.config as Config;
+            Object.assign(current, {service: 'microsoft', useCache: false, enableAIContext: false,
+                translationMaxRetries: 0, translationRequestsPerSecond: 0, translationRequestsPerMinute: 0,
+                privateTranslation: {enabled: true, service: 'openai', model: 'private-model'}});
+            const provider = vi.fn(async () => '这是确定的译文');
+            const broker = createTranslationBroker({ready: Promise.resolve(), getConfig: () => current,
+                providers: {microsoft: provider, openai: provider},
+                cache: {get: async () => null, set: async () => true, clear: async () => {}, cleanup: async () => {}},
+                serviceTypes: servicesType, endpointResolver: {resolveOpenAICompatibleEndpoint, aiSdkTransportProfile: 'ai-sdk'},
+                promptBuilder: {buildPageSummaryPrompt, buildPageSummarySystemPrompt},
+                getMissingCredentialMessage: () => null, resolveConfiguredModel,
+                getTranslationLanguages: override => resolveTranslationLanguages(override, {sourceLanguage: current.from, targetLanguage: current.to}),
+                buildTranslationCacheKey: identity => JSON.stringify(identity),
+            });
+            mocks.translateWithCache.mockImplementation(broker.translateWithCache);
+            const handler = createHandler(vi.fn());
+            try {
+                const page = {origin: 'A useful page sentence', privateContext: true, incognito: true};
+                const input = {type: 'inputBoxTranslation', text: 'A useful input sentence', targetLang: 'zh-CN', privateContext: true, incognito: true};
+                await expect(handler(page)).rejects.toThrow('无法确认窗口隐私身份');
+                await expect(handler(input)).resolves.toMatchObject({success: false, error: expect.stringContaining('无法确认窗口隐私身份')});
+                expect(provider).not.toHaveBeenCalled();
+                current.privateTranslation.enabled = false;
+                await expect(handler(page)).resolves.toBe('这是确定的译文');
+                await expect(handler(input)).resolves.toMatchObject({success: true, translatedText: '这是确定的译文'});
+                expect(provider).toHaveBeenCalledTimes(2);
+                expect(current.privateTranslation).toEqual({enabled: false, service: 'openai', model: 'private-model'});
+            } finally {handler.dispose();vi.unstubAllEnvs();}
+        });
         it('routes page, dictionary, caches, history and unsupported capabilities without conflating typed messages with translation',async()=>{
             const open=vi.fn(),handler=createHandler(open);
             try{

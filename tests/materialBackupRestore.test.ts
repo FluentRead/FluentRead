@@ -13,7 +13,8 @@ const file=new Blob(['{}']);
 const guard={generation:4,capturedAt:100};
 const capability={id:'00000000-0000-4000-8000-000000000000',token:'a'.repeat(64)};
 function client() {
-  return {begin:vi.fn(async()=>({state:'open',nextSeq:0})),append:vi.fn(async()=>({nextSeq:1})),seal:vi.fn(async()=>({state:'sealed'})),commit:vi.fn(async()=>result),discard:vi.fn(async()=> 'discarded'),resume:vi.fn(async()=>({state:'committed',result})),status:vi.fn(async()=>({state:'committed',result})),acknowledge:vi.fn(async()=> 'released-or-unavailable'),close:vi.fn()};
+  type Progress=(value:{done:number;total:number})=>void;
+  return {begin:vi.fn(async()=>({state:'open',nextSeq:0})),append:vi.fn(async()=>({nextSeq:1})),seal:vi.fn(async(_progress?:Progress)=>({state:'sealed'})),commit:vi.fn(async(_progress?:Progress)=>result),discard:vi.fn(async()=> 'discarded'),resume:vi.fn(async()=>({state:'committed',result})),status:vi.fn(async()=>({state:'committed',result})),acknowledge:vi.fn(async()=> 'released-or-unavailable'),close:vi.fn()};
 }
 function deferred<T>() {let resolve!:(v:T)=>void,reject!:(e:Error)=>void;const promise=new Promise<T>((a,b)=>{resolve=a;reject=b;});return {promise,resolve,reject};}
 let active:ReturnType<typeof client>;
@@ -97,6 +98,46 @@ describe('material backup recovery orchestration',()=>{
     expect(await pending).toEqual({kind:'unknown',capability:cap,commitDispatched:true});expect(active.discard).not.toHaveBeenCalled();expect(active.close).toHaveBeenCalledOnce();
     expect(await queryMaterialBackup(cap)).toEqual({state:'committed',result});expect(active.resume).toHaveBeenCalledWith(cap);block.resolve(result);
   });
+  it('allows slow seal and commit while validated work progresses, then reports only the actual commit result',async()=>{
+    vi.useFakeTimers();const seal=deferred<{state:'sealed'}>(),commit=deferred<MaterialImportResult>();
+    mocks.prepare.mockResolvedValueOnce({...prepared,manifest:{...prepared.manifest,frames:2}});
+    let sealProgress!:(progress:{done:number;total:number})=>void,commitProgress!:(progress:{done:number;total:number})=>void;
+    active.seal.mockImplementationOnce(progress=>{sealProgress=progress!;return seal.promise;});
+    active.commit.mockImplementationOnce(progress=>{commitProgress=progress!;return commit.promise;});
+    const pending=restoreLargeMaterialBackup(file,guard,{onCapability:()=>{}});
+    await vi.advanceTimersByTimeAsync(0);expect(active.seal).toHaveBeenCalledOnce();
+    await vi.advanceTimersByTimeAsync(20_000);sealProgress({done:1,total:2});await vi.advanceTimersByTimeAsync(20_000);
+    expect(active.commit).not.toHaveBeenCalled();sealProgress({done:2,total:2});seal.resolve({state:'sealed'});
+    await vi.advanceTimersByTimeAsync(0);expect(active.commit).toHaveBeenCalledOnce();
+    await vi.advanceTimersByTimeAsync(20_000);commitProgress({done:1,total:2});await vi.advanceTimersByTimeAsync(20_000);
+    commitProgress({done:2,total:2});commit.resolve(result);await vi.advanceTimersByTimeAsync(0);
+    expect(await pending).toMatchObject({kind:'committed',result});expect(active.close).toHaveBeenCalledOnce();
+  });
+  it('still times out a stalled seal without inferring a committed result',async()=>{
+    vi.useFakeTimers();const seal=deferred<{state:'sealed'}>();active.seal.mockReturnValueOnce(seal.promise);
+    const pending=restoreLargeMaterialBackup(file,guard,{onCapability:()=>{}});
+    await vi.advanceTimersByTimeAsync(0);expect(active.seal).toHaveBeenCalledOnce();
+    await vi.advanceTimersByTimeAsync(30_000);
+    expect(await pending).toMatchObject({kind:'failed',error:{name:'TimeoutError'},cleanupPending:true});
+    expect(active.commit).not.toHaveBeenCalled();expect(active.close).toHaveBeenCalledOnce();seal.resolve({state:'sealed'});
+  });
+  it('does not treat 100% frame progress as a committed result if commit stalls',async()=>{
+    vi.useFakeTimers();const commit=deferred<MaterialImportResult>();
+    active.commit.mockImplementationOnce(progress=>{progress!({done:1,total:1});return commit.promise;});
+    let capability:unknown;const pending=restoreLargeMaterialBackup(file,guard,{onCapability:value=>{capability=value;}});
+    await vi.advanceTimersByTimeAsync(0);expect(active.commit).toHaveBeenCalledOnce();
+    await vi.advanceTimersByTimeAsync(30_000);
+    expect(await pending).toEqual({kind:'unknown',capability,commitDispatched:true});
+    expect(active.close).toHaveBeenCalledOnce();expect(active.discard).not.toHaveBeenCalled();commit.resolve(result);
+  });
+  it('cancels a progressing seal without starting a later commit',async()=>{
+    vi.useFakeTimers();const seal=deferred<{state:'sealed'}>(),controller=new AbortController();
+    active.seal.mockImplementationOnce(progress=>{progress!({done:1,total:1});return seal.promise;});
+    const pending=restoreLargeMaterialBackup(file,guard,{signal:controller.signal,onCapability:()=>{}});
+    await vi.advanceTimersByTimeAsync(0);expect(active.seal).toHaveBeenCalledOnce();controller.abort();
+    expect(await pending).toMatchObject({kind:'cancelled',cleanupPending:true});expect(active.commit).not.toHaveBeenCalled();
+    seal.resolve({state:'sealed'});await vi.advanceTimersByTimeAsync(0);expect(active.commit).not.toHaveBeenCalled();
+  });
   it('aborts an in-flight append without claiming cleanup or dispatching commit',async()=>{
     const block=deferred<any>(),controller=new AbortController();active.append.mockReturnValue(block.promise);
     mocks.send.mockImplementation(async(_file,_plan,emit)=>{await emit({seq:0});});let cap:any;
@@ -171,6 +212,12 @@ describe('material backup recovery orchestration',()=>{
   it('discards an opened session when sealing fails without sending a commit',async()=>{
     active.seal.mockRejectedValueOnce(Error('cannot seal'));const out=await restoreLargeMaterialBackup(file,guard,{onCapability:()=>{}});
     expect(out).toMatchObject({kind:'failed',cleanupPending:false,error:expect.objectContaining({message:'cannot seal'})});
+    expect(active.discard).toHaveBeenCalledOnce();expect(active.commit).not.toHaveBeenCalled();expect(active.close).toHaveBeenCalledOnce();
+  });
+  it('cleans up if starting seal throws synchronously',async()=>{
+    active.seal.mockImplementationOnce(()=>{throw Error('cannot start seal');});
+    const out=await restoreLargeMaterialBackup(file,guard,{onCapability:()=>{}});
+    expect(out).toMatchObject({kind:'failed',cleanupPending:false,error:expect.objectContaining({message:'cannot start seal'})});
     expect(active.discard).toHaveBeenCalledOnce();expect(active.commit).not.toHaveBeenCalled();expect(active.close).toHaveBeenCalledOnce();
   });
   it('retains the capability when a failed send races a completed commit during discard',async()=>{

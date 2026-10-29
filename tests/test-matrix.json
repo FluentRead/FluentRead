@@ -688,6 +688,7 @@
       "tests/materialWorkspaceWrite.test.ts",
       "tests/materialImportCapacity.test.ts",
       "tests/materialImportPort.test.ts",
+      "tests/materialImportProgressIntegration.test.ts",
       "tests/materialImportRuntime.test.ts",
       "tests/materialImportRuntimeDatabase.test.ts",
       "tests/materialImportStage.test.ts",

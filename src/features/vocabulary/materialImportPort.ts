@@ -4,7 +4,7 @@
  * 主要内容：注入来源权限与暂存仓库，限制端口、消息、帧和并发；断线取消时保留结果未知语义。
  * 模块边界：不安装浏览器监听器、不读取文件、不负责数据库事务通知；实际后台接线须注入可信来源及隐私判断。
  */
-import type {Capability, Frame, Manifest} from '@/src/features/vocabulary/materialImportStage';
+import type {Capability, Frame, Manifest, MaterialImportProgress} from '@/src/features/vocabulary/materialImportStage';
 import type {MaterialOperationGuard} from '@/src/features/vocabulary/materialProtocol';
 import {MATERIAL_IMPORT_FRAME_BYTES} from '@/src/features/vocabulary/materialProtocol';
 
@@ -26,8 +26,8 @@ type Stage={
   beginRecoverable(manifest:Manifest,guard:MaterialOperationGuard,cap:Capability,options:{deadline:number;signal:AbortSignal}):Promise<Capability>;
   resume(cap:Capability,options:{signal:AbortSignal}):Promise<void>;
   append(cap:Capability,frame:Frame,options:{signal:AbortSignal}):Promise<{nextSeq:number}>;
-  seal(cap:Capability,options:{signal:AbortSignal}):Promise<void>;
-  commit(cap:Capability,options:{signal:AbortSignal}):Promise<{inserted:number;updated:number;skipped:number}>;
+  seal(cap:Capability,options:{signal:AbortSignal;onProgress?:(progress:MaterialImportProgress)=>void}):Promise<void>;
+  commit(cap:Capability,options:{signal:AbortSignal;onProgress?:(progress:MaterialImportProgress)=>void}):Promise<{inserted:number;updated:number;skipped:number}>;
   status(cap:Capability,options:{signal:AbortSignal}):Promise<unknown>;
   discard(cap:Capability,options:{signal:AbortSignal}):Promise<unknown>;
   acknowledge(cap:Capability,options:{signal:AbortSignal}):Promise<unknown>;
@@ -55,7 +55,8 @@ type RequestSnapshot =
   | {action:'begin';capability:Capability;manifest:Manifest;guard:MaterialOperationGuard;deadline:number}
   | {action:'resume';capability:Capability}
   | {action:'append';frame:Frame}
-  | {action:'seal'|'status'|'commit'|'discard'|'acknowledge'};
+  | {action:'seal'|'commit';reportProgress:boolean}
+  | {action:'status'|'discard'|'acknowledge'};
 
 /** 仅保留协议字段，避免在异步等待中持有调用者附加的大对象。 */
 function snapshotRequest(input:Record<string,unknown>):RequestSnapshot {
@@ -70,7 +71,9 @@ function snapshotRequest(input:Record<string,unknown>):RequestSnapshot {
   }
   if(action==='resume')return {action,capability:snapshotMaterialImportCapability(input.capability)};
   if(action==='append')return {action,frame:decodeWireFrame(input.frame)};
-  if(action==='seal'||action==='status'||action==='commit'||action==='discard'||action==='acknowledge')return {action};
+  // 旧客户端不声明进度，不会收到它不认识的中间消息。
+  if(action==='seal'||action==='commit')return {action,reportProgress:input.progress===true};
+  if(action==='status'||action==='discard'||action==='acknowledge')return {action};
   throw Error('invalid');
 }
 
@@ -149,9 +152,9 @@ export function makePortBridge(stage:Stage, options:{isTrustedSender:(sender:Sen
             if(!bound)throw Error('invalid');
             switch(request.action){
               case 'append':result=await stage.append(bound,request.frame,{signal});break;
-              case 'seal':await stage.seal(bound,{signal});result={state:'sealed'};break;
+              case 'seal':await stage.seal(bound,{signal,...(request.reportProgress?{onProgress:(progress:MaterialImportProgress)=>send({id,progress})}:{})});result={state:'sealed'};break;
               case 'status':result=await stage.status(bound,{signal});break;
-              case 'commit':result=await stage.commit(bound,{signal});break;
+              case 'commit':result=await stage.commit(bound,{signal,...(request.reportProgress?{onProgress:(progress:MaterialImportProgress)=>send({id,progress})}:{})});break;
               case 'discard':result=await stage.discard(bound,{signal});if(result==='discarded')bound=undefined;break;
               case 'acknowledge':result=await stage.acknowledge(bound,{signal});bound=undefined;break;
             }

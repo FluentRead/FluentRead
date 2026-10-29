@@ -410,6 +410,85 @@ describe('material import Port client',()=>{
     postMessage(value:unknown){if(this.closed)throw Error('closed');this.sent.push(structuredClone(value));}
     disconnect(){if(this.closed)return;this.closed=true;this.onDisconnect.emit();}
   }
+  it('negotiates validated, strictly increasing progress for a seal without resolving it early',async()=>{
+    const {createMaterialImportPortClient}=await import('@/src/features/vocabulary/materialImportPortClient');
+    const port=new ClientPort(),client=createMaterialImportPortClient(port),progress=vi.fn();
+    const pending=client.seal(progress);
+    expect(port.sent).toEqual([{id:1,action:'seal',progress:true}]);
+    port.onMessage.emit({id:1,progress:{done:1,total:3}});port.onMessage.emit({id:1,progress:{done:3,total:3}});
+    expect(progress.mock.calls).toEqual([[{done:1,total:3}],[{done:3,total:3}]]);
+    await expect(client.status()).rejects.toThrow('材料恢复请求尚未完成');
+    port.onMessage.emit({id:1,ok:true,data:{state:'sealed'}});expect(await pending).toEqual({state:'sealed'});client.close();
+  });
+  it.each([
+    {done:0,total:1},{done:2,total:1},{done:1,total:20_001},{done:1.5,total:2},null,'invalid',
+  ])('disconnects instead of extending a request on malformed progress %j',async progress=>{
+    const {createMaterialImportPortClient,MaterialImportPortDisconnectedError}=await import('@/src/features/vocabulary/materialImportPortClient');
+    const port=new ClientPort(),client=createMaterialImportPortClient(port),received=vi.fn(),pending=client.commit(received);
+    port.onMessage.emit({id:1,progress});await expect(pending).rejects.toBeInstanceOf(MaterialImportPortDisconnectedError);
+    expect(received).not.toHaveBeenCalled();expect(port.closed).toBe(true);
+  });
+  it.each(['duplicate','decreasing','different-total','unsolicited','mixed-response','mixed-error','extra-progress-field'] as const)('rejects %s progress without treating it as work',async mode=>{
+    const {createMaterialImportPortClient,MaterialImportPortDisconnectedError}=await import('@/src/features/vocabulary/materialImportPortClient');
+    const port=new ClientPort(),client=createMaterialImportPortClient(port),received=vi.fn();
+    const pending=mode==='unsolicited'?client.seal():client.seal(received);
+    if(mode==='duplicate'||mode==='decreasing'||mode==='different-total')port.onMessage.emit({id:1,progress:{done:2,total:4}});
+    const progress=mode==='duplicate'?{done:2,total:4}:mode==='decreasing'?{done:1,total:4}:mode==='different-total'?{done:3,total:5}:mode==='extra-progress-field'?{done:1,total:4,data:'extra'}:{done:1,total:4};
+    port.onMessage.emit({id:1,progress,...(mode==='mixed-response'?{ok:true}:mode==='mixed-error'?{error:'extra'}:{})});
+    await expect(pending).rejects.toBeInstanceOf(MaterialImportPortDisconnectedError);expect(port.closed).toBe(true);
+    expect(received).toHaveBeenCalledTimes(['duplicate','decreasing','different-total'].includes(mode)?1:0);
+  });
+  it('disconnects if the progress consumer rejects the reported operation',async()=>{
+    const {createMaterialImportPortClient,MaterialImportPortDisconnectedError}=await import('@/src/features/vocabulary/materialImportPortClient');
+    const port=new ClientPort(),client=createMaterialImportPortClient(port),pending=client.seal(()=>{throw Error('invalid expected total');});
+    port.onMessage.emit({id:1,progress:{done:1,total:2}});
+    await expect(pending).rejects.toBeInstanceOf(MaterialImportPortDisconnectedError);expect(port.closed).toBe(true);
+  });
+  it('requires the progress response id to be an own protocol field',async()=>{
+    const {createMaterialImportPortClient,MaterialImportPortDisconnectedError}=await import('@/src/features/vocabulary/materialImportPortClient');
+    const port=new ClientPort(),client=createMaterialImportPortClient(port),received=vi.fn(),pending=client.seal(received);
+    port.onMessage.emit(Object.assign(Object.create({id:1}),{progress:{done:1,total:2},extra:'invalid'}));
+    await expect(pending).rejects.toBeInstanceOf(MaterialImportPortDisconnectedError);expect(received).not.toHaveBeenCalled();
+  });
+  it('sends progress through the real stage only when the client negotiates it',async()=>{
+    const {createMaterialImportPortClient}=await import('@/src/features/vocabulary/materialImportPortClient');
+    const h=harness(),bridge=trackedBridge(h.stage,{isTrustedSender:trustSender,onCommitted:()=>{},isPrivateContext:()=>false});
+    const server=new MockPort('json'),clientPort=new ClientPort(),closeClient=clientPort.disconnect.bind(clientPort),replies:unknown[]=[];
+    clientPort.postMessage=(value:unknown)=>server.emit(value);
+    clientPort.disconnect=()=>{closeClient();server.disconnect();};server.onDisconnect.addListener(closeClient);
+    server.postMessage=(value:unknown)=>{replies.push(value);clientPort.onMessage.emit(JSON.parse(JSON.stringify(value)));};
+    expect(bridge.attach(server)).toBe(true);
+    const client=createMaterialImportPortClient(clientPort),cap=createImportCapability(),input=frames();
+    await client.begin(cap,input.manifest,{generation:0,capturedAt:100},1000);
+    const frame=decodeWireFrame(input.frame);await client.append(frame);
+    const progress=vi.fn();expect(await client.seal(progress)).toEqual({state:'sealed'});
+    expect(progress).toHaveBeenCalledWith({done:1,total:1});
+    expect(await client.commit()).toEqual({inserted:1,updated:0,skipped:0});
+    expect(replies.filter(value=>typeof value==='object'&&value!==null&&'progress' in value)).toHaveLength(1);
+    client.close();bridge.dispose();h.bridge.dispose();h.port.disconnect();
+  });
+  it.each(['seal','commit'] as const)('disconnects during real %s progress without acknowledging or committing',async phase=>{
+    const {createMaterialImportPortClient,MaterialImportPortDisconnectedError}=await import('@/src/features/vocabulary/materialImportPortClient');
+    const h=harness(),bridge=trackedBridge(h.stage,{isTrustedSender:trustSender,onCommitted:()=>{},isPrivateContext:()=>false});
+    const server=new MockPort('json'),clientPort=new ClientPort(),closeClient=clientPort.disconnect.bind(clientPort),replies:any[]=[];
+    clientPort.postMessage=(value:unknown)=>server.emit(value);
+    clientPort.disconnect=()=>{closeClient();server.disconnect();};server.onDisconnect.addListener(closeClient);
+    server.postMessage=(value:unknown)=>{
+      const response=JSON.parse(JSON.stringify(value));replies.push(response);clientPort.onMessage.emit(response);
+      if(response.progress)clientPort.disconnect();
+    };
+    expect(bridge.attach(server)).toBe(true);
+    const client=createMaterialImportPortClient(clientPort),cap=createImportCapability(),input=frames();
+    await client.begin(cap,input.manifest,{generation:0,capturedAt:100},1000);await client.append(decodeWireFrame(input.frame));
+    if(phase==='commit')await client.seal();
+    const progress=vi.fn();await expect(client[phase](progress)).rejects.toBeInstanceOf(MaterialImportPortDisconnectedError);
+    expect(progress).toHaveBeenCalledWith({done:1,total:1});
+    expect(replies.filter(value=>value.progress)).toHaveLength(1);
+    await vi.waitFor(async()=>expect((await h.stage.status(cap)).state).toBe(phase==='commit'?'sealed':'open'));
+    expect(await h.db.materials.count()).toBe(0);
+    expect(replies.some(value=>value.id===(phase==='commit'?4:3)&&value.ok===true)).toBe(false);
+    bridge.dispose();h.bridge.dispose();h.port.disconnect();
+  });
   it('closes before reusing a request ID when the safe integer limit is exhausted',async()=>{
     const {createMaterialImportPortClient,MaterialImportPortDisconnectedError}=await import('@/src/features/vocabulary/materialImportPortClient');
     const port=new ClientPort(),client=createMaterialImportPortClient(port);

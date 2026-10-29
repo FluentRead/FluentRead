@@ -4,8 +4,8 @@
  * 主要内容：对二进制帧执行有界 Base64 编码，关联请求与响应，断线时明确返回结果未知。
  * 模块边界：由调用方保存恢复能力、选择文件和管理页面生命周期；不自行重试、接触 IndexedDB 或安装浏览器监听。
  */
-import type {Capability, Frame, Manifest} from './materialImportStage';
-import type {MaterialImportResult, MaterialOperationGuard} from './materialProtocol';
+import type {Capability, Frame, Manifest, MaterialImportProgress} from './materialImportStage';
+import {MATERIAL_IMPORT_MAX_FRAMES, type MaterialImportResult, type MaterialOperationGuard} from './materialProtocol';
 import {MAX_FRAME_BYTES, snapshotMaterialImportCapability} from './materialImportPort';
 
 interface Events<T extends (...args: never[])=>void> {addListener(listener:T):void;removeListener(listener:T):void}
@@ -36,7 +36,7 @@ function encodeFrame(frame:Frame):Omit<Frame,'bytes'> & {base64:string} {
 /** 只允许一个在途请求；断连后绝不自动重放可能已提交的操作。 */
 export function createMaterialImportPortClient(port:MaterialImportClientPort) {
   let nextId=0,closed=false;
-  let pending:{id:number;action:string;resolve:(value:unknown)=>void;reject:(reason:unknown)=>void}|undefined;
+  let pending:{id:number;action:string;resolve:(value:unknown)=>void;reject:(reason:unknown)=>void;onProgress?:(progress:MaterialImportProgress)=>void;lastDone:number;total?:number}|undefined;
   const closeListeners=()=>{
     try{port.onMessage.removeListener(onMessage);}catch{/* 另一个监听仍须移除。 */}
     try{port.onDisconnect.removeListener(onDisconnect);}catch{/* 端口可能已经被浏览器释放。 */}
@@ -50,8 +50,20 @@ export function createMaterialImportPortClient(port:MaterialImportClientPort) {
   const onMessage=(value:unknown)=>{
     if(closed)return;
     if(!value||typeof value!=='object'||Array.isArray(value)){disconnect();return;}
-    const response=value as {id?:unknown;ok?:unknown;data?:unknown;error?:unknown};
-    if(!pending||response.id!==pending.id||typeof response.ok!=='boolean'){disconnect();return;}
+    const response=value as {id?:unknown;ok?:unknown;data?:unknown;error?:unknown;progress?:unknown};
+    if(!pending||response.id!==pending.id){disconnect();return;}
+    if(Object.hasOwn(response,'progress')){
+      const progress=response.progress;
+      if(!pending.onProgress||Object.keys(response).length!==2||!Object.hasOwn(response,'id')||!progress||typeof progress!=='object'||Array.isArray(progress)
+          ||Object.keys(progress).length!==2||!Object.hasOwn(progress,'done')||!Object.hasOwn(progress,'total')){disconnect();return;}
+      const {done,total}=progress as {done?:unknown;total?:unknown};
+      if(typeof done!=='number'||typeof total!=='number'||!Number.isSafeInteger(done)||!Number.isSafeInteger(total)
+          ||done<=pending.lastDone||done>total||total>MATERIAL_IMPORT_MAX_FRAMES||(pending.total!==undefined&&pending.total!==total)){disconnect();return;}
+      pending.lastDone=done;pending.total=total;
+      try{pending.onProgress({done,total});}catch{disconnect();}
+      return;
+    }
+    if(typeof response.ok!=='boolean'){disconnect();return;}
     const active=pending;pending=undefined;
     if(response.ok)active.resolve(response.data);
     else if(active.action==='begin'&&response.error==='capacity-exceeded')active.reject(Object.assign(new Error('材料备份超出当前恢复容量，请保留原材料和备份文件。'),{name:'MaterialBackupCapacityError'}));
@@ -63,13 +75,13 @@ export function createMaterialImportPortClient(port:MaterialImportClientPort) {
     // 注册期间同步断连时，监听可能在关闭回调之后才被加入。
     if(closed)closeListeners();
   } catch(error) {disconnect();closeListeners();throw error;}
-  function request<T>(action:string,fields:Record<string,unknown>={}):Promise<T>{
+  function request<T>(action:string,fields:Record<string,unknown>={},onProgress?:(progress:MaterialImportProgress)=>void):Promise<T>{
     if(closed)return Promise.reject(new MaterialImportPortDisconnectedError());
     if(pending)return Promise.reject(new Error('材料恢复请求尚未完成。'));
     if(nextId>=Number.MAX_SAFE_INTEGER){disconnect();return Promise.reject(new MaterialImportPortDisconnectedError());}
     const id=++nextId;
     return new Promise<T>((resolve,reject)=>{
-      pending={id,action,resolve:value=>resolve(value as T),reject};
+      pending={id,action,resolve:value=>resolve(value as T),reject,onProgress,lastDone:0};
       try{port.postMessage({id,action,...fields});}catch{disconnect();}
     });
   }
@@ -81,9 +93,9 @@ export function createMaterialImportPortClient(port:MaterialImportClientPort) {
     },
     resume:async(capability:Capability)=>request<MaterialImportStatus>('resume',{capability:snapshotMaterialImportCapability(capability)}),
     append:async(frame:Frame)=>request<{nextSeq:number}>('append',{frame:encodeFrame(frame)}),
-    seal:()=>request<{state:'sealed'}>('seal'),
+    seal:(onProgress?:(progress:MaterialImportProgress)=>void)=>request<{state:'sealed'}>('seal',onProgress?{progress:true}:{},onProgress),
     status:()=>request<MaterialImportStatus>('status'),
-    commit:()=>request<MaterialImportResult>('commit'),
+    commit:(onProgress?:(progress:MaterialImportProgress)=>void)=>request<MaterialImportResult>('commit',onProgress?{progress:true}:{},onProgress),
     discard:()=>request<'discarded'|'committed'>('discard'),
     acknowledge:()=>request<'released-or-unavailable'>('acknowledge'),
     close:disconnect,

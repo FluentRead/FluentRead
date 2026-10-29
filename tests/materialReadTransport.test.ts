@@ -225,6 +225,24 @@ describe('material read transport',()=>{
     await expect(result).rejects.toThrow('Unexpected material read message');
     expect(sent[1]).toEqual([]);
   });
+  it('honors cancellation by another port listener before a received frame is processed',async()=>{
+    const {ports,sent}=pair(),controller=new AbortController(),consume=vi.fn();
+    const result=receiveMaterialRead(ports[1],consume,{signal:controller.signal});
+    // Another listener may react to the same browser message before the
+    // awaiting receiver resumes in its next microtask.
+    ports[1].onMessage.addListener(()=>controller.abort());
+    ports[0].postMessage({v:1,type:'frame',seq:0,length:1,data:'YQ=='});
+    await expect(result).rejects.toThrow('cancelled');
+    expect(consume).not.toHaveBeenCalled();expect(sent[1]).toEqual([]);
+  });
+  it('honors cancellation by another port listener before an acknowledgement is processed',async()=>{
+    const {ports,sent}=pair(),controller=new AbortController();
+    const receiver=receiveMaterialRead(ports[1],()=>{}).catch(error=>error);
+    const producer=sendMaterialRead(ports[0],chunks(bytes(1)),{signal:controller.signal});
+    ports[0].onMessage.addListener(()=>controller.abort());
+    await expect(producer).rejects.toThrow('cancelled');await receiver;
+    expect(sent[0].filter((message:any)=>message.type==='end')).toHaveLength(0);
+  });
   it('aborts a cooperative producer when the peer disconnects',async()=>{
     const {ports}=pair();let aborted=false;
     const result=sendMaterialRead(ports[0],async function* (signal){

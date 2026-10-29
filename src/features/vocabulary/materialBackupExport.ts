@@ -57,8 +57,10 @@ function* jsonValue(value:unknown, ancestors:Set<object>):Generator<string> {
     ancestors.add(value);
     try {
         if (Array.isArray(value)) {
+            // JSON.stringify 快照数组长度，子元素的 toJSON 即使改变数组也不改变本次遍历范围。
+            const length = value.length;
             yield '[';
-            for (let index = 0; index < value.length; index++) {
+            for (let index = 0; index < length; index++) {
                 if (index) yield ',';
                 const child = prepared(value,String(index));
                 if (omitted(child)) yield 'null'; else yield* jsonValue(child,ancestors);

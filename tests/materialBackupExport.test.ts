@@ -71,6 +71,15 @@ describe('streamed material backup', () => {
         const output = text(await collect(streamMaterialBackup(fake(records),{exportedAt:123})));
         expect(output).toBe(JSON.stringify(backup(records)));
     });
+    it.each(['append','shrink'] as const)('uses the original array length when toJSON can %s it',async operation=>{
+        const make=()=>{
+            const values:unknown[]=[];
+            values.push({toJSON(){if(operation==='append')values.push('late');else values.length=1;return 'first';}},'second');
+            return [record('array',{extra:values})];
+        };
+        const expected=JSON.stringify(backup(make()));
+        expect(text(await collect(streamMaterialBackup(fake(make()),{exportedAt:123})))).toBe(expected);
+    });
     it('handles Unicode and escaping across string and frame boundaries without splitting encoded output', async () => {
         const value = 'a'.repeat(4095) + '😀' + ('\ud800' + '\udc00' + '😀' + '\ud800' + '\udfff' + '\udc00' + '"\\\n' + '长').repeat(4000);
         const records = [record('unicode',{references:[{kind:'note',id:'n',note:value}]})];

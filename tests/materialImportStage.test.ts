@@ -57,6 +57,41 @@ async function upload(stage:ReturnType<typeof createStage>, records:unknown[], c
 const deferred=()=>{let resolve!:()=>void;const promise=new Promise<void>(done=>resolve=done);return {promise,resolve};};
 
 describe('clearing materials and import staging',()=>{
+  it('reports only real increasing frame reads during seal and commit without claiming a transaction result',async()=>{
+    const target=instance(),record=await material('progress'),{token,input}=await upload(target.stage,[record]);
+    expect(input.frames.length).toBeGreaterThan(1);
+    const sealed:Array<{done:number;total:number}>=[],committing:Array<{done:number;total:number}>=[];
+    await target.stage.seal(token,{onProgress:progress=>sealed.push(progress)});
+    expect(sealed[0]).toEqual({done:1,total:input.frames.length});
+    expect(sealed.at(-1)).toEqual({done:input.frames.length,total:input.frames.length});
+    expect(sealed.every((value,index)=>index===0||value.done>sealed[index-1].done)).toBe(true);
+    expect((await target.stage.status(token)).state).toBe('sealed');
+    expect(await target.stage.commit(token,{onProgress:progress=>committing.push(progress)})).toEqual({inserted:1,updated:0,skipped:0});
+    expect(committing[0]).toEqual({done:1,total:input.frames.length});
+    expect(committing.at(-1)).toEqual({done:input.frames.length,total:input.frames.length});
+    expect(await target.repo.get(record.id)).not.toBeNull();
+  });
+  it.each(['seal','commit'] as const)('rolls back %s if the caller disconnects during real progress',async phase=>{
+    const target=instance(),record=await material(`cancel-progress-${phase}`),{token}=await upload(target.stage,[record]);
+    if(phase==='commit')await target.stage.seal(token);
+    const controller=new AbortController(),reported=vi.fn(()=>controller.abort());
+    await expect(target.stage[phase](token,{signal:controller.signal,onProgress:reported})).rejects.toThrow();
+    expect(reported).toHaveBeenCalledOnce();
+    await vi.waitFor(async()=>expect(await target.db.materials.count()).toBe(0));
+    expect((await target.stage.status(token)).state).toBe(phase==='commit'?'sealed':'open');
+  });
+  it.each(['seal','commit'] as const)('does not treat 100%% %s frame progress as a successful transaction',async phase=>{
+    const target=instance(),record=await material(`corrupt-progress-${phase}`),{token,input}=await upload(target.stage,[record]);
+    if(phase==='commit')await target.stage.seal(token);
+    const first=await target.stage.frames.get([token.id,0]);first.bytes=first.bytes.slice();
+    const changed=first.bytes.indexOf('x'.charCodeAt(0));expect(changed).toBeGreaterThanOrEqual(0);first.bytes[changed]='y'.charCodeAt(0);
+    await target.stage.frames.put(first);
+    const reported:Array<{done:number;total:number}>=[];
+    await expect(target.stage[phase](token,{onProgress:progress=>reported.push(progress)})).rejects.toThrow();
+    expect(reported.at(-1)).toEqual({done:input.frames.length,total:input.frames.length});
+    expect(await target.db.materials.count()).toBe(0);
+    expect((await target.stage.status(token)).state).toBe(phase==='commit'?'sealed':'open');
+  });
   it('rejects overlapping record applications without leaking writes',async()=>{
     const target=instance(),record=await material('consumer-guard'),guard={generation:0,capturedAt:100};
     await expect(target.repo.importRecords(async apply=>{

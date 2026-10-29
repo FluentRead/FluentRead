@@ -24,18 +24,25 @@ export type MaterialBackupOutcome =
 function cancelled(): Error {return Object.assign(new Error('已取消恢复'), {name: 'AbortError'});}
 function timedOut(): Error {return Object.assign(new Error('恢复请求超时'), {name: 'TimeoutError'});}
 function check(signal?: AbortSignal): void {if (signal?.aborted) throw cancelled();}
-function request<T>(work: Promise<T>, signal?: AbortSignal): Promise<T> {
+function request<T>(work: Promise<T>, signal?: AbortSignal, registerProgress?: (notify:()=>void)=>void): Promise<T> {
   return new Promise<T>((resolve, reject) => {
     let done = false;
     const finish = (fn: (value: T | never) => void, value: T | never) => {
       if (done) return; done = true; signal?.removeEventListener('abort', onAbort); clearTimeout(timer); fn(value);
     };
     const onAbort = () => finish(reject, cancelled() as never);
-    const timer = setTimeout(() => finish(reject, timedOut() as never), REQUEST_TIMEOUT_MS);
+    let timer = setTimeout(() => finish(reject, timedOut() as never), REQUEST_TIMEOUT_MS);
+    registerProgress?.(()=>{if(done)return;clearTimeout(timer);timer=setTimeout(()=>finish(reject,timedOut() as never),REQUEST_TIMEOUT_MS);});
     signal?.addEventListener('abort', onAbort, {once: true});
     work.then(value => finish(resolve, value), error => finish(reject, error as never));
     if (signal?.aborted) onAbort();
   });
+}
+/** Only validated, increasing backend work resets the idle timeout. */
+function requestWithProgress<T>(start:(notify:()=>void)=>Promise<T>,signal?:AbortSignal):Promise<T> {
+  let notify!:()=>void;
+  const work=Promise.resolve().then(()=>{check(signal);return start(()=>notify());});
+  return request(work,signal,callback=>{notify=callback;});
 }
 function connect(): Client {
   if (browser.extension?.inIncognitoContext === true) throw Error('无痕窗口不读取或保存学习材料');
@@ -67,10 +74,14 @@ export async function restoreLargeMaterialBackup(file: Blob, guard: MaterialOper
     check(signal);
     await sendMaterialBackup(file, prepared, frame => request(client!.append(frame), signal), {signal});
     check(signal);
-    await request(client.seal(), signal);
+    const progress=(notify:()=>void)=>(value:{done:number;total:number})=>{
+      if(value.total!==prepared.manifest.frames)throw Error('材料恢复进度无效');
+      notify();
+    };
+    await requestWithProgress(notify=>client!.seal(progress(notify)), signal);
     check(signal);
     commitDispatched = true;
-    const result = await request(client.commit(), signal);
+    const result = await requestWithProgress(notify=>client!.commit(progress(notify)), signal);
     if (!validResult(result)) return {kind: 'unknown', capability: cap, commitDispatched: true};
     return {kind: 'committed', result, capability: cap};
   } catch (error) {

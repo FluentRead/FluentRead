@@ -251,6 +251,42 @@ describe('trusted material page bridge',()=>{
         expect(await transfer(bridge,page(token,0))).toEqual([{type:'error',code:'stale-operation'}]);
         await bridge.dispose();
     });
+    it.each(['page','detail'] as const)('stops serializing remaining %s entries when the session closes mid-frame',async operation=>{
+        const {bridge,items}=fixture(2);
+        if(operation==='page')items[0].title='x'.repeat(80_000);
+        else items[0].references=Array.from({length:24},(_,i)=>({kind:'note',id:String(i),note:'n'.repeat(12_000)}));
+        const token=header(await transfer(bridge,start())).capability!;await tick();
+        const [server,client]=pair();bridge.connect(server);const chunks:Uint8Array[]=[];
+        let closing:Promise<MaterialPageMessage[]>|undefined;
+        const reading=receiveMaterialRead(client as MaterialReadPort,async chunk=>{
+            chunks.push(chunk);
+            if(!closing){closing=transfer(bridge,close(token));await tick();}
+        });
+        client.postMessage(operation==='page'?page(token,0):detail(token,'00',0));
+        await reading;expect(await closing).toEqual([{type:'closed'}]);
+        const output=new TextDecoder().decode(Uint8Array.from(chunks.flatMap(chunk=>[...chunk])));
+        const messages:MaterialPageMessage[]=output.trim().split('\n').map(line=>JSON.parse(line));
+        expect(messages.at(-1)).toEqual({type:'error',code:'stale-operation'});
+        expect(messages.some(message=>message.type==='complete')).toBe(false);
+        await bridge.dispose();
+    });
+    it.each(['page','detail','topics'] as const)('waits for the final %s revision check after session closure',async operation=>{
+        const {bridge,repo,items}=fixture(1);items[0].topics=['alpha'];
+        const token=header(await transfer(bridge,start())).capability!;await tick();
+        let release!:()=>void,started!:()=>void;
+        const held=new Promise<void>(resolve=>{release=resolve;}),entered=new Promise<void>(resolve=>{started=resolve;});
+        const original=repo.checkSnapshot.getMockImplementation()!;let calls=0;
+        repo.checkSnapshot.mockImplementation(async revision=>{
+            if(++calls===(operation==='detail'?2:3)){started();await held;}
+            return original(revision);
+        });
+        const reading=transfer(bridge,operation==='page'?page(token,0):operation==='detail'?detail(token,'00',0):topics(token,0));
+        await entered;const closing=transfer(bridge,close(token));await tick();release();
+        const [messages,closed]=await Promise.all([reading,closing]);
+        expect(closed).toEqual([{type:'closed'}]);expect(messages.at(-1)).toEqual({type:'error',code:'stale-operation'});
+        expect(messages.some(message=>message.type==='complete')).toBe(false);
+        await bridge.dispose();
+    });
     it('does not replace an existing session if random capability generation collides',async()=>{
         const {repo}=fixture(1),bridge=createMaterialPageBridge({repository:repo,ready:Promise.resolve(),isPrivateContext:()=>false,isTrustedSender:()=>true,maxSessions:2});
         const random=vi.spyOn(crypto,'getRandomValues').mockImplementation(value=>{(value as Uint8Array).fill(0);return value;});

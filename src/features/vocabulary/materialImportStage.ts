@@ -14,6 +14,8 @@ import {materialImportCapacity} from '@/src/features/vocabulary/materialImportCa
 
 export interface Manifest {records:number; frames:number; bytes:number; digest:string}
 export interface Frame {seq:number; record:number; part:number; total:number; recordBytes:number; bytes:Uint8Array}
+/** 已真实读取并处理的帧数；不表示事务已封存或提交。 */
+export interface MaterialImportProgress {done:number; total:number}
 export interface Capability {id:string; token:string}
 type Phase = 'open' | 'sealed';
 interface Session extends Manifest {id:string; ownerHash:string; phase:Phase; guard:MaterialOperationGuard; nextSeq:number; nextRecord:number; nextPart:number; currentTotal:number; currentBytes:number; receivedBytes:number; expiresAt:number}
@@ -365,8 +367,9 @@ export function createStage(db:MaterialDatabase, options:{limits?:Partial<Limits
   }
   // Walk IDB frames sequentially, hold at most one bounded record plus one frame.
   // Decoding/JSON.parse can allocate additional memory proportional to that record.
-  async function consume(s:Session,onRecord:(item:unknown)=>Promise<void>):Promise<void>{
+  async function consume(s:Session,onRecord:(item:unknown)=>Promise<void>,onProgress?:(progress:MaterialImportProgress)=>void):Promise<void>{
     const hash=sha256.create();let seq=0,totalBytes=0;
+    let lastProgress:number|undefined;
     for(let record=0;record<s.records;record++){
       const first=await frames.get([s.id,seq]);
       if(!first||first.record!==record||first.part!==0||first.total<1||first.recordBytes>limits.recordBytes)throw Error('missing or invalid record');
@@ -377,6 +380,16 @@ export function createStage(db:MaterialDatabase, options:{limits?:Partial<Limits
         const item=await frames.get([s.id,seq++]);
         if(!item||item.record!==record||item.part!==part||item.total!==total||item.recordBytes!==recordBytes||!item.bytes.length||item.bytes.length>limits.frameBytes||offset+item.bytes.length>recordBytes)throw Error('missing or invalid frame');
         assembled.set(item.bytes,offset);hash.update(item.bytes);offset+=item.bytes.length;
+        if(onProgress){
+          const now=performance.now();
+          if(lastProgress===undefined||now-lastProgress>=1000||seq===s.frames){
+            lastProgress=now;
+            try{
+              const outcome:unknown=onProgress({done:seq,total:s.frames});
+              if(outcome&&(typeof outcome==='object'||typeof outcome==='function'))void Promise.resolve(outcome).catch(()=>{});
+            }catch{/* 诊断或端口通知不能伪造事务结果。 */}
+          }
+        }
       }
       if(offset!==recordBytes)throw Error('incomplete record');
       totalBytes+=recordBytes;
@@ -386,20 +399,20 @@ export function createStage(db:MaterialDatabase, options:{limits?:Partial<Limits
     }
     if(seq!==s.frames||totalBytes!==s.bytes||bytesToHex(hash.digest())!==s.digest)throw Error('incomplete or corrupt backup');
   }
-  async function seal(capInput:Capability, options:{signal?:AbortSignal}={}):Promise<void>{
-    const cap=requireCapability(capInput),signal=options.signal;
+  async function seal(capInput:Capability, options:{signal?:AbortSignal;onProgress?:(progress:MaterialImportProgress)=>void}={}):Promise<void>{
+    const cap=requireCapability(capInput),signal=options.signal,onProgress=options.onProgress;
     await admit(cap,signal);
     return runControl('seal',cap.id,signal,()=>db.transaction('rw',frames,sessions,async()=>guardTransaction(signal,async()=>{
       const s=assertSession(await sessions.get(cap.id),cap);
       if(s.phase==='sealed')return;
       if(s.nextSeq!==s.frames||s.nextRecord!==s.records||s.nextPart!==0||s.receivedBytes!==s.bytes)throw Error('incomplete transfer');
-      await consume(s,async()=>{});
+      await consume(s,async()=>{},onProgress);
       s.phase='sealed';s.expiresAt=clock()+limits.ttlMs;await sessions.put(s);
     })));
   }
-  async function commit(capInput:Capability, options:{signal?:AbortSignal}={}):Promise<MaterialImportResult>{
+  async function commit(capInput:Capability, options:{signal?:AbortSignal;onProgress?:(progress:MaterialImportProgress)=>void}={}):Promise<MaterialImportResult>{
     // Snapshot mutable caller-owned options before the first asynchronous step.
-    const cap=requireCapability(capInput),signal=options.signal;
+    const cap=requireCapability(capInput),signal=options.signal,onProgress=options.onProgress;
     if(signal?.aborted)throw Error('cancelled');
     const admitted=admissionsByDatabase.get(db.name)?.get(cap.id);
     if(!admitted||admitted.expiresAt<=clock()||!secureEqual(admitted.ownerHash,hashToken(cap.token)))await resume(cap,{signal});
@@ -437,7 +450,7 @@ export function createStage(db:MaterialDatabase, options:{limits?:Partial<Limits
             if(cancelled)throw Error('cancelled');
             await apply(item);
             if(cancelled)throw Error('cancelled');
-          });
+          },onProgress);
         },now,s.guard);
         if(cancelled)throw Error('cancelled');
         const budget=await getBudget();releaseSessionBudget(budget,s,false);

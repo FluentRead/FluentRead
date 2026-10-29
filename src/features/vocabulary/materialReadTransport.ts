@@ -67,7 +67,7 @@ function channel(port:MaterialReadPort, options:MaterialReadOptions) {
   const failureListeners=new Set<(reason:Error)=>void>();
   const closeListeners=()=>{
     if(timer!==undefined)clearTimeout(timer);
-    options.signal?.removeEventListener('abort',onAbort);
+    try {options.signal?.removeEventListener('abort',onAbort);} catch {/* Continue releasing the port. */}
     try {port.onMessage.removeListener(onMessage);} catch {}
     try {port.onDisconnect.removeListener(onDisconnect);} catch {}
   };
@@ -183,7 +183,7 @@ export async function sendMaterialRead(port:MaterialReadPort, source:AsyncIterab
   } catch(error) {pipe.fail(pipeFailure(error));throw error;}
   finally {
     pipe.close();
-    if(!complete&&iterator) {try {const cleanup=iterator.return;if(cleanup)void Promise.resolve(cleanup.call(iterator)).catch(()=>{});} catch {/* Cleanup must not hide the original error. */}}
+    if(!complete&&iterator) {try {const cleanup=iterator.return;if(cleanup)void Promise.resolve(Reflect.apply(cleanup,iterator,[])).catch(()=>{});} catch {/* Cleanup must not hide the original error. */}}
     if(complete) {try {port.disconnect();} catch {/* The peer may already have closed the dedicated port. */}}
   }
 }

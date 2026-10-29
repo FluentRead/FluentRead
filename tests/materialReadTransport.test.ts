@@ -365,7 +365,9 @@ describe('material read transport',()=>{
   });
   it('runs iterator cleanup after a producer failure',async()=>{
     const {ports}=pair(), original=Error('read failed');let reads=0, observedThis:unknown;
-    const iterator={next:async()=>{throw original;},get return(){reads++;return function(this:unknown){observedThis=this;return Promise.reject(Error('cleanup failed'));};}};
+    const cleanup=function(this:unknown){observedThis=this;return Promise.reject(Error('cleanup failed'));};
+    Object.defineProperty(cleanup,'call',{get(){throw Error('unexpected call property access');}});
+    const iterator={next:async()=>{throw original;},get return(){reads++;return cleanup;}};
     const source={ [Symbol.asyncIterator](){return iterator;} };
     await expect(sendMaterialRead(ports[0],source)).rejects.toBe(original);
     expect(reads).toBe(1);expect(observedThis).toBe(iterator);
@@ -467,5 +469,52 @@ describe('hostile throwable and iterator cleanup',()=>{
     expect(producerError===original).toBe(true);
     expect(receiverError.message).toBe('Material read disconnected');
     expect(states.every(s=>s.messages.size===0&&s.disconnects.size===0)).toBe(true);
+  });
+});
+
+describe('signal cleanup failures',()=>{
+  it.each(['before','after'] as const)('preserves the consumer error when signal removal throws %s native removal',async mode=>{
+    const {ports,states}=pair(),controller=new AbortController(),original=Error('consumer failure'),cleanup=Error('signal removal failure');
+    const nativeRemove=controller.signal.removeEventListener.bind(controller.signal);
+    vi.spyOn(controller.signal,'removeEventListener').mockImplementation((type,listener,options)=>{
+      if(mode==='after')nativeRemove(type,listener,options);
+      throw cleanup;
+    });
+    const receiver=receiveMaterialRead(ports[1],()=>{throw original;},{signal:controller.signal,idleTimeoutMs:2000}).then(()=>undefined,error=>error);
+    const sender=sendMaterialRead(ports[0],chunks(bytes(1)),{idleTimeoutMs:2000}).then(()=>undefined,error=>error);
+    const received=await receiver;
+    expect(received).toBe(original);expect(states.every(state=>state.closed)).toBe(true);
+    const sent=await sender;expect(sent.message).toBe('Material read disconnected');
+    expect(states.every(state=>state.messages.size===0&&state.disconnects.size===0)).toBe(true);
+    controller.abort();expect(states.every(state=>state.messages.size===0&&state.disconnects.size===0)).toBe(true);
+  });
+  it('removes the abort listener normally after a successful transfer',async()=>{
+    const {ports,states}=pair(),controller=new AbortController(),remove=vi.spyOn(controller.signal,'removeEventListener');
+    const received=receiveMaterialRead(ports[1],()=>{},{signal:controller.signal,idleTimeoutMs:2000});
+    await Promise.all([sendMaterialRead(ports[0],chunks(bytes(1)),{idleTimeoutMs:2000}),received]);
+    expect(remove).toHaveBeenCalledWith('abort',expect.any(Function));
+    expect(states.every(state=>state.messages.size===0&&state.disconnects.size===0)).toBe(true);
+  });
+  it('preserves a producer failure when signal listener removal throws',async()=>{
+    const {ports,states}=pair(),controller=new AbortController(),original=Error('producer failure');
+    const nativeRemove=controller.signal.removeEventListener.bind(controller.signal);
+    vi.spyOn(controller.signal,'removeEventListener').mockImplementation((type,listener,options)=>{
+      nativeRemove(type,listener,options);throw Error('signal removal failure');
+    });
+    const receiver=receiveMaterialRead(ports[1],()=>{},{idleTimeoutMs:2000}).then(()=>undefined,error=>error);
+    const sender=sendMaterialRead(ports[0],()=>{throw original;},{signal:controller.signal,idleTimeoutMs:2000}).then(()=>undefined,error=>error);
+    const [sent,received]=await Promise.all([sender,receiver]);
+    expect(sent).toBe(original);expect(received.message).toBe('Material read disconnected');
+    expect(states.every(state=>state.closed&&state.messages.size===0&&state.disconnects.size===0)).toBe(true);
+  });
+  it('preserves a listener registration failure when signal listener removal throws',async()=>{
+    const {ports,states}=pair(),controller=new AbortController(),original=Error('registration failure');
+    const nativeRemove=controller.signal.removeEventListener.bind(controller.signal);
+    vi.spyOn(controller.signal,'removeEventListener').mockImplementation((type,listener,options)=>{
+      nativeRemove(type,listener,options);throw Error('signal removal failure');
+    });
+    ports[0].onMessage.addListener=()=>{throw original;};
+    await expect(receiveMaterialRead(ports[0],()=>{},{signal:controller.signal})).rejects.toBe(original);
+    expect(states.every(state=>state.closed&&state.messages.size===0&&state.disconnects.size===0)).toBe(true);
   });
 });

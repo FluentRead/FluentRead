@@ -521,6 +521,45 @@ describe('trusted material page bridge',()=>{
         expect(output).toContain('"processed":1');expect(output).not.toContain('"processed":2');
         expect(complete(await transfer(bridge,start())).count).toBe(3);await bridge.dispose();
     });
+    it('delivers coalesced progress even when a timer fires just before its deadline',async()=>{
+        const realSetTimeout=globalThis.setTimeout,realClearTimeout=globalThis.clearTimeout;
+        const bounded=async<T>(work:Promise<T>):Promise<T>=>{
+            let timer:ReturnType<typeof setTimeout>|undefined;
+            try{return await Promise.race([work,new Promise<never>((_,reject)=>{timer=realSetTimeout(()=>reject(Error('bridge did not drain')),1000);})]);}
+            finally{if(timer!==undefined)realClearTimeout(timer);}
+        };
+        let bridge:ReturnType<typeof createMaterialPageBridge>|undefined;
+        let finishSecond:((value:MaterialRecord|null)=>void)|undefined,finishThird:((value:MaterialRecord|null)=>void)|undefined,releaseAck:(()=>void)|undefined;
+        let restoreClock=()=>{},restoreTimers=()=>{};
+        try{
+            vi.useFakeTimers({toFake:['setTimeout','clearTimeout','performance']});
+            const base=performance.now.bind(performance);let received=false,last=-Infinity;
+            const clock=vi.spyOn(performance,'now').mockImplementation(()=>{
+                const value=base()+(received?0.1:0.9);if(value<last)throw Error('clock moved backwards');last=value;return value;
+            });
+            restoreClock=()=>clock.mockRestore();
+            const setTimer=vi.spyOn(globalThis,'setTimeout');restoreTimers=()=>setTimer.mockRestore();
+            const {repo}=fixture(3),original=repo.readSnapshotRecord.getMockImplementation()!;let calls=0;
+            const second=new Promise<MaterialRecord|null>(resolve=>{finishSecond=resolve;}),third=new Promise<MaterialRecord|null>(resolve=>{finishThird=resolve;});
+            const ack=new Promise<void>(resolve=>{releaseAck=resolve;});let thirdStarted=false;
+            repo.readSnapshotRecord.mockImplementation(async(revision,id)=>{calls++;if(calls===2)return second;if(calls===3){thirdStarted=true;return third;}return original(revision,id);});
+            bridge=createMaterialPageBridge({repository:repo,ready:Promise.resolve(),isPrivateContext:()=>false,isTrustedSender:()=>true});
+            const [server,client]=pair(),chunks:Uint8Array[]=[];bridge.connect(server);
+            const reading=receiveMaterialRead(client as MaterialReadPort,async bytes=>{chunks.push(bytes);if(!received){received=true;await ack;}});
+            await vi.advanceTimersByTimeAsync(1);client.postMessage(start());await vi.advanceTimersByTimeAsync(26);
+            expect(received).toBe(true);finishSecond!(item('01'));await vi.advanceTimersByTimeAsync(0);expect(thirdStarted).toBe(true);
+            await vi.advanceTimersByTimeAsync(475);releaseAck!();await vi.advanceTimersByTimeAsync(2);
+            expect(setTimer.mock.calls.some(([,delay])=>typeof delay==='number'&&delay>0&&delay<1)).toBe(true);
+            finishThird!(item('02'));await vi.advanceTimersByTimeAsync(100);
+            await bounded(reading);
+            const output=new TextDecoder().decode(Uint8Array.from(chunks.flatMap(chunk=>[...chunk])));
+            expect(output).toContain('"processed":2');expect(output).toContain('"type":"complete"');
+            await bounded(bridge.dispose());
+        }finally{
+            finishSecond?.(item('01'));finishThird?.(item('02'));releaseAck?.();
+            try{if(bridge)await bounded(bridge.dispose());}finally{restoreTimers();restoreClock();vi.useRealTimers();}
+        }
+    });
     it('does not keep an idle connection alive with fabricated progress while readiness is pending',async()=>{
         const {repo}=fixture();const bridge=createMaterialPageBridge({repository:repo,ready:new Promise(()=>{}),isPrivateContext:()=>false,isTrustedSender:()=>true,idleTimeoutMs:15});
         const [server,client]=pair();bridge.connect(server);const read=receiveMaterialRead(client as MaterialReadPort,()=>{}).catch(error=>error);

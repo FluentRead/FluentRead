@@ -482,6 +482,103 @@ describe('material backup source reader', () => {
       expect(reads).toBe(1);
     } finally {registration.mockRestore();}
   });
+  it.each(['before', 'after'] as const)('preserves the read result when listener removal throws %s native cleanup', async mode => {
+    const controller = new AbortController(), signal = controller.signal;
+    const nativeRemove = signal.removeEventListener.bind(signal);
+    const remove = vi.spyOn(signal, 'removeEventListener').mockImplementation(((type: string, listener: EventListenerOrEventListenerObject, options?: boolean | EventListenerOptions) => {
+      if (mode === 'after') nativeRemove(type, listener, options);
+      throw Error('signal cleanup failed');
+    }) as typeof signal.removeEventListener);
+    try {
+      await expect(prepareMaterialBackup(new Blob([wrap('{}')]), {signal})).resolves.toMatchObject({manifest: {records: 1}});
+      const failure = Error('file read failed'), source = new Blob([wrap('{}')]);
+      source.slice = () => ({arrayBuffer: async () => {throw failure;}} as unknown as Blob);
+      await expect(prepareMaterialBackup(source, {signal})).rejects.toBe(failure);
+    } finally {remove.mockRestore();}
+  });
+  it.each(['before', 'after'] as const)('observes a late read rejection when listener registration throws %s adding the listener', async mode => {
+    const controller = new AbortController(), signal = controller.signal, failure = Error('signal registration failed');
+    const nativeAdd = signal.addEventListener.bind(signal), remove = vi.spyOn(signal, 'removeEventListener');
+    const add = vi.spyOn(signal, 'addEventListener').mockImplementation(((type: string, listener: EventListenerOrEventListenerObject, options?: boolean | AddEventListenerOptions) => {
+      if (mode === 'after') nativeAdd(type, listener, options);
+      throw failure;
+    }) as typeof signal.addEventListener);
+    let rejectRead!: (reason: Error) => void;
+    const pending = new Promise<ArrayBuffer>((_resolve, reject) => {rejectRead = reject;});
+    const source = new Blob([wrap('{}')]);source.slice = () => ({arrayBuffer: () => pending} as unknown as Blob);
+    try {
+      await expect(prepareMaterialBackup(source, {signal})).rejects.toBe(failure);
+      expect(remove).toHaveBeenCalled();
+      rejectRead(Error('late read failure'));await new Promise(resolve => setTimeout(resolve, 0));
+    } finally {add.mockRestore();remove.mockRestore();}
+  });
+  it.each(['before', 'after'] as const)('preserves cancellation when listener registration aborts then throws %s adding the listener', async mode => {
+    const controller = new AbortController(), signal = controller.signal, nativeAdd = signal.addEventListener.bind(signal);
+    const add = vi.spyOn(signal, 'addEventListener').mockImplementation(((type: string, listener: EventListenerOrEventListenerObject, options?: boolean | AddEventListenerOptions) => {
+      if (mode === 'after') nativeAdd(type, listener, options);
+      controller.abort();
+      throw Error('signal registration failed');
+    }) as typeof signal.addEventListener);
+    const source = new Blob([wrap('{}')]);source.slice = () => ({arrayBuffer: () => new Promise<ArrayBuffer>(() => {})} as unknown as Blob);
+    try {await expect(prepareMaterialBackup(source, {signal})).rejects.toMatchObject({name: 'AbortError'});}
+    finally {add.mockRestore();}
+  });
+  it('removes a listener added after a synchronous cancellation callback', async () => {
+    const controller = new AbortController(), signal = controller.signal;
+    const nativeAdd = signal.addEventListener.bind(signal), remove = vi.spyOn(signal, 'removeEventListener');
+    const add = vi.spyOn(signal, 'addEventListener').mockImplementation(((type: string, listener: EventListenerOrEventListenerObject, options?: boolean | AddEventListenerOptions) => {
+      if (typeof listener === 'function') listener.call(signal, new Event('abort'));
+      else listener.handleEvent(new Event('abort'));
+      nativeAdd(type, listener, options);
+    }) as typeof signal.addEventListener);
+    const source = new Blob([wrap('{}')]);source.slice = () => ({arrayBuffer: () => new Promise<ArrayBuffer>(() => {})} as unknown as Blob);
+    try {
+      await expect(prepareMaterialBackup(source, {signal})).rejects.toMatchObject({name: 'AbortError'});
+      expect(remove).toHaveBeenCalledTimes(2);
+      expect(remove.mock.calls[0][1]).toBe(remove.mock.calls[1][1]);
+    } finally {add.mockRestore();remove.mockRestore();}
+  });
+  it('cleans up and observes a late read rejection if signal state fails after registration', async () => {
+    const controller = new AbortController(), signal = controller.signal, failure = Error('signal state failed');
+    const nativeAdd = signal.addEventListener.bind(signal), remove = vi.spyOn(signal, 'removeEventListener');
+    let registered = false, rejectRead!: (reason: Error) => void;
+    const aborted = vi.spyOn(signal, 'aborted', 'get').mockImplementation(() => {if (registered) throw failure;return false;});
+    const add = vi.spyOn(signal, 'addEventListener').mockImplementation(((type: string, listener: EventListenerOrEventListenerObject, options?: boolean | AddEventListenerOptions) => {
+      nativeAdd(type, listener, options);registered = true;
+    }) as typeof signal.addEventListener);
+    const pending = new Promise<ArrayBuffer>((_resolve, reject) => {rejectRead = reject;});
+    const source = new Blob([wrap('{}')]);source.slice = () => ({arrayBuffer: () => pending} as unknown as Blob);
+    try {
+      await expect(prepareMaterialBackup(source, {signal})).rejects.toBe(failure);
+      expect(remove).toHaveBeenCalledOnce();
+      rejectRead(Error('late read failure'));await new Promise(resolve => setTimeout(resolve, 0));
+    } finally {add.mockRestore();remove.mockRestore();aborted.mockRestore();}
+  });
+  it('observes a read that aborts before listener registration and later rejects', async () => {
+    const controller = new AbortController(), signal = controller.signal, add = vi.spyOn(signal, 'addEventListener');
+    let rejectRead!: (reason: Error) => void;
+    const pending = new Promise<ArrayBuffer>((_resolve, reject) => {rejectRead = reject;});
+    const source = new Blob([wrap('{}')]);source.slice = () => ({arrayBuffer: () => {controller.abort();return pending;}} as unknown as Blob);
+    try {
+      await expect(prepareMaterialBackup(source, {signal})).rejects.toMatchObject({name: 'AbortError'});
+      expect(add).not.toHaveBeenCalled();
+      rejectRead(Error('late read failure'));await new Promise(resolve => setTimeout(resolve, 0));
+    } finally {add.mockRestore();}
+  });
+  it('preserves a registration error when checking signal state also fails', async () => {
+    const controller = new AbortController(), signal = controller.signal, failure = Error('registration failed');
+    let registrationAttempted = false;
+    const aborted = vi.spyOn(signal, 'aborted', 'get').mockImplementation(() => {
+      if (registrationAttempted) throw Error('signal state failed');return false;
+    });
+    const add = vi.spyOn(signal, 'addEventListener').mockImplementation(() => {registrationAttempted = true;throw failure;});
+    const remove = vi.spyOn(signal, 'removeEventListener');
+    const source = new Blob([wrap('{}')]);source.slice = () => ({arrayBuffer: () => new Promise<ArrayBuffer>(() => {})} as unknown as Blob);
+    try {
+      await expect(prepareMaterialBackup(source, {signal})).rejects.toBe(failure);
+      expect(remove).toHaveBeenCalledOnce();
+    } finally {aborted.mockRestore();add.mockRestore();remove.mockRestore();}
+  });
   it('sends a >20 MiB synthetic record through the actual stage transaction', async () => {
     const record = `{"id":"one","source":{"kind":"article","url":"https://example.test/a"},"title":"A","topics":[],"references":[],"createdAt":1,"updatedAt":2,"archivedAt":null,"unused":"${'x'.repeat(21 * 1024 * 1024)}"}`;
     const blob = new Blob([wrap(record)]), plan = await prepareMaterialBackup(blob), db = database(), repo = new MaterialRepository(db), stage = createStage(db, {clock: () => 1000});

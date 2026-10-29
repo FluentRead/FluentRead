@@ -27,15 +27,31 @@ function check(signal?: AbortSignal): void {if (signal?.aborted) throw cancelled
 function request<T>(work: Promise<T>, signal?: AbortSignal, registerProgress?: (notify:()=>void)=>void): Promise<T> {
   return new Promise<T>((resolve, reject) => {
     let done = false;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const cleanup = () => {
+      if (timer !== undefined) {clearTimeout(timer); timer = undefined;}
+      try {signal?.removeEventListener('abort', onAbort);} catch {/* Preserve the request result. */}
+    };
     const finish = (fn: (value: T | never) => void, value: T | never) => {
-      if (done) return; done = true; signal?.removeEventListener('abort', onAbort); clearTimeout(timer); fn(value);
+      if (done) return; done = true;
+      cleanup();
+      fn(value);
     };
     const onAbort = () => finish(reject, cancelled() as never);
-    let timer = setTimeout(() => finish(reject, timedOut() as never), REQUEST_TIMEOUT_MS);
-    registerProgress?.(()=>{if(done)return;clearTimeout(timer);timer=setTimeout(()=>finish(reject,timedOut() as never),REQUEST_TIMEOUT_MS);});
-    signal?.addEventListener('abort', onAbort, {once: true});
-    work.then(value => finish(resolve, value), error => finish(reject, error as never));
-    if (signal?.aborted) onAbort();
+    // Observe work even if listener registration fails or cancellation wins immediately.
+    void work.then(value => finish(resolve, value), error => finish(reject, error as never));
+    try {
+      timer = setTimeout(() => finish(reject, timedOut() as never), REQUEST_TIMEOUT_MS);
+      registerProgress?.(()=>{if(done)return;clearTimeout(timer);timer=setTimeout(()=>finish(reject,timedOut() as never),REQUEST_TIMEOUT_MS);});
+      signal?.addEventListener('abort', onAbort, {once: true});
+      // A custom signal can invoke the callback before it actually installs it.
+      if (done) cleanup(); else if (signal?.aborted) onAbort();
+    } catch (error) {
+      if (done) {cleanup(); return;}
+      let aborted = false;
+      try {aborted = signal?.aborted === true;} catch {/* Preserve the setup failure. */}
+      if (aborted) onAbort(); else finish(reject, error as never);
+    }
   });
 }
 /** Only validated, increasing backend work resets the idle timeout. */

@@ -242,11 +242,25 @@ function wait<T>(value: T | PromiseLike<T>, signal?: AbortSignal): Promise<T> {
   if (!signal) return work;
   return new Promise((resolve, reject) => {
     let done = false;
-    const finish = (ok: boolean, result: T | unknown) => {if (done) return; done = true; signal.removeEventListener('abort', onAbort); if (ok) resolve(result as T); else reject(result);};
+    const cleanup = () => {try {signal.removeEventListener('abort', onAbort);} catch {/* Preserve the observed result. */}};
+    const finish = (ok: boolean, result: T | unknown) => {if (done) return; done = true; cleanup(); if (ok) resolve(result as T); else reject(result);};
     const onAbort = () => finish(false, cancelled());
-    signal.addEventListener('abort', onAbort, {once: true});
-    work.then(result => finish(true, result), error => finish(false, error));
-    if (signal.aborted) onAbort();
+    // Observe the read even when listener registration fails or cancellation wins.
+    void work.then(result => finish(true, result), error => finish(false, error));
+    try {
+      if (signal.aborted) {onAbort(); return;}
+      try {signal.addEventListener('abort', onAbort, {once: true});}
+      catch (error) {
+        if (done) {cleanup(); return;}
+        let aborted = false;
+        try {aborted = signal.aborted;} catch {/* Preserve the registration failure. */}
+        finish(false, aborted ? cancelled() : error);
+        return;
+      }
+      // A custom signal can synchronously cancel before actually adding the listener.
+      if (done) {cleanup(); return;}
+      if (signal.aborted) onAbort();
+    } catch (error) {finish(false, error);}
   });
 }
 async function yieldControl(signal?: AbortSignal) {await wait(new Promise<void>(resolve => setTimeout(resolve, 0)), signal); check(signal);}

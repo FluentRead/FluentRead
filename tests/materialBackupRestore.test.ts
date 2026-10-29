@@ -22,6 +22,97 @@ beforeEach(()=>{vi.clearAllMocks();mocks.private=false;active=client();mocks.cli
 afterEach(()=>{vi.useRealTimers();vi.restoreAllMocks();});
 
 describe('material backup recovery orchestration',()=>{
+  it.each(['before','after'] as const)('preserves a completed restore when signal listener removal throws %s removal',async mode=>{
+    vi.useFakeTimers();
+    const controller=new AbortController(),native=controller.signal.removeEventListener.bind(controller.signal);
+    vi.spyOn(controller.signal,'removeEventListener').mockImplementation((type,listener,options)=>{
+      if(mode==='after')native(type,listener,options);
+      throw Error('listener cleanup failed');
+    });
+    let cap:unknown;
+    const out=await restoreLargeMaterialBackup(file,guard,{signal:controller.signal,onCapability:value=>{cap=value;}});
+    expect(out).toEqual({kind:'committed',result,capability:cap});
+    expect(active.commit).toHaveBeenCalledOnce();expect(active.close).toHaveBeenCalledOnce();expect(vi.getTimerCount()).toBe(0);
+  });
+  it('preserves the original request failure if listener removal throws',async()=>{
+    const controller=new AbortController(),failure=Error('begin failed');
+    vi.spyOn(controller.signal,'removeEventListener').mockImplementation(()=>{throw Error('listener cleanup failed');});
+    active.begin.mockRejectedValueOnce(failure);
+    const out=await restoreLargeMaterialBackup(file,guard,{signal:controller.signal,onCapability:()=>{}});
+    expect(out).toMatchObject({kind:'failed',error:failure,cleanupPending:true});
+    expect(active.close).toHaveBeenCalledOnce();expect(active.commit).not.toHaveBeenCalled();
+  });
+  it('finishes cancellation and observes a late request rejection even if listener removal throws',async()=>{
+    const controller=new AbortController(),begin=deferred<{state:string;nextSeq:number}>();
+    vi.spyOn(controller.signal,'removeEventListener').mockImplementation(()=>{throw Error('listener cleanup failed');});
+    active.begin.mockImplementationOnce(()=>begin.promise);
+    const pending=restoreLargeMaterialBackup(file,guard,{signal:controller.signal,onCapability:()=>{}});
+    await vi.waitFor(()=>expect(active.begin).toHaveBeenCalledOnce());
+    controller.abort();
+    expect(await pending).toMatchObject({kind:'cancelled',cleanupPending:true});
+    expect(active.close).toHaveBeenCalledOnce();expect(active.commit).not.toHaveBeenCalled();
+    begin.reject(Error('late begin failure'));await Promise.resolve();
+  });
+  it.each(['before','after'] as const)('cleans up and observes late work when signal registration throws %s registration',async mode=>{
+    vi.useFakeTimers();
+    const controller=new AbortController(),begin=deferred<{state:string;nextSeq:number}>(),failure=Error('listener registration failed');
+    const native=controller.signal.addEventListener.bind(controller.signal),remove=vi.spyOn(controller.signal,'removeEventListener');
+    vi.spyOn(controller.signal,'addEventListener').mockImplementation((type,listener,options)=>{
+      if(mode==='after')native(type,listener,options);
+      throw failure;
+    });
+    active.begin.mockImplementationOnce(()=>begin.promise);
+    const out=await restoreLargeMaterialBackup(file,guard,{signal:controller.signal,onCapability:()=>{}});
+    expect(out).toMatchObject({kind:'failed',error:failure,cleanupPending:true});
+    expect(remove).toHaveBeenCalledWith('abort',expect.any(Function));expect(active.close).toHaveBeenCalledOnce();expect(vi.getTimerCount()).toBe(0);
+    begin.reject(Error('late begin failure'));await Promise.resolve();
+  });
+  it('keeps observed cancellation if signal registration aborts and then throws',async()=>{
+    const controller=new AbortController(),begin=deferred<{state:string;nextSeq:number}>(),native=controller.signal.addEventListener.bind(controller.signal);
+    vi.spyOn(controller.signal,'addEventListener').mockImplementation((type,listener,options)=>{
+      native(type,listener,options);controller.abort();throw Error('listener registration failed');
+    });
+    active.begin.mockImplementationOnce(()=>begin.promise);
+    const out=await restoreLargeMaterialBackup(file,guard,{signal:controller.signal,onCapability:()=>{}});
+    expect(out).toMatchObject({kind:'cancelled',cleanupPending:true});expect(active.close).toHaveBeenCalledOnce();
+    begin.reject(Error('late begin failure'));await Promise.resolve();
+  });
+  it.each(['return','throw'] as const)('removes a listener installed after synchronous cancellation when registration will %s',async mode=>{
+    vi.useFakeTimers();
+    const controller=new AbortController(),begin=deferred<{state:string;nextSeq:number}>();
+    const nativeAdd=controller.signal.addEventListener.bind(controller.signal),nativeRemove=controller.signal.removeEventListener.bind(controller.signal);
+    let installed=false,removedAfterInstall=false;
+    vi.spyOn(controller.signal,'removeEventListener').mockImplementation((type,listener,options)=>{
+      if(installed){removedAfterInstall=true;installed=false;}
+      nativeRemove(type,listener,options);
+    });
+    vi.spyOn(controller.signal,'addEventListener').mockImplementation((type,listener,options)=>{
+      controller.abort();
+      if(typeof listener==='function')listener.call(controller.signal,new Event('abort'));
+      else listener?.handleEvent(new Event('abort'));
+      nativeAdd(type,listener,options);installed=true;
+      if(mode==='throw')throw Error('registration failed after cancellation');
+    });
+    active.begin.mockImplementationOnce(()=>begin.promise);
+    const out=await restoreLargeMaterialBackup(file,guard,{signal:controller.signal,onCapability:()=>{}});
+    expect(out).toMatchObject({kind:'cancelled',cleanupPending:true});
+    expect(removedAfterInstall).toBe(true);expect(installed).toBe(false);expect(vi.getTimerCount()).toBe(0);
+    expect(active.close).toHaveBeenCalledOnce();begin.reject(Error('late begin failure'));await Promise.resolve();
+  });
+  it('cleans up the timer and preserves a setup failure if the signal status getter throws twice',async()=>{
+    vi.useFakeTimers();
+    const controller=new AbortController(),begin=deferred<{state:string;nextSeq:number}>(),failure=Error('signal status failed');
+    let armed=false,reads=0;
+    vi.spyOn(controller.signal,'aborted','get').mockImplementation(()=>{
+      if(armed&&reads++<2)throw failure;
+      return false;
+    });
+    active.begin.mockImplementationOnce(()=>{armed=true;return begin.promise;});
+    const out=await restoreLargeMaterialBackup(file,guard,{signal:controller.signal,onCapability:()=>{}});
+    expect(out).toMatchObject({kind:'failed',error:failure,cleanupPending:true});
+    expect(vi.getTimerCount()).toBe(0);expect(active.close).toHaveBeenCalledOnce();
+    begin.reject(Error('late begin failure'));await Promise.resolve();
+  });
   it('saves capability before begin, validates all frames before commit, and releases only after acknowledgement',async()=>{
     const phases:string[]=[];let received:any;
     mocks.prepare.mockImplementation(async()=>{phases.push('prepare');return prepared;});

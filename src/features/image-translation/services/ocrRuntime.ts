@@ -9,9 +9,11 @@ import {
     getAreaOcrImageSize,
     getOcrImageSize,
     getOcrLanguages,
-    normalizeOcrLines,
+    normalizeOcrLineViews,
+    collectRawNumericGuards,
     restoreOcrLineCoordinates,
     type OcrLine,
+    type NumericEvidenceOcrLine,
 } from '@/src/features/image-translation/core';
 import { getImageOcrModelLanguages, type ImageOcrLanguageCode } from '@/src/features/image-translation/ocrLanguages';
 import type {DownloadProgress} from '@/src/core/download/progress';
@@ -21,6 +23,7 @@ import { createOcrWorkerRuntime, type OcrWorkerPort } from './ocrWorkerRuntime';
 import {createSharedOcrTasks} from './sharedOcrTasks';
 import {encodeImageCanvas} from './imageEncoding';
 import {flattenOcrAlpha} from './ocrPixels';
+import {numericEvidenceKey} from './mangaNumeric';
 
 function extensionAsset(path: string): string {
     const getRuntimeUrl = chrome.runtime.getURL as (assetPath: string) => string;
@@ -56,9 +59,10 @@ const ocrWorkerRuntime = createOcrWorkerRuntime<TesseractRecognitionResult>({
 const MAX_CACHED_OCR_IMAGES = 3;
 const MAX_CACHED_OCR_BYTES = 12 * 1024 * 1024;
 const OCR_IMAGE_DECODE_TIMEOUT_MS = 15_000;
-export type OcrRecognitionOptions = {profile?: 'image' | 'area'; onProgress?: (percent: number) => void; decodedImage?: HTMLImageElement};
-const sharedRecognition = createSharedOcrTasks<OcrLine[]>();
-const completedRecognitionCache = new Map<string, {lines: OcrLine[]; bytes: number}>();
+export type OcrRecognitionOptions = {profile?: 'image' | 'area'; onProgress?: (percent: number) => void; decodedImage?: HTMLImageElement; includeMangaNumericConfidence?: boolean};
+type RecognitionViews = {ordinary: OcrLine[]; manga: NumericEvidenceOcrLine[]};
+const sharedRecognition = createSharedOcrTasks<RecognitionViews>();
+const completedRecognitionCache = new Map<string, {views: RecognitionViews; bytes: number}>();
 let cachedRecognitionBytes = 0;
 
 function abortRecognition(): Error {
@@ -67,15 +71,34 @@ function abortRecognition(): Error {
     return error;
 }
 
-function copyOcrLines(lines: OcrLine[]): OcrLine[] {
-    return lines.map(line => ({...line, bbox: {...line.bbox}}));
+function copyOcrLines(lines: NumericEvidenceOcrLine[], includeEvidence = true): NumericEvidenceOcrLine[] {
+    return lines.map(({numericConfidence, ...line}) => ({...line, bbox: {...line.bbox},
+        ...(includeEvidence && numericConfidence !== undefined ? {numericConfidence} : {})}));
 }
 
-function cacheRecognition(key: string, lines: OcrLine[]): void {
-    const bytes = key.length * 2 + lines.reduce((total, line) => total + line.text.length * 2 + 64, 0);
+/** 源坐标回映后相同物理框只计一次，避免缩放和 fallback 的重复消耗保护预算。 */
+function deduplicateOcrGuards(lines:NumericEvidenceOcrLine[]):NumericEvidenceOcrLine[] {
+    const seen=new Map<string,{line:NumericEvidenceOcrLine;key:string}>();
+    return lines.filter(line=>{
+        if(!line.guardOnly)return true;
+        // 唯一生产者 collectRawNumericGuards 保证每个守卫均带原始证据；缺失时抛错，保留原图。
+        const value=numericEvidenceKey(line.numericGuardText!);
+        const b=line.bbox,key=[b.x0,b.y0,b.x1,b.y1].join(',');
+        const previous=seen.get(key);
+        if(previous){
+            if(line.numericGuardConflict || previous.key!==value)previous.line.numericGuardConflict=true;
+            return false;
+        }
+        seen.set(key,{line,key:value});return true;
+    });
+}
+
+function cacheRecognition(key: string, views: RecognitionViews): void {
+    const lines:NumericEvidenceOcrLine[]=[...views.ordinary, ...views.manga];
+    const bytes = key.length * 2 + lines.reduce((total, line) => total + (line.text.length + (line.numericGuardText?.length ?? 0)) * 2 + 64, 0);
     if (bytes > MAX_CACHED_OCR_BYTES) return;
     // 同键在途任务已合并，完成缓存命中直接返回，因此这里只会写入新条目。
-    completedRecognitionCache.set(key, {lines: copyOcrLines(lines), bytes});
+    completedRecognitionCache.set(key, {views: {ordinary: copyOcrLines(views.ordinary), manga: copyOcrLines(views.manga)}, bytes});
     cachedRecognitionBytes += bytes;
     while (completedRecognitionCache.size > MAX_CACHED_OCR_IMAGES || cachedRecognitionBytes > MAX_CACHED_OCR_BYTES) {
         const oldestKey = completedRecognitionCache.keys().next().value!;
@@ -171,7 +194,7 @@ export async function recognizeImage(
     sourceLanguage: string,
     signal?: AbortSignal,
     options: OcrRecognitionOptions = {},
-): Promise<OcrLine[]> {
+): Promise<NumericEvidenceOcrLine[]> {
     if (signal?.aborted) throw abortRecognition();
     const packs = getOcrLanguages(sourceLanguage);
     const models = getImageOcrModelLanguages(packs);
@@ -185,28 +208,37 @@ export async function recognizeImage(
     if (cached) {
         completedRecognitionCache.delete(cacheKey);
         completedRecognitionCache.set(cacheKey, cached);
-        return copyOcrLines(cached.lines);
+        return copyOcrLines(options.includeMangaNumericConfidence ? cached.views.manga : cached.views.ordinary, options.includeMangaNumericConfidence === true);
     }
 
-    return copyOcrLines(await sharedRecognition.run(cacheKey, async (signal, onProgress) => {
+    const views = await sharedRecognition.run(cacheKey, async (signal, onProgress) => {
         const {recognitionImage, sourceWidth, sourceHeight, size} = await prepareOcrImage(image, profile, signal, options.decodedImage);
         if (signal?.aborted) throw abortRecognition();
         const result = await ocrWorkerRuntime.recognize(recognitionImage, languages, signal, layoutMode, onProgress);
         if (signal?.aborted) throw abortRecognition();
-        const readLines = (recognition: TesseractRecognitionResult) => restoreOcrLineCoordinates(
-            normalizeOcrLines(recognition.data.blocks), sourceWidth, sourceHeight, size.width, size.height, size.padding,
-        );
-        let lines = readLines(result);
-        if (lines.length === 0 && (profile === 'area' || (sourceWidth <= 1000 && sourceHeight <= 500))) {
+        const readLines = (recognition: TesseractRecognitionResult): RecognitionViews => {
+            const views = normalizeOcrLineViews(recognition.data.blocks);
+            return {
+                ordinary: restoreOcrLineCoordinates(views.ordinary, sourceWidth, sourceHeight, size.width, size.height, size.padding),
+                // 圈选只读文字不擦图，不需要数字物理保护门禁，避免噪声框阻断合法识别。
+                manga: deduplicateOcrGuards(restoreOcrLineCoordinates([...views.manga,...(profile==='area'?[]:collectRawNumericGuards(recognition.data.blocks,views.manga,{trustedWorkerData:true}))], sourceWidth, sourceHeight, size.width, size.height, size.padding)),
+            };
+        };
+        let views = readLines(result);
+        if (views.ordinary.length === 0 && (profile === 'area' || (sourceWidth <= 1000 && sourceHeight <= 500))) {
             // 圈选与小图片空结果才尝试单块分割，不给大型整页翻倍耗时，不降低噪声阈值。
             const fallback = await ocrWorkerRuntime.recognize(recognitionImage, languages, signal, PSM.SINGLE_BLOCK);
             if (signal?.aborted) throw abortRecognition();
-            lines = readLines(fallback);
+            const firstGuards=views.manga.filter(line=>line.guardOnly);
+            views = readLines(fallback);
+            views.manga=deduplicateOcrGuards([...views.manga,...firstGuards]);
+            if(views.manga.filter(line=>line.guardOnly).length>4096)throw new Error('图片数字保护区域过于复杂，已保留原图');
         }
         // 空结果不是稳定成功；用户重试时应重新识别，避免暂时失败被负缓存永久复用。
-        if (lines.length > 0) cacheRecognition(cacheKey, lines);
-        return lines;
-    }, signal, options.onProgress));
+        if (views.ordinary.length > 0) cacheRecognition(cacheKey, views);
+        return views;
+    }, signal, options.onProgress);
+    return copyOcrLines(options.includeMangaNumericConfidence ? views.manga : views.ordinary, options.includeMangaNumericConfidence === true);
 }
 
 export async function downloadImageOcrLanguages(

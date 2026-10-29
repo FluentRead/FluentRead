@@ -27,6 +27,21 @@ beforeEach(() => {
 afterEach(() => {reader.dispose();vi.useRealTimers();vi.unstubAllGlobals();});
 
 describe('图片文字独立阅读面板', () => {
+    it('不确定的数字在显示和复制时提示核对原图', async () => {
+        reader.setLines([{text:'08:45',numericUncertain:true},{text:'12:34',numericUncertain:true}]);reader.open();
+        expect(body().querySelectorAll('.fr-image-reader-note')).toHaveLength(2);
+        expect(body().textContent).toContain('数字识别可能有误，请对照原图');
+        event(copy());await Promise.resolve();
+        expect(writeText).toHaveBeenLastCalledWith('08:45\n数字识别可能有误，请对照原图\n\n12:34\n数字识别可能有误，请对照原图');
+    });
+    it('数字附近无法绘制时在对应译文显示原因，复制仍只包含文字', async () => {
+        reader.setLines([{sourceText:'Close',text:'近',renderSkipped:true},{sourceText:'90%',text:'90%'}]);
+        reader.open();
+        expect(body().querySelector('.fr-image-reader-note')?.textContent).toBe('为保护数字，此译文未绘制到图片');
+        expect(body().querySelectorAll('.fr-image-reader-note')).toHaveLength(1);
+        event(copy());await Promise.resolve();
+        expect(writeText).toHaveBeenLastCalledWith('近\n\n90%');
+    });
     it('安全呈现原文和译文，切换对照不会把识别内容当 HTML 执行', () => {
         reader.setLines([{sourceText:'<img src=x onerror=evil()>',text:'译文'}, {text:'仅译文'}]);
         expect(reader.element.hidden).toBe(true);

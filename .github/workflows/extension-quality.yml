@@ -71,7 +71,7 @@ jobs:
         run: node scripts/testing/run-resource-safe.mjs -- node scripts/testing/run-affected-tests.mjs --report coverage/affected-plan/plan.json
       - name: Check extension and shared Vue types
         if: steps.affected.outputs.extension_changed == 'true'
-        run: pnpm compile
+        run: node scripts/testing/run-ci-typecheck.mjs
       - name: Build Chrome and Firefox and verify generated manifests
         if: steps.affected.outputs.extension_changed == 'true'
         run: |

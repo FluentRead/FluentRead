@@ -5,8 +5,9 @@
  * 模块边界：不执行源模块、不压缩可执行逻辑，不改远程语言资源；标准版只压缩完整消费的样式与界面注册表，避免目录表示阻止原有裁剪；沿用 pako，消费函数保持原实现，Greasy Fork 保留可读数据。
  */
 import {resolve} from 'node:path';
+import {readFileSync} from 'node:fs';
 import {gunzipSync} from 'node:zlib';
-import {gzipUserscriptBuildData} from './buildGzip';
+import {gzipLargeStandaloneUserscriptData, gzipUserscriptBuildData} from './buildGzip';
 import {encodeUserscriptDataCompact, encodeUserscriptData} from './buildDataEncoding';
 import ts from 'typescript';
 import {normalizePath, type Plugin} from 'vite';
@@ -42,7 +43,7 @@ function literal(node: ts.Expression, allowNumericKeys = true): Json {
     throw new Error('Standalone settings data requires JSON literals');
 }
 
-export function createUserscriptSettingsDataPlugin(root: string, enabled: boolean, fullOptions = true): Plugin {
+export function createUserscriptSettingsDataPlugin(root: string, enabled: boolean, fullOptions = true, groupStandalone = false): Plugin {
     const targets = new Map<string, {names: readonly string[]; appearance?: boolean;
         sharedLocale?: {table: string; key: string; reference: string}}>([
         [normalizePath(resolve(root, 'src/core/config/translationAppearance.ts')), {names: ['TRANSLATION_STYLE_PRESETS']}],
@@ -67,8 +68,59 @@ export function createUserscriptSettingsDataPlugin(root: string, enabled: boolea
         targets.set(normalizePath(resolve(root, 'src/core/config/sentenceHighlight.ts')), {names: ['SENTENCE_HIGHLIGHT_STYLES']});
         targets.set(normalizePath(resolve(root, 'src/core/config/selectionTts.ts')), {names: ['SELECTION_TTS_VOICE_OPTIONS']});
     }
+    // 这些表已被完整设置页使用；其余表仍独立压缩，避免把可裁剪的数据重新引入。
+    // 仅 standalone 合并，首次消费时同步还原并缓存 JSON 文本；每个声明独立解析，保持 query 模块的对象隔离。
+    const groupedNames = new Set([
+        'TRANSLATION_STYLE_PRESETS', 'interfaceSkinOptions', 'interfaceFontOptions',
+        'HARNESS_TRANSLATED_PROMPTS', 'localizedTargetLanguageLabels', 'BUILTIN_GLOSSARIES',
+        'VIDEO_SUBTITLE_SKINS', 'TEST_SAMPLES', 'settingsPagePanels', 'settingsSearchTargets',
+        'translationLoadingStyleOptions', 'FREE_TRANSLATION_PROVIDERS', 'translationLanguageOptions',
+        'PARTS', 'SENTENCE_HIGHLIGHT_STYLES', 'SELECTION_TTS_VOICE_OPTIONS',
+    ]);
+    const groupEnabled = enabled && fullOptions && groupStandalone;
+    const groupValues: Json[] = [];
+    const groupIndices = new Map<string, number>();
+    const refreshGroup = () => {
+      groupValues.length = 0;
+      groupIndices.clear();
+      if (groupEnabled) for (const [path, target] of targets) {
+        const selected = target.names.filter(name => groupedNames.has(name));
+        if (!selected.length) continue;
+        const source = ts.createSourceFile(path, readFileSync(path, 'utf8'), ts.ScriptTarget.Latest, true);
+        if ((source as ts.SourceFile & {parseDiagnostics: readonly ts.Diagnostic[]}).parseDiagnostics.length) {
+            throw new Error('Standalone settings data source has syntax errors');
+        }
+        for (const name of selected) {
+            const matches = source.statements.filter(ts.isVariableStatement)
+                .flatMap(statement => [...statement.declarationList.declarations]
+                    .filter(declaration => ts.isIdentifier(declaration.name) && declaration.name.text === name)
+                    .map(declaration => ({declaration, constant: Boolean(statement.declarationList.flags & ts.NodeFlags.Const)})));
+            if (matches.length !== 1 || !matches[0].constant || !matches[0].declaration.initializer) {
+                throw new Error(`Standalone settings data declaration changed: ${name}`);
+            }
+            groupIndices.set(`${path}\0${name}`, groupValues.length);
+            groupValues.push(literal(matches[0].declaration.initializer, !target.appearance));
+        }
+      }
+    };
+    refreshGroup();
+    const virtualId = '\0fluentread:standalone-settings-data';
+    const publicId = 'virtual:fluentread-standalone-settings-data';
     return {
         name: 'standalone-settings-data', enforce: 'pre',
+        buildStart() { refreshGroup(); },
+        resolveId(id) { if (groupEnabled && id === publicId) return virtualId; },
+        async load(id) {
+            if (!groupEnabled || id !== virtualId) return null;
+            for (const [path, target] of targets) if (target.names.some(name => groupedNames.has(name))) this.addWatchFile(path);
+            const input = Buffer.from(JSON.stringify(groupValues.map(value => JSON.stringify(value))));
+            const bytes = await gzipLargeStandaloneUserscriptData(input, root);
+            const encoded = encodeUserscriptDataCompact(bytes);
+            return "import {inflateWithPako} from '@/userscript/pakoRuntime';\n"
+                + "import {decodeUserscriptData} from '@/userscript/dataEncoding';\n"
+                + 'let values;\n'
+                + `export function getSettingsData(index) { values ||= JSON.parse(inflateWithPako(decodeUserscriptData(${JSON.stringify(encoded)}))); return JSON.parse(values[index]); }`;
+        },
         transform(code, id) {
             const target = targets.get(normalizePath(id.split('?')[0]));
             if (!enabled || !target) return null;
@@ -86,12 +138,13 @@ export function createUserscriptSettingsDataPlugin(root: string, enabled: boolea
                         .filter(declaration => ts.isIdentifier(declaration.name) && target.names.includes(declaration.name.text))
                         .map(declaration => ({declaration, constant: Boolean(statement.declarationList.flags & ts.NodeFlags.Const),
                             exported: Boolean(statement.modifiers?.some(modifier => modifier.kind === ts.SyntaxKind.ExportKeyword))})));
-                if (code.includes('__fluentreadInflateSettingsData') || code.includes('__fluentreadDecodeSettingsData')
+                if (code.includes('__fluentreadInflateSettingsData') || code.includes('__fluentreadDecodeSettingsData') || code.includes('__fluentreadGetSettingsData')
                     || target.names.some(name => declarations.filter(entry => entry.declaration.name.getText(source) === name).length !== 1)
                     || declarations.some(entry => !entry.constant || !entry.declaration.initializer || target.appearance && !entry.exported)) {
                     throw new Error(`Standalone settings data declaration changed: ${target.names.join(', ')}`);
                 }
                 let transformed = code;
+                let usesGroup = false;
                 for (const entry of [...declarations].sort((left, right) => right.declaration.pos - left.declaration.pos)) {
                     const initializer = entry.declaration.initializer!;
                     const shared = target.sharedLocale?.table === entry.declaration.name.getText(source) ? target.sharedLocale : undefined;
@@ -118,6 +171,15 @@ export function createUserscriptSettingsDataPlugin(root: string, enabled: boolea
                     } else data = literal(initializer, !target.appearance);
                     if (target.appearance && (!Array.isArray(data) || !data.length)) throw unsupported();
                     const json = JSON.stringify(data);
+                    const groupIndex = id.includes('?') ? undefined
+                        : groupIndices.get(`${normalizePath(id)}\0${entry.declaration.name.getText(source)}`);
+                    if (groupIndex !== undefined) {
+                        if (JSON.stringify(groupValues[groupIndex]) !== json) throw new Error('Standalone grouped settings data changed during build');
+                        usesGroup = true;
+                        transformed = transformed.slice(0, initializer.getStart(source))
+                            + `/* @__PURE__ */ __fluentreadGetSettingsData(${groupIndex})` + transformed.slice(initializer.end);
+                        continue;
+                    }
                     const compressed = gzipUserscriptBuildData(Buffer.from(json), undefined, fullOptions);
                     if (target.appearance && JSON.stringify(JSON.parse(gunzipSync(compressed).toString('utf8'))) !== json) throw unsupported();
                     // 和原字面量一样，未被消费的表不应触发还原；整个闭包只还原固定数据，无外部写入。
@@ -129,7 +191,8 @@ export function createUserscriptSettingsDataPlugin(root: string, enabled: boolea
                     transformed = transformed.slice(0, initializer.getStart(source)) + value + transformed.slice(initializer.end);
                 }
                 const importCode = "import {inflateWithPako as __fluentreadInflateSettingsData} from '@/userscript/pakoRuntime';\n"
-                    + "import {decodeUserscriptData as __fluentreadDecodeSettingsData} from '@/userscript/dataEncoding';\n";
+                    + "import {decodeUserscriptData as __fluentreadDecodeSettingsData} from '@/userscript/dataEncoding';\n"
+                    + (usesGroup ? `import {getSettingsData as __fluentreadGetSettingsData} from '${publicId}';\n` : '');
                 const insertion = target.appearance ? source.statements[0].getStart(source) : 0;
                 return {code: transformed.slice(0, insertion) + importCode + transformed.slice(insertion), map: null};
             } catch (error) {

@@ -2,7 +2,7 @@
  * @file src/features/image-translation/content/runtime.ts
  * 文件职责：实现网页图片翻译的独立悬浮/右键入口、可信目标快照、异步请求所有权和单图及漫画连续模式的原图/译图切换，保持宿主图片与响应式图片资源不变。
  * 主要内容：单图失败提供模型与服务导航，译图操作条随指针隐藏并保留键盘入口；指针局部检查仅在本次调用内复用同图几何与样式读取，第二个重叠命中立即停止，下一帧重新定位；单图识别方式纳入缓存身份，切换后不复用旧结果；在封闭 Shadow DOM 中挂载原生译图，跟随图片盒模型与祖先裁切；合并布局更新，默认 12 张可配置的快速缓存和 100 页/16 MiB 二进制局部结果，靠近视口时直接预合成画布，无文字页只保留轻量完成标记；返页不复用已经取消的预合成，旧任务结束不能删除新任务；漫画状态以订阅快照发送并隔离同步异常，避免订阅变化重复递送或阻断请求和卸载；图片重载、独立服务及模型变化使结果失效；组合按所选成员的安全连接摘要建立响应式依赖，成员变更撤销旧任务与缓存，漫画返页复用结果不等待其他页推理；预合成不得撤下当前译图，单页反馈展示真实阶段与进度，漫画错误恢复跟随图片可见边缘，正常处理与完成隐藏操作条，换图、取消与卸载时释放资源。
- * 模块边界：本运行时在读取预算内异步编码页面允许访问的 Canvas，污染画布先走网页 CORS，再按剩余预算授权后台读取当前任务图片；共用 PNG 编码器处理取消/迟到结果，识别、文本翻译、图像修复与语言包管理位于 background/services，控件交互由 controls 模块提供。
+ * 模块边界：本运行时在读取预算内异步编码页面允许访问的 Canvas，污染画布先走网页 CORS，再按剩余预算授权后台读取当前任务图片；漫画语言包恢复由会话队列管理并按当前引擎准备；共用 PNG 编码器处理取消/迟到结果，识别、文本翻译、图像修复与语言包管理位于 background/services，控件交互由 controls 模块提供。
  */
 import {imageTranslationFailureCode, imageLocalFailureMessage, type ImageLocalFailure} from '../failure';
 import {sendRuntimeMessage} from '@/src/platform/browser/runtimeMessages';
@@ -25,6 +25,8 @@ import {resolveImagePresentation, surfaceStyleToBitmap, presentationMatchesSourc
 import {createImageControls, IMAGE_CONTROLS_CSS, type ImageControlPhase, type ImageSettingsSection} from './controls';
 import {isImageHoverEligible} from './hoverEligibility';
 import {createMangaReader} from './mangaReader';
+import {createMangaReadingSnapshots, prepareMangaReadingLines} from './mangaReadingSnapshots';
+import type {MangaReadingList, MangaReadingResult} from './mangaReadingCoordinator';
 import type {MangaTranslationStatus} from './mangaSession';
 import {imageLoadTracker} from './imageLoads';
 import {normalizeMangaCachePages, mangaCachePixelBudget, resolveMangaSite, resolveMangaSourceLanguage} from '@/src/core/config/manga';
@@ -34,6 +36,14 @@ import {createMangaCanvas} from './mangaCanvas';
 import {createMangaBackground} from './mangaBackground';
 import {createMangaImageSegments, type MangaImageSegment} from './mangaImageSegments';
 import {getMangaOcrEngine} from '../ocrLanguages';
+
+let mangaReadingOpener: ((event: MouseEvent) => boolean) | undefined;
+/** 漫画入口注册可信点击动作；卸载时只撤销自己的注册。 */
+export function registerMangaReadingOpener(opener: (event: MouseEvent) => boolean): () => void {
+    mangaReadingOpener = opener;
+    return () => {if (mangaReadingOpener === opener) mangaReadingOpener = undefined;};
+}
+const openMangaReading = (event: MouseEvent) => mangaReadingOpener?.(event) ?? false;
 
 const IMAGE_TRANSLATION_OVERLAY = 'fluent-read-image-translation-overlay';
 const IMAGE_TRANSLATION_ROOT = 'fluent-read-image-translation-root';
@@ -53,7 +63,7 @@ function surfacePixels(surface: TranslatedSurface): number {
         : (surface as HTMLImageElement).naturalWidth * (surface as HTMLImageElement).naturalHeight;
 }
 
-type ImageTranslationLine = OcrLine & {backgroundColor: string; sourceText?: string};
+type ImageTranslationLine = OcrLine & {backgroundColor: string; sourceText?: string; renderSkipped?: true; numericUncertain?: true};
 type ImageControls = ReturnType<typeof createImageControls>;
 
 interface ImageTranslationState {
@@ -67,6 +77,9 @@ interface ImageTranslationState {
     controls: ImageControls;
     phase: ImageControlPhase;
     abortController: AbortController | null;
+    translationTask?: {promise: Promise<void>; invalidated: boolean; manga: boolean; source: string; identity: string};
+    translationGeneration?: number;
+    queuedTranslation?: {promise: Promise<void>};
     hovered: boolean;
     hoverEntry: boolean;
     hoverTimer: number | null;
@@ -203,6 +216,11 @@ let mangaReader: ReturnType<typeof createMangaReader> | null = null;
 let mangaCanvas: ReturnType<typeof createMangaCanvas<HTMLCanvasElement>> | null = null;
 let mangaBackground: ReturnType<typeof createMangaBackground> | null = null;
 let mangaSegments: ReturnType<typeof createMangaImageSegments> | null = null;
+let mangaReadingOverlay:{host:HTMLElement}|null=null;
+/** 仅豁免扩展实际持有的阅读层，不信任页面可伪造的标记属性。 */
+export function registerMangaReadingOverlayHost(host:HTMLElement):()=>void {
+    const owner={host};mangaReadingOverlay=owner;return ()=>{if(mangaReadingOverlay===owner)mangaReadingOverlay=null;};
+}
 let mangaStatus: MangaTranslationStatus = {available: false, active: false, pending: false, errors: 0};
 const mangaListeners = new Set<(status: MangaTranslationStatus) => void>();
 
@@ -218,7 +236,12 @@ export function subscribeMangaTranslation(listener: (status: MangaTranslationSta
 }
 
 export function toggleMangaTranslation(): boolean {
-    return mangaReader?.toggle() ?? false;
+    const toggled = mangaReader?.toggle() ?? false;
+    // 连续会话接管时撤销单页等待；新会话按自己的队列重新判断当前页。
+    if (toggled && mangaReader?.status().active) activeStates.forEach(state => {
+        if (state.queuedTranslation) restoreImageTranslation(state);
+    });
+    return toggled;
 }
 
 function publishMangaStatus(status: MangaTranslationStatus): void {
@@ -248,16 +271,31 @@ function restoreMangaImage(image: HTMLImageElement): void {
     updateOverlayPosition(state);
 }
 
-async function translateMangaImage(image: HTMLImageElement): Promise<void> {
+async function translateMangaImage(image: HTMLImageElement): Promise<void | 'deferred'> {
     const state = states.get(image) || createState(image);
+    // 不兼容的旧请求须先取消并等待；普通单图的取消回调仍能看到原来的模式。
+    const previous = state.translationTask;
+    if (previous && (previous.invalidated || !previous.manga || previous.source !== sourceIdentity(image)
+        || previous.identity !== configurationIdentity(true) || !presentationMatchesSource(image, state.presentation))) {
+        if (!previous.invalidated) restoreImageTranslation(state);
+        const reader = mangaReader;
+        await previous.promise;
+        // 等待期间 DOM、地址或设置可能已变化；先同步关闸并重新发现，再由会话决定是否开始。
+        if (mangaReader === reader) reader?.deferForRefresh();
+        return 'deferred';
+    }
     state.manga = true;
-    await translateImage(state);
+    // 语言包重试也由会话串行调度；排队期间若识别方式改变，不能下载旧方式的资源。
+    const prepare = state.needsPreparation && getMangaOcrEngine(mangaSourceLanguage()) === 'tesseract';
+    await translateImage(state, prepare);
 }
 
 /** 漫画中的显式单页操作也由会话排队，重试进度、错误和暂停保持同一所有权。 */
-function requestImageTranslation(state: ImageTranslationState): void {
+function requestImageTranslation(state: ImageTranslationState, prepareLanguages = false): void {
     if (state.manga && mangaReader?.status().active) {mangaReader.retry(state.image);return;}
-    void translateImage(state);
+    // 暂停会话后的右键单页仍可单独准备；切换到 Paddle 后不下载 Tesseract 语言包。
+    const prepare = prepareLanguages && (!state.manga || getMangaOcrEngine(mangaSourceLanguage()) === 'tesseract');
+    void translateImage(state, prepare);
 }
 
 /** 同步交接已完成的漫画结果；不能因其他页在推理而让用户等待或重新识别。 */
@@ -347,8 +385,9 @@ function watchTranslationConfiguration(): () => void {
         configurationRevision += 1;
         clearMangaCache();
         for (const state of activeStates) {
-            if (!state.abortController) continue;
-            state.abortController.abort();
+            if (!state.abortController && !(state.phase === 'loading' && state.translationTask)) continue;
+            state.abortController?.abort();
+            invalidateTranslationTask(state);
             state.abortController = null;
             state.waitingForImage = false;
             state.needsPreparation = false;
@@ -493,6 +532,7 @@ function setStateHovered(state: ImageTranslationState, hovered: boolean): void {
 function removeState(state: ImageTranslationState): void {
     clearHoverTimer(state);
     state.abortController?.abort();
+    invalidateTranslationTask(state);
     state.abortController = null;
     restoreOriginalImage(state);
     state.resizeObserver?.disconnect();
@@ -525,6 +565,7 @@ function invalidateSource(state: ImageTranslationState): void {
     state.sourceIdentity = sourceIdentity(state.image);
     warming.get(state.image)?.controller.abort();
     state.abortController?.abort();
+    invalidateTranslationTask(state);
     state.abortController = null;
     state.waitingForImage = false;
     restoreOriginalImage(state);
@@ -617,7 +658,7 @@ function updateOverlayPosition(state: ImageTranslationState): void {
     state.overlay.style.clipPath = `inset(${top - rect.top}px ${rect.right - right}px ${rect.bottom - bottom}px ${left - rect.left}px)`;
     state.controls.element.style.setProperty('left', `${left - rect.left + 8}px`, 'important');
     state.controls.element.style.setProperty('bottom', `${rect.bottom - bottom + 8}px`, 'important');
-    const edgeFeedback = state.manga && (state.phase === 'loading' || state.phase === 'error');
+    const edgeFeedback = state.manga && (state.phase === 'loading' || state.phase === 'error' || state.controls.feedback.dataset.warning === 'true');
     state.controls.feedback.style.left = `${edgeFeedback ? left - rect.left + 8 : (left + right) / 2 - rect.left}px`;
     state.controls.feedback.style.top = `${edgeFeedback ? top - rect.top + 8 : (top + bottom) / 2 - rect.top}px`;
     state.controls.feedback.style.maxHeight = `${Math.max(0, bottom - top - 16)}px`;
@@ -658,6 +699,7 @@ function createState(image: HTMLImageElement, hoverEntry = false): ImageTranslat
     overlay.dataset.fluentReadImageTranslation = 'true';
     const controls = createImageControls({
         translate: (source) => translateLegacyText(source, normalizeUiLanguage(config.uiLanguage)),
+        onWarning: openMangaReading,
         onAction: () => {
             const state = states.get(image);
             if (!state || !imageTranslationAllowed(state.manga === true)) return;
@@ -678,7 +720,8 @@ function createState(image: HTMLImageElement, hoverEntry = false): ImageTranslat
         },
         onPrepare: () => {
             const state = states.get(image);
-            if (state) void translateImage(state, true);
+            if (!state) return;
+            requestImageTranslation(state, true);
         },
     });
     overlay.append(controls.feedback, controls.element);
@@ -862,6 +905,10 @@ function setButtonState(state: ImageTranslationState, phase: ImageControlPhase, 
     if (state.manga && phase === 'loading') publishMangaStatus({...mangaStatus, message, progress, stage});
     state.controls.update(phase, message, {
         prepare: phase === 'error' && state.needsPreparation, animations: config.animations, progress, quiet: state.manga === true,
+        warning: state.manga === true && phase === 'translated'
+            && (state.lines.some(line => line.renderSkipped) || (!state.translatedImage && state.lines.length > 0)),
+        warningAction: state.manga === true && state.lines.some(line => line.renderSkipped),
+        queued: phase === 'loading' && Boolean(state.queuedTranslation),
         modelSettings: phase === 'error' && Boolean(state.localFailure),
         serviceSettings: phase === 'error' && !state.needsPreparation, errorDetails: state.errorDetails,
     });
@@ -922,7 +969,9 @@ function showTranslatedImage(state: ImageTranslationState): void {
         state.overlay.prepend(image);
     }
     state.controls.setLines(state.lines);
-    setButtonState(state, 'translated', image || state.lines.length ? '已翻译 · 点击恢复原图' : '未检测到文字，已保留原图');
+    setButtonState(state, 'translated', state.manga && state.lines.some(line => line.renderSkipped)
+        ? '部分译文未绘制，请查看漫画文字' : state.manga && !image && state.lines.length
+            ? '已识别文字，原图未改动' : image || state.lines.length ? '已翻译 · 点击恢复原图' : '未检测到文字，已保留原图');
     updateOverlayPosition(state);
 }
 
@@ -930,6 +979,7 @@ function restoreImageTranslation(state: ImageTranslationState): void {
     state.resultIdentity = null;
     warming.get(state.image)?.controller.abort();
     state.abortController?.abort();
+    invalidateTranslationTask(state);
     state.abortController = null;
     state.waitingForImage = false;
     restoreOriginalImage(state);
@@ -949,7 +999,52 @@ function requestIsCurrent(state: ImageTranslationState, controller: AbortControl
     return true;
 }
 
-async function translateImage(state: ImageTranslationState, prepareLanguages = false): Promise<void> {
+function invalidateTranslationTask(state: ImageTranslationState): void {
+    state.translationGeneration = (state.translationGeneration ?? 0) + 1;
+    if (state.translationTask) state.translationTask.invalidated = true;
+    state.queuedTranslation = undefined;
+}
+
+function translateImage(state: ImageTranslationState, prepareLanguages = false): Promise<void> {
+    if (state.queuedTranslation) return state.queuedTranslation.promise;
+    const manga = state.manga === true, source = sourceIdentity(state.image), identity = configurationIdentity(manga);
+    const previous = state.translationTask;
+    if (previous) {
+        if (state.phase === 'loading' && !previous.invalidated && previous.manga === manga && previous.source === source && previous.identity === identity
+            && presentationMatchesSource(state.image, state.presentation)) return previous.promise;
+        // 漫画交接在 translateMangaImage 中等待；普通单图沿用取消后可立即重试的行为。
+        if (!previous.invalidated) restoreImageTranslation(state);
+        if (manga) {
+            const generation = state.translationGeneration;
+            const queued = {promise: Promise.resolve()};
+            const start = () => {
+                if (state.queuedTranslation !== queued || states.get(state.image) !== state || state.translationGeneration !== generation || !state.image.isConnected
+                    || state.manga !== true || sourceIdentity(state.image) !== source || configurationIdentity(true) !== identity
+                    || mangaReader?.status().active) {
+                    // 来源或状态可能在布局通知前变化，不能留下无人持有的等待提示。
+                    if (state.queuedTranslation === queued && states.get(state.image) === state) restoreImageTranslation(state);
+                    return;
+                }
+                state.queuedTranslation = undefined;
+                setButtonState(state, 'idle', '翻译图片');
+                return translateImage(state, prepareLanguages);
+            };
+            queued.promise = previous.promise.then(start, start);
+            state.queuedTranslation = queued;
+            setButtonState(state, 'loading', '等待上一项任务结束…');
+            return queued.promise;
+        }
+    }
+    if (sourceIdentity(state.image) !== state.sourceIdentity || !presentationMatchesSource(state.image, state.presentation)) invalidateSource(state);
+    let resolve!: () => void, reject!: (reason: unknown) => void;
+    const promise = new Promise<void>((yes, no) => {resolve = yes;reject = no;});
+    const task = {promise, invalidated: false, manga, source: sourceIdentity(state.image), identity: configurationIdentity(manga)};
+    state.translationTask = task;
+    void performImageTranslation(state, prepareLanguages).then(resolve, reject);
+    return promise.finally(() => {if (state.translationTask === task) state.translationTask = undefined;});
+}
+
+async function performImageTranslation(state: ImageTranslationState, prepareLanguages = false): Promise<void> {
     // 识别方式改变后，不继续下载旧方式的语言包；新方式在用户的翻译任务内准备自己的资源。
     if (!state.manga && config.imageTranslationOcrEngine === 'paddle') prepareLanguages = false;
     if (state.phase === 'loading' || !state.image.isConnected || !imageTranslationAllowed(state.manga === true)) return;
@@ -1301,6 +1396,7 @@ function syncLayoutObservation(): void {
 export function mountImageTranslator(): void {
     if (mounted) return;
     mounted = true;
+    const readingSnapshots = createMangaReadingSnapshots();
     stopConfigurationWatch = watchTranslationConfiguration();
     const translateSnapshot = async (image: string, signal: AbortSignal) => {
         const identity = configurationIdentity(true);
@@ -1330,7 +1426,9 @@ export function mountImageTranslator(): void {
         enabled: () => mounted && imageTranslationAllowed(true),
         configurationIdentity: () => configurationIdentity(true),
         cacheEnabled: () => config.useCache,
+        readingSnapshots,
         recovery,
+        openReading: openMangaReading,
         acceptsInteractionLayer: (_canvas, hit) => {
             const selector = resolveMangaSite(window.location.href, config.imageTranslationMangaSites)?.canvasInteractionSelector;
             return !!selector && hit.matches(selector);
@@ -1341,7 +1439,9 @@ export function mountImageTranslator(): void {
         enabled: () => mounted && imageTranslationAllowed(true),
         configurationIdentity: () => configurationIdentity(true),
         cacheEnabled: () => config.useCache,
+        readingSnapshots,
         recovery,
+        openReading: openMangaReading,
         ready: () => mangaReader?.schedule(),
         translate: translateSnapshot,
     });
@@ -1349,7 +1449,9 @@ export function mountImageTranslator(): void {
         enabled: () => mounted && imageTranslationAllowed(true),
         configurationIdentity: () => configurationIdentity(true),
         cacheEnabled: () => config.useCache,
+        readingSnapshots,
         recovery,
+        openReading: openMangaReading,
         imageIdentity: sourceIdentity,
         readSource: (image, signal) => readAuthorizedImage(image, {signal}),
         translate: translateSnapshot,
@@ -1368,6 +1470,59 @@ export function mountImageTranslator(): void {
         release: image => { const state = states.get(image); if (state) removeState(state); },
         failed: image => states.get(image)?.phase === 'error',
         changed: publishMangaStatus,
+        reading: {
+            version: source => {
+                if(source.kind==='image') {
+                    const state=states.get(source.surface as HTMLImageElement);
+                    return state?.phase==='translated'&&state.resultIdentity===configurationIdentity(true)?state.lines:undefined;
+                }
+                const controller=source.kind==='canvas'?mangaCanvas:source.kind==='background'?mangaBackground:mangaSegments;
+                return controller?.readingVersion(source.surface as never);
+            },
+            live: (source,waiting) => {
+                if(source.kind!=='image') {
+                    const controller=source.kind==='canvas'?mangaCanvas:source.kind==='background'?mangaBackground:mangaSegments;
+                    if(!controller)return false;
+                    // 各载体必须明确提供无网络、副作用的来源查询。
+                    const surface=source.surface as never;
+                    const identity=controller.readingIdentity(surface);
+                    return identity===source.identity&&controller.readingVisible(surface,identity,mangaReadingOverlay?.host,waiting);
+                }
+                const image=source.surface as HTMLImageElement,state=states.get(image);
+                if((!state||!state.manga)&&!waiting)return false;
+                if(!image.isConnected||!imageTranslationAllowed(true)
+                    ||source.identity!==`${sourceIdentity(image)}:${configurationIdentity(true)}:${imageLoadTracker.revision(image)}`
+                    ||(state?.manga && (state.sourceIdentity!==sourceIdentity(image)||!presentationMatchesSource(image,state.presentation))))return false;
+                const presentation=state?.manga?state.presentation:resolveImagePresentation(image);
+                const surface=presentation.element;
+                if(!surface.isConnected||typeof document.elementsFromPoint!=='function')return false;
+                const rect=surface.getBoundingClientRect();let left=Math.max(0,rect.left),right=Math.min(window.innerWidth,rect.right);
+                let top=Math.max(0,rect.top),bottom=Math.min(window.innerHeight,rect.bottom);
+                for(let item:Element|null=surface;item;item=item.parentElement){
+                    const style=getComputedStyle(item),opacity=item===surface&&state?.manga&&state.sourceStyleLease?state.sourceStyleLease.computedOpacity:style.opacity;
+                    if(style.display==='none'||style.visibility==='hidden'||style.visibility==='collapse'||opacity==='0')return false;
+                    if(item===document.documentElement||item===document.scrollingElement)continue;
+                    if(item!==surface){const x=/^(hidden|clip|auto|scroll)$/.test(style.overflowX),y=/^(hidden|clip|auto|scroll)$/.test(style.overflowY);
+                        if(x||y){const clip=item.getBoundingClientRect();if(x){left=Math.max(left,clip.left);right=Math.min(right,clip.right);}if(y){top=Math.max(top,clip.top);bottom=Math.min(bottom,clip.bottom);}}}
+                }
+                return right>left&&bottom>top&&!isImagePresentationOccluded(surface,{left,top,right,bottom},imageOverlayHost,image,mangaReadingOverlay?.host);
+            },
+            load: async (source,signal) => {
+                if(signal.aborted)return {status:'cancelled'};
+                if(source.kind!=='image') {
+                    const controller=source.kind==='canvas'?mangaCanvas:source.kind==='background'?mangaBackground:mangaSegments;
+                    return controller?.readLines(source.surface as never,signal)??{status:'unavailable'};
+                }
+                const state=states.get(source.surface as HTMLImageElement);
+                if(!state||!state.manga)return {status:'unavailable'};
+                if(state.phase==='loading')return {status:'pending'};
+                if(state.phase==='error')return {status:'error'};
+                if(state.phase!=='translated'||state.resultIdentity!==configurationIdentity(true))return {status:'unavailable'};
+                const prepared=prepareMangaReadingLines(state.lines);
+                if(prepared.status!=='ready')return {status:prepared.status==='overBudget'?'overBudget':'error'};
+                return prepared.lines.length?{status:'ready',lines:prepared.lines}:{status:'empty'};
+            },
+        },
         canvas: mangaCanvas,
         background: mangaBackground,
         segments: mangaSegments,
@@ -1416,11 +1571,22 @@ export function mountImageTranslator(): void {
         window.removeEventListener('resize', scheduleViewportChange);
         layoutObserver?.disconnect();
         layoutObserver = null;
+        readingSnapshots.clear();
         if (positionFrame !== null) {
             window.cancelAnimationFrame(positionFrame);
             positionFrame = null;
         }
     };
+}
+
+/** 仅使用当前会话已发现的候选；不会触发识别或图片读取。 */
+export function getMangaReadingCandidates():MangaReadingList {return mangaReader?.readingCandidates()??{status:'unavailable'};}
+export function readMangaReadingCandidate(token:object,signal:AbortSignal):Promise<MangaReadingResult> {
+    return mangaReader?.readReadingCandidate(token,signal)??Promise.resolve({status:signal.aborted?'cancelled':'unavailable'});
+}
+/** 读取成功后立即建立唯一观察；返回 undefined 表示目标已经失效。 */
+export function observeMangaReadingCandidate(token:object,onInvalid:()=>void):(()=>void)|undefined {
+    return mangaReader?.observeReadingCandidate(token,onInvalid);
 }
 
 export function unmountImageTranslator(): void {

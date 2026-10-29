@@ -20,6 +20,14 @@ function sessionFixture(extra: {reuse?: (image: HTMLImageElement) => boolean} = 
 afterEach(() => {vi.useRealTimers();vi.restoreAllMocks(); vi.unstubAllGlobals();});
 
 describe('漫画会话所有权与可见页调度', () => {
+    it('按需列表只复制可见保留页，按章节序号排序并保留第 65 项作超预算标记',()=>{
+        const pages=Array.from({length:66},(_,index)=>({image:{} as HTMLImageElement,identity:String(index),visible:true,ordinal:66-index}));
+        const ports={translate:vi.fn().mockResolvedValue(undefined),restore:vi.fn(),release:vi.fn(),failed:()=>false,changed:vi.fn()};
+        const session=createMangaSession(ports),snapshot={route:'chapter',available:true,pages};session.refresh(snapshot);session.toggle();session.refresh(snapshot);
+        const visible=session.readingPages();expect(visible).toHaveLength(65);expect(visible[0].ordinal).toBe(2);expect(visible.at(-1)?.ordinal).toBe(66);
+        session.refresh({...snapshot,suspended:true});expect(session.readingPages()).toEqual([]);
+        session.dispose();expect(session.readingPages()).toEqual([]);
+    });
     it('移动关闸同步阻止下一页启动，停留后按最新可见页继续；缓存交接仍立即执行', async () => {
         const reuse = vi.fn().mockReturnValue(false), f = sessionFixture({reuse}), pending = deferred();
         f.snapshot.pages[1].prefetch = true;
@@ -207,6 +215,23 @@ describe('漫画会话所有权与可见页调度', () => {
         expect(f.session.toggle()).toBe(false); f.session.refresh(f.snapshot);
         expect(f.session.status()).toEqual({available: false, active: false, pending: false, errors: 0, completed: 0, prefetching: false, ahead: 0});
     });
+    it.each(['resolve', 'reject'] as const)('重复卸载且旧任务迟到 %s，不重复通知关闭或释放页面', async outcome => {
+        const f = sessionFixture();
+        let resolve!: () => void, reject!: (reason: Error) => void;
+        const pending = new Promise<void>((yes, no) => {resolve = yes;reject = no;});
+        f.ports.translate.mockReturnValueOnce(pending);f.start();await flush();
+        f.ports.changed.mockClear();f.session.dispose();
+        const closed = f.ports.changed.mock.calls.length;
+        expect(f.ports.changed.mock.calls.filter(([status]) => !status.available)).toHaveLength(1);
+        expect(f.ports.changed).toHaveBeenLastCalledWith(expect.objectContaining({available: false, active: false}));
+        expect(f.ports.release).toHaveBeenCalledOnce();
+        f.session.dispose();
+        if (outcome === 'resolve') resolve(); else reject(new Error('late failure'));
+        await flush();
+        expect(f.ports.changed).toHaveBeenCalledTimes(closed);
+        expect(f.ports.release).toHaveBeenCalledOnce();
+        expect(f.ports.translate).toHaveBeenCalledOnce();
+    });
     it('页面移除后的拒绝不会计入当前会话', async () => {
         const f = sessionFixture(); let reject!: (error: Error) => void;
         f.ports.translate.mockReturnValueOnce(new Promise<void>((_, no) => {reject = no;}));
@@ -215,7 +240,7 @@ describe('漫画会话所有权与可见页调度', () => {
     });
 });
 
-function readerFixture(withIntersection = true, initialUrl = 'https://mangaplus.shueisha.co.jp/viewer/1024050', siteRules?: () => import('@/src/core/config/manga').MangaSiteRule[], prefetchPages?: () => number, warm?: (images:HTMLImageElement[])=>void, canvas?: Parameters<typeof createMangaReader>[0]['canvas'], cachePorts?: Pick<Parameters<typeof createMangaReader>[0], 'resetCache' | 'cachePages' | 'reuse' | 'background' | 'segments'>) {
+function readerFixture(withIntersection = true, initialUrl = 'https://mangaplus.shueisha.co.jp/viewer/1024050', siteRules?: () => import('@/src/core/config/manga').MangaSiteRule[], prefetchPages?: () => number, warm?: (images:HTMLImageElement[])=>void, canvas?: Parameters<typeof createMangaReader>[0]['canvas'], cachePorts?: Pick<Parameters<typeof createMangaReader>[0], 'resetCache' | 'cachePages' | 'reuse' | 'background' | 'segments' | 'reading'>) {
     const {document, window: dom} = parseHTML('<html><body><div class="zao-image-container"><img class="zao-image" src="blob:page-1"></div><img id="logo" src="https://site/logo.png"></body></html>');
     const image = document.querySelector('img')! as HTMLImageElement;
     Object.defineProperties(image, {complete: {writable: true, value: true}, naturalWidth: {writable: true, value: 800}, naturalHeight: {value: 1200}, currentSrc: {get: () => image.src}});
@@ -241,11 +266,129 @@ function readerFixture(withIntersection = true, initialUrl = 'https://mangaplus.
     const run = () => {const callbacks = [...frames.values()]; frames.clear(); callbacks.forEach(c => c(0));};
     const intersect = (yes: boolean) => {io.callback([{target: image, isIntersecting: yes} as unknown as IntersectionObserverEntry], {} as IntersectionObserver); run();};
     const scroll = () => {events.get('scroll')!();run();};
-    return {reader, ports, image, io, mo, window, dom, document, run, intersect, scroll,
+    return {reader, ports, image, io, mo, window, dom, document, run, intersect, scroll, scrollPending:()=>events.get('scroll')!(),
         setRect: (v: Partial<typeof bounds>) => Object.assign(bounds, v), setStyle: (v: Partial<typeof style>) => Object.assign(style, v),
         setHidden: (v: boolean) => {hidden = v;}};
 }
 describe('漫画站点适配与 DOM 生命周期', () => {
+    it('地址突然不可用时撤销已打开的结果',async()=>{
+        const version={},reading={live:()=>true,version:()=>version,load:async()=>({status:'empty' as const})};
+        const f=readerFixture(true,undefined,undefined,undefined,undefined,undefined,{reading});f.reader.toggle();await flush();
+        const list=f.reader.readingCandidates();if(list.status!=='ready')throw Error('unexpected');const invalid=vi.fn();
+        f.reader.observeReadingCandidate(list.items[0].token,invalid);f.window.location.href='';f.reader.schedule();
+        expect(invalid).toHaveBeenCalledOnce();f.reader.dispose();
+    });
+    it('读取端口暂时没有返回任务时报告不可用，不触发额外翻译',async()=>{
+        const reading={live:()=>true,load:vi.fn().mockReturnValue(undefined)},f=readerFixture(true,undefined,undefined,undefined,undefined,undefined,{reading});
+        f.reader.toggle();await flush();const list=f.reader.readingCandidates();if(list.status!=='ready')throw Error('unexpected');
+        const count=f.ports.translate.mock.calls.length;expect(await f.reader.readReadingCandidate(list.items[0].token,new AbortController().signal)).toEqual({status:'unavailable'});
+        expect(f.ports.translate).toHaveBeenCalledTimes(count);f.reader.dispose();
+    });
+    it('观察候选需要可用来源与版本；旧观察者抛错和释放不能影响后续观察或重试',async()=>{
+        const version={},reading={live:vi.fn(()=>true),version:vi.fn(()=>version),load:async()=>({status:'empty' as const})};
+        const f=readerFixture(true,undefined,undefined,undefined,undefined,undefined,{reading});f.reader.toggle();await flush();
+        const list=f.reader.readingCandidates();if(list.status!=='ready')throw Error('unexpected');const token=list.items[0].token;
+        expect(f.reader.observeReadingCandidate({},vi.fn())).toBeUndefined();
+        reading.live.mockReturnValueOnce(false);expect(f.reader.observeReadingCandidate(token,vi.fn())).toBeUndefined();
+        reading.version.mockImplementationOnce(()=>{throw Error('stale version');});expect(f.reader.observeReadingCandidate(token,vi.fn())).toBeUndefined();
+        reading.version.mockReturnValueOnce(undefined as never);expect(f.reader.observeReadingCandidate(token,vi.fn())).toBeUndefined();
+        const first=vi.fn(()=>{throw Error('broken UI');}),stop=f.reader.observeReadingCandidate(token,first)!;const second=vi.fn(()=>{throw Error('broken UI on retry');});
+        expect(f.reader.observeReadingCandidate(token,second)).toBeTypeOf('function');expect(first).toHaveBeenCalledOnce();stop();
+        expect(f.reader.retry(f.image)).toBe(true);expect(second).toHaveBeenCalledOnce();f.reader.dispose();
+    });
+    it('来源检查异常与观察者异常不会阻断会话失效和卸载',async()=>{
+        const version={},reading={live:vi.fn(()=>true),version:()=>version,load:async()=>({status:'empty' as const})};
+        const f=readerFixture(true,undefined,undefined,undefined,undefined,undefined,{reading});f.reader.toggle();await flush();
+        const list=f.reader.readingCandidates();if(list.status!=='ready')throw Error('unexpected');
+        const invalid=vi.fn(()=>{throw Error('broken observer');});f.reader.observeReadingCandidate(list.items[0].token,invalid);
+        reading.live.mockImplementationOnce(()=>{throw Error('detached source');});f.reader.schedule();
+        expect(invalid).toHaveBeenCalledOnce();expect(()=>f.reader.dispose()).not.toThrow();
+    });
+    it('其他布局任务合并或卸载时取消待执行的观察帧',async()=>{
+        for(const action of ['schedule','dispose'] as const){
+            const version={},reading={live:()=>true,version:()=>version,load:async()=>({status:'empty' as const})};
+            const f=readerFixture(true,undefined,undefined,undefined,undefined,undefined,{reading});f.reader.toggle();await flush();f.run();
+            const list=f.reader.readingCandidates();if(list.status!=='ready')throw Error('unexpected');f.reader.observeReadingCandidate(list.items[0].token,vi.fn());
+            const unrelated=f.document.createElement('div');unrelated.setAttribute('data-fluent-read-ui','');f.document.body.append(unrelated);
+            f.mo.callback([{target:unrelated,type:'attributes',attributeName:'style'} as unknown as MutationRecord],{} as MutationObserver);
+            if(action==='schedule')f.reader.schedule();else f.reader.dispose();
+            expect(f.window.cancelAnimationFrame).toHaveBeenCalled();f.run();f.reader.dispose();vi.restoreAllMocks();vi.unstubAllGlobals();
+        }
+    });
+    it('伪造扩展标记的兄弟层变化会按帧重验已打开快照，重复变化不会重复测量',async()=>{
+        let valid=true;const version={},reading={live:vi.fn(()=>valid),version:()=>version,load:async()=>({status:'empty' as const})};
+        const f=readerFixture(true,undefined,undefined,undefined,undefined,undefined,{reading});
+        const overlay=f.document.createElement('aside');overlay.setAttribute('data-fluent-read-ui','');f.document.body.append(overlay);
+        f.reader.toggle();await flush();f.run();const list=f.reader.readingCandidates();if(list.status!=='ready')throw Error('unexpected');
+        const invalid=vi.fn();f.reader.observeReadingCandidate(list.items[0].token,invalid);reading.live.mockClear();valid=false;
+        for(let i=0;i<30;i++)f.mo.callback([{target:overlay,type:'attributes',attributeName:'style'} as unknown as MutationRecord],{} as MutationObserver);
+        expect(reading.live).not.toHaveBeenCalled();expect(invalid).not.toHaveBeenCalled();f.run();
+        expect(reading.live).toHaveBeenCalledOnce();expect(invalid).toHaveBeenCalledOnce();f.reader.dispose();
+    });
+    it('已选长图片段的宿主图片发生变化时撤销对应阅读快照',async()=>{
+        const values=new Map<HTMLImageElement,import('@/src/features/image-translation/content/mangaImageSegments').MangaImageSegment[]>();
+        const segments={identity:vi.fn(s=>s.source),translate:vi.fn().mockResolvedValue(undefined),reuse:vi.fn(()=>false),restore:vi.fn(),release:vi.fn(),failed:vi.fn(()=>false),update:vi.fn(),prepare:vi.fn(()=>values),pixels:vi.fn(()=>1_800_000),bounds:vi.fn(()=>({left:0,top:0,right:800,bottom:600,width:800,height:600}) as DOMRect)};
+        let valid=true;const version={},reading={live:()=>valid,version:()=>version,load:async()=>({status:'empty' as const})};
+        const f=readerFixture(true,undefined,undefined,undefined,undefined,undefined,{segments,reading});
+        values.set(f.image,[{image:f.image,top:0,height:600,width:800,contextTop:0,contextHeight:600,source:'one'}]);
+        f.reader.schedule();f.run();f.reader.toggle();await flush();const list=f.reader.readingCandidates();if(list.status!=='ready')throw Error('unexpected');
+        expect(list.items[0].kind).toBe('segment');const invalid=vi.fn();f.reader.observeReadingCandidate(list.items[0].token,invalid);
+        valid=false;f.mo.callback([{target:f.image,type:'attributes',attributeName:'src'} as unknown as MutationRecord],{} as MutationObserver);
+        expect(invalid).toHaveBeenCalledOnce();f.reader.dispose();
+    });
+    it.each(['hide','source'] as const)('伪造扩展标记的宿主祖先 %s 仍立即使已打开快照失效',async change=>{
+        let valid=true;const version={},reading={live:vi.fn(()=>valid),version:()=>version,load:async()=>({status:'empty' as const})};
+        const f=readerFixture(true,undefined,undefined,undefined,undefined,undefined,{reading});f.reader.toggle();await flush();
+        const list=f.reader.readingCandidates();if(list.status!=='ready')throw Error('unexpected');const invalid=vi.fn();
+        expect(f.reader.observeReadingCandidate(list.items[0].token,invalid)).toBeTypeOf('function');
+        const parent=f.image.parentElement!;parent.setAttribute('data-fluent-read-ui','');
+        if(change==='hide')parent.setAttribute('hidden','');else f.image.src='blob:changed';valid=false;
+        f.mo.callback([{target:change==='hide'?parent:f.image,type:'attributes',attributeName:change==='hide'?'hidden':'src'} as unknown as MutationRecord],{} as MutationObserver);
+        expect(invalid).toHaveBeenCalledOnce();f.reader.dispose();
+    });
+    it('已读快照观察独立于候选令牌：轻微滚动保留，换源或版本更新立即通知一次',async()=>{
+        let valid=true,version:object={};const reading={live:vi.fn(()=>valid),version:vi.fn(()=>version),load:vi.fn(async()=>({status:'empty' as const}))};
+        const f=readerFixture(true,undefined,undefined,undefined,undefined,undefined,{reading});f.reader.toggle();await flush();
+        let list=f.reader.readingCandidates();if(list.status!=='ready')throw Error('unexpected');
+        const invalid=vi.fn(),stop=f.reader.observeReadingCandidate(list.items[0].token,invalid);expect(stop).toBeTypeOf('function');
+        reading.live.mockClear();for(let i=0;i<30;i++)f.scrollPending();expect(reading.live).not.toHaveBeenCalled();
+        expect(invalid).not.toHaveBeenCalled();expect(await f.reader.readReadingCandidate(list.items[0].token,new AbortController().signal)).toEqual({status:'stale'});
+        f.run();expect(reading.live).toHaveBeenCalledOnce();list=f.reader.readingCandidates();if(list.status!=='ready')throw Error('unexpected');version={};f.scrollPending();f.run();
+        expect(invalid).toHaveBeenCalledOnce();f.scrollPending();expect(invalid).toHaveBeenCalledOnce();stop!();
+        f.reader.schedule();f.run();list=f.reader.readingCandidates();if(list.status!=='ready')throw Error('unexpected');const second=vi.fn();
+        expect(f.reader.observeReadingCandidate(list.items[0].token,second)).toBeTypeOf('function');valid=false;f.scrollPending();f.run();expect(second).toHaveBeenCalledOnce();f.reader.dispose();
+    });
+    it('观察关闭后不再通知；暂停和卸载会通知活动快照',async()=>{
+        const version={},reading={live:()=>true,version:()=>version,load:async()=>({status:'empty' as const})};
+        const f=readerFixture(true,undefined,undefined,undefined,undefined,undefined,{reading});f.reader.toggle();await flush();
+        let list=f.reader.readingCandidates();if(list.status!=='ready')throw Error('unexpected');const invalid=vi.fn();
+        const stop=f.reader.observeReadingCandidate(list.items[0].token,invalid)!;stop();f.reader.toggle();expect(invalid).not.toHaveBeenCalled();
+        f.reader.toggle();await flush();list=f.reader.readingCandidates();if(list.status!=='ready')throw Error('unexpected');
+        f.reader.observeReadingCandidate(list.items[0].token,invalid);f.reader.toggle();expect(invalid).toHaveBeenCalledOnce();
+        f.reader.toggle();await flush();list=f.reader.readingCandidates();if(list.status!=='ready')throw Error('unexpected');
+        f.reader.observeReadingCandidate(list.items[0].token,invalid);f.reader.dispose();expect(invalid).toHaveBeenCalledTimes(2);
+    });
+    it('按需枚举复用已有可见候选，滚动在下一帧前同步撤销旧目标且不额外识别',async()=>{
+        const reading={live:vi.fn(()=>true),load:vi.fn(async()=>({status:'empty' as const}))};
+        const f=readerFixture(true,undefined,undefined,undefined,undefined,undefined,{reading});
+        expect(f.reader.readingCandidates()).toEqual({status:'unavailable'});f.reader.toggle();await flush();
+        const list=f.reader.readingCandidates();expect(list.status).toBe('ready');if(list.status!=='ready')throw Error('unexpected');
+        expect(list.items).toHaveLength(1);expect(list.items[0]).toMatchObject({kind:'image',ordinal:1});
+        const before=f.ports.translate.mock.calls.length;expect(reading.load).not.toHaveBeenCalled();
+        f.scrollPending();expect(await f.reader.readReadingCandidate(list.items[0].token,new AbortController().signal)).toEqual({status:'stale'});
+        expect(f.reader.readingCandidates()).toEqual({status:'unavailable'});expect(f.ports.translate).toHaveBeenCalledTimes(before);
+        f.reader.dispose();
+    });
+    it('同时可见的多个页面各有独立 token，暂停与卸载后不能读取',async()=>{
+        const reading={live:vi.fn(()=>true),load:vi.fn(async()=>({status:'empty' as const}))};
+        const f=readerFixture(true,undefined,undefined,undefined,undefined,undefined,{reading}),second=f.document.createElement('img') as HTMLImageElement;
+        second.className='zao-image';second.src='blob:page-2';Object.defineProperties(second,{complete:{value:true},naturalWidth:{value:800},naturalHeight:{value:1200}});
+        second.getBoundingClientRect=()=>({left:500,right:1200,top:0,bottom:900,width:700,height:900}) as DOMRect;f.image.parentElement!.append(second);
+        f.reader.toggle();await flush();const list=f.reader.readingCandidates();if(list.status!=='ready')throw Error('unexpected');
+        expect(list.items.map(item=>item.ordinal)).toEqual([1,2]);expect(list.items[0].token).not.toBe(list.items[1].token);
+        f.reader.toggle();expect(await f.reader.readReadingCandidate(list.items[1].token,new AbortController().signal)).toEqual({status:'stale'});
+        f.reader.dispose();expect(f.reader.readingCandidates()).toEqual({status:'unavailable'});
+    });
     it('快速掠过页面不启动识别或预译，在途完成不穿过关闸，停下才处理最终视口', async () => {
         vi.useFakeTimers();let ahead = 0, anchor = 0;
         const f = readerFixture(true,undefined,undefined,() => ahead), images = [f.image], pending = deferred();
@@ -598,6 +741,29 @@ describe('漫画站点适配与 DOM 生命周期', () => {
         expect(reuse).toHaveBeenCalledWith(cached);expect(f.ports.translate).toHaveBeenCalledOnce();
         expect(f.reader.status()).toMatchObject({pending:true,completed:1});
         pending.resolve();await flush();expect(f.reader.status()).toMatchObject({pending:false,completed:2});f.reader.dispose();
+    });
+    it('附近离屏画布停稳后进入预译队列，不作为当前可见页', async () => {
+        vi.useFakeTimers();
+        const current = deferred(), ahead = deferred();
+        const canvasPorts = {identity: vi.fn().mockReturnValue('canvas-ahead'), translate: vi.fn().mockReturnValue(ahead.promise),
+            reuse: vi.fn().mockReturnValue(false), restore: vi.fn(), release: vi.fn(), failed: vi.fn().mockReturnValue(false),
+            update: vi.fn(), invalidate: vi.fn()};
+        const f = readerFixture(false, 'https://comic-zenon.com/episode/12207421983509986288', undefined, () => 1, undefined, canvasPorts);
+        f.image.className = 'page-image';f.image.parentElement!.className = 'page-area';
+        const canvas = f.document.createElement('canvas') as HTMLCanvasElement;
+        canvas.className = 'js-page-image';canvas.width = 400;canvas.height = 300;
+        canvas.getBoundingClientRect = () => ({left: 0, right: 400, top: 1000, bottom: 1300, width: 400, height: 300}) as DOMRect;
+        f.image.parentElement!.append(canvas);f.ports.translate.mockReturnValueOnce(current.promise);
+        f.reader.schedule();f.run();f.reader.toggle();await flush();
+        expect(canvasPorts.invalidate).toHaveBeenCalledWith(canvas);
+        expect(f.ports.translate).toHaveBeenCalledOnce();expect(canvasPorts.translate).not.toHaveBeenCalled();
+        f.scroll();current.resolve();await flush();
+        expect(canvasPorts.translate).not.toHaveBeenCalled();
+        vi.advanceTimersByTime(180);f.run();await flush();
+        expect(canvasPorts.translate).toHaveBeenCalledOnce();expect(canvasPorts.translate).toHaveBeenCalledWith(canvas);
+        expect(f.reader.status()).toMatchObject({pending: true, prefetching: true, ahead: 0});
+        ahead.resolve();await flush();expect(f.reader.status()).toMatchObject({pending: false, prefetching: false, ahead: 1, completed: 2});
+        f.reader.dispose();
     });
     it('可读画布与正文图片共用串行队列，重绘失效、暂停恢复和不可读降级不选推广图', async () => {
         const pending=deferred(), canvasPorts={identity:vi.fn().mockReturnValue('canvas-1'),translate:vi.fn().mockResolvedValue(undefined),reuse:vi.fn().mockReturnValue(false),restore:vi.fn(),release:vi.fn(),failed:vi.fn().mockReturnValue(false),update:vi.fn()};

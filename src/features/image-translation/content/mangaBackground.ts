@@ -12,6 +12,8 @@ interface BackgroundPresentation {
     dispose: () => void;
     reconcile: () => void;
     logicalImage: () => string | null;
+    /** 只读检查租约，按需阅读不能触发样式归还或来源探测。 */
+    readable: () => boolean;
 }
 interface BackgroundPage {url: string; width: number; height: number; ready: boolean; cancel: (() => void) | null; presentation?: BackgroundPresentation}
 interface ImageReceipt {value: string; priority: string; originalStyle: string | null; ownedValue: string; ownedPriority: string; ownedStyle: string | null; className: string | null}
@@ -43,9 +45,10 @@ export function createMangaBackground(ports: Parameters<typeof createMangaCanvas
     let pages = new WeakMap<HTMLElement, BackgroundPage>();
     let disposed = false, probing: HTMLElement | null = null;
 
-    function descriptor(element: HTMLElement): {url: string; x: number; y: number} | null {
+    function descriptor(element: HTMLElement, readonly = false): {url: string; x: number; y: number} | null {
         const presentation = pages.get(element)?.presentation;
-        presentation?.reconcile();
+        if(readonly && presentation && !presentation.readable())return null;
+        if(!readonly)presentation?.reconcile();
         const style = getComputedStyle(element);
         if (style.backgroundSize !== 'contain' || style.backgroundRepeat !== 'no-repeat' || style.backgroundOrigin !== 'padding-box') return null;
         if ([style.paddingTop, style.paddingRight, style.paddingBottom, style.paddingLeft,
@@ -87,6 +90,8 @@ export function createMangaBackground(ports: Parameters<typeof createMangaCanvas
         const presentation: BackgroundPresentation = {
             reconcile,
             logicalImage: () => receipt ? `url("${page.url}")` : null,
+            readable: () => !released && !disposed && !interrupted && (!receipt || (owns(receipt)
+                && element.getAttribute('class')===receipt.className && element.getAttribute('style')===receipt.ownedStyle)),
             show() {
                 if (released || disposed || !element.isConnected || pages.get(element) !== page) return false;
                 const current = descriptor(element);
@@ -171,16 +176,28 @@ export function createMangaBackground(ports: Parameters<typeof createMangaCanvas
         }
         return page?.ready ? `${page.url}:${page.width}:${page.height}` : null;
     }
+    function readingIdentity(element:HTMLElement):string|null {
+        if(disposed||!element.isConnected)return null;
+        const page=pages.get(element),value=descriptor(element,true);
+        return page?.ready&&value?.url===page.url?`${page.url}:${page.width}:${page.height}`:null;
+    }
     function bounds(element: HTMLElement): DOMRect {
         const rect = element.getBoundingClientRect(), page = pages.get(element)!, position = descriptor(element)!;
         const scale = Math.min(rect.width / page.width, rect.height / page.height);
         const width = page.width * scale, height = page.height * scale;
         return new DOMRect(rect.left + (rect.width - width) * position.x, rect.top + (rect.height - height) * position.y, width, height);
     }
+    function readingBounds(element:HTMLElement):DOMRect|null {
+        const page=pages.get(element),position=descriptor(element,true);
+        if(!page?.ready||!position||position.url!==page.url)return null;
+        const rect=element.getBoundingClientRect(),scale=Math.min(rect.width/page.width,rect.height/page.height);
+        const width=page.width*scale,height=page.height*scale;
+        return new DOMRect(rect.left+(rect.width-width)*position.x,rect.top+(rect.height-height)*position.y,width,height);
+    }
     const surface = createMangaCanvas<HTMLElement>({...ports,
         acceptsInteractionLayer: (element, hit) => element.contains(hit) || ports.acceptsInteractionLayer?.(element, hit) === true,
         source: {
-        identity, bounds,
+        identity, readingIdentity, readingBounds, bounds,
         presentation: async (element, canvas, signal) => {
             signal.throwIfAborted();
             const page = pages.get(element);

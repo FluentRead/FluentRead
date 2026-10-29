@@ -153,7 +153,7 @@ import {MaterialPageClientError, requestMaterialPage, requestMaterialDetail, req
 import type {MaterialSummary} from '../materialSummary';
 import type {MaterialDetailMetadata} from '../materialDetailPage';
 import {chooseMaterialBackupTarget, saveMaterialBackup, waitForMaterialBackupTarget, type MaterialBackupSavePlatform} from '../materialBackupSave';
-import {beginFirefoxMaterialBackup, beginFirefoxRecoveredMaterialBackup, listFirefoxMaterialBackupLeftovers, removeFirefoxMaterialBackupLeftover, type MaterialBackupLeftover} from '../materialBackupBrowserSave';
+import {beginFirefoxMaterialBackup, beginFirefoxRecoveredMaterialBackup, listFirefoxMaterialBackupLeftovers, removeFirefoxMaterialBackupLeftover, prepareFirefoxMaterialBackupContext, type MaterialBackupLeftover} from '../materialBackupBrowserSave';
 import {receiveMaterialBackupExport} from '../materialBackupExportClient';
 import {MATERIAL_BACKUP_EXPORT_PORT_NAME} from '../materialBackupExportProtocol';
 import type {MaterialReadPort} from '../materialReadTransport';
@@ -672,6 +672,7 @@ async function recoverTemporaryBackup(item:MaterialBackupLeftover) {
         if(active&&ticket===generation)feedback.value=message;
         else recordBackupStatus(result.state==='saved'?'此前开始的临时备份下载已完成，临时文件仍保留；确认后可删除。':'此前开始的临时备份下载已发起，临时文件仍保留；请确认下载完成后再处理。');
     } catch(failure) {
+        if(failure instanceof Error && failure.name==='MaterialBackupContextError')void prepareFirefoxMaterialBackupContext();
         if(active&&ticket===generation)temporaryError.value=backupFailureMessage(failure,'已取消取回备份。','取回备份失败，请重试。',true);
         else if(failure instanceof Error&&failure.name==='AbortError')recordBackupStatus('此前开始的临时备份取回已取消。');
         else retainUnmountedBackupFailure(failure,'firefox');
@@ -726,6 +727,7 @@ async function exportMaterials() {
     });
     let selectedFirefox=false,selectedBuffered=false;
     const targetPromise=firefoxChoice?firefoxChoice.catch(failure=>{
+        if(failure instanceof Error && failure.name==='MaterialBackupContextError') {void prepareFirefoxMaterialBackupContext();throw failure;}
         if(failure instanceof Error && failure.name==='MaterialBackupInitializationCleanupError')
             recordBackupWarning('创建备份时未能清理新建的空临时文件，请在临时文件列表检查。');
         return {status:'unavailable' as const};
@@ -929,7 +931,7 @@ watch(topicSearch, () => {
 }, {flush:'sync'});
 onActivated(() => {keptAliveVisible.value = true;});
 onDeactivated(() => {keptAliveVisible.value = false;});
-onMounted(() => { void reload(); browser.runtime.onMessage.addListener(onChanged); });
+onMounted(() => { void prepareFirefoxMaterialBackupContext(); void reload(); browser.runtime.onMessage.addListener(onChanged); });
 onBeforeUnmount(() => { active = false; generation++; detailGeneration++; temporaryGeneration++; backupController?.abort();exportController?.abort();listController?.abort();detailController?.abort();topicController?.abort();if(queryTimer!==undefined)clearTimeout(queryTimer);if(topicTimer!==undefined)clearTimeout(topicTimer);const session=currentSession;currentSession=undefined;if(session)void closeSession(session.capability);browser.runtime.onMessage.removeListener(onChanged); });
 </script>
 <style scoped>

@@ -1,7 +1,7 @@
 import {afterEach,describe,expect,it,vi} from 'vitest';
-const browserMock=vi.hoisted(()=>({permissions:{request:vi.fn()},downloads:undefined as unknown}));
+const browserMock=vi.hoisted(()=>({permissions:{request:vi.fn()},extension:{inIncognitoContext:false},tabs:{getCurrent:vi.fn(async()=>({incognito:false}))},downloads:undefined as unknown}));
 vi.mock('webextension-polyfill',()=>({default:browserMock}));
-import {beginFirefoxMaterialBackup,beginFirefoxRecoveredMaterialBackup,beginMaterialBrowserBackup,beginRecoveredMaterialBackup,createMaterialBrowserOpfsPlatform,listFirefoxMaterialBackupLeftovers,listMaterialBackupLeftovers,removeFirefoxMaterialBackupLeftover,removeMaterialBackupLeftover,startObservedMaterialDownload,type MaterialBrowserBackupEnvironment,type MaterialBrowserDownloads} from '@/src/features/vocabulary/materialBackupBrowserSave';
+import {beginFirefoxMaterialBackup,beginFirefoxRecoveredMaterialBackup,beginMaterialBrowserBackup,beginRecoveredMaterialBackup,createMaterialBrowserOpfsPlatform,listFirefoxMaterialBackupLeftovers,listMaterialBackupLeftovers,prepareFirefoxMaterialBackupContext,removeFirefoxMaterialBackupLeftover,removeMaterialBackupLeftover,startObservedMaterialDownload,type MaterialBrowserBackupEnvironment,type MaterialBrowserDownloads} from '@/src/features/vocabulary/materialBackupBrowserSave';
 import {saveMaterialBackup} from '@/src/features/vocabulary/materialBackupSave';
 
 const deferred=<T,>()=>{let resolve!:(value:T)=>void,reject!:(error:Error)=>void;const promise=new Promise<T>((yes,no)=>{resolve=yes;reject=no;});return {promise,resolve,reject};};
@@ -28,7 +28,7 @@ function fixture(){
     const env:MaterialBrowserBackupEnvironment={requestPermission:permission,directory:async()=>fs.root as unknown as FileSystemDirectoryHandle,locks:fs.locks as unknown as LockManager,downloads:d.api,randomId:()=> 'a'.repeat(32),now:()=>1700000000000,objectURL:file=>{urls.push(file);return 'blob:test';},revokeURL:vi.fn()};
     return {d,fs,permission,urls,env};
 }
-afterEach(()=>{vi.unstubAllEnvs();vi.unstubAllGlobals();vi.clearAllMocks();Object.defineProperty(browserMock,'downloads',{configurable:true,writable:true,value:undefined});});
+afterEach(async()=>{vi.stubEnv('BROWSER','firefox');browserMock.extension.inIncognitoContext=true;await prepareFirefoxMaterialBackupContext();vi.unstubAllEnvs();vi.unstubAllGlobals();vi.clearAllMocks();browserMock.extension.inIncognitoContext=false;browserMock.tabs.getCurrent.mockReset().mockResolvedValue({incognito:false});Object.defineProperty(browserMock,'downloads',{configurable:true,writable:true,value:undefined});});
 describe('browser material backup target',()=>{
     it('requests permission synchronously before any caller can await',async()=>{
         const f=fixture(),gate=deferred<boolean>();f.permission.mockReturnValueOnce(gate.promise);
@@ -129,6 +129,7 @@ describe('browser material backup target',()=>{
         vi.stubEnv('BROWSER','firefox');vi.stubGlobal('navigator',{storage:{getDirectory:async()=>f.fs.root},locks:f.fs.locks});
         vi.stubGlobal('crypto',{randomUUID:()=> 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa'});
         vi.stubGlobal('URL',{createObjectURL:()=> 'blob:test',revokeObjectURL:vi.fn()});
+        expect(await prepareFirefoxMaterialBackupContext()).toBe(true);
         browserMock.permissions.request.mockImplementation(()=>gate.promise);
         Object.defineProperty(browserMock,'downloads',{configurable:true,get(){return granted?f.d.api:undefined;},set(){}});
         const opening=beginFirefoxMaterialBackup('backup.json');expect(browserMock.permissions.request).toHaveBeenCalledWith({permissions:['downloads']});granted=true;gate.resolve(true);
@@ -141,8 +142,81 @@ describe('browser material backup target',()=>{
         await removeFirefoxMaterialBackupLeftover(name);expect(f.fs.files.has(name)).toBe(false);
         Object.defineProperty(browserMock,'downloads',{configurable:true,writable:true,value:undefined});
     });
+    it('waits for the actual Firefox tab privacy state even when downloads permission is already granted',async()=>{
+        const f=fixture(),privacy=deferred<{incognito:boolean}>(),directory=vi.fn(async()=>f.fs.root);
+        vi.stubEnv('BROWSER','firefox');vi.stubGlobal('navigator',{storage:{getDirectory:directory},locks:f.fs.locks});
+        vi.stubGlobal('crypto',{randomUUID:()=> 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa'});
+        expect(await prepareFirefoxMaterialBackupContext()).toBe(true);
+        browserMock.permissions.request.mockResolvedValue(true);browserMock.tabs.getCurrent.mockReturnValue(privacy.promise);
+        browserMock.downloads=f.d.api;
+        const opening=beginFirefoxMaterialBackup('backup.json');
+        expect(browserMock.permissions.request).toHaveBeenCalledOnce();await tick();expect(directory).not.toHaveBeenCalled();
+        privacy.resolve({incognito:false});const choice=await opening;if(choice.status!=='ready')throw Error('not ready');
+        expect(directory).toHaveBeenCalledOnce();await choice.target.abort();
+    });
+    it('never opens OPFS from a private or unidentifiable Firefox tab',async()=>{
+        const f=fixture(),directory=vi.fn(async()=>f.fs.root),name='fluentread-material-backup-v1-1700000000000-'+ 'd'.repeat(32)+'.tmp';
+        vi.stubEnv('BROWSER','firefox');vi.stubGlobal('navigator',{storage:{getDirectory:directory},locks:f.fs.locks});
+        browserMock.permissions.request.mockResolvedValue(true);browserMock.downloads=f.d.api;
+        for(const tab of [{incognito:true},undefined,{}] as const){
+            browserMock.tabs.getCurrent.mockResolvedValue(tab as never);
+            expect(await prepareFirefoxMaterialBackupContext()).toBe(false);
+            await expect(listFirefoxMaterialBackupLeftovers()).rejects.toThrow('隐私');
+            await expect(removeFirefoxMaterialBackupLeftover(name)).rejects.toThrow('隐私');
+            await expect(beginFirefoxMaterialBackup('backup.json')).rejects.toThrow('隐私');
+            await expect(beginFirefoxRecoveredMaterialBackup(name,'backup.json')).rejects.toThrow('隐私');
+        }
+        browserMock.tabs.getCurrent.mockRejectedValue(Error('tab query failed'));
+        await expect(listFirefoxMaterialBackupLeftovers()).rejects.toThrow('隐私');
+        await expect(beginFirefoxRecoveredMaterialBackup(name,'backup.json')).rejects.toThrow('隐私');
+        expect(browserMock.permissions.request).not.toHaveBeenCalled();expect(directory).not.toHaveBeenCalled();expect(f.fs.files.size).toBe(0);
+    });
+    it('does not prompt while the privacy preflight is pending and rejects stale preflight results',async()=>{
+        const f=fixture(),first=deferred<{incognito:boolean}>(),second=deferred<{incognito:boolean}>();
+        vi.stubEnv('BROWSER','firefox');vi.stubGlobal('navigator',{storage:{getDirectory:async()=>f.fs.root},locks:f.fs.locks});
+        browserMock.tabs.getCurrent.mockReturnValueOnce(first.promise).mockReturnValueOnce(second.promise);
+        const older=prepareFirefoxMaterialBackupContext(),newer=prepareFirefoxMaterialBackupContext();
+        await expect(beginFirefoxMaterialBackup('backup.json')).rejects.toMatchObject({name:'MaterialBackupContextError'});expect(browserMock.permissions.request).not.toHaveBeenCalled();
+        second.resolve({incognito:true});expect(await newer).toBe(false);first.resolve({incognito:false});expect(await older).toBe(false);
+        await expect(beginFirefoxMaterialBackup('backup.json')).rejects.toThrow('隐私');expect(browserMock.permissions.request).not.toHaveBeenCalled();
+    });
+    it('does not let an older failed preflight invalidate a newer successful one',async()=>{
+        const f=fixture(),olderTab=deferred<{incognito:boolean}>(),newerTab=deferred<{incognito:boolean}>();
+        vi.stubEnv('BROWSER','firefox');vi.stubGlobal('navigator',{storage:{getDirectory:async()=>f.fs.root},locks:f.fs.locks});
+        browserMock.tabs.getCurrent.mockReturnValueOnce(olderTab.promise).mockReturnValueOnce(newerTab.promise);
+        const older=prepareFirefoxMaterialBackupContext(),newer=prepareFirefoxMaterialBackupContext();
+        newerTab.resolve({incognito:false});expect(await newer).toBe(true);
+        olderTab.reject(Error('old query failed'));expect(await older).toBe(false);
+        browserMock.tabs.getCurrent.mockResolvedValue({incognito:false});browserMock.permissions.request.mockResolvedValue(false);
+        const choice=beginFirefoxMaterialBackup('backup.json');expect(browserMock.permissions.request).toHaveBeenCalledOnce();
+        expect(await choice).toEqual({status:'denied'});
+    });
+    it('does not let an older operation privacy failure invalidate a newer successful preflight',async()=>{
+        const f=fixture(),olderTab=deferred<{incognito:boolean}>();
+        vi.stubEnv('BROWSER','firefox');vi.stubGlobal('navigator',{storage:{getDirectory:async()=>f.fs.root},locks:f.fs.locks});
+        expect(await prepareFirefoxMaterialBackupContext()).toBe(true);
+        browserMock.permissions.request.mockResolvedValue(true);browserMock.tabs.getCurrent.mockReturnValueOnce(olderTab.promise);
+        const older=beginFirefoxMaterialBackup('backup.json');
+        expect(await prepareFirefoxMaterialBackupContext()).toBe(true);
+        olderTab.reject(Error('old query failed'));await expect(older).rejects.toMatchObject({name:'MaterialBackupContextError'});
+        browserMock.permissions.request.mockResolvedValue(false);
+        const choice=beginFirefoxMaterialBackup('backup.json');expect(browserMock.permissions.request).toHaveBeenCalledTimes(2);
+        expect(await choice).toEqual({status:'denied'});expect(f.fs.files.size).toBe(0);
+    });
+    it('fails closed when the extension context is private or changes while checking the tab',async()=>{
+        const f=fixture(),directory=vi.fn(async()=>f.fs.root),privacy=deferred<{incognito:boolean}>();
+        vi.stubEnv('BROWSER','firefox');vi.stubGlobal('navigator',{storage:{getDirectory:directory},locks:f.fs.locks});
+        browserMock.permissions.request.mockResolvedValue(true);browserMock.downloads=f.d.api;
+        expect(await prepareFirefoxMaterialBackupContext()).toBe(true);
+        browserMock.tabs.getCurrent.mockReturnValueOnce(privacy.promise);
+        const opening=beginFirefoxMaterialBackup('backup.json');expect(browserMock.permissions.request).toHaveBeenCalledOnce();
+        browserMock.extension.inIncognitoContext=true;privacy.resolve({incognito:false});await expect(opening).rejects.toThrow('隐私');
+        await expect(beginFirefoxMaterialBackup('backup.json')).rejects.toThrow('隐私');
+        await expect(listFirefoxMaterialBackupLeftovers()).rejects.toThrow('隐私');
+        expect(browserMock.permissions.request).toHaveBeenCalledOnce();expect(directory).not.toHaveBeenCalled();
+    });
     it('reports unavailable browser capabilities without requesting downloads access',async()=>{
-        vi.stubEnv('BROWSER','chrome');expect(await beginFirefoxMaterialBackup('backup.json')).toEqual({status:'unavailable'});
+        vi.stubEnv('BROWSER','chrome');expect(await prepareFirefoxMaterialBackupContext()).toBe(false);expect(browserMock.tabs.getCurrent).not.toHaveBeenCalled();expect(await beginFirefoxMaterialBackup('backup.json')).toEqual({status:'unavailable'});
         expect(await beginFirefoxRecoveredMaterialBackup('invalid','backup.json')).toEqual({status:'unavailable'});
         await expect(listFirefoxMaterialBackupLeftovers()).rejects.toThrow('无法查看');await expect(removeFirefoxMaterialBackupLeftover('invalid')).rejects.toThrow('无法清理');expect(browserMock.permissions.request).not.toHaveBeenCalled();
     });

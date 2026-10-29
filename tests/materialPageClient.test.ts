@@ -58,6 +58,24 @@ describe('material page client',()=>{
         expect(progress.mock.calls).toEqual([[{processed:1,total:2}],[{processed:2,total:2}]]);
         await fixture.serverResult;
     });
+    it('stops processing the current frame when a progress handler cancels the request',async()=>{
+        const fixture=serve([{type:'progress',processed:1,total:2},{type:'progress',processed:2,total:2},header(),{type:'summary',value:summary},{type:'complete',count:1}],4096);
+        const controller=new AbortController();
+        const progress=vi.fn(()=>controller.abort());
+        await expect(requestMaterialPage(open,{signal:controller.signal,onProgress:progress},()=>fixture.client)).rejects.toMatchObject({name:'AbortError'});
+        expect(progress).toHaveBeenCalledTimes(1);
+        expect(fixture.client.closed).toBe(true);
+        expect(fixture.server.closed).toBe(true);
+        await fixture.serverResult?.catch(()=>{});
+    });
+    it('closes the transport if the progress handler throws',async()=>{
+        const fixture=serve([{type:'progress',processed:1,total:2},header(),{type:'summary',value:summary},{type:'complete',count:1}],4096);
+        const error=new Error('progress handler failed');
+        await expect(requestMaterialPage(open,{onProgress:()=>{throw error;}},()=>fixture.client)).rejects.toBe(error);
+        expect(fixture.client.closed).toBe(true);
+        expect(fixture.server.closed).toBe(true);
+        await fixture.serverResult?.catch(()=>{});
+    });
     it('discards partial summaries and preserves a public stale error only after transport completion',async()=>{
         const fixture=serve([header(),{type:'summary',value:summary},{type:'error',code:'stale-operation'}]);
         await expect(requestMaterialPage(open,{},()=>fixture.client)).rejects.toMatchObject({name:'MaterialPageClientError',code:'stale-operation'});

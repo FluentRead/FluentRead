@@ -6,7 +6,6 @@
  */
 import {sha256} from '@noble/hashes/sha256';
 
-export const MATERIAL_READ_PORT_NAME = 'fluentread-material-read-v1';
 export const MATERIAL_READ_FRAME_BYTES = 24 * 1024;
 export const MATERIAL_READ_MESSAGE_BYTES = 40 * 1024;
 const VERSION = 1;

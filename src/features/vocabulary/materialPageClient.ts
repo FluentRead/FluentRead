@@ -61,7 +61,9 @@ async function receiveLines(request:MaterialPageRequest, options:Options, connec
             if (lineBytes>MATERIAL_PAGE_MAX_LINE_BYTES) throw Error('材料分页数据过大，请重试。');
             line+=decoder.decode(chunk.subarray(start,stop),{stream:true});
             if (end<0) break;
-            line+=decoder.decode(); accept(line); line=''; lineBytes=0;
+            line+=decoder.decode(); accept(line);
+            if (controller.signal.aborted) throw cancelled();
+            line=''; lineBytes=0;
             decoder=new TextDecoder('utf-8',{fatal:true,ignoreBOM:true}); start=end+1;
         }
     };

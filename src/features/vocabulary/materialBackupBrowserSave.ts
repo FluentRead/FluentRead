@@ -31,6 +31,8 @@ export interface MaterialBrowserBackupEnvironment {
 export type MaterialBrowserBackupChoice = {status:'ready';target:MaterialBackupSaveTarget}|{status:'denied'|'unavailable'};
 
 const TEMP_DIRECTORY='fluentread-material-backups';
+let verifiedFirefoxBackupContext=false,firefoxContextGeneration=0;
+const backupContextError=()=>Object.assign(new Error('无法在隐私浏览或无法确认隐私状态时使用材料备份，请稍后重试'),{name:'MaterialBackupContextError'});
 const notFound=(error:unknown)=>error instanceof DOMException&&error.name==='NotFoundError';
 async function exists(dir:FileSystemDirectoryHandle,name:string):Promise<boolean> {
     try {await dir.getFileHandle(name);return true;}catch(error){if(notFound(error))return false;throw error;}
@@ -162,12 +164,43 @@ function firefoxEnvironment():MaterialBrowserBackupEnvironment|undefined {
     if(import.meta.env.BROWSER!=='firefox'||typeof navigator==='undefined'||typeof navigator.storage?.getDirectory!=='function'
         ||typeof navigator.locks?.request!=='function'||typeof browser.permissions?.request!=='function') return undefined;
     return {
-        requestPermission:()=>browser.permissions.request({permissions:['downloads']}),
+        requestPermission:()=>{
+            if(!verifiedFirefoxBackupContext||browser.extension?.inIncognitoContext!==false)return Promise.reject(backupContextError());
+            // 权限请求保留在点击栈内，之后再次验证所属标签才能访问 OPFS。
+            const permission=browser.permissions.request({permissions:['downloads']});
+            return Promise.all([permission,assertFirefoxBackupContext()]).then(([allowed])=>allowed);
+        },
         directory:()=>navigator.storage.getDirectory(),locks:navigator.locks,
         get downloads(){return browser.downloads as unknown as MaterialBrowserDownloads;},
         randomId:()=>crypto.randomUUID().replaceAll('-',''),now:()=>Date.now(),
         objectURL:file=>URL.createObjectURL(file),revokeURL:url=>URL.revokeObjectURL(url),
     };
+}
+
+/** 页面提前调用；未完成或失败时，点击不会请求下载权限。 */
+export async function prepareFirefoxMaterialBackupContext():Promise<boolean> {
+    const generation=++firefoxContextGeneration;
+    verifiedFirefoxBackupContext=false;
+    if(import.meta.env.BROWSER!=='firefox')return false;
+    try {
+        await assertFirefoxBackupContext();
+        if(generation!==firefoxContextGeneration)return false;
+        verifiedFirefoxBackupContext=true;
+        return true;
+    } catch {return false;}
+}
+
+async function assertFirefoxBackupContext():Promise<void> {
+    const generation=firefoxContextGeneration;
+    const invalidate=()=>{if(generation===firefoxContextGeneration)verifiedFirefoxBackupContext=false;};
+    if(browser.extension?.inIncognitoContext!==false){invalidate();throw backupContextError();}
+    try {
+        // spanning 模式下 extension.inIncognitoContext 不能代表页面所属标签的隐私状态。
+        const tab=await browser.tabs.getCurrent();
+        if(tab?.incognito===false&&browser.extension?.inIncognitoContext===false&&generation===firefoxContextGeneration)return;
+    } catch {/* 无法确认所属标签时禁止访问私有文件。 */}
+    invalidate();
+    throw backupContextError();
 }
 
 /** Firefox 在缺少原生文件选择器时使用。用户点击中同步调用本函数。 */
@@ -236,10 +269,12 @@ export function beginRecoveredMaterialBackup(name:string,filename:string,env:Mat
 
 export async function listFirefoxMaterialBackupLeftovers():Promise<MaterialBackupLeftoverList> {
     const env=firefoxEnvironment();if(!env)throw new Error('当前浏览器无法查看材料备份临时文件');
+    await assertFirefoxBackupContext();
     return listMaterialBackupLeftovers(await env.directory());
 }
 export async function removeFirefoxMaterialBackupLeftover(name:string):Promise<void> {
     const env=firefoxEnvironment();if(!env)throw new Error('当前浏览器无法清理材料备份临时文件');
+    await assertFirefoxBackupContext();
     await removeMaterialBackupLeftover(await env.directory(),env.locks,name);
 }
 export function beginFirefoxRecoveredMaterialBackup(name:string,filename:string):Promise<MaterialBrowserBackupChoice> {

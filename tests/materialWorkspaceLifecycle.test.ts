@@ -23,6 +23,7 @@ vi.mock('@/src/features/vocabulary/materialClient', () => Object.fromEntries([
 ].map(name => [name, (...args: unknown[]) => (globalThis as any).__fluentreadMaterialUiTest.api[name.replace('workspaceMaterial','material')](...args)])));
 vi.mock('@/src/features/vocabulary/materialBackupExportClient', () => ({receiveMaterialBackupExport: async (...args: any[]) => (await (globalThis as any).__fluentreadMaterialUiTest.exportReceive(...args)) ?? {records:0,recordBytes:0,maxRecordBytes:0,frames:0}}));
 vi.mock('@/src/features/vocabulary/materialBackupBrowserSave', () => ({
+  prepareFirefoxMaterialBackupContext: () => (globalThis as any).__fluentreadMaterialUiTest.prepareBackupContext(),
   beginFirefoxMaterialBackup: (...args: any[]) => (globalThis as any).__fluentreadMaterialUiTest.browserSave(...args),
   beginFirefoxRecoveredMaterialBackup: (...args: any[]) => (globalThis as any).__fluentreadMaterialUiTest.recoverTemporary(...args),
   listFirefoxMaterialBackupLeftovers: (...args: any[]) => (globalThis as any).__fluentreadMaterialUiTest.listTemporary(...args),
@@ -68,7 +69,8 @@ async function mount(options: {shown?: import('vue').Ref<boolean>; list?: (...ar
     queryMaterialBackup:vi.fn(async():Promise<MaterialImportStatus>=>({state:'committed',result:{inserted:1,updated:0,skipped:0}})),
     acknowledgeMaterialBackup:vi.fn(async()=>undefined),discardMaterialBackup:vi.fn(async():Promise<{state:'discarded'}|{state:'committed';result:{inserted:number;updated:number;skipped:number}}>=>({state:'discarded'})),
   };
-  (globalThis as any)[KEY] = {api,pages:materialPageFixture(api),backup,exportReceive,browserSave,recoverTemporary,listTemporary,removeTemporary,getSession:options.session || (async()=>null),memories:options.memories || (async()=>[]),browser:{runtime:{connect:()=>exportPort,getURL:(p:string)=>`chrome-extension://fixture/${p}`,sendMessage:options.getEntry || (async()=>({success:true,data:null})),onMessage:{addListener:(value:typeof listener)=>{listener=value;},removeListener}}}};
+  const prepareBackupContext=vi.fn(async()=>true);
+  (globalThis as any)[KEY] = {api,pages:materialPageFixture(api),backup,exportReceive,browserSave,recoverTemporary,listTemporary,removeTemporary,prepareBackupContext,getSession:options.session || (async()=>null),memories:options.memories || (async()=>[]),browser:{runtime:{connect:()=>exportPort,getURL:(p:string)=>`chrome-extension://fixture/${p}`,sendMessage:options.getEntry || (async()=>({success:true,data:null})),onMessage:{addListener:(value:typeof listener)=>{listener=value;},removeListener}}}};
   const {document, window} = options.surface || parseHTML('<html><body><main></main></body></html>');
   delete (window as any).showSaveFilePicker;
   vi.stubGlobal('document', document); vi.stubGlobal('window', window);
@@ -717,6 +719,13 @@ it('ignores a late temporary-file scan after closing the panel or unmounting',as
   ui.listTemporary.mockRejectedValueOnce(Error('unavailable'));await ui.panel.openTemporaryBackups();expect(ui.panel.temporaryError).toBe('unavailable');
   const pending=deferred<any>();ui.listTemporary.mockReturnValueOnce(pending.promise);const loading=ui.panel.openTemporaryBackups();ui.unmount();pending.resolve({items:[],truncated:false,failed:0});await loading;
 });
+it('retries privacy preflight after a temporary backup recovery is rejected',async()=>{
+  const ui=await mount(),failure=new Error('请稍后重试');failure.name='MaterialBackupContextError';
+  ui.recoverTemporary.mockRejectedValueOnce(failure);
+  await ui.panel.recoverTemporaryBackup({name:'ready',createdAt:1,bytes:1,ready:true});
+  expect(ui.panel.temporaryError).toBe('请稍后重试');
+  expect((globalThis as any)[KEY].prepareBackupContext).toHaveBeenCalledTimes(2);
+});
 it('validates a chosen backup before import and displays the actual restored counts through the template',async()=>{
   const ui=await mount();const input=ui.document.querySelector<HTMLInputElement>('input[type="file"]')!;const picker=vi.spyOn(input,'click').mockImplementation(()=>{});await activate(ui,namedButton(ui,'恢复材料备份'));expect(picker).toHaveBeenCalledOnce();
   Object.defineProperty(input,'files',{configurable:true,value:[{size:21*1024*1024,text:vi.fn()}]});input.dispatchEvent(new ui.window.Event('change',{bubbles:true}));await ui.flush();expect(ui.backup.restoreLargeMaterialBackup).toHaveBeenCalledOnce();expect(ui.api.materialImport).not.toHaveBeenCalled();expect(ui.backup.acknowledgeMaterialBackup).toHaveBeenCalledWith(ui.cap);
@@ -978,4 +987,12 @@ it('falls back to a buffered download if Firefox permission or OPFS setup fails 
   const create=vi.spyOn(URL,'createObjectURL').mockReturnValue('blob:fallback');vi.spyOn(URL,'revokeObjectURL').mockImplementation(()=>{});
   vi.spyOn(ui.window.HTMLElement.prototype,'click').mockImplementation(()=>{});
   await activate(ui,namedButton(ui,'导出材料备份'));expect(create).toHaveBeenCalledOnce();expect(ui.document.body.textContent).toContain('已发起材料备份下载');expect(ui.panel.busy).toBe(false);
+});
+
+it('does not export through the buffered fallback when Firefox privacy context is unverified',async()=>{
+  const ui=await mount(),failure=new Error('请稍后重试');failure.name='MaterialBackupContextError';
+  ui.browserSave.mockRejectedValueOnce(failure);
+  const create=vi.spyOn(URL,'createObjectURL');
+  await ui.panel.exportMaterials();
+  expect(ui.panel.error).toBe('请稍后重试');expect(ui.exportReceive).not.toHaveBeenCalled();expect(create).not.toHaveBeenCalled();
 });

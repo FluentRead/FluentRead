@@ -154,15 +154,25 @@ export function createStage(db:MaterialDatabase, options:{limits?:Partial<Limits
     void work.then(release,release);
     return new Promise((resolve,reject)=>{
       let done=false;
+      let timer:ReturnType<typeof setTimeout>|undefined;
+      const cleanup=()=>{
+        if(timer!==undefined)clearTimeout(timer);
+        try {signal?.removeEventListener('abort',abort);} catch {/* Do not mask the estimate result. */}
+      };
       const finish=(result:{limit:number;sampledAt?:number}|undefined)=>{
-        if(done)return;done=true;clearTimeout(timer);signal?.removeEventListener('abort',abort);
+        if(done)return;done=true;cleanup();
         if(result)resolve(result);else reject(Error('cancelled'));
       };
+      const fail=(error:unknown)=>{if(done)return;done=true;cleanup();reject(error);};
       const abort=()=>finish(undefined);
-      const timer=setTimeout(()=>finish(fallback),2000);
-      signal?.addEventListener('abort',abort,{once:true});
-      work.then(value=>finish({limit:Math.min(limits.totalBytes,materialImportCapacity(value)),sampledAt}),()=>finish(fallback));
-      if(signal?.aborted)abort();
+      void work.then(value=>finish({limit:Math.min(limits.totalBytes,materialImportCapacity(value)),sampledAt}),()=>finish(fallback));
+      try {
+        if(signal?.aborted){abort();return;}
+        timer=setTimeout(()=>finish(fallback),2000);
+        try {signal?.addEventListener('abort',abort,{once:true});}
+        catch(error){if(done)return;if(abortedAfterRegistration(signal))abort();else fail(error);return;}
+        if(!done&&signal?.aborted)abort();
+      } catch(error) {fail(error);}
     });
   }
   // Shared in this runtime; cache hits are only admission hints.
@@ -213,9 +223,8 @@ export function createStage(db:MaterialDatabase, options:{limits?:Partial<Limits
   async function guardTransaction<T>(signal:AbortSignal|undefined,task:()=>Promise<T>):Promise<T>{
     const tx=Dexie.currentTransaction;
     const onAbort=()=>{try{tx?.abort();}catch{/* It may already be committed. */}};
-    signal?.addEventListener('abort',onAbort,{once:true});
-    try{if(signal?.aborted){onAbort();throw Error('cancelled');}return await task();}
-    finally{signal?.removeEventListener('abort',onAbort);}
+    try{signal?.addEventListener('abort',onAbort,{once:true});if(signal?.aborted){onAbort();throw Error('cancelled');}return await task();}
+    finally{try{signal?.removeEventListener('abort',onAbort);}catch{/* Preserve the transaction result. */}}
   }
   function runControl<T>(kind:string,id:string|undefined,signal:AbortSignal|undefined,task:()=>Promise<T>):Promise<T>{
     if(signal?.aborted)return Promise.reject(Error('cancelled'));

@@ -1982,6 +1982,88 @@ describe('dynamic staging capacity',()=>{
     await expect(stage.beginRecoverable(manifest,guard,cap,request)).resolves.toEqual(cap);
     expect(estimate).toHaveBeenCalledTimes(1);
   });
+  it.each(['before','after'] as const)('settles and releases the begin lane when estimate listener removal throws %s native removal',async mode=>{
+    const db=database(),blocked=deferred(),started=deferred(),controller=new AbortController();
+    const estimate=vi.fn(async()=>{started.resolve();await blocked.promise;return {quota:2*1024**3,usage:0};});
+    const stage=createStage(db,{clock:()=>100,estimate,limits:{inflight:1}}),signal=controller.signal;
+    const add=signal.addEventListener.bind(signal),remove=signal.removeEventListener.bind(signal);
+    let registrations=0,inner:EventListenerOrEventListenerObject|null=null;
+    const addSpy=vi.spyOn(signal,'addEventListener').mockImplementation((type,listener,options)=>{
+      if(type==='abort'&&++registrations===2)inner=listener;add(type,listener,options);
+    });
+    const removeSpy=vi.spyOn(signal,'removeEventListener').mockImplementation((type,listener,options)=>{
+      if(listener===inner){if(mode==='after')remove(type,listener,options);throw Error('estimate removal failed');}
+      remove(type,listener,options);
+    });
+    const empty=frameRecords([],128).manifest;
+    try{
+      const cap=createMaterialImportCapability(),pending=stage.beginRecoverable(empty,guard,cap,{...request,signal});
+      await started.promise;expect(inner).not.toBeNull();blocked.resolve();
+      await expect(pending).resolves.toEqual(cap);
+      await expect(stage.beginRecoverable(empty,guard,createMaterialImportCapability(),request)).resolves.toBeDefined();
+      expect(estimate).toHaveBeenCalledTimes(2);
+    }finally{blocked.resolve();if(inner)remove('abort',inner);addSpy.mockRestore();removeSpy.mockRestore();}
+  });
+  it.each(['before','after','abort'] as const)('cleans an estimate registration that throws %s',async mode=>{
+    const db=database(),blocked=deferred(),controller=new AbortController(),error=Error('estimate registration failed');
+    const estimate=vi.fn(async()=>{await blocked.promise;return {quota:2*1024**3,usage:0};});
+    const stage=createStage(db,{clock:()=>100,estimate,limits:{inflight:1}}),signal=controller.signal;
+    const add=signal.addEventListener.bind(signal),remove=signal.removeEventListener.bind(signal);
+    let registrations=0,inner:EventListenerOrEventListenerObject|null=null;
+    const addSpy=vi.spyOn(signal,'addEventListener').mockImplementation((type,listener,options)=>{
+      if(type==='abort'&&++registrations===2){
+        inner=listener;if(mode!=='before')add(type,listener,options);
+        if(mode==='abort')controller.abort();throw error;
+      }
+      add(type,listener,options);
+    });
+    const removeSpy=vi.spyOn(signal,'removeEventListener');
+    const timerSpy=vi.spyOn(globalThis,'setTimeout'),clearSpy=vi.spyOn(globalThis,'clearTimeout');
+    const empty=frameRecords([],128).manifest;
+    try{
+      const pending=stage.beginRecoverable(empty,guard,createMaterialImportCapability(),{...request,signal});
+      if(mode==='abort')await expect(pending).rejects.toThrow('cancelled');
+      else await expect(pending).rejects.toBe(error);
+      expect(inner).not.toBeNull();expect(removeSpy).toHaveBeenCalledWith('abort',inner);
+      const timerIndex=timerSpy.mock.calls.findIndex(([,delay])=>delay===2000);
+      expect(timerIndex).toBeGreaterThanOrEqual(0);
+      expect(clearSpy).toHaveBeenCalledWith(timerSpy.mock.results[timerIndex].value);
+      // The failed outer request must not free the underlying estimator's lane early.
+      await vi.waitFor(async()=>expect(await stage.beginRecoverable(empty,guard,createMaterialImportCapability(),request)).toBeDefined());
+      expect(estimate).toHaveBeenCalledTimes(1);
+      blocked.resolve();await vi.waitFor(async()=>{
+        await stage.beginRecoverable(empty,guard,createMaterialImportCapability(),request);
+        expect(estimate).toHaveBeenCalledTimes(2);
+      });
+    }finally{blocked.resolve();if(inner)remove('abort',inner);addSpy.mockRestore();removeSpy.mockRestore();timerSpy.mockRestore();clearSpy.mockRestore();}
+  });
+  it.each(['pre-aborted','silent-abort','silent-abort-on-throw','getter-error','abort-then-getter-error'] as const)(
+    'handles a caller-modified estimate signal: %s',async mode=>{
+      const db=database(),controller=new AbortController(),signal=controller.signal,blocked=deferred(),error=Error('signal getter failed');
+      const stage=createStage(db,{clock:()=>100,estimate:async()=>{await blocked.promise;return {quota:2*1024**3,usage:0};}});
+      const add=signal.addEventListener.bind(signal),remove=signal.removeEventListener.bind(signal);
+      let registrations=0,reads=0,inner:EventListenerOrEventListenerObject|null=null;
+      const getter=vi.spyOn(signal,'aborted','get');
+      if(mode==='pre-aborted')getter.mockImplementation(()=>++reads>=6);
+      const addSpy=vi.spyOn(signal,'addEventListener').mockImplementation((type,listener,options)=>{
+        if(type==='abort'&&++registrations===2){
+          inner=listener;add(type,listener,options);
+          if(mode==='silent-abort'||mode==='silent-abort-on-throw')getter.mockReturnValue(true);
+          if(mode==='getter-error')getter.mockImplementation(()=>{throw error;});
+          if(mode==='abort-then-getter-error')getter.mockImplementation(()=>{controller.abort();throw error;});
+          if(mode==='silent-abort-on-throw')throw Error('registration failed');
+          return;
+        }
+        add(type,listener,options);
+      });
+      try{
+        const pending=stage.beginRecoverable(frameRecords([],128).manifest,guard,createMaterialImportCapability(),{...request,signal});
+        if(mode==='getter-error')await expect(pending).rejects.toBe(error);
+        else await expect(pending).rejects.toThrow('cancelled');
+        expect(await stage.sessions.count()).toBe(0);
+      }finally{blocked.resolve();if(inner)remove('abort',inner);addSpy.mockRestore();getter.mockRestore();}
+    },
+  );
   it('bounds stalled estimators and falls back after timeout',async()=>{
     const blocked=deferred(),estimate=vi.fn(()=>blocked.promise.then(()=>({quota:2*1024**3,usage:0})));
     try{
@@ -1992,5 +2074,74 @@ describe('dynamic staging capacity',()=>{
       expect(estimate).toHaveBeenCalledTimes(1);
       blocked.resolve();await Promise.resolve();await Promise.resolve();
     } finally{blocked.resolve();}
+  });
+});
+
+describe('guarded stage transactions with exceptional signal cleanup',()=>{
+  it.each(['before','after'] as const)('commits seal when signal removal throws %s native removal',async mode=>{
+    const target=instance(),{token}=await upload(target.stage,[]),controller=new AbortController();
+    const native=controller.signal.removeEventListener.bind(controller.signal),failure=Error('signal removal failed');
+    const remove=vi.spyOn(controller.signal,'removeEventListener').mockImplementation((type,listener,options)=>{if(mode==='after')native(type,listener,options);throw failure;});
+    try {
+      await expect(target.stage.seal(token,{signal:controller.signal})).resolves.toBeUndefined();
+      expect(await target.stage.sessions.get(token.id)).toMatchObject({phase:'sealed'});
+      controller.abort();expect(await target.stage.sessions.get(token.id)).toMatchObject({phase:'sealed'});
+    } finally {remove.mockRestore();}
+  });
+  it.each(['before','after'] as const)('preserves incomplete-transfer failure when signal removal throws %s native removal',async mode=>{
+    const target=instance(),record=await material(`guard-signal-${mode}`),input=frameRecords([record],opts.frameBytes);
+    const token=await target.stage.begin(input.manifest,{generation:0,capturedAt:100}),controller=new AbortController();
+    const native=controller.signal.removeEventListener.bind(controller.signal),failure=Error('signal removal failed');
+    const remove=vi.spyOn(controller.signal,'removeEventListener').mockImplementation((type,listener,options)=>{if(mode==='after')native(type,listener,options);throw failure;});
+    try {
+      await expect(target.stage.seal(token,{signal:controller.signal})).rejects.toThrow('incomplete transfer');
+      expect(await target.stage.sessions.get(token.id)).toMatchObject({phase:'open',nextSeq:0});
+    } finally {remove.mockRestore();}
+  });
+  it.each(['before','after'] as const)('rolls back cancellation when signal removal throws %s native removal',async mode=>{
+    const target=instance(),record=await material(`guard-cancel-${mode}`),{token}=await upload(target.stage,[record]);
+    const controller=new AbortController(),native=controller.signal.removeEventListener.bind(controller.signal);
+    const remove=vi.spyOn(controller.signal,'removeEventListener').mockImplementation((type,listener,options)=>{if(mode==='after')native(type,listener,options);throw Error('signal removal failed');});
+    const progress=vi.fn(()=>controller.abort());
+    try {
+      await expect(target.stage.seal(token,{signal:controller.signal,onProgress:progress})).rejects.toThrow('cancelled');
+      expect(progress).toHaveBeenCalled();
+      expect(await target.stage.sessions.get(token.id)).toMatchObject({phase:'open'});
+    } finally {remove.mockRestore();}
+    await vi.waitFor(async()=>expect(await target.stage.seal(token)).toBeUndefined());
+    expect(await target.stage.sessions.get(token.id)).toMatchObject({phase:'sealed'});
+  });
+});
+
+describe('guard transaction registration failures',()=>{
+  it.each(['normal','throw-after'] as const)('cleans an abort listener and rolls back when registration throws and removal is %s',async mode=>{
+    const target=instance(),{token}=await upload(target.stage,[]),controller=new AbortController();
+    const nativeAdd=controller.signal.addEventListener.bind(controller.signal),nativeRemove=controller.signal.removeEventListener.bind(controller.signal);
+    const failure=Error('signal registration failed');let guardedListener:EventListenerOrEventListenerObject|null=null,callbacks=0;
+    let wrapped:EventListener|null=null,queued:PromiseLike<unknown>|undefined;
+    const add=vi.spyOn(controller.signal,'addEventListener').mockImplementation((type,listener,options)=>{
+      if(Dexie.currentTransaction){
+        guardedListener=listener;
+        wrapped=event=>{callbacks++;if(typeof listener==='function')listener.call(controller.signal,event);else listener.handleEvent(event);};
+        nativeAdd(type,wrapped,options);
+        queued=target.stage.sessions.update(token.id,{phase:'sealed'});void Promise.resolve(queued).catch(()=>{});
+        throw failure;
+      }
+      nativeAdd(type,listener,options);
+    });
+    const remove=vi.spyOn(controller.signal,'removeEventListener').mockImplementation((type,listener,options)=>{
+      nativeRemove(type,listener===guardedListener&&wrapped?wrapped:listener,options);
+      if(listener===guardedListener&&mode==='throw-after')throw Error('signal removal failed');
+    });
+    try {
+      await expect(target.stage.seal(token,{signal:controller.signal})).rejects.toBe(failure);
+      expect(guardedListener).not.toBeNull();
+      await Promise.allSettled(queued?[queued]:[]);
+      expect(await target.stage.sessions.get(token.id)).toMatchObject({phase:'open'});
+      expect(remove.mock.calls.some(([,listener])=>listener===guardedListener)).toBe(true);
+      controller.abort();expect(callbacks).toBe(0);
+    } finally {add.mockRestore();remove.mockRestore();}
+    await expect(target.stage.seal(token)).resolves.toBeUndefined();
+    expect(await target.stage.sessions.get(token.id)).toMatchObject({phase:'sealed'});
   });
 });

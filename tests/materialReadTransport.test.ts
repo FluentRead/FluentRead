@@ -1,5 +1,5 @@
 import {describe, expect, it, vi} from 'vitest';
-import {MATERIAL_READ_FRAME_BYTES, MATERIAL_READ_MESSAGE_BYTES, addMaterialReadCount, receiveMaterialRead, sendMaterialRead, type MaterialReadPort} from '@/src/features/vocabulary/materialReadTransport';
+import {MATERIAL_READ_FRAME_BYTES, MATERIAL_READ_MESSAGE_BYTES, addMaterialReadCount, receiveMaterialRead, sendMaterialRead, startMaterialRead, type MaterialReadPort} from '@/src/features/vocabulary/materialReadTransport';
 
 function pair() {
   type Listener=(value:unknown)=>void;
@@ -30,6 +30,15 @@ describe('material read transport',()=>{
     expect(sent[0]).toHaveLength(5);expect(sent[1]).toHaveLength(5);
     for(const message of sent[0])expect(JSON.stringify(message).length).toBeLessThanOrEqual(MATERIAL_READ_MESSAGE_BYTES);
     expect(states.every(s=>s.messages.size===0&&s.disconnects.size===0)).toBe(true);
+  });
+  it('closes a successful receiver and releases its listeners',async()=>{
+    const {ports,states}=pair(), input=bytes(32), output:Uint8Array[]=[];
+    const receiver=startMaterialRead(ports[1],chunk=>{output.push(chunk);});
+    expect(()=>receiver.assertOpen()).not.toThrow();
+    await Promise.all([sendMaterialRead(ports[0],chunks(input)),receiver.result]);
+    expect(Buffer.concat(output.map(chunk=>Buffer.from(chunk)))).toEqual(Buffer.from(input));
+    expect(()=>receiver.assertOpen()).toThrow('Material read disconnected');
+    expect(states.every(state=>state.messages.size===0&&state.disconnects.size===0)).toBe(true);
   });
   it('coalesces small chunks without changing byte order or exceeding the frame limit',async()=>{
     const {ports,sent}=pair(), result:Uint8Array[]=[];

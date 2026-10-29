@@ -254,51 +254,38 @@ describe('trusted material page bridge',()=>{
         expect(messages.some(value=>value.type==='complete')).toBe(false);
         expect(server.sent.every(value=>JSON.stringify(value).length<=40*1024)).toBe(true);bridge.dispose();
     });
-    it.each(['page','detail','topics'] as const)('does not complete a %s transfer after its session is closed',async operation=>{
-        const {bridge,items}=fixture(operation==='topics'?4:1);
-        items[0].title='x'.repeat(80_000);
-        items[0].references=Array.from({length:24},(_,i)=>({kind:'note',id:String(i),note:'n'.repeat(12_000)}));
-        if(operation==='topics')for(let index=0;index<items.length;index++)
-            items[index].topics=Array.from({length:25},(_,n)=>`${'汉'.repeat(78)}${String(index*25+n).padStart(2,'0')}`);
-        const token=header(await transfer(bridge,start())).capability!;await tick();
-        const [server,client]=pair();bridge.connect(server);const chunks:Uint8Array[]=[];
-        let closing:Promise<MaterialPageMessage[]>|undefined;
-        const read=receiveMaterialRead(client as MaterialReadPort,async bytes=>{
-            chunks.push(bytes);
-            if(!closing){closing=transfer(bridge,close(token));await tick();}
-        });
-        client.postMessage(operation==='page'?page(token,0):operation==='detail'?detail(token,'00',0):topics(token,0));
-        await read;expect(await closing).toEqual([{type:'closed'}]);
-        const output=new TextDecoder().decode(Uint8Array.from(chunks.flatMap(chunk=>[...chunk])));
-        const messages:MaterialPageMessage[]=output.trim().split('\n').map(line=>JSON.parse(line));
-        expect(messages.at(-1)).toEqual({type:'error',code:'stale-operation'});
-        expect(messages.some(value=>value.type==='complete')).toBe(false);
-        expect(await transfer(bridge,page(token,0))).toEqual([{type:'error',code:'stale-operation'}]);
-        await bridge.dispose();
-    });
-    it.each(['page','detail','topics'] as const)('stops serializing remaining %s entries when the session closes mid-frame',async operation=>{
-        const {bridge,items}=fixture(operation==='topics'?4:2);
-        if(operation==='page')items[0].title='x'.repeat(80_000);
-        else if(operation==='detail')items[0].references=Array.from({length:24},(_,i)=>({kind:'note',id:String(i),note:'n'.repeat(12_000)}));
-        else for(let index=0;index<items.length;index++)items[index].topics=Array.from({length:30},(_,n)=>`${'汉'.repeat(77)}${String(index*30+n).padStart(3,'0')}`);
-        const token=header(await transfer(bridge,start())).capability!;await tick();
-        const [server,client]=pair();bridge.connect(server);const chunks:Uint8Array[]=[];
-        let closing:Promise<MaterialPageMessage[]>|undefined;
-        const reading=receiveMaterialRead(client as MaterialReadPort,async chunk=>{
-            chunks.push(chunk);
-            if(!closing){closing=transfer(bridge,close(token));await tick();}
-        });
-        client.postMessage(operation==='page'?page(token,0):operation==='detail'?detail(token,'00',0):topics(token,0));
-        await reading;expect(await closing).toEqual([{type:'closed'}]);
-        const output=new TextDecoder().decode(Uint8Array.from(chunks.flatMap(chunk=>[...chunk])));
-        const messages:MaterialPageMessage[]=output.trim().split('\n').map(line=>JSON.parse(line));
-        if(operation==='topics'){
-            const sent=messages.filter(message=>message.type==='topic').length;
-            expect(sent).toBeGreaterThan(0);expect(sent).toBeLessThan(100);
-        }
-        expect(messages.at(-1)).toEqual({type:'error',code:'stale-operation'});
-        expect(messages.some(message=>message.type==='complete')).toBe(false);
-        await bridge.dispose();
+    it.each(['page-single','page-many','detail-metadata','detail-reference','topics-exact','topics-over'] as const)('stops and does not complete %s transfer after its session closes',async scenario=>{
+        const operation=scenario.startsWith('page')?'page':scenario.startsWith('detail')?'detail':'topics';
+        const {bridge,items}=fixture(operation==='topics'?4:scenario==='page-single'||scenario==='detail-metadata'?1:2);
+        try {
+            if(operation==='page'||scenario==='detail-metadata'||scenario==='topics-exact')items[0].title='x'.repeat(80_000);
+            if(scenario==='page-single'||operation==='detail'||scenario==='topics-exact')
+                items[0].references=Array.from({length:24},(_,i)=>({kind:'note',id:String(i),note:'n'.repeat(12_000)}));
+            if(operation==='topics')for(let index=0;index<items.length;index++){
+                const perItem=scenario==='topics-exact'?25:30, digits=perItem===25?2:3;
+                items[index].topics=Array.from({length:perItem},(_,n)=>`${'汉'.repeat(80-digits)}${String(index*perItem+n).padStart(digits,'0')}`);
+            }
+            const token=header(await transfer(bridge,start())).capability!;await tick();
+            const [server,client]=pair();bridge.connect(server);const chunks:Uint8Array[]=[];
+            let closing:Promise<MaterialPageMessage[]>|undefined;
+            const read=receiveMaterialRead(client as MaterialReadPort,async bytes=>{
+                chunks.push(bytes);
+                if(!closing){closing=transfer(bridge,close(token));await tick();}
+            });
+            client.postMessage(operation==='page'?page(token,0):operation==='detail'?detail(token,'00',0):topics(token,0));
+            await read;expect(await closing).toEqual([{type:'closed'}]);
+            const output=new TextDecoder().decode(Uint8Array.from(chunks.flatMap(chunk=>[...chunk])));
+            const messages:MaterialPageMessage[]=output.trim().split('\n').map(line=>JSON.parse(line));
+            const kind=operation==='page'?'summary':operation==='detail'?'reference':'topic';
+            const count=messages.filter(message=>message.type===kind).length;
+            if(scenario==='page-many')expect(count).toBeLessThan(2);
+            if(scenario==='detail-metadata')expect(count).toBeLessThan(24);
+            if(scenario==='detail-reference'){expect(count).toBeGreaterThan(0);expect(count).toBeLessThan(24);}
+            if(operation==='topics'){expect(count).toBeGreaterThan(0);expect(count).toBeLessThan(100);}
+            expect(messages.at(-1)).toEqual({type:'error',code:'stale-operation'});
+            expect(messages.some(message=>message.type==='complete')).toBe(false);
+            expect(await transfer(bridge,page(token,0))).toEqual([{type:'error',code:'stale-operation'}]);
+        } finally {await bridge.dispose();}
     });
     it.each(['page','detail','topics'] as const)('waits for the final %s revision check after session closure',async operation=>{
         const {bridge,repo,items}=fixture(1);items[0].topics=['alpha'];

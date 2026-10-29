@@ -109,6 +109,16 @@ beforeEach(() => {
 afterEach(() => { vi.useRealTimers(); vi.unstubAllGlobals(); vi.restoreAllMocks(); });
 
 describe('Offscreen 图片完整操作生命周期', () => {
+    it('漫画绘制拒绝后不编码或返回部分图块，并释放原图与画布',async()=>{
+        const error=new Error('漫画透明图案遮挡译文区域，已保留原图');
+        mocks.mangaRecognize.mockResolvedValueOnce(lines);
+        mocks.repair.mockImplementationOnce(async pixels=>pixels);
+        mocks.mangaDraw.mockImplementationOnce(()=>{throw error;});
+        await expect(translateImageInOffscreen('manga','en','Page',undefined,'manga-flow-failed',true)).rejects.toBe(error);
+        expect(mocks.mangaDraw).toHaveBeenCalledOnce();expect(mocks.encode).not.toHaveBeenCalled();
+        expect(canvases).toHaveLength(1);expect(canvases.every(canvas=>canvas.width===0&&canvas.height===0)).toBe(true);
+        expect(images).toHaveLength(1);expect(images[0].src).toBe('');
+    });
     it.each(['ru-RU', 'ko'])('漫画 %s 采用已有 Tesseract，清字、排版和局部结果仍使用漫画链路', async sourceLanguage => {
         if (sourceLanguage === 'ko') imageOptions.push({naturalWidth: 0, naturalHeight: 0});
         const controller = new AbortController();

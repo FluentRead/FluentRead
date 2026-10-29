@@ -1,0 +1,241 @@
+{
+  "schema": 2,
+  "baseCommit": "759608d6fd6e74c7e84f75cb1c52d750fe2835e4",
+  "sourceSha256": {
+    "mangaTextFlow.ts": "e9d8bee4d120cc5893f16c7617e0a582fc7abbe44a4a233a7a17731fc287c764",
+    "mangaGlyphRaster.ts": "17dea7f13caf1f01db77ff09813233bfc99cabb2e1535e06bedcd94f7e414970",
+    "mangaRendering.ts": "7791e481e663d9909159956376fb618755a0b5aed313085a3e24c499b733a56a"
+  },
+  "native": {
+    "nativeExitCode": 0,
+    "reportSha256": "0fe35e1db313feb3e227db7aa3f5a7137da05207692371e1de18fe66d56b475a",
+    "freezeSha256": "5faf6d4de0ed4688fc03723fac3242042aa3009fd5b0431da45c4a17f8d74de7",
+    "requirements": {
+      "original20": {
+        "total": 20,
+        "accepted": 14,
+        "fallback": 6,
+        "unmet": []
+      },
+      "extra18": {
+        "total": 18,
+        "unmet": []
+      },
+      "extraPunctuation2": [
+        {
+          "name": "space-before-close-cjk-cross-span",
+          "accepted": true,
+          "requirementMet": true
+        },
+        {
+          "name": "space-after-open-cjk-cross-span",
+          "accepted": true,
+          "requirementMet": true
+        }
+      ]
+    },
+    "pngReceiptsVerified": 84,
+    "actualRenderer": {
+      "completeText": true,
+      "fontMatches": true,
+      "literalFontSerializationMatches": false,
+      "expectedFonts": [
+        24.884641113281248,
+        23.968125
+      ],
+      "bitmapDraws": [
+        {
+          "x": 234,
+          "y": 218,
+          "integer": true,
+          "extraArguments": 0
+        },
+        {
+          "x": 235,
+          "y": 328,
+          "integer": true,
+          "extraArguments": 0
+        }
+      ],
+      "glyphAudits": [
+        {
+          "safe": true,
+          "inkPixels": 6776,
+          "protectedInkPixels": 0,
+          "outsideBboxInkPixels": 0,
+          "clippedUnclippedChannelMismatches": 0
+        },
+        {
+          "safe": true,
+          "inkPixels": 6316,
+          "protectedInkPixels": 0,
+          "outsideBboxInkPixels": 0,
+          "clippedUnclippedChannelMismatches": 0
+        }
+      ],
+      "pixels": 216,
+      "channelMismatches": 0,
+      "productionCost": {
+        "canvases": 4,
+        "readbacks": 4,
+        "canvasPixels": 70258,
+        "readbackPixels": 70258,
+        "timingsMsWithObservationAndEncoding": 6.699999988079071,
+        "evidencePngEncodingMs": 1.4000000059604645
+      }
+    },
+    "samePngAsIndependentComposition": true,
+    "ordinaryThreeWayNativeRgbaDifference": 0,
+    "ordinaryExtraGlyphCanvas": 0,
+    "runtimeArrayCounts": {
+      "console": 0,
+      "exceptions": 0,
+      "pageErrors": 0,
+      "requestFailures": 0,
+      "blockedNonlocal": 0,
+      "requests": 8,
+      "focusEvents": 0,
+      "focusObserverErrors": 0
+    },
+    "browserClosed": true,
+    "profileRemoved": true,
+    "allPageLedgerLivePixelsZero": true,
+    "scope": "Historical frozen5a793 direct native Canvas/glyph/render behavior. The current hole-filter source was verified by recorded native-pixel replay and targeted tests, not a new40-case browser run.",
+    "frozenCommit": "5a7933214c09c5af3cec205d6e8a8e569a026433",
+    "sourceSha256": {
+      "mangaTextFlow.ts": "e9d8bee4d120cc5893f16c7617e0a582fc7abbe44a4a233a7a17731fc287c764",
+      "mangaGlyphRaster.ts": "d066e165863fbeeddd456711890daefa6e48b9d8288a7e1d0945718c1d3ef8a5",
+      "mangaRendering.ts": "7791e481e663d9909159956376fb618755a0b5aed313085a3e24c499b733a56a"
+    }
+  },
+  "evidenceDirectory": "workspace-data/evidence/image-manga-quality-1068-20261025/iteration-v15/production-glyph-port",
+  "limits": [
+    "No new model download or model forward in this native test.",
+    "No real translation provider or linguistic accuracy evaluation.",
+    "Canvas timings include passive observations and PNG exports; no product speed or competitor superiority claim.",
+    "Native RGBA compares against the same browser-decoded source, not raw PNG channel values.",
+    "Color/whitespace/paragraph/Atlas quality findings from earlier matrices remain separate."
+  ],
+  "historicalValidationBeforeHoleFilter": {
+    "affectedBeforePunctuationFix": {
+      "files": 133,
+      "tests": 7298,
+      "passed": true,
+      "flowSourceSha256": "3135c7470e19d4d95e52f11e6c5bc6c525a9bf5c697a2cfe359d5390e6fcaa0b"
+    },
+    "finalTargeted": {
+      "files": 5,
+      "tests": 172,
+      "passed": true,
+      "statements": 100,
+      "branches": 100,
+      "functions": 100,
+      "lines": 100
+    },
+    "testTypeFix": {
+      "runtimeJavascriptUnchanged": true,
+      "testSha256": "5da527acea710fb0cb9da5c1cb94489db65b92229dc87a70a59cffeb97f18452"
+    },
+    "compile": true,
+    "chromeBuild": true,
+    "firefoxBuild": true,
+    "manifestVerification": true,
+    "testAudit": true,
+    "docsBuild": true
+  },
+  "validation": {
+    "finalTargeted": {
+      "files": 5,
+      "tests": 183,
+      "passed": true,
+      "statements": 100,
+      "branches": 100,
+      "functions": 100,
+      "lines": 100
+    },
+    "testTypeFix": {
+      "testSha256": "afbb2450cef0aab5998ec14da2026d1d0385897c30b15798ecf1a7ee28a2027f",
+      "runtimeJavascriptUnchanged": true,
+      "originalCompileFailurePreserved": true
+    },
+    "compile": true,
+    "chromeBuild": true,
+    "firefoxBuild": true,
+    "manifestVerification": true,
+    "testAudit": true,
+    "docsBuildLog": "iteration-v16/glyph-flow-hole-filter-docs-final.log"
+  },
+  "holeFilterFollowup": {
+    "scope": "Filter against full readback domain including guard; original draw and clip hole list unchanged. Equivalence is limited to internally constructed ordinary stable numeric rectangles, not arbitrary descriptor/get-inconsistent Proxy objects.",
+    "budget": "Each prefilter hole and pixel-hole comparison charges the unchanged shared page8,388,608 counter; no refund. Tight budgets may fall back earlier. Descriptors and a reference list add temporary allocations.",
+    "frozenNativeGlyphCopies": 64,
+    "distinctGeneratedScenes": 0,
+    "before": {
+      "safe": 19,
+      "budget": 45,
+      "checks": 8388608
+    },
+    "after": {
+      "safe": 64,
+      "budget": 0,
+      "checks": 437760,
+      "prefilterChecks": 4096
+    },
+    "independentPureControls": 41,
+    "seededGeometryComparisons": 1200,
+    "newBrowserRuns": 0,
+    "newModelRuns": 0,
+    "fullPageTypographyMeasured": false,
+    "endToEndLatencyMeasured": false
+  },
+  "followupEvidence": {
+    "iteration-v16/glyph-flow-hole-filter-chrome.log": {
+      "bytes": 92033,
+      "sha256": "040755ecb3a90d2b9f186a70099bff951a12cdda985a7a6c42bdc62ecf0972b0"
+    },
+    "iteration-v16/glyph-flow-hole-filter-firefox.log": {
+      "bytes": 92620,
+      "sha256": "5eab195ce223620493b752953a59ca23ff0c8743bab79f4fd411e7b0b870b546"
+    },
+    "iteration-v16/glyph-flow-hole-filter-compile.log": {
+      "bytes": 855,
+      "sha256": "a837ebc5b054f027e020da1858ab1d7e16b8a618140c2e438d6f1fd6e7d0c9ac"
+    },
+    "iteration-v16/glyph-flow-hole-filter-compile-final.log": {
+      "bytes": 276,
+      "sha256": "e26514aa02099cdf45096d31639c857318168c18dd39d7ccf2c9837fca2ffa50"
+    },
+    "iteration-v16/glyph-flow-hole-filter-manifests.log": {
+      "bytes": 1282,
+      "sha256": "2ae7541bf47cc2f898ad4a6173cbafabe244d4052258b8e20835dcdf8df9f46c"
+    },
+    "iteration-v16/glyph-flow-hole-filter-audit-final.log": {
+      "bytes": 330,
+      "sha256": "cc47ded08cf4d5a2634a07e19d79962519e2823f8309c9731350202f814b8e23"
+    },
+    "iteration-v16/glyph-flow-hole-filter-implementation/source-freeze.json": {
+      "bytes": 2960,
+      "sha256": "3d767182d5136d0a56c0062d63672ab8277830721746d9f9eba48d23f3c5ff14"
+    },
+    "iteration-v16/glyph-flow-hole-filter-implementation/targeted.log": {
+      "bytes": 1646,
+      "sha256": "04e3d0a60babbd34178c57d8d419c1c9c10d0844fa62c0f66634531b2dcf1217"
+    },
+    "iteration-v16/glyph-flow-hole-filter-implementation/coverage/coverage-summary.json": {
+      "bytes": 1475,
+      "sha256": "e9b7eb916d5b4841def0c1315ec2ccf08a0c66c88bedf99853f05abdd33a0f82"
+    },
+    "iteration-v16/glyph-flow-hole-filter-implementation/type-fix-equivalence.json": {
+      "bytes": 446,
+      "sha256": "81e2bfaac9a0f3539b5d0a60b35990a667c0324f5bd1917bfe5826b0c7809538"
+    },
+    "iteration-v16/glyph-flow-hole-filter-independent-review/review.json": {
+      "bytes": 5643,
+      "sha256": "e7cd31cb762845e6ce6d117940fe2b55b312f4942d4da9f66d401a9fc16fc4af"
+    },
+    "iteration-v16/glyph-flow-hole-filter-independent-review/exotic-metadata-boundary.json": {
+      "bytes": 880,
+      "sha256": "44176b9415221711ef19fb102e3805b5d0b00f14162b55b75349156a0042d96b"
+    }
+  }
+}

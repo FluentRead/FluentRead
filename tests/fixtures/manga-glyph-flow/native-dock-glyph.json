@@ -1,0 +1,27 @@
+{
+  "description": "Frozen native Edge glyph raster from PR1115 acceptance, decoded PNG bytes only; no font/model/browser execution in replay.",
+  "sourceHead": "5a7933214c09c5af3cec205d6e8a8e569a026433",
+  "originalPngSha256": "7e526dc20330e286b0201919659de6d55f29f6d60018892ba875e8434ec55e10",
+  "originalPngFile": "cases-dock-1-fixed-edge-size-native-Edge-attempt0-glyphPng.png",
+  "width": 428,
+  "height": 44,
+  "x": 234,
+  "y": 218,
+  "box": {
+    "x0": 242,
+    "y0": 226,
+    "x1": 654,
+    "y1": 254
+  },
+  "hole": {
+    "x0": 327,
+    "y0": 232,
+    "x1": 333,
+    "y1": 250,
+    "alpha": 0
+  },
+  "inkPixels": 6776,
+  "rgbaSha256": "13d80790c002ece321d2e2c0f719b1849df70512e9a752824137b7d63b65025d",
+  "gzipSha256": "6a735ca31f8c2bd0ab7cb65150868d685afdae5616c1345260b680b6acc0d5c1",
+  "provenance": "iteration-v15/production-glyph-port/native-first/report.json, cases[0].attempts[0]; original report and image retained unchanged."
+}

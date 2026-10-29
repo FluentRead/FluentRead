@@ -67,6 +67,18 @@ describe('material backup save targets', () => {
         expect(remove.mock.calls[0][0]).toBe('abort');
         controller.abort();
     });
+    it('cleans a late target once when cancellation reenters listener registration',async()=>{
+        const controller=new AbortController(),pending=deferred<MaterialBackupSaveTarget>();
+        const add=controller.signal.addEventListener.bind(controller.signal);
+        const registration=vi.spyOn(controller.signal,'addEventListener').mockImplementation((type,listener,options)=>{
+            add(type,listener,options);controller.abort();
+        });
+        const abort=vi.fn(async()=>{}),target:MaterialBackupSaveTarget={write:async()=>{},commit:async()=> 'saved',abort};
+        try {
+            await expect(waitForMaterialBackupTarget(pending.promise,controller.signal)).rejects.toMatchObject({name:'AbortError'});
+            pending.resolve(target);await vi.waitFor(()=>expect(abort).toHaveBeenCalledOnce());
+        } finally {registration.mockRestore();}
+    });
     it('keeps an observed write failure when the receiver later reports cancellation',async()=>{
         const controller=new AbortController(),failure=Error('disk write failed');
         const target:MaterialBackupSaveTarget={write:vi.fn(async()=>{throw failure;}),commit:vi.fn(async()=> 'saved' as const),abort:vi.fn(async()=>{})};

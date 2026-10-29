@@ -223,6 +223,7 @@
   "备份已下载，但临时文件未清理。确认没有下载进行后重载当前页面以释放占用，再在临时文件列表处理。": "La copia se descargó, pero queda el archivo temporal. Cuando no haya descargas en curso, recarga esta página para liberarlo y gestiónalo en la lista de archivos temporales.",
   "备份未完成，临时文件清理失败。确认没有下载进行后重载当前页面以释放占用，再在临时文件列表处理。": "La copia no terminó y no se pudo limpiar el archivo temporal. Cuando no haya descargas en curso, recarga esta página para liberarlo y gestiónalo en la lista de archivos temporales.",
   "备份未完成且无法清理已选择的文件，请检查保存位置是否留有不完整文件。": "La copia no terminó y no se pudo limpiar el archivo seleccionado. Comprueba si quedó un archivo incompleto en el destino.",
+  "材料备份未完成，清理失败，请检查保存位置是否存在不完整文件": "La copia de seguridad de materiales no se completó y falló la limpieza. Comprueba si quedó un archivo incompleto en el destino.",
   "关闭保存结果提示": "Cerrar resultado de guardado",
   "已发起备份下载，临时文件仍保留；请确认下载完成后再处理。": "Se inició la descarga de la copia. El archivo temporal se conserva; confirma que terminó antes de gestionarlo.",
   "材料备份已保存，包含来源、原句与个人笔记，请妥善保管。": "La copia de materiales se guardó. Contiene fuentes, citas y notas personales; consérvala de forma segura.",

@@ -99,6 +99,16 @@ describe('学习材料旧模板本地化', () => {
         }
     });
 
+    it('备份清理失败提示在六种界面语言中都有译文', () => {
+        const message = '材料备份未完成，清理失败，请检查保存位置是否存在不完整文件';
+        expect(readFileSync('src/features/vocabulary/ui/MaterialWorkspace.vue', 'utf8')).toContain(`'${message}'`);
+        for (const language of languages) {
+            const translated = translateLegacyText(message, language);
+            expect(translated, language).toBe((learningMaterialLegacyText[language] as Readonly<Record<string, string>>)[message]);
+            expect(translated, language).not.toBe(message);
+        }
+    });
+
     it('数量、页码、时间和导入汇总使用真实参数，不固定扫描器的数字占位', () => {
         for (const language of languages) {
             for (const count of [0, 1, 12, 125]) {

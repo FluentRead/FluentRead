@@ -265,5 +265,14 @@
   "这份材料已不存在。": "Cette ressource n’existe plus.",
   "材料分页数据无效，请重试。": "Données de page de ressources invalides. Réessayez.",
   "材料分页数据过大，请重试。": "Les données de page de ressources sont trop volumineuses. Réessayez.",
-  "无痕窗口不读取学习材料。": "Les ressources d’apprentissage ne peuvent pas être lues dans une fenêtre privée."
+  "无痕窗口不读取学习材料。": "Les ressources d’apprentissage ne peuvent pas être lues dans une fenêtre privée.",
+  "材料在导出期间已发生变化，请重试": "Les ressources ont changé pendant l’exportation. Réessayez",
+  "材料备份导出失败，请重试": "Impossible d’exporter la sauvegarde des ressources. Réessayez",
+  "材料备份统计无效": "Statistiques de sauvegarde des ressources invalides",
+  "材料备份传输包含多余数据": "Le transfert de la sauvegarde contient des données supplémentaires",
+  "材料备份传输不完整": "Le transfert de la sauvegarde est incomplet",
+  "材料备份传输格式无效": "Format de transfert de sauvegarde invalide",
+  "材料备份分片长度无效": "Longueur de fragment de sauvegarde invalide",
+  "材料备份过大": "La sauvegarde des ressources est trop volumineuse",
+  "材料备份错误代码无效": "Code d’erreur de sauvegarde invalide"
 }

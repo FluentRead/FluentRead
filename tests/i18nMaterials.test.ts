@@ -10,6 +10,7 @@ import {translateLegacyText} from '@/src/core/i18n';
 import {registerAllUiLanguageBundles} from './helpers/uiLanguageBundles';
 import {learningMaterialLegacyText} from '@/src/core/i18n/messages/learningMaterials';
 import {createUiI18nPlugin} from '@/src/ui/i18n';
+import {MaterialBackupExportError} from '@/src/features/vocabulary/materialBackupExportClient';
 
 vi.mock('@/src/services/config/store', () => ({
     config: {uiLanguage: 'en-US'}, configReady: Promise.resolve(), getConfigRevision: () => 0,
@@ -81,6 +82,23 @@ describe('学习材料旧模板本地化', () => {
         }
     });
 
+    it('备份导出的公开错误和传输诊断均有六种译文', () => {
+        const messages = [
+            '材料在导出期间已发生变化，请重试', '材料备份导出失败，请重试', '材料备份统计无效',
+            '材料备份传输包含多余数据', '材料备份传输不完整', '材料备份传输格式无效',
+            '材料备份分片长度无效', '材料备份过大', '材料备份错误代码无效',
+        ];
+        const source = readFileSync('src/features/vocabulary/materialBackupExportClient.ts', 'utf8');
+        for (const message of messages) {
+            expect(source).toContain(`'${message}'`);
+            for (const language of languages) {
+                const translated = translateLegacyText(message, language);
+                expect(translated, `${language}: ${message}`).not.toBe(message);
+                if (language !== 'ja-JP') expect(translated).not.toMatch(/[\u3400-\u9fff]/u);
+            }
+        }
+    });
+
     it('数量、页码、时间和导入汇总使用真实参数，不固定扫描器的数字占位', () => {
         for (const language of languages) {
             for (const count of [0, 1, 12, 125]) {
@@ -109,6 +127,31 @@ describe('学习材料旧模板本地化', () => {
                 expect(translateLegacyText(source, language)).toBe(source);
             }
         }
+    });
+
+    it.each([
+        ['stale-operation', 'Materials changed during export. Try again.'],
+        ['storage-error', 'Could not export the material backup. Try again.'],
+    ] as const)('实际错误提示模板在英文界面翻译导出错误 %s', async (code, expected) => {
+        const filename = 'src/features/vocabulary/ui/MaterialWorkspace.vue';
+        const {descriptor} = parse(readFileSync(filename, 'utf8'), {filename});
+        const feedback = descriptor.template!.content.match(/<p v-if="error"[\s\S]*?<\/p>/u)![0];
+        const compiled = compileTemplate({source: `<div>${feedback}</div>`, filename, id: 'material-export-feedback-i18n', compilerOptions: {mode: 'function'}});
+        expect(compiled.errors).toEqual([]);
+        const render = new Function('Vue', compiled.code)(Vue), error = new MaterialBackupExportError(code).message;
+        const html = await renderToString(Vue.h({setup: () => ({error, busy: false, reload: () => {}}), render}));
+        const {document, window} = parseHTML(`<html><body>${html}</body></html>`);
+        const root = document.body.firstElementChild as unknown as HTMLElement;
+        for (const [name, value] of Object.entries({document, Node: window.Node, MutationObserver: window.MutationObserver, NodeFilter: {SHOW_TEXT: 4}})) vi.stubGlobal(name, value);
+        let directive: any;
+        const app = {config: {globalProperties: {}}, provide: () => {}, directive: (_name: string, value: unknown) => {directive = value;}, mixin: () => {}, unmount: () => {}};
+        const plugin = createUiI18nPlugin();
+        if (typeof plugin.install !== 'function') throw new Error('UI i18n plugin must expose install');
+        try {
+            plugin.install(app as any); directive.mounted(root);
+            await vi.waitFor(() => expect(root.querySelector('[role="alert"]')?.firstChild?.textContent?.trim()).toBe(expected));
+            expect(root.querySelector('button')?.textContent).toBe('Retry');
+        } finally {app.unmount(); vi.unstubAllGlobals();}
     });
 
     it('实际材料模板与共享指令翻译位置、来源回退和问答标签，同时保留用户原文、章节和问题', async () => {

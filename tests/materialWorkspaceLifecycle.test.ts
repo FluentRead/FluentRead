@@ -996,3 +996,27 @@ it('does not export through the buffered fallback when Firefox privacy context i
   await ui.panel.exportMaterials();
   expect(ui.panel.error).toBe('请稍后重试');expect(ui.exportReceive).not.toHaveBeenCalled();expect(create).not.toHaveBeenCalled();
 });
+
+it.each(['stale-operation','storage-error'] as const)('displays the actual backup export %s error with translations',async code=>{
+  registerAllUiLanguageBundles();
+  const {MaterialBackupExportError}=await vi.importActual<typeof import('@/src/features/vocabulary/materialBackupExportClient')>('@/src/features/vocabulary/materialBackupExportClient');
+  const ui=await mount(),failure=new MaterialBackupExportError(code);
+  ui.exportReceive.mockRejectedValueOnce(failure);
+  await ui.panel.exportMaterials();
+  expect(ui.panel.error).toBe(failure.message);
+  await ui.flush();expect(ui.document.body.textContent).toContain(failure.message);
+  for(const locale of ['en-US','ja-JP','ko-KR','fr-FR','ru-RU','es-ES'] as const) {
+    const translated=translateLegacyText(ui.panel.error,locale);
+    expect(translated).not.toBe(ui.panel.error);
+    if(locale!=='ja-JP')expect(translated).not.toMatch(/[\u3400-\u9fff]/u);
+  }
+});
+
+it('displays an invalid backup transfer with a translated diagnostic',async()=>{
+  registerAllUiLanguageBundles();
+  const ui=await mount();ui.exportReceive.mockRejectedValueOnce(Error('材料备份传输不完整'));
+  await ui.panel.exportMaterials();
+  expect(ui.panel.error).toBe('材料备份传输不完整');
+  await ui.flush();expect(ui.document.body.textContent).toContain('材料备份传输不完整');
+  expect(translateLegacyText(ui.panel.error,'en-US')).toBe('The material backup transfer is incomplete');
+});

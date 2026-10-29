@@ -265,5 +265,14 @@
   "这份材料已不存在。": "This material no longer exists.",
   "材料分页数据无效，请重试。": "Invalid material page data. Try again.",
   "材料分页数据过大，请重试。": "The material page data is too large. Try again.",
-  "无痕窗口不读取学习材料。": "Learning materials cannot be read in a private window."
+  "无痕窗口不读取学习材料。": "Learning materials cannot be read in a private window.",
+  "材料在导出期间已发生变化，请重试": "Materials changed during export. Try again.",
+  "材料备份导出失败，请重试": "Could not export the material backup. Try again.",
+  "材料备份统计无效": "Invalid material backup statistics",
+  "材料备份传输包含多余数据": "The material backup transfer contains extra data",
+  "材料备份传输不完整": "The material backup transfer is incomplete",
+  "材料备份传输格式无效": "Invalid material backup transfer format",
+  "材料备份分片长度无效": "Invalid material backup chunk length",
+  "材料备份过大": "The material backup is too large",
+  "材料备份错误代码无效": "Invalid material backup error code"
 }

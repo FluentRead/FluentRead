@@ -106,6 +106,21 @@ describe('material backup export bridge',()=>{
         const {repo,bridge}=setup({ready,isPrivateContext:()=>restricted}),[server,client]=pair();bridge.connect(server);client.postMessage(start);
         await tick();restricted=true;release();await tick();expect(server.closed).toBe(true);expect(repo.openSnapshot).not.toHaveBeenCalled();await bridge.dispose();
     });
+    it('does not begin a read if privacy revalidation synchronously disposes the bridge',async()=>{
+        let checks=0,stopping:Promise<void>|undefined;
+        const {repo,bridge}=setup({isPrivateContext:()=>{if(++checks===2)stopping=bridge.dispose();return false;}});
+        const [server,client]=pair();bridge.connect(server);client.postMessage(start);
+        await tick();expect(checks).toBe(2);expect(repo.openSnapshot).not.toHaveBeenCalled();
+        expect(server.closed).toBe(true);await stopping;
+    });
+    it('releases the slot if the disconnect listener fires during registration',async()=>{
+        const {repo,bridge}=setup({maxPorts:1}),[server]=pair();
+        const register=server.onDisconnect.addListener.bind(server.onDisconnect);
+        server.onDisconnect.addListener=fn=>{register(fn);server.disconnect();};
+        bridge.connect(server);expect(server.closed).toBe(true);expect(repo.openSnapshot).not.toHaveBeenCalled();
+        expect(server.onMessage.listeners.size).toBe(0);expect(server.onDisconnect.listeners.size).toBe(0);
+        const [next]=pair();bridge.connect(next);expect(next.closed).toBe(false);await bridge.dispose();
+    });
     it('rejects untrusted and private senders without opening storage',()=>{
         const {repo,bridge}=setup();
         for(const sender of [undefined,{id:'wrong',url:'chrome-extension://abc/options.html'},

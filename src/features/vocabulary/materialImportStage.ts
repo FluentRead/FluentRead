@@ -96,9 +96,7 @@ function takeControl(name:string,kind:string,id:string|undefined,limit:number):(
   if(id&&lane.ids.has(id))throw Error('backpressure: control operation pending');
   if(lane.count>=limit)throw Error('backpressure: control receiver busy');
   lane.count++;if(id)lane.ids.add(id);
-  let released=false;
   return ()=>{
-    if(released)return;released=true;
     lane!.count--;if(id)lane!.ids.delete(id);
     if(lane!.count===0){lanes!.delete(kind);if(lanes!.size===0)controlsByDatabase.delete(name);}
   };

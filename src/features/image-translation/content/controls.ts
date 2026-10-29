@@ -1,7 +1,7 @@
 /**
  * @file src/features/image-translation/content/controls.ts
  * 文件职责：创建图片翻译的轻量操作条，支持单图反馈和不遮挡阅读的漫画模式，支持取消、重试和首次语言准备与模型/服务设置导航。
- * 主要内容：单图提供无额外外框的淡色图标入口、隔离操作条、可信手势按钮与全文详情，品牌提示沿用注入的界面本地化端口；漫画处理时在图片可见边缘延迟显示无交互的单行进度，失败时在同一边缘提供紧凑的单页重试、详情及设置入口，恢复动作先于独立滚动的长错误详情，完成或切回原图即撤下，不展开常驻阅读面板；任务旋转独立于装饰动画开关并保留系统减少动态效果偏好。
+ * 主要内容：单图提供无额外外框的淡色图标入口、隔离操作条、可信手势按钮与全文详情，品牌提示沿用注入的界面本地化端口；漫画处理时在图片可见边缘延迟显示轻量进度，暂停会话后的单页排队可取消，失败时在同一边缘提供紧凑的重试、详情及设置入口，恢复动作先于独立滚动的长错误详情，完成或切回原图即撤下，不展开常驻阅读面板；任务旋转独立于装饰动画开关并保留系统减少动态效果偏好。
  * 模块边界：仅操作所属 Shadow DOM，不读取配置、不访问网络、不持有图片请求；业务动作及生命周期由 content/runtime 注入。
  */
 import {createImageTextReader, IMAGE_READER_CSS, type ImageReaderLine} from './textReader';
@@ -49,8 +49,14 @@ export const IMAGE_CONTROLS_CSS = IMAGE_READER_CSS + `
 .fr-image-feedback .fr-image-prepare:hover,.fr-image-feedback .fr-image-model-settings:hover,.fr-image-feedback[data-preparation=false][data-recovery=false] .fluent-read-image-translation-button:hover {background:#c62752;color:#fff;}
 .fr-image-feedback .fr-image-dismiss,.fr-image-feedback[data-preparation=true] .fluent-read-image-translation-button {color:var(--fr-image-muted);}
  .fr-image-feedback[data-manga=true][data-phase=loading] {flex-direction:row;align-items:center;gap:6px;transform:none;min-width:0;padding:6px 9px;font-size:11px;pointer-events:none;animation:fr-manga-feedback .12s ease .15s both;}
+.fr-image-feedback[data-manga=true][data-warning=true] {flex-direction:row;transform:none;min-width:0;max-height:24px;padding:0;border:0;font-size:11px;pointer-events:auto;}
+.fr-image-feedback[data-warning=true] .fr-image-warning-button {min-height:24px;padding:3px 6px;white-space:nowrap;}
+.fr-image-feedback[data-manga=true][data-warning=true] .fr-image-status>span:last-child {white-space:normal;overflow-wrap:anywhere;}
 .fr-image-feedback[data-manga=true] .fr-image-status {gap:6px;min-width:0;}
 .fr-image-feedback[data-manga=true] .fr-image-status>span:last-child {overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.fr-image-feedback[data-manga=true][data-phase=loading][data-queued=true] {pointer-events:auto;}
+.fr-image-feedback[data-manga=true][data-queued=true] .fr-image-actions {padding:0;gap:0;}
+.fr-image-feedback[data-manga=true][data-queued=true] .fluent-read-image-translation-button {min-height:24px;padding:3px 7px;background:transparent;color:inherit;font-weight:500;}
 .fr-image-feedback[data-manga=true][data-phase=error] {width:280px;max-width:280px;transform:none;gap:5px;padding:8px 10px;border-color:#ffffff99;background:rgba(250,251,253,.94);box-shadow:0 2px 8px rgba(27,36,57,.08);font-size:11px;}
 .fr-image-feedback[data-manga=true][data-phase=error] .fr-image-status>span:last-child {display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;white-space:normal;min-width:0;flex:1;}
 .fr-image-feedback[data-manga=true][data-phase=error] .fr-image-actions {gap:4px;padding:0;}
@@ -66,7 +72,7 @@ export const IMAGE_CONTROLS_CSS = IMAGE_READER_CSS + `
 
 export type ImageSettingsSection = 'settings-services' | 'settings-image-translation';
 
-export function createImageControls(actions: {onAction(): void; onPrepare(): void; onDismiss?(): void; onInspect?(): void; onSettings?(section: ImageSettingsSection): void; translate?(source: string): string}) {
+export function createImageControls(actions: {onAction(): void; onPrepare(): void; onDismiss?(): void; onInspect?(): void; onSettings?(section: ImageSettingsSection): void; translate?(source: string): string; onWarning?(event: MouseEvent): void}) {
     const localize = (source: string) => actions.translate?.(source) ?? source;
     const element = document.createElement('div');
     element.className = 'fr-image-controls';
@@ -83,6 +89,8 @@ export function createImageControls(actions: {onAction(): void; onPrepare(): voi
     spinner.setAttribute('aria-hidden', 'true');
     const statusText = document.createElement('span');
     status.append(spinner, statusText);
+    const warningButton = document.createElement('button');
+    warningButton.type = 'button';warningButton.className = 'fr-image-warning-button';warningButton.hidden = true;
     const progressBar = document.createElement('div');
     progressBar.className = 'fr-image-progress';
     progressBar.setAttribute('role', 'progressbar');
@@ -152,8 +160,12 @@ export function createImageControls(actions: {onAction(): void; onPrepare(): voi
         button.title = `${brand} · ${button.title}`;
         button.setAttribute('aria-label', button.title);
         const localizedMessage = localize(sourceMessage);
-        statusText.textContent = localizedMessage + (progress === undefined ? '' : ` ${progress}%`);
-        statusText.title = phase === 'error' ? localizedMessage : '';
+        warningButton.textContent = localize('未绘制');warningButton.title = localizedMessage;
+        warningButton.setAttribute('aria-label', localizedMessage);
+        statusText.textContent = (feedback.dataset.warning === 'true' && feedback.dataset.warningAction !== 'true'
+            ? localize('已识别') : localizedMessage) + (progress === undefined ? '' : ` ${progress}%`);
+        if (feedback.dataset.warning === 'true') status.setAttribute('aria-label', localizedMessage);else status.removeAttribute('aria-label');
+        statusText.title = phase === 'error' || feedback.dataset.warning === 'true' ? localizedMessage : '';
         progressBar.setAttribute('aria-label', localize(sourceMessage));
         if (progress !== undefined) progressBar.setAttribute('aria-valuenow', String(progress));
         else progressBar.removeAttribute('aria-valuenow');
@@ -199,21 +211,26 @@ export function createImageControls(actions: {onAction(): void; onPrepare(): voi
     // 只隔离本操作条的输入，绝不在 document 注册会影响宿主快捷键/滚轮的监听器。
     element.addEventListener('click', handleClick);
     row.addEventListener('click', handleClick);
-    for (const event of ['pointerdown', 'keydown', 'keyup', 'wheel']) {
+    for (const event of ['pointerdown', 'keydown', 'keyup', 'touchstart', 'touchmove', 'touchend', 'touchcancel', 'wheel']) {
         element.addEventListener(event, isolate);
         row.addEventListener(event, isolate);
         feedback.addEventListener(event, isolate);
     }
+    const handleWarning = (event: MouseEvent) => {if (!event.isTrusted || disposed) return;event.stopPropagation();actions.onWarning?.(event);};
+    warningButton.addEventListener('click', handleWarning);
     feedback.addEventListener('click', isolate);
     row.append(button, prepare, inspect, dismiss, modelSettings, serviceSettings);
     feedback.append(heading, status, progressBar, errorDetails);
     element.append(details, row);
-    const update = (next: ImageControlPhase, message: string, options: {prepare?: boolean; animations?: boolean; progress?: number; quiet?: boolean; modelSettings?: boolean; serviceSettings?: boolean; errorDetails?: string} = {}) => {
+    const update = (next: ImageControlPhase, message: string, options: {prepare?: boolean; animations?: boolean; progress?: number; quiet?: boolean; warning?: boolean; warningAction?: boolean; queued?: boolean; modelSettings?: boolean; serviceSettings?: boolean; errorDetails?: string} = {}) => {
         phase = next;
         element.dataset.phase = next;
         button.dataset.phase = next;
         feedback.dataset.phase = next;
         feedback.dataset.manga = String(options.quiet === true);
+        feedback.dataset.queued = String(next === 'loading' && options.queued === true);
+        feedback.dataset.warning = String(next === 'translated' && options.quiet === true && options.warning === true);
+        feedback.dataset.warningAction = String(options.warningAction === true);
         heading.hidden = next !== 'error' || options.quiet === true;
         feedback.dataset.preparation = String(next === 'error' && options.prepare === true);
         element.dataset.preparation = feedback.dataset.preparation;
@@ -222,8 +239,10 @@ export function createImageControls(actions: {onAction(): void; onPrepare(): voi
         sourceMessage = message;
         progress = next === 'loading' ? normalizeImageProgress(options.progress) : undefined;
         refreshLanguage();
-        status.hidden = next === 'idle' || next === 'translated';
-        feedback.hidden = options.quiet === true ? next !== 'loading' && next !== 'error' : status.hidden;
+        warningButton.hidden = !(feedback.dataset.warning === 'true' && options.warningAction === true);
+        if (warningButton.hidden) warningButton.remove();else if (warningButton.parentElement !== feedback) feedback.append(warningButton);
+        status.hidden = next === 'idle' || (next === 'translated' && (feedback.dataset.warning !== 'true' || !warningButton.hidden));
+        feedback.hidden = options.quiet === true ? next !== 'loading' && next !== 'error' && feedback.dataset.warning !== 'true' : status.hidden;
         progressBar.hidden = options.quiet !== true || progress === undefined;
         refreshVisibility();
         modelSettings.hidden = next !== 'error' || options.modelSettings !== true;
@@ -237,7 +256,7 @@ export function createImageControls(actions: {onAction(): void; onPrepare(): voi
         feedback.dataset.animations = element.dataset.animations;
         prepare.hidden = next !== 'error' || !options.prepare;
         dismiss.hidden = next !== 'error' || options.prepare === true;
-        const feedbackOwnsActions = next === 'error';
+        const feedbackOwnsActions = next === 'error' || (next === 'loading' && options.queued === true);
         const actionsOwner = feedbackOwnsActions ? feedback : element;
         // 进度更新会频繁刷新状态；仅在状态容器变化时移动操作条，避免重挂载打断悬停与焦点。
         if (row.parentElement !== actionsOwner) actionsOwner.insertBefore(row, feedbackOwnsActions ? errorDetails : null);
@@ -266,11 +285,12 @@ export function createImageControls(actions: {onAction(): void; onPrepare(): voi
             details.removeEventListener('focusout', focusOut);
             element.removeEventListener('click', handleClick);
             row.removeEventListener('click', handleClick);
-            for (const event of ['pointerdown', 'keydown', 'keyup', 'wheel']) {
+            for (const event of ['pointerdown', 'keydown', 'keyup', 'touchstart', 'touchmove', 'touchend', 'touchcancel', 'wheel']) {
                 element.removeEventListener(event, isolate);
                 row.removeEventListener(event, isolate);
                 feedback.removeEventListener(event, isolate);
             }
+            warningButton.removeEventListener('click', handleWarning);
             feedback.removeEventListener('click', isolate);
             element.remove();
             feedback.remove();

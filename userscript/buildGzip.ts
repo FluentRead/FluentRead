@@ -34,10 +34,10 @@ export function gzipUserscriptBuildData(data: Uint8Array, filteredLevel?: 8 | 9,
     return Buffer.from(best);
 }
 
-/** 仅构建期的较大 standalone 数据使用 Zopfli；结果仍是可由现有 pako 解压的标准 gzip。 */
-export async function gzipLargeStandaloneUserscriptData(data: Uint8Array, root: string): Promise<Buffer> {
+/** 构建期按大小门槛选择 Zopfli；结果仍是可由现有 pako 解压的标准 gzip。 */
+export async function gzipLargeStandaloneUserscriptData(data: Uint8Array, root: string, minimumSize = 65_536): Promise<Buffer> {
     const baseline = gzipUserscriptBuildData(data);
-    if (data.byteLength < 65_536) return baseline;
+    if (data.byteLength < minimumSize) return baseline;
     // Zopfli 的 Emscripten 绑定会安装进程级异常监听；只在独立 worker 中载入，
     // 退出时清理整个上下文，避免影响 Vite、测试框架或其它构建插件的错误处理。
     const compact = await new Promise<Buffer>((resolveResult, reject) => {

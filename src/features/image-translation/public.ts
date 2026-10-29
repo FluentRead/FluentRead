@@ -10,7 +10,11 @@ export {
     toggleContextMenuImage,
     mountImageTranslator,
     unmountImageTranslator,
+    getMangaReadingCandidates,
+    readMangaReadingCandidate,
+    observeMangaReadingCandidate,
+    registerMangaReadingOverlayHost,
 } from './content';
 export type {MangaTranslationStatus} from './content/mangaSession';
 export {prepareImageOcrLanguages} from './services/client';
-export {isImageTranslatorNeeded, isMangaReaderPage, mountMangaEntry, unmountMangaEntry, openMangaEntry} from './content/mangaEntry';
+export {isImageTranslatorNeeded, isMangaReaderPage, mountMangaEntry, unmountMangaEntry, openMangaEntry, openMangaReading, subscribeMangaReading} from './content/mangaEntry';

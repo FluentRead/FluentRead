@@ -868,6 +868,12 @@ describe('userscript browser shim injection', () => {
             expect(committed).toBe(readFileSync(resolve(process.cwd(), path), 'utf8'));
         }
     });
+    it('keeps normal Chinese catalog compression synchronous and does not invoke standalone compression',()=>{
+        const compress=vi.fn(async()=>{throw Error('standalone compressor must not run');});
+        const plugin=createUserscriptCatalogCompressionPlugin(compress) as unknown as {resolveId:(source:string,importer:string)=>string;load:(id:string)=>string};
+        const id=plugin.resolveId('./messages/zh-CN',resolve(process.cwd(),'src/core/i18n/index.ts'));
+        expect(plugin.load(id)).toContain('export const zhCNMessages');expect(compress).not.toHaveBeenCalled();
+    });
     it('embeds the Chinese fallback catalog, minus the extension document and full-options statistics keys, as lossless static data', () => {
         const plugin = createUserscriptCatalogCompressionPlugin() as unknown as {
             resolveId: (source: string, importer: string) => string | null;
@@ -1396,17 +1402,38 @@ describe('userscript lossless Unicode character data', () => {
     };
 
     it.each([[dataPath, chineseCharacterData], [wordDataPath, functionWordData]])(
-        'roundtrips the complete standalone character data from %s', (path, expected) => {
+        'roundtrips the complete standalone character data from %s', async (path, expected) => {
             const plugin = createUserscriptCharacterDataCompressionPlugin(process.cwd(), true, true) as unknown as {
-                transform: (code: string, id: string) => {code: string} | null;
+                transform: (code: string, id: string) => Promise<{code: string}>;
             };
-            const transformed = plugin.transform(readFileSync(path, 'utf8'), path)!;
+            const transformed = await plugin.transform(readFileSync(path, 'utf8'), path);
+            const [bytes] = encodedDataBytes(transformed.code);
+            const original = gunzipSync(bytes);
+            expect(bytes.length).toBeLessThan(gzipUserscriptBuildData(original, undefined, true).length);
             vi.stubGlobal('pako', {ungzip});
             try {
                 expect(restoreExports(transformed.code, Object.keys(expected))).toEqual({...expected});
             } finally {vi.unstubAllGlobals();}
         },
     );
+
+    it('keeps compact character gzip when the candidate is larger and propagates worker failures', async () => {
+        vi.resetModules();
+        const gzipModule = await import('@/userscript/buildGzip');
+        const worker = vi.spyOn(gzipModule, 'gzipLargeStandaloneUserscriptData')
+            .mockImplementation(async data => Buffer.alloc(data.byteLength + 100));
+        try {
+            const {createUserscriptCharacterDataCompressionPlugin: create} = await import('@/userscript/characterDataPlugin');
+            const plugin = create(process.cwd(), true, true) as unknown as {transform(code: string, id: string): Promise<{code: string}>};
+            const source = 'export const sample = "AÁ";';
+            const result = await plugin.transform(source, dataPath);
+            const [bytes] = encodedDataBytes(result.code);
+            expect(Buffer.from(bytes)).toEqual(gzipUserscriptBuildData(Buffer.from(JSON.stringify([[65, 128]])), undefined, true));
+            expect(worker).toHaveBeenCalledWith(expect.any(Uint8Array), process.cwd(), 0);
+            worker.mockRejectedValueOnce(new Error('controlled character worker failure'));
+            await expect(plugin.transform(source, dataPath)).rejects.toThrow('controlled character worker failure');
+        } finally {worker.mockRestore(); vi.resetModules();}
+    });
 
     it('restores every generated Unicode character exactly before Chinese detection consumes it', () => {
         const original = readFileSync(dataPath, 'utf8');
@@ -2307,6 +2334,36 @@ describe('standalone service brand paths at actual icon use', () => {
         expect(realm.controlledHostData).toBe(hostData);
         return {api: module.exports, decoder, decode, parse, realm, hostData};
     }
+    it('compresses the complete standalone brand table without changing lazy restoration', async () => {
+        const plugin = createUserscriptServiceBrandIconsCompressionPlugin(root, true, true) as unknown as {
+            load(id: string): Promise<string>;
+        };
+        const source = await Reflect.apply(plugin.load, {addWatchFile: vi.fn()}, [helperId]);
+        const [bytes] = encodedDataBytes(source);
+        const original = Buffer.from(JSON.stringify(expected));
+        expect(gunzipSync(bytes)).toEqual(original);
+        expect(bytes.length).toBeLessThan(gzipUserscriptBuildData(original, 8, true).length);
+        const h = await loadAccessors(undefined, source);
+        expect(h.api.getServiceBrandIcon('unknown')).toBeUndefined();
+        expect(h.decoder).not.toHaveBeenCalled();
+        assertAllBrands(h.api);
+        expect(h.decoder).toHaveBeenCalledTimes(1);
+    });
+    it('keeps compact brand gzip when the candidate is larger and propagates worker failures', async () => {
+        vi.resetModules();
+        const gzipModule = await import('@/userscript/buildGzip');
+        const worker = vi.spyOn(gzipModule, 'gzipLargeStandaloneUserscriptData')
+            .mockImplementation(async data => Buffer.alloc(data.byteLength + 100));
+        try {
+            const {createUserscriptServiceBrandIconsCompressionPlugin: create} = await import('@/userscript/serviceBrandIconsPlugin');
+            const plugin = create(root, true, true) as unknown as {load(id: string): Promise<string>};
+            const [bytes] = encodedDataBytes(await Reflect.apply(plugin.load, {addWatchFile: vi.fn()}, [helperId]));
+            expect(Buffer.from(bytes)).toEqual(gzipUserscriptBuildData(Buffer.from(JSON.stringify(expected)), 8, true));
+            expect(worker).toHaveBeenCalledWith(expect.any(Uint8Array), root, 0);
+            worker.mockRejectedValueOnce(new Error('controlled brand worker failure'));
+            await expect(Reflect.apply(plugin.load, {addWatchFile: vi.fn()}, [helperId])).rejects.toThrow('controlled brand worker failure');
+        } finally {worker.mockRestore(); vi.resetModules();}
+    });
     function assertAllBrands(api: BrandApi, input: Record<string, Shape> = expected) {
         for (const [service, shape] of Object.entries(input)) {
             const restored = api.getServiceBrandIcon(service);
@@ -2718,7 +2775,7 @@ describe('userscript appearance registry data owner', () => {
             const results=Array.isArray(result)?result:[result];if(results.length!==1||!('output' in results[0])||results[0].output.length!==1||results[0].output[0].type!=='chunk')throw Error('Expected one real appearance consumer chunk');
             const chunk=results[0].output[0];expect(chunk.imports).toEqual([]);expect(chunk.dynamicImports).toEqual([]);
             const decode=vi.fn(),realm={appearanceOwner:undefined as typeof originalAppearance|undefined,atob,Uint8Array,ArrayBuffer,pako:{ungzip},__observeUserscriptDataDecode:decode};
-            runInNewContext(chunk.code,realm,{timeout:5000});expect(realm.appearanceOwner).toBeDefined();complete(realm.appearanceOwner!);expect(decode).toHaveBeenCalledTimes(enabled?2:0);
+            runInNewContext(chunk.code,realm,{timeout:5000});expect(realm.appearanceOwner).toBeDefined();complete(realm.appearanceOwner!);expect(decode).toHaveBeenCalledTimes(enabled?(standalone==='1'?1:2):0);
             expect(readFileSync(resolve(root,'public/third-party-notices/lobe-icons-MIT.txt'),'utf8')).toContain('Copyright (c) 2023 LobeHub');
         }finally{rmSync(directory,{recursive:true,force:true});vi.unstubAllEnvs();vi.resetModules();}
     }, 30_000);

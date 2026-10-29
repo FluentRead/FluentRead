@@ -28,6 +28,9 @@ export type MaterialBackupConsumer = (consume:(chunk:Uint8Array)=>Promise<void>,
 
 function cancelled():DOMException {return new DOMException('材料导出已取消','AbortError');}
 function check(signal:AbortSignal):void {if (signal.aborted) throw cancelled();}
+function removeAbortListener(signal:AbortSignal|undefined, listener:()=>void):void {
+    try {signal?.removeEventListener('abort',listener);} catch {/* Preserve the operation result. */}
+}
 
 /** 选择器或权限请求无法中断时，立即交还取消结果并清理迟到的保存目标。 */
 export function waitForMaterialBackupTarget(pending:Promise<MaterialBackupSaveTarget>,signal?:AbortSignal,onLateCleanupError?:(error:unknown)=>void):Promise<MaterialBackupSaveTarget> {
@@ -35,9 +38,8 @@ export function waitForMaterialBackupTarget(pending:Promise<MaterialBackupSaveTa
         let settled=false,abandoned=false;
         const abort=()=>{
             if(settled)return;
-            settled=true;abandoned=true;signal?.removeEventListener('abort',abort);reject(cancelled());
+            settled=true;abandoned=true;removeAbortListener(signal,abort);reject(cancelled());
         };
-        signal?.addEventListener('abort',abort,{once:true});
         void Promise.resolve(pending).then(target=>{
             if(abandoned){
                 void Promise.resolve().then(()=>target.abort()).catch(error=>{
@@ -45,12 +47,26 @@ export function waitForMaterialBackupTarget(pending:Promise<MaterialBackupSaveTa
                 });
                 return;
             }
-            settled=true;signal?.removeEventListener('abort',abort);resolve(target);
+            settled=true;removeAbortListener(signal,abort);resolve(target);
         },error=>{
             if(abandoned)return;
-            settled=true;signal?.removeEventListener('abort',abort);reject(error);
+            settled=true;removeAbortListener(signal,abort);reject(error);
         });
-        if(signal?.aborted)abort();
+        try {
+            if(signal?.aborted)abort();
+            else {
+                try {signal?.addEventListener('abort',abort,{once:true});}
+                catch(error) {
+                    let aborted=false;
+                    if(!settled)try {aborted=signal?.aborted===true;} catch {/* Preserve the first failure. */}
+                    if(aborted)abort();
+                    throw error;
+                }
+                if(!settled&&signal?.aborted)abort();
+            }
+        } catch(error) {
+            if(!settled){settled=true;abandoned=true;removeAbortListener(signal,abort);reject(error);}
+        }
     });
 }
 
@@ -101,8 +117,6 @@ export async function chooseMaterialBackupTarget(name:string, platform:MaterialB
 export async function saveMaterialBackup(target:MaterialBackupSaveTarget, receive:MaterialBackupConsumer, options:{signal?:AbortSignal} = {}):Promise<{state:MaterialBackupSaveState;bytes:number}> {
     const controller = new AbortController(), caller = options.signal;
     const abort = () => controller.abort();
-    caller?.addEventListener('abort',abort,{once:true});
-    if (caller?.aborted) abort();
     let pending:Promise<void>|undefined, failed = false, failure:unknown, bytes = 0, accepting = true;
     let writeFailedBeforeCancel = false, writeFailure:unknown;
     const reject = (error:unknown):Promise<void> => {
@@ -125,6 +139,18 @@ export async function saveMaterialBackup(target:MaterialBackupSaveTarget, receiv
         return work;
     };
     try {
+        if(caller?.aborted)abort();
+        else {
+            try {caller?.addEventListener('abort',abort,{once:true});}
+            catch(error) {
+                let aborted=controller.signal.aborted;
+                if(!aborted)try {aborted=caller?.aborted===true;} catch {/* Preserve the first failure. */}
+                if(aborted)throw cancelled();
+                throw error;
+            }
+            check(controller.signal);
+            if(caller?.aborted)abort();
+        }
         check(controller.signal);
         await receive(consume,controller.signal);
         accepting = false;
@@ -147,5 +173,5 @@ export async function saveMaterialBackup(target:MaterialBackupSaveTarget, receiv
         const settled = await Promise.allSettled(pending ? [cleanup,pending] : [cleanup]);
         if (settled[0].status === 'rejected') throw Object.assign(new Error('材料备份未完成，清理失败，请检查保存位置是否存在不完整文件'),{name:'MaterialBackupSaveCleanupError',cause});
         throw cause;
-    } finally {caller?.removeEventListener('abort',abort);}
+    } finally {removeAbortListener(caller,abort);}
 }

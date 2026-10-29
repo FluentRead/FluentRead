@@ -271,3 +271,134 @@ describe('material backup save targets', () => {
         expect(target.commit).toHaveBeenCalledOnce();
     });
 });
+
+function cleanupProbeTarget():MaterialBackupSaveTarget{return {write:vi.fn(async()=>{}),commit:vi.fn(async()=> 'saved' as const),abort:vi.fn(async()=>{})};}
+function poison(controller:AbortController,mode:'before'|'after') {
+ const native=controller.signal.removeEventListener.bind(controller.signal),failure=Error('remove failed');
+ return vi.spyOn(controller.signal,'removeEventListener').mockImplementation((type,listener,options)=>{if(mode==='after')native(type,listener,options);throw failure;});
+}
+describe('abort listener cleanup failures',()=>{
+ it.each(['before','after'] as const)('retains selection outcomes and cleans a late target when removal throws %s',async mode=>{
+  const controller=new AbortController(),spy=poison(controller,mode),chosen=cleanupProbeTarget(),failure=Error('permission failed');
+  try {
+   await expect(waitForMaterialBackupTarget(Promise.resolve(chosen),controller.signal)).resolves.toBe(chosen);
+   await expect(waitForMaterialBackupTarget(Promise.reject(failure),controller.signal)).rejects.toBe(failure);
+   const pending=deferred<MaterialBackupSaveTarget>(), late=cleanupProbeTarget(),cancel=new AbortController(),cancelSpy=poison(cancel,mode);
+   try {
+    const result=waitForMaterialBackupTarget(pending.promise,cancel.signal);cancel.abort();
+    await expect(result).rejects.toMatchObject({name:'AbortError'});pending.resolve(late);
+    await vi.waitFor(()=>expect(late.abort).toHaveBeenCalledOnce());
+   } finally {cancelSpy.mockRestore();}
+  } finally {spy.mockRestore();}
+ });
+ it.each(['before','after'] as const)('retains save success and original failure when removal throws %s',async mode=>{
+  const controller=new AbortController(),spy=poison(controller,mode),saved=cleanupProbeTarget(),failed=cleanupProbeTarget(),original=Error('receive failed');
+  try {
+   await expect(saveMaterialBackup(saved,async consume=>{await consume(new Uint8Array([42]));},{signal:controller.signal})).resolves.toEqual({state:'saved',bytes:1});
+   expect(saved.commit).toHaveBeenCalledOnce();expect(saved.abort).not.toHaveBeenCalled();
+   await expect(saveMaterialBackup(failed,async()=>{throw original;},{signal:controller.signal})).rejects.toBe(original);
+   expect(failed.abort).toHaveBeenCalledWith(original);expect(failed.commit).not.toHaveBeenCalled();
+  } finally {spy.mockRestore();}
+ });
+});
+
+describe('abort listener registration failures',()=>{
+ it.each(['before','after'] as const)('cleans a late target if signal registration throws %s adding the listener',async mode=>{
+  const controller=new AbortController(),failure=Error('registration failed'),native=controller.signal.addEventListener.bind(controller.signal);
+  const add=vi.spyOn(controller.signal,'addEventListener').mockImplementation((type,listener,options)=>{if(mode==='after')native(type,listener,options);throw failure;});
+  try {
+   const pending=deferred<MaterialBackupSaveTarget>(),late=cleanupProbeTarget();
+   await expect(waitForMaterialBackupTarget(pending.promise,controller.signal)).rejects.toBe(failure);
+   pending.resolve(late);await vi.waitFor(()=>expect(late.abort).toHaveBeenCalledOnce());
+   expect(late.commit).not.toHaveBeenCalled();
+   const denied=deferred<MaterialBackupSaveTarget>();
+   await expect(waitForMaterialBackupTarget(denied.promise,controller.signal)).rejects.toBe(failure);
+   denied.reject(Error('late permission failure'));await Promise.resolve();await Promise.resolve();
+  } finally {add.mockRestore();}
+ });
+ it.each(['before','after'] as const)('aborts the owned save target if signal registration throws %s adding the listener',async mode=>{
+  const controller=new AbortController(),failure=Error('registration failed'),native=controller.signal.addEventListener.bind(controller.signal),sink=cleanupProbeTarget();
+  const add=vi.spyOn(controller.signal,'addEventListener').mockImplementation((type,listener,options)=>{if(mode==='after')native(type,listener,options);throw failure;});
+  try {
+   await expect(saveMaterialBackup(sink,async()=>{throw Error('must not receive');},{signal:controller.signal})).rejects.toBe(failure);
+   expect(sink.abort).toHaveBeenCalledWith(failure);expect(sink.commit).not.toHaveBeenCalled();
+  } finally {add.mockRestore();}
+ });
+ it('keeps cancellation and cleans the late target if registration aborts then throws',async()=>{
+  const controller=new AbortController(),failure=Error('registration failed'),native=controller.signal.addEventListener.bind(controller.signal),pending=deferred<MaterialBackupSaveTarget>(),late=cleanupProbeTarget();
+  const add=vi.spyOn(controller.signal,'addEventListener').mockImplementation((type,listener,options)=>{native(type,listener,options);controller.abort();throw failure;});
+  try {
+   await expect(waitForMaterialBackupTarget(pending.promise,controller.signal)).rejects.toMatchObject({name:'AbortError'});
+   pending.resolve(late);await vi.waitFor(()=>expect(late.abort).toHaveBeenCalledOnce());
+  } finally {add.mockRestore();}
+ });
+});
+it('cleans selected and owned targets when caller signal state cannot be read',async()=>{
+ const controller=new AbortController(),failure=Error('signal state failed'),pending=deferred<MaterialBackupSaveTarget>(),late=cleanupProbeTarget(),sink=cleanupProbeTarget();
+ Object.defineProperty(controller.signal,'aborted',{configurable:true,get(){throw failure;}});
+ try {
+  await expect(waitForMaterialBackupTarget(pending.promise,controller.signal)).rejects.toBe(failure);
+  pending.resolve(late);await vi.waitFor(()=>expect(late.abort).toHaveBeenCalledOnce());
+  await expect(saveMaterialBackup(sink,async()=>{throw Error('must not receive');},{signal:controller.signal})).rejects.toBe(failure);
+  expect(sink.abort).toHaveBeenCalledWith(failure);expect(sink.commit).not.toHaveBeenCalled();
+ } finally {delete (controller.signal as unknown as {aborted?:boolean}).aborted;}
+});
+describe('abort precedence during signal registration',()=>{
+ it('does not register an already cancelled signal and cleans both targets',async()=>{
+  const controller=new AbortController(),pending=deferred<MaterialBackupSaveTarget>(),late=cleanupProbeTarget(),sink=cleanupProbeTarget();controller.abort();
+  const add=vi.spyOn(controller.signal,'addEventListener').mockImplementation(()=>{throw Error('must not register');});
+  try {
+   await expect(waitForMaterialBackupTarget(pending.promise,controller.signal)).rejects.toMatchObject({name:'AbortError'});
+   pending.resolve(late);await vi.waitFor(()=>expect(late.abort).toHaveBeenCalledOnce());
+   await expect(saveMaterialBackup(sink,async()=>{throw Error('must not receive');},{signal:controller.signal})).rejects.toMatchObject({name:'AbortError'});
+   expect(sink.abort).toHaveBeenCalledOnce();expect(sink.commit).not.toHaveBeenCalled();expect(add).not.toHaveBeenCalled();
+  } finally {add.mockRestore();}
+ });
+ it.each(['before','after'] as const)('preserves cancellation if registration aborts before throwing %s native registration',async mode=>{
+  const controller=new AbortController(),pending=deferred<MaterialBackupSaveTarget>(),late=cleanupProbeTarget();
+  const native=controller.signal.addEventListener.bind(controller.signal),failure=Error('registration failed');
+  const add=vi.spyOn(controller.signal,'addEventListener').mockImplementation((type,listener,options)=>{if(mode==='after')native(type,listener,options);controller.abort();throw failure;});
+  try {
+   await expect(waitForMaterialBackupTarget(pending.promise,controller.signal)).rejects.toMatchObject({name:'AbortError'});
+   pending.resolve(late);await vi.waitFor(()=>expect(late.abort).toHaveBeenCalledOnce());
+  } finally {add.mockRestore();}
+  const other=new AbortController(),otherNative=other.signal.addEventListener.bind(other.signal),sink=cleanupProbeTarget();
+  const otherAdd=vi.spyOn(other.signal,'addEventListener').mockImplementation((type,listener,options)=>{if(mode==='after')otherNative(type,listener,options);other.abort();throw failure;});
+  try {
+   await expect(saveMaterialBackup(sink,async()=>{throw Error('must not receive');},{signal:other.signal})).rejects.toMatchObject({name:'AbortError'});
+   expect(sink.abort).toHaveBeenCalledOnce();expect(sink.commit).not.toHaveBeenCalled();
+  } finally {otherAdd.mockRestore();}
+ });
+});
+it('observes cancellation when signal aborts immediately before native listener registration',async()=>{
+ const selectionController=new AbortController(),nativeSelection=selectionController.signal.addEventListener.bind(selectionController.signal),pending=deferred<MaterialBackupSaveTarget>(),late=cleanupProbeTarget();
+ const selectionAdd=vi.spyOn(selectionController.signal,'addEventListener').mockImplementation((type,listener,options)=>{selectionController.abort();nativeSelection(type,listener,options);});
+ try {
+  await expect(waitForMaterialBackupTarget(pending.promise,selectionController.signal)).rejects.toMatchObject({name:'AbortError'});
+  pending.resolve(late);await vi.waitFor(()=>expect(late.abort).toHaveBeenCalledOnce());
+ } finally {selectionAdd.mockRestore();}
+ const saveController=new AbortController(),nativeSave=saveController.signal.addEventListener.bind(saveController.signal),sink=cleanupProbeTarget();
+ const saveAdd=vi.spyOn(saveController.signal,'addEventListener').mockImplementation((type,listener,options)=>{saveController.abort();nativeSave(type,listener,options);});
+ try {
+  await expect(saveMaterialBackup(sink,async()=>{throw Error('must not receive');},{signal:saveController.signal})).rejects.toMatchObject({name:'AbortError'});
+  expect(sink.abort).toHaveBeenCalledOnce();expect(sink.commit).not.toHaveBeenCalled();
+ } finally {saveAdd.mockRestore();}
+});
+it('preserves a registration error if checking cancellation afterwards also fails',async()=>{
+ const setup=()=>{
+  const controller=new AbortController(),registration=Error('registration failed'),state=Error('state read failed');let reads=0;
+  Object.defineProperty(controller.signal,'aborted',{configurable:true,get(){if(++reads===1)return false;throw state;}});
+  const add=vi.spyOn(controller.signal,'addEventListener').mockImplementation(()=>{throw registration;});
+  return {controller,registration,add};
+ };
+ const one=setup(),pending=deferred<MaterialBackupSaveTarget>(),late=cleanupProbeTarget();
+ try {
+  await expect(waitForMaterialBackupTarget(pending.promise,one.controller.signal)).rejects.toBe(one.registration);
+  pending.resolve(late);await vi.waitFor(()=>expect(late.abort).toHaveBeenCalledOnce());
+ } finally {one.add.mockRestore();delete (one.controller.signal as unknown as {aborted?:boolean}).aborted;}
+ const two=setup(),sink=cleanupProbeTarget();
+ try {
+  await expect(saveMaterialBackup(sink,async()=>{throw Error('must not receive');},{signal:two.controller.signal})).rejects.toBe(two.registration);
+  expect(sink.abort).toHaveBeenCalledWith(two.registration);expect(sink.commit).not.toHaveBeenCalled();
+ } finally {two.add.mockRestore();delete (two.controller.signal as unknown as {aborted?:boolean}).aborted;}
+});

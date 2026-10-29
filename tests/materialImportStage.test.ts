@@ -299,6 +299,272 @@ describe('committed material change notifications',()=>{
       expect(observed).toHaveBeenCalledOnce();
     } finally {transaction.mockRestore();stop();}
   });
+  it.each([
+    ['before','none'],['after','none'],['before','before'],['after','before'],['before','after'],['after','after'],
+  ] as const)('releases append slot when registration throws %s installation and removal throws %s native removal',async (mode,removeMode)=>{
+    const target=instance(),input=frameRecords([{note:'public'}],opts.frameBytes),token=await target.stage.begin(input.manifest,{generation:0,capturedAt:100});
+    const signal=new AbortController(),failure=Error('registration failed'),nativeAdd=signal.signal.addEventListener.bind(signal.signal),nativeRemove=signal.signal.removeEventListener.bind(signal.signal);
+    const add=vi.spyOn(signal.signal,'addEventListener').mockImplementation((type,listener,options)=>{if(mode==='after')nativeAdd(type,listener,options);throw failure;});
+    const remove=vi.spyOn(signal.signal,'removeEventListener').mockImplementation((type,listener,options)=>{if(removeMode!=='before')nativeRemove(type,listener,options);if(removeMode!=='none')throw Error('removal failed');});
+    try {
+      await expect(target.stage.append(token,input.frames[0],{signal:signal.signal})).rejects.toBe(failure);
+      expect(await target.stage.frames.count()).toBe(0);expect(remove).toHaveBeenCalledWith('abort',expect.any(Function));
+      const listener=remove.mock.calls[0]?.[1];add.mockRestore();remove.mockRestore();if(listener)nativeRemove('abort',listener);
+      expect(await target.stage.append(token,input.frames[0])).toEqual({nextSeq:1});
+    } finally {const listener=remove.mock.calls[0]?.[1];add.mockRestore();remove.mockRestore();if(listener)nativeRemove('abort',listener);}
+  });
+  it.each(['before','after'] as const)('preserves appended frame and releases slot when signal removal throws %s native removal',async mode=>{
+    const target=instance(),input=frameRecords([{note:'public'}],opts.frameBytes),token=await target.stage.begin(input.manifest,{generation:0,capturedAt:100});
+    const signal=new AbortController(),native=signal.signal.removeEventListener.bind(signal.signal);
+    const remove=vi.spyOn(signal.signal,'removeEventListener').mockImplementation((type,listener,options)=>{if(mode==='after')native(type,listener,options);throw Error('removal failed');});
+    try {
+      expect(await target.stage.append(token,input.frames[0],{signal:signal.signal})).toEqual({nextSeq:1});
+      expect(await target.stage.frames.count()).toBe(1);const listener=remove.mock.calls[0]?.[1];remove.mockRestore();if(listener)native('abort',listener);
+      expect(await target.stage.append(token,input.frames[0])).toEqual({nextSeq:1});
+    } finally {const listener=remove.mock.calls[0]?.[1];remove.mockRestore();if(listener)native('abort',listener);}
+  });
+  it.each(['before','after'] as const)('holds an append slot until cancelled authentication settles when signal removal throws %s native removal',async mode=>{
+    const gate=deferred();let entered=false,finished=false;
+    const target=instance({now:100},{beforeAppend:async()=>{entered=true;await gate.promise;finished=true;}});
+    const input=frameRecords([{note:'public'}],opts.frameBytes),token=await target.stage.begin(input.manifest,{generation:0,capturedAt:100});
+    const signal=new AbortController(),native=signal.signal.removeEventListener.bind(signal.signal);
+    const remove=vi.spyOn(signal.signal,'removeEventListener').mockImplementation((type,listener,options)=>{if(mode==='after')native(type,listener,options);throw Error('removal failed');});
+    const pending=target.stage.append(token,input.frames[0],{signal:signal.signal});void pending.catch(()=>{});
+    try {
+      await vi.waitFor(()=>expect(entered).toBe(true),{timeout:3000});signal.abort();await expect(pending).rejects.toThrow('cancelled');
+      await expect(target.stage.append(token,input.frames[0])).rejects.toThrow('backpressure: append already pending');
+      gate.resolve();await vi.waitFor(()=>expect(finished).toBe(true),{timeout:3000});
+      await vi.waitFor(async()=>expect(await target.stage.append(token,input.frames[0])).toEqual({nextSeq:1}),{timeout:3000});
+      expect(await target.stage.frames.count()).toBe(1);
+    } finally {signal.abort();gate.resolve();remove.mockRestore();}
+  });
+  it('observes late authentication failure if cancellation occurs while starting resume',async()=>{
+    const target=instance({now:100},{limits:{...opts,inflight:1}}),{token}=await upload(target.stage,[]),signal=new AbortController(),gate=deferred();let entered=false;
+    const original=target.db.transaction.bind(target.db) as (...args:any[])=>Promise<unknown>;
+    const transaction=vi.spyOn(target.db,'transaction').mockImplementationOnce(((...args:any[])=>{
+      const work=original(...args);signal.abort();
+      return Promise.resolve(work).then(async()=>{entered=true;await gate.promise;throw Error('late read failure');});
+    }) as never);
+    try {
+      await expect(target.stage.resume(token,{signal:signal.signal})).rejects.toThrow('cancelled');
+      await vi.waitFor(()=>expect(entered).toBe(true),{timeout:3000});
+      await expect(target.stage.resume(token)).rejects.toThrow('backpressure: resume busy');
+      gate.resolve();await vi.waitFor(async()=>expect(await target.stage.resume(token)).toBeUndefined(),{timeout:3000});
+    } finally {gate.resolve();transaction.mockRestore();}
+  });
+  it.each(['before','after'] as const)('settles a successful resume when signal removal throws %s native removal',async mode=>{
+    const target=instance(),{token}=await upload(target.stage,[]),signal=new AbortController(),native=signal.signal.removeEventListener.bind(signal.signal);
+    const remove=vi.spyOn(signal.signal,'removeEventListener').mockImplementation((type,listener,options)=>{if(mode==='after')native(type,listener,options);throw Error('cleanup failed');});
+    try {
+      await expect(target.stage.resume(token,{signal:signal.signal})).resolves.toBeUndefined();
+      expect(remove).toHaveBeenCalledWith('abort',expect.any(Function));
+      const listener=remove.mock.calls[0]?.[1];remove.mockRestore();if(listener)native('abort',listener);
+      await expect(target.stage.resume(token)).resolves.toBeUndefined();
+    } finally {const listener=remove.mock.calls[0]?.[1];remove.mockRestore();if(listener)native('abort',listener);}
+  });
+  it.each(['before','after'] as const)('preserves a resume failure when signal removal throws %s native removal',async mode=>{
+    const target=instance(),{token}=await upload(target.stage,[]),signal=new AbortController(),original=Error('read failed'),native=signal.signal.removeEventListener.bind(signal.signal);
+    const remove=vi.spyOn(signal.signal,'removeEventListener').mockImplementation((type,listener,options)=>{if(mode==='after')native(type,listener,options);throw Error('cleanup failed');});
+    const transaction=vi.spyOn(target.db,'transaction').mockImplementationOnce(()=>Promise.reject(original) as never);
+    try {
+      await expect(target.stage.resume(token,{signal:signal.signal})).rejects.toBe(original);
+      const listener=remove.mock.calls[0]?.[1];remove.mockRestore();transaction.mockRestore();if(listener)native('abort',listener);
+      await expect(target.stage.resume(token)).resolves.toBeUndefined();
+    } finally {const listener=remove.mock.calls[0]?.[1];remove.mockRestore();transaction.mockRestore();if(listener)native('abort',listener);}
+  });
+  it.each(['before','after'] as const)('keeps the resume lane while cancelled authentication settles when removal throws %s native removal',async mode=>{
+    const target=instance({now:100},{limits:{...opts,inflight:1}}),{token}=await upload(target.stage,[]),signal=new AbortController(),gate=deferred();let entered=false;
+    const native=signal.signal.removeEventListener.bind(signal.signal),original=target.db.transaction.bind(target.db) as (...args:any[])=>Promise<unknown>;
+    const remove=vi.spyOn(signal.signal,'removeEventListener').mockImplementation((type,listener,options)=>{if(mode==='after')native(type,listener,options);throw Error('cleanup failed');});
+    const transaction=vi.spyOn(target.db,'transaction').mockImplementationOnce(((...args:any[])=>Promise.resolve(original(...args)).then(async value=>{entered=true;await gate.promise;return value;})) as never);
+    const pending=target.stage.resume(token,{signal:signal.signal});void pending.catch(()=>{});
+    try {
+      await vi.waitFor(()=>expect(entered).toBe(true),{timeout:3000});signal.abort();await expect(pending).rejects.toThrow('cancelled');
+      await expect(target.stage.resume(token)).rejects.toThrow('backpressure: resume busy');gate.resolve();
+      await vi.waitFor(async()=>expect(await target.stage.resume(token)).toBeUndefined(),{timeout:3000});
+    } finally {signal.abort();gate.resolve();remove.mockRestore();transaction.mockRestore();}
+  });
+  it.each([
+    ['before','none'],['after','none'],['before','before'],['after','before'],['before','after'],['after','after'],
+  ] as const)('keeps the resume lane if registration throws %s install and removal throws %s native removal',async (mode,removeMode)=>{
+    const target=instance({now:100},{limits:{...opts,inflight:1}}),{token}=await upload(target.stage,[]),signal=new AbortController(),gate=deferred(),failure=Error('registration failed');let entered=false;
+    const nativeAdd=signal.signal.addEventListener.bind(signal.signal),nativeRemove=signal.signal.removeEventListener.bind(signal.signal),original=target.db.transaction.bind(target.db) as (...args:any[])=>Promise<unknown>;
+    const add=vi.spyOn(signal.signal,'addEventListener').mockImplementation((type,listener,options)=>{if(mode==='after')nativeAdd(type,listener,options);throw failure;});
+    const remove=vi.spyOn(signal.signal,'removeEventListener').mockImplementation((type,listener,options)=>{if(removeMode!=='before')nativeRemove(type,listener,options);if(removeMode!=='none')throw Error('cleanup failed');});
+    const transaction=vi.spyOn(target.db,'transaction').mockImplementationOnce(((...args:any[])=>Promise.resolve(original(...args)).then(async value=>{entered=true;await gate.promise;return value;})) as never);
+    try {
+      await expect(target.stage.resume(token,{signal:signal.signal})).rejects.toBe(failure);
+      await vi.waitFor(()=>expect(entered).toBe(true),{timeout:3000});
+      await expect(target.stage.resume(token)).rejects.toThrow('backpressure: resume busy');
+      const listener=remove.mock.calls[0]?.[1];add.mockRestore();remove.mockRestore();if(listener)nativeRemove('abort',listener);
+      gate.resolve();await vi.waitFor(async()=>expect(await target.stage.resume(token)).toBeUndefined(),{timeout:3000});
+    } finally {const listener=remove.mock.calls[0]?.[1];add.mockRestore();remove.mockRestore();transaction.mockRestore();if(listener)nativeRemove('abort',listener);gate.resolve();}
+  });
+  it.each(['before','after'] as const)('preserves resume cancellation when signal aborts %s registration then throws',async mode=>{
+    const target=instance(),{token}=await upload(target.stage,[]),signal=new AbortController(),native=signal.signal.addEventListener.bind(signal.signal);
+    const add=vi.spyOn(signal.signal,'addEventListener').mockImplementation((type,listener,options)=>{if(mode==='after')native(type,listener,options);signal.abort();throw Error('registration failed');});
+    try {
+      await expect(target.stage.resume(token,{signal:signal.signal})).rejects.toThrow('cancelled');
+      add.mockRestore();await vi.waitFor(async()=>expect(await target.stage.resume(token)).toBeUndefined(),{timeout:3000});
+    } finally {add.mockRestore();}
+  });
+  it.each(['append','commit','resume'] as const)('preserves a signal state getter failure during %s',async action=>{
+    const target=instance(),input=frameRecords(action==='append'?[{note:'public'}]:[],opts.frameBytes),token=await target.stage.begin(input.manifest,{generation:0,capturedAt:100});
+    if(action==='commit')await target.stage.seal(token);
+    const signal=new AbortController(),failure=Error('signal state failed');let reads=0;
+    const throwAt=action==='commit'?3:2;
+    Object.defineProperty(signal.signal,'aborted',{configurable:true,get(){if(++reads===throwAt)throw failure;return false;}});
+    try {
+      const work=action==='append'?target.stage.append(token,input.frames[0],{signal:signal.signal}):action==='commit'?target.stage.commit(token,{signal:signal.signal}):target.stage.resume(token,{signal:signal.signal});
+      await expect(work).rejects.toBe(failure);
+      delete (signal.signal as unknown as {aborted?:boolean}).aborted;
+      if(action==='append')expect(await target.stage.append(token,input.frames[0])).toEqual({nextSeq:1});
+      else if(action==='commit')await expect(target.stage.commit(token)).resolves.toEqual({inserted:0,updated:0,skipped:0});
+      else await vi.waitFor(async()=>expect(await target.stage.resume(token)).toBeUndefined(),{timeout:3000});
+    } finally {delete (signal.signal as unknown as {aborted?:boolean}).aborted;}
+  });
+  it.each(['append','commit','resume'] as const)('preserves a %s registration error when rechecking signal state also throws',async action=>{
+    const target=instance(),input=frameRecords(action==='append'?[{note:'public'}]:[],opts.frameBytes),token=await target.stage.begin(input.manifest,{generation:0,capturedAt:100});
+    if(action==='commit')await target.stage.seal(token);
+    const signal=new AbortController(),failure=Error('registration failed');let reads=0;
+    const throwAt=action==='commit'?4:3;
+    Object.defineProperty(signal.signal,'aborted',{configurable:true,get(){if(++reads===throwAt)throw Error('signal state failed');return false;}});
+    const add=vi.spyOn(signal.signal,'addEventListener').mockImplementation(()=>{throw failure;});
+    try {
+      const work=action==='append'?target.stage.append(token,input.frames[0],{signal:signal.signal}):action==='commit'?target.stage.commit(token,{signal:signal.signal}):target.stage.resume(token,{signal:signal.signal});
+      await expect(work).rejects.toBe(failure);expect(reads).toBe(throwAt);
+      delete (signal.signal as unknown as {aborted?:boolean}).aborted;add.mockRestore();
+      if(action==='append')expect(await target.stage.append(token,input.frames[0])).toEqual({nextSeq:1});
+      else if(action==='commit')await expect(target.stage.commit(token)).resolves.toEqual({inserted:0,updated:0,skipped:0});
+      else await vi.waitFor(async()=>expect(await target.stage.resume(token)).toBeUndefined(),{timeout:3000});
+    } finally {delete (signal.signal as unknown as {aborted?:boolean}).aborted;add.mockRestore();}
+  });
+  it.each(['append','commit'] as const)('preserves observed %s cancellation before reading a throwing signal getter',async action=>{
+    const target=instance(),input=frameRecords(action==='append'?[{note:'public'}]:[],opts.frameBytes),token=await target.stage.begin(input.manifest,{generation:0,capturedAt:100});
+    if(action==='commit')await target.stage.seal(token);
+    const signal=new AbortController(),native=signal.signal.addEventListener.bind(signal.signal),getter=Object.getOwnPropertyDescriptor(AbortSignal.prototype,'aborted')!.get!;
+    let reads=0;const throwAt=action==='commit'?4:3;
+    Object.defineProperty(signal.signal,'aborted',{configurable:true,get(){if(++reads===throwAt)throw Error('signal state failed');return getter.call(signal.signal);}});
+    const add=vi.spyOn(signal.signal,'addEventListener').mockImplementation((type,listener,options)=>{native(type,listener,options);signal.abort();});
+    const transaction=vi.spyOn(target.db,'transaction');
+    try {
+      const work=action==='append'?target.stage.append(token,input.frames[0],{signal:signal.signal}):target.stage.commit(token,{signal:signal.signal});
+      await expect(work).rejects.toThrow('cancelled');expect(reads).toBe(throwAt-1);expect(transaction).not.toHaveBeenCalled();
+      delete (signal.signal as unknown as {aborted?:boolean}).aborted;add.mockRestore();transaction.mockRestore();
+      if(action==='append')expect(await target.stage.append(token,input.frames[0])).toEqual({nextSeq:1});
+      else await expect(target.stage.commit(token)).resolves.toEqual({inserted:0,updated:0,skipped:0});
+    } finally {delete (signal.signal as unknown as {aborted?:boolean}).aborted;add.mockRestore();transaction.mockRestore();}
+  });
+  it('detects commit cancellation on the final state check before registration',async()=>{
+    const target=instance(),{token}=await upload(target.stage,[]);await target.stage.seal(token);
+    const signal=new AbortController();let reads=0;
+    Object.defineProperty(signal.signal,'aborted',{configurable:true,get(){return ++reads===3;}});
+    const transaction=vi.spyOn(target.db,'transaction');
+    try {
+      await expect(target.stage.commit(token,{signal:signal.signal})).rejects.toThrow('cancelled');
+      expect(transaction).not.toHaveBeenCalled();
+      delete (signal.signal as unknown as {aborted?:boolean}).aborted;transaction.mockRestore();
+      await expect(target.stage.commit(token)).resolves.toEqual({inserted:0,updated:0,skipped:0});
+    } finally {delete (signal.signal as unknown as {aborted?:boolean}).aborted;transaction.mockRestore();}
+  });
+  it.each(['append','commit'] as const)('detects %s cancellation before a listener is installed and registration returns normally',async action=>{
+    const target=instance(),input=frameRecords(action==='append'?[{note:'public'}]:[],opts.frameBytes),token=await target.stage.begin(input.manifest,{generation:0,capturedAt:100});
+    if(action==='commit')await target.stage.seal(token);
+    const signal=new AbortController(),native=signal.signal.addEventListener.bind(signal.signal);
+    const add=vi.spyOn(signal.signal,'addEventListener').mockImplementation((type,listener,options)=>{signal.abort();native(type,listener,options);});
+    const transaction=vi.spyOn(target.db,'transaction');
+    try {
+      const work=action==='append'?target.stage.append(token,input.frames[0],{signal:signal.signal}):target.stage.commit(token,{signal:signal.signal});
+      await expect(work).rejects.toThrow('cancelled');expect(transaction).not.toHaveBeenCalled();
+      add.mockRestore();transaction.mockRestore();
+      if(action==='append'){
+        expect(await target.stage.frames.count()).toBe(0);
+        expect(await target.stage.append(token,input.frames[0])).toEqual({nextSeq:1});
+      } else {
+        expect(await target.stage.receipts.count()).toBe(0);expect((await target.stage.sessions.get(token.id))?.phase).toBe('sealed');
+        await expect(target.stage.commit(token)).resolves.toEqual({inserted:0,updated:0,skipped:0});
+      }
+    } finally {add.mockRestore();transaction.mockRestore();}
+  });
+  it.each(['before','after'] as const)('preserves append cancellation when signal aborts %s registration then throws',async mode=>{
+    const target=instance(),input=frameRecords([{note:'public'}],opts.frameBytes),token=await target.stage.begin(input.manifest,{generation:0,capturedAt:100});
+    const signal=new AbortController(),failure=Error('registration failed'),native=signal.signal.addEventListener.bind(signal.signal);
+    const add=vi.spyOn(signal.signal,'addEventListener').mockImplementation((type,listener,options)=>{if(mode==='after')native(type,listener,options);signal.abort();throw failure;});
+    const transaction=vi.spyOn(target.db,'transaction');
+    try {
+      await expect(target.stage.append(token,input.frames[0],{signal:signal.signal})).rejects.toThrow('cancelled');
+      expect(transaction).not.toHaveBeenCalled();add.mockRestore();transaction.mockRestore();
+      expect(await target.stage.frames.count()).toBe(0);
+      expect(await target.stage.append(token,input.frames[0])).toEqual({nextSeq:1});
+    } finally {add.mockRestore();transaction.mockRestore();}
+  });
+  it.each(['before','after'] as const)('preserves commit cancellation when signal aborts %s registration then throws',async mode=>{
+    const target=instance(),{token}=await upload(target.stage,[]);await target.stage.seal(token);
+    const signal=new AbortController(),failure=Error('registration failed'),native=signal.signal.addEventListener.bind(signal.signal);
+    const add=vi.spyOn(signal.signal,'addEventListener').mockImplementation((type,listener,options)=>{if(mode==='after')native(type,listener,options);signal.abort();throw failure;});
+    const transaction=vi.spyOn(target.db,'transaction');
+    try {
+      await expect(target.stage.commit(token,{signal:signal.signal})).rejects.toThrow('cancelled');
+      expect(transaction).not.toHaveBeenCalled();add.mockRestore();transaction.mockRestore();
+      expect(await target.stage.receipts.count()).toBe(0);expect((await target.stage.sessions.get(token.id))?.phase).toBe('sealed');
+      await expect(target.stage.commit(token)).resolves.toEqual({inserted:0,updated:0,skipped:0});
+    } finally {add.mockRestore();transaction.mockRestore();}
+  });
+  it('releases the commit slot if caller signal listener removal throws',async()=>{
+    const target=instance(),{token}=await upload(target.stage,[]);await target.stage.seal(token);
+    const signal=new AbortController();
+    const native=signal.signal.removeEventListener.bind(signal.signal);let calls=0;
+    const remove=vi.spyOn(signal.signal,'removeEventListener').mockImplementation((type,listener,options)=>{native(type,listener,options);calls++;throw Error('cleanup failed');});
+    try {
+      expect(await target.stage.commit(token,{signal:signal.signal})).toEqual({inserted:0,updated:0,skipped:0});
+      expect(calls).toBe(1);
+      await expect(target.stage.commit(token)).resolves.toEqual({inserted:0,updated:0,skipped:0});
+    } finally {remove.mockRestore();}
+  });
+  it('preserves synchronous transaction failure if caller signal listener removal throws',async()=>{
+    const target=instance(),{token}=await upload(target.stage,[]);await target.stage.seal(token);
+    const signal=new AbortController(),original=Error('db failed');
+    const remove=vi.spyOn(signal.signal,'removeEventListener').mockImplementation(()=>{throw Error('cleanup failed');});
+    const transaction=vi.spyOn(target.db,'transaction').mockImplementationOnce(()=>{throw original;});
+    try {
+      await expect(target.stage.commit(token,{signal:signal.signal})).rejects.toBe(original);
+      transaction.mockRestore();remove.mockRestore();
+      await expect(target.stage.commit(token)).resolves.toEqual({inserted:0,updated:0,skipped:0});
+    } finally {transaction.mockRestore();remove.mockRestore();}
+  });
+  it.each(['before','after'] as const)('releases cancelled commit when signal removal throws %s native removal',async mode=>{
+    const target=instance(),record=await material('signal-cleanup-'+mode),{token}=await upload(target.stage,[record]);await target.stage.seal(token);
+    const controller=new AbortController(),native=controller.signal.removeEventListener.bind(controller.signal);
+    const remove=vi.spyOn(controller.signal,'removeEventListener').mockImplementation((type,listener,options)=>{if(mode==='after')native(type,listener,options);throw Error('cleanup failed');});
+    const reported=vi.fn(()=>controller.abort());
+    try {
+      await expect(target.stage.commit(token,{signal:controller.signal,onProgress:reported})).rejects.toThrow('cancelled');
+      expect(reported).toHaveBeenCalled();
+      expect(await target.stage.status(token)).toMatchObject({state:'sealed'});
+      expect(await target.stage.receipts.count()).toBe(0);expect(await target.repo.get(record.id)).toBeNull();
+      await vi.waitFor(async()=>expect(await target.stage.commit(token)).toEqual({inserted:1,updated:0,skipped:0}));
+      expect(await target.repo.get(record.id)).not.toBeNull();
+    } finally {remove.mockRestore();}
+  });
+  it.each([
+    ['before','none'],['after','none'],['before','before'],['after','before'],['before','after'],['after','after'],
+  ] as const)('releases the commit slot when registration throws %s installation and removal throws %s native removal',async (mode,removeMode)=>{
+    const target=instance(),{token}=await upload(target.stage,[]);await target.stage.seal(token);
+    const signal=new AbortController(),original=Error('registration failed');
+    const nativeAdd=signal.signal.addEventListener.bind(signal.signal),nativeRemove=signal.signal.removeEventListener.bind(signal.signal);
+    const add=vi.spyOn(signal.signal,'addEventListener').mockImplementation((type,listener,options)=>{if(mode==='after')nativeAdd(type,listener,options);throw original;});
+    const remove=vi.spyOn(signal.signal,'removeEventListener').mockImplementation((type,listener,options)=>{if(removeMode!=='before')nativeRemove(type,listener,options);if(removeMode!=='none')throw Error('cleanup failed');});
+    try {
+      await expect(target.stage.commit(token,{signal:signal.signal})).rejects.toBe(original);
+      expect(remove).toHaveBeenCalledWith('abort',expect.any(Function));
+      const listener=remove.mock.calls[0]?.[1];add.mockRestore();remove.mockRestore();
+      if(listener)nativeRemove('abort',listener);
+      await expect(target.stage.commit(token)).resolves.toEqual({inserted:0,updated:0,skipped:0});
+    } finally {
+      const listener=remove.mock.calls[0]?.[1];add.mockRestore();remove.mockRestore();
+      if(listener)nativeRemove('abort',listener);
+    }
+  });
   it('releases the commit slot and abort listener when a transaction throws synchronously',async()=>{
     const target=instance(),observed=vi.fn(),stop=target.stage.observeCommitted(observed);
     const {token}=await upload(target.stage,[await material('sync-transaction')]);await target.stage.seal(token);

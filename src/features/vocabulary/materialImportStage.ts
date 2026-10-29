@@ -102,14 +102,26 @@ function takeControl(name:string,kind:string,id:string|undefined,limit:number):(
   };
 }
 function activeFor(name:string){let entries=activeByDatabase.get(name);if(!entries){entries=new Map();activeByDatabase.set(name,entries);}return entries;}
+/** Inspect cancellation after a registration error without replacing that error. */
+function abortedAfterRegistration(signal:AbortSignal|undefined):boolean {
+  try {return signal?.aborted===true;} catch {return false;}
+}
 function waitWithAbort<T>(work:Promise<T>,signal:AbortSignal|undefined,message='cancelled'):Promise<T>{
   if(!signal)return work;
-  if(signal.aborted)return Promise.reject(Error(message));
   return new Promise<T>((resolve,reject)=>{
-    const onAbort=()=>{signal.removeEventListener('abort',onAbort);reject(Error(message));};
-    signal.addEventListener('abort',onAbort,{once:true});
-    work.then(value=>{signal.removeEventListener('abort',onAbort);resolve(value);},error=>{signal.removeEventListener('abort',onAbort);reject(error);});
-    if(signal.aborted)onAbort();
+    let settled=false;
+    const cleanup=()=>{try {signal.removeEventListener('abort',onAbort);} catch {/* Do not mask the operation result. */}};
+    const succeed=(value:T)=>{if(settled)return;settled=true;cleanup();resolve(value);};
+    const fail=(error:unknown)=>{if(settled)return;settled=true;cleanup();reject(error);};
+    const onAbort=()=>fail(Error(message));
+    // Observe the actual work before touching caller-owned signal methods.
+    void work.then(succeed,fail);
+    try {
+      if(signal.aborted){onAbort();return;}
+      try {signal.addEventListener('abort',onAbort,{once:true});}
+      catch(error) {if(abortedAfterRegistration(signal))onAbort();else fail(error);return;}
+      if(signal.aborted)onAbort();
+    } catch(error) {fail(error);}
   });
 }
 export function createStage(db:MaterialDatabase, options:{limits?:Partial<Limits>; clock?:()=>number; onCleanupCorruption?:()=>void; estimate?:()=>Promise<unknown>}={}) {
@@ -312,8 +324,13 @@ export function createStage(db:MaterialDatabase, options:{limits?:Partial<Limits
     const controller=new AbortController();active.set(cap.id,{ownerHash,controller});
     let authentication:Promise<void>|undefined;
     const onCallerAbort=()=>controller.abort();
-    if(callerSignal?.aborted)onCallerAbort();else callerSignal?.addEventListener('abort',onCallerAbort,{once:true});
     try {
+      if(callerSignal?.aborted)onCallerAbort();
+      else try {callerSignal?.addEventListener('abort',onCallerAbort,{once:true});}
+      catch(error){if(controller.signal.aborted||abortedAfterRegistration(callerSignal))throw Error('cancelled');throw error;}
+      if(controller.signal.aborted)throw Error('cancelled');
+      if(callerSignal?.aborted)onCallerAbort();
+      if(controller.signal.aborted)throw Error('cancelled');
       if(!input||typeof input!=='object')throw Error('invalid frame');
       const {seq,record,part,total,recordBytes,bytes}=input;
       if(!(bytes instanceof Uint8Array))throw Error('invalid frame');
@@ -358,7 +375,7 @@ export function createStage(db:MaterialDatabase, options:{limits?:Partial<Limits
       if(current&&secureEqual(current.ownerHash,ownerHash))remember(cap.id,ownerHash,clock()+limits.ttlMs);
       return result;
     } finally {
-      callerSignal?.removeEventListener('abort',onCallerAbort);
+      try {callerSignal?.removeEventListener('abort',onCallerAbort);} catch {/* Continue releasing the admission slot. */}
       const release=()=>{active.delete(cap.id);if(active.size===0&&activeByDatabase.get(db.name)===active)activeByDatabase.delete(db.name);};
       if(authentication) void authentication.then(release,release); else release();
     }
@@ -420,12 +437,19 @@ export function createStage(db:MaterialDatabase, options:{limits?:Partial<Limits
     if(active.size>=limits.inflight)throw Error('backpressure: receiver busy');
     const controller=new AbortController();active.set(cap.id,{ownerHash,controller});
     const onCallerAbort=()=>controller.abort();
-    if(signal?.aborted)onCallerAbort();else signal?.addEventListener('abort',onCallerAbort,{once:true});
     const release=()=>{
-      signal?.removeEventListener('abort',onCallerAbort);
+      try {signal?.removeEventListener('abort',onCallerAbort);} catch {/* Continue releasing the admission slot. */}
       active.delete(cap.id);
       if(active.size===0&&activeByDatabase.get(db.name)===active)activeByDatabase.delete(db.name);
     };
+    try {
+      if(signal?.aborted)onCallerAbort();
+      else try {signal?.addEventListener('abort',onCallerAbort,{once:true});}
+      catch(error){if(controller.signal.aborted||abortedAfterRegistration(signal))throw Error('cancelled');throw error;}
+      if(controller.signal.aborted)throw Error('cancelled');
+      if(signal?.aborted)onCallerAbort();
+      if(controller.signal.aborted)throw Error('cancelled');
+    } catch(error){release();throw error;}
     let createdReceipt=false;
     let operation:Promise<MaterialImportResult>;
     try {operation=Promise.resolve(db.transaction('rw',[db.materials,db.meta,frames,sessions,receipts,budgets],async()=>{

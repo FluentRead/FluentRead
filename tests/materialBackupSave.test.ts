@@ -111,6 +111,17 @@ describe('material backup save targets', () => {
         await expect(chooseMaterialBackupTarget('ok.json',{})).rejects.toMatchObject({code:'storage-error'});
         for(const name of ['', 'x'.repeat(256)]) await expect(chooseMaterialBackupTarget(name,{})).rejects.toMatchObject({code:'invalid-input'});
     });
+    it('rejects an oversized reported chunk without discarding previous buffered data',async()=>{
+        class OversizedChunk extends Uint8Array {get byteLength(){return Number.MAX_SAFE_INTEGER;} subarray():never{throw Error('oversized input reached copying');}}
+        const downloaded:number[][]=[];
+        const download=vi.fn(async (_name:string,parts:readonly Uint8Array[])=>{downloaded.push(parts.flatMap(part=>[...part]));return 'saved' as const;});
+        const target=await chooseMaterialBackupTarget('backup.json',{downloadBuffered:download});
+        await target.write(new Uint8Array([42]));
+        await expect(target.write(new OversizedChunk(0))).rejects.toMatchObject({code:'limit-exceeded'});
+        expect(download).not.toHaveBeenCalled();
+        await expect(target.commit(new AbortController().signal)).resolves.toBe('saved');
+        expect(downloaded).toEqual([[42]]);
+    });
     it('coalesces many tiny blocks and distinguishes a started download from a confirmed save', async () => {
         const observed:{parts:number;bytes:number}[]=[];
         const download=vi.fn(async (_name:string,parts:readonly Uint8Array[])=>{observed.push({parts:parts.length,bytes:parts.reduce((n,p)=>n+p.length,0)});return 'initiated' as const;});

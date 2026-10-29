@@ -77,6 +77,18 @@ describe('material backup recovery orchestration',()=>{
     expect(out).toMatchObject({kind:'cancelled',cleanupPending:true});expect(active.close).toHaveBeenCalledOnce();
     begin.reject(Error('late begin failure'));await Promise.resolve();
   });
+  it('prioritizes cancellation when registration aborts before installing a listener and throws',async()=>{
+    vi.useFakeTimers();
+    const controller=new AbortController(),begin=deferred<{state:string;nextSeq:number}>(),remove=vi.spyOn(controller.signal,'removeEventListener');
+    vi.spyOn(controller.signal,'addEventListener').mockImplementation(()=>{controller.abort();throw Error('listener registration failed');});
+    active.begin.mockImplementationOnce(()=>begin.promise);
+    let cap:unknown;
+    const out=await restoreLargeMaterialBackup(file,guard,{signal:controller.signal,onCapability:value=>{cap=value;}});
+    expect(out).toEqual({kind:'cancelled',cleanupPending:true,capability:cap});
+    expect(remove).toHaveBeenCalledWith('abort',expect.any(Function));
+    expect(vi.getTimerCount()).toBe(0);expect(active.close).toHaveBeenCalledOnce();expect(active.commit).not.toHaveBeenCalled();
+    begin.reject(Error('late begin failure'));await Promise.resolve();
+  });
   it.each(['return','throw'] as const)('removes a listener installed after synchronous cancellation when registration will %s',async mode=>{
     vi.useFakeTimers();
     const controller=new AbortController(),begin=deferred<{state:string;nextSeq:number}>();

@@ -516,6 +516,7 @@
       "tests/clickSelectionConfig.test.ts",
       "tests/pointerSelectionSession.test.ts",
       "tests/aiMultiSegmentConfig.test.ts",
+      "tests/youtubeDirectAudio.test.ts",
       "tests/areaRuntimeComposition.test.ts"
     ],
     "functional": [

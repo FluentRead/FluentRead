@@ -1,5 +1,7 @@
 import {afterEach, describe, expect, it, vi} from 'vitest';
 import {parseHTML} from 'linkedom';
+// 菜单所有权测试不启动真实配置存储；显式注入此跨模块端口，避免导入 UI 时产生无关存储告警。
+vi.mock('@/src/services/config/store', () => ({config: {uiLanguage: 'zh-Hans'}}));
 import {createVideoAiModelMenu} from '@/src/features/video-subtitle/content/video-ai/modelMenu';
 import {createVideoAiModelSetup} from '@/src/features/video-subtitle/content/video-ai/modelSetup';
 

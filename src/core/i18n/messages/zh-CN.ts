@@ -1225,6 +1225,7 @@ export const zhCNMessages = {
     'video.downloadBilingual': '下载双语字幕',
     'video.openSettings': '打开视频翻译设置',
     'video.aiGenerate': '生成 AI 字幕',
+    'video.youtubeDefaultAudioHint': '本地识别使用默认或唯一音轨，不跟随播放器中的配音选择。',
     'video.aiStop': '停止生成',
     'video.aiDisable': '关闭 AI 字幕',
     'video.aiReadingAudio': '读取音频中…',

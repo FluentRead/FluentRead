@@ -996,6 +996,7 @@ export const esESMessages = {
     'video.downloadBilingual': 'Descargar los subtítulos bilingües',
     'video.openSettings': 'Abrir ajustes de traducción de vídeo',
     'video.aiGenerate': 'Generar subtítulos con IA',
+    'video.youtubeDefaultAudioHint': 'La transcripción local usa la pista de audio predeterminada o la única disponible, no el doblaje seleccionado en el reproductor.',
     'video.aiStop': 'Detener generación',
     'video.aiDisable': 'Desactivar subtítulos de IA',
     'video.aiReadingAudio': 'Leyendo audio…',

@@ -1194,6 +1194,8 @@ describe('public mounted X subtitle track priority and lifecycle', () => {
   });
 
   it.each([false, true])('keeps a pending model request across same-video metadata enrichment (download: %s)', async download => {
+    const warning = vi.spyOn(console, 'warn');
+    try {
     const status = deferred<unknown>(), prepared = deferred<unknown>();
     ports.send.mockImplementation(async (message: {type: string; keepWarm?: boolean}) => {
       if (message.type === 'fluentReadGetLocalVideoModelState') return status.promise;
@@ -1201,6 +1203,8 @@ describe('public mounted X subtitle track priority and lifecycle', () => {
       return {success: true, hit: false};
     });
     const f = fixture();
+    // 本用例只证明模型等待的媒体身份；浏览器 load 端口保持等待，清理由 dispose 取消，不以 linkedom 缺失方法制造错误。
+    defineBrowserPort(Object.getPrototypeOf(f.video), 'load', {configurable: true, value: () => undefined});
     f.video.src = 'blob:same-media'; f.video.poster = '';
     f.start(); await settle();
     const menu = f.document.getElementById(VIDEO_TRANSLATION_MENU_ID)!;
@@ -1216,6 +1220,11 @@ describe('public mounted X subtitle track priority and lifecycle', () => {
     else status.resolve({success: true, models: ['tiny']});
     await settle();
     expect(ports.send.mock.calls.filter(([message]) => message.type === 'fluentReadPrepareLocalVideoModel' && message.keepWarm)).toHaveLength(1);
+    // 这个 blob 夹具没有独立音轨，预热成功后的受控失败应精确一次，不是缺失浏览器方法。
+    expect(warning).toHaveBeenCalledOnce();
+    expect(warning.mock.calls[0][0]).toBe('[FluentRead] 视频 AI 完整字幕请求失败');
+    expect((warning.mock.calls[0][1] as Error).message).toBe('当前视频没有可用的独立音频源');
+    } finally { warning.mockRestore(); }
   });
 
   it.each(['media', 'language', 'off', 'dispose'])('rejects a late downloaded-model status after %s invalidates the request', async change => {
@@ -1722,6 +1731,129 @@ describe('public mounted YouTube nonfinite time and human track fallback', () =>
   });
 });
 
+describe('public mounted YouTube direct-audio path (offline browser ports, not live YouTube)', () => {
+  const id = 'abcdefghijk';
+  const audioUrl = 'https://rr1.fixture.googlevideo.com/videoplayback?fake=synthetic-only';
+  function directFixture() {
+    const f = fixture(undefined, 'youtube');
+    defineBrowserPort(f.window, 'location', {configurable: true, value: new URL(`https://www.youtube.com/watch?v=${id}`)});
+    Object.defineProperty(f.video, 'duration', {configurable: true, value: 1});
+    f.video.src = 'blob:youtube-mse';f.video.poster = '';f.video.currentTime = .1;f.video.muted = true;f.video.volume = .3;
+    const script = f.document.createElement('script');
+    script.textContent = 'var ytInitialPlayerResponse = ' + JSON.stringify({videoDetails: {videoId: id, lengthSeconds: '1', isLiveContent: false},
+      playabilityStatus: {status: 'OK'}, streamingData: {adaptiveFormats: [{url: audioUrl, contentLength: '4', approxDurationMs: '1000', mimeType: 'audio/mp4; codecs="mp4a.40.2"'}]}});
+    f.document.head.appendChild(script);
+    const close = vi.fn(async () => {});
+    class DecodeContext {
+      state = 'running';close = close;
+      async decodeAudioData() {return {duration: 1, numberOfChannels: 1, sampleRate: 16000, getChannelData: () => new Float32Array(16000).fill(.1)};}
+    }
+    vi.stubGlobal('AudioContext', DecodeContext);defineBrowserPort(f.window, 'AudioContext', {configurable: true, value: DecodeContext});
+    const play = vi.fn(), pause = vi.fn(), capture = vi.fn();
+    Object.assign(f.video, {play, pause, captureStream: capture});
+    ports.fetch.mockImplementation(async () => new Response(new Uint8Array(4), {headers: {'content-type': 'audio/mp4', 'content-length': '4'}}));
+    ports.send.mockImplementation(async (message: {type: string}) => {
+      if (message.type === 'fluentReadGetLocalVideoModelState') return {success: true, models: ['tiny']};
+      if (message.type === 'fluentReadTranscribeLocalVideoAudio') return {success: true, text: 'Local audio subtitle.', segments: [{startMs: 0, endMs: 900, text: 'Local audio subtitle.'}]};
+      return {success: true, hit: false};
+    });
+    const unchanged = () => {expect(play).not.toHaveBeenCalled();expect(pause).not.toHaveBeenCalled();expect(capture).not.toHaveBeenCalled();
+      expect(f.video.src).toBe('blob:youtube-mse');expect(f.video.currentTime).toBe(.1);
+      expect(f.video.muted).toBe(true);expect(f.video.volume).toBe(.3);expect(f.video.playbackRate).toBe(1);expect(f.video.paused).toBe(true);expect(f.document.querySelector('.ytp-subtitles-button')?.getAttribute('aria-pressed')).toBe('true');};
+    return {...f, script, close, unchanged, start: () => {
+      const dispose = f.start();f.document.getElementById(VIDEO_TRANSLATION_MENU_ID)!.hidden = false;return dispose;
+    }};
+  }
+  it('shows the entry only for eligible current audio and never uses a stale SPA script', async () => {
+    const f = directFixture();f.script.remove();f.start();await settle();
+    const button = f.document.querySelector<HTMLButtonElement>('[data-action="toggle-ai-subtitle"]')!;expect(button.hidden).toBe(true);expect(f.document.querySelector<HTMLElement>('[data-youtube-audio-notice]')!.hidden).toBe(true);
+    f.document.head.append(f.script);await vi.advanceTimersByTimeAsync(1000);expect(button.hidden).toBe(true);
+    f.document.getElementById(VIDEO_TRANSLATION_MENU_ID)!.hidden = true;
+    const open = new f.window.Event('click', {bubbles: true});Object.defineProperty(open, 'isTrusted', {value: true});
+    f.document.getElementById(VIDEO_TRANSLATION_BUTTON_ID)!.dispatchEvent(open);await settle();expect(button.hidden).toBe(false);
+    const notice = f.document.querySelector<HTMLElement>('[data-youtube-audio-notice]')!;expect(notice.hidden).toBe(false);
+    expect(notice.textContent).toContain('默认或唯一音轨');expect(button.getAttribute('aria-describedby')).toBe(notice.id);
+    f.window.location.href = 'https://www.youtube.com/watch?v=XXXXXXXXXXX';await vi.advanceTimersByTimeAsync(1000);expect(button.hidden).toBe(true);
+    expect(ports.fetch).not.toHaveBeenCalled();f.unchanged();
+  });
+  it('caches positive and negative UI qualification without repeated initialization JSON parsing', async () => {
+    const f = directFixture();
+    const parse = vi.spyOn(JSON, 'parse');
+    const count = () => parse.mock.calls.filter(([value]) => typeof value === 'string' && value.includes('"streamingData"')).length;
+    try {
+      f.start();await settle();const initial = count();expect(initial).toBeGreaterThan(0);
+      for (let index = 0; index < 5; index += 1) {f.emitVideo('timeupdate');await settle();}
+      await vi.advanceTimersByTimeAsync(5000);expect(count()).toBe(initial);
+      f.script.remove();
+      f.document.getElementById(VIDEO_TRANSLATION_MENU_ID)!.hidden = true;
+      const open = new f.window.Event('click', {bubbles: true});Object.defineProperty(open, 'isTrusted', {value: true});
+      f.document.getElementById(VIDEO_TRANSLATION_BUTTON_ID)!.dispatchEvent(open);await settle();
+      expect(f.document.querySelector<HTMLButtonElement>('[data-action="toggle-ai-subtitle"]')!.hidden).toBe(true);
+      f.document.head.append(f.script);const negative = count();
+      await vi.advanceTimersByTimeAsync(5000);expect(count()).toBe(negative);
+      expect(f.document.querySelector<HTMLButtonElement>('[data-action="toggle-ai-subtitle"]')!.hidden).toBe(true);
+      f.document.getElementById(VIDEO_TRANSLATION_MENU_ID)!.hidden = true;
+      const reopen = new f.window.Event('click', {bubbles: true});Object.defineProperty(reopen, 'isTrusted', {value: true});
+      f.document.getElementById(VIDEO_TRANSLATION_BUTTON_ID)!.dispatchEvent(reopen);await settle();
+      expect(count()).toBeGreaterThan(negative);
+      expect(f.document.querySelector<HTMLButtonElement>('[data-action="toggle-ai-subtitle"]')!.hidden).toBe(false);
+    } finally {parse.mockRestore();}
+  });
+  it.each(['stale-script', 'ad', 'navigation'])('revalidates generation despite cached eligibility: %s', async reason => {
+    const f = directFixture();f.start();await settle();
+    expect(f.document.querySelector<HTMLButtonElement>('[data-action="toggle-ai-subtitle"]')!.hidden).toBe(false);
+    if (reason === 'stale-script') f.script.remove();
+    else if (reason === 'ad') f.player.classList.add('ad-showing');
+    else f.window.location.href = 'https://www.youtube.com/watch?v=XXXXXXXXXXX';
+    clickMenu(f, '[data-action="toggle-ai-subtitle"]');await settle();
+    expect(ports.fetch).not.toHaveBeenCalled();
+    expect(ports.send.mock.calls.some(([message]) => message.type === 'fluentReadTranscribeLocalVideoAudio')).toBe(false);f.unchanged();
+  });
+  it('feeds real fullCapture with isolated decoded PCM, arbitrates native captions, and restores them when stopped', async () => {
+    const f = directFixture();f.setCaption('Native caption.');f.start();await settle();
+    clickMenu(f, '[data-action="toggle-ai-subtitle"]');await settle();
+    expect(ports.fetch).toHaveBeenCalledOnce();expect(ports.fetch.mock.calls[0][0]).toBe(audioUrl);
+    expect(ports.send.mock.calls.filter(([message]) => message.type === 'fluentReadTranscribeLocalVideoAudio')).toHaveLength(1);
+    expect(f.document.getElementById(VIDEO_AI_CAPTION_CONTAINER_ID)?.firstElementChild?.textContent).toBe('Local audio subtitle.');
+    expect(f.displayed().source).toBe('Local audio subtitle.');expect(f.player.classList.contains('fluent-read-youtube-ai-source')).toBe(true);
+    expect(JSON.stringify(ports.send.mock.calls)).not.toContain('googlevideo');
+    expect(JSON.stringify(ports.send.mock.calls)).toContain(`https://www.youtube.com/embed/${id}`);
+    const native = new f.window.Event('message');
+    Object.defineProperties(native, {source: {value: f.window}, origin: {value: f.window.location.origin}, data: {value: {
+      source: 'fluent-read', type: YOUTUBE_TIMED_TEXT_MESSAGE, url: `https://www.youtube.com/api/timedtext?v=${id}&lang=en&fmt=json3`,
+      responseText: JSON.stringify({events: [{tStartMs: 0, dDurationMs: 900, segs: [{utf8: 'Late native caption.'}]}]}),
+    }}});f.window.dispatchEvent(native);await settle();f.emitVideo('timeupdate');await settle();
+    expect(f.displayed().source).toBe('Local audio subtitle.');
+    expect(f.close).toHaveBeenCalledOnce();f.unchanged();
+    clickMenu(f, '[data-action="toggle-ai-subtitle"]');await settle();
+    expect(f.document.getElementById(VIDEO_AI_CAPTION_CONTAINER_ID)).toBeNull();expect(f.player.classList.contains('fluent-read-youtube-ai-source')).toBe(false);
+    expect(f.document.getElementById('ytp-caption-window-container')?.textContent).toBe('Native caption.');f.unchanged();
+  });
+  it('reports one sanitized direct-read failure, preserves native captions, and never falls back to a scan clone', async () => {
+    const warning = vi.spyOn(console, 'warn');
+    try {
+      const f = directFixture();f.setCaption('Native caption.');ports.fetch.mockRejectedValue(new Error(audioUrl));f.start();await settle();
+      clickMenu(f, '[data-action="toggle-ai-subtitle"]');await settle();
+      expect(warning).toHaveBeenCalledOnce();expect(String(warning.mock.calls[0][1])).not.toContain(audioUrl);
+      expect((warning.mock.calls[0][1] as Error).message).toBe('YouTube 直达音轨不可读取或不完整，请刷新后重试；不会接管播放器');
+      expect(ports.send.mock.calls.some(([message]) => message.type === 'fluentReadTranscribeLocalVideoAudio')).toBe(false);
+      expect(f.document.querySelectorAll('video')).toHaveLength(1);expect(f.player.classList.contains('fluent-read-youtube-ai-source')).toBe(false);
+      expect(f.document.querySelector('[data-action="toggle-ai-subtitle"]')?.getAttribute('data-error')).toBe('true');f.unchanged();
+    } finally {warning.mockRestore();}
+  });
+  it.each(['navigation', 'ad', 'cancel', 'dispose'])('discards late decoded media after %s', async reason => {
+    const f = directFixture(), media = deferred<Response>();ports.fetch.mockReturnValue(media.promise);
+    const dispose = f.start();await settle();clickMenu(f, '[data-action="toggle-ai-subtitle"]');await settle();
+    expect(ports.fetch).toHaveBeenCalledOnce();
+    if (reason === 'navigation') f.window.location.href = 'https://www.youtube.com/watch?v=XXXXXXXXXXX';
+    else if (reason === 'ad') f.player.classList.add('ad-showing');
+    else if (reason === 'cancel') clickMenu(f, '[data-action="toggle-ai-subtitle"]');else dispose();
+    await vi.advanceTimersByTimeAsync(1000);
+    media.resolve(new Response(new Uint8Array(4), {headers: {'content-type': 'audio/mp4', 'content-length': '4'}}));await settle();
+    expect(ports.send.mock.calls.some(([message]) => message.type === 'fluentReadTranscribeLocalVideoAudio')).toBe(false);
+    expect(f.document.getElementById(VIDEO_AI_CAPTION_CONTAINER_ID)).toBeNull();expect(f.close).not.toHaveBeenCalled();f.unchanged();
+  });
+});
 
 it('YouTube 同语言切换命名字幕轨时撤销旧翻译，签名刷新不误触发切轨', async () => {
   const tasks: Array<{source: string; signal: AbortSignal; resolve: (text: string) => void}> = [];

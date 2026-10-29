@@ -1230,6 +1230,7 @@ export const enUSMessages = {
     'video.downloadBilingual': 'Download bilingual subtitles',
     'video.openSettings': 'Open video translation settings',
     'video.aiGenerate': 'Generate AI subtitles',
+    'video.youtubeDefaultAudioHint': 'Local transcription uses the default or only audio track, not the player’s selected dub.',
     'video.aiStop': 'Stop generation',
     'video.aiDisable': 'Turn off AI subtitles',
     'video.aiReadingAudio': 'Reading audio…',

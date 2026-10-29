@@ -19,6 +19,9 @@ export default defineConfig({
             reportsDirectory: 'coverage/core',
             reporter: ['text', 'json-summary', 'json', 'html'],
             include: [
+                'src/features/video-subtitle/content/youtubeAudio.ts',
+                'src/features/video-subtitle/content/youtubeAudioReader.ts',
+                'src/features/video-subtitle/content/youtubeAiCaptionSource.ts',
                 'src/app/options/index.ts',
                 'src/providers/translation/ai-sdk/boundedErrorResponse.ts',
                 'userscript/buildGzip.ts',

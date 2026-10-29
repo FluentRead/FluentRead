@@ -1637,3 +1637,7 @@ Popup 服务概览显示默认、继承和独立功能在配置中选择的模�
 生成语音和播放状态栏位于正文之后，带独立分隔线并按控件实际高度参与布局。自动尺寸卡片为底栏自然增高，达到当前位置的可用高度上限时正文滚动；手动调整过尺寸的卡片保留用户外框，正文独立滚动。停止后底栏收起，自动卡恢复自然高度。
 
 针对该边界运行 `pnpm test tests/selectionTranslatorLifecycle.test.ts`。生产构建后运行 `node scripts/run-selection-speech-test.cjs --layout-only --extension-dir .output/chrome-mv3 --playwright-root <Node包目录> --focus-safe-helper scripts/testing/focus-safe-browser.cjs --runtime-diagnostics <扩展界面测试技能>/scripts/runtime-diagnostics.cjs --artifacts-dir <证据目录>`，验证等待生成、播放、停止和重播、原文与译文切换、窄屏与深色，以及手动缩小卡片后正文末尾和操作按钮仍可访问。断言正文滚动区域不与底栏相交，所有播放按钮完整位于底栏内；自动卡未到高度上限时不得因语音栏出现而压缩正文。测试使用临时后台 Edge 和确定性翻译/WAV 夹具，不能代替外部语音合成质量或 Firefox 实机验证。
+
+## YouTube 受限直达音轨本地转写
+
+`youtubeDirectAudio` 覆盖当前视频身份、直达音频资格、googlevideo URL 边界、完整响应与 PCM 校验、取消/期限和自有字幕层清理；`videoSubtitleTrackPriorityRuntime` 通过真实生产模块及 DOM 验证入口资格、fullCapture 接线、晚到原生字幕仲裁、导航/广告/取消/卸载，以及失败不触碰播放器/CC。全部音频、模型和网络端口均为确定性夹具，不代表真实 YouTube 音轨或 CORS 验收。受限能力、缓存行为和未验证范围见 [YouTube 直达音轨](maintainers/youtube-direct-audio.md)。

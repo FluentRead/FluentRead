@@ -996,6 +996,7 @@ export const koKRMessages = {
     'video.downloadBilingual': '이중 자막 다운로드',
     'video.openSettings': '동영상 번역 설정 열기',
     'video.aiGenerate': 'AI 자막 생성',
+    'video.youtubeDefaultAudioHint': '로컬 전사는 기본 또는 유일한 오디오 트랙을 사용하며 플레이어에서 선택한 더빙을 따르지 않습니다.',
     'video.aiStop': '생성 중지',
     'video.aiDisable': 'AI 자막 끄기',
     'video.aiReadingAudio': '오디오 읽는 중…',

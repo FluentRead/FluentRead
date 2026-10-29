@@ -996,6 +996,7 @@ export const ruRUMessages = {
     'video.downloadBilingual': 'Скачать двуязычные субтитры',
     'video.openSettings': 'Открыть настройки перевода видео',
     'video.aiGenerate': 'Создать субтитры с ИИ',
+    'video.youtubeDefaultAudioHint': 'Локальная транскрипция использует звуковую дорожку по умолчанию или единственную дорожку, а не выбранный в плеере дубляж.',
     'video.aiStop': 'Остановить создание',
     'video.aiDisable': 'Отключить субтитры ИИ',
     'video.aiReadingAudio': 'Чтение аудио…',

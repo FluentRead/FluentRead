@@ -996,6 +996,7 @@ export const frFRMessages = {
     'video.downloadBilingual': 'Télécharger les sous-titres bilingues',
     'video.openSettings': 'Ouvrir les réglages de traduction vidéo',
     'video.aiGenerate': 'Générer des sous-titres avec l’IA',
+    'video.youtubeDefaultAudioHint': 'La transcription locale utilise la piste audio par défaut ou unique, pas le doublage sélectionné dans le lecteur.',
     'video.aiStop': 'Arrêter la génération',
     'video.aiDisable': 'Désactiver les sous-titres IA',
     'video.aiReadingAudio': 'Lecture de l’audio…',

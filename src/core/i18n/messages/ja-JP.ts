@@ -996,6 +996,7 @@ export const jaJPMessages = {
     'video.downloadBilingual': '二言語字幕をダウンロード',
     'video.openSettings': '動画翻訳設定を開く',
     'video.aiGenerate': 'AI 字幕を生成',
+    'video.youtubeDefaultAudioHint': 'ローカル文字起こしは既定または唯一の音声トラックを使用し、プレーヤーで選択した吹き替えには追従しません。',
     'video.aiStop': '生成を停止',
     'video.aiDisable': 'AI 字幕をオフ',
     'video.aiReadingAudio': '音声を読み取り中…',

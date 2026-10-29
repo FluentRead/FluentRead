@@ -320,6 +320,19 @@ describe('paged material query sessions', () => {
         await Promise.resolve(); expect(closed).toBe(false);
         finish(material('a')); await expect(outcome).resolves.toMatchObject({name:'AbortError'}); await close; expect(closed).toBe(true);
     });
+    it('keeps a topic page lease while its snapshot check settles after close', async () => {
+        const f = fake([material('a',{topics:['alpha']})]), session = await createMaterialPageSession(f.repository);
+        let finish!:()=>void, began!:()=>void;
+        const pending = new Promise<void>(resolve=>{finish=resolve;}), started = new Promise<void>(resolve=>{began=resolve;});
+        f.repository.checkSnapshot.mockImplementationOnce(() => {began(); return pending;});
+        const topics = session.getTopicsPage({offset:0}), outcome = topics.catch(error=>error);
+        await started;
+        await expect(session.getPage({offset:0})).rejects.toMatchObject({code:'limit-exceeded'});
+        let closed=false; const closing=session.close().then(()=>{closed=true;});
+        await Promise.resolve(); expect(closed).toBe(false);
+        finish(); await expect(outcome).resolves.toMatchObject({name:'AbortError'}); await closing;
+        expect(closed).toBe(true); await expect(session.getTopicsPage({offset:0})).rejects.toMatchObject({name:'AbortError'});
+    });
     it('cancels one page through its caller signal and permits a later retry', async () => {
         const f = fake([material('a')]), session = await createMaterialPageSession(f.repository);
         const already = new AbortController(); already.abort();

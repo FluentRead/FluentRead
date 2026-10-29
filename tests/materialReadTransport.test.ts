@@ -1,5 +1,5 @@
 import {describe, expect, it, vi} from 'vitest';
-import {MATERIAL_READ_FRAME_BYTES, MATERIAL_READ_MESSAGE_BYTES, receiveMaterialRead, sendMaterialRead, type MaterialReadPort} from '@/src/features/vocabulary/materialReadTransport';
+import {MATERIAL_READ_FRAME_BYTES, MATERIAL_READ_MESSAGE_BYTES, addMaterialReadCount, receiveMaterialRead, sendMaterialRead, type MaterialReadPort} from '@/src/features/vocabulary/materialReadTransport';
 
 function pair() {
   type Listener=(value:unknown)=>void;
@@ -17,6 +17,11 @@ async function* chunks(...items:Uint8Array[]) {yield* items;}
 const bytes=(count:number)=>Uint8Array.from({length:count},(_,index)=>index%251);
 
 describe('material read transport',()=>{
+  it('checks sequence and byte counters at the safe integer boundary',()=>{
+    expect(addMaterialReadCount(Number.MAX_SAFE_INTEGER-1,1,'Material read is too large')).toBe(Number.MAX_SAFE_INTEGER);
+    expect(()=>addMaterialReadCount(Number.MAX_SAFE_INTEGER,1,'Material read is too large')).toThrow('Material read is too large');
+    expect(()=>addMaterialReadCount(Number.MAX_SAFE_INTEGER,1,'Invalid material read sequence')).toThrow('Invalid material read sequence');
+  });
   it('streams large content with one frame in flight and validates completion',async()=>{
     const {ports,states,sent}=pair(), input=bytes(MATERIAL_READ_FRAME_BYTES*3+17), output:Uint8Array[]=[];
     const received=receiveMaterialRead(ports[1],async chunk=>{output.push(chunk);await Promise.resolve();});
@@ -204,6 +209,21 @@ describe('material read transport',()=>{
     ports[0].postMessage({v:1,type:'frame',seq:0,length:1,data:'YQ=='});
     await new Promise(resolve=>setTimeout(resolve,0));controller.abort();
     await expect(result).rejects.toThrow('cancelled');release();
+  });
+  it('observes a late consumer rejection after cancellation without acknowledging the frame',async()=>{
+    const {ports,sent}=pair(),controller=new AbortController();let rejectWork!:(error:Error)=>void,started!:()=>void;
+    const startedWork=new Promise<void>(resolve=>{started=resolve;});
+    const unhandled:unknown[]=[],onUnhandled=(error:unknown)=>{unhandled.push(error);};
+    process.on('unhandledRejection',onUnhandled);
+    try {
+      const consumer=receiveMaterialRead(ports[1],()=>{started();return new Promise<void>((_resolve,reject)=>{rejectWork=reject;});},{signal:controller.signal});
+      const producer=sendMaterialRead(ports[0],chunks(bytes(1))).catch(error=>error);
+      await startedWork;controller.abort();
+      await expect(consumer).rejects.toThrow('cancelled');
+      rejectWork(Error('late consumer failure'));expect((await producer).message).toContain('disconnected');
+      await new Promise(resolve=>setTimeout(resolve,0));
+      expect(unhandled).toEqual([]);expect(sent[1]).toEqual([]);
+    } finally {process.removeListener('unhandledRejection',onUnhandled);}
   });
   it('preserves cancellation if a consumer finishes immediately before its acknowledgement is sent',async()=>{
     const {ports,sent}=pair(),controller=new AbortController();

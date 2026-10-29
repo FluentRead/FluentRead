@@ -191,6 +191,16 @@ describe('browser material backup target',()=>{
         const choice=beginFirefoxMaterialBackup('backup.json');expect(browserMock.permissions.request).toHaveBeenCalledOnce();
         expect(await choice).toEqual({status:'denied'});
     });
+    it('rejects an older preflight superseded immediately after its tab check',async()=>{
+        const oldTab=deferred<{incognito:boolean}>(),newTab=deferred<{incognito:boolean}>();
+        vi.stubEnv('BROWSER','firefox');
+        browserMock.tabs.getCurrent.mockReturnValueOnce(oldTab.promise).mockReturnValueOnce(newTab.promise);
+        const old=prepareFirefoxMaterialBackupContext();let newer!:Promise<boolean>;
+        oldTab.resolve({incognito:false});
+        queueMicrotask(()=>{newer=prepareFirefoxMaterialBackupContext();});
+        expect(await old).toBe(false);
+        newTab.resolve({incognito:false});expect(await newer).toBe(true);
+    });
     it('does not let an older operation privacy failure invalidate a newer successful preflight',async()=>{
         const f=fixture(),olderTab=deferred<{incognito:boolean}>();
         vi.stubEnv('BROWSER','firefox');vi.stubGlobal('navigator',{storage:{getDirectory:async()=>f.fs.root},locks:f.fs.locks});

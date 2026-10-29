@@ -10,6 +10,13 @@ export const MATERIAL_READ_FRAME_BYTES = 24 * 1024;
 export const MATERIAL_READ_MESSAGE_BYTES = 40 * 1024;
 const VERSION = 1;
 
+/** Add frame or byte counts without losing integer precision. */
+export function addMaterialReadCount(value:number,increment:number,errorMessage:'Material read is too large'|'Invalid material read sequence'):number {
+  const result=value+increment;
+  if(!Number.isSafeInteger(result))throw Error(errorMessage);
+  return result;
+}
+
 type Events<T extends (...args: never[]) => void> = {addListener(listener:T):void;removeListener(listener:T):void};
 export interface MaterialReadPort {
   onMessage: Events<(message:unknown)=>void>;
@@ -122,14 +129,15 @@ export async function sendMaterialRead(port:MaterialReadPort, source:AsyncIterab
   const flush=async()=>{
     if(!used)return;
     const part=buffer.subarray(0,used);
-    if(!Number.isSafeInteger(seq+1)||!Number.isSafeInteger(bytes+part.length))throw Error('Material read is too large');
-    hash.update(part);bytes+=part.length;
+    const nextSeq=addMaterialReadCount(seq,1,'Material read is too large');
+    const nextBytes=addMaterialReadCount(bytes,part.length,'Material read is too large');
+    hash.update(part);bytes=nextBytes;
     const message={v:VERSION,type:'frame',seq,length:part.length,data:encode(part)};
     if(JSON.stringify(message).length>MATERIAL_READ_MESSAGE_BYTES)throw Error('Material read frame is too large');
     pipe.resume();pipe.send(message);
     const ack=record(await pipe.next(),['v','type','seq']);
     if(ack.type!=='ack'||ack.seq!==seq)throw Error('Invalid material read acknowledgement');
-    pipe.pause();seq++;used=0;blocks=0;bufferedAt=0;
+    pipe.pause();seq=nextSeq;used=0;blocks=0;bufferedAt=0;
   };
   try {
     pipe.assertOpen();pipe.pause();
@@ -181,13 +189,14 @@ export async function receiveMaterialRead(port:MaterialReadPort, onChunk:(chunk:
       const type=(incoming as {type?:unknown}|null)?.type;
       if(type==='frame') {
         const message=record(incoming,['v','type','seq','length','data']);
-        if(message.seq!==seq||!Number.isSafeInteger(seq+1))throw Error('Invalid material read sequence');
+        if(message.seq!==seq)throw Error('Invalid material read sequence');
+        const nextSeq=addMaterialReadCount(seq,1,'Invalid material read sequence');
         const chunk=decode(message.data,message.length);
-        if(!Number.isSafeInteger(bytes+chunk.length))throw Error('Material read is too large');
-        hash.update(chunk);bytes+=chunk.length;
+        const nextBytes=addMaterialReadCount(bytes,chunk.length,'Material read is too large');
+        hash.update(chunk);bytes=nextBytes;
         pipe.pause();
         await pipe.guard(Promise.resolve().then(()=>{pipe.assertOpen();return onChunk(chunk,pipe.signal);}));
-        pipe.resume();pipe.send({v:VERSION,type:'ack',seq});seq++;
+        pipe.resume();pipe.send({v:VERSION,type:'ack',seq});seq=nextSeq;
       } else if(type==='end') {
         const message=record(incoming,['v','type','seq','bytes','digest']);
         if(message.seq!==seq||message.bytes!==bytes||message.digest!==digestHex(hash.digest()))throw Error('Invalid material read completion');

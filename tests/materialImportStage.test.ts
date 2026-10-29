@@ -319,6 +319,32 @@ describe('committed cleanup corruption notifications',()=>{
     expect(await target.stage.cleanup()).toEqual({sessions:1,receipts:0,corruptSessions:1});
     expect(notified).toHaveBeenCalledOnce();expect(await target.stage.frames.count()).toBe(0);
   });
+  it('rolls back expired private frames and receipts if the final cleanup budget update fails',async()=>{
+    const target=instance(),imported=await material('cleanup-committed');
+    const committed=await upload(target.stage,[imported]);await target.stage.seal(committed.token);
+    const result=await target.stage.commit(committed.token);
+    const pending=await upload(target.stage,[{note:'private pending cleanup'}]);
+    target.clock.now+=opts.receiptTtlMs;
+    const starts=target.db.table<any,string>('stageStarts');
+    const snapshot={frames:await target.stage.frames.toArray(),sessions:await target.stage.sessions.toArray(),
+      receipts:await target.stage.receipts.toArray(),starts:await starts.toArray(),budget:await target.stage.budgets.get('stage')};
+    expect(snapshot.frames).toHaveLength(pending.input.frames.length);
+    expect(new TextDecoder().decode(snapshot.frames[0].bytes)).toContain('private pending cleanup');
+    const fail=()=>{throw new DOMException('simulated quota','QuotaExceededError');};
+    target.stage.budgets.hook('updating',fail);
+    try{await expect(target.stage.cleanup()).rejects.toThrow('simulated quota');}
+    finally{target.stage.budgets.hook('updating').unsubscribe(fail);}
+    expect(await target.stage.frames.toArray()).toEqual(snapshot.frames);
+    expect(await target.stage.sessions.toArray()).toEqual(snapshot.sessions);
+    expect(await target.stage.receipts.toArray()).toEqual(snapshot.receipts);
+    expect(await starts.toArray()).toEqual(snapshot.starts);
+    expect(await target.stage.budgets.get('stage')).toEqual(snapshot.budget);
+    expect(await target.repo.get(imported.id)).not.toBeNull();
+    expect(result).toEqual({inserted:1,updated:0,skipped:0});
+    expect(await target.stage.cleanup()).toMatchObject({sessions:1,receipts:1});
+    expect(await target.stage.frames.count()).toBe(0);expect(await target.stage.receipts.count()).toBe(0);
+    expect(await target.repo.get(imported.id)).not.toBeNull();
+  });
   it('does not report ordinary expiry as corruption',async()=>{
     const notified=vi.fn(),clock={now:100},target=instance(clock,{onCleanupCorruption:notified});
     await upload(target.stage,[{note:'ordinary staged note'}]);clock.now+=opts.ttlMs;

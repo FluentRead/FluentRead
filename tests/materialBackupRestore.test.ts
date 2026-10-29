@@ -124,6 +124,18 @@ describe('material backup recovery orchestration',()=>{
     expect(await pending).toMatchObject({kind:'unknown',commitDispatched:true});
     commit.resolve(result);expect(active.close).toHaveBeenCalledOnce();
   });
+  it.each(['seal','commit'] as const)('rejects inconsistent %s progress without claiming a commit result',async phase=>{
+    if(phase==='seal')active.seal.mockImplementationOnce(async progress=>{progress!({done:1,total:2});return {state:'sealed'};});
+    else active.commit.mockImplementationOnce(async progress=>{progress!({done:1,total:2});return result;});
+    const out=await restoreLargeMaterialBackup(file,guard,{onCapability:()=>{}});
+    if(phase==='seal'){
+      expect(out).toMatchObject({kind:'failed',cleanupPending:false,error:{message:'材料恢复进度无效'}});
+      expect(active.discard).toHaveBeenCalledOnce();expect(active.commit).not.toHaveBeenCalled();
+    } else {
+      expect(out).toMatchObject({kind:'unknown',commitDispatched:true});expect(active.discard).not.toHaveBeenCalled();
+    }
+    expect(active.close).toHaveBeenCalledOnce();
+  });
   it('still times out a stalled seal without inferring a committed result',async()=>{
     vi.useFakeTimers();const seal=deferred<{state:'sealed'}>();active.seal.mockReturnValueOnce(seal.promise);
     const pending=restoreLargeMaterialBackup(file,guard,{onCapability:()=>{}});

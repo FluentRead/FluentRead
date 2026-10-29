@@ -236,6 +236,12 @@ describe('material snapshot revisions', () => {
         await expect(repo.checkSnapshot(-1)).rejects.toMatchObject({code:'invalid-input'});
         await expect(repo.readSnapshotRecord(0, '')).rejects.toMatchObject({code:'invalid-input'});
     });
+    it.each(['', 'x'.repeat(257)])('rejects a damaged stored snapshot key without exposing its record', async id => {
+        const db = database(), repo = new MaterialRepository(db);
+        await db.materials.put({id,identityKey:'article:damaged',title:'private damaged record'} as never);
+        await expect(repo.openSnapshot()).rejects.toMatchObject({code:'storage-error'});
+        expect(await db.materials.count()).toBe(1);
+    });
     it('increments once per import, skips unchanged input and rolls back nested failures', async () => {
         const sourceDb = database(), sourceRepo = new MaterialRepository(sourceDb);
         const first = await capture(sourceRepo, 'first'), second = await capture(sourceRepo, 'second');

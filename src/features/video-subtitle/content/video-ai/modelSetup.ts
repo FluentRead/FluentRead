@@ -27,6 +27,7 @@ export interface VideoAiModelChoice {
 export interface VideoAiModelSetupDependencies {
     readonly sendMessage: LocalVideoModelStatusSender & LocalVideoModelDownloadSender;
     readonly getConfiguredModel: () => VideoLocalTranscriptionModel;
+    readonly isNative?: () => boolean;
     /** 记录发起请求时的视频与语言，返回的函数在异步结果到达时判断请求是否仍然有效。 */
     readonly captureRequest: () => () => boolean;
     readonly persistModel: (model: VideoLocalTranscriptionModel) => void;
@@ -39,6 +40,7 @@ export interface VideoAiModelSetupDependencies {
 }
 
 export interface VideoAiModelSetup {
+    readonly revision: number;
     readonly checking: boolean;
     readonly downloading: boolean;
     /** 下载中且已收到首个进度时可用；总量未知时 total 为 0。 */
@@ -62,6 +64,7 @@ export function createVideoAiModelSetup(dependencies: VideoAiModelSetupDependenc
     let activeWatchStop: (() => void) | undefined;
 
     return {
+        get revision() { return requestEpoch; },
         get checking() { return checking; },
         get downloading() { return downloading; },
         get downloadProgress() { return downloadProgress; },
@@ -69,6 +72,17 @@ export function createVideoAiModelSetup(dependencies: VideoAiModelSetupDependenc
 
         async request(canShowChoice, chooseModel = false) {
             if (checking || downloading) return;
+            if (dependencies.isNative?.()) {
+                requestEpoch += 1;
+                if (chooseModel) {
+                    dependencies.setError('请在设置中切换识别方式');
+                    dependencies.onChange();
+                } else if (canShowChoice() && dependencies.captureRequest()()) {
+                    dependencies.setError('');
+                    dependencies.startGeneration();
+                }
+                return;
+            }
             const captured = dependencies.captureRequest();
             const epoch = ++requestEpoch;
             const isCurrent = () => epoch === requestEpoch && captured();

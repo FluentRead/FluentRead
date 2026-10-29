@@ -47,6 +47,8 @@ export interface VideoAiTranscriptionSegment {
 }
 
 export interface VideoAiTranscriptionResult extends VideoAiRecognitionMetadata {
+  provider?: 'browser' | 'native-qwen';
+  timingSource?: 'audio-window';
   text?: string;
   segments?: VideoAiTranscriptionSegment[];
   /** 当 offscreen 正在处理另一条流时，旧请求被丢弃；这不是识别错误。 */

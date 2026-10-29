@@ -25,6 +25,8 @@ function pattern(
 }
 
 export const runtimeFeedbackPatterns: readonly LocalizedLegacyPattern[] = [
+    pattern("^原生转写服务返回HTTP (\\d+)$", [],
+        "The local transcription service returned HTTP {1}.", "ローカル文字起こしサービスが HTTP {1} を返しました。", "로컬 전사 서비스가 HTTP {1}을 반환했습니다.", "Le service de transcription locale a renvoyé HTTP {1}.", "Локальный сервис транскрипции вернул HTTP {1}.", "El servicio de transcripción local devolvió HTTP {1}."),
     // 翻译链路与服务商。
     pattern("^豆包网页翻译访客初始化失败: (\\d+)$", [],
         'Doubao Web Translation could not initialize an anonymous guest: {1}', 'Doubao ウェブ翻訳の匿名ゲストを初期化できませんでした：{1}', 'Doubao 웹 번역의 익명 방문자를 초기화하지 못했습니다: {1}', 'La traduction web Doubao n’a pas pu initialiser un visiteur anonyme : {1}', 'Веб-перевод Doubao не смог инициализировать анонимного гостя: {1}', 'La traducción web de Doubao no pudo inicializar un visitante anónimo: {1}'),

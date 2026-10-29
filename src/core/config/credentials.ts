@@ -7,6 +7,7 @@
  */
 
 import type { Config } from './model';
+import {normalizeNativeAsrBaseUrl} from './nativeAsr';
 import {isSensitiveConfigKey} from './sensitiveKeys';
 import {normalizeApiKeys} from './apiKeys';
 import {normalizeSiteAdaptationSettings} from '@/src/core/site-adaptation/schema';
@@ -188,6 +189,10 @@ export function credentialsEqual(left: ConfigCredentials, right: ConfigCredentia
 export function sanitizeConfigCredentials(value: unknown): Record<string, unknown> {
     if (!isRecord(value)) return {};
     const sanitized = cloneValue(value, true) as Record<string, unknown>;
+    // Imported/history records can reach this boundary before Config normalization.
+    if (Object.hasOwn(value, 'videoNativeAsrBaseUrl')) {
+        sanitized.videoNativeAsrBaseUrl = normalizeNativeAsrBaseUrl(value.videoNativeAsrBaseUrl);
+    }
     // 仅配置根字段采用严格网站规则 schema；content.key 是标签，其他位置仍按凭据清洗。
     if (Object.hasOwn(value, 'siteAdaptation')) sanitized.siteAdaptation = normalizeSiteAdaptationSettings(value.siteAdaptation);
     if (Object.hasOwn(value, 'sectionTranslationRules')) sanitized.sectionTranslationRules = normalizeSectionTranslationRules(value.sectionTranslationRules);

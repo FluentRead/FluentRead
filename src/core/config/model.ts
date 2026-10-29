@@ -12,6 +12,7 @@
 
 import {DEFAULT_AI_MULTI_SEGMENT_MAX_SEGMENTS, DEFAULT_AI_MULTI_SEGMENT_MAX_CHARACTERS, normalizeAiMultiSegmentMaxSegments, normalizeAiMultiSegmentMaxCharacters} from './aiMultiSegment';
 import {DEFAULT_CLICK_SELECTION_HOTKEY, normalizeClickSelectionHotkey} from './clickSelection';
+import {DEFAULT_NATIVE_ASR_BASE_URL, normalizeNativeAsrBaseUrl} from './nativeAsr';
 import {DEFAULT_SENTENCE_HIGHLIGHT_STYLE, DEFAULT_SENTENCE_HIGHLIGHT_APPEARANCE, normalizeSentenceHighlightStyle, normalizeSentenceHighlightAppearance, normalizeSentenceHighlightProfiles, type SentenceHighlightStyle, type SentenceHighlightAppearance, type SentenceHighlightProfile} from './sentenceHighlight';
 import {DEFAULT_INFORMATION_HIGHLIGHT_PREFERENCES, normalizeInformationHighlightPreferences, type InformationHighlightPreferences} from './informationHighlight';
 import {normalizeMangaSiteRules, normalizeMangaPrefetchPages, normalizeMangaCachePages, type MangaSiteRule} from './mangaNormalization';
@@ -221,6 +222,7 @@ export type DeepSeekApiType = 'auto' | 'responses' | 'chat';
 export type DeepSeekThinkingMode = 'enabled' | 'disabled';
 export type VideoSubtitleDisplayMode = 'bilingual' | 'translation-only' | 'original-only';
 export type VideoLocalTranscriptionModel = 'tiny' | 'base' | 'small';
+export type VideoTranscriptionProvider = 'browser' | 'native-qwen';
 export type FullPageTranslationMode = 'viewport' | 'all';
 export const DEFAULT_VIDEO_SUBTITLE_FONT_SIZE = 100;
 export const DEFAULT_NEW_API_URL = 'http://localhost:3000';
@@ -388,6 +390,8 @@ export class Config {
     videoPreferHumanSubtitles: boolean; // 优先使用目标语言人工字幕
     videoService: string; // 字幕服务，空值跟随网页默认
     videoLocalModel: VideoLocalTranscriptionModel; // X 无原生字幕时使用的本地 Whisper 模型
+    videoTranscriptionProvider: VideoTranscriptionProvider; // 本机 Qwen 仅在明确选择后启用
+    videoNativeAsrBaseUrl: string; // 发送前仍须校验回环端点，保存不探测服务
     videoSourceLanguage: string; // 视频原语言，auto 表示自动识别；独立于网页翻译 from
     videoServiceDefaultMigrated: boolean; // 是否已迁移视频字幕默认服务
     videoSubtitleVisible: boolean; // 是否显示 FluentRead 视频字幕
@@ -600,6 +604,8 @@ export class Config {
         this.videoPreferHumanSubtitles = true;
         this.videoService = ''; // 默认跟随网页服务
         this.videoLocalModel = 'small';
+        this.videoTranscriptionProvider = 'browser';
+        this.videoNativeAsrBaseUrl = DEFAULT_NATIVE_ASR_BASE_URL;
         this.videoSourceLanguage = 'auto';
         this.videoServiceDefaultMigrated = true;
         this.videoSubtitleVisible = true; // 默认显示视频译文
@@ -1292,6 +1298,9 @@ export function normalizeConfig(value: unknown): Config {
     if (normalized.videoLocalModel !== 'tiny' && normalized.videoLocalModel !== 'base' && normalized.videoLocalModel !== 'small') {
         normalized.videoLocalModel = 'small';
     }
+    normalized.videoTranscriptionProvider = source.videoTranscriptionProvider === 'native-qwen' ? 'native-qwen' : 'browser';
+    normalized.videoNativeAsrBaseUrl = source.videoNativeAsrBaseUrl === undefined
+        ? DEFAULT_NATIVE_ASR_BASE_URL : normalizeNativeAsrBaseUrl(source.videoNativeAsrBaseUrl);
     if (!VIDEO_SOURCE_LANGUAGE_OPTIONS.some((item) => item.value === normalized.videoSourceLanguage)) {
         normalized.videoSourceLanguage = 'auto';
     }

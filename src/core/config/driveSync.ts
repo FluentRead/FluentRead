@@ -207,10 +207,11 @@ const VISIBLE_FIELDS: Record<string, string> = {
     contextMenuEntries: '右键菜单入口', shareCard: '双语卡片',
     contextMenuShowTargetLanguage: '右键菜单显示目标语言', contextMenuShowShortcut: '右键菜单显示快捷键',
     hoverShortcutBeforeDisable: '已保存的悬浮快捷键', selectionTranslatorModeBeforeDisable: '已保存的划词模式',
-    videoLocalModel: '本地语音识别模型', requestHeaderRules: '移除来源请求头',
+    videoLocalModel: '本地语音识别模型', videoTranscriptionProvider: '语音识别方式', videoNativeAsrBaseUrl: '本机语音识别地址', requestHeaderRules: '移除来源请求头',
 };
 // 端点、路由模型与凭据一起选择，防止自动合并把某端的密钥绑定到另一端的新地址。
 const CONNECTION_FIELDS = new Set<string>([
+    'videoTranscriptionProvider', 'videoNativeAsrBaseUrl',
     ...CONFIG_CREDENTIAL_FIELDS, ...SERVICE_FIELDS, 'translationCenterServices', 'favoriteServices',
     'quickTranslationProfiles', 'writing', 'harness', 'serviceRegion', 'customModels', 'modelThinking',
     'requireApiKey', 'apiKeyRotationEnabled', 'inputBoxTranslationModel', 'deepseekApiType', 'deepseekThinkingMode', 'proxy', 'custom', 'deeplx', 'customBody', 'customOpenAIProviders',
@@ -270,12 +271,12 @@ export function restoreDriveSyncSettings(local: DriveSyncConfig, settings: Drive
 const fieldLabel = (field: string) => Object.hasOwn(VISIBLE_FIELDS, field) ? VISIBLE_FIELDS[field] : configDiffFieldLabel(field);
 const CONNECTION_SUMMARIES: [string, readonly string[]][] = [
     ['settings.cloud.changed.credentials', CONFIG_CREDENTIAL_FIELDS],
-    ['settings.cloud.changed.requests', ['proxy', 'custom', 'deeplx', 'customBody', 'newApiUrl', 'azureOpenaiEndpoint']],
+    ['settings.cloud.changed.requests', ['proxy', 'custom', 'deeplx', 'customBody', 'newApiUrl', 'azureOpenaiEndpoint', 'videoNativeAsrBaseUrl']],
     ['settings.cloud.changed.models', ['model', 'customModel', 'customModels', 'modelThinking', 'documentModel', 'documentCustomModel', 'inputBoxTranslationModel']],
     ['settings.cloud.changed.services', [...SERVICE_FIELDS, 'translationCenterServices', 'favoriteServices', 'quickTranslationProfiles']],
     ['settings.cloud.changed.customServices', ['customOpenAIProviders']],
     ['settings.cloud.changed.assistants', ['writing', 'harness']],
-    ['settings.cloud.changed.options', ['serviceRegion', 'requireApiKey', 'apiKeyRotationEnabled', 'deepseekApiType', 'deepseekThinkingMode', 'deeplApiPlan', 'minimaxBillingPlan', 'minimaxRegion', 'mimoBillingPlan', 'mimoRegion']],
+    ['settings.cloud.changed.options', ['serviceRegion', 'requireApiKey', 'apiKeyRotationEnabled', 'deepseekApiType', 'deepseekThinkingMode', 'deeplApiPlan', 'minimaxBillingPlan', 'minimaxRegion', 'mimoBillingPlan', 'mimoRegion', 'videoTranscriptionProvider']],
 ];
 function connectionDetails(local: DriveSyncConfig, remote: DriveSyncConfig): string[] {
     return CONNECTION_SUMMARIES.filter(([, keys]) => keys.some(key => !driveValuesEqual(local[key], remote[key]))).map(([label]) => label);

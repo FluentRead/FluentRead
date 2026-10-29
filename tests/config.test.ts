@@ -3853,3 +3853,19 @@ describe('配置 store 默认字段快照复用', () => {
         }
     });
 });
+
+describe('native video ASR configuration boundaries', () => {
+    it('defaults only missing endpoints and preserves explicit invalid endpoints as disabled', () => {
+        expect(new Config().videoTranscriptionProvider).toBe('browser');
+        expect(new Config().videoNativeAsrBaseUrl).toBe('http://127.0.0.1:8000');
+        expect(normalizeConfig({}).videoNativeAsrBaseUrl).toBe('http://127.0.0.1:8000');
+        expect(normalizeConfig({videoTranscriptionProvider: 'native-qwen', videoNativeAsrBaseUrl: 'http://127.0.0.1:8000/v1/'}))
+            .toMatchObject({videoTranscriptionProvider: 'native-qwen', videoNativeAsrBaseUrl: 'http://127.0.0.1:8000'});
+        for (const value of [null, '', 'https://example.com']) {
+            expect(normalizeConfig({videoNativeAsrBaseUrl: value}).videoNativeAsrBaseUrl).toBe('');
+        }
+        for (const value of [undefined, null, '', 'unknown', {}, 1]) {
+            expect(normalizeConfig({videoTranscriptionProvider: value}).videoTranscriptionProvider).toBe('browser');
+        }
+    });
+});

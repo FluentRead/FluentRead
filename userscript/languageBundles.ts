@@ -34,16 +34,45 @@ export const zhCNMessages = userscriptMessages(extensionChinese);
 const materialSources = new Set(Object.keys(learningMaterialLegacyText['en-US']));
 const materialPatternSources = new Set(learningMaterialPatterns.map(({pattern}) => pattern));
 
+// Userscript does not mount settings-video or its native ASR runtime. Keep config-diff
+// field names AND provider values; only unreachable video UI/transport feedback is omitted.
+const extensionOnlyNativeAsrText = new Set([
+    "识别方式",
+    "本机服务地址",
+    "固定模型：Qwen/Qwen3-ASR-1.7B。使用标准 vLLM 音频转写接口，仅允许 127.0.0.1 或 [::1]，服务需由你事先启动。",
+    "保存设置不会探测端口、启动服务或下载权重。开始 AI 字幕后才发送音频到所填本机地址；失败会报错，不自动切回 Whisper。",
+    "该接口返回文本，字幕时间按音频窗口估计，并非字级对齐；此处不代表模型已经加载或已使用 GPU。",
+    "请在设置中切换识别方式",
+    "字幕配置尚未安全加载，请稍后重试",
+    "原生转写模型与请求不一致",
+    "识别配置已改变，请重新请求 AI 字幕",
+    "本机转写选择、地址或语言已改变，请重新请求 AI 字幕",
+    "本机转写仍在进行，请等待当前音频窗口完成",
+    "原生转写需要 PCM16 音频",
+    "原生模型由本机服务管理，不通过浏览器下载",
+    "原生转写地址必须是本机回环地址，不接受凭据、远程地址或额外路径",
+    "原生转写需要不超过30秒的16kHz单声道PCM16数据",
+    "原生转写PCM16数据无效",
+    "原生转写响应为空",
+    "原生转写响应超过大小限制",
+    "原生转写源语言必须是ISO 639-1代码或auto",
+    "原生转写响应缺少text字符串",
+    "原生转写超时",
+    "识别设置已更改，请重新请求 AI 字幕"
+]);
+const extensionOnlyNativeAsrPattern = "^原生转写服务返回HTTP (\\d+)$";
+
+
 /** 按实际脚本能力投影当前词典；学习材料和文档页不随脚本构建进入本地增量。 */
 export function currentUserscriptLanguageBundle(language: RegisteredUiLanguage): UiLanguageBundle {
     const bundle = extensionBundles[language];
     return {
         messages: userscriptPageMessages(userscriptMessages(bundle.messages)),
         legacyText: Object.fromEntries(Object.entries(bundle.legacyText).filter(([source]) =>
-            !materialSources.has(source) && source !== '移动端 / X 自动贴底')),
+            !materialSources.has(source) && !extensionOnlyNativeAsrText.has(source) && source !== '移动端 / X 自动贴底')),
         legacyPatterns: {
-            early: bundle.legacyPatterns.early.filter(([source]) => !materialPatternSources.has(source)),
-            late: bundle.legacyPatterns.late.filter(([source]) => !materialPatternSources.has(source)),
+            early: bundle.legacyPatterns.early.filter(([source]) => !materialPatternSources.has(source) && source !== extensionOnlyNativeAsrPattern),
+            late: bundle.legacyPatterns.late.filter(([source]) => !materialPatternSources.has(source) && source !== extensionOnlyNativeAsrPattern),
         },
     };
 }

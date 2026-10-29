@@ -1,12 +1,14 @@
 /**
  * @file src/features/video-subtitle/transcriptionCache.ts
  * 文件职责：定义视频 AI 字幕缓存的纯协议、稳定身份和完整 cue 规范化规则。
- * 主要内容：生成 status/media、poster 或稳定 direct source key，隔离模型/视频源语言/识别策略版本，避免复用旧版固定语言的字幕，并拒绝临时地址与 partial cue。
+ * 主要内容：生成 status/media、poster 或稳定 direct source key，隔离识别方式/本机端点/模型/视频源语言/识别策略版本，避免复用旧版固定语言的字幕，并拒绝临时地址与 partial cue。
  * 模块边界：只依赖纯视频字幕数据和模型归一化，不导入 Dexie、浏览器 API、后台 runtime 或音频数据。
  */
 import type {VideoSubtitleCue} from '@/src/features/video-subtitle/content/youtubeSubtitleData';
 import {normalizeVideoAiSubtitleTimeline} from '@/src/features/video-subtitle/content/video-ai/cueTimeline';
 import {isDegenerateVideoTranscript, normalizeVideoLocalTranscriptionModel, type VideoLocalTranscriptionModel} from '@/src/features/video-subtitle/transcription';
+import {NATIVE_QWEN_ASR_MODEL} from '@/src/core/messaging/video';
+import {normalizeNativeAsrBaseUrl} from '@/src/core/config/nativeAsr';
 
 export const VIDEO_AI_SUBTITLE_CACHE_GET_MESSAGE = 'fluentReadGetVideoAiSubtitleCache' as const;
 export const VIDEO_AI_SUBTITLE_CACHE_SET_MESSAGE = 'fluentReadSetVideoAiSubtitleCache' as const;
@@ -28,9 +30,11 @@ export interface VideoAiSubtitleCacheSource {
 
 export interface VideoAiSubtitleCacheIdentity {
   videoKey: string;
-  model: VideoLocalTranscriptionModel;
+  model: VideoLocalTranscriptionModel | typeof NATIVE_QWEN_ASR_MODEL;
   sourceLanguage: string;
-  schemaFingerprint: typeof VIDEO_AI_SUBTITLE_CACHE_SCHEMA_FINGERPRINT;
+  schemaFingerprint: typeof VIDEO_AI_SUBTITLE_CACHE_SCHEMA_FINGERPRINT | 'video-native-qwen-text-v1';
+  provider?: 'native-qwen';
+  nativeBaseUrl?: string;
 }
 
 export interface VideoAiSubtitleCacheRequest {
@@ -38,6 +42,8 @@ export interface VideoAiSubtitleCacheRequest {
   model?: unknown;
   sourceLanguage?: unknown;
   videoSourceLanguage?: unknown;
+  provider?: unknown;
+  nativeBaseUrl?: unknown;
 }
 
 function normalizedText(value: unknown): string {
@@ -84,6 +90,13 @@ function sourceLanguage(value: unknown): string {
 export function buildVideoAiSubtitleCacheIdentity(request: VideoAiSubtitleCacheRequest): VideoAiSubtitleCacheIdentity | null {
   const videoKey = buildVideoAiSubtitleVideoKey(request.source);
   if (!videoKey) return null;
+  if (request.provider === 'native-qwen') {
+    const nativeBaseUrl = normalizeNativeAsrBaseUrl(request.nativeBaseUrl);
+    if (request.model !== NATIVE_QWEN_ASR_MODEL || !nativeBaseUrl) return null;
+    return {videoKey, model: NATIVE_QWEN_ASR_MODEL, provider: 'native-qwen', nativeBaseUrl,
+      sourceLanguage: sourceLanguage(request.videoSourceLanguage ?? request.sourceLanguage), schemaFingerprint: 'video-native-qwen-text-v1'};
+  }
+  if (request.provider !== undefined && request.provider !== 'browser') return null;
   return {
     videoKey,
     model: normalizeVideoLocalTranscriptionModel(request.model),
@@ -93,6 +106,7 @@ export function buildVideoAiSubtitleCacheIdentity(request: VideoAiSubtitleCacheR
 }
 
 export function buildVideoAiSubtitleCacheKey(identity: VideoAiSubtitleCacheIdentity): string {
+  if (identity.provider === 'native-qwen') return JSON.stringify([identity.schemaFingerprint, identity.videoKey, identity.model, identity.sourceLanguage, identity.nativeBaseUrl]);
   return [identity.schemaFingerprint, identity.videoKey, identity.model, identity.sourceLanguage].join('|');
 }
 

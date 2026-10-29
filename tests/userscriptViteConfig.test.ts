@@ -721,7 +721,8 @@ describe('userscript browser shim injection', () => {
         for (const [source, value] of Object.entries(current.legacyText)) expect(mergedLegacy[source]).toBe(value);
         const materialSources = new Set(Object.keys(learningMaterialLegacyText[language as keyof typeof learningMaterialLegacyText]));
         for (const source of materialSources) expect(current.legacyText).not.toHaveProperty(source);
-        const materialPatterns = learningMaterialPatterns.map(({pattern}) => pattern);
+        // Native ASR is extension-only, like learning-material operations; all other patterns retain exact order.
+        const materialPatterns = [...learningMaterialPatterns.map(({pattern}) => pattern), '^原生转写服务返回HTTP (\\d+)$'];
         for (const phase of ['early', 'late'] as const) {
             expect(current.legacyPatterns[phase]).toEqual(original.legacyPatterns[phase].filter(([source]) => !materialPatterns.includes(source)));
         }

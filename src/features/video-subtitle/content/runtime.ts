@@ -5,6 +5,7 @@
  * 模块边界：本文件只在 content 页面编排，同视频底控的局部显隐订阅与字幕布局共用帧调度，帧内先校准自有菜单宿主再测菜单，并随关闭、重绑和销毁清理；完整 AI 字幕缓存请求与提交身份由 subtitleSession 拥有，requestSession 将完整采集映射为后台单流的唯一请求代际；采集资源仍归 fullCapture，不拦截 fetch/XHR 也不实现翻译 provider，翻译经统一 service client。
  */
 import {createApp, h, shallowReactive} from 'vue';
+import {NATIVE_QWEN_ASR_MODEL} from '@/src/core/messaging/video';
 import {createNativeFullscreenSubtitles, supportsNativeVideoFullscreen} from './nativeFullscreen';
 import {createSavedVideoPositionRestorer, getVideoLearningSource, type MutableVideoSentenceLearningProps} from './sentenceLearningHost';
 import {createVideoSentenceLearningSession} from './sentenceLearningSession';
@@ -230,6 +231,9 @@ export function mountVideoSubtitleTranslation(): () => void {
   let aiCues: VideoSubtitleCue[] = [];
   let regenerateAiRequested = false;
   let activeAiModel = normalizeVideoLocalTranscriptionModel(config.videoLocalModel);
+  let activeAiProvider = config.videoTranscriptionProvider;
+  let activeNativeBaseUrl = config.videoNativeAsrBaseUrl;
+  const activeRecognitionModel = () => activeAiProvider === 'native-qwen' ? NATIVE_QWEN_ASR_MODEL : activeAiModel;
   const aiStreamId = typeof crypto.randomUUID === 'function'
     ? crypto.randomUUID()
     : `video-ai-${Date.now()}-${Math.random().toString(36).slice(2)}`;
@@ -246,7 +250,11 @@ export function mountVideoSubtitleTranslation(): () => void {
   let playerBinding: VideoPlayerBinding | undefined;
   let subtitlesPreviouslyVisible = config.on && config.videoTranslationEnabled && config.videoSubtitleVisible !== false;
   const transcriptCache = new VideoTranscriptionCacheClient(sendRuntimeMessage);
-  const currentCacheRequest = () => getVideoTranscriptionCacheRequest(observedVideo, activeAiModel, activeVideoLanguage, window.location.href, observedMediaIdentity);
+  const currentCacheRequest = () => {
+    const request = getVideoTranscriptionCacheRequest(observedVideo, activeRecognitionModel(), activeVideoLanguage, window.location.href, observedMediaIdentity);
+    return request ? {...request, provider: activeAiProvider,
+      ...(activeAiProvider === 'native-qwen' ? {nativeBaseUrl: activeNativeBaseUrl} : {})} : null;
+  };
   const aiSubtitleSession = new VideoAiSubtitleSession({
     readRequest: currentCacheRequest,
     canRestore: () => !destroyed && canReadVideo() && !isAiFullActive() && !xCaptionSource.readNativeTrack() && xSubtitleCues.length === 0,
@@ -689,6 +697,8 @@ export function mountVideoSubtitleTranslation(): () => void {
       throw new Error(response?.error || 'AI 字幕接口没有返回文字');
     }
     return {
+      provider: response.provider,
+      timingSource: response.timingSource,
       text: response.text,
       segments: response.segments,
       skipped: response.skipped,
@@ -705,7 +715,8 @@ export function mountVideoSubtitleTranslation(): () => void {
   };
 
   const prepareAiTranscription = (sessionId: number) => {
-    const identity = aiRequests.start(sessionId, activeAiModel, activeVideoLanguage);
+    const identity = aiRequests.start(sessionId, activeRecognitionModel(), activeVideoLanguage,
+      {provider: activeAiProvider, nativeBaseUrl: activeNativeBaseUrl});
     if (identity) void sendVideoSubtitleRequest(sendRuntimeMessage, {type: 'fluentReadPrepareLocalVideoModel', ...identity, keepWarm: true}).catch(() => undefined);
   };
   const cancelAiTranscription = (sessionId: number, reason: string) => {
@@ -756,7 +767,7 @@ export function mountVideoSubtitleTranslation(): () => void {
       return hlsAudio.read(video, signal, currentCacheRequest()?.source);
     },
     getVideo: () => observedVideo,
-    getModel: () => activeAiModel,
+    getModel: activeRecognitionModel,
     isSupported: () => !destroyed && isXVideoPage(),
     transcribe: transcribeAiAudioChunk,
     onCuesProgress: (cues, sessionId) => {
@@ -802,6 +813,8 @@ export function mountVideoSubtitleTranslation(): () => void {
   const startFullAiSubtitleGeneration = (): boolean => {
     if (!aiFullCapture) return false;
     activeAiModel = normalizeVideoLocalTranscriptionModel(config.videoLocalModel);
+    activeAiProvider = config.videoTranscriptionProvider;
+    activeNativeBaseUrl = config.videoNativeAsrBaseUrl;
     aiSubtitleSession.beginGeneration();
     resetAiSubtitleCues();
     aiFullPhase = 'capturing';
@@ -904,7 +917,7 @@ export function mountVideoSubtitleTranslation(): () => void {
       active: isAiFullActive(),
       fullActive: isAiFullActive(), phase: aiFullPhase, progress: aiFullProgress, error: aiCaptureError,
     }, language);
-    const canChooseAiModel = enabled && visible && isXVideoPage() && browserCapabilities.extensionDom;
+    const canChooseAiModel = enabled && visible && isXVideoPage() && browserCapabilities.extensionDom && activeAiProvider !== 'native-qwen';
     renderVideoAiModelSelection(menu, {
       model: activeAiModel, available: canChooseAiModel,
       disabled: aiModelSetup.checking || aiModelSetup.downloading
@@ -985,15 +998,19 @@ export function mountVideoSubtitleTranslation(): () => void {
   const aiModelSetup = createVideoAiModelSetup({
     sendMessage: sendRuntimeMessage,
     getConfiguredModel: () => normalizeVideoLocalTranscriptionModel(config.videoLocalModel),
+    isNative: () => config.videoTranscriptionProvider === 'native-qwen',
     captureRequest: () => {
       // 读取或下载期间换视频、改源语言或关闭翻译时，旧结果不能启动新一轮识别。
       const pageKey = getVideoPageKey();
       const mediaEpoch = observedMediaEpoch;
       const language = activeVideoLanguage;
+      const provider = config.videoTranscriptionProvider;
+      const nativeBaseUrl = config.videoNativeAsrBaseUrl;
       const regenerating = regenerateAiRequested;
       return () => !destroyed && config.on && config.videoTranslationEnabled
         && (!isAiFullActive() || (regenerating && aiFullPhase === 'ready'))
-        && pageKey === getVideoPageKey() && mediaEpoch === observedMediaEpoch && observedVideo !== null && language === activeVideoLanguage;
+        && pageKey === getVideoPageKey() && mediaEpoch === observedMediaEpoch && observedVideo !== null && language === activeVideoLanguage
+        && provider === config.videoTranscriptionProvider && nativeBaseUrl === config.videoNativeAsrBaseUrl;
     },
     persistModel: model => persistVideoConfig({videoLocalModel: model}),
     startGeneration: () => {
@@ -1646,7 +1663,13 @@ export function mountVideoSubtitleTranslation(): () => void {
     subtitlesPreviouslyVisible = subtitlesVisible;
     if (!subtitlesEnabled) aiSubtitleSession.invalidate();
     const nextAiModel = normalizeVideoLocalTranscriptionModel(nextConfig.videoLocalModel);
-    if (nextAiModel !== activeAiModel || nextConfig.videoSourceLanguage !== activeVideoLanguage) {
+    if (nextAiModel !== activeAiModel || nextConfig.videoSourceLanguage !== activeVideoLanguage
+        || nextConfig.videoTranscriptionProvider !== activeAiProvider || nextConfig.videoNativeAsrBaseUrl !== activeNativeBaseUrl) {
+      if (nextConfig.videoSourceLanguage !== activeVideoLanguage
+          || nextConfig.videoTranscriptionProvider !== activeAiProvider
+          || nextConfig.videoNativeAsrBaseUrl !== activeNativeBaseUrl) {
+        aiModelSetup.reset();
+      }
       aiSubtitleSession.invalidate();
       if (activeVideoLanguage !== nextConfig.videoSourceLanguage) {
         // 新语言必须重新选择 HLS 字幕资源，不能复用上一语言的 visited 集合或混合时间轴。
@@ -1659,13 +1682,15 @@ export function mountVideoSubtitleTranslation(): () => void {
       activeVideoLanguage = nextConfig.videoSourceLanguage;
       const captureWasActive = isAiFullActive();
       activeAiModel = nextAiModel;
+      activeAiProvider = nextConfig.videoTranscriptionProvider;
+      activeNativeBaseUrl = nextConfig.videoNativeAsrBaseUrl;
       if (captureWasActive) {
         // 模型切换会改变 Worker session；旧模型结果必须立刻作废，不能与
         // 新模型的滑窗混进同一条稳定时间轴。
         stopFullAiSubtitleGeneration();
         aiCues = [];
         setPretranslationTrack('ai:capture', { url: 'ai:capture', cues: [] });
-        aiCaptureError = '模型已切换，请重新请求 AI 字幕';
+        aiCaptureError = '识别设置已更改，请重新请求 AI 字幕';
         resetTranslationState();
       }
     }

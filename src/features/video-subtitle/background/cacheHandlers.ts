@@ -26,7 +26,8 @@ function request(value: unknown): VideoAiSubtitleCacheRequest {
   if (!value || typeof value !== 'object' || Array.isArray(value)) throw new TypeError('视频 AI 字幕缓存请求身份无效');
   const input = value as Record<string, unknown>;
   if (!input.source || typeof input.source !== 'object' || Array.isArray(input.source)) throw new TypeError('视频 AI 字幕缓存 source 无效');
-  return {source: input.source as VideoAiSubtitleCacheRequest['source'], model: input.model, sourceLanguage: input.sourceLanguage, videoSourceLanguage: input.videoSourceLanguage};
+  return {source: input.source as VideoAiSubtitleCacheRequest['source'], model: input.model, sourceLanguage: input.sourceLanguage, videoSourceLanguage: input.videoSourceLanguage,
+    provider: input.provider, nativeBaseUrl: input.nativeBaseUrl};
 }
 
 export function createVideoAiSubtitleCacheHandlers(repository: VideoAiSubtitleCacheRepository): readonly GetMessage[] {

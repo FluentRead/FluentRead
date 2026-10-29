@@ -1,3 +1,4 @@
+import {parseVideoBackgroundResponse} from '@/src/core/messaging/video';
 /** Real shared Offscreen client → message router → controlled execution ports; malformed serialized data stays at the boundary. */
 import {describe, expect, expectTypeOf, it, vi} from 'vitest';
 import {createOffscreenClient, type OffscreenMessage} from '@/src/platform/offscreen/client';
@@ -260,5 +261,20 @@ describe('known local inference wire contracts', () => {
         await expect(sendVideoSubtitleRequest(send, {type: 'fluentReadRemoveLocalVideoModel', model: 'tiny'})).resolves.toEqual({success: true, models: []});
         expect(f.ports.videoAi.removeModel).toHaveBeenCalledWith({type: 'VIDEO_AI_REMOVE_MODEL', model: 'tiny', target: 'offscreen'});
         await expect(sendVideoSubtitleRequest(async () => ({success: true, text: 42}), {type: 'fluentReadTranscribeLocalVideoAudio', ...identity, audioPcm16Base64: 'AAAA'})).rejects.toThrow('响应消息格式无效');
+    });
+});
+
+describe('native ASR response claims stay bounded', () => {
+    const prepareType = 'fluentReadPrepareLocalVideoModel' as const;
+    const native = {success: true, model: 'Qwen/Qwen3-ASR-1.7B', provider: 'native-qwen', preparation: 'client-only'};
+    it('accepts client-only preparation without claiming inference hardware', () => {
+        expect(parseVideoBackgroundResponse(prepareType, native)).toEqual(native);
+        const browser = {success: true, model: 'tiny', models: ['tiny'], provider: 'browser'};
+        expect(parseVideoBackgroundResponse(prepareType, browser)).toEqual(browser);
+        expect(() => parseVideoBackgroundResponse(prepareType, {...browser, preparation: 'client-only'})).toThrow();
+    });
+    it.each([{models: ['tiny']}, {backend: 'wasm'}, {gpuInfo: 'claimed GPU'}, {threads: 4}, {dtype: 'q4'},
+        {provider: undefined}, {preparation: undefined}, {model: 'tiny'}])('rejects unsupported native claims %#', patch => {
+        expect(() => parseVideoBackgroundResponse(prepareType, {...native, ...patch})).toThrow();
     });
 });

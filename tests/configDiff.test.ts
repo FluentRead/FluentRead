@@ -1237,3 +1237,20 @@ describe('逐句高亮自定义外观差异', () => {
         ]);
     });
 });
+
+describe('native video ASR private diff rendering', () => {
+    it('names provider choices and hides every configured endpoint', () => {
+        const change = group(buildConfigDiff({videoTranscriptionProvider: 'browser'}, {videoTranscriptionProvider: 'native-qwen'}), 'videoSubtitles')!;
+        expect(change.changes[0]).toMatchObject({before: '浏览器内 Whisper', after: '本机 Qwen3 ASR'});
+        for (const value of [undefined, 'invalid']) {
+            expect(group(buildConfigDiff({videoTranscriptionProvider: value}, {videoTranscriptionProvider: 'native-qwen'}), 'videoSubtitles')!.changes[0].before).toBe('未设置');
+        }
+        for (const value of [undefined, null, '']) {
+            const result = buildConfigDiff({videoNativeAsrBaseUrl: value}, {videoNativeAsrBaseUrl: 'http://127.0.0.1:8000'});
+            expect(group(result, 'videoSubtitles')!.changes[0]).toMatchObject({before: '未设置', after: '已设置（内容隐藏）'});
+            expect(JSON.stringify(result)).not.toContain('127.0.0.1');
+        }
+        const changed = buildConfigDiff({videoNativeAsrBaseUrl: 'http://127.0.0.1:8000'}, {videoNativeAsrBaseUrl: 'http://127.0.0.1:9000'});
+        expect(JSON.stringify(changed)).not.toContain('127.0.0.1');
+    });
+});

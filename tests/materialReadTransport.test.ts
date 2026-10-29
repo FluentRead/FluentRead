@@ -31,6 +31,29 @@ describe('material read transport',()=>{
     for(const message of sent[0])expect(JSON.stringify(message).length).toBeLessThanOrEqual(MATERIAL_READ_MESSAGE_BYTES);
     expect(states.every(s=>s.messages.size===0&&s.disconnects.size===0)).toBe(true);
   });
+  it('rejects an oversized encoded frame before posting it to the peer',async()=>{
+    const {ports,states,sent}=pair(), nativeEncoder=globalThis.btoa;
+    const encoding=vi.spyOn(globalThis,'btoa').mockReturnValue('A'.repeat(MATERIAL_READ_MESSAGE_BYTES));
+    let deadline:ReturnType<typeof setTimeout>|undefined;
+    try {
+      const receiving=receiveMaterialRead(ports[1],()=>{},{idleTimeoutMs:2000}).then(()=>undefined,error=>error);
+      const sending=sendMaterialRead(ports[0],chunks(bytes(1)),{idleTimeoutMs:2000}).then(()=>undefined,error=>error);
+      const [producerError,receiverError]=await Promise.race([
+        Promise.all([sending,receiving]),
+        new Promise<never>((_,reject)=>{deadline=setTimeout(()=>reject(Error('transport did not settle')),3000);}),
+      ]);
+      expect(sent[0]).toHaveLength(0);
+      expect(producerError.message).toBe('Material read frame is too large');
+      expect(receiverError.message).toBe('Material read disconnected');
+      expect(encoding).toHaveBeenCalledOnce();
+      expect(states.every(state=>state.closed&&state.messages.size===0&&state.disconnects.size===0)).toBe(true);
+    } finally {
+      if(deadline!==undefined)clearTimeout(deadline);
+      for(const port of ports)try {port.disconnect();} catch {/* Keep restoring the encoder if a port fails to close. */}
+      encoding.mockRestore();
+    }
+    expect(globalThis.btoa).toBe(nativeEncoder);
+  });
   it('closes a successful receiver and releases its listeners',async()=>{
     const {ports,states}=pair(), input=bytes(32), output:Uint8Array[]=[];
     const receiver=startMaterialRead(ports[1],chunk=>{output.push(chunk);});

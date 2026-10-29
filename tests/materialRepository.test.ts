@@ -19,6 +19,29 @@ describe('material identities and locators', () => {
         expect(normalizeMaterialSource(source).identityKey).not.toBe(normalizeMaterialSource({...source, url:'https://example.test/read?id=2'}).identityKey);
         for (const url of ['javascript:alert(1)', 'https://user:pass@example.test/', 'blob:https://example.test/a', 'invalid']) expect(canonicalMaterialUrl(url)).toBe('');
     });
+    it('preserves long canonical URLs while bounding and rejecting noncanonical long inputs', () => {
+        const path = 'https://example.test/' + '中'.repeat(1000);
+        const canonical = canonicalMaterialUrl(path);
+        expect(canonical.length).toBeGreaterThan(8192);
+        expect(canonicalMaterialUrl(canonical)).toBe(canonical);
+        const query = canonical + '?a=1&a=2&z=3#/chapter/一';
+        // Routing fragments use the URL serializer's stored representation.
+        const stored = new URL(query).href;
+        expect(canonicalMaterialUrl(stored)).toBe(stored);
+        for (const invalid of [
+            canonical + '?z=1&a=1', canonical + '#paragraph', canonical + '?utm_source=x',
+            canonical.replace('https://', 'https://user:pass@'),
+            canonical.replace('https://', 'javascript:'),
+            'https://example.test/' + 'a'.repeat(131100),
+            'https://example.test/' + '中'.repeat(15000),
+        ]) expect(canonicalMaterialUrl(invalid)).toBe('');
+    });
+    it('rejects an oversized tracking query before performing repeated deletions', () => {
+        const input = 'https://example.test/?' + 'utm_source=x&'.repeat(8000);
+        const remove = vi.spyOn(URLSearchParams.prototype, 'delete');
+        try {expect(canonicalMaterialUrl(input)).toBe('');expect(remove).not.toHaveBeenCalled();}
+        finally {remove.mockRestore();}
+    });
     it('unifies YouTube platforms while preserving X multi-video identities', () => {
         const youtube = (url: string) => normalizeMaterialSource({kind:'video',url}).identityKey;
         expect(youtube('https://youtu.be/abcdefghijk?t=4')).toBe(youtube('https://music.youtube.com/watch?v=abcdefghijk&t=30'));
@@ -152,6 +175,50 @@ describe('local material lifecycle', () => {
         await repository.importData(backup,500);
         expect((await repository.get(original.id))?.references[0].updatedAt).toBe(100);
     });
+    it('restores a generated long hostname title after its source changes while keeping explicit titles bounded', async () => {
+        const hostname = `${Array(4).fill('a'.repeat(60)).join('.')}.test`;
+        const original = await repository.capture({source:{kind:'article',url:`https://${hostname}/article`}},100);
+        expect(original.title).toBe(hostname);
+        await repository.update(original.id,{source:{kind:'article',url:'https://moved.test/article'}},200);
+        const explicit = await repository.capture({source:{kind:'article',url:'https://named.test/',title:'x'.repeat(300)}},100);
+        expect(explicit.title).toBe('x'.repeat(240));
+        expect((await repository.update(explicit.id,{title:'y'.repeat(300)},200)).title).toBe('y'.repeat(240));
+        const directHost = `${Array(4).fill('b'.repeat(60)).join('.')}.test`;
+        const direct = await repository.capture({source:{kind:'article',url:`https://${directHost}/article`}},100);
+
+        const backup = await repository.exportData(300);
+        const arbitrary = {...explicit,id:'arbitrary',source:{kind:'article' as const,url:'https://arbitrary.test/'},title:'not a host '.repeat(30)};
+        const noncanonical = {...explicit,id:'noncanonical',source:{kind:'article' as const,url:'https://noncanonical.test/'},title:'A'.repeat(300)};
+        const unrelated = {...explicit,id:'unrelated',source:{kind:'article' as const,url:'https://unrelated.test/'},title:`${Array(4).fill('c'.repeat(60)).join('.')}.test`};
+        const missingHistory = {...original,id:'missing-history',source:{kind:'article' as const,url:'https://missing.test/'},aliases:[]};
+        const oversized = {...explicit,id:'oversized',source:{kind:'article' as const,url:'https://oversized.test/'},title:'z'.repeat(8192 * 16 + 17)};
+        await repository.clear(400);
+        expect(await repository.importData({...backup,materials:[...backup.materials,arbitrary,noncanonical,unrelated,missingHistory,oversized]},500))
+            .toEqual({inserted:8,updated:0,skipped:0});
+        expect((await repository.get(original.id))?.title).toBe(hostname);
+        expect((await repository.get(direct.id))?.title).toBe(directHost);
+        expect((await repository.get(explicit.id))?.title).toBe('y'.repeat(240));
+        expect((await repository.get('arbitrary'))?.title).toBe(arbitrary.title.trim().slice(0,240));
+        expect((await repository.get('noncanonical'))?.title).toBe('A'.repeat(240));
+        expect((await repository.get('unrelated'))?.title).toBe(unrelated.title.slice(0,240));
+        expect((await repository.get('missing-history'))?.title).toBe(hostname.slice(0,240));
+        expect((await repository.get('oversized'))?.title).toBe('z'.repeat(240));
+        const secondBackup = await repository.exportData(600);
+        await repository.clear(700);
+        await repository.importData(secondBackup,800);
+        expect((await repository.get(original.id))?.title).toBe(hostname);
+        expect((await repository.get(direct.id))?.title).toBe(directHost);
+    });
+    it('bounds a document title when the previous URL cannot be proven from its fingerprint identity history', async () => {
+        const hostname = `${Array(4).fill('d'.repeat(60)).join('.')}.test`;
+        const original = await repository.capture({source:{kind:'document',fingerprint:'sha256:doc',url:`https://${hostname}/document`}},100);
+        await repository.update(original.id,{source:{kind:'document',fingerprint:'sha256:doc',url:'https://moved.test/document'}},200);
+        const backup = await repository.exportData(300);
+        expect(backup.materials[0].aliases).toBeUndefined();
+        await repository.clear(400);
+        await repository.importData(backup,500);
+        expect((await repository.get(original.id))?.title).toBe(hostname.slice(0,240));
+    });
     it('filters topics/search/archive and preserves soft-deleted data during captures', async () => {
         const a = await repository.capture({source,locator:{kind:'text',quote:'原句'},reference:{kind:'note',id:'n',note:'a useful thought'}},100);
         await repository.update(a.id,{topics:['AI',' ML ','AI'],title:'Reading'});
@@ -207,6 +274,76 @@ describe('local material lifecycle', () => {
         expect(entry.contexts[0].text).toBe('Original');
         await r.list(); expect(legacy).toHaveBeenCalledTimes(1);
         await r.clear(); await r.list(); expect(legacy).toHaveBeenCalledTimes(1);
+    });
+    it('indexes large existing materials one cursor record at a time and preserves source matching', async () => {
+        const seed = await repository.capture({source}, 100);
+        const records = Array.from({length:12}, (_, index) => ({...seed, id:`material-${String(index).padStart(2,'0')}`,
+            identityKey:`article:https://example.test/read?id=${index}`, source:{...seed.source,url:`https://example.test/read?id=${index}`},
+            references:[{kind:'vocabulary' as const,id:'shared',excerpt:'existing',createdAt:1},
+                ...Array.from({length:80}, (_, n)=>({kind:'note' as const,id:`note-${n}`,note:'x'.repeat(12000),createdAt:1}))]})).reverse();
+        await db.materials.clear(); await db.materials.bulkPut(records);
+        const context = [{id:'shared',contexts:[{sourceUrl:'https://example.test/read',text:'duplicate',capturedAt:10},
+            {sourceUrl:'https://another.test/source',text:'separate',capturedAt:11}]}] as VocabularyEntry[];
+        const toCollection = db.materials.toCollection.bind(db.materials), seen:string[]=[];
+        let eachCalls=0;
+        const cursor = vi.spyOn(db.materials,'toCollection').mockImplementation(()=>{
+            const collection=toCollection(), each=collection.each.bind(collection);
+            collection.each=callback=>{eachCalls++;return each((value,cursor)=>{seen.push(value.id);return callback(value,cursor);});};
+            return collection;
+        });
+        const all = vi.spyOn(db.materials,'toArray');
+        try {
+            const rows = await new MaterialRepository(db,async()=>context).list();
+            expect(eachCalls).toBe(1); expect(all).toHaveBeenCalledOnce(); // Final list, not migration.
+            expect(seen).toEqual(records.map(record=>record.id).sort());
+            expect(rows).toHaveLength(13);
+            for (const record of records) expect(rows.find(row=>row.id===record.id)).toEqual(record);
+            expect(rows.find(row=>row.source.url==='https://another.test/source')?.references).toMatchObject([{kind:'vocabulary',id:'shared',excerpt:'separate'}]);
+            expect(rows.some(row=>row.source.url==='https://example.test/read')).toBe(false);
+        } finally {cursor.mockRestore();all.mockRestore();}
+    });
+    it('propagates corrupt cursor records and leaves migration uncommitted so repair can retry', async () => {
+        const current=await repository.capture({source,reference:{kind:'vocabulary',id:'v'}},100);
+        await db.materials.update(current.id,{references:null} as never);
+        await db.materials.put({...current,id:'z-after-corrupt',identityKey:'article:https://after.test/',source:{kind:'article',url:'https://after.test/'}});
+        const legacy=[{id:'new',contexts:[{sourceUrl:'https://legacy-retry.test/',text:'saved',capturedAt:10}]}] as VocabularyEntry[];
+        const migrated=new MaterialRepository(db,async()=>legacy), seen:string[]=[];
+        const toCollection=db.materials.toCollection.bind(db.materials);
+        const cursor=vi.spyOn(db.materials,'toCollection').mockImplementation(()=>{
+            const collection=toCollection(), each=collection.each.bind(collection);
+            collection.each=callback=>each((value,key)=>{seen.push(value.id);return callback(value,key);});return collection;
+        });
+        try {await expect(migrated.list()).rejects.toBeInstanceOf(TypeError);} finally {cursor.mockRestore();}
+        expect(seen).toEqual([current.id]);
+        expect((await db.meta.get('state'))?.migrated).not.toBe(true);
+        expect(await db.materials.count()).toBe(2);
+        expect((await db.materials.get(current.id))?.references).toBeNull();
+        await db.materials.update(current.id,{references:current.references});
+        expect(await migrated.list()).toHaveLength(3);expect((await db.meta.get('state'))?.migrated).toBe(true);
+    });
+    it('preserves reading-hook transformations and propagates hook failures without committing migration', async () => {
+        const current=await repository.capture({source,reference:{kind:'vocabulary',id:'v'}},100);
+        const legacy=[{id:'v',contexts:[{sourceUrl:'https://alias-hook.test/',text:'matched alias',capturedAt:10}]}] as VocabularyEntry[];
+        const migrated=new MaterialRepository(db,async()=>legacy);
+        const error=Error('reading hook failed');
+        const fail=()=>{throw error;};db.materials.hook('reading',fail);
+        try {await expect(migrated.list()).rejects.toBe(error);} finally {db.materials.hook('reading').unsubscribe(fail);}
+        expect((await db.meta.get('state'))?.migrated).not.toBe(true);expect(await db.materials.count()).toBe(1);
+        const addAlias=(record:typeof current)=>({...record,aliases:[...(record.aliases??[]),'article:https://alias-hook.test/']});
+        db.materials.hook('reading',addAlias);
+        try {const rows=await migrated.list();expect(rows).toHaveLength(1);expect(rows[0].id).toBe(current.id);}
+        finally {db.materials.hook('reading').unsubscribe(addAlias);}
+        expect((await db.materials.get(current.id))?.aliases).toBeUndefined();
+    });
+    it('rolls back earlier migration writes and the migration marker after a later write fails', async () => {
+        const legacy=[{id:'v',contexts:[{sourceUrl:'https://migration-rollback.test/first',text:'one',capturedAt:1},
+            {sourceUrl:'https://migration-rollback.test/second',text:'two',capturedAt:2}]}] as VocabularyEntry[];
+        const migrated=new MaterialRepository(db,async()=>legacy), put=db.materials.put.bind(db.materials);
+        let writes=0;
+        const failure=vi.spyOn(db.materials,'put').mockImplementation((...args)=>{if(++writes===2)return Promise.reject(Error('second write failed')) as ReturnType<typeof put>;return put(...args);});
+        try {await expect(migrated.list()).rejects.toThrow('second write failed');} finally {failure.mockRestore();}
+        expect(writes).toBe(2);expect(await db.materials.count()).toBe(0);expect((await db.meta.get('state'))?.migrated).not.toBe(true);
+        expect(await migrated.list()).toHaveLength(2);
     });
     it('does not remigrate a newly linked vocabulary context under its privacy-stripped URL', async () => {
         const entry = {id:'new-vocabulary',contexts:[{sourceUrl:'https://example.test/read',text:'Original translated context',capturedAt:100}]} as VocabularyEntry;
@@ -297,6 +434,31 @@ describe('local material lifecycle', () => {
         expect((await repository.list({archived:true}))[0]).toMatchObject({id:original.id,topics:['AI'],locator:{quote:'private paragraph'}});
         expect((await repository.capture({source})).id).toBe(original.id);
         expect(await repository.importData(backup)).toEqual({inserted:0,updated:0,skipped:1});
+    });
+    it('round trips long multilingual URLs and historical aliases through an actual backup',async()=>{
+        const originalUrl = 'https://example.test/' + '中'.repeat(1000);
+        const original = await repository.capture({source:{kind:'article',url:originalUrl,title:'中文材料'}},100);
+        expect(original.source.url!.length).toBeGreaterThan(8192);
+        const firstBackup = JSON.parse(JSON.stringify(await repository.exportData(150)));
+        await repository.clear(200);
+        expect(await repository.importData(firstBackup,250)).toEqual({inserted:1,updated:0,skipped:0});
+        expect(await repository.get(original.id)).toMatchObject({source:{url:original.source.url},identityKey:original.identityKey});
+        expect((await repository.capture({source:{kind:'article',url:originalUrl}},260)).id).toBe(original.id);
+
+        await repository.update(original.id,{source:{kind:'article',url:'https://example.test/moved',title:'中文材料'}},300);
+        const secondBackup = JSON.parse(JSON.stringify(await repository.exportData(350)));
+        expect(secondBackup.materials[0].aliases).toContain(original.identityKey);
+        await repository.clear(400);
+        expect(await repository.importData(secondBackup,450)).toEqual({inserted:1,updated:0,skipped:0});
+        expect((await repository.capture({source:{kind:'article',url:originalUrl}},460)).id).toBe(original.id);
+        expect((await repository.get(original.id))?.aliases).toContain(original.identityKey);
+        // 用户在已有材料上编辑来源后，其百分号编码地址也必须能再次导入。
+        await repository.update(original.id,{source:{kind:'article',url:originalUrl,title:'中文材料'}},500);
+        const thirdBackup = JSON.parse(JSON.stringify(await repository.exportData(550)));
+        await repository.clear(600);
+        expect(await repository.importData(thirdBackup,650)).toEqual({inserted:1,updated:0,skipped:0});
+        expect(await repository.get(original.id)).toMatchObject({source:{url:original.source.url},identityKey:original.identityKey});
+        expect((await repository.capture({source:{kind:'article',url:'https://example.test/moved'}},660)).id).toBe(original.id);
     });
     it('rejects a backup read started before clear while allowing a new explicit restore',async()=>{
         await repository.capture({source},100);

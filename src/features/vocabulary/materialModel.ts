@@ -7,6 +7,10 @@
 import {sanitizeVocabularyVideoUrl} from './source';
 import {normalizeDocumentMaterialReference} from '@/src/features/document-translation/material/public';
 import type {MaterialErrorCode, MaterialLocator, MaterialReference, MaterialSource} from './materialProtocol';
+const MAX_RAW_MATERIAL_URL = 8192;
+// UTF-8 百分号编码与域名 ASCII 化可能使旧版已保存的规范地址显著增长。
+// 保留明确的上限，长地址仅接受已经规范化的形态，避免反复扩张。
+const MAX_CANONICAL_MATERIAL_URL = MAX_RAW_MATERIAL_URL * 16 + 16;
 export class MaterialError extends Error {
     constructor(readonly code: MaterialErrorCode, message: string) {super(message); this.name = 'MaterialError';}
 }
@@ -15,17 +19,26 @@ export function materialText(value: unknown, max: number): string {
 }
 /** URL 仅剥离已知追踪参数，保留 id、语言、章节等语义查询与 hash 路由。 */
 export function canonicalMaterialUrl(value: unknown): string {
-    if (typeof value !== 'string' || value.length > 8192) return '';
+    if (typeof value !== 'string' || value.length > MAX_CANONICAL_MATERIAL_URL) return '';
     try {
         const url = new URL(value);
         if (!['http:', 'https:', 'file:'].includes(url.protocol) || url.username || url.password) return '';
-        for (const key of [...url.searchParams.keys()]) {
-            if (/^(?:utm_.+|fbclid|gclid|msclkid|__fluentread_material)$/iu.test(key)) url.searchParams.delete(key);
+        const long = value.length > MAX_RAW_MATERIAL_URL;
+        // 短输入删除时需要快照；长输入不删除，直接迭代可提前拒绝。
+        const keys = long ? url.searchParams.keys() : [...url.searchParams.keys()];
+        for (const key of keys) {
+            if (/^(?:utm_.+|fbclid|gclid|msclkid|__fluentread_material)$/iu.test(key)) {
+                // 长输入只接受已规范化的地址；无需逐个删除大量追踪键。
+                if (long) return '';
+                url.searchParams.delete(key);
+            }
         }
         url.searchParams.sort();
         // 原文锚点不是新材料；hash 路由仍然属于页面身份。
         if (!/^#(?:\/|!\/)/u.test(url.hash)) url.hash = '';
-        return url.href;
+        const result = url.href;
+        if (result.length > MAX_CANONICAL_MATERIAL_URL || (long && result !== value)) return '';
+        return result;
     } catch {return '';}
 }
 export function normalizeMaterialSource(input: MaterialSource): {source: MaterialSource; identityKey: string} {

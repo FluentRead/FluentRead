@@ -73,7 +73,7 @@ function channel(port:MaterialReadPort, options:MaterialReadOptions) {
     try {port.disconnect();} catch {}
   };
   const touch=()=>{if(timer!==undefined)clearTimeout(timer);timer=setTimeout(()=>fail(Error('Material read timed out')),timeout);};
-  const onAbort=()=>fail(Error('Material read cancelled'));
+  const onAbort=()=>fail(new DOMException('Material read cancelled','AbortError'));
   const onDisconnect=()=>fail(Error('Material read disconnected'));
   const onMessage=(message:unknown)=>{
     if(closed)return;

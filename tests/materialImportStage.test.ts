@@ -57,6 +57,24 @@ async function upload(stage:ReturnType<typeof createStage>, records:unknown[], c
 const deferred=()=>{let resolve!:()=>void;const promise=new Promise<void>(done=>resolve=done);return {promise,resolve};};
 
 describe('clearing materials and import staging',()=>{
+  it.each(['bytes','frames'] as const)('rolls back a commit if a reentrant progress observer corrupts the %s budget',async dimension=>{
+    const target=instance(),record=await material(`reentrant-budget-${dimension}`),{token,input}=await upload(target.stage,[record]);
+    await target.stage.seal(token);
+    let queued=false;const writes:PromiseLike<unknown>[]=[];
+    const progress=()=>{
+      if(queued)return;queued=true;
+      // Simulate a reentrant same-transaction observer damaging persisted metadata.
+      writes.push(target.stage.sessions.update(token.id,{[dimension]:0}),target.stage.budgets.update('stage',{[dimension==='bytes'?'reserved':'reservedFrames']:0}));
+    };
+    await expect(target.stage.commit(token,{onProgress:progress})).rejects.toThrow('budget corruption');
+    await Promise.allSettled(writes);
+    expect(queued).toBe(true);
+    expect(await target.repo.get(record.id)).toBeNull();
+    expect(await target.stage.receipts.count()).toBe(0);
+    expect(await target.stage.frames.count()).toBe(input.frames.length);
+    expect(await target.stage.sessions.get(token.id)).toMatchObject({bytes:input.manifest.bytes,frames:input.manifest.frames,phase:'sealed'});
+    expect(await target.stage.budgets.get('stage')).toMatchObject({reserved:input.manifest.bytes,reservedFrames:input.manifest.frames});
+  });
   it.each(['throw','async-reject','function'] as const)('keeps a real import valid when a progress observer returns %s',async mode=>{
     const target=instance(),record=await material(`progress-observer-${mode}`),{token}=await upload(target.stage,[record]);
     const observer=vi.fn(()=>{if(mode==='throw')throw Error('observer failed');if(mode==='async-reject')return Promise.reject(Error('observer failed'));return ()=>{};});

@@ -245,6 +245,15 @@ describe('material read transport',()=>{
     await expect(result).rejects.toThrow('Unexpected material read message');
     expect(sent[1]).toEqual([]);
   });
+  it('keeps a protocol failure if the caller cancels after the failure',async()=>{
+    const {ports}=pair(),controller=new AbortController();let started!:()=>void;
+    const consuming=new Promise<void>(resolve=>{started=resolve;});
+    const result=receiveMaterialRead(ports[1],()=>{started();return new Promise<void>(()=>{});},{signal:controller.signal});
+    ports[0].postMessage({v:1,type:'frame',seq:0,length:1,data:'YQ=='});
+    await consuming;
+    ports[0].postMessage({v:1,type:'frame',seq:1,length:1,data:'Yg=='});queueMicrotask(()=>controller.abort());
+    await expect(result).rejects.toMatchObject({name:'Error',message:'Unexpected material read message'});
+  });
   it('honors cancellation by another port listener before a received frame is processed',async()=>{
     const {ports,sent}=pair(),controller=new AbortController(),consume=vi.fn();
     const result=receiveMaterialRead(ports[1],consume,{signal:controller.signal});

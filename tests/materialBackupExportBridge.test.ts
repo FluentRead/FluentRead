@@ -164,6 +164,20 @@ describe('material backup export bridge',()=>{
         expect(backup).toMatchObject({format:'fluentread-learning-materials',version:1,materials:[material()]});
         expect(result.bytes).toBe(new TextEncoder().encode(text).length);expect(repo.checkSnapshot).toHaveBeenCalledOnce();bridge.dispose();
     });
+    it('aborts a partially written file when a real streamed export is cancelled',async()=>{
+        const large=material();large.references=[{kind:'note',id:'n',note:'private'.repeat(10000)}];
+        const repo={openSnapshot:vi.fn(async()=>({revision:1,ids:['m']})),readSnapshotRecord:vi.fn(async()=>large),checkSnapshot:vi.fn(async()=>{})};
+        const {bridge}=setup({repository:repo}),[server,client]=pair(),controller=new AbortController();bridge.connect(server);
+        const file:MaterialBackupWritable={write:vi.fn(async()=>{}),close:vi.fn(async()=>{}),abort:vi.fn(async()=>{})};
+        const target=await chooseMaterialBackupTarget('backup.json',{pick:async()=>({createWritable:async()=>file})});
+        const saving=saveMaterialBackup(target,async (consume,signal)=>{
+            const receiving=receiveMaterialBackupExport(client as MaterialReadPort,async chunk=>{await consume(chunk);controller.abort();},{signal});
+            client.postMessage(start);await receiving;
+        },{signal:controller.signal});
+        await expect(saving).rejects.toMatchObject({name:'AbortError'});
+        expect(file.write).toHaveBeenCalled();expect(file.abort).toHaveBeenCalledOnce();expect(file.close).not.toHaveBeenCalled();
+        await bridge.dispose();expect(server.closed).toBe(true);
+    });
     it('sends only a verified public stale code and aborts the partially written target',async()=>{
         const repo={openSnapshot:async()=>({revision:1,ids:['m']}),readSnapshotRecord:async()=>material(),
             checkSnapshot:async()=>{throw new MaterialError('stale-operation','private path secret');}};

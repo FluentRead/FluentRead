@@ -53,7 +53,6 @@ async function receiveLines(request:MaterialPageRequest, options:Options, connec
     let port:MaterialReadPort|undefined;
     let line = '', lineBytes = 0, decoder = new TextDecoder('utf-8',{fatal:true,ignoreBOM:true});
     const onChunk = (chunk:Uint8Array) => {
-        if (!(chunk instanceof Uint8Array)) return invalid();
         for (let start=0;start<chunk.length;) {
             if (isTerminal()) return invalid();
             const end=chunk.indexOf(10,start), stop=end<0?chunk.length:end;

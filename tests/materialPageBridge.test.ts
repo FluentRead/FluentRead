@@ -44,6 +44,43 @@ const header=(messages:MaterialPageMessage[])=>messages.find(value=>value.type==
 const complete=(messages:MaterialPageMessage[])=>messages.find(value=>value.type==='complete') as Extract<MaterialPageMessage,{type:'complete'}>;
 
 describe('trusted material page bridge',()=>{
+    it.each(['ready','open','progress','detail'] as const)('cleans up when listener registration synchronously disconnects during %s',async stage=>{
+        const {repo,bridge:unusedBridge}=fixture(1);await unusedBridge.dispose();
+        const bridge=createMaterialPageBridge({repository:repo,ready:Promise.resolve(),isPrivateContext:()=>false,isTrustedSender:()=>true,maxSessions:1});
+        let restoreRegistration=()=>{};
+        try{
+            let token:string|undefined;
+            if(stage==='detail'){token=header(await transfer(bridge,start())).capability!;await tick();}
+            else if(stage!=='ready')await tick();
+            const priorReads=repo.readSnapshotRecord.mock.calls.length;
+            const [server,client]=pair(),native=AbortSignal.prototype.addEventListener;
+            const target=stage==='progress'?2:1;let registrations=0,triggeredAt:number|undefined;
+            // The overridden registration simulates a synchronous disconnect that native
+            // AbortSignal registration itself does not normally cause.
+            // The first bridge abort listener is readiness, open forwarding, or detail
+            // forwarding respectively; progress adds its own second abort listener.
+            const spy=vi.spyOn(AbortSignal.prototype,'addEventListener').mockImplementation(function(this:AbortSignal,type,listener,options){
+                native.call(this,type,listener,options);
+                if(type==='abort'&&typeof listener==='function'&&listener.name==='abort'&&++registrations===target){
+                    triggeredAt=registrations;client.disconnect();
+                }
+            });
+            restoreRegistration=()=>spy.mockRestore();
+            bridge.connect(server);const chunks:Uint8Array[]=[];
+            const reading=receiveMaterialRead(client as MaterialReadPort,bytes=>{chunks.push(bytes);}).then(()=>undefined,error=>error);
+            client.postMessage(stage==='detail'?detail(token!,'00',0):start());
+            expect(await reading).toMatchObject({message:'Material read disconnected'});
+            expect(triggeredAt).toBe(target);
+            expect(chunks).toEqual([]);expect(server.closed).toBe(true);
+            expect(server.onMessage.listeners.size).toBe(0);expect(server.onDisconnect.listeners.size).toBe(0);
+            expect(client.onMessage.listeners.size).toBe(0);expect(client.onDisconnect.listeners.size).toBe(0);
+            if(stage==='detail')expect(repo.readSnapshotRecord).toHaveBeenCalledTimes(priorReads);
+            else expect(repo.openSnapshot).not.toHaveBeenCalled();
+            restoreRegistration();await tick();await tick();
+            if(stage==='detail')expect((await transfer(bridge,detail(token!,'00',0))).some(value=>value.type==='detail-header')).toBe(true);
+            else expect(complete(await transfer(bridge,start())).count).toBe(1);
+        }finally{restoreRegistration();await bridge.dispose();}
+    });
     it('shares cleanup when an abort observer synchronously disposes the bridge',async()=>{
         const actual=sessions.createMaterialPageSession, {repo,bridge}=fixture(0);
         let release!:()=>void;const gate=new Promise<void>(resolve=>{release=resolve;});

@@ -117,6 +117,26 @@ describe('streamed material backup', () => {
         await expect(collect(streamMaterialBackup(fake([record('a',{big:1n})]),{exportedAt:1}))).rejects.toBeInstanceOf(TypeError);
         await expect(collect(streamMaterialBackup(fake([record('a',{big:Object(1n)})]),{exportedAt:1}))).rejects.toBeInstanceOf(TypeError);
     });
+    it('fails closed without reporting statistics if a serializer unexpectedly returns no token', async () => {
+        const sentinel=19_790_317, stringify=JSON.stringify, report=vi.fn();
+        const repo=fake([record('serializer-failure',{extra:{prefix:'x'.repeat(MATERIAL_READ_FRAME_BYTES+1024),value:sentinel}})]);
+        const emitted:Uint8Array[]=[];
+        // Simulate a modified serializer; standard JSON.stringify does not return undefined for this number.
+        const spy=vi.spyOn(JSON,'stringify').mockImplementation(((value:unknown,...args:unknown[])=>{
+            if(value===sentinel)return undefined;
+            return stringify(value,...args as []);
+        }) as typeof JSON.stringify);
+        try {
+            const drain=async()=>{for await(const chunk of streamMaterialBackup(repo,{exportedAt:1,onStatistics:report}))emitted.push(chunk);};
+            await expect(drain()).rejects.toThrow('无法序列化材料备份');
+            expect(emitted.length).toBeGreaterThan(0);
+            const partial=new Uint8Array(emitted.reduce((sum,chunk)=>sum+chunk.length,0));
+            let offset=0;for(const chunk of emitted){partial.set(chunk,offset);offset+=chunk.length;}
+            expect(()=>JSON.parse(text(partial))).toThrow(SyntaxError);
+            expect(repo.checkSnapshot).not.toHaveBeenCalled();
+            expect(report).not.toHaveBeenCalled();
+        } finally {spy.mockRestore();}
+    });
     it('uses the current time by default', async () => {
         const now=vi.spyOn(Date,'now').mockReturnValue(456);
         try {expect(text(await collect(streamMaterialBackup(fake([]))))).toBe(JSON.stringify(backup([],456)));}

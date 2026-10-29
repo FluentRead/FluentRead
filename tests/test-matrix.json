@@ -288,6 +288,7 @@
       "tests/videoTranslationCache.test.ts",
       "tests/videoReadingAnnotationSession.test.ts",
       "tests/videoReadingAnnotationTransport.test.ts",
+      "tests/readingAnnotationLicense.test.ts",
       "tests/videoReadingContent.test.ts",
       "tests/videoReadingPlayer.test.ts",
       "tests/videoReadingJapanese.test.ts",

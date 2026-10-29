@@ -338,6 +338,18 @@ describe('trusted material page bridge',()=>{
         expect(await closing).toEqual([{type:'closed'}]);
         await tick();expect(complete(await transfer(bridge,start())).count).toBe(1);bridge.dispose();
     });
+    it('does not deliver a detail if the request disconnects just after its snapshot check',async()=>{
+        const {bridge,repo}=fixture(1),token=header(await transfer(bridge,start())).capability!;await tick();
+        let release!:()=>void,started!:()=>void;
+        const held=new Promise<void>(resolve=>{release=resolve;}),entered=new Promise<void>(resolve=>{started=resolve;});
+        repo.checkSnapshot.mockImplementationOnce(()=>{started();return held;});
+        const [server,client]=pair();bridge.connect(server);const chunks:Uint8Array[]=[];
+        const reading=receiveMaterialRead(client as MaterialReadPort,chunk=>{chunks.push(chunk);}).catch(error=>error);
+        client.postMessage(detail(token,'00',0));await entered;
+        held.then(()=>client.disconnect());release();expect(await reading).toBeInstanceOf(Error);
+        await tick();await tick();expect(chunks).toEqual([]);
+        expect(complete(await transfer(bridge,start())).count).toBe(1);await bridge.dispose();
+    });
     it('distinguishes a busy session from a permanent repository limit',async()=>{
         const {bridge,repo}=fixture(1),token=header(await transfer(bridge,start())).capability!;await tick();
         let finish!:(value:MaterialRecord|null)=>void,began!:()=>void;
@@ -362,6 +374,20 @@ describe('trusted material page bridge',()=>{
         const first=await transfer(bridge,start());await tick();const second=await transfer(bridge,start());expect(complete(second).count).toBe(2);
         expect(await transfer(bridge,page(header(first).capability!,0))).toEqual([{type:'error',code:'stale-operation'}]);
         await transfer(bridge,close(header(second).capability!));await tick();expect(complete(await transfer(bridge,start())).count).toBe(2);bridge.dispose();
+    });
+    it('releases an evicted session if its replacement disconnects while eviction settles',async()=>{
+        const {repo}=fixture(1);let replacement:Port|undefined,evicted=0;
+        repo.openSnapshot.mockImplementationOnce(async(signal?:AbortSignal)=>{
+            signal?.addEventListener('abort',()=>{evicted++;replacement?.disconnect();},{once:true});
+            return {revision:1,ids:['00']};
+        });
+        const bridge=createMaterialPageBridge({repository:repo,ready:Promise.resolve(),isPrivateContext:()=>false,isTrustedSender:()=>true,maxSessions:1});
+        expect(complete(await transfer(bridge,start())).count).toBe(1);await tick();
+        const [server,client]=pair();replacement=client;bridge.connect(server);
+        const receiving=receiveMaterialRead(client as MaterialReadPort,()=>{}).catch(error=>error);
+        client.postMessage(start());expect(await receiving).toBeInstanceOf(Error);
+        await tick();await tick();expect(evicted).toBe(1);expect(repo.openSnapshot).toHaveBeenCalledTimes(1);
+        replacement=undefined;expect(complete(await transfer(bridge,start())).count).toBe(1);await bridge.dispose();
     });
     it('evicts the least recently used idle tab and preserves the recently used one',async()=>{
         const {repo}=fixture();const bridge=createMaterialPageBridge({repository:repo,ready:Promise.resolve(),isPrivateContext:()=>false,isTrustedSender:()=>true,maxSessions:2});

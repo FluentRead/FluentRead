@@ -57,6 +57,27 @@ describe('material backup save targets', () => {
         const failure=Error('permission denied');
         await expect(waitForMaterialBackupTarget(Promise.reject(failure))).rejects.toBe(failure);
     });
+    it('removes the abort listener when target selection fails',async()=>{
+        const controller=new AbortController(),pending=deferred<MaterialBackupSaveTarget>(),failure=Error('permission denied');
+        const remove=vi.spyOn(controller.signal,'removeEventListener');
+        const selection=waitForMaterialBackupTarget(pending.promise,controller.signal);
+        pending.reject(failure);
+        await expect(selection).rejects.toBe(failure);
+        expect(remove).toHaveBeenCalledOnce();
+        expect(remove.mock.calls[0][0]).toBe('abort');
+        controller.abort();
+    });
+    it('keeps an observed write failure when the receiver later reports cancellation',async()=>{
+        const controller=new AbortController(),failure=Error('disk write failed');
+        const target:MaterialBackupSaveTarget={write:vi.fn(async()=>{throw failure;}),commit:vi.fn(async()=> 'saved' as const),abort:vi.fn(async()=>{})};
+        const saving=saveMaterialBackup(target,async consume=>{
+            try {await consume(new Uint8Array([1]));} catch {/* The receiver may report cancellation afterwards. */}
+            controller.abort();
+            throw new DOMException('cancelled','AbortError');
+        },{signal:controller.signal});
+        await expect(saving).rejects.toBe(failure);
+        expect(target.abort).toHaveBeenCalledWith(failure);expect(target.commit).not.toHaveBeenCalled();
+    });
     it('starts the picker synchronously and closes only after verified receiving completes', async () => {
         const {file,chunks}=writable(), gate=deferred<void>();let inClick=true;
         const pick=vi.fn(()=>{expect(inClick).toBe(true);return Promise.resolve({createWritable:async()=>file});});

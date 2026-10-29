@@ -345,12 +345,15 @@ describe('material page client',()=>{
         [{...detailHeader,total:1},{type:'reference',value:{kind:'note',id:'',note:'text'}}],
         [detailHeader,...metadataRows({...metadata,archivedAt:-1}),{type:'complete',count:0}],
         [detailHeader,...metadataRows({...metadata,source:{kind:'video'}}),{type:'complete',count:0}],
+        [detailHeader,...metadataRows({...metadata,source:{...metadata.source,title:'x'.repeat(241)}}),{type:'complete',count:0}],
         [detailHeader,...metadataRows({...metadata,source:[]}),{type:'complete',count:0}],
         [detailHeader,...metadataRows({...metadata,locator:[]}),{type:'complete',count:0}],
         [detailHeader,...metadataRows({...metadata,locator:{kind:'video',startMs:-1}}),{type:'complete',count:0}],
         [detailHeader,...metadataRows({...metadata,locator:{kind:'document',page:0}}),{type:'complete',count:0}],
         [{...detailHeader,total:1},{type:'reference',value:[]}],
         [{...detailHeader,total:1},{type:'reference',value:{kind:'note',id:'n',excerpt:'x'.repeat(6001)}}],
+        [{...detailHeader,total:1},{type:'reference',value:{kind:'note',id:'n',updatedAt:-1}}],
+        [{...detailHeader,total:2,nextOffset:2},...metadataRows(metadata),{type:'reference',value:{kind:'note',id:'n'}},{type:'complete',count:1}],
         [{...detailHeader,total:25},...Array.from({length:25},(_,index)=>({type:'reference',value:{kind:'note',id:`n-${index}`}}))],
     ])('rejects inconsistent or malformed detail response %#',async(...values)=>{
         const fixture=serve(values);

@@ -5,6 +5,7 @@
  * 模块边界：不打开浏览器端口、不校验文件摘要或声称下载已完成；调用方须先校验完整传输，下载器须如实报告状态；内存缓存随文件大小增长，浏览器下载兼容性由接线和验收决定。
  */
 import {MaterialError} from './materialModel';
+import {assertMaterialBackupSafeCount} from './materialBackupSafeCount';
 import {MATERIAL_READ_FRAME_BYTES} from './materialReadTransport';
 
 export type MaterialBackupSaveState = 'saved'|'initiated';
@@ -89,7 +90,7 @@ export async function chooseMaterialBackupTarget(name:string, platform:MaterialB
     return {
         async write(chunk) {
             if (finished) throw new MaterialError('storage-error','材料备份保存已结束');
-            if (!Number.isSafeInteger(size + chunk.byteLength)) throw new MaterialError('limit-exceeded','材料备份超出当前保存容量限制');
+            assertMaterialBackupSafeCount(size + chunk.byteLength,'材料备份超出当前保存容量限制');
             for (let offset = 0; offset < chunk.byteLength;) {
                 current ??= new Uint8Array(64 * 1024);
                 const length = Math.min(current.length-used,chunk.byteLength-offset);

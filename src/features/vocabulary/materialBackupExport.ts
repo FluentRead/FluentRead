@@ -5,6 +5,7 @@
  * 模块边界：不安装消息监听或选择下载位置，不承担传输完整性和文件落盘；调用方必须校验完整传输并在失败时取消目标写入。单条记录仍由 IndexedDB 整体读取。
  */
 import {MaterialError} from './materialModel';
+import {assertMaterialBackupSafeCount} from './materialBackupSafeCount';
 import type {MaterialRepository} from './materialRepository';
 import {MATERIAL_READ_FRAME_BYTES} from './materialReadTransport';
 import {MATERIAL_IMPORT_FRAME_BYTES} from './materialProtocol';
@@ -120,11 +121,12 @@ export async function* streamMaterialBackup(repository:Repository, options:Mater
             const size=recordSize!;
             statistics.records++;statistics.recordBytes+=size;statistics.maxRecordBytes=Math.max(statistics.maxRecordBytes,size);
             statistics.frames+=Math.ceil(size/MATERIAL_IMPORT_FRAME_BYTES);recordSize=undefined;
-            if(!Number.isSafeInteger(statistics.recordBytes)||!Number.isSafeInteger(statistics.frames))throw new MaterialError('limit-exceeded','材料备份统计超出安全范围');
+            assertMaterialBackupSafeCount(statistics.recordBytes,'材料备份统计超出安全范围');
+            assertMaterialBackupSafeCount(statistics.frames,'材料备份统计超出安全范围');
             continue;
         }
         const encoded = encoder.encode(token);
-        if(recordSize!==undefined){recordSize+=encoded.length;if(!Number.isSafeInteger(recordSize))throw new MaterialError('limit-exceeded','材料备份统计超出安全范围');}
+        if(recordSize!==undefined){recordSize+=encoded.length;assertMaterialBackupSafeCount(recordSize,'材料备份统计超出安全范围');}
         for (let offset = 0; offset < encoded.length;) {
             const length = Math.min(buffer.length-used,encoded.length-offset);
             buffer.set(encoded.subarray(offset,offset+length),used); used += length; offset += length;

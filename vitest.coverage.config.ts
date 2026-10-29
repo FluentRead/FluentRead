@@ -22,6 +22,7 @@ export default defineConfig({
                 'src/features/vocabulary/materialBackupReader.ts',
                 'src/features/vocabulary/materialBackupRestore.ts',
                 'src/features/vocabulary/materialBackupExport.ts',
+                'src/features/vocabulary/materialBackupSafeCount.ts',
                 'src/features/vocabulary/materialBackupExportBridge.ts',
                 'src/features/vocabulary/materialBackupExportClient.ts',
                 'src/features/vocabulary/materialBackupExportProtocol.ts',

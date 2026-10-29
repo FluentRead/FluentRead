@@ -11,6 +11,9 @@ import {sha256} from '@noble/hashes/sha256';
 import {bytesToHex} from '@noble/hashes/utils';
 import {MaterialDatabase, MaterialRepository} from '@/src/features/vocabulary/materialRepository';
 import {streamMaterialBackup} from '@/src/features/vocabulary/materialBackupExport';
+import {assertMaterialBackupSafeCount} from '@/src/features/vocabulary/materialBackupSafeCount';
+import * as backupSafeCount from '@/src/features/vocabulary/materialBackupSafeCount';
+import {MaterialError} from '@/src/features/vocabulary/materialModel';
 import {MATERIAL_READ_FRAME_BYTES} from '@/src/features/vocabulary/materialReadTransport';
 import {prepareMaterialBackup, sendMaterialBackup} from '@/src/features/vocabulary/materialBackupReader';
 import {createStage} from '@/src/features/vocabulary/materialImportStage';
@@ -50,6 +53,23 @@ const text = (bytes:Uint8Array) => new TextDecoder('utf-8',{fatal:true}).decode(
 const backup = (materials:MaterialRecord[],exportedAt=123) => ({format:'fluentread-learning-materials',version:1,exportedAt,materials});
 
 describe('streamed material backup', () => {
+    it('propagates a failed count validation without completing the backup',async()=>{
+        const failure=new MaterialError('limit-exceeded','材料备份统计超出安全范围'),report=vi.fn();
+        const repo=fake([record('count-failure')]);
+        // Simulate the shared guard's failure; this is not a >2^53-byte input.
+        const guard=vi.spyOn(backupSafeCount,'assertMaterialBackupSafeCount').mockImplementationOnce(()=>{throw failure;});
+        try{
+            await expect(collect(streamMaterialBackup(repo,{exportedAt:1,onStatistics:report}))).rejects.toBe(failure);
+            expect(repo.checkSnapshot).not.toHaveBeenCalled();expect(report).not.toHaveBeenCalled();
+        }finally{guard.mockRestore();}
+    });
+    it.each(['材料备份统计超出安全范围','材料备份超出当前保存容量限制'])('guards safe-integer boundaries with the correct backup error: %s',message=>{
+        for(const value of [Number.MAX_SAFE_INTEGER,Number.MIN_SAFE_INTEGER,0])expect(()=>assertMaterialBackupSafeCount(value,message)).not.toThrow();
+        for(const value of [Number.MAX_SAFE_INTEGER+1,Number.MIN_SAFE_INTEGER-1,NaN,Infinity,0.5]){
+            try{assertMaterialBackupSafeCount(value,message);throw Error('expected failure');}
+            catch(error){expect(error).toBeInstanceOf(MaterialError);expect(error).toMatchObject({code:'limit-exceeded',message});}
+        }
+    });
     it('matches compact JSON.stringify bytes, preserving fields and property order', async () => {
         const records = [record('one',{extra:{value:'中文😀\ud800\udc00\ud800',missing:undefined,empty:null},
             locator:{kind:'text',quote:'" \\ \n \t \u0001'}, topics:['one','two'],

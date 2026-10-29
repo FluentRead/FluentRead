@@ -10,6 +10,8 @@ import {bytesToHex} from '@noble/hashes/utils';
 import {chooseMaterialBackupTarget, saveMaterialBackup, waitForMaterialBackupTarget, type MaterialBackupSaveTarget, type MaterialBackupWritable} from '@/src/features/vocabulary/materialBackupSave';
 import {MATERIAL_INLINE_BACKUP_MAX_BYTES} from '@/src/features/vocabulary/materialProtocol';
 import {MATERIAL_READ_FRAME_BYTES} from '@/src/features/vocabulary/materialReadTransport';
+import * as backupSafeCount from '@/src/features/vocabulary/materialBackupSafeCount';
+import {MaterialError} from '@/src/features/vocabulary/materialModel';
 
 function writable() {
     const chunks:Uint8Array[] = [];
@@ -19,6 +21,20 @@ function writable() {
 function deferred<T>() {let resolve!:(value:T)=>void;let reject!:(error:unknown)=>void;const promise=new Promise<T>((yes,no)=>{resolve=yes;reject=no;});return {promise,resolve,reject};}
 
 describe('material backup save targets', () => {
+    it('rejects a buffered write with the original count failure and permits cleanup',async()=>{
+        const failure=new MaterialError('limit-exceeded','材料备份超出当前保存容量限制'),download=vi.fn();
+        const target=await chooseMaterialBackupTarget('materials.json',{downloadBuffered:download});
+        await target.write(new Uint8Array([1,2]));
+        // Simulate the shared guard's failure; this is not a >2^53-byte input.
+        const guard=vi.spyOn(backupSafeCount,'assertMaterialBackupSafeCount').mockImplementationOnce(()=>{throw failure;});
+        try{
+            const result=target.write(new Uint8Array([3]));
+            expect(result).toBeInstanceOf(Promise);await expect(result).rejects.toBe(failure);
+            expect(download).not.toHaveBeenCalled();await target.abort(failure);
+            await expect(target.write(new Uint8Array([4]))).rejects.toMatchObject({code:'storage-error'});
+            expect(download).not.toHaveBeenCalled();
+        }finally{guard.mockRestore();await target.abort(failure);}
+    });
     it('cancels pending target selection immediately and aborts a target that arrives later',async()=>{
         const pending=deferred<MaterialBackupSaveTarget>(),controller=new AbortController();
         const target:MaterialBackupSaveTarget={write:vi.fn(async()=>{}),commit:vi.fn(async()=> 'saved' as const),abort:vi.fn(async()=>{})};

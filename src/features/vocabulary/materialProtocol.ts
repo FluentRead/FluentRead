@@ -8,7 +8,13 @@ import type {DocumentMaterialReference} from '@/src/features/document-translatio
 
 export const MATERIAL_MESSAGE = 'fluentReadMaterials' as const;
 export const MATERIAL_CHANGED_MESSAGE = 'fluentReadMaterialsChanged' as const;
-export const MATERIAL_BACKUP_MAX_BYTES = 20 * 1024 * 1024;
+/** 较小文件沿用直接 JSON.parse 恢复；这不是分片恢复的总量上限。 */
+export const MATERIAL_INLINE_BACKUP_MAX_BYTES = 20 * 1024 * 1024;
+/** 大备份暂存的当前默认预算；设备动态预算若启用，须同步更新读取端的准入方式。 */
+export const MATERIAL_IMPORT_FRAME_BYTES = 128 * 1024;
+export const MATERIAL_IMPORT_MAX_RECORD_BYTES = 128 * 1024 * 1024;
+export const MATERIAL_IMPORT_MAX_TOTAL_BYTES = 256 * 1024 * 1024;
+export const MATERIAL_IMPORT_MAX_FRAMES = 20_000;
 export type MaterialKind = 'article' | 'document' | 'video';
 export interface MaterialSource {kind: MaterialKind; url?: string; title?: string; fingerprint?: string}
 export interface MaterialLocator {
@@ -43,6 +49,8 @@ export type MaterialResponse<T = unknown> = {success: true; data: T} | {success:
 export interface MaterialBackup {format: 'fluentread-learning-materials'; version: 1; exportedAt: number; materials: MaterialRecord[]}
 export interface MaterialOperationGuard {generation: number; capturedAt: number}
 export interface MaterialImportResult {inserted: number; updated: number; skipped: number}
+/** 设置页写入成功后只传递 ID；未知结果必须重新读取，不能盲目重放写入。 */
+export interface MaterialWorkspaceWriteReceipt {id: string}
 export type MaterialRequest =
     | {type: typeof MATERIAL_MESSAGE; action: 'list'; options?: MaterialListOptions}
     | {type: typeof MATERIAL_MESSAGE; action: 'generation'}
@@ -52,4 +60,8 @@ export type MaterialRequest =
     | {type: typeof MATERIAL_MESSAGE; action: 'update'; id: string; patch: MaterialPatch}
     | {type: typeof MATERIAL_MESSAGE; action: 'archive' | 'restore'; id: string}
     | {type: typeof MATERIAL_MESSAGE; action: 'clear' | 'exportData'}
-    | {type: typeof MATERIAL_MESSAGE; action: 'importData'; data: unknown; guard?: MaterialOperationGuard};
+    | {type: typeof MATERIAL_MESSAGE; action: 'importData'; data: unknown; guard?: MaterialOperationGuard}
+    | {type: typeof MATERIAL_MESSAGE; action: 'workspaceCapture'; input: MaterialCaptureInput}
+    | {type: typeof MATERIAL_MESSAGE; action: 'workspaceUpdate'; id: string; patch: MaterialPatch}
+    | {type: typeof MATERIAL_MESSAGE; action: 'workspaceRemoveReference'; id: string; kind: MaterialReference['kind']; referenceId: string}
+    | {type: typeof MATERIAL_MESSAGE; action: 'workspaceArchive' | 'workspaceRestore'; id: string};

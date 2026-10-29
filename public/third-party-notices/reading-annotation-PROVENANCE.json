@@ -57,9 +57,11 @@
     "npmGitHead": "e529729b923f8a9d9acc62b2c9c0887b00e9bd88",
     "source": "https://github.com/gerosyab/koroman/tree/e529729b923f8a9d9acc62b2c9c0887b00e9bd88",
     "upstreamLicenseBlob": "970a4da6f0407fe4a45858c88f37890e2b44ca61",
-    "licenseNormalization": "Original malformed LICENSE preserved separately; only merge-conflict markers and duplicate heading removed from reading-koroman-MIT.txt",
+    "licenseNormalization": "Original malformed LICENSE preserved byte-for-byte in the gzip archive; only merge-conflict markers and duplicate heading removed from reading-koroman-MIT.txt",
     "coreSha256": "ec1891ef55a6ec92d1fd9447e95f9b0ba9b12caaa40907378e9a863d7bdfbd7e",
-    "implementationChanges": "none; imported from fixed npm package"
+    "implementationChanges": "none; imported from fixed npm package",
+    "upstreamLicenseArchive": "reading-koroman-upstream-LICENSE.txt.gz",
+    "upstreamLicenseSha256": "8e140c804d0226d197db528f1653ede195ab254935b4fa18bc81f1ea455614ca"
   },
   "pinyinProData": {
     "package": "@pinyin-pro/data@1.3.1",

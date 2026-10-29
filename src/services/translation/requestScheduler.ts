@@ -233,13 +233,23 @@ export function createTranslationRequestScheduler(
         return state;
     }
 
-    function refreshActiveBuckets(config: TranslationRequestSchedulerConfig): void {
+    function refreshActiveBuckets(config: TranslationRequestSchedulerConfig, current: number): void {
         // 用户可在请求仍运行时切换沿用/自定义。启动时的 bucket 已不是当前约束，
-        // 因此按稳定请求身份重新投影所有在途任务；starts 继续保留原速率历史。
+        // 因此按稳定请求身份重新投影所有在途任务；starts 继续保留窗口内速率历史。
         // settled 仅表示调用方收到结果，holdUntil 未结束的 transport 仍在集合里。
-        for (const state of buckets.values()) state.active = 0;
+        // 失效的模型配置不会再访问对应 bucket；在完整扫描时清理其过期历史，
+        // 避免后台生命周期内模型不断切换导致状态和每次扫描成本持续增长。
+        const emptyKeys: string[] = [];
+        for (const [key, state] of buckets) {
+            state.active = 0;
+            prune(state, current);
+            if (state.starts.length === 0) emptyKeys.push(key);
+        }
         for (const entry of activeRequests) {
             for (const key of keysFor(entry.identity, config)) stateFor(key).active += 1;
+        }
+        for (const key of emptyKeys) {
+            if (buckets.get(key)?.active === 0) buckets.delete(key);
         }
     }
 
@@ -417,7 +427,7 @@ export function createTranslationRequestScheduler(
                 }
                 if (!incremental) {
                     resetDrainMemo();
-                    refreshActiveBuckets(config);
+                    refreshActiveBuckets(config, current);
                     rejectInactive(current);
                 }
                 let earliest = incremental ? incremental.wakeAt - current : Number.POSITIVE_INFINITY;

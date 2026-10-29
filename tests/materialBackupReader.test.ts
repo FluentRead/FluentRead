@@ -1,0 +1,652 @@
+import 'fake-indexeddb/auto';
+import Dexie from 'dexie';
+import {afterEach, describe, expect, it, vi} from 'vitest';
+import {sha256} from '@noble/hashes/sha256';
+import {bytesToHex} from '@noble/hashes/utils';
+import {prepareMaterialBackup, sendMaterialBackup} from '@/src/features/vocabulary/materialBackupReader';
+import {createStage} from '@/src/features/vocabulary/materialImportStage';
+import {createMaterialImportCapability} from '@/src/features/vocabulary/materialImportPort';
+import {MaterialDatabase, MaterialRepository} from '@/src/features/vocabulary/materialRepository';
+import type {Frame} from '@/src/features/vocabulary/materialImportStage';
+
+const wrap = (records: string, version = '1') => `{"format":"fluentread-learning-materials","version":${version},"materials":[${records}]}`;
+function splitRecordAtChunk(record: string, token: string): string {
+  const prefix = '{"format":"fluentread-learning-materials","version":1,"padding":"';
+  const middle = '","materials":[';
+  const offset = record.indexOf(token);
+  if (offset < 0) throw Error('test token is missing');
+  return prefix + 'x'.repeat(65535 - prefix.length - middle.length - offset) + middle + record + ']}';
+}
+const encoder = new TextEncoder();
+const dbs: MaterialDatabase[] = [];
+let serial = 0;
+function database() {const result = new MaterialDatabase(`material-reader-test-${++serial}`); dbs.push(result); return result;}
+afterEach(async () => {for (const db of dbs.splice(0)) {const name = db.name; db.close(); await Dexie.delete(name);}});
+async function read(blob: Blob) {
+  const prepared = await prepareMaterialBackup(blob), frames: Frame[] = [];
+  await sendMaterialBackup(blob, prepared, async frame => {frames.push(frame);});
+  const actual = [];
+  for (let i = 0; i < prepared.manifest.records; i++) actual.push(JSON.parse(await new Blob(frames.filter(frame => frame.record === i).map(frame => frame.bytes)).text()));
+  return {prepared, frames, actual};
+}
+
+describe('material backup source reader', () => {
+  it('rejects a changed Blob size after scanning instead of accepting an inconsistent plan', async () => {
+    class ChangingSize extends Blob {
+      reads = 0;
+      get size() {return super.size - (++this.reads === 1 ? 1 : 0);}
+    }
+    const source = new ChangingSize([wrap('')]);
+    await expect(prepareMaterialBackup(source)).rejects.toThrow('备份文件在读取过程中改变');
+    expect(source.reads).toBe(2);
+  });
+  it('keeps its initial read bound when a Blob later reports an infinite size', async () => {
+    const json = wrap(''), block = json + ' '.repeat(65536 - json.length);
+    class GrowingSize extends Blob {
+      reads = 0; slices = 0;
+      get size() {return ++this.reads === 1 ? 65536 : Infinity;}
+      slice(start?: number, end?: number) {
+        if (++this.slices > 2) throw Error('unexpected extra read');
+        return new Blob([start === 0 ? block : ' '.repeat((end ?? 0) - (start ?? 0))]);
+      }
+    }
+    const source = new GrowingSize([block]);
+    await expect(prepareMaterialBackup(source)).rejects.toThrow('备份文件在读取过程中改变');
+    expect(source.slices).toBe(1); expect(source.reads).toBe(2);
+  });
+  it('rejects a size change while rereading a long version token', async () => {
+    const version = '1.' + '0'.repeat(1200), json = wrap('', version), start = json.indexOf(version);
+    class ChangingDuringVersion extends Blob {
+      changed = false;
+      get size() {return super.size + Number(this.changed);}
+      slice(from?: number, to?: number, type?: string) {
+        if (from === start) this.changed = true;
+        return super.slice(from, to, type);
+      }
+    }
+    const source = new ChangingDuringVersion([json]);
+    await expect(prepareMaterialBackup(source)).rejects.toThrow('备份文件在读取过程中改变');
+    expect(source.changed).toBe(true);
+  });
+  it.each([-1, NaN, Infinity, Number.MAX_SAFE_INTEGER + 1])('rejects invalid initial Blob size before reading: %s', async size => {
+    class InvalidSize extends Blob {get size() {return size;}}
+    const source = new InvalidSize([wrap('')]), readSlice = vi.spyOn(source, 'slice');
+    await expect(prepareMaterialBackup(source)).rejects.toThrow('无效的备份文件');
+    expect(readSlice).not.toHaveBeenCalled();
+  });
+  it('retains exact last-key, UTF-8 replacement, numeric and long-token semantics', async () => {
+    const title = 'A' + '\u0315'.repeat(131072) + '\u0300', number = '1' + '0'.repeat(140000) + 'e-140000';
+    const prefix = `\ufeff{"format":"bad","format":"fluentread-learning-materials","version":2,"version":1,"materials":[0],"m\\u0061terials":[{"title":${JSON.stringify(title)},"number":${number},"negative":-0,"huge":1e400,"value":"`;
+    const blob = new Blob([encoder.encode(prefix), new Uint8Array([0xe0, 0x80, 0x80]), encoder.encode('\\ud800","value":"x"}]}')]);
+    const {actual} = await read(blob), expected = JSON.parse(await blob.text()).materials;
+    expect(actual).toEqual(expected);
+    expect((actual[0].title as string).normalize('NFC')[0]).toBe('À');
+    expect(Object.is(actual[0].negative, -0)).toBe(true); expect(actual[0].huge).toBe(Infinity);
+  });
+  it('preserves escaped ASCII and positive and negative numeric forms', async () => {
+    const value = wrap('{"s":"\\\"\\\\\\/\\b\\f\\n\\r\\t","numbers":[-3,-0,0.2,0e1,1.1e1]}');
+    expect((await read(new Blob([value]))).actual).toEqual(JSON.parse(value).materials);
+  });
+  it.each([
+    '{"format":"fluentread-learning-materials","version":1,"materials":[1,],"materials":[]}',
+    '{"format":"fluentread-learning-materials","version":1,"materials":[],"ignored":{"x":01}}',
+    '{"format":"fluentread-learning-materials","version":1,"materials":[]}x',
+    '{"format":"fluentread-learning-materials","version":1,"materials":[],}',
+    '{"format":"fluentread-learning-materials","version":1,"materials":["a\\u00xy"]}',
+    '{"format":"fluentread-learning-materials","version":1,"materials":[1e+]}',
+    '{"format":"fluentread-learning-materials","version":1,"materials":[true false]}',
+    '{"format":"fluentread-learning-materials","version":1,"materials":[-x]}',
+    '{"format":"fluentread-learning-materials","version":1,"materials":[0e]}',
+    '{"format":"fluentread-learning-materials","version":1,"materials":[0.]}',
+    '{"format":"fluentread-learning-materials","version":1,"materials":[0.1e+]}',
+    '{"format":"fluentread-learning-materials","version":1,"materials":[truex]}',
+    '{"format":"fluentread-learning-materials","version":1,"materials":[{"a":[1}}]}',
+    '{"format":"fluentread-learning-materials","version":1,"materials":[{"a":{]}}]}',
+    '{"format":"fluentread-learning-materials","version":1,"materials":["\\z"]}',
+    '{"format":"fluentread-learning-materials","version":1,"materials":[{}',
+    '\ufeff',
+  ])('rejects malformed syntax even in ignored and overwritten fields', async value => {
+    expect(() => JSON.parse(value)).toThrow(); await expect(prepareMaterialBackup(new Blob([value]))).rejects.toBeInstanceOf(SyntaxError);
+  });
+  it('uses native JSON number conversion for long version and rejects other versions', async () => {
+    const one = '1' + '0'.repeat(140000) + 'e-140000', two = '2' + '0'.repeat(140000) + 'e-140000';
+    expect((await prepareMaterialBackup(new Blob([wrap('', one)]))).manifest.records).toBe(0);
+    await expect(prepareMaterialBackup(new Blob([wrap('', two)]))).rejects.toThrow('不支持');
+  });
+  it('checks the full long version token when rereading it', async () => {
+    const old = '2' + '0'.repeat(140000) + 'e-140000', next = '1' + '0'.repeat(140000) + 'e-140000';
+    const raw = wrap('', old), start = raw.indexOf(old), source = new Blob([raw]), original = source.slice.bind(source);
+    source.slice = (from, to) => from === start ? new Blob([next.slice(0, (to ?? raw.length) - start)]) : original(from, to);
+    await expect(prepareMaterialBackup(source)).rejects.toThrow('改变');
+  });
+  it('accepts a valid version at the resource boundary while yielding between reads', async () => {
+    const version = '1.' + '0'.repeat(1024 * 1024 - 2), controller = new AbortController();
+    const result = await prepareMaterialBackup(new Blob([wrap('', version)]), {signal: controller.signal});
+    expect(result.manifest.records).toBe(0);
+  });
+  it('bounds exceptionally large version tokens and nesting depth with clear errors', async () => {
+    const version = '1.' + '0'.repeat(1024 * 1024);
+    expect(JSON.parse(version)).toBe(1);
+    await expect(prepareMaterialBackup(new Blob([wrap('', version)]))).rejects.toMatchObject({name: 'MaterialBackupCapacityError', message: '备份版本字段超过恢复大小限制'});
+    const deep = `{"format":"fluentread-learning-materials","version":1,"materials":[],"unknown":${'['.repeat(1024)}0${']'.repeat(1024)}}`;
+    expect(JSON.parse(deep).materials).toEqual([]);
+    await expect(prepareMaterialBackup(new Blob([deep]))).rejects.toMatchObject({name: 'MaterialBackupCapacityError', message: '备份文件嵌套层级超过恢复限制'});
+  });
+  it('bounds work for an oversized version overwritten later while still validating the full source', async () => {
+    const version = '1.' + '0'.repeat(3 * 1024 * 1024);
+    const prefix = '{"format":"fluentread-learning-materials","version":';
+    const suffix = ',"version":1,"materials":[]}';
+    const source = new Blob([prefix, version, suffix]);
+    const decode = vi.spyOn(TextDecoder.prototype, 'decode');
+    try {
+      const prepared = await prepareMaterialBackup(source);
+      expect(prepared.manifest.records).toBe(0);
+      const streamedBytes = decode.mock.calls.filter(([, options]) => options?.stream === true)
+        .reduce((total, [input]) => total + (input?.byteLength ?? 0), 0);
+      // One crossing chunk and the final one-byte version are the only excess work.
+      expect(streamedBytes).toBeGreaterThan(1024 * 1024);
+      expect(streamedBytes).toBeLessThanOrEqual(1024 * 1024 + 65536 + 1);
+      expect(prepared.plan.fileDigest).toBe(bytesToHex(sha256(new Uint8Array(await source.arrayBuffer()))));
+
+      const changed = new Uint8Array(await source.arrayBuffer());
+      changed[prefix.length + 2 * 1024 * 1024] = 49;
+      const altered = new Blob([changed]), originalSlice = source.slice.bind(source);
+      source.slice = (start, end, type) => altered.slice(start, end, type);
+      try {await expect(sendMaterialBackup(source, prepared, async () => {})).rejects.toThrow('改变');}
+      finally {source.slice = originalSlice;}
+
+      const malformed = new Blob([prefix, version, ',"version":1,"materials":[],"ignored":[1,]}']);
+      await expect(prepareMaterialBackup(malformed)).rejects.toBeInstanceOf(SyntaxError);
+    } finally {decode.mockRestore();}
+  });
+  it.each([
+    {frame: 8, record: 4, frames: 100, records: '"abcd"'},
+    {frame: 2, record: 100, frames: 1, records: '"ab"'},
+  ])('rejects a record or frame protocol limit after one scan', async ({frame, record, frames, records}) => {
+    vi.resetModules();
+    vi.doMock('@/src/features/vocabulary/materialProtocol', async importOriginal => ({
+      ...await importOriginal<object>(), MATERIAL_IMPORT_FRAME_BYTES: frame, MATERIAL_IMPORT_MAX_RECORD_BYTES: record,
+      MATERIAL_IMPORT_MAX_FRAMES: frames,
+    }));
+    try {
+      const reader = await import('@/src/features/vocabulary/materialBackupReader'), blob = new Blob([wrap(records)]), original = blob.slice.bind(blob);
+      let reads = 0; blob.slice = (start, end) => {reads++; return original(start, end);};
+      await expect(reader.prepareMaterialBackup(blob)).rejects.toMatchObject({name: 'MaterialBackupCapacityError', message: '材料备份超过当前恢复容量限制'});
+      expect(reads).toBe(1);
+    } finally {vi.doUnmock('@/src/features/vocabulary/materialProtocol'); vi.resetModules();}
+  });
+  it('sends a valid prepared backup at both record and total frame limits', async () => {
+    vi.resetModules();
+    vi.doMock('@/src/features/vocabulary/materialProtocol', async importOriginal => ({
+      ...await importOriginal<object>(), MATERIAL_IMPORT_FRAME_BYTES: 2, MATERIAL_IMPORT_MAX_RECORD_BYTES: 4,
+      MATERIAL_IMPORT_MAX_FRAMES: 4,
+    }));
+    try {
+      const reader = await import('@/src/features/vocabulary/materialBackupReader');
+      const source = new Blob([wrap('"ab","cd"')]), plan = await reader.prepareMaterialBackup(source), frames: Frame[] = [];
+      expect(plan.manifest).toMatchObject({records: 2, bytes: 8, frames: 4});
+      await reader.sendMaterialBackup(source, plan, async frame => {frames.push(frame);});
+      expect(frames.map(frame => [frame.record, frame.part, frame.bytes.length])).toEqual([[0,0,2],[0,1,2],[1,0,2],[1,1,2]]);
+      expect(await new Blob(frames.map(frame => frame.bytes)).text()).toBe('"ab""cd"');
+    } finally {vi.doUnmock('@/src/features/vocabulary/materialProtocol'); vi.resetModules();}
+  });
+  it('lets the background budget admit records exceeding the former fixed total', async () => {
+    vi.resetModules();
+    vi.doMock('@/src/features/vocabulary/materialProtocol', async importOriginal => ({
+      ...await importOriginal<object>(), MATERIAL_IMPORT_FRAME_BYTES: 8, MATERIAL_IMPORT_MAX_RECORD_BYTES: 100,
+      MATERIAL_IMPORT_MAX_TOTAL_BYTES: 5, MATERIAL_IMPORT_MAX_FRAMES: 100,
+    }));
+    try {
+      const reader = await import('@/src/features/vocabulary/materialBackupReader'), source = new Blob([wrap('"a","b"')]);
+      const plan = await reader.prepareMaterialBackup(source), frames: Frame[] = [];
+      expect(plan.manifest.bytes).toBe(6);
+      await reader.sendMaterialBackup(source, plan, async frame => {frames.push(frame);});
+      expect(frames.map(frame => frame.record)).toEqual([0, 1]);
+      expect((await Promise.all(frames.map(frame => new Blob([frame.bytes]).text()))).map(value => JSON.parse(value))).toEqual(['a','b']);
+    } finally {vi.doUnmock('@/src/features/vocabulary/materialProtocol'); vi.resetModules();}
+  });
+  it('validates the entire file before applying the record limit to the last materials key', async () => {
+    vi.resetModules();
+    vi.doMock('@/src/features/vocabulary/materialProtocol', async importOriginal => ({
+      ...await importOriginal<object>(), MATERIAL_IMPORT_FRAME_BYTES: 8, MATERIAL_IMPORT_MAX_RECORD_BYTES: 4,
+      MATERIAL_IMPORT_MAX_FRAMES: 100,
+    }));
+    try {
+      const reader = await import('@/src/features/vocabulary/materialBackupReader');
+      const first = `"${'x'.repeat(70_000)}"`;
+      const source = `{"format":"fluentread-learning-materials","version":1,"materials":[${first}],"materials":["a"]}`;
+      const blob = new Blob([source]);
+      const plan = await reader.prepareMaterialBackup(blob), frames: Frame[] = [];
+      await reader.sendMaterialBackup(blob, plan, async frame => {frames.push(frame);});
+      expect(plan.manifest.records).toBe(1);
+      expect(await new Blob(frames.map(frame => frame.bytes)).text()).toBe('"a"');
+      await expect(reader.prepareMaterialBackup(new Blob([source.slice(0, -1) + ',"ignored":[1,]}'])))
+        .rejects.toBeInstanceOf(SyntaxError);
+      const oversizedLast = `{"format":"fluentread-learning-materials","version":1,"materials":["a"],"materials":[${first}]}`;
+      await expect(reader.prepareMaterialBackup(new Blob([oversizedLast]))).rejects.toMatchObject({name: 'MaterialBackupCapacityError'});
+    } finally {vi.doUnmock('@/src/features/vocabulary/materialProtocol'); vi.resetModules();}
+  });
+  it('bounds decoding of overwritten oversized records while preserving raw hash and invalid UTF-8 semantics', async () => {
+    vi.resetModules();
+    vi.doMock('@/src/features/vocabulary/materialProtocol', async importOriginal => ({
+      ...await importOriginal<object>(), MATERIAL_IMPORT_FRAME_BYTES: 8, MATERIAL_IMPORT_MAX_RECORD_BYTES: 4,
+      MATERIAL_IMPORT_MAX_FRAMES: 100,
+    }));
+    const decode = vi.spyOn(TextDecoder.prototype, 'decode');
+    try {
+      const reader = await import('@/src/features/vocabulary/materialBackupReader');
+      const prefix = encoder.encode('{"format":"fluentread-learning-materials","version":1,"materials":["');
+      const badUtf8 = new Uint8Array(2 * 1024 * 1024); badUtf8.fill(0xff);
+      const suffix = encoder.encode('"],"materials":["a"]}');
+      const source = new Blob([prefix, badUtf8, suffix]);
+      const expected = JSON.parse(await source.text()).materials;
+      decode.mockClear();
+      const prepared = await reader.prepareMaterialBackup(source);
+      expect(prepared.plan.fileDigest).toBe(bytesToHex(sha256(new Uint8Array(await source.arrayBuffer()))));
+      expect(decode.mock.calls.filter(([, options]) => options?.stream === true).length).toBeLessThan(8);
+      const frames: Frame[] = []; await reader.sendMaterialBackup(source, prepared, async frame => {frames.push(frame);});
+      expect(JSON.parse(await new Blob(frames.map(frame => frame.bytes)).text())).toEqual(expected[0]);
+      const changed = new Uint8Array(await source.arrayBuffer()); changed[prefix.length + 8] = 0xfe;
+      const changedBlob = new Blob([changed]), changedSliceOriginal = source.slice.bind(source);
+      source.slice = (start, end, type) => changedBlob.slice(start, end, type);
+      try {await expect(reader.sendMaterialBackup(source, prepared, async () => {})).rejects.toThrow('改变');}
+      finally {source.slice = changedSliceOriginal;}
+      const malformed = new Blob([prefix, badUtf8, encoder.encode('"],"materials":["a"],"ignored":[1,]}')]);
+      await expect(reader.prepareMaterialBackup(malformed)).rejects.toBeInstanceOf(SyntaxError);
+      const finalTooLarge = new Blob([prefix, badUtf8, encoder.encode('"]}')]);
+      await expect(reader.prepareMaterialBackup(finalTooLarge)).rejects.toMatchObject({name: 'MaterialBackupCapacityError'});
+      const sameChunk = new Blob(['{"format":"fluentread-learning-materials","version":1,"materials":["oversized","a"],"materials":["b"]}']);
+      expect((await reader.prepareMaterialBackup(sameChunk)).manifest.records).toBe(1);
+      await expect(reader.prepareMaterialBackup(new Blob([wrap('"oversized","a"')]))).rejects.toMatchObject({name: 'MaterialBackupCapacityError'});
+      const abortSource = source.slice(), originalSlice = abortSource.slice.bind(abortSource), controller = new AbortController();
+      let slices = 0;
+      abortSource.slice = (start, end, type) => {const part = originalSlice(start, end, type); if (++slices === 3) controller.abort(); return part;};
+      await expect(reader.prepareMaterialBackup(abortSource, {signal: controller.signal})).rejects.toMatchObject({name: 'AbortError'});
+      expect(slices).toBe(3);
+    } finally {decode.mockRestore();vi.doUnmock('@/src/features/vocabulary/materialProtocol'); vi.resetModules();}
+  });
+  it('uses decoded UTF-8 length at the exact material record boundary', async () => {
+    vi.resetModules();
+    vi.doMock('@/src/features/vocabulary/materialProtocol', async importOriginal => ({
+      ...await importOriginal<object>(), MATERIAL_IMPORT_FRAME_BYTES: 8, MATERIAL_IMPORT_MAX_RECORD_BYTES: 5,
+      MATERIAL_IMPORT_MAX_FRAMES: 100,
+    }));
+    try {
+      const reader = await import('@/src/features/vocabulary/materialBackupReader');
+      const prefix = encoder.encode(wrap('"').slice(0, -2));
+      const source = new Blob([prefix, new Uint8Array([0xff]), encoder.encode('"]}')]);
+      const prepared = await reader.prepareMaterialBackup(source);
+      expect(prepared.manifest.bytes).toBe(5); // 两个引号加替换字符的三个 UTF-8 字节。
+      const frames: Frame[] = []; await reader.sendMaterialBackup(source, prepared, async frame => {frames.push(frame);});
+      expect(JSON.parse(await new Blob(frames.map(frame => frame.bytes)).text())).toBe('\ufffd');
+      const tooLarge = new Blob([prefix, new Uint8Array([0xff, 0xff]), encoder.encode('"]}')]);
+      await expect(reader.prepareMaterialBackup(tooLarge)).rejects.toMatchObject({name: 'MaterialBackupCapacityError'});
+    } finally {vi.doUnmock('@/src/features/vocabulary/materialProtocol'); vi.resetModules();}
+  });
+  it('counts a UTF-8 character split across source chunks at the exact boundary', async () => {
+    const prefix = encoder.encode('{"format":"fluentread-learning-materials","version":1,"materials":["');
+    const pad = new Uint8Array(65535 - prefix.length); pad.fill(0x61);
+    const limit = pad.length + 6; // 两个引号和四字节字符。
+    vi.resetModules();
+    vi.doMock('@/src/features/vocabulary/materialProtocol', async importOriginal => ({
+      ...await importOriginal<object>(), MATERIAL_IMPORT_FRAME_BYTES: 128 * 1024, MATERIAL_IMPORT_MAX_RECORD_BYTES: limit,
+      MATERIAL_IMPORT_MAX_FRAMES: 100,
+    }));
+    try {
+      const reader = await import('@/src/features/vocabulary/materialBackupReader');
+      const emoji = encoder.encode('😀'), source = new Blob([prefix, pad, emoji, encoder.encode('"]}')]);
+      const prepared = await reader.prepareMaterialBackup(source);
+      expect(prepared.manifest.bytes).toBe(limit);
+      const frames: Frame[] = []; await reader.sendMaterialBackup(source, prepared, async frame => {frames.push(frame);});
+      expect(JSON.parse(await new Blob(frames.map(frame => frame.bytes)).text())).toBe('a'.repeat(pad.length) + '😀');
+      const tooLong = new Blob([prefix, pad, emoji, encoder.encode('x"]}')]);
+      await expect(reader.prepareMaterialBackup(tooLong)).rejects.toMatchObject({name: 'MaterialBackupCapacityError'});
+    } finally {vi.doUnmock('@/src/features/vocabulary/materialProtocol'); vi.resetModules();}
+  });
+  it('rejects wrong scalar metadata and unknown oversized keys do not shadow known keys', async () => {
+    const key = 'version' + 'x'.repeat(140000), escapedFormat = [...'format'].map(ch => `\\u${ch.charCodeAt(0).toString(16).padStart(4, '0')}`).join('');
+    const text = `{"${key}":3,"${escapedFormat}":"fluentread-learning-materials","version":1,"materials":[{},[]]}`;
+    expect((await read(new Blob([text]))).actual).toEqual(JSON.parse(text).materials);
+    await expect(prepareMaterialBackup(new Blob([wrap('', JSON.stringify('x'.repeat(2048)))]))).rejects.toThrow('不支持');
+    await expect(prepareMaterialBackup(new Blob(['[]']))).rejects.toThrow('不支持');
+    await expect(prepareMaterialBackup(new Blob([wrap('') + ' true']))).rejects.toBeInstanceOf(SyntaxError);
+  });
+  it('validates all JSON and selects the final materials value including over-limit overwritten arrays', async () => {
+    const value = `{"format":"fluentread-learning-materials","version":1,"materials":[${Array(10001).fill('null').join(',')}],"materials":[-0]}`;
+    const result = await read(new Blob([value]));
+    expect(result.prepared.manifest.records).toBe(1); expect(Object.is(result.actual[0], -0)).toBe(true);
+    await expect(prepareMaterialBackup(new Blob([value.replace('"materials":[-0]', '"materials":null')]))).rejects.toThrow('不支持');
+    await expect(prepareMaterialBackup(new Blob([wrap(Array(10001).fill('null').join(','))]))).rejects.toThrow('超过材料上限');
+  });
+  it('matches JSON.parse when malformed UTF-8 crosses the 64 KiB source boundary', async () => {
+    const prefix = '{"format":"fluentread-learning-materials","version":1,"materials":[{"value":"';
+    const pad = new Uint8Array(65535 - encoder.encode(prefix).length); pad.fill(0x61);
+    const source = new Blob([encoder.encode(prefix), pad, new Uint8Array([0xf0, 0x9f, 0x28, 0xff]), encoder.encode('"}]}')]);
+    expect((await read(source)).actual).toEqual(JSON.parse(await source.text()).materials);
+  });
+  it.each([
+    ['{"text":"\\uD83D\\uDE00"}', '\\uD83D'],
+    ['{"text":"before\\\"after"}', '\\\"'],
+    ['{"number":-0.001e-7}', 'e-7'],
+    ['{"values":[true,false,null]}', 'false'],
+  ])('preserves JSON tokens split across the 64 KiB source boundary: %s', async (record, token) => {
+    const text = splitRecordAtChunk(record, token);
+    expect(text.indexOf(token)).toBe(65535);
+    const actual = await read(new Blob([text]));
+    expect(actual.actual).toEqual(JSON.parse(text).materials);
+    expect(actual.prepared.manifest.records).toBe(1);
+  });
+  it.each([
+    ['{"text":"\\u12G0"}', '\\u12G0'],
+    ['{"number":1e+}', 'e+'],
+    ['{"value":truX}', 'truX'],
+  ])('rejects malformed JSON tokens split across the 64 KiB source boundary: %s', async (record, token) => {
+    const text = splitRecordAtChunk(record, token);
+    expect(text.indexOf(token)).toBe(65535);
+    expect(() => JSON.parse(text)).toThrow(SyntaxError);
+    await expect(prepareMaterialBackup(new Blob([text]))).rejects.toBeInstanceOf(SyntaxError);
+  });
+  it('replaces incomplete UTF-8 immediately before the end of a record', async () => {
+    const source = new Blob([encoder.encode(wrap('"').slice(0, -2)), new Uint8Array([0xf0, 0x9f]), encoder.encode('" , 1]}')]);
+    expect((await read(source)).actual).toEqual(JSON.parse(await source.text()).materials);
+  });
+  it('agrees with JSON.parse on a seeded corpus of malformed and valid byte mutations', async () => {
+    let state = 0xdecafbad; const random = () => {state = (Math.imul(state, 1664525) + 1013904223) >>> 0; return state;};
+    const samples = [wrap('{"text":"😀","nested":[true,false,null,-0,1e400]}'), wrap('"ok",42,{"\\u0061":"x"}'), '{"format":"wrong","format":"fluentread-learning-materials","version":1,"materials":[1],"materials":["x"]}'];
+    for (let sample = 0; sample < 600; sample++) {
+      const bytes = encoder.encode(samples[random() % samples.length]);
+      if (sample % 3 !== 0) for (let n = 0; n < 1 + random() % 3; n++) bytes[random() % bytes.length] = random() % 256;
+      const source = new Blob([bytes]); let expected: any, valid = false;
+      try {expected = JSON.parse(await source.text()); valid = !!expected && typeof expected === 'object' && !Array.isArray(expected) && expected.format === 'fluentread-learning-materials' && expected.version === 1 && Array.isArray(expected.materials) && expected.materials.length <= 10000;} catch {/* Invalid input must not yield a plan. */}
+      let result: Awaited<ReturnType<typeof read>> | undefined;
+      try {result = await read(source);} catch {/* Rejection is checked against JSON.parse below. */}
+      expect(Boolean(result), `acceptance mismatch in sample ${sample}`).toBe(valid);
+      if (result) expect(result.actual).toEqual(expected.materials);
+    }
+  });
+  it('maintains existing stage digest and ordered bounded frames', async () => {
+    const blob = new Blob([wrap(`{"text":"😀${'x'.repeat(140000)}"},-0,1e400`)]), {prepared, frames, actual} = await read(blob), h = sha256.create();
+    for (let i = 0; i < actual.length; i++) {
+      const all = frames.filter(frame => frame.record === i).map(frame => frame.bytes), bytes = new Uint8Array(await new Blob(all).arrayBuffer()), n = bytes.length;
+      h.update(new Uint8Array([(n >>> 24) & 255, (n >>> 16) & 255, (n >>> 8) & 255, n & 255])); h.update(bytes);
+    }
+    expect(bytesToHex(h.digest())).toBe(prepared.manifest.digest);
+    expect(frames.map(frame => frame.seq)).toEqual(frames.map((_, i) => i));
+    expect(frames.every(frame => frame.bytes.length > 0 && frame.bytes.length <= 128 * 1024)).toBe(true);
+    expect(actual).toEqual(JSON.parse(await blob.text()).materials);
+  });
+  it('detects source changes during prepare and after frames are sent', async () => {
+    const original = new Blob([wrap('{"a":1}')]), changed = new Blob([wrap('{"a":2}')]);
+    const plan = await prepareMaterialBackup(original), frames: Frame[] = [];
+    await expect(sendMaterialBackup(changed, plan, async frame => {frames.push(frame);})).rejects.toThrow('改变');
+    expect(frames.length).toBeGreaterThan(0);
+    const unstable = new Blob([original]), slice = unstable.slice.bind(unstable); let reads = 0;
+    unstable.slice = (start, end) => ++reads > 1 ? changed.slice(start, end) : slice(start, end);
+    await expect(prepareMaterialBackup(unstable)).rejects.toThrow('改变');
+  });
+  it('rejects a size change during the second prepare scan even when file bytes match', async () => {
+    class ChangingOnSecondScan extends Blob {
+      scans = 0; changed = false;
+      get size() {return super.size + Number(this.changed);}
+      slice(start?: number, end?: number, type?: string) {
+        if (++this.scans === 2) this.changed = true;
+        return super.slice(start, end, type);
+      }
+    }
+    const source = new ChangingOnSecondScan([wrap('{"a":1}')]);
+    await expect(prepareMaterialBackup(source)).rejects.toThrow('备份文件在读取过程中改变');
+    expect(source.scans).toBe(2); expect(source.changed).toBe(true);
+  });
+  it('rejects a size change after frames are emitted so the caller cannot seal them', async () => {
+    class ChangingAfterFrame extends Blob {
+      changed = false;
+      get size() {return super.size + Number(this.changed);}
+    }
+    const source = new ChangingAfterFrame([wrap('{"a":1}')]), plan = await prepareMaterialBackup(source), frames: Frame[] = [];
+    await expect(sendMaterialBackup(source, plan, async frame => {frames.push(frame); source.changed = true;}))
+      .rejects.toThrow('备份文件在读取过程中改变');
+    expect(frames).toHaveLength(1);
+  });
+  it('detects short source reads, rejected callbacks and invalid prepared plans', async () => {
+    const source = new Blob([wrap('{"a":1}')]), plan = await prepareMaterialBackup(source), short = new Blob([source]);
+    short.slice = () => ({arrayBuffer: async () => new Uint8Array([1]).buffer} as Blob);
+    await expect(prepareMaterialBackup(short)).rejects.toThrow('读取长度改变');
+    await expect(sendMaterialBackup(short, plan, async () => {})).rejects.toThrow('读取长度改变');
+    await expect(sendMaterialBackup(source, plan, async () => {throw Error('append failed');})).rejects.toThrow('append failed');
+    for (const mutate of [
+      (p: typeof plan) => {p.manifest.records++;},
+      (p: typeof plan) => {p.manifest.bytes++;},
+      (p: typeof plan) => {p.manifest.frames++;},
+      (p: typeof plan) => {p.manifest.digest = 'invalid';},
+      (p: typeof plan) => {p.plan.records[0].start = -1;},
+      (p: typeof plan) => {p.plan.records[0].end = p.plan.size + 1;},
+    ]) {
+      const bad = structuredClone(plan); mutate(bad);
+      await expect(sendMaterialBackup(source, bad, async () => {})).rejects.toThrow('无效的备份计划');
+    }
+  });
+  it('validates caller-provided plan and source before accepting frames', async () => {
+    const source = new Blob([wrap('{"a":"abcdefghijkl"}')]), plan = await prepareMaterialBackup(source);
+    await expect(prepareMaterialBackup(null as unknown as Blob)).rejects.toThrow('无效的备份文件');
+    await expect(sendMaterialBackup(source, null as never, async () => {})).rejects.toThrow('无效的备份计划');
+    const missing = structuredClone(plan); missing.plan.records[0] = null as never;
+    await expect(sendMaterialBackup(source, missing, async () => {})).rejects.toThrow('无效的备份计划');
+    const nonRecord = structuredClone(plan); nonRecord.plan.records[0] = 'not a record' as never;
+    await expect(sendMaterialBackup(source, nonRecord, async () => {})).rejects.toThrow('无效的备份计划');
+    const nonManifest = {...plan, manifest: 'not a manifest' as never};
+    await expect(sendMaterialBackup(source, nonManifest, async () => {})).rejects.toThrow('无效的备份计划');
+    const badDigest = structuredClone(plan); badDigest.plan.fileDigest = 'x';
+    await expect(sendMaterialBackup(source, badDigest, async () => {})).rejects.toThrow('无效的备份计划');
+    await expect(sendMaterialBackup(new Blob(['shorter']), plan, async () => {})).rejects.toThrow('改变');
+    for (const delta of [-1, 1]) {
+      const bad = structuredClone(plan); bad.plan.records[0].length += delta; bad.manifest.bytes += delta;
+      await expect(sendMaterialBackup(source, bad, async () => {})).rejects.toThrow('改变');
+    }
+    const tampered = structuredClone(plan); tampered.manifest.digest = '0'.repeat(64);
+    await expect(sendMaterialBackup(source, tampered, async () => {})).rejects.toThrow('改变');
+  });
+  it('rejects overlong or sparse prepared record lists before reading entries or sending frames', async () => {
+    const source = new Blob([wrap('1')]), plan = await prepareMaterialBackup(source);
+    const tooMany = structuredClone(plan), entries = new Array(10001);
+    Object.defineProperty(entries, '0', {get() {throw Error('overlong plan was read');}});
+    tooMany.plan.records = entries;
+    const emit = vi.fn(async () => undefined), slice = vi.spyOn(source, 'slice');
+    await expect(sendMaterialBackup(source, tooMany, emit)).rejects.toThrow('无效的备份计划');
+    expect(emit).not.toHaveBeenCalled();expect(slice).not.toHaveBeenCalled();
+    const sparse = structuredClone(plan); sparse.plan.records = new Array(1);
+    await expect(sendMaterialBackup(source, sparse, emit)).rejects.toThrow('无效的备份计划');
+    expect(emit).not.toHaveBeenCalled();expect(slice).not.toHaveBeenCalled();
+    const nonArray = {...plan, plan: {...plan.plan, records: {length: 1} as never}};
+    await expect(sendMaterialBackup(source, nonArray, emit)).rejects.toThrow('无效的备份计划');
+    expect(emit).not.toHaveBeenCalled();expect(slice).not.toHaveBeenCalled();
+  });
+  it('rejects forged plans exceeding restore record or frame limits before reading or sending', async () => {
+    const frameBytes = 128 * 1024, recordLimit = 128 * 1024 * 1024;
+    for (const lengths of [[recordLimit + 1], Array.from({length: 20}, () => recordLimit)]) {
+      const source = new Blob([]), emit = vi.fn(async () => undefined);
+      let size = 0;
+      const records = lengths.map(length => {const start = size; size += length; return {start, end: size, length};});
+      const frames = lengths.reduce((total, length) => total + Math.ceil(length / frameBytes), 0);
+      Object.defineProperty(source, 'size', {value: size});
+      const slice = vi.spyOn(source, 'slice');
+      const plan = {plan: {records, size, fileDigest: '0'.repeat(64)}, manifest: {records: records.length, bytes: size, frames, digest: '0'.repeat(64)}};
+      await expect(sendMaterialBackup(source, plan, emit)).rejects.toThrow('无效的备份计划');
+      expect(slice).not.toHaveBeenCalled();
+      expect(emit).not.toHaveBeenCalled();
+    }
+  });
+  it('snapshots the record count before reading mutable entries', async () => {
+    const source = new Blob([wrap('1')]), plan = await prepareMaterialBackup(source);
+    const rows = plan.plan.records, original = rows[0];
+    Object.defineProperty(rows, '0', {get() {rows.length = 10001; return original;}});
+    const frames: Frame[] = [];
+    await sendMaterialBackup(source, plan, async frame => {frames.push(frame);});
+    expect(frames).toHaveLength(1);
+  });
+  it('rejects a corrupted plan that ends in the middle of a multibyte character', async () => {
+    const blob = new Blob([wrap('{"value":"😀"}')]), plan = await prepareMaterialBackup(blob);
+    const bytes = new Uint8Array(await blob.arrayBuffer()), firstByte = bytes.indexOf(0xf0), bad = structuredClone(plan);
+    bad.plan.records[0].end = firstByte + 1;
+    bad.plan.records[0].length = bad.plan.records[0].end - bad.plan.records[0].start + 2;
+    bad.manifest.bytes = bad.plan.records[0].length;
+    bad.manifest.digest = '0'.repeat(64);
+    await expect(sendMaterialBackup(blob, bad, async () => {})).rejects.toThrow('改变');
+  });
+  it('rejects partial BOM, incomplete root values, and cancellation before reading', async () => {
+    for (const bytes of [new Uint8Array([0xef, 0xbb]), encoder.encode('true'), encoder.encode('{')]) {
+      await expect(prepareMaterialBackup(new Blob([bytes]))).rejects.toThrow();
+    }
+    const source = new Blob([wrap('')]), slice = vi.spyOn(source, 'slice'), controller = new AbortController();
+    controller.abort(); await expect(prepareMaterialBackup(source, {signal: controller.signal})).rejects.toMatchObject({name: 'AbortError'});
+    expect(slice).not.toHaveBeenCalled();
+  });
+  it('snapshots a prepared plan before asynchronous frame delivery', async () => {
+    const blob = new Blob([wrap(`{"value":"${'x'.repeat(150000)}"},-0`)]), plan = await prepareMaterialBackup(blob);
+    Object.defineProperty(plan.plan.records[0], 'unrelated', {enumerable: true, get() {throw Error('unrelated data must not be read');}});
+    let calls = 0;
+    await sendMaterialBackup(blob, plan, async () => {if (calls++ === 0) {plan.manifest.digest = '0'.repeat(64); plan.plan.fileDigest = '0'.repeat(64); plan.plan.records[1].start = 0;}});
+    expect(calls).toBeGreaterThan(1);
+    await expect(sendMaterialBackup(blob, plan, async () => {})).rejects.toThrow();
+  });
+  it('cancels pending file reads and frame delivery without starting additional work', async () => {
+    const blob = new Blob([wrap('{}')]); let finish!: (value: ArrayBuffer) => void, reads = 0;
+    const pending = new Promise<ArrayBuffer>(resolve => {finish = resolve;});
+    blob.slice = () => ({arrayBuffer() {reads++; return pending;}} as Blob);
+    const controller = new AbortController(), task = prepareMaterialBackup(blob, {signal: controller.signal});
+    controller.abort(); await expect(task).rejects.toMatchObject({name: 'AbortError'}); finish(new Uint8Array([0]).buffer);
+    await new Promise(resolve => setTimeout(resolve, 0)); expect(reads).toBe(1);
+    const source = new Blob([wrap(`{"a":"${'x'.repeat(200000)}"}`)]), plan = await prepareMaterialBackup(source), controller2 = new AbortController();
+    let calls = 0, resume!: () => void; const hold = new Promise<void>(resolve => {resume = resolve;});
+    const sending = sendMaterialBackup(source, plan, async () => {calls++; await hold;}, {signal: controller2.signal});
+    await viUntil(() => calls === 1); controller2.abort(); await expect(sending).rejects.toMatchObject({name: 'AbortError'});
+    resume(); await new Promise(resolve => setTimeout(resolve, 0)); expect(calls).toBe(1);
+  });
+  it('observes cancellation during listener registration before a pending read can settle', async () => {
+    const source = new Blob([wrap('{}')]), controller = new AbortController();
+    let release!: (value: ArrayBuffer) => void, reads = 0;
+    const pending = new Promise<ArrayBuffer>(resolve => {release = resolve;});
+    source.slice = () => ({arrayBuffer() {reads++; return pending;}} as Blob);
+    const add = controller.signal.addEventListener.bind(controller.signal);
+    const registration = vi.spyOn(controller.signal, 'addEventListener').mockImplementation(((type: string, listener: EventListenerOrEventListenerObject, options?: boolean | AddEventListenerOptions) => {
+      controller.abort();
+      add(type, listener, options);
+    }) as typeof controller.signal.addEventListener);
+    try {
+      await expect(prepareMaterialBackup(source, {signal: controller.signal})).rejects.toMatchObject({name: 'AbortError'});
+      release(new ArrayBuffer(0));
+      await new Promise(resolve => setTimeout(resolve, 0));
+      expect(reads).toBe(1);
+    } finally {registration.mockRestore();}
+  });
+  it.each(['before', 'after'] as const)('preserves the read result when listener removal throws %s native cleanup', async mode => {
+    const controller = new AbortController(), signal = controller.signal;
+    const nativeRemove = signal.removeEventListener.bind(signal);
+    const remove = vi.spyOn(signal, 'removeEventListener').mockImplementation(((type: string, listener: EventListenerOrEventListenerObject, options?: boolean | EventListenerOptions) => {
+      if (mode === 'after') nativeRemove(type, listener, options);
+      throw Error('signal cleanup failed');
+    }) as typeof signal.removeEventListener);
+    try {
+      await expect(prepareMaterialBackup(new Blob([wrap('{}')]), {signal})).resolves.toMatchObject({manifest: {records: 1}});
+      const failure = Error('file read failed'), source = new Blob([wrap('{}')]);
+      source.slice = () => ({arrayBuffer: async () => {throw failure;}} as unknown as Blob);
+      await expect(prepareMaterialBackup(source, {signal})).rejects.toBe(failure);
+    } finally {remove.mockRestore();}
+  });
+  it.each(['before', 'after'] as const)('observes a late read rejection when listener registration throws %s adding the listener', async mode => {
+    const controller = new AbortController(), signal = controller.signal, failure = Error('signal registration failed');
+    const nativeAdd = signal.addEventListener.bind(signal), remove = vi.spyOn(signal, 'removeEventListener');
+    const add = vi.spyOn(signal, 'addEventListener').mockImplementation(((type: string, listener: EventListenerOrEventListenerObject, options?: boolean | AddEventListenerOptions) => {
+      if (mode === 'after') nativeAdd(type, listener, options);
+      throw failure;
+    }) as typeof signal.addEventListener);
+    let rejectRead!: (reason: Error) => void;
+    const pending = new Promise<ArrayBuffer>((_resolve, reject) => {rejectRead = reject;});
+    const source = new Blob([wrap('{}')]);source.slice = () => ({arrayBuffer: () => pending} as unknown as Blob);
+    try {
+      await expect(prepareMaterialBackup(source, {signal})).rejects.toBe(failure);
+      expect(remove).toHaveBeenCalled();
+      rejectRead(Error('late read failure'));await new Promise(resolve => setTimeout(resolve, 0));
+    } finally {add.mockRestore();remove.mockRestore();}
+  });
+  it.each(['before', 'after'] as const)('preserves cancellation when listener registration aborts then throws %s adding the listener', async mode => {
+    const controller = new AbortController(), signal = controller.signal, nativeAdd = signal.addEventListener.bind(signal);
+    const add = vi.spyOn(signal, 'addEventListener').mockImplementation(((type: string, listener: EventListenerOrEventListenerObject, options?: boolean | AddEventListenerOptions) => {
+      if (mode === 'after') nativeAdd(type, listener, options);
+      controller.abort();
+      throw Error('signal registration failed');
+    }) as typeof signal.addEventListener);
+    const source = new Blob([wrap('{}')]);source.slice = () => ({arrayBuffer: () => new Promise<ArrayBuffer>(() => {})} as unknown as Blob);
+    try {await expect(prepareMaterialBackup(source, {signal})).rejects.toMatchObject({name: 'AbortError'});}
+    finally {add.mockRestore();}
+  });
+  it('removes a listener added after a synchronous cancellation callback', async () => {
+    const controller = new AbortController(), signal = controller.signal;
+    const nativeAdd = signal.addEventListener.bind(signal), remove = vi.spyOn(signal, 'removeEventListener');
+    const add = vi.spyOn(signal, 'addEventListener').mockImplementation(((type: string, listener: EventListenerOrEventListenerObject, options?: boolean | AddEventListenerOptions) => {
+      if (typeof listener === 'function') listener.call(signal, new Event('abort'));
+      else listener.handleEvent(new Event('abort'));
+      nativeAdd(type, listener, options);
+    }) as typeof signal.addEventListener);
+    const source = new Blob([wrap('{}')]);source.slice = () => ({arrayBuffer: () => new Promise<ArrayBuffer>(() => {})} as unknown as Blob);
+    try {
+      await expect(prepareMaterialBackup(source, {signal})).rejects.toMatchObject({name: 'AbortError'});
+      expect(remove).toHaveBeenCalledTimes(2);
+      expect(remove.mock.calls[0][1]).toBe(remove.mock.calls[1][1]);
+    } finally {add.mockRestore();remove.mockRestore();}
+  });
+  it('cleans up and observes a late read rejection if signal state fails after registration', async () => {
+    const controller = new AbortController(), signal = controller.signal, failure = Error('signal state failed');
+    const nativeAdd = signal.addEventListener.bind(signal), remove = vi.spyOn(signal, 'removeEventListener');
+    let registered = false, rejectRead!: (reason: Error) => void;
+    const aborted = vi.spyOn(signal, 'aborted', 'get').mockImplementation(() => {if (registered) throw failure;return false;});
+    const add = vi.spyOn(signal, 'addEventListener').mockImplementation(((type: string, listener: EventListenerOrEventListenerObject, options?: boolean | AddEventListenerOptions) => {
+      nativeAdd(type, listener, options);registered = true;
+    }) as typeof signal.addEventListener);
+    const pending = new Promise<ArrayBuffer>((_resolve, reject) => {rejectRead = reject;});
+    const source = new Blob([wrap('{}')]);source.slice = () => ({arrayBuffer: () => pending} as unknown as Blob);
+    try {
+      await expect(prepareMaterialBackup(source, {signal})).rejects.toBe(failure);
+      expect(remove).toHaveBeenCalledOnce();
+      rejectRead(Error('late read failure'));await new Promise(resolve => setTimeout(resolve, 0));
+    } finally {add.mockRestore();remove.mockRestore();aborted.mockRestore();}
+  });
+  it('observes a read that aborts before listener registration and later rejects', async () => {
+    const controller = new AbortController(), signal = controller.signal, add = vi.spyOn(signal, 'addEventListener');
+    let rejectRead!: (reason: Error) => void;
+    const pending = new Promise<ArrayBuffer>((_resolve, reject) => {rejectRead = reject;});
+    const source = new Blob([wrap('{}')]);source.slice = () => ({arrayBuffer: () => {controller.abort();return pending;}} as unknown as Blob);
+    try {
+      await expect(prepareMaterialBackup(source, {signal})).rejects.toMatchObject({name: 'AbortError'});
+      expect(add).not.toHaveBeenCalled();
+      rejectRead(Error('late read failure'));await new Promise(resolve => setTimeout(resolve, 0));
+    } finally {add.mockRestore();}
+  });
+  it('preserves a registration error when checking signal state also fails', async () => {
+    const controller = new AbortController(), signal = controller.signal, failure = Error('registration failed');
+    let registrationAttempted = false;
+    const aborted = vi.spyOn(signal, 'aborted', 'get').mockImplementation(() => {
+      if (registrationAttempted) throw Error('signal state failed');return false;
+    });
+    const add = vi.spyOn(signal, 'addEventListener').mockImplementation(() => {registrationAttempted = true;throw failure;});
+    const remove = vi.spyOn(signal, 'removeEventListener');
+    const source = new Blob([wrap('{}')]);source.slice = () => ({arrayBuffer: () => new Promise<ArrayBuffer>(() => {})} as unknown as Blob);
+    try {
+      await expect(prepareMaterialBackup(source, {signal})).rejects.toBe(failure);
+      expect(remove).toHaveBeenCalledOnce();
+    } finally {aborted.mockRestore();add.mockRestore();remove.mockRestore();}
+  });
+  it('sends a >20 MiB synthetic record through the actual stage transaction', async () => {
+    const record = `{"id":"one","source":{"kind":"article","url":"https://example.test/a"},"title":"A","topics":[],"references":[],"createdAt":1,"updatedAt":2,"archivedAt":null,"unused":"${'x'.repeat(21 * 1024 * 1024)}"}`;
+    const blob = new Blob([wrap(record)]), plan = await prepareMaterialBackup(blob), db = database(), repo = new MaterialRepository(db), stage = createStage(db, {clock: () => 1000});
+    const cap = createMaterialImportCapability();
+    await stage.beginRecoverable(plan.manifest, {generation: 0, capturedAt: 1}, cap, {deadline: 301000});
+    await sendMaterialBackup(blob, plan, frame => stage.append(cap, frame));
+    await stage.seal(cap); expect(await stage.commit(cap)).toEqual({inserted: 1, updated: 0, skipped: 0});
+    expect((await repo.get('one'))?.source.url).toBe('https://example.test/a');
+  }, 60000);
+});
+
+async function viUntil(check: () => boolean) {
+  for (let i = 0; i < 100 && !check(); i++) await new Promise(resolve => setTimeout(resolve, 1));
+  expect(check()).toBe(true);
+}

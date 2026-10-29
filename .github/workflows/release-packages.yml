@@ -86,6 +86,9 @@ jobs:
           fi
           rg --version
       - name: Audit and check types
+        # The full Vue/TypeScript graph needs more heap than the other steps.
+        env:
+          NODE_OPTIONS: --max-old-space-size=5120
         run: |
           pnpm test:audit
           pnpm compile

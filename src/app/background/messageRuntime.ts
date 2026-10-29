@@ -50,6 +50,7 @@ import {localTtsOffscreenAdapter} from '@/src/features/local-tts/background/offs
 import {createSelectionTtsSynthesizer} from '@/src/features/selection-translation/background/selectionTtsSynthesis';
 import {installWritingBackgroundRuntime} from './writingRuntime';
 import {installHarnessBackgroundRuntime} from './harnessRuntime';
+import {installMaterialRuntimes} from './materialRuntimes';
 import {createImageGlossaryContext} from './imageGlossaryContext';
 import {createEmbeddedFrameBackgroundHandlers, type EmbeddedFrameBackgroundContext} from '@/src/features/full-page-translation/background/embeddedFrameHandlers';
 import {createNativePdfSelectionHandler} from './nativePdfSelection';
@@ -63,6 +64,7 @@ export interface BackgroundMessageRuntimeOptions {
     capabilities?: BrowserCapabilities;
 }
 export function installBackgroundMessageRuntime(options: BackgroundMessageRuntimeOptions): void {
+    installMaterialRuntimes(configReady);
     const cancelWriting = installWritingBackgroundRuntime();
     const capabilities = options.capabilities ?? browserCapabilities;
     const tabBroadcast = installBrowserTabBroadcastRuntime(capabilities.browser);
@@ -151,13 +153,11 @@ export function installBackgroundMessageRuntime(options: BackgroundMessageRuntim
         }),
         createBrowserMaterialHandler({ready: configReady, config, vocabularyBook}),
         ...createVocabularyBackgroundHandlers({
-            configReady,
+            configReady, vocabularyBook,
             isVocabularyBookEnabled: () => config.vocabularyBookEnabled === true, isReencounterEnabled: () => config.on && config.vocabularyReencounterEnabled === true && !browser.extension.inIncognitoContext,
-            vocabularyBook,
             ...createBrowserVocabularyUndoOptions(),
             broadcastChanged: createBrowserVocabularyBookChangedBroadcaster({
-                sendRuntimeMessage: (message) => browser.runtime.sendMessage(message),
-                ...tabBroadcast,
+                sendRuntimeMessage: (message) => browser.runtime.sendMessage(message), ...tabBroadcast,
             }),
             logOperationFailure: (error) => console.error('[FluentRead] vocabulary book operation failed:', error),
         }),

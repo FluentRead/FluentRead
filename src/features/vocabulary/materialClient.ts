@@ -5,7 +5,7 @@
  * 模块边界：客户端不直接访问 IndexedDB 或配置同步；生命周期与迟到结果由调用者 guard 和持久化世代共同约束。
  */
 import browser from 'webextension-polyfill';
-import {MATERIAL_MESSAGE, type MaterialOperationGuard, type MaterialBackup, type MaterialImportResult, type MaterialCaptureInput, type MaterialListOptions, type MaterialPatch, type MaterialRecord, type MaterialReference, type MaterialRequest, type MaterialResponse} from './materialProtocol';
+import {MATERIAL_MESSAGE, type MaterialOperationGuard, type MaterialBackup, type MaterialImportResult, type MaterialCaptureInput, type MaterialListOptions, type MaterialPatch, type MaterialRecord, type MaterialReference, type MaterialRequest, type MaterialResponse, type MaterialWorkspaceWriteReceipt} from './materialProtocol';
 export class MaterialClientError extends Error {
     constructor(readonly code: string, message: string) {super(message); this.name = 'MaterialClientError';}
 }
@@ -25,6 +25,29 @@ export const materialRemoveReference = (id: string, kind: MaterialReference['kin
 export const materialArchive = (id: string) => request<MaterialRecord>({type: MATERIAL_MESSAGE, action: 'archive', id});
 export const materialRestore = (id: string) => request<MaterialRecord>({type: MATERIAL_MESSAGE, action: 'restore', id});
 export const materialClear = () => request<boolean>({type: MATERIAL_MESSAGE, action: 'clear'});
+/** 设置页写入只接收 ID，结果未知时调用方须刷新而非自动重放。 */
+async function workspaceWrite(message:MaterialRequest):Promise<MaterialWorkspaceWriteReceipt> {
+    if (browser.extension?.inIncognitoContext === true) throw new MaterialClientError('privacy-disabled','无痕窗口不读取或保存学习材料');
+    const unknown = () => new MaterialClientError('storage-error','无法确认操作是否完成，请刷新材料后检查。');
+    let response:unknown;
+    try {response = await browser.runtime.sendMessage(message);} catch {throw unknown();}
+    if (!response || typeof response !== 'object' || Array.isArray(response)) throw unknown();
+    const value = response as {success?:unknown;data?:unknown;error?:unknown};
+    if (value.success === true && value.data && typeof value.data === 'object' && !Array.isArray(value.data)) {
+        const receipt = value.data as Record<string,unknown>;
+        if (Object.keys(receipt).length === 1 && typeof receipt.id === 'string' && receipt.id.length > 0 && receipt.id.length <= 256) return {id:receipt.id};
+    }
+    if (value.success === false && value.error && typeof value.error === 'object' && !Array.isArray(value.error)) {
+        const error = value.error as Record<string,unknown>;
+        if (typeof error.code === 'string' && ['invalid-input','not-found','privacy-disabled','stale-operation','limit-exceeded','storage-error'].includes(error.code) && typeof error.message === 'string') throw new MaterialClientError(error.code,error.message);
+    }
+    throw unknown();
+}
+export const workspaceMaterialCapture = (input: MaterialCaptureInput) => workspaceWrite({type:MATERIAL_MESSAGE,action:'workspaceCapture',input});
+export const workspaceMaterialUpdate = (id:string, patch:MaterialPatch) => workspaceWrite({type:MATERIAL_MESSAGE,action:'workspaceUpdate',id,patch});
+export const workspaceMaterialRemoveReference = (id:string, kind:MaterialReference['kind'], referenceId:string) => workspaceWrite({type:MATERIAL_MESSAGE,action:'workspaceRemoveReference',id,kind,referenceId});
+export const workspaceMaterialArchive = (id:string) => workspaceWrite({type:MATERIAL_MESSAGE,action:'workspaceArchive',id});
+export const workspaceMaterialRestore = (id:string) => workspaceWrite({type:MATERIAL_MESSAGE,action:'workspaceRestore',id});
 
 /** 主动下载的私密本地备份包含来源、原文与笔记，不属于配置同步。 */
 export const materialExport = () => request<MaterialBackup>({type: MATERIAL_MESSAGE, action: 'exportData'});

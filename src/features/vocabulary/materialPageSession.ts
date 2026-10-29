@@ -147,8 +147,10 @@ export async function createMaterialPageSession(repository:Repository, input:Mat
         let closed = false, pending:Promise<unknown>|undefined, closePromise:Promise<void>|undefined;
         const close = ():Promise<void> => {
             if (closePromise) return closePromise;
-            closed = true; signal?.removeEventListener('abort', abortSession); controller.abort();
-            closePromise = (async () => {try {await pending;} catch {/* 等待底层读取完成后释放索引。 */} index.length = 0; topics.length = 0;})();
+            closed = true; signal?.removeEventListener('abort', abortSession);
+            // A pending read can synchronously reenter close when it observes abort.
+            closePromise = Promise.resolve().then(async () => {try {await pending;} catch {/* 等待底层读取完成后释放索引。 */} index.length = 0; topics.length = 0;});
+            controller.abort();
             return closePromise;
         };
         const abortSession = () => {void close();};

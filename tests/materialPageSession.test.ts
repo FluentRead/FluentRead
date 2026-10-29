@@ -19,7 +19,7 @@ function fake(records:MaterialRecord[]) {
             if (expected.revision !== revision) throw Object.assign(Error('stale'), {code:'stale-operation'});
             return byId.get(id) ?? null;
         }),
-        checkSnapshot:vi.fn(async (expected:{revision:number;epoch:string}) => {if (expected.revision !== revision) throw Object.assign(Error('stale'), {code:'stale-operation'});}),
+        checkSnapshot:vi.fn(async (expected:{revision:number;epoch:string}, _signal?:AbortSignal) => {if (expected.revision !== revision) throw Object.assign(Error('stale'), {code:'stale-operation'});}),
     };
     return {repository, change() {revision++;}};
 }
@@ -372,6 +372,26 @@ describe('paged material query sessions', () => {
         await expect(outcome).resolves.toMatchObject({name:'AbortError'});
         expect((await session.getPage({offset:0})).items.map(item => item.id)).toEqual(['a']);
         await session.close();
+    });
+    it('shares one close promise when a pending read synchronously reenters on abort', async () => {
+        const f = fake([]), session = await createMaterialPageSession(f.repository);
+        let finish!:()=>void, markStarted!:()=>void, nested:Promise<void>|undefined;
+        const gate = new Promise<void>(resolve=>{finish=resolve;});
+        const started = new Promise<void>(resolve=>{markStarted=resolve;});
+        f.repository.checkSnapshot.mockImplementationOnce(async (_version, signal?:AbortSignal) => {
+            signal?.addEventListener('abort',()=>{nested=session.close();},{once:true});
+            markStarted(); await gate;
+        });
+        const page = session.getPage({offset:0}).catch(error=>error);
+        try {
+            await started;
+            const closing = session.close();
+            expect(nested).toBe(closing);
+            let done = false; void closing.then(()=>{done=true;});
+            await Promise.resolve(); await Promise.resolve(); expect(done).toBe(false);
+            finish(); expect(await page).toMatchObject({name:'AbortError'});
+            await closing; expect(done).toBe(true); expect(session.close()).toBe(closing);
+        } finally {finish(); await page; await session.close();}
     });
     it('binds the creation signal to the session and waits for an active read after abort', async () => {
         const f = fake([material('a')]), controller = new AbortController();

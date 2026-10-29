@@ -121,11 +121,13 @@ export function createMaterialPageBridge(options:MaterialPageBridgeOptions):{con
     const drop=(token:string,entry:Entry):Promise<void>=>{
         if(entry.closing)return entry.closing;
         if(entry.timer!==undefined)clearTimeout(entry.timer);
-        entry.controller.abort();
-        entry.closing=(async()=>{
+        // Publish the shared closing promise before abort: an abort listener can
+        // synchronously reenter disposal and must reuse this same cleanup.
+        entry.closing=Promise.resolve().then(async()=>{
             try{await Promise.allSettled([Promise.resolve().then(()=>entry.session?.close()),entry.pending??Promise.resolve()]);}
             finally{if(entries.get(token)===entry)entries.delete(token);notifyDrained();}
-        })();
+        });
+        entry.controller.abort();
         return entry.closing;
     };
     const arm=(token:string,entry:Entry)=>{

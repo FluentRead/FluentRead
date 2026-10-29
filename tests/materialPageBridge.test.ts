@@ -44,6 +44,53 @@ const header=(messages:MaterialPageMessage[])=>messages.find(value=>value.type==
 const complete=(messages:MaterialPageMessage[])=>messages.find(value=>value.type==='complete') as Extract<MaterialPageMessage,{type:'complete'}>;
 
 describe('trusted material page bridge',()=>{
+    it('shares cleanup when an abort observer synchronously disposes the bridge',async()=>{
+        const actual=sessions.createMaterialPageSession, {repo,bridge}=fixture(0);
+        let release!:()=>void;const gate=new Promise<void>(resolve=>{release=resolve;});
+        const closeSpy=vi.fn();let nested:Promise<void>|undefined,drained=false;
+        const original=repo.openSnapshot.getMockImplementation()!;
+        repo.openSnapshot.mockImplementation(async(...args:any[])=>{
+            const signal=args[0] as AbortSignal;
+            signal.addEventListener('abort',()=>{nested=bridge.dispose().then(()=>{drained=true;});},{once:true});
+            return original();
+        });
+        const factory=vi.spyOn(sessions,'createMaterialPageSession').mockImplementation(async(...args)=>{
+            const session=await actual(...args);return {...session,close:()=>{closeSpy();return gate.then(()=>session.close());}};
+        });
+        try{
+            const token=header(await transfer(bridge,start())).capability!;await tick();
+            await transfer(bridge,close(token)).catch(()=>{});await tick();
+            expect(nested).toBeDefined();expect(drained).toBe(false);expect(closeSpy).toHaveBeenCalledTimes(1);
+            release();await nested;expect(drained).toBe(true);
+        }finally{release();factory.mockRestore();await bridge.dispose();}
+    });
+    it.each(['throw','reject'] as const)('releases session capacity when close will %s',async mode=>{
+        const actual=sessions.createMaterialPageSession,{repo}=fixture(0),closeSpy=vi.fn();
+        const bridge=createMaterialPageBridge({repository:repo,ready:Promise.resolve(),isPrivateContext:()=>false,isTrustedSender:()=>true,maxSessions:1});
+        const factory=vi.spyOn(sessions,'createMaterialPageSession').mockImplementation(async(...args)=>{
+            const session=await actual(...args);return {...session,close:()=>{closeSpy();if(mode==='throw')throw Error('close failed');return Promise.reject(Error('close failed'));}};
+        });
+        try{
+            const token=header(await transfer(bridge,start())).capability!;await tick();
+            expect(await transfer(bridge,close(token))).toEqual([{type:'closed'}]);expect(closeSpy).toHaveBeenCalledOnce();
+            factory.mockRestore();expect(complete(await transfer(bridge,start())).count).toBe(0);
+        }finally{factory.mockRestore();await bridge.dispose();}
+    });
+    it('shares a pending session close between concurrent close requests',async()=>{
+        const actual=sessions.createMaterialPageSession,{repo}=fixture(0),closeSpy=vi.fn();
+        let release!:()=>void;const gate=new Promise<void>(resolve=>{release=resolve;});
+        const bridge=createMaterialPageBridge({repository:repo,ready:Promise.resolve(),isPrivateContext:()=>false,isTrustedSender:()=>true,maxSessions:1});
+        const factory=vi.spyOn(sessions,'createMaterialPageSession').mockImplementation(async(...args)=>{
+            const session=await actual(...args);return {...session,close:()=>{closeSpy();return gate.then(()=>session.close());}};
+        });
+        try{
+            const token=header(await transfer(bridge,start())).capability!;await tick();
+            const first=transfer(bridge,close(token)),second=transfer(bridge,close(token));await tick();
+            expect(closeSpy).toHaveBeenCalledOnce();release();
+            expect(await Promise.all([first,second])).toEqual([[{type:'closed'}],[{type:'closed'}]]);
+            factory.mockRestore();expect(complete(await transfer(bridge,start())).count).toBe(0);
+        }finally{release();factory.mockRestore();await bridge.dispose();}
+    });
     it.each([2,3,4,5])('releases a just-created session when disconnect follows in microtask %s',async turns=>{
         const actual=sessions.createMaterialPageSession;
         const {repo}=fixture(0),bridge=createMaterialPageBridge({repository:repo,ready:Promise.resolve(),isPrivateContext:()=>false,isTrustedSender:()=>true,maxSessions:1}),[server,client]=pair();

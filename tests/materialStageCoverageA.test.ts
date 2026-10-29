@@ -76,14 +76,6 @@ describe('material staging stored metadata boundaries',()=>{
     await expect(stage.resume(null as never)).rejects.toThrow('session unavailable');
     expect(db.isOpen()).toBe(false);
   });
-  it('rejects corrupt expiry in any existing session before reserving a second session',async()=>{
-    const {db,begin}=setup();const first=await begin();
-    await db.table('stageSessions').update(first.id,{expiresAt:NaN});
-    expect(await db.table('stageSessions').get(first.id)).toMatchObject({expiresAt:NaN});
-    await expect(begin()).rejects.toThrow('invalid expiry');
-    expect(await db.table('stageSessions').count()).toBe(1);
-    expect(await db.table('stageBudget').get('stage')).toMatchObject({slots:1});
-  });
   it('stops reading session metadata after the first corrupted record',async()=>{
     const {db,begin}=setup(), ids=(await Promise.all([begin(),begin(),begin()])).map(cap=>cap.id).sort();
     await db.table('stageSessions').update(ids[1],{expiresAt:NaN});

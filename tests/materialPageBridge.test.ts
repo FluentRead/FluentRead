@@ -649,6 +649,42 @@ describe('trusted material page bridge',()=>{
             try{if(bridge)await bridge.dispose();}finally{clock.mockRestore();vi.useRealTimers();}
         }
     });
+    it('clears pending progress when a controlled clock synchronously disconnects the port',async()=>{
+        // Controlled reentrancy: native performance.now does not disconnect ports.
+        const realSetTimeout=globalThis.setTimeout,realClearTimeout=globalThis.clearTimeout;
+        const bounded=async<T>(work:Promise<T>):Promise<T>=>{
+            let timer:ReturnType<typeof setTimeout>|undefined;
+            try{return await Promise.race([work,new Promise<never>((_,reject)=>{timer=realSetTimeout(()=>reject(Error('bridge did not drain')),2000);})]);}
+            finally{if(timer!==undefined)realClearTimeout(timer);}
+        };
+        const {repo,bridge:unused}=fixture(3);await unused.dispose();
+        const original=repo.readSnapshotRecord.getMockImplementation()!;let calls=0;
+        let finishSecond!:(value:MaterialRecord|null)=>void,finishThird!:(value:MaterialRecord|null)=>void,thirdBegan!:()=>void,received!:()=>void,releaseAck!:()=>void;
+        const second=new Promise<MaterialRecord|null>(resolve=>{finishSecond=resolve;}),third=new Promise<MaterialRecord|null>(resolve=>{finishThird=resolve;});
+        const thirdStarted=new Promise<void>(resolve=>{thirdBegan=resolve;}),firstReceived=new Promise<void>(resolve=>{received=resolve;}),ack=new Promise<void>(resolve=>{releaseAck=resolve;});
+        repo.readSnapshotRecord.mockImplementation(async(revision,id)=>{calls++;if(calls===2)return second;if(calls===3){thirdBegan();return third;}return original(revision,id);});
+        const bridge=createMaterialPageBridge({repository:repo,ready:Promise.resolve(),isPrivateContext:()=>false,isTrustedSender:()=>true});
+        const [server,client]=pair();let armed=false,triggered=false,now=100;
+        const clock=vi.spyOn(performance,'now').mockImplementation(()=>{now+=30;if(armed){armed=false;triggered=true;client.disconnect();}return now;});
+        const setTimer=vi.spyOn(globalThis,'setTimeout'),clearTimer=vi.spyOn(globalThis,'clearTimeout');
+        try{
+            bridge.connect(server);
+            const reading=receiveMaterialRead(client as MaterialReadPort,async()=>{received();await ack;}).then(()=>undefined,error=>error);
+            client.postMessage(start());await bounded(firstReceived);setTimer.mockClear();
+            finishSecond(item('01'));await bounded(thirdStarted);
+            const pending=setTimer.mock.calls.map((call,index)=>({delay:call[1],timer:setTimer.mock.results[index]?.value}))
+                .filter(value=>typeof value.delay==='number'&&value.delay>100&&value.delay<=500);
+            expect(pending).toHaveLength(1);
+            expect(clearTimer.mock.calls.some(([timer])=>timer===pending[0]!.timer)).toBe(false);
+            armed=true;releaseAck();expect(await bounded(reading)).toMatchObject({message:'Material read disconnected'});
+            await new Promise<void>(resolve=>realSetTimeout(resolve,100));
+            expect(triggered).toBe(true);
+            expect(clearTimer.mock.calls.some(([timer])=>timer===pending[0]!.timer)).toBe(true);
+        }finally{
+            armed=false;releaseAck();finishSecond(item('01'));finishThird(item('02'));
+            try{await bounded(bridge.dispose());}finally{clearTimer.mockRestore();setTimer.mockRestore();clock.mockRestore();}
+        }
+    });
     it('cancels a coalesced progress update without releasing the unfinished scan',async()=>{
         const {repo}=fixture(3);let finishSecond!:(value:MaterialRecord|null)=>void,finishThird!:(value:MaterialRecord|null)=>void,beginThird!:()=>void;
         const second=new Promise<MaterialRecord|null>(resolve=>{finishSecond=resolve;}),third=new Promise<MaterialRecord|null>(resolve=>{finishThird=resolve;});

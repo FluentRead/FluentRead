@@ -253,6 +253,7 @@
   "备份文件嵌套层级超过恢复限制": "La profundidad de anidamiento de la copia supera el límite de restauración",
   "备份版本字段超过恢复大小限制": "El campo de versión de la copia supera el límite de tamaño de restauración",
   "材料版本无效": "Revisión del material no válida",
+  "材料快照身份无效": "Identidad de la instantánea de materiales no válida",
   "材料版本已耗尽": "Se alcanzó el límite de revisiones del material",
   "材料数量已超过快照上限": "La cantidad de materiales supera el límite de la instantánea",
   "材料已发生变化，请重新读取": "Los materiales cambiaron. Vuelve a leerlos.",

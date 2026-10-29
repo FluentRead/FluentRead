@@ -253,6 +253,7 @@
   "备份文件嵌套层级超过恢复限制": "La profondeur des données de sauvegarde dépasse la limite de restauration",
   "备份版本字段超过恢复大小限制": "Le champ de version de la sauvegarde dépasse la taille limite de restauration",
   "材料版本无效": "Révision de ressource invalide",
+  "材料快照身份无效": "Identité de l’instantané de ressources invalide",
   "材料版本已耗尽": "Limite de révision de ressource atteinte",
   "材料数量已超过快照上限": "Le nombre de ressources dépasse la limite de l’instantané",
   "材料已发生变化，请重新读取": "Les ressources ont changé. Relisez-les.",

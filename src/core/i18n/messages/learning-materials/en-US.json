@@ -253,6 +253,7 @@
   "备份文件嵌套层级超过恢复限制": "The backup nesting depth exceeds the restoration limit",
   "备份版本字段超过恢复大小限制": "The backup version field exceeds the restoration size limit",
   "材料版本无效": "Invalid material revision",
+  "材料快照身份无效": "Invalid material snapshot identity",
   "材料版本已耗尽": "Material revision limit reached",
   "材料数量已超过快照上限": "The material count exceeds the snapshot limit",
   "材料已发生变化，请重新读取": "Materials changed. Read them again.",

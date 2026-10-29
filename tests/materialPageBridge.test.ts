@@ -265,10 +265,11 @@ describe('trusted material page bridge',()=>{
         expect(await transfer(bridge,page(token,0))).toEqual([{type:'error',code:'stale-operation'}]);
         await bridge.dispose();
     });
-    it.each(['page','detail'] as const)('stops serializing remaining %s entries when the session closes mid-frame',async operation=>{
-        const {bridge,items}=fixture(2);
+    it.each(['page','detail','topics'] as const)('stops serializing remaining %s entries when the session closes mid-frame',async operation=>{
+        const {bridge,items}=fixture(operation==='topics'?4:2);
         if(operation==='page')items[0].title='x'.repeat(80_000);
-        else items[0].references=Array.from({length:24},(_,i)=>({kind:'note',id:String(i),note:'n'.repeat(12_000)}));
+        else if(operation==='detail')items[0].references=Array.from({length:24},(_,i)=>({kind:'note',id:String(i),note:'n'.repeat(12_000)}));
+        else for(let index=0;index<items.length;index++)items[index].topics=Array.from({length:30},(_,n)=>`${'汉'.repeat(77)}${String(index*30+n).padStart(3,'0')}`);
         const token=header(await transfer(bridge,start())).capability!;await tick();
         const [server,client]=pair();bridge.connect(server);const chunks:Uint8Array[]=[];
         let closing:Promise<MaterialPageMessage[]>|undefined;
@@ -276,10 +277,14 @@ describe('trusted material page bridge',()=>{
             chunks.push(chunk);
             if(!closing){closing=transfer(bridge,close(token));await tick();}
         });
-        client.postMessage(operation==='page'?page(token,0):detail(token,'00',0));
+        client.postMessage(operation==='page'?page(token,0):operation==='detail'?detail(token,'00',0):topics(token,0));
         await reading;expect(await closing).toEqual([{type:'closed'}]);
         const output=new TextDecoder().decode(Uint8Array.from(chunks.flatMap(chunk=>[...chunk])));
         const messages:MaterialPageMessage[]=output.trim().split('\n').map(line=>JSON.parse(line));
+        if(operation==='topics'){
+            const sent=messages.filter(message=>message.type==='topic').length;
+            expect(sent).toBeGreaterThan(0);expect(sent).toBeLessThan(100);
+        }
         expect(messages.at(-1)).toEqual({type:'error',code:'stale-operation'});
         expect(messages.some(message=>message.type==='complete')).toBe(false);
         await bridge.dispose();

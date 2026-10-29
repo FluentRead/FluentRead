@@ -27,6 +27,15 @@ let serial = 0; const databases:MaterialDatabase[] = [];
 afterEach(async () => {const entries = databases.splice(0); for (const db of entries) db.close(); for (const name of new Set(entries.map(db => db.name))) await Dexie.delete(name);});
 
 describe('paged material query sessions', () => {
+    it('closes a session if cancellation reenters while its revision is read', async () => {
+        const f = fake([]), controller = new AbortController(), removed = vi.spyOn(controller.signal, 'removeEventListener');
+        let reads = 0;
+        f.repository.openSnapshot.mockResolvedValueOnce({ids:[],get revision() {if (++reads === 2) controller.abort();return 1;}});
+        await expect(createMaterialPageSession(f.repository,{},controller.signal)).rejects.toMatchObject({name:'AbortError'});
+        expect(f.repository.checkSnapshot).toHaveBeenCalledOnce();
+        expect(removed).toHaveBeenCalledWith('abort',expect.any(Function));
+        const retry=await createMaterialPageSession(f.repository);expect(retry.total).toBe(0);await retry.close();
+    });
     it('pages all archive topics in the previous stable locale order, independent of active filters', async () => {
         const records = [
             material('z',{lastReadAt:1,updatedAt:8,topics:['e\u0301','shared','beta']}),

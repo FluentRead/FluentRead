@@ -191,6 +191,22 @@ describe('material snapshot revisions', () => {
         await capture(repo, 'upgraded', 30);
         expect(await db.meta.get('state')).toEqual({key:'state',generation:3,migrated:true,clearedAt:20,revision:1});
     });
+    it('updates an old material database that never had a metadata row', async () => {
+        const name = `material-revision-no-meta-${++serial}`; names.add(name);
+        const original = await capture(new MaterialRepository(database()), 'old-without-meta');
+        const old = new Dexie(name); old.version(1).stores({materials:'id,&identityKey,*aliases,updatedAt',meta:'key'});
+        try {
+            await old.table('materials').put(original); expect(await old.table('meta').get('state')).toBeUndefined();
+        } finally {old.close();}
+        const db = database(name), repo = new MaterialRepository(db);
+        const snapshot = await repo.openSnapshot();
+        expect(snapshot).toEqual({revision:0,ids:[original.id]});
+        expect(await db.meta.get('state')).toBeUndefined();
+        await repo.update(original.id, {title:'updated after upgrade'}, 30);
+        expect(await repo.get(original.id)).toMatchObject({title:'updated after upgrade',identityKey:original.identityKey});
+        expect(await db.meta.get('state')).toMatchObject({generation:0,revision:1});
+        await expect(repo.readSnapshotRecord(snapshot.revision, original.id)).rejects.toMatchObject({code:'stale-operation'});
+    });
     it('serializes writes from separate database connections', async () => {
         const a = database(), b = database(a.name), left = new MaterialRepository(a), right = new MaterialRepository(b);
         await Promise.all(Array.from({length:20}, (_, index) => capture(index % 2 ? left : right, `parallel-${index}`, 100)));
@@ -303,6 +319,13 @@ describe('material snapshot revisions', () => {
 });
 
 describe('snapshot transaction cancellation', () => {
+    it('cancels a snapshot check while its database transaction is starting', async () => {
+        const db=database(),repo=new MaterialRepository(db),controller=new AbortController();
+        const pending=repo.checkSnapshot(0,controller.signal);
+        controller.abort();
+        await expect(pending).rejects.toMatchObject({name:'AbortError'});
+        await expect(repo.checkSnapshot(0)).resolves.toBeUndefined();
+    });
     it.each(['open', 'record', 'check'] as const)('aborts a %s read blocked by a real IndexedDB writer and permits retry', async operation => {
         const db = database(), peer = database(db.name), repo = new MaterialRepository(db);
         const item = await capture(repo, `cancel-${operation}`), snapshot = await repo.openSnapshot();

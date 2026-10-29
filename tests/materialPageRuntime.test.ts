@@ -26,6 +26,19 @@ function fixture(){
 }
 
 describe('material page background runtime',()=>{
+    it('does not start a repository read when disposal reenters snapshot revision access',async()=>{
+        const f=fixture();let dispose!:()=>Promise<void>,stopping!:Promise<void>;
+        f.repository.openSnapshot.mockResolvedValueOnce({ids:['id'],get revision(){stopping=dispose();return 1;}});
+        dispose=installMaterialPageRuntime(f.options as never);
+        try {
+            const [server,client]=pair();f.runtime.onConnect.fire(server);
+            const reading=receiveMaterialRead(client as MaterialReadPort,()=>{}).catch(error=>error);
+            client.postMessage({v:1,type:'start',operation:'open',options:{}});
+            expect(await reading).toBeInstanceOf(Error);await stopping;
+            expect(f.repository.readSnapshotRecord).not.toHaveBeenCalled();expect(f.repository.db.close).toHaveBeenCalledOnce();
+            expect(f.runtime.onConnect.listeners.size).toBe(0);
+        } finally {await dispose();}
+    });
     it('removes a partially installed listener when registering it fails, and can reinstall',async()=>{
         const f=fixture(),add=f.runtime.onConnect.addListener.bind(f.runtime.onConnect),failure=Error('listener registration failed');
         f.runtime.onConnect.addListener=fn=>{add(fn);throw failure;};

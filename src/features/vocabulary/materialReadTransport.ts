@@ -64,6 +64,7 @@ function channel(port:MaterialReadPort, options:MaterialReadOptions) {
   let timer:ReturnType<typeof setTimeout>|undefined, closed=false, accepting=true, pending:unknown, hasPending=false, wake:(()=>void)|undefined;
   const controller=new AbortController();
   let failure:Error|undefined;
+  const closeReason=()=>failure??Error('Material read disconnected');
   const failureListeners=new Set<(reason:Error)=>void>();
   const closeListeners=()=>{
     if(timer!==undefined)clearTimeout(timer);
@@ -98,28 +99,28 @@ function channel(port:MaterialReadPort, options:MaterialReadOptions) {
   return {
     signal:controller.signal,
     async next():Promise<unknown> {
-      if(closed)throw failure??Error('Material read disconnected');
+      if(closed)throw closeReason();
       if(!hasPending)await new Promise<void>((resolve,reject)=>{
         const onFailure=(error:Error)=>{wake=undefined;reject(error);};
         failureListeners.add(onFailure);
         wake=()=>{failureListeners.delete(onFailure);resolve();};
       });
-      if(closed)throw failure??Error('Material read disconnected');
+      if(closed)throw closeReason();
       const result=pending;pending=undefined;hasPending=false;return result;
     },
     async guard<T>(value:PromiseLike<T>):Promise<T> {
       // Always observe the supplied work, even if it triggered cancellation synchronously.
       const work=Promise.resolve(value);
-      if(closed) {void work.catch(()=>{});throw failure??Error('Material read disconnected');}
+      if(closed) {void work.catch(()=>{});throw closeReason();}
       return new Promise<T>((resolve,reject)=>{
         const onFailure=(error:Error)=>reject(error);
         failureListeners.add(onFailure);
         work.then(result=>{failureListeners.delete(onFailure);resolve(result);},error=>{failureListeners.delete(onFailure);reject(error);});
       });
     },
-    assertOpen(){if(closed)throw failure??Error('Material read disconnected');},
+    assertOpen(){if(closed)throw closeReason();},
     pause(){accepting=false;},
-    send(message:unknown){if(closed)throw failure??Error('Material read disconnected');touch();try {port.postMessage(message);} catch {fail(Error('Material read send failed'));throw Error('Material read send failed');}},
+    send(message:unknown){if(closed)throw closeReason();touch();try {port.postMessage(message);} catch {fail(Error('Material read send failed'));throw Error('Material read send failed');}},
     resume(){accepting=true;},
     fail,
     close(){if(closed)return;closed=true;closeListeners();},

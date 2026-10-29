@@ -63,6 +63,20 @@ describe('material read transport',()=>{
     expect(()=>receiver.assertOpen()).toThrow('Material read disconnected');
     expect(states.every(state=>state.messages.size===0&&state.disconnects.size===0)).toBe(true);
   });
+  it.each(['cancel','invalid message'] as const)('preserves the original receiver failure after %s',async reason=>{
+    const {ports,states}=pair(),controller=new AbortController();
+    const receiver=startMaterialRead(ports[1],()=>{},{signal:controller.signal});
+    const finished=receiver.result.catch(error=>error);
+    if(reason==='cancel')controller.abort();else ports[0].postMessage({v:1,type:'invalid'});
+    const failure=await finished;
+    expect(failure).toBeInstanceOf(Error);
+    if(reason==='cancel')expect(failure).toMatchObject({name:'AbortError'});
+    else expect(failure.message).toBe('Invalid material read message');
+    let observed:unknown;
+    try{receiver.assertOpen();}catch(error){observed=error;}
+    expect(observed).toBe(failure);
+    expect(states[1].messages.size).toBe(0);expect(states[1].disconnects.size).toBe(0);
+  });
   it('coalesces small chunks without changing byte order or exceeding the frame limit',async()=>{
     const {ports,sent}=pair(), result:Uint8Array[]=[];
     async function* source(){for(let i=0;i<101;i++)yield new Uint8Array([i]);}

@@ -44,6 +44,25 @@ const header=(messages:MaterialPageMessage[])=>messages.find(value=>value.type==
 const complete=(messages:MaterialPageMessage[])=>messages.find(value=>value.type==='complete') as Extract<MaterialPageMessage,{type:'complete'}>;
 
 describe('trusted material page bridge',()=>{
+    it('does not retain an open session when the port disconnects as creation finishes',async()=>{
+        const actual=sessions.createMaterialPageSession;
+        let release!:()=>void,notifyReady!:()=>void;
+        const held=new Promise<void>(resolve=>{release=resolve;}),ready=new Promise<void>(resolve=>{notifyReady=resolve;});
+        const factory=vi.spyOn(sessions,'createMaterialPageSession').mockImplementation(async(...args)=>{
+            const session=await actual(...args);notifyReady();await held;return session;
+        });
+        const {repo}=fixture(0),bridge=createMaterialPageBridge({repository:repo,ready:Promise.resolve(),
+            isPrivateContext:()=>false,isTrustedSender:()=>true,maxSessions:1}),[server,client]=pair();
+        try {
+            bridge.connect(server);const chunks:Uint8Array[]=[];
+            const read=receiveMaterialRead(client as MaterialReadPort,bytes=>{chunks.push(bytes);}).catch(error=>error);
+            client.postMessage(start());await ready;
+            void held.then(()=>client.disconnect());release();
+            expect(await read).toBeInstanceOf(Error);await tick();await tick();
+            expect(chunks).toEqual([]);
+            expect(complete(await transfer(bridge,start())).count).toBe(0);
+        } finally {release();await bridge.dispose();factory.mockRestore();}
+    });
     it.each(['page','topics'] as const)('does not deliver a %s result when the port closes as the session resolves',async operation=>{
         const actual=sessions.createMaterialPageSession;
         let onResult:(()=>void)|undefined;

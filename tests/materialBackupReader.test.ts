@@ -10,6 +10,13 @@ import {MaterialDatabase, MaterialRepository} from '@/src/features/vocabulary/ma
 import type {Frame} from '@/src/features/vocabulary/materialImportStage';
 
 const wrap = (records: string, version = '1') => `{"format":"fluentread-learning-materials","version":${version},"materials":[${records}]}`;
+function splitRecordAtChunk(record: string, token: string): string {
+  const prefix = '{"format":"fluentread-learning-materials","version":1,"padding":"';
+  const middle = '","materials":[';
+  const offset = record.indexOf(token);
+  if (offset < 0) throw Error('test token is missing');
+  return prefix + 'x'.repeat(65535 - prefix.length - middle.length - offset) + middle + record + ']}';
+}
 const encoder = new TextEncoder();
 const dbs: MaterialDatabase[] = [];
 let serial = 0;
@@ -289,6 +296,28 @@ describe('material backup source reader', () => {
     const pad = new Uint8Array(65535 - encoder.encode(prefix).length); pad.fill(0x61);
     const source = new Blob([encoder.encode(prefix), pad, new Uint8Array([0xf0, 0x9f, 0x28, 0xff]), encoder.encode('"}]}')]);
     expect((await read(source)).actual).toEqual(JSON.parse(await source.text()).materials);
+  });
+  it.each([
+    ['{"text":"\\uD83D\\uDE00"}', '\\uD83D'],
+    ['{"text":"before\\\"after"}', '\\\"'],
+    ['{"number":-0.001e-7}', 'e-7'],
+    ['{"values":[true,false,null]}', 'false'],
+  ])('preserves JSON tokens split across the 64 KiB source boundary: %s', async (record, token) => {
+    const text = splitRecordAtChunk(record, token);
+    expect(text.indexOf(token)).toBe(65535);
+    const actual = await read(new Blob([text]));
+    expect(actual.actual).toEqual(JSON.parse(text).materials);
+    expect(actual.prepared.manifest.records).toBe(1);
+  });
+  it.each([
+    ['{"text":"\\u12G0"}', '\\u12G0'],
+    ['{"number":1e+}', 'e+'],
+    ['{"value":truX}', 'truX'],
+  ])('rejects malformed JSON tokens split across the 64 KiB source boundary: %s', async (record, token) => {
+    const text = splitRecordAtChunk(record, token);
+    expect(text.indexOf(token)).toBe(65535);
+    expect(() => JSON.parse(text)).toThrow(SyntaxError);
+    await expect(prepareMaterialBackup(new Blob([text]))).rejects.toBeInstanceOf(SyntaxError);
   });
   it('replaces incomplete UTF-8 immediately before the end of a record', async () => {
     const source = new Blob([encoder.encode(wrap('"').slice(0, -2)), new Uint8Array([0xf0, 0x9f]), encoder.encode('" , 1]}')]);

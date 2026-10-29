@@ -41,7 +41,7 @@ const tick=()=>new Promise<void>(resolve=>setTimeout(resolve,0));
 function material(id='m'):MaterialRecord{return {id,identityKey:'private-id',kind:'article',title:'Private title',source:{kind:'article',url:'https://example.test/'},
     topics:['topic'],references:[{kind:'note',id:'n',note:'my note'}],createdAt:1,updatedAt:2,lastReadAt:3,archivedAt:null};}
 function setup(overrides:Partial<Parameters<typeof createMaterialBackupExportBridge>[0]>={}){
-    const repo={openSnapshot:vi.fn(async()=>({revision:1,ids:['m']})),readSnapshotRecord:vi.fn(async()=>material()),checkSnapshot:vi.fn(async()=>{})};
+    const repo={openSnapshot:vi.fn(async()=>({revision:1,epoch:'test-epoch',ids:['m']})),readSnapshotRecord:vi.fn(async()=>material()),checkSnapshot:vi.fn(async()=>{})};
     const bridge=createMaterialBackupExportBridge({repository:repo,ready:Promise.resolve(),
         isTrustedSender:sender=>isTrustedSettingsSender(sender,'abc','chrome-extension://abc/options.html'),isPrivateContext:()=>false,...overrides});
     return {repo,bridge};
@@ -153,13 +153,13 @@ describe('material backup export bridge',()=>{
         await bridge.dispose();expect(repo.openSnapshot).not.toHaveBeenCalled();
     });
     it('drains an already-started read before disposal finishes',async()=>{
-        let finish!:(value:{revision:number;ids:string[]})=>void,started!:()=>void;
-        const pending=new Promise<{revision:number;ids:string[]}>(resolve=>{finish=resolve;}),began=new Promise<void>(resolve=>{started=resolve;});
+        let finish!:(value:{revision:number;epoch:string;ids:string[]})=>void,started!:()=>void;
+        const pending=new Promise<{revision:number;epoch:string;ids:string[]}>(resolve=>{finish=resolve;}),began=new Promise<void>(resolve=>{started=resolve;});
         const repo={openSnapshot:()=>{started();return pending;},readSnapshotRecord:async()=>null,checkSnapshot:async()=>{}};
         const {bridge}=setup({repository:repo}),[server,client]=pair();bridge.connect(server);
         const read=receiveMaterialBackupExport(client as MaterialReadPort,async()=>{}).catch(error=>error);client.postMessage(start);await began;
         let done=false;const stop=bridge.dispose().then(()=>{done=true;});await tick();expect(done).toBe(false);await read;
-        finish({revision:1,ids:[]});await stop;expect(done).toBe(true);
+        finish({revision:1,epoch:'test-epoch',ids:[]});await stop;expect(done).toBe(true);
     });
     it('exports a verified byte stream and saves only after the terminal digest',async()=>{
         const {repo,bridge}=setup(),[server,client]=pair();bridge.connect(server);
@@ -173,7 +173,7 @@ describe('material backup export bridge',()=>{
     });
     it('aborts a partially written file when a real streamed export is cancelled',async()=>{
         const large=material();large.references=[{kind:'note',id:'n',note:'private'.repeat(10000)}];
-        const repo={openSnapshot:vi.fn(async()=>({revision:1,ids:['m']})),readSnapshotRecord:vi.fn(async()=>large),checkSnapshot:vi.fn(async()=>{})};
+        const repo={openSnapshot:vi.fn(async()=>({revision:1,epoch:'test-epoch',ids:['m']})),readSnapshotRecord:vi.fn(async()=>large),checkSnapshot:vi.fn(async()=>{})};
         const {bridge}=setup({repository:repo}),[server,client]=pair(),controller=new AbortController();bridge.connect(server);
         const file:MaterialBackupWritable={write:vi.fn(async()=>{}),close:vi.fn(async()=>{}),abort:vi.fn(async()=>{})};
         const target=await chooseMaterialBackupTarget('backup.json',{pick:async()=>({createWritable:async()=>file})});
@@ -204,7 +204,7 @@ describe('material backup export bridge',()=>{
         expect(file.abort).toHaveBeenCalledOnce();expect(file.close).not.toHaveBeenCalled();await bridge.dispose();
     });
     it('sends only a verified public stale code and aborts the partially written target',async()=>{
-        const repo={openSnapshot:async()=>({revision:1,ids:['m']}),readSnapshotRecord:async()=>material(),
+        const repo={openSnapshot:async()=>({revision:1,epoch:'test-epoch',ids:['m']}),readSnapshotRecord:async()=>material(),
             checkSnapshot:async()=>{throw new MaterialError('stale-operation','private path secret');}};
         const {bridge}=setup({repository:repo}),[server,client]=pair();bridge.connect(server);
         const file:MaterialBackupWritable={write:vi.fn(async()=>{}),close:vi.fn(async()=>{}),abort:vi.fn(async()=>{})};
@@ -248,14 +248,14 @@ describe('material backup export bridge',()=>{
         await expect(receiving).rejects.toMatchObject({code:'storage-error'});expect(JSON.stringify(server.sent)).not.toContain('private text');bridge.dispose();
     });
     it('holds the port quota through underlying uncooperative storage and releases it after cleanup',async()=>{
-        let resolve!:(value:{revision:number;ids:string[]})=>void,started!:()=>void;
-        const pending=new Promise<{revision:number;ids:string[]}>(done=>{resolve=done;}),began=new Promise<void>(done=>{started=done;});
+        let resolve!:(value:{revision:number;epoch:string;ids:string[]})=>void,started!:()=>void;
+        const pending=new Promise<{revision:number;epoch:string;ids:string[]}>(done=>{resolve=done;}),began=new Promise<void>(done=>{started=done;});
         const repo={openSnapshot:()=>{started();return pending;},readSnapshotRecord:async()=>null,checkSnapshot:async()=>{}};
         const {bridge}=setup({repository:repo,maxPorts:1}),[server,client]=pair();bridge.connect(server);
         const read=receiveMaterialBackupExport(client as MaterialReadPort,async()=>{}).catch(error=>error);client.postMessage(start);await began;
         client.disconnect();await expect(read).resolves.toBeInstanceOf(Error);
         const [blocked]=pair();bridge.connect(blocked);expect(blocked.closed).toBe(true);
-        resolve({revision:1,ids:[]});await tick();await tick();const [allowed]=pair();bridge.connect(allowed);expect(allowed.closed).toBe(false);bridge.dispose();
+        resolve({revision:1,epoch:'test-epoch',ids:[]});await tick();await tick();const [allowed]=pair();bridge.connect(allowed);expect(allowed.closed).toBe(false);bridge.dispose();
     });
     it('cancels a pending readiness gate and safely closes silent ports',async()=>{
         let ready!:()=>void;const waiting=new Promise<void>(resolve=>{ready=resolve;});
@@ -281,7 +281,7 @@ describe('material backup wire reader',()=>{
         expect(statistics).toEqual({records:1,recordBytes:3,maxRecordBytes:3,frames:1});
     });
     it('returns zero statistics for a valid empty backup and withholds them if the transport digest is corrupted',async()=>{
-        const {bridge}=setup({repository:{openSnapshot:async()=>({revision:1,ids:[]}),readSnapshotRecord:async()=>null,checkSnapshot:async()=>{}}});
+        const {bridge}=setup({repository:{openSnapshot:async()=>({revision:1,epoch:'test-epoch',ids:[]}),readSnapshotRecord:async()=>null,checkSnapshot:async()=>{}}});
         const [server,client]=pair();bridge.connect(server);const chunks:Uint8Array[]=[];
         const read=receiveMaterialBackupExport(client as MaterialReadPort,async chunk=>{chunks.push(chunk);});client.postMessage(start);
         expect(await read).toEqual({records:0,recordBytes:0,maxRecordBytes:0,frames:0});

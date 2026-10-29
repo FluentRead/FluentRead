@@ -90,7 +90,7 @@ async function* tokens(repository:Repository, exportedAt:number, signal?:AbortSi
     for (let index = 0; index < snapshot.ids.length; index++) {
         check(signal);
         const id = snapshot.ids[index];
-        const record = await repository.readSnapshotRecord(snapshot.revision,id,signal);
+        const record = await repository.readSnapshotRecord(snapshot,id,signal);
         check(signal);
         if (!record || record.id !== id) throw new MaterialError('storage-error','材料快照记录不存在');
         if (index) yield ',';
@@ -101,7 +101,7 @@ async function* tokens(repository:Repository, exportedAt:number, signal?:AbortSi
         yield RECORD_END;
     }
     check(signal);
-    await repository.checkSnapshot(snapshot.revision,signal);
+    await repository.checkSnapshot(snapshot,signal);
     check(signal);
     yield ']}';
 }

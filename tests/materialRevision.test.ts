@@ -200,12 +200,62 @@ describe('material snapshot revisions', () => {
         } finally {old.close();}
         const db = database(name), repo = new MaterialRepository(db);
         const snapshot = await repo.openSnapshot();
-        expect(snapshot).toEqual({revision:0,ids:[original.id]});
-        expect(await db.meta.get('state')).toBeUndefined();
+        expect(snapshot).toMatchObject({revision:0,ids:[original.id],epoch:expect.any(String)});
+        expect(await db.meta.get('state')).toMatchObject({snapshotEpoch:snapshot.epoch});
         await repo.update(original.id, {title:'updated after upgrade'}, 30);
         expect(await repo.get(original.id)).toMatchObject({title:'updated after upgrade',identityKey:original.identityKey});
         expect(await db.meta.get('state')).toMatchObject({generation:0,revision:1});
-        await expect(repo.readSnapshotRecord(snapshot.revision, original.id)).rejects.toMatchObject({code:'stale-operation'});
+        await expect(repo.readSnapshotRecord(snapshot, original.id)).rejects.toMatchObject({code:'stale-operation'});
+    });
+    it('migrates legacy entries from an old database with no state before assigning the snapshot epoch', async () => {
+        const name=`material-revision-migrate-no-meta-${++serial}`; names.add(name);
+        const original=await capture(new MaterialRepository(database()),'legacy-without-state');
+        const old=new Dexie(name);old.version(1).stores({materials:'id,&identityKey,*aliases,updatedAt',meta:'key'});
+        await old.table('materials').put(original);old.close();
+        const db=database(name), entries=[{id:'old-v',contexts:[{sourceUrl:'https://example.test/legacy-without-state',text:'legacy text',capturedAt:5}]}] as VocabularyEntry[];
+        const repo=new MaterialRepository(db,async()=>entries);
+        const snapshot=await repo.openSnapshot();
+        expect(snapshot).toMatchObject({revision:1,ids:[original.id],epoch:expect.any(String)});
+        expect(await db.meta.get('state')).toMatchObject({migrated:true,revision:1,snapshotEpoch:snapshot.epoch});
+        expect((await repo.readSnapshotRecord(snapshot,original.id))?.references).toEqual(expect.arrayContaining([expect.objectContaining({id:'old-v'})]));
+    });
+    it('invalidates old snapshots when another connection recreates deleted state at the same revision', async () => {
+        const db=database(), peer=database(db.name), repo=new MaterialRepository(db), other=new MaterialRepository(peer);
+        const item=await capture(repo,'epoch-reuse');
+        const before=await repo.openSnapshot();
+        await peer.meta.delete('state');
+        await other.update(item.id,{title:'changed after state loss'},30);
+        expect(await other.revision()).toBe(before.revision);
+        await expect(repo.readSnapshotRecord(before,item.id)).rejects.toMatchObject({code:'stale-operation'});
+        await expect(repo.checkSnapshot(before)).rejects.toMatchObject({code:'stale-operation'});
+        const after=await other.openSnapshot();
+        expect(after.epoch).not.toBe(before.epoch);
+        expect(await repo.readSnapshotRecord(after,item.id)).toMatchObject({title:'changed after state loss'});
+        await expect(repo.checkSnapshot(before)).rejects.toMatchObject({code:'stale-operation'});
+    });
+    it('initializes one epoch for concurrent snapshots of a legacy state without one', async () => {
+        const db=database(), peer=database(db.name), repo=new MaterialRepository(db), other=new MaterialRepository(peer);
+        const item=await capture(repo,'concurrent-epoch');
+        const [left,right]=await Promise.all([repo.openSnapshot(),other.openSnapshot()]);
+        expect(left.epoch).toBe(right.epoch);
+        expect(await other.readSnapshotRecord(left,item.id)).toEqual(item);
+        expect(await repo.readSnapshotRecord(right,item.id)).toEqual(item);
+    });
+    it('opens later snapshots in a read-only transaction without rewriting metadata', async () => {
+        const db=database(),repo=new MaterialRepository(db);
+        await capture(repo,'readonly-epoch');const initial=await repo.openSnapshot();
+        const put=vi.spyOn(db.meta,'put'),get=db.meta.get.bind(db.meta);let mode:string|undefined;
+        const spy=vi.spyOn(db.meta,'get').mockImplementation((...args)=>{mode=Dexie.currentTransaction?.mode;return get(...args);});
+        try {
+            const next=await repo.openSnapshot();
+            expect(next.epoch).toBe(initial.epoch);expect(mode).toBe('readonly');expect(put).not.toHaveBeenCalled();
+        } finally {put.mockRestore();spy.mockRestore();}
+    });
+    it.each([null,'','x'.repeat(129),42])('rejects malformed stored snapshot identity %s',async epoch=>{
+        const db=database(),repo=new MaterialRepository(db);
+        await db.meta.put({key:'state',generation:0,migrated:true,clearedAt:0,revision:0,snapshotEpoch:epoch} as never);
+        await expect(repo.openSnapshot()).rejects.toMatchObject({code:'storage-error'});
+        expect(await db.meta.get('state')).toMatchObject({snapshotEpoch:epoch});
     });
     it('serializes writes from separate database connections', async () => {
         const a = database(), b = database(a.name), left = new MaterialRepository(a), right = new MaterialRepository(b);
@@ -226,31 +276,32 @@ describe('material snapshot revisions', () => {
             const snapshot = await repo.openSnapshot();
             expect(snapshot.revision).toBe(2); expect(snapshot.ids).toHaveLength(2);
             expect(snapshot.ids).toContain(existing.id);
-            expect(await repo.readSnapshotRecord(snapshot.revision, existing.id)).toEqual(existing);
-            expect(await repo.readSnapshotRecord(snapshot.revision, 'missing')).toBeNull();
-            await repo.checkSnapshot(snapshot.revision);
+            expect(await repo.readSnapshotRecord(snapshot, existing.id)).toEqual(existing);
+            expect(await repo.readSnapshotRecord(snapshot, 'missing')).toBeNull();
+            await repo.checkSnapshot(snapshot);
         } finally {noArray.mockRestore();}
     });
     it('invalidates snapshot reads and final checks after concurrent edit and clear', async () => {
         const db = database(), peer = database(db.name), repo = new MaterialRepository(db), other = new MaterialRepository(peer);
         const first = await capture(repo, 'first'), second = await capture(repo, 'second');
         const snapshot = await repo.openSnapshot();
-        expect(await repo.readSnapshotRecord(snapshot.revision, first.id)).toEqual(first);
+        expect(await repo.readSnapshotRecord(snapshot, first.id)).toEqual(first);
         await other.update(second.id, {title:'changed'}, 30);
-        await expect(repo.readSnapshotRecord(snapshot.revision, second.id)).rejects.toMatchObject({code:'stale-operation'});
-        await expect(repo.checkSnapshot(snapshot.revision)).rejects.toMatchObject({code:'stale-operation'});
+        await expect(repo.readSnapshotRecord(snapshot, second.id)).rejects.toMatchObject({code:'stale-operation'});
+        await expect(repo.checkSnapshot(snapshot)).rejects.toMatchObject({code:'stale-operation'});
         const next = await repo.openSnapshot();
         await other.clear(100);
-        await expect(repo.readSnapshotRecord(next.revision, first.id)).rejects.toMatchObject({code:'stale-operation'});
-        await expect(repo.checkSnapshot(next.revision)).rejects.toMatchObject({code:'stale-operation'});
-        const empty = await repo.openSnapshot(); expect(empty.ids).toEqual([]); await repo.checkSnapshot(empty.revision);
+        await expect(repo.readSnapshotRecord(next, first.id)).rejects.toMatchObject({code:'stale-operation'});
+        await expect(repo.checkSnapshot(next)).rejects.toMatchObject({code:'stale-operation'});
+        const empty = await repo.openSnapshot(); expect(empty.ids).toEqual([]); await repo.checkSnapshot(empty);
     });
     it('bounds snapshot primary keys and validates snapshot arguments', async () => {
         const db = database(), repo = new MaterialRepository(db);
         await db.materials.bulkPut(Array.from({length:10001}, (_, i) => ({id:`id-${i}`,identityKey:`identity-${i}`})) as never);
         await expect(repo.openSnapshot()).rejects.toMatchObject({code:'limit-exceeded'});
-        await expect(repo.checkSnapshot(-1)).rejects.toMatchObject({code:'invalid-input'});
-        await expect(repo.readSnapshotRecord(0, '')).rejects.toMatchObject({code:'invalid-input'});
+        expect(await db.meta.get('state')).toBeUndefined();
+        await expect(repo.checkSnapshot({revision:-1,epoch:'test'})).rejects.toMatchObject({code:'invalid-input'});
+        await expect(repo.readSnapshotRecord({revision:0,epoch:'test'}, '')).rejects.toMatchObject({code:'invalid-input'});
     });
     it.each(['', 'x'.repeat(257)])('rejects a damaged stored snapshot key without exposing its record', async id => {
         const db = database(), repo = new MaterialRepository(db);
@@ -319,8 +370,23 @@ describe('material snapshot revisions', () => {
 });
 
 describe('snapshot transaction cancellation', () => {
+    it('rolls back a first epoch initialization when its transaction is cancelled', async () => {
+        const db=database(),repo=new MaterialRepository(db),controller=new AbortController();
+        const put=db.meta.put.bind(db.meta);
+        const spy=vi.spyOn(db.meta,'put').mockImplementation((...args)=>{
+            const write=put(...args);
+            Dexie.ignoreTransaction(()=>controller.abort());
+            return write;
+        });
+        try {await expect(repo.openSnapshot(controller.signal)).rejects.toMatchObject({name:'AbortError'});}
+        finally {spy.mockRestore();}
+        expect(await db.meta.get('state')).toBeUndefined();
+        const snapshot=await repo.openSnapshot();
+        expect(await db.meta.get('state')).toMatchObject({snapshotEpoch:snapshot.epoch});
+    });
     it('cancels at fake IndexedDB transaction completion without leaving the reader unusable', async () => {
         const db=database(),repo=new MaterialRepository(db),controller=new AbortController();
+        const snapshot=await repo.openSnapshot();
         await db.open();
         const get=db.meta.get.bind(db.meta);let observedCompletion=false;
         const spy=vi.spyOn(db.meta,'get').mockImplementation((...args)=>{
@@ -329,17 +395,18 @@ describe('snapshot transaction cancellation', () => {
             return get(...args);
         });
         try {
-            await expect(repo.checkSnapshot(0,controller.signal)).rejects.toMatchObject({name:'AbortError'});
+            await expect(repo.checkSnapshot(snapshot,controller.signal)).rejects.toMatchObject({name:'AbortError'});
             expect(observedCompletion).toBe(true);
         } finally {spy.mockRestore();}
-        await expect(repo.checkSnapshot(0)).resolves.toBeUndefined();
+        await expect(repo.checkSnapshot(snapshot)).resolves.toBeUndefined();
     });
     it('cancels a snapshot check while its database transaction is starting', async () => {
         const db=database(),repo=new MaterialRepository(db),controller=new AbortController();
-        const pending=repo.checkSnapshot(0,controller.signal);
+        const snapshot=await repo.openSnapshot();
+        const pending=repo.checkSnapshot(snapshot,controller.signal);
         controller.abort();
         await expect(pending).rejects.toMatchObject({name:'AbortError'});
-        await expect(repo.checkSnapshot(0)).resolves.toBeUndefined();
+        await expect(repo.checkSnapshot(snapshot)).resolves.toBeUndefined();
     });
     it.each(['open', 'record', 'check'] as const)('aborts a %s read blocked by a real IndexedDB writer and permits retry', async operation => {
         const db = database(), peer = database(db.name), repo = new MaterialRepository(db);
@@ -357,16 +424,16 @@ describe('snapshot transaction cancellation', () => {
         const spy = vi.spyOn(db.meta,'get').mockImplementation((...args) => {Dexie.ignoreTransaction(requested);return get(...args);});
         const controller=new AbortController();
         const read = operation==='open' ? repo.openSnapshot(controller.signal)
-            : operation==='record' ? repo.readSnapshotRecord(snapshot.revision,item.id,controller.signal)
-            : repo.checkSnapshot(snapshot.revision,controller.signal);
+            : operation==='record' ? repo.readSnapshotRecord(snapshot,item.id,controller.signal)
+            : repo.checkSnapshot(snapshot,controller.signal);
         try {
             await queued;controller.abort();
             const outcome = await Promise.race([read.then(()=>'unexpected',error=>error.name),new Promise<string>(resolve=>setTimeout(()=>resolve('timeout'),1000))]);
             expect(outcome).toBe('AbortError');
         } finally {holding=false;try {writer.abort();} catch {} spy.mockRestore();}
         const retried=await repo.openSnapshot();
-        expect(await repo.readSnapshotRecord(retried.revision,item.id)).toEqual(item);
-        await repo.checkSnapshot(retried.revision);
+        expect(await repo.readSnapshotRecord(retried,item.id)).toEqual(item);
+        await repo.checkSnapshot(retried);
     });
     it('waits for non-cooperative legacy storage and skips migration after cancellation', async () => {
         const db=database();let finish!:(value:VocabularyEntry[])=>void,started!:()=>void;
@@ -395,8 +462,8 @@ describe('snapshot transaction cancellation', () => {
     it('fails before accessing a database when the signal is already aborted', async () => {
         const db=database(),repo=new MaterialRepository(db),controller=new AbortController();controller.abort();
         await expect(repo.openSnapshot(controller.signal)).rejects.toMatchObject({name:'AbortError'});
-        await expect(repo.readSnapshotRecord(0,'id',controller.signal)).rejects.toMatchObject({name:'AbortError'});
-        await expect(repo.checkSnapshot(0,controller.signal)).rejects.toMatchObject({name:'AbortError'});
+        await expect(repo.readSnapshotRecord({revision:0,epoch:'test'},'id',controller.signal)).rejects.toMatchObject({name:'AbortError'});
+        await expect(repo.checkSnapshot({revision:0,epoch:'test'},controller.signal)).rejects.toMatchObject({name:'AbortError'});
         expect(db.isOpen()).toBe(false);
     });
 });

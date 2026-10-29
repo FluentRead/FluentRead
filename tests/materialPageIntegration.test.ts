@@ -38,6 +38,24 @@ function database(name=`material-page-integration-${++serial}`) {const db=new Ma
 afterEach(async()=>{const all=databases.splice(0),names=new Set(all.map(db=>db.name));for(const db of all)db.close();for(const name of names)await Dexie.delete(name);});
 
 describe('material page transport and repository integration',()=>{
+    it.each(['page','topics','detail'] as const)('rejects %s delivery after state loss and revision reuse on another connection',async operation=>{
+        const db=database(),peer=database(db.name),repository=new MaterialRepository(db),other=new MaterialRepository(peer);
+        const item=await repository.capture({source:{kind:'article',url:'https://example.test/state-loss'},capturedAt:10},10);
+        const bridge=createMaterialPageBridge({repository,ready:Promise.resolve(),isPrivateContext:()=>false,isTrustedSender:()=>true});
+        const connect=():MaterialReadPort=>{const {server,client}=ports();bridge.connect(server);return client;};
+        try {
+            const page=await requestMaterialPage({v:1,type:'start',operation:'open',options:{}},{},connect);
+            expect(page).toBeDefined();const {capability,revision}=page!;
+            await peer.meta.delete('state');await other.update(item.id,{title:'changed'},20);
+            expect(await other.revision()).toBe(revision);
+            const request=operation==='page'
+                ? requestMaterialPage({v:1,type:'start',operation:'page',capability:capability!,offset:0},{},connect)
+                : operation==='topics'
+                    ? requestMaterialTopics({v:1,type:'start',operation:'topics',capability:capability!,offset:0},revision,{},connect)
+                    : requestMaterialDetail({v:1,type:'start',operation:'detail',capability:capability!,id:item.id,offset:0},revision,{},connect);
+            await expect(request).rejects.toMatchObject({code:'stale-operation'});
+        } finally {await bridge.dispose();}
+    });
     it('accepts a real capture whose fallback hostname exceeds the explicit title limit',async()=>{
         const db=database(),repository=new MaterialRepository(db),host=`${'a'.repeat(300)}.example`;
         const item=await repository.capture({source:{kind:'article',url:`https://${host}/`},capturedAt:10},10);

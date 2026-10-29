@@ -207,7 +207,7 @@ export function createMaterialPageBridge(options:MaterialPageBridgeOptions):{con
                                     if(signal.aborted||entry.controller.signal.aborted)throw new MaterialError('stale-operation','材料读取会话已结束');
                                     yield message({type:'topics-header',version:1,revision:page.revision,total:page.total,matched:page.matched,offset:page.offset,nextOffset:page.nextOffset});
                                     for(const topic of page.topics){if(signal.aborted||entry.controller.signal.aborted)throw new MaterialError('stale-operation','材料读取会话已结束');yield message({type:'topic',value:topic});}
-                                    await entryWork(entry,()=>options.repository.checkSnapshot(page.revision,signal));
+                                    await entryWork(entry,()=>options.repository.checkSnapshot(entry.session!.snapshot,signal));
                                     if(signal.aborted||entry.controller.signal.aborted)throw new MaterialError('stale-operation','材料读取会话已结束');
                                     yield message({type:'complete',count:page.topics.length});complete=true;return;
                                 }
@@ -216,7 +216,7 @@ export function createMaterialPageBridge(options:MaterialPageBridgeOptions):{con
                                     signal.addEventListener('abort',abort,{once:true});entry.controller.signal.addEventListener('abort',abort,{once:true});
                                     if(signal.aborted||entry.controller.signal.aborted)abort();
                                     try{
-                                        const detail=await entryWork(entry,()=>readMaterialDetailPage(options.repository,{revision:entry.session!.revision,id:request.id,offset:request.offset},combined.signal));
+                                        const detail=await entryWork(entry,()=>readMaterialDetailPage(options.repository,{revision:entry.session!.revision,id:request.id,offset:request.offset},combined.signal,entry.session!.snapshot));
                                         if(combined.signal.aborted)throw new MaterialError('stale-operation','材料读取会话已结束');
                                         yield message({type:'detail-header',version:1,revision:detail.revision,id:detail.id,total:detail.total,offset:detail.offset,nextOffset:detail.nextOffset});
                                         for(const key of Object.keys(detail.metadata) as Array<keyof MaterialDetailMetadata>){
@@ -224,7 +224,7 @@ export function createMaterialPageBridge(options:MaterialPageBridgeOptions):{con
                                             yield message({type:'metadata',key,value:detail.metadata[key]});
                                         }
                                         for(const reference of detail.references){if(combined.signal.aborted)throw new MaterialError('stale-operation','材料读取会话已结束');yield message({type:'reference',value:reference});}
-                                        await entryWork(entry,()=>options.repository.checkSnapshot(detail.revision,combined.signal));
+                                        await entryWork(entry,()=>options.repository.checkSnapshot(entry.session!.snapshot,combined.signal));
                                         if(combined.signal.aborted)throw new MaterialError('stale-operation','材料读取会话已结束');
                                         yield message({type:'complete',count:detail.references.length});complete=true;return;
                                     }finally{signal.removeEventListener('abort',abort);entry.controller.signal.removeEventListener('abort',abort);}
@@ -233,7 +233,7 @@ export function createMaterialPageBridge(options:MaterialPageBridgeOptions):{con
                                 if(signal.aborted||entry.controller.signal.aborted)throw new MaterialError('stale-operation','材料读取会话已结束');
                                 yield message({type:'header',version:1,operation:request.operation,...(request.operation==='open'?{capability:token}:{}),revision:page.revision,total:page.total,matched:page.matched,offset:page.offset,nextOffset:page.nextOffset});
                                 for(const item of page.items){if(signal.aborted||entry.controller.signal.aborted)throw new MaterialError('stale-operation','材料读取会话已结束');yield message({type:'summary',value:item});}
-                                await entryWork(entry,()=>options.repository.checkSnapshot(page.revision,signal));
+                                await entryWork(entry,()=>options.repository.checkSnapshot(entry.session!.snapshot,signal));
                                 if(signal.aborted||entry.controller.signal.aborted)throw new MaterialError('stale-operation','材料读取会话已结束');
                                 yield message({type:'complete',count:page.items.length});
                                 complete=true;

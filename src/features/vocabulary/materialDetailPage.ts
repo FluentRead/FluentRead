@@ -6,7 +6,7 @@
  */
 import {MaterialError} from './materialModel';
 import type {MaterialRecord, MaterialReference} from './materialProtocol';
-import type {MaterialRepository} from './materialRepository';
+import type {MaterialRepository, MaterialSnapshotVersion} from './materialRepository';
 
 /** 显示和继续阅读所需的元信息；历史身份别名不属于详情内容。 */
 export type MaterialDetailMetadata = Pick<MaterialRecord, 'id'|'kind'|'title'|'source'|'locator'|'topics'|'createdAt'|'updatedAt'|'lastReadAt'|'archivedAt'>;
@@ -30,10 +30,10 @@ function check(signal?: AbortSignal): void {
 }
 
 /** 只在最后一次版本检查完成后返回整页，调用方须在传输完整性验证后再展示。 */
-export async function readMaterialDetailPage(repository: Repository, input: MaterialDetailRequest, signal?: AbortSignal): Promise<MaterialDetailPage> {
+export async function readMaterialDetailPage(repository: Repository, input: MaterialDetailRequest, signal: AbortSignal | undefined, snapshot: MaterialSnapshotVersion): Promise<MaterialDetailPage> {
     if (!input || typeof input !== 'object' || Array.isArray(input)
         || Object.keys(input).some(key => !['revision','id','offset','limit'].includes(key))
-        || !Number.isSafeInteger(input.revision) || input.revision < 0
+        || !Number.isSafeInteger(input.revision) || input.revision < 0 || !snapshot || snapshot.revision !== input.revision
         || typeof input.id !== 'string' || !input.id || input.id.length > 256
         || !Number.isSafeInteger(input.offset) || input.offset < 0
         || (input.limit !== undefined && (!Number.isSafeInteger(input.limit) || input.limit < 1 || input.limit > MATERIAL_DETAIL_PAGE_MAX_ITEMS))) {
@@ -42,7 +42,7 @@ export async function readMaterialDetailPage(repository: Repository, input: Mate
     // 在异步读取前快照调用者输入，避免等待时被修改。
     const {revision, id, offset} = input, limit = input.limit ?? MATERIAL_DETAIL_PAGE_MAX_ITEMS;
     check(signal);
-    const record = await repository.readSnapshotRecord(revision, id, signal);
+    const record = await repository.readSnapshotRecord(snapshot, id, signal);
     check(signal);
     if (!record) throw new MaterialError('not-found', '这份材料已不存在');
     if (record.id !== id || !Array.isArray(record.references) || record.references.length > 1000) throw new MaterialError('storage-error', '材料详情不可用');
@@ -65,7 +65,7 @@ export async function readMaterialDetailPage(repository: Repository, input: Mate
         next++;
     }
     check(signal);
-    await repository.checkSnapshot(revision, signal);
+    await repository.checkSnapshot(snapshot, signal);
     check(signal);
     return {revision, id, metadata, total, offset, nextOffset:next < total ? next : null, references};
 }

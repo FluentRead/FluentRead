@@ -35,8 +35,8 @@ function record(id:string, extras:Record<string,unknown> = {}):MaterialRecord {
 }
 function fake(records:MaterialRecord[]) {
     const map = new Map(records.map(item=>[item.id,item]));
-    return {openSnapshot:vi.fn(async()=>({revision:3,ids:[...map.keys()]})),
-        readSnapshotRecord:vi.fn(async (_revision:number,id:string)=>map.get(id) ?? null),
+    return {openSnapshot:vi.fn(async()=>({revision:3,epoch:'test-epoch',ids:[...map.keys()]})),
+        readSnapshotRecord:vi.fn(async (_revision:{revision:number;epoch:string},id:string)=>map.get(id) ?? null),
         checkSnapshot:vi.fn(async()=>{})};
 }
 async function collect(source:AsyncIterable<Uint8Array>):Promise<Uint8Array> {
@@ -105,7 +105,7 @@ describe('streamed material backup', () => {
     },30_000);
     it('checks revision even for an empty library and returns valid empty JSON', async () => {
         const repo = fake([]), output = text(await collect(streamMaterialBackup(repo,{exportedAt:123})));
-        expect(output).toBe(JSON.stringify(backup([])));expect(repo.checkSnapshot).toHaveBeenCalledWith(3,undefined);
+        expect(output).toBe(JSON.stringify(backup([])));expect(repo.checkSnapshot).toHaveBeenCalledWith({revision:3,epoch:'test-epoch',ids:[]},undefined);
     });
     it('rejects invalid time, missing records, cyclic objects and BigInt without a complete result', async () => {
         await expect(collect(streamMaterialBackup(fake([]),{exportedAt:NaN}))).rejects.toMatchObject({code:'invalid-input'});
@@ -148,6 +148,20 @@ describe('streamed material backup', () => {
             await peer.update(first.id,{title:'changed'},10);return result;
         });
         try {await expect(collect(source)).rejects.toMatchObject({code:'stale-operation'});} finally {open.mockRestore();}
+    });
+    it('does not complete a backup after another connection recreates state at the same revision', async () => {
+        const db=database(),other=new MaterialDatabase(db.name);databases.push(other);
+        const repo=new MaterialRepository(db),peer=new MaterialRepository(other),report=vi.fn();
+        const item=await repo.capture({source:{kind:'article',url:'https://example.test/state-loss'},capturedAt:1},1);
+        const read=vi.spyOn(repo,'readSnapshotRecord').mockImplementationOnce(async (...args)=>{
+            const result=await MaterialRepository.prototype.readSnapshotRecord.apply(repo,args);
+            await other.meta.delete('state');await peer.update(item.id,{title:'changed'},10);
+            expect(await peer.revision()).toBe(args[0].revision);
+            return result;
+        });
+        try {await expect(collect(streamMaterialBackup(repo,{exportedAt:3,onStatistics:report}))).rejects.toMatchObject({code:'stale-operation'});}
+        finally {read.mockRestore();}
+        expect(report).not.toHaveBeenCalled();
     });
     it('round trips the streamed backup through the production reader and atomic staging repository', async () => {
         const sourceDb=database(), source=new MaterialRepository(sourceDb);

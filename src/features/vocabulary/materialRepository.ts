@@ -8,7 +8,9 @@ import Dexie, {type Table, type Transaction} from 'dexie';
 import type {VocabularyEntry} from './learningModel';
 import type {MaterialOperationGuard, MaterialBackup, MaterialImportResult, MaterialCaptureInput, MaterialListOptions, MaterialPatch, MaterialRecord, MaterialReference} from './materialProtocol';
 import {MaterialError, canonicalMaterialUrl, materialText, normalizeMaterialLocator, normalizeMaterialReference, normalizeMaterialSource, normalizeMaterialTopics} from './materialModel';
-interface MaterialMeta {key: string; generation: number; migrated: boolean; clearedAt: number; revision?: number}
+interface MaterialMeta {key: string; generation: number; migrated: boolean; clearedAt: number; revision?: number; snapshotEpoch?: string}
+/** 内部快照身份；对外协议仍只展示数字 revision。 */
+export interface MaterialSnapshotVersion {readonly revision: number; readonly epoch: string}
 export class MaterialDatabase extends Dexie {
     materials!: Table<MaterialRecord, string>;
     meta!: Table<MaterialMeta, string>;
@@ -70,29 +72,48 @@ export class MaterialRepository {
         } finally {signal?.removeEventListener('abort', abort);}
     }
     /** 只复制有界的主键，不复制全文；后续按 ID 单条读取并在完成后再次校验版本。 */
-    async openSnapshot(signal?:AbortSignal): Promise<{revision: number; ids: string[]}> {
+    async openSnapshot(signal?:AbortSignal): Promise<MaterialSnapshotVersion & {ids: string[]}> {
         await this.migrate(signal);
-        return this.snapshotTransaction('r', [this.db.materials, this.db.meta], signal, async () => {
-            const revision = await this.revision();
+        const collect = async (state:MaterialMeta, epoch:string) => {
+            const revision = materialRevision(state);
             const ids = await this.db.materials.limit(10001).primaryKeys();
             if (ids.length > 10000) throw new MaterialError('limit-exceeded', '材料数量已超过快照上限');
             if (ids.some(id => typeof id !== 'string' || !id || id.length > 256)) throw new MaterialError('storage-error', '材料标识无效');
-            return {revision, ids};
+            return {revision, epoch, ids};
+        };
+        const readEpoch = (state:MaterialMeta|undefined) => {
+            const epoch = state?.snapshotEpoch;
+            if (epoch !== undefined && (typeof epoch !== 'string' || !epoch || epoch.length > 128)) throw new MaterialError('storage-error', '材料快照身份无效');
+            return epoch;
+        };
+        // Keep ordinary opens read-only; only legacy/missing identities need a
+        // write transaction. Reread state there to serialize concurrent upgrades.
+        const current = await this.snapshotTransaction('r', [this.db.materials, this.db.meta], signal, async () => {
+            const state = await this.db.meta.get('state'), epoch = readEpoch(state);
+            return epoch === undefined ? undefined : collect(state!,epoch);
+        });
+        if (current) return current;
+        return this.snapshotTransaction('rw', [this.db.materials, this.db.meta], signal, async () => {
+            const state = await this.db.meta.get('state') ?? initialMeta();
+            const epoch = readEpoch(state) ?? crypto.randomUUID();
+            if (state.snapshotEpoch === undefined) await this.db.meta.put({...state, snapshotEpoch:epoch});
+            return collect(state,epoch);
         });
     }
-    private async requireRevision(expected: number): Promise<void> {
-        if (!Number.isSafeInteger(expected) || expected < 0) throw new MaterialError('invalid-input', '材料版本无效');
-        if (await this.revision() !== expected) throw new MaterialError('stale-operation', '材料已发生变化，请重新读取');
+    private async requireRevision(expected: MaterialSnapshotVersion): Promise<void> {
+        if (!expected || !Number.isSafeInteger(expected.revision) || expected.revision < 0 || typeof expected.epoch !== 'string' || !expected.epoch || expected.epoch.length > 128) throw new MaterialError('invalid-input', '材料版本无效');
+        const state = await this.db.meta.get('state');
+        if (state?.snapshotEpoch !== expected.epoch || materialRevision(state) !== expected.revision) throw new MaterialError('stale-operation', '材料已发生变化，请重新读取');
     }
     /** 检查与获取在同一事务内；不能将此事务保持到跨进程发送时。 */
-    async readSnapshotRecord(revision: number, id: string, signal?:AbortSignal): Promise<MaterialRecord | null> {
+    async readSnapshotRecord(revision: MaterialSnapshotVersion, id: string, signal?:AbortSignal): Promise<MaterialRecord | null> {
         this.id(id);
         return this.snapshotTransaction('r', [this.db.materials, this.db.meta], signal, async () => {
             await this.requireRevision(revision);
             return await this.db.materials.get(id) ?? null;
         });
     }
-    async checkSnapshot(revision: number, signal?:AbortSignal): Promise<void> {
+    async checkSnapshot(revision: MaterialSnapshotVersion, signal?:AbortSignal): Promise<void> {
         await this.snapshotTransaction('r', [this.db.meta], signal, () => this.requireRevision(revision));
     }
     async get(id: string): Promise<MaterialRecord | null> {return await this.db.materials.get(this.id(id)) ?? null;}

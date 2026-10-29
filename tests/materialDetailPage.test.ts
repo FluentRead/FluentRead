@@ -1,8 +1,8 @@
 import 'fake-indexeddb/auto';
 import Dexie from 'dexie';
 import {afterEach, describe, expect, it, vi} from 'vitest';
-import {MaterialDatabase, MaterialRepository} from '@/src/features/vocabulary/materialRepository';
-import {MATERIAL_DETAIL_PAGE_MAX_ITEMS, MATERIAL_DETAIL_PAGE_TARGET_BYTES, readMaterialDetailPage} from '@/src/features/vocabulary/materialDetailPage';
+import {MaterialDatabase, MaterialRepository, type MaterialSnapshotVersion} from '@/src/features/vocabulary/materialRepository';
+import {MATERIAL_DETAIL_PAGE_MAX_ITEMS, MATERIAL_DETAIL_PAGE_TARGET_BYTES, readMaterialDetailPage as readDetail} from '@/src/features/vocabulary/materialDetailPage';
 import type {MaterialRecord, MaterialReference} from '@/src/features/vocabulary/materialProtocol';
 
 let serial = 0;
@@ -25,16 +25,19 @@ function fixture(references: MaterialReference[] = []): MaterialRecord {
 }
 function repository(record: MaterialRecord | null, revision = 3) {
     return {
-        readSnapshotRecord: vi.fn(async (expected:number,id:string) => {
-            if (expected !== revision) throw Object.assign(Error('stale'), {code:'stale-operation'});
+        readSnapshotRecord: vi.fn(async (expected:MaterialSnapshotVersion,id:string) => {
+            if (expected.revision !== revision) throw Object.assign(Error('stale'), {code:'stale-operation'});
             return record && record.id === id ? record : null;
         }),
-        checkSnapshot: vi.fn(async (expected:number) => {
-            if (expected !== revision) throw Object.assign(Error('stale'), {code:'stale-operation'});
+        checkSnapshot: vi.fn(async (expected:MaterialSnapshotVersion) => {
+            if (expected.revision !== revision) throw Object.assign(Error('stale'), {code:'stale-operation'});
         }),
     };
 }
 const request = (offset = 0) => ({revision:3,id:'id-1',offset});
+function readMaterialDetailPage(repo:Parameters<typeof readDetail>[0], input:Parameters<typeof readDetail>[1], signal?:AbortSignal, snapshot:MaterialSnapshotVersion={revision:input?.revision,epoch:'fixture'}) {
+    return readDetail(repo,input,signal,snapshot);
+}
 
 describe('bounded material detail pages', () => {
     it('preserves complete source and document position while excluding unrelated identity history', async () => {
@@ -103,13 +106,13 @@ describe('bounded material detail pages', () => {
         const db = database(), otherDb = database(db.name), repo = new MaterialRepository(db), other = new MaterialRepository(otherDb);
         const item = await repo.capture({source:{kind:'article',url:'https://example.test/detail'},
             reference:{kind:'note',id:'n',note:'private'},capturedAt:10},10);
-        const revision = (await repo.openSnapshot()).revision;
-        const first = await readMaterialDetailPage(repo,{revision,id:item.id,offset:0});
+        const snapshot = await repo.openSnapshot(), revision = snapshot.revision;
+        const first = await readMaterialDetailPage(repo,{revision,id:item.id,offset:0},undefined,snapshot);
         expect(first.references[0]).toMatchObject({id:'n',note:'private'});
         await other.update(item.id,{title:'changed'},20);
-        await expect(readMaterialDetailPage(repo,{revision,id:item.id,offset:0})).rejects.toMatchObject({code:'stale-operation'});
-        const next = (await repo.openSnapshot()).revision; await other.clear(30);
-        await expect(readMaterialDetailPage(repo,{revision:next,id:item.id,offset:0})).rejects.toMatchObject({code:'stale-operation'});
+        await expect(readMaterialDetailPage(repo,{revision,id:item.id,offset:0},undefined,snapshot)).rejects.toMatchObject({code:'stale-operation'});
+        const next = await repo.openSnapshot(); await other.clear(30);
+        await expect(readMaterialDetailPage(repo,{revision:next.revision,id:item.id,offset:0},undefined,next)).rejects.toMatchObject({code:'stale-operation'});
     });
     it('does not publish a page when the revision changes after reading it', async () => {
         const repo = repository(fixture([{kind:'note',id:'n',note:'private'}]));
@@ -123,7 +126,7 @@ describe('bounded material detail pages', () => {
         const input = {...request(),limit:1}, result = readMaterialDetailPage(repo,input);
         input.offset = 42; input.id = 'changed'; input.revision = 99; finish(fixture());
         expect(await result).toMatchObject({revision:3,id:'id-1',offset:0});
-        expect(repo.checkSnapshot).toHaveBeenCalledWith(3,undefined);
+        expect(repo.checkSnapshot).toHaveBeenCalledWith({revision:3,epoch:'fixture'},undefined);
     });
     it('honors cancellation before work and after an uncooperative read settles', async () => {
         const repo = repository(fixture()), already = new AbortController(); already.abort();

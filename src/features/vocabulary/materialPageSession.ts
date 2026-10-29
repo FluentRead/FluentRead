@@ -5,7 +5,7 @@
  * 模块边界：不保存材料全文与来源地址，不处理消息鉴权或帧传输；当前存储仍须逐次物化单条材料记录。
  */
 import {MaterialError} from './materialModel';
-import type {MaterialRepository} from './materialRepository';
+import type {MaterialRepository, MaterialSnapshotVersion} from './materialRepository';
 import {matchesNormalizedMaterialSearch, normalizeMaterialSearch, summarizeMaterial, type MaterialSummary, type MaterialSummaryQuery} from './materialSummary';
 
 type Repository = Pick<MaterialRepository, 'openSnapshot'|'readSnapshotRecord'|'checkSnapshot'>;
@@ -19,6 +19,7 @@ const MAX_SEARCH_LENGTH = 128 * 1024;
 export interface MaterialPage {revision:number; total:number; matched:number; offset:number; nextOffset:number|null; items:MaterialSummary[]}
 export interface MaterialTopicPage {revision:number; total:number; matched:number; offset:number; nextOffset:number|null; topics:string[]}
 export interface MaterialPageSession {
+    readonly snapshot:MaterialSnapshotVersion;
     readonly revision:number;
     readonly total:number;
     readonly matched:number;
@@ -109,12 +110,13 @@ export async function createMaterialPageSession(repository:Repository, input:Mat
     const search = normalizeMaterialSearch(query.search);
     try {
         const snapshot = await repository.openSnapshot(signal);
+        const version = Object.freeze({revision:snapshot.revision, epoch:snapshot.epoch});
         check(signal);
         let total = 0;
         let processed = 0;
         for (const id of snapshot.ids) {
             check(signal);
-            const item = await repository.readSnapshotRecord(snapshot.revision, id, signal);
+            const item = await repository.readSnapshotRecord(version, id, signal);
             check(signal);
             if (!item || item.id !== id) throw new MaterialError('storage-error', '材料快照记录不存在');
             processed++;
@@ -139,7 +141,7 @@ export async function createMaterialPageSession(repository:Repository, input:Mat
         // 首次来源排序键只用于确定相同 locale 顺序；之后只保留主题字符串。
         const topics = orderedTopics.map(entry=>entry.value); orderedTopics.length = 0;
         check(signal);
-        await repository.checkSnapshot(snapshot.revision, signal);
+        await repository.checkSnapshot(version, signal);
         check(signal);
         const revision = snapshot.revision, matched = index.length, controller = new AbortController();
         let closed = false, pending:Promise<unknown>|undefined, closePromise:Promise<void>|undefined;
@@ -153,7 +155,7 @@ export async function createMaterialPageSession(repository:Repository, input:Mat
         signal?.addEventListener('abort', abortSession, {once:true});
         if (signal?.aborted) {abortSession(); check(signal);}
         return {
-            revision, total, matched,
+            snapshot:version, revision, total, matched,
             getPage(options) {
                 if (closed) return Promise.reject(cancelled());
                 if (!options || typeof options !== 'object' || Array.isArray(options)
@@ -172,18 +174,18 @@ export async function createMaterialPageSession(repository:Repository, input:Mat
                     let bytes = 0, next = offset;
                     try {
                         check(combined.signal);
-                        await repository.checkSnapshot(revision, combined.signal);
+                        await repository.checkSnapshot(version, combined.signal);
                         check(combined.signal);
                         while (next < matched && page.length < limit) {
                             const entry = index[next];
-                            const item = await repository.readSnapshotRecord(revision, entry.id, combined.signal);
+                            const item = await repository.readSnapshotRecord(version, entry.id, combined.signal);
                             check(combined.signal);
                             if (!item || item.id !== entry.id) throw new MaterialError('storage-error', '材料快照记录不存在');
                             const summary = summarizeMaterial(item), size = encoder.encode(JSON.stringify(summary)).length;
                             if (page.length && bytes + size > MATERIAL_PAGE_TARGET_BYTES) break;
                             page.push(summary); bytes += size; next++;
                         }
-                        await repository.checkSnapshot(revision, combined.signal);
+                        await repository.checkSnapshot(version, combined.signal);
                         check(combined.signal);
                         return {revision, total, matched, offset, nextOffset:next < matched ? next : null, items:page};
                     } finally {combined.release();}
@@ -207,7 +209,7 @@ export async function createMaterialPageSession(repository:Repository, input:Mat
                 const work=Promise.resolve().then(async ():Promise<MaterialTopicPage> => {
                     try {
                         check(combined.signal);
-                        await repository.checkSnapshot(revision,combined.signal);
+                        await repository.checkSnapshot(version,combined.signal);
                         check(combined.signal);
                         const page:string[] = [];
                         let matched=0;
@@ -225,7 +227,7 @@ export async function createMaterialPageSession(repository:Repository, input:Mat
                             }
                             if (offset > matched) throw new MaterialError('invalid-input', '材料主题分页无效');
                         }
-                        await repository.checkSnapshot(revision,combined.signal);
+                        await repository.checkSnapshot(version,combined.signal);
                         check(combined.signal);
                         const next=offset+page.length;
                         return {revision,total:topics.length,matched,offset,nextOffset:next < matched ? next : null,topics:page};

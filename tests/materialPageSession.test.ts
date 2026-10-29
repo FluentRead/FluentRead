@@ -14,12 +14,12 @@ function fake(records:MaterialRecord[]) {
     let revision = 1;
     const byId = new Map(records.map(record => [record.id,record]));
     const repository = {
-        openSnapshot:vi.fn(async () => ({revision,ids:records.map(record => record.id)})),
-        readSnapshotRecord:vi.fn(async (expected:number,id:string) => {
-            if (expected !== revision) throw Object.assign(Error('stale'), {code:'stale-operation'});
+        openSnapshot:vi.fn(async () => ({revision,epoch:'test-epoch',ids:records.map(record => record.id)})),
+        readSnapshotRecord:vi.fn(async (expected:{revision:number;epoch:string},id:string) => {
+            if (expected.revision !== revision) throw Object.assign(Error('stale'), {code:'stale-operation'});
             return byId.get(id) ?? null;
         }),
-        checkSnapshot:vi.fn(async (expected:number) => {if (expected !== revision) throw Object.assign(Error('stale'), {code:'stale-operation'});}),
+        checkSnapshot:vi.fn(async (expected:{revision:number;epoch:string}) => {if (expected.revision !== revision) throw Object.assign(Error('stale'), {code:'stale-operation'});}),
     };
     return {repository, change() {revision++;}};
 }
@@ -27,10 +27,17 @@ let serial = 0; const databases:MaterialDatabase[] = [];
 afterEach(async () => {const entries = databases.splice(0); for (const db of entries) db.close(); for (const name of new Set(entries.map(db => db.name))) await Dexie.delete(name);});
 
 describe('paged material query sessions', () => {
+    it('keeps its internal snapshot identity immutable while exposing a numeric page revision', async () => {
+        const session=await createMaterialPageSession(fake([material('x')]).repository);
+        expect(Object.isFrozen(session.snapshot)).toBe(true);
+        expect(Reflect.set(session.snapshot,'epoch','changed')).toBe(false);
+        expect((await session.getPage({offset:0})).revision).toBe(1);
+        await session.close();
+    });
     it('closes a session if cancellation reenters while its revision is read', async () => {
         const f = fake([]), controller = new AbortController(), removed = vi.spyOn(controller.signal, 'removeEventListener');
         let reads = 0;
-        f.repository.openSnapshot.mockResolvedValueOnce({ids:[],get revision() {if (++reads === 2) controller.abort();return 1;}});
+        f.repository.openSnapshot.mockResolvedValueOnce({ids:[],epoch:'test-epoch',get revision() {if (++reads === 2) controller.abort();return 1;}});
         await expect(createMaterialPageSession(f.repository,{},controller.signal)).rejects.toMatchObject({name:'AbortError'});
         expect(f.repository.checkSnapshot).toHaveBeenCalledOnce();
         expect(removed).toHaveBeenCalledWith('abort',expect.any(Function));
@@ -181,8 +188,8 @@ describe('paged material query sessions', () => {
     });
     it('sorts and pages the full 10,000 by 30 topic bound without retaining material bodies', async () => {
         const count=10000, ids=Array.from({length:count},(_,i)=>String(i).padStart(5,'0'));
-        const repo={openSnapshot:async()=>({revision:1,ids}), checkSnapshot:async()=>{},
-            readSnapshotRecord:async (_revision:number,id:string)=>material(id,{
+        const repo={openSnapshot:async()=>({revision:1,epoch:'test-epoch',ids}), checkSnapshot:async()=>{},
+            readSnapshotRecord:async (_revision:{revision:number;epoch:string},id:string)=>material(id,{
                 source:{kind:'article',url:`https://private.test/${id}`},
                 topics:Array.from({length:30},(_,i)=>`${id}-${String(i).padStart(2,'0')}`.padEnd(80,'x')),
                 references:[{kind:'note',id:'private-note',note:'personal body'}],
@@ -319,7 +326,7 @@ describe('paged material query sessions', () => {
     it('cancels during index construction after the actual pending read settles', async () => {
         let finish!: (value:MaterialRecord|null)=>void; const pending = new Promise<MaterialRecord|null>(resolve => {finish = resolve;});
         let began!:()=>void; const started = new Promise<void>(resolve => {began=resolve;});
-        const repository = {openSnapshot:async () => ({revision:1,ids:['a']}),
+        const repository = {openSnapshot:async () => ({revision:1,epoch:'test-epoch',ids:['a']}),
             readSnapshotRecord:() => {began();return pending;}, checkSnapshot:async () => {}};
         const controller = new AbortController(), operation = createMaterialPageSession(repository,{},controller.signal);
         await started; controller.abort(); finish(material('a'));

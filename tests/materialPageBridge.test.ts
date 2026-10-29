@@ -21,9 +21,9 @@ const item=(id:string):MaterialRecord=>({id,identityKey:`article:https://example
 function fixture(count=2){
     let revision=1;
     const items=Array.from({length:count},(_,index)=>item(String(index).padStart(2,'0')));
-    const repo={openSnapshot:vi.fn(async()=>({revision,ids:items.map(value=>value.id)})),
-        readSnapshotRecord:vi.fn(async(expected:number,id:string)=>{if(expected!==revision)throw new MaterialError('stale-operation','private');return items.find(value=>value.id===id)??null;}),
-        checkSnapshot:vi.fn(async(expected:number)=>{if(expected!==revision)throw new MaterialError('stale-operation','private');})};
+    const repo={openSnapshot:vi.fn(async()=>({revision,epoch:'test-epoch',ids:items.map(value=>value.id)})),
+        readSnapshotRecord:vi.fn(async(expected:{revision:number;epoch:string},id:string)=>{if(expected.revision!==revision)throw new MaterialError('stale-operation','private');return items.find(value=>value.id===id)??null;}),
+        checkSnapshot:vi.fn(async(expected:{revision:number;epoch:string})=>{if(expected.revision!==revision)throw new MaterialError('stale-operation','private');})};
     const bridge=createMaterialPageBridge({repository:repo,ready:Promise.resolve(),isPrivateContext:()=>false,
         isTrustedSender:sender=>sender?.id==='extension'&&sender.url==='chrome-extension://extension/options.html'});
     return {bridge,repo,items,mutate(){revision++;}};
@@ -395,7 +395,7 @@ describe('trusted material page bridge',()=>{
         const {repo}=fixture(1);let replacement:Port|undefined,evicted=0;
         repo.openSnapshot.mockImplementationOnce(async(signal?:AbortSignal)=>{
             signal?.addEventListener('abort',()=>{evicted++;replacement?.disconnect();},{once:true});
-            return {revision:1,ids:['00']};
+            return {revision:1,epoch:'test-epoch',ids:['00']};
         });
         const bridge=createMaterialPageBridge({repository:repo,ready:Promise.resolve(),isPrivateContext:()=>false,isTrustedSender:()=>true,maxSessions:1});
         expect(complete(await transfer(bridge,start())).count).toBe(1);await tick();
@@ -454,8 +454,8 @@ describe('trusted material page bridge',()=>{
         expect(complete(await transfer(bridge,start())).count).toBe(2);bridge.dispose();
     });
     it('waits for an uncooperative database read before resolving bridge disposal',async()=>{
-        const {repo}=fixture();let finish!:(snapshot:{revision:number;ids:string[]})=>void,began!:()=>void;
-        const held=new Promise<{revision:number;ids:string[]}>(resolve=>{finish=resolve;}),started=new Promise<void>(resolve=>{began=resolve;});
+        const {repo}=fixture();let finish!:(snapshot:{revision:number;epoch:string;ids:string[]})=>void,began!:()=>void;
+        const held=new Promise<{revision:number;epoch:string;ids:string[]}>(resolve=>{finish=resolve;}),started=new Promise<void>(resolve=>{began=resolve;});
         repo.openSnapshot.mockImplementationOnce(async()=>{began();return held;});
         const bridge=createMaterialPageBridge({repository:repo,ready:Promise.resolve(),isPrivateContext:()=>false,isTrustedSender:()=>true});
         const [server,client]=pair();bridge.connect(server);const read=receiveMaterialRead(client as MaterialReadPort,()=>{}).catch(error=>error);
@@ -463,7 +463,7 @@ describe('trusted material page bridge',()=>{
         const disposal=bridge.dispose().then(()=>{drained=true;});const repeated=bridge.dispose();
         expect(await read).toBeInstanceOf(Error);await tick();expect(drained).toBe(false);
         const [blocked]=pair();bridge.connect(blocked);expect(blocked.closed).toBe(true);
-        finish({revision:1,ids:[]});await Promise.all([disposal,repeated]);expect(drained).toBe(true);
+        finish({revision:1,epoch:'test-epoch',ids:[]});await Promise.all([disposal,repeated]);expect(drained).toBe(true);
     });
     it('shares a single disposal promise if port disconnection synchronously reenters disposal',async()=>{
         const {bridge}=fixture(),[server]=pair();bridge.connect(server);const disconnect=server.disconnect.bind(server);

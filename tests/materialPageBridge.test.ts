@@ -3,6 +3,7 @@ import {createMaterialPageBridge,type MaterialPagePort} from '@/src/features/voc
 import {MATERIAL_PAGE_MAX_LINE_BYTES,MATERIAL_PAGE_PORT_NAME,type MaterialPageMessage} from '@/src/features/vocabulary/materialPageProtocol';
 import {receiveMaterialRead,type MaterialReadPort} from '@/src/features/vocabulary/materialReadTransport';
 import {MaterialError} from '@/src/features/vocabulary/materialModel';
+import * as sessions from '@/src/features/vocabulary/materialPageSession';
 import type {MaterialRecord} from '@/src/features/vocabulary/materialProtocol';
 
 type Fn=(...args:any[])=>void;
@@ -43,6 +44,28 @@ const header=(messages:MaterialPageMessage[])=>messages.find(value=>value.type==
 const complete=(messages:MaterialPageMessage[])=>messages.find(value=>value.type==='complete') as Extract<MaterialPageMessage,{type:'complete'}>;
 
 describe('trusted material page bridge',()=>{
+    it.each(['page','topics'] as const)('does not deliver a %s result when the port closes as the session resolves',async operation=>{
+        const actual=sessions.createMaterialPageSession;
+        let onResult:(()=>void)|undefined;
+        const factory=vi.spyOn(sessions,'createMaterialPageSession').mockImplementation(async(...args)=>{
+            const session=await actual(...args);
+            return {...session,
+                async getPage(options){const result=await session.getPage(options);onResult?.();return result;},
+                async getTopicsPage(options){const result=await session.getTopicsPage(options);onResult?.();return result;}};
+        });
+        const {bridge,items}=fixture(1);items[0].topics=['alpha'];
+        try{
+            const token=header(await transfer(bridge,start())).capability!;await tick();
+            const [server,client]=pair();bridge.connect(server);const chunks:Uint8Array[]=[];
+            const read=receiveMaterialRead(client as MaterialReadPort,bytes=>{chunks.push(bytes);}).catch(error=>error);
+            onResult=()=>client.disconnect();
+            client.postMessage(operation==='page'?page(token,0):topics(token,0));
+            expect(await read).toBeInstanceOf(Error);await tick();
+            expect(chunks).toEqual([]);
+            onResult=undefined;
+            expect(complete(await transfer(bridge,start())).count).toBe(1);
+        }finally{onResult=undefined;await bridge.dispose();factory.mockRestore();}
+    });
     it('opens a bounded session, reads additional pages and closes idempotently',async()=>{
         const {bridge}=fixture(31);
         const first=await transfer(bridge,start());const h=header(first);

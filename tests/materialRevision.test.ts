@@ -370,6 +370,23 @@ describe('material snapshot revisions', () => {
 });
 
 describe('snapshot transaction cancellation', () => {
+    it.each(['storage failure','cancellation'] as const)('releases the listener after a snapshot %s and allows retry',async outcome=>{
+        const db=database(),repo=new MaterialRepository(db),controller=new AbortController();
+        const snapshot=await repo.openSnapshot(),error=Error('snapshot storage failed');
+        const remove=vi.spyOn(controller.signal,'removeEventListener');
+        const get=vi.spyOn(db.meta,'get').mockImplementation(()=>{
+            if(outcome==='cancellation')controller.abort();
+            return Promise.reject(error) as never;
+        });
+        try {
+            const read=repo.checkSnapshot(snapshot,controller.signal);
+            if(outcome==='cancellation')await expect(read).rejects.toMatchObject({name:'AbortError'});
+            else await expect(read).rejects.toBe(error);
+            expect(remove).toHaveBeenCalledTimes(1);
+            expect(remove).toHaveBeenCalledWith('abort',expect.any(Function));
+        } finally {get.mockRestore();remove.mockRestore();}
+        await expect(repo.checkSnapshot(snapshot)).resolves.toBeUndefined();
+    });
     it('rolls back a first epoch initialization when its transaction is cancelled', async () => {
         const db=database(),repo=new MaterialRepository(db),controller=new AbortController();
         const put=db.meta.put.bind(db.meta);

@@ -26,6 +26,26 @@ function fixture(){
 }
 
 describe('material page background runtime',()=>{
+    it('refuses late bridge repository calls after disposal without reopening storage',async()=>{
+        let facade!:{openSnapshot:(signal?:AbortSignal)=>unknown;readSnapshotRecord:(version:unknown,id:string,signal?:AbortSignal)=>unknown;checkSnapshot:(version:unknown,signal?:AbortSignal)=>unknown};
+        vi.doMock('@/src/features/vocabulary/materialPageBridge',()=>({
+            createMaterialPageBridge:({repository}:{repository:typeof facade})=>{
+                facade=repository;
+                return {connect:()=>true,dispose:async()=>{}};
+            },
+        }));
+        try{
+            vi.resetModules();
+            const {installMaterialPageRuntime:install}=await import('@/src/app/background/materialPageRuntime');
+            const f=fixture(),dispose=install(f.options as never);
+            await dispose();
+            expect(()=>facade.openSnapshot()).toThrow('unavailable');
+            expect(()=>facade.readSnapshotRecord({revision:1},'late')).toThrow('unavailable');
+            expect(()=>facade.checkSnapshot({revision:1})).toThrow('unavailable');
+            expect(f.createRepository).not.toHaveBeenCalled();
+            expect(f.repository.db.close).not.toHaveBeenCalled();
+        } finally {vi.doUnmock('@/src/features/vocabulary/materialPageBridge');vi.resetModules();}
+    });
     it('does not start a repository read when disposal reenters snapshot revision access',async()=>{
         const f=fixture();let dispose!:()=>Promise<void>,stopping!:Promise<void>;
         f.repository.openSnapshot.mockResolvedValueOnce({ids:['id'],get revision(){stopping=dispose();return 1;}});

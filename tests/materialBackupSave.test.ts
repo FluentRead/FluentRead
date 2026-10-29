@@ -53,6 +53,17 @@ describe('material backup save targets', () => {
         await expect(saveMaterialBackup(selected,async()=>{throw Error('must not receive');},{signal:controller.signal})).rejects.toMatchObject({name:'AbortError'});
         expect(target.abort).toHaveBeenCalledOnce();expect(target.commit).not.toHaveBeenCalled();
     });
+    it('ignores a late abort listener when the signal refuses to remove it',async()=>{
+        const controller=new AbortController();
+        const remove=vi.spyOn(controller.signal,'removeEventListener').mockImplementation(()=>{});
+        const target:MaterialBackupSaveTarget={write:vi.fn(async()=>{}),commit:vi.fn(async()=> 'saved' as const),abort:vi.fn(async()=>{})};
+        try {
+            const selected=await waitForMaterialBackupTarget(Promise.resolve(target),controller.signal);
+            controller.abort();
+            expect(selected).toBe(target);
+            expect(target.abort).not.toHaveBeenCalled();
+        } finally {remove.mockRestore();}
+    });
     it('preserves target selection failures without an abort signal',async()=>{
         const failure=Error('permission denied');
         await expect(waitForMaterialBackupTarget(Promise.reject(failure))).rejects.toBe(failure);

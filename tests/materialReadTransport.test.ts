@@ -333,6 +333,13 @@ describe('material read transport',()=>{
     await expect(producer).rejects.toThrow('cancelled');await receiver;
     expect(sent[0].filter((message:any)=>message.type==='end')).toHaveLength(0);
   });
+  it('preserves cancellation when sending a frame synchronously closes its port',async()=>{
+    const {ports,sent,states}=pair(),controller=new AbortController(),post=ports[0].postMessage.bind(ports[0]);
+    ports[0].postMessage=message=>{post(message);controller.abort();};
+    await expect(sendMaterialRead(ports[0],chunks(bytes(1)),{signal:controller.signal})).rejects.toMatchObject({name:'AbortError'});
+    expect(sent[0]).toHaveLength(1);
+    expect(states[0].messages.size).toBe(0);expect(states[0].disconnects.size).toBe(0);
+  });
   it('aborts a cooperative producer when the peer disconnects',async()=>{
     const {ports}=pair();let aborted=false;
     const result=sendMaterialRead(ports[0],async function* (signal){

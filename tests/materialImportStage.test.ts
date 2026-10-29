@@ -647,6 +647,29 @@ describe('committed cleanup corruption notifications',()=>{
     expect(await target.stage.frames.count()).toBe(0);expect(await target.stage.receipts.count()).toBe(0);
     expect(await target.repo.get(imported.id)).not.toBeNull();
   });
+  it('rolls back cleanup if a reentrant transaction adds a receipt without reserving its slot',async()=>{
+    const target=instance(),record=await material('cleanup-reentrant-receipt');
+    const committed=await upload(target.stage,[record]);await target.stage.seal(committed.token);await target.stage.commit(committed.token);
+    await upload(target.stage,[{note:'pending private frame'}]);
+    target.clock.now+=opts.receiptTtlMs;
+    const snapshot={frames:await target.stage.frames.toArray(),sessions:await target.stage.sessions.toArray(),
+      receipts:await target.stage.receipts.toArray(),budget:await target.stage.budgets.get('stage')};
+    let inserted=false;const writes:PromiseLike<unknown>[]=[];
+    const inject=()=>{
+      if(inserted)return;inserted=true;
+      const write=target.stage.receipts.put({...snapshot.receipts[0],id:'injected-receipt'});
+      void write.catch(()=>{});writes.push(write);
+    };
+    target.stage.sessions.hook('deleting',inject);
+    try{await expect(target.stage.cleanup()).rejects.toThrow('budget corruption');}
+    finally{target.stage.sessions.hook('deleting').unsubscribe(inject);}
+    await Promise.allSettled(writes);expect(inserted).toBe(true);
+    expect(await target.stage.frames.toArray()).toEqual(snapshot.frames);
+    expect(await target.stage.sessions.toArray()).toEqual(snapshot.sessions);
+    expect(await target.stage.receipts.toArray()).toEqual(snapshot.receipts);
+    expect(await target.stage.budgets.get('stage')).toEqual(snapshot.budget);
+    expect(await target.stage.cleanup()).toMatchObject({sessions:1,receipts:1});
+  });
   it('does not report ordinary expiry as corruption',async()=>{
     const notified=vi.fn(),clock={now:100},target=instance(clock,{onCleanupCorruption:notified});
     await upload(target.stage,[{note:'ordinary staged note'}]);clock.now+=opts.ttlMs;

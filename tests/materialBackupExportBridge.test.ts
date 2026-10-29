@@ -12,6 +12,8 @@ import {createMaterialBackupExportBridge, type MaterialBackupExportPort} from '@
 import {receiveMaterialBackupExport} from '@/src/features/vocabulary/materialBackupExportClient';
 import {MATERIAL_BACKUP_EXPORT_PORT_NAME} from '@/src/features/vocabulary/materialBackupExportProtocol';
 import {sendMaterialRead, type MaterialReadPort} from '@/src/features/vocabulary/materialReadTransport';
+import * as readTransport from '@/src/features/vocabulary/materialReadTransport';
+import * as backupExport from '@/src/features/vocabulary/materialBackupExport';
 import {chooseMaterialBackupTarget,saveMaterialBackup,type MaterialBackupWritable} from '@/src/features/vocabulary/materialBackupSave';
 import {isTrustedSettingsSender} from '@/src/app/background/handlers/trustedSettingsSender';
 import {MaterialDatabase,MaterialRepository} from '@/src/features/vocabulary/materialRepository';
@@ -54,6 +56,39 @@ function wireStatistics(records:number,recordBytes:number,maxRecordBytes:number,
 }
 
 describe('material backup export bridge',()=>{
+    it('aborts between the wire header and payload without emitting the payload',async()=>{
+        let finish!:(value:{first?:IteratorResult<Uint8Array>;error?:unknown})=>void;
+        const result=new Promise<{first?:IteratorResult<Uint8Array>;error?:unknown}>(resolve=>{finish=resolve;});
+        const send=vi.spyOn(readTransport,'sendMaterialRead').mockImplementation(async(_port,source)=>{
+            const controller=new AbortController();
+            let first:IteratorResult<Uint8Array>|undefined;
+            try {
+                const stream=typeof source==='function'?source(controller.signal):source;
+                const iterator=stream[Symbol.asyncIterator]();
+                first=await iterator.next();controller.abort();
+                await iterator.next();finish({first});
+            } catch(error) {finish({first,error});}
+        });
+        const {bridge}=setup(),[server,client]=pair();
+        try {
+            bridge.connect(server);client.postMessage(start);
+            const observed=await result;
+            expect(observed.first?.value?.[0]).toBe(1);
+            expect(observed.error).toMatchObject({name:'AbortError'});
+            await bridge.dispose();expect(server.closed).toBe(true);
+        } finally {send.mockRestore();await bridge.dispose();}
+    });
+    it('rejects a completed producer that did not supply backup statistics',async()=>{
+        const producer=vi.spyOn(backupExport,'streamMaterialBackup').mockImplementation(async function*(){});
+        const {bridge}=setup(),[server,client]=pair();
+        try {
+            bridge.connect(server);
+            const received=receiveMaterialBackupExport(client as MaterialReadPort,async()=>{});
+            client.postMessage(start);
+            await expect(received).rejects.toMatchObject({code:'storage-error'});
+            expect(producer).toHaveBeenCalledOnce();
+        } finally {producer.mockRestore();await bridge.dispose();}
+    });
     it('keeps receiver setup failures in the public Promise contract',async()=>{
         const [,client]=pair(),failure=Error('listener setup failed');
         client.onMessage.addListener=()=>{throw failure;};

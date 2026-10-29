@@ -319,6 +319,21 @@ describe('material snapshot revisions', () => {
 });
 
 describe('snapshot transaction cancellation', () => {
+    it('cancels at fake IndexedDB transaction completion without leaving the reader unusable', async () => {
+        const db=database(),repo=new MaterialRepository(db),controller=new AbortController();
+        await db.open();
+        const get=db.meta.get.bind(db.meta);let observedCompletion=false;
+        const spy=vi.spyOn(db.meta,'get').mockImplementation((...args)=>{
+            const native=Dexie.currentTransaction?.idbtrans;
+            native?.addEventListener('complete',()=>{observedCompletion=true;controller.abort();},{capture:true,once:true});
+            return get(...args);
+        });
+        try {
+            await expect(repo.checkSnapshot(0,controller.signal)).rejects.toMatchObject({name:'AbortError'});
+            expect(observedCompletion).toBe(true);
+        } finally {spy.mockRestore();}
+        await expect(repo.checkSnapshot(0)).resolves.toBeUndefined();
+    });
     it('cancels a snapshot check while its database transaction is starting', async () => {
         const db=database(),repo=new MaterialRepository(db),controller=new AbortController();
         const pending=repo.checkSnapshot(0,controller.signal);

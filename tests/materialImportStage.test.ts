@@ -57,6 +57,24 @@ async function upload(stage:ReturnType<typeof createStage>, records:unknown[], c
 const deferred=()=>{let resolve!:()=>void;const promise=new Promise<void>(done=>resolve=done);return {promise,resolve};};
 
 describe('clearing materials and import staging',()=>{
+  it('rolls back acknowledgement if a reentrant clock invalidates its receipt and budget',async()=>{
+    const db=database();let armed=false,triggered=false,cap!:Capability,stage!:ReturnType<typeof createStage>;
+    const writes:PromiseLike<unknown>[]=[];
+    stage=createStage(db,{limits:opts,clock:()=>{
+      if(armed&&!triggered&&Dexie.currentTransaction){
+        triggered=true;
+        const deletion=stage.receipts.delete(cap.id),adjustment=stage.budgets.put({key:'stage',reserved:0,reservedFrames:0,slots:0});
+        void deletion.catch(()=>{});void adjustment.catch(()=>{});writes.push(deletion,adjustment);
+      }
+      return 100;
+    }});
+    const empty=frameRecords([],opts.frameBytes).manifest;
+    cap=await stage.begin(empty,{generation:0,capturedAt:100});await stage.seal(cap);await stage.commit(cap);
+    armed=true;
+    await expect(stage.acknowledge(cap)).rejects.toThrow('budget corruption');
+    await Promise.allSettled(writes);expect(triggered).toBe(true);
+    expect(await stage.receipts.get(cap.id)).toBeDefined();expect(await stage.budgets.get('stage')).toMatchObject({slots:1});
+  });
   it.each(['bytes','frames'] as const)('rolls back a commit if a reentrant progress observer corrupts the %s budget',async dimension=>{
     const target=instance(),record=await material(`reentrant-budget-${dimension}`),{token,input}=await upload(target.stage,[record]);
     await target.stage.seal(token);

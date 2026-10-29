@@ -67,11 +67,11 @@ function errorCode(error:unknown):MaterialPageErrorCode {
 /** 只发送实际完成的扫描进度，合并快速更新；底层工作仍由调用方跟踪至真正结束。 */
 async function* withProgress<T>(start:(update:(processed:number,total:number)=>void)=>Promise<T>,signal:AbortSignal):AsyncGenerator<Uint8Array,T> {
     let result:{ok:true;value:T}|{ok:false;error:unknown}|undefined,latest:{processed:number;total:number}|undefined;
-    let wake:(()=>void)|undefined,timer:ReturnType<typeof setTimeout>|undefined,last=0;
+    let wake:(()=>void)|undefined,timer:ReturnType<typeof setTimeout>|undefined,last=-Infinity;
     const notify=()=>{wake?.();wake=undefined;};
     const update=(processed:number,total:number)=>{
         latest={processed,total};
-        if(!last||performance.now()-last>=500)notify();
+        if(performance.now()-last>=500)notify();
         else if(timer===undefined)timer=setTimeout(()=>{timer=undefined;notify();},Math.max(0,500-(performance.now()-last)));
     };
     const abort=()=>notify();
@@ -81,7 +81,7 @@ async function* withProgress<T>(start:(update:(processed:number,total:number)=>v
         void Promise.resolve().then(()=>start(update)).then(value=>{result={ok:true,value};notify();},error=>{result={ok:false,error};notify();});
         while(!result){
             if(signal.aborted)throw Error('cancelled');
-            if(latest&&(!last||performance.now()-last>=500)){
+            if(latest&&performance.now()-last>=500){
                 const progress=latest;latest=undefined;last=performance.now();yield message({type:'progress',...progress});continue;
             }
             await new Promise<void>(resolve=>{

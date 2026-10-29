@@ -624,6 +624,31 @@ describe('trusted material page bridge',()=>{
         const output=new TextDecoder().decode(Uint8Array.from(chunks.flatMap(chunk=>[...chunk])));
         expect(output).toContain('"type":"complete"');bridge.dispose();
     });
+    it('coalesces progress when the first update occurs at time zero',async()=>{
+        vi.useFakeTimers({toFake:['setTimeout','clearTimeout','performance']});
+        const now=performance.now.bind(performance),clock=vi.spyOn(performance,'now').mockImplementation(()=>Math.max(0,now()-200));
+        let finishSecond:((value:MaterialRecord|null)=>void)|undefined,finishThird:((value:MaterialRecord|null)=>void)|undefined;
+        let bridge:ReturnType<typeof createMaterialPageBridge>|undefined;
+        try{
+            const {repo,bridge:unused}=fixture(3);await unused.dispose();
+            const original=repo.readSnapshotRecord.getMockImplementation()!;let calls=0;
+            const second=new Promise<MaterialRecord|null>(resolve=>{finishSecond=resolve;}),third=new Promise<MaterialRecord|null>(resolve=>{finishThird=resolve;});
+            repo.readSnapshotRecord.mockImplementation(async(revision,id)=>{calls++;if(calls===2)return second;if(calls===3)return third;return original(revision,id);});
+            bridge=createMaterialPageBridge({repository:repo,ready:Promise.resolve(),isPrivateContext:()=>false,isTrustedSender:()=>true});
+            const [server,client]=pair(),chunks:Uint8Array[]=[];bridge.connect(server);
+            const reading=receiveMaterialRead(client as MaterialReadPort,bytes=>{chunks.push(bytes);}).catch(error=>error);client.postMessage(start());
+            await vi.advanceTimersByTimeAsync(100);
+            const output=()=>new TextDecoder().decode(Uint8Array.from(chunks.flatMap(chunk=>[...chunk])));
+            expect(output()).toContain('"processed":1');
+            finishSecond!(item('01'));await vi.advanceTimersByTimeAsync(100);
+            expect(calls).toBe(3);expect(output()).not.toContain('"processed":2');
+            await vi.advanceTimersByTimeAsync(550);expect(output()).toContain('"processed":2');
+            finishThird!(item('02'));await vi.advanceTimersByTimeAsync(50);expect(await reading).not.toBeInstanceOf(Error);await bridge.dispose();
+        }finally{
+            finishSecond?.(item('01'));finishThird?.(item('02'));
+            try{if(bridge)await bridge.dispose();}finally{clock.mockRestore();vi.useRealTimers();}
+        }
+    });
     it('cancels a coalesced progress update without releasing the unfinished scan',async()=>{
         const {repo}=fixture(3);let finishSecond!:(value:MaterialRecord|null)=>void,finishThird!:(value:MaterialRecord|null)=>void,beginThird!:()=>void;
         const second=new Promise<MaterialRecord|null>(resolve=>{finishSecond=resolve;}),third=new Promise<MaterialRecord|null>(resolve=>{finishThird=resolve;});

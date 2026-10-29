@@ -53,7 +53,7 @@ function isPunctuationToken(token:string,contains:RegExp):boolean {
 }
 
 /** 仅拆出词首闭标点和词尾开标点，词内小数、网址及括号仍保留原词。 */
-function splitEdgePunctuation(tokens:string[]):string[] {
+export function splitEdgePunctuation(tokens:string[]):string[] {
     if(!segmenter)return tokens;
     const result:string[]=[];
     for(let index=0;index<tokens.length;index++){
@@ -70,6 +70,32 @@ function splitEdgePunctuation(tokens:string[]):string[] {
         for(let position=right;position<parts.length;position++)result.push(parts[position]);
     }
     return result;
+}
+
+/** 供绕孔排版识别同一完整字素上的标点，绑定时由调用方保留原行空白。 */
+export function isMangaOpeningToken(token:string):boolean {
+    return OPEN.test(token)||(token.length>1&&!(token.charCodeAt(0)<128&&token.charCodeAt(1)<128)&&isPunctuationToken(token,OPEN_ANY));
+}
+export function isMangaClosingToken(token:string):boolean {
+    return CLOSE.test(token)||(token.length>1&&!(token.charCodeAt(0)<128&&token.charCodeAt(1)<128)&&isPunctuationToken(token,CLOSE_ANY));
+}
+
+/** 判断词首闭标点是否与后文同属一个 token；不拆分字素。 */
+export function hasMangaMixedClosingPrefix(token:string):boolean {
+    return token.length>1&&!CLOSE.test(token)&&CLOSE_ANY.test(token[0]);
+}
+
+/** 无字素分割器时不拆词；可安全识别的词边缘标点需要调用方回退。 */
+export function hasMangaUnboundEdgePunctuation(tokens:string[]):boolean {
+    let hasPrevious=false;
+    for(let index=0;index<tokens.length;index++){
+        const token=tokens[index];
+        if(/^\s+$/u.test(token))continue;
+        if(token.length>1&&((hasPrevious&&hasMangaMixedClosingPrefix(token))
+            || (index+1<tokens.length&&!OPEN.test(token)&&OPEN_ANY.test(token[token.length-1]))))return true;
+        hasPrevious=true;
+    }
+    return false;
 }
 
 function bindPunctuation(tokens: string[]): string[] {

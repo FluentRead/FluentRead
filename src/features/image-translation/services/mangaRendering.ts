@@ -1,7 +1,7 @@
 /**
  * @file src/features/image-translation/services/mangaRendering.ts
  * 文件职责：在整段漫画区域中绘制适合阅读的译文，避免整行逐框放大和复杂背景扩散条纹。
- * 主要内容：保留整段内容和裁剪边界，对白保留横向内边距，按真实 Canvas 整行字形上下界、描边与有界像素余量适配并居中，缺少完整指标时保守沿用行框；原始大标题使用有界大字与高对比描边；边缘采样全部不透明时才允许均匀背景按原始行及描边蒙版清字；清字和绘字共同扣除原图冻结的低 alpha 并集，再在原框内无孔连续矩形完整重排，选择最大可用字号而不切除译文字形；多候选共享分词，按原序预检最大字号后用二分上界跳过必输搜索，保留原候选顺序的平局及页内准入；页内度量以固定字体族下的字重、字号与全文短键复用，仍保持有界缓存；复用原图背景分类，避免修补后被误判成均匀底色而二次铺板。
+ * 主要内容：保留整段内容和裁剪边界，对白保留横向内边距，按真实 Canvas 整行字形上下界、描边与有界像素余量适配并居中，缺少完整指标时保守沿用行框；原始大标题使用有界大字与高对比描边；边缘采样全部不透明时才允许均匀背景按原始行及描边蒙版清字；清字和绘字共同扣除原图冻结的低 alpha 并集；受影响的短段优先在原字号整行中绕孔分配完整词，并以实际绘字像素审计，失败时仅增加一次水平余量；成功复用同一位图，预算或不支持路径沿用无孔连续矩形完整重排，避免切除译文字形；多候选共享分词，按原序预检最大字号后用二分上界跳过必输搜索，保留原候选顺序的平局及页内准入；页内度量以固定字体族下的字重、字号与全文短键复用，仍保持有界缓存；复用原图背景分类，避免修补后被误判成均匀底色而二次铺板。
  * 模块边界：只操作调用方提供的画布和像素，不运行 OCR/翻译、不修改宿主页面；绘制区域局限于识别框，完整原图仍可通过现有按钮对照。
  */
 import type {MangaRegion} from './mangaRegions';
@@ -9,6 +9,8 @@ import {getImageTextColor, getImageTextBackgroundColor} from './rendering';
 import {createMangaTranslationSearch, layoutMangaTranslationText, MANGA_TEXT_FONT} from './mangaTypography';
 import {mangaMaskBoxes} from '../mangaPatchResult';
 import {mangaAlphaClearRects,type MangaAlphaProtection} from './mangaAlphaProtection';
+import {planMangaTextFlow} from './mangaTextFlow';
+import {createMangaGlyphRasterLedger,rasterizeMangaGlyphs} from './mangaGlyphRaster';
 
 export interface MangaBackground {color: string; uniform: boolean}
 
@@ -42,9 +44,10 @@ export function drawMangaTranslations(context: CanvasRenderingContext2D, pixels:
     width: number, height: number, regions: Array<MangaRegion & {sourceText?: string}>, repaired = false, backgrounds?: MangaBackground[],protection?:MangaAlphaProtection) {
     if (![width, height].every(value => Number.isSafeInteger(value) && value > 0) || pixels.length < width * height * 4) return;
     // 本次绘制的字体族固定；短键保留字重、实际字号和全文，不跨页面或设备复用。
-    const measurements = new Map<string, {width:number;ascent:number;descent:number}>();
+    const measurements = new Map<string, {width:number;ascent:number;descent:number;actualBoundingBoxLeft:number;actualBoundingBoxRight:number}>();
     let cachedCharacters = 0;
-    const alphaLayoutBudget={remaining:1_048_576};let additionalLayouts=0;
+    const alphaLayoutBudget={remaining:1_048_576};let additionalLayouts=0,flowRegions=0;
+    let glyphLedger:ReturnType<typeof createMangaGlyphRasterLedger>|undefined;
     if(protection)context.save();
     try {
     // 共享全页裁剪只构造一次；区域恢复继续沿用已有 save/restore，避免路径按区域数放大。
@@ -76,7 +79,7 @@ export function drawMangaTranslations(context: CanvasRenderingContext2D, pixels:
             const maxSize = Math.min(region.fontSize * 1.05,width * (display ? .10 : .034));
             // 保留横向余量；OCR 框是字形边界，竖向空间由实际字形和描边适配，不再重复扣除内边距。
             let measuredFont = '', keyFontSize = NaN, font = '', keyPrefix = '', logicalPrefixLength = 0;
-            context.textBaseline = 'alphabetic';
+            context.textBaseline = 'alphabetic';context.textAlign = 'left';
             const measure = (text:string,size:number) => {
                 if (keyFontSize !== size) {
                     keyFontSize = size; font = `${weight} ${size}px ${MANGA_TEXT_FONT}`;
@@ -87,7 +90,8 @@ export function drawMangaTranslations(context: CanvasRenderingContext2D, pixels:
                 if (cached !== undefined) return cached;
                 if (measuredFont !== font) {context.font = font; measuredFont = font;}
                 const metrics = context.measureText(text);
-                const value = {width:metrics.width,ascent:metrics.actualBoundingBoxAscent,descent:metrics.actualBoundingBoxDescent};
+                const value = {width:metrics.width,ascent:metrics.actualBoundingBoxAscent,descent:metrics.actualBoundingBoxDescent,
+                    actualBoundingBoxLeft:metrics.actualBoundingBoxLeft,actualBoundingBoxRight:metrics.actualBoundingBoxRight};
                 // 键更短也不增加缓存准入量，仍按原完整字体键的长度计费。
                 const logicalCharacters = logicalPrefixLength + text.length;
                 if (measurements.size < 8192 && cachedCharacters + logicalCharacters <= 131072) {measurements.set(key,value); cachedCharacters += logicalCharacters;}
@@ -110,6 +114,39 @@ export function drawMangaTranslations(context: CanvasRenderingContext2D, pixels:
             const available=protection?mangaAlphaClearRects(protection,bounds,alphaLayoutBudget):[bounds];
             if(!available.length)throw new Error('漫画透明图案遮挡译文区域，已保留原图');
             const affected=available.length!==1||available[0]!==bounds;
+            // 只有实际受孔洞影响的短段进入额外路径；普通单框不分词、不建栅格画布。
+            // 全页至多64段，每段最多两个固定计划；像素、读回和相交检查另共用累计账本。
+            let flowed=false;
+            if(affected&&region.text.length<=4096&&++flowRegions<=64){
+                const whole=fit(bounds),layout=whole.layout;
+                if(whole.fits&&layout.ink&&layout.lines.length){
+                    const ink=sampled.uniform?getImageTextColor(background):'#111111';
+                    const ref={layout,fontSize:layout.fontSize,lineWidth:lineWidth(layout.fontSize),box:bounds,
+                        family:MANGA_TEXT_FONT,style:String(weight)};
+                    for(const safety of [0,1] as const){
+                        const plan=planMangaTextFlow(region.text,ref,protection!.rectangles,text=>{
+                            const metrics=measure(text,layout.fontSize);
+                            return {...metrics,actualBoundingBoxAscent:metrics.ascent,actualBoundingBoxDescent:metrics.descent};
+                        },safety);
+                        if(!plan.accepted)break;
+                        const raster=rasterizeMangaGlyphs(plan,bounds,protection!.rectangles,{
+                            fillStyle:ink==='#111827'?'#111111':ink,strokeStyle:sampled.uniform?background:'#ffffff',
+                        },glyphLedger??=createMangaGlyphRasterLedger());
+                        if(raster.kind==='accepted'){
+                            let drawn=false;
+                            try{context.drawImage(raster.canvas,raster.x,raster.y);drawn=true;}
+                            finally{
+                                // drawImage首因不能被随后释放异常覆盖；正常绘制时释放错误仍向上传播。
+                                if(drawn)raster.dispose();else try{raster.dispose();}catch{/* 保留同一原生绘制异常。 */}
+                            }
+                            flowed=true;break;
+                        }
+                        // 真实字形越界才准许h1；资源不足直接保留连续矩形路径。
+                        if(raster.kind!=='unsafe')break;
+                    }
+                }
+            }
+            if(flowed)continue;
             let best:ReturnType<typeof fit>|undefined;
             if(!affected||available.length===1||!(maxSize>.99)){
                 best=fit(available[0]);if(affected&&!best.fits)best=undefined;

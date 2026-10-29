@@ -9,6 +9,11 @@ overrides:
   react: 18.3.1
   react-dom: 18.3.1
 
+patchedDependencies:
+  ppu-paddle-ocr@6.6.0:
+    hash: uyhf5xrse2irby66xw7xu3mrw4
+    path: patches/ppu-paddle-ocr@6.6.0.patch
+
 importers:
 
   .:
@@ -108,7 +113,7 @@ importers:
         version: 3.29.4
       ppu-paddle-ocr:
         specifier: 6.6.0
-        version: 6.6.0(onnxruntime-node@1.24.3)(onnxruntime-web@1.23.2)
+        version: 6.6.0(patch_hash=uyhf5xrse2irby66xw7xu3mrw4)(onnxruntime-node@1.24.3)(onnxruntime-web@1.23.2)
       saxes:
         specifier: 6.0.0
         version: 6.0.0
@@ -7400,7 +7405,7 @@ snapshots:
       '@napi-rs/canvas': 1.0.10
       '@techstark/opencv-js': 5.0.0-release.1
 
-  ppu-paddle-ocr@6.6.0(onnxruntime-node@1.24.3)(onnxruntime-web@1.23.2):
+  ppu-paddle-ocr@6.6.0(patch_hash=uyhf5xrse2irby66xw7xu3mrw4)(onnxruntime-node@1.24.3)(onnxruntime-web@1.23.2):
     dependencies:
       ppu-ocv: 4.0.0
     optionalDependencies:

@@ -358,6 +358,8 @@ export default defineConfig({
                 'src/features/image-translation/content/mangaSession.ts',
                 'src/features/image-translation/services/mangaRegions.ts',
                 'src/features/image-translation/services/mangaRendering.ts',
+                'src/features/image-translation/services/mangaTextFlow.ts',
+                'src/features/image-translation/services/mangaGlyphRaster.ts',
                 'src/features/image-translation/services/mangaOcr.ts',
                 'src/features/image-translation/services/mangaOcrColor.ts',
                 'src/features/image-translation/services/mangaOcrDeskew.ts',

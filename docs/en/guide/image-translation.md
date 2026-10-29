@@ -26,6 +26,8 @@ By default, FluentRead prepares the next **3 images** already loaded by the webs
 
 Failed pages keep their originals while other pages continue. Switch to originals and back to retry. Changing chapters, leaving the page, or disabling manga translation stops old work. Image translation and floating-button switches are independent of manga; adjust its separate entry under **Standalone manga button**.
 
+When the original background opacity can be established, transparent cutouts are protected. Text flows around them inside the original text box, preserving its size and whole words where possible. Less available space can still require smaller text; open the text panel to read the full translation. Very complex cutouts or a fully blocked text area leave the original page with an error message.
+
 Search **Supported websites** by name or domain and check the reader type. Some support continuous translation; others offer **Select manga area to translate**, which requires area translation and a drag over visible artwork. Listing a site does not verify every chapter. Login, paid, and protected content still depends on what the website can display. Elsewhere, try a single image or [area translation](/en/guide/area-translation).
 
 <details class="guide-details">
@@ -49,6 +51,7 @@ Small or decorative text, names, tilted lettering, and background repairs can be
 
 - **No icon:** avatars, icons, emoji, video previews, and small images are usually skipped. Use the context menu or open a clear original. A viewer or menu covering an image temporarily hides its controls.
 - **Incorrect recognition:** check the source language and use a clear original. Complex tables, decorative fonts, and vertical text outside Japanese are harder to recognize. Check names, numbers, and units.
+- **Recognition fails:** retry as prompted. Failed manga pages retain their originals; switch to originals and back to retry.
 - **Translation fails:** retry as prompted or change the image translation service. After an extension update or reload, refresh the webpage first.
 - **A local model fails:** use **Adjust local model** to check resources and supported languages, or **Change image translation service**. Return to the image and retry after making changes. Text is not automatically sent to an online service instead.
 
